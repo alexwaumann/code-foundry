@@ -90,7 +90,7 @@ func openSettings(t *testing.T) *settings.Store {
 	return st
 }
 
-// Settings changes reach the registry before they are published, and session.new's
+// Settings changes reach the registry before they are published, and thread.new's
 // model/effort defaults and keybinding overrides show up in List.
 func TestApplySettings(t *testing.T) {
 	st := openSettings(t)
@@ -133,7 +133,7 @@ func TestApplySettings(t *testing.T) {
 	if c.Args[0].Default != "claude-opus-4-8[1m]" || c.Args[1].Default != "high" || !slices.Equal(c.Keybindings, []string{"cmd+t"}) {
 		t.Errorf("thread.new = defaults %q/%q keybindings %v", c.Args[0].Default, c.Args[1].Default, c.Keybindings)
 	}
-	// The pull request session commands start sessions too, with the same defaults.
+	// The pull request thread commands start threads too, with the same defaults.
 	for _, name := range []string{"pr.ask", "pr.explain", "pr.fix.findings"} {
 		c, _ := reg.Get(name)
 		if m, e := argDefault(c, "model"), argDefault(c, "effort"); m != "claude-opus-4-8[1m]" || e != "high" {

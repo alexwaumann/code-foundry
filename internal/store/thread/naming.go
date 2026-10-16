@@ -17,8 +17,8 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/model"
 )
 
-// Namer turns a session's first user message into a short natural title, such as
-// "Fix the login redirect". The title is the session's name; a new worktree's branch
+// Namer turns a thread's first user message into a short natural title, such as
+// "Fix the login redirect". The title is the thread's name; a new worktree's branch
 // is cf/<slugify(title)>.
 type Namer func(ctx context.Context, firstMessage string) (string, error)
 
@@ -75,15 +75,15 @@ func namingArgs(m string, minimal bool) []string {
 // for Claude's longest policy refusal, which names the flags and the setting.
 const maxNamingErrDetail = 4096
 
-// sessionKey carries the session id into the namer for its log lines.
+// threadKey carries the thread id into the namer for its log lines.
 type threadKey struct{}
 
-// withNamingSession returns ctx tagged with the session a naming call is for.
+// withNamingThread returns ctx tagged with the thread a naming call is for.
 func withNamingThread(ctx context.Context, id string) context.Context {
 	return context.WithValue(ctx, threadKey{}, id)
 }
 
-// namingSession returns the session id withNamingSession put in ctx, or "".
+// namingThread returns the thread id withNamingThread put in ctx, or "".
 func namingThread(ctx context.Context) string {
 	id, _ := ctx.Value(threadKey{}).(string)
 	return id
@@ -93,7 +93,7 @@ func namingThread(ctx context.Context) string {
 type namingModelKey struct{}
 
 // WithNamingModel returns ctx asking ClaudeNamer to name with model m (a model
-// registry value). The daemon sets it per call from sessions.naming_model, so the setting
+// registry value). The daemon sets it per call from threads.naming_model, so the setting
 // applies without a restart.
 func WithNamingModel(ctx context.Context, m string) context.Context {
 	return context.WithValue(ctx, namingModelKey{}, m)
@@ -114,7 +114,7 @@ const namingPrompt = "Write a short title of 3 to 6 words that names the coding 
 	"no quotes and no markdown. Examples: Fix the login redirect; Add release channel switcher. " +
 	"Reply with only the title.\n\nRequest:\n"
 
-// ClaudeNamer names sessions with an independent, non-interactive claude call:
+// ClaudeNamer names threads with an independent, non-interactive claude call:
 //
 //	claude -p --model <model> --effort low --no-session-persistence --safe-mode --tools "" -- <prompt>
 //

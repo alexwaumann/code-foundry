@@ -35,7 +35,7 @@ func (h *Thread) Create(ctx context.Context, req *connect.Request[v1.CreateThrea
 	return connect.NewResponse(&v1.CreateThreadResponse{Thread: threadToProto(s)}), nil
 }
 
-// Fork continues a session's conversation in a new session.
+// Fork continues a thread's conversation in a new thread.
 func (h *Thread) Fork(ctx context.Context, req *connect.Request[v1.ForkThreadRequest]) (*connect.Response[v1.ForkThreadResponse], error) {
 	s, err := h.store.Fork(ctx, req.Msg.GetId(), req.Msg.GetName())
 	if err != nil {
@@ -44,7 +44,7 @@ func (h *Thread) Fork(ctx context.Context, req *connect.Request[v1.ForkThreadReq
 	return connect.NewResponse(&v1.ForkThreadResponse{Thread: threadToProto(s)}), nil
 }
 
-// List returns every session, and the retired usage ledger.
+// List returns every thread, and the retired usage ledger.
 func (h *Thread) List(context.Context, *connect.Request[v1.ListThreadsRequest]) (*connect.Response[v1.ListThreadsResponse], error) {
 	snap := h.store.Snapshot()
 	res := &v1.ListThreadsResponse{Threads: threadsToProto(snap)}
@@ -54,7 +54,7 @@ func (h *Thread) List(context.Context, *connect.Request[v1.ListThreadsRequest]) 
 	return connect.NewResponse(res), nil
 }
 
-// Get returns one session.
+// Get returns one thread.
 func (h *Thread) Get(ctx context.Context, req *connect.Request[v1.GetThreadRequest]) (*connect.Response[v1.GetThreadResponse], error) {
 	s, err := h.store.Get(ctx, req.Msg.GetId())
 	if err != nil {
@@ -107,7 +107,7 @@ func (h *Thread) Snooze(ctx context.Context, req *connect.Request[v1.SnoozeThrea
 	return connect.NewResponse(&v1.SnoozeThreadResponse{Thread: threadToProto(s)}), nil
 }
 
-// Close ends the process gracefully; it returns once the session is DISCONNECTED. No
+// Close ends the process gracefully; it returns once the thread is DISCONNECTED. No
 // command calls it (docs/notes/thread-lifecycle.md); kept for compatibility.
 func (h *Thread) Close(ctx context.Context, req *connect.Request[v1.CloseThreadRequest]) (*connect.Response[v1.CloseThreadResponse], error) {
 	if err := h.store.Close(ctx, req.Msg.GetId()); err != nil {
@@ -116,7 +116,7 @@ func (h *Thread) Close(ctx context.Context, req *connect.Request[v1.CloseThreadR
 	return connect.NewResponse(&v1.CloseThreadResponse{}), nil
 }
 
-// Reconnect resumes a DISCONNECTED session without a prompt. No command calls it (a
+// Reconnect resumes a DISCONNECTED thread without a prompt. No command calls it (a
 // message starts a stopped thread); kept for compatibility.
 func (h *Thread) Reconnect(ctx context.Context, req *connect.Request[v1.ReconnectThreadRequest]) (*connect.Response[v1.ReconnectThreadResponse], error) {
 	s, err := h.store.Reconnect(ctx, req.Msg.GetId())
@@ -126,7 +126,7 @@ func (h *Thread) Reconnect(ctx context.Context, req *connect.Request[v1.Reconnec
 	return connect.NewResponse(&v1.ReconnectThreadResponse{Thread: threadToProto(s)}), nil
 }
 
-// Remove forgets a session, closing it first if needed.
+// Remove forgets a thread, closing it first if needed.
 func (h *Thread) Remove(ctx context.Context, req *connect.Request[v1.RemoveThreadRequest]) (*connect.Response[v1.RemoveThreadResponse], error) {
 	if err := h.store.Remove(ctx, req.Msg.GetId()); err != nil {
 		return nil, threadError(err)
@@ -144,7 +144,7 @@ func (h *Thread) RunIn(ctx context.Context, req *connect.Request[v1.RunInThreadR
 	return connect.NewResponse(&v1.RunInThreadResponse{Thread: threadToProto(s)}), nil
 }
 
-// Watch sends a snapshot, then every session event. If the client falls behind and
+// Watch sends a snapshot, then every thread event. If the client falls behind and
 // events are dropped, it sends a fresh snapshot.
 func (h *Thread) Watch(ctx context.Context, _ *connect.Request[v1.WatchThreadsRequest], stream *connect.ServerStream[v1.ThreadListEvent]) error {
 	// Subscribe first so nothing published between snapshot and stream is lost. Each
@@ -176,7 +176,7 @@ func (h *Thread) Watch(ctx context.Context, _ *connect.Request[v1.WatchThreadsRe
 	}
 }
 
-// sessionEventToProto converts a bus event (or a *thread.Snapshot) to the wire event.
+// threadListEventToProto converts a bus event (or a *thread.Snapshot) to the wire event.
 func threadListEventToProto(ev thread.Event) *v1.ThreadListEvent {
 	switch e := ev.(type) {
 	case *thread.Snapshot:
@@ -269,7 +269,7 @@ func threadToProto(s thread.Thread) *v1.Thread {
 	return p
 }
 
-// sessionError maps store errors to Connect codes.
+// threadError maps store errors to Connect codes.
 func threadError(err error) error {
 	var ce *connect.Error
 	if errors.As(err, &ce) {

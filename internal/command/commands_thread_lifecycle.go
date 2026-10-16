@@ -15,20 +15,20 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/model"
 )
 
-// Models and effort levels offered for new sessions. Models come from the registry
+// Models and effort levels offered for new threads. Models come from the registry
 // (internal/model): pinned ids with the 1M suffix ("claude-opus-4-8[1m]"). From
 // `claude --help` (Claude Code 2.1.294): --effort takes low, medium, high, xhigh, max.
-// The SessionService API also accepts full model names outside the registry.
+// The ThreadService API also accepts full model names outside the registry.
 var (
 	ThreadModels  = model.Values()
 	ThreadEfforts = []string{"low", "medium", "high", "xhigh", "max"}
 )
 
-// sessionModelHelp describes the model arg; the enum values list the registry.
+// threadModelHelp describes the model arg; the enum values list the registry.
 const threadModelHelp = "Model: a claude-* id with the 1M context suffix; quote it in the shell ('claude-opus-4-8[1m]')"
 
-// SessionPermissions are session.new's permission values, mapped to the claude
-// --permission-mode they select by sessionPermissionModes. Full access
+// ThreadPermissions are thread.new's permission values, mapped to the claude
+// --permission-mode they select by threadPermissionModes. Full access
 // (bypassPermissions) is deliberately not offered.
 var ThreadPermissions = []string{"supervised", "accept-edits", "auto"}
 
@@ -53,7 +53,7 @@ func hasThread(c Context) bool { return c.ActiveThreadID != "" }
 
 func hasRepoOrWorktree(c Context) bool { return c.ActiveRepoID != "" || c.ActiveWorktreePath != "" }
 
-// canStartThread is session.new's availability: a GUI caller needs an active
+// canStartThread is thread.new's availability: a GUI caller needs an active
 // repository or worktree, or the composer (whose target may be no project at all). A
 // CLI caller (no active view) names everything with flags, and --workspace, --repos or
 // --no-project alone are enough, which When cannot see, so Run validates instead.
@@ -61,7 +61,7 @@ func canStartThread(c Context) bool {
 	return hasRepoOrWorktree(c) || c.ActiveView == "" || c.ActiveView == "compose"
 }
 
-// noProjectAlone refuses session.new's no-project with any arg that places the thread
+// noProjectAlone refuses thread.new's no-project with any arg that places the thread
 // in a project or workspace.
 func noProjectAlone(a Args) error {
 	for _, name := range []string{"repo", "worktree", "workspace", "repos", "new-worktree", "base"} {
@@ -72,7 +72,7 @@ func noProjectAlone(a Args) error {
 	return nil
 }
 
-// sessionLabel is "name (id)" or just the id.
+// threadLabel is "name (id)" or just the id.
 func threadLabel(s *v1.Thread) string {
 	if s.GetName() != "" {
 		return s.GetName() + " (" + s.GetId() + ")"
@@ -80,7 +80,7 @@ func threadLabel(s *v1.Thread) string {
 	return s.GetId()
 }
 
-// linkedPRs is session.list's PRS cell: "#5,#6", each prefixed with its repository's
+// linkedPRs is thread.list's PRS cell: "#5,#6", each prefixed with its repository's
 // name when the thread linked pull requests in more than one; "-" when none.
 func linkedPRs(s *v1.Thread) string {
 	links := s.GetLinkedPullRequests()
@@ -99,7 +99,7 @@ func linkedPRs(s *v1.Thread) string {
 	return strings.Join(out, ",")
 }
 
-// listStatus is session.list's STATUS cell: the status, with the reason for ERROR
+// listStatus is thread.list's STATUS cell: the status, with the reason for ERROR
 // ("error (interrupted)").
 func listStatus(s *v1.Thread) string {
 	st := strings.ToLower(strings.TrimPrefix(s.GetStatus().String(), "THREAD_STATUS_"))
@@ -109,7 +109,7 @@ func listStatus(s *v1.Thread) string {
 	return st
 }
 
-// listContext is session.list's CONTEXT cell for a thread with a result: its
+// listContext is thread.list's CONTEXT cell for a thread with a result: its
 // context size and whether the prompt cache is still warm at now ("25.7K · cache
 // expires in 42 min", "25.7K · cache expired"); "-" otherwise.
 func listContext(s *v1.Thread, now time.Time) string {
@@ -138,11 +138,11 @@ func minutesLeft(d time.Duration) string {
 	}
 }
 
-// RegisterThreadLifecycle registers session.new, session.list, session.focus, session.rename,
-// session.fork, session.remove, session.run-in, session.pin, session.archive, and
-// session.snooze. There is no close or reconnect: a message starts a stopped thread and
+// RegisterThreadLifecycle registers thread.new, thread.list, thread.focus, thread.rename,
+// thread.fork, thread.remove, thread.run-in, thread.pin, thread.archive, and
+// thread.snooze. There is no close or reconnect: a message starts a stopped thread and
 // the daemon stops idle ones (docs/notes/thread-lifecycle.md). The user-facing word is "thread" (titles, descriptions, messages);
-// command names and identifiers keep "session".
+// command names and identifiers keep "thread".
 func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextThread, Description: "Thread id"}
 	focus := func(id string) int {

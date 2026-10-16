@@ -10,7 +10,7 @@ import (
 )
 
 // A thread's subagent runs (docs/notes/agents-1-daemon.md): ThreadItemsSnapshot.agents,
-// ThreadEvent.agents, and the Session's running counts.
+// ThreadEvent.agents, and the Thread's running counts.
 
 var agentStatuses = map[thread.AgentStatus]v1.ThreadAgentStatus{
 	thread.AgentRunning: v1.ThreadAgentStatus_THREAD_AGENT_STATUS_RUNNING,

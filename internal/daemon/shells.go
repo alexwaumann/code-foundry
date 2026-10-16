@@ -34,7 +34,7 @@ type shellReaperOptions struct {
 	// DirGone reports whether a worktree directory no longer exists. Default: os.Stat
 	// fails with fs.ErrNotExist.
 	DirGone func(path string) bool
-	// RepoExists and SessionExists let the sweep remove the shells of an unregistered
+	// RepoExists and ThreadExists let the sweep remove the shells of an unregistered
 	// project or a removed thread whose event was dropped. Nil: assume it exists.
 	RepoExists   func(id string) bool
 	ThreadExists func(id string) bool

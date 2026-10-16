@@ -11,7 +11,7 @@ import (
 // Linked pull requests (docs/notes/linked-prs.md).
 //
 // Claude Code writes a "pr-link" record to the session's transcript whenever it sees a
-// pull request for the session's repository (one it created, one a subagent created in
+// pull request for the thread's repository (one it created, one a subagent created in
 // another worktree, one named in a prompt):
 //
 //	{"type":"pr-link","sessionId":"…","prNumber":5,"prUrl":"https://github.com/o/r/pull/5",
@@ -19,10 +19,10 @@ import (
 //
 // The record is re-emitted at nearly every turn boundary for the rest of the session
 // and tracks the latest pull request seen, so it can flip back to an earlier one. A
-// session's links are therefore every distinct URL, deduplicated by URL, in first-seen
+// thread's links are therefore every distinct URL, deduplicated by URL, in first-seen
 // order, and never removed.
 
-// LinkedPullRequest is a pull request Claude linked to the session.
+// LinkedPullRequest is a pull request Claude linked to the thread.
 type LinkedPullRequest struct {
 	Slug     string // "owner/name"
 	Number   int
@@ -88,8 +88,8 @@ func scanPRLinks(path string, limit int64) ([]LinkedPullRequest, error) {
 	return out, err
 }
 
-// linkPullRequests adds the links whose URL the session does not have yet, persists
-// them, and publishes the session. Links without a time get now (links is modified:
+// linkPullRequests adds the links whose URL the thread does not have yet, persists
+// them, and publishes the thread. Links without a time get now (links is modified:
 // the caller gives it up). Returns how many were new; a repeat of a known URL changes
 // nothing and publishes nothing.
 func (m *Manager) linkPullRequests(id string, links []LinkedPullRequest) int {

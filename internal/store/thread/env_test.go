@@ -8,12 +8,12 @@ import (
 )
 
 // Every claude process gets Options.Env: the daemon's loopback endpoint and token,
-// so the CLI inside a session reaches the daemon without the Unix socket.
+// so the CLI inside a thread reaches the daemon without the Unix socket.
 func TestSpawnPassesEnv(t *testing.T) {
 	env := []string{"CODE_FOUNDRY_ENDPOINT=http://127.0.0.1:1234", "CODE_FOUNDRY_TOKEN=secret"}
 	e := newEnv(t, func(o *Options) { o.Env = append(o.Env, env...) })
 	s := e.connected(CreateOptions{})
-	// Each thread also gets its own id, the CLI's default --context-session.
+	// Each thread also gets its own id, the CLI's default --context-thread.
 	if got := e.spec(s.ID).Env; !hasAll(got, append(slices.Clone(env), paths.EnvThread+"="+s.ID)) {
 		t.Fatalf("create env = %q, want %q and its thread in it", got, env)
 	}

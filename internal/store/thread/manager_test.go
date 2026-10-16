@@ -159,7 +159,7 @@ func (e *env) ctx() context.Context {
 	return ctx
 }
 
-// waitFor polls the session until cond holds.
+// waitFor polls the thread until cond holds.
 func (e *env) waitFor(id, what string, cond func(Thread) bool) Thread {
 	e.t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
@@ -340,7 +340,7 @@ func argOf(argv []string, flag string) string {
 	return ""
 }
 
-// sentinelLink is a pr-link record of a URL no fixture has. Once a session links it,
+// sentinelLink is a pr-link record of a URL no fixture has. Once a thread links it,
 // every transcript line written before it has been read: a barrier for tests that
 // assert something was not published.
 const sentinelLink = `{"type":"pr-link","sessionId":"x","prNumber":999,"prUrl":"https://github.com/o/sentinel/pull/999","prRepository":"o/sentinel","timestamp":"2026-10-10T00:00:00Z"}`
@@ -550,7 +550,7 @@ func TestReconnectResumesOrStartsFresh(t *testing.T) {
 	}
 	e.waitFor(s.ID, "connected", func(s Thread) bool { return s.State == StateConnected })
 
-	// A session that never got a message has nothing to resume.
+	// A thread that never got a message has nothing to resume.
 	s2 := e.connected(CreateOptions{})
 	e.exit(s2.ID, 0)
 	e.waitFor(s2.ID, "disconnected", func(s Thread) bool { return s.State == StateDisconnected })

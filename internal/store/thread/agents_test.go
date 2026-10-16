@@ -315,7 +315,7 @@ func TestAgentsTranscriptLife(t *testing.T) {
 }
 
 // The runner publishes a lifecycle change at once and progress alone at most once per
-// agentPublishGap; the Session and the thread log get the same list, persisted. The
+// agentPublishGap; the Thread and the thread log get the same list, persisted. The
 // fake replays one turn per message: a start, then progress, then the end.
 func TestAgentsPublication(t *testing.T) {
 	const result = `{"type":"result","subtype":"success","is_error":false,"duration_ms":1,"num_turns":1,"result":"ok","session_id":"x","total_cost_usd":0,"usage":{"input_tokens":1,"output_tokens":1}}`

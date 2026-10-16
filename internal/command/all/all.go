@@ -15,7 +15,7 @@ import (
 type Deps struct {
 	Daemon  command.DaemonInfo
 	Emitter command.Emitter
-	// Terminal backs terminal.* (terminal.new also reads Repo and Session to find a
+	// Terminal backs terminal.* (terminal.new also reads Repo and Thread to find a
 	// shell's owner). Nil registers the commands against
 	// UnimplementedTerminalServiceHandler, so they list but fail with Unimplemented.
 	Terminal command.TerminalBackend
@@ -47,7 +47,7 @@ type Deps struct {
 	GitOps command.GitOpsDeps
 	// Gh backs pr.revert, pr.merge, pr.review.request, pr.refresh, pr.review and
 	// pr.comment (the pull request detail panel's actions), and reads the pull request for pr.ask, pr.explain and
-	// pr.fix.findings (which also use Repo, Session, GitOps.Backend and Emitter). Nil
+	// pr.fix.findings (which also use Repo, Thread, GitOps.Backend and Emitter). Nil
 	// works like Terminal.
 	Gh command.GhBackend
 	// Settings backs settings.*, theme.* and notifications.test (the alert volume). Nil works like
@@ -61,7 +61,7 @@ type Deps struct {
 	Restart func()
 	// Workspace backs workspace.*. Nil works like Terminal.
 	Workspace command.WorkspaceBackend
-	// Action backs action.* (which also use Repo and Session to find a run's owner).
+	// Action backs action.* (which also use Repo and Thread to find a run's owner).
 	// Nil works like Terminal.
 	Action command.ActionBackend
 }

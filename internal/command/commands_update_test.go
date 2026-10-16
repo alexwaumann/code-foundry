@@ -397,7 +397,7 @@ func TestDaemonRestart(t *testing.T) {
 				restart = func() { restarts++ }
 			}
 			reg := newUpdateRegistry(t, &commandtest.Update{Status: &v1.UpdateStatus{State: tt.status}}, &commandtest.Thread{Current: tt.thread}, restart)
-			// Unconfirmed: asks first, with the live-session count, and does not restart.
+			// Unconfirmed: asks first, with the live-thread count, and does not restart.
 			_, err := reg.Invoke(ctx, command.Context{}, "daemon.restart", nil)
 			var ce *command.ConfirmError
 			if !errors.As(err, &ce) || ce.Message != tt.wantConfirm {

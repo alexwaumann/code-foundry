@@ -89,7 +89,7 @@ func (ss statusSetup) start(t *testing.T) (*env, Thread) {
 	return e, s
 }
 
-// TestStatusSurvivesDisconnect covers every way a live process ends: the session keeps
+// TestStatusSurvivesDisconnect covers every way a live process ends: the thread keeps
 // the status it had, persisted. A turn that was running is interrupted, and so is one
 // waiting on a request: the request dies with the process.
 func TestStatusSurvivesDisconnect(t *testing.T) {

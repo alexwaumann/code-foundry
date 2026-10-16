@@ -203,7 +203,7 @@ func formatTokens(n int64) string {
 
 func trimZero(s string) string { return strings.TrimSuffix(s, ".0") }
 
-// formatUSD shows cents, or four decimals under a cent so small sessions are not $0.00.
+// formatUSD shows cents, or four decimals under a cent so small threads are not $0.00.
 func formatUSD(v float64) string {
 	if v > 0 && v < 0.01 {
 		return "$" + strconv.FormatFloat(v, 'f', 4, 64)

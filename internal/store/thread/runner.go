@@ -10,7 +10,7 @@ import (
 // activityPersistGap is the minimum interval between saves of last_activity_at alone.
 const activityPersistGap = 30 * time.Second
 
-// runner owns one connected session: its claude process over stdio (stream.go), the
+// runner owns one connected thread: its claude process over stdio (stream.go), the
 // transcript tailer, status publishing, RunIn and close. All fields below are touched
 // only by run (the goroutine), except closeReq, cdReq, stopReq and done, and st's
 // documented exceptions.
@@ -70,7 +70,7 @@ type runner struct {
 	// (usage_runs.go). Each is complete from byte zero: a file read from its start, or
 	// history rescanned on the first discovery (rescan). usageSeen: that discovery
 	// happened. usageOff: the rescan failed, so some fold is partial and must not
-	// replace the session's usage; the next discovery (reconnect, restart) rescans.
+	// replace the thread's usage; the next discovery (reconnect, restart) rescans.
 	usage     *threadUsage
 	usageSeen bool
 	usageOff  bool
@@ -207,7 +207,7 @@ func (r *runner) pollTranscript() {
 	r.publishUsage()
 }
 
-// publishUsage replaces the session's usage and runs when a fold or a run changed: at
+// publishUsage replaces the thread's usage and runs when a fold or a run changed: at
 // most once per poll with a new API response, a run opening or closing, or a run's
 // lifecycle changing (streaming repeats of a counted request change nothing); a run's
 // progress alone at most once per agentPublishGap. The thread log's runs follow. While
@@ -322,7 +322,7 @@ func (r *runner) checkStatus() {
 }
 
 // publishStatus publishes and persists the status. Persisting every change
-// (debounced, a handful per turn) is what lets a session that is waiting on the user
+// (debounced, a handful per turn) is what lets a thread that is waiting on the user
 // still say so after the daemon dies without a clean shutdown.
 func (r *runner) publishStatus() {
 	r.status, r.reason = r.st.sd.Status()
@@ -338,7 +338,7 @@ func (r *runner) publishStatus() {
 }
 
 // finish detaches the runner, applying the final state. Every disconnect of a live
-// process goes through here (exit, crash, close, idle stop, daemon stop): the session
+// process goes through here (exit, crash, close, idle stop, daemon stop): the thread
 // keeps the slash commands and MCP status Claude last reported (threadcache_db.go) and the
 // status it had at that moment, read fresh (the published one may lag by the
 // debounce), or as it was when a close began; disconnectedStatus turns busy
@@ -378,7 +378,7 @@ func (r *runner) finish(fn func(*Thread)) {
 	})
 }
 
-// slogger prefixes runner logs with the session id.
+// slogger prefixes runner logs with the thread id.
 type slogger struct{ r *runner }
 
 func (l *slogger) args(kv []any) []any         { return append([]any{"thread", l.r.id}, kv...) }

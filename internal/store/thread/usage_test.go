@@ -394,7 +394,7 @@ func TestRemoveRetiresUsage(t *testing.T) {
 		t.Errorf("retired after b = %+v", got)
 	}
 
-	// A session without usage retires nothing and publishes no RetiredUsage.
+	// A thread without usage retires nothing and publishes no RetiredUsage.
 	c := e.connected(CreateOptions{Name: "c"})
 	for len(e.events.C()) > 0 {
 		<-e.events.C()
@@ -435,7 +435,7 @@ func TestSaveAndLoadUsage(t *testing.T) {
 	if err := saveUsage(ctx, db, a.ID, first); err != nil {
 		t.Fatal(err)
 	}
-	// Saving replaces the session's rows; it never merges.
+	// Saving replaces the thread's rows; it never merges.
 	second := []UsageBucket{{Model: "n", Day: "2026-10-10", Requests: 7}}
 	if err := saveUsage(ctx, db, a.ID, second); err != nil {
 		t.Fatal(err)

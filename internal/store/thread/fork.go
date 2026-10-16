@@ -55,7 +55,7 @@ func forkItems(parent []Item, noteID, note string, now time.Time) []Item {
 
 // forkLog builds the fork newID's log from parent's current items and installs it, so
 // the fork's spawn and first Watch see the copy before any row is written (the fork's
-// session row, which thread_items references, is written by spawn; persistForkLog
+// thread row, which thread_items references, is written by spawn; persistForkLog
 // writes the rows after it).
 func (m *Manager) forkLog(ctx context.Context, parent Thread, newID string) ([]Item, error) {
 	plog, err := m.thread(ctx, parent.ID)
@@ -69,7 +69,7 @@ func (m *Manager) forkLog(ctx context.Context, parent Thread, newID string) ([]I
 	return items, nil
 }
 
-// persistForkLog writes the fork's copied items once its session row exists.
+// persistForkLog writes the fork's copied items once its thread row exists.
 func (m *Manager) persistForkLog(ctx context.Context, id string, items []Item) {
 	if err := saveItems(context.WithoutCancel(ctx), m.opts.DB, id, items); err != nil {
 		m.log.Error("persist fork history", "thread", id, "items", len(items), "err", err)

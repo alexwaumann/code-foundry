@@ -261,7 +261,7 @@ func shellsRunning(n int) func(Thread) bool {
 }
 
 // The captures through the runner (the fake replays one turn per message): the call
-// runs past its turn and the Session counts the shell; the next message replays the
+// runs past its turn and the Thread counts the shell; the next message replays the
 // end and Claude's own turn: the call done or failed with the summary, the count 0.
 func TestBgShellsThroughTheStream(t *testing.T) {
 	tests := []struct {

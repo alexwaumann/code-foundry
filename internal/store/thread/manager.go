@@ -21,8 +21,8 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 )
 
-// RepoSource is the part of the repo store sessions need: resolving worktrees and
-// creating one for a new session. *repo.Git implements it.
+// RepoSource is the part of the repo store threads need: resolving worktrees and
+// creating one for a new thread. *repo.Git implements it.
 type RepoSource interface {
 	Snapshot() *repo.Snapshot
 	CreateWorktree(ctx context.Context, opts repo.CreateWorktreeOptions) (repo.Worktree, error)
@@ -48,7 +48,7 @@ type Options struct {
 	// Paths locates Claude's config dir and global config. Default
 	// DefaultClaudePaths().
 	Paths ClaudePaths
-	// Namer names sessions from their first user message. Default ClaudeNamer in
+	// Namer names threads from their first user message. Default ClaudeNamer in
 	// /tmp, which names with model.NamingDefault unless the ctx carries
 	// WithNamingModel (the daemon's settingsNamer sets it per call).
 	Namer Namer
@@ -72,9 +72,9 @@ type Options struct {
 	RefExists func(ctx context.Context, dir, ref string) bool
 	// Env entries ("KEY=VALUE") are added to every claude process's environment
 	// (Create, Reconnect, Fork). The daemon passes its loopback endpoint and token so
-	// the CLI inside a session reaches it without the Unix socket. Every process also
-	// gets its own thread's id as paths.EnvSession (CODE_FOUNDRY_SESSION), which the CLI
-	// sends as its default --context-session.
+	// the CLI inside a thread reaches it without the Unix socket. Every process also
+	// gets its own thread's id as paths.EnvThread (CODE_FOUNDRY_THREAD), which the CLI
+	// sends as its default --context-thread.
 	Env []string
 	// WorktreeCreated, when set, is called after Create made a new worktree for a thread
 	// (CreateOptions.NewWorktree) and the thread has started. It must not block: the
@@ -96,7 +96,7 @@ type Options struct {
 	WakeTimeout    time.Duration
 	StatusDebounce time.Duration // default 100ms
 	// SlugTimeout bounds how long Create waits for the namer before naming a new
-	// worktree's branch after the session id. Default 6s.
+	// worktree's branch after the thread id. Default 6s.
 	SlugTimeout time.Duration
 	// NamingRetryDelay is the pause before the one retry of a rate-limited naming
 	// call. Default 2s.
@@ -110,7 +110,7 @@ type Options struct {
 	// (six times longer for a background run). Default 10m.
 	AgentIdleClose time.Duration
 	// CacheTTL is the prompt cache lifetime a thread's CacheExpiresAt counts
-	// from its last result (the sessions.cache_ttl_seconds setting; SetCacheTTL changes
+	// from its last result (the threads.cache_ttl_seconds setting; SetCacheTTL changes
 	// it live). Default DefaultCacheTTL.
 	CacheTTL time.Duration
 	// SnoozeCheckInterval is how often snoozed threads are checked against the wall
@@ -214,8 +214,8 @@ type Manager struct {
 
 type record struct {
 	s           Thread
-	run         *runner // non-nil while a claude process belongs to the session
-	namingTried bool    // one naming call per session (per daemon run)
+	run         *runner // non-nil while a claude process belongs to the thread
+	namingTried bool    // one naming call per thread (per daemon run)
 	// first is the thread's first prompt, handed to its runner by spawn.
 	first *outgoing
 	// reserved is set while a stopped thread starts and has no runner yet (reserve in
@@ -225,7 +225,7 @@ type record struct {
 
 var _ Store = (*Manager)(nil)
 
-// New loads persisted sessions and returns the Manager. Sessions that were live when
+// New loads persisted threads and returns the Manager. Threads that were live when
 // the daemon last stopped without a clean shutdown are marked DISCONNECTED, keeping
 // their last published status by the same rule as any disconnect
 // (disconnectedStatus: busy becomes interrupted).
@@ -309,7 +309,7 @@ func (m *Manager) Bus() *bus.Bus { return m.opts.Bus }
 // Snapshot returns the current snapshot.
 func (m *Manager) Snapshot() *Snapshot { return m.snap.Load() }
 
-// Get returns one session.
+// Get returns one thread.
 func (m *Manager) Get(_ context.Context, id string) (Thread, error) {
 	if s, ok := m.Snapshot().Thread(id); ok {
 		return s, nil
@@ -368,7 +368,7 @@ func (m *Manager) record(id string) (*record, error) {
 	return rec, nil
 }
 
-// Create spawns claude in a worktree. The session is returned STARTING. With
+// Create spawns claude in a worktree. The thread is returned STARTING. With
 // NewWorktree it first creates the worktree (synchronously: on failure nothing is
 // persisted); see newWorktree. With NoProject it runs in Options.Home and has no
 // owner.
@@ -494,7 +494,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 	return m.Get(ctx, id)
 }
 
-// Fork starts a new session that continues id's conversation under a new Claude
+// Fork starts a new thread that continues id's conversation under a new Claude
 // session id (claude --resume <id> --fork-session --session-id <new>). Its items start
 // as a copy of id's, ended by a "Forked from <name>" note (fork.go).
 func (m *Manager) Fork(ctx context.Context, id, name string) (Thread, error) {
@@ -568,11 +568,11 @@ func (m *Manager) Fork(ctx context.Context, id, name string) (Thread, error) {
 	return m.Get(ctx, newID)
 }
 
-// Reconnect resumes a DISCONNECTED session without a prompt. Without a resumable
+// Reconnect resumes a DISCONNECTED thread without a prompt. Without a resumable
 // conversation (no Claude session id yet, or its transcript is gone) it starts a new
 // conversation in the same worktree and says so in LastError. It unarchives and
 // unsnoozes the thread. No command calls it any more (a message starts a stopped
-// thread: Send); it stays for SessionService.Reconnect and tests.
+// thread: Send); it stays for ThreadService.Reconnect and tests.
 func (m *Manager) Reconnect(ctx context.Context, id string) (Thread, error) {
 	if _, err := m.startStopped(ctx, id, startOpts{backToList: true}); err != nil {
 		if errors.Is(err, errNotStopped) {
@@ -650,7 +650,7 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 // claudeCommand is the argv and environment of a claude spawn for s: its model,
 // effort and permission mode, the attachments dir and workspace members as --add-dir,
 // the workspace prompt and env. The prompt is never in argv (it is the first user
-// message). g is what the conversation's allow-for-session answers granted (an effort
+// message). g is what the conversation's allow-for-thread answers granted (an effort
 // restart's; a fresh spawn starts without).
 func (m *Manager) claudeCommand(s Thread, l launch, g grants) (argv, env []string) {
 	sa := spawnArgs{model: s.Model, effort: s.Effort, perm: s.PermissionMode,
@@ -720,7 +720,7 @@ func (m *Manager) Pin(_ context.Context, id string, pinned bool) (Thread, error)
 	return rec.s, nil
 }
 
-// Close ends the process gracefully and waits until the session is DISCONNECTED.
+// Close ends the process gracefully and waits until the thread is DISCONNECTED.
 // Archive, Snooze and Remove close through it; no command calls it directly any more.
 func (m *Manager) Close(ctx context.Context, id string) error {
 	m.mu.Lock()
@@ -743,7 +743,7 @@ func (m *Manager) Close(ctx context.Context, id string) error {
 	}
 }
 
-// Remove closes the session if needed, kills and removes the shells that belong to it
+// Remove closes the thread if needed, kills and removes the shells that belong to it
 // (terminals labelled termlabel.KindShell with its id), then forgets it.
 func (m *Manager) Remove(ctx context.Context, id string) error {
 	if err := m.Close(ctx, id); err != nil {
@@ -761,7 +761,7 @@ func (m *Manager) Remove(ctx context.Context, id string) error {
 	if rec.run != nil || rec.reserved != nil {
 		return fmt.Errorf("%w: thread %s was started while being removed", ErrFailedPrecondition, id)
 	}
-	// The session's usage moves to the retired ledger in the delete's transaction.
+	// The thread's usage moves to the retired ledger in the delete's transaction.
 	if err := retireThread(ctx, m.opts.DB, id, rec.s.Usage); err != nil {
 		return err
 	}
@@ -781,7 +781,7 @@ func (m *Manager) Remove(ctx context.Context, id string) error {
 }
 
 // Shutdown stops every runner, which terminates its claude process (it talks to the
-// daemon over pipes and cannot outlive it), and records live sessions as DISCONNECTED
+// daemon over pipes and cannot outlive it), and records live threads as DISCONNECTED
 // ("daemon stopped"). The Manager is unusable afterwards.
 func (m *Manager) Shutdown(ctx context.Context) error {
 	m.mu.Lock()
@@ -807,7 +807,7 @@ func (m *Manager) Shutdown(ctx context.Context) error {
 	}
 }
 
-// detach clears a finished runner from its record, applying fn to the session.
+// detach clears a finished runner from its record, applying fn to the thread.
 func (m *Manager) detach(r *runner, fn func(*Thread)) {
 	m.update(r.id, true, func(rec *record) {
 		if rec.run == r {
@@ -817,7 +817,7 @@ func (m *Manager) detach(r *runner, fn func(*Thread)) {
 	})
 }
 
-// startNaming names a session from its first user message, once.
+// startNaming names a thread from its first user message, once.
 func (m *Manager) startNaming(id, msg string) {
 	m.mu.Lock()
 	rec, ok := m.recs[id]

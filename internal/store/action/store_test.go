@@ -40,7 +40,7 @@ type harness struct {
 	m     *Manager
 	// web, feat and api are real directories: background runs start in them.
 	web, feat, api string
-	// sessions are the threads Options.Session knows.
+	// threads are the threads Options.Thread knows.
 	mu      sync.Mutex
 	threads map[string]Owner
 }

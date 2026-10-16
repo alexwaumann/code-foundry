@@ -15,7 +15,7 @@ import (
 // Usage); the stream's task frames (claudestream.Task) add their lifecycle: status,
 // current activity, Claude's counters, the report or the error. Both are applied on the
 // runner goroutine to the same runUsage, so there is one record per run, persisted in
-// session_agent_runs and published on the Session (AgentRuns) and on the thread's log
+// session_agent_runs and published on the Thread (AgentRuns) and on the thread's log
 // (ItemsSnapshot.Agents, AgentsChanged; agents_runner.go).
 //
 // The frames are the source: a run's task_started makes it running, task_updated and

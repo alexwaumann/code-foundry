@@ -13,9 +13,9 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/command"
 )
 
-// Session is a fake command.SessionBackend. Err, when set, is returned by every call.
-// Sessions returned by Create/Fork/Rename echo the request; Get returns
-// Current (default: a CONNECTED session with the requested id). List returns Current
+// Thread is a fake command.ThreadBackend. Err, when set, is returned by every call.
+// Threads returned by Create/Fork/Rename echo the request; Get returns
+// Current (default: a CONNECTED thread with the requested id). List returns Current
 // and Others.
 type Thread struct {
 	// The conversation RPCs (ListItems, Send, ...) are unimplemented.
@@ -36,9 +36,9 @@ func (s *Thread) do(m proto.Message) error {
 	return s.Err
 }
 
-// Create echoes the request as a STARTING session "s1". With new_worktree the session
+// Create echoes the request as a STARTING thread "s1". With new_worktree the thread
 // is in /worktrees/s1 with created_worktree and base_ref set. workspace_id is echoed;
-// with new_workspace the session belongs to "w-new" and runs in /worktrees/<repo>
+// with new_workspace the thread belongs to "w-new" and runs in /worktrees/<repo>
 // (repo_id, else the first repo). With no_project it runs in /home.
 func (s *Thread) Create(_ context.Context, r *connect.Request[v1.CreateThreadRequest]) (*connect.Response[v1.CreateThreadResponse], error) {
 	if err := s.do(r.Msg); err != nil {
@@ -65,7 +65,7 @@ func (s *Thread) Create(_ context.Context, r *connect.Request[v1.CreateThreadReq
 	return connect.NewResponse(&v1.CreateThreadResponse{Thread: out}), nil
 }
 
-// Fork returns session "s2" with ParentId set.
+// Fork returns thread "s2" with ParentId set.
 func (s *Thread) Fork(_ context.Context, r *connect.Request[v1.ForkThreadRequest]) (*connect.Response[v1.ForkThreadResponse], error) {
 	if err := s.do(r.Msg); err != nil {
 		return nil, err
@@ -115,7 +115,7 @@ func (s *Thread) Remove(_ context.Context, r *connect.Request[v1.RemoveThreadReq
 	return connect.NewResponse(&v1.RemoveThreadResponse{}), nil
 }
 
-// Pin returns Current (default: a CONNECTED session) with the requested id and pin.
+// Pin returns Current (default: a CONNECTED thread) with the requested id and pin.
 func (s *Thread) Pin(_ context.Context, r *connect.Request[v1.PinThreadRequest]) (*connect.Response[v1.PinThreadResponse], error) {
 	if err := s.do(r.Msg); err != nil {
 		return nil, err
@@ -128,7 +128,7 @@ func (s *Thread) Pin(_ context.Context, r *connect.Request[v1.PinThreadRequest])
 	return connect.NewResponse(&v1.PinThreadResponse{Thread: cur}), nil
 }
 
-// Archive returns Current (default: a CONNECTED session) with the requested id:
+// Archive returns Current (default: a CONNECTED thread) with the requested id:
 // archiving disconnects and unpins it and sets archived_at (kept when already set);
 // unarchiving clears archived_at.
 func (s *Thread) Archive(_ context.Context, r *connect.Request[v1.ArchiveThreadRequest]) (*connect.Response[v1.ArchiveThreadResponse], error) {
@@ -151,7 +151,7 @@ func (s *Thread) Archive(_ context.Context, r *connect.Request[v1.ArchiveThreadR
 	return connect.NewResponse(&v1.ArchiveThreadResponse{Thread: cur}), nil
 }
 
-// Snooze returns Current (default: a CONNECTED session) with the requested id:
+// Snooze returns Current (default: a CONNECTED thread) with the requested id:
 // snoozing disconnects, unpins and unarchives it and sets snoozed_until to the request's
 // until; an unset until clears snoozed_until.
 func (s *Thread) Snooze(_ context.Context, r *connect.Request[v1.SnoozeThreadRequest]) (*connect.Response[v1.SnoozeThreadResponse], error) {
@@ -170,8 +170,8 @@ func (s *Thread) Snooze(_ context.Context, r *connect.Request[v1.SnoozeThreadReq
 	return connect.NewResponse(&v1.SnoozeThreadResponse{Thread: cur}), nil
 }
 
-// RunIn returns Current (default: a CONNECTED session in workspace "w-1") with the
-// requested id. A disconnected session runs in the target at once; a live one gets it
+// RunIn returns Current (default: a CONNECTED thread in workspace "w-1") with the
+// requested id. A disconnected thread runs in the target at once; a live one gets it
 // as pending_worktree_path. The target is worktree_path, else /worktrees/<repo_id>.
 func (s *Thread) RunIn(_ context.Context, r *connect.Request[v1.RunInThreadRequest]) (*connect.Response[v1.RunInThreadResponse], error) {
 	if err := s.do(r.Msg); err != nil {

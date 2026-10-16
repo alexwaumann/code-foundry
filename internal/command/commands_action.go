@@ -30,7 +30,7 @@ var (
 	_ ActionBackend = codefoundryv1connect.ActionServiceClient(nil)
 )
 
-// ActionDeps are the action.* commands' dependencies. Repo and Session find the
+// ActionDeps are the action.* commands' dependencies. Repo and Thread find the
 // project and the owner of a run the way terminal.new finds a shell's.
 type ActionDeps struct {
 	Action ActionBackend

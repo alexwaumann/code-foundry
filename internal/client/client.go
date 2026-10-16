@@ -1,7 +1,7 @@
 // Package client is the Go client for the code-foundry daemon, used by the CLI and the
 // Wails host. It talks to the daemon over the Unix socket and can start the daemon
 // on demand. Inside a Claude session the daemon spawned, the CLI uses the loopback
-// endpoint from the session's environment instead (EndpointFromEnv) and never starts
+// endpoint from the thread's environment instead (EndpointFromEnv) and never starts
 // a daemon.
 package client
 
@@ -81,7 +81,7 @@ type Endpoint struct {
 }
 
 // Environment variables the daemon sets in every Claude session it spawns, so the CLI
-// inside the session reaches the daemon over loopback TCP: sandboxed sessions cannot
+// inside the thread reaches the daemon over loopback TCP: sandboxed threads cannot
 // connect to Unix sockets.
 const (
 	EnvEndpoint = paths.EnvEndpoint // http://127.0.0.1:<port>

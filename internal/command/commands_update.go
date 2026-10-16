@@ -53,7 +53,7 @@ type AppVersion struct {
 }
 
 // DaemonRestart is daemon.restart's JSON result. ThreadsInterrupted counts the threads
-// the restart cut off (ActiveSession).
+// the restart cut off (ActiveThread).
 type DaemonRestart struct {
 	ThreadsInterrupted int `json:"threads_interrupted"`
 }
@@ -143,7 +143,7 @@ func channelSuffix(st *v1.UpdateStatus) string {
 	return " (" + st.GetChannel() + " channel)"
 }
 
-// ActiveSession reports whether a restart cuts s off, by the predicate archive and
+// ActiveThread reports whether a restart cuts s off, by the predicate archive and
 // snooze confirm with (archiveInterrupts): Claude starting or running a turn, waiting on
 // a permission request or question, background agents or shells running, or the turn
 // that reports one that just ended. An idle thread loses nothing: a message starts it
@@ -153,7 +153,7 @@ func ActiveThread(s *v1.Thread) bool {
 	return why != ""
 }
 
-// RestartCost is what a restart cuts off, summed over the threads (ActiveSession).
+// RestartCost is what a restart cuts off, summed over the threads (ActiveThread).
 type RestartCost struct {
 	// Threads is how many threads lose something.
 	Threads int
@@ -206,7 +206,7 @@ func (c RestartCost) String() string {
 	return strings.Join(parts[:len(parts)-1], ", ") + " and " + parts[len(parts)-1]
 }
 
-// restartCost is RestartCostOf the daemon's threads; nothing when the session service
+// restartCost is RestartCostOf the daemon's threads; nothing when the thread service
 // is unavailable.
 func restartCost(ctx context.Context, s ThreadBackend) RestartCost {
 	res, err := s.List(ctx, connect.NewRequest(&v1.ListThreadsRequest{}))

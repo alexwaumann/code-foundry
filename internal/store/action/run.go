@@ -91,7 +91,7 @@ func (m *Manager) Run(ctx context.Context, o RunOptions) (Run, error) {
 	return m.start(ctx, a, owner, o.Mode, TriggerUser)
 }
 
-// owner resolves a run's owner: the thread sessionID, else the registered worktree at
+// owner resolves a run's owner: the thread threadID, else the registered worktree at
 // worktree (in repoID when given).
 func (m *Manager) owner(threadID, worktree, repoID string) (Owner, error) {
 	switch {
@@ -357,7 +357,7 @@ func (m *Manager) Wait(ctx context.Context, id string) (Run, error) {
 }
 
 // WorktreeCreated runs repoID's on-worktree-create actions in the background, one
-// after another in their order, for the thread sessionID whose new worktree is at
+// after another in their order, for the thread threadID whose new worktree is at
 // worktree. It returns at once; failures are logged and published as RunFinished.
 func (m *Manager) WorktreeCreated(threadID, repoID, worktree string) {
 	m.mu.Lock()

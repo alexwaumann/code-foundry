@@ -5,7 +5,7 @@
 // immutable Snapshot behind an atomic pointer and emits events on the bus.
 //
 // The store also runs actions. Every run executes `$SHELL -lc <command>` in a worktree
-// with CODE_FOUNDRY_PROJECT_ROOT and CODE_FOUNDRY_WORKTREE (and CODE_FOUNDRY_SESSION for
+// with CODE_FOUNDRY_PROJECT_ROOT and CODE_FOUNDRY_WORKTREE (and CODE_FOUNDRY_THREAD for
 // a thread's run) added to the daemon's environment, and belongs to an owner: a thread
 // or a worktree, like a shell. Two runners:
 //
@@ -272,7 +272,7 @@ type UpdateOptions struct {
 	Position *int
 }
 
-// Owner is who a run belongs to: a thread (SessionID set; RepoID and Worktree are the
+// Owner is who a run belongs to: a thread (ThreadID set; RepoID and Worktree are the
 // thread's) or a worktree.
 type Owner struct {
 	ThreadID string
@@ -284,7 +284,7 @@ type Owner struct {
 type RunOptions struct {
 	// Action is an action id, or its name within RepoID (default: the owner's project).
 	Action string
-	// SessionID makes the thread the owner; it wins over Worktree.
+	// ThreadID makes the thread the owner; it wins over Worktree.
 	ThreadID string
 	// Worktree is the owner when there is no thread: a registered worktree of the
 	// action's project.

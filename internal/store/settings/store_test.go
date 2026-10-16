@@ -79,7 +79,7 @@ func TestOpenReportsBadValues(t *testing.T) {
 	}
 }
 
-// A setting the app no longer has (sessions.render, removed with terminal threads) is
+// A setting the app no longer has (threads.render, removed with terminal threads) is
 // an issue, not an error: the file still loads.
 func TestOpenReportsRemovedSettings(t *testing.T) {
 	s, _, _ := openTest(t, "[threads]\nrender = \"terminal\"\ndefault_effort = \"low\"\n")

@@ -22,7 +22,7 @@ func scanBucket(sc interface{ Scan(...any) error }, prefix ...any) (UsageBucket,
 	return b, err
 }
 
-// saveUsage replaces a session's usage rows with buckets in one transaction.
+// saveUsage replaces a thread's usage rows with buckets in one transaction.
 func saveUsage(ctx context.Context, db *sql.DB, threadID string, buckets []UsageBucket) error {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
@@ -38,7 +38,7 @@ func saveUsage(ctx context.Context, db *sql.DB, threadID string, buckets []Usage
 	return nil
 }
 
-// replaceUsageTx replaces a session's session_usage rows inside tx.
+// replaceUsageTx replaces a thread's session_usage rows inside tx.
 func replaceUsageTx(ctx context.Context, tx *sql.Tx, threadID string, buckets []UsageBucket) error {
 	if _, err := tx.ExecContext(ctx, `DELETE FROM session_usage WHERE session_id = ?`, threadID); err != nil {
 		return fmt.Errorf("thread: save usage of %s: %w", threadID, err)
@@ -52,7 +52,7 @@ func replaceUsageTx(ctx context.Context, tx *sql.Tx, threadID string, buckets []
 	return nil
 }
 
-// loadUsage returns every session's usage, each sorted by (Day, Model, Tier, Speed).
+// loadUsage returns every thread's usage, each sorted by (Day, Model, Tier, Speed).
 func loadUsage(ctx context.Context, db *sql.DB) (map[string][]UsageBucket, error) {
 	rows, err := db.QueryContext(ctx, `SELECT session_id, `+usageColumns+`
 		FROM session_usage ORDER BY session_id, day, model, tier, speed`)
@@ -96,9 +96,9 @@ func loadRetiredUsage(ctx context.Context, db *sql.DB) ([]UsageBucket, error) {
 	return out, nil
 }
 
-// retireSession adds the session's usage into usage_retired and deletes the session
+// retireThread adds the thread's usage into usage_retired and deletes the thread
 // (its session_usage rows cascade) in one transaction, so a crash either keeps the
-// session with its rows or retires them exactly once.
+// thread with its rows or retires them exactly once.
 func retireThread(ctx context.Context, db *sql.DB, id string, buckets []UsageBucket) error {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {

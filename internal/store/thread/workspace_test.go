@@ -176,8 +176,8 @@ func TestCreateNewWorkspace(t *testing.T) {
 		wantCall   string   // the workspace store's Create call
 		wantBranch string
 		wantRepo   string
-		wantName   string // session name
-		wantBase   string // session base ref; default: the request's
+		wantName   string // thread name
+		wantBase   string // thread base ref; default: the request's
 		wantErr    error
 	}{
 		{name: "title names the thread, its slug the branch and workspace; first repo is the cwd",

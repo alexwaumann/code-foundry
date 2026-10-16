@@ -53,17 +53,17 @@ type stores struct {
 	// stopShells stops the shell reaper (shells.go): exited shells and the shells of a
 	// removed worktree are removed. Stopped before terminal closes.
 	stopShells func()
-	// session layers Claude sessions on terminal and db; shut down before terminal so
-	// live sessions are recorded as disconnected while their processes still run.
+	// thread layers Claude sessions on terminal and db; shut down before terminal so
+	// live threads are recorded as disconnected while their processes still run.
 	thread *thread.Manager
 	// update checks for and installs new releases (disabled in dev builds).
 	update *update.Store
 	// workspace holds branch sets across repos; it creates and removes worktrees
-	// through repo and asks session which threads are live. Opened before session,
+	// through repo and asks thread which threads are live. Opened before thread,
 	// which reads workspace members at launch.
 	workspace *workspace.Manager
 	// action holds each project's actions and runs them (in a terminal, or in the
-	// background). Opened before session (whose new worktrees run on-worktree-create
+	// background). Opened before thread (whose new worktrees run on-worktree-create
 	// actions) and closed before it, killing background runs.
 	action *action.Manager
 	// stopActions stops the glue that forgets an unregistered project's actions and
@@ -75,8 +75,8 @@ type stores struct {
 }
 
 // openStores opens the database, applies migrations, and starts every store. On
-// error, whatever was started is closed again. sessionEnv is added to every Claude
-// session's environment (see sessionEnv in daemon.go).
+// error, whatever was started is closed again. threadEnv is added to every Claude
+// process's environment (see threadEnv in daemon.go).
 func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv []string) (_ *stores, err error) {
 	s := &stores{bus: bus.New()}
 	defer func() {
@@ -150,8 +150,8 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	s.terminal = terminal.New(terminal.Options{
 		Bus: s.bus, Logger: log.With("store", "terminal"), MaxScrollbackLines: uint(cfg.Threads.ScrollbackLines),
 	})
-	// Workspaces open before sessions: a session reads a workspace thread's members at
-	// every spawn, and the workspace store asks sessions about their threads (and
+	// Workspaces open before threads: a thread reads a workspace thread's members at
+	// every spawn, and the workspace store asks threads about their threads (and
 	// pre-trusts worktrees) only through these closures, which run after both exist.
 	if s.workspace, err = workspace.New(ctx, workspace.Options{
 		DB: s.db, Repos: s.repo, Bus: s.bus, Log: log.With("store", "workspace"),
@@ -202,7 +202,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 		return nil, err
 	}
 	applyCacheTTL(s.settings, s.thread)
-	// After session: the reaper's sweep asks it which threads exist.
+	// After thread: the reaper's sweep asks it which threads exist.
 	if s.stopShells, err = startShellReaper(ctx, shellReaperOptions{
 		Log: log.With("store", "terminal"), Terminals: s.terminal, Bus: s.bus,
 		RepoExists: func(id string) bool { _, ok := s.repo.Snapshot().Repo(id); return ok },
@@ -238,7 +238,7 @@ func envDuration(log *slog.Logger, name string) time.Duration {
 	return d
 }
 
-// sessionOwner is thread id's project and worktree, the owner of its action runs.
+// threadOwner is thread id's project and worktree, the owner of its action runs.
 func threadOwner(snap *thread.Snapshot, id string) (action.Owner, bool) {
 	if snap == nil {
 		return action.Owner{}, false

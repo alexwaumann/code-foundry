@@ -42,7 +42,7 @@ func main() {
 		os.Exit(1)
 	}
 	// Before anything spawns the daemon: give it the user's PATH (Finder launches get
-	// launchd's minimal one) and point it and its sessions at the CLI installed next to this executable.
+	// launchd's minimal one) and point it and its threads at the CLI installed next to this executable.
 	adoptLoginShellPath(log)
 	exportDaemonBinary(log)
 

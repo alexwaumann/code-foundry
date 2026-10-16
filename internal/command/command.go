@@ -50,11 +50,11 @@ type Command struct {
 	// a dialog and the CLI prompts (or takes --yes), then they invoke again.
 	Confirm string
 	// DynamicConfirm, when set with Confirm and returning non-empty, replaces the
-	// rendered Confirm message at invoke time (e.g. "Close 3 sessions and restart the
+	// rendered Confirm message at invoke time (e.g. "Close 3 threads and restart the
 	// daemon?"). It sees the effective context and validated args.
 	DynamicConfirm func(ctx context.Context, uctx Context, args Args) string
 	// ConfirmIf, when set with Confirm, decides at invoke time whether this call needs
-	// the confirmation at all: false runs the command without one (e.g. session.archive
+	// the confirmation at all: false runs the command without one (e.g. thread.archive
 	// asks only while Claude is working or waiting on the user). nil means always.
 	// Listing still reports the command as requiring confirmation, so clients offer
 	// their confirm flag. It sees the effective context and validated args.
@@ -73,7 +73,7 @@ type Context struct {
 	ActiveThreadID     string
 	ActiveRepoID       string
 	ActiveWorktreePath string
-	// ActiveView is a logical view name ("session", "projects", ...). Empty from the CLI.
+	// ActiveView is a logical view name ("thread", "projects", ...). Empty from the CLI.
 	ActiveView string
 	// ActiveWorkspaceID is the workspace that owns what is active (the active thread's
 	// workspace, or the workspace a composer or page is for). Empty for a project
@@ -89,7 +89,7 @@ const (
 	NoContext ContextField = iota
 	// ContextTerminal is Context.ActiveTerminalID.
 	ContextTerminal
-	// ContextSession is Context.ActiveSessionID.
+	// ContextThread is Context.ActiveThreadID.
 	ContextThread
 	// ContextRepo is Context.ActiveRepoID.
 	ContextRepo

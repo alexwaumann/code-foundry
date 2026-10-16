@@ -45,7 +45,7 @@ func Read(path string) Settings {
 // Values are stringified leniently (14 and "14" both work for an int); type errors are
 // found by Field.parse. Under [keybindings], unquoted dotted keys (thread.new = ...)
 // parse as nested tables and are flattened back. Names from before threads were renamed
-// from sessions are read as the new ones (renameLegacyKeys).
+// from threads are read as the new ones (renameLegacyKeys).
 func decode(data []byte) (map[string]string, error) {
 	var doc map[string]any
 	if _, err := toml.Decode(string(data), &doc); err != nil {

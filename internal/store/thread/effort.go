@@ -18,7 +18,7 @@ import (
 // The thread stays connected throughout; its items, viewers, transcript tailing and
 // usage carry on. A send during the restart waits for the new process (held); Interrupt,
 // SetModel and SetPermissionMode are refused until it is up (connection). What "Allow for
-// session" granted the old process lives in its memory only, so the new one gets it again
+// thread" granted the old process lives in its memory only, so the new one gets it again
 // as flags (grants).
 //
 // Across a daemon restart: the row's Effort is the new level from SetEffort on, and

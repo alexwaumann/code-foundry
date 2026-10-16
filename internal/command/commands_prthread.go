@@ -16,8 +16,8 @@ import (
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 )
 
-// PullRequestSessionDeps are the dependencies of pr.ask, pr.explain and
-// pr.fix.findings: commands that start a Claude session about a pull request. Nil
+// PullRequestThreadDeps are the dependencies of pr.ask, pr.explain and
+// pr.fix.findings: commands that start a thread about a pull request. Nil
 // backends register the commands against the Unimplemented handlers.
 type PullRequestThreadDeps struct {
 	// Gh reads the pull request (GetPullRequestDetail).
@@ -25,22 +25,22 @@ type PullRequestThreadDeps struct {
 	// Repo lists registered repositories (to find the clone of the slug and its
 	// worktrees) and creates the head branch's worktree for pr.fix.findings.
 	Repo RepoBackend
-	// Session starts the session (Create with an initial prompt).
+	// Thread starts the thread (Create with an initial prompt).
 	Thread ThreadBackend
 	// GitOps fetches origin before pr.fix.findings creates a worktree.
 	GitOps GitOpsBackend
-	// Emitter focuses the new session, as session.new does. Required.
+	// Emitter focuses the new thread, as thread.new does. Required.
 	Emitter Emitter
 }
 
-// prSessionKind says which worktree rules a command follows (see pickPRWorktree).
+// prThreadKind says which worktree rules a command follows (see pickPRWorktree).
 type prThreadKind int
 
 const (
-	// prSessionRead (ask, explain): explicit worktree, else the active worktree when it
+	// prThreadRead (ask, explain): explicit worktree, else the active worktree when it
 	// is a clone of the slug, else the head's worktree, else the main worktree.
 	prThreadRead prThreadKind = iota
-	// prSessionFix (fix.findings): explicit worktree, else the head's worktree, else a
+	// prThreadFix (fix.findings): explicit worktree, else the head's worktree, else a
 	// new worktree for the head branch (same-repository pull requests only).
 	prThreadFix
 )
@@ -116,10 +116,10 @@ func worktreeStatus(repos []*v1.Repo, path string) *v1.GitStatus {
 	return nil
 }
 
-// prWorktreePick is where a pull request session runs.
+// prWorktreePick is where a pull request thread runs.
 type prWorktreePick struct {
 	// RepoID is the registered repository; empty for an explicit worktree, which the
-	// session store resolves itself.
+	// thread store resolves itself.
 	RepoID string
 	// Path is the worktree; empty when Create.
 	Path string
@@ -129,7 +129,7 @@ type prWorktreePick struct {
 	MainPath string
 }
 
-// pickPRWorktree chooses the worktree for a pull request session. repos are the
+// pickPRWorktree chooses the worktree for a pull request thread. repos are the
 // registered repositories in RepoService.List order; the clones of slug are those
 // whose github_slug matches it (case-insensitively). explicit is the worktree arg,
 // active the caller's active worktree. Errors are FailedPrecondition.
@@ -205,9 +205,9 @@ func wrapStep(step string, err error) error {
 	return fmt.Errorf("%s: %w", step, err)
 }
 
-// RegisterPullRequestSessions registers pr.ask, pr.explain and pr.fix.findings. Each
+// RegisterPullRequestThreads registers pr.ask, pr.explain and pr.fix.findings. Each
 // reads the pull request, picks (or, for fix.findings, creates) a worktree, starts a
-// session there with a prompt about the pull request, and focuses it.
+// thread there with a prompt about the pull request, and focuses it.
 func RegisterPullRequestThreads(r *Registry, d PullRequestThreadDeps) error {
 	if d.Emitter == nil {
 		return errors.New("register pull request threads: Emitter is required")

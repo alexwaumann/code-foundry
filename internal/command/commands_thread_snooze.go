@@ -10,13 +10,13 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 )
 
-// sessionSnooze is session.snooze: snooze a thread until a time (Claude closed, its
+// threadSnooze is thread.snooze: snooze a thread until a time (Claude closed, its
 // shells removed, unpinned and unarchived, listed apart until the daemon wakes it into
 // needs-attention "snooze ended") or unsnooze it with clear. until is parsed here
 // (parseSnoozeUntil, the daemon's local zone) and the API gets an absolute time; the
 // GUI computes its presets itself. Snoozing asks for confirmation only while Claude is
 // mid-turn or waiting on the user, or background agents or shells run, like
-// session.archive; unsnoozing never asks. See
+// thread.archive; unsnoozing never asks. See
 // docs/notes/snooze-threads-1-daemon.md.
 func threadSnooze(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
@@ -63,7 +63,7 @@ func threadSnooze(b ThreadBackend, idArg ArgSpec) Command {
 	}
 }
 
-// snoozeArgs is the snooze time session.snooze's args ask for: zero with clear, else
+// snoozeArgs is the snooze time thread.snooze's args ask for: zero with clear, else
 // until parsed for now in the local zone. Exactly one of them must be given.
 func snoozeArgs(a Args, now time.Time) (time.Time, error) {
 	unsnooze, hasUntil := a.Bool("clear"), a.Has("until")
@@ -82,7 +82,7 @@ func snoozeArgs(a Args, now time.Time) (time.Time, error) {
 	return t, nil
 }
 
-// snoozeConfirm is session.snooze's confirmation for this call, or "" when it needs
+// snoozeConfirm is thread.snooze's confirmation for this call, or "" when it needs
 // none: unsnoozing, args Run will refuse anyway, an unknown thread (Run reports it), or
 // snoozing a thread that is not mid-turn and runs no background work (archiveInterrupts).
 func snoozeConfirm(ctx context.Context, b ThreadBackend, a Args) string {

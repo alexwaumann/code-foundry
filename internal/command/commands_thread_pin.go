@@ -8,7 +8,7 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 )
 
-// sessionPin is session.pin: pin a thread to the top of the GUI's thread list, or unpin
+// threadPin is thread.pin: pin a thread to the top of the GUI's thread list, or unpin
 // it. Without --pinned it toggles the thread's current pin.
 func threadPin(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{

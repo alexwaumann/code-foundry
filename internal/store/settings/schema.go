@@ -143,7 +143,7 @@ const (
 	defaultAlertCooldown = 60
 )
 
-// sessions.default_worktree values: a new worktree, or the project's main checkout.
+// threads.default_worktree values: a new worktree, or the project's main checkout.
 const (
 	WorktreeNew     = "new"
 	WorktreeCurrent = "current"
@@ -168,7 +168,7 @@ var staticFields = []Field{
 	},
 	{
 		// Read by the GUI only: the composer's "Work in" picker starts from it (a choice
-		// remembered per project wins). session.new itself stays explicit (--new-worktree
+		// remembered per project wins). thread.new itself stays explicit (--new-worktree
 		// or --worktree).
 		Key: KeyDefaultWorktree, Group: GroupThreads, Type: Enum, Title: "New threads work in",
 		Description: "A fresh copy keeps each thread on its own branch and folder. The project folder itself edits your files in place.",

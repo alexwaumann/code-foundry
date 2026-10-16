@@ -5,7 +5,7 @@
 //
 // Worktrees are made and removed through the repo store (the same fetch-then-`git
 // worktree add` path a new thread's worktree takes) and pre-trusted for Claude like a
-// session's worktree. The store never looks at sessions directly: the daemon hands it
+// thread's worktree. The store never looks at threads directly: the daemon hands it
 // a function listing live threads, so a member worktree a thread runs in is not
 // removed from under it. See docs/notes/workspaces-1-store.md.
 package workspace
@@ -152,7 +152,7 @@ type MemberInfo struct {
 	Current bool
 }
 
-// Thread is a live session as the removal guard sees it.
+// Thread is a live thread as the removal guard sees it.
 type Thread struct {
 	ID, Name string
 	Cwd      string // the worktree it runs in

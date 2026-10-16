@@ -151,7 +151,7 @@ func TestThreadLifecycleCommands(t *testing.T) {
 			wantMsg: "unpinned thread s5", wantReqs: []proto.Message{&v1.PinThreadRequest{Id: "s5"}}},
 		{name: "pin unavailable without a thread", cmd: "thread.pin", wantErr: command.ErrUnavailable},
 		{name: "focus", cmd: "thread.focus", ctx: command.Context{ActiveThreadID: "s7"}, wantMsg: "delivered=1", wantIntent: focusIntent("s7")},
-		// session.list has no state column (whether Claude runs is the daemon's business);
+		// thread.list has no state column (whether Claude runs is the daemon's business);
 		// a stopped thread reads like a running one.
 		{name: "list", cmd: "thread.list", current: &v1.Thread{Id: "s1", Name: "n", State: v1.ThreadState_THREAD_STATE_DISCONNECTED, DisconnectReason: "idle"},
 			wantReqs: []proto.Message{&v1.ListThreadsRequest{}}, wantIn: []string{"s1", "n", "unspecified", "-", "-", "-", "-"}},
@@ -243,7 +243,7 @@ func TestThreadNewKeybindingAndEnums(t *testing.T) {
 	if !ok || !slices.Contains(c.Keybindings, "cmd+n") || c.Title != "New Thread" {
 		t.Fatalf("thread.new = %q keybindings %v", c.Title, c.Keybindings)
 	}
-	// The GUI composer invokes session.new with exactly these args.
+	// The GUI composer invokes thread.new with exactly these args.
 	var names []string
 	for _, a := range c.Args {
 		names = append(names, a.Name)

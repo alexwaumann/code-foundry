@@ -7,11 +7,11 @@ import (
 	"time"
 )
 
-// Persistence for the sessions table (migrations 0003, 0006, 0008, 0009, 0011, 0014,
+// Persistence for the threads table (migrations 0003, 0006, 0008, 0009, 0011, 0014,
 // 0015, 0016, 0017 and 0018) and session_pull_requests (0010); session_usage and usage_retired
-// (0012) are in usage_db.go, which also deletes sessions (retireSession). No process
+// (0012) are in usage_db.go, which also deletes threads (retireThread). No process
 // survives a daemon restart. Status, its reason and StatusChangedAt are (0011): a disconnected
-// session keeps the status it ended with.
+// thread keeps the status it ended with.
 
 func millis(t time.Time) int64 {
 	if t.IsZero() {
@@ -138,7 +138,7 @@ func loadThreads(ctx context.Context, db *sql.DB) ([]Thread, error) {
 	return out, nil
 }
 
-// saveLinks records newly linked pull requests. A URL the session already has is
+// saveLinks records newly linked pull requests. A URL the thread already has is
 // ignored.
 func saveLinks(ctx context.Context, db *sql.DB, threadID string, links []LinkedPullRequest) error {
 	tx, err := db.BeginTx(ctx, nil)
@@ -159,7 +159,7 @@ func saveLinks(ctx context.Context, db *sql.DB, threadID string, links []LinkedP
 	return nil
 }
 
-// loadLinks returns every session's linked pull requests in first-seen (insertion)
+// loadLinks returns every thread's linked pull requests in first-seen (insertion)
 // order.
 func loadLinks(ctx context.Context, db *sql.DB) (map[string][]LinkedPullRequest, error) {
 	rows, err := db.QueryContext(ctx, `SELECT session_id, slug, number, url, linked_at

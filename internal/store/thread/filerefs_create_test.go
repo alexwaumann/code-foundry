@@ -15,7 +15,7 @@ func TestCreateRewritesFileRefs(t *testing.T) {
 	tests := []struct {
 		name string
 		o    CreateOptions
-		// want builds the expected prompt from the session and the workspace env.
+		// want builds the expected prompt from the thread and the workspace env.
 		want func(s Thread, e *wsEnv) string
 	}{
 		{name: "existing worktree: only the thread's project resolves",

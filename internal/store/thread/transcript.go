@@ -15,10 +15,10 @@ import (
 //
 // Claude writes a session's transcript to <claude dir>/projects/<slug>/<session
 // id>.jsonl (slug: see projectSlug). The file only appears with the first message, so
-// it is often created well after spawn. The session store chooses the Claude session
+// it is often created well after spawn. The thread store chooses the Claude session
 // id itself (--session-id, or the id passed to --resume), so discovery waits for one
 // known file instead of guessing among the newest files in a directory shared with
-// other sessions in the same worktree. /clear makes Claude switch to a new session id
+// other threads in the same worktree. /clear makes Claude switch to a new session id
 // and file; that rotation is followed through Claude's per-process record
 // sessions/<pid>.json (see pidSessionID).
 

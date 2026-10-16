@@ -83,7 +83,7 @@ type streamState struct {
 	restart            restartPhase
 	restartTimer       *time.Timer
 	held               []threadCmd
-	// grants: what allow-for-session answers gave this conversation, passed again to a
+	// grants: what allow-for-thread answers gave this conversation, passed again to a
 	// restarted process (effort.go).
 	grants grants
 	// swapping (under connMu): a restart is replacing the Conn; Store calls made outside
@@ -461,7 +461,7 @@ func (r *runner) onStreamEvent(ev claudestream.Event) {
 	r.maybeRestart()
 }
 
-// onAPIRetry records that Claude waits to retry a failed API request (Session.Retry),
+// onAPIRetry records that Claude waits to retry a failed API request (Thread.Retry),
 // so the thread says why it is quiet. Published, not persisted; cleared by clearRetry.
 func (r *runner) onAPIRetry(e *claudestream.APIRetry) {
 	status := 0
@@ -473,7 +473,7 @@ func (r *runner) onAPIRetry(e *claudestream.APIRetry) {
 	r.m.update(r.id, false, func(rec *record) { rec.s.Retry = retry })
 }
 
-// clearRetry drops Session.Retry on the first frame after an api_retry that is not
+// clearRetry drops Thread.Retry on the first frame after an api_retry that is not
 // another one: nothing announces a retry's success, so the next frame of any other kind
 // is the signal (Claude's own REPL clears its banner the same way). Unknown frames
 // count too: they are Claude's, so the request went through.

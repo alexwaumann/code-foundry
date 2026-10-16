@@ -267,7 +267,7 @@ func TestCreateWorktreeFetch(t *testing.T) {
 	}
 }
 
-// The session store resolves the worktree from the snapshot as soon as
+// The thread store resolves the worktree from the snapshot as soon as
 // CreateWorktree returns, so it must already be there, at the documented path for a
 // branch with a "/".
 func TestCreateWorktreeIsInSnapshotOnReturn(t *testing.T) {

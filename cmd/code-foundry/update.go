@@ -252,7 +252,7 @@ func (cl *cli) followDownload(ctx context.Context, c *client.Client) (*v1.Update
 }
 
 // restartCostOf is what restarting the daemon behind c would cut off (nothing when the
-// session list is unavailable).
+// thread list is unavailable).
 func restartCostOf(ctx context.Context, c *client.Client) command.RestartCost {
 	// Only threads working, waiting on an answer or running background work lose
 	// anything to the restart; an idle one starts again with its next message.

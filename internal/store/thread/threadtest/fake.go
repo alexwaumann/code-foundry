@@ -1,5 +1,5 @@
-// Package sessiontest provides an in-memory thread.Store for tests of code that
-// consumes sessions (API handlers, commands, the events stream). No processes are
+// Package threadtest provides an in-memory thread.Store for tests of code that
+// consumes threads (API handlers, commands, the events stream). No processes are
 // involved: tests drive state changes with Put.
 package threadtest
 
@@ -32,7 +32,7 @@ type Fake struct {
 	calls   []string
 	retired []thread.UsageBucket
 	items   map[string]*thread.ItemsSnapshot
-	// Watchers counts WatchItems calls whose ctx has not ended, by session.
+	// Watchers counts WatchItems calls whose ctx has not ended, by thread.
 	watchers map[string]int
 	mcpErrs  map[string]string
 }
@@ -58,7 +58,7 @@ func (f *Fake) Calls() []string {
 	return slices.Clone(f.calls)
 }
 
-// Put inserts or replaces a session and publishes Updated.
+// Put inserts or replaces a thread and publishes Updated.
 func (f *Fake) Put(s thread.Thread) {
 	f.mu.Lock()
 	f.byID[s.ID] = s
@@ -94,7 +94,7 @@ func (f *Fake) get(id string) (thread.Thread, error) {
 	return s, nil
 }
 
-// mutate applies fn to session id under the lock and publishes the result.
+// mutate applies fn to thread id under the lock and publishes the result.
 func (f *Fake) mutate(call, id string, fn func(*thread.Thread) error) (thread.Thread, error) {
 	f.mu.Lock()
 	if err := f.record(call); err != nil {
@@ -134,9 +134,9 @@ func (f *Fake) add(call string, s thread.Thread) (thread.Thread, error) {
 	return s, nil
 }
 
-// Create records the call and adds a STARTING session ("s-N"). With
-// NewWorktree the session's worktree is /worktrees/cf-<N> (CreatedWorktree, BaseRef as
-// requested). WorkspaceID is copied as is. With NewWorkspace the session belongs to
+// Create records the call and adds a STARTING thread ("s-N"). With
+// NewWorktree the thread's worktree is /worktrees/cf-<N> (CreatedWorktree, BaseRef as
+// requested). WorkspaceID is copied as is. With NewWorkspace the thread belongs to
 // workspace "w-new" and runs in /worktrees/<repo>, repo being RepoID or the first repo.
 // With NoProject it runs in /home. The call reads "Create <repo> <path> <model>
 // <effort>", then " perm=<n>", " new-worktree=<base>", " workspace=<id>",
@@ -206,7 +206,7 @@ func (f *Fake) ReadAttachment(_ context.Context, path string) ([]byte, string, e
 	return []byte("data:" + path), "image/png", nil
 }
 
-// Fork adds a STARTING session with ParentID set.
+// Fork adds a STARTING thread with ParentID set.
 func (f *Fake) Fork(_ context.Context, id, name string) (thread.Thread, error) {
 	f.mu.Lock()
 	parent, err := f.get(id)
@@ -220,7 +220,7 @@ func (f *Fake) Fork(_ context.Context, id, name string) (thread.Thread, error) {
 	})
 }
 
-// Get returns one session.
+// Get returns one thread.
 func (f *Fake) Get(_ context.Context, id string) (thread.Thread, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -249,7 +249,7 @@ func (f *Fake) Pin(_ context.Context, id string, pinned bool) (thread.Thread, er
 	})
 }
 
-// Archive records "Archive <id> <archived>". Archiving disconnects a live session
+// Archive records "Archive <id> <archived>". Archiving disconnects a live thread
 // (reason "closed"), unpins and unsnoozes it and sets ArchivedAt to Now unless already
 // set; unarchiving clears ArchivedAt only. No shells are involved.
 func (f *Fake) Archive(_ context.Context, id string, archived bool) (thread.Thread, error) {
@@ -270,7 +270,7 @@ func (f *Fake) Archive(_ context.Context, id string, archived bool) (thread.Thre
 }
 
 // Snooze records "Snooze <id> <until RFC3339 ms>" ("Snooze <id> -" to unsnooze).
-// Snoozing requires until after Now (ErrInvalidArgument), disconnects a live session
+// Snoozing requires until after Now (ErrInvalidArgument), disconnects a live thread
 // (reason "closed"), unpins and unarchives it and sets SnoozedUntil; unsnoozing clears
 // SnoozedUntil only. No shells are involved and nothing wakes: tests Put the woken
 // state.
@@ -295,7 +295,7 @@ func (f *Fake) Snooze(_ context.Context, id string, until time.Time) (thread.Thr
 	})
 }
 
-// Close disconnects the session with reason "closed".
+// Close disconnects the thread with reason "closed".
 func (f *Fake) Close(_ context.Context, id string) error {
 	_, err := f.mutate("Close "+id, id, func(s *thread.Thread) error {
 		if s.State != thread.StateDisconnected {
@@ -306,7 +306,7 @@ func (f *Fake) Close(_ context.Context, id string) error {
 	return err
 }
 
-// Reconnect requires DISCONNECTED and moves the session to STARTING, unarchived and
+// Reconnect requires DISCONNECTED and moves the thread to STARTING, unarchived and
 // unsnoozed.
 func (f *Fake) Reconnect(_ context.Context, id string) (thread.Thread, error) {
 	return f.mutate("Reconnect "+id, id, func(s *thread.Thread) error {
@@ -319,7 +319,7 @@ func (f *Fake) Reconnect(_ context.Context, id string) (thread.Thread, error) {
 }
 
 // RunIn records "RunIn <id> <repo> <path>". It requires a workspace thread. A
-// disconnected session moves at once to the path (else /worktrees/<repo>); a live one
+// disconnected thread moves at once to the path (else /worktrees/<repo>); a live one
 // gets it as PendingWorktreePath.
 func (f *Fake) RunIn(_ context.Context, id string, t thread.RunInTarget) (thread.Thread, error) {
 	return f.mutate("RunIn "+id+" "+t.RepoID+" "+t.WorktreePath, id, func(s *thread.Thread) error {
@@ -339,7 +339,7 @@ func (f *Fake) RunIn(_ context.Context, id string, t thread.RunInTarget) (thread
 	})
 }
 
-// Remove forgets a session and publishes Removed. Like the Manager, a session's usage
+// Remove forgets a thread and publishes Removed. Like the Manager, a thread's usage
 // moves to the retired ledger (then RetiredUsage is published too).
 func (f *Fake) Remove(_ context.Context, id string) error {
 	f.mu.Lock()
@@ -381,7 +381,7 @@ func (f *Fake) Snapshot() *thread.Snapshot {
 	return f.snap
 }
 
-// PutItems replaces a session's thread items (and pending requests, derived from the
+// PutItems replaces a thread's items (and pending requests, derived from the
 // request items) and publishes ItemAppended for each.
 func (f *Fake) PutItems(id string, items ...thread.Item) {
 	f.mu.Lock()
@@ -473,7 +473,7 @@ func (f *Fake) appendItem(id string, it thread.Item) (thread.Item, thread.Thread
 }
 
 // Send records "Send <id> <text>" (" attachments=<a,b>" and " composer=<text>" when
-// set) and appends a user_message item. A disconnected session becomes CONNECTED (the
+// set) and appends a user_message item. A disconnected thread becomes CONNECTED (the
 // Manager starts it). Sending unarchives and unsnoozes.
 func (f *Fake) Send(_ context.Context, id string, msg thread.Message) (thread.Item, error) {
 	f.mu.Lock()

@@ -62,7 +62,7 @@ type Runner interface {
 	Run(ctx context.Context, c Cmd) Result
 }
 
-// ExecRunner runs real processes: stdin is /dev/null, the child gets its own session
+// ExecRunner runs real processes: stdin is /dev/null, the child gets its own thread
 // (Setsid) so neither git nor ssh has a terminal to prompt on, and the environment is
 // scrubbed and pinned (see childEnv).
 type ExecRunner struct {

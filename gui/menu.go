@@ -5,7 +5,7 @@ import (
 )
 
 // EventRunCommand is emitted to the frontend by app menu items that run something in the
-// window: the data is a registry command name (session.new, view.settings, ...) or the
+// window: the data is a registry command name (thread.new, view.settings, ...) or the
 // name of a GUI view action (menuViewActions in gui/frontend/src/keys/menu.ts). The page
 // starts it exactly as the palette would, so the menu adds no user action of its own
 // (docs/notes/onboarding-1-entry-points.md).

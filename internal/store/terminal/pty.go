@@ -36,8 +36,8 @@ func startPTY(cmd *exec.Cmd, cols, rows uint16) (*os.File, error) {
 	}
 
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = tty, tty, tty
-	// New session with the PTY as controlling terminal (fd 0 in the child). The child is
-	// the session and process-group leader, so Kill can signal the whole group.
+	// New thread with the PTY as controlling terminal (fd 0 in the child). The child is
+	// the thread and process-group leader, so Kill can signal the whole group.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true, Setctty: true, Ctty: 0}
 	if err := cmd.Start(); err != nil {
 		_ = master.Close()

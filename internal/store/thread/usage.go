@@ -11,8 +11,8 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/pricing"
 )
 
-// Session usage (docs/notes/session-usage.md, design in
-// docs/sketches/session-usage/DESIGN.md).
+// Thread usage (docs/notes/session-usage.md, design in
+// docs/sketches/thread-usage/DESIGN.md).
 //
 // Every API response is one or more "assistant" records in the transcript carrying
 // message.model and message.usage. A streamed response is written as one record per
@@ -21,7 +21,7 @@ import (
 // only ever replaces the cached value with a complete fold, never adds to it from a
 // partial read: that one invariant makes restarts, resumes and forks safe.
 
-// UsageBucket is the token counters for one model on one UTC day of one session.
+// UsageBucket is the token counters for one model on one UTC day of one thread.
 type UsageBucket struct {
 	Model        string // canonical id as written by Claude: "claude-opus-5-5"
 	Tier         string // "" or "long" (Haiku 5.5 prompts over 100K tokens); see internal/pricing
@@ -183,9 +183,9 @@ func (f *usageFold) Line(line []byte) {
 // nil when nothing was counted.
 func (f *usageFold) Buckets() []UsageBucket { return sortedBuckets(f.buckets) }
 
-// setUsage replaces a session's usage, runs and changed sources with a complete
+// setUsage replaces a thread's usage, runs and changed sources with a complete
 // fold's (threadUsage.snapshot), persists them in one transaction, and publishes the
-// session when its usage or runs changed.
+// thread when its usage or runs changed.
 func (m *Manager) setUsage(id string, up usageUpdate) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

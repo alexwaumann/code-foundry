@@ -14,16 +14,16 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
 )
 
-// New-worktree sessions (CreateOptions.NewWorktree).
+// New-worktree threads (CreateOptions.NewWorktree).
 //
 // Create makes the worktree synchronously so a failure reaches the caller before
 // anything is persisted (the GUI composer keeps its draft). The branch is
-// cf/<slug>: the slug is the session's explicit name slugified, else the namer's
+// cf/<slug>: the slug is the thread's explicit name slugified, else the namer's
 // title for the first prompt slugified, else (no title, or one with nothing to
-// slugify) the session id. Only the branch waits for the namer, bounded by
-// Options.SlugTimeout. The namer is called once per session: a title that arrives in
-// time names the branch and the session; one that arrives later only names the
-// session then (the branch stays cf/<id>; the row keeps its placeholder until then).
+// slugify) the thread id. Only the branch waits for the namer, bounded by
+// Options.SlugTimeout. The namer is called once per thread: a title that arrives in
+// time names the branch and the thread; one that arrives later only names the
+// thread then (the branch stays cf/<id>; the row keeps its placeholder until then).
 
 // branchPrefix namespaces branches the app creates.
 const branchPrefix = "cf/"
@@ -42,13 +42,13 @@ type createdWorktree struct {
 	repoID, path, baseRef string
 	// name is the namer's title when it arrived within SlugTimeout.
 	name string
-	// namerCalled: the namer was started for this session (in time or not).
+	// namerCalled: the namer was started for this thread (in time or not).
 	namerCalled bool
 	// late delivers the namer's answer when it did not arrive in time.
 	late <-chan namingResult
 }
 
-// newWorktree resolves the branch and creates the worktree for a new session.
+// newWorktree resolves the branch and creates the worktree for a new thread.
 func (m *Manager) newWorktree(ctx context.Context, id, name string, o CreateOptions) (createdWorktree, error) {
 	var nw createdWorktree
 	if m.opts.Repos == nil {
@@ -103,11 +103,11 @@ func (m *Manager) newWorktree(ctx context.Context, id, name string, o CreateOpti
 // slugWait is the outcome of waitSlug.
 type slugWait struct {
 	// slug for the branch: the explicit name slugified, else the namer's title
-	// slugified, else "" (the caller falls back to the session id).
+	// slugified, else "" (the caller falls back to the thread id).
 	slug string
 	// name is the namer's title when it arrived within SlugTimeout.
 	name string
-	// namerCalled: the namer was started for this session (in time or not).
+	// namerCalled: the namer was started for this thread (in time or not).
 	namerCalled bool
 	// late delivers the namer's answer when it did not arrive in time.
 	late <-chan namingResult
@@ -182,8 +182,8 @@ func (m *Manager) startSlug(id, prompt string) (<-chan namingResult, error) {
 	return ch, nil
 }
 
-// applyLateName names session id from a namer answer that missed SlugTimeout, unless
-// the session was named meanwhile.
+// applyLateName names thread id from a namer answer that missed SlugTimeout, unless
+// the thread was named meanwhile.
 func (m *Manager) applyLateName(id string, ch <-chan namingResult) {
 	m.mu.Lock()
 	if m.closed {
@@ -262,7 +262,7 @@ func validateRef(ref string) error {
 	return nil
 }
 
-// repoError wraps a repo store error in the session error class with the same
+// repoError wraps a repo store error in the thread error class with the same
 // meaning, so API codes survive.
 func repoError(what string, err error) error {
 	var kind error
@@ -279,7 +279,7 @@ func repoError(what string, err error) error {
 	return classified{kind: kind, err: fmt.Errorf("%s: %w", what, err)}
 }
 
-// classified adds a session error class to an error without repeating it in the
+// classified adds a thread error class to an error without repeating it in the
 // message (repo errors already start with "failed precondition: ...").
 type classified struct{ kind, err error }
 

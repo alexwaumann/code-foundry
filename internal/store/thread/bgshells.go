@@ -21,7 +21,7 @@ import (
 // its result comes at once ("Command running in background with ID: b…"), so the
 // projector keeps it running (projector.async) until the shell ends, then done with
 // Claude's summary as its output, or an error with it. No note items: the count shows
-// in the strip above the composer only (Session.BackgroundShellsRunning).
+// in the strip above the composer only (Thread.BackgroundShellsRunning).
 
 // shellOrphanSuffix ends the error of a shell still running when its process ended
 // (the reasons are the agents': orphanProcessEnded, orphanDaemonStopped, ...).

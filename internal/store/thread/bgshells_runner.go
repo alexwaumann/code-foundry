@@ -3,7 +3,7 @@ package thread
 import "github.com/alexwaumann/code-foundry/internal/claudestream"
 
 // The runner's half of the background shells (bgshells.go): task frames in, the call's
-// item and the Session's count out.
+// item and the Thread's count out.
 
 // onShellTask applies a task frame if it is one of the thread's own shells'; false
 // when it is not (the agents model takes it).
@@ -36,8 +36,8 @@ func (r *runner) shellCall(toolUseID string) (name, input string) {
 	return it.Tool.Name, it.Tool.InputJSON
 }
 
-// publishBgShells sets the Session's count of running shells (not persisted: shells die
-// with the process). EventService carries it with the session.
+// publishBgShells sets the Thread's count of running shells (not persisted: shells die
+// with the process). EventService carries it with the thread.
 func (r *runner) publishBgShells() {
 	n := r.bgShells.count()
 	if n == r.bgShellsPub {

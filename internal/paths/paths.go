@@ -25,7 +25,7 @@ const EnvHome = "CODE_FOUNDRY_HOME"
 
 // The daemon sets these in every Claude session it spawns: its loopback endpoint
 // (http://127.0.0.1:<port>) and bearer token. The CLI prefers them over the Unix
-// socket (client.EndpointFromEnv); sandboxed sessions cannot connect to sockets.
+// socket (client.EndpointFromEnv); sandboxed threads cannot connect to sockets.
 const (
 	EnvEndpoint = "CODE_FOUNDRY_ENDPOINT"
 	EnvToken    = "CODE_FOUNDRY_TOKEN"
@@ -119,7 +119,7 @@ func (p Paths) Worktrees() string { return filepath.Join(p.home, "worktrees") }
 func (p Paths) Projects() string { return filepath.Join(p.home, "projects") }
 
 // Attachments is where images staged for a new thread's first prompt are kept
-// (SessionService.StageAttachment). The session store creates it on demand and
+// (ThreadService.StageAttachment). The thread store creates it on demand and
 // removes files older than a day on daemon start.
 func (p Paths) Attachments() string { return filepath.Join(p.home, "attachments") }
 

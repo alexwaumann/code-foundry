@@ -42,7 +42,7 @@ var (
 )
 
 // TerminalDeps are the terminal.* commands' dependencies. terminal.new reads the
-// thread (Session) or the registered worktrees (Repo) to find who owns a new shell.
+// thread (Thread) or the registered worktrees (Repo) to find who owns a new shell.
 type TerminalDeps struct {
 	Terminal TerminalBackend
 	Repo     RepoBackend

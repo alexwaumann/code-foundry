@@ -13,7 +13,7 @@ import (
 // publication out.
 //
 // Publication goes through publishUsage (runner.go), the one path that replaces the
-// Session's AgentRuns (and persists the changed runs) and then the thread log's list
+// Thread's AgentRuns (and persists the changed runs) and then the thread log's list
 // (AgentsChanged). A lifecycle change publishes at once; progress alone (task_progress
 // comes per tool call) at most once per agentPublishGap, the rest on the next tick.
 
@@ -183,8 +183,8 @@ func (p *projector) agentEnded(toolUseID string, failed bool, output string, fin
 	})
 }
 
-// setAgentRuns replaces a session's runs' records while its usage cannot be published
-// (a rescan failed: runner.usageOff): each run keeps the usage the session has.
+// setAgentRuns replaces a thread's runs' records while its usage cannot be published
+// (a rescan failed: runner.usageOff): each run keeps the usage the thread has.
 func (m *Manager) setAgentRuns(id string, runs []AgentRun) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

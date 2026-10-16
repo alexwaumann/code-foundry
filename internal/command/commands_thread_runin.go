@@ -8,7 +8,7 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 )
 
-// hasWorkspaceThread is session.run-in's availability: a thread is active and, in the
+// hasWorkspaceThread is thread.run-in's availability: a thread is active and, in the
 // GUI, it belongs to a workspace (the GUI passes the thread's workspace as
 // ActiveWorkspaceID). A CLI caller (no active view) names the thread with --id, which
 // When cannot look up, so the daemon refuses a project thread instead.
@@ -16,7 +16,7 @@ func hasWorkspaceThread(c Context) bool {
 	return hasThread(c) && (c.ActiveWorkspaceID != "" || c.ActiveView == "")
 }
 
-// sessionRunIn is session.run-in: move a workspace thread to another member worktree
+// threadRunIn is thread.run-in: move a workspace thread to another member worktree
 // ("Run in…"). The daemon moves a live thread (set_cwd) once it is idle at its prompt.
 func threadRunIn(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{

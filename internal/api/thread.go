@@ -18,7 +18,7 @@ import (
 // thread pass through each subscription, so it is larger than watchBuffer.
 const threadWatchBuffer = 2048
 
-// Thread implements codefoundryv1connect.ThreadServiceHandler over the session store's
+// Thread implements codefoundryv1connect.ThreadServiceHandler over the thread store's
 // thread methods.
 type Thread struct {
 	store thread.Store

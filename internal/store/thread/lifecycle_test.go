@@ -560,7 +560,7 @@ func TestIdleStopLoop(t *testing.T) {
 	}
 }
 
-// sessions.cache_ttl_seconds moves the expiry both ways; a thread without a result
+// threads.cache_ttl_seconds moves the expiry both ways; a thread without a result
 // counts from its last activity; the grace holds a young process past an old expiry.
 func TestIdleStopExpiryRules(t *testing.T) {
 	t.Run("ttl changes", func(t *testing.T) {

@@ -175,7 +175,7 @@ func TestNamingModelField(t *testing.T) {
 		!slices.Equal(f.EnumLabels, field(t, KeyDefaultModel).EnumLabels) {
 		t.Errorf("field = %+v, want a live Threads enum over the model registry", f)
 	}
-	// Directly after "Name sessions automatically".
+	// Directly after "Name threads automatically".
 	if i := slices.IndexFunc(staticFields, func(f Field) bool { return f.Key == KeyAutoName }); staticFields[i+1].Key != KeyNamingModel {
 		t.Errorf("field after %s = %s", KeyAutoName, staticFields[i+1].Key)
 	}
@@ -334,7 +334,7 @@ func TestNotificationFields(t *testing.T) {
 
 func TestDefaultWorktreeField(t *testing.T) {
 	f := field(t, KeyDefaultWorktree)
-	// Live (the composer reads every snapshot), in Sessions, right after the default effort.
+	// Live (the composer reads every snapshot), in Threads, right after the default effort.
 	if f.Group != GroupThreads || f.Type != Enum || f.Default != WorktreeNew || f.Restart || f.Title != "New threads work in" {
 		t.Errorf("field = %+v", f)
 	}

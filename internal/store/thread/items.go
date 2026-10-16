@@ -252,7 +252,7 @@ type Message struct {
 type Decision struct {
 	Allow bool
 	// ForSession, with Allow, also applies Claude's permission suggestions ("allow for
-	// this session").
+	// this thread").
 	ForSession bool
 	// Answers answer a question: question text -> chosen label(s). Required for a
 	// question unless denying.
@@ -263,11 +263,11 @@ type Decision struct {
 	Interrupt bool
 }
 
-// ThreadEvent is published on the bus as bus.Publish[session.ThreadEvent] for every
+// ThreadEvent is published on the bus as bus.Publish[thread.ThreadEvent] for every
 // change to a thread's items. Seq increases per thread.
 type ThreadEvent interface {
 	isThreadEvent()
-	// Thread is the session id.
+	// Thread is the thread id.
 	Thread() string
 }
 

@@ -51,7 +51,7 @@ func readOperation(adminDir string) operationInfo {
 		// The merge backend (the default, and every interactive rebase).
 		return operationInfo{Op: OpRebase, Step: readInt(at("rebase-merge", "msgnum")), Total: readInt(at("rebase-merge", "end"))}
 	case isDir(at("rebase-apply")):
-		// The apply backend, shared with `git am`; "applying" marks an am session.
+		// The apply backend, shared with `git am`; "applying" marks an am thread.
 		op := OpRebase
 		if exists(at("rebase-apply", "applying")) {
 			op = OpAm

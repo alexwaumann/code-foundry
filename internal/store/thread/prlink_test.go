@@ -280,7 +280,7 @@ func TestSaveAndLoadLinks(t *testing.T) {
 	if err := saveLinks(ctx, db, b.ID, []LinkedPullRequest{l(2)}); err != nil {
 		t.Fatal(err)
 	}
-	// A URL the session has is ignored, not an error; the first row wins.
+	// A URL the thread has is ignored, not an error; the first row wins.
 	dup := l(3)
 	dup.LinkedAt = at.Add(time.Hour)
 	if err := saveLinks(ctx, db, a.ID, []LinkedPullRequest{dup, l(4)}); err != nil {

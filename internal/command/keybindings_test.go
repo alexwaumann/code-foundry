@@ -50,7 +50,7 @@ func TestPanelKeybindings(t *testing.T) {
 	}
 }
 
-// The chords the GUI (phase 2c) expects on the session commands.
+// The chords the GUI (phase 2c) expects on the thread commands.
 func TestThreadKeybindings(t *testing.T) {
 	f := newFixture(t)
 	want := map[string]string{

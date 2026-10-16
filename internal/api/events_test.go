@@ -304,7 +304,7 @@ func TestEventsSnapshotOrderThenLive(t *testing.T) {
 	if got := describe(s.next()); got != "ui.palette x" {
 		t.Fatalf("got %q, want ui.palette x", got)
 	}
-	// The labels that place session terminals survive the mapping.
+	// The labels that place thread terminals survive the mapping.
 	if l := f.term.List(ctx); len(l) != 1 || l[0].Labels["thread"] != "s1" {
 		t.Fatalf("list = %v", l)
 	}

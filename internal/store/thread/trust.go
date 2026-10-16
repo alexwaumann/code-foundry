@@ -157,8 +157,8 @@ func lockFile(path string) (func(), error) {
 	}
 }
 
-// PreTrust marks dir as trusted in Claude's config, as spawn does for a session's
-// worktree, so a session can later be started in (or moved with RunIn to) dir. The
+// PreTrust marks dir as trusted in Claude's config, as spawn does for a thread's
+// worktree, so a thread can later be started in (or moved with RunIn to) dir. The
 // workspace store calls it for member worktrees. It is a no-op with
 // Options.DisablePreTrust.
 func (m *Manager) PreTrust(dir string) error {

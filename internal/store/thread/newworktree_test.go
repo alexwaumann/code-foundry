@@ -63,7 +63,7 @@ func TestCreateNewWorktree(t *testing.T) {
 		o          CreateOptions
 		taken      []string
 		namer      func(n int, msg string) (string, error) // n counts calls from 1
-		wantBranch string                                  // "<id>" stands for cf/<session id>
+		wantBranch string                                  // "<id>" stands for cf/<thread id>
 		wantName   string
 		wantCalls  int
 		wantBase   string
@@ -158,7 +158,7 @@ func TestCreateNewWorktree(t *testing.T) {
 			n2 := len(e.named)
 			e.mu.Unlock()
 			if want := tt.wantCalls; tt.wantCalls == 0 && tt.o.Name == "" {
-				// Nothing named the session yet, so the transcript path may name it.
+				// Nothing named the thread yet, so the transcript path may name it.
 				if n2 > 1 {
 					t.Errorf("namer calls after transcript = %d", n2)
 				}

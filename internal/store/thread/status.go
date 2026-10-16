@@ -2,7 +2,7 @@ package thread
 
 import "time"
 
-// Status is what Claude is doing. Values mirror codefoundry.v1.SessionStatus, so a
+// Status is what Claude is doing. Values mirror codefoundry.v1.ThreadStatus, so a
 // conversion is a cast.
 type Status int
 
@@ -45,7 +45,7 @@ func (s *Thread) setStatus(st Status, reason string, now time.Time) bool {
 	return true
 }
 
-// disconnectedStatus is the status a session keeps once its process is gone, whatever
+// disconnectedStatus is the status a thread keeps once its process is gone, whatever
 // the disconnect reason (closed, exited, crashed, daemon stopped or restarted): a turn
 // that was running is interrupted (StatusError ReasonInterrupted); anything else,
 // including needs-attention with its reason, is kept so it survives a daemon restart.

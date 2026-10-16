@@ -8,8 +8,8 @@ import "time"
 // agents-1-daemon.md), a moment after the end frame. Until that turn ends the thread is
 // not really idle: an effort restart (maybeRestart) in that gap would close stdin under
 // the reply. So the end sets wakePending, the next result clears it, and a fallback timer
-// (Options.WakeTimeout) clears it when no turn comes. Session.WakePending mirrors it on
-// the row (not persisted, not on the proto) and Session.BackgroundWork counts it.
+// (Options.WakeTimeout) clears it when no turn comes. Thread.WakePending mirrors it on
+// the row (not persisted, not on the proto) and Thread.BackgroundWork counts it.
 
 // expectWake notes that a background end (what) may wake Claude: only when it arrived at
 // the prompt (an end during a turn is reported in that turn).

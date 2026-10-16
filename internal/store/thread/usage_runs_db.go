@@ -92,7 +92,7 @@ func saveTranscript(ctx context.Context, db *sql.DB, threadID, cid string, seq i
 	return nil
 }
 
-// loadTranscripts returns every session's transcript ids, oldest first.
+// loadTranscripts returns every thread's transcript ids, oldest first.
 func loadTranscripts(ctx context.Context, db *sql.DB) (map[string][]string, error) {
 	rows, err := db.QueryContext(ctx, `SELECT session_id, claude_session_id FROM session_transcripts
 		ORDER BY session_id, seq, rowid`)
@@ -114,7 +114,7 @@ func loadTranscripts(ctx context.Context, db *sql.DB) (map[string][]string, erro
 	return out, nil
 }
 
-// loadAgentRuns returns every session's runs (sorted like Session.AgentRuns) with
+// loadAgentRuns returns every thread's runs (sorted like Thread.AgentRuns) with
 // their usage.
 func loadAgentRuns(ctx context.Context, db *sql.DB) (map[string][]AgentRun, error) {
 	rows, err := db.QueryContext(ctx, `SELECT session_id, agent_id, claude_session_id, tool_use_id, description,
@@ -162,8 +162,8 @@ func loadAgentRuns(ctx context.Context, db *sql.DB) (map[string][]AgentRun, erro
 	return out, nil
 }
 
-// loadSourceUsage returns the per-source buckets of one session (sessionID != "") or
-// of all: session id -> source -> buckets sorted by (Day, Model, Tier, Speed).
+// loadSourceUsage returns the per-source buckets of one thread (threadID != "") or
+// of all: thread id -> source -> buckets sorted by (Day, Model, Tier, Speed).
 func loadSourceUsage(ctx context.Context, db *sql.DB, threadID string) (map[string]map[string][]UsageBucket, error) {
 	q := `SELECT session_id, source, ` + usageColumns + ` FROM session_source_usage`
 	var args []any

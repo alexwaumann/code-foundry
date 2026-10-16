@@ -73,14 +73,14 @@ const ViewPanelWorktree = "panel.worktree"
 
 // hasWorkspaceThreadContext is view.panel.workspace's availability: a thread is active
 // and it belongs to a workspace (the GUI passes the thread's workspace as
-// ActiveWorkspaceID; the CLI with --context-session and --context-workspace).
+// ActiveWorkspaceID; the CLI with --context-thread and --context-workspace).
 func hasWorkspaceThreadContext(c Context) bool {
 	return hasThread(c) && c.ActiveWorkspaceID != ""
 }
 
 // hasWorktreeThreadContext is view.panel.worktree's availability: a thread is active and
 // it sits in a registered worktree (the GUI passes the placement as ActiveRepoID and
-// ActiveWorktreePath; the CLI with --context-session plus --context-repo and
+// ActiveWorktreePath; the CLI with --context-thread plus --context-repo and
 // --context-worktree). A terminal alone does not count: the GUI never selects one (a
 // Projects-page bottom shell brings its worktree, but the page has no thread).
 func hasWorktreeThreadContext(c Context) bool {

@@ -235,7 +235,7 @@ func (m *Manager) failStart(id string, log *threadLog, err error) error {
 }
 
 // startFailure is the timeline's line for a start that failed: "Claude did not start:
-// <reason>", without the store's own "session <id>: " prefix.
+// <reason>", without the store's own "thread <id>: " prefix.
 func startFailure(id string, err error) string {
 	return "Claude did not start: " + strings.TrimPrefix(err.Error(), "thread "+id+": ")
 }

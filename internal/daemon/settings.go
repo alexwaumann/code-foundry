@@ -24,11 +24,11 @@ import (
 // settings page marks them "applies after a daemon restart". Everything below applies
 // live:
 //
-//   - keybinding overrides and session model/effort defaults -> command registry
+//   - keybinding overrides and thread model/effort defaults -> command registry
 //     overrides (CommandService.List reports the effective values);
 //   - log level -> the log file handler's LevelVar;
-//   - auto-naming and the naming model -> a Namer that reads both per session;
-//   - sessions.cache_ttl_seconds -> thread.Manager.SetCacheTTL on every change
+//   - auto-naming and the naming model -> a Namer that reads both per thread;
+//   - threads.cache_ttl_seconds -> thread.Manager.SetCacheTTL on every change
 //     (applyCacheTTL), which republishes the threads whose cache expiry moved;
 //   - worktree directory -> repo.worktree.new's default path, and the path of the
 //     worktree a new thread creates (thread.Options.WorktreePath).
@@ -80,11 +80,11 @@ func logLevel(s string) slog.Level {
 	return l
 }
 
-// errAutoNameOff is what the namer returns when auto-naming is turned off; the session
-// store logs it and leaves the session unnamed.
+// errAutoNameOff is what the namer returns when auto-naming is turned off; the thread
+// store logs it and leaves the thread unnamed.
 var errAutoNameOff = errors.New("auto-naming is turned off in settings (threads.auto_name)")
 
-// settingsNamer wraps next so sessions.auto_name and sessions.naming_model apply
+// settingsNamer wraps next so threads.auto_name and threads.naming_model apply
 // without a restart: each call reads them and hands the model to next with
 // thread.WithNamingModel.
 func settingsNamer(st *settings.Store, next thread.Namer) thread.Namer {
@@ -97,7 +97,7 @@ func settingsNamer(st *settings.Store, next thread.Namer) thread.Namer {
 	}
 }
 
-// settingsWorktreePath applies repos.worktree_dir to the worktrees the session store
+// settingsWorktreePath applies repos.worktree_dir to the worktrees the thread store
 // makes for new threads (thread.Options.WorktreePath), the same way worktreeDirRepo
 // does for repo.worktree.new. "" leaves the repo store's default.
 func settingsWorktreePath(st *settings.Store) func(repo.Repo, string) string {
@@ -159,11 +159,11 @@ func settingsManagedRoots(st *settings.Store) func(string) []string {
 	}
 }
 
-// cacheTTLSetter is the session store's live cache TTL (*thread.Manager).
+// cacheTTLSetter is the thread store's live cache TTL (*thread.Manager).
 type cacheTTLSetter interface{ SetCacheTTL(time.Duration) }
 
-// applyCacheTTL keeps the session store's prompt cache lifetime equal to
-// sessions.cache_ttl_seconds, now and on every settings change.
+// applyCacheTTL keeps the thread store's prompt cache lifetime equal to
+// threads.cache_ttl_seconds, now and on every settings change.
 func applyCacheTTL(st *settings.Store, threads cacheTTLSetter) {
 	st.OnChange(func(snap *settings.Snapshot) { threads.SetCacheTTL(snap.Settings.CacheTTL()) })
 }

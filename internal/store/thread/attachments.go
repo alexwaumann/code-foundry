@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-// Attachments are images staged for a new session's first prompt. The GUI uploads
+// Attachments are images staged for a new thread's first prompt. The GUI uploads
 // them with StageAttachment before Create; Create appends one "Attached image: <path>"
 // line per path and Claude reads them with its Read tool. Staged files are kept so a
 // later turn can read them again (and so what a thread was sent can be inspected when

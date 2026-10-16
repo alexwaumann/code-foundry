@@ -82,7 +82,7 @@ func TestPullRequestThreadCommands(t *testing.T) {
 		uctx    command.Context
 		setup   func(*prThreadFixture)
 		wantReq []proto.Message // gh, repo and gitops requests, in call order
-		// wantSession checks the CreateSessionRequest (prompt by prefix and contents).
+		// wantThread checks the CreateThreadRequest (prompt by prefix and contents).
 		wantThread   *v1.CreateThreadRequest
 		wantPrompt   string
 		wantInPrompt []string

@@ -136,7 +136,7 @@ func (p *Process) Stderr() string {
 	return string(p.stderr)
 }
 
-// LastStderrLine is the last non-empty stderr line, for a session's LastError.
+// LastStderrLine is the last non-empty stderr line, for a thread's LastError.
 func (p *Process) LastStderrLine() string {
 	lines := strings.Split(strings.TrimSpace(p.Stderr()), "\n")
 	for i := len(lines) - 1; i >= 0; i-- {

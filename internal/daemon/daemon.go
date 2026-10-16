@@ -96,8 +96,8 @@ func Run(ctx context.Context, opts Options) error {
 	defer restart(nil)
 
 	// The loopback listener and its token exist before the stores: every Claude
-	// session gets them in its environment (sessionEnv), so the CLI inside a session
-	// reaches this daemon over TCP. Sandboxed sessions cannot use the Unix socket.
+	// thread gets them in its environment (threadEnv), so the CLI inside a thread
+	// reaches this daemon over TCP. Sandboxed threads cannot use the Unix socket.
 	token, err := newToken()
 	if err != nil {
 		return err

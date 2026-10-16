@@ -8,10 +8,10 @@ import (
 
 // Context totals of rendered threads (docs/notes/rendered-threads-cold-cache.md).
 //
-// After every result the thread records its context size (Session.ContextTokens), the
+// After every result the thread records its context size (Thread.ContextTokens), the
 // model that answered and when (LastResultAt). The prompt cache refreshes on every hit,
 // so the conversation's cache expires one TTL after its last request:
-// CacheExpiresAt = LastResultAt + the store's cache TTL (the sessions.cache_ttl_seconds
+// CacheExpiresAt = LastResultAt + the store's cache TTL (the threads.cache_ttl_seconds
 // setting, applied live with SetCacheTTL). Claude Code exposes its TTL only to hooks,
 // which managed settings forbid, so the daemon keeps it as a setting.
 
@@ -55,7 +55,7 @@ func (m *Manager) cacheTTLLocked() time.Duration {
 	return DefaultCacheTTL
 }
 
-// SetCacheTTL changes the prompt cache lifetime (the sessions.cache_ttl_seconds
+// SetCacheTTL changes the prompt cache lifetime (the threads.cache_ttl_seconds
 // setting) and recomputes every thread's CacheExpiresAt, publishing the threads whose
 // expiry moved. A ttl <= 0 restores DefaultCacheTTL.
 func (m *Manager) SetCacheTTL(ttl time.Duration) {

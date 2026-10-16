@@ -39,7 +39,7 @@ type Settings struct {
 	Advanced    Advanced
 }
 
-// Sessions are defaults for new Claude Code sessions.
+// Threads are defaults for new Claude Code sessions.
 type Threads struct {
 	DefaultModel      string // default model.Default
 	DefaultEffort     string // default "high"
@@ -115,12 +115,12 @@ func Defaults() Settings {
 	return resolve(nil, nil).settings
 }
 
-// CloseGrace is Sessions.CloseGraceSeconds as a duration.
+// CloseGrace is Threads.CloseGraceSeconds as a duration.
 func (s Settings) CloseGrace() time.Duration {
 	return time.Duration(s.Threads.CloseGraceSeconds) * time.Second
 }
 
-// CacheTTL is Sessions.CacheTTLSeconds as a duration.
+// CacheTTL is Threads.CacheTTLSeconds as a duration.
 func (s Settings) CacheTTL() time.Duration {
 	return time.Duration(s.Threads.CacheTTLSeconds) * time.Second
 }

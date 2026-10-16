@@ -320,7 +320,7 @@ func TestRenderedSetEffortGap(t *testing.T) {
 					t.Fatalf("send: %v", err)
 				}
 				re.waitFor(s.ID, "applied", func(s Thread) bool { return !s.EffortPending && turnOver(s) })
-				// The session can publish the applied state a moment before the held
+				// The thread can publish the applied state a moment before the held
 				// message is written to the new process's stdin: wait for the delivery.
 				fresh, resumed := re.waitDeliveries("held", func(fresh, resumed int) bool { return fresh == 0 && resumed == 1 })
 				if fresh != 0 || resumed != 1 {

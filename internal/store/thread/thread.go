@@ -1,13 +1,13 @@
-// Package session is the Claude session store. A session (a thread) is Claude Code
-// running in a worktree as `claude -p` over stream-json (internal/claudestream): a
-// connected session owns one claude process, a disconnected one owns none. The store
+// Package thread is the thread store. A thread is a Claude Code conversation
+// run in a worktree as `claude -p` over stream-json (internal/claudestream): a
+// connected thread owns one claude process, a disconnected one owns none. The store
 // starts the process when a message is sent (`claude --resume`) and stops it when the
 // thread has idled past its prompt cache expiry (lifecycle.go): users never manage it.
 // Its conversation is recorded as thread items (Store.Items).
 //
-// The Manager persists sessions in SQLite (they survive daemon restarts as
+// The Manager persists threads in SQLite (they survive daemon restarts as
 // DISCONNECTED), publishes an immutable Snapshot behind an atomic pointer, and emits
-// Updated/Removed events on the bus. Each connected session has one runner goroutine
+// Updated/Removed events on the bus. Each connected thread has one runner goroutine
 // that drives the process over stdio, projects the stream into items, derives the
 // status from it, tails the Claude transcript, and runs the graceful close. See
 // docs/notes/rendered-threads-1-daemon.md and docs/notes/rendered-only-daemon.md.
@@ -28,8 +28,8 @@ var (
 	ErrClosed             = errors.New("thread store closed")
 )
 
-// State is the lifecycle of the Claude process behind a session. Values mirror
-// codefoundry.v1.SessionState.
+// State is the lifecycle of the Claude process behind a thread. Values mirror
+// codefoundry.v1.ThreadState.
 type State int
 
 // States.
@@ -60,7 +60,7 @@ func (s State) String() string {
 	}
 }
 
-// PermissionMode is the claude --permission-mode a session runs with. Values mirror
+// PermissionMode is the claude --permission-mode a thread runs with. Values mirror
 // codefoundry.v1.PermissionMode. Full access (bypassPermissions) is deliberately not
 // representable.
 type PermissionMode int
@@ -93,7 +93,7 @@ func (p PermissionMode) Flag() string {
 
 func (p PermissionMode) valid() bool { return p >= PermissionDefault && p <= PermissionAuto }
 
-// Disconnect reasons recorded in Session.DisconnectReason.
+// Disconnect reasons recorded in Thread.DisconnectReason.
 const (
 	ReasonClosed         = "closed"           // closed through Close (archive, snooze, remove)
 	ReasonExited         = "exited"           // process exited 0 without a close request (/exit)
@@ -109,8 +109,8 @@ const (
 // ReasonInterrupted is the StatusReason of StatusError: the process ended mid-turn.
 const ReasonInterrupted = "interrupted"
 
-// Session is an immutable snapshot of one session. Field meanings follow
-// codefoundry.v1.Session.
+// Thread is an immutable snapshot of one thread. Field meanings follow
+// codefoundry.v1.Thread.
 //
 // Owner: WorkspaceID when set, else the project RepoID when set, else none (a thread
 // without a project, CreateOptions.NoProject, running in Options.Home). RepoID and
@@ -207,12 +207,12 @@ type Thread struct {
 	BackgroundShellsRunning int
 	// WakePending: a background shell or agent run ended while Claude was at its prompt,
 	// and the turn Claude starts by itself to report it has not ended yet (wake.go). Not
-	// persisted; Session.background_wake_pending on the API.
+	// persisted; Thread.background_wake_pending on the API.
 	WakePending bool
 }
 
 // APIRetry is one api_retry frame of a thread's stream (stream.go): Claude retries a
-// failed API request at RetryAt. A value in Session.Retry: never mutated once set.
+// failed API request at RetryAt. A value in Thread.Retry: never mutated once set.
 type APIRetry struct {
 	// Attempt counts from 1 to MaxRetries.
 	Attempt, MaxRetries int
@@ -224,17 +224,17 @@ type APIRetry struct {
 	Error string
 }
 
-// Snapshot is every session, sorted by creation time then id. Never mutate it.
+// Snapshot is every thread, sorted by creation time then id. Never mutate it.
 type Snapshot struct {
 	Threads []Thread
-	// RetiredUsage is the usage of removed sessions summed per (model, tier, speed,
-	// day): Store.Remove adds a session's buckets here as it forgets it, so the total
-	// over every thread ever tracked is the sessions' Usage plus RetiredUsage. Sorted
-	// like Session.Usage. Persisted (usage_retired).
+	// RetiredUsage is the usage of removed threads summed per (model, tier, speed,
+	// day): Store.Remove adds a thread's buckets here as it forgets it, so the total
+	// over every thread ever tracked is the threads' Usage plus RetiredUsage. Sorted
+	// like Thread.Usage. Persisted (usage_retired).
 	RetiredUsage []UsageBucket
 }
 
-// Session returns the session with id.
+// Thread returns the thread with id.
 func (s *Snapshot) Thread(id string) (Thread, bool) {
 	if s == nil {
 		return Thread{}, false
@@ -246,21 +246,21 @@ func (s *Snapshot) Thread(id string) (Thread, bool) {
 	return s.Threads[i], true
 }
 
-// Event is published on the bus as bus.Publish[session.Event]. Subscribe with
-// bus.Subscribe[session.Event] and type-switch. The store publishes only Updated,
+// Event is published on the bus as bus.Publish[thread.Event]. Subscribe with
+// bus.Subscribe[thread.Event] and type-switch. The store publishes only Updated,
 // Removed and RetiredUsage; *Snapshot also implements Event so a consumer can merge
 // "resync with the current snapshot" into the same stream (the API's Watch does that
 // on drops).
 type Event interface{ isThreadListEvent() }
 
-// Updated carries a session's full state after a change.
+// Updated carries a thread's full state after a change.
 type Updated struct{ Thread Thread }
 
-// Removed is sent when a session is forgotten.
+// Removed is sent when a thread is forgotten.
 type Removed struct{ ID string }
 
-// RetiredUsage follows Removed when the removed session had usage. It carries the
-// whole retired ledger (Snapshot.RetiredUsage) after the session's buckets were added.
+// RetiredUsage follows Removed when the removed thread had usage. It carries the
+// whole retired ledger (Snapshot.RetiredUsage) after the thread's buckets were added.
 type RetiredUsage struct{ Buckets []UsageBucket }
 
 func (Updated) isThreadListEvent()      {}
@@ -302,10 +302,10 @@ type CreateOptions struct {
 	ComposerPrompt string
 	// PermissionMode selects claude --permission-mode.
 	PermissionMode PermissionMode
-	// NewWorktree, when set, makes Create branch a new worktree for the session before
+	// NewWorktree, when set, makes Create branch a new worktree for the thread before
 	// claude starts; WorktreePath is then ignored. The branch is cf/<slug>, the slug
 	// named from InitialPrompt with a bounded wait (Options.SlugTimeout), else
-	// cf/<session id>.
+	// cf/<thread id>.
 	NewWorktree *NewWorktree
 	// Attachments are paths returned by StageAttachment. Each becomes an
 	// "Attached image: <path>" line after the prompt; Claude reads them with its Read
@@ -328,23 +328,23 @@ type NewWorktree struct {
 	BaseRef string
 }
 
-// Store is the session store API. *Manager implements it; sessiontest.Fake is an
+// Store is the thread store API. *Manager implements it; threadtest.Fake is an
 // in-memory fake.
 type Store interface {
 	Create(ctx context.Context, opts CreateOptions) (Thread, error)
-	// Fork starts a new session continuing id's conversation (claude --fork-session).
+	// Fork starts a new thread continuing id's conversation (claude --fork-session).
 	Fork(ctx context.Context, id, name string) (Thread, error)
 	Get(ctx context.Context, id string) (Thread, error)
 	// Rename sets a user-chosen name and disables auto-naming.
 	Rename(ctx context.Context, id, name string) (Thread, error)
-	// Close ends the Claude process gracefully and waits until the session is
+	// Close ends the Claude process gracefully and waits until the thread is
 	// DISCONNECTED (bounded by the store's close timeout plus the kill grace). No
 	// command calls it: archive, snooze and remove close through it.
 	Close(ctx context.Context, id string) error
-	// Reconnect resumes a DISCONNECTED session in a new claude process, without a
+	// Reconnect resumes a DISCONNECTED thread in a new claude process, without a
 	// prompt. No command calls it: a message starts a stopped thread (Send).
 	Reconnect(ctx context.Context, id string) (Thread, error)
-	// Remove closes the session if needed and forgets it.
+	// Remove closes the thread if needed and forgets it.
 	Remove(ctx context.Context, id string) error
 	// RunIn moves a workspace thread to another member worktree: set_cwd once the live
 	// thread is idle at its prompt (the row's cwd changes when Claude accepts), or the
@@ -372,7 +372,7 @@ type Store interface {
 	// Snapshot returns the current immutable snapshot.
 	Snapshot() *Snapshot
 
-	// Thread conversations (thread.go, items.go).
+	// Thread conversations (conversation.go, items.go).
 
 	// Items returns a thread's conversation: every item, the one streaming
 	// included, and the pending permission requests and questions.

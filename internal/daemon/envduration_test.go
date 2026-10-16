@@ -8,7 +8,7 @@ import (
 )
 
 // The idle-stop development aids (CODE_FOUNDRY_IDLE_GRACE, CODE_FOUNDRY_IDLE_CHECK):
-// a valid positive duration, else 0 (the session store's default).
+// a valid positive duration, else 0 (the thread store's default).
 func TestEnvDuration(t *testing.T) {
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	tests := []struct {

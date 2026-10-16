@@ -68,7 +68,7 @@ type ArgSpec struct {
 	Positional bool
 	// DefaultToCwd makes the CLI send its working directory when the flag is not
 	// given (Path args only). A Claude session runs the CLI from its worktree, so
-	// `code-foundry workspace members` finds the session's workspace.
+	// `code-foundry workspace members` finds the thread's workspace.
 	DefaultToCwd bool
 }
 

@@ -41,7 +41,7 @@ func retiredToProto(buckets []thread.UsageBucket) []*v1.UsageBucket {
 	return out
 }
 
-// agentRunsToProto maps a thread's subagent runs, each priced like the session.
+// agentRunsToProto maps a thread's subagent runs, each priced like the thread.
 func agentRunsToProto(runs []thread.AgentRun) []*v1.AgentRun {
 	out := make([]*v1.AgentRun, 0, len(runs))
 	for _, r := range runs {

@@ -28,7 +28,7 @@ type actionRuns interface {
 //     database cascades) and its runs killed and forgotten;
 //   - a thread is removed (thread.Removed), archived or snoozed (thread.Updated with
 //     ArchivedAt or SnoozedUntil set): its background runs are killed, as its action
-//     terminals are by the session store;
+//     terminals are by the thread store;
 //   - a worktree's directory is removed (repo.WorktreeRemoved, directory gone): the
 //     background runs in it are killed.
 //

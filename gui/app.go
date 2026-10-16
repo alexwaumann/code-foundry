@@ -129,7 +129,7 @@ func (s *AppService) SetZoom(percent int) error {
 // Relaunch quits the app and starts this executable again once this process has
 // exited, so the new process runs whatever is on disk at this path now (an installed
 // update swaps the app directory in place). It keeps the arguments and the environment
-// (CODE_FOUNDRY_HOME, CODE_FOUNDRY_BIN, the adopted PATH, ...). Sessions are unaffected:
+// (CODE_FOUNDRY_HOME, CODE_FOUNDRY_BIN, the adopted PATH, ...). Threads are unaffected:
 // they live in the daemon.
 func (s *AppService) Relaunch() error {
 	s.log.Info("relaunch requested")
@@ -168,9 +168,9 @@ func shellQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''
 // appMenu is the default macOS menu with "Check for Updates…" in the app menu, which
 // asks the frontend to open the update dialog and check. The View menu is custom: the
 // default one binds Reload (cmd+r) and Force Reload (cmd+shift+r): cmd+r is
-// session.rename, a stray cmd+shift+r must not reload the GUI either, and Zoom (cmd+0/=/-), which the GUI uses for
+// thread.rename, a stray cmd+shift+r must not reload the GUI either, and Zoom (cmd+0/=/-), which the GUI uses for
 // its own page zoom (appearance.zoom; CSS zoom on <html>, see gui/frontend/src/lib/zoom.ts). A menu chord fires whenever the page leaves the key unhandled,
-// so cmd+r with no session selected would reload the whole GUI. Keep the chords left
+// so cmd+r with no thread selected would reload the whole GUI. Keep the chords left
 // here in command.ReservedChords.
 //
 // The File menu is custom too: the default role binds Close Window to cmd+w, and the

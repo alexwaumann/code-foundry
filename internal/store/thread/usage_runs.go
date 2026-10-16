@@ -17,7 +17,7 @@ import (
 // A thread's usage is the sum of its sources (docs/notes/session-usage.md, PR 2):
 //
 //   - every transcript file the thread has used: Claude moves to a new one on /clear
-//     (Session.Transcripts), and
+//     (Thread.Transcripts), and
 //   - every subagent run under them: <project dir>/<claude session id>/subagents/
 //     agent-<id>.jsonl, with agent-<id>.meta.json beside it (agentMeta).
 //
@@ -55,7 +55,7 @@ type AgentRun struct {
 	// StartedAt is when the run started (its task_started, else its first record); zero
 	// if unknown. Runs are listed by it, so it never changes once set.
 	StartedAt time.Time
-	// Usage is the run's own fold, sorted like Session.Usage. Included in Session.Usage.
+	// Usage is the run's own fold, sorted like Thread.Usage. Included in Thread.Usage.
 	Usage []UsageBucket
 
 	// ParentID is the run that spawned this one (SpawnDepth 2+); "" for the thread's own.

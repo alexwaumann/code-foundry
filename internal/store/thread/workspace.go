@@ -15,9 +15,9 @@ import (
 
 // Workspace threads (docs/notes/workspaces-2-launch.md).
 //
-// A thread's owner is one field: Session.WorkspaceID when set, else the project
+// A thread's owner is one field: Thread.WorkspaceID when set, else the project
 // RepoID. The cwd (RepoID, WorktreePath) is a separate fact: the member worktree the
-// thread runs in. The session store reads workspaces from the workspace store (never
+// thread runs in. The thread store reads workspaces from the workspace store (never
 // the other way round: the workspace store learns about live threads from a function
 // the daemon hands it).
 
@@ -69,7 +69,7 @@ func isDir(path string) bool {
 	return err == nil && fi.IsDir()
 }
 
-// WorkspaceSource is the part of the workspace store sessions need: the current
+// WorkspaceSource is the part of the workspace store threads need: the current
 // members at every spawn, and making a workspace for a new workspace thread.
 // *workspace.Manager implements it.
 type WorkspaceSource interface {
@@ -271,7 +271,7 @@ func (m *Manager) newWorkspace(ctx context.Context, id, name string, o CreateOpt
 	return cw, nil
 }
 
-// workspaceError wraps a workspace store error in the session error class with the
+// workspaceError wraps a workspace store error in the thread error class with the
 // same meaning, so API codes survive.
 func workspaceError(what string, err error) error {
 	var kind error

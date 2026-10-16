@@ -91,7 +91,7 @@ func agentStatusWord(s v1.ThreadAgentStatus) string {
 }
 
 // agentRunning counts running runs: all, and the thread's own background ones (as the
-// Session counts them).
+// Thread counts them).
 func agentRunning(runs []*v1.ThreadAgentRun) (all, background int) {
 	for _, r := range runs {
 		if r.GetStatus() != v1.ThreadAgentStatus_THREAD_AGENT_STATUS_RUNNING {

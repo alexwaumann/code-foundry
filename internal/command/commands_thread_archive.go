@@ -9,7 +9,7 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 )
 
-// sessionArchive is session.archive: archive a thread (Claude closed, its shells
+// threadArchive is thread.archive: archive a thread (Claude closed, its shells
 // removed, unpinned, listed apart) or unarchive it (back in the thread list, still
 // disconnected). Without --archived it toggles. Archiving asks for confirmation only
 // while Claude is working or waiting on the user's answer, since it ends that turn, or
@@ -60,7 +60,7 @@ func threadArchive(b ThreadBackend, idArg ArgSpec) Command {
 	}
 }
 
-// archiveConfirm is session.archive's confirmation for this call, or "" when it needs
+// archiveConfirm is thread.archive's confirmation for this call, or "" when it needs
 // none: unarchiving, or archiving a thread that is not mid-turn (archiveInterrupts).
 // An unknown thread needs none either: Run reports it.
 func archiveConfirm(ctx context.Context, b ThreadBackend, a Args) string {

@@ -79,7 +79,7 @@ type eventSource interface {
 }
 
 // sources lists the stream's sources in the order their snapshots are sent (see
-// events.proto: repo, workspace, terminal, session, thread, gh, gitops, settings, update,
+// events.proto: repo, workspace, terminal, thread, thread, gh, gitops, settings, update,
 // action),
 // followed by UI intents.
 func (h *Events) sources() []eventSource {
@@ -373,10 +373,10 @@ func (s *terminalSource) snapshot(ctx context.Context) []*v1.Event {
 	return out
 }
 
-// ---- session -------------------------------------------------------------------
+// ---- thread list --------------------------------------------------------------
 
-// sessionSource reuses SessionService's mapping (api/session.go). The store publishes
-// one bus type, thread.Event; its snapshot is a SessionEvent.snapshot.
+// threadListSource reuses ThreadService's mapping (api/thread_lifecycle.go). The store
+// publishes one bus type, thread.Event; its snapshot is a ThreadListEvent.snapshot.
 type threadListSource struct {
 	store thread.Store
 	bus   *bus.Bus

@@ -16,7 +16,7 @@ import (
 //	--model <model>      alias ("fable", "opus", "sonnet"; "haiku" also works) or full name
 //	--effort <level>     low, medium, high, xhigh, max
 //	--session-id <uuid>  use this session id (the transcript is <uuid>.jsonl)
-//	-r, --resume <id>    resume a conversation by session id
+//	-r, --resume <id>    resume a conversation by thread id
 //	--fork-session       with --resume: continue under a new session id
 //	-p, --print          non-interactive; skips the trust dialog
 //	--no-session-persistence, --tools "" (with -p, for naming)
@@ -58,7 +58,7 @@ func validateModelEffort(model, effort string) error {
 	return nil
 }
 
-// launch describes how to start claude for a session.
+// launch describes how to start claude for a thread.
 type launch struct {
 	// resume is the Claude session id to resume; empty starts a new conversation.
 	resume string
@@ -172,7 +172,7 @@ func newUUID() (string, error) {
 	return h[0:8] + "-" + h[8:12] + "-" + h[12:16] + "-" + h[16:20] + "-" + h[20:], nil
 }
 
-// newSessionID returns our own session id ("s-" + 12 hex digits).
+// newThreadID returns our own thread id ("s-" + 12 hex digits).
 func newThreadID() (string, error) {
 	var b [6]byte
 	if _, err := rand.Read(b[:]); err != nil {
@@ -242,7 +242,7 @@ func (p ClaudePaths) transcriptPath(cwd, claudeID string) (string, bool) {
 }
 
 // pidFile is Claude's per-process session record: {"pid":..,"sessionId":..,"cwd":..}.
-// It is rewritten when the session id changes (/clear) and removed on exit.
+// It is rewritten when the thread id changes (/clear) and removed on exit.
 func (p ClaudePaths) pidFile(pid int) string {
 	return filepath.Join(p.Dir, "sessions", fmt.Sprintf("%d.json", pid))
 }
