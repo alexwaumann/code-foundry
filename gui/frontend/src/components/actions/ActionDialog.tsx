@@ -133,12 +133,12 @@ function ActionForm({ target, keysRef }: { target: ActionEditorTarget; keysRef: 
         void save();
       }}
     >
-      <DialogDescription className="mt-1 pr-7 text-xs text-muted-foreground">
+      <DialogDescription className="mt-1 pr-7 text-caption">
         Saved for every thread in <span className="font-medium text-foreground">{project}</span>. Runs in {where} and opens as a tab in the bottom panel.
       </DialogDescription>
       <div className="mt-4 flex flex-col gap-3.5">
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="action-name" className="text-xs">
+          <Label htmlFor="action-name" className="text-label">
             Name
           </Label>
           <Input
@@ -157,7 +157,7 @@ function ActionForm({ target, keysRef }: { target: ActionEditorTarget; keysRef: 
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="action-command" className="text-xs">
+          <Label htmlFor="action-command" className="text-label">
             Command
           </Label>
           <Textarea
@@ -175,14 +175,14 @@ function ActionForm({ target, keysRef }: { target: ActionEditorTarget; keysRef: 
             aria-invalid={commandError || undefined}
             aria-describedby="action-command-help"
             data-testid="action-command"
-            className="min-h-[72px] resize-y py-1.5 font-mono text-[12.5px] leading-[19px] whitespace-pre"
+            className="min-h-[72px] resize-y py-1.5 text-body-sm font-mono whitespace-pre"
           />
-          <span id="action-command-help" className="text-xs text-muted-foreground">
+          <span id="action-command-help" className="text-caption">
             Runs from the checkout's root. Each line runs in order.
           </span>
         </div>
         <div className="flex flex-col gap-1.5">
-          <span className="text-xs font-medium" id="action-icon-label">
+          <span className="text-label" id="action-icon-label">
             Icon
           </span>
           <IconTiles
@@ -193,10 +193,10 @@ function ActionForm({ target, keysRef }: { target: ActionEditorTarget; keysRef: 
             }}
           />
         </div>
-        <div className="flex items-center gap-3 rounded-md border border-border/70 px-3 py-2 text-sm dark:border-transparent dark:bg-foreground/[0.035]">
+        <div className="flex items-center gap-3 rounded-md border border-border/70 px-3 py-2 text-body dark:border-transparent dark:bg-foreground/[0.035]">
           <span className="min-w-0 flex-1">
             Run automatically when a worktree is created
-            <small className="mt-px block text-xs text-muted-foreground">In the background, for a new thread's worktree; failures notify you</small>
+            <small className="mt-px block text-caption">In the background, for a new thread's worktree; failures notify you</small>
           </span>
           <Switch
             checked={draft.onWorktreeCreate}
@@ -210,13 +210,13 @@ function ActionForm({ target, keysRef }: { target: ActionEditorTarget; keysRef: 
         </div>
       </div>
       {(error !== null || gone) && (
-        <p className="mt-3 text-xs text-destructive" role="alert" data-testid="action-error">
+        <p className="mt-3 text-caption text-destructive" role="alert" data-testid="action-error">
           {gone ? "This action was deleted." : error}
         </p>
       )}
       {confirming ? (
         <div className="mt-4 flex items-center gap-2" data-testid="action-delete-confirm">
-          <p className="min-w-0 flex-1 text-sm">
+          <p className="min-w-0 flex-1 text-body">
             {/* The project's name does not break (at its hyphens, say); a long one ellipsizes. */}
             Delete <span className="font-medium">{existing?.name ?? draft.name}</span> for every thread in{" "}
             <span className="inline-block max-w-full truncate align-bottom" data-testid="action-delete-project">
