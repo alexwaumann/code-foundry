@@ -6,7 +6,7 @@ import { type Allowlist, CATEGORIES, FRONTEND, INSTEAD, count, isScanned, scanSo
 /**
  * Text uses a type role and radii the scale (index.css; docs/notes/design-system-1-tokens.md).
  * Every scanned source file (src/**\/*.{ts,tsx} except tests and src/gen) is searched for
- * Tailwind sizes, weights, arbitrary line-heights and off-scale radii in its string and
+ * Tailwind sizes, arbitrary line-heights and off-scale radii in its string and
  * template literals. guards.allow.json holds what the tree had when the guard landed: a
  * file may lose hits, never gain them, and a file not listed may have none. When a file
  * has fewer than its entry, `pnpm run guards:allow` rewrites the list, so it only shrinks.
@@ -27,7 +27,7 @@ describe("design-system guard", () => {
     expect(files["src/components/ui/button.tsx"]).toBeDefined();
   });
 
-  it("no file adds a Tailwind size, weight, arbitrary leading or off-scale radius", () => {
+  it("no file adds a Tailwind size, arbitrary leading or off-scale radius", () => {
     const problems: string[] = [];
     for (const [file, src] of Object.entries(files)) {
       const key = FRONTEND + file;
@@ -71,11 +71,12 @@ describe("design-system guard", () => {
 describe("scanSource", () => {
   // Each case: the source, then the matches it should report (category:match).
   it.each([
-    ["a class string", `const c = "px-2 text-sm font-medium";`, ["size:text-sm", "weight:font-medium"]],
+    ["a class string", `const c = "px-2 text-sm font-medium";`, ["size:text-sm"]],
     ["JSX attribute", `<p className="text-xs leading-[18px] rounded">x</p>`, ["size:text-xs", "leading:leading-[18px]", "radius:rounded"]],
-    ["template with substitution", "const c = `text-[13px] ${a ? \"font-semibold\" : \"\"} rounded-[7px]`;", ["size:text-[13px]", "weight:font-semibold", "radius:rounded-[7px]"]],
+    ["template with substitution", "const c = `text-[13px] ${a ? \"font-semibold\" : \"\"} rounded-[7px]`;", ["size:text-[13px]", "radius:rounded-[7px]"]],
     ["every occurrence counts", `const c = "text-sm hover:text-sm md:text-lg";`, ["size:text-sm", "size:text-sm", "size:text-lg"]],
     ["scale radii and roles pass", `const c = "rounded-md rounded-pane rounded-t-lg rounded-full text-body text-caption-sm text-body-sm font-mono";`, []],
+    ["weights on a role pass", `const c = "text-label font-semibold text-caption font-medium";`, []],
     ["colours pass", `const c = "text-muted-foreground text-link text-foreground/80";`, []],
     ["comments are not read", "// text-sm rounded\n/* font-bold */ const x = 1;", []],
     ["JSX text is not read", `<p>a rounded corner, text-sm</p>`, []],

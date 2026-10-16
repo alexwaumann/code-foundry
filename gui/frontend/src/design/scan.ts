@@ -3,13 +3,14 @@ import ts from "typescript";
 /**
  * The design-system guard's scanner (docs/notes/design-system-1-tokens.md), shared by
  * src/design/guards.test.ts and `pnpm run guards:allow` (scripts/guards-allow.ts). It finds
- * Tailwind sizes, weights, arbitrary line-heights and off-scale radii inside string and
- * template literals: text uses a type role (`text-body`, `text-caption`, ...) and radii the
- * scale (`rounded-sm/md/lg/pane`). Comments, JSX text and regex literals are not class
- * strings and are not read.
+ * Tailwind sizes, arbitrary line-heights and off-scale radii inside string and template
+ * literals: text uses a type role (`text-body`, `text-caption`, ...) and radii the scale
+ * (`rounded-sm/md/lg/pane`). Weights (`font-medium`, ...) are not scanned: with sizes
+ * banned, a weight only ever modifies a role, which is allowed. Comments, JSX text and
+ * regex literals are not class strings and are not read.
  */
 
-export const CATEGORIES = ["size", "weight", "leading", "radius"] as const;
+export const CATEGORIES = ["size", "leading", "radius"] as const;
 export type Category = (typeof CATEGORIES)[number];
 export type Counts = Record<Category, number>;
 /** Per file (repo-relative path), the hits each category may still have. */
@@ -18,7 +19,6 @@ export type Allowlist = Record<string, Counts>;
 /** What each category bans. Global: every occurrence counts. */
 export const PATTERNS: Record<Category, readonly RegExp[]> = {
   size: [/\btext-(?:xs|sm|base|lg|xl|2xl|3xl)\b/g, /\btext-\[[^\]]+\]/g],
-  weight: [/\bfont-(?:thin|extralight|light|normal|medium|semibold|bold|extrabold|black)\b/g],
   leading: [/\bleading-\[[^\]]+\]/g],
   radius: [/\brounded\b(?!-)/g, /\brounded-\[[^\]]+\]/g],
 };
@@ -26,7 +26,6 @@ export const PATTERNS: Record<Category, readonly RegExp[]> = {
 /** What to use instead, for the failure message. */
 export const INSTEAD: Record<Category, string> = {
   size: "a type role (text-title, text-heading, text-subheading, text-overline, text-body, text-body-sm, text-label, text-caption, text-caption-sm, text-link, text-code)",
-  weight: "a type role; a weight utility only as a deliberate modifier on one",
   leading: "a type role (each sets its own line-height)",
   radius: "the scale: rounded-sm (4), rounded-md (6), rounded-lg (10), rounded-pane (12), rounded-2xl (16), rounded-full",
 };
@@ -87,7 +86,7 @@ export function scanSource(fileName: string, source: string): Hit[] {
 }
 
 export function zero(): Counts {
-  return { size: 0, weight: 0, leading: 0, radius: 0 };
+  return { size: 0, leading: 0, radius: 0 };
 }
 
 export function count(hits: readonly Hit[]): Counts {
@@ -115,7 +114,7 @@ export function serialize(allow: Allowlist): string {
     .sort()
     .map((file) => {
       const c = allow[file] ?? zero();
-      return `  ${JSON.stringify(file)}: { "size": ${String(c.size)}, "weight": ${String(c.weight)}, "leading": ${String(c.leading)}, "radius": ${String(c.radius)} }`;
+      return `  ${JSON.stringify(file)}: { "size": ${String(c.size)}, "leading": ${String(c.leading)}, "radius": ${String(c.radius)} }`;
     });
   return `{\n${rows.join(",\n")}\n}\n`;
 }
