@@ -76,7 +76,7 @@
  *   thread.run-in queues a move (pendingWorktreePath) that lands ~2s after the thread is not busy.
  *   thread.new takes workspace (a member thread) or new-worktree + repos (a new workspace),
  *   or no-project (a thread in the home directory with no repo or workspace).
- *   GET  /__mock/attachments                      (StageAttachment uploads: path, name, type, size)
+ *   GET  /__mock/attachments                      (StageAttachment uploads: path, name, type, size, pages)
  *   FilesystemService.ListSkills / SearchFiles: mock/filesystem.ts (project skills review and
  *        deploy in every project, user skill commit; DEFAULT_FILES in every project)
  *   POST /__mock/files?repo=repo-cf&path=a.ts&path=src/b.ts   (that project's files; no path:
@@ -389,7 +389,7 @@ function routes(router: ConnectRouter): void {
     remove: () => {
       throw new ConnectError("use the thread.remove command in the mock", Code.Unimplemented);
     },
-    stageAttachment: (req) => guard(() => ({ path: world.stageAttachment(req.name, req.mimeType, req.data.length) })),
+    stageAttachment: (req) => guard(() => ({ path: world.stageAttachment(req.name, req.mimeType, req.data.length, req.pages) })),
     // The scripted thread's image (mock/thread.ts); staged uploads have no bytes in the mock.
     readAttachment: (req) => {
       if (req.path === MOCK_ATTACHMENT || world.attachments.has(req.path)) return { data: new Uint8Array(MOCK_ATTACHMENT_PNG), mimeType: "image/png" };

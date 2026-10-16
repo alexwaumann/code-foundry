@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, expectTooltip, invocations, mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
+import { CF, expectTooltip, invocations, mockPost, mockUrl, openApp, resetMock, row, testPdf } from "./fixtures";
 
 const OUTDATED = "The running daemon is older than the app. Restart it (Daemon → Restart) to use this feature.";
 
@@ -15,9 +15,9 @@ async function threadCount(): Promise<number> {
   return ((await res.json()) as unknown[]).length;
 }
 
-async function staged(): Promise<{ path: string; name: string; mimeType: string; size: number }[]> {
+async function staged(): Promise<{ path: string; name: string; mimeType: string; size: number; pages: number }[]> {
   const res = await fetch(`${mockUrl}/__mock/attachments`);
-  return (await res.json()) as { path: string; name: string; mimeType: string; size: number }[];
+  return (await res.json()) as { path: string; name: string; mimeType: string; size: number; pages: number }[];
 }
 
 /** cmd+n, then cmd+<n> in the project picker: the composer for the nth project. */
@@ -367,7 +367,7 @@ test("attachments: picked, rejected, removed, staged on send", async ({ page }) 
   const thumbs = page.getByTestId("attachment");
   await expect(thumbs).toHaveCount(1);
   await expect(thumbs.first().locator("img")).toHaveAttribute("src", /^blob:/);
-  await expect(page.getByTestId("composer-notice")).toHaveText("notes.txt: not a PNG, JPEG, GIF or WebP image");
+  await expect(page.getByTestId("composer-notice")).toHaveText("notes.txt: not a PNG, JPEG, GIF, WebP or PDF file");
 
   await input.setInputFiles([{ name: "other.png", mimeType: "image/png", buffer: PNG }]);
   await expect(thumbs).toHaveCount(2);
@@ -726,4 +726,146 @@ test("attachment preview: a chip whose image is gone opens nothing", async ({ pa
   await page.waitForTimeout(300);
   await expect(page.getByTestId("attachment-preview")).toHaveCount(0);
   await expect(page.getByTestId("composer-input")).toBeFocused();
+});
+
+/** Pastes a file into the prompt the way WebKit/Chromium deliver a copied file. */
+async function pasteFile(page: Page, name: string, type: string, data: Buffer): Promise<void> {
+  await page.getByTestId("composer-input").evaluate(
+    (el, [file, mime, bytes]) => {
+      const dt = new DataTransfer();
+      dt.items.add(new File([new Uint8Array(bytes as number[])], file as string, { type: mime as string }));
+      el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+    },
+    [name, type, [...data]] as const,
+  );
+}
+
+test("PDFs: picked and pasted, a first-page tile and a chip with pages, previewed page by page, sent as [PDF: …]", async ({ page }) => {
+  await openApp(page);
+  await compose(page);
+  const two = testPdf(2);
+  const tiles = page.getByTestId("attachment");
+  const chips = page.getByTestId("prompt-chip");
+  await expect(page.getByTestId("composer-attach")).toHaveAttribute("aria-label", "Attach images or PDFs");
+  await expect(page.getByTestId("composer-file-input")).toHaveAttribute("accept", /application\/pdf,\.pdf$/);
+
+  // Picked, with prose in the prompt: a tile and a chip at the caret.
+  await page.keyboard.type("Summarize");
+  await page.getByTestId("composer-file-input").setInputFiles([{ name: "spec.pdf", mimeType: "application/pdf", buffer: two }]);
+  await expect(tiles).toHaveCount(1);
+  await expect(tiles.first()).toHaveAttribute("data-kind", "pdf");
+  await expect(tiles.first()).toHaveAttribute("data-pages", "2");
+  await expect(tiles.first()).toContainText("PDF");
+  // pdf.js drew the first page.
+  await expect(tiles.first().locator("img")).toHaveAttribute("src", /^data:image\/png;base64,/);
+  await expect(page.getByTestId("attachment-open")).toHaveAttribute("aria-label", "Preview spec.pdf, PDF, 2 pages, 1 KB");
+  await expect(chips).toHaveCount(1);
+  await expect(chips.first()).toHaveAttribute("data-attachment-kind", "pdf");
+  await expect(chips.first()).toHaveAttribute("aria-label", "PDF attachment, spec.pdf, 2 pages");
+  await expect(chips.first()).toContainText("2 pages");
+  await expect(chips.first().locator("img")).toHaveAttribute("src", /^data:image\/png/);
+  await expect(page.getByTestId("composer-notice")).toHaveCount(0);
+
+  // The preview: name, size and pages; a canvas per page, each drawn.
+  const preview = page.getByTestId("attachment-preview");
+  const open = page.getByTestId("attachment-open");
+  await open.click();
+  await expect(preview).toBeVisible();
+  await expect(preview).toHaveAttribute("data-kind", "pdf");
+  await expect(preview.getByRole("heading")).toHaveText("spec.pdf");
+  await expect(page.getByTestId("attachment-preview-size")).toHaveText("1 KB · 2 pages");
+  const pages = preview.getByTestId("pdf-page");
+  await expect(pages).toHaveCount(2);
+  await expect(pages.locator("canvas")).toHaveCount(2);
+  await expect(pages.first()).toHaveAttribute("data-rendered", "true");
+  await pages.nth(1).scrollIntoViewIfNeeded();
+  await expect(pages.nth(1)).toHaveAttribute("data-rendered", "true");
+  // Drawn at the column's width, in device pixels.
+  const drawn = await pages.first().locator("canvas").evaluate((c: HTMLCanvasElement) => ({ w: c.width, css: c.getBoundingClientRect().width, ratio: window.devicePixelRatio }));
+  expect(drawn.w).toBeGreaterThanOrEqual(Math.floor(drawn.css * drawn.ratio) - 1);
+  // Capped like an image: within the window.
+  const box = await preview.boundingBox();
+  const vp = page.viewportSize();
+  expect((box?.height ?? 0) <= (vp?.height ?? 0)).toBe(true);
+  await page.keyboard.press("Escape");
+  await expect(preview).toHaveCount(0);
+  await expect(open).toBeFocused();
+
+  // Pasted: another tile, and a chip at the caret.
+  await page.getByTestId("composer-input").focus();
+  await page.keyboard.press("End");
+  await page.keyboard.type("and");
+  await pasteFile(page, "notes.pdf", "application/pdf", testPdf(1));
+  await expect(tiles).toHaveCount(2);
+  await expect(chips.nth(1)).toHaveAttribute("aria-label", "PDF attachment, notes.pdf, 1 page");
+  // The chip opens the same preview.
+  await chips.nth(1).click();
+  await expect(preview).toBeVisible();
+  await expect(preview.getByTestId("pdf-page")).toHaveCount(1);
+  await page.keyboard.press("Escape");
+  await expect(preview).toHaveCount(0);
+
+  await page.getByTestId("composer-input").press("Enter");
+  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("thread.new");
+  const up = await staged();
+  // With pdf.js's page counts, which the daemon takes when it has no pdfinfo.
+  expect(up.map((a) => [a.name, a.mimeType, a.size, a.pages])).toEqual([
+    ["spec.pdf", "application/pdf", two.length, 2],
+    ["notes.pdf", "application/pdf", testPdf(1).length, 1],
+  ]);
+  const args = (await invocations()).at(-1)?.args;
+  expect(args?.prompt).toBe(`Summarize [PDF: spec.pdf; ref=${up[0]?.path ?? ""}] and [PDF: notes.pdf; ref=${up[1]?.path ?? ""}]`);
+  expect(args?.attachments).toBe(up.map((a) => a.path).join(","));
+});
+
+test("PDFs: over 20 MB is rejected; over 10 pages goes as a path and says so", async ({ page }) => {
+  await openApp(page);
+  await compose(page);
+  const input = page.getByTestId("composer-file-input");
+  const notice = page.getByTestId("composer-notice");
+  await input.setInputFiles([{ name: "huge.pdf", mimeType: "application/pdf", buffer: testPdf(1, 21 * 1024 * 1024) }]);
+  await expect(notice).toHaveText("huge.pdf: larger than 20 MB");
+  await expect(page.getByTestId("attachment")).toHaveCount(0);
+
+  await input.setInputFiles([{ name: "book.pdf", mimeType: "application/pdf", buffer: testPdf(30) }]);
+  await expect(page.getByTestId("attachment")).toHaveAttribute("data-pages", "30");
+  await expect(notice).toHaveText("book.pdf has 30 pages; Claude reads it page by page");
+  await expect(page.getByTestId("attachment-open")).toHaveAttribute("aria-label", /^Preview book\.pdf, PDF, 30 pages, \d+ KB$/);
+});
+
+test.describe("a long PDF's preview", () => {
+  test.use({ deviceScaleFactor: 3 });
+
+  test("draws pages at most at 2x and releases the ones scrolled far away", async ({ page }) => {
+    await openApp(page);
+    await compose(page);
+    await page.getByTestId("composer-file-input").setInputFiles([{ name: "book.pdf", mimeType: "application/pdf", buffer: testPdf(30) }]);
+    await expect(page.getByTestId("attachment")).toHaveAttribute("data-pages", "30");
+    await page.getByTestId("attachment-open").click();
+    const preview = page.getByTestId("attachment-preview");
+    const pages = preview.getByTestId("pdf-page");
+    await expect(pages).toHaveCount(30);
+    const first = pages.first();
+    await expect(first).toHaveAttribute("data-rendered", "true");
+    // The backing store is capped at 2x the CSS size, not the screen's 3x.
+    const drawn = await first.locator("canvas").evaluate((c: HTMLCanvasElement) => ({ w: c.width, css: c.getBoundingClientRect().width }));
+    expect(drawn.w).toBeGreaterThan(drawn.css * 1.9);
+    expect(drawn.w).toBeLessThanOrEqual(Math.ceil(drawn.css * 2) + 1);
+
+    // At the end, the first page is far away: its canvas is released, its placeholder back.
+    const scroller = preview.getByTestId("pdf-pages");
+    await scroller.evaluate((el) => {
+      el.scrollTop = el.scrollHeight;
+    });
+    await expect(pages.last()).toHaveAttribute("data-rendered", "true");
+    await expect(first).not.toHaveAttribute("data-rendered");
+    await expect(first).toContainText("Page 1");
+    expect(await first.locator("canvas").evaluate((c: HTMLCanvasElement) => c.width * c.height)).toBe(0);
+    // Back at the top it is drawn again, and the last page released.
+    await scroller.evaluate((el) => {
+      el.scrollTop = 0;
+    });
+    await expect(first).toHaveAttribute("data-rendered", "true");
+    await expect(pages.last()).not.toHaveAttribute("data-rendered");
+  });
 });

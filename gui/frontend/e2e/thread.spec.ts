@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { invocations, mockPost, mockUrl, openApp, openStreams, resetMock, row } from "./fixtures";
+import { invocations, mockPost, mockUrl, openApp, openStreams, resetMock, row, testPdf } from "./fixtures";
 
 /**
  * A thread (components/thread, docs/notes/rendered-threads-2-gui.md) over the
@@ -355,6 +355,20 @@ test("a pending question docks with its pager", async ({ page }) => {
   await q.getByTestId("thread-question-next").click();
   await expect(q).toContainText("2 of 2");
   await expect(q).toContainText("Should I also update the PR description?");
+});
+
+test("a follow-up takes a PDF: a tile, a chip with its pages, sent as [PDF: …]", async ({ page }) => {
+  await openThread(page, "idle");
+  const composer = page.getByTestId("thread-composer");
+  const editor = composer.locator('[contenteditable="true"]');
+  await editor.click();
+  await page.keyboard.type("Check");
+  await expect(composer.getByTestId("thread-attach")).toHaveAttribute("aria-label", "Attach images or PDFs");
+  await composer.getByTestId("thread-file-input").setInputFiles([{ name: "spec.pdf", mimeType: "application/pdf", buffer: testPdf(3) }]);
+  await expect(composer.getByTestId("attachment")).toHaveAttribute("data-pages", "3");
+  await expect(composer.getByTestId("prompt-chip")).toHaveAttribute("aria-label", "PDF attachment, spec.pdf, 3 pages");
+  await page.keyboard.press("Enter");
+  await expect.poll(async () => (await invocations()).find((i) => i.name === "thread.send")?.args.text ?? "").toMatch(/^Check \[PDF: spec\.pdf; ref=\S+-3p\.pdf\]$/);
 });
 
 test("a follow-up goes through thread.send with the composer's tags projected; the reply streams in", async ({ page }) => {

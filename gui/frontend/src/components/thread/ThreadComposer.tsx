@@ -384,6 +384,7 @@ export function ThreadComposer({ threadId, pending, busy }: { threadId: string; 
             accept={ATTACHMENT_ACCEPT}
             multiple
             hidden
+            data-testid="thread-file-input"
             onChange={(e) => {
               attach(Array.from(e.target.files ?? []));
               e.target.value = "";

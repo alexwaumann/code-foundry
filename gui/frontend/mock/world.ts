@@ -634,7 +634,7 @@ export class World {
   /** EventService watchers that include UI intents (they count toward Emit's `delivered`). */
   uiEventWatchers = 0;
   /** ThreadService.StageAttachment uploads, by returned path. */
-  attachments = new Map<string, { name: string; mimeType: string; size: number }>();
+  attachments = new Map<string, { name: string; mimeType: string; size: number; pages: number }>();
   /** How long thread.new takes to create a worktree (ms). */
   worktreeDelayMs = 700;
   /** terminal.new: how long it takes (ms), and whether its next run fails (the reason). POST /__mock/terminal/new. */
@@ -1822,13 +1822,18 @@ export class World {
     return { message: `created thread ${s.id} in ${member.worktreePath} (workspace ${ws.id})`, resultJson: JSON.stringify({ id: s.id, worktreePath: member.worktreePath, workspaceId: ws.id }) };
   }
 
-  /** ThreadService.StageAttachment: keeps the bytes' size, returns a fake path. */
-  stageAttachment(name: string, mimeType: string, size: number): string {
-    if (!["image/png", "image/jpeg", "image/gif", "image/webp"].includes(mimeType)) throw new CommandError("invalid", `unsupported attachment type ${mimeType}`);
-    if (size > 10 * 1024 * 1024) throw new CommandError("invalid", "attachment larger than 10 MiB");
+  /**
+   * ThreadService.StageAttachment: keeps the bytes' size and the page hint, returns a fake
+   * path; a PDF's carries the count like the daemon's (the hint, else "~1").
+   */
+  stageAttachment(name: string, mimeType: string, size: number, pages = 0): string {
+    if (!["image/png", "image/jpeg", "image/gif", "image/webp", "application/pdf"].includes(mimeType)) throw new CommandError("invalid", `unsupported attachment type ${mimeType}`);
+    const max = mimeType === "application/pdf" ? 20 : 10;
+    if (size > max * 1024 * 1024) throw new CommandError("invalid", `attachment larger than ${String(max)} MiB`);
     const ext = (/\.[a-z0-9]+$/i.exec(name)?.[0] ?? "").toLowerCase();
-    const path = `${HOME}/.code-foundry/attachments/att-${String(this.attachments.size + 1)}${ext}`;
-    this.attachments.set(path, { name, mimeType, size });
+    const count = mimeType === "application/pdf" ? `-${pages > 0 ? String(pages) : "~1"}p` : "";
+    const path = `${HOME}/.code-foundry/attachments/att-${String(this.attachments.size + 1)}${count}${ext}`;
+    this.attachments.set(path, { name, mimeType, size, pages });
     return path;
   }
 
