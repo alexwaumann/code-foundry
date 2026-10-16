@@ -179,7 +179,7 @@ slot refused, no message); the command count test.
 
 - `make check` green (Go: `theme.pick` table, command count; frontend: 3360 tests before
   the picker store tests, 21 more after; the drift test with the new selectors).
-- `make gui-e2e`: E2E_RESULT
+- `make gui-e2e`: 810 passed, 40 skipped, 0 failed (WebKit + Chromium, 24 min) on the final head, a clean run with nothing else on the machine. That includes the 16 new picker tests (8 × 2) and the three #119 specs. An earlier run that overlapped with the GUI build, the live check and a second Playwright run had 5 one-off failures (`thread.spec.ts:360`, `usage-page.spec.ts:79`, `zoom-popovers.spec.ts:35` in WebKit; `addproject.spec.ts:50` and `:208` in Chromium); all 16 cases passed when rerun on their own, and the clean run had none. `settings.spec.ts:63` failed once the same way while the full suite ran in parallel and passed on a rerun.
 - Live (`make gui-build`, `CODE_FOUNDRY_HOME=/tmp/cf-te4`, scheme dark, a bottom shell in a
   scratch project printing ANSI 0–15 on the Projects page):
   - Settings → search "theme" → the Dark theme row's **Choose…** opened the page on the dark
