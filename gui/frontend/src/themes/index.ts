@@ -26,8 +26,7 @@ export const themes: readonly Theme[] = catalog as Theme[];
 
 export const themeById: ReadonlyMap<string, Theme> = new Map(themes.map((t) => [t.id, t]));
 
-export const DEFAULT_LIGHT = "catppuccin-latte";
-export const DEFAULT_DARK = "catppuccin-mocha";
+export { DEFAULT_DARK, DEFAULT_LIGHT } from "./defaults";
 
 /** The themes that can fill a scheme's slot, in catalog order (Catppuccin first). */
 export function themesFor(scheme: ThemeScheme): readonly Theme[] {

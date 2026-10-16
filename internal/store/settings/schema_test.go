@@ -50,6 +50,11 @@ func TestFieldParse(t *testing.T) {
 		{key: KeyNamingModel, in: "claude-4.5-haiku[1m]", want: "claude-4.5-haiku[1m]"},
 		{key: KeyNamingModel, in: "claude-opus-4-8[1m]", want: "claude-opus-4-8[1m]"},
 		{key: KeyTheme, in: "Dark", err: `want one of "system", "dark", "light", got "Dark"`},
+		{key: KeyThemeDark, in: "dracula", want: "dracula"},
+		{key: KeyThemeLight, in: "rose-pine-dawn", want: "rose-pine-dawn"},
+		{key: KeyThemeDark, in: "catppuccin-latte", err: `Catppuccin Latte ("catppuccin-latte") is a light theme; the dark theme must be one of "catppuccin-mocha", "graphite-dark", "dracula", "gruvbox-dark", "nord", "tokyo-night", "rose-pine", "atom-one-dark", "solarized-dark", "monokai-pro", "github-dark", "kanagawa-wave", "everforest-dark-hard", "ayu-mirage"`},
+		{key: KeyThemeLight, in: "dracula", err: `Dracula ("dracula") is a dark theme; the light theme must be one of "catppuccin-latte", "graphite-light", "gruvbox-light", "rose-pine-dawn", "atom-one-light", "solarized-light", "github-light"`},
+		{key: KeyThemeLight, in: "sepia", err: `unknown theme "sepia"; light themes are "catppuccin-latte", "graphite-light", "gruvbox-light", "rose-pine-dawn", "atom-one-light", "solarized-light", "github-light"`},
 		{key: KeyBackdrop, in: "none", want: "none"},
 		{key: KeyBackdrop, in: "aurora", err: `want one of "forest", "none", got "aurora"`},
 		{key: KeyThreadWidth, in: "full", want: "full"},
@@ -132,8 +137,12 @@ func TestEnumLabels(t *testing.T) {
 		{KeyDefaultModel, "claude-4.5-haiku[1m]", "Haiku 4.5"},
 		{KeyNamingModel, "claude-sonnet-5[1m]", "Sonnet 5"},
 		{KeyNamingModel, "claude-haiku-5-5[1m]", "Haiku 5.5"},
+		{KeyTheme, "system", "System"},
+		{KeyThemeDark, "catppuccin-mocha", "Catppuccin Mocha"},
+		{KeyThemeDark, "dracula", "Dracula"},
+		{KeyThemeLight, "rose-pine-dawn", "Rosé Pine Dawn"},
 		// Fields without labels show their values as they are.
-		{KeyTheme, "dark", ""},
+		{KeyDensity, "compact", ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.key+"="+tt.value, func(t *testing.T) {

@@ -3,16 +3,27 @@ import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { contrast } from "./color.ts";
-import { buildCatalog, catalogJson, indexVarNames, parseGhostty, PATHS, readInputs, SYNTAX_VARS, syntaxAliases, themesCss, type Inputs, type Override } from "./convert.ts";
+import { DEFAULT_DARK, DEFAULT_LIGHT } from "../src/themes/defaults.ts";
+import { buildCatalog, catalogJson, goCatalogJson, indexVarNames, parseGhostty, PATHS, readInputs, SYNTAX_VARS, syntaxAliases, themesCss, type Inputs, type Override } from "./convert.ts";
 
 const inputs = readInputs();
 
 describe("generated files", () => {
-  // `pnpm run themes` regenerates both; a hand edit or a changed input fails here.
-  it("catalog.json and themes.css match the converter's output", () => {
+  // `pnpm run themes` regenerates all three; a hand edit or a changed input fails here.
+  it("catalog.json, themes.css and the daemon's catalog match the converter's output", () => {
     const catalog = buildCatalog(inputs);
     expect(fs.readFileSync(PATHS.catalog, "utf8")).toBe(catalogJson(catalog));
     expect(fs.readFileSync(PATHS.css, "utf8")).toBe(themesCss(catalog, syntaxAliases(inputs.threadCss)));
+    expect(fs.readFileSync(PATHS.goCatalog, "utf8")).toBe(goCatalogJson(catalog));
+  });
+
+  it("the daemon's catalog has every theme without colours, and the defaults", () => {
+    const catalog = buildCatalog(inputs);
+    const go = JSON.parse(goCatalogJson(catalog)) as { defaults: Record<string, string>; themes: { id: string; scheme: string; pair?: string }[] };
+    expect(go.defaults).toEqual({ dark: DEFAULT_DARK, light: DEFAULT_LIGHT });
+    expect(go.themes.map((t) => t.id)).toEqual(catalog.map((t) => t.id));
+    for (const t of go.themes) expect(Object.keys(t).every((k) => ["id", "name", "scheme", "pair"].includes(k)), t.id).toBe(true);
+    for (const [scheme, id] of Object.entries(go.defaults)) expect(go.themes.find((t) => t.id === id)?.scheme).toBe(scheme);
   });
 
   it("every theme has every index.css colour variable and the syntax colours, nothing else", () => {

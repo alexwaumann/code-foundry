@@ -3,7 +3,8 @@
 
 /**
  * AppService is bound to the frontend: the GUI's own version, relaunching itself, the
- * native folder picker (pickdir.go), and the Dock badge, bounce and alert sound (notify.go).
+ * native folder picker (pickdir.go), the Dock badge, bounce and alert sound (notify.go),
+ * and the window background (windowbg.go).
  * Updates are installed by the daemon; the host only quits and reopens the window.
  * @module
  */
@@ -71,6 +72,16 @@ export function Relaunch(): $CancellablePromise<void> {
  */
 export function SetBadge(count: number): $CancellablePromise<void> {
     return $Call.ByID(3963801633, count);
+}
+
+/**
+ * SetWindowBackground paints the window behind the page in the active theme's sheet and
+ * saves both themes' sheets and the scheme, so the next launch opens in the right colour
+ * before the page loads. The frontend calls it on start and on every theme, scheme or
+ * macOS appearance change (lib/theme.ts).
+ */
+export function SetWindowBackground(bg: $models.WindowBackground): $CancellablePromise<void> {
+    return $Call.ByID(765787086, bg);
 }
 
 /**

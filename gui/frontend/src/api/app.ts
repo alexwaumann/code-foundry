@@ -1,5 +1,5 @@
 import { Browser, Events } from "@wailsio/runtime";
-import { Bounce, Info, PickDirectory, PlaySound, Relaunch, SetBadge, SetZoom } from "../../bindings/github.com/alexwaumann/code-foundry/gui/appservice";
+import { Bounce, Info, PickDirectory, PlaySound, Relaunch, SetBadge, SetWindowBackground, SetZoom } from "../../bindings/github.com/alexwaumann/code-foundry/gui/appservice";
 
 /** The Wails host (window shell). */
 export interface AppInfoView {
@@ -60,6 +60,30 @@ export async function setHostZoom(percent: number): Promise<void> {
     await SetZoom(percent);
   } catch (err: unknown) {
     console.warn("host zoom", err);
+  }
+}
+
+/** The window colours the host keeps (gui/windowbg.go WindowBackground). */
+export interface WindowBackgroundView {
+  /** appearance.theme. */
+  scheme: "system" | "dark" | "light";
+  /** The dark and the light theme's `--sheet`, `#rrggbb`. */
+  dark: string;
+  light: string;
+  /** The scheme the page shows now. */
+  active: "dark" | "light";
+}
+
+/**
+ * Paints the native window behind the page in the active sheet and lets the host open the
+ * next launch in it (gui/windowbg.go). No-op without a host.
+ */
+export async function setWindowBackground(bg: WindowBackgroundView): Promise<void> {
+  if (!(await appInfo())) return;
+  try {
+    await SetWindowBackground(bg);
+  } catch (err: unknown) {
+    console.warn("window background", err);
   }
 }
 

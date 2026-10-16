@@ -1,6 +1,7 @@
 /**
  * Ghostty themes -> the app's colour variables. `pnpm run themes` regenerates
- * src/themes/catalog.json and src/themes/themes.css (both committed);
+ * src/themes/catalog.json, src/themes/themes.css and the daemon's copy
+ * internal/theme/catalog.json (ids, names, schemes, pairs and the defaults; all committed);
  * `pnpm run themes -- --refresh` first re-copies the vendored Ghostty files from
  * /Applications/Ghostty.app. src/themes/catalog.test.ts regenerates in memory and fails
  * on drift. docs/notes/theme-engine-2-engine.md explains every rule and guard.
@@ -12,6 +13,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { DEFAULT_DARK, DEFAULT_LIGHT } from "../src/themes/defaults.ts";
 import { chroma, contrast, ensureContrast, lightness, mix, over, parseCss, parseHex, shiftL, toHex } from "./color.ts";
 
 export type Scheme = "light" | "dark";
@@ -55,6 +57,7 @@ export const PATHS = {
   threadCss: path.join(here, "../src/components/thread/thread.css"),
   catalog: path.join(here, "../src/themes/catalog.json"),
   css: path.join(here, "../src/themes/themes.css"),
+  goCatalog: path.join(here, "../../../internal/theme/catalog.json"),
 };
 const GHOSTTY_APP = "/Applications/Ghostty.app/Contents/Resources/ghostty/themes";
 
@@ -379,6 +382,15 @@ export function catalogJson(catalog: CatalogTheme[]): string {
   return JSON.stringify(catalog, null, 2) + "\n";
 }
 
+/**
+ * The daemon's copy (internal/theme, go:embed): what it needs to validate and list the
+ * appearance.theme_dark / theme_light settings. No colours: the daemon never paints.
+ */
+export function goCatalogJson(catalog: CatalogTheme[]): string {
+  const themes = catalog.map((t) => ({ id: t.id, name: t.name, scheme: t.scheme, ...(t.pair ? { pair: t.pair } : {}) }));
+  return JSON.stringify({ defaults: { dark: DEFAULT_DARK, light: DEFAULT_LIGHT }, themes }, null, 2) + "\n";
+}
+
 export function themesCss(catalog: CatalogTheme[], aliases: SyntaxAliases): string {
   const syntax = new Set<string>(SYNTAX_VARS);
   const lines = [
@@ -413,6 +425,7 @@ function main(): void {
   const catalog = buildCatalog(inputs);
   fs.writeFileSync(PATHS.catalog, catalogJson(catalog));
   fs.writeFileSync(PATHS.css, themesCss(catalog, syntaxAliases(inputs.threadCss)));
+  fs.writeFileSync(PATHS.goCatalog, goCatalogJson(catalog));
   const r = (a: string | undefined, b: string | undefined) => (a && b ? Number(contrast(a, b).toFixed(1)) : NaN);
   console.table(
     catalog.map((t) => {

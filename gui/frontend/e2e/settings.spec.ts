@@ -109,6 +109,27 @@ test("cmd+, opens settings rendered from the schema", async ({ page }) => {
   await expect(settings).toHaveCount(0);
 });
 
+test("the dark and light theme rows offer their scheme's themes and apply live", async ({ page }) => {
+  await openSettings(page);
+  await pick(page, "appearance.theme", "Dark");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "catppuccin-mocha");
+  await pick(page, "appearance.theme_dark", "Dracula");
+  await expect.poll(async () => (await mockSettings()).raw["appearance.theme_dark"]).toBe("dracula");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dracula");
+  await expect(page.locator("html")).toHaveClass(/dark/);
+
+  await select(page, "appearance.theme_light").click();
+  await expect(listbox(page).getByRole("option", { name: "Rosé Pine Dawn", exact: true })).toBeVisible();
+  await expect(listbox(page).getByRole("option", { name: "Dracula", exact: true })).toHaveCount(0);
+  await listbox(page).getByRole("option", { name: "Rosé Pine Dawn", exact: true }).click();
+  await expect.poll(async () => (await mockSettings()).raw["appearance.theme_light"]).toBe("rose-pine-dawn");
+  // The dark scheme still shows Dracula; flipping the scheme shows the light slot.
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dracula");
+  await pick(page, "appearance.theme", "Light");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "rose-pine-dawn");
+  await expect(page.locator("html")).not.toHaveClass(/dark/);
+});
+
 test("changing a bool and an enum saves to the file and applies live", async ({ page }) => {
   await openSettings(page);
   const autoName = setting(page, "sessions.auto_name").getByRole("switch");
@@ -118,10 +139,10 @@ test("changing a bool and an enum saves to the file and applies live", async ({ 
   await expect(page.getByText("Saved Name sessions automatically")).toBeVisible();
   await expect.poll(async () => (await mockSettings()).raw["sessions.auto_name"]).toBe("false");
 
-  await pick(page, "appearance.theme", "light");
+  await pick(page, "appearance.theme", "Light");
   await expect.poll(async () => (await mockSettings()).raw["appearance.theme"]).toBe("light");
   await expect(page.locator("html")).not.toHaveClass(/dark/);
-  await pick(page, "appearance.theme", "dark");
+  await pick(page, "appearance.theme", "Dark");
   await expect(page.locator("html")).toHaveClass(/dark/);
 
   // An out-of-range number is rejected inline and not saved.

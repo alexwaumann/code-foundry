@@ -40,7 +40,10 @@ Three processes, one protocol.
   `PlaySound`; the frontend's `stores/dockAlerts.ts` decides from the sessions and the
   `notifications.*` settings, and `notifications.test` previews the sound through a
   `PlayAlertSound` UI intent; no notification banners for a bare executable,
-  `docs/notes/dock-alerts.md`). No business logic lives in the Wails host.
+  `docs/notes/dock-alerts.md`). It paints the window behind the page in the active
+  theme's sheet and keeps those colours for the next launch (`SetWindowBackground`,
+  `window-background.json` in the config home; `docs/notes/theme-engine-3-settings.md`).
+  No business logic lives in the Wails host.
 * **CLI** subcommands (`code-foundry new-session --repo foo`, `code-foundry focus <id>`, …)
   are clients of the same daemon API. A Claude Code session running inside the app can call
   the CLI, so sessions can orchestrate other sessions.

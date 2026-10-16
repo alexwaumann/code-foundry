@@ -10,6 +10,7 @@ import (
 
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/model"
+	"github.com/alexwaumann/code-foundry/internal/theme"
 )
 
 // Type is a field's value type. Values travel as strings; the type drives parsing, the
@@ -61,6 +62,9 @@ type Field struct {
 	bind func(s *Settings) any
 	// check is extra validation run after parsing (e.g. an executable exists).
 	check func(v string) error
+	// unlisted, when set, explains an Enum value outside Enum in place of the generic
+	// "want one of" (a theme of the other scheme).
+	unlisted func(v string) error
 }
 
 // Name is the key within its group's table.
@@ -88,7 +92,7 @@ var Groups = []Group{
 	{GroupGitHub, "GitHub", "Your pull requests and default-branch checks, polled with gh's login."},
 	{GroupRepos, "Repositories", "Git fetching and where new worktrees go."},
 	{GroupGitOps, "Git operations", "How worktrees are handed to other apps."},
-	{GroupAppearance, "Appearance", "Theme, terminal font, density, and backdrop. Applied live in every window."},
+	{GroupAppearance, "Appearance", "Scheme, themes, terminal font, density, and backdrop. Applied live in every window."},
 	{GroupNotify, "Notifications", "Dock badge and alerts for threads that need you. macOS banners aren't available to an app without a bundle."},
 	{GroupKeybindings, "Keybindings", `Override a command's chord, or "none" to unbind it. Reserved app chords (cmd+k, cmd+b, cmd+1..9, ...) cannot be bound.`},
 	{GroupUpdate, "Updates", "Which releases the app checks for and offers to install."},
@@ -111,6 +115,8 @@ const (
 	KeyWorktreeDir       = "repos.worktree_dir"
 	KeyEditorCommand     = "gitops.editor_command"
 	KeyTheme             = "appearance.theme"
+	KeyThemeDark         = "appearance.theme_dark"
+	KeyThemeLight        = "appearance.theme_light"
 	KeyFontFamily        = "appearance.font_family"
 	KeyFontSize          = "appearance.font_size"
 	KeyZoom              = "appearance.zoom"
@@ -232,11 +238,17 @@ var staticFields = []Field{
 		bind:        func(s *Settings) any { return &s.GitOps.EditorCommand },
 	},
 	{
-		Key: KeyTheme, Group: GroupAppearance, Type: Enum, Title: "Theme",
-		Description: "System follows the macOS appearance.",
-		Enum:        []string{"system", "dark", "light"}, Default: "system",
+		// The key predates the theme slots: it is the scheme, and the slots below say which
+		// theme each scheme uses.
+		Key: KeyTheme, Group: GroupAppearance, Type: Enum, Title: "Scheme",
+		Description: "Dark or light. System follows the macOS appearance.",
+		Enum:        []string{"system", "dark", "light"}, EnumLabels: []string{"System", "Dark", "Light"}, Default: "system",
 		bind: func(s *Settings) any { return &s.Appearance.Theme },
 	},
+	themeField(KeyThemeDark, theme.SchemeDark, "Dark theme", "Colours of the window, threads and terminals when the scheme is dark.",
+		func(s *Settings) any { return &s.Appearance.ThemeDark }),
+	themeField(KeyThemeLight, theme.SchemeLight, "Light theme", "Colours of the window, threads and terminals when the scheme is light.",
+		func(s *Settings) any { return &s.Appearance.ThemeLight }),
 	{
 		// The GUI bundles JetBrainsMono Nerd Font Mono (gui/frontend/public/fonts). Its own
 		// stack, used when this is empty, is DEFAULT_TERMINAL_FONT_FAMILY in src/terminal/fonts.ts.
@@ -331,6 +343,20 @@ var staticFields = []Field{
 	},
 }
 
+// themeField is a theme slot: an Enum of the scheme's themes from the GUI's catalog
+// (internal/theme), labelled with their names. A theme of the other scheme is refused
+// with a message that says so. A value on disk the catalog no longer has (a theme removed
+// later) falls back to the default like any rejected value: reported in Issues and logged
+// at start, the file left as it is.
+func themeField(key, scheme, title, desc string, bind func(s *Settings) any) Field {
+	return Field{
+		Key: key, Group: GroupAppearance, Type: Enum, Title: title, Description: desc,
+		Enum: theme.IDs(scheme), EnumLabels: theme.Names(scheme), Default: theme.Default(scheme),
+		bind:     bind,
+		unlisted: func(v string) error { return theme.Check(v, scheme) },
+	}
+}
+
 // CommandInfo is what the keybinding fields need to know about a registry command.
 type CommandInfo struct {
 	Name        string
@@ -385,6 +411,11 @@ func (f Field) parse(v string) (string, error) {
 		out = strconv.Itoa(n)
 	case Enum:
 		if !slices.Contains(f.Enum, v) {
+			if f.unlisted != nil {
+				if err := f.unlisted(v); err != nil {
+					return "", err
+				}
+			}
 			return "", fmt.Errorf("want one of %s, got %q", enumList(f.Enum), v)
 		}
 		out = v
