@@ -21,13 +21,18 @@ function drag(page: Page, selector: string) {
   return page.locator(selector).first().evaluate((el) => getComputedStyle(el).getPropertyValue("--wails-draggable").trim());
 }
 
-// Window geometry (components/window/titleBand.ts): a 52px title band with no full-width
-// strip. The sidebar's band (80px traffic-light gutter, then the app name) is
-// 52px; the panes start 8px down and their 44px headers end on the band (their 1px
-// bottom border is the first row below it: the pane's own 1px border puts the header
-// at 9..53).
-const BAND = 52;
+// Window geometry (components/window/titleBand.ts, docs/notes/design-system-2-shell.md):
+// a 56px title band with no full-width strip. The sidebar's band (80px traffic-light
+// gutter, then the app name) is 56px; the panes start a shell gap (12px) down and their
+// 44px headers end on the band (their 1px bottom border is the first row below it: the
+// pane's own 1px border puts the header at 13..57). The band's content centres on the
+// header, 34px down.
+const GAP = 12;
+const BAND = 56;
 const HEADER = 44;
+const CENTER = 34;
+/** An icon-xs button's inset around its glyph: (24px box - 14px glyph) / 2. */
+const ICON_INSET = 5;
 
 test("the app name is 16px semibold and fits whole at the minimum sidebar width, zoomed out too", async ({ page }) => {
   await openApp(page);
@@ -64,15 +69,18 @@ test("the sidebar band holds only the empty traffic-light gutter and the app nam
   expect(await page.getByTestId("traffic-light-gutter").evaluate((el) => [el.childElementCount, el.textContent])).toEqual([0, ""]);
   const title = page.getByTestId("sidebar-app-name");
   await expect(title).toHaveText("Code Foundry");
-  // 12px after the gutter.
+  // 12px after the gutter, centred on the pane headers (34px down), not on the band.
   expect(await title.evaluate((el) => el.getBoundingClientRect().left)).toBe(80 + 12);
+  const name = await box(page, "sidebar-app-name");
+  expect(name.top + name.height / 2).toBe(CENTER);
   expect(await drag(page, '[data-testid="sidebar-app-name"]')).toBe("drag");
 
-  // The toolbar sits right under the band, 32px tall, in the sidebar body's 8px left gutter
-  // with no inset of its own (#40: rows, toolbar and status run to the sidebar's edges, 8px
-  // from the window and from the pane), its buttons in order from there; it does not drag.
+  // The toolbar sits right under the band, 32px tall, in the sidebar body's 12px left gutter
+  // with no inset of its own (#40: rows, toolbar and status run to the sidebar's edges, a
+  // shell gap from the window and from the pane), its buttons in order from there; it does
+  // not drag.
   const toolbar = await box(page, "sidebar-toolbar");
-  expect([toolbar.top, toolbar.left, toolbar.height]).toEqual([BAND, 8, 32]);
+  expect([toolbar.top, toolbar.left, toolbar.height]).toEqual([BAND, GAP, 32]);
   expect(await drag(page, '[data-testid="sidebar-toolbar"]')).toBe("no-drag");
   expect(await drag(page, '[data-testid="sidebar-new-session"]')).toBe("no-drag");
   const buttons = await page
@@ -80,12 +88,14 @@ test("the sidebar band holds only the empty traffic-light gutter and the app nam
     .locator("button")
     .evaluateAll((els) => els.map((e) => e.getAttribute("data-testid")));
   expect(buttons).toEqual(["sidebar-dashboard", "sidebar-notifications"]);
-  expect((await box(page, "sidebar-dashboard")).left).toBe(8);
-  // New thread is a full-width button under the toolbar: 8px from the window edge, and it
-  // ends where the sidebar does (the content pane's 8px margin is the gap beyond it).
+  // The first button's glyph (not its box) sits on the gutter line.
+  expect((await box(page, "sidebar-dashboard")).left).toBe(GAP - ICON_INSET);
+  expect(await page.getByTestId("sidebar-dashboard").locator("svg").evaluate((el) => el.getBoundingClientRect().left)).toBe(GAP);
+  // New thread is a full-width button under the toolbar: 12px from the window edge, and it
+  // ends where the sidebar does (the content pane's 12px margin is the gap beyond it).
   const newThread = await box(page, "sidebar-new-session");
   const sidebar = await box(page, "sidebar");
-  expect(newThread.left).toBe(8);
+  expect(newThread.left).toBe(GAP);
   expect(newThread.top).toBeGreaterThan(BAND + 32);
   expect(newThread.height).toBe(32);
   expect(newThread.left + newThread.width).toBe(sidebar.left + sidebar.width);
@@ -99,12 +109,12 @@ test("the sidebar band holds only the empty traffic-light gutter and the app nam
 
   // The sheet above the panes drags too; the panes themselves do not.
   const edge = await box(page, "window-drag-edge");
-  expect([edge.top, edge.left, edge.width, edge.height]).toEqual([0, 0, viewport?.width, 8]);
+  expect([edge.top, edge.left, edge.width, edge.height]).toEqual([0, 0, viewport?.width, GAP]);
   expect(await drag(page, '[data-testid="window-drag-edge"]')).toBe("drag");
   expect(await drag(page, '[data-testid="content-pane"]')).toBe("");
 });
 
-test("the panes start 8px from the top and their 44px headers drag the window, with the sidebar shown and hidden", async ({ page }) => {
+test("the panes start a shell gap (12px) from the top and their 44px headers drag the window, with the sidebar shown and hidden", async ({ page }) => {
   await openApp(page);
   const viewport = page.viewportSize();
   await row(page, "s:s-1").click();
@@ -118,14 +128,17 @@ test("the panes start 8px from the top and their 44px headers drag the window, w
       await expect(page.getByTestId("sidebar")).toHaveCount(0);
     }
     const pane = await box(page, "content-pane");
-    expect(pane.top).toBe(8);
-    expect(pane.left).toBe(visible ? (await box(page, "sidebar")).right + 8 : 8);
-    expect(viewport && viewport.height - pane.bottom).toBe(8);
+    expect(pane.top).toBe(GAP);
+    expect(pane.left).toBe(visible ? (await box(page, "sidebar")).right + GAP : GAP);
+    expect(viewport && viewport.height - pane.bottom).toBe(GAP);
 
     const header = await box(page, "thread-header");
     expect(header.top).toBe(pane.top + 1);
     expect(header.height).toBe(HEADER);
     expect(header.bottom - 1).toBe(BAND);
+    // Its content (inside the 1px bottom border) centres 34.5px down, half a pixel below
+    // the band's centre (the app name, the traffic lights).
+    expect(Math.abs((header.top + header.bottom - 1) / 2 - CENTER)).toBeLessThanOrEqual(0.5);
     expect(await drag(page, '[data-testid="thread-header"]')).toBe("drag");
     // The name and the location are buttons (rename, worktree surface): they do not drag.
     expect(await drag(page, '[data-testid="thread-title"]')).toBe("no-drag");
@@ -136,8 +149,8 @@ test("the panes start 8px from the top and their 44px headers drag the window, w
 
     // The side panel: same top, same header, ending on the band.
     const wrapper = await box(page, "side-panel-wrapper");
-    expect(wrapper.top).toBe(8);
-    expect(viewport && viewport.width - wrapper.right).toBe(8);
+    expect(wrapper.top).toBe(GAP);
+    expect(viewport && viewport.width - wrapper.right).toBe(GAP);
     const panelHeader = await box(page, "panel-header");
     expect(panelHeader.top).toBe(header.top);
     expect(panelHeader.height).toBe(HEADER);
@@ -145,16 +158,16 @@ test("the panes start 8px from the top and their 44px headers drag the window, w
     expect(await drag(page, '[data-testid="panel-header"]')).toBe("drag");
     expect(await drag(page, '[data-testid="panel-header"] [data-testid="panel-toggle"]')).toBe("no-drag");
     expect(await drag(page, '[data-testid="panel-empty"]')).toBe("");
-    // The resize handle runs from the panel's top (just below the window's 8px edge) and never drags.
+    // The resize handle runs from the panel's top (just below the window's 12px edge) and never drags.
     const handle = await box(page, "panel-resize-handle");
-    expect(handle.top).toBe(8);
+    expect(handle.top).toBe(GAP);
     expect(await drag(page, '[data-testid="panel-resize-handle"]')).toBe("no-drag");
 
     // Hidden sidebar: the pane runs under the traffic lights, so the header content
     // starts past the gutter.
     const title = await box(page, "thread-title");
     // (The name's button pulls its 6px hover padding into the header's own; its text starts past the gutter.)
-    if (!visible) expect(title.left + 6).toBeGreaterThanOrEqual(80 + 8);
+    if (!visible) expect(title.left + 6).toBeGreaterThanOrEqual(80 + GAP);
   }
   await expect(page.getByTestId("hints")).toHaveCount(0);
 });
@@ -166,7 +179,7 @@ test("every page header is 44px, ends on the band and drags; its controls do not
       const r = el.getBoundingClientRect();
       return { top: r.top, height: r.height, bottom: r.bottom };
     });
-    expect(h, header).toEqual({ top: 9, height: HEADER, bottom: BAND + 1 });
+    expect(h, header).toEqual({ top: GAP + 1, height: HEADER, bottom: BAND + 1 });
     expect(await drag(page, header)).toBe("drag");
     for (const sel of noDrag) expect(await drag(page, `${header} ${sel}`), sel).toBe("no-drag");
   };
@@ -193,7 +206,7 @@ test("headerless panes (start page, composer) drag the window from the same 44px
       const r = el.getBoundingClientRect();
       return { top: r.top, height: r.height, bottom: r.bottom };
     });
-    expect(b, band).toEqual({ top: 9, height: HEADER, bottom: BAND + 1 });
+    expect(b, band).toEqual({ top: GAP + 1, height: HEADER, bottom: BAND + 1 });
     expect(await drag(page, band)).toBe("drag");
     expect(await drag(page, content)).toBe("");
   };
@@ -214,6 +227,12 @@ test("the daemon status and update indicator sit at the bottom of the sidebar", 
   expect(status.right).toBeLessThanOrEqual(sidebar.right);
   expect(sidebar.bottom - status.bottom).toBeLessThan(16);
   await expect(page.locator("footer")).toHaveCount(0);
+  // The last status button's glyph (not its box) ends on the sidebar's right edge, a shell
+  // gap from the content pane.
+  const settings = await box(page, "status-settings");
+  expect(settings.right).toBe(sidebar.right + ICON_INSET);
+  expect(await page.getByTestId("status-settings").locator("svg").evaluate((el) => el.getBoundingClientRect().right)).toBe(sidebar.right);
+  expect((await box(page, "content-pane")).left - sidebar.right).toBe(GAP);
 });
 
 for (const scheme of ["dark", "light"] as const) {

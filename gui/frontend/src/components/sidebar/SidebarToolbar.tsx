@@ -58,6 +58,11 @@ function NotificationsButton() {
  * Notifications. Not part of the window drag area. New thread is the labelled button
  * under it (SidebarNewThread). See docs/notes/sidebar-toolbar.md and
  * docs/notes/onboarding-1-entry-points.md.
+ *
+ * The first button's glyph sits on the sidebar's left gutter line (where the New thread
+ * button and the rows start): an icon-xs box is 24px (size-6) around a 14px glyph
+ * (size-3.5), so it is pulled left by (24 - 14) / 2 = 5px (-ml-1.25). Its hover and
+ * current background still show the whole box. docs/notes/design-system-2-shell.md.
  */
 export function SidebarToolbar() {
   const dashboard = useUiStore((s) => isDashboard(s.selection));
@@ -73,7 +78,7 @@ export function SidebarToolbar() {
         icon={LayoutDashboard}
         whenUnavailable="disable"
         current={dashboard}
-        className={dashboard ? "bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent dark:hover:bg-sidebar-accent" : undefined}
+        className={cn("-ml-1.25", dashboard && "bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent dark:hover:bg-sidebar-accent")}
         data-testid="sidebar-dashboard"
       />
       <NotificationsButton />
