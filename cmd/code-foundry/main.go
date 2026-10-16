@@ -32,7 +32,7 @@ var subcommands = []subcommand{
 	{"version", "Print version information", runVersion},
 	{"commands", "List daemon commands and their availability (--context-* flags)", runCommands},
 	{"gui", "Start the app (the GUI installed next to this CLI, or the dev build)", runGUI},
-	{"update", "Install the latest release (also --update; --version, --force, --yes)", runUpdate},
+	{"update", "Download the latest release for `app restart`, or install it when no daemon runs (also --update; --version, --force, --yes)", runUpdate},
 }
 
 // errUsage marks errors already explained to the user; main exits 2 without repeating them.
