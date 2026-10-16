@@ -62,7 +62,7 @@ func threadEnv(port int, token string) []string {
 // daemon's own values (threadEnv, and their own paths.EnvThread).
 func scrubEndpointEnv(log *slog.Logger) {
 	var vars []string
-	for _, k := range []string{paths.EnvEndpoint, paths.EnvToken, paths.EnvThread} {
+	for _, k := range []string{paths.EnvEndpoint, paths.EnvToken, paths.EnvThread, paths.EnvThreadLegacy} {
 		if _, ok := os.LookupEnv(k); ok {
 			_ = os.Unsetenv(k)
 			vars = append(vars, k)

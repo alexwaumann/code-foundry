@@ -42,7 +42,7 @@ type contextFlags struct {
 func (cl *cli) addContextFlags(fs *flag.FlagSet) *contextFlags {
 	cf := &contextFlags{}
 	fs.StringVar(&cf.terminal, "context-terminal", "", "active terminal `id`")
-	fs.StringVar(&cf.thread, "context-thread", cl.env(paths.EnvThread), "active thread `id` (default $"+paths.EnvThread+")")
+	fs.StringVar(&cf.thread, "context-thread", cl.threadEnv(), "active thread `id` (default $"+paths.EnvThread+")")
 	fs.StringVar(&cf.repo, "context-repo", "", "active repository `id`")
 	fs.StringVar(&cf.worktree, "context-worktree", "", "active worktree `path`")
 	fs.StringVar(&cf.workspace, "context-workspace", "", "active workspace `id`")
@@ -55,6 +55,15 @@ func (cl *cli) env(key string) string {
 		return ""
 	}
 	return strings.TrimSpace(cl.getenv(key))
+}
+
+// threadEnv is --context-thread's default: $CODE_FOUNDRY_THREAD, else, for one release,
+// its old name $CODE_FOUNDRY_SESSION (paths.EnvThreadLegacy).
+func (cl *cli) threadEnv() string {
+	if id := cl.env(paths.EnvThread); id != "" {
+		return id
+	}
+	return cl.env(paths.EnvThreadLegacy)
 }
 
 func (cl *cli) uiContext(cf *contextFlags) (*v1.UiContext, error) {

@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/alexwaumann/code-foundry/internal/paths"
 )
 
 func TestInheritedClaudeVars(t *testing.T) {
@@ -74,9 +76,10 @@ func TestScrubEndpointEnv(t *testing.T) {
 	t.Setenv("CODE_FOUNDRY_ENDPOINT", "http://127.0.0.1:1")
 	t.Setenv("CODE_FOUNDRY_TOKEN", "other-daemon")
 	t.Setenv("CODE_FOUNDRY_THREAD", "s-other-daemon")
+	t.Setenv(paths.EnvThreadLegacy, "s-older-daemon")
 	var logs bytes.Buffer
 	scrubEndpointEnv(slog.New(slog.NewTextHandler(&logs, nil)))
-	for _, k := range []string{"CODE_FOUNDRY_ENDPOINT", "CODE_FOUNDRY_TOKEN", "CODE_FOUNDRY_THREAD"} {
+	for _, k := range []string{"CODE_FOUNDRY_ENDPOINT", "CODE_FOUNDRY_TOKEN", "CODE_FOUNDRY_THREAD", paths.EnvThreadLegacy} {
 		if _, ok := os.LookupEnv(k); ok {
 			t.Errorf("%s still set", k)
 		}

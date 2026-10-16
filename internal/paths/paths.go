@@ -37,6 +37,12 @@ const (
 // thread's agent lands in that thread's bottom panel.
 const EnvThread = "CODE_FOUNDRY_THREAD"
 
+// EnvThreadLegacy is EnvThread's name before threads were renamed from sessions. The CLI
+// still reads it when EnvThread is unset, for one release, so a process started with the
+// old name keeps its default --context-thread; the daemon sets only EnvThread and scrubs
+// both. Remove it after the next stable release.
+const EnvThreadLegacy = "CODE_FOUNDRY_SESSION"
+
 // Every action run (internal/store/action) gets these: the project's main checkout and
 // the worktree the run belongs to (its cwd).
 const (
