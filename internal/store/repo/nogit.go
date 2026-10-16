@@ -20,9 +20,10 @@ import (
 // initial commit, then refreshes, which flips the project to git and lets the normal
 // reconcile take over.
 
-// initialCommitMessage is the message of the empty commit InitGit makes, so the new
-// repository has a HEAD that worktrees can branch from.
-const initialCommitMessage = "Initial commit"
+// initialCommitMessage is the message of the empty commit InitGit (and CreateWorktree
+// on an unborn branch) makes, so the repository has a HEAD that worktrees can branch
+// from. Conventional-commits form; it is the user's repository, not Code Foundry's.
+const initialCommitMessage = "chore: initial commit"
 
 // probeGit reports whether dir is a git project (has .git). It fails when dir does not
 // exist or is not a directory, like a reconcile of a moved repository.

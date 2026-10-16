@@ -668,3 +668,79 @@ func TestPeriodicFetch(t *testing.T) {
 	git(t, f.other, "push", "-q")
 	h.waitFor("behind via periodic fetch", worktreeUpdated(f.repo, func(w Worktree) bool { return w.Status.Behind == 1 }))
 }
+
+// TestCreateWorktreeUnbornBase covers a `git init` folder with no commit: the default
+// base, or an explicit base naming the checkout's unborn branch, gets the empty
+// initial commit first; another base and a repo with commits are left alone; a
+// failing commit is a clear failed precondition.
+func TestCreateWorktreeUnbornBase(t *testing.T) {
+	tests := []struct {
+		name     string
+		base     string
+		breakGit bool // make the commit fail (no identity)
+		wantErr  error
+		wantLog  string // subjects after the call, newest first
+	}{
+		{name: "default base", wantLog: "chore: initial commit"},
+		{name: "explicit unborn branch", base: "main", wantLog: "chore: initial commit"},
+		{name: "explicit full ref", base: "refs/heads/main", wantLog: "chore: initial commit"},
+		{name: "other base", base: "nope", wantErr: ErrFailedPrecondition},
+		{name: "commit fails", breakGit: true, wantErr: ErrFailedPrecondition},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			isolateGit(t)
+			base, err := filepath.EvalSymlinks(t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
+			dir := filepath.Join(base, "pad")
+			git(t, base, "init", "-q", "-b", "main", dir)
+			writeFile(t, filepath.Join(dir, "notes.md"), "todo\n")
+			if tt.breakGit {
+				git(t, dir, "config", "user.name", "")
+				git(t, dir, "config", "user.email", "")
+			}
+			h := startHarness(t, "", Options{})
+			ctx := context.Background()
+			r, err := h.store.Register(ctx, dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if r.DefaultBranch != "main" || r.Worktrees[0].Head != "" {
+				t.Fatalf("registered = %+v", r)
+			}
+			w, err := h.store.CreateWorktree(ctx, CreateWorktreeOptions{RepoID: r.ID, Branch: "cf/x", BaseRef: tt.base})
+			if tt.wantErr != nil {
+				if !errors.Is(err, tt.wantErr) {
+					t.Fatalf("err = %v, want %v", err, tt.wantErr)
+				}
+				if tt.breakGit && !strings.Contains(err.Error(), "has no commits yet") {
+					t.Fatalf("err = %v", err)
+				}
+				if n := git(t, dir, "rev-list", "--count", "--all"); n != "0" {
+					t.Fatalf("commits after failure = %s", n)
+				}
+				return
+			}
+			if err != nil || w.Branch != "cf/x" || len(w.Head) != 40 {
+				t.Fatalf("worktree = %+v, %v", w, err)
+			}
+			if subj := git(t, dir, "log", "--format=%s"); subj != tt.wantLog {
+				t.Fatalf("log = %q", subj)
+			}
+			// The untracked file stays untracked; the main checkout now has a head.
+			got, _ := h.store.Snapshot().Repo(r.ID)
+			if m := got.Worktrees[0]; !m.IsMain || len(m.Head) != 40 || m.Status.Untracked != 1 {
+				t.Fatalf("main worktree = %+v", m)
+			}
+			// A second worktree makes no second commit.
+			if _, err := h.store.CreateWorktree(ctx, CreateWorktreeOptions{RepoID: r.ID, Branch: "cf/y"}); err != nil {
+				t.Fatal(err)
+			}
+			if n := git(t, dir, "rev-list", "--count", "HEAD"); n != "1" {
+				t.Fatalf("commits = %s", n)
+			}
+		})
+	}
+}
