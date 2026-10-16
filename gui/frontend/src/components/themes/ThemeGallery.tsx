@@ -288,7 +288,7 @@ function Composer() {
             <Gauge /> High <ChevronDown className="opacity-60" />
           </Button>
           <Button variant="ghost" size="xs" className={picker} tabIndex={-1}>
-            <ShieldCheck /> Accept edits <ChevronDown className="opacity-60" />
+            <ShieldCheck /> Auto <ChevronDown className="opacity-60" />
           </Button>
           <span className="ml-auto flex size-7 items-center justify-center rounded-md text-muted-foreground">
             <Paperclip className="size-4" aria-hidden />
