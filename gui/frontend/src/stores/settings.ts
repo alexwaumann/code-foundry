@@ -10,13 +10,15 @@ import { getSettingsSchema, SettingsValidationError, updateSettings, type Settin
 import { errorMessage } from "@/api/stream";
 import type { Choice } from "@/lib/compose";
 import { FALLBACK_MODEL_CHOICES, modelChoicesFromSchema } from "@/lib/models";
-import { setThemePreference } from "@/lib/theme";
+import { setThemePreference, setThemeSlots } from "@/lib/theme";
 import { DEFAULT_TERMINAL_FONT_FAMILY, FONT_FALLBACKS } from "@/terminal/fonts";
 import { refreshCommands } from "./commands";
 import { nextZoom, useUiStore, ZOOM_DEFAULT } from "./ui";
 
 export const KEYS = {
   theme: "appearance.theme",
+  themeDark: "appearance.theme_dark",
+  themeLight: "appearance.theme_light",
   fontFamily: "appearance.font_family",
   fontSize: "appearance.font_size",
   zoom: "appearance.zoom",
@@ -66,6 +68,11 @@ export function applySettingsSnapshot(next: SettingsSnapshotView): void {
   useSettingsStore.setState({ snapshot: next });
   const theme = next.values[KEYS.theme];
   if (theme === "system" || theme === "dark" || theme === "light") setThemePreference(theme);
+  // Only the keys the snapshot has: lib/theme resets a slot given undefined.
+  const slots: { light?: string; dark?: string } = {};
+  if (KEYS.themeLight in next.values) slots.light = next.values[KEYS.themeLight];
+  if (KEYS.themeDark in next.values) slots.dark = next.values[KEYS.themeDark];
+  setThemeSlots(slots);
   if (changed(prev, next, KEYS.fontSize)) {
     const n = Number(next.values[KEYS.fontSize]);
     if (Number.isFinite(n) && n > 0) useUiStore.getState().setFontSize(n);

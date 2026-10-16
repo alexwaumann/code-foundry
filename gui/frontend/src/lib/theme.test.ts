@@ -85,3 +85,29 @@ describe("syncDocumentScheme", () => {
     }
   });
 });
+
+describe("the stored theme", () => {
+  afterEach(() => {
+    localStorage.clear();
+    vi.resetModules();
+  });
+
+  it("is written on every change", async () => {
+    const { setThemePreference: pref, setThemeSlots: slots, THEME_STORAGE_KEY } = await import("./theme");
+    slots({ dark: "dracula" });
+    pref("light");
+    expect(JSON.parse(localStorage.getItem(THEME_STORAGE_KEY) ?? "")).toEqual({ scheme: "light", light: DEFAULT_LIGHT, dark: "dracula" });
+  });
+
+  it.each([
+    ["a stored theme", { scheme: "light", dark: "nord", light: "rose-pine-dawn" }, "light", { light: "rose-pine-dawn", dark: "nord" }],
+    ["unknown and wrong-scheme ids", { scheme: "dark", dark: "gone", light: "dracula" }, "dark", { light: DEFAULT_LIGHT, dark: DEFAULT_DARK }],
+    ["a bad scheme", { scheme: "sepia" }, "system", { light: DEFAULT_LIGHT, dark: DEFAULT_DARK }],
+  ])("seeds a fresh load from %s", async (_, stored, pref, want) => {
+    localStorage.setItem("cf.theme", JSON.stringify(stored));
+    vi.resetModules();
+    const fresh = await import("./theme");
+    expect(fresh.themePreference()).toBe(pref);
+    expect(fresh.themeSlots()).toEqual(want);
+  });
+});

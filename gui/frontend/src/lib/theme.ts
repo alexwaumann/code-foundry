@@ -15,6 +15,38 @@ function media(): MediaQueryList | null {
 let preference: ThemePreference = "system";
 const listeners = new Set<() => void>();
 
+/**
+ * The last applied preference and slots, kept in localStorage so a launch paints the
+ * user's theme before the daemon's settings arrive: index.html's inline script applies it
+ * to <html> before the stylesheet paints, and this module starts from it. The daemon's
+ * snapshot (stores/settings.ts) then confirms or replaces it. WebKit's localStorage is
+ * per user, not per CODE_FOUNDRY_HOME: a scratch home's launch writes it too.
+ */
+export const THEME_STORAGE_KEY = "cf.theme";
+
+interface StoredTheme {
+  scheme?: unknown;
+  light?: unknown;
+  dark?: unknown;
+}
+
+function readStored(): StoredTheme {
+  try {
+    const v: unknown = JSON.parse(localStorage.getItem(THEME_STORAGE_KEY) ?? "null");
+    return v && typeof v === "object" ? v : {};
+  } catch {
+    return {};
+  }
+}
+
+function persist(): void {
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify({ scheme: preference, light: slots.light, dark: slots.dark }));
+  } catch {
+    // No storage (Node) or a full quota: the next launch paints the defaults until settings load.
+  }
+}
+
 /** Dark unless the system explicitly prefers light. */
 export function systemScheme(): ColorScheme {
   return media()?.matches ? "light" : "dark";
@@ -25,10 +57,16 @@ export function effectiveScheme(): ColorScheme {
   return preference === "system" ? systemScheme() : preference;
 }
 
+/** appearance.theme as last set. */
+export function themePreference(): ThemePreference {
+  return preference;
+}
+
 /** Sets appearance.theme; every useColorScheme and the document follow. */
 export function setThemePreference(p: ThemePreference): void {
   if (p === preference) return;
   preference = p;
+  persist();
   for (const l of listeners) l();
 }
 
@@ -40,6 +78,14 @@ function subscribe(cb: () => void): () => void {
     m?.removeEventListener("change", cb);
     listeners.delete(cb);
   };
+}
+
+/**
+ * Calls cb after every change to the active theme's inputs: the preference, the slots,
+ * or the macOS appearance. Returns an unsubscribe.
+ */
+export function onThemeChange(cb: () => void): () => void {
+  return subscribe(cb);
 }
 
 /** Follows the theme preference and, for "system", the macOS appearance live. */
@@ -72,7 +118,18 @@ export function setThemeSlots(next: { light?: string; dark?: string }): void {
   const dark = "dark" in next ? validSlot(next.dark, "dark") : slots.dark;
   if (light === slots.light && dark === slots.dark) return;
   slots = { light, dark };
+  persist();
   for (const l of listeners) l();
+}
+
+// Start from the last applied theme (THEME_STORAGE_KEY); anything unusable is the default.
+{
+  const stored = readStored();
+  if (stored.scheme === "system" || stored.scheme === "dark" || stored.scheme === "light") preference = stored.scheme;
+  slots = {
+    light: validSlot(typeof stored.light === "string" ? stored.light : undefined, "light"),
+    dark: validSlot(typeof stored.dark === "string" ? stored.dark : undefined, "dark"),
+  };
 }
 
 export function themeSlots(): ThemeSlots {

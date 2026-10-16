@@ -6,6 +6,7 @@
  */
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { SettingType, type SettingFieldSchema, type SettingGroupSchema, type SettingsSnapshotSchema } from "../src/gen/codefoundry/v1/settings_pb";
+import { DEFAULT_DARK, DEFAULT_LIGHT, themesFor } from "../src/themes";
 
 type FieldInit = MessageInitShape<typeof SettingFieldSchema> & { key: string; type: SettingType; defaultValue: string; group: string };
 type GroupInit = MessageInitShape<typeof SettingGroupSchema>;
@@ -26,7 +27,7 @@ export const groups: GroupInit[] = [
   { id: "github", title: "GitHub", description: "Your pull requests and default-branch checks, polled with gh's login." },
   { id: "repos", title: "Repositories", description: "Git fetching and where new worktrees go." },
   { id: "gitops", title: "Git operations", description: "How worktrees are handed to other apps." },
-  { id: "appearance", title: "Appearance", description: "Theme, terminal font, density, and backdrop. Applied live in every window." },
+  { id: "appearance", title: "Appearance", description: "Scheme, themes, terminal font, density, and backdrop. Applied live in every window." },
   { id: "notifications", title: "Notifications", description: "Dock badge and alerts for threads that need you. macOS banners aren't available to an app without a bundle." },
   { id: "keybindings", title: "Keybindings", description: 'Override a command\'s chord, or "none" to unbind it. Reserved app chords (cmd+k, cmd+b, cmd+1..9, ...) cannot be bound.' },
   { id: "update", title: "Updates", description: "Which releases the app checks for and offers to install." },
@@ -89,7 +90,10 @@ const staticFields: FieldInit[] = [
   { key: "repos.fetch_interval_seconds", group: "repos", type: S.INT, title: "Fetch interval (seconds)", description: "How often each repository runs git fetch --prune. 0 turns it off.", defaultValue: "120", min: 0n, max: 86400n, restartRequired: true },
   { key: "repos.worktree_dir", group: "repos", type: S.PATH, title: "Worktree directory", description: "Where New Worktree puts worktrees. {repo} is replaced by the repository's name. Empty uses ~/.code-foundry/worktrees/<owner>/<repo>.", defaultValue: "", placeholder: "~/worktrees/{repo}" },
   { key: "gitops.editor_command", group: "gitops", type: S.STRING, title: "Editor command", description: "Command that opens a worktree (Open in Editor). {path} is replaced by the worktree path. Empty detects an editor.", defaultValue: "", placeholder: "auto-detect" },
-  { key: "appearance.theme", group: "appearance", type: S.ENUM, title: "Theme", description: "System follows the macOS appearance.", enumValues: ["system", "dark", "light"], defaultValue: "system" },
+  { key: "appearance.theme", group: "appearance", type: S.ENUM, title: "Scheme", description: "Dark or light. System follows the macOS appearance.", enumValues: ["system", "dark", "light"], enumLabels: ["System", "Dark", "Light"], defaultValue: "system" },
+  // Like internal/store/settings themeField: the catalog's themes of one scheme.
+  { key: "appearance.theme_dark", group: "appearance", type: S.ENUM, title: "Dark theme", description: "Colours of the window, threads and terminals when the scheme is dark.", enumValues: themesFor("dark").map((t) => t.id), enumLabels: themesFor("dark").map((t) => t.name), defaultValue: DEFAULT_DARK },
+  { key: "appearance.theme_light", group: "appearance", type: S.ENUM, title: "Light theme", description: "Colours of the window, threads and terminals when the scheme is light.", enumValues: themesFor("light").map((t) => t.id), enumLabels: themesFor("light").map((t) => t.name), defaultValue: DEFAULT_LIGHT },
   { key: "appearance.font_family", group: "appearance", type: S.STRING, title: "Terminal font family", description: "Comma-separated font families, first available wins. JetBrainsMono Nerd Font Mono ships with the app.", defaultValue: "JetBrainsMono Nerd Font Mono, JetBrains Mono, SF Mono, Menlo", placeholder: "JetBrainsMono Nerd Font Mono, JetBrains Mono, SF Mono, Menlo" },
   { key: "appearance.font_size", group: "appearance", type: S.INT, title: "Terminal font size", description: "In points, before zoom.", defaultValue: "13", min: 9n, max: 28n },
   { key: "appearance.zoom", group: "appearance", type: S.INT, title: "Zoom", description: "Scale of the whole window in percent, terminal included. cmd+=, cmd+- and cmd+0 change it too.", defaultValue: "100", min: 90n, max: 200n },

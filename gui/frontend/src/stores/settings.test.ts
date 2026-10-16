@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SettingsSnapshotView } from "@/api/settings";
-import { effectiveScheme } from "@/lib/theme";
+import { activeTheme, effectiveScheme, themeSlots } from "@/lib/theme";
 import { answerConfirm, useConfirmStore } from "./confirm";
 import { applySettingsSnapshot, terminalFontFamily, threadWidthOf, useSettingsStore, zoomUi } from "./settings";
 import { useUiStore } from "./ui";
@@ -33,6 +33,17 @@ describe("applySettingsSnapshot", () => {
     applySettingsSnapshot(snap({ "appearance.theme": "dark", "appearance.font_size": "16", "appearance.density": "compact" }, 2));
     expect(effectiveScheme()).toBe("dark");
     expect(document.documentElement.dataset.density).toBe("compact");
+  });
+
+  it("applies the theme slots, and keeps a slot the snapshot lacks", () => {
+    applySettingsSnapshot(snap({ "appearance.theme": "dark", "appearance.theme_dark": "dracula", "appearance.theme_light": "rose-pine-dawn" }));
+    expect(themeSlots()).toEqual({ dark: "dracula", light: "rose-pine-dawn" });
+    expect(activeTheme().id).toBe("dracula");
+    applySettingsSnapshot(snap({ "appearance.theme": "light", "appearance.theme_dark": "nord" }, 2));
+    expect(themeSlots()).toEqual({ dark: "nord", light: "rose-pine-dawn" });
+    expect(activeTheme().id).toBe("rose-pine-dawn");
+    applySettingsSnapshot(snap({ "appearance.theme": "dark", "appearance.theme_dark": "catppuccin-mocha", "appearance.theme_light": "catppuccin-latte" }, 3));
+    expect(activeTheme().id).toBe("catppuccin-mocha");
   });
 
   it.each([

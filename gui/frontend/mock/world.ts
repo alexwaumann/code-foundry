@@ -20,6 +20,7 @@ import { HOME, projectFolder } from "./filesystem";
 import { projectCommands } from "./create";
 import { Hub } from "./hub";
 import { MockSettings, MODEL_VALUES } from "./settings";
+import { themesFor } from "../src/themes";
 import { MockUpdater, type RestartCost } from "./update";
 import { pageUsage, retiredUsage, sampleUsage, usageFields, type MockUsage } from "./usage";
 import { ENTER_ALT, prompt, RESET, topFrame } from "./screens";
@@ -2770,6 +2771,32 @@ export class World {
           return `alert sound at ${String(volume)}%: delivered=${String(n)}`;
         },
       },
+      // Like internal/command/commands_theme.go.
+      {
+        cmd: { name: "theme.list", title: "List Themes", category: "Settings", description: "Print every colour theme by scheme, marking the dark and light themes in use.", keybindings: [], args: [] },
+        when: always,
+        run: () => {
+          const v = this.settings.values();
+          return (["dark", "light"] as const)
+            .map((s) => `${s} themes:\n` + themesFor(s).map((t) => `${t.id === v[`appearance.theme_${s}`] ? "*" : " "} ${t.id}  ${t.name}`).join("\n"))
+            .join("\n\n");
+        },
+      },
+      ...(["dark", "light"] as const).map((scheme) => ({
+        cmd: {
+          name: `theme.set-${scheme}`,
+          title: `Set ${scheme === "dark" ? "Dark" : "Light"} Theme`,
+          category: "Settings",
+          description: `Choose the theme used when the scheme is ${scheme}.`,
+          keybindings: [],
+          args: [{ name: "theme", type: ArgType.ENUM, required: true, description: `A ${scheme} theme id`, enumValues: themesFor(scheme).map((t) => t.id) }],
+        },
+        when: always,
+        run: (_ctx: UiContext | undefined, args: Record<string, string>) => {
+          this.settings.update({ [`appearance.theme_${scheme}`]: args.theme ?? "" });
+          return `${scheme} theme = ${args.theme ?? ""}`;
+        },
+      })),
       ...this.update.commands(),
     ];
   }
