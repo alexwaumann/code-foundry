@@ -82,6 +82,11 @@
       "scheme": "dark"
     },
     {
+      "id": "petros-dusk",
+      "name": "Petros Dusk",
+      "scheme": "dark"
+    },
+    {
       "id": "github-light",
       "name": "GitHub Light",
       "scheme": "light",

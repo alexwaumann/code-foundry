@@ -121,6 +121,17 @@
     "accent": "#ffad66",
     "why": "Accent is Ayu's orange (keyword colour), distinct from its yellow warning. The bright-blue selection is replaced by the guard."
   },
+  "petros-dusk": {
+    "name": "Petros Dusk",
+    "ghostty": "Petros Dusk",
+    "upstream": "Peter Bybel's Ghostty theme (shared 2026-10-16)",
+    "accent": "#eb9b1a",
+    "status": {
+      "info": 14,
+      "warning": 13
+    },
+    "why": "Orange on deep purple: the accent is the foreground orange, so primary buttons and the user bubble carry the theme's signature. ANSI blue (#33489c) is 1.9:1 on the purple, so info/link use bright aqua (ANSI 14) instead. Warning (bright yellow #fca503) is close to the body text colour by design. The bright red (3.6:1) and the orange foreground (6.8:1) are lifted by the guards."
+  },
   "github-light": {
     "name": "GitHub Light",
     "ghostty": "GitHub Light Default",
