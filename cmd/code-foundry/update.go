@@ -59,11 +59,13 @@ func runUpdate(ctx context.Context, cl *cli, args []string) error {
 	}
 
 	daemon := runningDaemon(ctx)
+	var direct string // why a running daemon is not doing the update
 	if daemon != nil {
-		done, err := cl.updateViaDaemon(ctx, daemon, *tag, *channelFlag, *force)
-		if done || err != nil {
+		why, err := cl.updateViaDaemon(ctx, daemon, *tag, *channelFlag, *force)
+		if why == "" || err != nil {
 			return err
 		}
+		direct = why
 	}
 
 	repo, dir := version.Repo(), version.ReleaseDir()
@@ -107,6 +109,9 @@ func runUpdate(ctx context.Context, cl *cli, args []string) error {
 	if !*force && update.IsSemver(installed) && !update.Newer(*tag, installed) {
 		fmt.Fprintf(cl.stdout, "Code Foundry %s is up to date (latest %s release %s).\n", installed, channel, *tag)
 		return nil
+	}
+	if direct != "" {
+		fmt.Fprintf(cl.stdout, "Installing directly (%s); the running app and daemon keep their version until restarted.\n", direct)
 	}
 	fmt.Fprintf(cl.stdout, "Updating Code Foundry %s -> %s\n", installed, *tag)
 
@@ -152,19 +157,18 @@ func runningDaemon(ctx context.Context) *client.Client {
 }
 
 // updateViaDaemon hands the update to the running daemon: check, download, follow the
-// download's progress, then point at `app restart`. done is false when the daemon cannot
-// do what was asked (a specific version or channel it does not offer, --force, updates
-// off in the daemon): the caller then installs directly, after the note printed here.
-func (cl *cli) updateViaDaemon(ctx context.Context, c *client.Client, tag, channelFlag string, force bool) (done bool, err error) {
+// download's progress, then point at `app restart`. It returns why, without doing
+// anything, when the daemon cannot do what was asked (a version or channel it does not
+// offer, --force, updates off in the daemon): the caller then installs directly.
+func (cl *cli) updateViaDaemon(ctx context.Context, c *client.Client, tag, channelFlag string, force bool) (why string, err error) {
 	var st *v1.UpdateStatus
 	res, err := c.Update.Check(ctx, connect.NewRequest(&v1.CheckForUpdateRequest{}))
 	switch {
 	case err == nil:
 		st = res.Msg.GetStatus()
 	case connect.CodeOf(err) != connect.CodeFailedPrecondition:
-		return true, fmt.Errorf("check latest release: %w", err)
+		return "", fmt.Errorf("check latest release: %w", err)
 	} // FailedPrecondition: updates are off in the daemon; st stays nil
-	var why string
 	switch {
 	case st == nil || !st.GetEnabled():
 		why = "the running daemon does not update itself"
@@ -176,8 +180,7 @@ func (cl *cli) updateViaDaemon(ctx context.Context, c *client.Client, tag, chann
 		why = "the running daemon offers " + cmp.Or(st.GetTargetVersion(), "nothing newer")
 	}
 	if why != "" {
-		fmt.Fprintf(cl.stdout, "Installing directly (%s). The running app and daemon keep their version until restarted.\n", why)
-		return false, nil
+		return why, nil
 	}
 
 	target := st.GetTargetVersion()
@@ -186,14 +189,14 @@ func (cl *cli) updateViaDaemon(ctx context.Context, c *client.Client, tag, chann
 		fmt.Fprintf(cl.stdout, "Downloading Code Foundry %s (running %s)\n", target, st.GetCurrentVersion())
 		dl, err := c.Update.Download(ctx, connect.NewRequest(&v1.DownloadUpdateRequest{}))
 		if err != nil {
-			return true, fmt.Errorf("download %s: %w", target, err)
+			return "", fmt.Errorf("download %s: %w", target, err)
 		}
 		st = dl.Msg.GetStatus()
 	case v1.UpdateState_UPDATE_STATE_DOWNLOADING:
 		fmt.Fprintf(cl.stdout, "The daemon is already downloading Code Foundry %s\n", target)
 	case v1.UpdateState_UPDATE_STATE_INSTALLED, v1.UpdateState_UPDATE_STATE_RESTART_REQUIRED:
 		fmt.Fprintf(cl.stdout, "Code Foundry %s is installed; the app and the daemon (%s) run the old version until you restart Code Foundry:\n  code-foundry app restart\n", target, st.GetCurrentVersion())
-		return true, nil
+		return "", nil
 	case v1.UpdateState_UPDATE_STATE_DOWNLOADED:
 		// Below.
 	default:
@@ -202,20 +205,20 @@ func (cl *cli) updateViaDaemon(ctx context.Context, c *client.Client, tag, chann
 			msg += " (latest " + st.GetChannel() + " release " + l + ")"
 		}
 		fmt.Fprintln(cl.stdout, msg+".")
-		return true, nil
+		return "", nil
 	}
 	if st.GetState() == v1.UpdateState_UPDATE_STATE_DOWNLOADING {
 		if st, err = cl.followDownload(ctx, c); err != nil {
-			return true, err
+			return "", err
 		}
 	}
 	if st.GetState() != v1.UpdateState_UPDATE_STATE_DOWNLOADED {
-		return true, fmt.Errorf("downloading %s failed: %s", target, cmp.Or(st.GetFailureReason(), "the updater is "+st.GetState().String()))
+		return "", fmt.Errorf("downloading %s failed: %s", target, cmp.Or(st.GetFailureReason(), "the updater is "+st.GetState().String()))
 	}
 	fmt.Fprintf(cl.stdout, "Downloaded %s. Nothing has changed on disk yet. Install it and restart Code Foundry\n", st.GetTargetVersion())
 	fmt.Fprintf(cl.stdout, "(the app and the daemon update together; %s) with:\n", activeThreads(restartCostOf(ctx, c)))
 	fmt.Fprintf(cl.stdout, "  code-foundry app restart\n")
-	return true, nil
+	return "", nil
 }
 
 // followDownload prints the daemon's download progress until the state leaves
