@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { BOTTOM_MIN, bottomMax, clampBottomHeight, CONTENT_MIN, DASHBOARD, PANE_GAPS, PANEL_MIN, SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN, clampPanelWidth, isDashboard, panelMax, useUiStore, type FocusRegion, type Selection } from "./ui";
+import { SHELL_GAP } from "@/design/tokens";
+import { BOTTOM_GAP, BOTTOM_MIN, bottomMax, clampBottomHeight, CONTENT_MIN, DASHBOARD, PANE_GAPS, PANEL_MIN, SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN, clampPanelWidth, isDashboard, panelMax, useUiStore, type FocusRegion, type Selection } from "./ui";
+
+describe("shell gaps", () => {
+  it("the panes' horizontal gaps are three shell gaps (sidebar | gap | content | gap | panel | gap), 36px", () => {
+    expect(PANE_GAPS).toBe(3 * SHELL_GAP);
+    expect(PANE_GAPS).toBe(36);
+  });
+  it("the bottom panel sits one shell gap under the content pane", () => {
+    expect(BOTTOM_GAP).toBe(SHELL_GAP);
+  });
+});
 
 describe("panelMax", () => {
   const cases: [string, number, number, number][] = [
@@ -29,7 +40,7 @@ describe("clampPanelWidth", () => {
     ["below the minimum", 100, 1400, 260, PANEL_MIN],
     ["inside the bounds, rounded", 500.4, 1400, 260, 500],
     ["above 60% of the window", 1000, 1400, 0, 840],
-    ["above the room beside a wide sidebar", 700, 1400, 520, 496],
+    ["above the room beside a wide sidebar", 700, 1400, 520, 484],
     ["no room keeps the minimum", 400, 1000, 520, PANEL_MIN],
   ];
   it.each(cases)("%s", (_name, w, windowWidth, sidebar, want) => {
@@ -162,7 +173,7 @@ describe("bottomMax and clampBottomHeight", () => {
   const cases: [string, number, number][] = [
     ["70% of the column", 1000, 700],
     ["floored", 784, 548],
-    ["a short column keeps 160 for the content pane (plus the 8px gap)", 500, 500 - 160 - 8],
+    ["a short column keeps 160 for the content pane (plus the 12px gap)", 500, 500 - 160 - 12],
     ["never below the minimum", 250, BOTTOM_MIN],
     ["an unmeasured column", 0, BOTTOM_MIN],
   ];

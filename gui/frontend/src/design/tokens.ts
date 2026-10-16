@@ -15,3 +15,10 @@ export const RADIUS_NAMES = ["pane"] as const;
 
 /** Spacing names beyond Tailwind's (`m-shell`, `gap-shell`, ...). */
 export const SPACING_NAMES = ["shell"] as const;
+
+/**
+ * The shell gap in CSS px: `--gap-shell` in index.css (m-shell, pl-shell, ...), for code
+ * that does layout arithmetic (stores/ui.ts panelMax, components/window/titleBand.ts).
+ * roles.test.ts fails when the two differ.
+ */
+export const SHELL_GAP = 12;

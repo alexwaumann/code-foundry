@@ -77,12 +77,12 @@ test("the header toggle and cmd+j show and hide a thread's bottom panel", async 
   await expect.poll(() => focusInBottomTerminal(page)).toBe(true);
   await expect.poll(() => region(page)).toBe("bottom");
 
-  // Same width as the content pane, 8px under it, 8px above the window's bottom edge, 280 high.
+  // Same width as the content pane, a shell gap (12px) under it, 12px above the window's bottom edge, 280 high.
   const content = await box(page, "content-pane");
   const wrapper = await box(page, "bottom-panel-wrapper");
   expect([wrapper.left, wrapper.right]).toEqual([content.left, content.right]);
-  expect(wrapper.top - content.bottom).toBe(8);
-  expect((page.viewportSize()?.height ?? 0) - wrapper.bottom).toBe(8);
+  expect(wrapper.top - content.bottom).toBe(12);
+  expect((page.viewportSize()?.height ?? 0) - wrapper.bottom).toBe(12);
   expect(wrapper.height).toBe(280);
   // The header strip is no drag surface.
   expect(await page.getByTestId("bottom-header").evaluate((el) => getComputedStyle(el).getPropertyValue("--wails-draggable").trim())).toBe("no-drag");
@@ -214,9 +214,9 @@ test("the resize handle sizes one panel by keyboard and double-click, and the he
   await expect(handle).toHaveAttribute("aria-orientation", "horizontal");
   await expect(handle).toHaveAttribute("aria-valuenow", "280");
   await expect(handle).toHaveAttribute("aria-valuemin", "120");
-  // 70% of the content column (800 - 2 × 8).
-  await expect(handle).toHaveAttribute("aria-valuemax", String(Math.floor(784 * 0.7)));
-  // The handle fills the 8px gap above the panel.
+  // 70% of the content column (800 - 2 × 12).
+  await expect(handle).toHaveAttribute("aria-valuemax", String(Math.floor(776 * 0.7)));
+  // The handle fills the 12px gap above the panel.
   const h = await box(page, "bottom-resize-handle");
   expect(h.bottom).toBe((await box(page, "bottom-panel-wrapper")).top);
   expect(h.top).toBe((await box(page, "content-pane")).bottom);
@@ -232,7 +232,7 @@ test("the resize handle sizes one panel by keyboard and double-click, and the he
   await page.keyboard.press("Home");
   await expect(handle).toHaveAttribute("aria-valuenow", "120");
   await page.keyboard.press("End");
-  await expect(handle).toHaveAttribute("aria-valuenow", "548");
+  await expect(handle).toHaveAttribute("aria-valuenow", "543");
 
   // Dragging up makes it taller.
   await page.keyboard.press("Home");

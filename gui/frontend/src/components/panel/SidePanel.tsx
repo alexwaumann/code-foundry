@@ -8,6 +8,7 @@ import { Plus, X } from "lucide-react";
 import { CommandButton } from "@/components/command/CommandButton";
 import { Kbd } from "@/components/ui/kbd";
 import { Tip } from "@/components/ui/tooltip";
+import { PANE_HEADER_HEIGHT } from "@/components/window/titleBand";
 import { chordFromEvent } from "@/keys/chord";
 import { cn } from "@/lib/utils";
 import {
@@ -433,14 +434,18 @@ function surfaceKey(panelKey: string, chord: string): boolean {
 
 /**
  * The panel's header: tabs on the left, the expand button and the toggle at the far
- * right. 44px (h-11) like
- * every content pane header (window/PaneHeader), so it ends on the title band's bottom
- * edge beside them (window/titleBand.ts). Like them it drags the window: the empty
- * space around the tabs does, each tab and both buttons are `no-drag`.
+ * right. PANE_HEADER_HEIGHT (44px) like every content pane header (window/PaneHeader),
+ * so it ends on the title band's bottom edge beside them (window/titleBand.ts). Like them
+ * it drags the window: the empty space around the tabs does, each tab and both buttons
+ * are `no-drag`.
  */
 function PanelHeader({ panelKey, hasTabs }: { panelKey: string; hasTabs: boolean }) {
   return (
-    <div className="flex h-11 shrink-0 items-center gap-2 border-b border-pane-border pr-2 pl-1.5 [--wails-draggable:drag]" data-testid="panel-header">
+    <div
+      className="flex shrink-0 items-center gap-2 border-b border-pane-border pr-2 pl-1.5 [--wails-draggable:drag]"
+      style={{ height: PANE_HEADER_HEIGHT }}
+      data-testid="panel-header"
+    >
       {hasTabs ? <TabStrip panelKey={panelKey} /> : <div className="min-w-0 flex-1" />}
       <span className="flex shrink-0 items-center gap-0.5">
         <PanelExpand />
@@ -494,9 +499,9 @@ function Panel({ panelKey, max, expanded, asideRef }: { panelKey: string; max: n
   return (
     // The wrapper is not clipped so the resize handle can sit in the gap to its left.
     // Expanded, the content pane is hidden: the wrapper fills the row with the content
-    // pane's own 8px margins, and there is nothing to resize against.
+    // pane's own shell-gap margins, and there is nothing to resize against.
     <div
-      className={cn("relative flex", expanded ? "m-2 min-w-0 flex-1" : "mt-2 mr-2 mb-2 shrink-0")}
+      className={cn("relative flex", expanded ? "m-shell min-w-0 flex-1" : "mt-shell mr-shell mb-shell shrink-0")}
       style={expanded ? undefined : { width }}
       data-testid="side-panel-wrapper"
       data-expanded={expanded || undefined}
@@ -510,7 +515,7 @@ function Panel({ panelKey, max, expanded, asideRef }: { panelKey: string; max: n
         data-testid="side-panel"
         data-panel-key={panelKey}
         data-picking={picking || undefined}
-        className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-pane-border bg-pane shadow-xs outline-none"
+        className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-pane border border-pane-border bg-pane shadow-xs outline-none"
         onKeyDown={onKeyDown}
       >
         <PanelHeader panelKey={panelKey} hasTabs={hasTabs} />

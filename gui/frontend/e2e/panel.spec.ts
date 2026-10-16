@@ -101,13 +101,13 @@ test("the header toggle shows the empty surface list and hides the panel again",
   await expect(empty.locator('[data-surface="worktree"]')).toBeEnabled();
   await expect(panel(page).getByTestId("panel-tabs")).toHaveCount(0);
 
-  // Two panes, 8px apart, the panel 8px in from the window's right and bottom edges.
+  // Two panes, a shell gap (12px) apart, the panel 12px in from the window's right and bottom edges.
   const viewport = page.viewportSize();
   const content = await box(page, "content-pane");
   const side = await box(page, "side-panel");
-  expect(side.left - content.right).toBe(8);
-  expect(viewport && viewport.width - side.right).toBe(8);
-  expect(viewport && viewport.height - side.bottom).toBe(8);
+  expect(side.left - content.right).toBe(12);
+  expect(viewport && viewport.width - side.right).toBe(12);
+  expect(viewport && viewport.height - side.bottom).toBe(12);
   expect(side.top).toBe(content.top);
   expect(side.width).toBe(420);
   // The panel header lines up with the content pane header: 44px, same top and bottom
@@ -121,7 +121,7 @@ test("the header toggle shows the empty surface list and hides the panel again",
   await expect(panel(page)).toHaveCount(0);
   await expect(toggle).toHaveAttribute("aria-pressed", "false");
   await expect(page.getByTestId("panel-resize-handle")).toHaveCount(0);
-  expect(viewport && viewport.width - (await box(page, "content-pane")).right).toBe(8);
+  expect(viewport && viewport.width - (await box(page, "content-pane")).right).toBe(12);
   // The button runs the registry command through its local presenter: no daemon call.
   expect((await invocations()).map((i) => i.name)).not.toContain("view.panel.toggle");
 });
@@ -404,23 +404,23 @@ test("a narrow window with a wide sidebar shrinks the panel, then hides it, neve
   await page.setViewportSize({ width: 1200, height: 800 });
   await page.getByTestId("panel-toggle").click();
   await expect(panel(page)).toBeVisible();
-  // 1200 - 520 sidebar - 24 gaps - 360 content minimum.
-  await expect.poll(async () => (await box(page, "side-panel")).width).toBe(296);
+  // 1200 - 520 sidebar - 36 gaps - 360 content minimum.
+  await expect.poll(async () => (await box(page, "side-panel")).width).toBe(284);
   expect((await box(page, "content-pane")).width).toBeGreaterThanOrEqual(360);
-  expect((await box(page, "side-panel")).right).toBe(1200 - 8);
+  expect((await box(page, "side-panel")).right).toBe(1200 - 12);
 
   // No room for 280px: the panel hides but stays open, and the content pane fills the row.
   await page.setViewportSize({ width: 1000, height: 800 });
   await expect(panel(page)).toHaveCount(0);
   await expect(page.getByTestId("panel-toggle")).toHaveAttribute("aria-pressed", "true");
-  expect((await box(page, "content-pane")).right).toBe(1000 - 8);
+  expect((await box(page, "content-pane")).right).toBe(1000 - 12);
 
   // Hiding the sidebar makes room again.
   await threadPrompt(page).click();
   await page.keyboard.press("Meta+b");
   await expect(page.getByTestId("sidebar")).toHaveCount(0);
   await expect(panel(page)).toBeVisible();
-  expect((await box(page, "side-panel")).right).toBe(1000 - 8);
+  expect((await box(page, "side-panel")).right).toBe(1000 - 12);
   expect((await box(page, "content-pane")).width).toBeGreaterThanOrEqual(360);
 });
 
@@ -562,15 +562,15 @@ test("expand fills the content area, keeps the thread mounted, and restores the 
   expect(await expand.evaluate((el) => getComputedStyle(el).getPropertyValue("--wails-draggable").trim())).toBe("no-drag");
 
   await expand.click();
-  // The panel takes the content pane's place: 8px right of the sidebar, 8px in from the
+  // The panel takes the content pane's place: 12px right of the sidebar, 12px in from the
   // window's right, top and bottom edges.
   const vp = page.viewportSize();
   const sidebar = await box(page, "sidebar");
-  await expect.poll(async () => (await box(page, "side-panel-wrapper")).left).toBe(sidebar.right + 8);
+  await expect.poll(async () => (await box(page, "side-panel-wrapper")).left).toBe(sidebar.right + 12);
   const wrapper = await box(page, "side-panel-wrapper");
-  expect(vp && vp.width - wrapper.right).toBe(8);
-  expect(wrapper.top).toBe(8);
-  expect(vp && vp.height - wrapper.bottom).toBe(8);
+  expect(vp && vp.width - wrapper.right).toBe(12);
+  expect(wrapper.top).toBe(12);
+  expect(vp && vp.height - wrapper.bottom).toBe(12);
   await expect(page.getByTestId("content-pane")).toBeHidden();
   // The content column (content pane and bottom panel) is display: none, not unmounted.
   expect(await page.getByTestId("content-column").evaluate((el) => getComputedStyle(el).display)).toBe("none");
@@ -587,7 +587,7 @@ test("expand fills the content area, keeps the thread mounted, and restores the 
   // Expanded, it shows even where a split panel would have no room.
   await setSidebarWidth(page, 520);
   await page.setViewportSize({ width: 1000, height: 800 });
-  await expect.poll(async () => (await box(page, "side-panel-wrapper")).left).toBe(520 + 8);
+  await expect.poll(async () => (await box(page, "side-panel-wrapper")).left).toBe(520 + 12);
   await expect(panel(page)).toBeVisible();
   await setSidebarWidth(page, 280);
   await page.setViewportSize({ width: 1280, height: 800 });

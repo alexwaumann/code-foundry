@@ -7,7 +7,7 @@ import { BOTTOM_MIN, clamp } from "@/stores/ui";
 const STEP = 16;
 
 /**
- * Drag handle in the 8px gap above the bottom panel (PanelResizeHandle turned on its
+ * Drag handle filling the shell gap above the bottom panel (PanelResizeHandle turned on its
  * side: dragging up makes the panel taller). It sizes one panel (`panelKey`). Double-click
  * resets it to BOTTOM_DEFAULT. Focusable: Up/Down resize (Up grows), Home/End go to the
  * minimum/maximum.
@@ -40,7 +40,7 @@ export function BottomResizeHandle({ panelKey, height, max }: { panelKey: string
       aria-valuemin={BOTTOM_MIN}
       aria-valuemax={max}
       data-testid="bottom-resize-handle"
-      className="absolute inset-x-0 -top-2 z-10 h-2 cursor-row-resize touch-none [--wails-draggable:no-drag] outline-none after:absolute after:inset-x-0 after:top-1/2 after:h-px after:bg-transparent after:transition-colors hover:after:bg-ring focus-visible:after:bg-ring active:after:bg-ring"
+      className="absolute inset-x-0 -top-shell z-10 h-shell cursor-row-resize touch-none [--wails-draggable:no-drag] outline-none after:absolute after:inset-x-0 after:top-1/2 after:h-px after:bg-transparent after:transition-colors hover:after:bg-ring focus-visible:after:bg-ring active:after:bg-ring"
       onPointerDown={(e) => {
         e.preventDefault();
         e.currentTarget.setPointerCapture(e.pointerId);

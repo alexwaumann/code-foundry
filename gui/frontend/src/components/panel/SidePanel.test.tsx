@@ -142,12 +142,12 @@ describe("SidePanel", () => {
   it("renders a stored width above the room at the room, and keeps it for when the room comes back", () => {
     usePanelStore.setState({ byKey: { [KEY]: { open: true, tabs: [], activeTabId: null, width: 800 } } });
     render(<SidePanel />);
-    // 1400 - 260 - 24 - 360 = 756.
-    expect(screen.getByTestId("side-panel-wrapper").style.width).toBe("756px");
+    // 1400 - 260 - 36 - 360 = 744.
+    expect(screen.getByTestId("side-panel-wrapper").style.width).toBe("744px");
     act(() => {
       useUiStore.getState().setWindowWidth(1100);
     });
-    expect(screen.getByTestId("side-panel-wrapper").style.width).toBe("456px");
+    expect(screen.getByTestId("side-panel-wrapper").style.width).toBe("444px");
     expect(getPanel(KEY).width).toBe(800);
     act(() => {
       useUiStore.getState().setWindowWidth(1600);

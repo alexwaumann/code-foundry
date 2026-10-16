@@ -6,7 +6,7 @@ import { PANEL_MIN } from "@/stores/ui";
 const STEP = 16;
 
 /**
- * Drag handle in the 8px gap left of the side panel (same pattern as the sidebar's
+ * Drag handle filling the shell gap left of the side panel (same pattern as the sidebar's
  * ResizeHandle, mirrored: dragging left widens the panel). It sizes one panel (`panelKey`): every
  * selection's panel has its own width. Double-click resets that panel to PANEL_DEFAULT.
  * Focusable: Left/Right resize (Left widens), Home/End go to the minimum/maximum.
@@ -38,7 +38,7 @@ export function PanelResizeHandle({ panelKey, width, max }: { panelKey: string; 
       aria-valuemin={PANEL_MIN}
       aria-valuemax={Math.max(PANEL_MIN, max)}
       data-testid="panel-resize-handle"
-      className="absolute top-0 -left-2 z-10 h-full w-2 cursor-col-resize touch-none [--wails-draggable:no-drag] outline-none after:absolute after:inset-y-0 after:left-1/2 after:w-px after:bg-transparent after:transition-colors hover:after:bg-ring focus-visible:after:bg-ring active:after:bg-ring"
+      className="absolute top-0 -left-shell z-10 h-full w-shell cursor-col-resize touch-none [--wails-draggable:no-drag] outline-none after:absolute after:inset-y-0 after:left-1/2 after:w-px after:bg-transparent after:transition-colors hover:after:bg-ring focus-visible:after:bg-ring active:after:bg-ring"
       onPointerDown={(e) => {
         e.preventDefault();
         e.currentTarget.setPointerCapture(e.pointerId);

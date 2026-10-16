@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { UiContextView } from "@/api/command";
+import { SHELL_GAP } from "@/design/tokens";
 
 /**
  * What the content area shows. Derived into the UiContext sent with List/Invoke. A shell
@@ -57,10 +58,11 @@ export const PANEL_DEFAULT = 420;
 /** The content pane never gets narrower than this to make room for the side panel. */
 export const CONTENT_MIN = 360;
 /**
- * Horizontal gaps around the panes when the side panel shows: the content pane's 8px
- * margins on both sides plus the panel's 8px right margin (App.tsx, SidePanel.tsx).
+ * Horizontal gaps around the panes when the side panel shows: the content pane's margins
+ * on both sides plus the panel's right margin (App.tsx m-shell, SidePanel.tsx mr-shell),
+ * three shell gaps.
  */
-export const PANE_GAPS = 24;
+export const PANE_GAPS = 3 * SHELL_GAP;
 /**
  * Bottom panel height bounds (components/bottom): the upper bound is a share of the
  * content column's measured height (bottomMax).
@@ -214,8 +216,8 @@ export function panelMax(windowWidth: number, sidebarWidth: number): number {
 
 /** The content pane keeps at least this much height above the bottom panel. */
 export const MAIN_MIN_HEIGHT = 160;
-/** The gap between the content pane and the bottom panel (App.tsx, components/bottom). */
-export const BOTTOM_GAP = 8;
+/** The gap between the content pane and the bottom panel (components/bottom: mt-shell). */
+export const BOTTOM_GAP = SHELL_GAP;
 
 /**
  * Tallest the bottom panel may be: 70% of the content column (main pane, gap and bottom

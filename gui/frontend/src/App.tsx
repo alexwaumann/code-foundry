@@ -115,7 +115,7 @@ function ContentPane({ children }: { children: ReactNode }) {
   return (
     <main
       ref={ref}
-      className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-pane-border bg-pane shadow-xs"
+      className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-pane border border-pane-border bg-pane shadow-xs"
       data-testid="content-pane"
     >
       {children}
@@ -150,9 +150,10 @@ function useColumnHeight(ref: RefObject<HTMLElement | null>, hidden: boolean): n
 
 /**
  * The content column: the content pane and, under it, the selection's bottom terminal
- * panel (components/bottom), the same width, 8px apart. Hidden (display: none), not
- * unmounted, while the side panel is expanded over it: the thread keeps its Watch and
- * scroll position. The bottom panel unmounts then (its terminal detaches).
+ * panel (components/bottom), the same width, a shell gap (12px) apart. Hidden
+ * (display: none), not unmounted, while the side panel is expanded over it: the thread
+ * keeps its Watch and scroll position. The bottom panel unmounts then (its terminal
+ * detaches).
  */
 function ContentColumn({ hidden, children }: { hidden: boolean; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -160,7 +161,7 @@ function ContentColumn({ hidden, children }: { hidden: boolean; children: ReactN
   return (
     <div
       ref={ref}
-      className={cn("m-2 min-h-0 min-w-0 flex-1 flex-col", hidden ? "hidden" : "flex")}
+      className={cn("m-shell min-h-0 min-w-0 flex-1 flex-col", hidden ? "hidden" : "flex")}
       // The side panel shrinks, then hides, before the content column gets narrower than this.
       style={{ minWidth: CONTENT_MIN }}
       data-testid="content-column"
@@ -184,8 +185,9 @@ export function App() {
 
   return (
     // The sheet: one background under the sidebar. The content area is a pane floating
-    // on it (rounded, lighter, 8px in from its neighbours and the window's top, right
-    // and bottom edges), with the selection's bottom terminal panel under it; the selection's side panel, when open, is a second pane to its
+    // on it (rounded-pane, lighter, a shell gap (12px, m-shell) in from its neighbours and
+    // the window's top, right and bottom edges), with the selection's bottom terminal
+    // panel under it; the selection's side panel, when open, is a second pane to its
     // right (components/panel, docs/notes/side-panel.md). Nothing spans the title band
     // (components/window/titleBand.ts): the sidebar's top band and the pane headers fill it.
     // One TooltipProvider for the whole window (docs/notes/theme-3-tooltips.md): its 500 ms
@@ -195,8 +197,8 @@ export function App() {
       <div className="relative flex h-full flex-col overflow-hidden bg-sheet text-foreground">
         {/* The sheet above the panes drags the window too (as the sidebar band and the pane
             headers do), so a page without a header (dashboard, composer) still has a drag
-            surface when the sidebar is hidden. */}
-        <div className="absolute inset-x-0 top-0 h-2 [--wails-draggable:drag]" data-testid="window-drag-edge" aria-hidden />
+            surface when the sidebar is hidden. It is the shell gap tall: the sheet above the panes. */}
+        <div className="absolute inset-x-0 top-0 h-shell [--wails-draggable:drag]" data-testid="window-drag-edge" aria-hidden />
         <div className="flex min-h-0 flex-1">
           <Sidebar />
           <ContentColumn hidden={panelExpanded}>
