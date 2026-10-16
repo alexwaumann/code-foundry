@@ -14,7 +14,7 @@ export function BranchIndicator({ worktree }: { worktree: { branch: string; head
       role="note"
       aria-label={label}
       data-testid="composer-checkout-branch"
-      className="inline-flex h-6 max-w-64 min-w-0 shrink-0 cursor-default items-center gap-1 rounded-md bg-muted/50 px-1.5 text-xs font-medium whitespace-nowrap text-muted-foreground select-none [&_svg]:size-3 [&_svg]:shrink-0"
+      className="inline-flex h-6 max-w-64 min-w-0 shrink-0 cursor-default items-center gap-1 rounded-md bg-muted/50 px-1.5 text-caption font-medium whitespace-nowrap select-none [&_svg]:size-3 [&_svg]:shrink-0"
     >
       <Icon aria-hidden />
       <span className="truncate">{text}</span>

@@ -221,7 +221,7 @@ export function Attachments({ draftKey, disabled, refocus }: { draftKey: string;
       {attachments.map((a) => (
         <li
           key={a.id}
-          className="group relative size-16 overflow-hidden rounded-lg border bg-muted/40"
+          className="group relative size-16 overflow-hidden rounded-md border bg-muted/40"
           data-testid="attachment"
           data-attachment-id={a.id}
         >
@@ -230,7 +230,7 @@ export function Attachments({ draftKey, disabled, refocus }: { draftKey: string;
             aria-label={`Preview ${a.file.name}, ${formatAttachmentSize(a.file.size)}`}
             aria-haspopup="dialog"
             data-testid="attachment-open"
-            className="block size-full cursor-pointer rounded-[inherit] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:ring-inset"
+            className="block size-full cursor-pointer rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:ring-inset"
             onClick={(e) => {
               openPreview(draftKey, a.id, e.currentTarget);
             }}
@@ -496,7 +496,7 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
           aria-hidden
           className={cn(
             // Translucent over the backdrop, frosted so the prompt stays readable.
-            "-z-10 col-span-2 col-start-1 row-span-2 row-start-1 rounded-2xl border shadow-sm backdrop-blur-xl transition-colors",
+            "-z-10 col-span-2 col-start-1 row-span-2 row-start-1 rounded-lg border shadow-sm backdrop-blur-xl transition-colors",
             dragging ? "border-info/70 bg-info/5" : "border-border bg-card/85",
           )}
         />
@@ -601,7 +601,7 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
           />
         </div>
         {(error ?? notice) && (
-          <div className="col-span-2 col-start-1 row-start-3 flex flex-col gap-1 px-2 pt-2 text-sm">
+          <div className="col-span-2 col-start-1 row-start-3 flex flex-col gap-1 px-2 pt-2 text-body">
             {error && (
               <p role="alert" className="text-destructive" data-testid="composer-error">
                 {error}
@@ -637,7 +637,7 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
                 listClassName="max-h-96"
                 data-testid="composer-worktree"
               />
-              {noGitPath !== undefined ? <NoGitBadge className="mx-1 h-6 rounded-md px-1.5 text-xs" /> : chosen && <BranchIndicator worktree={chosen} />}
+              {noGitPath !== undefined ? <NoGitBadge className="mx-1 h-6 rounded-md px-1.5 text-caption" /> : chosen && <BranchIndicator worktree={chosen} />}
               {worktree.kind === "members" && primaryCheckout && <BranchIndicator worktree={primaryCheckout} />}
               {worktree.kind === "new" && (
                 <ComposerPicker
@@ -681,7 +681,7 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
                 data-phase={phase}
                 className={cn(
                   "flex h-8 items-center justify-center gap-1.5 rounded-full bg-primary text-primary-foreground outline-none transition-all hover:bg-primary/90 focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none",
-                  busy ? "px-3 text-xs font-medium" : "w-8 disabled:opacity-40",
+                  busy ? "px-3 text-body-sm font-medium" : "w-8 disabled:opacity-40",
                 )}
                 onClick={send}
               >
@@ -728,11 +728,11 @@ export function Composer({ repoId, workspaceId, noProject = false }: { repoId: s
       <Backdrop />
       <section className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto p-10" data-region="content" aria-label="New thread" data-testid="composer">
         {name === null ? (
-          <p className="m-auto text-sm text-muted-foreground">{loaded ? gone : "Loading…"}</p>
+          <p className="m-auto text-body text-muted-foreground">{loaded ? gone : "Loading…"}</p>
         ) : (
           // The heading's name is the first composer Tab stop, then the member chips, the prompt…
           <div className="m-auto w-full max-w-2xl" data-testid="composer-body" onKeyDown={cycleStops}>
-            <h1 className="mb-6 text-center text-2xl font-semibold tracking-tight" data-testid="composer-heading">
+            <h1 className="mb-6 text-center text-title" data-testid="composer-heading">
               {/* "build with No project" reads as "with no project"; "in" would not. */}
               What should we build {noProject ? "with" : "in"} <ProjectSwitcher target={target} name={name} disabled={busy} />?
             </h1>

@@ -21,7 +21,7 @@ export function ProjectBadge({ name, className }: { name: string; className?: st
   return (
     <span
       aria-hidden
-      className={`flex size-6 shrink-0 items-center justify-center rounded-md text-[10px] font-semibold tracking-wide text-white ${className ?? ""}`}
+      className={`flex size-6 shrink-0 items-center justify-center rounded-md text-overline font-semibold tracking-wide text-white ${className ?? ""}`}
       style={{ backgroundColor: `oklch(0.55 0.13 ${String(hue)})` }}
     >
       {projectInitials(name)}
@@ -67,7 +67,7 @@ function ProjectRow({ id, index, current, onPick }: { id: string; index?: number
       <ProjectBadge name={name} />
       <span className="flex min-w-0 flex-col">
         <span className="truncate font-medium">{name}</span>
-        <span className="truncate text-xs text-muted-foreground" data-testid="project-source">
+        <span className="truncate text-caption" data-testid="project-source">
           {source} · {tildify(path)}
         </span>
       </span>
@@ -100,7 +100,7 @@ function WorkspaceRow({ id, current, onPick }: { id: string; current: boolean; o
       </span>
       <span className="flex min-w-0 flex-col">
         <span className="truncate font-medium">{name}</span>
-        <span className="truncate text-xs text-muted-foreground" data-testid="workspace-detail">
+        <span className="truncate text-caption" data-testid="workspace-detail">
           {branch} · {projects.join(", ")}
         </span>
       </span>
@@ -120,7 +120,7 @@ function NoProjectRow({ current, onPick }: { current: boolean; onPick: () => voi
       <NoProjectBadge />
       <span className="flex min-w-0 flex-col">
         <span className="truncate font-medium">{NO_PROJECT}</span>
-        <span className="truncate text-xs text-muted-foreground">~</span>
+        <span className="truncate text-caption">~</span>
       </span>
       {current && <CurrentMark />}
     </CommandItem>

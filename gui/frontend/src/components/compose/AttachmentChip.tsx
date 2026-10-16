@@ -96,7 +96,7 @@ export function AttachmentChip({ id, label, selected, editor }: { id: string; la
       >
         {att ? <img src={att.url} alt="" draggable={false} className="size-[1.17em] shrink-0 rounded-sm object-cover" /> : <ImageIcon aria-hidden className="size-[1.17em] shrink-0" />}
         <span className="truncate">{middleTruncate(name)}</span>
-        {size && <span className="shrink-0 text-[0.8em] font-normal opacity-70">{size}</span>}
+        {size && <span className="shrink-0 text-caption-sm leading-none text-inherit opacity-70">{size}</span>}
       </NodeViewWrapper>
     </Tip>
   );

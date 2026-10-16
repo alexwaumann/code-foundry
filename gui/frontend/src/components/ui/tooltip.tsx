@@ -120,7 +120,7 @@ function Tip({
           side={side}
           align={align}
           sideOffset={sideOffset}
-          className={cn("max-w-80 px-2.5 py-1.5 text-body-sm text-inherit break-words whitespace-pre-line", className)}
+          className={cn("max-w-80 px-2.5 py-1.5 text-body-sm break-words whitespace-pre-line", className)}
           data-testid={testId}
           onEscapeKeyDown={() => {
             escapeTo.current = document.activeElement ?? document.body

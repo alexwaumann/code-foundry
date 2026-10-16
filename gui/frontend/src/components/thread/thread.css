@@ -784,7 +784,8 @@ html[data-thread-width="full"] .cf-thread {
 .cf-thread .ccard {
   position: relative;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  /* The composer card: rounded-lg, one step inside the content pane (rounded-pane, 12). */
+  border-radius: 10px;
   background: color-mix(in oklab, var(--card) 85%, transparent);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
@@ -806,7 +807,7 @@ html[data-thread-width="full"] .cf-thread {
   /* Several prompts at once (subagents ask in parallel): scroll rather than cover the pane. */
   max-height: min(60vh, 520px);
   overflow-y: auto;
-  border-radius: 16px 16px 0 0;
+  border-radius: 10px 10px 0 0;
 }
 .cf-thread .pend {
   padding: 12px 14px;

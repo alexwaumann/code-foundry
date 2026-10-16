@@ -21,7 +21,7 @@ function Detail({ item }: { item: CompletionItem }) {
     at = to;
   }
   parts.push(item.detail.slice(at));
-  return <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{parts}</span>;
+  return <span className="min-w-0 flex-1 truncate text-caption">{parts}</span>;
 }
 
 function ProjectHeading({ repoId }: { repoId: string }) {
@@ -36,7 +36,7 @@ function ProjectHeading({ repoId }: { repoId: string }) {
 
 function Heading({ heading }: { heading: NonNullable<CompletionGroup["heading"]> }) {
   return (
-    <div role="presentation" className="flex items-center gap-1.5 px-3 pt-2 pb-0.5 text-[11px] text-muted-foreground" data-testid="completion-group">
+    <div role="presentation" className="flex items-center gap-1.5 px-3 pt-2 pb-0.5 text-caption-sm" data-testid="completion-group">
       {heading.kind === "project" ? <ProjectHeading repoId={heading.repoId} /> : <span>{heading.kind === "user" ? "User" : heading.text}</span>}
     </div>
   );
@@ -157,7 +157,7 @@ export function CompletionCard({ completion, above = false }: { completion: Comp
     <div
       ref={cardRef}
       className={cn(
-        "group/completion absolute inset-x-0 z-10 flex flex-col overflow-hidden rounded-2xl border border-border bg-card/85 text-[13px] shadow-sm backdrop-blur-xl",
+        "group/completion absolute inset-x-0 z-10 flex flex-col overflow-hidden rounded-lg border border-border bg-card/85 text-body-sm shadow-sm backdrop-blur-xl",
         above ? "bottom-full mb-2" : "top-full mt-2",
       )}
       data-testid="completion-card"
@@ -166,7 +166,7 @@ export function CompletionCard({ completion, above = false }: { completion: Comp
       }}
     >
       {show !== "list" ? (
-        <p className="shrink-0 px-3 py-2.5 text-[13px] text-muted-foreground" role="status" data-testid={show === "searching" ? "completion-searching" : "completion-empty"}>
+        <p className="shrink-0 px-3 py-2.5 text-caption" role="status" data-testid={show === "searching" ? "completion-searching" : "completion-empty"}>
           {emptyText}
         </p>
       ) : (
@@ -197,13 +197,13 @@ export function CompletionCard({ completion, above = false }: { completion: Comp
                       {item.label}
                     </span>
                     {item.hint && (
-                      <span className="max-w-[40%] shrink-0 truncate text-xs text-muted-foreground/70" data-testid="completion-hint">
+                      <span className="max-w-[40%] shrink-0 truncate text-caption text-muted-foreground/70" data-testid="completion-hint">
                         {item.hint}
                       </span>
                     )}
                     <Detail item={item} />
                     {on && (
-                      <span aria-hidden className="shrink-0 text-xs text-muted-foreground">
+                      <span aria-hidden className="shrink-0 text-caption">
                         ⏎
                       </span>
                     )}
@@ -215,7 +215,7 @@ export function CompletionCard({ completion, above = false }: { completion: Comp
         </div>
       )}
       <div
-        className={cn("flex shrink-0 items-center gap-3 border-t px-3 py-1.5 text-[11px] text-muted-foreground group-data-[short]/completion:hidden", show !== "list" && "hidden")} data-testid="completion-hints">
+        className={cn("flex shrink-0 items-center gap-3 border-t px-3 py-1.5 text-caption-sm group-data-[short]/completion:hidden", show !== "list" && "hidden")} data-testid="completion-hints">
         <span className="flex items-center gap-1">
           <Kbd size="sm">↑</Kbd>
           <Kbd size="sm">↓</Kbd> move

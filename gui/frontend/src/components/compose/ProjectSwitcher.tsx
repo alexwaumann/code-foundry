@@ -73,7 +73,7 @@ export function ProjectSwitcher({ target, name, disabled }: { target: ComposeTar
       <PopoverContent
         align="center"
         sideOffset={8}
-        className="w-80 p-0 text-left text-sm font-normal tracking-normal"
+        className="w-80 p-0 text-left text-body tracking-normal"
         data-testid="composer-project-list"
         onOpenAutoFocus={(e) => {
           // cmdk handles keys on its input: focus that, not the popover.
