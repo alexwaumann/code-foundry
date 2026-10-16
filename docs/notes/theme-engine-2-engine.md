@@ -227,7 +227,7 @@ adds the settings and calls `setThemeSlots` from `stores/settings.ts` the way
 ## Verified
 
 - `make check` green.
-- `make gui-e2e` (before the rebase onto PR 1): 786 passed, 40 skipped, 6 failed:
+- `make gui-e2e`, before and after the rebase onto PR 1 (same result): 786 passed, 40 skipped, 6 failed:
   `archive.spec.ts:135`, `snooze.spec.ts:150` and `:251` in both browsers. They fail the
   same way on a clean `origin/main` (they still expect the thread to stay selected after
   archiving/snoozing, which #119 changed to the dashboard): not this PR.
