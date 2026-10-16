@@ -12,29 +12,7 @@ import (
 	"connectrpc.com/connect"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
-	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/model"
-)
-
-// SessionBackend is the slice of SessionService the session.* commands need, in
-// generated Connect signatures (see TerminalBackend for why). The session step's (2a)
-// API handler, any SessionServiceHandler, and a SessionServiceClient satisfy it.
-type SessionBackend interface {
-	Create(context.Context, *connect.Request[v1.CreateSessionRequest]) (*connect.Response[v1.CreateSessionResponse], error)
-	Fork(context.Context, *connect.Request[v1.ForkSessionRequest]) (*connect.Response[v1.ForkSessionResponse], error)
-	List(context.Context, *connect.Request[v1.ListSessionsRequest]) (*connect.Response[v1.ListSessionsResponse], error)
-	Get(context.Context, *connect.Request[v1.GetSessionRequest]) (*connect.Response[v1.GetSessionResponse], error)
-	Rename(context.Context, *connect.Request[v1.RenameSessionRequest]) (*connect.Response[v1.RenameSessionResponse], error)
-	Remove(context.Context, *connect.Request[v1.RemoveSessionRequest]) (*connect.Response[v1.RemoveSessionResponse], error)
-	RunIn(context.Context, *connect.Request[v1.RunInSessionRequest]) (*connect.Response[v1.RunInSessionResponse], error)
-	Pin(context.Context, *connect.Request[v1.PinSessionRequest]) (*connect.Response[v1.PinSessionResponse], error)
-	Archive(context.Context, *connect.Request[v1.ArchiveSessionRequest]) (*connect.Response[v1.ArchiveSessionResponse], error)
-	Snooze(context.Context, *connect.Request[v1.SnoozeSessionRequest]) (*connect.Response[v1.SnoozeSessionResponse], error)
-}
-
-var (
-	_ SessionBackend = codefoundryv1connect.SessionServiceHandler(nil)
-	_ SessionBackend = codefoundryv1connect.SessionServiceClient(nil)
 )
 
 // Models and effort levels offered for new sessions. Models come from the registry
@@ -42,19 +20,19 @@ var (
 // `claude --help` (Claude Code 2.1.294): --effort takes low, medium, high, xhigh, max.
 // The SessionService API also accepts full model names outside the registry.
 var (
-	SessionModels  = model.Values()
-	SessionEfforts = []string{"low", "medium", "high", "xhigh", "max"}
+	ThreadModels  = model.Values()
+	ThreadEfforts = []string{"low", "medium", "high", "xhigh", "max"}
 )
 
 // sessionModelHelp describes the model arg; the enum values list the registry.
-const sessionModelHelp = "Model: a claude-* id with the 1M context suffix; quote it in the shell ('claude-opus-4-8[1m]')"
+const threadModelHelp = "Model: a claude-* id with the 1M context suffix; quote it in the shell ('claude-opus-4-8[1m]')"
 
 // SessionPermissions are session.new's permission values, mapped to the claude
 // --permission-mode they select by sessionPermissionModes. Full access
 // (bypassPermissions) is deliberately not offered.
-var SessionPermissions = []string{"supervised", "accept-edits", "auto"}
+var ThreadPermissions = []string{"supervised", "accept-edits", "auto"}
 
-var sessionPermissionModes = map[string]v1.PermissionMode{
+var threadPermissionModes = map[string]v1.PermissionMode{
 	"supervised":   v1.PermissionMode_PERMISSION_MODE_SUPERVISED,
 	"accept-edits": v1.PermissionMode_PERMISSION_MODE_ACCEPT_EDITS,
 	"auto":         v1.PermissionMode_PERMISSION_MODE_AUTO,
@@ -71,7 +49,7 @@ func splitList(v string) []string {
 	return out
 }
 
-func hasSession(c Context) bool { return c.ActiveSessionID != "" }
+func hasThread(c Context) bool { return c.ActiveThreadID != "" }
 
 func hasRepoOrWorktree(c Context) bool { return c.ActiveRepoID != "" || c.ActiveWorktreePath != "" }
 
@@ -95,7 +73,7 @@ func noProjectAlone(a Args) error {
 }
 
 // sessionLabel is "name (id)" or just the id.
-func sessionLabel(s *v1.Session) string {
+func threadLabel(s *v1.Thread) string {
 	if s.GetName() != "" {
 		return s.GetName() + " (" + s.GetId() + ")"
 	}
@@ -104,7 +82,7 @@ func sessionLabel(s *v1.Session) string {
 
 // linkedPRs is session.list's PRS cell: "#5,#6", each prefixed with its repository's
 // name when the thread linked pull requests in more than one; "-" when none.
-func linkedPRs(s *v1.Session) string {
+func linkedPRs(s *v1.Thread) string {
 	links := s.GetLinkedPullRequests()
 	if len(links) == 0 {
 		return "-"
@@ -123,9 +101,9 @@ func linkedPRs(s *v1.Session) string {
 
 // listStatus is session.list's STATUS cell: the status, with the reason for ERROR
 // ("error (interrupted)").
-func listStatus(s *v1.Session) string {
-	st := strings.ToLower(strings.TrimPrefix(s.GetStatus().String(), "SESSION_STATUS_"))
-	if s.GetStatus() == v1.SessionStatus_SESSION_STATUS_ERROR && s.GetStatusReason() != "" {
+func listStatus(s *v1.Thread) string {
+	st := strings.ToLower(strings.TrimPrefix(s.GetStatus().String(), "THREAD_STATUS_"))
+	if s.GetStatus() == v1.ThreadStatus_THREAD_STATUS_ERROR && s.GetStatusReason() != "" {
 		st += " (" + s.GetStatusReason() + ")"
 	}
 	return st
@@ -134,7 +112,7 @@ func listStatus(s *v1.Session) string {
 // listContext is session.list's CONTEXT cell for a thread with a result: its
 // context size and whether the prompt cache is still warm at now ("25.7K · cache
 // expires in 42 min", "25.7K · cache expired"); "-" otherwise.
-func listContext(s *v1.Session, now time.Time) string {
+func listContext(s *v1.Thread, now time.Time) string {
 	if s.GetContextTokens() <= 0 || s.GetCacheExpiresAt() == nil {
 		return "-"
 	}
@@ -160,19 +138,19 @@ func minutesLeft(d time.Duration) string {
 	}
 }
 
-// RegisterSession registers session.new, session.list, session.focus, session.rename,
+// RegisterThreadLifecycle registers session.new, session.list, session.focus, session.rename,
 // session.fork, session.remove, session.run-in, session.pin, session.archive, and
 // session.snooze. There is no close or reconnect: a message starts a stopped thread and
 // the daemon stops idle ones (docs/notes/thread-lifecycle.md). The user-facing word is "thread" (titles, descriptions, messages);
 // command names and identifiers keep "session".
-func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
-	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextSession, Description: "Thread id"}
+func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
+	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextThread, Description: "Thread id"}
 	focus := func(id string) int {
-		return e.Emit(&v1.UiIntent{Intent: &v1.UiIntent_FocusSession_{FocusSession: &v1.UiIntent_FocusSession{SessionId: id}}})
+		return e.Emit(&v1.UiIntent{Intent: &v1.UiIntent_FocusThread_{FocusThread: &v1.UiIntent_FocusThread{ThreadId: id}}})
 	}
 	return r.RegisterAll(
 		Command{
-			Name:  "session.new",
+			Name:  "thread.new",
 			Title: "New Thread",
 			Description: "Start Claude Code in a worktree (default: the active worktree, else the active repository's main worktree), or in a new worktree. " +
 				"With workspace the thread belongs to that workspace and runs in one of its member worktrees; with new-worktree and repos it gets a new workspace. " +
@@ -184,9 +162,9 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 				{Name: "worktree", Type: Path, Context: ContextWorktree, Description: "Worktree path (with workspace: a member worktree)"},
 				{Name: "workspace", Type: String, Description: "Workspace id or name the thread belongs to; it runs in the member repo or worktree names (default: the first member)"},
 				{Name: "repos", Type: String, Description: "With new-worktree: comma-separated repositories (id, name, or path; repo:base gives that one its own base) for a new workspace, a cf/<slug of the thread name> worktree in each; repo picks the member the thread runs in (default: the first)"},
-				{Name: "model", Type: Enum, Enum: SessionModels, Description: sessionModelHelp + " (default: settings sessions.default_model)"},
-				{Name: "effort", Type: Enum, Enum: SessionEfforts, Description: "Effort level (default: settings sessions.default_effort)"},
-				{Name: "permission", Type: Enum, Enum: SessionPermissions, Default: "auto",
+				{Name: "model", Type: Enum, Enum: ThreadModels, Description: threadModelHelp + " (default: settings threads.default_model)"},
+				{Name: "effort", Type: Enum, Enum: ThreadEfforts, Description: "Effort level (default: settings threads.default_effort)"},
+				{Name: "permission", Type: Enum, Enum: ThreadPermissions, Default: "auto",
 					Description: "Permissions: supervised (confirm every tool call), accept-edits (file edits allowed), or auto (Claude's auto mode)"},
 				{Name: "new-worktree", Type: Bool, Description: "Create a new worktree for the thread (branch cf/<slug of the thread name>, named from the prompt)"},
 				{Name: "base", Type: String, Description: "Ref the new worktree branches from (default: origin/<default branch>); needs new-worktree"},
@@ -206,10 +184,10 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 				} else if a.String("repo") == "" && a.Path("worktree") == "" && ws == "" && len(repos) == 0 {
 					return Result{}, InvalidArg("worktree", "a worktree, repository, or workspace is required (or no-project)")
 				}
-				req := &v1.CreateSessionRequest{
+				req := &v1.CreateThreadRequest{
 					RepoId: a.String("repo"), WorktreePath: a.Path("worktree"), Model: a.String("model"),
 					Effort: a.String("effort"), Name: a.String("name"), InitialPrompt: a.String("prompt"),
-					ComposerPrompt: a.String("composer-prompt"), PermissionMode: sessionPermissionModes[a.String("permission")], Attachments: splitList(a.String("attachments")),
+					ComposerPrompt: a.String("composer-prompt"), PermissionMode: threadPermissionModes[a.String("permission")], Attachments: splitList(a.String("attachments")),
 					WorkspaceId: ws, NoProject: a.Bool("no-project"),
 				}
 				switch {
@@ -228,9 +206,9 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 				if err != nil {
 					return Result{}, err
 				}
-				s := res.Msg.GetSession()
+				s := res.Msg.GetThread()
 				focus(s.GetId())
-				msg := "created thread " + sessionLabel(s) + " in " + s.GetWorktreePath()
+				msg := "created thread " + threadLabel(s) + " in " + s.GetWorktreePath()
 				if s.GetWorkspaceId() != "" {
 					msg += " (workspace " + s.GetWorkspaceId() + ")"
 				}
@@ -244,12 +222,12 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 			},
 		},
 		Command{
-			Name:        "session.list",
+			Name:        "thread.list",
 			Title:       "List Threads",
 			Description: "List every thread.",
 			Category:    "Thread",
 			Run: func(ctx context.Context, _ Context, _ Args) (Result, error) {
-				res, err := b.List(ctx, connect.NewRequest(&v1.ListSessionsRequest{}))
+				res, err := b.List(ctx, connect.NewRequest(&v1.ListThreadsRequest{}))
 				if err != nil {
 					return Result{}, err
 				}
@@ -259,7 +237,7 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 				// keeps state and disconnect_reason).
 				_, _ = fmt.Fprintln(tw, "ID\tNAME\tSTATUS\tREASON\tWORKSPACE\tPRS\tCONTEXT\tWORKTREE")
 				now := time.Now()
-				for _, s := range res.Msg.GetSessions() {
+				for _, s := range res.Msg.GetThreads() {
 					_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", s.GetId(), cmp.Or(s.GetName(), "-"),
 						listStatus(s), cmp.Or(s.GetStatusReason(), "-"), cmp.Or(s.GetWorkspaceId(), "-"), linkedPRs(s),
 						listContext(s, now), s.GetWorktreePath())
@@ -269,69 +247,69 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 			},
 		},
 		Command{
-			Name:        "session.focus",
+			Name:        "thread.focus",
 			Title:       "Focus Thread",
 			Description: "Show a thread in every connected window.",
 			Category:    "Thread",
 			Args:        []ArgSpec{idArg},
-			When:        hasSession,
+			When:        hasThread,
 			Run: func(_ context.Context, _ Context, a Args) (Result, error) {
 				n := focus(a.String("id"))
 				return Result{Message: fmt.Sprintf("delivered=%d", n), JSON: EmitResult{Delivered: n}}, nil
 			},
 		},
 		Command{
-			Name:        "session.rename",
+			Name:        "thread.rename",
 			Title:       "Rename Thread",
 			Description: "Set the thread's name. Turns off automatic naming.",
 			Category:    "Thread",
 			Keybindings: []string{"cmd+r"},
 			Args:        []ArgSpec{idArg, {Name: "name", Type: String, Required: true, Description: "New name"}},
-			When:        hasSession,
+			When:        hasThread,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-				res, err := b.Rename(ctx, connect.NewRequest(&v1.RenameSessionRequest{Id: a.String("id"), Name: a.String("name")}))
+				res, err := b.Rename(ctx, connect.NewRequest(&v1.RenameThreadRequest{Id: a.String("id"), Name: a.String("name")}))
 				if err != nil {
 					return Result{}, err
 				}
-				return Result{Message: "renamed thread " + sessionLabel(res.Msg.GetSession()), JSON: res.Msg.GetSession()}, nil
+				return Result{Message: "renamed thread " + threadLabel(res.Msg.GetThread()), JSON: res.Msg.GetThread()}, nil
 			},
 		},
 		Command{
-			Name:        "session.fork",
+			Name:        "thread.fork",
 			Title:       "Fork Thread",
 			Description: "Start a new thread that continues this thread's conversation.",
 			Category:    "Thread",
 			Args:        []ArgSpec{idArg, {Name: "name", Type: String, Description: "Name for the fork"}},
-			When:        hasSession,
+			When:        hasThread,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-				res, err := b.Fork(ctx, connect.NewRequest(&v1.ForkSessionRequest{Id: a.String("id"), Name: a.String("name")}))
+				res, err := b.Fork(ctx, connect.NewRequest(&v1.ForkThreadRequest{Id: a.String("id"), Name: a.String("name")}))
 				if err != nil {
 					return Result{}, err
 				}
-				s := res.Msg.GetSession()
+				s := res.Msg.GetThread()
 				focus(s.GetId())
-				return Result{Message: "forked " + a.String("id") + " into " + sessionLabel(s), JSON: s}, nil
+				return Result{Message: "forked " + a.String("id") + " into " + threadLabel(s), JSON: s}, nil
 			},
 		},
 		Command{
-			Name:        "session.remove",
+			Name:        "thread.remove",
 			Title:       "Remove Thread",
 			Description: "Forget a thread, stopping Claude first if it runs.",
 			Category:    "Thread",
 			Args:        []ArgSpec{idArg},
-			When:        hasSession,
+			When:        hasThread,
 			Confirm:     "Remove thread {id}? Claude stops if it runs, and the thread is forgotten.",
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				id := a.String("id")
-				if _, err := b.Remove(ctx, connect.NewRequest(&v1.RemoveSessionRequest{Id: id})); err != nil {
+				if _, err := b.Remove(ctx, connect.NewRequest(&v1.RemoveThreadRequest{Id: id})); err != nil {
 					return Result{}, err
 				}
 				return Result{Message: "removed thread " + id}, nil
 			},
 		},
-		sessionRunIn(b, idArg),
-		sessionPin(b, idArg),
-		sessionArchive(b, idArg),
-		sessionSnooze(b, idArg),
+		threadRunIn(b, idArg),
+		threadPin(b, idArg),
+		threadArchive(b, idArg),
+		threadSnooze(b, idArg),
 	)
 }

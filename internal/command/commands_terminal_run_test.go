@@ -66,7 +66,7 @@ func TestTerminalNewRun(t *testing.T) {
 			out := &commandtest.Output{Block: tt.block, Err: tt.awaitErr}
 			writesAtAwait := -1
 			out.OnAwait = func(string) { writesAtAwait = len(writesOf(term.Requests())) }
-			deps := command.TerminalDeps{Terminal: term, Repo: &commandtest.Repo{Repos: repos}, Session: &commandtest.Session{}, RunWait: tt.runWait}
+			deps := command.TerminalDeps{Terminal: term, Repo: &commandtest.Repo{Repos: repos}, Thread: &commandtest.Thread{}, RunWait: tt.runWait}
 			if !tt.noAwait {
 				deps.AwaitOutput = out.Await
 			}

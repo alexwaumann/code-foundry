@@ -37,7 +37,7 @@ const ViewPanelMcp = "panel.mcp"
 
 // RegisterMcp registers thread.mcp, thread.mcp-reconnect and view.panel.mcp.
 func RegisterMcp(r *Registry, b McpBackend, e Emitter) error {
-	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextSession, Description: "Thread id"}
+	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextThread, Description: "Thread id"}
 	return r.RegisterAll(
 		Command{
 			Name:  "thread.mcp",
@@ -50,9 +50,9 @@ func RegisterMcp(r *Registry, b McpBackend, e Emitter) error {
 				{Name: "refresh", Type: Bool, Description: "Ask Claude now instead of showing the last check (starts Claude if it is not running)"},
 				{Name: "full", Type: Bool, Description: "List each server's tools with their hints"},
 			},
-			When: hasSession,
+			When: hasThread,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-				res, err := b.McpStatus(ctx, connect.NewRequest(&v1.McpStatusRequest{SessionId: a.String("id"), Refresh: a.Bool("refresh")}))
+				res, err := b.McpStatus(ctx, connect.NewRequest(&v1.McpStatusRequest{ThreadId: a.String("id"), Refresh: a.Bool("refresh")}))
 				if err != nil {
 					return Result{}, err
 				}
@@ -70,10 +70,10 @@ func RegisterMcp(r *Registry, b McpBackend, e Emitter) error {
 				idArg,
 				{Name: "server", Type: String, Required: true, Description: "The server's name as thread.mcp prints it"},
 			},
-			When: hasSession,
+			When: hasThread,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				name := a.String("server")
-				res, err := b.McpReconnect(ctx, connect.NewRequest(&v1.McpReconnectRequest{SessionId: a.String("id"), ServerName: name}))
+				res, err := b.McpReconnect(ctx, connect.NewRequest(&v1.McpReconnectRequest{ThreadId: a.String("id"), ServerName: name}))
 				if err != nil {
 					return Result{}, err
 				}
@@ -98,7 +98,7 @@ func RegisterMcp(r *Registry, b McpBackend, e Emitter) error {
 			Category: "View",
 			// No default chord, like view.panel.usage (M opens it while the panel has
 			// focus).
-			When: hasSession,
+			When: hasThread,
 			Run: func(context.Context, Context, Args) (Result, error) {
 				n := e.Emit(&v1.UiIntent{Intent: &v1.UiIntent_ShowView_{ShowView: &v1.UiIntent_ShowView{Name: ViewPanelMcp}}})
 				return Result{JSON: EmitResult{Delivered: n}}, nil

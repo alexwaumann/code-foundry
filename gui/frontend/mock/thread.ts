@@ -2,7 +2,7 @@
  * Threads in the mock daemon (docs/notes/rendered-threads-2-gui.md): one scripted
  * conversation, the sketch's "Fix stale PR badge" (docs/sketches/rendered-thread), in the
  * states the sketch shows, a short history for each default-world thread (seed), plus
- * ThreadService.Watch / Send / Interrupt and the EventService `thread` source (pending
+ * ThreadService.WatchThread / Send / Interrupt and the EventService `thread` source (pending
  * requests only, like the daemon since PR 1's review).
  *
  *   POST /__mock/thread?state=permission|question|streaming|idle|parallel|multi[&id=s-r1]
@@ -27,7 +27,7 @@
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
-import { SessionStatus } from "../src/gen/codefoundry/v1/session_pb";
+import { ThreadStatus } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
 import {
   ThreadAgentStatus,
   ThreadItemDelta_Field,
@@ -76,11 +76,11 @@ export interface ThreadWorld {
    * thread list; a thread already starting just queues); `ready` runs once Claude is up.
    */
   start(id: string, ready: () => void): void;
-  setStatus(id: string, status: SessionStatus, reason: string): void;
+  setStatus(id: string, status: ThreadStatus, reason: string): void;
   setModel(id: string, model: string): void;
   setPermission(id: string, permission: string): void;
   setEffort(id: string, effort: string, pending: boolean): void;
-  statusOf(id: string): SessionStatus;
+  statusOf(id: string): ThreadStatus;
   /** The thread's model as picked ("claude-opus-4-8[1m]"). */
   modelOf(id: string): string;
   /** A turn ended: the thread's context totals move to now (mock/context.ts). */
@@ -353,7 +353,7 @@ export class MockThreads {
     else this.agents.delete(id);
     const l = this.log(id);
     l.seq++;
-    this.publish(id, { event: { case: "agents", value: { sessionId: id, seq: BigInt(l.seq), agents: runs } } });
+    this.publish(id, { event: { case: "agents", value: { threadId: id, seq: BigInt(l.seq), agents: runs } } });
     this.world.agentsChanged(id);
   }
 
@@ -411,7 +411,7 @@ export class MockThreads {
     else this.slash.delete(id);
     const l = this.log(id);
     l.seq++;
-    this.publish(id, { event: { case: "commands", value: { sessionId: id, seq: BigInt(l.seq), commands } } });
+    this.publish(id, { event: { case: "commands", value: { threadId: id, seq: BigInt(l.seq), commands } } });
   }
 
   /** The thread's MCP status (mock/mcp.ts); undefined when it has none. Throws for an unknown thread. */
@@ -426,7 +426,7 @@ export class MockThreads {
     else this.mcp.delete(id);
     const l = this.log(id);
     l.seq++;
-    this.publish(id, { event: { case: "mcp", value: { sessionId: id, seq: BigInt(l.seq), status } } });
+    this.publish(id, { event: { case: "mcp", value: { threadId: id, seq: BigInt(l.seq), status } } });
   }
 
   /** The Watch's first event. */
@@ -440,7 +440,7 @@ export class MockThreads {
     return { event: { case: "pendingSnapshot", value: { threads } } };
   }
 
-  /** ThreadService.Watch: the snapshot, then this thread's events; counts as a viewer while open. */
+  /** ThreadService.WatchThread: the snapshot, then this thread's events; counts as a viewer while open. */
   async *watch(id: string, signal: AbortSignal): AsyncGenerator<ThreadEventInit> {
     this.world.worktreeOf(id);
     const l = this.log(id);
@@ -459,7 +459,7 @@ export class MockThreads {
   private seen(id: string): void {
     const l = this.log(id);
     const last = l.items[l.items.length - 1];
-    if (l.watchers > 0 && l.pending.length === 0 && last?.payload?.case === "turnEnd") this.world.setStatus(id, SessionStatus.IDLE, "at prompt");
+    if (l.watchers > 0 && l.pending.length === 0 && last?.payload?.case === "turnEnd") this.world.setStatus(id, ThreadStatus.IDLE, "at prompt");
   }
 
   private item(id: string, payload: ItemInit["payload"], over: Partial<ItemInit> & { at?: Date; until?: Date } = {}): ItemInit {
@@ -474,7 +474,7 @@ export class MockThreads {
     const l = this.log(id);
     l.items.push(it);
     l.seq++;
-    this.publish(id, { event: { case: "appended", value: { sessionId: id, seq: BigInt(l.seq), item: it } } });
+    this.publish(id, { event: { case: "appended", value: { threadId: id, seq: BigInt(l.seq), item: it } } });
     return it;
   }
 
@@ -484,7 +484,7 @@ export class MockThreads {
     if (i < 0) return;
     l.items[i] = it;
     l.seq++;
-    this.publish(id, { event: { case: "updated", value: { sessionId: id, seq: BigInt(l.seq), item: it } } });
+    this.publish(id, { event: { case: "updated", value: { threadId: id, seq: BigInt(l.seq), item: it } } });
   }
 
   private setPending(id: string, pending: PendingInit[]): void {
@@ -508,7 +508,7 @@ export class MockThreads {
     if (!it || it.payload?.case !== "assistantText") return;
     it.payload.value = { text: (it.payload.value.text ?? "") + text };
     l.seq++;
-    this.publish(id, { event: { case: "delta", value: { sessionId: id, seq: BigInt(l.seq), itemId: it.id, ordinal: it.ordinal, field: ThreadItemDelta_Field.TEXT, text } } });
+    this.publish(id, { event: { case: "delta", value: { threadId: id, seq: BigInt(l.seq), itemId: it.id, ordinal: it.ordinal, field: ThreadItemDelta_Field.TEXT, text } } });
   }
 
   /** Ends the turn: the streaming text completes, a turn_end follows, the thread is finished (seen when watched). */
@@ -558,7 +558,7 @@ export class MockThreads {
       }),
     );
     this.world.recordResult(id, model);
-    this.world.setStatus(id, l.watchers > 0 ? SessionStatus.IDLE : SessionStatus.NEEDS_ATTENTION, l.watchers > 0 ? "at prompt" : "finished");
+    this.world.setStatus(id, l.watchers > 0 ? ThreadStatus.IDLE : ThreadStatus.NEEDS_ATTENTION, l.watchers > 0 ? "at prompt" : "finished");
     if (l.pendingEffort) {
       const effort = l.pendingEffort;
       l.pendingEffort = "";
@@ -593,7 +593,7 @@ export class MockThreads {
     }
     const l = this.log(id);
     const status = this.world.statusOf(id);
-    const onTurn = status === SessionStatus.BUSY || l.pending.length > 0;
+    const onTurn = status === ThreadStatus.BUSY || l.pending.length > 0;
     this.world.setEffort(id, effort, true);
     if (onTurn) {
       l.pendingEffort = effort;
@@ -657,10 +657,10 @@ export class MockThreads {
     this.setPending(id, rest);
     const next = rest[0];
     if (next) {
-      this.world.setStatus(id, SessionStatus.NEEDS_ATTENTION, `${next.question ? "question" : "permission"}: ${next.summary ?? ""}`);
+      this.world.setStatus(id, ThreadStatus.NEEDS_ATTENTION, `${next.question ? "question" : "permission"}: ${next.summary ?? ""}`);
       return resolved;
     }
-    this.world.setStatus(id, SessionStatus.BUSY, "working");
+    this.world.setStatus(id, ThreadStatus.BUSY, "working");
     const reply = isQuestion
       ? deny
         ? "No problem, I'll leave those for later."
@@ -733,7 +733,7 @@ export class MockThreads {
       this.agents.set(id, runs);
       this.shells.set(id, shells);
       l.seq = l.items.length;
-      this.world.setStatus(id, SessionStatus.IDLE, "at prompt");
+      this.world.setStatus(id, ThreadStatus.IDLE, "at prompt");
       this.world.agentsChanged(id);
       return;
     }
@@ -741,7 +741,7 @@ export class MockThreads {
       // Background shells only (mock/shells.ts): idle at its prompt, two shells running.
       this.shells.set(id, scriptShells({ cwd, it, tool }));
       l.seq = l.items.length;
-      this.world.setStatus(id, SessionStatus.IDLE, "at prompt");
+      this.world.setStatus(id, ThreadStatus.IDLE, "at prompt");
       this.world.agentsChanged(id);
       return;
     }
@@ -836,7 +836,7 @@ export class MockThreads {
     if (state === "streaming") {
       text(ANSWER_STREAMING, { at: ago(5, 30), streaming: true });
       l.seq = l.items.length;
-      this.world.setStatus(id, SessionStatus.BUSY, "working");
+      this.world.setStatus(id, ThreadStatus.BUSY, "working");
       return;
     }
     text(ANSWER, { at: ago(5, 30) });
@@ -852,7 +852,7 @@ export class MockThreads {
       // the totals would say $0.38).
       it({ case: "turnEnd", value: { subtype: "success", durationMs: 62_000n, numTurns: 4, costUsd: 1.5, turnCostUsd: 1.5, model: "claude-sonnet-5", stopReason: "end_turn" } }, { at: ago(1, 58) });
       l.seq = l.items.length;
-      this.world.setStatus(id, SessionStatus.IDLE, "at prompt");
+      this.world.setStatus(id, ThreadStatus.IDLE, "at prompt");
       return;
     }
     if (state === "multi") {
@@ -863,8 +863,8 @@ export class MockThreads {
       const summary = MULTI.questions[0]?.question ?? "";
       l.pending = [{ requestId: "req-checks", itemId: item.id, question: true, toolName: "AskUserQuestion", summary }];
       l.seq = l.items.length;
-      this.world.setStatus(id, SessionStatus.NEEDS_ATTENTION, `question: ${summary}`);
-      this.source({ event: { case: "pending", value: { sessionId: id, seq: BigInt(l.seq), pending: l.pending } } });
+      this.world.setStatus(id, ThreadStatus.NEEDS_ATTENTION, `question: ${summary}`);
+      this.source({ event: { case: "pending", value: { threadId: id, seq: BigInt(l.seq), pending: l.pending } } });
       return;
     }
     if (state === "parallel") {
@@ -912,8 +912,8 @@ export class MockThreads {
         { requestId: "req-push", itemId: pushPerm.id, question: false, toolName: "Bash", summary: `Bash ${PUSH}` },
       ];
       l.seq = l.items.length;
-      this.world.setStatus(id, SessionStatus.NEEDS_ATTENTION, "permission: Edit poller.go");
-      this.source({ event: { case: "pending", value: { sessionId: id, seq: BigInt(l.seq), pending: l.pending } } });
+      this.world.setStatus(id, ThreadStatus.NEEDS_ATTENTION, "permission: Edit poller.go");
+      this.source({ event: { case: "pending", value: { threadId: id, seq: BigInt(l.seq), pending: l.pending } } });
       return;
     }
     if (state === "subagent") {
@@ -943,8 +943,8 @@ export class MockThreads {
       );
       l.pending = [{ requestId: "req-sub", itemId: perm.id, question: false, toolName: "Write", summary: "Write CHANGELOG.md" }];
       l.seq = l.items.length;
-      this.world.setStatus(id, SessionStatus.NEEDS_ATTENTION, "permission: Write CHANGELOG.md");
-      this.source({ event: { case: "pending", value: { sessionId: id, seq: BigInt(l.seq), pending: l.pending } } });
+      this.world.setStatus(id, ThreadStatus.NEEDS_ATTENTION, "permission: Write CHANGELOG.md");
+      this.source({ event: { case: "pending", value: { threadId: id, seq: BigInt(l.seq), pending: l.pending } } });
       return;
     }
     if (state === "question") {
@@ -954,8 +954,8 @@ export class MockThreads {
       const item = it({ case: "question", value: { requestId: "req-push-q", toolName: "AskUserQuestion", toolUseId: qCall?.toolUseId ?? "", inputJson: JSON.stringify(QUESTIONS), state: ThreadRequestState.PENDING } }, { at: ago(2, 57) });
       l.pending = [{ requestId: "req-push-q", itemId: item.id, question: true, toolName: "AskUserQuestion", summary: QUESTIONS.questions[0]?.question ?? "" }];
       l.seq = l.items.length;
-      this.world.setStatus(id, SessionStatus.NEEDS_ATTENTION, `question: ${QUESTIONS.questions[0]?.question ?? ""}`);
-      this.source({ event: { case: "pending", value: { sessionId: id, seq: BigInt(l.seq), pending: l.pending } } });
+      this.world.setStatus(id, ThreadStatus.NEEDS_ATTENTION, `question: ${QUESTIONS.questions[0]?.question ?? ""}`);
+      this.source({ event: { case: "pending", value: { threadId: id, seq: BigInt(l.seq), pending: l.pending } } });
       return;
     }
     text("All 412 tests pass. The branch was rebased onto `main` earlier, so this needs a force-push.", { at: ago(3) });
@@ -980,8 +980,8 @@ export class MockThreads {
     );
     l.pending = [{ requestId: "req-push", itemId: perm.id, question: false, toolName: "Bash", summary: `Bash ${PUSH}` }];
     l.seq = l.items.length;
-    this.world.setStatus(id, SessionStatus.NEEDS_ATTENTION, `permission: Bash ${PUSH}`);
-    this.source({ event: { case: "pending", value: { sessionId: id, seq: BigInt(l.seq), pending: l.pending } } });
+    this.world.setStatus(id, ThreadStatus.NEEDS_ATTENTION, `permission: Bash ${PUSH}`);
+    this.source({ event: { case: "pending", value: { threadId: id, seq: BigInt(l.seq), pending: l.pending } } });
   }
 
   /**
@@ -1029,7 +1029,7 @@ export class MockThreads {
       l.pending = [{ requestId: `req-${id}`, itemId: perm.id, question: false, toolName: "Bash", summary: `Bash ${h.reply}` }];
     }
     l.seq = l.items.length;
-    if (l.pending.length > 0) this.source({ event: { case: "pending", value: { sessionId: id, seq: BigInt(l.seq), pending: l.pending } } });
+    if (l.pending.length > 0) this.source({ event: { case: "pending", value: { threadId: id, seq: BigInt(l.seq), pending: l.pending } } });
   }
 
   /**
@@ -1079,7 +1079,7 @@ export class MockThreads {
 
   /** The scripted reply to a message: thinking, a streamed answer, the turn's end. */
   private reply(id: string): void {
-    this.world.setStatus(id, SessionStatus.BUSY, "working");
+    this.world.setStatus(id, ThreadStatus.BUSY, "working");
     const gen = this.generation;
     void (async () => {
       await sleep(250);
@@ -1106,7 +1106,7 @@ export class MockThreads {
     run: (ctx: UiContext | undefined, args: Record<string, string>) => string;
   }[] {
     // Every thread (the CLI's context has no view; the GUI's has "session").
-    const when = (ctx: UiContext | undefined) => Boolean(ctx?.activeSessionId);
+    const when = (ctx: UiContext | undefined) => Boolean(ctx?.activeThreadId);
     // Like the daemon's: an arg with a context default is listed as not required (the GUI
     // does not prompt for it) and filled from the context when omitted.
     const id = { name: "id", type: ArgType.STRING, required: false, description: "Thread id (default: the active thread)" };
@@ -1202,7 +1202,7 @@ export class MockThreads {
         },
       },
     ];
-    return list.map((c) => ({ ...c, run: (ctx, a) => c.run(ctx, { ...a, id: a.id || ctx?.activeSessionId || "" }) }));
+    return list.map((c) => ({ ...c, run: (ctx, a) => c.run(ctx, { ...a, id: a.id || ctx?.activeThreadId || "" }) }));
   }
 
   /** Text for the streaming answer's remainder (finish). */

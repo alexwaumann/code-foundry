@@ -28,7 +28,7 @@ func newMcpRegistry(t *testing.T) (*command.Registry, *threadtest.Fake, *command
 	if err := command.RegisterMcp(reg, api.NewThread(fake, b), emit); err != nil {
 		t.Fatal(err)
 	}
-	fake.Put(thread.Session{ID: "s1", Name: "fix", State: thread.StateConnected})
+	fake.Put(thread.Thread{ID: "s1", Name: "fix", State: thread.StateConnected})
 	fake.PutMcp("s1", &thread.McpStatus{CheckedAt: time.Now().Add(-12 * time.Second), Trigger: thread.McpTriggerTurn, Servers: []thread.McpServer{
 		{Name: "github", Status: thread.McpConnected, Version: "1.12.0", Scope: "user", Transport: "stdio",
 			Tools: []thread.McpTool{{Name: "get_pull_request", Description: "Get details of a pull request", ReadOnly: true}, {Name: "merge_pull_request", Destructive: true, OpenWorld: true}}},
@@ -45,8 +45,8 @@ func TestMcpCommandsAvailability(t *testing.T) {
 		ctx  command.Context
 		want bool
 	}{
-		{"cli", command.Context{ActiveSessionID: "s1"}, true},
-		{"gui thread", command.Context{ActiveSessionID: "s1", ActiveView: "session"}, true},
+		{"cli", command.Context{ActiveThreadID: "s1"}, true},
+		{"gui thread", command.Context{ActiveThreadID: "s1", ActiveView: "thread"}, true},
 		{"no thread", command.Context{ActiveView: "projects"}, false},
 	}
 	for _, tt := range tests {
@@ -136,7 +136,7 @@ func TestMcpCommands(t *testing.T) {
 
 func TestViewPanelMcpEmits(t *testing.T) {
 	reg, _, emit := newMcpRegistry(t)
-	uctx := command.Context{ActiveSessionID: "s1", ActiveView: "session"}
+	uctx := command.Context{ActiveThreadID: "s1", ActiveView: "thread"}
 	res, err := reg.Invoke(context.Background(), uctx, "view.panel.mcp", nil)
 	if err != nil {
 		t.Fatal(err)

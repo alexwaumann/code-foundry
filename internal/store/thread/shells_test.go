@@ -30,7 +30,7 @@ func TestRemoveTakesTheThreadsShellsCloseDoesNot(t *testing.T) {
 		{"the thread's shell", termlabel.Shell(s.ID, "r1", e.wt), true},
 		{"another thread's shell", termlabel.Shell("other", "r1", e.wt), false},
 		{"the worktree's shell", termlabel.Shell("", "r1", e.wt), false},
-		{"not terminal.new's, same session label", map[string]string{termlabel.Session: s.ID}, false},
+		{"not terminal.new's, same thread label", map[string]string{termlabel.Thread: s.ID}, false},
 	}
 	ids := make([]string, len(terms))
 	for i, tt := range terms {

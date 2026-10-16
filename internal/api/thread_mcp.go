@@ -14,18 +14,18 @@ import (
 
 // McpStatus returns the thread's MCP servers as last checked, or checks now.
 func (h *Thread) McpStatus(ctx context.Context, req *connect.Request[v1.McpStatusRequest]) (*connect.Response[v1.McpStatusResponse], error) {
-	s, err := h.store.McpStatus(ctx, req.Msg.GetSessionId(), req.Msg.GetRefresh())
+	s, err := h.store.McpStatus(ctx, req.Msg.GetThreadId(), req.Msg.GetRefresh())
 	if err != nil {
-		return nil, sessionError(err)
+		return nil, threadError(err)
 	}
 	return connect.NewResponse(&v1.McpStatusResponse{Status: mcpStatusToProto(s)}), nil
 }
 
 // McpReconnect reconnects one server and returns the servers checked afterwards.
 func (h *Thread) McpReconnect(ctx context.Context, req *connect.Request[v1.McpReconnectRequest]) (*connect.Response[v1.McpReconnectResponse], error) {
-	res, err := h.store.McpReconnect(ctx, req.Msg.GetSessionId(), req.Msg.GetServerName())
+	res, err := h.store.McpReconnect(ctx, req.Msg.GetThreadId(), req.Msg.GetServerName())
 	if err != nil {
-		return nil, sessionError(err)
+		return nil, threadError(err)
 	}
 	return connect.NewResponse(&v1.McpReconnectResponse{Status: mcpStatusToProto(res.Status), Error: res.Error}), nil
 }

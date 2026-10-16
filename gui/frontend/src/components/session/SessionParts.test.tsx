@@ -21,7 +21,7 @@ function repo(name: string, worktrees: Worktree[], git = true) {
 }
 
 beforeEach(() => {
-  useCommandsStore.setState({ commands: [cmd("session.rename"), cmd("view.panel.worktree")] });
+  useCommandsStore.setState({ commands: [cmd("thread.rename"), cmd("view.panel.worktree")] });
   useReposStore.setState({
     byId: {
       cf: repo("code-foundry", [
@@ -50,7 +50,7 @@ describe("SessionTitle", () => {
     expect(title().textContent).toBe("Fix the stale PR badge");
     expect(title().getAttribute("title")).toBeNull();
     fireEvent.click(title());
-    expect(startCommandNamed).toHaveBeenCalledWith("session.rename");
+    expect(startCommandNamed).toHaveBeenCalledWith("thread.rename");
   });
 
   it("shows no status, badge text, model or path", () => {
@@ -92,7 +92,7 @@ describe("SessionTitle", () => {
   });
 
   it("no project: the House icon and No project, no branch or chip, plain text without view.panel.worktree", () => {
-    useCommandsStore.setState({ commands: [cmd("session.rename")] });
+    useCommandsStore.setState({ commands: [cmd("thread.rename")] });
     useSessionsStore.setState({ byId: { "s-1": thread({ repoId: "", worktreePath: "/Users/dev" }) } });
     render(<SessionTitle id="s-1" />);
     expect(location().tagName).toBe("SPAN");

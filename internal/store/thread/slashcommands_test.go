@@ -100,7 +100,7 @@ func TestRefusedSlashCommand(t *testing.T) {
 		{"effort", "/effort high", nil, "effort", "Change the effort with the composer's effort selector (or `thread.set-effort`), not /effort."},
 		{"fast", "/fast on", nil, "fast", "Pick the model with the composer's model selector (or `thread.set-model`), not /fast."},
 		{"mcp", "/mcp reconnect github", nil, "mcp", "Manage MCP servers in the MCP panel (or `thread.mcp`), not /mcp."},
-		{"rename", "/rename my thread", nil, "rename", "Rename the thread with Rename Thread (or `session.rename`), not /rename."},
+		{"rename", "/rename my thread", nil, "rename", "Rename the thread with Rename Thread (or `thread.rename`), not /rename."},
 		{"leading whitespace", "  \t/clear", nil, "clear", ""},
 		{"leading blank lines", "\n\n  /clear\n", nil, "clear", ""},
 		{"tab after the name", "/model\topus", nil, "model", ""},
@@ -254,7 +254,7 @@ func TestThreadLogSlashCommands(t *testing.T) {
 			continue
 		}
 		ev := (<-sub.C()).(SlashCommandsChanged)
-		if ev.SessionID != "t1" || ev.Seq != snap.Seq || (ev.Commands == nil) != (s.set == nil) {
+		if ev.ThreadID != "t1" || ev.Seq != snap.Seq || (ev.Commands == nil) != (s.set == nil) {
 			t.Fatalf("step %d: event %+v", i, ev)
 		}
 	}
@@ -334,7 +334,7 @@ func TestRenderedSlashCommands(t *testing.T) {
 	sub := bus.Subscribe[ThreadEvent](re.bus, 1024)
 	defer sub.Close()
 	s := re.create(CreateOptions{Effort: "low"})
-	re.waitFor(s.ID, "connected", func(s Session) bool { return s.State == StateConnected })
+	re.waitFor(s.ID, "connected", func(s Thread) bool { return s.State == StateConnected })
 	got := re.waitCommands(s.ID, "after the handshake", func(cs []SlashCommand) bool { return cs != nil })
 	if len(got) != 42 || slices.Contains(names(got), "model") || !slices.Contains(names(got), "compact") {
 		t.Fatalf("handshake list %q", names(got))
@@ -342,7 +342,7 @@ func TestRenderedSlashCommands(t *testing.T) {
 	snap := re.items(s.ID)
 	var ev *SlashCommandsChanged
 	for len(sub.C()) > 0 {
-		if e, ok := (<-sub.C()).(SlashCommandsChanged); ok && e.SessionID == s.ID {
+		if e, ok := (<-sub.C()).(SlashCommandsChanged); ok && e.ThreadID == s.ID {
 			ev = &e
 		}
 	}
@@ -379,14 +379,14 @@ func TestRenderedSlashCommands(t *testing.T) {
 	if _, err := re.m.SetEffort(re.ctx(), s.ID, "high"); err != nil {
 		t.Fatal(err)
 	}
-	re.waitFor(s.ID, "restarted", func(s Session) bool { return !s.EffortPending && s.Effort == "high" })
+	re.waitFor(s.ID, "restarted", func(s Thread) bool { return !s.EffortPending && s.Effort == "high" })
 	re.waitCommands(s.ID, "after the restart", func(cs []SlashCommand) bool { return len(cs) == 42 })
 
 	if err := re.m.Close(re.ctx(), s.ID); err != nil {
 		t.Fatal(err)
 	}
 	// Stopped: the last list stays (and is persisted; TestThreadCacheSurvivesRestart).
-	re.waitFor(s.ID, "stopped", func(s Session) bool { return s.State == StateDisconnected })
+	re.waitFor(s.ID, "stopped", func(s Thread) bool { return s.State == StateDisconnected })
 	if cs, err := re.m.SlashCommands(re.ctx(), s.ID); len(cs) != 42 || err != nil {
 		t.Errorf("stopped: %q, %v", names(cs), err)
 	}

@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.12
 // 	protoc        (unknown)
-// source: codefoundry/v1/session.proto
+// source: codefoundry/v1/thread_lifecycle.proto
 
 package codefoundryv1
 
@@ -64,11 +64,11 @@ func (x PermissionMode) String() string {
 }
 
 func (PermissionMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_codefoundry_v1_session_proto_enumTypes[0].Descriptor()
+	return file_codefoundry_v1_thread_lifecycle_proto_enumTypes[0].Descriptor()
 }
 
 func (PermissionMode) Type() protoreflect.EnumType {
-	return &file_codefoundry_v1_session_proto_enumTypes[0]
+	return &file_codefoundry_v1_thread_lifecycle_proto_enumTypes[0]
 }
 
 func (x PermissionMode) Number() protoreflect.EnumNumber {
@@ -77,135 +77,135 @@ func (x PermissionMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use PermissionMode.Descriptor instead.
 func (PermissionMode) EnumDescriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{0}
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{0}
 }
 
-// SessionState is the lifecycle of the Claude process behind a session. The daemon
+// ThreadState is the lifecycle of the Claude process behind a thread. The daemon
 // manages it (docs/notes/thread-lifecycle.md): a message starts a stopped thread, and a
 // thread idle at its prompt past its prompt cache expiry stops. Users never need to know
 // it; clients may use it internally (a thread that is STARTING has not answered yet).
-type SessionState int32
+type ThreadState int32
 
 const (
-	SessionState_SESSION_STATE_UNSPECIFIED SessionState = 0
+	ThreadState_THREAD_STATE_UNSPECIFIED ThreadState = 0
 	// Process spawned, the stream-json initialize handshake not yet done. Messages sent
 	// meanwhile wait for it.
-	SessionState_SESSION_STATE_STARTING SessionState = 1
+	ThreadState_THREAD_STATE_STARTING ThreadState = 1
 	// Claude is running.
-	SessionState_SESSION_STATE_CONNECTED SessionState = 2
+	ThreadState_THREAD_STATE_CONNECTED ThreadState = 2
 	// A stop is under way (idle, archive, snooze, remove); waiting for the process to
 	// exit. A message sent meanwhile starts a new process once it has.
-	SessionState_SESSION_STATE_CLOSING SessionState = 3
+	ThreadState_THREAD_STATE_CLOSING ThreadState = 3
 	// No process: stopped by the daemon (idle, archive, snooze), exited by Claude, crashed,
 	// or not started since the daemon started. The next message starts it.
-	SessionState_SESSION_STATE_DISCONNECTED SessionState = 4
+	ThreadState_THREAD_STATE_DISCONNECTED ThreadState = 4
 )
 
-// Enum value maps for SessionState.
+// Enum value maps for ThreadState.
 var (
-	SessionState_name = map[int32]string{
-		0: "SESSION_STATE_UNSPECIFIED",
-		1: "SESSION_STATE_STARTING",
-		2: "SESSION_STATE_CONNECTED",
-		3: "SESSION_STATE_CLOSING",
-		4: "SESSION_STATE_DISCONNECTED",
+	ThreadState_name = map[int32]string{
+		0: "THREAD_STATE_UNSPECIFIED",
+		1: "THREAD_STATE_STARTING",
+		2: "THREAD_STATE_CONNECTED",
+		3: "THREAD_STATE_CLOSING",
+		4: "THREAD_STATE_DISCONNECTED",
 	}
-	SessionState_value = map[string]int32{
-		"SESSION_STATE_UNSPECIFIED":  0,
-		"SESSION_STATE_STARTING":     1,
-		"SESSION_STATE_CONNECTED":    2,
-		"SESSION_STATE_CLOSING":      3,
-		"SESSION_STATE_DISCONNECTED": 4,
+	ThreadState_value = map[string]int32{
+		"THREAD_STATE_UNSPECIFIED":  0,
+		"THREAD_STATE_STARTING":     1,
+		"THREAD_STATE_CONNECTED":    2,
+		"THREAD_STATE_CLOSING":      3,
+		"THREAD_STATE_DISCONNECTED": 4,
 	}
 )
 
-func (x SessionState) Enum() *SessionState {
-	p := new(SessionState)
+func (x ThreadState) Enum() *ThreadState {
+	p := new(ThreadState)
 	*p = x
 	return p
 }
 
-func (x SessionState) String() string {
+func (x ThreadState) String() string {
 	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
 }
 
-func (SessionState) Descriptor() protoreflect.EnumDescriptor {
-	return file_codefoundry_v1_session_proto_enumTypes[1].Descriptor()
+func (ThreadState) Descriptor() protoreflect.EnumDescriptor {
+	return file_codefoundry_v1_thread_lifecycle_proto_enumTypes[1].Descriptor()
 }
 
-func (SessionState) Type() protoreflect.EnumType {
-	return &file_codefoundry_v1_session_proto_enumTypes[1]
+func (ThreadState) Type() protoreflect.EnumType {
+	return &file_codefoundry_v1_thread_lifecycle_proto_enumTypes[1]
 }
 
-func (x SessionState) Number() protoreflect.EnumNumber {
+func (x ThreadState) Number() protoreflect.EnumNumber {
 	return protoreflect.EnumNumber(x)
 }
 
-// Deprecated: Use SessionState.Descriptor instead.
-func (SessionState) EnumDescriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{1}
+// Deprecated: Use ThreadState.Descriptor instead.
+func (ThreadState) EnumDescriptor() ([]byte, []int) {
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{1}
 }
 
-// SessionStatus is what Claude is doing, derived by observing output and the transcript.
-type SessionStatus int32
+// ThreadStatus is what Claude is doing, derived by observing output and the transcript.
+type ThreadStatus int32
 
 const (
-	SessionStatus_SESSION_STATUS_UNSPECIFIED SessionStatus = 0
-	SessionStatus_SESSION_STATUS_BUSY        SessionStatus = 1
-	SessionStatus_SESSION_STATUS_IDLE        SessionStatus = 2
+	ThreadStatus_THREAD_STATUS_UNSPECIFIED ThreadStatus = 0
+	ThreadStatus_THREAD_STATUS_BUSY        ThreadStatus = 1
+	ThreadStatus_THREAD_STATUS_IDLE        ThreadStatus = 2
 	// Claude is waiting on the user: a permission prompt, a question, or a dialog.
-	SessionStatus_SESSION_STATUS_NEEDS_ATTENTION SessionStatus = 3
-	// The session's process ended while Claude was working (status_reason
+	ThreadStatus_THREAD_STATUS_NEEDS_ATTENTION ThreadStatus = 3
+	// The thread's process ended while Claude was working (status_reason
 	// "interrupted"): it crashed, exited, was closed, or the daemon stopped mid-turn; or
 	// Claude did not start for a message (status_reason "did not start"; the timeline has
-	// an error item saying why). Set only on a DISCONNECTED session; the next start
+	// an error item saying why). Set only on a DISCONNECTED thread; the next start
 	// replaces it. Claude-reported API errors stay NEEDS_ATTENTION "error: <code>".
-	SessionStatus_SESSION_STATUS_ERROR SessionStatus = 4
+	ThreadStatus_THREAD_STATUS_ERROR ThreadStatus = 4
 )
 
-// Enum value maps for SessionStatus.
+// Enum value maps for ThreadStatus.
 var (
-	SessionStatus_name = map[int32]string{
-		0: "SESSION_STATUS_UNSPECIFIED",
-		1: "SESSION_STATUS_BUSY",
-		2: "SESSION_STATUS_IDLE",
-		3: "SESSION_STATUS_NEEDS_ATTENTION",
-		4: "SESSION_STATUS_ERROR",
+	ThreadStatus_name = map[int32]string{
+		0: "THREAD_STATUS_UNSPECIFIED",
+		1: "THREAD_STATUS_BUSY",
+		2: "THREAD_STATUS_IDLE",
+		3: "THREAD_STATUS_NEEDS_ATTENTION",
+		4: "THREAD_STATUS_ERROR",
 	}
-	SessionStatus_value = map[string]int32{
-		"SESSION_STATUS_UNSPECIFIED":     0,
-		"SESSION_STATUS_BUSY":            1,
-		"SESSION_STATUS_IDLE":            2,
-		"SESSION_STATUS_NEEDS_ATTENTION": 3,
-		"SESSION_STATUS_ERROR":           4,
+	ThreadStatus_value = map[string]int32{
+		"THREAD_STATUS_UNSPECIFIED":     0,
+		"THREAD_STATUS_BUSY":            1,
+		"THREAD_STATUS_IDLE":            2,
+		"THREAD_STATUS_NEEDS_ATTENTION": 3,
+		"THREAD_STATUS_ERROR":           4,
 	}
 )
 
-func (x SessionStatus) Enum() *SessionStatus {
-	p := new(SessionStatus)
+func (x ThreadStatus) Enum() *ThreadStatus {
+	p := new(ThreadStatus)
 	*p = x
 	return p
 }
 
-func (x SessionStatus) String() string {
+func (x ThreadStatus) String() string {
 	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
 }
 
-func (SessionStatus) Descriptor() protoreflect.EnumDescriptor {
-	return file_codefoundry_v1_session_proto_enumTypes[2].Descriptor()
+func (ThreadStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_codefoundry_v1_thread_lifecycle_proto_enumTypes[2].Descriptor()
 }
 
-func (SessionStatus) Type() protoreflect.EnumType {
-	return &file_codefoundry_v1_session_proto_enumTypes[2]
+func (ThreadStatus) Type() protoreflect.EnumType {
+	return &file_codefoundry_v1_thread_lifecycle_proto_enumTypes[2]
 }
 
-func (x SessionStatus) Number() protoreflect.EnumNumber {
+func (x ThreadStatus) Number() protoreflect.EnumNumber {
 	return protoreflect.EnumNumber(x)
 }
 
-// Deprecated: Use SessionStatus.Descriptor instead.
-func (SessionStatus) EnumDescriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{2}
+// Deprecated: Use ThreadStatus.Descriptor instead.
+func (ThreadStatus) EnumDescriptor() ([]byte, []int) {
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{2}
 }
 
 // Whether a subagent run is still running (ThreadAgentRun.status in detail).
@@ -246,11 +246,11 @@ func (x AgentRunStatus) String() string {
 }
 
 func (AgentRunStatus) Descriptor() protoreflect.EnumDescriptor {
-	return file_codefoundry_v1_session_proto_enumTypes[3].Descriptor()
+	return file_codefoundry_v1_thread_lifecycle_proto_enumTypes[3].Descriptor()
 }
 
 func (AgentRunStatus) Type() protoreflect.EnumType {
-	return &file_codefoundry_v1_session_proto_enumTypes[3]
+	return &file_codefoundry_v1_thread_lifecycle_proto_enumTypes[3]
 }
 
 func (x AgentRunStatus) Number() protoreflect.EnumNumber {
@@ -259,17 +259,17 @@ func (x AgentRunStatus) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use AgentRunStatus.Descriptor instead.
 func (AgentRunStatus) EnumDescriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{3}
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{3}
 }
 
 // Ownership: a thread has at most one owner. When workspace_id is set the owner is that
 // workspace; otherwise, when repo_id is set, it is the project (repository) repo_id;
-// otherwise the thread has no project (CreateSessionRequest.no_project) and runs in the
+// otherwise the thread has no project (CreateThreadRequest.no_project) and runs in the
 // daemon's home directory. repo_id and worktree_path are facts about the thread's cwd
 // (for a workspace thread, the member worktree it runs in) and never decide the owner
 // beyond that order. Rows from before projects were required may also have an empty
 // repo_id with a worktree_path inside a project; clients may place those by the path.
-type Session struct {
+type Thread struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Our stable id (survives reconnects).
 	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -289,34 +289,34 @@ type Session struct {
 	// Model and effort as passed to claude (e.g. "opus", "high"). Empty means claude's default.
 	Model          string                 `protobuf:"bytes,7,opt,name=model,proto3" json:"model,omitempty"`
 	Effort         string                 `protobuf:"bytes,8,opt,name=effort,proto3" json:"effort,omitempty"`
-	State          SessionState           `protobuf:"varint,10,opt,name=state,proto3,enum=codefoundry.v1.SessionState" json:"state,omitempty"`
-	Status         SessionStatus          `protobuf:"varint,11,opt,name=status,proto3,enum=codefoundry.v1.SessionStatus" json:"status,omitempty"`
+	State          ThreadState            `protobuf:"varint,10,opt,name=state,proto3,enum=codefoundry.v1.ThreadState" json:"state,omitempty"`
+	Status         ThreadStatus           `protobuf:"varint,11,opt,name=status,proto3,enum=codefoundry.v1.ThreadStatus" json:"status,omitempty"`
 	CreatedAt      *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	LastActivityAt *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=last_activity_at,json=lastActivityAt,proto3" json:"last_activity_at,omitempty"`
 	// Exit code of the last process, valid when DISCONNECTED after a process ran.
 	ExitCode int32 `protobuf:"varint,14,opt,name=exit_code,json=exitCode,proto3" json:"exit_code,omitempty"`
-	// Why the session is DISCONNECTED: "idle" (stopped at its prompt cache expiry),
+	// Why the thread is DISCONNECTED: "idle" (stopped at its prompt cache expiry),
 	// "closed" (archive, snooze, remove), "exited", "crashed", "daemon stopped", "daemon
 	// restarted", "spawn failed" (Claude did not start or never answered its handshake),
 	// or empty. Internal detail for clients; the next message starts the thread whatever it
 	// says.
 	DisconnectReason string `protobuf:"bytes,15,opt,name=disconnect_reason,json=disconnectReason,proto3" json:"disconnect_reason,omitempty"`
 	LastError        string `protobuf:"bytes,16,opt,name=last_error,json=lastError,proto3" json:"last_error,omitempty"`
-	// Forked from this session id, if any.
+	// Forked from this thread id, if any.
 	ParentId string `protobuf:"bytes,17,opt,name=parent_id,json=parentId,proto3" json:"parent_id,omitempty"`
 	// Short explanation of status from the detector, e.g. "finished", "at prompt",
 	// "permission: Do you want to proceed?", "snooze ended" (NEEDS_ATTENTION on a
 	// disconnected thread whose snooze ran out; cleared like "finished" on a disconnected
 	// thread, by the next start), or "interrupted" / "did not start" for ERROR. Persisted with
-	// status: a DISCONNECTED session keeps the status and reason it had when its process
+	// status: a DISCONNECTED thread keeps the status and reason it had when its process
 	// ended (a busy one becomes ERROR "interrupted"), across daemon restarts. Empty when
 	// unknown.
 	StatusReason string `protobuf:"bytes,18,opt,name=status_reason,json=statusReason,proto3" json:"status_reason,omitempty"`
 	// Permission mode passed to claude; re-passed on Reconnect.
 	PermissionMode PermissionMode `protobuf:"varint,19,opt,name=permission_mode,json=permissionMode,proto3,enum=codefoundry.v1.PermissionMode" json:"permission_mode,omitempty"`
-	// Ref the session's worktree branch was created from, when Create made the worktree.
+	// Ref the thread's worktree branch was created from, when Create made the worktree.
 	BaseRef string `protobuf:"bytes,20,opt,name=base_ref,json=baseRef,proto3" json:"base_ref,omitempty"`
-	// Create made the worktree for this session (new_worktree or new_workspace was set).
+	// Create made the worktree for this thread (new_worktree or new_workspace was set).
 	CreatedWorktree bool `protobuf:"varint,21,opt,name=created_worktree,json=createdWorktree,proto3" json:"created_worktree,omitempty"`
 	// Owner workspace (see the ownership rule above); empty for a project thread and for a
 	// thread without a project. Every spawn of a workspace thread gets --add-dir for the
@@ -326,11 +326,11 @@ type Session struct {
 	// nothing is queued. Not persisted: a thread that disconnects first moves its row
 	// there instead.
 	PendingWorktreePath string `protobuf:"bytes,23,opt,name=pending_worktree_path,json=pendingWorktreePath,proto3" json:"pending_worktree_path,omitempty"`
-	// The user pinned the thread (SessionService.Pin). Persisted.
+	// The user pinned the thread (ThreadService.Pin). Persisted.
 	Pinned bool `protobuf:"varint,24,opt,name=pinned,proto3" json:"pinned,omitempty"`
 	// Pull requests Claude linked to the conversation. Source: the "pr-link" records Claude
-	// Code writes to the session's transcript whenever it sees a pull request for the
-	// repository (created in the session, by a subagent, or named in a prompt). Claude
+	// Code writes to its transcript whenever it sees a pull request for the
+	// repository (created in the conversation, by a subagent, or named in a prompt). Claude
 	// re-emits the record at nearly every turn and it can flip back to an earlier pull
 	// request, so this is every distinct URL (deduplicated by URL) in first-seen order;
 	// entries are never removed. A reconnected thread is backfilled from its transcript's
@@ -367,7 +367,7 @@ type Session struct {
 	// docs/notes/rendered-threads-cold-cache.md.
 	ContextTokens int64 `protobuf:"varint,33,opt,name=context_tokens,json=contextTokens,proto3" json:"context_tokens,omitempty"`
 	// When the prompt cache of the thread's conversation expires: its last result
-	// plus the sessions.cache_ttl_seconds setting (the cache refreshes on every hit, so
+	// plus the threads.cache_ttl_seconds setting (the cache refreshes on every hit, so
 	// the last request is what counts). Recomputed when the setting changes. Unset
 	// before the first result.
 	CacheExpiresAt *timestamppb.Timestamp `protobuf:"bytes,34,opt,name=cache_expires_at,json=cacheExpiresAt,proto3" json:"cache_expires_at,omitempty"`
@@ -380,11 +380,11 @@ type Session struct {
 	// connection error); unset once any other frame follows or the process ends. Not
 	// persisted. See docs/notes/api-retry-note.md.
 	Retry *ApiRetry `protobuf:"bytes,36,opt,name=retry,proto3" json:"retry,omitempty"`
-	// When the user archived the thread (SessionService.Archive); unset when it is not
+	// When the user archived the thread (ThreadService.Archive); unset when it is not
 	// archived. An archived thread is disconnected, unpinned and has no shells; the GUI
 	// lists it apart. Reconnect, Pin (pinned) and Send clear it. Persisted.
 	ArchivedAt *timestamppb.Timestamp `protobuf:"bytes,37,opt,name=archived_at,json=archivedAt,proto3" json:"archived_at,omitempty"`
-	// When a snoozed thread wakes (SessionService.Snooze); unset when it is not snoozed.
+	// When a snoozed thread wakes (ThreadService.Snooze); unset when it is not snoozed.
 	// A snoozed thread is disconnected, unpinned, not archived and has no shells; the GUI
 	// lists it apart. The daemon checks the wall clock (every 30 s and at startup, so a
 	// snooze that ended while the Mac slept or the daemon was stopped wakes as soon as it
@@ -412,21 +412,21 @@ type Session struct {
 	sizeCache             protoimpl.SizeCache
 }
 
-func (x *Session) Reset() {
-	*x = Session{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[0]
+func (x *Thread) Reset() {
+	*x = Thread{}
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *Session) String() string {
+func (x *Thread) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*Session) ProtoMessage() {}
+func (*Thread) ProtoMessage() {}
 
-func (x *Session) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[0]
+func (x *Thread) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -437,285 +437,285 @@ func (x *Session) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Session.ProtoReflect.Descriptor instead.
-func (*Session) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{0}
+// Deprecated: Use Thread.ProtoReflect.Descriptor instead.
+func (*Thread) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *Session) GetId() string {
+func (x *Thread) GetId() string {
 	if x != nil {
 		return x.Id
 	}
 	return ""
 }
 
-func (x *Session) GetClaudeSessionId() string {
+func (x *Thread) GetClaudeSessionId() string {
 	if x != nil {
 		return x.ClaudeSessionId
 	}
 	return ""
 }
 
-func (x *Session) GetRepoId() string {
+func (x *Thread) GetRepoId() string {
 	if x != nil {
 		return x.RepoId
 	}
 	return ""
 }
 
-func (x *Session) GetWorktreePath() string {
+func (x *Thread) GetWorktreePath() string {
 	if x != nil {
 		return x.WorktreePath
 	}
 	return ""
 }
 
-func (x *Session) GetName() string {
+func (x *Thread) GetName() string {
 	if x != nil {
 		return x.Name
 	}
 	return ""
 }
 
-func (x *Session) GetAutoNamed() bool {
+func (x *Thread) GetAutoNamed() bool {
 	if x != nil {
 		return x.AutoNamed
 	}
 	return false
 }
 
-func (x *Session) GetModel() string {
+func (x *Thread) GetModel() string {
 	if x != nil {
 		return x.Model
 	}
 	return ""
 }
 
-func (x *Session) GetEffort() string {
+func (x *Thread) GetEffort() string {
 	if x != nil {
 		return x.Effort
 	}
 	return ""
 }
 
-func (x *Session) GetState() SessionState {
+func (x *Thread) GetState() ThreadState {
 	if x != nil {
 		return x.State
 	}
-	return SessionState_SESSION_STATE_UNSPECIFIED
+	return ThreadState_THREAD_STATE_UNSPECIFIED
 }
 
-func (x *Session) GetStatus() SessionStatus {
+func (x *Thread) GetStatus() ThreadStatus {
 	if x != nil {
 		return x.Status
 	}
-	return SessionStatus_SESSION_STATUS_UNSPECIFIED
+	return ThreadStatus_THREAD_STATUS_UNSPECIFIED
 }
 
-func (x *Session) GetCreatedAt() *timestamppb.Timestamp {
+func (x *Thread) GetCreatedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.CreatedAt
 	}
 	return nil
 }
 
-func (x *Session) GetLastActivityAt() *timestamppb.Timestamp {
+func (x *Thread) GetLastActivityAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.LastActivityAt
 	}
 	return nil
 }
 
-func (x *Session) GetExitCode() int32 {
+func (x *Thread) GetExitCode() int32 {
 	if x != nil {
 		return x.ExitCode
 	}
 	return 0
 }
 
-func (x *Session) GetDisconnectReason() string {
+func (x *Thread) GetDisconnectReason() string {
 	if x != nil {
 		return x.DisconnectReason
 	}
 	return ""
 }
 
-func (x *Session) GetLastError() string {
+func (x *Thread) GetLastError() string {
 	if x != nil {
 		return x.LastError
 	}
 	return ""
 }
 
-func (x *Session) GetParentId() string {
+func (x *Thread) GetParentId() string {
 	if x != nil {
 		return x.ParentId
 	}
 	return ""
 }
 
-func (x *Session) GetStatusReason() string {
+func (x *Thread) GetStatusReason() string {
 	if x != nil {
 		return x.StatusReason
 	}
 	return ""
 }
 
-func (x *Session) GetPermissionMode() PermissionMode {
+func (x *Thread) GetPermissionMode() PermissionMode {
 	if x != nil {
 		return x.PermissionMode
 	}
 	return PermissionMode_PERMISSION_MODE_UNSPECIFIED
 }
 
-func (x *Session) GetBaseRef() string {
+func (x *Thread) GetBaseRef() string {
 	if x != nil {
 		return x.BaseRef
 	}
 	return ""
 }
 
-func (x *Session) GetCreatedWorktree() bool {
+func (x *Thread) GetCreatedWorktree() bool {
 	if x != nil {
 		return x.CreatedWorktree
 	}
 	return false
 }
 
-func (x *Session) GetWorkspaceId() string {
+func (x *Thread) GetWorkspaceId() string {
 	if x != nil {
 		return x.WorkspaceId
 	}
 	return ""
 }
 
-func (x *Session) GetPendingWorktreePath() string {
+func (x *Thread) GetPendingWorktreePath() string {
 	if x != nil {
 		return x.PendingWorktreePath
 	}
 	return ""
 }
 
-func (x *Session) GetPinned() bool {
+func (x *Thread) GetPinned() bool {
 	if x != nil {
 		return x.Pinned
 	}
 	return false
 }
 
-func (x *Session) GetLinkedPullRequests() []*LinkedPullRequest {
+func (x *Thread) GetLinkedPullRequests() []*LinkedPullRequest {
 	if x != nil {
 		return x.LinkedPullRequests
 	}
 	return nil
 }
 
-func (x *Session) GetStatusChangedAt() *timestamppb.Timestamp {
+func (x *Thread) GetStatusChangedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.StatusChangedAt
 	}
 	return nil
 }
 
-func (x *Session) GetUsage() []*UsageBucket {
+func (x *Thread) GetUsage() []*UsageBucket {
 	if x != nil {
 		return x.Usage
 	}
 	return nil
 }
 
-func (x *Session) GetCostUsd() float64 {
+func (x *Thread) GetCostUsd() float64 {
 	if x != nil {
 		return x.CostUsd
 	}
 	return 0
 }
 
-func (x *Session) GetUnpriced() bool {
+func (x *Thread) GetUnpriced() bool {
 	if x != nil {
 		return x.Unpriced
 	}
 	return false
 }
 
-func (x *Session) GetAgentRuns() []*AgentRun {
+func (x *Thread) GetAgentRuns() []*AgentRun {
 	if x != nil {
 		return x.AgentRuns
 	}
 	return nil
 }
 
-func (x *Session) GetEffortPending() bool {
+func (x *Thread) GetEffortPending() bool {
 	if x != nil {
 		return x.EffortPending
 	}
 	return false
 }
 
-func (x *Session) GetContextTokens() int64 {
+func (x *Thread) GetContextTokens() int64 {
 	if x != nil {
 		return x.ContextTokens
 	}
 	return 0
 }
 
-func (x *Session) GetCacheExpiresAt() *timestamppb.Timestamp {
+func (x *Thread) GetCacheExpiresAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.CacheExpiresAt
 	}
 	return nil
 }
 
-func (x *Session) GetContextRereadUsd() float64 {
+func (x *Thread) GetContextRereadUsd() float64 {
 	if x != nil {
 		return x.ContextRereadUsd
 	}
 	return 0
 }
 
-func (x *Session) GetRetry() *ApiRetry {
+func (x *Thread) GetRetry() *ApiRetry {
 	if x != nil {
 		return x.Retry
 	}
 	return nil
 }
 
-func (x *Session) GetArchivedAt() *timestamppb.Timestamp {
+func (x *Thread) GetArchivedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.ArchivedAt
 	}
 	return nil
 }
 
-func (x *Session) GetSnoozedUntil() *timestamppb.Timestamp {
+func (x *Thread) GetSnoozedUntil() *timestamppb.Timestamp {
 	if x != nil {
 		return x.SnoozedUntil
 	}
 	return nil
 }
 
-func (x *Session) GetAgentsRunning() int32 {
+func (x *Thread) GetAgentsRunning() int32 {
 	if x != nil {
 		return x.AgentsRunning
 	}
 	return 0
 }
 
-func (x *Session) GetBackgroundAgentsRunning() int32 {
+func (x *Thread) GetBackgroundAgentsRunning() int32 {
 	if x != nil {
 		return x.BackgroundAgentsRunning
 	}
 	return 0
 }
 
-func (x *Session) GetBackgroundShellsRunning() int32 {
+func (x *Thread) GetBackgroundShellsRunning() int32 {
 	if x != nil {
 		return x.BackgroundShellsRunning
 	}
 	return 0
 }
 
-func (x *Session) GetBackgroundWakePending() bool {
+func (x *Thread) GetBackgroundWakePending() bool {
 	if x != nil {
 		return x.BackgroundWakePending
 	}
@@ -740,7 +740,7 @@ type ApiRetry struct {
 
 func (x *ApiRetry) Reset() {
 	*x = ApiRetry{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[1]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -752,7 +752,7 @@ func (x *ApiRetry) String() string {
 func (*ApiRetry) ProtoMessage() {}
 
 func (x *ApiRetry) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[1]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -765,7 +765,7 @@ func (x *ApiRetry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApiRetry.ProtoReflect.Descriptor instead.
 func (*ApiRetry) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{1}
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *ApiRetry) GetAttempt() int32 {
@@ -803,7 +803,7 @@ func (x *ApiRetry) GetError() string {
 	return ""
 }
 
-// One subagent run of a thread (Session.agent_runs): a Claude Code Agent tool call,
+// One subagent run of a thread (Thread.agent_runs): a Claude Code Agent tool call,
 // with its own transcript.
 type AgentRun struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -822,7 +822,7 @@ type AgentRun struct {
 	SpawnDepth int32 `protobuf:"varint,8,opt,name=spawn_depth,json=spawnDepth,proto3" json:"spawn_depth,omitempty"`
 	// Time of the run's first record; unset if unknown.
 	StartedAt *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
-	// The run's own usage, sorted like Session.usage, priced the same way.
+	// The run's own usage, sorted like Thread.usage, priced the same way.
 	Usage         []*UsageBucket `protobuf:"bytes,10,rep,name=usage,proto3" json:"usage,omitempty"`
 	CostUsd       float64        `protobuf:"fixed64,11,opt,name=cost_usd,json=costUsd,proto3" json:"cost_usd,omitempty"`
 	Unpriced      bool           `protobuf:"varint,12,opt,name=unpriced,proto3" json:"unpriced,omitempty"`
@@ -832,7 +832,7 @@ type AgentRun struct {
 
 func (x *AgentRun) Reset() {
 	*x = AgentRun{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[2]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -844,7 +844,7 @@ func (x *AgentRun) String() string {
 func (*AgentRun) ProtoMessage() {}
 
 func (x *AgentRun) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[2]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -857,7 +857,7 @@ func (x *AgentRun) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentRun.ProtoReflect.Descriptor instead.
 func (*AgentRun) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{2}
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *AgentRun) GetId() string {
@@ -944,7 +944,7 @@ func (x *AgentRun) GetUnpriced() bool {
 	return false
 }
 
-// Token counters for one model on one UTC day (of one session, or of the retired
+// Token counters for one model on one UTC day (of one thread, or of the retired
 // ledger).
 type UsageBucket struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -982,7 +982,7 @@ type UsageBucket struct {
 
 func (x *UsageBucket) Reset() {
 	*x = UsageBucket{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[3]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -994,7 +994,7 @@ func (x *UsageBucket) String() string {
 func (*UsageBucket) ProtoMessage() {}
 
 func (x *UsageBucket) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[3]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1007,7 +1007,7 @@ func (x *UsageBucket) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UsageBucket.ProtoReflect.Descriptor instead.
 func (*UsageBucket) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{3}
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *UsageBucket) GetModel() string {
@@ -1136,7 +1136,7 @@ func (x *UsageBucket) GetCacheSavingsUsd() float64 {
 	return 0
 }
 
-// A pull request Claude linked to a session (Session.linked_pull_requests).
+// A pull request Claude linked to a thread (Thread.linked_pull_requests).
 type LinkedPullRequest struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	Slug   string                 `protobuf:"bytes,1,opt,name=slug,proto3" json:"slug,omitempty"` // "owner/name"
@@ -1150,7 +1150,7 @@ type LinkedPullRequest struct {
 
 func (x *LinkedPullRequest) Reset() {
 	*x = LinkedPullRequest{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[4]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1162,7 +1162,7 @@ func (x *LinkedPullRequest) String() string {
 func (*LinkedPullRequest) ProtoMessage() {}
 
 func (x *LinkedPullRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[4]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1175,7 +1175,7 @@ func (x *LinkedPullRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LinkedPullRequest.ProtoReflect.Descriptor instead.
 func (*LinkedPullRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{4}
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *LinkedPullRequest) GetSlug() string {
@@ -1206,7 +1206,7 @@ func (x *LinkedPullRequest) GetLinkedAt() *timestamppb.Timestamp {
 	return nil
 }
 
-type CreateSessionRequest struct {
+type CreateThreadRequest struct {
 	state        protoimpl.MessageState `protogen:"open.v1"`
 	RepoId       string                 `protobuf:"bytes,1,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
 	WorktreePath string                 `protobuf:"bytes,2,opt,name=worktree_path,json=worktreePath,proto3" json:"worktree_path,omitempty"`
@@ -1218,9 +1218,9 @@ type CreateSessionRequest struct {
 	// started (attachments as image blocks).
 	InitialPrompt  string         `protobuf:"bytes,6,opt,name=initial_prompt,json=initialPrompt,proto3" json:"initial_prompt,omitempty"`
 	PermissionMode PermissionMode `protobuf:"varint,7,opt,name=permission_mode,json=permissionMode,proto3,enum=codefoundry.v1.PermissionMode" json:"permission_mode,omitempty"`
-	// When set, Create makes a new worktree for the session before claude starts and
+	// When set, Create makes a new worktree for the thread before claude starts and
 	// worktree_path is ignored. The branch is cf/<slug>, the slug of the explicit name,
-	// else of the title named from initial_prompt (bounded wait), else cf/<session id>.
+	// else of the title named from initial_prompt (bounded wait), else cf/<thread id>.
 	NewWorktree *NewWorktree `protobuf:"bytes,8,opt,name=new_worktree,json=newWorktree,proto3" json:"new_worktree,omitempty"`
 	// Paths returned by StageAttachment, appended to initial_prompt.
 	Attachments []string `protobuf:"bytes,9,rep,name=attachments,proto3" json:"attachments,omitempty"`
@@ -1238,7 +1238,7 @@ type CreateSessionRequest struct {
 	// (ThreadItem UserMessageItem.composer_text).
 	ComposerPrompt string `protobuf:"bytes,13,opt,name=composer_prompt,json=composerPrompt,proto3" json:"composer_prompt,omitempty"`
 	// When set, the thread has no project: it runs in the daemon's home directory with an
-	// empty repo_id and workspace_id (see the ownership rule on Session). Exclusive with
+	// empty repo_id and workspace_id (see the ownership rule on Thread). Exclusive with
 	// repo_id, worktree_path, new_worktree, workspace_id and new_workspace
 	// (InvalidArgument). RunIn refuses such a thread; Fork and Reconnect keep its cwd.
 	NoProject     bool `protobuf:"varint,14,opt,name=no_project,json=noProject,proto3" json:"no_project,omitempty"`
@@ -1246,21 +1246,21 @@ type CreateSessionRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CreateSessionRequest) Reset() {
-	*x = CreateSessionRequest{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[5]
+func (x *CreateThreadRequest) Reset() {
+	*x = CreateThreadRequest{}
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CreateSessionRequest) String() string {
+func (x *CreateThreadRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CreateSessionRequest) ProtoMessage() {}
+func (*CreateThreadRequest) ProtoMessage() {}
 
-func (x *CreateSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[5]
+func (x *CreateThreadRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1271,96 +1271,96 @@ func (x *CreateSessionRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CreateSessionRequest.ProtoReflect.Descriptor instead.
-func (*CreateSessionRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{5}
+// Deprecated: Use CreateThreadRequest.ProtoReflect.Descriptor instead.
+func (*CreateThreadRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *CreateSessionRequest) GetRepoId() string {
+func (x *CreateThreadRequest) GetRepoId() string {
 	if x != nil {
 		return x.RepoId
 	}
 	return ""
 }
 
-func (x *CreateSessionRequest) GetWorktreePath() string {
+func (x *CreateThreadRequest) GetWorktreePath() string {
 	if x != nil {
 		return x.WorktreePath
 	}
 	return ""
 }
 
-func (x *CreateSessionRequest) GetModel() string {
+func (x *CreateThreadRequest) GetModel() string {
 	if x != nil {
 		return x.Model
 	}
 	return ""
 }
 
-func (x *CreateSessionRequest) GetEffort() string {
+func (x *CreateThreadRequest) GetEffort() string {
 	if x != nil {
 		return x.Effort
 	}
 	return ""
 }
 
-func (x *CreateSessionRequest) GetName() string {
+func (x *CreateThreadRequest) GetName() string {
 	if x != nil {
 		return x.Name
 	}
 	return ""
 }
 
-func (x *CreateSessionRequest) GetInitialPrompt() string {
+func (x *CreateThreadRequest) GetInitialPrompt() string {
 	if x != nil {
 		return x.InitialPrompt
 	}
 	return ""
 }
 
-func (x *CreateSessionRequest) GetPermissionMode() PermissionMode {
+func (x *CreateThreadRequest) GetPermissionMode() PermissionMode {
 	if x != nil {
 		return x.PermissionMode
 	}
 	return PermissionMode_PERMISSION_MODE_UNSPECIFIED
 }
 
-func (x *CreateSessionRequest) GetNewWorktree() *NewWorktree {
+func (x *CreateThreadRequest) GetNewWorktree() *NewWorktree {
 	if x != nil {
 		return x.NewWorktree
 	}
 	return nil
 }
 
-func (x *CreateSessionRequest) GetAttachments() []string {
+func (x *CreateThreadRequest) GetAttachments() []string {
 	if x != nil {
 		return x.Attachments
 	}
 	return nil
 }
 
-func (x *CreateSessionRequest) GetWorkspaceId() string {
+func (x *CreateThreadRequest) GetWorkspaceId() string {
 	if x != nil {
 		return x.WorkspaceId
 	}
 	return ""
 }
 
-func (x *CreateSessionRequest) GetNewWorkspace() *NewWorkspace {
+func (x *CreateThreadRequest) GetNewWorkspace() *NewWorkspace {
 	if x != nil {
 		return x.NewWorkspace
 	}
 	return nil
 }
 
-func (x *CreateSessionRequest) GetComposerPrompt() string {
+func (x *CreateThreadRequest) GetComposerPrompt() string {
 	if x != nil {
 		return x.ComposerPrompt
 	}
 	return ""
 }
 
-func (x *CreateSessionRequest) GetNoProject() bool {
+func (x *CreateThreadRequest) GetNoProject() bool {
 	if x != nil {
 		return x.NoProject
 	}
@@ -1377,7 +1377,7 @@ type NewWorktree struct {
 
 func (x *NewWorktree) Reset() {
 	*x = NewWorktree{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[6]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1389,7 +1389,7 @@ func (x *NewWorktree) String() string {
 func (*NewWorktree) ProtoMessage() {}
 
 func (x *NewWorktree) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[6]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1402,7 +1402,7 @@ func (x *NewWorktree) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NewWorktree.ProtoReflect.Descriptor instead.
 func (*NewWorktree) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{6}
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *NewWorktree) GetBaseRef() string {
@@ -1428,7 +1428,7 @@ type NewWorkspace struct {
 
 func (x *NewWorkspace) Reset() {
 	*x = NewWorkspace{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[7]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1440,7 +1440,7 @@ func (x *NewWorkspace) String() string {
 func (*NewWorkspace) ProtoMessage() {}
 
 func (x *NewWorkspace) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[7]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1453,7 +1453,7 @@ func (x *NewWorkspace) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NewWorkspace.ProtoReflect.Descriptor instead.
 func (*NewWorkspace) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{7}
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *NewWorkspace) GetRepos() []string {
@@ -1490,7 +1490,7 @@ type StageAttachmentRequest struct {
 
 func (x *StageAttachmentRequest) Reset() {
 	*x = StageAttachmentRequest{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[8]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1502,7 +1502,7 @@ func (x *StageAttachmentRequest) String() string {
 func (*StageAttachmentRequest) ProtoMessage() {}
 
 func (x *StageAttachmentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[8]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1515,7 +1515,7 @@ func (x *StageAttachmentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StageAttachmentRequest.ProtoReflect.Descriptor instead.
 func (*StageAttachmentRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{8}
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *StageAttachmentRequest) GetName() string {
@@ -1548,7 +1548,7 @@ type StageAttachmentResponse struct {
 
 func (x *StageAttachmentResponse) Reset() {
 	*x = StageAttachmentResponse{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[9]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1560,7 +1560,7 @@ func (x *StageAttachmentResponse) String() string {
 func (*StageAttachmentResponse) ProtoMessage() {}
 
 func (x *StageAttachmentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[9]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1573,7 +1573,7 @@ func (x *StageAttachmentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StageAttachmentResponse.ProtoReflect.Descriptor instead.
 func (*StageAttachmentResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{9}
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *StageAttachmentResponse) GetPath() string {
@@ -1593,7 +1593,7 @@ type ReadAttachmentRequest struct {
 
 func (x *ReadAttachmentRequest) Reset() {
 	*x = ReadAttachmentRequest{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[10]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1605,7 +1605,7 @@ func (x *ReadAttachmentRequest) String() string {
 func (*ReadAttachmentRequest) ProtoMessage() {}
 
 func (x *ReadAttachmentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[10]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1618,7 +1618,7 @@ func (x *ReadAttachmentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadAttachmentRequest.ProtoReflect.Descriptor instead.
 func (*ReadAttachmentRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{10}
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ReadAttachmentRequest) GetPath() string {
@@ -1639,7 +1639,7 @@ type ReadAttachmentResponse struct {
 
 func (x *ReadAttachmentResponse) Reset() {
 	*x = ReadAttachmentResponse{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[11]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1651,7 +1651,7 @@ func (x *ReadAttachmentResponse) String() string {
 func (*ReadAttachmentResponse) ProtoMessage() {}
 
 func (x *ReadAttachmentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[11]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1664,7 +1664,7 @@ func (x *ReadAttachmentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadAttachmentResponse.ProtoReflect.Descriptor instead.
 func (*ReadAttachmentResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{11}
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ReadAttachmentResponse) GetData() []byte {
@@ -1681,28 +1681,28 @@ func (x *ReadAttachmentResponse) GetMimeType() string {
 	return ""
 }
 
-type CreateSessionResponse struct {
+type CreateThreadResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Session       *Session               `protobuf:"bytes,1,opt,name=session,proto3" json:"session,omitempty"`
+	Thread        *Thread                `protobuf:"bytes,1,opt,name=thread,proto3" json:"thread,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CreateSessionResponse) Reset() {
-	*x = CreateSessionResponse{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[12]
+func (x *CreateThreadResponse) Reset() {
+	*x = CreateThreadResponse{}
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CreateSessionResponse) String() string {
+func (x *CreateThreadResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CreateSessionResponse) ProtoMessage() {}
+func (*CreateThreadResponse) ProtoMessage() {}
 
-func (x *CreateSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[12]
+func (x *CreateThreadResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1713,19 +1713,19 @@ func (x *CreateSessionResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CreateSessionResponse.ProtoReflect.Descriptor instead.
-func (*CreateSessionResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{12}
+// Deprecated: Use CreateThreadResponse.ProtoReflect.Descriptor instead.
+func (*CreateThreadResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{12}
 }
 
-func (x *CreateSessionResponse) GetSession() *Session {
+func (x *CreateThreadResponse) GetThread() *Thread {
 	if x != nil {
-		return x.Session
+		return x.Thread
 	}
 	return nil
 }
 
-type ForkSessionRequest struct {
+type ForkThreadRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
@@ -1733,21 +1733,21 @@ type ForkSessionRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ForkSessionRequest) Reset() {
-	*x = ForkSessionRequest{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[13]
+func (x *ForkThreadRequest) Reset() {
+	*x = ForkThreadRequest{}
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ForkSessionRequest) String() string {
+func (x *ForkThreadRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ForkSessionRequest) ProtoMessage() {}
+func (*ForkThreadRequest) ProtoMessage() {}
 
-func (x *ForkSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[13]
+func (x *ForkThreadRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1758,47 +1758,47 @@ func (x *ForkSessionRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ForkSessionRequest.ProtoReflect.Descriptor instead.
-func (*ForkSessionRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{13}
+// Deprecated: Use ForkThreadRequest.ProtoReflect.Descriptor instead.
+func (*ForkThreadRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{13}
 }
 
-func (x *ForkSessionRequest) GetId() string {
+func (x *ForkThreadRequest) GetId() string {
 	if x != nil {
 		return x.Id
 	}
 	return ""
 }
 
-func (x *ForkSessionRequest) GetName() string {
+func (x *ForkThreadRequest) GetName() string {
 	if x != nil {
 		return x.Name
 	}
 	return ""
 }
 
-type ForkSessionResponse struct {
+type ForkThreadResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Session       *Session               `protobuf:"bytes,1,opt,name=session,proto3" json:"session,omitempty"`
+	Thread        *Thread                `protobuf:"bytes,1,opt,name=thread,proto3" json:"thread,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ForkSessionResponse) Reset() {
-	*x = ForkSessionResponse{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[14]
+func (x *ForkThreadResponse) Reset() {
+	*x = ForkThreadResponse{}
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ForkSessionResponse) String() string {
+func (x *ForkThreadResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ForkSessionResponse) ProtoMessage() {}
+func (*ForkThreadResponse) ProtoMessage() {}
 
-func (x *ForkSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[14]
+func (x *ForkThreadResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1809,39 +1809,39 @@ func (x *ForkSessionResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ForkSessionResponse.ProtoReflect.Descriptor instead.
-func (*ForkSessionResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{14}
+// Deprecated: Use ForkThreadResponse.ProtoReflect.Descriptor instead.
+func (*ForkThreadResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{14}
 }
 
-func (x *ForkSessionResponse) GetSession() *Session {
+func (x *ForkThreadResponse) GetThread() *Thread {
 	if x != nil {
-		return x.Session
+		return x.Thread
 	}
 	return nil
 }
 
-type ListSessionsRequest struct {
+type ListThreadsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ListSessionsRequest) Reset() {
-	*x = ListSessionsRequest{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[15]
+func (x *ListThreadsRequest) Reset() {
+	*x = ListThreadsRequest{}
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ListSessionsRequest) String() string {
+func (x *ListThreadsRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ListSessionsRequest) ProtoMessage() {}
+func (*ListThreadsRequest) ProtoMessage() {}
 
-func (x *ListSessionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[15]
+func (x *ListThreadsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1852,35 +1852,35 @@ func (x *ListSessionsRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ListSessionsRequest.ProtoReflect.Descriptor instead.
-func (*ListSessionsRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{15}
+// Deprecated: Use ListThreadsRequest.ProtoReflect.Descriptor instead.
+func (*ListThreadsRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{15}
 }
 
-type ListSessionsResponse struct {
-	state    protoimpl.MessageState `protogen:"open.v1"`
-	Sessions []*Session             `protobuf:"bytes,1,rep,name=sessions,proto3" json:"sessions,omitempty"`
-	// Usage of removed threads (see SessionSnapshot.retired_usage).
+type ListThreadsResponse struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Threads []*Thread              `protobuf:"bytes,1,rep,name=threads,proto3" json:"threads,omitempty"`
+	// Usage of removed threads (see ThreadListSnapshot.retired_usage).
 	RetiredUsage  []*UsageBucket `protobuf:"bytes,2,rep,name=retired_usage,json=retiredUsage,proto3" json:"retired_usage,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ListSessionsResponse) Reset() {
-	*x = ListSessionsResponse{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[16]
+func (x *ListThreadsResponse) Reset() {
+	*x = ListThreadsResponse{}
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ListSessionsResponse) String() string {
+func (x *ListThreadsResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ListSessionsResponse) ProtoMessage() {}
+func (*ListThreadsResponse) ProtoMessage() {}
 
-func (x *ListSessionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[16]
+func (x *ListThreadsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1891,47 +1891,47 @@ func (x *ListSessionsResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ListSessionsResponse.ProtoReflect.Descriptor instead.
-func (*ListSessionsResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{16}
+// Deprecated: Use ListThreadsResponse.ProtoReflect.Descriptor instead.
+func (*ListThreadsResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{16}
 }
 
-func (x *ListSessionsResponse) GetSessions() []*Session {
+func (x *ListThreadsResponse) GetThreads() []*Thread {
 	if x != nil {
-		return x.Sessions
+		return x.Threads
 	}
 	return nil
 }
 
-func (x *ListSessionsResponse) GetRetiredUsage() []*UsageBucket {
+func (x *ListThreadsResponse) GetRetiredUsage() []*UsageBucket {
 	if x != nil {
 		return x.RetiredUsage
 	}
 	return nil
 }
 
-type GetSessionRequest struct {
+type GetThreadRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GetSessionRequest) Reset() {
-	*x = GetSessionRequest{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[17]
+func (x *GetThreadRequest) Reset() {
+	*x = GetThreadRequest{}
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GetSessionRequest) String() string {
+func (x *GetThreadRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetSessionRequest) ProtoMessage() {}
+func (*GetThreadRequest) ProtoMessage() {}
 
-func (x *GetSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[17]
+func (x *GetThreadRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1942,40 +1942,40 @@ func (x *GetSessionRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetSessionRequest.ProtoReflect.Descriptor instead.
-func (*GetSessionRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{17}
+// Deprecated: Use GetThreadRequest.ProtoReflect.Descriptor instead.
+func (*GetThreadRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{17}
 }
 
-func (x *GetSessionRequest) GetId() string {
+func (x *GetThreadRequest) GetId() string {
 	if x != nil {
 		return x.Id
 	}
 	return ""
 }
 
-type GetSessionResponse struct {
+type GetThreadResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Session       *Session               `protobuf:"bytes,1,opt,name=session,proto3" json:"session,omitempty"`
+	Thread        *Thread                `protobuf:"bytes,1,opt,name=thread,proto3" json:"thread,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GetSessionResponse) Reset() {
-	*x = GetSessionResponse{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[18]
+func (x *GetThreadResponse) Reset() {
+	*x = GetThreadResponse{}
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GetSessionResponse) String() string {
+func (x *GetThreadResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetSessionResponse) ProtoMessage() {}
+func (*GetThreadResponse) ProtoMessage() {}
 
-func (x *GetSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[18]
+func (x *GetThreadResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1986,19 +1986,19 @@ func (x *GetSessionResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetSessionResponse.ProtoReflect.Descriptor instead.
-func (*GetSessionResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{18}
+// Deprecated: Use GetThreadResponse.ProtoReflect.Descriptor instead.
+func (*GetThreadResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{18}
 }
 
-func (x *GetSessionResponse) GetSession() *Session {
+func (x *GetThreadResponse) GetThread() *Thread {
 	if x != nil {
-		return x.Session
+		return x.Thread
 	}
 	return nil
 }
 
-type RenameSessionRequest struct {
+type RenameThreadRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
@@ -2006,21 +2006,21 @@ type RenameSessionRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *RenameSessionRequest) Reset() {
-	*x = RenameSessionRequest{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[19]
+func (x *RenameThreadRequest) Reset() {
+	*x = RenameThreadRequest{}
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *RenameSessionRequest) String() string {
+func (x *RenameThreadRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*RenameSessionRequest) ProtoMessage() {}
+func (*RenameThreadRequest) ProtoMessage() {}
 
-func (x *RenameSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[19]
+func (x *RenameThreadRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2031,47 +2031,47 @@ func (x *RenameSessionRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use RenameSessionRequest.ProtoReflect.Descriptor instead.
-func (*RenameSessionRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{19}
+// Deprecated: Use RenameThreadRequest.ProtoReflect.Descriptor instead.
+func (*RenameThreadRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{19}
 }
 
-func (x *RenameSessionRequest) GetId() string {
+func (x *RenameThreadRequest) GetId() string {
 	if x != nil {
 		return x.Id
 	}
 	return ""
 }
 
-func (x *RenameSessionRequest) GetName() string {
+func (x *RenameThreadRequest) GetName() string {
 	if x != nil {
 		return x.Name
 	}
 	return ""
 }
 
-type RenameSessionResponse struct {
+type RenameThreadResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Session       *Session               `protobuf:"bytes,1,opt,name=session,proto3" json:"session,omitempty"`
+	Thread        *Thread                `protobuf:"bytes,1,opt,name=thread,proto3" json:"thread,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *RenameSessionResponse) Reset() {
-	*x = RenameSessionResponse{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[20]
+func (x *RenameThreadResponse) Reset() {
+	*x = RenameThreadResponse{}
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *RenameSessionResponse) String() string {
+func (x *RenameThreadResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*RenameSessionResponse) ProtoMessage() {}
+func (*RenameThreadResponse) ProtoMessage() {}
 
-func (x *RenameSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[20]
+func (x *RenameThreadResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2082,40 +2082,40 @@ func (x *RenameSessionResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use RenameSessionResponse.ProtoReflect.Descriptor instead.
-func (*RenameSessionResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{20}
+// Deprecated: Use RenameThreadResponse.ProtoReflect.Descriptor instead.
+func (*RenameThreadResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{20}
 }
 
-func (x *RenameSessionResponse) GetSession() *Session {
+func (x *RenameThreadResponse) GetThread() *Thread {
 	if x != nil {
-		return x.Session
+		return x.Thread
 	}
 	return nil
 }
 
-type CloseSessionRequest struct {
+type CloseThreadRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CloseSessionRequest) Reset() {
-	*x = CloseSessionRequest{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[21]
+func (x *CloseThreadRequest) Reset() {
+	*x = CloseThreadRequest{}
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CloseSessionRequest) String() string {
+func (x *CloseThreadRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CloseSessionRequest) ProtoMessage() {}
+func (*CloseThreadRequest) ProtoMessage() {}
 
-func (x *CloseSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[21]
+func (x *CloseThreadRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2126,39 +2126,39 @@ func (x *CloseSessionRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CloseSessionRequest.ProtoReflect.Descriptor instead.
-func (*CloseSessionRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{21}
+// Deprecated: Use CloseThreadRequest.ProtoReflect.Descriptor instead.
+func (*CloseThreadRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{21}
 }
 
-func (x *CloseSessionRequest) GetId() string {
+func (x *CloseThreadRequest) GetId() string {
 	if x != nil {
 		return x.Id
 	}
 	return ""
 }
 
-type CloseSessionResponse struct {
+type CloseThreadResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CloseSessionResponse) Reset() {
-	*x = CloseSessionResponse{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[22]
+func (x *CloseThreadResponse) Reset() {
+	*x = CloseThreadResponse{}
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CloseSessionResponse) String() string {
+func (x *CloseThreadResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CloseSessionResponse) ProtoMessage() {}
+func (*CloseThreadResponse) ProtoMessage() {}
 
-func (x *CloseSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[22]
+func (x *CloseThreadResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2169,33 +2169,33 @@ func (x *CloseSessionResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CloseSessionResponse.ProtoReflect.Descriptor instead.
-func (*CloseSessionResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{22}
+// Deprecated: Use CloseThreadResponse.ProtoReflect.Descriptor instead.
+func (*CloseThreadResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{22}
 }
 
-type ReconnectSessionRequest struct {
+type ReconnectThreadRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ReconnectSessionRequest) Reset() {
-	*x = ReconnectSessionRequest{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[23]
+func (x *ReconnectThreadRequest) Reset() {
+	*x = ReconnectThreadRequest{}
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ReconnectSessionRequest) String() string {
+func (x *ReconnectThreadRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ReconnectSessionRequest) ProtoMessage() {}
+func (*ReconnectThreadRequest) ProtoMessage() {}
 
-func (x *ReconnectSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[23]
+func (x *ReconnectThreadRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2206,40 +2206,40 @@ func (x *ReconnectSessionRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ReconnectSessionRequest.ProtoReflect.Descriptor instead.
-func (*ReconnectSessionRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{23}
+// Deprecated: Use ReconnectThreadRequest.ProtoReflect.Descriptor instead.
+func (*ReconnectThreadRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{23}
 }
 
-func (x *ReconnectSessionRequest) GetId() string {
+func (x *ReconnectThreadRequest) GetId() string {
 	if x != nil {
 		return x.Id
 	}
 	return ""
 }
 
-type ReconnectSessionResponse struct {
+type ReconnectThreadResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Session       *Session               `protobuf:"bytes,1,opt,name=session,proto3" json:"session,omitempty"`
+	Thread        *Thread                `protobuf:"bytes,1,opt,name=thread,proto3" json:"thread,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ReconnectSessionResponse) Reset() {
-	*x = ReconnectSessionResponse{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[24]
+func (x *ReconnectThreadResponse) Reset() {
+	*x = ReconnectThreadResponse{}
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ReconnectSessionResponse) String() string {
+func (x *ReconnectThreadResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ReconnectSessionResponse) ProtoMessage() {}
+func (*ReconnectThreadResponse) ProtoMessage() {}
 
-func (x *ReconnectSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[24]
+func (x *ReconnectThreadResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2250,40 +2250,40 @@ func (x *ReconnectSessionResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ReconnectSessionResponse.ProtoReflect.Descriptor instead.
-func (*ReconnectSessionResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{24}
+// Deprecated: Use ReconnectThreadResponse.ProtoReflect.Descriptor instead.
+func (*ReconnectThreadResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{24}
 }
 
-func (x *ReconnectSessionResponse) GetSession() *Session {
+func (x *ReconnectThreadResponse) GetThread() *Thread {
 	if x != nil {
-		return x.Session
+		return x.Thread
 	}
 	return nil
 }
 
-type RemoveSessionRequest struct {
+type RemoveThreadRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *RemoveSessionRequest) Reset() {
-	*x = RemoveSessionRequest{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[25]
+func (x *RemoveThreadRequest) Reset() {
+	*x = RemoveThreadRequest{}
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *RemoveSessionRequest) String() string {
+func (x *RemoveThreadRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*RemoveSessionRequest) ProtoMessage() {}
+func (*RemoveThreadRequest) ProtoMessage() {}
 
-func (x *RemoveSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[25]
+func (x *RemoveThreadRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2294,39 +2294,39 @@ func (x *RemoveSessionRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use RemoveSessionRequest.ProtoReflect.Descriptor instead.
-func (*RemoveSessionRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{25}
+// Deprecated: Use RemoveThreadRequest.ProtoReflect.Descriptor instead.
+func (*RemoveThreadRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{25}
 }
 
-func (x *RemoveSessionRequest) GetId() string {
+func (x *RemoveThreadRequest) GetId() string {
 	if x != nil {
 		return x.Id
 	}
 	return ""
 }
 
-type RemoveSessionResponse struct {
+type RemoveThreadResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *RemoveSessionResponse) Reset() {
-	*x = RemoveSessionResponse{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[26]
+func (x *RemoveThreadResponse) Reset() {
+	*x = RemoveThreadResponse{}
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *RemoveSessionResponse) String() string {
+func (x *RemoveThreadResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*RemoveSessionResponse) ProtoMessage() {}
+func (*RemoveThreadResponse) ProtoMessage() {}
 
-func (x *RemoveSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[26]
+func (x *RemoveThreadResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2337,12 +2337,12 @@ func (x *RemoveSessionResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use RemoveSessionResponse.ProtoReflect.Descriptor instead.
-func (*RemoveSessionResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{26}
+// Deprecated: Use RemoveThreadResponse.ProtoReflect.Descriptor instead.
+func (*RemoveThreadResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{26}
 }
 
-type RunInSessionRequest struct {
+type RunInThreadRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	// The member to run in: its repository id, or its worktree path. One is required;
@@ -2353,21 +2353,21 @@ type RunInSessionRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *RunInSessionRequest) Reset() {
-	*x = RunInSessionRequest{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[27]
+func (x *RunInThreadRequest) Reset() {
+	*x = RunInThreadRequest{}
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *RunInSessionRequest) String() string {
+func (x *RunInThreadRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*RunInSessionRequest) ProtoMessage() {}
+func (*RunInThreadRequest) ProtoMessage() {}
 
-func (x *RunInSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[27]
+func (x *RunInThreadRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2378,54 +2378,54 @@ func (x *RunInSessionRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use RunInSessionRequest.ProtoReflect.Descriptor instead.
-func (*RunInSessionRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{27}
+// Deprecated: Use RunInThreadRequest.ProtoReflect.Descriptor instead.
+func (*RunInThreadRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{27}
 }
 
-func (x *RunInSessionRequest) GetId() string {
+func (x *RunInThreadRequest) GetId() string {
 	if x != nil {
 		return x.Id
 	}
 	return ""
 }
 
-func (x *RunInSessionRequest) GetRepoId() string {
+func (x *RunInThreadRequest) GetRepoId() string {
 	if x != nil {
 		return x.RepoId
 	}
 	return ""
 }
 
-func (x *RunInSessionRequest) GetWorktreePath() string {
+func (x *RunInThreadRequest) GetWorktreePath() string {
 	if x != nil {
 		return x.WorktreePath
 	}
 	return ""
 }
 
-type RunInSessionResponse struct {
+type RunInThreadResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Session       *Session               `protobuf:"bytes,1,opt,name=session,proto3" json:"session,omitempty"`
+	Thread        *Thread                `protobuf:"bytes,1,opt,name=thread,proto3" json:"thread,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *RunInSessionResponse) Reset() {
-	*x = RunInSessionResponse{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[28]
+func (x *RunInThreadResponse) Reset() {
+	*x = RunInThreadResponse{}
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *RunInSessionResponse) String() string {
+func (x *RunInThreadResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*RunInSessionResponse) ProtoMessage() {}
+func (*RunInThreadResponse) ProtoMessage() {}
 
-func (x *RunInSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[28]
+func (x *RunInThreadResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2436,19 +2436,19 @@ func (x *RunInSessionResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use RunInSessionResponse.ProtoReflect.Descriptor instead.
-func (*RunInSessionResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{28}
+// Deprecated: Use RunInThreadResponse.ProtoReflect.Descriptor instead.
+func (*RunInThreadResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{28}
 }
 
-func (x *RunInSessionResponse) GetSession() *Session {
+func (x *RunInThreadResponse) GetThread() *Thread {
 	if x != nil {
-		return x.Session
+		return x.Thread
 	}
 	return nil
 }
 
-type PinSessionRequest struct {
+type PinThreadRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Pinned        bool                   `protobuf:"varint,2,opt,name=pinned,proto3" json:"pinned,omitempty"`
@@ -2456,21 +2456,21 @@ type PinSessionRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *PinSessionRequest) Reset() {
-	*x = PinSessionRequest{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[29]
+func (x *PinThreadRequest) Reset() {
+	*x = PinThreadRequest{}
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *PinSessionRequest) String() string {
+func (x *PinThreadRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*PinSessionRequest) ProtoMessage() {}
+func (*PinThreadRequest) ProtoMessage() {}
 
-func (x *PinSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[29]
+func (x *PinThreadRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2481,47 +2481,47 @@ func (x *PinSessionRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use PinSessionRequest.ProtoReflect.Descriptor instead.
-func (*PinSessionRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{29}
+// Deprecated: Use PinThreadRequest.ProtoReflect.Descriptor instead.
+func (*PinThreadRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{29}
 }
 
-func (x *PinSessionRequest) GetId() string {
+func (x *PinThreadRequest) GetId() string {
 	if x != nil {
 		return x.Id
 	}
 	return ""
 }
 
-func (x *PinSessionRequest) GetPinned() bool {
+func (x *PinThreadRequest) GetPinned() bool {
 	if x != nil {
 		return x.Pinned
 	}
 	return false
 }
 
-type PinSessionResponse struct {
+type PinThreadResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Session       *Session               `protobuf:"bytes,1,opt,name=session,proto3" json:"session,omitempty"`
+	Thread        *Thread                `protobuf:"bytes,1,opt,name=thread,proto3" json:"thread,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *PinSessionResponse) Reset() {
-	*x = PinSessionResponse{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[30]
+func (x *PinThreadResponse) Reset() {
+	*x = PinThreadResponse{}
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *PinSessionResponse) String() string {
+func (x *PinThreadResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*PinSessionResponse) ProtoMessage() {}
+func (*PinThreadResponse) ProtoMessage() {}
 
-func (x *PinSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[30]
+func (x *PinThreadResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2532,19 +2532,19 @@ func (x *PinSessionResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use PinSessionResponse.ProtoReflect.Descriptor instead.
-func (*PinSessionResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{30}
+// Deprecated: Use PinThreadResponse.ProtoReflect.Descriptor instead.
+func (*PinThreadResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{30}
 }
 
-func (x *PinSessionResponse) GetSession() *Session {
+func (x *PinThreadResponse) GetThread() *Thread {
 	if x != nil {
-		return x.Session
+		return x.Thread
 	}
 	return nil
 }
 
-type ArchiveSessionRequest struct {
+type ArchiveThreadRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	// Archive (true) or unarchive (false).
@@ -2553,21 +2553,21 @@ type ArchiveSessionRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ArchiveSessionRequest) Reset() {
-	*x = ArchiveSessionRequest{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[31]
+func (x *ArchiveThreadRequest) Reset() {
+	*x = ArchiveThreadRequest{}
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ArchiveSessionRequest) String() string {
+func (x *ArchiveThreadRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ArchiveSessionRequest) ProtoMessage() {}
+func (*ArchiveThreadRequest) ProtoMessage() {}
 
-func (x *ArchiveSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[31]
+func (x *ArchiveThreadRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2578,47 +2578,47 @@ func (x *ArchiveSessionRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ArchiveSessionRequest.ProtoReflect.Descriptor instead.
-func (*ArchiveSessionRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{31}
+// Deprecated: Use ArchiveThreadRequest.ProtoReflect.Descriptor instead.
+func (*ArchiveThreadRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{31}
 }
 
-func (x *ArchiveSessionRequest) GetId() string {
+func (x *ArchiveThreadRequest) GetId() string {
 	if x != nil {
 		return x.Id
 	}
 	return ""
 }
 
-func (x *ArchiveSessionRequest) GetArchived() bool {
+func (x *ArchiveThreadRequest) GetArchived() bool {
 	if x != nil {
 		return x.Archived
 	}
 	return false
 }
 
-type ArchiveSessionResponse struct {
+type ArchiveThreadResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Session       *Session               `protobuf:"bytes,1,opt,name=session,proto3" json:"session,omitempty"`
+	Thread        *Thread                `protobuf:"bytes,1,opt,name=thread,proto3" json:"thread,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ArchiveSessionResponse) Reset() {
-	*x = ArchiveSessionResponse{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[32]
+func (x *ArchiveThreadResponse) Reset() {
+	*x = ArchiveThreadResponse{}
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ArchiveSessionResponse) String() string {
+func (x *ArchiveThreadResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ArchiveSessionResponse) ProtoMessage() {}
+func (*ArchiveThreadResponse) ProtoMessage() {}
 
-func (x *ArchiveSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[32]
+func (x *ArchiveThreadResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2629,19 +2629,19 @@ func (x *ArchiveSessionResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ArchiveSessionResponse.ProtoReflect.Descriptor instead.
-func (*ArchiveSessionResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{32}
+// Deprecated: Use ArchiveThreadResponse.ProtoReflect.Descriptor instead.
+func (*ArchiveThreadResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{32}
 }
 
-func (x *ArchiveSessionResponse) GetSession() *Session {
+func (x *ArchiveThreadResponse) GetThread() *Thread {
 	if x != nil {
-		return x.Session
+		return x.Thread
 	}
 	return nil
 }
 
-type SnoozeSessionRequest struct {
+type SnoozeThreadRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	// When the thread wakes; must be in the future. Unset unsnoozes.
@@ -2650,21 +2650,21 @@ type SnoozeSessionRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *SnoozeSessionRequest) Reset() {
-	*x = SnoozeSessionRequest{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[33]
+func (x *SnoozeThreadRequest) Reset() {
+	*x = SnoozeThreadRequest{}
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *SnoozeSessionRequest) String() string {
+func (x *SnoozeThreadRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*SnoozeSessionRequest) ProtoMessage() {}
+func (*SnoozeThreadRequest) ProtoMessage() {}
 
-func (x *SnoozeSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[33]
+func (x *SnoozeThreadRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2675,47 +2675,47 @@ func (x *SnoozeSessionRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use SnoozeSessionRequest.ProtoReflect.Descriptor instead.
-func (*SnoozeSessionRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{33}
+// Deprecated: Use SnoozeThreadRequest.ProtoReflect.Descriptor instead.
+func (*SnoozeThreadRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{33}
 }
 
-func (x *SnoozeSessionRequest) GetId() string {
+func (x *SnoozeThreadRequest) GetId() string {
 	if x != nil {
 		return x.Id
 	}
 	return ""
 }
 
-func (x *SnoozeSessionRequest) GetUntil() *timestamppb.Timestamp {
+func (x *SnoozeThreadRequest) GetUntil() *timestamppb.Timestamp {
 	if x != nil {
 		return x.Until
 	}
 	return nil
 }
 
-type SnoozeSessionResponse struct {
+type SnoozeThreadResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Session       *Session               `protobuf:"bytes,1,opt,name=session,proto3" json:"session,omitempty"`
+	Thread        *Thread                `protobuf:"bytes,1,opt,name=thread,proto3" json:"thread,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *SnoozeSessionResponse) Reset() {
-	*x = SnoozeSessionResponse{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[34]
+func (x *SnoozeThreadResponse) Reset() {
+	*x = SnoozeThreadResponse{}
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *SnoozeSessionResponse) String() string {
+func (x *SnoozeThreadResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*SnoozeSessionResponse) ProtoMessage() {}
+func (*SnoozeThreadResponse) ProtoMessage() {}
 
-func (x *SnoozeSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[34]
+func (x *SnoozeThreadResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2726,39 +2726,39 @@ func (x *SnoozeSessionResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use SnoozeSessionResponse.ProtoReflect.Descriptor instead.
-func (*SnoozeSessionResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{34}
+// Deprecated: Use SnoozeThreadResponse.ProtoReflect.Descriptor instead.
+func (*SnoozeThreadResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{34}
 }
 
-func (x *SnoozeSessionResponse) GetSession() *Session {
+func (x *SnoozeThreadResponse) GetThread() *Thread {
 	if x != nil {
-		return x.Session
+		return x.Thread
 	}
 	return nil
 }
 
-type WatchSessionsRequest struct {
+type WatchThreadsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *WatchSessionsRequest) Reset() {
-	*x = WatchSessionsRequest{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[35]
+func (x *WatchThreadsRequest) Reset() {
+	*x = WatchThreadsRequest{}
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *WatchSessionsRequest) String() string {
+func (x *WatchThreadsRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*WatchSessionsRequest) ProtoMessage() {}
+func (*WatchThreadsRequest) ProtoMessage() {}
 
-func (x *WatchSessionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[35]
+func (x *WatchThreadsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2769,39 +2769,39 @@ func (x *WatchSessionsRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use WatchSessionsRequest.ProtoReflect.Descriptor instead.
-func (*WatchSessionsRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{35}
+// Deprecated: Use WatchThreadsRequest.ProtoReflect.Descriptor instead.
+func (*WatchThreadsRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{35}
 }
 
-type SessionEvent struct {
+type ThreadListEvent struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Event:
 	//
-	//	*SessionEvent_Snapshot
-	//	*SessionEvent_Updated
-	//	*SessionEvent_RemovedId
-	//	*SessionEvent_RetiredUsage
-	Event         isSessionEvent_Event `protobuf_oneof:"event"`
+	//	*ThreadListEvent_Snapshot
+	//	*ThreadListEvent_Updated
+	//	*ThreadListEvent_RemovedId
+	//	*ThreadListEvent_RetiredUsage
+	Event         isThreadListEvent_Event `protobuf_oneof:"event"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *SessionEvent) Reset() {
-	*x = SessionEvent{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[36]
+func (x *ThreadListEvent) Reset() {
+	*x = ThreadListEvent{}
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *SessionEvent) String() string {
+func (x *ThreadListEvent) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*SessionEvent) ProtoMessage() {}
+func (*ThreadListEvent) ProtoMessage() {}
 
-func (x *SessionEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[36]
+func (x *ThreadListEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2812,109 +2812,109 @@ func (x *SessionEvent) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use SessionEvent.ProtoReflect.Descriptor instead.
-func (*SessionEvent) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{36}
+// Deprecated: Use ThreadListEvent.ProtoReflect.Descriptor instead.
+func (*ThreadListEvent) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{36}
 }
 
-func (x *SessionEvent) GetEvent() isSessionEvent_Event {
+func (x *ThreadListEvent) GetEvent() isThreadListEvent_Event {
 	if x != nil {
 		return x.Event
 	}
 	return nil
 }
 
-func (x *SessionEvent) GetSnapshot() *SessionSnapshot {
+func (x *ThreadListEvent) GetSnapshot() *ThreadListSnapshot {
 	if x != nil {
-		if x, ok := x.Event.(*SessionEvent_Snapshot); ok {
+		if x, ok := x.Event.(*ThreadListEvent_Snapshot); ok {
 			return x.Snapshot
 		}
 	}
 	return nil
 }
 
-func (x *SessionEvent) GetUpdated() *Session {
+func (x *ThreadListEvent) GetUpdated() *Thread {
 	if x != nil {
-		if x, ok := x.Event.(*SessionEvent_Updated); ok {
+		if x, ok := x.Event.(*ThreadListEvent_Updated); ok {
 			return x.Updated
 		}
 	}
 	return nil
 }
 
-func (x *SessionEvent) GetRemovedId() string {
+func (x *ThreadListEvent) GetRemovedId() string {
 	if x != nil {
-		if x, ok := x.Event.(*SessionEvent_RemovedId); ok {
+		if x, ok := x.Event.(*ThreadListEvent_RemovedId); ok {
 			return x.RemovedId
 		}
 	}
 	return ""
 }
 
-func (x *SessionEvent) GetRetiredUsage() *RetiredUsage {
+func (x *ThreadListEvent) GetRetiredUsage() *RetiredUsage {
 	if x != nil {
-		if x, ok := x.Event.(*SessionEvent_RetiredUsage); ok {
+		if x, ok := x.Event.(*ThreadListEvent_RetiredUsage); ok {
 			return x.RetiredUsage
 		}
 	}
 	return nil
 }
 
-type isSessionEvent_Event interface {
-	isSessionEvent_Event()
+type isThreadListEvent_Event interface {
+	isThreadListEvent_Event()
 }
 
-type SessionEvent_Snapshot struct {
-	Snapshot *SessionSnapshot `protobuf:"bytes,1,opt,name=snapshot,proto3,oneof"`
+type ThreadListEvent_Snapshot struct {
+	Snapshot *ThreadListSnapshot `protobuf:"bytes,1,opt,name=snapshot,proto3,oneof"`
 }
 
-type SessionEvent_Updated struct {
-	Updated *Session `protobuf:"bytes,2,opt,name=updated,proto3,oneof"`
+type ThreadListEvent_Updated struct {
+	Updated *Thread `protobuf:"bytes,2,opt,name=updated,proto3,oneof"`
 }
 
-type SessionEvent_RemovedId struct {
+type ThreadListEvent_RemovedId struct {
 	RemovedId string `protobuf:"bytes,3,opt,name=removed_id,json=removedId,proto3,oneof"`
 }
 
-type SessionEvent_RetiredUsage struct {
+type ThreadListEvent_RetiredUsage struct {
 	// Follows removed_id when the removed thread had usage: the whole retired ledger.
 	RetiredUsage *RetiredUsage `protobuf:"bytes,4,opt,name=retired_usage,json=retiredUsage,proto3,oneof"`
 }
 
-func (*SessionEvent_Snapshot) isSessionEvent_Event() {}
+func (*ThreadListEvent_Snapshot) isThreadListEvent_Event() {}
 
-func (*SessionEvent_Updated) isSessionEvent_Event() {}
+func (*ThreadListEvent_Updated) isThreadListEvent_Event() {}
 
-func (*SessionEvent_RemovedId) isSessionEvent_Event() {}
+func (*ThreadListEvent_RemovedId) isThreadListEvent_Event() {}
 
-func (*SessionEvent_RetiredUsage) isSessionEvent_Event() {}
+func (*ThreadListEvent_RetiredUsage) isThreadListEvent_Event() {}
 
-type SessionSnapshot struct {
-	state    protoimpl.MessageState `protogen:"open.v1"`
-	Sessions []*Session             `protobuf:"bytes,1,rep,name=sessions,proto3" json:"sessions,omitempty"`
+type ThreadListSnapshot struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Threads []*Thread              `protobuf:"bytes,1,rep,name=threads,proto3" json:"threads,omitempty"`
 	// Usage of removed threads, summed per (model, tier, speed, day): a thread's buckets
 	// are added here when it is removed. Usage over every thread ever tracked is the
-	// sessions' usage plus this.
+	// threads' usage plus this.
 	RetiredUsage  []*UsageBucket `protobuf:"bytes,2,rep,name=retired_usage,json=retiredUsage,proto3" json:"retired_usage,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *SessionSnapshot) Reset() {
-	*x = SessionSnapshot{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[37]
+func (x *ThreadListSnapshot) Reset() {
+	*x = ThreadListSnapshot{}
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *SessionSnapshot) String() string {
+func (x *ThreadListSnapshot) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*SessionSnapshot) ProtoMessage() {}
+func (*ThreadListSnapshot) ProtoMessage() {}
 
-func (x *SessionSnapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[37]
+func (x *ThreadListSnapshot) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2925,26 +2925,26 @@ func (x *SessionSnapshot) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use SessionSnapshot.ProtoReflect.Descriptor instead.
-func (*SessionSnapshot) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{37}
+// Deprecated: Use ThreadListSnapshot.ProtoReflect.Descriptor instead.
+func (*ThreadListSnapshot) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{37}
 }
 
-func (x *SessionSnapshot) GetSessions() []*Session {
+func (x *ThreadListSnapshot) GetThreads() []*Thread {
 	if x != nil {
-		return x.Sessions
+		return x.Threads
 	}
 	return nil
 }
 
-func (x *SessionSnapshot) GetRetiredUsage() []*UsageBucket {
+func (x *ThreadListSnapshot) GetRetiredUsage() []*UsageBucket {
 	if x != nil {
 		return x.RetiredUsage
 	}
 	return nil
 }
 
-// The retired usage ledger after a removal (SessionEvent.retired_usage).
+// The retired usage ledger after a removal (ThreadListEvent.retired_usage).
 type RetiredUsage struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Buckets       []*UsageBucket         `protobuf:"bytes,1,rep,name=buckets,proto3" json:"buckets,omitempty"`
@@ -2954,7 +2954,7 @@ type RetiredUsage struct {
 
 func (x *RetiredUsage) Reset() {
 	*x = RetiredUsage{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[38]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2966,7 +2966,7 @@ func (x *RetiredUsage) String() string {
 func (*RetiredUsage) ProtoMessage() {}
 
 func (x *RetiredUsage) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[38]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2979,7 +2979,7 @@ func (x *RetiredUsage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RetiredUsage.ProtoReflect.Descriptor instead.
 func (*RetiredUsage) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{38}
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *RetiredUsage) GetBuckets() []*UsageBucket {
@@ -2989,12 +2989,12 @@ func (x *RetiredUsage) GetBuckets() []*UsageBucket {
 	return nil
 }
 
-var File_codefoundry_v1_session_proto protoreflect.FileDescriptor
+var File_codefoundry_v1_thread_lifecycle_proto protoreflect.FileDescriptor
 
-const file_codefoundry_v1_session_proto_rawDesc = "" +
+const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\n" +
-	"\x1ccodefoundry/v1/session.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa1\x0e\n" +
-	"\aSession\x12\x0e\n" +
+	"%codefoundry/v1/thread_lifecycle.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x9e\x0e\n" +
+	"\x06Thread\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12*\n" +
 	"\x11claude_session_id\x18\x02 \x01(\tR\x0fclaudeSessionId\x12\x17\n" +
 	"\arepo_id\x18\x03 \x01(\tR\x06repoId\x12#\n" +
@@ -3003,10 +3003,10 @@ const file_codefoundry_v1_session_proto_rawDesc = "" +
 	"\n" +
 	"auto_named\x18\x06 \x01(\bR\tautoNamed\x12\x14\n" +
 	"\x05model\x18\a \x01(\tR\x05model\x12\x16\n" +
-	"\x06effort\x18\b \x01(\tR\x06effort\x122\n" +
+	"\x06effort\x18\b \x01(\tR\x06effort\x121\n" +
 	"\x05state\x18\n" +
-	" \x01(\x0e2\x1c.codefoundry.v1.SessionStateR\x05state\x125\n" +
-	"\x06status\x18\v \x01(\x0e2\x1d.codefoundry.v1.SessionStatusR\x06status\x129\n" +
+	" \x01(\x0e2\x1b.codefoundry.v1.ThreadStateR\x05state\x124\n" +
+	"\x06status\x18\v \x01(\x0e2\x1c.codefoundry.v1.ThreadStatusR\x06status\x129\n" +
 	"\n" +
 	"created_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12D\n" +
 	"\x10last_activity_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\x0elastActivityAt\x12\x1b\n" +
@@ -3093,8 +3093,8 @@ const file_codefoundry_v1_session_proto_rawDesc = "" +
 	"\x04slug\x18\x01 \x01(\tR\x04slug\x12\x16\n" +
 	"\x06number\x18\x02 \x01(\x05R\x06number\x12\x10\n" +
 	"\x03url\x18\x03 \x01(\tR\x03url\x127\n" +
-	"\tlinked_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\blinkedAt\"\xa4\x04\n" +
-	"\x14CreateSessionRequest\x12\x17\n" +
+	"\tlinked_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\blinkedAt\"\xa3\x04\n" +
+	"\x13CreateThreadRequest\x12\x17\n" +
 	"\arepo_id\x18\x01 \x01(\tR\x06repoId\x12#\n" +
 	"\rworktree_path\x18\x02 \x01(\tR\fworktreePath\x12\x14\n" +
 	"\x05model\x18\x03 \x01(\tR\x05model\x12\x16\n" +
@@ -3126,68 +3126,68 @@ const file_codefoundry_v1_session_proto_rawDesc = "" +
 	"\x04path\x18\x01 \x01(\tR\x04path\"I\n" +
 	"\x16ReadAttachmentResponse\x12\x12\n" +
 	"\x04data\x18\x01 \x01(\fR\x04data\x12\x1b\n" +
-	"\tmime_type\x18\x02 \x01(\tR\bmimeType\"J\n" +
-	"\x15CreateSessionResponse\x121\n" +
-	"\asession\x18\x01 \x01(\v2\x17.codefoundry.v1.SessionR\asession\"8\n" +
-	"\x12ForkSessionRequest\x12\x0e\n" +
+	"\tmime_type\x18\x02 \x01(\tR\bmimeType\"F\n" +
+	"\x14CreateThreadResponse\x12.\n" +
+	"\x06thread\x18\x01 \x01(\v2\x16.codefoundry.v1.ThreadR\x06thread\"7\n" +
+	"\x11ForkThreadRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\"H\n" +
-	"\x13ForkSessionResponse\x121\n" +
-	"\asession\x18\x01 \x01(\v2\x17.codefoundry.v1.SessionR\asession\"\x15\n" +
-	"\x13ListSessionsRequest\"\x8d\x01\n" +
-	"\x14ListSessionsResponse\x123\n" +
-	"\bsessions\x18\x01 \x03(\v2\x17.codefoundry.v1.SessionR\bsessions\x12@\n" +
-	"\rretired_usage\x18\x02 \x03(\v2\x1b.codefoundry.v1.UsageBucketR\fretiredUsage\"#\n" +
-	"\x11GetSessionRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"G\n" +
-	"\x12GetSessionResponse\x121\n" +
-	"\asession\x18\x01 \x01(\v2\x17.codefoundry.v1.SessionR\asession\":\n" +
-	"\x14RenameSessionRequest\x12\x0e\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\"D\n" +
+	"\x12ForkThreadResponse\x12.\n" +
+	"\x06thread\x18\x01 \x01(\v2\x16.codefoundry.v1.ThreadR\x06thread\"\x14\n" +
+	"\x12ListThreadsRequest\"\x89\x01\n" +
+	"\x13ListThreadsResponse\x120\n" +
+	"\athreads\x18\x01 \x03(\v2\x16.codefoundry.v1.ThreadR\athreads\x12@\n" +
+	"\rretired_usage\x18\x02 \x03(\v2\x1b.codefoundry.v1.UsageBucketR\fretiredUsage\"\"\n" +
+	"\x10GetThreadRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"C\n" +
+	"\x11GetThreadResponse\x12.\n" +
+	"\x06thread\x18\x01 \x01(\v2\x16.codefoundry.v1.ThreadR\x06thread\"9\n" +
+	"\x13RenameThreadRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\"J\n" +
-	"\x15RenameSessionResponse\x121\n" +
-	"\asession\x18\x01 \x01(\v2\x17.codefoundry.v1.SessionR\asession\"%\n" +
-	"\x13CloseSessionRequest\x12\x0e\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\"F\n" +
+	"\x14RenameThreadResponse\x12.\n" +
+	"\x06thread\x18\x01 \x01(\v2\x16.codefoundry.v1.ThreadR\x06thread\"$\n" +
+	"\x12CloseThreadRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\x15\n" +
+	"\x13CloseThreadResponse\"(\n" +
+	"\x16ReconnectThreadRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"I\n" +
+	"\x17ReconnectThreadResponse\x12.\n" +
+	"\x06thread\x18\x01 \x01(\v2\x16.codefoundry.v1.ThreadR\x06thread\"%\n" +
+	"\x13RemoveThreadRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x16\n" +
-	"\x14CloseSessionResponse\")\n" +
-	"\x17ReconnectSessionRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"M\n" +
-	"\x18ReconnectSessionResponse\x121\n" +
-	"\asession\x18\x01 \x01(\v2\x17.codefoundry.v1.SessionR\asession\"&\n" +
-	"\x14RemoveSessionRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"\x17\n" +
-	"\x15RemoveSessionResponse\"c\n" +
-	"\x13RunInSessionRequest\x12\x0e\n" +
+	"\x14RemoveThreadResponse\"b\n" +
+	"\x12RunInThreadRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\arepo_id\x18\x02 \x01(\tR\x06repoId\x12#\n" +
-	"\rworktree_path\x18\x03 \x01(\tR\fworktreePath\"I\n" +
-	"\x14RunInSessionResponse\x121\n" +
-	"\asession\x18\x01 \x01(\v2\x17.codefoundry.v1.SessionR\asession\";\n" +
-	"\x11PinSessionRequest\x12\x0e\n" +
+	"\rworktree_path\x18\x03 \x01(\tR\fworktreePath\"E\n" +
+	"\x13RunInThreadResponse\x12.\n" +
+	"\x06thread\x18\x01 \x01(\v2\x16.codefoundry.v1.ThreadR\x06thread\":\n" +
+	"\x10PinThreadRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
-	"\x06pinned\x18\x02 \x01(\bR\x06pinned\"G\n" +
-	"\x12PinSessionResponse\x121\n" +
-	"\asession\x18\x01 \x01(\v2\x17.codefoundry.v1.SessionR\asession\"C\n" +
-	"\x15ArchiveSessionRequest\x12\x0e\n" +
+	"\x06pinned\x18\x02 \x01(\bR\x06pinned\"C\n" +
+	"\x11PinThreadResponse\x12.\n" +
+	"\x06thread\x18\x01 \x01(\v2\x16.codefoundry.v1.ThreadR\x06thread\"B\n" +
+	"\x14ArchiveThreadRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1a\n" +
-	"\barchived\x18\x02 \x01(\bR\barchived\"K\n" +
-	"\x16ArchiveSessionResponse\x121\n" +
-	"\asession\x18\x01 \x01(\v2\x17.codefoundry.v1.SessionR\asession\"X\n" +
-	"\x14SnoozeSessionRequest\x12\x0e\n" +
+	"\barchived\x18\x02 \x01(\bR\barchived\"G\n" +
+	"\x15ArchiveThreadResponse\x12.\n" +
+	"\x06thread\x18\x01 \x01(\v2\x16.codefoundry.v1.ThreadR\x06thread\"W\n" +
+	"\x13SnoozeThreadRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x120\n" +
-	"\x05until\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x05until\"J\n" +
-	"\x15SnoozeSessionResponse\x121\n" +
-	"\asession\x18\x01 \x01(\v2\x17.codefoundry.v1.SessionR\asession\"\x16\n" +
-	"\x14WatchSessionsRequest\"\xf1\x01\n" +
-	"\fSessionEvent\x12=\n" +
-	"\bsnapshot\x18\x01 \x01(\v2\x1f.codefoundry.v1.SessionSnapshotH\x00R\bsnapshot\x123\n" +
-	"\aupdated\x18\x02 \x01(\v2\x17.codefoundry.v1.SessionH\x00R\aupdated\x12\x1f\n" +
+	"\x05until\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x05until\"F\n" +
+	"\x14SnoozeThreadResponse\x12.\n" +
+	"\x06thread\x18\x01 \x01(\v2\x16.codefoundry.v1.ThreadR\x06thread\"\x15\n" +
+	"\x13WatchThreadsRequest\"\xf6\x01\n" +
+	"\x0fThreadListEvent\x12@\n" +
+	"\bsnapshot\x18\x01 \x01(\v2\".codefoundry.v1.ThreadListSnapshotH\x00R\bsnapshot\x122\n" +
+	"\aupdated\x18\x02 \x01(\v2\x16.codefoundry.v1.ThreadH\x00R\aupdated\x12\x1f\n" +
 	"\n" +
 	"removed_id\x18\x03 \x01(\tH\x00R\tremovedId\x12C\n" +
 	"\rretired_usage\x18\x04 \x01(\v2\x1c.codefoundry.v1.RetiredUsageH\x00R\fretiredUsageB\a\n" +
 	"\x05event\"\x88\x01\n" +
-	"\x0fSessionSnapshot\x123\n" +
-	"\bsessions\x18\x01 \x03(\v2\x17.codefoundry.v1.SessionR\bsessions\x12@\n" +
+	"\x12ThreadListSnapshot\x120\n" +
+	"\athreads\x18\x01 \x03(\v2\x16.codefoundry.v1.ThreadR\athreads\x12@\n" +
 	"\rretired_usage\x18\x02 \x03(\v2\x1b.codefoundry.v1.UsageBucketR\fretiredUsage\"E\n" +
 	"\fRetiredUsage\x125\n" +
 	"\abuckets\x18\x01 \x03(\v2\x1b.codefoundry.v1.UsageBucketR\abuckets*\x8d\x01\n" +
@@ -3195,206 +3195,159 @@ const file_codefoundry_v1_session_proto_rawDesc = "" +
 	"\x1bPERMISSION_MODE_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aPERMISSION_MODE_SUPERVISED\x10\x01\x12 \n" +
 	"\x1cPERMISSION_MODE_ACCEPT_EDITS\x10\x02\x12\x18\n" +
-	"\x14PERMISSION_MODE_AUTO\x10\x03*\xa1\x01\n" +
-	"\fSessionState\x12\x1d\n" +
-	"\x19SESSION_STATE_UNSPECIFIED\x10\x00\x12\x1a\n" +
-	"\x16SESSION_STATE_STARTING\x10\x01\x12\x1b\n" +
-	"\x17SESSION_STATE_CONNECTED\x10\x02\x12\x19\n" +
-	"\x15SESSION_STATE_CLOSING\x10\x03\x12\x1e\n" +
-	"\x1aSESSION_STATE_DISCONNECTED\x10\x04*\x9f\x01\n" +
-	"\rSessionStatus\x12\x1e\n" +
-	"\x1aSESSION_STATUS_UNSPECIFIED\x10\x00\x12\x17\n" +
-	"\x13SESSION_STATUS_BUSY\x10\x01\x12\x17\n" +
-	"\x13SESSION_STATUS_IDLE\x10\x02\x12\"\n" +
-	"\x1eSESSION_STATUS_NEEDS_ATTENTION\x10\x03\x12\x18\n" +
-	"\x14SESSION_STATUS_ERROR\x10\x04*j\n" +
+	"\x14PERMISSION_MODE_AUTO\x10\x03*\x9b\x01\n" +
+	"\vThreadState\x12\x1c\n" +
+	"\x18THREAD_STATE_UNSPECIFIED\x10\x00\x12\x19\n" +
+	"\x15THREAD_STATE_STARTING\x10\x01\x12\x1a\n" +
+	"\x16THREAD_STATE_CONNECTED\x10\x02\x12\x18\n" +
+	"\x14THREAD_STATE_CLOSING\x10\x03\x12\x1d\n" +
+	"\x19THREAD_STATE_DISCONNECTED\x10\x04*\x99\x01\n" +
+	"\fThreadStatus\x12\x1d\n" +
+	"\x19THREAD_STATUS_UNSPECIFIED\x10\x00\x12\x16\n" +
+	"\x12THREAD_STATUS_BUSY\x10\x01\x12\x16\n" +
+	"\x12THREAD_STATUS_IDLE\x10\x02\x12!\n" +
+	"\x1dTHREAD_STATUS_NEEDS_ATTENTION\x10\x03\x12\x17\n" +
+	"\x13THREAD_STATUS_ERROR\x10\x04*j\n" +
 	"\x0eAgentRunStatus\x12 \n" +
 	"\x1cAGENT_RUN_STATUS_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15AGENT_RUN_STATUS_OPEN\x10\x01\x12\x1b\n" +
-	"\x17AGENT_RUN_STATUS_CLOSED\x10\x022\xc0\n" +
-	"\n" +
-	"\x0eSessionService\x12W\n" +
-	"\x06Create\x12$.codefoundry.v1.CreateSessionRequest\x1a%.codefoundry.v1.CreateSessionResponse\"\x00\x12Q\n" +
-	"\x04Fork\x12\".codefoundry.v1.ForkSessionRequest\x1a#.codefoundry.v1.ForkSessionResponse\"\x00\x12S\n" +
-	"\x04List\x12#.codefoundry.v1.ListSessionsRequest\x1a$.codefoundry.v1.ListSessionsResponse\"\x00\x12N\n" +
-	"\x03Get\x12!.codefoundry.v1.GetSessionRequest\x1a\".codefoundry.v1.GetSessionResponse\"\x00\x12W\n" +
-	"\x06Rename\x12$.codefoundry.v1.RenameSessionRequest\x1a%.codefoundry.v1.RenameSessionResponse\"\x00\x12T\n" +
-	"\x05Close\x12#.codefoundry.v1.CloseSessionRequest\x1a$.codefoundry.v1.CloseSessionResponse\"\x00\x12`\n" +
-	"\tReconnect\x12'.codefoundry.v1.ReconnectSessionRequest\x1a(.codefoundry.v1.ReconnectSessionResponse\"\x00\x12W\n" +
-	"\x06Remove\x12$.codefoundry.v1.RemoveSessionRequest\x1a%.codefoundry.v1.RemoveSessionResponse\"\x00\x12T\n" +
-	"\x05RunIn\x12#.codefoundry.v1.RunInSessionRequest\x1a$.codefoundry.v1.RunInSessionResponse\"\x00\x12N\n" +
-	"\x03Pin\x12!.codefoundry.v1.PinSessionRequest\x1a\".codefoundry.v1.PinSessionResponse\"\x00\x12Z\n" +
-	"\aArchive\x12%.codefoundry.v1.ArchiveSessionRequest\x1a&.codefoundry.v1.ArchiveSessionResponse\"\x00\x12W\n" +
-	"\x06Snooze\x12$.codefoundry.v1.SnoozeSessionRequest\x1a%.codefoundry.v1.SnoozeSessionResponse\"\x00\x12O\n" +
-	"\x05Watch\x12$.codefoundry.v1.WatchSessionsRequest\x1a\x1c.codefoundry.v1.SessionEvent\"\x000\x01\x12d\n" +
-	"\x0fStageAttachment\x12&.codefoundry.v1.StageAttachmentRequest\x1a'.codefoundry.v1.StageAttachmentResponse\"\x00\x12a\n" +
-	"\x0eReadAttachment\x12%.codefoundry.v1.ReadAttachmentRequest\x1a&.codefoundry.v1.ReadAttachmentResponse\"\x00B\xc4\x01\n" +
-	"\x12com.codefoundry.v1B\fSessionProtoP\x01ZGgithub.com/alexwaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
+	"\x17AGENT_RUN_STATUS_CLOSED\x10\x02B\xcc\x01\n" +
+	"\x12com.codefoundry.v1B\x14ThreadLifecycleProtoP\x01ZGgithub.com/alexwaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
 
 var (
-	file_codefoundry_v1_session_proto_rawDescOnce sync.Once
-	file_codefoundry_v1_session_proto_rawDescData []byte
+	file_codefoundry_v1_thread_lifecycle_proto_rawDescOnce sync.Once
+	file_codefoundry_v1_thread_lifecycle_proto_rawDescData []byte
 )
 
-func file_codefoundry_v1_session_proto_rawDescGZIP() []byte {
-	file_codefoundry_v1_session_proto_rawDescOnce.Do(func() {
-		file_codefoundry_v1_session_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_codefoundry_v1_session_proto_rawDesc), len(file_codefoundry_v1_session_proto_rawDesc)))
+func file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP() []byte {
+	file_codefoundry_v1_thread_lifecycle_proto_rawDescOnce.Do(func() {
+		file_codefoundry_v1_thread_lifecycle_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_codefoundry_v1_thread_lifecycle_proto_rawDesc), len(file_codefoundry_v1_thread_lifecycle_proto_rawDesc)))
 	})
-	return file_codefoundry_v1_session_proto_rawDescData
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescData
 }
 
-var file_codefoundry_v1_session_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_codefoundry_v1_session_proto_msgTypes = make([]protoimpl.MessageInfo, 39)
-var file_codefoundry_v1_session_proto_goTypes = []any{
-	(PermissionMode)(0),              // 0: codefoundry.v1.PermissionMode
-	(SessionState)(0),                // 1: codefoundry.v1.SessionState
-	(SessionStatus)(0),               // 2: codefoundry.v1.SessionStatus
-	(AgentRunStatus)(0),              // 3: codefoundry.v1.AgentRunStatus
-	(*Session)(nil),                  // 4: codefoundry.v1.Session
-	(*ApiRetry)(nil),                 // 5: codefoundry.v1.ApiRetry
-	(*AgentRun)(nil),                 // 6: codefoundry.v1.AgentRun
-	(*UsageBucket)(nil),              // 7: codefoundry.v1.UsageBucket
-	(*LinkedPullRequest)(nil),        // 8: codefoundry.v1.LinkedPullRequest
-	(*CreateSessionRequest)(nil),     // 9: codefoundry.v1.CreateSessionRequest
-	(*NewWorktree)(nil),              // 10: codefoundry.v1.NewWorktree
-	(*NewWorkspace)(nil),             // 11: codefoundry.v1.NewWorkspace
-	(*StageAttachmentRequest)(nil),   // 12: codefoundry.v1.StageAttachmentRequest
-	(*StageAttachmentResponse)(nil),  // 13: codefoundry.v1.StageAttachmentResponse
-	(*ReadAttachmentRequest)(nil),    // 14: codefoundry.v1.ReadAttachmentRequest
-	(*ReadAttachmentResponse)(nil),   // 15: codefoundry.v1.ReadAttachmentResponse
-	(*CreateSessionResponse)(nil),    // 16: codefoundry.v1.CreateSessionResponse
-	(*ForkSessionRequest)(nil),       // 17: codefoundry.v1.ForkSessionRequest
-	(*ForkSessionResponse)(nil),      // 18: codefoundry.v1.ForkSessionResponse
-	(*ListSessionsRequest)(nil),      // 19: codefoundry.v1.ListSessionsRequest
-	(*ListSessionsResponse)(nil),     // 20: codefoundry.v1.ListSessionsResponse
-	(*GetSessionRequest)(nil),        // 21: codefoundry.v1.GetSessionRequest
-	(*GetSessionResponse)(nil),       // 22: codefoundry.v1.GetSessionResponse
-	(*RenameSessionRequest)(nil),     // 23: codefoundry.v1.RenameSessionRequest
-	(*RenameSessionResponse)(nil),    // 24: codefoundry.v1.RenameSessionResponse
-	(*CloseSessionRequest)(nil),      // 25: codefoundry.v1.CloseSessionRequest
-	(*CloseSessionResponse)(nil),     // 26: codefoundry.v1.CloseSessionResponse
-	(*ReconnectSessionRequest)(nil),  // 27: codefoundry.v1.ReconnectSessionRequest
-	(*ReconnectSessionResponse)(nil), // 28: codefoundry.v1.ReconnectSessionResponse
-	(*RemoveSessionRequest)(nil),     // 29: codefoundry.v1.RemoveSessionRequest
-	(*RemoveSessionResponse)(nil),    // 30: codefoundry.v1.RemoveSessionResponse
-	(*RunInSessionRequest)(nil),      // 31: codefoundry.v1.RunInSessionRequest
-	(*RunInSessionResponse)(nil),     // 32: codefoundry.v1.RunInSessionResponse
-	(*PinSessionRequest)(nil),        // 33: codefoundry.v1.PinSessionRequest
-	(*PinSessionResponse)(nil),       // 34: codefoundry.v1.PinSessionResponse
-	(*ArchiveSessionRequest)(nil),    // 35: codefoundry.v1.ArchiveSessionRequest
-	(*ArchiveSessionResponse)(nil),   // 36: codefoundry.v1.ArchiveSessionResponse
-	(*SnoozeSessionRequest)(nil),     // 37: codefoundry.v1.SnoozeSessionRequest
-	(*SnoozeSessionResponse)(nil),    // 38: codefoundry.v1.SnoozeSessionResponse
-	(*WatchSessionsRequest)(nil),     // 39: codefoundry.v1.WatchSessionsRequest
-	(*SessionEvent)(nil),             // 40: codefoundry.v1.SessionEvent
-	(*SessionSnapshot)(nil),          // 41: codefoundry.v1.SessionSnapshot
-	(*RetiredUsage)(nil),             // 42: codefoundry.v1.RetiredUsage
-	(*timestamppb.Timestamp)(nil),    // 43: google.protobuf.Timestamp
+var file_codefoundry_v1_thread_lifecycle_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
+var file_codefoundry_v1_thread_lifecycle_proto_msgTypes = make([]protoimpl.MessageInfo, 39)
+var file_codefoundry_v1_thread_lifecycle_proto_goTypes = []any{
+	(PermissionMode)(0),             // 0: codefoundry.v1.PermissionMode
+	(ThreadState)(0),                // 1: codefoundry.v1.ThreadState
+	(ThreadStatus)(0),               // 2: codefoundry.v1.ThreadStatus
+	(AgentRunStatus)(0),             // 3: codefoundry.v1.AgentRunStatus
+	(*Thread)(nil),                  // 4: codefoundry.v1.Thread
+	(*ApiRetry)(nil),                // 5: codefoundry.v1.ApiRetry
+	(*AgentRun)(nil),                // 6: codefoundry.v1.AgentRun
+	(*UsageBucket)(nil),             // 7: codefoundry.v1.UsageBucket
+	(*LinkedPullRequest)(nil),       // 8: codefoundry.v1.LinkedPullRequest
+	(*CreateThreadRequest)(nil),     // 9: codefoundry.v1.CreateThreadRequest
+	(*NewWorktree)(nil),             // 10: codefoundry.v1.NewWorktree
+	(*NewWorkspace)(nil),            // 11: codefoundry.v1.NewWorkspace
+	(*StageAttachmentRequest)(nil),  // 12: codefoundry.v1.StageAttachmentRequest
+	(*StageAttachmentResponse)(nil), // 13: codefoundry.v1.StageAttachmentResponse
+	(*ReadAttachmentRequest)(nil),   // 14: codefoundry.v1.ReadAttachmentRequest
+	(*ReadAttachmentResponse)(nil),  // 15: codefoundry.v1.ReadAttachmentResponse
+	(*CreateThreadResponse)(nil),    // 16: codefoundry.v1.CreateThreadResponse
+	(*ForkThreadRequest)(nil),       // 17: codefoundry.v1.ForkThreadRequest
+	(*ForkThreadResponse)(nil),      // 18: codefoundry.v1.ForkThreadResponse
+	(*ListThreadsRequest)(nil),      // 19: codefoundry.v1.ListThreadsRequest
+	(*ListThreadsResponse)(nil),     // 20: codefoundry.v1.ListThreadsResponse
+	(*GetThreadRequest)(nil),        // 21: codefoundry.v1.GetThreadRequest
+	(*GetThreadResponse)(nil),       // 22: codefoundry.v1.GetThreadResponse
+	(*RenameThreadRequest)(nil),     // 23: codefoundry.v1.RenameThreadRequest
+	(*RenameThreadResponse)(nil),    // 24: codefoundry.v1.RenameThreadResponse
+	(*CloseThreadRequest)(nil),      // 25: codefoundry.v1.CloseThreadRequest
+	(*CloseThreadResponse)(nil),     // 26: codefoundry.v1.CloseThreadResponse
+	(*ReconnectThreadRequest)(nil),  // 27: codefoundry.v1.ReconnectThreadRequest
+	(*ReconnectThreadResponse)(nil), // 28: codefoundry.v1.ReconnectThreadResponse
+	(*RemoveThreadRequest)(nil),     // 29: codefoundry.v1.RemoveThreadRequest
+	(*RemoveThreadResponse)(nil),    // 30: codefoundry.v1.RemoveThreadResponse
+	(*RunInThreadRequest)(nil),      // 31: codefoundry.v1.RunInThreadRequest
+	(*RunInThreadResponse)(nil),     // 32: codefoundry.v1.RunInThreadResponse
+	(*PinThreadRequest)(nil),        // 33: codefoundry.v1.PinThreadRequest
+	(*PinThreadResponse)(nil),       // 34: codefoundry.v1.PinThreadResponse
+	(*ArchiveThreadRequest)(nil),    // 35: codefoundry.v1.ArchiveThreadRequest
+	(*ArchiveThreadResponse)(nil),   // 36: codefoundry.v1.ArchiveThreadResponse
+	(*SnoozeThreadRequest)(nil),     // 37: codefoundry.v1.SnoozeThreadRequest
+	(*SnoozeThreadResponse)(nil),    // 38: codefoundry.v1.SnoozeThreadResponse
+	(*WatchThreadsRequest)(nil),     // 39: codefoundry.v1.WatchThreadsRequest
+	(*ThreadListEvent)(nil),         // 40: codefoundry.v1.ThreadListEvent
+	(*ThreadListSnapshot)(nil),      // 41: codefoundry.v1.ThreadListSnapshot
+	(*RetiredUsage)(nil),            // 42: codefoundry.v1.RetiredUsage
+	(*timestamppb.Timestamp)(nil),   // 43: google.protobuf.Timestamp
 }
-var file_codefoundry_v1_session_proto_depIdxs = []int32{
-	1,  // 0: codefoundry.v1.Session.state:type_name -> codefoundry.v1.SessionState
-	2,  // 1: codefoundry.v1.Session.status:type_name -> codefoundry.v1.SessionStatus
-	43, // 2: codefoundry.v1.Session.created_at:type_name -> google.protobuf.Timestamp
-	43, // 3: codefoundry.v1.Session.last_activity_at:type_name -> google.protobuf.Timestamp
-	0,  // 4: codefoundry.v1.Session.permission_mode:type_name -> codefoundry.v1.PermissionMode
-	8,  // 5: codefoundry.v1.Session.linked_pull_requests:type_name -> codefoundry.v1.LinkedPullRequest
-	43, // 6: codefoundry.v1.Session.status_changed_at:type_name -> google.protobuf.Timestamp
-	7,  // 7: codefoundry.v1.Session.usage:type_name -> codefoundry.v1.UsageBucket
-	6,  // 8: codefoundry.v1.Session.agent_runs:type_name -> codefoundry.v1.AgentRun
-	43, // 9: codefoundry.v1.Session.cache_expires_at:type_name -> google.protobuf.Timestamp
-	5,  // 10: codefoundry.v1.Session.retry:type_name -> codefoundry.v1.ApiRetry
-	43, // 11: codefoundry.v1.Session.archived_at:type_name -> google.protobuf.Timestamp
-	43, // 12: codefoundry.v1.Session.snoozed_until:type_name -> google.protobuf.Timestamp
+var file_codefoundry_v1_thread_lifecycle_proto_depIdxs = []int32{
+	1,  // 0: codefoundry.v1.Thread.state:type_name -> codefoundry.v1.ThreadState
+	2,  // 1: codefoundry.v1.Thread.status:type_name -> codefoundry.v1.ThreadStatus
+	43, // 2: codefoundry.v1.Thread.created_at:type_name -> google.protobuf.Timestamp
+	43, // 3: codefoundry.v1.Thread.last_activity_at:type_name -> google.protobuf.Timestamp
+	0,  // 4: codefoundry.v1.Thread.permission_mode:type_name -> codefoundry.v1.PermissionMode
+	8,  // 5: codefoundry.v1.Thread.linked_pull_requests:type_name -> codefoundry.v1.LinkedPullRequest
+	43, // 6: codefoundry.v1.Thread.status_changed_at:type_name -> google.protobuf.Timestamp
+	7,  // 7: codefoundry.v1.Thread.usage:type_name -> codefoundry.v1.UsageBucket
+	6,  // 8: codefoundry.v1.Thread.agent_runs:type_name -> codefoundry.v1.AgentRun
+	43, // 9: codefoundry.v1.Thread.cache_expires_at:type_name -> google.protobuf.Timestamp
+	5,  // 10: codefoundry.v1.Thread.retry:type_name -> codefoundry.v1.ApiRetry
+	43, // 11: codefoundry.v1.Thread.archived_at:type_name -> google.protobuf.Timestamp
+	43, // 12: codefoundry.v1.Thread.snoozed_until:type_name -> google.protobuf.Timestamp
 	43, // 13: codefoundry.v1.ApiRetry.retry_at:type_name -> google.protobuf.Timestamp
 	3,  // 14: codefoundry.v1.AgentRun.status:type_name -> codefoundry.v1.AgentRunStatus
 	43, // 15: codefoundry.v1.AgentRun.started_at:type_name -> google.protobuf.Timestamp
 	7,  // 16: codefoundry.v1.AgentRun.usage:type_name -> codefoundry.v1.UsageBucket
 	43, // 17: codefoundry.v1.LinkedPullRequest.linked_at:type_name -> google.protobuf.Timestamp
-	0,  // 18: codefoundry.v1.CreateSessionRequest.permission_mode:type_name -> codefoundry.v1.PermissionMode
-	10, // 19: codefoundry.v1.CreateSessionRequest.new_worktree:type_name -> codefoundry.v1.NewWorktree
-	11, // 20: codefoundry.v1.CreateSessionRequest.new_workspace:type_name -> codefoundry.v1.NewWorkspace
-	4,  // 21: codefoundry.v1.CreateSessionResponse.session:type_name -> codefoundry.v1.Session
-	4,  // 22: codefoundry.v1.ForkSessionResponse.session:type_name -> codefoundry.v1.Session
-	4,  // 23: codefoundry.v1.ListSessionsResponse.sessions:type_name -> codefoundry.v1.Session
-	7,  // 24: codefoundry.v1.ListSessionsResponse.retired_usage:type_name -> codefoundry.v1.UsageBucket
-	4,  // 25: codefoundry.v1.GetSessionResponse.session:type_name -> codefoundry.v1.Session
-	4,  // 26: codefoundry.v1.RenameSessionResponse.session:type_name -> codefoundry.v1.Session
-	4,  // 27: codefoundry.v1.ReconnectSessionResponse.session:type_name -> codefoundry.v1.Session
-	4,  // 28: codefoundry.v1.RunInSessionResponse.session:type_name -> codefoundry.v1.Session
-	4,  // 29: codefoundry.v1.PinSessionResponse.session:type_name -> codefoundry.v1.Session
-	4,  // 30: codefoundry.v1.ArchiveSessionResponse.session:type_name -> codefoundry.v1.Session
-	43, // 31: codefoundry.v1.SnoozeSessionRequest.until:type_name -> google.protobuf.Timestamp
-	4,  // 32: codefoundry.v1.SnoozeSessionResponse.session:type_name -> codefoundry.v1.Session
-	41, // 33: codefoundry.v1.SessionEvent.snapshot:type_name -> codefoundry.v1.SessionSnapshot
-	4,  // 34: codefoundry.v1.SessionEvent.updated:type_name -> codefoundry.v1.Session
-	42, // 35: codefoundry.v1.SessionEvent.retired_usage:type_name -> codefoundry.v1.RetiredUsage
-	4,  // 36: codefoundry.v1.SessionSnapshot.sessions:type_name -> codefoundry.v1.Session
-	7,  // 37: codefoundry.v1.SessionSnapshot.retired_usage:type_name -> codefoundry.v1.UsageBucket
+	0,  // 18: codefoundry.v1.CreateThreadRequest.permission_mode:type_name -> codefoundry.v1.PermissionMode
+	10, // 19: codefoundry.v1.CreateThreadRequest.new_worktree:type_name -> codefoundry.v1.NewWorktree
+	11, // 20: codefoundry.v1.CreateThreadRequest.new_workspace:type_name -> codefoundry.v1.NewWorkspace
+	4,  // 21: codefoundry.v1.CreateThreadResponse.thread:type_name -> codefoundry.v1.Thread
+	4,  // 22: codefoundry.v1.ForkThreadResponse.thread:type_name -> codefoundry.v1.Thread
+	4,  // 23: codefoundry.v1.ListThreadsResponse.threads:type_name -> codefoundry.v1.Thread
+	7,  // 24: codefoundry.v1.ListThreadsResponse.retired_usage:type_name -> codefoundry.v1.UsageBucket
+	4,  // 25: codefoundry.v1.GetThreadResponse.thread:type_name -> codefoundry.v1.Thread
+	4,  // 26: codefoundry.v1.RenameThreadResponse.thread:type_name -> codefoundry.v1.Thread
+	4,  // 27: codefoundry.v1.ReconnectThreadResponse.thread:type_name -> codefoundry.v1.Thread
+	4,  // 28: codefoundry.v1.RunInThreadResponse.thread:type_name -> codefoundry.v1.Thread
+	4,  // 29: codefoundry.v1.PinThreadResponse.thread:type_name -> codefoundry.v1.Thread
+	4,  // 30: codefoundry.v1.ArchiveThreadResponse.thread:type_name -> codefoundry.v1.Thread
+	43, // 31: codefoundry.v1.SnoozeThreadRequest.until:type_name -> google.protobuf.Timestamp
+	4,  // 32: codefoundry.v1.SnoozeThreadResponse.thread:type_name -> codefoundry.v1.Thread
+	41, // 33: codefoundry.v1.ThreadListEvent.snapshot:type_name -> codefoundry.v1.ThreadListSnapshot
+	4,  // 34: codefoundry.v1.ThreadListEvent.updated:type_name -> codefoundry.v1.Thread
+	42, // 35: codefoundry.v1.ThreadListEvent.retired_usage:type_name -> codefoundry.v1.RetiredUsage
+	4,  // 36: codefoundry.v1.ThreadListSnapshot.threads:type_name -> codefoundry.v1.Thread
+	7,  // 37: codefoundry.v1.ThreadListSnapshot.retired_usage:type_name -> codefoundry.v1.UsageBucket
 	7,  // 38: codefoundry.v1.RetiredUsage.buckets:type_name -> codefoundry.v1.UsageBucket
-	9,  // 39: codefoundry.v1.SessionService.Create:input_type -> codefoundry.v1.CreateSessionRequest
-	17, // 40: codefoundry.v1.SessionService.Fork:input_type -> codefoundry.v1.ForkSessionRequest
-	19, // 41: codefoundry.v1.SessionService.List:input_type -> codefoundry.v1.ListSessionsRequest
-	21, // 42: codefoundry.v1.SessionService.Get:input_type -> codefoundry.v1.GetSessionRequest
-	23, // 43: codefoundry.v1.SessionService.Rename:input_type -> codefoundry.v1.RenameSessionRequest
-	25, // 44: codefoundry.v1.SessionService.Close:input_type -> codefoundry.v1.CloseSessionRequest
-	27, // 45: codefoundry.v1.SessionService.Reconnect:input_type -> codefoundry.v1.ReconnectSessionRequest
-	29, // 46: codefoundry.v1.SessionService.Remove:input_type -> codefoundry.v1.RemoveSessionRequest
-	31, // 47: codefoundry.v1.SessionService.RunIn:input_type -> codefoundry.v1.RunInSessionRequest
-	33, // 48: codefoundry.v1.SessionService.Pin:input_type -> codefoundry.v1.PinSessionRequest
-	35, // 49: codefoundry.v1.SessionService.Archive:input_type -> codefoundry.v1.ArchiveSessionRequest
-	37, // 50: codefoundry.v1.SessionService.Snooze:input_type -> codefoundry.v1.SnoozeSessionRequest
-	39, // 51: codefoundry.v1.SessionService.Watch:input_type -> codefoundry.v1.WatchSessionsRequest
-	12, // 52: codefoundry.v1.SessionService.StageAttachment:input_type -> codefoundry.v1.StageAttachmentRequest
-	14, // 53: codefoundry.v1.SessionService.ReadAttachment:input_type -> codefoundry.v1.ReadAttachmentRequest
-	16, // 54: codefoundry.v1.SessionService.Create:output_type -> codefoundry.v1.CreateSessionResponse
-	18, // 55: codefoundry.v1.SessionService.Fork:output_type -> codefoundry.v1.ForkSessionResponse
-	20, // 56: codefoundry.v1.SessionService.List:output_type -> codefoundry.v1.ListSessionsResponse
-	22, // 57: codefoundry.v1.SessionService.Get:output_type -> codefoundry.v1.GetSessionResponse
-	24, // 58: codefoundry.v1.SessionService.Rename:output_type -> codefoundry.v1.RenameSessionResponse
-	26, // 59: codefoundry.v1.SessionService.Close:output_type -> codefoundry.v1.CloseSessionResponse
-	28, // 60: codefoundry.v1.SessionService.Reconnect:output_type -> codefoundry.v1.ReconnectSessionResponse
-	30, // 61: codefoundry.v1.SessionService.Remove:output_type -> codefoundry.v1.RemoveSessionResponse
-	32, // 62: codefoundry.v1.SessionService.RunIn:output_type -> codefoundry.v1.RunInSessionResponse
-	34, // 63: codefoundry.v1.SessionService.Pin:output_type -> codefoundry.v1.PinSessionResponse
-	36, // 64: codefoundry.v1.SessionService.Archive:output_type -> codefoundry.v1.ArchiveSessionResponse
-	38, // 65: codefoundry.v1.SessionService.Snooze:output_type -> codefoundry.v1.SnoozeSessionResponse
-	40, // 66: codefoundry.v1.SessionService.Watch:output_type -> codefoundry.v1.SessionEvent
-	13, // 67: codefoundry.v1.SessionService.StageAttachment:output_type -> codefoundry.v1.StageAttachmentResponse
-	15, // 68: codefoundry.v1.SessionService.ReadAttachment:output_type -> codefoundry.v1.ReadAttachmentResponse
-	54, // [54:69] is the sub-list for method output_type
-	39, // [39:54] is the sub-list for method input_type
+	39, // [39:39] is the sub-list for method output_type
+	39, // [39:39] is the sub-list for method input_type
 	39, // [39:39] is the sub-list for extension type_name
 	39, // [39:39] is the sub-list for extension extendee
 	0,  // [0:39] is the sub-list for field type_name
 }
 
-func init() { file_codefoundry_v1_session_proto_init() }
-func file_codefoundry_v1_session_proto_init() {
-	if File_codefoundry_v1_session_proto != nil {
+func init() { file_codefoundry_v1_thread_lifecycle_proto_init() }
+func file_codefoundry_v1_thread_lifecycle_proto_init() {
+	if File_codefoundry_v1_thread_lifecycle_proto != nil {
 		return
 	}
-	file_codefoundry_v1_session_proto_msgTypes[36].OneofWrappers = []any{
-		(*SessionEvent_Snapshot)(nil),
-		(*SessionEvent_Updated)(nil),
-		(*SessionEvent_RemovedId)(nil),
-		(*SessionEvent_RetiredUsage)(nil),
+	file_codefoundry_v1_thread_lifecycle_proto_msgTypes[36].OneofWrappers = []any{
+		(*ThreadListEvent_Snapshot)(nil),
+		(*ThreadListEvent_Updated)(nil),
+		(*ThreadListEvent_RemovedId)(nil),
+		(*ThreadListEvent_RetiredUsage)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_session_proto_rawDesc), len(file_codefoundry_v1_session_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_thread_lifecycle_proto_rawDesc), len(file_codefoundry_v1_thread_lifecycle_proto_rawDesc)),
 			NumEnums:      4,
 			NumMessages:   39,
 			NumExtensions: 0,
-			NumServices:   1,
+			NumServices:   0,
 		},
-		GoTypes:           file_codefoundry_v1_session_proto_goTypes,
-		DependencyIndexes: file_codefoundry_v1_session_proto_depIdxs,
-		EnumInfos:         file_codefoundry_v1_session_proto_enumTypes,
-		MessageInfos:      file_codefoundry_v1_session_proto_msgTypes,
+		GoTypes:           file_codefoundry_v1_thread_lifecycle_proto_goTypes,
+		DependencyIndexes: file_codefoundry_v1_thread_lifecycle_proto_depIdxs,
+		EnumInfos:         file_codefoundry_v1_thread_lifecycle_proto_enumTypes,
+		MessageInfos:      file_codefoundry_v1_thread_lifecycle_proto_msgTypes,
 	}.Build()
-	File_codefoundry_v1_session_proto = out.File
-	file_codefoundry_v1_session_proto_goTypes = nil
-	file_codefoundry_v1_session_proto_depIdxs = nil
+	File_codefoundry_v1_thread_lifecycle_proto = out.File
+	file_codefoundry_v1_thread_lifecycle_proto_goTypes = nil
+	file_codefoundry_v1_thread_lifecycle_proto_depIdxs = nil
 }

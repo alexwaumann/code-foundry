@@ -22,10 +22,10 @@ import (
 
 // Errors returned by Store methods. They are wrapped with detail; test with errors.Is.
 var (
-	ErrNotFound           = errors.New("session not found")
+	ErrNotFound           = errors.New("thread not found")
 	ErrInvalidArgument    = errors.New("invalid argument")
 	ErrFailedPrecondition = errors.New("failed precondition")
-	ErrClosed             = errors.New("session store closed")
+	ErrClosed             = errors.New("thread store closed")
 )
 
 // State is the lifecycle of the Claude process behind a session. Values mirror
@@ -116,7 +116,7 @@ const ReasonInterrupted = "interrupted"
 // without a project, CreateOptions.NoProject, running in Options.Home). RepoID and
 // WorktreePath are the cwd (for a workspace thread, the member worktree it runs in),
 // never the owner beyond that order.
-type Session struct {
+type Thread struct {
 	ID              string
 	ClaudeSessionID string // set once the transcript file is discovered
 	RepoID          string // repository of the cwd; the owner when WorkspaceID is empty
@@ -226,7 +226,7 @@ type APIRetry struct {
 
 // Snapshot is every session, sorted by creation time then id. Never mutate it.
 type Snapshot struct {
-	Sessions []Session
+	Threads []Thread
 	// RetiredUsage is the usage of removed sessions summed per (model, tier, speed,
 	// day): Store.Remove adds a session's buckets here as it forgets it, so the total
 	// over every thread ever tracked is the sessions' Usage plus RetiredUsage. Sorted
@@ -235,15 +235,15 @@ type Snapshot struct {
 }
 
 // Session returns the session with id.
-func (s *Snapshot) Session(id string) (Session, bool) {
+func (s *Snapshot) Thread(id string) (Thread, bool) {
 	if s == nil {
-		return Session{}, false
+		return Thread{}, false
 	}
-	i := slices.IndexFunc(s.Sessions, func(x Session) bool { return x.ID == id })
+	i := slices.IndexFunc(s.Threads, func(x Thread) bool { return x.ID == id })
 	if i < 0 {
-		return Session{}, false
+		return Thread{}, false
 	}
-	return s.Sessions[i], true
+	return s.Threads[i], true
 }
 
 // Event is published on the bus as bus.Publish[session.Event]. Subscribe with
@@ -251,10 +251,10 @@ func (s *Snapshot) Session(id string) (Session, bool) {
 // Removed and RetiredUsage; *Snapshot also implements Event so a consumer can merge
 // "resync with the current snapshot" into the same stream (the API's Watch does that
 // on drops).
-type Event interface{ isSessionEvent() }
+type Event interface{ isThreadListEvent() }
 
 // Updated carries a session's full state after a change.
-type Updated struct{ Session Session }
+type Updated struct{ Thread Thread }
 
 // Removed is sent when a session is forgotten.
 type Removed struct{ ID string }
@@ -263,10 +263,10 @@ type Removed struct{ ID string }
 // whole retired ledger (Snapshot.RetiredUsage) after the session's buckets were added.
 type RetiredUsage struct{ Buckets []UsageBucket }
 
-func (Updated) isSessionEvent()      {}
-func (Removed) isSessionEvent()      {}
-func (RetiredUsage) isSessionEvent() {}
-func (*Snapshot) isSessionEvent()    {}
+func (Updated) isThreadListEvent()      {}
+func (Removed) isThreadListEvent()      {}
+func (RetiredUsage) isThreadListEvent() {}
+func (*Snapshot) isThreadListEvent()    {}
 
 // CreateOptions configures Store.Create.
 type CreateOptions struct {
@@ -331,37 +331,37 @@ type NewWorktree struct {
 // Store is the session store API. *Manager implements it; sessiontest.Fake is an
 // in-memory fake.
 type Store interface {
-	Create(ctx context.Context, opts CreateOptions) (Session, error)
+	Create(ctx context.Context, opts CreateOptions) (Thread, error)
 	// Fork starts a new session continuing id's conversation (claude --fork-session).
-	Fork(ctx context.Context, id, name string) (Session, error)
-	Get(ctx context.Context, id string) (Session, error)
+	Fork(ctx context.Context, id, name string) (Thread, error)
+	Get(ctx context.Context, id string) (Thread, error)
 	// Rename sets a user-chosen name and disables auto-naming.
-	Rename(ctx context.Context, id, name string) (Session, error)
+	Rename(ctx context.Context, id, name string) (Thread, error)
 	// Close ends the Claude process gracefully and waits until the session is
 	// DISCONNECTED (bounded by the store's close timeout plus the kill grace). No
 	// command calls it: archive, snooze and remove close through it.
 	Close(ctx context.Context, id string) error
 	// Reconnect resumes a DISCONNECTED session in a new claude process, without a
 	// prompt. No command calls it: a message starts a stopped thread (Send).
-	Reconnect(ctx context.Context, id string) (Session, error)
+	Reconnect(ctx context.Context, id string) (Thread, error)
 	// Remove closes the session if needed and forgets it.
 	Remove(ctx context.Context, id string) error
 	// RunIn moves a workspace thread to another member worktree: set_cwd once the live
 	// thread is idle at its prompt (the row's cwd changes when Claude accepts), or the
 	// row's cwd at once for a disconnected thread.
-	RunIn(ctx context.Context, id string, target RunInTarget) (Session, error)
+	RunIn(ctx context.Context, id string, target RunInTarget) (Thread, error)
 	// Pin sets or clears the user's pin, in any state. Pinning unarchives and unsnoozes.
-	Pin(ctx context.Context, id string, pinned bool) (Session, error)
+	Pin(ctx context.Context, id string, pinned bool) (Thread, error)
 	// Archive archives a thread (archived true): it closes it like Close, kills and
 	// removes its shells, unpins and unsnoozes it and sets ArchivedAt (kept when already set). With
 	// archived false it only clears ArchivedAt; the thread stays disconnected.
-	Archive(ctx context.Context, id string, archived bool) (Session, error)
+	Archive(ctx context.Context, id string, archived bool) (Thread, error)
 	// Snooze snoozes a thread until a time (after now; ErrInvalidArgument otherwise):
 	// it closes it like Close, kills and removes its shells, unpins and unarchives it
 	// and sets SnoozedUntil (replacing an earlier one). When the time comes the store
 	// clears it and the disconnected thread needs attention (ReasonSnoozeEnded). A zero
 	// until only clears SnoozedUntil.
-	Snooze(ctx context.Context, id string, until time.Time) (Session, error)
+	Snooze(ctx context.Context, id string, until time.Time) (Thread, error)
 	// StageAttachment stores an image for a first prompt and returns its absolute
 	// path. mimeType must be one of AttachmentTypes; data at most MaxAttachmentBytes.
 	// name is the user's file name, used only in logs.
@@ -391,16 +391,16 @@ type Store interface {
 	Interrupt(ctx context.Context, id string) error
 	// SetModel switches the model of a running thread and records it for later
 	// spawns; on a thread that is not running it only records it.
-	SetModel(ctx context.Context, id, model string) (Session, error)
+	SetModel(ctx context.Context, id, model string) (Thread, error)
 	// SetPermissionMode switches the permission mode (supervised, accept edits or auto;
 	// Claude's default cannot be restored live) and records it; on a thread that is not
 	// running it only records it.
-	SetPermissionMode(ctx context.Context, id string, mode PermissionMode) (Session, error)
+	SetPermissionMode(ctx context.Context, id string, mode PermissionMode) (Thread, error)
 	// SetEffort changes a thread's effort and records it. Claude has no live effort
 	// switch: a running process restarts with --resume and the new --effort, at once
 	// when idle, else after the running turn (EffortPending meanwhile); a thread that is
 	// not running only records it.
-	SetEffort(ctx context.Context, id, effort string) (Session, error)
+	SetEffort(ctx context.Context, id, effort string) (Thread, error)
 	// McpStatus returns a thread's MCP servers as last checked (mcp.go), also while it
 	// is not running. refresh asks Claude again first, starting a stopped thread without
 	// a prompt. Without it, a running thread not checked yet is asked once.

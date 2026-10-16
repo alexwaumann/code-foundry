@@ -394,7 +394,7 @@ func (u *threadUsage) runList() []AgentRun {
 
 // AgentsRunning counts the thread's running subagent runs: all of them, and those it
 // launched in the background itself (spawn depth 1).
-func (s Session) AgentsRunning() (all, background int) {
+func (s Thread) AgentsRunning() (all, background int) {
 	for _, r := range s.AgentRuns {
 		if r.Status != AgentRunning {
 			continue

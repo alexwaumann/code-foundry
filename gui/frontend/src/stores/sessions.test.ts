@@ -273,7 +273,7 @@ describe("event dispatch", () => {
     useTerminalsStore.setState({ ...emptyTerminals, loaded: true });
     applyIntent({ kind: "focusTerminal", terminalId: "t1" });
     expect(useUiStore.getState().selection).toEqual({ kind: "none" });
-    dispatchEvent({ source: "terminal", event: { kind: "updated", terminal: term("t1", { session: "s1", kind: "shell" }) } });
+    dispatchEvent({ source: "terminal", event: { kind: "updated", terminal: term("t1", { thread: "s1", kind: "shell" }) } });
     expect(useUiStore.getState().selection).toEqual({ kind: "session", id: "s1" });
   });
 });

@@ -156,7 +156,7 @@ func TestRenderedMcpOnInit(t *testing.T) {
 	sub := bus.Subscribe[ThreadEvent](re.bus, 1024)
 	defer sub.Close()
 	s := re.create(CreateOptions{InitialPrompt: "a table please"})
-	re.waitFor(s.ID, "connected", func(s Session) bool { return s.State == StateConnected })
+	re.waitFor(s.ID, "connected", func(s Thread) bool { return s.State == StateConnected })
 	got := re.waitMcp(s.ID, "after init", func(m *McpStatus) bool { return m != nil })
 	if got.Trigger != McpTriggerTurn || got.CheckedAt.IsZero() || len(got.Servers) != 5 || got.Connected() != 1 {
 		t.Fatalf("status %+v", got)
@@ -182,7 +182,7 @@ func TestRenderedMcpOnInit(t *testing.T) {
 	snap := re.items(s.ID)
 	var ev *McpChanged
 	for len(sub.C()) > 0 {
-		if e, ok := (<-sub.C()).(McpChanged); ok && e.SessionID == s.ID {
+		if e, ok := (<-sub.C()).(McpChanged); ok && e.ThreadID == s.ID {
 			ev = &e
 		}
 	}
@@ -238,7 +238,7 @@ func TestRenderedMcpOnInit(t *testing.T) {
 func TestRenderedMcpReconnect(t *testing.T) {
 	re := newFixtureEnvAt(t, fixturePath("text-table"), []string{"CF_FAKE_CLAUDE_MCP=" + mcpFixture()})
 	s := re.create(CreateOptions{})
-	re.waitFor(s.ID, "idle", func(s Session) bool { return s.State == StateConnected && s.Status == StatusIdle })
+	re.waitFor(s.ID, "idle", func(s Thread) bool { return s.State == StateConnected && s.Status == StatusIdle })
 
 	// No turn yet: the first read asks.
 	first, err := re.m.McpStatus(re.ctx(), s.ID, false)

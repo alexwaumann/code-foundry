@@ -37,7 +37,7 @@ func TestDisconnectedStatus(t *testing.T) {
 
 func TestSetStatusStampsOnlyChanges(t *testing.T) {
 	t0, t1 := time.UnixMilli(1000), time.UnixMilli(2000)
-	var s Session
+	var s Thread
 	if !s.setStatus(StatusBusy, "working", t0) || s.StatusChangedAt != t0 {
 		t.Fatalf("first set: %+v", s)
 	}
@@ -75,7 +75,7 @@ var (
 	finishedSetup   = statusSetup{fixture: "text-table", prompt: "a table", st: StatusNeedsAttention, reason: "finished"}
 )
 
-func (ss statusSetup) start(t *testing.T) (*env, Session) {
+func (ss statusSetup) start(t *testing.T) (*env, Thread) {
 	t.Helper()
 	path := hangFixture(t)
 	if ss.fixture != "" {
@@ -83,7 +83,7 @@ func (ss statusSetup) start(t *testing.T) (*env, Session) {
 	}
 	e := newFixtureEnvAt(t, path, nil)
 	s := e.create(CreateOptions{InitialPrompt: ss.prompt})
-	s = e.waitFor(s.ID, "status published", func(s Session) bool {
+	s = e.waitFor(s.ID, "status published", func(s Thread) bool {
 		return s.State == StateConnected && s.Status == ss.st && s.StatusReason == ss.reason
 	})
 	return e, s
@@ -93,16 +93,16 @@ func (ss statusSetup) start(t *testing.T) (*env, Session) {
 // the status it had, persisted. A turn that was running is interrupted, and so is one
 // waiting on a request: the request dies with the process.
 func TestStatusSurvivesDisconnect(t *testing.T) {
-	type end func(e *env, s Session)
+	type end func(e *env, s Thread)
 	exit := func(code int) end {
-		return func(e *env, s Session) { e.exit(s.ID, code) }
+		return func(e *env, s Thread) { e.exit(s.ID, code) }
 	}
-	closeIt := func(e *env, s Session) {
+	closeIt := func(e *env, s Thread) {
 		if err := e.m.Close(context.Background(), s.ID); err != nil {
 			e.t.Fatal(err)
 		}
 	}
-	shutdown := func(e *env, _ Session) { e.restart() }
+	shutdown := func(e *env, _ Thread) { e.restart() }
 	tests := []struct {
 		name       string
 		setup      statusSetup
@@ -126,7 +126,7 @@ func TestStatusSurvivesDisconnect(t *testing.T) {
 			e, s := tt.setup.start(t)
 			before := time.Now()
 			tt.end(e, s)
-			got := e.waitFor(s.ID, "disconnected", func(s Session) bool { return s.State == StateDisconnected })
+			got := e.waitFor(s.ID, "disconnected", func(s Thread) bool { return s.State == StateDisconnected })
 			if got.DisconnectReason != tt.wantDisc || got.Status != tt.want || got.StatusReason != tt.wantReason {
 				t.Errorf("after %s: disconnect %q, status %v %q; want %q, %v %q", tt.name, got.DisconnectReason,
 					got.Status, got.StatusReason, tt.wantDisc, tt.want, tt.wantReason)
@@ -135,7 +135,7 @@ func TestStatusSurvivesDisconnect(t *testing.T) {
 				t.Errorf("StatusChangedAt %v not restamped (end began %v)", got.StatusChangedAt, before)
 			}
 			// Persisted: the row reads back the same.
-			rows, err := loadSessions(context.Background(), e.m.opts.DB)
+			rows, err := loadThreads(context.Background(), e.m.opts.DB)
 			if err != nil || len(rows) != 1 {
 				t.Fatalf("load = %v, %v", rows, err)
 			}
@@ -161,7 +161,7 @@ func TestStatusAfterDaemonCrash(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			e, s := tt.setup.start(t)
-			rows, err := loadSessions(context.Background(), e.m.opts.DB)
+			rows, err := loadThreads(context.Background(), e.m.opts.DB)
 			if err != nil || len(rows) != 1 || rows[0].Status != tt.setup.st || rows[0].StatusReason != tt.setup.reason || rows[0].StatusChangedAt.IsZero() {
 				t.Fatalf("published status not persisted: %+v, %v", rows, err)
 			}
@@ -172,7 +172,7 @@ func TestStatusAfterDaemonCrash(t *testing.T) {
 			if err := e.m.Shutdown(ctx); err != nil {
 				t.Fatal(err)
 			}
-			if err := saveSession(context.Background(), e.m.opts.DB, live); err != nil {
+			if err := saveThread(context.Background(), e.m.opts.DB, live); err != nil {
 				t.Fatal(err)
 			}
 			e.open()
@@ -189,7 +189,7 @@ func TestStatusAfterDaemonCrash(t *testing.T) {
 func TestReconnectResetsTheStatus(t *testing.T) {
 	e, s := questionSetup.start(t)
 	e.exit(s.ID, 1)
-	e.waitFor(s.ID, "disconnected", func(s Session) bool { return s.State == StateDisconnected })
+	e.waitFor(s.ID, "disconnected", func(s Thread) bool { return s.State == StateDisconnected })
 	r, err := e.m.Reconnect(e.ctx(), s.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -197,5 +197,5 @@ func TestReconnectResetsTheStatus(t *testing.T) {
 	if r.Status != StatusUnknown || r.StatusReason != "" {
 		t.Errorf("reconnected status = %v %q, want unknown", r.Status, r.StatusReason)
 	}
-	e.waitFor(s.ID, "the stream's reading", func(s Session) bool { return s.Status == StatusIdle && s.StatusReason == "at prompt" })
+	e.waitFor(s.ID, "the stream's reading", func(s Thread) bool { return s.Status == StatusIdle && s.StatusReason == "at prompt" })
 }

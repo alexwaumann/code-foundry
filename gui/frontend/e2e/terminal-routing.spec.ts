@@ -34,7 +34,7 @@ test("a thread row's New terminal here: the thread owns the shell, in its bottom
   // s-2 is not selected: its panel opens on the shell, the selection stays.
   await row(page, "s:s-2").click({ button: "right" });
   await page.getByTestId("row-menu").getByText("New terminal here").click();
-  expect((await lastNew())?.context).toMatchObject({ activeSessionId: "s-2", activeView: "session" });
+  expect((await lastNew())?.context).toMatchObject({ activeThreadId: "s-2", activeView: "session" });
   await expect(row(page, "s:s-1")).toHaveAttribute("aria-selected", "true");
   await noTerminalRows(page);
   await row(page, "s:s-2").click();
@@ -59,7 +59,7 @@ test("cmd+t on a thread starts its shell in the bottom panel, with the keyboard 
   await page.keyboard.press("Meta+t");
   await expect(bottom(page).getByRole("tab")).toHaveCount(1);
   await expect.poll(() => page.evaluate(() => document.activeElement?.closest("[data-region]")?.getAttribute("data-region"))).toBe("bottom");
-  expect((await lastNew())?.context).toMatchObject({ activeSessionId: "s-2" });
+  expect((await lastNew())?.context).toMatchObject({ activeThreadId: "s-2" });
   await noTerminalRows(page);
   // The new tab is the feedback: no "created terminal" toast.
   await expect(page.locator("[data-sonner-toast]")).toHaveCount(0);
@@ -75,7 +75,7 @@ test("a workspace member's New terminal here in a thread's side panel: the threa
   await cf.getByTestId("member-terminal").click();
   const call = await lastNew();
   expect(call?.args).toEqual({ cwd: CF_MEMBER });
-  expect(call?.context).toMatchObject({ activeSessionId: driver, activeView: "session" });
+  expect(call?.context).toMatchObject({ activeThreadId: driver, activeView: "session" });
   // The thread's bottom panel, not the Projects page's.
   await expect(row(page, `s:${driver}`)).toHaveAttribute("aria-selected", "true");
   await expect(bottom(page).getByRole("tab")).toHaveCount(1);
@@ -123,7 +123,7 @@ test("a project row's New terminal: the Projects page's bottom panel", async ({ 
   const cf = page.locator('[data-nav-key="p:repo-cf"]');
   await cf.hover();
   await cf.getByTestId("project-new-terminal").click();
-  expect((await lastNew())?.context).toMatchObject({ activeRepoId: "repo-cf", activeWorktreePath: CF, activeSessionId: "" });
+  expect((await lastNew())?.context).toMatchObject({ activeRepoId: "repo-cf", activeWorktreePath: CF, activeThreadId: "" });
   // t-top (feat/sidebar) and the new one (main).
   await expect(bottom(page).getByRole("tab")).toHaveText(["feat-sidebar", "code-foundry"]);
   await expect(bottom(page).getByRole("tab").nth(1)).toHaveAttribute("aria-selected", "true");

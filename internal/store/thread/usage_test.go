@@ -234,7 +234,7 @@ func TestUsageFromLiveTranscript(t *testing.T) {
 	c := usageLines(t)
 	e.writeTranscript(cid, userLine("hi"))
 	e.writeTranscript(cid, c[1])
-	got := e.waitFor(s.ID, "usage", func(s Session) bool { return totalRequests(s.Usage) == 1 })
+	got := e.waitFor(s.ID, "usage", func(s Thread) bool { return totalRequests(s.Usage) == 1 })
 	if got.Usage[0].Output != 199 {
 		t.Errorf("usage = %+v", got.Usage)
 	}
@@ -248,13 +248,13 @@ func TestUsageFromLiveTranscript(t *testing.T) {
 	e.waitFor(s.ID, "sentinel read", linkedSentinel)
 	for len(e.events.C()) > 0 {
 		// The sentinel's own update is the only one.
-		if u, ok := (<-e.events.C()).(Updated); ok && u.Session.ID == s.ID && !linkedSentinel(u.Session) {
-			t.Errorf("repeat published an update: %+v", u.Session.Usage)
+		if u, ok := (<-e.events.C()).(Updated); ok && u.Thread.ID == s.ID && !linkedSentinel(u.Thread) {
+			t.Errorf("repeat published an update: %+v", u.Thread.Usage)
 		}
 	}
 
 	e.writeTranscript(cid, c[3:]...)
-	got = e.waitFor(s.ID, "all usage", func(s Session) bool { return totalRequests(s.Usage) == 4 })
+	got = e.waitFor(s.ID, "all usage", func(s Thread) bool { return totalRequests(s.Usage) == 4 })
 	var whole usageFold
 	for _, l := range c {
 		whole.Line([]byte(l))
@@ -282,9 +282,9 @@ func TestUsageRescanOnReconnect(t *testing.T) {
 	cid := argOf(e.spec(s.ID).Argv, "--session-id")
 	c := usageLines(t)
 	e.writeTranscript(cid, userLine("hi"), c[1], c[2])
-	e.waitFor(s.ID, "usage", func(s Session) bool { return totalRequests(s.Usage) == 1 })
+	e.waitFor(s.ID, "usage", func(s Thread) bool { return totalRequests(s.Usage) == 1 })
 	e.exit(s.ID, 0)
-	e.waitFor(s.ID, "disconnected", func(s Session) bool { return s.State == StateDisconnected })
+	e.waitFor(s.ID, "disconnected", func(s Thread) bool { return s.State == StateDisconnected })
 
 	// History the daemon never saw, and a cached value that is wrong (as after a crash
 	// between a transcript write and the persist): the rescan replaces it, it never
@@ -299,14 +299,14 @@ func TestUsageRescanOnReconnect(t *testing.T) {
 	for _, l := range c {
 		whole.Line([]byte(l))
 	}
-	got := e.waitFor(s.ID, "rescan", func(s Session) bool { return totalRequests(s.Usage) == 4 })
+	got := e.waitFor(s.ID, "rescan", func(s Thread) bool { return totalRequests(s.Usage) == 4 })
 	if !slices.Equal(got.Usage, whole.Buckets()) {
 		t.Errorf("rescanned = %+v; want %+v", got.Usage, whole.Buckets())
 	}
 
 	// New records after the resume add to the rescanned fold.
 	e.writeTranscript(cid, usageLine("r-new", "2026-10-10T01:00:00Z", cid, "claude-opus-5-5", 1, 1, 1, 0, h1(0), "standard"))
-	got = e.waitFor(s.ID, "live after rescan", func(s Session) bool { return totalRequests(s.Usage) == 5 })
+	got = e.waitFor(s.ID, "live after rescan", func(s Thread) bool { return totalRequests(s.Usage) == 5 })
 	if last := got.Usage[len(got.Usage)-1]; last.Day != "2026-10-10" || last.Requests != 1 {
 		t.Errorf("usage = %+v", got.Usage)
 	}
@@ -318,7 +318,7 @@ func TestForkSkipsParentUsage(t *testing.T) {
 	cid := argOf(e.spec(s.ID).Argv, "--session-id")
 	c := usageLines(t)
 	e.writeTranscript(cid, userLine("hi"), c[1])
-	e.waitFor(s.ID, "usage", func(s Session) bool { return totalRequests(s.Usage) == 1 })
+	e.waitFor(s.ID, "usage", func(s Thread) bool { return totalRequests(s.Usage) == 1 })
 
 	f, err := e.m.Fork(e.ctx(), s.ID, "fork")
 	if err != nil {
@@ -334,19 +334,19 @@ func TestForkSkipsParentUsage(t *testing.T) {
 	own := usageLine("r-own", time.Now().UTC().Add(time.Minute).Format(time.RFC3339Nano), fcid,
 		"claude-haiku-5-5", 2, 4, 25896, 13021, h1(13021), "standard")
 	e.writeTranscript(fcid, userLine("hi"), c[1], c[3], own)
-	got := e.waitFor(f.ID, "fork usage", func(s Session) bool { return len(s.Usage) > 0 })
+	got := e.waitFor(f.ID, "fork usage", func(s Thread) bool { return len(s.Usage) > 0 })
 	if totalRequests(got.Usage) != 1 || got.Usage[0].Model != "claude-haiku-5-5" {
 		t.Errorf("fork usage = %+v; want only its own haiku request", got.Usage)
 	}
 
 	// The rescan on reconnect skips the copies too.
 	e.exit(f.ID, 0)
-	e.waitFor(f.ID, "fork disconnected", func(s Session) bool { return s.State == StateDisconnected })
+	e.waitFor(f.ID, "fork disconnected", func(s Thread) bool { return s.State == StateDisconnected })
 	e.m.setUsage(f.ID, usageUpdate{})
 	if _, err := e.m.Reconnect(e.ctx(), f.ID); err != nil {
 		t.Fatal(err)
 	}
-	got = e.waitFor(f.ID, "fork rescan", func(s Session) bool { return len(s.Usage) > 0 })
+	got = e.waitFor(f.ID, "fork rescan", func(s Thread) bool { return len(s.Usage) > 0 })
 	if totalRequests(got.Usage) != 1 || got.Usage[0].Model != "claude-haiku-5-5" {
 		t.Errorf("fork usage after rescan = %+v", got.Usage)
 	}
@@ -404,7 +404,7 @@ func TestRemoveRetiresUsage(t *testing.T) {
 	}
 	for len(e.events.C()) > 0 {
 		if r, ok := (<-e.events.C()).(RetiredUsage); ok {
-			t.Errorf("removing a session without usage published %+v", r)
+			t.Errorf("removing a thread without usage published %+v", r)
 		}
 	}
 
@@ -441,7 +441,7 @@ func TestSaveAndLoadUsage(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := saveUsage(ctx, db, "s-nope", second); err == nil {
-		t.Error("saveUsage for an unknown session = nil error (foreign key)")
+		t.Error("saveUsage for an unknown thread = nil error (foreign key)")
 	}
 	got, err := loadUsage(ctx, db)
 	if err != nil || len(got) != 1 || !slices.Equal(got[a.ID], second) {
@@ -450,9 +450,9 @@ func TestSaveAndLoadUsage(t *testing.T) {
 	if err := saveUsage(ctx, db, a.ID, first); err != nil {
 		t.Fatal(err)
 	}
-	sessions, err := loadSessions(ctx, db)
-	if err != nil || len(sessions) != 1 || !slices.Equal(sessions[0].Usage, first) {
-		t.Errorf("loadSessions usage = %+v, %v", sessions, err)
+	threads, err := loadThreads(ctx, db)
+	if err != nil || len(threads) != 1 || !slices.Equal(threads[0].Usage, first) {
+		t.Errorf("loadThreads usage = %+v, %v", threads, err)
 	}
 	if err := saveUsage(ctx, db, a.ID, nil); err != nil {
 		t.Fatal(err)

@@ -14,13 +14,13 @@ import (
 // wins the race between the close and that last step makes Archive fail rather than
 // archive a live thread. Unarchiving only clears ArchivedAt: the thread stays
 // disconnected until the user reconnects it.
-func (m *Manager) Archive(ctx context.Context, id string, archived bool) (Session, error) {
+func (m *Manager) Archive(ctx context.Context, id string, archived bool) (Thread, error) {
 	if !archived {
 		m.mu.Lock()
 		defer m.mu.Unlock()
 		rec, err := m.record(id)
 		if err != nil {
-			return Session{}, err
+			return Thread{}, err
 		}
 		if m.unarchiveLocked(rec) {
 			m.commitLocked(rec, true)
@@ -28,19 +28,19 @@ func (m *Manager) Archive(ctx context.Context, id string, archived bool) (Sessio
 		return rec.s, nil
 	}
 	if err := m.Close(ctx, id); err != nil {
-		return Session{}, err
+		return Thread{}, err
 	}
 	if err := m.removeShells(ctx, id); err != nil {
-		return Session{}, err
+		return Thread{}, err
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	rec, err := m.record(id)
 	if err != nil {
-		return Session{}, err
+		return Thread{}, err
 	}
 	if rec.run != nil || rec.s.State != StateDisconnected {
-		return Session{}, fmt.Errorf("%w: session %s was started while being archived", ErrFailedPrecondition, id)
+		return Thread{}, fmt.Errorf("%w: thread %s was started while being archived", ErrFailedPrecondition, id)
 	}
 	unsnoozed := m.unsnoozeLocked(rec) // archive and snooze are exclusive
 	if !rec.s.ArchivedAt.IsZero() && !rec.s.Pinned && !unsnoozed {
@@ -51,7 +51,7 @@ func (m *Manager) Archive(ctx context.Context, id string, archived bool) (Sessio
 	}
 	rec.s.Pinned = false
 	m.commitLocked(rec, true)
-	m.log.Info("archived thread", "session", id)
+	m.log.Info("archived thread", "thread", id)
 	return rec.s, nil
 }
 

@@ -34,24 +34,24 @@ func TestCLISettings(t *testing.T) {
 		wantStderr string
 	}{
 		{"get one", []string{"settings", "get", "appearance.font_size"}, nil, "13\n", ""},
-		{"get all", []string{"settings", "get"}, nil, `sessions.auto_name = "true"`, ""},
-		{"naming model default", []string{"settings", "get", "sessions.naming_model"}, nil, "claude-sonnet-5[1m]\n", ""},
-		{"set naming model", []string{"settings", "set", "sessions.naming_model", "claude-4.5-haiku[1m]"}, nil, `sessions.naming_model = "claude-4.5-haiku[1m]"`, ""},
-		{"invalid naming model", []string{"settings", "set", "sessions.naming_model", "gpt-5"}, errAny, "", ""},
+		{"get all", []string{"settings", "get"}, nil, `threads.auto_name = "true"`, ""},
+		{"naming model default", []string{"settings", "get", "threads.naming_model"}, nil, "claude-sonnet-5[1m]\n", ""},
+		{"set naming model", []string{"settings", "set", "threads.naming_model", "claude-4.5-haiku[1m]"}, nil, `threads.naming_model = "claude-4.5-haiku[1m]"`, ""},
+		{"invalid naming model", []string{"settings", "set", "threads.naming_model", "gpt-5"}, errAny, "", ""},
 		{"set positional", []string{"settings", "set", "appearance.font_size", "15"}, nil, `appearance.font_size = "15"`, ""},
 		{"get after set", []string{"settings.get", "appearance.font_size"}, nil, "15\n", ""},
 		{"flags still work", []string{"settings", "set", "--key", "appearance.theme", "--value", "dark"}, nil, `appearance.theme = "dark"`, ""},
 		{"flags interleaved", []string{"settings", "get", "--json", "appearance.theme"}, nil, `"value":"dark"`, ""},
-		{"restart note", []string{"settings", "set", "sessions.scrollback_lines", "20000"}, nil, "applies after a daemon restart", ""},
+		{"restart note", []string{"settings", "set", "threads.scrollback_lines", "20000"}, nil, "applies after a daemon restart", ""},
 		{"reset", []string{"settings", "reset", "appearance.theme"}, nil, `appearance.theme = "system" (default)`, ""},
 		{"path", []string{"settings", "path"}, nil, "/settings.toml\n", ""},
 		{"invalid value", []string{"settings", "set", "appearance.font_size", "99"}, errAny, "", ""},
-		{"reserved chord", []string{"settings", "set", "keybindings.session.new", "cmd+k"}, errAny, "", ""},
+		{"reserved chord", []string{"settings", "set", "keybindings.thread.new", "cmd+k"}, errAny, "", ""},
 		{"unknown key", []string{"settings", "get", "nope.nope"}, errUsage, "", `unknown setting "nope.nope"`},
 		{"too many words", []string{"settings", "set", "a", "b", "c"}, errUsage, "", "unexpected arguments [c]"},
 		{"missing value", []string{"settings", "set", "appearance.font_size"}, errUsage, "", `missing required argument "value"`},
 		{"help shows positionals", []string{"help", "settings", "set"}, nil, "code-foundry settings.set <key> <value> [flags]", ""},
-		{"help shows --yes", []string{"help", "session", "remove"}, nil, "--yes", ""},
+		{"help shows --yes", []string{"help", "thread", "remove"}, nil, "--yes", ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

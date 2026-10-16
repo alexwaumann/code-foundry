@@ -57,16 +57,16 @@ func TestMcpStatusToProto(t *testing.T) {
 
 func TestThreadMcp(t *testing.T) {
 	fake, c := newThreadServer(t)
-	fake.Put(thread.Session{ID: "s1", State: thread.StateConnected})
+	fake.Put(thread.Thread{ID: "s1", State: thread.StateConnected})
 	fake.PutItems("s1", thread.Item{ID: "u1", Kind: thread.KindUserMessage, Text: "hi"})
 	fake.PutMcp("s1", mcpSample(time.Now()))
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if _, err := c.McpStatus(ctx, connect.NewRequest(&v1.McpStatusRequest{SessionId: "nope"})); connect.CodeOf(err) != connect.CodeNotFound {
+	if _, err := c.McpStatus(ctx, connect.NewRequest(&v1.McpStatusRequest{ThreadId: "nope"})); connect.CodeOf(err) != connect.CodeNotFound {
 		t.Errorf("unknown thread: %v", err)
 	}
-	stream, err := c.Watch(ctx, connect.NewRequest(&v1.WatchThreadRequest{SessionId: "s1"}))
+	stream, err := c.WatchThread(ctx, connect.NewRequest(&v1.WatchThreadRequest{ThreadId: "s1"}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,19 +83,19 @@ func TestThreadMcp(t *testing.T) {
 		t.Fatalf("snapshot %v", snap)
 	}
 
-	got, err := c.McpStatus(ctx, connect.NewRequest(&v1.McpStatusRequest{SessionId: "s1"}))
+	got, err := c.McpStatus(ctx, connect.NewRequest(&v1.McpStatusRequest{ThreadId: "s1"}))
 	if err != nil || len(got.Msg.GetStatus().GetServers()) != 6 {
 		t.Fatalf("status %v %v", got, err)
 	}
-	ref, err := c.McpStatus(ctx, connect.NewRequest(&v1.McpStatusRequest{SessionId: "s1", Refresh: true}))
+	ref, err := c.McpStatus(ctx, connect.NewRequest(&v1.McpStatusRequest{ThreadId: "s1", Refresh: true}))
 	if err != nil || ref.Msg.GetStatus().GetTrigger() != v1.McpCheckTrigger_MCP_CHECK_TRIGGER_REFRESH {
 		t.Fatalf("refresh %v %v", ref, err)
 	}
-	if ev := next().GetMcp(); ev.GetSessionId() != "s1" || ev.GetSeq() != 3 || ev.GetStatus().GetTrigger() != v1.McpCheckTrigger_MCP_CHECK_TRIGGER_REFRESH {
+	if ev := next().GetMcp(); ev.GetThreadId() != "s1" || ev.GetSeq() != 3 || ev.GetStatus().GetTrigger() != v1.McpCheckTrigger_MCP_CHECK_TRIGGER_REFRESH {
 		t.Errorf("refresh event %v", ev)
 	}
 
-	rc, err := c.McpReconnect(ctx, connect.NewRequest(&v1.McpReconnectRequest{SessionId: "s1", ServerName: "playwright"}))
+	rc, err := c.McpReconnect(ctx, connect.NewRequest(&v1.McpReconnectRequest{ThreadId: "s1", ServerName: "playwright"}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,11 +106,11 @@ func TestThreadMcp(t *testing.T) {
 		t.Errorf("reconnect event %v", ev)
 	}
 	fake.SetMcpReconnectError("linear", "needs login")
-	rc, err = c.McpReconnect(ctx, connect.NewRequest(&v1.McpReconnectRequest{SessionId: "s1", ServerName: "linear"}))
+	rc, err = c.McpReconnect(ctx, connect.NewRequest(&v1.McpReconnectRequest{ThreadId: "s1", ServerName: "linear"}))
 	if err != nil || rc.Msg.GetError() != "needs login" || rc.Msg.GetStatus().GetServers()[1].GetStatus() != v1.McpServerStatus_MCP_SERVER_STATUS_NEEDS_AUTH {
 		t.Errorf("failed reconnect %v %v", rc, err)
 	}
-	if _, err := c.McpReconnect(ctx, connect.NewRequest(&v1.McpReconnectRequest{SessionId: "s1", ServerName: "nope"})); connect.CodeOf(err) != connect.CodeNotFound {
+	if _, err := c.McpReconnect(ctx, connect.NewRequest(&v1.McpReconnectRequest{ThreadId: "s1", ServerName: "nope"})); connect.CodeOf(err) != connect.CodeNotFound {
 		t.Errorf("unknown server: %v", err)
 	}
 
@@ -122,7 +122,7 @@ func TestThreadMcp(t *testing.T) {
 			break
 		}
 	}
-	none, err := c.McpStatus(ctx, connect.NewRequest(&v1.McpStatusRequest{SessionId: "s1"}))
+	none, err := c.McpStatus(ctx, connect.NewRequest(&v1.McpStatusRequest{ThreadId: "s1"}))
 	if err != nil || none.Msg.GetStatus() != nil {
 		t.Errorf("no status %v %v", none, err)
 	}

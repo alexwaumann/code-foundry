@@ -111,7 +111,7 @@ func TestCreateInWorkspace(t *testing.T) {
 				return
 			}
 			if s.WorkspaceID != "w-login" || s.RepoID != tt.wantRepo || s.WorktreePath != tt.wantPath() {
-				t.Errorf("session = %+v", s)
+				t.Errorf("thread = %+v", s)
 			}
 			if spec := e.spec(s.ID); !samePath(spec.Cwd, tt.wantPath()) {
 				t.Errorf("cwd = %s, want %s", spec.Cwd, tt.wantPath())
@@ -135,7 +135,7 @@ func TestWorkspaceOwnerSurvivesRestartAndFork(t *testing.T) {
 	s := e.connected(CreateOptions{WorkspaceID: "login", RepoID: "r2", Name: "driver"})
 	cid := argOf(e.spec(s.ID).Argv, "--session-id")
 	e.writeTranscriptIn(e.wt2, cid, userLine("hi"))
-	e.waitFor(s.ID, "discovered", func(s Session) bool { return s.ClaudeSessionID == cid })
+	e.waitFor(s.ID, "discovered", func(s Thread) bool { return s.ClaudeSessionID == cid })
 
 	f, err := e.m.Fork(e.ctx(), s.ID, "")
 	if err != nil {
@@ -244,7 +244,7 @@ func TestCreateNewWorkspace(t *testing.T) {
 			}
 			mem, _ := w.Member(tt.wantRepo)
 			if s.RepoID != tt.wantRepo || s.WorktreePath != mem.WorktreePath || !s.CreatedWorktree || s.Name != tt.wantName {
-				t.Errorf("session = %+v, want cwd %s in %s", s, mem.WorktreePath, tt.wantRepo)
+				t.Errorf("thread = %+v, want cwd %s in %s", s, mem.WorktreePath, tt.wantRepo)
 			}
 			if base := cmp.Or(tt.wantBase, tt.o.NewWorkspace.BaseRef); base != "" && s.BaseRef != base {
 				t.Errorf("base = %q, want %q", s.BaseRef, base)
@@ -314,7 +314,7 @@ func TestWorkspaceThreadSpawn(t *testing.T) {
 	e := newWSEnv(t, func(o *Options) { o.AttachmentsDir, o.Env = att, append(o.Env, base...) })
 	line := "This thread belongs to workspace login. Run `code-foundry workspace members` for the current worktrees."
 	wantEnv := append(slices.Clone(base), "CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1")
-	check := func(what string, s Session, wantDirs ...string) {
+	check := func(what string, s Thread, wantDirs ...string) {
 		t.Helper()
 		spec := e.spec(s.ID)
 		if got := addDirs(spec.Argv); !slices.Equal(got, append([]string{att}, wantDirs...)) {
@@ -331,7 +331,7 @@ func TestWorkspaceThreadSpawn(t *testing.T) {
 	check("create", s, e.wt2)
 	cid := argOf(e.spec(s.ID).Argv, "--session-id")
 	e.writeTranscript(cid, userLine("hi"))
-	e.waitFor(s.ID, "discovered", func(s Session) bool { return s.ClaudeSessionID == cid })
+	e.waitFor(s.ID, "discovered", func(s Thread) bool { return s.ClaudeSessionID == cid })
 
 	// A repo added since: reconnect and fork see it. A member whose worktree is gone is
 	// skipped (claude refuses a missing --add-dir).
@@ -344,7 +344,7 @@ func TestWorkspaceThreadSpawn(t *testing.T) {
 		workspace.Member{RepoID: "r4", WorktreePath: filepath.Join(lib, "gone")})
 	e.ws.Put(w)
 	e.exit(s.ID, 0)
-	e.waitFor(s.ID, "disconnected", func(s Session) bool { return s.State == StateDisconnected })
+	e.waitFor(s.ID, "disconnected", func(s Thread) bool { return s.State == StateDisconnected })
 	r, err := e.m.Reconnect(e.ctx(), s.ID)
 	if err != nil {
 		t.Fatal(err)

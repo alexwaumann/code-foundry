@@ -160,7 +160,7 @@ func (e *env) ctx() context.Context {
 }
 
 // waitFor polls the session until cond holds.
-func (e *env) waitFor(id, what string, cond func(Session) bool) Session {
+func (e *env) waitFor(id, what string, cond func(Thread) bool) Thread {
 	e.t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
 	for {
@@ -169,13 +169,13 @@ func (e *env) waitFor(id, what string, cond func(Session) bool) Session {
 			return s
 		}
 		if time.Now().After(deadline) {
-			e.t.Fatalf("timed out waiting for %s; session = %+v (err %v)", what, s, err)
+			e.t.Fatalf("timed out waiting for %s; thread = %+v (err %v)", what, s, err)
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
 }
 
-func (e *env) create(o CreateOptions) Session {
+func (e *env) create(o CreateOptions) Thread {
 	e.t.Helper()
 	if o.WorktreePath == "" && o.RepoID == "" && !o.NoProject {
 		o.WorktreePath = e.wt
@@ -190,10 +190,10 @@ func (e *env) create(o CreateOptions) Session {
 // connected creates a thread and waits until Claude answered the handshake and the
 // status says so (the first reading is published after a debounce when no prompt was
 // sent), so no update from the start is still on its way.
-func (e *env) connected(o CreateOptions) Session {
+func (e *env) connected(o CreateOptions) Thread {
 	e.t.Helper()
 	s := e.create(o)
-	return e.waitFor(s.ID, "connected", func(s Session) bool { return s.State == StateConnected && s.Status != StatusUnknown })
+	return e.waitFor(s.ID, "connected", func(s Thread) bool { return s.State == StateConnected && s.Status != StatusUnknown })
 }
 
 // pid is the process id of the thread's running claude.
@@ -345,7 +345,7 @@ func argOf(argv []string, flag string) string {
 // assert something was not published.
 const sentinelLink = `{"type":"pr-link","sessionId":"x","prNumber":999,"prUrl":"https://github.com/o/sentinel/pull/999","prRepository":"o/sentinel","timestamp":"2026-10-10T00:00:00Z"}`
 
-func linkedSentinel(s Session) bool {
+func linkedSentinel(s Thread) bool {
 	return slices.ContainsFunc(s.LinkedPullRequests, func(l LinkedPullRequest) bool { return l.Number == 999 })
 }
 
@@ -373,7 +373,7 @@ func TestCreateSpawnsClaude(t *testing.T) {
 	if err != nil || !strings.Contains(string(cfg), realPath(e.wt)) || !strings.Contains(string(cfg), "hasTrustDialogAccepted") {
 		t.Errorf("worktree not pre-trusted: %s (%v)", cfg, err)
 	}
-	e.waitFor(s.ID, "connected", func(s Session) bool { return s.State == StateConnected })
+	e.waitFor(s.ID, "connected", func(s Thread) bool { return s.State == StateConnected })
 }
 
 func TestCreateResolvesWorktree(t *testing.T) {
@@ -400,7 +400,7 @@ func TestCreateResolvesWorktree(t *testing.T) {
 				t.Fatalf("err = %v, want %v", err, tt.wantErr)
 			}
 			if err == nil && (s.WorktreePath != e.wt || s.RepoID != "r1") {
-				t.Errorf("session = %+v", s)
+				t.Errorf("thread = %+v", s)
 			}
 		})
 	}
@@ -409,8 +409,8 @@ func TestCreateResolvesWorktree(t *testing.T) {
 	if _, err := bad.m.Create(bad.ctx(), CreateOptions{RepoID: "r1"}); err == nil {
 		t.Fatal("spawn failure not reported")
 	}
-	if n := len(bad.m.Snapshot().Sessions); n != 0 {
-		t.Errorf("failed create left a row: %d sessions", n)
+	if n := len(bad.m.Snapshot().Threads); n != 0 {
+		t.Errorf("failed create left a row: %d threads", n)
 	}
 }
 
@@ -423,9 +423,9 @@ func TestExitWithoutCloseDisconnects(t *testing.T) {
 			e := newEnv(t)
 			s := e.connected(CreateOptions{})
 			e.exit(s.ID, tt.code)
-			got := e.waitFor(s.ID, "disconnected", func(s Session) bool { return s.State == StateDisconnected })
+			got := e.waitFor(s.ID, "disconnected", func(s Thread) bool { return s.State == StateDisconnected })
 			if got.DisconnectReason != tt.reason || got.ExitCode != tt.code {
-				t.Errorf("session = %+v", got)
+				t.Errorf("thread = %+v", got)
 			}
 			if tt.code == 1 && !strings.Contains(got.LastError, "fake claude: exit 1") {
 				t.Errorf("last error %q, want the stderr line", got.LastError)
@@ -477,9 +477,9 @@ func TestTranscriptDiscoveryAndAutoNaming(t *testing.T) {
 		t.Fatalf("claude session id known before the transcript: %q", s.ClaudeSessionID)
 	}
 	e.writeTranscript(cid, `{"type":"mode","mode":"normal"}`, userLine("pong please"))
-	got := e.waitFor(s.ID, "named", func(s Session) bool { return s.Name != "" })
+	got := e.waitFor(s.ID, "named", func(s Thread) bool { return s.Name != "" })
 	if got.ClaudeSessionID != cid || got.Name != "named-pong" || !got.AutoNamed {
-		t.Errorf("session = %+v", got)
+		t.Errorf("thread = %+v", got)
 	}
 	e.writeTranscript(cid, userLine("second message"))
 	time.Sleep(100 * time.Millisecond)
@@ -502,12 +502,12 @@ func TestExplicitNameOrRenameSkipsAutoNaming(t *testing.T) {
 	e := newEnv(t)
 	s := e.connected(CreateOptions{Name: "chosen"})
 	e.writeTranscript(argOf(e.spec(s.ID).Argv, "--session-id"), userLine("hello there"))
-	e.waitFor(s.ID, "discovered", func(s Session) bool { return s.ClaudeSessionID != "" })
+	e.waitFor(s.ID, "discovered", func(s Thread) bool { return s.ClaudeSessionID != "" })
 	time.Sleep(50 * time.Millisecond)
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if len(e.named) != 0 {
-		t.Errorf("namer called for an explicitly named session: %q", e.named)
+		t.Errorf("namer called for an explicitly named thread: %q", e.named)
 	}
 }
 
@@ -521,7 +521,7 @@ func TestFollowsClearViaPidFile(t *testing.T) {
 	}
 	time.Sleep(60 * time.Millisecond)
 	e.writeTranscript("rotated-id", `{"type":"mode"}`)
-	e.waitFor(s.ID, "rotated id", func(s Session) bool { return s.ClaudeSessionID == "rotated-id" })
+	e.waitFor(s.ID, "rotated id", func(s Thread) bool { return s.ClaudeSessionID == "rotated-id" })
 }
 
 func TestReconnectResumesOrStartsFresh(t *testing.T) {
@@ -532,9 +532,9 @@ func TestReconnectResumesOrStartsFresh(t *testing.T) {
 	}
 	cid := argOf(e.spec(s.ID).Argv, "--session-id")
 	e.writeTranscript(cid, userLine("hi"))
-	e.waitFor(s.ID, "discovered", func(s Session) bool { return s.ClaudeSessionID == cid })
+	e.waitFor(s.ID, "discovered", func(s Thread) bool { return s.ClaudeSessionID == cid })
 	e.exit(s.ID, 0)
-	e.waitFor(s.ID, "disconnected", func(s Session) bool { return s.State == StateDisconnected })
+	e.waitFor(s.ID, "disconnected", func(s Thread) bool { return s.State == StateDisconnected })
 
 	r, err := e.m.Reconnect(e.ctx(), s.ID)
 	if err != nil {
@@ -548,12 +548,12 @@ func TestReconnectResumesOrStartsFresh(t *testing.T) {
 	if r.State != StateStarting || r.LastError != "" || r.DisconnectReason != "" {
 		t.Errorf("reconnected = %+v", r)
 	}
-	e.waitFor(s.ID, "connected", func(s Session) bool { return s.State == StateConnected })
+	e.waitFor(s.ID, "connected", func(s Thread) bool { return s.State == StateConnected })
 
 	// A session that never got a message has nothing to resume.
 	s2 := e.connected(CreateOptions{})
 	e.exit(s2.ID, 0)
-	e.waitFor(s2.ID, "disconnected", func(s Session) bool { return s.State == StateDisconnected })
+	e.waitFor(s2.ID, "disconnected", func(s Thread) bool { return s.State == StateDisconnected })
 	r2, err := e.m.Reconnect(e.ctx(), s2.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -575,7 +575,7 @@ func TestFork(t *testing.T) {
 	}
 	cid := argOf(e.spec(s.ID).Argv, "--session-id")
 	e.writeTranscript(cid, userLine("hi"))
-	e.waitFor(s.ID, "discovered", func(s Session) bool { return s.ClaudeSessionID == cid })
+	e.waitFor(s.ID, "discovered", func(s Thread) bool { return s.ClaudeSessionID == cid })
 	f, err := e.m.Fork(e.ctx(), s.ID, "")
 	if err != nil {
 		t.Fatal(err)
@@ -588,7 +588,7 @@ func TestFork(t *testing.T) {
 	if f.ParentID != s.ID || f.Name != "Base work (fork)" || f.AutoNamed || f.ID == s.ID || f.WorktreePath != s.WorktreePath {
 		t.Errorf("fork = %+v", f)
 	}
-	e.waitFor(f.ID, "fork connected", func(s Session) bool { return s.State == StateConnected })
+	e.waitFor(f.ID, "fork connected", func(s Thread) bool { return s.State == StateConnected })
 	if _, err := e.m.Items(e.ctx(), f.ID); err != nil {
 		t.Errorf("fork items: %v", err)
 	}
@@ -614,18 +614,18 @@ func TestRemoveClosesThenForgets(t *testing.T) {
 			t.Fatal("no Removed event")
 		}
 	}
-	rows, _ := loadSessions(context.Background(), e.m.opts.DB)
+	rows, _ := loadThreads(context.Background(), e.m.opts.DB)
 	if len(rows) != 0 {
 		t.Errorf("rows after remove: %+v", rows)
 	}
 }
 
-func TestSessionsSurviveRestartAsDisconnected(t *testing.T) {
+func TestThreadsSurviveRestartAsDisconnected(t *testing.T) {
 	e := newEnv(t)
 	live := e.connected(CreateOptions{Name: "live"})
 	cid := argOf(e.spec(live.ID).Argv, "--session-id")
 	e.writeTranscript(cid, userLine("hi"))
-	e.waitFor(live.ID, "discovered", func(s Session) bool { return s.ClaudeSessionID == cid })
+	e.waitFor(live.ID, "discovered", func(s Thread) bool { return s.ClaudeSessionID == cid })
 
 	// Clean shutdown: "daemon stopped".
 	e.restart()
@@ -639,7 +639,7 @@ func TestSessionsSurviveRestartAsDisconnected(t *testing.T) {
 	}
 	// A row left live by a crash is repaired on load.
 	got.State = StateConnected
-	if err := saveSession(context.Background(), e.m.opts.DB, got); err != nil {
+	if err := saveThread(context.Background(), e.m.opts.DB, got); err != nil {
 		t.Fatal(err)
 	}
 	e.restart()
@@ -663,7 +663,7 @@ func TestPermissionModeIsKeptForReconnectAndFork(t *testing.T) {
 	}
 	cid := argOf(argv, "--session-id")
 	e.writeTranscript(cid, userLine("hi"))
-	e.waitFor(s.ID, "discovered", func(s Session) bool { return s.ClaudeSessionID == cid })
+	e.waitFor(s.ID, "discovered", func(s Thread) bool { return s.ClaudeSessionID == cid })
 	e.restart()
 	got, _ := e.m.Get(e.ctx(), s.ID)
 	if got.PermissionMode != PermissionAcceptEdits {
@@ -694,8 +694,8 @@ func TestEventsAndSnapshot(t *testing.T) {
 	for !slices.Contains(states, StateConnected) {
 		select {
 		case ev := <-e.events.C():
-			if u, ok := ev.(Updated); ok && u.Session.ID == s.ID {
-				states = append(states, u.Session.State)
+			if u, ok := ev.(Updated); ok && u.Thread.ID == s.ID {
+				states = append(states, u.Thread.State)
 			}
 		case <-timeout:
 			t.Fatalf("states seen: %v", states)
@@ -705,7 +705,7 @@ func TestEventsAndSnapshot(t *testing.T) {
 		t.Errorf("first state = %v", states[0])
 	}
 	snap := e.m.Snapshot()
-	if len(snap.Sessions) != 1 || snap.Sessions[0].ID != s.ID {
+	if len(snap.Threads) != 1 || snap.Threads[0].ID != s.ID {
 		t.Errorf("snapshot = %+v", snap)
 	}
 }

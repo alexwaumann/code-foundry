@@ -247,7 +247,7 @@ function shellsNote(n: number): string {
 
 /** thread.agents and view.panel.agents, like the daemon's (any active thread). */
 export function agentsCommands(threads: AgentThreads, emit: (i: UiIntentInit) => number): Command[] {
-  const when = (ctx: UiContext | undefined) => Boolean(ctx?.activeSessionId);
+  const when = (ctx: UiContext | undefined) => Boolean(ctx?.activeThreadId);
   return [
     {
       cmd: {
@@ -260,7 +260,7 @@ export function agentsCommands(threads: AgentThreads, emit: (i: UiIntentInit) =>
       },
       when,
       run: (ctx, a) => {
-        const id = a.id || ctx?.activeSessionId || "";
+        const id = a.id || ctx?.activeThreadId || "";
         threads.calls.push(`agents ${id}`);
         const runs = threads.agentsOf(id);
         const shells = shellsNote(threads.shellsOf(id));

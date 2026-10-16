@@ -15,7 +15,7 @@ func TestFakeLifecycle(t *testing.T) {
 	f := New(nil)
 	events, _ := f.Watch(ctx)
 
-	term, err := f.Create(ctx, terminal.Spec{Argv: []string{"claude"}, Labels: map[string]string{"session": "s1"}})
+	term, err := f.Create(ctx, terminal.Spec{Argv: []string{"claude"}, Labels: map[string]string{"thread": "s1"}})
 	if err != nil {
 		t.Fatal(err)
 	}

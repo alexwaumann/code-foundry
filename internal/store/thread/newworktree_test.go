@@ -68,14 +68,14 @@ func TestCreateNewWorktree(t *testing.T) {
 		wantCalls  int
 		wantBase   string
 	}{
-		{name: "title in time names the session, its slug the branch", o: CreateOptions{RepoID: "r1", InitialPrompt: "fix the login bug"},
+		{name: "title in time names the thread, its slug the branch", o: CreateOptions{RepoID: "r1", InitialPrompt: "fix the login bug"},
 			namer: func(int, string) (string, error) { return "Fix the login bug", nil }, wantBranch: "cf/fix-the-login-bug",
 			wantName: "Fix the login bug", wantCalls: 1, wantBase: "origin/main"},
 		{name: "a six-word title keeps every word in the branch", o: CreateOptions{RepoID: "r1", InitialPrompt: "x"},
 			namer:      func(int, string) (string, error) { return "Add README usage section for tests", nil },
 			wantBranch: "cf/add-readme-usage-section-for-tests", wantName: "Add README usage section for tests", wantCalls: 1,
 			wantBase: "origin/main"},
-		{name: "a title with nothing to slugify names the session, the branch is the id", o: CreateOptions{RepoID: "r1", InitialPrompt: "x"},
+		{name: "a title with nothing to slugify names the thread, the branch is the id", o: CreateOptions{RepoID: "r1", InitialPrompt: "x"},
 			namer: func(int, string) (string, error) { return "Добавить тёмную тему", nil }, wantBranch: "<id>",
 			wantName: "Добавить тёмную тему", wantCalls: 1, wantBase: "origin/main"},
 		{name: "explicit base ref", o: CreateOptions{RepoID: "r1", InitialPrompt: "x", NewWorktree: &NewWorktree{BaseRef: "origin/dev"}},
@@ -136,7 +136,7 @@ func TestCreateNewWorktree(t *testing.T) {
 			wantPath := rr.WorktreeRoot + "/_local/repo/" + strings.ReplaceAll(branch, "/", "-")
 			if !s.CreatedWorktree || s.WorktreePath != wantPath || s.RepoID != "r1" || s.BaseRef != tt.wantBase ||
 				s.Name != tt.wantName || s.AutoNamed != (tt.wantName != "" && tt.o.Name == "") {
-				t.Errorf("session = %+v", s)
+				t.Errorf("thread = %+v", s)
 			}
 			spec := e.spec(s.ID)
 			if !samePath(spec.Cwd, wantPath) {
@@ -152,7 +152,7 @@ func TestCreateNewWorktree(t *testing.T) {
 			cid := argOf(spec.Argv, "--session-id")
 			e.wt = s.WorktreePath
 			e.writeTranscript(cid, userLine("x"))
-			e.waitFor(s.ID, "discovered", func(s Session) bool { return s.ClaudeSessionID == cid })
+			e.waitFor(s.ID, "discovered", func(s Thread) bool { return s.ClaudeSessionID == cid })
 			time.Sleep(50 * time.Millisecond)
 			e.mu.Lock()
 			n2 := len(e.named)
@@ -183,7 +183,7 @@ func TestCreateNewWorktreeUsesWorktreePathOption(t *testing.T) {
 	}
 	want := dir + "/repo/cf-do-x"
 	if got := rr.created(); len(got) != 1 || got[0].Path != want || s.WorktreePath != want {
-		t.Fatalf("CreateWorktree calls = %+v, session path %q", got, s.WorktreePath)
+		t.Fatalf("CreateWorktree calls = %+v, thread path %q", got, s.WorktreePath)
 	}
 }
 
@@ -206,14 +206,14 @@ func TestCreateNewWorktreeSlugTimeoutNamesLater(t *testing.T) {
 		t.Fatalf("CreateWorktree calls = %+v", got)
 	}
 	if s.Name != "" || s.State != StateStarting {
-		t.Fatalf("session = %+v", s)
+		t.Fatalf("thread = %+v", s)
 	}
 	close(release)
-	got := e.waitFor(s.ID, "named", func(s Session) bool { return s.Name == "Slow name" })
+	got := e.waitFor(s.ID, "named", func(s Thread) bool { return s.Name == "Slow name" })
 	if !got.AutoNamed {
-		t.Errorf("session = %+v", got)
+		t.Errorf("thread = %+v", got)
 	}
-	rows, _ := loadSessions(context.Background(), e.m.opts.DB)
+	rows, _ := loadThreads(context.Background(), e.m.opts.DB)
 	if len(rows) != 1 || rows[0].Name != "Slow name" || !rows[0].CreatedWorktree || rows[0].BaseRef != "origin/main" {
 		t.Errorf("rows = %+v", rows)
 	}
@@ -267,10 +267,10 @@ func TestCreateNewWorktreeFailures(t *testing.T) {
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("err = %v, want %v", err, tt.wantErr)
 			}
-			if n := len(e.m.Snapshot().Sessions); n != 0 {
-				t.Errorf("failed create left %d sessions", n)
+			if n := len(e.m.Snapshot().Threads); n != 0 {
+				t.Errorf("failed create left %d threads", n)
 			}
-			if rows, _ := loadSessions(context.Background(), e.m.opts.DB); len(rows) != 0 {
+			if rows, _ := loadThreads(context.Background(), e.m.opts.DB); len(rows) != 0 {
 				t.Errorf("failed create persisted %+v", rows)
 			}
 		})

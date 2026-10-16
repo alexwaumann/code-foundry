@@ -1,7 +1,7 @@
 import { create, toJsonString } from "@bufbuild/protobuf";
 import { Code, ConnectError } from "@connectrpc/connect";
 import { describe, expect, it } from "vitest";
-import { SessionSchema } from "@/gen/codefoundry/v1/session_pb";
+import { ThreadSchema } from "@/gen/codefoundry/v1/thread_lifecycle_pb";
 import { GitOpKind, GitOpSchema, GitOpState, GitOpsEventSchema } from "@/gen/codefoundry/v1/gitops_pb";
 import { isGitOpFailure, isGitOpResult, toGitOpsEventView } from "./gitops";
 
@@ -31,7 +31,7 @@ describe("gitops mapping", () => {
     expect(isGitOpResult(toJsonString(GitOpSchema, op))).toBe(true);
     expect(isGitOpResult("")).toBe(false);
     expect(isGitOpResult('{"delivered":2}')).toBe(false);
-    expect(isGitOpResult(toJsonString(SessionSchema, create(SessionSchema, { id: "s-1", name: "x" })))).toBe(false);
+    expect(isGitOpResult(toJsonString(ThreadSchema, create(ThreadSchema, { id: "s-1", name: "x" })))).toBe(false);
     expect(isGitOpResult("not json")).toBe(false);
   });
 

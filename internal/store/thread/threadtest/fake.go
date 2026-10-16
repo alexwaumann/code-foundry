@@ -27,7 +27,7 @@ type Fake struct {
 	mu      sync.Mutex
 	next    int
 	staged  int
-	byID    map[string]thread.Session
+	byID    map[string]thread.Thread
 	snap    *thread.Snapshot
 	calls   []string
 	retired []thread.UsageBucket
@@ -44,7 +44,7 @@ func New(b *bus.Bus) *Fake {
 	if b == nil {
 		b = bus.New()
 	}
-	return &Fake{bus: b, Now: time.Now, byID: map[string]thread.Session{}, snap: &thread.Snapshot{},
+	return &Fake{bus: b, Now: time.Now, byID: map[string]thread.Thread{}, snap: &thread.Snapshot{},
 		items: map[string]*thread.ItemsSnapshot{}, watchers: map[string]int{}}
 }
 
@@ -59,26 +59,26 @@ func (f *Fake) Calls() []string {
 }
 
 // Put inserts or replaces a session and publishes Updated.
-func (f *Fake) Put(s thread.Session) {
+func (f *Fake) Put(s thread.Thread) {
 	f.mu.Lock()
 	f.byID[s.ID] = s
 	f.rebuild()
 	f.mu.Unlock()
-	bus.Publish[thread.Event](f.bus, thread.Updated{Session: s})
+	bus.Publish[thread.Event](f.bus, thread.Updated{Thread: s})
 }
 
 func (f *Fake) rebuild() {
-	out := make([]thread.Session, 0, len(f.byID))
+	out := make([]thread.Thread, 0, len(f.byID))
 	for _, s := range f.byID {
 		out = append(out, s)
 	}
-	slices.SortFunc(out, func(a, b thread.Session) int {
+	slices.SortFunc(out, func(a, b thread.Thread) int {
 		if c := a.CreatedAt.Compare(b.CreatedAt); c != 0 {
 			return c
 		}
 		return strings.Compare(a.ID, b.ID)
 	})
-	f.snap = &thread.Snapshot{Sessions: out, RetiredUsage: f.retired}
+	f.snap = &thread.Snapshot{Threads: out, RetiredUsage: f.retired}
 }
 
 func (f *Fake) record(call string) error {
@@ -86,20 +86,20 @@ func (f *Fake) record(call string) error {
 	return f.Err
 }
 
-func (f *Fake) get(id string) (thread.Session, error) {
+func (f *Fake) get(id string) (thread.Thread, error) {
 	s, ok := f.byID[id]
 	if !ok {
-		return thread.Session{}, fmt.Errorf("%w: %s", thread.ErrNotFound, id)
+		return thread.Thread{}, fmt.Errorf("%w: %s", thread.ErrNotFound, id)
 	}
 	return s, nil
 }
 
 // mutate applies fn to session id under the lock and publishes the result.
-func (f *Fake) mutate(call, id string, fn func(*thread.Session) error) (thread.Session, error) {
+func (f *Fake) mutate(call, id string, fn func(*thread.Thread) error) (thread.Thread, error) {
 	f.mu.Lock()
 	if err := f.record(call); err != nil {
 		f.mu.Unlock()
-		return thread.Session{}, err
+		return thread.Thread{}, err
 	}
 	s, err := f.get(id)
 	if err == nil {
@@ -107,20 +107,20 @@ func (f *Fake) mutate(call, id string, fn func(*thread.Session) error) (thread.S
 	}
 	if err != nil {
 		f.mu.Unlock()
-		return thread.Session{}, err
+		return thread.Thread{}, err
 	}
 	f.byID[id] = s
 	f.rebuild()
 	f.mu.Unlock()
-	bus.Publish[thread.Event](f.bus, thread.Updated{Session: s})
+	bus.Publish[thread.Event](f.bus, thread.Updated{Thread: s})
 	return s, nil
 }
 
-func (f *Fake) add(call string, s thread.Session) (thread.Session, error) {
+func (f *Fake) add(call string, s thread.Thread) (thread.Thread, error) {
 	f.mu.Lock()
 	if err := f.record(call); err != nil {
 		f.mu.Unlock()
-		return thread.Session{}, err
+		return thread.Thread{}, err
 	}
 	f.next++
 	s.ID = fmt.Sprintf("s-%d", f.next)
@@ -130,7 +130,7 @@ func (f *Fake) add(call string, s thread.Session) (thread.Session, error) {
 	f.byID[s.ID] = s
 	f.rebuild()
 	f.mu.Unlock()
-	bus.Publish[thread.Event](f.bus, thread.Updated{Session: s})
+	bus.Publish[thread.Event](f.bus, thread.Updated{Thread: s})
 	return s, nil
 }
 
@@ -142,9 +142,9 @@ func (f *Fake) add(call string, s thread.Session) (thread.Session, error) {
 // <effort>", then " perm=<n>", " new-worktree=<base>", " workspace=<id>",
 // " new-workspace=<a,b>", " no-project", " prompt=<text>"
 // " composer=<text>" and " attachments=<a,b>" when set.
-func (f *Fake) Create(_ context.Context, o thread.CreateOptions) (thread.Session, error) {
+func (f *Fake) Create(_ context.Context, o thread.CreateOptions) (thread.Thread, error) {
 	call := fmt.Sprintf("Create %s %s %s %s", o.RepoID, o.WorktreePath, o.Model, o.Effort)
-	s := thread.Session{
+	s := thread.Thread{
 		RepoID: o.RepoID, WorktreePath: o.WorktreePath, Model: o.Model, Effort: o.Effort, Name: o.Name,
 		PermissionMode: o.PermissionMode,
 	}
@@ -207,29 +207,29 @@ func (f *Fake) ReadAttachment(_ context.Context, path string) ([]byte, string, e
 }
 
 // Fork adds a STARTING session with ParentID set.
-func (f *Fake) Fork(_ context.Context, id, name string) (thread.Session, error) {
+func (f *Fake) Fork(_ context.Context, id, name string) (thread.Thread, error) {
 	f.mu.Lock()
 	parent, err := f.get(id)
 	f.mu.Unlock()
 	if err != nil {
-		return thread.Session{}, err
+		return thread.Thread{}, err
 	}
-	return f.add("Fork "+id, thread.Session{
+	return f.add("Fork "+id, thread.Thread{
 		RepoID: parent.RepoID, WorktreePath: parent.WorktreePath, Model: parent.Model, Effort: parent.Effort,
 		Name: name, ParentID: id, PermissionMode: parent.PermissionMode, WorkspaceID: parent.WorkspaceID,
 	})
 }
 
 // Get returns one session.
-func (f *Fake) Get(_ context.Context, id string) (thread.Session, error) {
+func (f *Fake) Get(_ context.Context, id string) (thread.Thread, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.get(id)
 }
 
 // Rename sets the name and clears AutoNamed.
-func (f *Fake) Rename(_ context.Context, id, name string) (thread.Session, error) {
-	return f.mutate("Rename "+id+" "+name, id, func(s *thread.Session) error {
+func (f *Fake) Rename(_ context.Context, id, name string) (thread.Thread, error) {
+	return f.mutate("Rename "+id+" "+name, id, func(s *thread.Thread) error {
 		if strings.TrimSpace(name) == "" {
 			return fmt.Errorf("%w: name is empty", thread.ErrInvalidArgument)
 		}
@@ -239,8 +239,8 @@ func (f *Fake) Rename(_ context.Context, id, name string) (thread.Session, error
 }
 
 // Pin records "Pin <id> <pinned>" and sets Pinned. Pinning unarchives and unsnoozes.
-func (f *Fake) Pin(_ context.Context, id string, pinned bool) (thread.Session, error) {
-	return f.mutate(fmt.Sprintf("Pin %s %t", id, pinned), id, func(s *thread.Session) error {
+func (f *Fake) Pin(_ context.Context, id string, pinned bool) (thread.Thread, error) {
+	return f.mutate(fmt.Sprintf("Pin %s %t", id, pinned), id, func(s *thread.Thread) error {
 		s.Pinned = pinned
 		if pinned {
 			s.ArchivedAt, s.SnoozedUntil = time.Time{}, time.Time{}
@@ -252,8 +252,8 @@ func (f *Fake) Pin(_ context.Context, id string, pinned bool) (thread.Session, e
 // Archive records "Archive <id> <archived>". Archiving disconnects a live session
 // (reason "closed"), unpins and unsnoozes it and sets ArchivedAt to Now unless already
 // set; unarchiving clears ArchivedAt only. No shells are involved.
-func (f *Fake) Archive(_ context.Context, id string, archived bool) (thread.Session, error) {
-	return f.mutate(fmt.Sprintf("Archive %s %t", id, archived), id, func(s *thread.Session) error {
+func (f *Fake) Archive(_ context.Context, id string, archived bool) (thread.Thread, error) {
+	return f.mutate(fmt.Sprintf("Archive %s %t", id, archived), id, func(s *thread.Thread) error {
 		if !archived {
 			s.ArchivedAt = time.Time{}
 			return nil
@@ -274,12 +274,12 @@ func (f *Fake) Archive(_ context.Context, id string, archived bool) (thread.Sess
 // (reason "closed"), unpins and unarchives it and sets SnoozedUntil; unsnoozing clears
 // SnoozedUntil only. No shells are involved and nothing wakes: tests Put the woken
 // state.
-func (f *Fake) Snooze(_ context.Context, id string, until time.Time) (thread.Session, error) {
+func (f *Fake) Snooze(_ context.Context, id string, until time.Time) (thread.Thread, error) {
 	call := "Snooze " + id + " -"
 	if !until.IsZero() {
 		call = "Snooze " + id + " " + until.UTC().Format("2006-01-02T15:04:05.000Z07:00")
 	}
-	return f.mutate(call, id, func(s *thread.Session) error {
+	return f.mutate(call, id, func(s *thread.Thread) error {
 		if until.IsZero() {
 			s.SnoozedUntil = time.Time{}
 			return nil
@@ -297,7 +297,7 @@ func (f *Fake) Snooze(_ context.Context, id string, until time.Time) (thread.Ses
 
 // Close disconnects the session with reason "closed".
 func (f *Fake) Close(_ context.Context, id string) error {
-	_, err := f.mutate("Close "+id, id, func(s *thread.Session) error {
+	_, err := f.mutate("Close "+id, id, func(s *thread.Thread) error {
 		if s.State != thread.StateDisconnected {
 			s.State, s.DisconnectReason = thread.StateDisconnected, thread.ReasonClosed
 		}
@@ -308,10 +308,10 @@ func (f *Fake) Close(_ context.Context, id string) error {
 
 // Reconnect requires DISCONNECTED and moves the session to STARTING, unarchived and
 // unsnoozed.
-func (f *Fake) Reconnect(_ context.Context, id string) (thread.Session, error) {
-	return f.mutate("Reconnect "+id, id, func(s *thread.Session) error {
+func (f *Fake) Reconnect(_ context.Context, id string) (thread.Thread, error) {
+	return f.mutate("Reconnect "+id, id, func(s *thread.Thread) error {
 		if s.State != thread.StateDisconnected {
-			return fmt.Errorf("%w: session %s is %s", thread.ErrFailedPrecondition, id, s.State)
+			return fmt.Errorf("%w: thread %s is %s", thread.ErrFailedPrecondition, id, s.State)
 		}
 		s.State, s.DisconnectReason, s.ArchivedAt, s.SnoozedUntil = thread.StateStarting, "", time.Time{}, time.Time{}
 		return nil
@@ -321,8 +321,8 @@ func (f *Fake) Reconnect(_ context.Context, id string) (thread.Session, error) {
 // RunIn records "RunIn <id> <repo> <path>". It requires a workspace thread. A
 // disconnected session moves at once to the path (else /worktrees/<repo>); a live one
 // gets it as PendingWorktreePath.
-func (f *Fake) RunIn(_ context.Context, id string, t thread.RunInTarget) (thread.Session, error) {
-	return f.mutate("RunIn "+id+" "+t.RepoID+" "+t.WorktreePath, id, func(s *thread.Session) error {
+func (f *Fake) RunIn(_ context.Context, id string, t thread.RunInTarget) (thread.Thread, error) {
+	return f.mutate("RunIn "+id+" "+t.RepoID+" "+t.WorktreePath, id, func(s *thread.Thread) error {
 		if s.WorkspaceID == "" {
 			return fmt.Errorf("%w: thread %s does not belong to a workspace", thread.ErrFailedPrecondition, id)
 		}
@@ -385,7 +385,7 @@ func (f *Fake) Snapshot() *thread.Snapshot {
 // request items) and publishes ItemAppended for each.
 func (f *Fake) PutItems(id string, items ...thread.Item) {
 	f.mu.Lock()
-	snap := &thread.ItemsSnapshot{SessionID: id}
+	snap := &thread.ItemsSnapshot{ThreadID: id}
 	f.items[id] = snap
 	var evs []thread.ThreadEvent
 	for i, it := range items {
@@ -394,7 +394,7 @@ func (f *Fake) PutItems(id string, items ...thread.Item) {
 		}
 		snap.Seq++
 		snap.Items = append(snap.Items, it)
-		evs = append(evs, thread.ItemAppended{SessionID: id, Seq: snap.Seq, Item: it})
+		evs = append(evs, thread.ItemAppended{ThreadID: id, Seq: snap.Seq, Item: it})
 	}
 	snap.Pending = pending(snap.Items)
 	f.mu.Unlock()
@@ -416,7 +416,7 @@ func pending(items []thread.Item) []thread.PendingRequest {
 func (f *Fake) itemsLocked(id string) thread.ItemsSnapshot {
 	snap, ok := f.items[id]
 	if !ok {
-		return thread.ItemsSnapshot{SessionID: id}
+		return thread.ItemsSnapshot{ThreadID: id}
 	}
 	out := *snap
 	out.Items = slices.Clone(snap.Items)
@@ -462,14 +462,14 @@ func (f *Fake) Watchers(id string) int {
 func (f *Fake) appendItem(id string, it thread.Item) (thread.Item, thread.ThreadEvent) {
 	snap, ok := f.items[id]
 	if !ok {
-		snap = &thread.ItemsSnapshot{SessionID: id}
+		snap = &thread.ItemsSnapshot{ThreadID: id}
 		f.items[id] = snap
 	}
 	it.Ordinal = int64(len(snap.Items) + 1)
 	it.CreatedAt, it.UpdatedAt = f.Now(), f.Now()
 	snap.Seq++
 	snap.Items = append(snap.Items, it)
-	return it, thread.ItemAppended{SessionID: id, Seq: snap.Seq, Item: it}
+	return it, thread.ItemAppended{ThreadID: id, Seq: snap.Seq, Item: it}
 }
 
 // Send records "Send <id> <text>" (" attachments=<a,b>" and " composer=<text>" when
@@ -509,7 +509,7 @@ func (f *Fake) Send(_ context.Context, id string, msg thread.Message) (thread.It
 	f.mu.Unlock()
 	bus.Publish(f.bus, ev)
 	if changed {
-		bus.Publish[thread.Event](f.bus, thread.Updated{Session: s})
+		bus.Publish[thread.Event](f.bus, thread.Updated{Thread: s})
 	}
 	return it, nil
 }
@@ -562,8 +562,8 @@ func (f *Fake) Respond(_ context.Context, id, requestID string, d thread.Decisio
 	snap.Seq++
 	snap.Pending = pending(snap.Items)
 	evs := []thread.ThreadEvent{
-		thread.ItemUpdated{SessionID: id, Seq: snap.Seq, Item: it},
-		thread.PendingChanged{SessionID: id, Seq: snap.Seq + 1, Pending: snap.Pending},
+		thread.ItemUpdated{ThreadID: id, Seq: snap.Seq, Item: it},
+		thread.PendingChanged{ThreadID: id, Seq: snap.Seq + 1, Pending: snap.Pending},
 	}
 	snap.Seq++
 	f.mu.Unlock()
@@ -585,8 +585,8 @@ func (f *Fake) Interrupt(_ context.Context, id string) error {
 }
 
 // SetModel records "SetModel <id> <model>" and sets Model.
-func (f *Fake) SetModel(_ context.Context, id, model string) (thread.Session, error) {
-	return f.mutate("SetModel "+id+" "+model, id, func(s *thread.Session) error {
+func (f *Fake) SetModel(_ context.Context, id, model string) (thread.Thread, error) {
+	return f.mutate("SetModel "+id+" "+model, id, func(s *thread.Thread) error {
 		s.Model = model
 		return nil
 	})
@@ -594,8 +594,8 @@ func (f *Fake) SetModel(_ context.Context, id, model string) (thread.Session, er
 
 // SetPermissionMode records "SetPermissionMode <id> <n>" and sets PermissionMode;
 // PermissionDefault is refused like the Manager does.
-func (f *Fake) SetPermissionMode(_ context.Context, id string, mode thread.PermissionMode) (thread.Session, error) {
-	return f.mutate(fmt.Sprintf("SetPermissionMode %s %d", id, mode), id, func(s *thread.Session) error {
+func (f *Fake) SetPermissionMode(_ context.Context, id string, mode thread.PermissionMode) (thread.Thread, error) {
+	return f.mutate(fmt.Sprintf("SetPermissionMode %s %d", id, mode), id, func(s *thread.Thread) error {
 		if mode < thread.PermissionSupervised || mode > thread.PermissionAuto {
 			return fmt.Errorf("%w: permission mode %d", thread.ErrInvalidArgument, mode)
 		}
@@ -606,8 +606,8 @@ func (f *Fake) SetPermissionMode(_ context.Context, id string, mode thread.Permi
 
 // SetEffort implements thread.Store: the row's effort changes at once (no restart to
 // fake).
-func (f *Fake) SetEffort(_ context.Context, id, effort string) (thread.Session, error) {
-	return f.mutate(fmt.Sprintf("SetEffort %s %s", id, effort), id, func(s *thread.Session) error {
+func (f *Fake) SetEffort(_ context.Context, id, effort string) (thread.Thread, error) {
+	return f.mutate(fmt.Sprintf("SetEffort %s %s", id, effort), id, func(s *thread.Thread) error {
 		if !slices.Contains(thread.Efforts, effort) {
 			return fmt.Errorf("%w: effort %q", thread.ErrInvalidArgument, effort)
 		}
@@ -621,12 +621,12 @@ func (f *Fake) PutMcp(id string, s *thread.McpStatus) {
 	f.mu.Lock()
 	snap, ok := f.items[id]
 	if !ok {
-		snap = &thread.ItemsSnapshot{SessionID: id}
+		snap = &thread.ItemsSnapshot{ThreadID: id}
 		f.items[id] = snap
 	}
 	snap.Seq++
 	snap.Mcp = s
-	ev := thread.McpChanged{SessionID: id, Seq: snap.Seq, Status: s}
+	ev := thread.McpChanged{ThreadID: id, Seq: snap.Seq, Status: s}
 	f.mu.Unlock()
 	bus.Publish[thread.ThreadEvent](f.bus, ev)
 }

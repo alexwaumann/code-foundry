@@ -44,7 +44,7 @@ var slashDenied = map[string]SlashDenial{
 	"effort": {SlashReplaced, "Change the effort with the composer's effort selector (or `thread.set-effort`), not /effort."},
 	"fast":   {SlashReplaced, "Pick the model with the composer's model selector (or `thread.set-model`), not /fast."},
 	"mcp":    {SlashReplaced, "Manage MCP servers in the MCP panel (or `thread.mcp`), not /mcp."},
-	"rename": {SlashReplaced, "Rename the thread with Rename Thread (or `session.rename`), not /rename."},
+	"rename": {SlashReplaced, "Rename the thread with Rename Thread (or `thread.rename`), not /rename."},
 	"clear":  {SlashReplaced, "Start a new thread instead of clearing this one."},
 
 	// Terminal-only, or meaningless over stream-json.

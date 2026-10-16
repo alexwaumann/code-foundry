@@ -174,7 +174,7 @@ func (r *runner) pollTranscript() {
 			// transcripts, this one's skipped history, their runs) is folded from byte
 			// zero. A new conversation or a fork has nothing before.
 			r.usageSeen = true
-			if s, ok := r.m.Snapshot().Session(r.id); ok && (r.tail.skipped > 0 || len(s.Transcripts) > 1 || len(s.AgentRuns) > 0) {
+			if s, ok := r.m.Snapshot().Thread(r.id); ok && (r.tail.skipped > 0 || len(s.Transcripts) > 1 || len(s.AgentRuns) > 0) {
 				r.rescan(s, cid, r.tail.path, r.tail.skipped)
 			}
 		}
@@ -239,7 +239,7 @@ func (r *runner) publishUsage() {
 // last saved fold. The result replaces whatever was persisted. The pr-link records of
 // the current file's skipped history are merged in too (a thread reconnected after
 // linking pull requests); first-seen order holds since this runs before any new line.
-func (r *runner) rescan(s Session, cid, path string, limit int64) {
+func (r *runner) rescan(s Thread, cid, path string, limit int64) {
 	start := time.Now()
 	u := newThreadUsage(r.usage.notBefore, r.usage.now, r.usage.idleClose)
 	u.watchDir = r.usage.watchDir
@@ -343,7 +343,7 @@ func (r *runner) publishStatus() {
 // status it had at that moment, read fresh (the published one may lag by the
 // debounce), or as it was when a close began; disconnectedStatus turns busy
 // into interrupted.
-func (r *runner) finish(fn func(*Session)) {
+func (r *runner) finish(fn func(*Thread)) {
 	r.finished = true
 	for _, t := range []*time.Timer{r.closeTimer, r.debounce} {
 		if t != nil {
@@ -359,7 +359,7 @@ func (r *runner) finish(fn func(*Session)) {
 		st, reason = StatusError, ReasonStartFailed
 	}
 	now := r.m.opts.Now()
-	r.m.detach(r, func(s *Session) {
+	r.m.detach(r, func(s *Thread) {
 		fn(s)
 		// Under m.mu, which RunIn holds while it queues: nothing can be queued after.
 		if owed := r.unsentCd(); owed != nil {
@@ -381,7 +381,7 @@ func (r *runner) finish(fn func(*Session)) {
 // slogger prefixes runner logs with the session id.
 type slogger struct{ r *runner }
 
-func (l *slogger) args(kv []any) []any         { return append([]any{"session", l.r.id}, kv...) }
+func (l *slogger) args(kv []any) []any         { return append([]any{"thread", l.r.id}, kv...) }
 func (l *slogger) debug(msg string, kv ...any) { l.r.m.log.Debug(msg, l.args(kv)...) }
 func (l *slogger) info(msg string, kv ...any)  { l.r.m.log.Info(msg, l.args(kv)...) }
 func (l *slogger) warn(msg string, kv ...any)  { l.r.m.log.Warn(msg, l.args(kv)...) }

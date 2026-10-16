@@ -211,9 +211,9 @@ test("remove member confirms and the mock applies it; add member and Run in go t
   await dot.hover();
   await expect(gp.getByTestId("member-run-in")).toHaveCount(0);
   await dot.getByTestId("member-run-in").click();
-  const runIn = await lastInvocation("session.run-in");
+  const runIn = await lastInvocation("thread.run-in");
   expect(runIn?.args).toEqual({ repo: "repo-dot" });
-  expect(runIn?.context).toMatchObject({ activeSessionId: driver, activeWorkspaceId: WS });
+  expect(runIn?.context).toMatchObject({ activeThreadId: driver, activeWorkspaceId: WS });
   // The mock moves an idle thread ~2s later; the marker follows.
   await expect(dot.getByTestId("member-at")).toHaveText("here", { timeout: 8000 });
   await expect(gp.getByTestId("member-at")).toHaveCount(0);

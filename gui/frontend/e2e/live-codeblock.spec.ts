@@ -28,7 +28,7 @@ function cli(...args: string[]): string {
 /** The thread's running shells, from the daemon. */
 function shellsOf(session: string): string[] {
   const list = (JSON.parse(cli("terminal", "list", "--json")) as { terminals?: { id: string; state?: string; labels?: Record<string, string> }[] }).terminals ?? [];
-  return list.filter((t) => t.labels?.kind === "shell" && t.labels.session === session && t.state !== "TERMINAL_STATE_EXITED").map((t) => t.id);
+  return list.filter((t) => t.labels?.kind === "shell" && t.labels.thread === session && t.state !== "TERMINAL_STATE_EXITED").map((t) => t.id);
 }
 
 function screenText(page: Page): Promise<string> {

@@ -49,7 +49,7 @@ async function openSnoozeSub(page: Page, key: string) {
   return { menu, sub };
 }
 
-const lastSnooze = async () => (await invocations()).filter((i) => i.name === "session.snooze").at(-1);
+const lastSnooze = async () => (await invocations()).filter((i) => i.name === "thread.snooze").at(-1);
 
 test("Snoozed section: collapsed by default between Working and Archived; expanded, single-line rows with the time left, soonest first", async ({ page }) => {
   await openApp(page);
@@ -128,7 +128,7 @@ test("the row menu's Snooze submenu: presets with their times; 1 hour snoozes wi
   await expect(page.getByTestId("confirm-dialog")).toHaveCount(0);
   await expect.poll(() => mainKeys(page)).toEqual(["s:s-2", "s:s-6", "s:s-4"]);
   const inv = await lastSnooze();
-  expect(inv?.context?.activeSessionId).toBe("s-3");
+  expect(inv?.context?.activeThreadId).toBe("s-3");
   const until = Date.parse(inv?.args.until ?? "");
   expect(until - before).toBeGreaterThan(3_600_000 - 10_000);
   expect(until - before).toBeLessThan(3_600_000 + 10_000);
@@ -166,7 +166,7 @@ test("snoozing a working thread from the header asks first; it then drops its pa
   await page.getByTestId("confirm-ok").click();
   await expect(page.getByTestId("snoozed-count")).toHaveText("3");
   await expect(page.getByTestId("working-count")).toHaveText("1");
-  const confirmed = (await invocations()).filter((i) => i.name === "session.snooze");
+  const confirmed = (await invocations()).filter((i) => i.name === "thread.snooze");
   expect(confirmed.map((i) => i.confirmed)).toEqual([false, true]);
   const until = new Date(confirmed[1]?.args.until ?? "");
   expect([until.getHours(), until.getMinutes()]).toEqual([9, 0]);
@@ -244,7 +244,7 @@ test("Pick a date and time…: a month calendar and a time; Snooze sends that lo
   await expect(dialog).toHaveCount(0);
   await expect(page.getByTestId("snoozed-count")).toHaveText("3");
   expect(Date.parse((await lastSnooze())?.args.until ?? "")).toBe(target.getTime());
-  expect((await lastSnooze())?.context?.activeSessionId).toBe("s-4");
+  expect((await lastSnooze())?.context?.activeThreadId).toBe("s-4");
 
   // Cancel snoozes nothing.
   const again = await openSnoozeSub(page, "s:s-3");
@@ -252,7 +252,7 @@ test("Pick a date and time…: a month calendar and a time; Snooze sends that lo
   await expect(page.getByTestId("snooze-dialog")).toBeVisible();
   await page.getByTestId("snooze-dialog").getByRole("button", { name: "Cancel" }).click();
   await expect(page.getByTestId("snooze-dialog")).toHaveCount(0);
-  expect((await invocations()).filter((i) => i.name === "session.snooze")).toHaveLength(1);
+  expect((await invocations()).filter((i) => i.name === "thread.snooze")).toHaveLength(1);
 });
 
 test("a wake brings the thread back needing attention: Snooze ended in amber, counted by the bell; snooze it again from the header", async ({ page }) => {

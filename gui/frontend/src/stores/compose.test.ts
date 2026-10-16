@@ -93,7 +93,7 @@ describe("Work in: the setting, the per-project memory, the draft's own pick", (
     ({ id, path: `/src/${id}`, name: id, defaultBranch: "main", githubSlug: "", remotes: [], git: true, worktrees: [wt(`/src/${id}`, true), wt(`/wt/${id}-x`, false)] }) as unknown as RepoView;
   const setting = (v: string | undefined) => {
     useSettingsStore.setState({
-      snapshot: { values: v === undefined ? {} : { "sessions.default_worktree": v }, path: "", revision: 1, loadError: "", issues: [], restartPending: [] },
+      snapshot: { values: v === undefined ? {} : { "threads.default_worktree": v }, path: "", revision: 1, loadError: "", issues: [], restartPending: [] },
     });
   };
   const place = (id: string) => {

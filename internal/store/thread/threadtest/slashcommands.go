@@ -13,12 +13,12 @@ func (f *Fake) PutSlashCommands(id string, cs []thread.SlashCommand) {
 	f.mu.Lock()
 	snap, ok := f.items[id]
 	if !ok {
-		snap = &thread.ItemsSnapshot{SessionID: id}
+		snap = &thread.ItemsSnapshot{ThreadID: id}
 		f.items[id] = snap
 	}
 	snap.Seq++
 	snap.Commands = cs
-	ev := thread.SlashCommandsChanged{SessionID: id, Seq: snap.Seq, Commands: cs}
+	ev := thread.SlashCommandsChanged{ThreadID: id, Seq: snap.Seq, Commands: cs}
 	f.mu.Unlock()
 	bus.Publish[thread.ThreadEvent](f.bus, ev)
 }

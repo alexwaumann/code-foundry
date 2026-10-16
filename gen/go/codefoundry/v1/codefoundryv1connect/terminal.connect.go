@@ -79,7 +79,7 @@ type TerminalServiceClient interface {
 	// Kill, waits for it to exit, and removes it. It returns once the terminal is gone
 	// (Watch has sent `updated` with state EXITED, then `removed_id`). Closing an exited
 	// shell or action run just removes it. Any other
-	// terminal (a thread's Claude terminal: use SessionService.Close) is refused with
+	// terminal (one created through Create without those labels) is refused with
 	// FailedPrecondition; an unknown id is NotFound.
 	Close(context.Context, *connect.Request[v1.CloseTerminalRequest]) (*connect.Response[v1.CloseTerminalResponse], error)
 	// Watch streams lifecycle and metadata changes for all terminals.
@@ -248,7 +248,7 @@ type TerminalServiceHandler interface {
 	// Kill, waits for it to exit, and removes it. It returns once the terminal is gone
 	// (Watch has sent `updated` with state EXITED, then `removed_id`). Closing an exited
 	// shell or action run just removes it. Any other
-	// terminal (a thread's Claude terminal: use SessionService.Close) is refused with
+	// terminal (one created through Create without those labels) is refused with
 	// FailedPrecondition; an unknown id is NotFound.
 	Close(context.Context, *connect.Request[v1.CloseTerminalRequest]) (*connect.Response[v1.CloseTerminalResponse], error)
 	// Watch streams lifecycle and metadata changes for all terminals.

@@ -76,16 +76,16 @@ func namingArgs(m string, minimal bool) []string {
 const maxNamingErrDetail = 4096
 
 // sessionKey carries the session id into the namer for its log lines.
-type sessionKey struct{}
+type threadKey struct{}
 
 // withNamingSession returns ctx tagged with the session a naming call is for.
-func withNamingSession(ctx context.Context, id string) context.Context {
-	return context.WithValue(ctx, sessionKey{}, id)
+func withNamingThread(ctx context.Context, id string) context.Context {
+	return context.WithValue(ctx, threadKey{}, id)
 }
 
 // namingSession returns the session id withNamingSession put in ctx, or "".
-func namingSession(ctx context.Context) string {
-	id, _ := ctx.Value(sessionKey{}).(string)
+func namingThread(ctx context.Context) string {
+	id, _ := ctx.Value(threadKey{}).(string)
 	return id
 }
 
@@ -139,16 +139,16 @@ func ClaudeNamer(claude, cwd string, log *slog.Logger) Namer {
 			msg = msg[:maxNamingInput]
 		}
 		prompt := namingPrompt + msg
-		session := namingSession(ctx)
+		thread := namingThread(ctx)
 		m := NamingModel(ctx)
 		args := namingArgs(m, minimal.Load())
-		out, err := runNaming(ctx, log, session, claude, cwd, args, prompt)
+		out, err := runNaming(ctx, log, thread, claude, cwd, args, prompt)
 		if err != nil && !minimal.Load() && isFlagRefused(err) {
 			log.Warn("claude refused a naming flag; retrying with the minimal command for this daemon run",
-				"session", session, "args", namingCommand(args), "err", err)
+				"thread", thread, "args", namingCommand(args), "err", err)
 			minimal.Store(true)
 			first := err
-			if out, err = runNaming(ctx, log, session, claude, cwd, namingArgs(m, true), prompt); err != nil {
+			if out, err = runNaming(ctx, log, thread, claude, cwd, namingArgs(m, true), prompt); err != nil {
 				err = fmt.Errorf("%w (after the hardened command failed: %v)", err, first)
 			}
 		}
@@ -164,7 +164,7 @@ func ClaudeNamer(claude, cwd string, log *slog.Logger) Namer {
 }
 
 // runNaming runs claude with args, "--" and the prompt in cwd and returns its stdout.
-func runNaming(ctx context.Context, log *slog.Logger, session, claude, cwd string, args []string, prompt string) (string, error) {
+func runNaming(ctx context.Context, log *slog.Logger, thread, claude, cwd string, args []string, prompt string) (string, error) {
 	argv := append(append(slices.Clone(args), "--"), prompt)
 	cmd := exec.CommandContext(ctx, claude, argv...)
 	cmd.Dir = cwd
@@ -172,7 +172,7 @@ func runNaming(ctx context.Context, log *slog.Logger, session, claude, cwd strin
 	cmd.Stderr = &stderr
 	start := time.Now()
 	out, err := cmd.Output()
-	log.Info("naming command finished", "session", session, "cmd", claude+" "+namingCommand(args),
+	log.Info("naming command finished", "thread", thread, "cmd", claude+" "+namingCommand(args),
 		"ok", err == nil, "took", time.Since(start).Round(time.Millisecond).String())
 	if err != nil {
 		// claude -p reports API errors (429, overloaded) on stdout and refusals on

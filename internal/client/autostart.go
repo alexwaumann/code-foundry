@@ -48,7 +48,7 @@ func Connect(ctx context.Context, p paths.Paths, opts ConnectOptions) (*Client, 
 		pctx, cancel := context.WithTimeout(ctx, probeTimeout)
 		defer cancel()
 		if _, err := c.Ping(pctx); err != nil {
-			return nil, fmt.Errorf("daemon at %s (%s) is not reachable; not starting one from inside a session: %w",
+			return nil, fmt.Errorf("daemon at %s (%s) is not reachable; not starting one from inside a thread: %w",
 				ep.BaseURL, EnvEndpoint, err)
 		}
 		return c, nil

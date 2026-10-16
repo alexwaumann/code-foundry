@@ -112,7 +112,7 @@ func TestRenderedContextTotals(t *testing.T) {
 	re := newFixtureEnv(t, "text-table")
 	re.restart(clock)
 	s := re.create(CreateOptions{InitialPrompt: "a table please"})
-	got := re.waitFor(s.ID, "context totals", func(s Session) bool { return s.ContextTokens > 0 })
+	got := re.waitFor(s.ID, "context totals", func(s Thread) bool { return s.ContextTokens > 0 })
 	if got.ContextTokens != 22061 || got.ContextModel != "claude-haiku-5-5" || !got.LastResultAt.Equal(now) ||
 		!got.CacheExpiresAt.Equal(now.Add(DefaultCacheTTL)) {
 		t.Fatalf("after the result: tokens %d model %q last %v expires %v", got.ContextTokens, got.ContextModel, got.LastResultAt, got.CacheExpiresAt)
@@ -131,7 +131,7 @@ func TestRenderedContextTotals(t *testing.T) {
 		select {
 		case ev := <-sub.C():
 			u, ok := ev.(Updated)
-			published = ok && u.Session.ID == s.ID && u.Session.CacheExpiresAt.Equal(now.Add(time.Minute))
+			published = ok && u.Thread.ID == s.ID && u.Thread.CacheExpiresAt.Equal(now.Add(time.Minute))
 		case <-deadline:
 			t.Fatal("SetCacheTTL published no update with the new expiry")
 		}

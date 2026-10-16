@@ -1,6 +1,6 @@
 /**
  * Threads' items (docs/notes/rendered-threads-2-gui.md). Only the visible
- * thread holds a ThreadService.Watch (the content pane's slot in the
+ * thread holds a ThreadService.WatchThread (the content pane's slot in the
  * connection budget, ARCHITECTURE §8, and it is what marks its turns seen). The Watch
  * sends a snapshot, then events with the thread's seq: an event whose seq is not above the
  * log's is dropped, and a later snapshot (a resync after drops, or a reconnect) replaces

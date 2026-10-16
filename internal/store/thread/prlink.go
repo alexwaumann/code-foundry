@@ -113,7 +113,7 @@ func (m *Manager) linkPullRequests(id string, links []LinkedPullRequest) int {
 		return 0
 	}
 	if err := saveLinks(context.Background(), m.opts.DB, id, added); err != nil {
-		m.log.Error("persist linked pull requests", "session", id, "err", err)
+		m.log.Error("persist linked pull requests", "thread", id, "err", err)
 	}
 	rec.s.LinkedPullRequests = merged
 	m.commitLocked(rec, false)

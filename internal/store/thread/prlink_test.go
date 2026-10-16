@@ -163,7 +163,7 @@ func TestScanPRLinks(t *testing.T) {
 	}
 }
 
-func linkNumbers(s Session) []int {
+func linkNumbers(s Thread) []int {
 	var out []int
 	for _, l := range s.LinkedPullRequests {
 		out = append(out, l.Number)
@@ -178,7 +178,7 @@ func TestLinkedPullRequestsFromLiveTranscript(t *testing.T) {
 	cid := argOf(e.spec(s.ID).Argv, "--session-id")
 	e.writeTranscript(cid, userLine("open a pr"))
 	e.writeTranscript(cid, lines[:12]...) // through the second #7 record
-	got := e.waitFor(s.ID, "links", func(s Session) bool { return len(s.LinkedPullRequests) == 3 })
+	got := e.waitFor(s.ID, "links", func(s Thread) bool { return len(s.LinkedPullRequests) == 3 })
 	if !slices.Equal(linkNumbers(got), []int{5, 6, 7}) || !got.LinkedPullRequests[0].LinkedAt.Equal(ts("2026-10-09T18:24:11.771Z")) ||
 		got.LinkedPullRequests[0].Slug != "alexwaumann/code-foundry" {
 		t.Errorf("links = %+v", got.LinkedPullRequests)
@@ -191,17 +191,17 @@ func TestLinkedPullRequestsFromLiveTranscript(t *testing.T) {
 	e.writeTranscript(cid, lines[10], lines[11], lines[10])
 	// A barrier: once the sentinel's usage shows, the repeats have been read.
 	e.writeTranscript(cid, usageLine("r-sentinel", "2026-10-10T00:00:00Z", cid, "claude-haiku-5-5", 1, 1, 1, 0, h1(0), "standard"))
-	e.waitFor(s.ID, "sentinel read", func(s Session) bool { return totalRequests(s.Usage) == 1 })
+	e.waitFor(s.ID, "sentinel read", func(s Thread) bool { return totalRequests(s.Usage) == 1 })
 	for len(e.events.C()) > 0 {
 		// The sentinel's own update is the only one.
-		if u, ok := (<-e.events.C()).(Updated); ok && u.Session.ID == s.ID && totalRequests(u.Session.Usage) != 1 {
-			t.Errorf("repeat published an update: %+v", u.Session.LinkedPullRequests)
+		if u, ok := (<-e.events.C()).(Updated); ok && u.Thread.ID == s.ID && totalRequests(u.Thread.Usage) != 1 {
+			t.Errorf("repeat published an update: %+v", u.Thread.LinkedPullRequests)
 		}
 	}
 
 	// The rest, with the flip back to #11: appended once, in first-seen order.
 	e.writeTranscript(cid, lines[12:]...)
-	got = e.waitFor(s.ID, "all links", func(s Session) bool { return len(s.LinkedPullRequests) == 8 })
+	got = e.waitFor(s.ID, "all links", func(s Thread) bool { return len(s.LinkedPullRequests) == 8 })
 	if !slices.Equal(linkNumbers(got), []int{5, 6, 7, 9, 10, 11, 12, 13}) {
 		t.Errorf("links = %v", linkNumbers(got))
 	}
@@ -226,9 +226,9 @@ func TestLinkedPullRequestsBackfillOnReconnect(t *testing.T) {
 	s := e.connected(CreateOptions{Name: "driver"})
 	cid := argOf(e.spec(s.ID).Argv, "--session-id")
 	e.writeTranscript(cid, userLine("hi"))
-	e.waitFor(s.ID, "discovered", func(s Session) bool { return s.ClaudeSessionID == cid })
+	e.waitFor(s.ID, "discovered", func(s Thread) bool { return s.ClaudeSessionID == cid })
 	e.exit(s.ID, 0)
-	e.waitFor(s.ID, "disconnected", func(s Session) bool { return s.State == StateDisconnected })
+	e.waitFor(s.ID, "disconnected", func(s Thread) bool { return s.State == StateDisconnected })
 
 	// History the daemon never saw: written while disconnected, or before pr-link
 	// records were read at all.
@@ -239,14 +239,14 @@ func TestLinkedPullRequestsBackfillOnReconnect(t *testing.T) {
 	if argv := e.spec(s.ID).Argv; argOf(argv, "--resume") != cid {
 		t.Fatalf("reconnect argv = %q", argv)
 	}
-	got := e.waitFor(s.ID, "backfill", func(s Session) bool { return len(s.LinkedPullRequests) == 7 })
+	got := e.waitFor(s.ID, "backfill", func(s Thread) bool { return len(s.LinkedPullRequests) == 7 })
 	if !slices.Equal(linkNumbers(got), []int{5, 6, 7, 9, 10, 11, 12}) {
 		t.Errorf("backfilled = %v", linkNumbers(got))
 	}
 
 	// New records after the resume append after the backfilled ones.
 	e.writeTranscript(cid, lines[22:]...)
-	got = e.waitFor(s.ID, "live link", func(s Session) bool { return len(s.LinkedPullRequests) == 8 })
+	got = e.waitFor(s.ID, "live link", func(s Thread) bool { return len(s.LinkedPullRequests) == 8 })
 	if !slices.Equal(linkNumbers(got), []int{5, 6, 7, 9, 10, 11, 12, 13}) {
 		t.Errorf("links = %v", linkNumbers(got))
 	}
@@ -287,27 +287,27 @@ func TestSaveAndLoadLinks(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := saveLinks(ctx, db, "s-nope", []LinkedPullRequest{l(1)}); err == nil {
-		t.Error("saveLinks for an unknown session = nil error (foreign key)")
+		t.Error("saveLinks for an unknown thread = nil error (foreign key)")
 	}
 	got, err := loadLinks(ctx, db)
 	if err != nil {
 		t.Fatal(err)
 	}
-	ga := linkNumbers(Session{LinkedPullRequests: got[a.ID]})
-	gb := linkNumbers(Session{LinkedPullRequests: got[b.ID]})
+	ga := linkNumbers(Thread{LinkedPullRequests: got[a.ID]})
+	gb := linkNumbers(Thread{LinkedPullRequests: got[b.ID]})
 	if !slices.Equal(ga, []int{3, 1, 4}) || !slices.Equal(gb, []int{2}) || len(got) != 2 {
-		t.Errorf("loadLinks: a=%v b=%v (%d sessions)", ga, gb, len(got))
+		t.Errorf("loadLinks: a=%v b=%v (%d threads)", ga, gb, len(got))
 	}
 	if !got[a.ID][0].LinkedAt.Equal(at.Add(3*time.Second)) || got[a.ID][0].Slug != "o/r" || got[a.ID][0].URL != link(3).URL {
 		t.Errorf("loaded row = %+v", got[a.ID][0])
 	}
-	sessions, err := loadSessions(ctx, db)
+	threads, err := loadThreads(ctx, db)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, s := range sessions {
+	for _, s := range threads {
 		if s.ID == a.ID && !slices.Equal(linkNumbers(s), []int{3, 1, 4}) {
-			t.Errorf("loadSessions links = %v", linkNumbers(s))
+			t.Errorf("loadThreads links = %v", linkNumbers(s))
 		}
 	}
 }

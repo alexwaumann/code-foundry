@@ -15,16 +15,16 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/command"
 )
 
-func TestSessionArchive(t *testing.T) {
-	connected := v1.SessionState_SESSION_STATE_CONNECTED
-	live := func(status v1.SessionStatus, reason string) *v1.Session {
-		return &v1.Session{Name: "drv", State: connected, Status: status, StatusReason: reason}
+func TestThreadArchive(t *testing.T) {
+	connected := v1.ThreadState_THREAD_STATE_CONNECTED
+	live := func(status v1.ThreadStatus, reason string) *v1.Thread {
+		return &v1.Thread{Name: "drv", State: connected, Status: status, StatusReason: reason}
 	}
-	busy := live(v1.SessionStatus_SESSION_STATUS_BUSY, "working")
+	busy := live(v1.ThreadStatus_THREAD_STATUS_BUSY, "working")
 	archivedAt := timestamppb.New(time.UnixMilli(42))
-	get := &v1.GetSessionRequest{Id: "s5"}
-	archive := &v1.ArchiveSessionRequest{Id: "s5", Archived: true}
-	unarchive := &v1.ArchiveSessionRequest{Id: "s5"}
+	get := &v1.GetThreadRequest{Id: "s5"}
+	archive := &v1.ArchiveThreadRequest{Id: "s5", Archived: true}
+	unarchive := &v1.ArchiveThreadRequest{Id: "s5"}
 	const working = "Archive thread drv? Claude is still working; archiving ends the turn."
 	const waiting = "Archive thread drv? Claude is waiting on your answer; archiving ends the turn."
 
@@ -32,7 +32,7 @@ func TestSessionArchive(t *testing.T) {
 		name       string
 		ctx        command.Context
 		args       map[string]string
-		current    *v1.Session
+		current    *v1.Thread
 		confirmed  bool
 		backendErr error
 		wantErr    error
@@ -41,56 +41,56 @@ func TestSessionArchive(t *testing.T) {
 		wantMsg    string
 		wantReqs   []proto.Message
 	}{
-		{name: "toggle archives an idle thread without asking", ctx: command.Context{ActiveSessionID: "s5"},
-			current: live(v1.SessionStatus_SESSION_STATUS_IDLE, "at prompt"),
+		{name: "toggle archives an idle thread without asking", ctx: command.Context{ActiveThreadID: "s5"},
+			current: live(v1.ThreadStatus_THREAD_STATUS_IDLE, "at prompt"),
 			wantMsg: "archived thread drv (s5)", wantReqs: []proto.Message{get, get, archive}},
 		{name: "a finished turn archives without asking", args: map[string]string{"id": "s5", "archived": "true"},
-			current: live(v1.SessionStatus_SESSION_STATUS_NEEDS_ATTENTION, "finished"),
+			current: live(v1.ThreadStatus_THREAD_STATUS_NEEDS_ATTENTION, "finished"),
 			wantMsg: "archived thread drv (s5)", wantReqs: []proto.Message{get, archive}},
 		{name: "a failed turn archives without asking", args: map[string]string{"id": "s5", "archived": "true"},
-			current: live(v1.SessionStatus_SESSION_STATUS_NEEDS_ATTENTION, "error: rate_limit"),
+			current: live(v1.ThreadStatus_THREAD_STATUS_NEEDS_ATTENTION, "error: rate_limit"),
 			wantMsg: "archived thread drv (s5)"},
 		{name: "a disconnected thread archives without asking", args: map[string]string{"id": "s5", "archived": "true"},
-			current: &v1.Session{Name: "drv", State: v1.SessionState_SESSION_STATE_DISCONNECTED, Status: v1.SessionStatus_SESSION_STATUS_ERROR, StatusReason: "interrupted"},
+			current: &v1.Thread{Name: "drv", State: v1.ThreadState_THREAD_STATE_DISCONNECTED, Status: v1.ThreadStatus_THREAD_STATUS_ERROR, StatusReason: "interrupted"},
 			wantMsg: "archived thread drv (s5)"},
 		{name: "a closing thread archives without asking", args: map[string]string{"id": "s5", "archived": "true"},
-			current: &v1.Session{Name: "drv", State: v1.SessionState_SESSION_STATE_CLOSING, Status: v1.SessionStatus_SESSION_STATUS_BUSY},
+			current: &v1.Thread{Name: "drv", State: v1.ThreadState_THREAD_STATE_CLOSING, Status: v1.ThreadStatus_THREAD_STATUS_BUSY},
 			wantMsg: "archived thread drv (s5)"},
-		{name: "a working thread asks", ctx: command.Context{ActiveSessionID: "s5"}, current: busy,
+		{name: "a working thread asks", ctx: command.Context{ActiveThreadID: "s5"}, current: busy,
 			wantAsk: working, wantReqs: []proto.Message{get, get}},
 		{name: "a starting thread asks", args: map[string]string{"id": "s5", "archived": "true"},
-			current: &v1.Session{Name: "drv", State: v1.SessionState_SESSION_STATE_STARTING}, wantAsk: working},
+			current: &v1.Thread{Name: "drv", State: v1.ThreadState_THREAD_STATE_STARTING}, wantAsk: working},
 		{name: "a pending permission asks", args: map[string]string{"id": "s5", "archived": "true"},
-			current: live(v1.SessionStatus_SESSION_STATUS_NEEDS_ATTENTION, "permission: Bash rm -rf x"), wantAsk: waiting},
+			current: live(v1.ThreadStatus_THREAD_STATUS_NEEDS_ATTENTION, "permission: Bash rm -rf x"), wantAsk: waiting},
 		{name: "a pending question asks", args: map[string]string{"id": "s5", "archived": "true"},
-			current: live(v1.SessionStatus_SESSION_STATUS_NEEDS_ATTENTION, "question: Which one?"), wantAsk: waiting},
+			current: live(v1.ThreadStatus_THREAD_STATUS_NEEDS_ATTENTION, "question: Which one?"), wantAsk: waiting},
 		// Background work stops with the process (a dev server, a long agent).
 		{name: "a background shell asks", args: map[string]string{"id": "s5", "archived": "true"},
-			current: &v1.Session{Name: "drv", State: connected, Status: v1.SessionStatus_SESSION_STATUS_IDLE, BackgroundShellsRunning: 1},
+			current: &v1.Thread{Name: "drv", State: connected, Status: v1.ThreadStatus_THREAD_STATUS_IDLE, BackgroundShellsRunning: 1},
 			wantAsk: "Archive thread drv? 1 background shell is running; archiving stops it."},
 		{name: "background agents and shells ask", args: map[string]string{"id": "s5", "archived": "true"},
-			current: &v1.Session{Name: "drv", State: connected, Status: v1.SessionStatus_SESSION_STATUS_NEEDS_ATTENTION, StatusReason: "finished",
+			current: &v1.Thread{Name: "drv", State: connected, Status: v1.ThreadStatus_THREAD_STATUS_NEEDS_ATTENTION, StatusReason: "finished",
 				BackgroundAgentsRunning: 2, BackgroundShellsRunning: 1},
 			wantAsk: "Archive thread drv? 2 background agents and 1 shell are running; archiving stops them."},
 		{name: "Claude's turn after a background end asks", args: map[string]string{"id": "s5", "archived": "true"},
-			current: &v1.Session{Name: "drv", State: connected, Status: v1.SessionStatus_SESSION_STATUS_IDLE, BackgroundWakePending: true},
+			current: &v1.Thread{Name: "drv", State: connected, Status: v1.ThreadStatus_THREAD_STATUS_IDLE, BackgroundWakePending: true},
 			wantAsk: "Archive thread drv? Claude is about to report background work that just finished; archiving loses that report."},
 		{name: "a working turn is named before background work", args: map[string]string{"id": "s5", "archived": "true"},
-			current: &v1.Session{Name: "drv", State: connected, Status: v1.SessionStatus_SESSION_STATUS_BUSY, BackgroundAgentsRunning: 1},
+			current: &v1.Thread{Name: "drv", State: connected, Status: v1.ThreadStatus_THREAD_STATUS_BUSY, BackgroundAgentsRunning: 1},
 			wantAsk: working},
 		{name: "an unnamed thread is asked about by id", args: map[string]string{"id": "s5", "archived": "true"},
-			current: &v1.Session{State: connected, Status: v1.SessionStatus_SESSION_STATUS_BUSY},
+			current: &v1.Thread{State: connected, Status: v1.ThreadStatus_THREAD_STATUS_BUSY},
 			wantAsk: "Archive thread s5? Claude is still working; archiving ends the turn."},
 		{name: "a working thread archives once confirmed", args: map[string]string{"id": "s5"}, current: busy, confirmed: true,
 			wantMsg: "archived thread drv (s5)", wantReqs: []proto.Message{get, archive}},
 		{name: "toggle unarchives without asking, even a working thread", args: map[string]string{"id": "s5"},
-			current: &v1.Session{Name: "drv", State: connected, Status: v1.SessionStatus_SESSION_STATUS_BUSY, ArchivedAt: archivedAt},
+			current: &v1.Thread{Name: "drv", State: connected, Status: v1.ThreadStatus_THREAD_STATUS_BUSY, ArchivedAt: archivedAt},
 			wantMsg: "unarchived thread drv (s5)", wantReqs: []proto.Message{get, get, unarchive}},
 		{name: "explicit unarchive", args: map[string]string{"id": "s5", "archived": "false"},
-			current: &v1.Session{Name: "drv", State: v1.SessionState_SESSION_STATE_DISCONNECTED, ArchivedAt: archivedAt},
+			current: &v1.Thread{Name: "drv", State: v1.ThreadState_THREAD_STATE_DISCONNECTED, ArchivedAt: archivedAt},
 			wantMsg: "unarchived thread drv (s5)", wantReqs: []proto.Message{get, unarchive}},
 		{name: "re-archiving an archived thread", args: map[string]string{"id": "s5", "archived": "true"},
-			current: &v1.Session{Name: "drv", State: v1.SessionState_SESSION_STATE_DISCONNECTED, ArchivedAt: archivedAt},
+			current: &v1.Thread{Name: "drv", State: v1.ThreadState_THREAD_STATE_DISCONNECTED, ArchivedAt: archivedAt},
 			wantMsg: "archived thread drv (s5)", wantReqs: []proto.Message{get, archive}},
 		{name: "unavailable without a thread", wantErr: command.ErrUnavailable},
 		{name: "an unknown thread fails in Run, not with a confirmation", args: map[string]string{"id": "s5", "archived": "true"},
@@ -98,9 +98,9 @@ func TestSessionArchive(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			reg, b, _ := newSessionRegistry(t)
+			reg, b, _ := newLifecycleRegistry(t)
 			b.Current, b.Err = tt.current, tt.backendErr
-			res, err := reg.Invoke(context.Background(), tt.ctx, "session.archive", tt.args, command.Confirmed(tt.confirmed))
+			res, err := reg.Invoke(context.Background(), tt.ctx, "thread.archive", tt.args, command.Confirmed(tt.confirmed))
 			switch {
 			case tt.wantCode != 0:
 				if connect.CodeOf(err) != tt.wantCode {
@@ -125,17 +125,17 @@ func TestSessionArchive(t *testing.T) {
 			if tt.wantReqs != nil && !slices.EqualFunc(got, tt.wantReqs, proto.Equal) {
 				t.Errorf("requests = %v, want %v", got, tt.wantReqs)
 			}
-			if tt.wantAsk != "" && slices.ContainsFunc(got, func(m proto.Message) bool { _, ok := m.(*v1.ArchiveSessionRequest); return ok }) {
+			if tt.wantAsk != "" && slices.ContainsFunc(got, func(m proto.Message) bool { _, ok := m.(*v1.ArchiveThreadRequest); return ok }) {
 				t.Error("archived without the confirmation")
 			}
 		})
 	}
 }
 
-func TestSessionArchiveListsAsConfirmable(t *testing.T) {
-	reg, _, _ := newSessionRegistry(t)
-	c, ok := reg.Get("session.archive")
+func TestThreadArchiveListsAsConfirmable(t *testing.T) {
+	reg, _, _ := newLifecycleRegistry(t)
+	c, ok := reg.Get("thread.archive")
 	if !ok || c.Confirm == "" || c.Category != "Thread" {
-		t.Fatalf("session.archive = %+v", c)
+		t.Fatalf("thread.archive = %+v", c)
 	}
 }

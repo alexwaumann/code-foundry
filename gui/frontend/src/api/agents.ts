@@ -1,6 +1,6 @@
 /**
  * A thread's subagent runs (docs/notes/agents-1-daemon.md, docs/notes/agents-2-gui.md)
- * mapped to view models. Generated types stay in src/api. ThreadService.Watch carries the
+ * mapped to view models. Generated types stay in src/api. ThreadService.WatchThread carries the
  * whole list in spawn order: the snapshot's `agents`, then an `agents` event on every
  * change, so the Agents surface, the strip above the composer and the timeline's Agent
  * rows read it from the thread store.

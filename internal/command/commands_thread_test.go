@@ -21,14 +21,14 @@ func newThreadRegistry(t *testing.T) (*command.Registry, *threadtest.Fake) {
 	if err := command.RegisterThread(reg, api.NewThread(fake, b)); err != nil {
 		t.Fatal(err)
 	}
-	fake.Put(thread.Session{ID: "s1", Name: "fix", State: thread.StateConnected})
+	fake.Put(thread.Thread{ID: "s1", Name: "fix", State: thread.StateConnected})
 	return reg, fake
 }
 
 // A setting on a stopped thread only goes to its row; the message says when it applies.
 func TestThreadSetEffortStopped(t *testing.T) {
 	reg, fake := newThreadRegistry(t)
-	fake.Put(thread.Session{ID: "s2", Name: "idle", State: thread.StateDisconnected, DisconnectReason: thread.ReasonIdle})
+	fake.Put(thread.Thread{ID: "s2", Name: "idle", State: thread.StateDisconnected, DisconnectReason: thread.ReasonIdle})
 	res, err := reg.Invoke(context.Background(), command.Context{}, "thread.set-effort", map[string]string{"id": "s2", "effort": "high"})
 	if err != nil {
 		t.Fatal(err)
@@ -45,8 +45,8 @@ func TestThreadCommandsAvailability(t *testing.T) {
 		ctx  command.Context
 		want bool
 	}{
-		{"cli", command.Context{ActiveSessionID: "s1"}, true},
-		{"gui thread", command.Context{ActiveSessionID: "s1", ActiveView: "session"}, true},
+		{"cli", command.Context{ActiveThreadID: "s1"}, true},
+		{"gui thread", command.Context{ActiveThreadID: "s1", ActiveView: "thread"}, true},
 		{"no thread", command.Context{ActiveView: "projects"}, false},
 	}
 	for _, tt := range tests {

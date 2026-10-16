@@ -44,7 +44,7 @@ func TestCommandMenus(t *testing.T) {
 			name:   "thread",
 			groups: threadMenu,
 			want:   []string{"New Thread", "Add Project…", "-", "Rename Thread", "Fork Thread", "Snooze…", "Archive", "-", "Next Needing Attention"},
-			cmds:   []string{"session.new", "repo.add", "session.rename", "session.fork", "session.snooze", "session.archive", "attention.next"},
+			cmds:   []string{"thread.new", "repo.add", "thread.rename", "thread.fork", "thread.snooze", "thread.archive", "attention.next"},
 		},
 		{
 			name:   "help",

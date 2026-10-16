@@ -18,7 +18,7 @@ describe("toActionEventView", () => {
               actionName: "Test",
               command: "go test",
               repoId: "r",
-              sessionId: "s-1",
+              threadId: "s-1",
               worktreePath: "/w",
               mode: ActionRunMode.TERMINAL,
               terminalId: "t-1",

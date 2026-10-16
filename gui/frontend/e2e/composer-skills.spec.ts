@@ -27,7 +27,7 @@ const rows = (page: Page) => card(page).getByTestId("completion-item");
 const tags = (page: Page) => page.getByTestId("prompt-tag");
 
 async function newThreads(): Promise<number> {
-  return (await invocations()).filter((i) => i.name === "session.new").length;
+  return (await invocations()).filter((i) => i.name === "thread.new").length;
 }
 
 async function completionCalls(): Promise<string[]> {

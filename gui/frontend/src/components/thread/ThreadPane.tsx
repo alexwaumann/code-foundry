@@ -55,7 +55,7 @@ function ThreadMissing() {
  * linked PRs and the pane's commands; docs/notes/thread-header.md), the conversation as a dense work log, and the follow-up composer floating
  * over its bottom, the same whether Claude's process runs or not (the daemon starts it on
  * a message and stops it at cache expiry; docs/notes/hide-connection-state.md). While
- * shown it holds the thread's ThreadService.Watch (which also marks finished turns seen).
+ * shown it holds the thread's ThreadService.WatchThread (which also marks finished turns seen).
  */
 export function ThreadPane({ sessionId }: { sessionId: string }) {
   const exists = useSessionsStore((s) => sessionId in s.byId);

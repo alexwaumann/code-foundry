@@ -448,7 +448,7 @@ func permissionResult(r *Request, kind ItemKind, d Decision) (claudestream.Permi
 	in["answers"] = answers
 	up, err := json.Marshal(in)
 	if err != nil {
-		return res, fmt.Errorf("session: question answer: %w", err)
+		return res, fmt.Errorf("thread: question answer: %w", err)
 	}
 	res.UpdatedInput = up
 	return res, nil

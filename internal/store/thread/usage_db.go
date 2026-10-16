@@ -23,30 +23,30 @@ func scanBucket(sc interface{ Scan(...any) error }, prefix ...any) (UsageBucket,
 }
 
 // saveUsage replaces a session's usage rows with buckets in one transaction.
-func saveUsage(ctx context.Context, db *sql.DB, sessionID string, buckets []UsageBucket) error {
+func saveUsage(ctx context.Context, db *sql.DB, threadID string, buckets []UsageBucket) error {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("session: save usage of %s: %w", sessionID, err)
+		return fmt.Errorf("thread: save usage of %s: %w", threadID, err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	if err := replaceUsageTx(ctx, tx, sessionID, buckets); err != nil {
+	if err := replaceUsageTx(ctx, tx, threadID, buckets); err != nil {
 		return err
 	}
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("session: save usage of %s: %w", sessionID, err)
+		return fmt.Errorf("thread: save usage of %s: %w", threadID, err)
 	}
 	return nil
 }
 
 // replaceUsageTx replaces a session's session_usage rows inside tx.
-func replaceUsageTx(ctx context.Context, tx *sql.Tx, sessionID string, buckets []UsageBucket) error {
-	if _, err := tx.ExecContext(ctx, `DELETE FROM session_usage WHERE session_id = ?`, sessionID); err != nil {
-		return fmt.Errorf("session: save usage of %s: %w", sessionID, err)
+func replaceUsageTx(ctx context.Context, tx *sql.Tx, threadID string, buckets []UsageBucket) error {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM session_usage WHERE session_id = ?`, threadID); err != nil {
+		return fmt.Errorf("thread: save usage of %s: %w", threadID, err)
 	}
 	for _, b := range buckets {
 		if _, err := tx.ExecContext(ctx, `INSERT INTO session_usage (session_id, `+usageColumns+`)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, append([]any{sessionID}, usageArgs(b)...)...); err != nil {
-			return fmt.Errorf("session: save usage of %s: %w", sessionID, err)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, append([]any{threadID}, usageArgs(b)...)...); err != nil {
+			return fmt.Errorf("thread: save usage of %s: %w", threadID, err)
 		}
 	}
 	return nil
@@ -57,7 +57,7 @@ func loadUsage(ctx context.Context, db *sql.DB) (map[string][]UsageBucket, error
 	rows, err := db.QueryContext(ctx, `SELECT session_id, `+usageColumns+`
 		FROM session_usage ORDER BY session_id, day, model, tier, speed`)
 	if err != nil {
-		return nil, fmt.Errorf("session: load usage: %w", err)
+		return nil, fmt.Errorf("thread: load usage: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 	out := map[string][]UsageBucket{}
@@ -65,12 +65,12 @@ func loadUsage(ctx context.Context, db *sql.DB) (map[string][]UsageBucket, error
 		var id string
 		b, err := scanBucket(rows, &id)
 		if err != nil {
-			return nil, fmt.Errorf("session: load usage: %w", err)
+			return nil, fmt.Errorf("thread: load usage: %w", err)
 		}
 		out[id] = append(out[id], b)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("session: load usage: %w", err)
+		return nil, fmt.Errorf("thread: load usage: %w", err)
 	}
 	return out, nil
 }
@@ -79,19 +79,19 @@ func loadUsage(ctx context.Context, db *sql.DB) (map[string][]UsageBucket, error
 func loadRetiredUsage(ctx context.Context, db *sql.DB) ([]UsageBucket, error) {
 	rows, err := db.QueryContext(ctx, `SELECT `+usageColumns+` FROM usage_retired ORDER BY day, model, tier, speed`)
 	if err != nil {
-		return nil, fmt.Errorf("session: load retired usage: %w", err)
+		return nil, fmt.Errorf("thread: load retired usage: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 	var out []UsageBucket
 	for rows.Next() {
 		b, err := scanBucket(rows)
 		if err != nil {
-			return nil, fmt.Errorf("session: load retired usage: %w", err)
+			return nil, fmt.Errorf("thread: load retired usage: %w", err)
 		}
 		out = append(out, b)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("session: load retired usage: %w", err)
+		return nil, fmt.Errorf("thread: load retired usage: %w", err)
 	}
 	return out, nil
 }
@@ -99,10 +99,10 @@ func loadRetiredUsage(ctx context.Context, db *sql.DB) ([]UsageBucket, error) {
 // retireSession adds the session's usage into usage_retired and deletes the session
 // (its session_usage rows cascade) in one transaction, so a crash either keeps the
 // session with its rows or retires them exactly once.
-func retireSession(ctx context.Context, db *sql.DB, id string, buckets []UsageBucket) error {
+func retireThread(ctx context.Context, db *sql.DB, id string, buckets []UsageBucket) error {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("session: delete %s: %w", id, err)
+		return fmt.Errorf("thread: delete %s: %w", id, err)
 	}
 	defer func() { _ = tx.Rollback() }()
 	for _, b := range buckets {
@@ -115,14 +115,14 @@ func retireSession(ctx context.Context, db *sql.DB, id string, buckets []UsageBu
 				cache_read = cache_read + excluded.cache_read,
 				cache_write_5m = cache_write_5m + excluded.cache_write_5m,
 				cache_write_1h = cache_write_1h + excluded.cache_write_1h`, usageArgs(b)...); err != nil {
-			return fmt.Errorf("session: retire usage of %s: %w", id, err)
+			return fmt.Errorf("thread: retire usage of %s: %w", id, err)
 		}
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM sessions WHERE id = ?`, id); err != nil {
-		return fmt.Errorf("session: delete %s: %w", id, err)
+		return fmt.Errorf("thread: delete %s: %w", id, err)
 	}
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("session: delete %s: %w", id, err)
+		return fmt.Errorf("thread: delete %s: %w", id, err)
 	}
 	return nil
 }

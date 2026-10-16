@@ -25,7 +25,7 @@ export const KEYS = {
   density: "appearance.density",
   threadWidth: "appearance.thread_width",
   backdrop: "appearance.backdrop",
-  scrollback: "sessions.scrollback_lines",
+  scrollback: "threads.scrollback_lines",
 } as const;
 
 const KEYBINDING_PREFIX = "keybindings.";

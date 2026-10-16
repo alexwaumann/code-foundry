@@ -75,25 +75,25 @@ func (m *Manager) StageAttachment(_ context.Context, name, mimeType string, data
 		return "", err
 	}
 	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return "", fmt.Errorf("session: attachments dir: %w", err)
+		return "", fmt.Errorf("thread: attachments dir: %w", err)
 	}
 	var b [16]byte
 	if _, err := rand.Read(b[:]); err != nil {
-		return "", fmt.Errorf("session: attachment name: %w", err)
+		return "", fmt.Errorf("thread: attachment name: %w", err)
 	}
 	path := filepath.Join(dir, hex.EncodeToString(b[:])+ext)
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
-		return "", fmt.Errorf("session: stage attachment: %w", err)
+		return "", fmt.Errorf("thread: stage attachment: %w", err)
 	}
 	if _, err := f.Write(data); err != nil {
 		_ = f.Close()
 		_ = os.Remove(path)
-		return "", fmt.Errorf("session: stage attachment: %w", err)
+		return "", fmt.Errorf("thread: stage attachment: %w", err)
 	}
 	if err := f.Close(); err != nil {
 		_ = os.Remove(path)
-		return "", fmt.Errorf("session: stage attachment: %w", err)
+		return "", fmt.Errorf("thread: stage attachment: %w", err)
 	}
 	m.log.Info("attachment staged", "path", path, "name", name, "bytes", len(data))
 	return path, nil
@@ -182,7 +182,7 @@ func reapAttachments(dir string, cutoff time.Time) (int, error) {
 		return 0, nil
 	}
 	if err != nil {
-		return 0, fmt.Errorf("session: reap attachments: %w", err)
+		return 0, fmt.Errorf("thread: reap attachments: %w", err)
 	}
 	n := 0
 	var first error
@@ -196,7 +196,7 @@ func reapAttachments(dir string, cutoff time.Time) (int, error) {
 		}
 		if err := os.Remove(filepath.Join(dir, e.Name())); err != nil {
 			if first == nil {
-				first = fmt.Errorf("session: reap attachments: %w", err)
+				first = fmt.Errorf("thread: reap attachments: %w", err)
 			}
 			continue
 		}

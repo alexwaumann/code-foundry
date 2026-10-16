@@ -10,7 +10,7 @@
  * refers to an attachment by id; removing a chip from the text keeps the attachment.
  * Skill and file tags of a project go when the project leaves the draft.
  *
- * Sending stages the attachments (SessionService.StageAttachment) and invokes the
+ * Sending stages the attachments (ThreadService.StageAttachment) and invokes the
  * session.new registry command, like every other user action.
  */
 import { create } from "zustand";

@@ -36,27 +36,27 @@ const (
 )
 
 // SetEffort implements Store.
-func (m *Manager) SetEffort(ctx context.Context, id, effort string) (Session, error) {
+func (m *Manager) SetEffort(ctx context.Context, id, effort string) (Thread, error) {
 	if !slices.Contains(Efforts, effort) {
-		return Session{}, fmt.Errorf("%w: effort %q (want one of %s)", ErrInvalidArgument, effort, strings.Join(Efforts, ", "))
+		return Thread{}, fmt.Errorf("%w: effort %q (want one of %s)", ErrInvalidArgument, effort, strings.Join(Efforts, ", "))
 	}
 	var r *runner
 	for {
 		live, _, err := m.liveOrStopped(ctx, id)
 		if err != nil {
-			return Session{}, err
+			return Thread{}, err
 		}
 		if live != nil {
 			r = live
 			break
 		}
 		// Not running: the row has it, the next spawn passes it (claudeCommand).
-		s, ok, err := m.updateStopped(id, func(s *Session) { s.Effort, s.EffortPending = effort, false })
+		s, ok, err := m.updateStopped(id, func(s *Thread) { s.Effort, s.EffortPending = effort, false })
 		if err != nil {
-			return Session{}, err
+			return Thread{}, err
 		}
 		if ok {
-			m.log.Info("thread effort changed for its next start", "session", id, "effort", effort)
+			m.log.Info("thread effort changed for its next start", "thread", id, "effort", effort)
 			return s, nil
 		}
 	}
@@ -66,13 +66,13 @@ func (m *Manager) SetEffort(ctx context.Context, id, effort string) (Session, er
 	case <-r.done:
 		return m.SetEffort(ctx, id, effort) // it stopped meanwhile: the row takes it
 	case <-ctx.Done():
-		return Session{}, ctx.Err()
+		return Thread{}, ctx.Err()
 	}
 	select {
 	case rep := <-cmd.reply:
-		return rep.session, rep.err
+		return rep.thread, rep.err
 	case <-ctx.Done():
-		return Session{}, ctx.Err()
+		return Thread{}, ctx.Err()
 	}
 }
 
@@ -80,7 +80,7 @@ func (m *Manager) SetEffort(ctx context.Context, id, effort string) (Session, er
 func (r *runner) restarting() bool { return r.st.restart != restartNone }
 
 // setEffort records the wanted effort on the row; maybeRestart applies it.
-func (r *runner) setEffort(effort string) Session {
+func (r *runner) setEffort(effort string) Thread {
 	st := r.st
 	st.wantEffort = effort
 	r.log().info("thread effort change requested", "effort", effort, "running", st.effort)
@@ -141,12 +141,12 @@ func (r *runner) respawn() {
 	}
 	// The old process has exited: its cost-state record is in the transcript.
 	st.proj.restart(restoredTotals(r.m.opts.Paths, r.cwd, l))
-	s, _ := r.m.Snapshot().Session(r.id)
+	s, _ := r.m.Snapshot().Thread(r.id)
 	s.WorktreePath, s.Effort = r.cwd, st.wantEffort
 	argv, env := r.m.claudeCommand(s, l, st.grants)
 	proc, err := claudestream.Start(claudestream.Spec{
 		Argv: argv, Env: env, Dir: r.cwd,
-		Conn: claudestream.Options{Log: r.m.log.With("session", r.id)},
+		Conn: claudestream.Options{Log: r.m.log.With("thread", r.id)},
 	})
 	if err != nil {
 		msg := "Claude did not restart for the effort change: " + err.Error()
@@ -155,7 +155,7 @@ func (r *runner) respawn() {
 		st.setSwapping(false)
 		st.proj.w.add(Item{ID: st.proj.nextID("err"), Kind: KindError, Text: msg})
 		r.failHeld("Claude did not restart")
-		r.finish(func(s *Session) {
+		r.finish(func(s *Thread) {
 			s.State, s.DisconnectReason, s.LastError = StateDisconnected, ReasonSpawnFailed, msg
 		})
 		return

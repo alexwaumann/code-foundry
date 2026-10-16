@@ -79,7 +79,7 @@ type Options struct {
 	// WorktreeCreated, when set, is called after Create made a new worktree for a thread
 	// (CreateOptions.NewWorktree) and the thread has started. It must not block: the
 	// daemon runs the project's on-worktree-create actions from it in the background.
-	WorktreeCreated func(sessionID, repoID, worktree string)
+	WorktreeCreated func(threadID, repoID, worktree string)
 	// Home is the cwd of a thread without a project (CreateOptions.NoProject). Default:
 	// os.UserHomeDir().
 	Home string
@@ -130,7 +130,7 @@ type Options struct {
 
 func (o Options) withDefaults() (Options, error) {
 	if o.DB == nil || o.Terminals == nil {
-		return o, errors.New("session: Options.DB and Options.Terminals are required")
+		return o, errors.New("thread: Options.DB and Options.Terminals are required")
 	}
 	if o.Bus == nil {
 		o.Bus = bus.New()
@@ -154,7 +154,7 @@ func (o Options) withDefaults() (Options, error) {
 	if o.Home == "" {
 		home, err := os.UserHomeDir()
 		if err != nil {
-			return o, fmt.Errorf("session: home directory: %w", err)
+			return o, fmt.Errorf("thread: home directory: %w", err)
 		}
 		o.Home = home
 	}
@@ -213,7 +213,7 @@ type Manager struct {
 }
 
 type record struct {
-	s           Session
+	s           Thread
 	run         *runner // non-nil while a claude process belongs to the session
 	namingTried bool    // one naming call per session (per daemon run)
 	// first is the thread's first prompt, handed to its runner by spawn.
@@ -242,7 +242,7 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 	if orphaned > 0 {
 		opts.Log.Info("subagent runs failed: the daemon restarted while they ran", "runs", orphaned)
 	}
-	rows, err := loadSessions(ctx, opts.DB)
+	rows, err := loadThreads(ctx, opts.DB)
 	if err != nil {
 		return nil, err
 	}
@@ -258,7 +258,7 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 			s.State, s.DisconnectReason = StateDisconnected, ReasonDaemonRestarts
 			st, reason := disconnectedStatus(s.Status, s.StatusReason)
 			s.setStatus(st, reason, opts.Now())
-			if err := saveSession(ctx, opts.DB, s); err != nil {
+			if err := saveThread(ctx, opts.DB, s); err != nil {
 				return nil, err
 			}
 		}
@@ -310,37 +310,37 @@ func (m *Manager) Bus() *bus.Bus { return m.opts.Bus }
 func (m *Manager) Snapshot() *Snapshot { return m.snap.Load() }
 
 // Get returns one session.
-func (m *Manager) Get(_ context.Context, id string) (Session, error) {
-	if s, ok := m.Snapshot().Session(id); ok {
+func (m *Manager) Get(_ context.Context, id string) (Thread, error) {
+	if s, ok := m.Snapshot().Thread(id); ok {
 		return s, nil
 	}
-	return Session{}, fmt.Errorf("%w: %s", ErrNotFound, id)
+	return Thread{}, fmt.Errorf("%w: %s", ErrNotFound, id)
 }
 
 // rebuildLocked publishes a new snapshot. Callers hold m.mu.
 func (m *Manager) rebuildLocked() {
-	out := make([]Session, 0, len(m.recs))
+	out := make([]Thread, 0, len(m.recs))
 	for _, r := range m.recs {
 		out = append(out, r.s)
 	}
-	slices.SortFunc(out, func(a, b Session) int {
+	slices.SortFunc(out, func(a, b Thread) int {
 		if c := a.CreatedAt.Compare(b.CreatedAt); c != 0 {
 			return c
 		}
 		return strings.Compare(a.ID, b.ID)
 	})
-	m.snap.Store(&Snapshot{Sessions: out, RetiredUsage: m.retired})
+	m.snap.Store(&Snapshot{Threads: out, RetiredUsage: m.retired})
 }
 
 // update applies fn to a record, optionally persists, rebuilds the snapshot, and
 // publishes Updated. Everything happens under m.mu so the snapshot, the database, and
 // the event order agree (bus.Publish never blocks).
-func (m *Manager) update(id string, persist bool, fn func(*record)) (Session, bool) {
+func (m *Manager) update(id string, persist bool, fn func(*record)) (Thread, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	rec, ok := m.recs[id]
 	if !ok {
-		return Session{}, false
+		return Thread{}, false
 	}
 	fn(rec)
 	m.commitLocked(rec, persist)
@@ -352,12 +352,12 @@ func (m *Manager) update(id string, persist bool, fn func(*record)) (Session, bo
 // have yet, and a crash in that window would lose a status the GUI already showed.
 func (m *Manager) commitLocked(rec *record, persist bool) {
 	if persist {
-		if err := saveSession(context.Background(), m.opts.DB, rec.s); err != nil {
-			m.log.Error("persist session", "session", rec.s.ID, "err", err)
+		if err := saveThread(context.Background(), m.opts.DB, rec.s); err != nil {
+			m.log.Error("persist thread", "thread", rec.s.ID, "err", err)
 		}
 	}
 	m.rebuildLocked()
-	bus.Publish[Event](m.opts.Bus, Updated{Session: rec.s})
+	bus.Publish[Event](m.opts.Bus, Updated{Thread: rec.s})
 }
 
 func (m *Manager) record(id string) (*record, error) {
@@ -372,44 +372,44 @@ func (m *Manager) record(id string) (*record, error) {
 // NewWorktree it first creates the worktree (synchronously: on failure nothing is
 // persisted); see newWorktree. With NoProject it runs in Options.Home and has no
 // owner.
-func (m *Manager) Create(ctx context.Context, o CreateOptions) (Session, error) {
+func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 	if err := validateModelEffort(o.Model, o.Effort); err != nil {
-		return Session{}, err
+		return Thread{}, err
 	}
 	if !o.PermissionMode.valid() {
-		return Session{}, fmt.Errorf("%w: permission mode %d", ErrInvalidArgument, o.PermissionMode)
+		return Thread{}, fmt.Errorf("%w: permission mode %d", ErrInvalidArgument, o.PermissionMode)
 	}
 	name, err := cleanName(o.Name, true)
 	if err != nil {
-		return Session{}, err
+		return Thread{}, err
 	}
 	attachments, err := checkAttachments(m.opts.AttachmentsDir, o.Attachments)
 	if err != nil {
-		return Session{}, err
+		return Thread{}, err
 	}
 	prompt := buildPrompt(o.InitialPrompt, attachments)
 	if strings.ContainsRune(prompt, 0) {
-		return Session{}, fmt.Errorf("%w: prompt contains a NUL byte", ErrInvalidArgument)
+		return Thread{}, fmt.Errorf("%w: prompt contains a NUL byte", ErrInvalidArgument)
 	}
-	id, err := newSessionID()
+	id, err := newThreadID()
 	if err != nil {
-		return Session{}, err
+		return Thread{}, err
 	}
 	cid, err := newUUID()
 	if err != nil {
-		return Session{}, err
+		return Thread{}, err
 	}
-	s := Session{
+	s := Thread{
 		ID: id, Name: name, Model: o.Model, Effort: o.Effort, PermissionMode: o.PermissionMode, State: StateStarting,
 	}
 	namingTried := name != ""
 	var late <-chan namingResult
 	var members []workspace.Member // a workspace thread's, for file references
 	if (o.NewWorkspace != nil && (o.NewWorktree != nil || o.WorkspaceID != "")) || (o.NewWorktree != nil && o.WorkspaceID != "") {
-		return Session{}, fmt.Errorf("%w: new workspace, new worktree and workspace are exclusive", ErrInvalidArgument)
+		return Thread{}, fmt.Errorf("%w: new workspace, new worktree and workspace are exclusive", ErrInvalidArgument)
 	}
 	if o.NoProject && (o.RepoID != "" || o.WorktreePath != "" || o.NewWorktree != nil || o.WorkspaceID != "" || o.NewWorkspace != nil) {
-		return Session{}, fmt.Errorf("%w: no project excludes a repo, worktree, new worktree, workspace and new workspace", ErrInvalidArgument)
+		return Thread{}, fmt.Errorf("%w: no project excludes a repo, worktree, new worktree, workspace and new workspace", ErrInvalidArgument)
 	}
 	switch {
 	case o.NoProject:
@@ -419,7 +419,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Session, error) 
 	case o.NewWorkspace != nil:
 		cw, err := m.newWorkspace(ctx, id, name, o)
 		if err != nil {
-			return Session{}, err
+			return Thread{}, err
 		}
 		s.WorkspaceID, s.RepoID, s.WorktreePath, s.BaseRef, s.CreatedWorktree = cw.workspaceID, cw.repoID, cw.path, cw.baseRef, true
 		members = cw.members
@@ -431,14 +431,14 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Session, error) 
 	case o.WorkspaceID != "":
 		w, mem, err := m.workspaceMember(o.WorkspaceID, o.RepoID, o.WorktreePath)
 		if err != nil {
-			return Session{}, err
+			return Thread{}, err
 		}
 		s.WorkspaceID, s.RepoID, s.WorktreePath = w.ID, mem.RepoID, mem.WorktreePath
 		members = w.Members
 	case o.NewWorktree != nil:
 		nw, err := m.newWorktree(ctx, id, name, o)
 		if err != nil {
-			return Session{}, err
+			return Thread{}, err
 		}
 		s.RepoID, s.WorktreePath, s.BaseRef, s.CreatedWorktree = nw.repoID, nw.path, nw.baseRef, true
 		if nw.name != "" {
@@ -448,7 +448,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Session, error) 
 		late = nw.late
 	default:
 		if s.RepoID, s.WorktreePath, err = m.resolveWorktree(o.RepoID, o.WorktreePath); err != nil {
-			return Session{}, err
+			return Thread{}, err
 		}
 	}
 	// The worktrees exist now: point file references at them (see filerefs.go).
@@ -460,14 +460,14 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Session, error) 
 	})
 	if len(dropped) > 0 {
 		m.log.Warn("file references outside the thread's projects; passing their relative paths",
-			"session", id, "repo", s.RepoID, "workspace", s.WorkspaceID, "refs", dropped)
+			"thread", id, "repo", s.RepoID, "workspace", s.WorkspaceID, "refs", dropped)
 	}
 	now := m.opts.Now()
 	s.CreatedAt, s.LastActivityAt = now, now
 	m.mu.Lock()
 	if m.closed {
 		m.mu.Unlock()
-		return Session{}, ErrClosed
+		return Thread{}, ErrClosed
 	}
 	rec := &record{s: s, namingTried: namingTried}
 	if prompt != "" {
@@ -483,7 +483,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Session, error) 
 		delete(m.threads, id) // the thread's log, loaded by spawnStream
 		m.tmu.Unlock()
 		m.mu.Unlock()
-		return Session{}, err
+		return Thread{}, err
 	}
 	if late != nil {
 		m.applyLateName(id, late)
@@ -497,46 +497,46 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Session, error) 
 // Fork starts a new session that continues id's conversation under a new Claude
 // session id (claude --resume <id> --fork-session --session-id <new>). Its items start
 // as a copy of id's, ended by a "Forked from <name>" note (fork.go).
-func (m *Manager) Fork(ctx context.Context, id, name string) (Session, error) {
+func (m *Manager) Fork(ctx context.Context, id, name string) (Thread, error) {
 	name, err := cleanName(name, true)
 	if err != nil {
-		return Session{}, err
+		return Thread{}, err
 	}
 	m.mu.Lock()
 	rec, err := m.record(id)
 	if err != nil {
 		m.mu.Unlock()
-		return Session{}, err
+		return Thread{}, err
 	}
 	parent := rec.s
 	closed := m.closed
 	m.mu.Unlock()
 	if closed {
-		return Session{}, ErrClosed
+		return Thread{}, ErrClosed
 	}
 	if parent.ClaudeSessionID == "" {
-		return Session{}, fmt.Errorf("%w: session %s has no saved conversation to fork yet", ErrFailedPrecondition, id)
+		return Thread{}, fmt.Errorf("%w: thread %s has no saved conversation to fork yet", ErrFailedPrecondition, id)
 	}
 	if _, ok := m.opts.Paths.transcriptPath(parent.WorktreePath, parent.ClaudeSessionID); !ok {
-		return Session{}, fmt.Errorf("%w: transcript of %s not found", ErrFailedPrecondition, parent.ClaudeSessionID)
+		return Thread{}, fmt.Errorf("%w: transcript of %s not found", ErrFailedPrecondition, parent.ClaudeSessionID)
 	}
 	if _, err := os.Stat(parent.WorktreePath); err != nil {
-		return Session{}, fmt.Errorf("%w: worktree %s: %v", ErrFailedPrecondition, parent.WorktreePath, err)
+		return Thread{}, fmt.Errorf("%w: worktree %s: %v", ErrFailedPrecondition, parent.WorktreePath, err)
 	}
-	newID, err := newSessionID()
+	newID, err := newThreadID()
 	if err != nil {
-		return Session{}, err
+		return Thread{}, err
 	}
 	cid, err := newUUID()
 	if err != nil {
-		return Session{}, err
+		return Thread{}, err
 	}
 	autoNamed := false
 	if name == "" && parent.Name != "" {
 		name, autoNamed = forkName(parent.Name), parent.AutoNamed
 	}
 	now := m.opts.Now()
-	s := Session{
+	s := Thread{
 		ID: newID, RepoID: parent.RepoID, WorktreePath: parent.WorktreePath, WorkspaceID: parent.WorkspaceID,
 		Name: name, AutoNamed: autoNamed,
 		Model: parent.Model, Effort: parent.Effort, PermissionMode: parent.PermissionMode,
@@ -558,11 +558,11 @@ func (m *Manager) Fork(ctx context.Context, id, name string) (Session, error) {
 	items, err := m.forkLog(ctx, parent, newID)
 	if err != nil {
 		drop()
-		return Session{}, err
+		return Thread{}, err
 	}
 	if err := m.spawn(ctx, newID, launch{resume: parent.ClaudeSessionID, fork: true, newID: cid}); err != nil {
 		drop()
-		return Session{}, err
+		return Thread{}, err
 	}
 	m.persistForkLog(ctx, newID, items)
 	return m.Get(ctx, newID)
@@ -573,12 +573,12 @@ func (m *Manager) Fork(ctx context.Context, id, name string) (Session, error) {
 // conversation in the same worktree and says so in LastError. It unarchives and
 // unsnoozes the thread. No command calls it any more (a message starts a stopped
 // thread: Send); it stays for SessionService.Reconnect and tests.
-func (m *Manager) Reconnect(ctx context.Context, id string) (Session, error) {
+func (m *Manager) Reconnect(ctx context.Context, id string) (Thread, error) {
 	if _, err := m.startStopped(ctx, id, startOpts{backToList: true}); err != nil {
 		if errors.Is(err, errNotStopped) {
-			return Session{}, fmt.Errorf("%w: thread %s is not stopped; only a stopped thread can be started this way", ErrFailedPrecondition, id)
+			return Thread{}, fmt.Errorf("%w: thread %s is not stopped; only a stopped thread can be started this way", ErrFailedPrecondition, id)
 		}
-		return Session{}, err
+		return Thread{}, err
 	}
 	return m.Get(ctx, id)
 }
@@ -599,9 +599,9 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 
 	if !m.opts.DisablePreTrust {
 		if changed, err := trustWorktree(m.opts.Paths.Config, s.WorktreePath); err != nil {
-			m.log.Warn("pre-trust worktree failed", "session", id, "path", s.WorktreePath, "err", err)
+			m.log.Warn("pre-trust worktree failed", "thread", id, "path", s.WorktreePath, "err", err)
 		} else if changed {
-			m.log.Info("pre-trusted worktree in claude config", "session", id, "path", realPath(s.WorktreePath))
+			m.log.Info("pre-trusted worktree in claude config", "thread", id, "path", realPath(s.WorktreePath))
 		}
 	}
 
@@ -639,7 +639,7 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 	m.commitLocked(rec, true)
 	m.wg.Add(1)
 	m.mu.Unlock()
-	m.log.Info("session spawned", "session", id, "pid", r.st.proc.Pid(), "argv", argv, "cwd", s.WorktreePath)
+	m.log.Info("thread spawned", "thread", id, "pid", r.st.proc.Pid(), "argv", argv, "cwd", s.WorktreePath)
 	go func() {
 		defer m.wg.Done()
 		r.run()
@@ -652,7 +652,7 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 // the workspace prompt and env. The prompt is never in argv (it is the first user
 // message). g is what the conversation's allow-for-session answers granted (an effort
 // restart's; a fresh spawn starts without).
-func (m *Manager) claudeCommand(s Session, l launch, g grants) (argv, env []string) {
+func (m *Manager) claudeCommand(s Thread, l launch, g grants) (argv, env []string) {
 	sa := spawnArgs{model: s.Model, effort: s.Effort, perm: s.PermissionMode,
 		allowedTools: g.allow, disallowedTools: g.deny}
 	if m.opts.AttachmentsDir != "" {
@@ -660,7 +660,7 @@ func (m *Manager) claudeCommand(s Session, l launch, g grants) (argv, env []stri
 		// may read its images again.
 		sa.addDirs = []string{m.opts.AttachmentsDir}
 	}
-	env = append(slices.Clip(m.opts.Env), paths.EnvSession+"="+s.ID)
+	env = append(slices.Clip(m.opts.Env), paths.EnvThread+"="+s.ID)
 	if s.WorkspaceID != "" {
 		// The current members, every spawn (create, reconnect, fork): a repo added to
 		// the workspace since the row was written is included.
@@ -673,11 +673,11 @@ func (m *Manager) claudeCommand(s Session, l launch, g grants) (argv, env []stri
 			sa.appendSystemPrompt = wl.prompt
 			env = append(slices.Clip(env), wl.env...)
 			if len(wl.missing) > 0 {
-				m.log.Warn("workspace member worktrees missing; not passed to claude", "session", s.ID,
+				m.log.Warn("workspace member worktrees missing; not passed to claude", "thread", s.ID,
 					"workspace", s.WorkspaceID, "paths", wl.missing)
 			}
 		} else {
-			m.log.Warn("workspace of thread not found; starting without its members", "session", s.ID, "workspace", s.WorkspaceID)
+			m.log.Warn("workspace of thread not found; starting without its members", "thread", s.ID, "workspace", s.WorkspaceID)
 		}
 	}
 	sa.addDirs = append(sa.addDirs, g.dirs...)
@@ -685,16 +685,16 @@ func (m *Manager) claudeCommand(s Session, l launch, g grants) (argv, env []stri
 }
 
 // Rename sets a user-chosen name and disables auto-naming.
-func (m *Manager) Rename(_ context.Context, id, name string) (Session, error) {
+func (m *Manager) Rename(_ context.Context, id, name string) (Thread, error) {
 	name, err := cleanName(name, false)
 	if err != nil {
-		return Session{}, err
+		return Thread{}, err
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	rec, err := m.record(id)
 	if err != nil {
-		return Session{}, err
+		return Thread{}, err
 	}
 	rec.s.Name, rec.s.AutoNamed, rec.namingTried = name, false, true
 	m.commitLocked(rec, true)
@@ -703,12 +703,12 @@ func (m *Manager) Rename(_ context.Context, id, name string) (Session, error) {
 
 // Pin sets or clears the user's pin. It works in any state and is persisted. Pinning an
 // archived or snoozed thread unarchives or unsnoozes it.
-func (m *Manager) Pin(_ context.Context, id string, pinned bool) (Session, error) {
+func (m *Manager) Pin(_ context.Context, id string, pinned bool) (Thread, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	rec, err := m.record(id)
 	if err != nil {
-		return Session{}, err
+		return Thread{}, err
 	}
 	unarchived := pinned && m.unarchiveLocked(rec)
 	unsnoozed := pinned && m.unsnoozeLocked(rec)
@@ -759,10 +759,10 @@ func (m *Manager) Remove(ctx context.Context, id string) error {
 		return err
 	}
 	if rec.run != nil || rec.reserved != nil {
-		return fmt.Errorf("%w: session %s was started while being removed", ErrFailedPrecondition, id)
+		return fmt.Errorf("%w: thread %s was started while being removed", ErrFailedPrecondition, id)
 	}
 	// The session's usage moves to the retired ledger in the delete's transaction.
-	if err := retireSession(ctx, m.opts.DB, id, rec.s.Usage); err != nil {
+	if err := retireThread(ctx, m.opts.DB, id, rec.s.Usage); err != nil {
 		return err
 	}
 	delete(m.recs, id)
@@ -803,12 +803,12 @@ func (m *Manager) Shutdown(ctx context.Context) error {
 	case <-done:
 		return nil
 	case <-ctx.Done():
-		return fmt.Errorf("session: shutdown: %w", ctx.Err())
+		return fmt.Errorf("thread: shutdown: %w", ctx.Err())
 	}
 }
 
 // detach clears a finished runner from its record, applying fn to the session.
-func (m *Manager) detach(r *runner, fn func(*Session)) {
+func (m *Manager) detach(r *runner, fn func(*Thread)) {
 	m.update(r.id, true, func(rec *record) {
 		if rec.run == r {
 			rec.run = nil
@@ -830,12 +830,12 @@ func (m *Manager) startNaming(id, msg string) {
 	m.mu.Unlock()
 	go func() {
 		defer m.wg.Done()
-		ctx, cancel := context.WithTimeout(withNamingSession(m.ctx, id), m.opts.NamingTimeout)
+		ctx, cancel := context.WithTimeout(withNamingThread(m.ctx, id), m.opts.NamingTimeout)
 		defer cancel()
 		start := time.Now()
 		name, err := m.opts.Namer(ctx, msg)
 		if err != nil {
-			m.log.Warn("auto-naming failed", "session", id, "err", err)
+			m.log.Warn("auto-naming failed", "thread", id, "err", err)
 			return
 		}
 		if _, ok := m.update(id, true, func(rec *record) {
@@ -843,7 +843,7 @@ func (m *Manager) startNaming(id, msg string) {
 				rec.s.Name, rec.s.AutoNamed = name, true
 			}
 		}); ok {
-			m.log.Info("session auto-named", "session", id, "name", name, "took", time.Since(start).Round(time.Millisecond).String())
+			m.log.Info("thread auto-named", "thread", id, "name", name, "took", time.Since(start).Round(time.Millisecond).String())
 		}
 	}()
 }

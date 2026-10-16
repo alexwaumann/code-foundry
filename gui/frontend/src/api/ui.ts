@@ -23,8 +23,8 @@ export function toUiIntentView(i: UiIntent): UiIntentView | null {
   switch (e.case) {
     case "focusTerminal":
       return { kind: "focusTerminal", terminalId: e.value.terminalId };
-    case "focusSession":
-      return { kind: "focusSession", sessionId: e.value.sessionId };
+    case "focusThread":
+      return { kind: "focusSession", sessionId: e.value.threadId };
     case "focusRepo":
       return { kind: "focusRepo", repoId: e.value.repoId, worktreePath: e.value.worktreePath };
     case "openPalette":

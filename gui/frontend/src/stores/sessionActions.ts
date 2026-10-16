@@ -7,14 +7,14 @@ import { runCommand, useCommandsStore } from "./commands";
 import { getUiContext } from "./context";
 
 export const SESSION_COMMANDS = {
-  create: "session.new",
-  rename: "session.rename",
-  remove: "session.remove",
-  fork: "session.fork",
-  pin: "session.pin",
-  archive: "session.archive",
-  snooze: "session.snooze",
-  runIn: "session.run-in",
+  create: "thread.new",
+  rename: "thread.rename",
+  remove: "thread.remove",
+  fork: "thread.fork",
+  pin: "thread.pin",
+  archive: "thread.archive",
+  snooze: "thread.snooze",
+  runIn: "thread.run-in",
 } as const;
 
 /** The context of a thread (its worktree and workspace too), whether or not it is selected. */

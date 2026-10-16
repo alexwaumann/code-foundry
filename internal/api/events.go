@@ -32,7 +32,7 @@ type EventsDeps struct {
 	Bus      *bus.Bus
 	Repo     repo.Store
 	Terminal terminal.Store
-	Session  thread.Store
+	Thread   thread.Store
 	Gh       gh.Service
 	GitOps   gitops.Store
 	Settings settings.Service
@@ -94,8 +94,8 @@ func (h *Events) sources() []eventSource {
 	if d.Terminal != nil {
 		out = append(out, &terminalSource{store: d.Terminal, bus: d.Bus, known: map[string]bool{}})
 	}
-	if d.Session != nil {
-		out = append(out, sessionSource{store: d.Session, bus: d.Bus}, threadSource{store: d.Session, bus: d.Bus})
+	if d.Thread != nil {
+		out = append(out, threadListSource{store: d.Thread, bus: d.Bus}, threadSource{store: d.Thread, bus: d.Bus})
 	}
 	if d.Gh != nil {
 		out = append(out, ghSource{store: d.Gh, bus: d.Bus})
@@ -377,26 +377,26 @@ func (s *terminalSource) snapshot(ctx context.Context) []*v1.Event {
 
 // sessionSource reuses SessionService's mapping (api/session.go). The store publishes
 // one bus type, thread.Event; its snapshot is a SessionEvent.snapshot.
-type sessionSource struct {
+type threadListSource struct {
 	store thread.Store
 	bus   *bus.Bus
 }
 
-func (sessionSource) kind() v1.EventSource { return v1.EventSource_EVENT_SOURCE_SESSION }
+func (threadListSource) kind() v1.EventSource { return v1.EventSource_EVENT_SOURCE_THREAD_LIST }
 
-func sessionWrap(ev thread.Event) *v1.Event {
-	if m := sessionEventToProto(ev); m != nil {
-		return &v1.Event{Event: &v1.Event_Session{Session: m}}
+func threadListWrap(ev thread.Event) *v1.Event {
+	if m := threadListEventToProto(ev); m != nil {
+		return &v1.Event{Event: &v1.Event_ThreadList{ThreadList: m}}
 	}
 	return nil
 }
 
-func (s sessionSource) subscribe(ctx context.Context) <-chan *v1.Event {
-	return fanIn(ctx, newTap(s.bus, watchBuffer, sessionWrap))
+func (s threadListSource) subscribe(ctx context.Context) <-chan *v1.Event {
+	return fanIn(ctx, newTap(s.bus, watchBuffer, threadListWrap))
 }
 
-func (s sessionSource) snapshot(context.Context) []*v1.Event {
-	return []*v1.Event{sessionWrap(s.store.Snapshot())}
+func (s threadListSource) snapshot(context.Context) []*v1.Event {
+	return []*v1.Event{threadListWrap(s.store.Snapshot())}
 }
 
 // ---- thread --------------------------------------------------------------------
@@ -433,7 +433,7 @@ func (s threadSource) subscribe(ctx context.Context) <-chan *v1.Event {
 func (s threadSource) snapshot(ctx context.Context) []*v1.Event {
 	snap := &v1.ThreadPendingSnapshot{}
 	if ss := s.store.Snapshot(); ss != nil {
-		for _, x := range ss.Sessions {
+		for _, x := range ss.Threads {
 			if x.State == thread.StateDisconnected {
 				continue
 			}

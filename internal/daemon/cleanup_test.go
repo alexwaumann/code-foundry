@@ -56,20 +56,20 @@ func TestWorktreeThreads(t *testing.T) {
 	now := time.Date(2026, 10, 15, 4, 0, 0, 0, time.UTC)
 	tests := []struct {
 		name string
-		s    thread.Session
+		s    thread.Thread
 		want bool
 	}{
-		{name: "running", s: thread.Session{State: thread.StateConnected}, want: true},
-		{name: "starting", s: thread.Session{State: thread.StateStarting}, want: true},
-		{name: "stopped at cache expiry", s: thread.Session{State: thread.StateDisconnected, DisconnectReason: "idle"}, want: true},
-		{name: "stopping", s: thread.Session{State: thread.StateClosing}, want: true},
-		{name: "snoozed (it comes back to the worktree)", s: thread.Session{State: thread.StateDisconnected, SnoozedUntil: now}, want: true},
-		{name: "archived", s: thread.Session{State: thread.StateDisconnected, ArchivedAt: now}, want: false},
+		{name: "running", s: thread.Thread{State: thread.StateConnected}, want: true},
+		{name: "starting", s: thread.Thread{State: thread.StateStarting}, want: true},
+		{name: "stopped at cache expiry", s: thread.Thread{State: thread.StateDisconnected, DisconnectReason: "idle"}, want: true},
+		{name: "stopping", s: thread.Thread{State: thread.StateClosing}, want: true},
+		{name: "snoozed (it comes back to the worktree)", s: thread.Thread{State: thread.StateDisconnected, SnoozedUntil: now}, want: true},
+		{name: "archived", s: thread.Thread{State: thread.StateDisconnected, ArchivedAt: now}, want: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.s.ID, tt.s.Name, tt.s.WorktreePath = "s1", "fix-badge", "/wt/cf-a"
-			got := worktreeThreads(&thread.Snapshot{Sessions: []thread.Session{tt.s}})
+			got := worktreeThreads(&thread.Snapshot{Threads: []thread.Thread{tt.s}})
 			var want []workspace.Thread
 			if tt.want {
 				want = []workspace.Thread{{ID: "s1", Name: "fix-badge", Cwd: "/wt/cf-a"}}

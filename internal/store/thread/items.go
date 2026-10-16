@@ -217,7 +217,7 @@ type PendingRequest struct {
 
 // ItemsSnapshot is a thread's items at one point.
 type ItemsSnapshot struct {
-	SessionID string
+	ThreadID string
 	// Seq is the thread's event sequence number the snapshot includes: apply only
 	// ThreadEvents with a greater Seq.
 	Seq     uint64
@@ -273,16 +273,16 @@ type ThreadEvent interface {
 
 // ItemAppended: a new item (possibly Streaming).
 type ItemAppended struct {
-	SessionID string
-	Seq       uint64
-	Item      Item
+	ThreadID string
+	Seq      uint64
+	Item     Item
 }
 
 // ItemUpdated: an item's new full state (completed, a tool result, a decision).
 type ItemUpdated struct {
-	SessionID string
-	Seq       uint64
-	Item      Item
+	ThreadID string
+	Seq      uint64
+	Item     Item
 }
 
 // DeltaField names what an ItemDelta extends.
@@ -296,19 +296,19 @@ const (
 
 // ItemDelta: Text was appended to a streaming item's Field.
 type ItemDelta struct {
-	SessionID string
-	Seq       uint64
-	ItemID    string
-	Ordinal   int64
-	Field     DeltaField
-	Text      string
+	ThreadID string
+	Seq      uint64
+	ItemID   string
+	Ordinal  int64
+	Field    DeltaField
+	Text     string
 }
 
 // PendingChanged: the thread's pending requests changed (the whole list).
 type PendingChanged struct {
-	SessionID string
-	Seq       uint64
-	Pending   []PendingRequest
+	ThreadID string
+	Seq      uint64
+	Pending  []PendingRequest
 }
 
 func (ItemAppended) isThreadEvent()   {}
@@ -317,16 +317,16 @@ func (ItemDelta) isThreadEvent()      {}
 func (PendingChanged) isThreadEvent() {}
 
 // Thread implements ThreadEvent.
-func (e ItemAppended) Thread() string { return e.SessionID }
+func (e ItemAppended) Thread() string { return e.ThreadID }
 
 // Thread implements ThreadEvent.
-func (e ItemUpdated) Thread() string { return e.SessionID }
+func (e ItemUpdated) Thread() string { return e.ThreadID }
 
 // Thread implements ThreadEvent.
-func (e ItemDelta) Thread() string { return e.SessionID }
+func (e ItemDelta) Thread() string { return e.ThreadID }
 
 // Thread implements ThreadEvent.
-func (e PendingChanged) Thread() string { return e.SessionID }
+func (e PendingChanged) Thread() string { return e.ThreadID }
 
 // maxResultJSON bounds ToolCall.ResultJSON (a Read's structured result holds the
 // whole file). maxToolOutput bounds ToolCall.Output the same way: every update of
@@ -390,7 +390,7 @@ func newThreadLog(id string, b *bus.Bus, now func() time.Time, items []Item) *th
 func (t *threadLog) snapshot() ItemsSnapshot {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	return ItemsSnapshot{SessionID: t.id, Seq: t.seq, Items: slices.Clone(t.items), Pending: pendingOf(t.items), Mcp: t.mcp.status, Commands: t.commands,
+	return ItemsSnapshot{ThreadID: t.id, Seq: t.seq, Items: slices.Clone(t.items), Pending: pendingOf(t.items), Mcp: t.mcp.status, Commands: t.commands,
 		Agents: t.agents}
 }
 
@@ -424,7 +424,7 @@ func (t *threadLog) append(it Item) Item {
 		it.Ordinal, it.CreatedAt = t.items[i].Ordinal, t.items[i].CreatedAt
 		it.UpdatedAt = t.now()
 		t.items[i] = it
-		t.publishLocked(func(seq uint64) ThreadEvent { return ItemUpdated{SessionID: t.id, Seq: seq, Item: it} }, it.Kind)
+		t.publishLocked(func(seq uint64) ThreadEvent { return ItemUpdated{ThreadID: t.id, Seq: seq, Item: it} }, it.Kind)
 		return it
 	}
 	now := t.now()
@@ -432,7 +432,7 @@ func (t *threadLog) append(it Item) Item {
 	t.nextOrd++
 	t.byID[it.ID] = len(t.items)
 	t.items = append(t.items, it)
-	t.publishLocked(func(seq uint64) ThreadEvent { return ItemAppended{SessionID: t.id, Seq: seq, Item: it} }, it.Kind)
+	t.publishLocked(func(seq uint64) ThreadEvent { return ItemAppended{ThreadID: t.id, Seq: seq, Item: it} }, it.Kind)
 	return it
 }
 
@@ -448,7 +448,7 @@ func (t *threadLog) update(id string, fn func(*Item)) (Item, bool) {
 	fn(&it)
 	it.UpdatedAt = t.now()
 	t.items[i] = it
-	t.publishLocked(func(seq uint64) ThreadEvent { return ItemUpdated{SessionID: t.id, Seq: seq, Item: it} }, it.Kind)
+	t.publishLocked(func(seq uint64) ThreadEvent { return ItemUpdated{ThreadID: t.id, Seq: seq, Item: it} }, it.Kind)
 	return it, true
 }
 
@@ -477,7 +477,7 @@ func (t *threadLog) delta(id string, field DeltaField, text string) {
 	}
 	t.items[i] = it
 	t.seq++
-	bus.Publish[ThreadEvent](t.bus, ItemDelta{SessionID: t.id, Seq: t.seq, ItemID: id, Ordinal: it.Ordinal, Field: field, Text: text})
+	bus.Publish[ThreadEvent](t.bus, ItemDelta{ThreadID: t.id, Seq: t.seq, ItemID: id, Ordinal: it.Ordinal, Field: field, Text: text})
 }
 
 // publishLocked bumps seq and publishes ev, then PendingChanged when a request item
@@ -487,7 +487,7 @@ func (t *threadLog) publishLocked(ev func(seq uint64) ThreadEvent, kind ItemKind
 	bus.Publish(t.bus, ev(t.seq))
 	if kind == KindPermission || kind == KindQuestion {
 		t.seq++
-		bus.Publish[ThreadEvent](t.bus, PendingChanged{SessionID: t.id, Seq: t.seq, Pending: pendingOf(t.items)})
+		bus.Publish[ThreadEvent](t.bus, PendingChanged{ThreadID: t.id, Seq: t.seq, Pending: pendingOf(t.items)})
 	}
 }
 
@@ -596,17 +596,17 @@ func (m *Manager) thread(ctx context.Context, id string) (*threadLog, error) {
 	// What Claude last reported outlives its process (threadcache_db.go).
 	cmds, mcp, err := loadThreadCache(ctx, m.opts.DB, id)
 	if err != nil {
-		m.log.Warn("load thread cache", "session", id, "err", err)
+		m.log.Warn("load thread cache", "thread", id, "err", err)
 	}
 	t.commands, t.mcp.status = cmds, mcp
 	t.saveCommands = func(cs []SlashCommand) {
 		if err := saveSlashCommands(context.Background(), m.opts.DB, id, cs); err != nil {
-			m.log.Error("persist slash commands", "session", id, "err", err)
+			m.log.Error("persist slash commands", "thread", id, "err", err)
 		}
 	}
 	t.saveMcp = func(s *McpStatus) {
 		if err := saveMcpStatus(context.Background(), m.opts.DB, id, s); err != nil {
-			m.log.Error("persist MCP status", "session", id, "err", err)
+			m.log.Error("persist MCP status", "thread", id, "err", err)
 		}
 	}
 	m.threads[id] = t

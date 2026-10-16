@@ -3,14 +3,14 @@ import { Code, ConnectError } from "@connectrpc/connect";
 import {
   AgentRunStatus,
   PermissionMode,
-  SessionService,
-  SessionState,
-  SessionStatus,
+  ThreadState,
+  ThreadStatus,
   type AgentRun,
-  type Session,
-  type SessionEvent,
+  type Thread,
+  type ThreadListEvent,
   type UsageBucket,
-} from "@/gen/codefoundry/v1/session_pb";
+} from "@/gen/codefoundry/v1/thread_lifecycle_pb";
+import { ThreadService } from "@/gen/codefoundry/v1/thread_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
 import { orOutdatedDaemon } from "./errors";
 
@@ -232,20 +232,20 @@ export type SessionEventView =
   | { kind: "removed"; id: string }
   | { kind: "retiredUsage"; buckets: UsageBucketView[] };
 
-const stateMap: Record<SessionState, SessionStateView> = {
-  [SessionState.UNSPECIFIED]: "unknown",
-  [SessionState.STARTING]: "starting",
-  [SessionState.CONNECTED]: "connected",
-  [SessionState.CLOSING]: "closing",
-  [SessionState.DISCONNECTED]: "disconnected",
+const stateMap: Record<ThreadState, SessionStateView> = {
+  [ThreadState.UNSPECIFIED]: "unknown",
+  [ThreadState.STARTING]: "starting",
+  [ThreadState.CONNECTED]: "connected",
+  [ThreadState.CLOSING]: "closing",
+  [ThreadState.DISCONNECTED]: "disconnected",
 };
 
-const statusMap: Record<SessionStatus, SessionStatusView> = {
-  [SessionStatus.UNSPECIFIED]: "unknown",
-  [SessionStatus.BUSY]: "busy",
-  [SessionStatus.IDLE]: "idle",
-  [SessionStatus.NEEDS_ATTENTION]: "attention",
-  [SessionStatus.ERROR]: "error",
+const statusMap: Record<ThreadStatus, SessionStatusView> = {
+  [ThreadStatus.UNSPECIFIED]: "unknown",
+  [ThreadStatus.BUSY]: "busy",
+  [ThreadStatus.IDLE]: "idle",
+  [ThreadStatus.NEEDS_ATTENTION]: "attention",
+  [ThreadStatus.ERROR]: "error",
 };
 
 const permissionMap: Record<PermissionMode, PermissionModeView> = {
@@ -255,7 +255,7 @@ const permissionMap: Record<PermissionMode, PermissionModeView> = {
   [PermissionMode.AUTO]: "auto",
 };
 
-export function toSessionView(s: Session): SessionView {
+export function toSessionView(s: Thread): SessionView {
   return {
     id: s.id,
     claudeSessionId: s.claudeSessionId,
@@ -344,11 +344,11 @@ export function toUsageBucketView(b: UsageBucket): UsageBucketView {
   };
 }
 
-export function toSessionEventView(ev: SessionEvent): SessionEventView | null {
+export function toSessionEventView(ev: ThreadListEvent): SessionEventView | null {
   const e = ev.event;
   switch (e.case) {
     case "snapshot":
-      return { kind: "snapshot", sessions: e.value.sessions.map(toSessionView), retiredUsage: e.value.retiredUsage.map(toUsageBucketView) };
+      return { kind: "snapshot", sessions: e.value.threads.map(toSessionView), retiredUsage: e.value.retiredUsage.map(toUsageBucketView) };
     case "updated":
       return { kind: "updated", session: toSessionView(e.value) };
     case "removedId":
@@ -361,13 +361,13 @@ export function toSessionEventView(ev: SessionEvent): SessionEventView | null {
 }
 
 export async function listSessions(conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<SessionView[]> {
-  const c = await conn.client(SessionService);
+  const c = await conn.client(ThreadService);
   const res = await c.list({}, { signal });
-  return res.sessions.map(toSessionView);
+  return res.threads.map(toSessionView);
 }
 
 /**
- * Image types SessionService.StageAttachment accepts, and its per-file limit. The daemon
+ * Image types ThreadService.StageAttachment accepts, and its per-file limit. The daemon
  * enforces both; the composer checks first so a bad file is rejected before upload.
  */
 export const ATTACHMENT_MIME_TYPES: readonly string[] = ["image/png", "image/jpeg", "image/gif", "image/webp"];
@@ -378,7 +378,7 @@ export const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
  * once the daemon reaped it. Rejects when the daemon could not be asked.
  */
 export async function readAttachment(path: string, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<{ data: Uint8Array; mimeType: string } | null> {
-  const c = await conn.client(SessionService);
+  const c = await conn.client(ThreadService);
   try {
     const res = await c.readAttachment({ path }, { signal });
     return { data: res.data, mimeType: res.mimeType };
@@ -395,7 +395,7 @@ export async function readAttachment(path: string, conn: DaemonConnection = daem
  * daemon older than the RPC fails with OutdatedDaemonError.
  */
 export async function stageAttachment(file: { name: string; type: string; arrayBuffer(): Promise<ArrayBuffer> }, conn: DaemonConnection = daemon): Promise<string> {
-  const c = await conn.client(SessionService);
+  const c = await conn.client(ThreadService);
   const data = new Uint8Array(await file.arrayBuffer());
   try {
     const res = await c.stageAttachment({ name: file.name, mimeType: file.type, data });

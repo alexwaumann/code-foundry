@@ -25,10 +25,10 @@ func newAgentsRegistry(t *testing.T) (*command.Registry, *threadtest.Fake, *comm
 	fake := threadtest.New(b)
 	reg := command.NewRegistry()
 	emit := &commandtest.Emitter{Delivered: 1}
-	if err := command.RegisterAgents(reg, api.NewThread(fake, b), api.NewSession(fake, b), emit); err != nil {
+	if err := command.RegisterAgents(reg, api.NewThread(fake, b), emit); err != nil {
 		t.Fatal(err)
 	}
-	fake.Put(thread.Session{ID: "s1", Name: "fix", State: thread.StateConnected})
+	fake.Put(thread.Thread{ID: "s1", Name: "fix", State: thread.StateConnected})
 	return reg, fake, emit
 }
 
@@ -39,8 +39,8 @@ func TestAgentsCommandsAvailability(t *testing.T) {
 		ctx  command.Context
 		want bool
 	}{
-		{"cli", command.Context{ActiveSessionID: "s1"}, true},
-		{"gui thread", command.Context{ActiveSessionID: "s1", ActiveView: "session"}, true},
+		{"cli", command.Context{ActiveThreadID: "s1"}, true},
+		{"gui thread", command.Context{ActiveThreadID: "s1", ActiveView: "thread"}, true},
 		{"no thread", command.Context{ActiveView: "projects"}, false},
 	}
 	for _, tt := range tests {
@@ -55,7 +55,7 @@ func TestAgentsCommandsAvailability(t *testing.T) {
 
 func TestThreadAgentsCommand(t *testing.T) {
 	reg, fake, _ := newAgentsRegistry(t)
-	fake.Put(thread.Session{ID: "s1", Name: "fix", State: thread.StateConnected, BackgroundShellsRunning: 2})
+	fake.Put(thread.Thread{ID: "s1", Name: "fix", State: thread.StateConnected, BackgroundShellsRunning: 2})
 	start := time.Now().Add(-90 * time.Second)
 	fake.PutAgents("s1",
 		thread.AgentRun{ID: "a1", Description: "Slow count", AgentType: "general-purpose", Model: "haiku", Background: true, SpawnDepth: 1,
@@ -78,7 +78,7 @@ func TestThreadAgentsCommand(t *testing.T) {
 			t.Errorf("message lacks %q:\n%s", w, res.Message)
 		}
 	}
-	if j, ok := res.JSON.(*v1.ThreadAgentsChange); !ok || j.GetSessionId() != "s1" || len(j.GetAgents()) != 2 {
+	if j, ok := res.JSON.(*v1.ThreadAgentsChange); !ok || j.GetThreadId() != "s1" || len(j.GetAgents()) != 2 {
 		t.Errorf("json %+v", res.JSON)
 	}
 	_, err = reg.Invoke(context.Background(), command.Context{}, "thread.agents", map[string]string{"id": "nope"})
@@ -90,7 +90,7 @@ func TestThreadAgentsCommand(t *testing.T) {
 
 func TestViewPanelAgentsEmits(t *testing.T) {
 	reg, _, emit := newAgentsRegistry(t)
-	res, err := reg.Invoke(context.Background(), command.Context{ActiveSessionID: "s1", ActiveView: "session"}, "view.panel.agents", nil)
+	res, err := reg.Invoke(context.Background(), command.Context{ActiveThreadID: "s1", ActiveView: "thread"}, "view.panel.agents", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -43,11 +43,11 @@ func startActionCleanup(ctx context.Context, log *slog.Logger, runs actionRuns, 
 func startActionCleanupWith(ctx context.Context, log *slog.Logger, runs actionRuns, b *bus.Bus, dirGone func(string) bool) func() {
 	ctx, cancel := context.WithCancel(ctx)
 	repoEvents := bus.Subscribe[repo.Event](b, 256)
-	sessionEvents := bus.Subscribe[thread.Event](b, 256)
+	threadListEvents := bus.Subscribe[thread.Event](b, 256)
 	var wg sync.WaitGroup
 	wg.Go(func() {
 		defer repoEvents.Close()
-		defer sessionEvents.Close()
+		defer threadListEvents.Close()
 		kill := func(why string, match func(action.Run) bool) {
 			if n := runs.KillRuns(match); n > 0 {
 				log.Info("killed background action runs", "why", why, "count", n)
@@ -66,17 +66,17 @@ func startActionCleanupWith(ctx context.Context, log *slog.Logger, runs actionRu
 						kill("worktree removed", func(r action.Run) bool { return r.Worktree == e.Path })
 					}
 				}
-			case ev := <-sessionEvents.C():
+			case ev := <-threadListEvents.C():
 				switch e := ev.(type) {
 				case thread.Removed:
-					kill("thread removed", func(r action.Run) bool { return r.SessionID == e.ID })
+					kill("thread removed", func(r action.Run) bool { return r.ThreadID == e.ID })
 				case thread.Updated:
-					id := e.Session.ID
+					id := e.Thread.ID
 					switch {
-					case !e.Session.ArchivedAt.IsZero():
-						kill("thread archived", func(r action.Run) bool { return r.SessionID == id })
-					case !e.Session.SnoozedUntil.IsZero():
-						kill("thread snoozed", func(r action.Run) bool { return r.SessionID == id })
+					case !e.Thread.ArchivedAt.IsZero():
+						kill("thread archived", func(r action.Run) bool { return r.ThreadID == id })
+					case !e.Thread.SnoozedUntil.IsZero():
+						kill("thread snoozed", func(r action.Run) bool { return r.ThreadID == id })
 					}
 				}
 			}

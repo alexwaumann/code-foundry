@@ -1,6 +1,6 @@
 /**
  * docs/notes/thread-render-stall.md, cause 1: after the Wails window was hidden, minimized
- * or covered, WKWebView holds the last bytes of the ThreadService.Watch response until more
+ * or covered, WKWebView holds the last bytes of the ThreadService.WatchThread response until more
  * bytes arrive. The stream stays open, so nothing reconnects, and the thread shows a stale
  * tail until the user leaves and comes back. These tests cover the client half of the fix
  * (resync when the page becomes visible: runStream resyncOnVisible).

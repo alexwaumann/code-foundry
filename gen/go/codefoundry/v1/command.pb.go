@@ -84,7 +84,7 @@ func (ArgType) EnumDescriptor() ([]byte, []int) {
 type UiContext struct {
 	state              protoimpl.MessageState `protogen:"open.v1"`
 	ActiveTerminalId   string                 `protobuf:"bytes,1,opt,name=active_terminal_id,json=activeTerminalId,proto3" json:"active_terminal_id,omitempty"`
-	ActiveSessionId    string                 `protobuf:"bytes,2,opt,name=active_session_id,json=activeSessionId,proto3" json:"active_session_id,omitempty"`
+	ActiveThreadId     string                 `protobuf:"bytes,2,opt,name=active_thread_id,json=activeThreadId,proto3" json:"active_thread_id,omitempty"`
 	ActiveRepoId       string                 `protobuf:"bytes,3,opt,name=active_repo_id,json=activeRepoId,proto3" json:"active_repo_id,omitempty"`
 	ActiveWorktreePath string                 `protobuf:"bytes,4,opt,name=active_worktree_path,json=activeWorktreePath,proto3" json:"active_worktree_path,omitempty"`
 	// Logical view name, e.g. "terminal", "repo", "dashboard". Empty from the CLI.
@@ -133,9 +133,9 @@ func (x *UiContext) GetActiveTerminalId() string {
 	return ""
 }
 
-func (x *UiContext) GetActiveSessionId() string {
+func (x *UiContext) GetActiveThreadId() string {
 	if x != nil {
-		return x.ActiveSessionId
+		return x.ActiveThreadId
 	}
 	return ""
 }
@@ -179,7 +179,7 @@ type ArgSpec struct {
 	// Positional args take bare words on the CLI, in declaration order
 	// (`code-foundry settings set <key> <value>`). The flag form still works.
 	Positional bool `protobuf:"varint,7,opt,name=positional,proto3" json:"positional,omitempty"`
-	// The CLI sends its working directory when the flag is not given (a Claude session
+	// The CLI sends its working directory when the flag is not given (a thread's Claude
 	// runs `code-foundry workspace members` from the worktree it works in).
 	DefaultToCwd  bool `protobuf:"varint,8,opt,name=default_to_cwd,json=defaultToCwd,proto3" json:"default_to_cwd,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -675,10 +675,10 @@ var File_codefoundry_v1_command_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_command_proto_rawDesc = "" +
 	"\n" +
-	"\x1ccodefoundry/v1/command.proto\x12\x0ecodefoundry.v1\"\xad\x02\n" +
+	"\x1ccodefoundry/v1/command.proto\x12\x0ecodefoundry.v1\"\xab\x02\n" +
 	"\tUiContext\x12,\n" +
-	"\x12active_terminal_id\x18\x01 \x01(\tR\x10activeTerminalId\x12*\n" +
-	"\x11active_session_id\x18\x02 \x01(\tR\x0factiveSessionId\x12$\n" +
+	"\x12active_terminal_id\x18\x01 \x01(\tR\x10activeTerminalId\x12(\n" +
+	"\x10active_thread_id\x18\x02 \x01(\tR\x0eactiveThreadId\x12$\n" +
 	"\x0eactive_repo_id\x18\x03 \x01(\tR\factiveRepoId\x120\n" +
 	"\x14active_worktree_path\x18\x04 \x01(\tR\x12activeWorktreePath\x12\x1f\n" +
 	"\vactive_view\x18\x05 \x01(\tR\n" +

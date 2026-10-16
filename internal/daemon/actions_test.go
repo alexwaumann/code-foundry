@@ -49,9 +49,9 @@ func (r *recordingRuns) state() ([]string, []string) {
 
 func TestActionCleanup(t *testing.T) {
 	runs := []action.Run{
-		{ID: "r1", RepoID: "web", SessionID: "s1", Worktree: "/wt/feat"},
+		{ID: "r1", RepoID: "web", ThreadID: "s1", Worktree: "/wt/feat"},
 		{ID: "r2", RepoID: "web", Worktree: "/wt/main"},
-		{ID: "r3", RepoID: "api", SessionID: "s2", Worktree: "/wt/api"},
+		{ID: "r3", RepoID: "api", ThreadID: "s2", Worktree: "/wt/api"},
 	}
 	tests := []struct {
 		name       string
@@ -67,10 +67,10 @@ func TestActionCleanup(t *testing.T) {
 			wantKilled: []string{"r2"}},
 		{name: "a worktree still on disk (a failed refresh) keeps its runs", event: repo.WorktreeRemoved{RepoID: "web", Path: "/wt/main"}},
 		{name: "an archived thread's background runs are killed",
-			event: thread.Updated{Session: thread.Session{ID: "s2", ArchivedAt: time.Unix(1, 0)}}, wantKilled: []string{"r3"}},
+			event: thread.Updated{Thread: thread.Thread{ID: "s2", ArchivedAt: time.Unix(1, 0)}}, wantKilled: []string{"r3"}},
 		{name: "a snoozed thread's background runs are killed",
-			event: thread.Updated{Session: thread.Session{ID: "s1", SnoozedUntil: time.Unix(1, 0)}}, wantKilled: []string{"r1"}},
-		{name: "other session updates are ignored", event: thread.Updated{Session: thread.Session{ID: "s1"}}},
+			event: thread.Updated{Thread: thread.Thread{ID: "s1", SnoozedUntil: time.Unix(1, 0)}}, wantKilled: []string{"r1"}},
+		{name: "other thread updates are ignored", event: thread.Updated{Thread: thread.Thread{ID: "s1"}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

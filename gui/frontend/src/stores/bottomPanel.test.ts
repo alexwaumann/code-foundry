@@ -38,7 +38,7 @@ function term(id: string, labels: Record<string, string>, extra: Partial<Termina
   return { id, argv: ["/bin/zsh"], cwd: "/src/app", cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: null, exitedAtMs: null, altScreen: false, labels, ...extra };
 }
 
-const shell = (session: string, worktree = "/src/app") => ({ kind: "shell", repo: "r", worktree, ...(session ? { session } : {}) });
+const shell = (session: string, worktree = "/src/app") => ({ kind: "shell", repo: "r", worktree, ...(session ? { thread: session } : {}) });
 
 function data(list: TerminalView[]): TerminalsData {
   return { byId: Object.fromEntries(list.map((t) => [t.id, t])), order: list.map((t) => t.id) };
@@ -65,7 +65,7 @@ describe("ownerKeyOf", () => {
     ["a thread-labelled terminal that is no shell (session, no kind)", { session: "s1", worktree: "/src/app" }, null],
     ["an unlabelled terminal", {}, null],
     ["another kind", { kind: "job", session: "s1" }, null],
-    ["a thread's action run", { kind: "action", session: "s1", action: "a-1", "action.name": "Test", "action.run": "r-1" }, "session:s1"],
+    ["a thread's action run", { kind: "action", thread: "s1", action: "a-1", "action.name": "Test", "action.run": "r-1" }, "session:s1"],
     ["a worktree's action run", { kind: "action", repo: "r", worktree: "/src/app", action: "a-1" }, "view:projects"],
   ];
   it.each(cases)("%s", (_name, labels, want) => {
@@ -82,7 +82,7 @@ describe("bottomTabIds", () => {
     term("loose", {}),
     term("c", shell("s1")),
     term("w2", shell("", "/src/app.worktrees/x")),
-    term("run", { kind: "action", session: "s1", "action.name": "Test" }, { state: "exited", exitCode: 1 }),
+    term("run", { kind: "action", thread: "s1", "action.name": "Test" }, { state: "exited", exitCode: 1 }),
   ]);
   const cases: [string, string, string[]][] = [
     ["a thread: its shells and action runs (exited too) in store order, not a non-shell terminal", "session:s1", ["a", "c", "run"]],
@@ -114,16 +114,16 @@ describe("bottomTabTitle", () => {
     ["a thread's shell without a title: its cwd's last segment", { cwd: "/src/app/cmd/" }, "session:s1", "cmd"],
     ["the Projects page: the worktree's folder, whatever the title", { title: "vim", cwd: "/src/app.worktrees/x/sub", labels: shell("", "/src/app.worktrees/x") }, "view:projects", "x"],
     ["the Projects page without a worktree label: the cwd's", { cwd: "/src/other", labels: { kind: "shell" } }, "view:projects", "other"],
-    ["an action run: the action's name, not its OSC title", { title: "zsh", labels: { kind: "action", session: "s1", "action.name": "Test" } }, "session:s1", "Test"],
+    ["an action run: the action's name, not its OSC title", { title: "zsh", labels: { kind: "action", thread: "s1", "action.name": "Test" } }, "session:s1", "Test"],
     ["an action run on the Projects page: the action's name", { labels: { kind: "action", worktree: "/src/app", "action.name": "Build" } }, "view:projects", "Build"],
   ];
   it.each(cases)("%s", (_name, extra, key, want) => {
     expect(bottomTabTitle(term("t", shell("s1"), extra), key)).toBe(want);
   });
   it.each([
-    ["a shell in the thread's home: No project", { cwd: "/Users/dev", labels: { kind: "shell", session: "s1", repo: "", worktree: "/Users/dev" } }, "No project"],
-    ["one elsewhere: its folder", { cwd: "/Users/dev/notes", labels: { kind: "shell", session: "s1", repo: "", worktree: "/Users/dev" } }, "notes"],
-    ["its own title wins", { title: "htop", cwd: "/Users/dev", labels: { kind: "shell", session: "s1", repo: "", worktree: "/Users/dev" } }, "htop"],
+    ["a shell in the thread's home: No project", { cwd: "/Users/dev", labels: { kind: "shell", thread: "s1", repo: "", worktree: "/Users/dev" } }, "No project"],
+    ["one elsewhere: its folder", { cwd: "/Users/dev/notes", labels: { kind: "shell", thread: "s1", repo: "", worktree: "/Users/dev" } }, "notes"],
+    ["its own title wins", { title: "htop", cwd: "/Users/dev", labels: { kind: "shell", thread: "s1", repo: "", worktree: "/Users/dev" } }, "htop"],
   ] as [string, Partial<TerminalView>, string][])("a thread without a project: %s", (_name, extra, want) => {
     expect(bottomTabTitle(term("t", {}, extra), "session:s1", true)).toBe(want);
   });
@@ -134,7 +134,7 @@ describe("bottomTabTitles (duplicates numbered)", () => {
   const cases: [string, TerminalView[], string, Record<string, string>][] = [
     [
       "two runs of one action: the second is numbered",
-      [term("a", { kind: "action", session: "s1", "action.name": "Test" }, { title: "zsh" }), term("b", shell("s1")), term("c", { kind: "action", session: "s1", "action.name": "Test" })],
+      [term("a", { kind: "action", thread: "s1", "action.name": "Test" }, { title: "zsh" }), term("b", shell("s1")), term("c", { kind: "action", thread: "s1", "action.name": "Test" })],
       "session:s1",
       { a: "Test", b: "app", c: "Test 2" },
     ],

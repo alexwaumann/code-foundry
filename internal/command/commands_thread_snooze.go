@@ -18,9 +18,9 @@ import (
 // mid-turn or waiting on the user, or background agents or shells run, like
 // session.archive; unsnoozing never asks. See
 // docs/notes/snooze-threads-1-daemon.md.
-func sessionSnooze(b SessionBackend, idArg ArgSpec) Command {
+func threadSnooze(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
-		Name:  "session.snooze",
+		Name:  "thread.snooze",
 		Title: "Snooze or Unsnooze Thread",
 		Description: "Snooze a thread until a time: Claude is closed, its terminals are removed and it is unpinned and " +
 			"listed apart; when the time comes it returns needing attention (\"snooze ended\"). " +
@@ -32,7 +32,7 @@ func sessionSnooze(b SessionBackend, idArg ArgSpec) Command {
 			{Name: "until", Type: String, Description: "When the thread wakes: 1h, 90m, tomorrow, next-week, mon..sun, 2026-10-20, 2026-10-20 14:00 or RFC 3339"},
 			{Name: "clear", Type: Bool, Description: "Unsnooze the thread instead"},
 		},
-		When:    hasSession,
+		When:    hasThread,
 		Confirm: "Snooze thread {id}? Claude is still working; snoozing ends the turn.",
 		ConfirmIf: func(ctx context.Context, _ Context, a Args) bool {
 			return snoozeConfirm(ctx, b, a) != ""
@@ -46,7 +46,7 @@ func sessionSnooze(b SessionBackend, idArg ArgSpec) Command {
 			if err != nil {
 				return Result{}, err
 			}
-			req := &v1.SnoozeSessionRequest{Id: a.String("id")}
+			req := &v1.SnoozeThreadRequest{Id: a.String("id")}
 			if !until.IsZero() {
 				req.Until = timestamppb.New(until)
 			}
@@ -54,11 +54,11 @@ func sessionSnooze(b SessionBackend, idArg ArgSpec) Command {
 			if err != nil {
 				return Result{}, err
 			}
-			s := res.Msg.GetSession()
+			s := res.Msg.GetThread()
 			if su := s.GetSnoozedUntil(); su != nil {
-				return Result{Message: "snoozed thread " + sessionLabel(s) + " until " + formatSnoozeTime(su.AsTime(), now, time.Local), JSON: s}, nil
+				return Result{Message: "snoozed thread " + threadLabel(s) + " until " + formatSnoozeTime(su.AsTime(), now, time.Local), JSON: s}, nil
 			}
-			return Result{Message: "unsnoozed thread " + sessionLabel(s), JSON: s}, nil
+			return Result{Message: "unsnoozed thread " + threadLabel(s), JSON: s}, nil
 		},
 	}
 }
@@ -85,15 +85,15 @@ func snoozeArgs(a Args, now time.Time) (time.Time, error) {
 // snoozeConfirm is session.snooze's confirmation for this call, or "" when it needs
 // none: unsnoozing, args Run will refuse anyway, an unknown thread (Run reports it), or
 // snoozing a thread that is not mid-turn and runs no background work (archiveInterrupts).
-func snoozeConfirm(ctx context.Context, b SessionBackend, a Args) string {
+func snoozeConfirm(ctx context.Context, b ThreadBackend, a Args) string {
 	if until, err := snoozeArgs(a, time.Now()); err != nil || until.IsZero() {
 		return ""
 	}
-	res, err := b.Get(ctx, connect.NewRequest(&v1.GetSessionRequest{Id: a.String("id")}))
+	res, err := b.Get(ctx, connect.NewRequest(&v1.GetThreadRequest{Id: a.String("id")}))
 	if err != nil {
 		return ""
 	}
-	s := res.Msg.GetSession()
+	s := res.Msg.GetThread()
 	why, ends := archiveInterrupts(s)
 	if why == "" {
 		return ""

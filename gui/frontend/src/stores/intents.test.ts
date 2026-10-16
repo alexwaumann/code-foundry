@@ -20,7 +20,7 @@ function term(id: string, labels: Record<string, string>): TerminalView {
   return { id, argv: ["/bin/zsh"], cwd: "/src/app", cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: null, exitedAtMs: null, altScreen: false, labels };
 }
 const thread = (id: string) => ({ id, repoId: "r1", worktreePath: "/src/app", workspaceId: "", state: "connected" }) as SessionView;
-const shell = { kind: "shell", session: "s1", repo: "r1", worktree: "/src/app" };
+const shell = { kind: "shell", thread: "s1", repo: "r1", worktree: "/src/app" };
 
 function setTerminals(list: TerminalView[]): void {
   useTerminalsStore.setState({ byId: Object.fromEntries(list.map((t) => [t.id, t])), order: list.map((t) => t.id), loaded: true });
@@ -78,7 +78,7 @@ describe("a pending focusTerminal", () => {
     focusTerminal("later");
     act();
     const selected = useUiStore.getState().selection;
-    const later = term("later", { kind: "shell", session: "s2", repo: "r1", worktree: "/src/app" });
+    const later = term("later", { kind: "shell", thread: "s2", repo: "r1", worktree: "/src/app" });
     setTerminals([later]);
     onNewTerminal(later);
     expect(useUiStore.getState().selection).toEqual(selected);

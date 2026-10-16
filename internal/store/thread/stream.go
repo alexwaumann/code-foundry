@@ -125,9 +125,9 @@ type threadCmd struct {
 }
 
 type threadReply struct {
-	item    Item
-	session Session // SetEffort's
-	err     error
+	item   Item
+	thread Thread // SetEffort's
+	err    error
 }
 
 // viewersChanged tells the runner the thread's viewer count changed. Non-blocking.
@@ -162,10 +162,10 @@ func (m *Manager) spawnStream(ctx context.Context, rec *record, r *runner, argv,
 	closeUnfinished(st.proj.w, "the thread's process ended")
 	proc, err := claudestream.Start(claudestream.Spec{
 		Argv: argv, Env: env, Dir: s.WorktreePath,
-		Conn: claudestream.Options{Log: m.log.With("session", s.ID)},
+		Conn: claudestream.Options{Log: m.log.With("thread", s.ID)},
 	})
 	if err != nil {
-		return fmt.Errorf("session %s: spawn claude: %w", s.ID, err)
+		return fmt.Errorf("thread %s: spawn claude: %w", s.ID, err)
 	}
 	st.proc, st.conn = proc, proc.Conn()
 	st.events = st.conn.Events()
@@ -181,7 +181,7 @@ func (m *Manager) spawnStream(ctx context.Context, rec *record, r *runner, argv,
 
 func (m *Manager) saveItem(id string, it Item) {
 	if err := saveItem(context.Background(), m.opts.DB, id, it); err != nil {
-		m.log.Error("persist thread item", "session", id, "item", it.ID, "err", err)
+		m.log.Error("persist thread item", "thread", id, "item", it.ID, "err", err)
 	}
 }
 
@@ -371,7 +371,7 @@ func (r *runner) onInitialized(res initResult) {
 		r.readyClosed = true
 		close(r.ready)
 	}
-	r.log().info("session connected", "why", "initialized", "pid", st.proc.Pid())
+	r.log().info("thread connected", "why", "initialized", "pid", st.proc.Pid())
 	r.checkStatus()
 }
 
@@ -481,7 +481,7 @@ func (r *runner) clearRetry(ev claudestream.Event) {
 	if _, retry := ev.(*claudestream.APIRetry); retry {
 		return
 	}
-	if s, ok := r.m.Snapshot().Session(r.id); !ok || s.Retry == nil {
+	if s, ok := r.m.Snapshot().Thread(r.id); !ok || s.Retry == nil {
 		return
 	}
 	r.m.update(r.id, false, func(rec *record) { rec.s.Retry = nil })
@@ -626,7 +626,7 @@ func (r *runner) onThreadCmd(cmd threadCmd) {
 	case cmd.send != nil:
 		rep.item, rep.err = r.sendMessage(cmd.send)
 	case cmd.effort != nil:
-		rep.session = r.setEffort(*cmd.effort)
+		rep.thread = r.setEffort(*cmd.effort)
 	default:
 		rep.item, rep.err = r.respond(cmd.requestID, cmd.decision)
 	}
@@ -753,7 +753,7 @@ func (r *runner) beginClose() {
 	r.state = StateClosing
 	r.closeBy = time.Now().Add(r.m.opts.CloseTimeout)
 	r.m.update(r.id, true, func(rec *record) { rec.s.State = StateClosing })
-	r.log().info("closing session")
+	r.log().info("closing thread")
 	busy := st.sd.busy || st.sd.compacting
 	conn := st.conn
 	go func() {
@@ -822,8 +822,8 @@ func (r *runner) shutdown() {
 	st.conn.Close()
 	// End the reader even if a grandchild kept stdout open.
 	st.proc.CloseOutput()
-	r.log().info("session disconnected", "reason", ReasonDaemonStopped)
-	r.finish(func(s *Session) {
+	r.log().info("thread disconnected", "reason", ReasonDaemonStopped)
+	r.finish(func(s *Thread) {
 		s.State, s.DisconnectReason = StateDisconnected, ReasonDaemonStopped
 	})
 }
@@ -878,8 +878,8 @@ func (r *runner) maybeExited() {
 	st.log.dropMcpChecks()
 	r.stopStreamTimers()
 	st.conn.Close()
-	r.log().info("session disconnected", "reason", reason, "exit_code", code)
-	r.finish(func(s *Session) {
+	r.log().info("thread disconnected", "reason", reason, "exit_code", code)
+	r.finish(func(s *Thread) {
 		s.State, s.DisconnectReason, s.ExitCode = StateDisconnected, reason, code
 		if lastErr != "" && (code != 0 || !st.initialized) {
 			s.LastError = lastErr

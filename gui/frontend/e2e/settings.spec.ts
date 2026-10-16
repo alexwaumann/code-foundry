@@ -66,10 +66,10 @@ test("cmd+, opens settings rendered from the schema", async ({ page }) => {
     await expect(settings.getByRole("heading", { name: title, exact: true })).toBeVisible();
   }
   await expect(setting(page, "appearance.font_size").getByRole("spinbutton")).toHaveValue("13");
-  await expect(select(page, "sessions.default_model")).toHaveAttribute("data-value", "claude-opus-4-8[1m]");
-  await expect(select(page, "sessions.default_model")).toHaveText("Opus 4.8 (default)");
+  await expect(select(page, "threads.default_model")).toHaveAttribute("data-value", "claude-opus-4-8[1m]");
+  await expect(select(page, "threads.default_model")).toHaveText("Opus 4.8 (default)");
   // The model registry's labels; the setting's own default is marked.
-  await expectOptions(page, "sessions.default_model", [
+  await expectOptions(page, "threads.default_model", [
     "Opus 5.5",
     "Opus 4.8 (default)",
     "Opus 4.7",
@@ -80,27 +80,27 @@ test("cmd+, opens settings rendered from the schema", async ({ page }) => {
     "Haiku 4.5",
   ]);
   // Where new threads work: a dropdown with plain-language labels, a fresh copy by default.
-  await expect(setting(page, "sessions.default_worktree")).toContainText("New threads work in");
-  await expect(select(page, "sessions.default_worktree")).toHaveAttribute("data-value", "new");
-  await expectOptions(page, "sessions.default_worktree", ["A fresh copy of the project (default)", "The project folder itself"]);
+  await expect(setting(page, "threads.default_worktree")).toContainText("New threads work in");
+  await expect(select(page, "threads.default_worktree")).toHaveAttribute("data-value", "new");
+  await expectOptions(page, "threads.default_worktree", ["A fresh copy of the project (default)", "The project folder itself"]);
   // The naming model is its own live setting, defaulting to Sonnet 5.
-  await expect(select(page, "sessions.naming_model")).toHaveAttribute("data-value", "claude-sonnet-5[1m]");
-  await expect(select(page, "sessions.naming_model")).toHaveText("Sonnet 5 (default)");
-  await expect(setting(page, "sessions.naming_model").getByTestId("restart-hint")).toHaveCount(0);
+  await expect(select(page, "threads.naming_model")).toHaveAttribute("data-value", "claude-sonnet-5[1m]");
+  await expect(select(page, "threads.naming_model")).toHaveText("Sonnet 5 (default)");
+  await expect(setting(page, "threads.naming_model").getByTestId("restart-hint")).toHaveCount(0);
   // Every thread is rendered: no view setting (the schema has none).
-  await expect(setting(page, "sessions.render")).toHaveCount(0);
+  await expect(setting(page, "threads.render")).toHaveCount(0);
   // Restart-required fields say so; live ones do not.
-  await expect(setting(page, "sessions.scrollback_lines").getByTestId("restart-hint")).toBeVisible();
+  await expect(setting(page, "threads.scrollback_lines").getByTestId("restart-hint")).toBeVisible();
   await expect(setting(page, "appearance.theme").getByTestId("restart-hint")).toHaveCount(0);
   // One keybinding field per registry command, with its default chord.
-  await expect(setting(page, "keybindings.session.new").getByRole("button", { name: /shortcut/ })).toHaveText("⌘N");
+  await expect(setting(page, "keybindings.thread.new").getByRole("button", { name: /shortcut/ })).toHaveText("⌘N");
   await expect(page.getByTestId("settings-path")).toContainText("settings.toml");
 
   // Search narrows the form.
   await settings.getByRole("searchbox", { name: "Search settings" }).fill("font");
   await expect(setting(page, "appearance.font_size")).toBeVisible();
   await expect(setting(page, "appearance.font_family")).toBeVisible();
-  await expect(setting(page, "sessions.auto_name")).toHaveCount(0);
+  await expect(setting(page, "threads.auto_name")).toHaveCount(0);
 
   // Escape (outside a field) closes the page.
   await settings.getByRole("searchbox", { name: "Search settings" }).fill("");
@@ -132,12 +132,12 @@ test("the dark and light theme rows offer their scheme's themes and apply live",
 
 test("changing a bool and an enum saves to the file and applies live", async ({ page }) => {
   await openSettings(page);
-  const autoName = setting(page, "sessions.auto_name").getByRole("switch");
+  const autoName = setting(page, "threads.auto_name").getByRole("switch");
   await expect(autoName).toHaveAttribute("aria-checked", "true");
   await autoName.click();
   await expect(autoName).toHaveAttribute("aria-checked", "false");
   await expect(page.getByText("Saved Name sessions automatically")).toBeVisible();
-  await expect.poll(async () => (await mockSettings()).raw["sessions.auto_name"]).toBe("false");
+  await expect.poll(async () => (await mockSettings()).raw["threads.auto_name"]).toBe("false");
 
   await pick(page, "appearance.theme", "Light");
   await expect.poll(async () => (await mockSettings()).raw["appearance.theme"]).toBe("light");
@@ -153,10 +153,10 @@ test("changing a bool and an enum saves to the file and applies live", async ({ 
   expect((await mockSettings()).raw["appearance.font_size"]).toBeUndefined();
 
   // The restart-required field shows a pending badge once changed.
-  const scroll = setting(page, "sessions.scrollback_lines").getByRole("spinbutton");
+  const scroll = setting(page, "threads.scrollback_lines").getByRole("spinbutton");
   await scroll.fill("20000");
   await scroll.press("Enter");
-  await expect(setting(page, "sessions.scrollback_lines").getByTestId("restart-pending")).toBeVisible();
+  await expect(setting(page, "threads.scrollback_lines").getByTestId("restart-pending")).toBeVisible();
 });
 
 test("an enum select works from the keyboard and its list is themed", async ({ page }) => {
@@ -229,29 +229,29 @@ test("appearance.thread_width sets data-thread-width on <html>, live", async ({ 
 
 test("a keybinding override rejects a reserved chord and applies a valid one", async ({ page }) => {
   await openSettings(page);
-  const recorder = setting(page, "keybindings.session.new").getByRole("button", { name: /shortcut/ });
+  const recorder = setting(page, "keybindings.thread.new").getByRole("button", { name: /shortcut/ });
   await recorder.click();
   await page.keyboard.press("Meta+k");
-  await expect(setting(page, "keybindings.session.new").getByTestId("setting-error")).toHaveText("cmd+k is reserved by the app");
+  await expect(setting(page, "keybindings.thread.new").getByTestId("setting-error")).toHaveText("cmd+k is reserved by the app");
   // Recording swallowed the chord: the palette did not open.
   await expect(page.getByTestId("palette")).toHaveCount(0);
-  expect((await mockSettings()).raw["keybindings.session.new"]).toBeUndefined();
+  expect((await mockSettings()).raw["keybindings.thread.new"]).toBeUndefined();
 
   // Colliding with another command's chord is rejected by the daemon.
   await recorder.click();
   await page.keyboard.press("Meta+t");
-  await expect(setting(page, "keybindings.session.new").getByTestId("setting-error")).toContainText("already bound to terminal.new");
+  await expect(setting(page, "keybindings.thread.new").getByTestId("setting-error")).toContainText("already bound to terminal.new");
 
   await recorder.click();
   await page.keyboard.press("Meta+Shift+y");
   await expect(recorder).toHaveText("⇧⌘Y");
-  await expect.poll(async () => (await mockSettings()).raw["keybindings.session.new"]).toBe("cmd+shift+y");
+  await expect.poll(async () => (await mockSettings()).raw["keybindings.thread.new"]).toBe("cmd+shift+y");
 
   // CommandService.List reports the override: the palette shows the new chord.
   await page.keyboard.press("Escape");
   await row(page, "s:s-1").click();
   await page.keyboard.press("Meta+k");
-  await expect(page.getByTestId("palette").locator('[data-command="session.new"]')).toContainText("⇧⌘Y");
+  await expect(page.getByTestId("palette").locator('[data-command="thread.new"]')).toContainText("⇧⌘Y");
 });
 
 test("hand edits to the file update the open page and the terminal font", async ({ page }) => {
@@ -306,12 +306,12 @@ test("cmd+/ opens the help overlay; its shortcuts tab lists commands and app cho
   await expect(page.getByTestId("help-guide")).toContainText("a thread keeps its history, and a message always continues it.");
   await expect(help).not.toContainText(/disconnected|Reconnect/);
   await page.getByTestId("help-tab-shortcuts").click();
-  await expect(help.locator('[data-help-command="session.close"], [data-help-command="session.reconnect"]')).toHaveCount(0);
+  await expect(help.locator('[data-help-command="thread.close"], [data-help-command="thread.reconnect"]')).toHaveCount(0);
   await expect(help.locator('[data-help-section="App"]')).toContainText("Command palette");
   await expect(help.locator('[data-help-section="App"]')).toContainText("⌘K");
   // Registry commands with their effective chords, grouped by category; unavailable
   // ones (session.new without a worktree) are still listed.
-  await expect(help.locator('[data-help-command="session.new"]')).toContainText("⌘N");
+  await expect(help.locator('[data-help-command="thread.new"]')).toContainText("⌘N");
   await expect(help.locator('[data-help-command="terminal.new"]')).toContainText("⌘T");
   await expect(help.locator('[data-help-command="view.settings"]')).toContainText("⌘,");
   await page.keyboard.press("Escape");
@@ -343,13 +343,13 @@ test("destructive commands ask first; cancel keeps, confirm runs", async ({ page
   await dialog.getByTestId("confirm-cancel").click();
   await expect(dialog).toHaveCount(0);
   await expect(row(page, "s:s-3")).toBeVisible();
-  let calls = (await invocations()).filter((i) => i.name === "session.remove");
+  let calls = (await invocations()).filter((i) => i.name === "thread.remove");
   expect(calls.map((c) => (c as { confirmed?: boolean }).confirmed)).toEqual([false]);
 
   await remove();
   await expect(dialog).toBeVisible();
   await dialog.getByTestId("confirm-ok").click();
   await expect(row(page, "s:s-3")).toHaveCount(0);
-  calls = (await invocations()).filter((i) => i.name === "session.remove");
+  calls = (await invocations()).filter((i) => i.name === "thread.remove");
   expect(calls.map((c) => (c as { confirmed?: boolean }).confirmed)).toEqual([false, false, true]);
 });

@@ -39,7 +39,7 @@ func (re *env) waitArgv(what string, cond func([]string) bool) []string {
 
 // turnOver reports a thread whose turn has ended: idle when something watched it,
 // or "finished" (needs attention) when nothing did. Which one depends on timing.
-func turnOver(s Session) bool {
+func turnOver(s Thread) bool {
 	return s.Status == StatusIdle || s.Status == StatusNeedsAttention && s.StatusReason == "finished"
 }
 
@@ -54,7 +54,7 @@ func hasEffortNote(effort string) func([]Item) bool {
 func TestRenderedSetEffortIdleRestarts(t *testing.T) {
 	re := newFixtureEnv(t, "text-table")
 	s := re.create(CreateOptions{Model: "haiku", Effort: "low", PermissionMode: PermissionSupervised})
-	re.waitFor(s.ID, "idle", func(s Session) bool { return s.Status == StatusIdle })
+	re.waitFor(s.ID, "idle", func(s Thread) bool { return s.Status == StatusIdle })
 	first := re.argvOf()
 	cid := argOf(first, "--session-id")
 	if argOf(first, "--effort") != "low" || cid == "" {
@@ -84,7 +84,7 @@ func TestRenderedSetEffortIdleRestarts(t *testing.T) {
 	if note < 0 || msg < note {
 		t.Errorf("the note should come before the held message:\n%s", describeItems(items))
 	}
-	got = re.waitFor(s.ID, "applied", func(s Session) bool { return !s.EffortPending && turnOver(s) })
+	got = re.waitFor(s.ID, "applied", func(s Thread) bool { return !s.EffortPending && turnOver(s) })
 	if got.State != StateConnected || got.Effort != "high" {
 		t.Errorf("after the restart %+v", got)
 	}
@@ -101,7 +101,7 @@ func TestRenderedSetEffortIdleRestarts(t *testing.T) {
 func TestRenderedSetEffortWaitsForTheTurn(t *testing.T) {
 	re := newFixtureEnv(t, "write-allow")
 	s := re.create(CreateOptions{Effort: "low", PermissionMode: PermissionSupervised, InitialPrompt: "write"})
-	re.waitFor(s.ID, "permission", func(s Session) bool { return s.Status == StatusNeedsAttention })
+	re.waitFor(s.ID, "permission", func(s Thread) bool { return s.Status == StatusNeedsAttention })
 	got, err := re.m.SetEffort(re.ctx(), s.ID, "max")
 	if err != nil || !got.EffortPending || got.Effort != "max" {
 		t.Fatalf("set effort %+v %v", got, err)
@@ -123,13 +123,13 @@ func TestRenderedSetEffortWaitsForTheTurn(t *testing.T) {
 	}
 	re.waitArgv("the restart after the turn", func(a []string) bool { return argOf(a, "--effort") == "max" })
 	re.waitItems(s.ID, "the effort note", hasEffortNote("max"))
-	re.waitFor(s.ID, "applied", func(s Session) bool { return !s.EffortPending && s.State == StateConnected })
+	re.waitFor(s.ID, "applied", func(s Thread) bool { return !s.EffortPending && s.State == StateConnected })
 }
 
 func TestRenderedSetEffortRefusals(t *testing.T) {
 	re := newFixtureEnv(t, "text-table")
 	s := re.create(CreateOptions{})
-	re.waitFor(s.ID, "idle", func(s Session) bool { return s.Status == StatusIdle })
+	re.waitFor(s.ID, "idle", func(s Thread) bool { return s.Status == StatusIdle })
 	if _, err := re.m.SetEffort(re.ctx(), s.ID, "huge"); !errors.Is(err, ErrInvalidArgument) {
 		t.Errorf("bad effort: %v", err)
 	}
@@ -167,7 +167,7 @@ func TestDenyMessage(t *testing.T) {
 func TestRenderedFollowsClaudesModeChange(t *testing.T) {
 	re := newFixtureEnv(t, "text-table")
 	s := re.create(CreateOptions{PermissionMode: PermissionSupervised})
-	re.waitFor(s.ID, "idle", func(s Session) bool { return s.Status == StatusIdle })
+	re.waitFor(s.ID, "idle", func(s Thread) bool { return s.Status == StatusIdle })
 	re.m.mu.Lock()
 	r := re.m.recs[s.ID].run
 	re.m.mu.Unlock()
@@ -310,16 +310,16 @@ func TestRenderedSetEffortGap(t *testing.T) {
 		name   string
 		env    []string
 		mutate func(*Options)
-		run    func(t *testing.T, re *env, s Session)
+		run    func(t *testing.T, re *env, s Thread)
 	}{
 		{
 			name: "a send is held and reaches the new process once",
-			run: func(t *testing.T, re *env, s Session) {
+			run: func(t *testing.T, re *env, s Thread) {
 				done := re.sendAsync(re.ctx(), s.ID, "held")
 				if err := waitErr(t, "the held send", done); err != nil {
 					t.Fatalf("send: %v", err)
 				}
-				re.waitFor(s.ID, "applied", func(s Session) bool { return !s.EffortPending && turnOver(s) })
+				re.waitFor(s.ID, "applied", func(s Thread) bool { return !s.EffortPending && turnOver(s) })
 				// The session can publish the applied state a moment before the held
 				// message is written to the new process's stdin: wait for the delivery.
 				fresh, resumed := re.waitDeliveries("held", func(fresh, resumed int) bool { return fresh == 0 && resumed == 1 })
@@ -330,13 +330,13 @@ func TestRenderedSetEffortGap(t *testing.T) {
 		},
 		{
 			name: "a send its caller gave up on is dropped",
-			run: func(t *testing.T, re *env, s Session) {
+			run: func(t *testing.T, re *env, s Thread) {
 				ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 				defer cancel()
 				if err := waitErr(t, "the send", re.sendAsync(ctx, s.ID, "gave up")); !errors.Is(err, context.DeadlineExceeded) {
 					t.Fatalf("send: %v", err)
 				}
-				re.waitFor(s.ID, "applied", func(s Session) bool { return !s.EffortPending && s.State == StateConnected })
+				re.waitFor(s.ID, "applied", func(s Thread) bool { return !s.EffortPending && s.State == StateConnected })
 				if fresh, resumed := re.deliveries("gave up"); fresh+resumed != 0 {
 					t.Errorf("a send that failed was delivered (%d, %d)", fresh, resumed)
 				}
@@ -347,7 +347,7 @@ func TestRenderedSetEffortGap(t *testing.T) {
 		},
 		{
 			name: "interrupt, model and mode wait for the new process; respond finds nothing",
-			run: func(t *testing.T, re *env, s Session) {
+			run: func(t *testing.T, re *env, s Thread) {
 				if err := re.m.Interrupt(re.ctx(), s.ID); !errors.Is(err, ErrFailedPrecondition) {
 					t.Errorf("interrupt: %v", err)
 				}
@@ -360,7 +360,7 @@ func TestRenderedSetEffortGap(t *testing.T) {
 				if _, err := re.m.Respond(re.ctx(), s.ID, "req-1", Decision{Allow: true}); !errors.Is(err, ErrNotFound) {
 					t.Errorf("respond: %v", err)
 				}
-				got := re.waitFor(s.ID, "applied", func(s Session) bool { return !s.EffortPending && s.State == StateConnected })
+				got := re.waitFor(s.ID, "applied", func(s Thread) bool { return !s.EffortPending && s.State == StateConnected })
 				if got.Model != "haiku" || got.PermissionMode != PermissionSupervised {
 					t.Errorf("refused changes were recorded: %+v", got)
 				}
@@ -373,7 +373,7 @@ func TestRenderedSetEffortGap(t *testing.T) {
 			// A message is never lost to a close: like a send to a closing thread, the
 			// held one waits for the exit and starts the thread again with it.
 			name: "a close during the restart: the held send starts the thread again",
-			run: func(t *testing.T, re *env, s Session) {
+			run: func(t *testing.T, re *env, s Thread) {
 				done := re.sendAsync(re.ctx(), s.ID, "held")
 				time.Sleep(20 * time.Millisecond) // the send is on the runner first
 				if err := re.m.Close(re.ctx(), s.ID); err != nil {
@@ -382,7 +382,7 @@ func TestRenderedSetEffortGap(t *testing.T) {
 				if err := waitErr(t, "the held send", done); err != nil {
 					t.Errorf("held send after close: %v", err)
 				}
-				got := re.waitFor(s.ID, "started again", func(s Session) bool { return s.State == StateConnected && turnOver(s) })
+				got := re.waitFor(s.ID, "started again", func(s Thread) bool { return s.State == StateConnected && turnOver(s) })
 				if got.Effort != "high" || got.EffortPending {
 					t.Errorf("after the start %+v", got)
 				}
@@ -393,7 +393,7 @@ func TestRenderedSetEffortGap(t *testing.T) {
 		},
 		{
 			name: "daemon shutdown fails the held send; the next spawn uses the new effort",
-			run: func(t *testing.T, re *env, s Session) {
+			run: func(t *testing.T, re *env, s Thread) {
 				done := re.sendAsync(re.ctx(), s.ID, "held")
 				time.Sleep(20 * time.Millisecond)
 				re.restart()
@@ -411,7 +411,7 @@ func TestRenderedSetEffortGap(t *testing.T) {
 				if argOf(argv, "--model") != "haiku" {
 					t.Errorf("reconnect argv %q", argv)
 				}
-				re.waitFor(s.ID, "reconnected", func(s Session) bool { return s.State == StateConnected && !s.EffortPending })
+				re.waitFor(s.ID, "reconnected", func(s Thread) bool { return s.State == StateConnected && !s.EffortPending })
 			},
 		},
 		{
@@ -419,7 +419,7 @@ func TestRenderedSetEffortGap(t *testing.T) {
 			// prompt (the fake fails only the first resumed process, CF_FAKE_CLAUDE_ONCE).
 			name: "the new process exits before its handshake",
 			env:  []string{"CF_FAKE_CLAUDE_RESUME_EXIT=3"},
-			run: func(t *testing.T, re *env, s Session) {
+			run: func(t *testing.T, re *env, s Thread) {
 				heldItemThenStarted(t, re, s, "Claude did not start: exit code 3: fake claude: cannot resume")
 			},
 		},
@@ -427,7 +427,7 @@ func TestRenderedSetEffortGap(t *testing.T) {
 			name:   "the new process never answers its handshake",
 			env:    []string{"CF_FAKE_CLAUDE_RESUME_HANG=1"},
 			mutate: func(o *Options) { o.StartTimeout = 700 * time.Millisecond },
-			run: func(t *testing.T, re *env, s Session) {
+			run: func(t *testing.T, re *env, s Thread) {
 				heldItemThenStarted(t, re, s, "Claude did not start: no answer to the initialize handshake after a restart")
 			},
 		},
@@ -441,7 +441,7 @@ func TestRenderedSetEffortGap(t *testing.T) {
 			}
 			re := newFixtureEnvAt(t, fixturePath("text-table"), vars, mutate...)
 			s := re.create(CreateOptions{Model: "haiku", Effort: "low", PermissionMode: PermissionSupervised})
-			re.waitFor(s.ID, "idle", func(s Session) bool { return s.Status == StatusIdle })
+			re.waitFor(s.ID, "idle", func(s Thread) bool { return s.Status == StatusIdle })
 			re.writeTranscript(argOf(re.argvOf(), "--session-id"), userLine("earlier"))
 			if _, err := re.m.SetEffort(re.ctx(), s.ID, "high"); err != nil {
 				t.Fatal(err)
@@ -458,7 +458,7 @@ func TestRenderedSetEffortGap(t *testing.T) {
 // timeline); the send it held succeeds, the thread starts again with the message as its
 // first prompt (one delivery, to a resumed process), and the failed restart's effort note
 // never came.
-func heldItemThenStarted(t *testing.T, re *env, s Session, failText string) {
+func heldItemThenStarted(t *testing.T, re *env, s Thread, failText string) {
 	t.Helper()
 	it, err := re.m.Send(re.ctx(), s.ID, Message{Text: "held"})
 	if err != nil || it.Text != "held" {
@@ -467,7 +467,7 @@ func heldItemThenStarted(t *testing.T, re *env, s Session, failText string) {
 	if _, resumed := re.waitDeliveries("held", func(_, r int) bool { return r == 1 }); resumed != 1 {
 		t.Errorf("held message delivered %d times", resumed)
 	}
-	got := re.waitFor(s.ID, "started again", func(s Session) bool { return s.State == StateConnected && turnOver(s) })
+	got := re.waitFor(s.ID, "started again", func(s Thread) bool { return s.State == StateConnected && turnOver(s) })
 	if got.Effort != "high" || got.EffortPending {
 		t.Errorf("after the start %+v", got)
 	}
@@ -494,7 +494,7 @@ func TestRenderedSetEffortRespawnExecFails(t *testing.T) {
 	re := newFixtureEnvAt(t, fixturePath("text-table"), []string{"CF_FAKE_CLAUDE_EXIT_DELAY=400ms"},
 		func(o *Options) { o.Claude = link })
 	s := re.create(CreateOptions{Model: "haiku", Effort: "low"})
-	re.waitFor(s.ID, "idle", func(s Session) bool { return s.Status == StatusIdle })
+	re.waitFor(s.ID, "idle", func(s Thread) bool { return s.Status == StatusIdle })
 	re.writeTranscript(argOf(re.argvOf(), "--session-id"), userLine("earlier"))
 	if err := os.Remove(link); err != nil {
 		t.Fatal(err)
@@ -507,7 +507,7 @@ func TestRenderedSetEffortRespawnExecFails(t *testing.T) {
 	if err != nil || it.Text != "held" {
 		t.Fatalf("held send: %+v, %v", it, err)
 	}
-	got := re.waitFor(s.ID, "stopped with an error", func(s Session) bool { return s.State == StateDisconnected && s.Status == StatusError })
+	got := re.waitFor(s.ID, "stopped with an error", func(s Thread) bool { return s.State == StateDisconnected && s.Status == StatusError })
 	if got.StatusReason != ReasonStartFailed || got.Effort != "high" || got.EffortPending {
 		t.Errorf("after the failed restart %+v", got)
 	}
@@ -528,13 +528,13 @@ func TestRenderedSetEffortRespawnExecFails(t *testing.T) {
 	if argOf(argv, "--model") != "haiku" {
 		t.Errorf("argv %q", argv)
 	}
-	re.waitFor(s.ID, "started", func(s Session) bool { return s.State == StateConnected })
+	re.waitFor(s.ID, "started", func(s Thread) bool { return s.State == StateConnected })
 }
 
 func TestRenderedSetEffortRespawnArgv(t *testing.T) {
 	re := newFixtureEnv(t, "bash")
 	s := re.create(CreateOptions{Model: "haiku", Effort: "low", PermissionMode: PermissionAcceptEdits, InitialPrompt: "run it"})
-	re.waitFor(s.ID, "permission", func(s Session) bool { return s.Status == StatusNeedsAttention })
+	re.waitFor(s.ID, "permission", func(s Thread) bool { return s.Status == StatusNeedsAttention })
 	first := re.argvOf()
 	re.writeTranscript(argOf(first, "--session-id"), userLine("run it"))
 	p := re.items(s.ID).Pending
@@ -546,7 +546,7 @@ func TestRenderedSetEffortRespawnArgv(t *testing.T) {
 		t.Fatal(err)
 	}
 	argv := re.waitArgv("the restart", func(a []string) bool { return argOf(a, "--effort") == "max" })
-	re.waitFor(s.ID, "applied", func(s Session) bool { return !s.EffortPending && s.State == StateConnected })
+	re.waitFor(s.ID, "applied", func(s Thread) bool { return !s.EffortPending && s.State == StateConnected })
 
 	// Everything before the conversation flags and after the effort is the same.
 	strip := func(a []string) []string {
@@ -613,7 +613,7 @@ func TestGrants(t *testing.T) {
 func TestRenderedRespondToWithdrawnRequest(t *testing.T) {
 	re := newFixtureEnv(t, "interrupt-pending")
 	s := re.create(CreateOptions{PermissionMode: PermissionSupervised, InitialPrompt: "write"})
-	re.waitFor(s.ID, "permission", func(s Session) bool { return s.Status == StatusNeedsAttention })
+	re.waitFor(s.ID, "permission", func(s Thread) bool { return s.Status == StatusNeedsAttention })
 	p := re.items(s.ID).Pending[0]
 	if err := re.m.Interrupt(re.ctx(), s.ID); err != nil {
 		t.Fatal(err)

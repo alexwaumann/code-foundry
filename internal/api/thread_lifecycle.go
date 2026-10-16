@@ -10,31 +10,12 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
-	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
 
-// Session implements codefoundryv1connect.SessionServiceHandler over a thread.Store.
-type Session struct {
-	store thread.Store
-	bus   *bus.Bus
-}
-
-var _ codefoundryv1connect.SessionServiceHandler = (*Session)(nil)
-
-// NewSession returns a SessionService handler. b must be the bus the store publishes
-// thread.Event on.
-func NewSession(store thread.Store, b *bus.Bus) *Session { return &Session{store: store, bus: b} }
-
-// Route mounts the service.
-func (h *Session) Route(opts ...connect.HandlerOption) Route {
-	path, handler := codefoundryv1connect.NewSessionServiceHandler(h, opts...)
-	return Route{Path: path, Handler: handler}
-}
-
 // Create spawns claude in a worktree.
-func (h *Session) Create(ctx context.Context, req *connect.Request[v1.CreateSessionRequest]) (*connect.Response[v1.CreateSessionResponse], error) {
+func (h *Thread) Create(ctx context.Context, req *connect.Request[v1.CreateThreadRequest]) (*connect.Response[v1.CreateThreadResponse], error) {
 	m := req.Msg
 	o := thread.CreateOptions{
 		RepoID: m.GetRepoId(), WorktreePath: m.GetWorktreePath(), Model: m.GetModel(), Effort: m.GetEffort(),
@@ -49,24 +30,24 @@ func (h *Session) Create(ctx context.Context, req *connect.Request[v1.CreateSess
 	}
 	s, err := h.store.Create(ctx, o)
 	if err != nil {
-		return nil, sessionError(err)
+		return nil, threadError(err)
 	}
-	return connect.NewResponse(&v1.CreateSessionResponse{Session: sessionToProto(s)}), nil
+	return connect.NewResponse(&v1.CreateThreadResponse{Thread: threadToProto(s)}), nil
 }
 
 // Fork continues a session's conversation in a new session.
-func (h *Session) Fork(ctx context.Context, req *connect.Request[v1.ForkSessionRequest]) (*connect.Response[v1.ForkSessionResponse], error) {
+func (h *Thread) Fork(ctx context.Context, req *connect.Request[v1.ForkThreadRequest]) (*connect.Response[v1.ForkThreadResponse], error) {
 	s, err := h.store.Fork(ctx, req.Msg.GetId(), req.Msg.GetName())
 	if err != nil {
-		return nil, sessionError(err)
+		return nil, threadError(err)
 	}
-	return connect.NewResponse(&v1.ForkSessionResponse{Session: sessionToProto(s)}), nil
+	return connect.NewResponse(&v1.ForkThreadResponse{Thread: threadToProto(s)}), nil
 }
 
 // List returns every session, and the retired usage ledger.
-func (h *Session) List(context.Context, *connect.Request[v1.ListSessionsRequest]) (*connect.Response[v1.ListSessionsResponse], error) {
+func (h *Thread) List(context.Context, *connect.Request[v1.ListThreadsRequest]) (*connect.Response[v1.ListThreadsResponse], error) {
 	snap := h.store.Snapshot()
-	res := &v1.ListSessionsResponse{Sessions: sessionsToProto(snap)}
+	res := &v1.ListThreadsResponse{Threads: threadsToProto(snap)}
 	if snap != nil {
 		res.RetiredUsage = retiredToProto(snap.RetiredUsage)
 	}
@@ -74,44 +55,44 @@ func (h *Session) List(context.Context, *connect.Request[v1.ListSessionsRequest]
 }
 
 // Get returns one session.
-func (h *Session) Get(ctx context.Context, req *connect.Request[v1.GetSessionRequest]) (*connect.Response[v1.GetSessionResponse], error) {
+func (h *Thread) Get(ctx context.Context, req *connect.Request[v1.GetThreadRequest]) (*connect.Response[v1.GetThreadResponse], error) {
 	s, err := h.store.Get(ctx, req.Msg.GetId())
 	if err != nil {
-		return nil, sessionError(err)
+		return nil, threadError(err)
 	}
-	return connect.NewResponse(&v1.GetSessionResponse{Session: sessionToProto(s)}), nil
+	return connect.NewResponse(&v1.GetThreadResponse{Thread: threadToProto(s)}), nil
 }
 
 // Rename sets a user-chosen name.
-func (h *Session) Rename(ctx context.Context, req *connect.Request[v1.RenameSessionRequest]) (*connect.Response[v1.RenameSessionResponse], error) {
+func (h *Thread) Rename(ctx context.Context, req *connect.Request[v1.RenameThreadRequest]) (*connect.Response[v1.RenameThreadResponse], error) {
 	s, err := h.store.Rename(ctx, req.Msg.GetId(), req.Msg.GetName())
 	if err != nil {
-		return nil, sessionError(err)
+		return nil, threadError(err)
 	}
-	return connect.NewResponse(&v1.RenameSessionResponse{Session: sessionToProto(s)}), nil
+	return connect.NewResponse(&v1.RenameThreadResponse{Thread: threadToProto(s)}), nil
 }
 
 // Pin sets or clears the user's pin.
-func (h *Session) Pin(ctx context.Context, req *connect.Request[v1.PinSessionRequest]) (*connect.Response[v1.PinSessionResponse], error) {
+func (h *Thread) Pin(ctx context.Context, req *connect.Request[v1.PinThreadRequest]) (*connect.Response[v1.PinThreadResponse], error) {
 	s, err := h.store.Pin(ctx, req.Msg.GetId(), req.Msg.GetPinned())
 	if err != nil {
-		return nil, sessionError(err)
+		return nil, threadError(err)
 	}
-	return connect.NewResponse(&v1.PinSessionResponse{Session: sessionToProto(s)}), nil
+	return connect.NewResponse(&v1.PinThreadResponse{Thread: threadToProto(s)}), nil
 }
 
 // Archive archives (closing it and its shells, unpinning) or unarchives a thread.
-func (h *Session) Archive(ctx context.Context, req *connect.Request[v1.ArchiveSessionRequest]) (*connect.Response[v1.ArchiveSessionResponse], error) {
+func (h *Thread) Archive(ctx context.Context, req *connect.Request[v1.ArchiveThreadRequest]) (*connect.Response[v1.ArchiveThreadResponse], error) {
 	s, err := h.store.Archive(ctx, req.Msg.GetId(), req.Msg.GetArchived())
 	if err != nil {
-		return nil, sessionError(err)
+		return nil, threadError(err)
 	}
-	return connect.NewResponse(&v1.ArchiveSessionResponse{Session: sessionToProto(s)}), nil
+	return connect.NewResponse(&v1.ArchiveThreadResponse{Thread: threadToProto(s)}), nil
 }
 
 // Snooze snoozes a thread until req.until (closing it and its shells, unpinning,
 // unarchiving) or unsnoozes it (until unset).
-func (h *Session) Snooze(ctx context.Context, req *connect.Request[v1.SnoozeSessionRequest]) (*connect.Response[v1.SnoozeSessionResponse], error) {
+func (h *Thread) Snooze(ctx context.Context, req *connect.Request[v1.SnoozeThreadRequest]) (*connect.Response[v1.SnoozeThreadResponse], error) {
 	var until time.Time
 	if t := req.Msg.GetUntil(); t != nil {
 		if err := t.CheckValid(); err != nil {
@@ -121,56 +102,56 @@ func (h *Session) Snooze(ctx context.Context, req *connect.Request[v1.SnoozeSess
 	}
 	s, err := h.store.Snooze(ctx, req.Msg.GetId(), until)
 	if err != nil {
-		return nil, sessionError(err)
+		return nil, threadError(err)
 	}
-	return connect.NewResponse(&v1.SnoozeSessionResponse{Session: sessionToProto(s)}), nil
+	return connect.NewResponse(&v1.SnoozeThreadResponse{Thread: threadToProto(s)}), nil
 }
 
 // Close ends the process gracefully; it returns once the session is DISCONNECTED. No
 // command calls it (docs/notes/thread-lifecycle.md); kept for compatibility.
-func (h *Session) Close(ctx context.Context, req *connect.Request[v1.CloseSessionRequest]) (*connect.Response[v1.CloseSessionResponse], error) {
+func (h *Thread) Close(ctx context.Context, req *connect.Request[v1.CloseThreadRequest]) (*connect.Response[v1.CloseThreadResponse], error) {
 	if err := h.store.Close(ctx, req.Msg.GetId()); err != nil {
-		return nil, sessionError(err)
+		return nil, threadError(err)
 	}
-	return connect.NewResponse(&v1.CloseSessionResponse{}), nil
+	return connect.NewResponse(&v1.CloseThreadResponse{}), nil
 }
 
 // Reconnect resumes a DISCONNECTED session without a prompt. No command calls it (a
 // message starts a stopped thread); kept for compatibility.
-func (h *Session) Reconnect(ctx context.Context, req *connect.Request[v1.ReconnectSessionRequest]) (*connect.Response[v1.ReconnectSessionResponse], error) {
+func (h *Thread) Reconnect(ctx context.Context, req *connect.Request[v1.ReconnectThreadRequest]) (*connect.Response[v1.ReconnectThreadResponse], error) {
 	s, err := h.store.Reconnect(ctx, req.Msg.GetId())
 	if err != nil {
-		return nil, sessionError(err)
+		return nil, threadError(err)
 	}
-	return connect.NewResponse(&v1.ReconnectSessionResponse{Session: sessionToProto(s)}), nil
+	return connect.NewResponse(&v1.ReconnectThreadResponse{Thread: threadToProto(s)}), nil
 }
 
 // Remove forgets a session, closing it first if needed.
-func (h *Session) Remove(ctx context.Context, req *connect.Request[v1.RemoveSessionRequest]) (*connect.Response[v1.RemoveSessionResponse], error) {
+func (h *Thread) Remove(ctx context.Context, req *connect.Request[v1.RemoveThreadRequest]) (*connect.Response[v1.RemoveThreadResponse], error) {
 	if err := h.store.Remove(ctx, req.Msg.GetId()); err != nil {
-		return nil, sessionError(err)
+		return nil, threadError(err)
 	}
-	return connect.NewResponse(&v1.RemoveSessionResponse{}), nil
+	return connect.NewResponse(&v1.RemoveThreadResponse{}), nil
 }
 
 // RunIn moves a workspace thread to another member worktree.
-func (h *Session) RunIn(ctx context.Context, req *connect.Request[v1.RunInSessionRequest]) (*connect.Response[v1.RunInSessionResponse], error) {
+func (h *Thread) RunIn(ctx context.Context, req *connect.Request[v1.RunInThreadRequest]) (*connect.Response[v1.RunInThreadResponse], error) {
 	m := req.Msg
 	s, err := h.store.RunIn(ctx, m.GetId(), thread.RunInTarget{RepoID: m.GetRepoId(), WorktreePath: m.GetWorktreePath()})
 	if err != nil {
-		return nil, sessionError(err)
+		return nil, threadError(err)
 	}
-	return connect.NewResponse(&v1.RunInSessionResponse{Session: sessionToProto(s)}), nil
+	return connect.NewResponse(&v1.RunInThreadResponse{Thread: threadToProto(s)}), nil
 }
 
 // Watch sends a snapshot, then every session event. If the client falls behind and
 // events are dropped, it sends a fresh snapshot.
-func (h *Session) Watch(ctx context.Context, _ *connect.Request[v1.WatchSessionsRequest], stream *connect.ServerStream[v1.SessionEvent]) error {
+func (h *Thread) Watch(ctx context.Context, _ *connect.Request[v1.WatchThreadsRequest], stream *connect.ServerStream[v1.ThreadListEvent]) error {
 	// Subscribe first so nothing published between snapshot and stream is lost. Each
 	// event carries full state, so applying queued older events still converges.
 	sub := bus.Subscribe[thread.Event](h.bus, watchBuffer)
 	defer sub.Close()
-	if err := stream.Send(sessionEventToProto(h.store.Snapshot())); err != nil {
+	if err := stream.Send(threadListEventToProto(h.store.Snapshot())); err != nil {
 		return err
 	}
 	var dropped uint64
@@ -186,7 +167,7 @@ func (h *Session) Watch(ctx context.Context, _ *connect.Request[v1.WatchSessions
 				dropped = d
 				ev = h.store.Snapshot()
 			}
-			if msg := sessionEventToProto(ev); msg != nil {
+			if msg := threadListEventToProto(ev); msg != nil {
 				if err := stream.Send(msg); err != nil {
 					return err
 				}
@@ -196,37 +177,37 @@ func (h *Session) Watch(ctx context.Context, _ *connect.Request[v1.WatchSessions
 }
 
 // sessionEventToProto converts a bus event (or a *thread.Snapshot) to the wire event.
-func sessionEventToProto(ev thread.Event) *v1.SessionEvent {
+func threadListEventToProto(ev thread.Event) *v1.ThreadListEvent {
 	switch e := ev.(type) {
 	case *thread.Snapshot:
-		snap := &v1.SessionSnapshot{Sessions: sessionsToProto(e)}
+		snap := &v1.ThreadListSnapshot{Threads: threadsToProto(e)}
 		if e != nil {
 			snap.RetiredUsage = retiredToProto(e.RetiredUsage)
 		}
-		return &v1.SessionEvent{Event: &v1.SessionEvent_Snapshot{Snapshot: snap}}
+		return &v1.ThreadListEvent{Event: &v1.ThreadListEvent_Snapshot{Snapshot: snap}}
 	case thread.Updated:
-		return &v1.SessionEvent{Event: &v1.SessionEvent_Updated{Updated: sessionToProto(e.Session)}}
+		return &v1.ThreadListEvent{Event: &v1.ThreadListEvent_Updated{Updated: threadToProto(e.Thread)}}
 	case thread.Removed:
-		return &v1.SessionEvent{Event: &v1.SessionEvent_RemovedId{RemovedId: e.ID}}
+		return &v1.ThreadListEvent{Event: &v1.ThreadListEvent_RemovedId{RemovedId: e.ID}}
 	case thread.RetiredUsage:
-		return &v1.SessionEvent{Event: &v1.SessionEvent_RetiredUsage{RetiredUsage: &v1.RetiredUsage{Buckets: retiredToProto(e.Buckets)}}}
+		return &v1.ThreadListEvent{Event: &v1.ThreadListEvent_RetiredUsage{RetiredUsage: &v1.RetiredUsage{Buckets: retiredToProto(e.Buckets)}}}
 	}
 	return nil
 }
 
-func sessionsToProto(snap *thread.Snapshot) []*v1.Session {
+func threadsToProto(snap *thread.Snapshot) []*v1.Thread {
 	if snap == nil {
 		return nil
 	}
-	out := make([]*v1.Session, len(snap.Sessions))
-	for i, s := range snap.Sessions {
-		out[i] = sessionToProto(s)
+	out := make([]*v1.Thread, len(snap.Threads))
+	for i, s := range snap.Threads {
+		out[i] = threadToProto(s)
 	}
 	return out
 }
 
-func sessionToProto(s thread.Session) *v1.Session {
-	p := &v1.Session{
+func threadToProto(s thread.Thread) *v1.Thread {
+	p := &v1.Thread{
 		Id:                  s.ID,
 		ClaudeSessionId:     s.ClaudeSessionID,
 		RepoId:              s.RepoID,
@@ -235,8 +216,8 @@ func sessionToProto(s thread.Session) *v1.Session {
 		AutoNamed:           s.AutoNamed,
 		Model:               s.Model,
 		Effort:              s.Effort,
-		State:               v1.SessionState(s.State),
-		Status:              v1.SessionStatus(s.Status),
+		State:               v1.ThreadState(s.State),
+		Status:              v1.ThreadStatus(s.Status),
 		StatusReason:        s.StatusReason,
 		ExitCode:            int32(s.ExitCode),
 		DisconnectReason:    s.DisconnectReason,
@@ -289,7 +270,7 @@ func sessionToProto(s thread.Session) *v1.Session {
 }
 
 // sessionError maps store errors to Connect codes.
-func sessionError(err error) error {
+func threadError(err error) error {
 	var ce *connect.Error
 	if errors.As(err, &ce) {
 		return err
@@ -313,20 +294,20 @@ func sessionError(err error) error {
 }
 
 // StageAttachment stores an image for a first prompt and returns its path.
-func (h *Session) StageAttachment(ctx context.Context, req *connect.Request[v1.StageAttachmentRequest]) (*connect.Response[v1.StageAttachmentResponse], error) {
+func (h *Thread) StageAttachment(ctx context.Context, req *connect.Request[v1.StageAttachmentRequest]) (*connect.Response[v1.StageAttachmentResponse], error) {
 	m := req.Msg
 	path, err := h.store.StageAttachment(ctx, m.GetName(), m.GetMimeType(), m.GetData())
 	if err != nil {
-		return nil, sessionError(err)
+		return nil, threadError(err)
 	}
 	return connect.NewResponse(&v1.StageAttachmentResponse{Path: path}), nil
 }
 
 // ReadAttachment returns a staged attachment's bytes.
-func (h *Session) ReadAttachment(ctx context.Context, req *connect.Request[v1.ReadAttachmentRequest]) (*connect.Response[v1.ReadAttachmentResponse], error) {
+func (h *Thread) ReadAttachment(ctx context.Context, req *connect.Request[v1.ReadAttachmentRequest]) (*connect.Response[v1.ReadAttachmentResponse], error) {
 	data, mimeType, err := h.store.ReadAttachment(ctx, req.Msg.GetPath())
 	if err != nil {
-		return nil, sessionError(err)
+		return nil, threadError(err)
 	}
 	return connect.NewResponse(&v1.ReadAttachmentResponse{Data: data, MimeType: mimeType}), nil
 }

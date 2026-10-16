@@ -63,7 +63,7 @@ func TestRenderedWritePermissionEndToEnd(t *testing.T) {
 	s := re.create(CreateOptions{Model: "haiku", Effort: "low", PermissionMode: PermissionSupervised,
 		InitialPrompt: "  create @cf-file://r1/hello.txt please  ", ComposerPrompt: "create [hello.txt](cf-file://r1/hello.txt) please"})
 	var argv []string
-	re.waitFor(s.ID, "connected", func(s Session) bool { return s.State == StateConnected })
+	re.waitFor(s.ID, "connected", func(s Thread) bool { return s.State == StateConnected })
 	if b, err := os.ReadFile(re.argv); err == nil {
 		_ = json.Unmarshal(b, &argv)
 	}
@@ -90,7 +90,7 @@ func TestRenderedWritePermissionEndToEnd(t *testing.T) {
 	}
 
 	// Claude asks to Write: needs attention, one pending request.
-	got := re.waitFor(s.ID, "permission", func(s Session) bool { return s.Status == StatusNeedsAttention })
+	got := re.waitFor(s.ID, "permission", func(s Thread) bool { return s.Status == StatusNeedsAttention })
 	if got.StatusReason != "permission: Write hello.txt" {
 		t.Errorf("reason %q", got.StatusReason)
 	}
@@ -145,7 +145,7 @@ func TestRenderedWritePermissionEndToEnd(t *testing.T) {
 		}
 	}
 	// Nobody watched: the finished turn needs attention.
-	re.waitFor(s.ID, "finished", func(s Session) bool { return s.Status == StatusNeedsAttention && s.StatusReason == "finished" })
+	re.waitFor(s.ID, "finished", func(s Thread) bool { return s.Status == StatusNeedsAttention && s.StatusReason == "finished" })
 
 	// The items survive a daemon restart; the thread is disconnected, its status kept.
 	re.restart()
@@ -165,7 +165,7 @@ func TestRenderedWritePermissionEndToEnd(t *testing.T) {
 	}
 	// A message starts the stopped thread and appends after the old items.
 	sentIt, err := re.m.Send(re.ctx(), s.ID, Message{Text: "/tdd again", ComposerText: "[/tdd](cf-skill://~/tdd) again"})
-	re.waitFor(s.ID, "started", func(s Session) bool { return s.State == StateConnected })
+	re.waitFor(s.ID, "started", func(s Thread) bool { return s.State == StateConnected })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -193,7 +193,7 @@ func TestRenderedWatchItemsAcknowledges(t *testing.T) {
 	}
 	items := re.waitItems(s.ID, "turn end", hasTurnEnd)
 	// A viewer saw the turn finish: idle, not "finished".
-	re.waitFor(s.ID, "idle", func(s Session) bool { return s.Status == StatusIdle && s.StatusReason == "at prompt" })
+	re.waitFor(s.ID, "idle", func(s Thread) bool { return s.Status == StatusIdle && s.StatusReason == "at prompt" })
 	cancel()
 
 	// Replaying the events after the snapshot rebuilds the same items, the streamed
@@ -240,7 +240,7 @@ func TestRenderedWatchItemsAcknowledges(t *testing.T) {
 func TestRenderedQuestion(t *testing.T) {
 	re := newFixtureEnv(t, "ask")
 	s := re.create(CreateOptions{InitialPrompt: "ask me"})
-	re.waitFor(s.ID, "question", func(s Session) bool {
+	re.waitFor(s.ID, "question", func(s Thread) bool {
 		return s.Status == StatusNeedsAttention && s.StatusReason == "question: Which color do you prefer?"
 	})
 	p := re.items(s.ID).Pending
@@ -269,7 +269,7 @@ func TestRenderedDenyAndSubagent(t *testing.T) {
 	t.Run("deny", func(t *testing.T) {
 		re := newFixtureEnv(t, "write-deny")
 		s := re.create(CreateOptions{InitialPrompt: "write"})
-		re.waitFor(s.ID, "permission", func(s Session) bool { return s.Status == StatusNeedsAttention })
+		re.waitFor(s.ID, "permission", func(s Thread) bool { return s.Status == StatusNeedsAttention })
 		p := re.items(s.ID).Pending
 		it, err := re.m.Respond(re.ctx(), s.ID, p[0].RequestID, Decision{Message: "The user denied this."})
 		if err != nil || it.Request.State != RequestDenied || it.Request.Decision != DecisionDeny {
@@ -289,7 +289,7 @@ func TestRenderedDenyAndSubagent(t *testing.T) {
 	t.Run("subagent", func(t *testing.T) {
 		re := newFixtureEnv(t, "task")
 		s := re.create(CreateOptions{InitialPrompt: "agent"})
-		re.waitFor(s.ID, "permission", func(s Session) bool { return s.Status == StatusNeedsAttention })
+		re.waitFor(s.ID, "permission", func(s Thread) bool { return s.Status == StatusNeedsAttention })
 		p := re.items(s.ID).Pending
 		if _, err := re.m.Respond(re.ctx(), s.ID, p[0].RequestID, Decision{Allow: true, ForSession: true}); err != nil {
 			t.Fatal(err)
@@ -319,9 +319,9 @@ func TestRenderedDenyAndSubagent(t *testing.T) {
 func TestRenderedControls(t *testing.T) {
 	re := newFixtureEnv(t, "text-table")
 	s := re.create(CreateOptions{})
-	re.waitFor(s.ID, "connected", func(s Session) bool { return s.State == StateConnected })
+	re.waitFor(s.ID, "connected", func(s Thread) bool { return s.State == StateConnected })
 	// No prompt: idle at the prompt once initialized.
-	re.waitFor(s.ID, "idle", func(s Session) bool { return s.Status == StatusIdle })
+	re.waitFor(s.ID, "idle", func(s Thread) bool { return s.Status == StatusIdle })
 	if err := re.m.Interrupt(re.ctx(), s.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -356,7 +356,7 @@ func TestRenderedControls(t *testing.T) {
 func TestRenderedRunInUsesSetCwd(t *testing.T) {
 	re := newFixtureEnv(t, "text-table")
 	s := re.create(CreateOptions{})
-	re.waitFor(s.ID, "idle", func(s Session) bool { return s.Status == StatusIdle })
+	re.waitFor(s.ID, "idle", func(s Thread) bool { return s.Status == StatusIdle })
 	other := filepath.Join(t.TempDir(), "other")
 	if err := os.MkdirAll(other, 0o755); err != nil {
 		t.Fatal(err)
@@ -367,7 +367,7 @@ func TestRenderedRunInUsesSetCwd(t *testing.T) {
 	re.m.recs[s.ID].s.PendingWorktreePath = other
 	run.cdReq <- cdRequest{path: other, repoID: "r2"}
 	re.m.mu.Unlock()
-	got := re.waitFor(s.ID, "moved", func(s Session) bool { return s.WorktreePath == other })
+	got := re.waitFor(s.ID, "moved", func(s Thread) bool { return s.WorktreePath == other })
 	if got.RepoID != "r2" || got.PendingWorktreePath != "" {
 		t.Errorf("after move %+v", got)
 	}
@@ -482,7 +482,7 @@ func TestRenderedFirstPromptWithImage(t *testing.T) {
 func TestRenderedStartCrash(t *testing.T) {
 	re := newFixtureEnv(t, "no-such-fixture")
 	s := re.create(CreateOptions{InitialPrompt: "hi"})
-	got := re.waitFor(s.ID, "disconnected", func(s Session) bool { return s.State == StateDisconnected })
+	got := re.waitFor(s.ID, "disconnected", func(s Thread) bool { return s.State == StateDisconnected })
 	if got.DisconnectReason != ReasonCrashed || got.ExitCode != 2 || !strings.Contains(got.LastError, "fake claude") ||
 		got.Status != StatusError || got.StatusReason != ReasonStartFailed {
 		t.Errorf("after crash %+v", got)
@@ -581,11 +581,11 @@ func TestRenderedConnectsBusyWithItsFirstPrompt(t *testing.T) {
 		select {
 		case ev := <-re.events.C():
 			u, ok := ev.(Updated)
-			if !ok || u.Session.ID != s.ID || u.Session.State != StateConnected {
+			if !ok || u.Thread.ID != s.ID || u.Thread.State != StateConnected {
 				continue
 			}
-			if u.Session.Status != StatusBusy {
-				t.Fatalf("first connected update: status %v %q", u.Session.Status, u.Session.StatusReason)
+			if u.Thread.Status != StatusBusy {
+				t.Fatalf("first connected update: status %v %q", u.Thread.Status, u.Thread.StatusReason)
 			}
 			items, err := re.m.Items(re.ctx(), s.ID)
 			if err != nil || len(items.Items) == 0 || items.Items[0].Kind != KindUserMessage {

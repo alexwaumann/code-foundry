@@ -16,7 +16,7 @@ const forkWhy = "the thread was forked before it finished"
 
 // forkNoteText is the note that ends a fork's copied history, naming the parent as it
 // was called at fork time (the row outlives a rename or removal of the parent).
-func forkNoteText(parent Session) string {
+func forkNoteText(parent Thread) string {
 	name := parent.Name
 	if name == "" {
 		name = parent.ID
@@ -57,10 +57,10 @@ func forkItems(parent []Item, noteID, note string, now time.Time) []Item {
 // the fork's spawn and first Watch see the copy before any row is written (the fork's
 // session row, which thread_items references, is written by spawn; persistForkLog
 // writes the rows after it).
-func (m *Manager) forkLog(ctx context.Context, parent Session, newID string) ([]Item, error) {
+func (m *Manager) forkLog(ctx context.Context, parent Thread, newID string) ([]Item, error) {
 	plog, err := m.thread(ctx, parent.ID)
 	if err != nil {
-		return nil, fmt.Errorf("session: fork %s: %w", parent.ID, err)
+		return nil, fmt.Errorf("thread: fork %s: %w", parent.ID, err)
 	}
 	items := forkItems(plog.snapshot().Items, "note-fork-"+parent.ID, forkNoteText(parent), m.opts.Now())
 	m.tmu.Lock()
@@ -72,6 +72,6 @@ func (m *Manager) forkLog(ctx context.Context, parent Session, newID string) ([]
 // persistForkLog writes the fork's copied items once its session row exists.
 func (m *Manager) persistForkLog(ctx context.Context, id string, items []Item) {
 	if err := saveItems(context.WithoutCancel(ctx), m.opts.DB, id, items); err != nil {
-		m.log.Error("persist fork history", "session", id, "items", len(items), "err", err)
+		m.log.Error("persist fork history", "thread", id, "items", len(items), "err", err)
 	}
 }

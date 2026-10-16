@@ -9,7 +9,7 @@ export interface SessionsData {
 }
 
 /**
- * Whether the daemon serves SessionService. "unavailable" (e.g. HTTP 404 from a daemon
+ * Whether the daemon serves ThreadService. "unavailable" (e.g. HTTP 404 from a daemon
  * without Phase 2a) leaves the rest of the UI working: thread rows are simply absent.
  */
 export type SessionsAvailability = "unknown" | "available" | "unavailable";

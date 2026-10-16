@@ -28,7 +28,7 @@ func TestCreateNoProject(t *testing.T) {
 	if err != nil || !strings.Contains(string(cfg), `"`+realPath(e.home)+`"`) || !strings.Contains(string(cfg), "hasTrustDialogAccepted") {
 		t.Errorf("home not pre-trusted: %s (%v)", cfg, err)
 	}
-	e.waitFor(s.ID, "connected", func(s Session) bool { return s.State == StateConnected })
+	e.waitFor(s.ID, "connected", func(s Thread) bool { return s.State == StateConnected })
 }
 
 func TestCreateNoProjectIsExclusive(t *testing.T) {
@@ -53,8 +53,8 @@ func TestCreateNoProjectIsExclusive(t *testing.T) {
 			}
 		})
 	}
-	if n := len(e.m.Snapshot().Sessions); n != 0 {
-		t.Errorf("refused creates left %d sessions", n)
+	if n := len(e.m.Snapshot().Threads); n != 0 {
+		t.Errorf("refused creates left %d threads", n)
 	}
 	if ws := e.ws.Snapshot().Workspaces; len(ws) != 1 {
 		t.Errorf("refused creates made workspaces: %+v", ws)
@@ -80,7 +80,7 @@ func TestNoProjectThreadSurvivesForkReconnectAndRestart(t *testing.T) {
 	s := e.connected(CreateOptions{NoProject: true, Name: "scratch"})
 	cid := argOf(e.spec(s.ID).Argv, "--session-id")
 	e.writeTranscriptIn(e.home, cid, userLine("hi"))
-	e.waitFor(s.ID, "discovered", func(s Session) bool { return s.ClaudeSessionID == cid })
+	e.waitFor(s.ID, "discovered", func(s Thread) bool { return s.ClaudeSessionID == cid })
 
 	f, err := e.m.Fork(e.ctx(), s.ID, "")
 	if err != nil {
@@ -94,7 +94,7 @@ func TestNoProjectThreadSurvivesForkReconnectAndRestart(t *testing.T) {
 	}
 
 	e.exit(s.ID, 0)
-	e.waitFor(s.ID, "disconnected", func(s Session) bool { return s.State == StateDisconnected })
+	e.waitFor(s.ID, "disconnected", func(s Thread) bool { return s.State == StateDisconnected })
 	r, err := e.m.Reconnect(e.ctx(), s.ID)
 	if err != nil {
 		t.Fatal(err)

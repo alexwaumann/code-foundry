@@ -17,8 +17,8 @@ func TestPinPersistsAcrossRestart(t *testing.T) {
 	if err != nil || !got.Pinned {
 		t.Fatalf("Pin = %+v, %v", got, err)
 	}
-	if snap := e.m.Snapshot(); len(snap.Sessions) != 1 || !snap.Sessions[0].Pinned {
-		t.Errorf("snapshot after Pin = %+v", snap.Sessions)
+	if snap := e.m.Snapshot(); len(snap.Threads) != 1 || !snap.Threads[0].Pinned {
+		t.Errorf("snapshot after Pin = %+v", snap.Threads)
 	}
 	// Pinning again is a no-op.
 	if got, err := e.m.Pin(e.ctx(), s.ID, true); err != nil || !got.Pinned {

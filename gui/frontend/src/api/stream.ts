@@ -12,7 +12,7 @@ export interface Backoff {
 export const defaultBackoff: Backoff = { initialMs: 250, maxMs: 10_000, factor: 2 };
 
 /**
- * How often the daemon sends a StreamHeartbeat on a quiet ThreadService.Watch,
+ * How often the daemon sends a StreamHeartbeat on a quiet ThreadService.WatchThread,
  * TerminalService.Attach or EventService.Watch. Mirrors api.HeartbeatInterval
  * (internal/api/heartbeat.go): keep them equal.
  */

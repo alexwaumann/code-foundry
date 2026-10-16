@@ -53,8 +53,8 @@
  *   POST /__mock/usage?session=s-2&model=claude-opus-5&requests=3&cacheRead=1000[&input=…&output=…
  *        &cacheWrite5m=…&cacheWrite1h=…&day=YYYY-MM-DD]   (Claude made requests: added to the
  *                                                 session's (model, day) bucket; s-1 is seeded)
- *   POST /__mock/sessions-service?enabled=false   (simulate a daemon without SessionService)
- *   POST /__mock/missing-rpc?rpc=RepoService/ListRefs&rpc=SessionService/StageAttachment
+ *   POST /__mock/sessions-service?enabled=false   (simulate a daemon without ThreadService)
+ *   POST /__mock/missing-rpc?rpc=RepoService/ListRefs&rpc=ThreadService/StageAttachment
  *                                                 (simulate a daemon older than those RPCs: 404)
  *   POST /__mock/session-new?delay=700            (how long session.new takes to make a worktree)
  *   POST /__mock/worktree/checkout?path=…&branch=…   (the worktree switches branch; no branch detaches HEAD)
@@ -137,7 +137,7 @@ import { FilesystemService } from "../src/gen/codefoundry/v1/filesystem_pb";
 import { GhService } from "../src/gen/codefoundry/v1/gh_pb";
 import { HealthService } from "../src/gen/codefoundry/v1/health_pb";
 import { RepoService } from "../src/gen/codefoundry/v1/repo_pb";
-import { SessionService, SessionState, SessionStatus } from "../src/gen/codefoundry/v1/session_pb";
+import { ThreadState, ThreadStatus } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
 import { TerminalService, TerminalState, type AttachEventSchema } from "../src/gen/codefoundry/v1/terminal_pb";
 import { ThreadDecision, ThreadService } from "../src/gen/codefoundry/v1/thread_pb";
 import { ActionRunMode, ActionRunState, ActionService } from "../src/gen/codefoundry/v1/action_pb";
@@ -154,7 +154,7 @@ import { retiredUsage, utcDay } from "./usage";
 import { reconnectMcp, refreshMcp } from "./mcp";
 import type { ActionEventInit } from "./actions";
 import { refuseSlashCommand, slashCommandsFor } from "./slashCommands";
-import { MOCK_ATTACHMENT, MOCK_ATTACHMENT_PNG, MockThreads, THREAD_STATES, type ThreadState } from "./thread";
+import { MOCK_ATTACHMENT, MOCK_ATTACHMENT_PNG, MockThreads, THREAD_STATES, type ThreadState as ScriptedThreadState } from "./thread";
 import { CommandError, ConfirmNeeded, snoozeUntil, World, type EventInit } from "./world";
 
 type AttachEventInit = MessageInitShape<typeof AttachEventSchema>;
@@ -366,17 +366,17 @@ function routes(router: ConnectRouter): void {
     emit: (req) => ({ delivered: req.intent ? world.emit(req.intent) : 0 }),
   });
 
-  router.service(SessionService, {
-    list: () => ({ sessions: [...world.sessions.values()].map((s) => world.sessionMsg(s)), retiredUsage: retiredUsage() }),
-    get: (req) => guard(() => ({ session: world.sessionMsg(world.session(req.id)) })),
+  router.service(ThreadService, {
+    list: () => ({ threads: [...world.sessions.values()].map((s) => world.sessionMsg(s)), retiredUsage: retiredUsage() }),
+    get: (req) => guard(() => ({ thread: world.sessionMsg(world.session(req.id)) })),
     create: () => {
-      throw new ConnectError("use the session.new command in the mock", Code.Unimplemented);
+      throw new ConnectError("use the thread.new command in the mock", Code.Unimplemented);
     },
     fork: () => {
       throw new ConnectError("fork is not mocked", Code.Unimplemented);
     },
     rename: () => {
-      throw new ConnectError("use the session.rename command in the mock", Code.Unimplemented);
+      throw new ConnectError("use the thread.rename command in the mock", Code.Unimplemented);
     },
     // Kept in the proto for compatibility; the daemon starts and stops threads itself and no
     // command calls them (docs/notes/thread-lifecycle.md).
@@ -387,7 +387,7 @@ function routes(router: ConnectRouter): void {
       throw new ConnectError("the daemon starts and stops threads itself", Code.Unimplemented);
     },
     remove: () => {
-      throw new ConnectError("use the session.remove command in the mock", Code.Unimplemented);
+      throw new ConnectError("use the thread.remove command in the mock", Code.Unimplemented);
     },
     stageAttachment: (req) => guard(() => ({ path: world.stageAttachment(req.name, req.mimeType, req.data.length) })),
     // The scripted thread's image (mock/thread.ts); staged uploads have no bytes in the mock.
@@ -395,28 +395,25 @@ function routes(router: ConnectRouter): void {
       if (req.path === MOCK_ATTACHMENT || world.attachments.has(req.path)) return { data: new Uint8Array(MOCK_ATTACHMENT_PNG), mimeType: "image/png" };
       throw new ConnectError(`attachment ${req.path} not found`, Code.NotFound);
     },
-    watch: (_req, ctx) => tracked("SessionService/Watch", world.sessionEvents.subscribe(ctx.signal, [world.sessionSnapshot()])),
-  });
-
-  // Threads (mock/thread.ts). The GUI goes through the thread.* commands for
-  // Send / Interrupt / Respond / SetModel / SetPermissionMode / SetEffort; these serve the RPCs themselves.
-  router.service(ThreadService, {
-    listItems: (req) => guard(() => ({ snapshot: world.threads.snapshotValue(req.sessionId) })),
-    watch: (req, ctx) => tracked("ThreadService/Watch", guard(() => world.threads.watch(req.sessionId, ctx.signal))),
-    send: (req) => guard(() => (refuseSlashCommand(req.text), { item: world.threads.send(req.sessionId, req.text, req.attachments, req.composerText) })),
-    slashCommands: (req) => guard(() => ({ commands: world.threads.slashCommandsOf(req.sessionId) })),
-    interrupt: (req) => guard(() => (world.threads.finish(req.sessionId, { interrupted: true }), {})),
+    watch: (_req, ctx) => tracked("ThreadService/Watch", world.sessionEvents.subscribe(ctx.signal, [world.sessionSnapshot()])),
+    // The conversation (mock/thread.ts). The GUI goes through the thread.* commands for
+    // Send / Interrupt / Respond / SetModel / SetPermissionMode / SetEffort; these serve the RPCs themselves.
+    listItems: (req) => guard(() => ({ snapshot: world.threads.snapshotValue(req.threadId) })),
+    watchThread: (req, ctx) => tracked("ThreadService/WatchThread", guard(() => world.threads.watch(req.threadId, ctx.signal))),
+    send: (req) => guard(() => (refuseSlashCommand(req.text), { item: world.threads.send(req.threadId, req.text, req.attachments, req.composerText) })),
+    slashCommands: (req) => guard(() => ({ commands: world.threads.slashCommandsOf(req.threadId) })),
+    interrupt: (req) => guard(() => (world.threads.finish(req.threadId, { interrupted: true }), {})),
     respond: (req) =>
       guard(() => {
         const decision = req.decision === ThreadDecision.DENY ? "deny" : req.decision === ThreadDecision.ALLOW_FOR_SESSION ? "allow-session" : "allow";
-        return { item: world.threads.respond(req.sessionId, req.requestId, decision, req.answers, req.message) };
+        return { item: world.threads.respond(req.threadId, req.requestId, decision, req.answers, req.message) };
       }),
-    setEffort: (req) => guard(() => (world.threads.setEffort(req.sessionId, req.effort), { session: world.sessionMsg(world.session(req.sessionId)) })),
+    setEffort: (req) => guard(() => (world.threads.setEffort(req.threadId, req.effort), { thread: world.sessionMsg(world.session(req.threadId)) })),
     // MCP (mock/mcp.ts): the GUI reads McpStatus once for a thread never checked; refresh and reconnect go through thread.mcp / thread.mcp-reconnect.
-    mcpStatus: (req) => guard(() => ({ status: req.refresh ? refreshMcp(world.threads, req.sessionId) : world.threads.mcpOf(req.sessionId) })),
+    mcpStatus: (req) => guard(() => ({ status: req.refresh ? refreshMcp(world.threads, req.threadId) : world.threads.mcpOf(req.threadId) })),
     mcpReconnect: async (req) => {
       try {
-        return await reconnectMcp(world.threads, req.sessionId, req.serverName);
+        return await reconnectMcp(world.threads, req.threadId, req.serverName);
       } catch (err) {
         throw rpcError(err);
       }
@@ -457,14 +454,14 @@ function routes(router: ConnectRouter): void {
       const want = new Set(
         req.sources.length > 0
           ? req.sources
-          : [EventSource.REPO, EventSource.WORKSPACE, EventSource.TERMINAL, EventSource.SESSION, EventSource.THREAD, EventSource.GH, EventSource.GITOPS, EventSource.SETTINGS, EventSource.UPDATE, EventSource.UI, EventSource.ACTION],
+          : [EventSource.REPO, EventSource.WORKSPACE, EventSource.TERMINAL, EventSource.THREAD_LIST, EventSource.THREAD, EventSource.GH, EventSource.GITOPS, EventSource.SETTINGS, EventSource.UPDATE, EventSource.UI, EventSource.ACTION],
       );
-      if (!sessionsEnabled) want.delete(EventSource.SESSION);
+      if (!sessionsEnabled) want.delete(EventSource.THREAD_LIST);
       const initial: { source: EventSource; event: EventInit }[] = [
         { source: EventSource.REPO, event: { event: { case: "repo", value: { event: { case: "snapshot", value: { repos: [...world.repos.values()].map((r) => world.repoMsg(r)) } } } } } },
         { source: EventSource.WORKSPACE, event: { event: { case: "workspace", value: world.workspaceSnapshot() } } },
         ...[...world.terms.values()].map((t) => ({ source: EventSource.TERMINAL, event: { event: { case: "terminal" as const, value: { event: { case: "updated" as const, value: world.terminalMsg(t) } } } } })),
-        { source: EventSource.SESSION, event: { event: { case: "session", value: world.sessionSnapshot() } } },
+        { source: EventSource.THREAD_LIST, event: { event: { case: "threadList", value: world.sessionSnapshot() } } },
         { source: EventSource.THREAD, event: { event: { case: "thread", value: world.threads.pendingSnapshot() } } },
         ghEvent(world.gh.polledEvent()),
         { source: EventSource.GITOPS, event: { event: { case: "gitops", value: world.gitops.snapshot() } } },
@@ -602,8 +599,8 @@ function sessionSummary(id: string): Record<string, unknown> {
   return {
     id: s.id,
     name: s.name,
-    state: SessionState[s.state],
-    status: SessionStatus[s.status],
+    state: ThreadState[s.state],
+    status: ThreadStatus[s.status],
     statusReason: s.statusReason,
     statusChangedAt: s.statusChangedAt.toISOString(),
     repoId: s.repoId,
@@ -617,7 +614,7 @@ function sessionSummary(id: string): Record<string, unknown> {
   };
 }
 
-const statusNames: Record<string, SessionStatus> = { busy: SessionStatus.BUSY, idle: SessionStatus.IDLE, attention: SessionStatus.NEEDS_ATTENTION };
+const statusNames: Record<string, ThreadStatus> = { busy: ThreadStatus.BUSY, idle: ThreadStatus.IDLE, attention: ThreadStatus.NEEDS_ATTENTION };
 
 /** Session controls: POST /__mock/session/{attention|status|stop|hold|release|focus|archive}?id=…[&status=…][&reason=…&code=…] */
 function sessionControl(res: ServerResponse, action: string, q: URLSearchParams): void {
@@ -625,7 +622,7 @@ function sessionControl(res: ServerResponse, action: string, q: URLSearchParams)
   try {
     switch (action) {
       case "attention":
-        world.setSessionStatus(id, SessionStatus.NEEDS_ATTENTION, q.get("reason") ?? undefined);
+        world.setSessionStatus(id, ThreadStatus.NEEDS_ATTENTION, q.get("reason") ?? undefined);
         break;
       case "status": {
         const status = statusNames[q.get("status") ?? ""];
@@ -702,7 +699,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       json(res, 200, { ok: true });
       break;
     case "POST /__mock/sessions-service":
-      // enabled=false simulates a daemon without Phase 2a: SessionService 404s and the
+      // enabled=false simulates a daemon without Phase 2a: ThreadService 404s and the
       // events stream carries no session source. Reset turns it back on.
       sessionsEnabled = q.get("enabled") !== "false";
       json(res, 200, { enabled: sessionsEnabled });
@@ -748,7 +745,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     case "POST /__mock/workspace-thread":
       // workspace=login[&repo=repo-gp][&name=driver][&status=busy]: a connected thread owned by the workspace.
       try {
-        const s = world.addWorkspaceThread(q.get("workspace") ?? "", q.get("repo") ?? "", q.get("name") ?? "driver", statusNames[q.get("status") ?? "idle"] ?? SessionStatus.IDLE);
+        const s = world.addWorkspaceThread(q.get("workspace") ?? "", q.get("repo") ?? "", q.get("name") ?? "driver", statusNames[q.get("status") ?? "idle"] ?? ThreadStatus.IDLE);
         json(res, 200, sessionSummary(s.id));
       } catch (err) {
         json(res, 400, { error: err instanceof Error ? err.message : String(err) });
@@ -793,7 +790,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "POST /__mock/thread": {
       // state=permission|question|streaming|idle[&id=s-r1]: the sketch's scripted thread.
-      const state = (q.get("state") ?? "permission") as ThreadState;
+      const state = (q.get("state") ?? "permission") as ScriptedThreadState;
       if (!THREAD_STATES.includes(state)) {
         json(res, 400, { error: `state must be one of ${THREAD_STATES.join(", ")}` });
         break;
@@ -884,7 +881,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     case "POST /__mock/threads":
       // repo=repo-cf&count=3&status=busy|idle|attention[&prefix=Job]: connected threads in the repo's main worktree.
       try {
-        const list = world.addThreads(q.get("repo") ?? "repo-cf", Number(q.get("count") ?? "1"), statusNames[q.get("status") ?? "busy"] ?? SessionStatus.BUSY, q.get("prefix") ?? "Thread");
+        const list = world.addThreads(q.get("repo") ?? "repo-cf", Number(q.get("count") ?? "1"), statusNames[q.get("status") ?? "busy"] ?? ThreadStatus.BUSY, q.get("prefix") ?? "Thread");
         json(res, 200, list.map((s) => s.id));
       } catch (err) {
         json(res, 400, { error: err instanceof Error ? err.message : String(err) });
@@ -1035,7 +1032,7 @@ const server = createServer((req, res) => {
     control(req, res, url.pathname, url.searchParams);
     return;
   }
-  if (!sessionsEnabled && url.pathname.startsWith("/codefoundry.v1.SessionService/")) {
+  if (!sessionsEnabled && url.pathname.startsWith("/codefoundry.v1.ThreadService/")) {
     res.writeHead(404, { "Content-Type": "text/plain" });
     res.end("404 page not found\n");
     return;

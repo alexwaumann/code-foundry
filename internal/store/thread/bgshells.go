@@ -204,7 +204,7 @@ func isShellLaunch(raw json.RawMessage) bool {
 // background agent run it launched itself, one of its own background shells, or the turn
 // Claude is about to start for one that just ended (WakePending, wake.go). Foreground runs
 // are part of a turn, nested runs keep their background parent running.
-func (s Session) BackgroundWork() bool {
+func (s Thread) BackgroundWork() bool {
 	_, background := s.AgentsRunning()
 	return background > 0 || s.BackgroundShellsRunning > 0 || s.WakePending
 }

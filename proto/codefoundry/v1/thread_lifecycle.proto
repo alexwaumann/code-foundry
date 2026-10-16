@@ -4,69 +4,10 @@ package codefoundry.v1;
 
 import "google/protobuf/timestamp.proto";
 
-// SessionService manages Claude Code sessions (threads). A session is the primary unit of
-// the app. A connected session owns one claude process (claude -p over stream-json);
-// a disconnected session owns none and can be reconnected (claude --resume).
-service SessionService {
-  // Create spawns claude in a worktree and returns the session in STARTING state.
-  rpc Create(CreateSessionRequest) returns (CreateSessionResponse) {}
-  // Fork starts a new session that continues an existing session's conversation.
-  rpc Fork(ForkSessionRequest) returns (ForkSessionResponse) {}
-  // List returns all sessions.
-  rpc List(ListSessionsRequest) returns (ListSessionsResponse) {}
-  // Get returns one session.
-  rpc Get(GetSessionRequest) returns (GetSessionResponse) {}
-  // Rename sets a user-chosen name and disables auto-naming for the session.
-  rpc Rename(RenameSessionRequest) returns (RenameSessionResponse) {}
-  // Close ends the Claude process gracefully (interrupt, stdin closed, bounded wait,
-  // then kill). The session remains, DISCONNECTED, until Remove. No command calls it
-  // since 2026-10-15: the daemon starts a thread's process when a message is sent
-  // (ThreadService.Send) and stops it at the prompt cache expiry
-  // (docs/notes/thread-lifecycle.md). Kept for compatibility.
-  rpc Close(CloseSessionRequest) returns (CloseSessionResponse) {}
-  // Reconnect resumes a DISCONNECTED session in a new claude process, without a
-  // prompt. No command calls it since 2026-10-15 (a message starts a stopped thread).
-  // Kept for compatibility.
-  rpc Reconnect(ReconnectSessionRequest) returns (ReconnectSessionResponse) {}
-  // Remove forgets a session. Stops its Claude first if it runs.
-  rpc Remove(RemoveSessionRequest) returns (RemoveSessionResponse) {}
-  // RunIn moves a workspace thread's cwd to another member worktree of its workspace.
-  // A live thread gets set_cwd once it is idle (pending_worktree_path shows the queued
-  // target until then) and the row's worktree_path and repo_id change when Claude
-  // accepts it. A disconnected thread's row
-  // changes at once; the next reconnect resumes there. Refused for a project thread or
-  // a target that is not a member.
-  rpc RunIn(RunInSessionRequest) returns (RunInSessionResponse) {}
-  // Pin pins or unpins a thread. Pinned threads sit in their own section at the top of
-  // the GUI's thread list. Persisted; any state.
-  rpc Pin(PinSessionRequest) returns (PinSessionResponse) {}
-  // Archive archives or unarchives a thread. Archiving ends Claude gracefully like
-  // Close (the thread is DISCONNECTED), kills and removes the thread's shells, unpins
-  // it and records archived_at (kept when it is already archived). Unarchiving only
-  // clears archived_at: the thread stays disconnected until a Reconnect. Reconnect,
-  // Pin (pinned) and Send unarchive a thread implicitly. Persisted; any state.
-  rpc Archive(ArchiveSessionRequest) returns (ArchiveSessionResponse) {}
-  // Snooze snoozes a thread until a time, or unsnoozes it (until unset). Snoozing ends
-  // Claude gracefully like Close (the thread is DISCONNECTED), kills and removes the
-  // thread's shells, unpins and unarchives it and records snoozed_until (a re-snooze
-  // replaces it). until must be in the future (INVALID_ARGUMENT otherwise). When the
-  // time comes the daemon wakes the thread: snoozed_until is cleared and the thread,
-  // still disconnected, becomes NEEDS_ATTENTION "snooze ended" (status_changed_at = the
-  // wake time). Unsnoozing before then only clears snoozed_until. Reconnect, Pin
-  // (pinned), Send and Archive (archived) clear a snooze implicitly. Persisted.
-  rpc Snooze(SnoozeSessionRequest) returns (SnoozeSessionResponse) {}
-  // Watch streams session changes. The first event is a snapshot.
-  rpc Watch(WatchSessionsRequest) returns (stream SessionEvent) {}
-  // StageAttachment stores an image the first prompt refers to and returns its path.
-  // Create appends "Attached image: <path>" lines for CreateSessionRequest.attachments;
-  // Claude reads them with its Read tool. Only image types are accepted, with size
-  // limits; unused staged files are reaped by the daemon.
-  rpc StageAttachment(StageAttachmentRequest) returns (StageAttachmentResponse) {}
-  // ReadAttachment returns a staged attachment's bytes (a user message shows its
-  // images). Only files directly in the attachments directory;
-  // NOT_FOUND once the file was reaped.
-  rpc ReadAttachment(ReadAttachmentRequest) returns (ReadAttachmentResponse) {}
-}
+// Thread lifecycle messages: the thread record (Thread), its state and status, and the
+// requests and events of ThreadService's lifecycle RPCs (Create, Fork, List, Get, Rename,
+// Close, Reconnect, Remove, RunIn, Pin, Archive, Snooze, Watch, StageAttachment,
+// ReadAttachment). The service itself is in thread.proto.
 
 // PermissionMode maps to claude --permission-mode. Full access (bypassPermissions) is
 // deliberately not offered.
@@ -81,48 +22,48 @@ enum PermissionMode {
   PERMISSION_MODE_AUTO = 3;
 }
 
-// SessionState is the lifecycle of the Claude process behind a session. The daemon
+// ThreadState is the lifecycle of the Claude process behind a thread. The daemon
 // manages it (docs/notes/thread-lifecycle.md): a message starts a stopped thread, and a
 // thread idle at its prompt past its prompt cache expiry stops. Users never need to know
 // it; clients may use it internally (a thread that is STARTING has not answered yet).
-enum SessionState {
-  SESSION_STATE_UNSPECIFIED = 0;
+enum ThreadState {
+  THREAD_STATE_UNSPECIFIED = 0;
   // Process spawned, the stream-json initialize handshake not yet done. Messages sent
   // meanwhile wait for it.
-  SESSION_STATE_STARTING = 1;
+  THREAD_STATE_STARTING = 1;
   // Claude is running.
-  SESSION_STATE_CONNECTED = 2;
+  THREAD_STATE_CONNECTED = 2;
   // A stop is under way (idle, archive, snooze, remove); waiting for the process to
   // exit. A message sent meanwhile starts a new process once it has.
-  SESSION_STATE_CLOSING = 3;
+  THREAD_STATE_CLOSING = 3;
   // No process: stopped by the daemon (idle, archive, snooze), exited by Claude, crashed,
   // or not started since the daemon started. The next message starts it.
-  SESSION_STATE_DISCONNECTED = 4;
+  THREAD_STATE_DISCONNECTED = 4;
 }
 
-// SessionStatus is what Claude is doing, derived by observing output and the transcript.
-enum SessionStatus {
-  SESSION_STATUS_UNSPECIFIED = 0;
-  SESSION_STATUS_BUSY = 1;
-  SESSION_STATUS_IDLE = 2;
+// ThreadStatus is what Claude is doing, derived by observing output and the transcript.
+enum ThreadStatus {
+  THREAD_STATUS_UNSPECIFIED = 0;
+  THREAD_STATUS_BUSY = 1;
+  THREAD_STATUS_IDLE = 2;
   // Claude is waiting on the user: a permission prompt, a question, or a dialog.
-  SESSION_STATUS_NEEDS_ATTENTION = 3;
-  // The session's process ended while Claude was working (status_reason
+  THREAD_STATUS_NEEDS_ATTENTION = 3;
+  // The thread's process ended while Claude was working (status_reason
   // "interrupted"): it crashed, exited, was closed, or the daemon stopped mid-turn; or
   // Claude did not start for a message (status_reason "did not start"; the timeline has
-  // an error item saying why). Set only on a DISCONNECTED session; the next start
+  // an error item saying why). Set only on a DISCONNECTED thread; the next start
   // replaces it. Claude-reported API errors stay NEEDS_ATTENTION "error: <code>".
-  SESSION_STATUS_ERROR = 4;
+  THREAD_STATUS_ERROR = 4;
 }
 
 // Ownership: a thread has at most one owner. When workspace_id is set the owner is that
 // workspace; otherwise, when repo_id is set, it is the project (repository) repo_id;
-// otherwise the thread has no project (CreateSessionRequest.no_project) and runs in the
+// otherwise the thread has no project (CreateThreadRequest.no_project) and runs in the
 // daemon's home directory. repo_id and worktree_path are facts about the thread's cwd
 // (for a workspace thread, the member worktree it runs in) and never decide the owner
 // beyond that order. Rows from before projects were required may also have an empty
 // repo_id with a worktree_path inside a project; clients may place those by the path.
-message Session {
+message Thread {
   // Our stable id (survives reconnects).
   string id = 1;
   // Claude's own session id, once discovered from the transcript directory. Needed for
@@ -144,34 +85,34 @@ message Session {
   // 9 was terminal_id (threads ran in a PTY until 2026-10-12).
   reserved 9;
   reserved "terminal_id";
-  SessionState state = 10;
-  SessionStatus status = 11;
+  ThreadState state = 10;
+  ThreadStatus status = 11;
   google.protobuf.Timestamp created_at = 12;
   google.protobuf.Timestamp last_activity_at = 13;
   // Exit code of the last process, valid when DISCONNECTED after a process ran.
   int32 exit_code = 14;
-  // Why the session is DISCONNECTED: "idle" (stopped at its prompt cache expiry),
+  // Why the thread is DISCONNECTED: "idle" (stopped at its prompt cache expiry),
   // "closed" (archive, snooze, remove), "exited", "crashed", "daemon stopped", "daemon
   // restarted", "spawn failed" (Claude did not start or never answered its handshake),
   // or empty. Internal detail for clients; the next message starts the thread whatever it
   // says.
   string disconnect_reason = 15;
   string last_error = 16;
-  // Forked from this session id, if any.
+  // Forked from this thread id, if any.
   string parent_id = 17;
   // Short explanation of status from the detector, e.g. "finished", "at prompt",
   // "permission: Do you want to proceed?", "snooze ended" (NEEDS_ATTENTION on a
   // disconnected thread whose snooze ran out; cleared like "finished" on a disconnected
   // thread, by the next start), or "interrupted" / "did not start" for ERROR. Persisted with
-  // status: a DISCONNECTED session keeps the status and reason it had when its process
+  // status: a DISCONNECTED thread keeps the status and reason it had when its process
   // ended (a busy one becomes ERROR "interrupted"), across daemon restarts. Empty when
   // unknown.
   string status_reason = 18;
   // Permission mode passed to claude; re-passed on Reconnect.
   PermissionMode permission_mode = 19;
-  // Ref the session's worktree branch was created from, when Create made the worktree.
+  // Ref the thread's worktree branch was created from, when Create made the worktree.
   string base_ref = 20;
-  // Create made the worktree for this session (new_worktree or new_workspace was set).
+  // Create made the worktree for this thread (new_worktree or new_workspace was set).
   bool created_worktree = 21;
   // Owner workspace (see the ownership rule above); empty for a project thread and for a
   // thread without a project. Every spawn of a workspace thread gets --add-dir for the
@@ -181,11 +122,11 @@ message Session {
   // nothing is queued. Not persisted: a thread that disconnects first moves its row
   // there instead.
   string pending_worktree_path = 23;
-  // The user pinned the thread (SessionService.Pin). Persisted.
+  // The user pinned the thread (ThreadService.Pin). Persisted.
   bool pinned = 24;
   // Pull requests Claude linked to the conversation. Source: the "pr-link" records Claude
-  // Code writes to the session's transcript whenever it sees a pull request for the
-  // repository (created in the session, by a subagent, or named in a prompt). Claude
+  // Code writes to its transcript whenever it sees a pull request for the
+  // repository (created in the conversation, by a subagent, or named in a prompt). Claude
   // re-emits the record at nearly every turn and it can flip back to an earlier pull
   // request, so this is every distinct URL (deduplicated by URL) in first-seen order;
   // entries are never removed. A reconnected thread is backfilled from its transcript's
@@ -225,7 +166,7 @@ message Session {
   // docs/notes/rendered-threads-cold-cache.md.
   int64 context_tokens = 33;
   // When the prompt cache of the thread's conversation expires: its last result
-  // plus the sessions.cache_ttl_seconds setting (the cache refreshes on every hit, so
+  // plus the threads.cache_ttl_seconds setting (the cache refreshes on every hit, so
   // the last request is what counts). Recomputed when the setting changes. Unset
   // before the first result.
   google.protobuf.Timestamp cache_expires_at = 34;
@@ -238,11 +179,11 @@ message Session {
   // connection error); unset once any other frame follows or the process ends. Not
   // persisted. See docs/notes/api-retry-note.md.
   ApiRetry retry = 36;
-  // When the user archived the thread (SessionService.Archive); unset when it is not
+  // When the user archived the thread (ThreadService.Archive); unset when it is not
   // archived. An archived thread is disconnected, unpinned and has no shells; the GUI
   // lists it apart. Reconnect, Pin (pinned) and Send clear it. Persisted.
   google.protobuf.Timestamp archived_at = 37;
-  // When a snoozed thread wakes (SessionService.Snooze); unset when it is not snoozed.
+  // When a snoozed thread wakes (ThreadService.Snooze); unset when it is not snoozed.
   // A snoozed thread is disconnected, unpinned, not archived and has no shells; the GUI
   // lists it apart. The daemon checks the wall clock (every 30 s and at startup, so a
   // snooze that ended while the Mac slept or the daemon was stopped wakes as soon as it
@@ -292,7 +233,7 @@ enum AgentRunStatus {
   AGENT_RUN_STATUS_CLOSED = 2;
 }
 
-// One subagent run of a thread (Session.agent_runs): a Claude Code Agent tool call,
+// One subagent run of a thread (Thread.agent_runs): a Claude Code Agent tool call,
 // with its own transcript.
 message AgentRun {
   // Claude's agent id.
@@ -310,13 +251,13 @@ message AgentRun {
   int32 spawn_depth = 8;
   // Time of the run's first record; unset if unknown.
   google.protobuf.Timestamp started_at = 9;
-  // The run's own usage, sorted like Session.usage, priced the same way.
+  // The run's own usage, sorted like Thread.usage, priced the same way.
   repeated UsageBucket usage = 10;
   double cost_usd = 11;
   bool unpriced = 12;
 }
 
-// Token counters for one model on one UTC day (of one session, or of the retired
+// Token counters for one model on one UTC day (of one thread, or of the retired
 // ledger).
 message UsageBucket {
   // Canonical model id as Claude wrote it, e.g. "claude-opus-5-5".
@@ -349,7 +290,7 @@ message UsageBucket {
   double cache_savings_usd = 18;
 }
 
-// A pull request Claude linked to a session (Session.linked_pull_requests).
+// A pull request Claude linked to a thread (Thread.linked_pull_requests).
 message LinkedPullRequest {
   string slug = 1; // "owner/name"
   int32 number = 2;
@@ -358,7 +299,7 @@ message LinkedPullRequest {
   google.protobuf.Timestamp linked_at = 4;
 }
 
-message CreateSessionRequest {
+message CreateThreadRequest {
   string repo_id = 1;
   string worktree_path = 2;
   string model = 3;
@@ -369,9 +310,9 @@ message CreateSessionRequest {
   // started (attachments as image blocks).
   string initial_prompt = 6;
   PermissionMode permission_mode = 7;
-  // When set, Create makes a new worktree for the session before claude starts and
+  // When set, Create makes a new worktree for the thread before claude starts and
   // worktree_path is ignored. The branch is cf/<slug>, the slug of the explicit name,
-  // else of the title named from initial_prompt (bounded wait), else cf/<session id>.
+  // else of the title named from initial_prompt (bounded wait), else cf/<thread id>.
   NewWorktree new_worktree = 8;
   // Paths returned by StageAttachment, appended to initial_prompt.
   repeated string attachments = 9;
@@ -392,7 +333,7 @@ message CreateSessionRequest {
   // (ThreadItem UserMessageItem.composer_text).
   string composer_prompt = 13;
   // When set, the thread has no project: it runs in the daemon's home directory with an
-  // empty repo_id and workspace_id (see the ownership rule on Session). Exclusive with
+  // empty repo_id and workspace_id (see the ownership rule on Thread). Exclusive with
   // repo_id, worktree_path, new_worktree, workspace_id and new_workspace
   // (InvalidArgument). RunIn refuses such a thread; Fork and Reconnect keep its cwd.
   bool no_project = 14;
@@ -437,65 +378,65 @@ message ReadAttachmentResponse {
   string mime_type = 2;
 }
 
-message CreateSessionResponse {
-  Session session = 1;
+message CreateThreadResponse {
+  Thread thread = 1;
 }
 
-message ForkSessionRequest {
+message ForkThreadRequest {
   string id = 1;
   string name = 2;
 }
 
-message ForkSessionResponse {
-  Session session = 1;
+message ForkThreadResponse {
+  Thread thread = 1;
 }
 
-message ListSessionsRequest {}
+message ListThreadsRequest {}
 
-message ListSessionsResponse {
-  repeated Session sessions = 1;
-  // Usage of removed threads (see SessionSnapshot.retired_usage).
+message ListThreadsResponse {
+  repeated Thread threads = 1;
+  // Usage of removed threads (see ThreadListSnapshot.retired_usage).
   repeated UsageBucket retired_usage = 2;
 }
 
-message GetSessionRequest {
+message GetThreadRequest {
   string id = 1;
 }
 
-message GetSessionResponse {
-  Session session = 1;
+message GetThreadResponse {
+  Thread thread = 1;
 }
 
-message RenameSessionRequest {
+message RenameThreadRequest {
   string id = 1;
   string name = 2;
 }
 
-message RenameSessionResponse {
-  Session session = 1;
+message RenameThreadResponse {
+  Thread thread = 1;
 }
 
-message CloseSessionRequest {
+message CloseThreadRequest {
   string id = 1;
 }
 
-message CloseSessionResponse {}
+message CloseThreadResponse {}
 
-message ReconnectSessionRequest {
+message ReconnectThreadRequest {
   string id = 1;
 }
 
-message ReconnectSessionResponse {
-  Session session = 1;
+message ReconnectThreadResponse {
+  Thread thread = 1;
 }
 
-message RemoveSessionRequest {
+message RemoveThreadRequest {
   string id = 1;
 }
 
-message RemoveSessionResponse {}
+message RemoveThreadResponse {}
 
-message RunInSessionRequest {
+message RunInThreadRequest {
   string id = 1;
   // The member to run in: its repository id, or its worktree path. One is required;
   // both must name the same member.
@@ -503,60 +444,60 @@ message RunInSessionRequest {
   string worktree_path = 3;
 }
 
-message RunInSessionResponse {
-  Session session = 1;
+message RunInThreadResponse {
+  Thread thread = 1;
 }
 
-message PinSessionRequest {
+message PinThreadRequest {
   string id = 1;
   bool pinned = 2;
 }
 
-message PinSessionResponse {
-  Session session = 1;
+message PinThreadResponse {
+  Thread thread = 1;
 }
 
-message ArchiveSessionRequest {
+message ArchiveThreadRequest {
   string id = 1;
   // Archive (true) or unarchive (false).
   bool archived = 2;
 }
 
-message ArchiveSessionResponse {
-  Session session = 1;
+message ArchiveThreadResponse {
+  Thread thread = 1;
 }
 
-message SnoozeSessionRequest {
+message SnoozeThreadRequest {
   string id = 1;
   // When the thread wakes; must be in the future. Unset unsnoozes.
   google.protobuf.Timestamp until = 2;
 }
 
-message SnoozeSessionResponse {
-  Session session = 1;
+message SnoozeThreadResponse {
+  Thread thread = 1;
 }
 
-message WatchSessionsRequest {}
+message WatchThreadsRequest {}
 
-message SessionEvent {
+message ThreadListEvent {
   oneof event {
-    SessionSnapshot snapshot = 1;
-    Session updated = 2;
+    ThreadListSnapshot snapshot = 1;
+    Thread updated = 2;
     string removed_id = 3;
     // Follows removed_id when the removed thread had usage: the whole retired ledger.
     RetiredUsage retired_usage = 4;
   }
 }
 
-message SessionSnapshot {
-  repeated Session sessions = 1;
+message ThreadListSnapshot {
+  repeated Thread threads = 1;
   // Usage of removed threads, summed per (model, tier, speed, day): a thread's buckets
   // are added here when it is removed. Usage over every thread ever tracked is the
-  // sessions' usage plus this.
+  // threads' usage plus this.
   repeated UsageBucket retired_usage = 2;
 }
 
-// The retired usage ledger after a removal (SessionEvent.retired_usage).
+// The retired usage ledger after a removal (ThreadListEvent.retired_usage).
 message RetiredUsage {
   repeated UsageBucket buckets = 1;
 }

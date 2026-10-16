@@ -67,13 +67,13 @@ describe("toMcpStatusView", () => {
   });
 
   it("rides the thread events: the snapshot's mcp and the mcp event (null when dropped)", () => {
-    const snap = toThreadEventView(create(ThreadEventSchema, { event: { case: "snapshot", value: { sessionId: "s", seq: 3n, mcp: { servers: [{ name: "a", status: McpServerStatus.CONNECTED }] } } } }));
+    const snap = toThreadEventView(create(ThreadEventSchema, { event: { case: "snapshot", value: { threadId: "s", seq: 3n, mcp: { servers: [{ name: "a", status: McpServerStatus.CONNECTED }] } } } }));
     expect(snap).toMatchObject({ kind: "snapshot", seq: 3, mcp: { servers: [{ name: "a", status: "connected" }] } });
-    const none = toThreadEventView(create(ThreadEventSchema, { event: { case: "snapshot", value: { sessionId: "s", seq: 3n } } }));
+    const none = toThreadEventView(create(ThreadEventSchema, { event: { case: "snapshot", value: { threadId: "s", seq: 3n } } }));
     expect(none).toMatchObject({ kind: "snapshot", mcp: null });
-    const ev = toThreadEventView(create(ThreadEventSchema, { event: { case: "mcp", value: { sessionId: "s", seq: 4n, status: { trigger: McpCheckTrigger.RECONNECT, server: "a" } } } }));
+    const ev = toThreadEventView(create(ThreadEventSchema, { event: { case: "mcp", value: { threadId: "s", seq: 4n, status: { trigger: McpCheckTrigger.RECONNECT, server: "a" } } } }));
     expect(ev).toEqual({ kind: "mcp", sessionId: "s", seq: 4, status: { checkedAtMs: null, trigger: "reconnect", server: "a", servers: [] } });
-    const gone = toThreadEventView(create(ThreadEventSchema, { event: { case: "mcp", value: { sessionId: "s", seq: 5n } } }));
+    const gone = toThreadEventView(create(ThreadEventSchema, { event: { case: "mcp", value: { threadId: "s", seq: 5n } } }));
     expect(gone).toEqual({ kind: "mcp", sessionId: "s", seq: 5, status: null });
   });
 });

@@ -99,16 +99,16 @@ func TestApplySettings(t *testing.T) {
 		return command.Result{}, nil
 	}
 	if err := reg.RegisterAll(
-		command.Command{Name: "session.new", Title: "New Session", Category: "Session", Keybindings: []string{"cmd+n"}, Run: noop,
+		command.Command{Name: "thread.new", Title: "New Thread", Category: "Thread", Keybindings: []string{"cmd+n"}, Run: noop,
 			Args: []command.ArgSpec{
-				{Name: "model", Type: command.Enum, Enum: command.SessionModels},
-				{Name: "effort", Type: command.Enum, Enum: command.SessionEfforts},
+				{Name: "model", Type: command.Enum, Enum: command.ThreadModels},
+				{Name: "effort", Type: command.Enum, Enum: command.ThreadEfforts},
 			}},
 		command.Command{Name: "terminal.new", Title: "New Terminal", Category: "Terminal", Keybindings: []string{"cmd+t"}, Run: noop},
 	); err != nil {
 		t.Fatal(err)
 	}
-	if err := command.RegisterPullRequestSessions(reg, command.PullRequestSessionDeps{Emitter: &commandtest.Emitter{}}); err != nil {
+	if err := command.RegisterPullRequestThreads(reg, command.PullRequestThreadDeps{Emitter: &commandtest.Emitter{}}); err != nil {
 		t.Fatal(err)
 	}
 	argDefault := func(c command.Command, name string) string {
@@ -125,13 +125,13 @@ func TestApplySettings(t *testing.T) {
 
 	if _, err := st.Update(context.Background(), map[string]string{
 		settings.KeyDefaultModel: "claude-opus-4-8[1m]", settings.KeyDefaultEffort: "high", settings.KeyLogLevel: "warn",
-		settings.KeybindingKey("terminal.new"): "none", settings.KeybindingKey("session.new"): "cmd+t",
+		settings.KeybindingKey("terminal.new"): "none", settings.KeybindingKey("thread.new"): "cmd+t",
 	}); err != nil {
 		t.Fatal(err)
 	}
-	c, _ := reg.Get("session.new")
+	c, _ := reg.Get("thread.new")
 	if c.Args[0].Default != "claude-opus-4-8[1m]" || c.Args[1].Default != "high" || !slices.Equal(c.Keybindings, []string{"cmd+t"}) {
-		t.Errorf("session.new = defaults %q/%q keybindings %v", c.Args[0].Default, c.Args[1].Default, c.Keybindings)
+		t.Errorf("thread.new = defaults %q/%q keybindings %v", c.Args[0].Default, c.Args[1].Default, c.Keybindings)
 	}
 	// The pull request session commands start sessions too, with the same defaults.
 	for _, name := range []string{"pr.ask", "pr.explain", "pr.fix.findings"} {
@@ -151,7 +151,7 @@ func TestApplySettings(t *testing.T) {
 	if _, err := st.Update(context.Background(), map[string]string{settings.KeyDefaultModel: "", settings.KeyDefaultEffort: ""}); err != nil {
 		t.Fatal(err)
 	}
-	if c, _ := reg.Get("session.new"); c.Args[0].Default != "claude-opus-4-8[1m]" || c.Args[1].Default != "high" {
+	if c, _ := reg.Get("thread.new"); c.Args[0].Default != "claude-opus-4-8[1m]" || c.Args[1].Default != "high" {
 		t.Errorf("defaults after reset = %q/%q", c.Args[0].Default, c.Args[1].Default)
 	}
 	if c, _ := reg.Get("pr.fix.findings"); argDefault(c, "model") != "claude-opus-4-8[1m]" || argDefault(c, "effort") != "high" {

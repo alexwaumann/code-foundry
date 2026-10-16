@@ -47,7 +47,7 @@ export function toEventView(ev: Event): EventView | null {
       const v = toTerminalEventView(e.value);
       return v && { source: "terminal", event: v };
     }
-    case "session": {
+    case "threadList": {
       const v = toSessionEventView(e.value);
       return v && { source: "session", event: v };
     }

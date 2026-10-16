@@ -25,14 +25,14 @@ func newSlashRegistry(t *testing.T) (*command.Registry, *threadtest.Fake) {
 	if err := command.RegisterSlash(reg, api.NewThread(fake, b)); err != nil {
 		t.Fatal(err)
 	}
-	fake.Put(thread.Session{ID: "s1", Name: "fix", State: thread.StateConnected})
+	fake.Put(thread.Thread{ID: "s1", Name: "fix", State: thread.StateConnected})
 	fake.PutSlashCommands("s1", []thread.SlashCommand{
 		{Name: "deploy", Description: "Ship it (project)", ArgumentHint: "<env>"},
 		{Name: "compact", Description: "Free up context by summarizing the conversation so far", ArgumentHint: "<optional custom summarization instructions>", Builtin: true},
 		{Name: "usage", Description: "Show session cost", Aliases: []string{"cost", "stats"}, Builtin: true},
 		{Name: "anthropic-skills:pdf", Description: "Use this skill whenever the user wants to do anything with PDF files.\nSecond line."},
 	})
-	fake.Put(thread.Session{ID: "s2", Name: "gone", State: thread.StateDisconnected})
+	fake.Put(thread.Thread{ID: "s2", Name: "gone", State: thread.StateDisconnected})
 	return reg, fake
 }
 
@@ -44,8 +44,8 @@ func TestSlashCommandsAvailability(t *testing.T) {
 		ctx  command.Context
 		want bool
 	}{
-		{"cli", command.Context{ActiveSessionID: "s1"}, true},
-		{"gui thread", command.Context{ActiveSessionID: "s1", ActiveView: "session"}, true},
+		{"cli", command.Context{ActiveThreadID: "s1"}, true},
+		{"gui thread", command.Context{ActiveThreadID: "s1", ActiveView: "thread"}, true},
 		{"no thread", command.Context{ActiveView: "projects"}, false},
 	} {
 		if got := c.Available(tt.ctx); got != tt.want {

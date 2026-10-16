@@ -88,7 +88,7 @@ func commandError(err error) error {
 func contextFromProto(c *v1.UiContext) command.Context {
 	return command.Context{
 		ActiveTerminalID:   c.GetActiveTerminalId(),
-		ActiveSessionID:    c.GetActiveSessionId(),
+		ActiveThreadID:     c.GetActiveThreadId(),
 		ActiveRepoID:       c.GetActiveRepoId(),
 		ActiveWorktreePath: c.GetActiveWorktreePath(),
 		ActiveView:         c.GetActiveView(),

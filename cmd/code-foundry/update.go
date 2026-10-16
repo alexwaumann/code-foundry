@@ -256,15 +256,15 @@ func (cl *cli) followDownload(ctx context.Context, c *client.Client) (*v1.Update
 func restartCostOf(ctx context.Context, c *client.Client) command.RestartCost {
 	// Only threads working, waiting on an answer or running background work lose
 	// anything to the restart; an idle one starts again with its next message.
-	res, err := c.Command.Invoke(ctx, connect.NewRequest(&v1.InvokeCommandRequest{Name: "session.list"}))
+	res, err := c.Command.Invoke(ctx, connect.NewRequest(&v1.InvokeCommandRequest{Name: "thread.list"}))
 	if err != nil {
 		return command.RestartCost{}
 	}
-	var list v1.ListSessionsResponse
+	var list v1.ListThreadsResponse
 	if protojson.Unmarshal([]byte(res.Msg.GetResultJson()), &list) != nil {
 		return command.RestartCost{}
 	}
-	return command.RestartCostOf(list.GetSessions())
+	return command.RestartCostOf(list.GetThreads())
 }
 
 // afterUpdate follows a direct install while a daemon runs: it tells the daemon to

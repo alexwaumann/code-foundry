@@ -41,8 +41,8 @@ type harness struct {
 	// web, feat and api are real directories: background runs start in them.
 	web, feat, api string
 	// sessions are the threads Options.Session knows.
-	mu       sync.Mutex
-	sessions map[string]Owner
+	mu      sync.Mutex
+	threads map[string]Owner
 }
 
 func newHarness(t *testing.T, mut ...func(*Options)) *harness {
@@ -54,7 +54,7 @@ func newHarness(t *testing.T, mut ...func(*Options)) *harness {
 	}
 	t.Cleanup(func() { _ = d.Close() })
 	b := bus.New()
-	h := &harness{t: t, bus: b, repos: repotest.New(b), terms: terminaltest.New(b), sessions: map[string]Owner{}}
+	h := &harness{t: t, bus: b, repos: repotest.New(b), terms: terminaltest.New(b), threads: map[string]Owner{}}
 	root := t.TempDir()
 	if r, err := filepath.EvalSymlinks(root); err == nil {
 		root = r
@@ -74,14 +74,14 @@ func newHarness(t *testing.T, mut ...func(*Options)) *harness {
 			t.Fatal(err)
 		}
 	}
-	h.sessions["s1"] = Owner{RepoID: "web", Worktree: h.feat}
-	h.sessions["home"] = Owner{Worktree: root}
+	h.threads["s1"] = Owner{RepoID: "web", Worktree: h.feat}
+	h.threads["home"] = Owner{Worktree: root}
 	opts := Options{
 		DB: d, Repos: h.repos, Terminals: h.terms, Bus: b, Log: discard, Shell: "/bin/sh",
-		Session: func(id string) (Owner, bool) {
+		Thread: func(id string) (Owner, bool) {
 			h.mu.Lock()
 			defer h.mu.Unlock()
-			o, ok := h.sessions[id]
+			o, ok := h.threads[id]
 			return o, ok
 		},
 	}
@@ -323,18 +323,18 @@ func TestRunOwnerAndAction(t *testing.T) {
 		wantOwner Owner
 		wantName  string
 	}{
-		{name: "a thread owns it and names the project", opts: RunOptions{Action: "echo", SessionID: "s1"},
-			wantOwner: Owner{SessionID: "s1", RepoID: "web", Worktree: "%feat"}, wantName: "Echo"},
+		{name: "a thread owns it and names the project", opts: RunOptions{Action: "echo", ThreadID: "s1"},
+			wantOwner: Owner{ThreadID: "s1", RepoID: "web", Worktree: "%feat"}, wantName: "Echo"},
 		{name: "a worktree owns it", opts: RunOptions{Action: "ECHO", Worktree: "%web"},
 			wantOwner: Owner{RepoID: "web", Worktree: "%web"}, wantName: "Echo"},
 		{name: "by id", opts: RunOptions{Action: "#apiEcho", Worktree: "%api"},
 			wantOwner: Owner{RepoID: "api", Worktree: "%api"}, wantName: "Echo"},
-		{name: "the thread wins over a worktree", opts: RunOptions{Action: "echo", SessionID: "s1", Worktree: "%api"},
-			wantOwner: Owner{SessionID: "s1", RepoID: "web", Worktree: "%feat"}, wantName: "Echo"},
-		{name: "unknown thread", opts: RunOptions{Action: "echo", SessionID: "s9"}, wantErr: ErrNotFound, wantMsg: "thread s9"},
-		{name: "a thread without a project", opts: RunOptions{Action: "echo", SessionID: "home"}, wantErr: ErrFailedPrecondition,
+		{name: "the thread wins over a worktree", opts: RunOptions{Action: "echo", ThreadID: "s1", Worktree: "%api"},
+			wantOwner: Owner{ThreadID: "s1", RepoID: "web", Worktree: "%feat"}, wantName: "Echo"},
+		{name: "unknown thread", opts: RunOptions{Action: "echo", ThreadID: "s9"}, wantErr: ErrNotFound, wantMsg: "thread s9"},
+		{name: "a thread without a project", opts: RunOptions{Action: "echo", ThreadID: "home"}, wantErr: ErrFailedPrecondition,
 			wantMsg: "has no project"},
-		{name: "the thread is in another project than --repo", opts: RunOptions{Action: "echo", SessionID: "s1", RepoID: "api"},
+		{name: "the thread is in another project than --repo", opts: RunOptions{Action: "echo", ThreadID: "s1", RepoID: "api"},
 			wantErr: ErrInvalidArgument},
 		{name: "an unregistered worktree", opts: RunOptions{Action: "echo", Worktree: "/nowhere"}, wantErr: ErrInvalidArgument,
 			wantMsg: "/nowhere is not a worktree of a registered project"},
@@ -367,7 +367,7 @@ func TestRunOwnerAndAction(t *testing.T) {
 			}
 			want := tt.wantOwner
 			want.Worktree = sub(want.Worktree)
-			if got := (Owner{SessionID: r.SessionID, RepoID: r.RepoID, Worktree: r.Worktree}); got != want || r.ActionName != tt.wantName {
+			if got := (Owner{ThreadID: r.ThreadID, RepoID: r.RepoID, Worktree: r.Worktree}); got != want || r.ActionName != tt.wantName {
 				t.Errorf("run owner %+v %q, want %+v %q", got, r.ActionName, want, tt.wantName)
 			}
 			if r.Mode != ModeBackground || r.Trigger != TriggerUser {
@@ -382,7 +382,7 @@ func TestBackgroundRun(t *testing.T) {
 	tests := []struct {
 		name    string
 		command string
-		session bool
+		thread  bool
 		limit   int
 		want    func(h *harness) string // the whole output
 		wantRe  bool
@@ -391,9 +391,9 @@ func TestBackgroundRun(t *testing.T) {
 	}{
 		{name: "exit 0 with output", command: "echo out; echo err >&2", want: func(*harness) string { return "out\nerr\n" }},
 		{name: "a failing command's code and output", command: "echo boom; exit 3", want: func(*harness) string { return "boom\n" }, code: 3},
-		{name: "runs in the worktree with the project variables", command: `pwd; echo "$` + paths.EnvProjectRoot + `"; echo "$` + paths.EnvWorktree + `"; echo "[$` + paths.EnvSession + `]"`,
+		{name: "runs in the worktree with the project variables", command: `pwd; echo "$` + paths.EnvProjectRoot + `"; echo "$` + paths.EnvWorktree + `"; echo "[$` + paths.EnvThread + `]"`,
 			want: func(h *harness) string { return h.web + "\n" + h.web + "\n" + h.web + "\n[]\n" }},
-		{name: "a thread's run also gets its session", command: `pwd; echo "$` + paths.EnvProjectRoot + `"; echo "$` + paths.EnvSession + `"`, session: true,
+		{name: "a thread's run also gets its thread", command: `pwd; echo "$` + paths.EnvProjectRoot + `"; echo "$` + paths.EnvThread + `"`, thread: true,
 			want: func(h *harness) string { return h.feat + "\n" + h.web + "\ns1\n" }},
 		{name: "only the tail is kept", command: "printf 'aaaaa'; printf 'bbbbb'; printf 'ccc'", limit: 4,
 			want: func(*harness) string { return "bccc" }, trunc: true},
@@ -411,8 +411,8 @@ func TestBackgroundRun(t *testing.T) {
 			defer sub.Close()
 			a := h.create(CreateOptions{RepoID: "web", Name: "Run", Command: tt.command, InTerminal: true})
 			o := RunOptions{Action: "run", Worktree: h.web, Mode: ModeBackground}
-			if tt.session {
-				o = RunOptions{Action: "run", SessionID: "s1", Mode: ModeBackground}
+			if tt.thread {
+				o = RunOptions{Action: "run", ThreadID: "s1", Mode: ModeBackground}
 			}
 			started, err := h.m.Run(context.Background(), o)
 			if err != nil {
@@ -439,7 +439,7 @@ func TestBackgroundRun(t *testing.T) {
 					finished = append(finished, e)
 				}
 			}
-			want := RunFinished{RunID: r.ID, ActionID: a.ID, ActionName: "Run", RepoID: "web", SessionID: r.SessionID,
+			want := RunFinished{RunID: r.ID, ActionID: a.ID, ActionName: "Run", RepoID: "web", ThreadID: r.ThreadID,
 				Mode: ModeBackground, Trigger: TriggerUser, ExitCode: tt.code}
 			if len(finished) != 1 || finished[0] != want {
 				t.Errorf("RunFinished = %+v, want one %+v", finished, want)
@@ -453,7 +453,7 @@ func TestTerminalRun(t *testing.T) {
 	a := h.create(CreateOptions{RepoID: "web", Name: "Dev", Command: "pnpm dev", InTerminal: true})
 	sub := bus.Subscribe[Event](h.bus, 64)
 	defer sub.Close()
-	r, err := h.m.Run(context.Background(), RunOptions{Action: "dev", SessionID: "s1"})
+	r, err := h.m.Run(context.Background(), RunOptions{Action: "dev", ThreadID: "s1"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -465,13 +465,13 @@ func TestTerminalRun(t *testing.T) {
 		t.Fatal("no terminal")
 	}
 	wantLabels := map[string]string{
-		termlabel.Kind: termlabel.KindAction, termlabel.Session: "s1", termlabel.Repo: "web", termlabel.Worktree: h.feat,
+		termlabel.Kind: termlabel.KindAction, termlabel.Thread: "s1", termlabel.Repo: "web", termlabel.Worktree: h.feat,
 		termlabel.Action: a.ID, termlabel.ActionName: "Dev", termlabel.ActionRun: r.ID,
 	}
 	if !slices.Equal(spec.Argv, []string{"/bin/sh", "-lc", "pnpm dev"}) || spec.Cwd != h.feat || !maps.Equal(spec.Labels, wantLabels) {
 		t.Errorf("terminal spec argv %q cwd %q labels %v", spec.Argv, spec.Cwd, spec.Labels)
 	}
-	wantEnv := []string{paths.EnvProjectRoot + "=" + h.web, paths.EnvWorktree + "=" + h.feat, paths.EnvSession + "=s1"}
+	wantEnv := []string{paths.EnvProjectRoot + "=" + h.web, paths.EnvWorktree + "=" + h.feat, paths.EnvThread + "=s1"}
 	if !slices.Equal(spec.Env, wantEnv) {
 		t.Errorf("env = %q, want %q", spec.Env, wantEnv)
 	}
@@ -505,7 +505,7 @@ func TestTerminalRun(t *testing.T) {
 			t.Fatal("no RunFinished")
 		}
 	}
-	if finished.TerminalID != r.TerminalID || finished.ExitCode != 2 || finished.Mode != ModeTerminal || finished.SessionID != "s1" {
+	if finished.TerminalID != r.TerminalID || finished.ExitCode != 2 || finished.Mode != ModeTerminal || finished.ThreadID != "s1" {
 		t.Errorf("RunFinished %+v", finished)
 	}
 	// The terminal stays (EXITED) for the user to read; the store never removes it.
@@ -580,7 +580,7 @@ func TestWorktreeCreated(t *testing.T) {
 	h := newHarness(t)
 	h.create(CreateOptions{RepoID: "web", Name: "Install", Command: "echo one >> setup.log", OnWorktreeCreate: true})
 	h.create(CreateOptions{RepoID: "web", Name: "Manual", Command: "echo manual >> setup.log", InTerminal: true})
-	h.create(CreateOptions{RepoID: "web", Name: "Env", Command: `cat setup.log; echo "$` + paths.EnvSession + `"; exit 4`, OnWorktreeCreate: true, InTerminal: true})
+	h.create(CreateOptions{RepoID: "web", Name: "Env", Command: `cat setup.log; echo "$` + paths.EnvThread + `"; exit 4`, OnWorktreeCreate: true, InTerminal: true})
 	h.create(CreateOptions{RepoID: "api", Name: "Other", Command: "echo api >> setup.log", OnWorktreeCreate: true})
 	sub := bus.Subscribe[Event](h.bus, 64)
 	defer sub.Close()
@@ -602,7 +602,7 @@ func TestWorktreeCreated(t *testing.T) {
 		t.Errorf("finished = %+v", finished)
 	}
 	for _, f := range finished {
-		if f.Mode != ModeBackground || f.Trigger != TriggerWorktreeCreate || f.SessionID != "s1" {
+		if f.Mode != ModeBackground || f.Trigger != TriggerWorktreeCreate || f.ThreadID != "s1" {
 			t.Errorf("finished %+v", f)
 		}
 	}

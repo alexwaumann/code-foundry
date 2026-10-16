@@ -16,11 +16,11 @@ import (
 
 // File format: TOML, one table per group, keys without the group prefix:
 //
-//	[sessions]
+//	[threads]
 //	default_model = "claude-opus-4-8[1m]"
 //
 //	[keybindings]
-//	"session.new" = "cmd+shift+n"
+//	"thread.new" = "cmd+shift+n"
 //
 // TOML over JSON: the file is meant to be edited by hand, and TOML has comments (the
 // rendered file documents every field and shows its default) and no trailing-comma or
@@ -43,7 +43,7 @@ func Read(path string) Settings {
 
 // decode parses a settings file into raw string-encoded values keyed by settings key.
 // Values are stringified leniently (14 and "14" both work for an int); type errors are
-// found by Field.parse. Under [keybindings], unquoted dotted keys (session.new = ...)
+// found by Field.parse. Under [keybindings], unquoted dotted keys (thread.new = ...)
 // parse as nested tables and are flattened back.
 func decode(data []byte) (map[string]string, error) {
 	var doc map[string]any
@@ -107,7 +107,7 @@ func render(accepted map[string]string) []byte {
 		fmt.Fprintf(&b, "\n[%s]\n", g.ID)
 		if g.ID == GroupKeybindings {
 			writeComment(&b, g.Description)
-			b.WriteString(`# "session.new" = "cmd+shift+n"` + "\n")
+			b.WriteString(`# "thread.new" = "cmd+shift+n"` + "\n")
 			keys := slices.Sorted(maps.Keys(accepted))
 			for _, k := range keys {
 				if isKeybindingKey(k) {

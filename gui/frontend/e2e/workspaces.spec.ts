@@ -39,7 +39,7 @@ function chips(page: Page) {
 }
 
 async function lastNewThread(): Promise<Record<string, string>> {
-  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("session.new");
+  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("thread.new");
   return (await invocations()).at(-1)?.args ?? {};
 }
 

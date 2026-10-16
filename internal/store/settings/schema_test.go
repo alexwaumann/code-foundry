@@ -120,7 +120,7 @@ func TestSchemaShape(t *testing.T) {
 		}
 	}
 	d := Defaults()
-	if d.Appearance.FontSize != 13 || !d.Sessions.AutoName || d.Sessions.ScrollbackLines != 10000 || d.Appearance.Theme != "system" || d.Appearance.Backdrop != "forest" ||
+	if d.Appearance.FontSize != 13 || !d.Threads.AutoName || d.Threads.ScrollbackLines != 10000 || d.Appearance.Theme != "system" || d.Appearance.Backdrop != "forest" ||
 		d.Appearance.ThreadWidth != "comfortable" ||
 		d.GitHub.PollIntervalSeconds != 60 || d.Repos.FetchIntervalSeconds != 120 || d.Advanced.LogLevel != "info" {
 		t.Errorf("Defaults() = %+v", d)
@@ -168,12 +168,12 @@ func TestEnumLabels(t *testing.T) {
 
 func TestNamingModelField(t *testing.T) {
 	f := field(t, KeyNamingModel)
-	if f.Default != "claude-sonnet-5[1m]" || Defaults().Sessions.NamingModel != "claude-sonnet-5[1m]" {
-		t.Errorf("default = %q, Defaults() = %q; want Sonnet 5", f.Default, Defaults().Sessions.NamingModel)
+	if f.Default != "claude-sonnet-5[1m]" || Defaults().Threads.NamingModel != "claude-sonnet-5[1m]" {
+		t.Errorf("default = %q, Defaults() = %q; want Sonnet 5", f.Default, Defaults().Threads.NamingModel)
 	}
-	if f.Group != GroupSessions || f.Restart || !slices.Equal(f.Enum, field(t, KeyDefaultModel).Enum) ||
+	if f.Group != GroupThreads || f.Restart || !slices.Equal(f.Enum, field(t, KeyDefaultModel).Enum) ||
 		!slices.Equal(f.EnumLabels, field(t, KeyDefaultModel).EnumLabels) {
-		t.Errorf("field = %+v, want a live Sessions enum over the model registry", f)
+		t.Errorf("field = %+v, want a live Threads enum over the model registry", f)
 	}
 	// Directly after "Name sessions automatically".
 	if i := slices.IndexFunc(staticFields, func(f Field) bool { return f.Key == KeyAutoName }); staticFields[i+1].Key != KeyNamingModel {
@@ -187,7 +187,7 @@ func TestNamingModelField(t *testing.T) {
 }
 
 var testCmds = []CommandInfo{
-	{Name: "session.new", Title: "New Session", Category: "Session", Keybindings: []string{"cmd+n"}},
+	{Name: "thread.new", Title: "New Thread", Category: "Thread", Keybindings: []string{"cmd+n"}},
 	{Name: "terminal.new", Title: "New Terminal", Category: "Terminal", Keybindings: []string{"cmd+t"}},
 	{Name: "repo.refresh", Title: "Refresh", Category: "Repository"},
 }
@@ -202,28 +202,28 @@ func TestResolveKeybindings(t *testing.T) {
 		wantValue map[string]string
 	}{
 		{name: "defaults", cmds: testCmds, wantOver: map[string]string{},
-			wantValue: map[string]string{"keybindings.session.new": "cmd+n", "keybindings.repo.refresh": ""}},
+			wantValue: map[string]string{"keybindings.thread.new": "cmd+n", "keybindings.repo.refresh": ""}},
 		{name: "override normalizes", cmds: testCmds, raw: map[string]string{"keybindings.repo.refresh": "Alt+Cmd+R"},
 			wantOver: map[string]string{"repo.refresh": "cmd+alt+r"}, wantValue: map[string]string{"keybindings.repo.refresh": "cmd+alt+r"}},
-		{name: "none unbinds", cmds: testCmds, raw: map[string]string{"keybindings.session.new": "NONE"},
-			wantOver: map[string]string{"session.new": "none"}, wantValue: map[string]string{"keybindings.session.new": "none"}},
-		{name: "reserved chord", cmds: testCmds, raw: map[string]string{"keybindings.session.new": "cmd+k"},
-			wantOver: map[string]string{}, wantIssue: map[string]string{"keybindings.session.new": "cmd+k is reserved by the app"},
-			wantValue: map[string]string{"keybindings.session.new": "cmd+n"}},
+		{name: "none unbinds", cmds: testCmds, raw: map[string]string{"keybindings.thread.new": "NONE"},
+			wantOver: map[string]string{"thread.new": "none"}, wantValue: map[string]string{"keybindings.thread.new": "none"}},
+		{name: "reserved chord", cmds: testCmds, raw: map[string]string{"keybindings.thread.new": "cmd+k"},
+			wantOver: map[string]string{}, wantIssue: map[string]string{"keybindings.thread.new": "cmd+k is reserved by the app"},
+			wantValue: map[string]string{"keybindings.thread.new": "cmd+n"}},
 		{name: "collides with a default", cmds: testCmds, raw: map[string]string{"keybindings.repo.refresh": "cmd+t"},
 			wantOver: map[string]string{}, wantIssue: map[string]string{"keybindings.repo.refresh": "cmd+t is already bound to terminal.new"}},
 		{name: "unbinding frees the chord", cmds: testCmds,
 			raw:      map[string]string{"keybindings.terminal.new": "none", "keybindings.repo.refresh": "cmd+t"},
 			wantOver: map[string]string{"terminal.new": "none", "repo.refresh": "cmd+t"}},
 		{name: "swap", cmds: testCmds,
-			raw:      map[string]string{"keybindings.terminal.new": "cmd+n", "keybindings.session.new": "cmd+t"},
-			wantOver: map[string]string{"terminal.new": "cmd+n", "session.new": "cmd+t"}},
+			raw:      map[string]string{"keybindings.terminal.new": "cmd+n", "keybindings.thread.new": "cmd+t"},
+			wantOver: map[string]string{"terminal.new": "cmd+n", "thread.new": "cmd+t"}},
 		{name: "two overrides collide", cmds: testCmds,
-			raw:      map[string]string{"keybindings.terminal.new": "cmd+j", "keybindings.session.new": "cmd+j"},
+			raw:      map[string]string{"keybindings.terminal.new": "cmd+j", "keybindings.thread.new": "cmd+j"},
 			wantOver: map[string]string{},
 			wantIssue: map[string]string{
-				"keybindings.terminal.new": "cmd+j is already bound to session.new",
-				"keybindings.session.new":  "cmd+j is already bound to terminal.new",
+				"keybindings.terminal.new": "cmd+j is already bound to thread.new",
+				"keybindings.thread.new":   "cmd+j is already bound to terminal.new",
 			}},
 		{name: "unknown command", cmds: testCmds, raw: map[string]string{"keybindings.nope.nope": "cmd+j"},
 			wantOver: map[string]string{}, wantIssue: map[string]string{"keybindings.nope.nope": `unknown command "nope.nope"`}},
@@ -259,22 +259,22 @@ func TestKeybindingFields(t *testing.T) {
 		keys = append(keys, f.Key)
 	}
 	// Sorted by category, then title.
-	want := []string{"keybindings.repo.refresh", "keybindings.session.new", "keybindings.terminal.new"}
+	want := []string{"keybindings.repo.refresh", "keybindings.terminal.new", "keybindings.thread.new"}
 	if !slices.Equal(keys, want) {
 		t.Fatalf("keys = %v, want %v", keys, want)
 	}
-	if fs[1].Default != "cmd+n" || fs[1].Type != Keybinding || fs[1].Title != "Session: New Session" || fs[0].Default != "" {
+	if fs[2].Default != "cmd+n" || fs[2].Type != Keybinding || fs[2].Title != "Thread: New Thread" || fs[0].Default != "" {
 		t.Errorf("fields = %+v", fs)
 	}
 }
 
 func TestCacheTTLField(t *testing.T) {
 	f := field(t, KeyCacheTTL)
-	if f.Default != "3600" || f.Type != Int || f.Group != GroupSessions || f.Restart || f.Min != 60 || f.Max != 86400 {
+	if f.Default != "3600" || f.Type != Int || f.Group != GroupThreads || f.Restart || f.Min != 60 || f.Max != 86400 {
 		t.Errorf("field = %+v", f)
 	}
-	if got := Defaults(); got.Sessions.CacheTTLSeconds != 3600 || got.CacheTTL() != time.Hour {
-		t.Errorf("Defaults() cache TTL = %d (%v)", got.Sessions.CacheTTLSeconds, got.CacheTTL())
+	if got := Defaults(); got.Threads.CacheTTLSeconds != 3600 || got.CacheTTL() != time.Hour {
+		t.Errorf("Defaults() cache TTL = %d (%v)", got.Threads.CacheTTLSeconds, got.CacheTTL())
 	}
 	if i := slices.IndexFunc(staticFields, func(f Field) bool { return f.Key == KeyNamingModel }); staticFields[i+1].Key != KeyCacheTTL {
 		t.Errorf("field after %s = %s", KeyNamingModel, staticFields[i+1].Key)
@@ -335,14 +335,14 @@ func TestNotificationFields(t *testing.T) {
 func TestDefaultWorktreeField(t *testing.T) {
 	f := field(t, KeyDefaultWorktree)
 	// Live (the composer reads every snapshot), in Sessions, right after the default effort.
-	if f.Group != GroupSessions || f.Type != Enum || f.Default != WorktreeNew || f.Restart || f.Title != "New threads work in" {
+	if f.Group != GroupThreads || f.Type != Enum || f.Default != WorktreeNew || f.Restart || f.Title != "New threads work in" {
 		t.Errorf("field = %+v", f)
 	}
 	if i := slices.IndexFunc(staticFields, func(f Field) bool { return f.Key == KeyDefaultEffort }); staticFields[i+1].Key != KeyDefaultWorktree {
 		t.Errorf("field after %s = %s", KeyDefaultEffort, staticFields[i+1].Key)
 	}
-	if got := Defaults().Sessions.DefaultWorktree; got != WorktreeNew {
-		t.Errorf("Defaults().Sessions.DefaultWorktree = %q, want %q", got, WorktreeNew)
+	if got := Defaults().Threads.DefaultWorktree; got != WorktreeNew {
+		t.Errorf("Defaults().Threads.DefaultWorktree = %q, want %q", got, WorktreeNew)
 	}
 	tests := []struct {
 		in, label string

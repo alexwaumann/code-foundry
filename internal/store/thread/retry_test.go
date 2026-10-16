@@ -55,7 +55,7 @@ func TestAPIRetryFollowsStream(t *testing.T) {
 	sub := bus.Subscribe[Event](re.bus, 256)
 	defer sub.Close()
 	s := re.create(CreateOptions{InitialPrompt: "a table please"})
-	done := re.waitFor(s.ID, "the first turn's result", func(s Session) bool { return s.ContextTokens > 0 })
+	done := re.waitFor(s.ID, "the first turn's result", func(s Thread) bool { return s.ContextTokens > 0 })
 	if done.Retry != nil {
 		t.Fatalf("after the turn: Retry = %+v, want nil", done.Retry)
 	}
@@ -66,10 +66,10 @@ func TestAPIRetryFollowsStream(t *testing.T) {
 		select {
 		case ev := <-sub.C():
 			u, ok := ev.(Updated)
-			if !ok || u.Session.ID != s.ID {
+			if !ok || u.Thread.ID != s.ID {
 				continue
 			}
-			if r := u.Session.Retry; r != nil {
+			if r := u.Thread.Retry; r != nil {
 				if len(seen) == 0 || seen[len(seen)-1] != r.Attempt {
 					seen = append(seen, r.Attempt)
 				}
@@ -91,7 +91,7 @@ func TestAPIRetryFollowsStream(t *testing.T) {
 	if _, err := re.m.Send(re.ctx(), s.ID, Message{Text: "again"}); err != nil {
 		t.Fatal(err)
 	}
-	re.waitFor(s.ID, "the second turn's retry", func(s Session) bool { return s.Retry != nil && s.Retry.Attempt == 1 })
+	re.waitFor(s.ID, "the second turn's retry", func(s Thread) bool { return s.Retry != nil && s.Retry.Attempt == 1 })
 	re.exit(s.ID, 0)
-	re.waitFor(s.ID, "the exit clearing the retry", func(s Session) bool { return s.State == StateDisconnected && s.Retry == nil })
+	re.waitFor(s.ID, "the exit clearing the retry", func(s Thread) bool { return s.State == StateDisconnected && s.Retry == nil })
 }

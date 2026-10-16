@@ -10,22 +10,22 @@ import (
 // the usage (saveUsageUpdate) or alone (saveAgentRuns).
 
 // saveAgentRuns writes runs' rows (not their usage) in one transaction.
-func saveAgentRuns(ctx context.Context, db *sql.DB, sessionID string, runs []AgentRun) error {
+func saveAgentRuns(ctx context.Context, db *sql.DB, threadID string, runs []AgentRun) error {
 	if len(runs) == 0 {
 		return nil
 	}
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("session: save agent runs of %s: %w", sessionID, err)
+		return fmt.Errorf("thread: save agent runs of %s: %w", threadID, err)
 	}
 	defer func() { _ = tx.Rollback() }()
 	for _, r := range runs {
-		if err := saveAgentRunTx(ctx, tx, sessionID, r); err != nil {
+		if err := saveAgentRunTx(ctx, tx, threadID, r); err != nil {
 			return err
 		}
 	}
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("session: save agent runs of %s: %w", sessionID, err)
+		return fmt.Errorf("thread: save agent runs of %s: %w", threadID, err)
 	}
 	return nil
 }
@@ -37,7 +37,7 @@ func failOrphanedRuns(ctx context.Context, db *sql.DB) (int64, error) {
 	res, err := db.ExecContext(ctx, `UPDATE session_agent_runs SET status = ?, error = ? WHERE status = ?`,
 		string(AgentFailed), orphanDaemonRestart+orphanSuffix, string(AgentRunning))
 	if err != nil {
-		return 0, fmt.Errorf("session: fail orphaned agent runs: %w", err)
+		return 0, fmt.Errorf("thread: fail orphaned agent runs: %w", err)
 	}
 	n, _ := res.RowsAffected()
 	return n, nil

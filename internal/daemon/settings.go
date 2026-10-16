@@ -64,10 +64,10 @@ func registryOverrides(s settings.Settings) command.Overrides {
 	return command.Overrides{
 		Keybindings: settings.KeybindingOverrides(s.Keybindings),
 		ArgDefaults: map[string]map[string]string{
-			"session.new":     {"model": s.Sessions.DefaultModel, "effort": s.Sessions.DefaultEffort},
-			"pr.ask":          {"model": s.Sessions.DefaultModel, "effort": s.Sessions.DefaultEffort},
-			"pr.explain":      {"model": s.Sessions.DefaultModel, "effort": s.Sessions.DefaultEffort},
-			"pr.fix.findings": {"model": s.Sessions.DefaultModel, "effort": s.Sessions.DefaultEffort},
+			"thread.new":      {"model": s.Threads.DefaultModel, "effort": s.Threads.DefaultEffort},
+			"pr.ask":          {"model": s.Threads.DefaultModel, "effort": s.Threads.DefaultEffort},
+			"pr.explain":      {"model": s.Threads.DefaultModel, "effort": s.Threads.DefaultEffort},
+			"pr.fix.findings": {"model": s.Threads.DefaultModel, "effort": s.Threads.DefaultEffort},
 		},
 	}
 }
@@ -82,14 +82,14 @@ func logLevel(s string) slog.Level {
 
 // errAutoNameOff is what the namer returns when auto-naming is turned off; the session
 // store logs it and leaves the session unnamed.
-var errAutoNameOff = errors.New("auto-naming is turned off in settings (sessions.auto_name)")
+var errAutoNameOff = errors.New("auto-naming is turned off in settings (threads.auto_name)")
 
 // settingsNamer wraps next so sessions.auto_name and sessions.naming_model apply
 // without a restart: each call reads them and hands the model to next with
 // thread.WithNamingModel.
 func settingsNamer(st *settings.Store, next thread.Namer) thread.Namer {
 	return func(ctx context.Context, msg string) (string, error) {
-		s := st.Settings().Sessions
+		s := st.Settings().Threads
 		if !s.AutoName {
 			return "", errAutoNameOff
 		}
@@ -164,8 +164,8 @@ type cacheTTLSetter interface{ SetCacheTTL(time.Duration) }
 
 // applyCacheTTL keeps the session store's prompt cache lifetime equal to
 // sessions.cache_ttl_seconds, now and on every settings change.
-func applyCacheTTL(st *settings.Store, sessions cacheTTLSetter) {
-	st.OnChange(func(snap *settings.Snapshot) { sessions.SetCacheTTL(snap.Settings.CacheTTL()) })
+func applyCacheTTL(st *settings.Store, threads cacheTTLSetter) {
+	st.OnChange(func(snap *settings.Snapshot) { threads.SetCacheTTL(snap.Settings.CacheTTL()) })
 }
 
 // updateChannelSetter is the updater's live channel (*update.Store).

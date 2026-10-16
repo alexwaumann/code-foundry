@@ -36,15 +36,15 @@ type SlashCommand struct {
 // commands changed: Claude answered initialize with a different list, or pushed a new
 // one. Commands nil: none (a thread whose Claude never answered a handshake).
 type SlashCommandsChanged struct {
-	SessionID string
-	Seq       uint64
-	Commands  []SlashCommand
+	ThreadID string
+	Seq      uint64
+	Commands []SlashCommand
 }
 
 func (SlashCommandsChanged) isThreadEvent() {}
 
 // Thread implements ThreadEvent.
-func (e SlashCommandsChanged) Thread() string { return e.SessionID }
+func (e SlashCommandsChanged) Thread() string { return e.ThreadID }
 
 // visibleSlashCommands is what the composer offers of Claude's list, in Claude's order
 // (its skills first, then its built-ins, then plugin skills): one row per name (the
@@ -93,7 +93,7 @@ func (t *threadLog) setSlashCommands(cs []SlashCommand) {
 	}
 	t.commands = cs
 	t.seq++
-	bus.Publish[ThreadEvent](t.bus, SlashCommandsChanged{SessionID: t.id, Seq: t.seq, Commands: cs})
+	bus.Publish[ThreadEvent](t.bus, SlashCommandsChanged{ThreadID: t.id, Seq: t.seq, Commands: cs})
 	t.mu.Unlock()
 	if t.saveCommands != nil {
 		t.saveCommands(cs)

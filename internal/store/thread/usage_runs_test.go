@@ -471,7 +471,7 @@ func (e *env) reconnect(id string) {
 	s, _ := e.m.Get(e.ctx(), id)
 	if s.State != StateDisconnected {
 		e.exit(id, 0)
-		e.waitFor(id, "disconnected", func(s Session) bool { return s.State == StateDisconnected })
+		e.waitFor(id, "disconnected", func(s Thread) bool { return s.State == StateDisconnected })
 	}
 	if _, err := e.m.Reconnect(e.ctx(), id); err != nil {
 		e.t.Fatal(err)
@@ -491,7 +491,7 @@ func TestAgentRunsRollUpAndPersist(t *testing.T) {
 	e.writeTranscript(cid, userLine("hi"), usageLine("r-1", now.UTC().Format(time.RFC3339Nano), cid, "claude-haiku-5-5", 1, 1, 1, 0, h1(0), "standard"),
 		spawnFg(c, "T1"))
 	e.writeAgent(cid, "A1", agentMetaJSON("T1"), userLine("say ok"), agentReq("A1", "a-1", now))
-	got := e.waitFor(s.ID, "open run", func(s Session) bool {
+	got := e.waitFor(s.ID, "open run", func(s Thread) bool {
 		return len(s.AgentRuns) == 1 && s.AgentRuns[0].Open && totalRequests(s.Usage) == 2
 	})
 	if r := got.AgentRuns[0]; r.ID != "A1" || r.ToolUseID != "T1" || r.Description != "say ok" || r.ClaudeSessionID != cid || totalRequests(r.Usage) != 1 {
@@ -499,7 +499,7 @@ func TestAgentRunsRollUpAndPersist(t *testing.T) {
 	}
 	e.writeAgent(cid, "A1", "", agentReq("A1", "a-2", now.Add(time.Second)))
 	e.writeTranscript(cid, completed(c, "T1", "A1"))
-	got = e.waitFor(s.ID, "closed run", func(s Session) bool {
+	got = e.waitFor(s.ID, "closed run", func(s Thread) bool {
 		return len(s.AgentRuns) == 1 && !s.AgentRuns[0].Open && totalRequests(s.Usage) == 3
 	})
 
@@ -513,7 +513,7 @@ func TestAgentRunsRollUpAndPersist(t *testing.T) {
 	// stale cached value.
 	e.m.setUsage(s.ID, usageUpdate{total: []UsageBucket{{Model: "claude-haiku-5-5", Day: "2026-01-01", Requests: 99}}})
 	e.reconnect(s.ID)
-	e.waitFor(s.ID, "rescanned", func(s Session) bool {
+	e.waitFor(s.ID, "rescanned", func(s Thread) bool {
 		return slices.Equal(s.Usage, got.Usage) && sameRuns(s.AgentRuns, got.AgentRuns)
 	})
 }
@@ -535,7 +535,7 @@ func TestClearRescansEveryTranscript(t *testing.T) {
 	e.writeAgent(first, "A1", agentMetaJSON("T1"))
 	e.writeAgent(first, "A1", "", agentReq("A1", "a-1", now))
 	e.writeTranscript(first, userLine("hi"), req("r-1", now), spawnFg(c, "T1"), completed(c, "T1", "A1"))
-	e.waitFor(s.ID, "first file", func(s Session) bool { return totalRequests(s.Usage) == 2 })
+	e.waitFor(s.ID, "first file", func(s Thread) bool { return totalRequests(s.Usage) == 2 })
 
 	// /clear: Claude moves to a new id and file.
 	pid := e.pid(s.ID)
@@ -546,7 +546,7 @@ func TestClearRescansEveryTranscript(t *testing.T) {
 	// No need to wait for the runner to see the pid file: it reads a newly followed
 	// transcript from its start, whenever the file was written.
 	e.writeTranscript("cleared-id", userLine("again"), req("r-2", now.Add(time.Second)))
-	live := e.waitFor(s.ID, "both files", func(s Session) bool {
+	live := e.waitFor(s.ID, "both files", func(s Thread) bool {
 		return s.ClaudeSessionID == "cleared-id" && totalRequests(s.Usage) == 3
 	})
 	if !slices.Equal(live.Transcripts, []string{first, "cleared-id"}) {
@@ -558,7 +558,7 @@ func TestClearRescansEveryTranscript(t *testing.T) {
 	e.restart()
 	e.m.setUsage(s.ID, usageUpdate{total: []UsageBucket{{Model: "claude-haiku-5-5", Day: "2026-01-01", Requests: 99}}})
 	e.reconnect(s.ID)
-	got := e.waitFor(s.ID, "rescan of both files", func(s Session) bool { return slices.Equal(s.Usage, live.Usage) })
+	got := e.waitFor(s.ID, "rescan of both files", func(s Thread) bool { return slices.Equal(s.Usage, live.Usage) })
 	if len(got.AgentRuns) != 1 || got.AgentRuns[0].Open {
 		t.Errorf("runs = %+v", got.AgentRuns)
 	}
@@ -572,7 +572,7 @@ func TestClearRescansEveryTranscript(t *testing.T) {
 	}
 	e.m.setUsage(s.ID, usageUpdate{total: []UsageBucket{{Model: "claude-haiku-5-5", Day: "2026-01-01", Requests: 99}}, runs: got.AgentRuns})
 	e.reconnect(s.ID)
-	e.waitFor(s.ID, "rescan with a deleted file", func(s Session) bool {
+	e.waitFor(s.ID, "rescan with a deleted file", func(s Thread) bool {
 		return slices.Equal(s.Usage, live.Usage) && len(s.AgentRuns) == 1
 	})
 }

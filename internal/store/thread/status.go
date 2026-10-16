@@ -37,7 +37,7 @@ func (s Status) String() string {
 
 // setStatus sets the status and reason, stamping StatusChangedAt with now when either
 // changes. It reports whether anything changed.
-func (s *Session) setStatus(st Status, reason string, now time.Time) bool {
+func (s *Thread) setStatus(st Status, reason string, now time.Time) bool {
 	if s.Status == st && s.StatusReason == reason {
 		return false
 	}

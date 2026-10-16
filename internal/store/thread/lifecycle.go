@@ -57,12 +57,12 @@ func (rec *record) release() {
 // lifecycle reads where a thread's process is: live (a runner that is not closing),
 // closing (a runner on its way out), reserved (a start before its runner exists: the
 // channel closes when it resolves), or none of them (stopped).
-func (m *Manager) lifecycle(id string) (live, closing *runner, reserved <-chan struct{}, s Session, err error) {
+func (m *Manager) lifecycle(id string) (live, closing *runner, reserved <-chan struct{}, s Thread, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	rec, err := m.record(id)
 	if err != nil {
-		return nil, nil, nil, Session{}, err
+		return nil, nil, nil, Thread{}, err
 	}
 	switch {
 	case rec.run != nil && rec.s.State == StateClosing:
@@ -77,7 +77,7 @@ func (m *Manager) lifecycle(id string) (live, closing *runner, reserved <-chan s
 
 // liveOrStopped waits out a reserved start and returns the thread's live runner, or
 // nil when it has none (stopped, or closing).
-func (m *Manager) liveOrStopped(ctx context.Context, id string) (*runner, Session, error) {
+func (m *Manager) liveOrStopped(ctx context.Context, id string) (*runner, Thread, error) {
 	for {
 		live, _, reserved, s, err := m.lifecycle(id)
 		if err != nil || reserved == nil {
@@ -95,12 +95,12 @@ func (m *Manager) liveOrStopped(ctx context.Context, id string) (*runner, Sessio
 // a closing process is never restarted) and commits it, persisted. It reports false,
 // changing nothing, when the thread is live or a start is reserved: the caller looks
 // again (liveOrStopped).
-func (m *Manager) updateStopped(id string, fn func(*Session)) (Session, bool, error) {
+func (m *Manager) updateStopped(id string, fn func(*Thread)) (Thread, bool, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	rec, err := m.record(id)
 	if err != nil {
-		return Session{}, false, err
+		return Thread{}, false, err
 	}
 	if rec.reserved != nil || (rec.run != nil && rec.s.State != StateClosing) {
 		return rec.s, false, nil
@@ -182,7 +182,7 @@ func (m *Manager) startStopped(ctx context.Context, id string, o startOpts) (Ite
 		return it, m.failStart(id, log, launchErr)
 	}
 	if note != "" {
-		m.log.Info("conversation not found; starting a new one", "session", id, "claude_session_id", prev.ClaudeSessionID)
+		m.log.Info("conversation not found; starting a new one", "thread", id, "claude_session_id", prev.ClaudeSessionID)
 	}
 	m.update(id, false, func(r *record) {
 		r.s.LastError = lastErr
@@ -214,7 +214,7 @@ func (m *Manager) failStart(id string, log *threadLog, err error) error {
 	if log != nil {
 		w := itemWriter{log: log, save: func(it Item) { m.saveItem(id, it) }}
 		w.add(Item{ID: "err-" + itemSuffix(), Kind: KindError, Text: msg})
-		m.log.Warn("thread failed to start", "session", id, "err", err)
+		m.log.Warn("thread failed to start", "thread", id, "err", err)
 	}
 	now := m.opts.Now()
 	m.update(id, true, func(r *record) {
@@ -237,7 +237,7 @@ func (m *Manager) failStart(id string, log *threadLog, err error) error {
 // startFailure is the timeline's line for a start that failed: "Claude did not start:
 // <reason>", without the store's own "session <id>: " prefix.
 func startFailure(id string, err error) string {
-	return "Claude did not start: " + strings.TrimPrefix(err.Error(), "session "+id+": ")
+	return "Claude did not start: " + strings.TrimPrefix(err.Error(), "thread "+id+": ")
 }
 
 // itemSuffix is a unique tail for an item id the daemon makes outside a runner.
@@ -268,7 +268,7 @@ func userItem(id string, o *outgoing) Item {
 // worktree, with why in lastErr, and note, when a conversation existed but its
 // transcript is gone, for the timeline (Claude remembers nothing of it). An error when
 // the worktree is gone.
-func (m *Manager) resumeLaunch(prev Session) (l launch, lastErr, note string, err error) {
+func (m *Manager) resumeLaunch(prev Thread) (l launch, lastErr, note string, err error) {
 	if _, err := os.Stat(prev.WorktreePath); err != nil {
 		return launch{}, "", "", fmt.Errorf("%w: worktree %s: %v", ErrFailedPrecondition, prev.WorktreePath, err)
 	}
@@ -322,7 +322,7 @@ func (m *Manager) running(ctx context.Context, id string) (*runner, error) {
 			if _, err := m.startStopped(ctx, id, startOpts{}); err != nil && !errors.Is(err, errNotStopped) {
 				return nil, err
 			} else if err == nil {
-				m.log.Info("started thread without a prompt", "session", id)
+				m.log.Info("started thread without a prompt", "thread", id)
 				started = true
 			}
 		}
@@ -402,7 +402,7 @@ func (r *runner) onIdleCheck(c idleCheck) {
 // lastActive is when the thread last did something: the stream's last event or send,
 // or the row's last activity when that is later (the runner's activity starts at spawn).
 func (r *runner) lastActive() time.Time {
-	s, _ := r.m.Snapshot().Session(r.id)
+	s, _ := r.m.Snapshot().Thread(r.id)
 	if s.LastActivityAt.After(r.activity) {
 		return s.LastActivityAt
 	}
@@ -464,7 +464,7 @@ func idleHoldOf(in idleInputs) string {
 // idleHold is idleHoldOf for this runner at now (run goroutine only).
 func (r *runner) idleHold(now time.Time) string {
 	st := r.st
-	s, _ := r.m.Snapshot().Session(r.id)
+	s, _ := r.m.Snapshot().Thread(r.id)
 	return idleHoldOf(idleInputs{
 		now:             now,
 		closing:         r.closing || r.finished,

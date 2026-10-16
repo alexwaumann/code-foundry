@@ -35,13 +35,13 @@ describe("toThreadItemView", () => {
 
 describe("toThreadEventView", () => {
   it("maps snapshots, deltas and the pending snapshot; drops unknown fields", () => {
-    const snap = toThreadEventView(create(ThreadEventSchema, { event: { case: "snapshot", value: { sessionId: "s", seq: 9n, items: [{ id: "a", payload: { case: "assistantText", value: { text: "x" } } }], pending: [{ requestId: "r", itemId: "perm-r", toolName: "Bash", summary: "Bash ls" }] } } }));
+    const snap = toThreadEventView(create(ThreadEventSchema, { event: { case: "snapshot", value: { threadId: "s", seq: 9n, items: [{ id: "a", payload: { case: "assistantText", value: { text: "x" } } }], pending: [{ requestId: "r", itemId: "perm-r", toolName: "Bash", summary: "Bash ls" }] } } }));
     expect(snap).toMatchObject({ kind: "snapshot", seq: 9, items: [{ id: "a", kind: "text", text: "x" }], pending: [{ requestId: "r" }] });
-    const delta = (field: ThreadItemDelta_Field) => toThreadEventView(create(ThreadEventSchema, { event: { case: "delta", value: { sessionId: "s", seq: 10n, itemId: "a", field, text: "y" } } }));
+    const delta = (field: ThreadItemDelta_Field) => toThreadEventView(create(ThreadEventSchema, { event: { case: "delta", value: { threadId: "s", seq: 10n, itemId: "a", field, text: "y" } } }));
     expect(delta(ThreadItemDelta_Field.TEXT)).toMatchObject({ kind: "delta", field: "text", seq: 10 });
     expect(delta(ThreadItemDelta_Field.INPUT)).toMatchObject({ field: "input" });
     expect(delta(ThreadItemDelta_Field.UNSPECIFIED)).toBeNull();
-    expect(toThreadEventView(create(ThreadEventSchema, { event: { case: "pendingSnapshot", value: { threads: [{ sessionId: "s", seq: 3n, pending: [] }] } } }))).toEqual({
+    expect(toThreadEventView(create(ThreadEventSchema, { event: { case: "pendingSnapshot", value: { threads: [{ threadId: "s", seq: 3n, pending: [] }] } } }))).toEqual({
       kind: "pendingSnapshot",
       threads: [{ sessionId: "s", seq: 3, pending: [] }],
     });

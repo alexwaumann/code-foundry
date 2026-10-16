@@ -51,11 +51,11 @@ func TestPanelKeybindings(t *testing.T) {
 }
 
 // The chords the GUI (phase 2c) expects on the session commands.
-func TestSessionKeybindings(t *testing.T) {
+func TestThreadKeybindings(t *testing.T) {
 	f := newFixture(t)
 	want := map[string]string{
-		"session.new":    "cmd+n",
-		"session.rename": "cmd+r",
+		"thread.new":    "cmd+n",
+		"thread.rename": "cmd+r",
 	}
 	for name, chord := range want {
 		c, ok := f.reg.Get(name)

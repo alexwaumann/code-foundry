@@ -27,7 +27,7 @@ test("help overlay: the guide first, its contents scroll it, then the shortcuts"
   await page.getByTestId("help-tab-shortcuts").click();
   await expect(page.getByTestId("help-tab-shortcuts")).toHaveAttribute("data-state", "active");
   await expect(guide).toHaveCount(0);
-  await expect(help.locator('[data-help-command="session.new"]')).toContainText("⌘N");
+  await expect(help.locator('[data-help-command="thread.new"]')).toContainText("⌘N");
 
   // Closed and opened again with cmd+/: back on the guide.
   await page.getByTestId("help-close").click();

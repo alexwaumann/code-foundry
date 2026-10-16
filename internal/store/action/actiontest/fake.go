@@ -153,7 +153,7 @@ func (f *Fake) Run(_ context.Context, o action.RunOptions) (action.Run, error) {
 	f.ran = append(f.ran, o)
 	r := action.Run{
 		ID: f.id("r-"), ActionID: a.ID, ActionName: a.Name, Command: a.Command, RepoID: a.RepoID,
-		SessionID: o.SessionID, Worktree: o.Worktree, Mode: cmp.Or(o.Mode, action.ModeBackground),
+		ThreadID: o.ThreadID, Worktree: o.Worktree, Mode: cmp.Or(o.Mode, action.ModeBackground),
 		Trigger: action.TriggerUser, State: action.RunRunning, StartedAt: time.Now(),
 	}
 	if r.Mode == action.ModeTerminal {
@@ -187,7 +187,7 @@ func (f *Fake) Finish(id string, code int, output string) error {
 	pub.Output = ""
 	bus.Publish[action.Event](f.bus, action.RunUpdated{Run: pub})
 	bus.Publish[action.Event](f.bus, action.RunFinished{
-		RunID: r.ID, ActionID: r.ActionID, ActionName: r.ActionName, RepoID: r.RepoID, SessionID: r.SessionID,
+		RunID: r.ID, ActionID: r.ActionID, ActionName: r.ActionName, RepoID: r.RepoID, ThreadID: r.ThreadID,
 		TerminalID: r.TerminalID, Mode: r.Mode, Trigger: r.Trigger, ExitCode: code,
 	})
 	return nil

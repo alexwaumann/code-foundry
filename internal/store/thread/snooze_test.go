@@ -48,25 +48,25 @@ func TestSnooze(t *testing.T) {
 	tests := []struct {
 		name string
 		// setup returns the thread to snooze.
-		setup      func(e *env) Session
+		setup      func(e *env) Thread
 		wantReason string // DisconnectReason after the snooze
 	}{
-		{name: "a connected thread is closed", wantReason: ReasonClosed, setup: func(e *env) Session {
+		{name: "a connected thread is closed", wantReason: ReasonClosed, setup: func(e *env) Thread {
 			return e.connected(CreateOptions{Name: "live"})
 		}},
-		{name: "a pinned connected thread is closed and unpinned", wantReason: ReasonClosed, setup: func(e *env) Session {
+		{name: "a pinned connected thread is closed and unpinned", wantReason: ReasonClosed, setup: func(e *env) Thread {
 			s := e.connected(CreateOptions{Name: "pinned"})
 			if _, err := e.m.Pin(e.ctx(), s.ID, true); err != nil {
 				e.t.Fatal(err)
 			}
 			return s
 		}},
-		{name: "a disconnected thread is not closed again", wantReason: ReasonExited, setup: func(e *env) Session {
+		{name: "a disconnected thread is not closed again", wantReason: ReasonExited, setup: func(e *env) Thread {
 			s := e.connected(CreateOptions{Name: "gone"})
 			e.exit(s.ID, 0)
-			return e.waitFor(s.ID, "exited", func(s Session) bool { return s.State == StateDisconnected })
+			return e.waitFor(s.ID, "exited", func(s Thread) bool { return s.State == StateDisconnected })
 		}},
-		{name: "an archived thread is unarchived", wantReason: ReasonClosed, setup: func(e *env) Session {
+		{name: "an archived thread is unarchived", wantReason: ReasonClosed, setup: func(e *env) Thread {
 			return e.archived()
 		}},
 	}
@@ -98,7 +98,7 @@ func TestSnooze(t *testing.T) {
 			if got.Status == StatusNeedsAttention && got.StatusReason == ReasonSnoozeEnded {
 				t.Errorf("status = %s %q right after snoozing", got.Status, got.StatusReason)
 			}
-			if snap, _ := e.m.Snapshot().Session(s.ID); !snap.SnoozedUntil.Equal(got.SnoozedUntil) {
+			if snap, _ := e.m.Snapshot().Thread(s.ID); !snap.SnoozedUntil.Equal(got.SnoozedUntil) {
 				t.Errorf("snapshot SnoozedUntil = %v, want %v", snap.SnoozedUntil, got.SnoozedUntil)
 			}
 			if _, err := e.terms.Get(e.ctx(), mine.ID); !errors.Is(err, terminal.ErrNotFound) {
@@ -148,7 +148,7 @@ func TestSnoozeUnknown(t *testing.T) {
 }
 
 // snoozed returns a disconnected thread snoozed for an hour.
-func (e *env) snoozed() Session {
+func (e *env) snoozed() Thread {
 	e.t.Helper()
 	s := e.connected(CreateOptions{Name: "snoozed"})
 	got, err := e.m.Snooze(e.ctx(), s.ID, e.m.opts.Now().Add(time.Hour))
@@ -162,51 +162,51 @@ func TestUnsnooze(t *testing.T) {
 	tests := []struct {
 		name string
 		// act unsnoozes thread id one way and returns the thread afterwards.
-		act          func(e *env, id string) Session
+		act          func(e *env, id string) Thread
 		wantState    State
 		wantArchived bool
 	}{
-		{name: "snooze with no time only clears it", wantState: StateDisconnected, act: func(e *env, id string) Session {
+		{name: "snooze with no time only clears it", wantState: StateDisconnected, act: func(e *env, id string) Thread {
 			s, err := e.m.Snooze(e.ctx(), id, time.Time{})
 			if err != nil {
 				e.t.Fatal(err)
 			}
 			return s
 		}},
-		{name: "reconnect", wantState: StateConnected, act: func(e *env, id string) Session {
+		{name: "reconnect", wantState: StateConnected, act: func(e *env, id string) Thread {
 			if _, err := e.m.Reconnect(e.ctx(), id); err != nil {
 				e.t.Fatal(err)
 			}
-			return e.waitFor(id, "connected", func(s Session) bool { return s.State == StateConnected })
+			return e.waitFor(id, "connected", func(s Thread) bool { return s.State == StateConnected })
 		}},
-		{name: "pin", wantState: StateDisconnected, act: func(e *env, id string) Session {
+		{name: "pin", wantState: StateDisconnected, act: func(e *env, id string) Thread {
 			s, err := e.m.Pin(e.ctx(), id, true)
 			if err != nil || !s.Pinned {
 				e.t.Fatalf("Pin = %+v, %v", s, err)
 			}
 			return s
 		}},
-		{name: "archive", wantState: StateDisconnected, wantArchived: true, act: func(e *env, id string) Session {
+		{name: "archive", wantState: StateDisconnected, wantArchived: true, act: func(e *env, id string) Thread {
 			s, err := e.m.Archive(e.ctx(), id, true)
 			if err != nil {
 				e.t.Fatal(err)
 			}
 			return s
 		}},
-		{name: "send", wantState: StateConnected, act: func(e *env, id string) Session {
+		{name: "send", wantState: StateConnected, act: func(e *env, id string) Thread {
 			// Snooze only commits on a disconnected thread; a live snoozed one is what
 			// a send would meet after a race, so mark it by hand.
 			if _, err := e.m.Reconnect(e.ctx(), id); err != nil {
 				e.t.Fatal(err)
 			}
-			e.waitFor(id, "connected", func(s Session) bool { return s.State == StateConnected && s.Status != StatusUnknown })
+			e.waitFor(id, "connected", func(s Thread) bool { return s.State == StateConnected && s.Status != StatusUnknown })
 			e.m.mu.Lock()
 			e.m.recs[id].s.SnoozedUntil = time.Now().Add(time.Hour)
 			e.m.mu.Unlock()
 			if _, err := e.m.Send(e.ctx(), id, Message{Text: "again"}); err != nil {
 				e.t.Fatal(err)
 			}
-			return e.waitFor(id, "unsnoozed", func(s Session) bool { return s.SnoozedUntil.IsZero() })
+			return e.waitFor(id, "unsnoozed", func(s Thread) bool { return s.SnoozedUntil.IsZero() })
 		}},
 	}
 	for _, tt := range tests {
@@ -233,14 +233,14 @@ func TestUnsnooze(t *testing.T) {
 func TestSnoozeKeptBy(t *testing.T) {
 	tests := []struct {
 		name string
-		act  func(e *env, id string) (Session, error)
+		act  func(e *env, id string) (Thread, error)
 	}{
-		{name: "unpin", act: func(e *env, id string) (Session, error) { return e.m.Pin(e.ctx(), id, false) }},
-		{name: "unarchive", act: func(e *env, id string) (Session, error) { return e.m.Archive(e.ctx(), id, false) }},
-		{name: "rename", act: func(e *env, id string) (Session, error) { return e.m.Rename(e.ctx(), id, "renamed") }},
-		{name: "close", act: func(e *env, id string) (Session, error) {
+		{name: "unpin", act: func(e *env, id string) (Thread, error) { return e.m.Pin(e.ctx(), id, false) }},
+		{name: "unarchive", act: func(e *env, id string) (Thread, error) { return e.m.Archive(e.ctx(), id, false) }},
+		{name: "rename", act: func(e *env, id string) (Thread, error) { return e.m.Rename(e.ctx(), id, "renamed") }},
+		{name: "close", act: func(e *env, id string) (Thread, error) {
 			if err := e.m.Close(e.ctx(), id); err != nil {
-				return Session{}, err
+				return Thread{}, err
 			}
 			return e.m.Get(e.ctx(), id)
 		}},
@@ -258,18 +258,18 @@ func TestSnoozeKeptBy(t *testing.T) {
 }
 
 // waitEvent waits for an Updated of id that satisfies cond.
-func (e *env) waitEvent(sub *bus.Subscription[Event], id, what string, cond func(Session) bool) Session {
+func (e *env) waitEvent(sub *bus.Subscription[Event], id, what string, cond func(Thread) bool) Thread {
 	e.t.Helper()
 	timeout := time.After(5 * time.Second)
 	for {
 		select {
 		case ev := <-sub.C():
-			if u, ok := ev.(Updated); ok && u.Session.ID == id && cond(u.Session) {
-				return u.Session
+			if u, ok := ev.(Updated); ok && u.Thread.ID == id && cond(u.Thread) {
+				return u.Thread
 			}
 		case <-timeout:
 			e.t.Fatalf("timed out waiting for the %s event", what)
-			return Session{}
+			return Thread{}
 		}
 	}
 }
@@ -294,7 +294,7 @@ func TestSnoozeWakes(t *testing.T) {
 	}
 
 	woke := clk.advance(time.Minute + 10*time.Second)
-	ev := e.waitEvent(sub, s.ID, "wake", func(s Session) bool { return s.SnoozedUntil.IsZero() })
+	ev := e.waitEvent(sub, s.ID, "wake", func(s Thread) bool { return s.SnoozedUntil.IsZero() })
 	if ev.Status != StatusNeedsAttention || ev.StatusReason != ReasonSnoozeEnded || !ev.StatusChangedAt.Equal(woke) ||
 		ev.State != StateDisconnected {
 		t.Errorf("woken = %s %s %q at %v; want disconnected, needs attention %q at %v",
@@ -317,7 +317,7 @@ func TestSnoozeWakes(t *testing.T) {
 		t.Fatal(err)
 	}
 	again := clk.advance(2 * time.Minute)
-	ev = e.waitEvent(sub, s.ID, "second wake", func(s Session) bool { return s.SnoozedUntil.IsZero() })
+	ev = e.waitEvent(sub, s.ID, "second wake", func(s Thread) bool { return s.SnoozedUntil.IsZero() })
 	if !ev.StatusChangedAt.Equal(again) || ev.StatusReason != ReasonSnoozeEnded {
 		t.Errorf("second wake = %q at %v, want %q at %v", ev.StatusReason, ev.StatusChangedAt, ReasonSnoozeEnded, again)
 	}
@@ -326,7 +326,7 @@ func TestSnoozeWakes(t *testing.T) {
 	if _, err := e.m.Reconnect(e.ctx(), s.ID); err != nil {
 		t.Fatal(err)
 	}
-	got = e.waitFor(s.ID, "connected", func(s Session) bool { return s.State == StateConnected && s.Status != StatusUnknown })
+	got = e.waitFor(s.ID, "connected", func(s Thread) bool { return s.State == StateConnected && s.Status != StatusUnknown })
 	if got.StatusReason == ReasonSnoozeEnded {
 		t.Errorf("after reconnect = %s %q; want the new process's status", got.Status, got.StatusReason)
 	}

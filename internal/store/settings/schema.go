@@ -75,7 +75,7 @@ const KeybindingNone = "none"
 
 // Group ids.
 const (
-	GroupSessions    = "sessions"
+	GroupThreads     = "threads"
 	GroupGitHub      = "github"
 	GroupRepos       = "repos"
 	GroupGitOps      = "gitops"
@@ -88,7 +88,7 @@ const (
 
 // Groups in display order (also the order of tables in the file).
 var Groups = []Group{
-	{GroupSessions, "Sessions", "Defaults for new Claude Code sessions."},
+	{GroupThreads, "Threads", "Defaults for new threads."},
 	{GroupGitHub, "GitHub", "Your pull requests and default-branch checks, polled with gh's login."},
 	{GroupRepos, "Repositories", "Git fetching and where new worktrees go."},
 	{GroupGitOps, "Git operations", "How worktrees are handed to other apps."},
@@ -101,14 +101,14 @@ var Groups = []Group{
 
 // Keys of the static fields that have consumers in the daemon or GUI.
 const (
-	KeyDefaultModel      = "sessions.default_model"
-	KeyDefaultEffort     = "sessions.default_effort"
-	KeyDefaultWorktree   = "sessions.default_worktree"
-	KeyAutoName          = "sessions.auto_name"
-	KeyNamingModel       = "sessions.naming_model"
-	KeyCacheTTL          = "sessions.cache_ttl_seconds"
-	KeyCloseGrace        = "sessions.close_grace_seconds"
-	KeyScrollback        = "sessions.scrollback_lines"
+	KeyDefaultModel      = "threads.default_model"
+	KeyDefaultEffort     = "threads.default_effort"
+	KeyDefaultWorktree   = "threads.default_worktree"
+	KeyAutoName          = "threads.auto_name"
+	KeyNamingModel       = "threads.naming_model"
+	KeyCacheTTL          = "threads.cache_ttl_seconds"
+	KeyCloseGrace        = "threads.close_grace_seconds"
+	KeyScrollback        = "threads.scrollback_lines"
 	KeyGhPollInterval    = "github.poll_interval_seconds"
 	KeyDashboards        = "github.dashboards_enabled"
 	KeyFetchInterval     = "repos.fetch_interval_seconds"
@@ -155,57 +155,57 @@ func KeybindingKey(command string) string { return keybindingKeyPrefix + command
 // staticFields are every field except the per-command keybindings, in display order.
 var staticFields = []Field{
 	{
-		Key: KeyDefaultModel, Group: GroupSessions, Type: Enum, Title: "Default model",
+		Key: KeyDefaultModel, Group: GroupThreads, Type: Enum, Title: "Default model",
 		Description: "Model for new threads when none is picked. Every model runs with the 1M context window.",
-		Enum:        command.SessionModels, EnumLabels: model.Labels(), Default: model.Default,
-		bind: func(s *Settings) any { return &s.Sessions.DefaultModel },
+		Enum:        command.ThreadModels, EnumLabels: model.Labels(), Default: model.Default,
+		bind: func(s *Settings) any { return &s.Threads.DefaultModel },
 	},
 	{
-		Key: KeyDefaultEffort, Group: GroupSessions, Type: Enum, Title: "Default effort",
+		Key: KeyDefaultEffort, Group: GroupThreads, Type: Enum, Title: "Default effort",
 		Description: "Effort level for new threads when none is picked.",
-		Enum:        command.SessionEfforts, Default: "high",
-		bind: func(s *Settings) any { return &s.Sessions.DefaultEffort },
+		Enum:        command.ThreadEfforts, Default: "high",
+		bind: func(s *Settings) any { return &s.Threads.DefaultEffort },
 	},
 	{
 		// Read by the GUI only: the composer's "Work in" picker starts from it (a choice
 		// remembered per project wins). session.new itself stays explicit (--new-worktree
 		// or --worktree).
-		Key: KeyDefaultWorktree, Group: GroupSessions, Type: Enum, Title: "New threads work in",
+		Key: KeyDefaultWorktree, Group: GroupThreads, Type: Enum, Title: "New threads work in",
 		Description: "A fresh copy keeps each thread on its own branch and folder. The project folder itself edits your files in place.",
 		Enum:        []string{WorktreeNew, WorktreeCurrent},
 		EnumLabels:  []string{"A fresh copy of the project", "The project folder itself"},
 		Default:     WorktreeNew,
-		bind:        func(s *Settings) any { return &s.Sessions.DefaultWorktree },
+		bind:        func(s *Settings) any { return &s.Threads.DefaultWorktree },
 	},
 	{
-		Key: KeyAutoName, Group: GroupSessions, Type: Bool, Title: "Name sessions automatically",
-		Description: "Name a new session from its first message with a short claude -p call.",
+		Key: KeyAutoName, Group: GroupThreads, Type: Bool, Title: "Name threads automatically",
+		Description: "Name a new thread from its first message with a short claude -p call.",
 		Default:     "true",
-		bind:        func(s *Settings) any { return &s.Sessions.AutoName },
+		bind:        func(s *Settings) any { return &s.Threads.AutoName },
 	},
 	{
-		Key: KeyNamingModel, Group: GroupSessions, Type: Enum, Title: "Naming model",
-		Description: "Model for the claude -p call that names a new session. Always runs at low effort.",
-		Enum:        command.SessionModels, EnumLabels: model.Labels(), Default: model.NamingDefault,
-		bind: func(s *Settings) any { return &s.Sessions.NamingModel },
+		Key: KeyNamingModel, Group: GroupThreads, Type: Enum, Title: "Naming model",
+		Description: "Model for the claude -p call that names a new thread. Always runs at low effort.",
+		Enum:        command.ThreadModels, EnumLabels: model.Labels(), Default: model.NamingDefault,
+		bind: func(s *Settings) any { return &s.Threads.NamingModel },
 	},
 	{
-		Key: KeyCacheTTL, Group: GroupSessions, Type: Int, Title: "Prompt cache lifetime (seconds)",
+		Key: KeyCacheTTL, Group: GroupThreads, Type: Int, Title: "Prompt cache lifetime (seconds)",
 		Description: "How long the Claude API in use keeps a conversation's prompt cache after its last request: 1 hour on Bedrock and the Anthropic API today (5 minutes only applies to subagents, which live inside a turn). A thread idle longer than this says its next message re-reads the whole context.",
 		Default:     strconv.Itoa(defaultCacheTTL), Min: 60, Max: 86400,
-		bind: func(s *Settings) any { return &s.Sessions.CacheTTLSeconds },
+		bind: func(s *Settings) any { return &s.Threads.CacheTTLSeconds },
 	},
 	{
-		Key: KeyCloseGrace, Group: GroupSessions, Type: Int, Title: "Close grace (seconds)",
-		Description: "How long closing a session waits for Claude to exit after its input is closed before terminating it.",
+		Key: KeyCloseGrace, Group: GroupThreads, Type: Int, Title: "Close grace (seconds)",
+		Description: "How long closing a thread waits for Claude to exit after its input is closed before terminating it.",
 		Default:     strconv.Itoa(defaultCloseGrace), Min: 1, Max: 120, Restart: true,
-		bind: func(s *Settings) any { return &s.Sessions.CloseGraceSeconds },
+		bind: func(s *Settings) any { return &s.Threads.CloseGraceSeconds },
 	},
 	{
-		Key: KeyScrollback, Group: GroupSessions, Type: Int, Title: "Scrollback lines",
+		Key: KeyScrollback, Group: GroupThreads, Type: Int, Title: "Scrollback lines",
 		Description: "Lines of history each terminal keeps, in the daemon and in the window.",
 		Default:     strconv.Itoa(defaultScrollback), Min: 1000, Max: 100000, Restart: true,
-		bind: func(s *Settings) any { return &s.Sessions.ScrollbackLines },
+		bind: func(s *Settings) any { return &s.Threads.ScrollbackLines },
 	},
 	{
 		Key: KeyGhPollInterval, Group: GroupGitHub, Type: Int, Title: "Poll interval (seconds)",

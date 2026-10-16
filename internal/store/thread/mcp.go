@@ -97,15 +97,15 @@ type McpReconnectResult struct {
 // McpChanged is published on the bus (as a ThreadEvent) when a thread's MCP status was
 // checked again.
 type McpChanged struct {
-	SessionID string
-	Seq       uint64
-	Status    *McpStatus
+	ThreadID string
+	Seq      uint64
+	Status   *McpStatus
 }
 
 func (McpChanged) isThreadEvent() {}
 
 // Thread implements ThreadEvent.
-func (e McpChanged) Thread() string { return e.SessionID }
+func (e McpChanged) Thread() string { return e.ThreadID }
 
 // Connected counts the connected servers.
 func (s *McpStatus) Connected() int {
@@ -183,7 +183,7 @@ func (t *threadLog) setMcp(ticket uint64, s *McpStatus) bool {
 	t.mcp.applied = ticket
 	t.mcp.status = s
 	t.seq++
-	bus.Publish[ThreadEvent](t.bus, McpChanged{SessionID: t.id, Seq: t.seq, Status: s})
+	bus.Publish[ThreadEvent](t.bus, McpChanged{ThreadID: t.id, Seq: t.seq, Status: s})
 	t.mu.Unlock()
 	t.persistMcp(ticket, s)
 	return true
@@ -239,7 +239,7 @@ func (r *runner) checkMcp(init []claudestream.McpServerInit) {
 			s, err := m.fetchMcp(context.Background(), conn, log, trigger, "", init)
 			if err != nil {
 				if !errors.Is(err, claudestream.ErrClosed) {
-					m.log.Warn("check MCP servers", "session", id, "err", err)
+					m.log.Warn("check MCP servers", "thread", id, "err", err)
 				}
 				return
 			}
@@ -357,7 +357,7 @@ func (m *Manager) McpReconnect(ctx context.Context, id, server string) (McpRecon
 	default:
 		return res, controlErr(err)
 	}
-	m.log.Info("MCP server reconnected", "session", id, "server", server, "err", res.Error)
+	m.log.Info("MCP server reconnected", "thread", id, "server", server, "err", res.Error)
 	if res.Status, err = m.fetchMcp(ctx, conn, log, McpTriggerReconnect, server, nil); err != nil {
 		return res, controlErr(err)
 	}

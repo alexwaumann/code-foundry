@@ -81,11 +81,11 @@ func TestForkItems(t *testing.T) {
 
 func TestForkNoteText(t *testing.T) {
 	for _, tt := range []struct {
-		parent Session
+		parent Thread
 		want   string
 	}{
-		{Session{ID: "s-1", Name: "fix-badge"}, "Forked from fix-badge"},
-		{Session{ID: "s-1"}, "Forked from s-1"},
+		{Thread{ID: "s-1", Name: "fix-badge"}, "Forked from fix-badge"},
+		{Thread{ID: "s-1"}, "Forked from s-1"},
 	} {
 		if got := forkNoteText(tt.parent); got != tt.want {
 			t.Errorf("forkNoteText(%+v) = %q; want %q", tt.parent, got, tt.want)
@@ -111,7 +111,7 @@ func (e *env) resumable(id string) {
 	e.t.Helper()
 	cid := argOf(e.spec(id).Argv, "--session-id")
 	e.writeTranscript(cid, userLine("hi"))
-	e.waitFor(id, "discovered", func(s Session) bool { return s.ClaudeSessionID == cid })
+	e.waitFor(id, "discovered", func(s Thread) bool { return s.ClaudeSessionID == cid })
 }
 
 // history is a thread's items without what changes in a copy (ordinal) or is the
@@ -176,7 +176,7 @@ func TestForkCopiesItems(t *testing.T) {
 	if p := e.items(s.ID); len(p.Pending) != 1 || len(p.Items) != len(parent.Items) {
 		t.Errorf("parent after fork: %d items, pending %+v", len(p.Items), p.Pending)
 	}
-	e.waitFor(f.ID, "fork connected", func(s Session) bool { return s.State == StateConnected })
+	e.waitFor(f.ID, "fork connected", func(s Thread) bool { return s.State == StateConnected })
 
 	// Renaming the parent later does not change the note; the rows survive a restart.
 	if _, err := e.m.Rename(e.ctx(), s.ID, "renamed"); err != nil {
@@ -197,7 +197,7 @@ func TestForkOfAFork(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	e.waitFor(f.ID, "fork connected", func(s Session) bool { return s.State == StateConnected })
+	e.waitFor(f.ID, "fork connected", func(s Thread) bool { return s.State == StateConnected })
 	e.resumable(f.ID)
 	e.putItems(f.ID, Item{ID: "u2", Kind: KindUserMessage, Text: "two"}, Item{ID: "turn-2", Kind: KindTurnEnd, Turn: &TurnEnd{Subtype: "success"}})
 	// The parent goes away: the fork's copy and note stay.
@@ -228,5 +228,5 @@ func TestForkOfAThreadWithoutItems(t *testing.T) {
 	if got := history(e.items(f.ID).Items); !slices.Equal(got, want) {
 		t.Errorf("fork items = %q; want %q", got, want)
 	}
-	e.waitFor(f.ID, "fork connected", func(s Session) bool { return s.State == StateConnected })
+	e.waitFor(f.ID, "fork connected", func(s Thread) bool { return s.State == StateConnected })
 }

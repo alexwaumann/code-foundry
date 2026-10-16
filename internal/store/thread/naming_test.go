@@ -118,7 +118,7 @@ echo "API Error: 429 rate limited"; exit 1`,
 			bin, dir := fakeClaude(t, tt.body)
 			var logs bytes.Buffer
 			namer := ClaudeNamer(bin, t.TempDir(), slog.New(slog.NewTextHandler(&logs, nil)))
-			ctx := WithNamingModel(withNamingSession(context.Background(), "s123"), "claude-opus-4-8[1m]")
+			ctx := WithNamingModel(withNamingThread(context.Background(), "s123"), "claude-opus-4-8[1m]")
 			for i := range 2 {
 				name, err := namer(ctx, "-fix the login bug")
 				if tt.wantErr == nil {
@@ -147,8 +147,8 @@ echo "API Error: 429 rate limited"; exit 1`,
 			if got := strings.Contains(logs.String(), "level=WARN"); got != tt.warn {
 				t.Errorf("warned = %v, want %v; logs:\n%s", got, tt.warn, logs.String())
 			}
-			if !strings.Contains(logs.String(), "session=s123") || !strings.Contains(logs.String(), `"naming command finished"`) {
-				t.Errorf("logs miss the session or the command:\n%s", logs.String())
+			if !strings.Contains(logs.String(), "thread=s123") || !strings.Contains(logs.String(), `"naming command finished"`) {
+				t.Errorf("logs miss the thread or the command:\n%s", logs.String())
 			}
 		})
 	}

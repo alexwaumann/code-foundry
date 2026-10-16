@@ -266,7 +266,7 @@ func (m *Manager) newWorkspace(ctx context.Context, id, name string, o CreateOpt
 			}
 		}
 	}
-	m.log.Info("workspace created for session", "session", id, "workspace", w.ID, "name", w.Name,
+	m.log.Info("workspace created for thread", "thread", id, "workspace", w.ID, "name", w.Name,
 		"branch", branch, "members", len(w.Members), "cwd", mem.WorktreePath)
 	return cw, nil
 }

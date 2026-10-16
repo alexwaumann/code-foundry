@@ -14,9 +14,9 @@ import (
 
 // SlashCommands returns the slash commands the thread offers; none when not running.
 func (h *Thread) SlashCommands(ctx context.Context, req *connect.Request[v1.SlashCommandsRequest]) (*connect.Response[v1.SlashCommandsResponse], error) {
-	cs, err := h.store.SlashCommands(ctx, req.Msg.GetSessionId())
+	cs, err := h.store.SlashCommands(ctx, req.Msg.GetThreadId())
 	if err != nil {
-		return nil, sessionError(err)
+		return nil, threadError(err)
 	}
 	return connect.NewResponse(&v1.SlashCommandsResponse{Commands: slashCommandsToProto(cs)}), nil
 }

@@ -27,7 +27,7 @@ func fromMillis(ms int64) time.Time {
 	return time.UnixMilli(ms)
 }
 
-func saveSession(ctx context.Context, db *sql.DB, s Session) error {
+func saveThread(ctx context.Context, db *sql.DB, s Thread) error {
 	_, err := db.ExecContext(ctx, `INSERT INTO sessions (
 			id, claude_session_id, repo_id, worktree_path, name, auto_named, model, effort,
 			created_at, last_activity_at, parent_id, state, disconnect_reason, exit_code, last_error,
@@ -68,12 +68,12 @@ func saveSession(ctx context.Context, db *sql.DB, s Session) error {
 		int(s.Status), s.StatusReason, millis(s.StatusChangedAt),
 		s.ContextTokens, s.ContextModel, millis(s.LastResultAt), millis(s.ArchivedAt), millis(s.SnoozedUntil))
 	if err != nil {
-		return fmt.Errorf("session: save %s: %w", s.ID, err)
+		return fmt.Errorf("thread: save %s: %w", s.ID, err)
 	}
 	return nil
 }
 
-func loadSessions(ctx context.Context, db *sql.DB) ([]Session, error) {
+func loadThreads(ctx context.Context, db *sql.DB) ([]Thread, error) {
 	rows, err := db.QueryContext(ctx, `SELECT id, claude_session_id, repo_id, worktree_path, name, auto_named,
 			model, effort, created_at, last_activity_at, parent_id, state, disconnect_reason, exit_code, last_error,
 			permission_mode, base_ref, created_worktree, workspace_id, pinned,
@@ -81,12 +81,12 @@ func loadSessions(ctx context.Context, db *sql.DB) ([]Session, error) {
 			context_tokens, context_model, last_result_at, archived_at, snoozed_until
 		FROM sessions ORDER BY created_at, id`)
 	if err != nil {
-		return nil, fmt.Errorf("session: load: %w", err)
+		return nil, fmt.Errorf("thread: load: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
-	var out []Session
+	var out []Thread
 	for rows.Next() {
-		var s Session
+		var s Thread
 		var created, active, statusAt, lastResult, archived, snoozed int64
 		var state, perm, status int
 		if err := rows.Scan(&s.ID, &s.ClaudeSessionID, &s.RepoID, &s.WorktreePath, &s.Name, &s.AutoNamed,
@@ -94,7 +94,7 @@ func loadSessions(ctx context.Context, db *sql.DB) ([]Session, error) {
 			&perm, &s.BaseRef, &s.CreatedWorktree, &s.WorkspaceID, &s.Pinned,
 			&status, &s.StatusReason, &statusAt,
 			&s.ContextTokens, &s.ContextModel, &lastResult, &archived, &snoozed); err != nil {
-			return nil, fmt.Errorf("session: load: %w", err)
+			return nil, fmt.Errorf("thread: load: %w", err)
 		}
 		s.CreatedAt, s.LastActivityAt, s.State = fromMillis(created), fromMillis(active), State(state)
 		if s.PermissionMode = PermissionMode(perm); !s.PermissionMode.valid() {
@@ -110,7 +110,7 @@ func loadSessions(ctx context.Context, db *sql.DB) ([]Session, error) {
 		out = append(out, s)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("session: load: %w", err)
+		return nil, fmt.Errorf("thread: load: %w", err)
 	}
 	links, err := loadLinks(ctx, db)
 	if err != nil {
@@ -140,21 +140,21 @@ func loadSessions(ctx context.Context, db *sql.DB) ([]Session, error) {
 
 // saveLinks records newly linked pull requests. A URL the session already has is
 // ignored.
-func saveLinks(ctx context.Context, db *sql.DB, sessionID string, links []LinkedPullRequest) error {
+func saveLinks(ctx context.Context, db *sql.DB, threadID string, links []LinkedPullRequest) error {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("session: save links of %s: %w", sessionID, err)
+		return fmt.Errorf("thread: save links of %s: %w", threadID, err)
 	}
 	defer func() { _ = tx.Rollback() }()
 	for _, l := range links {
 		if _, err := tx.ExecContext(ctx, `INSERT INTO session_pull_requests (session_id, slug, number, url, linked_at)
 			VALUES (?, ?, ?, ?, ?) ON CONFLICT (session_id, url) DO NOTHING`,
-			sessionID, l.Slug, l.Number, l.URL, millis(l.LinkedAt)); err != nil {
-			return fmt.Errorf("session: save links of %s: %w", sessionID, err)
+			threadID, l.Slug, l.Number, l.URL, millis(l.LinkedAt)); err != nil {
+			return fmt.Errorf("thread: save links of %s: %w", threadID, err)
 		}
 	}
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("session: save links of %s: %w", sessionID, err)
+		return fmt.Errorf("thread: save links of %s: %w", threadID, err)
 	}
 	return nil
 }
@@ -165,7 +165,7 @@ func loadLinks(ctx context.Context, db *sql.DB) (map[string][]LinkedPullRequest,
 	rows, err := db.QueryContext(ctx, `SELECT session_id, slug, number, url, linked_at
 		FROM session_pull_requests ORDER BY session_id, rowid`)
 	if err != nil {
-		return nil, fmt.Errorf("session: load links: %w", err)
+		return nil, fmt.Errorf("thread: load links: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 	out := map[string][]LinkedPullRequest{}
@@ -174,13 +174,13 @@ func loadLinks(ctx context.Context, db *sql.DB) (map[string][]LinkedPullRequest,
 		var l LinkedPullRequest
 		var at int64
 		if err := rows.Scan(&id, &l.Slug, &l.Number, &l.URL, &at); err != nil {
-			return nil, fmt.Errorf("session: load links: %w", err)
+			return nil, fmt.Errorf("thread: load links: %w", err)
 		}
 		l.LinkedAt = fromMillis(at)
 		out[id] = append(out[id], l)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("session: load links: %w", err)
+		return nil, fmt.Errorf("thread: load links: %w", err)
 	}
 	return out, nil
 }

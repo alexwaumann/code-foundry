@@ -109,7 +109,7 @@ func Run(ctx context.Context, opts Options) error {
 	defer func() { _ = tcpLn.Close() }() // no-op once the server has shut it down
 	port := tcpLn.Addr().(*net.TCPAddr).Port
 
-	st, err := openStores(ctx, log, p, sessionEnv(port, token))
+	st, err := openStores(ctx, log, p, threadEnv(port, token))
 	if err != nil {
 		// In the log file too: an auto-started daemon's stderr goes nowhere a user
 		// looks (db.ErrNewerSchema, say, after reinstalling an older build).
@@ -122,11 +122,10 @@ func Run(ctx context.Context, opts Options) error {
 	events := st.bus
 	repoAPI := api.NewRepo(st.repo, events).WithGitHub(st.gh, st.cloner).WithProjects(st.projects, st.gh).
 		WithCleanupHold(func(w repo.Worktree) string {
-			return cleanupHold(w.Path, worktreeThreads(st.session.Snapshot()), st.terminal.List(context.Background()), st.workspace.Snapshot())
+			return cleanupHold(w.Path, worktreeThreads(st.thread.Snapshot()), st.terminal.List(context.Background()), st.workspace.Snapshot())
 		})
 	terminalAPI := api.NewTerminal(st.terminal)
-	sessionAPI := api.NewSession(st.session, events)
-	threadAPI := api.NewThread(st.session, events)
+	threadAPI := api.NewThread(st.thread, events)
 	gitopsAPI := api.NewGitOps(st.gitops, events, ctx.Done())
 	ghAPI := api.NewGh(st.gh, events, ctx.Done())
 	settingsAPI := api.NewSettings(st.settings)
@@ -165,8 +164,7 @@ func Run(ctx context.Context, opts Options) error {
 			r, ok := st.repo.Snapshot().Owner(c.ActiveRepoID, c.ActiveWorktreePath)
 			return ok && !r.Git
 		},
-		Session: sessionAPI,
-		Thread:  threadAPI,
+		Thread: threadAPI,
 		GitOps: command.GitOpsDeps{
 			Backend:    gitopsAPI,
 			GitHubSlug: func(c command.Context) string { return st.gitops.GitHubSlug(c.ActiveRepoID, c.ActiveWorktreePath) },
@@ -190,7 +188,6 @@ func Run(ctx context.Context, opts Options) error {
 		api.NewCommand(commands).Route(),
 		api.NewUI(events).Route(),
 		terminalAPI.Route(),
-		sessionAPI.Route(),
 		threadAPI.Route(),
 		repoAPI.Route(),
 		ghAPI.Route(),
@@ -200,7 +197,7 @@ func Run(ctx context.Context, opts Options) error {
 		workspaceAPI.Route(),
 		actionAPI.Route(),
 		api.NewFilesystem(st.home, st.repo).Route(),
-		api.NewEvents(api.EventsDeps{Bus: events, Repo: st.repo, Terminal: st.terminal, Session: st.session, Gh: st.gh, GitOps: st.gitops, Settings: st.settings, Update: st.update, Workspace: st.workspace, Action: st.action, Done: ctx.Done()}).Route(),
+		api.NewEvents(api.EventsDeps{Bus: events, Repo: st.repo, Terminal: st.terminal, Thread: st.thread, Gh: st.gh, GitOps: st.gitops, Settings: st.settings, Update: st.update, Workspace: st.workspace, Action: st.action, Done: ctx.Done()}).Route(),
 	}
 	mux := http.NewServeMux()
 	for _, r := range routes {

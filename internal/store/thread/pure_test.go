@@ -337,7 +337,7 @@ func TestPidSessionID(t *testing.T) {
 	_ = os.MkdirAll(filepath.Join(dir, "sessions"), 0o755)
 	_ = os.WriteFile(paths.pidFile(42), []byte(`{"pid":42,"sessionId":"s1","cwd":"/x"}`), 0o644)
 	if got := pidSessionID(paths, 42); got != "s1" {
-		t.Errorf("pidSessionID = %q, want s1", got)
+		t.Errorf("pidThreadID = %q, want s1", got)
 	}
 	_ = os.WriteFile(paths.pidFile(43), []byte(`{"pid":7,"sessionId":"s1"}`), 0o644)
 	if got := pidSessionID(paths, 43); got != "" {

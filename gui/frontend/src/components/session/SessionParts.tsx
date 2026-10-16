@@ -18,7 +18,7 @@ function ThreadName({ id }: { id: string }) {
   const name = useSessionsStore((s) => s.byId[id]?.name || id);
   return (
     <CommandButton
-      command="session.rename"
+      command="thread.rename"
       whenUnavailable="plain"
       size="xs"
       className="-ml-1.5 flex h-6 min-w-0 shrink items-center rounded-md px-1.5 text-label text-foreground"

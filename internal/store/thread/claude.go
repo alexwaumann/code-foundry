@@ -173,10 +173,10 @@ func newUUID() (string, error) {
 }
 
 // newSessionID returns our own session id ("s-" + 12 hex digits).
-func newSessionID() (string, error) {
+func newThreadID() (string, error) {
 	var b [6]byte
 	if _, err := rand.Read(b[:]); err != nil {
-		return "", fmt.Errorf("session id: %w", err)
+		return "", fmt.Errorf("thread id: %w", err)
 	}
 	return "s-" + hex.EncodeToString(b[:]), nil
 }

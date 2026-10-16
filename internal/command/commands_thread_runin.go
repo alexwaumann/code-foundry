@@ -13,14 +13,14 @@ import (
 // ActiveWorkspaceID). A CLI caller (no active view) names the thread with --id, which
 // When cannot look up, so the daemon refuses a project thread instead.
 func hasWorkspaceThread(c Context) bool {
-	return hasSession(c) && (c.ActiveWorkspaceID != "" || c.ActiveView == "")
+	return hasThread(c) && (c.ActiveWorkspaceID != "" || c.ActiveView == "")
 }
 
 // sessionRunIn is session.run-in: move a workspace thread to another member worktree
 // ("Run in…"). The daemon moves a live thread (set_cwd) once it is idle at its prompt.
-func sessionRunIn(b SessionBackend, idArg ArgSpec) Command {
+func threadRunIn(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
-		Name:  "session.run-in",
+		Name:  "thread.run-in",
 		Title: "Run Thread In…",
 		Description: "Move a workspace thread to another member worktree of its workspace. " +
 			"A thread moves once it is idle at its prompt (at once when Claude is not running for it).",
@@ -35,16 +35,16 @@ func sessionRunIn(b SessionBackend, idArg ArgSpec) Command {
 			if a.String("repo") == "" && a.Path("worktree") == "" {
 				return Result{}, InvalidArg("repo", "name the member: a repository or a worktree path")
 			}
-			res, err := b.RunIn(ctx, connect.NewRequest(&v1.RunInSessionRequest{
+			res, err := b.RunIn(ctx, connect.NewRequest(&v1.RunInThreadRequest{
 				Id: a.String("id"), RepoId: a.String("repo"), WorktreePath: a.Path("worktree"),
 			}))
 			if err != nil {
 				return Result{}, err
 			}
-			s := res.Msg.GetSession()
-			msg := "thread " + sessionLabel(s) + " runs in " + s.GetWorktreePath()
+			s := res.Msg.GetThread()
+			msg := "thread " + threadLabel(s) + " runs in " + s.GetWorktreePath()
 			if p := s.GetPendingWorktreePath(); p != "" {
-				msg = "thread " + sessionLabel(s) + " moves to " + p + " once it is idle"
+				msg = "thread " + threadLabel(s) + " moves to " + p + " once it is idle"
 			}
 			return Result{Message: msg, JSON: s}, nil
 		},

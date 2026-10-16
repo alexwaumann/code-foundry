@@ -32,17 +32,17 @@ func quietHelp(err error) error {
 // contextFlags are the --context-* flags that set UiContext for availability checks
 // and context-defaulted args.
 type contextFlags struct {
-	terminal, session, repo, worktree, workspace string
+	terminal, thread, repo, worktree, workspace string
 }
 
-// addContextFlags adds the --context-* flags. --context-session defaults to
-// $CODE_FOUNDRY_SESSION, which the daemon sets in every thread's Claude session, so a
+// addContextFlags adds the --context-* flags. --context-thread defaults to
+// $CODE_FOUNDRY_THREAD, which the daemon sets in every thread's Claude process, so a
 // thread's agent running `code-foundry terminal new` or `action run` acts for its own
-// thread (its bottom panel). --context-session= (empty) opts out.
+// thread (its bottom panel). --context-thread= (empty) opts out.
 func (cl *cli) addContextFlags(fs *flag.FlagSet) *contextFlags {
 	cf := &contextFlags{}
 	fs.StringVar(&cf.terminal, "context-terminal", "", "active terminal `id`")
-	fs.StringVar(&cf.session, "context-session", cl.env(paths.EnvSession), "active session `id` (default $"+paths.EnvSession+")")
+	fs.StringVar(&cf.thread, "context-thread", cl.env(paths.EnvThread), "active thread `id` (default $"+paths.EnvThread+")")
 	fs.StringVar(&cf.repo, "context-repo", "", "active repository `id`")
 	fs.StringVar(&cf.worktree, "context-worktree", "", "active worktree `path`")
 	fs.StringVar(&cf.workspace, "context-workspace", "", "active workspace `id`")
@@ -64,7 +64,7 @@ func (cl *cli) uiContext(cf *contextFlags) (*v1.UiContext, error) {
 	}
 	return &v1.UiContext{
 		ActiveTerminalId:   cf.terminal,
-		ActiveSessionId:    cf.session,
+		ActiveThreadId:     cf.thread,
 		ActiveRepoId:       cf.repo,
 		ActiveWorktreePath: wt,
 		ActiveWorkspaceId:  cf.workspace,
@@ -323,7 +323,7 @@ func printCommandHelp(w io.Writer, cmd *v1.Command) {
 		fmt.Fprintln(tw, "  --yes\tdo not ask for confirmation (required without a terminal)")
 	}
 	fmt.Fprintln(tw, "  --context-terminal id\tactive terminal, for availability and defaults")
-	fmt.Fprintln(tw, "  --context-session id\tactive session (default $"+paths.EnvSession+", set in a thread's Claude session)")
+	fmt.Fprintln(tw, "  --context-thread id\tactive thread (default $"+paths.EnvThread+", set in a thread's Claude process)")
 	fmt.Fprintln(tw, "  --context-repo id\tactive repository")
 	fmt.Fprintln(tw, "  --context-worktree path\tactive worktree")
 	fmt.Fprintln(tw, "  --context-workspace id\tactive workspace")

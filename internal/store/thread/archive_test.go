@@ -13,23 +13,23 @@ func TestArchive(t *testing.T) {
 	tests := []struct {
 		name string
 		// setup returns the thread to archive.
-		setup      func(e *env) Session
+		setup      func(e *env) Thread
 		wantReason string // DisconnectReason after the archive
 	}{
-		{name: "a connected thread is closed", wantReason: ReasonClosed, setup: func(e *env) Session {
+		{name: "a connected thread is closed", wantReason: ReasonClosed, setup: func(e *env) Thread {
 			return e.connected(CreateOptions{Name: "live"})
 		}},
-		{name: "a pinned connected thread is closed and unpinned", wantReason: ReasonClosed, setup: func(e *env) Session {
+		{name: "a pinned connected thread is closed and unpinned", wantReason: ReasonClosed, setup: func(e *env) Thread {
 			s := e.connected(CreateOptions{Name: "pinned"})
 			if _, err := e.m.Pin(e.ctx(), s.ID, true); err != nil {
 				e.t.Fatal(err)
 			}
 			return s
 		}},
-		{name: "a disconnected thread is not closed again", wantReason: ReasonExited, setup: func(e *env) Session {
+		{name: "a disconnected thread is not closed again", wantReason: ReasonExited, setup: func(e *env) Thread {
 			s := e.connected(CreateOptions{Name: "gone"})
 			e.exit(s.ID, 0)
-			return e.waitFor(s.ID, "exited", func(s Session) bool { return s.State == StateDisconnected })
+			return e.waitFor(s.ID, "exited", func(s Thread) bool { return s.State == StateDisconnected })
 		}},
 	}
 	for _, tt := range tests {
@@ -56,7 +56,7 @@ func TestArchive(t *testing.T) {
 			if got.ArchivedAt.Before(before) || got.ArchivedAt.After(time.Now()) {
 				t.Errorf("ArchivedAt = %v, want between %v and now", got.ArchivedAt, before)
 			}
-			if snap, _ := e.m.Snapshot().Session(s.ID); !snap.ArchivedAt.Equal(got.ArchivedAt) {
+			if snap, _ := e.m.Snapshot().Thread(s.ID); !snap.ArchivedAt.Equal(got.ArchivedAt) {
 				t.Errorf("snapshot ArchivedAt = %v, want %v", snap.ArchivedAt, got.ArchivedAt)
 			}
 			if _, err := e.terms.Get(e.ctx(), mine.ID); !errors.Is(err, terminal.ErrNotFound) {
@@ -85,7 +85,7 @@ func TestArchiveUnknown(t *testing.T) {
 }
 
 // archived returns a disconnected, archived thread.
-func (e *env) archived() Session {
+func (e *env) archived() Thread {
 	e.t.Helper()
 	s := e.connected(CreateOptions{Name: "archived"})
 	got, err := e.m.Archive(e.ctx(), s.ID, true)
@@ -99,43 +99,43 @@ func TestUnarchive(t *testing.T) {
 	tests := []struct {
 		name string
 		// act unarchives thread id one way and returns the thread afterwards.
-		act       func(e *env, id string) Session
+		act       func(e *env, id string) Thread
 		wantState State
 	}{
-		{name: "archive false only clears it", wantState: StateDisconnected, act: func(e *env, id string) Session {
+		{name: "archive false only clears it", wantState: StateDisconnected, act: func(e *env, id string) Thread {
 			s, err := e.m.Archive(e.ctx(), id, false)
 			if err != nil {
 				e.t.Fatal(err)
 			}
 			return s
 		}},
-		{name: "reconnect", wantState: StateConnected, act: func(e *env, id string) Session {
+		{name: "reconnect", wantState: StateConnected, act: func(e *env, id string) Thread {
 			if _, err := e.m.Reconnect(e.ctx(), id); err != nil {
 				e.t.Fatal(err)
 			}
-			return e.waitFor(id, "connected", func(s Session) bool { return s.State == StateConnected })
+			return e.waitFor(id, "connected", func(s Thread) bool { return s.State == StateConnected })
 		}},
-		{name: "pin", wantState: StateDisconnected, act: func(e *env, id string) Session {
+		{name: "pin", wantState: StateDisconnected, act: func(e *env, id string) Thread {
 			s, err := e.m.Pin(e.ctx(), id, true)
 			if err != nil || !s.Pinned {
 				e.t.Fatalf("Pin = %+v, %v", s, err)
 			}
 			return s
 		}},
-		{name: "send", wantState: StateConnected, act: func(e *env, id string) Session {
+		{name: "send", wantState: StateConnected, act: func(e *env, id string) Thread {
 			// Archive only commits on a disconnected thread; a live archived one is
 			// what a send would meet after a race, so mark it by hand.
 			if _, err := e.m.Reconnect(e.ctx(), id); err != nil {
 				e.t.Fatal(err)
 			}
-			e.waitFor(id, "connected", func(s Session) bool { return s.State == StateConnected && s.Status != StatusUnknown })
+			e.waitFor(id, "connected", func(s Thread) bool { return s.State == StateConnected && s.Status != StatusUnknown })
 			e.m.mu.Lock()
 			e.m.recs[id].s.ArchivedAt = time.Now()
 			e.m.mu.Unlock()
 			if _, err := e.m.Send(e.ctx(), id, Message{Text: "again"}); err != nil {
 				e.t.Fatal(err)
 			}
-			return e.waitFor(id, "unarchived", func(s Session) bool { return s.ArchivedAt.IsZero() })
+			return e.waitFor(id, "unarchived", func(s Thread) bool { return s.ArchivedAt.IsZero() })
 		}},
 	}
 	for _, tt := range tests {

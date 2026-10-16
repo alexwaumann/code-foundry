@@ -16,31 +16,31 @@ func TestCreateRewritesFileRefs(t *testing.T) {
 		name string
 		o    CreateOptions
 		// want builds the expected prompt from the session and the workspace env.
-		want func(s Session, e *wsEnv) string
+		want func(s Thread, e *wsEnv) string
 	}{
 		{name: "existing worktree: only the thread's project resolves",
 			o: CreateOptions{RepoID: "r1"},
-			want: func(s Session, _ *wsEnv) string {
+			want: func(s Thread, _ *wsEnv) string {
 				return "read @" + s.WorktreePath + "/README.md and @docs/a b.md and @x.go"
 			}},
 		{name: "no project: nothing resolves",
 			o: CreateOptions{NoProject: true},
-			want: func(Session, *wsEnv) string {
+			want: func(Thread, *wsEnv) string {
 				return "read @README.md and @docs/a b.md and @x.go"
 			}},
 		{name: "new worktree: the created worktree",
 			o: CreateOptions{RepoID: "r1", NewWorktree: &NewWorktree{}},
-			want: func(s Session, _ *wsEnv) string {
+			want: func(s Thread, _ *wsEnv) string {
 				return "read @" + s.WorktreePath + "/README.md and @docs/a b.md and @x.go"
 			}},
 		{name: "workspace thread: every member",
 			o: CreateOptions{WorkspaceID: "login", RepoID: "r2"},
-			want: func(s Session, e *wsEnv) string {
+			want: func(s Thread, e *wsEnv) string {
 				return "read @" + e.wt + "/README.md and @" + e.wt2 + "/docs/a b.md and @x.go"
 			}},
 		{name: "new workspace: the new members' worktrees",
 			o: CreateOptions{NewWorkspace: &NewWorkspace{Repos: []string{"r1", "r2"}}},
-			want: func(s Session, e *wsEnv) string {
+			want: func(s Thread, e *wsEnv) string {
 				w, _ := e.ws.Snapshot().Workspace(s.WorkspaceID)
 				m1, _ := w.Member("r1")
 				m2, _ := w.Member("r2")

@@ -32,8 +32,8 @@ func newThreadServer(t *testing.T) (*threadtest.Fake, codefoundryv1connect.Threa
 
 func TestThreadWatchSendRespond(t *testing.T) {
 	fake, c := newThreadServer(t)
-	fake.Put(thread.Session{ID: "s1", State: thread.StateConnected})
-	fake.Put(thread.Session{ID: "d1", State: thread.StateDisconnected})
+	fake.Put(thread.Thread{ID: "s1", State: thread.StateConnected})
+	fake.Put(thread.Thread{ID: "d1", State: thread.StateDisconnected})
 	fake.PutItems("s1",
 		thread.Item{ID: "u1", Kind: thread.KindUserMessage, Text: "hi @cf-file://r1/a.go", Attachments: []string{"/att/1.png"},
 			ComposerText: "hi [a.go](cf-file://r1/a.go)"},
@@ -43,11 +43,11 @@ func TestThreadWatchSendRespond(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if _, err := c.ListItems(ctx, connect.NewRequest(&v1.ListThreadItemsRequest{SessionId: "nope"})); connect.CodeOf(err) != connect.CodeNotFound {
+	if _, err := c.ListItems(ctx, connect.NewRequest(&v1.ListThreadItemsRequest{ThreadId: "nope"})); connect.CodeOf(err) != connect.CodeNotFound {
 		t.Errorf("items of an unknown thread: %v", err)
 	}
 
-	stream, err := c.Watch(ctx, connect.NewRequest(&v1.WatchThreadRequest{SessionId: "s1"}))
+	stream, err := c.WatchThread(ctx, connect.NewRequest(&v1.WatchThreadRequest{ThreadId: "s1"}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +78,7 @@ func TestThreadWatchSendRespond(t *testing.T) {
 		t.Errorf("watchers = %d", fake.Watchers("s1"))
 	}
 
-	res, err := c.Send(ctx, connect.NewRequest(&v1.SendThreadMessageRequest{SessionId: "s1", Text: "more", Attachments: []string{"/att/2.png"},
+	res, err := c.Send(ctx, connect.NewRequest(&v1.SendThreadMessageRequest{ThreadId: "s1", Text: "more", Attachments: []string{"/att/2.png"},
 		ComposerText: "![a.png](cf-attachment://0) more"}))
 	if err != nil {
 		t.Fatal(err)
@@ -90,10 +90,10 @@ func TestThreadWatchSendRespond(t *testing.T) {
 		t.Errorf("appended %v", ev)
 	}
 
-	if _, err := c.Respond(ctx, connect.NewRequest(&v1.RespondThreadRequest{SessionId: "s1", RequestId: "r1"})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+	if _, err := c.Respond(ctx, connect.NewRequest(&v1.RespondThreadRequest{ThreadId: "s1", RequestId: "r1"})); connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Errorf("respond without a decision: %v", err)
 	}
-	rr, err := c.Respond(ctx, connect.NewRequest(&v1.RespondThreadRequest{SessionId: "s1", RequestId: "r1", Decision: v1.ThreadDecision_THREAD_DECISION_ALLOW_FOR_SESSION}))
+	rr, err := c.Respond(ctx, connect.NewRequest(&v1.RespondThreadRequest{ThreadId: "s1", RequestId: "r1", Decision: v1.ThreadDecision_THREAD_DECISION_ALLOW_FOR_SESSION}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,31 +106,31 @@ func TestThreadWatchSendRespond(t *testing.T) {
 	if ev := next().GetPending(); ev == nil || len(ev.GetPending()) != 0 {
 		t.Errorf("pending %v", ev)
 	}
-	if _, err := c.Respond(ctx, connect.NewRequest(&v1.RespondThreadRequest{SessionId: "s1", RequestId: "r1", Decision: v1.ThreadDecision_THREAD_DECISION_DENY})); connect.CodeOf(err) != connect.CodeNotFound {
+	if _, err := c.Respond(ctx, connect.NewRequest(&v1.RespondThreadRequest{ThreadId: "s1", RequestId: "r1", Decision: v1.ThreadDecision_THREAD_DECISION_DENY})); connect.CodeOf(err) != connect.CodeNotFound {
 		t.Errorf("respond twice: %v", err)
 	}
-	if _, err := c.Interrupt(ctx, connect.NewRequest(&v1.InterruptThreadRequest{SessionId: "s1"})); err != nil {
+	if _, err := c.Interrupt(ctx, connect.NewRequest(&v1.InterruptThreadRequest{ThreadId: "s1"})); err != nil {
 		t.Fatal(err)
 	}
-	ms, err := c.SetModel(ctx, connect.NewRequest(&v1.SetThreadModelRequest{SessionId: "s1", Model: "sonnet"}))
-	if err != nil || ms.Msg.GetSession().GetModel() != "sonnet" {
+	ms, err := c.SetModel(ctx, connect.NewRequest(&v1.SetThreadModelRequest{ThreadId: "s1", Model: "sonnet"}))
+	if err != nil || ms.Msg.GetThread().GetModel() != "sonnet" {
 		t.Fatalf("set model %v %v", ms, err)
 	}
-	if _, err := c.SetPermissionMode(ctx, connect.NewRequest(&v1.SetThreadPermissionModeRequest{SessionId: "s1"})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+	if _, err := c.SetPermissionMode(ctx, connect.NewRequest(&v1.SetThreadPermissionModeRequest{ThreadId: "s1"})); connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Errorf("set default mode: %v", err)
 	}
-	if _, err := c.SetPermissionMode(ctx, connect.NewRequest(&v1.SetThreadPermissionModeRequest{SessionId: "s1", PermissionMode: v1.PermissionMode_PERMISSION_MODE_ACCEPT_EDITS})); err != nil {
+	if _, err := c.SetPermissionMode(ctx, connect.NewRequest(&v1.SetThreadPermissionModeRequest{ThreadId: "s1", PermissionMode: v1.PermissionMode_PERMISSION_MODE_ACCEPT_EDITS})); err != nil {
 		t.Fatal(err)
 	}
-	es, err := c.SetEffort(ctx, connect.NewRequest(&v1.SetThreadEffortRequest{SessionId: "s1", Effort: "max"}))
-	if err != nil || es.Msg.GetSession().GetEffort() != "max" {
+	es, err := c.SetEffort(ctx, connect.NewRequest(&v1.SetThreadEffortRequest{ThreadId: "s1", Effort: "max"}))
+	if err != nil || es.Msg.GetThread().GetEffort() != "max" {
 		t.Fatalf("set effort %v %v", es, err)
 	}
-	if _, err := c.SetEffort(ctx, connect.NewRequest(&v1.SetThreadEffortRequest{SessionId: "s1", Effort: "huge"})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+	if _, err := c.SetEffort(ctx, connect.NewRequest(&v1.SetThreadEffortRequest{ThreadId: "s1", Effort: "huge"})); connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Errorf("bad effort: %v", err)
 	}
 	// A message starts a stopped thread.
-	if res, err := c.Send(ctx, connect.NewRequest(&v1.SendThreadMessageRequest{SessionId: "d1", Text: "x"})); err != nil || res.Msg.GetItem().GetUserMessage().GetText() != "x" {
+	if res, err := c.Send(ctx, connect.NewRequest(&v1.SendThreadMessageRequest{ThreadId: "d1", Text: "x"})); err != nil || res.Msg.GetItem().GetUserMessage().GetText() != "x" {
 		t.Errorf("send to a stopped thread: %v, %v", res, err)
 	}
 	if s, _ := fake.Get(ctx, "d1"); s.State != thread.StateConnected {

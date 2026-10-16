@@ -12,7 +12,7 @@ function term(id: string, labels: Record<string, string>): TerminalView {
   return { id, argv: ["/bin/zsh"], cwd: "/src/app", cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: null, exitedAtMs: null, altScreen: false, labels };
 }
 
-const shell = { kind: "shell", session: "s1", repo: "r1", worktree: "/src/app" };
+const shell = { kind: "shell", thread: "s1", repo: "r1", worktree: "/src/app" };
 const closed = { open: false, query: "", commandName: null, page: "commands" as const, returnTo: "content" as const };
 
 describe("the bottom panel's shell in the command context", () => {

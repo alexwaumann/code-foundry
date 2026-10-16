@@ -3,21 +3,85 @@ syntax = "proto3";
 package codefoundry.v1;
 
 import "codefoundry/v1/heartbeat.proto";
-import "codefoundry/v1/session.proto";
+import "codefoundry/v1/thread_lifecycle.proto";
 import "google/protobuf/timestamp.proto";
 
-// ThreadService drives threads: Claude Code runs headlessly (claude -p over
-// stream-json) and the conversation is recorded by the daemon as items the GUI draws.
-// See docs/notes/rendered-threads-1-daemon.md and docs/notes/rendered-only.md.
+// ThreadService manages threads, the primary unit of the app, and drives their
+// conversations. A thread runs Claude Code headlessly (claude -p over stream-json) and
+// the daemon records the conversation as items the GUI draws. A connected thread owns
+// one claude process; a disconnected thread owns none and the next message resumes it
+// (claude --resume). The lifecycle messages (Thread, CreateThreadRequest, ...) are in
+// thread_lifecycle.proto. See docs/notes/rendered-threads-1-daemon.md and
+// docs/notes/rendered-only.md.
 service ThreadService {
+  // Create spawns claude in a worktree and returns the thread in STARTING state.
+  rpc Create(CreateThreadRequest) returns (CreateThreadResponse) {}
+  // Fork starts a new thread that continues an existing thread's conversation.
+  rpc Fork(ForkThreadRequest) returns (ForkThreadResponse) {}
+  // List returns all threads.
+  rpc List(ListThreadsRequest) returns (ListThreadsResponse) {}
+  // Get returns one thread.
+  rpc Get(GetThreadRequest) returns (GetThreadResponse) {}
+  // Rename sets a user-chosen name and disables auto-naming for the thread.
+  rpc Rename(RenameThreadRequest) returns (RenameThreadResponse) {}
+  // Close ends the Claude process gracefully (interrupt, stdin closed, bounded wait,
+  // then kill). The thread remains, DISCONNECTED, until Remove. No command calls it
+  // since 2026-10-15: the daemon starts a thread's process when a message is sent
+  // (Send) and stops it at the prompt cache expiry (docs/notes/thread-lifecycle.md).
+  // Kept for compatibility.
+  rpc Close(CloseThreadRequest) returns (CloseThreadResponse) {}
+  // Reconnect resumes a DISCONNECTED thread in a new claude process, without a
+  // prompt. No command calls it since 2026-10-15 (a message starts a stopped thread).
+  // Kept for compatibility.
+  rpc Reconnect(ReconnectThreadRequest) returns (ReconnectThreadResponse) {}
+  // Remove forgets a thread. Stops its Claude first if it runs.
+  rpc Remove(RemoveThreadRequest) returns (RemoveThreadResponse) {}
+  // RunIn moves a workspace thread's cwd to another member worktree of its workspace.
+  // A live thread gets set_cwd once it is idle (pending_worktree_path shows the queued
+  // target until then) and the row's worktree_path and repo_id change when Claude
+  // accepts it. A disconnected thread's row
+  // changes at once; the next reconnect resumes there. Refused for a project thread or
+  // a target that is not a member.
+  rpc RunIn(RunInThreadRequest) returns (RunInThreadResponse) {}
+  // Pin pins or unpins a thread. Pinned threads sit in their own section at the top of
+  // the GUI's thread list. Persisted; any state.
+  rpc Pin(PinThreadRequest) returns (PinThreadResponse) {}
+  // Archive archives or unarchives a thread. Archiving ends Claude gracefully like
+  // Close (the thread is DISCONNECTED), kills and removes the thread's shells, unpins
+  // it and records archived_at (kept when it is already archived). Unarchiving only
+  // clears archived_at: the thread stays disconnected until a Reconnect. Reconnect,
+  // Pin (pinned) and Send unarchive a thread implicitly. Persisted; any state.
+  rpc Archive(ArchiveThreadRequest) returns (ArchiveThreadResponse) {}
+  // Snooze snoozes a thread until a time, or unsnoozes it (until unset). Snoozing ends
+  // Claude gracefully like Close (the thread is DISCONNECTED), kills and removes the
+  // thread's shells, unpins and unarchives it and records snoozed_until (a re-snooze
+  // replaces it). until must be in the future (INVALID_ARGUMENT otherwise). When the
+  // time comes the daemon wakes the thread: snoozed_until is cleared and the thread,
+  // still disconnected, becomes NEEDS_ATTENTION "snooze ended" (status_changed_at = the
+  // wake time). Unsnoozing before then only clears snoozed_until. Reconnect, Pin
+  // (pinned), Send and Archive (archived) clear a snooze implicitly. Persisted.
+  rpc Snooze(SnoozeThreadRequest) returns (SnoozeThreadResponse) {}
+  // Watch streams changes to the thread list (every thread's record, not its items).
+  // The first event is a snapshot. WatchThread streams one thread's conversation.
+  rpc Watch(WatchThreadsRequest) returns (stream ThreadListEvent) {}
+  // StageAttachment stores an image the first prompt refers to and returns its path.
+  // Create appends "Attached image: <path>" lines for CreateThreadRequest.attachments;
+  // Claude reads them with its Read tool. Only image types are accepted, with size
+  // limits; unused staged files are reaped by the daemon.
+  rpc StageAttachment(StageAttachmentRequest) returns (StageAttachmentResponse) {}
+  // ReadAttachment returns a staged attachment's bytes (a user message shows its
+  // images). Only files directly in the attachments directory;
+  // NOT_FOUND once the file was reaped.
+  rpc ReadAttachment(ReadAttachmentRequest) returns (ReadAttachmentResponse) {}
+
   // ListItems returns a thread's items (the streaming one included) and its pending
   // requests. Works while disconnected (items persist).
   rpc ListItems(ListThreadItemsRequest) returns (ListThreadItemsResponse) {}
-  // Watch streams one thread: a snapshot first, then appended/updated items, text
-  // deltas and pending-request changes. While a Watch is open the thread counts as
+  // WatchThread streams one thread: a snapshot first, then appended/updated items, text
+  // deltas and pending-request changes. While a WatchThread is open the thread counts as
   // looked at: a finished turn is seen at once. Apply only
   // events whose seq is greater than the snapshot's.
-  rpc Watch(WatchThreadRequest) returns (stream ThreadEvent) {}
+  rpc WatchThread(WatchThreadRequest) returns (stream ThreadEvent) {}
   // Send sends a user message. Allowed while a turn runs: Claude queues it or folds it
   // in. A thread that is not running starts with the message as its first prompt: the
   // returned item is in the timeline at once, and a start that fails is an error item
@@ -44,13 +108,13 @@ service ThreadService {
   rpc SetPermissionMode(SetThreadPermissionModeRequest) returns (SetThreadPermissionModeResponse) {}
   // SetEffort changes a thread's effort level. Claude has no live effort switch, so the
   // daemon restarts a running process with --resume and the new --effort: at once when
-  // the thread is idle, else once the running turn ends (Session.effort_pending says so
+  // the thread is idle, else once the running turn ends (Thread.effort_pending says so
   // meanwhile). The row records the effort for later spawns either way; a thread that is
   // not running only records it.
   rpc SetEffort(SetThreadEffortRequest) returns (SetThreadEffortResponse) {}
   // McpStatus returns the thread's MCP servers as last checked. The daemon asks Claude
   // (mcp_status) at the start of every turn, again every few seconds while a server is
-  // still connecting, and after McpReconnect; Watch carries each new answer (the `mcp`
+  // still connecting, and after McpReconnect; WatchThread carries each new answer (the `mcp`
   // event). The last answer is kept while the thread is not running, also across daemon
   // restarts. refresh asks Claude now, starting a stopped thread without a prompt.
   // Without it a running thread not checked yet is asked once; status is unset when
@@ -68,7 +132,7 @@ service ThreadService {
   // the app's own controls, terminal-only, or retired; never a skill or a user, project
   // or plugin command). In Claude's order: its skills, then its built-ins, then plugin
   // skills. What Claude last reported, kept while the thread is not running (also across
-  // daemon restarts); empty when it never answered a handshake. Watch carries every change (the
+  // daemon restarts); empty when it never answered a handshake. WatchThread carries every change (the
   // `commands` event). See docs/notes/slash-commands-1-daemon.md.
   rpc SlashCommands(SlashCommandsRequest) returns (SlashCommandsResponse) {}
 }
@@ -265,7 +329,7 @@ message ThreadPendingRequest {
 }
 
 message ThreadItemsSnapshot {
-  string session_id = 1;
+  string thread_id = 1;
   // The thread's event sequence number included in the snapshot.
   uint64 seq = 2;
   repeated ThreadItem items = 3;
@@ -283,7 +347,7 @@ message ThreadItemsSnapshot {
 
 // Text appended to a streaming item.
 message ThreadItemDelta {
-  string session_id = 1;
+  string thread_id = 1;
   uint64 seq = 2;
   string item_id = 3;
   int64 ordinal = 4;
@@ -299,14 +363,14 @@ message ThreadItemDelta {
 }
 
 message ThreadItemChange {
-  string session_id = 1;
+  string thread_id = 1;
   uint64 seq = 2;
   ThreadItem item = 3;
 }
 
 // A thread's pending requests changed (the whole list).
 message ThreadPending {
-  string session_id = 1;
+  string thread_id = 1;
   uint64 seq = 2;
   repeated ThreadPendingRequest pending = 3;
 }
@@ -319,24 +383,24 @@ message ThreadPendingSnapshot {
 
 message ThreadEvent {
   oneof event {
-    // ThreadService.Watch's first event (and a resync after drops).
+    // ThreadService.WatchThread's first event (and a resync after drops).
     ThreadItemsSnapshot snapshot = 1;
-    // Watch only: items and their streaming deltas.
+    // WatchThread only: items and their streaming deltas.
     ThreadItemChange appended = 2;
     ThreadItemChange updated = 3;
     ThreadItemDelta delta = 4;
-    // Watch and EventService: the thread's pending requests changed.
+    // WatchThread and EventService: the thread's pending requests changed.
     ThreadPending pending = 5;
     // EventService only: the snapshot of the thread source.
     ThreadPendingSnapshot pending_snapshot = 6;
-    // Watch only: the thread's MCP servers were checked again.
+    // WatchThread only: the thread's MCP servers were checked again.
     ThreadMcpChange mcp = 7;
-    // Watch only: the thread's slash commands changed (Claude's list changed).
+    // WatchThread only: the thread's slash commands changed (Claude's list changed).
     ThreadSlashCommandsChange commands = 8;
-    // Watch only: nothing else was sent for a while (see StreamHeartbeat). It does not
+    // WatchThread only: nothing else was sent for a while (see StreamHeartbeat). It does not
     // advance seq.
     StreamHeartbeat heartbeat = 9;
-    // Watch only: the thread's subagent runs changed (the whole list). A run's status,
+    // WatchThread only: the thread's subagent runs changed (the whole list). A run's status,
     // report or a new run comes at once; its progress (activity, last tool, counters) at
     // most once a second.
     ThreadAgentsChange agents = 10;
@@ -412,9 +476,9 @@ message ThreadMcpStatus {
   repeated McpServer servers = 4;
 }
 
-// A thread's MCP status changed (ThreadService.Watch).
+// A thread's MCP status changed (ThreadService.WatchThread).
 message ThreadMcpChange {
-  string session_id = 1;
+  string thread_id = 1;
   uint64 seq = 2;
   // Always set since 2026-10-15 (the status outlives the process); unset was "none any
   // more".
@@ -433,7 +497,7 @@ enum ThreadAgentStatus {
 
 // One subagent run of a thread (an Agent tool call, foreground or background, also one
 // spawned by another run), as the stream's task frames report it. A run woken again by
-// SendMessage goes back to RUNNING in place (resumed_at). Persisted, with Session.agent_runs.
+// SendMessage goes back to RUNNING in place (resumed_at). Persisted, with Thread.agent_runs.
 message ThreadAgentRun {
   // Claude's agent id (the task id).
   string id = 1;
@@ -478,16 +542,16 @@ message ThreadAgentRun {
   string note_item_id = 21;
 }
 
-// A thread's subagent runs changed (ThreadService.Watch).
+// A thread's subagent runs changed (ThreadService.WatchThread).
 message ThreadAgentsChange {
-  string session_id = 1;
+  string thread_id = 1;
   uint64 seq = 2;
   // The whole list, in spawn order.
   repeated ThreadAgentRun agents = 3;
 }
 
 message ListThreadItemsRequest {
-  string session_id = 1;
+  string thread_id = 1;
 }
 
 message ListThreadItemsResponse {
@@ -495,11 +559,11 @@ message ListThreadItemsResponse {
 }
 
 message WatchThreadRequest {
-  string session_id = 1;
+  string thread_id = 1;
 }
 
 message SendThreadMessageRequest {
-  string session_id = 1;
+  string thread_id = 1;
   // As typed; "@cf-file://<repo id>/<path>" tags become absolute paths for Claude.
   string text = 2;
   // StageAttachment paths.
@@ -522,7 +586,7 @@ enum ThreadDecision {
 }
 
 message RespondThreadRequest {
-  string session_id = 1;
+  string thread_id = 1;
   string request_id = 2;
   ThreadDecision decision = 3;
   // A question's answers (required to allow one): question -> chosen label(s).
@@ -542,42 +606,42 @@ message RespondThreadResponse {
 }
 
 message InterruptThreadRequest {
-  string session_id = 1;
+  string thread_id = 1;
 }
 
 message InterruptThreadResponse {}
 
 message SetThreadModelRequest {
-  string session_id = 1;
+  string thread_id = 1;
   string model = 2;
 }
 
 message SetThreadModelResponse {
-  Session session = 1;
+  Thread thread = 1;
 }
 
 message SetThreadPermissionModeRequest {
-  string session_id = 1;
+  string thread_id = 1;
   PermissionMode permission_mode = 2;
 }
 
 message SetThreadPermissionModeResponse {
-  Session session = 1;
+  Thread thread = 1;
 }
 
 message SetThreadEffortRequest {
-  string session_id = 1;
+  string thread_id = 1;
   // low, medium, high, xhigh or max.
   string effort = 2;
 }
 
 message SetThreadEffortResponse {
   // effort_pending is set when the restart waits for the running turn.
-  Session session = 1;
+  Thread thread = 1;
 }
 
 message McpStatusRequest {
-  string session_id = 1;
+  string thread_id = 1;
   // Ask Claude now instead of returning the last check.
   bool refresh = 2;
 }
@@ -588,7 +652,7 @@ message McpStatusResponse {
 }
 
 message McpReconnectRequest {
-  string session_id = 1;
+  string thread_id = 1;
   // The server's name as McpServer.name has it.
   string server_name = 2;
 }
@@ -617,16 +681,16 @@ message SlashCommand {
   bool builtin = 5;
 }
 
-// A thread's slash commands changed (ThreadService.Watch).
+// A thread's slash commands changed (ThreadService.WatchThread).
 message ThreadSlashCommandsChange {
-  string session_id = 1;
+  string thread_id = 1;
   uint64 seq = 2;
   // The whole new list.
   repeated SlashCommand commands = 3;
 }
 
 message SlashCommandsRequest {
-  string session_id = 1;
+  string thread_id = 1;
 }
 
 message SlashCommandsResponse {

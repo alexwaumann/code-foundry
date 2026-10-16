@@ -43,24 +43,24 @@ func (f *fakeCommands) Invoke(_ context.Context, req *connect.Request[v1.InvokeC
 	return connect.NewResponse(f.res), nil
 }
 
-func TestCLISessionDefaultAndExitCode(t *testing.T) {
+func TestCLIThreadDefaultAndExitCode(t *testing.T) {
 	tests := []struct {
-		name        string
-		env         map[string]string // nil: no getenv
-		args        []string
-		res         *v1.InvokeCommandResponse
-		wantSession string
-		wantExit    int
-		wantStdout  string
+		name       string
+		env        map[string]string // nil: no getenv
+		args       []string
+		res        *v1.InvokeCommandResponse
+		wantThread string
+		wantExit   int
+		wantStdout string
 	}{
-		{name: "a thread's agent acts for its thread", env: map[string]string{paths.EnvSession: "s-agent"},
-			args: []string{"action", "run", "test"}, wantSession: "s-agent"},
-		{name: "an explicit --context-session wins", env: map[string]string{paths.EnvSession: "s-agent"},
-			args: []string{"action", "run", "test", "--context-session", "s-other"}, wantSession: "s-other"},
-		{name: "--context-session= opts out", env: map[string]string{paths.EnvSession: "s-agent"},
-			args: []string{"action", "run", "test", "--context-session="}, wantSession: ""},
-		{name: "outside a session", env: map[string]string{}, args: []string{"action", "run", "test"}, wantSession: ""},
-		{name: "no environment at all (tests)", args: []string{"action", "run", "test"}, wantSession: ""},
+		{name: "a thread's agent acts for its thread", env: map[string]string{paths.EnvThread: "s-agent"},
+			args: []string{"action", "run", "test"}, wantThread: "s-agent"},
+		{name: "an explicit --context-thread wins", env: map[string]string{paths.EnvThread: "s-agent"},
+			args: []string{"action", "run", "test", "--context-thread", "s-other"}, wantThread: "s-other"},
+		{name: "--context-thread= opts out", env: map[string]string{paths.EnvThread: "s-agent"},
+			args: []string{"action", "run", "test", "--context-thread="}, wantThread: ""},
+		{name: "outside a thread", env: map[string]string{}, args: []string{"action", "run", "test"}, wantThread: ""},
+		{name: "no environment at all (tests)", args: []string{"action", "run", "test"}, wantThread: ""},
 		{name: "a reported exit code ends the CLI with it after the output",
 			args:     []string{"action", "run", "test", "--wait"},
 			res:      &v1.InvokeCommandResponse{Message: "FAIL\nTest exited with code 3 (run r1)", ExitCode: 3},
@@ -105,8 +105,8 @@ func TestCLISessionDefaultAndExitCode(t *testing.T) {
 			if len(f.invoked) != 1 {
 				t.Fatalf("invoked %d times", len(f.invoked))
 			}
-			if got := f.invoked[0].GetContext().GetActiveSessionId(); got != tt.wantSession {
-				t.Errorf("context session = %q, want %q", got, tt.wantSession)
+			if got := f.invoked[0].GetContext().GetActiveThreadId(); got != tt.wantThread {
+				t.Errorf("context thread = %q, want %q", got, tt.wantThread)
 			}
 		})
 	}

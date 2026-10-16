@@ -59,7 +59,7 @@ func (e *env) answer(id string) {
 func TestRunInMovesWhenIdle(t *testing.T) {
 	e := newWSPermissionEnv(t)
 	s := e.create(CreateOptions{WorkspaceID: "login", InitialPrompt: "write"})
-	e.waitFor(s.ID, "permission", func(s Session) bool { return s.Status == StatusNeedsAttention })
+	e.waitFor(s.ID, "permission", func(s Thread) bool { return s.Status == StatusNeedsAttention })
 
 	got, err := e.m.RunIn(e.ctx(), s.ID, RunInTarget{RepoID: "api"}) // a repo name works too
 	if err != nil {
@@ -74,7 +74,7 @@ func TestRunInMovesWhenIdle(t *testing.T) {
 	}
 	e.answer(s.ID)
 	e.waitSent("set_cwd", isSetCwd(e.wt2))
-	moved := e.waitFor(s.ID, "moved", func(s Session) bool { return s.WorktreePath == e.wt2 })
+	moved := e.waitFor(s.ID, "moved", func(s Thread) bool { return s.WorktreePath == e.wt2 })
 	if moved.RepoID != "r2" || moved.PendingWorktreePath != "" || moved.WorkspaceID != "w-login" {
 		t.Errorf("moved = %+v", moved)
 	}
@@ -89,7 +89,7 @@ func TestRunInMovesWhenIdle(t *testing.T) {
 func TestRunInBackCancels(t *testing.T) {
 	e := newWSPermissionEnv(t)
 	s := e.create(CreateOptions{WorkspaceID: "login", InitialPrompt: "write"})
-	e.waitFor(s.ID, "permission", func(s Session) bool { return s.Status == StatusNeedsAttention })
+	e.waitFor(s.ID, "permission", func(s Thread) bool { return s.Status == StatusNeedsAttention })
 	if _, err := e.m.RunIn(e.ctx(), s.ID, RunInTarget{RepoID: "r2"}); err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +104,7 @@ func TestRunInBackCancels(t *testing.T) {
 		t.Error("moved after the cancel")
 	}
 	if got, _ := e.m.Get(e.ctx(), s.ID); got.WorktreePath != e.wt {
-		t.Errorf("session = %+v", got)
+		t.Errorf("thread = %+v", got)
 	}
 }
 
@@ -113,12 +113,12 @@ func TestRunInBackCancels(t *testing.T) {
 func TestRunInWithoutAProcess(t *testing.T) {
 	e := newWSPermissionEnv(t)
 	s := e.create(CreateOptions{WorkspaceID: "login", InitialPrompt: "write"})
-	e.waitFor(s.ID, "permission", func(s Session) bool { return s.Status == StatusNeedsAttention })
+	e.waitFor(s.ID, "permission", func(s Thread) bool { return s.Status == StatusNeedsAttention })
 	if _, err := e.m.RunIn(e.ctx(), s.ID, RunInTarget{RepoID: "r2"}); err != nil {
 		t.Fatal(err)
 	}
 	e.exit(s.ID, 0)
-	got := e.waitFor(s.ID, "disconnected", func(s Session) bool { return s.State == StateDisconnected })
+	got := e.waitFor(s.ID, "disconnected", func(s Thread) bool { return s.State == StateDisconnected })
 	if got.WorktreePath != e.wt2 || got.RepoID != "r2" || got.PendingWorktreePath != "" {
 		t.Fatalf("after exit with a queued move = %+v", got)
 	}

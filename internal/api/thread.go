@@ -23,7 +23,7 @@ const threadWatchBuffer = 2048
 type Thread struct {
 	store thread.Store
 	bus   *bus.Bus
-	beat  time.Duration // Watch's heartbeat interval; zero is HeartbeatInterval (tests shorten it)
+	beat  time.Duration // WatchThread's heartbeat interval; zero is HeartbeatInterval (tests shorten it)
 }
 
 var _ codefoundryv1connect.ThreadServiceHandler = (*Thread)(nil)
@@ -40,25 +40,25 @@ func (h *Thread) Route(opts ...connect.HandlerOption) Route {
 
 // ListItems returns a thread's items and pending requests.
 func (h *Thread) ListItems(ctx context.Context, req *connect.Request[v1.ListThreadItemsRequest]) (*connect.Response[v1.ListThreadItemsResponse], error) {
-	snap, err := h.store.Items(ctx, req.Msg.GetSessionId())
+	snap, err := h.store.Items(ctx, req.Msg.GetThreadId())
 	if err != nil {
-		return nil, sessionError(err)
+		return nil, threadError(err)
 	}
 	return connect.NewResponse(&v1.ListThreadItemsResponse{Snapshot: itemsSnapshotToProto(snap)}), nil
 }
 
-// Watch sends the thread's snapshot, then its events. It counts as a viewer of the
+// WatchThread sends the thread's snapshot, then its events. It counts as a viewer of the
 // thread while open (Store.WatchItems). After dropped events it resends the snapshot.
 // A quiet thread gets a heartbeat every HeartbeatInterval (see heartbeat.proto).
-func (h *Thread) Watch(ctx context.Context, req *connect.Request[v1.WatchThreadRequest], stream *connect.ServerStream[v1.ThreadEvent]) error {
-	id := req.Msg.GetSessionId()
+func (h *Thread) WatchThread(ctx context.Context, req *connect.Request[v1.WatchThreadRequest], stream *connect.ServerStream[v1.ThreadEvent]) error {
+	id := req.Msg.GetThreadId()
 	// Subscribe first: events published between the snapshot and the loop are in the
 	// queue, and their seq says whether the snapshot has them already.
 	sub := bus.Subscribe[thread.ThreadEvent](h.bus, threadWatchBuffer)
 	defer sub.Close()
 	snap, err := h.store.WatchItems(ctx, id)
 	if err != nil {
-		return sessionError(err)
+		return threadError(err)
 	}
 	beat := newHeartbeat(h.beat)
 	defer beat.Stop()
@@ -86,7 +86,7 @@ func (h *Thread) Watch(ctx context.Context, req *connect.Request[v1.WatchThreadR
 			if d := sub.Dropped(); d != dropped {
 				dropped = d
 				if snap, err = h.store.Items(ctx, id); err != nil {
-					return sessionError(err)
+					return threadError(err)
 				}
 				seen = snap.Seq
 				if err := send(&v1.ThreadEvent{Event: &v1.ThreadEvent_Snapshot{Snapshot: itemsSnapshotToProto(snap)}}); err != nil {
@@ -109,9 +109,9 @@ func (h *Thread) Watch(ctx context.Context, req *connect.Request[v1.WatchThreadR
 // Send sends a user message.
 func (h *Thread) Send(ctx context.Context, req *connect.Request[v1.SendThreadMessageRequest]) (*connect.Response[v1.SendThreadMessageResponse], error) {
 	m := req.Msg
-	it, err := h.store.Send(ctx, m.GetSessionId(), thread.Message{Text: m.GetText(), Attachments: m.GetAttachments(), ComposerText: m.GetComposerText()})
+	it, err := h.store.Send(ctx, m.GetThreadId(), thread.Message{Text: m.GetText(), Attachments: m.GetAttachments(), ComposerText: m.GetComposerText()})
 	if err != nil {
-		return nil, sessionError(err)
+		return nil, threadError(err)
 	}
 	return connect.NewResponse(&v1.SendThreadMessageResponse{Item: itemToProto(it)}), nil
 }
@@ -129,9 +129,9 @@ func (h *Thread) Respond(ctx context.Context, req *connect.Request[v1.RespondThr
 	default:
 		return nil, connect.NewError(connect.CodeInvalidArgument, errDecision)
 	}
-	it, err := h.store.Respond(ctx, m.GetSessionId(), m.GetRequestId(), d)
+	it, err := h.store.Respond(ctx, m.GetThreadId(), m.GetRequestId(), d)
 	if err != nil {
-		return nil, sessionError(err)
+		return nil, threadError(err)
 	}
 	return connect.NewResponse(&v1.RespondThreadResponse{Item: itemToProto(it)}), nil
 }
@@ -140,37 +140,37 @@ var errDecision = errors.New("a decision is required: allow, allow for session, 
 
 // Interrupt stops the running turn.
 func (h *Thread) Interrupt(ctx context.Context, req *connect.Request[v1.InterruptThreadRequest]) (*connect.Response[v1.InterruptThreadResponse], error) {
-	if err := h.store.Interrupt(ctx, req.Msg.GetSessionId()); err != nil {
-		return nil, sessionError(err)
+	if err := h.store.Interrupt(ctx, req.Msg.GetThreadId()); err != nil {
+		return nil, threadError(err)
 	}
 	return connect.NewResponse(&v1.InterruptThreadResponse{}), nil
 }
 
 // SetModel switches the model.
 func (h *Thread) SetModel(ctx context.Context, req *connect.Request[v1.SetThreadModelRequest]) (*connect.Response[v1.SetThreadModelResponse], error) {
-	s, err := h.store.SetModel(ctx, req.Msg.GetSessionId(), req.Msg.GetModel())
+	s, err := h.store.SetModel(ctx, req.Msg.GetThreadId(), req.Msg.GetModel())
 	if err != nil {
-		return nil, sessionError(err)
+		return nil, threadError(err)
 	}
-	return connect.NewResponse(&v1.SetThreadModelResponse{Session: sessionToProto(s)}), nil
+	return connect.NewResponse(&v1.SetThreadModelResponse{Thread: threadToProto(s)}), nil
 }
 
 // SetPermissionMode switches the permission mode.
 func (h *Thread) SetPermissionMode(ctx context.Context, req *connect.Request[v1.SetThreadPermissionModeRequest]) (*connect.Response[v1.SetThreadPermissionModeResponse], error) {
-	s, err := h.store.SetPermissionMode(ctx, req.Msg.GetSessionId(), thread.PermissionMode(req.Msg.GetPermissionMode()))
+	s, err := h.store.SetPermissionMode(ctx, req.Msg.GetThreadId(), thread.PermissionMode(req.Msg.GetPermissionMode()))
 	if err != nil {
-		return nil, sessionError(err)
+		return nil, threadError(err)
 	}
-	return connect.NewResponse(&v1.SetThreadPermissionModeResponse{Session: sessionToProto(s)}), nil
+	return connect.NewResponse(&v1.SetThreadPermissionModeResponse{Thread: threadToProto(s)}), nil
 }
 
 // SetEffort changes the effort (a restart with --resume, now or after the turn).
 func (h *Thread) SetEffort(ctx context.Context, req *connect.Request[v1.SetThreadEffortRequest]) (*connect.Response[v1.SetThreadEffortResponse], error) {
-	s, err := h.store.SetEffort(ctx, req.Msg.GetSessionId(), req.Msg.GetEffort())
+	s, err := h.store.SetEffort(ctx, req.Msg.GetThreadId(), req.Msg.GetEffort())
 	if err != nil {
-		return nil, sessionError(err)
+		return nil, threadError(err)
 	}
-	return connect.NewResponse(&v1.SetThreadEffortResponse{Session: sessionToProto(s)}), nil
+	return connect.NewResponse(&v1.SetThreadEffortResponse{Thread: threadToProto(s)}), nil
 }
 
 // ---- mapping ----------------------------------------------------------------------
@@ -199,35 +199,35 @@ func threadSeq(ev thread.ThreadEvent) uint64 {
 func threadEventToProto(ev thread.ThreadEvent) *v1.ThreadEvent {
 	switch e := ev.(type) {
 	case thread.ItemAppended:
-		return &v1.ThreadEvent{Event: &v1.ThreadEvent_Appended{Appended: &v1.ThreadItemChange{SessionId: e.SessionID, Seq: e.Seq, Item: itemToProto(e.Item)}}}
+		return &v1.ThreadEvent{Event: &v1.ThreadEvent_Appended{Appended: &v1.ThreadItemChange{ThreadId: e.ThreadID, Seq: e.Seq, Item: itemToProto(e.Item)}}}
 	case thread.ItemUpdated:
-		return &v1.ThreadEvent{Event: &v1.ThreadEvent_Updated{Updated: &v1.ThreadItemChange{SessionId: e.SessionID, Seq: e.Seq, Item: itemToProto(e.Item)}}}
+		return &v1.ThreadEvent{Event: &v1.ThreadEvent_Updated{Updated: &v1.ThreadItemChange{ThreadId: e.ThreadID, Seq: e.Seq, Item: itemToProto(e.Item)}}}
 	case thread.ItemDelta:
 		f := v1.ThreadItemDelta_FIELD_TEXT
 		if e.Field == thread.DeltaInput {
 			f = v1.ThreadItemDelta_FIELD_INPUT
 		}
 		return &v1.ThreadEvent{Event: &v1.ThreadEvent_Delta{Delta: &v1.ThreadItemDelta{
-			SessionId: e.SessionID, Seq: e.Seq, ItemId: e.ItemID, Ordinal: e.Ordinal, Field: f, Text: e.Text,
+			ThreadId: e.ThreadID, Seq: e.Seq, ItemId: e.ItemID, Ordinal: e.Ordinal, Field: f, Text: e.Text,
 		}}}
 	case thread.PendingChanged:
-		return &v1.ThreadEvent{Event: &v1.ThreadEvent_Pending{Pending: pendingToProto(e.SessionID, e.Seq, e.Pending)}}
+		return &v1.ThreadEvent{Event: &v1.ThreadEvent_Pending{Pending: pendingToProto(e.ThreadID, e.Seq, e.Pending)}}
 	case thread.McpChanged:
-		return &v1.ThreadEvent{Event: &v1.ThreadEvent_Mcp{Mcp: &v1.ThreadMcpChange{SessionId: e.SessionID, Seq: e.Seq, Status: mcpStatusToProto(e.Status)}}}
+		return &v1.ThreadEvent{Event: &v1.ThreadEvent_Mcp{Mcp: &v1.ThreadMcpChange{ThreadId: e.ThreadID, Seq: e.Seq, Status: mcpStatusToProto(e.Status)}}}
 	case thread.SlashCommandsChanged:
-		return &v1.ThreadEvent{Event: &v1.ThreadEvent_Commands{Commands: &v1.ThreadSlashCommandsChange{SessionId: e.SessionID, Seq: e.Seq, Commands: slashCommandsToProto(e.Commands)}}}
+		return &v1.ThreadEvent{Event: &v1.ThreadEvent_Commands{Commands: &v1.ThreadSlashCommandsChange{ThreadId: e.ThreadID, Seq: e.Seq, Commands: slashCommandsToProto(e.Commands)}}}
 	case thread.AgentsChanged:
-		return &v1.ThreadEvent{Event: &v1.ThreadEvent_Agents{Agents: &v1.ThreadAgentsChange{SessionId: e.SessionID, Seq: e.Seq, Agents: threadAgentsToProto(e.Agents)}}}
+		return &v1.ThreadEvent{Event: &v1.ThreadEvent_Agents{Agents: &v1.ThreadAgentsChange{ThreadId: e.ThreadID, Seq: e.Seq, Agents: threadAgentsToProto(e.Agents)}}}
 	}
 	return nil
 }
 
 func itemsSnapshotToProto(s thread.ItemsSnapshot) *v1.ThreadItemsSnapshot {
-	out := &v1.ThreadItemsSnapshot{SessionId: s.SessionID, Seq: s.Seq, Items: make([]*v1.ThreadItem, len(s.Items))}
+	out := &v1.ThreadItemsSnapshot{ThreadId: s.ThreadID, Seq: s.Seq, Items: make([]*v1.ThreadItem, len(s.Items))}
 	for i, it := range s.Items {
 		out.Items[i] = itemToProto(it)
 	}
-	out.Pending = pendingToProto(s.SessionID, s.Seq, s.Pending).GetPending()
+	out.Pending = pendingToProto(s.ThreadID, s.Seq, s.Pending).GetPending()
 	out.Mcp = mcpStatusToProto(s.Mcp)
 	out.Commands = slashCommandsToProto(s.Commands)
 	out.Agents = threadAgentsToProto(s.Agents)
@@ -235,7 +235,7 @@ func itemsSnapshotToProto(s thread.ItemsSnapshot) *v1.ThreadItemsSnapshot {
 }
 
 func pendingToProto(id string, seq uint64, pending []thread.PendingRequest) *v1.ThreadPending {
-	out := &v1.ThreadPending{SessionId: id, Seq: seq}
+	out := &v1.ThreadPending{ThreadId: id, Seq: seq}
 	for _, p := range pending {
 		out.Pending = append(out.Pending, &v1.ThreadPendingRequest{
 			RequestId: p.RequestID, ItemId: p.ItemID, Question: p.Kind == thread.KindQuestion, ToolName: p.ToolName, Summary: p.Summary,

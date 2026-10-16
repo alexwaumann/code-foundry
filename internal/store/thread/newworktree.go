@@ -95,7 +95,7 @@ func (m *Manager) newWorktree(ctx context.Context, id, name string, o CreateOpti
 	}
 	nw.repoID, nw.path = r.ID, wt.Path
 	nw.baseRef = cmp.Or(base, wt.Status.BaseRef, r.DefaultBranch)
-	m.log.Info("worktree created for session", "session", id, "repo", r.ID, "branch", branch,
+	m.log.Info("worktree created for thread", "thread", id, "repo", r.ID, "branch", branch,
 		"path", wt.Path, "base", nw.baseRef)
 	return nw, nil
 }
@@ -133,14 +133,14 @@ func (m *Manager) waitSlug(ctx context.Context, id, name, prompt string) (slugWa
 	case res := <-ch:
 		timer.Stop()
 		if res.err != nil {
-			m.log.Warn("naming new worktree branch failed; using the session id", "session", id, "err", res.err)
+			m.log.Warn("naming new worktree branch failed; using the thread id", "thread", id, "err", res.err)
 		} else {
 			sw.slug, sw.name = slugify(res.name), res.name
-			m.log.Info("session auto-named", "session", id, "name", res.name,
+			m.log.Info("thread auto-named", "thread", id, "name", res.name,
 				"took", time.Since(start).Round(time.Millisecond).String())
 		}
 	case <-timer.C:
-		m.log.Info("naming new worktree branch timed out; using the session id", "session", id,
+		m.log.Info("naming new worktree branch timed out; using the thread id", "thread", id,
 			"timeout", m.opts.SlugTimeout.String())
 		sw.late = ch
 	case <-ctx.Done():
@@ -164,11 +164,11 @@ func (m *Manager) startSlug(id, prompt string) (<-chan namingResult, error) {
 	ch := make(chan namingResult, 1)
 	go func() {
 		defer m.wg.Done()
-		ctx, cancel := context.WithTimeout(withNamingSession(m.ctx, id), m.opts.NamingTimeout)
+		ctx, cancel := context.WithTimeout(withNamingThread(m.ctx, id), m.opts.NamingTimeout)
 		defer cancel()
 		name, err := m.opts.Namer(ctx, prompt)
 		if isRateLimit(err) {
-			m.log.Info("naming rate limited; retrying once", "session", id, "err", err)
+			m.log.Info("naming rate limited; retrying once", "thread", id, "err", err)
 			t := time.NewTimer(m.opts.NamingRetryDelay)
 			select {
 			case <-t.C:
@@ -201,7 +201,7 @@ func (m *Manager) applyLateName(id string, ch <-chan namingResult) {
 			return
 		}
 		if res.err != nil {
-			m.log.Warn("auto-naming failed", "session", id, "err", res.err)
+			m.log.Warn("auto-naming failed", "thread", id, "err", res.err)
 			return
 		}
 		if _, ok := m.update(id, true, func(rec *record) {
@@ -209,7 +209,7 @@ func (m *Manager) applyLateName(id string, ch <-chan namingResult) {
 				rec.s.Name, rec.s.AutoNamed = res.name, true
 			}
 		}); ok {
-			m.log.Info("session auto-named after its worktree was created", "session", id, "name", res.name)
+			m.log.Info("thread auto-named after its worktree was created", "thread", id, "name", res.name)
 		}
 	}()
 }

@@ -13,12 +13,12 @@ func (f *Fake) PutAgents(id string, runs ...thread.AgentRun) {
 	f.mu.Lock()
 	snap, ok := f.items[id]
 	if !ok {
-		snap = &thread.ItemsSnapshot{SessionID: id}
+		snap = &thread.ItemsSnapshot{ThreadID: id}
 		f.items[id] = snap
 	}
 	snap.Seq++
 	snap.Agents = slices.Clone(runs)
-	ev := thread.AgentsChanged{SessionID: id, Seq: snap.Seq, Agents: snap.Agents}
+	ev := thread.AgentsChanged{ThreadID: id, Seq: snap.Seq, Agents: snap.Agents}
 	f.mu.Unlock()
 	bus.Publish[thread.ThreadEvent](f.bus, ev)
 }

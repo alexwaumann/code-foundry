@@ -235,17 +235,17 @@ func TestBackgroundWork(t *testing.T) {
 	}
 	tests := []struct {
 		name string
-		s    Session
+		s    Thread
 		want bool
 	}{
-		{"nothing", Session{}, false},
-		{"a shell", Session{BackgroundShellsRunning: 1}, true},
-		{"a background agent", Session{AgentRuns: []AgentRun{run(AgentRunning, true, 1)}}, true},
-		{"a foreground agent (part of the turn)", Session{AgentRuns: []AgentRun{run(AgentRunning, false, 1)}}, false},
-		{"a nested background run alone", Session{AgentRuns: []AgentRun{run(AgentRunning, true, 2)}}, false},
-		{"a finished background agent", Session{AgentRuns: []AgentRun{run(AgentDone, true, 1)}}, false},
-		{"both", Session{BackgroundShellsRunning: 2, AgentRuns: []AgentRun{run(AgentRunning, true, 1)}}, true},
-		{"Claude's turn for an end is due", Session{WakePending: true}, true},
+		{"nothing", Thread{}, false},
+		{"a shell", Thread{BackgroundShellsRunning: 1}, true},
+		{"a background agent", Thread{AgentRuns: []AgentRun{run(AgentRunning, true, 1)}}, true},
+		{"a foreground agent (part of the turn)", Thread{AgentRuns: []AgentRun{run(AgentRunning, false, 1)}}, false},
+		{"a nested background run alone", Thread{AgentRuns: []AgentRun{run(AgentRunning, true, 2)}}, false},
+		{"a finished background agent", Thread{AgentRuns: []AgentRun{run(AgentDone, true, 1)}}, false},
+		{"both", Thread{BackgroundShellsRunning: 2, AgentRuns: []AgentRun{run(AgentRunning, true, 1)}}, true},
+		{"Claude's turn for an end is due", Thread{WakePending: true}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -256,8 +256,8 @@ func TestBackgroundWork(t *testing.T) {
 	}
 }
 
-func shellsRunning(n int) func(Session) bool {
-	return func(s Session) bool { return s.BackgroundShellsRunning == n }
+func shellsRunning(n int) func(Thread) bool {
+	return func(s Thread) bool { return s.BackgroundShellsRunning == n }
 }
 
 // The captures through the runner (the fake replays one turn per message): the call
@@ -327,7 +327,7 @@ func TestBgShellsOrphaned(t *testing.T) {
 		e.waitItems(s.ID, "launched", turnCount(1))
 		e.waitFor(s.ID, "a shell", shellsRunning(1))
 		e.exit(s.ID, 0)
-		got := e.waitFor(s.ID, "disconnected", func(s Session) bool { return s.State == StateDisconnected })
+		got := e.waitFor(s.ID, "disconnected", func(s Thread) bool { return s.State == StateDisconnected })
 		if got.BackgroundShellsRunning != 0 || got.BackgroundWork() {
 			t.Errorf("shells %d", got.BackgroundShellsRunning)
 		}
@@ -357,7 +357,7 @@ func TestBgShellBlocksTheEffortRestart(t *testing.T) {
 	e := newFixtureEnv(t, "shells")
 	s := e.create(CreateOptions{Effort: "low", InitialPrompt: "launch"})
 	e.waitItems(s.ID, "launched", turnCount(1))
-	e.waitFor(s.ID, "a shell at the prompt", func(s Session) bool { return s.BackgroundShellsRunning == 1 && turnOver(s) })
+	e.waitFor(s.ID, "a shell at the prompt", func(s Thread) bool { return s.BackgroundShellsRunning == 1 && turnOver(s) })
 	got, err := e.m.SetEffort(e.ctx(), s.ID, "high")
 	if err != nil || !got.EffortPending {
 		t.Fatalf("set effort %+v %v", got, err)
@@ -370,7 +370,7 @@ func TestBgShellBlocksTheEffortRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	e.waitArgv("the restart after the shell", func(a []string) bool { return argOf(a, "--effort") == "high" })
-	e.waitFor(s.ID, "applied", func(s Session) bool { return !s.EffortPending && s.State == StateConnected })
+	e.waitFor(s.ID, "applied", func(s Thread) bool { return !s.EffortPending && s.State == StateConnected })
 }
 
 // restartBegun reports whether the thread's runner began an effort restart. It goes
@@ -446,10 +446,10 @@ func TestBgShellOrphanKeepsTheUpdatedEnd(t *testing.T) {
 func TestBackgroundEndHoldsTheEffortRestartForClaudesTurn(t *testing.T) {
 	tests := []struct {
 		fixture string
-		running func(Session) bool
+		running func(Thread) bool
 	}{
-		{"shells", func(s Session) bool { return s.BackgroundShellsRunning == 1 }},
-		{"agents", func(s Session) bool { _, bg := s.AgentsRunning(); return bg == 1 }},
+		{"shells", func(s Thread) bool { return s.BackgroundShellsRunning == 1 }},
+		{"agents", func(s Thread) bool { _, bg := s.AgentsRunning(); return bg == 1 }},
 	}
 	for _, tt := range tests {
 		t.Run(tt.fixture, func(t *testing.T) {
@@ -463,7 +463,7 @@ func TestBackgroundEndHoldsTheEffortRestartForClaudesTurn(t *testing.T) {
 			e := newFixtureEnvAt(t, fixturePath(tt.fixture), []string{"CF_FAKE_CLAUDE_UNPROMPTED=" + gates})
 			s := e.create(CreateOptions{Effort: "low", InitialPrompt: "launch"})
 			e.waitItems(s.ID, "launched", turnCount(1))
-			e.waitFor(s.ID, "background work at the prompt", func(s Session) bool { return tt.running(s) && turnOver(s) })
+			e.waitFor(s.ID, "background work at the prompt", func(s Thread) bool { return tt.running(s) && turnOver(s) })
 			if got, err := e.m.SetEffort(e.ctx(), s.ID, "high"); err != nil || !got.EffortPending {
 				t.Fatalf("set effort %+v %v", got, err)
 			}
@@ -473,7 +473,7 @@ func TestBackgroundEndHoldsTheEffortRestartForClaudesTurn(t *testing.T) {
 
 			// The end frames: nothing runs any more, but Claude's turn is due.
 			release("turn-2")
-			got := e.waitFor(s.ID, "the end, a wake due", func(s Session) bool { return !tt.running(s) && s.WakePending })
+			got := e.waitFor(s.ID, "the end, a wake due", func(s Thread) bool { return !tt.running(s) && s.WakePending })
 			if !got.BackgroundWork() {
 				t.Errorf("no background work while the wake is due: %+v", got)
 			}
@@ -484,7 +484,7 @@ func TestBackgroundEndHoldsTheEffortRestartForClaudesTurn(t *testing.T) {
 			// Claude's turn: once it ended, the restart goes ahead.
 			release("turn-2.init")
 			e.waitArgv("the restart after Claude's turn", func(a []string) bool { return argOf(a, "--effort") == "high" })
-			got = e.waitFor(s.ID, "applied", func(s Session) bool { return !s.EffortPending && !s.WakePending && s.State == StateConnected })
+			got = e.waitFor(s.ID, "applied", func(s Thread) bool { return !s.EffortPending && !s.WakePending && s.State == StateConnected })
 			if got.BackgroundWork() {
 				t.Errorf("background work after the turn: %+v", got)
 			}
@@ -513,7 +513,7 @@ func TestBackgroundWakeTimesOut(t *testing.T) {
 		func(o *Options) { o.WakeTimeout = 150 * time.Millisecond })
 	s := e.create(CreateOptions{Effort: "low", InitialPrompt: "launch"})
 	e.waitItems(s.ID, "launched", turnCount(1))
-	e.waitFor(s.ID, "a shell at the prompt", func(s Session) bool { return s.BackgroundShellsRunning == 1 && turnOver(s) })
+	e.waitFor(s.ID, "a shell at the prompt", func(s Thread) bool { return s.BackgroundShellsRunning == 1 && turnOver(s) })
 	if _, err := e.m.SetEffort(e.ctx(), s.ID, "high"); err != nil {
 		t.Fatal(err)
 	}
@@ -521,7 +521,7 @@ func TestBackgroundWakeTimesOut(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(gates, "turn-2"), nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	e.waitFor(s.ID, "a wake due", func(s Session) bool { return s.WakePending })
+	e.waitFor(s.ID, "a wake due", func(s Thread) bool { return s.WakePending })
 	e.waitArgv("the restart after the timeout", func(a []string) bool { return argOf(a, "--effort") == "high" })
-	e.waitFor(s.ID, "applied", func(s Session) bool { return !s.EffortPending && !s.WakePending })
+	e.waitFor(s.ID, "applied", func(s Thread) bool { return !s.EffortPending && !s.WakePending })
 }

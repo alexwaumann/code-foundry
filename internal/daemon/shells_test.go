@@ -22,7 +22,7 @@ var discard = slog.New(slog.NewTextHandler(io.Discard, nil))
 func TestShellReaper(t *testing.T) {
 	gone := "/cf-test/src/app/.worktrees/feat" // does not exist: a real removal
 	// Owner labels without the shell kind: not terminal.new's, so never reaped.
-	owned := map[string]string{termlabel.Session: "s1", termlabel.Worktree: gone}
+	owned := map[string]string{termlabel.Thread: "s1", termlabel.Worktree: gone}
 	worktreeRemoved := func(path string) func(dir string) any {
 		return func(dir string) any {
 			if path == "%dir" {
@@ -32,8 +32,8 @@ func TestShellReaper(t *testing.T) {
 		}
 	}
 	event := func(ev any) func(string) any { return func(string) any { return ev } }
-	action := func(sessionID, repoID, worktree string) map[string]string {
-		return termlabel.ActionTerminal(sessionID, repoID, worktree, "a-1", "Test", "r-1")
+	action := func(threadID, repoID, worktree string) map[string]string {
+		return termlabel.ActionTerminal(threadID, repoID, worktree, "a-1", "Test", "r-1")
 	}
 	tests := []struct {
 		name string
@@ -123,8 +123,8 @@ func TestShellReaper(t *testing.T) {
 			}
 			stop, err := startShellReaper(t.Context(), shellReaperOptions{
 				Log: discard, Terminals: f, Bus: b, SweepEvery: sweep,
-				RepoExists:    func(id string) bool { return id == "r1" || id == "r2" },
-				SessionExists: func(id string) bool { return id == "s1" || id == "s2" },
+				RepoExists:   func(id string) bool { return id == "r1" || id == "r2" },
+				ThreadExists: func(id string) bool { return id == "s1" || id == "s2" },
 			})
 			if err != nil {
 				t.Fatal(err)

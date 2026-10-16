@@ -205,7 +205,7 @@ func (m *Manager) setUsage(id string, up usageUpdate) {
 		}
 	}
 	if err := saveUsageUpdate(context.Background(), m.opts.DB, id, up, changedRuns); err != nil {
-		m.log.Error("persist session usage", "session", id, "err", err)
+		m.log.Error("persist thread usage", "thread", id, "err", err)
 	}
 	if same {
 		return
@@ -226,7 +226,7 @@ func (m *Manager) discoverTranscript(id, cid string) {
 	rec.s.ClaudeSessionID = cid
 	if !slices.Contains(rec.s.Transcripts, cid) {
 		if err := saveTranscript(context.Background(), m.opts.DB, id, cid, len(rec.s.Transcripts)); err != nil {
-			m.log.Error("persist session transcript", "session", id, "err", err)
+			m.log.Error("persist thread transcript", "thread", id, "err", err)
 		}
 		rec.s.Transcripts = append(slices.Clip(rec.s.Transcripts), cid)
 	}

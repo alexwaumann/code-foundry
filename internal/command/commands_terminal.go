@@ -46,7 +46,7 @@ var (
 type TerminalDeps struct {
 	Terminal TerminalBackend
 	Repo     RepoBackend
-	Session  SessionBackend
+	Thread   ThreadBackend
 	// IsShell reports whether terminal id is a shell terminal.new started or an action
 	// run (termlabel.IsPanel). It gates terminal.close, which refuses other terminals
 	// (unlabelled ones TerminalService.Create made) anyway. Nil: any terminal (the
@@ -78,7 +78,7 @@ func hasTerminal(c Context) bool { return c.ActiveTerminalID != "" }
 // sends its working directory as --here and is refused outside every registered project.
 // The dashboard and the Pull Requests page never offer it.
 func canStartShell(c Context) bool {
-	return hasSession(c) || c.ActiveWorktreePath != "" || c.ActiveView == ""
+	return hasThread(c) || c.ActiveWorktreePath != "" || c.ActiveView == ""
 }
 
 // notInProject is how terminal.new refuses a cwd outside every registered worktree:
@@ -123,13 +123,13 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 				if err != nil {
 					return Result{}, err
 				}
-				owner, err := shellOwner(ctx, d.Repo, d.Session, c, a.Path("cwd"), a.Path("here"),
+				owner, err := shellOwner(ctx, d.Repo, d.Thread, c, a.Path("cwd"), a.Path("here"),
 					"terminal.new needs a thread, a worktree, or --cwd inside a registered project")
 				if err != nil {
 					return Result{}, err
 				}
 				res, err := d.Terminal.Create(ctx, connect.NewRequest(&v1.CreateTerminalRequest{
-					Argv: argv, Cwd: owner.cwd, Labels: termlabel.Shell(owner.session, owner.repo, owner.worktree),
+					Argv: argv, Cwd: owner.cwd, Labels: termlabel.Shell(owner.thread, owner.repo, owner.worktree),
 				}))
 				if err != nil {
 					return Result{}, err
@@ -311,8 +311,8 @@ func formatLabels(l map[string]string) string {
 
 // owner is who a new shell belongs to (its labels) and where it starts.
 type owner struct {
-	session, repo, worktree string
-	cwd                     string
+	thread, repo, worktree string
+	cwd                    string
 }
 
 // shellOwner decides who owns a shell terminal.new starts (and an action run action.run
@@ -321,14 +321,14 @@ type owner struct {
 // registered worktree containing cwd, else here (the CLI's working directory). The shell
 // starts in cwd, else in here when here chose the owner, else in the thread's worktree or
 // the context's worktree path. Without any of them it fails with missing.
-func shellOwner(ctx context.Context, repos RepoBackend, sessions SessionBackend, c Context, cwd, here, missing string) (owner, error) {
-	if c.ActiveSessionID != "" {
-		res, err := sessions.Get(ctx, connect.NewRequest(&v1.GetSessionRequest{Id: c.ActiveSessionID}))
+func shellOwner(ctx context.Context, repos RepoBackend, threads ThreadBackend, c Context, cwd, here, missing string) (owner, error) {
+	if c.ActiveThreadID != "" {
+		res, err := threads.Get(ctx, connect.NewRequest(&v1.GetThreadRequest{Id: c.ActiveThreadID}))
 		if err != nil {
 			return owner{}, err
 		}
-		s := res.Msg.GetSession()
-		return owner{session: s.GetId(), repo: s.GetRepoId(), worktree: s.GetWorktreePath(), cwd: cmp.Or(cwd, s.GetWorktreePath())}, nil
+		s := res.Msg.GetThread()
+		return owner{thread: s.GetId(), repo: s.GetRepoId(), worktree: s.GetWorktreePath(), cwd: cmp.Or(cwd, s.GetWorktreePath())}, nil
 	}
 	path, start := c.ActiveWorktreePath, cmp.Or(cwd, c.ActiveWorktreePath)
 	if path == "" {

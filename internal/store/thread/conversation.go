@@ -47,7 +47,7 @@ func (m *Manager) Send(ctx context.Context, id string, msg Message) (Item, error
 	// "/clear" and the like: the app has its own control (slashdeny.go). The commands
 	// Claude last reported count while it is stopped too.
 	if ref := refusedSlashCommand(msg.Text, log.offersSlashCommand); ref != nil {
-		m.log.Info("refused a slash command the app replaces", "session", id, "command", ref.Command)
+		m.log.Info("refused a slash command the app replaces", "thread", id, "command", ref.Command)
 		return Item{}, ref
 	}
 	attachments, err := checkAttachments(m.opts.AttachmentsDir, msg.Attachments)
@@ -67,7 +67,7 @@ func (m *Manager) Send(ctx context.Context, id string, msg Message) (Item, error
 	}
 	prompt, dropped := rewriteFileRefs(prompt, m.fileRefRoots(s))
 	if len(dropped) > 0 {
-		m.log.Warn("file references outside the thread's projects; passing their relative paths", "session", id, "refs", dropped)
+		m.log.Warn("file references outside the thread's projects; passing their relative paths", "thread", id, "refs", dropped)
 	}
 	o := &outgoing{text: strings.TrimSpace(msg.Text), composer: strings.TrimSpace(msg.ComposerText), attachments: attachments, prompt: prompt}
 	for {
@@ -108,7 +108,7 @@ func (m *Manager) Send(ctx context.Context, id string, msg Message) (Item, error
 // fileRefRoots resolves a file reference's repository to its worktree for thread s:
 // the workspace's member in that repository, else s's own worktree for its repo. A
 // thread without a project resolves none.
-func (m *Manager) fileRefRoots(s Session) func(repoID string) (string, bool) {
+func (m *Manager) fileRefRoots(s Thread) func(repoID string) (string, bool) {
 	var members []workspace.Member
 	if s.WorkspaceID != "" && m.opts.Workspaces != nil {
 		if w, ok := m.opts.Workspaces.Snapshot().Workspace(s.WorkspaceID); ok {
@@ -155,11 +155,11 @@ func (m *Manager) Interrupt(ctx context.Context, id string) error {
 // setLive applies a setting: through Claude's control protocol (apply) on a live
 // thread, then on the row; only on the row (persisted) for a thread that is not
 // running, which the next spawn reads (claudeCommand).
-func (m *Manager) setLive(ctx context.Context, id string, apply func(*claudestream.Conn) error, row func(*Session)) (Session, error) {
+func (m *Manager) setLive(ctx context.Context, id string, apply func(*claudestream.Conn) error, row func(*Thread)) (Thread, error) {
 	for {
 		r, _, err := m.liveOrStopped(ctx, id)
 		if err != nil {
-			return Session{}, err
+			return Thread{}, err
 		}
 		if r == nil {
 			s, ok, err := m.updateStopped(id, row)
@@ -173,11 +173,11 @@ func (m *Manager) setLive(ctx context.Context, id string, apply func(*claudestre
 		case <-r.done:
 			continue
 		case <-ctx.Done():
-			return Session{}, ctx.Err()
+			return Thread{}, ctx.Err()
 		}
 		conn, err := r.st.connection()
 		if err != nil {
-			return Session{}, err
+			return Thread{}, err
 		}
 		if err := apply(conn); errors.Is(err, claudestream.ErrClosed) {
 			// The process ended under the request (an idle stop raced it): once the
@@ -185,11 +185,11 @@ func (m *Manager) setLive(ctx context.Context, id string, apply func(*claudestre
 			select {
 			case <-r.done:
 			case <-ctx.Done():
-				return Session{}, ctx.Err()
+				return Thread{}, ctx.Err()
 			}
 			continue
 		} else if err != nil {
-			return Session{}, controlErr(err)
+			return Thread{}, controlErr(err)
 		}
 		s, _ := m.update(id, true, func(rec *record) { row(&rec.s) })
 		return s, nil
@@ -197,17 +197,17 @@ func (m *Manager) setLive(ctx context.Context, id string, apply func(*claudestre
 }
 
 // SetModel implements Store.
-func (m *Manager) SetModel(ctx context.Context, id, model string) (Session, error) {
+func (m *Manager) SetModel(ctx context.Context, id, model string) (Thread, error) {
 	if model == "" {
-		return Session{}, fmt.Errorf("%w: a model is required", ErrInvalidArgument)
+		return Thread{}, fmt.Errorf("%w: a model is required", ErrInvalidArgument)
 	}
 	if err := validateModelEffort(model, ""); err != nil {
-		return Session{}, err
+		return Thread{}, err
 	}
 	s, err := m.setLive(ctx, id, func(c *claudestream.Conn) error { return c.SetModel(ctx, model) },
-		func(s *Session) { s.Model = model })
+		func(s *Thread) { s.Model = model })
 	if err == nil {
-		m.log.Info("thread model changed", "session", id, "model", model)
+		m.log.Info("thread model changed", "thread", id, "model", model)
 	}
 	return s, err
 }
@@ -215,7 +215,7 @@ func (m *Manager) SetModel(ctx context.Context, id, model string) (Session, erro
 // SetPermissionMode implements Store. Only supervised, accept edits and auto: plan and
 // bypass are not representable, and Claude's default (no flag: the user's
 // defaultMode setting) cannot be selected live.
-func (m *Manager) SetPermissionMode(ctx context.Context, id string, mode PermissionMode) (Session, error) {
+func (m *Manager) SetPermissionMode(ctx context.Context, id string, mode PermissionMode) (Thread, error) {
 	wire := ""
 	switch mode {
 	case PermissionSupervised:
@@ -225,12 +225,12 @@ func (m *Manager) SetPermissionMode(ctx context.Context, id string, mode Permiss
 	case PermissionAuto:
 		wire = claudestream.ModeAuto
 	default:
-		return Session{}, fmt.Errorf("%w: permission mode %d (want supervised, accept edits or auto)", ErrInvalidArgument, mode)
+		return Thread{}, fmt.Errorf("%w: permission mode %d (want supervised, accept edits or auto)", ErrInvalidArgument, mode)
 	}
 	s, err := m.setLive(ctx, id, func(c *claudestream.Conn) error { return c.SetPermissionMode(ctx, wire) },
-		func(s *Session) { s.PermissionMode = mode })
+		func(s *Thread) { s.PermissionMode = mode })
 	if err == nil {
-		m.log.Info("thread permission mode changed", "session", id, "mode", mode.Flag())
+		m.log.Info("thread permission mode changed", "thread", id, "mode", mode.Flag())
 	}
 	return s, err
 }

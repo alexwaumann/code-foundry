@@ -33,9 +33,9 @@ var (
 // ActionDeps are the action.* commands' dependencies. Repo and Session find the
 // project and the owner of a run the way terminal.new finds a shell's.
 type ActionDeps struct {
-	Action  ActionBackend
-	Repo    RepoBackend
-	Session SessionBackend
+	Action ActionBackend
+	Repo   RepoBackend
+	Thread ThreadBackend
 }
 
 // actionIcons maps the icon names the commands take to the proto enum; the first is
@@ -81,7 +81,7 @@ func actionIconName(i v1.ActionIcon) string {
 // canUseActions: a thread, a project or worktree in context, or the CLI (which finds
 // the project from its working directory).
 func canUseActions(c Context) bool {
-	return hasSession(c) || hasRepoOrWorktree(c) || c.ActiveView == ""
+	return hasThread(c) || hasRepoOrWorktree(c) || c.ActiveView == ""
 }
 
 // noProject is how the action commands refuse a context without a project.
@@ -259,13 +259,13 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 				case a.Bool("terminal"):
 					mode = v1.ActionRunMode_ACTION_RUN_MODE_TERMINAL
 				}
-				o, err := shellOwner(ctx, d.Repo, d.Session, c, "", a.Path("here"),
+				o, err := shellOwner(ctx, d.Repo, d.Thread, c, "", a.Path("here"),
 					"action.run needs a thread, a worktree, or to run inside a registered project")
 				if err != nil {
 					return Result{}, err
 				}
 				res, err := d.Action.Run(ctx, connect.NewRequest(&v1.RunActionRequest{
-					Action: a.String("action"), SessionId: o.session, WorktreePath: o.worktree, RepoId: o.repo, Mode: mode,
+					Action: a.String("action"), ThreadId: o.thread, WorktreePath: o.worktree, RepoId: o.repo, Mode: mode,
 				}))
 				if err != nil {
 					return Result{}, err
@@ -326,12 +326,12 @@ func actionRepo(ctx context.Context, d ActionDeps, c Context, a Args) (string, e
 	if ref := strings.TrimSpace(a.String("repo")); ref != "" {
 		return resolveRepoRef(ctx, d.Repo, ref)
 	}
-	o, err := shellOwner(ctx, d.Repo, d.Session, c, "", a.Path("here"), noProject)
+	o, err := shellOwner(ctx, d.Repo, d.Thread, c, "", a.Path("here"), noProject)
 	if err != nil {
 		return "", err
 	}
 	if o.repo == "" {
-		return "", InvalidArg("repo", "thread %s has no project; %s", o.session, noProject)
+		return "", InvalidArg("repo", "thread %s has no project; %s", o.thread, noProject)
 	}
 	return o.repo, nil
 }
@@ -464,8 +464,8 @@ func formatRuns(runs []*v1.ActionRun) string {
 			where = "terminal " + r.GetTerminalId()
 		}
 		owner := r.GetWorktreePath()
-		if r.GetSessionId() != "" {
-			owner = "thread " + r.GetSessionId()
+		if r.GetThreadId() != "" {
+			owner = "thread " + r.GetThreadId()
 		}
 		started := ""
 		if t := r.GetStartedAt(); t != nil {

@@ -91,7 +91,7 @@ func (f *Action) Run(_ context.Context, r *connect.Request[v1.RunActionRequest])
 	if f.Started != nil {
 		run = proto.CloneOf(f.Started)
 	}
-	run.SessionId, run.WorktreePath, run.RepoId = r.Msg.GetSessionId(), r.Msg.GetWorktreePath(), r.Msg.GetRepoId()
+	run.ThreadId, run.WorktreePath, run.RepoId = r.Msg.GetThreadId(), r.Msg.GetWorktreePath(), r.Msg.GetRepoId()
 	if run.Mode == v1.ActionRunMode_ACTION_RUN_MODE_UNSPECIFIED {
 		run.Mode = r.Msg.GetMode()
 	}

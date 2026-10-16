@@ -44,10 +44,10 @@ func RegisterSlash(r *Registry, b SlashBackend) error {
 		Description: "Print the slash commands a running thread offers: Claude's own list (skills, user and project commands, " +
 			"plugin skills and built-ins), minus the ones the app replaces or that mean nothing outside Claude's terminal.",
 		Category: "Thread",
-		Args:     []ArgSpec{{Name: "id", Type: String, Required: true, Context: ContextSession, Description: "Thread id"}},
-		When:     hasSession,
+		Args:     []ArgSpec{{Name: "id", Type: String, Required: true, Context: ContextThread, Description: "Thread id"}},
+		When:     hasThread,
 		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-			res, err := b.SlashCommands(ctx, connect.NewRequest(&v1.SlashCommandsRequest{SessionId: a.String("id")}))
+			res, err := b.SlashCommands(ctx, connect.NewRequest(&v1.SlashCommandsRequest{ThreadId: a.String("id")}))
 			if err != nil {
 				return Result{}, err
 			}

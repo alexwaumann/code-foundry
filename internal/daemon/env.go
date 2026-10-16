@@ -49,7 +49,7 @@ func scrubClaudeEnv(log *slog.Logger) []string {
 // sessionEnv is what every Claude session gets on top of the daemon's environment:
 // this daemon's loopback endpoint and bearer token. The CLI prefers them over the
 // Unix socket (client.EndpointFromEnv), which sandboxed sessions cannot connect to.
-func sessionEnv(port int, token string) []string {
+func threadEnv(port int, token string) []string {
 	return []string{
 		paths.EnvEndpoint + "=http://127.0.0.1:" + strconv.Itoa(port),
 		paths.EnvToken + "=" + token,
@@ -57,12 +57,12 @@ func sessionEnv(port int, token string) []string {
 }
 
 // scrubEndpointEnv removes an inherited endpoint, token and thread id (a daemon
-// started by hand from inside a session), so this daemon's plain terminals and action
-// runs do not point the CLI at the other daemon or at a thread of it. Sessions get this
-// daemon's own values (sessionEnv, and their own paths.EnvSession).
+// started by hand from inside a thread), so this daemon's plain terminals and action
+// runs do not point the CLI at the other daemon or at a thread of it. Threads get this
+// daemon's own values (threadEnv, and their own paths.EnvThread).
 func scrubEndpointEnv(log *slog.Logger) {
 	var vars []string
-	for _, k := range []string{paths.EnvEndpoint, paths.EnvToken, paths.EnvSession} {
+	for _, k := range []string{paths.EnvEndpoint, paths.EnvToken, paths.EnvThread} {
 		if _, ok := os.LookupEnv(k); ok {
 			_ = os.Unsetenv(k)
 			vars = append(vars, k)

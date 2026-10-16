@@ -14,11 +14,11 @@ func TestSpawnPassesEnv(t *testing.T) {
 	e := newEnv(t, func(o *Options) { o.Env = append(o.Env, env...) })
 	s := e.connected(CreateOptions{})
 	// Each thread also gets its own id, the CLI's default --context-session.
-	if got := e.spec(s.ID).Env; !hasAll(got, append(slices.Clone(env), paths.EnvSession+"="+s.ID)) {
-		t.Fatalf("create env = %q, want %q and its session in it", got, env)
+	if got := e.spec(s.ID).Env; !hasAll(got, append(slices.Clone(env), paths.EnvThread+"="+s.ID)) {
+		t.Fatalf("create env = %q, want %q and its thread in it", got, env)
 	}
 	e.exit(s.ID, 0)
-	e.waitFor(s.ID, "disconnected", func(s Session) bool { return s.State == StateDisconnected })
+	e.waitFor(s.ID, "disconnected", func(s Thread) bool { return s.State == StateDisconnected })
 	if _, err := e.m.Reconnect(e.ctx(), s.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -30,11 +30,11 @@ func TestSpawnPassesEnv(t *testing.T) {
 // A new worktree for a thread calls Options.WorktreeCreated once the thread started; a
 // thread in an existing worktree does not.
 func TestCreateNewWorktreeCallsWorktreeCreated(t *testing.T) {
-	type call struct{ session, repo, worktree string }
+	type call struct{ thread, repo, worktree string }
 	var calls []call
 	e, _ := newWorktreeEnv(t, nil, func(o *Options) {
-		o.WorktreeCreated = func(sessionID, repoID, worktree string) {
-			calls = append(calls, call{sessionID, repoID, worktree})
+		o.WorktreeCreated = func(threadID, repoID, worktree string) {
+			calls = append(calls, call{threadID, repoID, worktree})
 		}
 	})
 	e.namer = func(string) (string, error) { return "Do x", nil }

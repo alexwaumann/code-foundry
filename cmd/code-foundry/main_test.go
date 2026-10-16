@@ -139,8 +139,8 @@ func TestConnectOptionsFromEnv(t *testing.T) {
 		wantURL string // "" means the Unix socket
 		wantErr bool
 	}{
-		{"outside a session", nil, "", false},
-		{"inside a session", map[string]string{"CODE_FOUNDRY_ENDPOINT": "http://127.0.0.1:5555", "CODE_FOUNDRY_TOKEN": "t"}, "http://127.0.0.1:5555", false},
+		{"outside a thread", nil, "", false},
+		{"inside a thread", map[string]string{"CODE_FOUNDRY_ENDPOINT": "http://127.0.0.1:5555", "CODE_FOUNDRY_TOKEN": "t"}, "http://127.0.0.1:5555", false},
 		{"endpoint without token", map[string]string{"CODE_FOUNDRY_ENDPOINT": "http://127.0.0.1:5555"}, "", true},
 	}
 	for _, tt := range tests {

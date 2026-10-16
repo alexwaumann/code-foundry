@@ -65,7 +65,7 @@ func agentRunsToProto(runs []thread.AgentRun) []*v1.AgentRun {
 // (pricing.RereadCost): at the rate of the model that answered its last turn, else of
 // the row's model when that is a full id; the TTL is the one its expiry was computed
 // with. 0 when nothing is recorded or the model is unpriced.
-func contextRereadUSD(s thread.Session) float64 {
+func contextRereadUSD(s thread.Thread) float64 {
 	if s.ContextTokens <= 0 || s.LastResultAt.IsZero() || s.CacheExpiresAt.IsZero() {
 		return 0
 	}

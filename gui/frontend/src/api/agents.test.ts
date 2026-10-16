@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { create } from "@bufbuild/protobuf";
 import { timestampFromMs } from "@bufbuild/protobuf/wkt";
-import { SessionSchema } from "@/gen/codefoundry/v1/session_pb";
+import { ThreadSchema } from "@/gen/codefoundry/v1/thread_lifecycle_pb";
 import { ThreadAgentRunSchema, ThreadAgentStatus, ThreadEventSchema } from "@/gen/codefoundry/v1/thread_pb";
 import { toAgentRunView } from "./agents";
 import { toSessionView } from "./session";
@@ -71,7 +71,7 @@ describe("toAgentRunView", () => {
 describe("the Watch's agents", () => {
   it("the snapshot carries the list in spawn order", () => {
     const ev = toThreadEventView(
-      create(ThreadEventSchema, { event: { case: "snapshot", value: { sessionId: "s", seq: 3n, agents: [{ id: "a0", status: ThreadAgentStatus.DONE }, { id: "a1", status: ThreadAgentStatus.RUNNING }] } } }),
+      create(ThreadEventSchema, { event: { case: "snapshot", value: { threadId: "s", seq: 3n, agents: [{ id: "a0", status: ThreadAgentStatus.DONE }, { id: "a1", status: ThreadAgentStatus.RUNNING }] } } }),
     );
     expect(ev?.kind).toBe("snapshot");
     expect(ev?.kind === "snapshot" && ev.agents.map((a) => [a.id, a.status])).toEqual([
@@ -81,7 +81,7 @@ describe("the Watch's agents", () => {
   });
 
   it("an agents event carries the whole new list", () => {
-    const ev = toThreadEventView(create(ThreadEventSchema, { event: { case: "agents", value: { sessionId: "s", seq: 9n, agents: [{ id: "a1", status: ThreadAgentStatus.FAILED, error: "stopped" }] } } }));
+    const ev = toThreadEventView(create(ThreadEventSchema, { event: { case: "agents", value: { threadId: "s", seq: 9n, agents: [{ id: "a1", status: ThreadAgentStatus.FAILED, error: "stopped" }] } } }));
     expect(ev).toMatchObject({ kind: "agents", sessionId: "s", seq: 9 });
     expect(ev?.kind === "agents" && ev.agents[0]).toMatchObject({ id: "a1", status: "failed", error: "stopped" });
   });
@@ -89,12 +89,12 @@ describe("the Watch's agents", () => {
 
 describe("the session's running agents", () => {
   it("maps both counts", () => {
-    const v = toSessionView(create(SessionSchema, { id: "s", agentsRunning: 3, backgroundAgentsRunning: 2 }));
+    const v = toSessionView(create(ThreadSchema, { id: "s", agentsRunning: 3, backgroundAgentsRunning: 2 }));
     expect([v.agentsRunning, v.backgroundAgentsRunning]).toEqual([3, 2]);
   });
 
   it("maps the background shells", () => {
-    expect(toSessionView(create(SessionSchema, { id: "s", backgroundShellsRunning: 2 })).backgroundShellsRunning).toBe(2);
-    expect(toSessionView(create(SessionSchema, { id: "s" })).backgroundShellsRunning).toBe(0);
+    expect(toSessionView(create(ThreadSchema, { id: "s", backgroundShellsRunning: 2 })).backgroundShellsRunning).toBe(2);
+    expect(toSessionView(create(ThreadSchema, { id: "s" })).backgroundShellsRunning).toBe(0);
   });
 });

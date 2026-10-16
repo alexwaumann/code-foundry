@@ -8,7 +8,7 @@ import { useCommandsStore } from "@/stores/commands";
 type ButtonProps = ComponentProps<typeof Button>;
 
 interface CommandButtonProps {
-  /** Registry command name, e.g. "session.new". */
+  /** Registry command name, e.g. "thread.new". */
   command: string;
   /** The button's icon; omit it when `children` draws the whole content. */
   icon?: LucideIcon;

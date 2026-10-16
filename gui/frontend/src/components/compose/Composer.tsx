@@ -71,8 +71,8 @@ const HOME_TRIGGERS: readonly TriggerChar[] = ["/"];
 
 /** Model and effort the composer starts with: the settings defaults, else opus / high. */
 function useDefaults(): { model: string; effort: string } {
-  const model = pickDefault(useModelChoices(), useSettingValue("sessions.default_model"), DEFAULT_MODEL);
-  const effort = pickDefault(EFFORT_CHOICES, useSettingValue("sessions.default_effort"), DEFAULT_EFFORT);
+  const model = pickDefault(useModelChoices(), useSettingValue("threads.default_model"), DEFAULT_MODEL);
+  const effort = pickDefault(EFFORT_CHOICES, useSettingValue("threads.default_effort"), DEFAULT_EFFORT);
   return useMemo(() => ({ model, effort }), [model, effort]);
 }
 

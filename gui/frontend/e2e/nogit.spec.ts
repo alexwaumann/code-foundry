@@ -94,7 +94,7 @@ test("the composer in a project without git offers only its current checkout; th
   await page.getByTestId("composer-input").click();
   await page.keyboard.type("Outline chapter two");
   await page.keyboard.press("Enter");
-  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("session.new");
+  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("thread.new");
   const args = (await invocations()).at(-1)?.args;
   expect(args).toMatchObject({ repo: "repo-wr", worktree: WR });
   expect(args).not.toHaveProperty("new-worktree");

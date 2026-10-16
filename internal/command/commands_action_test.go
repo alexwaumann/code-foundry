@@ -25,13 +25,13 @@ var actionRepos = []*v1.Repo{
 	{Id: "r2", Name: "lib", Path: actLib, Worktrees: []*v1.Worktree{{RepoId: "r2", Path: actLib}}},
 }
 
-func actionRegistry(t *testing.T, act *commandtest.Action, sess *v1.Session) *command.Registry {
+func actionRegistry(t *testing.T, act *commandtest.Action, th *v1.Thread) *command.Registry {
 	t.Helper()
 	reg := command.NewRegistry()
 	if err := command.RegisterAction(reg, command.ActionDeps{
-		Action:  act,
-		Repo:    &commandtest.Repo{Repos: actionRepos},
-		Session: &commandtest.Session{Current: cmp.Or(sess, &v1.Session{RepoId: "r1", WorktreePath: actFeat})},
+		Action: act,
+		Repo:   &commandtest.Repo{Repos: actionRepos},
+		Thread: &commandtest.Thread{Current: cmp.Or(th, &v1.Thread{RepoId: "r1", WorktreePath: actFeat})},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -39,23 +39,23 @@ func actionRegistry(t *testing.T, act *commandtest.Action, sess *v1.Session) *co
 }
 
 func TestActionRunOwnerAndMode(t *testing.T) {
-	gui := func(c command.Context) command.Context { c.ActiveView = "session"; return c }
+	gui := func(c command.Context) command.Context { c.ActiveView = "thread"; return c }
 	tests := []struct {
 		name    string
 		ctx     command.Context
 		args    map[string]string
-		session *v1.Session
+		thread  *v1.Thread
 		wantErr error
 		wantMsg string
 		want    *v1.RunActionRequest
 	}{
 		// The same owner terminal.new would pick.
-		{name: "a thread (the agent's CODE_FOUNDRY_SESSION) owns it", ctx: command.Context{ActiveSessionID: "s1"},
+		{name: "a thread (the agent's CODE_FOUNDRY_THREAD) owns it", ctx: command.Context{ActiveThreadID: "s1"},
 			args: map[string]string{"action": "test", "here": "/cf-test/elsewhere"},
-			want: &v1.RunActionRequest{Action: "test", SessionId: "s1", RepoId: "r1", WorktreePath: actFeat}},
-		{name: "a thread in the GUI", ctx: gui(command.Context{ActiveSessionID: "s1", ActiveRepoID: "r1", ActiveWorktreePath: actFeat}),
+			want: &v1.RunActionRequest{Action: "test", ThreadId: "s1", RepoId: "r1", WorktreePath: actFeat}},
+		{name: "a thread in the GUI", ctx: gui(command.Context{ActiveThreadID: "s1", ActiveRepoID: "r1", ActiveWorktreePath: actFeat}),
 			args: map[string]string{"action": "test"},
-			want: &v1.RunActionRequest{Action: "test", SessionId: "s1", RepoId: "r1", WorktreePath: actFeat}},
+			want: &v1.RunActionRequest{Action: "test", ThreadId: "s1", RepoId: "r1", WorktreePath: actFeat}},
 		{name: "a worktree in the GUI", ctx: command.Context{ActiveRepoID: "r1", ActiveWorktreePath: actApp, ActiveView: "projects"},
 			args: map[string]string{"action": "test"}, want: &v1.RunActionRequest{Action: "test", RepoId: "r1", WorktreePath: actApp}},
 		{name: "the CLI's working directory", args: map[string]string{"action": "Lint", "here": actFeat + "/pkg"},
@@ -71,12 +71,12 @@ func TestActionRunOwnerAndMode(t *testing.T) {
 		{name: "no owner at all", args: map[string]string{"action": "dev"}, wantErr: command.ErrInvalidArgs, wantMsg: "action.run needs a thread"},
 		{name: "the dashboard does not offer it", ctx: command.Context{ActiveView: "dashboard"}, args: map[string]string{"action": "dev"},
 			wantErr: command.ErrUnavailable},
-		{name: "no action", ctx: command.Context{ActiveSessionID: "s1"}, wantErr: command.ErrInvalidArgs},
+		{name: "no action", ctx: command.Context{ActiveThreadID: "s1"}, wantErr: command.ErrInvalidArgs},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			act := &commandtest.Action{}
-			reg := actionRegistry(t, act, tt.session)
+			reg := actionRegistry(t, act, tt.thread)
 			res, err := reg.Invoke(context.Background(), tt.ctx, "action.run", tt.args)
 			if tt.wantErr != nil {
 				if !errors.Is(err, tt.wantErr) || !strings.Contains(err.Error(), tt.wantMsg) {
@@ -133,7 +133,7 @@ func TestActionRunWait(t *testing.T) {
 				if name == "action.wait" {
 					args = map[string]string{"run": "r1"}
 				}
-				res, err := reg.Invoke(context.Background(), command.Context{ActiveSessionID: "s1"}, name, args)
+				res, err := reg.Invoke(context.Background(), command.Context{ActiveThreadID: "s1"}, name, args)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -155,12 +155,12 @@ func TestActionProject(t *testing.T) {
 		name     string
 		ctx      command.Context
 		args     map[string]string
-		session  *v1.Session
+		thread   *v1.Thread
 		wantRepo string
 		wantErr  error
 		wantMsg  string
 	}{
-		{name: "the thread's project", ctx: command.Context{ActiveSessionID: "s1"}, args: map[string]string{"here": actLib}, wantRepo: "r1"},
+		{name: "the thread's project", ctx: command.Context{ActiveThreadID: "s1"}, args: map[string]string{"here": actLib}, wantRepo: "r1"},
 		{name: "the GUI's project", ctx: gui(command.Context{ActiveRepoID: "r2"}), wantRepo: "r2"},
 		{name: "the GUI's worktree", ctx: gui(command.Context{ActiveWorktreePath: actFeat}), wantRepo: "r1"},
 		{name: "the working directory", args: map[string]string{"here": actLib + "/src"}, wantRepo: "r2"},
@@ -170,7 +170,7 @@ func TestActionProject(t *testing.T) {
 		{name: "--repo unknown", args: map[string]string{"repo": "nope"}, wantErr: command.ErrInvalidArgs, wantMsg: `no project "nope"`},
 		{name: "--repo outside every project", args: map[string]string{"repo": "/cf-test/elsewhere"}, wantErr: command.ErrInvalidArgs,
 			wantMsg: "not inside a registered project"},
-		{name: "a thread without a project", ctx: command.Context{ActiveSessionID: "s1"}, session: &v1.Session{WorktreePath: "/cf-test/home"},
+		{name: "a thread without a project", ctx: command.Context{ActiveThreadID: "s1"}, thread: &v1.Thread{WorktreePath: "/cf-test/home"},
 			wantErr: command.ErrInvalidArgs, wantMsg: "has no project"},
 		{name: "nothing to go on", wantErr: command.ErrInvalidArgs, wantMsg: "actions belong to a project"},
 		{name: "the dashboard", ctx: command.Context{ActiveView: "dashboard"}, wantErr: command.ErrUnavailable},
@@ -178,7 +178,7 @@ func TestActionProject(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			act := &commandtest.Action{}
-			reg := actionRegistry(t, act, tt.session)
+			reg := actionRegistry(t, act, tt.thread)
 			_, err := reg.Invoke(context.Background(), tt.ctx, "action.list", tt.args)
 			if tt.wantErr != nil {
 				if !errors.Is(err, tt.wantErr) || !strings.Contains(err.Error(), tt.wantMsg) {
@@ -215,7 +215,7 @@ func TestActionAddEditRemove(t *testing.T) {
 	}{
 		{name: "add with defaults", cmd: "action.add", args: map[string]string{"name": "Lint", "command": "make lint", "here": actApp},
 			want: &v1.CreateActionRequest{RepoId: "r1", Name: "Lint", Command: "make lint", Icon: v1.ActionIcon_ACTION_ICON_PLAY, InTerminal: true}},
-		{name: "add in the background for new worktrees", cmd: "action.add", ctx: command.Context{ActiveSessionID: "s1"},
+		{name: "add in the background for new worktrees", cmd: "action.add", ctx: command.Context{ActiveThreadID: "s1"},
 			args: map[string]string{"name": "Setup", "command": "pnpm i", "icon": "configure", "in-terminal": "false", "on-worktree-create": "true"},
 			want: &v1.CreateActionRequest{RepoId: "r1", Name: "Setup", Command: "pnpm i", Icon: v1.ActionIcon_ACTION_ICON_CONFIGURE, OnWorktreeCreate: true}},
 		{name: "add with an unknown icon", cmd: "action.add", args: map[string]string{"name": "X", "command": "x", "icon": "rocket", "here": actApp},
@@ -229,7 +229,7 @@ func TestActionAddEditRemove(t *testing.T) {
 			wantMsg: "nothing to change"},
 		{name: "edit a name the project lacks", cmd: "action.edit", args: map[string]string{"action": "deploy", "here": actApp, "name": "x"},
 			wantMsg: `no action "deploy"`},
-		{name: "remove by name for a thread", cmd: "action.remove", ctx: command.Context{ActiveSessionID: "s1"}, args: map[string]string{"action": "TEST"},
+		{name: "remove by name for a thread", cmd: "action.remove", ctx: command.Context{ActiveThreadID: "s1"}, args: map[string]string{"action": "TEST"},
 			want: &v1.DeleteActionRequest{Id: "a-1"}},
 	}
 	for _, tt := range tests {

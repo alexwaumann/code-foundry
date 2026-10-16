@@ -23,15 +23,15 @@ const agentPublishGap = time.Second
 // AgentsChanged is published on the bus (as a ThreadEvent) when a thread's subagent
 // runs changed: the whole list, in spawn order, without usage.
 type AgentsChanged struct {
-	SessionID string
-	Seq       uint64
-	Agents    []AgentRun
+	ThreadID string
+	Seq      uint64
+	Agents   []AgentRun
 }
 
 func (AgentsChanged) isThreadEvent() {}
 
 // Thread implements ThreadEvent.
-func (e AgentsChanged) Thread() string { return e.SessionID }
+func (e AgentsChanged) Thread() string { return e.ThreadID }
 
 // logAgents is runs as the thread log keeps them: without usage (a new slice).
 func logAgents(runs []AgentRun) []AgentRun {
@@ -55,7 +55,7 @@ func (t *threadLog) setAgents(runs []AgentRun) {
 	}
 	t.agents = runs
 	t.seq++
-	bus.Publish[ThreadEvent](t.bus, AgentsChanged{SessionID: t.id, Seq: t.seq, Agents: runs})
+	bus.Publish[ThreadEvent](t.bus, AgentsChanged{ThreadID: t.id, Seq: t.seq, Agents: runs})
 }
 
 // onTask applies a task frame: the run's record, the Agent call's item when a
@@ -210,7 +210,7 @@ func (m *Manager) setAgentRuns(id string, runs []AgentRun) {
 		return
 	}
 	if err := saveAgentRuns(context.Background(), m.opts.DB, id, changed); err != nil {
-		m.log.Error("persist agent runs", "session", id, "err", err)
+		m.log.Error("persist agent runs", "thread", id, "err", err)
 	}
 	rec.s.AgentRuns = next
 	m.commitLocked(rec, false)

@@ -70,7 +70,7 @@ func (c *Command) Available(uctx Context) bool {
 // GUI sends its real context; the CLI sends whatever --context-* flags were given.
 type Context struct {
 	ActiveTerminalID   string
-	ActiveSessionID    string
+	ActiveThreadID     string
 	ActiveRepoID       string
 	ActiveWorktreePath string
 	// ActiveView is a logical view name ("session", "projects", ...). Empty from the CLI.
@@ -90,7 +90,7 @@ const (
 	// ContextTerminal is Context.ActiveTerminalID.
 	ContextTerminal
 	// ContextSession is Context.ActiveSessionID.
-	ContextSession
+	ContextThread
 	// ContextRepo is Context.ActiveRepoID.
 	ContextRepo
 	// ContextWorktree is Context.ActiveWorktreePath.
@@ -102,8 +102,8 @@ func (c Context) Get(f ContextField) string {
 	switch f {
 	case ContextTerminal:
 		return c.ActiveTerminalID
-	case ContextSession:
-		return c.ActiveSessionID
+	case ContextThread:
+		return c.ActiveThreadID
 	case ContextRepo:
 		return c.ActiveRepoID
 	case ContextWorktree:
@@ -118,8 +118,8 @@ func (c Context) With(f ContextField, v string) Context {
 	switch f {
 	case ContextTerminal:
 		c.ActiveTerminalID = v
-	case ContextSession:
-		c.ActiveSessionID = v
+	case ContextThread:
+		c.ActiveThreadID = v
 	case ContextRepo:
 		c.ActiveRepoID = v
 	case ContextWorktree:
@@ -133,8 +133,8 @@ func (f ContextField) Describe() string {
 	switch f {
 	case ContextTerminal:
 		return "the active terminal"
-	case ContextSession:
-		return "the active session"
+	case ContextThread:
+		return "the active thread"
 	case ContextRepo:
 		return "the active repository"
 	case ContextWorktree:
@@ -169,7 +169,7 @@ var argNamePattern = regexp.MustCompile(`^[a-z][a-z0-9]*(-[a-z0-9]+)*$`)
 // ReservedArgNames are CLI flags every generated verb has; commands may not use them.
 var ReservedArgNames = []string{
 	"json", "help", "h", "yes",
-	"context-terminal", "context-session", "context-repo", "context-worktree", "context-workspace",
+	"context-terminal", "context-thread", "context-repo", "context-worktree", "context-workspace",
 }
 
 // Sentinel errors. Use errors.Is; internal/api maps them to Connect codes.

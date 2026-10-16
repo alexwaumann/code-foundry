@@ -15,7 +15,7 @@ service CommandService {
 // UiContext describes what the caller is looking at. The daemon never guesses it.
 message UiContext {
   string active_terminal_id = 1;
-  string active_session_id = 2;
+  string active_thread_id = 2;
   string active_repo_id = 3;
   string active_worktree_path = 4;
   // Logical view name, e.g. "terminal", "repo", "dashboard". Empty from the CLI.
@@ -48,7 +48,7 @@ message ArgSpec {
   // Positional args take bare words on the CLI, in declaration order
   // (`code-foundry settings set <key> <value>`). The flag form still works.
   bool positional = 7;
-  // The CLI sends its working directory when the flag is not given (a Claude session
+  // The CLI sends its working directory when the flag is not given (a thread's Claude
   // runs `code-foundry workspace members` from the worktree it works in).
   bool default_to_cwd = 8;
 }

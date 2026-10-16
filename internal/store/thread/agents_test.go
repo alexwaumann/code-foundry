@@ -364,7 +364,7 @@ func TestAgentsPublication(t *testing.T) {
 	if got := agents(); len(got) != 1 || len(got[0].Agents) != 1 || got[0].Agents[0].Status != AgentRunning {
 		t.Fatalf("after start %+v", got)
 	}
-	if all, bg := e.waitFor(s.ID, "a run", func(s Session) bool { return len(s.AgentRuns) == 1 }).AgentsRunning(); all != 1 || bg != 1 {
+	if all, bg := e.waitFor(s.ID, "a run", func(s Thread) bool { return len(s.AgentRuns) == 1 }).AgentsRunning(); all != 1 || bg != 1 {
 		t.Errorf("running %d, background %d", all, bg)
 	}
 
@@ -407,7 +407,7 @@ func TestAgentsPublication(t *testing.T) {
 	}
 	run := e.snapshot(s.ID).AgentRuns[0]
 	if run.NoteItemID != note.ID || run.ToolUses != 2 || run.DurationMS != 80 || run.EndedAt.IsZero() {
-		t.Errorf("session run %+v", run)
+		t.Errorf("thread run %+v", run)
 	}
 	if all, _ := e.snapshot(s.ID).AgentsRunning(); all != 0 {
 		t.Errorf("still %d running", all)
@@ -427,7 +427,7 @@ func waitAgents(t *testing.T, sub *bus.Subscription[ThreadEvent], id string, con
 	for {
 		select {
 		case ev := <-sub.C():
-			if a, ok := ev.(AgentsChanged); ok && a.SessionID == id && cond(a) {
+			if a, ok := ev.(AgentsChanged); ok && a.ThreadID == id && cond(a) {
 				return a
 			}
 		case <-deadline:
@@ -436,7 +436,7 @@ func waitAgents(t *testing.T, sub *bus.Subscription[ThreadEvent], id string, con
 	}
 }
 
-func (e *env) snapshot(id string) Session {
+func (e *env) snapshot(id string) Thread {
 	e.t.Helper()
 	s, err := e.m.Get(context.Background(), id)
 	if err != nil {
@@ -495,7 +495,7 @@ func TestAgentsThroughTheStream(t *testing.T) {
 	if it := agentItem(t, items, fxSlowTool); it.Tool.Status != ToolRunning || !strings.Contains(it.Tool.Output, "Async agent launched") {
 		t.Errorf("background Agent call after its turn %+v", it.Tool)
 	}
-	got := e.waitFor(s.ID, "running", func(s Session) bool { all, bg := s.AgentsRunning(); return all == 1 && bg == 1 })
+	got := e.waitFor(s.ID, "running", func(s Thread) bool { all, bg := s.AgentsRunning(); return all == 1 && bg == 1 })
 	if r := got.AgentRuns[0]; r.ID != fxSlowCount || r.Status != AgentRunning || r.Model != "haiku" {
 		t.Errorf("run %+v", r)
 	}
@@ -555,9 +555,9 @@ func TestAgentsOrphaned(t *testing.T) {
 		e := newFixtureEnv(t, "agents")
 		s := e.create(CreateOptions{InitialPrompt: "launch"})
 		e.waitItems(s.ID, "launched", turnCount(1))
-		e.waitFor(s.ID, "running", func(s Session) bool { all, _ := s.AgentsRunning(); return all == 1 })
+		e.waitFor(s.ID, "running", func(s Thread) bool { all, _ := s.AgentsRunning(); return all == 1 })
 		e.exit(s.ID, 0)
-		got := e.waitFor(s.ID, "disconnected", func(s Session) bool { return s.State == StateDisconnected })
+		got := e.waitFor(s.ID, "disconnected", func(s Thread) bool { return s.State == StateDisconnected })
 		if r := got.AgentRuns[0]; r.Status != AgentFailed || r.Error != "the thread's process ended before the agent finished" || r.EndedAt.IsZero() {
 			t.Errorf("run %+v", r)
 		}
@@ -573,7 +573,7 @@ func TestAgentsOrphaned(t *testing.T) {
 		e := newFixtureEnv(t, "agents")
 		s := e.create(CreateOptions{InitialPrompt: "launch"})
 		e.waitItems(s.ID, "launched", turnCount(1))
-		e.waitFor(s.ID, "running", func(s Session) bool { all, _ := s.AgentsRunning(); return all == 1 })
+		e.waitFor(s.ID, "running", func(s Thread) bool { all, _ := s.AgentsRunning(); return all == 1 })
 		e.restart()
 		if r := e.snapshot(s.ID).AgentRuns; len(r) != 1 || r[0].Status != AgentFailed || r[0].Error != "the daemon stopped before the agent finished" {
 			t.Errorf("runs %+v", r)
@@ -585,7 +585,7 @@ func TestAgentsOrphaned(t *testing.T) {
 	t.Run("daemon died", func(t *testing.T) {
 		e := newEnv(t)
 		s := e.create(CreateOptions{Name: "x"})
-		e.waitFor(s.ID, "connected", func(s Session) bool { return s.State == StateConnected })
+		e.waitFor(s.ID, "connected", func(s Thread) bool { return s.State == StateConnected })
 		// What a crash leaves: a row saved as running.
 		if err := saveAgentRuns(context.Background(), e.m.opts.DB, s.ID, []AgentRun{{ID: "a1", Description: "d", Status: AgentRunning, SpawnDepth: 1}}); err != nil {
 			t.Fatal(err)

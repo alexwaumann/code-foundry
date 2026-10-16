@@ -23,11 +23,11 @@ const threadWatchIdleBudget = 8 * time.Second
 // the held tail, and give the client something to detect a dead stream with.
 func TestThreadWatchIdleHeartbeat(t *testing.T) {
 	fake, c := newThreadServer(t)
-	fake.Put(thread.Session{ID: "s1", State: thread.StateConnected})
+	fake.Put(thread.Thread{ID: "s1", State: thread.StateConnected})
 	fake.PutItems("s1", thread.Item{ID: "u1", Kind: thread.KindUserMessage, Text: "hi"})
 	ctx, cancel := context.WithTimeout(context.Background(), threadWatchIdleBudget+5*time.Second)
 	defer cancel()
-	stream, err := c.Watch(ctx, connect.NewRequest(&v1.WatchThreadRequest{SessionId: "s1"}))
+	stream, err := c.WatchThread(ctx, connect.NewRequest(&v1.WatchThreadRequest{ThreadId: "s1"}))
 	if err != nil {
 		t.Fatal(err)
 	}

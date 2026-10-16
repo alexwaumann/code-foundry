@@ -137,9 +137,9 @@ test("pin from the context menu moves a thread to the top; unpin moves it back",
   await expect(menu).toBeVisible();
   await menu.getByTestId("menu-pin").click();
   await expect.poll(async () => (await session("s-3"))?.pinned).toBe(true);
-  const pin = await lastInvocation("session.pin");
+  const pin = await lastInvocation("thread.pin");
   expect(pin?.args).toEqual({ pinned: "true" });
-  expect(pin?.context?.activeSessionId).toBe("s-3");
+  expect(pin?.context?.activeThreadId).toBe("s-3");
   await expect.poll(async () => (await rowKeys(page)).slice(0, 2)).toEqual(["s:s-3", "s:s-2"]);
   await expect(row(page, "s:s-3")).toHaveAttribute("data-section", "pinned");
   await expect(row(page, "s:s-3").getByTestId("row-pinned")).toBeVisible();
@@ -164,9 +164,9 @@ test("Run in… from the context menu moves a workspace thread; the row shows th
   await expect(members.locator('[data-member="repo-gp"]')).toHaveAttribute("data-disabled", "");
   await members.locator('[data-member="repo-cf"]').click();
 
-  const inv = await lastInvocation("session.run-in");
+  const inv = await lastInvocation("thread.run-in");
   expect(inv?.args).toEqual({ repo: "repo-cf" });
-  expect(inv?.context).toMatchObject({ activeSessionId: driver, activeWorkspaceId: WS, activeView: "session" });
+  expect(inv?.context).toMatchObject({ activeThreadId: driver, activeWorkspaceId: WS, activeView: "session" });
   // Queued until the thread is idle at its prompt (the mock: ~2s), then the row's worktree changes.
   await expect(d.getByTestId("row-moving")).toHaveText("moving to code-foundry…");
   await expect(d.getByTestId("row-moving")).toHaveCount(0, { timeout: 8000 });
@@ -188,22 +188,22 @@ test("Run in… is absent for a project thread and offered in the palette for a 
   await page.keyboard.press("Meta+k");
   const palette = page.getByTestId("palette");
   await page.keyboard.type("Run Thread In");
-  await expect(palette.locator('[data-command="session.run-in"]')).toHaveCount(0);
+  await expect(palette.locator('[data-command="thread.run-in"]')).toHaveCount(0);
   await page.keyboard.press("Escape");
 
   // Workspace thread: the palette offers it; picking it lists the other members.
   await row(page, `s:${driver}`).click();
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("Run Thread In");
-  await palette.locator('[data-command="session.run-in"]').click();
+  await palette.locator('[data-command="thread.run-in"]').click();
   const picker = page.getByTestId("runin-picker");
   await expect(picker).toBeVisible();
   await expect(picker.locator('[data-member="repo-gp"]')).toContainText("runs here");
   await picker.locator('[data-member="repo-cf"]').click();
   await expect(picker).toHaveCount(0);
-  const inv = await lastInvocation("session.run-in");
+  const inv = await lastInvocation("thread.run-in");
   expect(inv?.args).toEqual({ repo: "repo-cf" });
-  expect(inv?.context).toMatchObject({ activeSessionId: driver, activeWorkspaceId: WS });
+  expect(inv?.context).toMatchObject({ activeThreadId: driver, activeWorkspaceId: WS });
   await expect(row(page, `s:${driver}`).getByTestId("row-moving")).toBeVisible();
 });
 

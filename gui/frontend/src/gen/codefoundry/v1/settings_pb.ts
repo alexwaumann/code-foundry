@@ -17,8 +17,8 @@ export const file_codefoundry_v1_settings: GenFile = /*@__PURE__*/
  */
 export type SettingField = Message<"codefoundry.v1.SettingField"> & {
   /**
-   * Dotted key, "<group>.<name>", e.g. "sessions.default_model". Keybinding fields are
-   * "keybindings.<command name>", e.g. "keybindings.session.new".
+   * Dotted key, "<group>.<name>", e.g. "threads.default_model". Keybinding fields are
+   * "keybindings.<command name>", e.g. "keybindings.thread.new".
    *
    * @generated from field: string key = 1;
    */
@@ -84,7 +84,7 @@ export type SettingField = Message<"codefoundry.v1.SettingField"> & {
 
   /**
    * Display names for enum_values, parallel to it; empty when the values are shown as is.
-   * sessions.default_model carries the model registry's labels ("Opus 4.8").
+   * threads.default_model carries the model registry's labels ("Opus 4.8").
    *
    * @generated from field: repeated string enum_labels = 12;
    */

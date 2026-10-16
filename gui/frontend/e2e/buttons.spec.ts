@@ -38,7 +38,7 @@ test("sidebar new-thread button opens the project picker, then the composer", as
   await page.keyboard.type("Port the renderer");
   await page.keyboard.press("Enter");
 
-  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("session.new");
+  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("thread.new");
   const last = (await invocations()).at(-1);
   expect(last?.args).toMatchObject({ repo: "repo-gp", "new-worktree": "true", prompt: "Port the renderer" });
   expect(last?.context).toMatchObject({ activeRepoId: "repo-gp", activeWorktreePath: "", activeView: "compose" });
@@ -124,9 +124,9 @@ test("session pane header: the name renames, the location opens the worktree; no
   // Fork stays in the palette.
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("Fork Thread");
-  await page.getByTestId("palette").locator('[data-command="session.fork"]').click();
-  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("session.fork");
-  expect((await invocations()).at(-1)?.context?.activeSessionId).toBe("s-1");
+  await page.getByTestId("palette").locator('[data-command="thread.fork"]').click();
+  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("thread.fork");
+  expect((await invocations()).at(-1)?.context?.activeThreadId).toBe("s-1");
   const fork = page.locator('[data-row-kind="session"][aria-selected="true"]');
   await expect(fork).toHaveAttribute("data-row-key", /^s:s-new-/);
 

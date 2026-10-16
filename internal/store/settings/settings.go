@@ -25,7 +25,7 @@ const FileName = "settings.toml"
 
 // Settings is the typed view of the effective values.
 type Settings struct {
-	Sessions   Sessions
+	Threads    Threads
 	GitHub     GitHub
 	Repos      Repos
 	GitOps     GitOps
@@ -40,7 +40,7 @@ type Settings struct {
 }
 
 // Sessions are defaults for new Claude Code sessions.
-type Sessions struct {
+type Threads struct {
 	DefaultModel      string // default model.Default
 	DefaultEffort     string // default "high"
 	DefaultWorktree   string // WorktreeNew or WorktreeCurrent; read by the GUI's composer only
@@ -117,12 +117,12 @@ func Defaults() Settings {
 
 // CloseGrace is Sessions.CloseGraceSeconds as a duration.
 func (s Settings) CloseGrace() time.Duration {
-	return time.Duration(s.Sessions.CloseGraceSeconds) * time.Second
+	return time.Duration(s.Threads.CloseGraceSeconds) * time.Second
 }
 
 // CacheTTL is Sessions.CacheTTLSeconds as a duration.
 func (s Settings) CacheTTL() time.Duration {
-	return time.Duration(s.Sessions.CacheTTLSeconds) * time.Second
+	return time.Duration(s.Threads.CacheTTLSeconds) * time.Second
 }
 
 // GhPollInterval is GitHub.PollIntervalSeconds as a duration.

@@ -36,8 +36,8 @@ type shellReaperOptions struct {
 	DirGone func(path string) bool
 	// RepoExists and SessionExists let the sweep remove the shells of an unregistered
 	// project or a removed thread whose event was dropped. Nil: assume it exists.
-	RepoExists    func(id string) bool
-	SessionExists func(id string) bool
+	RepoExists   func(id string) bool
+	ThreadExists func(id string) bool
 }
 
 // shellReaper removes the bottom panel's terminals (termlabel.IsPanel: the shells
@@ -88,11 +88,11 @@ func startShellReaper(ctx context.Context, opts shellReaperOptions) (func(), err
 		return nil, err
 	}
 	repoEvents := bus.Subscribe[repo.Event](opts.Bus, 256)
-	sessionEvents := bus.Subscribe[thread.Event](opts.Bus, 256)
+	threadListEvents := bus.Subscribe[thread.Event](opts.Bus, 256)
 	r.sweep()
 	r.wg.Go(func() {
 		defer repoEvents.Close()
-		defer sessionEvents.Close()
+		defer threadListEvents.Close()
 		tick := time.NewTicker(opts.SweepEvery)
 		defer tick.Stop()
 		for {
@@ -119,9 +119,9 @@ func startShellReaper(ctx context.Context, opts shellReaperOptions) (func(), err
 				case repo.RepoRemoved:
 					r.reap("project unregistered", termlabel.Repo, e.ID)
 				}
-			case ev := <-sessionEvents.C():
+			case ev := <-threadListEvents.C():
 				if e, ok := ev.(thread.Removed); ok {
-					r.reap("thread removed", termlabel.Session, e.ID)
+					r.reap("thread removed", termlabel.Thread, e.ID)
 				}
 			}
 		}
@@ -183,8 +183,8 @@ func (r *shellReaper) sweep() {
 			reap("worktree gone", termlabel.Worktree, l[termlabel.Worktree])
 		case l[termlabel.Repo] != "" && r.opts.RepoExists != nil && !r.opts.RepoExists(l[termlabel.Repo]):
 			reap("project gone", termlabel.Repo, l[termlabel.Repo])
-		case l[termlabel.Session] != "" && r.opts.SessionExists != nil && !r.opts.SessionExists(l[termlabel.Session]):
-			reap("thread gone", termlabel.Session, l[termlabel.Session])
+		case l[termlabel.Thread] != "" && r.opts.ThreadExists != nil && !r.opts.ThreadExists(l[termlabel.Thread]):
+			reap("thread gone", termlabel.Thread, l[termlabel.Thread])
 		}
 	}
 }

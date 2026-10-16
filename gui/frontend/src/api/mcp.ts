@@ -1,7 +1,7 @@
 /**
  * A thread's MCP servers (docs/notes/mcp-panel.md) mapped to view models.
  * Generated types stay in src/api. The daemon checks the servers at the start of every
- * turn (and after a reconnect); ThreadService.Watch carries each check (the snapshot's
+ * turn (and after a reconnect); ThreadService.WatchThread carries each check (the snapshot's
  * `mcp`, then `mcp` events), so the panel reads them from the thread store.
  */
 import { timestampMs } from "@bufbuild/protobuf/wkt";
@@ -97,6 +97,6 @@ export function toMcpStatusView(s: ThreadMcpStatus | undefined): McpStatusView |
  */
 export async function getMcpStatus(sessionId: string, conn: DaemonConnection = daemon): Promise<McpStatusView | null> {
   const c = await conn.client(ThreadService);
-  const res = await c.mcpStatus({ sessionId });
+  const res = await c.mcpStatus({ threadId: sessionId });
   return toMcpStatusView(res.status);
 }

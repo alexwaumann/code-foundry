@@ -134,7 +134,7 @@ test('the toggle and "+" start shells for the thread, which open there focused',
   // The header's toggle on a thread without shells: the panel opens with one.
   await page.getByTestId("bottom-toggle").click();
   await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("terminal.new");
-  expect((await invocations()).at(-1)?.context).toMatchObject({ activeSessionId: "s-2" });
+  expect((await invocations()).at(-1)?.context).toMatchObject({ activeThreadId: "s-2" });
   await expect(tabs(page)).toHaveCount(1);
   const first = await host(page).getAttribute("data-terminal-id");
   expect(first).toMatch(/^t-new-/);
@@ -171,7 +171,7 @@ test("a stopped thread has the toggle left of the side panel's, and its panel", 
   await header.getByTestId("bottom-toggle").click();
   await expect(tabs(page)).toHaveCount(1);
   await expect(host(page)).toHaveAttribute("data-attach-phase", "live");
-  expect((await invocations()).at(-1)?.context).toMatchObject({ activeSessionId: "s-3" });
+  expect((await invocations()).at(-1)?.context).toMatchObject({ activeThreadId: "s-3" });
   await expect(page.getByTestId("thread-composer")).toBeVisible();
 });
 
@@ -312,7 +312,7 @@ test("the Projects page's panel lists the worktree shells; its + starts one in t
 
   await bottom(page).getByTestId("bottom-new-terminal").click();
   await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("terminal.new");
-  expect((await invocations()).at(-1)?.context).toMatchObject({ activeRepoId: "repo-cf", activeWorktreePath: `${CFW}/feat-sidebar`, activeSessionId: "" });
+  expect((await invocations()).at(-1)?.context).toMatchObject({ activeRepoId: "repo-cf", activeWorktreePath: `${CFW}/feat-sidebar`, activeThreadId: "" });
   await expect(tabs(page)).toHaveText(["feat-sidebar", "feat-sidebar 2"]);
   await expect(tabs(page).nth(1)).toHaveAttribute("aria-selected", "true");
   await expect(page.getByTestId("projects-page")).toBeVisible();
@@ -478,7 +478,7 @@ test("cmd+j on a thread without shells starts one; its exit hides the panel; the
   expect(first).toMatch(/^t-new-/);
   const started = (await invocations()).filter((i) => i.name === "terminal.new");
   expect(started).toHaveLength(1);
-  expect(started[0]?.context).toMatchObject({ activeSessionId: "s-2" });
+  expect(started[0]?.context).toMatchObject({ activeThreadId: "s-2" });
   await expect(host(page)).toHaveAttribute("data-attach-phase", "live");
   await expect.poll(() => focusInBottomTerminal(page)).toBe(true);
   await mockPost("terminal/new?delay=0");

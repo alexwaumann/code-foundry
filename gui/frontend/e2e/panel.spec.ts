@@ -577,7 +577,7 @@ test("expand fills the content area, keeps the thread mounted, and restores the 
   // The thread stays mounted and watched (its conversation and scroll position kept).
   await expect(page.getByTestId("thread-pane")).toHaveCount(1);
   await expect(page.getByTestId("thread-pane")).toBeHidden();
-  expect((await openStreams())["ThreadService/Watch"]).toBe(1);
+  expect((await openStreams())["ThreadService/WatchThread"]).toBe(1);
   await expect(page.getByTestId("panel-resize-handle")).toHaveCount(0);
   await expect(expand).toHaveAttribute("aria-pressed", "true");
   expect(await expandIcon(page)).toBe("minimize");

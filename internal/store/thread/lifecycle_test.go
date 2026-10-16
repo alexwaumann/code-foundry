@@ -58,7 +58,7 @@ func (e *env) sentUser(text string) map[string]any {
 	return e.waitSent("the message "+text, func(m map[string]any) bool { return userTextOf(m) == text })
 }
 
-func stopped(s Session) bool { return s.State == StateDisconnected }
+func stopped(s Thread) bool { return s.State == StateDisconnected }
 
 // A message to a stopped thread: its item is there when Send returns, before Claude is
 // up; claude resumes the conversation with it as the first prompt (one delivery, under
@@ -81,14 +81,14 @@ func TestSendStartsStoppedThread(t *testing.T) {
 	if it.Kind != KindUserMessage || it.Text != "again" || it.ComposerText != "again!" || it.Ordinal != int64(before+1) {
 		t.Errorf("returned item %+v (had %d items)", it, before)
 	}
-	if got, ok := e.m.Snapshot().Session(s.ID); !ok || got.State == StateDisconnected || !got.ArchivedAt.IsZero() {
+	if got, ok := e.m.Snapshot().Thread(s.ID); !ok || got.State == StateDisconnected || !got.ArchivedAt.IsZero() {
 		t.Errorf("right after the send %+v", got)
 	}
 
 	// (The fake replays the capture's ids, so the resumed turn's items replace the
 	// first turn's rather than adding new ones.)
 	e.waitDeliveries("again", func(f, r int) bool { return r == 1 })
-	e.waitFor(s.ID, "the resumed turn over", func(s Session) bool { return s.State == StateConnected && turnOver(s) })
+	e.waitFor(s.ID, "the resumed turn over", func(s Thread) bool { return s.State == StateConnected && turnOver(s) })
 	items := e.items(s.ID).Items
 	if got := userItems(items); !slices.Equal(got, []string{"first", "again"}) {
 		t.Errorf("user items %q\n%s", got, describeItems(items))
@@ -103,7 +103,7 @@ func TestSendStartsStoppedThread(t *testing.T) {
 	if m := e.sentUser("again"); m["uuid"] != it.ID {
 		t.Errorf("delivered under %v, item %s", m["uuid"], it.ID)
 	}
-	got := e.waitFor(s.ID, "connected", func(s Session) bool { return s.State == StateConnected })
+	got := e.waitFor(s.ID, "connected", func(s Thread) bool { return s.State == StateConnected })
 	if got.LastError != "" || got.DisconnectReason != "" {
 		t.Errorf("after the start %+v", got)
 	}
@@ -208,11 +208,11 @@ func TestSendToStoppedThreadIsBusyAtOnce(t *testing.T) {
 	t.Cleanup(gate.open) // before the env's shutdown (cleanups run last first)
 	gate.open()
 	s := e.create(CreateOptions{InitialPrompt: "first"})
-	e.waitFor(s.ID, "a finished turn", func(s Session) bool { return s.Status == StatusNeedsAttention })
+	e.waitFor(s.ID, "a finished turn", func(s Thread) bool { return s.Status == StatusNeedsAttention })
 	if err := e.m.Close(e.ctx(), s.ID); err != nil {
 		t.Fatal(err)
 	}
-	e.waitFor(s.ID, "stopped, still finished", func(s Session) bool { return stopped(s) && s.Status == StatusNeedsAttention })
+	e.waitFor(s.ID, "stopped, still finished", func(s Thread) bool { return stopped(s) && s.Status == StatusNeedsAttention })
 
 	// The next start's handshake is held.
 	if err := os.Remove(gate.path); err != nil {
@@ -251,7 +251,7 @@ func TestSendWhileClosingWaits(t *testing.T) {
 	old := e.pid(s.ID)
 	closed := make(chan error, 1)
 	go func() { closed <- e.m.Close(e.ctx(), s.ID) }()
-	e.waitFor(s.ID, "closing", func(s Session) bool { return s.State == StateClosing })
+	e.waitFor(s.ID, "closing", func(s Thread) bool { return s.State == StateClosing })
 	it, err := e.m.Send(e.ctx(), s.ID, Message{Text: "after"})
 	if err != nil || it.Text != "after" {
 		t.Fatalf("send while closing: %+v, %v", it, err)
@@ -259,7 +259,7 @@ func TestSendWhileClosingWaits(t *testing.T) {
 	if err := waitErr(t, "the close", closed); err != nil {
 		t.Fatal(err)
 	}
-	e.waitFor(s.ID, "started again", func(s Session) bool { return s.State == StateConnected })
+	e.waitFor(s.ID, "started again", func(s Thread) bool { return s.State == StateConnected })
 	if e.pid(s.ID) == old {
 		t.Error("the message went to the closing process")
 	}
@@ -276,27 +276,27 @@ func TestSendSpawnFailure(t *testing.T) {
 	tests := []struct {
 		name string
 		// breakIt makes the next start fail; fixIt undoes it.
-		breakIt, fixIt func(e *env, s Session)
+		breakIt, fixIt func(e *env, s Thread)
 		wantText       string
 	}{
 		{
 			name:     "worktree gone",
-			breakIt:  func(e *env, _ Session) { mustRename(e.t, e.home, e.home+".gone") },
-			fixIt:    func(e *env, _ Session) { mustRename(e.t, e.home+".gone", e.home) },
+			breakIt:  func(e *env, _ Thread) { mustRename(e.t, e.home, e.home+".gone") },
+			fixIt:    func(e *env, _ Thread) { mustRename(e.t, e.home+".gone", e.home) },
 			wantText: "Claude did not start: failed precondition: worktree ",
 		},
 		{
 			name:     "claude missing",
-			breakIt:  func(e *env, _ Session) { e.restart(func(o *Options) { o.Claude = "/nonexistent/claude" }) },
-			fixIt:    func(e *env, _ Session) { e.restart() },
+			breakIt:  func(e *env, _ Thread) { e.restart(func(o *Options) { o.Claude = "/nonexistent/claude" }) },
+			fixIt:    func(e *env, _ Thread) { e.restart() },
 			wantText: "Claude did not start: spawn claude: ",
 		},
 		{
 			name: "claude exits before its handshake",
-			breakIt: func(e *env, _ Session) {
+			breakIt: func(e *env, _ Thread) {
 				e.restart(func(o *Options) { o.Env[0] = fakeClaudeEnv + "=" + fixturePath("no-such-fixture") })
 			},
-			fixIt:    func(e *env, _ Session) { e.restart() },
+			fixIt:    func(e *env, _ Thread) { e.restart() },
 			wantText: "Claude did not start: exit code 2: fake claude",
 		},
 	}
@@ -313,7 +313,7 @@ func TestSendSpawnFailure(t *testing.T) {
 			if err != nil || it.Text != "lost" {
 				t.Fatalf("send: %+v, %v", it, err)
 			}
-			got := e.waitFor(s.ID, "stopped with an error", func(s Session) bool {
+			got := e.waitFor(s.ID, "stopped with an error", func(s Thread) bool {
 				return stopped(s) && s.Status == StatusError
 			})
 			if got.StatusReason != ReasonStartFailed || got.LastError == "" {
@@ -332,7 +332,7 @@ func TestSendSpawnFailure(t *testing.T) {
 			if _, err := e.m.Send(e.ctx(), s.ID, Message{Text: "retry"}); err != nil {
 				t.Fatal(err)
 			}
-			e.waitFor(s.ID, "started", func(s Session) bool { return s.State == StateConnected && s.Status != StatusError })
+			e.waitFor(s.ID, "started", func(s Thread) bool { return s.State == StateConnected && s.Status != StatusError })
 		})
 	}
 }
@@ -443,7 +443,7 @@ func TestProcessDeathItems(t *testing.T) {
 	t.Run("mid-turn", func(t *testing.T) {
 		e := newFixtureEnv(t, "write-allow")
 		s := e.create(CreateOptions{InitialPrompt: "write it"})
-		e.waitFor(s.ID, "asking", func(s Session) bool { return s.Status == StatusNeedsAttention })
+		e.waitFor(s.ID, "asking", func(s Thread) bool { return s.Status == StatusNeedsAttention })
 		e.exit(s.ID, 1)
 		got := e.waitFor(s.ID, "stopped", stopped)
 		items := e.items(s.ID).Items
@@ -519,7 +519,7 @@ func TestIdleStopAtCacheExpiry(t *testing.T) {
 	e, clock := idleEnv(t, "text-table", nil)
 	s := e.create(CreateOptions{InitialPrompt: "hi"})
 	e.waitItems(s.ID, "the turn", turnCount(1))
-	s = e.waitFor(s.ID, "finished", func(s Session) bool { return s.StatusReason == "finished" && !s.CacheExpiresAt.IsZero() })
+	s = e.waitFor(s.ID, "finished", func(s Thread) bool { return s.StatusReason == "finished" && !s.CacheExpiresAt.IsZero() })
 	exp := s.CacheExpiresAt
 	if want := clock.Now().Add(10 * time.Minute); !exp.Equal(want) {
 		t.Fatalf("expiry %s, want %s", exp, want)
@@ -541,7 +541,7 @@ func TestIdleStopAtCacheExpiry(t *testing.T) {
 	if _, err := e.m.Send(e.ctx(), s.ID, Message{Text: "back"}); err != nil {
 		t.Fatal(err)
 	}
-	e.waitFor(s.ID, "started", func(s Session) bool { return s.State == StateConnected })
+	e.waitFor(s.ID, "started", func(s Thread) bool { return s.State == StateConnected })
 }
 
 // The loop: on its own tick it stops an expired thread.
@@ -549,7 +549,7 @@ func TestIdleStopLoop(t *testing.T) {
 	e, clock := idleEnv(t, "text-table", nil, func(o *Options) { o.IdleCheckInterval = 5 * time.Millisecond })
 	s := e.create(CreateOptions{InitialPrompt: "hi"})
 	e.waitItems(s.ID, "the turn", turnCount(1))
-	e.waitFor(s.ID, "a result", func(s Session) bool { return !s.CacheExpiresAt.IsZero() && turnOver(s) })
+	e.waitFor(s.ID, "a result", func(s Thread) bool { return !s.CacheExpiresAt.IsZero() && turnOver(s) })
 	time.Sleep(30 * time.Millisecond)
 	if got := e.snapshot(s.ID); stopped(got) {
 		t.Fatalf("stopped before its expiry: %+v", got)
@@ -567,7 +567,7 @@ func TestIdleStopExpiryRules(t *testing.T) {
 		e, clock := idleEnv(t, "text-table", nil)
 		s := e.create(CreateOptions{InitialPrompt: "hi"})
 		e.waitItems(s.ID, "the turn", turnCount(1))
-		s = e.waitFor(s.ID, "a result", func(s Session) bool { return !s.CacheExpiresAt.IsZero() && turnOver(s) })
+		s = e.waitFor(s.ID, "a result", func(s Thread) bool { return !s.CacheExpiresAt.IsZero() && turnOver(s) })
 		result := s.LastResultAt
 		e.m.SetCacheTTL(30 * time.Minute)
 		if h := e.idleHold(s.ID, result.Add(11*time.Minute)); h != "cache warm" {
@@ -613,25 +613,25 @@ func TestIdleStopHolds(t *testing.T) {
 		vars          []string
 		gated         bool // the handshake is held until the test ends
 		// setup brings the thread to the state to hold in.
-		setup func(e *env) Session
+		setup func(e *env) Thread
 		want  string
 	}{
-		{name: "a pending permission request", fixture: "write-allow", want: "pending request", setup: func(e *env) Session {
+		{name: "a pending permission request", fixture: "write-allow", want: "pending request", setup: func(e *env) Thread {
 			s := e.create(CreateOptions{InitialPrompt: "write it"})
-			return e.waitFor(s.ID, "asking", func(s Session) bool { return s.Status == StatusNeedsAttention })
+			return e.waitFor(s.ID, "asking", func(s Thread) bool { return s.Status == StatusNeedsAttention })
 		}},
-		{name: "a background shell", fixture: "shells", want: "background work", setup: func(e *env) Session {
+		{name: "a background shell", fixture: "shells", want: "background work", setup: func(e *env) Thread {
 			s := e.create(CreateOptions{InitialPrompt: "launch"})
 			e.waitItems(s.ID, "launched", turnCount(1))
 			return e.waitFor(s.ID, "a shell", shellsRunning(1))
 		}},
-		{name: "a background agent", fixture: "agents", want: "background work", setup: func(e *env) Session {
+		{name: "a background agent", fixture: "agents", want: "background work", setup: func(e *env) Thread {
 			s := e.create(CreateOptions{InitialPrompt: "launch"})
 			e.waitItems(s.ID, "launched", turnCount(1))
-			return e.waitFor(s.ID, "running", func(s Session) bool { _, bg := s.AgentsRunning(); return bg == 1 })
+			return e.waitFor(s.ID, "running", func(s Thread) bool { _, bg := s.AgentsRunning(); return bg == 1 })
 		}},
 		{name: "a message waiting for the handshake", fixture: "text-table", gated: true,
-			want: "starting", setup: func(e *env) Session {
+			want: "starting", setup: func(e *env) Thread {
 				s := e.create(CreateOptions{InitialPrompt: "first"})
 				if _, err := e.m.Send(e.ctx(), s.ID, Message{Text: "second"}); err != nil {
 					e.t.Fatal(err)
@@ -676,18 +676,18 @@ func TestIdleStopHoldsForTheWake(t *testing.T) {
 	e, clock := idleEnv(t, "shells", []string{"CF_FAKE_CLAUDE_UNPROMPTED=" + gates})
 	s := e.create(CreateOptions{InitialPrompt: "launch"})
 	e.waitItems(s.ID, "launched", turnCount(1))
-	e.waitFor(s.ID, "a shell at the prompt", func(s Session) bool { return s.BackgroundShellsRunning == 1 && turnOver(s) })
+	e.waitFor(s.ID, "a shell at the prompt", func(s Thread) bool { return s.BackgroundShellsRunning == 1 && turnOver(s) })
 	far := clock.Now().Add(24 * time.Hour)
 	if h := e.idleHold(s.ID, far); h != "background work" {
 		t.Errorf("with the shell running: %q", h)
 	}
 	release("turn-2") // the end frames; Claude's own turn is held before its init
-	e.waitFor(s.ID, "a wake due", func(s Session) bool { return s.BackgroundShellsRunning == 0 && s.WakePending })
+	e.waitFor(s.ID, "a wake due", func(s Thread) bool { return s.BackgroundShellsRunning == 0 && s.WakePending })
 	if h := e.idleHold(s.ID, far); h != "background work" {
 		t.Errorf("with Claude's turn due: %q", h)
 	}
 	release("turn-2.init")
-	e.waitFor(s.ID, "the turn over", func(s Session) bool { return !s.WakePending && turnOver(s) })
+	e.waitFor(s.ID, "the turn over", func(s Thread) bool { return !s.WakePending && turnOver(s) })
 	if h := e.idleHold(s.ID, far); h != "" {
 		t.Errorf("after Claude's turn: %q", h)
 	}

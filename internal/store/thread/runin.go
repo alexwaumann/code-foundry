@@ -27,40 +27,40 @@ type cdRequest struct {
 }
 
 // RunIn implements Store.
-func (m *Manager) RunIn(_ context.Context, id string, t RunInTarget) (Session, error) {
+func (m *Manager) RunIn(_ context.Context, id string, t RunInTarget) (Thread, error) {
 	if t.RepoID == "" && t.WorktreePath == "" {
-		return Session{}, fmt.Errorf("%w: a member repo or worktree path is required", ErrInvalidArgument)
+		return Thread{}, fmt.Errorf("%w: a member repo or worktree path is required", ErrInvalidArgument)
 	}
 	cur, err := m.Get(context.Background(), id)
 	if err != nil {
-		return Session{}, err
+		return Thread{}, err
 	}
 	if cur.WorkspaceID == "" {
-		return Session{}, fmt.Errorf("%w: thread %s does not belong to a workspace", ErrFailedPrecondition, id)
+		return Thread{}, fmt.Errorf("%w: thread %s does not belong to a workspace", ErrFailedPrecondition, id)
 	}
 	w, mem, err := m.workspaceMember(cur.WorkspaceID, t.RepoID, t.WorktreePath)
 	if err != nil {
-		return Session{}, err
+		return Thread{}, err
 	}
 	if !isDir(mem.WorktreePath) {
-		return Session{}, fmt.Errorf("%w: member worktree %s of workspace %s does not exist", ErrFailedPrecondition, mem.WorktreePath, w.Name)
+		return Thread{}, fmt.Errorf("%w: member worktree %s of workspace %s does not exist", ErrFailedPrecondition, mem.WorktreePath, w.Name)
 	}
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	rec, err := m.record(id)
 	if err != nil {
-		return Session{}, err
+		return Thread{}, err
 	}
 	switch {
 	case rec.s.State == StateClosing:
-		return Session{}, fmt.Errorf("%w: thread %s is closing", ErrFailedPrecondition, id)
+		return Thread{}, fmt.Errorf("%w: thread %s is closing", ErrFailedPrecondition, id)
 	case rec.reserved != nil:
-		return Session{}, fmt.Errorf("%w: thread %s is starting; try again in a moment", ErrFailedPrecondition, id)
+		return Thread{}, fmt.Errorf("%w: thread %s is starting; try again in a moment", ErrFailedPrecondition, id)
 	case rec.run == nil:
 		rec.s.WorktreePath, rec.s.RepoID, rec.s.PendingWorktreePath = mem.WorktreePath, mem.RepoID, ""
 		m.commitLocked(rec, true)
-		m.log.Info("thread moved to another workspace member", "session", id, "path", mem.WorktreePath)
+		m.log.Info("thread moved to another workspace member", "thread", id, "path", mem.WorktreePath)
 		return rec.s, nil
 	}
 	req := cdRequest{path: mem.WorktreePath, repoID: mem.RepoID}
@@ -79,7 +79,7 @@ func (m *Manager) RunIn(_ context.Context, id string, t RunInTarget) (Session, e
 	rec.run.cdReq <- req
 	m.commitLocked(rec, false)
 	if req.path != "" {
-		m.log.Info("thread move queued until idle", "session", id, "path", req.path)
+		m.log.Info("thread move queued until idle", "thread", id, "path", req.path)
 	}
 	return rec.s, nil
 }

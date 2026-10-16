@@ -50,15 +50,15 @@ func TestThreadAgentsToProto(t *testing.T) {
 	}
 }
 
-func TestSessionAgentCounts(t *testing.T) {
+func TestThreadAgentCounts(t *testing.T) {
 	runs := agentsSample(time.Now())
 	runs = append(runs, thread.AgentRun{ID: "a5", Background: true, SpawnDepth: 2, Status: thread.AgentRunning})
-	p := sessionToProto(thread.Session{ID: "s1", AgentRuns: runs, BackgroundShellsRunning: 3})
+	p := threadToProto(thread.Thread{ID: "s1", AgentRuns: runs, BackgroundShellsRunning: 3})
 	if p.GetAgentsRunning() != 2 || p.GetBackgroundAgentsRunning() != 1 || p.GetBackgroundShellsRunning() != 3 {
 		t.Errorf("running %d, background %d, shells %d", p.GetAgentsRunning(), p.GetBackgroundAgentsRunning(), p.GetBackgroundShellsRunning())
 	}
 	// The wake hold travels too (restarts and archive confirm it as background work).
-	if p.GetBackgroundWakePending() || !sessionToProto(thread.Session{ID: "s2", WakePending: true}).GetBackgroundWakePending() {
+	if p.GetBackgroundWakePending() || !threadToProto(thread.Thread{ID: "s2", WakePending: true}).GetBackgroundWakePending() {
 		t.Error("background_wake_pending mapping")
 	}
 	want := []v1.AgentRunStatus{v1.AgentRunStatus_AGENT_RUN_STATUS_OPEN, v1.AgentRunStatus_AGENT_RUN_STATUS_CLOSED,
@@ -69,7 +69,7 @@ func TestSessionAgentCounts(t *testing.T) {
 		}
 	}
 	// A row from before the lifecycle (no status) follows Open.
-	old := sessionToProto(thread.Session{ID: "s2", AgentRuns: []thread.AgentRun{{ID: "x", Open: true}}})
+	old := threadToProto(thread.Thread{ID: "s2", AgentRuns: []thread.AgentRun{{ID: "x", Open: true}}})
 	if old.GetAgentRuns()[0].GetStatus() != v1.AgentRunStatus_AGENT_RUN_STATUS_OPEN {
 		t.Errorf("old open run %v", old.GetAgentRuns()[0])
 	}
@@ -77,12 +77,12 @@ func TestSessionAgentCounts(t *testing.T) {
 
 func TestThreadAgentsWatch(t *testing.T) {
 	fake, c := newThreadServer(t)
-	fake.Put(thread.Session{ID: "s1", State: thread.StateConnected})
+	fake.Put(thread.Thread{ID: "s1", State: thread.StateConnected})
 	fake.PutItems("s1", thread.Item{ID: "u1", Kind: thread.KindUserMessage, Text: "hi"})
 	fake.PutAgents("s1", agentsSample(time.Now())[:1]...)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	stream, err := c.Watch(ctx, connect.NewRequest(&v1.WatchThreadRequest{SessionId: "s1"}))
+	stream, err := c.WatchThread(ctx, connect.NewRequest(&v1.WatchThreadRequest{ThreadId: "s1"}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,10 +100,10 @@ func TestThreadAgentsWatch(t *testing.T) {
 	}
 	fake.PutAgents("s1", agentsSample(time.Now())...)
 	ev := next().GetAgents()
-	if ev.GetSessionId() != "s1" || ev.GetSeq() != 3 || len(ev.GetAgents()) != 4 {
+	if ev.GetThreadId() != "s1" || ev.GetSeq() != 3 || len(ev.GetAgents()) != 4 {
 		t.Errorf("event %v", ev)
 	}
-	list, err := c.ListItems(ctx, connect.NewRequest(&v1.ListThreadItemsRequest{SessionId: "s1"}))
+	list, err := c.ListItems(ctx, connect.NewRequest(&v1.ListThreadItemsRequest{ThreadId: "s1"}))
 	if err != nil || len(list.Msg.GetSnapshot().GetAgents()) != 4 {
 		t.Errorf("list %v %v", list, err)
 	}

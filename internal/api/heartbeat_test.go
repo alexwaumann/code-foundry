@@ -96,7 +96,7 @@ func serveOnce(t *testing.T, r Route, done chan struct{}) *httptest.Server {
 	mux := http.NewServeMux()
 	mux.Handle(r.Path, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		r.Handler.ServeHTTP(w, req)
-		if strings.HasSuffix(req.URL.Path, "/Watch") || strings.HasSuffix(req.URL.Path, "/Attach") {
+		if strings.HasSuffix(req.URL.Path, "/Watch") || strings.HasSuffix(req.URL.Path, "/WatchThread") || strings.HasSuffix(req.URL.Path, "/Attach") {
 			close(done)
 		}
 	}))
@@ -129,11 +129,11 @@ func pump[T any](s interface {
 func openThreadBeats(t *testing.T, ctx context.Context, every time.Duration) beatStream {
 	b := bus.New()
 	fake := threadtest.New(b)
-	fake.Put(thread.Session{ID: "s1", State: thread.StateConnected})
+	fake.Put(thread.Thread{ID: "s1", State: thread.StateConnected})
 	done := make(chan struct{})
 	srv := serveOnce(t, (&Thread{store: fake, bus: b, beat: every}).Route(), done)
 	c := codefoundryv1connect.NewThreadServiceClient(srv.Client(), srv.URL)
-	s, err := c.Watch(ctx, connect.NewRequest(&v1.WatchThreadRequest{SessionId: "s1"}))
+	s, err := c.WatchThread(ctx, connect.NewRequest(&v1.WatchThreadRequest{ThreadId: "s1"}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -185,22 +185,22 @@ func openEventBeats(t *testing.T, ctx context.Context, every time.Duration) beat
 	b := bus.New()
 	fake := threadtest.New(b)
 	done := make(chan struct{})
-	srv := serveOnce(t, (&Events{deps: EventsDeps{Bus: b, Session: fake}, beat: every}).Route(), done)
+	srv := serveOnce(t, (&Events{deps: EventsDeps{Bus: b, Thread: fake}, beat: every}).Route(), done)
 	c := codefoundryv1connect.NewEventServiceClient(srv.Client(), srv.URL)
-	s, err := c.Watch(ctx, connect.NewRequest(&v1.WatchEventsRequest{Sources: []v1.EventSource{v1.EventSource_EVENT_SOURCE_SESSION}}))
+	s, err := c.Watch(ctx, connect.NewRequest(&v1.WatchEventsRequest{Sources: []v1.EventSource{v1.EventSource_EVENT_SOURCE_THREAD_LIST}}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = s.Close() })
-	if !s.Receive() || s.Msg().GetSession() == nil {
-		t.Fatalf("no session snapshot: %v", s.Err())
+	if !s.Receive() || s.Msg().GetThreadList() == nil {
+		t.Fatalf("no thread snapshot: %v", s.Err())
 	}
 	n := 0
 	return beatStream{
 		msgs: pump(s, func(m *v1.Event) bool { return m.GetHeartbeat() != nil }),
 		poke: func(*testing.T) {
 			n++
-			fake.Put(thread.Session{ID: "s1", Name: string(rune('a' + n%26))})
+			fake.Put(thread.Thread{ID: "s1", Name: string(rune('a' + n%26))})
 		},
 		done: done,
 	}
@@ -232,7 +232,7 @@ func TestStreamHeartbeats(t *testing.T) {
 		name string
 		open func(*testing.T, context.Context, time.Duration) beatStream
 	}{
-		{"ThreadService.Watch", openThreadBeats},
+		{"ThreadService.WatchThread", openThreadBeats},
 		{"TerminalService.Attach", openAttachBeats},
 		{"EventService.Watch", openEventBeats},
 	}
@@ -300,11 +300,11 @@ func TestThreadWatchHeartbeatKeepsSeq(t *testing.T) {
 	defer cancel()
 	b := bus.New()
 	fake := threadtest.New(b)
-	fake.Put(thread.Session{ID: "s1", State: thread.StateConnected})
+	fake.Put(thread.Thread{ID: "s1", State: thread.StateConnected})
 	fake.PutItems("s1", thread.Item{ID: "u1", Kind: thread.KindUserMessage, Text: "hi"})
 	srv := serveOnce(t, (&Thread{store: fake, bus: b, beat: 50 * time.Millisecond}).Route(), make(chan struct{}))
 	c := codefoundryv1connect.NewThreadServiceClient(srv.Client(), srv.URL)
-	s, err := c.Watch(ctx, connect.NewRequest(&v1.WatchThreadRequest{SessionId: "s1"}))
+	s, err := c.WatchThread(ctx, connect.NewRequest(&v1.WatchThreadRequest{ThreadId: "s1"}))
 	if err != nil {
 		t.Fatal(err)
 	}

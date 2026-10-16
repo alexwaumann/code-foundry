@@ -99,7 +99,7 @@ func (h *Action) Run(ctx context.Context, req *connect.Request[v1.RunActionReque
 		mode = action.ModeBackground
 	}
 	r, err := h.store.Run(ctx, action.RunOptions{
-		Action: m.GetAction(), SessionID: m.GetSessionId(), Worktree: m.GetWorktreePath(), RepoID: m.GetRepoId(), Mode: mode,
+		Action: m.GetAction(), ThreadID: m.GetThreadId(), Worktree: m.GetWorktreePath(), RepoID: m.GetRepoId(), Mode: mode,
 	})
 	if err != nil {
 		return nil, actionError(err)
@@ -175,7 +175,7 @@ func actionEventToProto(ev action.Event) *v1.ActionEvent {
 		return &v1.ActionEvent{Event: &v1.ActionEvent_RunRemovedId{RunRemovedId: e.ID}}
 	case action.RunFinished:
 		return &v1.ActionEvent{Event: &v1.ActionEvent_RunFinished{RunFinished: &v1.ActionRunFinished{
-			RunId: e.RunID, ActionId: e.ActionID, ActionName: e.ActionName, RepoId: e.RepoID, SessionId: e.SessionID,
+			RunId: e.RunID, ActionId: e.ActionID, ActionName: e.ActionName, RepoId: e.RepoID, ThreadId: e.ThreadID,
 			ExitCode: int32(e.ExitCode), Mode: actionModeToProto(e.Mode), Trigger: actionTriggerToProto(e.Trigger),
 			TerminalId: e.TerminalID,
 		}}}
@@ -247,7 +247,7 @@ func actionTriggerToProto(t action.Trigger) v1.ActionRunTrigger {
 func actionRunToProto(r action.Run) *v1.ActionRun {
 	p := &v1.ActionRun{
 		Id: r.ID, ActionId: r.ActionID, ActionName: r.ActionName, Command: r.Command, RepoId: r.RepoID,
-		SessionId: r.SessionID, WorktreePath: r.Worktree, Mode: actionModeToProto(r.Mode), TerminalId: r.TerminalID,
+		ThreadId: r.ThreadID, WorktreePath: r.Worktree, Mode: actionModeToProto(r.Mode), TerminalId: r.TerminalID,
 		// A proto string must be valid UTF-8 (the store already replaces invalid bytes).
 		Trigger: actionTriggerToProto(r.Trigger), Output: strings.ToValidUTF8(r.Output, "\uFFFD"), OutputTruncated: r.Truncated,
 		State: v1.ActionRunState_ACTION_RUN_STATE_RUNNING,

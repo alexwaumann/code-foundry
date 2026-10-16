@@ -27,7 +27,7 @@ func TestUsageToProto(t *testing.T) {
 	}{
 		{name: "none"},
 		{name: "priced", in: []thread.UsageBucket{opus, haikuLong}, cost: 4 + 20 + 0.2 + 5 + 8 + 0.5},
-		{name: "an unpriced bucket adds nothing and flags the session", in: []thread.UsageBucket{opus, unknown},
+		{name: "an unpriced bucket adds nothing and flags the thread", in: []thread.UsageBucket{opus, unknown},
 			cost: 4 + 20 + 0.2 + 5 + 8, unpriced: true},
 	}
 	for _, tt := range tests {
@@ -69,27 +69,27 @@ func TestUsageToProto(t *testing.T) {
 	}
 }
 
-func TestSessionUsageOnTheWire(t *testing.T) {
-	fake, c := newSessionServer(t)
+func TestThreadUsageOnTheWire(t *testing.T) {
+	fake, c := newThreadServer(t)
 	usage := []thread.UsageBucket{{Model: "claude-opus-5-5", Day: "2026-10-09", Requests: 1, Output: 1_000_000}}
-	fake.Put(thread.Session{ID: "s-a", CreatedAt: time.Unix(1, 0), Usage: usage})
+	fake.Put(thread.Thread{ID: "s-a", CreatedAt: time.Unix(1, 0), Usage: usage})
 	fake.SetRetiredUsage([]thread.UsageBucket{{Model: "claude-haiku-5-5", Day: "2026-10-08", Requests: 1, Output: 2_000_000}})
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	list, err := c.List(ctx, connect.NewRequest(&v1.ListSessionsRequest{}))
+	list, err := c.List(ctx, connect.NewRequest(&v1.ListThreadsRequest{}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := list.Msg.GetSessions()[0]
+	s := list.Msg.GetThreads()[0]
 	if len(s.GetUsage()) != 1 || !near(s.GetCostUsd(), 20) || s.GetUnpriced() {
-		t.Errorf("listed session usage = %v, cost %v, unpriced %v", s.GetUsage(), s.GetCostUsd(), s.GetUnpriced())
+		t.Errorf("listed thread usage = %v, cost %v, unpriced %v", s.GetUsage(), s.GetCostUsd(), s.GetUnpriced())
 	}
 	if r := list.Msg.GetRetiredUsage(); len(r) != 1 || !near(r[0].GetCostUsd(), 1) {
 		t.Errorf("listed retired = %v", r)
 	}
 
-	stream, err := c.Watch(ctx, connect.NewRequest(&v1.WatchSessionsRequest{}))
+	stream, err := c.Watch(ctx, connect.NewRequest(&v1.WatchThreadsRequest{}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,22 +137,22 @@ func TestAgentRunsToProto(t *testing.T) {
 
 func TestContextRereadUSD(t *testing.T) {
 	at := time.Date(2026, 10, 12, 9, 0, 0, 0, time.UTC)
-	hour := func(s thread.Session) thread.Session {
+	hour := func(s thread.Thread) thread.Thread {
 		s.LastResultAt, s.CacheExpiresAt = at, at.Add(time.Hour)
 		return s
 	}
 	tests := []struct {
 		name string
-		s    thread.Session
+		s    thread.Thread
 		want float64
 	}{
-		{name: "the answering model's 1 h write rate", s: hour(thread.Session{ContextTokens: 1_000_000, ContextModel: "claude-opus-4-8", Model: "opus"}), want: 10},
-		{name: "a 5 min TTL bills the 5 min rate", want: 6.25, s: thread.Session{ContextTokens: 1_000_000, ContextModel: "claude-opus-4-8",
+		{name: "the answering model's 1 h write rate", s: hour(thread.Thread{ContextTokens: 1_000_000, ContextModel: "claude-opus-4-8", Model: "opus"}), want: 10},
+		{name: "a 5 min TTL bills the 5 min rate", want: 6.25, s: thread.Thread{ContextTokens: 1_000_000, ContextModel: "claude-opus-4-8",
 			LastResultAt: at, CacheExpiresAt: at.Add(5 * time.Minute)}},
-		{name: "the row's model when it is a full id", s: hour(thread.Session{ContextTokens: 1_000_000, Model: "claude-sonnet-4-6"}), want: 6},
-		{name: "an alias alone is unpriced", s: hour(thread.Session{ContextTokens: 1_000_000, Model: "haiku"})},
-		{name: "an unknown model", s: hour(thread.Session{ContextTokens: 1_000_000, ContextModel: "claude-next-1"})},
-		{name: "no result yet", s: thread.Session{ContextTokens: 0, ContextModel: "claude-opus-4-8"}},
+		{name: "the row's model when it is a full id", s: hour(thread.Thread{ContextTokens: 1_000_000, Model: "claude-sonnet-4-6"}), want: 6},
+		{name: "an alias alone is unpriced", s: hour(thread.Thread{ContextTokens: 1_000_000, Model: "haiku"})},
+		{name: "an unknown model", s: hour(thread.Thread{ContextTokens: 1_000_000, ContextModel: "claude-next-1"})},
+		{name: "no result yet", s: thread.Thread{ContextTokens: 0, ContextModel: "claude-opus-4-8"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -163,19 +163,19 @@ func TestContextRereadUSD(t *testing.T) {
 	}
 }
 
-func TestSessionContextOnTheWire(t *testing.T) {
-	fake, c := newSessionServer(t)
+func TestThreadContextOnTheWire(t *testing.T) {
+	fake, c := newThreadServer(t)
 	at := time.Date(2026, 10, 12, 9, 0, 0, 0, time.UTC)
-	fake.Put(thread.Session{ID: "s-a", CreatedAt: time.Unix(1, 0), ContextTokens: 25_700,
+	fake.Put(thread.Thread{ID: "s-a", CreatedAt: time.Unix(1, 0), ContextTokens: 25_700,
 		ContextModel: "claude-haiku-4-5-20251001", LastResultAt: at, CacheExpiresAt: at.Add(time.Hour)})
-	fake.Put(thread.Session{ID: "s-b", CreatedAt: time.Unix(2, 0)}) // no result yet
+	fake.Put(thread.Thread{ID: "s-b", CreatedAt: time.Unix(2, 0)}) // no result yet
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	list, err := c.List(ctx, connect.NewRequest(&v1.ListSessionsRequest{}))
+	list, err := c.List(ctx, connect.NewRequest(&v1.ListThreadsRequest{}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	r, fresh := list.Msg.GetSessions()[0], list.Msg.GetSessions()[1]
+	r, fresh := list.Msg.GetThreads()[0], list.Msg.GetThreads()[1]
 	if r.GetContextTokens() != 25_700 || !r.GetCacheExpiresAt().AsTime().Equal(at.Add(time.Hour)) || !near(r.GetContextRereadUsd(), 25_700*2/1e6) {
 		t.Errorf("with a result = tokens %d, expires %v, reread %v", r.GetContextTokens(), r.GetCacheExpiresAt(), r.GetContextRereadUsd())
 	}

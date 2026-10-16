@@ -23,7 +23,7 @@ const (
 	// Kind says what started the terminal: KindShell or KindAction.
 	Kind = "kind"
 	// Session is the id of the thread (session) the terminal belongs to.
-	Session = "session"
+	Thread = "thread"
 	// Repo is the id of the registered repository whose worktree the terminal belongs to.
 	Repo = "repo"
 	// Worktree is the path (symlinks resolved, as in the repo snapshot) of the worktree
@@ -61,18 +61,18 @@ func IsPanel(labels map[string]string) bool { return IsShell(labels) || IsAction
 
 // Shell returns the labels of a shell owned by worktree path of repo repoID, and by
 // thread sessionID when it is not empty.
-func Shell(sessionID, repoID, worktree string) map[string]string {
+func Shell(threadID, repoID, worktree string) map[string]string {
 	l := map[string]string{Kind: KindShell, Repo: repoID, Worktree: worktree}
-	if sessionID != "" {
-		l[Session] = sessionID
+	if threadID != "" {
+		l[Thread] = threadID
 	}
 	return l
 }
 
 // ActionTerminal returns the labels of run runID of action actionID (named name) in a
 // terminal owned like a shell (see Shell).
-func ActionTerminal(sessionID, repoID, worktree, actionID, name, runID string) map[string]string {
-	l := Shell(sessionID, repoID, worktree)
+func ActionTerminal(threadID, repoID, worktree, actionID, name, runID string) map[string]string {
+	l := Shell(threadID, repoID, worktree)
 	l[Kind] = KindAction
 	l[Action] = actionID
 	l[ActionName] = name

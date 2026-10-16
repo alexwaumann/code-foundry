@@ -91,7 +91,7 @@ function isMissingService(err: unknown): boolean {
   return err.code === Code.Unimplemented || err.code === Code.NotFound || /HTTP 404/.test(err.rawMessage);
 }
 
-/** Lists sessions without failing the resync: a daemon without SessionService still works. */
+/** Lists sessions without failing the resync: a daemon without ThreadService still works. */
 async function reconcileSessions(signal: AbortSignal): Promise<void> {
   try {
     const list = await listSessions(daemon, signal);

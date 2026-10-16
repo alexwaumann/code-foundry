@@ -102,7 +102,7 @@ test("a refused command shows the daemon's message under the composer and keeps 
   await page.keyboard.type("/name new title");
   await expect(error).toBeHidden();
   await page.keyboard.press("Enter");
-  await expect(error).toHaveText("Rename the thread with Rename Thread (or `session.rename`), not /rename.");
+  await expect(error).toHaveText("Rename the thread with Rename Thread (or `thread.rename`), not /rename.");
   await page.keyboard.press("ControlOrMeta+a");
   await page.keyboard.type("/clearly fine");
   await page.keyboard.press("Enter");

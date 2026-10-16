@@ -75,7 +75,7 @@ const ViewPanelWorktree = "panel.worktree"
 // and it belongs to a workspace (the GUI passes the thread's workspace as
 // ActiveWorkspaceID; the CLI with --context-session and --context-workspace).
 func hasWorkspaceThreadContext(c Context) bool {
-	return hasSession(c) && c.ActiveWorkspaceID != ""
+	return hasThread(c) && c.ActiveWorkspaceID != ""
 }
 
 // hasWorktreeThreadContext is view.panel.worktree's availability: a thread is active and
@@ -84,7 +84,7 @@ func hasWorkspaceThreadContext(c Context) bool {
 // --context-worktree). A terminal alone does not count: the GUI never selects one (a
 // Projects-page bottom shell brings its worktree, but the page has no thread).
 func hasWorktreeThreadContext(c Context) bool {
-	return hasSession(c) && hasWorktree(c)
+	return hasThread(c) && hasWorktree(c)
 }
 
 // RegisterView registers view.dashboard, which shows the dashboard, view.usage, which
@@ -208,7 +208,7 @@ func RegisterView(r *Registry, e Emitter) error {
 			// No default chord, like view.panel.workspace (L opens it while the panel has
 			// focus). Available for any thread, even one without links, so the palette
 			// finds it and the GUI can say there are none yet.
-			When: hasSession,
+			When: hasThread,
 			Run: func(context.Context, Context, Args) (Result, error) {
 				return show(ViewPanelLinkedPRs), nil
 			},
@@ -221,7 +221,7 @@ func RegisterView(r *Registry, e Emitter) error {
 			Category: "View",
 			// No default chord, like view.panel.linked-prs (U opens it while the panel has
 			// focus). Available for any thread, even one without usage yet.
-			When: hasSession,
+			When: hasThread,
 			Run: func(context.Context, Context, Args) (Result, error) {
 				return show(ViewPanelUsage), nil
 			},

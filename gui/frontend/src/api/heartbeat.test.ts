@@ -28,9 +28,9 @@ async function collect<T>(it: AsyncIterable<T>): Promise<T[]> {
 const signal = new AbortController().signal;
 
 describe("stream openers map a StreamHeartbeat to HEARTBEAT", () => {
-  it("ThreadService.Watch", async () => {
-    const conn = fakeConn("watch", [
-      create(ThreadEventSchema, { event: { case: "snapshot", value: { sessionId: "s", seq: 3n } } }),
+  it("ThreadService.WatchThread", async () => {
+    const conn = fakeConn("watchThread", [
+      create(ThreadEventSchema, { event: { case: "snapshot", value: { threadId: "s", seq: 3n } } }),
       create(ThreadEventSchema, { event: { case: "heartbeat", value: {} } }),
     ]);
     const got = await collect(watchThread("s", signal, conn));

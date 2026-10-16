@@ -116,7 +116,7 @@ type Run struct {
 	ActionName string // when it started
 	Command    string // when it started
 	RepoID     string
-	SessionID  string // empty for a worktree's run
+	ThreadID   string // empty for a worktree's run
 	Worktree   string // cwd and CODE_FOUNDRY_WORKTREE
 	Mode       Mode   // ModeTerminal or ModeBackground
 	TerminalID string // ModeTerminal
@@ -236,7 +236,7 @@ type RunRemoved struct{ ID string }
 // RunFinished follows a finished run's RunUpdated, once per run.
 type RunFinished struct {
 	RunID, ActionID, ActionName string
-	RepoID, SessionID           string
+	RepoID, ThreadID            string
 	TerminalID                  string
 	Mode                        Mode
 	Trigger                     Trigger
@@ -275,9 +275,9 @@ type UpdateOptions struct {
 // Owner is who a run belongs to: a thread (SessionID set; RepoID and Worktree are the
 // thread's) or a worktree.
 type Owner struct {
-	SessionID string
-	RepoID    string
-	Worktree  string
+	ThreadID string
+	RepoID   string
+	Worktree string
 }
 
 // RunOptions configures Store.Run.
@@ -285,7 +285,7 @@ type RunOptions struct {
 	// Action is an action id, or its name within RepoID (default: the owner's project).
 	Action string
 	// SessionID makes the thread the owner; it wins over Worktree.
-	SessionID string
+	ThreadID string
 	// Worktree is the owner when there is no thread: a registered worktree of the
 	// action's project.
 	Worktree string

@@ -14,14 +14,14 @@ import type { StreamHeartbeat } from "./heartbeat_pb";
 import { file_codefoundry_v1_heartbeat } from "./heartbeat_pb";
 import type { RepoEvent } from "./repo_pb";
 import { file_codefoundry_v1_repo } from "./repo_pb";
-import type { SessionEvent } from "./session_pb";
-import { file_codefoundry_v1_session } from "./session_pb";
 import type { SettingsEvent } from "./settings_pb";
 import { file_codefoundry_v1_settings } from "./settings_pb";
 import type { TerminalEvent } from "./terminal_pb";
 import { file_codefoundry_v1_terminal } from "./terminal_pb";
 import type { ThreadEvent } from "./thread_pb";
 import { file_codefoundry_v1_thread } from "./thread_pb";
+import type { ThreadListEvent } from "./thread_lifecycle_pb";
+import { file_codefoundry_v1_thread_lifecycle } from "./thread_lifecycle_pb";
 import type { UiIntent } from "./ui_pb";
 import { file_codefoundry_v1_ui } from "./ui_pb";
 import type { UpdateEvent } from "./update_pb";
@@ -34,7 +34,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/events.proto.
  */
 export const file_codefoundry_v1_events: GenFile = /*@__PURE__*/
-  fileDesc("Chtjb2RlZm91bmRyeS92MS9ldmVudHMucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIkIKEldhdGNoRXZlbnRzUmVxdWVzdBIsCgdzb3VyY2VzGAEgAygOMhsuY29kZWZvdW5kcnkudjEuRXZlbnRTb3VyY2UiyAQKBUV2ZW50EikKBHJlcG8YASABKAsyGS5jb2RlZm91bmRyeS52MS5SZXBvRXZlbnRIABIxCgh0ZXJtaW5hbBgCIAEoCzIdLmNvZGVmb3VuZHJ5LnYxLlRlcm1pbmFsRXZlbnRIABIvCgdzZXNzaW9uGAMgASgLMhwuY29kZWZvdW5kcnkudjEuU2Vzc2lvbkV2ZW50SAASJQoCZ2gYBCABKAsyFy5jb2RlZm91bmRyeS52MS5HaEV2ZW50SAASJgoCdWkYBSABKAsyGC5jb2RlZm91bmRyeS52MS5VaUludGVudEgAEi0KBmdpdG9wcxgGIAEoCzIbLmNvZGVmb3VuZHJ5LnYxLkdpdE9wc0V2ZW50SAASMQoIc2V0dGluZ3MYByABKAsyHS5jb2RlZm91bmRyeS52MS5TZXR0aW5nc0V2ZW50SAASLQoGdXBkYXRlGAogASgLMhsuY29kZWZvdW5kcnkudjEuVXBkYXRlRXZlbnRIABIzCgl3b3Jrc3BhY2UYCyABKAsyHi5jb2RlZm91bmRyeS52MS5Xb3Jrc3BhY2VFdmVudEgAEi0KBnRocmVhZBgMIAEoCzIbLmNvZGVmb3VuZHJ5LnYxLlRocmVhZEV2ZW50SAASNAoJaGVhcnRiZWF0GA0gASgLMh8uY29kZWZvdW5kcnkudjEuU3RyZWFtSGVhcnRiZWF0SAASLQoGYWN0aW9uGA4gASgLMhsuY29kZWZvdW5kcnkudjEuQWN0aW9uRXZlbnRIAEIHCgVldmVudCq8AgoLRXZlbnRTb3VyY2USHAoYRVZFTlRfU09VUkNFX1VOU1BFQ0lGSUVEEAASFQoRRVZFTlRfU09VUkNFX1JFUE8QARIZChVFVkVOVF9TT1VSQ0VfVEVSTUlOQUwQAhIYChRFVkVOVF9TT1VSQ0VfU0VTU0lPThADEhMKD0VWRU5UX1NPVVJDRV9HSBAEEhMKD0VWRU5UX1NPVVJDRV9VSRAFEhcKE0VWRU5UX1NPVVJDRV9HSVRPUFMQBhIZChVFVkVOVF9TT1VSQ0VfU0VUVElOR1MQBxIXChNFVkVOVF9TT1VSQ0VfVVBEQVRFEAoSGgoWRVZFTlRfU09VUkNFX1dPUktTUEFDRRALEhcKE0VWRU5UX1NPVVJDRV9USFJFQUQQDBIXChNFVkVOVF9TT1VSQ0VfQUNUSU9OEA0yVgoMRXZlbnRTZXJ2aWNlEkYKBVdhdGNoEiIuY29kZWZvdW5kcnkudjEuV2F0Y2hFdmVudHNSZXF1ZXN0GhUuY29kZWZvdW5kcnkudjEuRXZlbnQiADABQsMBChJjb20uY29kZWZvdW5kcnkudjFCC0V2ZW50c1Byb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM", [file_codefoundry_v1_action, file_codefoundry_v1_gh, file_codefoundry_v1_gitops, file_codefoundry_v1_heartbeat, file_codefoundry_v1_repo, file_codefoundry_v1_session, file_codefoundry_v1_settings, file_codefoundry_v1_terminal, file_codefoundry_v1_thread, file_codefoundry_v1_ui, file_codefoundry_v1_update, file_codefoundry_v1_workspace]);
+  fileDesc("Chtjb2RlZm91bmRyeS92MS9ldmVudHMucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIkIKEldhdGNoRXZlbnRzUmVxdWVzdBIsCgdzb3VyY2VzGAEgAygOMhsuY29kZWZvdW5kcnkudjEuRXZlbnRTb3VyY2UizwQKBUV2ZW50EikKBHJlcG8YASABKAsyGS5jb2RlZm91bmRyeS52MS5SZXBvRXZlbnRIABIxCgh0ZXJtaW5hbBgCIAEoCzIdLmNvZGVmb3VuZHJ5LnYxLlRlcm1pbmFsRXZlbnRIABI2Cgt0aHJlYWRfbGlzdBgDIAEoCzIfLmNvZGVmb3VuZHJ5LnYxLlRocmVhZExpc3RFdmVudEgAEiUKAmdoGAQgASgLMhcuY29kZWZvdW5kcnkudjEuR2hFdmVudEgAEiYKAnVpGAUgASgLMhguY29kZWZvdW5kcnkudjEuVWlJbnRlbnRIABItCgZnaXRvcHMYBiABKAsyGy5jb2RlZm91bmRyeS52MS5HaXRPcHNFdmVudEgAEjEKCHNldHRpbmdzGAcgASgLMh0uY29kZWZvdW5kcnkudjEuU2V0dGluZ3NFdmVudEgAEi0KBnVwZGF0ZRgKIAEoCzIbLmNvZGVmb3VuZHJ5LnYxLlVwZGF0ZUV2ZW50SAASMwoJd29ya3NwYWNlGAsgASgLMh4uY29kZWZvdW5kcnkudjEuV29ya3NwYWNlRXZlbnRIABItCgZ0aHJlYWQYDCABKAsyGy5jb2RlZm91bmRyeS52MS5UaHJlYWRFdmVudEgAEjQKCWhlYXJ0YmVhdBgNIAEoCzIfLmNvZGVmb3VuZHJ5LnYxLlN0cmVhbUhlYXJ0YmVhdEgAEi0KBmFjdGlvbhgOIAEoCzIbLmNvZGVmb3VuZHJ5LnYxLkFjdGlvbkV2ZW50SABCBwoFZXZlbnQqwAIKC0V2ZW50U291cmNlEhwKGEVWRU5UX1NPVVJDRV9VTlNQRUNJRklFRBAAEhUKEUVWRU5UX1NPVVJDRV9SRVBPEAESGQoVRVZFTlRfU09VUkNFX1RFUk1JTkFMEAISHAoYRVZFTlRfU09VUkNFX1RIUkVBRF9MSVNUEAMSEwoPRVZFTlRfU09VUkNFX0dIEAQSEwoPRVZFTlRfU09VUkNFX1VJEAUSFwoTRVZFTlRfU09VUkNFX0dJVE9QUxAGEhkKFUVWRU5UX1NPVVJDRV9TRVRUSU5HUxAHEhcKE0VWRU5UX1NPVVJDRV9VUERBVEUQChIaChZFVkVOVF9TT1VSQ0VfV09SS1NQQUNFEAsSFwoTRVZFTlRfU09VUkNFX1RIUkVBRBAMEhcKE0VWRU5UX1NPVVJDRV9BQ1RJT04QDTJWCgxFdmVudFNlcnZpY2USRgoFV2F0Y2gSIi5jb2RlZm91bmRyeS52MS5XYXRjaEV2ZW50c1JlcXVlc3QaFS5jb2RlZm91bmRyeS52MS5FdmVudCIAMAFCwwEKEmNvbS5jb2RlZm91bmRyeS52MUILRXZlbnRzUHJvdG9QAVpHZ2l0aHViLmNvbS9hbGV4d2F1bWFubi9jb2RlLWZvdW5kcnkvZ2VuL2dvL2NvZGVmb3VuZHJ5L3YxO2NvZGVmb3VuZHJ5djGiAgNDWFiqAg5Db2RlZm91bmRyeS5WMcoCDkNvZGVmb3VuZHJ5XFYx4gIaQ29kZWZvdW5kcnlcVjFcR1BCTWV0YWRhdGHqAg9Db2RlZm91bmRyeTo6VjFiBnByb3RvMw", [file_codefoundry_v1_action, file_codefoundry_v1_gh, file_codefoundry_v1_gitops, file_codefoundry_v1_heartbeat, file_codefoundry_v1_repo, file_codefoundry_v1_settings, file_codefoundry_v1_terminal, file_codefoundry_v1_thread, file_codefoundry_v1_thread_lifecycle, file_codefoundry_v1_ui, file_codefoundry_v1_update, file_codefoundry_v1_workspace]);
 
 /**
  * @generated from message codefoundry.v1.WatchEventsRequest
@@ -76,10 +76,10 @@ export type Event = Message<"codefoundry.v1.Event"> & {
     case: "terminal";
   } | {
     /**
-     * @generated from field: codefoundry.v1.SessionEvent session = 3;
+     * @generated from field: codefoundry.v1.ThreadListEvent thread_list = 3;
      */
-    value: SessionEvent;
-    case: "session";
+    value: ThreadListEvent;
+    case: "threadList";
   } | {
     /**
      * @generated from field: codefoundry.v1.GhEvent gh = 4;
@@ -175,9 +175,9 @@ export enum EventSource {
   TERMINAL = 2,
 
   /**
-   * @generated from enum value: EVENT_SOURCE_SESSION = 3;
+   * @generated from enum value: EVENT_SOURCE_THREAD_LIST = 3;
    */
-  SESSION = 3,
+  THREAD_LIST = 3,
 
   /**
    * @generated from enum value: EVENT_SOURCE_GH = 4;
@@ -211,7 +211,7 @@ export enum EventSource {
 
   /**
    * Workspaces (branch sets). Sent right after repo, before terminal: members name
-   * repositories, and sessions name workspaces.
+   * repositories, and threads name workspaces.
    *
    * @generated from enum value: EVENT_SOURCE_WORKSPACE = 11;
    */
@@ -219,9 +219,9 @@ export enum EventSource {
 
   /**
    * Rendered threads' pending requests (permission prompts and questions), for
-   * every rendered thread: a ThreadPendingSnapshot (right after session), then a
+   * every rendered thread: a ThreadPendingSnapshot (right after the thread list), then a
    * ThreadEvent.pending per change. A thread's items come only from
-   * ThreadService.ListItems or Watch; this source never carries them.
+   * ThreadService.ListItems or WatchThread; this source never carries them.
    *
    * @generated from enum value: EVENT_SOURCE_THREAD = 12;
    */
@@ -253,7 +253,7 @@ export const EventSourceSchema: GenEnum<EventSource> = /*@__PURE__*/
 export const EventService: GenService<{
   /**
    * Watch streams all events. Each store's snapshot event is sent first, in the order
-   * repo, workspace, terminal, session, thread, gh, gitops, settings, update, action, so a
+   * repo, workspace, terminal, thread list, thread, gh, gitops, settings, update, action, so a
    * client can replace its state wholesale on connect.
    *
    * @generated from rpc codefoundry.v1.EventService.Watch

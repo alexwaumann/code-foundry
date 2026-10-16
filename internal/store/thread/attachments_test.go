@@ -91,7 +91,7 @@ func TestStageAttachment(t *testing.T) {
 		t.Errorf("argv = %q, want --add-dir %s", argv, dir)
 	}
 	e.exit(s.ID, 0)
-	e.waitFor(s.ID, "disconnected", func(s Session) bool { return s.State == StateDisconnected })
+	e.waitFor(s.ID, "disconnected", func(s Thread) bool { return s.State == StateDisconnected })
 	if _, err := e.m.Reconnect(e.ctx(), s.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -174,8 +174,8 @@ func TestCreateRejectsForeignAttachments(t *testing.T) {
 	if _, err := e.m.Create(e.ctx(), CreateOptions{WorktreePath: e.wt, InitialPrompt: "x", Attachments: []string{secret}}); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("err = %v", err)
 	}
-	if n := len(e.m.Snapshot().Sessions); n != 0 {
-		t.Errorf("%d sessions", n)
+	if n := len(e.m.Snapshot().Threads); n != 0 {
+		t.Errorf("%d threads", n)
 	}
 }
 

@@ -24,45 +24,45 @@ const SnoozeCheckInterval = 30 * time.Second
 // Archive, a Reconnect that wins the race between the close and that last step makes
 // Snooze fail rather than snooze a live thread. Unsnoozing only clears SnoozedUntil:
 // the thread stays disconnected and gets no attention.
-func (m *Manager) Snooze(ctx context.Context, id string, until time.Time) (Session, error) {
+func (m *Manager) Snooze(ctx context.Context, id string, until time.Time) (Thread, error) {
 	if until.IsZero() {
 		m.mu.Lock()
 		defer m.mu.Unlock()
 		rec, err := m.record(id)
 		if err != nil {
-			return Session{}, err
+			return Thread{}, err
 		}
 		if m.unsnoozeLocked(rec) {
 			m.commitLocked(rec, true)
-			m.log.Info("unsnoozed thread", "session", id)
+			m.log.Info("unsnoozed thread", "thread", id)
 		}
 		return rec.s, nil
 	}
 	// Wall clock only (see wakeSnoozed); persisted at millisecond precision.
 	until = until.Round(0).Truncate(time.Millisecond)
 	if !until.After(m.opts.Now()) {
-		return Session{}, fmt.Errorf("%w: snooze time %s is not in the future", ErrInvalidArgument, until.Format(time.RFC3339))
+		return Thread{}, fmt.Errorf("%w: snooze time %s is not in the future", ErrInvalidArgument, until.Format(time.RFC3339))
 	}
 	if err := m.Close(ctx, id); err != nil {
-		return Session{}, err
+		return Thread{}, err
 	}
 	if err := m.removeShells(ctx, id); err != nil {
-		return Session{}, err
+		return Thread{}, err
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	rec, err := m.record(id)
 	if err != nil {
-		return Session{}, err
+		return Thread{}, err
 	}
 	if rec.run != nil || rec.s.State != StateDisconnected {
-		return Session{}, fmt.Errorf("%w: session %s was started while being snoozed", ErrFailedPrecondition, id)
+		return Thread{}, fmt.Errorf("%w: thread %s was started while being snoozed", ErrFailedPrecondition, id)
 	}
 	rec.s.SnoozedUntil = until
 	rec.s.Pinned = false
 	m.unarchiveLocked(rec)
 	m.commitLocked(rec, true)
-	m.log.Info("snoozed thread", "session", id, "until", until)
+	m.log.Info("snoozed thread", "thread", id, "until", until)
 	return rec.s, nil
 }
 
@@ -103,7 +103,7 @@ func (m *Manager) wakeSnoozed() {
 			rec.s.Status, rec.s.StatusReason, rec.s.StatusChangedAt = StatusNeedsAttention, ReasonSnoozeEnded, now
 		}
 		m.commitLocked(rec, true)
-		m.log.Info("snooze ended", "session", id, "until", until, "late", now.Sub(until).Round(time.Second))
+		m.log.Info("snooze ended", "thread", id, "until", until, "late", now.Sub(until).Round(time.Second))
 	}
 }
 

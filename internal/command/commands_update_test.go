@@ -15,11 +15,11 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/version"
 )
 
-func newUpdateRegistry(t *testing.T, u *commandtest.Update, s *commandtest.Session, restart func()) *command.Registry {
+func newUpdateRegistry(t *testing.T, u *commandtest.Update, s *commandtest.Thread, restart func()) *command.Registry {
 	t.Helper()
 	reg := command.NewRegistry()
 	if err := command.RegisterUpdate(reg, command.UpdateDeps{
-		Update: u, Session: s, Restart: restart,
+		Update: u, Thread: s, Restart: restart,
 		Daemon: command.DaemonInfo{Version: version.Info{Version: "v0.1.0"}},
 	}); err != nil {
 		t.Fatal(err)
@@ -48,7 +48,7 @@ func TestAppUpdateAvailabilityAndTitle(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			reg := newUpdateRegistry(t, &commandtest.Update{Status: tt.status, Err: tt.err}, &commandtest.Session{}, nil)
+			reg := newUpdateRegistry(t, &commandtest.Update{Status: tt.status, Err: tt.err}, &commandtest.Thread{}, nil)
 			var got *command.Listed
 			for _, l := range reg.List(command.Context{}, true) {
 				if l.Name == "app.update" {
@@ -107,7 +107,7 @@ func TestAppUpdateCommands(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			reg := newUpdateRegistry(t, &commandtest.Update{Status: tt.status, Delivered: tt.deliver}, &commandtest.Session{}, nil)
+			reg := newUpdateRegistry(t, &commandtest.Update{Status: tt.status, Delivered: tt.deliver}, &commandtest.Thread{}, nil)
 			res, err := reg.Invoke(ctx, command.Context{}, tt.command, nil)
 			if err != nil {
 				t.Fatal(err)
@@ -124,45 +124,45 @@ func TestAppUpdateCommands(t *testing.T) {
 // and stopped threads start again with their next message.
 func TestRestartCost(t *testing.T) {
 	const (
-		connected    = v1.SessionState_SESSION_STATE_CONNECTED
-		starting     = v1.SessionState_SESSION_STATE_STARTING
-		disconnected = v1.SessionState_SESSION_STATE_DISCONNECTED
-		busy         = v1.SessionStatus_SESSION_STATUS_BUSY
-		idle         = v1.SessionStatus_SESSION_STATUS_IDLE
-		attention    = v1.SessionStatus_SESSION_STATUS_NEEDS_ATTENTION
+		connected    = v1.ThreadState_THREAD_STATE_CONNECTED
+		starting     = v1.ThreadState_THREAD_STATE_STARTING
+		disconnected = v1.ThreadState_THREAD_STATE_DISCONNECTED
+		busy         = v1.ThreadStatus_THREAD_STATUS_BUSY
+		idle         = v1.ThreadStatus_THREAD_STATUS_IDLE
+		attention    = v1.ThreadStatus_THREAD_STATUS_NEEDS_ATTENTION
 	)
-	sess := func(st v1.SessionState, status v1.SessionStatus, reason string) *v1.Session {
-		return &v1.Session{State: st, Status: status, StatusReason: reason}
+	th := func(st v1.ThreadState, status v1.ThreadStatus, reason string) *v1.Thread {
+		return &v1.Thread{State: st, Status: status, StatusReason: reason}
 	}
-	shells := func(n int32) *v1.Session {
-		return &v1.Session{State: connected, Status: idle, StatusReason: "at prompt", BackgroundShellsRunning: n}
+	shells := func(n int32) *v1.Thread {
+		return &v1.Thread{State: connected, Status: idle, StatusReason: "at prompt", BackgroundShellsRunning: n}
 	}
 	tests := []struct {
 		name     string
-		sessions []*v1.Session
+		threads  []*v1.Thread
 		want     command.RestartCost
 		wantText string
 	}{
 		{"none", nil, command.RestartCost{}, ""},
-		{"busy and starting", []*v1.Session{sess(connected, busy, "working"), sess(starting, 0, "")},
+		{"busy and starting", []*v1.Thread{th(connected, busy, "working"), th(starting, 0, "")},
 			command.RestartCost{Threads: 2, MidTurn: 2}, "2 threads working or waiting on you"},
-		{"a permission prompt and a question", []*v1.Session{sess(connected, attention, "permission: Bash ls"), sess(connected, attention, "question: Which?")},
+		{"a permission prompt and a question", []*v1.Thread{th(connected, attention, "permission: Bash ls"), th(connected, attention, "question: Which?")},
 			command.RestartCost{Threads: 2, MidTurn: 2}, "2 threads working or waiting on you"},
-		{"idle and finished do not count", []*v1.Session{sess(connected, idle, "at prompt"), sess(connected, attention, "finished")},
+		{"idle and finished do not count", []*v1.Thread{th(connected, idle, "at prompt"), th(connected, attention, "finished")},
 			command.RestartCost{}, ""},
-		{"stopped threads do not count", []*v1.Session{sess(disconnected, attention, "permission: x"), {State: disconnected, BackgroundShellsRunning: 1}},
+		{"stopped threads do not count", []*v1.Thread{th(disconnected, attention, "permission: x"), {State: disconnected, BackgroundShellsRunning: 1}},
 			command.RestartCost{}, ""},
-		{"background work counts", []*v1.Session{shells(2), {State: connected, Status: attention, StatusReason: "finished", BackgroundAgentsRunning: 1}},
+		{"background work counts", []*v1.Thread{shells(2), {State: connected, Status: attention, StatusReason: "finished", BackgroundAgentsRunning: 1}},
 			command.RestartCost{Threads: 2, Agents: 1, Shells: 2}, "1 background agent and 2 shells"},
-		{"the wake hold counts", []*v1.Session{{State: connected, Status: idle, BackgroundWakePending: true}},
+		{"the wake hold counts", []*v1.Thread{{State: connected, Status: idle, BackgroundWakePending: true}},
 			command.RestartCost{Threads: 1, Waking: 1}, "1 thread about to report finished background work"},
-		{"everything", []*v1.Session{sess(connected, busy, "working"), shells(1), {State: connected, Status: idle, BackgroundWakePending: true}},
+		{"everything", []*v1.Thread{th(connected, busy, "working"), shells(1), {State: connected, Status: idle, BackgroundWakePending: true}},
 			command.RestartCost{Threads: 3, MidTurn: 1, Shells: 1, Waking: 1},
 			"1 thread working or waiting on you, 1 background shell and 1 thread about to report finished background work"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := command.RestartCostOf(tt.sessions)
+			got := command.RestartCostOf(tt.threads)
 			if got != tt.want || got.String() != tt.wantText {
 				t.Fatalf("RestartCostOf = %+v %q, want %+v %q", got, got.String(), tt.want, tt.wantText)
 			}
@@ -172,19 +172,19 @@ func TestRestartCost(t *testing.T) {
 
 func TestAppRestart(t *testing.T) {
 	ctx := context.Background()
-	busy := &v1.Session{Id: "s1", State: v1.SessionState_SESSION_STATE_CONNECTED, Status: v1.SessionStatus_SESSION_STATUS_BUSY}
-	busy2 := &v1.Session{Id: "s2", State: v1.SessionState_SESSION_STATE_CONNECTED, Status: v1.SessionStatus_SESSION_STATUS_BUSY}
-	idle := &v1.Session{Id: "s3", State: v1.SessionState_SESSION_STATE_CONNECTED, Status: v1.SessionStatus_SESSION_STATUS_IDLE}
-	dead := &v1.Session{Id: "s4", State: v1.SessionState_SESSION_STATE_DISCONNECTED, Status: v1.SessionStatus_SESSION_STATUS_BUSY}
-	asking := &v1.Session{Id: "s5", State: v1.SessionState_SESSION_STATE_CONNECTED, Status: v1.SessionStatus_SESSION_STATUS_NEEDS_ATTENTION, StatusReason: "question: Which?"}
+	busy := &v1.Thread{Id: "s1", State: v1.ThreadState_THREAD_STATE_CONNECTED, Status: v1.ThreadStatus_THREAD_STATUS_BUSY}
+	busy2 := &v1.Thread{Id: "s2", State: v1.ThreadState_THREAD_STATE_CONNECTED, Status: v1.ThreadStatus_THREAD_STATUS_BUSY}
+	idle := &v1.Thread{Id: "s3", State: v1.ThreadState_THREAD_STATE_CONNECTED, Status: v1.ThreadStatus_THREAD_STATUS_IDLE}
+	dead := &v1.Thread{Id: "s4", State: v1.ThreadState_THREAD_STATE_DISCONNECTED, Status: v1.ThreadStatus_THREAD_STATUS_BUSY}
+	asking := &v1.Thread{Id: "s5", State: v1.ThreadState_THREAD_STATE_CONNECTED, Status: v1.ThreadStatus_THREAD_STATUS_NEEDS_ATTENTION, StatusReason: "question: Which?"}
 	const quiet = "Restart Code Foundry? Threads keep their history; a message starts each again."
 	tests := []struct {
-		name     string
-		sessions []*v1.Session
-		status   v1.UpdateState
-		restart  bool
-		windows  int32
-		backErr  bool // RequestRestart fails
+		name    string
+		threads []*v1.Thread
+		status  v1.UpdateState
+		restart bool
+		windows int32
+		backErr bool // RequestRestart fails
 		// installErr fails Install (the status is DOWNLOADED).
 		installErr error
 		wantMsg    string
@@ -195,21 +195,21 @@ func TestAppRestart(t *testing.T) {
 		wantConfirm string
 	}{
 		{
-			name: "two busy threads and a question", sessions: []*v1.Session{busy, busy2, idle, asking}, status: v1.UpdateState_UPDATE_STATE_INSTALLED, restart: true, windows: 1,
+			name: "two busy threads and a question", threads: []*v1.Thread{busy, busy2, idle, asking}, status: v1.UpdateState_UPDATE_STATE_INSTALLED, restart: true, windows: 1,
 			wantMsg:     "restarting Code Foundry (cuts off 3 threads working or waiting on you); the app relaunches once the daemon has stopped",
 			wantJSON:    command.AppRestart{ThreadsInterrupted: 3, GUINotified: 1},
 			restarts:    1,
 			wantConfirm: "3 threads working or waiting on you will be cut off. Restart Code Foundry anyway?",
 		},
 		{
-			name: "one busy thread", sessions: []*v1.Session{busy}, status: v1.UpdateState_UPDATE_STATE_RESTART_REQUIRED, restart: true, windows: 1,
+			name: "one busy thread", threads: []*v1.Thread{busy}, status: v1.UpdateState_UPDATE_STATE_RESTART_REQUIRED, restart: true, windows: 1,
 			wantMsg:     "restarting Code Foundry (cuts off 1 thread working or waiting on you); the app relaunches once the daemon has stopped",
 			wantJSON:    command.AppRestart{ThreadsInterrupted: 1, GUINotified: 1},
 			restarts:    1,
 			wantConfirm: "1 thread working or waiting on you will be cut off. Restart Code Foundry anyway?",
 		},
 		{
-			name: "nothing working", sessions: []*v1.Session{idle, dead}, status: v1.UpdateState_UPDATE_STATE_IDLE, restart: true, windows: 2,
+			name: "nothing working", threads: []*v1.Thread{idle, dead}, status: v1.UpdateState_UPDATE_STATE_IDLE, restart: true, windows: 2,
 			wantMsg:     "restarting Code Foundry; the app relaunches once the daemon has stopped",
 			wantJSON:    command.AppRestart{GUINotified: 2},
 			restarts:    1,
@@ -223,12 +223,12 @@ func TestAppRestart(t *testing.T) {
 			wantConfirm: quiet,
 		},
 		{
-			name: "refused while downloading", sessions: []*v1.Session{busy}, status: v1.UpdateState_UPDATE_STATE_DOWNLOADING, restart: true,
+			name: "refused while downloading", threads: []*v1.Thread{busy}, status: v1.UpdateState_UPDATE_STATE_DOWNLOADING, restart: true,
 			wantErr:     command.ErrUnavailable,
 			wantConfirm: "1 thread working or waiting on you will be cut off. Restart Code Foundry anyway?",
 		},
 		{
-			name: "installs a download first", sessions: []*v1.Session{busy}, status: v1.UpdateState_UPDATE_STATE_DOWNLOADED, restart: true, windows: 1,
+			name: "installs a download first", threads: []*v1.Thread{busy}, status: v1.UpdateState_UPDATE_STATE_DOWNLOADED, restart: true, windows: 1,
 			wantMsg:     "installed v0.2.0; restarting Code Foundry (cuts off 1 thread working or waiting on you); the app relaunches once the daemon has stopped",
 			wantJSON:    command.AppRestart{ThreadsInterrupted: 1, GUINotified: 1, Installed: "v0.2.0"},
 			restarts:    1,
@@ -272,7 +272,7 @@ func TestAppRestart(t *testing.T) {
 					}
 				}
 			}
-			reg := newUpdateRegistry(t, u, &commandtest.Session{Others: tt.sessions}, restart)
+			reg := newUpdateRegistry(t, u, &commandtest.Thread{Others: tt.threads}, restart)
 			// Unconfirmed: asks first, counting busy threads, and neither notifies nor restarts.
 			_, err := reg.Invoke(ctx, command.Context{}, "app.restart", nil)
 			var ce *command.ConfirmError
@@ -337,7 +337,7 @@ func TestAppRestartTitle(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.state.String(), func(t *testing.T) {
-			reg := newUpdateRegistry(t, &commandtest.Update{Status: &v1.UpdateStatus{State: tt.state, TargetVersion: "v0.2.0"}}, &commandtest.Session{}, func() {})
+			reg := newUpdateRegistry(t, &commandtest.Update{Status: &v1.UpdateStatus{State: tt.state, TargetVersion: "v0.2.0"}}, &commandtest.Thread{}, func() {})
 			for _, l := range reg.List(command.Context{}, true) {
 				if l.Name == "app.restart" {
 					if l.Title != tt.want {
@@ -363,15 +363,15 @@ func requested(u *commandtest.Update, m proto.Message) bool {
 
 func TestDaemonRestart(t *testing.T) {
 	ctx := context.Background()
-	live := &v1.Session{Id: "s1", State: v1.SessionState_SESSION_STATE_CONNECTED, Status: v1.SessionStatus_SESSION_STATUS_BUSY}
-	idle := &v1.Session{Id: "s3", State: v1.SessionState_SESSION_STATE_CONNECTED, Status: v1.SessionStatus_SESSION_STATUS_IDLE}
-	dead := &v1.Session{Id: "s2", State: v1.SessionState_SESSION_STATE_DISCONNECTED, Status: v1.SessionStatus_SESSION_STATUS_BUSY}
+	live := &v1.Thread{Id: "s1", State: v1.ThreadState_THREAD_STATE_CONNECTED, Status: v1.ThreadStatus_THREAD_STATUS_BUSY}
+	idle := &v1.Thread{Id: "s3", State: v1.ThreadState_THREAD_STATE_CONNECTED, Status: v1.ThreadStatus_THREAD_STATUS_IDLE}
+	dead := &v1.Thread{Id: "s2", State: v1.ThreadState_THREAD_STATE_DISCONNECTED, Status: v1.ThreadStatus_THREAD_STATUS_BUSY}
 	const quiet = "Restart the daemon? Threads keep their history; a message starts each again."
 	const one = "1 thread working or waiting on you will be cut off. Restart the daemon anyway?"
-	shell := &v1.Session{Id: "s4", State: v1.SessionState_SESSION_STATE_CONNECTED, Status: v1.SessionStatus_SESSION_STATUS_IDLE, BackgroundShellsRunning: 1}
+	shell := &v1.Thread{Id: "s4", State: v1.ThreadState_THREAD_STATE_CONNECTED, Status: v1.ThreadStatus_THREAD_STATUS_IDLE, BackgroundShellsRunning: 1}
 	tests := []struct {
 		name     string
-		session  *v1.Session
+		thread   *v1.Thread
 		status   v1.UpdateState
 		restart  bool
 		wantMsg  string
@@ -396,7 +396,7 @@ func TestDaemonRestart(t *testing.T) {
 			if tt.restart {
 				restart = func() { restarts++ }
 			}
-			reg := newUpdateRegistry(t, &commandtest.Update{Status: &v1.UpdateStatus{State: tt.status}}, &commandtest.Session{Current: tt.session}, restart)
+			reg := newUpdateRegistry(t, &commandtest.Update{Status: &v1.UpdateStatus{State: tt.status}}, &commandtest.Thread{Current: tt.thread}, restart)
 			// Unconfirmed: asks first, with the live-session count, and does not restart.
 			_, err := reg.Invoke(ctx, command.Context{}, "daemon.restart", nil)
 			var ce *command.ConfirmError
