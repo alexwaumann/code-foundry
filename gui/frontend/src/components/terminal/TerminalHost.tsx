@@ -49,7 +49,7 @@ function Overlay({ state }: { state: AttachState }) {
   if (state.phase === "exited") {
     return (
       <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center" data-testid="exit-overlay">
-        <div className="pointer-events-auto flex items-center gap-2 rounded-md border bg-popover/95 px-3 py-2 text-sm shadow-lg backdrop-blur">
+        <div className="pointer-events-auto flex items-center gap-2 rounded-md border bg-popover/95 px-3 py-2 text-body shadow-lg backdrop-blur">
           <CircleX className={state.exitCode === 0 ? "size-4 text-muted-foreground" : "size-4 text-destructive"} />
           <span>
             Process exited with code <span className="font-mono">{state.exitCode ?? "?"}</span>
@@ -60,7 +60,7 @@ function Overlay({ state }: { state: AttachState }) {
   }
   if (state.phase === "connecting" || state.phase === "reconnecting") {
     return (
-      <div className="pointer-events-none absolute top-3 right-4 flex items-center gap-2 rounded-md border bg-popover/90 px-2.5 py-1 text-xs text-muted-foreground">
+      <div className="pointer-events-none absolute top-3 right-4 flex items-center gap-2 rounded-md border bg-popover/90 px-2.5 py-1 text-caption">
         {state.phase === "connecting" ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5 animate-spin" />}
         {state.phase === "connecting" ? "Attaching…" : "Reconnecting…"}
       </div>
@@ -69,7 +69,7 @@ function Overlay({ state }: { state: AttachState }) {
   if (state.phase === "error") {
     return (
       <div className="absolute inset-0 flex items-center justify-center bg-background/80" role="alert">
-        <div className="rounded-md border bg-popover px-4 py-3 text-sm">
+        <div className="rounded-md border bg-popover px-4 py-3 text-body">
           <p className="font-medium">Cannot attach to terminal</p>
           <p className="mt-1 text-muted-foreground">{state.error}</p>
         </div>

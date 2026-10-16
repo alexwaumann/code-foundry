@@ -80,7 +80,7 @@ function TerminalTab({ panelKey, id, active, focusable }: { panelKey: string; id
       data-exited={exited || undefined}
       data-kind={action ? "action" : "shell"}
       className={cn(
-        "group relative flex h-7 max-w-48 shrink-0 items-center rounded-md pr-1 text-xs [--wails-draggable:no-drag]",
+        "group relative flex h-7 max-w-48 shrink-0 items-center rounded-md pr-1 text-body-sm [--wails-draggable:no-drag]",
         active ? "bg-accent text-accent-foreground dark:bg-accent/50" : "text-muted-foreground hover:bg-accent/40 hover:text-foreground",
       )}
       onMouseDown={(e) => {
@@ -228,13 +228,13 @@ function EmptyState({ panelKey }: { panelKey: string }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center p-6" data-testid="bottom-empty">
       <div className="w-full max-w-64">
-        <h2 className="mb-3 text-center text-sm font-medium">No terminals</h2>
+        <h2 className="mb-3 text-center text-subheading">No terminals</h2>
         {canStart ? (
           <ul className="flex flex-col gap-0.5">
             <li>
               <button
                 type="button"
-                className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent"
+                className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-label hover:bg-accent"
                 data-testid="bottom-empty-new"
                 onClick={() => void newBottomTerminal(panelKey)}
               >
@@ -245,7 +245,7 @@ function EmptyState({ panelKey }: { panelKey: string }) {
             </li>
           </ul>
         ) : (
-          <p className="text-center text-xs text-muted-foreground">Start one with New terminal on a project or worktree row.</p>
+          <p className="text-center text-caption">Start one with New terminal on a project or worktree row.</p>
         )}
       </div>
     </div>
