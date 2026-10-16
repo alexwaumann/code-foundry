@@ -1,0 +1,30 @@
+name: setup-go-ghostty
+description: Go toolchain from go.mod plus a cached libghostty-vt build (shared by ci and release).
+runs:
+  using: composite
+  steps:
+    # Reads the `toolchain` directive (go1.26.x) from go.mod.
+    - uses: actions/setup-go@v7
+      with:
+        go-version-file: go.mod
+        # Go bakes the pkg-config link path of libghostty-vt into compiled cgo packages
+        # without keying on it, so key the build cache on the library pins as well.
+        cache-dependency-path: |
+          go.sum
+          scripts/ghostty-vt.sh
+
+    # libghostty-vt (static) from the pinned ghostty commit with zig 0.16.0, cached on
+    # both pins. The .pc files hardcode the absolute prefix, which is stable on runners.
+    # A cold build downloads zig and the ghostty source and takes about a minute.
+    - name: libghostty-vt cache key
+      id: ghostty-vt
+      shell: bash
+      run: echo "key=$(./scripts/ghostty-vt.sh --print-key)" >> "$GITHUB_OUTPUT"
+
+    - uses: actions/cache@v6
+      with:
+        path: third_party/ghostty-vt
+        key: ${{ runner.os }}-${{ steps.ghostty-vt.outputs.key }}
+
+    - shell: bash
+      run: make ghostty-vt
