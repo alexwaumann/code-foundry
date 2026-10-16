@@ -733,7 +733,7 @@ async function pasteFile(page: Page, name: string, type: string, data: Buffer): 
   await page.getByTestId("composer-input").evaluate(
     (el, [file, mime, bytes]) => {
       const dt = new DataTransfer();
-      dt.items.add(new File([new Uint8Array(bytes as number[])], file as string, { type: mime as string }));
+      dt.items.add(new File([new Uint8Array(bytes as number[])], file, { type: mime }));
       el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
     },
     [name, type, [...data]] as const,
