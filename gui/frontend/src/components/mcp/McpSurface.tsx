@@ -60,16 +60,16 @@ function Header({ threadId }: { threadId: string }) {
   const refreshing = useMcpRefreshing(threadId);
   return (
     <header className="flex min-w-0 flex-col gap-0.5 border-b border-pane-border px-4 pt-2 pb-2.5 @max-[340px]:px-3" data-testid="mcp-header">
-      <h2 className="flex min-w-0 items-center gap-1.5 text-sm font-semibold">
+      <h2 className="flex min-w-0 items-center gap-1.5 text-heading">
         <Plug className="size-4 shrink-0 text-warning" aria-hidden />
         <span className="min-w-0 truncate">MCP servers</span>
         {h && (
-          <span className="ml-auto shrink-0 text-xs font-normal text-muted-foreground tabular-nums" data-testid="mcp-count">
+          <span className="ml-auto shrink-0 text-caption tabular-nums" data-testid="mcp-count">
             {h.connected} of {h.total} connected
           </span>
         )}
       </h2>
-      <span className="flex min-h-6 min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+      <span className="flex min-h-6 min-w-0 items-center gap-1.5 text-caption">
         <Clock className="size-3.5 shrink-0" aria-hidden />
         {h ? <CheckedText checkedAtMs={h.checkedAtMs} trigger={h.trigger} server={h.server} /> : <span className="min-w-0 truncate">Not checked yet</span>}
         {/* The span carries the tooltip while the button is disabled (no pointer events). */}
@@ -107,11 +107,11 @@ function HintIcon({ hint }: { hint: ToolHint }) {
 
 function ToolRow({ tool }: { tool: McpToolView }) {
   return (
-    <li className="flex h-6 min-w-0 items-center gap-2 pl-1 text-xs" data-testid="mcp-tool" data-tool={tool.name}>
+    <li className="flex h-6 min-w-0 items-center gap-2 pl-1 text-body-sm" data-testid="mcp-tool" data-tool={tool.name}>
       {/* The description gives way first; a name wider than the row truncates on its own. */}
       <span className="flex min-w-0 flex-1 items-center gap-2">
         <Tip label={tool.name} whenTruncated>
-          <span className="max-w-full shrink-0 truncate font-mono text-[11.5px]" data-testid="mcp-tool-name">
+          <span className="max-w-full shrink-0 truncate text-code" data-testid="mcp-tool-name">
             {tool.name}
           </span>
         </Tip>
@@ -142,7 +142,7 @@ function ServerCard({ threadId, name }: { threadId: string; name: string }) {
   return (
     <div
       className={cn(
-        "flex min-w-0 flex-col gap-1.5 rounded-[10px] border border-border px-3 pt-2.5 pb-2",
+        "flex min-w-0 flex-col gap-1.5 rounded-lg border border-border px-3 pt-2.5 pb-2",
         shown === "failed" && "border-destructive/35",
         shown === "needs-auth" && "border-warning/35",
         shown === "disabled" && "opacity-65",
@@ -151,29 +151,29 @@ function ServerCard({ threadId, name }: { threadId: string; name: string }) {
       data-server={server.name}
       data-status={shown}
     >
-      <div className="flex min-w-0 items-center gap-2 text-[13px]">
+      <div className="flex min-w-0 items-center gap-2 text-body-sm">
         {shown === "pending" ? <LoaderCircle className="size-3 shrink-0 animate-spin text-muted-foreground" aria-hidden /> : <span className={cn("size-2 shrink-0 rounded-full", DOT[shown])} aria-hidden />}
         {/* The pill always shows: the version gives way first, then the name truncates. */}
         <span className="flex min-w-0 flex-1 items-center gap-2">
           <Tip label={server.name} whenTruncated>
-            <span className="max-w-full shrink-0 truncate font-semibold" data-testid="mcp-name">
+            <span className="max-w-full shrink-0 truncate text-subheading" data-testid="mcp-name">
               {server.name}
             </span>
           </Tip>
           {server.version && (
             <Tip label={`v${server.version}`} whenTruncated>
-              <span className="min-w-0 truncate font-mono text-[11.5px] text-muted-foreground" data-testid="mcp-version">
+              <span className="min-w-0 truncate text-code text-muted-foreground" data-testid="mcp-version">
                 v{server.version}
               </span>
             </Tip>
           )}
         </span>
-        <span className={cn("shrink-0 rounded-full px-1.5 text-[10.5px] leading-4 font-medium whitespace-nowrap", PILL[shown])} data-testid="mcp-pill">
+        <span className={cn("shrink-0 rounded-full px-1.5 text-caption-sm font-medium whitespace-nowrap", PILL[shown])} data-testid="mcp-pill">
           {MCP_STATUS_LABEL[shown]}
         </span>
       </div>
       {meta.length > 0 && (
-        <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground" data-testid="mcp-meta">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 text-caption" data-testid="mcp-meta">
           {meta.map((p, i) => (
             <span key={p} className="contents">
               {i > 0 && <span className="opacity-50">·</span>}
@@ -183,11 +183,11 @@ function ServerCard({ threadId, name }: { threadId: string; name: string }) {
         </div>
       )}
       {server.error ? (
-        <div className="font-mono text-[11.5px] leading-4 break-words text-destructive" data-testid="mcp-error">
+        <div className="text-caption-sm font-mono break-words text-destructive" data-testid="mcp-error">
           {server.error}
         </div>
       ) : server.status === "needs-auth" ? (
-        <div className="text-xs leading-4 text-warning" data-testid="mcp-login-hint">
+        <div className="text-caption text-warning" data-testid="mcp-login-hint">
           {MCP_LOGIN_HINT}
         </div>
       ) : null}
@@ -197,7 +197,7 @@ function ServerCard({ threadId, name }: { threadId: string; name: string }) {
             <button
               type="button"
               className={cn(
-                "inline-flex h-6 items-center gap-1.5 rounded-md border px-2 text-xs font-medium outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-60",
+                "inline-flex h-6 items-center gap-1.5 rounded-md border px-2 text-body-sm font-medium outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-60",
                 attention
                   ? "border-warning/40 text-warning hover:bg-warning/10"
                   : "border-transparent text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent/50",
@@ -213,7 +213,7 @@ function ServerCard({ threadId, name }: { threadId: string; name: string }) {
           {server.tools.length > 0 && (
             <button
               type="button"
-              className="ml-auto inline-flex h-6 items-center gap-1 rounded-md px-2 text-xs font-medium text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:hover:bg-accent/50"
+              className="ml-auto inline-flex h-6 items-center gap-1 rounded-md px-2 text-body-sm font-medium text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:hover:bg-accent/50"
               aria-expanded={open}
               onClick={() => {
                 setOpen((o) => !o);
@@ -239,7 +239,7 @@ function ServerCard({ threadId, name }: { threadId: string; name: string }) {
 
 function Message({ testId, children }: { testId: string; children: string }) {
   return (
-    <p className="px-4 py-3 text-sm text-muted-foreground @max-[340px]:px-3" data-testid={testId}>
+    <p className="px-4 py-3 text-body text-muted-foreground @max-[340px]:px-3" data-testid={testId}>
       {children}
     </p>
   );
