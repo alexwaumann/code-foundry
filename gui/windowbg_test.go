@@ -75,10 +75,10 @@ func TestWindowBackgroundFile(t *testing.T) {
 	if got := loadWindowBackground(path); got != defaultWindowBackground {
 		t.Fatalf("missing file = %+v", got)
 	}
-	if got := launchBackgroundColour(path, true); got != application.NewRGB(0x13, 0x12, 0x22) {
+	if got := launchBackgroundColour(path, true); got != application.NewRGB(0x04, 0x07, 0x0c) {
 		t.Errorf("first launch, dark = %+v", got)
 	}
-	if got := launchBackgroundColour(path, false); got != application.NewRGB(0xe0, 0xe2, 0xe6) {
+	if got := launchBackgroundColour(path, false); got != application.NewRGB(0xf0, 0xf0, 0xf0) {
 		t.Errorf("first launch, light = %+v", got)
 	}
 	saved := WindowBackground{Scheme: "light", Dark: "#1c1e29", Light: "#ebe5de", Active: "light"}
@@ -120,7 +120,7 @@ func TestDefaultWindowBackground(t *testing.T) {
 	for _, th := range catalog {
 		sheet[th.ID] = th.Vars["--sheet"]
 	}
-	if d := defaultWindowBackground; d.Dark != sheet["catppuccin-mocha"] || d.Light != sheet["catppuccin-latte"] || d.Scheme != "system" {
-		t.Errorf("default = %+v, want Mocha %s / Latte %s", d, sheet["catppuccin-mocha"], sheet["catppuccin-latte"])
+	if d := defaultWindowBackground; d.Dark != sheet["github-dark"] || d.Light != sheet["github-light"] || d.Scheme != "system" {
+		t.Errorf("default = %+v, want GitHub Dark %s / Light %s", d, sheet["github-dark"], sheet["github-light"])
 	}
 }

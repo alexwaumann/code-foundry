@@ -71,8 +71,8 @@ type GitOps struct {
 // Appearance is consumed by the GUI.
 type Appearance struct {
 	Theme       string // the scheme: system, dark, light
-	ThemeDark   string // a dark theme id (internal/theme); default catppuccin-mocha
-	ThemeLight  string // a light theme id; default catppuccin-latte
+	ThemeDark   string // a dark theme id (internal/theme); default github-dark
+	ThemeLight  string // a light theme id; default github-light
 	FontFamily  string
 	FontSize    int
 	Zoom        int    // percent; scales the whole GUI

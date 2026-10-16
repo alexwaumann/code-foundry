@@ -26,7 +26,7 @@ type Theme struct {
 	ID     string `json:"id"`
 	Name   string `json:"name"`
 	Scheme string `json:"scheme"`
-	// Pair is the sibling of the other scheme (Catppuccin Mocha and Latte), or "".
+	// Pair is the sibling of the other scheme (GitHub Dark and Light), or "".
 	Pair string `json:"pair,omitempty"`
 }
 
@@ -50,7 +50,7 @@ func mustParse(data []byte) catalogFile {
 	return c
 }
 
-// Themes returns every theme: dark ones first, Catppuccin first in each scheme.
+// Themes returns every theme: dark ones first, the default (GitHub) first in each scheme.
 func Themes() []Theme { return slices.Clone(catalog.Themes) }
 
 // For returns the themes of one scheme, in catalog order.
@@ -93,7 +93,7 @@ func ByID(id string) (Theme, bool) {
 	return catalog.Themes[i], true
 }
 
-// Default is the scheme's default theme id (catppuccin-mocha, catppuccin-latte), or ""
+// Default is the scheme's default theme id (github-dark, github-light), or ""
 // for an unknown scheme.
 func Default(scheme string) string { return catalog.Defaults[scheme] }
 

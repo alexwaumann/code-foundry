@@ -31,16 +31,16 @@ func TestThemeCommands(t *testing.T) {
 		wantErr  string   // substring of the error
 	}{
 		{name: "list marks the defaults", cmd: "theme.list",
-			wantMsg:  []string{"scheme: system (appearance.theme)", "dark themes (appearance.theme_dark):\n* catppuccin-mocha ", "  dracula ", "light themes (appearance.theme_light):\n* catppuccin-latte "},
-			wantJSON: `"scheme":"system","dark":"catppuccin-mocha","light":"catppuccin-latte"`},
+			wantMsg:  []string{"scheme: system (appearance.theme)", "dark themes (appearance.theme_dark):\n* github-dark ", "  dracula ", "light themes (appearance.theme_light):\n* github-light "},
+			wantJSON: `"scheme":"system","dark":"github-dark","light":"github-light"`},
 		{name: "set dark", cmd: "theme.set-dark", args: map[string]string{"theme": "dracula"},
 			wantMsg: []string{"dark theme = Dracula (dracula)"}, wantJSON: `{"key":"appearance.theme_dark","id":"dracula","name":"Dracula","scheme":"dark"}`},
 		{name: "set light", cmd: "theme.set-light", args: map[string]string{"theme": "rose-pine-dawn"},
 			wantMsg: []string{"light theme = Rosé Pine Dawn (rose-pine-dawn)"}},
-		{name: "list follows", cmd: "theme.list", wantMsg: []string{"* dracula ", "* rose-pine-dawn ", "  catppuccin-mocha "},
+		{name: "list follows", cmd: "theme.list", wantMsg: []string{"* dracula ", "* rose-pine-dawn ", "  github-dark "},
 			wantJSON: `{"id":"dracula","name":"Dracula","scheme":"dark","selected":true}`},
 		{name: "light id in the dark slot", cmd: "theme.set-dark", args: map[string]string{"theme": "catppuccin-latte"},
-			wantErr: `argument "theme": want one of catppuccin-mocha, graphite-dark`},
+			wantErr: `argument "theme": want one of github-dark, catppuccin-mocha, graphite-dark`},
 		{name: "unknown id", cmd: "theme.set-light", args: map[string]string{"theme": "sepia"}, wantErr: `got "sepia"`},
 		{name: "missing id", cmd: "theme.set-dark", wantErr: `missing required argument "theme"`},
 	}

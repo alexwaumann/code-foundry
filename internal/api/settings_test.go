@@ -57,7 +57,7 @@ func TestSettingsService(t *testing.T) {
 	if d := byKey["appearance.density"]; len(d.GetEnumLabels()) != 0 {
 		t.Errorf("density labels = %v, want none", d.GetEnumLabels())
 	}
-	if th := byKey["appearance.theme_light"]; th.GetDefaultValue() != "catppuccin-latte" || len(th.GetEnumLabels()) != len(th.GetEnumValues()) || th.GetEnumLabels()[0] != "Catppuccin Latte" {
+	if th := byKey["appearance.theme_light"]; th.GetDefaultValue() != "github-light" || len(th.GetEnumLabels()) != len(th.GetEnumValues()) || th.GetEnumLabels()[0] != "GitHub Light" {
 		t.Errorf("theme_light field = %v", th)
 	}
 	if !byKey["sessions.scrollback_lines"].GetRestartRequired() || len(schema.Msg.GetGroups()) != len(settings.Groups) {

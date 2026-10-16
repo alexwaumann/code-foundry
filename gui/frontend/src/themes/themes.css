@@ -6,6 +6,89 @@
  * syntax colour at (0,3,0), so the window theme's html[data-theme] .cf-thread patch
  * (0,2,1) never leaks into it. */
 
+/* GitHub Dark (dark) */
+html[data-theme="github-dark"],
+[data-theme-scope][data-theme="github-dark"] {
+  color-scheme: dark;
+  --sheet: #04070c;
+  --pane: #0d1117;
+  --pane-border: #25292f;
+  --background: #04070c;
+  --foreground: #e6edf3;
+  --card: #0d1117;
+  --card-foreground: #e6edf3;
+  --popover: #14181e;
+  --popover-foreground: #e6edf3;
+  --primary: #4493f8;
+  --primary-foreground: #0d1117;
+  --secondary: #252a31;
+  --secondary-foreground: #e6edf3;
+  --muted: #252a31;
+  --muted-foreground: #989ea5;
+  --accent: #252a31;
+  --accent-foreground: #e6edf3;
+  --destructive: #ffa198;
+  --destructive-foreground: #0d1117;
+  --success: #56d364;
+  --success-foreground: #0d1117;
+  --warning: #e3b341;
+  --warning-foreground: #0d1117;
+  --info: #79c0ff;
+  --info-foreground: #0d1117;
+  --highlight: #d2a8ff;
+  --highlight-foreground: #0d1117;
+  --link: #79c0ff;
+  --border: #25292f;
+  --input: #2e3238;
+  --ring: #3162a1;
+  --chart-1: #cdd4da;
+  --chart-2: #91979e;
+  --chart-3: #6f757c;
+  --chart-4: #4f545b;
+  --chart-5: #31363c;
+  --sidebar: #04070c;
+  --sidebar-foreground: #e6edf3;
+  --sidebar-primary: #4493f8;
+  --sidebar-primary-foreground: #0d1117;
+  --sidebar-accent: #14181e;
+  --sidebar-accent-foreground: #e6edf3;
+  --sidebar-border: #04070c;
+  --sidebar-ring: #3162a1;
+  --terminal-fg: #e6edf3;
+  --terminal-cursor: #2f81f7;
+  --terminal-cursor-accent: #0d1117;
+  --terminal-selection: #3b4046;
+  --terminal-selection-inactive: #23272e;
+  --terminal-ansi-0: #484f58;
+  --terminal-ansi-1: #ff7b72;
+  --terminal-ansi-2: #3fb950;
+  --terminal-ansi-3: #d29922;
+  --terminal-ansi-4: #58a6ff;
+  --terminal-ansi-5: #bc8cff;
+  --terminal-ansi-6: #39c5cf;
+  --terminal-ansi-7: #b1bac4;
+  --terminal-ansi-8: #6e7681;
+  --terminal-ansi-9: #ffa198;
+  --terminal-ansi-10: #56d364;
+  --terminal-ansi-11: #e3b341;
+  --terminal-ansi-12: #79c0ff;
+  --terminal-ansi-13: #d2a8ff;
+  --terminal-ansi-14: #56d4dd;
+  --terminal-ansi-15: #ffffff;
+}
+[data-theme-scope][data-theme="github-dark"] .cf-thread {
+  --syn-fg: #e6edf3;
+  --syn-kw: #bc8cff;
+  --syn-fn: #58a6ff;
+  --syn-type: #d29922;
+  --syn-str: #3fb950;
+  --syn-com: #6e7681;
+  --syn-num: #39c5cf;
+  --sh-cmd: #58a6ff;
+  --sh-flag: #39c5cf;
+  --sh-str: #3fb950;
+}
+
 /* Catppuccin Mocha (dark) */
 html[data-theme="catppuccin-mocha"],
 [data-theme-scope][data-theme="catppuccin-mocha"] {
@@ -890,89 +973,6 @@ html[data-theme="monokai-pro"] .cf-thread {
   --sh-str: #a9dc76;
 }
 
-/* GitHub Dark (dark) */
-html[data-theme="github-dark"],
-[data-theme-scope][data-theme="github-dark"] {
-  color-scheme: dark;
-  --sheet: #04070c;
-  --pane: #0d1117;
-  --pane-border: #25292f;
-  --background: #04070c;
-  --foreground: #e6edf3;
-  --card: #0d1117;
-  --card-foreground: #e6edf3;
-  --popover: #14181e;
-  --popover-foreground: #e6edf3;
-  --primary: #4493f8;
-  --primary-foreground: #0d1117;
-  --secondary: #252a31;
-  --secondary-foreground: #e6edf3;
-  --muted: #252a31;
-  --muted-foreground: #989ea5;
-  --accent: #252a31;
-  --accent-foreground: #e6edf3;
-  --destructive: #ffa198;
-  --destructive-foreground: #0d1117;
-  --success: #56d364;
-  --success-foreground: #0d1117;
-  --warning: #e3b341;
-  --warning-foreground: #0d1117;
-  --info: #79c0ff;
-  --info-foreground: #0d1117;
-  --highlight: #d2a8ff;
-  --highlight-foreground: #0d1117;
-  --link: #79c0ff;
-  --border: #25292f;
-  --input: #2e3238;
-  --ring: #3162a1;
-  --chart-1: #cdd4da;
-  --chart-2: #91979e;
-  --chart-3: #6f757c;
-  --chart-4: #4f545b;
-  --chart-5: #31363c;
-  --sidebar: #04070c;
-  --sidebar-foreground: #e6edf3;
-  --sidebar-primary: #4493f8;
-  --sidebar-primary-foreground: #0d1117;
-  --sidebar-accent: #14181e;
-  --sidebar-accent-foreground: #e6edf3;
-  --sidebar-border: #04070c;
-  --sidebar-ring: #3162a1;
-  --terminal-fg: #e6edf3;
-  --terminal-cursor: #2f81f7;
-  --terminal-cursor-accent: #0d1117;
-  --terminal-selection: #3b4046;
-  --terminal-selection-inactive: #23272e;
-  --terminal-ansi-0: #484f58;
-  --terminal-ansi-1: #ff7b72;
-  --terminal-ansi-2: #3fb950;
-  --terminal-ansi-3: #d29922;
-  --terminal-ansi-4: #58a6ff;
-  --terminal-ansi-5: #bc8cff;
-  --terminal-ansi-6: #39c5cf;
-  --terminal-ansi-7: #b1bac4;
-  --terminal-ansi-8: #6e7681;
-  --terminal-ansi-9: #ffa198;
-  --terminal-ansi-10: #56d364;
-  --terminal-ansi-11: #e3b341;
-  --terminal-ansi-12: #79c0ff;
-  --terminal-ansi-13: #d2a8ff;
-  --terminal-ansi-14: #56d4dd;
-  --terminal-ansi-15: #ffffff;
-}
-[data-theme-scope][data-theme="github-dark"] .cf-thread {
-  --syn-fg: #e6edf3;
-  --syn-kw: #bc8cff;
-  --syn-fn: #58a6ff;
-  --syn-type: #d29922;
-  --syn-str: #3fb950;
-  --syn-com: #6e7681;
-  --syn-num: #39c5cf;
-  --sh-cmd: #58a6ff;
-  --sh-flag: #39c5cf;
-  --sh-str: #3fb950;
-}
-
 /* Kanagawa Wave (dark) */
 html[data-theme="kanagawa-wave"],
 [data-theme-scope][data-theme="kanagawa-wave"] {
@@ -1234,6 +1234,96 @@ html[data-theme="ayu-mirage"] .cf-thread {
   --sh-str: #87d96c;
 }
 
+/* GitHub Light (light) */
+html[data-theme="github-light"],
+[data-theme-scope][data-theme="github-light"] {
+  color-scheme: light;
+  --sheet: #f0f0f0;
+  --pane: #ffffff;
+  --pane-border: #ededee;
+  --background: #f0f0f0;
+  --foreground: #1f2328;
+  --card: #ffffff;
+  --card-foreground: #1f2328;
+  --popover: #ffffff;
+  --popover-foreground: #1f2328;
+  --primary: #0969da;
+  --primary-foreground: #ffffff;
+  --secondary: #edeeee;
+  --secondary-foreground: #1f2328;
+  --muted: #edeeee;
+  --muted-foreground: #5e6166;
+  --accent: #edeeee;
+  --accent-foreground: #1f2328;
+  --destructive: #cf222e;
+  --destructive-foreground: #ffffff;
+  --success: #116329;
+  --success-foreground: #ffffff;
+  --warning: #946300;
+  --warning-foreground: #ffffff;
+  --info: #0969da;
+  --info-foreground: #ffffff;
+  --highlight: #814edd;
+  --highlight-foreground: #ffffff;
+  --link: #0969da;
+  --border: #e9e9ea;
+  --input: #e2e2e3;
+  --ring: #6ca0eb;
+  --chart-1: #32353a;
+  --chart-2: #65686c;
+  --chart-3: #86888c;
+  --chart-4: #a9abad;
+  --chart-5: #cdcecf;
+  --sidebar: #f0f0f0;
+  --sidebar-foreground: #1f2328;
+  --sidebar-primary: #0969da;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #d8d9da;
+  --sidebar-accent-foreground: #1f2328;
+  --sidebar-border: #f0f0f0;
+  --sidebar-ring: #6ca0eb;
+  --terminal-fg: #1f2328;
+  --terminal-cursor: #0969da;
+  --terminal-cursor-accent: #ffffff;
+  --terminal-selection: #c1c2c4;
+  --terminal-selection-inactive: #e0e0e1;
+  --terminal-ansi-0: #24292f;
+  --terminal-ansi-1: #cf222e;
+  --terminal-ansi-2: #116329;
+  --terminal-ansi-3: #4d2d00;
+  --terminal-ansi-4: #0969da;
+  --terminal-ansi-5: #8250df;
+  --terminal-ansi-6: #1b7c83;
+  --terminal-ansi-7: #6e7781;
+  --terminal-ansi-8: #57606a;
+  --terminal-ansi-9: #a40e26;
+  --terminal-ansi-10: #1a7f37;
+  --terminal-ansi-11: #633c01;
+  --terminal-ansi-12: #218bff;
+  --terminal-ansi-13: #a475f9;
+  --terminal-ansi-14: #3192aa;
+  --terminal-ansi-15: #8c959f;
+}
+html[data-theme="github-light"] .cf-thread {
+  --syn-fn: #7f4ddc;
+  --syn-type: #0667d8;
+  --syn-num: #10767d;
+  --sh-cmd: #0667d8;
+  --sh-flag: #10767d;
+}
+[data-theme-scope][data-theme="github-light"] .cf-thread {
+  --syn-fg: #1f2328;
+  --syn-kw: #cf222e;
+  --syn-fn: #7f4ddc;
+  --syn-type: #0667d8;
+  --syn-str: #116329;
+  --syn-com: #6e7781;
+  --syn-num: #10767d;
+  --sh-cmd: #0667d8;
+  --sh-flag: #10767d;
+  --sh-str: #116329;
+}
+
 /* Catppuccin Latte (light) */
 html[data-theme="catppuccin-latte"],
 [data-theme-scope][data-theme="catppuccin-latte"] {
@@ -1247,7 +1337,7 @@ html[data-theme="catppuccin-latte"],
   --card-foreground: #4c4f69;
   --popover: #f6f8fc;
   --popover-foreground: #4c4f69;
-  --primary: #8839ef;
+  --primary: #5363d5;
   --primary-foreground: #eff1f5;
   --secondary: #e3e5eb;
   --secondary-foreground: #4c4f69;
@@ -1268,7 +1358,7 @@ html[data-theme="catppuccin-latte"],
   --link: #0d57e5;
   --border: #dfe1e7;
   --input: #dadce3;
-  --ring: #a884f6;
+  --ring: #8596e3;
   --chart-1: #5b5e76;
   --chart-2: #818498;
   --chart-3: #999cad;
@@ -1276,12 +1366,12 @@ html[data-theme="catppuccin-latte"],
   --chart-5: #ccced8;
   --sidebar: #e0e2e6;
   --sidebar-foreground: #4c4f69;
-  --sidebar-primary: #8839ef;
+  --sidebar-primary: #5363d5;
   --sidebar-primary-foreground: #eff1f5;
   --sidebar-accent: #d0d2d9;
   --sidebar-accent-foreground: #4c4f69;
   --sidebar-border: #e0e2e6;
-  --sidebar-ring: #a884f6;
+  --sidebar-ring: #8596e3;
   --terminal-fg: #4c4f69;
   --terminal-cursor: #dc8a78;
   --terminal-cursor-accent: #4c4f69;
@@ -1525,7 +1615,7 @@ html[data-theme="rose-pine-dawn"],
   --muted-foreground: #666284;
   --accent: #ede8e4;
   --accent-foreground: #534e75;
-  --destructive: #9c4d64;
+  --destructive: #b0405a;
   --destructive-foreground: #faf4ed;
   --success: #4c6d67;
   --success-foreground: #faf4ed;
@@ -1782,94 +1872,4 @@ html[data-theme="solarized-light"] .cf-thread {
   --sh-cmd: #006eae;
   --sh-flag: #007770;
   --sh-str: #617000;
-}
-
-/* GitHub Light (light) */
-html[data-theme="github-light"],
-[data-theme-scope][data-theme="github-light"] {
-  color-scheme: light;
-  --sheet: #f0f0f0;
-  --pane: #ffffff;
-  --pane-border: #ededee;
-  --background: #f0f0f0;
-  --foreground: #1f2328;
-  --card: #ffffff;
-  --card-foreground: #1f2328;
-  --popover: #ffffff;
-  --popover-foreground: #1f2328;
-  --primary: #0969da;
-  --primary-foreground: #ffffff;
-  --secondary: #edeeee;
-  --secondary-foreground: #1f2328;
-  --muted: #edeeee;
-  --muted-foreground: #5e6166;
-  --accent: #edeeee;
-  --accent-foreground: #1f2328;
-  --destructive: #cf222e;
-  --destructive-foreground: #ffffff;
-  --success: #116329;
-  --success-foreground: #ffffff;
-  --warning: #946300;
-  --warning-foreground: #ffffff;
-  --info: #0969da;
-  --info-foreground: #ffffff;
-  --highlight: #814edd;
-  --highlight-foreground: #ffffff;
-  --link: #0969da;
-  --border: #e9e9ea;
-  --input: #e2e2e3;
-  --ring: #6ca0eb;
-  --chart-1: #32353a;
-  --chart-2: #65686c;
-  --chart-3: #86888c;
-  --chart-4: #a9abad;
-  --chart-5: #cdcecf;
-  --sidebar: #f0f0f0;
-  --sidebar-foreground: #1f2328;
-  --sidebar-primary: #0969da;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #d8d9da;
-  --sidebar-accent-foreground: #1f2328;
-  --sidebar-border: #f0f0f0;
-  --sidebar-ring: #6ca0eb;
-  --terminal-fg: #1f2328;
-  --terminal-cursor: #0969da;
-  --terminal-cursor-accent: #ffffff;
-  --terminal-selection: #c1c2c4;
-  --terminal-selection-inactive: #e0e0e1;
-  --terminal-ansi-0: #24292f;
-  --terminal-ansi-1: #cf222e;
-  --terminal-ansi-2: #116329;
-  --terminal-ansi-3: #4d2d00;
-  --terminal-ansi-4: #0969da;
-  --terminal-ansi-5: #8250df;
-  --terminal-ansi-6: #1b7c83;
-  --terminal-ansi-7: #6e7781;
-  --terminal-ansi-8: #57606a;
-  --terminal-ansi-9: #a40e26;
-  --terminal-ansi-10: #1a7f37;
-  --terminal-ansi-11: #633c01;
-  --terminal-ansi-12: #218bff;
-  --terminal-ansi-13: #a475f9;
-  --terminal-ansi-14: #3192aa;
-  --terminal-ansi-15: #8c959f;
-}
-html[data-theme="github-light"] .cf-thread {
-  --syn-fn: #7f4ddc;
-  --syn-type: #0667d8;
-  --syn-num: #10767d;
-  --sh-cmd: #0667d8;
-  --sh-flag: #10767d;
-}
-[data-theme-scope][data-theme="github-light"] .cf-thread {
-  --syn-fg: #1f2328;
-  --syn-kw: #cf222e;
-  --syn-fn: #7f4ddc;
-  --syn-type: #0667d8;
-  --syn-str: #116329;
-  --syn-com: #6e7781;
-  --syn-num: #10767d;
-  --sh-cmd: #0667d8;
-  --sh-flag: #10767d;
-  --sh-str: #116329;
 }

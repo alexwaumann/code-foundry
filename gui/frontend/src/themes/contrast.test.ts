@@ -63,7 +63,7 @@ describe.each(themes.map((t) => [t.id, t] as const))("%s", (_, t) => {
 });
 
 describe("catalog", () => {
-  it("has the curated 21, dark first, Catppuccin first in each", () => {
+  it("has the curated 21, dark first, the defaults (GitHub) first in each", () => {
     expect(themes).toHaveLength(21);
     expect(new Set(themes.map((t) => t.id)).size).toBe(21);
     const dark = themesFor("dark");

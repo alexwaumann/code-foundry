@@ -19,8 +19,8 @@ func TestThemeSlotFields(t *testing.T) {
 	tests := []struct {
 		key, scheme, def string
 	}{
-		{KeyThemeDark, theme.SchemeDark, "catppuccin-mocha"},
-		{KeyThemeLight, theme.SchemeLight, "catppuccin-latte"},
+		{KeyThemeDark, theme.SchemeDark, "github-dark"},
+		{KeyThemeLight, theme.SchemeLight, "github-light"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.key, func(t *testing.T) {
@@ -43,12 +43,12 @@ func TestThemeSlotFields(t *testing.T) {
 	if want := []string{KeyTheme, KeyThemeDark, KeyThemeLight}; !slices.Equal(order[:3], want) {
 		t.Errorf("appearance order = %v, want %v first", order, want)
 	}
-	if d := Defaults().Appearance; d.Theme != "system" || d.ThemeDark != "catppuccin-mocha" || d.ThemeLight != "catppuccin-latte" {
+	if d := Defaults().Appearance; d.Theme != "system" || d.ThemeDark != "github-dark" || d.ThemeLight != "github-light" {
 		t.Errorf("defaults = %+v", d)
 	}
 }
 
-// A file written before the theme slots existed loads with the Catppuccin defaults,
+// A file written before the theme slots existed loads with the default themes,
 // keeps its scheme, reports nothing, and renders the new keys commented out. No rewrite
 // is needed: settings.toml has no schema version, a missing key is its default.
 func TestOlderFileGetsThemeDefaults(t *testing.T) {
@@ -62,11 +62,11 @@ func TestOlderFileGetsThemeDefaults(t *testing.T) {
 		t.Errorf("issues = %v", r.issues)
 	}
 	a := r.settings.Appearance
-	if a.Theme != "light" || a.FontSize != 14 || a.ThemeDark != "catppuccin-mocha" || a.ThemeLight != "catppuccin-latte" {
+	if a.Theme != "light" || a.FontSize != 14 || a.ThemeDark != "github-dark" || a.ThemeLight != "github-light" {
 		t.Errorf("appearance = %+v", a)
 	}
 	text := string(render(r.accepted))
-	for _, want := range []string{"theme = \"light\"\n", "# theme_dark = \"catppuccin-mocha\"\n", "# theme_light = \"catppuccin-latte\"\n"} {
+	for _, want := range []string{"theme = \"light\"\n", "# theme_dark = \"github-dark\"\n", "# theme_light = \"github-light\"\n"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("rendered file lacks %q", want)
 		}
@@ -89,10 +89,10 @@ func TestThemeOnDiskFallsBack(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = s.Close() })
 	snap := s.Snapshot()
-	if a := snap.Settings.Appearance; a.Theme != "dark" || a.ThemeDark != "catppuccin-mocha" || a.ThemeLight != "catppuccin-latte" {
+	if a := snap.Settings.Appearance; a.Theme != "dark" || a.ThemeDark != "github-dark" || a.ThemeLight != "github-light" {
 		t.Errorf("appearance = %+v", a)
 	}
-	if snap.Values[KeyThemeDark] != "catppuccin-mocha" || snap.Values[KeyThemeLight] != "catppuccin-latte" {
+	if snap.Values[KeyThemeDark] != "github-dark" || snap.Values[KeyThemeLight] != "github-light" {
 		t.Errorf("values = %q, %q", snap.Values[KeyThemeDark], snap.Values[KeyThemeLight])
 	}
 	keys := make([]string, len(snap.Issues))
@@ -113,7 +113,7 @@ func TestThemeOnDiskFallsBack(t *testing.T) {
 		}
 	}
 	// The CLI's daemon-less read agrees.
-	if a := Read(path).Appearance; a.ThemeDark != "catppuccin-mocha" || a.ThemeLight != "catppuccin-latte" {
+	if a := Read(path).Appearance; a.ThemeDark != "github-dark" || a.ThemeLight != "github-light" {
 		t.Errorf("Read = %+v", a)
 	}
 }
@@ -152,7 +152,7 @@ func TestUpdateThemeSlots(t *testing.T) {
 	}
 	// "" resets to the default.
 	snap, err = s.Update(context.Background(), map[string]string{KeyThemeDark: ""})
-	if err != nil || snap.Settings.Appearance.ThemeDark != "catppuccin-mocha" {
+	if err != nil || snap.Settings.Appearance.ThemeDark != "github-dark" {
 		t.Fatalf("reset = %+v, %v", snap.Settings.Appearance, err)
 	}
 }

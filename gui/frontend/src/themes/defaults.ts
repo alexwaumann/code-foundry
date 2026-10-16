@@ -3,5 +3,5 @@
  * the daemon's copy of the catalog (internal/theme/catalog.json) without importing the
  * generated catalog it is about to replace.
  */
-export const DEFAULT_LIGHT = "catppuccin-latte";
-export const DEFAULT_DARK = "catppuccin-mocha";
+export const DEFAULT_LIGHT = "github-light";
+export const DEFAULT_DARK = "github-dark";
