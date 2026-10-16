@@ -195,6 +195,10 @@ func (g *Git) detail(ctx context.Context, repoID, path string) {
 		return
 	}
 	wt := *slot.cur.Load()
+	var unmerged []string
+	if u := slot.unmerged.Load(); u != nil {
+		unmerged = *u
+	}
 	d := WorktreeDetail{RepoID: repoID, Path: path, Head: wt.Head}
 	var baseSHA string
 	d.BaseRef, baseSHA = g.detailBase(ctx, st, wt)
@@ -203,7 +207,7 @@ func (g *Git) detail(ctx context.Context, repoID, path string) {
 	ds.mu.Lock()
 	hp := ds.heads[k]
 	ds.mu.Unlock()
-	hp, runs, err := g.fillDetail(ctx, &d, baseSHA, clean, hp)
+	hp, runs, err := g.fillDetail(ctx, &d, baseSHA, clean, unmerged, hp)
 	if ctx.Err() != nil {
 		return
 	}
@@ -272,11 +276,16 @@ func gitDiff(extra ...string) []string {
 // exactly a function of its key even if a ref moves while this runs (the status job
 // that sees the move schedules another detail).
 //
+// unmerged is the worktree's conflicted paths as its last status saw them
+// (wtSlot.unmerged). The uncommitted diff against HEAD never looks at index stages, so
+// it reports them as M; they are marked U here instead, keeping their counts. That
+// needs no git command.
+//
 // A clean worktree (per status) skips the working-tree scans: the uncommitted diff and
 // the untracked listing are empty, and counts come from a tree-to-tree diff, which is
 // itself cached in the head part. A clean worktree whose key did not change therefore
 // runs no git at all.
-func (g *Git) fillDetail(ctx context.Context, d *WorktreeDetail, baseSHA string, clean bool, hp *headPart) (*headPart, int, error) {
+func (g *Git) fillDetail(ctx context.Context, d *WorktreeDetail, baseSHA string, clean bool, unmerged []string, hp *headPart) (*headPart, int, error) {
 	dir := d.Path
 	runs := 0
 	run := func(args ...string) ([]byte, error) {
@@ -319,6 +328,9 @@ func (g *Git) fillDetail(ctx context.Context, d *WorktreeDetail, baseSHA string,
 		return nil, runs, err
 	}
 	uncommitted := parseNameStatusZ(out)
+	for _, p := range unmerged { // after the diff's entry for the path, so U wins in mergeFiles
+		uncommitted = append(uncommitted, nameStatus{status: "U", path: p})
+	}
 	if out, err = run("ls-files", "--others", "--exclude-standard", "--directory", "--no-empty-directory", "-z"); err != nil {
 		return nil, runs, err
 	}

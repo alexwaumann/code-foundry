@@ -41,7 +41,25 @@ func TestParseStatusV2(t *testing.T) {
 			name: "merge conflict",
 			in: "# branch.oid b42cf5bc10dc74c2d123765be86641da4b3dbea6\x00# branch.head main\x00" +
 				"u UU N... 100644 100644 100644 100644 1f25f40627bf553f1a29d49c498ddb66075eaefa 351be5bf6e17c59ea560546d69654115ecb2fd8d e45c9c2666d44e0327c1f9c239a74c508336053e f\x00",
-			want: statusInfo{Head: "b42cf5bc10dc74c2d123765be86641da4b3dbea6", Branch: "main", Conflicted: 1},
+			want: statusInfo{Head: "b42cf5bc10dc74c2d123765be86641da4b3dbea6", Branch: "main", Conflicted: 1, Unmerged: []string{"f"}},
+		},
+		{
+			// Captured from a rebase stopped on two conflicts, one path with a space,
+			// next to an ordinary staged change.
+			name: "rebase conflicts keep their paths in order",
+			in: "# branch.oid 83e8d627476900f51f280b898d9bf43a450c80c6\x00# branch.head (detached)\x00" +
+				"1 M. N... 100644 100644 100644 b68fde2a051d9af2fe3ff4c96c0898e5a3212e4d 208be99941cc8a15b0d3f95bbaf8fe41c8b05cc1 keep.txt\x00" +
+				"u UU N... 100644 100644 100644 100644 df967b96a579e45a18b8251732d16804b2e56a55 ba2906d0666cf726c7eaadd2cd3db615dedfdf3a a7453f07505c42ea8d6fdda75fa91710c81c53d6 a.txt\x00" +
+				"u UU N... 100644 100644 100644 100644 587be6b4c3f93f93c489c0111bba5596147a26cb 28ce6a8b26aa170e1de65536fe8abe1832bd3242 6a69f92020f5df77af6e8813ff1232493383b708 sp ace.txt\x00",
+			want: statusInfo{
+				Head: "83e8d627476900f51f280b898d9bf43a450c80c6", Detached: true, Staged: 1,
+				Conflicted: 2, Unmerged: []string{"a.txt", "sp ace.txt"},
+			},
+		},
+		{
+			name: "deleted by them",
+			in:   "# branch.head m\x00u UD N... 100644 100644 000000 100644 1f25f40627bf553f1a29d49c498ddb66075eaefa 351be5bf6e17c59ea560546d69654115ecb2fd8d 0000000000000000000000000000000000000000 gone.go\x00",
+			want: statusInfo{Branch: "m", Conflicted: 1, Unmerged: []string{"gone.go"}},
 		},
 		{
 			name: "unborn branch",
@@ -62,6 +80,7 @@ func TestParseStatusV2(t *testing.T) {
 		{name: "bad ab", in: "# branch.ab +x -1\x00", wantErr: true},
 		{name: "unknown entry", in: "Z what\x00", wantErr: true},
 		{name: "short entry", in: "1 M\x00", wantErr: true},
+		{name: "unmerged entry without a path", in: "u UU N... 100644 100644 100644 100644 a b c\x00", wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -69,7 +88,7 @@ func TestParseStatusV2(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("err = %v, wantErr %v", err, tt.wantErr)
 			}
-			if !tt.wantErr && got != tt.want {
+			if !tt.wantErr && !reflect.DeepEqual(got, tt.want) {
 				t.Fatalf("got  %+v\nwant %+v", got, tt.want)
 			}
 		})
