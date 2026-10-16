@@ -10,8 +10,10 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"sync"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/events"
 
 	"github.com/alexwaumann/code-foundry/internal/paths"
 	"github.com/alexwaumann/code-foundry/internal/version"
@@ -83,6 +85,8 @@ func main() {
 		// different colour before the page paints. SetWindowBackground keeps it current.
 		BackgroundColour: launchBackgroundColour(p.WindowBackground(), systemIsDark()),
 		URL:              "/",
+		// Shown below, once the webview stops painting its own background.
+		Hidden: true,
 		Mac: application.MacWindow{
 			TitleBar: application.MacTitleBarHiddenInset,
 			// No native drag band. A native band drags on any mouse-down in it, before the
@@ -91,6 +95,17 @@ func main() {
 		},
 	})
 	appService.window = window
+	// Wails shows a window once its page has loaded (WebViewDidFinishNavigation), but
+	// WebKit composites the page a moment later; until then an opaque webview shows its
+	// empty-page colour (#1e1e1e in dark mode) instead of BackgroundColour. So the
+	// window starts hidden and is shown here, with the webview's background cleared.
+	var shown sync.Once
+	window.OnWindowEvent(events.Mac.WebViewDidFinishNavigation, func(*application.WindowEvent) {
+		shown.Do(func() {
+			application.InvokeSync(func() { clearWebViewBackground(window.NativeWindow()) })
+			window.Show()
+		})
+	})
 
 	// `app.relaunch` (e.g. after an update is installed) reaches the host directly.
 	watchCtx, stopWatch := context.WithCancel(context.Background())
