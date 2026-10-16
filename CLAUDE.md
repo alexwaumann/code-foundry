@@ -49,3 +49,8 @@ cd gui && wails3 dev   # GUI with hot reload (needs a running daemon or auto-sta
 Before claiming a step done: `make check` green, the new behavior exercised end to end
 (daemon + CLI or daemon + GUI), and a short note in `docs/notes/<step>.md` recording
 decisions and gotchas.
+
+After the final commit is pushed, run `make attest`. It posts a `local-check` status on
+the pushed commit if its tree is the one `make check` last passed on, and CI then skips
+its jobs for that pull request. If it refuses (tree changed since the check), run
+`make check` again and re-attest. Never attest a tree you did not check.

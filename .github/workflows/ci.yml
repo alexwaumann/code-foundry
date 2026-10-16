@@ -1,5 +1,11 @@
 name: ci
 
+# Three jobs (go-test, go-lint on macOS; frontend on Linux) so wall time is the longest
+# of them, not their sum. For a pull request whose head commit carries a "local-check"
+# status with its tree hash (posted by `make attest` after a green `make check`, see
+# docs/notes/ci-attest.md), all three are skipped: the same suite already ran on a Mac.
+# Pushes to main always run everything.
+
 on:
   push:
     branches: [main]
@@ -7,53 +13,79 @@ on:
 
 permissions:
   contents: read
+  statuses: read
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  check:
+  attested:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      skip: ${{ steps.check.outputs.skip }}
+    steps:
+      - uses: actions/checkout@v7
+        if: github.event_name == 'pull_request'
+        with:
+          # The PR head itself, not the merge commit: the attestation names its tree.
+          ref: ${{ github.event.pull_request.head.sha }}
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
+            echo "skip=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          tree="$(git rev-parse 'HEAD^{tree}')"
+          attested="$(gh api "repos/$GITHUB_REPOSITORY/commits/$SHA/status" \
+            --jq '[.statuses[] | select(.context == "local-check" and .state == "success") | .description] | first // ""')"
+          if [ "$attested" = "tree $tree" ]; then
+            echo "::notice::$SHA was checked locally (make attest, tree $tree); skipping CI jobs."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "no local-check attestation for tree $tree (found: '${attested:-none}'); running CI."
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  go-test:
+    needs: attested
+    if: needs.attested.outputs.skip != 'true'
     # macOS only: the gui package links Wails (cgo + WebKit), and the product is macOS-only.
     runs-on: macos-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-go-ghostty
+      - run: make go-test
 
-      # Reads the `toolchain` directive (go1.26.x) from go.mod.
-      - uses: actions/setup-go@v7
-        with:
-          go-version-file: go.mod
-          # Go bakes the pkg-config link path of libghostty-vt into compiled cgo packages
-          # without keying on it, so key the build cache on the library pins as well.
-          cache-dependency-path: |
-            go.sum
-            scripts/ghostty-vt.sh
+  go-lint:
+    needs: attested
+    if: needs.attested.outputs.skip != 'true'
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-go-ghostty
+      - run: make go-lint
 
+  frontend:
+    needs: attested
+    if: needs.attested.outputs.skip != 'true'
+    # Nothing in the frontend checks is macOS-specific; Linux runners start in seconds.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
         with:
           version: 12.8.1
-
       - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: pnpm
           cache-dependency-path: gui/frontend/pnpm-lock.yaml
-
-      # libghostty-vt (static) from the pinned ghostty commit with zig 0.16.0, cached on
-      # both pins. The .pc files hardcode the absolute prefix, which is stable on runners.
-      # A cold build downloads zig and the ghostty source and takes about a minute.
-      - name: libghostty-vt cache key
-        id: ghostty-vt
-        run: echo "key=$(./scripts/ghostty-vt.sh --print-key)" >> "$GITHUB_OUTPUT"
-
-      - uses: actions/cache@v6
-        with:
-          path: third_party/ghostty-vt
-          key: ${{ runner.os }}-${{ steps.ghostty-vt.outputs.key }}
-
-      - run: make ghostty-vt
-
-      # go vet + staticcheck + go test -race, then frontend typecheck + lint + test.
-      # Generated code (buf, Wails bindings) is committed, so neither buf nor wails3 is needed.
-      - run: make check
+      # typecheck + lint + vitest. Generated code is committed, so no buf or wails3.
+      - run: make frontend-check

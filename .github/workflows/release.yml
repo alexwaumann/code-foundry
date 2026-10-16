@@ -54,15 +54,7 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
-      # Same setup as ci.yml.
-      - uses: actions/setup-go@v7
-        with:
-          go-version-file: go.mod
-          # Go bakes the pkg-config link path of libghostty-vt into compiled cgo packages
-          # without keying on it, so key the build cache on the library pins as well.
-          cache-dependency-path: |
-            go.sum
-            scripts/ghostty-vt.sh
+      - uses: ./.github/actions/setup-go-ghostty
 
       - uses: pnpm/action-setup@v6
         with:
@@ -73,17 +65,6 @@ jobs:
           node-version: 24
           cache: pnpm
           cache-dependency-path: gui/frontend/pnpm-lock.yaml
-
-      - name: libghostty-vt cache key
-        id: ghostty-vt
-        run: echo "key=$(./scripts/ghostty-vt.sh --print-key)" >> "$GITHUB_OUTPUT"
-
-      - uses: actions/cache@v6
-        with:
-          path: third_party/ghostty-vt
-          key: ${{ runner.os }}-${{ steps.ghostty-vt.outputs.key }}
-
-      - run: make ghostty-vt
 
       # wails3 builds the GUI bundle. Built with the module's toolchain (go1.26), which
       # setup-go put on PATH via the go.mod toolchain directive.

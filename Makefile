@@ -36,7 +36,7 @@ LDFLAGS  := -X github.com/alexwaumann/code-foundry/internal/version.Version=$(VE
 FRONTEND := gui/frontend
 PNPM     := pnpm --dir $(FRONTEND)
 
-.PHONY: all gen build check go-check frontend-check frontend-deps gui-dist-stub \
+.PHONY: all gen build check attest go-check go-lint go-test frontend-check frontend-deps gui-dist-stub \
         dev gui-build gui-dev gui-e2e gui-mock ghostty-vt package release promote clean
 
 all: build
@@ -51,8 +51,15 @@ gen:
 build: ghostty-vt
 	go build -trimpath -ldflags "$(LDFLAGS)" -o bin/code-foundry ./cmd/code-foundry
 
-## check: everything CI runs.
+## check: everything CI runs. On success it records the working tree's hash so that
+## `make attest` can vouch for it once committed and pushed (scripts/attest.sh).
 check: go-check frontend-check
+	@scripts/attest.sh record
+
+## attest: post a "local-check" commit status on the pushed HEAD, provided its tree is the
+## one `make check` last passed on. CI then skips its jobs for that pull request.
+attest:
+	@scripts/attest.sh post
 
 # gui/main.go embeds gui/frontend/dist, which only exists after a frontend build. Go
 # vet/staticcheck/test compile the gui package, so give them a placeholder if needed.
@@ -62,10 +69,14 @@ gui-dist-stub:
 		echo '<!doctype html><p>Frontend not built. Run <code>wails3 build</code> in gui/.</p>' > $(FRONTEND)/dist/index.html; \
 	fi
 
-go-check: gui-dist-stub ghostty-vt
+go-check: go-lint go-test
+
+go-lint: gui-dist-stub ghostty-vt
 	@unformatted=$$(gofmt -l cmd internal gui/*.go 2>/dev/null); if [ -n "$$unformatted" ]; then echo "gofmt needed:" $$unformatted; exit 1; fi
 	go vet ./...
 	go tool staticcheck ./...
+
+go-test: gui-dist-stub ghostty-vt
 	go test -race ./...
 
 frontend-deps:
