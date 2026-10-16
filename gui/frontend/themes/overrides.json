@@ -1,4 +1,12 @@
 {
+  "github-dark": {
+    "name": "GitHub Dark",
+    "ghostty": "GitHub Dark Default",
+    "pair": "github-light",
+    "upstream": "GitHub Primer, github.com/primer/github-vscode-theme (MIT)",
+    "accent": "#4493f8",
+    "why": "Accent is Primer's accent.fg. The selection is the foreground (inverted); the guard replaces it."
+  },
   "catppuccin-mocha": {
     "name": "Catppuccin Mocha",
     "ghostty": "Catppuccin Mocha",
@@ -91,14 +99,6 @@
     },
     "why": "Accent is Monokai's yellow, which is also its ANSI yellow, so warning takes the orange (ANSI 4, Monokai has no blue) and info takes cyan."
   },
-  "github-dark": {
-    "name": "GitHub Dark",
-    "ghostty": "GitHub Dark Default",
-    "pair": "github-light",
-    "upstream": "GitHub Primer, github.com/primer/github-vscode-theme (MIT)",
-    "accent": "#4493f8",
-    "why": "Accent is Primer's accent.fg. The selection is the foreground (inverted); the guard replaces it."
-  },
   "kanagawa-wave": {
     "name": "Kanagawa Wave",
     "ghostty": "Kanagawa Wave",
@@ -121,17 +121,28 @@
     "accent": "#ffad66",
     "why": "Accent is Ayu's orange (keyword colour), distinct from its yellow warning. The bright-blue selection is replaced by the guard."
   },
+  "github-light": {
+    "name": "GitHub Light",
+    "ghostty": "GitHub Light Default",
+    "pair": "github-dark",
+    "upstream": "GitHub Primer, github.com/primer/github-vscode-theme (MIT)",
+    "accent": "#0969da",
+    "status": {
+      "warning": "#9a6700"
+    },
+    "why": "Accent is Primer's blue. ANSI yellow is near-black brown (#4d2d00), so warning is Primer's attention.fg. The selection is the foreground (inverted); the guard replaces it."
+  },
   "catppuccin-latte": {
     "name": "Catppuccin Latte",
     "ghostty": "Catppuccin Latte",
     "pair": "catppuccin-mocha",
     "upstream": "Catppuccin, github.com/catppuccin/catppuccin (MIT)",
-    "accent": "#8839ef",
+    "accent": "#7287fd",
     "vars": {
       "--syn-kw": "#8839ef",
       "--syn-num": "#fe640b"
     },
-    "why": "Accent is mauve from the official palette. Yellow and green are too light for text on the light base; the guards darken them."
+    "why": "Accent is lavender from the official palette (#7287fd), not mauve. Lavender is too light for text on or under it, so the primary guard darkens it at the same hue to #5363d5. Keywords stay mauve and numbers peach, as Catppuccin's syntax style guide. Yellow and green are too light for text on the light base; the guards darken them."
   },
   "graphite-light": {
     "name": "Graphite Light",
@@ -156,10 +167,11 @@
     "upstream": "Rosé Pine, github.com/rose-pine/rose-pine-theme (MIT)",
     "accent": "#907aa9",
     "status": {
+      "destructive": "#b0405a",
       "success": "#6d8f89",
       "info": 4
     },
-    "why": "Accent is iris. No green (as Rosé Pine): success is Dawn's leaf; info stays foam (ANSI 4) so it is not the same teal as pine. Gold warning is darkened by the guard."
+    "why": "Accent is iris. Destructive is a redder take on love: the guard darkens Ghostty's love #b4637a to a mauve-pink #9c4d64, so it is set to #b0405a (hue nudged toward red, a little more chroma), which already clears 4.5:1 on pane and sheet. No green (as Rosé Pine): success is Dawn's leaf; info stays foam (ANSI 4) so it is not the same teal as pine. Gold warning is darkened by the guard."
   },
   "atom-one-light": {
     "name": "Atom One Light",
@@ -176,16 +188,5 @@
     "upstream": "Solarized, github.com/altercation/solarized (MIT)",
     "accent": "#268bd2",
     "why": "Accent is blue. Solarized is low contrast by design (fg 4.1:1); the guards darken the foreground to 7:1 and every status colour to 4.5:1."
-  },
-  "github-light": {
-    "name": "GitHub Light",
-    "ghostty": "GitHub Light Default",
-    "pair": "github-dark",
-    "upstream": "GitHub Primer, github.com/primer/github-vscode-theme (MIT)",
-    "accent": "#0969da",
-    "status": {
-      "warning": "#9a6700"
-    },
-    "why": "Accent is Primer's blue. ANSI yellow is near-black brown (#4d2d00), so warning is Primer's attention.fg. The selection is the foreground (inverted); the guard replaces it."
   }
 }

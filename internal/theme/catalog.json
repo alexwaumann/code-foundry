@@ -1,9 +1,15 @@
 {
   "defaults": {
-    "dark": "catppuccin-mocha",
-    "light": "catppuccin-latte"
+    "dark": "github-dark",
+    "light": "github-light"
   },
   "themes": [
+    {
+      "id": "github-dark",
+      "name": "GitHub Dark",
+      "scheme": "dark",
+      "pair": "github-light"
+    },
     {
       "id": "catppuccin-mocha",
       "name": "Catppuccin Mocha",
@@ -61,12 +67,6 @@
       "scheme": "dark"
     },
     {
-      "id": "github-dark",
-      "name": "GitHub Dark",
-      "scheme": "dark",
-      "pair": "github-light"
-    },
-    {
       "id": "kanagawa-wave",
       "name": "Kanagawa Wave",
       "scheme": "dark"
@@ -80,6 +80,12 @@
       "id": "ayu-mirage",
       "name": "Ayu Mirage",
       "scheme": "dark"
+    },
+    {
+      "id": "github-light",
+      "name": "GitHub Light",
+      "scheme": "light",
+      "pair": "github-dark"
     },
     {
       "id": "catppuccin-latte",
@@ -116,12 +122,6 @@
       "name": "Solarized Light",
       "scheme": "light",
       "pair": "solarized-dark"
-    },
-    {
-      "id": "github-light",
-      "name": "GitHub Light",
-      "scheme": "light",
-      "pair": "github-dark"
     }
   ]
 }
