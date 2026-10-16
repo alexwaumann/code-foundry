@@ -238,7 +238,7 @@ type Store interface {
 	// base (detail.go), computing them if needed.
 	WorktreeDetail(ctx context.Context, repoID, path string) (WorktreeDetail, error)
 	// InitGit makes a project without git a git repository (`git init -b <default>`
-	// and an empty "Initial commit") and refreshes it, returning the git project.
+	// and an empty "chore: initial commit") and refreshes it, returning the git project.
 	// ErrFailedPrecondition when it already is one.
 	InitGit(ctx context.Context, id string) (Repo, error)
 }

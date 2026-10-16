@@ -4,7 +4,7 @@
 // unregister, then remove the folder).
 //
 // Create makes <projects>/<name>, runs the repo store's InitRepository there (git init
-// on init.defaultBranch, else main, and an empty "Initial commit") and registers the
+// on init.defaultBranch, else main, and an empty "chore: initial commit") and registers the
 // folder through the repo store. Publish runs `gh repo create <owner>/<name> --source
 // <path> --remote origin --push --<visibility>`, so the user's gh login applies, and
 // refreshes the project so origin and the GitHub slug show up. Neither keeps state

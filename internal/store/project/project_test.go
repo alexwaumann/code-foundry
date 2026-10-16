@@ -163,7 +163,7 @@ func TestCreate(t *testing.T) {
 		register bool
 	}{
 		{name: "creates, inits and registers", project: "demo", wantDir: true, register: true,
-			wantGit: []string{"config --get init.defaultBranch", "init --quiet -b trunk", "commit --quiet --allow-empty -m Initial commit"}},
+			wantGit: []string{"config --get init.defaultBranch", "init --quiet -b trunk", "commit --quiet --allow-empty -m chore: initial commit"}},
 		{name: "invalid name", project: "../x", err: ErrInvalidArgument},
 		{name: "folder exists", project: "taken", err: ErrExists, wantDir: true, setup: func(t *testing.T, root string) {
 			if err := os.MkdirAll(filepath.Join(root, "taken"), 0o755); err != nil {
@@ -181,10 +181,10 @@ func TestCreate(t *testing.T) {
 		{name: "git init fails: nothing left", project: "broken", gitFail: "init", err: ErrFailed, errText: "fatal: init failed",
 			wantGit: []string{"config --get init.defaultBranch", "init --quiet -b trunk"}},
 		{name: "initial commit fails: nothing left", project: "nocommit", gitFail: "commit", err: ErrFailed, errText: "fatal: commit failed",
-			wantGit: []string{"config --get init.defaultBranch", "init --quiet -b trunk", "commit --quiet --allow-empty -m Initial commit"}},
+			wantGit: []string{"config --get init.defaultBranch", "init --quiet -b trunk", "commit --quiet --allow-empty -m chore: initial commit"}},
 		{name: "register fails: the folder stays", project: "unreg", regErr: errors.New("boom"), errText: "could not add it as a project: boom",
 			wantDir: true, register: true,
-			wantGit: []string{"config --get init.defaultBranch", "init --quiet -b trunk", "commit --quiet --allow-empty -m Initial commit"}},
+			wantGit: []string{"config --get init.defaultBranch", "init --quiet -b trunk", "commit --quiet --allow-empty -m chore: initial commit"}},
 		{name: "projects dir outside the allowed root", project: "out", outside: true, err: ErrOutsideRoot},
 	}
 	for _, tt := range tests {
@@ -275,7 +275,7 @@ func TestCreateRealGit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("git log: %v\n%s", err, out)
 	}
-	if strings.TrimSpace(string(out)) != "Initial commit" {
+	if strings.TrimSpace(string(out)) != "chore: initial commit" {
 		t.Errorf("log = %q", out)
 	}
 	head, _ := exec.Command("git", "-C", filepath.Join(root, "real"), "symbolic-ref", "--short", "HEAD").Output()

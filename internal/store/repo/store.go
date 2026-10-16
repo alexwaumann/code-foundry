@@ -595,6 +595,9 @@ func (g *Git) CreateWorktree(ctx context.Context, opts CreateWorktreeOptions) (W
 		}
 		args = []string{"worktree", "add", path, opts.Branch}
 	default:
+		if err := g.ensureBorn(ctx, m, opts.BaseRef); err != nil {
+			return Worktree{}, err
+		}
 		base := opts.BaseRef
 		if base == "" {
 			base = g.defaultBase(ctx, m)
@@ -633,6 +636,36 @@ func (g *Git) CreateWorktree(ctx context.Context, opts CreateWorktreeOptions) (W
 		return Worktree{}, fmt.Errorf("repo: created worktree %s is missing from git worktree list", path)
 	}
 	return wt, nil
+}
+
+// ensureBorn makes the empty initial commit in the main checkout when it has no
+// commit yet and the new worktree would branch from that unborn branch: the default
+// base, or an explicit base naming the checkout's own branch. A `git init` folder
+// (or one whose Add-project initial commit failed) otherwise fails `git worktree add`
+// with "invalid reference: main", which a user cannot be asked to understand. The
+// commit is harmless and is what Add project makes; the repo is refreshed after it
+// so DefaultBranch, refs and the main worktree's head see the commit. Any other
+// base is left to git.
+func (g *Git) ensureBorn(ctx context.Context, m *repoMeta, base string) error {
+	if g.refExists(ctx, m.Path, "HEAD") {
+		return nil
+	}
+	out, err := g.runner.Run(ctx, m.Path, "symbolic-ref", "--quiet", "--short", "HEAD")
+	if err != nil {
+		return nil // detached from nothing: not the unborn-branch case
+	}
+	unborn := string(trimNL(out))
+	if unborn == "" || (base != "" && base != unborn && base != "refs/heads/"+unborn) {
+		return nil
+	}
+	if _, err := g.runner.Run(ctx, m.Path, "commit", "--quiet", "--allow-empty", "-m", initialCommitMessage); err != nil {
+		return fmt.Errorf("%w: %s has no commits yet and the initial commit failed: %w", ErrFailedPrecondition, m.Name, err)
+	}
+	g.log.Info("initial commit made for unborn branch", "repo", m.ID, "path", m.Path, "branch", unborn)
+	if err := g.refresh(ctx, m.ID); err != nil {
+		return err
+	}
+	return nil
 }
 
 // originFetches reports whether one of origin's configured fetch refspecs writes the

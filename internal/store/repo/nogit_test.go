@@ -205,7 +205,7 @@ func TestInitGit(t *testing.T) {
 			if w.Status.Untracked != 1 || w.Status.Staged != 0 {
 				t.Fatalf("status = %+v", w.Status)
 			}
-			if subj := git(t, dir, "log", "--format=%s"); subj != "Initial commit" {
+			if subj := git(t, dir, "log", "--format=%s"); subj != "chore: initial commit" {
 				t.Fatalf("log = %q", subj)
 			}
 			// The watcher is live now: a commit is seen without a refresh.
