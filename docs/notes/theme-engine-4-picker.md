@@ -114,7 +114,7 @@ for the other pages.
 | --- | --- |
 | `theme.pick [dark\|light]` ("Choose Theme…", Settings) | new, `internal/command/commands_theme_pick.go`. Emits `ShowView` `themes`, `themes.dark` or `themes.light`. CLI: `code-foundry theme pick [slot]` opens the page in every window, on that slot |
 | palette | presented locally (`keys/bindings.ts`), so only this window opens, on the slot in use; listed in `paletteSupplied` so the palette does not prompt for the optional slot |
-| Settings → Appearance, Dark theme / Light theme rows | the select stays; a **Choose…** button beside it opens the page on that slot (`components/settings/ThemeSlotEditor.tsx`, registered in `keyEditors`) |
+| Settings → Appearance, Dark theme / Light theme rows | the select stays; a **Choose…** button beside it opens the page on that slot (`components/settings/ThemeSlotEditor.tsx`, registered in `keyEditors`). These two selects drop the " (default)" suffix (`EnumEditor`'s `markDefault={false}`): beside the button it clipped to "Catppuccin Latte (", and the reset arrow already marks a changed value |
 | Settings group nav | a **Themes ›** link under the groups (a separator above it) |
 
 No sidebar icon. `showView("themes…")` opens rather than toggles (Esc and × close; a second
