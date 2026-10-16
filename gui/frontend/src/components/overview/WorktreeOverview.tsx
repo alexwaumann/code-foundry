@@ -41,7 +41,7 @@ function AheadBehind({ ahead, behind }: { ahead: number; behind: number }) {
 /** Upstream and base comparison, plus the working tree summary. */
 function SyncLine({ st }: { st: GitStatusView }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-5 gap-y-1 font-mono text-xs" data-testid="sync-line">
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-body-sm font-mono" data-testid="sync-line">
       <span>
         <span className="text-muted-foreground">{st.upstream ? `Upstream ${st.upstream}: ` : "Upstream: "}</span>
         {st.upstream ? <AheadBehind ahead={st.ahead} behind={st.behind} /> : <span className="text-muted-foreground">none</span>}
@@ -68,9 +68,9 @@ function SyncLine({ st }: { st: GitStatusView }) {
 function Section({ title, extra, children, testId }: { title: ReactNode; extra?: ReactNode; children: ReactNode; testId?: string }) {
   return (
     <section data-testid={testId}>
-      <h2 className="mb-1.5 flex flex-wrap items-baseline gap-x-3 border-b pb-1 text-sm font-semibold">
+      <h2 className="mb-1.5 flex flex-wrap items-baseline gap-x-3 border-b pb-1 text-heading">
         <span>{title}</span>
-        {extra && <span className="ml-auto text-xs font-normal text-muted-foreground">{extra}</span>}
+        {extra && <span className="ml-auto text-caption">{extra}</span>}
       </h2>
       {children}
     </section>
@@ -89,9 +89,9 @@ const statusColor: Record<string, string> = {
 };
 
 function Counts({ added, deleted, binary }: { added: number; deleted: number; binary: boolean }) {
-  if (binary && added === 0 && deleted === 0) return <span className="text-xs text-muted-foreground">bin</span>;
+  if (binary && added === 0 && deleted === 0) return <span className="text-caption">bin</span>;
   return (
-    <span className="text-xs tabular-nums">
+    <span className="text-body-sm tabular-nums">
       <span className="text-success">+{added}</span> <span className="text-destructive">−{deleted}</span>
     </span>
   );
@@ -99,7 +99,7 @@ function Counts({ added, deleted, binary }: { added: number; deleted: number; bi
 
 function FileLine({ row }: { row: FileRow }) {
   return (
-    <NavRow navKey={row.key} tip={row.file?.oldPath ? `${row.file.oldPath} → ${row.path}` : row.path} className="flex h-full items-center gap-2 px-2 font-mono text-xs">
+    <NavRow navKey={row.key} tip={row.file?.oldPath ? `${row.file.oldPath} → ${row.path}` : row.path} className="flex h-full items-center gap-2 px-2 text-body-sm font-mono">
       <span className={cn("w-7 shrink-0 text-center", row.kind === "file" ? statusColor[row.status] : "text-muted-foreground")} data-status={row.status}>
         {row.kind === "file" ? row.status : ""}
       </span>
@@ -112,7 +112,7 @@ function FileLine({ row }: { row: FileRow }) {
         </span>
         {row.kind === "dir" && <span className="shrink-0 text-muted-foreground">({row.count})</span>}
         {row.file?.oldPath && <span className="truncate text-muted-foreground">← {row.file.oldPath}</span>}
-        {row.uncommitted && row.kind === "file" && <span className="shrink-0 text-[10px] text-muted-foreground uppercase">wt</span>}
+        {row.uncommitted && row.kind === "file" && <span className="shrink-0 text-caption-sm uppercase">wt</span>}
       </span>
       <span className="ml-auto shrink-0">{!row.file?.isDir && <Counts added={row.added} deleted={row.deleted} binary={row.binary} />}</span>
     </NavRow>
@@ -124,7 +124,7 @@ function LogLine({ e }: { e: LogEntryView }) {
     <NavRow
       navKey={`l:${e.sha}`}
       tip={`${e.sha}\n${e.authorName} <${e.authorEmail}>`}
-      className="grid h-full grid-cols-[4.5rem_minmax(0,1fr)_3rem_minmax(6rem,10rem)] items-center gap-3 px-2 text-xs @max-[420px]:grid-cols-[4rem_minmax(0,1fr)_2.5rem] @max-[420px]:gap-2"
+      className="grid h-full grid-cols-[4.5rem_minmax(0,1fr)_3rem_minmax(6rem,10rem)] items-center gap-3 px-2 text-body-sm @max-[420px]:grid-cols-[4rem_minmax(0,1fr)_2.5rem] @max-[420px]:gap-2"
     >
       <span className="font-mono text-warning/80">{e.shortSha}</span>
       <span className="truncate">{e.subject}</span>
@@ -136,7 +136,7 @@ function LogLine({ e }: { e: LogEntryView }) {
 
 function CheckLine({ c }: { c: CheckRunView }) {
   return (
-    <NavRow navKey={`c:${c.url || c.name}`} className="flex h-6 items-center gap-2 px-2 pl-6 font-mono text-xs @max-[420px]:pl-2">
+    <NavRow navKey={`c:${c.url || c.name}`} className="flex h-6 items-center gap-2 px-2 pl-6 text-body-sm font-mono @max-[420px]:pl-2">
       {c.workflow && <span className="min-w-0 shrink truncate text-muted-foreground">{c.workflow}:</span>}
       <span className="min-w-0 truncate text-destructive">{c.name}</span>
       <span className="shrink-0 text-muted-foreground @max-[420px]:hidden">{c.conclusion.replace(/_/g, " ")}</span>
@@ -151,7 +151,7 @@ function PrLine({ pr, prefix, viewer }: { pr: PullRequestView; prefix: string; v
       navKey={`${prefix}:${String(pr.number)}`}
       activateOnClick
       onCmdClick={() => void openUrl(pr.url)}
-      className="flex h-6 items-center gap-2 px-2 pl-6 text-xs @max-[420px]:pl-2"
+      className="flex h-6 items-center gap-2 px-2 pl-6 text-body-sm @max-[420px]:pl-2"
     >
       <PrStateIcon state={pr.state} draft={pr.draft} />
       <span className="text-muted-foreground tabular-nums">#{pr.number}</span>
@@ -188,13 +188,13 @@ function GithubActivity({ activity, activityError, branch, branchPrs }: {
   branchPrs: { prs: PullRequestView[]; fetchedAtMs: number | null; error: string };
 }) {
   if (!activity) {
-    return <p className="text-xs text-muted-foreground">{activityError ? `Cannot load GitHub activity: ${activityError}` : "Loading…"}</p>;
+    return <p className="text-caption">{activityError ? `Cannot load GitHub activity: ${activityError}` : "Loading…"}</p>;
   }
   const { stats, defaultBranch: ci } = activity;
   const fetched = stats.fetchedAtMs !== null;
   const summary = ci ? checksSummary(ci.rollup) : null;
   return (
-    <div className="flex flex-col gap-1 text-xs" data-testid="gh-activity">
+    <div className="flex flex-col gap-1 text-body-sm" data-testid="gh-activity">
       <div data-testid="gh-merged-stats">
         <span className="text-muted-foreground">My PRs merged: </span>
         {fetched ? (
@@ -270,7 +270,7 @@ function GithubActivity({ activity, activityError, branch, branchPrs }: {
 function PublishToGitHub({ repoId }: { repoId: string }) {
   return (
     <div className="flex flex-wrap items-center gap-3" data-testid="no-remote">
-      <p className="text-xs text-muted-foreground">No remote: this repository is only on this Mac.</p>
+      <p className="text-caption">No remote: this repository is only on this Mac.</p>
       <Button
         type="button"
         variant="outline"
@@ -296,12 +296,12 @@ function NoGitBody({ repoId, path }: { repoId: string; path: string }) {
   const [busy, setBusy] = useState(false);
   return (
     <div className="flex flex-col gap-6" data-testid="overview-nogit">
-      <section className="rounded-md border border-dashed px-4 py-3" data-testid="section-nogit">
-        <h2 className="flex items-center gap-2 text-sm font-semibold">
+      <section className="rounded-lg border border-dashed px-4 py-3" data-testid="section-nogit">
+        <h2 className="flex items-center gap-2 text-heading">
           <Folder className="size-4 text-muted-foreground" aria-hidden />
           Not a git repository
         </h2>
-        <p className="mt-1 text-xs text-muted-foreground">
+        <p className="mt-1 text-caption">
           Threads and terminals run in this folder. Branches, worktrees, diffs and pull requests need git: initializing makes an empty first commit on the
           default branch.
         </p>
@@ -410,7 +410,7 @@ function OverviewBody({ repo, wt }: { repo: RepoView; wt: WorktreeView }) {
           ) : isRemoteless(repo) ? (
             <PublishToGitHub repoId={repo.id} />
           ) : (
-            <p className="text-xs text-muted-foreground">No GitHub remote: origin is not on github.com.</p>
+            <p className="text-caption">No GitHub remote: origin is not on github.com.</p>
           )}
         </Section>
         <Section
@@ -440,9 +440,9 @@ function OverviewBody({ repo, wt }: { repo: RepoView; wt: WorktreeView }) {
           }
         >
           {!detail ? (
-            <p className="text-xs text-muted-foreground">{detailEntry?.error ? `Cannot compute: ${detailEntry.error}` : "Computing…"}</p>
+            <p className="text-caption">{detailEntry?.error ? `Cannot compute: ${detailEntry.error}` : "Computing…"}</p>
           ) : fileRows.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No changes against {detail.baseRef || "HEAD"}.</p>
+            <p className="text-caption">No changes against {detail.baseRef || "HEAD"}.</p>
           ) : (
             <RowList rows={fileRows} rowKey={(r) => r.key} rowHeight={FILE_ROW_H} render={(r) => <FileLine row={r} />} testId="files-list" />
           )}
@@ -482,7 +482,7 @@ export function WorktreePanelView({ repoId, path }: { repoId: string; path: stri
     // @container: log, check and pull request rows narrow with the panel.
     <div className="@container flex min-w-0 flex-col gap-3 px-4 py-3 @max-[340px]:px-3" data-testid="worktree-surface" data-repo={repoId} data-path={path} data-git={repo ? !noGit : undefined}>
       <header className="flex min-w-0 flex-col gap-0.5 border-b border-pane-border pb-2" data-testid="worktree-surface-header">
-        <h2 className="flex min-w-0 items-center gap-1.5 text-sm font-semibold">
+        <h2 className="flex min-w-0 items-center gap-1.5 text-heading">
           {noGit ? <Folder className="size-4 shrink-0 text-muted-foreground" aria-hidden /> : <GitBranch className="size-4 shrink-0 text-highlight" aria-hidden />}
           <span className="flex min-w-0 items-center gap-2 truncate" data-testid="worktree-surface-title">
             {repo?.name ?? repoId}
@@ -497,15 +497,15 @@ export function WorktreePanelView({ repoId, path }: { repoId: string; path: stri
           </span>
         </h2>
         <Tip label={path} align="start">
-          <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">{tildify(path)}</span>
+          <span className="min-w-0 truncate text-caption font-mono">{tildify(path)}</span>
         </Tip>
       </header>
       {!repo ? (
-        <p className="text-sm text-muted-foreground">Project not found.</p>
+        <p className="text-body text-muted-foreground">Project not found.</p>
       ) : noGit ? (
         <NoGitBody repoId={repoId} path={path} />
       ) : !wt ? (
-        <p className="text-sm text-muted-foreground" data-testid="worktree-surface-missing">
+        <p className="text-body text-muted-foreground" data-testid="worktree-surface-missing">
           This worktree is gone (removed from the workspace, or deleted).
         </p>
       ) : (
