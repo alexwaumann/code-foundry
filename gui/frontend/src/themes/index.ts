@@ -14,7 +14,7 @@ export interface Theme {
   readonly name: string;
   /** Fixed per theme, from its background's lightness. */
   readonly scheme: ThemeScheme;
-  /** The light/dark sibling (Catppuccin Mocha and Latte, ...). */
+  /** The light/dark sibling (GitHub Dark and Light, ...). */
   readonly pair?: string;
   /** Upstream project and the Ghostty file it was converted from. */
   readonly source: string;
@@ -28,7 +28,7 @@ export const themeById: ReadonlyMap<string, Theme> = new Map(themes.map((t) => [
 
 export { DEFAULT_DARK, DEFAULT_LIGHT } from "./defaults";
 
-/** The themes that can fill a scheme's slot, in catalog order (Catppuccin first). */
+/** The themes that can fill a scheme's slot, in catalog order (the default first). */
 export function themesFor(scheme: ThemeScheme): readonly Theme[] {
   return themes.filter((t) => t.scheme === scheme);
 }

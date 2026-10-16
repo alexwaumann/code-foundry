@@ -18,23 +18,24 @@ import {
 } from "./themePicker";
 import { closeThemes, openThemes, showView, useViewsStore } from "./views";
 
-const DEFAULTS = { dark: "catppuccin-mocha", light: "catppuccin-latte" };
+// A fixed pair of slots (not the app defaults), so the pairing cases have a companion to find.
+const SLOTS = { dark: "catppuccin-mocha", light: "catppuccin-latte" };
 
 beforeEach(() => {
   runCommandForResult.mockReset();
   runCommandForResult.mockResolvedValue({ message: "", resultJson: "" });
   setThemePreference("dark");
-  setThemeSlots(DEFAULTS);
+  setThemeSlots(SLOTS);
   useViewsStore.setState({ settingsOpen: false, usageOpen: false, themesOpen: false, helpOpen: false });
 });
 
 describe("pairHintFor", () => {
   it.each([
-    ["a theme whose companion is not the other slot", "gruvbox-dark", DEFAULTS, { slot: "light", themeId: "gruvbox-light", fromId: "gruvbox-dark" }],
-    ["a light theme suggests for dark", "rose-pine-dawn", DEFAULTS, { slot: "dark", themeId: "rose-pine", fromId: "rose-pine-dawn" }],
-    ["the companion already in the other slot", "catppuccin-mocha", DEFAULTS, null],
-    ["a theme without a companion", "dracula", DEFAULTS, null],
-    ["an unknown id", "sepia", DEFAULTS, null],
+    ["a theme whose companion is not the other slot", "gruvbox-dark", SLOTS, { slot: "light", themeId: "gruvbox-light", fromId: "gruvbox-dark" }],
+    ["a light theme suggests for dark", "rose-pine-dawn", SLOTS, { slot: "dark", themeId: "rose-pine", fromId: "rose-pine-dawn" }],
+    ["the companion already in the other slot", "catppuccin-mocha", SLOTS, null],
+    ["a theme without a companion", "dracula", SLOTS, null],
+    ["an unknown id", "sepia", SLOTS, null],
   ])("%s", (_, id, slots, want) => {
     expect(pairHintFor(id, slots)).toEqual(want);
   });
@@ -76,15 +77,15 @@ describe("the page state", () => {
     previewTheme("catppuccin-latte");
     expect(useThemePickerStore.getState().preview).toBeNull();
     previewTheme("nord");
-    expect(previewedId(useThemePickerStore.getState(), DEFAULTS)).toBe("nord");
+    expect(previewedId(useThemePickerStore.getState(), SLOTS)).toBe("nord");
     previewTheme("catppuccin-mocha");
     expect(useThemePickerStore.getState().preview).toBeNull();
     previewTheme("nord");
     resetPreview();
-    expect(previewedId(useThemePickerStore.getState(), DEFAULTS)).toBe("catppuccin-mocha");
+    expect(previewedId(useThemePickerStore.getState(), SLOTS)).toBe("catppuccin-mocha");
     previewTheme("nord");
     setPickerSlot("light");
-    expect(previewedId(useThemePickerStore.getState(), DEFAULTS)).toBe("catppuccin-latte");
+    expect(previewedId(useThemePickerStore.getState(), SLOTS)).toBe("catppuccin-latte");
   });
 
   it("Apply writes the slot through its command, then suggests the companion; accepting writes the other slot", async () => {

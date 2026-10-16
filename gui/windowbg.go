@@ -32,9 +32,9 @@ type WindowBackground struct {
 	Active string `json:"active,omitempty"`
 }
 
-// defaultWindowBackground is Catppuccin Mocha's and Latte's sheets (the default themes;
+// defaultWindowBackground is GitHub Dark's and Light's sheets (the default themes;
 // gui/frontend/src/themes/catalog.json, checked by TestDefaultWindowBackground).
-var defaultWindowBackground = WindowBackground{Scheme: "system", Dark: "#131222", Light: "#e0e2e6"}
+var defaultWindowBackground = WindowBackground{Scheme: "system", Dark: "#04070c", Light: "#f0f0f0"}
 
 // validate checks every field; Active may be empty.
 func (b WindowBackground) validate() error {

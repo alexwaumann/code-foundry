@@ -95,7 +95,7 @@
 
 /* Graphite Light (:root) and Graphite Dark (.dark): the hard fallback when no data-theme
  * is set (unit tests, a stylesheet loaded without lib/theme.ts). The app always sets one
- * (catppuccin-latte / catppuccin-mocha by default). themes/convert.ts reads the variable
+ * (github-light / github-dark by default). themes/convert.ts reads the variable
  * names and Graphite's values from these two blocks, so a variable added here must be
  * derived there too (src/themes/catalog.test.ts fails until `pnpm run themes`). */
 :root {

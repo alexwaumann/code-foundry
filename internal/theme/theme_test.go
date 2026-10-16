@@ -34,7 +34,7 @@ func TestCatalog(t *testing.T) {
 			t.Errorf("IDs/Names(%s) = %d/%d", s, len(IDs(s)), len(Names(s)))
 		}
 	}
-	if Default(SchemeDark) != "catppuccin-mocha" || Default(SchemeLight) != "catppuccin-latte" {
+	if Default(SchemeDark) != "github-dark" || Default(SchemeLight) != "github-light" {
 		t.Errorf("defaults = %q, %q", Default(SchemeDark), Default(SchemeLight))
 	}
 	if Default("sepia") != "" {
@@ -50,9 +50,9 @@ func TestCheck(t *testing.T) {
 		{"catppuccin-mocha", SchemeDark, ""},
 		{"dracula", SchemeDark, ""},
 		{"rose-pine-dawn", SchemeLight, ""},
-		{"catppuccin-latte", SchemeDark, `Catppuccin Latte ("catppuccin-latte") is a light theme; the dark theme must be one of "catppuccin-mocha"`},
-		{"dracula", SchemeLight, `Dracula ("dracula") is a dark theme; the light theme must be one of "catppuccin-latte"`},
-		{"nope", SchemeDark, `unknown theme "nope"; dark themes are "catppuccin-mocha"`},
+		{"catppuccin-latte", SchemeDark, `Catppuccin Latte ("catppuccin-latte") is a light theme; the dark theme must be one of "github-dark"`},
+		{"dracula", SchemeLight, `Dracula ("dracula") is a dark theme; the light theme must be one of "github-light"`},
+		{"nope", SchemeDark, `unknown theme "nope"; dark themes are "github-dark"`},
 		{"", SchemeLight, `unknown theme ""`},
 		{"dracula", "sepia", `unknown scheme "sepia"`},
 	}

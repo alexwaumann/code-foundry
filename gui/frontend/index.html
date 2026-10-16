@@ -12,7 +12,7 @@
         var t = {};
         try { t = JSON.parse(localStorage.getItem("cf.theme")) || {}; } catch (e) {}
         var s = t.scheme === "dark" || t.scheme === "light" ? t.scheme : matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
-        var id = typeof t[s] === "string" ? t[s] : s === "light" ? "catppuccin-latte" : "catppuccin-mocha";
+        var id = typeof t[s] === "string" ? t[s] : s === "light" ? "github-light" : "github-dark";
         var r = document.documentElement;
         r.dataset.theme = id;
         r.classList.toggle("dark", s === "dark");

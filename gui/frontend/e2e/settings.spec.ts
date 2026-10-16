@@ -112,7 +112,7 @@ test("cmd+, opens settings rendered from the schema", async ({ page }) => {
 test("the dark and light theme rows offer their scheme's themes and apply live", async ({ page }) => {
   await openSettings(page);
   await pick(page, "appearance.theme", "Dark");
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "catppuccin-mocha");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "github-dark");
   await pick(page, "appearance.theme_dark", "Dracula");
   await expect.poll(async () => (await mockSettings()).raw["appearance.theme_dark"]).toBe("dracula");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dracula");

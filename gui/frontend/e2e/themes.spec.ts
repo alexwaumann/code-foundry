@@ -3,7 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { emit, mockUrl, openApp, resetMock } from "./fixtures";
 
 // The Themes page (theme.pick, docs/notes/theme-engine-4-picker.md). The mock starts on the
-// defaults: scheme system (the browser is dark, playwright.config), Catppuccin Mocha and Latte.
+// defaults: scheme system (the browser is dark, playwright.config), GitHub Dark and Light.
 
 // The generated catalog, read as a file: Playwright's loader refuses a JSON import without
 // an import attribute, which src/themes (bundled by Vite) does not carry.
@@ -53,13 +53,13 @@ async function openFromPalette(page: Page) {
 test("Choose… in Settings opens the page on that slot, listing only its scheme's themes", async ({ page }) => {
   await openFromSettings(page, "light");
   await expect(page.getByTestId("themes-list").getByTestId("theme-name")).toHaveText(themesFor("light").map((t) => t.name));
-  await expect(option(page, "Catppuccin Latte")).toHaveAttribute("data-current", "true");
+  await expect(option(page, "GitHub Light")).toHaveAttribute("data-current", "true");
   await page.getByTestId("themes-slot-dark").click();
   await expect(page.getByTestId("themes-list").getByTestId("theme-name")).toHaveText(themesFor("dark").map((t) => t.name));
   // The dark slot is the one in use (the browser is dark): the badge and the sentence say so.
   await expect(page.getByTestId("themes-slot-dark")).toContainText("in use");
   await expect(page.getByTestId("themes-slot-light")).not.toContainText("in use");
-  await expect(page.getByTestId("themes-scheme-note")).toHaveText("Follows macOS: dark now, showing Catppuccin Mocha");
+  await expect(page.getByTestId("themes-scheme-note")).toHaveText("Follows macOS: dark now, showing GitHub Dark");
   // The close button goes back to Settings, where it came from.
   await page.getByRole("button", { name: "Close themes" }).click();
   await expect(page$(page)).toHaveCount(0);
@@ -68,22 +68,22 @@ test("Choose… in Settings opens the page on that slot, listing only its scheme
 
 test("a previewed theme paints the gallery, not the window; Apply paints the window and saves the slot", async ({ page }) => {
   await openFromSettings(page, "dark");
-  await expect(html(page)).toHaveAttribute("data-theme", "catppuccin-mocha");
+  await expect(html(page)).toHaveAttribute("data-theme", "github-dark");
   await expect(page.getByTestId("themes-apply")).toBeDisabled();
 
   await option(page, "Dracula").click();
   await expect(scope(page)).toHaveAttribute("data-theme", "dracula");
   await expect(page.getByTestId("themes-previewed-name")).toHaveText("Dracula");
-  // The gallery's pane is Dracula's; the window keeps Mocha's.
+  // The gallery's pane is Dracula's; the window keeps GitHub Dark's.
   const pane = (sel: string) => page.locator(sel).first().evaluate((el) => getComputedStyle(el).getPropertyValue("--pane").trim());
   expect(await pane('[data-testid="gallery-thread"]')).toBe(themeById.get("dracula")?.vars["--pane"]);
-  expect(await pane("html")).toBe(themeById.get("catppuccin-mocha")?.vars["--pane"]);
-  await expect(html(page)).toHaveAttribute("data-theme", "catppuccin-mocha");
+  expect(await pane("html")).toBe(themeById.get("github-dark")?.vars["--pane"]);
+  await expect(html(page)).toHaveAttribute("data-theme", "github-dark");
   expect(await raw("appearance.theme_dark")).toBeUndefined();
 
   // Back to current, then preview again and apply.
   await page.getByTestId("themes-reset").click();
-  await expect(scope(page)).toHaveAttribute("data-theme", "catppuccin-mocha");
+  await expect(scope(page)).toHaveAttribute("data-theme", "github-dark");
   await expect(page.getByTestId("themes-apply")).toBeDisabled();
   await option(page, "Dracula").click();
   await page.getByTestId("themes-apply").click();
@@ -102,10 +102,10 @@ test("Escape discards the preview and closes; the next visit starts from the app
   await page.keyboard.press("Escape");
   await expect(page$(page)).toHaveCount(0);
   await expect(page.getByTestId("settings-page")).toBeVisible();
-  await expect(html(page)).toHaveAttribute("data-theme", "catppuccin-mocha");
+  await expect(html(page)).toHaveAttribute("data-theme", "github-dark");
   expect(await raw("appearance.theme_dark")).toBeUndefined();
   await page.getByTestId("choose-theme-dark").click();
-  await expect(scope(page)).toHaveAttribute("data-theme", "catppuccin-mocha");
+  await expect(scope(page)).toHaveAttribute("data-theme", "github-dark");
 });
 
 test("after Apply, the companion theme is suggested for the other slot, and one click uses it", async ({ page }) => {
@@ -121,10 +121,10 @@ test("after Apply, the companion theme is suggested for the other slot, and one 
   await expect(hint).toHaveCount(0);
   await expect(html(page)).toHaveAttribute("data-theme", "gruvbox-dark");
 
-  // Applying Mocha back: Latte is not the light slot any more, so it is suggested; dismissed, it goes.
-  await option(page, "Catppuccin Mocha").click();
+  // Applying GitHub Dark back: GitHub Light is not the light slot any more, so it is suggested; dismissed, it goes.
+  await option(page, "GitHub Dark").click();
   await page.getByTestId("themes-apply").click();
-  await expect(hint).toContainText("Catppuccin Latte");
+  await expect(hint).toContainText("GitHub Light");
   await page.getByRole("button", { name: "Dismiss suggestion" }).click();
   await expect(hint).toHaveCount(0);
   expect(await raw("appearance.theme_light")).toBe("gruvbox-light");
@@ -169,7 +169,7 @@ test("a light preview inside the dark window renders with the light rules", asyn
   await expect(html(page)).toHaveClass(/\bdark\b/);
   const thread = page.getByTestId("gallery-thread");
   const t = themeById.get("solarized-light");
-  // Every syntax colour is the scope's, not the window's dark aliases or Mocha's patch.
+  // Every syntax colour is the scope's, not the window's dark aliases or its theme's patch.
   for (const k of ["--syn-kw", "--syn-com", "--syn-fn"])
     expect(await thread.evaluate((el, key) => getComputedStyle(el).getPropertyValue(key).trim(), k)).toBe(t?.vars[k]);
   // dark: utilities stay off: a shadcn Input is transparent in light (dark:bg-input/30 in dark).
@@ -181,12 +181,12 @@ test("the scheme control writes appearance.theme and the slot in use follows", a
   await openFromPalette(page);
   await page.getByTestId("themes-scheme").getByRole("radio", { name: "Light" }).click();
   await expect.poll(() => raw("appearance.theme")).toBe("light");
-  await expect(html(page)).toHaveAttribute("data-theme", "catppuccin-latte");
+  await expect(html(page)).toHaveAttribute("data-theme", "github-light");
   await expect(page.getByTestId("themes-slot-light")).toContainText("in use");
-  await expect(page.getByTestId("themes-scheme-note")).toHaveText("Always light, showing Catppuccin Latte");
+  await expect(page.getByTestId("themes-scheme-note")).toHaveText("Always light, showing GitHub Light");
   await page.getByTestId("themes-scheme").getByRole("radio", { name: "System" }).click();
   await expect.poll(() => raw("appearance.theme")).toBe("system");
-  await expect(html(page)).toHaveAttribute("data-theme", "catppuccin-mocha");
+  await expect(html(page)).toHaveAttribute("data-theme", "github-dark");
 });
 
 test("theme pick from the CLI (ShowView themes.light) opens the page on that slot; Settings' Themes link opens it too", async ({ page }) => {
@@ -201,7 +201,7 @@ test("theme pick from the CLI (ShowView themes.light) opens the page on that slo
 
   await page.keyboard.press("Meta+Comma");
   // The slot selects name the theme whole: no " (default)" beside the Choose… button.
-  for (const [key, name] of [["appearance.theme_dark", "Catppuccin Mocha"], ["appearance.theme_light", "Catppuccin Latte"]] as const)
+  for (const [key, name] of [["appearance.theme_dark", "GitHub Dark"], ["appearance.theme_light", "GitHub Light"]] as const)
     await expect(page.locator(`[data-setting="${key}"] [data-slot="select-trigger"]`)).toHaveText(name);
   await page.getByTestId("settings-themes-link").click();
   await expect(page$(page)).toBeVisible();

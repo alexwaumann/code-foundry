@@ -15,8 +15,8 @@ afterEach(() => {
 });
 
 describe("theme slots", () => {
-  it("default to Catppuccin", () => {
-    expect(themeSlots()).toEqual({ light: "catppuccin-latte", dark: "catppuccin-mocha" });
+  it("default to GitHub", () => {
+    expect(themeSlots()).toEqual({ light: "github-light", dark: "github-dark" });
   });
 
   it.each([
@@ -31,9 +31,9 @@ describe("theme slots", () => {
   });
 
   it("a missing key keeps that slot", () => {
-    setThemeSlots({ light: "github-light" });
+    setThemeSlots({ light: "atom-one-light" });
     setThemeSlots({ dark: "nord" });
-    expect(themeSlots()).toEqual({ light: "github-light", dark: "nord" });
+    expect(themeSlots()).toEqual({ light: "atom-one-light", dark: "nord" });
   });
 
   it("the active theme is the effective scheme's slot", () => {
@@ -49,17 +49,17 @@ describe("syncDocumentScheme", () => {
   it("sets data-theme, the dark class and color-scheme, and follows slot and preference changes", () => {
     stop = syncDocumentScheme();
     // jsdom has no matchMedia: the system scheme is dark.
-    expect(root.dataset.theme).toBe("catppuccin-mocha");
+    expect(root.dataset.theme).toBe("github-dark");
     expect(root.classList.contains("dark")).toBe(true);
     expect(root.style.colorScheme).toBe("dark");
 
     setThemePreference("light");
-    expect(root.dataset.theme).toBe("catppuccin-latte");
+    expect(root.dataset.theme).toBe("github-light");
     expect(root.classList.contains("dark")).toBe(false);
     expect(root.style.colorScheme).toBe("light");
 
-    setThemeSlots({ light: "github-light" });
-    expect(root.dataset.theme).toBe("github-light");
+    setThemeSlots({ light: "rose-pine-dawn" });
+    expect(root.dataset.theme).toBe("rose-pine-dawn");
   });
 
   it("follows the macOS appearance under the system preference", () => {
@@ -74,10 +74,10 @@ describe("syncDocumentScheme", () => {
     }));
     try {
       stop = syncDocumentScheme();
-      expect(root.dataset.theme).toBe("catppuccin-mocha");
+      expect(root.dataset.theme).toBe("github-dark");
       light = true;
       for (const l of listeners) l();
-      expect(root.dataset.theme).toBe("catppuccin-latte");
+      expect(root.dataset.theme).toBe("github-light");
     } finally {
       stop();
       stop = () => {};

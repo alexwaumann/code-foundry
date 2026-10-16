@@ -380,7 +380,7 @@ export function buildCatalog(inputs: Inputs): CatalogTheme[] {
     } else throw new Error(`${id}: neither ghostty nor graphite`);
     out.push({ id, name: o.name, scheme, ...(o.pair ? { pair: o.pair } : {}), source, vars });
   }
-  // Dark first, then light; overrides.json order within each (Catppuccin first).
+  // Dark first, then light; overrides.json order within each (the default, GitHub, first).
   return [...out.filter((t) => t.scheme === "dark"), ...out.filter((t) => t.scheme === "light")];
 }
 

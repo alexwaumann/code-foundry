@@ -93,7 +93,7 @@ export function useColorScheme(): ColorScheme {
   return useSyncExternalStore(subscribe, effectiveScheme, () => "dark");
 }
 
-/** The theme id used for each scheme (Settings fills them; Catppuccin by default). */
+/** The theme id used for each scheme (Settings fills them; GitHub Dark and Light by default). */
 export interface ThemeSlots {
   readonly light: string;
   readonly dark: string;
@@ -110,7 +110,7 @@ function validSlot(id: string | undefined, scheme: ColorScheme): string {
 
 /**
  * Sets the light and dark theme slots. An id that is unknown, or a theme of the other
- * scheme, falls back to that slot's default (catppuccin-latte / catppuccin-mocha); a
+ * scheme, falls back to that slot's default (github-light / github-dark); a
  * missing key keeps the slot as it is.
  */
 export function setThemeSlots(next: { light?: string; dark?: string }): void {
