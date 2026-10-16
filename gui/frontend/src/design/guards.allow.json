@@ -1,11 +1,3 @@
 {
-  "gui/frontend/src/components/addproject/GitHubTab.tsx": { "size": 17, "leading": 0, "radius": 1 },
-  "gui/frontend/src/components/addproject/LocalFolderTab.tsx": { "size": 3, "leading": 0, "radius": 0 },
-  "gui/frontend/src/components/addproject/NewTab.tsx": { "size": 4, "leading": 0, "radius": 0 },
-  "gui/frontend/src/components/settings/SettingRow.tsx": { "size": 8, "leading": 0, "radius": 3 },
-  "gui/frontend/src/components/settings/SettingsPage.tsx": { "size": 13, "leading": 0, "radius": 0 },
-  "gui/frontend/src/components/settings/VolumeEditor.tsx": { "size": 1, "leading": 0, "radius": 0 },
-  "gui/frontend/src/components/themes/ThemeChip.tsx": { "size": 1, "leading": 0, "radius": 1 },
-  "gui/frontend/src/components/themes/ThemeGallery.tsx": { "size": 30, "leading": 0, "radius": 1 },
-  "gui/frontend/src/components/themes/ThemesPage.tsx": { "size": 13, "leading": 0, "radius": 0 }
+
 }

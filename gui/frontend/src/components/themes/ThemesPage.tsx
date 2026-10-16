@@ -108,7 +108,7 @@ export function ThemesPage() {
   return (
     <section className="flex min-h-0 flex-1 flex-col" aria-label="Themes" data-testid="themes-page" data-keys-local onKeyDown={onKeyDown}>
       <PaneHeader className="gap-3 px-4">
-        <h1 className="text-sm font-semibold">Themes</h1>
+        <h1 className="text-heading">Themes</h1>
         <Button variant="ghost" size="icon-xs" className="ml-auto [--wails-draggable:no-drag]" aria-label="Close themes" onClick={closeThemes}>
           <X />
         </Button>
@@ -127,7 +127,7 @@ export function ThemesPage() {
               onChange={(e) => {
                 setPickerQuery(e.target.value);
               }}
-              className="h-8 pr-8 pl-7 text-[13px]"
+              className="h-8 pr-8 pl-7 text-body-sm"
             />
             {!query && (
               <Kbd size="sm" className="absolute top-1/2 right-5 mt-0.5 -translate-y-1/2">
@@ -147,9 +147,9 @@ export function ThemesPage() {
             {list.map((t) => (
               <ThemeRow key={t.id} theme={t} previewed={t.id === shownId} current={t.id === slots[slot]} />
             ))}
-            {list.length === 0 && <p className="px-2 py-3 text-xs text-muted-foreground">No {slot} themes match “{query}”.</p>}
+            {list.length === 0 && <p className="px-2 py-3 text-caption">No {slot} themes match “{query}”.</p>}
           </div>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-pane-border px-3 py-2 text-[11px] text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-pane-border px-3 py-2 text-caption-sm">
             <span className="flex items-center gap-1">
               <Kbd size="sm">↑</Kbd>
               <Kbd size="sm">↓</Kbd> preview
@@ -192,7 +192,7 @@ function ThemeRow({ theme, previewed, current }: { theme: Theme; previewed: bool
       data-theme-id={theme.id}
       data-current={current || undefined}
       className={cn(
-        "flex h-9 cursor-default items-center gap-2.5 rounded-md px-2 text-[13px] select-none",
+        "flex h-9 cursor-default items-center gap-2.5 rounded-md px-2 text-body-sm select-none",
         previewed ? "bg-accent text-accent-foreground" : "hover:bg-accent/50",
       )}
       onClick={() => {
@@ -225,7 +225,7 @@ function ControlBar({ slot, slots }: { slot: ThemeSlot; slots: { dark: string; l
   return (
     <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-pane-border px-4 py-2.5" data-testid="themes-controls">
       <div className="flex items-center gap-2">
-        <span className="text-xs text-muted-foreground">Scheme</span>
+        <span className="text-caption">Scheme</span>
         <RadioGroup variant="segmented" value={pref} onValueChange={save} aria-label="Scheme" data-testid="themes-scheme">
           <RadioGroupChoice value="system">
             <Monitor /> System
@@ -243,7 +243,7 @@ function ControlBar({ slot, slots }: { slot: ThemeSlot; slots: { dark: string; l
           <SlotChip key={s} slot={s} theme={themeOf(slots[s])} editing={s === slot} inUse={s === scheme} />
         ))}
       </div>
-      <p className="min-w-0 truncate text-xs text-muted-foreground" data-testid="themes-scheme-note">
+      <p className="min-w-0 truncate text-caption" data-testid="themes-scheme-note">
         {schemeNote(pref, scheme, themeOf(slots[scheme]).name)}
       </p>
     </div>
@@ -265,10 +265,10 @@ function SlotChip({ slot, theme, editing, inUse }: { slot: ThemeSlot; theme: The
     >
       <Icon className="text-muted-foreground" />
       <span className="text-muted-foreground">{SLOT_LABEL[slot]}:</span>
-      <ThemeAa theme={theme} className="h-4 w-6 text-[10px]" />
+      <ThemeAa theme={theme} className="h-4 w-6" />
       <span className="font-medium">{theme.name}</span>
       {inUse && (
-        <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
+        <Badge variant="secondary" className="px-1.5 py-0">
           in use
         </Badge>
       )}
@@ -280,7 +280,7 @@ function PreviewBar({ slot, shown, current, previewing }: { slot: ThemeSlot; sho
   const applying = useThemePickerStore((s) => s.applying);
   return (
     <div className="flex h-11 shrink-0 items-center gap-2 border-b border-pane-border px-4" data-testid="themes-preview-bar">
-      <span className="truncate text-[13px]">
+      <span className="truncate text-body-sm">
         <span className="text-muted-foreground">{previewing ? "Previewing " : "Current: "}</span>
         <span className="font-medium" data-testid="themes-previewed-name">
           {shown.name}
@@ -288,7 +288,7 @@ function PreviewBar({ slot, shown, current, previewing }: { slot: ThemeSlot; sho
       </span>
       {previewing && (
         <>
-          <span className="truncate text-xs text-muted-foreground">· {SLOT_LABEL[slot].toLowerCase()} is {current.name}</span>
+          <span className="truncate text-caption">· {SLOT_LABEL[slot].toLowerCase()} is {current.name}</span>
           <Button variant="link" size="xs" className="px-1" onClick={resetPreview} data-testid="themes-reset">
             Back to current
           </Button>
@@ -310,9 +310,9 @@ function PairHintLine({ slots }: { slots: { dark: string; light: string } }) {
   if (!hint || slots[hint.slot] === hint.themeId) return null;
   const pair = themeOf(hint.themeId);
   return (
-    <div className="flex shrink-0 items-center gap-2 border-b border-pane-border px-4 py-2 text-xs" role="status" data-testid="themes-pair-hint">
+    <div className="flex shrink-0 items-center gap-2 border-b border-pane-border px-4 py-2 text-body-sm" role="status" data-testid="themes-pair-hint">
       <Link2 className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-      <ThemeAa theme={pair} className="h-4 w-6 text-[10px]" />
+      <ThemeAa theme={pair} className="h-4 w-6" />
       <span className="min-w-0 truncate text-muted-foreground">
         <span className="text-foreground">{pair.name}</span> is this theme&rsquo;s {hint.slot} companion. Use it for {hint.slot}?
       </span>
