@@ -87,9 +87,9 @@
  *   POST /__mock/settings/external?appearance.font_size=18   (a hand edit; "" deletes a key)
  *   POST /__mock/settings/external?loadError=…               (the file stops parsing)
  *   GET  /__mock/update
- *   POST /__mock/update/state?state=idle|available|downloading|installed|restartRequired|failed&version=v0.2.0[&reason=…]
+ *   POST /__mock/update/state?state=idle|available|downloading|downloaded|installed|restartRequired|failed&version=v0.2.0[&reason=…]
  *   POST /__mock/update/latest?version=v0.2.0     (what the next check finds)
- *   POST /__mock/update/fail?reason=…             (the next install fails)
+ *   POST /__mock/update/fail?reason=…             (the next download fails)
  *   POST /__mock/update/disabled?reason=dev%20build
  *        app.restart (Restart Now) and daemon.restart come back as the installed version;
  *        GET /__mock/update counts app.restart runs (restarts)
@@ -439,6 +439,7 @@ function routes(router: ConnectRouter): void {
   router.service(UpdateService, {
     get: () => ({ status: world.update.msg() }),
     check: () => guard(() => (world.update.check(), { status: world.update.msg() })),
+    download: () => guard(() => (world.update.download(), { status: world.update.msg() })),
     install: () => guard(() => (world.update.install(), { status: world.update.msg() })),
     relaunch: () => ({ delivered: world.update.relaunch() }),
     watch: (_req, ctx) => tracked("UpdateService/Watch", updateEvents(world.events.subscribe(ctx.signal, [{ source: EventSource.UPDATE, event: { event: { case: "update", value: world.update.event() } } }]))),
@@ -529,7 +530,7 @@ function updateControl(res: ServerResponse, action: string, q: URLSearchParams):
       }
       u.set(state, state === UpdateState.IDLE ? "" : (q.get("version") ?? "v0.2.0"), {
         failureReason: q.get("reason") ?? (state === UpdateState.FAILED ? "installer: exit status 1: error: checksum mismatch" : ""),
-        progress: state === UpdateState.DOWNLOADING ? "==> downloading CodeFoundry-darwin-arm64.zip" : "",
+        progress: state === UpdateState.DOWNLOADING ? "==> downloading code-foundry-darwin-arm64.tar.gz" : "",
         currentVersion: q.get("current") ?? u.status.currentVersion,
         lastCheckedAt: new Date(),
       });
