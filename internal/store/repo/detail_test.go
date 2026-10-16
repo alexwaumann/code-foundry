@@ -3,6 +3,7 @@ package repo
 import (
 	"context"
 	"errors"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -85,6 +86,22 @@ func TestMergeFiles(t *testing.T) {
 	if trunc || !slices.Equal(got, want) {
 		t.Errorf("got %+v\nwant %+v", got, want)
 	}
+
+	// A conflicted path arrives twice, as the diff's M and then as U (fillDetail
+	// appends the unmerged paths): one entry, U, with its counts, order unchanged.
+	conflicted := append(slices.Clone(uncommitted), nameStatus{status: "U", path: "both.go"}, nameStatus{status: "U", path: "gone.go"})
+	got, _ = mergeFiles(committed, conflicted, counts, nil)
+	want = []FileChange{
+		{Path: "b", OldPath: "a", Status: "R"},
+		{Path: "both.go", Status: "U", Added: 2, Deleted: 1, Uncommitted: true},
+		{Path: "gone.go", Status: "U", Uncommitted: true},
+		{Path: "new.go", Status: "A", Added: 5},
+		{Path: "wt-deleted.go", Status: "D", Deleted: 9, Uncommitted: true},
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("conflicts: got %+v\nwant %+v", got, want)
+	}
+
 	many := make([]string, DetailFilesMax+5)
 	for i := range many {
 		many[i] = strings.Repeat("x", 1+i%7) + string(rune('a'+i%26)) + "/" + time.Duration(i).String()
@@ -202,6 +219,77 @@ func TestWorktreeDetail(t *testing.T) {
 
 	if _, err := h.store.WorktreeDetail(ctx, r.ID, "/nope"); !errors.Is(err, ErrNotFound) {
 		t.Errorf("unknown worktree err = %v", err)
+	}
+}
+
+// TestWorktreeDetailConflicts stops a real rebase on a conflict: the conflicted file is
+// U (the uncommitted diff alone says M), a cleanly applied file of the same pick keeps
+// its own status, and after --abort the file is back to M.
+func TestWorktreeDetailConflicts(t *testing.T) {
+	f := newFixture(t)
+	h := startHarness(t, "", Options{})
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	r, err := h.store.Register(ctx, f.repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wt, err := h.store.CreateWorktree(ctx, CreateWorktreeOptions{RepoID: r.ID, Branch: "feat"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := wt.Path
+	// feat 1 edits README and adds g.txt; main changes README the other way.
+	writeFile(t, filepath.Join(p, "README.md"), "feat\n")
+	writeFile(t, filepath.Join(p, "g.txt"), "g\n")
+	git(t, p, "add", ".")
+	git(t, p, "commit", "-q", "-m", "feat 1")
+	writeFile(t, filepath.Join(f.repo, "README.md"), "main\n")
+	git(t, f.repo, "commit", "-q", "-am", "main change")
+
+	gitFails(t, p, "rebase", "main")
+	if err := h.store.Refresh(ctx, r.ID); err != nil {
+		t.Fatal(err)
+	}
+	if w, _ := h.store.Snapshot().Worktree(r.ID, p); w.Status.Conflicted != 1 {
+		t.Fatalf("status = %+v, want one conflict", w.Status)
+	}
+	d, err := h.store.WorktreeDetail(ctx, r.ID, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	statuses := func(d WorktreeDetail) map[string]string {
+		m := map[string]string{}
+		for _, f := range d.Files {
+			m[f.Path] = f.Status
+		}
+		return m
+	}
+	readme := slices.IndexFunc(d.Files, func(f FileChange) bool { return f.Path == "README.md" })
+	if got := statuses(d); len(d.Files) != 2 || readme < 0 || got["README.md"] != "U" || got["g.txt"] != "A" {
+		t.Fatalf("files during the rebase = %+v", d.Files)
+	}
+	if rf := d.Files[readme]; !rf.Uncommitted || rf.Added == 0 {
+		t.Errorf("conflicted README lost its counts: %+v", rf)
+	}
+
+	for len(h.sub.C()) > 0 {
+		<-h.sub.C()
+	}
+	git(t, p, "rebase", "--abort")
+	if err := h.store.Refresh(ctx, r.ID); err != nil {
+		t.Fatal(err)
+	}
+	h.waitFor("detail after the abort", func(ev Event) bool {
+		u, ok := ev.(WorktreeDetailUpdated)
+		if !ok || u.Path != p {
+			return false
+		}
+		d, _ = h.store.WorktreeDetail(ctx, r.ID, p)
+		return statuses(d)["README.md"] == "M"
+	})
+	if got := statuses(d); got["g.txt"] != "A" || slices.Contains(slices.Collect(maps.Values(got)), "U") {
+		t.Errorf("files after the abort = %+v", d.Files)
 	}
 }
 

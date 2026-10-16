@@ -109,8 +109,12 @@ type wtSlot struct {
 	cur atomic.Pointer[Worktree]
 	// base memoizes the last base ahead/behind by (HEAD, base sha); written only by
 	// the status job.
-	base  atomic.Pointer[baseCount]
-	admin string // linked worktree admin dir; guarded by Git.mu
+	base atomic.Pointer[baseCount]
+	// unmerged is the conflicted paths from the last successful status (nil when
+	// none), which the detail job marks U; written only by the status job. It is kept
+	// off Status, which is compared with ==.
+	unmerged atomic.Pointer[[]string]
+	admin    string // linked worktree admin dir; guarded by Git.mu
 	// gitDir is the worktree's git admin dir (worktreeAdminDir), where the status job
 	// reads operation markers (operation.go). Resolved by reconcile; guarded by Git.mu.
 	gitDir string
@@ -1088,6 +1092,9 @@ func (g *Git) status(ctx context.Context, repoID, path string) {
 
 	if g.slot(repoID, path) != slot {
 		return // removed while we ran
+	}
+	if err == nil {
+		slot.unmerged.Store(&info.Unmerged) // a failed refresh keeps the last list, like Status
 	}
 	slot.cur.Store(&next)
 	changed := next.Branch != prev.Branch || next.Head != prev.Head || next.Detached != prev.Detached ||
