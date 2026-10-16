@@ -400,7 +400,7 @@ export function goCatalogJson(catalog: CatalogTheme[]): string {
 /**
  * The attribute that makes any element a theme scope: `<div data-theme-scope
  * data-theme="dracula">` paints its subtree in Dracula whatever <html> shows (the Themes
- * page's gallery previews a theme this way, components/themes/ThemePreview.tsx).
+ * page's gallery previews a theme this way, components/themes/ThemeScope.tsx).
  */
 export const THEME_SCOPE_ATTR = "data-theme-scope";
 

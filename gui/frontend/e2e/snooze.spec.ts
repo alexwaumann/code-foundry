@@ -171,7 +171,14 @@ test("snoozing a working thread from the header asks first; it then drops its pa
   const until = new Date(confirmed[1]?.args.until ?? "");
   expect([until.getHours(), until.getMinutes()]).toEqual([9, 0]);
 
-  // Still selected: the composer, with "Snoozed until <day> 9:00 AM" and Unsnooze above the prompt.
+  // It was the selected thread, so the window lands on the dashboard (#119,
+  // docs/notes/put-away-focuses-dashboard.md), its panels dropped.
+  await expect(page.getByTestId("start-heading")).toBeVisible();
+  await expect(page.getByTestId("thread-pane")).toHaveCount(0);
+  await expect(page.getByTestId("sidebar-dashboard")).toHaveAttribute("aria-current", "page");
+  // Opened from the Snoozed section: the composer, with "Snoozed until <day> 9:00 AM" and Unsnooze above the prompt.
+  await page.getByTestId("snoozed-header").click();
+  await row(page, "s:s-1").click();
   await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-session-id", "s-1");
   const card = page.getByTestId("thread-composer");
   const note = card.getByTestId("thread-snooze-note");
@@ -275,6 +282,12 @@ test("a wake brings the thread back needing attention: Snooze ended in amber, co
   await page.getByTestId("pane-snooze-presets").locator('[data-preset="3h"]').click();
   await expect(page.getByTestId("snoozed-count")).toHaveText("2");
   await expect(bell.getByTestId("attention-badge")).toHaveText("1");
+  // Snoozing the selected thread selects the dashboard (#119); open it from the Snoozed section.
+  await expect(page.getByTestId("start-heading")).toBeVisible();
+  await expect(page.getByTestId("thread-pane")).toHaveCount(0);
+  await page.getByTestId("snoozed-header").click();
+  await row(page, "s:s-8").click();
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-session-id", "s-8");
   await expect(card.getByTestId("thread-snoozed")).toHaveText(/^Snoozed until (\w{3} )?\d{1,2}:\d\d [AP]M$/);
   // A message unsnoozes (the daemon's rule) and gets its answer.
   await card.getByTestId("composer-input").click();

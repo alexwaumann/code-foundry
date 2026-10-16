@@ -150,14 +150,23 @@ test("archiving a working thread asks first (the daemon's confirmation); it then
   await expect(page.getByTestId("archived-count")).toHaveText("2");
   await expect(page.getByTestId("working-count")).toHaveText("1");
   await expect(row(page, "s:s-1")).toHaveCount(0);
-  // Still selected: the pane shows it with its composer, as before.
-  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-session-id", "s-1");
-  await expect(page.getByTestId("thread-composer")).toBeVisible();
+  // It was the selected thread, so the window lands on the dashboard (#119,
+  // docs/notes/put-away-focuses-dashboard.md).
+  await expect(page.getByTestId("start-heading")).toBeVisible();
+  await expect(page.getByTestId("thread-pane")).toHaveCount(0);
+  await expect(page.getByTestId("sidebar-dashboard")).toHaveAttribute("aria-current", "page");
   await expect(page.getByTestId("side-panel")).toHaveCount(0);
   await expect(page.getByTestId("bottom-panel")).toHaveCount(0);
   expect(
     await page.evaluate(`import("/src/stores/panel.ts").then((m) => m.usePanelStore.getState().byKey["session:s-1"])`),
   ).toEqual({ open: false, tabs: [], activeTabId: null });
+  // Opened again from the Archived section: its composer, and neither panel comes back.
+  await page.getByTestId("archived-header").click();
+  await row(page, "s:s-1").click();
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-session-id", "s-1");
+  await expect(page.getByTestId("thread-composer")).toBeVisible();
+  await expect(page.getByTestId("side-panel")).toHaveCount(0);
+  await expect(page.getByTestId("bottom-panel")).toHaveCount(0);
   // The header button now unarchives.
   await expect(page.getByTestId("thread-header").getByRole("button", { name: "Unarchive Thread" })).toBeVisible();
   const confirmed = (await invocations()).filter((i) => i.name === "session.archive");
