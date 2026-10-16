@@ -22,7 +22,7 @@ package termlabel
 const (
 	// Kind says what started the terminal: KindShell or KindAction.
 	Kind = "kind"
-	// Thread is the id of the thread (thread) the terminal belongs to.
+	// Thread is the id of the thread the terminal belongs to.
 	Thread = "thread"
 	// Repo is the id of the registered repository whose worktree the terminal belongs to.
 	Repo = "repo"

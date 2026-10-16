@@ -295,7 +295,7 @@ func RegisterPullRequestThreads(r *Registry, d PullRequestThreadDeps) error {
 		Command{
 			Name:        "pr.ask",
 			Title:       "Ask About Pull Request",
-			Description: "Start a Claude thread that answers a question about a pull request without changing code.",
+			Description: "Start a thread that answers a question about a pull request without changing code.",
 			Category:    "Pull Request",
 			Args: []ArgSpec{slug, number,
 				{Name: "question", Type: String, Required: true, Positional: true, Description: "What to ask"},
@@ -315,7 +315,7 @@ func RegisterPullRequestThreads(r *Registry, d PullRequestThreadDeps) error {
 		Command{
 			Name:        "pr.explain",
 			Title:       "Explain Pull Request",
-			Description: "Start a Claude thread that walks through a pull request for a first-time reviewer.",
+			Description: "Start a thread that walks through a pull request for a first-time reviewer.",
 			Category:    "Pull Request",
 			Args:        []ArgSpec{slug, number, worktree, model, effort},
 			When:        hasPullRequest,
@@ -328,7 +328,7 @@ func RegisterPullRequestThreads(r *Registry, d PullRequestThreadDeps) error {
 		Command{
 			Name:        "pr.fix.findings",
 			Title:       "Fix Pull Request Findings",
-			Description: "Start a Claude thread on the pull request's branch that fixes its unresolved review comments and failing checks.",
+			Description: "Start a thread on the pull request's branch that fixes its unresolved review comments and failing checks.",
 			Category:    "Pull Request",
 			Args:        []ArgSpec{slug, number, worktree, model, effort},
 			When:        hasPullRequest,
