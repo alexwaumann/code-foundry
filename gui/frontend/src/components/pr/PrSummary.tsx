@@ -28,7 +28,7 @@ function Section({ tabKey, section, title, count, extra, children, testId }: { t
         <button
           type="button"
           aria-expanded={open}
-          className="-ml-1 flex items-center gap-1 rounded px-1 text-[13px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+          className="-ml-1 flex items-center gap-1 rounded-sm px-1 text-label text-muted-foreground outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
           onClick={() => {
             toggleSection(tabKey, section);
           }}
@@ -60,7 +60,7 @@ function Reviewer({ r }: { r: PullRequestReviewerView }) {
   return (
     <Tip label={label ? `${r.login}: ${label}` : null}>
       <span
-        className={cn("inline-flex h-6 max-w-full min-w-0 items-center gap-1.5 rounded-full border border-border bg-muted/40 pr-2 pl-0.5 text-xs", r.stale && "opacity-70")}
+        className={cn("inline-flex h-6 max-w-full min-w-0 items-center gap-1.5 rounded-full border border-border bg-muted/40 pr-2 pl-0.5 text-body-sm", r.stale && "opacity-70")}
         data-testid="pr-reviewer"
         data-login={r.login}
         data-status={status}
@@ -80,7 +80,7 @@ function Reviewer({ r }: { r: PullRequestReviewerView }) {
 function Row({ icon: Icon, label, children, testId }: { icon: typeof Users; label: string; children: ReactNode; testId: string }) {
   return (
     <div className="flex min-h-7 items-start gap-3 @max-[340px]:flex-col @max-[340px]:gap-0" data-testid={testId}>
-      <span className="flex h-7 w-24 shrink-0 items-center gap-2 text-[13px] text-muted-foreground">
+      <span className="flex h-7 w-24 shrink-0 items-center gap-2 text-caption">
         <Icon className="size-4" aria-hidden />
         {label}
       </span>
@@ -102,15 +102,15 @@ function CheckRow({ c, now }: { c: CheckView; now: number }) {
         <button
           type="button"
           disabled={!c.url}
-          className="group flex h-7 w-full items-center gap-2 rounded-md px-1.5 text-left text-[13px] outline-none enabled:hover:bg-accent/60 focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-default"
+          className="group flex h-7 w-full items-center gap-2 rounded-md px-1.5 text-left text-body-sm outline-none enabled:hover:bg-accent/60 focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-default"
           data-testid="pr-check"
           data-tone={tone}
           onClick={() => void openUrl(c.url)}
         >
           <Icon className={cn("size-3.5 shrink-0", toneText[tone], tone === "pending" && c.status === "in_progress" && "animate-pulse")} aria-label={tone} />
           <span className="min-w-0 truncate">{c.name}</span>
-          {c.workflow && <span className="min-w-0 shrink truncate text-xs text-muted-foreground">{c.workflow}</span>}
-          <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums" data-testid="pr-check-meta">
+          {c.workflow && <span className="min-w-0 shrink truncate text-caption">{c.workflow}</span>}
+          <span className="ml-auto shrink-0 text-caption tabular-nums" data-testid="pr-check-meta">
             {checkMeta(c, now)}
           </span>
           <ExternalLink className={cn("size-3 shrink-0 text-muted-foreground opacity-0", c.url && "group-hover:opacity-100")} aria-hidden />
@@ -123,7 +123,7 @@ function CheckRow({ c, now }: { c: CheckView; now: number }) {
 function Checks({ d }: { d: PullRequestDetailView }) {
   // Tick every second only while a running check's duration grows.
   const now = useNow(d.checks.some(checkRunning) ? 1000 : 30_000);
-  if (d.checks.length === 0) return <p className="text-[13px] text-muted-foreground">No checks on the head commit.</p>;
+  if (d.checks.length === 0) return <p className="text-caption">No checks on the head commit.</p>;
   return (
     <>
       <ul className="-mx-1.5 flex flex-col" data-testid="pr-checks-list">
@@ -138,7 +138,7 @@ function Checks({ d }: { d: PullRequestDetailView }) {
 
 function Notice({ children }: { children: ReactNode }) {
   return (
-    <p className="mt-1.5 text-xs text-muted-foreground" data-testid="pr-truncated">
+    <p className="mt-1.5 text-caption" data-testid="pr-truncated">
       {children}
     </p>
   );
@@ -146,14 +146,14 @@ function Notice({ children }: { children: ReactNode }) {
 
 function CommentHeader({ c, now, verb }: { c: PullRequestCommentView; now: number; verb?: ReactNode }) {
   return (
-    <div className="flex min-w-0 items-start gap-1.5 text-xs">
+    <div className="flex min-w-0 items-start gap-1.5 text-body-sm">
       <Avatar login={c.author} src={c.authorAvatarUrl} size={20} />
       {/* The verb and age wrap under a long login instead of cutting it short. */}
       <span className="flex min-h-5 min-w-0 flex-1 flex-wrap items-center gap-x-1.5">
         <span className="max-w-full min-w-0 truncate font-medium text-foreground" data-testid="pr-comment-author">
           {c.author || "ghost"}
         </span>
-        {c.authorIsBot && <span className="rounded border px-1 text-[10px] text-muted-foreground">bot</span>}
+        {c.authorIsBot && <span className="rounded-sm border px-1 text-caption-sm">bot</span>}
         {verb}
         <Tip label={c.createdAtMs === null ? null : new Date(c.createdAtMs).toLocaleString()}>
           <span className="whitespace-nowrap text-muted-foreground">{ago(c.createdAtMs, now)}</span>
@@ -163,7 +163,7 @@ function CommentHeader({ c, now, verb }: { c: PullRequestCommentView; now: numbe
         <Tip label="Open on GitHub">
           <button
             type="button"
-            className="ml-auto flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 outline-none group-hover:opacity-100 hover:bg-accent hover:text-foreground focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-ring"
+            className="ml-auto flex size-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground opacity-0 outline-none group-hover:opacity-100 hover:bg-accent hover:text-foreground focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-ring"
             aria-label="Open on GitHub"
             onClick={() => void openUrl(c.url)}
           >
@@ -187,8 +187,8 @@ function Comment({ c, now }: { c: PullRequestCommentView; now: number }) {
   return (
     <article className="group flex flex-col gap-1.5 py-2" data-testid="pr-comment" data-kind={c.kind}>
       <CommentHeader c={c} now={now} verb={verb} />
-      {c.path && <span className="pl-[26px] font-mono text-xs text-muted-foreground">{c.path}</span>}
-      {c.body ? <Markdown className="pl-[26px]">{c.body}</Markdown> : <p className="pl-[26px] text-xs text-muted-foreground italic">No comment.</p>}
+      {c.path && <span className="pl-[26px] text-caption font-mono">{c.path}</span>}
+      {c.body ? <Markdown className="pl-[26px]">{c.body}</Markdown> : <p className="pl-[26px] text-caption italic">No comment.</p>}
     </article>
   );
 }
@@ -197,7 +197,7 @@ function Badge({ children, tone }: { children: ReactNode; tone: "success" | "pen
   return (
     <span
       className={cn(
-        "rounded-full border px-1.5 text-[10px] leading-4",
+        "rounded-full border px-1.5 text-caption-sm",
         tone === "success" && "border-success/30 text-success",
         tone === "pending" && "border-warning/30 text-warning",
         tone === "neutral" && "border-border text-muted-foreground",
@@ -214,7 +214,7 @@ const baseOf = (path: string): string => path.slice(path.lastIndexOf("/") + 1);
 function Thread({ t, now }: { t: ReviewThreadView; now: number }) {
   return (
     <article className={cn("my-1.5 rounded-lg border border-border", t.isResolved && "opacity-75")} data-testid="pr-thread" data-resolved={t.isResolved} data-outdated={t.isOutdated}>
-      <header className="flex items-center gap-2 border-b border-border px-2.5 py-1.5 text-xs">
+      <header className="flex items-center gap-2 border-b border-border px-2.5 py-1.5 text-body-sm">
         <FileCode2 className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
         {/* The directory gives way first, so the file and line stay readable. */}
         <Tip label={threadLocation(t)} whenTruncated align="start">
@@ -235,7 +235,7 @@ function Thread({ t, now }: { t: ReviewThreadView; now: number }) {
             {c.body && <Markdown className="pl-[26px]">{c.body}</Markdown>}
           </div>
         ))}
-        {t.commentsTruncated && <p className="py-1.5 text-xs text-muted-foreground">More replies on GitHub.</p>}
+        {t.commentsTruncated && <p className="py-1.5 text-caption">More replies on GitHub.</p>}
       </div>
     </article>
   );
@@ -243,7 +243,7 @@ function Thread({ t, now }: { t: ReviewThreadView; now: number }) {
 
 function Conversation({ items }: { items: ConversationItem[] }) {
   const now = useNow(30_000);
-  if (items.length === 0) return <p className="text-[13px] text-muted-foreground">No comments yet.</p>;
+  if (items.length === 0) return <p className="text-caption">No comments yet.</p>;
   return (
     <VirtualStack
       items={items}
@@ -264,7 +264,7 @@ function OrderToggle({ tabKey, which, compact = false }: { tabKey: string; which
     <Tip label={label} whenTruncated>
       <button
         type="button"
-        className="flex h-6 shrink-0 items-center gap-1 rounded px-1.5 text-xs whitespace-nowrap text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+        className="flex h-6 shrink-0 items-center gap-1 rounded-sm px-1.5 text-caption whitespace-nowrap outline-none hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
         data-testid={which === "commentOrder" ? "pr-comment-order" : "pr-timeline-order"}
         data-order={order}
         onClick={() => {
@@ -288,16 +288,16 @@ export function PrSummary({ d, prRef, tabKey }: { d: PullRequestDetailView; prRe
     <div className="flex flex-col pb-6" data-testid="pr-summary">
       <div className="flex flex-col gap-1 px-4 pt-3 pb-2">
         <Row icon={Users} label="Reviewers" testId="pr-reviewers">
-          {d.reviewers.length === 0 && <span className="text-[13px] text-muted-foreground">None</span>}
+          {d.reviewers.length === 0 && <span className="text-caption">None</span>}
           {d.reviewers.map((r) => (
             <Reviewer key={r.login} r={r} />
           ))}
-          {d.reviewersTruncated && <span className="text-xs text-muted-foreground" data-testid="pr-truncated">and more on GitHub</span>}
+          {d.reviewersTruncated && <span className="text-caption" data-testid="pr-truncated">and more on GitHub</span>}
           <ReviewerPicker prRef={prRef} canUpdate={d.viewerCanUpdate} />
         </Row>
       </div>
       <Section tabKey={tabKey} section="description" title="Description" testId="pr-description">
-        {d.body.trim() ? <Markdown>{d.body}</Markdown> : <p className="text-[13px] text-muted-foreground italic">No description provided.</p>}
+        {d.body.trim() ? <Markdown>{d.body}</Markdown> : <p className="text-caption italic">No description provided.</p>}
       </Section>
       <Section tabKey={tabKey} section="checks" title="Checks" count={d.checks.length} testId="pr-checks">
         <Checks d={d} />

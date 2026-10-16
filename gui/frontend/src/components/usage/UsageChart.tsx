@@ -91,7 +91,7 @@ export function UsageChart({ daily, series, mode }: { daily: readonly DayUsage[]
           {grid.map((v) => (
             <g key={v}>
               <line x1={LEFT} x2={width - RIGHT} y1={y(v)} y2={y(v)} className="stroke-foreground/8" strokeWidth={1} />
-              <text x={LEFT - 8} y={y(v) + 4} textAnchor="end" className="fill-muted-foreground text-[11px] tabular-nums">
+              <text x={LEFT - 8} y={y(v) + 4} textAnchor="end" className="fill-muted-foreground text-caption-sm tabular-nums">
                 {formatTick(v, mode)}
               </text>
             </g>
@@ -134,7 +134,7 @@ export function UsageChart({ daily, series, mode }: { daily: readonly DayUsage[]
           {labelledDays(n).map((i) => {
             const d = daily[i];
             return d ? (
-              <text key={d.day} x={LEFT + slot * i + slot / 2} y={H - 6} textAnchor="middle" className="fill-muted-foreground text-[11px]">
+              <text key={d.day} x={LEFT + slot * i + slot / 2} y={H - 6} textAnchor="middle" className="fill-muted-foreground text-caption-sm">
                 {dayLabel(d.day).toUpperCase()}
               </text>
             ) : null;
@@ -166,7 +166,7 @@ export function UsageChart({ daily, series, mode }: { daily: readonly DayUsage[]
       </svg>
       {hover && hovered && (totals[hover.index] ?? 0) > 0 && (
         <div
-          className="pointer-events-none absolute z-10 min-w-40 rounded-lg border border-border bg-popover px-2.5 py-2 text-[11px] shadow-lg"
+          className="pointer-events-none absolute z-10 min-w-40 rounded-lg border border-border bg-popover px-2.5 py-2 text-caption-sm text-popover-foreground shadow-lg"
           style={{ left: Math.max(0, Math.min(hover.x + 14, width - 220)), top: Math.max(0, hover.y - 10) }}
           data-testid="usage-page-tooltip"
         >
@@ -188,7 +188,7 @@ export function UsageChart({ daily, series, mode }: { daily: readonly DayUsage[]
           </div>
         </div>
       )}
-      <div className="mt-2.5 flex flex-wrap gap-3.5 text-[11px] text-muted-foreground" data-testid="usage-page-legend">
+      <div className="mt-2.5 flex flex-wrap gap-3.5 text-caption-sm" data-testid="usage-page-legend">
         {series.map((k) => (
           <span key={k} className="inline-flex items-center" data-series={k}>
             <Swatch model={k} />
@@ -202,5 +202,5 @@ export function UsageChart({ daily, series, mode }: { daily: readonly DayUsage[]
 
 /** A model's (or series') colour square; grey for a model without a slot. */
 export function Swatch({ model }: { model: string }) {
-  return <span aria-hidden className={cn("mr-2 inline-block size-2 shrink-0 rounded-[2px]", SWATCH_BG)} style={seriesStyle(model)} />;
+  return <span aria-hidden className={cn("mr-2 inline-block size-2 shrink-0", SWATCH_BG)} style={seriesStyle(model)} />;
 }

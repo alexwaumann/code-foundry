@@ -54,7 +54,7 @@ function PanelMemberRow({ workspaceId, member, threadId, onOpen }: RowOptions & 
     (onOpen ?? ((repoId, path) => openWorktreeTab("current", repoId, path)))(member.repoId, member.path);
   };
   return (
-    <NavRow navKey={memberKey(workspaceId, member.repoId)} className="group/member flex h-full flex-col justify-center gap-0.5 px-2 text-sm" tip={member.path}>
+    <NavRow navKey={memberKey(workspaceId, member.repoId)} className="group/member flex h-full flex-col justify-center gap-0.5 px-2 text-body" tip={member.path}>
       <span className="flex min-w-0 items-center gap-1.5" data-testid="workspace-member" data-repo={member.repoId} data-current={at === "current" || undefined}>
         <FolderGit2 className="size-3.5 shrink-0 text-info/90" aria-hidden />
         <span className="min-w-0 truncate font-medium" data-testid="member-name">
@@ -62,7 +62,7 @@ function PanelMemberRow({ workspaceId, member, threadId, onOpen }: RowOptions & 
         </span>
         {at && (
           <Tip label={at === "current" ? "The thread runs in this worktree" : "The thread moves here once it is idle at its prompt"}>
-            <span className={cn("shrink-0 rounded-sm px-1 text-[10px] leading-4 font-medium", at === "current" ? "bg-success/15 text-success" : "bg-warning/15 text-warning")} data-testid="member-at">
+            <span className={cn("shrink-0 rounded-sm px-1 text-caption-sm font-medium", at === "current" ? "bg-success/15 text-success" : "bg-warning/15 text-warning")} data-testid="member-at">
               {at === "current" ? "here" : "queued"}
             </span>
           </Tip>
@@ -99,7 +99,7 @@ function PanelMemberRow({ workspaceId, member, threadId, onOpen }: RowOptions & 
 function MemberRow({ workspaceId, member }: { workspaceId: string; member: Member }) {
   const name = useReposStore((s) => s.byId[member.repoId]?.name ?? member.repoId);
   return (
-    <NavRow navKey={memberKey(workspaceId, member.repoId)} className="group/member flex h-full items-center gap-2 px-2 text-sm" tip={member.path}>
+    <NavRow navKey={memberKey(workspaceId, member.repoId)} className="group/member flex h-full items-center gap-2 rounded-md px-2 text-body" tip={member.path}>
       <span className="flex h-full min-w-0 flex-1 items-center gap-2" data-testid="workspace-member" data-repo={member.repoId}>
         <FolderGit2 className="size-3.5 shrink-0 text-info/90" aria-hidden />
         <span className="w-32 shrink-0 truncate font-medium" data-testid="member-name">
@@ -141,7 +141,7 @@ function AddMember({ workspaceId }: { workspaceId: string }) {
       groups={groups}
       disabled={adding !== null}
       filterPlaceholder="Filter projects…"
-      status={addable.length === 0 ? <p className="px-3 py-2 text-xs text-muted-foreground">Every project is a member.</p> : undefined}
+      status={addable.length === 0 ? <p className="px-3 py-2 text-caption">Every project is a member.</p> : undefined}
       data-testid="workspace-add-member"
       onChange={(repoId) => {
         setAdding({ id: repoId, name: names[addable.indexOf(repoId)] ?? repoId });
@@ -186,7 +186,7 @@ export function WorkspaceMembers({
   return (
     <div className="flex flex-col gap-1" data-testid="workspace-members" data-workspace={workspaceId}>
       {members.length === 0 ? (
-        <p className="px-2 text-sm text-muted-foreground">No members.</p>
+        <p className="px-2 text-body text-muted-foreground">No members.</p>
       ) : (
         <RowList
           rows={members}

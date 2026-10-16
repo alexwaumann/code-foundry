@@ -11,7 +11,7 @@ export function CleanableTag({ repoId, path }: { repoId: string; path: string })
   if (!cleanable) return null;
   return (
     <Tip label={cleanableTitle(baseRef)}>
-      <span className="flex shrink-0 items-center gap-[3px] rounded-sm bg-success/15 px-1 text-[10px] leading-4 font-medium text-success" data-testid="worktree-cleanable">
+      <span className="flex shrink-0 items-center gap-[3px] rounded-sm bg-success/15 px-1 text-caption-sm font-medium text-success" data-testid="worktree-cleanable">
         <GitMerge className="size-2.5" aria-hidden />
         in main
       </span>

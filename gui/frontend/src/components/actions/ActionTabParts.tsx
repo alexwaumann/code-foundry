@@ -58,9 +58,9 @@ export function ActionEcho({ id }: { id: string }) {
   if (!first) return null;
   return (
     <Tip label={command} whenTruncated={more === 0} align="start">
-      <div className="flex shrink-0 items-baseline gap-2 bg-pane pt-1.5 pr-3 pl-[9px] font-mono text-xs leading-[17px] text-muted-foreground" data-testid="action-echo">
+      <div className="flex shrink-0 items-baseline gap-2 bg-pane pt-1.5 pr-3 pl-[9px] text-caption font-mono" data-testid="action-echo">
         <span className="min-w-0 truncate">$ {first}</span>
-        {more > 0 && <span className="shrink-0 font-sans text-[11px] opacity-80">+{more} {more === 1 ? "line" : "lines"}</span>}
+        {more > 0 && <span className="shrink-0 text-caption-sm font-sans opacity-80">+{more} {more === 1 ? "line" : "lines"}</span>}
       </div>
     </Tip>
   );
@@ -100,11 +100,11 @@ export function ActionStatusLine({ id }: { id: string }) {
   const started = runStarted ?? termStarted;
   const finished = runFinished ?? termExited;
   const failed = status === "failed";
-  const button = "inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-xs font-medium text-foreground outline-none hover:bg-accent focus-visible:ring-1 focus-visible:ring-ring dark:hover:bg-accent/60";
+  const button = "inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-body-sm font-medium outline-none hover:bg-accent focus-visible:ring-1 focus-visible:ring-ring dark:hover:bg-accent/60";
   return (
     <div
       className={cn(
-        "flex h-7 shrink-0 items-center gap-1.5 border-t border-pane-border pr-1.5 pl-3 text-xs text-muted-foreground",
+        "flex h-7 shrink-0 items-center gap-1.5 border-t border-pane-border pr-1.5 pl-3 text-caption",
         failed && "bg-destructive/[0.07]",
       )}
       data-testid="action-status"

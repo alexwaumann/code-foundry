@@ -53,7 +53,7 @@ function ActionItem({ id, onRun, onEdit }: { id: string; onRun: (id: string) => 
           tabIndex={-1}
           aria-label={`Edit ${action.name}`}
           data-testid="action-edit"
-          className="-my-0.5 flex size-6 shrink-0 items-center justify-center rounded-[5px] text-muted-foreground opacity-0 group-hover/item:opacity-100 group-data-[highlighted]/item:opacity-100 hover:bg-foreground/10 hover:text-foreground [&_svg]:size-3.5"
+          className="-my-0.5 flex size-6 shrink-0 items-center justify-center rounded-sm text-muted-foreground opacity-0 group-hover/item:opacity-100 group-data-[highlighted]/item:opacity-100 hover:bg-foreground/10 hover:text-foreground [&_svg]:size-3.5"
           onPointerDown={stop}
           onPointerUp={stop}
           onClick={(e) => {

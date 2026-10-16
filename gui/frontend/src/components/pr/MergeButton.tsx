@@ -53,7 +53,7 @@ export function MergeButton({ prRef, detail }: { prRef: PrRef; detail: PullReque
             aria-describedby={a.reason ? reasonId : undefined}
             data-reason={a.reason ?? undefined}
             className={cn(
-              "flex h-7 shrink-0 items-center gap-1 rounded-md bg-primary pr-1.5 pl-2 text-[13px] font-medium text-primary-foreground shadow-xs outline-none hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring/60 @max-[340px]:pl-1.5",
+              "flex h-7 shrink-0 items-center gap-1 rounded-md bg-primary pr-1.5 pl-2 text-label text-primary-foreground shadow-xs outline-none hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring/60 @max-[340px]:pl-1.5",
               blocked && "cursor-default hover:bg-primary",
               a.reason !== null && "opacity-50",
             )}
@@ -84,7 +84,7 @@ export function MergeButton({ prRef, detail }: { prRef: PrRef; detail: PullReque
           </DropdownMenuLabel>
         </Tip>
         {a.notes.map((n) => (
-          <p key={n} className="px-2 pb-1.5 text-xs text-warning" data-testid="pr-merge-note">
+          <p key={n} className="px-2 pb-1.5 text-caption text-warning" data-testid="pr-merge-note">
             {n}
           </p>
         ))}
@@ -102,7 +102,7 @@ export function MergeButton({ prRef, detail }: { prRef: PrRef; detail: PullReque
           >
             <span className="flex min-w-0 flex-1 flex-col">
               <span>{MERGE_METHOD_LABELS[m]}</span>
-              <span className="text-xs text-muted-foreground">{mergeMethodHint(m, detail.commitCount, pr.baseRef)}</span>
+              <span className="text-caption">{mergeMethodHint(m, detail.commitCount, pr.baseRef)}</span>
             </span>
           </DropdownMenuItem>
         ))}
@@ -124,7 +124,7 @@ export function MergeButton({ prRef, detail }: { prRef: PrRef; detail: PullReque
         >
           <span className="flex min-w-0 flex-1 flex-col">
             <span>Delete branch after merge</span>
-            <span className="text-xs [overflow-wrap:anywhere] text-muted-foreground" data-testid="pr-merge-delete-branch-note">
+            <span className="text-caption [overflow-wrap:anywhere]" data-testid="pr-merge-delete-branch-note">
               {del.subtitle}
             </span>
           </span>

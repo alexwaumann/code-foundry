@@ -58,12 +58,12 @@ function Header({ threadId }: { threadId: string }) {
   const name = useSessionsStore((s) => s.byId[threadId]?.name || threadId);
   const count = useSessionsStore((s) => s.byId[threadId]?.linkedPullRequests.length ?? 0);
   return (
-    <header className="flex min-w-0 items-center gap-1.5 border-b border-pane-border px-4 py-2.5 text-sm font-semibold @max-[340px]:px-3" data-testid="linkedprs-header">
+    <header className="flex min-w-0 items-center gap-1.5 border-b border-pane-border px-4 py-2.5 text-heading @max-[340px]:px-3" data-testid="linkedprs-header">
       <GitPullRequestArrow className="size-4 shrink-0 text-success" aria-hidden />
       <span className="min-w-0 truncate" data-testid="linkedprs-thread">
         {name}
       </span>
-      <span className="ml-auto shrink-0 text-xs font-normal text-muted-foreground tabular-nums" data-testid="linkedprs-count">
+      <span className="ml-auto shrink-0 text-caption tabular-nums" data-testid="linkedprs-count">
         {linkedCount(count)}
       </span>
     </header>
@@ -74,7 +74,7 @@ function Header({ threadId }: { threadId: string }) {
 function StateChip({ state, draft }: { state: Parameters<typeof stateBadge>[0]["state"]; draft: boolean }) {
   const b = stateBadge({ state, draft });
   return (
-    <span className={cn("shrink-0 rounded-sm border px-1 text-[10px] leading-4 font-medium", toneBadge[b.tone])} data-testid="linkedpr-state" data-state={b.label.toLowerCase()}>
+    <span className={cn("shrink-0 rounded-sm border px-1 text-caption-sm font-medium", toneBadge[b.tone])} data-testid="linkedpr-state" data-state={b.label.toLowerCase()}>
       {b.label}
     </span>
   );
@@ -111,7 +111,7 @@ function LinkedPrRow({ link, showRepo }: { link: LinkRow; showRepo: boolean }) {
       onCmdClick={() => void openUrl(link.url)}
       className="group/link flex h-full flex-col justify-center gap-0.5 px-2"
     >
-      <span className="flex min-w-0 items-center gap-1.5 text-sm" data-testid="linkedpr" data-url={link.url} data-loaded={pr ? "true" : "false"}>
+      <span className="flex min-w-0 items-center gap-1.5 text-body" data-testid="linkedpr" data-url={link.url} data-loaded={pr ? "true" : "false"}>
         <span className="shrink-0 font-medium text-muted-foreground tabular-nums" data-testid="linkedpr-number">
           #{link.number}
         </span>
@@ -123,20 +123,20 @@ function LinkedPrRow({ link, showRepo }: { link: LinkRow; showRepo: boolean }) {
           </Tip>
         ) : failed ? (
           <Tip label={failed}>
-            <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground" data-testid="linkedpr-unavailable">
+            <span className="min-w-0 flex-1 truncate text-caption" data-testid="linkedpr-unavailable">
               {urlHost(link.url)} · details unavailable
             </span>
           </Tip>
         ) : (
           <span className="flex min-w-0 flex-1 items-center gap-1.5" aria-busy="true" data-testid="linkedpr-loading">
-            <span className="shrink-0 text-xs text-muted-foreground">{urlHost(link.url)}</span>
+            <span className="shrink-0 text-caption">{urlHost(link.url)}</span>
             <Skeleton className="h-3 max-w-40 flex-1" />
           </span>
         )}
         {pr && <StateChip state={pr.state} draft={pr.draft} />}
         {pr?.state === "open" && <ChecksBadge checks={pr.checks} compact />}
       </span>
-      <span className="flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
+      <span className="flex min-w-0 items-center gap-1.5 text-caption-sm">
         {pr?.headRef && (
           <span className="flex min-w-0 items-center gap-1" data-testid="linkedpr-branch">
             <GitBranch className="size-3 shrink-0" aria-hidden />
@@ -204,14 +204,14 @@ export function LinkedPRsSurface() {
     // @container: the header and rows adapt to the panel's width (down to 280px).
     <div className="@container flex min-w-0 flex-col" data-testid="linkedprs-surface" data-thread={threadId || undefined}>
       {!known ? (
-        <p className="px-4 py-3 text-sm text-muted-foreground" data-testid="linkedprs-missing">
+        <p className="px-4 py-3 text-body text-muted-foreground" data-testid="linkedprs-missing">
           Select a thread to see the pull requests it linked.
         </p>
       ) : (
         <>
           <Header threadId={threadId} />
           {rows.length === 0 ? (
-            <p className="px-4 py-3 text-sm text-muted-foreground" data-testid="linkedprs-empty">
+            <p className="px-4 py-3 text-body text-muted-foreground" data-testid="linkedprs-empty">
               No linked PRs yet. Pull requests this thread creates or mentions show up here.
             </p>
           ) : (

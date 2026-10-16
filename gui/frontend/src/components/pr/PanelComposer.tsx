@@ -143,7 +143,7 @@ export function PanelComposer({
   const SubmitIcon = submit.icon;
   return (
     <section className={cn("flex flex-col gap-2 border-b border-pane-border px-4 py-3 @max-[340px]:px-3", className)} aria-label={ariaLabel} data-testid={testIds.root} {...dataAttrs}>
-      <Label htmlFor={inputId} className={cn("gap-1.5 text-xs", labelClassName ?? "text-muted-foreground")} data-testid={testIds.label}>
+      <Label htmlFor={inputId} className={cn("gap-1.5 text-body-sm", labelClassName ?? "text-muted-foreground")} data-testid={testIds.label}>
         {label}
       </Label>
       <Textarea
@@ -154,23 +154,23 @@ export function PanelComposer({
         readOnly={locked}
         placeholder={placeholder}
         aria-describedby={hintId}
-        className="max-h-[calc(6lh+1rem+2px)] min-h-0 resize-none overflow-y-auto text-[13px] leading-snug read-only:opacity-70"
+        className="max-h-[calc(6lh+1rem+2px)] min-h-0 resize-none overflow-y-auto text-body-sm read-only:opacity-70"
         data-testid={testIds.input}
         onChange={(e) => {
           onTextChange(e.target.value);
         }}
         onKeyDown={onKeyDown}
       />
-      <div className="flex min-w-0 items-center gap-2">
+      <div className="flex min-w-0 items-center gap-1.5">
         <Tip label={hint} whenTruncated align="start">
-          <span id={hintId} className="min-w-0 truncate text-xs text-muted-foreground" role={hintIsStatus ? "status" : undefined} data-testid={testIds.hint}>
+          <span id={hintId} className="min-w-0 truncate text-caption-sm" role={hintIsStatus ? "status" : undefined} data-testid={testIds.hint}>
             {hint}
           </span>
         </Tip>
         <button
           type="button"
           disabled={locked}
-          className="ml-auto shrink-0 rounded-md px-2 py-1 text-xs text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50 disabled:hover:bg-transparent"
+          className="ml-auto shrink-0 rounded-md px-2 py-1 text-body-sm text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50 disabled:hover:bg-transparent"
           data-testid={testIds.cancel}
           onClick={close}
         >
@@ -182,7 +182,7 @@ export function PanelComposer({
           aria-busy={submit.busy || undefined}
           aria-label={submit.ariaLabel}
           className={cn(
-            "flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-medium whitespace-nowrap outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50",
+            "flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-body-sm font-medium whitespace-nowrap outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50",
             submit.className,
           )}
           data-testid={testIds.submit}

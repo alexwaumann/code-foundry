@@ -26,7 +26,7 @@ const matches = (c: ReviewerCandidateView, term: string): boolean => {
 
 function Message({ children, testId }: { children: ReactNode; testId?: string }) {
   return (
-    <p className="px-2 py-3 text-sm text-muted-foreground" data-testid={testId}>
+    <p className="px-2 py-3 text-body text-muted-foreground" data-testid={testId}>
       {children}
     </p>
   );
@@ -55,7 +55,7 @@ function CandidateRow({ prRef, c, onRemove }: { prRef: PrRef; c: ReviewerCandida
     >
       <Avatar login={c.login} src={c.avatarUrl} size={20} />
       <span className="truncate">{c.login}</span>
-      {c.name && <span className="truncate text-xs text-muted-foreground">{c.name}</span>}
+      {c.name && <span className="truncate text-caption">{c.name}</span>}
       <span className="ml-auto flex size-4 shrink-0 items-center justify-center">
         {busy ? (
           <Loader2 className="size-3.5 animate-spin" aria-label="Updating" />
@@ -211,11 +211,11 @@ export function ReviewerPicker({ prRef, canUpdate }: { prRef: PrRef; canUpdate: 
           <Candidates prRef={prRef} />
         ) : (
           <div>
-            <div className="flex h-9 items-center gap-2 border-b px-3 text-sm text-muted-foreground">
+            <div className="flex h-9 items-center gap-2 border-b px-3 text-body text-muted-foreground">
               <Search className="size-4 shrink-0 opacity-50" aria-hidden />
               <span className="opacity-60">Search people with access</span>
             </div>
-            <p className="px-3 py-3 text-sm text-muted-foreground" data-testid="pr-reviewer-readonly">
+            <p className="px-3 py-3 text-body text-muted-foreground" data-testid="pr-reviewer-readonly">
               {WRITE_ACCESS_HINT}
             </p>
           </div>

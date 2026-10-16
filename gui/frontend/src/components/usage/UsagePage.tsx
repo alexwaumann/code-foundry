@@ -56,8 +56,8 @@ export function UsagePage() {
   return (
     <section className="flex min-h-0 flex-1 flex-col" aria-label="Usage" data-testid="usage-page" data-focus-root tabIndex={-1}>
       <PaneHeader className="gap-3 px-4">
-        <h1 className="text-sm font-semibold">Usage</h1>
-        <span className="ml-auto truncate text-xs text-muted-foreground">Code Foundry threads only</span>
+        <h1 className="text-heading">Usage</h1>
+        <span className="ml-auto truncate text-caption">Code Foundry threads only</span>
         <Segmented
           options={RANGE_OPTIONS}
           value={range}
@@ -76,10 +76,10 @@ export function UsagePage() {
       </PaneHeader>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-[1040px] px-8 pt-7 pb-10">
-          <div className="text-[44px] leading-none font-semibold tracking-[-0.02em] proportional-nums" data-testid="usage-page-total">
+          <div className="text-title proportional-nums" data-testid="usage-page-total">
             {fmtUsd(totals.costUsd)}
           </div>
-          <p className="mt-2 text-[13px] text-muted-foreground" data-testid="usage-page-summary">
+          <p className="mt-2 text-caption" data-testid="usage-page-summary">
             {(
               [
                 [fmtTok(totals.tokens), plural(totals.tokens, "token", "tokens")],
@@ -94,19 +94,19 @@ export function UsagePage() {
             ))}
           </p>
           {empty ? (
-            <p className="mt-10 text-sm text-muted-foreground" data-testid="usage-page-empty">
+            <p className="mt-10 text-body text-muted-foreground" data-testid="usage-page-empty">
               No usage in this range
             </p>
           ) : (
             <>
               <div className="mt-8 mb-2.5 flex items-center justify-between">
-                <h2 className="text-[13px] font-semibold">
+                <h2 className="text-subheading">
                   Daily<span className="ml-2 font-normal text-muted-foreground">by model</span>
                 </h2>
                 <Segmented options={MODE_OPTIONS} value={mode} onChange={setMode} aria-label="Chart measure" data-testid="usage-page-mode" />
               </div>
               <UsageChart daily={data.daily} series={data.series} mode={mode} />
-              <h2 className="mt-8 mb-2.5 text-[13px] font-semibold">By model</h2>
+              <h2 className="mt-8 mb-2.5 text-subheading">By model</h2>
               <ModelTable models={data.models} totalCost={totals.costUsd} />
               <BucketStrip totals={totals} cacheSavingsUsd={data.cacheSavingsUsd} />
             </>
@@ -118,9 +118,9 @@ export function UsagePage() {
 }
 
 function ModelTable({ models, totalCost }: { models: readonly ModelUsage[]; totalCost: number }) {
-  const th = "px-2 py-1.5 text-[11px] font-medium text-muted-foreground border-b border-border";
+  const th = "px-2 py-1.5 text-caption-sm font-medium border-b border-border";
   return (
-    <table className="w-full border-collapse text-[13px]" data-testid="usage-page-models">
+    <table className="w-full border-collapse text-body-sm" data-testid="usage-page-models">
       <thead>
         <tr>
           <th className={`${th} text-left`}>Model</th>
@@ -142,7 +142,7 @@ function ModelTable({ models, totalCost }: { models: readonly ModelUsage[]; tota
                   <Swatch model={m.model} />
                   <span className="font-mono">{m.model}</span>
                   {m.unpriced && (
-                    <span className="ml-1.5 rounded border border-border px-1.5 py-px text-[10px] text-muted-foreground" data-testid="usage-page-unpriced">
+                    <span className="ml-1.5 rounded-sm border border-border px-1.5 py-px text-caption-sm" data-testid="usage-page-unpriced">
                       unpriced
                     </span>
                   )}
@@ -173,13 +173,13 @@ function BucketStrip({ totals, cacheSavingsUsd }: { totals: UsageTotals; cacheSa
     <div className="mt-5 flex flex-wrap gap-8 border-t border-border pt-4" data-testid="usage-page-buckets">
       {items.map(([k, v]) => (
         <div key={k}>
-          <div className="text-[11px] text-muted-foreground">{k}</div>
-          <div className="mt-[3px] text-sm font-medium tabular-nums">{fmtTok(v)}</div>
+          <div className="text-caption-sm">{k}</div>
+          <div className="mt-[3px] text-body font-medium tabular-nums">{fmtTok(v)}</div>
         </div>
       ))}
       <div className="ml-auto text-right" data-testid="usage-page-cache-savings">
-        <div className="text-[11px] text-muted-foreground">Cache savings</div>
-        <div className="mt-[3px] text-sm font-medium tabular-nums">{fmtUsd(cacheSavingsUsd)}</div>
+        <div className="text-caption-sm">Cache savings</div>
+        <div className="mt-[3px] text-body font-medium tabular-nums">{fmtUsd(cacheSavingsUsd)}</div>
       </div>
     </div>
   );

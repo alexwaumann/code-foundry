@@ -34,17 +34,17 @@ function Header({ threadId }: { threadId: string }) {
   const c = useAgentCounts(threadId);
   return (
     <header className="flex min-w-0 flex-col gap-0.5 border-b border-pane-border px-4 pt-2 pb-2.5 @max-[340px]:px-3" data-testid="agents-header">
-      <h2 className="flex min-w-0 items-center gap-1.5 text-sm font-semibold">
+      <h2 className="flex min-w-0 items-center gap-1.5 text-heading">
         <Bot className="size-4 shrink-0 text-info" aria-hidden />
         <span className="min-w-0 truncate">Agents</span>
         {c && c.total > 0 && (
-          <span className="ml-auto shrink-0 text-xs font-normal text-muted-foreground tabular-nums" data-testid="agents-count">
+          <span className="ml-auto shrink-0 text-caption tabular-nums" data-testid="agents-count">
             {c.running} running · {c.total} this thread
           </span>
         )}
       </h2>
       {c && c.total > 0 && (
-        <span className="flex min-h-5 min-w-0 items-center gap-1.5 text-xs text-muted-foreground" data-testid="agents-subline">
+        <span className="flex min-h-5 min-w-0 items-center gap-1.5 text-caption" data-testid="agents-subline">
           {c.background > 0 && <LoaderCircle className="size-3.5 shrink-0 animate-spin" aria-hidden />}
           <span className="min-w-0 truncate">{agentsSubline(c)}</span>
         </span>
@@ -103,7 +103,7 @@ function AgentRow({ threadId, id }: { threadId: string; id: string }) {
       data-level={level}
       data-background={run.background || undefined}
     >
-      <div className="flex min-w-0 items-center gap-2 text-[13px]">
+      <div className="flex min-w-0 items-center gap-2 text-body-sm">
         {running ? (
           <LoaderCircle className="size-3 shrink-0 animate-spin text-info" aria-label="Running" />
         ) : (
@@ -114,11 +114,11 @@ function AgentRow({ threadId, id }: { threadId: string; id: string }) {
             {name}
           </span>
         </Tip>
-        <span className={cn("shrink-0 text-[11.5px] tabular-nums", STATUS_TONE[run.status])} data-testid="agent-status">
+        <span className={cn("shrink-0 text-caption-sm tabular-nums", STATUS_TONE[run.status])} data-testid="agent-status">
           {running || run.endedAtMs === null ? agentStatusText(run, 0) : <EndedStatus run={run} />}
         </span>
       </div>
-      <div className="min-w-0 truncate pl-5 text-xs text-muted-foreground" data-testid="agent-meta">
+      <div className="min-w-0 truncate pl-5 text-caption" data-testid="agent-meta">
         {meta.map((p, i) => (
           <Fragment key={`${String(i)}:${p}`}>
             {i > 0 && (
@@ -131,15 +131,15 @@ function AgentRow({ threadId, id }: { threadId: string; id: string }) {
         ))}
       </div>
       {running ? (
-        <div className="ml-5 flex min-w-0 items-center gap-1.5 text-xs" data-testid="agent-activity">
+        <div className="ml-5 flex min-w-0 items-center gap-1.5 text-body-sm" data-testid="agent-activity">
           <LoaderCircle className="size-[13px] shrink-0 animate-spin text-muted-foreground" aria-hidden />
           <span className="cf-agents-shimmer min-w-0 truncate">{run.activity || "Starting…"}</span>
-          {run.lastTool && <span className="shrink-0 font-mono text-[11px] text-muted-foreground">{run.lastTool}</span>}
+          {run.lastTool && <span className="shrink-0 text-code text-muted-foreground">{run.lastTool}</span>}
         </div>
       ) : run.status === "failed" ? (
         run.error && (
           <Tip label={run.error} whenTruncated>
-            <div className="ml-5 line-clamp-2 text-xs leading-[1.45] break-words text-destructive" data-testid="agent-error">
+            <div className="ml-5 line-clamp-2 text-body-sm break-words text-destructive" data-testid="agent-error">
               {run.error}
             </div>
           </Tip>
@@ -147,13 +147,13 @@ function AgentRow({ threadId, id }: { threadId: string; id: string }) {
       ) : (
         run.summary && (
           <Tip label={run.summary} whenTruncated>
-            <div className="ml-5 line-clamp-2 text-xs leading-[1.45] break-words text-muted-foreground" data-testid="agent-summary">
+            <div className="ml-5 line-clamp-2 text-caption break-words" data-testid="agent-summary">
               {run.summary}
             </div>
           </Tip>
         )
       )}
-      <div className="flex min-w-0 items-center justify-end gap-3 pl-5 text-[11.5px] text-muted-foreground tabular-nums" data-testid="agent-stats">
+      <div className="flex min-w-0 items-center justify-end gap-3 pl-5 text-caption-sm tabular-nums" data-testid="agent-stats">
         <Stat icon={Clock} label="Elapsed" testId="agent-elapsed">
           <Elapsed run={run} />
         </Stat>
@@ -170,7 +170,7 @@ function AgentRow({ threadId, id }: { threadId: string; id: string }) {
 
 function Message({ testId, children }: { testId: string; children: string }) {
   return (
-    <p className="px-4 py-3 text-sm text-muted-foreground @max-[340px]:px-3" data-testid={testId}>
+    <p className="px-4 py-3 text-body text-muted-foreground @max-[340px]:px-3" data-testid={testId}>
       {children}
     </p>
   );

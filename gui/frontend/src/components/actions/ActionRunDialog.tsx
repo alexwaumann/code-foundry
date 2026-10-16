@@ -36,13 +36,13 @@ function RunOutput({ runId }: { runId: string }) {
 
   if (load.phase === "loading")
     return (
-      <p className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+      <p className="mt-3 flex items-center gap-2 text-body text-muted-foreground">
         <Loader2 className="size-4 animate-spin" aria-hidden /> Loading the output…
       </p>
     );
   if (load.phase === "error")
     return (
-      <p className="mt-3 text-sm text-destructive" role="alert">
+      <p className="mt-3 text-body text-destructive" role="alert">
         {load.message}
       </p>
     );
@@ -54,7 +54,7 @@ function RunOutput({ runId }: { runId: string }) {
     <>
       {/* One line: only the path gives way, its directory first (a middle ellipsis), so the
           branch folder at its end stays readable. */}
-      <DialogDescription className="mt-1 flex items-center gap-1.5 pr-7 text-xs whitespace-nowrap text-muted-foreground" data-testid="action-run-meta">
+      <DialogDescription className="mt-1 flex items-center gap-1.5 pr-7 text-caption whitespace-nowrap" data-testid="action-run-meta">
         <CircleX className="size-3.5 shrink-0 text-destructive" aria-hidden />
         <span className="shrink-0 text-destructive">Exited with code {run.exitCode}</span>
         {took && (
@@ -75,9 +75,9 @@ function RunOutput({ runId }: { runId: string }) {
       </DialogDescription>
       {/* The whole command when the line cuts it short or it has more lines. */}
       <Tip label={run.command} whenTruncated={!run.command.includes("\n")} align="start">
-        <p className="mt-3 truncate font-mono text-xs text-muted-foreground">$ {run.command.split("\n")[0]}</p>
+        <p className="mt-3 truncate text-caption font-mono">$ {run.command.split("\n")[0]}</p>
       </Tip>
-      <pre className="mt-1 max-h-72 overflow-auto rounded-md border bg-pane p-2.5 font-mono text-xs leading-[17px] whitespace-pre-wrap" data-testid="action-run-output">
+      <pre className="mt-1 max-h-72 overflow-auto rounded-md border bg-pane p-2.5 text-body-sm font-mono whitespace-pre-wrap" data-testid="action-run-output">
         {truncated && <span className="text-muted-foreground">…{"\n"}</span>}
         {output || <span className="text-muted-foreground">(no output)</span>}
       </pre>

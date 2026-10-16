@@ -52,7 +52,7 @@ function PrRow({ section, pr, viewer }: { section: Section; pr: PullRequestView;
       navKey={prKey(section, pr)}
       activateOnClick
       onCmdClick={() => void openUrl(pr.url)}
-      className={cn("grid h-full items-center gap-3 px-2 text-sm", columns[section])}>
+      className={cn("grid h-full items-center gap-3 rounded-md px-2 text-body", columns[section])}>
       <Tip label={pr.repoSlug}>
         <span className="truncate text-muted-foreground">{repoName(pr.repoSlug)}</span>
       </Tip>
@@ -62,7 +62,7 @@ function PrRow({ section, pr, viewer }: { section: Section; pr: PullRequestView;
       {section !== "authored" && <span className="truncate text-muted-foreground">{author}</span>}
       <Tip label={pr.title}>
         <span className="truncate">
-          {pr.draft && <span className="mr-1.5 rounded bg-muted px-1 text-[10px] text-muted-foreground uppercase">draft</span>}
+          {pr.draft && <span className="mr-1.5 rounded-sm bg-muted px-1 text-caption-sm uppercase">draft</span>}
           {pr.title}
         </span>
       </Tip>
@@ -78,10 +78,10 @@ function PrTable({ section, title, rows, empty, viewer }: { section: Section; ti
     <section data-testid={`prs-${section}`}>
       <SectionTitle count={rows.length}>{title}</SectionTitle>
       {rows.length === 0 ? (
-        <p className="px-2 text-sm text-muted-foreground">{empty}</p>
+        <p className="px-2 text-body text-muted-foreground">{empty}</p>
       ) : (
-        <div className="rounded-md border">
-          <div className={cn("grid gap-3 border-b px-2 py-1 text-[11px] tracking-wide text-muted-foreground uppercase", columns[section])}>
+        <div className="rounded-lg border">
+          <div className={cn("grid gap-3 border-b px-2 py-1 text-overline", columns[section])}>
             {headers[section].map((h, i) => (
               <span key={h} className={cn(i === headers[section].length - 1 && "text-right")}>
                 {h}
@@ -101,19 +101,19 @@ function MonthTile({ month, testId }: { month: MonthView; testId: string }) {
   const now = useNow(60_000);
   return (
     <div className="flex min-w-48 flex-col items-center gap-1 rounded-lg border px-6 py-3" data-testid={testId}>
-      <span className="text-sm font-medium">{monthName(month.month, now)}</span>
+      <span className="text-label">{monthName(month.month, now)}</span>
       <div className="flex gap-8">
         <div className="flex flex-col items-center">
-          <span className="text-2xl font-semibold tabular-nums" data-testid={`${testId}-commits`}>
+          <span className="text-title tabular-nums" data-testid={`${testId}-commits`}>
             {month.commits}
           </span>
-          <span className="text-xs text-muted-foreground">commits</span>
+          <span className="text-caption">commits</span>
         </div>
         <div className="flex flex-col items-center">
-          <span className="text-2xl font-semibold tabular-nums" data-testid={`${testId}-merged`}>
+          <span className="text-title tabular-nums" data-testid={`${testId}-merged`}>
             {month.merged}
           </span>
-          <span className="text-xs text-muted-foreground">merged</span>
+          <span className="text-caption">merged</span>
         </div>
       </div>
     </div>
@@ -122,7 +122,7 @@ function MonthTile({ month, testId }: { month: MonthView; testId: string }) {
 
 function Banner({ tone, children }: { tone: "warn" | "info"; children: React.ReactNode }) {
   return (
-    <p className={cn("rounded-md border px-3 py-2 text-sm", tone === "warn" ? "border-warning/40 bg-warning/10 text-warning" : "text-muted-foreground")} role="status">
+    <p className={cn("rounded-lg border px-3 py-2 text-body", tone === "warn" ? "border-warning/40 bg-warning/10 text-warning" : "text-muted-foreground")} role="status">
       {children}
     </p>
   );
@@ -203,16 +203,16 @@ export function PullRequestsPage() {
     <section className="flex min-h-0 flex-1 flex-col" data-region="content" aria-label="Pull Requests" data-testid="prs-page">
       <PaneHeader className="gap-3 px-5">
         <GitPullRequest className="size-4 text-muted-foreground" aria-hidden />
-        <h1 className="text-sm font-semibold">Pull Requests</h1>
+        <h1 className="text-heading">Pull Requests</h1>
         <button
           type="button"
           onClick={toggle}
-          className="rounded border px-1.5 py-0.5 text-[11px] text-muted-foreground [--wails-draggable:no-drag] hover:bg-accent"
+          className="rounded-sm border px-1.5 py-0.5 text-caption-sm [--wails-draggable:no-drag] hover:bg-accent"
           data-testid="prs-scope"
         >
           {includeAll ? "all repositories" : "registered repositories"}
         </button>
-        <span className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
+        <span className="ml-auto flex items-center gap-2 text-caption">
           {d?.viewer && (
             <span className="font-mono" data-testid="prs-viewer">
               @{d.viewer.login}
@@ -231,7 +231,7 @@ export function PullRequestsPage() {
         ) : entry?.error ? (
           <Banner tone="warn">Cannot load pull requests: {entry.error}</Banner>
         ) : (
-          <p className="text-sm text-muted-foreground">Loading…</p>
+          <p className="text-body text-muted-foreground">Loading…</p>
         )}
       </div>
     </section>
@@ -245,7 +245,7 @@ export function PullRequestsNav() {
     <button
       type="button"
       className={cn(
-        "mt-1.5 flex h-7 items-center gap-2 rounded-md px-2 text-left text-[13px]",
+        "mt-1.5 flex h-7 items-center gap-2 rounded-md px-2 text-left text-body-sm",
         active ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/60",
       )}
       data-testid="nav-pullrequests"

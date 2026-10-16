@@ -20,7 +20,7 @@ export function Item({ icon, title, hint, children }: { icon: ReactNode; title: 
       {icon}
       <span className="flex min-w-0 flex-1 flex-col">
         <span>{title}</span>
-        {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
+        {hint && <span className="text-caption">{hint}</span>}
       </span>
       {children}
     </>

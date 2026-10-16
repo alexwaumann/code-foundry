@@ -51,7 +51,7 @@ function Entry({ rail, children, kind, pos, onOpen, tip }: { rail: ReactNode; ch
 }
 
 function Meta({ children }: { children: ReactNode }) {
-  return <span className="flex min-w-0 flex-wrap items-center gap-x-2 text-xs text-muted-foreground">{children}</span>;
+  return <span className="flex min-w-0 flex-wrap items-center gap-x-2 text-caption">{children}</span>;
 }
 
 function Row({ e, slug, now, pos }: { e: TimelineEntry; slug: string; now: number; pos: RailPos }) {
@@ -59,7 +59,7 @@ function Row({ e, slug, now, pos }: { e: TimelineEntry; slug: string; now: numbe
     case "merged":
       return (
         <Entry kind="merged" pos={pos} rail={<GitMerge className={cn("size-4", toneText.merged)} aria-hidden />}>
-          <span className="text-[13px] font-medium">
+          <span className="text-body-sm font-medium">
             {e.actor && <span className="mr-1.5">{e.actor}</span>}Pull request merged
           </span>
           <Meta>{ago(e.atMs, now)}</Meta>
@@ -68,14 +68,14 @@ function Row({ e, slug, now, pos }: { e: TimelineEntry; slug: string; now: numbe
     case "closed":
       return (
         <Entry kind="closed" pos={pos} rail={<GitPullRequestClosed className={cn("size-4", toneText.failure)} aria-hidden />}>
-          <span className="text-[13px] font-medium">Pull request closed</span>
+          <span className="text-body-sm font-medium">Pull request closed</span>
           <Meta>{ago(e.atMs, now)}</Meta>
         </Entry>
       );
     case "opened":
       return (
         <Entry kind="opened" pos={pos} rail={<GitPullRequest className="size-4 text-muted-foreground" aria-hidden />}>
-          <span className="text-[13px] font-medium">
+          <span className="text-body-sm font-medium">
             {e.actor && <span className="mr-1.5">{e.actor}</span>}Pull request opened
           </span>
           <Meta>{ago(e.atMs, now)}</Meta>
@@ -92,7 +92,7 @@ function Row({ e, slug, now, pos }: { e: TimelineEntry; slug: string; now: numbe
           tip={`${c.sha}\n${c.authorName || c.authorLogin}`}
           onOpen={() => void openUrl(`https://github.com/${slug}/commit/${c.sha}`)}
         >
-          <span className="truncate text-[13px] font-medium">{c.headline}</span>
+          <span className="truncate text-body-sm font-medium">{c.headline}</span>
           <Meta>
             <span className="font-mono">{c.shortSha}</span>
             <span>{ago(e.atMs, now)}</span>
@@ -108,12 +108,12 @@ function Row({ e, slug, now, pos }: { e: TimelineEntry; slug: string; now: numbe
       return (
         <Entry kind={e.kind} pos={pos} rail={<Avatar login={c.author} src={c.authorAvatarUrl} size={24} />}>
           {/* The verdict and age wrap under a long login instead of cutting it short. */}
-          <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 text-[13px]">
+          <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 text-body-sm">
             <span className="max-w-full min-w-0 truncate font-medium" data-testid="pr-timeline-author">
               {c.author || "ghost"}
             </span>
             <span className={cn("whitespace-nowrap", e.kind === "review" ? tone : "text-muted-foreground")}>{verdict}</span>
-            <span className="text-xs whitespace-nowrap text-muted-foreground">{ago(e.atMs, now)}</span>
+            <span className="text-caption whitespace-nowrap">{ago(e.atMs, now)}</span>
           </span>
           {c.body && <Markdown className="line-clamp-4">{c.body}</Markdown>}
         </Entry>
@@ -140,7 +140,7 @@ export function PrTimeline({ d, tabKey }: { d: PullRequestDetailView; tabKey: st
         />
       </div>
       {d.commitCount > d.commits.length && (
-        <p className="mt-2 text-xs text-muted-foreground" data-testid="pr-truncated">
+        <p className="mt-2 text-caption" data-testid="pr-truncated">
           Showing the last {d.commits.length} of {d.commitCount} commits.
         </p>
       )}
