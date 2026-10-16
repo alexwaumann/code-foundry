@@ -252,6 +252,7 @@ func worktreeToProto(w repo.Worktree) *v1.Worktree {
 		Staged: int32(s.Staged), Modified: int32(s.Modified), Untracked: int32(s.Untracked),
 		Conflicted: int32(s.Conflicted), Dirty: s.Dirty,
 		BaseRef: s.BaseRef, BaseAhead: int32(s.BaseAhead), BaseBehind: int32(s.BaseBehind),
+		Operation: s.Operation, OperationStep: int32(s.OperationStep), OperationTotal: int32(s.OperationTotal),
 		Error: s.Error,
 	}
 	if !s.RefreshedAt.IsZero() {

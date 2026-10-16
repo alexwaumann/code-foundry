@@ -504,7 +504,9 @@ from the pull request (docs/notes/pr-thread-commands.md).
 ## 9. Repo and GitHub stores
 
 * `repo`: registered repositories and their worktrees. Shells out to `git` for worktree
-  create/list/remove and status (branch, ahead/behind, dirty). One filesystem watcher
+  create/list/remove and status (branch, ahead/behind, dirty, conflicts, and the
+  operation in progress, read from marker files in the admin dir without another git
+  command; `docs/notes/worktree-op-state.md`). One filesystem watcher
   (fsnotify) across all registered roots feeds a debounced reconcile. Workers write
   disjoint per-path snapshot pointers. A project may be a plain folder (`Repo.Git`
   false): one synthetic checkout, no git commands or watches, the poll notices a later

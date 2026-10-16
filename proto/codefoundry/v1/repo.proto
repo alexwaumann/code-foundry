@@ -145,6 +145,15 @@ message GitStatus {
   int32 base_behind = 12;
   // Non-empty when the last status refresh failed; the other fields are then stale.
   string error = 13;
+  // The git operation in progress in the worktree: "" (none), "rebase", "am",
+  // "merge", "cherry-pick", "revert" or "bisect". Read from the marker files in the
+  // worktree's git admin dir (rebase-merge/, rebase-apply/, MERGE_HEAD, …) during the
+  // status refresh; no extra git command runs. A rebase or am also fills
+  // operation_step (the current patch, 1-based) and operation_total (the last one);
+  // both are 0 when git does not record them (merge, cherry-pick, revert, bisect).
+  string operation = 14;
+  int32 operation_step = 15;
+  int32 operation_total = 16;
 }
 
 message RegisterRepoRequest {

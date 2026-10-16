@@ -58,6 +58,22 @@ func TestClassify(t *testing.T) {
 		{wkLinkedAdmin, "gitdir", w, actNone},
 		{wkLinkedAdmin, "locked", c, actNone},
 
+		// operation markers (operation.go) in either admin dir
+		{wkCommon, "rebase-merge", c, actStatus},
+		{wkCommon, "rebase-merge", r, actStatus},
+		{wkCommon, "rebase-apply", c, actStatus},
+		{wkCommon, "MERGE_HEAD", c, actStatus},
+		{wkCommon, "MERGE_HEAD", r, actStatus},
+		{wkCommon, "CHERRY_PICK_HEAD", c, actStatus},
+		{wkCommon, "REVERT_HEAD", r, actStatus},
+		{wkCommon, "BISECT_LOG", c, actStatus},
+		{wkCommon, "MERGE_HEAD", a, actNone},
+		{wkCommon, "MERGE_HEAD.lock", c, actNone},
+		{wkLinkedAdmin, "rebase-merge", c, actStatus},
+		{wkLinkedAdmin, "MERGE_HEAD", r, actStatus},
+		{wkRoot, "MERGE_HEAD", c, actStatus}, // a plain top-level file, as before
+		{wkCommonLogs, "MERGE_HEAD", c, actNone},
+
 		{wkRemoteRefs, "main", c, actStatusAll},
 		{wkRemoteRefs, "feature", w, actStatusAll},
 

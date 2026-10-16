@@ -90,6 +90,10 @@ func classify(kind watchKind, name string, op fsnotify.Op) action {
 	if op == fsnotify.Chmod {
 		return actNone
 	}
+	// An operation starting or ending (rebase-merge/ appearing, MERGE_HEAD removed, …).
+	if (kind == wkCommon || kind == wkLinkedAdmin) && operationMarkers[name] {
+		return actStatus
+	}
 	switch kind {
 	case wkCommon:
 		switch name {
