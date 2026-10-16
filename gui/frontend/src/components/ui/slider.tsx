@@ -1,6 +1,6 @@
 import * as React from "react"
 import { Slider as SliderPrimitive } from "radix-ui"
-import { cn } from "cn"
+import { cn } from "@/lib/utils"
 
 /**
  * shadcn's Slider (new-york). One addition: `thumbLabel` names the thumbs (the role=slider

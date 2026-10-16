@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { Check, Link2, Monitor, Moon, Search, Sun, X } from "lucide-react";
 import { toast } from "sonner";
-import { cn } from "cn";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

@@ -1,5 +1,5 @@
 import * as React from "react"
-import { cn } from "cn"
+import { cn } from "@/lib/utils"
 
 /**
  * shadcn's Input (new-york) at the app's density: h-8, px-2.5, text-sm at every width

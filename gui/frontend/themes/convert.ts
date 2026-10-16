@@ -62,7 +62,7 @@ export const PATHS = {
 const GHOSTTY_APP = "/Applications/Ghostty.app/Contents/Resources/ghostty/themes";
 
 /** index.css variables that are not colours. */
-const NOT_COLOURS = new Set(["--cf-zoom", "--radius"]);
+const NOT_COLOURS = new Set(["--cf-zoom", "--radius", "--gap-shell"]);
 
 /**
  * thread.css's syntax colours. thread.css declares them on `.cf-thread` as aliases of

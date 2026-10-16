@@ -25,7 +25,7 @@ import {
   Trash2,
   TriangleAlert,
 } from "lucide-react";
-import { cn } from "cn";
+import { cn } from "@/lib/utils";
 import { Chip } from "@/components/session/Chip";
 import { ThreadMarkdown } from "@/components/thread/Code";
 import { UserBubble } from "@/components/thread/UserBubble";

@@ -1,5 +1,5 @@
 import { cva, type VariantProps } from "class-variance-authority"
-import { cn } from "cn"
+import { cn } from "@/lib/utils"
 
 /**
  * shadcn's Kbd (new-york), drawn as the app's key chip: a hairline border on a muted fill.
