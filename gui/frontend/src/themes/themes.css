@@ -16,11 +16,11 @@ html[data-theme="catppuccin-mocha"] {
   --popover-foreground: #cdd6f4;
   --primary: #cba6f7;
   --primary-foreground: #1e1e2e;
-  --secondary: #2d2e3f;
+  --secondary: #333446;
   --secondary-foreground: #cdd6f4;
-  --muted: #2d2e3f;
+  --muted: #333446;
   --muted-foreground: #9095af;
-  --accent: #2d2e3f;
+  --accent: #333446;
   --accent-foreground: #cdd6f4;
   --destructive: #f38ba8;
   --destructive-foreground: #1e1e2e;
@@ -180,11 +180,11 @@ html[data-theme="dracula"] {
   --popover-foreground: #f8f8f2;
   --primary: #bd93f9;
   --primary-foreground: #282a36;
-  --secondary: #3a3c47;
+  --secondary: #41434d;
   --secondary-foreground: #f8f8f2;
-  --muted: #3a3c47;
+  --muted: #41434d;
   --muted-foreground: #afb0b1;
-  --accent: #3a3c47;
+  --accent: #41434d;
   --accent-foreground: #f8f8f2;
   --destructive: #ff5555;
   --destructive-foreground: #282a36;
@@ -237,13 +237,13 @@ html[data-theme="dracula"] {
 }
 html[data-theme="dracula"] .cf-thread {
   --syn-fg: #f8f8f2;
-  --syn-kw: #ff79c6;
-  --syn-fn: #bd93f9;
+  --syn-kw: #ff8acb;
+  --syn-fn: #c59eff;
   --syn-type: #f1fa8c;
   --syn-str: #50fa7b;
   --syn-com: #6272a4;
   --syn-num: #8be9fd;
-  --sh-cmd: #bd93f9;
+  --sh-cmd: #c59eff;
   --sh-flag: #8be9fd;
   --sh-str: #50fa7b;
 }
@@ -262,11 +262,11 @@ html[data-theme="gruvbox-dark"] {
   --popover-foreground: #ebdbb2;
   --primary: #fe8019;
   --primary-foreground: #282828;
-  --secondary: #393734;
+  --secondary: #403e39;
   --secondary-foreground: #ebdbb2;
-  --muted: #393734;
+  --muted: #403e39;
   --muted-foreground: #a79d83;
-  --accent: #393734;
+  --accent: #403e39;
   --accent-foreground: #ebdbb2;
   --destructive: #ff513b;
   --destructive-foreground: #282828;
@@ -319,15 +319,15 @@ html[data-theme="gruvbox-dark"] {
 }
 html[data-theme="gruvbox-dark"] .cf-thread {
   --syn-fg: #ebdbb2;
-  --syn-kw: #db88ac;
-  --syn-fn: #6aaaad;
-  --syn-type: #d79921;
-  --syn-str: #a6a52f;
+  --syn-kw: #e38fb4;
+  --syn-fn: #73b3b6;
+  --syn-type: #dc9e29;
+  --syn-str: #afaf3b;
   --syn-com: #928374;
-  --syn-num: #77ad79;
-  --sh-cmd: #6aaaad;
-  --sh-flag: #77ad79;
-  --sh-str: #a6a52f;
+  --syn-num: #80b682;
+  --sh-cmd: #73b3b6;
+  --sh-flag: #80b682;
+  --sh-str: #afaf3b;
 }
 
 /* Nord (dark) */
@@ -344,11 +344,11 @@ html[data-theme="nord"] {
   --popover-foreground: #d8dee9;
   --primary: #88c0d0;
   --primary-foreground: #2e3440;
-  --secondary: #3d434f;
+  --secondary: #434955;
   --secondary-foreground: #d8dee9;
-  --muted: #3d434f;
+  --muted: #434955;
   --muted-foreground: #9da3af;
-  --accent: #3d434f;
+  --accent: #434955;
   --accent-foreground: #d8dee9;
   --destructive: #e17f87;
   --destructive-foreground: #2e3440;
@@ -401,15 +401,15 @@ html[data-theme="nord"] {
 }
 html[data-theme="nord"] .cf-thread {
   --syn-fg: #d8dee9;
-  --syn-kw: #caa4c3;
-  --syn-fn: #92b2d3;
+  --syn-kw: #d3abcb;
+  --syn-fn: #9bbcdd;
   --syn-type: #ebcb8b;
-  --syn-str: #a3be8c;
+  --syn-str: #a5c08e;
   --syn-com: #9da3af;
   --syn-num: #88c0d0;
-  --sh-cmd: #92b2d3;
+  --sh-cmd: #9bbcdd;
   --sh-flag: #88c0d0;
-  --sh-str: #a3be8c;
+  --sh-str: #a5c08e;
 }
 
 /* Tokyo Night (dark) */
@@ -426,11 +426,11 @@ html[data-theme="tokyo-night"] {
   --popover-foreground: #c0caf5;
   --primary: #7aa2f7;
   --primary-foreground: #1a1b26;
-  --secondary: #282a38;
+  --secondary: #2e303f;
   --secondary-foreground: #c0caf5;
-  --muted: #282a38;
+  --muted: #2e303f;
   --muted-foreground: #868cac;
-  --accent: #282a38;
+  --accent: #2e303f;
   --accent-foreground: #c0caf5;
   --destructive: #f7768e;
   --destructive-foreground: #1a1b26;
@@ -508,11 +508,11 @@ html[data-theme="rose-pine"] {
   --popover-foreground: #e0def4;
   --primary: #c4a7e7;
   --primary-foreground: #191724;
-  --secondary: #292736;
+  --secondary: #302e3d;
   --secondary-foreground: #e0def4;
-  --muted: #292736;
+  --muted: #302e3d;
   --muted-foreground: #9a98ab;
-  --accent: #292736;
+  --accent: #302e3d;
   --accent-foreground: #e0def4;
   --destructive: #eb6f92;
   --destructive-foreground: #191724;
@@ -568,12 +568,12 @@ html[data-theme="rose-pine"] .cf-thread {
   --syn-kw: #c4a7e7;
   --syn-fn: #9ccfd8;
   --syn-type: #f6c177;
-  --syn-str: #5698b4;
+  --syn-str: #5ea0bc;
   --syn-com: #6e6a86;
   --syn-num: #ebbcba;
   --sh-cmd: #9ccfd8;
   --sh-flag: #ebbcba;
-  --sh-str: #5698b4;
+  --sh-str: #5ea0bc;
 }
 
 /* Atom One Dark (dark) */
@@ -590,11 +590,11 @@ html[data-theme="atom-one-dark"] {
   --popover-foreground: #abb2bf;
   --primary: #61afef;
   --primary-foreground: #21252b;
-  --secondary: #2d3138;
+  --secondary: #32363d;
   --secondary-foreground: #abb2bf;
-  --muted: #2d3138;
+  --muted: #32363d;
   --muted-foreground: #878d98;
-  --accent: #2d3138;
+  --accent: #32363d;
   --accent-foreground: #abb2bf;
   --destructive: #e06c75;
   --destructive-foreground: #21252b;
@@ -647,7 +647,7 @@ html[data-theme="atom-one-dark"] {
 }
 html[data-theme="atom-one-dark"] .cf-thread {
   --syn-fg: #abb2bf;
-  --syn-kw: #c87adf;
+  --syn-kw: #ce80e5;
   --syn-fn: #61afef;
   --syn-type: #e5c07b;
   --syn-str: #98c379;
@@ -672,11 +672,11 @@ html[data-theme="solarized-dark"] {
   --popover-foreground: #a3b5b7;
   --primary: #3093da;
   --primary-foreground: #002b36;
-  --secondary: #123742;
+  --secondary: #193c47;
   --secondary-foreground: #a3b5b7;
-  --muted: #123742;
+  --muted: #193c47;
   --muted-foreground: #7b9296;
-  --accent: #123742;
+  --accent: #193c47;
   --accent-foreground: #a3b5b7;
   --destructive: #fb524a;
   --destructive-foreground: #002b36;
@@ -729,15 +729,15 @@ html[data-theme="solarized-dark"] {
 }
 html[data-theme="solarized-dark"] .cf-thread {
   --syn-fg: #a3b5b7;
-  --syn-kw: #fe60a6;
-  --syn-fn: #41a1ea;
-  --syn-type: #c0941c;
-  --syn-str: #8fa41c;
+  --syn-kw: #ff6eac;
+  --syn-fn: #48a7f0;
+  --syn-type: #c79a27;
+  --syn-str: #95aa27;
   --syn-com: #7b9296;
-  --syn-num: #39aca3;
-  --sh-cmd: #41a1ea;
-  --sh-flag: #39aca3;
-  --sh-str: #8fa41c;
+  --syn-num: #3fb1a7;
+  --sh-cmd: #48a7f0;
+  --sh-flag: #3fb1a7;
+  --sh-str: #95aa27;
 }
 
 /* Monokai Pro (dark) */
@@ -754,11 +754,11 @@ html[data-theme="monokai-pro"] {
   --popover-foreground: #fcfcfa;
   --primary: #ffd866;
   --primary-foreground: #2d2a2e;
-  --secondary: #3f3c40;
+  --secondary: #464347;
   --secondary-foreground: #fcfcfa;
-  --muted: #3f3c40;
+  --muted: #464347;
   --muted-foreground: #b4b3b3;
-  --accent: #3f3c40;
+  --accent: #464347;
   --accent-foreground: #fcfcfa;
   --destructive: #ff6188;
   --destructive-foreground: #2d2a2e;
@@ -811,7 +811,7 @@ html[data-theme="monokai-pro"] {
 }
 html[data-theme="monokai-pro"] .cf-thread {
   --syn-fg: #fcfcfa;
-  --syn-kw: #ab9df2;
+  --syn-kw: #b4a6fc;
   --syn-fn: #fc9867;
   --syn-type: #ffd866;
   --syn-str: #a9dc76;
@@ -836,11 +836,11 @@ html[data-theme="github-dark"] {
   --popover-foreground: #e6edf3;
   --primary: #4493f8;
   --primary-foreground: #0d1117;
-  --secondary: #1e2329;
+  --secondary: #252a31;
   --secondary-foreground: #e6edf3;
-  --muted: #1e2329;
+  --muted: #252a31;
   --muted-foreground: #989ea5;
-  --accent: #1e2329;
+  --accent: #252a31;
   --accent-foreground: #e6edf3;
   --destructive: #ffa198;
   --destructive-foreground: #0d1117;
@@ -918,11 +918,11 @@ html[data-theme="kanagawa-wave"] {
   --popover-foreground: #dcd7ba;
   --primary: #7e9cd8;
   --primary-foreground: #1f1f28;
-  --secondary: #2f2f35;
+  --secondary: #35353a;
   --secondary-foreground: #dcd7ba;
-  --muted: #2f2f35;
+  --muted: #35353a;
   --muted-foreground: #999788;
-  --accent: #2f2f35;
+  --accent: #35353a;
   --accent-foreground: #dcd7ba;
   --destructive: #fb3c36;
   --destructive-foreground: #1f1f28;
@@ -975,15 +975,15 @@ html[data-theme="kanagawa-wave"] {
 }
 html[data-theme="kanagawa-wave"] .cf-thread {
   --syn-fg: #dcd7ba;
-  --syn-kw: #a38dc7;
-  --syn-fn: #7e9cd8;
+  --syn-kw: #ab94cf;
+  --syn-fn: #7f9eda;
   --syn-type: #c0a36e;
-  --syn-str: #809f74;
+  --syn-str: #88a77c;
   --syn-com: #727169;
-  --syn-num: #74a094;
-  --sh-cmd: #7e9cd8;
-  --sh-flag: #74a094;
-  --sh-str: #809f74;
+  --syn-num: #7aa69a;
+  --sh-cmd: #7f9eda;
+  --sh-flag: #7aa69a;
+  --sh-str: #88a77c;
 }
 
 /* Everforest Dark Hard (dark) */
@@ -1000,11 +1000,11 @@ html[data-theme="everforest-dark-hard"] {
   --popover-foreground: #d3c6aa;
   --primary: #a7c080;
   --primary-foreground: #1e2326;
-  --secondary: #2d3132;
+  --secondary: #343737;
   --secondary-foreground: #d3c6aa;
-  --muted: #2d3132;
+  --muted: #343737;
   --muted-foreground: #948d7d;
-  --accent: #2d3132;
+  --accent: #343737;
   --accent-foreground: #d3c6aa;
   --destructive: #e67e80;
   --destructive-foreground: #1e2326;
@@ -1082,11 +1082,11 @@ html[data-theme="ayu-mirage"] {
   --popover-foreground: #cccac2;
   --primary: #ffad66;
   --primary-foreground: #1f2430;
-  --secondary: #2e323d;
+  --secondary: #343842;
   --secondary-foreground: #cccac2;
-  --muted: #2e323d;
+  --muted: #343842;
   --muted-foreground: #8f9090;
-  --accent: #2e323d;
+  --accent: #343842;
   --accent-foreground: #cccac2;
   --destructive: #f28779;
   --destructive-foreground: #1f2430;
@@ -1164,11 +1164,11 @@ html[data-theme="catppuccin-latte"] {
   --popover-foreground: #4c4f69;
   --primary: #8839ef;
   --primary-foreground: #eff1f5;
-  --secondary: #dde0e6;
+  --secondary: #e3e5eb;
   --secondary-foreground: #4c4f69;
-  --muted: #dde0e6;
+  --muted: #e3e5eb;
   --muted-foreground: #5f627a;
-  --accent: #dde0e6;
+  --accent: #e3e5eb;
   --accent-foreground: #4c4f69;
   --destructive: #ca0034;
   --destructive-foreground: #eff1f5;
@@ -1221,15 +1221,15 @@ html[data-theme="catppuccin-latte"] {
 }
 html[data-theme="catppuccin-latte"] .cf-thread {
   --syn-fg: #4c4f69;
-  --syn-kw: #812ee6;
-  --syn-fn: #0d57e5;
-  --syn-type: #8d5600;
-  --syn-str: #1c7300;
+  --syn-kw: #8433ea;
+  --syn-fn: #115ae9;
+  --syn-type: #935a00;
+  --syn-str: #1d7600;
   --syn-com: #6c6f85;
-  --syn-num: #ad4000;
-  --sh-cmd: #0d57e5;
-  --sh-flag: #006d73;
-  --sh-str: #1c7300;
+  --syn-num: #b24200;
+  --sh-cmd: #115ae9;
+  --sh-flag: #007278;
+  --sh-str: #1d7600;
 }
 
 /* Graphite Light (light) */
@@ -1328,11 +1328,11 @@ html[data-theme="gruvbox-light"] {
   --popover-foreground: #3c3836;
   --primary: #af3a03;
   --primary-foreground: #fbf1c7;
-  --secondary: #e6ddb7;
+  --secondary: #ece3bc;
   --secondary-foreground: #3c3836;
-  --muted: #e6ddb7;
+  --muted: #ece3bc;
   --muted-foreground: #686358;
-  --accent: #e6ddb7;
+  --accent: #ece3bc;
   --accent-foreground: #3c3836;
   --destructive: #9d0006;
   --destructive-foreground: #fbf1c7;
@@ -1385,15 +1385,15 @@ html[data-theme="gruvbox-light"] {
 }
 html[data-theme="gruvbox-light"] .cf-thread {
   --syn-fg: #3c3836;
-  --syn-kw: #94486c;
-  --syn-fn: #296a6e;
-  --syn-type: #825900;
-  --syn-str: #646400;
+  --syn-kw: #974b6e;
+  --syn-fn: #2c6d70;
+  --syn-type: #875d00;
+  --syn-str: #696800;
   --syn-com: #928374;
-  --syn-num: #386b3b;
-  --sh-cmd: #296a6e;
-  --sh-flag: #386b3b;
-  --sh-str: #646400;
+  --syn-num: #3c703f;
+  --sh-cmd: #2c6d70;
+  --sh-flag: #3c703f;
+  --sh-str: #696800;
 }
 
 /* Rosé Pine Dawn (light) */
@@ -1410,11 +1410,11 @@ html[data-theme="rose-pine-dawn"] {
   --popover-foreground: #534e75;
   --primary: #7d6795;
   --primary-foreground: #faf4ed;
-  --secondary: #e8e2e1;
+  --secondary: #ede8e4;
   --secondary-foreground: #534e75;
-  --muted: #e8e2e1;
+  --muted: #ede8e4;
   --muted-foreground: #666284;
-  --accent: #e8e2e1;
+  --accent: #ede8e4;
   --accent-foreground: #534e75;
   --destructive: #9c4d64;
   --destructive-foreground: #faf4ed;
@@ -1467,14 +1467,14 @@ html[data-theme="rose-pine-dawn"] {
 }
 html[data-theme="rose-pine-dawn"] .cf-thread {
   --syn-fg: #534e75;
-  --syn-kw: #715c89;
-  --syn-fn: #2e6d78;
-  --syn-type: #8e5900;
+  --syn-kw: #75608d;
+  --syn-fn: #31707b;
+  --syn-type: #945c00;
   --syn-str: #286983;
   --syn-com: #666284;
-  --syn-num: #9d4e4c;
-  --sh-cmd: #2e6d78;
-  --sh-flag: #9d4e4c;
+  --syn-num: #a0514f;
+  --sh-cmd: #31707b;
+  --sh-flag: #a0514f;
   --sh-str: #286983;
 }
 
@@ -1492,11 +1492,11 @@ html[data-theme="atom-one-light"] {
   --popover-foreground: #2a2c33;
   --primary: #356be4;
   --primary-foreground: #f9f9f9;
-  --secondary: #e2e2e3;
+  --secondary: #e9e9ea;
   --secondary-foreground: #2a2c33;
-  --muted: #e2e2e3;
+  --muted: #e9e9ea;
   --muted-foreground: #65676c;
-  --accent: #e2e2e3;
+  --accent: #e9e9ea;
   --accent-foreground: #2a2c33;
   --destructive: #ca2823;
   --destructive-foreground: #f9f9f9;
@@ -1550,14 +1550,14 @@ html[data-theme="atom-one-light"] {
 html[data-theme="atom-one-light"] .cf-thread {
   --syn-fg: #2a2c33;
   --syn-kw: #950095;
-  --syn-fn: #2a53ec;
-  --syn-type: #7b6128;
-  --syn-str: #197516;
+  --syn-fn: #2e58f1;
+  --syn-type: #7f662c;
+  --syn-str: #1f791c;
   --syn-com: #65676c;
-  --syn-num: #197516;
-  --sh-cmd: #2a53ec;
-  --sh-flag: #197516;
-  --sh-str: #197516;
+  --syn-num: #1f791c;
+  --sh-cmd: #2e58f1;
+  --sh-flag: #1f791c;
+  --sh-str: #1f791c;
 }
 
 /* Solarized Light (light) */
@@ -1574,11 +1574,11 @@ html[data-theme="solarized-light"] {
   --popover-foreground: #42575f;
   --primary: #0075ba;
   --primary-foreground: #fdf6e3;
-  --secondary: #e9e5d5;
+  --secondary: #efead9;
   --secondary-foreground: #42575f;
-  --muted: #e9e5d5;
+  --muted: #efead9;
   --muted-foreground: #586a6f;
-  --accent: #e9e5d5;
+  --accent: #efead9;
   --accent-foreground: #42575f;
   --destructive: #cc1d20;
   --destructive-foreground: #fdf6e3;
@@ -1631,15 +1631,15 @@ html[data-theme="solarized-light"] {
 }
 html[data-theme="solarized-light"] .cf-thread {
   --syn-fg: #42575f;
-  --syn-kw: #bf1f72;
-  --syn-fn: #006baa;
-  --syn-type: #826200;
-  --syn-str: #5e6d00;
+  --syn-kw: #c32375;
+  --syn-fn: #006eae;
+  --syn-type: #866400;
+  --syn-str: #617000;
   --syn-com: #586a6f;
-  --syn-num: #00726b;
-  --sh-cmd: #006baa;
-  --sh-flag: #00726b;
-  --sh-str: #5e6d00;
+  --syn-num: #007770;
+  --sh-cmd: #006eae;
+  --sh-flag: #007770;
+  --sh-str: #617000;
 }
 
 /* GitHub Light (light) */
@@ -1656,11 +1656,11 @@ html[data-theme="github-light"] {
   --popover-foreground: #1f2328;
   --primary: #0969da;
   --primary-foreground: #ffffff;
-  --secondary: #e6e6e7;
+  --secondary: #edeeee;
   --secondary-foreground: #1f2328;
-  --muted: #e6e6e7;
+  --muted: #edeeee;
   --muted-foreground: #5e6166;
-  --accent: #e6e6e7;
+  --accent: #edeeee;
   --accent-foreground: #1f2328;
   --destructive: #cf222e;
   --destructive-foreground: #ffffff;
@@ -1713,13 +1713,13 @@ html[data-theme="github-light"] {
 }
 html[data-theme="github-light"] .cf-thread {
   --syn-fg: #1f2328;
-  --syn-kw: #7b48d6;
-  --syn-fn: #0063d2;
+  --syn-kw: #7f4ddc;
+  --syn-fn: #0667d8;
   --syn-type: #4d2d00;
   --syn-str: #116329;
   --syn-com: #57606a;
-  --syn-num: #047279;
-  --sh-cmd: #0063d2;
-  --sh-flag: #047279;
+  --syn-num: #10767d;
+  --sh-cmd: #0667d8;
+  --sh-flag: #10767d;
   --sh-str: #116329;
 }

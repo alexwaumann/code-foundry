@@ -186,7 +186,8 @@ function derive(g: Ghostty, o: Override, names: readonly string[]): Record<strin
   const fg = ensureContrast(g.foreground, [pane], 7, away(scheme));
   const sheet = shiftL(pane, dark ? -0.05 : -0.045);
   const popover = shiftL(pane, dark ? 0.03 : 0.02);
-  const surface = mix(pane, fg, 0.1);
+  // Hover/muted surface: about Catppuccin surface0 on dark, a lighter step on light.
+  const surface = mix(pane, fg, dark ? 0.14 : 0.07);
   const v: Record<string, string> = {};
 
   v["--sheet"] = sheet;
