@@ -1,13 +1,18 @@
 import { X } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Tip } from "@/components/ui/tooltip";
+import { pageCount } from "@/lib/compose";
 import { formatAttachmentSize } from "@/lib/prompt";
+import { cn } from "@/lib/utils";
 import { closePreview, useComposeStore } from "@/stores/compose";
+import { PdfPages } from "./PdfPages";
 
 /**
- * The image lightbox for a draft attachment (opened from its thumbnail or an inline chip):
- * the image at natural size, capped to the window, under a line with its name and size.
- * Escape, the backdrop and × close it; focus goes back to where it was opened from.
+ * The lightbox for a draft attachment (opened from its tile or an inline chip): an image
+ * at natural size, capped to the window; a PDF's pages in a scrolling column at the
+ * dialog's width (the same caps), drawn as they come into view. Over either, a line with
+ * its name and size (and a PDF's page count). Escape, the backdrop and × close it; focus
+ * goes back to where it was opened from.
  */
 export function AttachmentPreview({ draftKey }: { draftKey: string }) {
   const preview = useComposeStore((s) => (s.preview?.draftKey === draftKey ? s.preview : null));
@@ -23,7 +28,11 @@ export function AttachmentPreview({ draftKey }: { draftKey: string }) {
         data-testid="attachment-preview"
         data-attachment-id={att?.id}
         overlayClassName="bg-black/80"
-        className="top-1/2 flex w-auto max-w-[calc(90vw/var(--cf-zoom))] min-w-72 -translate-y-1/2 flex-col overflow-hidden bg-popover/95 p-0"
+        data-kind={att?.kind}
+        className={cn(
+          "top-1/2 flex min-w-72 -translate-y-1/2 flex-col overflow-hidden bg-popover/95 p-0",
+          att?.kind === "pdf" ? "w-[calc(90vw/var(--cf-zoom))] max-w-4xl" : "w-auto max-w-[calc(90vw/var(--cf-zoom))]",
+        )}
         onCloseAutoFocus={(e) => {
           const el = preview?.returnFocus;
           if (!el?.isConnected) return;
@@ -37,6 +46,7 @@ export function AttachmentPreview({ draftKey }: { draftKey: string }) {
           </DialogTitle>
           <DialogDescription className="shrink-0" data-testid="attachment-preview-size">
             {att ? formatAttachmentSize(att.file.size) : ""}
+            {att?.pages != null && ` · ${pageCount(att.pages)}`}
           </DialogDescription>
           <Tip label="Close">
             <button
@@ -50,7 +60,8 @@ export function AttachmentPreview({ draftKey }: { draftKey: string }) {
             </button>
           </Tip>
         </div>
-        {att && <img src={att.url} alt={att.file.name} draggable={false} className="mx-auto block h-auto max-h-[calc(85vh/var(--cf-zoom))] w-auto max-w-[calc(90vw/var(--cf-zoom))] object-contain" />}
+        {att?.kind === "pdf" && <PdfPages file={att.file} />}
+        {att?.kind === "image" && <img src={att.url} alt={att.file.name} draggable={false} className="mx-auto block h-auto max-h-[calc(85vh/var(--cf-zoom))] w-auto max-w-[calc(90vw/var(--cf-zoom))] object-contain" />}
       </DialogContent>
     </Dialog>
   );

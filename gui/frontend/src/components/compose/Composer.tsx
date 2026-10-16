@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { ArrowUp, Brain, Folder, FolderGit2, Gauge, GitBranch, GitBranchPlus, GitCommitHorizontal, Layers, Loader2, Paperclip, ShieldCheck, X } from "lucide-react";
+import { ArrowUp, Brain, FileText, Folder, FolderGit2, Gauge, GitBranch, GitBranchPlus, GitCommitHorizontal, Layers, Loader2, Paperclip, ShieldCheck, X } from "lucide-react";
 import { AttachmentPreview } from "./AttachmentPreview";
 import { BranchIndicator } from "./BranchIndicator";
 import { ComposerPicker, type PickerGroup } from "./ComposerPicker";
@@ -24,6 +24,7 @@ import {
   draftMembers,
   EFFORT_CHOICES,
   NEW_BRANCH,
+  pageCount,
   PERMISSION_CHOICES,
   pickDefault,
   projectChipBranch,
@@ -112,7 +113,7 @@ function resolveWorktree(choice: WorktreeChoice, worktrees: readonly WorktreeOpt
 
 /** What the send button says while busy: new worktrees (one per project for a workspace), or starting. */
 function phaseText(phase: DraftPhase, newWorktrees: number): string {
-  if (phase === "attaching") return "Attaching images…";
+  if (phase === "attaching") return "Attaching files…";
   if (newWorktrees > 1) return "Creating worktrees…";
   return newWorktrees === 1 ? "Creating worktree…" : "Starting Claude…";
 }
@@ -196,7 +197,7 @@ function useMemberChips(
 
 /**
  * Removes an attachment from the draft. Still referenced by a chip in the text: asks
- * first, then removes the image and every reference; unreferenced: removes it at once.
+ * first, then removes the attachment and every reference; unreferenced: removes it at once.
  */
 async function removeWithConfirm(key: string, a: DraftAttachment, refocus: () => void): Promise<void> {
   if (isReferenced(getDraft(key).text, a.id)) {
@@ -212,22 +213,52 @@ async function removeWithConfirm(key: string, a: DraftAttachment, refocus: () =>
   refocus();
 }
 
-/** A draft's image thumbnails (preview on click, × to remove); also a thread's follow-up composer's. */
+/** What the composers' file pickers offer: the accepted types, and any file named .pdf. */
+export const ATTACHMENT_ACCEPT = `image/*,${ATTACHMENT_MIME_TYPES.join(",")},.pdf`;
+
+/** A tile's label: "Preview a.png, 58 KB", "Preview spec.pdf, PDF, 12 pages, 1.4 MB". */
+function tileLabel(a: DraftAttachment): string {
+  const size = formatAttachmentSize(a.file.size);
+  if (a.kind === "image") return `Preview ${a.file.name}, ${size}`;
+  return `Preview ${a.file.name}, PDF, ${a.pages === null ? "" : `${pageCount(a.pages)}, `}${size}`;
+}
+
+/** A PDF tile's face: the first page on a muted ground (the icon until it renders) over a "PDF" strip. */
+function PdfTile({ thumb }: { thumb: string | null }) {
+  return (
+    <span className="flex size-full flex-col bg-muted">
+      <span className="flex min-h-0 flex-1 items-center justify-center p-1">
+        {thumb ? (
+          <img src={thumb} alt="" draggable={false} className="max-h-full max-w-full object-contain shadow-sm" />
+        ) : (
+          <FileText aria-hidden className="size-5 text-muted-foreground" />
+        )}
+      </span>
+      <span aria-hidden className="border-t bg-popover text-center text-caption-sm font-medium text-muted-foreground">
+        PDF
+      </span>
+    </span>
+  );
+}
+
+/** A draft's attachment tiles (preview on click, × to remove); also a thread's follow-up composer's. */
 export function Attachments({ draftKey, disabled, refocus }: { draftKey: string; disabled: boolean; refocus: () => void }) {
   const attachments = useDraft(draftKey, "attachments");
   if (attachments.length === 0) return null;
   return (
-    <ul className="flex flex-wrap gap-2 px-3 pt-3" aria-label="Attached images">
+    <ul className="flex flex-wrap gap-2 px-3 pt-3" aria-label="Attachments">
       {attachments.map((a) => (
         <li
           key={a.id}
           className="group relative size-16 overflow-hidden rounded-md border bg-muted/40"
           data-testid="attachment"
           data-attachment-id={a.id}
+          data-kind={a.kind}
+          data-pages={a.pages ?? undefined}
         >
           <button
             type="button"
-            aria-label={`Preview ${a.file.name}, ${formatAttachmentSize(a.file.size)}`}
+            aria-label={tileLabel(a)}
             aria-haspopup="dialog"
             data-testid="attachment-open"
             className="block size-full cursor-pointer rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:ring-inset"
@@ -235,7 +266,7 @@ export function Attachments({ draftKey, disabled, refocus }: { draftKey: string;
               openPreview(draftKey, a.id, e.currentTarget);
             }}
           >
-            <img src={a.url} alt={a.file.name} draggable={false} className="size-full object-cover" />
+            {a.kind === "pdf" ? <PdfTile thumb={a.thumb} /> : <img src={a.url} alt={a.file.name} draggable={false} className="size-full object-cover" />}
           </button>
           <button
             type="button"
@@ -572,12 +603,12 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
             data-testid="composer-permission"
           />
           {/* The span carries the tooltip while the button is disabled (no pointer events). */}
-          <Tip label="Attach images">
+          <Tip label="Attach images or PDFs">
             <span className="ml-auto flex">
               <button
                 type="button"
                 disabled={busy}
-                aria-label="Attach images"
+                aria-label="Attach images or PDFs"
                 data-compose-stop
                 data-testid="composer-attach"
                 className="flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50"
@@ -590,7 +621,7 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
           <input
             ref={fileRef}
             type="file"
-            accept={`image/*,${ATTACHMENT_MIME_TYPES.join(",")}`}
+            accept={ATTACHMENT_ACCEPT}
             multiple
             hidden
             data-testid="composer-file-input"

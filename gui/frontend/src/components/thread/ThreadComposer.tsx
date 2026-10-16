@@ -1,11 +1,10 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { AlarmClockOff, ArrowUp, Brain, Gauge, Loader2, Paperclip, ShieldCheck } from "lucide-react";
-import { ATTACHMENT_MIME_TYPES } from "@/api/threads";
 import type { ThreadPendingView } from "@/api/thread";
 import { AttachmentPreview } from "@/components/compose/AttachmentPreview";
 import { CompletionCard } from "@/components/compose/CompletionCard";
-import { Attachments } from "@/components/compose/Composer";
+import { ATTACHMENT_ACCEPT, Attachments } from "@/components/compose/Composer";
 import { ComposerPicker } from "@/components/compose/ComposerPicker";
 import { PromptEditor, type EditorTrigger, type PromptEditorHandle } from "@/components/compose/PromptEditor";
 import { TagMultiProjectContext } from "@/components/compose/tagContext";
@@ -129,7 +128,7 @@ function SnoozeNote({ threadId }: { threadId: string }) {
  * The follow-up composer floating over the bottom of the thread (variant A): the
  * new-thread composer's prompt editor with its "/" skills (the running process's slash
  * commands when it has reported them) and "@" files, image
- * attachments, the model / effort / permission pickers, attach, Interrupt while Claude
+ * and PDF attachments, the model / effort / permission pickers, attach, Interrupt while Claude
  * works (the only Interrupt), and send. Pending permissions and questions dock into the
  * top of the card, oldest first (the card turns opaque); while the editor is empty its
  * digits (and a question's Enter) answer the oldest. Escape does not interrupt (it stopped
@@ -365,12 +364,12 @@ export function ThreadComposer({ threadId, pending, busy }: { threadId: string; 
             data-testid="thread-permission-mode"
           />
           {/* The span carries the tooltip while the button is disabled (no pointer events). */}
-          <Tip label="Attach images">
+          <Tip label="Attach images or PDFs">
             <span className="ml-auto flex">
               <button
                 type="button"
                 disabled={sending}
-                aria-label="Attach images"
+                aria-label="Attach images or PDFs"
                 data-testid="thread-attach"
                 className="flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50"
                 onClick={() => fileRef.current?.click()}
@@ -382,7 +381,7 @@ export function ThreadComposer({ threadId, pending, busy }: { threadId: string; 
           <input
             ref={fileRef}
             type="file"
-            accept={`image/*,${ATTACHMENT_MIME_TYPES.join(",")}`}
+            accept={ATTACHMENT_ACCEPT}
             multiple
             hidden
             onChange={(e) => {
@@ -411,7 +410,7 @@ export function ThreadComposer({ threadId, pending, busy }: { threadId: string; 
               <button
                 type="button"
                 disabled={!canSend}
-                aria-label={phase === "attaching" ? "Attaching images…" : sending ? "Sending…" : "Send"}
+                aria-label={phase === "attaching" ? "Attaching files…" : sending ? "Sending…" : "Send"}
                 data-testid="thread-send"
                 data-phase={phase}
                 className="flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground outline-none transition-all hover:bg-primary/90 focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-40"
