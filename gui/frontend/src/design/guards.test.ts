@@ -1,25 +1,21 @@
 import { describe, expect, it } from "vitest";
-import allowJson from "./guards.allow.json";
-import allowText from "./guards.allow.json?raw";
-import { type Allowlist, CATEGORIES, FRONTEND, INSTEAD, count, isScanned, scanSource, serialize, zero } from "./scan";
+import { FRONTEND, INSTEAD, isScanned, scanSource } from "./scan";
 
 /**
  * Text uses a type role and radii the scale (index.css; docs/notes/design-system-1-tokens.md).
  * Every scanned source file (src/**\/*.{ts,tsx} except tests and src/gen) is searched for
- * Tailwind sizes, arbitrary line-heights and off-scale radii in its string and
- * template literals. guards.allow.json holds what the tree had when the guard landed: a
- * file may lose hits, never gain them, and a file not listed may have none. When a file
- * has fewer than its entry, `pnpm run guards:allow` rewrites the list, so it only shrinks.
+ * Tailwind sizes, arbitrary line-heights and off-scale radii in its string and template
+ * literals. Strict since docs/notes/design-system-3-sweep-chrome.md: no file may have any
+ * (the allowlist the guard landed with reached zero and is gone).
  */
 
 const raw = import.meta.glob<string>(["/src/**/*.{ts,tsx}", "!/src/gen/**"], { query: "?raw", import: "default", eager: true });
-/** Paths relative to gui/frontend, as the scanner and `pnpm run guards:allow` see them. */
+/** Paths relative to gui/frontend, as the scanner sees them. */
 const files = Object.fromEntries(
   Object.entries(raw)
     .map(([file, src]) => [file.slice(1), src] as const)
     .filter(([file]) => isScanned(file)),
 );
-const allow: Allowlist = allowJson;
 
 describe("design-system guard", () => {
   it("scans the tree", () => {
@@ -27,44 +23,11 @@ describe("design-system guard", () => {
     expect(files["src/components/ui/button.tsx"]).toBeDefined();
   });
 
-  it("no file adds a Tailwind size, arbitrary leading or off-scale radius", () => {
-    const problems: string[] = [];
-    for (const [file, src] of Object.entries(files)) {
-      const key = FRONTEND + file;
-      const hits = scanSource(file, src);
-      const have = count(hits);
-      const allowed = allow[key] ?? zero();
-      for (const category of CATEGORIES) {
-        if (have[category] <= allowed[category]) continue;
-        const where = hits
-          .filter((h) => h.category === category)
-          .map((h) => `    ${key}:${String(h.line)}  ${h.match}  (/${h.pattern}/)  ${h.text}`)
-          .join("\n");
-        problems.push(
-          `${key}: ${String(have[category])} ${category} hit(s), ${String(allowed[category])} allowed. Use ${INSTEAD[category]}.\n${where}`,
-        );
-      }
-    }
-    expect(problems, `\n${problems.join("\n\n")}\n`).toEqual([]);
-  });
-
-  it("the allowlist only shrinks: run `pnpm run guards:allow` after removing banned classes", () => {
-    const stale: string[] = [];
-    for (const [key, allowed] of Object.entries(allow)) {
-      const file = key.slice(FRONTEND.length);
-      const src = files[file];
-      const have = src === undefined ? zero() : count(scanSource(file, src));
-      for (const category of CATEGORIES) {
-        if (have[category] < allowed[category]) {
-          stale.push(`${key}: ${category} is ${String(have[category])}, the allowlist still says ${String(allowed[category])}`);
-        }
-      }
-    }
-    expect(stale, `\nThe allowlist is above the tree. Run \`pnpm run guards:allow\` (gui/frontend) and commit src/design/guards.allow.json:\n${stale.join("\n")}\n`).toEqual([]);
-  });
-
-  it("guards.allow.json is in the generator's format (`pnpm run guards:allow`)", () => {
-    expect(allowText).toBe(serialize(allow));
+  it("no file has a Tailwind size, arbitrary leading or off-scale radius", () => {
+    const problems = Object.entries(files).flatMap(([file, src]) =>
+      scanSource(file, src).map((h) => `${FRONTEND}${file}:${String(h.line)}  ${h.match}  (/${h.pattern}/)  ${h.text}\n    Use ${INSTEAD[h.category]}.`),
+    );
+    expect(problems, `\n${problems.join("\n")}\n`).toEqual([]);
   });
 });
 

@@ -99,7 +99,8 @@ text-foreground`, `text-body font-medium`.
   because src has no Node types.
 - The weight category also counts `font-medium` used as a modifier on a role; PRs 3/4
   decide whether the guard should tell the two apart.
-  PR 3 dropped the weight category (docs/notes/design-system-3-sweep-chrome.md).
+  PR 3 dropped the weight category and, with PR 4 merged, made the guard strict and
+  deleted the allowlist and `guards:allow` (docs/notes/design-system-3-sweep-chrome.md).
 
 ## Verified
 

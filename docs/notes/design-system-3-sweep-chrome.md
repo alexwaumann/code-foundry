@@ -1,11 +1,11 @@
 # Design system 3: the type and radius sweep, chrome
 
 PR 3 of 4 of the design-system normalization (1: tokens + guard, #126; 2: shell, #129; 3:
-this; 4: the surfaces and pages). Frontend only. Every file the guard listed under
+this; 4: the surfaces and pages, #130, merged first). Frontend only. Every file the guard listed under
 components/{compose, ui, thread, sidebar, update, addproject, publish, palette, session,
 help, snooze, start, bottom, gitops, panel, terminal, command, settings, themes} and
-surfaces/Placeholder.tsx is now on the type roles and the radius scale; their allowlist
-entries are gone. App.tsx had no hits.
+surfaces/Placeholder.tsx is now on the type roles and the radius scale. App.tsx had no
+hits. With PR 4 in, the tree has none, so the guard is strict and the allowlist is gone.
 
 ## Mapping
 
@@ -90,11 +90,18 @@ HeaderActions do. roles.test.ts pins the merge.
   counted as a size; the size pattern now skips colour values (colour-mix, oklch, rgb, hsl,
   `#`, `color:`). The palette guard still polices arbitrary colours.
 - `text-brand` joined index.css, tokens.ts (so cn merges it) and roles.test.ts.
-- No new test for "these directories stay at zero": a file not in the allowlist may have no
-  hits, so the allowlist is the record.
+- **Strict.** PR 4 (#130) merged first; rebased on it, `guards:allow` left an empty
+  allowlist. So guards.allow.json, scripts/guards-allow.ts (and the `guards:allow` script and
+  scripts/ in tsconfig.node.json), the "only shrinks" and "generator format" tests and the
+  scanner's allowlist helpers are gone: guards.test.ts now fails on any hit in any scanned
+  file under src, naming file, line, match and what to use instead.
 
-Allowlist totals (files / size / weight / leading / radius): before 103 / 481 / 156 / 6 / 40;
-after 29 / 219 / - / 5 / 16. The 29 are PR 4's directories, untouched.
+Allowlist totals (files / size / weight / leading / radius): main before PR 4 103 / 481 /
+156 / 6 / 40; this branch alone 29 / 219 / - / 5 / 16 (the 29 were PR 4's directories);
+after the rebase on PR 4, 0 / 0 / - / 0 / 0, and the allowlist is deleted.
+
+Usage totals: PR 4 had left them at `text-title`; the page total is now `text-display`
+(keeping its `proportional-nums`) and the panel's cost `text-display-sm`.
 
 ## Gotchas
 

@@ -76,7 +76,7 @@ export function UsagePage() {
       </PaneHeader>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-[1040px] px-8 pt-7 pb-10">
-          <div className="text-title proportional-nums" data-testid="usage-page-total">
+          <div className="text-display proportional-nums" data-testid="usage-page-total">
             {fmtUsd(totals.costUsd)}
           </div>
           <p className="mt-2 text-caption" data-testid="usage-page-summary">

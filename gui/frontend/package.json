@@ -14,7 +14,6 @@
     "mock": "tsx mock/server.ts",
     "mock:emit": "tsx mock/emit.ts",
     "themes": "tsx themes/convert.ts",
-    "guards:allow": "tsx scripts/guards-allow.ts",
     "dev:mock": "vite --mode mock",
     "e2e": "playwright test",
     "e2e:live": "playwright test -c playwright.live.config.ts"
