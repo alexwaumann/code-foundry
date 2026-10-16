@@ -7,13 +7,14 @@ import { openUpdateDialog, useUpdateStore } from "@/stores/update";
 const tone: Record<UpdateBadgeKind, { className: string; icon: LucideIcon }> = {
   available: { className: "bg-info/10 text-info hover:bg-info/15", icon: Download },
   downloading: { className: "bg-info/10 text-info hover:bg-info/15", icon: Download },
+  downloaded: { className: "bg-success/10 text-success hover:bg-success/15", icon: RefreshCw },
   failed: { className: "bg-destructive/10 text-destructive hover:bg-destructive/15", icon: TriangleAlert },
   installed: { className: "bg-success/10 text-success hover:bg-success/15", icon: RefreshCw },
 };
 
 /**
  * Sidebar status row: a full-width chip for a pending update ("v0.2.0 available ·
- * Install", "v0.2.0 installed · Restart to apply", …); opens the update dialog.
+ * Download", "v0.2.0 downloaded · Restart to apply", …); opens the update dialog.
  */
 export function UpdateIndicator() {
   const status = useUpdateStore((s) => s.status);

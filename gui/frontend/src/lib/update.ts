@@ -87,7 +87,7 @@ export function versionMismatch(status: UpdateStatusView, guiVersion: string | n
   }
 }
 
-export type UpdateBadgeKind = "available" | "downloading" | "failed" | "installed";
+export type UpdateBadgeKind = "available" | "downloading" | "downloaded" | "failed" | "installed";
 
 export interface UpdateBadge {
   kind: UpdateBadgeKind;
@@ -97,21 +97,23 @@ export interface UpdateBadge {
 }
 
 /**
- * The sidebar status row's update chip. One restart (app.restart) applies an installed
- * update to both the daemon and the window, so installed, restart-required and partly
- * applied all read "vX installed · Restart to apply".
+ * The sidebar status row's update chip. One restart (app.restart) installs a download and
+ * applies it to both the daemon and the window, so downloaded reads "vX downloaded ·
+ * Restart to apply", and installed, restart-required and partly applied (the install on
+ * disk is newer than what runs) "vX installed · Restart to apply".
  */
 export function updateBadge(status: UpdateStatusView | null, guiVersion: string | null): UpdateBadge | null {
   if (!status) return null;
   const target = displayVersion(status.targetVersion);
   switch (status.state) {
     case "available":
-      return { kind: "available", label: `${target} available`, cta: "Install" };
+      return { kind: "available", label: `${target} available`, cta: "Download" };
     case "downloading":
-      return { kind: "downloading", label: `Installing ${target}…`, cta: "" };
+      return { kind: "downloading", label: `Downloading ${target}…`, cta: "" };
+    case "downloaded":
+      return { kind: "downloaded", label: `${target} downloaded`, cta: "Restart to apply" };
     case "failed":
       return { kind: "failed", label: "Update failed", cta: "Details" };
-    case "downloaded":
     case "installed":
     case "restartRequired":
       return { kind: "installed", label: `${target} installed`, cta: "Restart to apply" };
@@ -136,7 +138,7 @@ export type UpdateVariant =
   | "restarting"
   | "upToDate"
   | "available"
-  | "installing"
+  | "downloading"
   | "failed"
   | "readyIdle"
   | "readyBusy"
@@ -147,7 +149,9 @@ export interface UpdateView {
   variant: UpdateVariant;
   title: string;
   body: string;
-  /** The version offered, installing, installed or partly applied (current when up to date). */
+  /** The primary button's label; null for none (downloading, restarting, disabled). */
+  primary: string | null;
+  /** The version offered, downloading, downloaded, installed or partly applied (current when up to date). */
   version: string;
   /** The muted link under the primary button; it closes the dialog. null for none. */
   later: string | null;
@@ -189,6 +193,14 @@ export function cutOffLabel(kind: CutOff, agents: number, shells: number): strin
   }
 }
 
+/**
+ * Restart Now already ran. `install` is the downloaded version app.restart installs
+ * before restarting ("" when nothing was downloaded: a plain restart).
+ */
+export interface Restarting {
+  install: string;
+}
+
 function cutOff(busy: number): string {
   return busy === 1 ? "Restarting now cuts this thread off." : "Restarting now cuts these threads off.";
 }
@@ -212,16 +224,34 @@ function sentence(s: string): string {
   return /[.!?]$/.test(t) ? t : `${t}.`;
 }
 
+/** What a ready dialog says with threads a restart would cut off. */
+function readyBusyRest(busy: number, install: boolean): string {
+  const anyway = install ? "install and restart anyway" : "restart anyway";
+  return busy === 1
+    ? `Let it finish first, or ${anyway}: it keeps its history, and a message continues it.`
+    : `Let them finish first, or ${anyway}: they keep their history, and a message continues each.`;
+}
+
 /**
  * Picks the update dialog's variant and copy from the daemon's updater status, the
  * window's own version, the busy thread count, and whether Restart Now already ran.
  */
-export function updateView(status: UpdateStatusView, guiVersion: string | null, t: ThreadActivity, restarting = false): UpdateView {
+export function updateView(status: UpdateStatusView, guiVersion: string | null, t: ThreadActivity, restarting: Restarting | null = null): UpdateView {
   // Copy shows versions through displayVersion; `version` and `mismatch` keep the tags.
   const target = displayVersion(status.targetVersion);
   const current = displayVersion(status.currentVersion);
-  const base = { version: status.targetVersion, later: "Later", close: false, showBusy: false, mismatch: null };
+  const base = { version: status.targetVersion, primary: null, later: "Later", close: false, showBusy: false, mismatch: null };
   if (restarting) {
+    if (restarting.install) {
+      return {
+        ...base,
+        variant: "restarting",
+        version: restarting.install,
+        title: "Installing and restarting…",
+        body: `Code Foundry will reopen in a moment on ${displayVersion(restarting.install)}.`,
+        later: null,
+      };
+    }
     return { ...base, variant: "restarting", title: "Restarting…", body: "Code Foundry will reopen in a moment.", later: null };
   }
   if (!status.enabled) {
@@ -238,6 +268,7 @@ export function updateView(status: UpdateStatusView, guiVersion: string | null, 
       version: m.version,
       title: `Code Foundry ${displayVersion(m.version)} is partly applied`,
       body: `${where}; some things won’t work until you restart.${t.busy > 0 ? ` ${cutOff(t.busy)}` : ""}`,
+      primary: "Restart Now",
       later: laterFor(t),
       showBusy: t.busy > 0,
       mismatch: m,
@@ -251,6 +282,7 @@ export function updateView(status: UpdateStatusView, guiVersion: string | null, 
         version: status.currentVersion,
         title: status.checking ? "Checking for updates…" : "You’re up to date",
         body: olderStable(status) ? sentence(`stable ${displayVersion(status.latestVersion)} is older than this build; the next stable release will move you`) : `Code Foundry ${current} is the latest version.`,
+        primary: "Check Again",
         later: null,
         close: true,
       };
@@ -259,24 +291,34 @@ export function updateView(status: UpdateStatusView, guiVersion: string | null, 
         ...base,
         variant: "available",
         title: `Code Foundry ${target} is available`,
-        body: `You’re on ${current}. Installing happens in the background; you’ll be asked to restart when it’s done.`,
+        body: `You’re on ${current}. Downloading happens in the background and changes nothing until you restart.`,
+        primary: `Download ${target}`,
       };
     case "downloading":
-      return { ...base, variant: "installing", title: `Installing ${target}…`, body: "You can close this and keep working.", later: "Hide" };
+      return {
+        ...base,
+        variant: "downloading",
+        title: `Downloading ${target}…`,
+        body: "You can close this and keep working. Nothing changes on disk until you install and restart.",
+        later: "Hide",
+      };
     case "failed":
-      return { ...base, variant: "failed", title: `Couldn’t install ${target}`, body: `Nothing changed. You’re still on ${current}.`, later: "Not now" };
+      return { ...base, variant: "failed", title: `Couldn’t update to ${target}`, body: `Nothing changed. You’re still on ${current}.`, primary: "Try Again", later: "Not now" };
     case "downloaded":
     case "installed":
     case "restartRequired": {
+      // Downloaded: app.restart installs first. Installed / restart required: the install
+      // on disk is already newer (the installer ran by hand, or a restart did not follow).
+      const install = status.state === "downloaded";
       const title = `Code Foundry ${target} is ready`;
+      const primary = install ? "Install and Restart Now" : "Restart Now";
       if (t.busy > 0) {
-        const rest =
-          t.busy === 1
-            ? "Let it finish first, or restart anyway: it keeps its history, and a message continues it."
-            : "Let them finish first, or restart anyway: they keep their history, and a message continues each.";
-        return { ...base, variant: "readyBusy", title, body: `${cutOff(t.busy)} ${rest}`, later: laterFor(t), showBusy: true };
+        return { ...base, variant: "readyBusy", title, body: `${cutOff(t.busy)} ${readyBusyRest(t.busy, install)}`, primary, later: laterFor(t), showBusy: true };
       }
-      return { ...base, variant: "readyIdle", title, body: "Restart to finish updating. No thread is working or waiting on you, so nothing will be interrupted." };
+      const body = install
+        ? "Install and restart to finish updating. The app and the daemon update together, so nothing ends up out of sync. No thread is working or waiting on you, so nothing will be interrupted."
+        : "Restart to finish updating. No thread is working or waiting on you, so nothing will be interrupted.";
+      return { ...base, variant: "readyIdle", title, body, primary };
     }
   }
 }

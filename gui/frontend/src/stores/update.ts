@@ -5,12 +5,13 @@ import { appInfo, onCheckForUpdatesMenu, relaunchApp } from "@/api/app";
 import { invokeCommand, isUnknownCommand } from "@/api/command";
 import { errorMessage } from "@/api/stream";
 import type { UpdateEventView, UpdateStatusView } from "@/api/update";
+import type { Restarting } from "@/lib/update";
 import { invokeConfirmed, refreshCommands, useCommandsStore } from "./commands";
 import { getUiContext } from "./context";
 import { restartCutsOff } from "@/lib/session";
 import { useSessionsStore } from "./sessions";
 
-export type UpdateAction = "check" | "install" | "relaunch" | "restart";
+export type UpdateAction = "check" | "download" | "relaunch" | "restart";
 
 interface UpdateSlice {
   /** The daemon's updater status (from the events stream); null until the first event. */
@@ -20,8 +21,11 @@ interface UpdateSlice {
   dialogOpen: boolean;
   /** An action the dialog started and is waiting on. */
   pending: UpdateAction | null;
-  /** Restart Now succeeded: the dialog shows "Restarting…" until the window goes away. */
-  restarting: boolean;
+  /**
+   * Restart Now succeeded: the dialog shows "Restarting…" ("Installing and restarting…"
+   * when it installed a download) until the window goes away. null before.
+   */
+  restarting: Restarting | null;
   error: string | null;
 }
 
@@ -30,7 +34,7 @@ export const useUpdateStore = create<UpdateSlice>()(() => ({
   guiVersion: null,
   dialogOpen: false,
   pending: null,
-  restarting: false,
+  restarting: null,
   error: null,
 }));
 
@@ -45,7 +49,8 @@ export function applyUpdateEvent(ev: UpdateEventView): void {
   }
   const prev = useUpdateStore.getState().status;
   useUpdateStore.setState({ status: ev.status });
-  // app.update's availability and title ("Update to vX") follow the state.
+  // app.update's availability and title ("Download vX") and app.restart's ("Install vX
+  // and Restart") follow the state.
   if (prev?.state !== ev.status.state || prev.targetVersion !== ev.status.targetVersion) void refreshCommands();
 }
 
@@ -72,18 +77,18 @@ export function openUpdateDialog(opts: { check?: boolean } = {}): void {
 }
 
 export function closeUpdateDialog(): void {
-  useUpdateStore.setState({ dialogOpen: false, pending: null, restarting: false, error: null });
+  useUpdateStore.setState({ dialogOpen: false, pending: null, restarting: null, error: null });
 }
 
 const actionCommands: Record<Exclude<UpdateAction, "restart">, string> = {
   check: "app.update.check",
-  install: "app.update",
+  download: "app.update",
   relaunch: "app.relaunch",
 };
 
 /**
- * Restart Now: app.restart closes the sessions, asks the window host to relaunch once
- * the daemon has exited, and exits. The dialog is the confirmation, so it goes in with
+ * Restart Now: app.restart installs a downloaded update, closes the sessions, asks the
+ * window host to relaunch once the daemon has exited, and exits. The dialog is the confirmation, so it goes in with
  * confirmed set (no second confirm dialog). A daemon older than app.restart (absent
  * from the command list, or NotFound) gets daemon.restart and the host's own Relaunch.
  */
@@ -115,8 +120,11 @@ export async function runUpdateAction(action: UpdateAction): Promise<boolean> {
   useUpdateStore.setState({ pending: action, error: null });
   try {
     if (action === "restart") {
+      // Read before the call: the daemon has moved on (installed) by the time it returns.
+      const st = useUpdateStore.getState().status;
+      const install = st?.state === "downloaded" ? st.targetVersion : "";
       await restartApp();
-      useUpdateStore.setState({ restarting: true, dialogOpen: true });
+      useUpdateStore.setState({ restarting: { install }, dialogOpen: true });
       return true;
     }
     const res = await invokeConfirmed(actionCommands[action], {}, getUiContext());

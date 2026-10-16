@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { UpdateStateView, UpdateStatusView } from "@/api/update";
 import type { CutOff } from "./session";
-import { busyHeading, compareVersions, cutOffLabel, displayVersion, failureHeadline, olderStable, updateBadge, updateView, versionMismatch, type ThreadActivity, type UpdateVariant } from "./update";
+import { busyHeading, compareVersions, cutOffLabel, displayVersion, failureHeadline, olderStable, updateBadge, updateView, versionMismatch, type Restarting, type ThreadActivity, type UpdateVariant } from "./update";
 
 describe("displayVersion", () => {
   it.each([
@@ -79,6 +79,8 @@ describe("versionMismatch", () => {
     ["installed, GUI on target", status("installed"), "v0.2.0", "v0.2.0"],
     ["restartRequired, GUI on target", status("restartRequired"), "v0.2.0", "v0.2.0"],
     ["available, GUI on target", status("available"), "v0.2.0", null],
+    ["downloaded, GUI on target", status("downloaded"), "v0.2.0", null],
+    ["downloaded, old GUI", status("downloaded"), "v0.1.0", null],
   ])("%s", (_name, st, gui, want) => {
     expect(versionMismatch(st, gui)?.version ?? null).toBe(want);
   });
@@ -88,8 +90,10 @@ describe("updateBadge", () => {
   it.each<[string, UpdateStatusView | null, string | null, string | null, string | null]>([
     ["no status", null, "v0.1.0", null, null],
     ["idle", status("idle"), "v0.1.0", null, null],
-    ["available", status("available"), "v0.1.0", "v0.2.0 available", "Install"],
-    ["downloading", status("downloading"), "v0.1.0", "Installing v0.2.0…", ""],
+    ["available", status("available"), "v0.1.0", "v0.2.0 available", "Download"],
+    ["downloading", status("downloading"), "v0.1.0", "Downloading v0.2.0…", ""],
+    ["downloaded", status("downloaded"), "v0.1.0", "v0.2.0 downloaded", "Restart to apply"],
+    ["downloaded, GUI unknown (browser)", status("downloaded"), null, "v0.2.0 downloaded", "Restart to apply"],
     ["failed", status("failed"), "v0.1.0", "Update failed", "Details"],
     ["installed, old GUI", status("installed"), "v0.1.0", "v0.2.0 installed", "Restart to apply"],
     ["installed, GUI unknown (browser)", status("installed"), null, "v0.2.0 installed", "Restart to apply"],
@@ -99,8 +103,9 @@ describe("updateBadge", () => {
     ["partly applied: daemon restarted first", status("idle", { currentVersion: "v0.2.0" }), "v0.1.0", "v0.2.0 installed", "Restart to apply"],
     ["dev GUI against a release daemon", status("idle", { currentVersion: "v0.2.0" }), "dev", null, null],
     ["dev daemon, disabled", status("idle", { currentVersion: "dev", enabled: false }), "dev", null, null],
-    ["tip available", status("available", { targetVersion: "v0.15.0-tip.3", channel: "tip" }), null, "v0.15.0 (tip 3) available", "Install"],
-    ["tip installing", status("downloading", { targetVersion: "v0.15.0-tip.3", channel: "tip" }), null, "Installing v0.15.0 (tip 3)…", ""],
+    ["tip available", status("available", { targetVersion: "v0.15.0-tip.3", channel: "tip" }), null, "v0.15.0 (tip 3) available", "Download"],
+    ["tip downloading", status("downloading", { targetVersion: "v0.15.0-tip.3", channel: "tip" }), null, "Downloading v0.15.0 (tip 3)…", ""],
+    ["tip downloaded", status("downloaded", { targetVersion: "v0.15.0-tip.3", channel: "tip" }), null, "v0.15.0 (tip 3) downloaded", "Restart to apply"],
     ["tip installed", status("installed", { targetVersion: "v0.15.0-tip.3", channel: "tip" }), null, "v0.15.0 (tip 3) installed", "Restart to apply"],
     ["tip partly applied", status("idle", { currentVersion: "v0.15.0-tip.2" }), "v0.15.0-tip.3", "v0.15.0 (tip 3) installed", "Restart to apply"],
   ])("%s", (_name, st, gui, label, cta) => {
@@ -113,21 +118,25 @@ describe("updateBadge", () => {
     expect(updateBadge(status("restartRequired"), null)?.kind).toBe("installed");
     expect(updateBadge(status("idle"), "v0.2.0")?.kind).toBe("installed");
     expect(updateBadge(status("failed"), null)?.kind).toBe("failed");
+    expect(updateBadge(status("downloading"), null)?.kind).toBe("downloading");
+    // Downloaded is not a mismatch: the GUI on the target cannot happen before the install.
+    expect(updateBadge(status("downloaded"), null)?.kind).toBe("downloaded");
+    expect(updateBadge(status("downloaded"), "v0.2.0")?.kind).toBe("downloaded");
   });
 });
 
 const none: ThreadActivity = { busy: 0 };
 
 describe("updateView", () => {
-  it.each<[string, UpdateStatusView, string | null, ThreadActivity, boolean, UpdateVariant, string, string, string | null, boolean, boolean]>([
+  it.each<[string, UpdateStatusView, string | null, ThreadActivity, Restarting | null, UpdateVariant, string, string, string | null, boolean, boolean]>([
     // name, status, gui, threads, restarting -> variant, title, body, later, close, showBusy
-    ["ready, nothing running", status("installed"), "v0.1.0", none, false, "readyIdle", "Code Foundry v0.2.0 is ready", "Restart to finish updating. No thread is working or waiting on you, so nothing will be interrupted.", "Later", false, false],
+    ["ready, nothing running", status("installed"), "v0.1.0", none, null, "readyIdle", "Code Foundry v0.2.0 is ready", "Restart to finish updating. No thread is working or waiting on you, so nothing will be interrupted.", "Later", false, false],
     [
       "ready, threads mid-turn",
       status("restartRequired"),
       null,
       { busy: 2 },
-      false,
+      null,
       "readyBusy",
       "Code Foundry v0.2.0 is ready",
       "Restarting now cuts these threads off. Let them finish first, or restart anyway: they keep their history, and a message continues each.",
@@ -136,11 +145,63 @@ describe("updateView", () => {
       true,
     ],
     [
+      "downloaded, nothing running",
+      status("downloaded"),
+      "v0.1.0",
+      none,
+      null,
+      "readyIdle",
+      "Code Foundry v0.2.0 is ready",
+      "Install and restart to finish updating. The app and the daemon update together, so nothing ends up out of sync. No thread is working or waiting on you, so nothing will be interrupted.",
+      "Later",
+      false,
+      false,
+    ],
+    [
+      "downloaded, threads mid-turn",
+      status("downloaded"),
+      null,
+      { busy: 2 },
+      null,
+      "readyBusy",
+      "Code Foundry v0.2.0 is ready",
+      "Restarting now cuts these threads off. Let them finish first, or install and restart anyway: they keep their history, and a message continues each.",
+      "Wait, I’ll restart later",
+      false,
+      true,
+    ],
+    [
+      "downloaded, one thread mid-turn",
+      status("downloaded"),
+      null,
+      { busy: 1 },
+      null,
+      "readyBusy",
+      "Code Foundry v0.2.0 is ready",
+      "Restarting now cuts this thread off. Let it finish first, or install and restart anyway: it keeps its history, and a message continues it.",
+      "Wait, I’ll restart later",
+      false,
+      true,
+    ],
+    [
+      "downloaded with the GUI on the target is no mismatch",
+      status("downloaded"),
+      "v0.2.0",
+      none,
+      null,
+      "readyIdle",
+      "Code Foundry v0.2.0 is ready",
+      "Install and restart to finish updating. The app and the daemon update together, so nothing ends up out of sync. No thread is working or waiting on you, so nothing will be interrupted.",
+      "Later",
+      false,
+      false,
+    ],
+    [
       "ready, one thread mid-turn",
       status("installed"),
       null,
       { busy: 1 },
-      false,
+      null,
       "readyBusy",
       "Code Foundry v0.2.0 is ready",
       "Restarting now cuts this thread off. Let it finish first, or restart anyway: it keeps its history, and a message continues it.",
@@ -153,23 +214,35 @@ describe("updateView", () => {
       status("available"),
       "v0.1.0",
       none,
-      false,
+      null,
       "available",
       "Code Foundry v0.2.0 is available",
-      "You’re on v0.1.0. Installing happens in the background; you’ll be asked to restart when it’s done.",
+      "You’re on v0.1.0. Downloading happens in the background and changes nothing until you restart.",
       "Later",
       false,
       false,
     ],
-    ["installing", status("downloading"), "v0.1.0", none, false, "installing", "Installing v0.2.0…", "You can close this and keep working.", "Hide", false, false],
-    ["up to date", status("idle"), "v0.1.0", { busy: 1 }, false, "upToDate", "You’re up to date", "Code Foundry v0.1.0 is the latest version.", null, true, false],
-    ["checking", status("idle", { checking: true }), null, none, false, "upToDate", "Checking for updates…", "Code Foundry v0.1.0 is the latest version.", null, true, false],
+    [
+      "downloading",
+      status("downloading"),
+      "v0.1.0",
+      none,
+      null,
+      "downloading",
+      "Downloading v0.2.0…",
+      "You can close this and keep working. Nothing changes on disk until you install and restart.",
+      "Hide",
+      false,
+      false,
+    ],
+    ["up to date", status("idle"), "v0.1.0", { busy: 1 }, null, "upToDate", "You’re up to date", "Code Foundry v0.1.0 is the latest version.", null, true, false],
+    ["checking", status("idle", { checking: true }), null, none, null, "upToDate", "Checking for updates…", "Code Foundry v0.1.0 is the latest version.", null, true, false],
     [
       "up to date on tip",
       status("idle", { channel: "tip", currentVersion: "v0.15.0-tip.3", latestVersion: "v0.15.0-tip.3" }),
       null,
       none,
-      false,
+      null,
       "upToDate",
       "You’re up to date",
       "Code Foundry v0.15.0 (tip 3) is the latest version.",
@@ -182,7 +255,7 @@ describe("updateView", () => {
       status("idle", { channel: "stable", currentVersion: "v0.15.0-tip.2", latestVersion: "v0.14.41" }),
       null,
       none,
-      false,
+      null,
       "upToDate",
       "You’re up to date",
       "Stable v0.14.41 is older than this build; the next stable release will move you.",
@@ -195,10 +268,10 @@ describe("updateView", () => {
       status("available", { channel: "stable", currentVersion: "v0.15.0-tip.2", latestVersion: "v0.15.0", targetVersion: "v0.15.0" }),
       null,
       none,
-      false,
+      null,
       "available",
       "Code Foundry v0.15.0 is available",
-      "You’re on v0.15.0 (tip 2). Installing happens in the background; you’ll be asked to restart when it’s done.",
+      "You’re on v0.15.0 (tip 2). Downloading happens in the background and changes nothing until you restart.",
       "Later",
       false,
       false,
@@ -208,10 +281,10 @@ describe("updateView", () => {
       status("available", { channel: "tip", currentVersion: "v0.14.41", latestVersion: "v0.15.0-tip.3", targetVersion: "v0.15.0-tip.3" }),
       null,
       none,
-      false,
+      null,
       "available",
       "Code Foundry v0.15.0 (tip 3) is available",
-      "You’re on v0.14.41. Installing happens in the background; you’ll be asked to restart when it’s done.",
+      "You’re on v0.14.41. Downloading happens in the background and changes nothing until you restart.",
       "Later",
       false,
       false,
@@ -221,7 +294,7 @@ describe("updateView", () => {
       status("installed", { channel: "tip", currentVersion: "v0.15.0-tip.2", targetVersion: "v0.15.0-tip.3" }),
       "v0.15.0-tip.3",
       none,
-      false,
+      null,
       "partlyApplied",
       "Code Foundry v0.15.0 (tip 3) is partly applied",
       "The app is on v0.15.0 (tip 3) but the daemon is still on v0.15.0 (tip 2); some things won’t work until you restart.",
@@ -234,7 +307,7 @@ describe("updateView", () => {
       status("idle"),
       "v0.2.0",
       { busy: 2 },
-      false,
+      null,
       "partlyApplied",
       "Code Foundry v0.2.0 is partly applied",
       "The app is on v0.2.0 but the daemon is still on v0.1.0; some things won’t work until you restart. Restarting now cuts these threads off.",
@@ -247,7 +320,7 @@ describe("updateView", () => {
       status("installed"),
       "v0.2.0",
       { busy: 0 },
-      false,
+      null,
       "partlyApplied",
       "Code Foundry v0.2.0 is partly applied",
       "The app is on v0.2.0 but the daemon is still on v0.1.0; some things won’t work until you restart.",
@@ -260,7 +333,7 @@ describe("updateView", () => {
       status("idle", { currentVersion: "v0.2.0" }),
       "v0.1.0",
       none,
-      false,
+      null,
       "partlyApplied",
       "Code Foundry v0.2.0 is partly applied",
       "The daemon is on v0.2.0 but the app is still on v0.1.0; some things won’t work until you restart.",
@@ -268,9 +341,35 @@ describe("updateView", () => {
       false,
       false,
     ],
-    ["failed", status("failed", { failureReason: "x" }), "v0.1.0", none, false, "failed", "Couldn’t install v0.2.0", "Nothing changed. You’re still on v0.1.0.", "Not now", false, false],
-    ["restarting", status("idle", { currentVersion: "v0.2.0" }), "v0.1.0", { busy: 1 }, true, "restarting", "Restarting…", "Code Foundry will reopen in a moment.", null, false, false],
-    ["disabled", status("idle", { enabled: false, disabledReason: "dev build" }), "dev", none, false, "disabled", "Updates are off for this build", "Dev build.", null, true, false],
+    ["failed", status("failed", { failureReason: "x" }), "v0.1.0", none, null, "failed", "Couldn’t update to v0.2.0", "Nothing changed. You’re still on v0.1.0.", "Not now", false, false],
+    ["restarting", status("idle", { currentVersion: "v0.2.0" }), "v0.1.0", { busy: 1 }, { install: "" }, "restarting", "Restarting…", "Code Foundry will reopen in a moment.", null, false, false],
+    [
+      "restarting after a download: installs first",
+      status("installed"),
+      null,
+      none,
+      { install: "v0.2.0" },
+      "restarting",
+      "Installing and restarting…",
+      "Code Foundry will reopen in a moment on v0.2.0.",
+      null,
+      false,
+      false,
+    ],
+    [
+      "restarting a tip download",
+      status("idle", { currentVersion: "v0.15.0-tip.3" }),
+      null,
+      none,
+      { install: "v0.15.0-tip.3" },
+      "restarting",
+      "Installing and restarting…",
+      "Code Foundry will reopen in a moment on v0.15.0 (tip 3).",
+      null,
+      false,
+      false,
+    ],
+    ["disabled", status("idle", { enabled: false, disabledReason: "dev build" }), "dev", none, null, "disabled", "Updates are off for this build", "Dev build.", null, true, false],
   ])("%s", (_name, st, gui, threads, restarting, variant, title, body, later, close, showBusy) => {
     const v = updateView(st, gui, threads, restarting);
     expect(v.variant).toBe(variant);
@@ -286,6 +385,8 @@ describe("updateView", () => {
       updateView(status("installed"), null, none),
       updateView(status("available"), null, none),
       updateView(status("downloading"), null, none),
+      updateView(status("downloaded"), null, none),
+      updateView(status("downloaded"), null, { busy: 1 }),
       updateView(status("failed"), null, none),
       updateView(status("idle"), "v0.2.0", none),
     ];
@@ -293,6 +394,24 @@ describe("updateView", () => {
       expect(v.close).toBe(false);
       expect(v.later).not.toBeNull();
     }
+  });
+
+  // The primary button's label (null: none). The component maps the variant to its action.
+  it.each<[string, UpdateStatusView, string | null, ThreadActivity, Restarting | null, string | null]>([
+    ["available", status("available"), null, none, null, "Download v0.2.0"],
+    ["available tip", status("available", { targetVersion: "v0.15.0-tip.3" }), null, none, null, "Download v0.15.0 (tip 3)"],
+    ["downloading", status("downloading"), null, none, null, null],
+    ["downloaded", status("downloaded"), null, none, null, "Install and Restart Now"],
+    ["downloaded, busy", status("downloaded"), null, { busy: 2 }, null, "Install and Restart Now"],
+    ["installed", status("installed"), null, none, null, "Restart Now"],
+    ["restart required, busy", status("restartRequired"), null, { busy: 1 }, null, "Restart Now"],
+    ["partly applied", status("idle"), "v0.2.0", none, null, "Restart Now"],
+    ["failed", status("failed"), null, none, null, "Try Again"],
+    ["up to date", status("idle"), null, none, null, "Check Again"],
+    ["restarting", status("installed"), null, none, { install: "v0.2.0" }, null],
+    ["disabled", status("idle", { enabled: false }), null, none, null, null],
+  ])("primary: %s", (_name, st, gui, threads, restarting, want) => {
+    expect(updateView(st, gui, threads, restarting).primary).toBe(want);
   });
 
   it("partly applied carries both versions", () => {
