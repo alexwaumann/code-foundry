@@ -35,14 +35,14 @@ export function PublishPicker({
 }) {
   if (owners.state === "loading") {
     return (
-      <p className="flex items-center gap-2 text-xs text-muted-foreground" data-testid="publish-owners-loading">
+      <p className="flex items-center gap-2 text-caption" data-testid="publish-owners-loading">
         <Loader2 className="size-3 animate-spin" aria-hidden /> Asking GitHub where you can publish…
       </p>
     );
   }
   if (owners.state === "error") {
     return (
-      <p className="text-xs whitespace-pre-wrap text-destructive" role="alert" data-testid="publish-owners-error">
+      <p className="text-caption whitespace-pre-wrap text-destructive" role="alert" data-testid="publish-owners-error">
         Cannot list your GitHub accounts: {owners.message}
       </p>
     );
@@ -52,7 +52,7 @@ export function PublishPicker({
   return (
     <div className="flex flex-col gap-2" data-testid="publish-picker">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="w-16 text-xs text-muted-foreground">Owner</span>
+        <span className="w-16 text-caption">Owner</span>
         <DropdownMenu>
           <DropdownMenuTrigger asChild disabled={disabled}>
             <Button type="button" variant="outline" size="sm" className="min-w-40 justify-between" data-testid="publish-owner" data-owner={value.owner}>
@@ -75,7 +75,7 @@ export function PublishPicker({
               >
                 {o.kind === "org" ? <Building2 aria-hidden /> : <User aria-hidden />}
                 <span className="truncate">{o.login}</span>
-                <span className="ml-auto text-xs text-muted-foreground">{o.kind === "org" ? "organization" : "you"}</span>
+                <span className="ml-auto text-caption">{o.kind === "org" ? "organization" : "you"}</span>
                 {o.login === value.owner && <Check className="size-3.5" aria-hidden />}
               </DropdownMenuItem>
             ))}
@@ -83,11 +83,11 @@ export function PublishPicker({
         </DropdownMenu>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="w-16 text-xs text-muted-foreground" id="publish-visibility-label">
+        <span className="w-16 text-caption" id="publish-visibility-label">
           Visibility
         </span>
         {options.length === 0 ? (
-          <span className="text-xs text-destructive" data-testid="publish-visibility-none">
+          <span className="text-caption text-destructive" data-testid="publish-visibility-none">
             {value.owner} does not let members create repositories.
           </span>
         ) : (
@@ -117,13 +117,13 @@ export function PublishPicker({
         )}
       </div>
       {owner && !owner.known && (
-        <p className="text-xs text-muted-foreground" data-testid="publish-visibility-hint">
+        <p className="text-caption" data-testid="publish-visibility-hint">
           GitHub does not show {owner.login}'s repository policy to members, so every visibility is offered. If it does not allow the one you pick, GitHub refuses
           and you can pick another.
         </p>
       )}
       {error && (
-        <p className="text-xs whitespace-pre-wrap text-destructive" role="alert" data-testid="publish-error">
+        <p className="text-caption whitespace-pre-wrap text-destructive" role="alert" data-testid="publish-error">
           {error}
         </p>
       )}

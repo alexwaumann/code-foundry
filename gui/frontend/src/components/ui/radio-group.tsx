@@ -72,8 +72,8 @@ const radioGroupChoiceVariants = cva(
     variants: {
       variant: {
         segment:
-          "inline-flex h-full items-center gap-1.5 rounded-md border border-transparent px-2.5 text-xs font-medium text-foreground/70 aria-checked:bg-background aria-checked:text-foreground aria-checked:shadow-sm dark:aria-checked:border-input dark:aria-checked:bg-input/30 [&_svg]:size-3.5",
-        tile: "flex flex-col items-center gap-1.5 rounded-md border border-border/70 px-1 pt-2 pb-1.5 text-xs text-muted-foreground hover:bg-accent/50 hover:text-foreground aria-checked:border-primary/70 aria-checked:bg-primary/10 aria-checked:text-foreground dark:border-transparent dark:bg-foreground/[0.035] dark:aria-checked:border-transparent dark:aria-checked:bg-primary/10 dark:aria-checked:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--primary)_30%,transparent)] [&_svg]:size-4",
+          "inline-flex h-full items-center gap-1.5 rounded-md border border-transparent px-2.5 text-body-sm font-medium text-foreground/70 aria-checked:bg-background aria-checked:text-foreground aria-checked:shadow-sm dark:aria-checked:border-input dark:aria-checked:bg-input/30 [&_svg]:size-3.5",
+        tile: "flex flex-col items-center gap-1.5 rounded-md border border-border/70 px-1 pt-2 pb-1.5 text-caption hover:bg-accent/50 hover:text-foreground aria-checked:border-primary/70 aria-checked:bg-primary/10 aria-checked:text-foreground dark:border-transparent dark:bg-foreground/[0.035] dark:aria-checked:border-transparent dark:aria-checked:bg-primary/10 dark:aria-checked:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--primary)_30%,transparent)] [&_svg]:size-4",
       },
     },
     defaultVariants: {

@@ -48,7 +48,7 @@ function MemberChip({ draftKey, member, primary, disabled }: { draftKey: string;
   return (
     <li
       className={cn(
-        "flex h-7 max-w-72 min-w-0 items-center rounded-full border text-xs transition-colors",
+        "flex h-7 max-w-72 min-w-0 items-center rounded-full border text-body-sm transition-colors",
         primary ? "border-primary/50 bg-accent text-foreground" : "border-border bg-card text-muted-foreground",
       )}
       data-testid="composer-member"
@@ -75,13 +75,13 @@ function MemberChip({ draftKey, member, primary, disabled }: { draftKey: string;
           <NoGitBadge />
         ) : (
           member.branch && (
-            <span className="truncate font-mono text-[11px] text-muted-foreground" data-testid="composer-member-branch">
+            <span className="truncate font-mono text-caption-sm" data-testid="composer-member-branch">
               {member.branch}
             </span>
           )
         )}
         {primary && (
-          <span className="shrink-0 rounded-sm bg-primary/10 px-1 text-[10px] font-medium text-primary" data-testid="composer-member-primary">
+          <span className="shrink-0 rounded-sm bg-primary/10 px-1 text-caption-sm font-medium text-primary" data-testid="composer-member-primary">
             primary
           </span>
         )}

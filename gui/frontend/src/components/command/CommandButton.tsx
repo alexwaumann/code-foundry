@@ -102,7 +102,7 @@ export function CommandButton({
     >
       {Icon && <Icon aria-hidden className={label ? undefined : "size-3.5"} />}
       {count !== undefined && (
-        <span className="text-[11px] font-medium tabular-nums" aria-hidden data-count>
+        <span className="text-caption-sm font-medium text-inherit tabular-nums" aria-hidden data-count>
           {count}
         </span>
       )}

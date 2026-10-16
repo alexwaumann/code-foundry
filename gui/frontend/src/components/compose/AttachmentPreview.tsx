@@ -35,7 +35,7 @@ export function AttachmentPreview({ draftKey }: { draftKey: string }) {
           <DialogTitle className="min-w-0 truncate" data-testid="attachment-preview-name">
             {att?.file.name}
           </DialogTitle>
-          <DialogDescription className="shrink-0 text-xs" data-testid="attachment-preview-size">
+          <DialogDescription className="shrink-0" data-testid="attachment-preview-size">
             {att ? formatAttachmentSize(att.file.size) : ""}
           </DialogDescription>
           <Tip label="Close">

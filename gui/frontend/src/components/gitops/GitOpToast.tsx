@@ -37,13 +37,13 @@ export function GitOpResult({ op, expanded = false, onToggle }: { op: GitOpView;
       <span data-testid="gitop-summary" className="break-words text-foreground">
         {op.summary}
       </span>
-      {meta && <span className="text-xs text-muted-foreground">{meta}</span>}
+      {meta && <span className="text-caption">{meta}</span>}
       {op.state === "failed" && op.output && onToggle && (
         <>
           <button
             type="button"
             data-testid="gitop-output-toggle"
-            className="self-start text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+            className="self-start text-caption underline underline-offset-2 hover:text-foreground"
             onClick={onToggle}
           >
             {expanded ? "Hide output" : "Show output"}
@@ -51,7 +51,7 @@ export function GitOpResult({ op, expanded = false, onToggle }: { op: GitOpView;
           {expanded && (
             <pre
               data-testid="gitop-output"
-              className="max-h-64 w-full max-w-full overflow-auto whitespace-pre-wrap break-words rounded bg-muted p-2 font-mono text-[11px] leading-snug text-foreground"
+              className="max-h-64 w-full max-w-full overflow-auto whitespace-pre-wrap break-words rounded-sm bg-muted p-2 text-caption-sm font-mono leading-snug text-foreground"
             >
               {op.output}
             </pre>

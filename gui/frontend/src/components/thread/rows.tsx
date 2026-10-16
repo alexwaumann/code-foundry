@@ -251,7 +251,7 @@ const ToolRow = memo(function ToolRow({ node }: { node: Extract<WorkNode, { type
           </div>
         ) : (
           <div className="detail">
-            {request && request.state !== "allowed" && request.message && <p className="mb-1 text-xs text-muted-foreground">{request.message}</p>}
+            {request && request.state !== "allowed" && request.message && <p className="mb-1 text-caption">{request.message}</p>}
             <ToolDetail t={t} cwd={cwd} />
           </div>
         ))}
@@ -319,7 +319,7 @@ const ThinkingRow = memo(function ThinkingRow({ node }: { node: Extract<WorkNode
   return (
     <div>
       <Row icon={Lightbulb} label={label} expanded={info.text ? open : undefined} onToggle={toggle} testId="thread-thinking" />
-      {open && info.text && <div className="detail text-[12px] leading-relaxed whitespace-pre-wrap text-muted-foreground italic selectable">{info.text}</div>}
+      {open && info.text && <div className="detail text-caption leading-relaxed whitespace-pre-wrap italic selectable">{info.text}</div>}
     </div>
   );
 });
@@ -402,7 +402,7 @@ const QuestionRow = memo(function QuestionRow({ id }: { id: string }) {
         testId="thread-question-row"
       />
       {open && (
-        <dl className="detail grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[12px] selectable">
+        <dl className="detail grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-body-sm selectable">
           {questions.map((q) => (
             <div key={q.question} className="contents">
               <dt className="text-muted-foreground">{q.question}</dt>
@@ -445,7 +445,7 @@ const NoteRow = memo(function NoteRow({ id }: { id: string }) {
   if (!it) return null;
   if (it.kind === "error") {
     return (
-      <div className="my-1.5 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-2.5 py-1.5 text-[13px] selectable" data-testid="thread-error">
+      <div className="my-1.5 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-2.5 py-1.5 text-body-sm selectable" data-testid="thread-error">
         <CircleAlert className="mt-0.5 size-3.5 shrink-0 t-red" aria-hidden />
         <span className="t-red whitespace-pre-wrap">{it.text}</span>
       </div>
@@ -464,7 +464,7 @@ const NoteRow = memo(function NoteRow({ id }: { id: string }) {
           testId="thread-compaction"
         />
         {open && it.summary && (
-          <div className="detail text-[12px] text-muted-foreground">
+          <div className="detail text-caption">
             <ThreadMarkdown>{it.summary}</ThreadMarkdown>
           </div>
         )}

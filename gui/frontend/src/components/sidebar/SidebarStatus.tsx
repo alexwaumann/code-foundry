@@ -19,7 +19,7 @@ export function SidebarStatus() {
   const usageOpen = useViewsStore((s) => s.usageOpen);
   const settingsOpen = useViewsStore((s) => s.settingsOpen);
   return (
-    <div className="flex shrink-0 flex-col gap-0.5 pt-1 pb-1.5 text-[11px] text-muted-foreground" data-testid="sidebar-status">
+    <div className="flex shrink-0 flex-col gap-0.5 pt-1 pb-1.5 text-caption-sm" data-testid="sidebar-status">
       <UpdateIndicator />
       <div className="flex h-6 min-w-0 items-center gap-2">
         <DaemonStatus />

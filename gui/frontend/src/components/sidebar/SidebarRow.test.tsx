@@ -130,7 +130,7 @@ describe("SidebarRow snoozed", () => {
     expect(row.getAttribute("data-section")).toBe("snoozed");
     expect(screen.queryByTestId("row-place")).toBeNull();
     expect(screen.getByTestId("row-snooze-left").className).toContain("tabular-nums");
-    expect(screen.getByTestId("row-snooze-left").className).toContain("text-[11px]");
+    expect(screen.getByTestId("row-snooze-left").className).toContain("text-caption-sm");
     expect(screen.getByTestId("session-body").className).not.toContain("opacity-50");
     expect(screen.getByTestId("session-body").hasAttribute("data-snoozed")).toBe(true);
   });

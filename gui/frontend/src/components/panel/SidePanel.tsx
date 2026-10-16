@@ -106,7 +106,7 @@ function TabButton({ panelKey, tab, active, focusable }: { panelKey: string; tab
       // Translate, not Transform: tabs differ in width, and a scale would stretch the text.
       style={{ transform: CSS.Translate.toString(transform), transition }}
       className={cn(
-        "group relative flex h-7 max-w-48 shrink-0 items-center rounded-md pr-1 text-xs [--wails-draggable:no-drag]",
+        "group relative flex h-7 max-w-48 shrink-0 items-center rounded-md pr-1 text-body-sm [--wails-draggable:no-drag]",
         isDragging
           ? "z-10 bg-accent text-accent-foreground shadow-md ring-1 ring-border"
           : active
@@ -361,7 +361,7 @@ function SurfaceRow({ spec, ctx }: { spec: SurfaceSpec; ctx: SurfaceContext }) {
         disabled={!enabled}
         data-surface={spec.kind}
         data-availability={availability}
-        className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm enabled:hover:bg-accent disabled:cursor-default disabled:opacity-45"
+        className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-label enabled:hover:bg-accent disabled:cursor-default disabled:opacity-45"
         onClick={(e) => {
           const now = surfaceContext(ctx.panelKey);
           const tab = spec.openDefault(now);
@@ -388,7 +388,7 @@ function EmptyState({ panelKey }: { panelKey: string }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center p-6" data-surface-list data-testid="panel-empty">
       <div className="w-full max-w-64">
-        <h2 className="mb-3 text-center text-sm font-medium">Open a surface</h2>
+        <h2 className="mb-3 text-center text-subheading">Open a surface</h2>
         <ul className="flex flex-col gap-0.5">
           {surfaces.map((spec) => (
             <SurfaceRow key={spec.kind} spec={spec} ctx={ctx} />

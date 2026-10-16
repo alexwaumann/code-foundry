@@ -38,7 +38,7 @@ function DropdownMenuItem({ className, variant = "default", ...props }: React.Co
       data-slot="dropdown-menu-item"
       data-variant={variant}
       className={cn(
-        "relative flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 dark:data-[variant=destructive]:focus:bg-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground",
+        "relative flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-label outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 dark:data-[variant=destructive]:focus:bg-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground",
         className
       )}
       {...props}
@@ -51,13 +51,13 @@ function DropdownMenuCheckboxItem({ className, children, checked, ...props }: Re
     <DropdownMenuPrimitive.CheckboxItem
       data-slot="dropdown-menu-checkbox-item"
       className={cn(
-        "relative flex cursor-default items-center gap-2 rounded-md py-1.5 pr-2 pl-8 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        "relative flex cursor-default items-center gap-2 rounded-md py-1.5 pr-2 pl-8 text-label outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className
       )}
       checked={checked}
       {...props}
     >
-      <span className="pointer-events-none absolute left-2 flex size-4 items-center justify-center rounded-[4px] border border-input data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground" data-state={checked ? "checked" : "unchecked"}>
+      <span className="pointer-events-none absolute left-2 flex size-4 items-center justify-center rounded-sm border border-input data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground" data-state={checked ? "checked" : "unchecked"}>
         <DropdownMenuPrimitive.ItemIndicator>
           <CheckIcon className="size-3" />
         </DropdownMenuPrimitive.ItemIndicator>
@@ -68,7 +68,7 @@ function DropdownMenuCheckboxItem({ className, children, checked, ...props }: Re
 }
 
 function DropdownMenuLabel({ className, ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.Label>) {
-  return <DropdownMenuPrimitive.Label data-slot="dropdown-menu-label" className={cn("px-2 py-1.5 text-xs font-medium text-muted-foreground", className)} {...props} />
+  return <DropdownMenuPrimitive.Label data-slot="dropdown-menu-label" className={cn("px-2 py-1.5 text-caption-sm font-medium", className)} {...props} />
 }
 
 function DropdownMenuSeparator({ className, ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.Separator>) {
@@ -76,7 +76,7 @@ function DropdownMenuSeparator({ className, ...props }: React.ComponentProps<typ
 }
 
 function DropdownMenuShortcut({ className, ...props }: React.ComponentProps<"span">) {
-  return <span data-slot="dropdown-menu-shortcut" className={cn("ml-auto pl-4 text-xs tracking-widest text-muted-foreground", className)} {...props} />
+  return <span data-slot="dropdown-menu-shortcut" className={cn("ml-auto pl-4 text-caption-sm tracking-widest", className)} {...props} />
 }
 
 export { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuCheckboxItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuShortcut }

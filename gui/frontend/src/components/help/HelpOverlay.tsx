@@ -72,15 +72,15 @@ function Shortcuts() {
 
   return (
     <section aria-label="Keyboard shortcuts" data-testid="help-shortcuts" data-help-scroll tabIndex={-1} className="h-full columns-2 gap-8 overflow-y-auto px-5 py-4 outline-none">
-      {error && <p className="mb-4 text-xs text-destructive">Cannot list commands: {error}</p>}
+      {error && <p className="mb-4 text-caption text-destructive">Cannot list commands: {error}</p>}
       {sections.map((s) => (
         <div key={s.title} data-help-section={s.title} className="mb-4 break-inside-avoid">
-          <h4 className="mb-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">{s.title}</h4>
+          <h4 className="mb-1 text-overline">{s.title}</h4>
           <ul className="space-y-0.5">
             {s.items.map((i) => (
               // The tooltip names the command (and why a dimmed one is dimmed).
               <Tip key={`${i.command ?? ""}:${i.label}`} label={i.command && (i.available ? i.command : `${i.command} (not available here)`)} align="start">
-                <li className="flex items-center justify-between gap-3 text-sm" data-help-command={i.command}>
+                <li className="flex items-center justify-between gap-3 text-body" data-help-command={i.command}>
                   <span className={i.available ? "truncate" : "truncate text-muted-foreground"}>{i.label}</span>
                   <Keys keys={i.keys} />
                 </li>
@@ -111,7 +111,7 @@ export function Guide() {
             <li key={`${String(i)}:${e.title}`} className={e.level === 2 && i > 0 ? "mt-3" : undefined}>
               <button
                 type="button"
-                className={cn("w-full truncate rounded py-0.5 text-left text-[13px] hover:text-foreground", e.level === 2 ? "font-medium text-foreground" : "text-muted-foreground")}
+                className={cn("w-full truncate rounded-sm py-0.5 text-left text-body-sm hover:text-foreground", e.level === 2 ? "font-medium text-foreground" : "text-muted-foreground")}
                 data-toc-level={e.level}
                 onClick={() => {
                   scrollTo(i);
@@ -132,7 +132,7 @@ export function Guide() {
 
 /** Underlined tabs in the overlay's header (the shared TabsList is a segmented control). */
 const tabClass =
-  "h-auto flex-none rounded-none border-0 border-b-2 border-transparent px-0.5 pt-3 pb-2.5 text-sm font-normal text-muted-foreground hover:text-foreground data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none dark:data-[state=active]:border-foreground dark:data-[state=active]:bg-transparent";
+  "h-auto flex-none rounded-none border-0 border-b-2 border-transparent px-0.5 pt-3 pb-2.5 text-label font-normal text-muted-foreground hover:text-foreground data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none dark:data-[state=active]:border-foreground dark:data-[state=active]:bg-transparent";
 
 /** The overlay's body: the Guide and Keyboard shortcuts tabs, and a close button. */
 function HelpBody() {

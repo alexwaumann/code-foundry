@@ -22,10 +22,10 @@ const MAX_THREADS = 6;
 function Header({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div>
-      <h1 className="text-xl font-semibold tracking-tight" data-testid="start-heading">
+      <h1 className="text-title" data-testid="start-heading">
         {title}
       </h1>
-      <div className="mt-1 text-sm text-muted-foreground">{children}</div>
+      <div className="mt-1 text-body text-muted-foreground">{children}</div>
     </div>
   );
 }
@@ -75,12 +75,12 @@ function ActiveThreads() {
   const more = ids.length - MAX_THREADS;
   return (
     <section className="w-full max-w-[420px] text-left" aria-label="Threads" data-testid="start-threads">
-      <h2 className="px-2 pb-1.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Threads</h2>
+      <h2 className="px-2 pb-1.5 text-overline">Threads</h2>
       {ids.slice(0, MAX_THREADS).map((id) => (
         <ThreadRow key={id} id={id} />
       ))}
       {more > 0 && (
-        <p className="px-2 pt-1 text-xs text-muted-foreground" data-testid="start-threads-more">
+        <p className="px-2 pt-1 text-caption" data-testid="start-threads-more">
           +{more} more
         </p>
       )}
@@ -128,7 +128,7 @@ function Fleet() {
       <ActiveThreads />
       <button
         type="button"
-        className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+        className="text-caption underline underline-offset-2 hover:text-foreground"
         onClick={() => {
           // Straight to the shortcuts tab (view.help opens the guide).
           openHelp("shortcuts");

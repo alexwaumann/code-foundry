@@ -102,7 +102,7 @@ export function UsageSurface() {
   return (
     // @container: tightens the padding when the panel is narrow (down to 280px).
     <div className="@container px-4 pt-5 pb-8 @max-[340px]:px-3" data-testid="usage-surface" data-thread={threadId}>
-      <div className={cn("text-title tabular-nums", noCost && "text-muted-foreground")} data-testid="usage-cost">
+      <div className={cn("text-display-sm", noCost && "text-muted-foreground")} data-testid="usage-cost">
         {noCost ? "—" : fmtUsd(total.costUsd)}
       </div>
       <div className="mt-2 text-caption" data-testid="usage-summary">

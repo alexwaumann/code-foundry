@@ -49,7 +49,7 @@ import { Switch } from "@/components/ui/switch";
  */
 export function ThemeGallery() {
   return (
-    <div className="flex flex-col gap-3 p-3 text-[13px]" data-testid="theme-gallery">
+    <div className="flex flex-col gap-3 p-3 text-body-sm" data-testid="theme-gallery">
       <div className="flex h-[432px] gap-1.5 overflow-hidden rounded-lg border border-pane-border bg-sheet p-1.5">
         <MiniSidebar />
         <MiniThread />
@@ -92,7 +92,7 @@ export function ThemeGallery() {
 function Card({ label, children }: { label: string; children: ReactNode }) {
   return (
     <section className="min-w-0 rounded-lg border border-pane-border bg-pane p-3" aria-label={label}>
-      <h3 className="mb-2 text-[10px] font-medium tracking-wider text-muted-foreground uppercase">{label}</h3>
+      <h3 className="mb-2 text-overline">{label}</h3>
       {children}
     </section>
   );
@@ -105,7 +105,7 @@ function Row({ name, selected, pinned, chip, line2 }: { name: string; selected?:
   return (
     <div
       className={cn(
-        "flex h-[41px] shrink-0 items-center gap-1.5 rounded-md px-2 text-[13px] select-none",
+        "flex h-[41px] shrink-0 items-center gap-1.5 rounded-md px-2 text-body-sm select-none",
         selected ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground/90",
       )}
     >
@@ -117,7 +117,7 @@ function Row({ name, selected, pinned, chip, line2 }: { name: string; selected?:
             {pinned && <Pin className="size-3 shrink-0 text-muted-foreground" aria-hidden />}
           </span>
         </div>
-        <div className="flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground">
+        <div className="flex min-w-0 items-center gap-1 text-caption-sm">
           <span className="min-w-0 truncate">{line2}</span>
         </div>
       </div>
@@ -136,8 +136,8 @@ function Place({ project, branch }: { project: string; branch: string }) {
 function SectionHeader({ label, count }: { label: string; count: number }) {
   return (
     <div className="mt-1 flex h-[22px] shrink-0 items-center gap-1.5 px-2 text-muted-foreground">
-      <span className="truncate text-[11px] font-medium tracking-wider uppercase">{label}</span>
-      <span className="shrink-0 text-[11px] tabular-nums opacity-70">{count}</span>
+      <span className="truncate text-overline">{label}</span>
+      <span className="shrink-0 text-overline font-normal tabular-nums opacity-70">{count}</span>
       <ChevronDown className="ml-auto size-3" aria-hidden />
     </div>
   );
@@ -151,13 +151,13 @@ function MiniSidebar() {
       <Row name="Release build" line2={<span className="text-destructive">Error · exit status 2</span>} />
       <Row
         name="Usage page polish"
-        chip={<span className="flex shrink-0 items-center rounded-sm bg-success/15 px-1 text-[10px] leading-4 font-medium text-success tabular-nums">2 PRs</span>}
+        chip={<span className="flex shrink-0 items-center rounded-sm bg-success/15 px-1 text-caption-sm font-medium text-success tabular-nums">2 PRs</span>}
         line2={<span className="text-success">Finished 3m ago</span>}
       />
       <Row
         name="Docs typo sweep"
         chip={
-          <span className="flex max-w-24 min-w-0 items-center gap-0.5 rounded-sm bg-highlight/15 px-1 text-[10px] leading-4 font-medium text-highlight">
+          <span className="flex max-w-24 min-w-0 items-center gap-0.5 rounded-sm bg-highlight/15 px-1 text-caption-sm font-medium text-highlight">
             <Layers className="size-2.5" aria-hidden />
             <span className="truncate">site</span>
           </span>
@@ -182,7 +182,7 @@ function MiniSidebar() {
       <div className="flex h-[26px] shrink-0 items-center gap-1.5 rounded-md px-2 text-sidebar-foreground/90">
         <AlarmClock className="size-3 shrink-0 text-muted-foreground" aria-hidden />
         <span className="truncate">Bump wails</span>
-        <span className="ml-auto shrink-0 pl-1 text-[11px] text-muted-foreground tabular-nums">2h</span>
+        <span className="ml-auto shrink-0 pl-1 text-caption-sm tabular-nums">2h</span>
       </div>
     </div>
   );
@@ -220,8 +220,8 @@ function MiniThread() {
     <div className="cf-thread flex min-w-0 flex-1 flex-col overflow-hidden rounded-md border border-pane-border bg-pane" data-testid="gallery-thread">
       <div className="flex h-8 shrink-0 items-center gap-2 border-b border-pane-border px-3">
         <span className="size-1.5 rounded-full bg-success" aria-hidden />
-        <span className="truncate font-medium">Theme engine tokens</span>
-        <span className="truncate text-[12px] text-muted-foreground">idle · Opus 4.8 · high</span>
+        <span className="truncate text-label">Theme engine tokens</span>
+        <span className="truncate text-caption">idle · Opus 4.8 · high</span>
       </div>
       <div className="flex min-h-0 flex-1 flex-col px-4 pt-1">
         <UserBubble text="Map the Ghostty palette onto our tokens." composerText="" attachments={[]} createdAtMs={null} />
@@ -279,7 +279,7 @@ function Composer() {
   return (
     <div className="shrink-0 px-3 pb-3">
       <div className="ccard docked">
-        <div className="col-span-2 min-h-10 px-4 pt-2.5 pb-1 text-sm leading-6 text-muted-foreground">Send a follow-up…</div>
+        <div className="col-span-2 min-h-10 px-4 pt-2.5 pb-1 text-body text-muted-foreground">Send a follow-up…</div>
         <div className="col-start-1 flex min-w-0 items-center gap-0.5 px-2 pb-2">
           <Button variant="ghost" size="xs" className={picker} tabIndex={-1}>
             <Brain /> Opus 4.8 <ChevronDown className="opacity-60" />
@@ -288,7 +288,7 @@ function Composer() {
             <Gauge /> High <ChevronDown className="opacity-60" />
           </Button>
           <Button variant="ghost" size="xs" className={picker} tabIndex={-1}>
-            <ShieldCheck /> Accept edits <ChevronDown className="opacity-60" />
+            <ShieldCheck /> Auto <ChevronDown className="opacity-60" />
           </Button>
           <span className="ml-auto flex size-7 items-center justify-center rounded-md text-muted-foreground">
             <Paperclip className="size-4" aria-hidden />
@@ -311,7 +311,7 @@ const ansi = (n: number): CSSProperties => ({ color: `var(--terminal-ansi-${Stri
 /** The bottom panel's shell, without xterm: a prompt, some status words and ANSI 0-15 as cells. */
 function TerminalStrip() {
   return (
-    <div className="rounded-lg border border-pane-border bg-pane px-3 py-2 font-mono text-[12px] leading-5" style={{ color: "var(--terminal-fg)" }} data-testid="gallery-terminal">
+    <div className="rounded-lg border border-pane-border bg-pane px-3 py-2 text-caption-sm font-mono leading-5" style={{ color: "var(--terminal-fg)" }} data-testid="gallery-terminal">
       <div className="truncate">
         <span style={ansi(4)}>~/code-foundry</span> <span style={ansi(5)}>cf/theme-engine*</span> <span style={ansi(2)}>❯</span> git status -sb
       </div>
@@ -325,7 +325,7 @@ function TerminalStrip() {
         {Array.from({ length: 16 }, (_, n) => (
           <div key={n} className="flex flex-col items-center gap-0.5">
             <span className="h-4 w-full rounded-sm border border-pane-border" style={{ background: `var(--terminal-ansi-${String(n)})` }} data-ansi={n} />
-            <span className="text-[10px] leading-3 text-muted-foreground tabular-nums">{n}</span>
+            <span className="text-caption-sm leading-3 tabular-nums">{n}</span>
           </div>
         ))}
       </div>
@@ -373,10 +373,10 @@ function Inputs() {
             <SelectValue>Opus 4.8</SelectValue>
           </SelectTrigger>
         </Select>
-        <label className="flex items-center gap-1.5 text-xs">
+        <label className="flex items-center gap-1.5 text-body-sm">
           <Checkbox checked tabIndex={-1} /> Archive
         </label>
-        <label className="flex items-center gap-1.5 text-xs">
+        <label className="flex items-center gap-1.5 text-body-sm">
           <Checkbox checked={false} tabIndex={-1} /> Sound
         </label>
       </div>
@@ -410,11 +410,11 @@ function Badges() {
       </div>
       {/* The sidebar's status chips and the thread's result chips. */}
       <div className="cf-thread flex flex-wrap items-center gap-1.5">
-        <span className="rounded-sm bg-success/15 px-1 text-[10px] leading-4 font-medium text-success">+3 checks</span>
-        <span className="rounded-sm bg-warning/15 px-1 text-[10px] leading-4 font-medium text-warning">needs login</span>
-        <span className="rounded-sm bg-info/15 px-1 text-[10px] leading-4 font-medium text-info">working</span>
-        <span className="rounded-sm bg-highlight/15 px-1 text-[10px] leading-4 font-medium text-highlight">skill</span>
-        <span className="rounded-sm bg-destructive/15 px-1 text-[10px] leading-4 font-medium text-destructive">exit 1</span>
+        <span className="rounded-sm bg-success/15 px-1 text-caption-sm font-medium text-success">+3 checks</span>
+        <span className="rounded-sm bg-warning/15 px-1 text-caption-sm font-medium text-warning">needs login</span>
+        <span className="rounded-sm bg-info/15 px-1 text-caption-sm font-medium text-info">working</span>
+        <span className="rounded-sm bg-highlight/15 px-1 text-caption-sm font-medium text-highlight">skill</span>
+        <span className="rounded-sm bg-destructive/15 px-1 text-caption-sm font-medium text-destructive">exit 1</span>
         <Chip>worktree</Chip>
       </div>
       <div className="cf-thread flex flex-wrap items-center gap-1.5">
@@ -431,11 +431,11 @@ function Badges() {
 
 function TextSamples() {
   return (
-    <div className="flex flex-col gap-1 text-[12px] leading-5">
+    <div className="flex flex-col gap-1 text-body-sm">
       <p>Foreground: thread titles, body text</p>
       <p className="text-muted-foreground">Muted: hints, timestamps, branches</p>
       <p>
-        <span className="rounded bg-secondary px-1 text-secondary-foreground">secondary</span> · <span className="text-link underline underline-offset-2">a link</span> ·{" "}
+        <span className="rounded-sm bg-secondary px-1 text-secondary-foreground">secondary</span> · <span className="text-link underline underline-offset-2">a link</span> ·{" "}
         <span className="font-mono">mono 00o1lI</span>
       </p>
       <p>
@@ -444,7 +444,7 @@ function TextSamples() {
       </p>
       <div className="mt-1 flex items-center gap-1.5">
         {/* A tooltip, open (TooltipContent's classes). */}
-        <span className="rounded-lg border bg-popover px-2.5 py-1.5 text-xs text-popover-foreground shadow-lg">Snoozed until 6:00 PM</span>
+        <span className="rounded-lg border bg-popover px-2.5 py-1.5 text-body-sm text-popover-foreground shadow-lg">Snoozed until 6:00 PM</span>
       </div>
     </div>
   );
@@ -452,7 +452,7 @@ function TextSamples() {
 
 // ---------------------------------------------------------------- floating surfaces, inline
 
-const MENU_ITEM = "relative flex items-center gap-2 rounded-md px-2 py-1.5 text-sm select-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4";
+const MENU_ITEM = "relative flex items-center gap-2 rounded-md px-2 py-1.5 text-label select-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4";
 
 /** DropdownMenuContent and its items' classes, rendered open in place. */
 function Menu() {
@@ -462,16 +462,16 @@ function Menu() {
         <Brain /> Opus 4.8 <ChevronDown className="opacity-60" />
       </Button>
       <div className="w-full rounded-lg border bg-popover p-1 text-popover-foreground shadow-lg" role="presentation">
-        <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Model</div>
+        <div className="px-2 py-1.5 text-caption-sm font-medium">Model</div>
         <div className={MENU_ITEM}>
           <Check className="text-muted-foreground" aria-hidden /> Opus 4.8
-          <span className="ml-auto pl-4 text-xs tracking-widest text-muted-foreground">⌘1</span>
+          <span className="ml-auto pl-4 text-caption-sm tracking-widest">⌘1</span>
         </div>
         <div className={cn(MENU_ITEM, "bg-accent pl-8 text-accent-foreground")}>
-          Sonnet 5<span className="ml-auto pl-4 text-xs tracking-widest text-muted-foreground">⌘2</span>
+          Sonnet 5<span className="ml-auto pl-4 text-caption-sm tracking-widest">⌘2</span>
         </div>
         <div className={cn(MENU_ITEM, "pl-8")}>
-          Haiku 4.5<span className="ml-auto pl-4 text-xs tracking-widest text-muted-foreground">⌘3</span>
+          Haiku 4.5<span className="ml-auto pl-4 text-caption-sm tracking-widest">⌘3</span>
         </div>
         <div className="-mx-1 my-1 h-px bg-border" />
         <div className={cn(MENU_ITEM, "text-destructive")}>
@@ -487,8 +487,8 @@ function DialogCard() {
   return (
     <div className="rounded-md bg-sheet p-2">
       <div className="rounded-lg border bg-popover p-3 text-popover-foreground shadow-2xl">
-        <p className="text-sm font-semibold">Archive 2 busy threads?</p>
-        <p className="mt-1 text-xs text-muted-foreground">Their sessions stop and their shells close. You can unarchive them later.</p>
+        <p className="text-heading">Archive 2 busy threads?</p>
+        <p className="mt-1 text-caption">Their sessions stop and their shells close. You can unarchive them later.</p>
         <Input readOnly tabIndex={-1} aria-label="Reason" placeholder="Reason (optional)" className="mt-2 h-8" />
         <div className="mt-2.5 flex justify-end gap-2">
           <Button variant="outline" size="xs" tabIndex={-1}>
@@ -510,7 +510,7 @@ function Alert({ tone, icon: Icon, heading, children }: { tone: "warning" | "des
     info: "border-info/40 bg-info/10 [&>svg]:text-info",
   } as const;
   return (
-    <div className={cn("flex min-w-0 flex-1 items-start gap-2 rounded-md border px-3 py-2 text-xs", tones[tone])} role="presentation">
+    <div className={cn("flex min-w-0 flex-1 items-start gap-2 rounded-md border px-3 py-2 text-body-sm", tones[tone])} role="presentation">
       <Icon className="mt-px size-3.5 shrink-0" aria-hidden />
       <div className="min-w-0">
         <p className="font-medium">{heading}</p>

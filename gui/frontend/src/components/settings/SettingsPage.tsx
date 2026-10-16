@@ -29,12 +29,12 @@ function Banners() {
   return (
     <>
       {noService && (
-        <p className="mb-4 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs" data-testid="settings-unavailable">
+        <p className="mb-4 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-body-sm" data-testid="settings-unavailable">
           The daemon has not sent settings yet. If this persists it may be older than this window; restart it.
         </p>
       )}
       {loadError && (
-        <div className="mb-4 flex gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs" data-testid="settings-load-error">
+        <div className="mb-4 flex gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-body-sm" data-testid="settings-load-error">
           <TriangleAlert className="size-4 shrink-0 text-destructive" />
           <div>
             <p className="font-medium">The settings file does not parse; the previous values stay in effect and saving is paused.</p>
@@ -43,7 +43,7 @@ function Banners() {
         </div>
       )}
       {unknown.length > 0 && (
-        <p className="mb-4 rounded-md border border-border px-3 py-2 text-xs text-muted-foreground">
+        <p className="mb-4 rounded-md border border-border px-3 py-2 text-caption">
           Unknown keys in the file are ignored: <span className="font-mono">{unknown.join(", ")}</span>
         </p>
       )}
@@ -76,7 +76,7 @@ export function SettingsPage() {
   return (
     <section className="flex min-h-0 flex-1 flex-col" aria-label="Settings" data-testid="settings-page">
       <PaneHeader className="gap-3 px-4">
-        <h1 className="text-sm font-semibold">Settings</h1>
+        <h1 className="text-heading">Settings</h1>
         <div className="relative max-w-xs flex-1 [--wails-draggable:no-drag]">
           <Search className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -95,11 +95,11 @@ export function SettingsPage() {
               }
             }}
             // The pane header's compact size, beside its xs buttons.
-            className="h-7 pl-7 text-[13px]"
+            className="h-7 pl-7 text-body-sm"
           />
         </div>
         <Tip label={path} side="bottom">
-          <span className="ml-auto truncate font-mono text-[11px] text-muted-foreground" data-testid="settings-path">
+          <span className="ml-auto truncate text-caption-sm font-mono" data-testid="settings-path">
             {tildify(path)}
           </span>
         </Tip>
@@ -111,7 +111,7 @@ export function SettingsPage() {
         </Button>
       </PaneHeader>
       <div className="flex min-h-0 flex-1">
-        <nav className="w-44 shrink-0 space-y-0.5 border-r border-pane-border p-2 text-[13px]" aria-label="Setting groups">
+        <nav className="w-44 shrink-0 space-y-0.5 border-r border-pane-border p-2 text-body-sm" aria-label="Setting groups">
           {groups.map(({ group, fields }) => (
             <button
               key={group.id}
@@ -122,7 +122,7 @@ export function SettingsPage() {
               }}
             >
               <span>{group.title}</span>
-              {query && <span className="text-[11px] text-muted-foreground">{fields.length}</span>}
+              {query && <span className="text-caption-sm">{fields.length}</span>}
             </button>
           ))}
           {/* The Themes page (theme.pick): a page of its own, so a link, not a group. */}
@@ -142,15 +142,15 @@ export function SettingsPage() {
         <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
           <div className="mx-auto max-w-3xl">
             <Banners />
-            {schemaError && <p className="text-sm text-destructive">Cannot load the settings schema: {schemaError}</p>}
-            {!schema && !schemaError && <p className="text-sm text-muted-foreground">Loading…</p>}
-            {schema && groups.length === 0 && <p className="text-sm text-muted-foreground">No settings match “{query}”.</p>}
+            {schemaError && <p className="text-body text-destructive">Cannot load the settings schema: {schemaError}</p>}
+            {!schema && !schemaError && <p className="text-body text-muted-foreground">Loading…</p>}
+            {schema && groups.length === 0 && <p className="text-body text-muted-foreground">No settings match “{query}”.</p>}
             {groups.map(({ group, fields }) => (
               <section key={group.id} data-group={group.id} className="mb-8 scroll-mt-4" aria-labelledby={`group-${group.id}`}>
-                <h2 id={`group-${group.id}`} className="text-base font-semibold">
+                <h2 id={`group-${group.id}`} className="text-heading">
                   {group.title}
                 </h2>
-                {group.description && <p className="mt-0.5 mb-2 text-xs text-muted-foreground">{group.description}</p>}
+                {group.description && <p className="mt-0.5 mb-2 text-caption">{group.description}</p>}
                 <div>
                   {fields.map((f) => (
                     <SettingRow key={f.key} field={f} />

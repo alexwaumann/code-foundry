@@ -270,6 +270,31 @@
   letter-spacing: var(--tracking-tight);
   color: var(--color-foreground);
 }
+/* Display figures: a page's or panel's one big number (Usage totals). */
+@utility text-display {
+  font-size: 44px;
+  line-height: 48px;
+  font-weight: 600;
+  letter-spacing: var(--tracking-tight);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-foreground);
+}
+@utility text-display-sm {
+  font-size: 32px;
+  line-height: 36px;
+  font-weight: 600;
+  letter-spacing: var(--tracking-tight);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-foreground);
+}
+/* The sidebar's app name: the one title-band brand mark, between heading and title. */
+@utility text-brand {
+  font-size: 17px;
+  line-height: 20px;
+  font-weight: 600;
+  letter-spacing: var(--tracking-tight);
+  color: var(--color-foreground);
+}
 @utility text-heading {
   font-size: 15px;
   line-height: 20px;

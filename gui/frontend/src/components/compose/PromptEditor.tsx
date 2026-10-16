@@ -206,7 +206,7 @@ export function PromptEditor({
       ...(active ? { "aria-activedescendant": active } : {}),
       "data-compose-stop": "",
       "data-testid": "composer-input",
-      class: "min-h-16 max-h-80 overflow-y-auto px-4 pt-3.5 pb-1 text-sm leading-6 whitespace-pre-wrap break-words outline-none aria-disabled:opacity-70",
+      class: "min-h-16 max-h-80 overflow-y-auto px-4 pt-3.5 pb-1 text-body whitespace-pre-wrap break-words outline-none aria-disabled:opacity-70",
     }),
     [disabled, placeholder, triggers.length, controls, active],
   );
@@ -378,7 +378,7 @@ export function PromptEditor({
       {/* data-value: the prompt as stored (tag tokens included), for tests and debugging. */}
       <div className="relative" data-testid="composer-prompt" data-value={value}>
         {value === "" && (
-          <span aria-hidden className="pointer-events-none absolute top-3.5 left-4 text-sm leading-6 text-muted-foreground select-none">
+          <span aria-hidden className="pointer-events-none absolute top-3.5 left-4 text-body text-muted-foreground select-none">
             {placeholder}
           </span>
         )}

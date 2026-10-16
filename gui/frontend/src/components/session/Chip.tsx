@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
  */
 export function Chip({ children, className, ...props }: { children: ReactNode; className?: string; "aria-label"?: string; "data-testid"?: string }) {
   return (
-    <span className={cn("shrink-0 rounded-[3px] bg-foreground/8 px-1 text-[10px] leading-4 font-medium text-muted-foreground", className)} {...props}>
+    <span className={cn("shrink-0 rounded-sm bg-foreground/8 px-1 text-caption-sm font-medium", className)} {...props}>
       {children}
     </span>
   );

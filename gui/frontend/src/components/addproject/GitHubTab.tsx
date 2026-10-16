@@ -21,7 +21,7 @@ type Clone = { state: "idle" } | { state: "running"; lines: CloneProgressView[] 
 
 function Badge({ children, tone = "muted" }: { children: string; tone?: "muted" | "amber" }) {
   const cls = tone === "amber" ? "border-warning/40 text-warning" : "border-border text-muted-foreground";
-  return <span className={`shrink-0 rounded border px-1.5 py-px text-[10px] font-medium tracking-wide uppercase ${cls}`}>{children}</span>;
+  return <span className={`shrink-0 rounded-sm border px-1.5 py-px text-overline ${cls}`}>{children}</span>;
 }
 
 function RepoBadges({ repo }: { repo: GitHubRepoView }) {
@@ -44,11 +44,11 @@ function ResultRow({ repo, onPick }: { repo: GitHubRepoView; onPick: () => void 
       data-slug={repo.slug}
     >
       <span className="flex min-w-0 items-center gap-2">
-        <span className="truncate font-mono text-sm">{repo.slug}</span>
+        <span className="truncate text-body font-mono">{repo.slug}</span>
         <RepoBadges repo={repo} />
-        {repo.clonePathExists && <span className="ml-auto shrink-0 text-xs text-muted-foreground">already cloned</span>}
+        {repo.clonePathExists && <span className="ml-auto shrink-0 text-caption">already cloned</span>}
       </span>
-      {repo.description && <span className="line-clamp-1 text-xs text-muted-foreground">{repo.description}</span>}
+      {repo.description && <span className="line-clamp-1 text-caption">{repo.description}</span>}
     </button>
   );
 }
@@ -60,7 +60,7 @@ function ProgressLog({ lines }: { lines: readonly CloneProgressView[] }) {
     if (el) el.scrollTop = el.scrollHeight;
   }, [lines]);
   return (
-    <div ref={ref} className="max-h-40 overflow-y-auto rounded-md border bg-muted/30 px-3 py-2 font-mono text-[11px] leading-relaxed" data-testid="add-project-clone-progress">
+    <div ref={ref} className="max-h-40 overflow-y-auto rounded-md border bg-muted/30 px-3 py-2 text-caption-sm font-mono leading-relaxed text-foreground" data-testid="add-project-clone-progress">
       {lines.length === 0 ? (
         <div className="text-muted-foreground">Starting gh repo clone…</div>
       ) : (
@@ -138,7 +138,7 @@ function RepoCard({ repo, onBack, onRunning }: { repo: GitHubRepoView; onBack: (
       {onBack && (
         <button
           type="button"
-          className="flex w-fit items-center gap-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+          className="flex w-fit items-center gap-1 text-caption hover:text-foreground disabled:opacity-50"
           onClick={onBack}
           disabled={running}
           data-testid="add-project-github-back"
@@ -148,27 +148,27 @@ function RepoCard({ repo, onBack, onRunning }: { repo: GitHubRepoView; onBack: (
       )}
       <div className="flex flex-col gap-1 rounded-md border px-3 py-2.5" data-testid="add-project-github-card">
         <span className="flex min-w-0 items-center gap-2">
-          <span className="truncate font-mono text-sm font-medium">{repo.slug}</span>
+          <span className="truncate text-body font-mono font-medium">{repo.slug}</span>
           <RepoBadges repo={repo} />
         </span>
-        {repo.description && <span className="text-xs text-muted-foreground">{repo.description}</span>}
-        <span className="mt-1 text-xs text-muted-foreground">
+        {repo.description && <span className="text-caption">{repo.description}</span>}
+        <span className="mt-1 text-caption">
           Clones into <span className="font-mono text-foreground" data-testid="add-project-clone-dest">{tildify(repo.clonePath)}</span>
         </span>
         {repo.clonePathExists && (
-          <span className="text-xs text-warning" data-testid="add-project-clone-exists">
+          <span className="text-caption text-warning" data-testid="add-project-clone-exists">
             That folder already exists, so it cannot be cloned there. Add the existing folder instead.
           </span>
         )}
       </div>
       {clone.state !== "idle" && <ProgressLog lines={clone.lines} />}
       {clone.state === "failed" && (
-        <p className="text-xs whitespace-pre-wrap text-destructive" role="alert" data-testid="add-project-clone-error">
+        <p className="text-caption whitespace-pre-wrap text-destructive" role="alert" data-testid="add-project-clone-error">
           {clone.error}
         </p>
       )}
       <div className="flex items-center justify-end gap-2">
-        {running && <span className="mr-auto text-xs text-muted-foreground">Closing the dialog cancels the clone.</span>}
+        {running && <span className="mr-auto text-caption">Closing the dialog cancels the clone.</span>}
         {repo.clonePathExists ? (
           <Button type="button" size="sm" disabled={adding} onClick={() => void addExisting()} data-testid="add-project-add-existing">
             {adding ? <Loader2 className="animate-spin" aria-hidden /> : <FolderPlus aria-hidden />}
@@ -280,26 +280,26 @@ export function GitHubTab({ active }: { active: boolean }) {
         </Button>
       </form>
       {inputError && (
-        <p className="text-xs text-destructive" role="alert" data-testid="add-project-github-error">
+        <p className="text-caption text-destructive" role="alert" data-testid="add-project-github-error">
           {inputError}
         </p>
       )}
       {view.kind === "idle" && !inputError && (
-        <p className="text-xs text-muted-foreground">Press Enter to look up a repository or search GitHub. Clones go to ~/.code-foundry/projects/&lt;owner&gt;/&lt;repo&gt; with gh.</p>
+        <p className="text-caption">Press Enter to look up a repository or search GitHub. Clones go to ~/.code-foundry/projects/&lt;owner&gt;/&lt;repo&gt; with gh.</p>
       )}
       {view.kind === "loading" && (
-        <p className="flex items-center gap-2 text-xs text-muted-foreground" data-testid="add-project-github-loading">
+        <p className="flex items-center gap-2 text-caption" data-testid="add-project-github-loading">
           <Loader2 className="size-3 animate-spin" aria-hidden /> {view.what}
         </p>
       )}
       {view.kind === "message" && (
-        <p className="text-xs text-muted-foreground" data-testid="add-project-github-message">
+        <p className="text-caption" data-testid="add-project-github-message">
           {view.text}
         </p>
       )}
       {view.kind === "results" &&
         (view.repos.length === 0 ? (
-          <p className="text-xs text-muted-foreground" data-testid="add-project-github-message">
+          <p className="text-caption" data-testid="add-project-github-message">
             No repositories match “{view.query}”.
           </p>
         ) : (

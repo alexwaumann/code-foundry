@@ -139,7 +139,7 @@ export function ComposerPicker({
           {filterPlaceholder && <CommandInput ref={inputRef} placeholder={filterPlaceholder} value={search} onValueChange={setSearch} />}
           <CommandList className={cn("max-h-72 min-h-0", listClassName)}>
             {status ? (
-              <div className="px-3 py-3 text-xs text-muted-foreground" role="status">
+              <div className="px-3 py-3 text-caption" role="status">
                 {status}
               </div>
             ) : (
@@ -168,9 +168,9 @@ export function ComposerPicker({
                           <span className="flex min-w-0 flex-col">
                             <span className="flex min-w-0 items-center gap-1.5">
                               <span className="truncate">{o.label}</span>
-                              {o.tag && <span className="shrink-0 rounded border border-border px-1 text-[11px] leading-4 text-muted-foreground">{o.tag}</span>}
+                              {o.tag && <span className="shrink-0 rounded-sm border border-border px-1 text-caption-sm">{o.tag}</span>}
                             </span>
-                            {o.detail && <span className={cn("text-xs text-muted-foreground", o.wrap ? "text-pretty" : "truncate")}>{o.detail}</span>}
+                            {o.detail && <span className={cn("text-caption", o.wrap ? "text-pretty" : "truncate")}>{o.detail}</span>}
                           </span>
                         </CommandItem>
                       ))}
@@ -180,7 +180,7 @@ export function ComposerPicker({
               )}
           </CommandList>
           {footer && !status && (
-            <div className="mx-2 border-t border-border px-1 py-2 text-xs text-muted-foreground" data-slot="picker-footer">
+            <div className="mx-2 border-t border-border px-1 py-2 text-caption" data-slot="picker-footer">
               {footer}
             </div>
           )}

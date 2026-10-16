@@ -41,7 +41,7 @@ function TextTag({
           <span className="truncate">{label}</span>
         </NodeViewWrapper>
       </TooltipTrigger>
-      <TooltipContent side="top" className="max-w-80 px-2.5 py-1.5 text-xs" data-testid="prompt-tag-tooltip">
+      <TooltipContent side="top" className="max-w-80 px-2.5 py-1.5 text-body-sm" data-testid="prompt-tag-tooltip">
         <p>{tip}</p>
         {detail && <p className="mt-0.5 text-muted-foreground">{detail}</p>}
       </TooltipContent>

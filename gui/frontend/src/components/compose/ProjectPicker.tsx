@@ -138,12 +138,12 @@ export function ProjectPicker({ close }: { close: () => void }) {
                 <FolderPlus className="size-4" />
               </span>
               <span className="truncate font-medium">Add a project…</span>
-              <span className="truncate text-xs text-muted-foreground">a folder on this Mac, or from GitHub</span>
+              <span className="truncate text-caption">a folder on this Mac, or from GitHub</span>
             </CommandItem>
           </CommandGroup>
         )}
       </CommandList>
-      <div className="flex items-center gap-3 border-t px-3 py-1.5 text-[11px] text-muted-foreground" data-testid="picker-hints">
+      <div className="flex items-center gap-3 border-t px-3 py-1.5 text-caption-sm" data-testid="picker-hints">
         {hints.map(([key, label]) => (
           <span key={key} className="flex items-center gap-1">
             <Kbd size="sm">{key}</Kbd>

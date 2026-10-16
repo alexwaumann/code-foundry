@@ -12,7 +12,7 @@ export function ThemeAa({ theme, className }: { theme: Theme; className?: string
   return (
     <span
       aria-hidden
-      className={cn("inline-flex h-5 w-7 shrink-0 items-center justify-center rounded border text-[11px] leading-none font-semibold", className)}
+      className={cn("inline-flex h-5 w-7 shrink-0 items-center justify-center rounded-sm border text-caption-sm leading-none font-semibold", className)}
       style={{ background: theme.vars["--pane"], color: theme.vars["--foreground"], borderColor: theme.vars["--pane-border"] }}
     >
       Aa

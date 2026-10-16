@@ -29,7 +29,7 @@ function Progress({
       <ProgressPrimitive.Indicator
         data-slot="progress-indicator"
         className={cn(
-          "h-full flex-1 rounded-[inherit] bg-primary",
+          "h-full flex-1 rounded-full bg-primary",
           indeterminate
             ? "w-1/3 animate-[cf-indeterminate_1.4s_ease-in-out_infinite]"
             : "w-full transition-all"

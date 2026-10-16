@@ -46,6 +46,9 @@ describe("type roles", () => {
 
   it.each([
     ["text-title", { "font-size": "22px", "line-height": "28px", "font-weight": "600", "letter-spacing": "var(--tracking-tight)", color: "var(--color-foreground)" }],
+    ["text-display", { "font-size": "44px", "line-height": "48px", "font-weight": "600", "letter-spacing": "var(--tracking-tight)", "font-variant-numeric": "tabular-nums", color: "var(--color-foreground)" }],
+    ["text-display-sm", { "font-size": "32px", "line-height": "36px", "font-weight": "600", "letter-spacing": "var(--tracking-tight)", "font-variant-numeric": "tabular-nums", color: "var(--color-foreground)" }],
+    ["text-brand", { "font-size": "17px", "line-height": "20px", "font-weight": "600", "letter-spacing": "var(--tracking-tight)", color: "var(--color-foreground)" }],
     ["text-heading", { "font-size": "15px", "line-height": "20px", "font-weight": "600", color: "var(--color-foreground)" }],
     ["text-subheading", { "font-size": "14px", "line-height": "20px", "font-weight": "600", color: "var(--color-foreground)" }],
     ["text-overline", { "font-size": "11px", "line-height": "16px", "font-weight": "500", "letter-spacing": "0.06em", "text-transform": "uppercase", color: "var(--color-muted-foreground)" }],
@@ -69,6 +72,8 @@ describe("type roles", () => {
     ["text-body-sm", "font-semibold"],
     ["text-label", "font-normal"],
     ["text-title", "font-medium"],
+    ["text-display", "text-muted-foreground"],
+    ["text-display-sm", "font-medium"],
     ["text-title", "tracking-normal"],
     ["text-overline", "tracking-normal"],
     ["text-overline", "normal-case"],
@@ -137,6 +142,10 @@ describe("cn knows the tokens", () => {
     [["text-link", "text-destructive"], "text-link text-destructive"],
     [["text-code", "font-mono"], "text-code font-mono"],
     [["text-body", "text-caption"], "text-caption"],
+    [["text-display", "text-display-sm"], "text-display-sm"],
+    // Buttons, labels and tooltips keep their parent's colour unless a variant sets one.
+    [["text-label text-inherit", "text-primary-foreground"], "text-label text-primary-foreground"],
+    [["text-label text-inherit", "text-body-sm font-medium"], "text-inherit text-body-sm font-medium"],
     [["text-sm", "text-body"], "text-body"],
     [["text-xs text-muted-foreground", "text-caption"], "text-muted-foreground text-caption"],
     [["rounded-md", "rounded-pane"], "rounded-pane"],

@@ -51,14 +51,14 @@ function DialogClose({ ...props }: React.ComponentProps<typeof DialogPrimitive.C
 }
 
 function DialogTitle({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Title>) {
-  return <DialogPrimitive.Title data-slot="dialog-title" className={cn("text-sm font-semibold", className)} {...props} />
+  return <DialogPrimitive.Title data-slot="dialog-title" className={cn("text-heading", className)} {...props} />
 }
 
 function DialogDescription({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Description>) {
   return (
     <DialogPrimitive.Description
       data-slot="dialog-description"
-      className={cn("text-sm text-muted-foreground", className)}
+      className={cn("text-caption", className)}
       {...props}
     />
   )
