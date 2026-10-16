@@ -5,7 +5,7 @@
  */
 
 /** Block type roles: `text-<role>` sets size, line-height, weight (tracking) and colour. */
-export const TYPE_ROLES = ["title", "brand", "heading", "subheading", "overline", "body", "body-sm", "label", "caption", "caption-sm"] as const;
+export const TYPE_ROLES = ["display", "display-sm", "title", "brand", "heading", "subheading", "overline", "body", "body-sm", "label", "caption", "caption-sm"] as const;
 
 /** Inline type roles: weight, colour or family only; they keep the surrounding size. */
 export const INLINE_TYPE_ROLES = ["link", "code"] as const;

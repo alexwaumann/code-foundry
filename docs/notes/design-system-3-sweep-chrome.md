@@ -36,6 +36,14 @@ kbd `text-caption-sm` (sm with `leading-none` to stay 16px tall), dialog title
 items `text-label`, cmdk group headings `text-overline`, menu labels and shortcuts
 `text-caption-sm`, tab and segmented-radio triggers `text-body-sm font-medium`.
 
+## Display roles
+
+Added for PR 4's Usage totals, which had no role (44px and 32px figures squeezed to
+`text-title`): `text-display` 44/48 and `text-display-sm` 32/36, both 600, tracking-tight,
+tabular-nums, foreground. In index.css, tokens.ts (so cn merges them) and roles.test.ts.
+Pane-header page titles (Settings, Themes, and PR 4's Projects, Pull Requests, Usage) are
+all `text-heading`, not `text-title`: they sit in the 44px header.
+
 ## Colour: roles set one, `text-inherit` keeps the parent's
 
 Every block role sets a colour. That changes elements that used to inherit theirs: ghost and

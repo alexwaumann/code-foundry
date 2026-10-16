@@ -27,7 +27,7 @@ export const PATTERNS: Record<Category, readonly RegExp[]> = {
 
 /** What to use instead, for the failure message. */
 export const INSTEAD: Record<Category, string> = {
-  size: "a type role (text-title, text-heading, text-subheading, text-overline, text-body, text-body-sm, text-label, text-caption, text-caption-sm, text-link, text-code)",
+  size: "a type role (text-display, text-display-sm, text-title, text-heading, text-subheading, text-overline, text-body, text-body-sm, text-label, text-caption, text-caption-sm, text-link, text-code)",
   leading: "a type role (each sets its own line-height)",
   radius: "the scale: rounded-sm (4), rounded-md (6), rounded-lg (10), rounded-pane (12), rounded-2xl (16), rounded-full",
 };
