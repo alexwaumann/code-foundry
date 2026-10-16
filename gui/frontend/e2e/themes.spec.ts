@@ -200,6 +200,9 @@ test("theme pick from the CLI (ShowView themes.light) opens the page on that slo
   await expect(page.getByTestId("settings-page")).toHaveCount(0);
 
   await page.keyboard.press("Meta+Comma");
+  // The slot selects name the theme whole: no " (default)" beside the Choose… button.
+  for (const [key, name] of [["appearance.theme_dark", "Catppuccin Mocha"], ["appearance.theme_light", "Catppuccin Latte"]] as const)
+    await expect(page.locator(`[data-setting="${key}"] [data-slot="select-trigger"]`)).toHaveText(name);
   await page.getByTestId("settings-themes-link").click();
   await expect(page$(page)).toBeVisible();
   await expect(page.getByTestId("themes-slot-dark")).toHaveAttribute("aria-pressed", "true");

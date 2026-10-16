@@ -6,14 +6,14 @@ import { EnumEditor } from "./SettingRow";
 /**
  * appearance.theme_dark / appearance.theme_light: the enum select, and "Choose…", which
  * opens the Themes page (theme.pick) on this slot to preview the themes first. Closing that
- * page comes back here.
+ * page comes back here. No " (default)" after a name: it would not fit beside the button.
  */
 function slotEditor(slot: "dark" | "light"): SettingEditor {
   return function ThemeSlotEditor(props: EditorProps) {
     return (
       <div className="flex items-center gap-1.5">
         <div className="min-w-0 flex-1">
-          <EnumEditor {...props} />
+          <EnumEditor {...props} markDefault={false} />
         </div>
         <Button
           variant="outline"
