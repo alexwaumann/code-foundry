@@ -62,7 +62,7 @@ async function pick(page: Page, key: string, label: string) {
 
 test("cmd+, opens settings rendered from the schema", async ({ page }) => {
   const settings = await openSettings(page);
-  for (const title of ["Sessions", "GitHub", "Repositories", "Appearance", "Keybindings", "Advanced"]) {
+  for (const title of ["Threads", "GitHub", "Repositories", "Appearance", "Keybindings", "Advanced"]) {
     await expect(settings.getByRole("heading", { name: title, exact: true })).toBeVisible();
   }
   await expect(setting(page, "appearance.font_size").getByRole("spinbutton")).toHaveValue("13");

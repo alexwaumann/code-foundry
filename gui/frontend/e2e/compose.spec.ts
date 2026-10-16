@@ -321,8 +321,8 @@ test("an existing worktree or the current checkout shows its branch, read-only a
   await expect(page.getByTestId("composer-base")).toHaveText("From origin/main");
 });
 
-test("Work in: sessions.default_worktree = current starts in place; a pick is remembered per project", async ({ page }) => {
-  await mockPost("settings/external?sessions.default_worktree=current");
+test("Work in: threads.default_worktree = current starts in place; a pick is remembered per project", async ({ page }) => {
+  await mockPost("settings/external?threads.default_worktree=current");
   await openApp(page);
   await compose(page);
   const worktree = page.getByTestId("composer-worktree");

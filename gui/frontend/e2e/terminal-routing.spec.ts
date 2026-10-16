@@ -41,7 +41,7 @@ test("a thread row's New terminal here: the thread owns the shell, in its bottom
   await expect(bottom(page).getByRole("tab")).toHaveCount(1);
   await expect(host(page)).toHaveAttribute("data-attach-phase", "live");
   const id = (await host(page).getAttribute("data-terminal-id")) ?? "";
-  expect(await shellLabels(page, id)).toMatchObject({ kind: "shell", session: "s-2" });
+  expect(await shellLabels(page, id)).toMatchObject({ kind: "shell", thread: "s-2" });
 
   // s-1 has t-s1-shell already: a second tab.
   await row(page, "s:s-1").click({ button: "right" });
@@ -80,7 +80,7 @@ test("a workspace member's New terminal here in a thread's side panel: the threa
   await expect(row(page, `s:${driver}`)).toHaveAttribute("aria-selected", "true");
   await expect(bottom(page).getByRole("tab")).toHaveCount(1);
   const id = (await host(page).getAttribute("data-terminal-id")) ?? "";
-  expect(await shellLabels(page, id)).toMatchObject({ kind: "shell", session: driver });
+  expect(await shellLabels(page, id)).toMatchObject({ kind: "shell", thread: driver });
   await expectTooltip(page, bottom(page).getByRole("tab"), "~/.code-foundry/worktrees/alexwaumann/code-foundry/cf-checkout");
 });
 
