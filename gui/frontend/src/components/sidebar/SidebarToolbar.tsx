@@ -43,7 +43,7 @@ function NotificationsButton() {
           <span
             aria-hidden
             data-testid="attention-badge"
-            className="absolute -top-1 -right-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-warning px-[3px] text-[9px] leading-none font-semibold text-warning-foreground tabular-nums"
+            className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-warning px-[3px] text-overline leading-none font-semibold tracking-normal text-warning-foreground tabular-nums"
           >
             {count}
           </span>
@@ -98,7 +98,7 @@ export function SidebarNewThread() {
       command="session.new"
       variant="default"
       whenUnavailable="disable"
-      className="mt-1.5 h-8 w-full shrink-0 justify-start gap-2 px-2 text-[13px] has-[>svg]:px-2 [--wails-draggable:no-drag]"
+      className="mt-1.5 h-8 w-full shrink-0 justify-start gap-2 px-2 text-body-sm font-medium has-[>svg]:px-2 [--wails-draggable:no-drag]"
       data-testid="sidebar-new-session"
     >
       <SquarePen aria-hidden className="size-4" />

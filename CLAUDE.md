@@ -41,7 +41,7 @@ cd gui && wails3 dev   # GUI with hot reload (needs a running daemon or auto-sta
 - Generated protobuf types are used only in `src/api/`. Map to view models there.
 - Narrow selectors. Virtualize lists. No component subscribes to a whole slice.
 - Only the visible thread holds a `ThreadService.Watch` stream and only the visible bottom shell a `TerminalService.Attach` stream.
-- Text uses a type role class (`text-title`, `text-heading`, `text-subheading`, `text-overline`, `text-body`, `text-body-sm`, `text-label`, `text-caption`, `text-caption-sm`, `text-link`, `text-code`), with colour/weight utilities as modifiers after it; never a Tailwind size (`text-sm`, `text-[13px]`) or `leading-[…]` directly. A weight (`font-medium`) is fine as a modifier on a role. `cn` comes from `@/lib/utils`, which knows the roles.
+- Text uses a type role class (`text-title`, `text-heading`, `text-subheading`, `text-overline`, `text-body`, `text-body-sm`, `text-label`, `text-caption`, `text-caption-sm`, `text-link`, `text-code`; `text-brand` is the sidebar's app name only), with colour/weight utilities as modifiers after it; never a Tailwind size (`text-sm`, `text-[13px]`) or `leading-[…]` directly. A weight (`font-medium`) is fine as a modifier on a role. `cn` comes from `@/lib/utils`, which knows the roles.
 - Radii use the scale (`rounded-sm` 4, `rounded-md` 6, `rounded-lg` 10, `rounded-pane` 12, `rounded-2xl` 16, `rounded-full`), never bare `rounded` or `rounded-[…]`; an inner corner is one step smaller than its padded parent's. `src/design/guards.test.ts` enforces both (allowlist only shrinks: `pnpm run guards:allow`).
 
 ## Verification

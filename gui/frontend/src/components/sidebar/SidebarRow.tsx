@@ -56,7 +56,7 @@ function RenameField({ id, name }: { id: string; name: string }) {
       defaultValue={name}
       aria-label="Thread name"
       data-testid="rename-input"
-      className="h-5 min-w-0 flex-1 rounded-sm border border-sidebar-ring bg-background px-1 text-[13px] outline-none"
+      className="h-5 min-w-0 flex-1 rounded-sm border border-sidebar-ring bg-background px-1 text-body-sm outline-none"
       onClick={(e) => {
         e.stopPropagation();
       }}
@@ -92,7 +92,7 @@ function WorkspaceBadge({ id }: { id: string }) {
     // A click opens the workspace surface in the thread's side panel; the click goes on
     // to the row, which selects the thread (and so shows that panel).
     <span
-      className="flex max-w-24 min-w-0 cursor-pointer items-center gap-0.5 rounded-sm bg-highlight/15 px-1 text-[10px] leading-4 font-medium text-highlight hover:bg-highlight/30"
+      className="flex max-w-24 min-w-0 cursor-pointer items-center gap-0.5 rounded-sm bg-highlight/15 px-1 text-caption-sm font-medium text-highlight hover:bg-highlight/30"
       data-testid="row-workspace"
       onClick={() => {
         openWorkspaceSurface({ kind: "session", id });
@@ -112,7 +112,7 @@ function LinkedPrsBadge({ id }: { id: string }) {
     // Like the workspace badge: a click opens the Linked PRs surface in the thread's side
     // panel, and goes on to the row, which selects the thread (and so shows that panel).
     <span
-      className="flex shrink-0 cursor-pointer items-center rounded-sm bg-success/15 px-1 text-[10px] leading-4 font-medium text-success tabular-nums hover:bg-success/30"
+      className="flex shrink-0 cursor-pointer items-center rounded-sm bg-success/15 px-1 text-caption-sm font-medium text-success tabular-nums hover:bg-success/30"
       data-testid="row-linked-prs"
       onClick={() => {
         openLinkedPrsSurface({ kind: "session", id });
@@ -187,7 +187,7 @@ function ThreadLine({ id }: { id: string }) {
   const { project, branch, noGit, noProject, movingTo } = useThreadPlace(id);
   const status = line.kind !== "place";
   return (
-    <span className="flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground" data-testid="row-place" data-status-line={line.kind} data-session-badge={badge}>
+    <span className="flex min-w-0 items-center gap-1 text-caption-sm" data-testid="row-place" data-status-line={line.kind} data-session-badge={badge}>
       {movingTo !== null ? (
         <span className="flex min-w-0 items-center gap-1 text-warning" data-testid="row-moving">
           <ArrowRightLeft className="size-3 shrink-0" aria-hidden />
@@ -354,7 +354,7 @@ function ThreadTipBody({ id }: { id: string }) {
   );
   return (
     <>
-      <div className="mb-[5px] truncate text-[13px] font-semibold" data-testid="tip-name">
+      <div className="mb-[5px] truncate text-subheading" data-testid="tip-name">
         {name || id}
       </div>
       {snoozed ? <TipSnooze id={id} /> : <TipStatus id={id} />}
@@ -394,7 +394,7 @@ function ThreadTooltip({ id, children }: { id: string; children: ReactElement })
       disableHoverableContent
     >
       <TooltipTrigger asChild>{children}</TooltipTrigger>
-      <TooltipContent side="right" align="start" sideOffset={12} className="w-[220px] px-2.5 py-2 text-xs" data-testid="thread-tooltip" data-session-id={id}>
+      <TooltipContent side="right" align="start" sideOffset={12} className="w-[220px] px-2.5 py-2 text-body-sm" data-testid="thread-tooltip" data-session-id={id}>
         <ThreadTipBody id={id} />
       </TooltipContent>
     </Tooltip>
@@ -403,7 +403,7 @@ function ThreadTooltip({ id, children }: { id: string; children: ReactElement })
 
 /**
  * A footer's header, Working, Snoozed or Archived (design record: /tmp/working-header/index.html?v=2):
- * an 11px uppercase muted label, the number of threads in the section after it, and a
+ * an overline label (text-overline), the number of threads in the section after it, and a
  * chevron on the right saying whether the section is open. A button (aria-expanded) inside
  * the row; the row itself is role="presentation", so the listbox's cursor never lands on
  * it. Pressing it with the mouse does not take focus from the list. Test ids
@@ -432,11 +432,11 @@ function SectionHeader({ row }: { row: HeaderRow }) {
           else ui.toggleWorkingCollapsed();
         }}
       >
-        <span className="truncate text-[11px] font-medium tracking-wider uppercase" data-testid={`${row.section}-label`}>
+        <span className="truncate text-overline" data-testid={`${row.section}-label`}>
           {row.label}
         </span>
         {/* A flex container drops this space visually; it keeps the text and name "Working 2". */}{" "}
-        <span className="shrink-0 text-[11px] tabular-nums opacity-70" data-testid={`${row.section}-count`}>
+        <span className="shrink-0 text-overline font-normal tabular-nums opacity-70" data-testid={`${row.section}-count`}>
           {row.count}
         </span>
         <Chevron className="-mr-2 ml-auto size-3 shrink-0" aria-hidden />
@@ -451,7 +451,7 @@ function ArchivedAge({ id }: { id: string }) {
   const now = useNow(30_000);
   if (at === null) return null;
   return (
-    <span className="ml-auto shrink-0 pl-1 text-[11px] text-muted-foreground tabular-nums" data-testid="row-archived-age">
+    <span className="ml-auto shrink-0 pl-1 text-caption-sm tabular-nums" data-testid="row-archived-age">
       {shortAge(at, now)}
     </span>
   );
@@ -463,7 +463,7 @@ function SnoozeLeft({ id }: { id: string }) {
   const now = useNow(30_000);
   if (until === null) return null;
   return (
-    <span className="ml-auto shrink-0 pl-1 text-[11px] text-muted-foreground tabular-nums" data-testid="row-snooze-left">
+    <span className="ml-auto shrink-0 pl-1 text-caption-sm tabular-nums" data-testid="row-snooze-left">
       {shortRemaining(until, now)}
     </span>
   );
@@ -506,7 +506,7 @@ export const SidebarRow = memo(function SidebarRow({ row, selected, cursor, onAc
         data-section={row.section}
         data-cursor={cursor || undefined}
         className={cn(
-          "group/row flex h-full cursor-default items-center gap-1.5 rounded-md px-2 text-[13px] select-none",
+          "group/row flex h-full cursor-default items-center gap-1.5 rounded-md px-2 text-body-sm select-none",
           selected ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground/90 hover:bg-sidebar-accent/50",
           cursor && "group-focus:ring-1 group-focus:ring-sidebar-ring group-focus:ring-inset",
         )}

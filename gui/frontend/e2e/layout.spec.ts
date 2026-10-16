@@ -34,10 +34,10 @@ const CENTER = 34;
 /** An icon-xs button's inset around its glyph: (24px box - 14px glyph) / 2. */
 const ICON_INSET = 5;
 
-test("the app name is 16px semibold and fits whole at the minimum sidebar width, zoomed out too", async ({ page }) => {
+test("the app name is text-brand (17px semibold) and fits whole at the minimum sidebar width, zoomed in and out", async ({ page }) => {
   await openApp(page);
   const title = page.getByTestId("sidebar-app-name");
-  await expect(title).toHaveCSS("font-size", "16px");
+  await expect(title).toHaveCSS("font-size", "17px");
   await expect(title).toHaveCSS("font-weight", "600");
   const setWidth = (w: number) => page.evaluate(`import("/src/stores/ui.ts").then((m) => m.useUiStore.getState().setSidebarWidth(${String(w)}))`);
   const setZoom = (z: number) => page.evaluate(`import("/src/stores/ui.ts").then((m) => m.useUiStore.getState().setZoom(${String(z)}))`);
@@ -48,6 +48,9 @@ test("the app name is 16px semibold and fits whole at the minimum sidebar width,
   // Zoomed out, the gutter is wider in layout px (80 screen px over 0.9): the tightest case.
   await setZoom(90);
   await expect(page.getByTestId("traffic-light-gutter")).toHaveAttribute("style", /width: 89px/);
+  expect(await fits()).toBe(true);
+  await setZoom(150);
+  await expect(page.getByTestId("traffic-light-gutter")).toHaveAttribute("style", /width: 53px/);
   expect(await fits()).toBe(true);
   await expect(title).toBeVisible();
 });

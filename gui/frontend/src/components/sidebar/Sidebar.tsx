@@ -350,7 +350,7 @@ function SidebarList({ bodyHeight }: { bodyHeight: number }) {
               {rows.length === 0 &&
                 emptyText !== null && (
                   // No threads (once loaded): the list is simply empty.
-                  <p className="px-2 py-4 text-xs break-words text-muted-foreground" data-testid="thread-list-empty">
+                  <p className="px-2 py-4 text-caption break-words" data-testid="thread-list-empty">
                     {emptyText}
                   </p>
                 )}
@@ -371,7 +371,7 @@ function SessionsUnavailable() {
   if (!unavailable) return null;
   return (
     <Tip label={error} side="right">
-      <p className="shrink-0 border-t border-sidebar-border px-2 py-1.5 text-[11px] text-muted-foreground" data-testid="sessions-unavailable">
+      <p className="shrink-0 border-t border-sidebar-border px-2 py-1.5 text-caption-sm" data-testid="sessions-unavailable">
         Threads: service unavailable
       </p>
     </Tip>
@@ -389,7 +389,7 @@ function SessionsUnavailable() {
  * down), as the traffic lights do (gui/trafficlights_darwin.go).
  *
  * The name is a span, not a heading: every page in the content pane has its own h1. At
- * 16px it fits beside the gutter at SIDEBAR_MIN, so it is not measured; the overflow
+ * 17px (text-brand) it fits beside the gutter at SIDEBAR_MIN and 150% zoom, so it is not measured; the overflow
  * clip only guards against an unexpected font.
  */
 function SidebarBand() {
@@ -399,7 +399,7 @@ function SidebarBand() {
       <div className="h-full shrink-0" style={{ width: gutter }} data-testid="traffic-light-gutter" aria-hidden />
       <header className="flex h-full min-w-0 flex-1 items-center pt-shell pr-3 pl-3">
         <span
-          className="min-w-0 overflow-hidden text-base leading-none font-semibold tracking-tight whitespace-nowrap text-sidebar-foreground select-none"
+          className="min-w-0 overflow-hidden text-brand leading-none whitespace-nowrap text-sidebar-foreground select-none"
           data-testid="sidebar-app-name"
         >
           Code Foundry

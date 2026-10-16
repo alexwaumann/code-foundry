@@ -35,9 +35,9 @@ function MemberItem({ sessionId, repoId, path, current, queued }: { sessionId: s
       <FolderGit2 className="text-info/90" />
       <span className="flex min-w-0 flex-col">
         <span className="truncate">{name}</span>
-        <span className="truncate font-mono text-xs text-muted-foreground">{branch}</span>
+        <span className="truncate font-mono text-caption">{branch}</span>
       </span>
-      {(current || queued) && <span className="ml-auto pl-3 text-xs text-muted-foreground">{current ? "runs here" : "queued"}</span>}
+      {(current || queued) && <span className="ml-auto pl-3 text-caption">{current ? "runs here" : "queued"}</span>}
     </ContextMenuItem>
   );
 }
