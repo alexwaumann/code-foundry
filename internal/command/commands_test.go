@@ -68,7 +68,7 @@ func TestAllRegistersEveryDomain(t *testing.T) {
 		"pr.revert", "pr.merge", "pr.review.request", "pr.refresh", "pr.review", "pr.comment", "pr.ask", "pr.explain", "pr.fix.findings",
 		"worktree.open.editor", "worktree.reveal", "view.open.url",
 		"settings.get", "settings.set", "settings.reset", "settings.path", "settings.reveal",
-		"view.settings", "view.help", "notifications.test",
+		"view.settings", "view.help", "notifications.test", "theme.list", "theme.set-dark", "theme.set-light",
 		"app.version", "app.update.check", "app.update", "app.relaunch", "app.restart", "daemon.restart",
 		"view.dashboard", "view.usage", "usage.show", "view.pullrequests", "view.projects", "view.panel.toggle", "view.bottom.toggle", "view.panel.expand", "view.panel.new-tab", "view.panel.workspace", "view.panel.linked-prs", "view.panel.usage", "view.panel.worktree",
 		"workspace.new", "workspace.list", "workspace.members", "workspace.add-repo", "workspace.remove-repo", "workspace.remove",
