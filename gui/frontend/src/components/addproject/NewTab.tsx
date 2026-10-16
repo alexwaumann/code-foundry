@@ -117,7 +117,7 @@ export function NewTab({ active }: { active: boolean }) {
         void submit();
       }}
     >
-      <p className="text-xs text-muted-foreground">An empty project with git initialized (an empty first commit on the default branch).</p>
+      <p className="text-caption">An empty project with git initialized (an empty first commit on the default branch).</p>
       <div className="flex flex-col gap-1.5">
         <Input
           ref={inputRef}
@@ -135,16 +135,16 @@ export function NewTab({ active }: { active: boolean }) {
           className="font-mono placeholder:font-sans"
           data-testid="add-project-new-name"
         />
-        <span className="truncate text-xs text-muted-foreground">
+        <span className="truncate text-caption">
           Creates <span className="font-mono text-foreground" data-testid="add-project-new-dest">{destination}</span>
         </span>
         {nameMessage && (
-          <span className="text-xs whitespace-pre-wrap text-destructive" role="alert" data-testid="add-project-new-error">
+          <span className="text-caption whitespace-pre-wrap text-destructive" role="alert" data-testid="add-project-new-error">
             {nameMessage}
           </span>
         )}
         {created && (
-          <span className="text-xs text-success" data-testid="add-project-new-created">
+          <span className="text-caption text-success" data-testid="add-project-new-created">
             Created {created.name}. It stays a local project until it is published; closing this dialog deletes it.
           </span>
         )}
