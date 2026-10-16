@@ -49,6 +49,10 @@ type statusInfo struct {
 	Modified   int
 	Untracked  int
 	Conflicted int
+	// Unmerged lists the conflicted paths (the `u` records) in output order, nil when
+	// there are none. It stays here rather than on Status, which is compared with ==;
+	// the detail job uses it to mark those files U (wtSlot.unmerged).
+	Unmerged []string
 }
 
 // parseStatusV2 parses `git status --porcelain=v2 --branch -z`.
@@ -111,7 +115,13 @@ func parseStatusV2(out []byte) (statusInfo, error) {
 				i++ // the original path of a rename/copy is the next NUL field
 			}
 		case 'u':
+			// Ten space-separated fields precede the path, which may contain spaces.
+			f := strings.SplitN(rec, " ", 11)
+			if len(f) != 11 || f[10] == "" {
+				return statusInfo{}, fmt.Errorf("parse status: bad unmerged entry %q", rec)
+			}
 			st.Conflicted++
+			st.Unmerged = append(st.Unmerged, f[10])
 		case '?':
 			st.Untracked++
 		case '!':
