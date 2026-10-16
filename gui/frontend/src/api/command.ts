@@ -103,7 +103,8 @@ export function isUnknownCommand(err: unknown): boolean {
 }
 
 export function toUiContext(ctx: UiContextView): UiContext {
-  return create(UiContextSchema, ctx);
+  const { activeSessionId, ...rest } = ctx;
+  return create(UiContextSchema, { ...rest, activeThreadId: activeSessionId });
 }
 
 export async function listCommands(

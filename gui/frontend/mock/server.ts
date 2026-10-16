@@ -501,7 +501,7 @@ function actionControl(res: ServerResponse, action: string, q: URLSearchParams):
       case "run": {
         const mode = q.get("mode") ?? "";
         if (mode && modes[mode] === undefined) throw new CommandError("invalid", "mode must be terminal or background");
-        run = world.actions.run({ action: q.get("action") ?? "", sessionId: q.get("session") ?? "", worktreePath: q.get("worktree") ?? "", mode: modes[mode] ?? ActionRunMode.UNSPECIFIED });
+        run = world.actions.run({ action: q.get("action") ?? "", threadId: q.get("session") ?? "", worktreePath: q.get("worktree") ?? "", mode: modes[mode] ?? ActionRunMode.UNSPECIFIED });
         break;
       }
       default:

@@ -45,10 +45,10 @@ function cli(...args: string[]): string {
 function listSessions(): LiveSession[] {
   return (
     (
-      JSON.parse(cli("session", "list", "--json")) as {
-        sessions?: LiveSession[];
+      JSON.parse(cli("thread", "list", "--json")) as {
+        threads?: LiveSession[];
       }
-    ).sessions ?? []
+    ).threads ?? []
   );
 }
 
@@ -110,7 +110,7 @@ test("sessions end to end against the real daemon", async ({ page }) => {
   try {
     // (a) A session created from the CLI shows up in the sidebar, idle.
     const s1 = JSON.parse(
-      cli("session", "new", "--worktree", WORKTREE, "--model", MODEL, "--json"),
+      cli("thread", "new", "--worktree", WORKTREE, "--model", MODEL, "--json"),
     ) as LiveSession;
     created.push(s1.id);
     await test.step("a: CLI-created session is listed idle", async () => {
@@ -198,7 +198,7 @@ test("sessions end to end against the real daemon", async ({ page }) => {
           { timeout: 90_000 },
         )
         .toBe("SESSION_STATUS_NEEDS_ATTENTION finished");
-      expect(cli("session", "list")).toMatch(
+      expect(cli("thread", "list")).toMatch(
         /unwatched\s+needs_attention\s+finished/,
       );
       await openApp(page);
@@ -226,7 +226,7 @@ test("sessions end to end against the real daemon", async ({ page }) => {
     await test.step("d: a stopped thread keeps its composer; a message continues it", async () => {
       await row(page, `s:${s1.id}`).click();
       await expect(pane(page)).toHaveAttribute("data-session-id", s1.id);
-      cli("session", "archive", "--id", s1.id, "--yes");
+      cli("thread", "archive", "--id", s1.id, "--yes");
       await expect
         .poll(() => sessionInfo(s1.id)?.state, { timeout: 20_000 })
         .toBe("SESSION_STATE_DISCONNECTED");
@@ -285,7 +285,7 @@ test("sessions end to end against the real daemon", async ({ page }) => {
         "aria-selected",
         "true",
       );
-      expect(cli("session", "focus", "--id", s1.id)).toMatch(/delivered=[1-9]/);
+      expect(cli("thread", "focus", "--id", s1.id)).toMatch(/delivered=[1-9]/);
       await expect(row(page, `s:${s1.id}`)).toHaveAttribute(
         "aria-selected",
         "true",
@@ -295,7 +295,7 @@ test("sessions end to end against the real daemon", async ({ page }) => {
   } finally {
     for (const id of created) {
       if (sessionInfo(id)?.state !== "SESSION_STATE_DISCONNECTED")
-        cli("session", "archive", "--id", id, "--yes");
+        cli("thread", "archive", "--id", id, "--yes");
     }
     // For the caller's cleanup of ~/.claude/projects/<slug>/<id>.jsonl.
     console.log(

@@ -525,11 +525,11 @@ export class MockActions {
 
   /** ActionService.Run: an action by id, else by name in the owner's project (or repoId's). */
   run(
-    req: { action: string; sessionId?: string; worktreePath?: string; repoId?: string; mode?: ActionRunMode },
+    req: { action: string; threadId?: string; worktreePath?: string; repoId?: string; mode?: ActionRunMode },
     trigger = ActionRunTrigger.USER,
     script?: Script,
   ): RunInit {
-    const owner = this.owner(req.sessionId ?? "", req.worktreePath ?? "", req.repoId ?? "");
+    const owner = this.owner(req.threadId ?? "", req.worktreePath ?? "", req.repoId ?? "");
     const ref = req.action.trim();
     let a = this.actions.get(ref);
     if (a && a.repoId !== owner.repoId) throw new CommandError("unavailable", `action ${a.name} (${a.id}) belongs to another project`);
@@ -902,7 +902,7 @@ export class MockActions {
             worktreePath = exact ? path : best;
             if (!worktreePath) throw new CommandError("invalid", "action.run needs a thread, a worktree, or to run inside a registered project");
           }
-          const run = this.run({ action: args.action ?? "", sessionId: ctx?.activeThreadId ?? "", worktreePath, mode });
+          const run = this.run({ action: args.action ?? "", threadId: ctx?.activeThreadId ?? "", worktreePath, mode });
           if (args.wait === "true") return this.waitMessage(run.id ?? "");
           const json = toJsonString(ActionRunSchema, create(ActionRunSchema, run));
           if (run.mode === ActionRunMode.TERMINAL) return { message: `started ${run.actionName ?? ""} in terminal ${run.terminalId ?? ""} (run ${run.id ?? ""})`, resultJson: json };

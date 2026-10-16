@@ -62,7 +62,7 @@ test("composer: an @file tag from the card starts a haiku thread that reads the 
   await expect(created).toBeVisible({ timeout: 60_000 });
   const id = ((await created.getAttribute("data-row-key")) ?? "").slice(2);
   console.log(`live-files session ${id}`);
-  const find = () => ((JSON.parse(cli("session", "list", "--json")) as { sessions?: LiveSession[] }).sessions ?? []).find((s) => s.id === id);
+  const find = () => ((JSON.parse(cli("thread", "list", "--json")) as { threads?: LiveSession[] }).threads ?? []).find((s) => s.id === id);
   await expect.poll(() => find()?.claudeSessionId ?? "", { timeout: 60_000 }).not.toBe("");
   console.log(`worktree: ${find()?.worktreePath ?? ""}`);
   const transcript = () => {
@@ -82,5 +82,5 @@ test("composer: an @file tag from the card starts a haiku thread that reads the 
   console.log(`answer: ${answer().slice(0, 800)}`);
   await expect.poll(() => find()?.status, { timeout: 60_000 }).toBe("SESSION_STATUS_IDLE");
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "live-files-thread.png") });
-  cli("session", "archive", "--id", id, "--yes");
+  cli("thread", "archive", "--id", id, "--yes");
 });

@@ -264,11 +264,11 @@ export function agentsCommands(threads: AgentThreads, emit: (i: UiIntentInit) =>
         threads.calls.push(`agents ${id}`);
         const runs = threads.agentsOf(id);
         const shells = shellsNote(threads.shellsOf(id));
-        if (runs.length === 0) return Promise.resolve({ message: `no subagent runs in this thread${shells}`, resultJson: JSON.stringify({ sessionId: id, agents: [] }) });
+        if (runs.length === 0) return Promise.resolve({ message: `no subagent runs in this thread${shells}`, resultJson: JSON.stringify({ threadId: id, agents: [] }) });
         const c = agentCounts(runs);
         return Promise.resolve({
           message: `Agents: ${String(c.agentsRunning)} running (${String(c.backgroundAgentsRunning)} in the background) · ${String(runs.length)} this thread${shells}`,
-          resultJson: JSON.stringify({ sessionId: id, agents: runs.map((r) => ({ id: r.id, description: r.description })) }),
+          resultJson: JSON.stringify({ threadId: id, agents: runs.map((r) => ({ id: r.id, description: r.description })) }),
         });
       },
     },

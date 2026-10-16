@@ -2198,7 +2198,7 @@ export class World {
         cmd: {
           name: "thread.new",
           title: "New Thread",
-          category: "Session",
+          category: "Thread",
           description: "Start Claude Code in a worktree (or a new one), with a first prompt",
           keybindings: ["cmd+n"],
           args: [
@@ -2223,7 +2223,7 @@ export class World {
         run: (ctx, args) => this.newSession(ctx, args),
       },
       {
-        cmd: { name: "thread.fork", title: "Fork Thread", category: "Session", description: "Start a new session that continues this one's conversation", keybindings: [], args: [{ name: "name", type: ArgType.STRING, required: false, description: "Name for the fork" }] },
+        cmd: { name: "thread.fork", title: "Fork Thread", category: "Thread", description: "Start a new session that continues this one's conversation", keybindings: [], args: [{ name: "name", type: ArgType.STRING, required: false, description: "Name for the fork" }] },
         when: (ctx) => activeSession(ctx) !== undefined,
         run: (ctx) => {
           const s = activeSession(ctx);
@@ -2235,7 +2235,7 @@ export class World {
         },
       },
       {
-        cmd: { name: "thread.rename", title: "Rename Thread", category: "Session", description: "Set the session's name", keybindings: ["cmd+r"], args: [{ name: "name", type: ArgType.STRING, required: true, description: "New name" }] },
+        cmd: { name: "thread.rename", title: "Rename Thread", category: "Thread", description: "Set the session's name", keybindings: ["cmd+r"], args: [{ name: "name", type: ArgType.STRING, required: true, description: "New name" }] },
         when: (ctx) => activeSession(ctx) !== undefined,
         run: (ctx, args) => {
           const s = activeSession(ctx);
@@ -2414,7 +2414,7 @@ export class World {
       },
       {
         cmd: {
-          name: "thread.remove", title: "Remove Thread", category: "Session", description: "Forget the session (closes it first if connected)", keybindings: [], args: [],
+          name: "thread.remove", title: "Remove Thread", category: "Thread", description: "Forget the session (closes it first if connected)", keybindings: [], args: [],
           confirm: (ctx) => `Remove session ${ctx?.activeThreadId ?? ""}? It is closed first if connected, and its row is forgotten.`,
         },
         when: (ctx) => activeSession(ctx) !== undefined,
