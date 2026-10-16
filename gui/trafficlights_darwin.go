@@ -7,9 +7,9 @@ package main
 #import <objc/runtime.h>
 
 // The traffic lights are native, so the page zoom (CSS zoom on <html>) cannot move
-// them. Like T3 Code (Electron's setWindowButtonPosition) we keep them centred on the
-// zoomed title band instead: centerY is the band's centre in points below the window's
-// top edge. AppKit lays the title bar out again on resize and when leaving full screen,
+// them. Like T3 Code (Electron's setWindowButtonPosition) we move them with the zoomed
+// title band instead: centerY is the pane headers' centre in points below the window's
+// top edge (buttonCenterY below). AppKit lays the title bar out again on resize and when leaving full screen,
 // so the position is re-applied from those notifications. Observers are installed once
 // per window; the target lives in an associated object on the window.
 
@@ -59,16 +59,27 @@ import "C"
 
 import "unsafe"
 
-// titleBandHeight is the title band's height in points at 100% zoom
-// (TITLE_BAND_HEIGHT in frontend/src/components/window/titleBand.ts).
-const titleBandHeight = 52
+// The title band's geometry in CSS px at 100% zoom (points on screen), copied from
+// frontend/src/components/window/titleBand.ts: the panes start shellGap below the window
+// top (SHELL_GAP, --gap-shell) and their headers are paneHeaderHeight tall
+// (PANE_HEADER_HEIGHT). The band is the two together (TITLE_BAND_HEIGHT, 56) and its
+// content centres on the header, not the band (TITLE_BAND_CENTER, 34).
+const (
+	shellGap         = 12
+	paneHeaderHeight = 44
+)
 
-// positionWindowButtons centres the traffic lights on the title band at the given page
+// buttonCenterY is where the traffic lights centre, in points below the window's top
+// edge, at a page zoom (percent): the pane header's middle, zoomed.
+func buttonCenterY(zoomPercent int) float64 {
+	return (shellGap + paneHeaderHeight/2.0) * float64(zoomPercent) / 100
+}
+
+// positionWindowButtons centres the traffic lights on the pane headers at the given page
 // zoom (percent). Safe from any goroutine; the work runs on the main thread.
 func positionWindowButtons(nsWindow unsafe.Pointer, zoomPercent int) {
 	if nsWindow == nil || zoomPercent <= 0 {
 		return
 	}
-	centerY := float64(titleBandHeight) * float64(zoomPercent) / 100 / 2
-	C.cfSetWindowButtonCenterY(nsWindow, C.double(centerY))
+	C.cfSetWindowButtonCenterY(nsWindow, C.double(buttonCenterY(zoomPercent)))
 }

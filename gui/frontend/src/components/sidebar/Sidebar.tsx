@@ -384,6 +384,10 @@ function SessionsUnavailable() {
  * drags the window (Wails runtime, `--wails-draggable`); the controls are in the toolbar
  * below it (SidebarToolbar). See docs/notes/sidebar-toolbar.md.
  *
+ * The band is a shell gap plus a pane header tall (56px). The name sits in the lower
+ * 44px (pt-shell), so it centres on the pane headers beside it (TITLE_BAND_CENTER, 34px
+ * down), as the traffic lights do (gui/trafficlights_darwin.go).
+ *
  * The name is a span, not a heading: every page in the content pane has its own h1. At
  * 16px it fits beside the gutter at SIDEBAR_MIN, so it is not measured; the overflow
  * clip only guards against an unexpected font.
@@ -393,7 +397,7 @@ function SidebarBand() {
   return (
     <div className="flex shrink-0 items-center [--wails-draggable:drag]" style={{ height: TITLE_BAND_HEIGHT }} data-testid="sidebar-band">
       <div className="h-full shrink-0" style={{ width: gutter }} data-testid="traffic-light-gutter" aria-hidden />
-      <header className="flex h-full min-w-0 flex-1 items-center pr-3 pl-3">
+      <header className="flex h-full min-w-0 flex-1 items-center pt-shell pr-3 pl-3">
         <span
           className="min-w-0 overflow-hidden text-base leading-none font-semibold tracking-tight whitespace-nowrap text-sidebar-foreground select-none"
           data-testid="sidebar-app-name"
@@ -418,10 +422,10 @@ function SidebarShown({ width }: { width: number }) {
   return (
     <aside className="relative flex shrink-0 flex-col bg-sidebar" style={{ width }} data-testid="sidebar">
       <SidebarBand />
-      {/* The content pane floats 8px off the sidebar (App.tsx ContentPane's m-2). Rows run
-          to the sidebar's edges, so the same 8px gutter on the left keeps them as far from
-          the window edge as from the pane. */}
-      <div ref={bodyRef} className="flex min-h-0 flex-1 flex-col pl-2" data-testid="sidebar-body">
+      {/* The content pane floats a shell gap (12px) off the sidebar (App.tsx ContentColumn's
+          m-shell). Rows run to the sidebar's edges, so the same gap on the left (pl-shell)
+          keeps them as far from the window edge as from the pane. */}
+      <div ref={bodyRef} className="flex min-h-0 flex-1 flex-col pl-shell" data-testid="sidebar-body">
         <SidebarToolbar />
         <SidebarNewThread />
         <nav className="flex shrink-0 flex-col" aria-label="Pages">

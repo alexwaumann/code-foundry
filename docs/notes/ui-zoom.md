@@ -34,6 +34,9 @@ the whole window like T3 Code (Electron's `webContents.setZoomLevel`, ±0.5 step
 
 ## Traffic lights
 
+> Since design-system-2-shell.md the lights centre on the pane header, not the band:
+> `(12 + 44 / 2) * zoom` points (`buttonCenterY`), 34 at 100%, the band being 56.
+
 The three window buttons are native (hidden-inset title bar), so CSS zoom cannot scale
 them. T3 Code does not scale them either: it calls Electron's `setWindowButtonPosition`
 with `y = round(52 * zoomFactor / 2 - 7)` so they stay centred in the zoomed top bar
