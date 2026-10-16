@@ -94,7 +94,7 @@ function TextEditor({ field, value, pending, invalid, commit, setError }: Editor
       key={value}
       aria-label={field.title}
       aria-invalid={invalid || undefined}
-      className={field.type === "path" || field.type === "string" ? "font-mono text-xs" : undefined}
+      className={field.type === "path" || field.type === "string" ? "text-body-sm font-mono" : undefined}
       type={field.type === "int" ? "number" : "text"}
       min={field.type === "int" ? field.min : undefined}
       max={field.type === "int" ? field.max : undefined}
@@ -145,7 +145,7 @@ function KeybindingEditor({ field, value, pending, invalid, commit, setError }: 
       onKeyDown={onKey}
     >
       {recording ? (
-        <span className="text-xs text-muted-foreground">Press a shortcut… (Esc cancels, ⌫ unbinds)</span>
+        <span className="text-caption">Press a shortcut… (Esc cancels, ⌫ unbinds)</span>
       ) : (
         <span className={value && value !== "none" ? "" : "text-muted-foreground"}>{displayValue(field, value)}</span>
       )}
@@ -202,21 +202,21 @@ export function SettingRow({ field }: { field: SettingFieldView }) {
     >
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[13px] font-medium">{field.title}</span>
+          <span className="text-label">{field.title}</span>
           {restartPending ? (
-            <span className="rounded bg-warning/15 px-1.5 py-px text-[10px] font-medium text-warning" data-testid="restart-pending">
+            <span className="rounded-sm bg-warning/15 px-1.5 py-px text-caption-sm font-medium text-warning" data-testid="restart-pending">
               Restart the daemon to apply
             </span>
           ) : (
             field.restartRequired && (
-              <span className="rounded bg-muted px-1.5 py-px text-[10px] text-muted-foreground" data-testid="restart-hint">
+              <span className="rounded-sm bg-muted px-1.5 py-px text-caption-sm" data-testid="restart-hint">
                 Applies after daemon restart
               </span>
             )
           )}
         </div>
-        {field.description && <p className="mt-0.5 text-xs text-muted-foreground">{field.description}</p>}
-        <p className="mt-0.5 font-mono text-[10px] text-muted-foreground/70">{field.key}</p>
+        {field.description && <p className="mt-0.5 text-caption">{field.description}</p>}
+        <p className="mt-0.5 text-caption-sm font-mono text-muted-foreground/70">{field.key}</p>
       </div>
       <div className="flex min-w-0 flex-col gap-1">
         <div className="flex items-center gap-1.5">
@@ -227,7 +227,7 @@ export function SettingRow({ field }: { field: SettingFieldView }) {
             <button
               type="button"
               aria-label={`Reset ${field.title}`}
-              className={cn("rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground", !modified && "invisible")}
+              className={cn("rounded-sm p-1 text-muted-foreground hover:bg-accent hover:text-foreground", !modified && "invisible")}
               disabled={pending || !modified}
               onClick={() => {
                 commit("");
@@ -238,7 +238,7 @@ export function SettingRow({ field }: { field: SettingFieldView }) {
           </Tip>
         </div>
         {message && (
-          <p className="text-xs break-words text-destructive" role="alert" data-testid="setting-error">
+          <p className="text-caption break-words text-destructive" role="alert" data-testid="setting-error">
             {message}
           </p>
         )}

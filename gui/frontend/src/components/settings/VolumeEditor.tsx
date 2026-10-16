@@ -39,7 +39,7 @@ export function VolumeEditor({ field, value, commit }: EditorProps) {
           if (v !== undefined && String(v) !== value) commit(String(v));
         }}
       />
-      <span className="w-8 shrink-0 text-right text-xs text-muted-foreground tabular-nums" aria-hidden data-testid="volume-value">
+      <span className="w-8 shrink-0 text-right text-caption tabular-nums" aria-hidden data-testid="volume-value">
         {current}%
       </span>
       <Button
