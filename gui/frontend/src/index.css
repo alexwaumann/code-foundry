@@ -30,14 +30,23 @@
   src: url("/fonts/JetBrainsMonoNerdFontMono-Bold.ttf") format("truetype");
 }
 
+/* Radius scale (docs/notes/design-system-1-tokens.md): fixed steps, not multiples of
+ * --radius, and nothing else (Tailwind's xs/3xl/4xl are cleared one by one: `--radius-*:
+ * initial` would also take bare `rounded` with it). A rounded element inside
+ * a padded rounded parent takes the next step down. rounded-pane = rounded-xl = --radius.
+ * Bare `rounded` stays Tailwind's 0.25rem and is banned (src/design/guards.test.ts).
+ * --spacing-shell makes m-shell, pl-shell, gap-shell, ... the shell gap. */
 @theme inline {
-    --radius-sm: calc(var(--radius) * 0.6);
-    --radius-md: calc(var(--radius) * 0.8);
-    --radius-lg: var(--radius);
-    --radius-xl: calc(var(--radius) * 1.4);
-    --radius-2xl: calc(var(--radius) * 1.8);
-    --radius-3xl: calc(var(--radius) * 2.2);
-    --radius-4xl: calc(var(--radius) * 2.6);
+    --radius-xs: initial;
+    --radius-3xl: initial;
+    --radius-4xl: initial;
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 10px;
+    --radius-xl: var(--radius);
+    --radius-2xl: 16px;
+    --radius-pane: var(--radius);
+    --spacing-shell: var(--gap-shell);
     --color-background: var(--background);
     --color-foreground: var(--foreground);
     --color-card: var(--card);
@@ -92,7 +101,11 @@
 :root {
     /* Page zoom factor (lib/zoom.ts); viewport units divide by it, since zoom leaves them whole. */
     --cf-zoom: 1;
-    --radius: 0.625rem;
+    /* The pane corner (rounded-pane, rounded-xl) and the gap between the shell's panes and
+     * the window edge (m-shell, gap-shell, ...). Not colours: themes/convert.ts skips both,
+     * so no theme carries or moves them. */
+    --radius: 0.75rem;
+    --gap-shell: 12px;
     /* Sheet and panes. The sheet is the one window background (title strip and
      * sidebar sit on it); panes are the lighter rounded areas floating on it. */
     --sheet: oklch(0.955 0 0); /* #f0f0f0 */
@@ -242,6 +255,83 @@
     --terminal-ansi-13: #d68ff0;
     --terminal-ansi-14: #6fcbd6;
     --terminal-ansi-15: #f2f3f5;
+}
+
+/* Type roles (docs/notes/design-system-1-tokens.md). One class bundles size, line-height,
+ * weight, tracking and default colour; a colour or weight utility still wins over it
+ * (`text-caption text-foreground`, `text-body font-medium`): Tailwind orders utilities by
+ * their first property, and font-family/font-size come before font-weight and color, so a
+ * role always lands ahead of the single-property utilities (src/design/roles.test.ts).
+ * src/design/tokens.ts lists the names too, for cn()'s merge table. */
+@utility text-title {
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 600;
+  letter-spacing: var(--tracking-tight);
+  color: var(--color-foreground);
+}
+@utility text-heading {
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--color-foreground);
+}
+@utility text-subheading {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--color-foreground);
+}
+@utility text-overline {
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-muted-foreground);
+}
+@utility text-body {
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 400;
+  color: var(--color-foreground);
+}
+@utility text-body-sm {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 400;
+  color: var(--color-foreground);
+}
+@utility text-label {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--color-foreground);
+}
+@utility text-caption {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 400;
+  color: var(--color-muted-foreground);
+}
+@utility text-caption-sm {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
+  color: var(--color-muted-foreground);
+}
+/* Inline roles: they keep the surrounding size and line-height. */
+@utility text-link {
+  font-weight: 500;
+  color: var(--color-link);
+  &:hover {
+    text-decoration-line: underline;
+  }
+}
+@utility text-code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.92em;
+  font-weight: 400;
 }
 
 @layer base {
