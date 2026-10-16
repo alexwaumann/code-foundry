@@ -55,12 +55,12 @@ function PublishBody({ repoId }: { repoId: string }) {
         void submit();
       }}
     >
-      <p className="text-xs text-muted-foreground">
+      <p className="text-caption">
         Creates the repository on GitHub with gh, adds it as <span className="font-mono">origin</span> and pushes.
       </p>
       <PublishPicker owners={owners} value={choice} onChange={setChoice} disabled={busy} error={error} />
       <div className="flex flex-wrap items-center gap-2">
-        <Label htmlFor={nameId} className="w-16 text-xs font-normal text-muted-foreground">
+        <Label htmlFor={nameId} className="w-16 text-caption text-muted-foreground">
           Name
         </Label>
         <Input
@@ -80,12 +80,12 @@ function PublishBody({ repoId }: { repoId: string }) {
         />
       </div>
       {nameError && (
-        <p className="text-xs text-destructive" data-testid="publish-name-error">
+        <p className="text-caption text-destructive" data-testid="publish-name-error">
           {nameError}
         </p>
       )}
       {choice.owner && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-caption">
           As <span className="font-mono text-foreground" data-testid="publish-slug">{`${choice.owner}/${name || project}`}</span>
         </p>
       )}

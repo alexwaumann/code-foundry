@@ -41,7 +41,7 @@ export function SnoozePresetItems({ id, Item, Separator }: { id: string; Item: M
           >
             <Icon />
             {p.label}
-            <span className="ml-auto pl-6 text-xs text-muted-foreground tabular-nums" data-testid="snooze-preset-time">
+            <span className="ml-auto pl-6 text-caption tabular-nums" data-testid="snooze-preset-time">
               {p.hint}
             </span>
           </Item>

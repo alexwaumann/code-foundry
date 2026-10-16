@@ -28,7 +28,7 @@ function Calendar({ now, selected, onSelect }: { now: number; selected: Day; onS
   return (
     <div className="flex flex-col gap-2" data-testid="snooze-calendar">
       <div className="flex items-center">
-        <span className="text-sm font-medium" data-testid="snooze-month">
+        <span className="text-label" data-testid="snooze-month">
           {monthTitle(view.year, view.month)}
         </span>
         <span className="ml-auto flex items-center gap-0.5">
@@ -61,7 +61,7 @@ function Calendar({ now, selected, onSelect }: { now: number; selected: Day; onS
       </div>
       <div className="grid grid-cols-7 gap-0.5 text-center" role="grid" aria-label={monthTitle(view.year, view.month)}>
         {WEEKDAYS.map((w) => (
-          <span key={w} className="py-1 text-[11px] text-muted-foreground" role="columnheader">
+          <span key={w} className="py-1 text-caption-sm" role="columnheader">
             {w}
           </span>
         ))}
@@ -83,7 +83,7 @@ function Calendar({ now, selected, onSelect }: { now: number; selected: Day; onS
                 data-day={`${String(d.year)}-${String(d.month + 1).padStart(2, "0")}-${String(d.day).padStart(2, "0")}`}
                 data-today={isToday || undefined}
                 className={cn(
-                  "h-7 rounded-md border border-transparent text-xs tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-35",
+                  "h-7 rounded-md border border-transparent text-body-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-35",
                   isSelected ? "bg-primary font-medium text-primary-foreground" : "hover:bg-accent",
                   isToday && !isSelected && "border-border",
                   outside && !isSelected && "text-muted-foreground",
@@ -143,7 +143,7 @@ function SnoozeBody({ sessionId }: { sessionId: string }) {
             data-testid="snooze-time"
           />
         </div>
-        <span className={cn("shrink-0 text-xs tabular-nums", untilMs !== null && !ready ? "text-destructive" : "text-muted-foreground")} data-testid="snooze-summary">
+        <span className={cn("shrink-0 text-caption tabular-nums", untilMs !== null && !ready ? "text-destructive" : "text-muted-foreground")} data-testid="snooze-summary">
           {untilMs !== null && !ready ? "In the past" : formatDay(day, now)}
         </span>
       </div>

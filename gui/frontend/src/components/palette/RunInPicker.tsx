@@ -25,11 +25,11 @@ function MemberItem({ repoId, path, current, queued, onPick }: { repoId: string;
       <FolderGit2 className="size-4 text-info/90" aria-hidden />
       <span className="flex min-w-0 flex-col">
         <span className="truncate font-medium">{name}</span>
-        <span className="truncate text-xs text-muted-foreground">
+        <span className="truncate text-caption">
           {branch} · {tildify(path)}
         </span>
       </span>
-      {(current || queued) && <span className="ml-auto text-xs text-muted-foreground">{current ? "runs here" : "queued"}</span>}
+      {(current || queued) && <span className="ml-auto text-caption">{current ? "runs here" : "queued"}</span>}
     </CommandItem>
   );
 }
