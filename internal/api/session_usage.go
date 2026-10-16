@@ -5,13 +5,13 @@ import (
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/pricing"
-	"github.com/alexwaumann/code-foundry/internal/store/session"
+	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
 
 // usageToProto maps usage buckets to the wire, pricing each one (cost is computed at
 // read time, never stored). cost is the sum over priced buckets; unpriced is true when
 // any bucket has no known rate.
-func usageToProto(buckets []session.UsageBucket) (out []*v1.UsageBucket, cost float64, unpriced bool) {
+func usageToProto(buckets []thread.UsageBucket) (out []*v1.UsageBucket, cost float64, unpriced bool) {
 	for _, b := range buckets {
 		pb := pricing.Bucket{
 			Model: b.Model, Tier: b.Tier, Speed: b.Speed,
@@ -36,20 +36,20 @@ func usageToProto(buckets []session.UsageBucket) (out []*v1.UsageBucket, cost fl
 }
 
 // retiredToProto maps the retired ledger.
-func retiredToProto(buckets []session.UsageBucket) []*v1.UsageBucket {
+func retiredToProto(buckets []thread.UsageBucket) []*v1.UsageBucket {
 	out, _, _ := usageToProto(buckets)
 	return out
 }
 
 // agentRunsToProto maps a thread's subagent runs, each priced like the session.
-func agentRunsToProto(runs []session.AgentRun) []*v1.AgentRun {
+func agentRunsToProto(runs []thread.AgentRun) []*v1.AgentRun {
 	out := make([]*v1.AgentRun, 0, len(runs))
 	for _, r := range runs {
 		p := &v1.AgentRun{
 			Id: r.ID, Description: r.Description, AgentType: r.AgentType, Model: r.Model, Effort: r.Effort,
 			Background: r.Background, Status: v1.AgentRunStatus_AGENT_RUN_STATUS_CLOSED, SpawnDepth: int32(r.SpawnDepth),
 		}
-		if r.Status == session.AgentRunning || (r.Status == "" && r.Open) {
+		if r.Status == thread.AgentRunning || (r.Status == "" && r.Open) {
 			p.Status = v1.AgentRunStatus_AGENT_RUN_STATUS_OPEN
 		}
 		if !r.StartedAt.IsZero() {
@@ -65,7 +65,7 @@ func agentRunsToProto(runs []session.AgentRun) []*v1.AgentRun {
 // (pricing.RereadCost): at the rate of the model that answered its last turn, else of
 // the row's model when that is a full id; the TTL is the one its expiry was computed
 // with. 0 when nothing is recorded or the model is unpriced.
-func contextRereadUSD(s session.Session) float64 {
+func contextRereadUSD(s thread.Session) float64 {
 	if s.ContextTokens <= 0 || s.LastResultAt.IsZero() || s.CacheExpiresAt.IsZero() {
 		return 0
 	}

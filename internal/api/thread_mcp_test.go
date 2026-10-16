@@ -8,17 +8,17 @@ import (
 	"connectrpc.com/connect"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
-	"github.com/alexwaumann/code-foundry/internal/store/session"
+	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
 
-func mcpSample(at time.Time) *session.McpStatus {
-	return &session.McpStatus{CheckedAt: at, Trigger: session.McpTriggerTurn, Servers: []session.McpServer{
-		{Name: "github", Status: session.McpConnected, ServerName: "gh", Version: "1.2.0", Scope: "user", Source: "user", Transport: "stdio",
-			Tools: []session.McpTool{{Name: "get", Description: "Get", ReadOnly: true, OpenWorld: true}, {Name: "push", Destructive: true}}},
-		{Name: "linear", Status: session.McpNeedsAuth, Scope: "user", Transport: "http"},
-		{Name: "playwright", Status: session.McpFailed, Error: "spawn npx ENOENT", Scope: "project", Transport: "stdio"},
-		{Name: "fs", Status: session.McpPending, Scope: "local", Transport: "stdio"},
-		{Name: "sentry", Status: session.McpDisabled, Scope: "user", Transport: "http"},
+func mcpSample(at time.Time) *thread.McpStatus {
+	return &thread.McpStatus{CheckedAt: at, Trigger: thread.McpTriggerTurn, Servers: []thread.McpServer{
+		{Name: "github", Status: thread.McpConnected, ServerName: "gh", Version: "1.2.0", Scope: "user", Source: "user", Transport: "stdio",
+			Tools: []thread.McpTool{{Name: "get", Description: "Get", ReadOnly: true, OpenWorld: true}, {Name: "push", Destructive: true}}},
+		{Name: "linear", Status: thread.McpNeedsAuth, Scope: "user", Transport: "http"},
+		{Name: "playwright", Status: thread.McpFailed, Error: "spawn npx ENOENT", Scope: "project", Transport: "stdio"},
+		{Name: "fs", Status: thread.McpPending, Scope: "local", Transport: "stdio"},
+		{Name: "sentry", Status: thread.McpDisabled, Scope: "user", Transport: "http"},
 		{Name: "odd", Status: "sleeping"},
 	}}
 }
@@ -49,7 +49,7 @@ func TestMcpStatusToProto(t *testing.T) {
 	if p.GetServers()[2].GetError() != "spawn npx ENOENT" {
 		t.Errorf("playwright %v", p.GetServers()[2])
 	}
-	r := mcpStatusToProto(&session.McpStatus{Trigger: session.McpTriggerReconnect, Server: "linear"})
+	r := mcpStatusToProto(&thread.McpStatus{Trigger: thread.McpTriggerReconnect, Server: "linear"})
 	if r.GetCheckedAt() != nil || r.GetTrigger() != v1.McpCheckTrigger_MCP_CHECK_TRIGGER_RECONNECT || r.GetServer() != "linear" {
 		t.Errorf("reconnect status %v", r)
 	}
@@ -57,8 +57,8 @@ func TestMcpStatusToProto(t *testing.T) {
 
 func TestThreadMcp(t *testing.T) {
 	fake, c := newThreadServer(t)
-	fake.Put(session.Session{ID: "s1", State: session.StateConnected})
-	fake.PutItems("s1", session.Item{ID: "u1", Kind: session.KindUserMessage, Text: "hi"})
+	fake.Put(thread.Session{ID: "s1", State: thread.StateConnected})
+	fake.PutItems("s1", thread.Item{ID: "u1", Kind: thread.KindUserMessage, Text: "hi"})
 	fake.PutMcp("s1", mcpSample(time.Now()))
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

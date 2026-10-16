@@ -11,7 +11,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/store/action"
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
-	"github.com/alexwaumann/code-foundry/internal/store/session"
+	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
 
 // actionRuns is the part of the action store the cleanup drives. *action.Manager
@@ -26,7 +26,7 @@ type actionRuns interface {
 //
 //   - a project is unregistered (repo.RepoRemoved): its actions are forgotten (the
 //     database cascades) and its runs killed and forgotten;
-//   - a thread is removed (session.Removed), archived or snoozed (session.Updated with
+//   - a thread is removed (thread.Removed), archived or snoozed (thread.Updated with
 //     ArchivedAt or SnoozedUntil set): its background runs are killed, as its action
 //     terminals are by the session store;
 //   - a worktree's directory is removed (repo.WorktreeRemoved, directory gone): the
@@ -43,7 +43,7 @@ func startActionCleanup(ctx context.Context, log *slog.Logger, runs actionRuns, 
 func startActionCleanupWith(ctx context.Context, log *slog.Logger, runs actionRuns, b *bus.Bus, dirGone func(string) bool) func() {
 	ctx, cancel := context.WithCancel(ctx)
 	repoEvents := bus.Subscribe[repo.Event](b, 256)
-	sessionEvents := bus.Subscribe[session.Event](b, 256)
+	sessionEvents := bus.Subscribe[thread.Event](b, 256)
 	var wg sync.WaitGroup
 	wg.Go(func() {
 		defer repoEvents.Close()
@@ -68,9 +68,9 @@ func startActionCleanupWith(ctx context.Context, log *slog.Logger, runs actionRu
 				}
 			case ev := <-sessionEvents.C():
 				switch e := ev.(type) {
-				case session.Removed:
+				case thread.Removed:
 					kill("thread removed", func(r action.Run) bool { return r.SessionID == e.ID })
-				case session.Updated:
+				case thread.Updated:
 					id := e.Session.ID
 					switch {
 					case !e.Session.ArchivedAt.IsZero():

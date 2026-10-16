@@ -15,14 +15,14 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/bus"
-	"github.com/alexwaumann/code-foundry/internal/store/session"
-	"github.com/alexwaumann/code-foundry/internal/store/session/sessiontest"
+	"github.com/alexwaumann/code-foundry/internal/store/thread"
+	"github.com/alexwaumann/code-foundry/internal/store/thread/threadtest"
 )
 
-func newSessionServer(t *testing.T) (*sessiontest.Fake, codefoundryv1connect.SessionServiceClient) {
+func newSessionServer(t *testing.T) (*threadtest.Fake, codefoundryv1connect.SessionServiceClient) {
 	t.Helper()
 	b := bus.New()
-	fake := sessiontest.New(b)
+	fake := threadtest.New(b)
 	route := NewSession(fake, b).Route()
 	mux := http.NewServeMux()
 	mux.Handle(route.Path, route.Handler)
@@ -86,7 +86,7 @@ func TestSessionUnaryAndErrorCodes(t *testing.T) {
 	if err != nil || len(list.Msg.GetSessions()) != 1 {
 		t.Fatalf("List = %v, %v", list, err)
 	}
-	fake.Put(session.Session{ID: "s-9", Status: session.StatusNeedsAttention, StatusReason: "finished", State: session.StateConnected, CreatedAt: time.Unix(9, 0)})
+	fake.Put(thread.Session{ID: "s-9", Status: thread.StatusNeedsAttention, StatusReason: "finished", State: thread.StateConnected, CreatedAt: time.Unix(9, 0)})
 	got, _ = c.Get(ctx, connect.NewRequest(&v1.GetSessionRequest{Id: "s-9"}))
 	if got.Msg.GetSession().GetStatus() != v1.SessionStatus_SESSION_STATUS_NEEDS_ATTENTION ||
 		got.Msg.GetSession().GetState() != v1.SessionState_SESSION_STATE_CONNECTED ||
@@ -97,15 +97,15 @@ func TestSessionUnaryAndErrorCodes(t *testing.T) {
 		t.Errorf("zero StatusChangedAt mapped to %v", got.Msg.GetSession().GetStatusChangedAt())
 	}
 	changed := time.Date(2026, 10, 10, 9, 30, 0, 0, time.UTC)
-	fake.Put(session.Session{ID: "s-11", Status: session.StatusError, StatusReason: session.ReasonInterrupted,
-		StatusChangedAt: changed, State: session.StateDisconnected})
+	fake.Put(thread.Session{ID: "s-11", Status: thread.StatusError, StatusReason: thread.ReasonInterrupted,
+		StatusChangedAt: changed, State: thread.StateDisconnected})
 	got, _ = c.Get(ctx, connect.NewRequest(&v1.GetSessionRequest{Id: "s-11"}))
 	if p := got.Msg.GetSession(); p.GetStatus() != v1.SessionStatus_SESSION_STATUS_ERROR || p.GetStatusReason() != "interrupted" ||
 		!p.GetStatusChangedAt().AsTime().Equal(changed) {
 		t.Errorf("error status mapping = %v", p)
 	}
 	linkedAt := time.Date(2026, 10, 9, 18, 24, 11, 0, time.UTC)
-	fake.Put(session.Session{ID: "s-10", State: session.StateDisconnected, LinkedPullRequests: []session.LinkedPullRequest{
+	fake.Put(thread.Session{ID: "s-10", State: thread.StateDisconnected, LinkedPullRequests: []thread.LinkedPullRequest{
 		{Slug: "o/r", Number: 5, URL: "https://github.com/o/r/pull/5", LinkedAt: linkedAt},
 		{Slug: "o/r", Number: 6, URL: "https://github.com/o/r/pull/6"},
 	}})
@@ -184,8 +184,8 @@ func TestSessionCreateNoProject(t *testing.T) {
 func TestSessionRunIn(t *testing.T) {
 	fake, c := newSessionServer(t)
 	ctx := context.Background()
-	fake.Put(session.Session{ID: "s-1", WorkspaceID: "w-1", WorktreePath: "/wt/web", State: session.StateConnected})
-	fake.Put(session.Session{ID: "s-2", WorktreePath: "/src/app", State: session.StateConnected})
+	fake.Put(thread.Session{ID: "s-1", WorkspaceID: "w-1", WorktreePath: "/wt/web", State: thread.StateConnected})
+	fake.Put(thread.Session{ID: "s-2", WorktreePath: "/src/app", State: thread.StateConnected})
 	res, err := c.RunIn(ctx, connect.NewRequest(&v1.RunInSessionRequest{Id: "s-1", RepoId: "api"}))
 	if err != nil {
 		t.Fatal(err)
@@ -211,7 +211,7 @@ func TestSessionStageAttachment(t *testing.T) {
 	if calls := fake.Calls(); len(calls) != 1 || calls[0] != "StageAttachment shot.png image/png 3" {
 		t.Errorf("calls = %q", calls)
 	}
-	fake.Err = fmt.Errorf("%w: attachment type", session.ErrInvalidArgument)
+	fake.Err = fmt.Errorf("%w: attachment type", thread.ErrInvalidArgument)
 	if _, err := c.StageAttachment(ctx, connect.NewRequest(&v1.StageAttachmentRequest{MimeType: "text/plain"})); connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Errorf("rejected attachment: %v", err)
 	}
@@ -233,7 +233,7 @@ func TestSessionReadAttachment(t *testing.T) {
 
 func TestSessionWatchSendsSnapshotThenEvents(t *testing.T) {
 	fake, c := newSessionServer(t)
-	fake.Put(session.Session{ID: "s-a", Name: "a", CreatedAt: time.Unix(1, 0)})
+	fake.Put(thread.Session{ID: "s-a", Name: "a", CreatedAt: time.Unix(1, 0)})
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	stream, err := c.Watch(ctx, connect.NewRequest(&v1.WatchSessionsRequest{}))
@@ -247,7 +247,7 @@ func TestSessionWatchSendsSnapshotThenEvents(t *testing.T) {
 	if snap == nil || len(snap.GetSessions()) != 1 || snap.GetSessions()[0].GetId() != "s-a" {
 		t.Fatalf("first event = %v", stream.Msg())
 	}
-	fake.Put(session.Session{ID: "s-a", Name: "renamed", CreatedAt: time.Unix(1, 0)})
+	fake.Put(thread.Session{ID: "s-a", Name: "renamed", CreatedAt: time.Unix(1, 0)})
 	if !stream.Receive() || stream.Msg().GetUpdated().GetName() != "renamed" {
 		t.Fatalf("second event = %v (%v)", stream.Msg(), stream.Err())
 	}
@@ -284,7 +284,7 @@ func TestSessionSnooze(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			fake, c := newSessionServer(t)
 			fake.Now = func() time.Time { return now }
-			fake.Put(session.Session{ID: "s-1", State: session.StateConnected, Pinned: true, ArchivedAt: now.Add(-time.Hour),
+			fake.Put(thread.Session{ID: "s-1", State: thread.StateConnected, Pinned: true, ArchivedAt: now.Add(-time.Hour),
 				SnoozedUntil: now.Add(time.Hour), CreatedAt: now})
 			res, err := c.Snooze(context.Background(), connect.NewRequest(&v1.SnoozeSessionRequest{Id: tt.id, Until: tt.until}))
 			if connect.CodeOf(err) != tt.wantCode && (tt.wantCode != 0 || err != nil) {

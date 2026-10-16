@@ -21,9 +21,9 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/gitops"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
-	"github.com/alexwaumann/code-foundry/internal/store/session"
 	"github.com/alexwaumann/code-foundry/internal/store/settings"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
+	"github.com/alexwaumann/code-foundry/internal/store/thread"
 	"github.com/alexwaumann/code-foundry/internal/store/update"
 	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 	"github.com/alexwaumann/code-foundry/internal/version"
@@ -55,7 +55,7 @@ type stores struct {
 	stopShells func()
 	// session layers Claude sessions on terminal and db; shut down before terminal so
 	// live sessions are recorded as disconnected while their processes still run.
-	session *session.Manager
+	session *thread.Manager
 	// update checks for and installs new releases (disabled in dev builds).
 	update *update.Store
 	// workspace holds branch sets across repos; it creates and removes worktrees
@@ -184,10 +184,10 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, sessionEnv
 	}
 	claude := cmp.Or(settings.ExpandedPath(cfg.Advanced.ClaudePath), "claude")
 	sessionLog := log.With("store", "session")
-	if s.session, err = session.New(ctx, session.Options{
+	if s.session, err = thread.New(ctx, thread.Options{
 		DB: s.db, Terminals: s.terminal, Repos: s.repo, Workspaces: s.workspace, Bus: s.bus, Log: sessionLog,
 		Claude: claude, CloseTimeout: cfg.CloseGrace(),
-		Namer:          settingsNamer(s.settings, session.ClaudeNamer(claude, "/tmp", sessionLog)),
+		Namer:          settingsNamer(s.settings, thread.ClaudeNamer(claude, "/tmp", sessionLog)),
 		AttachmentsDir: p.Attachments(), WorktreePath: settingsWorktreePath(s.settings),
 		Env: sessionEnv, CacheTTL: cfg.CacheTTL(),
 		// Development aids: how long a thread's process stays up at least, and how often
@@ -208,7 +208,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, sessionEnv
 		RepoExists: func(id string) bool { _, ok := s.repo.Snapshot().Repo(id); return ok },
 		SessionExists: func(id string) bool {
 			snap := s.session.Snapshot()
-			return snap == nil || slices.ContainsFunc(snap.Sessions, func(x session.Session) bool { return x.ID == id })
+			return snap == nil || slices.ContainsFunc(snap.Sessions, func(x thread.Session) bool { return x.ID == id })
 		},
 	}); err != nil {
 		return nil, err
@@ -239,11 +239,11 @@ func envDuration(log *slog.Logger, name string) time.Duration {
 }
 
 // sessionOwner is thread id's project and worktree, the owner of its action runs.
-func sessionOwner(snap *session.Snapshot, id string) (action.Owner, bool) {
+func sessionOwner(snap *thread.Snapshot, id string) (action.Owner, bool) {
 	if snap == nil {
 		return action.Owner{}, false
 	}
-	i := slices.IndexFunc(snap.Sessions, func(x session.Session) bool { return x.ID == id })
+	i := slices.IndexFunc(snap.Sessions, func(x thread.Session) bool { return x.ID == id })
 	if i < 0 {
 		return action.Owner{}, false
 	}
@@ -254,7 +254,7 @@ func sessionOwner(snap *session.Snapshot, id string) (action.Owner, bool) {
 // workspace store's removal guards: every thread but an archived one, whatever its state
 // (a stopped thread looks like any other in the GUI and a message starts it again in the
 // same worktree; a snoozed one comes back to it).
-func worktreeThreads(snap *session.Snapshot) []workspace.Thread {
+func worktreeThreads(snap *thread.Snapshot) []workspace.Thread {
 	var out []workspace.Thread
 	if snap == nil {
 		return nil

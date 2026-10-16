@@ -9,25 +9,25 @@ import (
 	"connectrpc.com/connect"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
-	"github.com/alexwaumann/code-foundry/internal/store/session"
+	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
 
 func near(a, b float64) bool { return math.Abs(a-b) < 1e-9 }
 
 func TestUsageToProto(t *testing.T) {
-	opus := session.UsageBucket{Model: "claude-opus-5-5", Day: "2026-10-09", Requests: 2,
+	opus := thread.UsageBucket{Model: "claude-opus-5-5", Day: "2026-10-09", Requests: 2,
 		Input: 1_000_000, Output: 1_000_000, CacheRead: 1_000_000, CacheWrite5m: 1_000_000, CacheWrite1h: 1_000_000}
-	haikuLong := session.UsageBucket{Model: "claude-haiku-5-5", Tier: "long", Day: "2026-10-09", Requests: 1, Input: 1_000_000}
-	unknown := session.UsageBucket{Model: "claude-next-1", Day: "2026-10-10", Requests: 1, Input: 5}
+	haikuLong := thread.UsageBucket{Model: "claude-haiku-5-5", Tier: "long", Day: "2026-10-09", Requests: 1, Input: 1_000_000}
+	unknown := thread.UsageBucket{Model: "claude-next-1", Day: "2026-10-10", Requests: 1, Input: 5}
 	tests := []struct {
 		name     string
-		in       []session.UsageBucket
+		in       []thread.UsageBucket
 		cost     float64
 		unpriced bool
 	}{
 		{name: "none"},
-		{name: "priced", in: []session.UsageBucket{opus, haikuLong}, cost: 4 + 20 + 0.2 + 5 + 8 + 0.5},
-		{name: "an unpriced bucket adds nothing and flags the session", in: []session.UsageBucket{opus, unknown},
+		{name: "priced", in: []thread.UsageBucket{opus, haikuLong}, cost: 4 + 20 + 0.2 + 5 + 8 + 0.5},
+		{name: "an unpriced bucket adds nothing and flags the session", in: []thread.UsageBucket{opus, unknown},
 			cost: 4 + 20 + 0.2 + 5 + 8, unpriced: true},
 	}
 	for _, tt := range tests {
@@ -71,9 +71,9 @@ func TestUsageToProto(t *testing.T) {
 
 func TestSessionUsageOnTheWire(t *testing.T) {
 	fake, c := newSessionServer(t)
-	usage := []session.UsageBucket{{Model: "claude-opus-5-5", Day: "2026-10-09", Requests: 1, Output: 1_000_000}}
-	fake.Put(session.Session{ID: "s-a", CreatedAt: time.Unix(1, 0), Usage: usage})
-	fake.SetRetiredUsage([]session.UsageBucket{{Model: "claude-haiku-5-5", Day: "2026-10-08", Requests: 1, Output: 2_000_000}})
+	usage := []thread.UsageBucket{{Model: "claude-opus-5-5", Day: "2026-10-09", Requests: 1, Output: 1_000_000}}
+	fake.Put(thread.Session{ID: "s-a", CreatedAt: time.Unix(1, 0), Usage: usage})
+	fake.SetRetiredUsage([]thread.UsageBucket{{Model: "claude-haiku-5-5", Day: "2026-10-08", Requests: 1, Output: 2_000_000}})
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -113,11 +113,11 @@ func TestSessionUsageOnTheWire(t *testing.T) {
 
 func TestAgentRunsToProto(t *testing.T) {
 	started := time.Date(2026, 10, 11, 3, 0, 0, 0, time.UTC)
-	runs := []session.AgentRun{
+	runs := []thread.AgentRun{
 		{ID: "a1", Description: "say ok", AgentType: "general-purpose", Model: "haiku", Effort: "medium", SpawnDepth: 1,
-			StartedAt: started, Usage: []session.UsageBucket{{Model: "claude-haiku-5-5", Day: "2026-10-11", Requests: 1, Input: 1_000_000}}},
+			StartedAt: started, Usage: []thread.UsageBucket{{Model: "claude-haiku-5-5", Day: "2026-10-11", Requests: 1, Input: 1_000_000}}},
 		{ID: "a2", Background: true, Open: true, SpawnDepth: 2,
-			Usage: []session.UsageBucket{{Model: "claude-next-1", Day: "2026-10-11", Requests: 1, Input: 5}}},
+			Usage: []thread.UsageBucket{{Model: "claude-next-1", Day: "2026-10-11", Requests: 1, Input: 5}}},
 	}
 	out := agentRunsToProto(runs)
 	if len(out) != 2 {
@@ -137,22 +137,22 @@ func TestAgentRunsToProto(t *testing.T) {
 
 func TestContextRereadUSD(t *testing.T) {
 	at := time.Date(2026, 10, 12, 9, 0, 0, 0, time.UTC)
-	hour := func(s session.Session) session.Session {
+	hour := func(s thread.Session) thread.Session {
 		s.LastResultAt, s.CacheExpiresAt = at, at.Add(time.Hour)
 		return s
 	}
 	tests := []struct {
 		name string
-		s    session.Session
+		s    thread.Session
 		want float64
 	}{
-		{name: "the answering model's 1 h write rate", s: hour(session.Session{ContextTokens: 1_000_000, ContextModel: "claude-opus-4-8", Model: "opus"}), want: 10},
-		{name: "a 5 min TTL bills the 5 min rate", want: 6.25, s: session.Session{ContextTokens: 1_000_000, ContextModel: "claude-opus-4-8",
+		{name: "the answering model's 1 h write rate", s: hour(thread.Session{ContextTokens: 1_000_000, ContextModel: "claude-opus-4-8", Model: "opus"}), want: 10},
+		{name: "a 5 min TTL bills the 5 min rate", want: 6.25, s: thread.Session{ContextTokens: 1_000_000, ContextModel: "claude-opus-4-8",
 			LastResultAt: at, CacheExpiresAt: at.Add(5 * time.Minute)}},
-		{name: "the row's model when it is a full id", s: hour(session.Session{ContextTokens: 1_000_000, Model: "claude-sonnet-4-6"}), want: 6},
-		{name: "an alias alone is unpriced", s: hour(session.Session{ContextTokens: 1_000_000, Model: "haiku"})},
-		{name: "an unknown model", s: hour(session.Session{ContextTokens: 1_000_000, ContextModel: "claude-next-1"})},
-		{name: "no result yet", s: session.Session{ContextTokens: 0, ContextModel: "claude-opus-4-8"}},
+		{name: "the row's model when it is a full id", s: hour(thread.Session{ContextTokens: 1_000_000, Model: "claude-sonnet-4-6"}), want: 6},
+		{name: "an alias alone is unpriced", s: hour(thread.Session{ContextTokens: 1_000_000, Model: "haiku"})},
+		{name: "an unknown model", s: hour(thread.Session{ContextTokens: 1_000_000, ContextModel: "claude-next-1"})},
+		{name: "no result yet", s: thread.Session{ContextTokens: 0, ContextModel: "claude-opus-4-8"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -166,9 +166,9 @@ func TestContextRereadUSD(t *testing.T) {
 func TestSessionContextOnTheWire(t *testing.T) {
 	fake, c := newSessionServer(t)
 	at := time.Date(2026, 10, 12, 9, 0, 0, 0, time.UTC)
-	fake.Put(session.Session{ID: "s-a", CreatedAt: time.Unix(1, 0), ContextTokens: 25_700,
+	fake.Put(thread.Session{ID: "s-a", CreatedAt: time.Unix(1, 0), ContextTokens: 25_700,
 		ContextModel: "claude-haiku-4-5-20251001", LastResultAt: at, CacheExpiresAt: at.Add(time.Hour)})
-	fake.Put(session.Session{ID: "s-b", CreatedAt: time.Unix(2, 0)}) // no result yet
+	fake.Put(thread.Session{ID: "s-b", CreatedAt: time.Unix(2, 0)}) // no result yet
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	list, err := c.List(ctx, connect.NewRequest(&v1.ListSessionsRequest{}))

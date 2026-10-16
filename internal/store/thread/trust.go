@@ -1,0 +1,176 @@
+package thread
+
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"time"
+)
+
+// Folder trust.
+//
+// Claude records an accepted trust dialog in its global config (~/.claude.json) as
+// projects[<cwd, symlinks resolved>].hasTrustDialogAccepted = true (observed by
+// accepting the dialog once in /tmp/cf2a-trust1; Claude's own error text says "set
+// projects[<path>].hasTrustDialogAccepted"). A minimal entry {"hasTrustDialogAccepted":
+// true} is enough: Claude started in /tmp/cf2a-trust2 with no dialog and filled in the
+// rest of the entry itself. The check also walks up to trusted parent directories.
+//
+// Claude rewrites the file often from every running instance. It bundles
+// proper-lockfile, whose convention is a "<file>.lock" directory considered stale
+// after 10s; trustWorktree takes the same lock, re-reads, edits only the one entry,
+// and replaces the file atomically. claude -p skips the dialog itself, but set_cwd
+// (RunIn) refuses a folder that is not trusted ("needs_trust"), so spawn and RunIn
+// pre-trust.
+
+const (
+	trustLockStale = 10 * time.Second
+	trustLockWait  = 3 * time.Second
+)
+
+// trustWorktree marks dir (symlinks resolved) as trusted in Claude's config file. It
+// reports whether the file was changed.
+func trustWorktree(configPath, dir string) (bool, error) {
+	key := realPath(dir)
+	unlock, err := lockFile(configPath)
+	if err != nil {
+		return false, err
+	}
+	defer unlock()
+
+	data, err := os.ReadFile(configPath)
+	mode := fs.FileMode(0o600)
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		data = []byte("{}")
+	case err != nil:
+		return false, fmt.Errorf("trust: read %s: %w", configPath, err)
+	default:
+		if fi, err := os.Stat(configPath); err == nil {
+			mode = fi.Mode().Perm()
+		}
+	}
+	out, changed, err := setTrusted(data, key)
+	if err != nil || !changed {
+		return false, err
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(configPath), filepath.Base(configPath)+".code-foundry-*")
+	if err != nil {
+		return false, fmt.Errorf("trust: %w", err)
+	}
+	defer func() { _ = os.Remove(tmp.Name()) }()
+	if _, err := tmp.Write(out); err != nil {
+		_ = tmp.Close()
+		return false, fmt.Errorf("trust: write: %w", err)
+	}
+	if err := tmp.Chmod(mode); err != nil {
+		_ = tmp.Close()
+		return false, fmt.Errorf("trust: chmod: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return false, fmt.Errorf("trust: close: %w", err)
+	}
+	if err := os.Rename(tmp.Name(), configPath); err != nil {
+		return false, fmt.Errorf("trust: replace %s: %w", configPath, err)
+	}
+	return true, nil
+}
+
+// setTrusted sets projects[key].hasTrustDialogAccepted = true in a Claude config
+// document, leaving every other value as it was (object keys come out sorted).
+func setTrusted(data []byte, key string) ([]byte, bool, error) {
+	var root map[string]json.RawMessage
+	if err := json.Unmarshal(data, &root); err != nil {
+		return nil, false, fmt.Errorf("trust: parse config: %w", err)
+	}
+	if root == nil {
+		root = map[string]json.RawMessage{}
+	}
+	projects := map[string]json.RawMessage{}
+	if raw, ok := root["projects"]; ok && string(raw) != "null" {
+		if err := json.Unmarshal(raw, &projects); err != nil {
+			return nil, false, fmt.Errorf("trust: parse projects: %w", err)
+		}
+	}
+	entry := map[string]json.RawMessage{}
+	if raw, ok := projects[key]; ok && string(raw) != "null" {
+		if err := json.Unmarshal(raw, &entry); err != nil {
+			return nil, false, fmt.Errorf("trust: parse project %s: %w", key, err)
+		}
+	}
+	if string(entry["hasTrustDialogAccepted"]) == "true" {
+		return data, false, nil
+	}
+	entry["hasTrustDialogAccepted"] = json.RawMessage("true")
+	var err error
+	if projects[key], err = marshalRaw(entry); err != nil {
+		return nil, false, err
+	}
+	if root["projects"], err = marshalRaw(projects); err != nil {
+		return nil, false, err
+	}
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(root); err != nil {
+		return nil, false, fmt.Errorf("trust: encode config: %w", err)
+	}
+	return bytes.TrimRight(buf.Bytes(), "\n"), true, nil
+}
+
+func marshalRaw(v any) (json.RawMessage, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(v); err != nil {
+		return nil, fmt.Errorf("trust: encode: %w", err)
+	}
+	return json.RawMessage(bytes.TrimRight(buf.Bytes(), "\n")), nil
+}
+
+// lockFile takes a proper-lockfile compatible lock on path (a "<path>.lock"
+// directory). A lock older than trustLockStale is taken over.
+func lockFile(path string) (func(), error) {
+	dir := path + ".lock"
+	deadline := time.Now().Add(trustLockWait)
+	for {
+		err := os.Mkdir(dir, 0o700)
+		if err == nil {
+			return func() { _ = os.Remove(dir) }, nil
+		}
+		if !errors.Is(err, fs.ErrExist) {
+			return nil, fmt.Errorf("trust: lock %s: %w", dir, err)
+		}
+		if fi, serr := os.Stat(dir); serr == nil && time.Since(fi.ModTime()) > trustLockStale {
+			_ = os.Remove(dir)
+			continue
+		}
+		if time.Now().After(deadline) {
+			return nil, fmt.Errorf("trust: lock %s: held by another process", dir)
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+}
+
+// PreTrust marks dir as trusted in Claude's config, as spawn does for a session's
+// worktree, so a session can later be started in (or moved with RunIn to) dir. The
+// workspace store calls it for member worktrees. It is a no-op with
+// Options.DisablePreTrust.
+func (m *Manager) PreTrust(dir string) error {
+	if m.opts.DisablePreTrust {
+		return nil
+	}
+	changed, err := trustWorktree(m.opts.Paths.Config, dir)
+	if err != nil {
+		return err
+	}
+	if changed {
+		m.log.Info("pre-trusted worktree in claude config", "path", realPath(dir))
+	}
+	return nil
+}

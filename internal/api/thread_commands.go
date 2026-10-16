@@ -7,7 +7,7 @@ import (
 	"connectrpc.com/connect"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
-	"github.com/alexwaumann/code-foundry/internal/store/session"
+	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
 
 // A running thread's slash commands (docs/notes/slash-commands-1-daemon.md).
@@ -21,7 +21,7 @@ func (h *Thread) SlashCommands(ctx context.Context, req *connect.Request[v1.Slas
 	return connect.NewResponse(&v1.SlashCommandsResponse{Commands: slashCommandsToProto(cs)}), nil
 }
 
-func slashCommandsToProto(cs []session.SlashCommand) []*v1.SlashCommand {
+func slashCommandsToProto(cs []thread.SlashCommand) []*v1.SlashCommand {
 	if len(cs) == 0 {
 		return nil
 	}

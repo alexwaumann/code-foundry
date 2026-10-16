@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexwaumann/code-foundry/internal/store/session"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
+	"github.com/alexwaumann/code-foundry/internal/store/thread"
 	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 	"github.com/alexwaumann/code-foundry/internal/termlabel"
 )
@@ -56,20 +56,20 @@ func TestWorktreeThreads(t *testing.T) {
 	now := time.Date(2026, 10, 15, 4, 0, 0, 0, time.UTC)
 	tests := []struct {
 		name string
-		s    session.Session
+		s    thread.Session
 		want bool
 	}{
-		{name: "running", s: session.Session{State: session.StateConnected}, want: true},
-		{name: "starting", s: session.Session{State: session.StateStarting}, want: true},
-		{name: "stopped at cache expiry", s: session.Session{State: session.StateDisconnected, DisconnectReason: "idle"}, want: true},
-		{name: "stopping", s: session.Session{State: session.StateClosing}, want: true},
-		{name: "snoozed (it comes back to the worktree)", s: session.Session{State: session.StateDisconnected, SnoozedUntil: now}, want: true},
-		{name: "archived", s: session.Session{State: session.StateDisconnected, ArchivedAt: now}, want: false},
+		{name: "running", s: thread.Session{State: thread.StateConnected}, want: true},
+		{name: "starting", s: thread.Session{State: thread.StateStarting}, want: true},
+		{name: "stopped at cache expiry", s: thread.Session{State: thread.StateDisconnected, DisconnectReason: "idle"}, want: true},
+		{name: "stopping", s: thread.Session{State: thread.StateClosing}, want: true},
+		{name: "snoozed (it comes back to the worktree)", s: thread.Session{State: thread.StateDisconnected, SnoozedUntil: now}, want: true},
+		{name: "archived", s: thread.Session{State: thread.StateDisconnected, ArchivedAt: now}, want: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.s.ID, tt.s.Name, tt.s.WorktreePath = "s1", "fix-badge", "/wt/cf-a"
-			got := worktreeThreads(&session.Snapshot{Sessions: []session.Session{tt.s}})
+			got := worktreeThreads(&thread.Snapshot{Sessions: []thread.Session{tt.s}})
 			var want []workspace.Thread
 			if tt.want {
 				want = []workspace.Thread{{ID: "s1", Name: "fix-badge", Cwd: "/wt/cf-a"}}

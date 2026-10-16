@@ -22,11 +22,11 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/gitops/gitopstest"
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
 	"github.com/alexwaumann/code-foundry/internal/store/repo/repotest"
-	"github.com/alexwaumann/code-foundry/internal/store/session"
-	"github.com/alexwaumann/code-foundry/internal/store/session/sessiontest"
 	"github.com/alexwaumann/code-foundry/internal/store/settings/settingstest"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal/terminaltest"
+	"github.com/alexwaumann/code-foundry/internal/store/thread"
+	"github.com/alexwaumann/code-foundry/internal/store/thread/threadtest"
 	"github.com/alexwaumann/code-foundry/internal/store/update"
 	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 	"github.com/alexwaumann/code-foundry/internal/store/workspace/workspacetest"
@@ -36,7 +36,7 @@ type eventsFixture struct {
 	bus    *bus.Bus
 	repo   *repotest.Fake
 	term   *terminaltest.Fake
-	sess   *sessiontest.Fake
+	sess   *threadtest.Fake
 	gh     *ghtest.Store
 	gitops *gitopstest.Fake
 	set    *settingstest.Fake
@@ -57,7 +57,7 @@ func newEventsFixture(t *testing.T) *eventsFixture {
 	// A disabled updater: its snapshot is the status and it never checks.
 	upd := update.Start(context.Background(), update.Options{Current: "dev", DisabledReason: "dev build", Bus: b, InitialDelay: time.Hour})
 	t.Cleanup(upd.Close)
-	f := &eventsFixture{bus: b, repo: repotest.New(b), term: terminaltest.New(b), sess: sessiontest.New(b), gh: ghtest.New(b), gitops: gitopstest.New(b), set: set, update: upd, ws: workspacetest.New(b), done: make(chan struct{})}
+	f := &eventsFixture{bus: b, repo: repotest.New(b), term: terminaltest.New(b), sess: threadtest.New(b), gh: ghtest.New(b), gitops: gitopstest.New(b), set: set, update: upd, ws: workspacetest.New(b), done: make(chan struct{})}
 	route := NewEvents(EventsDeps{Bus: b, Repo: f.repo, Terminal: f.term, Session: f.sess, Gh: f.gh, GitOps: f.gitops, Settings: f.set, Update: f.update, Workspace: f.ws, Done: f.done}).Route()
 	mux := http.NewServeMux()
 	mux.Handle(route.Path, route.Handler)
@@ -203,9 +203,9 @@ func TestEventsSnapshotOrderThenLive(t *testing.T) {
 	_, _ = f.repo.Register(ctx, "/code/a")
 	t1, _ := f.term.Create(ctx, terminal.Spec{Argv: []string{"zsh"}})
 	t2, _ := f.term.Create(ctx, terminal.Spec{Argv: []string{"zsh"}, Labels: map[string]string{"kind": "shell", "session": "s1"}})
-	f.sess.Put(session.Session{ID: "s1", State: session.StateConnected, Status: session.StatusIdle})
-	f.sess.Put(session.Session{ID: "s2", State: session.StateConnected, CreatedAt: time.Unix(1, 0)})
-	f.sess.PutItems("s2", session.Item{ID: "perm-r1", Kind: session.KindPermission, Request: &session.Request{RequestID: "r1", ToolName: "Write", State: session.RequestPending}})
+	f.sess.Put(thread.Session{ID: "s1", State: thread.StateConnected, Status: thread.StatusIdle})
+	f.sess.Put(thread.Session{ID: "s2", State: thread.StateConnected, CreatedAt: time.Unix(1, 0)})
+	f.sess.PutItems("s2", thread.Item{ID: "perm-r1", Kind: thread.KindPermission, Request: &thread.Request{RequestID: "r1", ToolName: "Write", State: thread.RequestPending}})
 	f.gh.SetRepo(gh.RepoState{Slug: "o/b"})
 	f.gh.SetRepo(gh.RepoState{Slug: "o/a"})
 	f.gitops.Put(gitops.Op{ID: "op-0", Kind: gitops.KindFetch, State: gitops.StateRunning})
@@ -257,11 +257,11 @@ func TestEventsSnapshotOrderThenLive(t *testing.T) {
 	if got := describe(s.next()); got != "terminal.removed "+t1.ID {
 		t.Fatalf("got %q, want terminal removal", got)
 	}
-	f.sess.Put(session.Session{ID: "s1", State: session.StateConnected, Status: session.StatusNeedsAttention})
+	f.sess.Put(thread.Session{ID: "s1", State: thread.StateConnected, Status: thread.StatusNeedsAttention})
 	if got := describe(s.next()); got != "session.updated s1 SESSION_STATUS_NEEDS_ATTENTION" {
 		t.Fatalf("got %q, want session update", got)
 	}
-	if _, err := f.sess.Respond(ctx, "s2", "r1", session.Decision{Allow: true}); err != nil {
+	if _, err := f.sess.Respond(ctx, "s2", "r1", thread.Decision{Allow: true}); err != nil {
 		t.Fatal(err)
 	}
 	// Only the pending list travels on the event stream; the item update stays on

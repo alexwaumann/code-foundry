@@ -13,9 +13,9 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/bus"
-	"github.com/alexwaumann/code-foundry/internal/store/session"
-	"github.com/alexwaumann/code-foundry/internal/store/session/sessiontest"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal/terminaltest"
+	"github.com/alexwaumann/code-foundry/internal/store/thread"
+	"github.com/alexwaumann/code-foundry/internal/store/thread/threadtest"
 )
 
 func TestHeartbeatTimer(t *testing.T) {
@@ -128,8 +128,8 @@ func pump[T any](s interface {
 
 func openThreadBeats(t *testing.T, ctx context.Context, every time.Duration) beatStream {
 	b := bus.New()
-	fake := sessiontest.New(b)
-	fake.Put(session.Session{ID: "s1", State: session.StateConnected})
+	fake := threadtest.New(b)
+	fake.Put(thread.Session{ID: "s1", State: thread.StateConnected})
 	done := make(chan struct{})
 	srv := serveOnce(t, (&Thread{store: fake, bus: b, beat: every}).Route(), done)
 	c := codefoundryv1connect.NewThreadServiceClient(srv.Client(), srv.URL)
@@ -144,7 +144,7 @@ func openThreadBeats(t *testing.T, ctx context.Context, every time.Duration) bea
 	return beatStream{
 		msgs: pump(s, func(m *v1.ThreadEvent) bool { return m.GetHeartbeat() != nil }),
 		poke: func(t *testing.T) {
-			if _, err := fake.Send(ctx, "s1", session.Message{Text: "x"}); err != nil {
+			if _, err := fake.Send(ctx, "s1", thread.Message{Text: "x"}); err != nil {
 				t.Error(err)
 			}
 		},
@@ -183,7 +183,7 @@ func openAttachBeats(t *testing.T, ctx context.Context, every time.Duration) bea
 
 func openEventBeats(t *testing.T, ctx context.Context, every time.Duration) beatStream {
 	b := bus.New()
-	fake := sessiontest.New(b)
+	fake := threadtest.New(b)
 	done := make(chan struct{})
 	srv := serveOnce(t, (&Events{deps: EventsDeps{Bus: b, Session: fake}, beat: every}).Route(), done)
 	c := codefoundryv1connect.NewEventServiceClient(srv.Client(), srv.URL)
@@ -200,7 +200,7 @@ func openEventBeats(t *testing.T, ctx context.Context, every time.Duration) beat
 		msgs: pump(s, func(m *v1.Event) bool { return m.GetHeartbeat() != nil }),
 		poke: func(*testing.T) {
 			n++
-			fake.Put(session.Session{ID: "s1", Name: string(rune('a' + n%26))})
+			fake.Put(thread.Session{ID: "s1", Name: string(rune('a' + n%26))})
 		},
 		done: done,
 	}
@@ -299,9 +299,9 @@ func TestThreadWatchHeartbeatKeepsSeq(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	b := bus.New()
-	fake := sessiontest.New(b)
-	fake.Put(session.Session{ID: "s1", State: session.StateConnected})
-	fake.PutItems("s1", session.Item{ID: "u1", Kind: session.KindUserMessage, Text: "hi"})
+	fake := threadtest.New(b)
+	fake.Put(thread.Session{ID: "s1", State: thread.StateConnected})
+	fake.PutItems("s1", thread.Item{ID: "u1", Kind: thread.KindUserMessage, Text: "hi"})
 	srv := serveOnce(t, (&Thread{store: fake, bus: b, beat: 50 * time.Millisecond}).Route(), make(chan struct{}))
 	c := codefoundryv1connect.NewThreadServiceClient(srv.Client(), srv.URL)
 	s, err := c.Watch(ctx, connect.NewRequest(&v1.WatchThreadRequest{SessionId: "s1"}))
@@ -318,7 +318,7 @@ func TestThreadWatchHeartbeatKeepsSeq(t *testing.T) {
 			t.Fatalf("want a heartbeat, got %v (%v)", s.Msg(), s.Err())
 		}
 	}
-	if _, err := fake.Send(ctx, "s1", session.Message{Text: "more"}); err != nil {
+	if _, err := fake.Send(ctx, "s1", thread.Message{Text: "more"}); err != nil {
 		t.Fatal(err)
 	}
 	for s.Receive() {

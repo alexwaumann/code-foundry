@@ -15,25 +15,25 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/command/commandtest"
-	"github.com/alexwaumann/code-foundry/internal/store/session"
-	"github.com/alexwaumann/code-foundry/internal/store/session/sessiontest"
+	"github.com/alexwaumann/code-foundry/internal/store/thread"
+	"github.com/alexwaumann/code-foundry/internal/store/thread/threadtest"
 )
 
-func newMcpRegistry(t *testing.T) (*command.Registry, *sessiontest.Fake, *commandtest.Emitter) {
+func newMcpRegistry(t *testing.T) (*command.Registry, *threadtest.Fake, *commandtest.Emitter) {
 	t.Helper()
 	b := bus.New()
-	fake := sessiontest.New(b)
+	fake := threadtest.New(b)
 	reg := command.NewRegistry()
 	emit := &commandtest.Emitter{Delivered: 1}
 	if err := command.RegisterMcp(reg, api.NewThread(fake, b), emit); err != nil {
 		t.Fatal(err)
 	}
-	fake.Put(session.Session{ID: "s1", Name: "fix", State: session.StateConnected})
-	fake.PutMcp("s1", &session.McpStatus{CheckedAt: time.Now().Add(-12 * time.Second), Trigger: session.McpTriggerTurn, Servers: []session.McpServer{
-		{Name: "github", Status: session.McpConnected, Version: "1.12.0", Scope: "user", Transport: "stdio",
-			Tools: []session.McpTool{{Name: "get_pull_request", Description: "Get details of a pull request", ReadOnly: true}, {Name: "merge_pull_request", Destructive: true, OpenWorld: true}}},
-		{Name: "linear", Status: session.McpNeedsAuth, Scope: "user", Transport: "http"},
-		{Name: "playwright", Status: session.McpFailed, Error: "spawn npx ENOENT", Scope: "project", Transport: "stdio"},
+	fake.Put(thread.Session{ID: "s1", Name: "fix", State: thread.StateConnected})
+	fake.PutMcp("s1", &thread.McpStatus{CheckedAt: time.Now().Add(-12 * time.Second), Trigger: thread.McpTriggerTurn, Servers: []thread.McpServer{
+		{Name: "github", Status: thread.McpConnected, Version: "1.12.0", Scope: "user", Transport: "stdio",
+			Tools: []thread.McpTool{{Name: "get_pull_request", Description: "Get details of a pull request", ReadOnly: true}, {Name: "merge_pull_request", Destructive: true, OpenWorld: true}}},
+		{Name: "linear", Status: thread.McpNeedsAuth, Scope: "user", Transport: "http"},
+		{Name: "playwright", Status: thread.McpFailed, Error: "spawn npx ENOENT", Scope: "project", Transport: "stdio"},
 	}})
 	return reg, fake, emit
 }

@@ -13,26 +13,26 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/api"
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/command"
-	"github.com/alexwaumann/code-foundry/internal/store/session"
-	"github.com/alexwaumann/code-foundry/internal/store/session/sessiontest"
+	"github.com/alexwaumann/code-foundry/internal/store/thread"
+	"github.com/alexwaumann/code-foundry/internal/store/thread/threadtest"
 )
 
-func newSlashRegistry(t *testing.T) (*command.Registry, *sessiontest.Fake) {
+func newSlashRegistry(t *testing.T) (*command.Registry, *threadtest.Fake) {
 	t.Helper()
 	b := bus.New()
-	fake := sessiontest.New(b)
+	fake := threadtest.New(b)
 	reg := command.NewRegistry()
 	if err := command.RegisterSlash(reg, api.NewThread(fake, b)); err != nil {
 		t.Fatal(err)
 	}
-	fake.Put(session.Session{ID: "s1", Name: "fix", State: session.StateConnected})
-	fake.PutSlashCommands("s1", []session.SlashCommand{
+	fake.Put(thread.Session{ID: "s1", Name: "fix", State: thread.StateConnected})
+	fake.PutSlashCommands("s1", []thread.SlashCommand{
 		{Name: "deploy", Description: "Ship it (project)", ArgumentHint: "<env>"},
 		{Name: "compact", Description: "Free up context by summarizing the conversation so far", ArgumentHint: "<optional custom summarization instructions>", Builtin: true},
 		{Name: "usage", Description: "Show session cost", Aliases: []string{"cost", "stats"}, Builtin: true},
 		{Name: "anthropic-skills:pdf", Description: "Use this skill whenever the user wants to do anything with PDF files.\nSecond line."},
 	})
-	fake.Put(session.Session{ID: "s2", Name: "gone", State: session.StateDisconnected})
+	fake.Put(thread.Session{ID: "s2", Name: "gone", State: thread.StateDisconnected})
 	return reg, fake
 }
 

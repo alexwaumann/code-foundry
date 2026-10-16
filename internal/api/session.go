@@ -12,20 +12,20 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/bus"
-	"github.com/alexwaumann/code-foundry/internal/store/session"
+	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
 
-// Session implements codefoundryv1connect.SessionServiceHandler over a session.Store.
+// Session implements codefoundryv1connect.SessionServiceHandler over a thread.Store.
 type Session struct {
-	store session.Store
+	store thread.Store
 	bus   *bus.Bus
 }
 
 var _ codefoundryv1connect.SessionServiceHandler = (*Session)(nil)
 
 // NewSession returns a SessionService handler. b must be the bus the store publishes
-// session.Event on.
-func NewSession(store session.Store, b *bus.Bus) *Session { return &Session{store: store, bus: b} }
+// thread.Event on.
+func NewSession(store thread.Store, b *bus.Bus) *Session { return &Session{store: store, bus: b} }
 
 // Route mounts the service.
 func (h *Session) Route(opts ...connect.HandlerOption) Route {
@@ -36,16 +36,16 @@ func (h *Session) Route(opts ...connect.HandlerOption) Route {
 // Create spawns claude in a worktree.
 func (h *Session) Create(ctx context.Context, req *connect.Request[v1.CreateSessionRequest]) (*connect.Response[v1.CreateSessionResponse], error) {
 	m := req.Msg
-	o := session.CreateOptions{
+	o := thread.CreateOptions{
 		RepoID: m.GetRepoId(), WorktreePath: m.GetWorktreePath(), Model: m.GetModel(), Effort: m.GetEffort(),
-		Name: m.GetName(), InitialPrompt: m.GetInitialPrompt(), ComposerPrompt: m.GetComposerPrompt(), PermissionMode: session.PermissionMode(m.GetPermissionMode()),
+		Name: m.GetName(), InitialPrompt: m.GetInitialPrompt(), ComposerPrompt: m.GetComposerPrompt(), PermissionMode: thread.PermissionMode(m.GetPermissionMode()),
 		Attachments: m.GetAttachments(), WorkspaceID: m.GetWorkspaceId(), NoProject: m.GetNoProject(),
 	}
 	if nw := m.GetNewWorktree(); nw != nil {
-		o.NewWorktree = &session.NewWorktree{BaseRef: nw.GetBaseRef()}
+		o.NewWorktree = &thread.NewWorktree{BaseRef: nw.GetBaseRef()}
 	}
 	if nw := m.GetNewWorkspace(); nw != nil {
-		o.NewWorkspace = &session.NewWorkspace{Repos: nw.GetRepos(), BaseRef: nw.GetBaseRef(), Name: nw.GetName()}
+		o.NewWorkspace = &thread.NewWorkspace{Repos: nw.GetRepos(), BaseRef: nw.GetBaseRef(), Name: nw.GetName()}
 	}
 	s, err := h.store.Create(ctx, o)
 	if err != nil {
@@ -156,7 +156,7 @@ func (h *Session) Remove(ctx context.Context, req *connect.Request[v1.RemoveSess
 // RunIn moves a workspace thread to another member worktree.
 func (h *Session) RunIn(ctx context.Context, req *connect.Request[v1.RunInSessionRequest]) (*connect.Response[v1.RunInSessionResponse], error) {
 	m := req.Msg
-	s, err := h.store.RunIn(ctx, m.GetId(), session.RunInTarget{RepoID: m.GetRepoId(), WorktreePath: m.GetWorktreePath()})
+	s, err := h.store.RunIn(ctx, m.GetId(), thread.RunInTarget{RepoID: m.GetRepoId(), WorktreePath: m.GetWorktreePath()})
 	if err != nil {
 		return nil, sessionError(err)
 	}
@@ -168,7 +168,7 @@ func (h *Session) RunIn(ctx context.Context, req *connect.Request[v1.RunInSessio
 func (h *Session) Watch(ctx context.Context, _ *connect.Request[v1.WatchSessionsRequest], stream *connect.ServerStream[v1.SessionEvent]) error {
 	// Subscribe first so nothing published between snapshot and stream is lost. Each
 	// event carries full state, so applying queued older events still converges.
-	sub := bus.Subscribe[session.Event](h.bus, watchBuffer)
+	sub := bus.Subscribe[thread.Event](h.bus, watchBuffer)
 	defer sub.Close()
 	if err := stream.Send(sessionEventToProto(h.store.Snapshot())); err != nil {
 		return err
@@ -195,26 +195,26 @@ func (h *Session) Watch(ctx context.Context, _ *connect.Request[v1.WatchSessions
 	}
 }
 
-// sessionEventToProto converts a bus event (or a *session.Snapshot) to the wire event.
-func sessionEventToProto(ev session.Event) *v1.SessionEvent {
+// sessionEventToProto converts a bus event (or a *thread.Snapshot) to the wire event.
+func sessionEventToProto(ev thread.Event) *v1.SessionEvent {
 	switch e := ev.(type) {
-	case *session.Snapshot:
+	case *thread.Snapshot:
 		snap := &v1.SessionSnapshot{Sessions: sessionsToProto(e)}
 		if e != nil {
 			snap.RetiredUsage = retiredToProto(e.RetiredUsage)
 		}
 		return &v1.SessionEvent{Event: &v1.SessionEvent_Snapshot{Snapshot: snap}}
-	case session.Updated:
+	case thread.Updated:
 		return &v1.SessionEvent{Event: &v1.SessionEvent_Updated{Updated: sessionToProto(e.Session)}}
-	case session.Removed:
+	case thread.Removed:
 		return &v1.SessionEvent{Event: &v1.SessionEvent_RemovedId{RemovedId: e.ID}}
-	case session.RetiredUsage:
+	case thread.RetiredUsage:
 		return &v1.SessionEvent{Event: &v1.SessionEvent_RetiredUsage{RetiredUsage: &v1.RetiredUsage{Buckets: retiredToProto(e.Buckets)}}}
 	}
 	return nil
 }
 
-func sessionsToProto(snap *session.Snapshot) []*v1.Session {
+func sessionsToProto(snap *thread.Snapshot) []*v1.Session {
 	if snap == nil {
 		return nil
 	}
@@ -225,7 +225,7 @@ func sessionsToProto(snap *session.Snapshot) []*v1.Session {
 	return out
 }
 
-func sessionToProto(s session.Session) *v1.Session {
+func sessionToProto(s thread.Session) *v1.Session {
 	p := &v1.Session{
 		Id:                  s.ID,
 		ClaudeSessionId:     s.ClaudeSessionID,
@@ -296,13 +296,13 @@ func sessionError(err error) error {
 	}
 	code := connect.CodeInternal
 	switch {
-	case errors.Is(err, session.ErrNotFound):
+	case errors.Is(err, thread.ErrNotFound):
 		code = connect.CodeNotFound
-	case errors.Is(err, session.ErrInvalidArgument):
+	case errors.Is(err, thread.ErrInvalidArgument):
 		code = connect.CodeInvalidArgument
-	case errors.Is(err, session.ErrFailedPrecondition):
+	case errors.Is(err, thread.ErrFailedPrecondition):
 		code = connect.CodeFailedPrecondition
-	case errors.Is(err, session.ErrClosed):
+	case errors.Is(err, thread.ErrClosed):
 		code = connect.CodeUnavailable
 	case errors.Is(err, context.Canceled):
 		code = connect.CodeCanceled

@@ -7,7 +7,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
-	"github.com/alexwaumann/code-foundry/internal/store/session"
+	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
 
 // A thread's MCP servers (docs/notes/mcp-panel.md).
@@ -31,21 +31,21 @@ func (h *Thread) McpReconnect(ctx context.Context, req *connect.Request[v1.McpRe
 }
 
 var mcpServerStatuses = map[string]v1.McpServerStatus{
-	session.McpConnected: v1.McpServerStatus_MCP_SERVER_STATUS_CONNECTED,
-	session.McpFailed:    v1.McpServerStatus_MCP_SERVER_STATUS_FAILED,
-	session.McpNeedsAuth: v1.McpServerStatus_MCP_SERVER_STATUS_NEEDS_AUTH,
-	session.McpPending:   v1.McpServerStatus_MCP_SERVER_STATUS_PENDING,
-	session.McpDisabled:  v1.McpServerStatus_MCP_SERVER_STATUS_DISABLED,
+	thread.McpConnected: v1.McpServerStatus_MCP_SERVER_STATUS_CONNECTED,
+	thread.McpFailed:    v1.McpServerStatus_MCP_SERVER_STATUS_FAILED,
+	thread.McpNeedsAuth: v1.McpServerStatus_MCP_SERVER_STATUS_NEEDS_AUTH,
+	thread.McpPending:   v1.McpServerStatus_MCP_SERVER_STATUS_PENDING,
+	thread.McpDisabled:  v1.McpServerStatus_MCP_SERVER_STATUS_DISABLED,
 }
 
-var mcpTriggers = map[session.McpTrigger]v1.McpCheckTrigger{
-	session.McpTriggerTurn:      v1.McpCheckTrigger_MCP_CHECK_TRIGGER_TURN_START,
-	session.McpTriggerRefresh:   v1.McpCheckTrigger_MCP_CHECK_TRIGGER_REFRESH,
-	session.McpTriggerReconnect: v1.McpCheckTrigger_MCP_CHECK_TRIGGER_RECONNECT,
+var mcpTriggers = map[thread.McpTrigger]v1.McpCheckTrigger{
+	thread.McpTriggerTurn:      v1.McpCheckTrigger_MCP_CHECK_TRIGGER_TURN_START,
+	thread.McpTriggerRefresh:   v1.McpCheckTrigger_MCP_CHECK_TRIGGER_REFRESH,
+	thread.McpTriggerReconnect: v1.McpCheckTrigger_MCP_CHECK_TRIGGER_RECONNECT,
 }
 
 // mcpStatusToProto maps a status; nil (none) maps to nil.
-func mcpStatusToProto(s *session.McpStatus) *v1.ThreadMcpStatus {
+func mcpStatusToProto(s *thread.McpStatus) *v1.ThreadMcpStatus {
 	if s == nil {
 		return nil
 	}

@@ -16,9 +16,9 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/gh"
 	"github.com/alexwaumann/code-foundry/internal/store/gitops"
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
-	"github.com/alexwaumann/code-foundry/internal/store/session"
 	"github.com/alexwaumann/code-foundry/internal/store/settings"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
+	"github.com/alexwaumann/code-foundry/internal/store/thread"
 	"github.com/alexwaumann/code-foundry/internal/store/update"
 	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 )
@@ -32,7 +32,7 @@ type EventsDeps struct {
 	Bus      *bus.Bus
 	Repo     repo.Store
 	Terminal terminal.Store
-	Session  session.Store
+	Session  thread.Store
 	Gh       gh.Service
 	GitOps   gitops.Store
 	Settings settings.Service
@@ -376,15 +376,15 @@ func (s *terminalSource) snapshot(ctx context.Context) []*v1.Event {
 // ---- session -------------------------------------------------------------------
 
 // sessionSource reuses SessionService's mapping (api/session.go). The store publishes
-// one bus type, session.Event; its snapshot is a SessionEvent.snapshot.
+// one bus type, thread.Event; its snapshot is a SessionEvent.snapshot.
 type sessionSource struct {
-	store session.Store
+	store thread.Store
 	bus   *bus.Bus
 }
 
 func (sessionSource) kind() v1.EventSource { return v1.EventSource_EVENT_SOURCE_SESSION }
 
-func sessionWrap(ev session.Event) *v1.Event {
+func sessionWrap(ev thread.Event) *v1.Event {
 	if m := sessionEventToProto(ev); m != nil {
 		return &v1.Event{Event: &v1.Event_Session{Session: m}}
 	}
@@ -410,14 +410,14 @@ func (s sessionSource) snapshot(context.Context) []*v1.Event {
 // only, so nothing else may be built from it. A disconnected thread has nothing
 // pending (its requests are cancelled when its process ends).
 type threadSource struct {
-	store session.Store
+	store thread.Store
 	bus   *bus.Bus
 }
 
 func (threadSource) kind() v1.EventSource { return v1.EventSource_EVENT_SOURCE_THREAD }
 
-func threadWrap(ev session.ThreadEvent) *v1.Event {
-	if _, ok := ev.(session.PendingChanged); !ok {
+func threadWrap(ev thread.ThreadEvent) *v1.Event {
+	if _, ok := ev.(thread.PendingChanged); !ok {
 		return nil
 	}
 	if m := threadEventToProto(ev); m != nil {
@@ -434,7 +434,7 @@ func (s threadSource) snapshot(ctx context.Context) []*v1.Event {
 	snap := &v1.ThreadPendingSnapshot{}
 	if ss := s.store.Snapshot(); ss != nil {
 		for _, x := range ss.Sessions {
-			if x.State == session.StateDisconnected {
+			if x.State == thread.StateDisconnected {
 				continue
 			}
 			items, err := s.store.Items(ctx, x.ID)

@@ -11,8 +11,8 @@ import (
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
-	"github.com/alexwaumann/code-foundry/internal/store/session"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
+	"github.com/alexwaumann/code-foundry/internal/store/thread"
 	"github.com/alexwaumann/code-foundry/internal/termlabel"
 )
 
@@ -53,7 +53,7 @@ type shellReaperOptions struct {
 //     for every worktree when a refresh fails (it lists none), and that must not kill
 //     anything. This and the next two apply to action terminals too, exited or not.
 //   - Its project is unregistered (repo.RepoRemoved): killed and removed.
-//   - Its thread is removed (session.Removed): killed and removed. session.Manager.Remove
+//   - Its thread is removed (thread.Removed): killed and removed. thread.Manager.Remove
 //     does it first, synchronously; this catches a shell started while that ran.
 //   - Every SweepEvery, and once at start, each of the above is re-checked from the
 //     current state, for events the bus dropped.
@@ -88,7 +88,7 @@ func startShellReaper(ctx context.Context, opts shellReaperOptions) (func(), err
 		return nil, err
 	}
 	repoEvents := bus.Subscribe[repo.Event](opts.Bus, 256)
-	sessionEvents := bus.Subscribe[session.Event](opts.Bus, 256)
+	sessionEvents := bus.Subscribe[thread.Event](opts.Bus, 256)
 	r.sweep()
 	r.wg.Go(func() {
 		defer repoEvents.Close()
@@ -120,7 +120,7 @@ func startShellReaper(ctx context.Context, opts shellReaperOptions) (func(), err
 					r.reap("project unregistered", termlabel.Repo, e.ID)
 				}
 			case ev := <-sessionEvents.C():
-				if e, ok := ev.(session.Removed); ok {
+				if e, ok := ev.(thread.Removed); ok {
 					r.reap("thread removed", termlabel.Session, e.ID)
 				}
 			}

@@ -6,20 +6,20 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
-	"github.com/alexwaumann/code-foundry/internal/store/session"
+	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
 
 // A thread's subagent runs (docs/notes/agents-1-daemon.md): ThreadItemsSnapshot.agents,
 // ThreadEvent.agents, and the Session's running counts.
 
-var agentStatuses = map[session.AgentStatus]v1.ThreadAgentStatus{
-	session.AgentRunning: v1.ThreadAgentStatus_THREAD_AGENT_STATUS_RUNNING,
-	session.AgentDone:    v1.ThreadAgentStatus_THREAD_AGENT_STATUS_DONE,
-	session.AgentFailed:  v1.ThreadAgentStatus_THREAD_AGENT_STATUS_FAILED,
+var agentStatuses = map[thread.AgentStatus]v1.ThreadAgentStatus{
+	thread.AgentRunning: v1.ThreadAgentStatus_THREAD_AGENT_STATUS_RUNNING,
+	thread.AgentDone:    v1.ThreadAgentStatus_THREAD_AGENT_STATUS_DONE,
+	thread.AgentFailed:  v1.ThreadAgentStatus_THREAD_AGENT_STATUS_FAILED,
 }
 
 // threadAgentsToProto maps a thread's runs, in their order.
-func threadAgentsToProto(runs []session.AgentRun) []*v1.ThreadAgentRun {
+func threadAgentsToProto(runs []thread.AgentRun) []*v1.ThreadAgentRun {
 	if len(runs) == 0 {
 		return nil
 	}

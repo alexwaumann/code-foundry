@@ -8,16 +8,16 @@ import (
 	"connectrpc.com/connect"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
-	"github.com/alexwaumann/code-foundry/internal/store/session"
+	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
 
-func agentsSample(at time.Time) []session.AgentRun {
-	return []session.AgentRun{
+func agentsSample(at time.Time) []thread.AgentRun {
+	return []thread.AgentRun{
 		{ID: "a1", ToolUseID: "toolu_1", Description: "Slow count", AgentType: "general-purpose", Model: "haiku", Effort: "low",
-			Background: true, SpawnDepth: 1, Status: session.AgentRunning, Activity: "Running ls", LastTool: "Bash",
+			Background: true, SpawnDepth: 1, Status: thread.AgentRunning, Activity: "Running ls", LastTool: "Bash",
 			TotalTokens: 14140, ToolUses: 1, DurationMS: 1380, StartedAt: at, ResumedAt: at.Add(time.Minute)},
-		{ID: "a2", Description: "Outer", SpawnDepth: 1, Status: session.AgentDone, Summary: "outer done", StartedAt: at, EndedAt: at.Add(time.Second)},
-		{ID: "a3", ParentID: "a2", Description: "Inner", SpawnDepth: 2, Status: session.AgentFailed, Error: "stopped", NoteItemID: "agent-1"},
+		{ID: "a2", Description: "Outer", SpawnDepth: 1, Status: thread.AgentDone, Summary: "outer done", StartedAt: at, EndedAt: at.Add(time.Second)},
+		{ID: "a3", ParentID: "a2", Description: "Inner", SpawnDepth: 2, Status: thread.AgentFailed, Error: "stopped", NoteItemID: "agent-1"},
 		{ID: "a4", Status: "newer"},
 	}
 }
@@ -52,13 +52,13 @@ func TestThreadAgentsToProto(t *testing.T) {
 
 func TestSessionAgentCounts(t *testing.T) {
 	runs := agentsSample(time.Now())
-	runs = append(runs, session.AgentRun{ID: "a5", Background: true, SpawnDepth: 2, Status: session.AgentRunning})
-	p := sessionToProto(session.Session{ID: "s1", AgentRuns: runs, BackgroundShellsRunning: 3})
+	runs = append(runs, thread.AgentRun{ID: "a5", Background: true, SpawnDepth: 2, Status: thread.AgentRunning})
+	p := sessionToProto(thread.Session{ID: "s1", AgentRuns: runs, BackgroundShellsRunning: 3})
 	if p.GetAgentsRunning() != 2 || p.GetBackgroundAgentsRunning() != 1 || p.GetBackgroundShellsRunning() != 3 {
 		t.Errorf("running %d, background %d, shells %d", p.GetAgentsRunning(), p.GetBackgroundAgentsRunning(), p.GetBackgroundShellsRunning())
 	}
 	// The wake hold travels too (restarts and archive confirm it as background work).
-	if p.GetBackgroundWakePending() || !sessionToProto(session.Session{ID: "s2", WakePending: true}).GetBackgroundWakePending() {
+	if p.GetBackgroundWakePending() || !sessionToProto(thread.Session{ID: "s2", WakePending: true}).GetBackgroundWakePending() {
 		t.Error("background_wake_pending mapping")
 	}
 	want := []v1.AgentRunStatus{v1.AgentRunStatus_AGENT_RUN_STATUS_OPEN, v1.AgentRunStatus_AGENT_RUN_STATUS_CLOSED,
@@ -69,7 +69,7 @@ func TestSessionAgentCounts(t *testing.T) {
 		}
 	}
 	// A row from before the lifecycle (no status) follows Open.
-	old := sessionToProto(session.Session{ID: "s2", AgentRuns: []session.AgentRun{{ID: "x", Open: true}}})
+	old := sessionToProto(thread.Session{ID: "s2", AgentRuns: []thread.AgentRun{{ID: "x", Open: true}}})
 	if old.GetAgentRuns()[0].GetStatus() != v1.AgentRunStatus_AGENT_RUN_STATUS_OPEN {
 		t.Errorf("old open run %v", old.GetAgentRuns()[0])
 	}
@@ -77,8 +77,8 @@ func TestSessionAgentCounts(t *testing.T) {
 
 func TestThreadAgentsWatch(t *testing.T) {
 	fake, c := newThreadServer(t)
-	fake.Put(session.Session{ID: "s1", State: session.StateConnected})
-	fake.PutItems("s1", session.Item{ID: "u1", Kind: session.KindUserMessage, Text: "hi"})
+	fake.Put(thread.Session{ID: "s1", State: thread.StateConnected})
+	fake.PutItems("s1", thread.Item{ID: "u1", Kind: thread.KindUserMessage, Text: "hi"})
 	fake.PutAgents("s1", agentsSample(time.Now())[:1]...)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

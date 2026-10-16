@@ -13,8 +13,8 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/command/commandtest"
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
-	"github.com/alexwaumann/code-foundry/internal/store/session"
 	"github.com/alexwaumann/code-foundry/internal/store/settings"
+	"github.com/alexwaumann/code-foundry/internal/store/thread"
 	"github.com/alexwaumann/code-foundry/internal/store/update"
 )
 
@@ -165,7 +165,7 @@ func TestSettingsNamer(t *testing.T) {
 	var models []string
 	namer := settingsNamer(st, func(ctx context.Context, _ string) (string, error) {
 		calls++
-		models = append(models, session.NamingModel(ctx))
+		models = append(models, thread.NamingModel(ctx))
 		return "a-name", nil
 	})
 	if name, err := namer(context.Background(), "hi"); err != nil || name != "a-name" {
