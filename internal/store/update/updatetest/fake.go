@@ -4,6 +4,7 @@ package updatetest
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -112,44 +113,64 @@ func (s *Source) Latest(ctx context.Context, ch update.Channel) (string, error) 
 // NotesURL implements update.Source.
 func (s *Source) NotesURL(tag string) string { return "https://example.test/releases/" + tag }
 
-// Installer is a fake update.Installer. Each Install reports the Progress lines, then
-// blocks until Release is called (when Hold is set), then returns Err. On success it
-// sets the shared OnDisk version, so the store's InstalledVersion sees the new install.
+// Installer is a fake update.Installer over two fake directories: the install on disk
+// (OnDisk, may be nil) and the staged download (Staged). Download reports the Progress
+// lines, blocks until Release (when Hold is set), then returns DownloadErr or stages the
+// tag. Install returns InstallErr, fails when the tag is not staged (like
+// install.sh --apply-staged), else moves the staged version onto disk. Point
+// update.Options.StagedVersion at Staged().Version.
 type Installer struct {
 	Progress []string
-	Err      error
-	// Hold makes Install wait for Release.
+	// DownloadErr and InstallErr fail the respective step.
+	DownloadErr, InstallErr error
+	// Hold makes Download wait for Release.
 	Hold bool
-	// InstallAs is the version a successful install leaves on disk; the tag when empty.
+	// DownloadAs is the version a successful download stages; the tag when empty.
+	DownloadAs string
+	// InstallAs is the version a successful install leaves on disk; the staged version
+	// when empty.
 	InstallAs string
 
-	mu      sync.Mutex
-	calls   []string
-	release chan struct{}
-	onDisk  *OnDisk
+	mu        sync.Mutex
+	downloads []string
+	installs  []string
+	release   chan struct{}
+	onDisk    *OnDisk
+	staged    *OnDisk
 }
 
 var _ update.Installer = (*Installer)(nil)
 
-// NewInstaller returns an installer that records installs into disk (may be nil).
+// NewInstaller returns an installer that installs into disk (may be nil) and stages into
+// a fresh Staged directory (nothing staged).
 func NewInstaller(disk *OnDisk) *Installer {
-	return &Installer{release: make(chan struct{}), onDisk: disk}
+	return &Installer{release: make(chan struct{}), onDisk: disk, staged: NewOnDisk("")}
 }
 
-// Release lets a held Install finish.
+// Staged is the fake staged download, for update.Options.StagedVersion.
+func (i *Installer) Staged() *OnDisk { return i.staged }
+
+// Release lets a held Download finish.
 func (i *Installer) Release() { close(i.release) }
 
-// Calls returns the tags Install was called with.
+// Calls returns the tags Download was called with.
 func (i *Installer) Calls() []string {
 	i.mu.Lock()
 	defer i.mu.Unlock()
-	return append([]string(nil), i.calls...)
+	return append([]string(nil), i.downloads...)
 }
 
-// Install implements update.Installer.
-func (i *Installer) Install(ctx context.Context, tag string, progress func(string)) error {
+// Installs returns the tags Install was called with.
+func (i *Installer) Installs() []string {
 	i.mu.Lock()
-	i.calls = append(i.calls, tag)
+	defer i.mu.Unlock()
+	return append([]string(nil), i.installs...)
+}
+
+// Download implements update.Installer.
+func (i *Installer) Download(ctx context.Context, tag string, progress func(string)) error {
+	i.mu.Lock()
+	i.downloads = append(i.downloads, tag)
 	i.mu.Unlock()
 	for _, l := range i.Progress {
 		progress(l)
@@ -161,20 +182,43 @@ func (i *Installer) Install(ctx context.Context, tag string, progress func(strin
 			return ctx.Err()
 		}
 	}
-	if i.Err != nil {
-		return i.Err
+	if i.DownloadErr != nil {
+		i.staged.Set("") // install.sh removes the stage on failure
+		return i.DownloadErr
+	}
+	v := tag
+	if i.DownloadAs != "" {
+		v = i.DownloadAs
+	}
+	i.staged.Set(v)
+	return nil
+}
+
+// Install implements update.Installer.
+func (i *Installer) Install(_ context.Context, tag string) error {
+	i.mu.Lock()
+	i.installs = append(i.installs, tag)
+	i.mu.Unlock()
+	if i.InstallErr != nil {
+		return i.InstallErr
+	}
+	staged, _ := i.staged.Version()
+	if staged != tag {
+		return fmt.Errorf("installer: no staged download of %s (staged %q)", tag, staged)
 	}
 	if i.onDisk != nil {
-		v := tag
+		v := staged
 		if i.InstallAs != "" {
 			v = i.InstallAs
 		}
 		i.onDisk.Set(v)
 	}
+	i.staged.Set("")
 	return nil
 }
 
-// OnDisk is a fake installed version for update.Options.InstalledVersion.
+// OnDisk is a fake version file, for update.Options.InstalledVersion and
+// update.Options.StagedVersion.
 type OnDisk struct {
 	mu sync.Mutex
 	v  string
@@ -190,7 +234,7 @@ func (d *OnDisk) Set(v string) {
 	d.v = v
 }
 
-// Version implements update.Options.InstalledVersion.
+// Version implements update.Options.InstalledVersion and StagedVersion.
 func (d *OnDisk) Version() (string, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()

@@ -16,17 +16,33 @@ echo "args: $*"
 echo "repo: $CODE_FOUNDRY_RELEASE_REPO"
 echo "dir: ${CODE_FOUNDRY_RELEASE_DIR:-none}"
 echo ""
-if [ "$FAIL" = 1 ]; then echo "error: checksum mismatch" >&2; exit 3; fi
+if [ "$FAIL" = 1 ]; then echo "error: checksum mismatch" >&2; echo "failed: $*" >&2; exit 3; fi
 echo "==> done"
 `)
 	tests := []struct {
 		name     string
+		run      func(i ScriptInstaller, progress func(string)) error
 		fail     bool
 		wantErr  string
 		wantLine []string
 	}{
 		{
-			name: "success",
+			name: "download stages only",
+			run: func(i ScriptInstaller, p func(string)) error {
+				return i.Download(context.Background(), "v0.2.0", p)
+			},
+			wantLine: []string{
+				"args: --version v0.2.0 --stage-only --yes --skip-path --skip-link --app-dir /tmp/apps",
+				"repo: owner/name",
+				"dir: /tmp/rel",
+				"==> done",
+			},
+		},
+		{
+			name: "full install passes no mode",
+			run: func(i ScriptInstaller, p func(string)) error {
+				return i.InstallFull(context.Background(), "v0.2.0", p)
+			},
 			wantLine: []string{
 				"args: --version v0.2.0 --yes --skip-path --skip-link --app-dir /tmp/apps",
 				"repo: owner/name",
@@ -34,7 +50,22 @@ echo "==> done"
 				"==> done",
 			},
 		},
-		{name: "failure carries the last lines", fail: true, wantErr: "exit status 3: repo: owner/name / dir: /tmp/rel / error: checksum mismatch"},
+		{
+			name: "download failure carries the last lines",
+			run: func(i ScriptInstaller, p func(string)) error {
+				return i.Download(context.Background(), "v0.2.0", p)
+			},
+			fail:    true,
+			wantErr: "exit status 3: dir: /tmp/rel / error: checksum mismatch / failed: --version v0.2.0 --stage-only",
+		},
+		{
+			name: "install applies the stage",
+			run: func(i ScriptInstaller, _ func(string)) error {
+				return i.Install(context.Background(), "v0.2.0")
+			},
+			fail:    true, // the error's last line carries the arguments
+			wantErr: "failed: --version v0.2.0 --apply-staged --yes --skip-path --skip-link --app-dir /tmp/apps",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -45,7 +76,7 @@ echo "==> done"
 			}
 			i := ScriptInstaller{Script: fake, Repo: "owner/name", ReleaseDir: "/tmp/rel", AppDir: "/tmp/apps", Gh: "/opt/homebrew/bin/gh"}
 			var lines []string
-			err := i.Install(context.Background(), "v0.2.0", func(l string) { lines = append(lines, l) })
+			err := tt.run(i, func(l string) { lines = append(lines, l) })
 			if tt.wantErr != "" {
 				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 					t.Fatalf("err = %v, want %q", err, tt.wantErr)

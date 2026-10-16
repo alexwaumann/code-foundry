@@ -115,7 +115,7 @@ func runUpdate(ctx context.Context, cl *cli, args []string) error {
 	if *force {
 		inst.Args = append(inst.Args, "--force")
 	}
-	if err := inst.Install(ctx, *tag, nil); err != nil {
+	if err := inst.InstallFull(ctx, *tag, nil); err != nil {
 		return err
 	}
 	cl.afterUpdate(ctx)

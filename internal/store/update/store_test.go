@@ -40,6 +40,7 @@ func newRig(t *testing.T, latest string, edit func(*update.Options)) *rig {
 		Source:           r.source,
 		Installer:        r.installer,
 		InstalledVersion: r.disk.Version,
+		StagedVersion:    r.installer.Staged().Version,
 		Bus:              b,
 		InitialDelay:     time.Hour,
 	}
@@ -67,7 +68,7 @@ func (r *rig) waitState(t *testing.T, want update.State) update.Status {
 	}
 }
 
-func TestCheckInstallRelaunch(t *testing.T) {
+func TestCheckDownloadInstallRelaunch(t *testing.T) {
 	r := newRig(t, "v0.2.0", nil)
 	ctx := context.Background()
 
@@ -81,19 +82,27 @@ func TestCheckInstallRelaunch(t *testing.T) {
 	if st.State != update.Available || st.Target != "v0.2.0" || st.Latest != "v0.2.0" || st.NotesURL == "" || st.LastCheckedAt.IsZero() {
 		t.Fatalf("after check %+v", st)
 	}
+	// Nothing downloaded yet: nothing to install.
+	if _, err := r.store.Install(ctx); !errors.Is(err, update.ErrNotAvailable) || !strings.Contains(err.Error(), "nothing downloaded") {
+		t.Fatalf("Install before Download err = %v", err)
+	}
 
 	r.installer.Hold = true
 	r.installer.Progress = []string{"==> downloading", "==> verifying checksum"}
-	st, err = r.store.Install(ctx)
+	st, err = r.store.Download(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if st.State != update.Downloading {
-		t.Fatalf("Install returned %+v", st)
+	if st.State != update.Downloading || st.Progress != "starting download" {
+		t.Fatalf("Download returned %+v", st)
 	}
-	// While downloading: a second Install is refused and a check leaves the state.
+	// While downloading: a second Download and an Install are refused, and a check
+	// leaves the state.
+	if _, err := r.store.Download(ctx); !errors.Is(err, update.ErrNotAvailable) {
+		t.Fatalf("second Download err = %v", err)
+	}
 	if _, err := r.store.Install(ctx); !errors.Is(err, update.ErrNotAvailable) {
-		t.Fatalf("second Install err = %v", err)
+		t.Fatalf("Install while downloading err = %v", err)
 	}
 	r.source.Set("v0.3.0", nil)
 	if st, _ := r.store.Check(ctx); st.State != update.Downloading || st.Target != "v0.2.0" {
@@ -102,12 +111,37 @@ func TestCheckInstallRelaunch(t *testing.T) {
 	r.source.Set("v0.2.0", nil)
 	r.installer.Release()
 
-	st = r.waitState(t, update.Installed)
+	st = r.waitState(t, update.Downloaded)
 	if st.Target != "v0.2.0" || st.Progress != "" {
-		t.Fatalf("installed %+v", st)
+		t.Fatalf("downloaded %+v", st)
 	}
 	if got := r.installer.Calls(); len(got) != 1 || got[0] != "v0.2.0" {
-		t.Fatalf("installer calls %v", got)
+		t.Fatalf("download calls %v", got)
+	}
+	// Downloading changed nothing on disk.
+	if v, _ := r.disk.Version(); v != "v0.1.0" {
+		t.Fatalf("on disk after download: %s", v)
+	}
+	if _, err := r.store.Download(ctx); !errors.Is(err, update.ErrNotAvailable) {
+		t.Fatalf("Download when downloaded err = %v", err)
+	}
+	// A check for the same release keeps it downloaded.
+	if st, _ := r.store.Check(ctx); st.State != update.Downloaded || st.Target != "v0.2.0" {
+		t.Fatalf("check after download %+v", st)
+	}
+
+	st, err = r.store.Install(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.State != update.Installed || st.Target != "v0.2.0" {
+		t.Fatalf("Install returned %+v", st)
+	}
+	if v, _ := r.disk.Version(); v != "v0.2.0" {
+		t.Fatalf("on disk after install: %s", v)
+	}
+	if v, _ := r.installer.Staged().Version(); v != "" {
+		t.Fatalf("still staged after install: %s", v)
 	}
 
 	if n := r.store.RequestRelaunch(); n != 1 {
@@ -182,20 +216,20 @@ func TestRequestRestartWithoutBus(t *testing.T) {
 func TestProgressIsPublished(t *testing.T) {
 	r := newRig(t, "v0.2.0", nil)
 	r.installer.Hold = true
-	r.installer.Progress = []string{"==> downloading CodeFoundry-darwin-arm64.zip"}
+	r.installer.Progress = []string{"==> copying code-foundry-darwin-arm64.tar.gz"}
 	if _, err := r.store.Check(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := r.store.Install(context.Background()); err != nil {
+	if _, err := r.store.Download(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	deadline := time.After(5 * time.Second)
 	for {
 		select {
 		case ev := <-r.events.C():
-			if ev.Status.Progress == "==> downloading CodeFoundry-darwin-arm64.zip" {
+			if ev.Status.Progress == "==> copying code-foundry-darwin-arm64.tar.gz" {
 				r.installer.Release()
-				r.waitState(t, update.Installed)
+				r.waitState(t, update.Downloaded)
 				return
 			}
 		case <-deadline:
@@ -204,47 +238,199 @@ func TestProgressIsPublished(t *testing.T) {
 	}
 }
 
-func TestInstallFailureAndRetry(t *testing.T) {
+// downloaded checks for v0.2.0 and downloads it.
+func (r *rig) downloaded(t *testing.T) {
+	t.Helper()
+	if _, err := r.store.Check(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.store.Download(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	r.waitState(t, update.Downloaded)
+}
+
+func TestDownloadFailureAndRetry(t *testing.T) {
 	r := newRig(t, "v0.2.0", nil)
 	ctx := context.Background()
 	if _, err := r.store.Check(ctx); err != nil {
 		t.Fatal(err)
 	}
-	r.installer.Err = errors.New("installer: exit status 1: error: checksum mismatch")
-	if _, err := r.store.Install(ctx); err != nil {
+	r.installer.DownloadErr = errors.New("installer: exit status 1: error: checksum mismatch")
+	if _, err := r.store.Download(ctx); err != nil {
 		t.Fatal(err)
 	}
 	st := r.waitState(t, update.Failed)
-	if st.Target != "v0.2.0" || !strings.Contains(st.FailureReason, "checksum mismatch") {
+	if st.Target != "v0.2.0" || !strings.Contains(st.FailureReason, "checksum mismatch") || st.Progress != "" {
 		t.Fatalf("failed %+v", st)
 	}
 	// A check for the same version keeps the failure visible.
 	if st, _ := r.store.Check(ctx); st.State != update.Failed {
 		t.Fatalf("check after failure %+v", st)
 	}
-	r.installer.Err = nil
-	if _, err := r.store.Install(ctx); err != nil {
+	r.installer.DownloadErr = nil
+	if _, err := r.store.Download(ctx); err != nil {
 		t.Fatalf("retry: %v", err)
 	}
-	if st := r.waitState(t, update.Installed); st.FailureReason != "" {
+	if st := r.waitState(t, update.Downloaded); st.FailureReason != "" {
 		t.Fatalf("retry %+v", st)
+	}
+}
+
+func TestDownloadStagedMismatchFails(t *testing.T) {
+	tests := []struct {
+		name, as, want string
+	}{
+		{"another version staged", "v0.1.5", "found v0.1.5"},
+		{"nothing staged", "garbage", "found nothing"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := newRig(t, "v0.2.0", nil)
+			ctx := context.Background()
+			if _, err := r.store.Check(ctx); err != nil {
+				t.Fatal(err)
+			}
+			// The installer exits 0 but the stage reports another version.
+			r.installer.DownloadAs = tt.as
+			if _, err := r.store.Download(ctx); err != nil {
+				t.Fatal(err)
+			}
+			st := r.waitState(t, update.Failed)
+			if !strings.Contains(st.FailureReason, tt.want) {
+				t.Fatalf("failed %+v", st)
+			}
+		})
+	}
+}
+
+func TestInstallFailureAndRetry(t *testing.T) {
+	r := newRig(t, "v0.2.0", nil)
+	ctx := context.Background()
+	r.downloaded(t)
+	r.installer.InstallErr = errors.New("installer: exit status 1: error: could not move the new version")
+	st, err := r.store.Install(ctx)
+	if err == nil || errors.Is(err, update.ErrNotAvailable) {
+		t.Fatalf("Install err = %v", err)
+	}
+	if st.State != update.Failed || st.Target != "v0.2.0" || !strings.Contains(st.FailureReason, "could not move") {
+		t.Fatalf("Install returned %+v", st)
+	}
+	if v, _ := r.disk.Version(); v != "v0.1.0" {
+		t.Fatalf("on disk after a failed install: %s", v)
+	}
+	// The failure stays visible, and Install is refused until a new download.
+	if st, _ := r.store.Check(ctx); st.State != update.Failed {
+		t.Fatalf("check after failure %+v", st)
+	}
+	if _, err := r.store.Install(ctx); !errors.Is(err, update.ErrNotAvailable) {
+		t.Fatalf("Install from Failed err = %v", err)
+	}
+	r.installer.InstallErr = nil
+	if _, err := r.store.Download(ctx); err != nil {
+		t.Fatalf("retry: %v", err)
+	}
+	r.waitState(t, update.Downloaded)
+	if st, err := r.store.Install(ctx); err != nil || st.State != update.Installed || st.FailureReason != "" {
+		t.Fatalf("retry Install %+v, %v", st, err)
 	}
 }
 
 func TestInstallerMismatchFails(t *testing.T) {
 	r := newRig(t, "v0.2.0", nil)
-	ctx := context.Background()
-	if _, err := r.store.Check(ctx); err != nil {
-		t.Fatal(err)
-	}
+	r.downloaded(t)
 	// The installer exits 0 but the install on disk reports another version.
 	r.installer.InstallAs = "v0.1.5"
-	if _, err := r.store.Install(ctx); err != nil {
-		t.Fatal(err)
+	st, err := r.store.Install(context.Background())
+	if err == nil || st.State != update.Failed || !strings.Contains(st.FailureReason, "v0.1.5") {
+		t.Fatalf("Install %+v, %v", st, err)
 	}
-	st := r.waitState(t, update.Failed)
-	if !strings.Contains(st.FailureReason, "v0.1.5") {
-		t.Fatalf("failed %+v", st)
+}
+
+// Installed by hand meanwhile (install.sh also removes the stage): Install has nothing
+// left to do.
+func TestInstallAlreadyOnDisk(t *testing.T) {
+	r := newRig(t, "v0.2.0", nil)
+	r.downloaded(t)
+	r.disk.Set("v0.2.0")
+	r.installer.Staged().Set("")
+	st, err := r.store.Install(context.Background())
+	if err != nil || st.State != update.Installed || st.Target != "v0.2.0" {
+		t.Fatalf("Install %+v, %v", st, err)
+	}
+	if n := len(r.installer.Installs()); n != 0 {
+		t.Fatalf("installer ran %d times", n)
+	}
+}
+
+func TestInstallRefused(t *testing.T) {
+	tests := []struct {
+		name    string
+		latest  string
+		prepare func(t *testing.T, r *rig)
+	}{
+		{"idle", "v0.1.0", func(*testing.T, *rig) {}},
+		{"available", "v0.2.0", func(*testing.T, *rig) {}},
+		{"failed download", "v0.2.0", func(t *testing.T, r *rig) {
+			r.installer.DownloadErr = errors.New("boom")
+			if _, err := r.store.Download(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			r.waitState(t, update.Failed)
+		}},
+		{"installed", "v0.2.0", func(t *testing.T, r *rig) {
+			r.disk.Set("v0.2.0")
+			if st, _ := r.store.Check(context.Background()); st.State != update.Installed {
+				t.Fatalf("not installed: %+v", st)
+			}
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := newRig(t, tt.latest, nil)
+			if _, err := r.store.Check(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			tt.prepare(t, r)
+			before := r.store.Snapshot()
+			if _, err := r.store.Install(context.Background()); !errors.Is(err, update.ErrNotAvailable) || !strings.Contains(err.Error(), "nothing downloaded to install") {
+				t.Fatalf("Install err = %v", err)
+			}
+			if st := r.store.Snapshot(); st.State != before.State {
+				t.Fatalf("state %v, was %v", st.State, before.State)
+			}
+			if n := len(r.installer.Installs()); n != 0 {
+				t.Fatalf("installer ran %d times", n)
+			}
+		})
+	}
+}
+
+// A daemon that starts with a newer download staged (it crashed or restarted after
+// downloading) is Downloaded at once; a stale stage is ignored.
+func TestStagedDownloadAtStart(t *testing.T) {
+	tests := []struct {
+		name, current, onDisk, staged string
+		want                          update.State
+		wantTarget                    string
+	}{
+		{"newer download staged", "v0.1.0", "v0.1.0", "v0.2.0", update.Downloaded, "v0.2.0"},
+		{"stale stage", "v0.2.0", "v0.2.0", "v0.1.0", update.Idle, ""},
+		{"stage of the running version", "v0.2.0", "v0.2.0", "v0.2.0", update.Idle, ""},
+		{"staged above a newer install", "v0.1.0", "v0.2.0", "v0.3.0", update.Downloaded, "v0.3.0"},
+		{"stage below a newer install", "v0.1.0", "v0.3.0", "v0.2.0", update.Installed, "v0.3.0"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := newRig(t, "v0.1.0", func(o *update.Options) {
+				o.Current = tt.current
+				o.InstalledVersion = updatetest.NewOnDisk(tt.onDisk).Version
+				o.StagedVersion = updatetest.NewOnDisk(tt.staged).Version
+			})
+			if st := r.store.Snapshot(); st.State != tt.want || st.Target != tt.wantTarget {
+				t.Fatalf("%+v", st)
+			}
+		})
 	}
 }
 
@@ -296,6 +482,9 @@ func TestDisabled(t *testing.T) {
 	if _, err := r.store.Check(ctx); !errors.Is(err, update.ErrDisabled) {
 		t.Fatalf("Check err = %v", err)
 	}
+	if _, err := r.store.Download(ctx); !errors.Is(err, update.ErrDisabled) {
+		t.Fatalf("Download err = %v", err)
+	}
 	if _, err := r.store.Install(ctx); !errors.Is(err, update.ErrDisabled) {
 		t.Fatalf("Install err = %v", err)
 	}
@@ -308,12 +497,12 @@ func TestDisabled(t *testing.T) {
 	}
 }
 
-func TestInstallWithoutUpdate(t *testing.T) {
+func TestDownloadWithoutUpdate(t *testing.T) {
 	r := newRig(t, "v0.1.0", nil)
 	if _, err := r.store.Check(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := r.store.Install(context.Background()); !errors.Is(err, update.ErrNotAvailable) {
+	if _, err := r.store.Download(context.Background()); !errors.Is(err, update.ErrNotAvailable) {
 		t.Fatalf("err = %v", err)
 	}
 }

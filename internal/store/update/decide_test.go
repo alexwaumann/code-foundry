@@ -13,36 +13,82 @@ func TestDecide(t *testing.T) {
 		target     string
 		current    string
 		onDisk     string
+		staged     string
 		latest     string
 		want       State
 		wantTarget string
 	}{
-		{"up to date", Idle, "", "v0.1.0", "v0.1.0", "v0.1.0", Idle, ""},
-		{"newer release", Idle, "", "v0.1.0", "v0.1.0", "v0.2.0", Available, "v0.2.0"},
-		{"newer release, install unknown", Idle, "", "v0.1.0", "", "v0.2.0", Available, "v0.2.0"},
-		{"older release (yanked latest)", Idle, "", "v0.2.0", "", "v0.1.0", Idle, ""},
-		{"no release published", Idle, "", "v0.1.0", "", "", Idle, ""},
-		{"available stays available", Available, "v0.2.0", "v0.1.0", "", "v0.2.0", Available, "v0.2.0"},
-		{"available moves to an even newer one", Available, "v0.2.0", "v0.1.0", "", "v0.3.0", Available, "v0.3.0"},
-		{"downloading is left to the install", Downloading, "v0.2.0", "v0.1.0", "", "v0.3.0", Downloading, "v0.2.0"},
-		{"installed by someone else", Idle, "", "v0.1.0", "v0.2.0", "v0.2.0", Installed, "v0.2.0"},
-		{"installed stays installed", Installed, "v0.2.0", "v0.1.0", "v0.2.0", "v0.2.0", Installed, "v0.2.0"},
-		{"restart required stays", RestartRequired, "v0.2.0", "v0.1.0", "v0.2.0", "v0.2.0", RestartRequired, "v0.2.0"},
-		{"installed, then a newer release", Installed, "v0.2.0", "v0.1.0", "v0.2.0", "v0.3.0", Available, "v0.3.0"},
-		{"failed keeps the failure for the same version", Failed, "v0.2.0", "v0.1.0", "v0.1.0", "v0.2.0", Failed, "v0.2.0"},
-		{"failed, then a newer release", Failed, "v0.2.0", "v0.1.0", "v0.1.0", "v0.3.0", Available, "v0.3.0"},
-		{"failed, then installed elsewhere", Failed, "v0.2.0", "v0.1.0", "v0.2.0", "v0.2.0", Installed, "v0.2.0"},
-		{"pre-release counts as newer", Idle, "", "v0.1.0", "", "v0.2.0-rc.1", Available, "v0.2.0-rc.1"},
-		{"release after its pre-release", Idle, "", "v0.2.0-rc.1", "", "v0.2.0", Available, "v0.2.0"},
-		{"malformed on-disk version is ignored", Idle, "", "v0.1.0", "garbage", "v0.1.0", Idle, ""},
+		{"up to date", Idle, "", "v0.1.0", "v0.1.0", "", "v0.1.0", Idle, ""},
+		{"newer release", Idle, "", "v0.1.0", "v0.1.0", "", "v0.2.0", Available, "v0.2.0"},
+		{"newer release, install unknown", Idle, "", "v0.1.0", "", "", "v0.2.0", Available, "v0.2.0"},
+		{"older release (yanked latest)", Idle, "", "v0.2.0", "", "", "v0.1.0", Idle, ""},
+		{"no release published", Idle, "", "v0.1.0", "", "", "", Idle, ""},
+		{"available stays available", Available, "v0.2.0", "v0.1.0", "", "", "v0.2.0", Available, "v0.2.0"},
+		{"available moves to an even newer one", Available, "v0.2.0", "v0.1.0", "", "", "v0.3.0", Available, "v0.3.0"},
+		{"downloading is left to the download", Downloading, "v0.2.0", "v0.1.0", "", "", "v0.3.0", Downloading, "v0.2.0"},
+		{"downloaded stays downloaded", Downloaded, "v0.2.0", "v0.1.0", "v0.1.0", "v0.2.0", "v0.2.0", Downloaded, "v0.2.0"},
+		{"downloaded, then a newer release", Downloaded, "v0.2.0", "v0.1.0", "v0.1.0", "v0.2.0", "v0.3.0", Available, "v0.3.0"},
+		{"downloaded, latest yanked", Downloaded, "v0.2.0", "v0.1.0", "v0.1.0", "v0.2.0", "v0.1.0", Downloaded, "v0.2.0"},
+		{"staged by an earlier daemon", Idle, "", "v0.1.0", "v0.1.0", "v0.2.0", "v0.2.0", Downloaded, "v0.2.0"},
+		{"staged, nothing published (start)", Idle, "", "v0.1.0", "v0.1.0", "v0.2.0", "", Downloaded, "v0.2.0"},
+		{"stale stage is ignored", Idle, "", "v0.2.0", "v0.2.0", "v0.1.0", "v0.2.0", Idle, ""},
+		{"stage equal to the install is ignored", Idle, "", "v0.1.0", "v0.2.0", "v0.2.0", "v0.2.0", Installed, "v0.2.0"},
+		{"stale stage, newer release", Idle, "", "v0.2.0", "v0.2.0", "v0.1.0", "v0.3.0", Available, "v0.3.0"},
+		{"malformed stage is ignored", Idle, "", "v0.1.0", "v0.1.0", "garbage", "v0.1.0", Idle, ""},
+		{"failed install keeps the failure", Failed, "v0.2.0", "v0.1.0", "v0.1.0", "v0.2.0", "v0.2.0", Failed, "v0.2.0"},
+		{"installed by someone else", Idle, "", "v0.1.0", "v0.2.0", "", "v0.2.0", Installed, "v0.2.0"},
+		{"installed stays installed", Installed, "v0.2.0", "v0.1.0", "v0.2.0", "", "v0.2.0", Installed, "v0.2.0"},
+		{"restart required stays", RestartRequired, "v0.2.0", "v0.1.0", "v0.2.0", "", "v0.2.0", RestartRequired, "v0.2.0"},
+		{"installed, then a newer release", Installed, "v0.2.0", "v0.1.0", "v0.2.0", "", "v0.3.0", Available, "v0.3.0"},
+		{"installed, newer staged", Installed, "v0.2.0", "v0.1.0", "v0.2.0", "v0.3.0", "v0.3.0", Downloaded, "v0.3.0"},
+		{"failed keeps the failure for the same version", Failed, "v0.2.0", "v0.1.0", "v0.1.0", "", "v0.2.0", Failed, "v0.2.0"},
+		{"failed, then a newer release", Failed, "v0.2.0", "v0.1.0", "v0.1.0", "", "v0.3.0", Available, "v0.3.0"},
+		{"failed, then installed elsewhere", Failed, "v0.2.0", "v0.1.0", "v0.2.0", "", "v0.2.0", Installed, "v0.2.0"},
+		{"pre-release counts as newer", Idle, "", "v0.1.0", "", "", "v0.2.0-rc.1", Available, "v0.2.0-rc.1"},
+		{"release after its pre-release", Idle, "", "v0.2.0-rc.1", "", "", "v0.2.0", Available, "v0.2.0"},
+		{"malformed on-disk version is ignored", Idle, "", "v0.1.0", "garbage", "", "v0.1.0", Idle, ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, target := decide(tt.state, tt.target, tt.current, tt.onDisk, tt.latest)
+			// The store passes "" for versions that are not semver.
+			onDisk, staged := tt.onDisk, tt.staged
+			if !IsSemver(onDisk) {
+				onDisk = ""
+			}
+			if !IsSemver(staged) {
+				staged = ""
+			}
+			got, target := decide(tt.state, tt.target, tt.current, onDisk, staged, tt.latest)
 			if got != tt.want || target != tt.wantTarget {
 				t.Errorf("decide = %v %q, want %v %q", got, target, tt.want, tt.wantTarget)
 			}
 		})
+	}
+}
+
+func TestStagedVersion(t *testing.T) {
+	root := t.TempDir()
+	app := filepath.Join(root, "app")
+	if got := StageDir(app + "/"); got != app+".new" {
+		t.Fatalf("StageDir = %q", got)
+	}
+	if StageDir("") != "" || StagedVersion("") != "" {
+		t.Fatal(`StageDir("") or StagedVersion("") not empty`)
+	}
+	if v := StagedVersion(app); v != "" {
+		t.Fatalf("StagedVersion with nothing staged = %q", v)
+	}
+	if err := os.MkdirAll(app+".new", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if v := StagedVersion(app); v != "" {
+		t.Fatalf("StagedVersion without VERSION = %q", v)
+	}
+	if err := os.WriteFile(filepath.Join(app+".new", VersionFile), []byte("v0.2.0\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if v := StagedVersion(app); v != "v0.2.0" {
+		t.Fatalf("StagedVersion = %q", v)
 	}
 }
 

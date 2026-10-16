@@ -85,6 +85,25 @@ func InstalledVersion(dir string) (string, error) {
 	return v, nil
 }
 
+// StageDir is where a download is staged before Install swaps it in: the app
+// directory's sibling <appDir>.new (install.sh's STAGE). "" for "".
+func StageDir(appDir string) string {
+	if appDir == "" {
+		return ""
+	}
+	return filepath.Clean(appDir) + ".new"
+}
+
+// StagedVersion is the version of the download staged beside appDir ("" when there is
+// none or its VERSION cannot be read).
+func StagedVersion(appDir string) string {
+	v, err := installedVersionIn(StageDir(appDir))()
+	if err != nil {
+		return ""
+	}
+	return v
+}
+
 // installedVersionIn returns an Options.InstalledVersion that re-reads dir's VERSION
 // ("" when dir is not an install).
 func installedVersionIn(dir string) func() (string, error) {
