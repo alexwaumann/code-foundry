@@ -1,8 +1,8 @@
 # Update: download first, install inside the restart
 
-Status: Go/daemon half done on branch `t3code/update-download-then-install`. `make check`
-green. The frontend half (dialog and chip copy for DOWNLOADED, the mock) follows on the
-same branch and appends below.
+Status: both halves done on branch `t3code/update-download-then-install`. `make check`
+green, `make gui-e2e` green apart from one unrelated WebKit flake (see Frontend). The
+frontend half is the "Frontend" section below.
 
 ## Why
 
@@ -155,3 +155,95 @@ Install has swapped the directory.
     exit 1; `app version` → "updating to v0.96.0 failed: …"; `app restart --yes --json` →
     `{"threads_interrupted":0,"gui_notified":0}` (nothing installed), disk v0.95.0.
 * Not exercised: a real Wails window across the restart (the frontend half).
+
+## Frontend
+
+Dialog, chip, store and mock for Download → Downloaded → Install and Restart Now.
+`docs/notes/update-dialog.md` stays the reference for the dialog's layout; this is what
+changed.
+
+### Variants (changes to the update-dialog table)
+
+| variant | when | title | primary | link |
+|---|---|---|---|---|
+| available | available | Code Foundry vX is available ("You’re on vY. Downloading happens in the background and changes nothing until you restart.") | **Download vX** | Later |
+| **downloading** (was `installing`) | downloading | Downloading vX… ("… Nothing changes on disk until you install and restart.") + bar + last progress line | none | Hide |
+| readyIdle / readyBusy | **downloaded** | Code Foundry vX is ready ("Install and restart to finish updating. The app and the daemon update together, so nothing ends up out of sync. …"; busy: "… or install and restart anyway: …") | **Install and Restart Now** | Later / Wait, I’ll restart later |
+| readyIdle / readyBusy | installed / restartRequired | unchanged | Restart Now | unchanged |
+| failed | failed | **Couldn’t update to vX** | Try Again (Download) | Not now |
+| restarting | after (Install and) Restart Now | "Installing and restarting…" / "Code Foundry will reopen in a moment on vX." when it installed a download; else "Restarting…" as before | none | none |
+
+Chip: available "vX available · **Download**"; downloading "**Downloading** vX…"; new kind
+`downloaded` (emerald, like installed) "vX downloaded · Restart to apply". Installed,
+restart required and partly applied are unchanged. `versionMismatch` ignores downloaded.
+
+Test ids: `update-install` is now **`update-download`** (it is `update-${action}`), and
+`data-variant="installing"` is now `downloading`. `update-indicator` gains
+`data-kind="downloaded"`.
+
+### Decisions
+
+* **`UpdateView.primary`** carries the button label, so the component no longer hard-codes
+  text per variant; its `primaries` registry only maps the variant to the action and icon.
+  The ready variants are shared by downloaded and installed (one layout, two labels)
+  rather than new variant names.
+* **The store's action is `download`** (was `install`); it still runs the `app.update`
+  command, which calls `UpdateService.Download` in the daemon. The GUI never calls
+  UpdateService RPCs directly (every action is a command), so there was no `src/api`
+  install helper to rename. Restart is unchanged: `app.restart` with `confirmed: true`,
+  falling back to `daemon.restart` plus the host's Relaunch on an old daemon.
+* **`restarting` is `{ install: string } | null`** in the store. `runUpdateAction("restart")`
+  reads the version before invoking, because the daemon has already moved to Installed
+  (and the mock to Idle on the new version) by the time `app.restart` returns.
+* Mock: `download()` (AVAILABLE/FAILED → DOWNLOADING, progress lines from
+  `install.sh --stage-only`, then DOWNLOADED or FAILED with `failNext`), `install()`
+  (synchronous DOWNLOADED → INSTALLED) on the `Download` / `Install` RPCs. `app.update`
+  is "Download Update" / "Download vX"; `app.restart` is "Install vX and Restart" with the
+  confirm "Install vX and restart Code Foundry? …" when downloaded, refuses while
+  downloading ("an update is downloading; restart when it finishes"), installs, then
+  comes back as the new version ("installed vX; restarting Code Foundry …").
+  `daemon.restart` keeps a download (stays Downloaded). A check keeps Downloaded unless a
+  newer release appeared. `/__mock/update/state` accepts `downloaded`.
+
+### Verified
+
+* `make check` green. `make gui-e2e`: 811 passed, 40 skipped, 1 failed: WebKit
+  `workspaces.spec.ts:143` (the composer heading did not appear after cmd+n, while two
+  `make package` runs and the live app loaded the machine); it passed 3/3 alone with
+  `--repeat-each=3`. All 20 `e2e/update.spec.ts` cases pass on both browsers;
+  `e2e/update.spec.ts`
+  adds "available → Download → downloading → downloaded → Install and Restart Now" (idle;
+  checks the mock still runs v0.1.0 while downloaded, the palette's "Install v0.2.0 and
+  Restart", one confirmed `app.restart`, then v0.2.0), and the busy test now runs through
+  Download with the "install and restart anyway" copy.
+* Live, in the real Wails window: `make package` at v0.90.0 and v0.91.0
+  (`RELEASE_REPO=alexwaumann/code-foundry`), both published to `/tmp/cf-rel/<tag>/`, v0.90.0
+  installed with `install.sh --version v0.90.0 --yes --skip-link --skip-path --app-dir
+  /tmp/cf-shot/app`, `/tmp/cf-rel/latest` = v0.91.0, then
+  `CODE_FOUNDRY_HOME=/tmp/cf-shot CODE_FOUNDRY_RELEASE_DIR=/tmp/cf-rel
+  CODE_FOUNDRY_BIN=/tmp/cf-shot/app/code-foundry CODE_FOUNDRY_UPDATE_DELAY=1h
+  "/tmp/cf-shot/app/Code Foundry"`. App menu "Check for Updates…" → available; the
+  dialog's Download → "Downloading v0.91.0…" with "==> unpacking" → ready with "Install
+  and Restart Now" (`app.new/VERSION` v0.91.0, `app/VERSION` v0.90.0). Install and
+  Restart Now → the window closed and relaunched, the new daemon reported v0.91.0,
+  `app.new` gone, no chip (no mismatch). That is the "real Wails window across the
+  restart" the Go half left unexercised.
+* Screenshots: `update-download-then-install/downloaded-dark.png`, `downloaded-light.png`
+  (the live window, light via `settings.set appearance.theme light`, then back to dark).
+
+### Gotchas
+
+* Driving the window: System Events `click at` fails (-25208) and `key code` does not reach
+  the WKWebView, but the app menu item clicks, and the dialog's buttons appear in
+  `entire contents of window 1` as AXButtons named by their label, so
+  `perform action "AXPress"` presses them. Read `role`/`name` inside a `try` per element;
+  a `try` around the whole test skips the match.
+* The isolated copy shares the real app's WebKit localStorage, so it also uses the user's
+  saved sidebar width. At widths under about 240px the chip truncates to
+  "v0.91.0 downl… Restart to apply" (the CTA does not shrink); at the 280px default it fits.
+  The screenshots show the truncated chip; resizing the sidebar there would have changed
+  the real app's saved width.
+* The restart is fast: the "Installing and restarting…" frame is gone before a screenshot
+  a second later. e2e covers its copy.
+* Ports 7799/9255 (and others) may be taken by other worktrees' mocks; run e2e with
+  `E2E_MOCK_PORT`/`E2E_VITE_PORT` set to free ports.
