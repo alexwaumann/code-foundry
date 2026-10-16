@@ -43,7 +43,7 @@ describe("pairHintFor", () => {
 
 describe("filterThemes", () => {
   it.each([
-    ["empty lists the scheme's themes", "dark", "", 14],
+    ["empty lists the scheme's themes", "dark", "", 15],
     ["every word must match, any case", "dark", "GRUV dark", 1],
     ["ids match too", "light", "rose-pine", 1],
     ["only the scheme's themes", "light", "dracula", 0],

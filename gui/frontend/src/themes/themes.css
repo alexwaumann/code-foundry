@@ -1234,6 +1234,96 @@ html[data-theme="ayu-mirage"] .cf-thread {
   --sh-str: #87d96c;
 }
 
+/* Petros Dusk (dark) */
+html[data-theme="petros-dusk"],
+[data-theme-scope][data-theme="petros-dusk"] {
+  color-scheme: dark;
+  --sheet: #240f35;
+  --pane: #301b42;
+  --pane-border: #45293e;
+  --background: #240f35;
+  --foreground: #ee9e20;
+  --card: #301b42;
+  --card-foreground: #ee9e20;
+  --popover: #38234a;
+  --popover-foreground: #ee9e20;
+  --primary: #eb9b1a;
+  --primary-foreground: #301b42;
+  --secondary: #462e46;
+  --secondary-foreground: #ee9e20;
+  --muted: #462e46;
+  --muted-foreground: #bb7e40;
+  --accent: #462e46;
+  --accent-foreground: #ee9e20;
+  --destructive: #ff4540;
+  --destructive-foreground: #301b42;
+  --success: #47d422;
+  --success-foreground: #301b42;
+  --warning: #f2a4db;
+  --warning-foreground: #301b42;
+  --info: #34a4eb;
+  --info-foreground: #301b42;
+  --highlight: #f2a4db;
+  --highlight-foreground: #301b42;
+  --link: #34a4eb;
+  --border: #45293e;
+  --input: #4d2f3d;
+  --ring: #a36d43;
+  --chart-1: #d99032;
+  --chart-2: #a56f45;
+  --chart-3: #885b49;
+  --chart-4: #6b484a;
+  --chart-5: #513548;
+  --sidebar: #240f35;
+  --sidebar-foreground: #ee9e20;
+  --sidebar-primary: #eb9b1a;
+  --sidebar-primary-foreground: #301b42;
+  --sidebar-accent: #341e3a;
+  --sidebar-accent-foreground: #ee9e20;
+  --sidebar-border: #240f35;
+  --sidebar-ring: #a36d43;
+  --terminal-fg: #eb9b1a;
+  --terminal-cursor: #eb9b1a;
+  --terminal-cursor-accent: #301b42;
+  --terminal-selection: #503547;
+  --terminal-selection-inactive: #3f2845;
+  --terminal-ansi-0: #000000;
+  --terminal-ansi-1: #ff0000;
+  --terminal-ansi-2: #26e823;
+  --terminal-ansi-3: #ed9507;
+  --terminal-ansi-4: #2d3f91;
+  --terminal-ansi-5: #f4b8e4;
+  --terminal-ansi-6: #2e9ae8;
+  --terminal-ansi-7: #a5adce;
+  --terminal-ansi-8: #626880;
+  --terminal-ansi-9: #eb2d2d;
+  --terminal-ansi-10: #47d422;
+  --terminal-ansi-11: #fca503;
+  --terminal-ansi-12: #33489c;
+  --terminal-ansi-13: #f2a4db;
+  --terminal-ansi-14: #34a4eb;
+  --terminal-ansi-15: #ffffff;
+}
+html[data-theme="petros-dusk"] .cf-thread {
+  --syn-fn: #809bf6;
+  --syn-com: #bb7e40;
+  --syn-num: #3ca5f4;
+  --sh-cmd: #809bf6;
+  --sh-flag: #3ca5f4;
+}
+[data-theme-scope][data-theme="petros-dusk"] .cf-thread {
+  --syn-fg: #eb9b1a;
+  --syn-kw: #f4b8e4;
+  --syn-fn: #809bf6;
+  --syn-type: #ed9507;
+  --syn-str: #26e823;
+  --syn-com: #bb7e40;
+  --syn-num: #3ca5f4;
+  --sh-cmd: #809bf6;
+  --sh-flag: #3ca5f4;
+  --sh-str: #26e823;
+}
+
 /* GitHub Light (light) */
 html[data-theme="github-light"],
 [data-theme-scope][data-theme="github-light"] {

@@ -52,7 +52,7 @@ func TestFieldParse(t *testing.T) {
 		{key: KeyTheme, in: "Dark", err: `want one of "system", "dark", "light", got "Dark"`},
 		{key: KeyThemeDark, in: "dracula", want: "dracula"},
 		{key: KeyThemeLight, in: "rose-pine-dawn", want: "rose-pine-dawn"},
-		{key: KeyThemeDark, in: "catppuccin-latte", err: `Catppuccin Latte ("catppuccin-latte") is a light theme; the dark theme must be one of "github-dark", "catppuccin-mocha", "graphite-dark", "dracula", "gruvbox-dark", "nord", "tokyo-night", "rose-pine", "atom-one-dark", "solarized-dark", "monokai-pro", "kanagawa-wave", "everforest-dark-hard", "ayu-mirage"`},
+		{key: KeyThemeDark, in: "catppuccin-latte", err: `Catppuccin Latte ("catppuccin-latte") is a light theme; the dark theme must be one of "github-dark", "catppuccin-mocha", "graphite-dark", "dracula", "gruvbox-dark", "nord", "tokyo-night", "rose-pine", "atom-one-dark", "solarized-dark", "monokai-pro", "kanagawa-wave", "everforest-dark-hard", "ayu-mirage", "petros-dusk"`},
 		{key: KeyThemeLight, in: "dracula", err: `Dracula ("dracula") is a dark theme; the light theme must be one of "github-light", "catppuccin-latte", "graphite-light", "gruvbox-light", "rose-pine-dawn", "atom-one-light", "solarized-light"`},
 		{key: KeyThemeLight, in: "sepia", err: `unknown theme "sepia"; light themes are "github-light", "catppuccin-latte", "graphite-light", "gruvbox-light", "rose-pine-dawn", "atom-one-light", "solarized-light"`},
 		{key: KeyBackdrop, in: "none", want: "none"},
