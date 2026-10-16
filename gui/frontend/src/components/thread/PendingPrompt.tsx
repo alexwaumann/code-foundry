@@ -454,7 +454,7 @@ function QuestionPrompt({ r, keysRef, refocus }: PromptProps) {
             <input
               ref={otherRef}
               type="text"
-              className="mt-1.5 h-[26px] w-full rounded-md border bg-transparent px-2 text-xs"
+              className="mt-1.5 h-[26px] w-full rounded-md border bg-transparent px-2 text-body-sm"
               placeholder="Type your own answer"
               aria-label="Other answer"
               value={pick.otherText}

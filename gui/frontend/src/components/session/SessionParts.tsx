@@ -21,7 +21,7 @@ function ThreadName({ id }: { id: string }) {
       command="session.rename"
       whenUnavailable="plain"
       size="xs"
-      className="-ml-1.5 flex h-6 min-w-0 shrink items-center rounded-md px-1.5 text-[13px] font-medium text-foreground"
+      className="-ml-1.5 flex h-6 min-w-0 shrink items-center rounded-md px-1.5 text-label text-foreground"
       data-testid="thread-title"
     >
       <span className="truncate">{name}</span>
@@ -56,7 +56,7 @@ function ThreadLocation({ id }: { id: string }) {
       command="view.panel.worktree"
       whenUnavailable="plain"
       size="xs"
-      className="flex h-6 min-w-0 shrink items-center gap-1.5 rounded-md px-1.5 text-xs font-normal whitespace-nowrap text-muted-foreground"
+      className="flex h-6 min-w-0 shrink items-center gap-1.5 rounded-md px-1.5 text-caption whitespace-nowrap text-muted-foreground"
       data-testid="thread-location"
     >
       <Icon className="size-3.5 shrink-0" aria-hidden />
@@ -68,7 +68,7 @@ function ThreadLocation({ id }: { id: string }) {
       ) : (
         <>
           <span className="shrink-0 opacity-60">@</span>
-          <span className="truncate font-mono text-[11.5px]" data-testid="thread-branch">
+          <span className="truncate text-code" data-testid="thread-branch">
             {m.branch}
           </span>
           {m.worktree && <Chip data-testid="thread-worktree-chip">worktree</Chip>}

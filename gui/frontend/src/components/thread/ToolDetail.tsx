@@ -132,7 +132,7 @@ function TodoDetail({ t }: { t: ToolCallView }) {
   const todos = (parseObject(t.inputJson).todos ?? []) as Json[];
   if (!Array.isArray(todos)) return null;
   return (
-    <ul className="flex flex-col gap-0.5 text-[13px]">
+    <ul className="flex flex-col gap-0.5 text-body-sm">
       {todos.map((td, i) => {
         const status = str(td, "status");
         const Icon = status === "completed" ? Check : status === "in_progress" ? CircleDot : Circle;

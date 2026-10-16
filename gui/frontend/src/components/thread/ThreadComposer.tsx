@@ -107,7 +107,7 @@ function SnoozeNote({ sessionId }: { sessionId: string }) {
   });
   if (snoozedUntil === null && wokeAt === null) return null;
   return (
-    <div className="col-span-2 flex min-w-0 items-center gap-2 px-4 pt-2 text-xs text-muted-foreground" data-testid="thread-snooze-note">
+    <div className="col-span-2 flex min-w-0 items-center gap-2 px-4 pt-2 text-caption" data-testid="thread-snooze-note">
       {snoozedUntil !== null ? <SnoozedUntil until={snoozedUntil} /> : <SnoozeEnded at={wokeAt === 0 ? null : wokeAt} />}
       {snoozedUntil !== null && (
         <button
@@ -428,12 +428,12 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
           </Tip>
         </div>
         {effortPending && (
-          <p className="col-span-2 px-4 pb-2 text-xs text-muted-foreground" role="status" data-testid="thread-effort-pending">
+          <p className="col-span-2 px-4 pb-2 text-caption" role="status" data-testid="thread-effort-pending">
             {busy ? `Effort changes to ${choiceLabel(EFFORT_CHOICES, effort)} after this turn` : `Switching to ${choiceLabel(EFFORT_CHOICES, effort)} effort…`}
           </p>
         )}
         {(error ?? notice) && (
-          <div className="col-span-2 flex flex-col gap-1 px-4 pb-2 text-sm">
+          <div className="col-span-2 flex flex-col gap-1 px-4 pb-2 text-body">
             {error && (
               <p role="alert" className="text-destructive" data-testid="thread-composer-error">
                 {error}

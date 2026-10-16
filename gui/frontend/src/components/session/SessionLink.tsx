@@ -15,7 +15,7 @@ export function SessionLink({ id, icon, detail }: { id: string; icon?: ReactNode
   return (
     <button
       type="button"
-      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent"
+      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-body hover:bg-accent"
       data-session-link={id}
       onClick={() => {
         useUiStore.getState().select({ kind: "session", id }, { focusPrompt: true });
@@ -23,7 +23,7 @@ export function SessionLink({ id, icon, detail }: { id: string; icon?: ReactNode
     >
       <span className="flex size-4 shrink-0 items-center justify-center">{icon ?? <SessionStatusIcon id={id} />}</span>
       <span className="min-w-0 flex-1 truncate">{name}</span>
-      <span className="shrink-0 text-xs text-muted-foreground">{detail ?? badge}</span>
+      <span className="shrink-0 text-caption">{detail ?? badge}</span>
     </button>
   );
 }

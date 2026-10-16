@@ -30,7 +30,7 @@ export function ColdCacheNote({ sessionId, pending }: { sessionId: string; pendi
   const note = coldCacheNote({ state, status, contextTokens, cacheExpiresAtMs, contextRereadUsd, pending, phase, nowMs });
   if (!note) return null;
   return (
-    <p className="col-span-2 px-4 pt-2.5 text-xs text-muted-foreground" role="status" data-testid="thread-cold-cache">
+    <p className="col-span-2 px-4 pt-2.5 text-caption" role="status" data-testid="thread-cold-cache">
       {note}
     </p>
   );

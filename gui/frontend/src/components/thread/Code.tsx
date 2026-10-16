@@ -57,7 +57,7 @@ function LocalImage({ src, alt }: { src: string; alt: string }) {
   return (
     // The path, when the chip shows the alt text or "Loading image…" instead.
     <Tip label={loading || alt ? src : null}>
-      <span className="inline-flex items-center gap-1 rounded border px-1.5 text-xs text-muted-foreground">
+      <span className="inline-flex items-center gap-1 rounded-sm border px-1.5 text-caption">
         <ImageIcon className="size-3" aria-hidden />
         {loading ? "Loading image…" : alt || src}
       </span>

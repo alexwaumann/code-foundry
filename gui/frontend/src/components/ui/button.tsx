@@ -3,6 +3,12 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 import { Slot } from "radix-ui"
 
+/**
+ * Labels are text-label (xs: text-body-sm, medium). The colour is `text-inherit` unless a
+ * variant sets one, so ghost and outline buttons (and their icons) keep their parent's
+ * colour. That also means a role passed in className brings its size but not its colour:
+ * write the colour too (`text-caption text-muted-foreground`).
+ */
 const buttonVariants = cva(
   "inline-flex shrink-0 items-center justify-center gap-2 rounded-md text-label text-inherit whitespace-nowrap transition-all outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {

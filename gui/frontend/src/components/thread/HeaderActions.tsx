@@ -33,7 +33,7 @@ function SingleLinkedPr({ sessionId }: { sessionId: string }) {
       type="button"
       variant="ghost"
       size="xs"
-      className={cn("gap-1 px-1.5 text-[11.5px] font-medium tabular-nums", prStateText[look.tone])}
+      className={cn("gap-1 px-1.5 text-caption-sm font-medium tabular-nums", prStateText[look.tone])}
       tabIndex={-1}
       data-testid="pane-linked-pr"
       data-state={look.label}
@@ -72,7 +72,7 @@ function WorkspaceChip({ sessionId }: { sessionId: string }) {
       icon={Layers}
       label={name}
       size="xs"
-      className="min-w-0 gap-1.5 px-1.5 text-[11.5px] font-normal text-muted-foreground [&_svg]:size-3.5"
+      className="min-w-0 gap-1.5 px-1.5 text-caption-sm text-muted-foreground [&_svg]:size-3.5"
       data-testid="pane-workspace"
     />
   );
