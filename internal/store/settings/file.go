@@ -44,7 +44,8 @@ func Read(path string) Settings {
 // decode parses a settings file into raw string-encoded values keyed by settings key.
 // Values are stringified leniently (14 and "14" both work for an int); type errors are
 // found by Field.parse. Under [keybindings], unquoted dotted keys (thread.new = ...)
-// parse as nested tables and are flattened back.
+// parse as nested tables and are flattened back. Names from before threads were renamed
+// from sessions are read as the new ones (renameLegacyKeys).
 func decode(data []byte) (map[string]string, error) {
 	var doc map[string]any
 	if _, err := toml.Decode(string(data), &doc); err != nil {
@@ -59,7 +60,34 @@ func decode(data []byte) (map[string]string, error) {
 		}
 		flatten(raw, group, tbl, group == GroupKeybindings)
 	}
+	renameLegacyKeys(raw)
 	return raw, nil
+}
+
+// legacyPrefixes are key prefixes from before threads were renamed from sessions (the
+// [sessions] table, keybindings of the session.* commands) and what they are now.
+var legacyPrefixes = []struct{ old, new string }{
+	{"sessions.", GroupThreads + "."},
+	{GroupKeybindings + ".session.", GroupKeybindings + ".thread."},
+}
+
+// renameLegacyKeys rewrites raw's legacy keys to the current names, so a settings file
+// written before the rename keeps working; the next save writes the new names. A key
+// set under both names keeps the new name's value.
+func renameLegacyKeys(raw map[string]string) {
+	for key, v := range raw {
+		for _, p := range legacyPrefixes {
+			rest, ok := strings.CutPrefix(key, p.old)
+			if !ok {
+				continue
+			}
+			delete(raw, key)
+			if _, set := raw[p.new+rest]; !set {
+				raw[p.new+rest] = v
+			}
+			break
+		}
+	}
 }
 
 func flatten(raw map[string]string, prefix string, tbl map[string]any, nested bool) {

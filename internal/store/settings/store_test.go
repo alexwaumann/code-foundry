@@ -146,6 +146,26 @@ func TestUpdate(t *testing.T) {
 	}
 }
 
+// A settings file from before threads were renamed from sessions keeps its values, and
+// the next Update writes them under the new names.
+func TestLegacyFileRewrittenOnUpdate(t *testing.T) {
+	s, _, path := openTest(t, "[sessions]\nauto_name = false\nscrollback_lines = 5000\n")
+	if got := s.Snapshot().Settings.Threads; got.AutoName || got.ScrollbackLines != 5000 {
+		t.Fatalf("legacy values not read: %+v", got)
+	}
+	if _, err := s.Update(context.Background(), map[string]string{KeyFontSize: "15"}); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	if strings.Contains(text, "[sessions]") || !strings.Contains(text, "[threads]\n") || !strings.Contains(text, "\nauto_name = false\n") || !strings.Contains(text, "scrollback_lines = 5000\n") {
+		t.Fatalf("file after Update:\n%s", text)
+	}
+}
+
 func TestUpdateRejects(t *testing.T) {
 	s, _, path := openTest(t, "")
 	s.SetCommands(testCmds)
