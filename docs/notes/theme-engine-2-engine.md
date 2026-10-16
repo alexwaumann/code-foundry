@@ -4,7 +4,7 @@ PR 2 of 4 of the theme engine (1: thread.css and `dark:` cleanup, 2: this, 3: Se
 picker + Wails window background, 4: follow-ups). A theme is one object with a fixed
 scheme; 21 curated ones, generated at build time from Ghostty's theme files plus a small
 override map, and applied by `data-theme` on `<html>`. Default: Catppuccin Mocha (dark) and
-Catppuccin Latte (light). Frontend only.
+Catppuccin Latte (light); GitHub Dark and GitHub Light since theme-engine-5. Frontend only.
 
 ## Files
 
@@ -36,7 +36,7 @@ includes `themes/**/*.test.ts`.
   Every value is `#rrggbb`. Alpha borders (`oklch(1 0 0 / 11%)`) are painted over the pane
   into opaque hex; `var()` references are resolved.
 - Order: dark themes, then light, each in overrides.json order (Catppuccin first, then
-  Graphite).
+  Graphite; since theme-engine-5 the defaults, GitHub Dark and Light, come first).
 - `themes.css`: per theme, `html[data-theme="id"] { color-scheme; …vars }` and, only
   where a guard or override changed a syntax colour, `html[data-theme="id"] .cf-thread {
   …those tokens }` (17 of 21 themes have one; Mocha patches keyword, comment and number). `html[data-theme]` (0,1,1) outranks
@@ -145,7 +145,7 @@ every run.
 | id | accent | other | why |
 | --- | --- | --- | --- |
 | `catppuccin-mocha` | #cba6f7 mauve | `slots: normal`; keyword mauve, number peach | Ghostty's bright slots are re-saturated copies; the normal slots are the official palette. Syntax as Catppuccin's style guide |
-| `catppuccin-latte` | #8839ef mauve | keyword mauve, number peach | as Mocha |
+| `catppuccin-latte` | #7287fd lavender (guarded to #5363d5; mauve #8839ef before theme-engine-5) | keyword mauve, number peach | official lavender instead of mauve (theme-engine-5); too light for text, so the primary guard darkens it at the same hue |
 | `graphite-dark/-light` | (today's neutral) | | values from index.css; syntax from thread.css's aliases of its ANSI palette (the old One Dark / GitHub light set) |
 | `dracula` | #bd93f9 purple | `slots: normal`; info ANSI 6 (cyan) | Dracula's blue slot is the purple accent; info/link/Working would look like buttons |
 | `gruvbox-dark` | #fe8019 | | |
@@ -153,7 +153,7 @@ every run.
 | `nord` | #88c0d0 frost | | guards fix red and the selection |
 | `tokyo-night` | #7aa2f7 | | |
 | `rose-pine` | #c4a7e7 iris | success #95b1ac (leaf) | Rosé Pine has no green; its ANSI green is pine (blue-teal) |
-| `rose-pine-dawn` | #907aa9 iris | success #6d8f89 (leaf), info ANSI 4 (foam) | as Rosé Pine |
+| `rose-pine-dawn` | #907aa9 iris | destructive #b0405a (theme-engine-5), success #6d8f89 (leaf), info ANSI 4 (foam) | as Rosé Pine; the guard darkened love #b4637a to a mauve-pink #9c4d64, the override is a redder love that already clears 4.5:1 |
 | `atom-one-dark` | #61afef | | |
 | `atom-one-light` | #4078f2 | | guards fix the pale yellow and the faint comments |
 | `solarized-dark` | #268bd2 | `slots: normal` | bright slots are greys (and bright red is orange) |
@@ -196,7 +196,7 @@ adds the settings and calls `setThemeSlots` from `stores/settings.ts` the way
   sheet/pane ΔL ≥ 3%; popover ΔL ≥ 1% from the pane (except a white pane: Graphite Light and
   GitHub Light rely on the shadow and border, as before); terminal fg ≥ 3:1 on the
   selection; comments ≥ 3:1; the scheme matches the background. Plus: 21 themes, dark
-  first, Catppuccin first in each, defaults exist with the right scheme.
+  first, the default first in each (Catppuccin until theme-engine-5, GitHub since), defaults exist with the right scheme.
 - `src/lib/theme.test.ts`: slot validation (table), active theme per preference, and the
   document sync following preference, slots and the macOS appearance.
 - `src/terminal/theme.test.ts`: a `data-theme` flip repaints the terminal palette.
