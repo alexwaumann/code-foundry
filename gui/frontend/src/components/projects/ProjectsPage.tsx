@@ -164,7 +164,7 @@ function CollapseToggle({ collapsed, disabled, onToggle, testId, label }: { coll
       aria-label={collapsed ? `Expand ${label}` : `Collapse ${label}`}
       disabled={disabled}
       data-testid={testId}
-      className="-ml-1 flex size-[18px] shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50 disabled:hover:bg-transparent [&_svg]:size-3.5"
+      className="-ml-1 flex size-[18px] shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50 disabled:hover:bg-transparent [&_svg]:size-3.5"
       onMouseDown={(e) => {
         e.preventDefault();
       }}
@@ -200,7 +200,7 @@ function WorktreeRow({ repoId, path, cleanupSlot }: { repoId: string; path: stri
     ? [show]
     : [show, "separator", { label: "Remove worktree…", icon: Trash2, destructive: true, testId: "worktree-remove", onSelect: () => void removeWorktree(repoId, path) }];
   return (
-    <NavRow navKey={projectWorktreeKey(repoId, path)} className="group/wt flex h-full items-center gap-2 pr-2 pl-6 text-sm" tip={path}>
+    <NavRow navKey={projectWorktreeKey(repoId, path)} className="group/wt flex h-full items-center gap-2 rounded-md pr-2 pl-6 text-body" tip={path}>
       <span className="flex h-full min-w-0 flex-1 items-center" data-testid="project-worktree" data-path={path}>
         <WorktreeState repoId={repoId} path={path} />
       </span>
@@ -292,8 +292,8 @@ function ProjectBlock({ project, collapsed, filtering }: { project: ProjectModel
   const cleanable = useCleanableCount(repoId);
   const { Icon, className: iconClass } = KIND_ICON[kind.kind];
   return (
-    <section className="group/card rounded-md border" data-testid="project" data-repo={repoId} data-git={kind.kind !== "nogit"} data-kind={kind.kind} data-collapsed={collapsed}>
-      <NavRow navKey={projectKey(repoId)} className={cn("group/p flex h-9 items-center gap-2 px-2", !collapsed && "rounded-b-none border-b")}>
+    <section className="group/card rounded-lg border" data-testid="project" data-repo={repoId} data-git={kind.kind !== "nogit"} data-kind={kind.kind} data-collapsed={collapsed}>
+      <NavRow navKey={projectKey(repoId)} className={cn("group/p flex h-9 items-center gap-2 rounded-lg px-2", !collapsed && "rounded-b-none border-b")}>
         <CollapseToggle
           collapsed={collapsed}
           disabled={filtering}
@@ -314,12 +314,12 @@ function ProjectBlock({ project, collapsed, filtering }: { project: ProjectModel
         {kind.kind === "nogit" ? (
           <NoGitBadge />
         ) : (
-          <span className="min-w-0 truncate text-xs text-muted-foreground" data-testid="project-meta">
+          <span className="min-w-0 truncate text-caption" data-testid="project-meta">
             {kind.meta}
           </span>
         )}
         {collapsed && (
-          <span className="shrink-0 text-xs text-muted-foreground tabular-nums" data-testid="project-collapsed-summary">
+          <span className="shrink-0 text-caption tabular-nums" data-testid="project-collapsed-summary">
             {collapsedProjectSummary(project)}
           </span>
         )}
@@ -354,7 +354,7 @@ function ProjectBlock({ project, collapsed, filtering }: { project: ProjectModel
         <div className="p-0.5">
           <RowList rows={project.worktrees} rowKey={(p) => projectWorktreeKey(repoId, p)} rowHeight={ROW_H} render={(p) => <WorktreeRow repoId={repoId} path={p} cleanupSlot={cleanable > 0} />} />
           {project.inWorkspaces > 0 && (
-            <p className="px-6 py-1 text-xs text-muted-foreground" data-testid="project-in-workspaces">
+            <p className="px-6 py-1 text-caption" data-testid="project-in-workspaces">
               {project.inWorkspaces} {project.inWorkspaces === 1 ? "worktree is" : "worktrees are"} in workspaces (below)
             </p>
           )}
@@ -372,8 +372,8 @@ function WorkspaceBlock({ id, collapsed, filtering }: { id: string; collapsed: b
   const thread = useSessionsStore((s) => workspaceThread(s, id));
   const threadName = useSessionsStore((s) => (thread ? s.byId[thread]?.name || thread : ""));
   return (
-    <section className="group/card rounded-md border" data-testid="workspace" data-workspace={id} data-collapsed={collapsed}>
-      <NavRow navKey={workspaceKey(id)} className={cn("group/ws flex h-9 items-center gap-2 px-2", !collapsed && "rounded-b-none border-b")}>
+    <section className="group/card rounded-lg border" data-testid="workspace" data-workspace={id} data-collapsed={collapsed}>
+      <NavRow navKey={workspaceKey(id)} className={cn("group/ws flex h-9 items-center gap-2 rounded-lg px-2", !collapsed && "rounded-b-none border-b")}>
         <CollapseToggle
           collapsed={collapsed}
           disabled={filtering}
@@ -387,11 +387,11 @@ function WorkspaceBlock({ id, collapsed, filtering }: { id: string; collapsed: b
         <span className="truncate font-medium" data-testid="workspace-name">
           {name}
         </span>
-        <span className="min-w-0 truncate font-mono text-xs text-muted-foreground" data-testid="workspace-branch">
+        <span className="min-w-0 truncate text-caption font-mono" data-testid="workspace-branch">
           {branch}
         </span>
         {collapsed && (
-          <span className="shrink-0 text-xs text-muted-foreground tabular-nums" data-testid="workspace-collapsed-summary">
+          <span className="shrink-0 text-caption tabular-nums" data-testid="workspace-collapsed-summary">
             {collapsedWorkspaceSummary(members)}
           </span>
         )}
@@ -483,8 +483,8 @@ export function ProjectsPage() {
     <section className="flex min-h-0 flex-1 flex-col" data-region="content" aria-label="Projects" data-testid="projects-page">
       <PaneHeader className="gap-3 px-5">
         <FolderGit2 className="size-4 text-muted-foreground" aria-hidden />
-        <h1 className="text-sm font-semibold">Projects</h1>
-        <span className="text-xs text-muted-foreground tabular-nums" data-testid="projects-counts">
+        <h1 className="text-heading">Projects</h1>
+        <span className="text-caption tabular-nums" data-testid="projects-counts">
           {all.projects.length} {all.projects.length === 1 ? "project" : "projects"} · {all.workspaces.length} {all.workspaces.length === 1 ? "workspace" : "workspaces"}
         </span>
         <div className="relative ml-1 flex w-[220px] min-w-0 shrink items-center [--wails-draggable:no-drag]">
@@ -499,7 +499,7 @@ export function ProjectsPage() {
             autoComplete="off"
             data-testid="projects-filter"
             // The pane header's compact size.
-            className="h-7 pr-7 pl-7 text-[13px]"
+            className="h-7 pr-7 pl-7 text-body-sm"
             onChange={(e) => {
               setQuery(e.target.value);
             }}
@@ -558,9 +558,9 @@ export function ProjectsPage() {
             <div className="flex flex-col gap-3" data-testid="projects-section">
               <SectionTitle count={model.projects.length}>Projects</SectionTitle>
               {all.projects.length === 0 ? (
-                <p className="px-2 text-sm text-muted-foreground">{loaded ? "No projects registered. Add a folder or a git repository to start threads in it." : "Loading…"}</p>
+                <p className="px-2 text-body text-muted-foreground">{loaded ? "No projects registered. Add a folder or a git repository to start threads in it." : "Loading…"}</p>
               ) : model.projects.length === 0 ? (
-                <p className="px-2 text-sm text-muted-foreground" data-testid="projects-no-matches">
+                <p className="px-2 text-body text-muted-foreground" data-testid="projects-no-matches">
                   No matches.
                 </p>
               ) : (
@@ -570,12 +570,12 @@ export function ProjectsPage() {
             <div className="flex flex-col gap-3" data-testid="workspaces-section">
               <SectionTitle count={model.workspaces.length}>Workspaces</SectionTitle>
               {all.workspaces.length === 0 ? (
-                <p className="px-2 text-sm text-muted-foreground">
+                <p className="px-2 text-body text-muted-foreground">
                   No workspaces. A workspace is one branch across several projects: start one from the composer with “Also in…”, or with{" "}
                   <span className="font-mono">code-foundry workspace new</span>.
                 </p>
               ) : model.workspaces.length === 0 ? (
-                <p className="px-2 text-sm text-muted-foreground" data-testid="workspaces-no-matches">
+                <p className="px-2 text-body text-muted-foreground" data-testid="workspaces-no-matches">
                   No matches.
                 </p>
               ) : (
@@ -596,7 +596,7 @@ export function ProjectsNav() {
     <button
       type="button"
       className={cn(
-        "mt-0.5 flex h-7 items-center gap-2 rounded-md px-2 text-left text-[13px]",
+        "mt-0.5 flex h-7 items-center gap-2 rounded-md px-2 text-left text-body-sm",
         active ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/60",
       )}
       data-testid="nav-projects"
