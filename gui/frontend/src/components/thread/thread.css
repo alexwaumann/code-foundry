@@ -16,40 +16,40 @@
   --t-emerald-500: var(--success);
   --t-red-500: var(--destructive);
   --t-amber-500: var(--warning);
-  /* User messages (variant B): a tint and a hairline a step stronger than it. */
-  --t-bubble: oklch(0 0 0 / 7%);
-  --t-bubble-border: oklch(0 0 0 / 10%);
-  --t-hover: oklch(0 0 0 / 4%);
-  /* Terminal palette, light (theme.ts). */
-  --syn-fg: #24292f;
-  --syn-kw: #cf222e;
-  --syn-fn: #8250df;
-  --syn-type: #0969da;
-  --syn-str: #116329;
-  --syn-com: #6e7781;
-  --syn-num: #1b7c83;
-  --sh-cmd: #0969da;
-  --sh-flag: #1b7c83;
-  --sh-str: #116329;
+  /* User messages (variant B): the accent as a tint and a hairline a step stronger than
+     it. The alphas put the default's neutral --primary on today's greys over the pane
+     (237 and 230 of 255 light, 40 and 43 dark); a theme with a coloured --primary gets a
+     tinted bubble. Hovers stay a --foreground tint. */
+  --t-bubble: color-mix(in oklab, var(--primary) 8%, transparent);
+  --t-bubble-border: color-mix(in oklab, var(--primary) 11%, transparent);
+  --t-hover: color-mix(in oklab, var(--foreground) 4%, transparent);
+  /* Syntax and shell colours are the terminal palette (index.css --terminal-*, read by
+     src/terminal/theme.ts), so a theme recolours both at once. Light reads the GitHub
+     slots; dark (below) swaps keyword, function, type and comment onto the One Dark
+     slots it was drawn from. */
+  --syn-fg: var(--terminal-fg);
+  --syn-kw: var(--terminal-ansi-1);
+  --syn-fn: var(--terminal-ansi-5);
+  --syn-type: var(--terminal-ansi-4);
+  --syn-str: var(--terminal-ansi-2);
+  --syn-com: var(--terminal-ansi-7);
+  --syn-num: var(--terminal-ansi-6);
+  --sh-cmd: var(--terminal-ansi-4);
+  --sh-flag: var(--terminal-ansi-6);
+  --sh-str: var(--terminal-ansi-2);
   --t-mono: "JetBrainsMono Nerd Font Mono", "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
 }
 .dark .cf-thread {
   --t-sky: var(--info);
   --t-amber: var(--warning);
   --t-emerald: var(--success);
-  --t-bubble: oklch(1 0 0 / 13%);
-  --t-bubble-border: oklch(1 0 0 / 14%);
-  --t-hover: oklch(1 0 0 / 5%);
-  --syn-fg: #d8dadf;
-  --syn-kw: #c678dd;
-  --syn-fn: #61afef;
-  --syn-type: #e5c07b;
-  --syn-str: #98c379;
-  --syn-com: #5c6370;
-  --syn-num: #56b6c2;
-  --sh-cmd: #61afef;
-  --sh-flag: #56b6c2;
-  --sh-str: #98c379;
+  --t-bubble: color-mix(in oklab, var(--primary) 14.5%, transparent);
+  --t-bubble-border: color-mix(in oklab, var(--primary) 15.5%, transparent);
+  --t-hover: color-mix(in oklab, var(--foreground) 5%, transparent);
+  --syn-kw: var(--terminal-ansi-5);
+  --syn-fn: var(--terminal-ansi-4);
+  --syn-type: var(--terminal-ansi-3);
+  --syn-com: var(--terminal-ansi-8);
 }
 
 .cf-thread .mono {
@@ -106,7 +106,7 @@ html[data-thread-width="full"] .cf-thread {
   color: var(--syn-fg);
 }
 .dark .cf-thread .cf-markdown :where(pre, :not(pre) > code) {
-  background: oklch(1 0 0 / 5%);
+  background: color-mix(in oklab, var(--foreground) 5%, transparent);
 }
 .cf-thread .cf-markdown th {
   font-weight: 600;
@@ -340,7 +340,7 @@ html[data-thread-width="full"] .cf-thread {
   font-weight: 400;
 }
 .dark .cf-thread :is(.chip.tool, .chip.muted) {
-  background: oklch(1 0 0 / 5%);
+  background: color-mix(in oklab, var(--foreground) 5%, transparent);
 }
 /* A background subagent's chip: a muted outline (docs/sketches/agents-panel). */
 .cf-thread .chip.bg {
@@ -374,7 +374,7 @@ html[data-thread-width="full"] .cf-thread {
   margin-right: 2px;
 }
 .dark .cf-thread .q-hdr {
-  background: oklch(1 0 0 / 7%);
+  background: color-mix(in oklab, var(--foreground) 7%, transparent);
 }
 .cf-thread .detail {
   margin: 2px 0 6px 30px;
@@ -415,10 +415,10 @@ html[data-thread-width="full"] .cf-thread {
   font-family: var(--t-mono);
   font-size: 12px;
   line-height: 18px;
-  background: oklch(0 0 0 / 1.5%);
+  background: color-mix(in oklab, var(--foreground) 1.5%, transparent);
 }
 .dark .cf-thread .term {
-  background: oklch(1 0 0 / 2.5%);
+  background: color-mix(in oklab, var(--foreground) 2.5%, transparent);
 }
 .cf-thread .term .cmd {
   padding: 8px 12px;
@@ -461,7 +461,7 @@ html[data-thread-width="full"] .cf-thread {
   background: var(--muted);
 }
 .dark .cf-thread .diff .dh {
-  background: oklch(1 0 0 / 4%);
+  background: color-mix(in oklab, var(--foreground) 4%, transparent);
 }
 .cf-thread .diff .dh .path {
   color: color-mix(in oklab, var(--foreground) 85%, transparent);
@@ -949,12 +949,12 @@ html[data-thread-width="full"] .cf-thread {
   color: var(--syn-fg);
   white-space: pre-wrap;
   word-break: break-word;
-  background: oklch(0 0 0 / 2%);
+  background: color-mix(in oklab, var(--foreground) 2%, transparent);
   max-height: 160px;
   overflow: auto;
 }
 .dark .cf-thread .pend .cmdbox {
-  background: oklch(1 0 0 / 3%);
+  background: color-mix(in oklab, var(--foreground) 3%, transparent);
 }
 .cf-thread .pend .desc {
   font-size: 12px;
@@ -1003,7 +1003,7 @@ html[data-thread-width="full"] .cf-thread {
 }
 .dark .cf-thread .btn.outline {
   border-color: var(--input);
-  background: oklch(1 0 0 / 4.5%);
+  background: color-mix(in oklab, var(--foreground) 4.5%, transparent);
 }
 .cf-thread .btn.outline:hover {
   background: var(--accent);
@@ -1103,7 +1103,7 @@ html[data-thread-width="full"] .cf-thread {
 }
 .dark .cf-thread .intr {
   border-color: var(--input);
-  background: oklch(1 0 0 / 4.5%);
+  background: color-mix(in oklab, var(--foreground) 4.5%, transparent);
 }
 .cf-thread .intr:hover {
   background: var(--accent);
