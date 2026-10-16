@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -24,7 +25,8 @@ type AppInfo struct {
 }
 
 // AppService is bound to the frontend: the GUI's own version, relaunching itself, the
-// native folder picker (pickdir.go), and the Dock badge, bounce and alert sound (notify.go).
+// native folder picker (pickdir.go), the Dock badge, bounce and alert sound (notify.go),
+// and the window background (windowbg.go).
 // Updates are installed by the daemon; the host only quits and reopens the window.
 type AppService struct {
 	log *slog.Logger
@@ -32,11 +34,42 @@ type AppService struct {
 	window *application.WebviewWindow
 	// badge holds the Dock badge until the app has finished launching (dockLaunched).
 	badge *dockBadge
+	// bgPath is where SetWindowBackground keeps the colours for the next launch.
+	bgPath string
+	// bgMu guards bgSaved, the state last written to bgPath.
+	bgMu    sync.Mutex
+	bgSaved WindowBackground
 }
 
-// NewAppService returns an AppService.
-func NewAppService(log *slog.Logger) *AppService {
-	return &AppService{log: log, badge: &dockBadge{apply: setDockBadgeLabel}}
+// NewAppService returns an AppService that keeps the window background in bgPath.
+func NewAppService(log *slog.Logger, bgPath string) *AppService {
+	return &AppService{log: log, badge: &dockBadge{apply: setDockBadgeLabel}, bgPath: bgPath, bgSaved: loadWindowBackground(bgPath)}
+}
+
+// SetWindowBackground paints the window behind the page in the active theme's sheet and
+// saves both themes' sheets and the scheme, so the next launch opens in the right colour
+// before the page loads. The frontend calls it on start and on every theme, scheme or
+// macOS appearance change (lib/theme.ts).
+func (s *AppService) SetWindowBackground(bg WindowBackground) error {
+	if err := bg.validate(); err != nil {
+		return fmt.Errorf("set window background: %w", err)
+	}
+	c, _ := parseHexColour(bg.colour(systemIsDark()))
+	if s.window != nil {
+		s.window.SetBackgroundColour(c)
+	}
+	s.bgMu.Lock()
+	defer s.bgMu.Unlock()
+	saved := bg
+	saved.Active = ""
+	if saved == s.bgSaved || s.bgPath == "" {
+		return nil
+	}
+	if err := saveWindowBackground(s.bgPath, saved); err != nil {
+		return err
+	}
+	s.bgSaved = saved
+	return nil
 }
 
 // SetBadge shows count on the Dock icon: no badge for 0, "99+" above 99. The frontend

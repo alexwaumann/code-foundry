@@ -10,5 +10,6 @@ export {
 
 export type {
     AppInfo,
-    DaemonEndpoint
+    DaemonEndpoint,
+    WindowBackground
 } from "./models.js";

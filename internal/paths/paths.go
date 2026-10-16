@@ -117,6 +117,11 @@ func (p Paths) Projects() string { return filepath.Join(p.home, "projects") }
 // removes files older than a day on daemon start.
 func (p Paths) Attachments() string { return filepath.Join(p.home, "attachments") }
 
+// WindowBackground is the GUI host's own state: the window colour of each scheme, so the
+// window opens in the last theme's colour before the page (and the daemon's settings)
+// load (gui/windowbg.go). Not under App(): an update replaces that directory.
+func (p Paths) WindowBackground() string { return filepath.Join(p.home, "window-background.json") }
+
 // Ensure creates the home and logs directories with 0700 permissions and checks that
 // the socket path fits in sun_path.
 func (p Paths) Ensure() error {

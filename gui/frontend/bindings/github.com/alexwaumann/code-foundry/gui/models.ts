@@ -18,3 +18,27 @@ export interface DaemonEndpoint {
     "baseUrl": string;
     "token": string;
 }
+
+/**
+ * WindowBackground is what the frontend reports on every theme or scheme change
+ * (lib/theme.ts): the sheet of the dark and the light theme, the scheme setting, and the
+ * scheme in effect now.
+ */
+export interface WindowBackground {
+    /**
+     * Scheme is appearance.theme: "system", "dark" or "light".
+     */
+    "scheme": string;
+
+    /**
+     * Dark and Light are the two themes' sheets, "#rrggbb".
+     */
+    "dark": string;
+    "light": string;
+
+    /**
+     * Active is the scheme the page shows now ("dark" or "light"); not persisted: at
+     * launch it comes from Scheme and the macOS appearance.
+     */
+    "active"?: string;
+}

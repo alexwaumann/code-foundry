@@ -45,7 +45,7 @@ func main() {
 	exportDaemonBinary(log)
 
 	daemonService := NewDaemonService(p, log)
-	appService := NewAppService(log)
+	appService := NewAppService(log, p.WindowBackground())
 	app := application.New(application.Options{
 		Name:        "Code Foundry",
 		Description: "Supervise fleets of Claude Code sessions",
@@ -79,9 +79,9 @@ func main() {
 		// panel shrinks, then hides, when it does not fit (stores/ui.ts panelMax).
 		MinWidth:  900,
 		MinHeight: 500,
-		// The dark sheet colour (--sheet in index.css, #000000), so launch does not
-		// flash a different colour before the page paints.
-		BackgroundColour: application.NewRGB(0, 0, 0),
+		// The last theme's sheet (--sheet; windowbg.go), so launch does not flash a
+		// different colour before the page paints. SetWindowBackground keeps it current.
+		BackgroundColour: launchBackgroundColour(p.WindowBackground(), systemIsDark()),
 		URL:              "/",
 		Mac: application.MacWindow{
 			TitleBar: application.MacTitleBarHiddenInset,
