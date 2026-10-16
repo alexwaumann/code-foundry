@@ -151,7 +151,7 @@ test("dragging the handle resizes the panel within its bounds, and the width per
   await expect.poll(async () => (await box(page, "side-panel")).width).toBe(280);
 
   // Not wider than 60% of the window, nor so wide that the content pane gets under
-  // 360px: at 1280 with the 280px sidebar the room bound (1280-280-24-360) is the lower.
+  // 360px: at 1280 with the 280px sidebar the room bound (1280-280-36-360) is the lower.
   const hb = await handle.boundingBox();
   if (!hb) throw new Error("no handle");
   await page.mouse.move(hb.x + hb.width / 2, y);
@@ -159,7 +159,7 @@ test("dragging the handle resizes the panel within its bounds, and the width per
   await page.mouse.move(10, y, { steps: 4 });
   await page.mouse.up();
   const vw = page.viewportSize()?.width ?? 0;
-  const max = Math.floor(Math.min(vw * 0.6, vw - 280 - 24 - 360));
+  const max = Math.floor(Math.min(vw * 0.6, vw - 280 - 36 - 360));
   await expect.poll(async () => (await box(page, "side-panel")).width).toBe(max);
   expect((await box(page, "content-pane")).width).toBeGreaterThanOrEqual(360);
   await expect(handle).toHaveAttribute("aria-valuenow", String(max));
@@ -429,30 +429,30 @@ test("dragging starts from the rendered width after the room shrinks", async ({ 
   await selectSession(page, "s-1");
   await page.getByTestId("panel-toggle").click();
   await dragHandle(page, -200);
-  // At 1280 with the 280px sidebar the room bound is 616, so 420+200 clamps to it.
-  await expect.poll(async () => (await box(page, "side-panel")).width).toBe(616);
+  // At 1280 with the 280px sidebar the room bound is 604, so 420+200 clamps to it.
+  await expect.poll(async () => (await box(page, "side-panel")).width).toBe(604);
 
-  // The window shrinks: the panel renders at the room (1000-280-24-360 = 336), and the
+  // The window shrinks: the panel renders at the room (1000-280-36-360 = 324), and the
   // stored width is kept, so it comes back with the room.
   await page.setViewportSize({ width: 1000, height: 800 });
-  await expect.poll(async () => (await box(page, "side-panel")).width).toBe(336);
+  await expect.poll(async () => (await box(page, "side-panel")).width).toBe(324);
   await page.setViewportSize({ width: 1280, height: 800 });
-  await expect.poll(async () => (await box(page, "side-panel")).width).toBe(616);
+  await expect.poll(async () => (await box(page, "side-panel")).width).toBe(604);
   await page.setViewportSize({ width: 1000, height: 800 });
-  await expect.poll(async () => (await box(page, "side-panel")).width).toBe(336);
+  await expect.poll(async () => (await box(page, "side-panel")).width).toBe(324);
   await dragHandle(page, 30);
-  await expect.poll(async () => (await box(page, "side-panel")).width).toBe(306);
+  await expect.poll(async () => (await box(page, "side-panel")).width).toBe(294);
 
   // A wider sidebar shrinks the rendered width below the stored one; a drag acts at once.
   await page.setViewportSize({ width: 1280, height: 800 });
   await setSidebarWidth(page, 480);
-  // 1280-480-24-360 = 416 is the room; the stored 306 fits. Widen to the room.
+  // 1280-480-36-360 = 404 is the room; the stored 294 fits. Widen to the room.
   await dragHandle(page, -200);
-  await expect.poll(async () => (await box(page, "side-panel")).width).toBe(416);
+  await expect.poll(async () => (await box(page, "side-panel")).width).toBe(404);
   await setSidebarWidth(page, 520);
-  await expect.poll(async () => (await box(page, "side-panel")).width).toBe(376);
+  await expect.poll(async () => (await box(page, "side-panel")).width).toBe(364);
   await dragHandle(page, 20);
-  await expect.poll(async () => (await box(page, "side-panel")).width).toBe(356);
+  await expect.poll(async () => (await box(page, "side-panel")).width).toBe(344);
 });
 
 test("the palette hands focus back to the panel, and its toggle moves focus", async ({ page }) => {
