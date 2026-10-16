@@ -252,7 +252,23 @@ interface MockWorktree {
   /** HEAD is detached (branch is ""). */
   detached?: boolean;
   isMain: boolean;
-  status: { upstream: string; ahead: number; behind: number; staged: number; modified: number; untracked: number; dirty: boolean; baseRef?: string; baseAhead?: number; baseBehind?: number };
+  status: {
+    upstream: string;
+    ahead: number;
+    behind: number;
+    staged: number;
+    modified: number;
+    untracked: number;
+    dirty: boolean;
+    baseRef?: string;
+    baseAhead?: number;
+    baseBehind?: number;
+    conflicted?: number;
+    /** A git operation in progress ("rebase", "merge", ...; POST /__mock/worktree/operation). */
+    operation?: string;
+    operationStep?: number;
+    operationTotal?: number;
+  };
 }
 
 interface MockRepo {
@@ -1833,6 +1849,27 @@ export class World {
       if (!w) continue;
       w.branch = branch;
       w.detached = branch === "";
+      this.repoEvents.publish({ event: { case: "worktreeUpdated", value: this.worktreeMsg(repo.id, w) } });
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * A git operation stops in the worktree at `path` (POST /__mock/worktree/operation): the
+   * status carries it and `conflicted` unmerged entries, which lead the worktree detail as
+   * U files (`files`, else conflict_1.go, ...). An empty `op` ends it: the status clears
+   * and the U files go.
+   */
+  setOperation(path: string, op: string, step: number, total: number, conflicted: number, files: string[]): boolean {
+    for (const repo of this.repos.values()) {
+      const w = repo.worktrees.find((x) => x.path === path);
+      if (!w) continue;
+      w.status = op
+        ? { ...w.status, operation: op, operationStep: step, operationTotal: total, conflicted, dirty: w.status.dirty || conflicted > 0 }
+        : { ...w.status, operation: "", operationStep: 0, operationTotal: 0, conflicted: 0 };
+      const names = op ? Array.from({ length: conflicted }, (_, i) => files[i] ?? `conflict_${String(i + 1)}.go`) : [];
+      this.gh.setConflicts(path, names);
       this.repoEvents.publish({ event: { case: "worktreeUpdated", value: this.worktreeMsg(repo.id, w) } });
       return true;
     }

@@ -58,6 +58,9 @@
  *                                                 (simulate a daemon older than those RPCs: 404)
  *   POST /__mock/session-new?delay=700            (how long session.new takes to make a worktree)
  *   POST /__mock/worktree/checkout?path=…&branch=…   (the worktree switches branch; no branch detaches HEAD)
+ *   POST /__mock/worktree/operation?path=…&op=rebase&step=3&total=6&conflicted=2[&file=a.go]
+ *                                                 (a git operation stops in that worktree: status
+ *                                                 operation fields, U files lead its detail; no op ends it)
  *   POST /__mock/worktree/merged?repo=repo-cf&branch=cf/usage-polish[&path=…]   (a clean worktree whose
  *                                                 work is in origin/main: merged_clean, so repo.worktree.cleanup removes
  *                                                 it; a path outside ~/.code-foundry/worktrees is never merged_clean)
@@ -94,6 +97,8 @@
  *        app.restart (Restart Now) and daemon.restart come back as the installed version;
  *        GET /__mock/update counts app.restart runs (restarts)
  *   POST /__mock/gh/update | poll | stale | auth?ok=false | touch?path=…   (GitHub + detail)
+ *   POST /__mock/gh/branch-pr?slug=o/r&head=b&number=N&title=…&state=open|draft|merged|closed[&ago=ms][&append=1]
+ *                                                 (that branch's pull request, alone or beside the others)
  *   GET  /__mock/gh/calls                         (GhService/GetWorktreeDetail call counts;
  *        "ListReviewerCandidates query" counts the searches)
  *   POST /__mock/gh/pr-fail?command=pr.refresh             (that command's next run fails;
@@ -718,6 +723,12 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       json(res, ok ? 200 : 404, { ok });
       break;
     }
+    case "POST /__mock/worktree/operation": {
+      // path=…&op=rebase&step=3&total=6&conflicted=2[&file=a.go&file=b.go]; no op: it ends.
+      const ok = world.setOperation(q.get("path") ?? "", q.get("op") ?? "", Number(q.get("step") ?? "0"), Number(q.get("total") ?? "0"), Number(q.get("conflicted") ?? "0"), q.getAll("file"));
+      json(res, ok ? 200 : 404, { ok });
+      break;
+    }
     case "POST /__mock/worktree/merged":
       try {
         const w = world.addMergedWorktree(q.get("repo") ?? "", q.get("branch") ?? "", q.get("path") ?? "");
@@ -910,6 +921,11 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     case "POST /__mock/gh/auth":
       world.gh.authenticated = q.get("ok") !== "false";
       json(res, 200, { authenticated: world.gh.authenticated });
+      break;
+    case "POST /__mock/gh/branch-pr":
+      // slug=o/r&head=b&number=N&title=…&state=open|draft|merged|closed[&ago=ms][&append=1]
+      world.gh.setBranchPullRequest(q.get("slug") ?? "", q.get("head") ?? "", Number(q.get("number") ?? "0"), q.get("title") ?? "", q.get("state") ?? "open", Number(q.get("ago") ?? "1200000"), q.get("append") === "1");
+      json(res, 200, { ok: true });
       break;
     case "POST /__mock/gh/touch":
       json(res, world.gh.touch(q.get("path") ?? "") ? 200 : 404, { ok: true });

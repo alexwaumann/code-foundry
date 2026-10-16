@@ -305,6 +305,42 @@ export class GhWorld {
     this.publishGh({ event: { case: "branchPullRequestsUpdated", value: { repoSlug: slug, headRef: head, fetchedAt: timestampFromDate(new Date()) } } });
   }
 
+  /**
+   * Test control (POST /__mock/gh/branch-pr): a pull request on `head` in the given state
+   * (open, draft, merged, closed), `ageMs` old; with `append`, beside the branch's others,
+   * else alone. Announced like a poll.
+   */
+  setBranchPullRequest(slug: string, head: string, number: number, title: string, state: string, ageMs: number, append: boolean): void {
+    const merged = state === "merged";
+    const pr = this.pr(slug, number, title, {
+      headRef: head,
+      ageMs,
+      draft: state === "draft",
+      state: merged ? PullRequestState.MERGED : state === "closed" ? PullRequestState.CLOSED : PullRequestState.OPEN,
+      mergedAt: merged ? this.at(ageMs) : undefined,
+      checks: state === "draft" ? rollup(CheckRollupState.PENDING, 1, 0, 2) : rollup(CheckRollupState.SUCCESS, 3),
+      reviewDecision: state === "open" ? ReviewDecision.APPROVED : ReviewDecision.REVIEW_REQUIRED,
+    });
+    // Newer than the fixtures': the panel shows the newest.
+    pr.createdAt = timestampFromDate(new Date(Date.now() - ageMs));
+    const key = `${slug}\u0000${head}`;
+    this.branches.set(key, append ? [...(this.branches.get(key) ?? []), pr] : [pr]);
+    this.publishGh({ event: { case: "branchPullRequestsUpdated", value: { repoSlug: slug, headRef: head, fetchedAt: timestampFromDate(new Date()) } } });
+  }
+
+  /**
+   * The worktree detail's unmerged files (setOperation): `names` as U entries ahead of the
+   * rest, replacing any earlier ones; recomputed and announced.
+   */
+  setConflicts(path: string, names: string[]): void {
+    const d = this.details.get(path);
+    if (!d) return;
+    const rest = (d.files ?? []).filter((f) => f.status !== "U");
+    d.files = [...names.map((p) => ({ path: p, status: "U", added: 0, deleted: 0, binary: false, uncommitted: true, isDir: false, oldPath: "" })), ...rest];
+    d.computedAt = timestampFromDate(new Date());
+    this.publishRepo({ event: { case: "worktreeDetailUpdated", value: { repoId: d.repoId, path, computedAt: d.computedAt } } });
+  }
+
   /** A pull request any dashboard list or watched branch holds. */
   findPr(slug: string, number: number): PrInit | undefined {
     const d = this.dashboard;
