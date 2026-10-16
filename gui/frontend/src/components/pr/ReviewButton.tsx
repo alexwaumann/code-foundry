@@ -62,7 +62,7 @@ export function ReviewButton({ prRef, detail, onChoose }: { prRef: PrRef; detail
           aria-disabled={busy || undefined}
           aria-busy={busy || undefined}
           className={cn(
-            "flex h-7 shrink-0 items-center gap-1 rounded-md border text-[13px] font-medium shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
+            "flex h-7 shrink-0 items-center gap-1 rounded-md border text-label shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
             mine
               ? cn("px-2 @max-[340px]:px-1.5", toneBadge[YOUR_REVIEW_SPECS[mine].tone], "hover:brightness-110 aria-expanded:brightness-110")
               : "bg-background pr-1.5 pl-2 hover:bg-accent aria-expanded:bg-accent @max-[340px]:pl-1.5 dark:border-input dark:bg-input/30 dark:hover:bg-input/50 dark:aria-expanded:bg-input/50",

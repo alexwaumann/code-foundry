@@ -28,7 +28,7 @@ function StateBadge({ d }: { d: PullRequestDetailView }) {
   const b = stateBadge(d.pullRequest);
   const Icon = stateIcon[b.label] ?? GitPullRequest;
   return (
-    <span className={cn("inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-[13px] font-medium", toneBadge[b.tone])} data-testid="pr-state" data-state={b.label.toLowerCase()}>
+    <span className={cn("inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-label", toneBadge[b.tone])} data-testid="pr-state" data-state={b.label.toLowerCase()}>
       <Icon className="size-3.5" aria-hidden />
       {b.label}
     </span>
@@ -45,7 +45,7 @@ export function ChecksHeadline({ d }: { d: PullRequestDetailView }) {
   const m = /^(\d+) (.*)$/.exec(h.text);
   return (
     <Tip label={h.text} whenTruncated>
-      <span className={cn("flex min-w-0 items-center gap-1.5 text-xs whitespace-nowrap", toneText[h.tone])} data-testid="pr-checks-summary" data-tone={h.tone}>
+      <span className={cn("flex min-w-0 items-center gap-1.5 text-body-sm whitespace-nowrap", toneText[h.tone])} data-testid="pr-checks-summary" data-tone={h.tone}>
         <Icon className="size-3.5 shrink-0" aria-hidden />
         {m ? (
           <span className="min-w-0 truncate">
@@ -74,7 +74,7 @@ function Header({ d, prRef, panelKey, onAsk, onReview }: { d: PullRequestDetailV
       <div className="flex min-w-0 items-center gap-1.5">
         <button
           type="button"
-          className="flex min-w-0 items-center gap-1 rounded text-[13px] text-muted-foreground outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+          className="flex min-w-0 items-center gap-1 rounded-sm text-caption outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
           data-testid="pr-repo-link"
           onClick={() => void openUrl(pr.url)}
         >
@@ -89,12 +89,12 @@ function Header({ d, prRef, panelKey, onAsk, onReview }: { d: PullRequestDetailV
         </span>
       </div>
       <div className="flex min-w-0 items-start gap-2">
-        <h2 className="min-w-0 flex-1 text-[15px] leading-snug font-semibold break-words select-text" data-testid="pr-title">
+        <h2 className="min-w-0 flex-1 text-heading break-words select-text" data-testid="pr-title">
           {pr.title || `#${String(prRef.number)}`}
         </h2>
         <span className="flex shrink-0 items-center gap-1.5 pt-px">
           <Tip label={`${String(comments)} comments`}>
-            <span className="flex items-center gap-1 px-1 text-[13px] text-muted-foreground tabular-nums" data-testid="pr-comment-count">
+            <span className="flex items-center gap-1 px-1 text-caption tabular-nums" data-testid="pr-comment-count">
               <MessageSquare className="size-3.5" aria-hidden />
               {comments}
             </span>
@@ -102,7 +102,7 @@ function Header({ d, prRef, panelKey, onAsk, onReview }: { d: PullRequestDetailV
           <StateBadge d={d} />
         </span>
       </div>
-      <div className="flex min-w-0 items-center gap-1.5 text-[13px]">
+      <div className="flex min-w-0 items-center gap-1.5 text-body-sm">
         <Avatar login={pr.author} size={18} />
         <span className="min-w-0 truncate font-medium" data-testid="pr-author">
           {pr.author || "ghost"}
@@ -114,7 +114,7 @@ function Header({ d, prRef, panelKey, onAsk, onReview }: { d: PullRequestDetailV
           </span>
         </Tip>
       </div>
-      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-caption">
         <Tip label={`${pr.headRef} into ${pr.baseRef}`} whenTruncated align="start">
           <span className="flex max-w-full min-w-0 items-center gap-1.5 font-mono" data-testid="pr-branches">
             <span className="min-w-0 shrink truncate">{pr.baseRef}</span>
@@ -163,7 +163,7 @@ function InnerTabBar({ d, tabKey, inner }: { d: PullRequestDetailView; tabKey: s
               disabled={disabled}
               data-testid={`pr-tab-${t.id}`}
               className={cn(
-                "h-6 rounded-md px-2.5 text-[13px] outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-default disabled:opacity-55 @max-[340px]:px-2",
+                "h-6 rounded-md px-2.5 text-body-sm outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-default disabled:opacity-55 @max-[340px]:px-2",
                 active ? "bg-pane text-foreground shadow-xs dark:bg-accent" : "text-muted-foreground enabled:hover:text-foreground",
               )}
               onClick={() => {
@@ -188,7 +188,7 @@ function InnerTabBar({ d, tabKey, inner }: { d: PullRequestDetailView; tabKey: s
           <ChecksHeadline d={d} />
         ) : (
           <>
-            <span className="flex shrink-0 items-center gap-2 text-xs whitespace-nowrap text-muted-foreground tabular-nums @max-[400px]:hidden" data-testid="pr-timeline-counts">
+            <span className="flex shrink-0 items-center gap-2 text-caption whitespace-nowrap tabular-nums @max-[400px]:hidden" data-testid="pr-timeline-counts">
               {/* Timeline entries, not comments: the header's comment count includes thread replies the timeline leaves out. */}
               <span className="flex items-center gap-1">
                 <History className="size-3" aria-hidden />
@@ -222,7 +222,7 @@ function StaleBanner({ fetchedAtMs, lastError }: { fetchedAtMs: number | null; l
 
 function Banner({ children, testId }: { children: ReactNode; testId: string }) {
   return (
-    <div className="mx-4 mt-3 flex items-start gap-2 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning" role="status" data-testid={testId}>
+    <div className="mx-4 mt-3 flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-caption text-warning" role="status" data-testid={testId}>
       <TriangleAlert className="mt-px size-3.5 shrink-0" aria-hidden />
       <span className="min-w-0 break-words">{children}</span>
     </div>
@@ -247,10 +247,10 @@ function Loading() {
 
 function Centered({ icon: Icon, title, children, testId }: { icon: typeof SearchX; title: string; children?: ReactNode; testId: string }) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-sm" data-testid={testId}>
+    <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-body" data-testid={testId}>
       <Icon className="size-5 text-muted-foreground" aria-hidden />
       <p className="font-medium">{title}</p>
-      {children && <div className="max-w-80 text-xs break-words text-muted-foreground">{children}</div>}
+      {children && <div className="max-w-80 text-caption break-words">{children}</div>}
     </div>
   );
 }
