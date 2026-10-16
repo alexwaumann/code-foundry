@@ -72,16 +72,9 @@ html[data-theme="catppuccin-mocha"] {
   --terminal-ansi-15: #bac2de;
 }
 html[data-theme="catppuccin-mocha"] .cf-thread {
-  --syn-fg: #cdd6f4;
   --syn-kw: #cba6f7;
-  --syn-fn: #89b4fa;
-  --syn-type: #f9e2af;
-  --syn-str: #a6e3a1;
   --syn-com: #9095af;
   --syn-num: #fab387;
-  --sh-cmd: #89b4fa;
-  --sh-flag: #94e2d5;
-  --sh-str: #a6e3a1;
 }
 
 /* Graphite Dark (dark) */
@@ -152,18 +145,6 @@ html[data-theme="graphite-dark"] {
   --terminal-ansi-13: #d68ff0;
   --terminal-ansi-14: #6fcbd6;
   --terminal-ansi-15: #f2f3f5;
-}
-html[data-theme="graphite-dark"] .cf-thread {
-  --syn-fg: #d8dadf;
-  --syn-kw: #c678dd;
-  --syn-fn: #61afef;
-  --syn-type: #e5c07b;
-  --syn-str: #98c379;
-  --syn-com: #5c6370;
-  --syn-num: #56b6c2;
-  --sh-cmd: #61afef;
-  --sh-flag: #56b6c2;
-  --sh-str: #98c379;
 }
 
 /* Dracula (dark) */
@@ -236,16 +217,9 @@ html[data-theme="dracula"] {
   --terminal-ansi-15: #ffffff;
 }
 html[data-theme="dracula"] .cf-thread {
-  --syn-fg: #f8f8f2;
   --syn-kw: #ff8acb;
   --syn-fn: #c59eff;
-  --syn-type: #f1fa8c;
-  --syn-str: #50fa7b;
-  --syn-com: #6272a4;
-  --syn-num: #8be9fd;
   --sh-cmd: #c59eff;
-  --sh-flag: #8be9fd;
-  --sh-str: #50fa7b;
 }
 
 /* Gruvbox Dark (dark) */
@@ -318,12 +292,10 @@ html[data-theme="gruvbox-dark"] {
   --terminal-ansi-15: #ebdbb2;
 }
 html[data-theme="gruvbox-dark"] .cf-thread {
-  --syn-fg: #ebdbb2;
   --syn-kw: #e38fb4;
   --syn-fn: #73b3b6;
   --syn-type: #dc9e29;
   --syn-str: #afaf3b;
-  --syn-com: #928374;
   --syn-num: #80b682;
   --sh-cmd: #73b3b6;
   --sh-flag: #80b682;
@@ -400,15 +372,11 @@ html[data-theme="nord"] {
   --terminal-ansi-15: #eceff4;
 }
 html[data-theme="nord"] .cf-thread {
-  --syn-fg: #d8dee9;
   --syn-kw: #d3abcb;
   --syn-fn: #9bbcdd;
-  --syn-type: #ebcb8b;
   --syn-str: #a5c08e;
   --syn-com: #9da3af;
-  --syn-num: #88c0d0;
   --sh-cmd: #9bbcdd;
-  --sh-flag: #88c0d0;
   --sh-str: #a5c08e;
 }
 
@@ -482,16 +450,7 @@ html[data-theme="tokyo-night"] {
   --terminal-ansi-15: #c0caf5;
 }
 html[data-theme="tokyo-night"] .cf-thread {
-  --syn-fg: #c0caf5;
-  --syn-kw: #bb9af7;
-  --syn-fn: #7aa2f7;
-  --syn-type: #e0af68;
-  --syn-str: #9ece6a;
   --syn-com: #868cac;
-  --syn-num: #7dcfff;
-  --sh-cmd: #7aa2f7;
-  --sh-flag: #7dcfff;
-  --sh-str: #9ece6a;
 }
 
 /* Rosé Pine (dark) */
@@ -564,15 +523,7 @@ html[data-theme="rose-pine"] {
   --terminal-ansi-15: #e0def4;
 }
 html[data-theme="rose-pine"] .cf-thread {
-  --syn-fg: #e0def4;
-  --syn-kw: #c4a7e7;
-  --syn-fn: #9ccfd8;
-  --syn-type: #f6c177;
   --syn-str: #5ea0bc;
-  --syn-com: #6e6a86;
-  --syn-num: #ebbcba;
-  --sh-cmd: #9ccfd8;
-  --sh-flag: #ebbcba;
   --sh-str: #5ea0bc;
 }
 
@@ -646,16 +597,7 @@ html[data-theme="atom-one-dark"] {
   --terminal-ansi-15: #abb2bf;
 }
 html[data-theme="atom-one-dark"] .cf-thread {
-  --syn-fg: #abb2bf;
   --syn-kw: #ce80e5;
-  --syn-fn: #61afef;
-  --syn-type: #e5c07b;
-  --syn-str: #98c379;
-  --syn-com: #767676;
-  --syn-num: #56b6c2;
-  --sh-cmd: #61afef;
-  --sh-flag: #56b6c2;
-  --sh-str: #98c379;
 }
 
 /* Solarized Dark (dark) */
@@ -728,7 +670,7 @@ html[data-theme="solarized-dark"] {
   --terminal-ansi-15: #fdf6e3;
 }
 html[data-theme="solarized-dark"] .cf-thread {
-  --syn-fg: #a3b5b7;
+  --syn-fg: #92a3a5;
   --syn-kw: #ff6eac;
   --syn-fn: #48a7f0;
   --syn-type: #c79a27;
@@ -810,16 +752,8 @@ html[data-theme="monokai-pro"] {
   --terminal-ansi-15: #fcfcfa;
 }
 html[data-theme="monokai-pro"] .cf-thread {
-  --syn-fg: #fcfcfa;
   --syn-kw: #b4a6fc;
-  --syn-fn: #fc9867;
-  --syn-type: #ffd866;
-  --syn-str: #a9dc76;
   --syn-com: #b4b3b3;
-  --syn-num: #78dce8;
-  --sh-cmd: #fc9867;
-  --sh-flag: #78dce8;
-  --sh-str: #a9dc76;
 }
 
 /* GitHub Dark (dark) */
@@ -890,18 +824,6 @@ html[data-theme="github-dark"] {
   --terminal-ansi-13: #d2a8ff;
   --terminal-ansi-14: #56d4dd;
   --terminal-ansi-15: #ffffff;
-}
-html[data-theme="github-dark"] .cf-thread {
-  --syn-fg: #e6edf3;
-  --syn-kw: #bc8cff;
-  --syn-fn: #58a6ff;
-  --syn-type: #d29922;
-  --syn-str: #3fb950;
-  --syn-com: #6e7681;
-  --syn-num: #39c5cf;
-  --sh-cmd: #58a6ff;
-  --sh-flag: #39c5cf;
-  --sh-str: #3fb950;
 }
 
 /* Kanagawa Wave (dark) */
@@ -974,12 +896,9 @@ html[data-theme="kanagawa-wave"] {
   --terminal-ansi-15: #dcd7ba;
 }
 html[data-theme="kanagawa-wave"] .cf-thread {
-  --syn-fg: #dcd7ba;
   --syn-kw: #ab94cf;
   --syn-fn: #7f9eda;
-  --syn-type: #c0a36e;
   --syn-str: #88a77c;
-  --syn-com: #727169;
   --syn-num: #7aa69a;
   --sh-cmd: #7f9eda;
   --sh-flag: #7aa69a;
@@ -1055,18 +974,6 @@ html[data-theme="everforest-dark-hard"] {
   --terminal-ansi-14: #35a77c;
   --terminal-ansi-15: #fffbef;
 }
-html[data-theme="everforest-dark-hard"] .cf-thread {
-  --syn-fg: #d3c6aa;
-  --syn-kw: #d699b6;
-  --syn-fn: #7fbbb3;
-  --syn-type: #dbbc7f;
-  --syn-str: #a7c080;
-  --syn-com: #a6b0a0;
-  --syn-num: #83c092;
-  --sh-cmd: #7fbbb3;
-  --sh-flag: #83c092;
-  --sh-str: #a7c080;
-}
 
 /* Ayu Mirage (dark) */
 html[data-theme="ayu-mirage"] {
@@ -1138,16 +1045,7 @@ html[data-theme="ayu-mirage"] {
   --terminal-ansi-15: #ffffff;
 }
 html[data-theme="ayu-mirage"] .cf-thread {
-  --syn-fg: #cccac2;
-  --syn-kw: #dabafa;
-  --syn-fn: #6dcbfa;
-  --syn-type: #facc6e;
-  --syn-str: #87d96c;
   --syn-com: #8f9090;
-  --syn-num: #90e1c6;
-  --sh-cmd: #6dcbfa;
-  --sh-flag: #90e1c6;
-  --sh-str: #87d96c;
 }
 
 /* Catppuccin Latte (light) */
@@ -1220,12 +1118,11 @@ html[data-theme="catppuccin-latte"] {
   --terminal-ansi-15: #bcc0cc;
 }
 html[data-theme="catppuccin-latte"] .cf-thread {
-  --syn-fg: #4c4f69;
   --syn-kw: #8433ea;
-  --syn-fn: #115ae9;
-  --syn-type: #935a00;
+  --syn-fn: #a93a8f;
+  --syn-type: #115ae9;
   --syn-str: #1d7600;
-  --syn-com: #6c6f85;
+  --syn-com: #5f627a;
   --syn-num: #b24200;
   --sh-cmd: #115ae9;
   --sh-flag: #007278;
@@ -1301,18 +1198,6 @@ html[data-theme="graphite-light"] {
   --terminal-ansi-14: #3192aa;
   --terminal-ansi-15: #8c959f;
 }
-html[data-theme="graphite-light"] .cf-thread {
-  --syn-fg: #24292f;
-  --syn-kw: #cf222e;
-  --syn-fn: #8250df;
-  --syn-type: #0969da;
-  --syn-str: #116329;
-  --syn-com: #6e7781;
-  --syn-num: #1b7c83;
-  --sh-cmd: #0969da;
-  --sh-flag: #1b7c83;
-  --sh-str: #116329;
-}
 
 /* Gruvbox Light (light) */
 html[data-theme="gruvbox-light"] {
@@ -1384,12 +1269,10 @@ html[data-theme="gruvbox-light"] {
   --terminal-ansi-15: #3c3836;
 }
 html[data-theme="gruvbox-light"] .cf-thread {
-  --syn-fg: #3c3836;
-  --syn-kw: #974b6e;
-  --syn-fn: #2c6d70;
-  --syn-type: #875d00;
+  --syn-kw: #c71c17;
+  --syn-fn: #974b6e;
+  --syn-type: #2c6d70;
   --syn-str: #696800;
-  --syn-com: #928374;
   --syn-num: #3c703f;
   --sh-cmd: #2c6d70;
   --sh-flag: #3c703f;
@@ -1466,16 +1349,13 @@ html[data-theme="rose-pine-dawn"] {
   --terminal-ansi-15: #575279;
 }
 html[data-theme="rose-pine-dawn"] .cf-thread {
-  --syn-fg: #534e75;
-  --syn-kw: #75608d;
-  --syn-fn: #31707b;
-  --syn-type: #945c00;
-  --syn-str: #286983;
+  --syn-kw: #9f5067;
+  --syn-fn: #75608d;
+  --syn-type: #31707b;
   --syn-com: #666284;
   --syn-num: #a0514f;
   --sh-cmd: #31707b;
   --sh-flag: #a0514f;
-  --sh-str: #286983;
 }
 
 /* Atom One Light (light) */
@@ -1548,10 +1428,8 @@ html[data-theme="atom-one-light"] {
   --terminal-ansi-15: #ffffff;
 }
 html[data-theme="atom-one-light"] .cf-thread {
-  --syn-fg: #2a2c33;
-  --syn-kw: #950095;
-  --syn-fn: #2e58f1;
-  --syn-type: #7f662c;
+  --syn-kw: #ca2823;
+  --syn-type: #2e58f1;
   --syn-str: #1f791c;
   --syn-com: #65676c;
   --syn-num: #1f791c;
@@ -1630,10 +1508,10 @@ html[data-theme="solarized-light"] {
   --terminal-ansi-15: #fdf6e3;
 }
 html[data-theme="solarized-light"] .cf-thread {
-  --syn-fg: #42575f;
-  --syn-kw: #c32375;
-  --syn-fn: #006eae;
-  --syn-type: #866400;
+  --syn-fg: #576c74;
+  --syn-kw: #ce1f22;
+  --syn-fn: #c32375;
+  --syn-type: #006eae;
   --syn-str: #617000;
   --syn-com: #586a6f;
   --syn-num: #007770;
@@ -1712,14 +1590,9 @@ html[data-theme="github-light"] {
   --terminal-ansi-15: #8c959f;
 }
 html[data-theme="github-light"] .cf-thread {
-  --syn-fg: #1f2328;
-  --syn-kw: #7f4ddc;
-  --syn-fn: #0667d8;
-  --syn-type: #4d2d00;
-  --syn-str: #116329;
-  --syn-com: #57606a;
+  --syn-fn: #7f4ddc;
+  --syn-type: #0667d8;
   --syn-num: #10767d;
   --sh-cmd: #0667d8;
   --sh-flag: #10767d;
-  --sh-str: #116329;
 }

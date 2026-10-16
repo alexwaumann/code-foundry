@@ -37,8 +37,9 @@ includes `themes/**/*.test.ts`.
   into opaque hex; `var()` references are resolved.
 - Order: dark themes, then light, each in overrides.json order (Catppuccin first, then
   Graphite).
-- `themes.css`: per theme, `html[data-theme="id"] { color-scheme; …vars }` and
-  `html[data-theme="id"] .cf-thread { …syntax }`. `html[data-theme]` (0,1,1) outranks
+- `themes.css`: per theme, `html[data-theme="id"] { color-scheme; …vars }` and, only
+  where a guard or override changed a syntax colour, `html[data-theme="id"] .cf-thread {
+  …those tokens }` (17 of 21 themes have one; Mocha patches keyword, comment and number). `html[data-theme]` (0,1,1) outranks
   `:root`/`.dark` (0,1,0) and `html[data-theme] .cf-thread` (0,2,1) outranks thread.css's
   `.cf-thread` / `.dark .cf-thread`, so neither stylesheet was edited for the switch and the
   import order does not matter. index.css imports themes.css.
@@ -121,7 +122,7 @@ never a clip that changes hue).
 | `--terminal-fg`, `--terminal-cursor`, `--terminal-ansi-*` | straight from the file (the terminal stays faithful, even where the UI fg is lifted) |
 | `--terminal-cursor-accent` | `cursor-text` if it is 3:1 on the cursor, else pane or fg (GitHub Dark's and Monokai's cursor-text vanish on their cursors) |
 | `--terminal-selection` | `selection-background` (guarded); `-inactive` = selection 50% into the pane |
-| syntax | keyword ANSI 5, function 4, type 3, string 2, comment 8, number 6; shell command 4, flag 6, string 2; `--syn-fg` = fg (guarded) |
+| syntax | thread.css's aliases (PR 1), parsed from its `.cf-thread` / `.dark .cf-thread` blocks: light keyword ANSI 1, function 5, type 4, comment 7; dark keyword 5, function 4, type 3, comment 8; both string 2, number 6, shell command 4, flag 6, string 2, `--syn-fg` = `--terminal-fg` (then guarded) |
 
 ## Guards (automatic, in `guard()`)
 
@@ -145,7 +146,7 @@ every run.
 | --- | --- | --- | --- |
 | `catppuccin-mocha` | #cba6f7 mauve | `slots: normal`; keyword mauve, number peach | Ghostty's bright slots are re-saturated copies; the normal slots are the official palette. Syntax as Catppuccin's style guide |
 | `catppuccin-latte` | #8839ef mauve | keyword mauve, number peach | as Mocha |
-| `graphite-dark/-light` | (today's neutral) | syntax = thread.css's One Dark / GitHub light | values from index.css |
+| `graphite-dark/-light` | (today's neutral) | | values from index.css; syntax from thread.css's aliases of its ANSI palette (the old One Dark / GitHub light set) |
 | `dracula` | #bd93f9 purple | `slots: normal`; info ANSI 6 (cyan) | Dracula's blue slot is the purple accent; info/link/Working would look like buttons |
 | `gruvbox-dark` | #fe8019 | | |
 | `gruvbox-light` | #af3a03 | `slots: bright` | its bright slots are the darker "faded" set meant for light backgrounds |
@@ -205,13 +206,18 @@ adds the settings and calls `setThemeSlots` from `stores/settings.ts` the way
 - **Launch flash.** `gui/main.go`'s window `BackgroundColour` is still black (Graphite's
   sheet), so the window shows black before Mocha's #131222 sheet paints (and before Latte
   in light, as Graphite Light did). PR 3 sets the window colour from the active theme.
-- **The user bubble** is thread.css's (`--t-bubble`), PR 1 turns it into
-  `color-mix(var(--primary) 12%, transparent)`; not merged when this was checked, so the
-  bubble is still the neutral tint here.
-- **Syntax lives on `.cf-thread`.** Setting `--syn-*` on `html` alone would lose to
-  thread.css's `.cf-thread` declarations; themes.css sets them on
-  `html[data-theme] .cf-thread`. If PR 1 or later hoists them to index.css, move them into
-  the main block and drop the second rule.
+- **The user bubble** (PR 1, #122) is `color-mix(var(--primary) 8%/11%)` light and
+  14.5%/15.5% dark, so it takes the accent. Checked on the most saturated accents (Mocha
+  mauve, Dracula purple, Gruvbox orange, Monokai yellow, Ayu orange, Latte mauve): a tint,
+  not loud. Gruvbox's orange is the strongest (a warm brown) and stays readable, so the
+  thread.css alphas are unchanged.
+- **Syntax follows thread.css.** PR 1 made `--syn-*`/`--sh-*` aliases of terminal slots,
+  picked by the `dark` class. The converter parses those aliases (so the slot choice lives
+  in one place), resolves them on each theme's palette, guards them, and emits only the
+  tokens that changed, on `html[data-theme] .cf-thread`, which outranks `.dark .cf-thread`.
+  `syncDocumentScheme` sets `.dark` from the active theme's scheme, so a dark theme always
+  gets the dark slots. Light thread status tones still mix 15% black over the (already
+  guarded) tokens, a step darker than needed; thread.css's call, left as is.
 - **JSON imports** needed `resolveJsonModule` in `tsconfig.app.json`.
 - **The Haiku model id** `claude-4.5-haiku[1m]` (the work laptop's Bedrock id) is refused
   on this machine; the live thread used `claude-haiku-5-5[1m]`.
@@ -221,7 +227,10 @@ adds the settings and calls `setThemeSlots` from `stores/settings.ts` the way
 ## Verified
 
 - `make check` green.
-- `make gui-e2e`: see the PR.
+- `make gui-e2e` (before the rebase onto PR 1): 786 passed, 40 skipped, 6 failed:
+  `archive.spec.ts:135`, `snooze.spec.ts:150` and `:251` in both browsers. They fail the
+  same way on a clean `origin/main` (they still expect the thread to stay selected after
+  archiving/snoozing, which #119 changed to the dashboard): not this PR.
 - Live (`make gui-build`, isolated `CODE_FOUNDRY_HOME`, a Haiku thread in a scratch repo, a
   bottom shell printing ANSI 0-15): default dark is Catppuccin Mocha (mauve New thread and
   send buttons, Mocha surfaces, Catppuccin syntax, Mocha ANSI), `settings set

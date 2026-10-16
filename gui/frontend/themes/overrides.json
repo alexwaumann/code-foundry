@@ -6,7 +6,10 @@
     "upstream": "Catppuccin, github.com/catppuccin/catppuccin (MIT)",
     "accent": "#cba6f7",
     "slots": "normal",
-    "vars": { "--syn-kw": "#cba6f7", "--syn-num": "#fab387" },
+    "vars": {
+      "--syn-kw": "#cba6f7",
+      "--syn-num": "#fab387"
+    },
     "why": "Accent is mauve from the official palette (Ghostty has no accent). Normal slots: Ghostty's bright 9-13 are re-saturated copies, the official red/green/yellow/blue are the normal ones. Keywords mauve and numbers peach, as Catppuccin's own syntax style guide."
   },
   "graphite-dark": {
@@ -14,11 +17,7 @@
     "graphite": "dark",
     "pair": "graphite-light",
     "upstream": "Code Foundry's original dark theme (index.css .dark)",
-    "vars": {
-      "--syn-fg": "#d8dadf", "--syn-kw": "#c678dd", "--syn-fn": "#61afef", "--syn-type": "#e5c07b", "--syn-str": "#98c379",
-      "--syn-com": "#5c6370", "--syn-num": "#56b6c2", "--sh-cmd": "#61afef", "--sh-flag": "#56b6c2", "--sh-str": "#98c379"
-    },
-    "why": "The pre-engine neutral theme, read from index.css .dark so the stylesheet fallback and the catalog cannot drift. Syntax is thread.css's One Dark set."
+    "why": "The pre-engine neutral theme, read from index.css .dark so the stylesheet fallback and the catalog cannot drift."
   },
   "dracula": {
     "name": "Dracula",
@@ -26,7 +25,9 @@
     "upstream": "Dracula, github.com/dracula/dracula-theme (MIT)",
     "accent": "#bd93f9",
     "slots": "normal",
-    "status": { "info": 6 },
+    "status": {
+      "info": 6
+    },
     "why": "Dracula's blue slot is purple (#bd93f9, bright #d6acff), the accent; info/link/Working use cyan instead so they do not look like buttons. Normal slots are the official palette."
   },
   "gruvbox-dark": {
@@ -57,7 +58,9 @@
     "pair": "rose-pine-dawn",
     "upstream": "Rosé Pine, github.com/rose-pine/rose-pine-theme (MIT)",
     "accent": "#c4a7e7",
-    "status": { "success": "#95b1ac" },
+    "status": {
+      "success": "#95b1ac"
+    },
     "why": "Accent is iris. Rosé Pine has no green: its ANSI green is pine (blue-teal), which does not read as done; success is the palette's leaf (sage) instead."
   },
   "atom-one-dark": {
@@ -82,7 +85,10 @@
     "ghostty": "Monokai Pro",
     "upstream": "Monokai Pro, monokai.pro (palette via iTerm2-Color-Schemes)",
     "accent": "#ffd866",
-    "status": { "info": 6, "warning": 4 },
+    "status": {
+      "info": 6,
+      "warning": 4
+    },
     "why": "Accent is Monokai's yellow, which is also its ANSI yellow, so warning takes the orange (ANSI 4, Monokai has no blue) and info takes cyan."
   },
   "github-dark": {
@@ -121,7 +127,10 @@
     "pair": "catppuccin-mocha",
     "upstream": "Catppuccin, github.com/catppuccin/catppuccin (MIT)",
     "accent": "#8839ef",
-    "vars": { "--syn-kw": "#8839ef", "--syn-num": "#fe640b" },
+    "vars": {
+      "--syn-kw": "#8839ef",
+      "--syn-num": "#fe640b"
+    },
     "why": "Accent is mauve from the official palette. Yellow and green are too light for text on the light base; the guards darken them."
   },
   "graphite-light": {
@@ -129,11 +138,7 @@
     "graphite": "light",
     "pair": "graphite-dark",
     "upstream": "Code Foundry's original light theme (index.css :root)",
-    "vars": {
-      "--syn-fg": "#24292f", "--syn-kw": "#cf222e", "--syn-fn": "#8250df", "--syn-type": "#0969da", "--syn-str": "#116329",
-      "--syn-com": "#6e7781", "--syn-num": "#1b7c83", "--sh-cmd": "#0969da", "--sh-flag": "#1b7c83", "--sh-str": "#116329"
-    },
-    "why": "The pre-engine neutral theme, read from index.css :root. Syntax is thread.css's GitHub light set."
+    "why": "The pre-engine neutral theme, read from index.css :root."
   },
   "gruvbox-light": {
     "name": "Gruvbox Light",
@@ -150,7 +155,10 @@
     "pair": "rose-pine",
     "upstream": "Rosé Pine, github.com/rose-pine/rose-pine-theme (MIT)",
     "accent": "#907aa9",
-    "status": { "success": "#6d8f89", "info": 4 },
+    "status": {
+      "success": "#6d8f89",
+      "info": 4
+    },
     "why": "Accent is iris. No green (as Rosé Pine): success is Dawn's leaf; info stays foam (ANSI 4) so it is not the same teal as pine. Gold warning is darkened by the guard."
   },
   "atom-one-light": {
@@ -175,7 +183,9 @@
     "pair": "github-dark",
     "upstream": "GitHub Primer, github.com/primer/github-vscode-theme (MIT)",
     "accent": "#0969da",
-    "status": { "warning": "#9a6700" },
+    "status": {
+      "warning": "#9a6700"
+    },
     "why": "Accent is Primer's blue. ANSI yellow is near-black brown (#4d2d00), so warning is Primer's attention.fg. The selection is the foreground (inverted); the guard replaces it."
   }
 }

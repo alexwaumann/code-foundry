@@ -52,6 +52,7 @@ export const PATHS = {
   ghostty: path.join(here, "ghostty"),
   overrides: path.join(here, "overrides.json"),
   indexCss: path.join(here, "../src/index.css"),
+  threadCss: path.join(here, "../src/components/thread/thread.css"),
   catalog: path.join(here, "../src/themes/catalog.json"),
   css: path.join(here, "../src/themes/themes.css"),
 };
@@ -61,8 +62,10 @@ const GHOSTTY_APP = "/Applications/Ghostty.app/Contents/Resources/ghostty/themes
 const NOT_COLOURS = new Set(["--cf-zoom", "--radius"]);
 
 /**
- * thread.css's syntax colours. They are declared on `.cf-thread`, so themes.css sets them
- * there too (`html[data-theme] .cf-thread`, which outranks `.dark .cf-thread`).
+ * thread.css's syntax colours. thread.css declares them on `.cf-thread` as aliases of
+ * terminal slots (`--syn-kw: var(--terminal-ansi-1)`, other slots under `.dark`); the
+ * converter starts from the same aliases, and themes.css patches only the tokens a guard
+ * or override changed, on `html[data-theme] .cf-thread` (which outranks `.dark .cf-thread`).
  */
 export const SYNTAX_VARS = ["--syn-fg", "--syn-kw", "--syn-fn", "--syn-type", "--syn-str", "--syn-com", "--syn-num", "--sh-cmd", "--sh-flag", "--sh-str"] as const;
 
@@ -105,6 +108,33 @@ function cssBlock(css: string, selector: string): Block {
 /** The colour variables index.css declares, in its order. */
 export function indexVarNames(css: string): string[] {
   return [...cssBlock(css, ":root").keys()].filter((k) => !NOT_COLOURS.has(k));
+}
+
+/** Per scheme, each syntax variable and the terminal variable thread.css aliases it to. */
+export type SyntaxAliases = Record<Scheme, Map<string, string>>;
+
+export function syntaxAliases(threadCss: string): SyntaxAliases {
+  const pick = (b: Block) => {
+    const out = new Map<string, string>();
+    for (const [k, val] of b) {
+      if (!(SYNTAX_VARS as readonly string[]).includes(k)) continue;
+      const ref = /^var\((--terminal-[\w-]+)\)$/.exec(val);
+      if (!ref?.[1]) throw new Error(`thread.css: ${k} is not a terminal alias: ${val}`);
+      out.set(k, ref[1]);
+    }
+    return out;
+  };
+  const light = pick(cssBlock(threadCss, ".cf-thread"));
+  const dark = new Map([...light, ...pick(cssBlock(threadCss, ".dark .cf-thread"))]);
+  for (const k of SYNTAX_VARS) if (!light.has(k)) throw new Error(`thread.css: no ${k}`);
+  return { light, dark };
+}
+
+/** The syntax colours as thread.css's aliases resolve them on this theme's terminal palette. */
+function syntaxBase(v: Readonly<Record<string, string>>, scheme: Scheme, aliases: SyntaxAliases): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, term] of aliases[scheme]) out[k] = get(v, term);
+  return out;
 }
 
 /** A Graphite block as hex: var() resolved, alpha colours painted over the pane. */
@@ -177,7 +207,7 @@ function textOn(fill: string, a: string, b: string): string {
 /** Status/syntax text steps away from the pane: lighter on dark, darker on light. */
 const away = (scheme: Scheme) => (scheme === "dark" ? 0.005 : -0.005);
 
-function derive(g: Ghostty, o: Override, names: readonly string[]): Record<string, string> {
+function derive(g: Ghostty, o: Override, names: readonly string[], aliases: SyntaxAliases): Record<string, string> {
   const scheme = schemeOf(g.background);
   const dark = scheme === "dark";
   const p = g.palette;
@@ -236,18 +266,7 @@ function derive(g: Ghostty, o: Override, names: readonly string[]): Record<strin
   v["--terminal-selection"] = g.selection ?? mix(pane, tfg, 0.2);
   p.forEach((c, i) => (v[`--terminal-ansi-${String(i)}`] = c));
 
-  v["--syn-fg"] = fg;
-  v["--syn-kw"] = at(p, 5);
-  v["--syn-fn"] = at(p, 4);
-  v["--syn-type"] = at(p, 3);
-  v["--syn-str"] = at(p, 2);
-  v["--syn-com"] = at(p, 8);
-  v["--syn-num"] = at(p, 6);
-  v["--sh-cmd"] = at(p, 4);
-  v["--sh-flag"] = at(p, 6);
-  v["--sh-str"] = at(p, 2);
-
-  Object.assign(v, o.vars);
+  Object.assign(v, syntaxBase(v, scheme, aliases), o.vars);
   guard(v, scheme);
   // Derived from guarded values.
   v["--link"] = get(v, "--info");
@@ -316,6 +335,7 @@ function ordered(v: Record<string, string>, names: readonly string[]): Record<st
 export interface Inputs {
   overrides: Record<string, Override>;
   indexCss: string;
+  threadCss: string;
   ghostty: (file: string) => string;
 }
 
@@ -323,12 +343,14 @@ export function readInputs(): Inputs {
   return {
     overrides: JSON.parse(fs.readFileSync(PATHS.overrides, "utf8")) as Record<string, Override>,
     indexCss: fs.readFileSync(PATHS.indexCss, "utf8"),
+    threadCss: fs.readFileSync(PATHS.threadCss, "utf8"),
     ghostty: (file) => fs.readFileSync(path.join(PATHS.ghostty, file), "utf8"),
   };
 }
 
 export function buildCatalog(inputs: Inputs): CatalogTheme[] {
   const names = indexVarNames(inputs.indexCss);
+  const aliases = syntaxAliases(inputs.threadCss);
   const out: CatalogTheme[] = [];
   for (const [id, o] of Object.entries(inputs.overrides)) {
     let vars: Record<string, string>;
@@ -336,14 +358,15 @@ export function buildCatalog(inputs: Inputs): CatalogTheme[] {
     let source: string;
     if (o.graphite) {
       scheme = o.graphite;
-      const base = { ...graphiteBase(inputs.indexCss, scheme), ...o.vars };
+      const graphite = graphiteBase(inputs.indexCss, scheme);
+      const base = { ...graphite, ...syntaxBase(graphite, scheme, aliases), ...o.vars };
       guard(base, scheme);
       vars = ordered(base, names);
       source = o.upstream;
     } else if (o.ghostty) {
       const g = parseGhostty(inputs.ghostty(o.ghostty));
       scheme = schemeOf(g.background);
-      vars = derive(g, o, names);
+      vars = derive(g, o, names, aliases);
       source = `${o.upstream}; Ghostty theme "${o.ghostty}" (iTerm2-Color-Schemes, MIT)`;
     } else throw new Error(`${id}: neither ghostty nor graphite`);
     out.push({ id, name: o.name, scheme, ...(o.pair ? { pair: o.pair } : {}), source, vars });
@@ -356,7 +379,7 @@ export function catalogJson(catalog: CatalogTheme[]): string {
   return JSON.stringify(catalog, null, 2) + "\n";
 }
 
-export function themesCss(catalog: CatalogTheme[]): string {
+export function themesCss(catalog: CatalogTheme[], aliases: SyntaxAliases): string {
   const syntax = new Set<string>(SYNTAX_VARS);
   const lines = [
     "/* Generated by themes/convert.ts (`pnpm run themes`) from themes/ghostty and",
@@ -370,7 +393,9 @@ export function themesCss(catalog: CatalogTheme[]): string {
         .filter(([k]) => pred(k))
         .map(([k, val]) => `  ${k}: ${val};`);
     lines.push("", `/* ${t.name} (${t.scheme}) */`, `${sel} {`, `  color-scheme: ${t.scheme};`, ...decl((k) => !syntax.has(k)), "}");
-    lines.push(`${sel} .cf-thread {`, ...decl((k) => syntax.has(k)), "}");
+    // Syntax: only what differs from thread.css's alias of the terminal palette.
+    const patch = decl((k) => syntax.has(k) && t.vars[k] !== t.vars[aliases[t.scheme].get(k) ?? ""]);
+    if (patch.length) lines.push(`${sel} .cf-thread {`, ...patch, "}");
   }
   return lines.join("\n") + "\n";
 }
@@ -387,7 +412,7 @@ function main(): void {
   }
   const catalog = buildCatalog(inputs);
   fs.writeFileSync(PATHS.catalog, catalogJson(catalog));
-  fs.writeFileSync(PATHS.css, themesCss(catalog));
+  fs.writeFileSync(PATHS.css, themesCss(catalog, syntaxAliases(inputs.threadCss)));
   const r = (a: string | undefined, b: string | undefined) => (a && b ? Number(contrast(a, b).toFixed(1)) : NaN);
   console.table(
     catalog.map((t) => {

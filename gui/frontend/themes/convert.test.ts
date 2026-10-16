@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { contrast } from "./color.ts";
-import { buildCatalog, catalogJson, indexVarNames, parseGhostty, PATHS, readInputs, SYNTAX_VARS, themesCss, type Inputs, type Override } from "./convert.ts";
+import { buildCatalog, catalogJson, indexVarNames, parseGhostty, PATHS, readInputs, SYNTAX_VARS, syntaxAliases, themesCss, type Inputs, type Override } from "./convert.ts";
 
 const inputs = readInputs();
 
@@ -12,7 +12,7 @@ describe("generated files", () => {
   it("catalog.json and themes.css match the converter's output", () => {
     const catalog = buildCatalog(inputs);
     expect(fs.readFileSync(PATHS.catalog, "utf8")).toBe(catalogJson(catalog));
-    expect(fs.readFileSync(PATHS.css, "utf8")).toBe(themesCss(catalog));
+    expect(fs.readFileSync(PATHS.css, "utf8")).toBe(themesCss(catalog, syntaxAliases(inputs.threadCss)));
   });
 
   it("every theme has every index.css colour variable and the syntax colours, nothing else", () => {
@@ -52,6 +52,7 @@ function ghosttyFile(o: { bg: string; fg: string; selection?: string; palette?: 
 function convert(file: string, override: Partial<Override> = {}) {
   const fake: Inputs = {
     indexCss: inputs.indexCss,
+    threadCss: inputs.threadCss,
     overrides: { t: { name: "T", ghostty: "t", upstream: "test", why: "test", ...override } },
     ghostty: () => file,
   };
@@ -110,13 +111,24 @@ describe("derivation and guards", () => {
     expect(contrast(v(t, "--terminal-selection"), "#1f2328")).toBeGreaterThanOrEqual(3);
   });
 
+  // thread.css: comments are ANSI 8 on dark themes and ANSI 7 on light ones.
   it.each([
-    ["under 3:1", "#2a2a2a"],
-    ["as strong as the text", "#000000"],
-  ])("a comment colour %s becomes muted-foreground", (_, ansi8) => {
-    const bg = ansi8 === "#000000" ? "#f9f9f9" : "#1e1e1e";
-    const t = convert(ghosttyFile({ bg, fg: ansi8 === "#000000" ? "#2a2c33" : "#dddddd", palette: { 8: ansi8 } }));
+    ["under 3:1 (dark, ANSI 8)", "#1e1e1e", "#dddddd", { 8: "#2a2a2a" }],
+    ["as strong as the text (light, ANSI 7)", "#f9f9f9", "#2a2c33", { 7: "#000000" }],
+  ])("a comment colour %s becomes muted-foreground", (_, bg, fg, pal) => {
+    const t = convert(ghosttyFile({ bg, fg, palette: pal }));
     expect(t.vars["--syn-com"]).toBe(t.vars["--muted-foreground"]);
+  });
+
+  it("syntax starts from thread.css's terminal aliases and themes.css patches only what changed", () => {
+    const aliases = syntaxAliases(inputs.threadCss);
+    expect(aliases.dark.get("--syn-kw")).toBe("--terminal-ansi-5");
+    expect(aliases.light.get("--syn-kw")).toBe("--terminal-ansi-1");
+    const t = convert(ghosttyFile({ bg: "#1e1e1e", fg: "#dddddd", palette: { 8: "#2a2a2a" } }));
+    expect(t.vars["--syn-str"]).toBe(t.vars["--terminal-ansi-2"]);
+    const css = themesCss([t], aliases);
+    expect(css).toContain(`--syn-com: ${v(t, "--muted-foreground")};`);
+    expect(css).not.toContain("--syn-str:");
   });
 
   it("an accent becomes the primary with readable text, preferring dark text", () => {
