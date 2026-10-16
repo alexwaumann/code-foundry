@@ -25,7 +25,7 @@ export function UpdateIndicator() {
   return (
     <button
       type="button"
-      className={cn("mb-1 flex h-[22px] w-full min-w-0 items-center gap-1.5 rounded-md pr-[9px] pl-2 text-left text-[11px] font-medium transition-colors", className)}
+      className={cn("mb-1 flex h-[22px] w-full min-w-0 items-center gap-1.5 rounded-md pr-[9px] pl-2 text-left text-caption-sm font-medium transition-colors", className)}
       onClick={() => {
         openUpdateDialog();
       }}

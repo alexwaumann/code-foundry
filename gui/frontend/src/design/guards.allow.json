@@ -22,7 +22,5 @@
   "gui/frontend/src/components/themes/ThemeChip.tsx": { "size": 1, "leading": 0, "radius": 1 },
   "gui/frontend/src/components/themes/ThemeGallery.tsx": { "size": 30, "leading": 0, "radius": 1 },
   "gui/frontend/src/components/themes/ThemesPage.tsx": { "size": 13, "leading": 0, "radius": 0 },
-  "gui/frontend/src/components/update/UpdateDialog.tsx": { "size": 12, "leading": 1, "radius": 3 },
-  "gui/frontend/src/components/update/UpdateIndicator.tsx": { "size": 1, "leading": 0, "radius": 0 },
   "gui/frontend/src/surfaces/Placeholder.tsx": { "size": 1, "leading": 0, "radius": 0 }
 }

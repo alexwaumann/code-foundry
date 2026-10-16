@@ -81,7 +81,7 @@ function Meta({ items, lead }: { items: ReactNode[]; lead: string }) {
   const shown = items.filter((x) => x !== null && x !== "");
   if (shown.length === 0 && !lead) return null;
   return (
-    <div className="mt-4 grid gap-1 text-[11px] text-muted-foreground" data-testid="update-meta">
+    <div className="mt-4 grid gap-1 text-caption-sm" data-testid="update-meta">
       {lead && <div data-testid="update-meta-lead">{lead}</div>}
       {shown.length > 0 && (
         <div className="flex items-center justify-center gap-2">
@@ -123,7 +123,7 @@ function BusyThreads() {
   const ids = useCutOffThreadIds();
   if (ids.length === 0) return null;
   return (
-    <div className="mx-auto mt-3.5 max-w-[330px] rounded-lg border border-pane-border px-3 py-2 text-left text-xs" data-testid="update-busy-threads">
+    <div className="mx-auto mt-3.5 max-w-[330px] rounded-lg border border-pane-border px-3 py-2 text-left text-body-sm" data-testid="update-busy-threads">
       <div className="mb-1 flex items-center gap-[7px] font-medium text-warning" data-testid="update-busy-heading">
         <span className="size-1.5 shrink-0 rounded-full bg-current" aria-hidden />
         {busyHeading(ids.length)}
@@ -137,11 +137,11 @@ function BusyThreads() {
 
 function Failure({ reason }: { reason: string }) {
   return (
-    <div className="mt-3.5 flex gap-[9px] rounded-lg bg-destructive/10 px-3 py-2.5 text-left text-xs">
+    <div className="mt-3.5 flex gap-[9px] rounded-lg bg-destructive/10 px-3 py-2.5 text-left text-body-sm">
       <TriangleAlert className="mt-px size-3.5 shrink-0 text-destructive" aria-hidden />
       <div className="min-w-0">
         {failureHeadline(reason)}
-        <pre className="mt-[3px] max-h-32 overflow-auto font-mono text-[11px] break-words whitespace-pre-wrap text-muted-foreground select-text" data-testid="update-failure">
+        <pre className="mt-[3px] max-h-32 overflow-auto text-caption-sm font-mono break-words whitespace-pre-wrap select-text" data-testid="update-failure">
           {reason}
         </pre>
       </div>
@@ -157,7 +157,7 @@ function PrimaryButton({ p, label }: { p: Primary; label: string }) {
   return (
     <Button
       variant={p.outline ? "outline" : "default"}
-      className="h-8 w-full gap-[7px] rounded-[7px] text-[13px] [&_svg:not([class*='size-'])]:size-3.5"
+      className="h-8 w-full gap-[7px] rounded-md [&_svg:not([class*='size-'])]:size-3.5"
       disabled={pending !== null || busy}
       onClick={() => void runUpdateAction(p.action)}
       data-testid={`update-${p.action}`}
@@ -170,7 +170,7 @@ function PrimaryButton({ p, label }: { p: Primary; label: string }) {
 
 function LaterLink({ label }: { label: string }) {
   return (
-    <button type="button" className="mx-auto text-[12.5px] text-muted-foreground hover:text-foreground" onClick={closeUpdateDialog} data-testid="update-later">
+    <button type="button" className="mx-auto text-caption hover:text-foreground" onClick={closeUpdateDialog} data-testid="update-later">
       {label}
     </button>
   );
@@ -183,25 +183,25 @@ function Body({ st, v }: { st: UpdateStatusView; v: UpdateView }) {
   const checkError = st.lastCheckError && (v.variant === "upToDate" || v.variant === "available") ? st.lastCheckError : "";
   return (
     <>
-      <DialogDescription className="mx-auto mt-1.5 max-w-[330px] text-[12.5px] text-muted-foreground">{v.body}</DialogDescription>
+      <DialogDescription className="mx-auto mt-1.5 max-w-[330px]">{v.body}</DialogDescription>
       {v.showBusy && <BusyThreads />}
       {v.variant === "failed" && <Failure reason={st.failureReason} />}
       {v.variant === "downloading" && (
         <>
           <Progress className="mt-[18px] h-1" aria-label="Downloading the update" data-testid="update-progress-bar" />
-          <p className="mt-[7px] truncate text-left font-mono text-[11.5px] text-muted-foreground" data-testid="update-progress">
+          <p className="mt-[7px] truncate text-left text-caption-sm font-mono" data-testid="update-progress">
             {st.progress}
           </p>
         </>
       )}
       {v.variant === "restarting" && <Progress className="mt-4 h-1" aria-label="Restarting" data-testid="update-progress-bar" />}
       {checkError && (
-        <p className="mt-3 text-[11.5px] text-warning" data-testid="update-check-error">
+        <p className="mt-3 text-caption-sm text-warning" data-testid="update-check-error">
           Last check failed: {checkError}
         </p>
       )}
       {error && (
-        <p className="mt-3 text-[11.5px] break-words text-destructive" data-testid="update-error">
+        <p className="mt-3 text-caption-sm break-words text-destructive" data-testid="update-error">
           {error}
         </p>
       )}
@@ -238,7 +238,7 @@ export function UpdateDialog() {
       }}
     >
       <DialogContent
-        className="max-w-[400px] rounded-[10px] border-pane-border px-6 pt-[26px] pb-[18px] text-center text-[13px] leading-[1.45]"
+        className="max-w-[400px] border-pane-border px-6 pt-[26px] pb-[18px] text-center text-body-sm"
         data-testid="update-dialog"
         data-state-name={st?.state ?? "unknown"}
         data-variant={v?.variant ?? "waiting"}
@@ -254,8 +254,8 @@ export function UpdateDialog() {
             <X className="size-[13px]" aria-hidden />
           </button>
         )}
-        <img src="/appicon.png" alt="" className="mx-auto mb-3 block size-16 rounded-[15px]" draggable={false} />
-        <DialogTitle className="text-[15px] font-semibold" data-testid="update-state">
+        <img src="/appicon.png" alt="" className="mx-auto mb-3 block size-16 rounded-2xl" draggable={false} />
+        <DialogTitle data-testid="update-state">
           {v?.title ?? "Waiting for the daemon…"}
         </DialogTitle>
         {st && v ? <Body st={st} v={v} /> : <DialogDescription className="sr-only">Software update</DialogDescription>}
