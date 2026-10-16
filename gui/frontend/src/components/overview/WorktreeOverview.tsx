@@ -206,7 +206,19 @@ function Changes({ detail, error, rows, base }: { detail: WorktreeDetailView | n
         <span>Changes</span>
         {detail && rows.length > 0 && (
           <span className="truncate text-caption tabular-nums" data-testid="changes-totals">
-            {totals.count} {totals.count === 1 ? "file" : "files"} · <span className="text-success">+{totals.added}</span> <span className="text-destructive">−{totals.deleted}</span>
+            {totals.count} {totals.count === 1 ? "file" : "files"}
+            {totals.added > 0 && (
+              <>
+                {" · "}
+                <span className="text-success">+{totals.added}</span>
+              </>
+            )}
+            {totals.deleted > 0 && (
+              <>
+                {totals.added > 0 ? " " : " · "}
+                <span className="text-destructive">−{totals.deleted}</span>
+              </>
+            )}
           </span>
         )}
         {detail?.error && (

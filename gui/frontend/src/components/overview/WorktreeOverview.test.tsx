@@ -188,6 +188,8 @@ describe("WorktreePanelView", () => {
     expect(strip.textContent).toBe("Rebase in progress · 2 conflictsstep 3/6");
     expect(screen.getByTestId("fact-tree").textContent).toBe("working tree2 unmerged");
     expect(screen.getByTestId("fact-origin").textContent).toBe("originnot pushed");
+    // Totals leave out a zero side, like the rows.
+    expect(screen.getByTestId("changes-totals").textContent).toBe("3 files · +2");
     // Detached mid-rebase: no branch, so no pull request row.
     expect(q("overview-pr")).toBeNull();
     const names = within(screen.getByTestId("worktree-changes")).getAllByTestId("file-path").map((e) => e.textContent);
