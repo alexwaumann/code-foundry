@@ -75,7 +75,14 @@ type Status struct {
 	BaseRef    string
 	BaseAhead  int
 	BaseBehind int
-	Error      string // last refresh error; other fields are stale when set
+	// Operation is the git operation in progress (OpRebase, OpAm, OpMerge,
+	// OpCherryPick, OpRevert, OpBisect) or "", read from marker files in the
+	// worktree's admin dir (operation.go). OperationStep and OperationTotal are a
+	// rebase's (or am's) current and last patch, 1-based; 0 when not recorded.
+	Operation      string
+	OperationStep  int
+	OperationTotal int
+	Error          string // last refresh error; other fields are stale when set
 	// RefreshedAt is zero until the first refresh. After that, in a Snapshot it is the
 	// last refresh that changed something (refreshes that change nothing do not
 	// rebuild the snapshot), so it is not a "last checked" time.

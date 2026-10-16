@@ -38,6 +38,8 @@ func TestMergedCleanReason(t *testing.T) {
 		{"modified", with(func(w *Worktree) { w.Status.Modified = 1 }), "uncommitted changes"},
 		{"untracked", with(func(w *Worktree) { w.Status.Untracked = 1 }), "uncommitted changes"},
 		{"conflicted", with(func(w *Worktree) { w.Status.Conflicted = 1 }), "uncommitted changes"},
+		{"operation in progress", with(func(w *Worktree) { w.Status.Operation = OpBisect }), "bisect in progress"},
+		{"operation wins over dirty", with(func(w *Worktree) { w.Status.Operation, w.Status.Dirty = OpMerge, true }), "merge in progress"},
 		{"no base ref", with(func(w *Worktree) { w.Status.BaseRef = "" }), "no remote default branch to compare with"},
 		{"one commit ahead", with(func(w *Worktree) { w.Status.BaseAhead = 1 }), "1 commit not in origin/main"},
 		{"commits ahead", with(func(w *Worktree) { w.Status.BaseAhead = 3 }), "3 commits not in origin/main"},

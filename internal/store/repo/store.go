@@ -111,6 +111,9 @@ type wtSlot struct {
 	// the status job.
 	base  atomic.Pointer[baseCount]
 	admin string // linked worktree admin dir; guarded by Git.mu
+	// gitDir is the worktree's git admin dir (worktreeAdminDir), where the status job
+	// reads operation markers (operation.go). Resolved by reconcile; guarded by Git.mu.
+	gitDir string
 }
 
 // Git is the daemon's Store, backed by the git CLI.
@@ -835,12 +838,17 @@ func (g *Git) reconcile(ctx context.Context, id string) {
 	// the first event after the flip already carries the branch.
 	gitChanged := next.Git != prev.Git
 
-	// Resolve linked worktrees' admin dirs outside the lock (file reads).
+	// Resolve linked worktrees' admin dirs, and the main worktree's git dir, outside
+	// the lock (file reads).
 	admins := make(map[string]string, len(listed))
 	for _, l := range listed[min(1, len(listed)):] {
 		if a, err := readGitFile(l.Path); err == nil {
 			admins[l.Path] = a
 		}
+	}
+	var mainGitDir string
+	if len(listed) > 0 && next.Git {
+		mainGitDir = worktreeAdminDir(listed[0].Path)
 	}
 
 	g.mu.Lock()
@@ -867,6 +875,10 @@ func (g *Git) reconcile(ctx context.Context, id string) {
 			setChanged = true
 		}
 		slot.admin = admins[l.Path]
+		slot.gitDir = slot.admin
+		if isMain {
+			slot.gitDir = mainGitDir
+		}
 		wwts = append(wwts, watchWorktree{path: l.Path, isMain: isMain, admin: slot.admin})
 	}
 	for p := range st.wts {
@@ -1038,6 +1050,9 @@ func (g *Git) status(ctx context.Context, repoID, path string) {
 	prev := *slot.cur.Load()
 	next := prev
 	now := g.now()
+	g.mu.RLock()
+	gitDir := slot.gitDir
+	g.mu.RUnlock()
 
 	out, err := g.runner.Run(ctx, path, "status", "--porcelain=v2", "--branch", "-z")
 	var info statusInfo
@@ -1053,11 +1068,13 @@ func (g *Git) status(ctx context.Context, repoID, path string) {
 		g.log.Debug("status failed", "repo", repoID, "path", path, "err", err)
 	} else {
 		next.Branch, next.Head, next.Detached = info.Branch, info.Head, info.Detached
+		op := readOperation(gitDir) // marker files only, no git command
 		next.Status = Status{
 			Upstream: info.Upstream, Ahead: info.Ahead, Behind: info.Behind,
 			Staged: info.Staged, Modified: info.Modified, Untracked: info.Untracked,
-			Conflicted:  info.Conflicted,
-			Dirty:       info.Staged+info.Modified+info.Untracked+info.Conflicted > 0,
+			Conflicted: info.Conflicted,
+			Dirty:      info.Staged+info.Modified+info.Untracked+info.Conflicted > 0,
+			Operation:  op.Op, OperationStep: op.Step, OperationTotal: op.Total,
 			RefreshedAt: now,
 		}
 		if c, ok, reused := g.baseCounts(ctx, st, slot, path, info.Head); ok {

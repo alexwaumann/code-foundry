@@ -29,6 +29,8 @@ func MergedCleanReason(w Worktree) string {
 		return "git status failed: " + st.Error
 	case st.RefreshedAt.IsZero():
 		return "git status not read yet"
+	case st.Operation != "":
+		return st.Operation + " in progress"
 	case st.Dirty || st.Staged+st.Modified+st.Untracked+st.Conflicted > 0:
 		return "uncommitted changes"
 	case st.BaseRef == "":

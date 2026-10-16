@@ -168,11 +168,11 @@ deeper. Watched directories per repo (`<common>` = `<main>/.git`):
 
 | Directory | Entry → action |
 |---|---|
-| `<common>` | `HEAD`, `index` → status(main). `FETCH_HEAD`, `packed-refs`, `config`, `worktrees` → reconcile. `config.lock` created → reconcile too (see below) |
+| `<common>` | `HEAD`, `index` → status(main). `FETCH_HEAD`, `packed-refs`, `config`, `worktrees` → reconcile. `config.lock` created → reconcile too (see below). Operation markers (`rebase-merge`, `rebase-apply`, `MERGE_HEAD`, `CHERRY_PICK_HEAD`, `REVERT_HEAD`, `BISECT_LOG`) → status(main) (`docs/notes/worktree-op-state.md`) |
 | `<common>/logs` | `HEAD` (reflog append: commit, reset, rebase, merge, pull, checkout) → status(main) |
 | `<common>/refs/remotes/origin` | anything → base(repo), which then runs status(all worktrees) (push or fetch moved a remote-tracking ref) |
 | `<common>/worktrees` | entry created, removed, or renamed → reconcile (`git worktree add/remove/prune` from anywhere) |
-| `<common>/worktrees/<name>` | `HEAD`, `index` → status(that worktree) |
+| `<common>/worktrees/<name>` | `HEAD`, `index`, operation markers → status(that worktree) |
 | `<common>/worktrees/<name>/logs` | `HEAD` → status(that worktree) |
 | each worktree root | any entry except `.git` → status(that worktree) |
 | a watched dir itself removed or renamed | → reconcile (worktree deleted by hand, repo moved) |
