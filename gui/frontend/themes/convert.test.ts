@@ -138,8 +138,15 @@ describe("derivation and guards", () => {
     const t = convert(ghosttyFile({ bg: "#1e1e1e", fg: "#dddddd", palette: { 8: "#2a2a2a" } }));
     expect(t.vars["--syn-str"]).toBe(t.vars["--terminal-ansi-2"]);
     const css = themesCss([t], aliases);
-    expect(css).toContain(`--syn-com: ${v(t, "--muted-foreground")};`);
-    expect(css).not.toContain("--syn-str:");
+    const block = (sel: string) => css.slice(css.indexOf(`${sel} {`), css.indexOf("}", css.indexOf(`${sel} {`)));
+    const patch = block(`html[data-theme="${t.id}"] .cf-thread`);
+    expect(patch).toContain(`--syn-com: ${v(t, "--muted-foreground")};`);
+    expect(patch).not.toContain("--syn-str:");
+    // A nested scope (the Themes page's preview) carries every syntax colour, so the window
+    // theme's patch cannot leak into it.
+    const scoped = block(`[data-theme-scope][data-theme="${t.id}"] .cf-thread`);
+    for (const k of SYNTAX_VARS) expect(scoped).toContain(`${k}: ${v(t, k)};`);
+    expect(css).toContain(`html[data-theme="${t.id}"],\n[data-theme-scope][data-theme="${t.id}"] {`);
   });
 
   it("an accent becomes the primary with readable text, preferring dark text", () => {
