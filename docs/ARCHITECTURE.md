@@ -139,7 +139,7 @@ Services (v1):
   remove the thread's shells, unpin, stamp `archived_at`; pin and send
   unarchive; `docs/notes/archive-threads-1-daemon.md`), Snooze (close, remove the
   thread's shells, unpin, unarchive, set `snoozed_until`; the store wakes it on the wall
-  clock into NEEDS_ATTENTION "snooze ended"; `docs/notes/snooze-threads-1-daemon.md`), Watch (server stream of every thread), StageAttachment (images the first prompt refers to).
+  clock into NEEDS_ATTENTION "snooze ended"; `docs/notes/snooze-threads-1-daemon.md`), Watch (server stream of every thread), StageAttachment (images and PDFs a message refers to; `docs/notes/pdf-attachments-1-daemon.md`).
   Close and Reconnect remain in the proto for compatibility; no command calls them: the
   daemon starts a thread's process when a message is sent and stops it once the thread
   has idled at its prompt past its prompt cache expiry
