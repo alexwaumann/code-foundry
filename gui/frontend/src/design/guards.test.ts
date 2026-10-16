@@ -77,6 +77,7 @@ describe("scanSource", () => {
     ["every occurrence counts", `const c = "text-sm hover:text-sm md:text-lg";`, ["size:text-sm", "size:text-sm", "size:text-lg"]],
     ["scale radii and roles pass", `const c = "rounded-md rounded-pane rounded-t-lg rounded-full text-body text-caption-sm text-body-sm font-mono";`, []],
     ["weights on a role pass", `const c = "text-label font-semibold text-caption font-medium";`, []],
+    ["arbitrary colours are not sizes", `const c = "text-[color-mix(in_oklab,var(--a)_22%,var(--b))] text-[0.86em]";`, ["size:text-[0.86em]"]],
     ["colours pass", `const c = "text-muted-foreground text-link text-foreground/80";`, []],
     ["comments are not read", "// text-sm rounded\n/* font-bold */ const x = 1;", []],
     ["JSX text is not read", `<p>a rounded corner, text-sm</p>`, []],

@@ -18,7 +18,9 @@ export type Allowlist = Record<string, Counts>;
 
 /** What each category bans. Global: every occurrence counts. */
 export const PATTERNS: Record<Category, readonly RegExp[]> = {
-  size: [/\btext-(?:xs|sm|base|lg|xl|2xl|3xl)\b/g, /\btext-\[[^\]]+\]/g],
+  // An arbitrary text-[…] is a size unless it is a colour (`text-[color-mix(…)]`); the
+  // palette guard (lib/palette.test.ts) polices arbitrary colours.
+  size: [/\btext-(?:xs|sm|base|lg|xl|2xl|3xl)\b/g, /\btext-\[(?!(?:color:|color-mix\(|oklch\(|oklab\(|rgba?\(|hsla?\(|#))[^\]]+\]/g],
   leading: [/\bleading-\[[^\]]+\]/g],
   radius: [/\brounded\b(?!-)/g, /\brounded-\[[^\]]+\]/g],
 };

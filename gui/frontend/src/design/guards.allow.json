@@ -16,7 +16,7 @@
   "gui/frontend/src/components/compose/ProjectSwitcher.tsx": { "size": 1, "leading": 0, "radius": 0 },
   "gui/frontend/src/components/compose/PromptEditor.tsx": { "size": 2, "leading": 0, "radius": 0 },
   "gui/frontend/src/components/compose/TagView.tsx": { "size": 1, "leading": 0, "radius": 0 },
-  "gui/frontend/src/components/compose/tagStyle.ts": { "size": 2, "leading": 0, "radius": 2 },
+  "gui/frontend/src/components/compose/tagStyle.ts": { "size": 1, "leading": 0, "radius": 2 },
   "gui/frontend/src/components/gitops/GitOpToast.tsx": { "size": 3, "leading": 0, "radius": 1 },
   "gui/frontend/src/components/help/HelpOverlay.tsx": { "size": 5, "leading": 0, "radius": 1 },
   "gui/frontend/src/components/palette/CommandPalette.tsx": { "size": 4, "leading": 0, "radius": 1 },
