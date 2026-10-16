@@ -36,13 +36,24 @@ export default defineConfig([
   },
   {
     // Generated protobuf types are only allowed in src/api (see CLAUDE.md).
+    // cn comes from @/lib/utils, which teaches it the design tokens (type roles, rounded-pane).
     files: ["src/**/*.{ts,tsx}"],
-    ignores: ["src/api/**"],
+    ignores: ["src/api/**", "src/lib/utils.ts"],
     rules: {
       "no-restricted-imports": [
         "error",
-        { patterns: [{ group: ["@/gen/*", "**/gen/*"], message: "Import generated protobuf types only in src/api/." }] },
+        {
+          paths: [{ name: "cn", message: "Import cn from @/lib/utils: it knows the design tokens (src/design/tokens.ts)." }],
+          patterns: [{ group: ["@/gen/*", "**/gen/*"], message: "Import generated protobuf types only in src/api/." }],
+        },
       ],
+    },
+  },
+  {
+    // src/api may import generated types, but cn still comes from @/lib/utils.
+    files: ["src/api/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": ["error", { paths: [{ name: "cn", message: "Import cn from @/lib/utils." }] }],
     },
   },
   {

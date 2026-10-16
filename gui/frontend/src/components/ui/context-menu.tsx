@@ -1,7 +1,7 @@
 import * as React from "react"
 import { ContextMenu as ContextMenuPrimitive } from "radix-ui"
 import { ChevronRightIcon } from "lucide-react"
-import { cn } from "cn"
+import { cn } from "@/lib/utils"
 import { useZoomFactor, zoomPx } from "@/lib/zoom"
 
 const contentClass =

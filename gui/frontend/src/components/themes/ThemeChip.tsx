@@ -1,4 +1,4 @@
-import { cn } from "cn";
+import { cn } from "@/lib/utils";
 import type { Theme } from "@/themes";
 
 /** The status colours a list row shows, in this order. */

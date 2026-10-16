@@ -1,6 +1,6 @@
 import * as React from "react"
 import { Popover as PopoverPrimitive } from "radix-ui"
-import { cn } from "cn"
+import { cn } from "@/lib/utils"
 import { useZoomFactor, zoomPx } from "@/lib/zoom"
 
 function Popover({ ...props }: React.ComponentProps<typeof PopoverPrimitive.Root>) {
