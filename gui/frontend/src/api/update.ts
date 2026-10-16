@@ -1,7 +1,7 @@
 import { timestampDate } from "@bufbuild/protobuf/wkt";
 import { UpdateState, type UpdateEvent, type UpdateStatus } from "@/gen/codefoundry/v1/update_pb";
 
-export type UpdateStateView = "idle" | "available" | "downloading" | "installed" | "restartRequired" | "failed";
+export type UpdateStateView = "idle" | "available" | "downloading" | "downloaded" | "installed" | "restartRequired" | "failed";
 
 /** The release channel the updater follows (the update.channel setting). */
 export type UpdateChannel = "stable" | "tip";
@@ -38,6 +38,7 @@ const stateMap: Record<UpdateState, UpdateStateView> = {
   [UpdateState.INSTALLED]: "installed",
   [UpdateState.RESTART_REQUIRED]: "restartRequired",
   [UpdateState.FAILED]: "failed",
+  [UpdateState.DOWNLOADED]: "downloaded",
 };
 
 export function toUpdateStatusView(s: UpdateStatus): UpdateStatusView {

@@ -30,16 +30,22 @@ const (
 	UpdateState_UPDATE_STATE_IDLE UpdateState = 1
 	// target_version is newer than what is running and installed.
 	UpdateState_UPDATE_STATE_AVAILABLE UpdateState = 2
-	// The installer is downloading and installing target_version.
+	// The installer is downloading and staging target_version beside the app directory;
+	// nothing on disk changes yet.
 	UpdateState_UPDATE_STATE_DOWNLOADING UpdateState = 3
-	// target_version is installed on disk. The GUI needs a relaunch and the daemon a
+	// The install on disk is newer than the running daemon: target_version was installed
+	// (by Install, or outside the app) and the GUI needs a relaunch and the daemon a
 	// restart to run it (`app.restart` does both).
 	UpdateState_UPDATE_STATE_INSTALLED UpdateState = 4
-	// target_version is installed and the GUI was asked to relaunch; the daemon still
-	// runs current_version until `daemon.restart` (or `app.restart`).
+	// As INSTALLED, and the GUI was asked to relaunch; the daemon still runs
+	// current_version until `daemon.restart` (or `app.restart`).
 	UpdateState_UPDATE_STATE_RESTART_REQUIRED UpdateState = 5
-	// Installing target_version failed (failure_reason). Install may be retried.
+	// Downloading or installing target_version failed (failure_reason). Download may be
+	// retried.
 	UpdateState_UPDATE_STATE_FAILED UpdateState = 6
+	// target_version is downloaded and staged; the install on disk is unchanged.
+	// `app.restart` installs it and restarts the daemon and the window together.
+	UpdateState_UPDATE_STATE_DOWNLOADED UpdateState = 7
 )
 
 // Enum value maps for UpdateState.
@@ -52,6 +58,7 @@ var (
 		4: "UPDATE_STATE_INSTALLED",
 		5: "UPDATE_STATE_RESTART_REQUIRED",
 		6: "UPDATE_STATE_FAILED",
+		7: "UPDATE_STATE_DOWNLOADED",
 	}
 	UpdateState_value = map[string]int32{
 		"UPDATE_STATE_UNSPECIFIED":      0,
@@ -61,6 +68,7 @@ var (
 		"UPDATE_STATE_INSTALLED":        4,
 		"UPDATE_STATE_RESTART_REQUIRED": 5,
 		"UPDATE_STATE_FAILED":           6,
+		"UPDATE_STATE_DOWNLOADED":       7,
 	}
 )
 
@@ -111,7 +119,8 @@ type UpdateStatus struct {
 	// Latest release tag of the channel seen by the last successful check ("" until the
 	// first check after a channel change).
 	LatestVersion string `protobuf:"bytes,9,opt,name=latest_version,json=latestVersion,proto3" json:"latest_version,omitempty"`
-	// The version AVAILABLE / DOWNLOADING / INSTALLED / RESTART_REQUIRED / FAILED refer to.
+	// The version AVAILABLE / DOWNLOADING / DOWNLOADED / INSTALLED / RESTART_REQUIRED /
+	// FAILED refer to.
 	TargetVersion string `protobuf:"bytes,10,opt,name=target_version,json=targetVersion,proto3" json:"target_version,omitempty"`
 	// Release page for target_version.
 	NotesUrl string `protobuf:"bytes,11,opt,name=notes_url,json=notesUrl,proto3" json:"notes_url,omitempty"`
@@ -591,6 +600,86 @@ func (x *CheckForUpdateResponse) GetStatus() *UpdateStatus {
 	return nil
 }
 
+type DownloadUpdateRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DownloadUpdateRequest) Reset() {
+	*x = DownloadUpdateRequest{}
+	mi := &file_codefoundry_v1_update_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DownloadUpdateRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DownloadUpdateRequest) ProtoMessage() {}
+
+func (x *DownloadUpdateRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_update_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DownloadUpdateRequest.ProtoReflect.Descriptor instead.
+func (*DownloadUpdateRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_update_proto_rawDescGZIP(), []int{8}
+}
+
+type DownloadUpdateResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Status        *UpdateStatus          `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DownloadUpdateResponse) Reset() {
+	*x = DownloadUpdateResponse{}
+	mi := &file_codefoundry_v1_update_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DownloadUpdateResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DownloadUpdateResponse) ProtoMessage() {}
+
+func (x *DownloadUpdateResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_update_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DownloadUpdateResponse.ProtoReflect.Descriptor instead.
+func (*DownloadUpdateResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_update_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *DownloadUpdateResponse) GetStatus() *UpdateStatus {
+	if x != nil {
+		return x.Status
+	}
+	return nil
+}
+
 type InstallUpdateRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -599,7 +688,7 @@ type InstallUpdateRequest struct {
 
 func (x *InstallUpdateRequest) Reset() {
 	*x = InstallUpdateRequest{}
-	mi := &file_codefoundry_v1_update_proto_msgTypes[8]
+	mi := &file_codefoundry_v1_update_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -611,7 +700,7 @@ func (x *InstallUpdateRequest) String() string {
 func (*InstallUpdateRequest) ProtoMessage() {}
 
 func (x *InstallUpdateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_update_proto_msgTypes[8]
+	mi := &file_codefoundry_v1_update_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -624,7 +713,7 @@ func (x *InstallUpdateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InstallUpdateRequest.ProtoReflect.Descriptor instead.
 func (*InstallUpdateRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_update_proto_rawDescGZIP(), []int{8}
+	return file_codefoundry_v1_update_proto_rawDescGZIP(), []int{10}
 }
 
 type InstallUpdateResponse struct {
@@ -636,7 +725,7 @@ type InstallUpdateResponse struct {
 
 func (x *InstallUpdateResponse) Reset() {
 	*x = InstallUpdateResponse{}
-	mi := &file_codefoundry_v1_update_proto_msgTypes[9]
+	mi := &file_codefoundry_v1_update_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -648,7 +737,7 @@ func (x *InstallUpdateResponse) String() string {
 func (*InstallUpdateResponse) ProtoMessage() {}
 
 func (x *InstallUpdateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_update_proto_msgTypes[9]
+	mi := &file_codefoundry_v1_update_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -661,7 +750,7 @@ func (x *InstallUpdateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InstallUpdateResponse.ProtoReflect.Descriptor instead.
 func (*InstallUpdateResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_update_proto_rawDescGZIP(), []int{9}
+	return file_codefoundry_v1_update_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *InstallUpdateResponse) GetStatus() *UpdateStatus {
@@ -679,7 +768,7 @@ type RelaunchAppRequest struct {
 
 func (x *RelaunchAppRequest) Reset() {
 	*x = RelaunchAppRequest{}
-	mi := &file_codefoundry_v1_update_proto_msgTypes[10]
+	mi := &file_codefoundry_v1_update_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -691,7 +780,7 @@ func (x *RelaunchAppRequest) String() string {
 func (*RelaunchAppRequest) ProtoMessage() {}
 
 func (x *RelaunchAppRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_update_proto_msgTypes[10]
+	mi := &file_codefoundry_v1_update_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -704,7 +793,7 @@ func (x *RelaunchAppRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RelaunchAppRequest.ProtoReflect.Descriptor instead.
 func (*RelaunchAppRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_update_proto_rawDescGZIP(), []int{10}
+	return file_codefoundry_v1_update_proto_rawDescGZIP(), []int{12}
 }
 
 type RelaunchAppResponse struct {
@@ -717,7 +806,7 @@ type RelaunchAppResponse struct {
 
 func (x *RelaunchAppResponse) Reset() {
 	*x = RelaunchAppResponse{}
-	mi := &file_codefoundry_v1_update_proto_msgTypes[11]
+	mi := &file_codefoundry_v1_update_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -729,7 +818,7 @@ func (x *RelaunchAppResponse) String() string {
 func (*RelaunchAppResponse) ProtoMessage() {}
 
 func (x *RelaunchAppResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_update_proto_msgTypes[11]
+	mi := &file_codefoundry_v1_update_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -742,7 +831,7 @@ func (x *RelaunchAppResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RelaunchAppResponse.ProtoReflect.Descriptor instead.
 func (*RelaunchAppResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_update_proto_rawDescGZIP(), []int{11}
+	return file_codefoundry_v1_update_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *RelaunchAppResponse) GetDelivered() int32 {
@@ -760,7 +849,7 @@ type RequestRestartRequest struct {
 
 func (x *RequestRestartRequest) Reset() {
 	*x = RequestRestartRequest{}
-	mi := &file_codefoundry_v1_update_proto_msgTypes[12]
+	mi := &file_codefoundry_v1_update_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -772,7 +861,7 @@ func (x *RequestRestartRequest) String() string {
 func (*RequestRestartRequest) ProtoMessage() {}
 
 func (x *RequestRestartRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_update_proto_msgTypes[12]
+	mi := &file_codefoundry_v1_update_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -785,7 +874,7 @@ func (x *RequestRestartRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RequestRestartRequest.ProtoReflect.Descriptor instead.
 func (*RequestRestartRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_update_proto_rawDescGZIP(), []int{12}
+	return file_codefoundry_v1_update_proto_rawDescGZIP(), []int{14}
 }
 
 type RequestRestartResponse struct {
@@ -798,7 +887,7 @@ type RequestRestartResponse struct {
 
 func (x *RequestRestartResponse) Reset() {
 	*x = RequestRestartResponse{}
-	mi := &file_codefoundry_v1_update_proto_msgTypes[13]
+	mi := &file_codefoundry_v1_update_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -810,7 +899,7 @@ func (x *RequestRestartResponse) String() string {
 func (*RequestRestartResponse) ProtoMessage() {}
 
 func (x *RequestRestartResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_update_proto_msgTypes[13]
+	mi := &file_codefoundry_v1_update_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -823,7 +912,7 @@ func (x *RequestRestartResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RequestRestartResponse.ProtoReflect.Descriptor instead.
 func (*RequestRestartResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_update_proto_rawDescGZIP(), []int{13}
+	return file_codefoundry_v1_update_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *RequestRestartResponse) GetDelivered() int32 {
@@ -841,7 +930,7 @@ type WatchUpdateRequest struct {
 
 func (x *WatchUpdateRequest) Reset() {
 	*x = WatchUpdateRequest{}
-	mi := &file_codefoundry_v1_update_proto_msgTypes[14]
+	mi := &file_codefoundry_v1_update_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -853,7 +942,7 @@ func (x *WatchUpdateRequest) String() string {
 func (*WatchUpdateRequest) ProtoMessage() {}
 
 func (x *WatchUpdateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_update_proto_msgTypes[14]
+	mi := &file_codefoundry_v1_update_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -866,7 +955,7 @@ func (x *WatchUpdateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchUpdateRequest.ProtoReflect.Descriptor instead.
 func (*WatchUpdateRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_update_proto_rawDescGZIP(), []int{14}
+	return file_codefoundry_v1_update_proto_rawDescGZIP(), []int{16}
 }
 
 var File_codefoundry_v1_update_proto protoreflect.FileDescriptor
@@ -902,6 +991,9 @@ const file_codefoundry_v1_update_proto_rawDesc = "" +
 	"\x06status\x18\x01 \x01(\v2\x1c.codefoundry.v1.UpdateStatusR\x06status\"\x17\n" +
 	"\x15CheckForUpdateRequest\"N\n" +
 	"\x16CheckForUpdateResponse\x124\n" +
+	"\x06status\x18\x01 \x01(\v2\x1c.codefoundry.v1.UpdateStatusR\x06status\"\x17\n" +
+	"\x15DownloadUpdateRequest\"N\n" +
+	"\x16DownloadUpdateResponse\x124\n" +
 	"\x06status\x18\x01 \x01(\v2\x1c.codefoundry.v1.UpdateStatusR\x06status\"\x16\n" +
 	"\x14InstallUpdateRequest\"M\n" +
 	"\x15InstallUpdateResponse\x124\n" +
@@ -912,7 +1004,7 @@ const file_codefoundry_v1_update_proto_rawDesc = "" +
 	"\x15RequestRestartRequest\"6\n" +
 	"\x16RequestRestartResponse\x12\x1c\n" +
 	"\tdelivered\x18\x01 \x01(\x05R\tdelivered\"\x14\n" +
-	"\x12WatchUpdateRequest*\xd4\x01\n" +
+	"\x12WatchUpdateRequest*\xf1\x01\n" +
 	"\vUpdateState\x12\x1c\n" +
 	"\x18UPDATE_STATE_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11UPDATE_STATE_IDLE\x10\x01\x12\x1a\n" +
@@ -920,10 +1012,12 @@ const file_codefoundry_v1_update_proto_rawDesc = "" +
 	"\x18UPDATE_STATE_DOWNLOADING\x10\x03\x12\x1a\n" +
 	"\x16UPDATE_STATE_INSTALLED\x10\x04\x12!\n" +
 	"\x1dUPDATE_STATE_RESTART_REQUIRED\x10\x05\x12\x17\n" +
-	"\x13UPDATE_STATE_FAILED\x10\x062\xa5\x04\n" +
+	"\x13UPDATE_STATE_FAILED\x10\x06\x12\x1b\n" +
+	"\x17UPDATE_STATE_DOWNLOADED\x10\a2\x82\x05\n" +
 	"\rUpdateService\x12X\n" +
 	"\x03Get\x12&.codefoundry.v1.GetUpdateStatusRequest\x1a'.codefoundry.v1.GetUpdateStatusResponse\"\x00\x12X\n" +
-	"\x05Check\x12%.codefoundry.v1.CheckForUpdateRequest\x1a&.codefoundry.v1.CheckForUpdateResponse\"\x00\x12X\n" +
+	"\x05Check\x12%.codefoundry.v1.CheckForUpdateRequest\x1a&.codefoundry.v1.CheckForUpdateResponse\"\x00\x12[\n" +
+	"\bDownload\x12%.codefoundry.v1.DownloadUpdateRequest\x1a&.codefoundry.v1.DownloadUpdateResponse\"\x00\x12X\n" +
 	"\aInstall\x12$.codefoundry.v1.InstallUpdateRequest\x1a%.codefoundry.v1.InstallUpdateResponse\"\x00\x12U\n" +
 	"\bRelaunch\x12\".codefoundry.v1.RelaunchAppRequest\x1a#.codefoundry.v1.RelaunchAppResponse\"\x00\x12a\n" +
 	"\x0eRequestRestart\x12%.codefoundry.v1.RequestRestartRequest\x1a&.codefoundry.v1.RequestRestartResponse\"\x00\x12L\n" +
@@ -943,7 +1037,7 @@ func file_codefoundry_v1_update_proto_rawDescGZIP() []byte {
 }
 
 var file_codefoundry_v1_update_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_codefoundry_v1_update_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
+var file_codefoundry_v1_update_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_codefoundry_v1_update_proto_goTypes = []any{
 	(UpdateState)(0),                // 0: codefoundry.v1.UpdateState
 	(*UpdateStatus)(nil),            // 1: codefoundry.v1.UpdateStatus
@@ -954,41 +1048,46 @@ var file_codefoundry_v1_update_proto_goTypes = []any{
 	(*GetUpdateStatusResponse)(nil), // 6: codefoundry.v1.GetUpdateStatusResponse
 	(*CheckForUpdateRequest)(nil),   // 7: codefoundry.v1.CheckForUpdateRequest
 	(*CheckForUpdateResponse)(nil),  // 8: codefoundry.v1.CheckForUpdateResponse
-	(*InstallUpdateRequest)(nil),    // 9: codefoundry.v1.InstallUpdateRequest
-	(*InstallUpdateResponse)(nil),   // 10: codefoundry.v1.InstallUpdateResponse
-	(*RelaunchAppRequest)(nil),      // 11: codefoundry.v1.RelaunchAppRequest
-	(*RelaunchAppResponse)(nil),     // 12: codefoundry.v1.RelaunchAppResponse
-	(*RequestRestartRequest)(nil),   // 13: codefoundry.v1.RequestRestartRequest
-	(*RequestRestartResponse)(nil),  // 14: codefoundry.v1.RequestRestartResponse
-	(*WatchUpdateRequest)(nil),      // 15: codefoundry.v1.WatchUpdateRequest
-	(*timestamppb.Timestamp)(nil),   // 16: google.protobuf.Timestamp
+	(*DownloadUpdateRequest)(nil),   // 9: codefoundry.v1.DownloadUpdateRequest
+	(*DownloadUpdateResponse)(nil),  // 10: codefoundry.v1.DownloadUpdateResponse
+	(*InstallUpdateRequest)(nil),    // 11: codefoundry.v1.InstallUpdateRequest
+	(*InstallUpdateResponse)(nil),   // 12: codefoundry.v1.InstallUpdateResponse
+	(*RelaunchAppRequest)(nil),      // 13: codefoundry.v1.RelaunchAppRequest
+	(*RelaunchAppResponse)(nil),     // 14: codefoundry.v1.RelaunchAppResponse
+	(*RequestRestartRequest)(nil),   // 15: codefoundry.v1.RequestRestartRequest
+	(*RequestRestartResponse)(nil),  // 16: codefoundry.v1.RequestRestartResponse
+	(*WatchUpdateRequest)(nil),      // 17: codefoundry.v1.WatchUpdateRequest
+	(*timestamppb.Timestamp)(nil),   // 18: google.protobuf.Timestamp
 }
 var file_codefoundry_v1_update_proto_depIdxs = []int32{
 	0,  // 0: codefoundry.v1.UpdateStatus.state:type_name -> codefoundry.v1.UpdateState
-	16, // 1: codefoundry.v1.UpdateStatus.last_checked_at:type_name -> google.protobuf.Timestamp
+	18, // 1: codefoundry.v1.UpdateStatus.last_checked_at:type_name -> google.protobuf.Timestamp
 	1,  // 2: codefoundry.v1.UpdateEvent.status:type_name -> codefoundry.v1.UpdateStatus
 	2,  // 3: codefoundry.v1.UpdateEvent.relaunch_requested:type_name -> codefoundry.v1.RelaunchRequested
 	3,  // 4: codefoundry.v1.UpdateEvent.restart_requested:type_name -> codefoundry.v1.RestartRequested
 	1,  // 5: codefoundry.v1.GetUpdateStatusResponse.status:type_name -> codefoundry.v1.UpdateStatus
 	1,  // 6: codefoundry.v1.CheckForUpdateResponse.status:type_name -> codefoundry.v1.UpdateStatus
-	1,  // 7: codefoundry.v1.InstallUpdateResponse.status:type_name -> codefoundry.v1.UpdateStatus
-	5,  // 8: codefoundry.v1.UpdateService.Get:input_type -> codefoundry.v1.GetUpdateStatusRequest
-	7,  // 9: codefoundry.v1.UpdateService.Check:input_type -> codefoundry.v1.CheckForUpdateRequest
-	9,  // 10: codefoundry.v1.UpdateService.Install:input_type -> codefoundry.v1.InstallUpdateRequest
-	11, // 11: codefoundry.v1.UpdateService.Relaunch:input_type -> codefoundry.v1.RelaunchAppRequest
-	13, // 12: codefoundry.v1.UpdateService.RequestRestart:input_type -> codefoundry.v1.RequestRestartRequest
-	15, // 13: codefoundry.v1.UpdateService.Watch:input_type -> codefoundry.v1.WatchUpdateRequest
-	6,  // 14: codefoundry.v1.UpdateService.Get:output_type -> codefoundry.v1.GetUpdateStatusResponse
-	8,  // 15: codefoundry.v1.UpdateService.Check:output_type -> codefoundry.v1.CheckForUpdateResponse
-	10, // 16: codefoundry.v1.UpdateService.Install:output_type -> codefoundry.v1.InstallUpdateResponse
-	12, // 17: codefoundry.v1.UpdateService.Relaunch:output_type -> codefoundry.v1.RelaunchAppResponse
-	14, // 18: codefoundry.v1.UpdateService.RequestRestart:output_type -> codefoundry.v1.RequestRestartResponse
-	4,  // 19: codefoundry.v1.UpdateService.Watch:output_type -> codefoundry.v1.UpdateEvent
-	14, // [14:20] is the sub-list for method output_type
-	8,  // [8:14] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	1,  // 7: codefoundry.v1.DownloadUpdateResponse.status:type_name -> codefoundry.v1.UpdateStatus
+	1,  // 8: codefoundry.v1.InstallUpdateResponse.status:type_name -> codefoundry.v1.UpdateStatus
+	5,  // 9: codefoundry.v1.UpdateService.Get:input_type -> codefoundry.v1.GetUpdateStatusRequest
+	7,  // 10: codefoundry.v1.UpdateService.Check:input_type -> codefoundry.v1.CheckForUpdateRequest
+	9,  // 11: codefoundry.v1.UpdateService.Download:input_type -> codefoundry.v1.DownloadUpdateRequest
+	11, // 12: codefoundry.v1.UpdateService.Install:input_type -> codefoundry.v1.InstallUpdateRequest
+	13, // 13: codefoundry.v1.UpdateService.Relaunch:input_type -> codefoundry.v1.RelaunchAppRequest
+	15, // 14: codefoundry.v1.UpdateService.RequestRestart:input_type -> codefoundry.v1.RequestRestartRequest
+	17, // 15: codefoundry.v1.UpdateService.Watch:input_type -> codefoundry.v1.WatchUpdateRequest
+	6,  // 16: codefoundry.v1.UpdateService.Get:output_type -> codefoundry.v1.GetUpdateStatusResponse
+	8,  // 17: codefoundry.v1.UpdateService.Check:output_type -> codefoundry.v1.CheckForUpdateResponse
+	10, // 18: codefoundry.v1.UpdateService.Download:output_type -> codefoundry.v1.DownloadUpdateResponse
+	12, // 19: codefoundry.v1.UpdateService.Install:output_type -> codefoundry.v1.InstallUpdateResponse
+	14, // 20: codefoundry.v1.UpdateService.Relaunch:output_type -> codefoundry.v1.RelaunchAppResponse
+	16, // 21: codefoundry.v1.UpdateService.RequestRestart:output_type -> codefoundry.v1.RequestRestartResponse
+	4,  // 22: codefoundry.v1.UpdateService.Watch:output_type -> codefoundry.v1.UpdateEvent
+	16, // [16:23] is the sub-list for method output_type
+	9,  // [9:16] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_update_proto_init() }
@@ -1007,7 +1106,7 @@ func file_codefoundry_v1_update_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_update_proto_rawDesc), len(file_codefoundry_v1_update_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   15,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

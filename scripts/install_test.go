@@ -560,3 +560,173 @@ func TestInstallTipChannelGitHub(t *testing.T) {
 		})
 	}
 }
+
+// The in-app updater's two halves: --stage-only leaves the install alone and app.new in
+// place; --apply-staged swaps it in without a release source.
+func TestInstallStageThenApply(t *testing.T) {
+	e := newInstallEnv(t)
+	fakeRelease(t, e.rel, "v0.1.0", "v0.1.0")
+	if out, err := e.run(t); err != nil {
+		t.Fatalf("baseline install: %v\n%s", err, out)
+	}
+	fakeRelease(t, e.rel, "v0.2.0", "v0.2.0")
+
+	out, err := e.run(t, "--stage-only", "--yes", "--skip-path", "--skip-link")
+	if err != nil || !strings.Contains(out, "==> downloaded v0.2.0 to "+e.app()+".new") {
+		t.Fatalf("stage: %v\n%s", err, out)
+	}
+	if v := e.installedVersion(t); v != "v0.1.0" {
+		t.Fatalf("--stage-only changed the install to %s", v)
+	}
+	if b, err := os.ReadFile(filepath.Join(e.app()+".new", "VERSION")); err != nil || strings.TrimSpace(string(b)) != "v0.2.0" {
+		t.Fatalf("staged VERSION %q, %v", b, err)
+	}
+
+	// No release source needed: an unauthenticated gh and no release dir.
+	e.env = []string{"CODE_FOUNDRY_RELEASE_DIR=", "CODE_FOUNDRY_GH=/nonexistent/gh"}
+	out, err = e.run(t, "--apply-staged", "--version", "v0.2.0", "--yes", "--skip-path", "--skip-link")
+	if err != nil {
+		t.Fatalf("apply: %v\n%s", err, out)
+	}
+	if v := e.installedVersion(t); v != "v0.2.0" {
+		t.Fatalf("installed %s after --apply-staged\n%s", v, out)
+	}
+	if names := dirNames(t, filepath.Dir(e.app())); strings.Join(names, " ") != "app" {
+		t.Fatalf("~/.code-foundry holds %v, want just app", names)
+	}
+	if got := e.cli(t); got != "code-foundry v0.2.0" {
+		t.Fatalf("linked CLI says %q", got)
+	}
+}
+
+func TestInstallApplyStagedDefaultsToStagedVersion(t *testing.T) {
+	e := newInstallEnv(t)
+	fakeRelease(t, e.rel, "v0.1.0", "v0.1.0")
+	if out, err := e.run(t); err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	fakeRelease(t, e.rel, "v0.2.0", "v0.2.0")
+	if out, err := e.run(t, "--stage-only"); err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	if out, err := e.run(t, "--apply-staged"); err != nil || e.installedVersion(t) != "v0.2.0" {
+		t.Fatalf("%v\n%s", err, out)
+	}
+}
+
+// A first --stage-only (nothing installed yet) sets up neither the link nor PATH.
+func TestInstallStageOnlyFresh(t *testing.T) {
+	e := newInstallEnv(t)
+	fakeRelease(t, e.rel, "v0.1.0", "v0.1.0")
+	out, err := e.run(t, "--stage-only")
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	if _, err := os.Stat(e.app()); !os.IsNotExist(err) {
+		t.Fatalf("app dir exists after --stage-only (%v)", err)
+	}
+	if _, err := os.Lstat(filepath.Join(e.home, ".local", "bin", "code-foundry")); !os.IsNotExist(err) {
+		t.Fatalf("--stage-only linked the CLI (%v)", err)
+	}
+	if e.markers(t) != 0 {
+		t.Fatal("--stage-only edited ~/.zshrc")
+	}
+}
+
+func TestInstallStageAndApplyErrors(t *testing.T) {
+	tests := []struct {
+		name     string
+		prepare  func(t *testing.T, e installEnv)
+		args     []string
+		want     string
+		wantErr  bool
+		wantNew  bool   // app.new exists afterwards
+		wantOnly string // a second fragment of the output
+	}{
+		{
+			name:    "already installed: nothing staged",
+			prepare: func(*testing.T, installEnv) {},
+			args:    []string{"--stage-only"},
+			want:    "already installed",
+		},
+		{
+			name: "failed download leaves no stage",
+			prepare: func(t *testing.T, e installEnv) {
+				tgz := fakeRelease(t, e.rel, "v0.2.0", "v0.2.0")
+				_ = os.WriteFile(tgz, []byte("tampered"), 0o644)
+			},
+			args:    []string{"--stage-only"},
+			want:    "checksum mismatch",
+			wantErr: true,
+		},
+		{
+			name: "a failed download removes an older stage",
+			prepare: func(t *testing.T, e installEnv) {
+				fakeRelease(t, e.rel, "v0.2.0", "v0.2.0")
+				if out, err := e.run(t, "--stage-only"); err != nil {
+					t.Fatalf("%v\n%s", err, out)
+				}
+				tgz := fakeRelease(t, e.rel, "v0.3.0", "v0.3.0")
+				_ = os.WriteFile(tgz, []byte("tampered"), 0o644)
+			},
+			args:    []string{"--stage-only"},
+			want:    "checksum mismatch",
+			wantErr: true,
+		},
+		{
+			name:    "apply with nothing staged",
+			prepare: func(*testing.T, installEnv) {},
+			args:    []string{"--apply-staged", "--version", "v0.2.0"},
+			want:    "no staged download of v0.2.0 in ",
+			wantErr: true,
+		},
+		{
+			name:    "apply without --version or a stage",
+			prepare: func(*testing.T, installEnv) {},
+			args:    []string{"--apply-staged"},
+			want:    "no staged download in ",
+			wantErr: true,
+		},
+		{
+			name: "apply another version than staged",
+			prepare: func(t *testing.T, e installEnv) {
+				fakeRelease(t, e.rel, "v0.2.0", "v0.2.0")
+				if out, err := e.run(t, "--stage-only"); err != nil {
+					t.Fatalf("%v\n%s", err, out)
+				}
+			},
+			args:     []string{"--apply-staged", "--version", "v0.3.0"},
+			want:     "no staged download of v0.3.0 in ",
+			wantErr:  true,
+			wantNew:  true,
+			wantOnly: "(it holds v0.2.0); run again without --apply-staged",
+		},
+		{
+			name:    "both flags",
+			prepare: func(*testing.T, installEnv) {},
+			args:    []string{"--stage-only", "--apply-staged"},
+			want:    "--stage-only and --apply-staged exclude each other",
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := newInstallEnv(t)
+			fakeRelease(t, e.rel, "v0.1.0", "v0.1.0")
+			if out, err := e.run(t); err != nil {
+				t.Fatalf("baseline install: %v\n%s", err, out)
+			}
+			tt.prepare(t, e)
+			out, err := e.run(t, tt.args...)
+			if (err != nil) != tt.wantErr || !strings.Contains(out, tt.want) || !strings.Contains(out, tt.wantOnly) {
+				t.Fatalf("err = %v (want error %v), want output containing %q and %q:\n%s", err, tt.wantErr, tt.want, tt.wantOnly, out)
+			}
+			if v := e.installedVersion(t); v != "v0.1.0" {
+				t.Fatalf("installed %s", v)
+			}
+			if _, err := os.Stat(e.app() + ".new"); (err == nil) != tt.wantNew {
+				t.Fatalf("app.new exists = %v, want %v", err == nil, tt.wantNew)
+			}
+		})
+	}
+}

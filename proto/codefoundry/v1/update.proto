@@ -6,13 +6,16 @@ import "google/protobuf/timestamp.proto";
 
 // UpdateService is the in-app updater. The daemon checks the latest GitHub release of
 // the build's release repository through the user's authenticated `gh` (30s after start,
-// then every 24h), and installs it on request by running the installer embedded in the
-// binary. Installing replaces the app directory on disk; nothing restarts by itself,
+// then every 24h) and runs the installer embedded in the binary in two steps. Download
+// (`app.update`) fetches, verifies and stages the release beside the app directory
+// without changing the install, so a window reopened meanwhile still matches its daemon
+// (GUI and daemon have no cross-version compatibility). Nothing restarts by itself,
 // because restarting the daemon closes every session. `app.restart` (the GUI's "Restart
-// Now") applies an update in one step: it announces RestartRequested on Watch, then the
-// daemon exits; GUI hosts relaunch once their Watch stream ends, and the relaunched
-// window auto-starts the installed daemon. `app.relaunch` (Relaunch) and
-// `daemon.restart` do the two halves separately.
+// Now") applies a download in one step: Install swaps it into the app directory, then
+// RequestRestart announces RestartRequested on Watch and the daemon exits; GUI hosts
+// relaunch once their Watch stream ends, and the relaunched window auto-starts the
+// installed daemon. `app.relaunch` (Relaunch) and `daemon.restart` restart the two
+// halves separately.
 //
 // Dev builds (version not strict semver) and builds without a release repository do
 // not check: Get reports enabled=false with the reason.
@@ -23,9 +26,16 @@ service UpdateService {
   // failed check keeps the previous state and sets last_check_error. FailedPrecondition
   // when updates are disabled.
   rpc Check(CheckForUpdateRequest) returns (CheckForUpdateResponse) {}
-  // Install starts installing the available version and returns at once with state
-  // DOWNLOADING; progress and the outcome arrive on Watch. FailedPrecondition unless the
-  // state is AVAILABLE or FAILED.
+  // Download starts downloading and staging the available version and returns at once
+  // with state DOWNLOADING; progress and the outcome (DOWNLOADED or FAILED) arrive on
+  // Watch. Nothing on disk changes outside the staging directory. FailedPrecondition
+  // unless the state is AVAILABLE or FAILED.
+  rpc Download(DownloadUpdateRequest) returns (DownloadUpdateResponse) {}
+  // Install installs the downloaded version into the app directory and returns when done
+  // (fast: no network) with state INSTALLED, or an error and state FAILED.
+  // FailedPrecondition unless the state is DOWNLOADED. `app.restart` calls it right
+  // before restarting so the daemon and the window change version together; clients
+  // should invoke `app.restart`, not this.
   rpc Install(InstallUpdateRequest) returns (InstallUpdateResponse) {}
   // Relaunch asks every connected GUI to relaunch itself (to pick up an installed
   // update). Moves INSTALLED to RESTART_REQUIRED.
@@ -46,16 +56,22 @@ enum UpdateState {
   UPDATE_STATE_IDLE = 1;
   // target_version is newer than what is running and installed.
   UPDATE_STATE_AVAILABLE = 2;
-  // The installer is downloading and installing target_version.
+  // The installer is downloading and staging target_version beside the app directory;
+  // nothing on disk changes yet.
   UPDATE_STATE_DOWNLOADING = 3;
-  // target_version is installed on disk. The GUI needs a relaunch and the daemon a
+  // The install on disk is newer than the running daemon: target_version was installed
+  // (by Install, or outside the app) and the GUI needs a relaunch and the daemon a
   // restart to run it (`app.restart` does both).
   UPDATE_STATE_INSTALLED = 4;
-  // target_version is installed and the GUI was asked to relaunch; the daemon still
-  // runs current_version until `daemon.restart` (or `app.restart`).
+  // As INSTALLED, and the GUI was asked to relaunch; the daemon still runs
+  // current_version until `daemon.restart` (or `app.restart`).
   UPDATE_STATE_RESTART_REQUIRED = 5;
-  // Installing target_version failed (failure_reason). Install may be retried.
+  // Downloading or installing target_version failed (failure_reason). Download may be
+  // retried.
   UPDATE_STATE_FAILED = 6;
+  // target_version is downloaded and staged; the install on disk is unchanged.
+  // `app.restart` installs it and restarts the daemon and the window together.
+  UPDATE_STATE_DOWNLOADED = 7;
 }
 
 message UpdateStatus {
@@ -77,7 +93,8 @@ message UpdateStatus {
   // Latest release tag of the channel seen by the last successful check ("" until the
   // first check after a channel change).
   string latest_version = 9;
-  // The version AVAILABLE / DOWNLOADING / INSTALLED / RESTART_REQUIRED / FAILED refer to.
+  // The version AVAILABLE / DOWNLOADING / DOWNLOADED / INSTALLED / RESTART_REQUIRED /
+  // FAILED refer to.
   string target_version = 10;
   // Release page for target_version.
   string notes_url = 11;
@@ -118,6 +135,12 @@ message GetUpdateStatusResponse {
 message CheckForUpdateRequest {}
 
 message CheckForUpdateResponse {
+  UpdateStatus status = 1;
+}
+
+message DownloadUpdateRequest {}
+
+message DownloadUpdateResponse {
   UpdateStatus status = 1;
 }
 

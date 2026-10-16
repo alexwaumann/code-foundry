@@ -279,7 +279,7 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
   },
   "app.update": () => {
     openUpdateDialog();
-    void runUpdateAction("install");
+    void runUpdateAction("download");
     return true;
   },
 };

@@ -37,6 +37,8 @@ const (
 	UpdateServiceGetProcedure = "/codefoundry.v1.UpdateService/Get"
 	// UpdateServiceCheckProcedure is the fully-qualified name of the UpdateService's Check RPC.
 	UpdateServiceCheckProcedure = "/codefoundry.v1.UpdateService/Check"
+	// UpdateServiceDownloadProcedure is the fully-qualified name of the UpdateService's Download RPC.
+	UpdateServiceDownloadProcedure = "/codefoundry.v1.UpdateService/Download"
 	// UpdateServiceInstallProcedure is the fully-qualified name of the UpdateService's Install RPC.
 	UpdateServiceInstallProcedure = "/codefoundry.v1.UpdateService/Install"
 	// UpdateServiceRelaunchProcedure is the fully-qualified name of the UpdateService's Relaunch RPC.
@@ -56,9 +58,16 @@ type UpdateServiceClient interface {
 	// failed check keeps the previous state and sets last_check_error. FailedPrecondition
 	// when updates are disabled.
 	Check(context.Context, *connect.Request[v1.CheckForUpdateRequest]) (*connect.Response[v1.CheckForUpdateResponse], error)
-	// Install starts installing the available version and returns at once with state
-	// DOWNLOADING; progress and the outcome arrive on Watch. FailedPrecondition unless the
-	// state is AVAILABLE or FAILED.
+	// Download starts downloading and staging the available version and returns at once
+	// with state DOWNLOADING; progress and the outcome (DOWNLOADED or FAILED) arrive on
+	// Watch. Nothing on disk changes outside the staging directory. FailedPrecondition
+	// unless the state is AVAILABLE or FAILED.
+	Download(context.Context, *connect.Request[v1.DownloadUpdateRequest]) (*connect.Response[v1.DownloadUpdateResponse], error)
+	// Install installs the downloaded version into the app directory and returns when done
+	// (fast: no network) with state INSTALLED, or an error and state FAILED.
+	// FailedPrecondition unless the state is DOWNLOADED. `app.restart` calls it right
+	// before restarting so the daemon and the window change version together; clients
+	// should invoke `app.restart`, not this.
 	Install(context.Context, *connect.Request[v1.InstallUpdateRequest]) (*connect.Response[v1.InstallUpdateResponse], error)
 	// Relaunch asks every connected GUI to relaunch itself (to pick up an installed
 	// update). Moves INSTALLED to RESTART_REQUIRED.
@@ -96,6 +105,12 @@ func NewUpdateServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(updateServiceMethods.ByName("Check")),
 			connect.WithClientOptions(opts...),
 		),
+		download: connect.NewClient[v1.DownloadUpdateRequest, v1.DownloadUpdateResponse](
+			httpClient,
+			baseURL+UpdateServiceDownloadProcedure,
+			connect.WithSchema(updateServiceMethods.ByName("Download")),
+			connect.WithClientOptions(opts...),
+		),
 		install: connect.NewClient[v1.InstallUpdateRequest, v1.InstallUpdateResponse](
 			httpClient,
 			baseURL+UpdateServiceInstallProcedure,
@@ -127,6 +142,7 @@ func NewUpdateServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 type updateServiceClient struct {
 	get            *connect.Client[v1.GetUpdateStatusRequest, v1.GetUpdateStatusResponse]
 	check          *connect.Client[v1.CheckForUpdateRequest, v1.CheckForUpdateResponse]
+	download       *connect.Client[v1.DownloadUpdateRequest, v1.DownloadUpdateResponse]
 	install        *connect.Client[v1.InstallUpdateRequest, v1.InstallUpdateResponse]
 	relaunch       *connect.Client[v1.RelaunchAppRequest, v1.RelaunchAppResponse]
 	requestRestart *connect.Client[v1.RequestRestartRequest, v1.RequestRestartResponse]
@@ -141,6 +157,11 @@ func (c *updateServiceClient) Get(ctx context.Context, req *connect.Request[v1.G
 // Check calls codefoundry.v1.UpdateService.Check.
 func (c *updateServiceClient) Check(ctx context.Context, req *connect.Request[v1.CheckForUpdateRequest]) (*connect.Response[v1.CheckForUpdateResponse], error) {
 	return c.check.CallUnary(ctx, req)
+}
+
+// Download calls codefoundry.v1.UpdateService.Download.
+func (c *updateServiceClient) Download(ctx context.Context, req *connect.Request[v1.DownloadUpdateRequest]) (*connect.Response[v1.DownloadUpdateResponse], error) {
+	return c.download.CallUnary(ctx, req)
 }
 
 // Install calls codefoundry.v1.UpdateService.Install.
@@ -171,9 +192,16 @@ type UpdateServiceHandler interface {
 	// failed check keeps the previous state and sets last_check_error. FailedPrecondition
 	// when updates are disabled.
 	Check(context.Context, *connect.Request[v1.CheckForUpdateRequest]) (*connect.Response[v1.CheckForUpdateResponse], error)
-	// Install starts installing the available version and returns at once with state
-	// DOWNLOADING; progress and the outcome arrive on Watch. FailedPrecondition unless the
-	// state is AVAILABLE or FAILED.
+	// Download starts downloading and staging the available version and returns at once
+	// with state DOWNLOADING; progress and the outcome (DOWNLOADED or FAILED) arrive on
+	// Watch. Nothing on disk changes outside the staging directory. FailedPrecondition
+	// unless the state is AVAILABLE or FAILED.
+	Download(context.Context, *connect.Request[v1.DownloadUpdateRequest]) (*connect.Response[v1.DownloadUpdateResponse], error)
+	// Install installs the downloaded version into the app directory and returns when done
+	// (fast: no network) with state INSTALLED, or an error and state FAILED.
+	// FailedPrecondition unless the state is DOWNLOADED. `app.restart` calls it right
+	// before restarting so the daemon and the window change version together; clients
+	// should invoke `app.restart`, not this.
 	Install(context.Context, *connect.Request[v1.InstallUpdateRequest]) (*connect.Response[v1.InstallUpdateResponse], error)
 	// Relaunch asks every connected GUI to relaunch itself (to pick up an installed
 	// update). Moves INSTALLED to RESTART_REQUIRED.
@@ -207,6 +235,12 @@ func NewUpdateServiceHandler(svc UpdateServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(updateServiceMethods.ByName("Check")),
 		connect.WithHandlerOptions(opts...),
 	)
+	updateServiceDownloadHandler := connect.NewUnaryHandler(
+		UpdateServiceDownloadProcedure,
+		svc.Download,
+		connect.WithSchema(updateServiceMethods.ByName("Download")),
+		connect.WithHandlerOptions(opts...),
+	)
 	updateServiceInstallHandler := connect.NewUnaryHandler(
 		UpdateServiceInstallProcedure,
 		svc.Install,
@@ -237,6 +271,8 @@ func NewUpdateServiceHandler(svc UpdateServiceHandler, opts ...connect.HandlerOp
 			updateServiceGetHandler.ServeHTTP(w, r)
 		case UpdateServiceCheckProcedure:
 			updateServiceCheckHandler.ServeHTTP(w, r)
+		case UpdateServiceDownloadProcedure:
+			updateServiceDownloadHandler.ServeHTTP(w, r)
 		case UpdateServiceInstallProcedure:
 			updateServiceInstallHandler.ServeHTTP(w, r)
 		case UpdateServiceRelaunchProcedure:
@@ -260,6 +296,10 @@ func (UnimplementedUpdateServiceHandler) Get(context.Context, *connect.Request[v
 
 func (UnimplementedUpdateServiceHandler) Check(context.Context, *connect.Request[v1.CheckForUpdateRequest]) (*connect.Response[v1.CheckForUpdateResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.UpdateService.Check is not implemented"))
+}
+
+func (UnimplementedUpdateServiceHandler) Download(context.Context, *connect.Request[v1.DownloadUpdateRequest]) (*connect.Response[v1.DownloadUpdateResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.UpdateService.Download is not implemented"))
 }
 
 func (UnimplementedUpdateServiceHandler) Install(context.Context, *connect.Request[v1.InstallUpdateRequest]) (*connect.Response[v1.InstallUpdateResponse], error) {

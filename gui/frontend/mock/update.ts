@@ -1,7 +1,9 @@
 /**
  * Mock updater: the daemon's UpdateService state machine (internal/store/update) with
  * timers instead of gh and the installer. Driven by the app.* commands and by test
- * controls (see server.ts /__mock/update/*).
+ * controls (see server.ts /__mock/update/*). Download (app.update) stages the release:
+ * Available → Downloading → Downloaded (or Failed); Install, which app.restart runs
+ * first, swaps it in: Downloaded → Installed.
  *
  * Initial state: v0.1.0, up to date, latest release v0.1.0. POST
  * /__mock/update/latest?version=v0.2.0 publishes a newer release for the next check.
@@ -48,18 +50,19 @@ export interface UpdateCommandEntry {
 }
 
 const REPO = "alexwaumann/code-foundry";
+/** install.sh --stage-only's output. */
 const PROGRESS = [
-  "==> upgrading Code Foundry v0.1.0 -> {v}",
-  "==> downloading CodeFoundry-darwin-arm64.zip from alexwaumann/code-foundry {v}",
+  "==> downloading code-foundry-darwin-arm64.tar.gz from alexwaumann/code-foundry {v}",
   "==> verifying checksum",
   "==> unpacking",
-  "==> installed ~/Applications/CodeFoundry.app",
+  "==> downloaded {v} to ~/.code-foundry/app.new",
 ];
 
 export const updateStateNames: Record<string, UpdateState> = {
   idle: UpdateState.IDLE,
   available: UpdateState.AVAILABLE,
   downloading: UpdateState.DOWNLOADING,
+  downloaded: UpdateState.DOWNLOADED,
   installed: UpdateState.INSTALLED,
   restartRequired: UpdateState.RESTART_REQUIRED,
   failed: UpdateState.FAILED,
@@ -105,9 +108,9 @@ function cutOff(c: RestartCost): string {
 export class MockUpdater {
   status!: MockStatus;
   latest = "v0.1.0";
-  /** The next install fails with this reason (cleared after use). */
+  /** The next download fails with this reason (cleared after use). */
   failNext = "";
-  /** Install progress step interval. */
+  /** Download progress step interval. */
   stepMs = 250;
   relaunches = 0;
   /** app.restart runs (Restart Now). */
@@ -179,14 +182,16 @@ export class MockUpdater {
       return s;
     }
     const newer = this.latest !== s.currentVersion && this.latest > s.currentVersion;
-    const installedTarget = s.state === UpdateState.INSTALLED || s.state === UpdateState.RESTART_REQUIRED ? s.targetVersion : "";
+    // A download or an install of the latest stays; a newer release is offered over it.
+    const installedTarget = s.state === UpdateState.DOWNLOADED || s.state === UpdateState.INSTALLED || s.state === UpdateState.RESTART_REQUIRED ? s.targetVersion : "";
     if (newer && this.latest !== installedTarget) this.set(UpdateState.AVAILABLE, this.latest);
     else if (!installedTarget) this.set(UpdateState.IDLE, "");
     else this.emit();
     return this.status;
   }
 
-  install(): string {
+  /** UpdateService.Download: stages the target in the background (app.update). */
+  download(): string {
     const s = this.status;
     if (s.state !== UpdateState.AVAILABLE && s.state !== UpdateState.FAILED) throw new Error("no update available");
     const target = s.targetVersion;
@@ -211,13 +216,24 @@ export class MockUpdater {
             this.failNext = "";
             this.set(UpdateState.FAILED, target, { failureReason: reason });
           } else {
-            this.set(UpdateState.INSTALLED, target);
+            this.set(UpdateState.DOWNLOADED, target);
           }
         },
         this.stepMs * (PROGRESS.length + 1),
       ),
     );
-    return `installing ${target}`;
+    return `downloading ${target}`;
+  }
+
+  /** UpdateService.Install: the synchronous swap app.restart runs before restarting. */
+  install(): string {
+    if (this.status.state !== UpdateState.DOWNLOADED) throw new Error("no downloaded update to install");
+    this.set(UpdateState.INSTALLED);
+    return this.status.targetVersion;
+  }
+
+  private downloadedTarget(): string {
+    return this.status.state === UpdateState.DOWNLOADED ? this.status.targetVersion : "";
   }
 
   relaunch(): number {
@@ -226,14 +242,27 @@ export class MockUpdater {
     return this.publish({ event: { case: "relaunchRequested", value: {} } });
   }
 
-  /** daemon.restart: the mock keeps running but comes back as the installed version. */
+  /**
+   * daemon.restart: the mock keeps running but comes back as the installed version. It
+   * installs nothing: a download survives (the new daemon starts in Downloaded).
+   */
   restart(): string {
-    if (this.status.state === UpdateState.DOWNLOADING) throw new Error("an update is being installed; restart when it finishes");
+    if (this.status.state === UpdateState.DOWNLOADING) throw new Error("an update is downloading; restart when it finishes");
     const n = this.restartCost();
     const installed = this.status.state === UpdateState.INSTALLED || this.status.state === UpdateState.RESTART_REQUIRED;
     if (installed) this.status.currentVersion = this.status.targetVersion;
-    this.set(UpdateState.IDLE, "");
+    if (this.status.state !== UpdateState.DOWNLOADED) this.set(UpdateState.IDLE, "");
+    else this.emit();
     return `restarting the daemon${cutOff(n)}; the next client starts the installed version`;
+  }
+
+  /** app.restart: installs a download first (a failed install restarts nothing), then restarts. */
+  restartApp(): string {
+    if (this.status.state === UpdateState.DOWNLOADING) throw new Error("an update is downloading; restart when it finishes");
+    const installed = this.downloadedTarget() ? this.install() : "";
+    this.restarts++;
+    const msg = this.restart().replace("restarting the daemon", "restarting Code Foundry").replace("the next client starts the installed version", "the app relaunches once the daemon has stopped");
+    return installed ? `installed ${installed}; ${msg}` : msg;
   }
 
   private installable(): boolean {
@@ -260,14 +289,14 @@ export class MockUpdater {
       {
         cmd: {
           name: "app.update",
-          title: this.installable() ? `Update to ${this.status.targetVersion}` : "Update Code Foundry",
+          title: this.installable() ? `Download ${this.status.targetVersion}` : "Download Update",
           category: "App",
-          description: "Download and install the available update",
+          description: "Download the available update in the background. Nothing changes on disk until `app.restart` installs it and restarts; until then the app and daemon keep running the current version.",
           keybindings: [],
           args: [],
         },
         when: () => this.installable(),
-        run: () => this.install(),
+        run: () => this.download(),
       },
       {
         cmd: { name: "app.relaunch", title: "Relaunch App", category: "App", description: "Quit and reopen the app window", keybindings: [], args: [] },
@@ -275,23 +304,25 @@ export class MockUpdater {
         run: () => (this.relaunch() === 0 ? "no app window is connected; open it with `code-foundry gui`" : "relaunching the app"),
       },
       {
-        // The update dialog's Restart Now (confirmed: the dialog is the confirmation). The
-        // real daemon stops threads, asks the window host to relaunch once it has exited,
-        // and exits; the mock comes back as the installed version, like daemon.restart.
+        // The update dialog's (Install and) Restart Now (confirmed: the dialog is the
+        // confirmation). The real daemon installs a download, stops threads, asks the
+        // window host to relaunch once it has exited, and exits; the mock comes back as the
+        // installed version, like daemon.restart.
         cmd: {
           name: "app.restart",
-          title: "Restart Code Foundry",
+          title: this.downloadedTarget() ? `Install ${this.downloadedTarget()} and Restart` : "Restart Code Foundry",
           category: "App",
-          description: "Restart the daemon and relaunch the app so both run the installed version. Threads keep their history and a message starts each again; one that is working is cut off.",
+          description:
+            "Restart the daemon and relaunch the app so both run the installed version, installing a downloaded update first. Threads keep their history and a message starts each again; a turn or background work running is cut off.",
           keybindings: [],
           args: [],
-          confirm: () => restartConfirm("Restart Code Foundry", this.restartCost()),
+          confirm: () => {
+            const t = this.downloadedTarget();
+            return restartConfirm(t ? `Install ${t} and restart Code Foundry` : "Restart Code Foundry", this.restartCost());
+          },
         },
         when: always,
-        run: () => {
-          this.restarts++;
-          return this.restart().replace("restarting the daemon", "restarting Code Foundry");
-        },
+        run: () => this.restartApp(),
       },
       {
         cmd: {

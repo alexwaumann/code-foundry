@@ -1,6 +1,7 @@
 import { Code, ConnectError } from "@connectrpc/connect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CommandView } from "@/api/command";
+import type { UpdateStatusView } from "@/api/update";
 
 const invokeCommand = vi.hoisted(() => vi.fn(() => Promise.resolve({ message: "ok", resultJson: "" })));
 const listCommands = vi.hoisted(() => vi.fn(() => Promise.resolve([])));
@@ -21,7 +22,7 @@ function calls(): [string, boolean | undefined][] {
 }
 
 beforeEach(() => {
-  useUpdateStore.setState({ dialogOpen: true, pending: null, restarting: false, error: null });
+  useUpdateStore.setState({ status: null, dialogOpen: true, pending: null, restarting: null, error: null });
 });
 
 afterEach(() => {
@@ -35,7 +36,26 @@ describe("runUpdateAction('restart')", () => {
     await expect(runUpdateAction("restart")).resolves.toBe(true);
     expect(calls()).toEqual([["app.restart", true]]);
     expect(relaunchApp).not.toHaveBeenCalled();
-    expect(useUpdateStore.getState()).toMatchObject({ restarting: true, dialogOpen: true, pending: null, error: null });
+    expect(useUpdateStore.getState()).toMatchObject({ restarting: { install: "" }, dialogOpen: true, pending: null, error: null });
+  });
+
+  it("from downloaded, remembers the version app.restart installs (the status moves on before it returns)", async () => {
+    useCommandsStore.setState({ commands: [cmd("app.restart")] });
+    useUpdateStore.setState({ status: { state: "downloaded", targetVersion: "v0.2.0" } as UpdateStatusView });
+    invokeCommand.mockImplementationOnce(() => {
+      useUpdateStore.setState({ status: { state: "installed", targetVersion: "v0.2.0" } as UpdateStatusView });
+      return Promise.resolve({ message: "installed v0.2.0; restarting Code Foundry", resultJson: "" });
+    });
+    await expect(runUpdateAction("restart")).resolves.toBe(true);
+    expect(calls()).toEqual([["app.restart", true]]);
+    expect(useUpdateStore.getState().restarting).toEqual({ install: "v0.2.0" });
+  });
+
+  it("from installed it only restarts", async () => {
+    useCommandsStore.setState({ commands: [cmd("app.restart")] });
+    useUpdateStore.setState({ status: { state: "installed", targetVersion: "v0.2.0" } as UpdateStatusView });
+    await expect(runUpdateAction("restart")).resolves.toBe(true);
+    expect(useUpdateStore.getState().restarting).toEqual({ install: "" });
   });
 
   it("an older daemon without app.restart: daemon.restart confirmed, then the host relaunches", async () => {
@@ -43,7 +63,7 @@ describe("runUpdateAction('restart')", () => {
     await expect(runUpdateAction("restart")).resolves.toBe(true);
     expect(calls()).toEqual([["daemon.restart", true]]);
     expect(relaunchApp).toHaveBeenCalledTimes(1);
-    expect(useUpdateStore.getState().restarting).toBe(true);
+    expect(useUpdateStore.getState().restarting).toEqual({ install: "" });
   });
 
   it("with no command list yet, tries app.restart and falls back on NotFound", async () => {
@@ -58,10 +78,18 @@ describe("runUpdateAction('restart')", () => {
 
   it("other failures land in the dialog and do not restart", async () => {
     useCommandsStore.setState({ commands: [cmd("app.restart")] });
-    invokeCommand.mockRejectedValueOnce(new ConnectError("an update is being installed", Code.FailedPrecondition));
+    invokeCommand.mockRejectedValueOnce(new ConnectError("an update is downloading; restart when it finishes", Code.FailedPrecondition));
     await expect(runUpdateAction("restart")).resolves.toBe(false);
     expect(calls()).toEqual([["app.restart", true]]);
     expect(relaunchApp).not.toHaveBeenCalled();
-    expect(useUpdateStore.getState()).toMatchObject({ restarting: false, error: "an update is being installed" });
+    expect(useUpdateStore.getState()).toMatchObject({ restarting: null, error: "an update is downloading; restart when it finishes" });
+  });
+});
+
+describe("runUpdateAction('download')", () => {
+  it("invokes app.update (UpdateService.Download in the daemon)", async () => {
+    await expect(runUpdateAction("download")).resolves.toBe(true);
+    expect(calls().map((c) => c[0])).toEqual(["app.update"]);
+    expect(useUpdateStore.getState()).toMatchObject({ pending: null, error: null, restarting: null });
   });
 });

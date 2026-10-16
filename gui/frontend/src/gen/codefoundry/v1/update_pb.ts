@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/update.proto.
  */
 export const file_codefoundry_v1_update: GenFile = /*@__PURE__*/
-  fileDesc("Chtjb2RlZm91bmRyeS92MS91cGRhdGUucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIvICCgxVcGRhdGVTdGF0dXMSKgoFc3RhdGUYASABKA4yGy5jb2RlZm91bmRyeS52MS5VcGRhdGVTdGF0ZRIXCg9jdXJyZW50X3ZlcnNpb24YAiABKAkSDwoHZW5hYmxlZBgDIAEoCBIXCg9kaXNhYmxlZF9yZWFzb24YBCABKAkSFAoMcmVsZWFzZV9yZXBvGAUgASgJEhAKCGNoZWNraW5nGAYgASgIEjMKD2xhc3RfY2hlY2tlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASGAoQbGFzdF9jaGVja19lcnJvchgIIAEoCRIWCg5sYXRlc3RfdmVyc2lvbhgJIAEoCRIWCg50YXJnZXRfdmVyc2lvbhgKIAEoCRIRCglub3Rlc191cmwYCyABKAkSEAoIcHJvZ3Jlc3MYDCABKAkSFgoOZmFpbHVyZV9yZWFzb24YDSABKAkSDwoHY2hhbm5lbBgOIAEoCSITChFSZWxhdW5jaFJlcXVlc3RlZCISChBSZXN0YXJ0UmVxdWVzdGVkIsYBCgtVcGRhdGVFdmVudBIuCgZzdGF0dXMYASABKAsyHC5jb2RlZm91bmRyeS52MS5VcGRhdGVTdGF0dXNIABI/ChJyZWxhdW5jaF9yZXF1ZXN0ZWQYAiABKAsyIS5jb2RlZm91bmRyeS52MS5SZWxhdW5jaFJlcXVlc3RlZEgAEj0KEXJlc3RhcnRfcmVxdWVzdGVkGAMgASgLMiAuY29kZWZvdW5kcnkudjEuUmVzdGFydFJlcXVlc3RlZEgAQgcKBWV2ZW50IhgKFkdldFVwZGF0ZVN0YXR1c1JlcXVlc3QiRwoXR2V0VXBkYXRlU3RhdHVzUmVzcG9uc2USLAoGc3RhdHVzGAEgASgLMhwuY29kZWZvdW5kcnkudjEuVXBkYXRlU3RhdHVzIhcKFUNoZWNrRm9yVXBkYXRlUmVxdWVzdCJGChZDaGVja0ZvclVwZGF0ZVJlc3BvbnNlEiwKBnN0YXR1cxgBIAEoCzIcLmNvZGVmb3VuZHJ5LnYxLlVwZGF0ZVN0YXR1cyIWChRJbnN0YWxsVXBkYXRlUmVxdWVzdCJFChVJbnN0YWxsVXBkYXRlUmVzcG9uc2USLAoGc3RhdHVzGAEgASgLMhwuY29kZWZvdW5kcnkudjEuVXBkYXRlU3RhdHVzIhQKElJlbGF1bmNoQXBwUmVxdWVzdCIoChNSZWxhdW5jaEFwcFJlc3BvbnNlEhEKCWRlbGl2ZXJlZBgBIAEoBSIXChVSZXF1ZXN0UmVzdGFydFJlcXVlc3QiKwoWUmVxdWVzdFJlc3RhcnRSZXNwb25zZRIRCglkZWxpdmVyZWQYASABKAUiFAoSV2F0Y2hVcGRhdGVSZXF1ZXN0KtQBCgtVcGRhdGVTdGF0ZRIcChhVUERBVEVfU1RBVEVfVU5TUEVDSUZJRUQQABIVChFVUERBVEVfU1RBVEVfSURMRRABEhoKFlVQREFURV9TVEFURV9BVkFJTEFCTEUQAhIcChhVUERBVEVfU1RBVEVfRE9XTkxPQURJTkcQAxIaChZVUERBVEVfU1RBVEVfSU5TVEFMTEVEEAQSIQodVVBEQVRFX1NUQVRFX1JFU1RBUlRfUkVRVUlSRUQQBRIXChNVUERBVEVfU1RBVEVfRkFJTEVEEAYypQQKDVVwZGF0ZVNlcnZpY2USWAoDR2V0EiYuY29kZWZvdW5kcnkudjEuR2V0VXBkYXRlU3RhdHVzUmVxdWVzdBonLmNvZGVmb3VuZHJ5LnYxLkdldFVwZGF0ZVN0YXR1c1Jlc3BvbnNlIgASWAoFQ2hlY2sSJS5jb2RlZm91bmRyeS52MS5DaGVja0ZvclVwZGF0ZVJlcXVlc3QaJi5jb2RlZm91bmRyeS52MS5DaGVja0ZvclVwZGF0ZVJlc3BvbnNlIgASWAoHSW5zdGFsbBIkLmNvZGVmb3VuZHJ5LnYxLkluc3RhbGxVcGRhdGVSZXF1ZXN0GiUuY29kZWZvdW5kcnkudjEuSW5zdGFsbFVwZGF0ZVJlc3BvbnNlIgASVQoIUmVsYXVuY2gSIi5jb2RlZm91bmRyeS52MS5SZWxhdW5jaEFwcFJlcXVlc3QaIy5jb2RlZm91bmRyeS52MS5SZWxhdW5jaEFwcFJlc3BvbnNlIgASYQoOUmVxdWVzdFJlc3RhcnQSJS5jb2RlZm91bmRyeS52MS5SZXF1ZXN0UmVzdGFydFJlcXVlc3QaJi5jb2RlZm91bmRyeS52MS5SZXF1ZXN0UmVzdGFydFJlc3BvbnNlIgASTAoFV2F0Y2gSIi5jb2RlZm91bmRyeS52MS5XYXRjaFVwZGF0ZVJlcXVlc3QaGy5jb2RlZm91bmRyeS52MS5VcGRhdGVFdmVudCIAMAFCwwEKEmNvbS5jb2RlZm91bmRyeS52MUILVXBkYXRlUHJvdG9QAVpHZ2l0aHViLmNvbS9hbGV4d2F1bWFubi9jb2RlLWZvdW5kcnkvZ2VuL2dvL2NvZGVmb3VuZHJ5L3YxO2NvZGVmb3VuZHJ5djGiAgNDWFiqAg5Db2RlZm91bmRyeS5WMcoCDkNvZGVmb3VuZHJ5XFYx4gIaQ29kZWZvdW5kcnlcVjFcR1BCTWV0YWRhdGHqAg9Db2RlZm91bmRyeTo6VjFiBnByb3RvMw", [file_google_protobuf_timestamp]);
+  fileDesc("Chtjb2RlZm91bmRyeS92MS91cGRhdGUucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIvICCgxVcGRhdGVTdGF0dXMSKgoFc3RhdGUYASABKA4yGy5jb2RlZm91bmRyeS52MS5VcGRhdGVTdGF0ZRIXCg9jdXJyZW50X3ZlcnNpb24YAiABKAkSDwoHZW5hYmxlZBgDIAEoCBIXCg9kaXNhYmxlZF9yZWFzb24YBCABKAkSFAoMcmVsZWFzZV9yZXBvGAUgASgJEhAKCGNoZWNraW5nGAYgASgIEjMKD2xhc3RfY2hlY2tlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASGAoQbGFzdF9jaGVja19lcnJvchgIIAEoCRIWCg5sYXRlc3RfdmVyc2lvbhgJIAEoCRIWCg50YXJnZXRfdmVyc2lvbhgKIAEoCRIRCglub3Rlc191cmwYCyABKAkSEAoIcHJvZ3Jlc3MYDCABKAkSFgoOZmFpbHVyZV9yZWFzb24YDSABKAkSDwoHY2hhbm5lbBgOIAEoCSITChFSZWxhdW5jaFJlcXVlc3RlZCISChBSZXN0YXJ0UmVxdWVzdGVkIsYBCgtVcGRhdGVFdmVudBIuCgZzdGF0dXMYASABKAsyHC5jb2RlZm91bmRyeS52MS5VcGRhdGVTdGF0dXNIABI/ChJyZWxhdW5jaF9yZXF1ZXN0ZWQYAiABKAsyIS5jb2RlZm91bmRyeS52MS5SZWxhdW5jaFJlcXVlc3RlZEgAEj0KEXJlc3RhcnRfcmVxdWVzdGVkGAMgASgLMiAuY29kZWZvdW5kcnkudjEuUmVzdGFydFJlcXVlc3RlZEgAQgcKBWV2ZW50IhgKFkdldFVwZGF0ZVN0YXR1c1JlcXVlc3QiRwoXR2V0VXBkYXRlU3RhdHVzUmVzcG9uc2USLAoGc3RhdHVzGAEgASgLMhwuY29kZWZvdW5kcnkudjEuVXBkYXRlU3RhdHVzIhcKFUNoZWNrRm9yVXBkYXRlUmVxdWVzdCJGChZDaGVja0ZvclVwZGF0ZVJlc3BvbnNlEiwKBnN0YXR1cxgBIAEoCzIcLmNvZGVmb3VuZHJ5LnYxLlVwZGF0ZVN0YXR1cyIXChVEb3dubG9hZFVwZGF0ZVJlcXVlc3QiRgoWRG93bmxvYWRVcGRhdGVSZXNwb25zZRIsCgZzdGF0dXMYASABKAsyHC5jb2RlZm91bmRyeS52MS5VcGRhdGVTdGF0dXMiFgoUSW5zdGFsbFVwZGF0ZVJlcXVlc3QiRQoVSW5zdGFsbFVwZGF0ZVJlc3BvbnNlEiwKBnN0YXR1cxgBIAEoCzIcLmNvZGVmb3VuZHJ5LnYxLlVwZGF0ZVN0YXR1cyIUChJSZWxhdW5jaEFwcFJlcXVlc3QiKAoTUmVsYXVuY2hBcHBSZXNwb25zZRIRCglkZWxpdmVyZWQYASABKAUiFwoVUmVxdWVzdFJlc3RhcnRSZXF1ZXN0IisKFlJlcXVlc3RSZXN0YXJ0UmVzcG9uc2USEQoJZGVsaXZlcmVkGAEgASgFIhQKEldhdGNoVXBkYXRlUmVxdWVzdCrxAQoLVXBkYXRlU3RhdGUSHAoYVVBEQVRFX1NUQVRFX1VOU1BFQ0lGSUVEEAASFQoRVVBEQVRFX1NUQVRFX0lETEUQARIaChZVUERBVEVfU1RBVEVfQVZBSUxBQkxFEAISHAoYVVBEQVRFX1NUQVRFX0RPV05MT0FESU5HEAMSGgoWVVBEQVRFX1NUQVRFX0lOU1RBTExFRBAEEiEKHVVQREFURV9TVEFURV9SRVNUQVJUX1JFUVVJUkVEEAUSFwoTVVBEQVRFX1NUQVRFX0ZBSUxFRBAGEhsKF1VQREFURV9TVEFURV9ET1dOTE9BREVEEAcyggUKDVVwZGF0ZVNlcnZpY2USWAoDR2V0EiYuY29kZWZvdW5kcnkudjEuR2V0VXBkYXRlU3RhdHVzUmVxdWVzdBonLmNvZGVmb3VuZHJ5LnYxLkdldFVwZGF0ZVN0YXR1c1Jlc3BvbnNlIgASWAoFQ2hlY2sSJS5jb2RlZm91bmRyeS52MS5DaGVja0ZvclVwZGF0ZVJlcXVlc3QaJi5jb2RlZm91bmRyeS52MS5DaGVja0ZvclVwZGF0ZVJlc3BvbnNlIgASWwoIRG93bmxvYWQSJS5jb2RlZm91bmRyeS52MS5Eb3dubG9hZFVwZGF0ZVJlcXVlc3QaJi5jb2RlZm91bmRyeS52MS5Eb3dubG9hZFVwZGF0ZVJlc3BvbnNlIgASWAoHSW5zdGFsbBIkLmNvZGVmb3VuZHJ5LnYxLkluc3RhbGxVcGRhdGVSZXF1ZXN0GiUuY29kZWZvdW5kcnkudjEuSW5zdGFsbFVwZGF0ZVJlc3BvbnNlIgASVQoIUmVsYXVuY2gSIi5jb2RlZm91bmRyeS52MS5SZWxhdW5jaEFwcFJlcXVlc3QaIy5jb2RlZm91bmRyeS52MS5SZWxhdW5jaEFwcFJlc3BvbnNlIgASYQoOUmVxdWVzdFJlc3RhcnQSJS5jb2RlZm91bmRyeS52MS5SZXF1ZXN0UmVzdGFydFJlcXVlc3QaJi5jb2RlZm91bmRyeS52MS5SZXF1ZXN0UmVzdGFydFJlc3BvbnNlIgASTAoFV2F0Y2gSIi5jb2RlZm91bmRyeS52MS5XYXRjaFVwZGF0ZVJlcXVlc3QaGy5jb2RlZm91bmRyeS52MS5VcGRhdGVFdmVudCIAMAFCwwEKEmNvbS5jb2RlZm91bmRyeS52MUILVXBkYXRlUHJvdG9QAVpHZ2l0aHViLmNvbS9hbGV4d2F1bWFubi9jb2RlLWZvdW5kcnkvZ2VuL2dvL2NvZGVmb3VuZHJ5L3YxO2NvZGVmb3VuZHJ5djGiAgNDWFiqAg5Db2RlZm91bmRyeS5WMcoCDkNvZGVmb3VuZHJ5XFYx4gIaQ29kZWZvdW5kcnlcVjFcR1BCTWV0YWRhdGHqAg9Db2RlZm91bmRyeTo6VjFiBnByb3RvMw", [file_google_protobuf_timestamp]);
 
 /**
  * @generated from message codefoundry.v1.UpdateStatus
@@ -81,7 +81,8 @@ export type UpdateStatus = Message<"codefoundry.v1.UpdateStatus"> & {
   latestVersion: string;
 
   /**
-   * The version AVAILABLE / DOWNLOADING / INSTALLED / RESTART_REQUIRED / FAILED refer to.
+   * The version AVAILABLE / DOWNLOADING / DOWNLOADED / INSTALLED / RESTART_REQUIRED /
+   * FAILED refer to.
    *
    * @generated from field: string target_version = 10;
    */
@@ -255,6 +256,36 @@ export const CheckForUpdateResponseSchema: GenMessage<CheckForUpdateResponse> = 
   messageDesc(file_codefoundry_v1_update, 7);
 
 /**
+ * @generated from message codefoundry.v1.DownloadUpdateRequest
+ */
+export type DownloadUpdateRequest = Message<"codefoundry.v1.DownloadUpdateRequest"> & {
+};
+
+/**
+ * Describes the message codefoundry.v1.DownloadUpdateRequest.
+ * Use `create(DownloadUpdateRequestSchema)` to create a new message.
+ */
+export const DownloadUpdateRequestSchema: GenMessage<DownloadUpdateRequest> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_update, 8);
+
+/**
+ * @generated from message codefoundry.v1.DownloadUpdateResponse
+ */
+export type DownloadUpdateResponse = Message<"codefoundry.v1.DownloadUpdateResponse"> & {
+  /**
+   * @generated from field: codefoundry.v1.UpdateStatus status = 1;
+   */
+  status?: UpdateStatus | undefined;
+};
+
+/**
+ * Describes the message codefoundry.v1.DownloadUpdateResponse.
+ * Use `create(DownloadUpdateResponseSchema)` to create a new message.
+ */
+export const DownloadUpdateResponseSchema: GenMessage<DownloadUpdateResponse> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_update, 9);
+
+/**
  * @generated from message codefoundry.v1.InstallUpdateRequest
  */
 export type InstallUpdateRequest = Message<"codefoundry.v1.InstallUpdateRequest"> & {
@@ -265,7 +296,7 @@ export type InstallUpdateRequest = Message<"codefoundry.v1.InstallUpdateRequest"
  * Use `create(InstallUpdateRequestSchema)` to create a new message.
  */
 export const InstallUpdateRequestSchema: GenMessage<InstallUpdateRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_update, 8);
+  messageDesc(file_codefoundry_v1_update, 10);
 
 /**
  * @generated from message codefoundry.v1.InstallUpdateResponse
@@ -282,7 +313,7 @@ export type InstallUpdateResponse = Message<"codefoundry.v1.InstallUpdateRespons
  * Use `create(InstallUpdateResponseSchema)` to create a new message.
  */
 export const InstallUpdateResponseSchema: GenMessage<InstallUpdateResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_update, 9);
+  messageDesc(file_codefoundry_v1_update, 11);
 
 /**
  * @generated from message codefoundry.v1.RelaunchAppRequest
@@ -295,7 +326,7 @@ export type RelaunchAppRequest = Message<"codefoundry.v1.RelaunchAppRequest"> & 
  * Use `create(RelaunchAppRequestSchema)` to create a new message.
  */
 export const RelaunchAppRequestSchema: GenMessage<RelaunchAppRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_update, 10);
+  messageDesc(file_codefoundry_v1_update, 12);
 
 /**
  * @generated from message codefoundry.v1.RelaunchAppResponse
@@ -314,7 +345,7 @@ export type RelaunchAppResponse = Message<"codefoundry.v1.RelaunchAppResponse"> 
  * Use `create(RelaunchAppResponseSchema)` to create a new message.
  */
 export const RelaunchAppResponseSchema: GenMessage<RelaunchAppResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_update, 11);
+  messageDesc(file_codefoundry_v1_update, 13);
 
 /**
  * @generated from message codefoundry.v1.RequestRestartRequest
@@ -327,7 +358,7 @@ export type RequestRestartRequest = Message<"codefoundry.v1.RequestRestartReques
  * Use `create(RequestRestartRequestSchema)` to create a new message.
  */
 export const RequestRestartRequestSchema: GenMessage<RequestRestartRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_update, 12);
+  messageDesc(file_codefoundry_v1_update, 14);
 
 /**
  * @generated from message codefoundry.v1.RequestRestartResponse
@@ -346,7 +377,7 @@ export type RequestRestartResponse = Message<"codefoundry.v1.RequestRestartRespo
  * Use `create(RequestRestartResponseSchema)` to create a new message.
  */
 export const RequestRestartResponseSchema: GenMessage<RequestRestartResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_update, 13);
+  messageDesc(file_codefoundry_v1_update, 15);
 
 /**
  * @generated from message codefoundry.v1.WatchUpdateRequest
@@ -359,7 +390,7 @@ export type WatchUpdateRequest = Message<"codefoundry.v1.WatchUpdateRequest"> & 
  * Use `create(WatchUpdateRequestSchema)` to create a new message.
  */
 export const WatchUpdateRequestSchema: GenMessage<WatchUpdateRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_update, 14);
+  messageDesc(file_codefoundry_v1_update, 16);
 
 /**
  * @generated from enum codefoundry.v1.UpdateState
@@ -385,14 +416,16 @@ export enum UpdateState {
   AVAILABLE = 2,
 
   /**
-   * The installer is downloading and installing target_version.
+   * The installer is downloading and staging target_version beside the app directory;
+   * nothing on disk changes yet.
    *
    * @generated from enum value: UPDATE_STATE_DOWNLOADING = 3;
    */
   DOWNLOADING = 3,
 
   /**
-   * target_version is installed on disk. The GUI needs a relaunch and the daemon a
+   * The install on disk is newer than the running daemon: target_version was installed
+   * (by Install, or outside the app) and the GUI needs a relaunch and the daemon a
    * restart to run it (`app.restart` does both).
    *
    * @generated from enum value: UPDATE_STATE_INSTALLED = 4;
@@ -400,19 +433,28 @@ export enum UpdateState {
   INSTALLED = 4,
 
   /**
-   * target_version is installed and the GUI was asked to relaunch; the daemon still
-   * runs current_version until `daemon.restart` (or `app.restart`).
+   * As INSTALLED, and the GUI was asked to relaunch; the daemon still runs
+   * current_version until `daemon.restart` (or `app.restart`).
    *
    * @generated from enum value: UPDATE_STATE_RESTART_REQUIRED = 5;
    */
   RESTART_REQUIRED = 5,
 
   /**
-   * Installing target_version failed (failure_reason). Install may be retried.
+   * Downloading or installing target_version failed (failure_reason). Download may be
+   * retried.
    *
    * @generated from enum value: UPDATE_STATE_FAILED = 6;
    */
   FAILED = 6,
+
+  /**
+   * target_version is downloaded and staged; the install on disk is unchanged.
+   * `app.restart` installs it and restarts the daemon and the window together.
+   *
+   * @generated from enum value: UPDATE_STATE_DOWNLOADED = 7;
+   */
+  DOWNLOADED = 7,
 }
 
 /**
@@ -424,13 +466,16 @@ export const UpdateStateSchema: GenEnum<UpdateState> = /*@__PURE__*/
 /**
  * UpdateService is the in-app updater. The daemon checks the latest GitHub release of
  * the build's release repository through the user's authenticated `gh` (30s after start,
- * then every 24h), and installs it on request by running the installer embedded in the
- * binary. Installing replaces the app directory on disk; nothing restarts by itself,
+ * then every 24h) and runs the installer embedded in the binary in two steps. Download
+ * (`app.update`) fetches, verifies and stages the release beside the app directory
+ * without changing the install, so a window reopened meanwhile still matches its daemon
+ * (GUI and daemon have no cross-version compatibility). Nothing restarts by itself,
  * because restarting the daemon closes every session. `app.restart` (the GUI's "Restart
- * Now") applies an update in one step: it announces RestartRequested on Watch, then the
- * daemon exits; GUI hosts relaunch once their Watch stream ends, and the relaunched
- * window auto-starts the installed daemon. `app.relaunch` (Relaunch) and
- * `daemon.restart` do the two halves separately.
+ * Now") applies a download in one step: Install swaps it into the app directory, then
+ * RequestRestart announces RestartRequested on Watch and the daemon exits; GUI hosts
+ * relaunch once their Watch stream ends, and the relaunched window auto-starts the
+ * installed daemon. `app.relaunch` (Relaunch) and `daemon.restart` restart the two
+ * halves separately.
  *
  * Dev builds (version not strict semver) and builds without a release repository do
  * not check: Get reports enabled=false with the reason.
@@ -461,9 +506,24 @@ export const UpdateService: GenService<{
     output: typeof CheckForUpdateResponseSchema;
   },
   /**
-   * Install starts installing the available version and returns at once with state
-   * DOWNLOADING; progress and the outcome arrive on Watch. FailedPrecondition unless the
-   * state is AVAILABLE or FAILED.
+   * Download starts downloading and staging the available version and returns at once
+   * with state DOWNLOADING; progress and the outcome (DOWNLOADED or FAILED) arrive on
+   * Watch. Nothing on disk changes outside the staging directory. FailedPrecondition
+   * unless the state is AVAILABLE or FAILED.
+   *
+   * @generated from rpc codefoundry.v1.UpdateService.Download
+   */
+  download: {
+    methodKind: "unary";
+    input: typeof DownloadUpdateRequestSchema;
+    output: typeof DownloadUpdateResponseSchema;
+  },
+  /**
+   * Install installs the downloaded version into the app directory and returns when done
+   * (fast: no network) with state INSTALLED, or an error and state FAILED.
+   * FailedPrecondition unless the state is DOWNLOADED. `app.restart` calls it right
+   * before restarting so the daemon and the window change version together; clients
+   * should invoke `app.restart`, not this.
    *
    * @generated from rpc codefoundry.v1.UpdateService.Install
    */

@@ -14,23 +14,24 @@ import { closeUpdateDialog, runUpdateAction, useCutOffThreadIds, useUpdateStore,
 
 const linkTone = "text-link hover:underline";
 
+/** What a variant's primary button does; its label is the view's (UpdateView.primary). */
 interface Primary {
   action: UpdateAction;
-  label: (v: UpdateView) => string;
   icon?: LucideIcon;
   outline?: boolean;
 }
 
-const restart: Primary = { action: "restart", label: () => "Restart Now", icon: RefreshCw };
+// Restart Now / Install and Restart Now: app.restart installs a download itself.
+const restart: Primary = { action: "restart", icon: RefreshCw };
 
-/** The one full-width button per variant (none while installing, restarting, or disabled). */
+/** The one full-width button per variant (none while downloading, restarting, or disabled). */
 const primaries: Partial<Record<UpdateVariant, Primary>> = {
   readyIdle: restart,
   readyBusy: restart,
   partlyApplied: restart,
-  available: { action: "install", label: (v) => `Install ${displayVersion(v.version)}`, icon: Download },
-  failed: { action: "install", label: () => "Try Again" },
-  upToDate: { action: "check", label: () => "Check Again", outline: true },
+  available: { action: "download", icon: Download },
+  failed: { action: "download" },
+  upToDate: { action: "check", outline: true },
 };
 
 function checked(st: UpdateStatusView): string {
@@ -148,7 +149,7 @@ function Failure({ reason }: { reason: string }) {
   );
 }
 
-function PrimaryButton({ p, v }: { p: Primary; v: UpdateView }) {
+function PrimaryButton({ p, label }: { p: Primary; label: string }) {
   const pending = useUpdateStore((s) => s.pending);
   const checking = useUpdateStore((s) => s.status?.checking ?? false);
   const busy = pending === p.action || (p.action === "check" && checking);
@@ -162,7 +163,7 @@ function PrimaryButton({ p, v }: { p: Primary; v: UpdateView }) {
       data-testid={`update-${p.action}`}
     >
       {Icon && <Icon className={cn(busy && "animate-spin")} aria-hidden />}
-      {p.label(v)}
+      {label}
     </Button>
   );
 }
@@ -177,7 +178,7 @@ function LaterLink({ label }: { label: string }) {
 
 function Body({ st, v }: { st: UpdateStatusView; v: UpdateView }) {
   const error = useUpdateStore((s) => s.error);
-  const primary = primaries[v.variant];
+  const primary = v.primary === null ? undefined : primaries[v.variant];
   const meta = metas[v.variant]?.(st, v) ?? [];
   const checkError = st.lastCheckError && (v.variant === "upToDate" || v.variant === "available") ? st.lastCheckError : "";
   return (
@@ -185,9 +186,9 @@ function Body({ st, v }: { st: UpdateStatusView; v: UpdateView }) {
       <DialogDescription className="mx-auto mt-1.5 max-w-[330px] text-[12.5px] text-muted-foreground">{v.body}</DialogDescription>
       {v.showBusy && <BusyThreads />}
       {v.variant === "failed" && <Failure reason={st.failureReason} />}
-      {v.variant === "installing" && (
+      {v.variant === "downloading" && (
         <>
-          <Progress className="mt-[18px] h-1" aria-label="Installing the update" data-testid="update-progress-bar" />
+          <Progress className="mt-[18px] h-1" aria-label="Downloading the update" data-testid="update-progress-bar" />
           <p className="mt-[7px] truncate text-left font-mono text-[11.5px] text-muted-foreground" data-testid="update-progress">
             {st.progress}
           </p>
@@ -206,7 +207,7 @@ function Body({ st, v }: { st: UpdateStatusView; v: UpdateView }) {
       )}
       {(primary || v.later) && (
         <div className={cn("grid gap-2.5", primary ? "mt-[18px]" : "mt-3.5")}>
-          {primary && <PrimaryButton p={primary} v={v} />}
+          {primary && v.primary !== null && <PrimaryButton p={primary} label={v.primary} />}
           {v.later && <LaterLink label={v.later} />}
         </div>
       )}
@@ -216,8 +217,9 @@ function Body({ st, v }: { st: UpdateStatusView; v: UpdateView }) {
 }
 
 /**
- * Software update, centred on the app icon: one primary action per state (Install,
- * Restart Now, Try Again, Check Again), a muted link that closes, and a meta line.
+ * Software update, centred on the app icon: one primary action per state (Download,
+ * Install and Restart Now, Restart Now, Try Again, Check Again), a muted link that
+ * closes, and a meta line.
  * Only "up to date" (and "updates are off") has a ×; every other state closes through
  * its Later / Hide / Not now link. Variants and copy: lib/update.ts updateView.
  */

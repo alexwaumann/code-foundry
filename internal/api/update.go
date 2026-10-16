@@ -51,7 +51,16 @@ func (h *Update) Check(ctx context.Context, _ *connect.Request[v1.CheckForUpdate
 	return connect.NewResponse(&v1.CheckForUpdateResponse{Status: updateStatusToProto(st)}), nil
 }
 
-// Install starts installing the available version.
+// Download starts downloading and staging the available version.
+func (h *Update) Download(ctx context.Context, _ *connect.Request[v1.DownloadUpdateRequest]) (*connect.Response[v1.DownloadUpdateResponse], error) {
+	st, err := h.svc.Download(ctx)
+	if err != nil {
+		return nil, updateError(err)
+	}
+	return connect.NewResponse(&v1.DownloadUpdateResponse{Status: updateStatusToProto(st)}), nil
+}
+
+// Install installs the downloaded version (`app.restart` calls it before restarting).
 func (h *Update) Install(ctx context.Context, _ *connect.Request[v1.InstallUpdateRequest]) (*connect.Response[v1.InstallUpdateResponse], error) {
 	st, err := h.svc.Install(ctx)
 	if err != nil {
@@ -127,6 +136,7 @@ var updateStates = map[update.State]v1.UpdateState{
 	update.Idle:            v1.UpdateState_UPDATE_STATE_IDLE,
 	update.Available:       v1.UpdateState_UPDATE_STATE_AVAILABLE,
 	update.Downloading:     v1.UpdateState_UPDATE_STATE_DOWNLOADING,
+	update.Downloaded:      v1.UpdateState_UPDATE_STATE_DOWNLOADED,
 	update.Installed:       v1.UpdateState_UPDATE_STATE_INSTALLED,
 	update.RestartRequired: v1.UpdateState_UPDATE_STATE_RESTART_REQUIRED,
 	update.Failed:          v1.UpdateState_UPDATE_STATE_FAILED,

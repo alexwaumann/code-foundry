@@ -18,6 +18,7 @@ import (
 type UpdateBackend interface {
 	Get(context.Context, *connect.Request[v1.GetUpdateStatusRequest]) (*connect.Response[v1.GetUpdateStatusResponse], error)
 	Check(context.Context, *connect.Request[v1.CheckForUpdateRequest]) (*connect.Response[v1.CheckForUpdateResponse], error)
+	Download(context.Context, *connect.Request[v1.DownloadUpdateRequest]) (*connect.Response[v1.DownloadUpdateResponse], error)
 	Install(context.Context, *connect.Request[v1.InstallUpdateRequest]) (*connect.Response[v1.InstallUpdateResponse], error)
 	Relaunch(context.Context, *connect.Request[v1.RelaunchAppRequest]) (*connect.Response[v1.RelaunchAppResponse], error)
 	RequestRestart(context.Context, *connect.Request[v1.RequestRestartRequest]) (*connect.Response[v1.RequestRestartResponse], error)
@@ -63,6 +64,9 @@ type AppRestart struct {
 	// GUINotified is how many GUI listeners received the restart request; 0 when no
 	// window is connected (nothing relaunches; `code-foundry gui` opens one).
 	GUINotified int `json:"gui_notified"`
+	// Installed is the downloaded version the restart installed first ("" when nothing
+	// was downloaded).
+	Installed string `json:"installed,omitempty"`
 }
 
 // updateStatus reads the updater's status; nil when the service is unavailable.
@@ -75,7 +79,7 @@ func updateStatus(ctx context.Context, u UpdateBackend) *v1.UpdateStatus {
 }
 
 // installable reports whether app.update can run: an update is available, or the last
-// install failed and can be retried.
+// download or install failed and can be retried.
 func installable(st *v1.UpdateStatus) bool {
 	switch st.GetState() {
 	case v1.UpdateState_UPDATE_STATE_AVAILABLE, v1.UpdateState_UPDATE_STATE_FAILED:
@@ -98,13 +102,15 @@ func UpdateSummary(st *v1.UpdateStatus) string {
 	case v1.UpdateState_UPDATE_STATE_AVAILABLE:
 		return t + " available"
 	case v1.UpdateState_UPDATE_STATE_DOWNLOADING:
-		return "installing " + t
+		return "downloading " + t
+	case v1.UpdateState_UPDATE_STATE_DOWNLOADED:
+		return t + " downloaded; restart Code Foundry to install it"
 	case v1.UpdateState_UPDATE_STATE_INSTALLED:
 		return t + " installed; restart Code Foundry to apply"
 	case v1.UpdateState_UPDATE_STATE_RESTART_REQUIRED:
 		return t + " installed and the app relaunched; restart Code Foundry to apply"
 	case v1.UpdateState_UPDATE_STATE_FAILED:
-		return "installing " + t + " failed: " + st.GetFailureReason()
+		return "updating to " + t + " failed: " + st.GetFailureReason()
 	}
 	if st.GetLastCheckError() != "" {
 		return "last check failed: " + st.GetLastCheckError()
@@ -228,6 +234,28 @@ func cutOff(c RestartCost) string {
 	return " (cuts off " + c.String() + ")"
 }
 
+// downloadedTarget is the version app.restart installs first: the target while the
+// status is DOWNLOADED, else "".
+func downloadedTarget(st *v1.UpdateStatus) string {
+	if st.GetState() != v1.UpdateState_UPDATE_STATE_DOWNLOADED {
+		return ""
+	}
+	return st.GetTargetVersion()
+}
+
+// restartWhat is app.restart's action for the confirm: "Install vX and restart Code
+// Foundry" with a download pending, else "Restart Code Foundry".
+func restartWhat(st *v1.UpdateStatus) string {
+	if t := downloadedTarget(st); t != "" {
+		return "Install " + t + " and restart Code Foundry"
+	}
+	return "Restart Code Foundry"
+}
+
+// errDownloading refuses a restart while a download runs: the new daemon would start
+// without it.
+var errDownloading = fmt.Errorf("%w: an update is downloading; restart when it finishes", ErrUnavailable)
+
 func plural(n int, word string) string {
 	if n == 1 {
 		return fmt.Sprintf("1 %s", word)
@@ -284,24 +312,25 @@ func RegisterUpdate(r *Registry, d UpdateDeps) error {
 			},
 		},
 		Command{
-			Name:        "app.update",
-			Title:       "Update Code Foundry",
-			Description: "Download and install the available update. It applies on `app.restart`; until then the app and daemon keep running the current version.",
-			Category:    "App",
-			When:        func(Context) bool { return installable(updateStatus(context.Background(), d.Update)) },
+			Name:  "app.update",
+			Title: "Download Update",
+			Description: "Download the available update in the background. Nothing changes on disk until `app.restart` installs it and restarts; " +
+				"until then the app and daemon keep running the current version.",
+			Category: "App",
+			When:     func(Context) bool { return installable(updateStatus(context.Background(), d.Update)) },
 			DynamicTitle: func(Context) string {
 				if st := updateStatus(context.Background(), d.Update); installable(st) {
-					return "Update to " + st.GetTargetVersion()
+					return "Download " + st.GetTargetVersion()
 				}
 				return ""
 			},
 			Run: func(ctx context.Context, _ Context, _ Args) (Result, error) {
-				res, err := d.Update.Install(ctx, connect.NewRequest(&v1.InstallUpdateRequest{}))
+				res, err := d.Update.Download(ctx, connect.NewRequest(&v1.DownloadUpdateRequest{}))
 				if err != nil {
 					return Result{}, err
 				}
 				st := res.Msg.GetStatus()
-				return Result{Message: "installing " + st.GetTargetVersion(), JSON: st}, nil
+				return Result{Message: "downloading " + st.GetTargetVersion(), JSON: st}, nil
 			},
 		},
 		Command{
@@ -324,18 +353,34 @@ func RegisterUpdate(r *Registry, d UpdateDeps) error {
 			Name:     "app.restart",
 			Title:    "Restart Code Foundry",
 			Category: "App",
-			Description: "Restart the daemon and relaunch the app so both run the installed version. " +
+			Description: "Restart the daemon and relaunch the app so both run the installed version, installing a downloaded update first. " +
 				"Threads keep their history and a message starts each again; a turn or background work running is cut off.",
+			DynamicTitle: func(Context) string {
+				if t := downloadedTarget(updateStatus(context.Background(), d.Update)); t != "" {
+					return "Install " + t + " and Restart"
+				}
+				return ""
+			},
 			Confirm: restartConfirm("Restart Code Foundry", RestartCost{}),
 			DynamicConfirm: func(ctx context.Context, _ Context, _ Args) string {
-				return restartConfirm("Restart Code Foundry", restartCost(ctx, d.Session))
+				return restartConfirm(restartWhat(updateStatus(ctx, d.Update)), restartCost(ctx, d.Session))
 			},
 			Run: func(ctx context.Context, _ Context, _ Args) (Result, error) {
 				if d.Restart == nil {
 					return Result{}, errors.New("this daemon cannot restart itself")
 				}
-				if updateStatus(ctx, d.Update).GetState() == v1.UpdateState_UPDATE_STATE_DOWNLOADING {
-					return Result{}, fmt.Errorf("%w: an update is being installed; restart when it finishes", ErrUnavailable)
+				st := updateStatus(ctx, d.Update)
+				if st.GetState() == v1.UpdateState_UPDATE_STATE_DOWNLOADING {
+					return Result{}, errDownloading
+				}
+				// Install the download now, while both processes are about to go down
+				// together: the window relaunched below and the daemon started after this
+				// one exits run the same new version. A failed install restarts nothing.
+				installed := downloadedTarget(st)
+				if installed != "" {
+					if _, err := d.Update.Install(ctx, connect.NewRequest(&v1.InstallUpdateRequest{})); err != nil {
+						return Result{}, fmt.Errorf("install %s: %w", installed, err)
+					}
 				}
 				n := restartCost(ctx, d.Session)
 				// Announce before stopping, so GUIs hear it while the daemon is still up;
@@ -350,7 +395,10 @@ func RegisterUpdate(r *Registry, d UpdateDeps) error {
 				if notified == 0 {
 					msg = "restarting the daemon" + cutOff(n) + "; no app window is connected (open it with `code-foundry gui`)"
 				}
-				return Result{Message: msg, JSON: AppRestart{ThreadsInterrupted: n.Threads, GUINotified: notified}}, nil
+				if installed != "" {
+					msg = "installed " + installed + "; " + msg
+				}
+				return Result{Message: msg, JSON: AppRestart{ThreadsInterrupted: n.Threads, GUINotified: notified, Installed: installed}}, nil
 			},
 		},
 		Command{
@@ -367,8 +415,10 @@ func RegisterUpdate(r *Registry, d UpdateDeps) error {
 				if d.Restart == nil {
 					return Result{}, errors.New("this daemon cannot restart itself")
 				}
+				// It does not install a download: the daemon alone would then run a version
+				// the open window does not (`app.restart` changes both).
 				if updateStatus(ctx, d.Update).GetState() == v1.UpdateState_UPDATE_STATE_DOWNLOADING {
-					return Result{}, fmt.Errorf("%w: an update is being installed; restart when it finishes", ErrUnavailable)
+					return Result{}, errDownloading
 				}
 				n := restartCost(ctx, d.Session)
 				d.Restart()
