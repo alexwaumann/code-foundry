@@ -1,0 +1,181 @@
+{
+  "catppuccin-mocha": {
+    "name": "Catppuccin Mocha",
+    "ghostty": "Catppuccin Mocha",
+    "pair": "catppuccin-latte",
+    "upstream": "Catppuccin, github.com/catppuccin/catppuccin (MIT)",
+    "accent": "#cba6f7",
+    "slots": "normal",
+    "vars": { "--syn-kw": "#cba6f7", "--syn-num": "#fab387" },
+    "why": "Accent is mauve from the official palette (Ghostty has no accent). Normal slots: Ghostty's bright 9-13 are re-saturated copies, the official red/green/yellow/blue are the normal ones. Keywords mauve and numbers peach, as Catppuccin's own syntax style guide."
+  },
+  "graphite-dark": {
+    "name": "Graphite Dark",
+    "graphite": "dark",
+    "pair": "graphite-light",
+    "upstream": "Code Foundry's original dark theme (index.css .dark)",
+    "vars": {
+      "--syn-fg": "#d8dadf", "--syn-kw": "#c678dd", "--syn-fn": "#61afef", "--syn-type": "#e5c07b", "--syn-str": "#98c379",
+      "--syn-com": "#5c6370", "--syn-num": "#56b6c2", "--sh-cmd": "#61afef", "--sh-flag": "#56b6c2", "--sh-str": "#98c379"
+    },
+    "why": "The pre-engine neutral theme, read from index.css .dark so the stylesheet fallback and the catalog cannot drift. Syntax is thread.css's One Dark set."
+  },
+  "dracula": {
+    "name": "Dracula",
+    "ghostty": "Dracula",
+    "upstream": "Dracula, github.com/dracula/dracula-theme (MIT)",
+    "accent": "#bd93f9",
+    "slots": "normal",
+    "status": { "info": 6 },
+    "why": "Dracula's blue slot is purple (#bd93f9, bright #d6acff), the accent; info/link/Working use cyan instead so they do not look like buttons. Normal slots are the official palette."
+  },
+  "gruvbox-dark": {
+    "name": "Gruvbox Dark",
+    "ghostty": "Gruvbox Dark",
+    "pair": "gruvbox-light",
+    "upstream": "Gruvbox, github.com/morhetz/gruvbox (MIT)",
+    "accent": "#fe8019",
+    "why": "Accent is Gruvbox's bright orange (not in the ANSI palette)."
+  },
+  "nord": {
+    "name": "Nord",
+    "ghostty": "Nord",
+    "upstream": "Nord, github.com/nordtheme/nord (MIT)",
+    "accent": "#88c0d0",
+    "why": "Accent is frost nord8. Destructive (#bf616a, 3.1:1) and the inverted selection are fixed by the guards."
+  },
+  "tokyo-night": {
+    "name": "Tokyo Night",
+    "ghostty": "TokyoNight",
+    "upstream": "Tokyo Night, github.com/enkia/tokyo-night-vscode-theme",
+    "accent": "#7aa2f7",
+    "why": "Accent is Tokyo Night's blue."
+  },
+  "rose-pine": {
+    "name": "Rosé Pine",
+    "ghostty": "Rose Pine",
+    "pair": "rose-pine-dawn",
+    "upstream": "Rosé Pine, github.com/rose-pine/rose-pine-theme (MIT)",
+    "accent": "#c4a7e7",
+    "status": { "success": "#95b1ac" },
+    "why": "Accent is iris. Rosé Pine has no green: its ANSI green is pine (blue-teal), which does not read as done; success is the palette's leaf (sage) instead."
+  },
+  "atom-one-dark": {
+    "name": "Atom One Dark",
+    "ghostty": "Atom One Dark",
+    "pair": "atom-one-light",
+    "upstream": "Atom One, github.com/atom/atom (MIT)",
+    "accent": "#61afef",
+    "why": "Accent is One Dark's blue."
+  },
+  "solarized-dark": {
+    "name": "Solarized Dark",
+    "ghostty": "iTerm2 Solarized Dark",
+    "pair": "solarized-light",
+    "upstream": "Solarized, github.com/altercation/solarized (MIT)",
+    "accent": "#268bd2",
+    "slots": "normal",
+    "why": "Solarized's bright slots are its greys (and bright red is orange), so status colours use the normal accents. Accent is blue. The foreground (4.8:1) is lifted to 7:1 by the guard."
+  },
+  "monokai-pro": {
+    "name": "Monokai Pro",
+    "ghostty": "Monokai Pro",
+    "upstream": "Monokai Pro, monokai.pro (palette via iTerm2-Color-Schemes)",
+    "accent": "#ffd866",
+    "status": { "info": 6, "warning": 4 },
+    "why": "Accent is Monokai's yellow, which is also its ANSI yellow, so warning takes the orange (ANSI 4, Monokai has no blue) and info takes cyan."
+  },
+  "github-dark": {
+    "name": "GitHub Dark",
+    "ghostty": "GitHub Dark Default",
+    "pair": "github-light",
+    "upstream": "GitHub Primer, github.com/primer/github-vscode-theme (MIT)",
+    "accent": "#4493f8",
+    "why": "Accent is Primer's accent.fg. The selection is the foreground (inverted); the guard replaces it."
+  },
+  "kanagawa-wave": {
+    "name": "Kanagawa Wave",
+    "ghostty": "Kanagawa Wave",
+    "upstream": "Kanagawa, github.com/rebelot/kanagawa.nvim (MIT)",
+    "accent": "#7e9cd8",
+    "why": "Accent is crystalBlue. The selection is the foreground (inverted); the guard replaces it."
+  },
+  "everforest-dark-hard": {
+    "name": "Everforest Dark Hard",
+    "ghostty": "Everforest Dark Hard",
+    "upstream": "Everforest, github.com/sainnhe/everforest (MIT)",
+    "accent": "#a7c080",
+    "slots": "normal",
+    "why": "Accent is Everforest's green. The bright slots are the light variant's saturated, darker colours; on the dark background the normal slots are the theme's own."
+  },
+  "ayu-mirage": {
+    "name": "Ayu Mirage",
+    "ghostty": "Ayu Mirage",
+    "upstream": "Ayu, github.com/ayu-theme/ayu-colors (MIT)",
+    "accent": "#ffad66",
+    "why": "Accent is Ayu's orange (keyword colour), distinct from its yellow warning. The bright-blue selection is replaced by the guard."
+  },
+  "catppuccin-latte": {
+    "name": "Catppuccin Latte",
+    "ghostty": "Catppuccin Latte",
+    "pair": "catppuccin-mocha",
+    "upstream": "Catppuccin, github.com/catppuccin/catppuccin (MIT)",
+    "accent": "#8839ef",
+    "vars": { "--syn-kw": "#8839ef", "--syn-num": "#fe640b" },
+    "why": "Accent is mauve from the official palette. Yellow and green are too light for text on the light base; the guards darken them."
+  },
+  "graphite-light": {
+    "name": "Graphite Light",
+    "graphite": "light",
+    "pair": "graphite-dark",
+    "upstream": "Code Foundry's original light theme (index.css :root)",
+    "vars": {
+      "--syn-fg": "#24292f", "--syn-kw": "#cf222e", "--syn-fn": "#8250df", "--syn-type": "#0969da", "--syn-str": "#116329",
+      "--syn-com": "#6e7781", "--syn-num": "#1b7c83", "--sh-cmd": "#0969da", "--sh-flag": "#1b7c83", "--sh-str": "#116329"
+    },
+    "why": "The pre-engine neutral theme, read from index.css :root. Syntax is thread.css's GitHub light set."
+  },
+  "gruvbox-light": {
+    "name": "Gruvbox Light",
+    "ghostty": "Gruvbox Light",
+    "pair": "gruvbox-dark",
+    "upstream": "Gruvbox, github.com/morhetz/gruvbox (MIT)",
+    "accent": "#af3a03",
+    "slots": "bright",
+    "why": "Accent is Gruvbox light's orange. Its bright slots are the darker 'faded' set meant for the light background, so status colours use them. The selection is the foreground (inverted); the guard replaces it."
+  },
+  "rose-pine-dawn": {
+    "name": "Rosé Pine Dawn",
+    "ghostty": "Rose Pine Dawn",
+    "pair": "rose-pine",
+    "upstream": "Rosé Pine, github.com/rose-pine/rose-pine-theme (MIT)",
+    "accent": "#907aa9",
+    "status": { "success": "#6d8f89", "info": 4 },
+    "why": "Accent is iris. No green (as Rosé Pine): success is Dawn's leaf; info stays foam (ANSI 4) so it is not the same teal as pine. Gold warning is darkened by the guard."
+  },
+  "atom-one-light": {
+    "name": "Atom One Light",
+    "ghostty": "Atom One Light",
+    "pair": "atom-one-dark",
+    "upstream": "Atom One, github.com/atom/atom (MIT)",
+    "accent": "#4078f2",
+    "why": "Accent is One Light's blue. ANSI 8 is black, so code comments use muted-foreground (guard); the pale yellow warning is darkened by the guard."
+  },
+  "solarized-light": {
+    "name": "Solarized Light",
+    "ghostty": "iTerm2 Solarized Light",
+    "pair": "solarized-dark",
+    "upstream": "Solarized, github.com/altercation/solarized (MIT)",
+    "accent": "#268bd2",
+    "why": "Accent is blue. Solarized is low contrast by design (fg 4.1:1); the guards darken the foreground to 7:1 and every status colour to 4.5:1."
+  },
+  "github-light": {
+    "name": "GitHub Light",
+    "ghostty": "GitHub Light Default",
+    "pair": "github-dark",
+    "upstream": "GitHub Primer, github.com/primer/github-vscode-theme (MIT)",
+    "accent": "#0969da",
+    "status": { "warning": "#9a6700" },
+    "why": "Accent is Primer's blue. ANSI yellow is near-black brown (#4d2d00), so warning is Primer's attention.fg. The selection is the foreground (inverted); the guard replaces it."
+  }
+}

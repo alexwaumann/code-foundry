@@ -21,7 +21,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss(), wails("./bindings")],
   test: {
     environment: "jsdom",
-    include: ["src/**/*.test.{ts,tsx}"],
+    include: ["src/**/*.test.{ts,tsx}", "themes/**/*.test.ts"],
     setupFiles: ["src/test/setup.ts"],
     // Vitest hands stylesheets back empty; "?raw" ones keep their text so the palette guard
     // (src/lib/palette.test.ts) can read them. Plain CSS imports stay empty.

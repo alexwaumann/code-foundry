@@ -5,6 +5,7 @@ import { sameTheme, terminalTheme, watchTerminalTheme } from "./theme";
 const css = `
 :root { --pane: #ffffff; --terminal-fg: #24292f; --terminal-ansi-1: #cf222e; }
 .dark { --pane: #080808; --terminal-fg: #d8dadf; --terminal-ansi-1: #e06c75; }
+html[data-theme="catppuccin-mocha"] { --pane: #1e1e2e; --terminal-fg: #cdd6f4; --terminal-ansi-1: #f38ba8; }
 `;
 
 function install(): () => void {
@@ -15,6 +16,7 @@ function install(): () => void {
     style.remove();
     document.documentElement.className = "";
     document.documentElement.removeAttribute("style");
+    document.documentElement.removeAttribute("data-theme");
   };
 }
 
@@ -60,5 +62,19 @@ describe("watchTerminalTheme", () => {
     document.documentElement.classList.add("dark");
     await Promise.resolve();
     expect(seen).toHaveLength(2);
+  });
+
+  it("reports a new palette when data-theme changes (lib/theme.ts switching themes)", async () => {
+    cleanup = install();
+    document.documentElement.classList.add("dark");
+    const seen: string[] = [];
+    const stop = watchTerminalTheme((t) => seen.push(`${t.background ?? ""} ${t.red ?? ""}`));
+    document.documentElement.dataset.theme = "catppuccin-mocha";
+    await Promise.resolve();
+    expect(seen).toEqual(["#1e1e2e #f38ba8"]);
+    document.documentElement.dataset.theme = "unknown";
+    await Promise.resolve();
+    expect(seen).toEqual(["#1e1e2e #f38ba8", "#080808 #e06c75"]);
+    stop();
   });
 });
