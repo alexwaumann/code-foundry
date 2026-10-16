@@ -119,7 +119,7 @@ function PullRequestRow({ pr }: { pr: PullRequestView }) {
   const draft = pr.state === "open" && pr.draft;
   const word = draft ? "draft" : pr.state === "open" ? "" : pr.state;
   return (
-    <div data-testid="worktree-pr" data-number={pr.number} data-state={draft ? "draft" : pr.state}>
+    <div data-testid="overview-pr" data-number={pr.number} data-state={draft ? "draft" : pr.state}>
       <NavRow navKey="pr" activateOnClick onCmdClick={() => void openUrl(pr.url)} className="flex h-9 min-w-0 items-center gap-2 rounded-lg border px-2.5 text-body-sm">
         <PrStateIcon state={pr.state} draft={pr.draft} />
         <span className="shrink-0 text-muted-foreground tabular-nums">#{pr.number}</span>

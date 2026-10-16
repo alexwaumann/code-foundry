@@ -123,7 +123,7 @@ describe("WorktreePanelView", () => {
     expect(screen.getByTestId("fact-tree").textContent).toBe("working tree4 changed");
     expect(q("worktree-operation")).toBeNull();
 
-    const row = screen.getByTestId("worktree-pr");
+    const row = screen.getByTestId("overview-pr");
     expect(row.getAttribute("data-state")).toBe("open");
     expect(row.textContent).toContain("#126");
     expect(row.textContent).toContain("PR 126");
@@ -189,7 +189,7 @@ describe("WorktreePanelView", () => {
     expect(screen.getByTestId("fact-tree").textContent).toBe("working tree2 unmerged");
     expect(screen.getByTestId("fact-origin").textContent).toBe("originnot pushed");
     // Detached mid-rebase: no branch, so no pull request row.
-    expect(q("worktree-pr")).toBeNull();
+    expect(q("overview-pr")).toBeNull();
     const names = within(screen.getByTestId("worktree-changes")).getAllByTestId("file-path").map((e) => e.textContent);
     expect(names).toEqual(["‎internal/driver/‎plan.goconflict", "‎internal/driver/‎plan_test.goconflict", "‎docs/‎plan.md"]);
   });
@@ -211,7 +211,7 @@ describe("WorktreePanelView", () => {
     expect(screen.getByTestId("fact-origin-value").textContent).toBe("in sync");
     expect(screen.getByTestId("fact-base-value").textContent).toBe("even");
     expect(screen.getByTestId("fact-tree-value").textContent).toBe("clean");
-    expect(q("worktree-pr")).toBeNull();
+    expect(q("overview-pr")).toBeNull();
     expect(screen.getByTestId("worktree-changes").textContent).toContain("No changes against main.");
     expect(q("worktree-commits")).toBeNull();
   });
@@ -226,7 +226,7 @@ describe("WorktreePanelView", () => {
     detail([], []);
     prs.set("cf/feat", list);
     await show();
-    const row = screen.getByTestId("worktree-pr");
+    const row = screen.getByTestId("overview-pr");
     expect(row.getAttribute("data-number")).toBe(String(number));
     expect(row.getAttribute("data-state")).toBe(state);
     for (const t of has) expect(row.textContent).toContain(t);
@@ -287,7 +287,7 @@ describe("WorktreePanelView", () => {
     detail([], []);
     prs.set("cf/feat", [pr(126)]);
     await show();
-    const row = el(screen.getByTestId("worktree-pr").querySelector('[data-nav-key="pr"]'));
+    const row = el(screen.getByTestId("overview-pr").querySelector('[data-nav-key="pr"]'));
     fireEvent.click(row);
     expect(openPullRequestInPanel).toHaveBeenCalledWith({ slug: "o/web", number: 126 });
     fireEvent.click(row, { metaKey: true });
@@ -305,7 +305,7 @@ describe("WorktreePanelView", () => {
     world(status(), "cf/feat", { githubSlug: "" });
     await show();
     expect(q("no-remote")).toBeNull();
-    expect(q("worktree-pr")).toBeNull();
+    expect(q("overview-pr")).toBeNull();
     expect(getBranchPullRequests).not.toHaveBeenCalled();
   });
 
