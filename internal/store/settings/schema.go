@@ -380,7 +380,7 @@ var staticFields = []Field{
 	},
 	{
 		Key: KeyGhPollInterval, Group: GroupGitHub, Page: PageSource, Section: "github", Unit: "s", Type: Int, Title: "Poll interval",
-		Description: "How often one request checks your pull requests, watched branches and tracked default branches for changes. Details are fetched only for what changed.",
+		Description: "How often one request checks your pull requests, watched branches and tracked default branches for changes while the app's window is visible. Details are fetched only for what changed. With the window hidden it checks every 5 minutes, with the app closed every 15 (or at this interval, if longer).",
 		Default:     strconv.Itoa(defaultGhPollSeconds), Min: 15, Max: 3600,
 		bind: func(s *Settings) any { return &s.GitHub.PollIntervalSeconds },
 	},
