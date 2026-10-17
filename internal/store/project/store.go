@@ -1162,6 +1162,8 @@ func (g *Git) status(ctx context.Context, projectID, path string) {
 		}
 		return
 	}
+	g.log.Debug("worktree status changed", "project", projectID, "path", path, "head", shortSHA(next.Head),
+		"staged", next.Status.Staged, "modified", next.Status.Modified, "untracked", next.Status.Untracked)
 	g.commit(func(s *Snapshot) []Event {
 		if w, ok := s.Worktree(projectID, path); ok {
 			return []Event{WorktreeUpdated{Worktree: w}}

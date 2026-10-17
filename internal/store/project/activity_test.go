@@ -297,4 +297,12 @@ func TestTouch(t *testing.T) {
 	if n := cr.count("status") - before; n != 2 {
 		t.Fatalf("status ran %d times, want 2", n)
 	}
+
+	// A turn end right after an edit: TouchNow replaces the pending Touch.
+	h.store.Touch(f.project)
+	h.store.TouchNow(f.project)
+	time.Sleep(2 * window)
+	if n := cr.count("status") - before; n != 3 {
+		t.Fatalf("Touch then TouchNow ran status %d times, want 1", n-2)
+	}
 }

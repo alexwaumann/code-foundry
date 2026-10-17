@@ -250,7 +250,7 @@ type Store interface {
 	// debounce (a thread's tool edited files there). Unknown paths are ignored.
 	Touch(path string)
 	// TouchNow asks for a status refresh of the worktree at path at once (a thread's
-	// turn ended there). Unknown paths are ignored.
+	// turn ended there), replacing a pending Touch. Unknown paths are ignored.
 	TouchNow(path string)
 }
 

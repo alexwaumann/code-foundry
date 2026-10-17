@@ -255,6 +255,7 @@ func (g *Git) Touch(path string) {
 func (g *Git) TouchNow(path string) {
 	if k, ok := g.statusKey(path); ok {
 		g.log.Debug("worktree touched", "path", k.path, "debounced", false)
+		g.touch.cancel(k) // this refresh covers a pending debounced one
 		g.sched.request(k)
 	}
 }
