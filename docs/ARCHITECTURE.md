@@ -539,10 +539,15 @@ from the pull request (docs/notes/pr-thread-commands.md).
   `Managed` (cleanable; `docs/notes/drop-worktree-dir.md`). One recursive FSEvents
   stream (cgo, confined to one goroutine) over the worktree root, every project
   directory, and any worktree outside both is routed by path to debounced status,
-  base, and reconcile jobs (`docs/notes/fsevents-watcher.md`); a 2 min poll is the
-  backstop. Workers write disjoint per-path snapshot pointers. A project may be a plain
-  folder (`Project.Git` false): one synthetic checkout, no git commands; the stream (or
-  the poll) notices a later `git init` (`docs/notes/add-project-2-nogit.md`).
+  base, and reconcile jobs (`docs/notes/fsevents-watcher.md`). Workers write disjoint
+  per-path snapshot pointers. The backstop poll and the background fetch run each
+  project on a live tier (a worktree with a live thread, or a detail asked for in the
+  last 10 minutes: poll and fetch every 2 min) or a slower idle tier (poll 10 min,
+  fetch 15 min); threads' edit-tool results and turn ends refresh their worktree's
+  status directly, through daemon glue on the thread events
+  (`docs/notes/git-activity-tiers.md`). A project may be a plain folder (`Project.Git`
+  false): one synthetic checkout, no git commands; the stream (or the poll) notices a
+  later `git init` (`docs/notes/add-project-2-nogit.md`).
 * `gh`: GitHub GraphQL (and a little REST) sent in-process over one keep-alive HTTP
   client with the token from `gh auth token` (github.com only; see
   `docs/notes/gh-http-transport.md`). Scoped to the viewer: their PRs (authored, review

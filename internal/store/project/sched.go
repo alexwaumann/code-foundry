@@ -187,15 +187,30 @@ func (d *debouncer) trigger(k jobKey) {
 	if d.closed || d.timers[k] != nil {
 		return
 	}
-	d.timers[k] = time.AfterFunc(d.window, func() {
+	var t *time.Timer
+	t = time.AfterFunc(d.window, func() {
 		d.mu.Lock()
-		delete(d.timers, k)
-		closed := d.closed
+		mine := d.timers[k] == t // false once cancelled (or cancelled and re-armed)
+		if mine {
+			delete(d.timers, k)
+		}
+		fire := mine && !d.closed
 		d.mu.Unlock()
-		if !closed {
+		if fire {
 			d.fire(k)
 		}
 	})
+	d.timers[k] = t
+}
+
+// cancel drops k's armed timer, if any: the caller runs the job itself.
+func (d *debouncer) cancel(k jobKey) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if t := d.timers[k]; t != nil {
+		t.Stop()
+		delete(d.timers, k)
+	}
 }
 
 func (d *debouncer) close() {

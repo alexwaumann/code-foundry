@@ -97,6 +97,29 @@ func TestSchedulerCloseReleasesWaiters(t *testing.T) {
 	}
 }
 
+func TestDebouncerCancel(t *testing.T) {
+	var fired atomic.Int32
+	d := newDebouncer(30*time.Millisecond, func(jobKey) { fired.Add(1) })
+	defer d.close()
+	a, b := jobKey{kind: jobStatus, path: "a"}, jobKey{kind: jobStatus, path: "b"}
+	d.trigger(a)
+	d.trigger(b)
+	d.cancel(a)
+	d.cancel(jobKey{kind: jobStatus, path: "never armed"})
+	time.Sleep(80 * time.Millisecond)
+	if n := fired.Load(); n != 1 {
+		t.Fatalf("fired %d times, want 1 (b only)", n)
+	}
+	// Cancelled and re-armed: the new timer fires once.
+	d.trigger(a)
+	d.cancel(a)
+	d.trigger(a)
+	time.Sleep(80 * time.Millisecond)
+	if n := fired.Load(); n != 2 {
+		t.Fatalf("fired %d times, want 2", n)
+	}
+}
+
 func TestDebouncerCoalesces(t *testing.T) {
 	var fired atomic.Int32
 	d := newDebouncer(30*time.Millisecond, func(jobKey) { fired.Add(1) })

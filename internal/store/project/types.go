@@ -240,6 +240,18 @@ type Store interface {
 	// and an empty "chore: initial commit") and refreshes it, returning the git project.
 	// ErrFailedPrecondition when it already is one.
 	InitGit(ctx context.Context, id string) (Project, error)
+	// SetLiveWorktrees replaces the set of worktree paths that have a live thread (not
+	// archived, not snoozed). A project with one of them is polled and fetched on the
+	// live tier (activity.go); one that turns live is fetched now if its last fetch is
+	// older than the live interval. Paths are symlink-resolved; unknown ones are kept
+	// and match once the worktree appears.
+	SetLiveWorktrees(paths []string)
+	// Touch asks for a status refresh of the worktree at path after a short trailing
+	// debounce (a thread's tool edited files there). Unknown paths are ignored.
+	Touch(path string)
+	// TouchNow asks for a status refresh of the worktree at path at once (a thread's
+	// turn ended there), replacing a pending Touch. Unknown paths are ignored.
+	TouchNow(path string)
 }
 
 // ErrNotGit is wrapped (with ErrFailedPrecondition) by operations that need git on a

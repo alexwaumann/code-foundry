@@ -62,13 +62,23 @@ type Options struct {
 	// TreeDebounce is the per-worktree coalescing window for fs events in a
 	// worktree's tree (its files, at any depth). Zero means DefaultTreeDebounce.
 	TreeDebounce time.Duration
-	// FetchInterval is how often each project runs `git fetch --prune`. Zero means
-	// DefaultFetchInterval; negative disables fetching.
+	// FetchInterval is how often each live project runs `git fetch --prune`
+	// (activity.go). Zero means DefaultFetchInterval; negative disables fetching.
 	FetchInterval time.Duration
-	// PollInterval is a backstop status refresh of every worktree, for changes the
-	// FSEvents stream cannot see (a ref moved in a packed or reftable store, a stream
-	// that failed to start). Zero means DefaultPollInterval; negative disables polling.
+	// IdleFetchInterval is how often each idle project is fetched. Zero means
+	// DefaultIdleFetchInterval; it is never shorter than FetchInterval.
+	IdleFetchInterval time.Duration
+	// PollInterval is a backstop status refresh of every worktree of a live project,
+	// for changes the FSEvents stream cannot see (a ref moved in a packed or reftable
+	// store, a stream that failed to start). Zero means DefaultPollInterval; negative
+	// disables polling.
 	PollInterval time.Duration
+	// IdlePollInterval is the backstop poll of an idle project. Zero means
+	// DefaultIdlePollInterval; it is never shorter than PollInterval.
+	IdlePollInterval time.Duration
+	// TouchDebounce is Touch's per-worktree coalescing window. Zero means
+	// DefaultTouchDebounce.
+	TouchDebounce time.Duration
 	// Now returns the current time. Defaults to time.Now.
 	Now func() time.Time
 }
@@ -154,6 +164,15 @@ type Git struct {
 	sched   *scheduler
 	deb     *debouncer // git's directories, rescans, a known directory going away
 	treeDeb *debouncer // edits in a worktree's tree
+	// touch debounces Touch, apart from deb and treeDeb so fs events keep their
+	// shorter windows.
+	touch *debouncer
+
+	// live is the worktrees with a live thread (SetLiveWorktrees); pollNudge and
+	// fetchNudge wake the tier loops when a project may have turned live (activity.go).
+	live       liveSet
+	pollNudge  chan struct{}
+	fetchNudge chan struct{}
 
 	details detailState // worktree detail cache (detail.go)
 
@@ -187,6 +206,9 @@ func Start(ctx context.Context, opts Options) (*Git, error) {
 		now:        opts.Now,
 		projects:   map[string]*projectState{},
 		routes:     map[string]watchTarget{},
+		// Buffered: a nudge while a round runs is kept for the next one.
+		pollNudge:  make(chan struct{}, 1),
+		fetchNudge: make(chan struct{}, 1),
 	}
 	if g.runner == nil {
 		g.runner = ExecRunner{}
@@ -208,14 +230,23 @@ func Start(ctx context.Context, opts Options) (*Git, error) {
 	g.sched = newScheduler(ctx, cmp.Or(opts.Workers, DefaultWorkers), g.runJob)
 	g.deb = newDebouncer(cmp.Or(opts.Debounce, DefaultDebounce), func(k jobKey) { g.sched.request(k) })
 	g.treeDeb = newDebouncer(cmp.Or(opts.TreeDebounce, DefaultTreeDebounce), func(k jobKey) { g.sched.request(k) })
+	g.touch = newDebouncer(cmp.Or(opts.TouchDebounce, DefaultTouchDebounce), func(k jobKey) {
+		g.log.Debug("worktree touched", "path", k.path, "debounced", true)
+		g.sched.request(k)
+	})
 	g.fs = newFSWatcher(g.log, g.streamPaths, g.onEvents)
 	g.wg.Go(func() { g.fs.run(ctx) })
 	g.wg.Go(g.fs.dispatch)
-	if d := interval(opts.FetchInterval, DefaultFetchInterval); d > 0 {
-		g.wg.Go(func() { g.fetchLoop(ctx, d) })
+	if t := tiers(opts.FetchInterval, opts.IdleFetchInterval, DefaultFetchInterval, DefaultIdleFetchInterval); t.live > 0 {
+		// Every project is due in the first round (zero seed), shortly after start.
+		s := newTierSched(t, time.Time{})
+		g.wg.Go(func() { g.tierLoop(ctx, "fetch", s, min(t.live, firstFetchDelay), g.fetchNudge, g.fetch) })
 	}
-	if d := interval(opts.PollInterval, DefaultPollInterval); d > 0 {
-		g.wg.Go(func() { g.pollLoop(ctx, d) })
+	if t := tiers(opts.PollInterval, opts.IdlePollInterval, DefaultPollInterval, DefaultIdlePollInterval); t.live > 0 {
+		// The initial reconcile below refreshes everything, so each project's first
+		// poll is one interval after start.
+		s := newTierSched(t, g.now())
+		g.wg.Go(func() { g.tierLoop(ctx, "poll", s, t.live, g.pollNudge, g.poll) })
 	}
 
 	g.commit(nil)
@@ -254,6 +285,7 @@ func (g *Git) Close() error {
 	g.cancel()
 	g.deb.close()
 	g.treeDeb.close()
+	g.touch.close()
 	g.sched.close()
 	g.wg.Wait()
 	return nil
@@ -1130,6 +1162,8 @@ func (g *Git) status(ctx context.Context, projectID, path string) {
 		}
 		return
 	}
+	g.log.Debug("worktree status changed", "project", projectID, "path", path, "head", shortSHA(next.Head),
+		"staged", next.Status.Staged, "modified", next.Status.Modified, "untracked", next.Status.Untracked)
 	g.commit(func(s *Snapshot) []Event {
 		if w, ok := s.Worktree(projectID, path); ok {
 			return []Event{WorktreeUpdated{Worktree: w}}
@@ -1152,30 +1186,12 @@ func (g *Git) publishedBefore(projectID, path string, t time.Time) bool {
 
 // --- loops -----------------------------------------------------------------------
 
-// fetchLoop fetches every project, one at a time, every interval. The first round runs
-// shortly after start, once the initial reconcile has learned each project's origin.
-func (g *Git) fetchLoop(ctx context.Context, every time.Duration) {
-	t := time.NewTimer(min(every, firstFetchDelay))
-	defer t.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-t.C:
-		}
-		for _, id := range g.projectIDs() {
-			if ctx.Err() != nil {
-				return
-			}
-			g.fetch(ctx, id)
-		}
-		t.Reset(every)
-	}
-}
-
-// firstFetchDelay is when the first fetch round runs after Start.
+// firstFetchDelay is when the first fetch round runs after Start (or the live fetch
+// interval, if shorter), once the initial reconcile has learned each project's origin.
 const firstFetchDelay = 10 * time.Second
 
+// fetch fetches one project; the fetch tier loop (activity.go) calls it, one project
+// at a time.
 func (g *Git) fetch(ctx context.Context, id string) {
 	st := g.project(id)
 	if st == nil {
@@ -1195,28 +1211,4 @@ func (g *Git) fetch(ctx context.Context, id string) {
 	}
 	// The watcher sees FETCH_HEAD too; requesting here makes it independent of fs events.
 	g.sched.request(jobKey{kind: jobReconcile, projectID: id})
-}
-
-func (g *Git) pollLoop(ctx context.Context, every time.Duration) {
-	t := time.NewTicker(every)
-	defer t.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-t.C:
-		}
-		for _, id := range g.projectIDs() {
-			if st := g.project(id); st != nil && (st.meta.Load().Error != "" || !st.meta.Load().Git) {
-				// Failed projects have no watches left; retry so a moved-back project recovers.
-				// A project without git has none either: its reconcile is a stat that
-				// notices a .git created outside the app.
-				g.sched.request(jobKey{kind: jobReconcile, projectID: id})
-				continue
-			}
-			// Re-resolving the base each round covers ref moves the watcher cannot
-			// see; jobBase then refreshes every worktree's status.
-			g.sched.request(jobKey{kind: jobBase, projectID: id})
-		}
-	}
 }
