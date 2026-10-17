@@ -103,8 +103,8 @@ export interface MonthView {
 }
 
 export interface StatsView {
-  thisMonth: MonthView;
-  lastMonth: MonthView;
+  /** The last six calendar months, newest first (months[0] is the current one); empty until fetched. */
+  months: MonthView[];
   commitsSource: string;
   fetchedAtMs: number | null;
   lastError: string;
@@ -390,10 +390,14 @@ function toMonthView(m: MonthActivity | undefined): MonthView {
   return { month: m?.month ?? "", commits: m?.commits ?? 0, merged: m?.merged ?? 0 };
 }
 
+/** The stats' month at index i (0 = current), or an empty month when not fetched. */
+export function statsMonth(s: StatsView, i: number): MonthView {
+  return s.months[i] ?? toMonthView(undefined);
+}
+
 export function toStatsView(s: ActivityStats | undefined): StatsView {
   return {
-    thisMonth: toMonthView(s?.thisMonth),
-    lastMonth: toMonthView(s?.lastMonth),
+    months: (s?.months ?? []).map(toMonthView),
     commitsSource: s?.commitsSource ?? "",
     fetchedAtMs: ms(s?.fetchedAt),
     lastError: s?.lastError ?? "",

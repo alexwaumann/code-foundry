@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { ArgType, CommandSchema } from "@/gen/codefoundry/v1/command_pb";
 import { EventSchema } from "@/gen/codefoundry/v1/events_pb";
 import {
+  ActivityStatsSchema,
   CheckConclusion,
   CheckRollupState,
   CheckStatus,
@@ -27,7 +28,7 @@ import { WorkspaceEventSchema } from "@/gen/codefoundry/v1/workspace_pb";
 import { toCommandView } from "./command";
 import { overrideEndpoint } from "./endpoint";
 import { toEventView } from "./events";
-import { toGhEventView, toPullRequestDetailView, toPullRequestView, toReviewerCandidateView } from "./gh";
+import { statsMonth, toGhEventView, toPullRequestDetailView, toPullRequestView, toReviewerCandidateView, toStatsView } from "./gh";
 import { isRemoteless, toRepoEventView, toRepoView } from "./repo";
 import { toThreadListEventView, toThreadView } from "./threads";
 import { toAttachEventView, toTerminalEventView, toTerminalView } from "./terminal";
@@ -311,6 +312,21 @@ describe("gh mapping", () => {
     expect(toReviewerCandidateView(create(ReviewerCandidateSchema, { login: "kim" })).kind).toBe("user");
     const ev = create(GhEventSchema, { event: { case: "pullRequestDetailUpdated", value: { repoSlug: "o/r", number: 7 } } });
     expect(toGhEventView(ev)).toEqual({ kind: "pullRequestDetail", repoSlug: "o/r", number: 7 });
+  });
+
+  it("maps six months of stats newest first; the page reads this month and last", () => {
+    const months = ["2026-10", "2026-09", "2026-08", "2026-07", "2026-06", "2026-05"].map((month, i) => ({ month, commits: 10 * i, merged: i }));
+    const s = toStatsView(create(ActivityStatsSchema, { months, commitsSource: "search", fetchedAt: timestampFromMs(5_000) }));
+    expect(s.months).toHaveLength(6);
+    expect(statsMonth(s, 0)).toEqual({ month: "2026-10", commits: 0, merged: 0 });
+    expect(statsMonth(s, 1)).toEqual({ month: "2026-09", commits: 10, merged: 1 });
+    expect(s.months[5]).toEqual({ month: "2026-05", commits: 50, merged: 5 });
+    expect(s.commitsSource).toBe("search");
+    expect(s.fetchedAtMs).toBe(5_000);
+    // Never fetched: no months, and the tiles read empty ones.
+    const empty = toStatsView(undefined);
+    expect(empty.months).toEqual([]);
+    expect(statsMonth(empty, 1)).toEqual({ month: "", commits: 0, merged: 0 });
   });
 });
 

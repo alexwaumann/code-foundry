@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { create } from "zustand";
 import { GitPullRequest } from "lucide-react";
-import type { DashboardView, MonthView, PullRequestView } from "@/api/gh";
+import { statsMonth, type DashboardView, type MonthView, type PullRequestView } from "@/api/gh";
 import { PanelToggle } from "@/components/panel/PanelToggle";
 import { Tip } from "@/components/ui/tooltip";
 import { PaneHeader } from "@/components/window/PaneHeader";
@@ -181,8 +181,8 @@ function Body({ d, includeAll }: { d: DashboardView; includeAll: boolean }) {
           </Banner>
         )}
         <div className="flex flex-wrap gap-4">
-          <MonthTile month={d.stats.thisMonth} testId="tile-this-month" />
-          <MonthTile month={d.stats.lastMonth} testId="tile-last-month" />
+          <MonthTile month={statsMonth(d.stats, 0)} testId="tile-this-month" />
+          <MonthTile month={statsMonth(d.stats, 1)} testId="tile-last-month" />
         </div>
         <PrTable section="authored" title="Open PRs · authored by you" rows={d.authored} empty="No open PRs authored by you." viewer={viewer} />
         <PrTable section="review" title="PRs awaiting your review" rows={d.reviewRequested} empty="Nothing awaiting your review." viewer={viewer} />
