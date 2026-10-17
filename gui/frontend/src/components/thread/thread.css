@@ -542,15 +542,22 @@ html[data-thread-width="full"] .cf-thread {
   margin: 6px 0 18px;
 }
 .cf-thread .u .bubble {
-  max-width: 80%;
   background: var(--t-bubble);
   border: 1px solid var(--t-bubble-border);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+/* A turn's opening message; a steer (sent mid-turn) sizes its bubble with utilities
+   (UserBubble), which these unlayered rules would otherwise beat. */
+.cf-thread .u:not(.steer) .bubble {
+  max-width: 80%;
   border-radius: 16px;
   padding: 9px 14px;
   font-size: 13px;
   line-height: 1.6;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
+}
+.cf-thread .u.steer {
+  margin: 10px 0 12px;
 }
 .cf-thread .when {
   font-size: 11px;
@@ -761,7 +768,8 @@ html[data-thread-width="full"] .cf-thread {
 .cf-thread .tfoot .sep {
   opacity: 0.5;
 }
-.cf-thread .tfoot .fold {
+.cf-thread .tfoot .fold,
+.cf-thread .tfoot .line {
   display: inline-flex;
   align-items: center;
   gap: 8px;

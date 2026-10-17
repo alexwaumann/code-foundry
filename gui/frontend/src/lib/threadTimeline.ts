@@ -3,7 +3,9 @@
  * functions over a structural view of the items (no text), so text deltas never rebuild
  * it. The design is the sketch's variant A (docs/sketches/rendered-thread):
  *
- * - a turn is a user message and what follows it up to its turn_end footer;
+ * - a turn is a user message and what follows it up to its turn_end footer; a message the
+ *   user sends while the turn runs (a steer: Claude picks it up mid-turn, and the turn ends
+ *   with one turn_end) stays inside it as a steer row, which never folds;
  * - consecutive reads and searches fold into one group row ("Read 3 files, searched code
  *   2 times"); thinking between them is absorbed; consecutive thinking items merge;
  * - a subagent's items (parent_tool_use_id) nest under its Agent tool row;
@@ -47,6 +49,8 @@ export type WorkNode =
   | { type: "question"; key: string; id: string }
   | { type: "permission"; key: string; id: string }
   | { type: "note"; key: string; id: string; kind: "error" | "compaction" | "commandOutput" }
+  /** A user message sent while the turn ran (a steer); it stays visible when the turn folds. */
+  | { type: "steer"; key: string; id: string }
   /** A system note on its own line between turns (an item of kind "note"). */
   | { type: "system"; key: string; id: string };
 
@@ -152,6 +156,9 @@ export function workNodes(list: readonly TimelineItem[], children: ReadonlyMap<s
         out.push({ type: "system", key: it.id, id: it.id });
         break;
       case "user":
+        // Only a steer reaches here (buildTurns keeps a turn's opening messages apart).
+        out.push({ type: "steer", key: it.id, id: it.id });
+        break;
       case "turnEnd":
         break;
     }
@@ -169,9 +176,9 @@ function markFinal(body: WorkNode[]): void {
   }
 }
 
-/** Notes (errors, compactions, command output, system notes) stay visible in a folded turn. */
+/** Notes (errors, compactions, command output, system notes) and steers stay visible in a folded turn. */
 function foldsAway(n: WorkNode): boolean {
-  return !(n.type === "text" && n.final) && n.type !== "note" && n.type !== "system";
+  return !(n.type === "text" && n.final) && n.type !== "note" && n.type !== "system" && n.type !== "steer";
 }
 
 /** The thread's items (top level, in order) as turns. */
@@ -202,8 +209,17 @@ export function buildTurns(items: readonly TimelineItem[]): TimelineTurn[] {
   };
   for (const it of top) {
     if (it.kind === "user") {
+      // Sent while the turn runs (it has work and no turn_end yet): a steer. Claude picks
+      // it up mid-turn and the turn ends with one turn_end, so it stays in the turn's
+      // body. Unless the turn's process ended (an error item is the turn's last: Claude
+      // stopped or did not start), which no turn_end will follow: a new turn then.
+      const last = cur?.items[cur.items.length - 1];
+      if (cur && last && last.kind !== "error") {
+        cur.items.push(it);
+        continue;
+      }
       // A user message starts a turn, unless it follows another one with nothing between.
-      if (!cur || cur.items.length > 0 || cur.end) {
+      if (!cur || cur.items.length > 0) {
         close();
         cur = { key: it.id, user: [], items: [], end: "" };
       }
@@ -228,7 +244,7 @@ export function buildTurns(items: readonly TimelineItem[]): TimelineTurn[] {
   return turns;
 }
 
-/** A turn's work rows: what folding it hides (a group or Agent row counts as one). */
+/** A turn's work rows: what folding it hides (a group or Agent row counts as one; steers and notes are not steps). */
 function stepCount(body: readonly WorkNode[]): number {
   return body.filter(foldsAway).length;
 }

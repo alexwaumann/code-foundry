@@ -163,3 +163,106 @@ describe("a user message's attachments the text does not refer to", () => {
     expect(pdf?.querySelector("img")).toBeNull();
   });
 });
+
+function turnEndItem(over: Partial<Extract<ThreadItemView, { kind: "turnEnd" }>> = {}): ThreadItemView {
+  return {
+    ...base,
+    id: "e",
+    ordinal: 99,
+    kind: "turnEnd",
+    subtype: "success",
+    isError: false,
+    interrupted: false,
+    stopReason: "",
+    terminalReason: "",
+    durationMs: 2100,
+    numTurns: 1,
+    costUsd: 0.001,
+    turnCostUsd: 0.001,
+    model: "",
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0,
+    errors: [],
+    ...over,
+  };
+}
+
+const interrupted = { subtype: "error_during_execution", isError: true, interrupted: true };
+
+describe("a message sent mid-turn (a steer)", () => {
+  const at = new Date(2026, 9, 17, 14, 12).getTime();
+  const steered: ThreadItemView[] = [
+    { ...base, id: "u", ordinal: 1, kind: "user", text: "run it", attachments: [], composerText: "" },
+    { ...base, id: "t1", ordinal: 2, kind: "tool", toolUseId: "t1", name: "Bash", inputJson: '{"command":"sleep 1"}', status: "done", output: "", isError: false, resultJson: "" },
+    { ...base, id: "s", ordinal: 3, kind: "user", text: "also say hi", attachments: [], composerText: "", createdAtMs: at },
+    { ...base, id: "t2", ordinal: 4, kind: "tool", toolUseId: "t2", name: "Bash", inputJson: '{"command":"sleep 2"}', status: "done", output: "", isError: false, resultJson: "" },
+  ];
+
+  it("is a smaller bubble inside the turn with “sent mid-turn · <time>” under it, and stays when the turn folds", () => {
+    const c = show([...steered, { ...base, id: "a", ordinal: 5, kind: "text", text: "hi" }, turnEndItem()]);
+    expect(c.querySelectorAll('[data-testid="thread-user"]')).toHaveLength(1);
+    const steer = c.querySelector('[data-testid="thread-steer"]');
+    const bubble = steer?.querySelector(".bubble");
+    expect(bubble?.textContent).toBe("also say hi");
+    expect(bubble?.className).toContain("text-body-sm");
+    expect(bubble?.className).toContain("rounded-lg");
+    const caption = steer?.querySelector('[data-testid="thread-steer-caption"]');
+    expect(caption?.className).toContain("text-caption");
+    expect(caption?.textContent).toMatch(/^sent mid-turn · \d\d:12/);
+    expect(caption?.querySelector("svg")).not.toBeNull();
+    // Folded: the work is gone, the steer and the answer stay; one footer for the turn.
+    expect(c.textContent).not.toContain("sleep");
+    expect(c.querySelector('[data-testid="thread-text"]')?.textContent).toContain("hi");
+    expect(c.querySelectorAll('[data-testid="thread-footer"]')).toHaveLength(1);
+    expect(c.querySelector('[data-testid="thread-footer"]')?.textContent).toContain("2 steps");
+  });
+
+  it("a wake message mid-turn stays a wake note", () => {
+    const wake = { title: "build", json: '{"status":"ok"}' };
+    const c = show([...steered.slice(0, 2), { ...base, id: "w", ordinal: 3, kind: "user", text: "woken", attachments: [], composerText: "", wake }]);
+    expect(c.querySelector('[data-testid="thread-wake-note"]')).not.toBeNull();
+    expect(c.querySelector('[data-testid="thread-steer"]')).toBeNull();
+  });
+
+  it("an interrupted turn after a steer with no final text: one footer that folds it, no copy button", () => {
+    const c = show([...steered, turnEndItem(interrupted)]);
+    const footer = c.querySelector('[data-testid="thread-footer"]');
+    expect(c.querySelectorAll('[data-testid="thread-footer"]')).toHaveLength(1);
+    expect(footer?.textContent).toContain("Interrupted after 2.1s");
+    expect(footer?.querySelector("button.fold")).not.toBeNull();
+    expect(footer?.querySelector('[aria-label="Copy answer"]')).toBeNull();
+    expect(c.querySelector('[data-testid="thread-steer"]')).not.toBeNull();
+  });
+});
+
+describe("a finished turn with nothing to fold", () => {
+  const hi: ThreadItemView = { ...base, id: "u", ordinal: 1, kind: "user", text: "hi", attachments: [], composerText: "" };
+
+  it("shows its footer as plain text: no chevron, no button, not focusable; the answer still copies", () => {
+    const c = show([hi, { ...base, id: "a", ordinal: 2, kind: "text", text: "hello" }, turnEndItem()]);
+    const footer = c.querySelector('[data-testid="thread-footer"]');
+    const line = footer?.querySelector('[data-testid="thread-footer-line"]');
+    expect(line?.textContent).toBe("Worked for 2.1s·<$0.01");
+    expect(line?.querySelector("svg")).toBeNull();
+    expect(footer?.querySelector("button.fold")).toBeNull();
+    expect(footer?.querySelector("[aria-expanded]")).toBeNull();
+    expect(footer?.querySelectorAll("button")).toHaveLength(1);
+    expect(footer?.querySelector('[aria-label="Copy answer"]')).not.toBeNull();
+  });
+
+  it("an interrupted turn with no work and no answer keeps its wording and has no copy button", () => {
+    const c = show([hi, turnEndItem(interrupted)]);
+    const footer = c.querySelector('[data-testid="thread-footer"]');
+    expect(footer?.textContent).toContain("Interrupted after 2.1s");
+    expect(footer?.querySelector("button")).toBeNull();
+  });
+
+  it("a failed turn keeps its wording in red", () => {
+    const c = show([hi, turnEndItem({ subtype: "error_max_turns", isError: true })]);
+    const footer = c.querySelector('[data-testid="thread-footer"]');
+    expect(footer?.querySelector(".t-red")?.textContent).toBe("Failed (error max turns) after 2.1s");
+    expect(footer?.querySelector("button")).toBeNull();
+  });
+});

@@ -1,5 +1,5 @@
 import { memo, useMemo, useState } from "react";
-import { FileText, ImageIcon } from "lucide-react";
+import { ArrowDown, FileText, ImageIcon } from "lucide-react";
 import { AttachmentLightbox } from "@/components/compose/AttachmentLightbox";
 import { ChipFace, PdfTile } from "@/components/compose/attachmentFaces";
 import { TAG_ACCENT, tagClass } from "@/components/compose/tagStyle";
@@ -145,24 +145,28 @@ function timeOf(ms: number | null): string {
 /**
  * A user message: a right-aligned bubble with the composer's tags (from the composer text
  * the item carries, lib/userMessage), attachments (images and PDFs) the text does not
- * refer to as tiles above it, and the time under it.
+ * refer to as tiles above it, and the time under it. `steer`: a message sent while the
+ * turn ran (lib/threadTimeline): a smaller bubble inside the turn, "sent mid-turn · 14:12"
+ * under it.
  */
 export const UserBubble = memo(function UserBubble({
   text,
   composerText,
   attachments,
   createdAtMs,
+  steer = false,
 }: {
   text: string;
   composerText: string;
   attachments: readonly string[];
   createdAtMs: number | null;
+  steer?: boolean;
 }) {
   const pieces = useMemo(() => parseUserMessage(text, composerText, attachments), [text, composerText, attachments]);
   const inline = useMemo(() => inlineAttachmentPaths(pieces), [pieces]);
   const extra = attachments.filter((p) => !inline.has(p));
   return (
-    <div className="u" data-testid="thread-user">
+    <div className={cn("u", steer && "steer")} data-testid={steer ? "thread-steer" : "thread-user"}>
       {extra.length > 0 && (
         <ul className="flex flex-wrap justify-end gap-2" aria-label="Attached files">
           {extra.map((p) => (
@@ -171,7 +175,7 @@ export const UserBubble = memo(function UserBubble({
         </ul>
       )}
       {pieces.length > 0 && (
-        <div className="bubble selectable">
+        <div className={cn("bubble selectable", steer && "max-w-[72%] rounded-lg px-3 py-1.5 text-body-sm")}>
           {pieces.map((p, i) => {
             switch (p.kind) {
               case "text":
@@ -191,7 +195,14 @@ export const UserBubble = memo(function UserBubble({
           })}
         </div>
       )}
-      <span className="when">{timeOf(createdAtMs)}</span>
+      {steer ? (
+        <span className="text-caption inline-flex items-center gap-1 tabular-nums" data-testid="thread-steer-caption">
+          <ArrowDown className="size-3" aria-hidden />
+          {["sent mid-turn", timeOf(createdAtMs)].filter(Boolean).join(" · ")}
+        </span>
+      ) : (
+        <span className="when">{timeOf(createdAtMs)}</span>
+      )}
     </div>
   );
 });

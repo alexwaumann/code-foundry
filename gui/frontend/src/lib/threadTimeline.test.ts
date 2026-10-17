@@ -198,6 +198,76 @@ describe("buildTurns / buildRows", () => {
     expect(shape(buildRows(buildTurns([item("note", { id: "n" })]), { fold: () => undefined, working: true }))).toEqual(["system:n", "working()"]);
   });
 
+  it("a message sent while the turn runs is a steer inside it: one turn, one footer, the steer stays when it folds", () => {
+    const items = [user("u1"), tool("Bash"), user("s1"), tool("Bash"), text("a"), end("e1")];
+    const turns = buildTurns(items);
+    expect(turns.map((t) => [t.key, t.user, t.end])).toEqual([["u1", ["u1"], "e1"]]);
+    expect(shape(buildRows(turns, expanded))).toEqual(["user:u1", "tool:Bash", "steer:s1", "tool:Bash", "final:a", "footer"]);
+    const rows = buildRows(turns, open);
+    expect(shape(rows)).toEqual(["user:u1", "steer:s1", "final:a", "footer(folded 2)"]);
+    // Steps are the work rows only; the footer copies the final text.
+    expect(rows.flatMap((r) => (r.type === "footer" ? [[r.steps, r.finals]] : []))).toEqual([[2, ["a"]]]);
+  });
+
+  it("while it runs, the steer sits in the open turn and working counts from the turn's message", () => {
+    const items = [user("u1"), tool("Bash"), user("s1")];
+    expect(shape(buildRows(buildTurns(items), { fold: () => undefined, working: true }))).toEqual(["user:u1", "tool:Bash", "steer:s1", "working(u1)"]);
+  });
+
+  it("a steer then an interrupt: the turn_end after the steer closes the whole turn", () => {
+    const items = [user("u1"), tool("Bash"), user("s1"), tool("Bash", { toolStatus: "error" }), end("e1"), user("u2"), text("b"), end("e2")];
+    const turns = buildTurns(items);
+    expect(turns.map((t) => [t.key, t.end])).toEqual([
+      ["u1", "e1"],
+      ["u2", "e2"],
+    ]);
+    const rows = buildRows(turns, open);
+    expect(shape(rows)).toEqual(["user:u1", "steer:s1", "footer(folded 2)", "user:u2", "final:b", "footer(folded 0)"]);
+    // Interrupted with no final text: nothing to copy.
+    expect(rows.flatMap((r) => (r.type === "footer" ? [r.finals] : []))).toEqual([[], ["b"]]);
+  });
+
+  it("two steers stay in order in one turn", () => {
+    const items = [user("u1"), item("thinking"), tool("Edit"), user("s1"), tool("Bash"), user("s2"), text("a"), end("e1")];
+    const turns = buildTurns(items);
+    expect(turns).toHaveLength(1);
+    expect(shape(buildRows(turns, expanded))).toEqual(["user:u1", "thinking(1)", "tool:Edit", "steer:s1", "tool:Bash", "steer:s2", "final:a", "footer"]);
+    expect(shape(buildRows(turns, open))).toEqual(["user:u1", "steer:s1", "steer:s2", "final:a", "footer(folded 3)"]);
+  });
+
+  it("a steer followed by the final text: the text after it is the turn's answer", () => {
+    const items = [user("u1"), text("mid"), tool("Bash"), user("s1"), text("a1"), item("thinking"), text("a2"), end("e1")];
+    const rows = buildRows(buildTurns(items), open);
+    expect(shape(rows)).toEqual(["user:u1", "steer:s1", "final:a1", "final:a2", "footer(folded 3)"]);
+    expect(rows.flatMap((r) => (r.type === "footer" ? [r.finals] : []))).toEqual([["a1", "a2"]]);
+    // A steer right before the turn_end does not make earlier text final.
+    const late = buildRows(buildTurns([user("u1"), tool("Bash"), text("a"), user("s1"), end("e1")]), open);
+    expect(shape(late)).toEqual(["user:u1", "steer:s1", "footer(folded 2)"]);
+  });
+
+  it("a message after a turn_end, a system note or a process that ended (an error) starts a turn", () => {
+    const items = [
+      user("u1"),
+      text("a"),
+      end("e1"),
+      user("u2"),
+      tool("Bash"),
+      item("note", { id: "n" }),
+      user("u3"),
+      tool("Bash"),
+      item("error", { id: "err" }),
+      user("u4"),
+      text("d"),
+    ];
+    expect(buildTurns(items).map((t) => [t.key, t.user])).toEqual([
+      ["u1", ["u1"]],
+      ["u2", ["u2"]],
+      ["n", []],
+      ["u3", ["u3"]],
+      ["u4", ["u4"]],
+    ]);
+  });
+
   it("an empty thread has no rows, and a starting one only the working row", () => {
     expect(buildRows(buildTurns([]), open)).toEqual([]);
     expect(shape(buildRows(buildTurns([]), { fold: () => undefined, working: true }))).toEqual(["working()"]);
