@@ -33,7 +33,9 @@ test("Pull Requests page with real GitHub data", async ({ page }) => {
   await expect(page.getByTestId("prs-page")).toBeVisible();
   await expect(page.getByTestId("prs-viewer")).toHaveText(/^@\S+/, { timeout: 30_000 });
   await expect(page.getByTestId("prs-updated")).toHaveText(/updated \d+[smh] ago/, { timeout: 150_000 });
-  const commits = Number(await page.getByTestId("tile-this-month-commits").textContent());
+  const current = page.getByTestId("activity-commits").locator('[data-testid="activity-marker"][data-partial]');
+  await expect(current).toHaveAttribute("data-value", /^\d+$/, { timeout: 150_000 });
+  const commits = Number(await current.getAttribute("data-value"));
   expect(commits).toBeGreaterThanOrEqual(0);
   // LIVE_ALL=1: show every repository (with CODE_FOUNDRY_GH_SEARCH_AS the searches run
   // for an account whose PRs live in repos that are not registered here).

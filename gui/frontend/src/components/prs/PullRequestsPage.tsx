@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useRef } from "react";
 import { create } from "zustand";
 import { GitPullRequest } from "lucide-react";
-import { statsMonth, type DashboardView, type MonthView, type PullRequestView } from "@/api/gh";
+import type { DashboardView, PullRequestView } from "@/api/gh";
 import { PanelToggle } from "@/components/panel/PanelToggle";
 import { Tip } from "@/components/ui/tooltip";
 import { PaneHeader } from "@/components/window/PaneHeader";
-import { useNow } from "@/lib/clock";
 import { useNav, type NavItem } from "@/lib/nav";
 import { NavProvider, NavRow } from "@/lib/NavRow";
 import { cn } from "@/lib/utils";
@@ -13,7 +12,8 @@ import { dashboardResource, openUrl, useFreshness } from "@/stores/gh";
 import { openPullRequestInPanel } from "@/stores/prPanel";
 import { useResource } from "@/stores/resource";
 import { useUiStore } from "@/stores/ui";
-import { monthName, prKey, repoName } from "./format";
+import { ActivityCharts } from "./ActivityCharts";
+import { prKey, repoName } from "./format";
 import { Age, ChecksBadge, Freshness, PrStateIcon, ReviewBadge, SectionTitle } from "./PrBits";
 import { RowList } from "./RowList";
 
@@ -97,29 +97,6 @@ function PrTable({ section, title, rows, empty, viewer }: { section: Section; ti
   );
 }
 
-function MonthTile({ month, testId }: { month: MonthView; testId: string }) {
-  const now = useNow(60_000);
-  return (
-    <div className="flex min-w-48 flex-col items-center gap-1 rounded-lg border px-6 py-3" data-testid={testId}>
-      <span className="text-label">{monthName(month.month, now)}</span>
-      <div className="flex gap-8">
-        <div className="flex flex-col items-center">
-          <span className="text-title tabular-nums" data-testid={`${testId}-commits`}>
-            {month.commits}
-          </span>
-          <span className="text-caption">commits</span>
-        </div>
-        <div className="flex flex-col items-center">
-          <span className="text-title tabular-nums" data-testid={`${testId}-merged`}>
-            {month.merged}
-          </span>
-          <span className="text-caption">merged</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function Banner({ tone, children }: { tone: "warn" | "info"; children: React.ReactNode }) {
   return (
     <p className={cn("rounded-lg border px-3 py-2 text-body", tone === "warn" ? "border-warning/40 bg-warning/10 text-warning" : "text-muted-foreground")} role="status">
@@ -180,10 +157,7 @@ function Body({ d, includeAll }: { d: DashboardView; includeAll: boolean }) {
             </button>
           </Banner>
         )}
-        <div className="flex flex-wrap gap-4">
-          <MonthTile month={statsMonth(d.stats, 0)} testId="tile-this-month" />
-          <MonthTile month={statsMonth(d.stats, 1)} testId="tile-last-month" />
-        </div>
+        <ActivityCharts months={d.stats.months} />
         <PrTable section="authored" title="Open PRs · authored by you" rows={d.authored} empty="No open PRs authored by you." viewer={viewer} />
         <PrTable section="review" title="PRs awaiting your review" rows={d.reviewRequested} empty="Nothing awaiting your review." viewer={viewer} />
         <PrTable section="merged" title="Merged PRs · last 7 days" rows={d.recentlyMerged} empty="Nothing merged in the last 7 days." viewer={viewer} />

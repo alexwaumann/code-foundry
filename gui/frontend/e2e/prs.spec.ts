@@ -25,7 +25,7 @@ test.beforeEach(async () => {
 });
 
 test.describe("Pull Requests page", () => {
-  test("sidebar entry opens it: tiles, three sections filtered to registered repos", async ({ page }) => {
+  test("sidebar entry opens it: activity charts, three sections filtered to registered repos", async ({ page }) => {
     await openApp(page);
     await page.getByTestId("nav-pullrequests").click();
     const pageEl = page.getByTestId("prs-page");
@@ -33,10 +33,15 @@ test.describe("Pull Requests page", () => {
     await expect(page.getByTestId("nav-pullrequests")).toHaveAttribute("aria-current", "page");
     await expect(page.getByTestId("prs-viewer")).toHaveText("@alexwaumann");
     await expect(page.getByTestId("prs-updated")).toHaveText(/updated \d+s ago/);
-    await expect(page.getByTestId("tile-this-month-commits")).toHaveText("16");
-    await expect(page.getByTestId("tile-this-month-merged")).toHaveText("2");
-    await expect(page.getByTestId("tile-last-month-commits")).toHaveText("463");
-    await expect(page.getByTestId("tile-last-month-merged")).toHaveText("38");
+    // Activity charts (mock: six months newest first, 16/2, 463/38, 210/17, 96/9, 0/0, 41/3).
+    const merged = page.getByTestId("activity-merged");
+    const commits = page.getByTestId("activity-commits");
+    await expect(merged.getByTestId("activity-month")).toHaveCount(6);
+    await expect(merged.getByTestId("activity-value")).toHaveText("38");
+    await expect(commits.getByTestId("activity-value")).toHaveText("463");
+    await expect(merged.locator('[data-testid="activity-marker"][data-partial]')).toHaveAttribute("data-value", "2");
+    await expect(commits.locator('[data-testid="activity-marker"][data-partial]')).toHaveAttribute("data-value", "16");
+    await expect(page.getByTestId("activity-tooltip")).toHaveCount(0);
     // other-org/lib is not registered: filtered out of review and merged.
     await expect(prRows(page, "authored")).toHaveCount(3);
     await expect(prRows(page, "review")).toHaveCount(1);
@@ -55,6 +60,41 @@ test.describe("Pull Requests page", () => {
     await expect(page.getByTestId("prs-scope")).toHaveText("all repositories");
     await expect(prRows(page, "review")).toHaveCount(2);
     await expect(prRows(page, "merged")).toHaveCount(4);
+  });
+
+  test("activity charts share the hovered month; one tooltip, in the card under the pointer", async ({ page }) => {
+    await openApp(page);
+    await page.getByTestId("nav-pullrequests").click();
+    const merged = page.getByTestId("activity-merged");
+    const commits = page.getByTestId("activity-commits");
+    const tip = page.getByTestId("activity-tooltip");
+    // Oldest first: index 3 of 6 is two months back (August in the mock's October).
+    await merged.getByTestId("activity-month").nth(3).hover();
+    await expect(tip).toHaveCount(1);
+    await expect(merged.getByTestId("activity-tooltip")).toBeVisible();
+    await expect(tip).toContainText("210");
+    await expect(tip).toContainText("17");
+    await expect(tip).toHaveAttribute("data-side", "left");
+    await expect(commits.getByTestId("activity-crosshair")).toHaveCount(1);
+    await expect(commits.getByTestId("activity-band")).toBeVisible();
+    await shot(page, "prs-activity-hover");
+    // The pointer moves to the other card: the tooltip follows it.
+    await commits.getByTestId("activity-month").nth(1).hover();
+    await expect(tip).toHaveCount(1);
+    const now = new Date();
+    const june = new Date(now.getFullYear(), now.getMonth() - 4, 1);
+    await expect(commits.getByTestId("activity-tooltip")).toHaveAttribute("data-month", `${String(june.getFullYear())}-${String(june.getMonth() + 1).padStart(2, "0")}`);
+    await expect(tip.locator('[data-series="commits"]')).toContainText("0");
+    await expect(tip).toHaveAttribute("data-side", "right");
+    await expect(merged.getByTestId("activity-crosshair")).toHaveCount(1);
+    // The current month says so.
+    await commits.getByTestId("activity-month").nth(5).hover();
+    await expect(tip).toContainText("(so far)");
+    await expect(tip).toContainText("16");
+    // Leaving clears both.
+    await page.mouse.move(2, 2);
+    await expect(tip).toHaveCount(0);
+    await expect(page.getByTestId("activity-crosshair")).toHaveCount(0);
   });
 
   test("Enter and click open pull requests in the side panel; cmd+Enter and cmd+click on GitHub", async ({ page }) => {
