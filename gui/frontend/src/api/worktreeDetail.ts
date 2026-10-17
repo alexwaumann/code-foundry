@@ -11,7 +11,6 @@ export interface FileChangeView {
   deleted: number;
   binary: boolean;
   uncommitted: boolean;
-  isDir: boolean;
 }
 
 export interface LogEntryView {
@@ -53,7 +52,6 @@ export function toWorktreeDetailView(d: WorktreeDetail): WorktreeDetailView {
       deleted: f.deleted,
       binary: f.binary,
       uncommitted: f.uncommitted,
-      isDir: f.isDir,
     })),
     filesTruncated: d.filesTruncated,
     log: d.log.map((l) => ({

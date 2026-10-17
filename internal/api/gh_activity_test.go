@@ -156,7 +156,7 @@ func TestProjectGetWorktreeDetail(t *testing.T) {
 	fake.SetDetail(project.WorktreeDetail{
 		ProjectID: id, Path: "/code/proj", BaseRef: "origin/main", MergeBase: "m", Head: "h", LogTotal: 101, ComputedAt: at,
 		Files: []project.FileChange{{Path: "b", OldPath: "a", Status: "R", Added: 1, Deleted: 2, Uncommitted: true},
-			{Path: "d/", Status: "?", IsDir: true, Uncommitted: true}},
+			{Path: "d/notes.md", Status: "?", Added: 3, Uncommitted: true}},
 		Log: []project.LogEntry{{SHA: "h", ShortSHA: "h", Subject: "s", AuthorName: "A", AuthorEmail: "a@x", AuthoredAt: at}},
 	})
 	res, err := c.GetWorktreeDetail(ctx, connect.NewRequest(&v1.GetWorktreeDetailRequest{ProjectId: id, Path: "/code/proj"}))
@@ -165,7 +165,7 @@ func TestProjectGetWorktreeDetail(t *testing.T) {
 	}
 	d := res.Msg.GetDetail()
 	if d.GetBaseRef() != "origin/main" || d.GetLogTotal() != 101 || len(d.GetFiles()) != 2 || len(d.GetLog()) != 1 ||
-		d.GetFiles()[0].GetOldPath() != "a" || !d.GetFiles()[1].GetIsDir() || d.GetLog()[0].GetAuthoredAt() == nil ||
+		d.GetFiles()[0].GetOldPath() != "a" || d.GetFiles()[1].GetStatus() != "?" || d.GetFiles()[1].GetAdded() != 3 || d.GetLog()[0].GetAuthoredAt() == nil ||
 		!d.GetComputedAt().AsTime().Equal(at) {
 		t.Errorf("detail = %v", d)
 	}

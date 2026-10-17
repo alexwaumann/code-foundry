@@ -361,12 +361,13 @@ func (x *Worktree) GetMergedClean() bool {
 }
 
 type GitStatus struct {
-	state       protoimpl.MessageState `protogen:"open.v1"`
-	Upstream    string                 `protobuf:"bytes,1,opt,name=upstream,proto3" json:"upstream,omitempty"`
-	Ahead       int32                  `protobuf:"varint,2,opt,name=ahead,proto3" json:"ahead,omitempty"`
-	Behind      int32                  `protobuf:"varint,3,opt,name=behind,proto3" json:"behind,omitempty"`
-	Staged      int32                  `protobuf:"varint,4,opt,name=staged,proto3" json:"staged,omitempty"`
-	Modified    int32                  `protobuf:"varint,5,opt,name=modified,proto3" json:"modified,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Upstream string                 `protobuf:"bytes,1,opt,name=upstream,proto3" json:"upstream,omitempty"`
+	Ahead    int32                  `protobuf:"varint,2,opt,name=ahead,proto3" json:"ahead,omitempty"`
+	Behind   int32                  `protobuf:"varint,3,opt,name=behind,proto3" json:"behind,omitempty"`
+	Staged   int32                  `protobuf:"varint,4,opt,name=staged,proto3" json:"staged,omitempty"`
+	Modified int32                  `protobuf:"varint,5,opt,name=modified,proto3" json:"modified,omitempty"`
+	// Untracked, non-ignored files. An untracked directory counts each file in it.
 	Untracked   int32                  `protobuf:"varint,6,opt,name=untracked,proto3" json:"untracked,omitempty"`
 	Dirty       bool                   `protobuf:"varint,7,opt,name=dirty,proto3" json:"dirty,omitempty"`
 	RefreshedAt *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=refreshed_at,json=refreshedAt,proto3" json:"refreshed_at,omitempty"`
@@ -2037,9 +2038,7 @@ type FileChange struct {
 	Deleted int32 `protobuf:"varint,5,opt,name=deleted,proto3" json:"deleted,omitempty"`
 	Binary  bool  `protobuf:"varint,6,opt,name=binary,proto3" json:"binary,omitempty"`
 	// Changed in the working tree or index (not committed yet).
-	Uncommitted bool `protobuf:"varint,7,opt,name=uncommitted,proto3" json:"uncommitted,omitempty"`
-	// An untracked directory git reports as one entry (path ends in "/").
-	IsDir         bool `protobuf:"varint,8,opt,name=is_dir,json=isDir,proto3" json:"is_dir,omitempty"`
+	Uncommitted   bool `protobuf:"varint,7,opt,name=uncommitted,proto3" json:"uncommitted,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2119,13 +2118,6 @@ func (x *FileChange) GetBinary() bool {
 func (x *FileChange) GetUncommitted() bool {
 	if x != nil {
 		return x.Uncommitted
-	}
-	return false
-}
-
-func (x *FileChange) GetIsDir() bool {
-	if x != nil {
-		return x.IsDir
 	}
 	return false
 }
@@ -3397,7 +3389,7 @@ const file_codefoundry_v1_project_proto_rawDesc = "" +
 	"\vcomputed_at\x18\n" +
 	" \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"computedAt\x12\x14\n" +
-	"\x05error\x18\v \x01(\tR\x05error\"\xd4\x01\n" +
+	"\x05error\x18\v \x01(\tR\x05error\"\xcb\x01\n" +
 	"\n" +
 	"FileChange\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x19\n" +
@@ -3406,8 +3398,7 @@ const file_codefoundry_v1_project_proto_rawDesc = "" +
 	"\x05added\x18\x04 \x01(\x05R\x05added\x12\x18\n" +
 	"\adeleted\x18\x05 \x01(\x05R\adeleted\x12\x16\n" +
 	"\x06binary\x18\x06 \x01(\bR\x06binary\x12 \n" +
-	"\vuncommitted\x18\a \x01(\bR\vuncommitted\x12\x15\n" +
-	"\x06is_dir\x18\b \x01(\bR\x05isDir\"\xd4\x01\n" +
+	"\vuncommitted\x18\a \x01(\bR\vuncommittedJ\x04\b\b\x10\tR\x06is_dir\"\xd4\x01\n" +
 	"\bLogEntry\x12\x10\n" +
 	"\x03sha\x18\x01 \x01(\tR\x03sha\x12\x1b\n" +
 	"\tshort_sha\x18\x02 \x01(\tR\bshortSha\x12\x18\n" +

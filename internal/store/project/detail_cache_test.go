@@ -57,15 +57,15 @@ const (
 	gNameStatus = "diff --name-status"
 	gLog        = "log"
 	gLogTotal   = "rev-list --count"
-	gLsFiles    = "ls-files"
 	gNumstat    = "diff --numstat"
 )
 
 // headOnly is what a changed (HEAD, base) key costs a clean worktree's detail.
 var headOnly = []string{gMergeBase, gNameStatus, gLog, gLogTotal, gNumstat}
 
-// workingTree is what every recompute of a dirty worktree's detail costs.
-var workingTree = []string{gNameStatus, gLsFiles, gNumstat}
+// workingTree is what every recompute of a dirty worktree's detail costs: the
+// uncommitted letters and untracked files come from the status job's entries.
+var workingTree = []string{gNumstat}
 
 // cacheStep is one round of the jobs a poll runs for a watched worktree: jobBase, the
 // status job, and the detail job, in order. mutate runs first.

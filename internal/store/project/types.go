@@ -1,13 +1,13 @@
 // Package project is the project store: the persisted set of registered git
 // repositories, their worktrees, and per-worktree git status.
 //
-// The store shells out to git through a single Runner. A filesystem watcher (one
-// fsnotify watcher for every registered project) feeds debounced refresh jobs into a
-// bounded worker pool. A job owns one slot: a project reconcile job owns that project's
-// metadata and worktree set, a status job owns one worktree. No two workers run the
-// same job at once, so each slot has exactly one writer. Every slot write is followed
-// by rebuilding the immutable Snapshot (atomic.Pointer) and publishing ordered Events
-// on the bus. See docs/notes/phase1b-repo.md for exactly what triggers a refresh.
+// The store shells out to git through a single Runner. One FSEvents stream (for every
+// registered project and worktree) feeds debounced refresh jobs into a bounded worker
+// pool. A job owns one slot: a project reconcile job owns that project's metadata and
+// worktree set, a status job owns one worktree. No two workers run the same job at
+// once, so each slot has exactly one writer. Every slot write is followed by
+// rebuilding the immutable Snapshot (atomic.Pointer) and publishing ordered Events on
+// the bus. See docs/notes/fsevents-watcher.md for exactly what triggers a refresh.
 package project
 
 import (
@@ -62,11 +62,13 @@ type Worktree struct {
 
 // Status is the git status of a worktree.
 type Status struct {
-	Upstream   string // e.g. "origin/main"; empty when the branch has none
-	Ahead      int    // commits on HEAD not on Upstream
-	Behind     int    // commits on Upstream not on HEAD
-	Staged     int
-	Modified   int
+	Upstream string // e.g. "origin/main"; empty when the branch has none
+	Ahead    int    // commits on HEAD not on Upstream
+	Behind   int    // commits on Upstream not on HEAD
+	Staged   int
+	Modified int
+	// Untracked counts untracked, non-ignored files; an untracked directory counts
+	// each file in it (git status --untracked-files=all).
 	Untracked  int
 	Conflicted int
 	Dirty      bool

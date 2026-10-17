@@ -25,6 +25,31 @@ func TestParseStatusV2(t *testing.T) {
 			want: statusInfo{
 				Head: "1b5ad6fb7b0a3b684215e00490fb2f493b2a3619", Branch: "main", Upstream: "origin/main",
 				Ahead: 1, Behind: 1, Staged: 2, Modified: 2, Untracked: 1,
+				Entries: []statusEntry{
+					{Path: "b.txt", X: '.', Y: 'M'},
+					{Path: "c.txt", X: 'M', Y: 'M'},
+					{Path: "renamed.txt", OrigPath: "a.txt", X: 'R', Y: '.'},
+					{Path: "un tracked.txt", X: '?', Y: '?', Untracked: true},
+				},
+			},
+		},
+		{
+			// Captured from git 2.52 with --untracked-files=all --find-renames and
+			// status.renames=copies: a copy, a path with spaces, and an untracked
+			// directory listed file by file.
+			name: "copy, spaces, expanded untracked directory",
+			in: "# branch.oid 1e107ff85c38ae9fd683c0baa1d3a862c7656d78\x00# branch.head main\x00" +
+				"2 CM N... 100644 100644 100644 5fcb7b1b3ca40839d7673eed17afdb0a221432ce 5fcb7b1b3ca40839d7673eed17afdb0a221432ce C100 cp 1\x00src\x00" +
+				"1 AD N... 000000 100644 000000 0000000000000000000000000000000000000000 8ba3a16384aacc37d01564b28401755ce8053f51 a b/new 2\x00" +
+				"? ud/bin\x00? ud/sub/empty\x00",
+			want: statusInfo{
+				Head: "1e107ff85c38ae9fd683c0baa1d3a862c7656d78", Branch: "main", Staged: 2, Modified: 2, Untracked: 2,
+				Entries: []statusEntry{
+					{Path: "cp 1", OrigPath: "src", X: 'C', Y: 'M'},
+					{Path: "a b/new 2", X: 'A', Y: 'D'},
+					{Path: "ud/bin", X: '?', Y: '?', Untracked: true},
+					{Path: "ud/sub/empty", X: '?', Y: '?', Untracked: true},
+				},
 			},
 		},
 		{
@@ -41,7 +66,7 @@ func TestParseStatusV2(t *testing.T) {
 			name: "merge conflict",
 			in: "# branch.oid b42cf5bc10dc74c2d123765be86641da4b3dbea6\x00# branch.head main\x00" +
 				"u UU N... 100644 100644 100644 100644 1f25f40627bf553f1a29d49c498ddb66075eaefa 351be5bf6e17c59ea560546d69654115ecb2fd8d e45c9c2666d44e0327c1f9c239a74c508336053e f\x00",
-			want: statusInfo{Head: "b42cf5bc10dc74c2d123765be86641da4b3dbea6", Branch: "main", Conflicted: 1, Unmerged: []string{"f"}},
+			want: statusInfo{Head: "b42cf5bc10dc74c2d123765be86641da4b3dbea6", Branch: "main", Conflicted: 1, Entries: []statusEntry{{Path: "f", X: 'U', Y: 'U', Unmerged: true}}},
 		},
 		{
 			// Captured from a rebase stopped on two conflicts, one path with a space,
@@ -53,13 +78,18 @@ func TestParseStatusV2(t *testing.T) {
 				"u UU N... 100644 100644 100644 100644 587be6b4c3f93f93c489c0111bba5596147a26cb 28ce6a8b26aa170e1de65536fe8abe1832bd3242 6a69f92020f5df77af6e8813ff1232493383b708 sp ace.txt\x00",
 			want: statusInfo{
 				Head: "83e8d627476900f51f280b898d9bf43a450c80c6", Detached: true, Staged: 1,
-				Conflicted: 2, Unmerged: []string{"a.txt", "sp ace.txt"},
+				Conflicted: 2,
+				Entries: []statusEntry{
+					{Path: "keep.txt", X: 'M', Y: '.'},
+					{Path: "a.txt", X: 'U', Y: 'U', Unmerged: true},
+					{Path: "sp ace.txt", X: 'U', Y: 'U', Unmerged: true},
+				},
 			},
 		},
 		{
 			name: "deleted by them",
 			in:   "# branch.head m\x00u UD N... 100644 100644 000000 100644 1f25f40627bf553f1a29d49c498ddb66075eaefa 351be5bf6e17c59ea560546d69654115ecb2fd8d 0000000000000000000000000000000000000000 gone.go\x00",
-			want: statusInfo{Branch: "m", Conflicted: 1, Unmerged: []string{"gone.go"}},
+			want: statusInfo{Branch: "m", Conflicted: 1, Entries: []statusEntry{{Path: "gone.go", X: 'U', Y: 'D', Unmerged: true}}},
 		},
 		{
 			name: "unborn branch",
@@ -74,12 +104,15 @@ func TestParseStatusV2(t *testing.T) {
 		{
 			name: "rename whose original path looks like an entry is skipped",
 			in:   "# branch.head m\x002 R. N... 100644 100644 100644 a a R100 new\x00? old\x00",
-			want: statusInfo{Branch: "m", Staged: 1},
+			want: statusInfo{Branch: "m", Staged: 1, Entries: []statusEntry{{Path: "new", OrigPath: "? old", X: 'R', Y: '.'}}},
 		},
 		{name: "empty", in: "", want: statusInfo{}},
 		{name: "bad ab", in: "# branch.ab +x -1\x00", wantErr: true},
 		{name: "unknown entry", in: "Z what\x00", wantErr: true},
 		{name: "short entry", in: "1 M\x00", wantErr: true},
+		{name: "entry without a path", in: "1 .M N... 100644 100644 100644 a b\x00", wantErr: true},
+		{name: "rename without a score", in: "2 R. N... 100644 100644 100644 a b new\x00old\x00", wantErr: true},
+		{name: "untracked without a path", in: "?\x00", wantErr: true},
 		{name: "unmerged entry without a path", in: "u UU N... 100644 100644 100644 100644 a b c\x00", wantErr: true},
 	}
 	for _, tt := range tests {

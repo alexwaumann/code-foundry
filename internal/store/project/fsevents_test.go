@@ -123,7 +123,8 @@ func TestStreamBurstIsBounded(t *testing.T) {
 		}
 	}
 	burst := time.Since(start)
-	h.waitFor("untracked node_modules", worktreeUpdated(f.project, func(w Worktree) bool { return w.Status.Untracked == 1 }))
+	// Untracked counts files: every one of the 2000.
+	h.waitFor("untracked node_modules", worktreeUpdated(f.project, func(w Worktree) bool { return w.Status.Untracked == 2000 }))
 	time.Sleep(time.Second) // let the tail of the burst settle
 	runs := cr.count("status") - before
 	t.Logf("2000 files in %v: %d status runs", burst.Round(time.Millisecond), runs)

@@ -133,6 +133,7 @@ message GitStatus {
   int32 behind = 3;
   int32 staged = 4;
   int32 modified = 5;
+  // Untracked, non-ignored files. An untracked directory counts each file in it.
   int32 untracked = 6;
   bool dirty = 7;
   google.protobuf.Timestamp refreshed_at = 8;
@@ -342,8 +343,10 @@ message FileChange {
   bool binary = 6;
   // Changed in the working tree or index (not committed yet).
   bool uncommitted = 7;
-  // An untracked directory git reports as one entry (path ends in "/").
-  bool is_dir = 8;
+  // Was is_dir (an untracked directory listed as one "dir/" entry). Untracked
+  // directories are expanded to their files now.
+  reserved 8;
+  reserved "is_dir";
 }
 
 message LogEntry {

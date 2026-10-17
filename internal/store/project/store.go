@@ -124,11 +124,12 @@ type wtSlot struct {
 	// base memoizes the last base ahead/behind by (HEAD, base sha); written only by
 	// the status job.
 	base atomic.Pointer[baseCount]
-	// unmerged is the conflicted paths from the last successful status (nil when
-	// none), which the detail job marks U; written only by the status job. It is kept
-	// off Status, which is compared with ==.
-	unmerged atomic.Pointer[[]string]
-	admin    string // linked worktree admin dir; guarded by Git.mu
+	// entries is the changed paths from the last successful status (nil when none),
+	// from which the detail job derives the uncommitted files (uncommittedFiles);
+	// written only by the status job, which keeps the last list when a refresh fails.
+	// It is kept off Status, which is compared with ==.
+	entries atomic.Pointer[[]statusEntry]
+	admin   string // linked worktree admin dir; guarded by Git.mu
 	// gitDir is the worktree's git admin dir (worktreeAdminDir), where the status job
 	// reads operation markers (operation.go). Resolved by reconcile; guarded by Git.mu.
 	gitDir string
@@ -1104,7 +1105,7 @@ func (g *Git) status(ctx context.Context, projectID, path string) {
 	gitDir := slot.gitDir
 	g.mu.RUnlock()
 
-	out, err := g.runner.Run(ctx, path, "status", "--porcelain=v2", "--branch", "-z")
+	out, err := g.runner.Run(ctx, path, statusArgs...)
 	var info statusInfo
 	if err == nil {
 		info, err = parseStatusV2(out)
@@ -1140,7 +1141,7 @@ func (g *Git) status(ctx context.Context, projectID, path string) {
 		return // removed while we ran
 	}
 	if err == nil {
-		slot.unmerged.Store(&info.Unmerged) // a failed refresh keeps the last list, like Status
+		slot.entries.Store(&info.Entries) // a failed refresh keeps the last list, like Status
 	}
 	slot.cur.Store(&next)
 	changed := next.Branch != prev.Branch || next.Head != prev.Head || next.Detached != prev.Detached ||

@@ -50,7 +50,7 @@ function world(st: GitStatusView, branch = "cf/feat", project: Partial<ProjectVi
   });
 }
 
-const file = (path: string, o: Partial<FileChangeView> = {}): FileChangeView => ({ path, oldPath: "", status: "M", added: 1, deleted: 1, binary: false, uncommitted: false, isDir: false, ...o });
+const file = (path: string, o: Partial<FileChangeView> = {}): FileChangeView => ({ path, oldPath: "", status: "M", added: 1, deleted: 1, binary: false, uncommitted: false, ...o });
 const commit = (i: number): LogEntryView => ({ sha: `${String(i).padStart(7, "0")}${"f".repeat(33)}`, shortSha: String(i).padStart(7, "0"), subject: `commit ${String(i)}`, authorName: "Alex", authorEmail: "a@x", authoredAtMs: Date.now() - (i + 1) * 3_600_000 });
 
 function detail(files: FileChangeView[], log: LogEntryView[], o: Partial<WorktreeDetailView> = {}): void {

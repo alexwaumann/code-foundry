@@ -32,7 +32,7 @@ func worktreeDetailToProto(d project.WorktreeDetail) *v1.WorktreeDetail {
 		p.Files[i] = &v1.FileChange{
 			Path: f.Path, OldPath: f.OldPath, Status: f.Status,
 			Added: int32(f.Added), Deleted: int32(f.Deleted),
-			Binary: f.Binary, Uncommitted: f.Uncommitted, IsDir: f.IsDir,
+			Binary: f.Binary, Uncommitted: f.Uncommitted,
 		}
 	}
 	for i, e := range d.Log {
