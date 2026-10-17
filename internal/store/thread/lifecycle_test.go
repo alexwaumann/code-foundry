@@ -319,10 +319,12 @@ func TestSendSpawnFailure(t *testing.T) {
 			if got.StatusReason != ReasonStartFailed || got.LastError == "" {
 				t.Errorf("after the failed start %+v", got)
 			}
+			// The message's turn never ran: the error, then the daemon's turn end.
 			items := e.items(s.ID).Items
-			last := items[len(items)-1]
-			if last.Kind != KindError || !strings.HasPrefix(last.Text, tt.wantText) || items[len(items)-2].ID != it.ID {
-				t.Errorf("want the message then %q:\n%s", tt.wantText, describeItems(items))
+			n := len(items)
+			if n < 3 || items[n-2].Kind != KindError || !strings.HasPrefix(items[n-2].Text, tt.wantText) || items[n-3].ID != it.ID ||
+				items[n-1].ID != synthTurnPrefix+it.ID || !isSynthTurn(items[n-1].Turn) {
+				t.Errorf("want the message, %q, then a process_ended turn end:\n%s", tt.wantText, describeItems(items))
 			}
 			if n := kindCount(items, KindError); n != 1 {
 				t.Errorf("%d error items", n)

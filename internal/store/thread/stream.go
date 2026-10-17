@@ -827,6 +827,7 @@ func (r *runner) shutdown() {
 	st.sd.pending = nil
 	r.failHeld("the daemon stopped")
 	closeUnfinished(st.proj.w, "the daemon stopped")
+	closeOpenTurn(st.proj.w, r.m.opts.Now())
 	r.endRuns(orphanDaemonStopped)
 	r.endBgShells(orphanDaemonStopped)
 	st.log.dropMcpChecks()
@@ -885,6 +886,8 @@ func (r *runner) maybeExited() {
 	}
 	st.sd.pending = nil
 	closeUnfinished(st.proj.w, "the thread's process ended")
+	// A turn still open had no result: a close or archive while busy, a crash.
+	closeOpenTurn(st.proj.w, r.m.opts.Now())
 	r.endRuns(orphanProcessEnded)
 	r.endBgShells(orphanProcessEnded)
 	st.log.dropMcpChecks()

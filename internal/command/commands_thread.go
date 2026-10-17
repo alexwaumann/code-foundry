@@ -83,7 +83,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 		Command{
 			Name:  "thread.send",
 			Title: "Send to Thread",
-			Description: "Send a message to a thread, also while it works (Claude queues it or folds it in). " +
+			Description: "Send a message to a thread, also while it works: Claude picks it up mid-turn. " +
 				"A thread whose Claude is not running starts with it.",
 			Category: "Thread",
 			Args: []ArgSpec{
@@ -441,7 +441,10 @@ func FormatThreadItems(snap *v1.ThreadItemsSnapshot, full bool) string {
 			if t.TurnCostUsd != nil {
 				body += fmt.Sprintf(", $%.4f", t.GetTurnCostUsd())
 			}
-			body += fmt.Sprintf(", $%.4f so far", t.GetCostUsd())
+			if t.GetCostUsd() > 0 {
+				// None on a turn end the daemon wrote for a process that ended first.
+				body += fmt.Sprintf(", $%.4f so far", t.GetCostUsd())
+			}
 			if t.GetModel() != "" {
 				body += ", " + t.GetModel()
 			}

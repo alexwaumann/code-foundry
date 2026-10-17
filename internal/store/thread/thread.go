@@ -428,8 +428,8 @@ type Store interface {
 	// so a finished turn is seen at once. Subscribe to
 	// ThreadEvent on the bus first; events with Seq <= the snapshot's are in it.
 	WatchItems(ctx context.Context, id string) (ItemsSnapshot, error)
-	// Send sends a user message (also while a turn runs: Claude queues or folds it
-	// in). A thread that is not running starts with it as its first prompt; its item is
+	// Send sends a user message (also while a turn runs: Claude picks it up mid-turn,
+	// inside the running turn). A thread that is not running starts with it as its first prompt; its item is
 	// returned at once, and a start that fails is told in the timeline (lifecycle.go).
 	Send(ctx context.Context, id string, msg Message) (Item, error)
 	// Respond answers a pending permission request or question.
