@@ -5,30 +5,14 @@ import { fieldRows, rowBorder, type SectionFields } from "./model";
 import { sectionLinks } from "./sectionLinks";
 import { SettingRow, SettingRowPair } from "./SettingRow";
 
-/** A section: its title and description above a bordered card of hairline-separated rows. */
-export function SectionCard({
-  id,
-  title,
-  description,
-  aside,
-  children,
-}: {
-  id: string;
-  title: string;
-  description?: string;
-  /** Beside the title, at the right end (the keybindings page has none so far). */
-  aside?: ReactNode;
-  children: ReactNode;
-}) {
+/** A section: its heading and description above a bordered card of hairline-separated rows. */
+export function SectionCard({ id, heading, description, children }: { id: string; heading: string; description?: string; children: ReactNode }) {
   return (
-    <section className="mt-6" data-testid="settings-section" data-section={id} aria-label={title || undefined}>
-      {(title || description) && (
-        <div className="mb-2 ml-0.5 flex items-end gap-4">
-          <div className="min-w-0 flex-1">
-            {title && <h3 className="text-subheading">{title}</h3>}
-            {description && <p className="mt-px text-caption">{description}</p>}
-          </div>
-          {aside}
+    <section className="mt-6" data-testid="settings-section" data-section={id} aria-label={heading || undefined}>
+      {(heading || description) && (
+        <div className="mb-2 ml-0.5">
+          {heading && <h3 className="text-subheading">{heading}</h3>}
+          {description && <p className="mt-px text-caption">{description}</p>}
         </div>
       )}
       <div className="overflow-hidden rounded-lg border border-border">{children}</div>
@@ -60,7 +44,7 @@ export function SettingsSection({ schema, pageId, section }: { schema: SettingsS
   const rows = fieldRows(section.fields);
   const Link = sectionLinks[`${pageId}/${section.section.id}`];
   return (
-    <SectionCard id={section.section.id} title={section.section.title} description={section.section.description}>
+    <SectionCard id={section.section.id} heading={section.section.title} description={section.section.description}>
       {rows.map((row, i) => {
         const [first] = row;
         if (!first) return null;

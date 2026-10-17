@@ -2,8 +2,8 @@ import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { openThemes } from "@/stores/views";
 
-/** A row that opens somewhere else: title and description on the left, a chevron on the right. */
-export function LinkRow({ title, description, onClick, className, testId }: { title: string; description: string; onClick: () => void; className?: string | undefined; testId?: string }) {
+/** A row that opens somewhere else: label and description on the left, a chevron on the right. */
+export function LinkRow({ label, description, onClick, className, testId }: { label: string; description: string; onClick: () => void; className?: string | undefined; testId?: string }) {
   return (
     <button
       type="button"
@@ -12,7 +12,7 @@ export function LinkRow({ title, description, onClick, className, testId }: { ti
       data-testid={testId}
     >
       <span className="min-w-0 flex-1">
-        <span className="block text-label">{title}</span>
+        <span className="block text-label">{label}</span>
         <span className="mt-0.5 block text-caption">{description}</span>
       </span>
       <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
@@ -24,7 +24,7 @@ export function LinkRow({ title, description, onClick, className, testId }: { ti
 export function BrowseThemesRow({ className }: { className?: string | undefined }) {
   return (
     <LinkRow
-      title="Browse themes"
+      label="Browse themes"
       description="Preview every theme in a gallery of the app's controls, then apply one."
       className={className}
       testId="settings-themes-link"

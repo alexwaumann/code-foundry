@@ -98,7 +98,7 @@ export function KeybindingsPage({ schema, page }: { schema: SettingsSchemaView; 
       {buckets.categories.map(({ section, shown, unbound }) => {
         const expanded = open.has(section.id);
         return (
-          <SectionCard key={section.id} id={section.id} title={section.title} description={section.description}>
+          <SectionCard key={section.id} id={section.id} heading={section.title} description={section.description}>
             {shown.map((f, i) => (
               <KeybindingRow key={f.key} field={f} className={rowBorder(i)} />
             ))}
@@ -118,7 +118,7 @@ export function KeybindingsPage({ schema, page }: { schema: SettingsSchemaView; 
       {buckets.empty.length > 0 && (
         <SectionCard
           id="unbound"
-          title="No shortcuts yet"
+          heading="No shortcuts yet"
           description="Categories whose commands are all unbound. Open one to give a command a shortcut, or turn off Bound only."
         >
           <div data-testid="keybindings-unbound-card">
