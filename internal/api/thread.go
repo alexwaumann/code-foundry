@@ -44,6 +44,14 @@ func (h *Thread) ListItems(ctx context.Context, req *connect.Request[v1.ListThre
 	if err != nil {
 		return nil, threadError(err)
 	}
+	if q := req.Msg.GetQuery(); q != nil {
+		// A page for an agent (thread_read.go).
+		p, err := pageItems(snap.Items, q)
+		if err != nil {
+			return nil, threadError(err)
+		}
+		return connect.NewResponse(&v1.ListThreadItemsResponse{Page: pageToProto(snap.ThreadID, p)}), nil
+	}
 	return connect.NewResponse(&v1.ListThreadItemsResponse{Snapshot: itemsSnapshotToProto(snap)}), nil
 }
 

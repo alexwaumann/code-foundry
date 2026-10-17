@@ -1442,10 +1442,11 @@ export type ThreadItemsPage = Message<"codefoundry.v1.ThreadItemsPage"> & {
   items: ThreadItem[];
 
   /**
-   * Pass as since to read on: the id of the page's last item before the first one
-   * still in progress (streaming text, a running tool call, a pending request), which
-   * the next read returns again, complete by then. Empty when there is none (pass the
-   * same since again).
+   * Pass as since to read on: the id of the page's last item, or of the last one before
+   * a text still streaming (which the next read returns again, complete by then); the
+   * request's since when the page has nothing settled. Items change after they were
+   * read (a tool call gets its result, a request its answer): read from an earlier
+   * since, or the whole snapshot, to see that.
    *
    * @generated from field: string next_since = 3;
    */
