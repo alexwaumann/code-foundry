@@ -31,9 +31,9 @@ async function expectAgentsTab(page: Page): Promise<void> {
 
 /** Unfolds the finished turn (every finished turn folds by default) to show its Agent rows. */
 async function unfoldTurn(page: Page): Promise<void> {
-  const footer = page.getByTestId("thread-footer").first();
-  await footer.locator("button.fold").click();
-  await expect(footer).not.toHaveAttribute("data-folded", "true");
+  const header = page.locator('[data-testid="thread-turn-header"]:not([data-live])').first();
+  await header.locator("button.fold").click();
+  await expect(header).not.toHaveAttribute("data-folded", "true");
 }
 
 test.beforeEach(async () => {

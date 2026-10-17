@@ -539,7 +539,7 @@ html[data-thread-width="full"] .cf-thread {
   flex-direction: column;
   align-items: flex-end;
   gap: 4px;
-  margin: 6px 0 18px;
+  margin: 6px 0 12px;
 }
 .cf-thread .u .bubble {
   background: var(--t-bubble);
@@ -754,85 +754,108 @@ html[data-thread-width="full"] .cf-thread {
   white-space: pre;
   overflow-x: auto;
 }
-.cf-thread .tfoot {
+/* ---------- a turn's header (rows.tsx HeaderRow): under its user message, above its work.
+   Finished, the fold toggle ("Worked for 4m 08s · 12 steps"); live, "Working · 3 steps ·
+   1m 12s". The type role (text-caption) sets size and colour; the chevron or spinner sits
+   in a 22px slot that lines up with the work rows' icons. */
+.cf-thread .thead {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--muted-foreground);
+  height: 26px;
+  margin: 0 0 2px;
   font-variant-numeric: tabular-nums;
-  margin: 14px 0 24px;
-  padding-top: 6px;
-  border-top: 1px solid var(--border);
 }
-.cf-thread .tfoot .sep {
-  opacity: 0.5;
-}
-.cf-thread .tfoot .fold,
-.cf-thread .tfoot .line {
+.cf-thread .thead .fold,
+.cf-thread .thead .line {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  min-width: 0;
+  height: 26px;
+  padding: 0 8px 0 2px;
   border-radius: 6px;
-  padding: 0 4px;
-  margin-left: -4px;
-  height: 24px;
+  white-space: nowrap;
 }
-.cf-thread .tfoot .fold:hover {
+.cf-thread .thead .fold:hover {
   background: var(--t-hover);
   color: var(--foreground);
 }
-.cf-thread .tfoot .fold svg {
+.cf-thread .thead .fold:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--ring) 60%, transparent);
+  outline-offset: -2px;
+}
+.cf-thread .thead .ico {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+}
+.cf-thread .thead .ico svg {
+  width: 14px;
+  height: 14px;
+}
+.cf-thread .thead .fold .ico svg {
   width: 13px;
   height: 13px;
   transition: transform 0.12s;
 }
-.cf-thread .tfoot .fold[aria-expanded="true"] svg {
+.cf-thread .thead .fold[aria-expanded="true"] .ico svg {
   transform: rotate(90deg);
 }
-.cf-thread .tfoot .tb {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.cf-thread .tfoot .tb:hover {
-  background: var(--t-hover);
-  color: var(--foreground);
-}
-.cf-thread .tfoot .tb svg {
-  width: 13px;
-  height: 13px;
+.cf-thread .thead .sep {
+  opacity: 0.5;
 }
 @keyframes cf-shimmer {
   to {
     background-position: -200% 0;
   }
 }
-.cf-thread .working {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--muted-foreground);
-  height: 24px;
-  padding-left: 4px;
-  margin: 10px 0 24px;
-}
-.cf-thread .working svg {
-  width: 14px;
-  height: 14px;
-  color: var(--t-sky);
-}
-.cf-thread .working .shimmer {
+.cf-thread .thead .shimmer {
   background: linear-gradient(90deg, var(--muted-foreground) 0%, var(--foreground) 50%, var(--muted-foreground) 100%);
   background-size: 200% 100%;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
   animation: cf-shimmer 2s linear infinite;
+}
+/* The last row of a turn before the next one (Timeline's data-turn-end) carries the
+   space between turns. */
+.cf-thread [data-turn-end] {
+  padding-bottom: 16px;
+}
+/* A finished turn's answer copies from a button in the gutter at its top right, shown
+   while the answer is hovered (or the button has the keyboard). Outside the text, so it
+   never covers a code block's own actions. */
+.cf-thread .a-md.final {
+  position: relative;
+}
+.cf-thread .copy-answer {
+  position: absolute;
+  top: 0;
+  right: -32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  color: var(--muted-foreground);
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.cf-thread .a-md.final:hover > .copy-answer,
+.cf-thread .copy-answer:focus-visible {
+  opacity: 1;
+}
+.cf-thread .copy-answer:hover {
+  background: var(--t-hover);
+  color: var(--foreground);
+}
+.cf-thread .copy-answer svg {
+  width: 13px;
+  height: 13px;
 }
 
 /* ---------- jump to bottom: floats above the composer while the list is scrolled up ---------- */

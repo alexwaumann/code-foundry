@@ -47,16 +47,16 @@ const editor = (page: Page) => composer(page).locator('[contenteditable="true"]'
 const lastText = (page: Page) => page.getByTestId("thread-pane").locator('[data-testid="thread-text"]').last();
 
 /**
- * Waits for the running turn to end (it folds under its footer), then opens it again.
- * `footers` is how many the thread has once it ended: the final text streams in before
- * the turn_end, so until then the last footer is an earlier turn's (also folded).
+ * Waits for the running turn to end (it folds under its header), then opens it again.
+ * `headers` is how many the thread has once it ended: the final text streams in before
+ * the turn_end, so until then the last header is an earlier turn's (also folded).
  */
-async function unfoldLatest(page: Page, footers: number): Promise<void> {
-  await expect(page.getByTestId("thread-footer")).toHaveCount(footers);
-  const footer = page.getByTestId("thread-footer").nth(footers - 1);
-  await expect(footer).toHaveAttribute("data-folded", "true");
-  await footer.getByRole("button", { name: "Show this turn's work" }).click();
-  await expect(footer).not.toHaveAttribute("data-folded", "true");
+async function unfoldLatest(page: Page, headers: number): Promise<void> {
+  await expect(page.locator('[data-testid="thread-turn-header"]:not([data-live])')).toHaveCount(headers);
+  const header = page.locator('[data-testid="thread-turn-header"]:not([data-live])').nth(headers - 1);
+  await expect(header).toHaveAttribute("data-folded", "true");
+  await header.getByRole("button", { name: "Show this turn's work" }).click();
+  await expect(header).not.toHaveAttribute("data-folded", "true");
 }
 
 async function editorFocused(page: Page): Promise<boolean> {
@@ -133,7 +133,7 @@ test("Allow answers at once; the sidebar and the bell stop asking", async ({ pag
   await expect(page.getByTestId("attention-badge")).toHaveText("1");
   await expect(row(page, "s:s-r1")).not.toContainText("Needs input");
   await expect(lastText(page)).toContainText("Pushed. PR #63 now has the fix.");
-  await expect(page.getByTestId("thread-footer").last()).toBeVisible();
+  await expect(page.locator('[data-testid="thread-turn-header"]:not([data-live])').last()).toBeVisible();
   await unfoldLatest(page, 2);
   await expect(page.getByTestId("thread-pane").locator('[data-tool="Bash"]').last()).toContainText("Ran git push");
 });
@@ -272,8 +272,8 @@ test("Escape never interrupts a running turn (editor or timeline); the Interrupt
 
   await page.getByTestId("thread-interrupt").click();
   await expect.poll(calls).toContain("interrupt s-r1");
-  await expect(page.getByTestId("thread-footer").last()).toContainText("Interrupted");
-  // No success toast for an interrupt: the footer says it.
+  await expect(page.locator('[data-testid="thread-turn-header"]:not([data-live])').last()).toContainText("Interrupted");
+  // No success toast for an interrupt: the header says it.
   await expect(page.getByText("interrupted thread s-r1")).toHaveCount(0);
 });
 

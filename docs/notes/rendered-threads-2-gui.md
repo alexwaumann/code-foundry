@@ -48,7 +48,8 @@ with Alex's decisions (`docs/sketches/rendered-thread/DESIGN.md`, copied from
   allowed), notes (errors, compactions, command output) and the footer. Every finished
   turn has the footer, the latest one too ("Worked for 4m 08s · 12 steps · $1.12 · Opus",
   steps = the turn's work rows, a group or Agent counting as one); it is the toggle. Cost is the difference from the previous turn_end's cumulative cost (or the value
-  itself when the process restarted).
+  itself when the process restarted). (Since `thread-fold-3-header.md` that line is a header
+  under the user message, at the top of the turn's work, and the copy sits on the answer.)
 * **Rows.** Consecutive Read/Grep/Glob/LS fold into a group ("Read 3 files, searched code 2
   times"), absorbing thinking between them; a read waiting on a permission is never grouped.
   Consecutive thinking merges ("Thought for 9s", "Thought" when haiku streamed nothing).

@@ -9,7 +9,6 @@ import {
   ChevronDown,
   ChevronRight,
   CircleAlert,
-  Copy,
   FilePen,
   Gauge,
   GitMerge,
@@ -225,6 +224,18 @@ function MiniThread() {
       </div>
       <div className="flex min-h-0 flex-1 flex-col px-4 pt-1">
         <UserBubble text="Map the Ghostty palette onto our tokens." composerText="" attachments={[]} createdAtMs={null} />
+        <div className="thead">
+          <span className="fold text-caption">
+            <span className="ico">
+              <ChevronDown aria-hidden />
+            </span>
+            <span>Worked for 1m 12s</span>
+            <span className="sep">·</span>
+            <span>3 steps</span>
+            <span className="sep">·</span>
+            <span>$0.04</span>
+          </span>
+        </div>
         <ToolRow
           icon={SquareTerminal}
           meta={
@@ -250,22 +261,8 @@ function MiniThread() {
         <ToolRow icon={SquareTerminal} meta={<span className="chip fail">exit 1</span>}>
           Ran <span className="mono cmd">go test ./internal/api</span>
         </ToolRow>
-        <div className="a-md mt-1">
+        <div className="a-md final mt-1">
           <ThreadMarkdown>{MARKDOWN}</ThreadMarkdown>
-        </div>
-        <div className="tfoot">
-          <span className="fold">
-            <ChevronRight aria-hidden />
-            <span>Worked for 1m 12s</span>
-            <span className="sep">·</span>
-            <span>6 steps</span>
-            <span className="sep">·</span>
-            <span>$0.04</span>
-          </span>
-          <span className="flex-1" />
-          <span className="tb">
-            <Copy aria-hidden />
-          </span>
         </div>
       </div>
       <Composer />

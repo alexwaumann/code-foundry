@@ -154,7 +154,7 @@ export async function sendThreadDraft(threadId: string): Promise<boolean> {
 
 /**
  * Stops the running turn (thread.interrupt); pending requests are withdrawn. Quiet: the
- * timeline's footer says "Interrupted"; a failure still toasts.
+ * timeline's turn header says "Interrupted"; a failure still toasts.
  */
 export async function interruptThread(threadId: string): Promise<boolean> {
   return (await runCommandForResult(THREAD_COMMANDS.interrupt, { id: threadId }, { ctx: threadContext(threadId), quiet: true })) !== null;

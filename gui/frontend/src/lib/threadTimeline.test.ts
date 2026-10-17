@@ -26,10 +26,8 @@ function shape(rows: readonly TimelineRow[]): string[] {
         return r.children.length > 0 ? `tool:${r.name}[${shape(r.children).join(" ")}]` : `tool:${r.name}${r.permissionId ? "+perm" : ""}`;
       case "text":
         return r.final ? `final:${r.id}` : `text:${r.id}`;
-      case "footer":
-        return `footer${r.folded ? `(folded ${String(r.steps)})` : ""}`;
-      case "working":
-        return `working(${r.since})`;
+      case "header":
+        return r.id ? `header${r.folded ? `(folded ${String(r.steps)})` : ""}` : `live(${r.since},${String(r.steps)})`;
       case "note":
         return `note:${r.kind}`;
       default:
@@ -58,7 +56,7 @@ describe("buildTurns / buildRows", () => {
   it("groups consecutive reads and searches, absorbing thinking between them but not after", () => {
     const items = [user("u1"), item("thinking"), tool("Read"), item("thinking"), tool("Grep"), tool("Read"), item("thinking"), tool("Bash"), text("t1"), end("e1")];
     const rows = buildRows(buildTurns(items), expanded);
-    expect(shape(rows)).toEqual(["user:u1", "thinking(1)", "group(Read,Grep,Read)", "thinking(1)", "tool:Bash", "final:t1", "footer"]);
+    expect(shape(rows)).toEqual(["user:u1", "header", "thinking(1)", "group(Read,Grep,Read)", "thinking(1)", "tool:Bash", "final:t1"]);
   });
 
   it("a lone read stays a tool row; consecutive thinking merges", () => {
@@ -103,7 +101,7 @@ describe("buildTurns / buildRows", () => {
     expect(shape(buildRows(buildTurns(items), open))).toEqual(["user:u1", "tool:Read", "tool:Read+perm"]);
   });
 
-  it("folds every finished turn, the latest included; final text, notes and the footer stay", () => {
+  it("folds every finished turn, the latest included, under its header; final text and notes stay", () => {
     const items = [
       user("u1"),
       item("thinking"),
@@ -124,28 +122,35 @@ describe("buildTurns / buildRows", () => {
     const turns = buildTurns(items);
     expect(turns.map((t) => t.key)).toEqual(["u1", "u2"]);
     const rows = buildRows(turns, open);
-    expect(shape(rows)).toEqual(["user:u1", "note:error", "final:a1", "final:a2", "footer(folded 5)", "user:u2", "final:b1", "footer(folded 1)"]);
-    expect(rows.flatMap((r) => (r.type === "footer" ? [r.finals] : []))).toEqual([["a1", "a2"], ["b1"]]);
-    // Every finished turn's footer counts its steps (open or folded).
-    expect(rows.flatMap((r) => (r.type === "footer" ? [[r.id, r.steps, r.folded]] : []))).toEqual([
-      ["e1", 5, true],
-      ["e2", 1, true],
+    expect(shape(rows)).toEqual(["user:u1", "header(folded 5)", "note:error", "final:a1", "final:a2", "user:u2", "header(folded 1)", "final:b1"]);
+    expect(rows.flatMap((r) => (r.type === "header" ? [r.finals] : []))).toEqual([["a1", "a2"], ["b1"]]);
+    // Every finished turn's header counts its steps (open or folded) and carries its turn_end.
+    expect(rows.flatMap((r) => (r.type === "header" ? [[r.key, r.id, r.turn, r.steps, r.folded]] : []))).toEqual([
+      ["h:u1", "e1", "u1", 5, true],
+      ["h:u2", "e2", "u2", 1, true],
+    ]);
+    // The answer's copy action sits on its first final text row and copies all of it.
+    expect(rows.flatMap((r) => (r.type === "text" ? [[r.id, r.answer]] : []))).toEqual([
+      ["a1", "a1\na2"],
+      ["a2", ""],
+      ["b1", "b1"],
     ]);
     // The user's choice wins both ways: the latest turn reopened, then an older one.
     expect(shape(buildRows(turns, { fold: (k) => (k === "u2" ? false : undefined), working: false }))).toEqual([
       "user:u1",
+      "header(folded 5)",
       "note:error",
       "final:a1",
       "final:a2",
-      "footer(folded 5)",
       "user:u2",
+      "header",
       "tool:Bash",
       "final:b1",
-      "footer",
     ]);
     const fold = (k: string) => (k === "u1" ? false : k === "u2" ? true : undefined);
     expect(shape(buildRows(turns, { fold, working: false }))).toEqual([
       "user:u1",
+      "header",
       "thinking(1)",
       "group(Read,Read)",
       "text:mid",
@@ -154,21 +159,41 @@ describe("buildTurns / buildRows", () => {
       "final:a1",
       "thinking(1)",
       "final:a2",
-      "footer",
       "user:u2",
+      "header(folded 1)",
       "final:b1",
-      "footer(folded 1)",
     ]);
   });
 
   it("the running turn never folds; it folds the moment it ends", () => {
     const items = [user("u1"), tool("Bash"), text("a"), end("e1"), user("u2"), tool("Read")];
-    expect(shape(buildRows(buildTurns(items), { fold: () => undefined, working: true }))).toEqual(["user:u1", "final:a", "footer(folded 1)", "user:u2", "tool:Read", "working(u2)"]);
-    // The running turn has no footer, so no user choice: it stays open whatever fold says.
-    expect(shape(buildRows(buildTurns(items), { fold: () => true, working: true })).slice(3)).toEqual(["user:u2", "tool:Read", "working(u2)"]);
-    // Nothing runs after a turn_end: no working row even when the thread says busy, and
+    expect(shape(buildRows(buildTurns(items), { fold: () => undefined, working: true }))).toEqual(["user:u1", "header(folded 1)", "final:a", "user:u2", "live(u2,1)", "tool:Read"]);
+    // The running turn has no turn_end, so no user choice: it stays open whatever fold says.
+    expect(shape(buildRows(buildTurns(items), { fold: () => true, working: true })).slice(3)).toEqual(["user:u2", "live(u2,1)", "tool:Read"]);
+    // Nothing runs after a turn_end: no live header even when the thread says busy, and
     // the just-finished (latest) turn is folded.
-    expect(shape(buildRows(buildTurns(items.slice(0, 4)), { fold: () => undefined, working: true }))).toEqual(["user:u1", "final:a", "footer(folded 1)"]);
+    expect(shape(buildRows(buildTurns(items.slice(0, 4)), { fold: () => undefined, working: true }))).toEqual(["user:u1", "header(folded 1)", "final:a"]);
+  });
+
+  it("the live header becomes the finished one in place: same row key, same position", () => {
+    const running = [user("u1"), user("u2"), tool("Bash"), tool("Edit"), text("a")];
+    const live = buildRows(buildTurns(running), { fold: () => undefined, working: true });
+    expect(shape(live)).toEqual(["user:u1", "user:u2", "live(u2,2)", "tool:Bash", "tool:Edit", "final:a"]);
+    const done = buildRows(buildTurns([...running, end("e1")]), { fold: () => undefined, working: true });
+    expect(shape(done)).toEqual(["user:u1", "user:u2", "header(folded 2)", "final:a"]);
+    expect(live[2]?.key).toBe("h:u1");
+    expect(done[2]?.key).toBe("h:u1");
+    // A running turn's text has no copy action yet: the answer may still grow.
+    expect(live.flatMap((r) => (r.type === "text" ? [r.answer] : []))).toEqual([""]);
+    // A turn still starting (only its message) shows the live header too.
+    expect(shape(buildRows(buildTurns([user("u1")]), { fold: () => undefined, working: true }))).toEqual(["user:u1", "live(u1,0)"]);
+  });
+
+  it("no live header while a request waits (working is false); a turn Claude starts itself counts from its first item", () => {
+    const items = [user("u1"), tool("Bash", { toolUseId: "tu-b", toolStatus: "running" }), item("permission", { toolUseId: "tu-b", requestState: "pending" })];
+    expect(shape(buildRows(buildTurns(items), open))).toEqual(["user:u1", "tool:Bash+perm"]);
+    const woke = [user("u1"), text("a"), end("e1"), tool("Bash", { id: "w1" })];
+    expect(shape(buildRows(buildTurns(woke), { fold: () => undefined, working: true }))).toEqual(["user:u1", "header(folded 0)", "final:a", "live(w1,1)", "tool:Bash"]);
   });
 
   it("consecutive user messages share a turn; items before any user message form one", () => {
@@ -188,30 +213,31 @@ describe("buildTurns / buildRows", () => {
       ["n", ""],
       ["u2", ""],
     ]);
-    expect(shape(buildRows(turns, { fold: () => undefined, working: true }))).toEqual(["user:u1", "final:a", "footer(folded 1)", "system:n", "user:u2", "final:b", "working(u2)"]);
+    expect(shape(buildRows(turns, { fold: () => undefined, working: true }))).toEqual(["user:u1", "header(folded 1)", "final:a", "system:n", "user:u2", "live(u2,0)", "final:b"]);
   });
 
-  it("a system note ends a turn that was cut short; a fork with nothing else shows the note, then working while it starts", () => {
+  it("a system note ends a turn that was cut short; a fork with nothing else shows the note (no header of its own), then a live header while it starts", () => {
     const cut = [user("u1"), tool("Bash"), item("note", { id: "n" })];
     expect(buildTurns(cut).map((t) => t.key)).toEqual(["u1", "n"]);
     expect(shape(buildRows(buildTurns(cut), open))).toEqual(["user:u1", "tool:Bash", "system:n"]);
-    expect(shape(buildRows(buildTurns([item("note", { id: "n" })]), { fold: () => undefined, working: true }))).toEqual(["system:n", "working()"]);
+    expect(shape(buildRows(buildTurns([item("note", { id: "n" })]), open))).toEqual(["system:n"]);
+    expect(shape(buildRows(buildTurns([item("note", { id: "n" })]), { fold: () => undefined, working: true }))).toEqual(["system:n", "live(,0)"]);
   });
 
-  it("a message sent while the turn runs is a steer inside it: one turn, one footer, the steer stays when it folds", () => {
+  it("a message sent while the turn runs is a steer inside it: one turn, one header, the steer stays when it folds", () => {
     const items = [user("u1"), tool("Bash"), user("s1"), tool("Bash"), text("a"), end("e1")];
     const turns = buildTurns(items);
     expect(turns.map((t) => [t.key, t.user, t.end])).toEqual([["u1", ["u1"], "e1"]]);
-    expect(shape(buildRows(turns, expanded))).toEqual(["user:u1", "tool:Bash", "steer:s1", "tool:Bash", "final:a", "footer"]);
+    expect(shape(buildRows(turns, expanded))).toEqual(["user:u1", "header", "tool:Bash", "steer:s1", "tool:Bash", "final:a"]);
     const rows = buildRows(turns, open);
-    expect(shape(rows)).toEqual(["user:u1", "steer:s1", "final:a", "footer(folded 2)"]);
-    // Steps are the work rows only; the footer copies the final text.
-    expect(rows.flatMap((r) => (r.type === "footer" ? [[r.steps, r.finals]] : []))).toEqual([[2, ["a"]]]);
+    expect(shape(rows)).toEqual(["user:u1", "header(folded 2)", "steer:s1", "final:a"]);
+    // Steps are the work rows only; the finals are the final text.
+    expect(rows.flatMap((r) => (r.type === "header" ? [[r.steps, r.finals]] : []))).toEqual([[2, ["a"]]]);
   });
 
-  it("while it runs, the steer sits in the open turn and working counts from the turn's message", () => {
+  it("while it runs, the steer sits in the open turn and the live header counts from the turn's message", () => {
     const items = [user("u1"), tool("Bash"), user("s1")];
-    expect(shape(buildRows(buildTurns(items), { fold: () => undefined, working: true }))).toEqual(["user:u1", "tool:Bash", "steer:s1", "working(u1)"]);
+    expect(shape(buildRows(buildTurns(items), { fold: () => undefined, working: true }))).toEqual(["user:u1", "live(u1,1)", "tool:Bash", "steer:s1"]);
   });
 
   it("a steer then an interrupt: the turn_end after the steer closes the whole turn", () => {
@@ -222,27 +248,27 @@ describe("buildTurns / buildRows", () => {
       ["u2", "e2"],
     ]);
     const rows = buildRows(turns, open);
-    expect(shape(rows)).toEqual(["user:u1", "steer:s1", "footer(folded 2)", "user:u2", "final:b", "footer(folded 0)"]);
+    expect(shape(rows)).toEqual(["user:u1", "header(folded 2)", "steer:s1", "user:u2", "header(folded 0)", "final:b"]);
     // Interrupted with no final text: nothing to copy.
-    expect(rows.flatMap((r) => (r.type === "footer" ? [r.finals] : []))).toEqual([[], ["b"]]);
+    expect(rows.flatMap((r) => (r.type === "header" ? [r.finals] : []))).toEqual([[], ["b"]]);
   });
 
   it("two steers stay in order in one turn", () => {
     const items = [user("u1"), item("thinking"), tool("Edit"), user("s1"), tool("Bash"), user("s2"), text("a"), end("e1")];
     const turns = buildTurns(items);
     expect(turns).toHaveLength(1);
-    expect(shape(buildRows(turns, expanded))).toEqual(["user:u1", "thinking(1)", "tool:Edit", "steer:s1", "tool:Bash", "steer:s2", "final:a", "footer"]);
-    expect(shape(buildRows(turns, open))).toEqual(["user:u1", "steer:s1", "steer:s2", "final:a", "footer(folded 3)"]);
+    expect(shape(buildRows(turns, expanded))).toEqual(["user:u1", "header", "thinking(1)", "tool:Edit", "steer:s1", "tool:Bash", "steer:s2", "final:a"]);
+    expect(shape(buildRows(turns, open))).toEqual(["user:u1", "header(folded 3)", "steer:s1", "steer:s2", "final:a"]);
   });
 
   it("a steer followed by the final text: the text after it is the turn's answer", () => {
     const items = [user("u1"), text("mid"), tool("Bash"), user("s1"), text("a1"), item("thinking"), text("a2"), end("e1")];
     const rows = buildRows(buildTurns(items), open);
-    expect(shape(rows)).toEqual(["user:u1", "steer:s1", "final:a1", "final:a2", "footer(folded 3)"]);
-    expect(rows.flatMap((r) => (r.type === "footer" ? [r.finals] : []))).toEqual([["a1", "a2"]]);
+    expect(shape(rows)).toEqual(["user:u1", "header(folded 3)", "steer:s1", "final:a1", "final:a2"]);
+    expect(rows.flatMap((r) => (r.type === "header" ? [r.finals] : []))).toEqual([["a1", "a2"]]);
     // A steer right before the turn_end does not make earlier text final.
     const late = buildRows(buildTurns([user("u1"), tool("Bash"), text("a"), user("s1"), end("e1")]), open);
-    expect(shape(late)).toEqual(["user:u1", "steer:s1", "footer(folded 2)"]);
+    expect(shape(late)).toEqual(["user:u1", "header(folded 2)", "steer:s1"]);
   });
 
   it("a message after a turn_end, a system note or a process that ended (an error) starts a turn", () => {
@@ -268,9 +294,9 @@ describe("buildTurns / buildRows", () => {
     ]);
   });
 
-  it("an empty thread has no rows, and a starting one only the working row", () => {
+  it("an empty thread has no rows, and a starting one only a live header", () => {
     expect(buildRows(buildTurns([]), open)).toEqual([]);
-    expect(shape(buildRows(buildTurns([]), { fold: () => undefined, working: true }))).toEqual(["working()"]);
+    expect(shape(buildRows(buildTurns([]), { fold: () => undefined, working: true }))).toEqual(["live(,0)"]);
   });
 });
 

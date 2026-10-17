@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useState, type ReactNode } from "react";
+import { memo, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
 import {
   Bot,
@@ -46,7 +46,7 @@ import { useUiStore } from "@/stores/ui";
 import { getThreadItems, setRowExpanded, setTurnFolded, useRowExpanded, useThreadItem, useThreadStore } from "@/stores/thread";
 import { ThreadMarkdown } from "./Code";
 import { CodeRunContext } from "./codeContext";
-import { useThreadCtx } from "./context";
+import { KeepRowContext, useThreadCtx } from "./context";
 import { LineageNote } from "./LineageNote";
 import { AgentReport, ToolDetail } from "./ToolDetail";
 import { UserBubble } from "./UserBubble";
@@ -332,7 +332,29 @@ const ThinkingRow = memo(function ThinkingRow({ node }: { node: Extract<WorkNode
 });
 
 /** Claude's text: markdown, with a caret while it streams; the turn's final answer gets more air. */
-const TextRow = memo(function TextRow({ id, final, nested }: { id: string; final: boolean; nested?: boolean }) {
+/**
+ * Copies a finished turn's answer (its final text items, `answer`'s ids, joined by blank
+ * lines): a 24px button at the answer's top right, shown while the answer is hovered.
+ */
+function CopyAnswer({ answer }: { answer: string }) {
+  const { threadId } = useThreadCtx();
+  const copy = () => {
+    const ids = new Set(answer.split("\n"));
+    const text = getThreadItems(threadId)
+      .flatMap((x: ThreadItemView) => (ids.has(x.id) && x.kind === "text" ? [x.text] : []))
+      .join("\n\n");
+    void copyText(text);
+  };
+  return (
+    <Tip label="Copy answer">
+      <button type="button" className="tb copy-answer" aria-label="Copy answer" data-testid="thread-copy-answer" onClick={copy}>
+        <Copy aria-hidden />
+      </button>
+    </Tip>
+  );
+}
+
+const TextRow = memo(function TextRow({ id, final, answer, nested }: { id: string; final: boolean; answer?: string; nested?: boolean }) {
   const { threadId } = useThreadCtx();
   const it = useThreadItem(threadId, id);
   const text = it?.kind === "text" ? it.text : "";
@@ -355,6 +377,7 @@ const TextRow = memo(function TextRow({ id, final, nested }: { id: string; final
   return (
     <div className={final ? "a-md final selectable" : "a-md selectable"} data-testid="thread-text" data-final={final || undefined} data-streaming={it.streaming || undefined}>
       {md}
+      {answer && <CopyAnswer answer={answer} />}
     </div>
   );
 });
@@ -604,7 +627,7 @@ export function WorkNodeView({ node, nested }: { node: WorkNode; nested?: boolea
     case "thinking":
       return <ThinkingRow node={node} />;
     case "text":
-      return <TextRow id={node.id} final={node.final} nested={nested} />;
+      return <TextRow id={node.id} final={node.final} answer={nested ? undefined : node.answer} nested={nested} />;
     case "question":
       return <QuestionRow id={node.id} />;
     case "permission":
@@ -691,105 +714,119 @@ const UserRow = memo(function UserRow({ id, steer }: { id: string; steer?: boole
   return <UserBubble text={it.text} composerText={it.composerText} attachments={it.attachments} createdAtMs={it.createdAtMs} steer={steer} />;
 });
 
-/**
- * A finished turn's footer: "Worked for 4m 08s · 12 steps · $1.12 · Opus" on a hairline,
- * the latest turn's too. It folds the turn: a click hides (or shows again) the turn's work,
- * so the answer stays. A turn without work (no steps) has nothing to fold: the line is
- * plain text. The copy button copies the final answer.
- */
-const FooterRow = memo(function FooterRow({ row }: { row: Extract<TimelineRow, { type: "footer" }> }) {
-  const { threadId } = useThreadCtx();
-  const it = useThreadItem(threadId, row.id);
-  const models = useModelChoices();
-  if (it?.kind !== "turnEnd") return null;
-  const took = formatDuration(it.durationMs);
-  const what = it.interrupted ? "Interrupted" : it.isError ? `Failed (${it.subtype.replace(/_/g, " ")})` : "Worked";
-  const parts = [took ? `${what}${it.interrupted || it.isError ? " after" : " for"} ${took}` : what];
-  if (row.steps > 0) parts.push(`${String(row.steps)} ${row.steps === 1 ? "step" : "steps"}`);
-  // The daemon's measure of the turn and the model that replied. Without them (the daemon
-  // could not tell the cost, the turn had no reply, an older daemon recorded it) the
-  // footer says nothing rather than guess: cost_usd is a running total whose base a
-  // restart changes, and the thread's model may have changed since.
-  const cost = turnCostLabel(it.turnCostUsd);
-  if (cost) parts.push(cost);
-  if (it.model) parts.push(canonicalModelName(models, it.model));
-  const copy = () => {
-    const finals = new Set(row.finals);
-    const text = getThreadItems(threadId)
-      .flatMap((x: ThreadItemView) => (finals.has(x.id) && x.kind === "text" ? [x.text] : []))
-      .join("\n\n");
-    void copyText(text);
-  };
-  const line = parts.map((p, i) => (
-    <span key={i} className="contents">
-      {i > 0 && <span className="sep">·</span>}
-      <span className={it.isError && i === 0 ? "t-red" : undefined}>{p}</span>
-    </span>
-  ));
-  return (
-    <div className="tfoot" data-testid="thread-footer" data-folded={row.folded || undefined}>
-      {row.steps === 0 ? (
-        <span className="line" data-testid="thread-footer-line">
-          {line}
-        </span>
-      ) : (
-        <button
-          type="button"
-          className="fold"
-          aria-expanded={!row.folded}
-          aria-label={row.folded ? "Show this turn's work" : "Hide this turn's work"}
-          onClick={() => {
-            setTurnFolded(threadId, row.turn, !row.folded);
-          }}
-        >
-          <ChevronRight aria-hidden />
-          {line}
-        </button>
-      )}
-      <span className="flex-1" />
-      {row.finals.length > 0 && (
-        <Tip label="Copy answer">
-          <button type="button" className="tb" aria-label="Copy answer" onClick={copy}>
-            <Copy />
-          </button>
-        </Tip>
-      )}
-    </div>
-  );
-});
-
-/** "Working 3m 52s" while the turn runs, since its user message (Claude starting up for it included). */
-function WorkingRow({ since }: { since: string }) {
-  const { threadId } = useThreadCtx();
-  const start = useThreadStore((s) => s.logs[threadId]?.byId[since]?.createdAtMs ?? null);
+/** Re-renders every second while `live`. */
+function useLiveNow(live: boolean): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
+    if (!live) return;
     const t = setInterval(() => {
       setNow(Date.now());
     }, 1000);
     return () => {
       clearInterval(t);
     };
-  }, []);
-  const took = start !== null ? formatDuration(Math.max(0, now - start)) : "";
+  }, [live]);
+  return now;
+}
+
+/** A header's line: its parts with a "·" between them; the first one red when `red`. */
+function Parts({ parts, red }: { parts: readonly string[]; red?: boolean }) {
+  return parts.map((p, i) => (
+    <span key={i} className="contents">
+      {i > 0 && <span className="sep">·</span>}
+      <span className={red && i === 0 ? "t-red" : undefined}>{p}</span>
+    </span>
+  ));
+}
+
+function stepsLabel(steps: number): string {
+  return `${String(steps)} ${steps === 1 ? "step" : "steps"}`;
+}
+
+/**
+ * A turn's header, under its user message and above its work
+ * (docs/notes/thread-fold-3-header.md). Finished: "Worked for 4m 08s · 12 steps · $1.12 ·
+ * Opus" behind a chevron (right when folded, down when open); a click folds or unfolds the
+ * turn's work below it, and the header keeps its place on screen (KeepRowContext). A turn
+ * without work (no steps) has nothing to fold: the line is plain text. Live (the turn
+ * runs): a sky spinner, "Working" shimmering, the steps so far and the time since the
+ * turn's message, always open. One component for both under one row key, so the live line
+ * turns into the finished one in place.
+ */
+const HeaderRow = memo(function HeaderRow({ row }: { row: Extract<TimelineRow, { type: "header" }> }) {
+  const { threadId } = useThreadCtx();
+  const keep = useContext(KeepRowContext);
+  const live = row.id === "";
+  const it = useThreadItem(threadId, row.id);
+  const start = useThreadStore((s) => (live && row.since ? (s.logs[threadId]?.byId[row.since]?.createdAtMs ?? null) : null));
+  const now = useLiveNow(live);
+  const models = useModelChoices();
+  if (live) {
+    const parts = ["Working"];
+    if (row.steps > 0) parts.push(stepsLabel(row.steps));
+    if (start !== null) parts.push(formatDuration(Math.max(0, now - start)).replace(/\.\ds$/, "s"));
+    return (
+      <div className="thead" data-testid="thread-turn-header" data-live>
+        <span className="line text-caption" data-testid="thread-working">
+          <span className="ico">
+            <LoaderCircle className="t-sky animate-spin" aria-hidden />
+          </span>
+          {parts.map((p, i) => (
+            <span key={i} className="contents">
+              {i > 0 && <span className="sep">·</span>}
+              <span className={i === 0 ? "shimmer" : "tabular-nums"}>{p}</span>
+            </span>
+          ))}
+        </span>
+      </div>
+    );
+  }
+  if (it?.kind !== "turnEnd") return null;
+  const took = formatDuration(it.durationMs);
+  const what = it.interrupted ? "Interrupted" : it.isError ? `Failed (${it.subtype.replace(/_/g, " ")})` : "Worked";
+  const parts = [took ? `${what}${it.interrupted || it.isError ? " after" : " for"} ${took}` : what];
+  if (row.steps > 0) parts.push(stepsLabel(row.steps));
+  // The daemon's measure of the turn and the model that replied. Without them (the daemon
+  // could not tell the cost, the turn had no reply, an older daemon recorded it) the
+  // header says nothing rather than guess: cost_usd is a running total whose base a
+  // restart changes, and the thread's model may have changed since.
+  const cost = turnCostLabel(it.turnCostUsd);
+  if (cost) parts.push(cost);
+  if (it.model) parts.push(canonicalModelName(models, it.model));
   return (
-    <div className="working" data-testid="thread-working">
-      <LoaderCircle className="animate-spin" aria-hidden />
-      <span className="shimmer">Working</span>
-      {took && <span className="tabular-nums">{took.replace(/\.\ds$/, "s")}</span>}
+    <div className="thead" data-testid="thread-turn-header" data-folded={row.folded || undefined}>
+      {row.steps === 0 ? (
+        <span className="line text-caption" data-testid="thread-turn-header-line">
+          <Parts parts={parts} red={it.isError} />
+        </span>
+      ) : (
+        <button
+          type="button"
+          className="fold text-caption"
+          aria-expanded={!row.folded}
+          aria-label={row.folded ? "Show this turn's work" : "Hide this turn's work"}
+          onClick={() => {
+            keep(row.key);
+            setTurnFolded(threadId, row.turn, !row.folded);
+          }}
+        >
+          <span className="ico">
+            <ChevronRight aria-hidden />
+          </span>
+          <Parts parts={parts} red={it.isError} />
+        </button>
+      )}
     </div>
   );
-}
+});
 
 /** One timeline row. */
 export function TimelineRowView({ row }: { row: TimelineRow }) {
   switch (row.type) {
     case "user":
       return <UserRow id={row.id} />;
-    case "footer":
-      return <FooterRow row={row} />;
-    case "working":
-      return <WorkingRow since={row.since} />;
+    case "header":
+      return <HeaderRow row={row} />;
     default:
       return <WorkNodeView node={row} />;
   }

@@ -41,6 +41,22 @@ async function reveal(page: Page, target: Locator): Promise<Locator> {
   return target.first();
 }
 
+/**
+ * Scrolls the timeline up with the wheel (the user's scroll, so the list unpins rather
+ * than following the bottom back) until `target` is inside it.
+ */
+async function wheelUpTo(page: Page, target: Locator): Promise<void> {
+  const box = await page.getByTestId("thread-timeline").boundingBox();
+  if (!box) return;
+  await page.mouse.move(box.x + 200, box.y + 200);
+  for (let i = 0; i < 40; i++) {
+    const t = (await target.count()) > 0 ? await target.boundingBox() : null;
+    if (t && t.y >= box.y && t.y + t.height <= box.y + box.height) return;
+    await page.mouse.wheel(0, -200);
+    await page.waitForTimeout(50);
+  }
+}
+
 async function calls(): Promise<string[]> {
   const res = await fetch(`${mockUrl}/__mock/thread/calls`);
   return (await res.json()) as string[];
@@ -52,7 +68,8 @@ async function shot(page: Page, name: string): Promise<void> {
 }
 
 const pane = (page: Page) => page.getByTestId("thread-pane");
-const footers = (page: Page) => page.getByTestId("thread-footer");
+/** Finished turns' headers (the running turn's live header is "thread-working" inside it). */
+const headers = (page: Page) => page.locator('[data-testid="thread-turn-header"]:not([data-live])');
 
 for (const scheme of ["dark", "light"] as const) {
   test.describe(scheme, () => {
@@ -67,17 +84,19 @@ for (const scheme of ["dark", "light"] as const) {
       await expect(bubble.locator('[data-tag-kind="skill"]')).toHaveText("/tdd");
       await expect(bubble).toContainText("with /tdd. Keep the fingerprint check-count based in /tmp.");
 
-      // Turn 1 is finished and not the latest: folded to its answer and footer.
-      const first = footers(page).first();
+      // Turn 1 is finished and not the latest: folded to its message, header and answer.
+      const first = headers(page).first();
       await expect(first).toHaveAttribute("data-folded", "true");
       await expect(first).toContainText("Worked for 4m 08s");
       await expect(first).toContainText("12 steps");
       await expect(pane(page).getByTestId("thread-group")).toHaveCount(0);
       await expect(pane(page).locator('[data-testid="thread-text"][data-final]').first()).toContainText("Fixed: stale badge after a force-push");
       // The latest turn is open.
-      await expect(footers(page)).toHaveCount(1);
+      await expect(headers(page)).toHaveCount(1);
       await expect(pane(page).locator('[data-tool="Bash"]').first()).toContainText("go test ./...");
 
+      // Above the viewport (the list sits at the bottom): the user scrolls up to it.
+      await wheelUpTo(page, first);
       await first.locator("button.fold").click();
       await expect(first).not.toHaveAttribute("data-folded", "true");
       const groups = pane(page).getByTestId("thread-group");
@@ -130,7 +149,7 @@ for (const scheme of ["dark", "light"] as const) {
       expect(await answer.locator("pre code").evaluate((el) => getComputedStyle(el).fontFamily)).toContain("JetBrainsMono Nerd Font Mono");
       await shot(page, `thread-timeline-${scheme}`);
 
-      // The footer folds it again.
+      // The header folds it again.
       await reveal(page, first);
       await first.locator("button.fold").click();
       await expect(first).toHaveAttribute("data-folded", "true");
@@ -166,14 +185,18 @@ for (const scheme of ["dark", "light"] as const) {
       // Answering: e2e/thread-prompts.spec.ts.
     });
 
-    test("streaming: a caret while the answer grows, then the footer when the turn ends", async ({ page }) => {
+    test("streaming: a caret while the answer grows under the live header, which becomes the finished one in place", async ({ page }) => {
       await openThread(page, "streaming", scheme);
       const streaming = pane(page).locator('[data-testid="thread-text"][data-streaming]');
       await expect(streaming).toContainText("ReviewState: pr.Revi");
       const caret = await streaming.locator(".cf-streaming pre code").evaluate((el) => getComputedStyle(el, "::after").content);
       expect(caret).toBe('""');
-      await expect(page.getByTestId("thread-working")).toContainText("Working");
-      await expect(footers(page)).toHaveCount(0);
+      const live = pane(page).locator('[data-testid="thread-turn-header"][data-live]');
+      await expect(live.getByTestId("thread-working")).toHaveText(/^Working·\d+ steps·\d/);
+      await expect(headers(page)).toHaveCount(0);
+      // Live, the header heads the turn's work: under its message, above the rows.
+      const liveRow = live.locator("xpath=ancestor::*[@data-index][1]");
+      await expect(liveRow.locator("xpath=preceding-sibling::*[1]")).toHaveAttribute("data-row-type", "user");
       await shot(page, `thread-streaming-${scheme}`);
 
       await mockPost("thread/delta?text=" + encodeURIComponent("ewDecision,\n"));
@@ -181,15 +204,25 @@ for (const scheme of ["dark", "light"] as const) {
       // The view follows the bottom while it streams.
       await expect(page.getByTestId("thread-timeline")).toHaveAttribute("data-at-bottom", "true");
 
+      const element = await live.elementHandle();
       await mockPost("thread/finish");
       await expect(pane(page).locator('[data-testid="thread-text"][data-streaming]')).toHaveCount(0);
       await expect(page.getByTestId("thread-working")).toHaveCount(0);
-      await expect(footers(page)).toHaveCount(1);
-      await expect(footers(page)).toHaveAttribute("data-folded", "true");
-      await expect(pane(page).locator('[data-testid="thread-text"][data-final]').last()).toContainText("I have not pushed.");
+      await expect(headers(page)).toHaveCount(1);
+      await expect(headers(page)).toHaveAttribute("data-folded", "true");
+      // The same element: the line changed in place, nothing remounted.
+      expect(await element.evaluate((el) => el.isConnected && el.getAttribute("data-folded"))).toBe("true");
+      const answer = pane(page).locator('[data-testid="thread-text"][data-final]').last();
+      await expect(answer).toContainText("I have not pushed.");
+      // The answer copies from a button shown while it is hovered; the header has none.
+      await expect(headers(page).getByRole("button", { name: "Copy answer" })).toHaveCount(0);
+      const copy = answer.getByRole("button", { name: "Copy answer" });
+      await expect(copy).toHaveCSS("opacity", "0");
+      await answer.hover();
+      await expect(copy).toHaveCSS("opacity", "1");
     });
 
-    test("the latest turn folds when it ends and keeps its footer in view; only the user's scroll unpins the list", async ({ page }) => {
+    test("the latest turn folds when it ends and keeps its header and answer in view; only the user's scroll unpins the list", async ({ page }) => {
       await openThread(page, "streaming", scheme);
       const timeline = page.getByTestId("thread-timeline");
       await expect(timeline).toHaveAttribute("data-at-bottom", "true");
@@ -199,23 +232,27 @@ for (const scheme of ["dark", "light"] as const) {
         el.scrollTop -= 160;
       });
       await mockPost("thread/finish");
-      const footer = footers(page).last();
+      const header = headers(page).last();
       // The turn's own cost and the model that replied, from the daemon's turn_end.
-      await expect(footer).toContainText(/Worked for .*·12 steps·\$0\.04·Opus 4\.8/);
+      await expect(header).toContainText(/Worked for .*·12 steps·\$0\.04·Opus 4\.8/);
       // Folded the moment it ended, the latest turn too: its work rows are gone.
-      await expect(footer).toHaveAttribute("data-folded", "true");
+      await expect(header).toHaveAttribute("data-folded", "true");
       await expect(pane(page).locator('[data-tool="Edit"]')).toHaveCount(0);
-      await expect(pane(page).locator('[data-testid="thread-text"][data-final]').last()).toContainText("I have not pushed.");
+      const answer = pane(page).locator('[data-testid="thread-text"][data-final]').last();
+      await expect(answer).toContainText("I have not pushed.");
       await expect(timeline).toHaveAttribute("data-at-bottom", "true");
+      // Both on screen: the header below the timeline's top, the answer above the composer.
       await expect
         .poll(async () => {
-          const box = await footer.boundingBox();
+          const h = await header.boundingBox();
+          const a = await answer.boundingBox();
+          const t = await timeline.boundingBox();
           const composer = await page.getByTestId("thread-composer").boundingBox();
-          return box && composer && box.y + box.height <= composer.y;
+          return !!h && !!a && !!t && !!composer && h.y >= t.y && h.y < a.y && a.y + a.height <= composer.y;
         })
         .toBe(true);
       if (process.env.SHOTS) {
-        // Tall enough for the whole folded turn: the user's bubble, the answer, the footer.
+        // Tall enough for the whole folded turn: the user's bubble, the header, the answer.
         await page.setViewportSize({ width: 1280, height: 1000 });
         await page.mouse.move(0, 0);
         await page.waitForTimeout(300);
@@ -242,7 +279,7 @@ for (const scheme of ["dark", "light"] as const) {
       const bubble = page.getByTestId("thread-user").last();
       const before = await bubble.boundingBox();
       await mockPost("thread/finish");
-      await expect(footers(page).last()).toHaveAttribute("data-folded", "true");
+      await expect(headers(page).last()).toHaveAttribute("data-folded", "true");
       await expect.poll(async () => Math.round((await bubble.boundingBox())?.y ?? -1)).toBe(Math.round(before?.y ?? 0));
       await expect(timeline).not.toHaveAttribute("data-at-bottom", "true");
     });
@@ -265,13 +302,13 @@ for (const scheme of ["dark", "light"] as const) {
       expect((before?.y ?? 0) < (box?.y ?? 0)).toBe(true);
       const text = pane(page).locator('[data-testid="thread-text"][data-final]').last();
       await mockPost("thread/finish");
-      await expect(footers(page).last()).toHaveAttribute("data-folded", "true");
+      await expect(headers(page).last()).toHaveAttribute("data-folded", "true");
       await expect(pane(page).locator('[data-tool="Edit"]')).toHaveCount(0);
       await expect.poll(async () => Math.round((await text.boundingBox())?.y ?? -1)).toBe(Math.round(before?.y ?? 0));
       await expect(timeline).not.toHaveAttribute("data-at-bottom", "true");
     });
 
-    test("scrolled into the turn's work when it ends: what replaces it is past the new bottom, so the list pins", async ({ page }) => {
+    test("scrolled into the turn's work when it ends: the header that replaces it is past the new bottom, so the list pins", async ({ page }) => {
       await openThread(page, "streaming", scheme);
       const timeline = page.getByTestId("thread-timeline");
       const box = await timeline.boundingBox();
@@ -279,21 +316,22 @@ for (const scheme of ["dark", "light"] as const) {
       await page.mouse.wheel(0, -200);
       await expect(timeline).not.toHaveAttribute("data-at-bottom", "true");
       await mockPost("thread/finish");
-      const footer = footers(page).last();
-      await expect(footer).toHaveAttribute("data-folded", "true");
+      const header = headers(page).last();
+      await expect(header).toHaveAttribute("data-folded", "true");
       await expect(timeline).toHaveAttribute("data-at-bottom", "true");
       await expect
         .poll(async () => {
-          const f = await footer.boundingBox();
+          const h = await header.boundingBox();
+          const t = await timeline.boundingBox();
           const composer = await page.getByTestId("thread-composer").boundingBox();
-          return f && composer && f.y + f.height <= composer.y;
+          return !!h && !!t && !!composer && h.y >= t.y && h.y + h.height <= composer.y;
         })
         .toBe(true);
     });
   });
 }
 
-test("reading deep into an open tool row when the turn ends: the answer that replaces it starts at the top", async ({ page }) => {
+test("reading deep into an open tool row when the turn ends: the work folds up under the header, which takes the top", async ({ page }) => {
   await openThread(page, "streaming");
   const timeline = page.getByTestId("thread-timeline");
   // A long answer below the work, so there is room to keep the place.
@@ -321,21 +359,50 @@ test("reading deep into an open tool row when the turn ends: the answer that rep
   });
   await page.waitForTimeout(100);
   await mockPost("thread/finish");
-  await expect(footers(page).last()).toHaveAttribute("data-folded", "true");
+  await expect(headers(page).last()).toHaveAttribute("data-folded", "true");
   await expect(pane(page).locator('[data-tool="Edit"]')).toHaveCount(0);
-  const answer = pane(page).locator('[data-testid="thread-text"][data-final]').last().locator("xpath=ancestor::*[@data-index][1]");
-  await expect.poll(async () => Math.round(((await answer.boundingBox())?.y ?? -1) - (box?.y ?? 0))).toBe(0);
+  const header = headers(page).last().locator("xpath=ancestor::*[@data-index][1]");
+  await expect.poll(async () => Math.round(((await header.boundingBox())?.y ?? -1) - (box?.y ?? 0))).toBe(0);
   await expect(timeline).not.toHaveAttribute("data-at-bottom", "true");
 });
 
-test("footers: the daemon's turn cost and model; a turn without them shows neither", async ({ page }) => {
+test("a click on a header folds or unfolds its turn without moving the header on screen", async ({ page }) => {
+  // Tall enough for the whole folded thread: the list sits at the bottom (pinned) with the
+  // first turn's header (12 steps) on screen.
+  await page.setViewportSize({ width: 1280, height: 1100 });
+  await openThread(page, "idle");
+  const timeline = page.getByTestId("thread-timeline");
+  await expect(timeline).toHaveAttribute("data-at-bottom", "true");
+  const header = headers(page).first();
+  await expect(header).toHaveAttribute("data-folded", "true");
+  await expect(header).toContainText("12 steps");
+  await page.waitForTimeout(200);
+  const y = async () => Math.round((await header.boundingBox())?.y ?? -1);
+  const before = await y();
+  // Unfolded while pinned: the work opens below the header, which stays put rather than the
+  // list following the bottom, so the list is no longer at the bottom.
+  await header.locator("button.fold").click();
+  await expect(header).not.toHaveAttribute("data-folded", "true");
+  await expect(header.locator("button.fold")).toHaveAttribute("aria-expanded", "true");
+  await page.waitForTimeout(200);
+  expect(await y()).toBe(before);
+  await expect(timeline).not.toHaveAttribute("data-at-bottom", "true");
+  // Folded again: the work closes under it, still in place, and the list is at the bottom again.
+  await header.locator("button.fold").click();
+  await expect(header).toHaveAttribute("data-folded", "true");
+  await page.waitForTimeout(200);
+  expect(await y()).toBe(before);
+  await expect(timeline).toHaveAttribute("data-at-bottom", "true");
+});
+
+test("headers: the daemon's turn cost and model; a turn without them shows neither", async ({ page }) => {
   await openThread(page, "idle");
   // Turn 2 ran in a new process whose total passed the old one's: the difference of the
   // totals would say $0.38; the daemon's turn cost says $1.50, and Sonnet 5 answered.
-  await expect(footers(page).last()).toContainText(/·\$1\.50·Sonnet 5$/);
+  await expect(headers(page).last()).toContainText(/·\$1\.50·Sonnet 5$/);
   // Turn 1 has neither (an older daemon, or a cost the daemon could not tell): no guess
   // from the running total, no model from the thread's current one.
-  const first = await reveal(page, footers(page));
+  const first = await reveal(page, headers(page));
   await expect(first).toContainText(/steps$/);
   await expect(first).not.toContainText("$");
   await expect(first).not.toContainText("Opus");
@@ -446,12 +513,12 @@ test("a follow-up goes through thread.send with the composer's tags projected; t
   await expect(page.getByTestId("thread-user").last()).toContainText("Ship it with");
   await expect(page.getByTestId("thread-user").last().locator('[data-tag-kind="skill"]')).toHaveText("/review");
   await expect(pane(page).locator('[data-testid="thread-text"]').last()).toContainText("Got it: I'll take a look now.");
-  await expect(footers(page)).toHaveCount(3);
+  await expect(headers(page)).toHaveCount(3);
   // The draft cleared; every finished turn folded, the latest (the reply) included.
   await expect(page.getByTestId("composer-prompt")).toHaveAttribute("data-value", "");
-  await expect(footers(page).nth(0)).toHaveAttribute("data-folded", "true");
-  await expect(footers(page).nth(1)).toHaveAttribute("data-folded", "true");
-  await expect(footers(page).nth(2)).toHaveAttribute("data-folded", "true");
+  await expect(headers(page).nth(0)).toHaveAttribute("data-folded", "true");
+  await expect(headers(page).nth(1)).toHaveAttribute("data-folded", "true");
+  await expect(headers(page).nth(2)).toHaveAttribute("data-folded", "true");
   // The prompt has focus again after the send (it is read-only while the send is in flight).
   await expect(editor).toBeFocused();
   await page.keyboard.type("x");
@@ -512,7 +579,7 @@ test("Interrupt stops the running turn (thread.interrupt)", async ({ page }) => 
   await openThread(page, "streaming");
   await page.getByTestId("thread-interrupt").click();
   await expect.poll(calls).toContain("interrupt s-r1");
-  await expect(footers(page).last()).toContainText("Interrupted");
+  await expect(headers(page).last()).toContainText("Interrupted");
   await expect(page.getByTestId("thread-interrupt")).toHaveCount(0);
 });
 
@@ -571,7 +638,7 @@ test("a claude that did not start: its error in the timeline, the composer, and 
   await composer.getByTestId("composer-input").click();
   await page.keyboard.type("Try again");
   await page.keyboard.press("Enter");
-  // While Claude starts the timeline shows the same Working row as a turn, no "starting" word.
+  // While Claude starts the timeline shows the same live header as a turn, no "starting" word.
   const working = page.getByTestId("thread-working");
   await expect(working).toContainText("Working");
   await expect(pane(page)).not.toContainText(/Starting Claude|starting…/);
@@ -588,7 +655,7 @@ test("a stopped thread at its prompt keeps its conversation, the composer and th
   const composer = page.getByTestId("thread-composer");
   await expect(composer.getByTestId("thread-cold-cache")).toHaveText(/^Cache expired · the next message re-reads 25\.7K tokens/);
   await expect(composer.getByTestId("thread-send")).toBeDisabled();
-  await expect(footers(page).last()).toContainText("Sonnet 5");
+  await expect(headers(page).last()).toContainText("Sonnet 5");
   await expect(pane(page).locator('[data-testid="thread-text"]').last()).toContainText("All 412 tests pass and the branch is pushed");
   await expect(page.getByTestId("thread-working")).toHaveCount(0);
   await expect(page.getByTestId("thread-empty")).toHaveCount(0);
@@ -597,7 +664,7 @@ test("a stopped thread at its prompt keeps its conversation, the composer and th
 
 test("a fork shows its parent's conversation, ended by a Forked from note", async ({ page }) => {
   await openThread(page, "idle");
-  const parentFooters = await footers(page).count();
+  const parentHeaders = await headers(page).count();
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("Fork Thread");
   await page.keyboard.press("Enter");
@@ -608,7 +675,7 @@ test("a fork shows its parent's conversation, ended by a Forked from note", asyn
   await expect(note).toHaveText("Forked from Fix stale PR badge");
   await expect(page.getByTestId("thread-working")).toContainText("Working");
   // The copied turns are all there (folded: the note is the latest row), and nothing waits.
-  await expect(footers(page)).toHaveCount(parentFooters);
+  await expect(headers(page)).toHaveCount(parentHeaders);
   await expect(pane(page).locator('[data-testid="thread-text"]').last()).toContainText("All 412 tests pass and the branch is pushed");
   await expect(page.getByTestId("thread-working")).toHaveCount(0, { timeout: 5000 });
   await expect(page.getByTestId("thread-empty")).toHaveCount(0);
@@ -625,9 +692,9 @@ test("the follow-up placeholder says a message while Claude works is picked up m
   await expect(pane(page).getByRole("button", { name: /Interrupt/ })).toHaveCount(0);
 });
 
-test("a message sent mid-turn is a steer: it stays inside the running turn, which ends with one footer", async ({ page }) => {
+test("a message sent mid-turn is a steer: it stays inside the running turn, which ends with one header", async ({ page }) => {
   await openThread(page, "streaming");
-  const before = await footers(page).count();
+  const before = await headers(page).count();
   const editor = page.getByTestId("thread-composer").locator('[contenteditable="true"]');
   await editor.click();
   await page.keyboard.type("Also say hi when you are done");
@@ -638,12 +705,12 @@ test("a message sent mid-turn is a steer: it stays inside the running turn, whic
   await expect(steer).toContainText("Also say hi when you are done");
   await expect(steer.getByTestId("thread-steer-caption")).toHaveText(/^sent mid-turn · \d/);
   await expect(pane(page).getByTestId("thread-user").filter({ hasText: "Also say hi" })).toHaveCount(0);
-  // Claude answers it in the same turn: one footer more, the turn folds, the steer stays.
+  // Claude answers it in the same turn: one header more, the turn folds, the steer stays.
   await expect(pane(page).locator('[data-testid="thread-text"]').last()).toContainText("Got it: I'll take a look now.");
-  await expect(footers(page)).toHaveCount(before + 1);
-  await expect(footers(page).last()).toHaveAttribute("data-folded", "true");
+  await expect(headers(page)).toHaveCount(before + 1);
+  await expect(headers(page).last()).toHaveAttribute("data-folded", "true");
   await expect(steer).toBeVisible();
-  await expect(footers(page).last()).toContainText("steps");
+  await expect(headers(page).last()).toContainText("steps");
   await expect(pane(page).getByTestId("thread-user").filter({ hasText: "Also say hi" })).toHaveCount(0);
   await shot(page, "steer");
 });
