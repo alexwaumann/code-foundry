@@ -30,7 +30,7 @@ func fromMillis(ms int64) time.Time {
 
 func saveThread(ctx context.Context, db *sql.DB, s Thread) error {
 	_, err := db.ExecContext(ctx, `INSERT INTO threads (
-			id, claude_session_id, repo_id, worktree_path, name, auto_named, model, effort,
+			id, claude_session_id, project_id, worktree_path, name, auto_named, model, effort,
 			created_at, last_activity_at, parent_id, state, disconnect_reason, exit_code, last_error,
 			permission_mode, base_ref, created_worktree, workspace_id, pinned,
 			status, status_reason, status_changed_at,
@@ -41,7 +41,7 @@ func saveThread(ctx context.Context, db *sql.DB, s Thread) error {
 			?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (id) DO UPDATE SET
 			claude_session_id = excluded.claude_session_id,
-			repo_id = excluded.repo_id,
+			project_id = excluded.project_id,
 			worktree_path = excluded.worktree_path,
 			name = excluded.name,
 			auto_named = excluded.auto_named,
@@ -90,7 +90,7 @@ func saveThread(ctx context.Context, db *sql.DB, s Thread) error {
 }
 
 func loadThreads(ctx context.Context, db *sql.DB) ([]Thread, error) {
-	rows, err := db.QueryContext(ctx, `SELECT id, claude_session_id, repo_id, worktree_path, name, auto_named,
+	rows, err := db.QueryContext(ctx, `SELECT id, claude_session_id, project_id, worktree_path, name, auto_named,
 			model, effort, created_at, last_activity_at, parent_id, state, disconnect_reason, exit_code, last_error,
 			permission_mode, base_ref, created_worktree, workspace_id, pinned,
 			status, status_reason, status_changed_at,

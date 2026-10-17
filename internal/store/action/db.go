@@ -9,7 +9,7 @@ import (
 
 // Persistence for the actions table (migration 0020).
 
-const actionColumns = `id, repo_id, name, command, icon, in_terminal, on_worktree_create, position, created_at, updated_at`
+const actionColumns = `id, project_id, name, command, icon, in_terminal, on_worktree_create, position, created_at, updated_at`
 
 type scanner interface{ Scan(dest ...any) error }
 
@@ -26,7 +26,7 @@ func scanAction(row scanner) (Action, error) {
 }
 
 func loadActions(ctx context.Context, db *sql.DB) ([]Action, error) {
-	rows, err := db.QueryContext(ctx, `SELECT `+actionColumns+` FROM actions ORDER BY repo_id, position, rowid`)
+	rows, err := db.QueryContext(ctx, `SELECT `+actionColumns+` FROM actions ORDER BY project_id, position, rowid`)
 	if err != nil {
 		return nil, fmt.Errorf("action: load: %w", err)
 	}
@@ -94,9 +94,9 @@ func deleteAction(ctx context.Context, db *sql.DB, id string) error {
 }
 
 // deleteProjectActions removes a project's actions. Unregistering the project cascades
-// already (actions.repo_id references repos); this makes ProjectRemoved exact either way.
+// already (actions.project_id references projects); this makes ProjectRemoved exact either way.
 func deleteProjectActions(ctx context.Context, db *sql.DB, projectID string) error {
-	if _, err := db.ExecContext(ctx, `DELETE FROM actions WHERE repo_id = ?`, projectID); err != nil {
+	if _, err := db.ExecContext(ctx, `DELETE FROM actions WHERE project_id = ?`, projectID); err != nil {
 		return fmt.Errorf("action: delete project %s's actions: %w", projectID, err)
 	}
 	return nil

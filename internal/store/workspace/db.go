@@ -30,7 +30,7 @@ func loadWorkspaces(ctx context.Context, db *sql.DB) ([]Workspace, error) {
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("workspace: load: %w", err)
 	}
-	mrows, err := db.QueryContext(ctx, `SELECT workspace_id, repo_id, worktree_path FROM workspace_members
+	mrows, err := db.QueryContext(ctx, `SELECT workspace_id, project_id, worktree_path FROM workspace_members
 		ORDER BY added_at, rowid`)
 	if err != nil {
 		return nil, fmt.Errorf("workspace: load members: %w", err)
@@ -72,7 +72,7 @@ func insertWorkspace(ctx context.Context, db *sql.DB, w Workspace) (err error) {
 		return fmt.Errorf("workspace: save %s: %w", w.ID, err)
 	}
 	for _, m := range w.Members {
-		if _, err = tx.ExecContext(ctx, `INSERT INTO workspace_members (workspace_id, repo_id, worktree_path, added_at)
+		if _, err = tx.ExecContext(ctx, `INSERT INTO workspace_members (workspace_id, project_id, worktree_path, added_at)
 			VALUES (?, ?, ?, ?)`, w.ID, m.ProjectID, m.WorktreePath, w.CreatedAt.UnixMilli()); err != nil {
 			return fmt.Errorf("workspace: save %s member %s: %w", w.ID, m.ProjectID, err)
 		}
@@ -84,7 +84,7 @@ func insertWorkspace(ctx context.Context, db *sql.DB, w Workspace) (err error) {
 }
 
 func insertMember(ctx context.Context, db *sql.DB, id string, m Member, at time.Time) error {
-	if _, err := db.ExecContext(ctx, `INSERT INTO workspace_members (workspace_id, repo_id, worktree_path, added_at)
+	if _, err := db.ExecContext(ctx, `INSERT INTO workspace_members (workspace_id, project_id, worktree_path, added_at)
 		VALUES (?, ?, ?, ?)`, id, m.ProjectID, m.WorktreePath, at.UnixMilli()); err != nil {
 		return fmt.Errorf("workspace: add member %s to %s: %w", m.ProjectID, id, err)
 	}
@@ -92,7 +92,7 @@ func insertMember(ctx context.Context, db *sql.DB, id string, m Member, at time.
 }
 
 func deleteMember(ctx context.Context, db *sql.DB, id, projectID string) error {
-	if _, err := db.ExecContext(ctx, `DELETE FROM workspace_members WHERE workspace_id = ? AND repo_id = ?`, id, projectID); err != nil {
+	if _, err := db.ExecContext(ctx, `DELETE FROM workspace_members WHERE workspace_id = ? AND project_id = ?`, id, projectID); err != nil {
 		return fmt.Errorf("workspace: remove member %s from %s: %w", projectID, id, err)
 	}
 	return nil

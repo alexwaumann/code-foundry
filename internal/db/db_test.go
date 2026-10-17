@@ -42,8 +42,8 @@ func TestOpenPragmasAndEmbeddedMigrations(t *testing.T) {
 		_ = c.Close()
 	}
 
-	if _, err := db.ExecContext(ctx, `INSERT INTO repos (id, path, name, registered_at) VALUES ('a', '/x', 'x', 1)`); err != nil {
-		t.Fatalf("repos table missing: %v", err)
+	if _, err := db.ExecContext(ctx, `INSERT INTO projects (id, path, name, registered_at) VALUES ('a', '/x', 'x', 1)`); err != nil {
+		t.Fatalf("projects table missing: %v", err)
 	}
 	if err := db.Close(); err != nil {
 		t.Fatal(err)
@@ -56,8 +56,8 @@ func TestOpenPragmasAndEmbeddedMigrations(t *testing.T) {
 	}
 	defer func() { _ = db2.Close() }()
 	var n int
-	if err := db2.QueryRowContext(ctx, `SELECT count(*) FROM repos`).Scan(&n); err != nil || n != 1 {
-		t.Fatalf("repos rows = %d, %v", n, err)
+	if err := db2.QueryRowContext(ctx, `SELECT count(*) FROM projects`).Scan(&n); err != nil || n != 1 {
+		t.Fatalf("projects rows = %d, %v", n, err)
 	}
 	all, err := LoadMigrations(Migrations())
 	if err != nil || len(all) == 0 {
