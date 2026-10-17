@@ -15,6 +15,11 @@ import (
 // ThreadWaitConditions are thread.wait's until values.
 var ThreadWaitConditions = []string{"idle", "attention", "error", "disconnected"}
 
+// threadWaitGoals finish thread.wait's timeout message: "waiting for thread s-1 to ...".
+var threadWaitGoals = map[string]string{
+	"idle": "be idle", "attention": "need attention", "error": "have an error", "disconnected": "be disconnected",
+}
+
 var threadWaitConditions = map[string]v1.ThreadWaitCondition{
 	"idle":         v1.ThreadWaitCondition_THREAD_WAIT_CONDITION_IDLE,
 	"attention":    v1.ThreadWaitCondition_THREAD_WAIT_CONDITION_ATTENTION,
@@ -65,7 +70,7 @@ func threadWait(b ThreadBackend, idArg ArgSpec) Command {
 			s := res.Msg.GetThread()
 			if res.Msg.GetTimedOut() {
 				return Result{}, connect.NewError(connect.CodeDeadlineExceeded,
-					fmt.Errorf("timed out after %s waiting for thread %s to be %s; it is %s", limit, id, until, waitStatus(s)))
+					fmt.Errorf("timed out after %s waiting for thread %s to %s; it is %s", limit, id, threadWaitGoals[until], waitStatus(s)))
 			}
 			return Result{Message: waitLine(s), JSON: s}, nil
 		},
