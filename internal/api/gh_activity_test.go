@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -32,8 +33,7 @@ func TestGhDashboardFiltersToTracked(t *testing.T) {
 		FetchedAt:       at,
 		LastError:       "partial",
 		Stats: gh.MonthlyStats{
-			ThisMonth:     gh.MonthCount{Month: "2026-10", Commits: 16, Merged: 2},
-			LastMonth:     gh.MonthCount{Month: "2026-09", Commits: 463, Merged: 38},
+			Months:        sixMonths(),
 			CommitsSource: gh.CommitsFromSearch, FetchedAt: at,
 		},
 	})
@@ -61,8 +61,8 @@ func TestGhDashboardFiltersToTracked(t *testing.T) {
 		t.Errorf("merged PR = %v", mp)
 	}
 	s := m.GetStats()
-	if s.GetThisMonth().GetCommits() != 16 || s.GetLastMonth().GetMerged() != 38 || s.GetThisMonth().GetMonth() != "2026-10" ||
-		s.GetCommitsSource() != "search" || s.GetFetchedAt() == nil {
+	if ms := s.GetMonths(); len(ms) != 6 || ms[0].GetCommits() != 16 || ms[1].GetMerged() != 38 || ms[0].GetMonth() != "2026-10" ||
+		ms[5].GetMonth() != "2026-05" || s.GetCommitsSource() != "search" || s.GetFetchedAt() == nil {
 		t.Errorf("stats = %v", s)
 	}
 
@@ -96,7 +96,7 @@ func TestGhRepoActivityAndBranch(t *testing.T) {
 	}
 
 	store.SetActivity("o/repo", gh.RepoActivity{
-		Stats: gh.MonthlyStats{ThisMonth: gh.MonthCount{Month: "2026-10", Commits: 3, Merged: 1}, FetchedAt: at},
+		Stats: gh.MonthlyStats{Months: []gh.MonthCount{{Month: "2026-10", Commits: 3, Merged: 1}}, FetchedAt: at},
 		DefaultBranch: gh.BranchCI{
 			Branch: "main", SHA: "abc", Headline: "fix", CommittedAt: at, FetchedAt: at,
 			Rollup:  gh.CheckRollup{State: gh.RollupFailure, Total: 3, Passed: 1, Failed: 2},
@@ -116,7 +116,7 @@ func TestGhRepoActivityAndBranch(t *testing.T) {
 		db.GetFailing()[0].GetUrl() != "https://ci/1" || db.GetCommittedAt() == nil {
 		t.Errorf("default branch = %v", db)
 	}
-	if res.Msg.GetStats().GetThisMonth().GetCommits() != 3 || len(res.Msg.GetRecentlyMerged()) != 1 ||
+	if ms := res.Msg.GetStats().GetMonths(); len(ms) != 1 || ms[0].GetCommits() != 3 || len(res.Msg.GetRecentlyMerged()) != 1 ||
 		res.Msg.GetRecentlyMerged()[0].GetNumber() != 7 {
 		t.Errorf("activity = %v", res.Msg)
 	}
@@ -171,5 +171,47 @@ func TestRepoGetWorktreeDetail(t *testing.T) {
 	}
 	if _, err := c.GetWorktreeDetail(ctx, connect.NewRequest(&v1.GetWorktreeDetailRequest{RepoId: id, Path: "/nope"})); connect.CodeOf(err) != connect.CodeNotFound {
 		t.Errorf("unknown worktree err = %v", err)
+	}
+}
+
+// sixMonths is a dashboard's stats, newest first.
+func sixMonths() []gh.MonthCount {
+	return []gh.MonthCount{
+		{Month: "2026-10", Commits: 16, Merged: 2, Source: gh.CommitsFromSearch},
+		{Month: "2026-09", Commits: 463, Merged: 38, Source: gh.CommitsFromSearch},
+		{Month: "2026-08", Commits: 120, Merged: 9, Source: gh.CommitsFromSearch},
+		{Month: "2026-07", Commits: 0, Merged: 0, Source: gh.CommitsFromSearch},
+		{Month: "2026-06", Commits: 7, Merged: 1, Source: gh.CommitsFromSearch},
+		{Month: "2026-05", Commits: 2, Merged: 0, Source: gh.CommitsFromSearch},
+	}
+}
+
+func TestStatsToProto(t *testing.T) {
+	at := time.Date(2026, 10, 17, 9, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name string
+		in   gh.MonthlyStats
+		want string // months as month/commits/merged, newest first
+		src  string
+		err  string
+	}{
+		{name: "never fetched", in: gh.MonthlyStats{}, want: "[]"},
+		{name: "six months, newest first", in: gh.MonthlyStats{Months: sixMonths(), CommitsSource: gh.CommitsFromSearch, FetchedAt: at, ClosedAt: at},
+			want: "[2026-10/16/2 2026-09/463/38 2026-08/120/9 2026-07/0/0 2026-06/7/1 2026-05/2/0]", src: "search"},
+		{name: "fallback source and error kept", in: gh.MonthlyStats{Months: sixMonths()[:2], CommitsSource: gh.CommitsFromContributions, LastError: "boom"},
+			want: "[2026-10/16/2 2026-09/463/38]", src: "contributions", err: "boom"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := statsToProto(tt.in)
+			got := []string{}
+			for _, m := range p.GetMonths() {
+				got = append(got, fmt.Sprintf("%s/%d/%d", m.GetMonth(), m.GetCommits(), m.GetMerged()))
+			}
+			if fmt.Sprint(got) != tt.want || p.GetCommitsSource() != tt.src || p.GetLastError() != tt.err ||
+				(p.GetFetchedAt() != nil) != !tt.in.FetchedAt.IsZero() {
+				t.Errorf("got %v %q %q %v", got, p.GetCommitsSource(), p.GetLastError(), p.GetFetchedAt())
+			}
+		})
 	}
 }

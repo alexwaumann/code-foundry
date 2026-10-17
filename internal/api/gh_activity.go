@@ -106,12 +106,12 @@ func searchPullRequestsToProto(prs []gh.PullRequest, keep func(gh.PullRequest) b
 }
 
 func statsToProto(s gh.MonthlyStats) *v1.ActivityStats {
-	month := func(m gh.MonthCount) *v1.MonthActivity {
-		return &v1.MonthActivity{Month: m.Month, Commits: int32(m.Commits), Merged: int32(m.Merged)}
+	months := make([]*v1.MonthActivity, 0, len(s.Months))
+	for _, m := range s.Months {
+		months = append(months, &v1.MonthActivity{Month: m.Month, Commits: int32(m.Commits), Merged: int32(m.Merged)})
 	}
 	return &v1.ActivityStats{
-		ThisMonth:     month(s.ThisMonth),
-		LastMonth:     month(s.LastMonth),
+		Months:        months,
 		CommitsSource: s.CommitsSource,
 		FetchedAt:     timestamp(s.FetchedAt),
 		LastError:     s.LastError,

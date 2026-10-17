@@ -7318,10 +7318,22 @@
       },
       "history": {
         "target": {
-          "thisMonth": {
+          "h0": {
             "totalCount": 0
           },
-          "lastMonth": {
+          "h1": {
+            "totalCount": 0
+          },
+          "h2": {
+            "totalCount": 0
+          },
+          "h3": {
+            "totalCount": 0
+          },
+          "h4": {
+            "totalCount": 0
+          },
+          "h5": {
             "totalCount": 0
           }
         }
@@ -7425,11 +7437,23 @@
       },
       "history": {
         "target": {
-          "thisMonth": {
-            "totalCount": 23
+          "h0": {
+            "totalCount": 75
           },
-          "lastMonth": {
+          "h1": {
             "totalCount": 127
+          },
+          "h2": {
+            "totalCount": 455
+          },
+          "h3": {
+            "totalCount": 268
+          },
+          "h4": {
+            "totalCount": 47
+          },
+          "h5": {
+            "totalCount": 83
           }
         }
       }
@@ -7532,179 +7556,78 @@
       }
     },
     "r3": null,
-    "mergedThis": {
-      "issueCount": 4
+    "m0": {
+      "issueCount": 13
     },
-    "mergedLast": {
+    "m1": {
       "issueCount": 22
     },
-    "mergedRecent": {
-      "issueCount": 26,
-      "nodes": [
-        {
-          "mergedAt": "2026-10-04T13:31:41Z",
-          "repository": {
-            "nameWithOwner": "ghostty-org/ghostty"
-          }
-        },
-        {
-          "mergedAt": "2026-10-06T21:59:44Z",
-          "repository": {
-            "nameWithOwner": "ghostty-org/ghostty"
-          }
-        },
-        {
-          "mergedAt": "2026-10-01T15:47:07Z",
-          "repository": {
-            "nameWithOwner": "ghostty-org/ghostty"
-          }
-        },
-        {
-          "mergedAt": "2026-10-01T15:27:17Z",
-          "repository": {
-            "nameWithOwner": "ghostty-org/ghostty"
-          }
-        },
-        {
-          "mergedAt": "2026-09-30T11:37:05Z",
-          "repository": {
-            "nameWithOwner": "ghostty-org/ghostty"
-          }
-        },
-        {
-          "mergedAt": "2026-09-29T12:16:21Z",
-          "repository": {
-            "nameWithOwner": "ghostty-org/ghostty"
-          }
-        },
-        {
-          "mergedAt": "2026-09-29T11:26:31Z",
-          "repository": {
-            "nameWithOwner": "ghostty-org/ghostty"
-          }
-        },
-        {
-          "mergedAt": "2026-09-07T16:45:25Z",
-          "repository": {
-            "nameWithOwner": "ghostty-org/ghostty"
-          }
-        },
-        {
-          "mergedAt": "2026-09-25T20:38:10Z",
-          "repository": {
-            "nameWithOwner": "ghostty-org/ghostty"
-          }
-        },
-        {
-          "mergedAt": "2026-09-25T17:02:45Z",
-          "repository": {
-            "nameWithOwner": "ghostty-org/ghostty"
-          }
-        },
-        {
-          "mergedAt": "2026-09-20T04:18:08Z",
-          "repository": {
-            "nameWithOwner": "ghostty-org/ghostty"
-          }
-        },
-        {
-          "mergedAt": "2026-09-20T03:32:18Z",
-          "repository": {
-            "nameWithOwner": "ghostty-org/ghostty"
-          }
-        },
-        {
-          "mergedAt": "2026-09-18T16:58:29Z",
-          "repository": {
-            "nameWithOwner": "ghostty-org/ghostty"
-          }
-        },
-        {
-          "mergedAt": "2026-09-14T19:58:40Z",
-          "repository": {
-            "nameWithOwner": "ghostty-org/ghostty"
-          }
-        },
-        {
-          "mergedAt": "2026-09-14T19:58:17Z",
-          "repository": {
-            "nameWithOwner": "ghostty-org/ghostty"
-          }
-        },
-        {
-          "mergedAt": "2026-09-09T19:04:24Z",
-          "repository": {
-            "nameWithOwner": "ghostty-org/ghostty"
-          }
-        },
-        {
-          "mergedAt": "2026-09-09T15:34:04Z",
-          "repository": {
-            "nameWithOwner": "ghostty-org/ghostty"
-          }
-        },
-        {
-          "mergedAt": "2026-09-09T14:53:39Z",
-          "repository": {
-            "nameWithOwner": "ghostty-org/ghostty"
-          }
-        },
-        {
-          "mergedAt": "2026-09-08T04:02:02Z",
-          "repository": {
-            "nameWithOwner": "ghostty-org/ghostty"
-          }
-        },
-        {
-          "mergedAt": "2026-09-04T15:57:13Z",
-          "repository": {
-            "nameWithOwner": "ghostty-org/ghostty"
-          }
-        },
-        {
-          "mergedAt": "2026-09-04T17:10:50Z",
-          "repository": {
-            "nameWithOwner": "ghostty-org/ghostty"
-          }
-        },
-        {
-          "mergedAt": "2026-09-04T17:49:54Z",
-          "repository": {
-            "nameWithOwner": "ghostty-org/ghostty"
-          }
-        },
-        {
-          "mergedAt": "2026-09-03T23:09:40Z",
-          "repository": {
-            "nameWithOwner": "ghostty-org/ghostty"
-          }
-        },
-        {
-          "mergedAt": "2026-09-03T18:54:45Z",
-          "repository": {
-            "nameWithOwner": "ghostty-org/ghostty"
-          }
-        },
-        {
-          "mergedAt": "2026-09-03T04:12:15Z",
-          "repository": {
-            "nameWithOwner": "ghostty-org/ghostty"
-          }
-        },
-        {
-          "mergedAt": "2026-09-02T15:22:54Z",
-          "repository": {
-            "nameWithOwner": "ghostty-org/ghostty"
-          }
-        }
-      ]
+    "m2": {
+      "issueCount": 126
+    },
+    "m3": {
+      "issueCount": 42
+    },
+    "m4": {
+      "issueCount": 7
+    },
+    "m5": {
+      "issueCount": 11
+    },
+    "r0_m0": {
+      "issueCount": 0
+    },
+    "r0_m1": {
+      "issueCount": 0
+    },
+    "r0_m2": {
+      "issueCount": 0
+    },
+    "r0_m3": {
+      "issueCount": 0
+    },
+    "r0_m4": {
+      "issueCount": 0
+    },
+    "r0_m5": {
+      "issueCount": 0
+    },
+    "r1_m0": {
+      "issueCount": 13
+    },
+    "r1_m1": {
+      "issueCount": 22
+    },
+    "r1_m2": {
+      "issueCount": 126
+    },
+    "r1_m3": {
+      "issueCount": 42
+    },
+    "r1_m4": {
+      "issueCount": 5
+    },
+    "r1_m5": {
+      "issueCount": 9
     },
     "contributions": {
-      "thisMonth": {
-        "totalCommitContributions": 36
+      "c0": {
+        "totalCommitContributions": 84
       },
-      "lastMonth": {
+      "c1": {
         "totalCommitContributions": 143
+      },
+      "c2": {
+        "totalCommitContributions": 478
+      },
+      "c3": {
+        "totalCommitContributions": 300
+      },
+      "c4": {
+        "totalCommitContributions": 72
+      },
+      "c5": {
+        "totalCommitContributions": 142
       }
     }
   },

@@ -41,9 +41,12 @@ type Options struct {
 	// DetailBatch is how many open pull requests one detail request carries.
 	DetailBatch int
 
-	// StatsInterval is how often the monthly stats ride along with the poll. Negative
-	// disables them.
+	// StatsInterval is how often the current month's stats ride along with the poll.
+	// Negative disables the stats.
 	StatsInterval time.Duration
+	// HistoryInterval is how often the closed months' stats are refetched (sooner when
+	// some are missing).
+	HistoryInterval time.Duration
 	// BranchWatch is how long a branch stays in the poll after BranchPullRequests
 	// asked for it.
 	BranchWatch time.Duration
@@ -95,6 +98,7 @@ func (o *Options) setDefaults() {
 	if o.StatsInterval == 0 {
 		o.StatsInterval = DefaultStatsInterval
 	}
+	def(&o.HistoryInterval, DefaultHistoryInterval)
 	if o.Log == nil {
 		o.Log = slog.New(slog.DiscardHandler)
 	}
@@ -569,6 +573,9 @@ func (s *Store) callDoc(ctx context.Context, name, doc string, vars map[string]a
 	}
 	s.log.Debug("gh request", attrs...)
 	s.cycle.requests++
+	if name == queryPoll {
+		s.cycle.pollDur = s.lastEnd.Sub(start)
+	}
 	if rl != nil {
 		s.cycle.cost += rl.Cost
 	}

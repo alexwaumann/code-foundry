@@ -133,10 +133,22 @@
       },
       "history": {
         "target": {
-          "thisMonth": {
-            "totalCount": 135
+          "h0": {
+            "totalCount": 1462
           },
-          "lastMonth": {
+          "h1": {
+            "totalCount": 0
+          },
+          "h2": {
+            "totalCount": 0
+          },
+          "h3": {
+            "totalCount": 0
+          },
+          "h4": {
+            "totalCount": 0
+          },
+          "h5": {
             "totalCount": 0
           }
         }
@@ -240,10 +252,22 @@
       },
       "history": {
         "target": {
-          "thisMonth": {
+          "h0": {
             "totalCount": 0
           },
-          "lastMonth": {
+          "h1": {
+            "totalCount": 0
+          },
+          "h2": {
+            "totalCount": 0
+          },
+          "h3": {
+            "totalCount": 0
+          },
+          "h4": {
+            "totalCount": 0
+          },
+          "h5": {
             "totalCount": 0
           }
         }
@@ -347,21 +371,77 @@
       }
     },
     "r3": null,
-    "mergedThis": {
+    "m0": {
+      "issueCount": 153
+    },
+    "m1": {
       "issueCount": 0
     },
-    "mergedLast": {
+    "m2": {
       "issueCount": 0
     },
-    "mergedRecent": {
-      "issueCount": 0,
-      "nodes": []
+    "m3": {
+      "issueCount": 0
+    },
+    "m4": {
+      "issueCount": 0
+    },
+    "m5": {
+      "issueCount": 0
+    },
+    "r0_m0": {
+      "issueCount": 153
+    },
+    "r0_m1": {
+      "issueCount": 0
+    },
+    "r0_m2": {
+      "issueCount": 0
+    },
+    "r0_m3": {
+      "issueCount": 0
+    },
+    "r0_m4": {
+      "issueCount": 0
+    },
+    "r0_m5": {
+      "issueCount": 0
+    },
+    "r1_m0": {
+      "issueCount": 0
+    },
+    "r1_m1": {
+      "issueCount": 0
+    },
+    "r1_m2": {
+      "issueCount": 0
+    },
+    "r1_m3": {
+      "issueCount": 0
+    },
+    "r1_m4": {
+      "issueCount": 0
+    },
+    "r1_m5": {
+      "issueCount": 0
     },
     "contributions": {
-      "thisMonth": {
-        "totalCommitContributions": 214
+      "c0": {
+        "totalCommitContributions": 1524
       },
-      "lastMonth": {
+      "c1": {
+        "totalCommitContributions": 0
+      },
+      "c2": {
+        "totalCommitContributions": 0
+      },
+      "c3": {
+        "totalCommitContributions": 0
+      },
+      "c4": {
+        "totalCommitContributions": 0
+      },
+      "c5": {
         "totalCommitContributions": 0
       }
     }

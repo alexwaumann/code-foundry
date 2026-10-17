@@ -97,26 +97,23 @@ type repoResult struct {
 	// missing here failed with BranchErr.
 	Branches  map[string][]prFingerprint
 	BranchErr map[string]error
-	// History is the viewer's commits on the default branch this month and last; nil
-	// when not selected.
-	History *[2]int
+	// Commits are the viewer's commits on the default branch in each month the plan
+	// asked for (repoPlan.months); nil when not asked or missing from the response.
+	Commits []int
+	// Merged are the viewer's merged pull requests in each month asked for; nil when
+	// not asked or any count is missing (StatsErr says why).
+	Merged   []int
+	StatsErr error
 }
 
-// statsResult is the decoded monthly stats part.
+// statsResult is the decoded global monthly stats part, per month asked for
+// (statsPlan.months).
 type statsResult struct {
-	MergedThis, MergedLast int
-	// Recent is every merged PR of the two months (up to mergedStatsFirst).
-	Recent      []mergedItem
-	RecentTotal int
-	// Contrib* are contributionsCollection's commit counts (the fallback for REST).
-	ContribThis, ContribLast int
-	HasContrib               bool
-	Err                      error
-}
-
-type mergedItem struct {
-	Repo     string
-	MergedAt time.Time
+	Merged []int
+	// Contrib are contributionsCollection's commit counts (the fallback for REST).
+	Contrib    []int
+	HasContrib bool
+	Err        error
 }
 
 // pollResult is a decoded poll response.
@@ -175,7 +172,15 @@ func decodePoll(plan *pollPlan, data []byte, partial *PartialError) (pollResult,
 		}
 	}
 	for i, rp := range plan.repos {
-		res.Repos[rp.slug] = decodeRepoBlock(rp, top[repoAlias(i)], at(repoAlias(i)))
+		rr := decodeRepoBlock(rp, top[repoAlias(i)], at(repoAlias(i)))
+		if plan.stats != nil && len(rp.months) > 0 {
+			aliases := make([]string, len(rp.months))
+			for k := range aliases {
+				aliases[k] = repoMergedAlias(i, k)
+			}
+			rr.Merged, rr.StatsErr = decodeCounts(top, aliases, at)
+		}
+		res.Repos[rp.slug] = rr
 	}
 	if plan.stats != nil {
 		res.Stats = decodeStatsPart(top, plan.stats, at)
@@ -218,68 +223,68 @@ func decodeRepoBlock(rp repoPlan, raw json.RawMessage, aliasErr error) repoResul
 		}
 		out.Branches[head] = mapFingerprints(conn.Nodes, true)
 	}
-	if rp.history {
+	if len(rp.months) > 0 {
 		var h *struct {
-			Target *struct {
-				ThisMonth *totalJSON `json:"thisMonth"`
-				LastMonth *totalJSON `json:"lastMonth"`
-			} `json:"target"`
+			Target map[string]*totalJSON `json:"target"`
 		}
 		if err := unmarshalField(fields, "history", &h); err == nil {
-			counts := [2]int{}
-			// An empty repository has no default branch: no commits.
-			if h != nil && h.Target != nil {
-				if t := h.Target.ThisMonth; t != nil {
-					counts[0] = t.TotalCount
-				}
-				if t := h.Target.LastMonth; t != nil {
-					counts[1] = t.TotalCount
+			if _, ok := fields["history"]; ok {
+				// An empty repository has no default branch: no commits.
+				out.Commits = make([]int, len(rp.months))
+				for k := range out.Commits {
+					if h != nil {
+						if t := h.Target[fmt.Sprintf("h%d", k)]; t != nil {
+							out.Commits[k] = t.TotalCount
+						}
+					}
 				}
 			}
-			out.History = &counts
 		}
 	}
 	return out
 }
 
+// decodeCounts reads issueCount from each of the search aliases; any missing one fails
+// them all.
+func decodeCounts(top map[string]json.RawMessage, aliases []string, at func(string) error) ([]int, error) {
+	out := make([]int, len(aliases))
+	for k, a := range aliases {
+		var c *countJSON
+		if err := unmarshalField(top, a, &c); err != nil {
+			return nil, err
+		}
+		if c == nil {
+			return nil, cmpErr(at(a), fmt.Errorf("%s: missing search count", a))
+		}
+		out[k] = c.IssueCount
+	}
+	return out, nil
+}
+
 func decodeStatsPart(top map[string]json.RawMessage, plan *statsPlan, at func(string) error) *statsResult {
 	st := &statsResult{}
-	var this, last *countJSON
-	var recent *struct {
-		IssueCount int `json:"issueCount"`
-		Nodes      []struct {
-			MergedAt   time.Time          `json:"mergedAt"`
-			Repository *nameWithOwnerJSON `json:"repository"`
-		} `json:"nodes"`
+	aliases := make([]string, len(plan.months))
+	for k := range aliases {
+		aliases[k] = monthAlias(k)
 	}
-	err := errors.Join(unmarshalField(top, "mergedThis", &this), unmarshalField(top, "mergedLast", &last),
-		unmarshalField(top, "mergedRecent", &recent))
-	if err == nil && (this == nil || last == nil || recent == nil) {
-		err = cmpErr(at("mergedThis"), at("mergedLast"), at("mergedRecent"), errors.New("missing search counts"))
-	}
+	merged, err := decodeCounts(top, aliases, at)
 	if err != nil {
 		st.Err = fmt.Errorf("decode stats: %w", err)
 		return st
 	}
-	st.MergedThis, st.MergedLast, st.RecentTotal = this.IssueCount, last.IssueCount, recent.IssueCount
-	for _, n := range recent.Nodes {
-		if n.Repository == nil || n.MergedAt.IsZero() {
-			continue
-		}
-		slug, _ := NormalizeSlug(n.Repository.NameWithOwner)
-		st.Recent = append(st.Recent, mergedItem{Repo: slug, MergedAt: n.MergedAt})
-	}
+	st.Merged = merged
 	if plan.login != "" {
-		var u *struct {
-			ThisMonth struct {
-				Total int `json:"totalCommitContributions"`
-			} `json:"thisMonth"`
-			LastMonth struct {
-				Total int `json:"totalCommitContributions"`
-			} `json:"lastMonth"`
+		var u map[string]*struct {
+			Total int `json:"totalCommitContributions"`
 		}
 		if unmarshalField(top, "contributions", &u) == nil && u != nil {
-			st.ContribThis, st.ContribLast, st.HasContrib = u.ThisMonth.Total, u.LastMonth.Total, true
+			st.Contrib = make([]int, len(plan.months))
+			for k := range st.Contrib {
+				if c := u[fmt.Sprintf("c%d", k)]; c != nil {
+					st.Contrib[k] = c.Total
+				}
+			}
+			st.HasContrib = true
 		}
 	}
 	return st

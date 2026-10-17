@@ -10,7 +10,9 @@ import (
 // watched, and due. Every string that comes from outside (search queries, owners, names,
 // branches, ids, times) is a variable; only our own constants (search types, sizes) are
 // written into the text. Aliases: s_<section> for searches, r<i> for repositories with
-// b<j> for watched branches inside, and fixed names for the stats.
+// b<j> for watched branches inside; for the stats (k is the month: 0 current, 1 the one
+// before, ...) m<k> global merged counts, r<i>_m<k> per-repository merged counts,
+// contributions { c<k> }, and history { h<k> } inside r<i>.
 
 // Search sections of the poll, in dashboard order.
 const (
@@ -32,9 +34,6 @@ const (
 	// branch name reused by many people (or a watched default branch) still leaves room
 	// for the viewer's own pull requests; the fingerprint is cheap (~11ms per PR).
 	branchFirst = 25
-	// mergedStatsFirst caps the merged pull requests listed for per-repository merged
-	// counts (two months). Beyond it, per-repository counts are lower bounds.
-	mergedStatsFirst = 100
 )
 
 // searchSection is one dashboard search.
@@ -70,28 +69,52 @@ type repoPlan struct {
 	defaultBranch bool
 	// branches are watched head branches, in alias order (b0, b1, ...).
 	branches []string
-	// history selects the viewer's commit counts on the default branch (stats due).
-	history bool
+	// months selects this repository's stats (stats due, tracked): the viewer's merged
+	// pull requests and default-branch commits in each month, newest first (the current
+	// month, or every month when its closed months are due).
+	months []monthWindow
 }
 
 // statsPlan is the monthly stats part of the poll, included when due.
 type statsPlan struct {
-	this, last monthWindow
+	// all are the statsMonths windows, newest first.
+	all []monthWindow
+	// months are the global months asked for, newest first: the current month, plus the
+	// closed ones when due. Each repository has its own (repoPlan.months).
+	months []monthWindow
 	// login is whose contributions are counted; author is its node id (history).
 	login, author string
 	// me is @me or SearchAs, for the searches.
 	me string
 }
 
-func (st *statsPlan) mergedQuery(w monthWindow) string {
-	return fmt.Sprintf("is:pr is:merged author:%s merged:%s", st.me, w.searchRange())
+// mergedQuery counts the viewer's pull requests merged in w; repo ("owner/name")
+// narrows it to one repository.
+func (st *statsPlan) mergedQuery(w monthWindow, repo string) string {
+	q := fmt.Sprintf("is:pr is:merged author:%s merged:%s", st.me, w.searchRange())
+	if repo != "" {
+		q = "repo:" + repo + " " + q
+	}
+	return q
 }
 
-// recentQuery covers both months: its nodes give the per-repository merged counts.
-func (st *statsPlan) recentQuery() string {
-	return fmt.Sprintf("is:pr is:merged author:%s merged:%s..%s sort:updated-desc", st.me,
-		st.last.Start.Format(searchTimeLayout), st.this.End.Format(searchTimeLayout))
+// closed reports whether the plan asks for any closed month.
+func (st *statsPlan) closed(repos []repoPlan) bool {
+	if len(st.months) > 1 {
+		return true
+	}
+	for _, r := range repos {
+		if len(r.months) > 1 {
+			return true
+		}
+	}
+	return false
 }
+
+func monthAlias(k int) string { return fmt.Sprintf("m%d", k) }
+
+// repoMergedAlias is the top-level alias of plan.repos[i]'s merged count in month k.
+func repoMergedAlias(i, k int) string { return fmt.Sprintf("%s_m%d", repoAlias(i), k) }
 
 // pollPlan is everything one poll asks for.
 type pollPlan struct {
@@ -137,14 +160,24 @@ func (p *pollPlan) build() (string, map[string]any, error) {
 		fmt.Fprintf(&body, "  %s: search(query: %s, type: %s, first: %d) { issueCount nodes { __typename ...%s } }\n",
 			sectionAlias(sec.name), declare("q_"+sec.name, "String!", sec.query), sec.typ, sec.first, frag)
 	}
-	var thisStart, lastStart string
+	// History windows are shared by every repository that asks for them.
+	var since, until []string
 	if p.stats != nil && p.stats.author != "" {
+		var deep []monthWindow
 		for _, r := range p.repos {
-			if r.history {
-				thisStart = declare("hThis", "GitTimestamp!", p.stats.this.Start.Format(time.RFC3339))
-				lastStart = declare("hLast", "GitTimestamp!", p.stats.last.Start.Format(time.RFC3339))
-				declare("author", "ID!", p.stats.author)
-				break
+			if len(r.months) > len(deep) {
+				deep = r.months
+			}
+		}
+		if len(deep) > 0 {
+			declare("author", "ID!", p.stats.author)
+		}
+		for k, w := range deep {
+			since = append(since, declare(fmt.Sprintf("h%ds", k), "GitTimestamp!", w.Start.Format(time.RFC3339)))
+			if k == 0 {
+				until = append(until, "") // the current month runs to now
+			} else {
+				until = append(until, declare(fmt.Sprintf("h%du", k), "GitTimestamp!", w.next().Format(time.RFC3339)))
 			}
 		}
 	}
@@ -159,26 +192,36 @@ func (p *pollPlan) build() (string, map[string]any, error) {
 			fmt.Fprintf(&body, "    %s: pullRequests(headRefName: %s, first: %d, states: [OPEN, MERGED, CLOSED], orderBy: {field: UPDATED_AT, direction: DESC}) { nodes { ...PullRequestFingerprint } }\n",
 				branchAlias(j), declare(a+branchAlias(j), "String!", head), branchFirst)
 		}
-		if r.history && thisStart != "" {
-			fmt.Fprintf(&body, "    history: defaultBranchRef { target { ... on Commit { "+
-				"thisMonth: history(author: {id: $author}, since: %s) { totalCount } "+
-				"lastMonth: history(author: {id: $author}, since: %s, until: %s) { totalCount } } } }\n",
-				thisStart, lastStart, thisStart)
+		if len(r.months) > 0 && len(since) > 0 {
+			body.WriteString("    history: defaultBranchRef { target { ... on Commit {")
+			for k := range r.months {
+				if until[k] == "" {
+					fmt.Fprintf(&body, " h%d: history(author: {id: $author}, since: %s) { totalCount }", k, since[k])
+				} else {
+					fmt.Fprintf(&body, " h%d: history(author: {id: $author}, since: %s, until: %s) { totalCount }", k, since[k], until[k])
+				}
+			}
+			body.WriteString(" } } }\n")
 		}
 		body.WriteString("  }\n")
 	}
 	if st := p.stats; st != nil {
-		fmt.Fprintf(&body, "  mergedThis: search(query: %s, type: ISSUE, first: 0) { issueCount }\n", declare("mergedThis", "String!", st.mergedQuery(st.this)))
-		fmt.Fprintf(&body, "  mergedLast: search(query: %s, type: ISSUE, first: 0) { issueCount }\n", declare("mergedLast", "String!", st.mergedQuery(st.last)))
-		fmt.Fprintf(&body, "  mergedRecent: search(query: %s, type: ISSUE, first: %d) { issueCount nodes { ... on PullRequest { mergedAt repository { nameWithOwner } } } }\n",
-			declare("mergedRecent", "String!", st.recentQuery()), mergedStatsFirst)
+		for k, w := range st.months {
+			fmt.Fprintf(&body, "  %s: search(query: %s, type: ISSUE, first: 0) { issueCount }\n", monthAlias(k), declare(monthAlias(k), "String!", st.mergedQuery(w, "")))
+		}
+		for i, r := range p.repos {
+			for k, w := range r.months {
+				a := repoMergedAlias(i, k)
+				fmt.Fprintf(&body, "  %s: search(query: %s, type: ISSUE, first: 0) { issueCount }\n", a, declare(a, "String!", st.mergedQuery(w, r.slug)))
+			}
+		}
 		if st.login != "" {
-			fmt.Fprintf(&body, "  contributions: user(login: %s) { "+
-				"thisMonth: contributionsCollection(from: %s, to: %s) { totalCommitContributions } "+
-				"lastMonth: contributionsCollection(from: %s, to: %s) { totalCommitContributions } }\n",
-				declare("statsLogin", "String!", st.login),
-				declare("cThisFrom", "DateTime!", st.this.Start.Format(time.RFC3339)), declare("cThisTo", "DateTime!", st.this.End.Format(time.RFC3339)),
-				declare("cLastFrom", "DateTime!", st.last.Start.Format(time.RFC3339)), declare("cLastTo", "DateTime!", st.last.End.Format(time.RFC3339)))
+			fmt.Fprintf(&body, "  contributions: user(login: %s) {", declare("statsLogin", "String!", st.login))
+			for k, w := range st.months {
+				fmt.Fprintf(&body, " c%d: contributionsCollection(from: %s, to: %s) { totalCommitContributions }", k,
+					declare(fmt.Sprintf("c%df", k), "DateTime!", w.Start.Format(time.RFC3339)), declare(fmt.Sprintf("c%dt", k), "DateTime!", w.End.Format(time.RFC3339)))
+			}
+			body.WriteString(" }\n")
 		}
 	}
 	head := "query Poll"
@@ -199,7 +242,15 @@ func (p *pollPlan) summary() []any {
 			tracked++
 		}
 	}
-	return []any{"searches", len(p.sections), "default_branches", tracked, "branches", branches, "stats", p.stats != nil}
+	out := []any{"searches", len(p.sections), "default_branches", tracked, "branches", branches, "stats", p.stats != nil}
+	if p.stats != nil {
+		aliases := len(p.stats.months)
+		for _, r := range p.repos {
+			aliases += len(r.months)
+		}
+		out = append(out, "stats_months", len(p.stats.months), "stats_closed", p.stats.closed(p.repos), "stats_merged_searches", aliases)
+	}
+	return out
 }
 
 // ciRequest asks for the first page of a default branch head's checks.

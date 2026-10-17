@@ -73,7 +73,7 @@ func (s *Store) loadActivity(ctx context.Context, snap *Snapshot) {
 		snap.Dashboard.FetchedAt = snap.Poll.FetchedAt
 	}
 	if f := snap.Dashboard.Stats.FetchedAt; !f.IsZero() {
-		s.statsNext = f.Add(s.opts.StatsInterval)
+		s.statsNext = s.nextStatsAt(f)
 	}
 }
 

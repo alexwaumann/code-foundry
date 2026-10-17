@@ -120,7 +120,11 @@ func (s *Store) MergePullRequest(ctx context.Context, slug string, number int, r
 	s.log.Info("gh pull request merged", "pr", k.String(), "method", r.Method, "merged", res.Merged,
 		"sha", res.SHA, "branch_deleted", res.BranchDeleted)
 	s.invalidateFull(k)
-	// The dashboards move it to recently merged: poll soon.
+	// The dashboards move it to recently merged, and this month's merged count grows:
+	// poll soon, with the current month's stats.
+	if res.Merged {
+		s.statsDueNow("merged", "pr", k.String())
+	}
 	s.pollSoon()
 	return res, nil
 }

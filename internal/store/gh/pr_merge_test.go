@@ -18,7 +18,7 @@ import (
 // a fork, #5 open on a branch whose name needs escaping, #6 open from the default
 // branch (main) into release, #7 open with release as head and base. All on o/r,
 // whose default branch is main.
-func mergeWorld(t *testing.T) (*fakeGitHub, *fakeWriter, *Store, *testClock, *bus.Subscription[PullRequestDetailUpdated]) {
+func mergeWorld(t *testing.T, opt ...func(*Options)) (*fakeGitHub, *fakeWriter, *Store, *testClock, *bus.Subscription[PullRequestDetailUpdated]) {
 	t.Helper()
 	g := newFakeGitHub()
 	t0 := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
@@ -48,6 +48,9 @@ func mergeWorld(t *testing.T) (*fakeGitHub, *fakeWriter, *Store, *testClock, *bu
 	events := bus.Subscribe[PullRequestDetailUpdated](b, 64)
 	opts := testOptions(openTestDB(t), w, b)
 	opts.Now = clk.now
+	for _, o := range opt {
+		o(&opts)
+	}
 	return g, w, startStore(t, opts), clk, events
 }
 

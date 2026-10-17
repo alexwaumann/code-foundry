@@ -1,7 +1,6 @@
 package gh
 
 import (
-	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -26,7 +25,8 @@ import (
 //     Check count changes alone are applied from the fingerprint.
 //  3. One request for the failing checks of default branches whose head or failure
 //     count changed, only when they have failures.
-//  4. Two REST commit searches when the stats are due.
+//  4. REST commit searches when the stats are due: one per month asked for (the
+//     current month every StatsInterval, the closed ones every HistoryInterval).
 //
 // Then the snapshot is updated and events go out only for what changed, plus Polled.
 
@@ -43,6 +43,9 @@ const mergeableRechecks = 3
 // cycleStats counts one poll's requests for the debug log.
 type cycleStats struct {
 	requests, cost, details int
+	// pollDur is the poll request's time (stats included when due; callDoc sets it);
+	// statsDur is applyStats' (the REST commit searches).
+	pollDur, statsDur time.Duration
 }
 
 // poll runs one poll. Its error is the fingerprint request's (the parts that follow log
@@ -60,8 +63,12 @@ func (s *Store) poll(ctx context.Context) error {
 		next := s.pollNext.Sub(end)
 		s.mu.Unlock()
 		attrs := append([]any{"requests", s.cycle.requests, "cost", s.cycle.cost, "details", s.cycle.details,
-			"dur", end.Sub(start).Round(time.Millisecond).String(), "tier", s.presence().String(),
+			"dur", end.Sub(start).Round(time.Millisecond).String(), "poll_dur", s.cycle.pollDur.Round(time.Millisecond).String(),
+			"tier", s.presence().String(),
 			"next_in", max(0, next).Round(time.Second).String()}, plan.summary()...)
+		if plan.stats != nil {
+			attrs = append(attrs, "stats_dur", s.cycle.statsDur.Round(time.Millisecond).String())
+		}
 		if err != nil {
 			attrs = append(attrs, "err", err)
 		}
@@ -126,10 +133,13 @@ func (s *Store) planPoll(cfg Config, now time.Time) (pollPlan, bool) {
 		}
 	}
 	author := s.authorID()
+	var windows []monthWindow
+	snap := s.Snapshot()
 	switch {
 	case statsDue && author != "":
-		this, last := monthWindows(now)
-		plan.stats = &statsPlan{this: this, last: last, login: s.viewerLogin(), author: author, me: s.searchLogin()}
+		windows = monthWindows(now, statsMonths)
+		plan.stats = &statsPlan{all: windows, months: s.statsMonthsFor(snap.Dashboard.Stats, windows, now),
+			login: s.viewerLogin(), author: author, me: s.searchLogin()}
 	case statsDue:
 		plan.statsDeferred = true
 	}
@@ -146,12 +156,62 @@ func (s *Store) planPoll(cfg Config, now time.Time) (pollPlan, bool) {
 	slices.Sort(slugs)
 	for _, slug := range slugs {
 		slices.Sort(heads[slug])
-		plan.repos = append(plan.repos, repoPlan{
-			slug: slug, defaultBranch: isTracked[slug], branches: heads[slug],
-			history: plan.stats != nil && isTracked[slug],
-		})
+		rp := repoPlan{slug: slug, defaultBranch: isTracked[slug], branches: heads[slug]}
+		if plan.stats != nil && isTracked[slug] {
+			rp.months = s.statsMonthsFor(snap.Repos[slug].Activity.Stats, windows, now)
+		}
+		plan.repos = append(plan.repos, rp)
 	}
 	return plan, len(tracked) == 0 && len(heads) == 0
+}
+
+// statsMonthsFor picks the months a stats poll asks for, given what st holds: every
+// month when its closed months are due (closedDue), else the current one.
+func (s *Store) statsMonthsFor(st MonthlyStats, windows []monthWindow, now time.Time) []monthWindow {
+	if closedDue(st, windows, now, s.opts.HistoryInterval) {
+		return windows
+	}
+	return windows[:1]
+}
+
+// nextStatsAt is when the current month's stats are next due after a fetch at t:
+// StatsInterval later, or when the next month starts if that is sooner.
+func (s *Store) nextStatsAt(t time.Time) time.Time {
+	next := t.Add(s.opts.StatsInterval)
+	if m := monthWindows(t, 1)[0].next(); m.Before(next) {
+		return m
+	}
+	return next
+}
+
+// statsDueNow makes the next poll carry the current month's stats (a merge went
+// through or was observed). The closed months keep their own schedule.
+func (s *Store) statsDueNow(reason string, attrs ...any) {
+	if s.opts.StatsInterval < 0 {
+		return
+	}
+	s.mu.Lock()
+	s.statsNext = s.opts.Now()
+	s.mu.Unlock()
+	s.log.Debug("gh stats due", append([]any{"reason", reason}, attrs...)...)
+}
+
+// mergeObserved returns a pull request login authored that is in now's recently merged
+// list but not in prev's and merged in the current month (or of unknown merge time).
+func mergeObserved(prev, now []PullRequest, login string, month monthWindow) (PullRequest, bool) {
+	seen := make(map[string]bool, len(prev))
+	for _, p := range prev {
+		seen[p.ID] = true
+	}
+	for _, p := range now {
+		if seen[p.ID] || (login != "" && !strings.EqualFold(p.Author, login)) {
+			continue
+		}
+		if p.MergedAt.IsZero() || month.contains(p.MergedAt) {
+			return p, true
+		}
+	}
+	return PullRequest{}, false
 }
 
 // authorID is the node id commit history is filtered by: the viewer's, or SearchAs's
@@ -348,6 +408,15 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 	if stats != nil {
 		newDash.Stats = *stats
 	}
+	// A merge of the viewer's this month moves the current month's counts: the next
+	// poll brings them (this one already did when it carried stats). The first poll
+	// has no previous list to compare with.
+	if plan.stats == nil && len(plan.sections) > 0 && res.Sections[sectionMerged].Err == nil &&
+		!snap.Dashboard.FetchedAt.IsZero() && !snap.Dashboard.Disabled {
+		if p, ok := mergeObserved(snap.Dashboard.RecentlyMerged, newDash.RecentlyMerged, login, monthWindows(now, 1)[0]); ok {
+			s.statsDueNow("merge observed", "pr", fmt.Sprintf("%s#%d", p.Repo, p.Number))
+		}
+	}
 	dashChanged := !sameDashboard(snap.Dashboard, newDash)
 
 	type branchUpdate struct {
@@ -395,11 +464,18 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 	})
 	slices.Sort(repoChanged)
 
-	// The stats row is written whenever stats were fetched: its time schedules them
+	// Stats rows are written whenever stats were fetched: their times schedule them
 	// after a restart.
 	if stats != nil && stats.LastError == "" {
 		if err := s.cache.saveActivity(ctx, activityStats, stats.FetchedAt, *stats); err != nil {
 			s.log.Warn("gh cache write failed", "err", err)
+		}
+	}
+	for _, slug := range slices.Sorted(maps.Keys(repoStats)) {
+		if st := repoStats[slug]; st.LastError == "" {
+			if err := s.cache.saveActivity(ctx, activityRepoStats+slug, st.FetchedAt, st); err != nil {
+				s.log.Warn("gh cache write failed", "err", err)
+			}
 		}
 	}
 	if dashChanged {
@@ -412,11 +488,6 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 		a := s.Snapshot().Repos[slug].Activity
 		if err := s.cache.saveActivity(ctx, activityDefaultBranch+slug, now, a.DefaultBranch); err != nil {
 			s.log.Warn("gh cache write failed", "err", err)
-		}
-		if _, ok := repoStats[slug]; ok {
-			if err := s.cache.saveActivity(ctx, activityRepoStats+slug, now, a.Stats); err != nil {
-				s.log.Warn("gh cache write failed", "err", err)
-			}
 		}
 		publish(s, RepoActivityUpdated{Slug: slug, FetchedAt: now})
 	}
@@ -652,9 +723,11 @@ func (s *Store) fetchFailing(ctx context.Context, reqs []ciRequest, cis map[stri
 
 // applyStats turns the poll's stats part (and the REST commit searches) into the
 // global stats, which it returns, and per-repository stats, which it adds to repoStats.
+// The months asked for replace the held ones; the others (closed months not due) stay.
 func (s *Store) applyStats(ctx context.Context, cfg Config, plan *pollPlan, res *pollResult, snap *Snapshot, repoStats map[string]MonthlyStats) *MonthlyStats {
 	sp, st := plan.stats, res.Stats
-	now := s.opts.Now()
+	start := s.opts.Now()
+	defer func() { s.cycle.statsDur = s.opts.Now().Sub(start) }()
 	if st == nil || st.Err != nil {
 		err := errors.New("no stats in the response")
 		if st != nil {
@@ -662,77 +735,65 @@ func (s *Store) applyStats(ctx context.Context, cfg Config, plan *pollPlan, res 
 		}
 		s.mu.Lock()
 		s.statsFailures++
-		s.statsNext = now.Add(backoff(cfg.PollInterval, s.opts.MaxBackoff, s.statsFailures, s.opts.Rand()))
+		s.statsNext = start.Add(backoff(cfg.PollInterval, s.opts.MaxBackoff, s.statsFailures, s.opts.Rand()))
 		s.mu.Unlock()
 		s.log.Warn("gh stats failed", "err", err)
 		g := snap.Dashboard.Stats
 		g.LastError = err.Error()
 		return &g
 	}
-	global := MonthlyStats{
-		ThisMonth:     MonthCount{Month: sp.this.Label, Merged: st.MergedThis, Commits: st.ContribThis},
-		LastMonth:     MonthCount{Month: sp.last.Label, Merged: st.MergedLast, Commits: st.ContribLast},
-		CommitsSource: CommitsFromContributions,
+	fresh := make([]MonthCount, len(sp.months))
+	for k, w := range sp.months {
+		fresh[k] = MonthCount{Month: w.Label, Merged: st.Merged[k]}
+		if st.HasContrib {
+			fresh[k].Commits, fresh[k].Source = st.Contrib[k], CommitsFromContributions
+		}
 	}
 	// REST search/commits counts commits by author date in our time zone, which
-	// contributionsCollection cannot (it buckets by UTC day). Prefer it when it works.
+	// contributionsCollection cannot (it buckets by UTC day). Prefer it when it works;
+	// after a failure the remaining months keep the contributions counts.
 	if rr, ok := s.opts.Runner.(RESTRunner); ok {
-		me := sp.me
-		ct, err1 := s.searchCommits(ctx, rr, fmt.Sprintf("author:%s author-date:%s", me, sp.this.searchRange()))
-		var cl int
-		var err2 error
-		if err1 == nil {
-			cl, err2 = s.searchCommits(ctx, rr, fmt.Sprintf("author:%s author-date:%s", me, sp.last.searchRange()))
-		}
-		if err := cmp.Or(err1, err2); err != nil {
-			if ctx.Err() == nil {
-				s.log.Warn("gh commit search failed; using contributions", "err", err)
+		for k, w := range sp.months {
+			n, err := s.searchCommits(ctx, rr, fmt.Sprintf("author:%s author-date:%s", sp.me, w.searchRange()))
+			if err != nil {
+				if ctx.Err() == nil {
+					s.log.Warn("gh commit search failed; using contributions", "month", w.Label, "err", err)
+				}
+				break
 			}
-		} else {
-			global.ThisMonth.Commits, global.LastMonth.Commits, global.CommitsSource = ct, cl, CommitsFromSearch
+			fresh[k].Commits, fresh[k].Source = n, CommitsFromSearch
 		}
 	}
-	if !st.HasContrib && global.CommitsSource == CommitsFromContributions {
-		global.CommitsSource = ""
+	fetched := s.opts.Now()
+	merge := func(prev MonthlyStats, fresh []MonthCount) MonthlyStats {
+		out := MonthlyStats{Months: mergeMonths(sp.all, prev, fresh), FetchedAt: fetched, ClosedAt: prev.ClosedAt}
+		if len(fresh) > 1 {
+			out.ClosedAt = fetched
+		}
+		out.CommitsSource = commitsSource(out.Months)
+		return out
 	}
-	global.FetchedAt = s.opts.Now()
-	if st.RecentTotal > len(st.Recent) {
-		s.log.Info("gh merged pull requests exceed the stats list; per-repository merged counts are lower bounds",
-			"total", st.RecentTotal, "listed", len(st.Recent))
-	}
+	global := merge(snap.Dashboard.Stats, fresh)
 	for _, rp := range plan.repos {
-		if !rp.history {
+		if len(rp.months) == 0 {
 			continue
 		}
 		rr := res.Repos[rp.slug]
 		prev := snap.Repos[rp.slug].Activity.Stats
-		if rr.History == nil {
-			prev.LastError = cmpErr(rr.Err, errors.New("no commit history in the response")).Error()
+		if rr.Commits == nil || rr.Merged == nil {
+			prev.LastError = cmpErr(rr.Err, rr.StatsErr, errors.New("no commit history in the response")).Error()
 			repoStats[rp.slug] = prev
 			continue
 		}
-		rs := MonthlyStats{
-			ThisMonth:     MonthCount{Month: sp.this.Label, Commits: rr.History[0]},
-			LastMonth:     MonthCount{Month: sp.last.Label, Commits: rr.History[1]},
-			CommitsSource: CommitsFromSearch,
-			FetchedAt:     global.FetchedAt,
+		counts := make([]MonthCount, len(rp.months))
+		for k, w := range rp.months {
+			counts[k] = MonthCount{Month: w.Label, Commits: rr.Commits[k], Merged: rr.Merged[k], Source: CommitsFromSearch}
 		}
-		for _, m := range st.Recent {
-			if m.Repo != rp.slug {
-				continue
-			}
-			switch {
-			case sp.this.contains(m.MergedAt):
-				rs.ThisMonth.Merged++
-			case sp.last.contains(m.MergedAt):
-				rs.LastMonth.Merged++
-			}
-		}
-		repoStats[rp.slug] = rs
+		repoStats[rp.slug] = merge(prev, counts)
 	}
 	s.mu.Lock()
 	s.statsFailures = 0
-	s.statsNext = now.Add(s.opts.StatsInterval)
+	s.statsNext = s.nextStatsAt(start)
 	s.mu.Unlock()
 	return &global
 }
@@ -768,10 +829,11 @@ func sameJSON(a, b any) bool {
 	return err1 == nil && err2 == nil && string(x) == string(y)
 }
 
-// sameDashboard compares everything clients see except FetchedAt.
+// sameDashboard compares everything clients see except the fetch times.
 func sameDashboard(a, b Dashboard) bool {
 	a.FetchedAt, b.FetchedAt = time.Time{}, time.Time{}
 	a.Stats.FetchedAt, b.Stats.FetchedAt = time.Time{}, time.Time{}
+	a.Stats.ClosedAt, b.Stats.ClosedAt = time.Time{}, time.Time{}
 	return a.LastError == b.LastError && a.Disabled == b.Disabled && a.Stats.LastError == b.Stats.LastError &&
 		sameJSON(a, b) && sameJSON(a.Stats, b.Stats)
 }
@@ -782,9 +844,10 @@ func sameBranchCI(a, b BranchCI) bool {
 	return a.LastError == b.LastError && sameJSON(a, b)
 }
 
-// sameStats compares everything but FetchedAt.
+// sameStats compares everything but the fetch times.
 func sameStats(a, b MonthlyStats) bool {
 	a.FetchedAt, b.FetchedAt = time.Time{}, time.Time{}
+	a.ClosedAt, b.ClosedAt = time.Time{}, time.Time{}
 	return a.LastError == b.LastError && sameJSON(a, b)
 }
 
