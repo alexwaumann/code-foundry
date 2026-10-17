@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import type { AgentRunView, SessionEventView, SessionView, UsageBucketView } from "@/api/session";
-import { sessionBadge } from "@/lib/session";
+import type { AgentRunView, SessionEventView, SessionView, UsageBucketView } from "@/api/threads";
+import { sessionBadge } from "@/lib/thread";
 
 export interface SessionsData {
   byId: Readonly<Record<string, SessionView>>;

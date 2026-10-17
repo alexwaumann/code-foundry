@@ -14,7 +14,7 @@ import { NavProvider, NavRow } from "@/lib/NavRow";
 import { cn } from "@/lib/utils";
 import { openUrl, pullRequestDetailResource, pullRequestKey } from "@/stores/gh";
 import { copyPullRequestLink, openPullRequestInPanel } from "@/stores/prPanel";
-import { useSessionsStore } from "@/stores/sessions";
+import { useSessionsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { linkedCount, newestFirst, spansRepos, urlHost } from "@/surfaces/linkedprsTarget";
 

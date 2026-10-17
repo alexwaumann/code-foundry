@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { Bot } from "lucide-react";
 import { AgentsSurface } from "@/components/agents/AgentsSurface";
 import { useReposStore } from "@/stores/repos";
-import { useSessionsStore } from "@/stores/sessions";
+import { useSessionsStore } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
 import { AGENTS_KIND, AGENTS_TITLE, agentsTab, selectionAgentsThread } from "./agentsTarget";
 import type { SurfaceSpec } from "./types";

@@ -3,10 +3,10 @@
  * linked pull requests (availability), the tab, and the list's order and labels. Pure:
  * callers feed it the stores' current state.
  */
-import type { LinkedPullRequestView } from "@/api/session";
+import type { LinkedPullRequestView } from "@/api/threads";
 import { makeTab, type Tab } from "@/stores/panel";
 import type { ReposData } from "@/stores/repos";
-import type { SessionsData } from "@/stores/sessions";
+import type { SessionsData } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
 
 export const LINKED_PRS_KIND = "linkedprs";

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
-import { SessionStatusIcon } from "@/components/session/SessionStatusIcon";
-import { badgeLabels, sessionBadge } from "@/lib/session";
-import { useSessionsStore } from "@/stores/sessions";
+import { SessionStatusIcon } from "@/components/thread/ThreadStatusIcon";
+import { badgeLabels, sessionBadge } from "@/lib/thread";
+import { useSessionsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 
 /**

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { SessionView } from "@/api/session";
+import type { SessionView } from "@/api/threads";
 import type { SettingsSnapshotView } from "@/api/settings";
 import {
   alertSettings,
@@ -12,7 +12,7 @@ import {
   type DockAlertsState,
   type DockEffect,
 } from "./dockAlerts";
-import { applySessionEvent, attentionIds, emptySessions, replaceSessions, useSessionsStore } from "./sessions";
+import { applySessionEvent, attentionIds, emptySessions, replaceSessions, useSessionsStore } from "./threads";
 import { useSettingsStore } from "./settings";
 
 const on: AlertSettings = { dockBadge: true, bounce: true, sound: false, soundVolume: 50, cooldownMs: 60_000 };

@@ -9,7 +9,7 @@ import { composeIn, composeInWorkspace, composeNoProject } from "@/stores/compos
 import { addProject } from "@/stores/projectActions";
 import { getUiContext } from "@/stores/context";
 import { useReposStore } from "@/stores/repos";
-import { useSessionsStore } from "@/stores/sessions";
+import { useSessionsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
 

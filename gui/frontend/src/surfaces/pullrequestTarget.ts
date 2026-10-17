@@ -9,7 +9,7 @@ import { deriveContext } from "@/stores/context";
 import { makeTab, type Tab } from "@/stores/panel";
 import { findWorktree, type ReposData } from "@/stores/repos";
 import type { ResourceEntry } from "@/stores/resource";
-import type { SessionsData } from "@/stores/sessions";
+import type { SessionsData } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
 
 export const PULL_REQUEST_KIND = "pullrequest";

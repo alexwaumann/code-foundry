@@ -1,9 +1,9 @@
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { AgentRunView } from "@/api/agents";
-import type { SessionView } from "@/api/session";
+import type { SessionView } from "@/api/threads";
 import { useCommandsStore } from "@/stores/commands";
-import { useSessionsStore } from "@/stores/sessions";
+import { useSessionsStore } from "@/stores/threads";
 import { useThreadStore } from "@/stores/thread";
 import { AgentsStrip } from "./AgentsStrip";
 

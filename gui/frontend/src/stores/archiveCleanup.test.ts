@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { SessionView } from "@/api/session";
+import type { SessionView } from "@/api/threads";
 import { newlyArchived, newlyRemoved, newlySnoozed, putAwaySelected, startArchiveCleanup } from "./archiveCleanup";
 import { useBottomStore } from "./bottomPanel";
 import { emptyEntry, makeTab, usePanelStore } from "./panel";
-import { applySessionEvent, emptySessions, replaceSessions, useSessionsStore } from "./sessions";
+import { applySessionEvent, emptySessions, replaceSessions, useSessionsStore } from "./threads";
 import { DASHBOARD, useUiStore, type Selection } from "./ui";
 
 const session = (id: string, archivedAtMs: number | null = null, snoozedUntilMs: number | null = null) =>

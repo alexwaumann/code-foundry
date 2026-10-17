@@ -7,7 +7,7 @@
  */
 import { isNoProject } from "@/lib/threadRow";
 import { useReposStore, type ReposData } from "@/stores/repos";
-import { useSessionsStore, type SessionsData } from "@/stores/sessions";
+import { useSessionsStore, type SessionsData } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
 import type { Subscribable } from "./types";
 

@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const openUrl = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 vi.mock("@/stores/gh", () => ({ openUrl }));
 const readAttachment = vi.hoisted(() => vi.fn(() => Promise.resolve(null)));
-vi.mock("@/api/session", () => ({ readAttachment }));
+vi.mock("@/api/threads", () => ({ readAttachment }));
 
 const { ThreadMarkdown } = await import("./Code");
 

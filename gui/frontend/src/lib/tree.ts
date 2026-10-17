@@ -10,7 +10,7 @@
  * status-text updates). The placement helper (which worktree a thread sits in) is here too;
  * the command context uses it.
  */
-import type { ThreadGroup } from "./session";
+import type { ThreadGroup } from "./thread";
 
 export interface WorktreeRef {
   repoId: string;

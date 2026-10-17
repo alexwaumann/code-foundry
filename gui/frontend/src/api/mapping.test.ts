@@ -29,7 +29,7 @@ import { overrideEndpoint } from "./endpoint";
 import { toEventView } from "./events";
 import { toGhEventView, toPullRequestDetailView, toPullRequestView, toReviewerCandidateView } from "./gh";
 import { isRemoteless, toRepoEventView, toRepoView } from "./repo";
-import { toSessionEventView, toSessionView } from "./session";
+import { toSessionEventView, toSessionView } from "./threads";
 import { toAttachEventView, toTerminalEventView, toTerminalView } from "./terminal";
 import { toUiIntentView } from "./ui";
 import { toWorkspaceEventView } from "./workspace";

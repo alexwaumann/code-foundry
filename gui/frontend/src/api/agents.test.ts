@@ -4,7 +4,7 @@ import { timestampFromMs } from "@bufbuild/protobuf/wkt";
 import { ThreadSchema } from "@/gen/codefoundry/v1/thread_lifecycle_pb";
 import { ThreadAgentRunSchema, ThreadAgentStatus, ThreadEventSchema } from "@/gen/codefoundry/v1/thread_pb";
 import { toAgentRunView } from "./agents";
-import { toSessionView } from "./session";
+import { toSessionView } from "./threads";
 import { toThreadEventView } from "./thread";
 
 describe("toAgentRunView", () => {

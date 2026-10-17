@@ -2,7 +2,7 @@ import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { BranchPullRequestsView, PullRequestView } from "@/api/gh";
 import type { RepoView, WorktreeView } from "@/api/repo";
-import type { SessionView } from "@/api/session";
+import type { SessionView } from "@/api/threads";
 
 const getBranchPullRequests = vi.hoisted(() => vi.fn());
 vi.mock("@/api/gh", async (orig) => ({ ...(await orig<typeof import("@/api/gh")>()), getBranchPullRequests }));
@@ -10,7 +10,7 @@ vi.mock("@/api/gh", async (orig) => ({ ...(await orig<typeof import("@/api/gh")>
 const { SidePanel } = await import("@/components/panel/SidePanel");
 const { usePanelStore } = await import("@/stores/panel");
 const { useReposStore } = await import("@/stores/repos");
-const { useSessionsStore } = await import("@/stores/sessions");
+const { useSessionsStore } = await import("@/stores/threads");
 const { useUiStore } = await import("@/stores/ui");
 const { useViewsStore } = await import("@/stores/views");
 const { pullRequestSurface } = await import("./pullrequest");

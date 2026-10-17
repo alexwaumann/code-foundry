@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { RepoView } from "@/api/repo";
-import type { SessionView } from "@/api/session";
+import type { SessionView } from "@/api/threads";
 import type { ReposData } from "@/stores/repos";
-import type { SessionsData } from "@/stores/sessions";
+import type { SessionsData } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
 import {
   memberOfTab,

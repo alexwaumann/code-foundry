@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PullRequestDetailView, PullRequestView } from "@/api/gh";
-import type { LinkedPullRequestView, SessionView } from "@/api/session";
+import type { LinkedPullRequestView, SessionView } from "@/api/threads";
 
 // Details resolve per test (pending until then: the rows show their skeleton).
 const pending = new Map<string, (d: PullRequestDetailView) => void>();
@@ -15,7 +15,7 @@ const { SidePanel } = await import("@/components/panel/SidePanel");
 const { pullRequestDetailResource } = await import("@/stores/gh");
 const { getPanel, usePanelStore } = await import("@/stores/panel");
 const { useReposStore } = await import("@/stores/repos");
-const { useSessionsStore } = await import("@/stores/sessions");
+const { useSessionsStore } = await import("@/stores/threads");
 const { useUiStore } = await import("@/stores/ui");
 const { linkedPrsPanelCommand, showView, useViewsStore } = await import("@/stores/views");
 

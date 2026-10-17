@@ -6,7 +6,7 @@ import { useNav, type NavItem } from "@/lib/nav";
 import { NavProvider } from "@/lib/NavRow";
 import { memberKey } from "@/lib/projects";
 import { useCurrentPanelKey } from "@/stores/panel";
-import { useSessionsStore } from "@/stores/sessions";
+import { useSessionsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { openMemberTab } from "@/stores/workspacePanel";
 import { useWorkspacesStore } from "@/stores/workspaces";

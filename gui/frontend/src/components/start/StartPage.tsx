@@ -4,8 +4,8 @@ import { useShallow } from "zustand/react/shallow";
 import { Backdrop } from "@/components/backdrop/Backdrop";
 import { CommandButton } from "@/components/command/CommandButton";
 import { DragBand } from "@/components/window/DragBand";
-import { SessionLink } from "@/components/session/SessionLink";
-import { useNoProjectThread } from "@/components/session/useNoProject";
+import { SessionLink } from "@/components/thread/ThreadLink";
+import { useNoProjectThread } from "@/components/thread/useNoProject";
 import { greeting } from "@/lib/greeting";
 import { NO_PROJECT } from "@/lib/threadRow";
 import { placeSession } from "@/lib/tree";
@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { decodeRepoKeys, useRepoStructureKeys } from "@/stores/context";
 import { useReposStore } from "@/stores/repos";
 import { openHelp } from "@/stores/views";
-import { activeThreadIds, attentionIds, isAttention, runningCount, useSessionsStore } from "@/stores/sessions";
+import { activeThreadIds, attentionIds, isAttention, runningCount, useSessionsStore } from "@/stores/threads";
 
 /** Rows in the start page's thread list before "+N more". */
 const MAX_THREADS = 6;

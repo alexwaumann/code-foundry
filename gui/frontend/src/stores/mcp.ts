@@ -12,7 +12,7 @@ import { useShallow } from "zustand/react/shallow";
 import { getMcpStatus, type McpServerView, type McpStatusView } from "@/api/mcp";
 import { errorMessage } from "@/api/stream";
 import { runCommandForResult } from "./commands";
-import { sessionContext } from "./sessionActions";
+import { sessionContext } from "./threadActions";
 import { useThreadStore } from "./thread";
 
 export const MCP_COMMANDS = { status: "thread.mcp", reconnect: "thread.mcp-reconnect" } as const;

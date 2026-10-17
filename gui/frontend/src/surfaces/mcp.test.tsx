@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { McpServerView, McpStatusView } from "@/api/mcp";
-import type { SessionView } from "@/api/session";
+import type { SessionView } from "@/api/threads";
 
 const toast = vi.hoisted(() => Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), info: vi.fn() }));
 vi.mock("sonner", () => ({ toast }));
@@ -13,7 +13,7 @@ vi.mock("@/api/mcp", async (orig) => ({ ...(await orig<typeof import("@/api/mcp"
 const { SidePanel } = await import("@/components/panel/SidePanel");
 const { getPanel, usePanelStore } = await import("@/stores/panel");
 const { useReposStore } = await import("@/stores/repos");
-const { useSessionsStore } = await import("@/stores/sessions");
+const { useSessionsStore } = await import("@/stores/threads");
 const { useThreadStore } = await import("@/stores/thread");
 const { useUiStore } = await import("@/stores/ui");
 const { mcpPanelCommand, showView, useViewsStore } = await import("@/stores/views");

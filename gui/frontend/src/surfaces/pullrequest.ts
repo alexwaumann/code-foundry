@@ -5,7 +5,7 @@ import { COPY_LINK_CHORD } from "@/components/pr/keys";
 import { branchKey, branchPullRequestsResource } from "@/stores/gh";
 import { copyPullRequestLink } from "@/stores/prPanel";
 import { useReposStore } from "@/stores/repos";
-import { useSessionsStore } from "@/stores/sessions";
+import { useSessionsStore } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
 import { PULL_REQUEST_KIND, prRefOfTab, pullRequestTab, selectionBranch, selectionPullRequest, type PrRef } from "./pullrequestTarget";
 import { noProjectNow } from "./noProject";

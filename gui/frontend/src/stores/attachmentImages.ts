@@ -6,7 +6,7 @@
  * chip that mounts asks again.
  */
 import { useEffect, useState } from "react";
-import { readAttachment } from "@/api/session";
+import { readAttachment } from "@/api/threads";
 
 type Entry = { url: string | null; done: boolean; wait: Promise<string | null> };
 

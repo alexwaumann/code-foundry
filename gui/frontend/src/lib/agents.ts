@@ -5,7 +5,7 @@
  * structural sharing so a progress update re-renders only the row whose run changed.
  */
 import type { AgentRunView } from "@/api/agents";
-import { formatAgo } from "./session";
+import { formatAgo } from "./thread";
 
 /** The run's name: the Agent call's description, else its type. */
 export function agentName(r: Pick<AgentRunView, "description" | "agentType">): string {

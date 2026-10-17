@@ -9,7 +9,7 @@ import { buildSections, FOOTERS, isSessionRow, rowCache, sessionKey, type Footer
 import { zoomFactor } from "@/lib/zoom";
 import { decodeSessionListKeys, useSessionListKeys } from "@/stores/context";
 import { useEventsStore } from "@/stores/events";
-import { useSessionsStore } from "@/stores/sessions";
+import { useSessionsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { useRowHeight } from "@/stores/settings";
 import { RowMenu } from "./RowMenu";

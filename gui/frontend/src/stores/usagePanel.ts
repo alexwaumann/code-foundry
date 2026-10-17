@@ -5,7 +5,7 @@
 import { selectionUsageThread, usageTab } from "@/surfaces/usageTarget";
 import { keyOf, openSurface } from "./panel";
 import { useReposStore } from "./repos";
-import { useSessionsStore } from "./sessions";
+import { useSessionsStore } from "./threads";
 import { useUiStore, type Selection } from "./ui";
 
 /**

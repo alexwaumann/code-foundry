@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PullRequestView } from "@/api/gh";
 import type { GitStatusView, RepoView, WorktreeView } from "@/api/repo";
-import type { SessionView } from "@/api/session";
+import type { SessionView } from "@/api/threads";
 import type { TerminalView } from "@/api/terminal";
 import type { FileChangeView, LogEntryView, WorktreeDetailView } from "@/api/worktreeDetail";
 
@@ -19,7 +19,7 @@ vi.mock("@/stores/gh", async (orig) => ({ ...(await orig<typeof import("@/stores
 
 const { WorktreePanelView } = await import("./WorktreeOverview");
 const { useReposStore } = await import("@/stores/repos");
-const { useSessionsStore } = await import("@/stores/sessions");
+const { useSessionsStore } = await import("@/stores/threads");
 const { useTerminalsStore } = await import("@/stores/terminals");
 const { useUiStore } = await import("@/stores/ui");
 

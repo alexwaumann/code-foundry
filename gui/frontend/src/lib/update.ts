@@ -1,5 +1,5 @@
 import type { UpdateStatusView } from "@/api/update";
-import type { CutOff } from "./session";
+import type { CutOff } from "./thread";
 
 interface Semver {
   core: [number, number, number];

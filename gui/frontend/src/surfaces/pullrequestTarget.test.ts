@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { BranchPullRequestsView, PullRequestView } from "@/api/gh";
 import type { RepoView, WorktreeView } from "@/api/repo";
-import type { SessionView } from "@/api/session";
+import type { SessionView } from "@/api/threads";
 import type { ResourceEntry } from "@/stores/resource";
 import type { Selection } from "@/stores/ui";
 import { pickPullRequest, prRefOfTab, pullRequestTab, selectionPullRequest, type SelectionStores } from "./pullrequestTarget";

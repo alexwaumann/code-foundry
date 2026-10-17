@@ -3,8 +3,8 @@
  * doing or waiting on, in words and a colour, and whether "project @ branch" follows.
  * Pure, over the session view; the row renders it (components/sidebar/SidebarRow.tsx).
  */
-import type { SessionView } from "@/api/session";
-import { formatAgo, sessionBadge, statusKind, statusNote } from "./session";
+import type { SessionView } from "@/api/threads";
+import { formatAgo, sessionBadge, statusKind, statusNote } from "./thread";
 
 /**
  * - "place": just "project @ branch" (idle, unknown; whether Claude's process runs never shows)

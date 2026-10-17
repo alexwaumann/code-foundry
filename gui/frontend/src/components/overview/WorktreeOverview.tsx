@@ -19,7 +19,7 @@ import { openPullRequestInPanel } from "@/stores/prPanel";
 import { openPublishDialog } from "@/stores/publish";
 import { findWorktree, useReposStore } from "@/stores/repos";
 import { useResource } from "@/stores/resource";
-import { useSessionsStore } from "@/stores/sessions";
+import { useSessionsStore } from "@/stores/threads";
 import { useTerminalsStore } from "@/stores/terminals";
 import { useUiStore } from "@/stores/ui";
 import { detailKey, worktreeDetailResource } from "@/stores/worktreeDetail";

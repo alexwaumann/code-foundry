@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import type { SessionView } from "@/api/session";
+import type { SessionView } from "@/api/threads";
 import type { TerminalView } from "@/api/terminal";
 import { useBottomStore } from "./bottomPanel";
 import { decodeSessionListKeys, deriveContext, encodeSessionListKey, getListOptions, getListSessions, getUiContext } from "./context";
 import { useReposStore } from "./repos";
-import { useSessionsStore } from "./sessions";
+import { useSessionsStore } from "./threads";
 import { useTerminalsStore } from "./terminals";
 import { useUiStore } from "./ui";
 

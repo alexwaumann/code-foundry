@@ -1,12 +1,12 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { AgentRunView } from "@/api/agents";
-import type { SessionView } from "@/api/session";
+import type { SessionView } from "@/api/threads";
 
 const { SidePanel } = await import("@/components/panel/SidePanel");
 const { getPanel, usePanelStore } = await import("@/stores/panel");
 const { useReposStore } = await import("@/stores/repos");
-const { useSessionsStore } = await import("@/stores/sessions");
+const { useSessionsStore } = await import("@/stores/threads");
 const { applyWatchBatch, useThreadStore } = await import("@/stores/thread");
 const { useUiStore } = await import("@/stores/ui");
 const { agentsPanelCommand, showView, useViewsStore } = await import("@/stores/views");

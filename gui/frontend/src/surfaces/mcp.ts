@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { Plug } from "lucide-react";
 import { McpSurface } from "@/components/mcp/McpSurface";
 import { useReposStore } from "@/stores/repos";
-import { useSessionsStore } from "@/stores/sessions";
+import { useSessionsStore } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
 import { MCP_KIND, MCP_TITLE, mcpTab, selectionMcpThread } from "./mcpTarget";
 import type { SurfaceSpec } from "./types";

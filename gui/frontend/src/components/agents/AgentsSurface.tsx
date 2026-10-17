@@ -7,7 +7,7 @@ import { agentElapsedMs, agentMeta, agentName, agentStatusText, agentsSubline, f
 import { fmtTok } from "@/lib/usage";
 import { cn } from "@/lib/utils";
 import { useAgentCounts, useAgentLevel, useAgentRowIds, useAgentRun } from "@/stores/agents";
-import { useSessionsStore } from "@/stores/sessions";
+import { useSessionsStore } from "@/stores/threads";
 import { useThreadStore } from "@/stores/thread";
 import { useUiStore } from "@/stores/ui";
 import "./agents.css";

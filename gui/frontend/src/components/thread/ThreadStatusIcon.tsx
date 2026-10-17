@@ -1,7 +1,7 @@
 import { Bot, Circle, CircleX, Loader2 } from "lucide-react";
-import { badgeLabels, sessionBadge } from "@/lib/session";
+import { badgeLabels, sessionBadge } from "@/lib/thread";
 import { cn } from "@/lib/utils";
-import { useSessionsStore } from "@/stores/sessions";
+import { useSessionsStore } from "@/stores/threads";
 
 /**
  * Session status badge: busy spinner (Claude starting for a message included), idle dot,

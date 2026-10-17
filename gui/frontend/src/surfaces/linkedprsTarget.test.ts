@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { LinkedPullRequestView, SessionView } from "@/api/session";
+import type { LinkedPullRequestView, SessionView } from "@/api/threads";
 import type { ReposData } from "@/stores/repos";
-import type { SessionsData } from "@/stores/sessions";
+import type { SessionsData } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
 import { linkedCount, linkedPrsTab, newestFirst, prBadge, selectionLinkedThread, selectionThread, spansRepos, urlHost } from "./linkedprsTarget";
 

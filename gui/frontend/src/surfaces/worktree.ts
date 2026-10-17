@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { GitBranch } from "lucide-react";
 import { WorktreePanelView } from "@/components/overview/WorktreeOverview";
 import { useReposStore } from "@/stores/repos";
-import { useSessionsStore } from "@/stores/sessions";
+import { useSessionsStore } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
 import { worktreeTabTitle } from "@/stores/worktreePanel";
 import type { SurfaceSpec } from "./types";

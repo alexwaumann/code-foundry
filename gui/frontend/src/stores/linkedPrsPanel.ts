@@ -6,7 +6,7 @@
 import { linkedPrsTab, selectionLinkedThread, selectionThread } from "@/surfaces/linkedprsTarget";
 import { keyOf, openSurface } from "./panel";
 import { useReposStore } from "./repos";
-import { useSessionsStore } from "./sessions";
+import { useSessionsStore } from "./threads";
 import { useUiStore, type Selection } from "./ui";
 
 function stores() {

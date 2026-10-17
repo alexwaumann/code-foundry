@@ -5,7 +5,7 @@ import { HEARTBEAT, type Heartbeat } from "./stream";
 import { toGhEventView, type GhEventView } from "./gh";
 import { toGitOpsEventView, type GitOpsEventView } from "./gitops";
 import { toRepoEventView, type RepoEventView } from "./repo";
-import { toSessionEventView, type SessionEventView } from "./session";
+import { toSessionEventView, type SessionEventView } from "./threads";
 import { toSettingsSnapshotView, type SettingsSnapshotView } from "./settings";
 import { toTerminalEventView, type TerminalEventView } from "./terminal";
 import { toThreadEventView, type ThreadEventView } from "./thread";

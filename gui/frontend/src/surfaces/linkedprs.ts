@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { GitPullRequestArrow } from "lucide-react";
 import { LinkedPRsSurface } from "@/components/linkedprs/LinkedPRsSurface";
 import { useReposStore } from "@/stores/repos";
-import { useSessionsStore } from "@/stores/sessions";
+import { useSessionsStore } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
 import { LINKED_PRS_KIND, LINKED_PRS_TITLE, linkedPrsTab, selectionLinkedThread } from "./linkedprsTarget";
 import type { SurfaceSpec } from "./types";

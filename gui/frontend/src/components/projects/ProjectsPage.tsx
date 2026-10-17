@@ -69,7 +69,7 @@ import {
   unregisterProject,
 } from "@/stores/projectActions";
 import { findWorktree, mainWorktreePath, useReposStore } from "@/stores/repos";
-import { useSessionsStore } from "@/stores/sessions";
+import { useSessionsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { showWorkspaceInThread } from "@/stores/workspacePanel";
 import { showWorktreeInPanel } from "@/stores/worktreePanel";

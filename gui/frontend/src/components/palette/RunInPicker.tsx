@@ -3,9 +3,9 @@ import { FolderGit2 } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { tildify } from "@/lib/path";
 import { worktreeBranch } from "@/lib/threadRow";
-import { runSessionIn } from "@/stores/sessionActions";
+import { runSessionIn } from "@/stores/threadActions";
 import { useReposStore } from "@/stores/repos";
-import { useSessionsStore } from "@/stores/sessions";
+import { useSessionsStore } from "@/stores/threads";
 import { useWorkspacesStore } from "@/stores/workspaces";
 
 function MemberItem({ repoId, path, current, queued, onPick }: { repoId: string; path: string; current: boolean; queued: boolean; onPick: (repoId: string) => void }) {

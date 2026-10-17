@@ -1,6 +1,6 @@
-import type { SessionView } from "@/api/session";
+import type { SessionView } from "@/api/threads";
 import type { DraftPhase } from "@/stores/compose";
-import { sessionBadge } from "./session";
+import { sessionBadge } from "./thread";
 import { fmtTok, fmtUsd } from "./usage";
 
 /**

@@ -17,7 +17,7 @@
  */
 import { emptyBottom, useBottomStore } from "./bottomPanel";
 import { emptyEntry, keyOf, usePanelStore } from "./panel";
-import { useSessionsStore, type SessionsData } from "./sessions";
+import { useSessionsStore, type SessionsData } from "./threads";
 import { DASHBOARD, useUiStore, type Selection } from "./ui";
 
 /** The fields whose null → set transition puts a thread away. */

@@ -2,9 +2,9 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const startPrSession = vi.hoisted(() => vi.fn());
-vi.mock("@/stores/prSessions", async (orig) => ({ ...(await orig<typeof import("@/stores/prSessions")>()), startPrSession }));
+vi.mock("@/stores/prThreads", async (orig) => ({ ...(await orig<typeof import("@/stores/prThreads")>()), startPrSession }));
 
-const { usePrSessionsStore, startingKey } = await import("@/stores/prSessions");
+const { usePrSessionsStore, startingKey } = await import("@/stores/prThreads");
 const { ASK_ELSEWHERE_HINT, ASK_KEYS_HINT, ASK_SENDING_HINT, PrAskComposer } = await import("./PrAskComposer");
 const { composerKeyAction } = await import("./keys");
 

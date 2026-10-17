@@ -1,11 +1,11 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CommandView } from "@/api/command";
-import type { SessionView } from "@/api/session";
+import type { SessionView } from "@/api/threads";
 import { useCommandsStore } from "@/stores/commands";
 import { useReposStore } from "@/stores/repos";
-import { useSessionsStore } from "@/stores/sessions";
-import { SessionTitle } from "./SessionParts";
+import { useSessionsStore } from "@/stores/threads";
+import { SessionTitle } from "./ThreadParts";
 
 const startCommandNamed = vi.hoisted(() => vi.fn(() => true));
 vi.mock("@/keys/bindings", async (orig) => ({ ...(await orig<typeof import("@/keys/bindings")>()), startCommandNamed }));

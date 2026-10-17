@@ -1,4 +1,4 @@
-import type { SessionView } from "@/api/session";
+import type { SessionView } from "@/api/threads";
 
 /**
  * The one badge a session row shows. It never tells whether Claude's process runs (the

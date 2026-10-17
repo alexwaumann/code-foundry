@@ -7,7 +7,7 @@ import { openAddProject } from "@/stores/addProject";
 import { openNewThreadPicker } from "@/stores/compose";
 import { openPublishDialog } from "@/stores/publish";
 import { presentSnooze } from "@/stores/snoozeDialog";
-import { attentionIds, useSessionsStore } from "@/stores/sessions";
+import { attentionIds, useSessionsStore } from "@/stores/threads";
 import { zoomUi } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
 import { openUpdateDialog, runUpdateAction } from "@/stores/update";

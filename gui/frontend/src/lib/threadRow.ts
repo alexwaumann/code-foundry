@@ -3,7 +3,7 @@
  * the branch there, the owning workspace (the badge), and a queued "Run in…" move. Pure,
  * over the repos and workspaces slices.
  */
-import type { SessionView } from "@/api/session";
+import type { SessionView } from "@/api/threads";
 import type { WorkspaceView } from "@/api/workspace";
 import type { Choice } from "./compose";
 import { modelName } from "./models";

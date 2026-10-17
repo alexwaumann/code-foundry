@@ -1,12 +1,12 @@
 import { useShallow } from "zustand/react/shallow";
 import type { UiContextView } from "@/api/command";
-import type { SessionView } from "@/api/session";
+import type { SessionView } from "@/api/threads";
 import { placeSession, type ListOptions, type ListSession, type TreeRepo, type WorktreeRef } from "@/lib/tree";
 import { REPO_LABEL, WORKTREE_LABEL } from "@/lib/termlabel";
 import { focusedBottomShell, ownerKeyOf, PROJECTS_KEY, useBottomStore } from "./bottomPanel";
 import { useReposStore, type ReposData } from "./repos";
-import { useSessionsStore, type SessionsData } from "./sessions";
-import { isThreadGroup, threadGroup } from "@/lib/session";
+import { useSessionsStore, type SessionsData } from "./threads";
+import { isThreadGroup, threadGroup } from "@/lib/thread";
 import { isNoProject } from "@/lib/threadRow";
 import { useTerminalsStore } from "./terminals";
 import { useUiStore, type Selection } from "./ui";

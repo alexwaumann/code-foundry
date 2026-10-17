@@ -17,7 +17,7 @@ import { clearStopRequested, markStopRequested } from "./actionStops";
 import { closeBottomTerminal, revealShell, showOwnTerminal } from "./bottomActions";
 import { refreshCommands, runCommandForResult, useCommandsStore } from "./commands";
 import { getUiContext, repoContext, worktreeContext } from "./context";
-import { useSessionsStore } from "./sessions";
+import { useSessionsStore } from "./threads";
 import { useTerminalsStore } from "./terminals";
 import { useUiStore } from "./ui";
 

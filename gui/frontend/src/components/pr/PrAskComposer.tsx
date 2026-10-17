@@ -1,6 +1,6 @@
 import { CornerDownLeft, MessageCircleQuestion } from "lucide-react";
 import { useState } from "react";
-import { startingKey, startPrSession, usePrSessionsStore } from "@/stores/prSessions";
+import { startingKey, startPrSession, usePrSessionsStore } from "@/stores/prThreads";
 import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { PanelComposer } from "./PanelComposer";
 

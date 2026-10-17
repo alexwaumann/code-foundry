@@ -9,7 +9,7 @@ import { isStartable } from "@/keys/bindings";
 import { useAction, useRepoActionIds } from "@/stores/actions";
 import { useCommandsStore } from "@/stores/commands";
 import { useReposStore } from "@/stores/repos";
-import { useSessionsStore } from "@/stores/sessions";
+import { useSessionsStore } from "@/stores/threads";
 import { ACTION_ICON } from "./actionIcons";
 
 type From = "thread" | "projects";

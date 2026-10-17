@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { UpdateStateView, UpdateStatusView } from "@/api/update";
-import type { CutOff } from "./session";
+import type { CutOff } from "./thread";
 import { busyHeading, compareVersions, cutOffLabel, displayVersion, failureHeadline, olderStable, updateBadge, updateView, versionMismatch, type Restarting, type ThreadActivity, type UpdateVariant } from "./update";
 
 describe("displayVersion", () => {

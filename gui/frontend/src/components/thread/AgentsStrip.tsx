@@ -2,7 +2,7 @@ import { Bot, ChevronRight, SquareTerminal } from "lucide-react";
 import { CommandButton } from "@/components/command/CommandButton";
 import { backgroundLabel } from "@/lib/agents";
 import { useStripParts } from "@/stores/agents";
-import { useSessionsStore } from "@/stores/sessions";
+import { useSessionsStore } from "@/stores/threads";
 
 const STRIP =
   "agents-strip flex min-w-0 items-center gap-2.5 rounded-lg border border-info/35 bg-info/[0.07] py-[7px] pr-2 pl-3 text-body-sm";

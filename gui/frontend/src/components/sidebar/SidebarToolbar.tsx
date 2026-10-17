@@ -7,7 +7,7 @@ import { jumpToAttention } from "@/keys/bindings";
 import { formatChord } from "@/keys/chord";
 import { cn } from "@/lib/utils";
 import { useCommandsStore } from "@/stores/commands";
-import { useAttentionCount } from "@/stores/sessions";
+import { useAttentionCount } from "@/stores/threads";
 import { isDashboard, useUiStore } from "@/stores/ui";
 
 /**

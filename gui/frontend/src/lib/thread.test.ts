@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SessionStateView, SessionStatusView } from "@/api/session";
+import type { SessionStateView, SessionStatusView } from "@/api/threads";
 import {
   attentionTier,
   badgeLabels,
@@ -15,7 +15,7 @@ import {
   type SessionBadge,
   type StatusKind,
   type ThreadGroup,
-} from "./session";
+} from "./thread";
 
 describe("threadGroup (the sidebar group of an unpinned thread)", () => {
   it.each<[SessionStateView, SessionStatusView, string, ThreadGroup]>([

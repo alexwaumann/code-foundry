@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import type { SessionView } from "@/api/session";
+import type { SessionView } from "@/api/threads";
 import type { TerminalView } from "@/api/terminal";
-import { formatAgo } from "@/lib/session";
+import { formatAgo } from "@/lib/thread";
 import { windowTitle } from "@/lib/title";
 import { deriveContext, emptyContext } from "./context";
 import { dispatchEvent } from "./events";
 import { applyIntent } from "./intents";
 import { emptyRepos, replaceRepos, useReposStore } from "./repos";
-import { activeThreadIds, applyRetiredUsage, applySessionEvent, attentionIds, emptySessions, replaceSessions, runningCount, useSessionsStore } from "./sessions";
+import { activeThreadIds, applyRetiredUsage, applySessionEvent, attentionIds, emptySessions, replaceSessions, runningCount, useSessionsStore } from "./threads";
 import { emptyTerminals, useTerminalsStore } from "./terminals";
 import { useUiStore } from "./ui";
 

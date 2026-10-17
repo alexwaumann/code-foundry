@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CommandView } from "@/api/command";
 import type { PullRequestDetailView, PullRequestView } from "@/api/gh";
-import type { LinkedPullRequestView, SessionView } from "@/api/session";
+import type { LinkedPullRequestView, SessionView } from "@/api/threads";
 import { tooltipText } from "@/test/tooltip";
 
 const startCommandNamed = vi.hoisted(() => vi.fn(() => true));
@@ -11,7 +11,7 @@ const getPullRequestDetail = vi.hoisted(() => vi.fn());
 vi.mock("@/api/gh", async (orig) => ({ ...(await orig<typeof import("@/api/gh")>()), getPullRequestDetail }));
 const openPullRequestInPanel = vi.hoisted(() => vi.fn(() => true));
 const snoozeSession = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
-vi.mock("@/stores/sessionActions", async (orig) => ({ ...(await orig<typeof import("@/stores/sessionActions")>()), snoozeSession }));
+vi.mock("@/stores/threadActions", async (orig) => ({ ...(await orig<typeof import("@/stores/threadActions")>()), snoozeSession }));
 const openSnoozeDialog = vi.hoisted(() => vi.fn());
 vi.mock("@/stores/snoozeDialog", async (orig) => ({ ...(await orig<typeof import("@/stores/snoozeDialog")>()), openSnoozeDialog }));
 vi.mock("@/stores/prPanel", async (orig) => ({ ...(await orig<typeof import("@/stores/prPanel")>()), openPullRequestInPanel }));
@@ -19,7 +19,7 @@ vi.mock("@/stores/prPanel", async (orig) => ({ ...(await orig<typeof import("@/s
 const { HeaderActions } = await import("./HeaderActions");
 const { useCommandsStore } = await import("@/stores/commands");
 const { pullRequestDetailResource } = await import("@/stores/gh");
-const { useSessionsStore } = await import("@/stores/sessions");
+const { useSessionsStore } = await import("@/stores/threads");
 const { useUiStore } = await import("@/stores/ui");
 const { useWorkspacesStore } = await import("@/stores/workspaces");
 const { useActionsStore } = await import("@/stores/actions");

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { SessionView } from "@/api/session";
+import type { SessionView } from "@/api/threads";
 import type { TerminalView } from "@/api/terminal";
 
 const toastInfo = vi.hoisted(() => vi.fn());
@@ -12,7 +12,7 @@ const { applyIntent, clearPendingFocus } = await import("./intents");
 const { getBottom, PENDING_FOCUS_MS, useBottomStore } = await import("./bottomPanel");
 const { onNewTerminal, revealArrived } = await import("./bottomActions");
 const { usePanelStore } = await import("./panel");
-const { useSessionsStore } = await import("./sessions");
+const { useSessionsStore } = await import("./threads");
 const { useTerminalsStore } = await import("./terminals");
 const { useUiStore } = await import("./ui");
 

@@ -1,6 +1,6 @@
 import type { PullRequestView } from "@/api/gh";
 import type { GitStatusView } from "@/api/repo";
-import type { SessionsData } from "@/stores/sessions";
+import type { SessionsData } from "@/stores/threads";
 import type { TerminalsData } from "@/stores/terminals";
 
 /**

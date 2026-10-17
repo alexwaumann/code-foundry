@@ -1,10 +1,10 @@
 import { Loader2 } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Backdrop } from "@/components/backdrop/Backdrop";
-import { SessionTitle } from "@/components/session/SessionParts";
+import { SessionTitle } from "@/components/thread/ThreadParts";
 import { DragBand } from "@/components/window/DragBand";
 import { PaneHeader } from "@/components/window/PaneHeader";
-import { useSessionsStore } from "@/stores/sessions";
+import { useSessionsStore } from "@/stores/threads";
 import { startThreadWatch, useOpenRequests, useThreadEmpty, useThreadLoaded, useThreadPending, useThreadStore } from "@/stores/thread";
 import { AgentsStrip } from "./AgentsStrip";
 import { ThreadContext } from "./context";

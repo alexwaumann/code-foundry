@@ -11,7 +11,7 @@ import { PromptEditor, type EditorTrigger, type PromptEditorHandle } from "./Pro
 import { TagMultiProjectContext } from "./tagContext";
 import { useCompletion, useFileSource, useSkillSource } from "./useCompletion";
 import { NoGitBadge } from "@/components/projects/NoGitBadge";
-import { ATTACHMENT_MIME_TYPES } from "@/api/session";
+import { ATTACHMENT_MIME_TYPES } from "@/api/threads";
 import { Backdrop } from "@/components/backdrop/Backdrop";
 import { Tip } from "@/components/ui/tooltip";
 import { DragBand } from "@/components/window/DragBand";

@@ -5,11 +5,11 @@
  * Projects page workspace row opens it for. The member rows' current/queued marker is
  * lib/projects.ts threadAt. Pure: callers feed it the stores' current state.
  */
-import type { SessionView } from "@/api/session";
+import type { SessionView } from "@/api/threads";
 import { deriveContext } from "@/stores/context";
 import { makeTab, type Tab } from "@/stores/panel";
 import type { ReposData } from "@/stores/repos";
-import type { SessionsData } from "@/stores/sessions";
+import type { SessionsData } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
 
 export const WORKSPACE_KIND = "workspace";

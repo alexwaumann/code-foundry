@@ -7,7 +7,7 @@
 import { memberTab, selectionWorkspaceThread, workspaceTab } from "@/surfaces/workspaceTarget";
 import { keyOf, openSurface, togglePanel, type PanelTarget } from "./panel";
 import { useReposStore } from "./repos";
-import { useSessionsStore } from "./sessions";
+import { useSessionsStore } from "./threads";
 import { useUiStore, type Selection } from "./ui";
 import { useWorkspacesStore } from "./workspaces";
 

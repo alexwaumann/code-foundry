@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import { snoozeSession } from "./sessionActions";
-import { useSessionsStore } from "./sessions";
+import { snoozeSession } from "./threadActions";
+import { useSessionsStore } from "./threads";
 
 /**
  * The custom snooze dialog ("Pick a date and time…" in the snooze menus,

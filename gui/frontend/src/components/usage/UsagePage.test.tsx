@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { SessionView, UsageBucketView } from "@/api/session";
-import { useSessionsStore } from "@/stores/sessions";
+import type { SessionView, UsageBucketView } from "@/api/threads";
+import { useSessionsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { useViewsStore } from "@/stores/views";
 import { UsagePage } from "./UsagePage";

@@ -10,7 +10,7 @@
  */
 import { bounceDock, playAlertSound, setDockBadge } from "@/api/app";
 import type { SettingsSnapshotView } from "@/api/settings";
-import { attentionIds, useSessionsStore } from "./sessions";
+import { attentionIds, useSessionsStore } from "./threads";
 import { useSettingsStore } from "./settings";
 
 /** The notifications.* settings (internal/store/settings/schema.go). */

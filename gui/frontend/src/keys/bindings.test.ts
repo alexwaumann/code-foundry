@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CommandView } from "@/api/command";
-import type { SessionView } from "@/api/session";
+import type { SessionView } from "@/api/threads";
 import { useCommandsStore } from "@/stores/commands";
 import { contextKey, getUiContext } from "@/stores/context";
-import { useSessionsStore } from "@/stores/sessions";
+import { useSessionsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { chordFires, commandBindings, handleKeyDown, isGlobalChord, openRunInPicker } from "./bindings";
 

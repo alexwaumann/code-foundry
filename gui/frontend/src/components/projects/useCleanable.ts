@@ -1,7 +1,7 @@
 import { useShallow } from "zustand/react/shallow";
 import { memberHolds, terminalHolds, threadHolds } from "@/lib/projects";
 import { findWorktree, useReposStore } from "@/stores/repos";
-import { useSessionsStore } from "@/stores/sessions";
+import { useSessionsStore } from "@/stores/threads";
 import { useTerminalsStore } from "@/stores/terminals";
 import { useWorkspacesStore } from "@/stores/workspaces";
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { SessionView } from "@/api/session";
-import type { SessionsData } from "@/stores/sessions";
+import type { SessionView } from "@/api/threads";
+import type { SessionsData } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
 import { mcpTab, selectionMcpThread } from "./mcpTarget";
 

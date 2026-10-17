@@ -9,14 +9,14 @@ import {
   ContextMenuSubContent,
   ContextMenuSubTrigger,
 } from "@/components/ui/context-menu";
-import { useNoProjectThread } from "@/components/session/useNoProject";
+import { useNoProjectThread } from "@/components/thread/useNoProject";
 import { SnoozeRowItems } from "@/components/snooze/SnoozeMenu";
 import { beginRename } from "@/keys/bindings";
 import { worktreeBranch } from "@/lib/threadRow";
 import { newThreadTerminal } from "@/stores/bottomActions";
 import { useReposStore } from "@/stores/repos";
-import { archiveSession, forkSession, pinSession, removeSession, runSessionIn } from "@/stores/sessionActions";
-import { useSessionsStore } from "@/stores/sessions";
+import { archiveSession, forkSession, pinSession, removeSession, runSessionIn } from "@/stores/threadActions";
+import { useSessionsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { showWorktreeInThread } from "@/stores/worktreePanel";

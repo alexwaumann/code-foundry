@@ -5,7 +5,7 @@
  * place). Pure; inputs are the repos and workspaces slices' shapes.
  */
 import { isRemoteless, type RepoView, type WorktreeView } from "@/api/repo";
-import type { SessionView } from "@/api/session";
+import type { SessionView } from "@/api/threads";
 import type { TerminalView } from "@/api/terminal";
 import type { WorkspaceView } from "@/api/workspace";
 import { tildify } from "./path";

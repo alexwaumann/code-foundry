@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { ChartColumn } from "lucide-react";
 import { UsageSurface } from "@/components/usage/UsageSurface";
 import { useReposStore } from "@/stores/repos";
-import { useSessionsStore } from "@/stores/sessions";
+import { useSessionsStore } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
 import type { SurfaceSpec } from "./types";
 import { selectionUsageThread, USAGE_KIND, USAGE_TITLE, usageTab } from "./usageTarget";

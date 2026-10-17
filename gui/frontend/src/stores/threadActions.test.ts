@@ -1,12 +1,13 @@
 import { Code, ConnectError } from "@connectrpc/connect";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const commands = vi.hoisted(() => ({ runCommandForResult: vi.fn(), refreshCommands: vi.fn() }));
+const commands = vi.hoisted(() => ({ runCommand: vi.fn(), runCommandForResult: vi.fn(), refreshCommands: vi.fn() }));
 vi.mock("./commands", async (importOriginal) => ({ ...(await importOriginal<typeof import("./commands")>()), ...commands }));
+vi.mock("./context", () => ({ getUiContext: (target: { id: string }) => ({ activeSessionId: target.id }) }));
 const toast = vi.hoisted(() => Object.assign(vi.fn(), { error: vi.fn(), success: vi.fn() }));
 vi.mock("sonner", () => ({ toast }));
 
-const { respondThread } = await import("./threadActions");
+const { respondThread, snoozeSession, THREAD_COMMANDS } = await import("./threadActions");
 const { useThreadStore } = await import("./thread");
 
 type Opts = { expected?: (err: unknown) => boolean };
@@ -23,7 +24,21 @@ const answering = () => useThreadStore.getState().answering.s1 ?? {};
 
 beforeEach(() => {
   vi.clearAllMocks();
+  commands.runCommand.mockResolvedValue(true);
   useThreadStore.setState({ answering: {} });
+});
+
+describe("snoozeSession", () => {
+  it("sends an absolute time as RFC 3339 in the thread's context", async () => {
+    expect(await snoozeSession("s1", Date.UTC(2026, 9, 15, 14, 0))).toBe(true);
+    expect(commands.runCommand).toHaveBeenCalledWith(THREAD_COMMANDS.snooze, { until: "2026-10-15T14:00:00.000Z" }, { activeSessionId: "s1" });
+    expect(THREAD_COMMANDS.snooze).toBe("thread.snooze");
+  });
+
+  it("null unsnoozes with clear", async () => {
+    await snoozeSession("s2", null);
+    expect(commands.runCommand).toHaveBeenCalledWith("thread.snooze", { clear: "true" }, { activeSessionId: "s2" });
+  });
 });
 
 describe("respondThread", () => {

@@ -7,7 +7,7 @@ import { errorMessage, isAbort } from "@/api/stream";
 import { requestConfirm } from "./confirm";
 import { contextKey, getUiContext } from "./context";
 import { useReposStore } from "./repos";
-import { useSessionsStore } from "./sessions";
+import { useSessionsStore } from "./threads";
 import { useTerminalsStore } from "./terminals";
 import { useUiStore } from "./ui";
 

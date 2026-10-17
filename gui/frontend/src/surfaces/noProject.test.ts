@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
-import type { SessionView } from "@/api/session";
+import type { SessionView } from "@/api/threads";
 import { emptyRepos, replaceRepos, useReposStore } from "@/stores/repos";
-import { emptySessions, replaceSessions, useSessionsStore } from "@/stores/sessions";
+import { emptySessions, replaceSessions, useSessionsStore } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
 import { diffSurface } from "./diff";
 import { filesSurface } from "./files";

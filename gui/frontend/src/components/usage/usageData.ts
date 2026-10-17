@@ -3,7 +3,7 @@
  * the range's UTC days, folded into the hero totals, the per-model table and the daily
  * chart series. docs/notes/session-usage.md "Usage page".
  */
-import type { UsageBucketView } from "@/api/session";
+import type { UsageBucketView } from "@/api/threads";
 import { MODEL_SLOTS, bucketTokens, modelSlot, totalUsage, usageByModel, type ModelUsage, type UsageTotals } from "@/lib/usage";
 
 const DAY_MS = 86_400_000;

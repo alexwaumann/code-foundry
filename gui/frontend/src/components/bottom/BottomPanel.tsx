@@ -3,7 +3,7 @@ import { Plus, SquareTerminal, X } from "lucide-react";
 import { ActionEcho, ActionStatusLine, ActionTabIcon, ActionTabStatusMark } from "@/components/actions/ActionTabParts";
 import { CommandButton } from "@/components/command/CommandButton";
 import { revealTab } from "@/components/panel/reveal";
-import { useNoProjectThread } from "@/components/session/useNoProject";
+import { useNoProjectThread } from "@/components/thread/useNoProject";
 import { TerminalHost, type TerminalHostHandle } from "@/components/terminal/TerminalHost";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";

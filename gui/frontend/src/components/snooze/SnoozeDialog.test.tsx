@@ -1,12 +1,12 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { SessionView } from "@/api/session";
+import type { SessionView } from "@/api/threads";
 
 const snoozeSession = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
-vi.mock("@/stores/sessionActions", async (orig) => ({ ...(await orig<typeof import("@/stores/sessionActions")>()), snoozeSession }));
+vi.mock("@/stores/threadActions", async (orig) => ({ ...(await orig<typeof import("@/stores/threadActions")>()), snoozeSession }));
 
 const { SnoozeDialog } = await import("./SnoozeDialog");
-const { useSessionsStore } = await import("@/stores/sessions");
+const { useSessionsStore } = await import("@/stores/threads");
 const { openSnoozeDialog, useSnoozeDialogStore } = await import("@/stores/snoozeDialog");
 
 // Wed Oct 14 2026, 1:12 PM local.

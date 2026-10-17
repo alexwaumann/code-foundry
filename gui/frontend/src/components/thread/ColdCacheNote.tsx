@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { COLD_CACHE_RECHECK_MS, coldCacheNote } from "@/lib/coldCache";
 import { useDraft } from "@/stores/compose";
-import { useSessionsStore } from "@/stores/sessions";
+import { useSessionsStore } from "@/stores/threads";
 import { threadDraftKey } from "@/stores/threadActions";
 
 /**

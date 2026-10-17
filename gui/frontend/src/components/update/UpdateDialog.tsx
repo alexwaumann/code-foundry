@@ -6,10 +6,10 @@ import type { UpdateStatusView } from "@/api/update";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
-import { formatAgo, restartCutsOff } from "@/lib/session";
+import { formatAgo, restartCutsOff } from "@/lib/thread";
 import { busyHeading, cutOffLabel, displayVersion, failureHeadline, updateView, type UpdateVariant, type UpdateView } from "@/lib/update";
 import { cn } from "@/lib/utils";
-import { useSessionsStore } from "@/stores/sessions";
+import { useSessionsStore } from "@/stores/threads";
 import { closeUpdateDialog, runUpdateAction, useCutOffThreadIds, useUpdateStore, type UpdateAction } from "@/stores/update";
 
 const linkTone = "text-link hover:underline";

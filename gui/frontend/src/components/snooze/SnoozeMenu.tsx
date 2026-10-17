@@ -7,8 +7,8 @@ import { Tip } from "@/components/ui/tooltip";
 import { isStartable } from "@/keys/bindings";
 import { snoozePresets, type SnoozePresetId } from "@/lib/snooze";
 import { useCommandsStore } from "@/stores/commands";
-import { SESSION_COMMANDS, snoozeSession } from "@/stores/sessionActions";
-import { useSessionsStore } from "@/stores/sessions";
+import { THREAD_COMMANDS, snoozeSession } from "@/stores/threadActions";
+import { useSessionsStore } from "@/stores/threads";
 import { openSnoozeDialog } from "@/stores/snoozeDialog";
 
 const presetIcons: Readonly<Record<SnoozePresetId, LucideIcon>> = { "1h": Clock, "3h": Clock, tomorrow: Sun, "next-week": Calendar };
@@ -99,7 +99,7 @@ export function SnoozeRowItems({ id, snoozed }: { id: string; snoozed: boolean }
  * session.snooze here (an older daemon), like a CommandButton. Keeps focus where it is.
  */
 export function SnoozeButton({ sessionId }: { sessionId: string }) {
-  const available = useCommandsStore((s) => s.commands.some((c) => c.name === SESSION_COMMANDS.snooze && isStartable(c)));
+  const available = useCommandsStore((s) => s.commands.some((c) => c.name === THREAD_COMMANDS.snooze && isStartable(c)));
   const snoozed = useSessionsStore((s) => (s.byId[sessionId]?.snoozedUntilMs ?? null) !== null);
   if (!available) return null;
   const keepFocus = (e: React.MouseEvent) => {

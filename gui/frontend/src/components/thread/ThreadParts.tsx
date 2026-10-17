@@ -4,7 +4,7 @@ import { CommandButton } from "@/components/command/CommandButton";
 import { NoGitBadge } from "@/components/projects/NoGitBadge";
 import { threadRowModel, type WorkspaceLookup } from "@/lib/threadRow";
 import { useReposStore } from "@/stores/repos";
-import { useSessionsStore } from "@/stores/sessions";
+import { useSessionsStore } from "@/stores/threads";
 import { Chip } from "./Chip";
 
 const NO_WORKSPACES: WorkspaceLookup = { byId: {} };

@@ -6,8 +6,8 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { useNow } from "@/lib/clock";
 import { addDays, compareDays, dayOf, formatDay, monthGrid, monthTitle, parseTimeValue, sameDay, shiftMonth, SNOOZE_HOUR, wallTime, type Day } from "@/lib/snooze";
 import { cn } from "@/lib/utils";
-import { snoozeSession } from "@/stores/sessionActions";
-import { useSessionsStore } from "@/stores/sessions";
+import { snoozeSession } from "@/stores/threadActions";
+import { useSessionsStore } from "@/stores/threads";
 import { closeSnoozeDialog, useSnoozeDialogStore } from "@/stores/snoozeDialog";
 
 const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"] as const;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PullRequestView } from "@/api/gh";
-import type { SessionView } from "@/api/session";
+import type { SessionView } from "@/api/threads";
 import type { TerminalView } from "@/api/terminal";
 import { baseFact, branchPullRequest, operationStrip, originFact, otherThreads, shellsIn, shortRef, upstreamRemote, workingTreeFact, type FactPart } from "./facts";
 

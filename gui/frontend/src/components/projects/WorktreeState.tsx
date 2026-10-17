@@ -11,7 +11,7 @@ import { branchKey, branchPullRequestsResource } from "@/stores/gh";
 import { openPullRequestInPanel } from "@/stores/prPanel";
 import { findWorktree, useReposStore } from "@/stores/repos";
 import { useResource } from "@/stores/resource";
-import { useSessionsStore } from "@/stores/sessions";
+import { useSessionsStore } from "@/stores/threads";
 
 /**
  * The viewer's pull request on the worktree's branch (GhService.GetBranchPullRequests,

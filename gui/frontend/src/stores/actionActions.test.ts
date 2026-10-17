@@ -18,7 +18,7 @@ const { useActionsStore } = await import("./actions");
 const { useActionDialogStore } = await import("./actionDialog");
 const { useActionStopsStore } = await import("./actionStops");
 const { useTerminalsStore } = await import("./terminals");
-const { useSessionsStore } = await import("./sessions");
+const { useSessionsStore } = await import("./threads");
 const { useUiStore } = await import("./ui");
 
 const finished = (o: Partial<ActionRunFinishedView>): ActionRunFinishedView => ({

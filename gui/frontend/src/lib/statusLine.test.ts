@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SessionStateView, SessionStatusView } from "@/api/session";
+import type { SessionStateView, SessionStatusView } from "@/api/threads";
 import { showsPlace, statusLine, statusText, statusTones, tipStatusTone, type StatusLineKind, type TipStatusTone } from "./statusLine";
 
 const NOW = Date.UTC(2026, 9, 10, 12, 0, 0);

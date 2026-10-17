@@ -15,7 +15,7 @@
  */
 import { create } from "zustand";
 import { listRefs, type RepoView } from "@/api/repo";
-import { ATTACHMENT_MAX_BYTES, ATTACHMENT_MIME_TYPES, stageAttachment } from "@/api/session";
+import { ATTACHMENT_MAX_BYTES, ATTACHMENT_MIME_TYPES, stageAttachment } from "@/api/threads";
 import { isOutdatedDaemon } from "@/api/errors";
 import { errorMessage } from "@/api/stream";
 import {
@@ -44,7 +44,7 @@ import { invokeConfirmed, refreshCommands } from "./commands";
 import { requestConfirm, type ConfirmRequest } from "./confirm";
 import { getUiContext } from "./context";
 import { useReposStore } from "./repos";
-import { SESSION_COMMANDS } from "./sessionActions";
+import { THREAD_COMMANDS } from "./threadActions";
 import { useSettingsStore } from "./settings";
 import { useUiStore, type Selection } from "./ui";
 import { rememberedWorkIn, rememberWorkIn } from "./workIn";
@@ -496,7 +496,7 @@ export async function sendDraft(target: ComposeTarget, defaults: { model: string
       },
       sent.map((a) => a.stagedPath ?? ""),
     );
-    const res = await invokeConfirmed(SESSION_COMMANDS.create, args, getUiContext(composeSelection(target, place)));
+    const res = await invokeConfirmed(THREAD_COMMANDS.create, args, getUiContext(composeSelection(target, place)));
     if (!res) {
       updateDraft(key, { phase: "idle" });
       return false;

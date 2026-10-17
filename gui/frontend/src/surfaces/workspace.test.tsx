@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RepoView, WorktreeView } from "@/api/repo";
-import type { SessionView } from "@/api/session";
+import type { SessionView } from "@/api/threads";
 import type { WorkspaceView } from "@/api/workspace";
 
 // The surface body's member rows read branch pull requests; nothing to fetch here.
@@ -11,7 +11,7 @@ vi.mock("@/api/gh", async (orig) => ({ ...(await orig<typeof import("@/api/gh")>
 const { SidePanel } = await import("@/components/panel/SidePanel");
 const { getPanel, usePanelStore } = await import("@/stores/panel");
 const { useReposStore } = await import("@/stores/repos");
-const { useSessionsStore } = await import("@/stores/sessions");
+const { useSessionsStore } = await import("@/stores/threads");
 const { useUiStore } = await import("@/stores/ui");
 const { useViewsStore, workspacePanelCommand } = await import("@/stores/views");
 const { useWorkspacesStore } = await import("@/stores/workspaces");

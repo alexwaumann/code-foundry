@@ -1,6 +1,6 @@
 import { useCallback, useSyncExternalStore } from "react";
 import { RETRY_RECHECK_MS, retryNote } from "@/lib/retryNote";
-import { useSessionsStore } from "@/stores/sessions";
+import { useSessionsStore } from "@/stores/threads";
 
 /** The clock in whole seconds (the countdown's resolution), read at render. */
 function nowSeconds(): number {

@@ -1,13 +1,13 @@
 import { useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
-import type { UsageBucketView } from "@/api/session";
+import type { UsageBucketView } from "@/api/threads";
 import { Button } from "@/components/ui/button";
 import { Tip } from "@/components/ui/tooltip";
 import { PaneHeader } from "@/components/window/PaneHeader";
 import { useEscapeCloses } from "@/components/window/useEscapeCloses";
 import { fmtShare, fmtTok, fmtUsd, type ModelUsage, type UsageTotals } from "@/lib/usage";
-import { useSessionsStore } from "@/stores/sessions";
+import { useSessionsStore } from "@/stores/threads";
 import { USAGE_RANGES, useUiStore, type UsageRange } from "@/stores/ui";
 import { closeUsage } from "@/stores/views";
 import { Segmented } from "./Segmented";

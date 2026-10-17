@@ -17,7 +17,7 @@ import {
 } from "@/lib/mcp";
 import { cn } from "@/lib/utils";
 import { ensureMcpStatus, reconnectMcp, refreshMcp, useMcpHeader, useMcpReconnecting, useMcpRefreshing, useMcpServer, useMcpServerNames, useMcpStatus } from "@/stores/mcp";
-import { useSessionsStore } from "@/stores/sessions";
+import { useSessionsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 
 /** The thread this panel belongs to: the selected session ("" otherwise). */

@@ -31,7 +31,7 @@ import { agentElapsedMs, fmtElapsed, parseAgentNote } from "@/lib/agents";
 import { copyText } from "@/lib/clipboard";
 import { useNow } from "@/lib/clock";
 import { canonicalModelName } from "@/lib/models";
-import { formatAgo } from "@/lib/session";
+import { formatAgo } from "@/lib/thread";
 import { questionsOf } from "@/lib/threadRequest";
 import { groupLabel, turnCostLabel, type TimelineRow, type WorkNode } from "@/lib/threadTimeline";
 import { formatDuration, parseObject, splitPath, str, toolSummary, type Tense } from "@/lib/toolSummary";

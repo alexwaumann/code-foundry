@@ -31,7 +31,7 @@ import { startCommandSync } from "@/stores/commands";
 import { startEventSync } from "@/stores/events";
 import { startHealthPolling } from "@/stores/health";
 import { usePanelExpanded } from "@/stores/panel";
-import { useAttentionCount } from "@/stores/sessions";
+import { useAttentionCount } from "@/stores/threads";
 import { layoutWidth, startZoomSync, zoomFactor } from "@/lib/zoom";
 import { CONTENT_MIN, useUiStore, type FocusRegion } from "@/stores/ui";
 import { selectPageOpen, startViewSync, useViewsStore } from "@/stores/views";

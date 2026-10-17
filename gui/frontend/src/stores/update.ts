@@ -8,8 +8,8 @@ import type { UpdateEventView, UpdateStatusView } from "@/api/update";
 import type { Restarting } from "@/lib/update";
 import { invokeConfirmed, refreshCommands, useCommandsStore } from "./commands";
 import { getUiContext } from "./context";
-import { restartCutsOff } from "@/lib/session";
-import { useSessionsStore } from "./sessions";
+import { restartCutsOff } from "@/lib/thread";
+import { useSessionsStore } from "./threads";
 
 export type UpdateAction = "check" | "download" | "relaunch" | "restart";
 

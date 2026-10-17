@@ -16,7 +16,7 @@ vi.mock("@/api/app", async (orig) => ({
 
 const { runMenuCommand, startMenuCommands } = await import("./menu");
 const { useCommandsStore } = await import("@/stores/commands");
-const { useSessionsStore } = await import("@/stores/sessions");
+const { useSessionsStore } = await import("@/stores/threads");
 const { useUiStore } = await import("@/stores/ui");
 const { useViewsStore } = await import("@/stores/views");
 

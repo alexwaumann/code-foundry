@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { Layers } from "lucide-react";
 import { WorkspaceSurface } from "@/components/workspace/WorkspaceSurface";
 import { useReposStore } from "@/stores/repos";
-import { useSessionsStore } from "@/stores/sessions";
+import { useSessionsStore } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import type { SurfaceSpec } from "./types";

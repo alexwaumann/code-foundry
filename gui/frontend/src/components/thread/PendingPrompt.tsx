@@ -25,7 +25,7 @@ import {
   type QuestionPick,
 } from "@/lib/threadRequest";
 import { parseObject, relPath, str, toolHunks, type Json } from "@/lib/toolSummary";
-import { useSessionsStore } from "@/stores/sessions";
+import { useSessionsStore } from "@/stores/threads";
 import { useAgentInputOf, useThreadItem } from "@/stores/thread";
 import { respondThread } from "@/stores/threadActions";
 import { TokenSpans } from "./Code";

@@ -3,7 +3,7 @@
  * session.new args a draft turns into. The store (stores/compose.ts) and components
  * (components/compose) use these; they hold no state.
  */
-import type { PermissionModeView } from "@/api/session";
+import type { PermissionModeView } from "@/api/threads";
 import { retainRepoTags } from "./prompt";
 
 export interface Choice {

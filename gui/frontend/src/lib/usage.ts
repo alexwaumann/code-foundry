@@ -4,7 +4,7 @@
  * fixed model colour slots, and the number formats. Pure; buckets come from
  * SessionView.usage and the sessions store's retiredUsage.
  */
-import type { UsageBucketView } from "@/api/session";
+import type { UsageBucketView } from "@/api/threads";
 
 /** The five token counters of a bucket. */
 export type TokenKind = "input" | "output" | "cacheRead" | "cacheWrite5m" | "cacheWrite1h";

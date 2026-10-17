@@ -1,7 +1,7 @@
 import { useShallow } from "zustand/react/shallow";
 import { isNoProject } from "@/lib/threadRow";
 import { useReposStore } from "@/stores/repos";
-import { useSessionsStore } from "@/stores/sessions";
+import { useSessionsStore } from "@/stores/threads";
 
 /**
  * Whether a thread has no project (lib/threadRow isNoProject), from narrow selectors: its

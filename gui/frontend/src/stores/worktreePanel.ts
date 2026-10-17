@@ -9,7 +9,7 @@
 import { selectionWorktree, worktreeTab } from "@/surfaces/workspaceTarget";
 import { keyOf, openSurface, togglePanel, type PanelTarget } from "./panel";
 import { findWorktree, mainWorktreePath, useReposStore, type ReposData } from "./repos";
-import { useSessionsStore } from "./sessions";
+import { useSessionsStore } from "./threads";
 import { useUiStore, type Selection } from "./ui";
 
 /**

@@ -1,4 +1,4 @@
-import type { ApiRetryView, SessionView } from "@/api/session";
+import type { ApiRetryView, SessionView } from "@/api/threads";
 
 /**
  * The composer's "Rate limited · retrying in 20 s (attempt 3 of 10)" line

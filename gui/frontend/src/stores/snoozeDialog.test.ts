@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { SessionView } from "@/api/session";
+import type { SessionView } from "@/api/threads";
 
 const snoozeSession = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
-vi.mock("./sessionActions", async (orig) => ({ ...(await orig<typeof import("./sessionActions")>()), snoozeSession }));
+vi.mock("./threadActions", async (orig) => ({ ...(await orig<typeof import("./threadActions")>()), snoozeSession }));
 
 const { presentSnooze, useSnoozeDialogStore } = await import("./snoozeDialog");
 const { presentInPalette } = await import("@/keys/bindings");
-const { useSessionsStore } = await import("./sessions");
+const { useSessionsStore } = await import("./threads");
 const { useUiStore } = await import("./ui");
 
 const thread = (id: string, snoozedUntilMs: number | null) => ({ id, name: id, repoId: "", worktreePath: "", workspaceId: "", linkedPullRequests: [], snoozedUntilMs }) as unknown as SessionView;

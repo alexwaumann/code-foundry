@@ -7,7 +7,7 @@ vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), loading: vi.fn(() => "t1"), dismiss: vi.fn() }));
 vi.mock("sonner", () => ({ toast }));
 
-const { PREPARING_TOAST_DELAY_MS, openStartedSession, prSessionArgs, startingKey, startPrSession, usePrSessionsStore } = await import("./prSessions");
+const { PREPARING_TOAST_DELAY_MS, openStartedSession, prSessionArgs, startingKey, startPrSession, usePrSessionsStore } = await import("./prThreads");
 const { useUiStore } = await import("./ui");
 
 const REF = { slug: "acme/repo", number: 12 };
