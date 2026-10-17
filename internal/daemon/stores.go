@@ -69,6 +69,9 @@ type stores struct {
 	// stopActions stops the glue that forgets an unregistered project's actions and
 	// kills a removed thread's or worktree's background runs (actions.go).
 	stopActions func()
+	// stopWake stops the glue that hands every action run's end to the threads' wake
+	// subscriptions (wake.go).
+	stopWake func()
 	// home is the user's home directory (symlinks resolved): the root every project
 	// path must stay inside, and what FilesystemService completes under.
 	home string
@@ -198,6 +201,8 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 		// A new thread's worktree runs its project's on-worktree-create actions in the
 		// background (WorktreeCreated returns at once).
 		WorktreeCreated: s.action.WorktreeCreated,
+		// Wake subscriptions to action runs read them here (wake.go).
+		ActionRun: actionRunForWake(s.action),
 	}); err != nil {
 		return nil, err
 	}
@@ -214,6 +219,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 		return nil, err
 	}
 	s.stopActions = startActionCleanup(ctx, log.With("store", "action"), s.action, s.bus)
+	s.stopWake = startWakeRuns(ctx, log.With("store", "thread"), s.thread, s.bus)
 	uo := update.DefaultOptions(version.Version)
 	uo.Bus, uo.Log = s.bus, log.With("store", "update")
 	uo.Channel = update.ParseChannel(cfg.Update.Channel)
@@ -278,6 +284,9 @@ func (s *stores) close() error {
 	}
 	if s.stopActions != nil {
 		s.stopActions()
+	}
+	if s.stopWake != nil {
+		s.stopWake()
 	}
 	if s.action != nil {
 		closeCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)

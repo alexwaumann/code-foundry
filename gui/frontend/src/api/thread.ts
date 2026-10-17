@@ -8,6 +8,7 @@
  */
 import { timestampMs } from "@bufbuild/protobuf/wkt";
 import {
+  MessageOrigin,
   ThreadItemDelta_Field,
   ThreadRequestState,
   ThreadService,
@@ -102,11 +103,26 @@ export interface ToolCallView {
   resultJson: string;
 }
 
+/**
+ * A wake message's origin: the daemon sent it because a subscription fired (a thread the
+ * thread subscribed to settled, an action run finished). title is the header line without
+ * its "[code-foundry wake] " prefix (`Thread "Fix the login" (s-…) is idle: finished.`);
+ * json the payload Claude got in the fenced block (kind, subscription_id, condition,
+ * fired_at, and the thread or the run).
+ */
+export interface WakeView {
+  title: string;
+  json: string;
+}
+
 /** One entry of a thread's conversation; the kind says which payload it has. */
 export type ThreadItemView = ItemBase &
   (
-    /** composerText: the composer's text with its tag tokens ("" when sent without the composer); see lib/userMessage. */
-    | { kind: "user"; text: string; attachments: readonly string[]; composerText: string }
+    /**
+     * composerText: the composer's text with its tag tokens ("" when sent without the composer); see lib/userMessage.
+     * wake: set when the daemon sent it for a wake subscription (docs/notes/agents-4-wake.md), not the user.
+     */
+    | { kind: "user"; text: string; attachments: readonly string[]; composerText: string; wake?: WakeView }
     | { kind: "text"; text: string }
     | { kind: "thinking"; text: string }
     | ({ kind: "tool" } & ToolCallView)
@@ -212,7 +228,14 @@ export function toThreadItemView(it: ThreadItem): ThreadItemView | null {
   const p = it.payload;
   switch (p.case) {
     case "userMessage":
-      return { ...base, kind: "user", text: p.value.text, attachments: [...p.value.attachments], composerText: p.value.composerText };
+      return {
+        ...base,
+        kind: "user",
+        text: p.value.text,
+        attachments: [...p.value.attachments],
+        composerText: p.value.composerText,
+        ...(p.value.origin === MessageOrigin.WAKE ? { wake: { title: p.value.wakeTitle, json: p.value.wakeJson } } : {}),
+      };
     case "assistantText":
       return { ...base, kind: "text", text: p.value.text };
     case "thinking":
