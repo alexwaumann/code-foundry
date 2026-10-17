@@ -6,7 +6,7 @@ import "codefoundry/v1/action.proto";
 import "codefoundry/v1/gh.proto";
 import "codefoundry/v1/gitops.proto";
 import "codefoundry/v1/heartbeat.proto";
-import "codefoundry/v1/repo.proto";
+import "codefoundry/v1/project.proto";
 import "codefoundry/v1/settings.proto";
 import "codefoundry/v1/terminal.proto";
 import "codefoundry/v1/thread.proto";
@@ -21,7 +21,7 @@ import "codefoundry/v1/workspace.proto";
 // Watch RPCs remain for the CLI and tests.
 service EventService {
   // Watch streams all events. Each store's snapshot event is sent first, in the order
-  // repo, workspace, terminal, thread list, thread, gh, gitops, settings, update, action, so a
+  // project, workspace, terminal, thread list, thread, gh, gitops, settings, update, action, so a
   // client can replace its state wholesale on connect.
   rpc Watch(WatchEventsRequest) returns (stream Event) {}
   // SetClientState updates what a GUI client's open Watch stream reported about itself
@@ -75,7 +75,7 @@ message SetClientStateResponse {}
 
 enum EventSource {
   EVENT_SOURCE_UNSPECIFIED = 0;
-  EVENT_SOURCE_REPO = 1;
+  EVENT_SOURCE_PROJECT = 1;
   EVENT_SOURCE_TERMINAL = 2;
   EVENT_SOURCE_THREAD_LIST = 3;
   EVENT_SOURCE_GH = 4;
@@ -86,8 +86,8 @@ enum EventSource {
   // Phase 3d. Numbered 10 to stay clear of the parallel Phase 3 steps. Sent after
   // settings, before UI intents.
   EVENT_SOURCE_UPDATE = 10;
-  // Workspaces (branch sets). Sent right after repo, before terminal: members name
-  // repositories, and threads name workspaces.
+  // Workspaces (branch sets). Sent right after project, before terminal: members name
+  // projects, and threads name workspaces.
   EVENT_SOURCE_WORKSPACE = 11;
   // Rendered threads' pending requests (permission prompts and questions), for
   // every rendered thread: a ThreadPendingSnapshot (right after the thread list), then a
@@ -101,7 +101,7 @@ enum EventSource {
 
 message Event {
   oneof event {
-    RepoEvent repo = 1;
+    ProjectEvent project = 1;
     TerminalEvent terminal = 2;
     ThreadListEvent thread_list = 3;
     GhEvent gh = 4;

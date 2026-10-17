@@ -58,21 +58,21 @@ enum ThreadStatus {
 }
 
 // Ownership: a thread has at most one owner. When workspace_id is set the owner is that
-// workspace; otherwise, when repo_id is set, it is the project (repository) repo_id;
+// workspace; otherwise, when project_id is set, it is the project project_id;
 // otherwise the thread has no project (CreateThreadRequest.no_project) and runs in the
-// daemon's home directory. repo_id and worktree_path are facts about the thread's cwd
+// daemon's home directory. project_id and worktree_path are facts about the thread's cwd
 // (for a workspace thread, the member worktree it runs in) and never decide the owner
 // beyond that order. Rows from before projects were required may also have an empty
-// repo_id with a worktree_path inside a project; clients may place those by the path.
+// project_id with a worktree_path inside a project; clients may place those by the path.
 message Thread {
   // Our stable id (survives reconnects).
   string id = 1;
   // Claude's own session id, once discovered from the transcript directory. Needed for
   // resume; empty until known.
   string claude_session_id = 2;
-  // Repository of the cwd. The owner when workspace_id is empty. Empty, with an empty
+  // Project of the cwd. The owner when workspace_id is empty. Empty, with an empty
   // workspace_id, for a thread without a project.
-  string repo_id = 3;
+  string project_id = 3;
   // The cwd: the worktree claude runs in (the home directory for a thread without a
   // project).
   string worktree_path = 4;
@@ -347,7 +347,7 @@ message LinkedPullRequest {
 }
 
 message CreateThreadRequest {
-  string repo_id = 1;
+  string project_id = 1;
   string worktree_path = 2;
   string model = 3;
   string effort = 4;
@@ -363,14 +363,14 @@ message CreateThreadRequest {
   NewWorktree new_worktree = 8;
   // Paths returned by StageAttachment, appended to initial_prompt.
   repeated string attachments = 9;
-  // Workspace (id or name) the thread belongs to. repo_id or worktree_path then pick
+  // Workspace (id or name) the thread belongs to. project_id or worktree_path then pick
   // the member worktree it runs in (default: the first member); a worktree_path must
   // be a member's worktree. Not with new_worktree or new_workspace.
   string workspace_id = 10;
   // When set, Create makes a new workspace for the thread before claude starts: a
-  // worktree on branch cf/<slug> in every repository listed (the slug as for
+  // worktree on branch cf/<slug> in every project listed (the slug as for
   // new_worktree, after the same single bounded wait), then runs the thread in the
-  // member repo_id names (default: the first). worktree_path is ignored. Not with
+  // member project_id names (default: the first). worktree_path is ignored. Not with
   // new_worktree or workspace_id.
   NewWorkspace new_workspace = 11;
   // 12 was render until 2026-10-12.
@@ -380,8 +380,8 @@ message CreateThreadRequest {
   // (ThreadItem UserMessageItem.composer_text).
   string composer_prompt = 13;
   // When set, the thread has no project: it runs in the daemon's home directory with an
-  // empty repo_id and workspace_id (see the ownership rule on Thread). Exclusive with
-  // repo_id, worktree_path, new_worktree, workspace_id and new_workspace
+  // empty project_id and workspace_id (see the ownership rule on Thread). Exclusive with
+  // project_id, worktree_path, new_worktree, workspace_id and new_workspace
   // (InvalidArgument). RunIn refuses such a thread; Fork and Reconnect keep its cwd.
   bool no_project = 14;
   // The thread whose agent asks for this one (Thread.created_by); it must exist
@@ -415,11 +415,11 @@ message NewWorktree {
 }
 
 message NewWorkspace {
-  // Repositories (id, name when unique, or an absolute path inside one), in member
-  // order. At least one. "<repo>:<base ref>" gives that member its own base.
-  repeated string repos = 1;
+  // Projects (id, name when unique, or an absolute path inside one), in member
+  // order. At least one. "<project>:<base ref>" gives that member its own base.
+  repeated string projects = 1;
   // Ref every member without its own base branches from. Defaults to
-  // origin/<default branch>, else <default branch>, per repository.
+  // origin/<default branch>, else <default branch>, per project.
   string base_ref = 2;
   // Workspace name. Default: the slug (cf/<slug> without the prefix).
   string name = 3;
@@ -488,10 +488,10 @@ message ThreadFilter {
   ThreadStatus status = 3;
   // Only threads in this state (UNSPECIFIED: any).
   ThreadState state = 4;
-  // Only threads whose cwd is in this repository: an id, a name when exactly one
-  // repository has it, or an absolute path inside one of its worktrees
+  // Only threads whose cwd is in this project: an id, a name when exactly one
+  // project has it, or an absolute path inside one of its worktrees
   // (INVALID_ARGUMENT when it names none or several).
-  string repo = 5;
+  string project = 5;
   // Only threads owned by this workspace: an id or a name (INVALID_ARGUMENT when it
   // names none).
   string workspace = 6;
@@ -587,9 +587,9 @@ message RemoveThreadResponse {}
 
 message RunInThreadRequest {
   string id = 1;
-  // The member to run in: its repository id, or its worktree path. One is required;
+  // The member to run in: its project id, or its worktree path. One is required;
   // both must name the same member.
-  string repo_id = 2;
+  string project_id = 2;
   string worktree_path = 3;
 }
 

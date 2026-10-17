@@ -4,18 +4,19 @@ package codefoundry.v1;
 
 import "google/protobuf/timestamp.proto";
 
-// RepoService tracks registered git repositories, their worktrees, and git status.
-service RepoService {
+// ProjectService tracks registered projects (git repositories, or folders without git),
+// their worktrees, and git status.
+service ProjectService {
   // Register adds a project by path. A path inside a git repository registers that
   // repository (its main worktree); any other existing directory registers as a
-  // project without git (Repo.git false).
-  rpc Register(RegisterRepoRequest) returns (RegisterRepoResponse) {}
-  // Unregister forgets a repository. Worktrees on disk are not touched.
-  rpc Unregister(UnregisterRepoRequest) returns (UnregisterRepoResponse) {}
-  // List returns registered repositories with their worktrees.
-  rpc List(ListReposRequest) returns (ListReposResponse) {}
-  // Get returns one repository.
-  rpc Get(GetRepoRequest) returns (GetRepoResponse) {}
+  // project without git (Project.git false).
+  rpc Register(RegisterProjectRequest) returns (RegisterProjectResponse) {}
+  // Unregister forgets a project. Worktrees on disk are not touched.
+  rpc Unregister(UnregisterProjectRequest) returns (UnregisterProjectResponse) {}
+  // List returns registered projects with their worktrees.
+  rpc List(ListProjectsRequest) returns (ListProjectsResponse) {}
+  // Get returns one project.
+  rpc Get(GetProjectRequest) returns (GetProjectResponse) {}
   // CreateWorktree creates a worktree with a new or existing branch.
   rpc CreateWorktree(CreateWorktreeRequest) returns (CreateWorktreeResponse) {}
   // RemoveWorktree removes a worktree (and optionally its branch).
@@ -23,14 +24,14 @@ service RepoService {
   // CleanupWorktrees removes worktrees whose work is already in the default branch:
   // merged_clean (which includes "created by Code Foundry"), and no live thread, running
   // terminal or workspace holds them. It
-  // refreshes the repository's status first (a caller wanting fresh remote refs fetches
+  // refreshes the project's status first (a caller wanting fresh remote refs fetches
   // before), re-evaluates, and removes with `git worktree remove` (never --force).
   // Branches are never deleted. dry_run only evaluates the current snapshot.
   rpc CleanupWorktrees(CleanupWorktreesRequest) returns (CleanupWorktreesResponse) {}
-  // Refresh forces a status reconcile for a repo (or all repos when id is empty).
-  rpc Refresh(RefreshRepoRequest) returns (RefreshRepoResponse) {}
-  // Watch streams repository and worktree changes.
-  rpc Watch(WatchReposRequest) returns (stream RepoEvent) {}
+  // Refresh forces a status reconcile for a project (or all projects when id is empty).
+  rpc Refresh(RefreshProjectRequest) returns (RefreshProjectResponse) {}
+  // Watch streams project and worktree changes.
+  rpc Watch(WatchProjectsRequest) returns (stream ProjectEvent) {}
   // GetWorktreeDetail returns the files changed and commits on a worktree against its
   // base (status.base_ref, else the local default branch). It computes on first call
   // (or after 10 idle minutes) and serves the cached result otherwise. While a
@@ -53,16 +54,16 @@ service RepoService {
   rpc LookupGitHub(LookupGitHubRequest) returns (LookupGitHubResponse) {}
   // Clone runs `gh repo clone <owner>/<name> <config home>/projects/<owner>/<name> --
   // --progress` (the user's gh login and protocol apply), streams its output as
-  // progress events, registers the clone and ends with a repo event. AlreadyExists when
+  // progress events, registers the clone and ends with a project event. AlreadyExists when
   // the destination exists; NotFound when GitHub has no such repository; other failures
   // carry gh's last lines. Bounded at 15 minutes. Cancelling the stream kills the clone
   // and removes what it wrote.
-  rpc Clone(CloneRepoRequest) returns (stream CloneRepoEvent) {}
+  rpc Clone(CloneProjectRequest) returns (stream CloneProjectEvent) {}
   // Create starts a new project at <config home>/projects/<name>: mkdir, `git init -b
   // <init.defaultBranch, else main>`, an empty "Initial commit", then registers it.
   // InvalidArgument for a name that is empty, starts with ".", or has anything but
   // letters, digits, "-", "_" and "."; AlreadyExists when the folder exists.
-  rpc Create(CreateRepoRequest) returns (CreateRepoResponse) {}
+  rpc Create(CreateProjectRequest) returns (CreateProjectResponse) {}
   // ListPublishOwners lists where the viewer can publish a repository: their own
   // account (public and private) and every organization they belong to that lets them
   // create repositories (GitHub's viewerCanCreateRepositories), with the visibilities
@@ -74,15 +75,15 @@ service RepoService {
   // --<visibility>`, then refreshes the project. FailedPrecondition when the project is
   // not git or already has origin; a gh failure carries gh's last lines verbatim.
   // Bounded at 5 minutes.
-  rpc Publish(PublishRepoRequest) returns (PublishRepoResponse) {}
+  rpc Publish(PublishProjectRequest) returns (PublishProjectResponse) {}
   // Delete unregisters a project made by Create and removes its folder from disk. Only
   // a project directly inside the projects directory can be deleted (FailedPrecondition
   // otherwise); nothing on GitHub is touched. The Add Project dialog calls it when a
   // new project is cancelled before it is kept or published.
-  rpc Delete(DeleteRepoRequest) returns (DeleteRepoResponse) {}
+  rpc Delete(DeleteProjectRequest) returns (DeleteProjectResponse) {}
 }
 
-message Repo {
+message Project {
   // Stable id derived from the main worktree path.
   string id = 1;
   // Main worktree path.
@@ -93,12 +94,12 @@ message Repo {
   // "owner/name" when the origin remote is GitHub, else empty.
   string github_slug = 5;
   repeated Worktree worktrees = 6;
-  // When the repository was registered.
+  // When the project was registered.
   google.protobuf.Timestamp registered_at = 7;
   // Non-empty when the last reconcile failed (for example, the directory was moved or
-  // deleted). The repo stays registered; worktrees are empty until it recovers.
+  // deleted). The project stays registered; worktrees are empty until it recovers.
   string error = 8;
-  // Configured git remotes ("origin", …), sorted. Empty for a local-only repository:
+  // Configured git remotes ("origin", …), sorted. Empty for a local-only project:
   // fetch, pull, push and pull-request actions are unavailable then.
   repeated string remotes = 9;
   // The project is a git repository. A project without git has one synthetic main
@@ -108,7 +109,7 @@ message Repo {
 }
 
 message Worktree {
-  string repo_id = 1;
+  string project_id = 1;
   string path = 2;
   string branch = 3;
   string head = 4;
@@ -117,12 +118,12 @@ message Worktree {
   // HEAD is detached (branch is empty).
   bool detached = 7;
   // The git half of "safe to clean up": not the main worktree, created by Code Foundry
-  // (its path is under the app's worktrees directory or repos.worktree_dir; worktrees
+  // (its path is under the app's worktrees directory or projects.worktree_dir; worktrees
   // made by hand or by other tools never qualify), on a branch, no staged,
   // modified, untracked or conflicted entries, no status error, and status.base_ref is
   // set with base_ahead 0 (every commit on HEAD is in origin/<default>). Whether a live
   // thread, a running terminal or a workspace holds it is not part of this flag (the
-  // repo store does not know them); CleanupWorktrees checks those too.
+  // project store does not know them); CleanupWorktrees checks those too.
   bool merged_clean = 8;
 }
 
@@ -156,36 +157,36 @@ message GitStatus {
   int32 operation_total = 16;
 }
 
-message RegisterRepoRequest {
+message RegisterProjectRequest {
   string path = 1;
 }
 
-message RegisterRepoResponse {
-  Repo repo = 1;
+message RegisterProjectResponse {
+  Project project = 1;
 }
 
-message UnregisterRepoRequest {
+message UnregisterProjectRequest {
   string id = 1;
 }
 
-message UnregisterRepoResponse {}
+message UnregisterProjectResponse {}
 
-message ListReposRequest {}
+message ListProjectsRequest {}
 
-message ListReposResponse {
-  repeated Repo repos = 1;
+message ListProjectsResponse {
+  repeated Project projects = 1;
 }
 
-message GetRepoRequest {
+message GetProjectRequest {
   string id = 1;
 }
 
-message GetRepoResponse {
-  Repo repo = 1;
+message GetProjectResponse {
+  Project project = 1;
 }
 
 message CreateWorktreeRequest {
-  string repo_id = 1;
+  string project_id = 1;
   // Branch to check out. Created from base_ref when it does not exist.
   string branch = 2;
   // Ref to branch from when creating. Defaults to the default branch.
@@ -203,7 +204,7 @@ message CreateWorktreeResponse {
 }
 
 message RemoveWorktreeRequest {
-  string repo_id = 1;
+  string project_id = 1;
   string path = 2;
   bool delete_branch = 3;
   bool force = 4;
@@ -212,9 +213,9 @@ message RemoveWorktreeRequest {
 message RemoveWorktreeResponse {}
 
 message CleanupWorktreesRequest {
-  // Repository id or name (a name only when exactly one registered repository has it).
-  string repo = 1;
-  // One worktree to clean up; empty means every worktree of the repository.
+  // Project id or name (a name only when exactly one registered project has it).
+  string project = 1;
+  // One worktree to clean up; empty means every worktree of the project.
   string path = 2;
   // Evaluate the current snapshot only: nothing is refreshed or removed, and removed
   // lists what would be.
@@ -222,8 +223,8 @@ message CleanupWorktreesRequest {
 }
 
 message CleanupWorktreesResponse {
-  string repo_id = 1;
-  // Removed worktrees (their state just before removal), in the repository's order.
+  string project_id = 1;
+  // Removed worktrees (their state just before removal), in the project's order.
   repeated Worktree removed = 2;
   // Worktrees kept, with why. Without a path the main worktree is not listed.
   repeated SkippedWorktree skipped = 3;
@@ -237,7 +238,7 @@ message SkippedWorktree {
 }
 
 message ListRefsRequest {
-  string repo_id = 1;
+  string project_id = 1;
 }
 
 message ListRefsResponse {
@@ -252,44 +253,44 @@ message InitGitRequest {
 }
 
 message InitGitResponse {
-  Repo repo = 1;
+  Project project = 1;
 }
 
-message RefreshRepoRequest {
+message RefreshProjectRequest {
   string id = 1;
 }
 
-message RefreshRepoResponse {}
+message RefreshProjectResponse {}
 
-// The first event of every Watch stream is a snapshot of all repositories; live changes
+// The first event of every Watch stream is a snapshot of all projects; live changes
 // follow in publish order, each carrying the full state of what changed. A client
 // replaces its whole state on every snapshot event (the daemon sends another one if the
 // client fell behind and events were dropped) and applies the other events in order.
-message WatchReposRequest {}
+message WatchProjectsRequest {}
 
-message RepoEvent {
+message ProjectEvent {
   oneof event {
-    // Replaces the repo, including its worktree list.
-    Repo repo_updated = 1;
-    string repo_removed_id = 2;
-    // Replaces one worktree of an already known repo.
+    // Replaces the project, including its worktree list.
+    Project project_updated = 1;
+    string project_removed_id = 2;
+    // Replaces one worktree of an already known project.
     Worktree worktree_updated = 3;
     WorktreeRef worktree_removed = 4;
     // Replaces everything.
-    RepoSnapshot snapshot = 5;
+    ProjectSnapshot snapshot = 5;
     // A worktree's detail changed; re-read it with GetWorktreeDetail.
     WorktreeDetailRef worktree_detail_updated = 6;
   }
 }
 
 message WorktreeDetailRef {
-  string repo_id = 1;
+  string project_id = 1;
   string path = 2;
   google.protobuf.Timestamp computed_at = 3;
 }
 
 message GetWorktreeDetailRequest {
-  string repo_id = 1;
+  string project_id = 1;
   string path = 2;
 }
 
@@ -299,7 +300,7 @@ message GetWorktreeDetailResponse {
 
 // A worktree compared with its base.
 message WorktreeDetail {
-  string repo_id = 1;
+  string project_id = 1;
   string path = 2;
   // The ref compared against ("origin/main", or "main" without a remote). Empty when
   // there is none (or HEAD is unborn): files then hold only uncommitted changes and
@@ -351,12 +352,12 @@ message LogEntry {
   google.protobuf.Timestamp authored_at = 6;
 }
 
-message RepoSnapshot {
-  repeated Repo repos = 1;
+message ProjectSnapshot {
+  repeated Project projects = 1;
 }
 
 message WorktreeRef {
-  string repo_id = 1;
+  string project_id = 1;
   string path = 2;
 }
 
@@ -402,17 +403,17 @@ message LookupGitHubResponse {
   GitHubRepository repository = 1;
 }
 
-message CloneRepoRequest {
+message CloneProjectRequest {
   string owner = 1;
   string name = 2;
 }
 
 // One event of a Clone stream: output lines while it runs, then the registered project.
-message CloneRepoEvent {
+message CloneProjectEvent {
   oneof event {
     CloneProgress progress = 1;
     // The clone, registered. Always the last event of a successful clone.
-    Repo repo = 2;
+    Project project = 2;
   }
 }
 
@@ -423,13 +424,13 @@ message CloneProgress {
   bool transient = 2;
 }
 
-message CreateRepoRequest {
+message CreateProjectRequest {
   // The folder name under the projects directory.
   string name = 1;
 }
 
-message CreateRepoResponse {
-  Repo repo = 1;
+message CreateProjectResponse {
+  Project project = 1;
 }
 
 message ListPublishOwnersRequest {
@@ -446,11 +447,11 @@ message ListPublishOwnersResponse {
   bool stale = 2;
 }
 
-message DeleteRepoRequest {
+message DeleteProjectRequest {
   string id = 1;
 }
 
-message DeleteRepoResponse {}
+message DeleteProjectResponse {}
 
 enum PublishOwnerKind {
   PUBLISH_OWNER_KIND_UNSPECIFIED = 0;
@@ -471,8 +472,8 @@ message PublishOwner {
   bool known = 4;
 }
 
-message PublishRepoRequest {
-  string repo_id = 1;
+message PublishProjectRequest {
+  string project_id = 1;
   // GitHub user or organization login.
   string owner = 2;
   // Repository name on GitHub; the project's name when empty.
@@ -481,6 +482,6 @@ message PublishRepoRequest {
   RepositoryVisibility visibility = 4;
 }
 
-message PublishRepoResponse {
-  Repo repo = 1;
+message PublishProjectResponse {
+  Project project = 1;
 }

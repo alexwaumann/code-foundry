@@ -12,7 +12,7 @@ import "google/protobuf/timestamp.proto";
 // `$SHELL -lc <command>` in the worktree. Runs live in memory only (the newest 50 per
 // project). See docs/notes/actions-1-daemon.md.
 service ActionService {
-  // List returns a project's actions in order (every project's when repo_id is empty)
+  // List returns a project's actions in order (every project's when project_id is empty)
   // and the runs the daemon remembers, without their output.
   rpc List(ListActionsRequest) returns (ListActionsResponse) {}
   // Create adds an action at the end of its project's list. Names are unique within a
@@ -50,8 +50,8 @@ enum ActionIcon {
 message Action {
   // "a-" + 12 hex digits.
   string id = 1;
-  // The project (repository id) the action belongs to.
-  string repo_id = 2;
+  // The project (project id) the action belongs to.
+  string project_id = 2;
   // Unique within the project, ignoring case.
   string name = 3;
   // A shell command line, run as `$SHELL -lc <command>`.
@@ -98,7 +98,7 @@ message ActionRun {
   // The action's name and command when the run started.
   string action_name = 3;
   string command = 4;
-  string repo_id = 5;
+  string project_id = 5;
   // The thread the run belongs to; empty for a worktree's run.
   string thread_id = 6;
   // Where it runs (its cwd and CODE_FOUNDRY_WORKTREE).
@@ -122,7 +122,7 @@ message ActionRun {
 
 message ListActionsRequest {
   // Empty: every project.
-  string repo_id = 1;
+  string project_id = 1;
 }
 
 message ListActionsResponse {
@@ -132,7 +132,7 @@ message ListActionsResponse {
 }
 
 message CreateActionRequest {
-  string repo_id = 1;
+  string project_id = 1;
   string name = 2;
   string command = 3;
   // UNSPECIFIED: PLAY.
@@ -169,7 +169,7 @@ message DeleteActionRequest {
 message DeleteActionResponse {}
 
 message RunActionRequest {
-  // Action id, or its name (ignoring case) within the owner's project or repo_id.
+  // Action id, or its name (ignoring case) within the owner's project or project_id.
   string action = 1;
   // The owning thread: the run uses its project and worktree. Wins over worktree_path.
   string thread_id = 2;
@@ -177,7 +177,7 @@ message RunActionRequest {
   // project.
   string worktree_path = 3;
   // The project to find the action's name in; default: the owner's.
-  string repo_id = 4;
+  string project_id = 4;
   // UNSPECIFIED: the action's in_terminal.
   ActionRunMode mode = 5;
 }
@@ -232,7 +232,7 @@ message ActionRunFinished {
   string run_id = 1;
   string action_id = 2;
   string action_name = 3;
-  string repo_id = 4;
+  string project_id = 4;
   string thread_id = 5;
   int32 exit_code = 6;
   ActionRunMode mode = 7;

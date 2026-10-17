@@ -13,7 +13,7 @@ import "google/protobuf/timestamp.proto";
 // response carries fetched_at so the UI can show staleness; an unset fetched_at means
 // "never fetched".
 //
-// Repositories are identified by their "owner/name" slug (RepoService's github_slug).
+// Repositories are identified by their "owner/name" slug (Project.github_slug).
 // Slugs are case-insensitive and are normalised to lower case.
 service GhService {
   // GetViewer returns the authenticated GitHub user.
@@ -30,7 +30,7 @@ service GhService {
   // its error); an empty repo_slug only marks the poll due and returns without waiting.
   rpc Refresh(RefreshGhRequest) returns (RefreshGhResponse) {}
   // Track adds a repository to the poll (its default branch CI; the dashboards count
-  // its pull requests as tracked). RepoService's repositories with a GitHub remote are
+  // its pull requests as tracked). The GitHub repositories of registered projects are
   // tracked automatically; this is exposed for the CLI and debugging.
   rpc Track(TrackGhRepoRequest) returns (TrackGhRepoResponse) {}
   // Untrack removes a repository from the poll. Its cache is kept.
