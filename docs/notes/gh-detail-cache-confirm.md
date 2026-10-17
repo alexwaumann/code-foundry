@@ -59,7 +59,7 @@ unix socket (`/codefoundry.v1.GhService/GetPullRequestDetail`, JSON).
 | ghostty#13779 open, not covered | 12 | 13 (age rule unchanged) |
 | all GraphQL requests | 64 | 37 (polls 13 vs 14) |
 
-From 04:19 to the end (04:26) #152 was read 22 times with 7 polls confirming it and was
+From 09:19Z to the end (09:26Z) #152 was read 22 times with 7 polls confirming it and was
 never fetched. Each avoided fetch is one cost-1 request of 5-10 KB here (66 KB for the
 busy ghostty PR) and 0.4-1.3 s of worker time.
 
