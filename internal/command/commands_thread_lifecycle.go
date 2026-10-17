@@ -101,7 +101,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				{Name: "project", Type: String, Context: ContextProject, Description: "Project id (with workspace or projects: the member the thread runs in, by id or name)"},
 				{Name: "worktree", Type: Path, Context: ContextWorktree, Description: "Worktree path (with workspace: a member worktree)"},
 				{Name: "workspace", Type: String, Description: "Workspace id or name the thread belongs to; it runs in the member project or worktree names (default: the first member)"},
-				{Name: "projects", Type: String, Description: "With new-worktree: comma-separated projects (id, name, or path; project:base gives that one its own base) for a new workspace, a cf/<slug of the thread name> worktree in each; repo picks the member the thread runs in (default: the first)"},
+				{Name: "projects", Type: String, Description: "With new-worktree: comma-separated projects (id, name, or path; project:base gives that one its own base) for a new workspace, a cf/<slug of the thread name> worktree in each; project picks the member the thread runs in (default: the first)"},
 				{Name: "model", Type: Enum, Enum: ThreadModels, Description: threadModelHelp + " (default: settings threads.default_model)"},
 				{Name: "effort", Type: Enum, Enum: ThreadEfforts, Description: "Effort level (default: settings threads.default_effort)"},
 				{Name: "permission", Type: Enum, Enum: ThreadPermissions, Default: "auto",

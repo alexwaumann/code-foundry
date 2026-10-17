@@ -9,13 +9,14 @@ pass, `make check` is green, and its doc note is written.
 Phases 0–3 are done and merged on `main`. Each step's note is in `docs/notes/`.
 
 * **Phase 0** done: daemon with socket + token listeners, bus, client auto-start, CLI, Wails/React shell, CI (`phase0.md`).
-* **Phase 1** done: terminal (libghostty-vt actors), repo, GitHub, command registry and GUI shell (`phase1a`–`phase1e`).
+* **Phase 1** done: terminal (libghostty-vt actors), projects (then called repos), GitHub, command registry and GUI shell (`phase1a`–`phase1e`).
 * **Phase 2** done: threads (then called sessions), status detection, thread GUI, one EventService stream; memory gate in `docs/perf.md` (`phase2a`–`phase2c`, `phase2-integration.md`).
 * **Phase 3** done: Pull Requests page and worktree overview, settings/help/confirm, git operations, packaging and updater (`phase3a`–`phase3d`, `phase3-integration.md`).
 * **New thread composer** done (2026-10-09): project picker + in-pane composer, positional prompt, permission mode, `cf/<slug>` worktrees, image attachments, opus/high defaults, "thread" copy (`new-thread-composer.md`).
 * **Side panel + PR surface** done: per-selection side panel with a surface registry, the Pull request surface (summary, timeline, reviewers, refresh, revert), and its menu starting `pr.ask` / `pr.explain` / `pr.fix.findings` threads (`side-panel.md`, `gh-pr-detail.md`, `pr-thread-commands.md`).
 * **Natural thread names** done (2026-10-13): the namer asks for a 3–6 word sentence-case title, cleaned to one line; `cf/<slug>` branches slugify it; forks are "<parent> (fork)"; old slug names stay (`natural-thread-names.md`).
 * **Rename session to thread** done (2026-10-16): one `ThreadService`, `internal/store/thread`, `thread.*` commands and CLI verbs, `threads.*` settings (legacy keys rewritten on load), `CODE_FOUNDRY_THREAD` / `--context-thread`, migration 0022 renames the tables, frontend modules and test ids (`rename-session-to-thread.md`).
+* **Rename repo to project** done (2026-10-17): `ProjectService`, `internal/store/project` (and `newproject` for create/publish), `project.*` commands and CLI verbs with a new `project list`, `--project` / `--context-project`, `projects.*` settings (legacy keys rewritten on load), migration 0026 renames the tables and `repo_id` columns, frontend modules and saved state (`rename-repo-to-project.md`).
 
 ### Multi-repo workspaces: the five steps are built
 
@@ -69,7 +70,7 @@ clone`) needs both; PR 4 (`repo.create`, publish via `gh repo create`) needs 3.
 
 **Adding projects: done.** All four PRs are built: register any folder under home with
 completion or the folder picker, clone from GitHub, start a new project, publish it.
-`repo.add` is the one command for it (`code-foundry repo add <folder>` on the CLI); the
+`project.add` is the one command for it (`code-foundry project add <folder>` on the CLI); the
 old "Add Project (local folder)" command is gone: `docs/notes/add-project-remove-register.md`.
 
 ### Session usage: four PRs (design 2026-10-10)
@@ -234,7 +235,7 @@ Collected from the step notes; none blocks daily use.
   * `CODE_FOUNDRY_EDITOR` remains as a fallback when `gitops.editor_command` is empty.
 * **GitHub / Pull Requests page**
   * Populated PR lists have only been seen live through the `CODE_FOUNDRY_GH_SEARCH_AS` dev knob. The owner's account has no PRs, so with the real login the GUI has only ever shown empty lists.
-  * Dashboards are fetched unfiltered (50 per list) and filtered to tracked repos at read time. A viewer with many PRs outside registered repos can crowd out registered ones.
+  * Dashboards are fetched unfiltered (50 per list) and filtered to tracked repositories at read time. A viewer with many PRs outside registered projects can crowd out registered ones.
   * The poll (`gh-viewer-polling.md`) keeps richer PR detail (merge state, size, reviews, review requests) and a "reviewed by you" list that no view shows yet.
   * Branch PRs on the overview show only the viewer's own, non-fork PRs.
 * **Side panel + PR surface** (`side-panel.md`)

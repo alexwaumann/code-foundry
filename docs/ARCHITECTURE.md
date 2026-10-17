@@ -44,7 +44,7 @@ Three processes, one protocol.
   theme's sheet and keeps those colours for the next launch (`SetWindowBackground`,
   `window-background.json` in the config home; `docs/notes/theme-engine-3-settings.md`).
   No business logic lives in the Wails host.
-* **CLI** subcommands (`code-foundry thread new --repo foo`, `code-foundry focus <id>`, …)
+* **CLI** subcommands (`code-foundry thread new --project foo`, `code-foundry focus <id>`, …)
   are clients of the same daemon API. A Claude Code session running inside the app can call
   the CLI, so threads can orchestrate other threads.
 
@@ -91,7 +91,7 @@ internal/
     clone/                 gh repo clone into the projects dir with streamed output, then register
     newproject/            new projects in the projects dir (git init, register); gh repo create to publish
     update/                release checks via gh (stable or tip channel), downloads and installs with the embedded installer
-    workspace/             branch sets: one branch as a worktree in several repos
+    workspace/             branch sets: one branch as a worktree in several projects
                            (docs/notes/workspaces-1-store.md)
     action/                per-project actions (named command lines) and their runs, in a
                            kind=action terminal or in the background with captured output
@@ -183,9 +183,9 @@ Services (v1):
 * `TerminalService` — Attach (server stream: initial screen snapshot then live output
   chunks), Write (input bytes), Resize, Detach, Kill, Remove, and Close (kill, wait for
   the exit, remove; shells only).
-* `RepoService` — Register (a git repository, or any folder as a project without git;
+* `ProjectService` — Register (a git repository, or any folder as a project without git;
   "~" expands, the path must be absolute; the Add Project dialog's Local folder tab calls
-  it directly, the CLI through `repo add <folder>`),
+  it directly, the CLI through `project add <folder>`),
   Unregister, List, ListWorktrees, CreateWorktree (optionally fetching the base first),
   CleanupWorktrees (remove worktrees whose work is in origin/<default>: `merged_clean`,
   no thread (archived ones aside), terminal or workspace on it; never deletes branches;
@@ -218,7 +218,7 @@ Services (v1):
 * `UiService` — WatchIntents (server stream: focus thread, open palette, …); Emit (from
   CLI).
 * `EventService` — Watch: one server stream that multiplexes every store's events and UI
-  intents (sources repo, workspace, terminal, thread list, thread, gh, gitops, settings,
+  intents (sources project, workspace, terminal, thread list, thread, gh, gitops, settings,
   update, action, ui; the thread source carries threads' pending requests only, a
   snapshot then changes, never items; filterable). On connect it sends each source's snapshot in that order, then live events; a source that drops events for a
   slow client resends only its own snapshot. This is the GUI's only long-lived sync
@@ -246,13 +246,13 @@ Services (v1):
   window auto-starts the installed daemon. `app.relaunch` and `daemon.restart` restart
   the halves separately and install nothing. See `docs/notes/update-restart.md`,
   `docs/notes/update-download-then-install.md` and `docs/notes/release-channels.md`.
-* `WorkspaceService` — List, Create, AddRepo, RemoveRepo, Remove, Members (by id, name,
+* `WorkspaceService` — List, Create, AddProject, RemoveProject, Remove, Members (by id, name,
   or a path inside a member worktree), Watch. See `docs/notes/workspaces-1-store.md`.
   The GUI gets workspaces from EventService's `workspace` source (a `workspaces` slice),
   and the composer starts threads in them (`docs/notes/workspaces-3-composer.md`).
 * `FilesystemService` — ListDirectories: completes a typed path prefix to directories
   under the user's home (is_git, registered, common completion), for the palette's
-  `path` prompts and the Add Project dialog's Local folder tab. Every project path must resolve under home; `repo.Register` enforces
+  `path` prompts and the Add Project dialog's Local folder tab. Every project path must resolve under home; `project.Register` enforces
   it too (`docs/notes/add-project-1-paths.md`). ListSkills (`.claude/skills` and
   `.claude/commands` of given checkouts, plus the user's) and SearchFiles (fuzzy match over
   a checkout's git-listed or walked files, cached ~5s) feed the composer's `/` and `@`
@@ -299,7 +299,7 @@ PTY (creack/pty) ──reader goroutine──► tee ──► libghostty-vt (fe
   With no attachment, size is the last known size.
 * Labels are opaque to the store; their contract lives in `internal/termlabel`: `kind`
   (`shell` on a shell `terminal.new` started, `action` on an action run in a terminal),
-  `thread` (the owning thread), `repo` and `worktree` (the owning worktree), and on
+  `thread` (the owning thread), `project` and `worktree` (the owning worktree), and on
   action terminals `action`, `action.name` and `action.run`. `terminal.new`
   gives every shell an owner (thread, else worktree) and refuses a cwd outside every
   registered project. The shell reaper (`internal/daemon/shells.go`) removes a shell when
@@ -318,9 +318,9 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   session id (from `~/.claude/projects/<slug>/*.jsonl`) so dead threads can be resumed
   with `claude --resume`.
 * A thread has at most one owner: its workspace when `workspace_id` is set, else its
-  project when `repo_id` is set, else none: a thread without a project runs in the home
+  project when `project_id` is set, else none: a thread without a project runs in the home
   directory (`Options.Home`), pre-trusted like any cwd, and RunIn refuses it
-  (`docs/notes/no-project-1-daemon.md`). `repo_id`/`worktree_path` are the cwd. Every spawn of a workspace thread
+  (`docs/notes/no-project-1-daemon.md`). `project_id`/`worktree_path` are the cwd. Every spawn of a workspace thread
   (create, a start on send, fork) reads the workspace's current members from the workspace
   store and adds `--add-dir` for each other member,
   `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1`, and one static
@@ -401,7 +401,7 @@ type Command struct {
 }
 ```
 
-`Context` is what the caller is looking at: active thread, active repo/worktree, active
+`Context` is what the caller is looking at: active thread, active project/worktree, active
 view, and the workspace that owns the active thread or composer (so `thread.run-in` is
 offered for workspace threads only; the `thread.*` commands,
 send/respond/interrupt/items/set-model/set-mode/set-effort/mcp/mcp-reconnect/commands/agents, are
@@ -437,7 +437,7 @@ from the pull request (docs/notes/pr-thread-commands.md).
 * Connection budget: the GUI holds exactly one `EventService.Watch` stream plus at most
   two long-lived streams: the content pane's `ThreadService.Watch` and the bottom
   panel's active shell `TerminalService.Attach`, each only while it is visible. Everything else is unary, except a
-  `RepoService.Clone` stream while the Add Project dialog clones a repository. This keeps
+  `ProjectService.Clone` stream while the Add Project dialog clones a repository. This keeps
   the browser's six HTTP/1.1 connections per origin mostly free.
 * Stream liveness: the daemon sends a `StreamHeartbeat` on each of those three streams
   after 5 s without other messages (`api.HeartbeatInterval`, mirrored by
@@ -525,14 +525,14 @@ from the pull request (docs/notes/pr-thread-commands.md).
   getting started guide, `docs/GETTING-STARTED.md` bundled at build time; keep every
   label and chord it names in step with the app (`docs/notes/onboarding-2-guide.md`).
 
-## 9. Repo and GitHub stores
+## 9. Project and GitHub stores
 
-* `repo`: registered repositories and their worktrees. Shells out to `git` for worktree
+* `project`: registered projects and their worktrees. Shells out to `git` for worktree
   create/list/remove and status (branch, ahead/behind, dirty, conflicts, and the
   operation in progress, read from marker files in the admin dir without another git
   command; `docs/notes/worktree-op-state.md`). One filesystem watcher
   (fsnotify) across all registered roots feeds a debounced reconcile. Workers write
-  disjoint per-path snapshot pointers. A project may be a plain folder (`Repo.Git`
+  disjoint per-path snapshot pointers. A project may be a plain folder (`Project.Git`
   false): one synthetic checkout, no git commands or watches, the poll notices a later
   `git init` (`docs/notes/add-project-2-nogit.md`).
 * `gh`: GitHub GraphQL (and a little REST) sent in-process over one keep-alive HTTP
