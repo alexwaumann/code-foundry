@@ -1,7 +1,7 @@
 # code-foundry
 
 macOS desktop app (Go daemon + Wails v3/React GUI + CLI) for running fleets of Claude Code
-sessions across git worktrees. Read `docs/ARCHITECTURE.md` before changing structure and
+threads across git worktrees. Read `docs/ARCHITECTURE.md` before changing structure and
 `docs/PLAN.md` to see which step you are on.
 
 ## Commands

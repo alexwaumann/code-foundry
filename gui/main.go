@@ -50,7 +50,7 @@ func main() {
 	appService := NewAppService(log, p.WindowBackground())
 	app := application.New(application.Options{
 		Name:        "Code Foundry",
-		Description: "Supervise fleets of Claude Code sessions",
+		Description: "Supervise fleets of Claude Code threads",
 		Icon:        appIcon,
 		Services: []application.Service{
 			application.NewService(daemonService),

@@ -38,7 +38,7 @@ file and <kbd>/</kbd> to run one of the project's skills or commands.
 * **The project folder itself** (**In place**) edits your files where they are.
 
 The app remembers your last choice for each project. Set the default for every project
-under Settings › Sessions › **New threads work in**.
+under Settings › Threads › **New threads work in**.
 
 ### While it runs
 

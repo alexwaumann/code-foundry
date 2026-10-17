@@ -10,11 +10,12 @@ Phases 0–3 are done and merged on `main`. Each step's note is in `docs/notes/`
 
 * **Phase 0** done: daemon with socket + token listeners, bus, client auto-start, CLI, Wails/React shell, CI (`phase0.md`).
 * **Phase 1** done: terminal (libghostty-vt actors), repo, GitHub, command registry and GUI shell (`phase1a`–`phase1e`).
-* **Phase 2** done: sessions, status detection, session GUI, one EventService stream; memory gate in `docs/perf.md` (`phase2a`–`phase2c`, `phase2-integration.md`).
+* **Phase 2** done: threads (then called sessions), status detection, thread GUI, one EventService stream; memory gate in `docs/perf.md` (`phase2a`–`phase2c`, `phase2-integration.md`).
 * **Phase 3** done: Pull Requests page and worktree overview, settings/help/confirm, git operations, packaging and updater (`phase3a`–`phase3d`, `phase3-integration.md`).
 * **New thread composer** done (2026-10-09): project picker + in-pane composer, positional prompt, permission mode, `cf/<slug>` worktrees, image attachments, opus/high defaults, "thread" copy (`new-thread-composer.md`).
-* **Side panel + PR surface** done: per-selection side panel with a surface registry, the Pull request surface (summary, timeline, reviewers, refresh, revert), and its menu starting `pr.ask` / `pr.explain` / `pr.fix.findings` sessions (`side-panel.md`, `gh-pr-detail.md`, `pr-thread-commands.md`).
+* **Side panel + PR surface** done: per-selection side panel with a surface registry, the Pull request surface (summary, timeline, reviewers, refresh, revert), and its menu starting `pr.ask` / `pr.explain` / `pr.fix.findings` threads (`side-panel.md`, `gh-pr-detail.md`, `pr-thread-commands.md`).
 * **Natural thread names** done (2026-10-13): the namer asks for a 3–6 word sentence-case title, cleaned to one line; `cf/<slug>` branches slugify it; forks are "<parent> (fork)"; old slug names stay (`natural-thread-names.md`).
+* **Rename session to thread** done (2026-10-16): one `ThreadService`, `internal/store/thread`, `thread.*` commands and CLI verbs, `threads.*` settings (legacy keys rewritten on load), `CODE_FOUNDRY_THREAD` / `--context-thread`, migration 0022 renames the tables, frontend modules and test ids (`rename-session-to-thread.md`).
 
 ### Multi-repo workspaces: the five steps are built
 
@@ -221,11 +222,10 @@ database from a newer build. Design record: `docs/notes/release-channels-handoff
 
 Collected from the step notes; none blocks daily use.
 
-* **Threads / sessions**
-  * Removing a thread does not offer to remove the worktree `session.new` created for it.
+* **Threads**
+  * Removing a thread does not offer to remove the worktree `thread.new` created for it.
   * The composer prompt is a TipTap editor (inline image chips); the main bundle is over Vite's 500 kB warning, unmeasured whether TipTap pushed it there.
-  * Copy says "thread"; identifiers (`session.*`, `SessionService`, settings keys) still say session. Full rename is a separate pass.
-  * The GUI does not show `Session.status_reason` (the CLI does). A badge tooltip or the session header could.
+  * The GUI does not show `Thread.status_reason` (the CLI does). A badge tooltip or the thread header could.
   * "Viewed" means "has an Attach subscriber": a minimized or occluded window keeps acknowledging finished turns. Detaching on `visibilitychange` would fix it.
   * Memory gate measured the daemon only; the GUI (WKWebView) was not measured.
 * **Git operations**
@@ -240,7 +240,7 @@ Collected from the step notes; none blocks daily use.
 * **Side panel + PR surface** (`side-panel.md`)
   * Files and Diff surfaces, and the PR surface's Code tab, are disabled placeholders.
   * The PR menu has no Check out, Copy PR number, description editing, labels or replies; the picker lists org teams only when already requested.
-  * PR sessions use the settings' model and effort (no picker in the menu), and the menu does not say beforehand which worktree a session will start in.
+  * PR threads use the settings' model and effort (no picker in the menu), and the menu does not say beforehand which worktree a thread will start in.
   * Not run in the real Wails window.
 * **Settings**
   * Saving from the app rewrites `settings.toml`, which drops user comments and unknown keys.
