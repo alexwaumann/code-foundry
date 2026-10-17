@@ -643,8 +643,12 @@ func TestWakeLimitStatus(t *testing.T) {
 		t.Errorf("seen: %s %q", st, r)
 	}
 	d.wakeLimit = true
-	d.sent()
+	d.sent(false)
+	if !d.wakeLimit {
+		t.Errorf("a wake going out keeps it")
+	}
+	d.sent(true)
 	if d.wakeLimit {
-		t.Errorf("a message clears it")
+		t.Errorf("the user's message clears it")
 	}
 }

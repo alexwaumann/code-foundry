@@ -14,7 +14,7 @@ func TestStreamStatus(t *testing.T) {
 	ev := func(e claudestream.Event) step { return func(d *streamStatus) { d.event(e) } }
 	result := func(js string) step { return ev(claudestream.Parse([]byte(`{"type":"result",` + js + `}`))) }
 	init := func(d *streamStatus) { d.initialized() }
-	sent := func(d *streamStatus) { d.sent() }
+	sent := func(d *streamStatus) { d.sent(true) }
 	ack := func(d *streamStatus) { d.Acknowledge() }
 	ask := func(id string, it Item) step { return func(d *streamStatus) { d.ask(id, it) } }
 	resolved := func(id string) step { return func(d *streamStatus) { d.resolved(id) } }

@@ -550,7 +550,7 @@ func (r *runner) sendMessage(o *outgoing) (Item, error) {
 	} else {
 		it, _ = st.log.get(id)
 	}
-	st.sd.sent()
+	st.sd.sent(o.origin != OriginWake)
 	r.activity = r.m.opts.Now()
 	r.checkStatus()
 	return it, nil

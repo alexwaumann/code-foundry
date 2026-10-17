@@ -377,7 +377,7 @@ func TestBudgetStop(t *testing.T) {
 func TestBudgetStatus(t *testing.T) {
 	var d streamStatus
 	d.initialized()
-	d.sent()
+	d.sent(true)
 	d.budget = true
 	if st, r := d.Status(); st != StatusNeedsAttention || r != ReasonBudgetReached {
 		t.Fatalf("stopping: %s %q", st, r)
@@ -392,7 +392,7 @@ func TestBudgetStatus(t *testing.T) {
 		t.Errorf("seen: %s %q", st, r)
 	}
 
-	d.sent()
+	d.sent(true)
 	d.budget = true
 	d.event(interruptedResult())
 	d.turnStarted() // Claude starts a turn by itself
@@ -401,7 +401,7 @@ func TestBudgetStatus(t *testing.T) {
 	}
 
 	d.budget, d.budgetEnded = true, false
-	d.sent()
+	d.sent(true)
 	if st, _ := d.Status(); st != StatusBusy {
 		t.Errorf("a message clears it: %s", st)
 	}
