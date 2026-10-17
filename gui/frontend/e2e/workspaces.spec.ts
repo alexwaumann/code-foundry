@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { invocations, mockPost, mockUrl, openApp, resetMock } from "./fixtures";
+import { freshCopyByDefault, invocations, mockPost, mockUrl, openApp, resetMock } from "./fixtures";
 
 /** Where the mock (like the daemon) puts a project's worktree for a cf/<name> branch. */
 const WT = "/Users/dev/.code-foundry/worktrees/alexwaumann";
@@ -95,8 +95,8 @@ test("pick a workspace: member chips, the primary is changeable, the thread is t
     project: "repo-gp",
     workspace: "w-000000000001",
     worktree: GP_LOGIN,
-    model: "claude-opus-4-8[1m]",
-    effort: "high",
+    model: "claude-sonnet-5[1m]",
+    effort: "medium",
     permission: "auto",
     prompt: "Wire the login form to the new API",
   });
@@ -131,8 +131,8 @@ test("a workspace in new-worktree mode makes a new workspace with the same proje
     project: "repo-cf",
     "new-worktree": "true",
     projects: "repo-cf,repo-gp",
-    model: "claude-opus-4-8[1m]",
-    effort: "high",
+    model: "claude-sonnet-5[1m]",
+    effort: "medium",
     permission: "auto",
     prompt: "Rename the session cookie",
   });
@@ -141,6 +141,7 @@ test("a workspace in new-worktree mode makes a new workspace with the same proje
 });
 
 test("pick a project, add Also in: a new workspace with a cf/<slug> worktree in each", async ({ page }) => {
+  await freshCopyByDefault();
   await openApp(page);
   await page.keyboard.press("Meta+n");
   await page.keyboard.press("Meta+1");
@@ -199,8 +200,8 @@ test("pick a project, add Also in: a new workspace with a cf/<slug> worktree in 
     project: "repo-cf",
     "new-worktree": "true",
     projects: "repo-cf:origin/release/v0.3,repo-gp",
-    model: "claude-opus-4-8[1m]",
-    effort: "high",
+    model: "claude-sonnet-5[1m]",
+    effort: "medium",
     permission: "auto",
     prompt: "Add a dark mode toggle",
   });
@@ -222,6 +223,7 @@ test("pick a project, add Also in: a new workspace with a cf/<slug> worktree in 
 });
 
 test("with workspaces around, a single-project thread sends exactly what it did before", async ({ page }) => {
+  await freshCopyByDefault();
   await mockPost("workspace?name=login&projects=repo-cf,repo-gp");
   await openApp(page);
   await page.keyboard.press("Meta+n");
@@ -235,8 +237,8 @@ test("with workspaces around, a single-project thread sends exactly what it did 
     project: "repo-gp",
     "new-worktree": "true",
     base: "origin/main",
-    model: "claude-opus-4-8[1m]",
-    effort: "high",
+    model: "claude-sonnet-5[1m]",
+    effort: "medium",
     permission: "auto",
     prompt: "Port the renderer",
   });

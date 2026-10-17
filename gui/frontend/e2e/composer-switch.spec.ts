@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { invocations, mockPost, openApp, resetMock, row } from "./fixtures";
+import { freshCopyByDefault, invocations, mockPost, openApp, resetMock, row } from "./fixtures";
 
 test.beforeEach(async () => {
   await resetMock();
@@ -27,6 +27,7 @@ async function addAlsoIn(page: Page, name: string): Promise<void> {
 }
 
 test("switch the project from the heading: the draft moves, Also in is swapped, the thread starts there", async ({ page }) => {
+  await freshCopyByDefault();
   await openApp(page);
   await compose(page, 1);
   await expect(heading(page)).toHaveText("What should we build in code-foundry?");
@@ -89,6 +90,7 @@ test("switch the project from the heading: the draft moves, Also in is swapped, 
 });
 
 test("switch to a workspace and back to a project", async ({ page }) => {
+  await freshCopyByDefault();
   await mockPost("workspace?name=login&projects=repo-cf,repo-gp");
   await openApp(page);
   await compose(page, 3);

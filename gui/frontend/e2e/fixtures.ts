@@ -58,6 +58,15 @@ export async function mockPost(pathAndQuery: string): Promise<unknown> {
   return res.json();
 }
 
+/**
+ * Makes a fresh copy the composer's default Work in choice (the default is the project
+ * folder itself), for specs that exercise the new-worktree flow: the base picker, Also in,
+ * thread.new --new-worktree.
+ */
+export async function freshCopyByDefault(): Promise<void> {
+  await mockPost("settings/external?threads.default_worktree=new");
+}
+
 /** Stops the mock's clock from changing these threads (status, settling); controls and input still do. */
 export async function holdThreads(...ids: string[]): Promise<void> {
   await mockPost(`thread/hold?${ids.map((id) => `id=${id}`).join("&")}`);
