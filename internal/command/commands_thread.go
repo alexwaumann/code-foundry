@@ -441,7 +441,10 @@ func FormatThreadItems(snap *v1.ThreadItemsSnapshot, full bool) string {
 			if t.TurnCostUsd != nil {
 				body += fmt.Sprintf(", $%.4f", t.GetTurnCostUsd())
 			}
-			body += fmt.Sprintf(", $%.4f so far", t.GetCostUsd())
+			if t.GetCostUsd() > 0 {
+				// None on a turn end the daemon wrote for a process that ended first.
+				body += fmt.Sprintf(", $%.4f so far", t.GetCostUsd())
+			}
 			if t.GetModel() != "" {
 				body += ", " + t.GetModel()
 			}
