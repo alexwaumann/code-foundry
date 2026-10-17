@@ -1698,9 +1698,9 @@ export enum ThreadWaitCondition {
 
   /**
    * Claude is not working and no answer is pending: the thread is not STARTING and its
-   * status is IDLE, NEEDS_ATTENTION for a turn that ended ("finished", "error: <code>")
-   * or a snooze that ended, or ERROR (the process ended mid-turn). A permission prompt
-   * or question ("permission: ...", "question: ...") does not count.
+   * status is IDLE, ERROR (the process ended mid-turn), or NEEDS_ATTENTION for anything
+   * but a pending permission prompt or question (a turn that ended unseen, "finished"
+   * or "error: <code>"; a snooze that ended).
    *
    * @generated from enum value: THREAD_WAIT_CONDITION_IDLE = 1;
    */
