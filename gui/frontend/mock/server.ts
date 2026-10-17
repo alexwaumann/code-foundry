@@ -389,9 +389,12 @@ function routes(router: ConnectRouter): void {
     remove: () => {
       throw new ConnectError("use the thread.remove command in the mock", Code.Unimplemented);
     },
-    stageAttachment: (req) => guard(() => ({ path: world.stageAttachment(req.name, req.mimeType, req.data.length, req.pages) })),
-    // The scripted thread's image (mock/thread.ts); staged uploads have no bytes in the mock.
+    stageAttachment: (req) => guard(() => ({ path: world.stageAttachment(req.name, req.mimeType, req.data, req.pages) })),
+    // The scripted thread's image (mock/thread.ts); a staged PDF reads back as its bytes, a
+    // staged image as that same PNG.
     readAttachment: (req) => {
+      const pdf = world.attachmentBytes.get(req.path);
+      if (pdf) return { data: pdf, mimeType: "application/pdf" };
       if (req.path === MOCK_ATTACHMENT || world.attachments.has(req.path)) return { data: new Uint8Array(MOCK_ATTACHMENT_PNG), mimeType: "image/png" };
       throw new ConnectError(`attachment ${req.path} not found`, Code.NotFound);
     },
