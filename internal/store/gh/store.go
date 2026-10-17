@@ -564,7 +564,7 @@ func (s *Store) callDoc(ctx context.Context, name, doc string, vars map[string]a
 		}
 	}
 	attrs := []any{"query", name, "dur", s.lastEnd.Sub(start).Round(time.Millisecond).String(), "bytes", len(data)}
-	if name != queryPoll { // the poll's variables are logged by poll.go in summary form
+	if name != queryPoll && name != queryPollStats { // logged by poll.go in summary form
 		attrs = append(attrs, "vars", loggedVars(vars))
 	}
 	if rl != nil {

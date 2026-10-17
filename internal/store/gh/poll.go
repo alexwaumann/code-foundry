@@ -861,6 +861,11 @@ func (s *Store) fetchClosedStats(ctx context.Context, cp *pollPlan) (*pollResult
 	if err != nil {
 		return nil, err
 	}
+	slugs := make([]string, len(cp.repos))
+	for i, r := range cp.repos {
+		slugs[i] = r.slug
+	}
+	s.log.Debug("gh closed-month stats", "global_months", len(cp.stats.months), "repos", slugs)
 	data, err := s.callDoc(ctx, queryPollStats, doc, vars)
 	var partial *PartialError
 	if err != nil && !errors.As(err, &partial) {
