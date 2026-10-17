@@ -35,6 +35,7 @@ async function openFromSettings(page: Page, slot: "dark" | "light") {
   await openApp(page);
   await page.keyboard.press("Meta+Comma");
   await expect(page.getByTestId("settings-page")).toBeVisible();
+  await page.getByTestId("settings-nav-appearance").click();
   await page.getByTestId(`choose-theme-${slot}`).click();
   await expect(page$(page)).toBeVisible();
   await expect(page.getByTestId(`themes-slot-${slot}`)).toHaveAttribute("aria-pressed", "true");
@@ -189,7 +190,7 @@ test("the scheme control writes appearance.theme and the slot in use follows", a
   await expect(html(page)).toHaveAttribute("data-theme", "github-dark");
 });
 
-test("theme pick from the CLI (ShowView themes.light) opens the page on that slot; Settings' Themes link opens it too", async ({ page }) => {
+test("theme pick from the CLI (ShowView themes.light) opens the page on that slot; Settings' Browse themes row opens it too", async ({ page }) => {
   await openApp(page);
   await expect.poll(() => emit({ showView: { name: "themes.light" } })).toBeGreaterThan(0);
   await expect(page$(page)).toBeVisible();
@@ -200,6 +201,7 @@ test("theme pick from the CLI (ShowView themes.light) opens the page on that slo
   await expect(page.getByTestId("settings-page")).toHaveCount(0);
 
   await page.keyboard.press("Meta+Comma");
+  await page.getByTestId("settings-nav-appearance").click();
   // The slot selects name the theme whole: no " (default)" beside the Choose… button.
   for (const [key, name] of [["appearance.theme_dark", "GitHub Dark"], ["appearance.theme_light", "GitHub Light"]] as const)
     await expect(page.locator(`[data-setting="${key}"] [data-slot="select-trigger"]`)).toHaveText(name);

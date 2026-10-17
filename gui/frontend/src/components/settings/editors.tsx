@@ -30,8 +30,8 @@ export function BoolEditor({ field, value, pending, commit }: EditorProps) {
 const EMPTY_ENUM = "__cf_default__";
 
 /**
- * `markDefault` (on) appends " (default)" to the default's label; the theme slot rows turn it
- * off to leave room for their Choose… button (the reset arrow already marks a changed value).
+ * `markDefault` (on) appends " (default)" to the default's label in the list, not in the
+ * trigger, where the reset arrow already marks a changed value. The theme slot rows turn it off.
  */
 export function EnumEditor({ field, value, pending, invalid, commit, markDefault = true }: EditorProps & { markDefault?: boolean }) {
   const toItem = (v: string) => (v === "" ? EMPTY_ENUM : v);
@@ -50,7 +50,10 @@ export function EnumEditor({ field, value, pending, invalid, commit, markDefault
         {field.enumValues.map((v) => (
           <SelectItem key={v} value={toItem(v)}>
             {enumLabel(field, v)}
-            {markDefault && v === field.defaultValue && v !== "" ? " (default)" : ""}
+            {markDefault && v === field.defaultValue && v !== "" && (
+              // Only in the list: the trigger (the item's text copied into select-value) shows the name alone.
+              <span className="[[data-slot=select-value]_&]:hidden"> (default)</span>
+            )}
           </SelectItem>
         ))}
       </SelectContent>

@@ -154,6 +154,7 @@ for (const zoom of [100, 125]) {
     await openApp(page);
     await setZoom(page, zoom);
     await page.keyboard.press("Meta+Comma");
+    await page.getByTestId("settings-nav-appearance").click();
     const trigger = page.locator('[data-setting="appearance.theme"] [data-slot="select-trigger"]');
     await trigger.click();
     const list = page.locator('[data-slot="select-content"]');

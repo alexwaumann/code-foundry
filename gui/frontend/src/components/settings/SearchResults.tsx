@@ -14,7 +14,7 @@ export function SearchResults({ query, words, result, back }: { query: string; w
       <div className="mb-3 flex items-baseline gap-2" data-testid="settings-result-count">
         <h2 className="text-heading">
           {n} {n === 1 ? "result" : "results"}
-        </h2>
+        </h2>{" "}
         <span className="text-caption">for “{query}” in every page</span>
       </div>
       {n === 0 ? (

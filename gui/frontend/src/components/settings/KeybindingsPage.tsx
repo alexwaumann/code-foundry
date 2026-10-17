@@ -36,7 +36,7 @@ function KeybindingRow({ field, className }: { field: SettingFieldView; classNam
             <span className="inline-block max-w-full truncate align-middle text-body-sm">{field.title}</span>
           </Tip>
         </div>
-        <div className="min-w-36">{state.editor}</div>
+        <div className="min-w-28">{state.editor}</div>
         <ResetButton field={field} state={state} />
       </div>
       <FieldError message={state.message} className="pb-2" />
