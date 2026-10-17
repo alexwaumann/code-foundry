@@ -140,7 +140,7 @@ func pickPRWorktree(kind prThreadKind, projects []*v1.Project, slug string, numb
 	clones := clonesOf(projects, slug)
 	if len(clones) == 0 {
 		return prWorktreePick{}, connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf(
-			"no registered repository is a clone of %s: add one with `code-foundry repo add <folder>`, or pass --worktree", slug))
+			"no registered project is a clone of %s: add one with `code-foundry project add <folder>`, or pass --worktree", slug))
 	}
 	if kind == prThreadRead && active != "" {
 		active = filepath.Clean(active)
@@ -263,7 +263,7 @@ func RegisterPullRequestThreads(r *Registry, d PullRequestThreadDeps) error {
 			case err == nil:
 				projects = list.Msg.GetProjects()
 			case explicit == "":
-				return Result{}, wrapStep("list repositories", err)
+				return Result{}, wrapStep("list projects", err)
 			} // An explicit worktree only loses its status line in the prompt.
 		}
 		head := prHeadOf(pr)

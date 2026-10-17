@@ -115,7 +115,7 @@ func TestPullRequestThreadCommands(t *testing.T) {
 			wantReq:    []proto.Message{detail(false)},
 			wantCode:   connect.CodeInvalidArgument,
 			wantErrMsg: "the prompt for #7 would be 201 KiB, over the 200 KiB a thread can start with"},
-		{name: "explain with an explicit worktree skips the repo list", cmd: "pr.explain",
+		{name: "explain with an explicit worktree skips the project list", cmd: "pr.explain",
 			args:       map[string]string{"repo-slug": "o/r", "number": "7", "worktree": "/some/where"},
 			wantReq:    []proto.Message{detail(false)},
 			wantThread: &v1.CreateThreadRequest{WorktreePath: "/some/where"},
@@ -133,13 +133,13 @@ func TestPullRequestThreadCommands(t *testing.T) {
 				f.gh.Err = connect.NewError(connect.CodeNotFound, errors.New("no such pull request"))
 			},
 			wantCode: connect.CodeNotFound, wantErrMsg: "read #7: no such pull request"},
-		{name: "explain: a repository list failure keeps its code", cmd: "pr.explain",
+		{name: "explain: a project list failure keeps its code", cmd: "pr.explain",
 			args: map[string]string{"repo-slug": "o/r", "number": "7"},
 			setup: func(f *prThreadFixture) {
 				f.project.Err = connect.NewError(connect.CodeUnavailable, errors.New("daemon busy"))
 			},
 			wantReq:  []proto.Message{detail(false), list},
-			wantCode: connect.CodeUnavailable, wantErrMsg: "list repositories: daemon busy"},
+			wantCode: connect.CodeUnavailable, wantErrMsg: "list projects: daemon busy"},
 		{name: "fix on the head branch's worktree, refreshed, with its state in the prompt", cmd: "pr.fix.findings",
 			args:       map[string]string{"repo-slug": "o/r", "number": "7"},
 			setup:      addWorktree(&v1.Worktree{Path: "/wt/fix-it", Branch: "fix/it", Status: &v1.GitStatus{Upstream: "origin/fix/it", Behind: 2, Dirty: true}}),
