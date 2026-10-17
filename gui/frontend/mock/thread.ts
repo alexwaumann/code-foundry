@@ -1035,7 +1035,7 @@ export class MockThreadLogs {
         { at: at(21) },
       );
       l.pending = [{ requestId: `req-${id}`, itemId: perm.id, question: false, toolName: "Bash", summary: `Bash ${h.reply}` }];
-    } else if (h.end === "cut") {
+    } else {
       push({ case: "error", value: { text: `Claude stopped unexpectedly (exit code ${String(h.exitCode ?? 1)})` } }, { at: at(12) });
     }
     for (const [i, w] of (h.wakes ?? []).entries()) {
