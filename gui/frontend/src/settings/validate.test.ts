@@ -3,7 +3,7 @@ import type { SettingFieldView } from "@/api/settings";
 import { validateKeybinding, validateSetting } from "./validate";
 
 function field(over: Partial<SettingFieldView>): SettingFieldView {
-  return { key: "g.k", title: "K", description: "", group: "g", type: "string", enumValues: [], enumLabels: [], defaultValue: "", restartRequired: false, min: 0, max: 0, placeholder: "", ...over };
+  return { key: "g.k", title: "K", description: "", group: "g", type: "string", enumValues: [], enumLabels: [], defaultValue: "", restartRequired: false, min: 0, max: 0, placeholder: "", page: "", section: "", unit: "", dependsOn: "", row: "", ...over };
 }
 
 describe("validateSetting", () => {

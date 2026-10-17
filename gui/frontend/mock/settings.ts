@@ -5,12 +5,13 @@
  * the file are simulated with POST /__mock/settings/external?<key>=<value>[&loadError=…].
  */
 import type { MessageInitShape } from "@bufbuild/protobuf";
-import { SettingType, type SettingFieldSchema, type SettingGroupSchema, type SettingPageSchema, type SettingsSnapshotSchema } from "../src/gen/codefoundry/v1/settings_pb";
+import { SettingType, type SettingFieldSchema, type SettingGroupSchema, type SettingsSnapshotSchema } from "../src/gen/codefoundry/v1/settings_pb";
 import { DEFAULT_DARK, DEFAULT_LIGHT, themesFor } from "../src/themes";
 
 type FieldInit = MessageInitShape<typeof SettingFieldSchema> & { key: string; type: SettingType; defaultValue: string; group: string; page: string; section: string };
 type GroupInit = MessageInitShape<typeof SettingGroupSchema>;
-type PageInit = MessageInitShape<typeof SettingPageSchema> & { id: string };
+/** A SettingPage init, kept plain so pages() can spread it. */
+type PageInit = { id: string; title: string; description?: string; sections?: { id: string; title: string; description?: string }[] };
 export type SettingsSnapshotInit = MessageInitShape<typeof SettingsSnapshotSchema>;
 
 export interface MockCommandInfo {
