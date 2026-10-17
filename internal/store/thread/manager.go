@@ -391,6 +391,22 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 	if strings.ContainsRune(prompt, 0) {
 		return Thread{}, fmt.Errorf("%w: prompt contains a NUL byte", ErrInvalidArgument)
 	}
+	brief, err := CleanBrief(o.Brief)
+	if err != nil {
+		return Thread{}, err
+	}
+	labels, err := CleanLabels(o.Labels)
+	if err != nil {
+		return Thread{}, err
+	}
+	if err := CheckBudget(o.BudgetUSD); err != nil {
+		return Thread{}, err
+	}
+	// The creator's name now: the note and created_by_name keep it (metadata.go).
+	creatorID, creatorName, err := m.creator(o.CreatedBy)
+	if err != nil {
+		return Thread{}, err
+	}
 	id, err := newThreadID()
 	if err != nil {
 		return Thread{}, err
@@ -401,6 +417,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 	}
 	s := Thread{
 		ID: id, Name: name, Model: o.Model, Effort: o.Effort, PermissionMode: o.PermissionMode, State: StateStarting,
+		CreatedBy: creatorID, CreatedByName: creatorName, Brief: brief, Labels: labels, BudgetUSD: o.BudgetUSD,
 	}
 	namingTried := name != ""
 	var late <-chan namingResult
@@ -476,14 +493,33 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 	}
 	m.recs[id] = rec
 	m.mu.Unlock()
-	if err := m.spawn(ctx, id, launch{newID: cid}); err != nil {
+	drop := func() {
 		m.mu.Lock()
 		delete(m.recs, id)
 		m.tmu.Lock()
 		delete(m.threads, id) // the thread's log, loaded by spawnStream
 		m.tmu.Unlock()
 		m.mu.Unlock()
+	}
+	var note *Item
+	if creatorID != "" {
+		// Before spawn, so the note precedes the first message (written once Claude
+		// answers its handshake); its row once spawn wrote the thread's, like a fork's
+		// copy (fork.go).
+		it, err := m.startNote(ctx, id, createdByNoteID, createdByNoteText(creatorName, brief))
+		if err != nil {
+			drop()
+			return Thread{}, err
+		}
+		note = &it
+	}
+	if err := m.spawn(ctx, id, launch{newID: cid}); err != nil {
+		drop()
 		return Thread{}, err
+	}
+	if note != nil {
+		m.saveItem(id, *note)
+		m.log.Info("thread created by another thread", "thread", id, "created_by", creatorID)
 	}
 	if late != nil {
 		m.applyLateName(id, late)

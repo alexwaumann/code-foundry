@@ -227,6 +227,7 @@ func (r *runner) publishUsage() {
 		up := u.snapshot()
 		runs = up.runs
 		r.m.setUsage(r.id, up)
+		r.checkBudget() // budget.go
 	}
 	u.progressed, r.agentsPubAt = false, now
 	r.st.log.setAgents(runs)

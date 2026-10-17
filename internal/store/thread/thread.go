@@ -209,6 +209,22 @@ type Thread struct {
 	// and the turn Claude starts by itself to report it has not ended yet (wake.go). Not
 	// persisted; Thread.background_wake_pending on the API.
 	WakePending bool
+	// CreatedBy is the thread whose agent created this one (CreateOptions.CreatedBy);
+	// empty when the user did. CreatedByName is that thread's name (its id when unnamed)
+	// at creation, kept verbatim. Persisted (metadata.go).
+	CreatedBy     string
+	CreatedByName string
+	// Brief is what the thread was started for, in its creator's words. Persisted.
+	Brief string
+	// Labels are sorted, distinct label tokens (CleanLabels). Persisted. Copy on write.
+	Labels []string
+	// Report is the thread's latest report (Store.Report); the zero value when none.
+	// Persisted.
+	Report Report
+	// BudgetUSD is the spending limit (0 = none); BudgetHitUSD the budget value the
+	// budget stop last fired for (0 = armed; budget.go). Persisted.
+	BudgetUSD    float64
+	BudgetHitUSD float64
 }
 
 // APIRetry is one api_retry frame of a thread's stream (stream.go): Claude retries a
@@ -314,6 +330,13 @@ type CreateOptions struct {
 	// the attachments directory are rejected, as are attachments sending more than
 	// MaxMessageMediaBytes inline.
 	Attachments []string
+	// CreatedBy is the thread whose agent asks for this one; it must exist. Create
+	// records its current name and starts the log with a "Created by" note.
+	CreatedBy string
+	// Brief, Labels and BudgetUSD are the thread's (metadata.go validates them).
+	Brief     string
+	Labels    []string
+	BudgetUSD float64
 }
 
 // RunInTarget names the member a workspace thread should run in: its repository id or
@@ -358,6 +381,15 @@ type Store interface {
 	// removes its shells, unpins and unsnoozes it and sets ArchivedAt (kept when already set). With
 	// archived false it only clears ArchivedAt; the thread stays disconnected.
 	Archive(ctx context.Context, id string, archived bool) (Thread, error)
+	// Label edits a thread's labels: clear removes every label, then remove's go, then
+	// add's are added (each validated; a label in both is ErrInvalidArgument). Any state.
+	Label(ctx context.Context, id string, add, remove []string, clear bool) (Thread, error)
+	// Report replaces the thread's report (status required; summary and data
+	// validated), stamped with now. Any state.
+	Report(ctx context.Context, id string, r Report) (Thread, error)
+	// SetBudget sets the thread's spending limit (0 clears it). A budget above the
+	// thread's cost re-arms the budget stop (budget.go). Any state.
+	SetBudget(ctx context.Context, id string, usd float64) (Thread, error)
 	// Snooze snoozes a thread until a time (after now; ErrInvalidArgument otherwise):
 	// it closes it like Close, kills and removes its shells, unpins and unarchives it
 	// and sets SnoozedUntil (replacing an earlier one). When the time comes the store

@@ -3,12 +3,13 @@ package thread
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 )
 
 // Persistence for the threads table (migrations 0003, 0006, 0008, 0009, 0011, 0014,
-// 0015, 0016, 0017 and 0018) and thread_pull_requests (0010); thread_usage and usage_retired
+// 0015, 0016, 0017, 0018 and 0023) and thread_pull_requests (0010); thread_usage and usage_retired
 // (0012) are in usage_db.go, which also deletes threads (retireThread). No process
 // survives a daemon restart. Status, its reason and StatusChangedAt are (0011): a disconnected
 // thread keeps the status it ended with.
@@ -33,8 +34,11 @@ func saveThread(ctx context.Context, db *sql.DB, s Thread) error {
 			created_at, last_activity_at, parent_id, state, disconnect_reason, exit_code, last_error,
 			permission_mode, base_ref, created_worktree, workspace_id, pinned,
 			status, status_reason, status_changed_at,
-			context_tokens, context_model, last_result_at, archived_at, snoozed_until)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			context_tokens, context_model, last_result_at, archived_at, snoozed_until,
+			created_by, created_by_name, brief, labels,
+			report_status, report_summary, report_data, report_at, budget_usd, budget_hit_usd)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+			?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (id) DO UPDATE SET
 			claude_session_id = excluded.claude_session_id,
 			repo_id = excluded.repo_id,
@@ -61,12 +65,24 @@ func saveThread(ctx context.Context, db *sql.DB, s Thread) error {
 			context_model = excluded.context_model,
 			last_result_at = excluded.last_result_at,
 			archived_at = excluded.archived_at,
-			snoozed_until = excluded.snoozed_until`,
+			snoozed_until = excluded.snoozed_until,
+			created_by = excluded.created_by,
+			created_by_name = excluded.created_by_name,
+			brief = excluded.brief,
+			labels = excluded.labels,
+			report_status = excluded.report_status,
+			report_summary = excluded.report_summary,
+			report_data = excluded.report_data,
+			report_at = excluded.report_at,
+			budget_usd = excluded.budget_usd,
+			budget_hit_usd = excluded.budget_hit_usd`,
 		s.ID, s.ClaudeSessionID, s.RepoID, s.WorktreePath, s.Name, s.AutoNamed, s.Model, s.Effort,
 		millis(s.CreatedAt), millis(s.LastActivityAt), s.ParentID, int(s.State), s.DisconnectReason, s.ExitCode, s.LastError,
 		int(s.PermissionMode), s.BaseRef, s.CreatedWorktree, s.WorkspaceID, s.Pinned,
 		int(s.Status), s.StatusReason, millis(s.StatusChangedAt),
-		s.ContextTokens, s.ContextModel, millis(s.LastResultAt), millis(s.ArchivedAt), millis(s.SnoozedUntil))
+		s.ContextTokens, s.ContextModel, millis(s.LastResultAt), millis(s.ArchivedAt), millis(s.SnoozedUntil),
+		s.CreatedBy, s.CreatedByName, s.Brief, labelsJSON(s.Labels),
+		int(s.Report.Status), s.Report.Summary, s.Report.Data, millis(s.Report.At), s.BudgetUSD, s.BudgetHitUSD)
 	if err != nil {
 		return fmt.Errorf("thread: save %s: %w", s.ID, err)
 	}
@@ -78,7 +94,9 @@ func loadThreads(ctx context.Context, db *sql.DB) ([]Thread, error) {
 			model, effort, created_at, last_activity_at, parent_id, state, disconnect_reason, exit_code, last_error,
 			permission_mode, base_ref, created_worktree, workspace_id, pinned,
 			status, status_reason, status_changed_at,
-			context_tokens, context_model, last_result_at, archived_at, snoozed_until
+			context_tokens, context_model, last_result_at, archived_at, snoozed_until,
+			created_by, created_by_name, brief, labels,
+			report_status, report_summary, report_data, report_at, budget_usd, budget_hit_usd
 		FROM threads ORDER BY created_at, id`)
 	if err != nil {
 		return nil, fmt.Errorf("thread: load: %w", err)
@@ -87,13 +105,16 @@ func loadThreads(ctx context.Context, db *sql.DB) ([]Thread, error) {
 	var out []Thread
 	for rows.Next() {
 		var s Thread
-		var created, active, statusAt, lastResult, archived, snoozed int64
-		var state, perm, status int
+		var created, active, statusAt, lastResult, archived, snoozed, reportAt int64
+		var state, perm, status, reportStatus int
+		var labels string
 		if err := rows.Scan(&s.ID, &s.ClaudeSessionID, &s.RepoID, &s.WorktreePath, &s.Name, &s.AutoNamed,
 			&s.Model, &s.Effort, &created, &active, &s.ParentID, &state, &s.DisconnectReason, &s.ExitCode, &s.LastError,
 			&perm, &s.BaseRef, &s.CreatedWorktree, &s.WorkspaceID, &s.Pinned,
 			&status, &s.StatusReason, &statusAt,
-			&s.ContextTokens, &s.ContextModel, &lastResult, &archived, &snoozed); err != nil {
+			&s.ContextTokens, &s.ContextModel, &lastResult, &archived, &snoozed,
+			&s.CreatedBy, &s.CreatedByName, &s.Brief, &labels,
+			&reportStatus, &s.Report.Summary, &s.Report.Data, &reportAt, &s.BudgetUSD, &s.BudgetHitUSD); err != nil {
 			return nil, fmt.Errorf("thread: load: %w", err)
 		}
 		s.CreatedAt, s.LastActivityAt, s.State = fromMillis(created), fromMillis(active), State(state)
@@ -107,6 +128,11 @@ func loadThreads(ctx context.Context, db *sql.DB) ([]Thread, error) {
 		s.LastResultAt = fromMillis(lastResult)
 		s.ArchivedAt = fromMillis(archived)
 		s.SnoozedUntil = fromMillis(snoozed)
+		s.Labels = parseLabels(labels)
+		if s.Report.Status = ReportStatus(reportStatus); !s.Report.Status.valid() {
+			s.Report.Status = ReportNone
+		}
+		s.Report.At = fromMillis(reportAt)
 		out = append(out, s)
 	}
 	if err := rows.Err(); err != nil {
@@ -183,4 +209,25 @@ func loadLinks(ctx context.Context, db *sql.DB) (map[string][]LinkedPullRequest,
 		return nil, fmt.Errorf("thread: load links: %w", err)
 	}
 	return out, nil
+}
+
+// labelsJSON is the labels column: a JSON array, "[]" for none.
+func labelsJSON(labels []string) string {
+	if len(labels) == 0 {
+		return "[]"
+	}
+	b, err := json.Marshal(labels)
+	if err != nil {
+		return "[]" // a []string always marshals
+	}
+	return string(b)
+}
+
+// parseLabels reads the labels column; a malformed value (hand-edited) is no labels.
+func parseLabels(col string) []string {
+	var out []string
+	if json.Unmarshal([]byte(col), &out) != nil || len(out) == 0 {
+		return nil
+	}
+	return out
 }
