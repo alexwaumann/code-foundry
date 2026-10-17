@@ -1,248 +1,161 @@
-import { useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import type { ReactNode } from "react";
 import { RotateCcw } from "lucide-react";
-import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { SettingFieldView } from "@/api/settings";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Tip } from "@/components/ui/tooltip";
-import { chordFromEvent, formatChord } from "@/keys/chord";
-import { enumOptionLabel } from "@/lib/models";
-import { validateSetting } from "@/settings/validate";
-import { saveSettings, useSettingsStore, useSettingValue } from "@/stores/settings";
-import type { EditorProps, SettingEditor } from "./editor";
+import { Highlight } from "./Highlight";
 import { keyEditors } from "./keyEditors";
-
-/** An enum value's name: the schema's label (the model registry's "Opus 4.8"), else the value; "" is "no preference". */
-function enumLabel(f: SettingFieldView, v: string): string {
-  return v === "" ? "Default" : enumOptionLabel(f, v);
-}
-
-function displayValue(f: SettingFieldView, v: string): string {
-  if (f.type === "keybinding") return v === "none" ? "unbound" : v ? formatChord(v) : "unbound";
-  if (f.type === "enum") return enumLabel(f, v);
-  return v === "" ? "default" : v;
-}
+import { displayValue } from "./model";
+import { useSettingField } from "./useSettingField";
 
 
-function BoolEditor({ field, value, pending, commit }: EditorProps) {
-  const on = value === "true";
+type FieldState = ReturnType<typeof useSettingField>;
+
+/** "Applies after daemon restart", or "Restart the daemon to apply" once changed. */
+export function RestartChip({ field, restartPending }: { field: SettingFieldView; restartPending: boolean }) {
+  if (restartPending)
+    return (
+      <span className="rounded-sm bg-warning/15 px-1.5 py-px text-caption-sm font-medium text-warning" data-testid="restart-pending">
+        Restart the daemon to apply
+      </span>
+    );
+  if (!field.restartRequired) return null;
   return (
-    <Switch
-      aria-label={field.title}
-      checked={on}
-      disabled={pending}
-      onCheckedChange={(checked) => {
-        commit(checked ? "true" : "false");
-      }}
-    />
+    <span className="rounded-sm bg-muted px-1.5 py-px text-caption-sm" data-testid="restart-hint">
+      Applies after daemon restart
+    </span>
   );
 }
 
-/**
- * Radix Select reserves "" for "no value" (an item cannot have it), and "" is an enum's
- * "no preference" (Default); the list uses this stand-in for it.
- */
-const EMPTY_ENUM = "__cf_default__";
-
-/**
- * `markDefault` (on) appends " (default)" to the default's label; the theme slot rows turn it
- * off to leave room for their Choose… button (the reset arrow already marks a changed value).
- */
-export function EnumEditor({ field, value, pending, invalid, commit, markDefault = true }: EditorProps & { markDefault?: boolean }) {
-  const toItem = (v: string) => (v === "" ? EMPTY_ENUM : v);
+/** The reset arrow; its slot is kept while hidden, so editors stay aligned. */
+export function ResetButton({ field, state }: { field: SettingFieldView; state: FieldState }) {
+  const { modified, pending, commit } = state;
   return (
-    <Select
-      value={toItem(value)}
-      disabled={pending}
-      onValueChange={(v) => {
-        commit(v === EMPTY_ENUM ? "" : v);
-      }}
-    >
-      <SelectTrigger className="w-full" aria-label={field.title} aria-invalid={invalid || undefined} data-value={value}>
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {field.enumValues.map((v) => (
-          <SelectItem key={v} value={toItem(v)}>
-            {enumLabel(field, v)}
-            {markDefault && v === field.defaultValue && v !== "" ? " (default)" : ""}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <Tip label={`Reset to default (${displayValue(field, field.defaultValue)})`}>
+      <button
+        type="button"
+        aria-label={`Reset ${field.title}`}
+        className={cn("shrink-0 rounded-sm p-1 text-muted-foreground hover:bg-accent hover:text-foreground", !modified && "invisible")}
+        disabled={pending || !modified}
+        onClick={() => {
+          commit("");
+        }}
+      >
+        <RotateCcw className="size-3.5" />
+      </button>
+    </Tip>
   );
 }
 
-/** Text and number inputs commit on Enter or blur; Escape reverts. */
-function TextEditor({ field, value, pending, invalid, commit, setError }: EditorProps) {
-  const onKey = (e: ReactKeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") e.currentTarget.blur();
-    if (e.key === "Escape") {
-      e.preventDefault();
-      e.stopPropagation();
-      e.currentTarget.value = value;
-      setError(null);
-      e.currentTarget.blur();
-    }
-  };
+export function FieldError({ message, className }: { message: string | null; className?: string }) {
+  if (!message) return null;
   return (
-    <Input
-      // Remount on a new daemon value (e.g. the file was edited by hand).
-      key={value}
-      aria-label={field.title}
-      aria-invalid={invalid || undefined}
-      className={field.type === "path" || field.type === "string" ? "text-body-sm font-mono" : undefined}
-      type={field.type === "int" ? "number" : "text"}
-      min={field.type === "int" ? field.min : undefined}
-      max={field.type === "int" ? field.max : undefined}
-      defaultValue={value}
-      placeholder={field.placeholder || field.defaultValue}
-      disabled={pending}
-      spellCheck={false}
-      onKeyDown={onKey}
-      onBlur={(e) => {
-        if (e.currentTarget.value !== value) commit(e.currentTarget.value);
-      }}
-    />
+    <p className={cn("text-caption break-words text-destructive", className)} role="alert" data-testid="setting-error">
+      {message}
+    </p>
   );
 }
 
-/** Click, then press the shortcut. Esc cancels, Backspace unbinds. */
-function KeybindingEditor({ field, value, pending, invalid, commit, setError }: EditorProps) {
-  const [recording, setRecording] = useState(false);
-  const onKey = (e: ReactKeyboardEvent<HTMLButtonElement>) => {
-    if (!recording) return;
-    const chord = chordFromEvent(e.nativeEvent);
-    if (!chord) return; // a bare modifier: keep waiting
-    e.preventDefault();
-    e.stopPropagation();
-    setRecording(false);
-    if (chord === "escape") return;
-    commit(chord === "backspace" || chord === "delete" ? "none" : chord);
-  };
+/** The editor and its reset arrow; a switch or a number input sits at the right end. */
+function EditorCell({ field, state }: { field: SettingFieldView; state: FieldState }) {
+  const right = field.type === "bool" || (field.type === "int" && !keyEditors[field.key]);
   return (
-    <Button
-      type="button"
-      variant="outline"
-      size="sm"
-      data-key-recorder
-      aria-label={`${field.title} shortcut`}
-      aria-invalid={invalid || undefined}
-      disabled={pending}
-      className={cn("w-full justify-between px-2.5 font-normal", recording && "border-ring ring-[3px] ring-ring/50")}
-      onClick={(e) => {
-        // WebKit does not focus a button on click; the recorder needs the keydowns.
-        e.currentTarget.focus();
-        setError(null);
-        setRecording((r) => !r);
-      }}
-      onBlur={() => {
-        setRecording(false);
-      }}
-      onKeyDown={onKey}
-    >
-      {recording ? (
-        <span className="text-caption">Press a shortcut… (Esc cancels, ⌫ unbinds)</span>
-      ) : (
-        <span className={value && value !== "none" ? "" : "text-muted-foreground"}>{displayValue(field, value)}</span>
-      )}
-    </Button>
+    <div className="flex min-w-0 flex-col gap-1">
+      <div className="flex items-center gap-1.5">
+        <div className={right ? "flex min-w-0 flex-1 justify-end" : "min-w-0 flex-1"}>{state.editor}</div>
+        <ResetButton field={field} state={state} />
+      </div>
+      <FieldError message={state.message} />
+    </div>
   );
 }
 
-const editors: Record<SettingFieldView["type"], SettingEditor> = {
-  bool: BoolEditor,
-  enum: EnumEditor,
-  int: TextEditor,
-  string: TextEditor,
-  path: TextEditor,
-  keybinding: KeybindingEditor,
-};
+export interface SettingRowProps {
+  field: SettingFieldView;
+  className?: string;
+  /** Above the title: where the field lives ("Appearance › Terminal"), in search results. */
+  crumb?: ReactNode;
+  /** Search words: highlighted in the title and description, and the key is shown with them. */
+  words?: readonly string[];
+  /** Indented under its parent toggle (the row above), with a hairline. */
+  indent?: boolean;
+  /** The parent toggle is off: the row dims (its editor still works). */
+  dimmed?: boolean;
+  /** Under the description while dimmed: why the row has no effect now. */
+  note?: string;
+}
 
-/** One field: title, description, restart hint, editor, inline error, reset. */
-export function SettingRow({ field }: { field: SettingFieldView }) {
-  const value = useSettingValue(field.key) ?? field.defaultValue;
-  const restartPending = useSettingsStore((s) => s.snapshot?.restartPending.includes(field.key) ?? false);
-  const fileIssue = useSettingsStore((s) => s.snapshot?.issues.find((i) => i.key === field.key)?.message);
-  const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
-
-  const commit = (raw: string) => {
-    const v = validateSetting(field, raw);
-    if (!v.ok) {
-      setError(v.error);
-      return;
-    }
-    setError(null);
-    setPending(true);
-    void saveSettings({ [field.key]: v.value }).then((res) => {
-      setPending(false);
-      if (!res.ok) {
-        setError(res.issues[field.key] ?? res.error);
-        return;
-      }
-      const shown = displayValue(field, useSettingsStore.getState().snapshot?.values[field.key] ?? v.value);
-      toast.success(`Saved ${field.title}`, {
-        description: `${shown}${field.restartRequired ? " · applies after a daemon restart" : ""}`,
-      });
-    });
-  };
-
-  const Editor = keyEditors[field.key] ?? editors[field.type];
-  const modified = value !== field.defaultValue && !(field.type === "keybinding" && value === "" && field.defaultValue === "");
-  const message = error ?? (fileIssue ? `In the file: ${fileIssue}` : null);
+/** One field in a section card: title, description, restart hint, editor, inline error, reset. */
+export function SettingRow({ field, className, crumb, words, indent = false, dimmed = false, note }: SettingRowProps) {
+  const state = useSettingField(field);
   return (
     <div
-      className="grid grid-cols-[minmax(0,1fr)_18rem] items-start gap-x-6 gap-y-1 border-b border-border/60 py-3 last:border-b-0"
+      className={cn(
+        "relative grid grid-cols-[minmax(0,1fr)_18rem] items-center gap-x-6 gap-y-1 px-4 py-3",
+        // The hairline from the parent row down to this one, ending in a short elbow.
+        indent &&
+          "pl-10 before:absolute before:top-0 before:bottom-4 before:left-5 before:w-px before:bg-border after:absolute after:bottom-4 after:left-5 after:h-px after:w-2 after:bg-border",
+        className,
+      )}
       data-setting={field.key}
-      data-modified={modified || undefined}
+      data-modified={state.modified || undefined}
+      data-dimmed={dimmed || undefined}
     >
-      <div className="min-w-0">
+      <div className={cn("min-w-0", dimmed && "opacity-45")}>
+        {crumb}
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-label">{field.title}</span>
-          {restartPending ? (
-            <span className="rounded-sm bg-warning/15 px-1.5 py-px text-caption-sm font-medium text-warning" data-testid="restart-pending">
-              Restart the daemon to apply
-            </span>
-          ) : (
-            field.restartRequired && (
-              <span className="rounded-sm bg-muted px-1.5 py-px text-caption-sm" data-testid="restart-hint">
-                Applies after daemon restart
-              </span>
-            )
-          )}
+          <span className="text-label">
+            <Highlight text={field.title} words={words} />
+          </span>
+          <RestartChip field={field} restartPending={state.restartPending} />
         </div>
-        {field.description && <p className="mt-0.5 text-caption">{field.description}</p>}
-        <p className="mt-0.5 text-caption-sm font-mono text-muted-foreground/70">{field.key}</p>
-      </div>
-      <div className="flex min-w-0 flex-col gap-1">
-        <div className="flex items-center gap-1.5">
-          <div className={field.type === "bool" ? "flex flex-1 justify-end" : "min-w-0 flex-1"}>
-            <Editor field={field} value={value} pending={pending} invalid={message !== null} commit={commit} setError={setError} />
-          </div>
-          <Tip label={`Reset to default (${displayValue(field, field.defaultValue)})`}>
-            <button
-              type="button"
-              aria-label={`Reset ${field.title}`}
-              className={cn("rounded-sm p-1 text-muted-foreground hover:bg-accent hover:text-foreground", !modified && "invisible")}
-              disabled={pending || !modified}
-              onClick={() => {
-                commit("");
-              }}
-            >
-              <RotateCcw className="size-3.5" />
-            </button>
-          </Tip>
-        </div>
-        {message && (
-          <p className="text-caption break-words text-destructive" role="alert" data-testid="setting-error">
-            {message}
+        {field.description && (
+          <p className="mt-0.5 text-caption">
+            <Highlight text={field.description} words={words} />
+          </p>
+        )}
+        {dimmed && note && <p className="mt-0.5 text-caption-sm">{note}</p>}
+        {words && words.length > 0 && (
+          <p className="mt-0.5 text-caption-sm font-mono text-muted-foreground/75" data-testid="setting-key">
+            <Highlight text={field.key} words={words} />
           </p>
         )}
       </div>
+      <div className={cn(dimmed && "opacity-45 focus-within:opacity-100 hover:opacity-100")}>
+        <EditorCell field={field} state={state} />
+      </div>
+    </div>
+  );
+}
+
+/** One of a pair's fields: its title above its editor. */
+function PairCell({ field }: { field: SettingFieldView }) {
+  const state = useSettingField(field);
+  return (
+    <div className="min-w-0" data-setting={field.key} data-modified={state.modified || undefined}>
+      <div className="mb-1.5 flex flex-wrap items-center gap-2">
+        <span className="text-label">{field.title}</span>
+        <RestartChip field={field} restartPending={state.restartPending} />
+      </div>
+      <EditorCell field={field} state={state} />
+    </div>
+  );
+}
+
+/**
+ * Fields sharing a row (threads.default_model and default_effort): side by side, each
+ * title above its editor, and the first field's description under the pair.
+ */
+export function SettingRowPair({ fields, className }: { fields: readonly SettingFieldView[]; className?: string }) {
+  const description = fields[0]?.description;
+  return (
+    <div className={cn("px-4 py-3", className)} data-setting-row={fields[0]?.row}>
+      <div className="grid grid-flow-col auto-cols-fr gap-x-6">
+        {fields.map((f) => (
+          <PairCell key={f.key} field={f} />
+        ))}
+      </div>
+      {description && <p className="mt-2 text-caption">{description}</p>}
     </div>
   );
 }

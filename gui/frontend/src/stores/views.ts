@@ -20,6 +20,11 @@ import { resetThemePicker, setPickerSlot, useThemePickerStore, type ThemeSlot } 
 
 interface ViewsState {
   settingsOpen: boolean;
+  /**
+   * The settings page's current page (SettingPageView.id). Opening settings lands on
+   * General; coming back from the Themes page keeps the page it was opened from.
+   */
+  settingsPage: string;
   /** The Usage page (view.usage, docs/notes/session-usage.md). Never open with settings. */
   usageOpen: boolean;
   /** The Themes page (theme.pick, docs/notes/theme-engine-4-picker.md). Never open with settings or usage. */
@@ -32,7 +37,17 @@ interface ViewsState {
 /** The help overlay's tabs: the getting started guide (docs/GETTING-STARTED.md) and the keyboard shortcuts. */
 export type HelpTab = "guide" | "shortcuts";
 
-export const useViewsStore = create<ViewsState>()(() => ({ settingsOpen: false, usageOpen: false, themesOpen: false, helpOpen: false, helpTab: "guide" }));
+/** The settings page opening on: General. */
+export const SETTINGS_FIRST_PAGE = "general";
+
+export const useViewsStore = create<ViewsState>()(() => ({
+  settingsOpen: false,
+  settingsPage: SETTINGS_FIRST_PAGE,
+  usageOpen: false,
+  themesOpen: false,
+  helpOpen: false,
+  helpTab: "guide",
+}));
 
 /**
  * A window-level page (settings or usage) covers the content area. It hides the side
@@ -72,7 +87,7 @@ export function showView(name: string): boolean {
     case "settings":
       // A toggle like usage: the sidebar's settings button (and view.settings, cmd+,) closes it again.
       if (useViewsStore.getState().settingsOpen) closeSettings();
-      else useViewsStore.setState({ settingsOpen: true, usageOpen: false, themesOpen: false, helpOpen: false });
+      else useViewsStore.setState({ settingsOpen: true, settingsPage: SETTINGS_FIRST_PAGE, usageOpen: false, themesOpen: false, helpOpen: false });
       return true;
     case "usage":
       // A toggle: the sidebar's usage button (and view.usage from anywhere) closes it again.
@@ -352,6 +367,11 @@ export function agentsPanelCommand(): boolean {
 /** Asks the selected thread's prompt for the keyboard; nothing when no thread is selected. */
 function requestPromptFocus(): void {
   if (useUiStore.getState().selection.kind === "thread") useUiStore.setState((s) => ({ promptFocusSeq: s.promptFocusSeq + 1 }));
+}
+
+/** Shows a page of the open settings page (its left nav). */
+export function setSettingsPage(page: string): void {
+  useViewsStore.setState({ settingsPage: page });
 }
 
 export function closeSettings(): void {

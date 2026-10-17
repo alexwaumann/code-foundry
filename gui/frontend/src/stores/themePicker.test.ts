@@ -16,7 +16,7 @@ import {
   setPickerSlot,
   useThemePickerStore,
 } from "./themePicker";
-import { closeThemes, openThemes, showView, useViewsStore } from "./views";
+import { closeThemes, openThemes, setSettingsPage, showView, useViewsStore } from "./views";
 
 // A fixed pair of slots (not the app defaults), so the pairing cases have a companion to find.
 const SLOTS = { dark: "catppuccin-mocha", light: "catppuccin-latte" };
@@ -122,6 +122,16 @@ describe("the page state", () => {
     openThemes();
     closeThemes();
     expect(useViewsStore.getState()).toMatchObject({ themesOpen: false, settingsOpen: false });
+  });
+
+  it("Settings opens on General; back from Themes it keeps the page Themes was opened from", () => {
+    useViewsStore.setState({ settingsOpen: false, settingsPage: "keybindings" });
+    showView("settings");
+    expect(useViewsStore.getState()).toMatchObject({ settingsOpen: true, settingsPage: "general" });
+    setSettingsPage("appearance");
+    openThemes(undefined, "settings");
+    closeThemes();
+    expect(useViewsStore.getState()).toMatchObject({ settingsOpen: true, settingsPage: "appearance" });
   });
 
   it.each([
