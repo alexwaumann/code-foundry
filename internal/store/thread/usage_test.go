@@ -409,8 +409,8 @@ func TestRemoveRetiresUsage(t *testing.T) {
 	}
 
 	var n int
-	if err := e.m.opts.DB.QueryRow(`SELECT count(*) FROM session_usage`).Scan(&n); err != nil || n != 0 {
-		t.Errorf("session_usage rows after remove = %d, %v", n, err)
+	if err := e.m.opts.DB.QueryRow(`SELECT count(*) FROM thread_usage`).Scan(&n); err != nil || n != 0 {
+		t.Errorf("thread_usage rows after remove = %d, %v", n, err)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

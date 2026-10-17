@@ -256,7 +256,7 @@ func TestLinkedPullRequestsBackfillOnReconnect(t *testing.T) {
 		t.Fatal(err)
 	}
 	var n int
-	if err := e.m.opts.DB.QueryRow(`SELECT count(*) FROM session_pull_requests`).Scan(&n); err != nil || n != 0 {
+	if err := e.m.opts.DB.QueryRow(`SELECT count(*) FROM thread_pull_requests`).Scan(&n); err != nil || n != 0 {
 		t.Errorf("rows after remove = %d, %v", n, err)
 	}
 }

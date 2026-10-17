@@ -34,7 +34,7 @@ func saveAgentRuns(ctx context.Context, db *sql.DB, threadID string, runs []Agen
 // their thread's claude process, which did not outlive the daemon (a crash or a kill
 // skipped the runner's own endRuns).
 func failOrphanedRuns(ctx context.Context, db *sql.DB) (int64, error) {
-	res, err := db.ExecContext(ctx, `UPDATE session_agent_runs SET status = ?, error = ? WHERE status = ?`,
+	res, err := db.ExecContext(ctx, `UPDATE thread_agent_runs SET status = ?, error = ? WHERE status = ?`,
 		string(AgentFailed), orphanDaemonRestart+orphanSuffix, string(AgentRunning))
 	if err != nil {
 		return 0, fmt.Errorf("thread: fail orphaned agent runs: %w", err)

@@ -8,7 +8,7 @@ import (
 )
 
 // Persistence for the threads table (migrations 0003, 0006, 0008, 0009, 0011, 0014,
-// 0015, 0016, 0017 and 0018) and session_pull_requests (0010); session_usage and usage_retired
+// 0015, 0016, 0017 and 0018) and thread_pull_requests (0010); thread_usage and usage_retired
 // (0012) are in usage_db.go, which also deletes threads (retireThread). No process
 // survives a daemon restart. Status, its reason and StatusChangedAt are (0011): a disconnected
 // thread keeps the status it ended with.
@@ -28,7 +28,7 @@ func fromMillis(ms int64) time.Time {
 }
 
 func saveThread(ctx context.Context, db *sql.DB, s Thread) error {
-	_, err := db.ExecContext(ctx, `INSERT INTO sessions (
+	_, err := db.ExecContext(ctx, `INSERT INTO threads (
 			id, claude_session_id, repo_id, worktree_path, name, auto_named, model, effort,
 			created_at, last_activity_at, parent_id, state, disconnect_reason, exit_code, last_error,
 			permission_mode, base_ref, created_worktree, workspace_id, pinned,
@@ -79,7 +79,7 @@ func loadThreads(ctx context.Context, db *sql.DB) ([]Thread, error) {
 			permission_mode, base_ref, created_worktree, workspace_id, pinned,
 			status, status_reason, status_changed_at,
 			context_tokens, context_model, last_result_at, archived_at, snoozed_until
-		FROM sessions ORDER BY created_at, id`)
+		FROM threads ORDER BY created_at, id`)
 	if err != nil {
 		return nil, fmt.Errorf("thread: load: %w", err)
 	}
@@ -147,8 +147,8 @@ func saveLinks(ctx context.Context, db *sql.DB, threadID string, links []LinkedP
 	}
 	defer func() { _ = tx.Rollback() }()
 	for _, l := range links {
-		if _, err := tx.ExecContext(ctx, `INSERT INTO session_pull_requests (session_id, slug, number, url, linked_at)
-			VALUES (?, ?, ?, ?, ?) ON CONFLICT (session_id, url) DO NOTHING`,
+		if _, err := tx.ExecContext(ctx, `INSERT INTO thread_pull_requests (thread_id, slug, number, url, linked_at)
+			VALUES (?, ?, ?, ?, ?) ON CONFLICT (thread_id, url) DO NOTHING`,
 			threadID, l.Slug, l.Number, l.URL, millis(l.LinkedAt)); err != nil {
 			return fmt.Errorf("thread: save links of %s: %w", threadID, err)
 		}
@@ -162,8 +162,8 @@ func saveLinks(ctx context.Context, db *sql.DB, threadID string, links []LinkedP
 // loadLinks returns every thread's linked pull requests in first-seen (insertion)
 // order.
 func loadLinks(ctx context.Context, db *sql.DB) (map[string][]LinkedPullRequest, error) {
-	rows, err := db.QueryContext(ctx, `SELECT session_id, slug, number, url, linked_at
-		FROM session_pull_requests ORDER BY session_id, rowid`)
+	rows, err := db.QueryContext(ctx, `SELECT thread_id, slug, number, url, linked_at
+		FROM thread_pull_requests ORDER BY thread_id, rowid`)
 	if err != nil {
 		return nil, fmt.Errorf("thread: load links: %w", err)
 	}

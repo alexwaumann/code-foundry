@@ -6,7 +6,7 @@ import (
 	"fmt"
 )
 
-// Persistence for session_usage and usage_retired (migration 0012). The per-source
+// Persistence for thread_usage and usage_retired (migration 0012). The per-source
 // tables of 0013 are in usage_runs_db.go.
 
 const usageColumns = `model, tier, speed, day, requests, input, output, cache_read, cache_write_5m, cache_write_1h`
@@ -38,13 +38,13 @@ func saveUsage(ctx context.Context, db *sql.DB, threadID string, buckets []Usage
 	return nil
 }
 
-// replaceUsageTx replaces a thread's session_usage rows inside tx.
+// replaceUsageTx replaces a thread's thread_usage rows inside tx.
 func replaceUsageTx(ctx context.Context, tx *sql.Tx, threadID string, buckets []UsageBucket) error {
-	if _, err := tx.ExecContext(ctx, `DELETE FROM session_usage WHERE session_id = ?`, threadID); err != nil {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM thread_usage WHERE thread_id = ?`, threadID); err != nil {
 		return fmt.Errorf("thread: save usage of %s: %w", threadID, err)
 	}
 	for _, b := range buckets {
-		if _, err := tx.ExecContext(ctx, `INSERT INTO session_usage (session_id, `+usageColumns+`)
+		if _, err := tx.ExecContext(ctx, `INSERT INTO thread_usage (thread_id, `+usageColumns+`)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, append([]any{threadID}, usageArgs(b)...)...); err != nil {
 			return fmt.Errorf("thread: save usage of %s: %w", threadID, err)
 		}
@@ -54,8 +54,8 @@ func replaceUsageTx(ctx context.Context, tx *sql.Tx, threadID string, buckets []
 
 // loadUsage returns every thread's usage, each sorted by (Day, Model, Tier, Speed).
 func loadUsage(ctx context.Context, db *sql.DB) (map[string][]UsageBucket, error) {
-	rows, err := db.QueryContext(ctx, `SELECT session_id, `+usageColumns+`
-		FROM session_usage ORDER BY session_id, day, model, tier, speed`)
+	rows, err := db.QueryContext(ctx, `SELECT thread_id, `+usageColumns+`
+		FROM thread_usage ORDER BY thread_id, day, model, tier, speed`)
 	if err != nil {
 		return nil, fmt.Errorf("thread: load usage: %w", err)
 	}
@@ -97,7 +97,7 @@ func loadRetiredUsage(ctx context.Context, db *sql.DB) ([]UsageBucket, error) {
 }
 
 // retireThread adds the thread's usage into usage_retired and deletes the thread
-// (its session_usage rows cascade) in one transaction, so a crash either keeps the
+// (its thread_usage rows cascade) in one transaction, so a crash either keeps the
 // thread with its rows or retires them exactly once.
 func retireThread(ctx context.Context, db *sql.DB, id string, buckets []UsageBucket) error {
 	tx, err := db.BeginTx(ctx, nil)
@@ -118,7 +118,7 @@ func retireThread(ctx context.Context, db *sql.DB, id string, buckets []UsageBuc
 			return fmt.Errorf("thread: retire usage of %s: %w", id, err)
 		}
 	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM sessions WHERE id = ?`, id); err != nil {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM threads WHERE id = ?`, id); err != nil {
 		return fmt.Errorf("thread: delete %s: %w", id, err)
 	}
 	if err := tx.Commit(); err != nil {
