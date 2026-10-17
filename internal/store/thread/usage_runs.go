@@ -37,8 +37,8 @@ import (
 // followed the same way, so they are live too. Closing a run drains its file once more
 // and keeps its fold; only the file handle goes.
 
-// AgentRun is one subagent run of a thread. Persisted (session_agent_runs; its Usage in
-// session_source_usage). The transcripts give its identity, Open and Usage; the stream's
+// AgentRun is one subagent run of a thread. Persisted (thread_agent_runs; its Usage in
+// thread_source_usage). The transcripts give its identity, Open and Usage; the stream's
 // task frames its lifecycle (Status down to NoteItemID; agents.go).
 type AgentRun struct {
 	ID              string // Claude's agent id: agent-<ID>.jsonl
@@ -104,7 +104,7 @@ func sameRuns(a, b []AgentRun) bool {
 	return slices.EqualFunc(a, b, func(x, y AgentRun) bool { return sameRunInfo(x, y) && slices.Equal(x.Usage, y.Usage) })
 }
 
-// Source ids of session_source_usage.
+// Source ids of thread_source_usage.
 func transcriptSource(cid string) string { return "t:" + cid }
 func runSource(agentID string) string    { return "a:" + agentID }
 

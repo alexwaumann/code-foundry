@@ -43,8 +43,8 @@ func saveMcpStatus(ctx context.Context, db *sql.DB, threadID string, s *McpStatu
 
 // saveThreadCache upserts one column; col is one of the two above, never user input.
 func saveThreadCache(ctx context.Context, db *sql.DB, threadID, col, v string) error {
-	_, err := db.ExecContext(ctx, `INSERT INTO session_thread_cache (session_id, `+col+`) VALUES (?, ?)
-		ON CONFLICT (session_id) DO UPDATE SET `+col+` = excluded.`+col, threadID, v)
+	_, err := db.ExecContext(ctx, `INSERT INTO thread_cache (thread_id, `+col+`) VALUES (?, ?)
+		ON CONFLICT (thread_id) DO UPDATE SET `+col+` = excluded.`+col, threadID, v)
 	if err != nil {
 		return fmt.Errorf("thread: save %s of %s: %w", col, threadID, err)
 	}
@@ -56,7 +56,7 @@ func saveThreadCache(ctx context.Context, db *sql.DB, threadID, col, v string) e
 // logs: the next process reports it again.
 func loadThreadCache(ctx context.Context, db *sql.DB, threadID string) ([]SlashCommand, *McpStatus, error) {
 	var cmds, mcp string
-	err := db.QueryRowContext(ctx, `SELECT slash_commands, mcp_status FROM session_thread_cache WHERE session_id = ?`,
+	err := db.QueryRowContext(ctx, `SELECT slash_commands, mcp_status FROM thread_cache WHERE thread_id = ?`,
 		threadID).Scan(&cmds, &mcp)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
