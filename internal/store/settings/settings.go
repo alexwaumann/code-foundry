@@ -57,10 +57,10 @@ type GitHub struct {
 	DashboardsEnabled   bool
 }
 
-// Repos configures the repo store.
+// Projects configures the project store.
 type Projects struct {
 	FetchIntervalSeconds int    // 0 = off
-	WorktreeDir          string // "" = <config home>/worktrees/<owner>/<repo>; {repo} expands
+	WorktreeDir          string // "" = <config home>/worktrees/<owner>/<repo>; {project} expands
 }
 
 // GitOps configures the gitops store.
@@ -130,8 +130,8 @@ func (s Settings) GhPollInterval() time.Duration {
 	return time.Duration(s.GitHub.PollIntervalSeconds) * time.Second
 }
 
-// FetchInterval is Repos.FetchIntervalSeconds as a duration; negative (off) for 0, as
-// repo.Options.FetchInterval expects.
+// FetchInterval is Projects.FetchIntervalSeconds as a duration; negative (off) for 0, as
+// project.Options.FetchInterval expects.
 func (s Settings) FetchInterval() time.Duration {
 	if s.Projects.FetchIntervalSeconds <= 0 {
 		return -1

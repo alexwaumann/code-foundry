@@ -101,18 +101,18 @@ func TestUpdate(t *testing.T) {
 	s.OnChange(func(snap *Snapshot) { hooked = append(hooked, snap.Revision) })
 
 	snap, err := s.Update(context.Background(), map[string]string{
-		KeyFontSize: "16", KeyDefaultModel: "claude-opus-4-8[1m]", KeyNamingModel: "claude-4.5-haiku[1m]", KeybindingKey("repo.refresh"): "cmd+alt+r",
+		KeyFontSize: "16", KeyDefaultModel: "claude-opus-4-8[1m]", KeyNamingModel: "claude-4.5-haiku[1m]", KeybindingKey("project.refresh"): "cmd+alt+r",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if snap.Settings.Appearance.FontSize != 16 || snap.Settings.Threads.DefaultModel != "claude-opus-4-8[1m]" ||
 		snap.Settings.Threads.NamingModel != "claude-4.5-haiku[1m]" ||
-		snap.Settings.Keybindings["repo.refresh"] != "cmd+alt+r" {
+		snap.Settings.Keybindings["project.refresh"] != "cmd+alt+r" {
 		t.Fatalf("settings = %+v", snap.Settings)
 	}
 	data, _ := os.ReadFile(path)
-	for _, want := range []string{"font_size = 16\n", "default_model = \"claude-opus-4-8[1m]\"\n", "naming_model = \"claude-4.5-haiku[1m]\"\n", `"repo.refresh" = "cmd+alt+r"`} {
+	for _, want := range []string{"font_size = 16\n", "default_model = \"claude-opus-4-8[1m]\"\n", "naming_model = \"claude-4.5-haiku[1m]\"\n", `"project.refresh" = "cmd+alt+r"`} {
 		if !strings.Contains(string(data), want) {
 			t.Errorf("file lacks %q:\n%s", want, data)
 		}
@@ -181,8 +181,8 @@ func TestUpdateRejects(t *testing.T) {
 		{"reserved chord", map[string]string{KeybindingKey("thread.new"): "cmd+b"},
 			[]Issue{{"keybindings.thread.new", "cmd+b is reserved by the app"}}},
 		{"keybinding for an unknown command", map[string]string{KeybindingKey("x.y"): "cmd+j"}, []Issue{{"keybindings.x.y", "unknown setting"}}},
-		{"collision", map[string]string{KeybindingKey("repo.refresh"): "cmd+n"},
-			[]Issue{{"keybindings.repo.refresh", "cmd+n is already bound to thread.new"}}},
+		{"collision", map[string]string{KeybindingKey("project.refresh"): "cmd+n"},
+			[]Issue{{"keybindings.project.refresh", "cmd+n is already bound to thread.new"}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -258,8 +258,8 @@ func TestRestartPending(t *testing.T) {
 }
 
 func TestSetCommandsRevalidates(t *testing.T) {
-	s, _, _ := openTest(t, "[keybindings]\n\"repo.refresh\" = \"cmd+t\"\n\"gone.cmd\" = \"cmd+j\"\n")
-	if got := s.Snapshot().Settings.Keybindings; got["repo.refresh"] != "cmd+t" || got["gone.cmd"] != "cmd+j" {
+	s, _, _ := openTest(t, "[keybindings]\n\"project.refresh\" = \"cmd+t\"\n\"gone.cmd\" = \"cmd+j\"\n")
+	if got := s.Snapshot().Settings.Keybindings; got["project.refresh"] != "cmd+t" || got["gone.cmd"] != "cmd+j" {
 		t.Fatalf("before SetCommands: %v", got)
 	}
 	if n := len(s.Fields()); n != len(staticFields) {
@@ -272,7 +272,7 @@ func TestSetCommandsRevalidates(t *testing.T) {
 	}
 	want := []Issue{
 		{"keybindings.gone.cmd", `unknown command "gone.cmd"`},
-		{"keybindings.repo.refresh", "cmd+t is already bound to terminal.new"},
+		{"keybindings.project.refresh", "cmd+t is already bound to terminal.new"},
 	}
 	if !slices.Equal(snap.Issues, want) {
 		t.Errorf("issues = %v, want %v", snap.Issues, want)

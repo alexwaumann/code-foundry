@@ -26,9 +26,11 @@ func TestWorktreePath(t *testing.T) {
 		{"", "cf", "main", ""},
 		{"/wt", "cf", "", ""},
 		{"/wt", "cf", "alex/fix-x", "/wt/alex-fix-x"},
+		{"/wt/{project}", "cf", "feat", "/wt/cf/feat"},
+		{"~/worktrees/{project}", "cf", "feat", filepath.Join(home, "worktrees/cf/feat")},
+		{"relative/{project}", "cf", "feat", ""},
+		// {repo} is the placeholder's name before the rename; it still expands.
 		{"/wt/{repo}", "cf", "feat", "/wt/cf/feat"},
-		{"~/worktrees/{repo}", "cf", "feat", filepath.Join(home, "worktrees/cf/feat")},
-		{"relative/{repo}", "cf", "feat", ""},
 	}
 	for _, tt := range tests {
 		if got := worktreePath(tt.dir, tt.project, tt.branch); got != tt.want {
@@ -37,15 +39,16 @@ func TestWorktreePath(t *testing.T) {
 	}
 }
 
-// worktreeBase is the cleanup's managed root from repos.worktree_dir.
+// worktreeBase is the cleanup's managed root from projects.worktree_dir.
 func TestWorktreeBase(t *testing.T) {
 	home, _ := os.UserHomeDir()
 	tests := []struct{ dir, project, want string }{
 		{"", "cf", ""},
 		{"/wt", "cf", "/wt"},
+		{"/wt/{project}", "cf", "/wt/cf"},
+		{"~/worktrees/{project}", "cf", filepath.Join(home, "worktrees/cf")},
+		{"relative/{project}", "cf", ""},
 		{"/wt/{repo}", "cf", "/wt/cf"},
-		{"~/worktrees/{repo}", "cf", filepath.Join(home, "worktrees/cf")},
-		{"relative/{repo}", "cf", ""},
 	}
 	for _, tt := range tests {
 		if got := worktreeBase(tt.dir, tt.project); got != tt.want {
@@ -60,7 +63,7 @@ func TestSettingsWorktreePath(t *testing.T) {
 	pick := settingsWorktreePath(st)
 	r := project.Project{ID: "r1", Name: "cf"}
 	if got := pick(r, "cf/fix-x"); got != "" {
-		t.Errorf("unset setting = %q, want the repo store's default", got)
+		t.Errorf("unset setting = %q, want the project store's default", got)
 	}
 	if _, err := st.Update(context.Background(), map[string]string{settings.KeyWorktreeDir: "/wt/{repo}"}); err != nil {
 		t.Fatal(err)

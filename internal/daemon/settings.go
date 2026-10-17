@@ -100,7 +100,7 @@ func settingsNamer(st *settings.Store, next thread.Namer) thread.Namer {
 
 // settingsWorktreePath applies repos.worktree_dir to the worktrees the thread store
 // makes for new threads (thread.Options.WorktreePath), the same way worktreeDirRepo
-// does for repo.worktree.new. "" leaves the repo store's default.
+// does for repo.worktree.new. "" leaves the project store's default.
 func settingsWorktreePath(st *settings.Store) func(project.Project, string) string {
 	return func(r project.Project, branch string) string {
 		return worktreePath(st.Settings().Projects.WorktreeDir, r.Name, branch)
@@ -139,13 +139,15 @@ func worktreePath(dir, projectName, branch string) string {
 	return filepath.Join(base, strings.ReplaceAll(branch, "/", "-"))
 }
 
-// worktreeBase is dir with ~ and {repo} expanded: where repos.worktree_dir puts the
-// worktrees of repoName. "" when dir is unset.
+// worktreeBase is dir with ~ and {project} expanded: where projects.worktree_dir puts
+// the worktrees of projectName. {repo}, the placeholder's name before projects were
+// renamed from repos, expands the same way, so a setting written then keeps working.
+// "" when dir is unset.
 func worktreeBase(dir, projectName string) string {
 	if dir == "" {
 		return ""
 	}
-	return settings.ExpandedPath(strings.ReplaceAll(dir, "{repo}", projectName))
+	return settings.ExpandedPath(strings.NewReplacer("{project}", projectName, "{repo}", projectName).Replace(dir))
 }
 
 // settingsManagedRoots is repo.Options.ManagedRoots: besides the worktrees directory,
