@@ -56,12 +56,19 @@ type delivery struct {
 
 // fireLocked fires r: unless the subscriber is over the wake limit, it counts the fire
 // on r (FiredCount, LastFiredAt) and queues the message build makes. It reports
-// whether the wake was queued; a dropped one leaves r as it was. Callers hold m.mu and
+// whether the wake was queued; a dropped one (over the limit, or the Manager shutting
+// down) leaves r as it was. Callers hold m.mu and
 // m.subs.mu, and keep or remove r themselves (firedLocked).
 func (m *Manager) fireLocked(r *subRec, build func(Subscription, time.Time) Message) bool {
 	s := m.subs
 	now := m.opts.Now().Round(0).Truncate(time.Millisecond)
 	subscriber := r.s.SubscriberID
+	if m.closed {
+		// The daemon is stopping (its runners' ends commit as they go): not a fire, so a
+		// one-shot subscription is kept for the next transition after a restart.
+		m.log.Info("wake not fired: the daemon is stopping", "thread", subscriber, "subscription", r.s.ID)
+		return false
+	}
 	if !s.allowLocked(subscriber, now, m.opts.WakeLimit) {
 		m.log.Warn("wake dropped: the subscriber reached the wake limit", "thread", subscriber, "subscription", r.s.ID,
 			"target", r.s.TargetID, "limit", m.opts.WakeLimit, "window", WakeWindow.String())
@@ -99,8 +106,7 @@ func (s *subscriptions) allowLocked(subscriber string, now time.Time, limit int)
 // Nothing is queued once the Manager is shutting down. Callers hold m.mu and m.subs.mu.
 func (m *Manager) enqueueLocked(subscriber string, d delivery) {
 	if m.closed {
-		m.log.Info("wake not delivered: the daemon is stopping", "thread", subscriber, "subscription", d.sub)
-		return
+		return // fireLocked does not fire then; a wake limit note can wait
 	}
 	s := m.subs
 	q := s.queues[subscriber]
