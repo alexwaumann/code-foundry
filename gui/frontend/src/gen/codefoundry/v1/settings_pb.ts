@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/settings.proto.
  */
 export const file_codefoundry_v1_settings: GenFile = /*@__PURE__*/
-  fileDesc("Ch1jb2RlZm91bmRyeS92MS9zZXR0aW5ncy5wcm90bxIOY29kZWZvdW5kcnkudjEigwIKDFNldHRpbmdGaWVsZBILCgNrZXkYASABKAkSDQoFdGl0bGUYAiABKAkSEwoLZGVzY3JpcHRpb24YAyABKAkSDQoFZ3JvdXAYBCABKAkSKQoEdHlwZRgFIAEoDjIbLmNvZGVmb3VuZHJ5LnYxLlNldHRpbmdUeXBlEhMKC2VudW1fdmFsdWVzGAYgAygJEhUKDWRlZmF1bHRfdmFsdWUYByABKAkSGAoQcmVzdGFydF9yZXF1aXJlZBgIIAEoCBILCgNtaW4YCSABKAMSCwoDbWF4GAogASgDEhMKC3BsYWNlaG9sZGVyGAsgASgJEhMKC2VudW1fbGFiZWxzGAwgAygJIj4KDFNldHRpbmdHcm91cBIKCgJpZBgBIAEoCRINCgV0aXRsZRgCIAEoCRITCgtkZXNjcmlwdGlvbhgDIAEoCSIsCgxTZXR0aW5nSXNzdWUSCwoDa2V5GAEgASgJEg8KB21lc3NhZ2UYAiABKAki+gEKEFNldHRpbmdzU25hcHNob3QSPAoGdmFsdWVzGAEgAygLMiwuY29kZWZvdW5kcnkudjEuU2V0dGluZ3NTbmFwc2hvdC5WYWx1ZXNFbnRyeRIMCgRwYXRoGAIgASgJEhAKCHJldmlzaW9uGAMgASgEEhIKCmxvYWRfZXJyb3IYBCABKAkSLAoGaXNzdWVzGAUgAygLMhwuY29kZWZvdW5kcnkudjEuU2V0dGluZ0lzc3VlEhcKD3Jlc3RhcnRfcGVuZGluZxgGIAMoCRotCgtWYWx1ZXNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIkgKGFNldHRpbmdzVmFsaWRhdGlvbkVycm9ycxIsCgZlcnJvcnMYASADKAsyHC5jb2RlZm91bmRyeS52MS5TZXR0aW5nSXNzdWUiTgoNU2V0dGluZ3NFdmVudBI0CghzbmFwc2hvdBgBIAEoCzIgLmNvZGVmb3VuZHJ5LnYxLlNldHRpbmdzU25hcHNob3RIAEIHCgVldmVudCIaChhHZXRTZXR0aW5nc1NjaGVtYVJlcXVlc3QidwoZR2V0U2V0dGluZ3NTY2hlbWFSZXNwb25zZRIsCgZncm91cHMYASADKAsyHC5jb2RlZm91bmRyeS52MS5TZXR0aW5nR3JvdXASLAoGZmllbGRzGAIgAygLMhwuY29kZWZvdW5kcnkudjEuU2V0dGluZ0ZpZWxkIhQKEkdldFNldHRpbmdzUmVxdWVzdCJJChNHZXRTZXR0aW5nc1Jlc3BvbnNlEjIKCHNldHRpbmdzGAEgASgLMiAuY29kZWZvdW5kcnkudjEuU2V0dGluZ3NTbmFwc2hvdCKJAQoVVXBkYXRlU2V0dGluZ3NSZXF1ZXN0EkEKBnZhbHVlcxgBIAMoCzIxLmNvZGVmb3VuZHJ5LnYxLlVwZGF0ZVNldHRpbmdzUmVxdWVzdC5WYWx1ZXNFbnRyeRotCgtWYWx1ZXNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIkwKFlVwZGF0ZVNldHRpbmdzUmVzcG9uc2USMgoIc2V0dGluZ3MYASABKAsyIC5jb2RlZm91bmRyeS52MS5TZXR0aW5nc1NuYXBzaG90IhYKFFdhdGNoU2V0dGluZ3NSZXF1ZXN0KrwBCgtTZXR0aW5nVHlwZRIcChhTRVRUSU5HX1RZUEVfVU5TUEVDSUZJRUQQABIXChNTRVRUSU5HX1RZUEVfU1RSSU5HEAESFAoQU0VUVElOR19UWVBFX0lOVBACEhUKEVNFVFRJTkdfVFlQRV9CT09MEAMSFQoRU0VUVElOR19UWVBFX0VOVU0QBBIVChFTRVRUSU5HX1RZUEVfUEFUSBAFEhsKF1NFVFRJTkdfVFlQRV9LRVlCSU5ESU5HEAYy9AIKD1NldHRpbmdzU2VydmljZRJiCglHZXRTY2hlbWESKC5jb2RlZm91bmRyeS52MS5HZXRTZXR0aW5nc1NjaGVtYVJlcXVlc3QaKS5jb2RlZm91bmRyeS52MS5HZXRTZXR0aW5nc1NjaGVtYVJlc3BvbnNlIgASUAoDR2V0EiIuY29kZWZvdW5kcnkudjEuR2V0U2V0dGluZ3NSZXF1ZXN0GiMuY29kZWZvdW5kcnkudjEuR2V0U2V0dGluZ3NSZXNwb25zZSIAElkKBlVwZGF0ZRIlLmNvZGVmb3VuZHJ5LnYxLlVwZGF0ZVNldHRpbmdzUmVxdWVzdBomLmNvZGVmb3VuZHJ5LnYxLlVwZGF0ZVNldHRpbmdzUmVzcG9uc2UiABJQCgVXYXRjaBIkLmNvZGVmb3VuZHJ5LnYxLldhdGNoU2V0dGluZ3NSZXF1ZXN0Gh0uY29kZWZvdW5kcnkudjEuU2V0dGluZ3NFdmVudCIAMAFCxQEKEmNvbS5jb2RlZm91bmRyeS52MUINU2V0dGluZ3NQcm90b1ABWkdnaXRodWIuY29tL2FsZXh3YXVtYW5uL2NvZGUtZm91bmRyeS9nZW4vZ28vY29kZWZvdW5kcnkvdjE7Y29kZWZvdW5kcnl2MaICA0NYWKoCDkNvZGVmb3VuZHJ5LlYxygIOQ29kZWZvdW5kcnlcVjHiAhpDb2RlZm91bmRyeVxWMVxHUEJNZXRhZGF0YeoCD0NvZGVmb3VuZHJ5OjpWMWIGcHJvdG8z");
+  fileDesc("Ch1jb2RlZm91bmRyeS92MS9zZXR0aW5ncy5wcm90bxIOY29kZWZvdW5kcnkudjEi0QIKDFNldHRpbmdGaWVsZBILCgNrZXkYASABKAkSDQoFdGl0bGUYAiABKAkSEwoLZGVzY3JpcHRpb24YAyABKAkSDQoFZ3JvdXAYBCABKAkSKQoEdHlwZRgFIAEoDjIbLmNvZGVmb3VuZHJ5LnYxLlNldHRpbmdUeXBlEhMKC2VudW1fdmFsdWVzGAYgAygJEhUKDWRlZmF1bHRfdmFsdWUYByABKAkSGAoQcmVzdGFydF9yZXF1aXJlZBgIIAEoCBILCgNtaW4YCSABKAMSCwoDbWF4GAogASgDEhMKC3BsYWNlaG9sZGVyGAsgASgJEhMKC2VudW1fbGFiZWxzGAwgAygJEgwKBHBhZ2UYDSABKAkSDwoHc2VjdGlvbhgOIAEoCRIMCgR1bml0GA8gASgJEhIKCmRlcGVuZHNfb24YECABKAkSCwoDcm93GBEgASgJIj4KDFNldHRpbmdHcm91cBIKCgJpZBgBIAEoCRINCgV0aXRsZRgCIAEoCRITCgtkZXNjcmlwdGlvbhgDIAEoCSJvCgtTZXR0aW5nUGFnZRIKCgJpZBgBIAEoCRINCgV0aXRsZRgCIAEoCRITCgtkZXNjcmlwdGlvbhgDIAEoCRIwCghzZWN0aW9ucxgEIAMoCzIeLmNvZGVmb3VuZHJ5LnYxLlNldHRpbmdTZWN0aW9uIkAKDlNldHRpbmdTZWN0aW9uEgoKAmlkGAEgASgJEg0KBXRpdGxlGAIgASgJEhMKC2Rlc2NyaXB0aW9uGAMgASgJIiwKDFNldHRpbmdJc3N1ZRILCgNrZXkYASABKAkSDwoHbWVzc2FnZRgCIAEoCSL6AQoQU2V0dGluZ3NTbmFwc2hvdBI8CgZ2YWx1ZXMYASADKAsyLC5jb2RlZm91bmRyeS52MS5TZXR0aW5nc1NuYXBzaG90LlZhbHVlc0VudHJ5EgwKBHBhdGgYAiABKAkSEAoIcmV2aXNpb24YAyABKAQSEgoKbG9hZF9lcnJvchgEIAEoCRIsCgZpc3N1ZXMYBSADKAsyHC5jb2RlZm91bmRyeS52MS5TZXR0aW5nSXNzdWUSFwoPcmVzdGFydF9wZW5kaW5nGAYgAygJGi0KC1ZhbHVlc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiSAoYU2V0dGluZ3NWYWxpZGF0aW9uRXJyb3JzEiwKBmVycm9ycxgBIAMoCzIcLmNvZGVmb3VuZHJ5LnYxLlNldHRpbmdJc3N1ZSJOCg1TZXR0aW5nc0V2ZW50EjQKCHNuYXBzaG90GAEgASgLMiAuY29kZWZvdW5kcnkudjEuU2V0dGluZ3NTbmFwc2hvdEgAQgcKBWV2ZW50IhoKGEdldFNldHRpbmdzU2NoZW1hUmVxdWVzdCKjAQoZR2V0U2V0dGluZ3NTY2hlbWFSZXNwb25zZRIsCgZncm91cHMYASADKAsyHC5jb2RlZm91bmRyeS52MS5TZXR0aW5nR3JvdXASLAoGZmllbGRzGAIgAygLMhwuY29kZWZvdW5kcnkudjEuU2V0dGluZ0ZpZWxkEioKBXBhZ2VzGAMgAygLMhsuY29kZWZvdW5kcnkudjEuU2V0dGluZ1BhZ2UiFAoSR2V0U2V0dGluZ3NSZXF1ZXN0IkkKE0dldFNldHRpbmdzUmVzcG9uc2USMgoIc2V0dGluZ3MYASABKAsyIC5jb2RlZm91bmRyeS52MS5TZXR0aW5nc1NuYXBzaG90IokBChVVcGRhdGVTZXR0aW5nc1JlcXVlc3QSQQoGdmFsdWVzGAEgAygLMjEuY29kZWZvdW5kcnkudjEuVXBkYXRlU2V0dGluZ3NSZXF1ZXN0LlZhbHVlc0VudHJ5Gi0KC1ZhbHVlc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiTAoWVXBkYXRlU2V0dGluZ3NSZXNwb25zZRIyCghzZXR0aW5ncxgBIAEoCzIgLmNvZGVmb3VuZHJ5LnYxLlNldHRpbmdzU25hcHNob3QiFgoUV2F0Y2hTZXR0aW5nc1JlcXVlc3QqvAEKC1NldHRpbmdUeXBlEhwKGFNFVFRJTkdfVFlQRV9VTlNQRUNJRklFRBAAEhcKE1NFVFRJTkdfVFlQRV9TVFJJTkcQARIUChBTRVRUSU5HX1RZUEVfSU5UEAISFQoRU0VUVElOR19UWVBFX0JPT0wQAxIVChFTRVRUSU5HX1RZUEVfRU5VTRAEEhUKEVNFVFRJTkdfVFlQRV9QQVRIEAUSGwoXU0VUVElOR19UWVBFX0tFWUJJTkRJTkcQBjL0AgoPU2V0dGluZ3NTZXJ2aWNlEmIKCUdldFNjaGVtYRIoLmNvZGVmb3VuZHJ5LnYxLkdldFNldHRpbmdzU2NoZW1hUmVxdWVzdBopLmNvZGVmb3VuZHJ5LnYxLkdldFNldHRpbmdzU2NoZW1hUmVzcG9uc2UiABJQCgNHZXQSIi5jb2RlZm91bmRyeS52MS5HZXRTZXR0aW5nc1JlcXVlc3QaIy5jb2RlZm91bmRyeS52MS5HZXRTZXR0aW5nc1Jlc3BvbnNlIgASWQoGVXBkYXRlEiUuY29kZWZvdW5kcnkudjEuVXBkYXRlU2V0dGluZ3NSZXF1ZXN0GiYuY29kZWZvdW5kcnkudjEuVXBkYXRlU2V0dGluZ3NSZXNwb25zZSIAElAKBVdhdGNoEiQuY29kZWZvdW5kcnkudjEuV2F0Y2hTZXR0aW5nc1JlcXVlc3QaHS5jb2RlZm91bmRyeS52MS5TZXR0aW5nc0V2ZW50IgAwAULFAQoSY29tLmNvZGVmb3VuZHJ5LnYxQg1TZXR0aW5nc1Byb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM");
 
 /**
  * @generated from message codefoundry.v1.SettingField
@@ -89,6 +89,45 @@ export type SettingField = Message<"codefoundry.v1.SettingField"> & {
    * @generated from field: repeated string enum_labels = 12;
    */
   enumLabels: string[];
+
+  /**
+   * Page id (SettingPage.id) the settings page shows the field on. Display only: the
+   * field's table in the file is its group.
+   *
+   * @generated from field: string page = 13;
+   */
+  page: string;
+
+  /**
+   * Section id (SettingSection.id) within the page.
+   *
+   * @generated from field: string section = 14;
+   */
+  section: string;
+
+  /**
+   * Unit shown as a suffix inside a number input ("s", "pt", "%"); empty for none.
+   *
+   * @generated from field: string unit = 15;
+   */
+  unit: string;
+
+  /**
+   * Key of a SETTING_TYPE_BOOL field this one depends on: while that field is false,
+   * this one renders indented and dimmed. Empty for none.
+   *
+   * @generated from field: string depends_on = 16;
+   */
+  dependsOn: string;
+
+  /**
+   * Fields of a section sharing a non-empty row id render side by side in one row
+   * (model and effort), each under its own title, with the first field's description
+   * under the row.
+   *
+   * @generated from field: string row = 17;
+   */
+  row: string;
 };
 
 /**
@@ -99,6 +138,8 @@ export const SettingFieldSchema: GenMessage<SettingField> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_settings, 0);
 
 /**
+ * SettingGroup is a table of the settings file ([threads], [github], ...).
+ *
  * @generated from message codefoundry.v1.SettingGroup
  */
 export type SettingGroup = Message<"codefoundry.v1.SettingGroup"> & {
@@ -126,6 +167,77 @@ export const SettingGroupSchema: GenMessage<SettingGroup> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_settings, 1);
 
 /**
+ * SettingPage is one page (tab) of the settings page. Pages and their sections are
+ * display only and independent of the file's groups: a page may show fields of several
+ * groups.
+ *
+ * @generated from message codefoundry.v1.SettingPage
+ */
+export type SettingPage = Message<"codefoundry.v1.SettingPage"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string title = 2;
+   */
+  title: string;
+
+  /**
+   * Optional caption under the page title.
+   *
+   * @generated from field: string description = 3;
+   */
+  description: string;
+
+  /**
+   * In display order. The keybindings page has one section per command category.
+   *
+   * @generated from field: repeated codefoundry.v1.SettingSection sections = 4;
+   */
+  sections: SettingSection[];
+};
+
+/**
+ * Describes the message codefoundry.v1.SettingPage.
+ * Use `create(SettingPageSchema)` to create a new message.
+ */
+export const SettingPageSchema: GenMessage<SettingPage> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_settings, 2);
+
+/**
+ * @generated from message codefoundry.v1.SettingSection
+ */
+export type SettingSection = Message<"codefoundry.v1.SettingSection"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * Empty for a page's single unnamed section.
+   *
+   * @generated from field: string title = 2;
+   */
+  title: string;
+
+  /**
+   * Optional caption under the section title.
+   *
+   * @generated from field: string description = 3;
+   */
+  description: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.SettingSection.
+ * Use `create(SettingSectionSchema)` to create a new message.
+ */
+export const SettingSectionSchema: GenMessage<SettingSection> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_settings, 3);
+
+/**
  * @generated from message codefoundry.v1.SettingIssue
  */
 export type SettingIssue = Message<"codefoundry.v1.SettingIssue"> & {
@@ -145,7 +257,7 @@ export type SettingIssue = Message<"codefoundry.v1.SettingIssue"> & {
  * Use `create(SettingIssueSchema)` to create a new message.
  */
 export const SettingIssueSchema: GenMessage<SettingIssue> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_settings, 2);
+  messageDesc(file_codefoundry_v1_settings, 4);
 
 /**
  * @generated from message codefoundry.v1.SettingsSnapshot
@@ -200,7 +312,7 @@ export type SettingsSnapshot = Message<"codefoundry.v1.SettingsSnapshot"> & {
  * Use `create(SettingsSnapshotSchema)` to create a new message.
  */
 export const SettingsSnapshotSchema: GenMessage<SettingsSnapshot> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_settings, 3);
+  messageDesc(file_codefoundry_v1_settings, 5);
 
 /**
  * SettingsValidationErrors is the error detail of a rejected Update.
@@ -219,7 +331,7 @@ export type SettingsValidationErrors = Message<"codefoundry.v1.SettingsValidatio
  * Use `create(SettingsValidationErrorsSchema)` to create a new message.
  */
 export const SettingsValidationErrorsSchema: GenMessage<SettingsValidationErrors> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_settings, 4);
+  messageDesc(file_codefoundry_v1_settings, 6);
 
 /**
  * @generated from message codefoundry.v1.SettingsEvent
@@ -242,7 +354,7 @@ export type SettingsEvent = Message<"codefoundry.v1.SettingsEvent"> & {
  * Use `create(SettingsEventSchema)` to create a new message.
  */
 export const SettingsEventSchema: GenMessage<SettingsEvent> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_settings, 5);
+  messageDesc(file_codefoundry_v1_settings, 7);
 
 /**
  * @generated from message codefoundry.v1.GetSettingsSchemaRequest
@@ -255,21 +367,32 @@ export type GetSettingsSchemaRequest = Message<"codefoundry.v1.GetSettingsSchema
  * Use `create(GetSettingsSchemaRequestSchema)` to create a new message.
  */
 export const GetSettingsSchemaRequestSchema: GenMessage<GetSettingsSchemaRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_settings, 6);
+  messageDesc(file_codefoundry_v1_settings, 8);
 
 /**
  * @generated from message codefoundry.v1.GetSettingsSchemaResponse
  */
 export type GetSettingsSchemaResponse = Message<"codefoundry.v1.GetSettingsSchemaResponse"> & {
   /**
+   * The file's tables, in file order.
+   *
    * @generated from field: repeated codefoundry.v1.SettingGroup groups = 1;
    */
   groups: SettingGroup[];
 
   /**
+   * Every field. Within a section, fields are in display order.
+   *
    * @generated from field: repeated codefoundry.v1.SettingField fields = 2;
    */
   fields: SettingField[];
+
+  /**
+   * Pages in display order; every field's page and section are listed here.
+   *
+   * @generated from field: repeated codefoundry.v1.SettingPage pages = 3;
+   */
+  pages: SettingPage[];
 };
 
 /**
@@ -277,7 +400,7 @@ export type GetSettingsSchemaResponse = Message<"codefoundry.v1.GetSettingsSchem
  * Use `create(GetSettingsSchemaResponseSchema)` to create a new message.
  */
 export const GetSettingsSchemaResponseSchema: GenMessage<GetSettingsSchemaResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_settings, 7);
+  messageDesc(file_codefoundry_v1_settings, 9);
 
 /**
  * @generated from message codefoundry.v1.GetSettingsRequest
@@ -290,7 +413,7 @@ export type GetSettingsRequest = Message<"codefoundry.v1.GetSettingsRequest"> & 
  * Use `create(GetSettingsRequestSchema)` to create a new message.
  */
 export const GetSettingsRequestSchema: GenMessage<GetSettingsRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_settings, 8);
+  messageDesc(file_codefoundry_v1_settings, 10);
 
 /**
  * @generated from message codefoundry.v1.GetSettingsResponse
@@ -307,7 +430,7 @@ export type GetSettingsResponse = Message<"codefoundry.v1.GetSettingsResponse"> 
  * Use `create(GetSettingsResponseSchema)` to create a new message.
  */
 export const GetSettingsResponseSchema: GenMessage<GetSettingsResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_settings, 9);
+  messageDesc(file_codefoundry_v1_settings, 11);
 
 /**
  * @generated from message codefoundry.v1.UpdateSettingsRequest
@@ -324,7 +447,7 @@ export type UpdateSettingsRequest = Message<"codefoundry.v1.UpdateSettingsReques
  * Use `create(UpdateSettingsRequestSchema)` to create a new message.
  */
 export const UpdateSettingsRequestSchema: GenMessage<UpdateSettingsRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_settings, 10);
+  messageDesc(file_codefoundry_v1_settings, 12);
 
 /**
  * @generated from message codefoundry.v1.UpdateSettingsResponse
@@ -341,7 +464,7 @@ export type UpdateSettingsResponse = Message<"codefoundry.v1.UpdateSettingsRespo
  * Use `create(UpdateSettingsResponseSchema)` to create a new message.
  */
 export const UpdateSettingsResponseSchema: GenMessage<UpdateSettingsResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_settings, 11);
+  messageDesc(file_codefoundry_v1_settings, 13);
 
 /**
  * @generated from message codefoundry.v1.WatchSettingsRequest
@@ -354,7 +477,7 @@ export type WatchSettingsRequest = Message<"codefoundry.v1.WatchSettingsRequest"
  * Use `create(WatchSettingsRequestSchema)` to create a new message.
  */
 export const WatchSettingsRequestSchema: GenMessage<WatchSettingsRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_settings, 12);
+  messageDesc(file_codefoundry_v1_settings, 14);
 
 /**
  * @generated from enum codefoundry.v1.SettingType
@@ -421,7 +544,8 @@ export const SettingTypeSchema: GenEnum<SettingType> = /*@__PURE__*/
  */
 export const SettingsService: GenService<{
   /**
-   * GetSchema returns every field, in display order, and the groups they belong to.
+   * GetSchema returns every field, the file groups they belong to, and the pages and
+   * sections the settings page shows them under.
    *
    * @generated from rpc codefoundry.v1.SettingsService.GetSchema
    */

@@ -106,7 +106,21 @@ type SettingField struct {
 	Placeholder string `protobuf:"bytes,11,opt,name=placeholder,proto3" json:"placeholder,omitempty"`
 	// Display names for enum_values, parallel to it; empty when the values are shown as is.
 	// threads.default_model carries the model registry's labels ("Opus 4.8").
-	EnumLabels    []string `protobuf:"bytes,12,rep,name=enum_labels,json=enumLabels,proto3" json:"enum_labels,omitempty"`
+	EnumLabels []string `protobuf:"bytes,12,rep,name=enum_labels,json=enumLabels,proto3" json:"enum_labels,omitempty"`
+	// Page id (SettingPage.id) the settings page shows the field on. Display only: the
+	// field's table in the file is its group.
+	Page string `protobuf:"bytes,13,opt,name=page,proto3" json:"page,omitempty"`
+	// Section id (SettingSection.id) within the page.
+	Section string `protobuf:"bytes,14,opt,name=section,proto3" json:"section,omitempty"`
+	// Unit shown as a suffix inside a number input ("s", "pt", "%"); empty for none.
+	Unit string `protobuf:"bytes,15,opt,name=unit,proto3" json:"unit,omitempty"`
+	// Key of a SETTING_TYPE_BOOL field this one depends on: while that field is false,
+	// this one renders indented and dimmed. Empty for none.
+	DependsOn string `protobuf:"bytes,16,opt,name=depends_on,json=dependsOn,proto3" json:"depends_on,omitempty"`
+	// Fields of a section sharing a non-empty row id render side by side in one row
+	// (model and effort), each under its own title, with the first field's description
+	// under the row.
+	Row           string `protobuf:"bytes,17,opt,name=row,proto3" json:"row,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -225,6 +239,42 @@ func (x *SettingField) GetEnumLabels() []string {
 	return nil
 }
 
+func (x *SettingField) GetPage() string {
+	if x != nil {
+		return x.Page
+	}
+	return ""
+}
+
+func (x *SettingField) GetSection() string {
+	if x != nil {
+		return x.Section
+	}
+	return ""
+}
+
+func (x *SettingField) GetUnit() string {
+	if x != nil {
+		return x.Unit
+	}
+	return ""
+}
+
+func (x *SettingField) GetDependsOn() string {
+	if x != nil {
+		return x.DependsOn
+	}
+	return ""
+}
+
+func (x *SettingField) GetRow() string {
+	if x != nil {
+		return x.Row
+	}
+	return ""
+}
+
+// SettingGroup is a table of the settings file ([threads], [github], ...).
 type SettingGroup struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -285,6 +335,141 @@ func (x *SettingGroup) GetDescription() string {
 	return ""
 }
 
+// SettingPage is one page (tab) of the settings page. Pages and their sections are
+// display only and independent of the file's groups: a page may show fields of several
+// groups.
+type SettingPage struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Title string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	// Optional caption under the page title.
+	Description string `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	// In display order. The keybindings page has one section per command category.
+	Sections      []*SettingSection `protobuf:"bytes,4,rep,name=sections,proto3" json:"sections,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SettingPage) Reset() {
+	*x = SettingPage{}
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SettingPage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SettingPage) ProtoMessage() {}
+
+func (x *SettingPage) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SettingPage.ProtoReflect.Descriptor instead.
+func (*SettingPage) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *SettingPage) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *SettingPage) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *SettingPage) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *SettingPage) GetSections() []*SettingSection {
+	if x != nil {
+		return x.Sections
+	}
+	return nil
+}
+
+type SettingSection struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// Empty for a page's single unnamed section.
+	Title string `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	// Optional caption under the section title.
+	Description   string `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SettingSection) Reset() {
+	*x = SettingSection{}
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SettingSection) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SettingSection) ProtoMessage() {}
+
+func (x *SettingSection) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SettingSection.ProtoReflect.Descriptor instead.
+func (*SettingSection) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *SettingSection) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *SettingSection) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *SettingSection) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
 type SettingIssue struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
@@ -295,7 +480,7 @@ type SettingIssue struct {
 
 func (x *SettingIssue) Reset() {
 	*x = SettingIssue{}
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[2]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -307,7 +492,7 @@ func (x *SettingIssue) String() string {
 func (*SettingIssue) ProtoMessage() {}
 
 func (x *SettingIssue) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[2]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -320,7 +505,7 @@ func (x *SettingIssue) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SettingIssue.ProtoReflect.Descriptor instead.
 func (*SettingIssue) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{2}
+	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *SettingIssue) GetKey() string {
@@ -358,7 +543,7 @@ type SettingsSnapshot struct {
 
 func (x *SettingsSnapshot) Reset() {
 	*x = SettingsSnapshot{}
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[3]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -370,7 +555,7 @@ func (x *SettingsSnapshot) String() string {
 func (*SettingsSnapshot) ProtoMessage() {}
 
 func (x *SettingsSnapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[3]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -383,7 +568,7 @@ func (x *SettingsSnapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SettingsSnapshot.ProtoReflect.Descriptor instead.
 func (*SettingsSnapshot) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{3}
+	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *SettingsSnapshot) GetValues() map[string]string {
@@ -438,7 +623,7 @@ type SettingsValidationErrors struct {
 
 func (x *SettingsValidationErrors) Reset() {
 	*x = SettingsValidationErrors{}
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[4]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -450,7 +635,7 @@ func (x *SettingsValidationErrors) String() string {
 func (*SettingsValidationErrors) ProtoMessage() {}
 
 func (x *SettingsValidationErrors) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[4]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -463,7 +648,7 @@ func (x *SettingsValidationErrors) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SettingsValidationErrors.ProtoReflect.Descriptor instead.
 func (*SettingsValidationErrors) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{4}
+	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *SettingsValidationErrors) GetErrors() []*SettingIssue {
@@ -485,7 +670,7 @@ type SettingsEvent struct {
 
 func (x *SettingsEvent) Reset() {
 	*x = SettingsEvent{}
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[5]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -497,7 +682,7 @@ func (x *SettingsEvent) String() string {
 func (*SettingsEvent) ProtoMessage() {}
 
 func (x *SettingsEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[5]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -510,7 +695,7 @@ func (x *SettingsEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SettingsEvent.ProtoReflect.Descriptor instead.
 func (*SettingsEvent) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{5}
+	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *SettingsEvent) GetEvent() isSettingsEvent_Event {
@@ -547,7 +732,7 @@ type GetSettingsSchemaRequest struct {
 
 func (x *GetSettingsSchemaRequest) Reset() {
 	*x = GetSettingsSchemaRequest{}
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[6]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -559,7 +744,7 @@ func (x *GetSettingsSchemaRequest) String() string {
 func (*GetSettingsSchemaRequest) ProtoMessage() {}
 
 func (x *GetSettingsSchemaRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[6]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -572,20 +757,24 @@ func (x *GetSettingsSchemaRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSettingsSchemaRequest.ProtoReflect.Descriptor instead.
 func (*GetSettingsSchemaRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{6}
+	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{8}
 }
 
 type GetSettingsSchemaResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Groups        []*SettingGroup        `protobuf:"bytes,1,rep,name=groups,proto3" json:"groups,omitempty"`
-	Fields        []*SettingField        `protobuf:"bytes,2,rep,name=fields,proto3" json:"fields,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The file's tables, in file order.
+	Groups []*SettingGroup `protobuf:"bytes,1,rep,name=groups,proto3" json:"groups,omitempty"`
+	// Every field. Within a section, fields are in display order.
+	Fields []*SettingField `protobuf:"bytes,2,rep,name=fields,proto3" json:"fields,omitempty"`
+	// Pages in display order; every field's page and section are listed here.
+	Pages         []*SettingPage `protobuf:"bytes,3,rep,name=pages,proto3" json:"pages,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GetSettingsSchemaResponse) Reset() {
 	*x = GetSettingsSchemaResponse{}
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[7]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -597,7 +786,7 @@ func (x *GetSettingsSchemaResponse) String() string {
 func (*GetSettingsSchemaResponse) ProtoMessage() {}
 
 func (x *GetSettingsSchemaResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[7]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -610,7 +799,7 @@ func (x *GetSettingsSchemaResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSettingsSchemaResponse.ProtoReflect.Descriptor instead.
 func (*GetSettingsSchemaResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{7}
+	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *GetSettingsSchemaResponse) GetGroups() []*SettingGroup {
@@ -627,6 +816,13 @@ func (x *GetSettingsSchemaResponse) GetFields() []*SettingField {
 	return nil
 }
 
+func (x *GetSettingsSchemaResponse) GetPages() []*SettingPage {
+	if x != nil {
+		return x.Pages
+	}
+	return nil
+}
+
 type GetSettingsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -635,7 +831,7 @@ type GetSettingsRequest struct {
 
 func (x *GetSettingsRequest) Reset() {
 	*x = GetSettingsRequest{}
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[8]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -647,7 +843,7 @@ func (x *GetSettingsRequest) String() string {
 func (*GetSettingsRequest) ProtoMessage() {}
 
 func (x *GetSettingsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[8]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -660,7 +856,7 @@ func (x *GetSettingsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSettingsRequest.ProtoReflect.Descriptor instead.
 func (*GetSettingsRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{8}
+	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{10}
 }
 
 type GetSettingsResponse struct {
@@ -672,7 +868,7 @@ type GetSettingsResponse struct {
 
 func (x *GetSettingsResponse) Reset() {
 	*x = GetSettingsResponse{}
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[9]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -684,7 +880,7 @@ func (x *GetSettingsResponse) String() string {
 func (*GetSettingsResponse) ProtoMessage() {}
 
 func (x *GetSettingsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[9]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -697,7 +893,7 @@ func (x *GetSettingsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSettingsResponse.ProtoReflect.Descriptor instead.
 func (*GetSettingsResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{9}
+	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetSettingsResponse) GetSettings() *SettingsSnapshot {
@@ -716,7 +912,7 @@ type UpdateSettingsRequest struct {
 
 func (x *UpdateSettingsRequest) Reset() {
 	*x = UpdateSettingsRequest{}
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[10]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -728,7 +924,7 @@ func (x *UpdateSettingsRequest) String() string {
 func (*UpdateSettingsRequest) ProtoMessage() {}
 
 func (x *UpdateSettingsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[10]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -741,7 +937,7 @@ func (x *UpdateSettingsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateSettingsRequest.ProtoReflect.Descriptor instead.
 func (*UpdateSettingsRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{10}
+	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *UpdateSettingsRequest) GetValues() map[string]string {
@@ -760,7 +956,7 @@ type UpdateSettingsResponse struct {
 
 func (x *UpdateSettingsResponse) Reset() {
 	*x = UpdateSettingsResponse{}
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[11]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -772,7 +968,7 @@ func (x *UpdateSettingsResponse) String() string {
 func (*UpdateSettingsResponse) ProtoMessage() {}
 
 func (x *UpdateSettingsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[11]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -785,7 +981,7 @@ func (x *UpdateSettingsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateSettingsResponse.ProtoReflect.Descriptor instead.
 func (*UpdateSettingsResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{11}
+	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *UpdateSettingsResponse) GetSettings() *SettingsSnapshot {
@@ -803,7 +999,7 @@ type WatchSettingsRequest struct {
 
 func (x *WatchSettingsRequest) Reset() {
 	*x = WatchSettingsRequest{}
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[12]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -815,7 +1011,7 @@ func (x *WatchSettingsRequest) String() string {
 func (*WatchSettingsRequest) ProtoMessage() {}
 
 func (x *WatchSettingsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[12]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -828,14 +1024,14 @@ func (x *WatchSettingsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchSettingsRequest.ProtoReflect.Descriptor instead.
 func (*WatchSettingsRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{12}
+	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{14}
 }
 
 var File_codefoundry_v1_settings_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_settings_proto_rawDesc = "" +
 	"\n" +
-	"\x1dcodefoundry/v1/settings.proto\x12\x0ecodefoundry.v1\"\xf7\x02\n" +
+	"\x1dcodefoundry/v1/settings.proto\x12\x0ecodefoundry.v1\"\xea\x03\n" +
 	"\fSettingField\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +
@@ -851,8 +1047,23 @@ const file_codefoundry_v1_settings_proto_rawDesc = "" +
 	" \x01(\x03R\x03max\x12 \n" +
 	"\vplaceholder\x18\v \x01(\tR\vplaceholder\x12\x1f\n" +
 	"\venum_labels\x18\f \x03(\tR\n" +
-	"enumLabels\"V\n" +
+	"enumLabels\x12\x12\n" +
+	"\x04page\x18\r \x01(\tR\x04page\x12\x18\n" +
+	"\asection\x18\x0e \x01(\tR\asection\x12\x12\n" +
+	"\x04unit\x18\x0f \x01(\tR\x04unit\x12\x1d\n" +
+	"\n" +
+	"depends_on\x18\x10 \x01(\tR\tdependsOn\x12\x10\n" +
+	"\x03row\x18\x11 \x01(\tR\x03row\"V\n" +
 	"\fSettingGroup\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
+	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\"\x91\x01\n" +
+	"\vSettingPage\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
+	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\x12:\n" +
+	"\bsections\x18\x04 \x03(\v2\x1e.codefoundry.v1.SettingSectionR\bsections\"X\n" +
+	"\x0eSettingSection\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\":\n" +
@@ -875,10 +1086,11 @@ const file_codefoundry_v1_settings_proto_rawDesc = "" +
 	"\rSettingsEvent\x12>\n" +
 	"\bsnapshot\x18\x01 \x01(\v2 .codefoundry.v1.SettingsSnapshotH\x00R\bsnapshotB\a\n" +
 	"\x05event\"\x1a\n" +
-	"\x18GetSettingsSchemaRequest\"\x87\x01\n" +
+	"\x18GetSettingsSchemaRequest\"\xba\x01\n" +
 	"\x19GetSettingsSchemaResponse\x124\n" +
 	"\x06groups\x18\x01 \x03(\v2\x1c.codefoundry.v1.SettingGroupR\x06groups\x124\n" +
-	"\x06fields\x18\x02 \x03(\v2\x1c.codefoundry.v1.SettingFieldR\x06fields\"\x14\n" +
+	"\x06fields\x18\x02 \x03(\v2\x1c.codefoundry.v1.SettingFieldR\x06fields\x121\n" +
+	"\x05pages\x18\x03 \x03(\v2\x1b.codefoundry.v1.SettingPageR\x05pages\"\x14\n" +
 	"\x12GetSettingsRequest\"S\n" +
 	"\x13GetSettingsResponse\x12<\n" +
 	"\bsettings\x18\x01 \x01(\v2 .codefoundry.v1.SettingsSnapshotR\bsettings\"\x9d\x01\n" +
@@ -918,49 +1130,53 @@ func file_codefoundry_v1_settings_proto_rawDescGZIP() []byte {
 }
 
 var file_codefoundry_v1_settings_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_codefoundry_v1_settings_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
+var file_codefoundry_v1_settings_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_codefoundry_v1_settings_proto_goTypes = []any{
 	(SettingType)(0),                  // 0: codefoundry.v1.SettingType
 	(*SettingField)(nil),              // 1: codefoundry.v1.SettingField
 	(*SettingGroup)(nil),              // 2: codefoundry.v1.SettingGroup
-	(*SettingIssue)(nil),              // 3: codefoundry.v1.SettingIssue
-	(*SettingsSnapshot)(nil),          // 4: codefoundry.v1.SettingsSnapshot
-	(*SettingsValidationErrors)(nil),  // 5: codefoundry.v1.SettingsValidationErrors
-	(*SettingsEvent)(nil),             // 6: codefoundry.v1.SettingsEvent
-	(*GetSettingsSchemaRequest)(nil),  // 7: codefoundry.v1.GetSettingsSchemaRequest
-	(*GetSettingsSchemaResponse)(nil), // 8: codefoundry.v1.GetSettingsSchemaResponse
-	(*GetSettingsRequest)(nil),        // 9: codefoundry.v1.GetSettingsRequest
-	(*GetSettingsResponse)(nil),       // 10: codefoundry.v1.GetSettingsResponse
-	(*UpdateSettingsRequest)(nil),     // 11: codefoundry.v1.UpdateSettingsRequest
-	(*UpdateSettingsResponse)(nil),    // 12: codefoundry.v1.UpdateSettingsResponse
-	(*WatchSettingsRequest)(nil),      // 13: codefoundry.v1.WatchSettingsRequest
-	nil,                               // 14: codefoundry.v1.SettingsSnapshot.ValuesEntry
-	nil,                               // 15: codefoundry.v1.UpdateSettingsRequest.ValuesEntry
+	(*SettingPage)(nil),               // 3: codefoundry.v1.SettingPage
+	(*SettingSection)(nil),            // 4: codefoundry.v1.SettingSection
+	(*SettingIssue)(nil),              // 5: codefoundry.v1.SettingIssue
+	(*SettingsSnapshot)(nil),          // 6: codefoundry.v1.SettingsSnapshot
+	(*SettingsValidationErrors)(nil),  // 7: codefoundry.v1.SettingsValidationErrors
+	(*SettingsEvent)(nil),             // 8: codefoundry.v1.SettingsEvent
+	(*GetSettingsSchemaRequest)(nil),  // 9: codefoundry.v1.GetSettingsSchemaRequest
+	(*GetSettingsSchemaResponse)(nil), // 10: codefoundry.v1.GetSettingsSchemaResponse
+	(*GetSettingsRequest)(nil),        // 11: codefoundry.v1.GetSettingsRequest
+	(*GetSettingsResponse)(nil),       // 12: codefoundry.v1.GetSettingsResponse
+	(*UpdateSettingsRequest)(nil),     // 13: codefoundry.v1.UpdateSettingsRequest
+	(*UpdateSettingsResponse)(nil),    // 14: codefoundry.v1.UpdateSettingsResponse
+	(*WatchSettingsRequest)(nil),      // 15: codefoundry.v1.WatchSettingsRequest
+	nil,                               // 16: codefoundry.v1.SettingsSnapshot.ValuesEntry
+	nil,                               // 17: codefoundry.v1.UpdateSettingsRequest.ValuesEntry
 }
 var file_codefoundry_v1_settings_proto_depIdxs = []int32{
 	0,  // 0: codefoundry.v1.SettingField.type:type_name -> codefoundry.v1.SettingType
-	14, // 1: codefoundry.v1.SettingsSnapshot.values:type_name -> codefoundry.v1.SettingsSnapshot.ValuesEntry
-	3,  // 2: codefoundry.v1.SettingsSnapshot.issues:type_name -> codefoundry.v1.SettingIssue
-	3,  // 3: codefoundry.v1.SettingsValidationErrors.errors:type_name -> codefoundry.v1.SettingIssue
-	4,  // 4: codefoundry.v1.SettingsEvent.snapshot:type_name -> codefoundry.v1.SettingsSnapshot
-	2,  // 5: codefoundry.v1.GetSettingsSchemaResponse.groups:type_name -> codefoundry.v1.SettingGroup
-	1,  // 6: codefoundry.v1.GetSettingsSchemaResponse.fields:type_name -> codefoundry.v1.SettingField
-	4,  // 7: codefoundry.v1.GetSettingsResponse.settings:type_name -> codefoundry.v1.SettingsSnapshot
-	15, // 8: codefoundry.v1.UpdateSettingsRequest.values:type_name -> codefoundry.v1.UpdateSettingsRequest.ValuesEntry
-	4,  // 9: codefoundry.v1.UpdateSettingsResponse.settings:type_name -> codefoundry.v1.SettingsSnapshot
-	7,  // 10: codefoundry.v1.SettingsService.GetSchema:input_type -> codefoundry.v1.GetSettingsSchemaRequest
-	9,  // 11: codefoundry.v1.SettingsService.Get:input_type -> codefoundry.v1.GetSettingsRequest
-	11, // 12: codefoundry.v1.SettingsService.Update:input_type -> codefoundry.v1.UpdateSettingsRequest
-	13, // 13: codefoundry.v1.SettingsService.Watch:input_type -> codefoundry.v1.WatchSettingsRequest
-	8,  // 14: codefoundry.v1.SettingsService.GetSchema:output_type -> codefoundry.v1.GetSettingsSchemaResponse
-	10, // 15: codefoundry.v1.SettingsService.Get:output_type -> codefoundry.v1.GetSettingsResponse
-	12, // 16: codefoundry.v1.SettingsService.Update:output_type -> codefoundry.v1.UpdateSettingsResponse
-	6,  // 17: codefoundry.v1.SettingsService.Watch:output_type -> codefoundry.v1.SettingsEvent
-	14, // [14:18] is the sub-list for method output_type
-	10, // [10:14] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	4,  // 1: codefoundry.v1.SettingPage.sections:type_name -> codefoundry.v1.SettingSection
+	16, // 2: codefoundry.v1.SettingsSnapshot.values:type_name -> codefoundry.v1.SettingsSnapshot.ValuesEntry
+	5,  // 3: codefoundry.v1.SettingsSnapshot.issues:type_name -> codefoundry.v1.SettingIssue
+	5,  // 4: codefoundry.v1.SettingsValidationErrors.errors:type_name -> codefoundry.v1.SettingIssue
+	6,  // 5: codefoundry.v1.SettingsEvent.snapshot:type_name -> codefoundry.v1.SettingsSnapshot
+	2,  // 6: codefoundry.v1.GetSettingsSchemaResponse.groups:type_name -> codefoundry.v1.SettingGroup
+	1,  // 7: codefoundry.v1.GetSettingsSchemaResponse.fields:type_name -> codefoundry.v1.SettingField
+	3,  // 8: codefoundry.v1.GetSettingsSchemaResponse.pages:type_name -> codefoundry.v1.SettingPage
+	6,  // 9: codefoundry.v1.GetSettingsResponse.settings:type_name -> codefoundry.v1.SettingsSnapshot
+	17, // 10: codefoundry.v1.UpdateSettingsRequest.values:type_name -> codefoundry.v1.UpdateSettingsRequest.ValuesEntry
+	6,  // 11: codefoundry.v1.UpdateSettingsResponse.settings:type_name -> codefoundry.v1.SettingsSnapshot
+	9,  // 12: codefoundry.v1.SettingsService.GetSchema:input_type -> codefoundry.v1.GetSettingsSchemaRequest
+	11, // 13: codefoundry.v1.SettingsService.Get:input_type -> codefoundry.v1.GetSettingsRequest
+	13, // 14: codefoundry.v1.SettingsService.Update:input_type -> codefoundry.v1.UpdateSettingsRequest
+	15, // 15: codefoundry.v1.SettingsService.Watch:input_type -> codefoundry.v1.WatchSettingsRequest
+	10, // 16: codefoundry.v1.SettingsService.GetSchema:output_type -> codefoundry.v1.GetSettingsSchemaResponse
+	12, // 17: codefoundry.v1.SettingsService.Get:output_type -> codefoundry.v1.GetSettingsResponse
+	14, // 18: codefoundry.v1.SettingsService.Update:output_type -> codefoundry.v1.UpdateSettingsResponse
+	8,  // 19: codefoundry.v1.SettingsService.Watch:output_type -> codefoundry.v1.SettingsEvent
+	16, // [16:20] is the sub-list for method output_type
+	12, // [12:16] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_settings_proto_init() }
@@ -968,7 +1184,7 @@ func file_codefoundry_v1_settings_proto_init() {
 	if File_codefoundry_v1_settings_proto != nil {
 		return
 	}
-	file_codefoundry_v1_settings_proto_msgTypes[5].OneofWrappers = []any{
+	file_codefoundry_v1_settings_proto_msgTypes[7].OneofWrappers = []any{
 		(*SettingsEvent_Snapshot)(nil),
 	}
 	type x struct{}
@@ -977,7 +1193,7 @@ func file_codefoundry_v1_settings_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_settings_proto_rawDesc), len(file_codefoundry_v1_settings_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   15,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

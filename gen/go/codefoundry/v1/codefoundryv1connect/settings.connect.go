@@ -46,7 +46,8 @@ const (
 
 // SettingsServiceClient is a client for the codefoundry.v1.SettingsService service.
 type SettingsServiceClient interface {
-	// GetSchema returns every field, in display order, and the groups they belong to.
+	// GetSchema returns every field, the file groups they belong to, and the pages and
+	// sections the settings page shows them under.
 	GetSchema(context.Context, *connect.Request[v1.GetSettingsSchemaRequest]) (*connect.Response[v1.GetSettingsSchemaResponse], error)
 	// Get returns the current values.
 	Get(context.Context, *connect.Request[v1.GetSettingsRequest]) (*connect.Response[v1.GetSettingsResponse], error)
@@ -128,7 +129,8 @@ func (c *settingsServiceClient) Watch(ctx context.Context, req *connect.Request[
 
 // SettingsServiceHandler is an implementation of the codefoundry.v1.SettingsService service.
 type SettingsServiceHandler interface {
-	// GetSchema returns every field, in display order, and the groups they belong to.
+	// GetSchema returns every field, the file groups they belong to, and the pages and
+	// sections the settings page shows them under.
 	GetSchema(context.Context, *connect.Request[v1.GetSettingsSchemaRequest]) (*connect.Response[v1.GetSettingsSchemaResponse], error)
 	// Get returns the current values.
 	Get(context.Context, *connect.Request[v1.GetSettingsRequest]) (*connect.Response[v1.GetSettingsResponse], error)
