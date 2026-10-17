@@ -348,6 +348,9 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   `thread_items` (user message, assistant text, thinking, tool call, permission request,
   question, turn end, error, compaction, command output): streaming items stay in memory
   and are written when complete, so a restart rehydrates them and a resumed process appends.
+  Every turn ends with a turn end: when the process ended before Claude's result (a close,
+  a crash, a daemon stop or a daemon that died), the daemon writes one itself, subtype
+  `process_ended` (`turnclose.go`, `docs/notes/thread-fold-1-daemon.md`).
   A `note` item is the daemon's own line, not the stream's: a fork's items start as a
   copy of its parent's (never live: pending requests cancelled, running tools ended),
   then the note "Forked from <parent>" (`fork.go`, `docs/notes/fork-copies-history.md`).
