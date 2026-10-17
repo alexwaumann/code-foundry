@@ -9,7 +9,7 @@ import (
 type jobKind uint8
 
 const (
-	// jobReconcile owns a project's metadata, worktree set, and watches.
+	// jobReconcile owns a project's metadata, worktree set, and fs routes.
 	jobReconcile jobKind = iota + 1
 	// jobStatus owns one worktree's snapshot slot.
 	jobStatus
@@ -18,6 +18,20 @@ const (
 	// jobBase owns a project's resolved base sha (base.go).
 	jobBase
 )
+
+func (k jobKind) String() string {
+	switch k {
+	case jobReconcile:
+		return "reconcile"
+	case jobStatus:
+		return "status"
+	case jobDetail:
+		return "detail"
+	case jobBase:
+		return "base"
+	}
+	return "jobKind(?)"
+}
 
 // jobKey identifies a job. A key is never run by two workers at once, which is what
 // makes each snapshot slot single-writer.

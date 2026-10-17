@@ -85,7 +85,7 @@ internal/
     terminal/              PTY + libghostty-vt actor per terminal; output tee; snapshots
     thread/                threads: claude -p over stream-json, items, naming, status, resume
     claudestream/          the stream-json / control protocol client (pure Go)
-    project/               registered projects, worktrees, git status, filesystem watcher
+    project/               registered projects, worktrees, git status, FSEvents stream
     gh/                    GitHub GraphQL/REST polling over HTTP (token via gh), PR/CI cache
     gitops/                git/gh operations per worktree (fetch, pull, push, PR); editor, Finder, browser
     clone/                 gh repo clone into the projects dir with streamed output, then register
@@ -536,11 +536,13 @@ from the pull request (docs/notes/pr-thread-commands.md).
   command; `docs/notes/worktree-op-state.md`). Every worktree the app makes goes to
   `<config home>/worktrees/<owner>/<repo>/<branch>` (`_local/<name>` without a GitHub
   origin); no setting or request field moves it, and only worktrees under that root are
-  `Managed` (cleanable; `docs/notes/drop-worktree-dir.md`). One filesystem watcher
-  (fsnotify) across all registered roots feeds a debounced reconcile. Workers write
-  disjoint per-path snapshot pointers. A project may be a plain folder (`Project.Git`
-  false): one synthetic checkout, no git commands or watches, the poll notices a later
-  `git init` (`docs/notes/add-project-2-nogit.md`).
+  `Managed` (cleanable; `docs/notes/drop-worktree-dir.md`). One recursive FSEvents
+  stream (cgo, confined to one goroutine) over the worktree root, every project
+  directory, and any worktree outside both is routed by path to debounced status,
+  base, and reconcile jobs (`docs/notes/fsevents-watcher.md`); a 2 min poll is the
+  backstop. Workers write disjoint per-path snapshot pointers. A project may be a plain
+  folder (`Project.Git` false): one synthetic checkout, no git commands; the stream (or
+  the poll) notices a later `git init` (`docs/notes/add-project-2-nogit.md`).
 * `gh`: GitHub GraphQL (and a little REST) sent in-process over one keep-alive HTTP
   client with the token from `gh auth token` (github.com only; see
   `docs/notes/gh-http-transport.md`). Scoped to the viewer: their PRs (authored, review

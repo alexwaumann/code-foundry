@@ -162,6 +162,9 @@ branches, heads, and staged/modified/untracked counts. `github_slug`, upstream, 
 
 ## What triggers a refresh
 
+> **Superseded (2026-10-17):** one recursive FSEvents stream replaced the kqueue watcher
+> below; see `fsevents-watcher.md` for the current table. This section is history.
+
 fsnotify on macOS is kqueue. A watch on a directory reports entries created, removed, or
 renamed in it, plus writes to the files directly inside it. It does not report anything
 deeper. Watched directories per repo (`<common>` = `<main>/.git`):
