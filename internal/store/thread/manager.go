@@ -264,8 +264,10 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 	m := &Manager{opts: opts, log: opts.Log, recs: map[string]*record{}, retired: retired,
 		viewers: map[string]int{}, threads: map[string]*threadLog{}, cacheTTL: opts.CacheTTL}
 	m.ctx, m.cancel = context.WithCancel(context.WithoutCancel(ctx))
+	var lost []string
 	for _, s := range rows {
 		if s.State != StateDisconnected {
+			lost = append(lost, s.ID)
 			s.State, s.DisconnectReason = StateDisconnected, ReasonDaemonRestarts
 			st, reason := disconnectedStatus(s.Status, s.StatusReason)
 			s.setStatus(st, reason, opts.Now())
@@ -283,6 +285,14 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 	m.mu.Lock()
 	m.rebuildLocked()
 	m.mu.Unlock()
+	// The runs the daemon lost: loading a stopped thread's log closes what its run left
+	// open, the turn included (closeLostRun); done now, not when someone first reads the
+	// items, so the timeline is whole at once.
+	for _, id := range lost {
+		if _, err := m.thread(ctx, id); err != nil {
+			m.log.Warn("close the open turn of a thread the daemon lost", "thread", id, "err", err)
+		}
+	}
 	// Snoozes that ended while the daemon was stopped wake now, then the clock is
 	// checked on every tick (snooze.go).
 	m.wakeSnoozed()

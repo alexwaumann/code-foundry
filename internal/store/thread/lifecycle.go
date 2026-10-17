@@ -214,6 +214,8 @@ func (m *Manager) failStart(id string, log *threadLog, err error) error {
 	if log != nil {
 		w := itemWriter{log: log, save: func(it Item) { m.saveItem(id, it) }}
 		w.add(Item{ID: "err-" + itemSuffix(), Kind: KindError, Text: msg})
+		// The message's turn never ran: it ends here (turnclose.go).
+		closeOpenTurn(w, m.opts.Now())
 		m.log.Warn("thread failed to start", "thread", id, "err", err)
 	}
 	now := m.opts.Now()

@@ -43,6 +43,8 @@ const (
 	// KindQuestion is an AskUserQuestion request and its answers.
 	KindQuestion ItemKind = "question"
 	// KindTurnEnd ends a turn (the CLI's result): usage, cost, duration, stop reason.
+	// When the process ended before its result the daemon writes one itself
+	// (SubtypeProcessEnded, turnclose.go), so every turn ends with one.
 	KindTurnEnd ItemKind = "turn_end"
 	// KindError is something that went wrong outside a turn's result: the process
 	// failed to start or exited mid-turn (Text says what).
@@ -175,7 +177,9 @@ type Request struct {
 
 // TurnEnd is a turn_end item's payload (the CLI's result).
 type TurnEnd struct {
-	// Subtype is "success" or error_during_execution, error_max_turns, ...
+	// Subtype is "success" or error_during_execution, error_max_turns, ...; the
+	// daemon's own SubtypeProcessEnded ("process_ended") when the process ended before
+	// Claude's result (turnclose.go).
 	Subtype string
 	IsError bool
 	// Interrupted: the turn was stopped by an interrupt.
@@ -632,8 +636,9 @@ func (m *Manager) thread(ctx context.Context, id string) (*threadLog, error) {
 	}
 	m.threads[id] = t
 	if idle {
-		// A run the daemon lost (a crash) left items open; nothing will finish them.
-		closeUnfinished(itemWriter{log: t, save: func(it Item) { m.saveItem(id, it) }}, "the thread's process ended")
+		// A run the daemon lost (a crash) left items and its turn open; nothing will
+		// finish them.
+		closeLostRun(itemWriter{log: t, save: func(it Item) { m.saveItem(id, it) }}, "the thread's process ended")
 	}
 	return t, nil
 }

@@ -513,10 +513,11 @@ func TestRenderedSetEffortRespawnExecFails(t *testing.T) {
 	}
 	items := re.items(s.ID).Items
 	u := slices.IndexFunc(items, func(x Item) bool { return x.ID == it.ID })
-	if u < 0 || u == len(items)-1 || items[len(items)-1].Kind != KindError ||
-		!strings.HasPrefix(items[len(items)-1].Text, "Claude did not start: spawn claude: ") ||
+	n := len(items)
+	if u < 0 || u != n-3 || items[n-2].Kind != KindError || items[n-1].ID != synthTurnPrefix+it.ID ||
+		!strings.HasPrefix(items[n-2].Text, "Claude did not start: spawn claude: ") ||
 		!slices.ContainsFunc(items[:u], func(x Item) bool { return strings.HasPrefix(x.Text, "Claude did not restart for the effort change") }) {
-		t.Errorf("want the restart failure, the message, then the start failure:\n%s", describeItems(items))
+		t.Errorf("want the restart failure, the message, the start failure, then its turn end:\n%s", describeItems(items))
 	}
 	if err := os.Symlink(fakeClaudeBin, link); err != nil {
 		t.Fatal(err)
