@@ -7,6 +7,7 @@ import {
   CircleCheck,
   CircleX,
   Copy,
+  CornerDownRight,
   FilePen,
   FilePlus,
   FileText,
@@ -30,17 +31,22 @@ import { Tip } from "@/components/ui/tooltip";
 import { agentElapsedMs, fmtElapsed, parseAgentNote } from "@/lib/agents";
 import { copyText } from "@/lib/clipboard";
 import { useNow } from "@/lib/clock";
+import { CREATED_BY_NOTE_ID, parseCreatedByNote } from "@/lib/lineage";
 import { canonicalModelName } from "@/lib/models";
 import { formatAgo } from "@/lib/thread";
 import { questionsOf } from "@/lib/threadRequest";
 import { groupLabel, turnCostLabel, type TimelineRow, type WorkNode } from "@/lib/threadTimeline";
 import { formatDuration, parseObject, splitPath, str, toolSummary, type Tense } from "@/lib/toolSummary";
 import { useAgentRunOfCall, useAgentRunOfNote } from "@/stores/agents";
+import { useNoteCreatorId } from "@/stores/lineage";
 import { useModelChoices } from "@/stores/settings";
+import { useThreadsStore } from "@/stores/threads";
+import { useUiStore } from "@/stores/ui";
 import { getThreadItems, setRowExpanded, setTurnFolded, useRowExpanded, useThreadItem, useThreadStore } from "@/stores/thread";
 import { ThreadMarkdown } from "./Code";
 import { CodeRunContext } from "./codeContext";
 import { useThreadCtx } from "./context";
+import { LineageNote } from "./LineageNote";
 import { AgentReport, ToolDetail } from "./ToolDetail";
 import { UserBubble } from "./UserBubble";
 
@@ -479,9 +485,10 @@ const NoteRow = memo(function NoteRow({ id }: { id: string }) {
 });
 
 /**
- * A system note (the daemon's, not Claude's): one quiet centered line between hairlines,
- * the sketch's divider (docs/sketches/rendered-thread). A fork's "Forked from …" marks
- * where the history it copied from its parent ends.
+ * A system note (the daemon's, not Claude's). A fork's "Forked from …" (and any note
+ * without a style of its own) is one quiet centered line between hairlines, the sketch's
+ * divider (docs/sketches/rendered-thread): it marks where the history the fork copied from
+ * its parent ends. "Created by …" and a subagent's end are one-line notes of their own.
  */
 const SystemNoteRow = memo(function SystemNoteRow({ id }: { id: string }) {
   const { threadId } = useThreadCtx();
@@ -490,12 +497,62 @@ const SystemNoteRow = memo(function SystemNoteRow({ id }: { id: string }) {
   if (it?.kind !== "note") return null;
   const note = parseAgentNote(it.text, run?.description ?? "");
   if (note) return <AgentNoteRow note={note} atMs={it.createdAtMs} />;
+  if (parseCreatedByNote(it.text)) return <CreatedByNoteRow threadId={threadId} id={id} text={it.text} atMs={it.createdAtMs} />;
   return (
     <div className="sysnote" role="separator" aria-label={it.text} data-testid="thread-note">
       <span className="selectable">{it.text}</span>
     </div>
   );
 });
+
+/**
+ * The daemon's note at the top of a thread an agent created
+ * (docs/notes/agents-3-lineage-gui.md): "↳ Created by <creator> · brief: <brief>" on the
+ * lineage note's faint line, the creator's name a link that opens it (as a sidebar click
+ * does), the age on the right. The creator is the thread's recorded one for its own note,
+ * else (a fork's copied note) the one thread with that name; a creator that cannot be
+ * found (removed, or the name is ambiguous) is muted text.
+ */
+function CreatedByNoteRow({ threadId, id, text, atMs }: { threadId: string; id: string; text: string; atMs: number | null }) {
+  const recorded = useThreadsStore((s) => (id === CREATED_BY_NOTE_ID ? (s.byId[threadId]?.createdByName ?? "") : ""));
+  const note = parseCreatedByNote(text, recorded) ?? { name: "", brief: "" };
+  const creatorId = useNoteCreatorId(threadId, id, note.name);
+  return (
+    <LineageNote icon={<CornerDownRight aria-hidden />} atMs={atMs} testId="thread-created-by-note">
+      <span className="lead">Created by</span>
+      {creatorId ? (
+        <button
+          type="button"
+          className="nm"
+          data-testid="thread-created-by-note-link"
+          data-thread={creatorId}
+          onClick={(e) => {
+            e.stopPropagation();
+            useUiStore.getState().select({ kind: "thread", id: creatorId }, { focusPrompt: true });
+          }}
+        >
+          {note.name}
+        </button>
+      ) : (
+        <span className="nm gone" data-testid="thread-created-by-note-name">
+          {note.name}
+        </span>
+      )}
+      {note.brief && (
+        <>
+          <span className="ghost" aria-hidden>
+            ·
+          </span>
+          <Tip label={`brief: ${note.brief}`} whenTruncated>
+            <span className="sum selectable" data-testid="thread-created-by-note-brief">
+              brief: {note.brief}
+            </span>
+          </Tip>
+        </>
+      )}
+    </LineageNote>
+  );
+}
 
 /** "just now", "5 min ago": the note's age on the shared 30 s clock. */
 function NoteAge({ atMs }: { atMs: number }) {

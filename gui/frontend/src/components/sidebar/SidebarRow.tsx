@@ -1,5 +1,5 @@
 import { memo, useContext, useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
-import { AlarmClock, ArrowRightLeft, Bot, ChevronDown, ChevronRight, CircleAlert, Folder, FolderGit2, GitBranch, House, Layers, OctagonX, Pin, type LucideIcon } from "lucide-react";
+import { AlarmClock, ArrowRightLeft, Bot, ChevronDown, ChevronRight, CircleAlert, CornerDownRight, Folder, FolderGit2, GitBranch, House, Layers, OctagonX, Pin, type LucideIcon } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { CLAUDE_ORANGE, ClaudeMark } from "@/components/icons/ClaudeMark";
 import { NoGitBadge } from "@/components/projects/NoGitBadge";
@@ -13,6 +13,7 @@ import { shortRemaining, snoozeTimeFull } from "@/lib/snooze";
 import { showsPlace, statusLine, statusText, statusTones, tipStatusTone, type StatusLine, type StatusTone, type TipStatusTone } from "@/lib/statusLine";
 import { modelLabel, threadRowModel, type RepoLookup, type WorkspaceLookup } from "@/lib/threadRow";
 import type { HeaderRow, Row } from "@/lib/tree";
+import { useCreator, useMadeByThread } from "@/stores/lineage";
 import { useReposStore } from "@/stores/repos";
 import { renameThread } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
@@ -229,6 +230,17 @@ function ThreadLine({ id }: { id: string }) {
   );
 }
 
+/**
+ * The muted ↳ before the name of a thread an agent created (docs/notes/agents-3-lineage-gui.md,
+ * sketch variant A); nothing for the user's threads. No tooltip of its own: the row's
+ * tooltip says who created it.
+ */
+function MadeByThreadGlyph({ id }: { id: string }) {
+  const made = useMadeByThread(id);
+  if (!made) return null;
+  return <CornerDownRight className="-mr-px size-3 shrink-0 text-muted-foreground opacity-85" aria-label="Created by a thread" data-testid="row-created-by" />;
+}
+
 function ThreadLabel({ id }: { id: string }) {
   // Unnamed until the daemon names it from the first prompt: the id stands in.
   const name = useThreadsStore((s) => s.byId[id]?.name ?? "");
@@ -242,6 +254,7 @@ function ThreadLabel({ id }: { id: string }) {
           <RenameField id={id} name={name} />
         ) : (
           <>
+            <MadeByThreadGlyph id={id} />
             <span className={cn("truncate", !name && "text-muted-foreground")} data-testid="thread-name">
               {name || id}
             </span>
@@ -315,6 +328,24 @@ function TipSnooze({ id }: { id: string }) {
 }
 
 /**
+ * "↳ Created by <name>" for a thread an agent created (the name its creator had then); a
+ * removed creator is muted and marked so. Nothing for the user's threads.
+ */
+function TipCreatedBy({ id }: { id: string }) {
+  const creator = useCreator(id);
+  if (creator === null) return null;
+  return (
+    <div className="mb-[3px] flex items-start gap-2 leading-5" data-testid="tip-created-by" data-removed={!creator.exists || undefined}>
+      <CornerDownRight className="mt-[3px] size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+      <span className="min-w-0 break-words">
+        Created by <span className={creator.exists ? "font-medium" : "text-muted-foreground"}>{creator.name}</span>
+        {!creator.exists && <span className="text-muted-foreground"> (removed)</span>}
+      </span>
+    </div>
+  );
+}
+
+/**
  * A queued "Run in…" move in full (the row's "moving to X…" is cut short and does not say
  * when): the thread runs there once it is idle at its prompt. Nothing without a move.
  */
@@ -331,7 +362,7 @@ function TipMoving({ id }: { id: string }) {
 
 /**
  * The tooltip's body: name, status (attention or error only; for a snoozed thread its wake
- * time instead), a queued move, project ("No project" with the House icon for a thread without one),
+ * time instead), who created it (a thread an agent made), a queued move, project ("No project" with the House icon for a thread without one),
  * branch (git only) and model. Mounted only while open.
  */
 function ThreadTipBody({ id }: { id: string }) {
@@ -358,6 +389,7 @@ function ThreadTipBody({ id }: { id: string }) {
         {name || id}
       </div>
       {snoozed ? <TipSnooze id={id} /> : <TipStatus id={id} />}
+      <TipCreatedBy id={id} />
       <TipMoving id={id} />
       <TipRow icon={<TipIcon icon={m.noProject ? House : m.noGit ? Folder : FolderGit2} />} chip={m.noGit ? "no git" : null} testId="tip-project">
         {m.project}
@@ -483,6 +515,7 @@ function SingleLineLabel({ id, section }: { id: string; section: "archived" | "s
         <RenameField id={id} name={name} />
       ) : (
         <>
+          <MadeByThreadGlyph id={id} />
           <span className={cn("truncate", !name && "text-muted-foreground")} data-testid="thread-name">
             {name || id}
           </span>
