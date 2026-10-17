@@ -207,7 +207,7 @@ export function migratePanelV1(byKey: Readonly<Record<string, PanelEntry>>): Rec
     const tabs = e.tabs.map((t) => {
       if (!("repo" in t.params)) return t;
       const { repo, ...rest } = t.params;
-      const next = makeTab(t.kind, t.title, { ...rest, project: repo ?? "" });
+      const next = makeTab(t.kind, t.title, { ...rest, project: repo });
       ids.set(t.id, next.id);
       return next;
     });
