@@ -1,4 +1,4 @@
-package project
+package newproject
 
 import (
 	"context"

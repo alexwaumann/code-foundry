@@ -1,6 +1,6 @@
-// Package projecttest provides an in-memory fake of project.Service for handler and
+// Package newprojecttest provides an in-memory fake of newproject.Service for handler and
 // command tests.
-package projecttest
+package newprojecttest
 
 import (
 	"context"
@@ -9,11 +9,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/alexwaumann/code-foundry/internal/store/project"
+	"github.com/alexwaumann/code-foundry/internal/store/newproject"
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
 )
 
-// Fake is a project.Service. Create validates the name like the real store and refuses
+// Fake is a newproject.Service. Create validates the name like the real store and refuses
 // a name it created before; Publish fails with the error set for owner/name, else
 // returns the project with origin and its GitHub slug; Delete forgets a project under
 // Root and refuses any other.
@@ -27,7 +27,7 @@ type Fake struct {
 	calls   []string
 }
 
-var _ project.Service = (*Fake)(nil)
+var _ newproject.Service = (*Fake)(nil)
 
 // New returns a fake creating projects under root.
 func New(root string) *Fake {
@@ -56,17 +56,17 @@ func (f *Fake) Calls() []string {
 	return append([]string(nil), f.calls...)
 }
 
-// Create implements project.Service.
+// Create implements newproject.Service.
 func (f *Fake) Create(_ context.Context, name string) (repo.Repo, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.calls = append(f.calls, "create "+name)
-	if err := project.ValidateName(name); err != nil {
+	if err := newproject.ValidateName(name); err != nil {
 		return repo.Repo{}, err
 	}
 	dest := path.Join(f.Root, name)
 	if _, ok := f.created[strings.ToLower(name)]; ok {
-		return repo.Repo{}, fmt.Errorf("%s %w", dest, project.ErrExists)
+		return repo.Repo{}, fmt.Errorf("%s %w", dest, newproject.ErrExists)
 	}
 	r := repo.Repo{ID: "repo-" + strings.ToLower(name), Path: dest, Name: name, Git: true, DefaultBranch: "main"}
 	f.created[strings.ToLower(name)] = r
@@ -74,13 +74,13 @@ func (f *Fake) Create(_ context.Context, name string) (repo.Repo, error) {
 	return r, nil
 }
 
-// Publish implements project.Service.
-func (f *Fake) Publish(_ context.Context, o project.PublishOptions) (repo.Repo, error) {
+// Publish implements newproject.Service.
+func (f *Fake) Publish(_ context.Context, o newproject.PublishOptions) (repo.Repo, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	r, ok := f.repos[o.RepoID]
 	if !ok {
-		return repo.Repo{}, fmt.Errorf("%w: %q", project.ErrNotFound, o.RepoID)
+		return repo.Repo{}, fmt.Errorf("%w: %q", newproject.ErrNotFound, o.RepoID)
 	}
 	name := o.Name
 	if name == "" {
@@ -97,17 +97,17 @@ func (f *Fake) Publish(_ context.Context, o project.PublishOptions) (repo.Repo, 
 	return r, nil
 }
 
-// Delete implements project.Service.
+// Delete implements newproject.Service.
 func (f *Fake) Delete(_ context.Context, id string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.calls = append(f.calls, "delete "+id)
 	r, ok := f.repos[id]
 	if !ok {
-		return fmt.Errorf("%w: %q", project.ErrNotFound, id)
+		return fmt.Errorf("%w: %q", newproject.ErrNotFound, id)
 	}
 	if path.Dir(r.Path) != f.Root {
-		return fmt.Errorf("%w: %s is not in the projects directory %s", project.ErrFailedPrecondition, r.Path, f.Root)
+		return fmt.Errorf("%w: %s is not in the projects directory %s", newproject.ErrFailedPrecondition, r.Path, f.Root)
 	}
 	delete(f.repos, id)
 	delete(f.created, strings.ToLower(r.Name))

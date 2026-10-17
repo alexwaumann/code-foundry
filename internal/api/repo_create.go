@@ -8,14 +8,14 @@ import (
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/store/gh"
-	"github.com/alexwaumann/code-foundry/internal/store/project"
+	"github.com/alexwaumann/code-foundry/internal/store/newproject"
 )
 
 // The Add Project dialog's New tab and the Publish to GitHub button: Create, Publish and
 // Delete (the project store) and ListPublishOwners (the gh store).
 
 // WithProjects sets what Create, ListPublishOwners, Publish and Delete use, and returns h.
-func (h *Repo) WithProjects(projects project.Service, owners gh.Owners) *Repo {
+func (h *Repo) WithProjects(projects newproject.Service, owners gh.Owners) *Repo {
 	h.projects, h.owners = projects, owners
 	return h
 }
@@ -78,10 +78,10 @@ func (h *Repo) Delete(ctx context.Context, req *connect.Request[v1.DeleteRepoReq
 }
 
 // visibilityFlags maps the proto visibility to gh's flag spelling.
-var visibilityFlags = map[v1.RepositoryVisibility]project.Visibility{
-	v1.RepositoryVisibility_REPOSITORY_VISIBILITY_PUBLIC:   project.Public,
-	v1.RepositoryVisibility_REPOSITORY_VISIBILITY_INTERNAL: project.Internal,
-	v1.RepositoryVisibility_REPOSITORY_VISIBILITY_PRIVATE:  project.Private,
+var visibilityFlags = map[v1.RepositoryVisibility]newproject.Visibility{
+	v1.RepositoryVisibility_REPOSITORY_VISIBILITY_PUBLIC:   newproject.Public,
+	v1.RepositoryVisibility_REPOSITORY_VISIBILITY_INTERNAL: newproject.Internal,
+	v1.RepositoryVisibility_REPOSITORY_VISIBILITY_PRIVATE:  newproject.Private,
 }
 
 // Publish creates the project's GitHub repository and pushes it.
@@ -94,7 +94,7 @@ func (h *Repo) Publish(ctx context.Context, req *connect.Request[v1.PublishRepoR
 	if !ok {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("visibility must be public, internal or private"))
 	}
-	r, err := h.projects.Publish(ctx, project.PublishOptions{RepoID: m.GetRepoId(), Owner: m.GetOwner(), Name: m.GetName(), Visibility: vis})
+	r, err := h.projects.Publish(ctx, newproject.PublishOptions{RepoID: m.GetRepoId(), Owner: m.GetOwner(), Name: m.GetName(), Visibility: vis})
 	if err != nil {
 		return nil, projectError(err)
 	}
@@ -107,12 +107,12 @@ var projectErrorCodes = []struct {
 	err  error
 	code connect.Code
 }{
-	{project.ErrInvalidArgument, connect.CodeInvalidArgument},
-	{project.ErrExists, connect.CodeAlreadyExists},
-	{project.ErrOutsideRoot, connect.CodeFailedPrecondition},
-	{project.ErrNotFound, connect.CodeNotFound},
-	{project.ErrFailedPrecondition, connect.CodeFailedPrecondition},
-	{project.ErrFailed, connect.CodeUnknown},
+	{newproject.ErrInvalidArgument, connect.CodeInvalidArgument},
+	{newproject.ErrExists, connect.CodeAlreadyExists},
+	{newproject.ErrOutsideRoot, connect.CodeFailedPrecondition},
+	{newproject.ErrNotFound, connect.CodeNotFound},
+	{newproject.ErrFailedPrecondition, connect.CodeFailedPrecondition},
+	{newproject.ErrFailed, connect.CodeUnknown},
 	{context.Canceled, connect.CodeCanceled},
 	{context.DeadlineExceeded, connect.CodeDeadlineExceeded},
 }

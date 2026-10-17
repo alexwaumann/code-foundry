@@ -13,7 +13,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/store/clone"
 	"github.com/alexwaumann/code-foundry/internal/store/gh"
-	"github.com/alexwaumann/code-foundry/internal/store/project"
+	"github.com/alexwaumann/code-foundry/internal/store/newproject"
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
 )
 
@@ -31,7 +31,7 @@ type Repo struct {
 	cloner clone.Service
 	// projects and owners back Create, Publish and ListPublishOwners
 	// (repo_create.go); nil answers Unimplemented.
-	projects project.Service
+	projects newproject.Service
 	owners   gh.Owners
 	// cleanupHold backs CleanupWorktrees' non-git check (repo_cleanup.go); nil holds
 	// nothing.

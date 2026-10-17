@@ -15,16 +15,16 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/store/gh"
 	"github.com/alexwaumann/code-foundry/internal/store/gh/ghtest"
-	"github.com/alexwaumann/code-foundry/internal/store/project"
-	"github.com/alexwaumann/code-foundry/internal/store/project/projecttest"
+	"github.com/alexwaumann/code-foundry/internal/store/newproject"
+	"github.com/alexwaumann/code-foundry/internal/store/newproject/newprojecttest"
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
 	"github.com/alexwaumann/code-foundry/internal/store/repo/repotest"
 )
 
-func newProjectRepoServer(t *testing.T, configured bool) (*projecttest.Fake, *ghtest.Store, codefoundryv1connect.RepoServiceClient) {
+func newProjectRepoServer(t *testing.T, configured bool) (*newprojecttest.Fake, *ghtest.Store, codefoundryv1connect.RepoServiceClient) {
 	t.Helper()
 	b := bus.New()
-	projects, owners := projecttest.New("/home/me/.code-foundry/projects"), ghtest.New(b)
+	projects, owners := newprojecttest.New("/home/me/.code-foundry/projects"), ghtest.New(b)
 	h := NewRepo(repotest.New(b), b)
 	if configured {
 		h.WithProjects(projects, owners)
@@ -143,8 +143,8 @@ func TestPublishRepo(t *testing.T) {
 	projects, _, c := newProjectRepoServer(t, true)
 	projects.AddRepo(repo.Repo{ID: "r1", Name: "demo", Path: "/home/me/demo", Git: true})
 	ghTail := "GraphQL: Visibility can't be private. (createRepository)"
-	projects.FailPublish("octo-org/demo", &project.GhError{Tail: ghTail})
-	projects.FailPublish("me/taken", fmt.Errorf("%w: demo is being published", project.ErrFailedPrecondition))
+	projects.FailPublish("octo-org/demo", &newproject.GhError{Tail: ghTail})
+	projects.FailPublish("me/taken", fmt.Errorf("%w: demo is being published", newproject.ErrFailedPrecondition))
 	ctx := context.Background()
 
 	res, err := c.Publish(ctx, connect.NewRequest(&v1.PublishRepoRequest{RepoId: "r1", Owner: "me",

@@ -1,4 +1,4 @@
-// Package project starts new projects in the projects directory (RepoService.Create,
+// Package newproject starts new projects in the projects directory (RepoService.Create,
 // the repo.create command), publishes git projects to GitHub (RepoService.Publish,
 // repo.github.publish) and deletes projects it made (RepoService.Delete, repo.delete:
 // unregister, then remove the folder).
@@ -9,7 +9,7 @@
 // <path> --remote origin --push --<visibility>`, so the user's gh login applies, and
 // refreshes the project so origin and the GitHub slug show up. Neither keeps state
 // beyond the publishes in flight; the repo store publishes the results.
-package project
+package newproject
 
 import (
 	"context"
