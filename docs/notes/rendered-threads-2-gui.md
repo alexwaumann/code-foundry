@@ -11,7 +11,7 @@ with Alex's decisions (`docs/sketches/rendered-thread/DESIGN.md`, copied from
 | Path | What |
 |---|---|
 | `src/api/thread.ts` | `ThreadItemView` (a discriminated union per item kind), `ThreadEventView`, `ThreadPendingView`, `watchThread`. Generated types stay here. `api/events.ts` maps the `thread` source; `api/session.ts` maps `render` and adds `readAttachment` |
-| `src/stores/thread.ts` | logs per thread (`byId`, `order` by ordinal, `pending`, `seq`), `applyThreadEvent` (snapshot + seq dedupe, deltas), `startThreadWatch` (one Watch, events applied in one store update per ~frame), the EventService pending slice, fold and expand choices, narrow selectors (`useThreadItem`, `useTimelineKeys`, `useThreadPending`) |
+| `src/stores/thread.ts` | logs per thread (`byId`, `order` by ordinal, `pending`, `seq`), `applyThreadEvent` (snapshot + seq dedupe, deltas), `startThreadWatch` (one Watch, events applied in one store update per ~frame), the EventService pending slice, fold and expand choices (and turns left open while scrolled up), narrow selectors (`useThreadItem`, `useTimelineKeys`, `useThreadPending`) |
 | `src/lib/threadTimeline.ts` | turns, rows, explore groups, subagent nesting, fold, `groupLabel`, structural keys |
 | `src/lib/diff.ts`, `highlight.ts`, `toolSummary.ts`, `userMessage.ts`, `threadRequest.ts` | pure helpers (all vitest-tested): line diff / structuredPatch / word marks; lowlight to line tokens, shell tokens; tool row labels, meta, chips; the stored user text read back into tags; permission suggestions and AskUserQuestion questions |
 | `src/components/thread/*` | `ThreadPane` (lazy), `Timeline` (virtualized), `rows.tsx`, `ToolDetail`, `DiffView`, `Code` (`ThreadMarkdown`, `CodeBlock`), `UserBubble`, `PendingPrompt`, `ThreadComposer`, `thread.css` |
@@ -49,7 +49,10 @@ with Alex's decisions (`docs/sketches/rendered-thread/DESIGN.md`, copied from
   turn has the footer, the latest one too ("Worked for 4m 08s · 12 steps · $1.12 · Opus",
   steps = the turn's work rows, a group or Agent counting as one); it is the toggle. Cost is the difference from the previous turn_end's cumulative cost (or the value
   itself when the process restarted). (Since `thread-fold-3-header.md` that line is a header
-  under the user message, at the top of the turn's work, and the copy sits on the answer.)
+  under the user message, at the top of the turn's work, and the copy sits on the answer.
+  Since `thread-fold-4-pinned-fold.md` every finished turn folds by default, but one that
+  ends while the list is scrolled up stays open until the list is pinned again, and leaving
+  the thread forgets the fold choices.)
 * **Rows.** Consecutive Read/Grep/Glob/LS fold into a group ("Read 3 files, searched code 2
   times"), absorbing thinking between them; a read waiting on a permission is never grouped.
   Consecutive thinking merges ("Thought for 9s", "Thought" when haiku streamed nothing).
