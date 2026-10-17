@@ -43,7 +43,8 @@ function threadLine(t: Obj, json: string): WakeLine {
     tone: failed ? "fail" : waits ? "attention" : "ok",
     threadId: id,
     name: str(t.name) || id,
-    detail: [status.replace(/_/g, " "), reason].filter(Boolean).join(", "),
+    // A finished turn is idle at its prompt, as the wake's header says ("is idle: finished").
+    detail: [reason === "finished" ? "idle" : status.replace(/_/g, " "), reason].filter(Boolean).join(", "),
     summary: str(report?.summary),
     json,
   };

@@ -6,7 +6,7 @@ const run = (r: Record<string, unknown>) => JSON.stringify({ kind: "action_run",
 
 describe("wakeLine", () => {
   it.each([
-    ["a finished thread with a report", thread({ status: "needs_attention", status_reason: "finished", report: { status: "done", summary: "6 tests, all passing" } }), { tone: "ok", threadId: "s-c", name: "Child", detail: "needs attention, finished", summary: "6 tests, all passing" }],
+    ["a finished thread with a report", thread({ status: "needs_attention", status_reason: "finished", report: { status: "done", summary: "6 tests, all passing" } }), { tone: "ok", threadId: "s-c", name: "Child", detail: "idle, finished", summary: "6 tests, all passing" }],
     ["an idle thread, no report", thread({ status: "idle", status_reason: "at prompt", report: null }), { tone: "ok", detail: "idle, at prompt", summary: "" }],
     ["a thread waiting on a permission", thread({ status: "needs_attention", status_reason: "permission: Bash" }), { tone: "attention", detail: "needs attention, permission: Bash" }],
     ["an error status", thread({ status: "error", status_reason: "interrupted" }), { tone: "fail", detail: "error, interrupted" }],

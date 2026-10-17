@@ -106,7 +106,7 @@ test("timeline: a wake message is a collapsed Woken by note that expands to its 
   const note = page.getByTestId("thread-wake-note");
   await expect(note).toBeVisible();
   await expect(note.getByTestId("thread-wake-note-link")).toHaveText("Add retry to login redirect");
-  await expect(note.getByTestId("thread-wake-note-detail")).toHaveText(": needs attention, finished");
+  await expect(note.getByTestId("thread-wake-note-detail")).toHaveText(": idle, finished");
   await expect(note.getByTestId("thread-wake-note-summary")).toHaveText("Retry added around exchangeToken, 3 attempts; PR opened");
   await expect(note.locator("svg.t-emerald")).toHaveCount(1);
   // Not a bubble: the wake text with its fenced block is not shown.

@@ -107,7 +107,7 @@ describe("Created by note", () => {
     const row = q(el, "thread-wake-note") as HTMLElement;
     expect(row.querySelector("svg")?.getAttribute("class")).toContain("t-emerald");
     // The thread's current name (the payload had none yet), a link.
-    expect(row.textContent).toBe("Woken byFix login redirect: needs attention, finished·6 tests passjust now");
+    expect(row.textContent).toBe("Woken byFix login redirect: idle, finished·6 tests passjust now");
     expect(q(row, "thread-wake-note-body")).toBeNull();
     fireEvent.click(q(row, "thread-wake-note-line") as HTMLElement);
     expect(q(row, "thread-wake-note-body")?.querySelector("pre")?.textContent).toBe(JSON.stringify(JSON.parse(json), null, 2));

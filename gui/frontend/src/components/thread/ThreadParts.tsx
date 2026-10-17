@@ -80,7 +80,7 @@ function ThreadLocation({ id }: { id: string }) {
   );
 }
 
-const CREATED_BY_CHIP = "flex h-[22px] max-w-60 min-w-0 shrink-0 items-center gap-[5px] rounded-md bg-foreground/7 px-1.5 text-caption-sm font-normal whitespace-nowrap text-muted-foreground";
+const CREATED_BY_CHIP = "flex h-[22px] max-w-60 min-w-0 shrink-[4] items-center gap-[5px] rounded-md bg-foreground/7 px-1.5 text-caption-sm font-normal whitespace-nowrap text-muted-foreground";
 
 /**
  * "↳ from <creator>" for a thread an agent created (docs/notes/agents-3-lineage-gui.md,
