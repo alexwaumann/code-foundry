@@ -72,6 +72,9 @@ type stores struct {
 	// stopWake stops the glue that hands every action run's end to the threads' wake
 	// subscriptions (wake.go).
 	stopWake func()
+	// stopProjectActivity stops the glue that tells project which worktrees have live
+	// threads and when a thread edited files (projectactivity.go).
+	stopProjectActivity func()
 	// home is the user's home directory (symlinks resolved): the root every project
 	// path must stay inside, and what FilesystemService completes under.
 	home string
@@ -219,6 +222,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	}
 	s.stopActions = startActionCleanup(ctx, log.With("store", "action"), s.action, s.bus)
 	s.stopWake = startWakeRuns(ctx, log.With("store", "thread"), s.thread, s.bus)
+	s.stopProjectActivity = startProjectActivity(ctx, log.With("store", "project"), s.thread.Snapshot, s.project, s.bus)
 	uo := update.DefaultOptions(version.Version)
 	uo.Bus, uo.Log = s.bus, log.With("store", "update")
 	uo.Channel = update.ParseChannel(cfg.Update.Channel)
@@ -286,6 +290,9 @@ func (s *stores) close() error {
 	}
 	if s.stopWake != nil {
 		s.stopWake()
+	}
+	if s.stopProjectActivity != nil {
+		s.stopProjectActivity()
 	}
 	if s.action != nil {
 		closeCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)

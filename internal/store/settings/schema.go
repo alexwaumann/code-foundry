@@ -386,7 +386,7 @@ var staticFields = []Field{
 	// Source control › Projects.
 	{
 		Key: KeyFetchInterval, Group: GroupProjects, Page: PageSource, Section: "projects", Unit: "s", Type: Int, Title: "Fetch interval",
-		Description: "How often each project runs git fetch --prune. 0 turns background fetching off.",
+		Description: "How often a project with an active thread (or an open worktree panel) runs git fetch --prune. Other projects fetch every 15 minutes, or at this interval if longer. 0 turns background fetching off.",
 		Default:     strconv.Itoa(defaultFetchSeconds), Min: 0, Max: 86400, Restart: true,
 		bind: func(s *Settings) any { return &s.Projects.FetchIntervalSeconds },
 	},
