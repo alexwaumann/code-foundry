@@ -19,7 +19,7 @@ func cleanWt(branch, path string) *v1.Worktree {
 }
 
 // cleanupFixture is a registry with project.worktree.cleanup over fakes sharing one call
-// log. Repo r1 ("proj", origin) has main at /p and the worktrees a (merged) and b
+// log. Project r1 ("proj", origin) has main at /p and the worktrees a (merged) and b
 // (unmerged); r2 ("local") has no remote.
 func cleanupFixture(t *testing.T, dry, real *v1.CleanupWorktreesResponse) (*command.Registry, *commandtest.Calls, *commandtest.Project, *commandtest.GitOps) {
 	t.Helper()

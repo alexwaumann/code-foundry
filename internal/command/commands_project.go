@@ -34,7 +34,7 @@ func hasProject(c Context) bool { return c.ActiveProjectID != "" }
 
 func hasWorktree(c Context) bool { return c.ActiveProjectID != "" && c.ActiveWorktreePath != "" }
 
-// NotGitFunc reports whether the context's worktree (else repo) belongs to a
+// NotGitFunc reports whether the context's worktree (else project) belongs to a
 // registered project that is not a git repository. Worktree, git and pull request
 // commands are unavailable there; project.git.init is available only there. A nil
 // NotGitFunc means never (every project is git).

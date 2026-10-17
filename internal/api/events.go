@@ -129,7 +129,7 @@ type eventObserver interface{ observe(ev *v1.Event) }
 type eventResumer interface{ resume(ctx context.Context) }
 
 // sources lists the stream's sources in the order their snapshots are sent (see
-// events.proto: repo, workspace, terminal, thread, thread, gh, gitops, settings, update,
+// events.proto: project, workspace, terminal, thread, thread, gh, gitops, settings, update,
 // action),
 // followed by UI intents.
 func (h *Events) sources() []eventSource {

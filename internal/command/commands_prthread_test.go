@@ -15,7 +15,7 @@ import (
 )
 
 type prThreadFixture struct {
-	log     *commandtest.Calls // gh, repo and gitops requests, in call order
+	log     *commandtest.Calls // gh, project and gitops requests, in call order
 	reg     *command.Registry
 	gh      *commandtest.Gh
 	project *commandtest.Project
@@ -83,7 +83,7 @@ func TestPullRequestThreadCommands(t *testing.T) {
 		args    map[string]string
 		uctx    command.Context
 		setup   func(*prThreadFixture)
-		wantReq []proto.Message // gh, repo and gitops requests, in call order
+		wantReq []proto.Message // gh, project and gitops requests, in call order
 		// wantThread checks the CreateThreadRequest (prompt by prefix and contents).
 		wantThread   *v1.CreateThreadRequest
 		wantPrompt   string
