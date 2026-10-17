@@ -46,7 +46,7 @@ export interface ActionHost {
   /** Into world.events as EventSource.ACTION. */
   publish(e: ActionEventInit): void;
   /** Registered projects and their worktree paths. */
-  repos(): { id: string; name: string; worktrees: string[] }[];
+  projects(): { id: string; name: string; worktrees: string[] }[];
   /** A thread's project ("" for none) and worktree; undefined when unknown. */
   thread(id: string): { projectId: string; worktreePath: string } | undefined;
   /** Starts a kind=action terminal and returns its id. */
@@ -323,7 +323,7 @@ export class MockActions {
       const position = this.actions.size;
       this.actions.set(id, { id, projectId: "repo-cf", name, command, icon, inTerminal: true, onWorktreeCreate, position, createdAt: at, updatedAt: at });
     };
-    if (this.host.repos().some((r) => r.id === "repo-cf")) {
+    if (this.host.projects().some((r) => r.id === "repo-cf")) {
       seed("a-dev000000000", "Dev", ActionIcon.PLAY, "pnpm dev");
       seed("a-test00000000", "Test", ActionIcon.TEST, "go test ./...");
       seed("a-check0000000", "Check", ActionIcon.LINT, "make check");
@@ -438,7 +438,7 @@ export class MockActions {
   }
 
   create(req: { projectId: string; name: string; command: string; icon: ActionIcon; inTerminal: boolean; onWorktreeCreate: boolean }): ActionInit {
-    if (!this.host.repos().some((r) => r.id === req.projectId)) throw new CommandError("notfound", `not found: project "${req.projectId}" is not registered`);
+    if (!this.host.projects().some((r) => r.id === req.projectId)) throw new CommandError("notfound", `not found: project "${req.projectId}" is not registered`);
     const name = cleanName(req.name);
     const command = cleanCommand(req.command);
     const icon = checkIcon(req.icon);
@@ -548,9 +548,9 @@ export class MockActions {
       return { threadId, projectId: s.projectId, worktree: s.worktreePath };
     }
     if (worktree) {
-      const repo = this.host.repos().find((r) => r.worktrees.includes(worktree));
-      if (!repo) throw new CommandError("invalid", `invalid argument: ${worktree} is not a worktree of a registered project`);
-      return { threadId: "", projectId: repo.id, worktree };
+      const project = this.host.projects().find((r) => r.worktrees.includes(worktree));
+      if (!project) throw new CommandError("invalid", `invalid argument: ${worktree} is not a worktree of a registered project`);
+      return { threadId: "", projectId: project.id, worktree };
     }
     throw new CommandError("invalid", "invalid argument: a run needs a thread or a worktree");
   }
@@ -718,19 +718,19 @@ export class MockActions {
 
   /** The project the action commands work on (see commands_action.go actionRepo). */
   private projectFor(ctx: UiContext | undefined, args: Record<string, string>): string {
-    const repos = this.host.repos();
+    const projects = this.host.projects();
     const inside = (path: string) => {
       let best: { id: string; len: number } | null = null;
-      for (const r of repos) for (const w of r.worktrees) if ((path === w || path.startsWith(`${w}/`)) && w.length > (best?.len ?? 0)) best = { id: r.id, len: w.length };
+      for (const r of projects) for (const w of r.worktrees) if ((path === w || path.startsWith(`${w}/`)) && w.length > (best?.len ?? 0)) best = { id: r.id, len: w.length };
       return best?.id;
     };
     const ref = (args.project ?? "").trim();
     if (ref) {
-      if (repos.some((r) => r.id === ref)) return ref;
-      const named = repos.filter((r) => r.name === ref);
-      if (named.length > 1) throw new CommandError("invalid", `${String(named.length)} projects are named ${ref}; pass an id (code-foundry repo list)`);
+      if (projects.some((r) => r.id === ref)) return ref;
+      const named = projects.filter((r) => r.name === ref);
+      if (named.length > 1) throw new CommandError("invalid", `${String(named.length)} projects are named ${ref}; pass an id (code-foundry project list)`);
       const id = named[0]?.id ?? (ref.startsWith("/") ? inside(ref) : undefined);
-      if (!id) throw new CommandError("invalid", `no project "${ref}" (code-foundry repo list)`);
+      if (!id) throw new CommandError("invalid", `no project "${ref}" (code-foundry project list)`);
       return id;
     }
     if (ctx?.activeThreadId) {
@@ -739,7 +739,7 @@ export class MockActions {
       if (!s.projectId) throw new CommandError("invalid", `thread ${ctx.activeThreadId} has no project; ${noProject}`);
       return s.projectId;
     }
-    if (ctx?.activeProjectId && repos.some((r) => r.id === ctx.activeProjectId)) return ctx.activeProjectId;
+    if (ctx?.activeProjectId && projects.some((r) => r.id === ctx.activeProjectId)) return ctx.activeProjectId;
     const id = (ctx?.activeWorktreePath && inside(ctx.activeWorktreePath)) || (args.here && inside(args.here));
     if (!id) throw new CommandError("invalid", noProject);
     return id;
@@ -895,10 +895,10 @@ export class MockActions {
           let worktreePath = "";
           if (!ctx?.activeThreadId) {
             const path = ctx?.activeWorktreePath || args.here || "";
-            const repos = this.host.repos();
-            const exact = repos.some((r) => r.worktrees.includes(path));
+            const projects = this.host.projects();
+            const exact = projects.some((r) => r.worktrees.includes(path));
             let best = "";
-            if (!exact) for (const r of repos) for (const w of r.worktrees) if (path.startsWith(`${w}/`) && w.length > best.length) best = w;
+            if (!exact) for (const r of projects) for (const w of r.worktrees) if (path.startsWith(`${w}/`) && w.length > best.length) best = w;
             worktreePath = exact ? path : best;
             if (!worktreePath) throw new CommandError("invalid", "action.run needs a thread, a worktree, or to run inside a registered project");
           }

@@ -33,7 +33,7 @@ describe("CommandButton", () => {
     expect((b as HTMLButtonElement).disabled).toBe(want.disabled);
   });
 
-  it("thread.new stays enabled where the daemon lists it unavailable (the project picker supplies the repo)", () => {
+  it("thread.new stays enabled where the daemon lists it unavailable (the project picker supplies the project)", () => {
     useCommandsStore.setState({ commands: [cmd({ name: "thread.new", title: "New Thread", available: false })] });
     render(<CommandButton command="thread.new" icon={Plus} whenUnavailable="disable" data-testid="b" />);
     expect(screen.getByTestId<HTMLButtonElement>("b").disabled).toBe(false);

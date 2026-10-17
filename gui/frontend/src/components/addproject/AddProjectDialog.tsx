@@ -14,7 +14,7 @@ const tabs: { id: AddProjectTab; label: string; icon: typeof Sparkles }[] = [
 ];
 
 /**
- * The Add Project dialog (repo.add's presenter): New, Local folder, GitHub. Each opening
+ * The Add Project dialog (project.add's presenter): New, Local folder, GitHub. Each opening
  * starts fresh. Closing it (Escape, the overlay, the close button) cancels a clone in
  * flight and deletes a project the New tab created but did not keep; it is not possible
  * while the New tab is creating or publishing.

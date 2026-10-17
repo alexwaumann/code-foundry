@@ -134,7 +134,7 @@ export interface SkillGroup {
  * The skills matching a query, grouped: the projects in member order, then the user's.
  * Within a group: best score first, then the daemon's order (by name). A skill listed
  * twice in one group (a skill and a command of the same name) shows once. Project
- * skills of a repo that is not a member are left out.
+ * skills of a project that is not a member are left out.
  */
 export function groupSkills(skills: readonly SkillView[], query: string, members: readonly string[]): SkillGroup[] {
   const order = [...members, ""];

@@ -14,7 +14,7 @@ import { useUiStore, type Selection } from "./ui";
  */
 export function openMcpSurface(sel: Selection = useUiStore.getState().selection): string | null {
   const key = keyOf(sel);
-  const s = { repos: useProjectsStore.getState(), threads: useThreadsStore.getState() };
+  const s = { projects: useProjectsStore.getState(), threads: useThreadsStore.getState() };
   if (key === null || selectionMcpThread(sel, s) === null) return null;
   return openSurface(key, mcpTab()) ? key : null;
 }

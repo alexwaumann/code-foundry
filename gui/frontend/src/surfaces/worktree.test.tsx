@@ -21,7 +21,7 @@ const WEB_MAIN = "/src/web";
 const WEB_FEAT = "/wt/web/cf-feat";
 const status = { upstream: "", ahead: 0, behind: 0, staged: 0, modified: 0, untracked: 0, dirty: false, refreshedAtMs: null };
 const wt = (projectId: string, path: string, branch: string, isMain = false): WorktreeView => ({ projectId, path, branch, head: "abc", detached: false, isMain, status });
-const repo = (id: string, extra: WorktreeView[] = []): ProjectView => ({ id, path: `/src/${id}`, name: id, defaultBranch: "main", githubSlug: "", remotes: [], git: true, worktrees: [wt(id, `/src/${id}`, "main", true), ...extra] });
+const project = (id: string, extra: WorktreeView[] = []): ProjectView => ({ id, path: `/src/${id}`, name: id, defaultBranch: "main", githubSlug: "", remotes: [], git: true, worktrees: [wt(id, `/src/${id}`, "main", true), ...extra] });
 const thread = (id: string, o: Partial<ThreadView>) => ({ id, projectId: "web", worktreePath: WEB_MAIN, workspaceId: "", pendingWorktreePath: "", terminalId: "", state: "connected", linkedPullRequests: [], ...o }) as ThreadView;
 
 function select(id: string): void {
@@ -29,7 +29,7 @@ function select(id: string): void {
 }
 
 beforeEach(() => {
-  useProjectsStore.setState({ byId: { web: repo("web", [wt("web", WEB_FEAT, "cf/feat")]) }, order: ["web"] });
+  useProjectsStore.setState({ byId: { web: project("web", [wt("web", WEB_FEAT, "cf/feat")]) }, order: ["web"] });
   useThreadsStore.setState({
     byId: {
       "s-main": thread("s-main", {}),
@@ -56,11 +56,11 @@ const row = () => screen.queryByTestId("panel-empty")?.querySelector('[data-surf
 
 describe("worktreeTabTitle", () => {
   it("is the project for the main worktree, project · branch elsewhere, the project for an unknown path", () => {
-    const repos = useProjectsStore.getState();
-    expect(worktreeTabTitle(repos, "web", WEB_MAIN)).toBe("web");
-    expect(worktreeTabTitle(repos, "web", WEB_FEAT)).toBe("web · cf/feat");
-    expect(worktreeTabTitle(repos, "web", "/gone")).toBe("web");
-    expect(worktreeTabTitle(repos, "nope", "/x")).toBe("nope");
+    const projects = useProjectsStore.getState();
+    expect(worktreeTabTitle(projects, "web", WEB_MAIN)).toBe("web");
+    expect(worktreeTabTitle(projects, "web", WEB_FEAT)).toBe("web · cf/feat");
+    expect(worktreeTabTitle(projects, "web", "/gone")).toBe("web");
+    expect(worktreeTabTitle(projects, "nope", "/x")).toBe("nope");
   });
 });
 
@@ -89,7 +89,7 @@ describe("Worktree surface availability", () => {
     render(<SidePanel />);
     fireEvent.keyDown(screen.getByTestId("side-panel"), { key: "t" });
     const p = getPanel("thread:s-feat");
-    expect(p.activeTabId).toBe(`worktree?path=${encodeURIComponent(WEB_FEAT)}&repo=web`);
+    expect(p.activeTabId).toBe(`worktree?path=${encodeURIComponent(WEB_FEAT)}&project=web`);
     expect(p.tabs[0]?.title).toBe("web · cf/feat");
     expect(screen.getByTestId("worktree-surface").getAttribute("data-path")).toBe(WEB_FEAT);
     expect(screen.getByTestId("worktree-surface-title").textContent).toBe("web@cf/feat");
@@ -112,7 +112,7 @@ describe("Worktree surface availability", () => {
     select("s-sub");
     render(<SidePanel />);
     fireEvent.keyDown(screen.getByTestId("side-panel"), { key: "t" });
-    expect(getPanel("thread:s-sub").tabs[0]?.params).toEqual({ repo: "web", path: WEB_FEAT });
+    expect(getPanel("thread:s-sub").tabs[0]?.params).toEqual({ project: "web", path: WEB_FEAT });
   });
 });
 
@@ -121,7 +121,7 @@ describe("worktreePanelCommand (view.panel.worktree)", () => {
     usePanelStore.setState({ byKey: {} });
     select("s-main");
     expect(worktreePanelCommand()).toBe(true);
-    expect(getPanel("thread:s-main")).toMatchObject({ open: true, activeTabId: `worktree?path=${encodeURIComponent(WEB_MAIN)}&repo=web` });
+    expect(getPanel("thread:s-main")).toMatchObject({ open: true, activeTabId: `worktree?path=${encodeURIComponent(WEB_MAIN)}&project=web` });
     expect(getPanel("thread:s-main").tabs[0]?.title).toBe("web");
   });
 

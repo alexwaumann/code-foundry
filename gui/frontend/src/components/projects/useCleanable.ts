@@ -6,7 +6,7 @@ import { useTerminalsStore } from "@/stores/terminals";
 import { useWorkspacesStore } from "@/stores/workspaces";
 
 /**
- * Whether repo.worktree.cleanup would remove this worktree now (lib/projects.ts
+ * Whether project.worktree.cleanup would remove this worktree now (lib/projects.ts
  * isCleanable). Each store is asked one boolean, and only once git says merged and clean.
  */
 export function useCleanable(projectId: string, path: string): boolean {
@@ -17,7 +17,7 @@ export function useCleanable(projectId: string, path: string): boolean {
   return merged && !thread && !terminal && !member;
 }
 
-/** How many of the project's worktrees repo.worktree.cleanup would remove now. */
+/** How many of the project's worktrees project.worktree.cleanup would remove now. */
 export function useCleanableCount(projectId: string): number {
   const candidates = useProjectsStore(useShallow((s) => (s.byId[projectId]?.worktrees ?? []).filter((w) => w.mergedClean === true && !w.isMain).map((w) => w.path)));
   const byThread = useThreadsStore(useShallow((s) => candidates.filter((p) => threadHolds(s, p))));

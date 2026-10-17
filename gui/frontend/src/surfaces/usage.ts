@@ -8,7 +8,7 @@ import type { SurfaceSpec } from "./types";
 import { selectionUsageThread, USAGE_KIND, USAGE_TITLE, usageTab } from "./usageTarget";
 
 function thread(sel: Selection): string | null {
-  return selectionUsageThread(sel, { repos: useProjectsStore.getState(), threads: useThreadsStore.getState() });
+  return selectionUsageThread(sel, { projects: useProjectsStore.getState(), threads: useThreadsStore.getState() });
 }
 
 /**
@@ -24,7 +24,7 @@ export const usageSurface: SurfaceSpec = {
   icon: ChartColumn,
   hotkey: "u",
   available: (ctx) => (thread(ctx.selection) ? "enabled" : "hidden"),
-  // deriveContext reads the repos store too (placement); the thread comes from threads.
+  // deriveContext reads the projects store too (placement); the thread comes from threads.
   watches: [useThreadsStore, useProjectsStore],
   render: () => createElement(UsageSurface),
   openDefault: (ctx) => (thread(ctx.selection) ? usageTab() : null),

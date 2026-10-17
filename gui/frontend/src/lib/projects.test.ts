@@ -25,7 +25,7 @@ import {
   type ProjectsWorkspaces,
 } from "./projects";
 
-const repos: ProjectsSlice = {
+const projects: ProjectsSlice = {
   order: ["api", "dot", "web"],
   byId: {
     web: {
@@ -56,7 +56,7 @@ const workspaces: ProjectsWorkspaces = {
 
 describe("projectsModel", () => {
   it("lists each project's own worktrees; workspace members only under their workspace", () => {
-    expect(projectsModel(repos, workspaces)).toEqual({
+    expect(projectsModel(projects, workspaces)).toEqual({
       projects: [
         { projectId: "api", worktrees: ["/src/api"], inWorkspaces: 1 },
         { projectId: "dot", worktrees: ["/src/dot"], inWorkspaces: 0 },
@@ -66,12 +66,12 @@ describe("projectsModel", () => {
     });
   });
   it("with no workspaces every worktree is the project's", () => {
-    const m = projectsModel(repos, { order: [], byId: {} });
+    const m = projectsModel(projects, { order: [], byId: {} });
     expect(m.projects.find((p) => p.projectId === "web")?.worktrees).toEqual(["/src/web", "/wt/web/feat", "/wt/web/cf-login"]);
     expect(m.workspaces).toEqual([]);
   });
   it("pageItems: projects and their worktrees, then workspaces and their members", () => {
-    const keys = pageItems(projectsModel(repos, workspaces), workspaces).map((i) => i.key);
+    const keys = pageItems(projectsModel(projects, workspaces), workspaces).map((i) => i.key);
     expect(keys).toEqual([
       projectKey("api"),
       projectWorktreeKey("api", "/src/api"),
@@ -86,7 +86,7 @@ describe("projectsModel", () => {
     ]);
   });
   it("pageItems: a collapsed project or workspace keeps its header row only", () => {
-    const keys = pageItems(projectsModel(repos, workspaces), workspaces, { projects: new Set(["web", "api"]), workspaces: new Set(["w-1"]) }).map((i) => i.key);
+    const keys = pageItems(projectsModel(projects, workspaces), workspaces, { projects: new Set(["web", "api"]), workspaces: new Set(["w-1"]) }).map((i) => i.key);
     expect(keys).toEqual([projectKey("api"), projectKey("dot"), projectWorktreeKey("dot", "/src/dot"), projectKey("web"), workspaceKey("w-1")]);
   });
 });
@@ -118,8 +118,8 @@ describe("projectKind", () => {
     ["a remote that is not GitHub names it", { git: true, githubSlug: "", remotes: ["origin"] }, "git", "origin · not GitHub"],
     ["the first remote, sorted by the daemon", { git: true, githubSlug: "", remotes: ["gitlab", "origin"] }, "git", "gitlab · not GitHub"],
     ["no git: the badge says it", { git: false, githubSlug: "", remotes: [] }, "nogit", ""],
-  ])("%s", (_name, repo, kind, meta) => {
-    const info = projectKind(repo);
+  ])("%s", (_name, project, kind, meta) => {
+    const info = projectKind(project);
     expect(info.kind).toBe(kind);
     expect(info.meta).toBe(meta);
     expect(info.title).toMatch(/\.$/);
@@ -136,7 +136,7 @@ describe("filterProjects", () => {
     workspaces: ["w-login", "w-pay"],
   };
   const search: ProjectsSearch = {
-    repos: {
+    projects: {
       cf: {
         name: "code-foundry",
         githubSlug: "alexwaumann/code-foundry",
@@ -172,23 +172,23 @@ describe("filterProjects", () => {
 
 describe("addableProjects and projectRef", () => {
   it("addable: registered projects that are not members, in name order", () => {
-    expect(addableProjects(workspaces.byId["w-1"], repos)).toEqual(["dot"]);
-    expect(addableProjects(undefined, repos)).toEqual(["api", "dot", "web"]);
+    expect(addableProjects(workspaces.byId["w-1"], projects)).toEqual(["dot"]);
+    expect(addableProjects(undefined, projects)).toEqual(["api", "dot", "web"]);
   });
   it("addable: never a project without git", () => {
     const withNotes: ProjectsSlice = {
-      order: [...repos.order, "notes"],
-      byId: { ...repos.byId, dot: { id: "dot", name: "web", git: true, worktrees: [] }, notes: { id: "notes", name: "notes", git: false, worktrees: [{ path: "/src/notes", isMain: true }] } },
+      order: [...projects.order, "notes"],
+      byId: { ...projects.byId, dot: { id: "dot", name: "web", git: true, worktrees: [] }, notes: { id: "notes", name: "notes", git: false, worktrees: [{ path: "/src/notes", isMain: true }] } },
     };
     expect(addableProjects(undefined, withNotes)).toEqual(["api", "dot", "web"]);
   });
   it("projectRef: the name when unique, else the id", () => {
-    expect(projectRef(repos, "api")).toBe("api");
+    expect(projectRef(projects, "api")).toBe("api");
     // "dot" is named web too: the name is ambiguous, so its id.
-    expect(projectRef(repos, "dot")).toBe("dot");
+    expect(projectRef(projects, "dot")).toBe("dot");
     // Once the other is renamed, the name is unique again.
-    expect(projectRef({ ...repos, byId: { ...repos.byId, web: { id: "web", name: "site", worktrees: [] } } }, "dot")).toBe("web");
-    expect(projectRef(repos, "nope")).toBe("nope");
+    expect(projectRef({ ...projects, byId: { ...projects.byId, web: { id: "web", name: "site", worktrees: [] } } }, "dot")).toBe("web");
+    expect(projectRef(projects, "nope")).toBe("nope");
   });
 });
 
@@ -216,8 +216,8 @@ describe("projectNextStep (the header's Publish / Initialize git gate)", () => {
     ["GitHub remote: nothing", { git: true, remotes: ["origin"], worktrees: wt }, null],
     ["a remote elsewhere: nothing", { git: true, remotes: ["upstream"], worktrees: wt }, null],
     ["no git: initialize", { git: false, remotes: [], worktrees: wt }, "init"],
-  ])("%s", (_name, repo, want) => {
-    expect(projectNextStep(repo)).toBe(want);
+  ])("%s", (_name, project, want) => {
+    expect(projectNextStep(project)).toBe(want);
   });
 });
 

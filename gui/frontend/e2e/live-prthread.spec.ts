@@ -9,7 +9,7 @@
  * a clone of LIVE_PR_SLUG registered and threads.default_model=haiku, the Vite dev server
  * pointed at it, then:
  *
- *   LIVE_DAEMON=1 LIVE_APP_URL=http://127.0.0.1:9372 LIVE_REPO=code-foundry \
+ *   LIVE_DAEMON=1 LIVE_APP_URL=http://127.0.0.1:9372 LIVE_PROJECT=code-foundry \
  *   LIVE_PR_SLUG=alexwaumann/code-foundry LIVE_PR=1 LIVE_SHOTS=<dir> \
  *   pnpm run e2e:live e2e/live-prthread.spec.ts
  */
@@ -17,21 +17,21 @@ import { expect, test } from "@playwright/test";
 
 const LIVE = process.env.LIVE_DAEMON === "1";
 const SHOTS = process.env.LIVE_SHOTS ?? "";
-const REPO = process.env.LIVE_REPO ?? "";
+const PROJECT = process.env.LIVE_PROJECT ?? "";
 const SLUG = process.env.LIVE_PR_SLUG ?? "alexwaumann/code-foundry";
 const NUMBER = Number(process.env.LIVE_PR ?? "1");
 
-test.skip(!LIVE || !REPO, "set LIVE_DAEMON=1 and LIVE_REPO (see the file header)");
+test.skip(!LIVE || !PROJECT, "set LIVE_DAEMON=1 and LIVE_PROJECT (see the file header)");
 
 test("Explain this PR starts a real thread with the explain prompt", async ({ page }) => {
   await page.setViewportSize({ width: 1400, height: 900 });
   await page.goto("/");
   // Projects live on the Projects page (docs/notes/workspaces-4-sidebar.md).
-  const openRepo = async () => {
+  const openProject = async () => {
     await page.getByTestId("nav-projects").click({ timeout: 20_000 });
-    await page.locator('[data-testid="project"]').filter({ has: page.getByTestId("project-name").getByText(REPO, { exact: true }) }).locator("[data-nav-key^='p:']").dblclick();
+    await page.locator('[data-testid="project"]').filter({ has: page.getByTestId("project-name").getByText(PROJECT, { exact: true }) }).locator("[data-nav-key^='p:']").dblclick();
   };
-  await openRepo();
+  await openProject();
   await expect(page.getByTestId("worktree-surface")).toBeVisible();
   // Through the app's own store module, as a pull request row would.
   await page.evaluate(`import("/src/stores/prPanel.ts").then((m) => m.openPullRequestInPanel({ slug: "${SLUG}", number: ${String(NUMBER)} }))`);
@@ -49,6 +49,6 @@ test("Explain this PR starts a real thread with the explain prompt", async ({ pa
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/chunk4-live-explain.png` });
 
   // The originating selection's panel keeps the pull request.
-  await openRepo();
+  await openProject();
   await expect(page.getByTestId("panel-tabs").getByRole("tab")).toHaveText([`#${String(NUMBER)}`]);
 });

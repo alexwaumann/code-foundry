@@ -1,7 +1,7 @@
 /**
  * FilesystemService over a fake home directory, mirroring internal/fsx: "~" expansion,
  * case-insensitive prefix match, dot-directories only for a "." segment, a 200-entry
- * bound, and InvalidArgument outside home. The tree holds the mock's registered repos
+ * bound, and InvalidArgument outside home. The tree holds the mock's registered projects
  * (world.ts) plus a few unregistered folders to add. ListSkills and SearchFiles (the
  * composer's "/" and "@" completion) are at the end.
  */
@@ -23,13 +23,13 @@ interface Dir {
   children?: Record<string, Dir>;
 }
 
-const repo: Dir = { git: true, children: { src: {}, docs: {} } };
+const project: Dir = { git: true, children: { src: {}, docs: {} } };
 
 const tree: Dir = {
   children: {
     src: {
       children: {
-        "code-foundry": repo,
+        "code-foundry": project,
         "code-foundry.worktrees": { children: { "feat-sidebar": { git: true }, "fix-resize": { git: true } } },
         "ghostty-playground": { git: true },
         sketches: { git: true },
@@ -126,7 +126,7 @@ export function listDirectories(rawPrefix: string, registered: ReadonlySet<strin
 
 /**
  * The project folder ProjectService.Register adds for an absolute, clean path under home,
- * like repo.Register: the nearest enclosing git repository, else the folder itself as a
+ * like project.Register: the nearest enclosing git repository, else the folder itself as a
  * project without git. Undefined when the folder is not on the fake disk.
  */
 export function projectFolder(abs: string): { path: string; git: boolean } | undefined {
@@ -141,7 +141,7 @@ export function projectFolder(abs: string): { path: string; git: boolean } | und
 // ---- composer completion: ListSkills and SearchFiles -------------------------------------
 //
 // Every project has the same small file list unless a test sets its own
-// (POST /__mock/files?repo=repo-cf&path=a.ts&path=src/b.ts; no path: an empty project), and
+// (POST /__mock/files?project=repo-cf&path=a.ts&path=src/b.ts; no path: an empty project), and
 // the project skills `review` and `deploy`; the user has `commit`. Ranking mirrors
 // internal/fuzzy: exact base name > base name prefix > base name subsequence > path
 // subsequence, then shorter path, then path; an empty query lists the shallowest first.
@@ -172,9 +172,9 @@ const USER_SKILLS = [{ name: "commit", description: "Write a commit message and 
 const DEFAULT_FILE_LIMIT = 50;
 const MAX_FILE_LIMIT = 200;
 
-/** Files set by POST /__mock/files, by repo id. */
+/** Files set by POST /__mock/files, by project id. */
 const filesByProject = new Map<string, string[]>();
-/** "skills <repo,repo|-> <user>" and "search <repo> <query>", for specs that assert calls. */
+/** "skills <project,project|-> <user>" and "search <project> <query>", for specs that assert calls. */
 export const completionCalls: string[] = [];
 
 export function setMockFiles(projectId: string, files: string[]): void {
@@ -194,17 +194,17 @@ export function resetCompletion(): void {
 type SkillInit = MessageInitShape<typeof SkillSchema>;
 type SearchInit = MessageInitShape<typeof SearchFilesResponseSchema>;
 
-/** The checkout a request names: path (one of the repo's) or the main worktree. */
-function completionCheckout(repos: ReadonlyMap<string, CompletionProject>, projectId: string, path: string): CompletionProject {
+/** The checkout a request names: path (one of the project's) or the main worktree. */
+function completionCheckout(projects: ReadonlyMap<string, CompletionProject>, projectId: string, path: string): CompletionProject {
   if (projectId === "") throw invalid("project_id is required");
-  const repo = repos.get(projectId);
-  if (!repo) throw new ConnectError(`repo ${projectId} not found`, Code.NotFound);
+  const project = projects.get(projectId);
+  if (!project) throw new ConnectError(`project ${projectId} not found`, Code.NotFound);
   if (path !== "" && !within(clean(path))) throw invalid(`${path} is outside your home directory`);
-  return repo;
+  return project;
 }
 
 export function listSkills(
-  repos: ReadonlyMap<string, CompletionProject>,
+  projects: ReadonlyMap<string, CompletionProject>,
   sources: readonly { projectId: string; path: string }[],
   includeUser: boolean,
 ): SkillInit[] {
@@ -212,11 +212,11 @@ export function listSkills(
   const out: SkillInit[] = [];
   for (const src of sources) {
     // Like the daemon: an unknown project is skipped; a malformed source fails.
-    if (src.projectId !== "" && !repos.has(src.projectId)) continue;
-    const repo = completionCheckout(repos, src.projectId, src.path);
-    const dir = src.path || repo.path;
+    if (src.projectId !== "" && !projects.has(src.projectId)) continue;
+    const project = completionCheckout(projects, src.projectId, src.path);
+    const dir = src.path || project.path;
     for (const s of PROJECT_SKILLS) {
-      out.push({ name: s.name, description: s.description, scope: SkillScope.PROJECT, projectId: repo.id, path: `${dir}/${s.file}` });
+      out.push({ name: s.name, description: s.description, scope: SkillScope.PROJECT, projectId: project.id, path: `${dir}/${s.file}` });
     }
   }
   if (includeUser) {
@@ -260,22 +260,22 @@ export function fileTier(path: string, query: string): number {
 }
 
 /** searchFiles as the router serves it: logged, then after searchMode.delayMs, failing when searchMode.fail. */
-export async function searchFilesSlow(repos: ReadonlyMap<string, CompletionProject>, projectId: string, path: string, query: string, limit: number): Promise<SearchInit> {
+export async function searchFilesSlow(projects: ReadonlyMap<string, CompletionProject>, projectId: string, path: string, query: string, limit: number): Promise<SearchInit> {
   if (searchMode.delayMs > 0) await new Promise((r) => setTimeout(r, searchMode.delayMs));
   if (searchMode.fail) {
     completionCalls.push(`search ${projectId} ${query}`);
     throw new ConnectError("search failed", Code.Internal);
   }
-  return searchFiles(repos, projectId, path, query, limit);
+  return searchFiles(projects, projectId, path, query, limit);
 }
 
-export function searchFiles(repos: ReadonlyMap<string, CompletionProject>, projectId: string, path: string, query: string, limit: number): SearchInit {
+export function searchFiles(projects: ReadonlyMap<string, CompletionProject>, projectId: string, path: string, query: string, limit: number): SearchInit {
   if (limit < 0) throw invalid(`limit ${String(limit)} is negative`);
-  const repo = completionCheckout(repos, projectId, path);
-  completionCalls.push(`search ${repo.id} ${query}`);
+  const project = completionCheckout(projects, projectId, path);
+  completionCalls.push(`search ${project.id} ${query}`);
   const q = query.trim();
   const depth = (p: string) => p.split("/").length;
-  const ranked = withParentDirs(filesByProject.get(repo.id) ?? DEFAULT_FILES)
+  const ranked = withParentDirs(filesByProject.get(project.id) ?? DEFAULT_FILES)
     .map((e) => ({ ...e, tier: fileTier(e.path, q) }))
     .filter((e) => e.tier > 0)
     .sort((a, b) =>

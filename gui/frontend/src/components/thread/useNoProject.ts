@@ -5,7 +5,7 @@ import { useThreadsStore } from "@/stores/threads";
 
 /**
  * Whether a thread has no project (lib/threadRow isNoProject), from narrow selectors: its
- * owner fields and cwd, then one boolean over the repos. False for an unknown thread or
+ * owner fields and cwd, then one boolean over the projects. False for an unknown thread or
  * a null id.
  */
 export function useNoProjectThread(id: string | null): boolean {

@@ -92,7 +92,7 @@ function worktreeName(w: WorktreeOption): string {
   return w.branch || w.head.slice(0, 7);
 }
 
-/** The repo's worktrees (main first), as a shallow-stable list that follows branch changes live. */
+/** The project's worktrees (main first), as a shallow-stable list that follows branch changes live. */
 function useWorktrees(projectId: string): WorktreeOption[] {
   const keys = useProjectsStore(
     useShallow((s) => (s.byId[projectId]?.worktrees ?? []).map((w) => [w.path, w.branch, w.head, w.detached ? "1" : "", w.isMain ? "1" : ""].join(SEP))),
@@ -119,7 +119,7 @@ function phaseText(phase: DraftPhase, newWorktrees: number): string {
   return newWorktrees === 1 ? "Creating worktree…" : "Starting Claude…";
 }
 
-/** A workspace's members (repo id + worktree path), shallow-stable. */
+/** A workspace's members (project id + worktree path), shallow-stable. */
 function useWorkspaceMembers(workspaceId: string | null): { projectId: string; worktreePath: string }[] {
   const keys = useWorkspacesStore(useShallow((s) => (workspaceId ? (s.byId[workspaceId]?.members ?? []).map((m) => m.projectId + SEP + m.worktreePath) : [])));
   return useMemo(
@@ -132,7 +132,7 @@ function useWorkspaceMembers(workspaceId: string | null): { projectId: string; w
   );
 }
 
-/** The branch a member worktree has checked out now ("" when the repo store does not list it). */
+/** The branch a member worktree has checked out now ("" when the project store does not list it). */
 function useCheckout(projectId: string, path: string): WorktreeOption | undefined {
   const key = useProjectsStore((s) => {
     const w = s.byId[projectId]?.worktrees.find((x) => x.path === path);

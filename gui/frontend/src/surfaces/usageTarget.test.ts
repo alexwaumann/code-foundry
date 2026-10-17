@@ -12,7 +12,7 @@ function thread(id: string): ThreadView {
 
 const threads: ThreadsData = { byId: { "s-used": thread("s-used"), "s-new": thread("s-new") }, order: ["s-used", "s-new"] };
 
-const s = { repos: { byId: {}, order: [] }, threads };
+const s = { projects: { byId: {}, order: [] }, threads };
 
 describe("selectionUsageThread (the surface's availability)", () => {
   it.each<[string, Selection, string | null]>([

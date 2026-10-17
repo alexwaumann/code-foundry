@@ -8,7 +8,7 @@ import { AGENTS_KIND, AGENTS_TITLE, agentsTab, selectionAgentsThread } from "./a
 import type { SurfaceSpec } from "./types";
 
 function thread(sel: Selection): string | null {
-  return selectionAgentsThread(sel, { repos: useProjectsStore.getState(), threads: useThreadsStore.getState() });
+  return selectionAgentsThread(sel, { projects: useProjectsStore.getState(), threads: useThreadsStore.getState() });
 }
 
 /**

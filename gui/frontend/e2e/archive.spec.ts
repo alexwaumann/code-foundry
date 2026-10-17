@@ -223,8 +223,8 @@ test("the keyboard walks one order across the main list, Working and Archived; c
 
 test("the footers stay pinned under a long main list, are capped, and scroll their own rows to the cursor", async ({ page }) => {
   // 30 idle threads make the main list scroll; 12 busy ones overflow Working's cap.
-  await mockPost("threads?repo=repo-cf&count=30&status=idle&prefix=Idle");
-  const busy = (await mockPost("threads?repo=repo-cf&count=12&status=busy&prefix=Job")) as string[];
+  await mockPost("threads?project=repo-cf&count=30&status=idle&prefix=Idle");
+  const busy = (await mockPost("threads?project=repo-cf&count=12&status=busy&prefix=Job")) as string[];
   await holdThreads(...busy);
   await openApp(page);
   await expect(page.getByTestId("working-count")).toHaveText("14");

@@ -12,7 +12,7 @@ const threads: ThreadsData = {
   byId: { "s-r": thread("s-r"), "s-off": thread("s-off", "disconnected") },
   order: ["s-r", "s-off"],
 };
-const s = { repos: { byId: {}, order: [] }, threads };
+const s = { projects: { byId: {}, order: [] }, threads };
 
 describe("selectionMcpThread (the surface's availability)", () => {
   it.each<[string, Selection, string | null]>([

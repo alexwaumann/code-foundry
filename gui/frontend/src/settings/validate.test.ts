@@ -16,7 +16,7 @@ describe("validateSetting", () => {
     ["enum unknown", field({ type: "enum", enumValues: ["dark", "light"] }), "blue", { ok: false, error: "Want one of dark, light" }],
     ["bool", field({ type: "bool" }), "false", { ok: true, value: "false" }],
     ["path absolute", field({ type: "path" }), "/opt/bin/claude", { ok: true, value: "/opt/bin/claude" }],
-    ["path tilde", field({ type: "path" }), "~/wt/{repo}", { ok: true, value: "~/wt/{repo}" }],
+    ["path tilde", field({ type: "path" }), "~/wt/{project}", { ok: true, value: "~/wt/{project}" }],
     ["path relative", field({ type: "path" }), "bin/claude", { ok: false, error: "Want an absolute path (or ~/…)" }],
     ["string verbatim", field({}), "  Iosevka ", { ok: true, value: "  Iosevka " }],
   ])("%s", (_name, f, raw, want) => {

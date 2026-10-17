@@ -52,7 +52,7 @@ function MemberChip({ draftKey, member, primary, disabled }: { draftKey: string;
         primary ? "border-primary/50 bg-accent text-foreground" : "border-border bg-card text-muted-foreground",
       )}
       data-testid="composer-member"
-      data-repo={member.projectId}
+      data-project={member.projectId}
       data-primary={primary || undefined}
     >
       <button

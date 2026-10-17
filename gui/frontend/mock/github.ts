@@ -1,7 +1,7 @@
 /**
  * Mock GhService dashboards/activity/branch PRs and ProjectService.GetWorktreeDetail data
  * (Phase 3a). Deterministic, relative to the time the world was reset. Paths match
- * world.ts's repos.
+ * world.ts's projects.
  */
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { timestampFromDate, type Timestamp } from "@bufbuild/protobuf/wkt";

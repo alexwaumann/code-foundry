@@ -11,7 +11,7 @@ import { Composer } from "./Composer";
 vi.mock("@/api/project", async (orig) => ({ ...(await orig<typeof import("@/api/project")>()), listRefs: () => new Promise(() => undefined) }));
 vi.mock("@/api/filesystem", async (orig) => ({ ...(await orig<typeof import("@/api/filesystem")>()), listSkills: () => new Promise(() => undefined) }));
 
-const repo = (id: string): ProjectView => ({
+const project = (id: string): ProjectView => ({
   id,
   path: `/src/${id}`,
   name: id,
@@ -23,7 +23,7 @@ const repo = (id: string): ProjectView => ({
 });
 
 beforeEach(() => {
-  useProjectsStore.setState({ byId: { web: repo("web") }, order: ["web"], loaded: true });
+  useProjectsStore.setState({ byId: { web: project("web") }, order: ["web"], loaded: true });
   useWorkspacesStore.setState({ byId: {}, order: [], loaded: true });
 });
 

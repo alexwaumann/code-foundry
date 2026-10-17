@@ -9,7 +9,7 @@ import type { SurfaceSpec } from "./types";
 import { selectionWorkspaceThread, WORKSPACE_KIND, workspaceOfTab, workspaceTab, type WorkspaceThread } from "./workspaceTarget";
 
 function thread(sel: Selection): WorkspaceThread | null {
-  return selectionWorkspaceThread(sel, { repos: useProjectsStore.getState(), threads: useThreadsStore.getState() });
+  return selectionWorkspaceThread(sel, { projects: useProjectsStore.getState(), threads: useThreadsStore.getState() });
 }
 
 /**
@@ -26,7 +26,7 @@ export const workspaceSurface: SurfaceSpec = {
   icon: Layers,
   hotkey: "w",
   available: (ctx) => (thread(ctx.selection) ? "enabled" : "hidden"),
-  // deriveContext reads the repos store too (placement); the name comes from workspaces.
+  // deriveContext reads the projects store too (placement); the name comes from workspaces.
   watches: [useThreadsStore, useProjectsStore],
   render: (tab) => {
     const id = workspaceOfTab(tab);

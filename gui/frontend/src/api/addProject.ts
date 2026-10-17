@@ -111,13 +111,13 @@ export async function cloneRepo(
 ): Promise<ProjectView> {
   const c = await conn.client(ProjectService);
   try {
-    let repo: ProjectView | null = null;
+    let project: ProjectView | null = null;
     for await (const ev of c.clone({ owner, name }, { signal })) {
       if (ev.event.case === "progress") onProgress({ line: ev.event.value.line, transient: ev.event.value.transient });
-      else if (ev.event.case === "project") repo = toProjectView(ev.event.value);
+      else if (ev.event.case === "project") project = toProjectView(ev.event.value);
     }
-    if (!repo) throw new Error("the clone ended without a project");
-    return repo;
+    if (!project) throw new Error("the clone ended without a project");
+    return project;
   } catch (err) {
     throw orOutdatedDaemon(err);
   }

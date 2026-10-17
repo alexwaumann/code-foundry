@@ -15,7 +15,7 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-const project = (page: Page, projectId: string) => page.locator(`[data-testid="project"][data-repo="${projectId}"]`);
+const project = (page: Page, projectId: string) => page.locator(`[data-testid="project"][data-project="${projectId}"]`);
 const navKeys = (page: Page) => page.getByTestId("projects-list").locator("[data-nav-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-nav-key")));
 
 test("each project's header says what kind it is", async ({ page }) => {
@@ -45,7 +45,7 @@ test("each project's header says what kind it is", async ({ page }) => {
 });
 
 test("collapse a project and a workspace by mouse and keyboard; it persists across a reload", async ({ page }) => {
-  const ws = (await mockPost("workspace?name=login&repos=repo-cf,repo-gp")) as { id: string };
+  const ws = (await mockPost("workspace?name=login&projects=repo-cf,repo-gp")) as { id: string };
   await openApp(page);
   await openProjects(page);
   const cf = project(page, "repo-cf");
@@ -90,7 +90,7 @@ test("collapse a project and a workspace by mouse and keyboard; it persists acro
 });
 
 test("the filter: / focuses it, it hides what does not match, shows collapsed matches expanded, Escape clears it", async ({ page }) => {
-  await mockPost("workspace?name=login&repos=repo-cf,repo-gp");
+  await mockPost("workspace?name=login&projects=repo-cf,repo-gp");
   await openApp(page);
   await openProjects(page);
   const cf = project(page, "repo-cf");
@@ -169,7 +169,7 @@ test("row actions show without hover, muted at rest, in a fixed-width column; ro
   const widths = await Promise.all([main, feat, wtRow(page, "repo-cf", FIX)].map(async (r) => (await r.getByTestId("worktree-actions").boundingBox())?.width));
   expect(new Set(widths).size).toBe(1);
   // Members too: always shown.
-  await mockPost("workspace?name=login&repos=repo-cf,repo-gp");
+  await mockPost("workspace?name=login&projects=repo-cf,repo-gp");
   await expect(page.getByTestId("workspace-member").first()).toBeVisible();
   await page.mouse.move(0, 0);
   await expect(page.getByTestId("member-actions").first().getByTestId("member-terminal")).toBeVisible();
@@ -191,19 +191,19 @@ test("each worktree counts its threads, whether or not Claude runs for them", as
   await expect(wtRow(page, "repo-cf", FEAT).getByTestId("worktree-threads")).toHaveText("2");
   await expect(wtRow(page, "repo-cf", FIX).getByTestId("worktree-threads")).toHaveText("1");
   await expectTooltip(page, wtRow(page, "repo-cf", FIX).getByTestId("worktree-threads"), "1 thread on this worktree");
-  await mockPost("threads?repo=repo-cf&count=2&status=idle");
+  await mockPost("threads?project=repo-cf&count=2&status=idle");
   await expect(wtRow(page, "repo-cf", CF).getByTestId("worktree-threads")).toHaveText("4");
   // A workspace member with a thread counts it too.
-  await mockPost("workspace?name=login&repos=repo-cf,repo-gp");
-  const gp = page.locator('[data-testid="workspace-member"][data-repo="repo-gp"]');
+  await mockPost("workspace?name=login&projects=repo-cf,repo-gp");
+  const gp = page.locator('[data-testid="workspace-member"][data-project="repo-gp"]');
   await expect(gp).toBeVisible();
   await expect(gp.getByTestId("worktree-threads")).toHaveCount(0);
-  await mockPost("workspace-thread?workspace=login&repo=repo-gp&name=driver&status=busy");
+  await mockPost("workspace-thread?workspace=login&project=repo-gp&name=driver&status=busy");
   await expect(gp.getByTestId("worktree-threads")).toHaveText("1");
 });
 
 test("overflow menus per row kind; the menu keeps the list's cursor and gives it the keyboard back", async ({ page }) => {
-  await mockPost("workspace?name=login&repos=repo-cf,repo-gp");
+  await mockPost("workspace?name=login&projects=repo-cf,repo-gp");
   await openApp(page);
   await openProjects(page);
 
@@ -269,13 +269,13 @@ test("Publish to GitHub only on the remoteless project, Initialize git only on t
   }
   // Publish opens the publish dialog for that project.
   await project(page, "repo-sk").getByTestId("project-publish").click();
-  await expect(page.getByTestId("publish-dialog")).toHaveAttribute("data-repo", "repo-sk");
+  await expect(page.getByTestId("publish-dialog")).toHaveAttribute("data-project", "repo-sk");
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("publish-dialog")).toHaveCount(0);
   // The menu item too.
   await project(page, "repo-sk").getByTestId("project-more").click();
   await page.getByTestId("project-menu-publish").click();
-  await expect(page.getByTestId("publish-dialog")).toHaveAttribute("data-repo", "repo-sk");
+  await expect(page.getByTestId("publish-dialog")).toHaveAttribute("data-project", "repo-sk");
   // Closing the menu did not take the keyboard from the dialog.
   await expect.poll(() => page.evaluate(() => document.activeElement?.closest("[data-testid=publish-dialog]") !== null)).toBe(true);
   await page.keyboard.press("Escape");
@@ -347,7 +347,7 @@ const MERGED = "/Users/dev/.code-foundry/worktrees/alexwaumann/code-foundry/cf-u
 const T3 = "/Users/dev/.t3/worktrees/code-foundry/t3code-elsewhere";
 
 test("a merged, clean worktree shows 'in main' and a broom that removes it after a confirm naming the branch", async ({ page }) => {
-  expect(await mockPost("worktree/merged?repo=repo-cf&branch=cf/usage-polish")).toEqual({ path: MERGED });
+  expect(await mockPost("worktree/merged?project=repo-cf&branch=cf/usage-polish")).toEqual({ path: MERGED });
   await openApp(page);
   await openProjects(page);
   const row = wtRow(page, "repo-cf", MERGED);
@@ -379,10 +379,10 @@ test("a merged, clean worktree shows 'in main' and a broom that removes it after
 });
 
 test("the project menu counts merged worktrees, cleans them all up, and is disabled at zero", async ({ page }) => {
-  await mockPost("worktree/merged?repo=repo-cf&branch=cf/usage-polish");
-  await mockPost("worktree/merged?repo=repo-cf&branch=cf/old-docs");
+  await mockPost("worktree/merged?project=repo-cf&branch=cf/usage-polish");
+  await mockPost("worktree/merged?project=repo-cf&branch=cf/old-docs");
   // Merged and clean too, but made by another tool outside the app's worktrees directory: never cleanable.
-  await mockPost(`worktree/merged?repo=repo-cf&branch=t3code/elsewhere&path=${encodeURIComponent(T3)}`);
+  await mockPost(`worktree/merged?project=repo-cf&branch=t3code/elsewhere&path=${encodeURIComponent(T3)}`);
   await openApp(page);
   await openProjects(page);
   await expect(wtRow(page, "repo-cf", T3)).toBeVisible();
@@ -417,7 +417,7 @@ test("the project menu counts merged worktrees, cleans them all up, and is disab
 });
 
 test("a terminal open in a merged worktree keeps it: no tag, no broom, not counted", async ({ page }) => {
-  await mockPost("worktree/merged?repo=repo-cf&branch=cf/usage-polish");
+  await mockPost("worktree/merged?project=repo-cf&branch=cf/usage-polish");
   await openApp(page);
   await openProjects(page);
   const row = wtRow(page, "repo-cf", MERGED);

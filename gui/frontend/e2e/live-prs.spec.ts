@@ -8,14 +8,14 @@
  * with this repository and a GitHub-backed clone registered, the Vite dev server pointed
  * at it, then:
  *
- *   LIVE_DAEMON=1 LIVE_APP_URL=http://127.0.0.1:9257 LIVE_REPO=neovim \
+ *   LIVE_DAEMON=1 LIVE_APP_URL=http://127.0.0.1:9257 LIVE_PROJECT=neovim \
  *   LIVE_WORKTREE=<this worktree> LIVE_SHOTS=<dir> pnpm run e2e:live e2e/live-prs.spec.ts
  */
 import { expect, test, type Page } from "@playwright/test";
 
 const LIVE = process.env.LIVE_DAEMON === "1";
 const SHOTS = process.env.LIVE_SHOTS ?? "";
-const REPO = process.env.LIVE_REPO ?? "";
+const PROJECT = process.env.LIVE_PROJECT ?? "";
 const WORKTREE = process.env.LIVE_WORKTREE ?? "";
 
 test.skip(!LIVE, "set LIVE_DAEMON=1 (see the file header)");
@@ -38,7 +38,7 @@ test("Pull Requests page with real GitHub data", async ({ page }) => {
   const commits = Number(await current.getAttribute("data-value"));
   expect(commits).toBeGreaterThanOrEqual(0);
   // LIVE_ALL=1: show every repository (with CODE_FOUNDRY_GH_SEARCH_AS the searches run
-  // for an account whose PRs live in repos that are not registered here).
+  // for an account whose PRs live in projects that are not registered here).
   if (process.env.LIVE_ALL === "1") {
     await page.getByTestId("prs-list").press("a");
     await expect(page.getByTestId("prs-scope")).toHaveText("all repositories");
@@ -49,17 +49,17 @@ test("Pull Requests page with real GitHub data", async ({ page }) => {
 });
 
 test("worktree overview of a GitHub-backed clone", async ({ page }) => {
-  test.skip(!REPO, "set LIVE_REPO to a registered repo's name");
+  test.skip(!PROJECT, "set LIVE_PROJECT to a registered project's name");
   await page.goto("/");
   // Projects live on the Projects page (docs/notes/workspaces-4-sidebar.md).
   await page.getByTestId("nav-projects").click();
-  const project = page.locator('[data-testid="project"]').filter({ has: page.getByTestId("project-name").getByText(REPO, { exact: true }) }).locator("[data-nav-key^='p:']");
+  const project = page.locator('[data-testid="project"]').filter({ has: page.getByTestId("project-name").getByText(PROJECT, { exact: true }) }).locator("[data-nav-key^='p:']");
   await project.dblclick();
   await expect(page.getByTestId("worktree-surface")).toBeVisible();
   await expect(page.getByTestId("worktree-facts")).toBeVisible();
   await expect(page.getByTestId("worktree-changes")).toContainText("Changes");
   await page.waitForTimeout(300);
-  await shot(page, "live-overview-repo");
+  await shot(page, "live-overview-project");
 });
 
 test("worktree overview of this worktree (files and log vs origin/main)", async ({ page }) => {

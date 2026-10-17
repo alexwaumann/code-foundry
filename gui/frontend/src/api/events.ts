@@ -20,7 +20,7 @@ export type { GhEventView } from "./gh";
  * exactly one of these streams (HTTP/1.1 allows 6 connections per origin).
  */
 export type EventView =
-  | { source: "repo"; event: ProjectEventView }
+  | { source: "project"; event: ProjectEventView }
   | { source: "workspace"; event: WorkspaceEventView }
   | { source: "terminal"; event: TerminalEventView }
   | { source: "threadList"; event: ThreadListEventView }
@@ -37,7 +37,7 @@ export function toEventView(ev: Event): EventView | null {
   switch (e.case) {
     case "project": {
       const v = toProjectEventView(e.value);
-      return v && { source: "repo", event: v };
+      return v && { source: "project", event: v };
     }
     case "workspace": {
       const v = toWorkspaceEventView(e.value);

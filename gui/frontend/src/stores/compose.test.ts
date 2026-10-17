@@ -82,7 +82,7 @@ describe("compose drafts", () => {
 });
 
 describe("the no-project composer", () => {
-  it("its selection has no repo and maps to the home target and back", () => {
+  it("its selection has no project and maps to the home target and back", () => {
     composeNoProject();
     const sel = useUiStore.getState().selection;
     expect(sel).toEqual({ kind: "compose", projectId: "", noProject: true });
@@ -95,7 +95,7 @@ describe("the no-project composer", () => {
 
 describe("Work in: the setting, the per-project memory, the draft's own pick", () => {
   const wt = (path: string, isMain: boolean) => ({ path, branch: isMain ? "main" : "feat/x", head: "abc1234", detached: false, isMain, status: undefined });
-  const repo = (id: string): ProjectView =>
+  const project = (id: string): ProjectView =>
     ({ id, path: `/src/${id}`, name: id, defaultBranch: "main", githubSlug: "", remotes: [], git: true, worktrees: [wt(`/src/${id}`, true), wt(`/wt/${id}-x`, false)] }) as unknown as ProjectView;
   const setting = (v: string | undefined) => {
     useSettingsStore.setState({
@@ -108,7 +108,7 @@ describe("Work in: the setting, the per-project memory, the draft's own pick", (
   };
 
   beforeEach(() => {
-    useProjectsStore.setState({ byId: { "repo-cf": repo("repo-cf"), "repo-gp": repo("repo-gp") }, order: ["repo-cf", "repo-gp"] });
+    useProjectsStore.setState({ byId: { "repo-cf": project("repo-cf"), "repo-gp": project("repo-gp") }, order: ["repo-cf", "repo-gp"] });
     useWorkInStore.setState({ byProject: {} });
   });
   afterEach(() => {
@@ -170,7 +170,7 @@ describe("Work in: the setting, the per-project memory, the draft's own pick", (
 });
 
 describe("switchDraftTarget", () => {
-  const repo = (id: string, git = true): ProjectView => ({ id, path: `/src/${id}`, name: id.replace("repo-", ""), defaultBranch: "main", githubSlug: "", remotes: [], git, worktrees: [] });
+  const project = (id: string, git = true): ProjectView => ({ id, path: `/src/${id}`, name: id.replace("repo-", ""), defaultBranch: "main", githubSlug: "", remotes: [], git, worktrees: [] });
   const cf = { kind: "project", projectId: "repo-cf" } as const;
   const gp = { kind: "project", projectId: "repo-gp" } as const;
   const login = { kind: "workspace", workspaceId: "w-1" } as const;
@@ -180,7 +180,7 @@ describe("switchDraftTarget", () => {
   beforeEach(() => {
     revoke.mockClear();
     URL.revokeObjectURL = revoke;
-    useProjectsStore.setState({ byId: { "repo-cf": repo("repo-cf"), "repo-gp": repo("repo-gp"), "repo-sk": repo("repo-sk") }, order: ["repo-cf", "repo-gp", "repo-sk"] });
+    useProjectsStore.setState({ byId: { "repo-cf": project("repo-cf"), "repo-gp": project("repo-gp"), "repo-sk": project("repo-sk") }, order: ["repo-cf", "repo-gp", "repo-sk"] });
     useWorkspacesStore.setState({ byId: { "w-1": { id: "w-1", name: "login", branch: "cf/login", members: [{ projectId: "repo-gp", worktreePath: "/wt/gp" }], createdAtMs: null } }, order: ["w-1"], loaded: true });
     useUiStore.setState({ selection: { kind: "compose", projectId: "repo-cf" } });
   });
@@ -262,7 +262,7 @@ describe("switchDraftTarget", () => {
     expect(getDraft("ws:w-1").text).toBe(sk("repo-gp"));
   });
 
-  it("to no project: the home draft, selected without a repo; and back to a project", async () => {
+  it("to no project: the home draft, selected without a project; and back to a project", async () => {
     updateDraft("repo-cf", { text: "hi", alsoIn: ["repo-gp"], model: "haiku" });
     await expect(switchDraftTarget(cf, { kind: "home" })).resolves.toBe(true);
     expect(useComposeStore.getState().drafts["repo-cf"]).toBeUndefined();

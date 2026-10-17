@@ -29,7 +29,7 @@ async function paletteRun(page: Page, name: string) {
 async function settleThreads(busy: number): Promise<void> {
   await mockPost("thread/status?id=s-1&status=attention&reason=finished");
   for (const id of ["s-5", "s-6"]) await mockPost(`thread/stop?id=${id}&reason=idle&code=0&status=idle`);
-  if (busy > 0) await mockPost(`threads?repo=repo-cf&count=${String(busy)}&status=busy&prefix=Job`);
+  if (busy > 0) await mockPost(`threads?project=repo-cf&count=${String(busy)}&status=busy&prefix=Job`);
 }
 
 async function expectChip(page: Page, kind: string, label: string, cta: string | null) {

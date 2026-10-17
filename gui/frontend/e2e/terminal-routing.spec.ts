@@ -4,7 +4,7 @@ import { CF, expectTooltip, invocations, mockPost, openApp, openProjects, resetM
 // Every way to start a shell lands in a bottom panel (docs/notes/bottom-panel-3-routing.md):
 // the thread's when a thread owns it, else the Projects page's. The sidebar never gets a row.
 
-/** Where the mock (like the daemon) puts a repo's worktree for the cf/checkout branch. */
+/** Where the mock (like the daemon) puts a project's worktree for the cf/checkout branch. */
 const CF_MEMBER = "/Users/dev/.code-foundry/worktrees/alexwaumann/code-foundry/cf-checkout";
 const WS = "w-000000000001";
 
@@ -67,7 +67,7 @@ test("cmd+t on a thread starts its shell in the bottom panel, with the keyboard 
 
 test("a workspace member's New terminal here in a thread's side panel: the thread owns it, in the member's worktree", async ({ page }) => {
   await mockPost("workspace-mixed?name=checkout");
-  const driver = ((await mockPost("workspace-thread?workspace=checkout&repo=repo-gp&name=driver")) as { id: string }).id;
+  const driver = ((await mockPost("workspace-thread?workspace=checkout&project=repo-gp&name=driver")) as { id: string }).id;
   await openApp(page);
   await row(page, `s:${driver}`).getByTestId("row-workspace").click();
   const cf = page.getByTestId("workspace-surface").locator(`[data-nav-key="m:${WS}::repo-cf"]`);
@@ -86,7 +86,7 @@ test("a workspace member's New terminal here in a thread's side panel: the threa
 
 test("a member's New terminal here from an expanded side panel collapses it so the shell shows", async ({ page }) => {
   await mockPost("workspace-mixed?name=checkout");
-  const driver = ((await mockPost("workspace-thread?workspace=checkout&repo=repo-gp&name=driver")) as { id: string }).id;
+  const driver = ((await mockPost("workspace-thread?workspace=checkout&project=repo-gp&name=driver")) as { id: string }).id;
   await openApp(page);
   await row(page, `s:${driver}`).getByTestId("row-workspace").click();
   const side = page.getByTestId("side-panel");

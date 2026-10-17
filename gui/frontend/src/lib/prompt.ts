@@ -19,7 +19,7 @@
 export const ATTACHMENT_SCHEME = "cf-attachment://";
 export const SKILL_SCHEME = "cf-skill://";
 export const FILE_SCHEME = "cf-file://";
-/** The repo slot of a user-scope skill token. */
+/** The project slot of a user-scope skill token. */
 const USER_SCOPE = "~";
 
 /** What an inline tag refers to. */
@@ -34,7 +34,7 @@ export type TagKind = PromptTag["tagKind"];
 
 export type PromptPiece = { kind: "text"; text: string } | ({ kind: "tag" } & PromptTag);
 
-// Groups: 1 image label, 2 attachment id | 3 label, 4 skill|file, 5 repo slot, 6 the rest.
+// Groups: 1 image label, 2 attachment id | 3 label, 4 skill|file, 5 project slot, 6 the rest.
 // Labels exclude "[" (tokens never have one), so an unclosed "[" typed before a tag stays text.
 const TOKEN = /!\[([^[\]\n]*)\]\(cf-attachment:\/\/([A-Za-z0-9_-]+)\)|\[([^[\]\n]*)\]\(cf-(skill|file):\/\/([A-Za-z0-9_.~-]+)\/([^\s()]+)\)/g;
 
@@ -191,31 +191,31 @@ export function removeReferences(text: string, id: string): string {
   return removeTags(text, (t) => t.tagKind === "image" && t.id === id);
 }
 
-/** The project a tag belongs to: a project skill's or a file's repo; "" for images and user skills. */
+/** The project a tag belongs to: a project skill's or a file's project; "" for images and user skills. */
 export function tagProject(tag: PromptTag): string {
   return tag.tagKind === "image" ? "" : tag.projectId;
 }
 
 /**
- * Repo ids the prompt's project-scoped tags (project skills, files) refer to, in order of
+ * Project ids the prompt's project-scoped tags (project skills, files) refer to, in order of
  * first appearance: what a change of the draft's projects has to look at.
  */
 export function tagsByProject(text: string): string[] {
   return [...new Set(tokens(text).flatMap(({ tag }) => (tagProject(tag) ? [tagProject(tag)] : [])))];
 }
 
-/** How many project-scoped tags refer to the repo. */
+/** How many project-scoped tags refer to the project. */
 export function projectTagCount(text: string, projectId: string): number {
   return tokens(text).filter(({ tag }) => tagProject(tag) === projectId).length;
 }
 
-/** Removes every project-scoped tag of a repo (removeReferences' spacing rules). */
+/** Removes every project-scoped tag of a project (removeReferences' spacing rules). */
 export function removeProjectTags(text: string, projectId: string): string {
   return removeTags(text, (t) => tagProject(t) === projectId);
 }
 
 /**
- * Keeps only the project-scoped tags whose repo is one of `projectIds` (for a draft moved to
+ * Keeps only the project-scoped tags whose project is one of `projectIds` (for a draft moved to
  * other projects); the rest go, with removeReferences' spacing rules. Images and user
  * skills always stay.
  */

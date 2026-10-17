@@ -61,7 +61,7 @@ function SkillTag({ name, projectId, selected }: { name: string; projectId: stri
       ariaLabel={`Skill /${name}, ${scope}`}
       tip={scope}
       detail={description}
-      data={{ "data-skill": name, "data-repo": projectId || undefined }}
+      data={{ "data-skill": name, "data-project": projectId || undefined }}
     />
   );
 }
@@ -83,7 +83,7 @@ function FileTag({ projectId, path, selected }: { projectId: string; path: strin
       ariaLabel={`${path.endsWith("/") ? "Folder" : "File"} ${path} in ${project}`}
       tip={<span className="font-mono">{multi ? `${project}/${path}` : path}</span>}
       detail=""
-      data={{ "data-path": path, "data-repo": projectId }}
+      data={{ "data-path": path, "data-project": projectId }}
     />
   );
 }

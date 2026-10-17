@@ -27,7 +27,7 @@ async function compose(page: Page, n: number): Promise<void> {
 test("a project without git: No git on the Projects page, its overview, then Initialize Git", async ({ page }) => {
   await openApp(page);
   await openProjects(page);
-  const project = page.locator('[data-testid="project"][data-repo="repo-wr"]');
+  const project = page.locator('[data-testid="project"][data-project="repo-wr"]');
   await expect(project).toHaveAttribute("data-git", "false");
   await expect(project).toHaveAttribute("data-kind", "nogit");
   // The header says it after the name; on the row the badge stands where the branch
@@ -46,7 +46,7 @@ test("a project without git: No git on the Projects page, its overview, then Ini
   // Nothing git-shaped renders: facts, pull request, changes, commits.
   for (const id of ["worktree-facts", "overview-pr", "worktree-changes", "worktree-commits"]) await expect(page.getByTestId(id)).toHaveCount(0);
 
-  // Initialize Git runs project.git.init on the project (the page itself has no repo context).
+  // Initialize Git runs project.git.init on the project (the page itself has no project context).
   const init = page.getByTestId("init-git");
   await expect(init).toBeEnabled();
   await expect(init).toHaveText("Initialize Git");
@@ -133,7 +133,7 @@ test("a git repository without a remote: Publish to GitHub is there", async ({ p
 });
 
 test("workspace member pickers leave out projects without git, not repositories without a remote", async ({ page }) => {
-  await mockPost("workspace?name=login&repos=repo-cf");
+  await mockPost("workspace?name=login&projects=repo-cf");
   await openApp(page);
   // The composer's Also in (a new workspace).
   await compose(page, 1);

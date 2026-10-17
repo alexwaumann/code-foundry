@@ -18,7 +18,7 @@ export const worktreeDetailResource = createResource(
   { keepAliveMs: 5 * 60_000 },
 );
 
-/** Repo events that affect details: detail changes, and snapshots (a reconnect). */
+/** Project events that affect details: detail changes, and snapshots (a reconnect). */
 export function applyProjectEventToDetails(ev: ProjectEventView): void {
   if (ev.kind === "worktreeDetailUpdated") worktreeDetailResource.invalidate(detailKey(ev.projectId, ev.path));
   else if (ev.kind === "snapshot") worktreeDetailResource.invalidate(() => true);

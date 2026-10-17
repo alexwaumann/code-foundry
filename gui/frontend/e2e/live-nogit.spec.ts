@@ -6,7 +6,7 @@
  * that is not inside a git repository (LIVE_NOGIT_DIR).
  *
  * It registers the folder with the CLI, checks the Projects page, the overview and a
- * terminal's sidebar row, runs `repo git init` with the CLI, and checks that the project
+ * terminal's sidebar row, runs `project git init` with the CLI, and checks that the project
  * turned into a git repository on its default branch. No Claude turns. The folder is
  * left as a git repository with one empty commit; the terminal is killed.
  */
@@ -26,9 +26,9 @@ function cli(...args: string[]): string {
 
 test.skip(!LIVE || !HOME || !DIR, "LIVE_DAEMON=1, CODE_FOUNDRY_HOME and LIVE_NOGIT_DIR are required");
 
-test("register a plain folder, see No git everywhere, then repo git init turns it into a git project", async ({ page }) => {
-  const repo = JSON.parse(cli("project", "add", DIR, "--json")) as { id: string; name: string; git?: boolean };
-  expect(repo.git ?? false).toBe(false);
+test("register a plain folder, see No git everywhere, then project git init turns it into a git project", async ({ page }) => {
+  const project = JSON.parse(cli("project", "add", DIR, "--json")) as { id: string; name: string; git?: boolean };
+  expect(project.git ?? false).toBe(false);
   const term = JSON.parse(cli("terminal", "new", "--cwd", DIR, "--json")) as { id: string };
 
   try {
@@ -37,27 +37,27 @@ test("register a plain folder, see No git everywhere, then repo git init turns i
     // The shell belongs to the folder: the Projects page's bottom panel, titled by the folder.
     await page.keyboard.press("Meta+j");
     await expect(page.getByTestId("bottom-panel").locator(`[data-tab-id="${term.id}"]`)).toContainText(path.basename(DIR));
-    const project = page.locator(`[data-testid="project"][data-repo="${repo.id}"]`);
-    await expect(project).toHaveAttribute("data-git", "false");
-    await expect(project.getByTestId("no-git-badge")).toBeVisible();
-    await expect(project.getByTestId("worktree-branch")).toHaveCount(0);
+    const card = page.locator(`[data-testid="project"][data-project="${project.id}"]`);
+    await expect(card).toHaveAttribute("data-git", "false");
+    await expect(card.getByTestId("no-git-badge")).toBeVisible();
+    await expect(card.getByTestId("worktree-branch")).toHaveCount(0);
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "nogit-projects.png") });
 
-    await page.locator(`[data-nav-key="p:${repo.id}"]`).dblclick();
+    await page.locator(`[data-nav-key="p:${project.id}"]`).dblclick();
     await expect(page.getByTestId("worktree-surface")).toHaveAttribute("data-git", "false");
     await expect(page.getByTestId("section-nogit")).toContainText("Not a git repository");
     await expect(page.getByTestId("init-git")).toBeEnabled();
     await expect(page.getByTestId("worktree-changes")).toHaveCount(0);
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "nogit-overview.png") });
 
-    const after = JSON.parse(cli("project", "git", "init", "--project", repo.id, "--json")) as { git?: boolean; defaultBranch?: string };
+    const after = JSON.parse(cli("project", "git", "init", "--project", project.id, "--json")) as { git?: boolean; defaultBranch?: string };
     expect(after.git).toBe(true);
     const branch = after.defaultBranch ?? "";
     expect(branch).not.toBe("");
 
-    // The open overview follows the repo event: the normal git overview, no remote.
+    // The open overview follows the project event: the normal git overview, no remote.
     await expect(page.getByTestId("worktree-surface")).toHaveAttribute("data-git", "true");
-    await expect(page.getByTestId("worktree-surface-title")).toHaveText(`${repo.name}@${branch}`);
+    await expect(page.getByTestId("worktree-surface-title")).toHaveText(`${project.name}@${branch}`);
     await expect(page.getByTestId("worktree-facts")).toBeVisible();
     await expect(page.getByTestId("publish-github")).toBeEnabled();
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "nogit-after-init.png") });

@@ -13,7 +13,7 @@ export const LINKED_PRS_KIND = "linkedprs";
 export const LINKED_PRS_TITLE = "Linked PRs";
 
 export interface SelectionStores {
-  repos: ProjectsData;
+  projects: ProjectsData;
   threads: ThreadsData;
 }
 

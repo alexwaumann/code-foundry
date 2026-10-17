@@ -4,16 +4,16 @@
  *   pnpm run mock            # http://127.0.0.1:7788, token "dev-mock-token"
  *   MOCK_PORT=7799 MOCK_TOKEN=secret pnpm run mock
  *
- * Serves Health, Terminal, Repo, Filesystem, Thread, Command, Ui, Action and Event over Connect (HTTP/1.1,
+ * Serves Health, Terminal, Project, Filesystem, Thread, Command, Ui, Action and Event over Connect (HTTP/1.1,
  * like the real daemon's loopback listener for browsers), with bearer auth and
  * permissive CORS. Non-RPC control endpoints for tests live under /__mock/:
  *
  *   GET  /__mock/invocations | writes | resizes | threads | streams
  *   POST /__mock/reset
- *   ProjectService.SearchGitHub / LookupGitHub / Clone: mock/clone.ts (a repo named "fail" fails
+ *   ProjectService.SearchGitHub / LookupGitHub / Clone: mock/clone.ts (a project named "fail" fails
  *        to clone; octo-org/already-here's destination exists)
  *   GET  /__mock/github/calls                     ("search <q>", "lookup <o/n>", "clone <o/n>")
- *   ProjectService.Create / ListPublishOwners / Publish, repo.create, repo.github.publish:
+ *   ProjectService.Create / ListPublishOwners / Publish, project.create, project.github.publish:
  *        mock/create.ts (publishing private to octo-org, or a repository named "taken", fails like gh)
  *   GET  /__mock/projects/calls                   ("create <name>", "publish <id> <o/n> <visibility>", "delete <id>")
  *   POST /__mock/thread/attention?id=s-1
@@ -63,27 +63,27 @@
  *   POST /__mock/worktree/operation?path=…&op=rebase&step=3&total=6&conflicted=2[&file=a.go]
  *                                                 (a git operation stops in that worktree: status
  *                                                 operation fields, U files lead its detail; no op ends it)
- *   POST /__mock/worktree/merged?repo=repo-cf&branch=cf/usage-polish[&path=…]   (a clean worktree whose
- *                                                 work is in origin/main: merged_clean, so repo.worktree.cleanup removes
+ *   POST /__mock/worktree/merged?project=repo-cf&branch=cf/usage-polish[&path=…]   (a clean worktree whose
+ *                                                 work is in origin/main: merged_clean, so project.worktree.cleanup removes
  *                                                 it; a path outside ~/.code-foundry/worktrees is never merged_clean)
- *   POST /__mock/workspace?name=login&repos=repo-cf,repo-gp[&branch=cf/login]
- *                                                 (a workspace: a cf/<name> worktree in each repo)
+ *   POST /__mock/workspace?name=login&projects=repo-cf,repo-gp[&branch=cf/login]
+ *                                                 (a workspace: a cf/<name> worktree in each project)
  *   GET  /__mock/workspaces                       (id, name, branch, members)
  *   POST /__mock/empty                            (a fresh install: no projects, threads or terminals)
- *   POST /__mock/threads?repo=repo-cf&count=3&status=busy|idle|attention[&prefix=Job]
- *   POST /__mock/workspace-thread?workspace=login[&repo=repo-gp&name=driver&status=busy]
+ *   POST /__mock/threads?project=repo-cf&count=3&status=busy|idle|attention[&prefix=Job]
+ *   POST /__mock/workspace-thread?workspace=login[&project=repo-gp&name=driver&status=busy]
  *                                                 (a connected thread owned by the workspace)
  *   POST /__mock/workspace-mixed?name=checkout    (a workspace over code-foundry, ghostty-playground
  *                                                 and dotfiles: an open PR with failing CI, 2 ahead, dirty)
  *   thread.run-in queues a move (pendingWorktreePath) that lands ~2s after the thread is not busy.
- *   thread.new takes workspace (a member thread) or new-worktree + repos (a new workspace),
- *   or no-project (a thread in the home directory with no repo or workspace).
+ *   thread.new takes workspace (a member thread) or new-worktree + projects (a new workspace),
+ *   or no-project (a thread in the home directory with no project or workspace).
  *   GET  /__mock/attachments                      (StageAttachment uploads: path, name, type, size, pages)
  *   FilesystemService.ListSkills / SearchFiles: mock/filesystem.ts (project skills review and
  *        deploy in every project, user skill commit; DEFAULT_FILES in every project)
- *   POST /__mock/files?repo=repo-cf&path=a.ts&path=src/b.ts   (that project's files; no path:
+ *   POST /__mock/files?project=repo-cf&path=a.ts&path=src/b.ts   (that project's files; no path:
  *                                                 none; reset restores DEFAULT_FILES)
- *   GET  /__mock/files/calls                      ("skills <repo,…|-> <includeUser>", "search <repo> <query>")
+ *   GET  /__mock/files/calls                      ("skills <repo,…|-> <includeUser>", "search <project> <query>")
  *   POST /__mock/files/search?delay=700&fail=1    (SearchFiles answers after 700ms; fail=1: Internal; reset: at once)
  *   thread.new with a prompt containing FAIL fails (after the worktree delay, if any).
  *   POST /__mock/gitops?fail=git.push&delay=800   (next git.push fails; ops take 800ms)
@@ -222,9 +222,9 @@ async function* attach(id: string, signal: AbortSignal): AsyncGenerator<AttachEv
   }
 }
 
-/** GitHub slugs of the mock's registered repos (what the real daemon tracks). */
+/** GitHub slugs of the mock's registered projects (what the real daemon tracks). */
 function trackedSlugs(): string[] {
-  return [...world.repos.values()].map((r) => r.githubSlug.toLowerCase()).filter(Boolean).sort();
+  return [...world.projects.values()].map((r) => r.githubSlug.toLowerCase()).filter(Boolean).sort();
 }
 
 function routes(router: ConnectRouter): void {
@@ -251,16 +251,16 @@ function routes(router: ConnectRouter): void {
   });
 
   router.service(ProjectService, {
-    list: () => ({ projects: [...world.repos.values()].map((r) => world.projectMsg(r)) }),
+    list: () => ({ projects: [...world.projects.values()].map((r) => world.projectMsg(r)) }),
     get: (req) => {
-      const r = world.repos.get(req.id);
+      const r = world.projects.get(req.id);
       if (!r) throw new ConnectError(`project ${req.id} not found`, Code.NotFound);
       return { project: world.projectMsg(r) };
     },
     // The Add Project dialog's Local folder tab and an existing clone destination.
     register: (req) => guard(() => ({ project: world.projectMsg(world.registerFolder(req.path)) })),
     unregister: () => {
-      throw new ConnectError("use the repo.unregister command in the mock", Code.Unimplemented);
+      throw new ConnectError("use the project.unregister command in the mock", Code.Unimplemented);
     },
     createWorktree: () => {
       throw new ConnectError("use the worktree.create command in the mock", Code.Unimplemented);
@@ -276,12 +276,12 @@ function routes(router: ConnectRouter): void {
     lookupGitHub: (req) => lookupGitHub(req.owner, req.name),
     clone: (req, ctx) => cloneRepo(world, req.owner, req.name, ctx.signal),
     // The New tab and the publish dialog (mock/create.ts); the GUI goes through the
-    // repo.create and repo.github.publish commands, these serve the RPCs themselves.
+    // project.create and project.github.publish commands, these serve the RPCs themselves.
     create: (req) => {
       const r = createProject(world, req.name);
-      const repo = world.repos.get(r.id);
-      if (!repo) throw new ConnectError("created project vanished", Code.Internal);
-      return { project: world.projectMsg(repo) };
+      const project = world.projects.get(r.id);
+      if (!project) throw new ConnectError("created project vanished", Code.Internal);
+      return { project: world.projectMsg(project) };
     },
     listPublishOwners: () => listPublishOwners(),
     delete: (req) => {
@@ -291,9 +291,9 @@ function routes(router: ConnectRouter): void {
     publish: async (req) => {
       const vis = visibilityFlag(req.visibility);
       await publishProject(world, req.projectId, req.owner, req.name, vis);
-      const repo = world.repos.get(req.projectId);
-      if (!repo) throw new ConnectError("published project vanished", Code.Internal);
-      return { project: world.projectMsg(repo) };
+      const project = world.projects.get(req.projectId);
+      if (!project) throw new ConnectError("published project vanished", Code.Internal);
+      return { project: world.projectMsg(project) };
     },
     getWorktreeDetail: (req) => {
       const detail = world.gh.getWorktreeDetail(req.projectId, req.path);
@@ -305,11 +305,11 @@ function routes(router: ConnectRouter): void {
 
   router.service(FilesystemService, {
     listDirectories: (req) => {
-      const registered = new Set([...world.repos.values()].flatMap((r) => [r.path, ...r.worktrees.map((w) => w.path)]));
+      const registered = new Set([...world.projects.values()].flatMap((r) => [r.path, ...r.worktrees.map((w) => w.path)]));
       return listDirectories(req.prefix, registered);
     },
-    listSkills: (req) => ({ skills: listSkills(world.repos, req.sources, req.includeUser) }),
-    searchFiles: (req) => searchFilesSlow(world.repos, req.projectId, req.path, req.query, req.limit),
+    listSkills: (req) => ({ skills: listSkills(world.projects, req.sources, req.includeUser) }),
+    searchFiles: (req) => searchFilesSlow(world.projects, req.projectId, req.path, req.query, req.limit),
   });
 
   router.service(GhService, {
@@ -455,7 +455,7 @@ function routes(router: ConnectRouter): void {
   router.service(EventService, {
     // The real daemon paces GitHub polling by it; the mock has nothing to pace.
     setClientState: () => ({}),
-    // Snapshots first in the order events.proto promises (repo, workspace, terminal,
+    // Snapshots first in the order events.proto promises (project, workspace, terminal,
     // thread, gh, gitops, settings, update, action), then everything published, filtered by `sources`.
     watch: (req, ctx) => {
       const want = new Set(
@@ -465,7 +465,7 @@ function routes(router: ConnectRouter): void {
       );
       if (!threadsEnabled) want.delete(EventSource.THREAD_LIST);
       const initial: { source: EventSource; event: EventInit }[] = [
-        { source: EventSource.PROJECT, event: { event: { case: "project", value: { event: { case: "snapshot", value: { projects: [...world.repos.values()].map((r) => world.projectMsg(r)) } } } } } },
+        { source: EventSource.PROJECT, event: { event: { case: "project", value: { event: { case: "snapshot", value: { projects: [...world.projects.values()].map((r) => world.projectMsg(r)) } } } } } },
         { source: EventSource.WORKSPACE, event: { event: { case: "workspace", value: world.workspaceSnapshot() } } },
         ...[...world.terms.values()].map((t) => ({ source: EventSource.TERMINAL, event: { event: { case: "terminal" as const, value: { event: { case: "updated" as const, value: world.terminalMsg(t) } } } } })),
         { source: EventSource.THREAD_LIST, event: { event: { case: "threadList", value: world.threadListSnapshot() } } },
@@ -735,7 +735,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     }
     case "POST /__mock/worktree/merged":
       try {
-        const w = world.addMergedWorktree(q.get("repo") ?? "", q.get("branch") ?? "", q.get("path") ?? "");
+        const w = world.addMergedWorktree(q.get("project") ?? "", q.get("branch") ?? "", q.get("path") ?? "");
         json(res, 200, { path: w.path });
       } catch (err) {
         json(res, 400, { error: err instanceof Error ? err.message : String(err) });
@@ -743,16 +743,16 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "POST /__mock/workspace":
       try {
-        const w = world.addWorkspace(q.get("name") ?? "", (q.get("repos") ?? "").split(",").filter(Boolean), q.get("branch") ?? undefined);
+        const w = world.addWorkspace(q.get("name") ?? "", (q.get("projects") ?? "").split(",").filter(Boolean), q.get("branch") ?? undefined);
         json(res, 200, w);
       } catch (err) {
         json(res, 400, { error: err instanceof Error ? err.message : String(err) });
       }
       break;
     case "POST /__mock/workspace-thread":
-      // workspace=login[&repo=repo-gp][&name=driver][&status=busy]: a connected thread owned by the workspace.
+      // workspace=login[&project=repo-gp][&name=driver][&status=busy]: a connected thread owned by the workspace.
       try {
-        const s = world.addWorkspaceThread(q.get("workspace") ?? "", q.get("repo") ?? "", q.get("name") ?? "driver", statusNames[q.get("status") ?? "idle"] ?? ThreadStatus.IDLE);
+        const s = world.addWorkspaceThread(q.get("workspace") ?? "", q.get("project") ?? "", q.get("name") ?? "driver", statusNames[q.get("status") ?? "idle"] ?? ThreadStatus.IDLE);
         json(res, 200, threadSummary(s.id));
       } catch (err) {
         json(res, 400, { error: err instanceof Error ? err.message : String(err) });
@@ -889,9 +889,9 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       json(res, 200, { ok: true });
       break;
     case "POST /__mock/threads":
-      // repo=repo-cf&count=3&status=busy|idle|attention[&prefix=Job]: connected threads in the repo's main worktree.
+      // project=repo-cf&count=3&status=busy|idle|attention[&prefix=Job]: connected threads in the project's main worktree.
       try {
-        const list = world.addThreads(q.get("repo") ?? "repo-cf", Number(q.get("count") ?? "1"), statusNames[q.get("status") ?? "busy"] ?? ThreadStatus.BUSY, q.get("prefix") ?? "Thread");
+        const list = world.addThreads(q.get("project") ?? "repo-cf", Number(q.get("count") ?? "1"), statusNames[q.get("status") ?? "busy"] ?? ThreadStatus.BUSY, q.get("prefix") ?? "Thread");
         json(res, 200, list.map((s) => s.id));
       } catch (err) {
         json(res, 400, { error: err instanceof Error ? err.message : String(err) });
@@ -999,13 +999,13 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       json(res, 200, { ok: true });
       break;
     case "POST /__mock/files": {
-      const projectId = q.get("repo") ?? "";
-      if (!world.repos.has(projectId)) {
-        json(res, 404, { error: `unknown repo ${projectId}` });
+      const projectId = q.get("project") ?? "";
+      if (!world.projects.has(projectId)) {
+        json(res, 404, { error: `unknown project ${projectId}` });
         break;
       }
       setMockFiles(projectId, q.getAll("path"));
-      json(res, 200, { repo: projectId, files: q.getAll("path") });
+      json(res, 200, { project: projectId, files: q.getAll("path") });
       break;
     }
     case "POST /__mock/files/search":

@@ -20,8 +20,8 @@ export const emptyContext: UiContextView = {
   activeWorkspaceId: "",
 };
 
-function allWorktrees(repos: ProjectsData): WorktreeRef[] {
-  return repos.order.flatMap((id) => repos.byId[id]?.worktrees.map((w) => ({ projectId: id, path: w.path })) ?? []);
+function allWorktrees(projects: ProjectsData): WorktreeRef[] {
+  return projects.order.flatMap((id) => projects.byId[id]?.worktrees.map((w) => ({ projectId: id, path: w.path })) ?? []);
 }
 
 /** The context of an action on one worktree (the Projects page's rows, the panel's worktree tab): no selection involved. */
@@ -41,7 +41,7 @@ export interface ContextShell {
 }
 
 /**
- * The worktree a Projects-page shell belongs to (its repo and worktree labels); null for
+ * The worktree a Projects-page shell belongs to (its project and worktree labels); null for
  * any other terminal. Both the Projects page's "+" (bottomActions paneContext) and the
  * command context with the keyboard in that shell use it.
  */
@@ -54,14 +54,14 @@ export function projectsShellPlace(t: ContextShell | undefined): WorktreeRef | n
 
 /**
  * Derives the UiContext the daemon sees from the current selection. A thread contributes
- * its place (repo, worktree) and its workspace; a thread has no terminal of its own, so
+ * its place (project, worktree) and its workspace; a thread has no terminal of its own, so
  * activeTerminalId comes only from a focused bottom panel shell (focusedShell). The
- * composer looks only at its repo. Actions on a worktree that is not
+ * composer looks only at its project. Actions on a worktree that is not
  * selected (the Projects page, the panel's worktree tab) build their context with
  * worktreeContext / projectContext.
  */
-export function deriveContext(sel: Selection, repos: ProjectsData, threads: ThreadsData = { byId: {}, order: [] }, focusedShell?: ContextShell): UiContextView {
-  const ctx = deriveSelectionContext(sel, repos, threads);
+export function deriveContext(sel: Selection, projects: ProjectsData, threads: ThreadsData = { byId: {}, order: [] }, focusedShell?: ContextShell): UiContextView {
+  const ctx = deriveSelectionContext(sel, projects, threads);
   if (!focusedShell) return ctx;
   // The keyboard is in a bottom panel shell (focusedBottomShell): terminal commands act on
   // it. On the Projects page, which carries no worktree, the shell's worktree is the
@@ -72,17 +72,17 @@ export function deriveContext(sel: Selection, repos: ProjectsData, threads: Thre
     : { ...ctx, activeTerminalId: focusedShell.id };
 }
 
-function deriveSelectionContext(sel: Selection, repos: ProjectsData, threads: ThreadsData): UiContextView {
+function deriveSelectionContext(sel: Selection, projects: ProjectsData, threads: ThreadsData): UiContextView {
   switch (sel.kind) {
     case "none":
       return emptyContext;
     case "thread": {
       const s = threads.byId[sel.id];
-      const place = s ? placeThread(s, allWorktrees(repos)) : null;
-      // A thread without a project runs in home, which is no worktree: no repo or
+      const place = s ? placeThread(s, allWorktrees(projects)) : null;
+      // A thread without a project runs in home, which is no worktree: no project or
       // worktree in its context, so project-scoped commands (and thread.new without
       // no-project, which would refuse home) are not offered.
-      const home = s !== undefined && isNoProject(s, repos);
+      const home = s !== undefined && isNoProject(s, projects);
       return {
         ...emptyContext,
         activeThreadId: sel.id,
@@ -92,8 +92,8 @@ function deriveSelectionContext(sel: Selection, repos: ProjectsData, threads: Th
         activeWorkspaceId: s?.workspaceId ?? "",
       };
     }
-    // The composer has no worktree yet (it may make one): only the repo, which is
-    // what thread.new needs to be available. A composer without a project has no repo
+    // The composer has no worktree yet (it may make one): only the project, which is
+    // what thread.new needs to be available. A composer without a project has no project
     // either (the daemon offers thread.new in the compose view for it).
     case "compose":
       return { ...emptyContext, activeProjectId: sel.projectId, activeView: "compose", activeWorkspaceId: sel.workspaceId ?? "" };
@@ -121,7 +121,7 @@ export function getUiContext(sel?: Selection): UiContextView {
 
 const SEP = "\u0001";
 
-/** One string per repo: id + worktree paths. Shallow-stable across unrelated updates. */
+/** One string per project: id + worktree paths. Shallow-stable across unrelated updates. */
 export function useProjectStructureKeys(): string[] {
   return useProjectsStore(useShallow((s) => s.order.map((id) => [id, ...(s.byId[id]?.worktrees.map((w) => w.path) ?? [])].join(SEP))));
 }

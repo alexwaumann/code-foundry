@@ -55,7 +55,7 @@ function PanelMemberRow({ workspaceId, member, threadId, onOpen }: RowOptions & 
   };
   return (
     <NavRow navKey={memberKey(workspaceId, member.projectId)} className="group/member flex h-full flex-col justify-center gap-0.5 px-2 text-body" tip={member.path}>
-      <span className="flex min-w-0 items-center gap-1.5" data-testid="workspace-member" data-repo={member.projectId} data-current={at === "current" || undefined}>
+      <span className="flex min-w-0 items-center gap-1.5" data-testid="workspace-member" data-project={member.projectId} data-current={at === "current" || undefined}>
         <FolderGit2 className="size-3.5 shrink-0 text-info/90" aria-hidden />
         <span className="min-w-0 truncate font-medium" data-testid="member-name">
           {name}
@@ -100,7 +100,7 @@ function MemberRow({ workspaceId, member }: { workspaceId: string; member: Membe
   const name = useProjectsStore((s) => s.byId[member.projectId]?.name ?? member.projectId);
   return (
     <NavRow navKey={memberKey(workspaceId, member.projectId)} className="group/member flex h-full items-center gap-2 rounded-md px-2 text-body" tip={member.path}>
-      <span className="flex h-full min-w-0 flex-1 items-center gap-2" data-testid="workspace-member" data-repo={member.projectId}>
+      <span className="flex h-full min-w-0 flex-1 items-center gap-2" data-testid="workspace-member" data-project={member.projectId}>
         <FolderGit2 className="size-3.5 shrink-0 text-info/90" aria-hidden />
         <span className="w-32 shrink-0 truncate font-medium" data-testid="member-name">
           {name}
@@ -125,7 +125,7 @@ function MemberRow({ workspaceId, member }: { workspaceId: string; member: Membe
   );
 }
 
-/** "Add project": the registered projects that are not members yet (workspace.add-repo). */
+/** "Add project": the registered projects that are not members yet (workspace.add-project). */
 function AddMember({ workspaceId }: { workspaceId: string }) {
   const ws = useWorkspacesStore((s) => s.byId[workspaceId]);
   const addable = useProjectsStore(useShallow((s) => addableProjects(ws, s)));

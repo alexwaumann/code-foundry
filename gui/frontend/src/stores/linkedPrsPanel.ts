@@ -10,7 +10,7 @@ import { useThreadsStore } from "./threads";
 import { useUiStore, type Selection } from "./ui";
 
 function stores() {
-  return { repos: useProjectsStore.getState(), threads: useThreadsStore.getState() };
+  return { projects: useProjectsStore.getState(), threads: useThreadsStore.getState() };
 }
 
 /** What the selection is for the surface: a thread with links, a thread without any, or no thread. */

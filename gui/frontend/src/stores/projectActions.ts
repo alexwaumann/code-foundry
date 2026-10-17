@@ -19,13 +19,13 @@ export function newTerminalIn(projectId: string, path: string): Promise<boolean>
   return newWorktreeTerminal(projectId, path);
 }
 
-/** repo.worktree.remove (the daemon asks for confirmation; dirty worktrees are refused without force). */
+/** project.worktree.remove (the daemon asks for confirmation; dirty worktrees are refused without force). */
 export function removeWorktree(projectId: string, path: string): Promise<boolean> {
   return runCommand("project.worktree.remove", {}, worktreeContext(projectId, path));
 }
 
 /**
- * repo.worktree.cleanup for one worktree (confirmed; the daemon fetches, checks again and
+ * project.worktree.cleanup for one worktree (confirmed; the daemon fetches, checks again and
  * removes it without touching its branch). The fetch reports through the gitops toasts,
  * the result ("Removed 1 worktree: …" or why it was kept) as a toast.
  */
@@ -33,48 +33,48 @@ export function cleanupWorktree(projectId: string, path: string): Promise<boolea
   return runCommand("project.worktree.cleanup", { project: projectId, path }, worktreeContext(projectId, path));
 }
 
-/** repo.worktree.cleanup for every merged, clean, unheld worktree of the project (confirmed; the prompt lists the branches). */
+/** project.worktree.cleanup for every merged, clean, unheld worktree of the project (confirmed; the prompt lists the branches). */
 export function cleanupMergedWorktrees(projectId: string): Promise<boolean> {
   return runCommand("project.worktree.cleanup", { project: projectId }, projectContext(projectId));
 }
 
-/** repo.unregister (confirmed). */
+/** project.unregister (confirmed). */
 export function unregisterProject(projectId: string): Promise<boolean> {
   return runCommand("project.unregister", {}, projectContext(projectId));
 }
 
-/** repo.worktree.new on the project: the palette asks for the branch (base and fetch keep their defaults). */
+/** project.worktree.new on the project: the palette asks for the branch (base and fetch keep their defaults). */
 export function newWorktreeIn(projectId: string): void {
   useUiStore.getState().openPalette("", "project.worktree.new", projectContext(projectId));
 }
 
-/** repo.github.publish's presenter for the project: the publish dialog (owner, name, visibility). */
+/** project.github.publish's presenter for the project: the publish dialog (owner, name, visibility). */
 export function publishProject(projectId: string): void {
   openPublishDialog(projectId);
 }
 
-/** repo.git.init: a folder without git becomes a repository with an empty first commit. */
+/** project.git.init: a folder without git becomes a repository with an empty first commit. */
 export function initGitIn(projectId: string): Promise<boolean> {
   return runCommand("project.git.init", { project: projectId }, projectContext(projectId));
 }
 
 /**
  * A project header's Refresh: git.fetch in its main worktree when it has a remote (the
- * gitops toasts report it, a failure included), then repo.refresh for the project, quietly
+ * gitops toasts report it, a failure included), then project.refresh for the project, quietly
  * (its result is the header's freshness). A refresh failure is toasted.
  */
 export async function refreshProject(projectId: string): Promise<void> {
-  const repos = useProjectsStore.getState();
-  const main = mainWorktreePath(repos, projectId);
-  if (main && (repos.byId[projectId]?.remotes.length ?? 0) > 0) {
+  const projects = useProjectsStore.getState();
+  const main = mainWorktreePath(projects, projectId);
+  if (main && (projects.byId[projectId]?.remotes.length ?? 0) > 0) {
     await runCommandForResult("git.fetch", { worktree: main }, { ctx: worktreeContext(projectId, main), quiet: true });
   }
   await runCommandForResult("project.refresh", { project: projectId }, { ctx: projectContext(projectId), quiet: true });
 }
 
 /**
- * repo.add: the Add Project dialog. Opened directly when the daemon does not list
- * repo.add (one older than the dialog): its Local folder tab still works there.
+ * project.add: the Add Project dialog. Opened directly when the daemon does not list
+ * project.add (one older than the dialog): its Local folder tab still works there.
  */
 export function addProject(): void {
   if (!startCommandNamed("project.add")) openAddProject();
@@ -84,12 +84,12 @@ function wsName(workspaceId: string): string {
   return useWorkspacesStore.getState().byId[workspaceId]?.name ?? workspaceId;
 }
 
-/** workspace.add-repo: a worktree on the workspace branch in another project. */
+/** workspace.add-project: a worktree on the workspace branch in another project. */
 export function addToWorkspace(workspaceId: string, projectId: string): Promise<boolean> {
   return runCommand("workspace.add-project", { project: projectRef(useProjectsStore.getState(), projectId), workspace: workspaceId });
 }
 
-/** workspace.remove-repo (confirmed; refused while a thread runs there or with changes). */
+/** workspace.remove-project (confirmed; refused while a thread runs there or with changes). */
 export function removeFromWorkspace(workspaceId: string, projectId: string): Promise<boolean> {
   return runCommand("workspace.remove-project", { project: projectRef(useProjectsStore.getState(), projectId), workspace: workspaceId });
 }

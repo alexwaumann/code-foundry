@@ -3,7 +3,7 @@ import type { ProjectEventView, ProjectView, WorktreeView } from "@/api/project"
 
 export interface ProjectsData {
   byId: Readonly<Record<string, ProjectView>>;
-  /** Repo ids sorted by name. */
+  /** Project ids sorted by name. */
   order: readonly string[];
 }
 
@@ -40,9 +40,9 @@ export function replaceProjects(list: readonly ProjectView[]): ProjectsData {
 export function applyProjectEvent(prev: ProjectsData, ev: ProjectEventView): ProjectsData {
   switch (ev.kind) {
     case "snapshot":
-      return replaceProjects(ev.repos);
+      return replaceProjects(ev.projects);
     case "projectUpdated": {
-      const byId = { ...prev.byId, [ev.repo.id]: normalizeProject(ev.repo) };
+      const byId = { ...prev.byId, [ev.project.id]: normalizeProject(ev.project) };
       return { byId, order: sortedOrder(byId) };
     }
     case "projectRemoved": {
@@ -52,17 +52,17 @@ export function applyProjectEvent(prev: ProjectsData, ev: ProjectEventView): Pro
     }
     case "worktreeUpdated": {
       const w = ev.worktree;
-      const repo = prev.byId[w.projectId];
-      if (!repo) return prev; // the repo event will carry it
-      const rest = repo.worktrees.filter((x) => x.path !== w.path);
-      const next = { ...repo, worktrees: sortWorktrees([...rest, w]) };
-      return { byId: { ...prev.byId, [repo.id]: next }, order: prev.order };
+      const project = prev.byId[w.projectId];
+      if (!project) return prev; // the project event will carry it
+      const rest = project.worktrees.filter((x) => x.path !== w.path);
+      const next = { ...project, worktrees: sortWorktrees([...rest, w]) };
+      return { byId: { ...prev.byId, [project.id]: next }, order: prev.order };
     }
     case "worktreeRemoved": {
-      const repo = prev.byId[ev.projectId];
-      if (!repo?.worktrees.some((x) => x.path === ev.path)) return prev;
-      const next = { ...repo, worktrees: repo.worktrees.filter((x) => x.path !== ev.path) };
-      return { byId: { ...prev.byId, [repo.id]: next }, order: prev.order };
+      const project = prev.byId[ev.projectId];
+      if (!project?.worktrees.some((x) => x.path === ev.path)) return prev;
+      const next = { ...project, worktrees: project.worktrees.filter((x) => x.path !== ev.path) };
+      return { byId: { ...prev.byId, [project.id]: next }, order: prev.order };
     }
     case "worktreeDetailUpdated":
       return prev;
@@ -81,6 +81,6 @@ export function findWorktree(data: ProjectsData, projectId: string, path: string
 
 /** A project's main worktree path (its checkout for a project without git); "" for an unknown project. */
 export function mainWorktreePath(data: ProjectsData, projectId: string): string {
-  const repo = data.byId[projectId];
-  return repo?.worktrees.find((w) => w.isMain)?.path ?? repo?.path ?? "";
+  const project = data.byId[projectId];
+  return project?.worktrees.find((w) => w.isMain)?.path ?? project?.path ?? "";
 }

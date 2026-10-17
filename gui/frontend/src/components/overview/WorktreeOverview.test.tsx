@@ -42,10 +42,10 @@ const status = (o: Partial<GitStatusView> = {}): GitStatusView => ({
   ...o,
 });
 
-function world(st: GitStatusView, branch = "cf/feat", repo: Partial<ProjectView> = {}): void {
+function world(st: GitStatusView, branch = "cf/feat", project: Partial<ProjectView> = {}): void {
   const wt: WorktreeView = { projectId: "web", path: P, branch, head: "abcdef1234", detached: branch === "", isMain: false, status: st };
   useProjectsStore.setState({
-    byId: { web: { id: "web", path: "/src/web", name: "web", defaultBranch: "main", githubSlug: "o/web", remotes: ["origin"], git: true, worktrees: [wt], ...repo } },
+    byId: { web: { id: "web", path: "/src/web", name: "web", defaultBranch: "main", githubSlug: "o/web", remotes: ["origin"], git: true, worktrees: [wt], ...project } },
     order: ["web"],
   });
 }

@@ -18,7 +18,7 @@ import { useWorkspacesStore } from "./workspaces";
  */
 export function openWorkspaceSurface(sel: Selection = useUiStore.getState().selection): string | null {
   const key = keyOf(sel);
-  const thread = selectionWorkspaceThread(sel, { repos: useProjectsStore.getState(), threads: useThreadsStore.getState() });
+  const thread = selectionWorkspaceThread(sel, { projects: useProjectsStore.getState(), threads: useThreadsStore.getState() });
   if (key === null || thread === null) return null;
   const name = useWorkspacesStore.getState().byId[thread.workspaceId]?.name ?? "";
   return openSurface(key, workspaceTab(thread.workspaceId, name)) ? key : null;

@@ -144,7 +144,7 @@ interface UiState {
   archivedCollapsed: boolean;
   /** The sidebar's Snoozed section is collapsed (its threads hidden; the header counts them). Collapsed by default. */
   snoozedCollapsed: boolean;
-  /** Projects page: repo ids whose worktree rows are hidden (the header counts them). */
+  /** Projects page: project ids whose worktree rows are hidden (the header counts them). */
   collapsedProjects: string[];
   /** Projects page: workspace ids whose member rows are hidden. */
   collapsedWorkspaces: string[];
@@ -375,7 +375,7 @@ export const useUiStore = create<UiState>()(
     {
       name: "code-foundry.ui",
       // 2: the global panelWidth moved to per-panel widths in the panel store; drop it.
-      // 3: the sidebar is a flat thread list (no collapsible repos or worktrees); drop collapsed.
+      // 3: the sidebar is a flat thread list (no collapsible projects or worktrees); drop collapsed.
       version: 3,
       migrate: (persisted) => {
         const { panelWidth: _old, collapsed: _gone, ...rest } = (persisted ?? {}) as Record<string, unknown>;

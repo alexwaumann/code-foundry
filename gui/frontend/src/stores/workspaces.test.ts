@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { WorkspaceView } from "@/api/workspace";
 import { applyWorkspaceEvent, emptyWorkspaces, replaceWorkspaces } from "./workspaces";
 
-function ws(id: string, name: string, repos: string[] = ["web"]): WorkspaceView {
-  return { id, name, branch: `cf/${name}`, members: repos.map((r) => ({ projectId: r, worktreePath: `/wt/${r}/cf-${name}` })), createdAtMs: null };
+function ws(id: string, name: string, projects: string[] = ["web"]): WorkspaceView {
+  return { id, name, branch: `cf/${name}`, members: projects.map((r) => ({ projectId: r, worktreePath: `/wt/${r}/cf-${name}` })), createdAtMs: null };
 }
 
 describe("workspaces slice", () => {

@@ -93,7 +93,7 @@ describe("terminal mapping", () => {
   });
 });
 
-describe("repo mapping", () => {
+describe("project mapping", () => {
   it("defaults a missing git status to clean", () => {
     const r = toProjectView(create(ProjectSchema, { id: "r", name: "app", worktrees: [{ projectId: "r", path: "/a", isMain: true }] }));
     expect(r.worktrees[0]?.status).toMatchObject({ dirty: false, ahead: 0, refreshedAtMs: null });
@@ -332,7 +332,7 @@ describe("gh mapping", () => {
 
 describe("events mapping", () => {
   it.each([
-    [{ case: "project" as const, value: create(ProjectEventSchema, { event: { case: "snapshot", value: { projects: [] } } }) }, { source: "repo", event: { kind: "snapshot", repos: [] } }],
+    [{ case: "project" as const, value: create(ProjectEventSchema, { event: { case: "snapshot", value: { projects: [] } } }) }, { source: "project", event: { kind: "snapshot", projects: [] } }],
     [{ case: "terminal" as const, value: create(TerminalEventSchema, { event: { case: "removedId", value: "t1" } }) }, { source: "terminal", event: { kind: "removed", id: "t1" } }],
     [{ case: "threadList" as const, value: create(ThreadListEventSchema, { event: { case: "removedId", value: "s1" } }) }, { source: "threadList", event: { kind: "removed", id: "s1" } }],
     [{ case: "gh" as const, value: create(GhEventSchema, { event: { case: "polled", value: { fetchedAt: timestampFromMs(5000), lastError: "boom" } } }) }, { source: "gh", event: { kind: "polled", fetchedAtMs: 5000, lastError: "boom" } }],

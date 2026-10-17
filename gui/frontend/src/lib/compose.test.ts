@@ -135,17 +135,17 @@ describe("workspaces", () => {
       { projectId: "api", worktreePath: "/wt/api/cf-login" },
     ],
   };
-  const repos = new Set(["web", "api", "lib"]);
+  const projects = new Set(["web", "api", "lib"]);
   const env: PlaceEnv = {
     workspace: login,
-    isGitProject: (id) => repos.has(id),
+    isGitProject: (id) => projects.has(id),
     hasWorktree: (projectId, path) => projectId === "web" && path === "/src/web-fix",
     defaultRef: "origin/main",
   };
   const project: PlaceInput = { target: { kind: "project", projectId: "web" }, worktree: { kind: "new" }, base: null, alsoIn: [], primary: null };
   const workspace: PlaceInput = { target: { kind: "workspace", workspaceId: "w-1" }, worktree: { kind: "members" }, base: null, alsoIn: [], primary: null };
 
-  it("draft keys keep projects as repo ids and prefix workspaces", () => {
+  it("draft keys keep projects as project ids and prefix workspaces", () => {
     expect(draftKey({ kind: "project", projectId: "web" })).toBe("web");
     expect(draftKey({ kind: "workspace", workspaceId: "w-1" })).toBe("ws:w-1");
     expect(isWorkspaceKey("ws:w-1")).toBe(true);
@@ -155,7 +155,7 @@ describe("workspaces", () => {
   it("no project has its own draft key, no member and no primary", () => {
     expect(draftKey({ kind: "home" })).toBe(HOME_KEY);
     expect(isWorkspaceKey(HOME_KEY)).toBe(false);
-    expect(draftMembers({ target: { kind: "home" }, alsoIn: ["web"], primary: "web" }, login, (id) => repos.has(id))).toEqual({ projectIds: [], primary: "" });
+    expect(draftMembers({ target: { kind: "home" }, alsoIn: ["web"], primary: "web" }, login, (id) => projects.has(id))).toEqual({ projectIds: [], primary: "" });
   });
 
   it.each<[string, PlaceInput, string[], string]>([
@@ -167,7 +167,7 @@ describe("workspaces", () => {
     ["a workspace primary", { ...workspace, primary: "api" }, ["web", "api"], "api"],
     ["a workspace ignores Also in", { ...workspace, alsoIn: ["lib"] }, ["web", "api"], "web"],
   ])("draftMembers: %s", (_name, d, projectIds, primary) => {
-    expect(draftMembers(d, login, (id) => repos.has(id))).toEqual({ projectIds, primary });
+    expect(draftMembers(d, login, (id) => projects.has(id))).toEqual({ projectIds, primary });
   });
 
   it.each<[string, PlaceInput, Partial<PlaceEnv>, ThreadPlace | null]>([

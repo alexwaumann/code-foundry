@@ -64,7 +64,7 @@ test("every entry point opens the dialog", async ({ page }) => {
   await page.keyboard.press("Escape");
   await expect(dialog(page)).toHaveCount(0);
 
-  // project.clone in the palette opens it on GitHub instead of prompting for a repo.
+  // project.clone in the palette opens it on GitHub instead of prompting for a project.
   await openFromPalette(page, "project.clone");
   await expect(dialog(page)).toHaveAttribute("data-tab", "github");
   await expect(page.getByTestId("add-project-github-input")).toBeFocused();
@@ -94,12 +94,12 @@ test("every entry point opens the dialog", async ({ page }) => {
   await expect(dialog(page)).toHaveCount(0);
 
   // None of them invoked anything: the dialog is the GUI presentation of project.add.
-  expect((await invocations()).filter((i) => i.name.startsWith("repo."))).toEqual([]);
+  expect((await invocations()).filter((i) => i.name.startsWith("project."))).toEqual([]);
 });
 
 test("the project picker's empty state opens the dialog", async ({ page }) => {
-  const { projects: repos } = (await rpc("ProjectService/List", {})) as { projects: { id: string }[] };
-  for (const r of repos) {
+  const { projects: projects } = (await rpc("ProjectService/List", {})) as { projects: { id: string }[] };
+  for (const r of projects) {
     await rpc("CommandService/Invoke", { name: "project.unregister", context: { activeProjectId: r.id }, confirmed: true });
   }
   await openApp(page);
@@ -150,7 +150,7 @@ test("Local folder: Tab completes, Enter adds, and the new project opens", async
   await expect(dialog(page)).toHaveCount(0);
   // ProjectService.Register, not a command: "~" expanded, the trailing slash dropped.
   expect(await projectAt("/Users/dev/src/new-app")).toMatchObject({ name: "new-app", git: true });
-  expect((await invocations()).filter((i) => i.name.startsWith("repo."))).toEqual([]);
+  expect((await invocations()).filter((i) => i.name.startsWith("project."))).toEqual([]);
   await expect(page.getByTestId("worktree-surface-title")).toHaveText("new-app@main");
 });
 

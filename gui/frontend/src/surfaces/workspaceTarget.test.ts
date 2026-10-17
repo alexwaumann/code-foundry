@@ -20,7 +20,7 @@ function thread(id: string, o: Partial<ThreadView> = {}): ThreadView {
   return { id, projectId: "web", worktreePath: WEB, workspaceId: "", pendingWorktreePath: "", state: "connected", archivedAtMs: null, createdAtMs: 1, lastActivityAtMs: null, ...o } as ThreadView;
 }
 
-const repos: ProjectsData = {
+const projects: ProjectsData = {
   byId: {
     web: { id: "web", name: "web", worktrees: [{ path: WEB }] } as unknown as ProjectView,
     api: { id: "api", name: "api", worktrees: [{ path: API }] } as unknown as ProjectView,
@@ -33,7 +33,7 @@ function threads(...list: ThreadView[]): ThreadsData {
 }
 
 describe("selectionWorkspaceThread (the surface's availability)", () => {
-  const s = { repos, threads: threads(thread("s-ws", { workspaceId: "w1" }), thread("s-proj")) };
+  const s = { projects, threads: threads(thread("s-ws", { workspaceId: "w1" }), thread("s-proj")) };
   it.each<[string, Selection, { threadId: string; workspaceId: string } | null]>([
     ["a workspace thread", { kind: "thread", id: "s-ws" }, { threadId: "s-ws", workspaceId: "w1" }],
     ["a project thread", { kind: "thread", id: "s-proj" }, null],
@@ -55,13 +55,13 @@ describe("tabs", () => {
     expect(workspaceOfTab({ params: {} })).toBeNull();
   });
 
-  it("a member tab is keyed by repo and path, so each member is its own tab", () => {
+  it("a member tab is keyed by project and path, so each member is its own tab", () => {
     const t = memberTab("api", API, "api");
     expect(t.kind).toBe("worktree");
-    expect(t.id).toBe(`worktree?path=${encodeURIComponent(API)}&repo=api`);
+    expect(t.id).toBe(`worktree?path=${encodeURIComponent(API)}&project=api`);
     expect(memberOfTab(t)).toEqual({ projectId: "api", path: API });
     expect(memberTab("web", WEB, "web").id).not.toBe(t.id);
-    expect(memberOfTab({ params: { repo: "api" } })).toBeNull();
+    expect(memberOfTab({ params: { project: "api" } })).toBeNull();
   });
 });
 

@@ -14,7 +14,7 @@ import { usePublishOwners, type PublishChoice } from "./usePublishOwners";
 
 /**
  * The body of the publish dialog for one project: owner, GitHub name (the project's by
- * default) and visibility, then repo.github.publish. A refusal shows gh's error under the
+ * default) and visibility, then project.github.publish. A refusal shows gh's error under the
  * picker and keeps everything as it was, so another choice can be tried.
  */
 function PublishBody({ projectId }: { projectId: string }) {
@@ -102,7 +102,7 @@ function PublishBody({ projectId }: { projectId: string }) {
   );
 }
 
-/** Publish to GitHub (repo.github.publish's presenter, and the overview's button). */
+/** Publish to GitHub (project.github.publish's presenter, and the overview's button). */
 export function PublishDialog() {
   const open = usePublishDialogStore((s) => s.open);
   const projectId = usePublishDialogStore((s) => s.projectId);
@@ -115,7 +115,7 @@ export function PublishDialog() {
         if (!o) closePublishDialog();
       }}
     >
-      <DialogContent className="max-w-lg p-4" data-testid="publish-dialog" data-repo={projectId}>
+      <DialogContent className="max-w-lg p-4" data-testid="publish-dialog" data-project={projectId}>
         <DialogTitle>Publish {project} to GitHub</DialogTitle>
         <DialogDescription className="sr-only">Pick the owner and visibility of the new GitHub repository.</DialogDescription>
         {open && <PublishBody key={seq} projectId={projectId} />}

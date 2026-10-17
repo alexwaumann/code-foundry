@@ -2,7 +2,7 @@
  * The Projects page's view models: every project (registered repository) with its own
  * worktrees, and every workspace with its members. A workspace's member worktrees are
  * listed under the workspace only, never under their project (one change stays in one
- * place). Pure; inputs are the repos and workspaces slices' shapes.
+ * place). Pure; inputs are the projects and workspaces slices' shapes.
  */
 import { isRemoteless, type ProjectView, type WorktreeView } from "@/api/project";
 import type { ThreadView } from "@/api/threads";
@@ -25,7 +25,7 @@ export interface ProjectsWorkspaces {
 
 export interface ProjectModel {
   projectId: string;
-  /** Its worktrees that belong to no workspace, main first (the repos slice's order). */
+  /** Its worktrees that belong to no workspace, main first (the projects slice's order). */
   worktrees: string[];
   /** How many of its worktrees are workspace members (listed under their workspaces). */
   inWorkspaces: number;
@@ -43,11 +43,11 @@ export function memberPaths(workspaces: ProjectsWorkspaces): Set<string> {
   return out;
 }
 
-export function projectsModel(repos: ProjectsSlice, workspaces: ProjectsWorkspaces): ProjectsModel {
+export function projectsModel(projects: ProjectsSlice, workspaces: ProjectsWorkspaces): ProjectsModel {
   const members = memberPaths(workspaces);
   return {
-    projects: repos.order.flatMap((id) => {
-      const r = repos.byId[id];
+    projects: projects.order.flatMap((id) => {
+      const r = projects.byId[id];
       if (!r) return [];
       const own = r.worktrees.filter((w) => !members.has(w.path)).map((w) => w.path);
       return [{ projectId: id, worktrees: own, inWorkspaces: r.worktrees.length - own.length }];
@@ -61,10 +61,10 @@ export function projectsModel(repos: ProjectsSlice, workspaces: ProjectsWorkspac
  * the workspace branch; a repository without a remote is fine), and not yet members, by
  * name.
  */
-export function addableProjects(ws: Pick<WorkspaceView, "members"> | undefined, repos: ProjectsSlice): string[] {
+export function addableProjects(ws: Pick<WorkspaceView, "members"> | undefined, projects: ProjectsSlice): string[] {
   const inWs = new Set(ws?.members.map((m) => m.projectId) ?? []);
-  return repos.order.filter((id) => {
-    const r = repos.byId[id];
+  return projects.order.filter((id) => {
+    const r = projects.byId[id];
     return !inWs.has(id) && r !== undefined && r.git !== false;
   });
 }
@@ -73,11 +73,11 @@ export function addableProjects(ws: Pick<WorkspaceView, "members"> | undefined, 
  * How a command names a repository: its name when no other registered repository has it
  * (confirm prompts read better), else its id. The daemon resolves both.
  */
-export function projectRef(repos: ProjectsSlice, projectId: string): string {
-  const name = repos.byId[projectId]?.name;
+export function projectRef(projects: ProjectsSlice, projectId: string): string {
+  const name = projects.byId[projectId]?.name;
   if (!name) return projectId;
   let n = 0;
-  for (const id of repos.order) if (repos.byId[id]?.name === name) n++;
+  for (const id of projects.order) if (projects.byId[id]?.name === name) n++;
   return n === 1 ? name : projectId;
 }
 
@@ -170,7 +170,7 @@ export function projectKind(r: Pick<ProjectView, "githubSlug" | "remotes"> & { g
 
 /** What the page's filter matches against, per project and per workspace (only built while filtering). */
 export interface ProjectsSearch {
-  repos: Readonly<Record<string, { name: string; githubSlug: string; branches: Readonly<Record<string, string>> } | undefined>>;
+  projects: Readonly<Record<string, { name: string; githubSlug: string; branches: Readonly<Record<string, string>> } | undefined>>;
   workspaces: Readonly<Record<string, { name: string; branch: string } | undefined>>;
 }
 
@@ -186,7 +186,7 @@ export function filterProjects(model: ProjectsModel, query: string, search: Proj
   const hit = (s: string | undefined) => s !== undefined && s.toLowerCase().includes(q);
   return {
     projects: model.projects.flatMap((p) => {
-      const r = search.repos[p.projectId];
+      const r = search.projects[p.projectId];
       if (hit(r?.name) || hit(r?.githubSlug)) return [p];
       const worktrees = p.worktrees.filter((path) => hit(r?.branches[path]) || hit(tildify(path)));
       return worktrees.length > 0 ? [{ ...p, worktrees, inWorkspaces: 0 }] : [];
@@ -269,7 +269,7 @@ export function memberHolds(workspaces: ProjectsWorkspaces, path: string): boole
 }
 
 /**
- * Whether repo.worktree.cleanup would remove the worktree now: the daemon's git verdict
+ * Whether project.worktree.cleanup would remove the worktree now: the daemon's git verdict
  * (mergedClean) and nothing holds it, as the daemon's cleanupHold checks (a thread on it,
  * a terminal that has not exited, a workspace). The daemon checks again after a fetch.
  */

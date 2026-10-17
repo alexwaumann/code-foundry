@@ -61,8 +61,8 @@ describe("a Projects-page shell in the command context", () => {
   });
 
   const cases: [string, string, Partial<ReturnType<typeof getUiContext>>][] = [
-    ["its repo and worktree become the context (terminal.new starts beside it)", "p", { activeTerminalId: "p", activeProjectId: "r1", activeWorktreePath: "/src/app.worktrees/x", activeView: "projects" }],
-    ["without a repo label: the terminal only", "q", { activeTerminalId: "q", activeProjectId: "", activeWorktreePath: "", activeView: "projects" }],
+    ["its project and worktree become the context (terminal.new starts beside it)", "p", { activeTerminalId: "p", activeProjectId: "r1", activeWorktreePath: "/src/app.worktrees/x", activeView: "projects" }],
+    ["without a project label: the terminal only", "q", { activeTerminalId: "q", activeProjectId: "", activeWorktreePath: "", activeView: "projects" }],
   ];
   it.each(cases)("%s", (_name, active, want) => {
     useBottomStore.setState({ byKey: { "view:projects": { open: true, activeTerminalId: active } }, pendingFocus: null, pendingFocusId: null });

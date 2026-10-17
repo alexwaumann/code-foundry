@@ -126,7 +126,7 @@ describe("listSkills and searchFiles requests", () => {
   });
 
   it("other errors pass through", async () => {
-    const err = new ConnectError("repo zz not found", Code.NotFound);
+    const err = new ConnectError("project zz not found", Code.NotFound);
     const { conn } = fakeConn(undefined, err);
     await expect(searchFiles({ projectId: "zz", query: "" }, conn)).rejects.toBe(err);
   });

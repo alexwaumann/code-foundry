@@ -13,7 +13,7 @@ import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
 
-/** cmdk value of the empty state's row (repo.add). */
+/** cmdk value of the empty state's row (project.add). */
 const ADD_PROJECT_VALUE = "__add-project";
 
 /** The row to highlight first: the active thread's workspace, else the active project. */
@@ -94,7 +94,7 @@ export function ProjectPicker({ close }: { close: () => void }) {
       <CommandList>
         <CommandEmpty>{!loaded ? "Loading projects…" : "No matching projects."}</CommandEmpty>
         {loaded && order.length === 0 && (
-          // The empty state's way forward: the Add Project dialog (repo.add).
+          // The empty state's way forward: the Add Project dialog (project.add).
           <CommandGroup heading="No projects yet">
             <CommandItem
               forceMount
@@ -121,7 +121,7 @@ export function ProjectPicker({ close }: { close: () => void }) {
           onPickNoProject={loaded ? pickNoProject : undefined}
         />
         {loaded && order.length > 0 && (
-          // The way to a project that is not listed yet: the Add Project dialog (repo.add),
+          // The way to a project that is not listed yet: the Add Project dialog (project.add),
           // last, under a border. Always shown, so a search that finds nothing still offers it.
           <CommandGroup forceMount className="border-t">
             <CommandItem

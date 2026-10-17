@@ -73,19 +73,19 @@ export interface ProjectView {
 
 /**
  * A git repository with no remote (not one without git): offers Publish to GitHub.
- * Shown only once the repo has been reconciled (it has a worktree).
+ * Shown only once the project has been reconciled (it has a worktree).
  */
 export function isRemoteless(r: Pick<ProjectView, "git" | "remotes" | "worktrees">): boolean {
   return r.git && r.remotes.length === 0 && r.worktrees.length > 0;
 }
 
 export type ProjectEventView =
-  | { kind: "snapshot"; repos: ProjectView[] }
-  | { kind: "projectUpdated"; repo: ProjectView }
+  | { kind: "snapshot"; projects: ProjectView[] }
+  | { kind: "projectUpdated"; project: ProjectView }
   | { kind: "projectRemoved"; id: string }
   | { kind: "worktreeUpdated"; worktree: WorktreeView }
   | { kind: "worktreeRemoved"; projectId: string; path: string }
-  /** The worktree's detail changed (see api/worktreeDetail.ts); repo state is unchanged. */
+  /** The worktree's detail changed (see api/worktreeDetail.ts); project state is unchanged. */
   | { kind: "worktreeDetailUpdated"; projectId: string; path: string };
 
 const cleanStatus: GitStatusView = {
@@ -150,9 +150,9 @@ export function toProjectEventView(ev: ProjectEvent): ProjectEventView | null {
   const e = ev.event;
   switch (e.case) {
     case "snapshot":
-      return { kind: "snapshot", repos: e.value.projects.map(toProjectView) };
+      return { kind: "snapshot", projects: e.value.projects.map(toProjectView) };
     case "projectUpdated":
-      return { kind: "projectUpdated", repo: toProjectView(e.value) };
+      return { kind: "projectUpdated", project: toProjectView(e.value) };
     case "projectRemovedId":
       return { kind: "projectRemoved", id: e.value };
     case "worktreeUpdated":

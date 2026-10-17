@@ -42,8 +42,8 @@ export async function listProjects(): Promise<{ id: string; path: string; name: 
     body: "{}",
   });
   expect(res.ok).toBe(true);
-  const { projects: repos = [] } = (await res.json()) as { projects?: { id: string; path: string; name: string; git?: boolean }[] };
-  return repos.map((r) => ({ id: r.id, path: r.path, name: r.name, git: r.git ?? false }));
+  const { projects: projects = [] } = (await res.json()) as { projects?: { id: string; path: string; name: string; git?: boolean }[] };
+  return projects.map((r) => ({ id: r.id, path: r.path, name: r.name, git: r.git ?? false }));
 }
 
 /** The registered project at path, or undefined. */
@@ -135,7 +135,7 @@ export async function selectWorktree(page: Page, projectId: string, path: string
 export async function selectProject(page: Page, projectId: string): Promise<void> {
   await openProjects(page);
   await page.locator(`[data-nav-key="p:${projectId}"]`).dblclick();
-  await expect(page.getByTestId("worktree-surface")).toHaveAttribute("data-repo", projectId);
+  await expect(page.getByTestId("worktree-surface")).toHaveAttribute("data-project", projectId);
 }
 
 export function row(page: Page, key: string) {

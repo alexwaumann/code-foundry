@@ -7,8 +7,8 @@ import { invocations, mockPost, mockUrl, openApp, resetMock } from "./fixtures";
 
 const FILES = ["internal/api/thread.go", "gui/frontend/src/api/threads.ts", "internal/store/thread/fork.go", "README.md"];
 
-async function setFiles(repo: string, files: readonly string[]): Promise<void> {
-  await mockPost(`files?repo=${repo}&${files.map((f) => `path=${encodeURIComponent(f)}`).join("&")}`);
+async function setFiles(project: string, files: readonly string[]): Promise<void> {
+  await mockPost(`files?project=${project}&${files.map((f) => `path=${encodeURIComponent(f)}`).join("&")}`);
 }
 
 test.beforeEach(async () => {

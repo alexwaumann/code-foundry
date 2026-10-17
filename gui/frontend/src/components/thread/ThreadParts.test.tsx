@@ -16,7 +16,7 @@ const thread = (o: Partial<ThreadView>) =>
   ({ id: "s-1", name: "Fix the stale PR badge", projectId: "cf", worktreePath: "/src/cf.worktrees/pr-badge", workspaceId: "", pendingWorktreePath: "", state: "connected", status: "idle", model: "opus", effort: "high", linkedPullRequests: [], ...o }) as ThreadView;
 
 type Worktree = { path: string; branch: string; head: string; isMain?: boolean };
-function repo(name: string, worktrees: Worktree[], git = true) {
+function project(name: string, worktrees: Worktree[], git = true) {
   return { id: name, name, git, worktrees } as unknown as ReturnType<typeof useProjectsStore.getState>["byId"][string];
 }
 
@@ -24,11 +24,11 @@ beforeEach(() => {
   useCommandsStore.setState({ commands: [cmd("thread.rename"), cmd("view.panel.worktree")] });
   useProjectsStore.setState({
     byId: {
-      cf: repo("code-foundry", [
+      cf: project("code-foundry", [
         { path: "/src/cf", branch: "main", head: "abc", isMain: true },
         { path: "/src/cf.worktrees/pr-badge", branch: "cf/pr-badge-stale", head: "def", isMain: false },
       ]),
-      notes: repo("scratch notes", [{ path: "/src/notes", branch: "", head: "", isMain: true }], false),
+      notes: project("scratch notes", [{ path: "/src/notes", branch: "", head: "", isMain: true }], false),
     },
     order: ["cf", "notes"],
   });

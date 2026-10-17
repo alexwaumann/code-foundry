@@ -2,7 +2,7 @@
  * Live e2e: the flat thread sidebar, the Projects page and "Run in…" against a REAL
  * daemon and real Claude Code (docs/notes/workspaces-4-sidebar.md). Opt-in
  * (LIVE_DAEMON=1), run with playwright.live.config.ts, which starts nothing: bring up an
- * isolated daemon (CODE_FOUNDRY_HOME) with two registered repos and one workspace over
+ * isolated daemon (CODE_FOUNDRY_HOME) with two registered projects and one workspace over
  * both (LIVE_WORKSPACE, its name), and the Vite dev server pointed at it (recipe in
  * docs/notes/phase2-integration.md).
  *
@@ -68,7 +68,7 @@ test("flat sidebar, Projects page and Run in… with real threads", async ({ pag
       await expect(wsRow.getByTestId("row-project")).toHaveText(first.projectName);
       await expect(projRow.getByTestId("row-workspace")).toHaveCount(0);
       await expect(projRow.getByTestId("row-project")).toHaveText(second.projectName);
-      await expect(list.locator('[data-row-kind="repo"], [data-row-kind="worktree"]')).toHaveCount(0);
+      await expect(list.locator('[data-row-kind="project"], [data-row-kind="worktree"]')).toHaveCount(0);
       // Both turns end (the unwatched ones then wait under Needs attention, "finished").
       await expect.poll(() => threadInfo(wsThread)?.status, { timeout: 120_000 }).toMatch(/IDLE|NEEDS_ATTENTION/);
       await expect.poll(() => threadInfo(projThread)?.status, { timeout: 120_000 }).toMatch(/IDLE|NEEDS_ATTENTION/);

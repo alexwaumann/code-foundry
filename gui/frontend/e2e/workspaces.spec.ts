@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { invocations, mockPost, mockUrl, openApp, resetMock } from "./fixtures";
 
-/** Where the mock (like the daemon) puts a repo's worktree for a cf/<name> branch. */
+/** Where the mock (like the daemon) puts a project's worktree for a cf/<name> branch. */
 const WT = "/Users/dev/.code-foundry/worktrees/alexwaumann";
 const GP_LOGIN = `${WT}/ghostty-playground/cf-login`;
 
@@ -33,7 +33,7 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-/** The member chips: repo id, primary flag and visible text, in order. */
+/** The member chips: project id, primary flag and visible text, in order. */
 function chips(page: Page) {
   return page.getByTestId("composer-member");
 }
@@ -44,7 +44,7 @@ async function lastNewThread(): Promise<Record<string, string>> {
 }
 
 test("pick a workspace: member chips, the primary is changeable, the thread is the workspace's", async ({ page }) => {
-  await mockPost("workspace?name=login&repos=repo-cf,repo-gp");
+  await mockPost("workspace?name=login&projects=repo-cf,repo-gp");
   await openApp(page);
   await page.keyboard.press("Meta+n");
   const palette = page.getByTestId("palette");
@@ -65,7 +65,7 @@ test("pick a workspace: member chips, the primary is changeable, the thread is t
   await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in login?");
   await expect(page.getByTestId("composer-input")).toBeFocused();
   await expect(chips(page)).toHaveCount(2);
-  await expect(chips(page).nth(0)).toHaveAttribute("data-repo", "repo-cf");
+  await expect(chips(page).nth(0)).toHaveAttribute("data-project", "repo-cf");
   await expect(chips(page).nth(0)).toHaveAttribute("data-primary", "true");
   await expect(chips(page).nth(0)).toContainText("code-foundry");
   await expect(chips(page).nth(0)).toContainText("cf/login");
@@ -108,7 +108,7 @@ test("pick a workspace: member chips, the primary is changeable, the thread is t
 });
 
 test("a workspace in new-worktree mode makes a new workspace with the same projects", async ({ page }) => {
-  await mockPost("workspace?name=login&repos=repo-cf,repo-gp");
+  await mockPost("workspace?name=login&projects=repo-cf,repo-gp");
   await openApp(page);
   await page.keyboard.press("Meta+n");
   await page.getByTestId("palette").locator('[data-workspace="w-000000000001"]').click();
@@ -222,7 +222,7 @@ test("pick a project, add Also in: a new workspace with a cf/<slug> worktree in 
 });
 
 test("with workspaces around, a single-project thread sends exactly what it did before", async ({ page }) => {
-  await mockPost("workspace?name=login&repos=repo-cf,repo-gp");
+  await mockPost("workspace?name=login&projects=repo-cf,repo-gp");
   await openApp(page);
   await page.keyboard.press("Meta+n");
   await page.keyboard.press("Meta+3"); // projects keep cmd+1..9: ghostty-playground
@@ -248,7 +248,7 @@ test("with workspaces around, a single-project thread sends exactly what it did 
 });
 
 test("a workspace removed while its composer is open says so", async ({ page }) => {
-  await mockPost("workspace?name=login&repos=repo-cf,repo-gp");
+  await mockPost("workspace?name=login&projects=repo-cf,repo-gp");
   await openApp(page);
   await page.keyboard.press("Meta+n");
   await page.keyboard.press("Enter");

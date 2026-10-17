@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { CF, DEFAULT_ORDER, expectTooltip, holdThreads, invocations, mockPost, mockUrl, openApp, openProjects, resetMock, row } from "./fixtures";
 
-/** Where the mock (like the daemon) puts a repo's worktree for a cf/<name> branch. */
+/** Where the mock (like the daemon) puts a project's worktree for a cf/<name> branch. */
 const WT = "/Users/dev/.code-foundry/worktrees/alexwaumann";
 const CF_LOGIN = `${WT}/code-foundry/cf-login`;
 const GP_LOGIN = `${WT}/ghostty-playground/cf-login`;
@@ -23,8 +23,8 @@ async function thread(id: string): Promise<ThreadSummary | undefined> {
 
 /** A workspace "login" over code-foundry and ghostty-playground with a thread "driver" in the ghostty-playground member. */
 async function workspaceWithThread(): Promise<string> {
-  await mockPost("workspace?name=login&repos=repo-cf,repo-gp");
-  const s = (await mockPost("workspace-thread?workspace=login&repo=repo-gp&name=driver")) as { id: string };
+  await mockPost("workspace?name=login&projects=repo-cf,repo-gp");
+  const s = (await mockPost("workspace-thread?workspace=login&project=repo-gp&name=driver")) as { id: string };
   return s.id;
 }
 
@@ -92,7 +92,7 @@ test("Notifications: the count over the bell jumps to the waiting thread; with n
   await expect(page.getByTestId("projects-page")).toBeVisible();
 });
 
-test("the sidebar is a flat thread list: waiting threads on top, working ones under Working, workspace badges, no repo or worktree rows", async ({ page }) => {
+test("the sidebar is a flat thread list: waiting threads on top, working ones under Working, workspace badges, no project or worktree rows", async ({ page }) => {
   const driver = await workspaceWithThread();
   await openApp(page);
   await expect(row(page, `s:${driver}`)).toBeVisible();
@@ -218,7 +218,7 @@ test("the Projects page lists projects with their own worktrees and workspaces w
   await expect(page.getByTestId("project-name")).toHaveText(["code-foundry", "dotfiles", "ghostty-playground", "sketches", "writing"]);
 
   // code-foundry's own worktrees; its cf/login worktree is listed under the workspace only.
-  const cf = page.locator('[data-testid="project"][data-repo="repo-cf"]');
+  const cf = page.locator('[data-testid="project"][data-project="repo-cf"]');
   await expect(cf.getByTestId("worktree-branch")).toHaveText(["main", "feat/sidebar", "fix/resize"]);
   await expect(cf.getByTestId("project-in-workspaces")).toHaveText("1 worktree is in workspaces (below)");
   const feat = cf.locator(`[data-path="${CF}.worktrees/feat-sidebar"]`);
@@ -275,7 +275,7 @@ test("the Projects page lists projects with their own worktrees and workspaces w
 });
 
 test("the Projects page removes a workspace and offers project actions", async ({ page }) => {
-  await mockPost("workspace?name=spare&repos=repo-gp,repo-sk");
+  await mockPost("workspace?name=spare&projects=repo-gp,repo-sk");
   await openApp(page);
   await openProjects(page);
   const ws = page.locator('[data-testid="workspace"]').filter({ hasText: "spare" });
@@ -288,7 +288,7 @@ test("the Projects page removes a workspace and offers project actions", async (
   expect((await lastInvocation("workspace.remove"))?.args).toEqual({ workspace: "spare" });
 
   // New thread from a project row opens its composer.
-  const gp = page.locator('[data-testid="project"][data-repo="repo-gp"]');
+  const gp = page.locator('[data-testid="project"][data-project="repo-gp"]');
   await gp.getByTestId("project-new-thread").click();
   await expect(page.getByTestId("composer-heading")).toContainText("ghostty-playground");
 
@@ -471,7 +471,7 @@ test("Working section: the header counts threads as they start and stop working,
   await openApp(page);
   await expect(page.getByTestId("working-count")).toHaveText("2");
   // s-6 is idle (closing); a busy thread joins Working, at its place by creation time.
-  const [job = ""] = (await mockPost("threads?repo=repo-cf&count=1&status=busy&prefix=Job")) as string[];
+  const [job = ""] = (await mockPost("threads?project=repo-cf&count=1&status=busy&prefix=Job")) as string[];
   await holdThreads(job);
   await expect(page.getByTestId("working-count")).toHaveText("3");
   await expect.poll(async () => (await rowKeys(page)).slice(4, 8)).toEqual(["# Working 3", `s:${job}`, "s:s-5", "s:s-1"]);
@@ -491,7 +491,7 @@ test("Working section: the header counts threads as they start and stop working,
 });
 
 test("hovering a thread row shows its tooltip: name, project, branch with a worktree chip, model and effort", async ({ page }) => {
-  await mockPost("threads?repo=repo-wr&count=1&status=idle&prefix=Notes");
+  await mockPost("threads?project=repo-wr&count=1&status=idle&prefix=Notes");
   await openApp(page);
   // The open one: the previous tooltip may still be fading out.
   const tip = page.locator('[data-testid="thread-tooltip"]:not([data-state="closed"])');

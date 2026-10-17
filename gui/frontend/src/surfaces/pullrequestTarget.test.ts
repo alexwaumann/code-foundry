@@ -8,12 +8,12 @@ import { pickPullRequest, prRefOfTab, pullRequestTab, selectionPullRequest, type
 
 const status = { upstream: "", ahead: 0, behind: 0, staged: 0, modified: 0, untracked: 0, dirty: false, refreshedAtMs: null };
 const wt = (path: string, branch: string, isMain = false): WorktreeView => ({ projectId: "r1", path, branch, head: "abc", detached: false, isMain, status });
-const repo: ProjectView = { id: "r1", path: "/src/cf", name: "cf", defaultBranch: "main", githubSlug: "Alex/CF", remotes: ["origin"], git: true, worktrees: [wt("/src/cf", "main", true), wt("/src/cf-fix", "fix/resize"), wt("/src/cf-nopr", "feat/nopr")] };
+const project: ProjectView = { id: "r1", path: "/src/cf", name: "cf", defaultBranch: "main", githubSlug: "Alex/CF", remotes: ["origin"], git: true, worktrees: [wt("/src/cf", "main", true), wt("/src/cf-fix", "fix/resize"), wt("/src/cf-nopr", "feat/nopr")] };
 const local: ProjectView = { id: "r2", path: "/src/local", name: "local", defaultBranch: "main", githubSlug: "", remotes: [], git: true, worktrees: [{ ...wt("/src/local", "main", true), projectId: "r2" }] };
 const thread = (id: string, worktreePath: string): ThreadView => ({ id, worktreePath, projectId: "r1" }) as ThreadView;
 
 const stores: SelectionStores = {
-  repos: { byId: { r1: repo, r2: local }, order: ["r1", "r2"] },
+  projects: { byId: { r1: project, r2: local }, order: ["r1", "r2"] },
   threads: { byId: { s1: thread("s1", "/src/cf-fix"), s2: thread("s2", "/src/cf"), s3: thread("s3", "/gone") }, order: ["s1", "s2", "s3"] },
 };
 
@@ -28,7 +28,7 @@ describe("selectionPullRequest", () => {
   it.each<[string, Selection, { slug: string; number: number } | null]>([
     ["thread on a branch with an open PR", { kind: "thread", id: "s1" }, { slug: "alex/cf", number: 145 }],
     ["thread on main (no PR)", { kind: "thread", id: "s2" }, null],
-    ["composer (a repo, no worktree)", { kind: "compose", projectId: "r1" }, null],
+    ["composer (a project, no worktree)", { kind: "compose", projectId: "r1" }, null],
     ["thread whose worktree is gone", { kind: "thread", id: "s3" }, null],
     ["unknown thread", { kind: "thread", id: "nope" }, null],
     ["Pull Requests page", { kind: "view", name: "pullrequests" }, null],

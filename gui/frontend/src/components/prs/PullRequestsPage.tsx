@@ -166,7 +166,7 @@ function Body({ d, includeAll }: { d: DashboardView; includeAll: boolean }) {
   );
 }
 
-/** The global Pull Requests page: the viewer's GitHub dashboards across registered repos. */
+/** The global Pull Requests page: the viewer's GitHub dashboards across registered projects. */
 export function PullRequestsPage() {
   const includeAll = usePrPageStore((s) => s.includeAll);
   const toggle = usePrPageStore((s) => s.toggle);

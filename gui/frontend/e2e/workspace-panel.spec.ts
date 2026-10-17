@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { emit, invocations, mockPost, openApp, openProjects, resetMock, row } from "./fixtures";
 
-/** Where the mock (like the daemon) puts a repo's worktree for the cf/checkout branch. */
+/** Where the mock (like the daemon) puts a project's worktree for the cf/checkout branch. */
 const WT = "/Users/dev/.code-foundry/worktrees";
 const CF_MEMBER = `${WT}/alexwaumann/code-foundry/cf-checkout`;
 const GP_MEMBER = `${WT}/alexwaumann/ghostty-playground/cf-checkout`;
@@ -15,7 +15,7 @@ const WS = "w-000000000001";
 async function mixedWorkspace(thread = true): Promise<string> {
   await mockPost("workspace-mixed?name=checkout");
   if (!thread) return "";
-  const s = (await mockPost("workspace-thread?workspace=checkout&repo=repo-gp&name=driver")) as { id: string };
+  const s = (await mockPost("workspace-thread?workspace=checkout&project=repo-gp&name=driver")) as { id: string };
   return s.id;
 }
 
@@ -262,7 +262,7 @@ test("a Projects page workspace row opens the surface in a thread's panel, and o
   // Step 4's actions are unchanged.
   await expect(ws.getByTestId("workspace-new-thread")).toHaveCount(1);
 
-  const s = (await mockPost("workspace-thread?workspace=checkout&repo=repo-gp&name=driver")) as { id: string };
+  const s = (await mockPost("workspace-thread?workspace=checkout&project=repo-gp&name=driver")) as { id: string };
   await expect(ws.getByTestId("workspace-show-panel")).toHaveCount(1);
   // Stopped (the idle stop) it still counts: whether Claude runs never matters here.
   await mockPost(`thread/stop?id=${s.id}&reason=idle&code=0&status=idle`);

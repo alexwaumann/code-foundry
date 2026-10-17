@@ -1,7 +1,7 @@
 /**
  * Opening a worktree as a side panel tab (surfaces/worktree.ts), the only place a
  * worktree's overview shows: the Projects page's project and worktree rows (into the
- * page's own panel), the daemon's ui.focus.repo and the thread row menu's Show
+ * page's own panel), the daemon's ui.focus.project and the thread row menu's Show
  * worktree, and the selected thread's own worktree through T in the panel and
  * view.panel.worktree (worktreePanelCommand in stores/views.ts). Workspace member tabs
  * are stores/workspacePanel.ts openMemberTab.
@@ -17,9 +17,9 @@ import { useUiStore, type Selection } from "./ui";
  * ("web · cf/demo"), so a project's worktrees opened side by side stay apart. A worktree
  * the store does not know (gone, or a project without git) gets the project alone.
  */
-export function worktreeTabTitle(repos: ProjectsData, projectId: string, path: string): string {
-  const name = repos.byId[projectId]?.name ?? projectId;
-  const wt = findWorktree(repos, projectId, path);
+export function worktreeTabTitle(projects: ProjectsData, projectId: string, path: string): string {
+  const name = projects.byId[projectId]?.name ?? projectId;
+  const wt = findWorktree(projects, projectId, path);
   return !wt || wt.isMain || !wt.branch ? name : `${name} · ${wt.branch}`;
 }
 
@@ -40,14 +40,14 @@ export function showWorktreeInPanel(projectId: string, path: string): boolean {
 }
 
 /**
- * Shows a worktree from anywhere (ui.focus.repo, the Add Project flows): the Projects
+ * Shows a worktree from anywhere (ui.focus.project, the Add Project flows): the Projects
  * page with the worktree's tab in its panel. An empty path means the project's main
  * worktree. False for an unknown project.
  */
 export function showWorktreeOnProjectsPage(projectId: string, path = ""): boolean {
-  const repos = useProjectsStore.getState();
-  const at = path || mainWorktreePath(repos, projectId);
-  if (!repos.byId[projectId] || !at) return false;
+  const projects = useProjectsStore.getState();
+  const at = path || mainWorktreePath(projects, projectId);
+  if (!projects.byId[projectId] || !at) return false;
   useUiStore.getState().select({ kind: "view", name: "projects" });
   return showWorktreeInPanel(projectId, at);
 }
@@ -72,7 +72,7 @@ export function showWorktreeInThread(threadId: string): boolean {
  */
 export function openWorktreeSurface(sel: Selection = useUiStore.getState().selection): string | null {
   const key = keyOf(sel);
-  const w = selectionWorktree(sel, { repos: useProjectsStore.getState(), threads: useThreadsStore.getState() });
+  const w = selectionWorktree(sel, { projects: useProjectsStore.getState(), threads: useThreadsStore.getState() });
   if (key === null || w === null) return null;
   return openWorktreeTab(key, w.projectId, w.path) ? key : null;
 }

@@ -30,8 +30,8 @@ interface AddProjectState {
 export const useAddProjectStore = create<AddProjectState>()(() => ({ open: false, tab: "local", seq: 0, created: null, busy: false }));
 
 /**
- * Opens the Add Project dialog (repo.add's presenter; repo.clone opens it on GitHub,
- * repo.create on New), on Local folder unless the caller says. Deferred, so that a
+ * Opens the Add Project dialog (project.add's presenter; project.clone opens it on GitHub,
+ * project.create on New), on Local folder unless the caller says. Deferred, so that a
  * palette closing after its presenter ran does not take focus back from the dialog.
  */
 export function openAddProject(tab: AddProjectTab = "local"): void {
@@ -43,7 +43,7 @@ export function openAddProject(tab: AddProjectTab = "local"): void {
 /**
  * Cancels the dialog (Escape, the overlay, the close button). Ignored while the New tab
  * is creating or publishing. A project the New tab created and did not keep is deleted
- * again (repo.delete), folder included.
+ * again (project.delete), folder included.
  */
 export function closeAddProject(): void {
   const s = useAddProjectStore.getState();
@@ -94,8 +94,8 @@ export async function registerFolder(path: string): Promise<AddedProjectView> {
 }
 
 /**
- * Shows a project just added (its overview) once the repos store has it: the command or
- * clone answers before the repo event arrives on the event stream. Gives up after
+ * Shows a project just added (its overview) once the projects store has it: the command or
+ * clone answers before the project event arrives on the event stream. Gives up after
  * timeoutMs (the user can open it from the Projects page).
  */
 export function selectAddedProject(projectId: string, timeoutMs = 5000): void {

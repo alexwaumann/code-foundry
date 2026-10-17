@@ -38,7 +38,7 @@ export function NoProjectBadge({ className }: { className?: string }) {
   );
 }
 
-/** cmdk value of a workspace row: its target's draftKey (project rows use the repo id). */
+/** cmdk value of a workspace row: its target's draftKey (project rows use the project id). */
 const workspaceValue = (workspaceId: string) => draftKey({ kind: "workspace", workspaceId });
 
 /** The check on the row of the picker's current target. */
@@ -81,7 +81,7 @@ function WorkspaceRow({ id, current, onPick }: { id: string; current: boolean; o
   const name = useWorkspacesStore((s) => s.byId[id]?.name ?? id);
   const branch = useWorkspacesStore((s) => s.byId[id]?.branch ?? "");
   const memberIds = useWorkspacesStore(useShallow((s) => (s.byId[id]?.members ?? []).map((m) => m.projectId)));
-  // Member project names, in member order (repos the store does not know show their id).
+  // Member project names, in member order (projects the store does not know show their id).
   const projects = useProjectsStore(useShallow((s) => memberIds.map((r) => s.byId[r]?.name ?? r)));
   return (
     <CommandItem

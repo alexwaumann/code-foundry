@@ -36,7 +36,7 @@ type Handlers = { [S in EventView["source"]]: (event: Extract<EventView, { sourc
  * gh events invalidate the GitHub views on screen (stores/gh.ts).
  */
 const handlers: Handlers = {
-  repo: (ev) => {
+  project: (ev) => {
     useProjectsStore.setState((s) => applyProjectEvent(s, ev));
     applyProjectEventToDetails(ev);
   },
@@ -120,8 +120,8 @@ export function startEventSync(threadRetryMs = 10_000): () => void {
     onConnect: async (signal) => {
       // The schema carries the model registry; a restarted daemon may have a new one.
       void loadSettingsSchema();
-      const [repos, terminals] = await Promise.all([listProjects(daemon, signal), listTerminals(daemon, signal), reconcileThreads(signal)]);
-      useProjectsStore.setState({ ...replaceProjects(repos), loaded: true });
+      const [projects, terminals] = await Promise.all([listProjects(daemon, signal), listTerminals(daemon, signal), reconcileThreads(signal)]);
+      useProjectsStore.setState({ ...replaceProjects(projects), loaded: true });
       useTerminalsStore.setState((s) => ({ ...replaceTerminals(s, terminals), loaded: true }));
       // The List brings terminals without updated events: a pending reveal's shell may be here now.
       revealArrived();

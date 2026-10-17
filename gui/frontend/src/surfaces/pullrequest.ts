@@ -14,7 +14,7 @@ import type { SurfaceSpec } from "./types";
 const noop = (): void => undefined;
 
 function stores() {
-  return { repos: useProjectsStore.getState(), threads: useThreadsStore.getState() };
+  return { projects: useProjectsStore.getState(), threads: useThreadsStore.getState() };
 }
 
 /** The pull request of the selection's worktree branch, from what is loaded now. */
@@ -25,7 +25,7 @@ function currentPullRequest(sel: Selection): PrRef | null {
 
 /**
  * Pull request: the selection's pull request (a thread's or worktree's
- * branch; a repo row's main worktree). Enabled when that branch has one; disabled
+ * branch; a project row's main worktree). Enabled when that branch has one; disabled
  * otherwise, including on the Pull Requests page, whose rows open a pull request
  * explicitly (openSurface with pullRequestTab). Hidden for a thread without a project,
  * which has no branch (a pull request it linked opens from Linked PRs). Tabs: params

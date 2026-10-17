@@ -170,7 +170,7 @@ describe("skill and file tags", () => {
     ["a skill with a slash", "[/a](cf-skill://r1/a%2Fb)"],
     ["a user-scope file", "[a](cf-file://~/a.md)"],
     ["an unknown scheme", "[a](cf-thing://r1/a)"],
-    ["no repo slot", "[/a](cf-skill:///a)"],
+    ["no project slot", "[/a](cf-skill:///a)"],
   ])("leaves malformed tokens as text: %s", (_name, token) => {
     expect(parseLine(token)).toEqual([{ kind: "text", text: token }]);
   });
@@ -228,13 +228,13 @@ describe("skill and file tags", () => {
   it.each([
     ["the following space goes with each", `Use ${API_DEPLOY} and ${DIR} here`, "Use and here"],
     ["else the preceding one", `Look at ${DIR}`, "Look at"],
-    ["other repos, user skills and images stay", `${DEPLOY} ${API_DEPLOY} ${COMMIT} ${A}`, `${DEPLOY} ${COMMIT} ${A}`],
-    ["nothing of the repo: unchanged", `Fix ${DEPLOY} `, `Fix ${DEPLOY} `],
+    ["other projects, user skills and images stay", `${DEPLOY} ${API_DEPLOY} ${COMMIT} ${A}`, `${DEPLOY} ${COMMIT} ${A}`],
+    ["nothing of the project: unchanged", `Fix ${DEPLOY} `, `Fix ${DEPLOY} `],
   ])("removeProjectTags: %s", (_name, text, want) => {
     expect(removeProjectTags(text, "r2")).toBe(want);
   });
 
-  it("retainProjectTags keeps the listed repos' tags, images and user skills", () => {
+  it("retainProjectTags keeps the listed projects' tags, images and user skills", () => {
     const text = `${DEPLOY} ${API_DEPLOY} ${COMMIT} ${FILE} ${A}`;
     expect(retainProjectTags(text, ["r1"])).toBe(`${DEPLOY} ${COMMIT} ${FILE} ${A}`);
     expect(retainProjectTags(text, [])).toBe(`${COMMIT} ${A}`);

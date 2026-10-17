@@ -14,7 +14,7 @@ import { workspaceSurface } from "./workspace";
 import { worktreeSurface } from "./worktree";
 
 const thread = (id: string, o: Partial<ThreadView>) => ({ id, projectId: "r1", workspaceId: "", worktreePath: "/src/app", pendingWorktreePath: "", linkedPullRequests: [], ...o }) as ThreadView;
-const repos = replaceProjects([
+const projects = replaceProjects([
   {
     id: "r1",
     path: "/src/app",
@@ -42,13 +42,13 @@ describe("selectionHasNoProject", () => {
     ["a project composer", { kind: "compose", projectId: "r1" }, false],
     ["a page", { kind: "view", name: "projects" }, false],
   ])("%s", (_name, sel, want) => {
-    expect(selectionHasNoProject(sel, { repos, threads })).toBe(want);
+    expect(selectionHasNoProject(sel, { projects, threads })).toBe(want);
   });
 });
 
 describe("the side panel of a thread without a project", () => {
   it("lists no files, diff, pull request, workspace or worktree surface; thread surfaces stay", () => {
-    useProjectsStore.setState(repos);
+    useProjectsStore.setState(projects);
     useThreadsStore.setState(threads);
     const ctx = { selection: { kind: "thread", id: "home" } as Selection, panelKey: "thread:home" };
     for (const spec of [filesSurface, diffSurface, pullRequestSurface, workspaceSurface, worktreeSurface]) expect([spec.kind, spec.available(ctx)]).toEqual([spec.kind, "hidden"]);

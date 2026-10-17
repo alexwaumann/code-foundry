@@ -89,7 +89,7 @@ test("switch the project from the heading: the draft moves, Also in is swapped, 
 });
 
 test("switch to a workspace and back to a project", async ({ page }) => {
-  await mockPost("workspace?name=login&repos=repo-cf,repo-gp");
+  await mockPost("workspace?name=login&projects=repo-cf,repo-gp");
   await openApp(page);
   await compose(page, 3);
   await expect(heading(page)).toHaveText("What should we build in ghostty-playground?");
@@ -108,8 +108,8 @@ test("switch to a workspace and back to a project", async ({ page }) => {
   await expect(prompt(page)).toHaveAttribute("data-value", "Share the session cookie");
   // The workspace's members, not the old Also in.
   await expect(chips(page)).toHaveCount(2);
-  await expect(chips(page).nth(0)).toHaveAttribute("data-repo", "repo-cf");
-  await expect(chips(page).nth(1)).toHaveAttribute("data-repo", "repo-gp");
+  await expect(chips(page).nth(0)).toHaveAttribute("data-project", "repo-cf");
+  await expect(chips(page).nth(1)).toHaveAttribute("data-project", "repo-gp");
   await expect(page.getByTestId("composer-also-in")).toHaveCount(0);
   await expect(page.getByTestId("composer-worktree")).toHaveText("Workspace worktrees");
 

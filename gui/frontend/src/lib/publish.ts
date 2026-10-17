@@ -5,7 +5,7 @@
  * default.
  */
 
-/** A GitHub repository visibility, as gh's flags and repo.github.publish spell it. */
+/** A GitHub repository visibility, as gh's flags and project.github.publish spell it. */
 export type Visibility = "public" | "internal" | "private";
 
 /** Most open first: the order the picker lists them and picks a default in. */

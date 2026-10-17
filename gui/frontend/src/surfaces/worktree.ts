@@ -9,7 +9,7 @@ import type { SurfaceSpec } from "./types";
 import { selectionWorktree, WORKTREE_KIND, worktreeOfTab, worktreeTab, type WorktreeTarget } from "./workspaceTarget";
 
 function worktree(sel: Selection): WorktreeTarget | null {
-  return selectionWorktree(sel, { repos: useProjectsStore.getState(), threads: useThreadsStore.getState() });
+  return selectionWorktree(sel, { projects: useProjectsStore.getState(), threads: useThreadsStore.getState() });
 }
 
 /**
@@ -19,7 +19,7 @@ function worktree(sel: Selection): WorktreeTarget | null {
  * hidden for everything else, because its tabs are also opened from elsewhere: the
  * Projects page's project and worktree rows (Enter or double-click, into the page's own
  * panel) and the workspace surface's member rows (stores/worktreePanel.ts,
- * stores/workspacePanel.ts). Tab: params { repo, path }, titled with the project (and
+ * stores/workspacePanel.ts). Tab: params { project, path }, titled with the project (and
  * its branch off the main worktree).
  */
 export const worktreeSurface: SurfaceSpec = {
@@ -28,7 +28,7 @@ export const worktreeSurface: SurfaceSpec = {
   icon: GitBranch,
   hotkey: "t",
   available: (ctx) => (worktree(ctx.selection) ? "enabled" : "hidden"),
-  // deriveContext places a thread in a worktree from the repos store.
+  // deriveContext places a thread in a worktree from the projects store.
   watches: [useThreadsStore, useProjectsStore],
   render: (tab) => {
     const m = worktreeOfTab(tab);

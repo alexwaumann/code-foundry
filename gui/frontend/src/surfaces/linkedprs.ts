@@ -8,7 +8,7 @@ import { LINKED_PRS_KIND, LINKED_PRS_TITLE, linkedPrsTab, selectionLinkedThread 
 import type { SurfaceSpec } from "./types";
 
 function thread(sel: Selection): string | null {
-  return selectionLinkedThread(sel, { repos: useProjectsStore.getState(), threads: useThreadsStore.getState() });
+  return selectionLinkedThread(sel, { projects: useProjectsStore.getState(), threads: useThreadsStore.getState() });
 }
 
 /**
@@ -25,7 +25,7 @@ export const linkedPrsSurface: SurfaceSpec = {
   icon: GitPullRequestArrow,
   hotkey: "l",
   available: (ctx) => (thread(ctx.selection) ? "enabled" : "hidden"),
-  // deriveContext reads the repos store too (placement); the links come from threads.
+  // deriveContext reads the projects store too (placement); the links come from threads.
   watches: [useThreadsStore, useProjectsStore],
   render: () => createElement(LinkedPRsSurface),
   openDefault: (ctx) => (thread(ctx.selection) ? linkedPrsTab() : null),

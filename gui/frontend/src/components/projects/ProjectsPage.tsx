@@ -85,14 +85,14 @@ const ROW_H = 32;
 const SEP = "\u0001";
 
 /** The page's structure inputs as strings, so it rebuilds on membership changes only (not git status). */
-function useStructure(): { repos: string[]; workspaces: string[] } {
-  const repos = useProjectsStore(useShallow((s) => s.order.map((id) => [id, ...(s.byId[id]?.worktrees.map((w) => w.path) ?? [])].join(SEP))));
+function useStructure(): { projects: string[]; workspaces: string[] } {
+  const projects = useProjectsStore(useShallow((s) => s.order.map((id) => [id, ...(s.byId[id]?.worktrees.map((w) => w.path) ?? [])].join(SEP))));
   const workspaces = useWorkspacesStore(useShallow((s) => s.order.map((id) => [id, ...(s.byId[id]?.members.flatMap((m) => [m.projectId, m.worktreePath]) ?? [])].join(SEP))));
-  return { repos, workspaces };
+  return { projects, workspaces };
 }
 
 function decode(projectKeys: readonly string[], wsKeys: readonly string[]) {
-  const repos = {
+  const projects = {
     order: projectKeys.map((k) => k.split(SEP)[0] ?? ""),
     byId: Object.fromEntries(
       projectKeys.map((k) => {
@@ -112,27 +112,27 @@ function decode(projectKeys: readonly string[], wsKeys: readonly string[]) {
       }),
     ),
   };
-  return { repos, workspaces };
+  return { projects, workspaces };
 }
 
 /**
  * What the filter matches, as strings like useStructure, and only while filtering: names,
  * slugs and branches then rebuild the page too (and git status still does not).
  */
-function useSearchInputs(active: boolean): { repos: string[]; workspaces: string[] } {
-  const repos = useProjectsStore(
+function useSearchInputs(active: boolean): { projects: string[]; workspaces: string[] } {
+  const projects = useProjectsStore(
     useShallow((s) => (active ? s.order.map((id) => {
       const r = s.byId[id];
       return [id, r?.name ?? "", r?.githubSlug ?? "", ...(r?.worktrees.flatMap((w) => [w.path, w.branch]) ?? [])].join(SEP);
     }) : [])),
   );
   const workspaces = useWorkspacesStore(useShallow((s) => (active ? s.order.map((id) => [id, s.byId[id]?.name ?? "", s.byId[id]?.branch ?? ""].join(SEP)) : [])));
-  return { repos, workspaces };
+  return { projects, workspaces };
 }
 
 function decodeSearch(projectKeys: readonly string[], wsKeys: readonly string[]): ProjectsSearch {
   return {
-    repos: Object.fromEntries(
+    projects: Object.fromEntries(
       projectKeys.map((k) => {
         const [id = "", name = "", githubSlug = "", ...rest] = k.split(SEP);
         const branches: Record<string, string> = {};
@@ -292,7 +292,7 @@ function ProjectBlock({ project, collapsed, filtering }: { project: ProjectModel
   const cleanable = useCleanableCount(projectId);
   const { Icon, className: iconClass } = KIND_ICON[kind.kind];
   return (
-    <section className="group/card rounded-lg border" data-testid="project" data-repo={projectId} data-git={kind.kind !== "nogit"} data-kind={kind.kind} data-collapsed={collapsed}>
+    <section className="group/card rounded-lg border" data-testid="project" data-project={projectId} data-git={kind.kind !== "nogit"} data-kind={kind.kind} data-collapsed={collapsed}>
       <NavRow navKey={projectKey(projectId)} className={cn("group/p flex h-9 items-center gap-2 rounded-lg px-2", !collapsed && "rounded-b-none border-b")}>
         <CollapseToggle
           collapsed={collapsed}
@@ -441,13 +441,13 @@ export function ProjectsPage() {
   const collapsedProjects = useUiStore((s) => s.collapsedProjects);
   const collapsedWorkspaces = useUiStore((s) => s.collapsedWorkspaces);
   const { all, model, collapsed, items } = useMemo(() => {
-    const { repos, workspaces } = decode(structure.repos, structure.workspaces);
-    const m = projectsModel(repos, workspaces);
+    const { projects, workspaces } = decode(structure.projects, structure.workspaces);
+    const m = projectsModel(projects, workspaces);
     // While filtering, every match shows expanded; the saved collapsed sets stay as they are.
-    const shown = filtering ? filterProjects(m, query, decodeSearch(search.repos, search.workspaces)) : m;
+    const shown = filtering ? filterProjects(m, query, decodeSearch(search.projects, search.workspaces)) : m;
     const c: Collapsed = filtering ? NONE_COLLAPSED : { projects: new Set(collapsedProjects), workspaces: new Set(collapsedWorkspaces) };
     return { all: m, model: shown, collapsed: c, items: pageItems(shown, workspaces, c) };
-  }, [structure.repos, structure.workspaces, filtering, query, search.repos, search.workspaces, collapsedProjects, collapsedWorkspaces]);
+  }, [structure.projects, structure.workspaces, filtering, query, search.projects, search.workspaces, collapsedProjects, collapsedWorkspaces]);
   const navItems = useMemo<NavItem[]>(
     () =>
       items.map((it) => {

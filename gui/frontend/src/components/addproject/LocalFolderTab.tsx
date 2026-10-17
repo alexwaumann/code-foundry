@@ -65,10 +65,10 @@ export function LocalFolderTab({ active }: { active: boolean }) {
     setBusy(true);
     setError(null);
     try {
-      const repo = await registerFolder(p);
-      toast.success(`Added ${repo.name}`);
+      const project = await registerFolder(p);
+      toast.success(`Added ${project.name}`);
       finishAddProject();
-      selectAddedProject(repo.id);
+      selectAddedProject(project.id);
     } catch (err) {
       setError(errorMessage(err));
       setBusy(false);

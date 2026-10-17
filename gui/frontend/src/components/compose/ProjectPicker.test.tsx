@@ -9,7 +9,7 @@ import { useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { ProjectPicker } from "./ProjectPicker";
 
-const repo = (id: string): ProjectView => ({ id, path: `/Users/dev/src/${id}`, name: id, defaultBranch: "main", githubSlug: "", remotes: [], git: true, worktrees: [] });
+const project = (id: string): ProjectView => ({ id, path: `/Users/dev/src/${id}`, name: id, defaultBranch: "main", githubSlug: "", remotes: [], git: true, worktrees: [] });
 
 beforeAll(() => {
   // cmdk scrolls the highlighted row into view and measures the list; jsdom has neither.
@@ -26,7 +26,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   useWorkspacesStore.setState({ byId: { "w-1": { id: "w-1", name: "login", branch: "cf/login", members: [{ projectId: "web", worktreePath: "/wt/web" }], createdAtMs: null } }, order: ["w-1"], loaded: true });
-  useProjectsStore.setState({ byId: { web: repo("web"), api: repo("api") }, order: ["web", "api"], loaded: true });
+  useProjectsStore.setState({ byId: { web: project("web"), api: project("api") }, order: ["web", "api"], loaded: true });
   useUiStore.setState({ selection: { kind: "view", name: "dashboard" } });
 });
 

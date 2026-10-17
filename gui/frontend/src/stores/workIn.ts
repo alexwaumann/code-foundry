@@ -10,7 +10,7 @@ import { persist } from "zustand/middleware";
 import type { WorkInMode } from "@/lib/compose";
 
 interface WorkInState {
-  /** Repo id → the last fresh-copy / in-place pick. */
+  /** Project id → the last fresh-copy / in-place pick. */
   byProject: Readonly<Record<string, WorkInMode>>;
 }
 

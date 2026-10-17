@@ -25,7 +25,7 @@ test.beforeEach(async () => {
 });
 
 test.describe("Pull Requests page", () => {
-  test("sidebar entry opens it: activity charts, three sections filtered to registered repos", async ({ page }) => {
+  test("sidebar entry opens it: activity charts, three sections filtered to registered projects", async ({ page }) => {
     await openApp(page);
     await page.getByTestId("nav-pullrequests").click();
     const pageEl = page.getByTestId("prs-page");

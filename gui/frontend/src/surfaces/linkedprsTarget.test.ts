@@ -12,14 +12,14 @@ function thread(id: string, o: Partial<ThreadView> = {}): ThreadView {
   return { id, projectId: "web", worktreePath: WEB, workspaceId: "", pendingWorktreePath: "", state: "connected", terminalId: "", linkedPullRequests: [], ...o } as ThreadView;
 }
 
-const repos: ProjectsData = { byId: {}, order: [] };
+const projects: ProjectsData = { byId: {}, order: [] };
 
 function threads(...list: ThreadView[]): ThreadsData {
   return { byId: Object.fromEntries(list.map((s) => [s.id, s])), order: list.map((s) => s.id) };
 }
 
 const s = {
-  repos,
+  projects,
   threads: threads(thread("s-linked", { linkedPullRequests: [link("o/web", 5)], workspaceId: "w1" }), thread("s-bare")),
 };
 

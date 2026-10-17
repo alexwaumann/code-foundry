@@ -111,7 +111,7 @@ const WORKSPACE_KEY = "ws:";
 /** The draft key (and picker row value) of the no-project target. */
 export const HOME_KEY = "home:";
 
-/** The compose store's key for a target's draft: the repo id, "ws:<workspace id>", or HOME_KEY. */
+/** The compose store's key for a target's draft: the project id, "ws:<workspace id>", or HOME_KEY. */
 export function draftKey(t: ComposeTarget): string {
   switch (t.kind) {
     case "project":
@@ -186,7 +186,7 @@ export interface PlaceInput {
   base: string | null;
   /** Other projects a project's thread also works in (a new workspace on send). */
   alsoIn: readonly string[];
-  /** Repo id of the member the thread runs in; null: the project, or the workspace's first member. */
+  /** Project id of the member the thread runs in; null: the project, or the workspace's first member. */
   primary: string | null;
 }
 
@@ -231,7 +231,7 @@ export type ThreadPlace =
   | { kind: "workspace"; workspaceId: string; projectId: string; worktreePath: string }
   /** `base` applies to the primary member only ("" : every member's default). */
   | { kind: "new-workspace"; projectIds: readonly string[]; projectId: string; base: string }
-  /** thread.new --no-project: no repo, worktree or workspace. */
+  /** thread.new --no-project: no project, worktree or workspace. */
   | { kind: "home" };
 
 export interface PlaceEnv {

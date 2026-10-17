@@ -208,7 +208,7 @@ describe("thread reducers", () => {
 });
 
 describe("deriveContext for a thread", () => {
-  const repos = replaceProjects([
+  const projects = replaceProjects([
     {
       id: "r1",
       path: "/src/app",
@@ -222,7 +222,7 @@ describe("deriveContext for a thread", () => {
   ]);
   it("carries the thread and its worktree; no terminal (a thread has none)", () => {
     const threads = replaceThreads(emptyThreads, [thread("s1")]);
-    expect(deriveContext({ kind: "thread", id: "s1" }, repos, threads)).toEqual({
+    expect(deriveContext({ kind: "thread", id: "s1" }, projects, threads)).toEqual({
       activeThreadId: "s1",
       activeTerminalId: "",
       activeProjectId: "r1",
@@ -233,19 +233,19 @@ describe("deriveContext for a thread", () => {
   });
   it("a workspace thread carries its workspace (thread.run-in's availability)", () => {
     const threads = replaceThreads(emptyThreads, [thread("s1", { workspaceId: "w-1" })]);
-    expect(deriveContext({ kind: "thread", id: "s1" }, repos, threads).activeWorkspaceId).toBe("w-1");
-    expect(deriveContext({ kind: "compose", projectId: "r1", workspaceId: "w-2" }, repos, threads).activeWorkspaceId).toBe("w-2");
+    expect(deriveContext({ kind: "thread", id: "s1" }, projects, threads).activeWorkspaceId).toBe("w-1");
+    expect(deriveContext({ kind: "compose", projectId: "r1", workspaceId: "w-2" }, projects, threads).activeWorkspaceId).toBe("w-2");
   });
-  it("a thread without a project: no repo or worktree (home is none), so project commands and plain thread.new are not offered", () => {
+  it("a thread without a project: no project or worktree (home is none), so project commands and plain thread.new are not offered", () => {
     const threads = replaceThreads(emptyThreads, [thread("s1", { projectId: "", workspaceId: "", worktreePath: "/Users/dev" })]);
-    expect(deriveContext({ kind: "thread", id: "s1" }, repos, threads)).toMatchObject({ activeThreadId: "s1", activeProjectId: "", activeWorktreePath: "", activeView: "thread" });
+    expect(deriveContext({ kind: "thread", id: "s1" }, projects, threads)).toMatchObject({ activeThreadId: "s1", activeProjectId: "", activeWorktreePath: "", activeView: "thread" });
   });
-  it("an older thread without a repo id inside a project keeps its place", () => {
+  it("an older thread without a project id inside a project keeps its place", () => {
     const threads = replaceThreads(emptyThreads, [thread("s1", { projectId: "", workspaceId: "", worktreePath: "/src/app/docs" })]);
-    expect(deriveContext({ kind: "thread", id: "s1" }, repos, threads)).toMatchObject({ activeProjectId: "r1", activeWorktreePath: "/src/app" });
+    expect(deriveContext({ kind: "thread", id: "s1" }, projects, threads)).toMatchObject({ activeProjectId: "r1", activeWorktreePath: "/src/app" });
   });
   it("a composer without a project: the compose view alone", () => {
-    expect(deriveContext({ kind: "compose", projectId: "", noProject: true }, repos)).toEqual({ ...emptyContext, activeView: "compose" });
+    expect(deriveContext({ kind: "compose", projectId: "", noProject: true }, projects)).toEqual({ ...emptyContext, activeView: "compose" });
   });
   it("an unknown thread keeps the id", () => {
     const threads = replaceThreads(emptyThreads, [thread("s1", { state: "disconnected" })]);
@@ -264,7 +264,7 @@ describe("event dispatch", () => {
   it("routes each source to its slice", () => {
     dispatchEvent({ source: "threadList", event: { kind: "snapshot", threads: [thread("s1")], retiredUsage: [] } });
     dispatchEvent({ source: "terminal", event: { kind: "updated", terminal: term("t1") } });
-    dispatchEvent({ source: "repo", event: { kind: "snapshot", repos: [] } });
+    dispatchEvent({ source: "project", event: { kind: "snapshot", projects: [] } });
     dispatchEvent({ source: "gh", event: { kind: "viewer" } });
     dispatchEvent({ source: "ui", event: { kind: "focusThread", threadId: "s1" } });
     expect(useThreadsStore.getState()).toMatchObject({ order: ["s1"], availability: "available" });

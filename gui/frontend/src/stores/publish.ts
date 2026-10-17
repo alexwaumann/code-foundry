@@ -6,10 +6,10 @@ import { getUiContext } from "./context";
 import { useProjectsStore } from "./projects";
 
 /**
- * Creating a project (repo.create, the Add Project dialog's New tab), publishing one to
- * GitHub (repo.github.publish: the New tab's second step, and the publish dialog the
+ * Creating a project (project.create, the Add Project dialog's New tab), publishing one to
+ * GitHub (project.github.publish: the New tab's second step, and the publish dialog the
  * overview's Publish to GitHub button and the palette open) and deleting one the New
- * tab made and then cancelled (repo.delete). Errors reject with the daemon's message,
+ * tab made and then cancelled (project.delete). Errors reject with the daemon's message,
  * which for a refused publish is gh's own words; nothing is toasted here (the dialogs
  * show errors in place).
  */
@@ -24,7 +24,7 @@ interface PublishDialogState {
 export const usePublishDialogStore = create<PublishDialogState>()(() => ({ open: false, projectId: "", seq: 0 }));
 
 /**
- * Opens the publish dialog for a project (repo.github.publish's presenter). False when
+ * Opens the publish dialog for a project (project.github.publish's presenter). False when
  * there is no such project, so the command falls back to its prompts. Deferred like
  * openAddProject, so a palette closing after its presenter ran keeps focus off.
  */
@@ -46,14 +46,14 @@ export interface CreatedProject {
   path: string;
 }
 
-/** repo.create: a new project in the projects directory, git initialized. */
+/** project.create: a new project in the projects directory, git initialized. */
 export async function createProject(name: string): Promise<CreatedProject> {
   try {
     const res = await invokeConfirmed("project.create", { name });
     if (!res) throw new Error("cancelled");
-    const repo = JSON.parse(res.resultJson || "{}") as { id?: string; name?: string; path?: string };
-    if (!repo.id) throw new Error(res.message || "the daemon did not say which project it created");
-    return { id: repo.id, name: repo.name ?? name, path: repo.path ?? "" };
+    const project = JSON.parse(res.resultJson || "{}") as { id?: string; name?: string; path?: string };
+    if (!project.id) throw new Error(res.message || "the daemon did not say which project it created");
+    return { id: project.id, name: project.name ?? name, path: project.path ?? "" };
   } finally {
     void refreshCommands();
   }
@@ -68,7 +68,7 @@ export interface PublishRequest {
 }
 
 /**
- * repo.github.publish for one project. The context names only that project, so the
+ * project.github.publish for one project. The context names only that project, so the
  * daemon judges availability (git, no origin) for it and not for what is selected.
  */
 export async function publishProject(req: PublishRequest): Promise<string> {
@@ -83,7 +83,7 @@ export async function publishProject(req: PublishRequest): Promise<string> {
 }
 
 /**
- * repo.delete for a project the New tab created: unregisters it and removes its folder.
+ * project.delete for a project the New tab created: unregisters it and removes its folder.
  * Invoked as already confirmed: the user cancelled the dialog, which is the decision.
  */
 export async function deleteProject(projectId: string): Promise<void> {

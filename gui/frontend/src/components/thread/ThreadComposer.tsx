@@ -64,7 +64,7 @@ function useThreadSources(threadId: string) {
       return { projectId: r, worktreePath: p };
     });
     const workspace = wsMembers.length > 0;
-    // The thread's own repo first: where it runs.
+    // The thread's own project first: where it runs.
     const projectIds = workspace ? [projectId, ...wsMembers.map((m) => m.projectId).filter((r) => r !== projectId)] : [projectId];
     const input = { target: workspace ? ("workspace" as const) : ("project" as const), projectIds, wsMembers };
     return {

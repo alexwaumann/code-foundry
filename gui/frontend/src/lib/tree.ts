@@ -3,7 +3,7 @@
  * on the user, then finished turns, then idle ones (the main list); then the working ones
  * under a collapsible Working header, the snoozed ones under a collapsible Snoozed header
  * and the archived ones under a collapsible Archived header (the three footers,
- * buildSections), as rows for virtual lists. No repo, worktree or terminal
+ * buildSections), as rows for virtual lists. No project, worktree or terminal
  * rows: worktrees live on the Projects page, and shells in their owner's bottom panel
  * (stores/bottomPanel.ts). Pure functions over the minimal inputs that affect structure, so
  * the sidebar only rebuilds when membership, order, pin or group changes (not on name or

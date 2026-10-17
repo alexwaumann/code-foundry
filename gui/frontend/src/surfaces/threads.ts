@@ -8,7 +8,7 @@ import { selectionThreadsThread, THREADS_KIND, THREADS_TITLE, threadsTab } from 
 import type { SurfaceSpec } from "./types";
 
 function thread(sel: Selection): string | null {
-  return selectionThreadsThread(sel, { repos: useProjectsStore.getState(), threads: useThreadsStore.getState() });
+  return selectionThreadsThread(sel, { projects: useProjectsStore.getState(), threads: useThreadsStore.getState() });
 }
 
 /**
