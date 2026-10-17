@@ -69,7 +69,8 @@ func (m *Manager) Send(ctx context.Context, id string, msg Message) (Item, error
 	if len(dropped) > 0 {
 		m.log.Warn("file references outside the thread's projects; passing their relative paths", "thread", id, "refs", dropped)
 	}
-	o := &outgoing{text: strings.TrimSpace(msg.Text), composer: strings.TrimSpace(msg.ComposerText), attachments: attachments, prompt: prompt}
+	o := &outgoing{text: strings.TrimSpace(msg.Text), composer: strings.TrimSpace(msg.ComposerText), attachments: attachments, prompt: prompt,
+		origin: msg.Origin, wakeTitle: msg.WakeTitle, wakeJSON: msg.WakeJSON}
 	for {
 		live, closing, reserved, _, err := m.lifecycle(id)
 		var it Item

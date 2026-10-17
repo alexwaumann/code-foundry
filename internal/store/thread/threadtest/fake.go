@@ -35,6 +35,9 @@ type Fake struct {
 	// Watchers counts WatchItems calls whose ctx has not ended, by thread.
 	watchers map[string]int
 	mcpErrs  map[string]string
+	// subs are the wake subscriptions (subscriptions.go).
+	subs    []thread.Subscription
+	nextSub int
 }
 
 var _ thread.Store = (*Fake)(nil)
@@ -186,7 +189,21 @@ func (f *Fake) Create(_ context.Context, o thread.CreateOptions) (thread.Thread,
 	if err := f.createMetadata(&s, o, &call); err != nil {
 		return thread.Thread{}, err
 	}
-	return f.add(call, s)
+	if o.Notify {
+		if s.CreatedBy == "" {
+			return thread.Thread{}, fmt.Errorf("%w: notify needs created-by", thread.ErrInvalidArgument)
+		}
+		call += " notify"
+	}
+	s, err := f.add(call, s)
+	if err == nil && o.Notify {
+		f.mu.Lock()
+		f.nextSub++
+		f.subs = append(f.subs, thread.Subscription{ID: fmt.Sprintf("sub-%d", f.nextSub), SubscriberID: s.CreatedBy,
+			TargetKind: thread.TargetThread, TargetID: s.ID, Condition: thread.CondSettled, Repeat: true, CreatedAt: f.Now()})
+		f.mu.Unlock()
+	}
+	return s, err
 }
 
 // StageAttachment records "StageAttachment <name> <mime> <len>" (and " pages=<n>"

@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"connectrpc.com/connect"
@@ -37,7 +36,7 @@ func (h *Thread) Wait(ctx context.Context, req *connect.Request[v1.WaitThreadReq
 	var dropped uint64
 	for {
 		p := threadToProto(cur)
-		if threadWaitMet(until, p) {
+		if threadWaitMet(until, cur) {
 			return connect.NewResponse(&v1.WaitThreadResponse{Thread: p}), nil
 		}
 		select {
@@ -71,38 +70,21 @@ func (h *Thread) Wait(ctx context.Context, req *connect.Request[v1.WaitThreadReq
 	}
 }
 
-// threadWaitMet reports whether t meets the wait condition (ThreadWaitCondition in
-// thread_lifecycle.proto; UNSPECIFIED is IDLE).
-func threadWaitMet(until v1.ThreadWaitCondition, t *v1.Thread) bool {
-	switch until {
-	case v1.ThreadWaitCondition_THREAD_WAIT_CONDITION_ATTENTION:
-		return t.GetStatus() == v1.ThreadStatus_THREAD_STATUS_NEEDS_ATTENTION
-	case v1.ThreadWaitCondition_THREAD_WAIT_CONDITION_ERROR:
-		return t.GetStatus() == v1.ThreadStatus_THREAD_STATUS_ERROR
-	case v1.ThreadWaitCondition_THREAD_WAIT_CONDITION_DISCONNECTED:
-		return t.GetState() == v1.ThreadState_THREAD_STATE_DISCONNECTED
-	}
-	return threadSettled(t)
+// threadWaitConditions maps the wait conditions to the store's (UNSPECIFIED is IDLE).
+var threadWaitConditions = map[v1.ThreadWaitCondition]thread.Condition{
+	v1.ThreadWaitCondition_THREAD_WAIT_CONDITION_UNSPECIFIED:  thread.CondIdle,
+	v1.ThreadWaitCondition_THREAD_WAIT_CONDITION_IDLE:         thread.CondIdle,
+	v1.ThreadWaitCondition_THREAD_WAIT_CONDITION_ATTENTION:    thread.CondAttention,
+	v1.ThreadWaitCondition_THREAD_WAIT_CONDITION_ERROR:        thread.CondError,
+	v1.ThreadWaitCondition_THREAD_WAIT_CONDITION_DISCONNECTED: thread.CondDisconnected,
 }
 
-// threadSettled is the IDLE condition: Claude is not working and nothing waits on an
-// answer. A turn that ended shows as needs-attention "finished" (or "error: <code>")
-// until someone looks at the thread, so those count; a pending permission prompt or
-// question mid-turn does not (stream_status.go's reason prefixes, as thread.set-effort's
-// onTurn).
-func threadSettled(t *v1.Thread) bool {
-	if t.GetState() == v1.ThreadState_THREAD_STATE_STARTING {
-		return false
+// threadWaitMet reports whether t meets the wait condition (ThreadWaitCondition in
+// thread_lifecycle.proto): thread.Meets, which the wake subscriptions share.
+func threadWaitMet(until v1.ThreadWaitCondition, t thread.Thread) bool {
+	c, ok := threadWaitConditions[until]
+	if !ok {
+		c = thread.CondIdle
 	}
-	switch t.GetStatus() {
-	case v1.ThreadStatus_THREAD_STATUS_IDLE, v1.ThreadStatus_THREAD_STATUS_ERROR:
-		return true
-	case v1.ThreadStatus_THREAD_STATUS_NEEDS_ATTENTION:
-		r := t.GetStatusReason()
-		return !strings.HasPrefix(r, "permission") && !strings.HasPrefix(r, "question")
-	case v1.ThreadStatus_THREAD_STATUS_UNSPECIFIED:
-		// A row from before status persistence: only a stopped one is known not to work.
-		return t.GetState() == v1.ThreadState_THREAD_STATE_DISCONNECTED
-	}
-	return false
+	return thread.Meets(c, t)
 }

@@ -435,8 +435,10 @@ type Thread struct {
 	// disconnected thread whose snooze ran out; cleared like "finished" on a disconnected
 	// thread, by the next start), "budget reached" (NEEDS_ATTENTION: the thread's cost
 	// reached budget_usd mid-turn and the daemon interrupted Claude; cleared by the next
-	// message, or once seen like "finished"), or "interrupted" / "did not start" for ERROR. Persisted with
-	// status: a DISCONNECTED thread keeps the status and reason it had when its process
+	// message, or once seen like "finished"), "wake limit" (NEEDS_ATTENTION: the thread's
+	// wake subscriptions woke it 60 times within an hour and further wakes are dropped;
+	// cleared by the next message, or once seen), or "interrupted" / "did not start" for
+	// ERROR. Persisted with status: a DISCONNECTED thread keeps the status and reason it had when its process
 	// ended (a busy one becomes ERROR "interrupted"), across daemon restarts. Empty when
 	// unknown.
 	StatusReason string `protobuf:"bytes,18,opt,name=status_reason,json=statusReason,proto3" json:"status_reason,omitempty"`
@@ -1472,7 +1474,12 @@ type CreateThreadRequest struct {
 	// Thread.labels: each validated (lowercased first), then deduplicated and sorted.
 	Labels []string `protobuf:"bytes,17,rep,name=labels,proto3" json:"labels,omitempty"`
 	// Thread.budget_usd; 0 for none, never negative.
-	BudgetUsd     float64 `protobuf:"fixed64,18,opt,name=budget_usd,json=budgetUsd,proto3" json:"budget_usd,omitempty"`
+	BudgetUsd float64 `protobuf:"fixed64,18,opt,name=budget_usd,json=budgetUsd,proto3" json:"budget_usd,omitempty"`
+	// With created_by: also subscribe the creator to the new thread, condition SETTLED,
+	// repeat (ThreadService.Subscribe), so the creator's agent is woken each time the new
+	// thread settles. INVALID_ARGUMENT without created_by. See
+	// docs/notes/agents-4-wake.md.
+	Notify        bool `protobuf:"varint,19,opt,name=notify,proto3" json:"notify,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1624,6 +1631,13 @@ func (x *CreateThreadRequest) GetBudgetUsd() float64 {
 		return x.BudgetUsd
 	}
 	return 0
+}
+
+func (x *CreateThreadRequest) GetNotify() bool {
+	if x != nil {
+		return x.Notify
+	}
+	return false
 }
 
 type NewWorktree struct {
@@ -3821,7 +3835,7 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\x04slug\x18\x01 \x01(\tR\x04slug\x12\x16\n" +
 	"\x06number\x18\x02 \x01(\x05R\x06number\x12\x10\n" +
 	"\x03url\x18\x03 \x01(\tR\x03url\x127\n" +
-	"\tlinked_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\blinkedAt\"\x8f\x05\n" +
+	"\tlinked_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\blinkedAt\"\xa7\x05\n" +
 	"\x13CreateThreadRequest\x12\x17\n" +
 	"\arepo_id\x18\x01 \x01(\tR\x06repoId\x12#\n" +
 	"\rworktree_path\x18\x02 \x01(\tR\fworktreePath\x12\x14\n" +
@@ -3843,7 +3857,8 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\x05brief\x18\x10 \x01(\tR\x05brief\x12\x16\n" +
 	"\x06labels\x18\x11 \x03(\tR\x06labels\x12\x1d\n" +
 	"\n" +
-	"budget_usd\x18\x12 \x01(\x01R\tbudgetUsdJ\x04\b\f\x10\rR\x06render\"(\n" +
+	"budget_usd\x18\x12 \x01(\x01R\tbudgetUsd\x12\x16\n" +
+	"\x06notify\x18\x13 \x01(\bR\x06notifyJ\x04\b\f\x10\rR\x06render\"(\n" +
 	"\vNewWorktree\x12\x19\n" +
 	"\bbase_ref\x18\x01 \x01(\tR\abaseRef\"S\n" +
 	"\fNewWorkspace\x12\x14\n" +

@@ -4,6 +4,7 @@ package codefoundry.v1;
 
 import "codefoundry/v1/heartbeat.proto";
 import "codefoundry/v1/thread_lifecycle.proto";
+import "codefoundry/v1/thread_subscriptions.proto";
 import "google/protobuf/timestamp.proto";
 
 // ThreadService manages threads, the primary unit of the app, and drives their
@@ -75,6 +76,18 @@ service ThreadService {
   // SetBudget sets the thread's spending limit (Thread.budget_usd; 0 clears it). A
   // budget above the thread's cost re-arms the budget stop. Any state. Persisted.
   rpc SetBudget(SetThreadBudgetRequest) returns (SetThreadBudgetResponse) {}
+  // Subscribe makes a wake subscription: when the target (a thread, or an action run)
+  // meets the condition, the daemon sends the subscriber a message (a user_message item
+  // with origin WAKE) through Send, which starts a stopped subscriber and unsnoozes it.
+  // Edge-triggered, and once at once when the target already meets the condition.
+  // FAILED_PRECONDITION for a subscription to itself or the reverse of an existing one.
+  // See docs/notes/agents-4-wake.md.
+  rpc Subscribe(SubscribeThreadRequest) returns (SubscribeThreadResponse) {}
+  // Unsubscribe removes a subscription by id, or every subscription of a subscriber to a
+  // target. NOT_FOUND when nothing matched.
+  rpc Unsubscribe(UnsubscribeThreadRequest) returns (UnsubscribeThreadResponse) {}
+  // ListSubscriptions lists one subscriber's subscriptions, or every thread's.
+  rpc ListSubscriptions(ListThreadSubscriptionsRequest) returns (ListThreadSubscriptionsResponse) {}
   // Watch streams changes to the thread list (every thread's record, not its items).
   // The first event is a snapshot. WatchThread streams one thread's conversation.
   rpc Watch(WatchThreadsRequest) returns (stream ThreadListEvent) {}
@@ -200,6 +213,26 @@ message UserMessageItem {
   // attachments (not a number: the chip had lost its file). Empty for a message without tags or sent
   // without the composer (the CLI): text is then shown as is. Stored, never interpreted.
   string composer_text = 3;
+  // Who sent it: the user (USER; UNSPECIFIED on items from before the field), or the
+  // daemon for a wake subscription (WAKE: text is the header line and a fenced JSON
+  // block, as Claude got it; docs/notes/agents-4-wake.md).
+  MessageOrigin origin = 4;
+  // WAKE only: the header line without its "[code-foundry wake] " prefix, e.g.
+  // `Thread "Fix the login" (s-…) is idle: finished.`
+  string wake_title = 5;
+  // WAKE only: the JSON payload of the fenced block (kind, subscription_id, condition,
+  // fired_at, and the thread or the run).
+  string wake_json = 6;
+}
+
+// MessageOrigin is who sent a user_message item.
+enum MessageOrigin {
+  // An item recorded before origins existed: the user's.
+  MESSAGE_ORIGIN_UNSPECIFIED = 0;
+  // The user (the GUI's composer, the CLI's thread send, an agent's CLI).
+  MESSAGE_ORIGIN_USER = 1;
+  // The daemon, for a wake subscription (ThreadService.Subscribe).
+  MESSAGE_ORIGIN_WAKE = 2;
 }
 
 // One text block of Claude's reply (markdown).

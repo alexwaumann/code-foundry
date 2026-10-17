@@ -42,6 +42,9 @@ type outgoing struct {
 	// go out (a message to a stopped or starting thread: recordUser); sendMessage then
 	// delivers it under that id without writing a second item.
 	itemID string
+	// origin, wakeTitle and wakeJSON: the item's Origin, WakeTitle and WakeJSON.
+	origin              MessageOrigin
+	wakeTitle, wakeJSON string
 }
 
 // streamState is the runner's process half. Every field is touched only by
@@ -119,6 +122,7 @@ type threadCmd struct {
 	ctx       context.Context
 	send      *outgoing
 	effort    *string // SetEffort
+	wakeLimit bool    // the wake limit was reached (subscriptions_fire.go)
 	requestID string
 	decision  Decision
 	reply     chan threadReply
@@ -633,6 +637,8 @@ func (r *runner) onThreadCmd(cmd threadCmd) {
 		rep.item, rep.err = r.sendMessage(cmd.send)
 	case cmd.effort != nil:
 		rep.thread = r.setEffort(*cmd.effort)
+	case cmd.wakeLimit:
+		rep.item = r.onWakeLimit()
 	default:
 		rep.item, rep.err = r.respond(cmd.requestID, cmd.decision)
 	}

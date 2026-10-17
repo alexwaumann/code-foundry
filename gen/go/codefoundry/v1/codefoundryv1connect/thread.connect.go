@@ -65,6 +65,14 @@ const (
 	ThreadServiceReportProcedure = "/codefoundry.v1.ThreadService/Report"
 	// ThreadServiceSetBudgetProcedure is the fully-qualified name of the ThreadService's SetBudget RPC.
 	ThreadServiceSetBudgetProcedure = "/codefoundry.v1.ThreadService/SetBudget"
+	// ThreadServiceSubscribeProcedure is the fully-qualified name of the ThreadService's Subscribe RPC.
+	ThreadServiceSubscribeProcedure = "/codefoundry.v1.ThreadService/Subscribe"
+	// ThreadServiceUnsubscribeProcedure is the fully-qualified name of the ThreadService's Unsubscribe
+	// RPC.
+	ThreadServiceUnsubscribeProcedure = "/codefoundry.v1.ThreadService/Unsubscribe"
+	// ThreadServiceListSubscriptionsProcedure is the fully-qualified name of the ThreadService's
+	// ListSubscriptions RPC.
+	ThreadServiceListSubscriptionsProcedure = "/codefoundry.v1.ThreadService/ListSubscriptions"
 	// ThreadServiceWatchProcedure is the fully-qualified name of the ThreadService's Watch RPC.
 	ThreadServiceWatchProcedure = "/codefoundry.v1.ThreadService/Watch"
 	// ThreadServiceStageAttachmentProcedure is the fully-qualified name of the ThreadService's
@@ -164,6 +172,18 @@ type ThreadServiceClient interface {
 	// SetBudget sets the thread's spending limit (Thread.budget_usd; 0 clears it). A
 	// budget above the thread's cost re-arms the budget stop. Any state. Persisted.
 	SetBudget(context.Context, *connect.Request[v1.SetThreadBudgetRequest]) (*connect.Response[v1.SetThreadBudgetResponse], error)
+	// Subscribe makes a wake subscription: when the target (a thread, or an action run)
+	// meets the condition, the daemon sends the subscriber a message (a user_message item
+	// with origin WAKE) through Send, which starts a stopped subscriber and unsnoozes it.
+	// Edge-triggered, and once at once when the target already meets the condition.
+	// FAILED_PRECONDITION for a subscription to itself or the reverse of an existing one.
+	// See docs/notes/agents-4-wake.md.
+	Subscribe(context.Context, *connect.Request[v1.SubscribeThreadRequest]) (*connect.Response[v1.SubscribeThreadResponse], error)
+	// Unsubscribe removes a subscription by id, or every subscription of a subscriber to a
+	// target. NOT_FOUND when nothing matched.
+	Unsubscribe(context.Context, *connect.Request[v1.UnsubscribeThreadRequest]) (*connect.Response[v1.UnsubscribeThreadResponse], error)
+	// ListSubscriptions lists one subscriber's subscriptions, or every thread's.
+	ListSubscriptions(context.Context, *connect.Request[v1.ListThreadSubscriptionsRequest]) (*connect.Response[v1.ListThreadSubscriptionsResponse], error)
 	// Watch streams changes to the thread list (every thread's record, not its items).
 	// The first event is a snapshot. WatchThread streams one thread's conversation.
 	Watch(context.Context, *connect.Request[v1.WatchThreadsRequest]) (*connect.ServerStreamForClient[v1.ThreadListEvent], error)
@@ -349,6 +369,24 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(threadServiceMethods.ByName("SetBudget")),
 			connect.WithClientOptions(opts...),
 		),
+		subscribe: connect.NewClient[v1.SubscribeThreadRequest, v1.SubscribeThreadResponse](
+			httpClient,
+			baseURL+ThreadServiceSubscribeProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("Subscribe")),
+			connect.WithClientOptions(opts...),
+		),
+		unsubscribe: connect.NewClient[v1.UnsubscribeThreadRequest, v1.UnsubscribeThreadResponse](
+			httpClient,
+			baseURL+ThreadServiceUnsubscribeProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("Unsubscribe")),
+			connect.WithClientOptions(opts...),
+		),
+		listSubscriptions: connect.NewClient[v1.ListThreadSubscriptionsRequest, v1.ListThreadSubscriptionsResponse](
+			httpClient,
+			baseURL+ThreadServiceListSubscriptionsProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("ListSubscriptions")),
+			connect.WithClientOptions(opts...),
+		),
 		watch: connect.NewClient[v1.WatchThreadsRequest, v1.ThreadListEvent](
 			httpClient,
 			baseURL+ThreadServiceWatchProcedure,
@@ -454,6 +492,9 @@ type threadServiceClient struct {
 	label             *connect.Client[v1.LabelThreadRequest, v1.LabelThreadResponse]
 	report            *connect.Client[v1.ReportThreadRequest, v1.ReportThreadResponse]
 	setBudget         *connect.Client[v1.SetThreadBudgetRequest, v1.SetThreadBudgetResponse]
+	subscribe         *connect.Client[v1.SubscribeThreadRequest, v1.SubscribeThreadResponse]
+	unsubscribe       *connect.Client[v1.UnsubscribeThreadRequest, v1.UnsubscribeThreadResponse]
+	listSubscriptions *connect.Client[v1.ListThreadSubscriptionsRequest, v1.ListThreadSubscriptionsResponse]
 	watch             *connect.Client[v1.WatchThreadsRequest, v1.ThreadListEvent]
 	stageAttachment   *connect.Client[v1.StageAttachmentRequest, v1.StageAttachmentResponse]
 	readAttachment    *connect.Client[v1.ReadAttachmentRequest, v1.ReadAttachmentResponse]
@@ -548,6 +589,21 @@ func (c *threadServiceClient) Report(ctx context.Context, req *connect.Request[v
 // SetBudget calls codefoundry.v1.ThreadService.SetBudget.
 func (c *threadServiceClient) SetBudget(ctx context.Context, req *connect.Request[v1.SetThreadBudgetRequest]) (*connect.Response[v1.SetThreadBudgetResponse], error) {
 	return c.setBudget.CallUnary(ctx, req)
+}
+
+// Subscribe calls codefoundry.v1.ThreadService.Subscribe.
+func (c *threadServiceClient) Subscribe(ctx context.Context, req *connect.Request[v1.SubscribeThreadRequest]) (*connect.Response[v1.SubscribeThreadResponse], error) {
+	return c.subscribe.CallUnary(ctx, req)
+}
+
+// Unsubscribe calls codefoundry.v1.ThreadService.Unsubscribe.
+func (c *threadServiceClient) Unsubscribe(ctx context.Context, req *connect.Request[v1.UnsubscribeThreadRequest]) (*connect.Response[v1.UnsubscribeThreadResponse], error) {
+	return c.unsubscribe.CallUnary(ctx, req)
+}
+
+// ListSubscriptions calls codefoundry.v1.ThreadService.ListSubscriptions.
+func (c *threadServiceClient) ListSubscriptions(ctx context.Context, req *connect.Request[v1.ListThreadSubscriptionsRequest]) (*connect.Response[v1.ListThreadSubscriptionsResponse], error) {
+	return c.listSubscriptions.CallUnary(ctx, req)
 }
 
 // Watch calls codefoundry.v1.ThreadService.Watch.
@@ -683,6 +739,18 @@ type ThreadServiceHandler interface {
 	// SetBudget sets the thread's spending limit (Thread.budget_usd; 0 clears it). A
 	// budget above the thread's cost re-arms the budget stop. Any state. Persisted.
 	SetBudget(context.Context, *connect.Request[v1.SetThreadBudgetRequest]) (*connect.Response[v1.SetThreadBudgetResponse], error)
+	// Subscribe makes a wake subscription: when the target (a thread, or an action run)
+	// meets the condition, the daemon sends the subscriber a message (a user_message item
+	// with origin WAKE) through Send, which starts a stopped subscriber and unsnoozes it.
+	// Edge-triggered, and once at once when the target already meets the condition.
+	// FAILED_PRECONDITION for a subscription to itself or the reverse of an existing one.
+	// See docs/notes/agents-4-wake.md.
+	Subscribe(context.Context, *connect.Request[v1.SubscribeThreadRequest]) (*connect.Response[v1.SubscribeThreadResponse], error)
+	// Unsubscribe removes a subscription by id, or every subscription of a subscriber to a
+	// target. NOT_FOUND when nothing matched.
+	Unsubscribe(context.Context, *connect.Request[v1.UnsubscribeThreadRequest]) (*connect.Response[v1.UnsubscribeThreadResponse], error)
+	// ListSubscriptions lists one subscriber's subscriptions, or every thread's.
+	ListSubscriptions(context.Context, *connect.Request[v1.ListThreadSubscriptionsRequest]) (*connect.Response[v1.ListThreadSubscriptionsResponse], error)
 	// Watch streams changes to the thread list (every thread's record, not its items).
 	// The first event is a snapshot. WatchThread streams one thread's conversation.
 	Watch(context.Context, *connect.Request[v1.WatchThreadsRequest], *connect.ServerStream[v1.ThreadListEvent]) error
@@ -864,6 +932,24 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(threadServiceMethods.ByName("SetBudget")),
 		connect.WithHandlerOptions(opts...),
 	)
+	threadServiceSubscribeHandler := connect.NewUnaryHandler(
+		ThreadServiceSubscribeProcedure,
+		svc.Subscribe,
+		connect.WithSchema(threadServiceMethods.ByName("Subscribe")),
+		connect.WithHandlerOptions(opts...),
+	)
+	threadServiceUnsubscribeHandler := connect.NewUnaryHandler(
+		ThreadServiceUnsubscribeProcedure,
+		svc.Unsubscribe,
+		connect.WithSchema(threadServiceMethods.ByName("Unsubscribe")),
+		connect.WithHandlerOptions(opts...),
+	)
+	threadServiceListSubscriptionsHandler := connect.NewUnaryHandler(
+		ThreadServiceListSubscriptionsProcedure,
+		svc.ListSubscriptions,
+		connect.WithSchema(threadServiceMethods.ByName("ListSubscriptions")),
+		connect.WithHandlerOptions(opts...),
+	)
 	threadServiceWatchHandler := connect.NewServerStreamHandler(
 		ThreadServiceWatchProcedure,
 		svc.Watch,
@@ -982,6 +1068,12 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 			threadServiceReportHandler.ServeHTTP(w, r)
 		case ThreadServiceSetBudgetProcedure:
 			threadServiceSetBudgetHandler.ServeHTTP(w, r)
+		case ThreadServiceSubscribeProcedure:
+			threadServiceSubscribeHandler.ServeHTTP(w, r)
+		case ThreadServiceUnsubscribeProcedure:
+			threadServiceUnsubscribeHandler.ServeHTTP(w, r)
+		case ThreadServiceListSubscriptionsProcedure:
+			threadServiceListSubscriptionsHandler.ServeHTTP(w, r)
 		case ThreadServiceWatchProcedure:
 			threadServiceWatchHandler.ServeHTTP(w, r)
 		case ThreadServiceStageAttachmentProcedure:
@@ -1081,6 +1173,18 @@ func (UnimplementedThreadServiceHandler) Report(context.Context, *connect.Reques
 
 func (UnimplementedThreadServiceHandler) SetBudget(context.Context, *connect.Request[v1.SetThreadBudgetRequest]) (*connect.Response[v1.SetThreadBudgetResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.SetBudget is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) Subscribe(context.Context, *connect.Request[v1.SubscribeThreadRequest]) (*connect.Response[v1.SubscribeThreadResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Subscribe is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) Unsubscribe(context.Context, *connect.Request[v1.UnsubscribeThreadRequest]) (*connect.Response[v1.UnsubscribeThreadResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Unsubscribe is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) ListSubscriptions(context.Context, *connect.Request[v1.ListThreadSubscriptionsRequest]) (*connect.Response[v1.ListThreadSubscriptionsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.ListSubscriptions is not implemented"))
 }
 
 func (UnimplementedThreadServiceHandler) Watch(context.Context, *connect.Request[v1.WatchThreadsRequest], *connect.ServerStream[v1.ThreadListEvent]) error {

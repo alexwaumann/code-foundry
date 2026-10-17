@@ -337,6 +337,9 @@ type CreateOptions struct {
 	Brief     string
 	Labels    []string
 	BudgetUSD float64
+	// Notify, with CreatedBy, also subscribes the creator to the new thread: condition
+	// settled, repeat (subscriptions.go). ErrInvalidArgument without CreatedBy.
+	Notify bool
 }
 
 // RunInTarget names the member a workspace thread should run in: its repository id or
@@ -451,4 +454,16 @@ type Store interface {
 	// the deny table, kept current as Claude pushes changes and kept while it is not
 	// running (slashcommands.go). nil when Claude never answered a handshake.
 	SlashCommands(ctx context.Context, id string) ([]SlashCommand, error)
+
+	// Wake subscriptions (subscriptions.go, docs/notes/agents-4-wake.md).
+
+	// Subscribe makes a subscription: the subscriber is sent a wake message when the
+	// target thread meets the condition (on each transition into it, and at once when it
+	// already does), or when the target action run finishes.
+	Subscribe(ctx context.Context, o SubscribeOptions) (SubscribeResult, error)
+	// Unsubscribe removes a subscription by id, or every subscription of a subscriber to
+	// a target, and returns what it removed (ErrNotFound when nothing matched).
+	Unsubscribe(ctx context.Context, o UnsubscribeOptions) ([]Subscription, error)
+	// Subscriptions lists a subscriber's subscriptions, or every thread's ("").
+	Subscriptions(ctx context.Context, subscriber string) ([]Subscription, error)
 }
