@@ -22,7 +22,7 @@ type cliPresenter func(ctx context.Context, cl *cli, c *client.Client, vals map[
 
 // cliPresenters maps command names to their CLI presentation.
 var cliPresenters = map[string]cliPresenter{
-	// project.clone streams RepoService.Clone so the clone's progress shows as it runs;
+	// project.clone streams ProjectService.Clone so the clone's progress shows as it runs;
 	// Invoke would only answer once it is done.
 	"project.clone": presentClone,
 }

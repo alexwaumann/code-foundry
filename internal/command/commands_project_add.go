@@ -11,9 +11,9 @@ import (
 )
 
 // CloneFunc clones a github.com repository named by ref (owner/repo or an
-// https://github.com URL) into the projects directory and registers it: RepoService.Clone
+// https://github.com URL) into the projects directory and registers it: ProjectService.Clone
 // without the stream. progress gets every output line. A malformed ref is
-// InvalidArgument. The daemon wires the RepoService handler's CloneRef.
+// InvalidArgument. The daemon wires the ProjectService handler's CloneRef.
 type CloneFunc func(ctx context.Context, ref string, progress func(*v1.CloneProgress)) (*v1.Project, error)
 
 // AddProjectHint is project.add's answer outside the app without a folder, where there is
@@ -21,7 +21,7 @@ type CloneFunc func(ctx context.Context, ref string, progress func(*v1.CloneProg
 const AddProjectHint = "Add a project from the CLI with `code-foundry project add <folder>` " +
 	"or `code-foundry project clone <owner/repo>`; in the app, project.add opens the Add Project dialog."
 
-// RegisterRepoAdd registers project.add (the Add Project dialog in the app; on the CLI it
+// RegisterProjectAdd registers project.add (the Add Project dialog in the app; on the CLI it
 // registers a folder through repos.Register, or prints AddProjectHint without one) and
 // project.clone. A nil repos makes project.add with a folder fail with Unimplemented; a nil
 // clone does the same for project.clone.
@@ -45,7 +45,7 @@ func RegisterProjectAdd(r *Registry, projects ProjectBackend, clone CloneFunc) e
 				{Name: "path", Type: Path, Positional: true,
 					Description: "Project folder to add without the dialog (a git repository or any folder under home)"},
 			},
-			// The GUI presents it (the dialog, which calls RepoService.Register itself) and
+			// The GUI presents it (the dialog, which calls ProjectService.Register itself) and
 			// never invokes it; this is the CLI's answer. The palette does not prompt for
 			// an optional path.
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {

@@ -34,7 +34,7 @@ func New(root string) *Fake {
 	return &Fake{Root: root, created: map[string]project.Project{}, projects: map[string]project.Project{}, errs: map[string]error{}}
 }
 
-// AddRepo makes r publishable.
+// AddProject makes r publishable.
 func (f *Fake) AddProject(r project.Project) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

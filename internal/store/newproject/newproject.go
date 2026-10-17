@@ -1,6 +1,6 @@
-// Package newproject starts new projects in the projects directory (RepoService.Create,
-// the repo.create command), publishes git projects to GitHub (RepoService.Publish,
-// repo.github.publish) and deletes projects it made (RepoService.Delete, repo.delete:
+// Package newproject starts new projects in the projects directory (ProjectService.Create,
+// the project.create command), publishes git projects to GitHub (ProjectService.Publish,
+// project.github.publish) and deletes projects it made (ProjectService.Delete, project.delete:
 // unregister, then remove the folder).
 //
 // Create makes <projects>/<name>, runs the project store's InitRepository there (git init
@@ -34,7 +34,7 @@ import (
 const DefaultPublishTimeout = 5 * time.Minute
 
 // MaxNameLength is the longest project name Create accepts (GitHub's limit for
-// repository names).
+// project names).
 const MaxNameLength = 100
 
 // settleTimeout bounds registering a created project and refreshing a published one.
@@ -114,7 +114,7 @@ type Service interface {
 
 var _ Service = (*Store)(nil)
 
-// Repos is what the store needs from the project store. *repo.Git implements it.
+// Projects is what the store needs from the project store. *project.Git implements it.
 type Projects interface {
 	Snapshot() *project.Snapshot
 	Register(ctx context.Context, path string) (project.Project, error)
@@ -129,9 +129,9 @@ type Options struct {
 	// AllowedRoot is the directory every project must lie under (the resolved user
 	// home). Empty skips the check (the project store still enforces it on register).
 	AllowedRoot string
-	// Repos registers and refreshes projects. Required.
+	// Projects registers and refreshes projects. Required.
 	Projects Projects
-	// Git runs git for Create; repo.ExecRunner{} when nil.
+	// Git runs git for Create; project.ExecRunner{} when nil.
 	Git project.Runner
 	// Gh is the gh binary; "gh" from PATH when empty.
 	Gh string
@@ -146,7 +146,7 @@ type Options struct {
 type Store struct {
 	opts Options
 	mu   sync.Mutex
-	busy map[string]bool // repo ids being published
+	busy map[string]bool // project ids being published
 }
 
 // New returns a Store.

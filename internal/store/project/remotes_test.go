@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// newLocalRepo creates a repository with one commit on main and no remote.
+// newLocalProject creates a repository with one commit on main and no remote.
 func newLocalProject(t *testing.T) string {
 	t.Helper()
 	isolateGit(t)
@@ -111,7 +111,7 @@ func TestRemoteChangesAreDetected(t *testing.T) {
 	}
 }
 
-// A new worktree in a local-only repo branches from the local default branch, and
+// A new worktree in a local-only project branches from the local default branch, and
 // Fetch is a no-op: there is nothing to fetch from.
 func TestCreateWorktreeFetchInLocalOnlyProject(t *testing.T) {
 	dir := newLocalProject(t)

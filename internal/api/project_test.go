@@ -244,7 +244,7 @@ func TestProjectWatch(t *testing.T) {
 	if got := next().GetWorktreeRemoved(); got.GetPath() != w.Path || got.GetProjectId() != r.ID {
 		t.Fatalf("want worktree_removed, got %v", got)
 	}
-	next() // repo_updated after removal
+	next() // project_updated after removal
 	_ = fake.Unregister(ctx, r.ID)
 	if got := next().GetProjectRemovedId(); got != r.ID {
 		t.Fatalf("want repo_removed_id, got %v", got)

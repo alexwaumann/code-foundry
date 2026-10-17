@@ -43,7 +43,7 @@ const gitFilesTimeout = 15 * time.Second
 // gitEnv is base without the variables that would point git at another repository
 // (a daemon started from a git hook inherits them), plus GIT_OPTIONAL_LOCKS=0 so
 // listing never rewrites the index (which would fire the project store's watcher) and
-// GIT_TERMINAL_PROMPT=0. The repo store's runner does the same for its commands.
+// GIT_TERMINAL_PROMPT=0. The project store's runner does the same for its commands.
 func gitEnv(base []string) []string {
 	out := make([]string, 0, len(base)+2)
 	for _, kv := range base {
@@ -271,7 +271,7 @@ func (x *FileIndex) fill(ctx context.Context, key, dir string, git bool, l *list
 	var c cachedFiles
 	if err == nil {
 		// Stamp the entry when the listing is done: one slower than the TTL (a huge
-		// repo) would otherwise be cached already expired and re-run on every keystroke.
+		// project) would otherwise be cached already expired and re-run on every keystroke.
 		now := x.now()
 		c = cachedFiles{key: key, files: files, paths: make([]string, len(files)), created: now}
 		for i, f := range files {

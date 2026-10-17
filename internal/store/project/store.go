@@ -43,8 +43,8 @@ type Options struct {
 	// WorktreeRoot is where CreateWorktree puts worktrees without an explicit path:
 	// <WorktreeRoot>/<owner>/<repo>/<branch>. Required, absolute.
 	WorktreeRoot string
-	// ManagedRoots lists more directories the app makes worktrees in for the repository
-	// named repoName (the repos.worktree_dir setting); WorktreeRoot always counts. Only a
+	// ManagedRoots lists more directories the app makes worktrees in for the project
+	// named projectName (the projects.worktree_dir setting); WorktreeRoot always counts. Only a
 	// worktree inside one of them is Worktree.Managed, so only those can be cleaned up.
 	// Nil: WorktreeRoot only.
 	ManagedRoots func(projectName string) []string
@@ -58,7 +58,7 @@ type Options struct {
 	Workers int
 	// Debounce is the per-worktree coalescing window for fs events.
 	Debounce time.Duration
-	// FetchInterval is how often each repo runs `git fetch --prune`. Zero means
+	// FetchInterval is how often each project runs `git fetch --prune`. Zero means
 	// DefaultFetchInterval; negative disables fetching.
 	FetchInterval time.Duration
 	// PollInterval is a backstop status refresh of every worktree, for changes the
@@ -69,7 +69,7 @@ type Options struct {
 	Now func() time.Time
 }
 
-// repoMeta is a repo's metadata slot, written only by Register and the repo's
+// projectMeta is a project's metadata slot, written only by Register and the project's
 // reconcile job.
 type projectMeta struct {
 	ID            string
@@ -97,9 +97,9 @@ func (m *projectMeta) commonDir() string { return filepath.Join(m.Path, ".git") 
 
 type projectState struct {
 	meta atomic.Pointer[projectMeta]
-	// base is origin/<default> resolved to a sha; written only by the repo's jobBase.
+	// base is origin/<default> resolved to a sha; written only by the project's jobBase.
 	base atomic.Pointer[projectBase]
-	// wts is guarded by Git.mu; only the repo's reconcile job adds or removes slots.
+	// wts is guarded by Git.mu; only the project's reconcile job adds or removes slots.
 	wts map[string]*wtSlot
 }
 
@@ -155,8 +155,8 @@ type Git struct {
 
 var _ Store = (*Git)(nil)
 
-// Start loads registered repos, starts the watcher, workers, and periodic loops, and
-// schedules an initial reconcile of every repo. It returns without waiting for git.
+// Start loads registered projects, starts the watcher, workers, and periodic loops, and
+// schedules an initial reconcile of every project. It returns without waiting for git.
 func Start(ctx context.Context, opts Options) (*Git, error) {
 	if opts.DB == nil || opts.Bus == nil {
 		return nil, errors.New("project: Options.DB and Options.Bus are required")
@@ -383,7 +383,7 @@ func (g *Git) projectIDs() []string {
 	return ids
 }
 
-// refresh reconciles repo id, re-resolves its base, and then refreshes every
+// refresh reconciles project id, re-resolves its base, and then refreshes every
 // worktree's status, waiting for each step so the statuses see the new base.
 func (g *Git) refresh(ctx context.Context, id string) error {
 	if err := g.sched.wait(ctx, jobKey{kind: jobReconcile, projectID: id}); err != nil {
@@ -442,8 +442,8 @@ func (g *Git) Register(ctx context.Context, path string) (Project, error) {
 			g.mu.Unlock()
 			return Project{}, fmt.Errorf("project: register %s: %w", mainPath, err)
 		}
-		// No publish here: the first reconcile always publishes RepoUpdated (its
-		// worktree set changes from empty), so watchers never see a worktree-less repo.
+		// No publish here: the first reconcile always publishes ProjectUpdated (its
+		// worktree set changes from empty), so watchers never see a worktree-less project.
 		g.log.Info("project registered", "id", m.ID, "path", m.Path)
 	}
 	if err := g.refresh(ctx, m.ID); err != nil {
@@ -643,7 +643,7 @@ func (g *Git) CreateWorktree(ctx context.Context, opts CreateWorktreeOptions) (W
 // base, or an explicit base naming the checkout's own branch. A `git init` folder
 // (or one whose Add-project initial commit failed) otherwise fails `git worktree add`
 // with "invalid reference: main", which a user cannot be asked to understand. The
-// commit is harmless and is what Add project makes; the repo is refreshed after it
+// commit is harmless and is what Add project makes; the project is refreshed after it
 // so DefaultBranch, refs and the main worktree's head see the commit. Any other
 // base is left to git.
 func (g *Git) ensureBorn(ctx context.Context, m *projectMeta, base string) error {
@@ -755,7 +755,7 @@ func (g *Git) ListRefs(ctx context.Context, projectID string) (Refs, error) {
 		return Refs{}, fmt.Errorf("project: list refs of %s: %w", m.ID, err)
 	}
 	refs := parseRefs(out)
-	// DefaultBranch is empty until the repo's first reconcile after a daemon start.
+	// DefaultBranch is empty until the project's first reconcile after a daemon start.
 	def := m.DefaultBranch
 	if def == "" {
 		_, err := g.runner.Run(ctx, m.Path, "remote", "get-url", "origin")
@@ -842,7 +842,7 @@ func (g *Git) runJob(ctx context.Context, k jobKey) {
 	}
 }
 
-// reconcile re-lists a repo's worktrees and metadata, syncs slots and watches,
+// reconcile re-lists a project's worktrees and metadata, syncs slots and watches,
 // publishes, then requests jobBase, which re-resolves the base and refreshes the
 // status of every worktree.
 func (g *Git) reconcile(ctx context.Context, id string) {
@@ -1022,7 +1022,7 @@ func (g *Git) inspect(ctx context.Context, m *projectMeta) ([]listedWorktree, er
 	}
 
 	// One `git remote` per reconcile; origin's URL is read only when origin exists. A
-	// failed listing keeps the previous remotes rather than reporting a local-only repo.
+	// failed listing keeps the previous remotes rather than reporting a local-only project.
 	listedRemotes := true
 	if out, err := g.runner.Run(ctx, m.Path, "remote"); err == nil {
 		m.Remotes = parseRemotes(out)
@@ -1200,7 +1200,7 @@ func (g *Git) keysFor(ev fsnotify.Event) []jobKey {
 	var act action
 	switch {
 	case self && (ev.Has(fsnotify.Remove) || ev.Has(fsnotify.Rename)):
-		// A watched directory itself went away (worktree deleted by hand, repo moved).
+		// A watched directory itself went away (worktree deleted by hand, project moved).
 		act = actReconcile
 	default:
 		g.mu.RLock()
@@ -1227,8 +1227,8 @@ func (g *Git) keysFor(ev fsnotify.Event) []jobKey {
 	return nil
 }
 
-// fetchLoop fetches every repo, one at a time, every interval. The first round runs
-// shortly after start, once the initial reconcile has learned each repo's origin.
+// fetchLoop fetches every project, one at a time, every interval. The first round runs
+// shortly after start, once the initial reconcile has learned each project's origin.
 func (g *Git) fetchLoop(ctx context.Context, every time.Duration) {
 	t := time.NewTimer(min(every, firstFetchDelay))
 	defer t.Stop()
@@ -1283,7 +1283,7 @@ func (g *Git) pollLoop(ctx context.Context, every time.Duration) {
 		}
 		for _, id := range g.projectIDs() {
 			if st := g.project(id); st != nil && (st.meta.Load().Error != "" || !st.meta.Load().Git) {
-				// Failed repos have no watches left; retry so a moved-back repo recovers.
+				// Failed projects have no watches left; retry so a moved-back project recovers.
 				// A project without git has none either: its reconcile is a stat that
 				// notices a .git created outside the app.
 				g.sched.request(jobKey{kind: jobReconcile, projectID: id})

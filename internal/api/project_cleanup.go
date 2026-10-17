@@ -18,8 +18,8 @@ func (h *Project) WithCleanupHold(hold func(project.Worktree) string) *Project {
 	return h
 }
 
-// CleanupWorktrees removes the repository's merged, clean, unheld worktrees
-// (repo.Cleanup), or with dry_run lists them.
+// CleanupWorktrees removes the project's merged, clean, unheld worktrees
+// (project.Cleanup), or with dry_run lists them.
 func (h *Project) CleanupWorktrees(ctx context.Context, req *connect.Request[v1.CleanupWorktreesRequest]) (*connect.Response[v1.CleanupWorktreesResponse], error) {
 	r, err := workspace.ResolveProject(h.store.Snapshot(), req.Msg.GetProject())
 	if err != nil {

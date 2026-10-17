@@ -57,7 +57,7 @@ func TestWorktreeBase(t *testing.T) {
 	}
 }
 
-// repos.worktree_dir applies live to the worktrees new threads create.
+// projects.worktree_dir applies live to the worktrees new threads create.
 func TestSettingsWorktreePath(t *testing.T) {
 	st := openSettings(t)
 	pick := settingsWorktreePath(st)

@@ -58,8 +58,8 @@ type stores struct {
 	thread *thread.Manager
 	// update checks for and installs new releases (disabled in dev builds).
 	update *update.Store
-	// workspace holds branch sets across repos; it creates and removes worktrees
-	// through repo and asks thread which threads are live. Opened before thread,
+	// workspace holds branch sets across projects; it creates and removes worktrees
+	// through project and asks thread which threads are live. Opened before thread,
 	// which reads workspace members at launch.
 	workspace *workspace.Manager
 	// action holds each project's actions and runs them (in a terminal, or in the

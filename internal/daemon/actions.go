@@ -24,12 +24,12 @@ type actionRuns interface {
 // startActionCleanup keeps actions in step with their owners, like the shell reaper
 // does for terminals (which also covers action runs in a terminal, kind=action):
 //
-//   - a project is unregistered (repo.RepoRemoved): its actions are forgotten (the
+//   - a project is unregistered (project.ProjectRemoved): its actions are forgotten (the
 //     database cascades) and its runs killed and forgotten;
 //   - a thread is removed (thread.Removed), archived or snoozed (thread.Updated with
 //     ArchivedAt or SnoozedUntil set): its background runs are killed, as its action
 //     terminals are by the thread store;
-//   - a worktree's directory is removed (repo.WorktreeRemoved, directory gone): the
+//   - a worktree's directory is removed (project.WorktreeRemoved, directory gone): the
 //     background runs in it are killed.
 //
 // The returned func stops it.

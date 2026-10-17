@@ -17,7 +17,7 @@
 //
 // Runs live in memory only, newest RunHistory per project. Background runs are killed
 // when the store closes (daemon shutdown), when their project is unregistered
-// (RepoRemoved), and by KillRuns (the daemon calls it when a thread or worktree goes
+// (ProjectRemoved), and by KillRuns (the daemon calls it when a thread or worktree goes
 // away). See docs/notes/actions-1-daemon.md.
 package action
 
@@ -54,12 +54,12 @@ var Icons = []string{IconPlay, IconTest, IconLint, IconConfigure, IconBuild, Ico
 type Action struct {
 	ID               string // "a-" + 12 hex digits
 	ProjectID        string
-	Name             string // unique within RepoID, ignoring case
+	Name             string // unique within ProjectID, ignoring case
 	Command          string
 	Icon             string // one of Icons
 	InTerminal       bool
 	OnWorktreeCreate bool
-	Position         int // 0-based within RepoID
+	Position         int // 0-based within ProjectID
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 }
@@ -154,7 +154,7 @@ func (s *Snapshot) Action(id string) (Action, bool) {
 	return s.Actions[i], true
 }
 
-// ForRepo returns repoID's actions in order (all actions when repoID is empty).
+// ForProject returns projectID's actions in order (all actions when projectID is empty).
 func (s *Snapshot) ForProject(projectID string) []Action {
 	if s == nil {
 		return nil
@@ -183,7 +183,7 @@ func (s *Snapshot) Run(id string) (Run, bool) {
 	return s.Runs[i], true
 }
 
-// Resolve finds an action by id, else by name (ignoring case) within repoID.
+// Resolve finds an action by id, else by name (ignoring case) within projectID.
 func (s *Snapshot) Resolve(projectID, ref string) (Action, error) {
 	ref = strings.TrimSpace(ref)
 	if ref == "" {
@@ -272,7 +272,7 @@ type UpdateOptions struct {
 	Position *int
 }
 
-// Owner is who a run belongs to: a thread (ThreadID set; RepoID and Worktree are the
+// Owner is who a run belongs to: a thread (ThreadID set; ProjectID and Worktree are the
 // thread's) or a worktree.
 type Owner struct {
 	ThreadID  string
@@ -282,7 +282,7 @@ type Owner struct {
 
 // RunOptions configures Store.Run.
 type RunOptions struct {
-	// Action is an action id, or its name within RepoID (default: the owner's project).
+	// Action is an action id, or its name within ProjectID (default: the owner's project).
 	Action string
 	// ThreadID makes the thread the owner; it wins over Worktree.
 	ThreadID string

@@ -401,7 +401,7 @@ func subscribeTopics(ctx context.Context, topics []topic) <-chan *v1.Event {
 	return out
 }
 
-// ---- repo ----------------------------------------------------------------------
+// ---- project ----------------------------------------------------------------------
 
 type projectSource struct {
 	store project.Store

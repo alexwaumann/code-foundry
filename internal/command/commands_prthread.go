@@ -22,7 +22,7 @@ import (
 type PullRequestThreadDeps struct {
 	// Gh reads the pull request (GetPullRequestDetail).
 	Gh GhBackend
-	// Repo lists registered repositories (to find the clone of the slug and its
+	// Project lists registered projects (to find the clone of the slug and its
 	// worktrees) and creates the head branch's worktree for pr.fix.findings.
 	Project ProjectBackend
 	// Thread starts the thread (Create with an initial prompt).
@@ -118,19 +118,19 @@ func worktreeStatus(projects []*v1.Project, path string) *v1.GitStatus {
 
 // prWorktreePick is where a pull request thread runs.
 type prWorktreePick struct {
-	// RepoID is the registered repository; empty for an explicit worktree, which the
+	// ProjectID is the registered project; empty for an explicit worktree, which the
 	// thread store resolves itself.
 	ProjectID string
 	// Path is the worktree; empty when Create.
 	Path string
-	// Create: create a worktree for the head branch in RepoID first.
+	// Create: create a worktree for the head branch in ProjectID first.
 	Create bool
-	// MainPath is RepoID's main worktree (Create fetches there).
+	// MainPath is ProjectID's main worktree (Create fetches there).
 	MainPath string
 }
 
 // pickPRWorktree chooses the worktree for a pull request thread. repos are the
-// registered repositories in RepoService.List order; the clones of slug are those
+// registered projects in ProjectService.List order; the clones of slug are those
 // whose github_slug matches it (case-insensitively). explicit is the worktree arg,
 // active the caller's active worktree. Errors are FailedPrecondition.
 func pickPRWorktree(kind prThreadKind, projects []*v1.Project, slug string, number int, head prHead, explicit, active string) (prWorktreePick, error) {

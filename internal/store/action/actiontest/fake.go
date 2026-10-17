@@ -138,7 +138,7 @@ func (f *Fake) Delete(_ context.Context, id string) error {
 	return nil
 }
 
-// Run implements action.Store: it resolves the action by id, else by name in o.RepoID,
+// Run implements action.Store: it resolves the action by id, else by name in o.ProjectID,
 // records o, and returns a running run (ModeBackground unless o.Mode says otherwise).
 func (f *Fake) Run(_ context.Context, o action.RunOptions) (action.Run, error) {
 	f.mu.Lock()

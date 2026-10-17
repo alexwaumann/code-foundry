@@ -9,16 +9,16 @@ import (
 // base ahead/behind, the detail's merge base, files, and log). Those results depend
 // only on (HEAD sha, base sha), so status and detail jobs memoize them by that pair and
 // rerun the walks only when one side moves. HEAD comes from each status run; the base
-// sha is resolved once per repo by jobBase, which owns repoState.base.
+// sha is resolved once per project by jobBase, which owns projectState.base.
 //
 // jobBase runs wherever a status refresh of every worktree used to be requested: after
 // each reconcile (which fetch, FETCH_HEAD, packed-refs, and config changes trigger), on
 // any change under refs/remotes/origin, and on every backstop poll. It always ends by
 // requesting a status refresh of every worktree, so a status job that starts after a
-// base change reads the new sha. Its cost is one `git rev-parse` per repo per round.
+// base change reads the new sha. Its cost is one `git rev-parse` per project per round.
 
-// repoBase is origin/<default> as last resolved for a repo. A nil or empty sha means
-// there is no such ref (no remote, never fetched, or the repo is in error).
+// projectBase is origin/<default> as last resolved for a project. A nil or empty sha means
+// there is no such ref (no remote, never fetched, or the project is in error).
 type projectBase struct {
 	ref string // "origin/<default>"
 	sha string
@@ -32,7 +32,7 @@ type baseCount struct {
 }
 
 // resolveBase is the jobBase body: the only writer of st.base. It then requests a
-// status refresh of every worktree in the repo.
+// status refresh of every worktree in the project.
 func (g *Git) resolveBase(ctx context.Context, projectID string) {
 	st := g.project(projectID)
 	if st == nil {
@@ -72,7 +72,7 @@ func (g *Git) resolveBase(ctx context.Context, projectID string) {
 	}
 }
 
-// baseCounts returns HEAD's ahead/behind against the repo's base, reusing the
+// baseCounts returns HEAD's ahead/behind against the project's base, reusing the
 // worktree's memo when neither HEAD nor the base moved. ok is false when there is no
 // base comparison (no base ref, unborn HEAD, or rev-list failed). reused reports a memo
 // hit. Called only by the worktree's status job, which owns slot.base.

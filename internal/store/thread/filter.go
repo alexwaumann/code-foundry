@@ -29,7 +29,7 @@ type ListOptions struct {
 	// match any.
 	Status Status
 	State  State
-	// Repo: only threads whose cwd is in this repository. Store.List takes an id, a
+	// Project: only threads whose cwd is in this project. Store.List takes an id, a
 	// name or a path inside one of its worktrees; FilterThreads compares the id.
 	Project string
 	// Workspace: only threads the workspace owns. Store.List takes an id or a name;
@@ -45,7 +45,7 @@ type ListOptions struct {
 
 // FilterThreads returns the threads o selects, the most recently active first (last
 // activity, else creation; then the newest created, then by id), at most o.Limit of
-// them. o.Repo and o.Workspace are compared as ids.
+// them. o.Project and o.Workspace are compared as ids.
 func FilterThreads(threads []Thread, o ListOptions) []Thread {
 	var out []Thread
 	for _, t := range threads {
@@ -95,11 +95,11 @@ func lastActive(t Thread) time.Time {
 	return t.CreatedAt
 }
 
-// List returns the threads o selects (FilterThreads), resolving its Repo (an id, a
+// List returns the threads o selects (FilterThreads), resolving its Project (an id, a
 // name, or a path inside a worktree) and Workspace (an id or a name) first. A ref that
 // names nothing is ErrInvalidArgument.
 func (m *Manager) List(_ context.Context, o ListOptions) ([]Thread, error) {
-	if o.Project != "" && !o.All && m.opts.Projects != nil { // without a repo store (tests): an id
+	if o.Project != "" && !o.All && m.opts.Projects != nil { // without a project store (tests): an id
 		r, err := workspace.ResolveProject(m.opts.Projects.Snapshot(), o.Project)
 		if err != nil {
 			return nil, listRefError("project", o.Project, err)

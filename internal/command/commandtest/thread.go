@@ -45,7 +45,7 @@ func (s *Thread) do(m proto.Message) error {
 // Create echoes the request as a STARTING thread "s1". With new_worktree the thread
 // is in /worktrees/s1 with created_worktree and base_ref set. workspace_id is echoed;
 // with new_workspace the thread belongs to "w-new" and runs in /worktrees/<repo>
-// (repo_id, else the first repo). With no_project it runs in /home.
+// (project_id, else the first project). With no_project it runs in /home.
 func (s *Thread) Create(_ context.Context, r *connect.Request[v1.CreateThreadRequest]) (*connect.Response[v1.CreateThreadResponse], error) {
 	if err := s.do(r.Msg); err != nil {
 		return nil, err
@@ -179,7 +179,7 @@ func (s *Thread) Snooze(_ context.Context, r *connect.Request[v1.SnoozeThreadReq
 
 // RunIn returns Current (default: a CONNECTED thread in workspace "w-1") with the
 // requested id. A disconnected thread runs in the target at once; a live one gets it
-// as pending_worktree_path. The target is worktree_path, else /worktrees/<repo_id>.
+// as pending_worktree_path. The target is worktree_path, else /worktrees/<project_id>.
 func (s *Thread) RunIn(_ context.Context, r *connect.Request[v1.RunInThreadRequest]) (*connect.Response[v1.RunInThreadResponse], error) {
 	if err := s.do(r.Msg); err != nil {
 		return nil, err

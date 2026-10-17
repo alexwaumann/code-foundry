@@ -16,7 +16,7 @@ import (
 // Workspace threads (docs/notes/workspaces-2-launch.md).
 //
 // A thread's owner is one field: Thread.WorkspaceID when set, else the project
-// RepoID. The cwd (RepoID, WorktreePath) is a separate fact: the member worktree the
+// ProjectID. The cwd (ProjectID, WorktreePath) is a separate fact: the member worktree the
 // thread runs in. The thread store reads workspaces from the workspace store (never
 // the other way round: the workspace store learns about live threads from a function
 // the daemon hands it).
@@ -93,9 +93,9 @@ type WorkspaceSource interface {
 
 // NewWorkspace configures the workspace Create makes for a new workspace thread.
 type NewWorkspace struct {
-	// Repos are repository refs (id, name when unique, or an absolute path inside
+	// Projects are project refs (id, name when unique, or an absolute path inside
 	// one), in member order, each optionally followed by ":<base ref>" for that member
-	// (as `workspace new --repos`). CreateOptions.RepoID picks the member the thread
+	// (as `workspace new --projects`). CreateOptions.ProjectID picks the member the thread
 	// runs in (default: the first).
 	Projects []string
 	// BaseRef every member without its own base branches from. Empty: each
@@ -117,7 +117,7 @@ type createdWorkspace struct {
 }
 
 // workspaceMember resolves the member a thread of workspace ref (id or name) runs in;
-// see pickMember. repoID may also be a repository name.
+// see pickMember. projectID may also be a project name.
 func (m *Manager) workspaceMember(ref, projectID, path string) (workspace.Workspace, workspace.Member, error) {
 	if m.opts.Workspaces == nil {
 		return workspace.Workspace{}, workspace.Member{}, fmt.Errorf("%w: workspace threads need the workspace store", ErrFailedPrecondition)
@@ -140,7 +140,7 @@ func (m *Manager) workspaceMember(ref, projectID, path string) (workspace.Worksp
 }
 
 // pickMember chooses the member of w a thread runs in: the one whose worktree is path,
-// else the one for repoID, else the first. When both are given they must name the same
+// else the one for projectID, else the first. When both are given they must name the same
 // member. A path inside a member worktree but not the worktree itself is not a member.
 func pickMember(w workspace.Workspace, projectID, path string) (workspace.Member, error) {
 	if len(w.Members) == 0 {

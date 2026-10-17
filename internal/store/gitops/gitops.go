@@ -28,7 +28,7 @@ var (
 	ErrInvalidArgument = errors.New("invalid argument")
 	ErrClosed          = errors.New("gitops store closed")
 	// ErrNoRemote is returned by Fetch, Pull, Push, CreatePR and OpenPR for a worktree
-	// of a registered repository that has no git remote (see LocalOnly).
+	// of a registered project that has no git remote (see LocalOnly).
 	ErrNoRemote = errors.New("repository has no remote")
 )
 
@@ -85,7 +85,7 @@ type Op struct {
 	Title string
 	// WorktreePath is where the operation runs (symlinks resolved). Empty for open-url.
 	WorktreePath string
-	// RepoID is the registered repo containing WorktreePath, or empty.
+	// ProjectID is the registered project containing WorktreePath, or empty.
 	ProjectID string
 	// Branch when the operation was requested, if known.
 	Branch     string
@@ -180,10 +180,10 @@ type Store interface {
 	Reveal(ctx context.Context, worktreePath string) (Op, error)
 	OpenURL(ctx context.Context, url string) (Op, error)
 	// GitHubSlug returns the GitHub "owner/name" of the registered repo containing
-	// worktreePath, else of repo repoID, else "".
+	// worktreePath, else of project projectID, else "".
 	GitHubSlug(projectID, worktreePath string) string
-	// LocalOnly reports whether the registered repo containing worktreePath (else repo
-	// repoID) has no git remote. It is false for an unknown path or repo and for a repo
+	// LocalOnly reports whether the registered project containing worktreePath (else project
+	// projectID) has no git remote. It is false for an unknown path or project and for a project
 	// not yet (or not currently) reconciled, so it never hides an action by mistake.
 	LocalOnly(projectID, worktreePath string) bool
 }
@@ -193,8 +193,8 @@ func IsLocalOnly(r project.Project) bool {
 	return r.ID != "" && r.Error == "" && len(r.Worktrees) > 0 && len(r.Remotes) == 0
 }
 
-// Repos is the part of the project store gitops uses: the snapshot to map a path to its
-// repo (id, slug, branch) and Refresh after operations that move refs. repo.Store
+// Projects is the part of the project store gitops uses: the snapshot to map a path to its
+// repo (id, slug, branch) and Refresh after operations that move refs. project.Store
 // satisfies it.
 type Projects interface {
 	Snapshot() *project.Snapshot

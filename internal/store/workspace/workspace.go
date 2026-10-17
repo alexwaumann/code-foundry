@@ -1,5 +1,5 @@
 // Package workspace is the workspace store. A workspace is a branch set: one branch
-// checked out as a worktree in each of several registered repositories, for a change
+// checked out as a worktree in each of several registered projects, for a change
 // that spans them. The store persists workspaces in SQLite, publishes an immutable
 // Snapshot behind an atomic pointer, and emits Updated/Removed events on the bus.
 //
@@ -33,13 +33,13 @@ type Workspace struct {
 	Members   []Member // in the order they were added
 }
 
-// Member is one repository's worktree in a workspace.
+// Member is one project's worktree in a workspace.
 type Member struct {
 	ProjectID    string
 	WorktreePath string
 }
 
-// Member returns the member for repoID.
+// Member returns the member for projectID.
 func (w Workspace) Member(projectID string) (Member, bool) {
 	i := slices.IndexFunc(w.Members, func(m Member) bool { return m.ProjectID == projectID })
 	if i < 0 {
@@ -87,9 +87,9 @@ type Ref struct {
 	Cwd       string // absolute path
 }
 
-// MemberSpec names a repository to add.
+// MemberSpec names a project to add.
 type MemberSpec struct {
-	// Repo is a repository id, its name when unique, or a path inside it.
+	// Project is a project id, its name when unique, or a path inside it.
 	Project string
 	// BaseRef is where the branch starts when it does not exist yet. Empty: the
 	// operation's default base, else the project store's default (origin/<default>).
@@ -104,21 +104,21 @@ type CreateOptions struct {
 	Members []MemberSpec
 	// BaseRef is the default base for members without their own.
 	BaseRef string
-	// Fetch refreshes each remote-tracking base first (see repo.CreateWorktreeOptions).
+	// Fetch refreshes each remote-tracking base first (see project.CreateWorktreeOptions).
 	Fetch bool
 }
 
-// AddRepoOptions configures Store.AddRepo.
+// AddProjectOptions configures Store.AddProject.
 type AddProjectOptions struct {
 	Ref
 	Member MemberSpec
 	Fetch  bool
 }
 
-// RemoveRepoOptions configures Store.RemoveRepo.
+// RemoveProjectOptions configures Store.RemoveProject.
 type RemoveProjectOptions struct {
 	Ref
-	// Repo is a repository id, name, or a path inside it (the member worktree path
+	// Project is a project id, name, or a path inside it (the member worktree path
 	// works too).
 	Project string
 	// Force removes the worktree even with uncommitted changes.
@@ -143,10 +143,10 @@ type Membership struct {
 // MemberInfo is a member with what the project store knows about it now.
 type MemberInfo struct {
 	Member
-	ProjectName string // empty when the repo is no longer registered
+	ProjectName string // empty when the project is no longer registered
 	// Branch checked out in the worktree now; the workspace branch when unknown.
 	Branch string
-	// Missing: the worktree is not among its repository's worktrees.
+	// Missing: the worktree is not among its project's worktrees.
 	Missing bool
 	// Current: the Ref's Cwd is inside this worktree.
 	Current bool
@@ -166,9 +166,9 @@ type Store interface {
 	// Create makes a workspace and a worktree on its branch in every member
 	// repository. On failure, worktrees it made are removed again.
 	Create(ctx context.Context, opts CreateOptions) (Workspace, error)
-	// AddRepo creates a worktree on the workspace branch in another repository.
+	// AddProject creates a worktree on the workspace branch in another project.
 	AddProject(ctx context.Context, opts AddProjectOptions) (Workspace, error)
-	// RemoveRepo removes a member's worktree and drops the member. It refuses while a
+	// RemoveProject removes a member's worktree and drops the member. It refuses while a
 	// live thread runs in the worktree, and (without Force) when git refuses because
 	// of uncommitted changes.
 	RemoveProject(ctx context.Context, opts RemoveProjectOptions) (Workspace, error)

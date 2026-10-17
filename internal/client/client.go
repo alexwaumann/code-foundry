@@ -34,7 +34,7 @@ type Client struct {
 	Command codefoundryv1connect.CommandServiceClient
 	UI      codefoundryv1connect.UiServiceClient
 	Update  codefoundryv1connect.UpdateServiceClient
-	// Repo is for the repo.clone CLI verb, which streams RepoService.Clone itself.
+	// Project is for the project.clone CLI verb, which streams ProjectService.Clone itself.
 	Project codefoundryv1connect.ProjectServiceClient
 	// Events is for the events CLI verb, which streams EventService.Watch.
 	Events codefoundryv1connect.EventServiceClient

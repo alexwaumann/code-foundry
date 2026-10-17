@@ -24,7 +24,7 @@ const (
 	KeepFinished = 20
 	// MaxOutput caps Op.Output; the tail is kept.
 	MaxOutput = 64 << 10
-	// RefreshTimeout bounds the repo refresh after an operation.
+	// RefreshTimeout bounds the project refresh after an operation.
 	RefreshTimeout = 30 * time.Second
 )
 
@@ -44,7 +44,7 @@ var DefaultTimeouts = map[Kind]time.Duration{
 type Options struct {
 	// Bus receives Event. Required.
 	Bus *bus.Bus
-	// Repos maps paths to repos and is refreshed after ref-moving operations. May be nil
+	// Projects maps paths to projects and is refreshed after ref-moving operations. May be nil
 	// (no repo ids, slugs or refreshes).
 	Projects Projects
 	Log      *slog.Logger
@@ -136,7 +136,7 @@ func (m *Manager) timeout(k Kind) time.Duration {
 	return DefaultTimeouts[k]
 }
 
-// target is where an operation runs, resolved against the repo snapshot.
+// target is where an operation runs, resolved against the project snapshot.
 type target struct {
 	path    string // symlinks resolved
 	project project.Project
@@ -144,7 +144,7 @@ type target struct {
 }
 
 // resolve validates worktreePath (absolute, an existing directory) and finds the
-// registered repo containing it: an exact worktree match, else the longest containing
+// registered project containing it: an exact worktree match, else the longest containing
 // worktree path.
 func (m *Manager) resolve(worktreePath string) (target, error) {
 	if worktreePath == "" {
@@ -164,7 +164,7 @@ func (m *Manager) resolve(worktreePath string) (target, error) {
 	if r, w, ok := m.lookup(p); ok {
 		t.project, t.branch = r, w.Branch
 	}
-	// The repo snapshot can trail a `git switch` by a debounce; titles should name the
+	// The project snapshot can trail a `git switch` by a debounce; titles should name the
 	// branch that is actually checked out.
 	ctx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
 	defer cancel()
@@ -206,7 +206,7 @@ func (m *Manager) LocalOnly(projectID, worktreePath string) bool {
 	return ok && IsLocalOnly(r)
 }
 
-// repoFor returns the registered repo containing worktreePath, else repo repoID.
+// projectFor returns the registered project containing worktreePath, else project projectID.
 func (m *Manager) projectFor(projectID, worktreePath string) (project.Project, bool) {
 	if m.opts.Projects == nil {
 		return project.Project{}, false
@@ -316,7 +316,7 @@ func (m *Manager) execute(op *Op, refresh bool, b body) Op {
 	return final
 }
 
-// refresh asks the project store to re-read the repo after its refs moved.
+// refresh asks the project store to re-read the project after its refs moved.
 func (m *Manager) refresh(projectID string) {
 	ctx, cancel := context.WithTimeout(m.ctx, RefreshTimeout)
 	defer cancel()

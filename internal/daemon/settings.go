@@ -30,7 +30,7 @@ import (
 //   - auto-naming and the naming model -> a Namer that reads both per thread;
 //   - threads.cache_ttl_seconds -> thread.Manager.SetCacheTTL on every change
 //     (applyCacheTTL), which republishes the threads whose cache expiry moved;
-//   - worktree directory -> repo.worktree.new's default path, and the path of the
+//   - worktree directory -> project.worktree.new's default path, and the path of the
 //     worktree a new thread creates (thread.Options.WorktreePath).
 //   - editor command -> gitops' Editor func (stores.go), read on every open.
 //   - github.poll_interval_seconds and github.dashboards_enabled -> the gh store's
@@ -98,18 +98,18 @@ func settingsNamer(st *settings.Store, next thread.Namer) thread.Namer {
 	}
 }
 
-// settingsWorktreePath applies repos.worktree_dir to the worktrees the thread store
-// makes for new threads (thread.Options.WorktreePath), the same way worktreeDirRepo
-// does for repo.worktree.new. "" leaves the project store's default.
+// settingsWorktreePath applies projects.worktree_dir to the worktrees the thread store
+// makes for new threads (thread.Options.WorktreePath), the same way worktreeDirProject
+// does for project.worktree.new. "" leaves the project store's default.
 func settingsWorktreePath(st *settings.Store) func(project.Project, string) string {
 	return func(r project.Project, branch string) string {
 		return worktreePath(st.Settings().Projects.WorktreeDir, r.Name, branch)
 	}
 }
 
-// worktreeDirRepo applies repos.worktree_dir to repo.worktree.new: when the request has
+// worktreeDirProject applies projects.worktree_dir to project.worktree.new: when the request has
 // no explicit path and the setting is set, the worktree goes to
-// <dir with {repo} expanded>/<branch, "/" -> "-">.
+// <dir with {project} expanded>/<branch, "/" -> "-">.
 type worktreeDirProject struct {
 	command.ProjectBackend
 	projects *project.Git
@@ -129,7 +129,7 @@ func (w worktreeDirProject) CreateWorktree(ctx context.Context, req *connect.Req
 	return w.ProjectBackend.CreateWorktree(ctx, req)
 }
 
-// worktreePath is dir (~ and {repo} expanded) joined with the branch's directory name,
+// worktreePath is dir (~ and {project} expanded) joined with the branch's directory name,
 // or "" when dir is unset or the branch is empty.
 func worktreePath(dir, projectName, branch string) string {
 	base := worktreeBase(dir, projectName)
@@ -150,8 +150,8 @@ func worktreeBase(dir, projectName string) string {
 	return settings.ExpandedPath(strings.NewReplacer("{project}", projectName, "{repo}", projectName).Replace(dir))
 }
 
-// settingsManagedRoots is repo.Options.ManagedRoots: besides the worktrees directory,
-// the repos.worktree_dir setting's directory for the repository (read live), so the
+// settingsManagedRoots is project.Options.ManagedRoots: besides the worktrees directory,
+// the projects.worktree_dir setting's directory for the project (read live), so the
 // worktrees the app made there count as its own for cleanup.
 func settingsManagedRoots(st *settings.Store) func(string) []string {
 	return func(projectName string) []string {

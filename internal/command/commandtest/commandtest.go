@@ -166,8 +166,8 @@ func (o *Output) IDs() []string {
 	return append([]string(nil), o.ids...)
 }
 
-// Repo is a fake command.RepoBackend. Err, when set, is returned by every call. List
-// returns Repos. CreateWorktree calls OnCreateWorktree (when set) and then fails with
+// Project is a fake command.ProjectBackend. Err, when set, is returned by every call. List
+// returns Projects. CreateWorktree calls OnCreateWorktree (when set) and then fails with
 // CreateWorktreeErr (when set).
 type Project struct {
 	Calls
@@ -176,13 +176,13 @@ type Project struct {
 	CreateWorktreeErr error
 	OnCreateWorktree  func(*v1.CreateWorktreeRequest)
 	// OnCleanup answers CleanupWorktrees (dry runs included); nil answers an empty
-	// response for the requested repo.
+	// response for the requested project.
 	OnCleanup func(*v1.CleanupWorktreesRequest) (*v1.CleanupWorktreesResponse, error)
 }
 
 var _ command.ProjectBackend = (*Project)(nil)
 
-// Register records the request and returns a repo named after the path.
+// Register records the request and returns a project named after the path.
 func (f *Project) Register(_ context.Context, r *connect.Request[v1.RegisterProjectRequest]) (*connect.Response[v1.RegisterProjectResponse], error) {
 	f.record(r.Msg)
 	if f.Err != nil {
@@ -233,7 +233,7 @@ func (f *Project) CleanupWorktrees(_ context.Context, r *connect.Request[v1.Clea
 	return connect.NewResponse(res), nil
 }
 
-// List records the request and returns copies of Repos.
+// List records the request and returns copies of Projects.
 func (f *Project) List(_ context.Context, r *connect.Request[v1.ListProjectsRequest]) (*connect.Response[v1.ListProjectsResponse], error) {
 	f.record(r.Msg)
 	if f.Err != nil {
@@ -252,7 +252,7 @@ func (f *Project) Refresh(_ context.Context, r *connect.Request[v1.RefreshProjec
 	return connect.NewResponse(&v1.RefreshProjectResponse{}), f.Err
 }
 
-// InitGit records the request and returns a git repo on main with that id.
+// InitGit records the request and returns a git project on main with that id.
 func (f *Project) InitGit(_ context.Context, r *connect.Request[v1.InitGitRequest]) (*connect.Response[v1.InitGitResponse], error) {
 	f.record(r.Msg)
 	if f.Err != nil {

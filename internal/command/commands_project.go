@@ -9,11 +9,11 @@ import (
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 )
 
-// RepoBackend is the slice of RepoService the repo.* commands (and the pull request
+// ProjectBackend is the slice of ProjectService the project.* commands (and the pull request
 // thread commands, which list repositories) need, in generated Connect signatures (see
 // TerminalBackend for why). The repo step's (1b) API handler, any
-// RepoServiceHandler, and a RepoServiceClient satisfy it. Until it is wired,
-// codefoundryv1connect.UnimplementedRepoServiceHandler stands in.
+// ProjectServiceHandler, and a ProjectServiceClient satisfy it. Until it is wired,
+// codefoundryv1connect.UnimplementedProjectServiceHandler stands in.
 type ProjectBackend interface {
 	Register(context.Context, *connect.Request[v1.RegisterProjectRequest]) (*connect.Response[v1.RegisterProjectResponse], error)
 	Unregister(context.Context, *connect.Request[v1.UnregisterProjectRequest]) (*connect.Response[v1.UnregisterProjectResponse], error)
@@ -58,8 +58,8 @@ func (f NotGitFunc) whyNotGit(c Context) string {
 	return ""
 }
 
-// RegisterRepo registers project.unregister, project.worktree.new, project.worktree.remove,
-// project.refresh and project.git.init. Adding a project is project.add (commands_repo_add.go).
+// RegisterProject registers project.unregister, project.worktree.new, project.worktree.remove,
+// project.refresh and project.git.init. Adding a project is project.add (commands_project_add.go).
 func RegisterProject(r *Registry, b ProjectBackend, notGit NotGitFunc) error {
 	notGit = notGit.or()
 	projectArg := ArgSpec{Name: "project", Type: String, Required: true, Context: ContextProject, Description: "Project id"}

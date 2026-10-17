@@ -31,7 +31,7 @@ func TestProjectAddAndClone(t *testing.T) {
 		wantMsg    string
 		wantErr    string
 		wantRef    string
-		wantPath   string // RepoBackend.Register's path
+		wantPath   string // ProjectBackend.Register's path
 		// wantInvalid: the error wraps command.ErrInvalidArgs.
 		wantInvalid bool
 	}{

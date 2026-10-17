@@ -32,7 +32,7 @@ func (h *Action) Route(opts ...connect.HandlerOption) Route {
 	return Route{Path: path, Handler: handler}
 }
 
-// List returns a project's actions (every project's without repo_id) and the runs.
+// List returns a project's actions (every project's without project_id) and the runs.
 func (h *Action) List(_ context.Context, req *connect.Request[v1.ListActionsRequest]) (*connect.Response[v1.ListActionsResponse], error) {
 	snap := h.store.Snapshot()
 	projectID := req.Msg.GetProjectId()

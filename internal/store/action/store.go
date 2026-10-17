@@ -35,12 +35,12 @@ const (
 	MaxNameLen = 64
 )
 
-// RepoSource is the part of the project store actions need. *repo.Git implements it.
+// ProjectSource is the part of the project store actions need. *project.Git implements it.
 type ProjectSource interface {
 	Snapshot() *project.Snapshot
 }
 
-// Options configures a Manager. DB and Repos are required.
+// Options configures a Manager. DB and Projects are required.
 type Options struct {
 	DB       *sql.DB
 	Projects ProjectSource
@@ -153,7 +153,7 @@ func sortRuns(rs []Run) {
 	})
 }
 
-// repoActions returns repoID's actions in position order. Callers hold m.mu.
+// projectActions returns projectID's actions in position order. Callers hold m.mu.
 func (m *Manager) projectActions(projectID string) []Action {
 	var out []Action
 	for _, a := range m.byID {
@@ -316,9 +316,9 @@ func (m *Manager) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-// RepoRemoved forgets an unregistered project's actions (the database cascades; this
+// ProjectRemoved forgets an unregistered project's actions (the database cascades; this
 // deletes them too and updates the snapshot) and its runs, killing the background ones
-// still running. Its terminal runs are the shell reaper's: they carry the repo label.
+// still running. Its terminal runs are the shell reaper's: they carry the project label.
 func (m *Manager) ProjectRemoved(ctx context.Context, projectID string) {
 	if projectID == "" {
 		return

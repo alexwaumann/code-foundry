@@ -107,7 +107,7 @@ func TestInsideRootResolvesRootSymlinks(t *testing.T) {
 	}
 }
 
-// TestCleanupRealRepo: a worktree under the store's WorktreeRoot whose branch is merged
+// TestCleanupRealProject: a worktree under the store's WorktreeRoot whose branch is merged
 // into origin/main and clean is removed (its branch stays); a merged one with an
 // untracked file, one with a commit not on origin/main, one a hold names, and a merged
 // clean one outside WorktreeRoot (made by another tool) are kept with their reasons.

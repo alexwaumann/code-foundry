@@ -26,7 +26,7 @@ import (
 )
 
 // env is a Manager whose claude is the fake (fakeclaude_test.go) replaying a captured
-// stream, with a fake repo store (r1 at wt) and a fake terminal store for the shells.
+// stream, with a fake project store (r1 at wt) and a fake terminal store for the shells.
 type env struct {
 	t        *testing.T
 	m        *Manager

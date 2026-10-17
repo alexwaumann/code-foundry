@@ -215,7 +215,7 @@ func (m *Manager) applyLateName(id string, ch <-chan namingResult) {
 }
 
 // pickBranch returns cf/<slug>, or cf/<slug>-N when that branch exists locally or on
-// origin in any of repoPaths (or taken reports its name part, "<slug>" or
+// origin in any of projectPaths (or taken reports its name part, "<slug>" or
 // "<slug>-N", as used), or cf/<id> when the slug is empty or every suffix is taken.
 func (m *Manager) pickBranch(ctx context.Context, projectPaths []string, slug, id string, taken func(string) bool) string {
 	if slug == "" {
@@ -262,7 +262,7 @@ func validateRef(ref string) error {
 	return nil
 }
 
-// repoError wraps a repo store error in the thread error class with the same
+// projectError wraps a project store error in the thread error class with the same
 // meaning, so API codes survive.
 func projectError(what string, err error) error {
 	var kind error
@@ -280,7 +280,7 @@ func projectError(what string, err error) error {
 }
 
 // classified adds a thread error class to an error without repeating it in the
-// message (repo errors already start with "failed precondition: ...").
+// message (project errors already start with "failed precondition: ...").
 type classified struct{ kind, err error }
 
 func (c classified) Error() string   { return c.err.Error() }

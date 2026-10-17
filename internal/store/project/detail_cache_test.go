@@ -122,7 +122,7 @@ func (c *cacheCase) current(t *testing.T) (Worktree, WorktreeDetail) {
 	return wt, d
 }
 
-// featureWorktree: the fixture repo with a feat/x worktree one commit (a.txt) ahead of
+// featureWorktree: the fixture project with a feat/x worktree one commit (a.txt) ahead of
 // origin/main.
 func featureWorktree(t *testing.T, c *cacheCase) {
 	ctx := context.Background()
@@ -156,7 +156,7 @@ func TestDetailCache(t *testing.T) {
 	noop := func(*testing.T, *cacheCase) {}
 	tests := []struct {
 		name  string
-		setup func(t *testing.T, c *cacheCase) // registers the repo, sets repoID and wt
+		setup func(t *testing.T, c *cacheCase) // registers the project, sets projectID and wt
 		steps []cacheStep
 	}{
 		{

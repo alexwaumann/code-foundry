@@ -45,7 +45,7 @@ func git(t *testing.T, dir string, args ...string) string {
 	return strings.TrimSpace(string(out))
 }
 
-// fixture is a repo "proj" with one commit pushed to a bare "origin", plus a second
+// fixture is a project "proj" with one commit pushed to a bare "origin", plus a second
 // clone ("other") that can push to origin. All paths are symlink-resolved.
 type fixture struct {
 	base, origin, project, other string
@@ -168,7 +168,7 @@ func TestRegisterReportsProjectWorktreesAndStatus(t *testing.T) {
 	h := startHarness(t, "", Options{})
 	ctx := context.Background()
 
-	// Any path inside the repo works, including a symlinked one.
+	// Any path inside the project works, including a symlinked one.
 	link := filepath.Join(f.base, "link")
 	if err := os.Symlink(f.project, link); err != nil {
 		t.Fatal(err)
@@ -229,7 +229,7 @@ func TestWorktreeLifecycleAndWatcher(t *testing.T) {
 	}
 
 	// New branch from origin/main at the default path, without tracking origin/main.
-	// origin is a local path, so the repo files under _local.
+	// origin is a local path, so the project files under _local.
 	w, err := h.store.CreateWorktree(ctx, CreateWorktreeOptions{ProjectID: r.ID, Branch: "alex/feat"})
 	if err != nil {
 		t.Fatal(err)
@@ -483,7 +483,7 @@ func TestUnregisterAndReloadFromDB(t *testing.T) {
 	}
 	h.close()
 
-	// A fresh store on the same DB loads the remaining repo and reconciles it async.
+	// A fresh store on the same DB loads the remaining project and reconciles it async.
 	h2 := startHarness(t, dbPath, Options{})
 	snap := h2.store.Snapshot()
 	if len(snap.Projects) != 1 || snap.Projects[0].ID != r2.ID || !snap.Projects[0].RegisteredAt.Equal(r2.RegisteredAt) {
@@ -672,7 +672,7 @@ func TestPeriodicFetch(t *testing.T) {
 
 // TestCreateWorktreeUnbornBase covers a `git init` folder with no commit: the default
 // base, or an explicit base naming the checkout's unborn branch, gets the empty
-// initial commit first; another base and a repo with commits are left alone; a
+// initial commit first; another base and a project with commits are left alone; a
 // failing commit is a clear failed precondition.
 func TestCreateWorktreeUnbornBase(t *testing.T) {
 	tests := []struct {

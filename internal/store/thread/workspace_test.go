@@ -171,7 +171,7 @@ func TestCreateNewWorkspace(t *testing.T) {
 	tests := []struct {
 		name        string
 		o           CreateOptions
-		taken       []string // refs RefExists reports, in any repo
+		taken       []string // refs RefExists reports, in any project
 		existing    string   // a workspace with this name exists already
 		wantCall    string   // the workspace store's Create call
 		wantBranch  string

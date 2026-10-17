@@ -80,7 +80,7 @@ type WorktreeDetail struct {
 	Error          string // last computation error; other fields are from the last success
 }
 
-// WorktreeDetailUpdated is published (on the repo.Event topic) when a recomputed
+// WorktreeDetailUpdated is published (on the project.Event topic) when a recomputed
 // detail differs from the previous one.
 type WorktreeDetailUpdated struct {
 	ProjectID, Path string
@@ -241,7 +241,7 @@ func (ds *detailState) initLocked() {
 }
 
 // detailBase picks the ref to compare against, and its sha: origin/<default> when the
-// repo has it (as resolved by jobBase, the same sha status compared with), else the
+// project has it (as resolved by jobBase, the same sha status compared with), else the
 // local default branch if the worktree is on another branch. An unborn HEAD has no base.
 func (g *Git) detailBase(ctx context.Context, st *projectState, wt Worktree) (ref, sha string) {
 	if wt.Head == "" {

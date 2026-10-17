@@ -15,7 +15,7 @@ import (
 type Action struct {
 	Calls
 	Err error
-	// Actions is what List returns (filtered by repo).
+	// Actions is what List returns (filtered by project).
 	Actions []*v1.Action
 	// Started is what Run returns; its owner fields and mode are filled from the
 	// request (mode BACKGROUND when unspecified). Default: run r1 of the action.
@@ -31,7 +31,7 @@ func (f *Action) do(m proto.Message) error {
 	return f.Err
 }
 
-// List returns Actions in repo_id (all without one).
+// List returns Actions in project_id (all without one).
 func (f *Action) List(_ context.Context, r *connect.Request[v1.ListActionsRequest]) (*connect.Response[v1.ListActionsResponse], error) {
 	if err := f.do(r.Msg); err != nil {
 		return nil, err

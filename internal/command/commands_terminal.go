@@ -42,7 +42,7 @@ var (
 )
 
 // TerminalDeps are the terminal.* commands' dependencies. terminal.new reads the
-// thread (Thread) or the registered worktrees (Repo) to find who owns a new shell.
+// thread (Thread) or the registered worktrees (Project) to find who owns a new shell.
 type TerminalDeps struct {
 	Terminal TerminalBackend
 	Project  ProjectBackend
@@ -319,7 +319,7 @@ type owner struct {
 
 // shellOwner decides who owns a shell terminal.new starts (and an action run action.run
 // starts), in this order: the active thread; the active worktree (ActiveWorktreePath,
-// matched with ActiveRepoID when given, else the registered worktree containing it); the
+// matched with ActiveProjectID when given, else the registered worktree containing it); the
 // registered worktree containing cwd, else here (the CLI's working directory). The shell
 // starts in cwd, else in here when here chose the owner, else in the thread's worktree or
 // the context's worktree path. Without any of them it fails with missing.
@@ -351,7 +351,7 @@ func shellOwner(ctx context.Context, projects ProjectBackend, threads ThreadBack
 	return owner{project: projectID, worktree: wt, cwd: start}, nil
 }
 
-// ownerWorktree returns the registered worktree at wtPath (in repo repoID when that is
+// ownerWorktree returns the registered worktree at wtPath (in project projectID when that is
 // given), else the deepest registered worktree containing path.
 func ownerWorktree(projects []*v1.Project, projectID, wtPath, path string) (string, string, bool) {
 	var bestProject, best string
@@ -383,7 +383,7 @@ func within(path, root string) bool {
 	return path == root || strings.HasPrefix(path, strings.TrimSuffix(root, "/")+"/")
 }
 
-// realPath resolves symlinks in p the way the repo store stores paths (/tmp is
+// realPath resolves symlinks in p the way the project store stores paths (/tmp is
 // /private/tmp on macOS). A path that does not exist (yet) is resolved through its
 // nearest existing ancestor, with the missing rest appended.
 func realPath(p string) string {

@@ -34,7 +34,7 @@ type shellReaperOptions struct {
 	// DirGone reports whether a worktree directory no longer exists. Default: os.Stat
 	// fails with fs.ErrNotExist.
 	DirGone func(path string) bool
-	// RepoExists and ThreadExists let the sweep remove the shells of an unregistered
+	// ProjectExists and ThreadExists let the sweep remove the shells of an unregistered
 	// project or a removed thread whose event was dropped. Nil: assume it exists.
 	ProjectExists func(id string) bool
 	ThreadExists  func(id string) bool
@@ -47,12 +47,12 @@ type shellReaperOptions struct {
 //   - A shell is removed as soon as it exits. An action terminal is not: it stays
 //     EXITED so the user can read its output, and the GUI closes it (terminal.close).
 //     The sweep leaves exited action terminals alone too.
-//   - Its worktree is removed (repo.WorktreeRemoved, from repo.worktree.remove, a
+//   - Its worktree is removed (project.WorktreeRemoved, from project.worktree.remove, a
 //     workspace removal, or `git worktree remove` outside the app): killed and removed,
-//     but only once the directory is gone. The repo store also publishes WorktreeRemoved
+//     but only once the directory is gone. The project store also publishes WorktreeRemoved
 //     for every worktree when a refresh fails (it lists none), and that must not kill
 //     anything. This and the next two apply to action terminals too, exited or not.
-//   - Its project is unregistered (repo.RepoRemoved): killed and removed.
+//   - Its project is unregistered (project.ProjectRemoved): killed and removed.
 //   - Its thread is removed (thread.Removed): killed and removed. thread.Manager.Remove
 //     does it first, synchronously; this catches a shell started while that ran.
 //   - Every SweepEvery, and once at start, each of the above is re-checked from the

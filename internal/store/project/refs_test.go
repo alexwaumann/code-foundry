@@ -165,7 +165,7 @@ func pushCommit(t *testing.T, dir, name string) string {
 func TestCreateWorktreeFetch(t *testing.T) {
 	tests := []struct {
 		name string
-		// setup runs before Register and returns the options (RepoID is filled in)
+		// setup runs before Register and returns the options (ProjectID is filled in)
 		// and the sha the new worktree must be at.
 		setup     func(t *testing.T, f fixture) (CreateWorktreeOptions, string)
 		wantFetch int    // `git fetch` runs by CreateWorktree

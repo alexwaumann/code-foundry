@@ -37,7 +37,7 @@ type GitOpsDeps struct {
 	// GitHubSlug returns the GitHub "owner/name" of the context's worktree (or repo), or
 	// "". pr.* are available only when it is non-empty. Nil means never.
 	GitHubSlug func(Context) string
-	// LocalOnly reports whether the context's worktree (or repo) belongs to a registered
+	// LocalOnly reports whether the context's worktree (or project) belongs to a registered
 	// repository with no git remote. git.fetch, git.pull, git.push and pr.* are
 	// unavailable then. Nil means never.
 	LocalOnly func(Context) bool

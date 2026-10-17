@@ -100,8 +100,8 @@ func TestEventsResumeReplaysMissed(t *testing.T) {
 	if describe(ev) != "repo.updated one" || last == 0 {
 		t.Fatalf("got %q seq %d", describe(ev), last)
 	}
-	// Missed by a client that disconnected after "one": a repo, a thread (not asked
-	// for), and another repo.
+	// Missed by a client that disconnected after "one": a project, a thread (not asked
+	// for), and another project.
 	f.project.Put(projectNamed("two"))
 	f.th.Put(thread.Thread{ID: "s1", State: thread.StateConnected})
 	f.project.Put(projectNamed("three"))
@@ -198,7 +198,7 @@ func TestEventsTransientTopics(t *testing.T) {
 	}
 	sctx, stop := context.WithCancel(ctx)
 	s := f.watch(t, sctx, v1.EventSource_EVENT_SOURCE_UI, v1.EventSource_EVENT_SOURCE_PROJECT)
-	s.next() // repo snapshot
+	s.next() // project snapshot
 	f.project.Put(projectNamed("a"))
 	before := s.nextLive()
 	if describe(before) != "repo.updated a" {
@@ -222,7 +222,7 @@ func TestEventsTransientTopics(t *testing.T) {
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	// A resume from before the intent replays the repo event after it only.
+	// A resume from before the intent replays the project event after it only.
 	r := f.watchSince(t, ctx, before.GetSeq(), v1.EventSource_EVENT_SOURCE_UI, v1.EventSource_EVENT_SOURCE_PROJECT)
 	if got := describe(r.next()); got != "repo.updated b" {
 		t.Fatalf("replay = %q, want repo.updated b", got)

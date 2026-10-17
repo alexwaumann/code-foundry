@@ -30,7 +30,7 @@ type Fake struct {
 	URL string
 	// Slugs maps a repo id or worktree path to its GitHub slug for GitHubSlug.
 	Slugs map[string]string
-	// LocalOnlyRepos holds the repo ids and worktree paths LocalOnly reports true for.
+	// LocalOnlyProjects holds the project ids and worktree paths LocalOnly reports true for.
 	LocalOnlyProjects map[string]bool
 	// Calls records calls, e.g. "Push /w force=true".
 	Calls []string
@@ -139,7 +139,7 @@ func (f *Fake) OpenURL(_ context.Context, url string) (gitops.Op, error) {
 	return f.do(gitops.KindOpenURL, "", "OpenURL "+url)
 }
 
-// GitHubSlug implements gitops.Store: Slugs[worktreePath], else Slugs[repoID].
+// GitHubSlug implements gitops.Store: Slugs[worktreePath], else Slugs[projectID].
 func (f *Fake) GitHubSlug(projectID, worktreePath string) string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -149,8 +149,8 @@ func (f *Fake) GitHubSlug(projectID, worktreePath string) string {
 	return f.Slugs[projectID]
 }
 
-// LocalOnly implements gitops.Store: LocalOnlyRepos[worktreePath], else
-// LocalOnlyRepos[repoID].
+// LocalOnly implements gitops.Store: LocalOnlyProjects[worktreePath], else
+// LocalOnlyProjects[projectID].
 func (f *Fake) LocalOnly(projectID, worktreePath string) bool {
 	f.mu.Lock()
 	defer f.mu.Unlock()

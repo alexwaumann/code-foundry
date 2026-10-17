@@ -9,16 +9,16 @@ import (
 
 // File references in a first prompt.
 //
-// The GUI composer sends a file tag as "@cf-file://<repoId>/<relative/path>": it
+// The GUI composer sends a file tag as "@cf-file://<projectId>/<relative/path>": it
 // cannot know the absolute path of a worktree the daemon has not created yet (a
 // new-worktree or new-workspace thread). The token starts at "cf-file://" and ends at
 // the next whitespace or the end of the prompt; <relative/path> is percent-encoded
 // (the GUI encodes at least spaces and "%"), "/"-separated, relative to the project's
 // checkout, with a trailing "/" for a directory. Create rewrites every token once the
-// thread's worktrees exist and before claude starts: <repoId> names the thread's own
+// thread's worktrees exist and before claude starts: <projectId> names the thread's own
 // project (its cwd) or, in a workspace thread, a member, and the token becomes
 // "<that member's worktree>/<decoded path>", so "@cf-file://r-1/src/a.ts" reaches
-// claude as "@/Users/me/.../src/a.ts". A token whose repo is not part of the thread,
+// claude as "@/Users/me/.../src/a.ts". A token whose project is not part of the thread,
 // or whose path has a ".." segment, cannot be decoded, or decodes to a control
 // character, becomes the relative path alone ("@src/a.ts") and is logged.
 
@@ -26,9 +26,9 @@ import (
 const fileRefScheme = "cf-file://"
 
 // rewriteFileRefs replaces every cf-file:// token in prompt with an absolute path in
-// the worktree resolve returns for its repo id (see the comment above). It also
+// the worktree resolve returns for its project id (see the comment above). It also
 // returns the tokens that could not be resolved, as written, for the caller to log.
-// A token without a "/" after the repo id is left alone.
+// A token without a "/" after the project id is left alone.
 func rewriteFileRefs(prompt string, resolve func(projectID string) (worktree string, ok bool)) (string, []string) {
 	if !strings.Contains(prompt, fileRefScheme) {
 		return prompt, nil

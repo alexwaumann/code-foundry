@@ -9,7 +9,7 @@ import (
 )
 
 // gitInitCommand is project.git.init: make a project without git a git repository
-// (RepoService.InitGit). Available only for such a project.
+// (ProjectService.InitGit). Available only for such a project.
 func gitInitCommand(b ProjectBackend, projectArg ArgSpec, notGit NotGitFunc) Command {
 	return Command{
 		Name:  "project.git.init",

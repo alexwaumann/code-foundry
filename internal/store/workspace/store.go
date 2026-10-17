@@ -16,7 +16,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 )
 
-// RepoSource is the part of the project store workspaces need. *repo.Git implements it.
+// ProjectSource is the part of the project store workspaces need. *project.Git implements it.
 type ProjectSource interface {
 	Snapshot() *project.Snapshot
 	CreateWorktree(ctx context.Context, opts project.CreateWorktreeOptions) (project.Worktree, error)
@@ -25,7 +25,7 @@ type ProjectSource interface {
 	Refresh(ctx context.Context, id string) error
 }
 
-// Options configures a Manager. DB and Repos are required.
+// Options configures a Manager. DB and Projects are required.
 type Options struct {
 	DB       *sql.DB
 	Projects ProjectSource
@@ -39,7 +39,7 @@ type Options struct {
 	// before claude starts. Nil skips it. A failure is logged, not returned.
 	Trust func(dir string) error
 	// WorktreePath, when set, picks the path of a member worktree for branch in r; ""
-	// leaves it to the project store's default. The daemon applies repos.worktree_dir.
+	// leaves it to the project store's default. The daemon applies projects.worktree_dir.
 	WorktreePath func(r project.Project, branch string) string
 	Now          func() time.Time
 }
@@ -188,7 +188,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Workspace, error
 	return w, nil
 }
 
-// AddRepo implements Store.
+// AddProject implements Store.
 func (m *Manager) AddProject(ctx context.Context, o AddProjectOptions) (Workspace, error) {
 	if err := validateRef("base ref", o.Member.BaseRef); err != nil {
 		return Workspace{}, err
@@ -223,7 +223,7 @@ func (m *Manager) AddProject(ctx context.Context, o AddProjectOptions) (Workspac
 	return w, nil
 }
 
-// RemoveRepo implements Store.
+// RemoveProject implements Store.
 func (m *Manager) RemoveProject(ctx context.Context, o RemoveProjectOptions) (Workspace, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -363,7 +363,7 @@ func (m *Manager) rollback(ctx context.Context, made []created) {
 
 // removeMember removes mem's worktree through the project store (git refuses a dirty
 // worktree without force). gone reports whether the worktree is no longer there, so
-// the member can be dropped: removed now, already deleted by hand, or its repository
+// the member can be dropped: removed now, already deleted by hand, or its project
 // is no longer registered (the files are then left alone).
 func (m *Manager) removeMember(ctx context.Context, mem Member, force, deleteBranch bool) (gone bool, err error) {
 	if _, ok := m.opts.Projects.Snapshot().Project(mem.ProjectID); !ok {
@@ -409,7 +409,7 @@ func (m *Manager) dropMembers(ctx context.Context, w *Workspace, drop ...Member)
 	return errors.Join(errs...)
 }
 
-// dirtyMembers refreshes each member's repository and names the members whose
+// dirtyMembers refreshes each member's project and names the members whose
 // worktree has uncommitted changes.
 func (m *Manager) dirtyMembers(ctx context.Context, w Workspace) []string {
 	var out []string
@@ -429,7 +429,7 @@ func (m *Manager) dirtyMembers(ctx context.Context, w Workspace) []string {
 	return out
 }
 
-// repoError wraps a repo store error in the workspace error class with the same
+// projectError wraps a project store error in the workspace error class with the same
 // meaning, so API codes survive.
 func projectError(what string, err error) error {
 	var kind error
@@ -447,7 +447,7 @@ func projectError(what string, err error) error {
 }
 
 // classified adds a workspace error class to an error without repeating it in the
-// message (repo errors already start with "failed precondition: ...").
+// message (project errors already start with "failed precondition: ...").
 type classified struct{ kind, err error }
 
 func (c classified) Error() string   { return c.err.Error() }

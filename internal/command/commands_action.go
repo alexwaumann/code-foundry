@@ -30,7 +30,7 @@ var (
 	_ ActionBackend = codefoundryv1connect.ActionServiceClient(nil)
 )
 
-// ActionDeps are the action.* commands' dependencies. Repo and Thread find the
+// ActionDeps are the action.* commands' dependencies. Project and Thread find the
 // project and the owner of a run the way terminal.new finds a shell's.
 type ActionDeps struct {
 	Action  ActionBackend
@@ -323,7 +323,7 @@ func withDefault(a ArgSpec, def string) ArgSpec {
 	return a
 }
 
-// actionRepo is the project the action commands work on: --project (id, name, or a path
+// actionProject is the project the action commands work on: --project (id, name, or a path
 // inside it; the GUI's active project), else the owner terminal.new would pick (thread,
 // worktree, the CLI's working directory).
 func actionProject(ctx context.Context, d ActionDeps, c Context, a Args) (string, error) {
@@ -340,7 +340,7 @@ func actionProject(ctx context.Context, d ActionDeps, c Context, a Args) (string
 	return o.project, nil
 }
 
-// resolveRepoRef finds a registered project by id, else by name (when unique), else as
+// resolveProjectRef finds a registered project by id, else by name (when unique), else as
 // the deepest worktree containing an absolute path.
 func resolveProjectRef(ctx context.Context, projects ProjectBackend, ref string) (string, error) {
 	res, err := projects.List(ctx, connect.NewRequest(&v1.ListProjectsRequest{}))
@@ -372,7 +372,7 @@ func resolveProjectRef(ctx context.Context, projects ProjectBackend, ref string)
 }
 
 // findAction resolves the action argument: an id anywhere, else a name in the project
-// actionRepo picks.
+// actionProject picks.
 func findAction(ctx context.Context, d ActionDeps, c Context, a Args) (*v1.Action, error) {
 	ref := strings.TrimSpace(a.String("action"))
 	all, err := d.Action.List(ctx, connect.NewRequest(&v1.ListActionsRequest{}))

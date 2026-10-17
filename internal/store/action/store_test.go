@@ -28,7 +28,7 @@ import (
 
 var discard = slog.New(slog.NewTextHandler(io.Discard, nil))
 
-// harness is a Manager over a real database, the repo fake with two projects ("web",
+// harness is a Manager over a real database, the project fake with two projects ("web",
 // with a second worktree "feat", and "api") whose rows exist in the repos table (the
 // actions table references it), and the terminal fake.
 type harness struct {

@@ -92,7 +92,7 @@ func (m *Manager) Run(ctx context.Context, o RunOptions) (Run, error) {
 }
 
 // owner resolves a run's owner: the thread threadID, else the registered worktree at
-// worktree (in repoID when given).
+// worktree (in projectID when given).
 func (m *Manager) owner(threadID, worktree, projectID string) (Owner, error) {
 	switch {
 	case threadID != "":
@@ -289,7 +289,7 @@ func (m *Manager) finish(rec *runRec, code int) {
 	})
 }
 
-// trim forgets repoID's oldest finished runs beyond RunHistory and returns their ids.
+// trim forgets projectID's oldest finished runs beyond RunHistory and returns their ids.
 // Callers hold m.mu.
 func (m *Manager) trim(projectID string) []string {
 	var rs []Run
@@ -356,7 +356,7 @@ func (m *Manager) Wait(ctx context.Context, id string) (Run, error) {
 	}
 }
 
-// WorktreeCreated runs repoID's on-worktree-create actions in the background, one
+// WorktreeCreated runs projectID's on-worktree-create actions in the background, one
 // after another in their order, for the thread threadID whose new worktree is at
 // worktree. It returns at once; failures are logged and published as RunFinished.
 func (m *Manager) WorktreeCreated(threadID, projectID, worktree string) {

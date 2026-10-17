@@ -14,8 +14,8 @@ func (f *Fake) detailMap() map[string]project.WorktreeDetail {
 	return f.details
 }
 
-// SetDetail sets what WorktreeDetail returns for d.RepoID and d.Path and publishes
-// repo.WorktreeDetailUpdated.
+// SetDetail sets what WorktreeDetail returns for d.ProjectID and d.Path and publishes
+// project.WorktreeDetailUpdated.
 func (f *Fake) SetDetail(d project.WorktreeDetail) {
 	f.mu.Lock()
 	f.detailMap()[d.ProjectID+"\x00"+d.Path] = d
@@ -23,7 +23,7 @@ func (f *Fake) SetDetail(d project.WorktreeDetail) {
 	f.publish(project.WorktreeDetailUpdated{ProjectID: d.ProjectID, Path: d.Path, ComputedAt: d.ComputedAt})
 }
 
-// WorktreeDetail implements repo.Store. A known worktree without a SetDetail returns
+// WorktreeDetail implements project.Store. A known worktree without a SetDetail returns
 // an empty detail.
 func (f *Fake) WorktreeDetail(_ context.Context, projectID, path string) (project.WorktreeDetail, error) {
 	f.mu.Lock()

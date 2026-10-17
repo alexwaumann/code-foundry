@@ -61,7 +61,7 @@ func TestRunInMovesWhenIdle(t *testing.T) {
 	s := e.create(CreateOptions{WorkspaceID: "login", InitialPrompt: "write"})
 	e.waitFor(s.ID, "permission", func(s Thread) bool { return s.Status == StatusNeedsAttention })
 
-	got, err := e.m.RunIn(e.ctx(), s.ID, RunInTarget{ProjectID: "api"}) // a repo name works too
+	got, err := e.m.RunIn(e.ctx(), s.ID, RunInTarget{ProjectID: "api"}) // a project name works too
 	if err != nil {
 		t.Fatal(err)
 	}

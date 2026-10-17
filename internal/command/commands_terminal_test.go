@@ -23,7 +23,7 @@ import (
 func TestTerminalNewOwner(t *testing.T) {
 	t.Setenv("SHELL", "/bin/fish")
 	// A real directory behind a symlink (t.TempDir is under /var, which is /private/var
-	// on macOS): repo paths are stored resolved, the CLI sends what the shell sees.
+	// on macOS): project paths are stored resolved, the CLI sends what the shell sees.
 	real := t.TempDir()
 	if r, err := filepath.EvalSymlinks(real); err == nil {
 		real = r

@@ -15,7 +15,7 @@ import (
 type Deps struct {
 	Daemon  command.DaemonInfo
 	Emitter command.Emitter
-	// Terminal backs terminal.* (terminal.new also reads Repo and Thread to find a
+	// Terminal backs terminal.* (terminal.new also reads Project and Thread to find a
 	// shell's owner). Nil registers the commands against
 	// UnimplementedTerminalServiceHandler, so they list but fail with Unimplemented.
 	Terminal command.TerminalBackend
@@ -29,9 +29,9 @@ type Deps struct {
 	// TerminalBracketedPaste reports whether a terminal reads bracketed pastes;
 	// terminal.new --run then pastes its command. Nil: it types it.
 	TerminalBracketedPaste func(ctx context.Context, id string) (bool, error)
-	// Repo backs repo.*. Nil works like Terminal.
+	// Project backs project.*. Nil works like Terminal.
 	Project command.ProjectBackend
-	// NotGit reports a context in a project without git: it gates repo.worktree.*,
+	// NotGit reports a context in a project without git: it gates project.worktree.*,
 	// project.git.init, and (unless GitOps.NotGit is set) git.* and pr.*. Nil: every
 	// project is git.
 	NotGit command.NotGitFunc
@@ -47,7 +47,7 @@ type Deps struct {
 	GitOps command.GitOpsDeps
 	// Gh backs pr.revert, pr.merge, pr.review.request, pr.refresh, pr.review and
 	// pr.comment (the pull request detail panel's actions), and reads the pull request for pr.ask, pr.explain and
-	// pr.fix.findings (which also use Repo, Thread, GitOps.Backend and Emitter). Nil
+	// pr.fix.findings (which also use Project, Thread, GitOps.Backend and Emitter). Nil
 	// works like Terminal.
 	Gh command.GhBackend
 	// Settings backs settings.*, theme.* and notifications.test (the alert volume). Nil works like
@@ -61,7 +61,7 @@ type Deps struct {
 	Restart func()
 	// Workspace backs workspace.*. Nil works like Terminal.
 	Workspace command.WorkspaceBackend
-	// Action backs action.* (which also use Repo and Thread to find a run's owner).
+	// Action backs action.* (which also use Project and Thread to find a run's owner).
 	// Nil works like Terminal.
 	Action command.ActionBackend
 }

@@ -9,13 +9,13 @@ import (
 type jobKind uint8
 
 const (
-	// jobReconcile owns a repo's metadata, worktree set, and watches.
+	// jobReconcile owns a project's metadata, worktree set, and watches.
 	jobReconcile jobKind = iota + 1
 	// jobStatus owns one worktree's snapshot slot.
 	jobStatus
 	// jobDetail owns one worktree's cached detail (detail.go).
 	jobDetail
-	// jobBase owns a repo's resolved base sha (base.go).
+	// jobBase owns a project's resolved base sha (base.go).
 	jobBase
 )
 

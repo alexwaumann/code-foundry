@@ -49,7 +49,7 @@ type watchTarget struct {
 	kind      watchKind
 	projectID string
 	// wtPath is the worktree whose status the directory affects (empty for
-	// repo-wide kinds).
+	// project-wide kinds).
 	wtPath string
 }
 
@@ -59,8 +59,8 @@ type action uint8
 const (
 	actNone      action = iota
 	actStatus           // refresh the target's worktree
-	actStatusAll        // re-resolve the repo's base (jobBase), then refresh every worktree
-	actReconcile        // re-list worktrees and repo metadata, then refresh all
+	actStatusAll        // re-resolve the project's base (jobBase), then refresh every worktree
+	actReconcile        // re-list worktrees and project metadata, then refresh all
 )
 
 func (a action) String() string {
@@ -134,7 +134,7 @@ type watchWorktree struct {
 	admin  string // linked worktree admin dir (<common>/worktrees/<name>); unused for main
 }
 
-// desiredWatches returns every directory to watch for a repo, keyed by path.
+// desiredWatches returns every directory to watch for a project, keyed by path.
 // Directories that do not exist are filtered out by the caller when adding.
 func desiredWatches(projectID, mainPath, commonDir string, wts []watchWorktree) map[string]watchTarget {
 	out := map[string]watchTarget{
@@ -155,7 +155,7 @@ func desiredWatches(projectID, mainPath, commonDir string, wts []watchWorktree) 
 }
 
 // readGitFile returns the admin dir a linked worktree's .git file points to
-// ("gitdir: /repo/.git/worktrees/name"), resolved against the worktree.
+// ("gitdir: /project/.git/worktrees/name"), resolved against the worktree.
 func readGitFile(worktree string) (string, error) {
 	b, err := os.ReadFile(filepath.Join(worktree, ".git"))
 	if err != nil {

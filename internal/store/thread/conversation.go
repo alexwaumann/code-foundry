@@ -107,7 +107,7 @@ func (m *Manager) Send(ctx context.Context, id string, msg Message) (Item, error
 }
 
 // fileRefRoots resolves a file reference's repository to its worktree for thread s:
-// the workspace's member in that repository, else s's own worktree for its repo. A
+// the workspace's member in that project, else s's own worktree for its project. A
 // thread without a project resolves none.
 func (m *Manager) fileRefRoots(s Thread) func(projectID string) (string, bool) {
 	var members []workspace.Member

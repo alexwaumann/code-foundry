@@ -121,7 +121,7 @@ func TestNoProjectThreadSurvivesForkReconnectAndRestart(t *testing.T) {
 }
 
 // A thread without a project resolves no file reference, even one with an empty-looking
-// repo: every token becomes its relative path.
+// project: every token becomes its relative path.
 func TestNoProjectFileRefs(t *testing.T) {
 	e := newEnv(t)
 	s := e.connected(CreateOptions{NoProject: true})

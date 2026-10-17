@@ -15,7 +15,7 @@ import (
 // default branch (Status.BaseRef set, BaseAhead 0). Pure.
 //
 // Live threads, running terminals and workspace membership are the other half; the
-// repo store does not know them (CleanupOptions.Hold).
+// project store does not know them (CleanupOptions.Hold).
 func MergedCleanReason(w Worktree) string {
 	st := w.Status
 	switch {
@@ -81,7 +81,7 @@ func resolved(p string) string {
 	return p
 }
 
-// managedRoots is where the app makes worktrees for the repository named name.
+// managedRoots is where the app makes worktrees for the project named name.
 func (g *Git) managedRoots(name string) []string {
 	roots := []string{g.wtRoot}
 	if g.managed != nil {
@@ -96,7 +96,7 @@ func (w Worktree) MergedClean() bool { return MergedCleanReason(w) == "" }
 // CleanupOptions configures Cleanup.
 type CleanupOptions struct {
 	ProjectID string
-	// Path is the one worktree to clean up; "" means every worktree of the repo.
+	// Path is the one worktree to clean up; "" means every worktree of the project.
 	Path string
 	// DryRun evaluates the current snapshot only: no refresh, nothing removed, and
 	// Removed lists what would be.
@@ -120,8 +120,8 @@ type CleanupResult struct {
 	Skipped   []CleanupSkip
 }
 
-// Cleanup removes the worktrees of a repo whose work is already in its default branch
-// (MergedCleanReason "" and no Hold): it refreshes the repo's status (reconcile, base,
+// Cleanup removes the worktrees of a project whose work is already in its default branch
+// (MergedCleanReason "" and no Hold): it refreshes the project's status (reconcile, base,
 // every worktree; callers that want fresh remote refs fetch first), re-evaluates each
 // worktree, and removes it with RemoveWorktree, never forced, so git itself still
 // refuses a worktree that changed meanwhile. Branches are never deleted. A failed

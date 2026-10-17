@@ -1,4 +1,4 @@
-// Package repotest provides an in-memory repo.Store for tests of code that consumes
+// Package projecttest provides an in-memory project.Store for tests of code that consumes
 // the project store (API handlers, commands, the gh store).
 package projecttest
 
@@ -18,7 +18,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 )
 
-// Fake is an in-memory repo.Store. It never runs git: Register treats the path as the
+// Fake is an in-memory project.Store. It never runs git: Register treats the path as the
 // main worktree, CreateWorktree records a worktree, and every mutation publishes the
 // same events the real store does on the bus it was given (if any).
 type Fake struct {
@@ -33,13 +33,13 @@ type Fake struct {
 	refs map[string]project.Refs
 
 	// WorktreeRoot is where CreateWorktree puts worktrees without a path, like
-	// repo.Options.WorktreeRoot. New sets it to DefaultWorktreeRoot.
+	// project.Options.WorktreeRoot. New sets it to DefaultWorktreeRoot.
 	WorktreeRoot string
 	// AllowedRoot, when set, makes Register refuse paths outside it (compared
-	// lexically), like repo.Options.AllowedRoot. Empty accepts any absolute path.
+	// lexically), like project.Options.AllowedRoot. Empty accepts any absolute path.
 	AllowedRoot string
-	// Remotes are given to repos created by Register (cloned). Nil, the default,
-	// registers local-only repos; Put sets any remotes directly.
+	// Remotes are given to projects created by Register (cloned). Nil, the default,
+	// registers local-only projects; Put sets any remotes directly.
 	Remotes []string
 	// MakeDirs makes CreateWorktree create the worktree's directory, for callers that
 	// start processes in it.
@@ -70,7 +70,7 @@ func ID(path string) string {
 	return "id-" + strings.ReplaceAll(strings.Trim(filepath.Clean(path), "/"), "/", "-")
 }
 
-// Put inserts or replaces a repo and publishes RepoUpdated.
+// Put inserts or replaces a project and publishes ProjectUpdated.
 func (f *Fake) Put(r project.Project) {
 	f.mu.Lock()
 	f.projects[r.ID] = r
@@ -95,14 +95,14 @@ func (f *Fake) UpdateWorktree(w project.Worktree) {
 	f.publish(project.WorktreeUpdated{Worktree: w})
 }
 
-// Snapshot implements repo.Store.
+// Snapshot implements project.Store.
 func (f *Fake) Snapshot() *project.Snapshot {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.snap
 }
 
-// Register implements repo.Store.
+// Register implements project.Store.
 func (f *Fake) Register(_ context.Context, path string) (project.Project, error) {
 	f.mu.Lock()
 	f.Calls = append(f.Calls, "Register "+path)
@@ -147,7 +147,7 @@ func notGit(r project.Project) error {
 	return fmt.Errorf("%w: %s is %w", project.ErrFailedPrecondition, r.Name, project.ErrNotGit)
 }
 
-// InitGit implements repo.Store: the project becomes a git project on main with the
+// InitGit implements project.Store: the project becomes a git project on main with the
 // main worktree on main.
 func (f *Fake) InitGit(_ context.Context, id string) (project.Project, error) {
 	f.mu.Lock()
@@ -172,7 +172,7 @@ func (f *Fake) InitGit(_ context.Context, id string) (project.Project, error) {
 	return r, nil
 }
 
-// Unregister implements repo.Store.
+// Unregister implements project.Store.
 func (f *Fake) Unregister(_ context.Context, id string) error {
 	f.mu.Lock()
 	f.Calls = append(f.Calls, "Unregister "+id)
@@ -191,7 +191,7 @@ func (f *Fake) Unregister(_ context.Context, id string) error {
 	return nil
 }
 
-// CreateWorktree implements repo.Store.
+// CreateWorktree implements project.Store.
 func (f *Fake) CreateWorktree(_ context.Context, o project.CreateWorktreeOptions) (project.Worktree, error) {
 	f.mu.Lock()
 	f.Calls = append(f.Calls, "CreateWorktree "+o.ProjectID+" "+o.Branch)
@@ -231,7 +231,7 @@ func (f *Fake) CreateWorktree(_ context.Context, o project.CreateWorktreeOptions
 	return w, nil
 }
 
-// RemoveWorktree implements repo.Store.
+// RemoveWorktree implements project.Store.
 func (f *Fake) RemoveWorktree(_ context.Context, o project.RemoveWorktreeOptions) error {
 	f.mu.Lock()
 	f.Calls = append(f.Calls, "RemoveWorktree "+o.ProjectID+" "+o.Path)
@@ -262,7 +262,7 @@ func (f *Fake) RemoveWorktree(_ context.Context, o project.RemoveWorktreeOptions
 	return nil
 }
 
-// Refresh implements repo.Store.
+// Refresh implements project.Store.
 func (f *Fake) Refresh(_ context.Context, id string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -276,7 +276,7 @@ func (f *Fake) Refresh(_ context.Context, id string) error {
 	return nil
 }
 
-// SetRefs sets what ListRefs returns for repoID.
+// SetRefs sets what ListRefs returns for projectID.
 func (f *Fake) SetRefs(projectID string, refs project.Refs) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -286,7 +286,7 @@ func (f *Fake) SetRefs(projectID string, refs project.Refs) {
 	f.refs[projectID] = refs
 }
 
-// ListRefs implements repo.Store. Without SetRefs, a known repo lists its worktrees'
+// ListRefs implements project.Store. Without SetRefs, a known project lists its worktrees'
 // branches as local refs and its default branch as DefaultRef.
 func (f *Fake) ListRefs(_ context.Context, projectID string) (project.Refs, error) {
 	f.mu.Lock()

@@ -21,26 +21,26 @@ import (
 // than this gets a fresh snapshot event instead of the dropped deltas.
 const watchBuffer = 256
 
-// Repo implements codefoundryv1connect.RepoServiceHandler.
+// Project implements codefoundryv1connect.ProjectServiceHandler.
 type Project struct {
 	store project.Store
 	bus   *bus.Bus
-	// github and cloner back SearchGitHub, LookupGitHub and Clone (repo_github.go);
+	// github and cloner back SearchGitHub, LookupGitHub and Clone (project_github.go);
 	// nil answers Unimplemented.
 	github gh.Finder
 	cloner clone.Service
 	// projects and owners back Create, Publish and ListPublishOwners
-	// (repo_create.go); nil answers Unimplemented.
+	// (project_create.go); nil answers Unimplemented.
 	newProjects newproject.Service
 	owners      gh.Owners
-	// cleanupHold backs CleanupWorktrees' non-git check (repo_cleanup.go); nil holds
+	// cleanupHold backs CleanupWorktrees' non-git check (project_cleanup.go); nil holds
 	// nothing.
 	cleanupHold func(project.Worktree) string
 }
 
 var _ codefoundryv1connect.ProjectServiceHandler = (*Project)(nil)
 
-// NewRepo returns a RepoService handler over store, streaming repo.Event values from b.
+// NewProject returns a ProjectService handler over store, streaming project.Event values from b.
 func NewProject(store project.Store, b *bus.Bus) *Project {
 	return &Project{store: store, bus: b}
 }
@@ -53,7 +53,7 @@ func (h *Project) Route(opts ...connect.HandlerOption) Route {
 
 // Register adds the repository containing the given path (or the folder, as a project
 // without git). The path is what a user typed: "~" expands to home, and it must be
-// absolute (the Add Project dialog calls this directly; the CLI goes through repo.add).
+// absolute (the Add Project dialog calls this directly; the CLI goes through project.add).
 func (h *Project) Register(ctx context.Context, req *connect.Request[v1.RegisterProjectRequest]) (*connect.Response[v1.RegisterProjectResponse], error) {
 	path := req.Msg.GetPath()
 	if path != "" {
@@ -70,7 +70,7 @@ func (h *Project) Register(ctx context.Context, req *connect.Request[v1.Register
 	return connect.NewResponse(&v1.RegisterProjectResponse{Project: projectToProto(r)}), nil
 }
 
-// Unregister forgets a repository.
+// Unregister forgets a project.
 func (h *Project) Unregister(ctx context.Context, req *connect.Request[v1.UnregisterProjectRequest]) (*connect.Response[v1.UnregisterProjectResponse], error) {
 	if err := h.store.Unregister(ctx, req.Msg.GetId()); err != nil {
 		return nil, projectError(err)
@@ -78,12 +78,12 @@ func (h *Project) Unregister(ctx context.Context, req *connect.Request[v1.Unregi
 	return connect.NewResponse(&v1.UnregisterProjectResponse{}), nil
 }
 
-// List returns every registered repository from the current snapshot.
+// List returns every registered project from the current snapshot.
 func (h *Project) List(context.Context, *connect.Request[v1.ListProjectsRequest]) (*connect.Response[v1.ListProjectsResponse], error) {
 	return connect.NewResponse(&v1.ListProjectsResponse{Projects: projectsToProto(h.store.Snapshot().Projects)}), nil
 }
 
-// Get returns one repository from the current snapshot.
+// Get returns one project from the current snapshot.
 func (h *Project) Get(_ context.Context, req *connect.Request[v1.GetProjectRequest]) (*connect.Response[v1.GetProjectResponse], error) {
 	r, ok := h.store.Snapshot().Project(req.Msg.GetId())
 	if !ok {
@@ -137,7 +137,7 @@ func (h *Project) InitGit(ctx context.Context, req *connect.Request[v1.InitGitRe
 	return connect.NewResponse(&v1.InitGitResponse{Project: projectToProto(r)}), nil
 }
 
-// Refresh reconciles one repo (or all) and waits for fresh status.
+// Refresh reconciles one project (or all) and waits for fresh status.
 func (h *Project) Refresh(ctx context.Context, req *connect.Request[v1.RefreshProjectRequest]) (*connect.Response[v1.RefreshProjectResponse], error) {
 	if err := h.store.Refresh(ctx, req.Msg.GetId()); err != nil {
 		return nil, projectError(err)
@@ -145,7 +145,7 @@ func (h *Project) Refresh(ctx context.Context, req *connect.Request[v1.RefreshPr
 	return connect.NewResponse(&v1.RefreshProjectResponse{}), nil
 }
 
-// Watch sends a snapshot, then every repo event until the client goes away. If the
+// Watch sends a snapshot, then every project event until the client goes away. If the
 // client falls behind and events are dropped, it sends a fresh snapshot.
 func (h *Project) Watch(ctx context.Context, _ *connect.Request[v1.WatchProjectsRequest], stream *connect.ServerStream[v1.ProjectEvent]) error {
 	// Subscribe before reading the snapshot so nothing published in between is lost.
@@ -186,7 +186,7 @@ func (h *Project) Watch(ctx context.Context, _ *connect.Request[v1.WatchProjects
 	}
 }
 
-// repoError maps store errors to Connect codes.
+// projectError maps store errors to Connect codes.
 func projectError(err error) error {
 	code := connect.CodeInternal
 	switch {

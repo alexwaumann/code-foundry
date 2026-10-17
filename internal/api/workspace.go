@@ -53,7 +53,7 @@ func (h *Workspace) Create(ctx context.Context, req *connect.Request[v1.CreateWo
 	return connect.NewResponse(&v1.CreateWorkspaceResponse{Workspace: workspaceToProto(w)}), nil
 }
 
-// AddRepo adds a member repository.
+// AddProject adds a member project.
 func (h *Workspace) AddProject(ctx context.Context, req *connect.Request[v1.AddWorkspaceProjectRequest]) (*connect.Response[v1.AddWorkspaceProjectResponse], error) {
 	m := req.Msg
 	w, err := h.store.AddProject(ctx, workspace.AddProjectOptions{
@@ -67,7 +67,7 @@ func (h *Workspace) AddProject(ctx context.Context, req *connect.Request[v1.AddW
 	return connect.NewResponse(&v1.AddWorkspaceProjectResponse{Workspace: workspaceToProto(w)}), nil
 }
 
-// RemoveRepo removes a member repository's worktree.
+// RemoveProject removes a member project's worktree.
 func (h *Workspace) RemoveProject(ctx context.Context, req *connect.Request[v1.RemoveWorkspaceProjectRequest]) (*connect.Response[v1.RemoveWorkspaceProjectResponse], error) {
 	m := req.Msg
 	w, err := h.store.RemoveProject(ctx, workspace.RemoveProjectOptions{

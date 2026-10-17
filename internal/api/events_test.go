@@ -68,7 +68,7 @@ func newEventsFixture(t *testing.T) *eventsFixture {
 	route := f.events.Route()
 	mux := http.NewServeMux()
 	mux.Handle(route.Path, route.Handler)
-	// HTTP/2 like the repo drop test: flow-control windows bound how much the handler
+	// HTTP/2 like the project drop test: flow-control windows bound how much the handler
 	// can write ahead of a client that is not reading.
 	srv := httptest.NewUnstartedServer(mux)
 	srv.EnableHTTP2 = true

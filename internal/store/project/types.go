@@ -1,9 +1,9 @@
-// Package repo is the repository store: the persisted set of registered git
+// Package project is the project store: the persisted set of registered git
 // repositories, their worktrees, and per-worktree git status.
 //
 // The store shells out to git through a single Runner. A filesystem watcher (one
-// fsnotify watcher for every registered repo) feeds debounced refresh jobs into a
-// bounded worker pool. A job owns one slot: a repo reconcile job owns that repo's
+// fsnotify watcher for every registered project) feeds debounced refresh jobs into a
+// bounded worker pool. A job owns one slot: a project reconcile job owns that project's
 // metadata and worktree set, a status job owns one worktree. No two workers run the
 // same job at once, so each slot has exactly one writer. Every slot write is followed
 // by rebuilding the immutable Snapshot (atomic.Pointer) and publishing ordered Events
@@ -23,7 +23,7 @@ var (
 	ErrFailedPrecondition = errors.New("failed precondition")
 )
 
-// Repo is a registered project: a git repository, or (Git false) a plain directory.
+// Project is a registered project: a git repository, or (Git false) a plain directory.
 type Project struct {
 	ID            string
 	Path          string // main worktree path, symlinks resolved
@@ -95,13 +95,13 @@ func (s Status) equalIgnoringTime(o Status) bool {
 	return s == o
 }
 
-// Snapshot is an immutable view of every registered repo, sorted by name then path.
+// Snapshot is an immutable view of every registered project, sorted by name then path.
 // Never mutate a Snapshot or the slices it holds.
 type Snapshot struct {
 	Projects []Project
 }
 
-// Repo returns the repo with id.
+// Project returns the project with id.
 func (s *Snapshot) Project(id string) (Project, bool) {
 	if s == nil {
 		return Project{}, false
@@ -114,7 +114,7 @@ func (s *Snapshot) Project(id string) (Project, bool) {
 	return Project{}, false
 }
 
-// Worktree returns the worktree at path in repo id.
+// Worktree returns the worktree at path in project id.
 func (s *Snapshot) Worktree(projectID, path string) (Worktree, bool) {
 	r, ok := s.Project(projectID)
 	if !ok {
@@ -128,8 +128,8 @@ func (s *Snapshot) Worktree(projectID, path string) (Worktree, bool) {
 	return Worktree{}, false
 }
 
-// Owner returns the repo with a worktree at worktreePath, else the repo with id
-// repoID. It is how commands find the project a UI context points at.
+// Owner returns the project with a worktree at worktreePath, else the project with id
+// projectID. It is how commands find the project a UI context points at.
 func (s *Snapshot) Owner(projectID, worktreePath string) (Project, bool) {
 	if s == nil {
 		return Project{}, false
@@ -149,22 +149,22 @@ func (s *Snapshot) Owner(projectID, worktreePath string) (Project, bool) {
 	return s.Project(projectID)
 }
 
-// Event is published on the bus as bus.Publish[repo.Event]. Subscribe with
-// bus.Subscribe[repo.Event] and type-switch on the concrete types below. All repo
+// Event is published on the bus as bus.Publish[project.Event]. Subscribe with
+// bus.Subscribe[project.Event] and type-switch on the concrete types below. All project
 // events share one topic so subscribers see them in publish order.
 type Event interface{ isProjectEvent() }
 
-// RepoUpdated carries a repo's full state, including its worktree list. It is sent on
-// register and whenever repo metadata or the set of worktrees changes.
+// ProjectUpdated carries a project's full state, including its worktree list. It is sent on
+// register and whenever project metadata or the set of worktrees changes.
 type ProjectUpdated struct{ Project Project }
 
-// RepoRemoved is sent when a repo is unregistered.
+// ProjectRemoved is sent when a project is unregistered.
 type ProjectRemoved struct{ ID string }
 
 // WorktreeUpdated is sent when one worktree's branch, head, or status changes.
 type WorktreeUpdated struct{ Worktree Worktree }
 
-// WorktreeRemoved is sent when a worktree disappears from its repo.
+// WorktreeRemoved is sent when a worktree disappears from its project.
 type WorktreeRemoved struct{ ProjectID, Path string }
 
 func (ProjectUpdated) isProjectEvent()  {}
@@ -213,26 +213,26 @@ type RemoveWorktreeOptions struct {
 	Force bool
 }
 
-// Store is the repository store. The daemon's implementation is *Git; a fake lives in
-// repo/repotest.
+// Store is the project store. The daemon's implementation is *Git; a fake lives in
+// project/projecttest.
 type Store interface {
 	// Snapshot returns the current immutable snapshot. It never returns nil.
 	Snapshot() *Snapshot
 	// Register adds the repository containing path, or, when path is a directory
 	// outside any git repository, that directory as a project without git. It is
-	// idempotent: registering a path inside an already registered repo returns that
-	// repo.
+	// idempotent: registering a path inside an already registered project returns that
+	// project.
 	Register(ctx context.Context, path string) (Project, error)
-	// Unregister forgets a repo. Nothing on disk is touched.
+	// Unregister forgets a project. Nothing on disk is touched.
 	Unregister(ctx context.Context, id string) error
 	// CreateWorktree, RemoveWorktree, ListRefs and WorktreeDetail fail with
 	// ErrFailedPrecondition for a project without git.
 	CreateWorktree(ctx context.Context, opts CreateWorktreeOptions) (Worktree, error)
 	RemoveWorktree(ctx context.Context, opts RemoveWorktreeOptions) error
-	// ListRefs lists the repo's local branches and remote-tracking refs, read from git
+	// ListRefs lists the project's local branches and remote-tracking refs, read from git
 	// on each call (not from the snapshot).
 	ListRefs(ctx context.Context, projectID string) (Refs, error)
-	// Refresh reconciles one repo (or all when id is empty) and waits for its status.
+	// Refresh reconciles one project (or all when id is empty) and waits for its status.
 	Refresh(ctx context.Context, id string) error
 	// WorktreeDetail returns the files changed and commits on a worktree against its
 	// base (detail.go), computing them if needed.

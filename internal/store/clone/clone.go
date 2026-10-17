@@ -1,5 +1,5 @@
 // Package clone clones GitHub repositories into the projects directory and registers
-// them as projects (RepoService.Clone, the repo.clone command).
+// them as projects (ProjectService.Clone, the project.clone command).
 //
 // A clone runs `gh repo clone <owner>/<name> <projects>/<owner>/<name> -- --progress`,
 // so the user's gh login and git protocol settings apply, and streams gh's and git's
@@ -61,7 +61,7 @@ type Service interface {
 
 var _ Service = (*Cloner)(nil)
 
-// Registrar registers a directory as a project. *repo.Git implements it.
+// Registrar registers a directory as a project. *project.Git implements it.
 type Registrar interface {
 	Register(ctx context.Context, path string) (project.Project, error)
 }

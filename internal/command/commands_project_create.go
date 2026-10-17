@@ -9,9 +9,9 @@ import (
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 )
 
-// ProjectBackend is the slice of RepoService project.create, project.github.publish and
-// project.delete need, in generated Connect signatures. The RepoService handler, a
-// RepoServiceClient and codefoundryv1connect.UnimplementedRepoServiceHandler satisfy it.
+// ProjectBackend is the slice of ProjectService project.create, project.github.publish and
+// project.delete need, in generated Connect signatures. The ProjectService handler, a
+// ProjectServiceClient and codefoundryv1connect.UnimplementedProjectServiceHandler satisfy it.
 type NewProjectBackend interface {
 	Create(context.Context, *connect.Request[v1.CreateProjectRequest]) (*connect.Response[v1.CreateProjectResponse], error)
 	Publish(context.Context, *connect.Request[v1.PublishProjectRequest]) (*connect.Response[v1.PublishProjectResponse], error)
@@ -33,7 +33,7 @@ type DeletableFunc func(Context) bool
 
 // ProjectDeps are project.create's, project.github.publish's and project.delete's dependencies.
 type NewProjectDeps struct {
-	// Backend runs them; nil registers against UnimplementedRepoServiceHandler.
+	// Backend runs them; nil registers against UnimplementedProjectServiceHandler.
 	Backend NewProjectBackend
 	// NotGit and HasOrigin gate project.github.publish: a git project without origin.
 	NotGit    NotGitFunc

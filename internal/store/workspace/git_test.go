@@ -15,7 +15,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 )
 
-// End to end against real git through the real repo store.
+// End to end against real git through the real project store.
 
 func gitCmd(t *testing.T, dir string, args ...string) string {
 	t.Helper()

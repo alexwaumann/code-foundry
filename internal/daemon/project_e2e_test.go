@@ -42,7 +42,7 @@ func (b bearer) RoundTrip(r *http.Request) (*http.Response, error) {
 	return b.next.RoundTrip(r)
 }
 
-// TestRepoServiceEndToEnd runs the daemon and drives RepoService over the
+// TestProjectServiceEndToEnd runs the daemon and drives ProjectService over the
 // token-protected loopback listener: Register -> List -> CreateWorktree -> dirty file
 // observed on Watch -> RemoveWorktree -> Unregister, then a prompt shutdown with a
 // Watch stream still open.

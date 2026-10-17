@@ -17,7 +17,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 )
 
-// fakeRepos is an in-memory Repos: Register adds a git project at the path, Refresh
+// fakeProjects is an in-memory Projects: Register adds a git project at the path, Refresh
 // applies onRefresh (what the reconcile would discover).
 type fakeProjects struct {
 	mu           sync.Mutex

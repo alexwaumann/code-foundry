@@ -14,7 +14,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/project/projecttest"
 )
 
-// recordingRepos records CreateWorktree options and can fail them.
+// recordingProjects records CreateWorktree options and can fail them.
 type recordingProjects struct {
 	*projecttest.Fake
 	mu   sync.Mutex
@@ -41,7 +41,7 @@ func (r *recordingProjects) created() []project.CreateWorktreeOptions {
 	return slices.Clone(r.opts)
 }
 
-// newWorktreeEnv is an env whose repo source records worktree creation and whose
+// newWorktreeEnv is an env whose project source records worktree creation and whose
 // RefExists reports the refs in taken.
 func newWorktreeEnv(t *testing.T, taken []string, mutate ...func(*Options)) (*env, *recordingProjects) {
 	t.Helper()

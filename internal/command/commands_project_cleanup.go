@@ -13,10 +13,10 @@ import (
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 )
 
-// RepoCleanupDeps are project.worktree.cleanup's dependencies.
+// ProjectCleanupDeps are project.worktree.cleanup's dependencies.
 type ProjectCleanupDeps struct {
-	// Repo resolves the project and removes worktrees (RepoService.CleanupWorktrees).
-	// Nil works like UnimplementedRepoServiceHandler.
+	// Project resolves the project and removes worktrees (ProjectService.CleanupWorktrees).
+	// Nil works like UnimplementedProjectServiceHandler.
 	Project ProjectBackend
 	// GitOps fetches first, the same operation git.fetch runs (so the GUI shows its
 	// toast). Nil works like UnimplementedGitOpsServiceHandler.
@@ -29,7 +29,7 @@ type ProjectCleanupDeps struct {
 // run failed; Run then reports why).
 const cleanupConfirm = "Fetch {project} and remove the worktrees created by Code Foundry (under its worktrees directory) whose work is already in the default branch? Branches are kept."
 
-// RegisterRepoCleanup registers project.worktree.cleanup: reclaim the disk space of
+// RegisterProjectCleanup registers project.worktree.cleanup: reclaim the disk space of
 // worktrees whose work is already in origin/<default>. A worktree goes only when it is
 // not the main one, created by Code Foundry (under its worktrees directory), on a branch, without staged, modified, untracked or conflicted
 // files, every commit on it is in origin/<default>, and no thread (but an archived one), running

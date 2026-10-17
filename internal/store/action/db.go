@@ -93,8 +93,8 @@ func deleteAction(ctx context.Context, db *sql.DB, id string) error {
 	return nil
 }
 
-// deleteRepoActions removes a project's actions. Unregistering the project cascades
-// already (actions.repo_id references repos); this makes RepoRemoved exact either way.
+// deleteProjectActions removes a project's actions. Unregistering the project cascades
+// already (actions.repo_id references repos); this makes ProjectRemoved exact either way.
 func deleteProjectActions(ctx context.Context, db *sql.DB, projectID string) error {
 	if _, err := db.ExecContext(ctx, `DELETE FROM actions WHERE repo_id = ?`, projectID); err != nil {
 		return fmt.Errorf("action: delete project %s's actions: %w", projectID, err)

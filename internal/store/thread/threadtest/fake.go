@@ -142,7 +142,7 @@ func (f *Fake) add(call string, s thread.Thread) (thread.Thread, error) {
 // Create records the call and adds a STARTING thread ("s-N"). With
 // NewWorktree the thread's worktree is /worktrees/cf-<N> (CreatedWorktree, BaseRef as
 // requested). WorkspaceID is copied as is. With NewWorkspace the thread belongs to
-// workspace "w-new" and runs in /worktrees/<repo>, repo being RepoID or the first repo.
+// workspace "w-new" and runs in /worktrees/<project>, project being ProjectID or the first project.
 // With NoProject it runs in /home. The call reads "Create <repo> <path> <model>
 // <effort>", then " perm=<n>", " new-worktree=<base>", " workspace=<id>",
 // " new-workspace=<a,b>", " no-project", " prompt=<text>"
@@ -437,7 +437,7 @@ func (f *Fake) Snapshot() *thread.Snapshot {
 	return f.snap
 }
 
-// List filters the snapshot like the store (thread.FilterThreads), comparing Repo and
+// List filters the snapshot like the store (thread.FilterThreads), comparing Project and
 // Workspace as ids.
 func (f *Fake) List(_ context.Context, o thread.ListOptions) ([]thread.Thread, error) {
 	return thread.FilterThreads(f.Snapshot().Threads, o), nil

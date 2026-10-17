@@ -64,7 +64,7 @@ func (h *Project) Clone(ctx context.Context, req *connect.Request[v1.CloneProjec
 	return stream.Send(&v1.CloneProjectEvent{Event: &v1.CloneProjectEvent_Project{Project: r}})
 }
 
-// CloneRepo is Clone without the stream, for the repo.clone command: progress gets
+// CloneProject is Clone without the stream, for the project.clone command: progress gets
 // every output line (calls are serialized). Errors are Connect errors.
 func (h *Project) CloneProject(ctx context.Context, owner, name string, progress func(*v1.CloneProgress)) (*v1.Project, error) {
 	if h.cloner == nil {
@@ -81,9 +81,9 @@ func (h *Project) CloneProject(ctx context.Context, owner, name string, progress
 	return projectToProto(r), nil
 }
 
-// CloneRef is CloneRepo for a reference the user typed: owner/repo or an
+// CloneRef is CloneProject for a reference the user typed: owner/repo or an
 // https://github.com URL (gh.ParseRepoRef). A malformed one is InvalidArgument. It is
-// the repo.clone command's backend (command.CloneFunc).
+// the project.clone command's backend (command.CloneFunc).
 func (h *Project) CloneRef(ctx context.Context, ref string, progress func(*v1.CloneProgress)) (*v1.Project, error) {
 	owner, name, err := gh.ParseRepoRef(ref)
 	if err != nil {

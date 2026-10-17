@@ -111,7 +111,7 @@ func RequireGit(r project.Project) error {
 	return fmt.Errorf("%w: %s is not a git repository; workspaces need git in every project", ErrFailedPrecondition, r.Name)
 }
 
-// ResolveRepo finds a registered repository by id, by name when exactly one has it,
+// ResolveProject finds a registered project by id, by name when exactly one has it,
 // or by an absolute path inside its main worktree or any of its worktrees.
 func ResolveProject(snap *project.Snapshot, ref string) (project.Project, error) {
 	ref = strings.TrimSpace(ref)
@@ -164,7 +164,7 @@ func ResolveProject(snap *project.Snapshot, ref string) (project.Project, error)
 }
 
 // memberFor finds the member of w that ref names: a path inside its worktree, its
-// repository's id or name, or a path inside its repository.
+// project's id or name, or a path inside its project.
 func memberFor(w Workspace, projects *project.Snapshot, ref string) (Member, error) {
 	ref = strings.TrimSpace(ref)
 	if ref == "" {
@@ -306,7 +306,7 @@ func branchFor(name, branch string) (string, error) {
 }
 
 // validateRef rejects refs that could be read as a git option or are not one word.
-// git validates the rest (repo.Store.CreateWorktree runs check-ref-format).
+// git validates the rest (project.Store.CreateWorktree runs check-ref-format).
 func validateRef(what, ref string) error {
 	if ref == "" {
 		return nil

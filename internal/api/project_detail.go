@@ -44,7 +44,7 @@ func worktreeDetailToProto(d project.WorktreeDetail) *v1.WorktreeDetail {
 	return p
 }
 
-// worktreeDetailEvent maps repo.WorktreeDetailUpdated (see eventToProto).
+// worktreeDetailEvent maps project.WorktreeDetailUpdated (see eventToProto).
 func worktreeDetailEvent(e project.WorktreeDetailUpdated) *v1.ProjectEvent {
 	return &v1.ProjectEvent{Event: &v1.ProjectEvent_WorktreeDetailUpdated{WorktreeDetailUpdated: &v1.WorktreeDetailRef{
 		ProjectId: e.ProjectID, Path: e.Path, ComputedAt: timestamp(e.ComputedAt),

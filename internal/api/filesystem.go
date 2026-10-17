@@ -31,7 +31,7 @@ var _ codefoundryv1connect.FilesystemServiceHandler = (*Filesystem)(nil)
 
 // NewFilesystem returns a FilesystemService handler that completes paths under root
 // (the user's home directory, symlinks resolved; see fsx.HomeRoot), marks the
-// registered projects of repos, and lists skills (root/.claude for the user's) and
+// registered projects, and lists skills (root/.claude for the user's) and
 // files of their checkouts.
 func NewFilesystem(root string, projects project.Store) *Filesystem {
 	log := slog.Default().With("api", "filesystem")
@@ -46,7 +46,7 @@ func (h *Filesystem) Route(opts ...connect.HandlerOption) Route {
 
 // ListDirectories completes a path prefix to directories under home.
 func (h *Filesystem) ListDirectories(_ context.Context, req *connect.Request[v1.ListDirectoriesRequest]) (*connect.Response[v1.ListDirectoriesResponse], error) {
-	// A worktree path registers its repository, so it counts as added too.
+	// A worktree path registers its project, so it counts as added too.
 	registered := map[string]bool{}
 	for _, r := range h.projects.Snapshot().Projects {
 		registered[r.Path] = true
@@ -127,8 +127,8 @@ func (h *Filesystem) SearchFiles(ctx context.Context, req *connect.Request[v1.Se
 }
 
 // checkout resolves a request's checkout: path (absolute, symlinks resolved, under
-// home, an existing directory) or the repo's main worktree, and whether to list it
-// with git. The repo must be registered.
+// home, an existing directory) or the project's main worktree, and whether to list it
+// with git. The project must be registered.
 func (h *Filesystem) checkout(projectID, path string) (dir string, git bool, err error) {
 	if projectID == "" {
 		return "", false, connect.NewError(connect.CodeInvalidArgument, errors.New("project_id is required"))

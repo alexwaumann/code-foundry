@@ -21,8 +21,8 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 )
 
-// RepoSource is the part of the project store threads need: resolving worktrees and
-// creating one for a new thread. *repo.Git implements it.
+// ProjectSource is the part of the project store threads need: resolving worktrees and
+// creating one for a new thread. *project.Git implements it.
 type ProjectSource interface {
 	Snapshot() *project.Snapshot
 	CreateWorktree(ctx context.Context, opts project.CreateWorktreeOptions) (project.Worktree, error)
@@ -34,7 +34,7 @@ type Options struct {
 	// Terminals holds the shells terminal.new started for threads; Remove kills a
 	// thread's (shells.go). Claude itself never runs in a terminal.
 	Terminals terminal.Store
-	// Repos resolves repo ids and worktree paths. Nil accepts any existing directory
+	// Projects resolves project ids and worktree paths. Nil accepts any existing directory
 	// as a worktree (tests); the daemon always sets it.
 	Projects ProjectSource
 	// Workspaces lists workspaces (a workspace thread's members at every spawn) and
@@ -65,7 +65,7 @@ type Options struct {
 	AttachmentReapInterval time.Duration
 	// WorktreePath, when set, picks the path of a worktree Create makes for branch in
 	// r; "" leaves it to the project store's default. The daemon applies the
-	// repos.worktree_dir setting with it, as repo.worktree.new does.
+	// projects.worktree_dir setting with it, as project.worktree.new does.
 	WorktreePath func(r project.Project, branch string) string
 	// RefExists reports whether ref exists in the repository at dir; Create uses it
 	// to keep new worktree branches unique. Default: git rev-parse --verify.
@@ -453,7 +453,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 	}
 	switch {
 	case o.NoProject:
-		// No owner: RepoID and WorkspaceID stay empty and claude starts in the home
+		// No owner: ProjectID and WorkspaceID stay empty and claude starts in the home
 		// directory, trusted like any cwd (spawn).
 		s.WorktreePath = m.opts.Home
 	case o.NewWorkspace != nil:
@@ -911,7 +911,7 @@ func (m *Manager) startNaming(id, msg string) {
 	}()
 }
 
-// resolveWorktree maps (repo id, path) to a registered repo's worktree.
+// resolveWorktree maps (project id, path) to a registered project's worktree.
 func (m *Manager) resolveWorktree(projectID, path string) (string, string, error) {
 	if path != "" {
 		if !filepath.IsAbs(path) {

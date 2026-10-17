@@ -23,8 +23,8 @@ import (
 // Fake implements workspace.Store.
 type Fake struct {
 	bus *bus.Bus
-	// Repos, when set, is joined into Members (repo names, branches). Nil: members
-	// are reported with no repo name and Missing.
+	// Projects, when set, is joined into Members (project names, branches). Nil: members
+	// are reported with no project name and Missing.
 	Projects func() *project.Snapshot
 	// WorktreeRoot is where member worktrees "are": <root>/<repo>/<branch, / -> ->.
 	WorktreeRoot string
@@ -101,7 +101,7 @@ func (f *Fake) Snapshot() *workspace.Snapshot {
 	return f.snap
 }
 
-// Create implements workspace.Store. Repo refs are used as repo ids verbatim; the
+// Create implements workspace.Store. Project refs are used as project ids verbatim; the
 // branch defaults to cf/<name>.
 func (f *Fake) Create(_ context.Context, o workspace.CreateOptions) (workspace.Workspace, error) {
 	f.mu.Lock()
@@ -141,7 +141,7 @@ func (f *Fake) Create(_ context.Context, o workspace.CreateOptions) (workspace.W
 	return w, nil
 }
 
-// AddRepo implements workspace.Store.
+// AddProject implements workspace.Store.
 func (f *Fake) AddProject(_ context.Context, o workspace.AddProjectOptions) (workspace.Workspace, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -160,7 +160,7 @@ func (f *Fake) AddProject(_ context.Context, o workspace.AddProjectOptions) (wor
 	return w, nil
 }
 
-// RemoveRepo implements workspace.Store. Repo is matched against member repo ids.
+// RemoveProject implements workspace.Store. Project is matched against member project ids.
 func (f *Fake) RemoveProject(_ context.Context, o workspace.RemoveProjectOptions) (workspace.Workspace, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

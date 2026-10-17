@@ -428,7 +428,7 @@ func TestLocalOnly(t *testing.T) {
 	}{
 		{"rl", "", true},
 		{"", local, true},
-		{"ra", local, true}, // the worktree path wins over the repo id
+		{"ra", local, true}, // the worktree path wins over the project id
 		{"rl", w.a, false},
 		{"ra", "", false},
 		{"", w.b, false}, // unregistered: unknown, so not local-only

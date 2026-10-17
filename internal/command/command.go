@@ -2,7 +2,7 @@
 // the GUI palette, keybindings, and CLI verbs are three front doors to one Registry.
 //
 // Commands are registered explicitly, never from init(). Each domain exposes a
-// Register<Domain> function (RegisterDaemon, RegisterUI, RegisterTerminal, RegisterRepo)
+// Register<Domain> function (RegisterDaemon, RegisterUI, RegisterTerminal, RegisterProject)
 // that takes the registry plus the narrow dependencies it needs. The daemon calls them
 // once at startup through internal/command/all. Explicit registration keeps the full set
 // of commands visible at one call site, lets tests build a registry with fakes, and
@@ -96,7 +96,7 @@ const (
 	ContextTerminal
 	// ContextThread is Context.ActiveThreadID.
 	ContextThread
-	// ContextRepo is Context.ActiveRepoID.
+	// ContextProject is Context.ActiveProjectID.
 	ContextProject
 	// ContextWorktree is Context.ActiveWorktreePath.
 	ContextWorktree

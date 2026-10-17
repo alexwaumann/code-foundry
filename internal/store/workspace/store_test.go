@@ -20,11 +20,11 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/project/projecttest"
 )
 
-// faultyRepos wraps the repo fake to fail CreateWorktree for one repo and
+// faultyProjects wraps the project fake to fail CreateWorktree for one project and
 // RemoveWorktree for one path (as git does for a dirty worktree).
 type faultyProjects struct {
 	*projecttest.Fake
-	failCreate string // repo id
+	failCreate string // project id
 	failRemove string // worktree path
 }
 
@@ -104,7 +104,7 @@ func (h *harness) open() *Manager {
 	return m
 }
 
-// id is the fake repo id for /src/<name>.
+// id is the fake project id for /src/<name>.
 func id(name string) string { return projecttest.ID("/src/" + name) }
 
 func (h *harness) wt(name, branch string) string {
@@ -379,7 +379,7 @@ func TestRemove(t *testing.T) {
 	tests := []struct {
 		name    string
 		threads []Thread
-		dirty   string // repo name whose worktree the project store reports dirty
+		dirty   string // project name whose worktree the project store reports dirty
 		gitDirt bool   // git refuses to remove api's worktree
 		force   bool
 		wantErr error

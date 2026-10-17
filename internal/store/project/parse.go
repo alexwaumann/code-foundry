@@ -12,10 +12,10 @@ import (
 	"strings"
 )
 
-// idLen is how many hex characters of sha1(main worktree path) form a repo id.
+// idLen is how many hex characters of sha1(main worktree path) form a project id.
 const idLen = 12
 
-// repoID derives a stable id from a repo's main worktree path.
+// projectID derives a stable id from a project's main worktree path.
 func projectID(mainPath string) string {
 	sum := sha1.Sum([]byte(mainPath))
 	return hex.EncodeToString(sum[:])[:idLen]
@@ -23,7 +23,7 @@ func projectID(mainPath string) string {
 
 // mainWorktreeFromCommonDir maps the output of
 // `git rev-parse --path-format=absolute --git-common-dir` to the main worktree path.
-// Every worktree of a repo shares the common dir, which for a non-bare repository is
+// Every worktree of a project shares the common dir, which for a non-bare repository is
 // <main worktree>/.git.
 func mainWorktreeFromCommonDir(out string) (string, error) {
 	dir := filepath.Clean(strings.TrimSpace(out))
