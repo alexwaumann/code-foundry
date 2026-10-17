@@ -117,6 +117,8 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				{Name: "labels", Type: String, Description: "Comma-separated labels (lowercase letters, digits, -, _, . and /)"},
 				{Name: "budget", Type: String, Description: "Spending limit in USD at Claude API rates, e.g. 5.00: Claude is interrupted when the thread's cost reaches it"},
 				{Name: "notify", Type: Bool, Description: "With created-by: wake the creator with a message each time the new thread settles (a repeat thread.subscribe)"},
+				{Name: "request-id", Type: String, Description: "An idempotency key (at most 128 characters): repeating thread.new with a key its creator used " +
+					"in the last 24 hours prints the thread made then and starts nothing; use one per task so a retry after a timeout makes no duplicate"},
 			},
 			When: canStartThread,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
@@ -134,7 +136,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 					ComposerPrompt: a.String("composer-prompt"), PermissionMode: threadPermissionModes[a.String("permission")], Attachments: splitList(a.String("attachments")),
 					WorkspaceId: ws, NoProject: a.Bool("no-project"),
 					CreatedBy: a.String("created-by"), Brief: a.String("brief"), Labels: splitList(a.String("labels")),
-					Notify: a.Bool("notify"),
+					Notify: a.Bool("notify"), RequestId: a.String("request-id"),
 				}
 				if req.Notify && strings.TrimSpace(req.CreatedBy) == "" {
 					return Result{}, InvalidArg("notify", "needs created-by (the thread to wake; the CLI defaults it to $CODE_FOUNDRY_THREAD inside a thread)")
@@ -163,6 +165,11 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 					return Result{}, err
 				}
 				s := res.Msg.GetThread()
+				if res.Msg.GetReused() {
+					// The JSON is the thread, as the first time.
+					return Result{Message: "thread " + threadLabel(s) + " in " + s.GetWorktreePath() +
+						" was created earlier for request id " + req.GetRequestId() + "; nothing new started", JSON: s}, nil
+				}
 				focus(s.GetId())
 				msg := "created thread " + threadLabel(s) + " in " + s.GetWorktreePath()
 				if s.GetWorkspaceId() != "" {

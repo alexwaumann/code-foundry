@@ -71,3 +71,25 @@ func TestListOptionsFromProto(t *testing.T) {
 		t.Errorf("listOptionsFromProto = %+v, want %+v", got, want)
 	}
 }
+
+// Create with a request_id twice answers the first thread, reused.
+func TestThreadCreateRequestID(t *testing.T) {
+	b := bus.New()
+	h := NewThread(threadtest.New(b), b)
+	create := func() *v1.CreateThreadResponse {
+		t.Helper()
+		res, err := h.Create(context.Background(), connect.NewRequest(&v1.CreateThreadRequest{WorktreePath: "/wt", RequestId: "k1"}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return res.Msg
+	}
+	first, second := create(), create()
+	if first.GetReused() || !second.GetReused() || first.GetThread().GetId() != second.GetThread().GetId() {
+		t.Errorf("first %v, second %v", first, second)
+	}
+	_, err := h.Create(context.Background(), connect.NewRequest(&v1.CreateThreadRequest{WorktreePath: "/wt", RequestId: "a\x01b"}))
+	if connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Errorf("a bad key: %v", err)
+	}
+}

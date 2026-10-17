@@ -223,6 +223,8 @@ type Manager struct {
 
 	// subs are the wake subscriptions (subscriptions.go).
 	subs *subscriptions
+	// reqs are the request ids being created now (requests.go).
+	reqs requests
 }
 
 type record struct {

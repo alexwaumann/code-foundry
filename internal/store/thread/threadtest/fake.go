@@ -38,6 +38,8 @@ type Fake struct {
 	// subs are the wake subscriptions (subscriptions.go).
 	subs    []thread.Subscription
 	nextSub int
+	// requests are CreateOnce's keys (creator NUL key) to thread ids.
+	requests map[string]string
 }
 
 var _ thread.Store = (*Fake)(nil)
@@ -204,6 +206,36 @@ func (f *Fake) Create(_ context.Context, o thread.CreateOptions) (thread.Thread,
 		f.mu.Unlock()
 	}
 	return s, err
+}
+
+// CreateOnce is Create keyed by requestID (validated like the store's): a key its
+// creator used before returns that thread, reused, and records nothing. Keys never
+// expire in the fake.
+func (f *Fake) CreateOnce(ctx context.Context, requestID string, o thread.CreateOptions) (thread.Thread, bool, error) {
+	key, err := thread.CleanRequestID(requestID)
+	if err != nil {
+		return thread.Thread{}, false, err
+	}
+	slot := strings.TrimSpace(o.CreatedBy) + "\x00" + key
+	if key != "" {
+		f.mu.Lock()
+		id, ok := f.requests[slot]
+		s, exists := f.byID[id]
+		f.mu.Unlock()
+		if ok && exists {
+			return s, true, nil
+		}
+	}
+	s, err := f.Create(ctx, o)
+	if err == nil && key != "" {
+		f.mu.Lock()
+		if f.requests == nil {
+			f.requests = map[string]string{}
+		}
+		f.requests[slot] = s.ID
+		f.mu.Unlock()
+	}
+	return s, false, err
 }
 
 // StageAttachment records "StageAttachment <name> <mime> <len>" (and " pages=<n>"

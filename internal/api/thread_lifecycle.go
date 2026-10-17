@@ -30,11 +30,11 @@ func (h *Thread) Create(ctx context.Context, req *connect.Request[v1.CreateThrea
 	if nw := m.GetNewWorkspace(); nw != nil {
 		o.NewWorkspace = &thread.NewWorkspace{Repos: nw.GetRepos(), BaseRef: nw.GetBaseRef(), Name: nw.GetName()}
 	}
-	s, err := h.store.Create(ctx, o)
+	s, reused, err := h.store.CreateOnce(ctx, m.GetRequestId(), o)
 	if err != nil {
 		return nil, threadError(err)
 	}
-	return connect.NewResponse(&v1.CreateThreadResponse{Thread: threadToProto(s)}), nil
+	return connect.NewResponse(&v1.CreateThreadResponse{Thread: threadToProto(s), Reused: reused}), nil
 }
 
 // Fork continues a thread's conversation in a new thread.
