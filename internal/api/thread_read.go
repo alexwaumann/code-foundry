@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strconv"
 
+	"connectrpc.com/connect"
+
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
@@ -22,7 +24,7 @@ type itemPage struct {
 // pageItems selects q's page of items (in ordinal order): those of q's role; after
 // q.since (an item id, else an ordinal) the first q.last of them, else the last q.last;
 // q.last 0 is every one. A since that names no item of the thread and is no number is
-// thread.ErrNotFound.
+// NotFound.
 func pageItems(items []thread.Item, q *v1.ThreadItemsQuery) (itemPage, error) {
 	since, hasSince, err := sinceOrdinal(items, q.GetSince())
 	if err != nil {
@@ -66,7 +68,7 @@ func sinceOrdinal(items []thread.Item, since string) (ord int64, ok bool, err er
 	if n, err := strconv.ParseInt(since, 10, 64); err == nil && n >= 0 {
 		return n, true, nil
 	}
-	return 0, false, fmt.Errorf("%w: the thread has no item %s (since takes an item id or an ordinal)", thread.ErrNotFound, since)
+	return 0, false, connect.NewError(connect.CodeNotFound, fmt.Errorf("the thread has no item %s (give an item id or an ordinal)", since))
 }
 
 // roleMatches: it is of the role (any for UNSPECIFIED).

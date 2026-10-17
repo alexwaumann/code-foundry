@@ -1,9 +1,10 @@
 package api
 
 import (
-	"errors"
 	"slices"
 	"testing"
+
+	"connectrpc.com/connect"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
@@ -53,8 +54,8 @@ func TestPageItems(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			p, err := pageItems(items, tt.q)
 			if tt.notFound {
-				if !errors.Is(err, thread.ErrNotFound) {
-					t.Fatalf("err = %v, want ErrNotFound", err)
+				if connect.CodeOf(err) != connect.CodeNotFound {
+					t.Fatalf("err = %v, want NotFound", err)
 				}
 				return
 			}
