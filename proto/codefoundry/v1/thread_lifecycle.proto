@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package codefoundry.v1;
 
+import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 
 // Thread lifecycle messages: the thread record (Thread), its state and status, and the
@@ -412,6 +413,38 @@ message GetThreadRequest {
 
 message GetThreadResponse {
   Thread thread = 1;
+}
+
+// ThreadWaitCondition is what ThreadService.Wait waits for. Each is a fact about the
+// Thread record (state, status, status_reason), checked at once and on every change.
+enum ThreadWaitCondition {
+  // Means IDLE.
+  THREAD_WAIT_CONDITION_UNSPECIFIED = 0;
+  // Claude is not working and no answer is pending: the thread is not STARTING and its
+  // status is IDLE, ERROR (the process ended mid-turn), or NEEDS_ATTENTION for anything
+  // but a pending permission prompt or question (a turn that ended unseen, "finished"
+  // or "error: <code>"; a snooze that ended).
+  THREAD_WAIT_CONDITION_IDLE = 1;
+  // status NEEDS_ATTENTION, whatever the reason.
+  THREAD_WAIT_CONDITION_ATTENTION = 2;
+  // status ERROR.
+  THREAD_WAIT_CONDITION_ERROR = 3;
+  // state DISCONNECTED (no Claude process).
+  THREAD_WAIT_CONDITION_DISCONNECTED = 4;
+}
+
+message WaitThreadRequest {
+  string id = 1;
+  ThreadWaitCondition until = 2;
+  // How long to wait. Unset or zero: until the call is cancelled.
+  google.protobuf.Duration timeout = 3;
+}
+
+message WaitThreadResponse {
+  // The thread when the condition held, or when the timeout passed.
+  Thread thread = 1;
+  // The timeout passed before the condition held; thread is the current record.
+  bool timed_out = 2;
 }
 
 message RenameThreadRequest {

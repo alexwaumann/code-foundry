@@ -111,7 +111,15 @@ func (EventSource) EnumDescriptor() ([]byte, []int) {
 type WatchEventsRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Subset of sources to include. Empty means all.
-	Sources       []EventSource `protobuf:"varint,1,rep,packed,name=sources,proto3,enum=codefoundry.v1.EventSource" json:"sources,omitempty"`
+	Sources []EventSource `protobuf:"varint,1,rep,packed,name=sources,proto3,enum=codefoundry.v1.EventSource" json:"sources,omitempty"`
+	// Resume after this Event.seq (the last one the client applied). When the daemon
+	// still holds every live event after it (it keeps the last 4096), the stream skips
+	// the snapshots and replays those events (of the requested sources), then goes on
+	// live. Otherwise (too old, or ahead of the daemon's counter, as after a daemon
+	// restart) the stream starts as without it: snapshots, then live. A client tells the
+	// two apart by the first event: a replayed or live event has seq > 0, a snapshot 0.
+	// Zero: no resume.
+	SinceSeq      uint64 `protobuf:"varint,2,opt,name=since_seq,json=sinceSeq,proto3" json:"since_seq,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -153,6 +161,13 @@ func (x *WatchEventsRequest) GetSources() []EventSource {
 	return nil
 }
 
+func (x *WatchEventsRequest) GetSinceSeq() uint64 {
+	if x != nil {
+		return x.SinceSeq
+	}
+	return 0
+}
+
 type Event struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Event:
@@ -169,7 +184,13 @@ type Event struct {
 	//	*Event_Thread
 	//	*Event_Heartbeat
 	//	*Event_Action
-	Event         isEvent_Event `protobuf_oneof:"event"`
+	Event isEvent_Event `protobuf_oneof:"event"`
+	// Position of a live event in the daemon's one event sequence: 1, 2, 3, ... per
+	// daemon lifetime, shared by every client and source (the same event has the same
+	// seq on every stream; a stream filtered by source sees gaps). Snapshots, resyncs
+	// and heartbeats carry 0: they are not resumable. Pass the last seq applied as
+	// WatchEventsRequest.since_seq to resume.
+	Seq           uint64 `protobuf:"varint,20,opt,name=seq,proto3" json:"seq,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -319,6 +340,13 @@ func (x *Event) GetAction() *ActionEvent {
 	return nil
 }
 
+func (x *Event) GetSeq() uint64 {
+	if x != nil {
+		return x.Seq
+	}
+	return 0
+}
+
 type isEvent_Event interface {
 	isEvent_Event()
 }
@@ -405,9 +433,10 @@ var File_codefoundry_v1_events_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_events_proto_rawDesc = "" +
 	"\n" +
-	"\x1bcodefoundry/v1/events.proto\x12\x0ecodefoundry.v1\x1a\x1bcodefoundry/v1/action.proto\x1a\x17codefoundry/v1/gh.proto\x1a\x1bcodefoundry/v1/gitops.proto\x1a\x1ecodefoundry/v1/heartbeat.proto\x1a\x19codefoundry/v1/repo.proto\x1a\x1dcodefoundry/v1/settings.proto\x1a\x1dcodefoundry/v1/terminal.proto\x1a\x1bcodefoundry/v1/thread.proto\x1a%codefoundry/v1/thread_lifecycle.proto\x1a\x17codefoundry/v1/ui.proto\x1a\x1bcodefoundry/v1/update.proto\x1a\x1ecodefoundry/v1/workspace.proto\"K\n" +
+	"\x1bcodefoundry/v1/events.proto\x12\x0ecodefoundry.v1\x1a\x1bcodefoundry/v1/action.proto\x1a\x17codefoundry/v1/gh.proto\x1a\x1bcodefoundry/v1/gitops.proto\x1a\x1ecodefoundry/v1/heartbeat.proto\x1a\x19codefoundry/v1/repo.proto\x1a\x1dcodefoundry/v1/settings.proto\x1a\x1dcodefoundry/v1/terminal.proto\x1a\x1bcodefoundry/v1/thread.proto\x1a%codefoundry/v1/thread_lifecycle.proto\x1a\x17codefoundry/v1/ui.proto\x1a\x1bcodefoundry/v1/update.proto\x1a\x1ecodefoundry/v1/workspace.proto\"h\n" +
 	"\x12WatchEventsRequest\x125\n" +
-	"\asources\x18\x01 \x03(\x0e2\x1b.codefoundry.v1.EventSourceR\asources\"\xb3\x05\n" +
+	"\asources\x18\x01 \x03(\x0e2\x1b.codefoundry.v1.EventSourceR\asources\x12\x1b\n" +
+	"\tsince_seq\x18\x02 \x01(\x04R\bsinceSeq\"\xc5\x05\n" +
 	"\x05Event\x12/\n" +
 	"\x04repo\x18\x01 \x01(\v2\x19.codefoundry.v1.RepoEventH\x00R\x04repo\x12;\n" +
 	"\bterminal\x18\x02 \x01(\v2\x1d.codefoundry.v1.TerminalEventH\x00R\bterminal\x12B\n" +
@@ -422,7 +451,8 @@ const file_codefoundry_v1_events_proto_rawDesc = "" +
 	"\tworkspace\x18\v \x01(\v2\x1e.codefoundry.v1.WorkspaceEventH\x00R\tworkspace\x125\n" +
 	"\x06thread\x18\f \x01(\v2\x1b.codefoundry.v1.ThreadEventH\x00R\x06thread\x12?\n" +
 	"\theartbeat\x18\r \x01(\v2\x1f.codefoundry.v1.StreamHeartbeatH\x00R\theartbeat\x125\n" +
-	"\x06action\x18\x0e \x01(\v2\x1b.codefoundry.v1.ActionEventH\x00R\x06actionB\a\n" +
+	"\x06action\x18\x0e \x01(\v2\x1b.codefoundry.v1.ActionEventH\x00R\x06action\x12\x10\n" +
+	"\x03seq\x18\x14 \x01(\x04R\x03seqB\a\n" +
 	"\x05event*\xc0\x02\n" +
 	"\vEventSource\x12\x1c\n" +
 	"\x18EVENT_SOURCE_UNSPECIFIED\x10\x00\x12\x15\n" +

@@ -29,6 +29,14 @@ service EventService {
 message WatchEventsRequest {
   // Subset of sources to include. Empty means all.
   repeated EventSource sources = 1;
+  // Resume after this Event.seq (the last one the client applied). When the daemon
+  // still holds every live event after it (it keeps the last 4096), the stream skips
+  // the snapshots and replays those events (of the requested sources), then goes on
+  // live. Otherwise (too old, or ahead of the daemon's counter, as after a daemon
+  // restart) the stream starts as without it: snapshots, then live. A client tells the
+  // two apart by the first event: a replayed or live event has seq > 0, a snapshot 0.
+  // Zero: no resume.
+  uint64 since_seq = 2;
 }
 
 enum EventSource {
@@ -78,4 +86,10 @@ message Event {
     // run_finished.
     ActionEvent action = 14;
   }
+  // Position of a live event in the daemon's one event sequence: 1, 2, 3, ... per
+  // daemon lifetime, shared by every client and source (the same event has the same
+  // seq on every stream; a stream filtered by source sees gaps). Snapshots, resyncs
+  // and heartbeats carry 0: they are not resumable. Pass the last seq applied as
+  // WatchEventsRequest.since_seq to resume.
+  uint64 seq = 20;
 }

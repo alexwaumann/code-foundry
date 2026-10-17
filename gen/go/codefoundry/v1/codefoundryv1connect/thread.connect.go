@@ -41,6 +41,8 @@ const (
 	ThreadServiceListProcedure = "/codefoundry.v1.ThreadService/List"
 	// ThreadServiceGetProcedure is the fully-qualified name of the ThreadService's Get RPC.
 	ThreadServiceGetProcedure = "/codefoundry.v1.ThreadService/Get"
+	// ThreadServiceWaitProcedure is the fully-qualified name of the ThreadService's Wait RPC.
+	ThreadServiceWaitProcedure = "/codefoundry.v1.ThreadService/Wait"
 	// ThreadServiceRenameProcedure is the fully-qualified name of the ThreadService's Rename RPC.
 	ThreadServiceRenameProcedure = "/codefoundry.v1.ThreadService/Rename"
 	// ThreadServiceCloseProcedure is the fully-qualified name of the ThreadService's Close RPC.
@@ -103,6 +105,11 @@ type ThreadServiceClient interface {
 	List(context.Context, *connect.Request[v1.ListThreadsRequest]) (*connect.Response[v1.ListThreadsResponse], error)
 	// Get returns one thread.
 	Get(context.Context, *connect.Request[v1.GetThreadRequest]) (*connect.Response[v1.GetThreadResponse], error)
+	// Wait blocks until a thread meets a condition (ThreadWaitCondition), returning at
+	// once when it already does, or until the timeout (timed_out set, not an error). It
+	// follows the thread list's changes, never polls. NOT_FOUND for an unknown thread or
+	// one removed while waiting. The thread.wait command (docs/notes/agents-1-wait-events.md).
+	Wait(context.Context, *connect.Request[v1.WaitThreadRequest]) (*connect.Response[v1.WaitThreadResponse], error)
 	// Rename sets a user-chosen name and disables auto-naming for the thread.
 	Rename(context.Context, *connect.Request[v1.RenameThreadRequest]) (*connect.Response[v1.RenameThreadResponse], error)
 	// Close ends the Claude process gracefully (interrupt, stdin closed, bounded wait,
@@ -255,6 +262,12 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(threadServiceMethods.ByName("Get")),
 			connect.WithClientOptions(opts...),
 		),
+		wait: connect.NewClient[v1.WaitThreadRequest, v1.WaitThreadResponse](
+			httpClient,
+			baseURL+ThreadServiceWaitProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("Wait")),
+			connect.WithClientOptions(opts...),
+		),
 		rename: connect.NewClient[v1.RenameThreadRequest, v1.RenameThreadResponse](
 			httpClient,
 			baseURL+ThreadServiceRenameProcedure,
@@ -396,6 +409,7 @@ type threadServiceClient struct {
 	fork              *connect.Client[v1.ForkThreadRequest, v1.ForkThreadResponse]
 	list              *connect.Client[v1.ListThreadsRequest, v1.ListThreadsResponse]
 	get               *connect.Client[v1.GetThreadRequest, v1.GetThreadResponse]
+	wait              *connect.Client[v1.WaitThreadRequest, v1.WaitThreadResponse]
 	rename            *connect.Client[v1.RenameThreadRequest, v1.RenameThreadResponse]
 	close             *connect.Client[v1.CloseThreadRequest, v1.CloseThreadResponse]
 	reconnect         *connect.Client[v1.ReconnectThreadRequest, v1.ReconnectThreadResponse]
@@ -438,6 +452,11 @@ func (c *threadServiceClient) List(ctx context.Context, req *connect.Request[v1.
 // Get calls codefoundry.v1.ThreadService.Get.
 func (c *threadServiceClient) Get(ctx context.Context, req *connect.Request[v1.GetThreadRequest]) (*connect.Response[v1.GetThreadResponse], error) {
 	return c.get.CallUnary(ctx, req)
+}
+
+// Wait calls codefoundry.v1.ThreadService.Wait.
+func (c *threadServiceClient) Wait(ctx context.Context, req *connect.Request[v1.WaitThreadRequest]) (*connect.Response[v1.WaitThreadResponse], error) {
+	return c.wait.CallUnary(ctx, req)
 }
 
 // Rename calls codefoundry.v1.ThreadService.Rename.
@@ -560,6 +579,11 @@ type ThreadServiceHandler interface {
 	List(context.Context, *connect.Request[v1.ListThreadsRequest]) (*connect.Response[v1.ListThreadsResponse], error)
 	// Get returns one thread.
 	Get(context.Context, *connect.Request[v1.GetThreadRequest]) (*connect.Response[v1.GetThreadResponse], error)
+	// Wait blocks until a thread meets a condition (ThreadWaitCondition), returning at
+	// once when it already does, or until the timeout (timed_out set, not an error). It
+	// follows the thread list's changes, never polls. NOT_FOUND for an unknown thread or
+	// one removed while waiting. The thread.wait command (docs/notes/agents-1-wait-events.md).
+	Wait(context.Context, *connect.Request[v1.WaitThreadRequest]) (*connect.Response[v1.WaitThreadResponse], error)
 	// Rename sets a user-chosen name and disables auto-naming for the thread.
 	Rename(context.Context, *connect.Request[v1.RenameThreadRequest]) (*connect.Response[v1.RenameThreadResponse], error)
 	// Close ends the Claude process gracefully (interrupt, stdin closed, bounded wait,
@@ -708,6 +732,12 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(threadServiceMethods.ByName("Get")),
 		connect.WithHandlerOptions(opts...),
 	)
+	threadServiceWaitHandler := connect.NewUnaryHandler(
+		ThreadServiceWaitProcedure,
+		svc.Wait,
+		connect.WithSchema(threadServiceMethods.ByName("Wait")),
+		connect.WithHandlerOptions(opts...),
+	)
 	threadServiceRenameHandler := connect.NewUnaryHandler(
 		ThreadServiceRenameProcedure,
 		svc.Rename,
@@ -850,6 +880,8 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 			threadServiceListHandler.ServeHTTP(w, r)
 		case ThreadServiceGetProcedure:
 			threadServiceGetHandler.ServeHTTP(w, r)
+		case ThreadServiceWaitProcedure:
+			threadServiceWaitHandler.ServeHTTP(w, r)
 		case ThreadServiceRenameProcedure:
 			threadServiceRenameHandler.ServeHTTP(w, r)
 		case ThreadServiceCloseProcedure:
@@ -917,6 +949,10 @@ func (UnimplementedThreadServiceHandler) List(context.Context, *connect.Request[
 
 func (UnimplementedThreadServiceHandler) Get(context.Context, *connect.Request[v1.GetThreadRequest]) (*connect.Response[v1.GetThreadResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Get is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) Wait(context.Context, *connect.Request[v1.WaitThreadRequest]) (*connect.Response[v1.WaitThreadResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Wait is not implemented"))
 }
 
 func (UnimplementedThreadServiceHandler) Rename(context.Context, *connect.Request[v1.RenameThreadRequest]) (*connect.Response[v1.RenameThreadResponse], error) {
