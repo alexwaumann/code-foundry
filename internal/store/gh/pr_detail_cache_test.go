@@ -225,8 +225,10 @@ func TestFullCacheApplyPoll(t *testing.T) {
 			cached: pr("PR_x", func(p *PullRequest) { p.MergeStateStatus = "UNKNOWN" }),
 			seen:   []prFingerprint{fp(unchanged)}},
 		{name: "merged with unknown mergeability: confirmed",
-			cached: pr("PR_x", func(p *PullRequest) { p.State, p.Mergeable, p.MergeStateStatus = PullRequestMerged, MergeableUnknown, "UNKNOWN" }),
-			seen:   []prFingerprint{fp(pr("PR_x", func(p *PullRequest) { p.State = PullRequestMerged }))}, wantConfirmed: true},
+			cached: pr("PR_x", func(p *PullRequest) {
+				p.State, p.Mergeable, p.MergeStateStatus = PullRequestMerged, MergeableUnknown, "UNKNOWN"
+			}),
+			seen: []prFingerprint{fp(pr("PR_x", func(p *PullRequest) { p.State = PullRequestMerged }))}, wantConfirmed: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
