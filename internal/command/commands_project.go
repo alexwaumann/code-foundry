@@ -2,6 +2,8 @@ package command
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"connectrpc.com/connect"
 
@@ -58,12 +60,37 @@ func (f NotGitFunc) whyNotGit(c Context) string {
 	return ""
 }
 
-// RegisterProject registers project.unregister, project.worktree.new, project.worktree.remove,
+// RegisterProject registers project.list, project.unregister, project.worktree.new, project.worktree.remove,
 // project.refresh and project.git.init. Adding a project is project.add (commands_project_add.go).
 func RegisterProject(r *Registry, b ProjectBackend, notGit NotGitFunc) error {
 	notGit = notGit.or()
 	projectArg := ArgSpec{Name: "project", Type: String, Required: true, Context: ContextProject, Description: "Project id"}
 	return r.RegisterAll(
+		Command{
+			Name:         "project.list",
+			Title:        "List Projects",
+			Description:  "List registered projects: name, id and path, one per line. The id is what --project and the other project commands take.",
+			Category:     "Project",
+			NoKeybinding: true,
+			Run: func(ctx context.Context, _ Context, _ Args) (Result, error) {
+				res, err := b.List(ctx, connect.NewRequest(&v1.ListProjectsRequest{}))
+				if err != nil {
+					return Result{}, err
+				}
+				ps := res.Msg.GetProjects()
+				if len(ps) == 0 {
+					return Result{Message: "no projects", JSON: res.Msg}, nil
+				}
+				lines := make([]string, len(ps))
+				for i, p := range ps {
+					lines[i] = fmt.Sprintf("%s (%s) %s", p.GetName(), p.GetId(), p.GetPath())
+					if !p.GetGit() {
+						lines[i] += " (no git)"
+					}
+				}
+				return Result{Message: strings.Join(lines, "\n"), JSON: res.Msg}, nil
+			},
+		},
 		Command{
 			Name:        "project.unregister",
 			Title:       "Remove Project",
