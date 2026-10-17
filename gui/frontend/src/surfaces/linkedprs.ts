@@ -25,7 +25,7 @@ export const linkedPrsSurface: SurfaceSpec = {
   icon: GitPullRequestArrow,
   hotkey: "l",
   available: (ctx) => (thread(ctx.selection) ? "enabled" : "hidden"),
-  // deriveContext reads the repos store too (placement); the links come from sessions.
+  // deriveContext reads the repos store too (placement); the links come from threads.
   watches: [useThreadsStore, useReposStore],
   render: () => createElement(LinkedPRsSurface),
   openDefault: (ctx) => (thread(ctx.selection) ? linkedPrsTab() : null),

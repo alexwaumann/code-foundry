@@ -1,6 +1,6 @@
 /**
  * Model choices and names. The list comes from the daemon's model registry
- * (internal/model) through the settings schema: sessions.default_model's enum values and
+ * (internal/model) through the settings schema: threads.default_model's enum values and
  * labels. FALLBACK_MODEL_CHOICES only covers the moment before the schema has loaded (or a
  * daemon without settings).
  */

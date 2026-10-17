@@ -53,7 +53,7 @@ export function projectsShellPlace(t: ContextShell | undefined): WorktreeRef | n
 }
 
 /**
- * Derives the UiContext the daemon sees from the current selection. A session contributes
+ * Derives the UiContext the daemon sees from the current selection. A thread contributes
  * its place (repo, worktree) and its workspace; a thread has no terminal of its own, so
  * activeTerminalId comes only from a focused bottom panel shell (focusedShell). The
  * composer looks only at its repo. Actions on a worktree that is not
@@ -134,7 +134,7 @@ export function decodeRepoKeys(keys: readonly string[]): TreeRepo[] {
 }
 
 /**
- * One string per session for the sidebar list: id + pin + group + archive time + snooze
+ * One string per thread for the sidebar list: id + pin + group + archive time + snooze
  * end (name, model, a different dialog and the status line's text don't rebuild the list;
  * a question turning into a finished turn, an idle thread starting work, archiving,
  * snoozing and their undoing does, since it moves). In the store's order.

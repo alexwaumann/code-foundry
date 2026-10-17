@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { useThreadsStore } from "@/stores/threads";
 
 /**
- * Session status badge: busy spinner (Claude starting for a message included), idle dot,
+ * Thread status badge: busy spinner (Claude starting for a message included), idle dot,
  * needs-attention accent with a subtle pulse, error (the process ended mid-turn:
  * interrupted) a red crossed circle. Whether the process runs never shows (threadBadge).
  * The sidebar's thread rows do not use it (they say the status in words, lib/statusLine);

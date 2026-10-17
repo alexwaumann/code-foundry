@@ -15,8 +15,8 @@ export const ASK_ELSEWHERE_HINT = "Already starting a thread for this pull reque
  * Menu → Ask a question: an inline composer under the PR header (PanelComposer). Enter
  * sends the question through pr.ask (startPrThread), Shift+Enter is a newline, Escape
  * cancels. While its command runs the field is read-only and the composer cannot be
- * cancelled (the session starts either way); on success the daemon focuses the new
- * session and the composer closes, handing focus to the panel. A failure is toasted and
+ * cancelled (the thread starts either way); on success the daemon focuses the new
+ * thread and the composer closes, handing focus to the panel. A failure is toasted and
  * the text stays. While pr.ask for the same pull request runs from another surface, the
  * Ask button shows that spinner and the hint says so; the text stays editable.
  *

@@ -185,7 +185,7 @@ export async function respondThread(threadId: string, requestId: string, decisio
 
 /**
  * Changes the effort (thread.set-effort): Claude restarts with it, at once when idle, else
- * after the running turn (Session.effortPending says so meanwhile).
+ * after the running turn (Thread.effortPending says so meanwhile).
  */
 export async function setThreadEffort(threadId: string, effort: string): Promise<boolean> {
   return (await runCommandForResult(THREAD_COMMANDS.setEffort, { id: threadId, effort }, { ctx: threadContext(threadId), quiet: true })) !== null;

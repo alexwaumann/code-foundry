@@ -273,7 +273,7 @@ export class PrDetailWorld {
         "## Test plan",
         "",
         "- [x] `go test ./internal/store/terminal/...`",
-        "- [ ] resize a session while it prints (manual)",
+        "- [ ] resize a thread while it prints (manual)",
       ].join("\n"),
       labels: [
         { name: "bug", color: "d73a4a" },
@@ -504,7 +504,7 @@ export class PrDetailWorld {
     });
     return {
       pullRequest: pr,
-      body: "Claude Code writes a `pr-link` record to the session transcript whenever it sees a pull request. The runner parses them, stores every distinct URL per thread and publishes `Thread.linked_pull_requests`.\n\n- migration 0010 `thread_pull_requests`\n- backfill on reconnect from the skipped transcript bytes\n- `session list` PRS column",
+      body: "Claude Code writes a `pr-link` record to the session transcript whenever it sees a pull request. The runner parses them, stores every distinct URL per thread and publishes `Thread.linked_pull_requests`.\n\n- migration 0010 `thread_pull_requests`\n- backfill on reconnect from the skipped transcript bytes\n- `thread list` PRS column",
       commits: [
         { sha: "e589570000000000000000000000000000000000", headline: "feat(thread): linked pull requests from Claude's pr-link transcript records", authorLogin: this.h.viewer, authorName: "Alex", committedAt: this.at(40 * MIN) },
         { sha: "f6990c6000000000000000000000000000000000", headline: "feat(api): Thread.linked_pull_requests in the proto, API and thread.list", authorLogin: this.h.viewer, authorName: "Alex", committedAt: this.at(33 * MIN) },
@@ -835,7 +835,7 @@ export class PrDetailWorld {
   }
 
   /**
-   * Merges an open pull request (once; repeats in the session return the same, saying
+   * Merges an open pull request (once; repeats in the thread return the same, saying
    * when only the repeat asked for the branch), like the daemon: refused when it is not
    * open, a draft, conflicting, blocked, the method is not allowed, the viewer cannot
    * write, or expectedHeadSha is not its head. A success marks it merged, moves it to the

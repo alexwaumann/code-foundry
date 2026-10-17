@@ -108,7 +108,7 @@ describe("threadBadge", () => {
   ])("%s %s", (state, status, want) => {
     expect(threadBadge({ state, status })).toBe(want);
   });
-  it("is unknown without a session", () => {
+  it("is unknown without a thread", () => {
     expect(threadBadge(undefined)).toBe("unknown");
   });
   it("has no lifecycle badges", () => {

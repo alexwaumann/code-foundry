@@ -217,7 +217,7 @@ test("surface hotkeys do nothing while their surfaces are disabled", async ({ pa
   await expect(panel(page).getByTestId("panel-tabs")).toHaveCount(0);
 });
 
-test("each session has its own panel state", async ({ page }) => {
+test("each thread has its own panel state", async ({ page }) => {
   await openApp(page);
   await selectThread(page, "s-1");
   await page.getByTestId("panel-toggle").click();

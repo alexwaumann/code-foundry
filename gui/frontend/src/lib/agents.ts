@@ -53,7 +53,7 @@ export function agentStatusText(r: Pick<AgentRunView, "status" | "endedAtMs">, n
   return `${word} · ${formatAgo(r.endedAtMs, now)}`;
 }
 
-/** The header's figures: running runs (nested ones too, like Session.agents_running and the CLI), all runs, and the thread's own running background runs. */
+/** The header's figures: running runs (nested ones too, like Thread.agents_running and the CLI), all runs, and the thread's own running background runs. */
 export function agentCounts(runs: readonly AgentRunView[]): { running: number; total: number; background: number } {
   let running = 0;
   let background = 0;

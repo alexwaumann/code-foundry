@@ -1,7 +1,7 @@
 import type { ThreadView } from "@/api/threads";
 
 /**
- * The one badge a session row shows. It never tells whether Claude's process runs (the
+ * The one badge a thread row shows. It never tells whether Claude's process runs (the
  * daemon starts it on a message and stops it at cache expiry,
  * docs/notes/hide-connection-state.md); the process state only decides where the status
  * alone would mislead:
@@ -31,7 +31,7 @@ export const badgeLabels: Record<ThreadBadge, string> = {
 };
 
 /**
- * What a session is waiting on or why it stopped, classified from the daemon's status
+ * What a thread is waiting on or why it stopped, classified from the daemon's status
  * reason (the daemon's stream_status.go; the store's "interrupted"). "waiting for …",
  * "plan", "trust", "notification" and "bell" came from the screen detector of terminal
  * threads (removed 2026-10-12) and only survive on rows that stopped before then:

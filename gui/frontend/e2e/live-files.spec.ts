@@ -61,7 +61,7 @@ test("composer: an @file tag from the card starts a haiku thread that reads the 
   const created = page.locator('[data-row-kind="thread"][aria-selected="true"]');
   await expect(created).toBeVisible({ timeout: 60_000 });
   const id = ((await created.getAttribute("data-row-key")) ?? "").slice(2);
-  console.log(`live-files session ${id}`);
+  console.log(`live-files thread ${id}`);
   const find = () => ((JSON.parse(cli("thread", "list", "--json")) as { threads?: LiveThread[] }).threads ?? []).find((s) => s.id === id);
   await expect.poll(() => find()?.claudeSessionId ?? "", { timeout: 60_000 }).not.toBe("");
   console.log(`worktree: ${find()?.worktreePath ?? ""}`);

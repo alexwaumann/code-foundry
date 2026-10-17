@@ -23,7 +23,7 @@ const MODE_OPTIONS: { value: ChartMode; label: string }[] = [
 
 /**
  * Every thread's usage array, then the retired ledger last: one subscription, compared
- * element by element, so only a usage change (or a session update that brings a new
+ * element by element, so only a usage change (or a thread update that brings a new
  * array) re-folds.
  */
 function useAllUsage(): readonly (readonly UsageBucketView[])[] {

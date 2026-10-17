@@ -1,6 +1,6 @@
 /**
  * Which pull request a selection resolves to, for the Pull request surface: the
- * selection's worktree (a session's, a worktree row, a repo row's main
+ * selection's worktree (a thread's, a worktree row, a repo row's main
  * worktree) → its branch → the branch's pull requests (branchPullRequestsResource).
  * Pure: the surface spec feeds it the stores' current state.
  */

@@ -11,7 +11,7 @@ function badge(page: Page, threadId: string) {
   return row(page, `s:${threadId}`).locator("[data-thread-badge]");
 }
 
-test("session rows render with status badges, above the terminals no thread owns; none says whether Claude runs", async ({ page }) => {
+test("thread rows render with status badges, above the terminals no thread owns; none says whether Claude runs", async ({ page }) => {
   await openApp(page);
   const tree = page.getByTestId("thread-list");
   await expect(badge(page, "s-1")).toHaveAttribute("data-thread-badge", /^(busy|idle)$/);
@@ -231,7 +231,7 @@ test("rename inline: double-click commits via thread.rename, cmd+r from the prom
   expect((await invocations()).length).toBe(before);
 });
 
-test("FocusThread intent selects the session", async ({ page }) => {
+test("FocusThread intent selects the thread", async ({ page }) => {
   await openApp(page);
   await expect.poll(async () => ((await mockPost("thread/focus?id=s-3")) as { delivered: number }).delivered).toBeGreaterThan(0);
   await expect(row(page, "s:s-3")).toHaveAttribute("aria-selected", "true");
@@ -257,7 +257,7 @@ test("the whole app runs on one events stream plus one thread Watch", async ({ p
   page.on("requestfailed", done);
 
   await openApp(page);
-  // Exercise every source: sessions, threads (switching watches the other one), intents, repos.
+  // Exercise every source: threads, threads (switching watches the other one), intents, repos.
   const pane = page.getByTestId("thread-pane");
   await row(page, "s:s-2").click();
   await expect(pane.getByTestId("thread-user").first()).toContainText("Port the grid renderer");

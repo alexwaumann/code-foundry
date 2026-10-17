@@ -9,7 +9,7 @@ import { useUiStore } from "@/stores/ui";
 const NONE: readonly UsageBucketView[] = [];
 
 /**
- * The thread this panel belongs to: the selected session; "" otherwise (the panel always
+ * The thread this panel belongs to: the selected thread; "" otherwise (the panel always
  * shows the current selection's panel).
  */
 function useThreadId(): string {
@@ -17,7 +17,7 @@ function useThreadId(): string {
 }
 
 /**
- * The thread's usage buckets. Every session update carries a new array, so the previous
+ * The thread's usage buckets. Every thread update carries a new array, so the previous
  * one is kept while its content is the same: status changes do not re-render the surface.
  */
 function useUsage(threadId: string): readonly UsageBucketView[] {
@@ -69,7 +69,7 @@ function ModelRow({ row, total }: { row: ModelUsage; total: number }) {
 }
 
 /**
- * The side panel's Usage surface (docs/sketches/session-usage/DESIGN.md, session view):
+ * The side panel's Usage surface (docs/sketches/session-usage/DESIGN.md, thread view):
  * the selected thread's cost at Claude API rates, its tokens and requests, then per model
  * (swatch, id, tokens and requests; cost and share of cost) and per token kind (tokens
  * and cost). A model without a known rate is tagged "unpriced" and costs "—"; the totals

@@ -60,7 +60,7 @@ test("New Terminal from the palette starts a terminal in the selected thread's w
   const last = (await invocations()).at(-1);
   expect(last?.name).toBe("terminal.new");
   expect(last?.context?.activeWorktreePath).toBe(FIX_RESIZE);
-  // The shell belongs to the thread (labels session=s-3): the thread stays selected, the
+  // The shell belongs to the thread (labels thread=s-3): the thread stays selected, the
   // sidebar gains no row, and the shell opens in the thread's bottom panel.
   await expect(row(page, "s:s-3")).toHaveAttribute("aria-selected", "true");
   await expect(page.locator('[data-row-kind]:not([data-row-kind="thread"]):not([data-row-kind="header"])')).toHaveCount(0);
@@ -96,7 +96,7 @@ test("status row buttons toggle settings, open help and the palette", async ({ p
   expect((await invocations()).some((i) => i.name === "ui.palette.open")).toBe(false);
 });
 
-test("session pane header: the name renames, the location opens the worktree; no Close; fork is palette-only", async ({ page }) => {
+test("thread pane header: the name renames, the location opens the worktree; no Close; fork is palette-only", async ({ page }) => {
   await openApp(page);
   await row(page, "s:s-1").click();
   const header = page.getByTestId("thread-header");

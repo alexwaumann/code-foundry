@@ -4,7 +4,7 @@
  * scripted thread's "agents" state (POST /__mock/thread?state=agents, mock/thread.ts):
  * a finished foreground Explore with its report, two background general-purpose runs
  * still running with their activity, a nested run (spawn depth 2) under the first, and a
- * failed background run with its "Agent failed · …" note. The session's
+ * failed background run with its "Agent failed · …" note. The thread's
  * agents_running / background_agents_running follow the list (mock/world.ts threadMsg).
  *
  *   POST /__mock/thread/agent-end?id=s-r1&run=a1[&status=done|failed]   a run ends: its
@@ -45,7 +45,7 @@ export const EXPLORE_REPORT =
 export const FAILED_ERROR = "Stopped: process exited with code 1";
 /** What a run reports when POST /__mock/thread/agent-end ends it done. */
 export const END_REPORTS: Readonly<Record<string, string>> = {
-  a1: "Added task frame handling to the session store with 14 table tests; make check is green.",
+  a1: "Added task frame handling to the thread store with 14 table tests; make check is green.",
   a1b: "usage_runs.go keeps one record per run; nothing to change.",
   a2: "The Agents surface lists every run in spawn order with its live activity.",
 };
@@ -218,7 +218,7 @@ export function scriptAgents(s: AgentsScript, now = Date.now()): AgentRunInit[] 
   ];
 }
 
-/** Session.agents_running (every running run) and background_agents_running (the thread's own background ones). */
+/** Thread.agents_running (every running run) and background_agents_running (the thread's own background ones). */
 export function agentCounts(runs: readonly AgentRunInit[]): { agentsRunning: number; backgroundAgentsRunning: number } {
   const running = runs.filter((r) => r.status === ThreadAgentStatus.RUNNING);
   return { agentsRunning: running.length, backgroundAgentsRunning: running.filter((r) => r.background && (r.spawnDepth ?? 1) <= 1).length };

@@ -20,7 +20,7 @@ import { ensureMcpStatus, reconnectMcp, refreshMcp, useMcpHeader, useMcpReconnec
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 
-/** The thread this panel belongs to: the selected session ("" otherwise). */
+/** The thread this panel belongs to: the selected thread ("" otherwise). */
 function useThreadId(): string {
   return useUiStore((s) => (s.selection.kind === "thread" ? s.selection.id : ""));
 }

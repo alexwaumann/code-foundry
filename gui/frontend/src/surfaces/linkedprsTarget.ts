@@ -19,7 +19,7 @@ export interface SelectionStores {
 
 /**
  * The selection's thread (what view.panel.linked-prs's availability sees), when the
- * sessions store knows it. Null for a page or a composer.
+ * threads store knows it. Null for a page or a composer.
  */
 export function selectionThread(sel: Selection, s: SelectionStores): string | null {
   return sel.kind === "thread" && s.threads.byId[sel.id] ? sel.id : null;

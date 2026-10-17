@@ -1,12 +1,12 @@
 /**
- * Sessions about a pull request, from the PR surface's menu: pr.ask, pr.explain and
- * pr.fix.findings (internal/command/commands_prthread.go). Each starts a Claude session
+ * Threads about a pull request, from the PR surface's menu: pr.ask, pr.explain and
+ * pr.fix.findings (internal/command/commands_prthread.go). Each starts a thread
  * with a prompt about the pull request. The daemon picks the worktree (ask and explain
  * prefer the caller's active worktree, which getUiContext already sends, so no worktree
- * arg is passed; fix.findings may fetch and create one) and focuses the new session with
+ * arg is passed; fix.findings may fetch and create one) and focuses the new thread with
  * a FocusThread intent, as thread.new does (stores/intents.ts selects it). Model and
  * effort come from the settings defaults. The originating selection's panel keeps its
- * PR tab; the new session's panel is left as it is.
+ * PR tab; the new thread's panel is left as it is.
  */
 import { toast } from "sonner";
 import { create } from "zustand";
@@ -64,7 +64,7 @@ function preparingToast(ref: PrRef): () => void {
 }
 
 /**
- * The "Started session …" toast's Open action: selects the new session (with prompt
+ * The "Started thread …" toast's Open action: selects the new thread (with prompt
  * focus, as FocusThread does) unless it is selected already. The daemon's FocusThread
  * normally gets there first; this covers a stream that missed it.
  */
@@ -75,12 +75,12 @@ export function openStartedThread(id: string): void {
 }
 
 /**
- * Runs the command for kind. Resolves the new session's id (an empty string when the
+ * Runs the command for kind. Resolves the new thread's id (an empty string when the
  * result names none), or null when it failed (toasted by runCommandForResult), the
  * question is blank, or the same command for this pull request is already running.
  * pr.fix.findings shows a "Preparing worktree" toast while it runs (preparingToast), as it
  * may fetch and create a worktree. The success toast has an Open action
- * (openStartedThread) when the result names the session.
+ * (openStartedThread) when the result names the thread.
  */
 export async function startPrThread(kind: PrThreadKind, ref: PrRef, question = ""): Promise<string | null> {
   const args = prThreadArgs(kind, ref, question);

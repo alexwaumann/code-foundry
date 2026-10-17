@@ -4,11 +4,11 @@
  *   pnpm run mock            # http://127.0.0.1:7788, token "dev-mock-token"
  *   MOCK_PORT=7799 MOCK_TOKEN=secret pnpm run mock
  *
- * Serves Health, Terminal, Repo, Filesystem, Session, Command, Ui, Action and Event over Connect (HTTP/1.1,
+ * Serves Health, Terminal, Repo, Filesystem, Thread, Command, Ui, Action and Event over Connect (HTTP/1.1,
  * like the real daemon's loopback listener for browsers), with bearer auth and
  * permissive CORS. Non-RPC control endpoints for tests live under /__mock/:
  *
- *   GET  /__mock/invocations | writes | resizes | sessions | streams
+ *   GET  /__mock/invocations | writes | resizes | threads | streams
  *   POST /__mock/reset
  *   RepoService.SearchGitHub / LookupGitHub / Clone: mock/clone.ts (a repo named "fail" fails
  *        to clone; octo-org/already-here's destination exists)
@@ -48,11 +48,11 @@
  *   POST /__mock/thread/hold?id=s-1&id=s-5   (the clock stops changing them: s-1 stops flipping
  *        busy/idle, a starting or closing one does not settle; the sidebar order then holds still.
  *        e2e's resetMock holds s-1 and s-5.) POST /__mock/thread/release?id=s-5 undoes it.
- *   POST /__mock/link-pr?session=s-1&slug=owner/name&number=12[&ago=<ms>]   (Claude linked a pull
+ *   POST /__mock/link-pr?thread=s-1&slug=owner/name&number=12[&ago=<ms>]   (Claude linked a pull
  *                                                 request ago ms ago; deduplicated by URL like the daemon)
- *   POST /__mock/usage?session=s-2&model=claude-opus-5&requests=3&cacheRead=1000[&input=…&output=…
+ *   POST /__mock/usage?thread=s-2&model=claude-opus-5&requests=3&cacheRead=1000[&input=…&output=…
  *        &cacheWrite5m=…&cacheWrite1h=…&day=YYYY-MM-DD]   (Claude made requests: added to the
- *                                                 session's (model, day) bucket; s-1 is seeded)
+ *                                                 thread's (model, day) bucket; s-1 is seeded)
  *   POST /__mock/threads-service?enabled=false   (simulate a daemon without ThreadService)
  *   POST /__mock/missing-rpc?rpc=RepoService/ListRefs&rpc=ThreadService/StageAttachment
  *                                                 (simulate a daemon older than those RPCs: 404)
@@ -117,12 +117,12 @@
  *   GET  /__mock/actions                          (actions and runs as JSON, runs with their output)
  *   POST /__mock/action/finish?run=r-…&code=N     (or terminal=t-…: that running run's process exits
  *                                                 now with code N, default 0)
- *   POST /__mock/action/setup?session=s-1&code=1[&action=Install deps]   (a worktree-create
+ *   POST /__mock/action/setup?thread=s-1&code=1[&action=Install deps]   (a worktree-create
  *                                                 background run for that thread: some output, then
  *                                                 code after ~600 ms; default action: the project's
  *                                                 first on-worktree-create one)
- *   POST /__mock/action/run?session=s-1&action=Test[&mode=terminal|background]   (or worktree=…
- *                                                 instead of session: a run as the CLI or an agent
+ *   POST /__mock/action/run?thread=s-1&action=Test[&mode=terminal|background]   (or worktree=…
+ *                                                 instead of thread: a run as the CLI or an agent
  *                                                 would start it, not through the GUI)
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
@@ -449,7 +449,7 @@ function routes(router: ConnectRouter): void {
 
   router.service(EventService, {
     // Snapshots first in the order events.proto promises (repo, workspace, terminal,
-    // session, gh, gitops, settings, update, action), then everything published, filtered by `sources`.
+    // thread, gh, gitops, settings, update, action), then everything published, filtered by `sources`.
     watch: (req, ctx) => {
       const want = new Set(
         req.sources.length > 0
@@ -593,7 +593,7 @@ function json(res: ServerResponse, status: number, body: unknown): void {
   res.end(JSON.stringify(body, null, 2));
 }
 
-/** JSON-safe session summary (proto timestamps carry bigints). */
+/** JSON-safe thread summary (proto timestamps carry bigints). */
 function threadSummary(id: string): Record<string, unknown> {
   const s = world.thread(id);
   return {
@@ -654,7 +654,7 @@ function threadControl(res: ServerResponse, action: string, q: URLSearchParams):
         world.wakeThread(id);
         break;
       default:
-        json(res, 404, { error: "unknown session action" });
+        json(res, 404, { error: "unknown thread action" });
         return;
     }
     json(res, 200, threadSummary(id));
@@ -700,7 +700,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "POST /__mock/threads-service":
       // enabled=false simulates a daemon without Phase 2a: ThreadService 404s and the
-      // events stream carries no session source. Reset turns it back on.
+      // events stream carries no thread source. Reset turns it back on.
       threadsEnabled = q.get("enabled") !== "false";
       json(res, 200, { enabled: threadsEnabled });
       break;
@@ -759,7 +759,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       }
       break;
     case "POST /__mock/link-pr":
-      // session=s-1&slug=owner/name&number=12: a pr-link record; the session is republished if the URL is new.
+      // thread=s-1&slug=owner/name&number=12: a pr-link record; the thread is republished if the URL is new.
       try {
         const id = q.get("thread") ?? "";
         const added = world.linkPullRequest(id, q.get("slug") ?? "", Number(q.get("number") ?? ""), Number(q.get("ago") ?? "0"));
@@ -769,7 +769,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       }
       break;
     case "POST /__mock/usage":
-      // session=s-2&model=claude-opus-5&requests=3&cacheRead=1000[&input=…&output=…&cacheWrite5m=…&cacheWrite1h=…&day=YYYY-MM-DD]
+      // thread=s-2&model=claude-opus-5&requests=3&cacheRead=1000[&input=…&output=…&cacheWrite5m=…&cacheWrite1h=…&day=YYYY-MM-DD]
       try {
         const id = q.get("thread") ?? "";
         const n = (k: string) => Number(q.get(k) ?? "0");

@@ -26,11 +26,11 @@ const entryOf = (slug: string, branch: string) => entries[`${slug} ${branch}`];
 
 describe("selectionPullRequest", () => {
   it.each<[string, Selection, { slug: string; number: number } | null]>([
-    ["session on a branch with an open PR", { kind: "thread", id: "s1" }, { slug: "alex/cf", number: 145 }],
-    ["session on main (no PR)", { kind: "thread", id: "s2" }, null],
+    ["thread on a branch with an open PR", { kind: "thread", id: "s1" }, { slug: "alex/cf", number: 145 }],
+    ["thread on main (no PR)", { kind: "thread", id: "s2" }, null],
     ["composer (a repo, no worktree)", { kind: "compose", repoId: "r1" }, null],
-    ["session whose worktree is gone", { kind: "thread", id: "s3" }, null],
-    ["unknown session", { kind: "thread", id: "nope" }, null],
+    ["thread whose worktree is gone", { kind: "thread", id: "s3" }, null],
+    ["unknown thread", { kind: "thread", id: "nope" }, null],
     ["Pull Requests page", { kind: "view", name: "pullrequests" }, null],
     ["nothing selected", { kind: "none" }, null],
   ])("%s", (_name, sel, want) => {

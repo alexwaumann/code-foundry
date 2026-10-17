@@ -47,7 +47,7 @@ describe("statusLine / statusText", () => {
     expect(statusText(l, NOW)).toBe(text);
   });
 
-  it("is place for an unknown session", () => {
+  it("is place for an unknown thread", () => {
     expect(statusLine(undefined)).toEqual({ kind: "place", detail: "", at: null });
   });
 

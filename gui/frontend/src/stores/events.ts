@@ -56,7 +56,7 @@ const handlers: Handlers = {
     if (removed) onRemovedTerminal(removed, before);
   },
   threadList: (ev) => {
-    // Session events prove the service exists, even if List failed transiently.
+    // Thread events prove the service exists, even if List failed transiently.
     useThreadsStore.setState((s) => ({
       ...applyThreadListEvent(s, ev),
       retiredUsage: applyRetiredUsage(s.retiredUsage, ev),
@@ -91,7 +91,7 @@ function isMissingService(err: unknown): boolean {
   return err.code === Code.Unimplemented || err.code === Code.NotFound || /HTTP 404/.test(err.rawMessage);
 }
 
-/** Lists sessions without failing the resync: a daemon without ThreadService still works. */
+/** Lists threads without failing the resync: a daemon without ThreadService still works. */
 async function reconcileThreads(signal: AbortSignal): Promise<void> {
   try {
     const list = await listThreads(daemon, signal);
@@ -111,7 +111,7 @@ async function reconcileThreads(signal: AbortSignal): Promise<void> {
  * Keeps every slice in sync over one EventService.Watch. On each (re)connect the
  * per-service List calls run alongside the stream (events are buffered until they
  * resolve), so a reconnect reconciles removals the stream's snapshot cannot express
- * (terminal.proto has no snapshot message). Sessions are retried every `threadRetryMs`
+ * (terminal.proto has no snapshot message). Threads are retried every `threadRetryMs`
  * while the service is unavailable.
  */
 export function startEventSync(threadRetryMs = 10_000): () => void {

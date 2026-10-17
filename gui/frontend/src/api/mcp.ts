@@ -97,6 +97,6 @@ export function toMcpStatusView(s: ThreadMcpStatus | undefined): McpStatusView |
  */
 export async function getMcpStatus(threadId: string, conn: DaemonConnection = daemon): Promise<McpStatusView | null> {
   const c = await conn.client(ThreadService);
-  const res = await c.mcpStatus({ threadId: threadId });
+  const res = await c.mcpStatus({ threadId });
   return toMcpStatusView(res.status);
 }

@@ -74,7 +74,7 @@ interface MockThread {
   disconnectReason: string;
   /** Why the last start or run failed (stderr's last line); "" when nothing did. */
   lastError: string;
-  /** thread.fork: the session this one was forked from. */
+  /** thread.fork: the thread this one was forked from. */
   parentId: string;
   permissionMode: PermissionMode;
   baseRef: string;
@@ -106,13 +106,13 @@ interface MockThread {
   contextTokens: MockContext["contextTokens"];
   contextModel: MockContext["contextModel"];
   lastResultAt: MockContext["lastResultAt"];
-  /** A pending API retry (Session.retry; POST /__mock/thread/retry); null for none. */
+  /** A pending API retry (Thread.retry; POST /__mock/thread/retry); null for none. */
   retry: { attempt: number; maxRetries: number; retryAt: Date; errorStatus: number; error: string } | null;
   /** Mock-only: seconds a queued run-in waits once the thread is not busy (the daemon waits for its prompt). */
   moveIn: number;
-  /** Mock-only: seconds left before a STARTING/CLOSING session settles. */
+  /** Mock-only: seconds left before a STARTING/CLOSING thread settles. */
   settleIn: number;
-  /** Mock-only: seconds until an unnamed session gets `pendingName` (background naming). */
+  /** Mock-only: seconds until an unnamed thread gets `pendingName` (background naming). */
   nameIn: number;
   pendingName: string;
   /**
@@ -684,7 +684,7 @@ export class World {
     this.addThread({ id: "s-2", repoId: "repo-gp", worktreePath: GP, name: "Port renderer", model: "claude-sonnet-5[1m]", effort: "", status: ThreadStatus.NEEDS_ATTENTION, statusReason: `permission: Bash ${SEEDS["s-2"]?.reply ?? ""}`, statusChangedAt: ago(3), createdAt: ago(40) });
     this.addThread({ id: "s-3", repoId: "repo-cf", worktreePath: `${CFW}/fix-resize`, name: "Fix resize race", model: "claude-opus-4-8[1m]", effort: "medium", state: ThreadState.DISCONNECTED, disconnectReason: "idle", createdAt: ago(300), lastActivityAt: ago(95), usage: pageUsage("s-3") });
     this.addThread({ id: "s-4", repoId: "repo-cf", worktreePath: `${CFW}/feat-sidebar`, name: "Investigate flaky e2e", model: "claude-4.5-haiku[1m]", effort: "", state: ThreadState.DISCONNECTED, disconnectReason: "crashed", exitCode: 139, createdAt: ago(200), lastActivityAt: ago(17), usage: pageUsage("s-4") });
-    this.addThread({ id: "s-5", repoId: "repo-cf", worktreePath: `${CFW}/feat-sidebar`, name: "Write session docs", model: "claude-opus-4-8[1m]", effort: "low", state: ThreadState.STARTING, settleIn: 8, createdAt: ago(0) });
+    this.addThread({ id: "s-5", repoId: "repo-cf", worktreePath: `${CFW}/feat-sidebar`, name: "Write thread docs", model: "claude-opus-4-8[1m]", effort: "low", state: ThreadState.STARTING, settleIn: 8, createdAt: ago(0) });
     this.addThread({ id: "s-6", repoId: "repo-dot", worktreePath: `${HOME}/dotfiles`, name: "Tidy zshrc", model: "claude-sonnet-5[1m]", effort: "", state: ThreadState.CLOSING, settleIn: 8, createdAt: ago(60) });
     // Archived 90 min ago (the sidebar's Archived section, collapsed by default).
     this.addThread({ id: "s-7", repoId: "repo-cf", worktreePath: CF, name: "Spike a canvas sidebar", model: "claude-sonnet-5[1m]", effort: "", state: ThreadState.DISCONNECTED, disconnectReason: "closed", status: ThreadStatus.NEEDS_ATTENTION, statusReason: "finished", statusChangedAt: ago(95), createdAt: ago(600), lastActivityAt: ago(95), archivedAt: ago(90) });
@@ -1005,7 +1005,7 @@ export class World {
     this.workspaceEvents.publish({ event: { case: "removedId", value: ws.id } });
   }
 
-  // ---- Sessions -----------------------------------------------------------------
+  // ---- Threads -----------------------------------------------------------------
 
   private addThread(o: Partial<MockThread> & Pick<MockThread, "id" | "repoId" | "worktreePath" | "name" | "model" | "effort">): MockThread {
     const state = o.state ?? ThreadState.CONNECTED;
@@ -1096,7 +1096,7 @@ export class World {
 
   thread(id: string): MockThread {
     const s = this.threads.get(id);
-    if (!s) throw new CommandError("notfound", `session ${id} not found`);
+    if (!s) throw new CommandError("notfound", `thread ${id} not found`);
     return s;
   }
 
@@ -1105,7 +1105,7 @@ export class World {
   }
 
   /**
-   * Session → stopped (its claude process is gone: the idle stop, a crash). Like the daemon, the status it had
+   * Thread → stopped (its claude process is gone: the idle stop, a crash). Like the daemon, the status it had
    * is kept, except busy, which becomes ERROR "interrupted".
    * `status`, when given, is the status it had at that moment (tests use it: s-1 flips
    * busy/idle on a timer).
@@ -1125,7 +1125,7 @@ export class World {
   }
 
   /**
-   * Claude linked a pull request to the session (a pr-link transcript record): appended
+   * Claude linked a pull request to the thread (a pr-link transcript record): appended
    * unless its URL is already linked, like the daemon. agoMs backdates linkedAt (the
    * record's timestamp). Returns whether it was new.
    */
@@ -1141,8 +1141,8 @@ export class World {
   }
 
   /**
-   * Claude made requests: adds counters to the session's (model, day) bucket, or a new
-   * bucket, and republishes the session (the daemon's live fold, coarser).
+   * Claude made requests: adds counters to the thread's (model, day) bucket, or a new
+   * bucket, and republishes the thread (the daemon's live fold, coarser).
    */
   addUsage(id: string, u: MockUsage): void {
     const s = this.thread(id);
@@ -1166,14 +1166,14 @@ export class World {
 
   setThreadStatus(id: string, status: ThreadStatus, reason?: string): void {
     const s = this.thread(id);
-    if (s.state === ThreadState.DISCONNECTED) throw new CommandError("unavailable", "session is disconnected");
+    if (s.state === ThreadState.DISCONNECTED) throw new CommandError("unavailable", "thread is disconnected");
     if (status === ThreadStatus.ERROR) throw new CommandError("invalid", "error is set only by a disconnect while busy");
     this.setStatus(s, status, reason);
     s.lastActivityAt = new Date();
     this.publishThread(s);
   }
 
-  /** Sets status and reason, stamping statusChangedAt when either changes (Session.setStatus). */
+  /** Sets status and reason, stamping statusChangedAt when either changes (Thread.setStatus). */
   private setStatus(s: MockThread, status: ThreadStatus, reason: string = defaultReason(status)): void {
     if (s.status === status && s.statusReason === reason) return;
     s.status = status;
@@ -1226,7 +1226,7 @@ export class World {
     return s;
   }
 
-  /** sessions.cache_ttl_seconds (the daemon's default when unset). */
+  /** threads.cache_ttl_seconds (the daemon's default when unset). */
   private cacheTTLSeconds(): number {
     return Number(this.settings.values()["threads.cache_ttl_seconds"] || 3600);
   }
@@ -1256,7 +1256,7 @@ export class World {
     this.publishThread(s);
   }
 
-  /** Emits FocusThread for an existing session. */
+  /** Emits FocusThread for an existing thread. */
   focusThread(id: string): number {
     this.thread(id);
     return this.emit({ intent: { case: "focusThread", value: { threadId: id } } });
@@ -1268,7 +1268,7 @@ export class World {
   }
 
   /**
-   * A new session in STARTING. Unnamed for ~1s, then named `pendingName` (the daemon
+   * A new thread in STARTING. Unnamed for ~1s, then named `pendingName` (the daemon
    * names it in the background), connected after ~2s.
    */
   private createThread(repoId: string, path: string, model: string, effort: string, extra: Partial<MockThread> = {}): MockThread {
@@ -1633,7 +1633,7 @@ export class World {
   private shellOwner(ctx: UiContext | undefined, cwd: string): { labels: Record<string, string>; cwd: string } {
     const s = ctx?.activeThreadId ? this.threads.get(ctx.activeThreadId) : undefined;
     if (ctx?.activeThreadId) {
-      if (!s) throw new CommandError("notfound", `session ${ctx.activeThreadId} not found`);
+      if (!s) throw new CommandError("notfound", `thread ${ctx.activeThreadId} not found`);
       return { labels: shellLabels(s.id, s.repoId, s.worktreePath), cwd: cwd || s.worktreePath };
     }
     const exact = ctx?.activeRepoId ? this.repos.get(ctx.activeRepoId)?.worktrees.find((w) => w.path === ctx.activeWorktreePath) : undefined;
@@ -1677,7 +1677,7 @@ export class World {
   /**
    * thread.new like the daemon: an explicit worktree, or (new-worktree) a cf/<slug>
    * worktree made from `base` first, which takes a moment. A prompt containing FAIL
-   * fails the way a git error would, before any session exists.
+   * fails the way a git error would, before any thread exists.
    */
   private async newThread(ctx: UiContext | undefined, args: Record<string, string>): Promise<InvokeOut> {
     if (args["no-project"] === "true") return this.newHomeThread(ctx, args);
@@ -1730,7 +1730,7 @@ export class World {
     // Like the daemon's WorktreeCreated: the project's on-worktree-create actions, in the background.
     if (created) this.actions.worktreeCreated(s.id, repo.id, path);
     this.focusThread(s.id);
-    return { message: `created session ${s.id} in ${path}`, resultJson: JSON.stringify({ id: s.id, worktreePath: path }) };
+    return { message: `created thread ${s.id} in ${path}`, resultJson: JSON.stringify({ id: s.id, worktreePath: path }) };
   }
 
   /**
@@ -2026,13 +2026,13 @@ export class World {
 
   /**
    * pr.ask, pr.explain and pr.fix.findings (internal/command/commands_prthread.go): start a
-   * session about a pull request and focus it. The worktree rules follow the daemon's
-   * pickPRWorktree; the prompt is not built here (the mock's sessions never read it).
+   * thread about a pull request and focus it. The worktree rules follow the daemon's
+   * pickPRWorktree; the prompt is not built here (the mock's threads never read it).
    */
   private prThreadCommands(): ReturnType<World["registry"]> {
     const slugArg = { name: "repo-slug", type: ArgType.STRING, required: true, description: 'GitHub repository, "owner/name"' };
     const numberArg = { name: "number", type: ArgType.INT, required: true, description: "Pull request number" };
-    const worktreeArg = { name: "worktree", type: ArgType.PATH, required: false, description: "Worktree to start the session in (default: picked from the registered clones of repo-slug and the pull request's branch)" };
+    const worktreeArg = { name: "worktree", type: ArgType.PATH, required: false, description: "Worktree to start the thread in (default: picked from the registered clones of repo-slug and the pull request's branch)" };
     const modelArg = { name: "model", type: ArgType.ENUM, required: false, description: "Model (default: settings threads.default_model, else Claude's default)", enumValues: MODEL_VALUES };
     const effortArg = { name: "effort", type: ArgType.ENUM, required: false, description: "Effort level (default: settings threads.default_effort, else Claude's default)", enumValues: ["low", "medium", "high", "xhigh", "max"] };
     const start =
@@ -2100,9 +2100,9 @@ export class World {
         const defaults = this.threadDefaults();
         const s = this.createThread(target.repoId, target.path, args.model ?? defaults.model, args.effort ?? defaults.effort);
         this.focusThread(s.id);
-        // Like the daemon: the result JSON is the created Session (protojson).
+        // Like the daemon: the result JSON is the created Thread (protojson).
         return {
-          message: `Started session ${s.id} for PR #${String(n)}`,
+          message: `Started thread ${s.id} for PR #${String(n)}`,
           resultJson: JSON.stringify({ id: s.id, repoId: s.repoId, worktreePath: s.worktreePath, model: s.model, effort: s.effort }),
         };
       };
@@ -2113,7 +2113,7 @@ export class World {
           name: "pr.ask",
           title: "Ask About Pull Request",
           category: "Pull Request",
-          description: "Start a Claude session that answers a question about a pull request without changing code.",
+          description: "Start a thread that answers a question about a pull request without changing code.",
           keybindings: [],
           args: [slugArg, numberArg, { name: "question", type: ArgType.STRING, required: true, description: "What to ask" }, worktreeArg, modelArg, effortArg],
         },
@@ -2128,7 +2128,7 @@ export class World {
           name: "pr.explain",
           title: "Explain Pull Request",
           category: "Pull Request",
-          description: "Start a Claude session that walks through a pull request for a first-time reviewer.",
+          description: "Start a thread that walks through a pull request for a first-time reviewer.",
           keybindings: [],
           args: [slugArg, numberArg, worktreeArg, modelArg, effortArg],
         },
@@ -2140,7 +2140,7 @@ export class World {
           name: "pr.fix.findings",
           title: "Fix Pull Request Findings",
           category: "Pull Request",
-          description: "Start a Claude session on the pull request's branch that fixes its unresolved review comments and failing checks.",
+          description: "Start a thread on the pull request's branch that fixes its unresolved review comments and failing checks.",
           keybindings: [],
           args: [slugArg, numberArg, worktreeArg, modelArg, effortArg],
         },
@@ -2227,7 +2227,7 @@ export class World {
         when: (ctx) => activeThread(ctx) !== undefined,
         run: (ctx) => {
           const s = activeThread(ctx);
-          if (!s) throw new CommandError("unavailable", "no active session");
+          if (!s) throw new CommandError("unavailable", "no active thread");
           const f = this.createThread(s.repoId, s.worktreePath, s.model, s.effort, { pendingName: `${s.name || s.id} (fork)`, permissionMode: s.permissionMode, parentId: s.id });
           this.logs.fork(s.id, f.id, s.name || s.id);
           this.focusThread(f.id);
@@ -2235,11 +2235,11 @@ export class World {
         },
       },
       {
-        cmd: { name: "thread.rename", title: "Rename Thread", category: "Thread", description: "Set the session's name", keybindings: ["cmd+r"], args: [{ name: "name", type: ArgType.STRING, required: true, description: "New name" }] },
+        cmd: { name: "thread.rename", title: "Rename Thread", category: "Thread", description: "Set the thread's name", keybindings: ["cmd+r"], args: [{ name: "name", type: ArgType.STRING, required: true, description: "New name" }] },
         when: (ctx) => activeThread(ctx) !== undefined,
         run: (ctx, args) => {
           const s = activeThread(ctx);
-          if (!s) throw new CommandError("unavailable", "no active session");
+          if (!s) throw new CommandError("unavailable", "no active thread");
           s.name = args.name ?? s.name;
           s.autoNamed = false;
           this.publishThread(s);
@@ -2262,7 +2262,7 @@ export class World {
         when: (ctx) => activeThread(ctx) !== undefined && Boolean(ctx?.activeWorkspaceId || !ctx?.activeView),
         run: (ctx, args) => {
           const s = activeThread(ctx);
-          if (!s) throw new CommandError("unavailable", "no active session");
+          if (!s) throw new CommandError("unavailable", "no active thread");
           if (!args.repo && !args.worktree) throw new CommandError("invalid", "name the member: a repository or a worktree path");
           const out = this.runIn(s, args.repo ?? "", args.worktree ?? "");
           const label = out.name ? `${out.name} (${out.id})` : out.id;
@@ -2281,7 +2281,7 @@ export class World {
         when: (ctx) => activeThread(ctx) !== undefined,
         run: (ctx, args) => {
           const s = activeThread(ctx);
-          if (!s) throw new CommandError("unavailable", "no active session");
+          if (!s) throw new CommandError("unavailable", "no active thread");
           s.pinned = args.pinned === undefined || args.pinned === "" ? !s.pinned : args.pinned === "true";
           if (s.pinned) {
             s.archivedAt = null;
@@ -2373,7 +2373,7 @@ export class World {
         when: (ctx) => activeThread(ctx) !== undefined,
         run: (ctx, args) => {
           const s = activeThread(ctx);
-          if (!s) throw new CommandError("unavailable", "no active session");
+          if (!s) throw new CommandError("unavailable", "no active thread");
           return this.archiveThread(s.id, archiving(s, args));
         },
       },
@@ -2408,19 +2408,19 @@ export class World {
         when: (ctx) => activeThread(ctx) !== undefined,
         run: (ctx, args) => {
           const s = activeThread(ctx);
-          if (!s) throw new CommandError("unavailable", "no active session");
+          if (!s) throw new CommandError("unavailable", "no active thread");
           return this.snoozeThread(s.id, snoozeUntil(args));
         },
       },
       {
         cmd: {
           name: "thread.remove", title: "Remove Thread", category: "Thread", description: "Forget the thread (closes it first if connected)", keybindings: [], args: [],
-          confirm: (ctx) => `Remove session ${ctx?.activeThreadId ?? ""}? It is closed first if connected, and its row is forgotten.`,
+          confirm: (ctx) => `Remove thread ${ctx?.activeThreadId ?? ""}? It is closed first if connected, and its row is forgotten.`,
         },
         when: (ctx) => activeThread(ctx) !== undefined,
         run: (ctx) => {
           const s = activeThread(ctx);
-          if (!s) throw new CommandError("unavailable", "no active session");
+          if (!s) throw new CommandError("unavailable", "no active thread");
           if (s.state !== ThreadState.DISCONNECTED) this.stopThread(s.id, "closed", 0);
           this.closeShells((l) => l[LABEL_THREAD] === s.id);
           this.actions.stopBackground((r) => r.threadId === s.id);
@@ -2855,15 +2855,15 @@ export class World {
   }
 
   /** The registry with settings applied: keybinding overrides and thread.new defaults. */
-  /** sessions.default_model and sessions.default_effort ("" when unset). */
+  /** threads.default_model and threads.default_effort ("" when unset). */
   private threadDefaults(): { model: string; effort: string } {
     const v = this.settings.values();
     return { model: v["threads.default_model"] ?? "", effort: v["threads.default_effort"] ?? "" };
   }
 
   /**
-   * The registry with settings applied: keybinding overrides, and the session defaults on
-   * every command that starts a session (internal/daemon/settings.go registryOverrides).
+   * The registry with settings applied: keybinding overrides, and the thread defaults on
+   * every command that starts a thread (internal/daemon/settings.go registryOverrides).
    */
   private effectiveRegistry(): ReturnType<World["registry"]> {
     const entries = this.registry();

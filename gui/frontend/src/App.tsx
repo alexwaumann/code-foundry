@@ -84,7 +84,7 @@ function startApp(): () => void {
 }
 
 /**
- * Exactly one thing fills the content area. A session shows its conversation
+ * Exactly one thing fills the content area. A thread shows its conversation
  * (components/thread), connected or not; "compose" is the new-thread composer. Shells
  * never show here: they live in the bottom panel.
  */

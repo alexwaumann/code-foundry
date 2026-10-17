@@ -1,7 +1,7 @@
 /**
- * Mock token usage (docs/notes/session-usage.md): a session's buckets priced like the
+ * Mock token usage (docs/notes/session-usage.md): a thread's buckets priced like the
  * daemon's internal/pricing for the few models the fixtures use; any other model is
- * unpriced. Seeded on s-1; POST /__mock/usage adds a bucket to any session.
+ * unpriced. Seeded on s-1; POST /__mock/usage adds a bucket to any thread.
  */
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import type { UsageBucketSchema } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
@@ -61,7 +61,7 @@ function bucketMsg(u: MockUsage): UsageBucketInit {
   };
 }
 
-/** Session.usage, cost_usd and unpriced for a session's buckets. */
+/** Thread.usage, cost_usd and unpriced for a thread's buckets. */
 export function usageFields(list: readonly MockUsage[]): { usage: UsageBucketInit[]; costUsd: number; unpriced: boolean } {
   const usage = [...list].sort((a, b) => a.day.localeCompare(b.day) || a.model.localeCompare(b.model)).map(bucketMsg);
   return { usage, costUsd: usage.reduce((s, b) => s + (b.costUsd ?? 0), 0), unpriced: usage.some((b) => b.unpriced) };

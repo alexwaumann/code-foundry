@@ -11,7 +11,7 @@ const needsConfirm = vi.hoisted(() => new Error("needs confirmation"));
 vi.mock("@/api/command", async (orig) => ({
   ...(await orig<typeof import("@/api/command")>()),
   invokeCommand,
-  confirmationOf: (err: unknown) => (err === needsConfirm ? { command: "thread.remove", title: "Remove Session", message: "Remove session s1?" } : null),
+  confirmationOf: (err: unknown) => (err === needsConfirm ? { command: "thread.remove", title: "Remove Thread", message: "Remove thread s1?" } : null),
 }));
 const { runCommand } = await import("./commands");
 
@@ -136,7 +136,7 @@ describe("runCommand confirmation", () => {
     const ctx = { activeTerminalId: "", activeThreadId: "s1", activeRepoId: "", activeWorktreePath: "", activeView: "thread", activeWorkspaceId: "" };
     const done = runCommand("thread.remove", {}, ctx);
     await vi.waitFor(() => {
-      expect(useConfirmStore.getState().pending?.message).toBe("Remove session s1?");
+      expect(useConfirmStore.getState().pending?.message).toBe("Remove thread s1?");
     });
     answerConfirm(yes);
     expect(await done).toBe(yes);

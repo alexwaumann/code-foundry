@@ -50,7 +50,7 @@ function useStarting(prRef: PrRef, kind: PrThreadKind): boolean {
 /**
  * The header's ⋯ menu, in T3 Code's order. Every action is a registry command or a store
  * action. Ask a question opens the surface's composer (onAsk), or focuses it again when it
- * is open; Explain and Fix findings start their session at once, keeping the menu
+ * is open; Explain and Fix findings start their thread at once, keeping the menu
  * open with a spinner until it has started. A running item is aria-disabled (it stays
  * focusable; a second select sends nothing) wherever the pull request is shown.
  */
@@ -157,7 +157,7 @@ export function PrMenu({ prRef, detail, panelKey, onAsk }: { prRef: PrRef; detai
           aria-busy={explaining || undefined}
           aria-disabled={explaining || undefined}
           onSelect={(e) => {
-            // Stay open with a spinner until the session has started.
+            // Stay open with a spinner until the thread has started.
             e.preventDefault();
             start("explain");
           }}

@@ -210,7 +210,7 @@ test.describe("the overview", () => {
     const pr = s.getByTestId("overview-pr");
     await expect(pr).toHaveAttribute("data-number", "142");
     await expect(pr).toHaveAttribute("data-state", "open");
-    await expect(pr).toContainText("feat(gui): virtualized sidebar tree with session rows");
+    await expect(pr).toContainText("feat(gui): virtualized sidebar tree with thread rows");
 
     await expect(s.getByTestId("changes-totals")).toHaveText("8 files · +324 −147");
     await expect(s.getByTestId("worktree-changes")).toContainText("vs main");

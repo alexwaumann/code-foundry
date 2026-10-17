@@ -327,7 +327,7 @@ describe("events mapping", () => {
     expect(toEventView(create(EventSchema, { event }))).toEqual(want);
   });
 
-  it("maps a session", () => {
+  it("maps a thread", () => {
     const s = create(ThreadSchema, {
       id: "s1",
       worktreePath: "/w",

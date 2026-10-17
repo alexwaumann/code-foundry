@@ -32,7 +32,7 @@ function jumpTo(n: number): void {
   if (id !== undefined) useUiStore.getState().select({ kind: "thread", id }, { focusPrompt: true });
 }
 
-/** Selects the next session that needs attention after the current one, wrapping. */
+/** Selects the next thread that needs attention after the current one, wrapping. */
 export function jumpToAttention(): boolean {
   const waiting = new Set(attentionIds(useThreadsStore.getState()));
   const sel = useUiStore.getState().selection;
@@ -160,7 +160,7 @@ export function openRunInPicker(threadId: string): boolean {
   return true;
 }
 
-/** Starts inline rename of the active session's sidebar row. */
+/** Starts inline rename of the active thread's sidebar row. */
 export function beginRename(threadId: string | null = getUiContext().activeThreadId || null): boolean {
   if (!threadId || !useThreadsStore.getState().byId[threadId]) return false;
   const ui = useUiStore.getState();
@@ -346,7 +346,7 @@ function isEditable(el: Element | null): boolean {
  *  2. A focused terminal or a thread prompt's text ([data-chord-yield]) consumes everything
  *     else, except cmd chords bound to commands (see terminalYields).
  *  3. A focused text field (palette input, rename field) consumes everything else.
- *  4. F2 renames the selected session (the cursor row inside the tree); command
+ *  4. F2 renames the selected thread (the cursor row inside the tree); command
  *     keybindings from CommandService.List for the current context.
  */
 export function handleKeyDown(e: KeyboardEvent): void {

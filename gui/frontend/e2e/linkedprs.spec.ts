@@ -108,7 +108,7 @@ test("L and the header button open the list newest first; Enter opens a PR tab a
   await expect(numbers(page)).toHaveText(["#142", "#147", "#145", "#138"]);
   // Details from the cached PR detail: title, state, CI (open only), branch.
   await expect(list(page).getByTestId("linkedpr-title")).toHaveText([
-    "feat(gui): virtualized sidebar tree with session rows",
+    "feat(gui): virtualized sidebar tree with thread rows",
     "feat(thread): link pull requests from pr-link transcript records",
     "fix(terminal): resize race between attach and first output",
     "chore(gh): pace requests through one worker",

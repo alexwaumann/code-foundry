@@ -33,7 +33,7 @@ function useHeight(ref: React.RefObject<HTMLElement | null>): number {
 }
 
 /**
- * What the content pane shows for a thread id the sessions store does not have: a removed
+ * What the content pane shows for a thread id the threads store does not have: a removed
  * thread (a stale selection), or one the first List has not brought yet.
  */
 function ThreadMissing() {

@@ -22,15 +22,15 @@ import { orOutdatedDaemon } from "./errors";
  */
 export type ThreadStateView = "starting" | "connected" | "closing" | "disconnected" | "unknown";
 /**
- * What Claude is doing. Persisted by the daemon: a stopped session keeps the status it
+ * What Claude is doing. Persisted by the daemon: a stopped thread keeps the status it
  * ended with ("attention" with its reason survives a restart). "error" is set on a
- * session whose process ended mid-turn (statusReason "interrupted") or did not start.
+ * thread whose process ended mid-turn (statusReason "interrupted") or did not start.
  */
 export type ThreadStatusView = "busy" | "idle" | "attention" | "error" | "unknown";
 /** claude --permission-mode, as thread.new's `permission` arg spells it; "" = Claude's default. */
 export type PermissionModeView = "supervised" | "accept-edits" | "auto" | "";
 
-/** View model for a Claude session. Generated types stay inside src/api. */
+/** View model for a thread (Claude Code session plus its worktree and status). Generated types stay inside src/api. */
 export interface ThreadView {
   id: string;
   claudeSessionId: string;
@@ -53,9 +53,9 @@ export interface ThreadView {
   lastActivityAtMs: number | null;
   parentId: string;
   permissionMode: PermissionModeView;
-  /** Ref the session's worktree branch was created from ("" unless createdWorktree). */
+  /** Ref the thread's worktree branch was created from ("" unless createdWorktree). */
   baseRef: string;
-  /** thread.new made the worktree for this session. */
+  /** thread.new made the worktree for this thread. */
   createdWorktree: boolean;
   /**
    * The workspace that owns the thread; "" for a project thread (owned by repoId).
@@ -116,7 +116,7 @@ export interface ThreadView {
   contextTokens: number;
   /**
    * When the conversation's prompt cache expires (its last result plus the
-   * sessions.cache_ttl_seconds setting), epoch ms; null before the first result. Past it, the next message re-reads contextTokens.
+   * threads.cache_ttl_seconds setting), epoch ms; null before the first result. Past it, the next message re-reads contextTokens.
    */
   cacheExpiresAtMs: number | null;
   /** What re-reading contextTokens costs once the cache expired, USD; 0 when unpriced. */
@@ -175,7 +175,7 @@ export interface AgentRunView {
   /** 1: spawned by the thread; 2+: by another run. */
   spawnDepth: number;
   startedAtMs: number | null;
-  /** The run's own usage, priced like the session's. */
+  /** The run's own usage, priced like the thread's. */
   usage: UsageBucketView[];
   costUsd: number;
   unpriced: boolean;
@@ -222,8 +222,8 @@ export interface LinkedPullRequestView {
 }
 
 /**
- * Session events. retiredUsage is the usage of removed threads summed per (model, tier,
- * speed, day): usage over every thread is the sessions' usage plus it. A "retiredUsage"
+ * Thread events. retiredUsage is the usage of removed threads summed per (model, tier,
+ * speed, day): usage over every thread is the threads' usage plus it. A "retiredUsage"
  * event follows "removed" when the removed thread had usage and carries the whole ledger.
  */
 export type ThreadListEventView =

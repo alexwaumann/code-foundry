@@ -1,7 +1,7 @@
 /**
  * Context totals of threads in the mock daemon
  * (docs/notes/rendered-threads-cold-cache.md): a thread's context size after its last
- * turn, when that turn ended, and from those and the sessions.cache_ttl_seconds setting the
+ * turn, when that turn ended, and from those and the threads.cache_ttl_seconds setting the
  * cache expiry and the re-read cost, computed when sent like the daemon's.
  *
  *   POST /__mock/thread/cache?id=s-r1&ago=<seconds>[&tokens=N&model=M]
@@ -9,7 +9,7 @@
  */
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 
-/** The part of a mock session the context fields read. */
+/** The part of a mock thread the context fields read. */
 export interface MockContext {
   contextTokens: number;
   /** The model that answered the last turn ("" unknown). */
@@ -27,7 +27,7 @@ const WRITE: Readonly<Record<string, { m5: number; h1: number }>> = {
   "claude-haiku-5-5": { m5: 0.125, h1: 0.2 },
 };
 
-/** The Session message's context_tokens, cache_expires_at and context_reread_usd. */
+/** The Thread message's context_tokens, cache_expires_at and context_reread_usd. */
 export function contextFields(c: MockContext, ttlSeconds: number) {
   if (!c.lastResultAt || c.contextTokens <= 0) return { contextTokens: 0n, contextRereadUsd: 0 };
   const w = WRITE[c.contextModel];

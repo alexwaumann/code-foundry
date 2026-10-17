@@ -1,5 +1,5 @@
 /**
- * Sidebar list: a flat list of threads (sessions), pinned ones first, then the ones waiting
+ * Sidebar list: a flat list of threads, pinned ones first, then the ones waiting
  * on the user, then finished turns, then idle ones (the main list); then the working ones
  * under a collapsible Working header, the snoozed ones under a collapsible Snoozed header
  * and the archived ones under a collapsible Archived header (the three footers,
@@ -134,8 +134,8 @@ export interface Sections {
 }
 
 /**
- * The sidebar rows by panel. Threads newest first (`sessions` comes in creation order, the
- * sessions store's order) within each group, so a thread moves only when it changes group.
+ * The sidebar rows by panel. Threads newest first (`threads` comes in creation order, the
+ * threads store's order) within each group, so a thread moves only when it changes group.
  * Main: pinned ones (whatever their status); then unpinned ones waiting on the user
  * (prompts, then error and interrupted threads); finished turns; idle ones (idle, unknown;
  * lib/thread threadGroup); all without headers. Working: the working ones (busy or starting)

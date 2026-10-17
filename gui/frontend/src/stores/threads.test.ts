@@ -58,8 +58,8 @@ function term(id: string, labels: Record<string, string> = {}): TerminalView {
   return { id, argv: ["claude"], cwd: "/src/app", cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: 1, exitedAtMs: null, altScreen: false, labels };
 }
 
-describe("session reducers", () => {
-  it("replace keeps identity for unchanged sessions and orders by creation", () => {
+describe("thread reducers", () => {
+  it("replace keeps identity for unchanged threads and orders by creation", () => {
     const a = thread("a", { createdAtMs: 2 });
     const b = thread("b", { createdAtMs: 1 });
     const s1 = replaceThreads(emptyThreads, [a, b]);
@@ -149,7 +149,7 @@ describe("session reducers", () => {
     expect(applyThreadListEvent(withRun, { kind: "updated", thread: thread("a", { agentRuns: [run("open", 2)] }) })).not.toBe(withRun);
   });
 
-  it("attentionIds counts a stopped session's persisted attention, not an interrupted one", () => {
+  it("attentionIds counts a stopped thread's persisted attention, not an interrupted one", () => {
     const d = replaceThreads(emptyThreads, [
       thread("a", { status: "attention" }),
       thread("b", { status: "attention", statusReason: "question: Which color do you prefer?", state: "disconnected" }),
@@ -192,7 +192,7 @@ describe("session reducers", () => {
   });
 });
 
-describe("deriveContext for a session", () => {
+describe("deriveContext for a thread", () => {
   const repos = replaceRepos([
     {
       id: "r1",
@@ -205,7 +205,7 @@ describe("deriveContext for a session", () => {
       worktrees: [{ repoId: "r1", path: "/src/app", branch: "main", head: "", detached: false, isMain: true, status: { upstream: "", ahead: 0, behind: 0, staged: 0, modified: 0, untracked: 0, dirty: false, refreshedAtMs: null } }],
     },
   ]);
-  it("carries the session and its worktree; no terminal (a thread has none)", () => {
+  it("carries the thread and its worktree; no terminal (a thread has none)", () => {
     const threads = replaceThreads(emptyThreads, [thread("s1")]);
     expect(deriveContext({ kind: "thread", id: "s1" }, repos, threads)).toEqual({
       activeThreadId: "s1",
@@ -232,7 +232,7 @@ describe("deriveContext for a session", () => {
   it("a composer without a project: the compose view alone", () => {
     expect(deriveContext({ kind: "compose", repoId: "", noProject: true }, repos)).toEqual({ ...emptyContext, activeView: "compose" });
   });
-  it("an unknown session keeps the id", () => {
+  it("an unknown thread keeps the id", () => {
     const threads = replaceThreads(emptyThreads, [thread("s1", { state: "disconnected" })]);
     expect(deriveContext({ kind: "thread", id: "gone" }, emptyRepos, threads)).toMatchObject({ activeThreadId: "gone", activeView: "thread" });
   });
@@ -257,7 +257,7 @@ describe("event dispatch", () => {
     expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s1" });
   });
 
-  it("a session snapshot bumps the epoch; updates and removals do not", () => {
+  it("a thread snapshot bumps the epoch; updates and removals do not", () => {
     const start = useThreadsStore.getState().epoch;
     dispatchEvent({ source: "threadList", event: { kind: "snapshot", threads: [thread("s1")], retiredUsage: [] } });
     expect(useThreadsStore.getState().epoch).toBe(start + 1);
@@ -278,7 +278,7 @@ describe("event dispatch", () => {
   });
 });
 
-describe("session presentation", () => {
+describe("thread presentation", () => {
   it.each([
     [null, "never"],
     [1_000_000 - 10_000, "just now"],

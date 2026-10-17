@@ -32,7 +32,7 @@ export interface LinkRow {
 }
 
 /**
- * The thread this panel belongs to: the selected session; "" otherwise. (A panel always
+ * The thread this panel belongs to: the selected thread; "" otherwise. (A panel always
  * shows the current selection's panel, so the selection is the panel's owner.)
  */
 function useThreadId(): string {

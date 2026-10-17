@@ -158,7 +158,7 @@ export class GhWorld {
     const last = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const cf = "alexwaumann/code-foundry";
     const gp = "alexwaumann/ghostty-playground";
-    const sidebarPr = this.pr(cf, 142, "feat(gui): virtualized sidebar tree with session rows", {
+    const sidebarPr = this.pr(cf, 142, "feat(gui): virtualized sidebar tree with thread rows", {
       headRef: "feat/sidebar",
       // The merge button sends it as pr.merge's head-sha; the mock refuses another.
       headSha: "5eb1d0a142000000000000000000000000000000",
@@ -259,7 +259,7 @@ export class GhWorld {
       ], [
         ["9a8b7c6d1e", "feat(gui): row virtualization", 2 * HOUR],
         ["4f3e2d1c0b", "refactor(tree): flatten placement", 5 * HOUR],
-        ["8e7d6c5b4a", "feat(gui): session rows in the sidebar", DAY],
+        ["8e7d6c5b4a", "feat(gui): thread rows in the sidebar", DAY],
       ])],
       [`${CFW}/fix-resize`, this.detail(`${CFW}/fix-resize`, "origin/main", manyFiles(), Array.from({ length: 12 }, (_, i): [string, string, number] => [`${(0x1f2e3d4c + i * 7919).toString(16)}aa`, `fix(terminal): step ${String(12 - i)} of the resize rework`, (i + 1) * 3 * HOUR]))],
       [GP, this.detail(GP, "origin/main", [{ path: "src/renderer/atlas.zig", status: "M", added: 12, deleted: 3, uncommitted: true }], [])],

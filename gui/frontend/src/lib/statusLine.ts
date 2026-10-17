@@ -1,7 +1,7 @@
 /**
  * The second line of a sidebar thread row (docs/notes/thread-list.md): what the thread is
  * doing or waiting on, in words and a colour, and whether "project @ branch" follows.
- * Pure, over the session view; the row renders it (components/sidebar/SidebarRow.tsx).
+ * Pure, over the thread view; the row renders it (components/sidebar/SidebarRow.tsx).
  */
 import type { ThreadView } from "@/api/threads";
 import { formatAgo, threadBadge, statusKind, statusNote } from "./thread";

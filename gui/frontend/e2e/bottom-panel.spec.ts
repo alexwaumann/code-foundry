@@ -48,7 +48,7 @@ async function createShell(labels: Record<string, string>, cwd: string): Promise
   return ((await res.json()) as { terminal: { id: string } }).terminal.id;
 }
 
-const threadShell = (thread: string, worktree = CF) => ({ kind: "shell", thread: thread, repo: "repo-cf", worktree });
+const threadShell = (thread: string, worktree = CF) => ({ kind: "shell", thread, repo: "repo-cf", worktree });
 
 async function attachStreams(): Promise<number> {
   return (await openStreams())["TerminalService/Attach"] ?? 0;

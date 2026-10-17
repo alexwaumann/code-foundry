@@ -45,7 +45,7 @@ function Onboarding() {
   );
 }
 
-/** The registered project a session's worktree belongs to, by name; "No project" for a thread without one; null when it cannot be placed. */
+/** The registered project a thread's worktree belongs to, by name; "No project" for a thread without one; null when it cannot be placed. */
 function useThreadProject(id: string): string | null {
   const noProject = useNoProjectThread(id);
   const worktreePath = useThreadsStore((s) => s.byId[id]?.worktreePath ?? "");

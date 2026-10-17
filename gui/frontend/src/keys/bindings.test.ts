@@ -199,14 +199,14 @@ describe("handleKeyDown precedence", () => {
     expect(useUiStore.getState().palette.open).toBe(false);
   });
 
-  it("F2 renames the selected session outside the tree", () => {
+  it("F2 renames the selected thread outside the tree", () => {
     useThreadsStore.setState({ byId: { s1: thread("s1") }, order: ["s1"] });
     useUiStore.setState({ selection: { kind: "thread", id: "s1" } });
     press(outside, { key: "F2", code: "F2" });
     expect(useUiStore.getState().renamingThreadId).toBe("s1");
   });
 
-  it("cmd+shift+a cycles through sessions needing attention in sidebar order (newest first)", () => {
+  it("cmd+shift+a cycles through threads needing attention in sidebar order (newest first)", () => {
     useThreadsStore.setState({
       byId: { a: thread("a", { status: "attention" }), b: thread("b"), c: thread("c", { status: "attention" }) },
       order: ["a", "b", "c"],

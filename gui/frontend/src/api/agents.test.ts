@@ -87,7 +87,7 @@ describe("the Watch's agents", () => {
   });
 });
 
-describe("the session's running agents", () => {
+describe("the thread's running agents", () => {
   it("maps both counts", () => {
     const v = toThreadView(create(ThreadSchema, { id: "s", agentsRunning: 3, backgroundAgentsRunning: 2 }));
     expect([v.agentsRunning, v.backgroundAgentsRunning]).toEqual([3, 2]);

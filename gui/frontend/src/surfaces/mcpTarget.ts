@@ -10,7 +10,7 @@ export const MCP_KIND = "mcp";
 export const MCP_TITLE = "MCP";
 
 /**
- * The selection's thread when the sessions store knows it (selectionThread). Null
+ * The selection's thread when the threads store knows it (selectionThread). Null
  * otherwise, a page or a composer included. Whether Claude runs for it does not matter:
  * the last status outlives the process, and Refresh starts Claude.
  */

@@ -1,6 +1,6 @@
 /**
  * Opening the Linked PRs surface (surfaces/linkedprs.ts). The view.panel.linked-prs
- * command (linkedPrsPanelCommand in stores/views.ts), the session header button (the
+ * command (linkedPrsPanelCommand in stores/views.ts), the thread header button (the
  * command) and the sidebar's PR badge end here.
  */
 import { linkedPrsTab, selectionLinkedThread, selectionThread } from "@/surfaces/linkedprsTarget";

@@ -11,7 +11,7 @@ import { useAttentionCount } from "@/stores/threads";
 import { isDashboard, useUiStore } from "@/stores/ui";
 
 /**
- * Notifications: the sessions waiting on the user. Always shown; with a count, a click
+ * Notifications: the threads waiting on the user. Always shown; with a count, a click
  * jumps to the next one (as cmd+shift+a does). With none it does nothing, but still shows
  * its tooltip, so it is aria-disabled rather than disabled (disabled buttons get no hover).
  */

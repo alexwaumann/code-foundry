@@ -158,7 +158,7 @@ function TimedStatusText({ line }: { line: StatusLine }) {
 }
 
 /**
- * "N agents" (sky, with a bot) while the thread's subagents run (Session.agents_running,
+ * "N agents" (sky, with a bot) while the thread's subagents run (Thread.agents_running,
  * docs/notes/agents-2-gui.md), ahead of the status; nothing otherwise. The sort ignores it.
  */
 function AgentsRunning({ id, more }: { id: string; more: boolean }) {

@@ -136,7 +136,7 @@ describe("PrAskComposer", () => {
     expect(input()).toHaveProperty("value", "Why?");
   });
 
-  it("while its pr.ask runs: read-only, Cancel disabled, Escape and Enter ignored; it closes when the session starts", async () => {
+  it("while its pr.ask runs: read-only, Cancel disabled, Escape and Enter ignored; it closes when the thread starts", async () => {
     const d = deferred<string | null>();
     startPrThread.mockImplementationOnce(runningAsk(d.promise));
     const onClose = vi.fn();

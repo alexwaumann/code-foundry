@@ -11,7 +11,7 @@ const { PREPARING_TOAST_DELAY_MS, openStartedThread, prThreadArgs, startingKey, 
 const { useUiStore } = await import("./ui");
 
 const REF = { slug: "acme/repo", number: 12 };
-const started = (id: string) => ({ message: `Started session ${id} for PR #12`, resultJson: JSON.stringify({ id, worktreePath: "/w" }) });
+const started = (id: string) => ({ message: `Started thread ${id} for PR #12`, resultJson: JSON.stringify({ id, worktreePath: "/w" }) });
 
 function deferred<T>() {
   let resolve!: (v: T) => void;
@@ -53,7 +53,7 @@ describe("startPrThread", () => {
     expect(invokeCommand).toHaveBeenCalledWith(name, expect.anything(), { "repo-slug": "acme/repo", number: "12", ...extra });
     expect(toast.success).toHaveBeenCalledTimes(1); // runCommandForResult's own toast is skipped
     const [message, opts] = toast.success.mock.calls[0] as [string, { action: { label: string; onClick: unknown } }];
-    expect(message).toBe("Started session s-9 for PR #12");
+    expect(message).toBe("Started thread s-9 for PR #12");
     expect(opts.action.label).toBe("Open");
     expect(typeof opts.action.onClick).toBe("function");
     expect(usePrThreadsStore.getState().starting).toEqual({});
@@ -123,7 +123,7 @@ describe("startPrThread", () => {
     expect(usePrThreadsStore.getState().starting).toEqual({});
   });
 
-  it("a result without a session id still counts as started, with no Open action", async () => {
+  it("a result without a thread id still counts as started, with no Open action", async () => {
     invokeCommand.mockResolvedValueOnce({ message: "Started", resultJson: "" });
     await expect(startPrThread("explain", REF)).resolves.toBe("");
     expect(toast.success).toHaveBeenCalledWith("Started", undefined);
@@ -143,7 +143,7 @@ describe("startPrThread", () => {
 describe("openStartedThread", () => {
   it.each([
     ["the Pull Requests page", { kind: "view", name: "pullrequests" }, 1],
-    ["another session", { kind: "thread", id: "s-1" }, 1],
+    ["another thread", { kind: "thread", id: "s-1" }, 1],
     // FocusThread got there first: nothing changes (no second terminal focus).
     ["the new thread", { kind: "thread", id: "s-9" }, 0],
   ] as const)("from %s", (_, selection, focusSeq) => {

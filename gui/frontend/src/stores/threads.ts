@@ -20,7 +20,7 @@ interface ThreadsState extends ThreadsData {
   error: string | null;
   /**
    * Usage of removed threads (the daemon's retired ledger). Usage over every thread is the
-   * sessions' usage plus this. From the snapshot and "retiredUsage" events.
+   * threads' usage plus this. From the snapshot and "retiredUsage" events.
    */
   retiredUsage: readonly UsageBucketView[];
   /**
@@ -34,7 +34,7 @@ interface ThreadsState extends ThreadsData {
 
 export const emptyThreads: ThreadsData = { byId: {}, order: [] };
 
-/** Structural equality, so unchanged sessions keep their identity and rows don't re-render. */
+/** Structural equality, so unchanged threads keep their identity and rows don't re-render. */
 export function sameThread(a: ThreadView, b: ThreadView): boolean {
   return (Object.keys(a) as (keyof ThreadView)[]).every((k) =>
     k === "linkedPullRequests"
@@ -64,7 +64,7 @@ export function sameUsage(a: readonly UsageBucketView[], b: readonly UsageBucket
   return a === b || (a.length === b.length && a.every((x, i) => (Object.keys(x) as (keyof UsageBucketView)[]).every((k) => x[k] === b[i]?.[k])));
 }
 
-/** The retired ledger after a session event: kept by identity unless it changed. */
+/** The retired ledger after a thread event: kept by identity unless it changed. */
 export function applyRetiredUsage(prev: readonly UsageBucketView[], ev: ThreadListEventView): readonly UsageBucketView[] {
   const next = ev.kind === "snapshot" ? ev.retiredUsage : ev.kind === "retiredUsage" ? ev.buckets : prev;
   return sameUsage(prev, next) ? prev : next;
@@ -85,7 +85,7 @@ function sameOrder(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((id, i) => id === b[i]);
 }
 
-/** Replaces the whole set (List result or snapshot), keeping identity for unchanged sessions. */
+/** Replaces the whole set (List result or snapshot), keeping identity for unchanged threads. */
 export function replaceThreads(prev: ThreadsData, list: readonly ThreadView[]): ThreadsData {
   const byId: Record<string, ThreadView> = {};
   for (const s of list) {
@@ -129,7 +129,7 @@ export const useThreadsStore = create<ThreadsState>()(() => ({
 }));
 
 /**
- * The session needs the user: needs-attention, in any state. The daemon persists status, so
+ * The thread needs the user: needs-attention, in any state. The daemon persists status, so
  * a thread whose process stopped (or outlived a daemon restart) while asking a question or
  * waiting on a permission prompt still counts. "error" (interrupted) does not.
  */
@@ -138,7 +138,7 @@ export function isAttention(s: Pick<ThreadView, "status" | "state">): boolean {
 }
 
 /**
- * Session ids that need the user, in `order`. An archived or snoozed thread never counts
+ * Thread ids that need the user, in `order`. An archived or snoozed thread never counts
  * (the bell, the window title, the dock badge, cmd+shift+a, the start page): archiving one
  * that was waiting (usually a finished turn) says the user is done with it, snoozing says
  * not until later, and it sits in a collapsed section. A snoozed thread counts again once
@@ -152,14 +152,14 @@ export function attentionIds(data: ThreadsData): string[] {
 }
 
 /**
- * The session is working: the "busy" badge (busy, or Claude starting; threadBadge), never
- * a session that needs attention.
+ * The thread is working: the "busy" badge (busy, or Claude starting; threadBadge), never
+ * a thread that needs attention.
  */
 export function isRunning(s: Pick<ThreadView, "status" | "state">): boolean {
   return !isAttention(s) && threadBadge(s) === "busy";
 }
 
-/** Sessions that are running (isRunning), in `order`; none of them in attentionIds. */
+/** Threads that are running (isRunning), in `order`; none of them in attentionIds. */
 function runningIds(data: ThreadsData): string[] {
   return data.order.filter((id) => {
     const s = data.byId[id];
@@ -167,13 +167,13 @@ function runningIds(data: ThreadsData): string[] {
   });
 }
 
-/** Sessions that are running (isRunning). */
+/** Threads that are running (isRunning). */
 export function runningCount(data: ThreadsData): number {
   return runningIds(data).length;
 }
 
 /**
- * The start page's thread list: sessions waiting on the user, then running ones, each in
+ * The start page's thread list: threads waiting on the user, then running ones, each in
  * `order`. An id is never in both (attention wins): the list keys rows by id.
  */
 export function activeThreadIds(data: ThreadsData): string[] {
@@ -182,7 +182,7 @@ export function activeThreadIds(data: ThreadsData): string[] {
   return [...waiting, ...runningIds(data).filter((id) => !seen.has(id))];
 }
 
-/** Number of sessions needing attention (a narrow, primitive selector). */
+/** Number of threads needing attention (a narrow, primitive selector). */
 export function useAttentionCount(): number {
   return useThreadsStore((s) => attentionIds(s).length);
 }

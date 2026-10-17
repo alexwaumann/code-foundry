@@ -13,7 +13,7 @@ function thread(sel: Selection): string | null {
 
 /**
  * Usage: the selected thread's token usage and its cost at Claude API rates, per model and
- * per token kind (docs/sketches/session-usage/DESIGN.md, the session surface). Enabled for
+ * per token kind (docs/sketches/session-usage/DESIGN.md, the thread surface). Enabled for
  * a thread, even one without usage yet; hidden otherwise. One tab
  * per panel, no params: the body follows the selection's thread, like Linked PRs. Opened
  * by U in the panel and by view.panel.usage (stores/usagePanel.ts).
@@ -24,7 +24,7 @@ export const usageSurface: SurfaceSpec = {
   icon: ChartColumn,
   hotkey: "u",
   available: (ctx) => (thread(ctx.selection) ? "enabled" : "hidden"),
-  // deriveContext reads the repos store too (placement); the thread comes from sessions.
+  // deriveContext reads the repos store too (placement); the thread comes from threads.
   watches: [useThreadsStore, useReposStore],
   render: () => createElement(UsageSurface),
   openDefault: (ctx) => (thread(ctx.selection) ? usageTab() : null),

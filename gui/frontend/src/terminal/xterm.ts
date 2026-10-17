@@ -287,7 +287,7 @@ export class XtermRenderer implements TerminalRenderer {
     this.fit();
   }
 
-  /** sessions.scrollback_lines. */
+  /** threads.scrollback_lines. */
   setScrollback(lines: number): void {
     this.term.options.scrollback = lines;
   }

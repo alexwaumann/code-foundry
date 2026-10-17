@@ -126,7 +126,7 @@ interface UiState {
   palette: { open: boolean; query: string; commandName: string | null; page: PalettePage; returnTo: FocusRegion; threadId?: string; context?: UiContextView };
   /** Incremented to ask the composer to take focus. */
   composerFocusSeq: number;
-  /** Session whose sidebar row is in inline-rename mode. */
+  /** Thread whose sidebar row is in inline-rename mode. */
   renamingThreadId: string | null;
 
   // Persisted settings.

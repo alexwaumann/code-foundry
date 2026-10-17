@@ -1,7 +1,7 @@
 /**
  * Opening the workspace surface (surfaces/workspace.ts) and its member tabs. The
  * view.panel.workspace command (workspacePanelCommand in stores/views.ts), the sidebar's
- * workspace badge, the session header button (the command) and the Projects page's
+ * workspace badge, the thread header button (the command) and the Projects page's
  * workspace rows all end here.
  */
 import { memberTab, selectionWorkspaceThread, workspaceTab } from "@/surfaces/workspaceTarget";

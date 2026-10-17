@@ -66,13 +66,13 @@ export interface Draft {
   /** The prompt, tags as tokens (`![name](cf-attachment://<id>)`, `[/name](cf-skill://…)`, …). */
   text: string;
   attachments: readonly DraftAttachment[];
-  /** null: the settings default (sessions.default_model / default_effort). */
+  /** null: the settings default (threads.default_model / default_effort). */
   model: string | null;
   effort: string | null;
   permission: ComposePermission;
   /**
    * null: the project's default, resolved live (projectWorktree: the choice remembered
-   * for the project, else sessions.default_worktree). Workspace drafts always have one.
+   * for the project, else threads.default_worktree). Workspace drafts always have one.
    */
   worktree: WorktreeChoice | null;
   /** null: the primary repo's default base ref (ListRefs.default_ref). */
@@ -430,7 +430,7 @@ function mainCheckout(repoId: string): string | undefined {
 
 /**
  * Where a project's new thread works until the user picks: the choice remembered for the
- * project, else sessions.default_worktree (lib/compose defaultWorktree). The composer
+ * project, else threads.default_worktree (lib/compose defaultWorktree). The composer
  * resolves the same inputs with hooks.
  */
 export function projectWorktree(repoId: string): ProjectWorktree {

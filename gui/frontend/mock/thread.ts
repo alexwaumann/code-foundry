@@ -22,7 +22,7 @@
  * nothing is pending, an allowed tool runs and Claude carries on, a denied one makes Claude
  * reply to the reason, answers are echoed; then the turn ends. thread.set-effort applies at
  * once when idle ("Set effort to …" after ~300 ms), else when the turn ends
- * (Session.effort_pending meanwhile).
+ * (Thread.effort_pending meanwhile).
  */
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
@@ -67,7 +67,7 @@ export interface SeedHistory {
 
 /** The world the threads live in (mock/world.ts implements it). */
 export interface ThreadWorld {
-  /** The session's worktree; throws when the session does not exist. */
+  /** The thread's worktree; throws when the thread does not exist. */
   worktreeOf(id: string): string;
   /** Claude runs for the thread (CONNECTED). Internal to the daemon: the GUI never shows it. */
   isConnected(id: string): boolean;
@@ -85,7 +85,7 @@ export interface ThreadWorld {
   modelOf(id: string): string;
   /** A turn ended: the thread's context totals move to now (mock/context.ts). */
   recordResult(id: string, model: string): void;
-  /** The thread's subagent runs changed: its session's running counts follow (mock/agents.ts). */
+  /** The thread's subagent runs changed: its thread's running counts follow (mock/agents.ts). */
   agentsChanged(id: string): void;
 }
 
@@ -119,7 +119,7 @@ export const MOCK_ATTACHMENT_PNG = Buffer.from(
 export type ThreadState = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi" | "subagent" | "agents" | "shells" | "stopped" | "crashed";
 export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "parallel", "multi", "subagent", "agents", "shells", "stopped", "crashed"];
 
-/** The stderr line of the "crashed" state's claude (Session.last_error). */
+/** The stderr line of the "crashed" state's claude (Thread.last_error). */
 export const CRASH_STDERR = "error: unknown option '--bogus'";
 
 const ANSWER_HEAD = `## Fixed: stale badge after a force-push
@@ -315,12 +315,12 @@ export class MockThreadLogs {
     return this.agents.get(id) ?? [];
   }
 
-  /** The runs of a thread for its Session's counts (no check: the session may be going away). */
+  /** The runs of a thread for its Thread's counts (no check: the thread may be going away). */
   agentRunsOf(id: string): readonly AgentRunInit[] {
     return this.agents.get(id) ?? [];
   }
 
-  /** The thread's running background shells, for its Session's count. */
+  /** The thread's running background shells, for its Thread's count. */
   shellsOf(id: string): number {
     return this.shells.get(id)?.length ?? 0;
   }
@@ -347,7 +347,7 @@ export class MockThreadLogs {
     this.world.agentsChanged(id);
   }
 
-  /** Replaces the thread's runs, publishes the Watch's `agents` event (the whole list) and the session's counts. */
+  /** Replaces the thread's runs, publishes the Watch's `agents` event (the whole list) and the thread's counts. */
   setAgents(id: string, runs: AgentRunInit[]): void {
     if (runs.length > 0) this.agents.set(id, runs);
     else this.agents.delete(id);
@@ -986,7 +986,7 @@ export class MockThreadLogs {
 
   /**
    * A default-world thread's short history (mock/world.ts reset), so its timeline is not
-   * empty. Leaves the session's status alone (the world's seed sets it); a "permission"
+   * empty. Leaves the thread's status alone (the world's seed sets it); a "permission"
    * end publishes its pending request on the EventService thread source.
    */
   seed(id: string, h: SeedHistory): void {
@@ -1105,7 +1105,7 @@ export class MockThreadLogs {
     when: (ctx: UiContext | undefined) => boolean;
     run: (ctx: UiContext | undefined, args: Record<string, string>) => string;
   }[] {
-    // Every thread (the CLI's context has no view; the GUI's has "session").
+    // Every thread (the CLI's context has no view; the GUI's has "thread").
     const when = (ctx: UiContext | undefined) => Boolean(ctx?.activeThreadId);
     // Like the daemon's: an arg with a context default is listed as not required (the GUI
     // does not prompt for it) and filled from the context when omitted.

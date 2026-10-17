@@ -106,7 +106,7 @@ describe("AgentsStrip", () => {
     expect(screen.queryByTestId("agents-strip")).toBeNull();
   });
 
-  it("follows the session's count", () => {
+  it("follows the thread's count", () => {
     setup({ agentsRunning: 1, backgroundAgentsRunning: 1 }, [run("PR 1")]);
     expect(screen.getByTestId("agents-strip")).not.toBeNull();
     act(() => {

@@ -2,7 +2,7 @@
  * When a thread is archived or snoozed (from this window, another one, or the CLI), its
  * side panel and bottom panel entries are reset: the side panel's tabs go and it is
  * closed, and the bottom panel is closed (the daemon removed the thread's shells, so its
- * tabs went on their own). Reacting to the sessions store rather than wrapping
+ * tabs went on their own). Reacting to the threads store rather than wrapping
  * archiveThread / snoozeThread makes every archive and snooze behave the same. Only a
  * transition counts (archivedAtMs or snoozedUntilMs null to set, on a thread this window
  * already knew), so panels opened later on an archived or snoozed thread are left alone,
@@ -23,7 +23,7 @@ import { DASHBOARD, useUiStore, type Selection } from "./ui";
 /** The fields whose null → set transition puts a thread away. */
 type PutAwayField = "archivedAtMs" | "snoozedUntilMs";
 
-/** Ids whose `field` was set between two session sets: known and unset before, set now. */
+/** Ids whose `field` was set between two thread sets: known and unset before, set now. */
 function newlySet(prev: ThreadsData, next: ThreadsData, field: PutAwayField): string[] {
   if (prev.byId === next.byId) return [];
   return next.order.filter((id) => {
@@ -32,12 +32,12 @@ function newlySet(prev: ThreadsData, next: ThreadsData, field: PutAwayField): st
   });
 }
 
-/** Ids archived between two session sets: known and not archived before, archived now. */
+/** Ids archived between two thread sets: known and not archived before, archived now. */
 export function newlyArchived(prev: ThreadsData, next: ThreadsData): string[] {
   return newlySet(prev, next, "archivedAtMs");
 }
 
-/** Ids snoozed between two session sets: known and not snoozed before, snoozed now. */
+/** Ids snoozed between two thread sets: known and not snoozed before, snoozed now. */
 export function newlySnoozed(prev: ThreadsData, next: ThreadsData): string[] {
   return newlySet(prev, next, "snoozedUntilMs");
 }

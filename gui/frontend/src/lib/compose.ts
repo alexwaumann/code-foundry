@@ -51,7 +51,7 @@ export type WorktreeChoice = { kind: "new" } | { kind: "existing"; path: string 
 export type ProjectWorktree = Exclude<WorktreeChoice, { kind: "members" }>;
 
 /**
- * Where a project's new thread works by default (sessions.default_worktree, and the
+ * Where a project's new thread works by default (threads.default_worktree, and the
  * choice remembered per project): a fresh copy (a new worktree) or the project folder
  * itself (the main checkout).
  */
@@ -392,7 +392,7 @@ export function threadArgs(place: ThreadPlace, d: PromptArgsInput, attachments: 
   return args;
 }
 
-/** The session id in thread.new's result JSON (the created Session), or null. */
+/** The thread id in thread.new's result JSON (the created Thread), or null. */
 export function createdThreadId(resultJson: string): string | null {
   if (!resultJson) return null;
   try {

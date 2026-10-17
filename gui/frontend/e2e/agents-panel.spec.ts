@@ -102,7 +102,7 @@ test("view.panel.agents and the palette open it; a run ending moves only its row
   await mockPost("thread/agent-end?run=a1");
   await expect(agentRow(page, "a1")).toHaveAttribute("data-status", "done");
   await expect(agentRow(page, "a1").getByTestId("agent-status")).toHaveText("Done · just now");
-  await expect(agentRow(page, "a1").getByTestId("agent-summary")).toHaveText("Added task frame handling to the session store with 14 table tests; make check is green.");
+  await expect(agentRow(page, "a1").getByTestId("agent-summary")).toHaveText("Added task frame handling to the thread store with 14 table tests; make check is green.");
   await expect(surface(page).getByTestId("agents-count")).toHaveText("2 running · 5 this thread");
   // Never reordered by status.
   await expect(surface(page).getByTestId("agent-row")).toHaveCount(5);
@@ -200,7 +200,7 @@ test("the timeline: background and failed chips, live activity, and the end note
   const done = notes.last();
   await expect(done).not.toHaveAttribute("data-failed", "true");
   await expect(done.getByTestId("thread-agent-note-name")).toHaveText("PR 1: daemon task frames");
-  await expect(done.getByTestId("thread-agent-note-summary")).toHaveText("Added task frame handling to the session store with 14 table tests; make check is green.");
+  await expect(done.getByTestId("thread-agent-note-summary")).toHaveText("Added task frame handling to the thread store with 14 table tests; make check is green.");
   await expect(done).toContainText("just now");
 });
 

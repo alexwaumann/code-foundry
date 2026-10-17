@@ -256,7 +256,7 @@ describe("projectChipBranch", () => {
 });
 
 describe("helpers", () => {
-  it("createdThreadId reads the Session JSON", () => {
+  it("createdThreadId reads the Thread JSON", () => {
     expect(createdThreadId('{"id":"s-1a2b","worktreePath":"/x"}')).toBe("s-1a2b");
     expect(createdThreadId("")).toBeNull();
     expect(createdThreadId("not json")).toBeNull();

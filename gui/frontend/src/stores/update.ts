@@ -87,7 +87,7 @@ const actionCommands: Record<Exclude<UpdateAction, "restart">, string> = {
 };
 
 /**
- * Restart Now: app.restart installs a downloaded update, closes the sessions, asks the
+ * Restart Now: app.restart installs a downloaded update, closes the threads, asks the
  * window host to relaunch once the daemon has exited, and exits. The dialog is the confirmation, so it goes in with
  * confirmed set (no second confirm dialog). A daemon older than app.restart (absent
  * from the command list, or NotFound) gets daemon.restart and the host's own Relaunch.

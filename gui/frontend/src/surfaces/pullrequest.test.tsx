@@ -36,7 +36,7 @@ afterEach(() => {
 });
 
 describe("Pull request surface availability", () => {
-  it("follows the session's worktree when it switches to a branch with a pull request, and back", async () => {
+  it("follows the thread's worktree when it switches to a branch with a pull request, and back", async () => {
     render(<SidePanel />);
     const row = () => screen.getByTestId("panel-empty").querySelector('[data-surface="pullrequest"]');
     await vi.waitFor(() => {

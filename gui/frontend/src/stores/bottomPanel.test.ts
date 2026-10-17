@@ -38,7 +38,7 @@ function term(id: string, labels: Record<string, string>, extra: Partial<Termina
   return { id, argv: ["/bin/zsh"], cwd: "/src/app", cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: null, exitedAtMs: null, altScreen: false, labels, ...extra };
 }
 
-const shell = (thread: string, worktree = "/src/app") => ({ kind: "shell", repo: "r", worktree, ...(thread ? { thread: thread } : {}) });
+const shell = (thread: string, worktree = "/src/app") => ({ kind: "shell", repo: "r", worktree, ...(thread ? { thread } : {}) });
 
 function data(list: TerminalView[]): TerminalsData {
   return { byId: Object.fromEntries(list.map((t) => [t.id, t])), order: list.map((t) => t.id) };

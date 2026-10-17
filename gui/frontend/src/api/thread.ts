@@ -323,7 +323,7 @@ export function toThreadEventView(ev: ThreadEvent): ThreadEventView | null {
 /** Opens ThreadService.WatchThread for one thread and yields mapped events (a snapshot first) and HEARTBEAT for heartbeats. */
 export async function* watchThread(threadId: string, signal: AbortSignal, conn: DaemonConnection = daemon): AsyncGenerator<ThreadEventView | Heartbeat> {
   const c = await conn.client(ThreadService);
-  for await (const ev of c.watchThread({ threadId: threadId }, { signal })) {
+  for await (const ev of c.watchThread({ threadId }, { signal })) {
     if (ev.event.case === "heartbeat") {
       yield HEARTBEAT;
       continue;

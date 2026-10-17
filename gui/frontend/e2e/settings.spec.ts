@@ -136,7 +136,7 @@ test("changing a bool and an enum saves to the file and applies live", async ({ 
   await expect(autoName).toHaveAttribute("aria-checked", "true");
   await autoName.click();
   await expect(autoName).toHaveAttribute("aria-checked", "false");
-  await expect(page.getByText("Saved Name sessions automatically")).toBeVisible();
+  await expect(page.getByText("Saved Name threads automatically")).toBeVisible();
   await expect.poll(async () => (await mockSettings()).raw["threads.auto_name"]).toBe("false");
 
   await pick(page, "appearance.theme", "Light");
@@ -339,7 +339,7 @@ test("destructive commands ask first; cancel keeps, confirm runs", async ({ page
   };
   await remove();
   const dialog = page.getByTestId("confirm-dialog");
-  await expect(dialog).toContainText("Remove session s-3?");
+  await expect(dialog).toContainText("Remove thread s-3?");
   await dialog.getByTestId("confirm-cancel").click();
   await expect(dialog).toHaveCount(0);
   await expect(row(page, "s:s-3")).toBeVisible();

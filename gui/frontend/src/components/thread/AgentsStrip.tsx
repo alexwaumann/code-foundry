@@ -15,7 +15,7 @@ const LABEL = "shrink-0 font-medium whitespace-nowrap text-info";
  * ("2 agents and 1 shell running in the background"). With background subagents it also
  * names them ("name · activity") and offers "Agents ›" (view.panel.agents); with shells
  * only it is the sentence alone, behind a terminal icon. Shown only while
- * Session.background_agents_running or background_shells_running is above 0 and the
+ * Thread.background_agents_running or background_shells_running is above 0 and the
  * thread is not archived: foreground runs are covered by their spinning timeline rows.
  */
 export function AgentsStrip({ threadId }: { threadId: string }) {

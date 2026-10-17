@@ -5,7 +5,7 @@
  * at it first (recipe in docs/notes/phase2-integration.md).
  *
  * It spends two short Claude turns (opus "pong", haiku "ping"), writes their transcripts
- * under ~/.claude/projects/, and closes its sessions at the end.
+ * under ~/.claude/projects/, and closes its threads at the end.
  *
  * Env: LIVE_DAEMON=1, CODE_FOUNDRY_HOME (required); LIVE_BIN, LIVE_WORKTREE,
  * LIVE_APP_URL, LIVE_MODEL (default opus), LIVE_SHOTS (screenshot dir; unset = no
@@ -64,7 +64,7 @@ async function shot(page: Page, name: string): Promise<void> {
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, name) });
 }
 
-/** Records every distinct badge value of a session row, sampled every 50 ms in the page. */
+/** Records every distinct badge value of a thread row, sampled every 50 ms in the page. */
 async function recordBadge(page: Page, id: string): Promise<void> {
   await page.evaluate((sel) => {
     const w = window as unknown as {
@@ -104,16 +104,16 @@ test.skip(
   "live daemon e2e: set LIVE_DAEMON=1 (see playwright.live.config.ts)",
 );
 
-test("sessions end to end against the real daemon", async ({ page }) => {
+test("threads end to end against the real daemon", async ({ page }) => {
   expect(HOME, "CODE_FOUNDRY_HOME").not.toBe("");
   const created: string[] = [];
   try {
-    // (a) A session created from the CLI shows up in the sidebar, idle.
+    // (a) A thread created from the CLI shows up in the sidebar, idle.
     const s1 = JSON.parse(
       cli("thread", "new", "--worktree", WORKTREE, "--model", MODEL, "--json"),
     ) as LiveThread;
     created.push(s1.id);
-    await test.step("a: CLI-created session is listed idle", async () => {
+    await test.step("a: CLI-created thread is listed idle", async () => {
       await openApp(page);
       await expect(row(page, `s:${s1.id}`)).toBeVisible();
       await expect(badge(page, s1.id)).toHaveAttribute(
@@ -170,7 +170,7 @@ test("sessions end to end against the real daemon", async ({ page }) => {
     });
 
     // (c') The other half of the rule: a turn nobody watches ends as needs-attention
-    // "finished" in the CLI; showing the session in the GUI clears it to idle.
+    // "finished" in the CLI; showing the thread in the GUI clears it to idle.
     await test.step("c': an unwatched turn needs attention until viewed", async () => {
       await page.goto("about:blank"); // no GUI attached (thread.new would focus it)
       const s2 = JSON.parse(
@@ -278,8 +278,8 @@ test("sessions end to end against the real daemon", async ({ page }) => {
       expect(listThreads()).toHaveLength(before); // nothing was created
     });
 
-    // (f) `session focus` from the CLI selects the session in the GUI.
-    await test.step("f: CLI focus selects the session", async () => {
+    // (f) `thread focus` from the CLI selects the thread in the GUI.
+    await test.step("f: CLI focus selects the thread", async () => {
       await row(page, `s:${created[1] ?? ""}`).click();
       await expect(row(page, `s:${created[1] ?? ""}`)).toHaveAttribute(
         "aria-selected",

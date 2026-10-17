@@ -11,7 +11,7 @@ function nowSeconds(): number {
  * The composer's amber "Rate limited · retrying in 20 s (attempt 3 of 10)" line above the
  * prompt (docs/notes/api-retry-note.md; the rule is retryNote). Claude Code retries
  * failed API requests itself and says nothing when one goes through, so the line follows
- * the session's retry field: set by an api_retry frame, cleared by the next frame of any
+ * the thread's retry field: set by an api_retry frame, cleared by the next frame of any
  * other kind. The clock ticks every RETRY_RECHECK_MS only while a retry is pending.
  */
 export function RetryNote({ threadId }: { threadId: string }) {

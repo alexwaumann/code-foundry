@@ -302,7 +302,7 @@ export function startThreadWatch(threadId: string): () => void {
   };
 }
 
-/** Forgets the logs of threads that are gone (sessions removed). */
+/** Forgets the logs of threads that are gone (threads removed). */
 export function pruneThreadLogs(keep: (threadId: string) => boolean): void {
   useThreadStore.setState((s) => {
     const kept = Object.entries(s.logs).filter(([id]) => keep(id));

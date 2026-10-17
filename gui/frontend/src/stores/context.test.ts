@@ -99,7 +99,7 @@ describe("the sidebar list's keys", () => {
     expect(decodeThreadListKeys([encodeThreadListKey("s1", thread(o))])).toEqual([{ id: "s1", ...want }]);
   });
 
-  it("an unknown session decodes as an idle, unarchived, unsnoozed thread", () => {
+  it("an unknown thread decodes as an idle, unarchived, unsnoozed thread", () => {
     expect(decodeThreadListKeys([encodeThreadListKey("s9", undefined)])).toEqual([{ id: "s9", pinned: false, group: "idle", archivedAtMs: null, snoozedUntilMs: null }]);
   });
 
