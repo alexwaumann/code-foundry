@@ -43,7 +43,7 @@ func startGh(ctx context.Context, log *slog.Logger, store ghTracker, projects in
 	go func() {
 		defer wg.Done()
 		defer sub.Close()
-		slugs := map[string]string{} // repo id -> tracked slug
+		slugs := map[string]string{} // project id -> tracked slug
 		track := func(id, slug string) {
 			slug = strings.ToLower(slug)
 			if prev, ok := slugs[id]; ok && prev == slug {

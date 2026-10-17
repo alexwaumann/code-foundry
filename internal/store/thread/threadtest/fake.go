@@ -143,7 +143,7 @@ func (f *Fake) add(call string, s thread.Thread) (thread.Thread, error) {
 // NewWorktree the thread's worktree is /worktrees/cf-<N> (CreatedWorktree, BaseRef as
 // requested). WorkspaceID is copied as is. With NewWorkspace the thread belongs to
 // workspace "w-new" and runs in /worktrees/<project>, project being ProjectID or the first project.
-// With NoProject it runs in /home. The call reads "Create <repo> <path> <model>
+// With NoProject it runs in /home. The call reads "Create <project> <path> <model>
 // <effort>", then " perm=<n>", " new-worktree=<base>", " workspace=<id>",
 // " new-workspace=<a,b>", " no-project", " prompt=<text>"
 // " composer=<text>" and " attachments=<a,b>" when set.
@@ -374,8 +374,8 @@ func (f *Fake) Reconnect(_ context.Context, id string) (thread.Thread, error) {
 	})
 }
 
-// RunIn records "RunIn <id> <repo> <path>". It requires a workspace thread. A
-// disconnected thread moves at once to the path (else /worktrees/<repo>); a live one
+// RunIn records "RunIn <id> <project> <path>". It requires a workspace thread. A
+// disconnected thread moves at once to the path (else /worktrees/<project>); a live one
 // gets it as PendingWorktreePath.
 func (f *Fake) RunIn(_ context.Context, id string, t thread.RunInTarget) (thread.Thread, error) {
 	return f.mutate("RunIn "+id+" "+t.ProjectID+" "+t.WorktreePath, id, func(s *thread.Thread) error {

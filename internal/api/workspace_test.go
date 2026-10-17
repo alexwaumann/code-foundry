@@ -73,7 +73,7 @@ func TestWorkspaceUnaryAndErrorCodes(t *testing.T) {
 	}
 	rr, err := c.RemoveProject(ctx, connect.NewRequest(&v1.RemoveWorkspaceProjectRequest{Workspace: "login", Project: "api", Force: true}))
 	if err != nil || len(rr.Msg.GetWorkspace().GetMembers()) != 2 {
-		t.Fatalf("RemoveRepo = %v, %v", rr, err)
+		t.Fatalf("RemoveProject = %v, %v", rr, err)
 	}
 	if _, err := c.Remove(ctx, connect.NewRequest(&v1.RemoveWorkspaceRequest{Workspace: "w-1", DeleteBranch: true})); err != nil {
 		t.Fatal(err)

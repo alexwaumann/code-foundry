@@ -44,7 +44,7 @@ func (s *Thread) do(m proto.Message) error {
 
 // Create echoes the request as a STARTING thread "s1". With new_worktree the thread
 // is in /worktrees/s1 with created_worktree and base_ref set. workspace_id is echoed;
-// with new_workspace the thread belongs to "w-new" and runs in /worktrees/<repo>
+// with new_workspace the thread belongs to "w-new" and runs in /worktrees/<project>
 // (project_id, else the first project). With no_project it runs in /home.
 func (s *Thread) Create(_ context.Context, r *connect.Request[v1.CreateThreadRequest]) (*connect.Response[v1.CreateThreadResponse], error) {
 	if err := s.do(r.Msg); err != nil {

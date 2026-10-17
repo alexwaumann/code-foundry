@@ -568,7 +568,7 @@ func (g *Git) CreateWorktree(ctx context.Context, opts CreateWorktreeOptions) (W
 	}
 	path := opts.Path
 	if path == "" {
-		// Read origin now rather than m.GitHubSlug, which is empty until the repo's
+		// Read origin now rather than m.GitHubSlug, which is empty until the project's
 		// first reconcile after a daemon start.
 		slug := ""
 		if out, err := g.runner.Run(ctx, m.Path, "remote", "get-url", "origin"); err == nil {

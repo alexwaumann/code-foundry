@@ -45,7 +45,7 @@ type Options struct {
 	// Bus receives Event. Required.
 	Bus *bus.Bus
 	// Projects maps paths to projects and is refreshed after ref-moving operations. May be nil
-	// (no repo ids, slugs or refreshes).
+	// (no project ids, slugs or refreshes).
 	Projects Projects
 	Log      *slog.Logger
 	// Runner runs processes. Default ExecRunner{}.

@@ -191,7 +191,7 @@ func TestRegisterReportsProjectWorktreesAndStatus(t *testing.T) {
 	if !w.IsMain || w.Path != f.project || w.Branch != "main" || len(w.Head) != 40 || got != want {
 		t.Fatalf("main worktree = %+v", w)
 	}
-	if _, ok := h.waitFor("RepoUpdated", func(ev Event) bool { _, ok := ev.(ProjectUpdated); return ok }).(ProjectUpdated); !ok {
+	if _, ok := h.waitFor("ProjectUpdated", func(ev Event) bool { _, ok := ev.(ProjectUpdated); return ok }).(ProjectUpdated); !ok {
 		t.Fatal("no ProjectUpdated")
 	}
 
@@ -423,7 +423,7 @@ func TestExternalWorktreeAddAndRemoveAreDetected(t *testing.T) {
 	ext := filepath.Join(f.base, "ext")
 	// First linked worktree: creates .git/worktrees (event on the common dir).
 	git(t, f.project, "worktree", "add", "-q", "-b", "ext", ext)
-	h.waitFor("RepoUpdated with external worktree", func(ev Event) bool {
+	h.waitFor("ProjectUpdated with external worktree", func(ev Event) bool {
 		u, ok := ev.(ProjectUpdated)
 		return ok && u.Project.ID == r.ID && len(u.Project.Worktrees) == 2
 	})
@@ -474,7 +474,7 @@ func TestUnregisterAndReloadFromDB(t *testing.T) {
 	if err := h.store.Unregister(ctx, r1.ID); err != nil {
 		t.Fatal(err)
 	}
-	h.waitFor("RepoRemoved", func(ev Event) bool { rm, ok := ev.(ProjectRemoved); return ok && rm.ID == r1.ID })
+	h.waitFor("ProjectRemoved", func(ev Event) bool { rm, ok := ev.(ProjectRemoved); return ok && rm.ID == r1.ID })
 	if err := h.store.Unregister(ctx, r1.ID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("second unregister: %v", err)
 	}
@@ -577,14 +577,14 @@ func TestMissingProjectReportsErrorAndRecovers(t *testing.T) {
 	if err := os.Rename(f.project, moved); err != nil {
 		t.Fatal(err)
 	}
-	h.waitFor("repo error", func(ev Event) bool {
+	h.waitFor("project error", func(ev Event) bool {
 		u, ok := ev.(ProjectUpdated)
 		return ok && u.Project.ID == r.ID && u.Project.Error != "" && len(u.Project.Worktrees) == 0
 	})
 	if err := os.Rename(moved, f.project); err != nil {
 		t.Fatal(err)
 	}
-	h.waitFor("repo recovered", func(ev Event) bool {
+	h.waitFor("project recovered", func(ev Event) bool {
 		u, ok := ev.(ProjectUpdated)
 		return ok && u.Project.ID == r.ID && u.Project.Error == "" && len(u.Project.Worktrees) == 1
 	})

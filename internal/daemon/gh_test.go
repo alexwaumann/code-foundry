@@ -68,7 +68,7 @@ func TestStartGhTracksOnlyGitHubProjects(t *testing.T) {
 	}
 	waitTracked("acme/app")
 
-	// The local-only repo gains a GitHub origin, then loses it again.
+	// The local-only project gains a GitHub origin, then loses it again.
 	projects.Put(project.Project{ID: "local", Name: "momentum", GitHubSlug: "me/momentum", Remotes: []string{"origin"}})
 	waitTracked("acme/app", "me/momentum")
 	projects.Put(project.Project{ID: "local", Name: "momentum"})

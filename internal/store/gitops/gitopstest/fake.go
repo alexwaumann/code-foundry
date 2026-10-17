@@ -28,7 +28,7 @@ type Fake struct {
 	Fail string
 	// URL is set on every op's URL.
 	URL string
-	// Slugs maps a repo id or worktree path to its GitHub slug for GitHubSlug.
+	// Slugs maps a project id or worktree path to its GitHub slug for GitHubSlug.
 	Slugs map[string]string
 	// LocalOnlyProjects holds the project ids and worktree paths LocalOnly reports true for.
 	LocalOnlyProjects map[string]bool

@@ -39,14 +39,14 @@ type stores struct {
 	project  *project.Git
 	gh       *gh.Store
 	// cloner clones GitHub repositories into the projects dir and registers them in
-	// repo. It holds no resources: a clone in flight dies with its request.
+	// project. It holds no resources: a clone in flight dies with its request.
 	cloner *clone.Cloner
 	// projects creates new projects in the projects dir and publishes projects to
 	// GitHub with gh; like cloner, it holds no resources.
 	newProjects *newproject.Store
-	// stopGh cancels the gh poller and the repo→gh tracking glue, and waits for both.
+	// stopGh cancels the gh poller and the project→gh tracking glue, and waits for both.
 	stopGh func()
-	// gitops runs git/gh operations and refreshes repo afterwards; closed before repo.
+	// gitops runs git/gh operations and refreshes project afterwards; closed before project.
 	gitops *gitops.Manager
 	// terminal owns PTYs; closed first so every child gets hung up before the db goes.
 	terminal *terminal.Manager

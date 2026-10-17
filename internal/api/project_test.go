@@ -229,11 +229,11 @@ func TestProjectWatch(t *testing.T) {
 
 	r, _ := fake.Register(ctx, "/code/new")
 	if got := next().GetProjectUpdated(); got.GetId() != r.ID {
-		t.Fatalf("want repo_updated %s, got %v", r.ID, got)
+		t.Fatalf("want project_updated %s, got %v", r.ID, got)
 	}
 	w, _ := fake.CreateWorktree(ctx, project.CreateWorktreeOptions{ProjectID: r.ID, Branch: "x"})
 	if got := next().GetProjectUpdated(); len(got.GetWorktrees()) != 2 {
-		t.Fatalf("want repo_updated with 2 worktrees, got %v", got)
+		t.Fatalf("want project_updated with 2 worktrees, got %v", got)
 	}
 	w.Status.Modified = 1
 	fake.UpdateWorktree(w)
@@ -247,7 +247,7 @@ func TestProjectWatch(t *testing.T) {
 	next() // project_updated after removal
 	_ = fake.Unregister(ctx, r.ID)
 	if got := next().GetProjectRemovedId(); got != r.ID {
-		t.Fatalf("want repo_removed_id, got %v", got)
+		t.Fatalf("want project_removed_id, got %v", got)
 	}
 }
 

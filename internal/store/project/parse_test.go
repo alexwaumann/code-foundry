@@ -257,6 +257,6 @@ func TestDefaultWorktreePathAndID(t *testing.T) {
 	}
 	id := projectID("/Users/a/code/foundry")
 	if len(id) != idLen || id != projectID("/Users/a/code/foundry") || id == projectID("/Users/a/code/other") {
-		t.Fatalf("repoID not stable/distinct: %q", id)
+		t.Fatalf("projectID not stable/distinct: %q", id)
 	}
 }

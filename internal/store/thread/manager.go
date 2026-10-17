@@ -724,7 +724,7 @@ func (m *Manager) claudeCommand(s Thread, l launch, g grants) (argv, env []strin
 	}
 	env = append(slices.Clip(m.opts.Env), paths.EnvThread+"="+s.ID)
 	if s.WorkspaceID != "" {
-		// The current members, every spawn (create, reconnect, fork): a repo added to
+		// The current members, every spawn (create, reconnect, fork): a project added to
 		// the workspace since the row was written is included.
 		var ws *workspace.Snapshot
 		if m.opts.Workspaces != nil {

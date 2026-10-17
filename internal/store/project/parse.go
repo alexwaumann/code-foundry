@@ -268,7 +268,7 @@ func worktreeDirName(branch string) string {
 	return strings.ReplaceAll(branch, "/", "-")
 }
 
-// localOwner is the owner directory for repos without a GitHub origin. GitHub owner
+// localOwner is the owner directory for projects without a GitHub origin. GitHub owner
 // names cannot start with "_", so it never collides with a real owner.
 const localOwner = "_local"
 

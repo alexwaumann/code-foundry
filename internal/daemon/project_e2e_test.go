@@ -142,7 +142,7 @@ func TestProjectServiceEndToEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 	id := reg.Msg.GetProject().GetId()
-	waitFor("repo_updated", func(ev *v1.ProjectEvent) bool { return ev.GetProjectUpdated().GetId() == id })
+	waitFor("project_updated", func(ev *v1.ProjectEvent) bool { return ev.GetProjectUpdated().GetId() == id })
 
 	list, err := c.List(cctx, connect.NewRequest(&v1.ListProjectsRequest{}))
 	if err != nil || len(list.Msg.GetProjects()) != 1 {
@@ -195,7 +195,7 @@ func TestProjectServiceEndToEnd(t *testing.T) {
 	if _, err := c.Unregister(cctx, connect.NewRequest(&v1.UnregisterProjectRequest{Id: id})); err != nil {
 		t.Fatal(err)
 	}
-	waitFor("repo_removed", func(ev *v1.ProjectEvent) bool { return ev.GetProjectRemovedId() == id })
+	waitFor("project_removed", func(ev *v1.ProjectEvent) bool { return ev.GetProjectRemovedId() == id })
 
 	// Shutdown must not wait out the 5s graceful timeout for the open Watch stream.
 	start := time.Now()

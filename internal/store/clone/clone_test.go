@@ -181,7 +181,7 @@ func TestClone(t *testing.T) {
 				t.Fatal(err)
 			default:
 				if r.Path != dest || !reflect.DeepEqual(got, progress) {
-					t.Fatalf("repo %+v, progress %+v", r, got)
+					t.Fatalf("project %+v, progress %+v", r, got)
 				}
 			}
 			if ran := tt.runner.ncalls() > 0; ran != tt.wantRun {

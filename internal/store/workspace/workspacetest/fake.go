@@ -26,7 +26,7 @@ type Fake struct {
 	// Projects, when set, is joined into Members (project names, branches). Nil: members
 	// are reported with no project name and Missing.
 	Projects func() *project.Snapshot
-	// WorktreeRoot is where member worktrees "are": <root>/<repo>/<branch, / -> ->.
+	// WorktreeRoot is where member worktrees "are": <root>/<project>/<branch, / -> ->.
 	WorktreeRoot string
 	// MakeDirs makes Create create the member worktrees' directories, for callers that
 	// start processes in them.

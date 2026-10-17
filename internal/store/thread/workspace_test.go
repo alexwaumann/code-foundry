@@ -180,7 +180,7 @@ func TestCreateNewWorkspace(t *testing.T) {
 		wantBase    string // thread base ref; default: the request's
 		wantErr     error
 	}{
-		{name: "title names the thread, its slug the branch and workspace; first repo is the cwd",
+		{name: "title names the thread, its slug the branch and workspace; first project is the cwd",
 			o:        CreateOptions{InitialPrompt: "fix login", NewWorkspace: &NewWorkspace{Projects: []string{"r1", "api"}}},
 			wantCall: "Create named-fix r1,r2", wantBranch: "cf/named-fix", wantProject: "r1", wantName: "Named fix"},
 		{name: "project picks the cwd member, by name too",
@@ -334,7 +334,7 @@ func TestWorkspaceThreadSpawn(t *testing.T) {
 	e.writeTranscript(cid, userLine("hi"))
 	e.waitFor(s.ID, "discovered", func(s Thread) bool { return s.ClaudeSessionID == cid })
 
-	// A repo added since: reconnect and fork see it. A member whose worktree is gone is
+	// A project added since: reconnect and fork see it. A member whose worktree is gone is
 	// skipped (claude refuses a missing --add-dir).
 	lib := filepath.Join(t.TempDir(), "lib")
 	if err := os.MkdirAll(lib, 0o755); err != nil {

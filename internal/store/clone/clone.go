@@ -73,7 +73,7 @@ type Options struct {
 	// AllowedRoot is the directory every project must lie under (the resolved user
 	// home). Empty skips the check (the project store still enforces it on register).
 	AllowedRoot string
-	// Repos registers finished clones. Required.
+	// Projects registers finished clones. Required.
 	Projects Registrar
 	// Gh is the gh binary; "gh" from PATH when empty.
 	Gh string

@@ -34,7 +34,7 @@ type GitOpsDeps struct {
 	// Backend runs the operations. Nil registers the commands against
 	// UnimplementedGitOpsServiceHandler.
 	Backend GitOpsBackend
-	// GitHubSlug returns the GitHub "owner/name" of the context's worktree (or repo), or
+	// GitHubSlug returns the GitHub "owner/name" of the context's worktree (or project), or
 	// "". pr.* are available only when it is non-empty. Nil means never.
 	GitHubSlug func(Context) string
 	// LocalOnly reports whether the context's worktree (or project) belongs to a registered

@@ -179,7 +179,7 @@ type Store interface {
 	OpenEditor(ctx context.Context, worktreePath string) (Op, error)
 	Reveal(ctx context.Context, worktreePath string) (Op, error)
 	OpenURL(ctx context.Context, url string) (Op, error)
-	// GitHubSlug returns the GitHub "owner/name" of the registered repo containing
+	// GitHubSlug returns the GitHub "owner/name" of the registered project containing
 	// worktreePath, else of project projectID, else "".
 	GitHubSlug(projectID, worktreePath string) string
 	// LocalOnly reports whether the registered project containing worktreePath (else project
@@ -194,7 +194,7 @@ func IsLocalOnly(r project.Project) bool {
 }
 
 // Projects is the part of the project store gitops uses: the snapshot to map a path to its
-// repo (id, slug, branch) and Refresh after operations that move refs. project.Store
+// project (id, slug, branch) and Refresh after operations that move refs. project.Store
 // satisfies it.
 type Projects interface {
 	Snapshot() *project.Snapshot
