@@ -55,7 +55,7 @@ them (screenshots below).
   are one segment.
 * **One PR.** The data and the mock already had six months (#156), so this is GUI only.
   The helpers, the component and the e2e rewrite only make sense together, and the tiles
-  had to go in the same change ([[overview-page-removed]]: no leftover entry points).
+  had to go in the same change: no leftover entry points.
 
 ## Gotchas
 
