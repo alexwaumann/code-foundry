@@ -8,17 +8,17 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { projectNameError, type PublishOwnerView } from "@/lib/publish";
 import { closePublishDialog, publishProject, usePublishDialogStore } from "@/stores/publish";
-import { useReposStore } from "@/stores/repos";
+import { useProjectsStore } from "@/stores/projects";
 import { PublishPicker } from "./PublishPicker";
 import { usePublishOwners, type PublishChoice } from "./usePublishOwners";
 
 /**
  * The body of the publish dialog for one project: owner, GitHub name (the project's by
- * default) and visibility, then repo.github.publish. A refusal shows gh's error under the
+ * default) and visibility, then project.github.publish. A refusal shows gh's error under the
  * picker and keeps everything as it was, so another choice can be tried.
  */
-function PublishBody({ repoId }: { repoId: string }) {
-  const project = useReposStore((s) => s.byId[repoId]?.name ?? "");
+function PublishBody({ projectId }: { projectId: string }) {
+  const project = useProjectsStore((s) => s.byId[projectId]?.name ?? "");
   const [name, setName] = useState(project);
   const nameId = useId();
   const [choice, setChoice] = useState<PublishChoice>({ owner: "", visibility: null });
@@ -38,7 +38,7 @@ function PublishBody({ repoId }: { repoId: string }) {
     setBusy(true);
     setError(null);
     try {
-      const msg = await publishProject({ repoId, owner: choice.owner, name, visibility: choice.visibility });
+      const msg = await publishProject({ projectId, owner: choice.owner, name, visibility: choice.visibility });
       toast.success(msg || `Published ${project}`);
       closePublishDialog();
     } catch (err) {
@@ -102,12 +102,12 @@ function PublishBody({ repoId }: { repoId: string }) {
   );
 }
 
-/** Publish to GitHub (repo.github.publish's presenter, and the overview's button). */
+/** Publish to GitHub (project.github.publish's presenter, and the overview's button). */
 export function PublishDialog() {
   const open = usePublishDialogStore((s) => s.open);
-  const repoId = usePublishDialogStore((s) => s.repoId);
+  const projectId = usePublishDialogStore((s) => s.projectId);
   const seq = usePublishDialogStore((s) => s.seq);
-  const project = useReposStore((s) => s.byId[repoId]?.name ?? "");
+  const project = useProjectsStore((s) => s.byId[projectId]?.name ?? "");
   return (
     <Dialog
       open={open}
@@ -115,10 +115,10 @@ export function PublishDialog() {
         if (!o) closePublishDialog();
       }}
     >
-      <DialogContent className="max-w-lg p-4" data-testid="publish-dialog" data-repo={repoId}>
+      <DialogContent className="max-w-lg p-4" data-testid="publish-dialog" data-project={projectId}>
         <DialogTitle>Publish {project} to GitHub</DialogTitle>
         <DialogDescription className="sr-only">Pick the owner and visibility of the new GitHub repository.</DialogDescription>
-        {open && <PublishBody key={seq} repoId={repoId} />}
+        {open && <PublishBody key={seq} projectId={projectId} />}
       </DialogContent>
     </Dialog>
   );

@@ -5,7 +5,7 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-test("sidebar lists threads only; repos and worktrees are on the Projects page, shells in bottom panels", async ({ page }) => {
+test("sidebar lists threads only; projects and worktrees are on the Projects page, shells in bottom panels", async ({ page }) => {
   await openApp(page);
   const list = page.getByTestId("thread-list");
   // The waiting thread, the idle ones, then the working ones under Working. No terminal rows:
@@ -15,7 +15,7 @@ test("sidebar lists threads only; repos and worktrees are on the Projects page, 
   await expect.poll(() => list.locator('[data-row-kind="header"]').evaluateAll((els) => els.map((e) => e.getAttribute("data-section")))).toEqual(["working", "snoozed", "archived"]);
   await openProjects(page);
   await expect(page.getByTestId("project-name")).toHaveText(["code-foundry", "dotfiles", "ghostty-playground", "sketches", "writing"]);
-  await expect(page.locator('[data-testid="project"][data-repo="repo-cf"]').getByTestId("worktree-branch")).toHaveText(["main", "feat/sidebar", "fix/resize"]);
+  await expect(page.locator('[data-testid="project"][data-project="repo-cf"]').getByTestId("worktree-branch")).toHaveText(["main", "feat/sidebar", "fix/resize"]);
   await expect(page.getByTestId("daemon-status")).toContainText("mock");
 });
 
@@ -65,7 +65,7 @@ test("palette opens with cmd+k and lists only commands available in context", as
   await openApp(page);
   await page.keyboard.press("Meta+k");
   const palette = page.getByTestId("palette");
-  // thread.new is unavailable with nothing selected, but its project picker supplies the repo.
+  // thread.new is unavailable with nothing selected, but its project picker supplies the project.
   await expect(palette.locator('[data-command="thread.new"]')).toBeVisible();
   // A terminal belongs to a thread or a worktree: the dashboard offers none.
   await expect(palette.locator('[data-command="terminal.new"]')).toHaveCount(0);
@@ -129,7 +129,7 @@ test("invoking a command sends the current context", async ({ page }) => {
 
 test("required args are prompted inline before invoking", async ({ page }) => {
   await openApp(page);
-  // A thread on feat/sidebar: worktree.create takes its repo from the selection.
+  // A thread on feat/sidebar: worktree.create takes its project from the selection.
   await row(page, "s:s-4").click();
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("create worktree");
@@ -143,7 +143,7 @@ test("required args are prompted inline before invoking", async ({ page }) => {
   expect(last?.name).toBe("worktree.create");
   expect(last?.args).toEqual({ branch: "feat/palette" });
   expect(last?.context?.activeWorktreePath).toBe(`${CF}.worktrees/feat-sidebar`);
-  // The command emits FocusRepo for the new worktree, created under ~/.code-foundry/worktrees/<owner>/<repo>:
+  // The command emits FocusProject for the new worktree, created under ~/.code-foundry/worktrees/<owner>/<repo>:
   // the Projects page shows it in its side panel.
   await expect(page.getByTestId("projects-page")).toBeVisible();
   await expect(page.getByTestId("worktree-surface-title")).toHaveText("code-foundry@feat/palette");

@@ -1,14 +1,14 @@
 import { createElement } from "react";
 import { GitPullRequestArrow } from "lucide-react";
 import { LinkedPRsSurface } from "@/components/linkedprs/LinkedPRsSurface";
-import { useReposStore } from "@/stores/repos";
+import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
 import { LINKED_PRS_KIND, LINKED_PRS_TITLE, linkedPrsTab, selectionLinkedThread } from "./linkedprsTarget";
 import type { SurfaceSpec } from "./types";
 
 function thread(sel: Selection): string | null {
-  return selectionLinkedThread(sel, { repos: useReposStore.getState(), threads: useThreadsStore.getState() });
+  return selectionLinkedThread(sel, { projects: useProjectsStore.getState(), threads: useThreadsStore.getState() });
 }
 
 /**
@@ -25,8 +25,8 @@ export const linkedPrsSurface: SurfaceSpec = {
   icon: GitPullRequestArrow,
   hotkey: "l",
   available: (ctx) => (thread(ctx.selection) ? "enabled" : "hidden"),
-  // deriveContext reads the repos store too (placement); the links come from threads.
-  watches: [useThreadsStore, useReposStore],
+  // deriveContext reads the projects store too (placement); the links come from threads.
+  watches: [useThreadsStore, useProjectsStore],
   render: () => createElement(LinkedPRsSurface),
   openDefault: (ctx) => (thread(ctx.selection) ? linkedPrsTab() : null),
 };

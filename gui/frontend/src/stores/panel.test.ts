@@ -8,6 +8,7 @@ import {
   isPicking,
   keyOf,
   makeTab,
+  migratePanelV1,
   movePanelTab,
   moveTab,
   openSurface,
@@ -46,8 +47,8 @@ describe("keyOf", () => {
     ["none has no panel", { kind: "none" }, null],
     ["the dashboard has no panel", { kind: "view", name: "dashboard" }, null],
     ["thread", { kind: "thread", id: "s-1" }, "thread:s-1"],
-    ["composer", { kind: "compose", repoId: "r-1" }, "compose:r-1"],
-    ["workspace composer", { kind: "compose", repoId: "r-1", workspaceId: "w-1" }, "compose:ws:w-1"],
+    ["composer", { kind: "compose", projectId: "r-1" }, "compose:r-1"],
+    ["workspace composer", { kind: "compose", projectId: "r-1", workspaceId: "w-1" }, "compose:ws:w-1"],
     ["view", { kind: "view", name: "pullrequests" }, "view:pullrequests"],
   ];
   it.each(cases)("%s", (_name, sel, want) => {
@@ -68,6 +69,31 @@ describe("tabId", () => {
 
   it("is the same for equal params in any order", () => {
     expect(tabId("pullrequest", { a: "1", b: "2" })).toBe(tabId("pullrequest", { b: "2", a: "1" }));
+  });
+});
+
+describe("migratePanelV1", () => {
+  const old = { id: "worktree?path=%2Fsrc%2Fweb&repo=web", kind: "worktree", title: "web", params: { repo: "web", path: "/src/web" } };
+  const renamed = makeTab("worktree", "web", { project: "web", path: "/src/web" });
+
+  it("renames a tab's repo param to project and moves the ids that pointed at it", () => {
+    const got = migratePanelV1({
+      "thread:s-1": entry(true, [files, old], old.id),
+      "view:projects": picking([old, diff], old.id),
+      "thread:s-2": entry(false, [files, pr], pr.id),
+    });
+    expect(renamed.id).toBe("worktree?path=%2Fsrc%2Fweb&project=web");
+    expect(got["thread:s-1"]).toEqual(entry(true, [files, renamed], renamed.id));
+    expect(got["view:projects"]).toEqual(picking([renamed, diff], renamed.id));
+    expect(got["thread:s-2"]).toEqual(entry(false, [files, pr], pr.id));
+  });
+
+  it("rehydrates a version 1 store through it", async () => {
+    localStorage.setItem("code-foundry.panel", JSON.stringify({ version: 1, state: { byKey: { "thread:s-1": entry(true, [old], old.id) } } }));
+    await usePanelStore.persist.rehydrate();
+    expect(getPanel("thread:s-1")).toEqual(entry(true, [renamed], renamed.id));
+    localStorage.clear();
+    usePanelStore.setState({ byKey: {} });
   });
 });
 

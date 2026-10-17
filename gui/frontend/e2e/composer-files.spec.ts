@@ -3,12 +3,12 @@ import { invocations, mockPost, mockUrl, openApp, resetMock } from "./fixtures";
 
 // `@` file completion against the mock's SearchFiles (mock/filesystem.ts): each test sets
 // the projects' files with POST /__mock/files; the mock ranks like internal/fuzzy (tier,
-// then shorter path) and logs "search <repo> <query>" per request.
+// then shorter path) and logs "search <project> <query>" per request.
 
 const FILES = ["internal/api/thread.go", "gui/frontend/src/api/threads.ts", "internal/store/thread/fork.go", "README.md"];
 
-async function setFiles(repo: string, files: readonly string[]): Promise<void> {
-  await mockPost(`files?repo=${repo}&${files.map((f) => `path=${encodeURIComponent(f)}`).join("&")}`);
+async function setFiles(project: string, files: readonly string[]): Promise<void> {
+  await mockPost(`files?project=${project}&${files.map((f) => `path=${encodeURIComponent(f)}`).join("&")}`);
 }
 
 test.beforeEach(async () => {
@@ -38,7 +38,7 @@ async function newThreads(): Promise<number> {
   return (await invocations()).filter((i) => i.name === "thread.new").length;
 }
 
-/** The mock's SearchFiles calls ("search <repo> <query>"). */
+/** The mock's SearchFiles calls ("search <project> <query>"). */
 async function searches(): Promise<string[]> {
   const res = await fetch(`${mockUrl}/__mock/files/calls`);
   return ((await res.json()) as string[]).filter((c) => c.startsWith("search "));

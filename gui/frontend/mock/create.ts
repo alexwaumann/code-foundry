@@ -1,6 +1,6 @@
 /**
- * ProjectService.Create, ListPublishOwners, Publish and Delete, and the repo.create,
- * repo.github.publish and repo.delete commands (the Add Project dialog's New tab and the
+ * ProjectService.Create, ListPublishOwners, Publish and Delete, and the project.create,
+ * project.github.publish and project.delete commands (the Add Project dialog's New tab and the
  * publish dialog).
  *
  * - Create makes a git project on main at ~/.code-foundry/projects/<name>; the daemon's
@@ -38,10 +38,10 @@ export const GH_NAME_TAKEN = "GraphQL: Name already exists on this account (crea
 /** What World offers this module (mock/world.ts). */
 export interface ProjectWorld {
   projectPaths(): string[];
-  repoInfo(id: string): { name: string; path: string; git: boolean; remotes: string[] } | undefined;
+  projectInfo(id: string): { name: string; path: string; git: boolean; remotes: string[] } | undefined;
   addCreated(name: string, path: string): { id: string; name: string; path: string };
   setOrigin(id: string, slug: string): void;
-  removeRepo(id: string): void;
+  removeProject(id: string): void;
 }
 
 /** Every Create, Publish and Delete ("create <name>", "publish <id> <owner>/<name> <visibility>", "delete <id>"). */
@@ -55,18 +55,18 @@ export function listPublishOwners(): { owners: PublishOwnerInit[]; stale: boolea
   return { owners: publishOwners, stale: false };
 }
 
-/** ProjectService.Delete and repo.delete. */
+/** ProjectService.Delete and project.delete. */
 export function deleteProject(world: ProjectWorld, projectId: string): void {
   projectCalls.push(`delete ${projectId}`);
-  const repo = world.repoInfo(projectId);
-  if (!repo) throw new ConnectError(`project not found: "${projectId}"`, Code.NotFound);
-  if (repo.path.slice(0, repo.path.lastIndexOf("/")) !== PROJECTS) {
-    throw new ConnectError(`failed precondition: ${repo.path} is not in the projects directory ${PROJECTS}`, Code.FailedPrecondition);
+  const project = world.projectInfo(projectId);
+  if (!project) throw new ConnectError(`project not found: "${projectId}"`, Code.NotFound);
+  if (project.path.slice(0, project.path.lastIndexOf("/")) !== PROJECTS) {
+    throw new ConnectError(`failed precondition: ${project.path} is not in the projects directory ${PROJECTS}`, Code.FailedPrecondition);
   }
-  world.removeRepo(projectId);
+  world.removeProject(projectId);
 }
 
-/** ProjectService.Create and repo.create. */
+/** ProjectService.Create and project.create. */
 export function createProject(world: ProjectWorld, name: string): { id: string; name: string; path: string } {
   projectCalls.push(`create ${name}`);
   const why = projectNameError(name);
@@ -92,23 +92,23 @@ export function visibilityFlag(v: RepositoryVisibility): string {
   }
 }
 
-/** ProjectService.Publish and repo.github.publish. */
+/** ProjectService.Publish and project.github.publish. */
 export async function publishProject(world: ProjectWorld, projectId: string, owner: string, name: string, visibility: string): Promise<{ name: string; slug: string }> {
-  const repo = world.repoInfo(projectId);
-  if (!repo) throw new ConnectError(`project not found: "${projectId}"`, Code.NotFound);
-  const ghName = name || repo.name;
+  const project = world.projectInfo(projectId);
+  if (!project) throw new ConnectError(`project not found: "${projectId}"`, Code.NotFound);
+  const ghName = name || project.name;
   const vis = visibilityNames[visibility.toLowerCase()];
   projectCalls.push(`publish ${projectId} ${owner}/${ghName} ${visibility}`);
   if (!vis) throw new ConnectError(`invalid argument: visibility "${visibility}" (want public, internal or private)`, Code.InvalidArgument);
   if (!owner) throw new ConnectError("invalid argument: a GitHub owner is required", Code.InvalidArgument);
-  if (!repo.git) throw new ConnectError(`failed precondition: ${repo.name} is not a git repository; initialize git first`, Code.FailedPrecondition);
-  if (repo.remotes.includes("origin")) throw new ConnectError(`failed precondition: ${repo.name} already has an origin remote`, Code.FailedPrecondition);
+  if (!project.git) throw new ConnectError(`failed precondition: ${project.name} is not a git repository; initialize git first`, Code.FailedPrecondition);
+  if (project.remotes.includes("origin")) throw new ConnectError(`failed precondition: ${project.name} already has an origin remote`, Code.FailedPrecondition);
   await new Promise((r) => setTimeout(r, 400));
   if (owner === "octo-org" && vis === "private") throw new ConnectError(GH_PRIVATE_REFUSED, Code.Unknown);
   if (ghName.toLowerCase() === "taken") throw new ConnectError(GH_NAME_TAKEN, Code.Unknown);
   const slug = `${owner}/${ghName}`;
   world.setOrigin(projectId, slug);
-  return { name: repo.name, slug };
+  return { name: project.name, slug };
 }
 
 interface CommandEntry {
@@ -126,14 +126,14 @@ interface CommandEntry {
   run: (ctx: UiContext | undefined, args: Record<string, string>) => string | Promise<InvokeOut>;
 }
 
-/** repo.create, repo.github.publish and repo.delete, as internal/command/commands_repo_create.go. */
+/** project.create, project.github.publish and project.delete, as internal/command/commands_project_create.go. */
 export function projectCommands(world: ProjectWorld): CommandEntry[] {
   const publishable = (id: string): boolean => {
-    const r = world.repoInfo(id);
+    const r = world.projectInfo(id);
     return r !== undefined && r.git && !r.remotes.includes("origin");
   };
   const deletable = (id: string): boolean => {
-    const r = world.repoInfo(id);
+    const r = world.projectInfo(id);
     return r !== undefined && r.path.slice(0, r.path.lastIndexOf("/")) === PROJECTS;
   };
   return [

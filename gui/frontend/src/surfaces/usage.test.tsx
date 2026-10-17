@@ -7,7 +7,7 @@ vi.mock("sonner", () => ({ toast }));
 
 const { SidePanel } = await import("@/components/panel/SidePanel");
 const { getPanel, usePanelStore } = await import("@/stores/panel");
-const { useReposStore } = await import("@/stores/repos");
+const { useProjectsStore } = await import("@/stores/projects");
 const { useThreadsStore } = await import("@/stores/threads");
 const { useUiStore } = await import("@/stores/ui");
 const { showView, usagePanelCommand, useViewsStore } = await import("@/stores/views");
@@ -43,7 +43,7 @@ const FABLE = bucket("claude-fable-5-1", { requests: 122, input: 3100, output: 2
 const OLD = bucket("claude-opus-5", { requests: 14, cacheRead: 28_400_000, unpriced: true });
 
 const thread = (id: string, usage: UsageBucketView[]) =>
-  ({ id, name: `thread ${id}`, repoId: "web", worktreePath: "/src/web", workspaceId: "", pendingWorktreePath: "", terminalId: "", state: "connected", status: "idle", linkedPullRequests: [], usage, costUsd: 0, unpriced: false }) as unknown as ThreadView;
+  ({ id, name: `thread ${id}`, projectId: "web", worktreePath: "/src/web", workspaceId: "", pendingWorktreePath: "", terminalId: "", state: "connected", status: "idle", linkedPullRequests: [], usage, costUsd: 0, unpriced: false }) as unknown as ThreadView;
 
 function select(id: string): void {
   useUiStore.setState({ selection: { kind: "thread", id } });
@@ -54,7 +54,7 @@ const row = () => screen.queryByTestId("panel-empty")?.querySelector('[data-surf
 const pressU = () => fireEvent.keyDown(screen.getByTestId("side-panel"), { key: "u" });
 
 beforeEach(() => {
-  useReposStore.setState({ byId: {}, order: [] });
+  useProjectsStore.setState({ byId: {}, order: [] });
   useThreadsStore.setState({ byId: { "s-1": thread("s-1", [OPUS_A, FABLE, OPUS_B]), "s-0": thread("s-0", []), "s-x": thread("s-x", [OLD]) }, order: ["s-1", "s-0", "s-x"] });
   usePanelStore.setState({ byKey: { "thread:s-1": { open: true, tabs: [], activeTabId: null }, "thread:s-0": { open: true, tabs: [], activeTabId: null }, "thread:s-x": { open: true, tabs: [], activeTabId: null } } });
   useViewsStore.setState({ settingsOpen: false });

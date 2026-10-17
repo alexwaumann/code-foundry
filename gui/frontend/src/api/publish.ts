@@ -5,8 +5,8 @@ import { orOutdatedDaemon } from "./errors";
 
 /**
  * ProjectService.ListPublishOwners for the publish picker (the Add Project dialog's New tab
- * and the publish dialog). Creating and publishing go through repo.create and
- * repo.github.publish (stores/publish.ts).
+ * and the publish dialog). Creating and publishing go through project.create and
+ * project.github.publish (stores/publish.ts).
  */
 
 const visibilities: Partial<Record<RepositoryVisibility, Visibility>> = {

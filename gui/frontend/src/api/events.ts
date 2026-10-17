@@ -4,7 +4,7 @@ import { daemon, type DaemonConnection } from "./endpoint";
 import { HEARTBEAT, isPageVisible, type Heartbeat } from "./stream";
 import { toGhEventView, type GhEventView } from "./gh";
 import { toGitOpsEventView, type GitOpsEventView } from "./gitops";
-import { toRepoEventView, type RepoEventView } from "./repo";
+import { toProjectEventView, type ProjectEventView } from "./project";
 import { toThreadListEventView, type ThreadListEventView } from "./threads";
 import { toSettingsSnapshotView, type SettingsSnapshotView } from "./settings";
 import { toTerminalEventView, type TerminalEventView } from "./terminal";
@@ -20,7 +20,7 @@ export type { GhEventView } from "./gh";
  * exactly one of these streams (HTTP/1.1 allows 6 connections per origin).
  */
 export type EventView =
-  | { source: "repo"; event: RepoEventView }
+  | { source: "project"; event: ProjectEventView }
   | { source: "workspace"; event: WorkspaceEventView }
   | { source: "terminal"; event: TerminalEventView }
   | { source: "threadList"; event: ThreadListEventView }
@@ -36,8 +36,8 @@ export function toEventView(ev: Event): EventView | null {
   const e = ev.event;
   switch (e.case) {
     case "project": {
-      const v = toRepoEventView(e.value);
-      return v && { source: "repo", event: v };
+      const v = toProjectEventView(e.value);
+      return v && { source: "project", event: v };
     }
     case "workspace": {
       const v = toWorkspaceEventView(e.value);

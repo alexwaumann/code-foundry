@@ -25,7 +25,7 @@ export interface LogEntryView {
 
 /** ProjectService.GetWorktreeDetail: a worktree against its base. */
 export interface WorktreeDetailView {
-  repoId: string;
+  projectId: string;
   path: string;
   baseRef: string;
   mergeBase: string;
@@ -40,7 +40,7 @@ export interface WorktreeDetailView {
 
 export function toWorktreeDetailView(d: WorktreeDetail): WorktreeDetailView {
   return {
-    repoId: d.projectId,
+    projectId: d.projectId,
     path: d.path,
     baseRef: d.baseRef,
     mergeBase: d.mergeBase,
@@ -70,9 +70,9 @@ export function toWorktreeDetailView(d: WorktreeDetail): WorktreeDetailView {
   };
 }
 
-export async function getWorktreeDetail(repoId: string, path: string, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<WorktreeDetailView> {
+export async function getWorktreeDetail(projectId: string, path: string, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<WorktreeDetailView> {
   const c = await conn.client(ProjectService);
-  const r = await c.getWorktreeDetail({ projectId: repoId, path }, { signal });
+  const r = await c.getWorktreeDetail({ projectId, path }, { signal });
   if (!r.detail) throw new Error("GetWorktreeDetail returned no detail");
   return toWorktreeDetailView(r.detail);
 }

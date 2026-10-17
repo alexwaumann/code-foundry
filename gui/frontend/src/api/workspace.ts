@@ -1,15 +1,15 @@
 import { timestampMs } from "@bufbuild/protobuf/wkt";
 import type { Workspace, WorkspaceEvent } from "@/gen/codefoundry/v1/workspace_pb";
 
-/** A member of a workspace: a repository and its worktree on the workspace branch. */
+/** A member of a workspace: a project and its worktree on the workspace branch. */
 export interface WorkspaceMemberView {
-  repoId: string;
+  projectId: string;
   worktreePath: string;
 }
 
 /**
  * View model for a workspace: one branch checked out as a worktree in several
- * repositories (docs/notes/workspaces-1-store.md). Generated types stay inside src/api.
+ * projects (docs/notes/workspaces-1-store.md). Generated types stay inside src/api.
  */
 export interface WorkspaceView {
   /** "w-" + 12 hex digits. */
@@ -33,7 +33,7 @@ export function toWorkspaceView(w: Workspace): WorkspaceView {
     id: w.id,
     name: w.name,
     branch: w.branch,
-    members: w.members.map((m) => ({ repoId: m.projectId, worktreePath: m.worktreePath })),
+    members: w.members.map((m) => ({ projectId: m.projectId, worktreePath: m.worktreePath })),
     createdAtMs: w.createdAt ? timestampMs(w.createdAt) : null,
   };
 }

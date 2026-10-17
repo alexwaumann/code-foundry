@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MOCK_TOKEN } from "../playwright.config";
-import { invocations, listRepos, mockUrl, openAddProjectDialog, openApp, openProjects, repoAt, resetMock } from "./fixtures";
+import { invocations, listProjects, mockUrl, openAddProjectDialog, openApp, openProjects, projectAt, resetMock } from "./fixtures";
 
 // The Add Project dialog (project.add): its entry points, the tab order, the Local folder
 // tab (ProjectService.Register with path completion; completion itself is e2e/paths.spec.ts),
@@ -64,7 +64,7 @@ test("every entry point opens the dialog", async ({ page }) => {
   await page.keyboard.press("Escape");
   await expect(dialog(page)).toHaveCount(0);
 
-  // project.clone in the palette opens it on GitHub instead of prompting for a repo.
+  // project.clone in the palette opens it on GitHub instead of prompting for a project.
   await openFromPalette(page, "project.clone");
   await expect(dialog(page)).toHaveAttribute("data-tab", "github");
   await expect(page.getByTestId("add-project-github-input")).toBeFocused();
@@ -94,12 +94,12 @@ test("every entry point opens the dialog", async ({ page }) => {
   await expect(dialog(page)).toHaveCount(0);
 
   // None of them invoked anything: the dialog is the GUI presentation of project.add.
-  expect((await invocations()).filter((i) => i.name.startsWith("repo."))).toEqual([]);
+  expect((await invocations()).filter((i) => i.name.startsWith("project."))).toEqual([]);
 });
 
 test("the project picker's empty state opens the dialog", async ({ page }) => {
-  const { projects: repos } = (await rpc("ProjectService/List", {})) as { projects: { id: string }[] };
-  for (const r of repos) {
+  const { projects: projects } = (await rpc("ProjectService/List", {})) as { projects: { id: string }[] };
+  for (const r of projects) {
     await rpc("CommandService/Invoke", { name: "project.unregister", context: { activeProjectId: r.id }, confirmed: true });
   }
   await openApp(page);
@@ -149,14 +149,14 @@ test("Local folder: Tab completes, Enter adds, and the new project opens", async
   await page.keyboard.press("Enter");
   await expect(dialog(page)).toHaveCount(0);
   // ProjectService.Register, not a command: "~" expanded, the trailing slash dropped.
-  expect(await repoAt("/Users/dev/src/new-app")).toMatchObject({ name: "new-app", git: true });
-  expect((await invocations()).filter((i) => i.name.startsWith("repo."))).toEqual([]);
+  expect(await projectAt("/Users/dev/src/new-app")).toMatchObject({ name: "new-app", git: true });
+  expect((await invocations()).filter((i) => i.name.startsWith("project."))).toEqual([]);
   await expect(page.getByTestId("worktree-surface-title")).toHaveText("new-app@main");
 });
 
 test("Local folder: a click opens a folder; only Enter and the button add", async ({ page }) => {
   await openApp(page);
-  const before = (await listRepos()).length;
+  const before = (await listProjects()).length;
   await openAddProjectDialog(page);
   const input = page.getByTestId("add-project-local-input");
   const message = page.getByTestId("add-project-local-message");
@@ -185,7 +185,7 @@ test("Local folder: a click opens a folder; only Enter and the button add", asyn
   await expect(input).toHaveAttribute("data-path", "~/src/code-foundry/");
   await expect(entry("docs")).toBeVisible();
   await expect(dialog(page)).toBeVisible();
-  expect((await listRepos()).length).toBe(before);
+  expect((await listProjects()).length).toBe(before);
 
   // The chevron shows on the highlighted (or hovered) row only.
   await page.mouse.move(0, 0);
@@ -202,7 +202,7 @@ test("Local folder: a click opens a folder; only Enter and the button add", asyn
   await expect(entry("Website")).toHaveAttribute("data-selected", "true");
   await page.keyboard.press("Enter");
   await expect(dialog(page)).toHaveCount(0);
-  expect(await repoAt("/Users/dev/src/Website")).toMatchObject({ name: "Website", git: true });
+  expect(await projectAt("/Users/dev/src/Website")).toMatchObject({ name: "Website", git: true });
 });
 
 test("Local folder: after a click, Enter adds the typed path, and so does the button", async ({ page }) => {
@@ -218,8 +218,8 @@ test("Local folder: after a click, Enter adds the typed path, and so does the bu
   await expect(page.locator('[data-testid="path-entry"][data-selected="true"]')).toHaveCount(0);
   await page.keyboard.press("Enter");
   await expect(dialog(page)).toHaveCount(0);
-  expect(await repoAt("/Users/dev/Documents")).toMatchObject({ name: "Documents", git: false });
-  expect(await repoAt("/Users/dev/Documents/Projects")).toBeUndefined();
+  expect(await projectAt("/Users/dev/Documents")).toMatchObject({ name: "Documents", git: false });
+  expect(await projectAt("/Users/dev/Documents/Projects")).toBeUndefined();
 
   // The button adds the typed path.
   await openAddProjectDialog(page);
@@ -229,18 +229,18 @@ test("Local folder: after a click, Enter adds the typed path, and so does the bu
   await expect(dialog(page)).toBeVisible();
   await page.getByTestId("add-project-local-submit").click();
   await expect(dialog(page)).toHaveCount(0);
-  expect(await repoAt("/Users/dev/src/Notebook")).toMatchObject({ name: "Notebook", git: false });
+  expect(await projectAt("/Users/dev/src/Notebook")).toMatchObject({ name: "Notebook", git: false });
 });
 
 test("Local folder: a plain folder has no git, and a folder inside a project opens that project", async ({ page }) => {
   await openApp(page);
-  const before = (await listRepos()).length;
+  const before = (await listProjects()).length;
   await openAddProjectDialog(page);
   const input = page.getByTestId("add-project-local-input");
   await input.fill("src/Notebook");
   await page.keyboard.press("Enter");
   await expect(dialog(page)).toHaveCount(0);
-  expect(await repoAt("/Users/dev/src/Notebook")).toMatchObject({ name: "Notebook", git: false });
+  expect(await projectAt("/Users/dev/src/Notebook")).toMatchObject({ name: "Notebook", git: false });
 
   // A folder that does not exist is refused in place.
   await openAddProjectDialog(page);
@@ -252,7 +252,7 @@ test("Local folder: a plain folder has no git, and a folder inside a project ope
   await input.fill("src/code-foundry/src");
   await page.keyboard.press("Enter");
   await expect(dialog(page)).toHaveCount(0);
-  expect((await listRepos()).length).toBe(before + 1);
+  expect((await listProjects()).length).toBe(before + 1);
 });
 
 test("GitHub: Enter looks up owner/repo and URLs; bad input is refused without a request", async ({ page }) => {
@@ -351,6 +351,6 @@ test("GitHub: an existing destination is added as a folder instead", async ({ pa
   await expect(page.getByTestId("add-project-clone-exists")).toBeVisible();
   await page.getByTestId("add-project-add-existing").click();
   await expect(dialog(page)).toHaveCount(0);
-  expect(await repoAt("/Users/dev/.code-foundry/projects/octo-org/already-here")).toMatchObject({ name: "already-here", git: true });
+  expect(await projectAt("/Users/dev/.code-foundry/projects/octo-org/already-here")).toMatchObject({ name: "already-here", git: true });
   await expect(page.getByTestId("worktree-surface-title")).toHaveText("already-here@main");
 });

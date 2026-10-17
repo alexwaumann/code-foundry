@@ -14,22 +14,22 @@ import { SnoozeRowItems } from "@/components/snooze/SnoozeMenu";
 import { beginRename } from "@/keys/bindings";
 import { worktreeBranch } from "@/lib/threadRow";
 import { newThreadTerminal } from "@/stores/bottomActions";
-import { useReposStore } from "@/stores/repos";
+import { useProjectsStore } from "@/stores/projects";
 import { archiveThread, forkThread, pinThread, removeThread, runThreadIn } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { showWorktreeInThread } from "@/stores/worktreePanel";
 
-function MemberItem({ threadId, repoId, path, current, queued }: { threadId: string; repoId: string; path: string; current: boolean; queued: boolean }) {
-  const name = useReposStore((s) => s.byId[repoId]?.name ?? repoId);
-  const branch = useReposStore((s) => worktreeBranch(s, repoId, path));
+function MemberItem({ threadId, projectId, path, current, queued }: { threadId: string; projectId: string; path: string; current: boolean; queued: boolean }) {
+  const name = useProjectsStore((s) => s.byId[projectId]?.name ?? projectId);
+  const branch = useProjectsStore((s) => worktreeBranch(s, projectId, path));
   return (
     <ContextMenuItem
       disabled={current}
-      data-member={repoId}
+      data-member={projectId}
       onSelect={() => {
-        void runThreadIn(threadId, repoId);
+        void runThreadIn(threadId, projectId);
       }}
     >
       <FolderGit2 className="text-info/90" />
@@ -49,7 +49,7 @@ function MemberItem({ threadId, repoId, path, current, queued }: { threadId: str
 function RunInMenu({ threadId, workspaceId }: { threadId: string; workspaceId: string }) {
   const cwd = useThreadsStore((s) => s.byId[threadId]?.worktreePath ?? "");
   const pending = useThreadsStore((s) => s.byId[threadId]?.pendingWorktreePath ?? "");
-  const members = useWorkspacesStore(useShallow((s) => (s.byId[workspaceId]?.members ?? []).map((m) => `${m.repoId}\u0000${m.worktreePath}`)));
+  const members = useWorkspacesStore(useShallow((s) => (s.byId[workspaceId]?.members ?? []).map((m) => `${m.projectId}\u0000${m.worktreePath}`)));
   const wsName = useWorkspacesStore((s) => s.byId[workspaceId]?.name ?? workspaceId);
   return (
     <ContextMenuSub>
@@ -60,8 +60,8 @@ function RunInMenu({ threadId, workspaceId }: { threadId: string; workspaceId: s
       <ContextMenuSubContent data-testid="menu-run-in-members">
         <ContextMenuLabel>{wsName}</ContextMenuLabel>
         {members.map((k) => {
-          const [repoId = "", path = ""] = k.split("\u0000");
-          return <MemberItem key={k} threadId={threadId} repoId={repoId} path={path} current={path === cwd} queued={path === pending} />;
+          const [projectId = "", path = ""] = k.split("\u0000");
+          return <MemberItem key={k} threadId={threadId} projectId={projectId} path={path} current={path === cwd} queued={path === pending} />;
         })}
       </ContextMenuSubContent>
     </ContextMenuSub>

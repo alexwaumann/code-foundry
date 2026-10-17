@@ -9,7 +9,7 @@ import { worktreeBranch } from "@/lib/threadRow";
 import { cn } from "@/lib/utils";
 import { branchKey, branchPullRequestsResource } from "@/stores/gh";
 import { openPullRequestInPanel } from "@/stores/prPanel";
-import { findWorktree, useReposStore } from "@/stores/repos";
+import { findWorktree, useProjectsStore } from "@/stores/projects";
 import { useResource } from "@/stores/resource";
 import { useThreadsStore } from "@/stores/threads";
 
@@ -18,9 +18,9 @@ import { useThreadsStore } from "@/stores/threads";
  * cached and kept polled by the daemon while shown): state, number and checks. Nothing
  * for a repository without a GitHub remote, a detached head, or the default branch.
  */
-function BranchPullRequest({ repoId, branch }: { repoId: string; branch: string }) {
-  const slug = useReposStore((s) => s.byId[repoId]?.githubSlug.toLowerCase() ?? "");
-  const isDefault = useReposStore((s) => s.byId[repoId]?.defaultBranch === branch);
+function BranchPullRequest({ projectId, branch }: { projectId: string; branch: string }) {
+  const slug = useProjectsStore((s) => s.byId[projectId]?.githubSlug.toLowerCase() ?? "");
+  const isDefault = useProjectsStore((s) => s.byId[projectId]?.defaultBranch === branch);
   const entry = useResource(branchPullRequestsResource, slug && branch && !isDefault ? branchKey(slug, branch) : null);
   const pr = entry?.data?.pullRequests[0];
   if (!pr) return null;
@@ -65,19 +65,19 @@ function WorktreeThreads({ path }: { path: string }) {
  * `showPath` also prints it after the branch. A folder without git shows its path always
  * (it has no branch to name it).
  */
-export function WorktreeState({ repoId, path, showPath = false }: { repoId: string; path: string; showPath?: boolean }) {
-  const branch = useReposStore((s) => worktreeBranch(s, repoId, path));
-  const realBranch = useReposStore((s) => findWorktree(s, repoId, path)?.branch ?? "");
-  const isMain = useReposStore((s) => findWorktree(s, repoId, path)?.isMain ?? false);
-  const missing = useReposStore((s) => findWorktree(s, repoId, path) === undefined);
-  const dirty = useReposStore((s) => findWorktree(s, repoId, path)?.status.dirty ?? false);
-  const changes = useReposStore((s) => {
-    const st = findWorktree(s, repoId, path)?.status;
+export function WorktreeState({ projectId, path, showPath = false }: { projectId: string; path: string; showPath?: boolean }) {
+  const branch = useProjectsStore((s) => worktreeBranch(s, projectId, path));
+  const realBranch = useProjectsStore((s) => findWorktree(s, projectId, path)?.branch ?? "");
+  const isMain = useProjectsStore((s) => findWorktree(s, projectId, path)?.isMain ?? false);
+  const missing = useProjectsStore((s) => findWorktree(s, projectId, path) === undefined);
+  const dirty = useProjectsStore((s) => findWorktree(s, projectId, path)?.status.dirty ?? false);
+  const changes = useProjectsStore((s) => {
+    const st = findWorktree(s, projectId, path)?.status;
     return st ? st.staged + st.modified + st.untracked : 0;
   });
-  const ahead = useReposStore((s) => findWorktree(s, repoId, path)?.status.ahead ?? 0);
-  const behind = useReposStore((s) => findWorktree(s, repoId, path)?.status.behind ?? 0);
-  const noGit = useReposStore((s) => s.byId[repoId]?.git === false);
+  const ahead = useProjectsStore((s) => findWorktree(s, projectId, path)?.status.ahead ?? 0);
+  const behind = useProjectsStore((s) => findWorktree(s, projectId, path)?.status.behind ?? 0);
+  const noGit = useProjectsStore((s) => s.byId[projectId]?.git === false);
   if (noGit) {
     // The folder itself: no branch, status or pull request to show.
     return (
@@ -132,8 +132,8 @@ export function WorktreeState({ repoId, path, showPath = false }: { repoId: stri
             </span>
           </Tip>
         )}
-        <CleanableTag repoId={repoId} path={path} />
-        {realBranch && <BranchPullRequest repoId={repoId} branch={realBranch} />}
+        <CleanableTag projectId={projectId} path={path} />
+        {realBranch && <BranchPullRequest projectId={projectId} branch={realBranch} />}
       </span>
     </span>
   );

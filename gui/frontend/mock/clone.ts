@@ -139,5 +139,5 @@ export async function* cloneRepo(world: World, owner: string, name: string, sign
     yield ev;
   }
   existing.add(dest.toLowerCase());
-  yield { event: { case: "project", value: world.repoMsg(world.addClone(f.owner, f.name, dest)) } };
+  yield { event: { case: "project", value: world.projectMsg(world.addClone(f.owner, f.name, dest)) } };
 }

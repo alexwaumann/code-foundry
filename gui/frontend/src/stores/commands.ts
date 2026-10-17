@@ -6,7 +6,7 @@ import { isGitOpFailure, isGitOpResult } from "@/api/gitops";
 import { errorMessage, isAbort } from "@/api/stream";
 import { requestConfirm } from "./confirm";
 import { contextKey, getUiContext } from "./context";
-import { useReposStore } from "./repos";
+import { useProjectsStore } from "./projects";
 import { useThreadsStore } from "./threads";
 import { useTerminalsStore } from "./terminals";
 import { useUiStore } from "./ui";
@@ -40,7 +40,7 @@ export async function refreshCommands(ctx: UiContextView = getUiContext()): Prom
   useCommandsStore.setState({ loading: true });
   try {
     // Unavailable ones too: thread.new's keybinding and title are needed with nothing
-    // selected, where the project picker supplies the repo (keys/bindings.ts).
+    // selected, where the project picker supplies the project (keys/bindings.ts).
     const fresh = await listCommands(ctx, { includeUnavailable: true, signal: ctl.signal });
     if (inflight !== ctl) return;
     // Keep the old array when nothing changed, so an open palette does not re-render
@@ -153,7 +153,7 @@ export function startCommandSync(debounceMs = 60): () => void {
     clearTimeout(timer);
     timer = setTimeout(() => void refreshCommands(ctx), debounceMs);
   };
-  const unsubs = [useUiStore.subscribe(check), useTerminalsStore.subscribe(check), useReposStore.subscribe(check), useThreadsStore.subscribe(check)];
+  const unsubs = [useUiStore.subscribe(check), useTerminalsStore.subscribe(check), useProjectsStore.subscribe(check), useThreadsStore.subscribe(check)];
   check();
   // Retry periodically while the list is failing (e.g. daemon restarting).
   const retry = setInterval(() => {

@@ -5,7 +5,7 @@
  * default.
  */
 
-/** A GitHub repository visibility, as gh's flags and repo.github.publish spell it. */
+/** A GitHub repository visibility, as gh's flags and project.github.publish spell it. */
 export type Visibility = "public" | "internal" | "private";
 
 /** Most open first: the order the picker lists them and picks a default in. */
@@ -13,7 +13,7 @@ export const visibilityOrder: readonly Visibility[] = ["public", "internal", "pr
 
 export const visibilityLabels: Record<Visibility, string> = { public: "Public", internal: "Internal", private: "Private" };
 
-/** Where the viewer can publish a repository (RepoService.ListPublishOwners). */
+/** Where the viewer can publish a repository (ProjectService.ListPublishOwners). */
 export interface PublishOwnerView {
   login: string;
   kind: "user" | "org";

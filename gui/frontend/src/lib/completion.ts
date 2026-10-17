@@ -41,7 +41,7 @@ export interface CompletionItem {
 /** A group of rows under an optional heading: a project (dot + name), "User", or a plain label ("Claude Code"). */
 export interface CompletionGroup {
   key: string;
-  heading: { kind: "project"; repoId: string } | { kind: "user" } | { kind: "label"; text: string } | null;
+  heading: { kind: "project"; projectId: string } | { kind: "user" } | { kind: "label"; text: string } | null;
   items: CompletionItem[];
 }
 
@@ -124,9 +124,9 @@ export function skillScore(s: Pick<SkillView, "name" | "description">, query: st
   return words.some((w) => w.startsWith(q)) ? 2 : 0;
 }
 
-/** A group of the card: a project's skills (repoId) or the user's (repoId ""). */
+/** A group of the card: a project's skills (projectId) or the user's (projectId ""). */
 export interface SkillGroup {
-  repoId: string;
+  projectId: string;
   skills: SkillView[];
 }
 
@@ -134,27 +134,27 @@ export interface SkillGroup {
  * The skills matching a query, grouped: the projects in member order, then the user's.
  * Within a group: best score first, then the daemon's order (by name). A skill listed
  * twice in one group (a skill and a command of the same name) shows once. Project
- * skills of a repo that is not a member are left out.
+ * skills of a project that is not a member are left out.
  */
 export function groupSkills(skills: readonly SkillView[], query: string, members: readonly string[]): SkillGroup[] {
   const order = [...members, ""];
   const buckets = new Map<string, { s: SkillView; score: number; i: number }[]>(order.map((id) => [id, []]));
   const seen = new Set<string>();
   skills.forEach((s, i) => {
-    const repoId = s.scope === "user" ? "" : s.repoId;
-    const bucket = buckets.get(repoId);
-    const key = `${repoId}\u0000${s.name}`;
+    const projectId = s.scope === "user" ? "" : s.projectId;
+    const bucket = buckets.get(projectId);
+    const key = `${projectId}\u0000${s.name}`;
     if (!bucket || seen.has(key)) return;
     const score = skillScore(s, query);
     if (score === 0) return;
     seen.add(key);
     bucket.push({ s, score, i });
   });
-  return order.flatMap((repoId) => {
-    const hits = buckets.get(repoId) ?? [];
+  return order.flatMap((projectId) => {
+    const hits = buckets.get(projectId) ?? [];
     if (hits.length === 0) return [];
     hits.sort((a, b) => b.score - a.score || a.i - b.i);
-    return [{ repoId, skills: hits.map((h) => h.s) }];
+    return [{ projectId, skills: hits.map((h) => h.s) }];
   });
 }
 
@@ -209,7 +209,7 @@ export function commandItems(commands: readonly SlashCommandView[], skills: read
   const order = [...members, USER, OTHER, BUILTIN];
   const buckets = new Map<string, { item: CompletionItem; score: number; i: number }[]>(order.map((k) => [k, []]));
   const scopeOf = (name: string): string | null => {
-    for (const m of members) if (skills.some((s) => s.scope === "project" && s.repoId === m && s.name === name)) return m;
+    for (const m of members) if (skills.some((s) => s.scope === "project" && s.projectId === m && s.name === name)) return m;
     return skills.some((s) => s.scope === "user" && s.name === name) ? USER : null;
   };
   const scores = commands.map((c) => commandScore(c, query));
@@ -226,7 +226,7 @@ export function commandItems(commands: readonly SlashCommandView[], skills: read
       label: `/${c.name}`,
       hint: c.argumentHint,
       detail: firstLine(c.description),
-      tag: scope === null ? `/${c.name}` : { tagKind: "skill", name: c.name, repoId: scope },
+      tag: scope === null ? `/${c.name}` : { tagKind: "skill", name: c.name, projectId: scope },
     };
     buckets.get(group)?.push({ item, score, i });
   });
@@ -235,7 +235,7 @@ export function commandItems(commands: readonly SlashCommandView[], skills: read
     if (key === USER) return { kind: "user" };
     if (key === OTHER) return { kind: "label", text: "Skills" };
     if (key === BUILTIN) return { kind: "label", text: "Claude Code" };
-    return multi ? { kind: "project", repoId: key } : null;
+    return multi ? { kind: "project", projectId: key } : null;
   };
   return order.flatMap((key) => {
     const hits = buckets.get(key) ?? [];
@@ -249,11 +249,11 @@ export function commandItems(commands: readonly SlashCommandView[], skills: read
 export interface SkillSourceInput {
   target: "project" | "workspace";
   /** The draft's projects in member order (lib/compose draftMembers). */
-  repoIds: readonly string[];
+  projectIds: readonly string[];
   /** The resolved worktree choice. */
   worktree: WorktreeChoice;
   /** A workspace's members and their worktrees. */
-  wsMembers: readonly { repoId: string; worktreePath: string }[];
+  wsMembers: readonly { projectId: string; worktreePath: string }[];
 }
 
 /**
@@ -262,19 +262,19 @@ export interface SkillSourceInput {
  * worktree (path left out). The daemon adds the user's.
  */
 export function skillSources(input: SkillSourceInput): SkillSourceView[] {
-  return input.repoIds.map((repoId) => {
+  return input.projectIds.map((projectId) => {
     if (input.target === "workspace") {
-      const path = input.wsMembers.find((m) => m.repoId === repoId)?.worktreePath;
-      return path ? { repoId, path } : { repoId };
+      const path = input.wsMembers.find((m) => m.projectId === projectId)?.worktreePath;
+      return path ? { projectId, path } : { projectId };
     }
-    if (input.repoIds.length === 1 && input.worktree.kind === "existing") return { repoId, path: input.worktree.path };
-    return { repoId };
+    if (input.projectIds.length === 1 && input.worktree.kind === "existing") return { projectId, path: input.worktree.path };
+    return { projectId };
   });
 }
 
 /** A stable key for a source list (the skills cache's key). */
 export function skillSourcesKey(sources: readonly SkillSourceView[]): string {
-  return sources.map((s) => `${s.repoId}\u0001${s.path ?? ""}`).join("\u0002");
+  return sources.map((s) => `${s.projectId}\u0001${s.path ?? ""}`).join("\u0002");
 }
 
 // ---- files -----------------------------------------------------------------------------
@@ -283,11 +283,11 @@ export function skillSourcesKey(sources: readonly SkillSourceView[]): string {
 export interface FileSourceInput {
   target: "project" | "workspace";
   /** The draft's projects in member order (lib/compose draftMembers). */
-  repoIds: readonly string[];
+  projectIds: readonly string[];
   /** The resolved worktree choice ("members": a workspace's own worktrees). */
   worktree: WorktreeChoice;
   /** A workspace's members and their worktrees. */
-  wsMembers: readonly { repoId: string; worktreePath: string }[];
+  wsMembers: readonly { projectId: string; worktreePath: string }[];
 }
 
 /**
@@ -297,13 +297,13 @@ export interface FileSourceInput {
  * project's main worktree (path left out), which the new worktrees start from.
  */
 export function fileSources(input: FileSourceInput): SkillSourceView[] {
-  return input.repoIds.map((repoId) => {
+  return input.projectIds.map((projectId) => {
     if (input.target === "workspace") {
-      const path = input.worktree.kind === "members" ? input.wsMembers.find((m) => m.repoId === repoId)?.worktreePath : undefined;
-      return path ? { repoId, path } : { repoId };
+      const path = input.worktree.kind === "members" ? input.wsMembers.find((m) => m.projectId === projectId)?.worktreePath : undefined;
+      return path ? { projectId, path } : { projectId };
     }
-    if (input.repoIds.length === 1 && input.worktree.kind === "existing") return { repoId, path: input.worktree.path };
-    return { repoId };
+    if (input.projectIds.length === 1 && input.worktree.kind === "existing") return { projectId, path: input.worktree.path };
+    return { projectId };
   });
 }
 
@@ -365,7 +365,7 @@ export function emphasis(path: string, query: string): [number, number][] {
 
 /** One checkout's answer to a search. */
 export interface FileResults {
-  repoId: string;
+  projectId: string;
   matches: readonly FileMatchView[];
 }
 
@@ -379,20 +379,20 @@ export interface FileResults {
 export function fileItems(results: readonly FileResults[], query: string, members: readonly string[], primary: string): CompletionGroup[] {
   const order = members.includes(primary) ? [primary, ...members.filter((m) => m !== primary)] : [...members];
   const multi = members.length > 1;
-  return order.flatMap((repoId): CompletionGroup[] => {
-    const matches = results.find((r) => r.repoId === repoId)?.matches ?? [];
+  return order.flatMap((projectId): CompletionGroup[] => {
+    const matches = results.find((r) => r.projectId === projectId)?.matches ?? [];
     if (matches.length === 0) return [];
     const items = matches.map((m): CompletionItem => {
       const base = m.path.slice(m.path.lastIndexOf("/") + 1);
       return {
-        key: `${repoId}/${m.path}${m.isDir ? "/" : ""}`,
+        key: `${projectId}/${m.path}${m.isDir ? "/" : ""}`,
         label: m.isDir ? `${base}/` : base,
         mono: true,
         detail: m.path,
         emphasis: emphasis(m.path, query),
-        tag: { tagKind: "file", repoId, path: m.isDir ? `${m.path}/` : m.path },
+        tag: { tagKind: "file", projectId, path: m.isDir ? `${m.path}/` : m.path },
       };
     });
-    return [{ key: repoId, heading: multi ? { kind: "project", repoId } : null, items }];
+    return [{ key: projectId, heading: multi ? { kind: "project", projectId } : null, items }];
   });
 }

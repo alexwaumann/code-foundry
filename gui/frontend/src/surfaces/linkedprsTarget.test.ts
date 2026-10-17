@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { LinkedPullRequestView, ThreadView } from "@/api/threads";
-import type { ReposData } from "@/stores/repos";
+import type { ProjectsData } from "@/stores/projects";
 import type { ThreadsData } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
 import { linkedCount, linkedPrsTab, newestFirst, prBadge, selectionLinkedThread, selectionThread, spansRepos, urlHost } from "./linkedprsTarget";
@@ -9,17 +9,17 @@ const WEB = "/src/web";
 const link = (slug: string, number: number, linkedAt: number | null = number): LinkedPullRequestView => ({ slug, number, url: `https://github.com/${slug}/pull/${String(number)}`, linkedAt });
 
 function thread(id: string, o: Partial<ThreadView> = {}): ThreadView {
-  return { id, repoId: "web", worktreePath: WEB, workspaceId: "", pendingWorktreePath: "", state: "connected", terminalId: "", linkedPullRequests: [], ...o } as ThreadView;
+  return { id, projectId: "web", worktreePath: WEB, workspaceId: "", pendingWorktreePath: "", state: "connected", terminalId: "", linkedPullRequests: [], ...o } as ThreadView;
 }
 
-const repos: ReposData = { byId: {}, order: [] };
+const projects: ProjectsData = { byId: {}, order: [] };
 
 function threads(...list: ThreadView[]): ThreadsData {
   return { byId: Object.fromEntries(list.map((s) => [s.id, s])), order: list.map((s) => s.id) };
 }
 
 const s = {
-  repos,
+  projects,
   threads: threads(thread("s-linked", { linkedPullRequests: [link("o/web", 5)], workspaceId: "w1" }), thread("s-bare")),
 };
 
@@ -28,7 +28,7 @@ describe("selectionThread / selectionLinkedThread (the surface's availability)",
     ["a thread with links", { kind: "thread", id: "s-linked" }, "s-linked", "s-linked"],
     ["a thread without links", { kind: "thread", id: "s-bare" }, "s-bare", null],
     ["an unknown thread", { kind: "thread", id: "s-404" }, null, null],
-    ["a composer", { kind: "compose", repoId: "web" }, null, null],
+    ["a composer", { kind: "compose", projectId: "web" }, null, null],
     ["a page", { kind: "view", name: "pullrequests" }, null, null],
     ["nothing", { kind: "none" }, null, null],
   ])("%s", (_name, sel, want, linked) => {

@@ -2,10 +2,10 @@ import { useShallow } from "zustand/react/shallow";
 import { Check, House, Layers } from "lucide-react";
 import { CommandGroup, CommandItem, CommandSeparator, CommandShortcut } from "@/components/ui/command";
 import { formatChord } from "@/keys/chord";
-import { draftKey, HOME_KEY, projectHue, projectInitials, repoSource } from "@/lib/compose";
+import { draftKey, HOME_KEY, projectHue, projectInitials, projectSource } from "@/lib/compose";
 import { tildify } from "@/lib/path";
 import { NO_PROJECT } from "@/lib/threadRow";
-import { useReposStore } from "@/stores/repos";
+import { useProjectsStore } from "@/stores/projects";
 import { useWorkspacesStore } from "@/stores/workspaces";
 
 /**
@@ -38,7 +38,7 @@ export function NoProjectBadge({ className }: { className?: string }) {
   );
 }
 
-/** cmdk value of a workspace row: its target's draftKey (project rows use the repo id). */
+/** cmdk value of a workspace row: its target's draftKey (project rows use the project id). */
 const workspaceValue = (workspaceId: string) => draftKey({ kind: "workspace", workspaceId });
 
 /** The check on the row of the picker's current target. */
@@ -47,11 +47,11 @@ function CurrentMark() {
 }
 
 function ProjectRow({ id, index, current, onPick }: { id: string; index?: number; current: boolean; onPick: (id: string) => void }) {
-  const name = useReposStore((s) => s.byId[id]?.name ?? id);
-  const path = useReposStore((s) => s.byId[id]?.path ?? "");
-  const source = useReposStore((s) => {
+  const name = useProjectsStore((s) => s.byId[id]?.name ?? id);
+  const path = useProjectsStore((s) => s.byId[id]?.path ?? "");
+  const source = useProjectsStore((s) => {
     const r = s.byId[id];
-    return r ? repoSource(r) : "";
+    return r ? projectSource(r) : "";
   });
   return (
     <CommandItem
@@ -80,9 +80,9 @@ function ProjectRow({ id, index, current, onPick }: { id: string; index?: number
 function WorkspaceRow({ id, current, onPick }: { id: string; current: boolean; onPick: (id: string) => void }) {
   const name = useWorkspacesStore((s) => s.byId[id]?.name ?? id);
   const branch = useWorkspacesStore((s) => s.byId[id]?.branch ?? "");
-  const memberIds = useWorkspacesStore(useShallow((s) => (s.byId[id]?.members ?? []).map((m) => m.repoId)));
-  // Member project names, in member order (repos the store does not know show their id).
-  const projects = useReposStore(useShallow((s) => memberIds.map((r) => s.byId[r]?.name ?? r)));
+  const memberIds = useWorkspacesStore(useShallow((s) => (s.byId[id]?.members ?? []).map((m) => m.projectId)));
+  // Member project names, in member order (projects the store does not know show their id).
+  const projects = useProjectsStore(useShallow((s) => memberIds.map((r) => s.byId[r]?.name ?? r)));
   return (
     <CommandItem
       value={workspaceValue(id)}

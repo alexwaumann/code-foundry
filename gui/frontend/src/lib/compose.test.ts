@@ -22,7 +22,7 @@ import {
   projectChipBranch,
   projectHue,
   projectInitials,
-  repoSource,
+  projectSource,
   threadNewArgs,
   threadArgs,
   threadPlace,
@@ -131,22 +131,22 @@ describe("workspaces", () => {
   const login = {
     id: "w-1",
     members: [
-      { repoId: "web", worktreePath: "/wt/web/cf-login" },
-      { repoId: "api", worktreePath: "/wt/api/cf-login" },
+      { projectId: "web", worktreePath: "/wt/web/cf-login" },
+      { projectId: "api", worktreePath: "/wt/api/cf-login" },
     ],
   };
-  const repos = new Set(["web", "api", "lib"]);
+  const projects = new Set(["web", "api", "lib"]);
   const env: PlaceEnv = {
     workspace: login,
-    isRepo: (id) => repos.has(id),
-    hasWorktree: (repoId, path) => repoId === "web" && path === "/src/web-fix",
+    isGitProject: (id) => projects.has(id),
+    hasWorktree: (projectId, path) => projectId === "web" && path === "/src/web-fix",
     defaultRef: "origin/main",
   };
-  const project: PlaceInput = { target: { kind: "project", repoId: "web" }, worktree: { kind: "new" }, base: null, alsoIn: [], primary: null };
+  const project: PlaceInput = { target: { kind: "project", projectId: "web" }, worktree: { kind: "new" }, base: null, alsoIn: [], primary: null };
   const workspace: PlaceInput = { target: { kind: "workspace", workspaceId: "w-1" }, worktree: { kind: "members" }, base: null, alsoIn: [], primary: null };
 
-  it("draft keys keep projects as repo ids and prefix workspaces", () => {
-    expect(draftKey({ kind: "project", repoId: "web" })).toBe("web");
+  it("draft keys keep projects as project ids and prefix workspaces", () => {
+    expect(draftKey({ kind: "project", projectId: "web" })).toBe("web");
     expect(draftKey({ kind: "workspace", workspaceId: "w-1" })).toBe("ws:w-1");
     expect(isWorkspaceKey("ws:w-1")).toBe(true);
     expect(isWorkspaceKey("web")).toBe(false);
@@ -155,7 +155,7 @@ describe("workspaces", () => {
   it("no project has its own draft key, no member and no primary", () => {
     expect(draftKey({ kind: "home" })).toBe(HOME_KEY);
     expect(isWorkspaceKey(HOME_KEY)).toBe(false);
-    expect(draftMembers({ target: { kind: "home" }, alsoIn: ["web"], primary: "web" }, login, (id) => repos.has(id))).toEqual({ repoIds: [], primary: "" });
+    expect(draftMembers({ target: { kind: "home" }, alsoIn: ["web"], primary: "web" }, login, (id) => projects.has(id))).toEqual({ projectIds: [], primary: "" });
   });
 
   it.each<[string, PlaceInput, string[], string]>([
@@ -166,36 +166,36 @@ describe("workspaces", () => {
     ["a workspace: its members, the first by default", workspace, ["web", "api"], "web"],
     ["a workspace primary", { ...workspace, primary: "api" }, ["web", "api"], "api"],
     ["a workspace ignores Also in", { ...workspace, alsoIn: ["lib"] }, ["web", "api"], "web"],
-  ])("draftMembers: %s", (_name, d, repoIds, primary) => {
-    expect(draftMembers(d, login, (id) => repos.has(id))).toEqual({ repoIds, primary });
+  ])("draftMembers: %s", (_name, d, projectIds, primary) => {
+    expect(draftMembers(d, login, (id) => projects.has(id))).toEqual({ projectIds, primary });
   });
 
   it.each<[string, PlaceInput, Partial<PlaceEnv>, ThreadPlace | null]>([
-    ["a project, new worktree, default base", project, {}, { kind: "project", repoId: "web", worktree: { kind: "new" }, base: "origin/main" }],
-    ["a project, existing worktree", { ...project, worktree: { kind: "existing", path: "/src/web-fix" } }, {}, { kind: "project", repoId: "web", worktree: { kind: "existing", path: "/src/web-fix" }, base: "origin/main" }],
-    ["a project whose chosen worktree is gone: a new one", { ...project, worktree: { kind: "existing", path: "/gone" } }, {}, { kind: "project", repoId: "web", worktree: { kind: "new" }, base: "origin/main" }],
+    ["a project, new worktree, default base", project, {}, { kind: "project", projectId: "web", worktree: { kind: "new" }, base: "origin/main" }],
+    ["a project, existing worktree", { ...project, worktree: { kind: "existing", path: "/src/web-fix" } }, {}, { kind: "project", projectId: "web", worktree: { kind: "existing", path: "/src/web-fix" }, base: "origin/main" }],
+    ["a project whose chosen worktree is gone: a new one", { ...project, worktree: { kind: "existing", path: "/gone" } }, {}, { kind: "project", projectId: "web", worktree: { kind: "new" }, base: "origin/main" }],
     [
       "Also in: a new workspace, every project's default base",
       { ...project, worktree: { kind: "existing", path: "/src/web-fix" }, alsoIn: ["api"] },
       {},
-      { kind: "new-workspace", repoIds: ["web", "api"], repoId: "web", base: "" },
+      { kind: "new-workspace", projectIds: ["web", "api"], projectId: "web", base: "" },
     ],
-    ["Also in with a picked base and another primary", { ...project, alsoIn: ["api"], primary: "api", base: "origin/dev" }, {}, { kind: "new-workspace", repoIds: ["web", "api"], repoId: "api", base: "origin/dev" }],
-    ["a workspace's worktrees: the primary member", { ...workspace, primary: "api" }, {}, { kind: "workspace", workspaceId: "w-1", repoId: "api", worktreePath: "/wt/api/cf-login" }],
-    ["a workspace in new-worktree mode: a new workspace with its projects", { ...workspace, worktree: { kind: "new" }, base: "origin/x" }, {}, { kind: "new-workspace", repoIds: ["web", "api"], repoId: "web", base: "origin/x" }],
+    ["Also in with a picked base and another primary", { ...project, alsoIn: ["api"], primary: "api", base: "origin/dev" }, {}, { kind: "new-workspace", projectIds: ["web", "api"], projectId: "api", base: "origin/dev" }],
+    ["a workspace's worktrees: the primary member", { ...workspace, primary: "api" }, {}, { kind: "workspace", workspaceId: "w-1", projectId: "api", worktreePath: "/wt/api/cf-login" }],
+    ["a workspace in new-worktree mode: a new workspace with its projects", { ...workspace, worktree: { kind: "new" }, base: "origin/x" }, {}, { kind: "new-workspace", projectIds: ["web", "api"], projectId: "web", base: "origin/x" }],
     ["a workspace that is gone", workspace, { workspace: undefined }, null],
     ["a workspace with no members", workspace, { workspace: { id: "w-1", members: [] } }, null],
     [
       "a project without git: its current checkout, whatever the draft says",
-      { ...project, target: { kind: "project", repoId: "notes" }, alsoIn: ["api"], base: "origin/dev" },
+      { ...project, target: { kind: "project", projectId: "notes" }, alsoIn: ["api"], base: "origin/dev" },
       { noGitCheckout: (id) => (id === "notes" ? "/src/notes" : undefined) },
-      { kind: "project", repoId: "notes", worktree: { kind: "existing", path: "/src/notes" }, base: "" },
+      { kind: "project", projectId: "notes", worktree: { kind: "existing", path: "/src/notes" }, base: "" },
     ],
     [
       "a git project is unaffected by noGitCheckout",
       project,
       { noGitCheckout: (id) => (id === "notes" ? "/src/notes" : undefined) },
-      { kind: "project", repoId: "web", worktree: { kind: "new" }, base: "origin/main" },
+      { kind: "project", projectId: "web", worktree: { kind: "new" }, base: "origin/main" },
     ],
   ])("threadPlace: %s", (_name, d, over, want) => {
     expect(threadPlace(d, { ...env, ...over })).toEqual(want);
@@ -205,17 +205,17 @@ describe("workspaces", () => {
   it.each<[string, ThreadPlace, Record<string, string>]>([
     [
       "a workspace member",
-      { kind: "workspace", workspaceId: "w-1", repoId: "api", worktreePath: "/wt/api/cf-login" },
+      { kind: "workspace", workspaceId: "w-1", projectId: "api", worktreePath: "/wt/api/cf-login" },
       { project: "api", workspace: "w-1", worktree: "/wt/api/cf-login", model: "haiku", effort: "medium", permission: "auto", prompt: "Fix login" },
     ],
     [
       "a new workspace, default bases",
-      { kind: "new-workspace", repoIds: ["web", "api"], repoId: "web", base: "" },
+      { kind: "new-workspace", projectIds: ["web", "api"], projectId: "web", base: "" },
       { project: "web", "new-worktree": "true", projects: "web,api", model: "haiku", effort: "medium", permission: "auto", prompt: "Fix login" },
     ],
     [
       "a new workspace, the primary's own base",
-      { kind: "new-workspace", repoIds: ["web", "api"], repoId: "api", base: "origin/dev" },
+      { kind: "new-workspace", projectIds: ["web", "api"], projectId: "api", base: "origin/dev" },
       { project: "api", "new-worktree": "true", projects: "web,api:origin/dev", model: "haiku", effort: "medium", permission: "auto", prompt: "Fix login" },
     ],
   ])("threadArgs: %s", (_name, place, want) => {
@@ -223,7 +223,7 @@ describe("workspaces", () => {
   });
 
   it("threadArgs passes the composer's text with a prompt only", () => {
-    const place: ThreadPlace = { kind: "workspace", workspaceId: "w-1", repoId: "api", worktreePath: "/wt" };
+    const place: ThreadPlace = { kind: "workspace", workspaceId: "w-1", projectId: "api", worktreePath: "/wt" };
     expect(threadArgs(place, { ...prompt, text: "/tdd go", composerText: " [/tdd](cf-skill://~/tdd) go " }, [])).toMatchObject({ prompt: "/tdd go", "composer-prompt": "[/tdd](cf-skill://~/tdd) go" });
     expect(threadArgs(place, { ...prompt, text: " ", composerText: "x" }, [])).not.toHaveProperty("composer-prompt");
     expect(threadArgs(place, { ...prompt, text: "no tags", composerText: "no tags" }, [])).not.toHaveProperty("composer-prompt");
@@ -345,8 +345,8 @@ describe("helpers", () => {
     [{ githubSlug: "alexwaumann/app", remotes: ["origin"] }, "alexwaumann/app"],
     [{ githubSlug: "", remotes: ["gitlab", "origin"] }, "origin"],
     [{ githubSlug: "", remotes: ["upstream"] }, "upstream"],
-  ])("repoSource(%j) = %s", (r, want) => {
-    expect(repoSource(r)).toBe(want);
+  ])("projectSource(%j) = %s", (r, want) => {
+    expect(projectSource(r)).toBe(want);
   });
 
   it("projectHue is stable and in range", () => {
@@ -359,7 +359,7 @@ describe("helpers", () => {
 });
 
 describe("movedDraft", () => {
-  const proj = (repoId: string): ComposeTarget => ({ kind: "project", repoId });
+  const proj = (projectId: string): ComposeTarget => ({ kind: "project", projectId });
   const ws = (workspaceId: string): ComposeTarget => ({ kind: "workspace", workspaceId });
   // repo-wr is the project without git.
   const isGit = (id: string) => id !== "repo-wr";
@@ -407,8 +407,8 @@ describe("movedDraft", () => {
     expect(got).toMatchObject({ ...carried, ...want });
   });
 
-  const sk = (repoId: string) => tagToken({ tagKind: "skill", name: "deploy", repoId });
-  const fl = (repoId: string) => tagToken({ tagKind: "file", repoId, path: "src/a.ts" });
+  const sk = (projectId: string) => tagToken({ tagKind: "skill", name: "deploy", projectId });
+  const fl = (projectId: string) => tagToken({ tagKind: "file", projectId, path: "src/a.ts" });
   const img = tagToken({ tagKind: "image", id: "a1", name: "x.png" });
   it.each<[string, Partial<MovableDraft>, ComposeTarget, ComposeTarget, string[], string]>([
     ["the old project's tags go; images and user skills stay", { text: `Use ${sk("repo-cf")} on ${fl("repo-cf")} with ${img} ${sk("")}` }, proj("repo-cf"), proj("repo-gp"), [], `Use on with ${img} ${sk("")}`],

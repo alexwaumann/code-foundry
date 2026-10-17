@@ -7,10 +7,10 @@
 import { create } from "zustand";
 
 export type ActionEditorTarget =
-  /** A new action for project `repoId`; `from` words the description (a thread's header or the Projects page). */
-  | { mode: "new"; repoId: string; from: "thread" | "projects" }
+  /** A new action for project `projectId`; `from` words the description (a thread's header or the Projects page). */
+  | { mode: "new"; projectId: string; from: "thread" | "projects" }
   /** An existing action. */
-  | { mode: "edit"; actionId: string; repoId: string; from: "thread" | "projects" };
+  | { mode: "edit"; actionId: string; projectId: string; from: "thread" | "projects" };
 
 interface ActionDialogState {
   editor: ActionEditorTarget | null;

@@ -8,7 +8,7 @@
 import type { ThreadView } from "@/api/threads";
 import { deriveContext } from "@/stores/context";
 import { makeTab, type Tab } from "@/stores/panel";
-import type { ReposData } from "@/stores/repos";
+import type { ProjectsData } from "@/stores/projects";
 import type { ThreadsData } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
 
@@ -16,7 +16,7 @@ export const WORKSPACE_KIND = "workspace";
 export const WORKTREE_KIND = "worktree";
 
 export interface SelectionStores {
-  repos: ReposData;
+  projects: ProjectsData;
   threads: ThreadsData;
 }
 
@@ -33,25 +33,25 @@ export interface WorkspaceThread {
  */
 export function selectionWorkspaceThread(sel: Selection, s: SelectionStores): WorkspaceThread | null {
   if (sel.kind !== "thread") return null;
-  const ctx = deriveContext(sel, s.repos, s.threads);
+  const ctx = deriveContext(sel, s.projects, s.threads);
   return ctx.activeThreadId && ctx.activeWorkspaceId ? { threadId: ctx.activeThreadId, workspaceId: ctx.activeWorkspaceId } : null;
 }
 
 /** A worktree: the project it belongs to and its path. */
 export interface WorktreeTarget {
-  repoId: string;
+  projectId: string;
   path: string;
 }
 
 /**
  * The worktree the selection's thread runs in, placed in a registered worktree
- * (deriveContext's activeRepoId + activeWorktreePath). Null for a worktree or repo page (the overview is the content
+ * (deriveContext's activeProjectId + activeWorktreePath). Null for a worktree or project page (the overview is the content
  * already), a top-level page, a composer, or a thread whose cwd is in no worktree.
  */
 export function selectionWorktree(sel: Selection, s: SelectionStores): WorktreeTarget | null {
   if (sel.kind !== "thread") return null;
-  const ctx = deriveContext(sel, s.repos, s.threads);
-  return ctx.activeRepoId && ctx.activeWorktreePath ? { repoId: ctx.activeRepoId, path: ctx.activeWorktreePath } : null;
+  const ctx = deriveContext(sel, s.projects, s.threads);
+  return ctx.activeProjectId && ctx.activeWorktreePath ? { projectId: ctx.activeProjectId, path: ctx.activeWorktreePath } : null;
 }
 
 /** The workspace surface's tab: params { workspace }, titled with the workspace's name. */
@@ -65,12 +65,12 @@ export function workspaceOfTab(tab: Pick<Tab, "params">): string | null {
 }
 
 /**
- * A worktree's tab: params { repo, path }. Titled by the caller: a workspace member with
+ * A worktree's tab: params { project, path }. Titled by the caller: a workspace member with
  * the project alone (stores/workspacePanel.ts), any other worktree with the project and,
  * off the main worktree, its branch (stores/worktreePanel.ts worktreeTabTitle).
  */
-export function worktreeTab(repoId: string, path: string, title: string): Tab {
-  return makeTab(WORKTREE_KIND, title, { repo: repoId, path });
+export function worktreeTab(projectId: string, path: string, title: string): Tab {
+  return makeTab(WORKTREE_KIND, title, { project: projectId, path });
 }
 
 /** A workspace member's worktree tab (worktreeTab, titled with the project's name). */
@@ -78,9 +78,9 @@ export const memberTab = worktreeTab;
 
 /** The worktree a worktree tab names; null when its params are not one. */
 export function worktreeOfTab(tab: Pick<Tab, "params">): WorktreeTarget | null {
-  const repoId = tab.params.repo ?? "";
+  const projectId = tab.params.project ?? "";
   const path = tab.params.path ?? "";
-  return repoId && path ? { repoId, path } : null;
+  return projectId && path ? { projectId, path } : null;
 }
 
 /** worktreeOfTab, under the workspace surface's name for its member tabs. */

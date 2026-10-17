@@ -61,7 +61,7 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
   await expect(projects).toHaveCount(5);
   await expect(projects.nth(0)).toContainText("CF");
   await expect(projects.nth(0)).toContainText("code-foundry");
-  // The subtitle names where the repo lives: its GitHub slug, a remote, or "Local only".
+  // The subtitle names where the project lives: its GitHub slug, a remote, or "Local only".
   await expect(projects.getByTestId("project-source")).toHaveText([
     "alexwaumann/code-foundry · ~/src/code-foundry",
     "origin · ~/dotfiles",
@@ -139,7 +139,7 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
       .evaluateAll((els) => els[0]?.getAttribute("data-row-key"));
   await expect.poll(firstIdle).toBe(key);
 
-  // The draft was cleared: a new composer for the repo starts empty.
+  // The draft was cleared: a new composer for the project starts empty.
   await compose(page);
   await expect(prompt(page)).toHaveAttribute("data-value", "");
 });
@@ -299,7 +299,7 @@ test("an existing worktree or the current checkout shows its branch, read-only a
   await page.keyboard.press("Shift+Tab");
   await expect(worktree).toBeFocused();
 
-  // Follows the repo store: a checkout elsewhere, then a detached HEAD.
+  // Follows the project store: a checkout elsewhere, then a detached HEAD.
   await mockPost(`worktree/checkout?path=${encodeURIComponent(CF)}&branch=release%2Fv0.3`);
   await expect(indicator).toHaveText("On release/v0.3");
   await mockPost(`worktree/checkout?path=${encodeURIComponent(CF)}`);
@@ -395,7 +395,7 @@ test("attachments: picked, rejected, removed, staged on send", async ({ page }) 
   await expect(page.locator('[data-row-kind="thread"][aria-selected="true"]')).toBeVisible();
 });
 
-test("the draft survives switching away; Backspace goes back; Esc on an empty draft shows the repo", async ({ page }) => {
+test("the draft survives switching away; Backspace goes back; Esc on an empty draft shows the project", async ({ page }) => {
   await openApp(page);
   await compose(page, 3);
   await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in ghostty-playground?");
@@ -403,7 +403,7 @@ test("the draft survives switching away; Backspace goes back; Esc on an empty dr
   await row(page, "s:s-1").click();
   await expect(page.getByTestId("composer")).toHaveCount(0);
 
-  // Back through the picker: the selected repo is highlighted, Backspace returns to the commands.
+  // Back through the picker: the selected project is highlighted, Backspace returns to the commands.
   await page.keyboard.press("Meta+n");
   const palette = page.getByTestId("palette");
   await expect(palette.locator('[data-project="repo-cf"]')).toHaveAttribute("data-selected", "true");

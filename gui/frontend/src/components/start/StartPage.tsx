@@ -10,8 +10,8 @@ import { greeting } from "@/lib/greeting";
 import { NO_PROJECT } from "@/lib/threadRow";
 import { placeThread } from "@/lib/tree";
 import { cn } from "@/lib/utils";
-import { decodeRepoKeys, useRepoStructureKeys } from "@/stores/context";
-import { useReposStore } from "@/stores/repos";
+import { decodeProjectKeys, useProjectStructureKeys } from "@/stores/context";
+import { useProjectsStore } from "@/stores/projects";
 import { openHelp } from "@/stores/views";
 import { activeThreadIds, attentionIds, isAttention, runningCount, useThreadsStore } from "@/stores/threads";
 
@@ -49,12 +49,12 @@ function Onboarding() {
 function useThreadProject(id: string): string | null {
   const noProject = useNoProjectThread(id);
   const worktreePath = useThreadsStore((s) => s.byId[id]?.worktreePath ?? "");
-  const repoKeys = useRepoStructureKeys();
-  const repoId = useMemo(() => {
-    const worktrees = decodeRepoKeys(repoKeys).flatMap((r) => r.worktreePaths.map((path) => ({ repoId: r.id, path })));
-    return placeThread({ worktreePath }, worktrees)?.repoId ?? null;
-  }, [repoKeys, worktreePath]);
-  const name = useReposStore((s) => (repoId ? (s.byId[repoId]?.name ?? null) : null));
+  const projectKeys = useProjectStructureKeys();
+  const projectId = useMemo(() => {
+    const worktrees = decodeProjectKeys(projectKeys).flatMap((r) => r.worktreePaths.map((path) => ({ projectId: r.id, path })));
+    return placeThread({ worktreePath }, worktrees)?.projectId ?? null;
+  }, [projectKeys, worktreePath]);
+  const name = useProjectsStore((s) => (projectId ? (s.byId[projectId]?.name ?? null) : null));
   return noProject ? NO_PROJECT : name;
 }
 
@@ -145,7 +145,7 @@ function Fleet() {
  * then a greeting with the fleet at a glance. Centred both ways over the backdrop.
  */
 export function StartPage() {
-  const onboarding = useReposStore((s) => s.loaded && s.order.length === 0);
+  const onboarding = useProjectsStore((s) => s.loaded && s.order.length === 0);
   return (
     <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
       <Backdrop />

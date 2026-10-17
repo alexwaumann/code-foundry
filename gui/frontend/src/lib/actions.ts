@@ -90,15 +90,15 @@ export function refusalText(message: string): string {
   return message.replace(/^(?:failed precondition|invalid argument|not found): /, "");
 }
 
-/** action.add's args for a new action of project `repoId`. */
-export function addArgs(repoId: string, d: ActionDraft): Record<string, string> {
+/** action.add's args for a new action of project `projectId`. */
+export function addArgs(projectId: string, d: ActionDraft): Record<string, string> {
   return {
     name: d.name.trim(),
     command: d.command,
     icon: d.icon,
     "in-terminal": "true",
     "on-worktree-create": String(d.onWorktreeCreate),
-    project: repoId,
+    project: projectId,
   };
 }
 
@@ -115,5 +115,5 @@ export function editArgs(a: ActionView, d: ActionDraft): Record<string, string> 
   if (d.icon !== a.icon) out.icon = d.icon;
   if (d.onWorktreeCreate !== a.onWorktreeCreate) out["on-worktree-create"] = String(d.onWorktreeCreate);
   if (Object.keys(out).length === 0) return null;
-  return { action: a.id, ...out, project: a.repoId };
+  return { action: a.id, ...out, project: a.projectId };
 }

@@ -14,13 +14,13 @@ vi.mock("sonner", () => ({ toast }));
 const { SidePanel } = await import("@/components/panel/SidePanel");
 const { pullRequestDetailResource } = await import("@/stores/gh");
 const { getPanel, usePanelStore } = await import("@/stores/panel");
-const { useReposStore } = await import("@/stores/repos");
+const { useProjectsStore } = await import("@/stores/projects");
 const { useThreadsStore } = await import("@/stores/threads");
 const { useUiStore } = await import("@/stores/ui");
 const { linkedPrsPanelCommand, showView, useViewsStore } = await import("@/stores/views");
 
 const link = (slug: string, number: number): LinkedPullRequestView => ({ slug, number, url: `https://github.com/${slug}/pull/${String(number)}`, linkedAt: Date.now() - number * 60_000 });
-const thread = (id: string, links: LinkedPullRequestView[]) => ({ id, name: `thread ${id}`, repoId: "web", worktreePath: "/src/web", workspaceId: "", pendingWorktreePath: "", state: "connected", linkedPullRequests: links }) as ThreadView;
+const thread = (id: string, links: LinkedPullRequestView[]) => ({ id, name: `thread ${id}`, projectId: "web", worktreePath: "/src/web", workspaceId: "", pendingWorktreePath: "", state: "connected", linkedPullRequests: links }) as ThreadView;
 const pr = (slug: string, number: number, o: Partial<PullRequestView>): PullRequestDetailView =>
   ({
     pullRequest: { repoSlug: slug, number, title: `title ${String(number)}`, state: "open", draft: false, headRef: `branch-${String(number)}`, checks: { state: "success", total: 1, passed: 1, failed: 0, pending: 0, skipped: 0 }, ...o },
@@ -43,7 +43,7 @@ beforeEach(() => {
   Element.prototype.scrollIntoView = vi.fn();
   getPullRequestDetail.mockImplementation((slug: string, number: number) => new Promise((r) => pending.set(`${slug}#${String(number)}`, r)));
   pullRequestDetailResource.store.setState({ entries: {} });
-  useReposStore.setState({ byId: {}, order: [] });
+  useProjectsStore.setState({ byId: {}, order: [] });
   // First-seen order 5, 7, 6: the list shows 6, 7, 5.
   useThreadsStore.setState({ byId: { "s-1": thread("s-1", [link("o/web", 5), link("o/web", 7), link("o/web", 6)]), "s-0": thread("s-0", []) }, order: ["s-1", "s-0"] });
   usePanelStore.setState({ byKey: { "thread:s-1": { open: true, tabs: [], activeTabId: null }, "thread:s-0": { open: true, tabs: [], activeTabId: null } } });

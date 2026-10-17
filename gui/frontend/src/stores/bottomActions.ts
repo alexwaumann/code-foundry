@@ -58,7 +58,7 @@ export function paneContext(key: string): UiContextView | null {
   if (key !== PROJECTS_KEY) return null;
   const active = getBottomActiveId(key);
   const place = projectsShellPlace(active === null ? undefined : useTerminalsStore.getState().byId[active]);
-  return place ? worktreeContext(place.repoId, place.path) : null;
+  return place ? worktreeContext(place.projectId, place.path) : null;
 }
 
 /**
@@ -251,8 +251,8 @@ export function newThreadTerminal(threadId: string, cwd?: string): Promise<boole
 }
 
 /** terminal.new in a worktree from the Projects page (its rows): the shell lands in the page's panel. */
-export function newWorktreeTerminal(repoId: string, path: string): Promise<boolean> {
-  return startShell(worktreeContext(repoId, path));
+export function newWorktreeTerminal(projectId: string, path: string): Promise<boolean> {
+  return startShell(worktreeContext(projectId, path));
 }
 
 /**

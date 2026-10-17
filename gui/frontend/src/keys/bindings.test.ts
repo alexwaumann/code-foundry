@@ -28,7 +28,7 @@ function thread(id: string, over: Partial<ThreadView> = {}): ThreadView {
   return {
     id,
     claudeSessionId: "",
-    repoId: "",
+    projectId: "",
     worktreePath: "/src/app",
     name: id,
     autoNamed: false,

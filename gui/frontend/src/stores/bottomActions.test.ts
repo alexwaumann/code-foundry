@@ -140,7 +140,7 @@ describe("paneContext and newBottomTerminal", () => {
   });
 
   it("the Projects page's panel runs in its active tab's worktree, or nowhere without tabs", () => {
-    expect(paneContext("view:projects")).toMatchObject({ activeRepoId: "r1", activeWorktreePath: "/src/app.worktrees/x", activeThreadId: "" });
+    expect(paneContext("view:projects")).toMatchObject({ activeProjectId: "r1", activeWorktreePath: "/src/app.worktrees/x", activeThreadId: "" });
     setTerminals([]);
     expect(paneContext("view:projects")).toBeNull();
     expect(paneContext("view:pullrequests")).toBeNull();

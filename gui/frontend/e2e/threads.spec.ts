@@ -257,7 +257,7 @@ test("the whole app runs on one events stream plus one thread Watch", async ({ p
   page.on("requestfailed", done);
 
   await openApp(page);
-  // Exercise every source: threads, threads (switching watches the other one), intents, repos.
+  // Exercise every source: threads, threads (switching watches the other one), intents, projects.
   const pane = page.getByTestId("thread-pane");
   await row(page, "s:s-2").click();
   await expect(pane.getByTestId("thread-user").first()).toContainText("Port the grid renderer");
@@ -290,7 +290,7 @@ test("a daemon without ThreadService degrades to 'service unavailable'", async (
   // No rows to wait for (openApp waits for one): the notice is what shows.
   await page.goto(appPath);
   await expect(page.getByTestId("threads-unavailable")).toHaveText("Threads: service unavailable");
-  // No thread rows; repos still work (the Projects page, and its shells' bottom panel).
+  // No thread rows; projects still work (the Projects page, and its shells' bottom panel).
   await expect(page.locator('[data-row-kind="thread"]')).toHaveCount(0);
   await expect(page.getByTestId("daemon-status")).not.toContainText("syncing");
   await openProjects(page);

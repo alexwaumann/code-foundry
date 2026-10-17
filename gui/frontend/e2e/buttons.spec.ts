@@ -21,7 +21,7 @@ test("no footer and no chord hints outside the palette and help", async ({ page 
 test("sidebar new-thread button opens the project picker, then the composer", async ({ page }) => {
   await openApp(page);
   const button = page.getByTestId("sidebar-new-thread");
-  // Nothing selected: the picker supplies the repo, so the button is enabled anyway.
+  // Nothing selected: the picker supplies the project, so the button is enabled anyway.
   await expect(button).toBeEnabled();
   // A thread in ghostty-playground (s-2) is selected.
   await row(page, "s:s-2").click();

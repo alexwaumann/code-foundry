@@ -16,8 +16,8 @@ import { useSettingsStore } from "@/stores/settings";
 
 /**
  * New: a name (checked as it is typed, with the folder it becomes), an optional Publish
- * to GitHub step (owner and visibility), and Create. Create runs repo.create, then
- * repo.github.publish when asked. A refused publish keeps the project (it exists
+ * to GitHub step (owner and visibility), and Create. Create runs project.create, then
+ * project.github.publish when asked. A refused publish keeps the project (it exists
  * locally) and the picker, with gh's error under it, so another owner or visibility can
  * be tried, or the project kept local. Cancelling the dialog instead deletes it again
  * (the dialog's store does that).
@@ -95,7 +95,7 @@ export function NewTab({ active }: { active: boolean }) {
     setBusy("publish");
     setPublishError(null);
     try {
-      await publishProject({ repoId: project.id, owner: choice.owner, name: project.name, visibility: choice.visibility });
+      await publishProject({ projectId: project.id, owner: choice.owner, name: project.name, visibility: choice.visibility });
       finish(project, `Created ${project.name} and published it to ${choice.owner}/${project.name}`);
     } catch (err) {
       setPublishError(errorMessage(err));

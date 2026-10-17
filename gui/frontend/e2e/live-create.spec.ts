@@ -31,8 +31,8 @@ async function projectAt(dir: string): Promise<string> {
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${read("daemon.token")}` },
     body: "{}",
   });
-  const { projects: repos = [] } = (await res.json()) as { projects?: { id: string; path: string }[] };
-  return repos.find((r) => r.path.toLowerCase() === dir.toLowerCase())?.id ?? "";
+  const { projects: projects = [] } = (await res.json()) as { projects?: { id: string; path: string }[] };
+  return projects.find((r) => r.path.toLowerCase() === dir.toLowerCase())?.id ?? "";
 }
 
 test.skip(!LIVE || !HOME, "LIVE_DAEMON=1 and CODE_FOUNDRY_HOME are required");

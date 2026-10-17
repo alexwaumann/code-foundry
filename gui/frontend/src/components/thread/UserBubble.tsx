@@ -9,7 +9,7 @@ import { formatAttachmentSize, kindFromName, middleTruncate, stagedPdfPages, tag
 import { inlineAttachmentPaths, parseUserMessage } from "@/lib/userMessage";
 import { cn } from "@/lib/utils";
 import { type PdfSummary, useAttachment, usePdfSummary } from "@/stores/attachments";
-import { useReposStore } from "@/stores/repos";
+import { useProjectsStore } from "@/stores/projects";
 
 /** The image chip's accent: green, the success token. */
 const IMAGE_ACCENT = "[--chip-accent:var(--success)]";
@@ -123,12 +123,12 @@ function Thumbnail({ path }: { path: string }) {
   );
 }
 
-function FileChip({ repoId, path }: { repoId: string; path: string }) {
-  const project = useReposStore((s) => s.byId[repoId]?.name ?? repoId);
+function FileChip({ projectId, path }: { projectId: string; path: string }) {
+  const project = useProjectsStore((s) => s.byId[projectId]?.name ?? projectId);
   return (
     <Tip label={`${project}/${path}`}>
       <span data-testid="thread-tag" data-tag-kind="file" data-path={path} className={tagClass(false, TAG_ACCENT.file)}>
-        <span className="truncate">{tagLabel({ tagKind: "file", repoId, path })}</span>
+        <span className="truncate">{tagLabel({ tagKind: "file", projectId, path })}</span>
       </span>
     </Tip>
   );
@@ -183,7 +183,7 @@ export const UserBubble = memo(function UserBubble({
                   </span>
                 );
               case "file":
-                return <FileChip key={i} repoId={p.repoId} path={p.path} />;
+                return <FileChip key={i} projectId={p.projectId} path={p.path} />;
               case "image":
               case "pdf":
                 return <AttachmentChip key={i} name={p.name} path={p.path} pdf={p.kind === "pdf"} />;

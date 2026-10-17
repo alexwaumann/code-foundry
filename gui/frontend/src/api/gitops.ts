@@ -12,7 +12,7 @@ export interface GitOpView {
   state: GitOpStateView;
   title: string;
   worktreePath: string;
-  repoId: string;
+  projectId: string;
   branch: string;
   durationMs: number;
   summary: string;
@@ -51,7 +51,7 @@ export function toGitOpView(o: GitOp): GitOpView {
     state: stateMap[o.state],
     title: o.title,
     worktreePath: o.worktreePath,
-    repoId: o.projectId,
+    projectId: o.projectId,
     branch: o.branch,
     durationMs: Number(o.durationMs),
     summary: o.summary,

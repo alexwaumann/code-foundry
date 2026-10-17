@@ -24,7 +24,7 @@ export type ActionIconName = (typeof ACTION_ICONS)[number];
 export interface ActionView {
   /** "a-" + 12 hex digits. */
   id: string;
-  repoId: string;
+  projectId: string;
   name: string;
   command: string;
   icon: ActionIconName;
@@ -46,7 +46,7 @@ export interface ActionRunView {
   /** The action's name and command when the run started. */
   actionName: string;
   command: string;
-  repoId: string;
+  projectId: string;
   /** The owning thread; "" for a worktree's run. */
   threadId: string;
   worktreePath: string;
@@ -66,7 +66,7 @@ export interface ActionRunFinishedView {
   runId: string;
   actionId: string;
   actionName: string;
-  repoId: string;
+  projectId: string;
   threadId: string;
   exitCode: number;
   mode: ActionRunModeView;
@@ -107,7 +107,7 @@ const triggerNames: Record<ActionRunTrigger, ActionRunTriggerView> = {
 export function toActionView(a: Action): ActionView {
   return {
     id: a.id,
-    repoId: a.projectId,
+    projectId: a.projectId,
     name: a.name,
     command: a.command,
     icon: iconNames[a.icon],
@@ -123,7 +123,7 @@ export function toActionRunView(r: ActionRun): ActionRunView {
     actionId: r.actionId,
     actionName: r.actionName,
     command: r.command,
-    repoId: r.projectId,
+    projectId: r.projectId,
     threadId: r.threadId,
     worktreePath: r.worktreePath,
     mode: modeNames[r.mode],
@@ -141,7 +141,7 @@ export function toActionRunFinishedView(f: ActionRunFinished): ActionRunFinished
     runId: f.runId,
     actionId: f.actionId,
     actionName: f.actionName,
-    repoId: f.projectId,
+    projectId: f.projectId,
     threadId: f.threadId,
     exitCode: f.exitCode,
     mode: modeNames[f.mode],

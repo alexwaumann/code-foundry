@@ -39,12 +39,12 @@ describe("toSkillView", () => {
     [
       "project scope",
       { name: "review", description: "Review it.", scope: SkillScope.PROJECT, projectId: "r-1", path: "/w/.claude/skills/review/SKILL.md" },
-      { name: "review", description: "Review it.", scope: "project", repoId: "r-1", path: "/w/.claude/skills/review/SKILL.md" },
+      { name: "review", description: "Review it.", scope: "project", projectId: "r-1", path: "/w/.claude/skills/review/SKILL.md" },
     ],
     [
       "user scope, no description",
       { name: "commit", scope: SkillScope.USER, path: "/h/.claude/commands/commit.md" },
-      { name: "commit", description: "", scope: "user", repoId: "", path: "/h/.claude/commands/commit.md" },
+      { name: "commit", description: "", scope: "user", projectId: "", path: "/h/.claude/commands/commit.md" },
     ],
   ] as const)("%s", (_name, init, want) => {
     expect(toSkillView(create(SkillSchema, init))).toEqual(want);
@@ -94,7 +94,7 @@ describe("listSkills and searchFiles requests", () => {
     const { conn, calls } = fakeConn(
       create(ListSkillsResponseSchema, { skills: [{ name: "commit", scope: SkillScope.USER, path: "/h/.claude/skills/commit/SKILL.md" }] }),
     );
-    const got = await listSkills([{ repoId: "r-1" }, { repoId: "r-2", path: "/w/r-2" }], true, conn);
+    const got = await listSkills([{ projectId: "r-1" }, { projectId: "r-2", path: "/w/r-2" }], true, conn);
     expect(calls).toEqual([
       {
         method: "listSkills",
@@ -107,27 +107,27 @@ describe("listSkills and searchFiles requests", () => {
         },
       },
     ]);
-    expect(got).toEqual([{ name: "commit", description: "", scope: "user", repoId: "", path: "/h/.claude/skills/commit/SKILL.md" }]);
+    expect(got).toEqual([{ name: "commit", description: "", scope: "user", projectId: "", path: "/h/.claude/skills/commit/SKILL.md" }]);
   });
 
   it("searchFiles defaults path and limit to the proto's zero values", async () => {
     const { conn, calls } = fakeConn(create(SearchFilesResponseSchema, { matches: [{ path: "a.ts" }] }));
-    const got = await searchFiles({ repoId: "r-1", query: "a" }, conn);
+    const got = await searchFiles({ projectId: "r-1", query: "a" }, conn);
     expect(calls).toEqual([{ method: "searchFiles", req: { projectId: "r-1", path: "", query: "a", limit: 0 } }]);
     expect(got).toEqual({ matches: [{ path: "a.ts", isDir: false }], truncated: false });
   });
 
   it.each([
     ["listSkills", (conn: DaemonConnection) => listSkills([], true, conn)],
-    ["searchFiles", (conn: DaemonConnection) => searchFiles({ repoId: "r-1", query: "" }, conn)],
+    ["searchFiles", (conn: DaemonConnection) => searchFiles({ projectId: "r-1", query: "" }, conn)],
   ] as const)("%s on an older daemon fails with OutdatedDaemonError", async (_name, call) => {
     const { conn } = fakeConn(undefined, new ConnectError("HTTP 404", Code.Unimplemented));
     await expect(call(conn)).rejects.toBeInstanceOf(OutdatedDaemonError);
   });
 
   it("other errors pass through", async () => {
-    const err = new ConnectError("repo zz not found", Code.NotFound);
+    const err = new ConnectError("project zz not found", Code.NotFound);
     const { conn } = fakeConn(undefined, err);
-    await expect(searchFiles({ repoId: "zz", query: "" }, conn)).rejects.toBe(err);
+    await expect(searchFiles({ projectId: "zz", query: "" }, conn)).rejects.toBe(err);
   });
 });

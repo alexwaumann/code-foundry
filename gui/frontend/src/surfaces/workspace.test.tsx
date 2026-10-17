@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { RepoView, WorktreeView } from "@/api/repo";
+import type { ProjectView, WorktreeView } from "@/api/project";
 import type { ThreadView } from "@/api/threads";
 import type { WorkspaceView } from "@/api/workspace";
 
@@ -10,7 +10,7 @@ vi.mock("@/api/gh", async (orig) => ({ ...(await orig<typeof import("@/api/gh")>
 
 const { SidePanel } = await import("@/components/panel/SidePanel");
 const { getPanel, usePanelStore } = await import("@/stores/panel");
-const { useReposStore } = await import("@/stores/repos");
+const { useProjectsStore } = await import("@/stores/projects");
 const { useThreadsStore } = await import("@/stores/threads");
 const { useUiStore } = await import("@/stores/ui");
 const { useViewsStore, workspacePanelCommand } = await import("@/stores/views");
@@ -19,18 +19,18 @@ const { useWorkspacesStore } = await import("@/stores/workspaces");
 const WEB = "/wt/web/cf-demo";
 const API = "/wt/api/cf-demo";
 const status = { upstream: "", ahead: 0, behind: 0, staged: 0, modified: 0, untracked: 0, dirty: false, refreshedAtMs: null };
-const wt = (repoId: string, path: string, branch: string, isMain = false): WorktreeView => ({ repoId, path, branch, head: "abc", detached: false, isMain, status });
-const repo = (id: string, extra: WorktreeView[] = []): RepoView => ({ id, path: `/src/${id}`, name: id, defaultBranch: "main", githubSlug: "", remotes: [], git: true, worktrees: [wt(id, `/src/${id}`, "main", true), ...extra] });
-const ws: WorkspaceView = { id: "w1", name: "demo", branch: "cf/demo", members: [{ repoId: "web", worktreePath: WEB }, { repoId: "api", worktreePath: API }], createdAtMs: null };
-const thread = (id: string, o: Partial<ThreadView>) => ({ id, repoId: "web", worktreePath: WEB, workspaceId: "", pendingWorktreePath: "", terminalId: "", state: "connected", linkedPullRequests: [], ...o }) as ThreadView;
+const wt = (projectId: string, path: string, branch: string, isMain = false): WorktreeView => ({ projectId, path, branch, head: "abc", detached: false, isMain, status });
+const project = (id: string, extra: WorktreeView[] = []): ProjectView => ({ id, path: `/src/${id}`, name: id, defaultBranch: "main", githubSlug: "", remotes: [], git: true, worktrees: [wt(id, `/src/${id}`, "main", true), ...extra] });
+const ws: WorkspaceView = { id: "w1", name: "demo", branch: "cf/demo", members: [{ projectId: "web", worktreePath: WEB }, { projectId: "api", worktreePath: API }], createdAtMs: null };
+const thread = (id: string, o: Partial<ThreadView>) => ({ id, projectId: "web", worktreePath: WEB, workspaceId: "", pendingWorktreePath: "", terminalId: "", state: "connected", linkedPullRequests: [], ...o }) as ThreadView;
 
 function select(id: string): void {
   useUiStore.setState({ selection: { kind: "thread", id } });
 }
 
 beforeEach(() => {
-  useReposStore.setState({ byId: { web: repo("web", [wt("web", WEB, "cf/demo")]), api: repo("api", [wt("api", API, "cf/demo")]) }, order: ["api", "web"] });
-  useThreadsStore.setState({ byId: { "s-ws": thread("s-ws", { workspaceId: "w1", worktreePath: API, repoId: "api" }), "s-proj": thread("s-proj", { repoId: "web", worktreePath: "/src/web" }) }, order: ["s-ws", "s-proj"] });
+  useProjectsStore.setState({ byId: { web: project("web", [wt("web", WEB, "cf/demo")]), api: project("api", [wt("api", API, "cf/demo")]) }, order: ["api", "web"] });
+  useThreadsStore.setState({ byId: { "s-ws": thread("s-ws", { workspaceId: "w1", worktreePath: API, projectId: "api" }), "s-proj": thread("s-proj", { projectId: "web", worktreePath: "/src/web" }) }, order: ["s-ws", "s-proj"] });
   useWorkspacesStore.setState({ byId: { w1: ws }, order: ["w1"], loaded: true });
   usePanelStore.setState({ byKey: { "thread:s-ws": { open: true, tabs: [], activeTabId: null }, "thread:s-proj": { open: true, tabs: [], activeTabId: null } } });
   useViewsStore.setState({ settingsOpen: false });
@@ -63,7 +63,7 @@ describe("Workspace surface availability", () => {
     render(<SidePanel />);
     expect(row()).toBeNull();
     act(() => {
-      useThreadsStore.setState((s) => ({ byId: { ...s.byId, "s-proj": thread("s-proj", { repoId: "web", worktreePath: "/src/web", workspaceId: "w1" }) } }));
+      useThreadsStore.setState((s) => ({ byId: { ...s.byId, "s-proj": thread("s-proj", { projectId: "web", worktreePath: "/src/web", workspaceId: "w1" }) } }));
     });
     expect(row()?.getAttribute("data-availability")).toBe("enabled");
   });
@@ -76,7 +76,7 @@ describe("Workspace surface availability", () => {
     expect(screen.getByTestId("workspace-surface-branch").textContent).toBe("cf/demo");
     expect(screen.getByTestId("workspace-surface-count").textContent).toBe("2 members");
     const members = screen.getAllByTestId("workspace-member");
-    expect(members.map((m) => m.getAttribute("data-repo"))).toEqual(["web", "api"]);
+    expect(members.map((m) => m.getAttribute("data-project"))).toEqual(["web", "api"]);
     expect(members.map((m) => m.getAttribute("data-current"))).toEqual([null, "true"]);
     // Run in is offered on the other member only.
     expect(members[0]?.querySelector('[data-testid="member-run-in"]')).not.toBeNull();

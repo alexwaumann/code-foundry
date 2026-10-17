@@ -2,7 +2,7 @@
  * Live e2e: a workspace thread started from the composer against a REAL daemon and real
  * Claude Code (docs/notes/workspaces-3-composer.md). Opt-in (LIVE_DAEMON=1), run with
  * playwright.live.config.ts, which starts nothing: bring up an isolated daemon
- * (CODE_FOUNDRY_HOME) with two registered repos and one workspace (LIVE_WORKSPACE, its
+ * (CODE_FOUNDRY_HOME) with two registered projects and one workspace (LIVE_WORKSPACE, its
  * name), and the Vite dev server pointed at it (recipe in docs/notes/phase2-integration.md).
  *
  * It spends one short haiku turn ("say hi and stop") and closes the thread at the end.

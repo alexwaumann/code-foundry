@@ -51,7 +51,7 @@ describe("bottomKeyOf", () => {
     ["the dashboard", DASHBOARD, null],
     ["nothing", { kind: "none" }, null],
     ["the Pull Requests page", { kind: "view", name: "pullrequests" }, null],
-    ["the composer", { kind: "compose", repoId: "r" }, null],
+    ["the composer", { kind: "compose", projectId: "r" }, null],
   ];
   it.each(cases)("%s", (_name, sel, want) => {
     expect(bottomKeyOf(sel)).toBe(want);

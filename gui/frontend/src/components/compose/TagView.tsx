@@ -2,15 +2,15 @@ import { useContext, type ReactNode } from "react";
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { tagLabel } from "@/lib/prompt";
-import { useReposStore } from "@/stores/repos";
+import { useProjectsStore } from "@/stores/projects";
 import { useSkillDescription } from "@/stores/skills";
 import { AttachmentChip } from "./AttachmentChip";
 import { TagMultiProjectContext, tagOf } from "./tagContext";
 import { TAG_ACCENT, tagClass } from "./tagStyle";
 
 /** A project's name for a tag ("" for none, the id when the project is gone). */
-function useProjectName(repoId: string): string {
-  return useReposStore((s) => (repoId ? (s.byId[repoId]?.name ?? repoId) : ""));
+function useProjectName(projectId: string): string {
+  return useProjectsStore((s) => (projectId ? (s.byId[projectId]?.name ?? projectId) : ""));
 }
 
 /**
@@ -49,10 +49,10 @@ function TextTag({
   );
 }
 
-function SkillTag({ name, repoId, selected }: { name: string; repoId: string; selected: boolean }) {
-  const project = useProjectName(repoId);
-  const description = useSkillDescription(repoId, name);
-  const scope = repoId ? `Project skill · ${project}` : "User skill";
+function SkillTag({ name, projectId, selected }: { name: string; projectId: string; selected: boolean }) {
+  const project = useProjectName(projectId);
+  const description = useSkillDescription(projectId, name);
+  const scope = projectId ? `Project skill · ${project}` : "User skill";
   return (
     <TextTag
       kind="skill"
@@ -61,7 +61,7 @@ function SkillTag({ name, repoId, selected }: { name: string; repoId: string; se
       ariaLabel={`Skill /${name}, ${scope}`}
       tip={scope}
       detail={description}
-      data={{ "data-skill": name, "data-repo": repoId || undefined }}
+      data={{ "data-skill": name, "data-project": projectId || undefined }}
     />
   );
 }
@@ -71,10 +71,10 @@ function SkillTag({ name, repoId, selected }: { name: string; repoId: string; se
  * with the project's name when the draft has more than one project
  * (`api/internal/api/thread.go`).
  */
-function FileTag({ repoId, path, selected }: { repoId: string; path: string; selected: boolean }) {
-  const project = useProjectName(repoId);
+function FileTag({ projectId, path, selected }: { projectId: string; path: string; selected: boolean }) {
+  const project = useProjectName(projectId);
   const multi = useContext(TagMultiProjectContext);
-  const label = tagLabel({ tagKind: "file", repoId, path });
+  const label = tagLabel({ tagKind: "file", projectId, path });
   return (
     <TextTag
       kind="file"
@@ -83,7 +83,7 @@ function FileTag({ repoId, path, selected }: { repoId: string; path: string; sel
       ariaLabel={`${path.endsWith("/") ? "Folder" : "File"} ${path} in ${project}`}
       tip={<span className="font-mono">{multi ? `${project}/${path}` : path}</span>}
       detail=""
-      data={{ "data-path": path, "data-repo": repoId }}
+      data={{ "data-path": path, "data-project": projectId }}
     />
   );
 }
@@ -95,8 +95,8 @@ export function TagView({ node, selected, editor }: NodeViewProps) {
     case "image":
       return <AttachmentChip id={tag.id} label={tag.name} selected={selected} editor={editor} />;
     case "skill":
-      return <SkillTag name={tag.name} repoId={tag.repoId} selected={selected} />;
+      return <SkillTag name={tag.name} projectId={tag.projectId} selected={selected} />;
     case "file":
-      return <FileTag repoId={tag.repoId} path={tag.path} selected={selected} />;
+      return <FileTag projectId={tag.projectId} path={tag.path} selected={selected} />;
   }
 }

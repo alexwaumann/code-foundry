@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PullRequestView } from "@/api/gh";
-import type { GitStatusView, RepoView, WorktreeView } from "@/api/repo";
+import type { GitStatusView, ProjectView, WorktreeView } from "@/api/project";
 import type { ThreadView } from "@/api/threads";
 import type { TerminalView } from "@/api/terminal";
 import type { FileChangeView, LogEntryView, WorktreeDetailView } from "@/api/worktreeDetail";
@@ -18,7 +18,7 @@ vi.mock("@/stores/prPanel", async (orig) => ({ ...(await orig<typeof import("@/s
 vi.mock("@/stores/gh", async (orig) => ({ ...(await orig<typeof import("@/stores/gh")>()), openUrl }));
 
 const { WorktreePanelView } = await import("./WorktreeOverview");
-const { useReposStore } = await import("@/stores/repos");
+const { useProjectsStore } = await import("@/stores/projects");
 const { useThreadsStore } = await import("@/stores/threads");
 const { useTerminalsStore } = await import("@/stores/terminals");
 const { useUiStore } = await import("@/stores/ui");
@@ -42,10 +42,10 @@ const status = (o: Partial<GitStatusView> = {}): GitStatusView => ({
   ...o,
 });
 
-function world(st: GitStatusView, branch = "cf/feat", repo: Partial<RepoView> = {}): void {
-  const wt: WorktreeView = { repoId: "web", path: P, branch, head: "abcdef1234", detached: branch === "", isMain: false, status: st };
-  useReposStore.setState({
-    byId: { web: { id: "web", path: "/src/web", name: "web", defaultBranch: "main", githubSlug: "o/web", remotes: ["origin"], git: true, worktrees: [wt], ...repo } },
+function world(st: GitStatusView, branch = "cf/feat", project: Partial<ProjectView> = {}): void {
+  const wt: WorktreeView = { projectId: "web", path: P, branch, head: "abcdef1234", detached: branch === "", isMain: false, status: st };
+  useProjectsStore.setState({
+    byId: { web: { id: "web", path: "/src/web", name: "web", defaultBranch: "main", githubSlug: "o/web", remotes: ["origin"], git: true, worktrees: [wt], ...project } },
     order: ["web"],
   });
 }
@@ -54,7 +54,7 @@ const file = (path: string, o: Partial<FileChangeView> = {}): FileChangeView => 
 const commit = (i: number): LogEntryView => ({ sha: `${String(i).padStart(7, "0")}${"f".repeat(33)}`, shortSha: String(i).padStart(7, "0"), subject: `commit ${String(i)}`, authorName: "Alex", authorEmail: "a@x", authoredAtMs: Date.now() - (i + 1) * 3_600_000 });
 
 function detail(files: FileChangeView[], log: LogEntryView[], o: Partial<WorktreeDetailView> = {}): void {
-  details.set(P, { repoId: "web", path: P, baseRef: "origin/main", mergeBase: "x", head: "y", files, filesTruncated: false, log, logTotal: log.length, computedAtMs: 1, error: "", ...o } satisfies WorktreeDetailView);
+  details.set(P, { projectId: "web", path: P, baseRef: "origin/main", mergeBase: "x", head: "y", files, filesTruncated: false, log, logTotal: log.length, computedAtMs: 1, error: "", ...o } satisfies WorktreeDetailView);
 }
 
 const pr = (number: number, o: Partial<PullRequestView> = {}): PullRequestView =>
@@ -77,7 +77,7 @@ const thread = (id: string, worktreePath: string, o: Partial<ThreadView> = {}) =
 const term = (id: string, cwd: string, state: TerminalView["state"] = "running") => ({ id, cwd, state }) as TerminalView;
 
 async function show(): Promise<void> {
-  render(<WorktreePanelView repoId="web" path={P} />);
+  render(<WorktreePanelView projectId="web" path={P} />);
   // The detail and pull request fetches resolve.
   await act(async () => {
     await Promise.resolve();

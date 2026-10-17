@@ -5,7 +5,7 @@ import { NoGitBadge } from "@/components/projects/NoGitBadge";
 import { Tip } from "@/components/ui/tooltip";
 import { threadRowModel, type WorkspaceLookup } from "@/lib/threadRow";
 import { useCreator } from "@/stores/lineage";
-import { useReposStore } from "@/stores/repos";
+import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { Chip } from "./Chip";
 
@@ -43,10 +43,10 @@ function ThreadLocation({ id }: { id: string }) {
   const where = useThreadsStore(
     useShallow((st) => {
       const x = st.byId[id];
-      return { repoId: x?.repoId ?? "", worktreePath: x?.worktreePath ?? "", workspaceId: x?.workspaceId ?? "", pendingWorktreePath: "" };
+      return { projectId: x?.projectId ?? "", worktreePath: x?.worktreePath ?? "", workspaceId: x?.workspaceId ?? "", pendingWorktreePath: "" };
     }),
   );
-  const m = useReposStore(
+  const m = useProjectsStore(
     useShallow((st) => {
       const r = threadRowModel(where, st, NO_WORKSPACES);
       return { project: r.project, branch: r.branch, noGit: r.noGit, noProject: r.noProject, worktree: r.worktree };

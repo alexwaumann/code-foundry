@@ -95,7 +95,7 @@ export function isViewActionChord(chord: string): boolean {
 
 /**
  * Commands whose GUI presenter supplies the context the daemon needs: thread.new's
- * project picker picks the repo. They start (palette, chord, button) even where the
+ * project picker picks the project. They start (palette, chord, button) even where the
  * daemon lists them as unavailable, e.g. with nothing selected.
  */
 const contextSupplied: ReadonlySet<string> = new Set(["thread.new"]);
@@ -186,9 +186,9 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
   // Snooze: the custom date dialog for the active thread (the menus offer presets), or
   // unsnooze it when it is snoozed; both invoke thread.snooze.
   "thread.snooze": () => presentSnooze(getUiContext().activeThreadId),
-  // The Add Project dialog; its tabs call RepoService.Register (repo.add's CLI form with
-  // a folder), stream RepoService.Clone (repo.clone's CLI form), or invoke repo.create.
-  // repo.add's optional path is never prompted for. repo.clone opens it on the GitHub tab.
+  // The Add Project dialog; its tabs call ProjectService.Register (project.add's CLI form with
+  // a folder), stream ProjectService.Clone (project.clone's CLI form), or invoke project.create.
+  // project.add's optional path is never prompted for. project.clone opens it on the GitHub tab.
   "project.add": () => {
     openAddProject();
     return true;
@@ -197,14 +197,14 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
     openAddProject("github");
     return true;
   },
-  // The New tab invokes repo.create itself; from the palette it opens the dialog there.
+  // The New tab invokes project.create itself; from the palette it opens the dialog there.
   "project.create": () => {
     openAddProject("new");
     return true;
   },
   // The publish dialog (owner and visibility pickers) for the active project; it
-  // invokes repo.github.publish.
-  "project.github.publish": () => openPublishDialog(getUiContext().activeRepoId),
+  // invokes project.github.publish.
+  "project.github.publish": () => openPublishDialog(getUiContext().activeProjectId),
   // Window-local: only this window opens, without a round trip (the CLI and palette
   // reach every window through UiIntent.ShowView instead).
   "view.settings": () => showView("settings"),

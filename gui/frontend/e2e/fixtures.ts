@@ -35,20 +35,20 @@ export async function invocations(): Promise<Invocation[]> {
 }
 
 /** The mock's registered projects (ProjectService.List). protojson omits git: false. */
-export async function listRepos(): Promise<{ id: string; path: string; name: string; git: boolean }[]> {
+export async function listProjects(): Promise<{ id: string; path: string; name: string; git: boolean }[]> {
   const res = await fetch(`${mockUrl}/codefoundry.v1.ProjectService/List`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${MOCK_TOKEN}` },
     body: "{}",
   });
   expect(res.ok).toBe(true);
-  const { projects: repos = [] } = (await res.json()) as { projects?: { id: string; path: string; name: string; git?: boolean }[] };
-  return repos.map((r) => ({ id: r.id, path: r.path, name: r.name, git: r.git ?? false }));
+  const { projects: projects = [] } = (await res.json()) as { projects?: { id: string; path: string; name: string; git?: boolean }[] };
+  return projects.map((r) => ({ id: r.id, path: r.path, name: r.name, git: r.git ?? false }));
 }
 
 /** The registered project at path, or undefined. */
-export async function repoAt(path: string): Promise<{ id: string; path: string; name: string; git: boolean } | undefined> {
-  return (await listRepos()).find((r) => r.path === path);
+export async function projectAt(path: string): Promise<{ id: string; path: string; name: string; git: boolean } | undefined> {
+  return (await listProjects()).find((r) => r.path === path);
 }
 
 /** POSTs a /__mock control endpoint and returns its JSON. */
@@ -135,7 +135,7 @@ export async function selectWorktree(page: Page, projectId: string, path: string
 export async function selectProject(page: Page, projectId: string): Promise<void> {
   await openProjects(page);
   await page.locator(`[data-nav-key="p:${projectId}"]`).dblclick();
-  await expect(page.getByTestId("worktree-surface")).toHaveAttribute("data-repo", projectId);
+  await expect(page.getByTestId("worktree-surface")).toHaveAttribute("data-project", projectId);
 }
 
 export function row(page: Page, key: string) {

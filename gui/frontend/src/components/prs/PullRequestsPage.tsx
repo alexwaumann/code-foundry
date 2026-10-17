@@ -21,7 +21,7 @@ import { RowList } from "./RowList";
 const STALE_AFTER_MS = 5 * 60_000;
 const ROW_H = 28;
 
-/** Page-local, kept across visits: show every repository instead of registered ones. */
+/** Page-local, kept across visits: show every repository instead of the registered projects'. */
 const usePrPageStore = create<{ includeAll: boolean; toggle: () => void }>()((set) => ({
   includeAll: false,
   toggle: () => {
@@ -151,7 +151,7 @@ function Body({ d, includeAll }: { d: DashboardView; includeAll: boolean }) {
         )}
         {!includeAll && d.trackedSlugs.length === 0 && (
           <Banner tone="info">
-            No registered repository has a GitHub remote, so the lists are empty.{" "}
+            No registered project has a GitHub remote, so the lists are empty.{" "}
             <button type="button" className="underline underline-offset-2 hover:text-foreground" onClick={toggle} data-testid="prs-show-all">
               Show pull requests from every repository
             </button>
@@ -166,7 +166,7 @@ function Body({ d, includeAll }: { d: DashboardView; includeAll: boolean }) {
   );
 }
 
-/** The global Pull Requests page: the viewer's GitHub dashboards across registered repos. */
+/** The global Pull Requests page: the viewer's GitHub dashboards across registered projects. */
 export function PullRequestsPage() {
   const includeAll = usePrPageStore((s) => s.includeAll);
   const toggle = usePrPageStore((s) => s.toggle);
@@ -184,7 +184,7 @@ export function PullRequestsPage() {
           className="rounded-sm border px-1.5 py-0.5 text-caption-sm [--wails-draggable:no-drag] hover:bg-accent"
           data-testid="prs-scope"
         >
-          {includeAll ? "all repositories" : "registered repositories"}
+          {includeAll ? "all repositories" : "registered projects"}
         </button>
         <span className="ml-auto flex items-center gap-2 text-caption">
           {d?.viewer && (
@@ -212,7 +212,7 @@ export function PullRequestsPage() {
   );
 }
 
-/** Sidebar entry above the repository tree. */
+/** The sidebar's Pull Requests entry. */
 export function PullRequestsNav() {
   const active = useUiStore((s) => s.selection.kind === "view" && s.selection.name === "pullrequests");
   return (

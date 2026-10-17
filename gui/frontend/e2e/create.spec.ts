@@ -221,7 +221,7 @@ test("the overview's Publish to GitHub opens the publish dialog for sketches", a
   await page.getByTestId("publish-github").click();
   const pub = page.getByTestId("publish-dialog");
   await expect(pub).toBeVisible();
-  await expect(pub).toHaveAttribute("data-repo", "repo-sk");
+  await expect(pub).toHaveAttribute("data-project", "repo-sk");
   await expect(page.getByTestId("publish-name")).toHaveValue("sketches");
   await expect(page.getByTestId("publish-owner")).toHaveAttribute("data-owner", "dev");
   await expectVisibilities(page, ["Public", "Private"], "public");
@@ -255,7 +255,7 @@ test("project.github.publish in the palette opens the publish dialog; project.cr
   await page.keyboard.press("Meta+k");
   const palette = page.getByTestId("palette");
   await palette.locator('[data-command="project.github.publish"]').click();
-  await expect(page.getByTestId("publish-dialog")).toHaveAttribute("data-repo", "repo-sk");
+  await expect(page.getByTestId("publish-dialog")).toHaveAttribute("data-project", "repo-sk");
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("publish-dialog")).toHaveCount(0);
 

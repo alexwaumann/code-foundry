@@ -12,14 +12,14 @@ vi.mock("@/api/mcp", async (orig) => ({ ...(await orig<typeof import("@/api/mcp"
 
 const { SidePanel } = await import("@/components/panel/SidePanel");
 const { getPanel, usePanelStore } = await import("@/stores/panel");
-const { useReposStore } = await import("@/stores/repos");
+const { useProjectsStore } = await import("@/stores/projects");
 const { useThreadsStore } = await import("@/stores/threads");
 const { useThreadStore } = await import("@/stores/thread");
 const { useUiStore } = await import("@/stores/ui");
 const { mcpPanelCommand, showView, useViewsStore } = await import("@/stores/views");
 
 const thread = (id: string, state = "connected") =>
-  ({ id, name: `thread ${id}`, repoId: "web", worktreePath: "/src/web", workspaceId: "", pendingWorktreePath: "", state, status: "idle", linkedPullRequests: [], usage: [] }) as unknown as ThreadView;
+  ({ id, name: `thread ${id}`, projectId: "web", worktreePath: "/src/web", workspaceId: "", pendingWorktreePath: "", state, status: "idle", linkedPullRequests: [], usage: [] }) as unknown as ThreadView;
 
 function server(name: string, o: Partial<McpServerView> = {}): McpServerView {
   return { name, status: "connected", serverName: "", version: "", error: "", scope: "user", source: "user", transport: "stdio", tools: [], ...o };
@@ -54,7 +54,7 @@ const within = (el: HTMLElement, id: string) => el.querySelector(`[data-testid="
 const row = () => screen.queryByTestId("panel-empty")?.querySelector('[data-surface="mcp"]') ?? null;
 
 beforeEach(() => {
-  useReposStore.setState({ byId: {}, order: [] });
+  useProjectsStore.setState({ byId: {}, order: [] });
   useThreadsStore.setState({ byId: { "s-r": thread("s-r"), "s-off": thread("s-off", "disconnected") }, order: ["s-r", "s-off"] });
   usePanelStore.setState({ byKey: { "thread:s-r": { open: true, tabs: [], activeTabId: null }, "thread:s-off": { open: true, tabs: [], activeTabId: null }, "view:projects": { open: true, tabs: [], activeTabId: null } } });
   useViewsStore.setState({ settingsOpen: false });

@@ -1,13 +1,13 @@
 import { GitMerge } from "lucide-react";
 import { Tip } from "@/components/ui/tooltip";
 import { cleanableTitle } from "@/lib/projects";
-import { findWorktree, useReposStore } from "@/stores/repos";
+import { findWorktree, useProjectsStore } from "@/stores/projects";
 import { useCleanable } from "./useCleanable";
 
 /** The emerald "in main" tag of a worktree the cleanup would remove (nothing otherwise). */
-export function CleanableTag({ repoId, path }: { repoId: string; path: string }) {
-  const cleanable = useCleanable(repoId, path);
-  const baseRef = useReposStore((s) => findWorktree(s, repoId, path)?.status.baseRef ?? "");
+export function CleanableTag({ projectId, path }: { projectId: string; path: string }) {
+  const cleanable = useCleanable(projectId, path);
+  const baseRef = useProjectsStore((s) => findWorktree(s, projectId, path)?.status.baseRef ?? "");
   if (!cleanable) return null;
   return (
     <Tip label={cleanableTitle(baseRef)}>

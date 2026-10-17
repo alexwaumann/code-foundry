@@ -4,7 +4,7 @@ import type { ThreadView } from "@/api/threads";
 
 const { SidePanel } = await import("@/components/panel/SidePanel");
 const { getPanel, usePanelStore } = await import("@/stores/panel");
-const { useReposStore } = await import("@/stores/repos");
+const { useProjectsStore } = await import("@/stores/projects");
 const { useThreadsStore } = await import("@/stores/threads");
 const { useUiStore } = await import("@/stores/ui");
 const { showView, threadsPanelCommand, useViewsStore } = await import("@/stores/views");
@@ -18,7 +18,7 @@ function thread(id: string, o: Partial<ThreadView> = {}): ThreadView {
   return {
     id,
     name: `name ${id}`,
-    repoId: "web",
+    projectId: "web",
     worktreePath: "/src/web",
     workspaceId: "",
     pendingWorktreePath: "",
@@ -48,7 +48,7 @@ function setThreads(list: ThreadView[]): void {
 function sketch(): ThreadView[] {
   return [
     thread("p", { name: "Fix login redirect", state: "connected", status: "busy" }),
-    thread("me", by("p", { name: "Add retry", status: "attention", statusReason: "finished", brief: "Add retry, keep the PR small", repoId: "auth", worktreePath: "/src/auth" })),
+    thread("me", by("p", { name: "Add retry", status: "attention", statusReason: "finished", brief: "Add retry, keep the PR small", projectId: "auth", worktreePath: "/src/auth" })),
     thread("s1", by("p", { state: "connected", status: "busy", brief: "Cover the retry path" })),
     thread("s2", by("p", { status: "attention", statusReason: "permission: Bash" })),
     thread("s3", by("p", { status: "error", statusReason: "interrupted", archivedAtMs: NOW })),
@@ -72,7 +72,7 @@ function open(): void {
 
 beforeEach(() => {
   created = 0;
-  useReposStore.setState({
+  useProjectsStore.setState({
     byId: {
       web: { id: "web", name: "web-app", git: true, githubSlug: "", worktrees: [{ path: "/src/web", branch: "cf/fix-login", head: "a", isMain: false }] },
       auth: { id: "auth", name: "auth-service", git: true, githubSlug: "", worktrees: [{ path: "/src/auth", branch: "cf/login-retry", head: "b", isMain: false }] },

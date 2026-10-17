@@ -19,7 +19,7 @@ const { useUiStore } = await import("./ui");
 function term(id: string, labels: Record<string, string>): TerminalView {
   return { id, argv: ["/bin/zsh"], cwd: "/src/app", cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: null, exitedAtMs: null, altScreen: false, labels };
 }
-const thread = (id: string) => ({ id, repoId: "r1", worktreePath: "/src/app", workspaceId: "", state: "connected" }) as ThreadView;
+const thread = (id: string) => ({ id, projectId: "r1", worktreePath: "/src/app", workspaceId: "", state: "connected" }) as ThreadView;
 const shell = { kind: "shell", thread: "s1", project: "r1", worktree: "/src/app" };
 
 function setTerminals(list: TerminalView[]): void {

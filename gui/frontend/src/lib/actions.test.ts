@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ActionView } from "@/api/actions";
 import { actionCommandOf, actionTabStatus, addArgs, commandEcho, draftOf, draftProblem, editArgs, formatRunClock, formatRunDuration, NEW_ACTION_DRAFT, refusalText } from "./actions";
 
-const action: ActionView = { id: "a-1", repoId: "repo-cf", name: "Test", command: "go test ./...", icon: "test", inTerminal: true, onWorktreeCreate: false, position: 1 };
+const action: ActionView = { id: "a-1", projectId: "repo-cf", name: "Test", command: "go test ./...", icon: "test", inTerminal: true, onWorktreeCreate: false, position: 1 };
 
 describe("actionTabStatus", () => {
   it.each([

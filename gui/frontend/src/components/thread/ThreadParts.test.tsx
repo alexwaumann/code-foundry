@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CommandView } from "@/api/command";
 import type { ThreadView } from "@/api/threads";
 import { useCommandsStore } from "@/stores/commands";
-import { useReposStore } from "@/stores/repos";
+import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { ThreadTitle } from "./ThreadParts";
 
@@ -13,22 +13,22 @@ vi.mock("@/keys/bindings", async (orig) => ({ ...(await orig<typeof import("@/ke
 const cmd = (name: string): CommandView => ({ name, title: name, description: "", category: "", args: [], keybindings: [], available: true });
 
 const thread = (o: Partial<ThreadView>) =>
-  ({ id: "s-1", name: "Fix the stale PR badge", repoId: "cf", worktreePath: "/src/cf.worktrees/pr-badge", workspaceId: "", pendingWorktreePath: "", state: "connected", status: "idle", model: "opus", effort: "high", linkedPullRequests: [], ...o }) as ThreadView;
+  ({ id: "s-1", name: "Fix the stale PR badge", projectId: "cf", worktreePath: "/src/cf.worktrees/pr-badge", workspaceId: "", pendingWorktreePath: "", state: "connected", status: "idle", model: "opus", effort: "high", linkedPullRequests: [], ...o }) as ThreadView;
 
 type Worktree = { path: string; branch: string; head: string; isMain?: boolean };
-function repo(name: string, worktrees: Worktree[], git = true) {
-  return { id: name, name, git, worktrees } as unknown as ReturnType<typeof useReposStore.getState>["byId"][string];
+function project(name: string, worktrees: Worktree[], git = true) {
+  return { id: name, name, git, worktrees } as unknown as ReturnType<typeof useProjectsStore.getState>["byId"][string];
 }
 
 beforeEach(() => {
   useCommandsStore.setState({ commands: [cmd("thread.rename"), cmd("view.panel.worktree")] });
-  useReposStore.setState({
+  useProjectsStore.setState({
     byId: {
-      cf: repo("code-foundry", [
+      cf: project("code-foundry", [
         { path: "/src/cf", branch: "main", head: "abc", isMain: true },
         { path: "/src/cf.worktrees/pr-badge", branch: "cf/pr-badge-stale", head: "def", isMain: false },
       ]),
-      notes: repo("scratch notes", [{ path: "/src/notes", branch: "", head: "", isMain: true }], false),
+      notes: project("scratch notes", [{ path: "/src/notes", branch: "", head: "", isMain: true }], false),
     },
     order: ["cf", "notes"],
   });
@@ -66,13 +66,13 @@ describe("ThreadTitle", () => {
     ["a linked worktree: project @ branch and the worktree chip", "/src/cf.worktrees/pr-badge", "cf", "code-foundry@cf/pr-badge-staleworktree", true],
     ["the main checkout: no chip", "/src/cf", "cf", "code-foundry@main", false],
     ["no git: the folder and No git, no branch", "/src/notes", "notes", "scratch notesNo git", false],
-  ])("%s", (_name, worktreePath, repoId, text, chip) => {
-    useThreadsStore.setState({ byId: { "s-1": thread({ worktreePath, repoId }) } });
+  ])("%s", (_name, worktreePath, projectId, text, chip) => {
+    useThreadsStore.setState({ byId: { "s-1": thread({ worktreePath, projectId }) } });
     render(<ThreadTitle id="s-1" />);
     expect(location().textContent).toBe(text);
     expect(screen.queryByTestId("thread-worktree-chip") !== null).toBe(chip);
-    expect(screen.queryByTestId("thread-branch") === null).toBe(repoId === "notes");
-    expect(screen.queryByTestId("no-git-badge") !== null).toBe(repoId === "notes");
+    expect(screen.queryByTestId("thread-branch") === null).toBe(projectId === "notes");
+    expect(screen.queryByTestId("no-git-badge") !== null).toBe(projectId === "notes");
   });
 
   it("opens the worktree surface through view.panel.worktree; plain text where it is unavailable", () => {
@@ -93,7 +93,7 @@ describe("ThreadTitle", () => {
 
   it("no project: the House icon and No project, no branch or chip, plain text without view.panel.worktree", () => {
     useCommandsStore.setState({ commands: [cmd("thread.rename")] });
-    useThreadsStore.setState({ byId: { "s-1": thread({ repoId: "", worktreePath: "/Users/dev" }) } });
+    useThreadsStore.setState({ byId: { "s-1": thread({ projectId: "", worktreePath: "/Users/dev" }) } });
     render(<ThreadTitle id="s-1" />);
     expect(location().tagName).toBe("SPAN");
     expect(location().textContent).toBe("No project");

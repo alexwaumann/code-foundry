@@ -37,7 +37,7 @@ export interface GitStatusView {
 }
 
 export interface WorktreeView {
-  repoId: string;
+  projectId: string;
   path: string;
   branch: string;
   head: string;
@@ -54,7 +54,7 @@ export interface WorktreeView {
   mergedClean?: boolean;
 }
 
-export interface RepoView {
+export interface ProjectView {
   id: string;
   path: string;
   name: string;
@@ -73,20 +73,20 @@ export interface RepoView {
 
 /**
  * A git repository with no remote (not one without git): offers Publish to GitHub.
- * Shown only once the repo has been reconciled (it has a worktree).
+ * Shown only once the project has been reconciled (it has a worktree).
  */
-export function isRemoteless(r: Pick<RepoView, "git" | "remotes" | "worktrees">): boolean {
+export function isRemoteless(r: Pick<ProjectView, "git" | "remotes" | "worktrees">): boolean {
   return r.git && r.remotes.length === 0 && r.worktrees.length > 0;
 }
 
-export type RepoEventView =
-  | { kind: "snapshot"; repos: RepoView[] }
-  | { kind: "repoUpdated"; repo: RepoView }
-  | { kind: "repoRemoved"; id: string }
+export type ProjectEventView =
+  | { kind: "snapshot"; projects: ProjectView[] }
+  | { kind: "projectUpdated"; project: ProjectView }
+  | { kind: "projectRemoved"; id: string }
   | { kind: "worktreeUpdated"; worktree: WorktreeView }
-  | { kind: "worktreeRemoved"; repoId: string; path: string }
-  /** The worktree's detail changed (see api/worktreeDetail.ts); repo state is unchanged. */
-  | { kind: "worktreeDetailUpdated"; repoId: string; path: string };
+  | { kind: "worktreeRemoved"; projectId: string; path: string }
+  /** The worktree's detail changed (see api/worktreeDetail.ts); project state is unchanged. */
+  | { kind: "worktreeDetailUpdated"; projectId: string; path: string };
 
 const cleanStatus: GitStatusView = {
   upstream: "",
@@ -130,10 +130,10 @@ export function toGitStatusView(s: GitStatus | undefined): GitStatusView {
 }
 
 export function toWorktreeView(w: Worktree): WorktreeView {
-  return { repoId: w.projectId, path: w.path, branch: w.branch, head: w.head, detached: w.detached, isMain: w.isMain, status: toGitStatusView(w.status), mergedClean: w.mergedClean };
+  return { projectId: w.projectId, path: w.path, branch: w.branch, head: w.head, detached: w.detached, isMain: w.isMain, status: toGitStatusView(w.status), mergedClean: w.mergedClean };
 }
 
-export function toRepoView(r: Project): RepoView {
+export function toProjectView(r: Project): ProjectView {
   return {
     id: r.id,
     path: r.path,
@@ -146,30 +146,30 @@ export function toRepoView(r: Project): RepoView {
   };
 }
 
-export function toRepoEventView(ev: ProjectEvent): RepoEventView | null {
+export function toProjectEventView(ev: ProjectEvent): ProjectEventView | null {
   const e = ev.event;
   switch (e.case) {
     case "snapshot":
-      return { kind: "snapshot", repos: e.value.projects.map(toRepoView) };
+      return { kind: "snapshot", projects: e.value.projects.map(toProjectView) };
     case "projectUpdated":
-      return { kind: "repoUpdated", repo: toRepoView(e.value) };
+      return { kind: "projectUpdated", project: toProjectView(e.value) };
     case "projectRemovedId":
-      return { kind: "repoRemoved", id: e.value };
+      return { kind: "projectRemoved", id: e.value };
     case "worktreeUpdated":
       return { kind: "worktreeUpdated", worktree: toWorktreeView(e.value) };
     case "worktreeRemoved":
-      return { kind: "worktreeRemoved", repoId: e.value.projectId, path: e.value.path };
+      return { kind: "worktreeRemoved", projectId: e.value.projectId, path: e.value.path };
     case "worktreeDetailUpdated":
-      return { kind: "worktreeDetailUpdated", repoId: e.value.projectId, path: e.value.path };
+      return { kind: "worktreeDetailUpdated", projectId: e.value.projectId, path: e.value.path };
     default:
       return null;
   }
 }
 
-export async function listRepos(conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<RepoView[]> {
+export async function listProjects(conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<ProjectView[]> {
   const c = await conn.client(ProjectService);
   const res = await c.list({}, { signal });
-  return res.projects.map(toRepoView);
+  return res.projects.map(toProjectView);
 }
 
 export interface RefsView {
@@ -183,10 +183,10 @@ export interface RefsView {
  * Refs a new worktree can be based on (ProjectService.ListRefs). A daemon older than the
  * RPC fails with OutdatedDaemonError.
  */
-export async function listRefs(repoId: string, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<RefsView> {
+export async function listRefs(projectId: string, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<RefsView> {
   const c = await conn.client(ProjectService);
   try {
-    const res = await c.listRefs({ projectId: repoId }, { signal });
+    const res = await c.listRefs({ projectId }, { signal });
     return { refs: [...res.refs], defaultRef: res.defaultRef };
   } catch (err) {
     throw orOutdatedDaemon(err);

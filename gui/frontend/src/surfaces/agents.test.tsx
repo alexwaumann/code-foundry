@@ -5,7 +5,7 @@ import type { ThreadView } from "@/api/threads";
 
 const { SidePanel } = await import("@/components/panel/SidePanel");
 const { getPanel, usePanelStore } = await import("@/stores/panel");
-const { useReposStore } = await import("@/stores/repos");
+const { useProjectsStore } = await import("@/stores/projects");
 const { useThreadsStore } = await import("@/stores/threads");
 const { applyWatchBatch, useThreadStore } = await import("@/stores/thread");
 const { useUiStore } = await import("@/stores/ui");
@@ -13,7 +13,7 @@ const { agentsPanelCommand, showView, useViewsStore } = await import("@/stores/v
 const { useAgentRowIds, useAgentRun } = await import("@/stores/agents");
 
 const thread = (id: string, state = "connected") =>
-  ({ id, name: `thread ${id}`, repoId: "web", worktreePath: "/src/web", workspaceId: "", pendingWorktreePath: "", state, status: "idle", linkedPullRequests: [], usage: [] }) as unknown as ThreadView;
+  ({ id, name: `thread ${id}`, projectId: "web", worktreePath: "/src/web", workspaceId: "", pendingWorktreePath: "", state, status: "idle", linkedPullRequests: [], usage: [] }) as unknown as ThreadView;
 
 const NOW = Date.now();
 
@@ -63,7 +63,7 @@ const within = (el: HTMLElement, id: string) => el.querySelector(`[data-testid="
 const entry = () => screen.queryByTestId("panel-empty")?.querySelector('[data-surface="agents"]') ?? null;
 
 beforeEach(() => {
-  useReposStore.setState({ byId: {}, order: [] });
+  useProjectsStore.setState({ byId: {}, order: [] });
   useThreadsStore.setState({ byId: { "s-r": thread("s-r"), "s-off": thread("s-off", "disconnected") }, order: ["s-r", "s-off"] });
   usePanelStore.setState({ byKey: { "thread:s-r": { open: true, tabs: [], activeTabId: null }, "view:projects": { open: true, tabs: [], activeTabId: null } } });
   useViewsStore.setState({ settingsOpen: false });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { isNoProject, memberName, modelLabel, NO_PROJECT, threadRowModel, worktreeBranch, type RepoLookup, type WorkspaceLookup } from "./threadRow";
+import { isNoProject, memberName, modelLabel, NO_PROJECT, threadRowModel, worktreeBranch, type ProjectLookup, type WorkspaceLookup } from "./threadRow";
 
-const repos: RepoLookup & { order: string[] } = {
+const projects: ProjectLookup & { order: string[] } = {
   order: ["api", "notes", "web"],
   byId: {
     web: {
@@ -22,8 +22,8 @@ const workspaces: WorkspaceLookup = {
     "w-1": {
       name: "login",
       members: [
-        { repoId: "web", worktreePath: "/wt/web/cf-login" },
-        { repoId: "api", worktreePath: "/wt/api/cf-login" },
+        { projectId: "web", worktreePath: "/wt/web/cf-login" },
+        { projectId: "api", worktreePath: "/wt/api/cf-login" },
       ],
     },
   },
@@ -31,63 +31,63 @@ const workspaces: WorkspaceLookup = {
 
 describe("threadRowModel", () => {
   it.each([
-    ["a project thread: no badge", { repoId: "web", worktreePath: "/src/web", workspaceId: "", pendingWorktreePath: "" }, { project: "web", branch: "main", workspace: null, movingTo: null, worktree: false }],
+    ["a project thread: no badge", { projectId: "web", worktreePath: "/src/web", workspaceId: "", pendingWorktreePath: "" }, { project: "web", branch: "main", workspace: null, movingTo: null, worktree: false }],
     [
       "a workspace thread: badge with the workspace name",
-      { repoId: "web", worktreePath: "/wt/web/cf-login", workspaceId: "w-1", pendingWorktreePath: "" },
+      { projectId: "web", worktreePath: "/wt/web/cf-login", workspaceId: "w-1", pendingWorktreePath: "" },
       { project: "web", branch: "cf/login", workspace: "login", movingTo: null, worktree: true },
     ],
     [
       "a queued move names the target member's project",
-      { repoId: "web", worktreePath: "/wt/web/cf-login", workspaceId: "w-1", pendingWorktreePath: "/wt/api/cf-login" },
+      { projectId: "web", worktreePath: "/wt/web/cf-login", workspaceId: "w-1", pendingWorktreePath: "/wt/api/cf-login" },
       { project: "web", branch: "cf/login", workspace: "login", movingTo: "api", worktree: true },
     ],
     [
       "a pending path equal to the cwd is no move",
-      { repoId: "api", worktreePath: "/wt/api/cf-login", workspaceId: "w-1", pendingWorktreePath: "/wt/api/cf-login" },
+      { projectId: "api", worktreePath: "/wt/api/cf-login", workspaceId: "w-1", pendingWorktreePath: "/wt/api/cf-login" },
       { project: "api", branch: "cf/login", workspace: "login", movingTo: null, worktree: false },
     ],
     [
       "an unknown workspace still badges, by id",
-      { repoId: "api", worktreePath: "/wt/api/cf-login", workspaceId: "w-gone", pendingWorktreePath: "" },
+      { projectId: "api", worktreePath: "/wt/api/cf-login", workspaceId: "w-gone", pendingWorktreePath: "" },
       { project: "api", branch: "cf/login", workspace: "w-gone", movingTo: null, worktree: false },
     ],
     [
       "a detached head shows the short head",
-      { repoId: "web", worktreePath: "/wt/web/detached", workspaceId: "", pendingWorktreePath: "" },
+      { projectId: "web", worktreePath: "/wt/web/detached", workspaceId: "", pendingWorktreePath: "" },
       { project: "web", branch: "c0ffee0", workspace: null, movingTo: null, worktree: true },
     ],
     [
-      "an unknown repo falls back to its id and the path",
-      { repoId: "gone", worktreePath: "/elsewhere/thing", workspaceId: "", pendingWorktreePath: "" },
+      "an unknown project falls back to its id and the path",
+      { projectId: "gone", worktreePath: "/elsewhere/thing", workspaceId: "", pendingWorktreePath: "" },
       { project: "gone", branch: "thing", workspace: null, movingTo: null, worktree: false },
     ],
     [
-      "an older row without a repo id inside a project is placed by its path",
-      { repoId: "", worktreePath: "/src/web/docs", workspaceId: "", pendingWorktreePath: "" },
+      "an older row without a project id inside a project is placed by its path",
+      { projectId: "", worktreePath: "/src/web/docs", workspaceId: "", pendingWorktreePath: "" },
       { project: "web", branch: "docs", workspace: null, movingTo: null, worktree: false },
     ],
   ])("%s", (_name, s, want) => {
-    expect(threadRowModel(s, repos, workspaces)).toEqual({ noGit: false, noProject: false, ...want });
+    expect(threadRowModel(s, projects, workspaces)).toEqual({ noGit: false, noProject: false, ...want });
   });
 
   it("a thread without a project: No project, no branch, no worktree", () => {
-    const s = { repoId: "", worktreePath: "/Users/dev", workspaceId: "", pendingWorktreePath: "" };
-    expect(threadRowModel(s, repos, workspaces)).toEqual({ project: NO_PROJECT, noProject: true, branch: "", noGit: false, workspace: null, movingTo: null, worktree: false });
+    const s = { projectId: "", worktreePath: "/Users/dev", workspaceId: "", pendingWorktreePath: "" };
+    expect(threadRowModel(s, projects, workspaces)).toEqual({ project: NO_PROJECT, noProject: true, branch: "", noGit: false, workspace: null, movingTo: null, worktree: false });
   });
 });
 
 describe("isNoProject", () => {
   it.each([
-    ["home, no repo, no workspace", { repoId: "", workspaceId: "", worktreePath: "/Users/dev" }, true],
-    ["a path in no project", { repoId: "", workspaceId: "", worktreePath: "/elsewhere/thing" }, true],
-    ["a project thread", { repoId: "web", workspaceId: "", worktreePath: "/src/web" }, false],
-    ["a workspace thread", { repoId: "", workspaceId: "w-1", worktreePath: "/wt/web/cf-login" }, false],
-    ["an older row inside a worktree", { repoId: "", workspaceId: "", worktreePath: "/wt/web/cf-login/src" }, false],
-    ["an older row at a no-git checkout", { repoId: "", workspaceId: "", worktreePath: "/Users/dev/writing" }, false],
-    ["a sibling with a shared prefix is not inside", { repoId: "", workspaceId: "", worktreePath: "/src/webapp" }, true],
+    ["home, no project, no workspace", { projectId: "", workspaceId: "", worktreePath: "/Users/dev" }, true],
+    ["a path in no project", { projectId: "", workspaceId: "", worktreePath: "/elsewhere/thing" }, true],
+    ["a project thread", { projectId: "web", workspaceId: "", worktreePath: "/src/web" }, false],
+    ["a workspace thread", { projectId: "", workspaceId: "w-1", worktreePath: "/wt/web/cf-login" }, false],
+    ["an older row inside a worktree", { projectId: "", workspaceId: "", worktreePath: "/wt/web/cf-login/src" }, false],
+    ["an older row at a no-git checkout", { projectId: "", workspaceId: "", worktreePath: "/Users/dev/writing" }, false],
+    ["a sibling with a shared prefix is not inside", { projectId: "", workspaceId: "", worktreePath: "/src/webapp" }, true],
   ])("%s", (_name, s, want) => {
-    expect(isNoProject(s, repos)).toBe(want);
+    expect(isNoProject(s, projects)).toBe(want);
   });
 });
 
@@ -107,16 +107,16 @@ describe("helpers", () => {
     expect(modelLabel(model, models)).toBe(want);
   });
   it("worktreeBranch falls back to the directory name for an unknown worktree", () => {
-    expect(worktreeBranch(repos, "web", "/wt/web/gone")).toBe("gone");
+    expect(worktreeBranch(projects, "web", "/wt/web/gone")).toBe("gone");
   });
-  it("memberName prefers the workspace's member list, then any repo's worktrees", () => {
-    expect(memberName(repos, workspaces.byId["w-1"], "/wt/api/cf-login")).toBe("api");
-    expect(memberName(repos, undefined, "/src/web")).toBe("web");
-    expect(memberName(repos, undefined, "/nowhere/x")).toBe("x");
+  it("memberName prefers the workspace's member list, then any project's worktrees", () => {
+    expect(memberName(projects, workspaces.byId["w-1"], "/wt/api/cf-login")).toBe("api");
+    expect(memberName(projects, undefined, "/src/web")).toBe("web");
+    expect(memberName(projects, undefined, "/nowhere/x")).toBe("x");
   });
   it("a project without git: no branch, the No git badge", () => {
-    const s = { repoId: "notes", worktreePath: "/Users/dev/writing", workspaceId: "", pendingWorktreePath: "" };
-    expect(threadRowModel(s, repos, workspaces)).toEqual({ project: "notes", noProject: false, branch: "", noGit: true, workspace: null, movingTo: null, worktree: false });
-    expect(worktreeBranch(repos, "notes", "/Users/dev/writing")).toBe("");
+    const s = { projectId: "notes", worktreePath: "/Users/dev/writing", workspaceId: "", pendingWorktreePath: "" };
+    expect(threadRowModel(s, projects, workspaces)).toEqual({ project: "notes", noProject: false, branch: "", noGit: true, workspace: null, movingTo: null, worktree: false });
+    expect(worktreeBranch(projects, "notes", "/Users/dev/writing")).toBe("");
   });
 });

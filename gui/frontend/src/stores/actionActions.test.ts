@@ -25,7 +25,7 @@ const finished = (o: Partial<ActionRunFinishedView>): ActionRunFinishedView => (
   runId: "r-1",
   actionId: "a-1",
   actionName: "Install deps",
-  repoId: "repo-cf",
+  projectId: "repo-cf",
   threadId: "s-1",
   exitCode: 1,
   mode: "background",
@@ -38,7 +38,7 @@ beforeEach(() => {
   runCommandForResult.mockReset();
   useThreadsStore.setState({ byId: {}, order: [] });
   runCommandForResult.mockResolvedValue({ message: "", resultJson: '{"id":"r-9","terminalId":"t-9"}' });
-  useActionsStore.setState({ byId: { "a-1": { id: "a-1", repoId: "repo-cf", name: "Test", command: "go test", icon: "test", inTerminal: true, onWorktreeCreate: false, position: 0 } }, byRepo: { "repo-cf": ["a-1"] }, runs: {} });
+  useActionsStore.setState({ byId: { "a-1": { id: "a-1", projectId: "repo-cf", name: "Test", command: "go test", icon: "test", inTerminal: true, onWorktreeCreate: false, position: 0 } }, byProject: { "repo-cf": ["a-1"] }, runs: {} });
 });
 
 afterEach(() => {
@@ -82,7 +82,7 @@ describe("openFailedRun", () => {
 describe("ownerOfTerminal", () => {
   it.each([
     ["a thread's", { kind: "action", thread: "s-1", project: "r", worktree: "/w" }, { kind: "thread", threadId: "s-1" }],
-    ["a worktree's", { kind: "action", project: "r", worktree: "/w" }, { kind: "worktree", repoId: "r", path: "/w" }],
+    ["a worktree's", { kind: "action", project: "r", worktree: "/w" }, { kind: "worktree", projectId: "r", path: "/w" }],
     ["neither", { kind: "action" }, null],
   ])("%s", (_n, labels, want) => {
     expect(ownerOfTerminal(labels)).toEqual(want);
@@ -91,8 +91,8 @@ describe("ownerOfTerminal", () => {
 
 describe("runs", () => {
   it("runAction: action.run --terminal in the owner's context, quietly; the new tab is shown", async () => {
-    await expect(runAction("a-1", { kind: "worktree", repoId: "repo-cf", path: "/w" })).resolves.toBe("t-9");
-    expect(runCommandForResult).toHaveBeenCalledWith("action.run", { action: "a-1", terminal: "true" }, { ctx: expect.objectContaining({ activeRepoId: "repo-cf", activeWorktreePath: "/w" }) as unknown, quiet: true });
+    await expect(runAction("a-1", { kind: "worktree", projectId: "repo-cf", path: "/w" })).resolves.toBe("t-9");
+    expect(runCommandForResult).toHaveBeenCalledWith("action.run", { action: "a-1", terminal: "true" }, { ctx: expect.objectContaining({ activeProjectId: "repo-cf", activeWorktreePath: "/w" }) as unknown, quiet: true });
     expect(showOwnTerminal).toHaveBeenCalledWith("t-9");
   });
 
@@ -162,13 +162,13 @@ describe("runs", () => {
 
 describe("saveAction and deleteAction", () => {
   it("a new action: action.add with the project", async () => {
-    await expect(saveAction({ repoId: "repo-cf" }, { name: "Lint", command: "make lint", icon: "lint", onWorktreeCreate: false })).resolves.toBeNull();
+    await expect(saveAction({ projectId: "repo-cf" }, { name: "Lint", command: "make lint", icon: "lint", onWorktreeCreate: false })).resolves.toBeNull();
     expect(runCommandForResult.mock.calls[0]?.[0]).toBe("action.add");
     expect(runCommandForResult.mock.calls[0]?.[1]).toMatchObject({ name: "Lint", project: "repo-cf", "in-terminal": "true" });
   });
 
   it("an unchanged edit asks nothing", async () => {
-    await expect(saveAction({ repoId: "repo-cf", actionId: "a-1" }, { name: "Test", command: "go test", icon: "test", onWorktreeCreate: false })).resolves.toBeNull();
+    await expect(saveAction({ projectId: "repo-cf", actionId: "a-1" }, { name: "Test", command: "go test", icon: "test", onWorktreeCreate: false })).resolves.toBeNull();
     expect(runCommandForResult).not.toHaveBeenCalled();
   });
 
@@ -180,11 +180,11 @@ describe("saveAction and deleteAction", () => {
       expect(o.expected?.(new Error("x"))).toBe(true);
       return Promise.resolve(null);
     });
-    await expect(saveAction({ repoId: "repo-cf", actionId: "a-1" }, { name: "test", command: "go test", icon: "test", onWorktreeCreate: false })).resolves.toBe('this project already has an action named "Test"');
+    await expect(saveAction({ projectId: "repo-cf", actionId: "a-1" }, { name: "test", command: "go test", icon: "test", onWorktreeCreate: false })).resolves.toBe('this project already has an action named "Test"');
   });
 
   it("an action deleted meanwhile", async () => {
-    await expect(saveAction({ repoId: "repo-cf", actionId: "a-gone" }, { name: "x", command: "y", icon: "play", onWorktreeCreate: false })).resolves.toMatch(/deleted/);
+    await expect(saveAction({ projectId: "repo-cf", actionId: "a-gone" }, { name: "x", command: "y", icon: "play", onWorktreeCreate: false })).resolves.toMatch(/deleted/);
   });
 
   it("deleteAction: action.remove by id in the project", async () => {

@@ -10,23 +10,23 @@ import { runFromResult, type ActionRunFinishedView } from "@/api/actions";
 import { invokeCommand, type UiContextView } from "@/api/command";
 import { errorMessage } from "@/api/stream";
 import { addArgs, editArgs, refusalText, type ActionDraft } from "@/lib/actions";
-import { ACTION_LABEL, REPO_LABEL, THREAD_LABEL, WORKTREE_LABEL } from "@/lib/termlabel";
+import { ACTION_LABEL, PROJECT_LABEL, THREAD_LABEL, WORKTREE_LABEL } from "@/lib/termlabel";
 import { useActionsStore } from "./actions";
 import { openActionRunOutput } from "./actionDialog";
 import { clearStopRequested, markStopRequested } from "./actionStops";
 import { closeBottomTerminal, revealShell, showOwnTerminal } from "./bottomActions";
 import { refreshCommands, runCommandForResult, useCommandsStore } from "./commands";
-import { getUiContext, repoContext, worktreeContext } from "./context";
+import { getUiContext, projectContext, worktreeContext } from "./context";
 import { useThreadsStore } from "./threads";
 import { useTerminalsStore } from "./terminals";
 import { useUiStore } from "./ui";
 
 /** Who a run belongs to: a thread (its bottom panel) or a worktree (the Projects page's panel). */
-export type ActionOwner = { kind: "thread"; threadId: string } | { kind: "worktree"; repoId: string; path: string };
+export type ActionOwner = { kind: "thread"; threadId: string } | { kind: "worktree"; projectId: string; path: string };
 
 /** The command context a run for `owner` is started in (action.run takes its owner from it). */
 export function ownerContext(owner: ActionOwner): UiContextView {
-  return owner.kind === "thread" ? getUiContext({ kind: "thread", id: owner.threadId }) : worktreeContext(owner.repoId, owner.path);
+  return owner.kind === "thread" ? getUiContext({ kind: "thread", id: owner.threadId }) : worktreeContext(owner.projectId, owner.path);
 }
 
 /**
@@ -47,9 +47,9 @@ export async function runAction(actionId: string, owner: ActionOwner): Promise<s
 export function ownerOfTerminal(labels: Readonly<Record<string, string>>): ActionOwner | null {
   const thread = labels[THREAD_LABEL];
   if (thread) return { kind: "thread", threadId: thread };
-  const repoId = labels[REPO_LABEL] ?? "";
+  const projectId = labels[PROJECT_LABEL] ?? "";
   const path = labels[WORKTREE_LABEL] ?? "";
-  return repoId && path ? { kind: "worktree", repoId, path } : null;
+  return projectId && path ? { kind: "worktree", projectId, path } : null;
 }
 
 /**
@@ -98,16 +98,16 @@ export async function rerunAction(terminalId: string): Promise<string | null> {
 }
 
 /**
- * Save in the editor: action.add for a new action of `repoId`, action.edit (changed
+ * Save in the editor: action.add for a new action of `projectId`, action.edit (changed
  * fields only) for an existing one. Resolves to null on success (also when nothing
  * changed) or the daemon's refusal, which the editor shows in place (no toast).
  */
-export async function saveAction(target: { repoId: string; actionId?: string }, draft: ActionDraft): Promise<string | null> {
+export async function saveAction(target: { projectId: string; actionId?: string }, draft: ActionDraft): Promise<string | null> {
   let args: Record<string, string> | null;
   let name: string;
   if (target.actionId === undefined) {
     name = "action.add";
-    args = addArgs(target.repoId, draft);
+    args = addArgs(target.projectId, draft);
   } else {
     const a = useActionsStore.getState().byId[target.actionId];
     if (!a) return "This action was deleted meanwhile.";
@@ -117,7 +117,7 @@ export async function saveAction(target: { repoId: string; actionId?: string }, 
   }
   const failed = { message: "Could not save the action." };
   const res = await runCommandForResult(name, args, {
-    ctx: repoContext(target.repoId),
+    ctx: projectContext(target.projectId),
     quiet: true,
     onError: (m) => {
       failed.message = refusalText(m);
@@ -128,10 +128,10 @@ export async function saveAction(target: { repoId: string; actionId?: string }, 
 }
 
 /** Delete in the editor: action.remove. Resolves to null, or the daemon's refusal. */
-export async function deleteAction(actionId: string, repoId: string): Promise<string | null> {
+export async function deleteAction(actionId: string, projectId: string): Promise<string | null> {
   const failed = { message: "Could not delete the action." };
-  const res = await runCommandForResult("action.remove", { action: actionId, project: repoId }, {
-    ctx: repoContext(repoId),
+  const res = await runCommandForResult("action.remove", { action: actionId, project: projectId }, {
+    ctx: projectContext(projectId),
     quiet: true,
     onError: (m) => {
       failed.message = refusalText(m);

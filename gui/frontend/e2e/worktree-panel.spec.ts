@@ -50,7 +50,7 @@ test("double-click on a worktree row and on a project row opens their tabs in th
 });
 
 test("Enter on a workspace member row opens its tab in the page's panel", async ({ page }) => {
-  await mockPost("workspace?name=login&repos=repo-cf,repo-gp");
+  await mockPost("workspace?name=login&projects=repo-cf,repo-gp");
   await openApp(page);
   await openProjects(page);
   const member = page.locator('[data-nav-key="m:w-000000000001::repo-gp"]');

@@ -10,7 +10,7 @@ import { shortAge } from "@/lib/thread";
 import { threadRowModel, type WorkspaceLookup } from "@/lib/threadRow";
 import { cn } from "@/lib/utils";
 import { useChildIds, useCreator, useLineageCounts, useLineageStatus, useSiblingIds } from "@/stores/lineage";
-import { useReposStore } from "@/stores/repos";
+import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 
@@ -58,10 +58,10 @@ function Place({ id }: { id: string }) {
   const where = useThreadsStore(
     useShallow((st) => {
       const x = st.byId[id];
-      return { repoId: x?.repoId ?? "", worktreePath: x?.worktreePath ?? "", workspaceId: x?.workspaceId ?? "", pendingWorktreePath: "" };
+      return { projectId: x?.projectId ?? "", worktreePath: x?.worktreePath ?? "", workspaceId: x?.workspaceId ?? "", pendingWorktreePath: "" };
     }),
   );
-  const m = useReposStore(
+  const m = useProjectsStore(
     useShallow((st) => {
       const r = threadRowModel(where, st, NO_WORKSPACES);
       return { project: r.project, branch: r.branch, noGit: r.noGit, noProject: r.noProject };

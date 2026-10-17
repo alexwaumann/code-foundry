@@ -60,23 +60,23 @@ export function WorkspaceSurface({ workspaceId }: { workspaceId: string }) {
   const threadId = useThreadOf(workspaceId);
   const known = useWorkspacesStore((s) => s.byId[workspaceId] !== undefined);
   const loaded = useWorkspacesStore((s) => s.loaded);
-  const memberKeys = useWorkspacesStore(useShallow((s) => (s.byId[workspaceId]?.members ?? []).map((m) => `${m.repoId}${SEP}${m.worktreePath}`)));
+  const memberKeys = useWorkspacesStore(useShallow((s) => (s.byId[workspaceId]?.members ?? []).map((m) => `${m.projectId}${SEP}${m.worktreePath}`)));
   const items = useMemo<NavItem[]>(
     () =>
       memberKeys.map((k) => {
-        const [repoId = "", path = ""] = k.split(SEP);
+        const [projectId = "", path = ""] = k.split(SEP);
         return {
-          key: memberKey(workspaceId, repoId),
+          key: memberKey(workspaceId, projectId),
           activate: () => {
-            if (panelKey) openMemberTab(panelKey, repoId, path);
+            if (panelKey) openMemberTab(panelKey, projectId, path);
           },
         };
       }),
     [memberKeys, workspaceId, panelKey],
   );
   const nav = useNav(items);
-  const open = (repoId: string, path: string) => {
-    if (panelKey) openMemberTab(panelKey, repoId, path);
+  const open = (projectId: string, path: string) => {
+    if (panelKey) openMemberTab(panelKey, projectId, path);
   };
 
   return (

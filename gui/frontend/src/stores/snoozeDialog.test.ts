@@ -9,7 +9,7 @@ const { presentInPalette } = await import("@/keys/bindings");
 const { useThreadsStore } = await import("./threads");
 const { useUiStore } = await import("./ui");
 
-const thread = (id: string, snoozedUntilMs: number | null) => ({ id, name: id, repoId: "", worktreePath: "", workspaceId: "", linkedPullRequests: [], snoozedUntilMs }) as unknown as ThreadView;
+const thread = (id: string, snoozedUntilMs: number | null) => ({ id, name: id, projectId: "", worktreePath: "", workspaceId: "", linkedPullRequests: [], snoozedUntilMs }) as unknown as ThreadView;
 
 beforeEach(() => {
   useThreadsStore.setState({ byId: { a: thread("a", null), b: thread("b", 5_000) }, order: ["a", "b"] });

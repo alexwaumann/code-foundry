@@ -4,8 +4,8 @@
  *
  *   image  ![shot.png](cf-attachment://a3)            a draft attachment (an image or a PDF), by id
  *   skill  [/deploy](cf-skill://~/deploy)              a user skill (~/.claude)
- *          [/deploy](cf-skill://<repoId>/deploy)       a project skill (the project's .claude)
- *   file   [Composer.tsx](cf-file://<repoId>/src/components/Composer.tsx)
+ *          [/deploy](cf-skill://<projectId>/deploy)       a project skill (the project's .claude)
+ *   file   [Composer.tsx](cf-file://<projectId>/src/components/Composer.tsx)
  *          a project file or directory (ending in "/"), path segments percent-encoded
  *
  * The editor (components/compose/PromptEditor.tsx) parses the string into its document
@@ -19,22 +19,22 @@
 export const ATTACHMENT_SCHEME = "cf-attachment://";
 export const SKILL_SCHEME = "cf-skill://";
 export const FILE_SCHEME = "cf-file://";
-/** The repo slot of a user-scope skill token. */
+/** The project slot of a user-scope skill token. */
 const USER_SCOPE = "~";
 
 /** What an inline tag refers to. */
 export type PromptTag =
   | { tagKind: "image"; id: string; name: string }
-  /** repoId "" for a user skill. */
-  | { tagKind: "skill"; name: string; repoId: string }
+  /** projectId "" for a user skill. */
+  | { tagKind: "skill"; name: string; projectId: string }
   /** path is relative to the checkout, "/"-separated, a directory's ending in "/". */
-  | { tagKind: "file"; repoId: string; path: string };
+  | { tagKind: "file"; projectId: string; path: string };
 
 export type TagKind = PromptTag["tagKind"];
 
 export type PromptPiece = { kind: "text"; text: string } | ({ kind: "tag" } & PromptTag);
 
-// Groups: 1 image label, 2 attachment id | 3 label, 4 skill|file, 5 repo slot, 6 the rest.
+// Groups: 1 image label, 2 attachment id | 3 label, 4 skill|file, 5 project slot, 6 the rest.
 // Labels exclude "[" (tokens never have one), so an unclosed "[" typed before a tag stays text.
 const TOKEN = /!\[([^[\]\n]*)\]\(cf-attachment:\/\/([A-Za-z0-9_-]+)\)|\[([^[\]\n]*)\]\(cf-(skill|file):\/\/([A-Za-z0-9_.~-]+)\/([^\s()]+)\)/g;
 
@@ -87,9 +87,9 @@ export function tagToken(tag: PromptTag): string {
     case "image":
       return `![${cleanLabel(tag.name)}](${ATTACHMENT_SCHEME}${tag.id})`;
     case "skill":
-      return `[${linkLabel(tagLabel(tag))}](${SKILL_SCHEME}${tag.repoId || USER_SCOPE}/${encodeSegment(tag.name)})`;
+      return `[${linkLabel(tagLabel(tag))}](${SKILL_SCHEME}${tag.projectId || USER_SCOPE}/${encodeSegment(tag.name)})`;
     case "file":
-      return `[${linkLabel(tagLabel(tag))}](${FILE_SCHEME}${tag.repoId}/${encodeTagPath(tag.path)})`;
+      return `[${linkLabel(tagLabel(tag))}](${FILE_SCHEME}${tag.projectId}/${encodeTagPath(tag.path)})`;
   }
 }
 
@@ -106,10 +106,10 @@ function matchTag(m: RegExpExecArray): PromptTag | null {
   if (rest === null || rest === "") return null;
   if (m[4] === "skill") {
     if (rest.includes("/")) return null;
-    return { tagKind: "skill", name: rest, repoId: slot === USER_SCOPE ? "" : slot };
+    return { tagKind: "skill", name: rest, projectId: slot === USER_SCOPE ? "" : slot };
   }
   if (slot === USER_SCOPE) return null;
-  return { tagKind: "file", repoId: slot, path: rest };
+  return { tagKind: "file", projectId: slot, path: rest };
 }
 
 /** Every well-formed token of the text with its tag, in order. */
@@ -191,36 +191,36 @@ export function removeReferences(text: string, id: string): string {
   return removeTags(text, (t) => t.tagKind === "image" && t.id === id);
 }
 
-/** The project a tag belongs to: a project skill's or a file's repo; "" for images and user skills. */
-export function tagRepo(tag: PromptTag): string {
-  return tag.tagKind === "image" ? "" : tag.repoId;
+/** The project a tag belongs to: a project skill's or a file's project; "" for images and user skills. */
+export function tagProject(tag: PromptTag): string {
+  return tag.tagKind === "image" ? "" : tag.projectId;
 }
 
 /**
- * Repo ids the prompt's project-scoped tags (project skills, files) refer to, in order of
+ * Project ids the prompt's project-scoped tags (project skills, files) refer to, in order of
  * first appearance: what a change of the draft's projects has to look at.
  */
-export function tagsByRepo(text: string): string[] {
-  return [...new Set(tokens(text).flatMap(({ tag }) => (tagRepo(tag) ? [tagRepo(tag)] : [])))];
+export function tagsByProject(text: string): string[] {
+  return [...new Set(tokens(text).flatMap(({ tag }) => (tagProject(tag) ? [tagProject(tag)] : [])))];
 }
 
-/** How many project-scoped tags refer to the repo. */
-export function repoTagCount(text: string, repoId: string): number {
-  return tokens(text).filter(({ tag }) => tagRepo(tag) === repoId).length;
+/** How many project-scoped tags refer to the project. */
+export function projectTagCount(text: string, projectId: string): number {
+  return tokens(text).filter(({ tag }) => tagProject(tag) === projectId).length;
 }
 
-/** Removes every project-scoped tag of a repo (removeReferences' spacing rules). */
-export function removeRepoTags(text: string, repoId: string): string {
-  return removeTags(text, (t) => tagRepo(t) === repoId);
+/** Removes every project-scoped tag of a project (removeReferences' spacing rules). */
+export function removeProjectTags(text: string, projectId: string): string {
+  return removeTags(text, (t) => tagProject(t) === projectId);
 }
 
 /**
- * Keeps only the project-scoped tags whose repo is one of `repoIds` (for a draft moved to
+ * Keeps only the project-scoped tags whose project is one of `projectIds` (for a draft moved to
  * other projects); the rest go, with removeReferences' spacing rules. Images and user
  * skills always stay.
  */
-export function retainRepoTags(text: string, repoIds: readonly string[]): string {
-  return removeTags(text, (t) => tagRepo(t) !== "" && !repoIds.includes(tagRepo(t)));
+export function retainProjectTags(text: string, projectIds: readonly string[]): string {
+  return removeTags(text, (t) => tagProject(t) !== "" && !projectIds.includes(tagProject(t)));
 }
 
 /** A chip's attachment kind when only its name is known (the attachment is gone): a ".pdf" name is a PDF. */
@@ -241,7 +241,7 @@ export function stagedPdfPages(path: string): number | null {
  * The prompt Claude gets. An attachment chip becomes `[Image: <name>; ref=<ref>]`, or
  * `[PDF: <name>; ref=<ref>]` for a PDF, at its position (ref is the staged path; a chip
  * whose attachment is gone keeps only its name, its kind guessed from the name).
- * A skill becomes `/<name>`, a file `@cf-file://<repoId>/<encoded path>`; a space is put
+ * A skill becomes `/<name>`, a file `@cf-file://<projectId>/<encoded path>`; a space is put
  * after either when anything but whitespace follows, because a slash command and the
  * daemon's file reference both end at whitespace.
  */
@@ -264,7 +264,7 @@ export function projectPrompt(text: string, lookup: (id: string) => { name: stri
         out += `/${tag.name}${gap}`;
         break;
       case "file":
-        out += `@${FILE_SCHEME}${tag.repoId}/${encodeTagPath(tag.path)}${gap}`;
+        out += `@${FILE_SCHEME}${tag.projectId}/${encodeTagPath(tag.path)}${gap}`;
         break;
     }
   }

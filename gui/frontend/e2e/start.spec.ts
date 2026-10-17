@@ -29,12 +29,12 @@ test("onboarding: no projects shows the welcome and Add a project", async ({ pag
   await expect(page.getByTestId("add-project-dialog")).toHaveAttribute("data-tab", "local");
   await expect(page.getByTestId("add-project-local-input")).toBeFocused();
   await expect(page.getByTestId("palette")).toHaveCount(0);
-  expect((await invocations()).filter((i) => i.name.startsWith("repo."))).toEqual([]);
+  expect((await invocations()).filter((i) => i.name.startsWith("project."))).toEqual([]);
 });
 
 test("with projects: greeting, counts, actions, and no New terminal", async ({ page }) => {
   await steadyFleet();
-  await mockPost("threads?repo=repo-cf&count=2&status=busy&prefix=Job");
+  await mockPost("threads?project=repo-cf&count=2&status=busy&prefix=Job");
   await openApp(page);
   await expect(start(page)).toHaveAttribute("data-state", "fleet");
   await expect(page.getByTestId("start-heading")).toHaveText(/^Good (morning|afternoon|evening)$/);
@@ -58,9 +58,9 @@ test("with projects: greeting, counts, actions, and no New terminal", async ({ p
 
 test("thread list: waiting first, capped at six, a row selects its thread", async ({ page }) => {
   await steadyFleet();
-  await mockPost("threads?repo=repo-cf&count=4&status=busy&prefix=Job");
-  await mockPost("threads?repo=repo-dot&count=3&status=attention&prefix=Ask");
-  await mockPost("threads?repo=repo-cf&count=2&status=idle&prefix=Idle");
+  await mockPost("threads?project=repo-cf&count=4&status=busy&prefix=Job");
+  await mockPost("threads?project=repo-dot&count=3&status=attention&prefix=Ask");
+  await mockPost("threads?project=repo-cf&count=2&status=idle&prefix=Idle");
   await openApp(page);
   await expect(page.getByTestId("start-counts")).toHaveText("4 running · 4 waiting on you");
   const rows = page.getByTestId("start-threads").locator("[data-thread-link]");

@@ -1,10 +1,10 @@
 import { toast } from "sonner";
 import { create } from "zustand";
-import { registerRepo, type AddedProjectView } from "@/api/addProject";
+import { registerProject, type AddedProjectView } from "@/api/addProject";
 import { errorMessage } from "@/api/stream";
 import { refreshCommands } from "./commands";
 import { deleteProject, type CreatedProject } from "./publish";
-import { useReposStore } from "./repos";
+import { useProjectsStore } from "./projects";
 import { showWorktreeOnProjectsPage } from "./worktreePanel";
 
 /** The Add Project dialog's tabs, in display order. */
@@ -30,8 +30,8 @@ interface AddProjectState {
 export const useAddProjectStore = create<AddProjectState>()(() => ({ open: false, tab: "local", seq: 0, created: null, busy: false }));
 
 /**
- * Opens the Add Project dialog (repo.add's presenter; repo.clone opens it on GitHub,
- * repo.create on New), on Local folder unless the caller says. Deferred, so that a
+ * Opens the Add Project dialog (project.add's presenter; project.clone opens it on GitHub,
+ * project.create on New), on Local folder unless the caller says. Deferred, so that a
  * palette closing after its presenter ran does not take focus back from the dialog.
  */
 export function openAddProject(tab: AddProjectTab = "local"): void {
@@ -43,7 +43,7 @@ export function openAddProject(tab: AddProjectTab = "local"): void {
 /**
  * Cancels the dialog (Escape, the overlay, the close button). Ignored while the New tab
  * is creating or publishing. A project the New tab created and did not keep is deleted
- * again (repo.delete), folder included.
+ * again (project.delete), folder included.
  */
 export function closeAddProject(): void {
   const s = useAddProjectStore.getState();
@@ -81,35 +81,35 @@ export function setAddProjectTab(tab: AddProjectTab): void {
 
 /**
  * Adds a folder as a project (the Local folder tab, and an existing clone destination)
- * over RepoService.Register: resolves with the project's id and name. Errors reject with
+ * over ProjectService.Register: resolves with the project's id and name. Errors reject with
  * the daemon's message; nothing is toasted (the dialog shows them in place). Commands
  * are refreshed afterwards so their When guards see the new project.
  */
 export async function registerFolder(path: string): Promise<AddedProjectView> {
   try {
-    return await registerRepo(path.length > 1 ? path.replace(/\/+$/, "") : path);
+    return await registerProject(path.length > 1 ? path.replace(/\/+$/, "") : path);
   } finally {
     void refreshCommands();
   }
 }
 
 /**
- * Shows a project just added (its overview) once the repos store has it: the command or
- * clone answers before the repo event arrives on the event stream. Gives up after
+ * Shows a project just added (its overview) once the projects store has it: the command or
+ * clone answers before the project event arrives on the event stream. Gives up after
  * timeoutMs (the user can open it from the Projects page).
  */
-export function selectAddedProject(repoId: string, timeoutMs = 5000): void {
-  if (useReposStore.getState().byId[repoId]) {
-    showWorktreeOnProjectsPage(repoId);
+export function selectAddedProject(projectId: string, timeoutMs = 5000): void {
+  if (useProjectsStore.getState().byId[projectId]) {
+    showWorktreeOnProjectsPage(projectId);
     return;
   }
   const timer = setTimeout(() => {
     unsub();
   }, timeoutMs);
-  const unsub = useReposStore.subscribe((s) => {
-    if (!s.byId[repoId]) return;
+  const unsub = useProjectsStore.subscribe((s) => {
+    if (!s.byId[projectId]) return;
     clearTimeout(timer);
     unsub();
-    showWorktreeOnProjectsPage(repoId);
+    showWorktreeOnProjectsPage(projectId);
   });
 }

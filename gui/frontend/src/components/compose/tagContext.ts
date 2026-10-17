@@ -12,19 +12,19 @@ export interface TagAttrs {
   /** image: the file name; skill: the skill name. */
   name: string;
   /** skill ("" for a user skill), file. */
-  repoId: string;
+  projectId: string;
   /** file: the relative path. */
   path: string;
 }
 
-export const TAG_ATTR_DEFAULTS: TagAttrs = { kind: "image", id: "", name: "", repoId: "", path: "" };
+export const TAG_ATTR_DEFAULTS: TagAttrs = { kind: "image", id: "", name: "", projectId: "", path: "" };
 
 /** The node's attribute spec (TipTap and ProseMirror take the same shape). */
 export const TAG_ATTR_SPEC = {
   kind: { default: TAG_ATTR_DEFAULTS.kind },
   id: { default: "" },
   name: { default: "" },
-  repoId: { default: "" },
+  projectId: { default: "" },
   path: { default: "" },
 };
 
@@ -33,9 +33,9 @@ export function tagAttrs(tag: PromptTag): TagAttrs {
     case "image":
       return { ...TAG_ATTR_DEFAULTS, kind: "image", id: tag.id, name: tag.name };
     case "skill":
-      return { ...TAG_ATTR_DEFAULTS, kind: "skill", name: tag.name, repoId: tag.repoId };
+      return { ...TAG_ATTR_DEFAULTS, kind: "skill", name: tag.name, projectId: tag.projectId };
     case "file":
-      return { ...TAG_ATTR_DEFAULTS, kind: "file", repoId: tag.repoId, path: tag.path };
+      return { ...TAG_ATTR_DEFAULTS, kind: "file", projectId: tag.projectId, path: tag.path };
   }
 }
 
@@ -47,9 +47,9 @@ export function tagOf(attrs: Record<string, unknown>): PromptTag {
   };
   switch (s("kind")) {
     case "skill":
-      return { tagKind: "skill", name: s("name"), repoId: s("repoId") };
+      return { tagKind: "skill", name: s("name"), projectId: s("projectId") };
     case "file":
-      return { tagKind: "file", repoId: s("repoId"), path: s("path") };
+      return { tagKind: "file", projectId: s("projectId"), path: s("path") };
     default:
       return { tagKind: "image", id: s("id"), name: s("name") };
   }

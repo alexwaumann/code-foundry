@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { buildRows, buildSections, rowCache, nextAfter, placeThread, threadKey, threadOrder, type ListThread, type Row } from "./tree";
 
 const W = [
-  { repoId: "r1", path: "/src/app" },
-  { repoId: "r1", path: "/src/app.worktrees/feat" },
-  { repoId: "r2", path: "/src/lib" },
+  { projectId: "r1", path: "/src/app" },
+  { projectId: "r1", path: "/src/app.worktrees/feat" },
+  { projectId: "r2", path: "/src/lib" },
 ];
 
 describe("placeThread", () => {

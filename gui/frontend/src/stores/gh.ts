@@ -58,7 +58,7 @@ export function useViewerLogin(): string {
   return useResource(viewerResource, VIEWER_KEY)?.data?.login ?? "";
 }
 
-/** Keys: "tracked" (registered repos only) or "all". */
+/** Keys: "tracked" (registered projects only) or "all". */
 export const dashboardResource = createResource((key, signal) => getDashboard(key === "all", undefined, signal));
 
 const SEP = "\u0000";

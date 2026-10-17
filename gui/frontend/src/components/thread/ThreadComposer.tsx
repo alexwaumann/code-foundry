@@ -53,27 +53,27 @@ const SEP = "\u0001";
  */
 function useThreadSources(threadId: string) {
   const noProject = useNoProjectThread(threadId);
-  const repoId = useThreadsStore((s) => s.byId[threadId]?.repoId ?? "");
+  const projectId = useThreadsStore((s) => s.byId[threadId]?.projectId ?? "");
   const worktreePath = useThreadsStore((s) => s.byId[threadId]?.worktreePath ?? "");
   const workspaceId = useThreadsStore((s) => s.byId[threadId]?.workspaceId ?? "");
-  const memberKeys = useWorkspacesStore(useShallow((s) => (workspaceId ? (s.byId[workspaceId]?.members ?? []).map((m) => m.repoId + SEP + m.worktreePath) : [])));
+  const memberKeys = useWorkspacesStore(useShallow((s) => (workspaceId ? (s.byId[workspaceId]?.members ?? []).map((m) => m.projectId + SEP + m.worktreePath) : [])));
   return useMemo(() => {
-    if (noProject) return { noProject, repoIds: [], skills: [], files: [] };
+    if (noProject) return { noProject, projectIds: [], skills: [], files: [] };
     const wsMembers = memberKeys.map((k) => {
       const [r = "", p = ""] = k.split(SEP);
-      return { repoId: r, worktreePath: p };
+      return { projectId: r, worktreePath: p };
     });
     const workspace = wsMembers.length > 0;
-    // The thread's own repo first: where it runs.
-    const repoIds = workspace ? [repoId, ...wsMembers.map((m) => m.repoId).filter((r) => r !== repoId)] : [repoId];
-    const input = { target: workspace ? ("workspace" as const) : ("project" as const), repoIds, wsMembers };
+    // The thread's own project first: where it runs.
+    const projectIds = workspace ? [projectId, ...wsMembers.map((m) => m.projectId).filter((r) => r !== projectId)] : [projectId];
+    const input = { target: workspace ? ("workspace" as const) : ("project" as const), projectIds, wsMembers };
     return {
       noProject,
-      repoIds,
+      projectIds,
       skills: skillSources({ ...input, worktree: { kind: "existing", path: worktreePath } }),
       files: fileSources({ ...input, worktree: workspace ? { kind: "members" } : { kind: "existing", path: worktreePath } }),
     };
-  }, [noProject, repoId, worktreePath, memberKeys]);
+  }, [noProject, projectId, worktreePath, memberKeys]);
 }
 
 /** "Snoozed until Thu 9:00 AM" for a snoozed thread, on the shared 30 s clock. */
@@ -157,10 +157,10 @@ export function ThreadComposer({ threadId, pending, busy }: { threadId: string; 
   // "/": the running process's own list (what "/name" runs); the disk scan while there is
   // none (not running yet, or a daemon that predates the list).
   const commands = useSlashCommands(threadId);
-  const skillSource = useSkillSource(trigger, skillSourcesKey(sources.skills), sources.repoIds);
-  const commandSource = useCommandSource(trigger, commands, skillSourcesKey(sources.skills), sources.repoIds);
+  const skillSource = useSkillSource(trigger, skillSourcesKey(sources.skills), sources.projectIds);
+  const commandSource = useCommandSource(trigger, commands, skillSourcesKey(sources.skills), sources.projectIds);
   const slashSource = commands.length > 0 ? commandSource : skillSource;
-  const fileSource = useFileSource(trigger, sources.files, sources.repoIds, sources.repoIds[0] ?? "");
+  const fileSource = useFileSource(trigger, sources.files, sources.projectIds, sources.projectIds[0] ?? "");
   const completion = useCompletion(trigger, setTrigger, trigger?.char === "@" ? fileSource : slashSource, editorRef);
   const sending = phase !== "idle";
   // The daemon takes a message in any state: a stopped thread starts on it.
@@ -305,7 +305,7 @@ export function ThreadComposer({ threadId, pending, busy }: { threadId: string; 
         >
           <Attachments draftKey={draftKey} disabled={sending} refocus={refocus} />
           <AttachmentPreview draftKey={draftKey} />
-          <TagMultiProjectContext.Provider value={sources.repoIds.length > 1}>
+          <TagMultiProjectContext.Provider value={sources.projectIds.length > 1}>
             <PromptEditor
               handleRef={editorRef}
               draftKey={draftKey}

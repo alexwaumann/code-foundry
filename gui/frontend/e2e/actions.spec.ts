@@ -334,7 +334,7 @@ test("the Projects page: a worktree row runs an action for that worktree; the pr
   await expect(bottom(page).locator('[data-kind="action"]')).toHaveText("Build");
   await expect(page.getByTestId("action-echo")).toHaveText("$ make build");
 
-  const project = page.locator('[data-testid="project"][data-repo="repo-gp"]');
+  const project = page.locator('[data-testid="project"][data-project="repo-gp"]');
   await project.getByTestId("project-more").click();
   await page.getByTestId("project-new-action").click();
   await expect(dialog(page)).toHaveAttribute("data-mode", "new");

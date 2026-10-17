@@ -21,7 +21,7 @@ export function resetPublishOwnersCache(): void {
 }
 
 /**
- * The accounts the viewer can publish to (RepoService.ListPublishOwners), fetched while
+ * The accounts the viewer can publish to (ProjectService.ListPublishOwners), fetched while
  * enabled. The list rarely changes and takes a while to fetch (one GitHub request per
  * organization), so the picker always shows the latest known list right away: the one
  * this GUI saw last, then the daemon's cached one (allowStale), and when that is older

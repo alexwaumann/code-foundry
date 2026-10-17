@@ -8,7 +8,7 @@
  * shells and action runs only.
  */
 export const KIND_LABEL = "kind";
-export const REPO_LABEL = "project";
+export const PROJECT_LABEL = "project";
 /** The worktree path the terminal belongs to (the snapshot path, symlinks resolved). */
 export const WORKTREE_LABEL = "worktree";
 /** The thread that owns the terminal: a shell or an action run started for it. */

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { RepoView } from "@/api/repo";
+import type { ProjectView } from "@/api/project";
 import type { ThreadView } from "@/api/threads";
-import type { ReposData } from "@/stores/repos";
+import type { ProjectsData } from "@/stores/projects";
 import type { ThreadsData } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
 import {
@@ -17,13 +17,13 @@ const WEB = "/wt/web/cf-demo";
 const API = "/wt/api/cf-demo";
 
 function thread(id: string, o: Partial<ThreadView> = {}): ThreadView {
-  return { id, repoId: "web", worktreePath: WEB, workspaceId: "", pendingWorktreePath: "", state: "connected", archivedAtMs: null, createdAtMs: 1, lastActivityAtMs: null, ...o } as ThreadView;
+  return { id, projectId: "web", worktreePath: WEB, workspaceId: "", pendingWorktreePath: "", state: "connected", archivedAtMs: null, createdAtMs: 1, lastActivityAtMs: null, ...o } as ThreadView;
 }
 
-const repos: ReposData = {
+const projects: ProjectsData = {
   byId: {
-    web: { id: "web", name: "web", worktrees: [{ path: WEB }] } as unknown as RepoView,
-    api: { id: "api", name: "api", worktrees: [{ path: API }] } as unknown as RepoView,
+    web: { id: "web", name: "web", worktrees: [{ path: WEB }] } as unknown as ProjectView,
+    api: { id: "api", name: "api", worktrees: [{ path: API }] } as unknown as ProjectView,
   },
   order: ["api", "web"],
 };
@@ -33,12 +33,12 @@ function threads(...list: ThreadView[]): ThreadsData {
 }
 
 describe("selectionWorkspaceThread (the surface's availability)", () => {
-  const s = { repos, threads: threads(thread("s-ws", { workspaceId: "w1" }), thread("s-proj")) };
+  const s = { projects, threads: threads(thread("s-ws", { workspaceId: "w1" }), thread("s-proj")) };
   it.each<[string, Selection, { threadId: string; workspaceId: string } | null]>([
     ["a workspace thread", { kind: "thread", id: "s-ws" }, { threadId: "s-ws", workspaceId: "w1" }],
     ["a project thread", { kind: "thread", id: "s-proj" }, null],
     ["an unknown thread", { kind: "thread", id: "s-404" }, null],
-    ["a workspace composer (no thread yet)", { kind: "compose", repoId: "web", workspaceId: "w1" }, null],
+    ["a workspace composer (no thread yet)", { kind: "compose", projectId: "web", workspaceId: "w1" }, null],
     ["the Projects page", { kind: "view", name: "projects" }, null],
     ["nothing", { kind: "none" }, null],
   ])("%s", (_name, sel, want) => {
@@ -55,13 +55,13 @@ describe("tabs", () => {
     expect(workspaceOfTab({ params: {} })).toBeNull();
   });
 
-  it("a member tab is keyed by repo and path, so each member is its own tab", () => {
+  it("a member tab is keyed by project and path, so each member is its own tab", () => {
     const t = memberTab("api", API, "api");
     expect(t.kind).toBe("worktree");
-    expect(t.id).toBe(`worktree?path=${encodeURIComponent(API)}&repo=api`);
-    expect(memberOfTab(t)).toEqual({ repoId: "api", path: API });
+    expect(t.id).toBe(`worktree?path=${encodeURIComponent(API)}&project=api`);
+    expect(memberOfTab(t)).toEqual({ projectId: "api", path: API });
     expect(memberTab("web", WEB, "web").id).not.toBe(t.id);
-    expect(memberOfTab({ params: { repo: "api" } })).toBeNull();
+    expect(memberOfTab({ params: { project: "api" } })).toBeNull();
   });
 });
 

@@ -11,10 +11,10 @@ import { cn } from "@/lib/utils";
 import { threadBadge, shortAge } from "@/lib/thread";
 import { shortRemaining, snoozeTimeFull } from "@/lib/snooze";
 import { showsPlace, statusLine, statusText, statusTones, tipStatusTone, type StatusLine, type StatusTone, type TipStatusTone } from "@/lib/statusLine";
-import { modelLabel, threadRowModel, type RepoLookup, type WorkspaceLookup } from "@/lib/threadRow";
+import { modelLabel, threadRowModel, type ProjectLookup, type WorkspaceLookup } from "@/lib/threadRow";
 import type { HeaderRow, Row } from "@/lib/tree";
 import { useCreator, useMadeByThread } from "@/stores/lineage";
-import { useReposStore } from "@/stores/repos";
+import { useProjectsStore } from "@/stores/projects";
 import { renameThread } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
 import { useModelChoices } from "@/stores/settings";
@@ -76,7 +76,7 @@ function RenameField({ id, name }: { id: string; name: string }) {
   );
 }
 
-const NO_REPOS: RepoLookup = { byId: {} };
+const NO_PROJECTS: ProjectLookup = { byId: {} };
 const NO_WORKSPACES: WorkspaceLookup = { byId: {} };
 
 /** The badge of the workspace that owns the thread; nothing for a project thread. */
@@ -84,10 +84,10 @@ function WorkspaceBadge({ id }: { id: string }) {
   const s = useThreadsStore(
     useShallow((st) => {
       const x = st.byId[id];
-      return { repoId: x?.repoId ?? "", worktreePath: x?.worktreePath ?? "", workspaceId: x?.workspaceId ?? "", pendingWorktreePath: "" };
+      return { projectId: x?.projectId ?? "", worktreePath: x?.worktreePath ?? "", workspaceId: x?.workspaceId ?? "", pendingWorktreePath: "" };
     }),
   );
-  const workspace = useWorkspacesStore((st) => threadRowModel(s, NO_REPOS, st).workspace);
+  const workspace = useWorkspacesStore((st) => threadRowModel(s, NO_PROJECTS, st).workspace);
   if (workspace === null) return null;
   return (
     // A click opens the workspace surface in the thread's side panel; the click goes on
@@ -129,17 +129,17 @@ function useThreadPlace(id: string) {
   const s = useThreadsStore(
     useShallow((st) => {
       const x = st.byId[id];
-      return { repoId: x?.repoId ?? "", worktreePath: x?.worktreePath ?? "", workspaceId: x?.workspaceId ?? "", pendingWorktreePath: x?.pendingWorktreePath ?? "" };
+      return { projectId: x?.projectId ?? "", worktreePath: x?.worktreePath ?? "", workspaceId: x?.workspaceId ?? "", pendingWorktreePath: x?.pendingWorktreePath ?? "" };
     }),
   );
   // Each selector returns a primitive, so a row only re-renders when its own project,
   // branch, workspace or move changes.
   const ws = useWorkspacesStore((st) => (s.workspaceId ? st.byId[s.workspaceId] : undefined));
-  const project = useReposStore((st) => threadRowModel(s, st, NO_WORKSPACES).project);
-  const branch = useReposStore((st) => threadRowModel(s, st, NO_WORKSPACES).branch);
-  const noGit = useReposStore((st) => threadRowModel(s, st, NO_WORKSPACES).noGit);
-  const noProject = useReposStore((st) => threadRowModel(s, st, NO_WORKSPACES).noProject);
-  const movingTo = useReposStore((st) => threadRowModel(s, st, { byId: ws ? { [s.workspaceId]: ws } : {} }).movingTo);
+  const project = useProjectsStore((st) => threadRowModel(s, st, NO_WORKSPACES).project);
+  const branch = useProjectsStore((st) => threadRowModel(s, st, NO_WORKSPACES).branch);
+  const noGit = useProjectsStore((st) => threadRowModel(s, st, NO_WORKSPACES).noGit);
+  const noProject = useProjectsStore((st) => threadRowModel(s, st, NO_WORKSPACES).noProject);
+  const movingTo = useProjectsStore((st) => threadRowModel(s, st, { byId: ws ? { [s.workspaceId]: ws } : {} }).movingTo);
   return { project, branch, noGit, noProject, movingTo };
 }
 
@@ -374,10 +374,10 @@ function ThreadTipBody({ id }: { id: string }) {
   const where = useThreadsStore(
     useShallow((st) => {
       const x = st.byId[id];
-      return { repoId: x?.repoId ?? "", worktreePath: x?.worktreePath ?? "", workspaceId: x?.workspaceId ?? "", pendingWorktreePath: "" };
+      return { projectId: x?.projectId ?? "", worktreePath: x?.worktreePath ?? "", workspaceId: x?.workspaceId ?? "", pendingWorktreePath: "" };
     }),
   );
-  const m = useReposStore(
+  const m = useProjectsStore(
     useShallow((st) => {
       const r = threadRowModel(where, st, NO_WORKSPACES);
       return { project: r.project, branch: r.branch, noGit: r.noGit, noProject: r.noProject, worktree: r.worktree };

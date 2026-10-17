@@ -13,7 +13,7 @@ import { draftOf, draftProblem, NEW_ACTION_DRAFT, type ActionDraft } from "@/lib
 import { deleteAction, saveAction } from "@/stores/actionActions";
 import { closeActionEditor, useActionDialogStore, type ActionEditorTarget } from "@/stores/actionDialog";
 import { useActionsStore } from "@/stores/actions";
-import { useReposStore } from "@/stores/repos";
+import { useProjectsStore } from "@/stores/projects";
 import { ACTION_ICON, ACTION_ICON_LABEL } from "./actionIcons";
 
 /** The six icon tiles (T3's look, in a row); one is picked, one tab stop, arrows move it. */
@@ -52,7 +52,7 @@ function IconTiles({ value, onChange, disabled }: { value: ActionDraft["icon"]; 
  * daemon's refusal shows above the footer and the form stays as it was.
  */
 function ActionForm({ target, keysRef }: { target: ActionEditorTarget; keysRef: RefObject<((e: KeyboardEvent) => void) | null> }) {
-  const project = useReposStore((s) => s.byId[target.repoId]?.name ?? target.repoId);
+  const project = useProjectsStore((s) => s.byId[target.projectId]?.name ?? target.projectId);
   const existing = useActionsStore((s) => (target.mode === "edit" ? s.byId[target.actionId] : undefined));
   const [draft, setDraft] = useState<ActionDraft>(() => (existing ? draftOf(existing) : NEW_ACTION_DRAFT));
   const [busy, setBusy] = useState(false);
@@ -87,7 +87,7 @@ function ActionForm({ target, keysRef }: { target: ActionEditorTarget; keysRef: 
     if (problem !== null || busy || gone) return;
     setBusy(true);
     setError(null);
-    const err = await saveAction(target.mode === "edit" ? { repoId: target.repoId, actionId: target.actionId } : { repoId: target.repoId }, draft);
+    const err = await saveAction(target.mode === "edit" ? { projectId: target.projectId, actionId: target.actionId } : { projectId: target.projectId }, draft);
     setBusy(false);
     if (err === null) closeActionEditor();
     else setError(err);
@@ -98,7 +98,7 @@ function ActionForm({ target, keysRef }: { target: ActionEditorTarget; keysRef: 
     setBusy(true);
     setRemoving(true);
     setError(null);
-    const err = await deleteAction(target.actionId, target.repoId);
+    const err = await deleteAction(target.actionId, target.projectId);
     setBusy(false);
     if (err === null) closeActionEditor();
     else {
