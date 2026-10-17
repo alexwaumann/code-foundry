@@ -93,7 +93,7 @@ test("the header toggle shows the empty surface list and hides the panel again",
   await expect(empty.getByRole("heading", { name: "Open a surface" })).toBeVisible();
   const entries = empty.locator("[data-surface]");
   await expect(entries).toHaveCount(7);
-  await expect(entries).toHaveText(["FilesF", "DiffD", "Pull requestP", "UsageU", "MCPM", "AgentsA", "WorktreeT"]);
+  await expect(entries).toHaveText(["FilesF", "DiffD", "Pull requestP", "UsageU", "MCPM", "AgentsA", "ThreadsH", "WorktreeT"]);
   for (const kind of ["files", "diff", "pullrequest"]) {
     await expect(empty.locator(`[data-surface="${kind}"]`)).toBeDisabled();
   }
