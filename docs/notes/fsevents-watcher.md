@@ -56,8 +56,8 @@ dispatch-queue thread and does a **blocking** send of each batch on `EventStream
 If the goroutine that calls `Stop` also read that channel, a `Stop` that waits for an
 in-flight callback could deadlock against it. So every stream shares one buffered
 channel (256 batches) that `dispatch` drains, and `dispatch` never waits on `run`. It
-takes `Git.mu` for reading (the routing table) and calls `deb.trigger`, neither of which
-waits on `run`. `sync` is never called with `Git.mu` held. On `Close`, `run` stops the
+takes `Git.mu` for reading (the routing table) and calls `deb.trigger` or
+`treeDeb.trigger`, none of which waits on `run`. `sync` is never called with `Git.mu` held. On `Close`, `run` stops the
 stream and then closes `stopped`, and `dispatch` keeps draining until then.
 
 The race detector is clean (`go test -race`): the callback only writes the
@@ -97,8 +97,24 @@ writes lock files into a worktree. Attribute-only events (only `ItemInodeMetaMod
 `ItemXattrMod`, `ItemFinderInfoMod`, `ItemChangeOwner`) are ignored. An event with no
 change flag the decoder knows counts as a write.
 
-Each job key is still debounced by the 300 ms per-key debouncer, and the scheduler is
-unchanged; the stream only feeds `deb.trigger`.
+### Two debounce windows
+
+Each job key is debounced per key (the first trigger arms a timer, later ones are
+absorbed, the key fires when it expires), in one of two windows:
+
+* **Tree, 1 s** (`DefaultTreeDebounce`, `Options.TreeDebounce`): a status job whose
+  nearest known directory is a worktree root, i.e. any edit in a worktree's files.
+  `eventKeys` reports this route as `tree`. A dev server or build writing continuously
+  costs at most one `git status` per second per worktree.
+* **Git, 300 ms** (`DefaultDebounce`, `Options.Debounce`): everything else. Events in
+  the common and admin dirs (`HEAD`, `index`, `logs/HEAD`, refs, operation markers,
+  `worktrees/`), rescans, and a known directory itself going away. A commit, checkout,
+  or fetch shows up as fast as before.
+
+`onEvents` dedupes per batch by (key, tree) and sends tree hits to `treeDeb`, the rest to
+`deb`. The same key from both routes (an edit plus a `git add` touching `index`) keeps
+two independent timers; whichever fires first runs the job, and the scheduler merges a
+request that arrives while it is queued or running. The scheduler is unchanged.
 
 **Newly seen** (were poll-only): edits, creations, deletions, and renames of nested files
 in every worktree; remote-tracking refs with a `/` in the name moved by a push; `git init`
@@ -118,7 +134,7 @@ Scratch daemon (`--dev` debug log), Apple silicon, small repo:
 
 | Action | Result |
 |---|---|
-| Append to `src/deep/er/x.go` in the main checkout | event 13 ms after the write; status done 323 ms after (300 ms of it is the debounce) |
+| Append to `src/deep/er/x.go` in the main checkout | event 13 ms after the write; status done 323 ms after (300 ms of it is the debounce). With the 1 s tree window: see below |
 | Same in the managed worktree / the hand-made worktree outside both roots | status done 327 ms / 322 ms after the write |
 | `git commit -a` in the managed worktree | `worktrees/feat/logs/HEAD` → status(feat) |
 | push from another clone, then `git fetch` in the project | `FETCH_HEAD` → reconcile → base → status(all); `refs/remotes/origin/main` → base |
@@ -127,7 +143,18 @@ Scratch daemon (`--dev` debug log), Apple silicon, small repo:
 | untar 2000 files into `proj/node_modules` (~0.6 s) | 4082 events in 144 batches, **3 status runs** |
 | open fds (`lsof -p`) | 65 before the scenario, 65 after (two stream recreations and the burst included) |
 
-`TestStreamBurstIsBounded` (2000 files, 50 ms test debounce): 4 status runs.
+The table was measured before the tree window split. Nested edits are now seen in about
+1 s rather than ~320 ms; git operations (commit, checkout, fetch) still in ~320 ms.
+Re-measured with a scratch daemon (`--dev`) after the split:
+
+| Action | Result |
+|---|---|
+| append to a nested gitignored file (`bin/x/deep/x.txt`) in a linked worktree, three times | `fs event ... tree=true` 14 ms after the write; status done 1.03 to 1.06 s after |
+| append to that file every 50 ms for 8 s (a dev server stand-in) | **8 status runs**, 1.00 to 1.01 s apart |
+
+`TestStreamBurstIsBounded` (2000 files written over ~1.3 s, 200 ms test tree window):
+6 status runs against a cap of `burst/200ms + 3`. The other tests use a 50 ms tree
+window so they stay fast.
 
 ## Gotchas
 
@@ -152,12 +179,14 @@ Scratch daemon (`--dev` debug log), Apple silicon, small repo:
   above. It also sets a finalizer that stops a stream nobody stopped; `run` always stops
   its streams explicitly.
 * **Gitignored churn still runs status.** A dev server writing `.next/` or a build writing
-  `bin/` refreshes that worktree at most once per debounce window while it writes. Status
-  only publishes when something changed, so the cost is git processes, not events.
+  `bin/` refreshes that worktree at most once per tree window (1 s) while it writes.
+  Status only publishes when something changed, so the cost is git processes, not
+  events.
 
 ## Left out
 
 * Filtering events under gitignored directories (`git check-ignore` or a per-worktree
-  ignore cache) before requesting status. The burst numbers did not need it; worth
-  revisiting if a long-running watcher process (dev server) shows up in profiles.
+  ignore cache) before requesting status. The 1 s tree window answers the open question
+  this left: a long-running writer (dev server, watch build) costs at most one
+  `git status` per second per worktree, so gitignored folders stay unfiltered.
 * Routing `<common>/reftable/` changes.

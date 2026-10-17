@@ -144,36 +144,48 @@ func (g *Git) streamPaths() []string {
 }
 
 // onEvents is the route func of the store's watcher: it maps a batch to job keys under
-// one read lock of the routing table, then triggers each key once.
+// one read lock of the routing table, then triggers each key once per debouncer. Edits
+// in a worktree's tree go to treeDeb (1 s), everything else to deb (300 ms). The same
+// key from both routes keeps two independent timers; the scheduler merges the requests.
 func (g *Git) onEvents(evs []fsevents.Event) {
+	type routed struct {
+		key  jobKey
+		tree bool
+	}
 	type hit struct {
 		path  string
 		flags fsevents.EventFlags
 		n     int
 	}
-	keys := map[jobKey]*hit{}
-	var order []jobKey
+	hits := map[routed]*hit{}
+	var order []routed
 	g.mu.RLock()
 	for _, ev := range evs {
-		for _, k := range eventKeys(g.routes, ev.Path, ev.Flags) {
-			if h := keys[k]; h != nil {
+		keys, tree := eventKeys(g.routes, ev.Path, ev.Flags)
+		for _, k := range keys {
+			r := routed{key: k, tree: tree}
+			if h := hits[r]; h != nil {
 				h.n++
 				continue
 			}
-			keys[k] = &hit{path: ev.Path, flags: ev.Flags, n: 1}
-			order = append(order, k)
+			hits[r] = &hit{path: ev.Path, flags: ev.Flags, n: 1}
+			order = append(order, r)
 		}
 	}
 	g.mu.RUnlock()
-	for _, k := range order {
-		h := keys[k]
+	for _, r := range order {
+		k, h := r.key, hits[r]
 		if h.flags&rescanFlags != 0 {
 			g.log.Info("fs events need a rescan", "path", h.path, "flags", uint32(h.flags), "project", k.projectID)
 		} else {
 			g.log.Debug("fs event", "path", h.path, "ops", opsOf(h.flags).String(), "job", k.kind.String(),
-				"project", k.projectID, "worktree", k.path, "events", h.n)
+				"project", k.projectID, "worktree", k.path, "tree", r.tree, "events", h.n)
 		}
-		g.deb.trigger(k)
+		if r.tree {
+			g.treeDeb.trigger(k)
+		} else {
+			g.deb.trigger(k)
+		}
 	}
 }
 

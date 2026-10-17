@@ -24,6 +24,9 @@ const (
 	DefaultWorkers       = 4
 	DefaultDebounce      = 300 * time.Millisecond
 	DefaultFetchInterval = 2 * time.Minute
+	// DefaultTreeDebounce is longer than DefaultDebounce: a dev server or build
+	// writing continuously costs at most one `git status` per second per worktree.
+	DefaultTreeDebounce = time.Second
 	// DefaultPollInterval is a backstop: the FSEvents stream sees edits anywhere in a
 	// worktree, so the poll only covers what it cannot (fsevents-watcher.md).
 	DefaultPollInterval = 2 * time.Minute
@@ -52,8 +55,13 @@ type Options struct {
 	Runner Runner
 	// Workers bounds concurrent git refresh jobs. Defaults to DefaultWorkers.
 	Workers int
-	// Debounce is the per-worktree coalescing window for fs events.
+	// Debounce is the per-job coalescing window for fs events in git's directories
+	// (HEAD, index, logs, refs, admin dirs), rescans, and a known directory going
+	// away. Zero means DefaultDebounce.
 	Debounce time.Duration
+	// TreeDebounce is the per-worktree coalescing window for fs events in a
+	// worktree's tree (its files, at any depth). Zero means DefaultTreeDebounce.
+	TreeDebounce time.Duration
 	// FetchInterval is how often each project runs `git fetch --prune`. Zero means
 	// DefaultFetchInterval; negative disables fetching.
 	FetchInterval time.Duration
@@ -142,9 +150,10 @@ type Git struct {
 	// each one reflects the snapshot current when it was published.
 	pubMu sync.Mutex
 
-	fs    *fsWatcher
-	sched *scheduler
-	deb   *debouncer
+	fs      *fsWatcher
+	sched   *scheduler
+	deb     *debouncer // git's directories, rescans, a known directory going away
+	treeDeb *debouncer // edits in a worktree's tree
 
 	details detailState // worktree detail cache (detail.go)
 
@@ -198,6 +207,7 @@ func Start(ctx context.Context, opts Options) (*Git, error) {
 	ctx, g.cancel = context.WithCancel(context.WithoutCancel(ctx))
 	g.sched = newScheduler(ctx, cmp.Or(opts.Workers, DefaultWorkers), g.runJob)
 	g.deb = newDebouncer(cmp.Or(opts.Debounce, DefaultDebounce), func(k jobKey) { g.sched.request(k) })
+	g.treeDeb = newDebouncer(cmp.Or(opts.TreeDebounce, DefaultTreeDebounce), func(k jobKey) { g.sched.request(k) })
 	g.fs = newFSWatcher(g.log, g.streamPaths, g.onEvents)
 	g.wg.Go(func() { g.fs.run(ctx) })
 	g.wg.Go(g.fs.dispatch)
@@ -243,6 +253,7 @@ func interval(v, def time.Duration) time.Duration {
 func (g *Git) Close() error {
 	g.cancel()
 	g.deb.close()
+	g.treeDeb.close()
 	g.sched.close()
 	g.wg.Wait()
 	return nil

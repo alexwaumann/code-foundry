@@ -90,13 +90,15 @@ func TestStreamSeesNestedEdits(t *testing.T) {
 	}
 }
 
-// A burst of thousands of files (an npm install, an untar) costs a bounded number of
-// status runs: FSEvents batches it, and the debouncer and scheduler coalesce.
+// A burst of thousands of files (an npm install, an untar, a dev server writing
+// continuously) costs a bounded number of status runs: FSEvents batches it, and the
+// tree debouncer and scheduler coalesce to one run per tree window.
 func TestStreamBurstIsBounded(t *testing.T) {
 	requireFSEvents(t)
 	f := newFixture(t)
 	cr := &countingRunner{next: ExecRunner{}, n: map[string]int{}}
-	h := startHarness(t, "", Options{Runner: cr})
+	const window = 200 * time.Millisecond
+	h := startHarness(t, "", Options{Runner: cr, TreeDebounce: window})
 	r, err := h.store.Register(context.Background(), f.project)
 	if err != nil {
 		t.Fatal(err)
@@ -115,14 +117,18 @@ func TestStreamBurstIsBounded(t *testing.T) {
 			}
 		}
 		writeFile(t, filepath.Join(d, fmt.Sprintf("f%04d.js", i)), "x\n")
+		// Spread the burst over several tree windows, so the cap is what is tested.
+		if i%200 == 199 {
+			time.Sleep(window / 2)
+		}
 	}
 	burst := time.Since(start)
 	h.waitFor("untracked node_modules", worktreeUpdated(f.project, func(w Worktree) bool { return w.Status.Untracked == 1 }))
 	time.Sleep(time.Second) // let the tail of the burst settle
 	runs := cr.count("status") - before
 	t.Logf("2000 files in %v: %d status runs", burst.Round(time.Millisecond), runs)
-	// One run per debounce window (50ms here) while the burst lasts, plus the tail.
-	if limit := int(burst/(50*time.Millisecond)) + 5; runs > limit {
+	// One run per tree window while the burst lasts, plus the head and tail.
+	if limit := int(burst/window) + 3; runs > limit {
 		t.Fatalf("%d status runs for a %v burst (limit %d)", runs, burst, limit)
 	}
 }

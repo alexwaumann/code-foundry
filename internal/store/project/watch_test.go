@@ -232,11 +232,45 @@ func TestEventKeys(t *testing.T) {
 	}
 	dirs := fakeRoutes()
 	for _, tt := range tests {
-		got := eventKeys(dirs, tt.path, tt.flags)
+		got, _ := eventKeys(dirs, tt.path, tt.flags)
 		slices.SortFunc(got, func(a, b jobKey) int { return strings.Compare(a.projectID, b.projectID) })
 		if !(len(got) == 0 && len(tt.want) == 0) && !reflect.DeepEqual(got, tt.want) {
 			t.Errorf("eventKeys(%q, %#x) = %v, want %v", tt.path, uint32(tt.flags), got, tt.want)
 		}
+	}
+}
+
+// Only an edit in a worktree's tree takes the tree debounce window.
+func TestEventKeysTree(t *testing.T) {
+	const (
+		modified = fsevents.ItemModified | fsevents.ItemIsFile
+		renamed  = fsevents.ItemRenamed | fsevents.ItemIsFile
+		dirGone  = fsevents.ItemCreated | fsevents.ItemRemoved | fsevents.ItemIsDir
+	)
+	tests := []struct {
+		name  string
+		path  string
+		flags fsevents.EventFlags
+		want  bool
+	}{
+		{"nested file", "/h/p/internal/a/b/c.go", modified, true},
+		{"direct entry", "/h/p/README.md", modified, true},
+		{"nested worktree file", "/h/p/.claude/worktrees/agent/main.go", modified, true},
+		{"common index", "/h/p/.git/index", renamed, false},
+		{"linked admin HEAD", "/h/p/.git/worktrees/feat/HEAD", renamed, false},
+		{"remote ref", "/h/p/.git/refs/remotes/origin/main", renamed, false},
+		{"removed root", "/w/o/p/feat", dirGone, false},
+		{"rescan", "/h/p/src", fsevents.MustScanSubDirs | fsevents.UserDropped, false},
+		{"ignored .git file", "/w/o/p/feat/.git", modified, false},
+		{"plain project", "/h/q/notes.txt", modified, false},
+	}
+	dirs := fakeRoutes()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, got := eventKeys(dirs, tt.path, tt.flags); got != tt.want {
+				t.Errorf("eventKeys(%q, %#x) tree = %v, want %v", tt.path, uint32(tt.flags), got, tt.want)
+			}
+		})
 	}
 }
 

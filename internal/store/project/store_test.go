@@ -115,6 +115,9 @@ func startHarness(t *testing.T, dbPath string, opts Options) *harness {
 		opts.AllowedRoot = os.TempDir()
 	}
 	opts.Debounce = 50 * time.Millisecond
+	if opts.TreeDebounce == 0 {
+		opts.TreeDebounce = 50 * time.Millisecond
+	}
 	if opts.FetchInterval == 0 {
 		opts.FetchInterval = -1
 	}

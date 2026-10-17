@@ -258,8 +258,10 @@ func opsOf(f fsevents.EventFlags) op {
 
 // eventKeys maps one FSEvents event to the jobs it asks for. A rescan event
 // reconciles every project with a known directory at, above, or below its path (for a
-// stream root, every project it covers).
-func eventKeys(dirs map[string]watchTarget, path string, flags fsevents.EventFlags) []jobKey {
+// stream root, every project it covers). tree reports an edit in a worktree's tree (the
+// nearest known directory is a worktree root and the action is a status refresh): its
+// job takes the longer tree debounce window (Options.TreeDebounce).
+func eventKeys(dirs map[string]watchTarget, path string, flags fsevents.EventFlags) (keys []jobKey, tree bool) {
 	path = filepath.Clean(path)
 	if flags&rescanFlags != 0 {
 		ids := map[string]bool{}
@@ -268,13 +270,14 @@ func eventKeys(dirs map[string]watchTarget, path string, flags fsevents.EventFla
 				ids[t.projectID] = true
 			}
 		}
-		keys := make([]jobKey, 0, len(ids))
+		keys = make([]jobKey, 0, len(ids))
 		for id := range ids {
 			keys = append(keys, jobKey{kind: jobReconcile, projectID: id})
 		}
-		return keys
+		return keys, false
 	}
-	return keysFor(route(dirs, path, opsOf(flags)))
+	t, act := route(dirs, path, opsOf(flags))
+	return keysFor(t, act), t.kind == wkRoot && act == actStatus
 }
 
 // watchWorktree is the input to desiredWatches for one worktree.
