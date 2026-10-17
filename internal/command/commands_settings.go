@@ -87,11 +87,12 @@ func RegisterSettings(r *Registry, b SettingsBackend, e Emitter, reveal RevealFu
 	}
 	return r.RegisterAll(
 		Command{
-			Name:        "settings.get",
-			Title:       "Show Settings",
-			Description: "Print every setting as key = value, or one setting's value.",
-			Category:    "Settings",
-			Args:        []ArgSpec{{Name: "key", Type: String, Positional: true, Description: "Setting key (default: all)"}},
+			Name:         "settings.get",
+			Title:        "Show Settings",
+			Description:  "Print every setting as key = value, or one setting's value.",
+			Category:     "Settings",
+			NoKeybinding: true,
+			Args:         []ArgSpec{{Name: "key", Type: String, Positional: true, Description: "Setting key (default: all)"}},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				key := a.String("key")
 				f, fields, err := field(ctx, key)
@@ -118,10 +119,11 @@ func RegisterSettings(r *Registry, b SettingsBackend, e Emitter, reveal RevealFu
 			},
 		},
 		Command{
-			Name:        "settings.set",
-			Title:       "Change Setting",
-			Description: "Set one setting. The value is validated against the setting's type and written to the settings file.",
-			Category:    "Settings",
+			Name:         "settings.set",
+			Title:        "Change Setting",
+			Description:  "Set one setting. The value is validated against the setting's type and written to the settings file.",
+			Category:     "Settings",
+			NoKeybinding: true,
 			Args: []ArgSpec{keyArg, {Name: "value", Type: String, Required: true, Positional: true,
 				Description: `New value (bool: true/false; keybinding: a chord such as "cmd+shift+n", or "none")`}},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
@@ -139,11 +141,12 @@ func RegisterSettings(r *Registry, b SettingsBackend, e Emitter, reveal RevealFu
 			},
 		},
 		Command{
-			Name:        "settings.reset",
-			Title:       "Reset Setting",
-			Description: "Return one setting to its default.",
-			Category:    "Settings",
-			Args:        []ArgSpec{keyArg},
+			Name:         "settings.reset",
+			Title:        "Reset Setting",
+			Description:  "Return one setting to its default.",
+			Category:     "Settings",
+			NoKeybinding: true,
+			Args:         []ArgSpec{keyArg},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				key := a.String("key")
 				f, _, err := field(ctx, key)
@@ -159,10 +162,11 @@ func RegisterSettings(r *Registry, b SettingsBackend, e Emitter, reveal RevealFu
 			},
 		},
 		Command{
-			Name:        "settings.path",
-			Title:       "Settings File Path",
-			Description: "Print the settings file's path.",
-			Category:    "Settings",
+			Name:         "settings.path",
+			Title:        "Settings File Path",
+			Description:  "Print the settings file's path.",
+			Category:     "Settings",
+			NoKeybinding: true,
 			Run: func(ctx context.Context, _ Context, _ Args) (Result, error) {
 				res, err := b.Get(ctx, connect.NewRequest(&v1.GetSettingsRequest{}))
 				if err != nil {

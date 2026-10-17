@@ -146,10 +146,11 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 			},
 		},
 		Command{
-			Name:        "terminal.list",
-			Title:       "List Terminals",
-			Description: "List every terminal with its state, working directory and labels (who it belongs to).",
-			Category:    "Terminal",
+			Name:         "terminal.list",
+			Title:        "List Terminals",
+			Description:  "List every terminal with its state, working directory and labels (who it belongs to).",
+			Category:     "Terminal",
+			NoKeybinding: true,
 			Run: func(ctx context.Context, _ Context, _ Args) (Result, error) {
 				res, err := d.Terminal.List(ctx, connect.NewRequest(&v1.ListTerminalsRequest{}))
 				if err != nil {

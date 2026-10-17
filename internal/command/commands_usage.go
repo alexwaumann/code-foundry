@@ -276,7 +276,8 @@ func RegisterUsage(r *Registry, b ThreadBackend) error {
 		Title: "Show Token Usage",
 		Description: "Print token usage and its cost at Claude API rates, per model with totals: " +
 			"one thread with --thread, else every thread plus removed ones.",
-		Category: "View",
+		Category:     "View",
+		NoKeybinding: true,
 		Args: []ArgSpec{
 			{Name: "thread", Type: String, Description: "Thread id (default: every thread, plus removed threads)"},
 		},

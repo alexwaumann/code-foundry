@@ -104,6 +104,7 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 			Description: "List a project's actions: the commands `action run` starts, in order, with their ids. " +
 				"The project is the thread's, else the worktree's, else the working directory's.",
 			Category:       "Action",
+			NoKeybinding:   true,
 			Args:           []ArgSpec{repoArg, hereArg},
 			When:           canUseActions,
 			WhyUnavailable: whyNoProject,
@@ -282,11 +283,12 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 			},
 		},
 		Command{
-			Name:        "action.wait",
-			Title:       "Wait for Action Run",
-			Description: "Wait for an action run to finish, print its output (a background run's last 64 KiB), and exit with its exit code.",
-			Category:    "Action",
-			Args:        []ArgSpec{{Name: "run", Type: String, Required: true, Positional: true, Description: "Run id (r-...)"}},
+			Name:         "action.wait",
+			Title:        "Wait for Action Run",
+			Description:  "Wait for an action run to finish, print its output (a background run's last 64 KiB), and exit with its exit code.",
+			Category:     "Action",
+			NoKeybinding: true,
+			Args:         []ArgSpec{{Name: "run", Type: String, Required: true, Positional: true, Description: "Run id (r-...)"}},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				return waitRun(ctx, d, a.String("run"))
 			},
@@ -296,6 +298,7 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 			Title:          "List Action Runs",
 			Description:    "List a project's recent action runs (the daemon remembers the last 50 per project until it restarts), newest first.",
 			Category:       "Action",
+			NoKeybinding:   true,
 			Args:           []ArgSpec{repoArg, hereArg},
 			When:           canUseActions,
 			WhyUnavailable: whyNoProject,

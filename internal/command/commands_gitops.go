@@ -244,11 +244,12 @@ func RegisterGitOps(r *Registry, d GitOpsDeps) error {
 			},
 		},
 		Command{
-			Name:        "view.open.url",
-			Title:       "Open URL in Browser",
-			Description: "Open an http(s) URL in the default browser.",
-			Category:    "View",
-			Args:        []ArgSpec{{Name: "url", Type: String, Required: true, Description: "http or https URL"}},
+			Name:         "view.open.url",
+			Title:        "Open URL in Browser",
+			Description:  "Open an http(s) URL in the default browser.",
+			Category:     "View",
+			NoKeybinding: true,
+			Args:         []ArgSpec{{Name: "url", Type: String, Required: true, Description: "http or https URL"}},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				res, err := b.OpenUrl(ctx, connect.NewRequest(&v1.OpenUrlRequest{Url: a.String("url")}))
 				return opResult(res, err)

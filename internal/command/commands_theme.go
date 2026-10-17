@@ -86,10 +86,11 @@ func RegisterTheme(r *Registry, b SettingsBackend) error {
 	}
 	return r.RegisterAll(
 		Command{
-			Name:        "theme.list",
-			Title:       "List Themes",
-			Description: "Print every colour theme by scheme, marking the dark and light themes in use.",
-			Category:    "Settings",
+			Name:         "theme.list",
+			Title:        "List Themes",
+			Description:  "Print every colour theme by scheme, marking the dark and light themes in use.",
+			Category:     "Settings",
+			NoKeybinding: true,
 			Run: func(ctx context.Context, _ Context, _ Args) (Result, error) {
 				vals, err := values(ctx)
 				if err != nil {

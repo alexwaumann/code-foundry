@@ -7,6 +7,34 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/command"
 )
 
+// The commands the settings page offers no keybinding for: CLI queries that print, a
+// wait, and verbs the CLI uses to drive the GUI. A new command is bindable unless it is
+// added here (docs/notes/settings-pages-schema.md).
+func TestNoKeybindingCommands(t *testing.T) {
+	f := newFixture(t)
+	want := []string{
+		"action.list", "action.runs", "action.wait",
+		"app.version", "daemon.status", "daemon.version",
+		"settings.get", "settings.path", "settings.reset", "settings.set",
+		"terminal.list", "theme.list",
+		"thread.agents", "thread.commands", "thread.focus", "thread.items", "thread.list", "thread.mcp", "thread.respond",
+		"ui.focus.repo", "ui.focus.terminal", "ui.notify", "ui.palette.open",
+		"usage.show", "view.open.url",
+		"workspace.list", "workspace.members",
+	}
+	var got []string
+	for _, l := range f.reg.List(command.Context{}, true) {
+		if l.NoKeybinding {
+			got = append(got, l.Name)
+		}
+	}
+	slices.Sort(got)
+	slices.Sort(want)
+	if !slices.Equal(got, want) {
+		t.Errorf("NoKeybinding commands = %v, want %v", got, want)
+	}
+}
+
 func TestKeybindingsAreUniqueAndNotReserved(t *testing.T) {
 	f := newFixture(t)
 	owner := map[string]string{} // normalized chord -> command

@@ -77,10 +77,11 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 			},
 		},
 		Command{
-			Name:        "workspace.list",
-			Title:       "List Workspaces",
-			Description: "List workspaces with their branch and member repositories.",
-			Category:    "Workspace",
+			Name:         "workspace.list",
+			Title:        "List Workspaces",
+			Description:  "List workspaces with their branch and member repositories.",
+			Category:     "Workspace",
+			NoKeybinding: true,
 			Run: func(ctx context.Context, _ Context, _ Args) (Result, error) {
 				res, err := b.List(ctx, connect.NewRequest(&v1.ListWorkspacesRequest{}))
 				if err != nil {
@@ -102,8 +103,9 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 			Title: "Workspace Members",
 			Description: "List a workspace's worktrees: one line per member repository with its worktree path and branch. " +
 				"Without a workspace, the one whose worktree contains --cwd (the working directory) is used.",
-			Category: "Workspace",
-			Args:     []ArgSpec{withPositional(wsArg), cwdArg},
+			Category:     "Workspace",
+			NoKeybinding: true,
+			Args:         []ArgSpec{withPositional(wsArg), cwdArg},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				res, err := b.Members(ctx, connect.NewRequest(&v1.WorkspaceMembersRequest{
 					Workspace: a.String("workspace"), Cwd: a.Path("cwd"),

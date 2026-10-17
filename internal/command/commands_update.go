@@ -268,10 +268,11 @@ func plural(n int, word string) string {
 func RegisterUpdate(r *Registry, d UpdateDeps) error {
 	return r.RegisterAll(
 		Command{
-			Name:        "app.version",
-			Title:       "Version",
-			Description: "Show the running version and whether an update is available.",
-			Category:    "App",
+			Name:         "app.version",
+			Title:        "Version",
+			Description:  "Show the running version and whether an update is available.",
+			Category:     "App",
+			NoKeybinding: true,
 			Run: func(ctx context.Context, _ Context, _ Args) (Result, error) {
 				v := d.Daemon.Version
 				st := updateStatus(ctx, d.Update)

@@ -43,10 +43,11 @@ func RegisterDaemon(r *Registry, info DaemonInfo) error {
 	}
 	return r.RegisterAll(
 		Command{
-			Name:        "daemon.status",
-			Title:       "Daemon Status",
-			Description: "Show the daemon's pid, version, uptime, and config home.",
-			Category:    "Daemon",
+			Name:         "daemon.status",
+			Title:        "Daemon Status",
+			Description:  "Show the daemon's pid, version, uptime, and config home.",
+			Category:     "Daemon",
+			NoKeybinding: true,
 			Run: func(context.Context, Context, Args) (Result, error) {
 				up := info.Now().Sub(info.Started).Round(time.Second)
 				return Result{
@@ -64,10 +65,11 @@ func RegisterDaemon(r *Registry, info DaemonInfo) error {
 			},
 		},
 		Command{
-			Name:        "daemon.version",
-			Title:       "Daemon Version",
-			Description: "Show the daemon's build version.",
-			Category:    "Daemon",
+			Name:         "daemon.version",
+			Title:        "Daemon Version",
+			Description:  "Show the daemon's build version.",
+			Category:     "Daemon",
+			NoKeybinding: true,
 			Run: func(context.Context, Context, Args) (Result, error) {
 				v := info.Version
 				msg := "code-foundry " + v.Version
