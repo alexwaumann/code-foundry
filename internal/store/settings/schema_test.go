@@ -280,6 +280,10 @@ func TestKeybindingFields(t *testing.T) {
 	if fs[0].Section != "pull-request" || fs[1].Default != "" {
 		t.Errorf("fields = %+v", fs)
 	}
+	// The section names the category, so a "<Category>: " prefix goes.
+	if got := keybindingFields([]CommandInfo{{Name: "git.fetch", Title: "Git: Fetch", Category: "Git"}})[0].Title; got != "Fetch" {
+		t.Errorf("git.fetch title = %q, want Fetch", got)
+	}
 	// No value for a command without a field.
 	if _, values, _ := resolveKeybindings(nil, testCmds); len(values) != len(fs) {
 		t.Errorf("values = %v, want one per field", values)

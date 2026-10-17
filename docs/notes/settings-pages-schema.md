@@ -34,8 +34,10 @@ the old group sections; PR 2 builds the tabbed page from `pages`. Design sketch:
 
 ## Keybindings
 
-* Field title is the command title alone (no "Category: " prefix); placeholder is still
-  the command name, description the command's.
+* Field title is the command title alone (no "Category: " prefix). The Git commands'
+  own titles start with "Git: " ("Git: Fetch"); that prefix is stripped too, since the
+  section already says Git. Placeholder is still the command name, description the
+  command's.
 * Section id is the category slug (`"Pull Request"` → `pull-request`), title the category.
   Sections are in the palette's order, which is alphabetical by category
   (`groupByCategory`, `Registry.List`). The sketch's hand-picked order (Thread, View, Pull
@@ -77,6 +79,18 @@ surfaces, `action.add`/`edit`/`remove`/`run`, every `pr.*`, `repo.*`, `app.*` an
 * `TestNoKeybindingCommands` (internal/command) pins the list above; the uniqueness test
   is unchanged and green.
 * API test covers the new attributes and the page order.
+
+## End to end
+
+Isolated daemon (`CODE_FOUNDRY_HOME=/tmp/cfh-set ./bin/code-foundry daemon --dev`), then
+`GetSchema` as Connect JSON over the socket (`curl --unix-socket …/daemon.sock -H
+'Content-Type: application/json' -d '{}'
+http://localhost/codefoundry.v1.SettingsService/GetSchema`; there is no CLI verb that
+prints the schema). 110 fields, none outside a listed page/section, six pages in order,
+twelve keybinding sections (action … worktree), no `keybindings.thread.list`.
+`settings set keybindings.thread.list cmd+y` answers "unknown setting";
+`settings set notifications.sound_volume 30` writes the file, whose comment now reads
+"Range 0 to 100 percent."
 
 ## Gotchas
 

@@ -253,7 +253,8 @@ export class MockSettings {
 
   fields(): FieldInit[] {
     const kb = this.bindable().map<FieldInit>((c) => ({
-      key: `keybindings.${c.name}`, group: "keybindings", page: "keybindings", section: categorySection(c.category), type: S.KEYBINDING, title: c.title,
+      key: `keybindings.${c.name}`, group: "keybindings", page: "keybindings", section: categorySection(c.category), type: S.KEYBINDING,
+      title: c.title.startsWith(`${c.category}: `) ? c.title.slice(c.category.length + 2) : c.title,
       description: c.description, defaultValue: normalize(c.keybindings[0] ?? "") ?? "", placeholder: c.name,
     }));
     return [...staticFields, ...kb];

@@ -485,7 +485,7 @@ func categorySection(category string) string {
 
 // keybindingFields returns one Keybinding field per bindable command, sorted by
 // category then title like the palette. Each is in the keybindings page's section for
-// its category, titled with the command's title alone.
+// its category, titled with the command's title less a "<Category>: " prefix.
 func keybindingFields(cmds []CommandInfo) []Field {
 	out := make([]Field, 0, len(cmds))
 	for _, c := range sortCommands(cmds) {
@@ -498,7 +498,8 @@ func keybindingFields(cmds []CommandInfo) []Field {
 		}
 		out = append(out, Field{
 			Key: KeybindingKey(c.Name), Group: GroupKeybindings, Page: PageKeybindings, Section: categorySection(c.Category),
-			Type: Keybinding, Title: c.Title, Description: c.Description, Default: def, Placeholder: c.Name,
+			// The section names the category, so "Git: Fetch" shows as "Fetch".
+			Type: Keybinding, Title: strings.TrimPrefix(c.Title, c.Category+": "), Description: c.Description, Default: def, Placeholder: c.Name,
 		})
 	}
 	return out
