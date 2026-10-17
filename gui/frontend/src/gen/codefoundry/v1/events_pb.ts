@@ -34,7 +34,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/events.proto.
  */
 export const file_codefoundry_v1_events: GenFile = /*@__PURE__*/
-  fileDesc("Chtjb2RlZm91bmRyeS92MS9ldmVudHMucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIkIKEldhdGNoRXZlbnRzUmVxdWVzdBIsCgdzb3VyY2VzGAEgAygOMhsuY29kZWZvdW5kcnkudjEuRXZlbnRTb3VyY2UizwQKBUV2ZW50EikKBHJlcG8YASABKAsyGS5jb2RlZm91bmRyeS52MS5SZXBvRXZlbnRIABIxCgh0ZXJtaW5hbBgCIAEoCzIdLmNvZGVmb3VuZHJ5LnYxLlRlcm1pbmFsRXZlbnRIABI2Cgt0aHJlYWRfbGlzdBgDIAEoCzIfLmNvZGVmb3VuZHJ5LnYxLlRocmVhZExpc3RFdmVudEgAEiUKAmdoGAQgASgLMhcuY29kZWZvdW5kcnkudjEuR2hFdmVudEgAEiYKAnVpGAUgASgLMhguY29kZWZvdW5kcnkudjEuVWlJbnRlbnRIABItCgZnaXRvcHMYBiABKAsyGy5jb2RlZm91bmRyeS52MS5HaXRPcHNFdmVudEgAEjEKCHNldHRpbmdzGAcgASgLMh0uY29kZWZvdW5kcnkudjEuU2V0dGluZ3NFdmVudEgAEi0KBnVwZGF0ZRgKIAEoCzIbLmNvZGVmb3VuZHJ5LnYxLlVwZGF0ZUV2ZW50SAASMwoJd29ya3NwYWNlGAsgASgLMh4uY29kZWZvdW5kcnkudjEuV29ya3NwYWNlRXZlbnRIABItCgZ0aHJlYWQYDCABKAsyGy5jb2RlZm91bmRyeS52MS5UaHJlYWRFdmVudEgAEjQKCWhlYXJ0YmVhdBgNIAEoCzIfLmNvZGVmb3VuZHJ5LnYxLlN0cmVhbUhlYXJ0YmVhdEgAEi0KBmFjdGlvbhgOIAEoCzIbLmNvZGVmb3VuZHJ5LnYxLkFjdGlvbkV2ZW50SABCBwoFZXZlbnQqwAIKC0V2ZW50U291cmNlEhwKGEVWRU5UX1NPVVJDRV9VTlNQRUNJRklFRBAAEhUKEUVWRU5UX1NPVVJDRV9SRVBPEAESGQoVRVZFTlRfU09VUkNFX1RFUk1JTkFMEAISHAoYRVZFTlRfU09VUkNFX1RIUkVBRF9MSVNUEAMSEwoPRVZFTlRfU09VUkNFX0dIEAQSEwoPRVZFTlRfU09VUkNFX1VJEAUSFwoTRVZFTlRfU09VUkNFX0dJVE9QUxAGEhkKFUVWRU5UX1NPVVJDRV9TRVRUSU5HUxAHEhcKE0VWRU5UX1NPVVJDRV9VUERBVEUQChIaChZFVkVOVF9TT1VSQ0VfV09SS1NQQUNFEAsSFwoTRVZFTlRfU09VUkNFX1RIUkVBRBAMEhcKE0VWRU5UX1NPVVJDRV9BQ1RJT04QDTJWCgxFdmVudFNlcnZpY2USRgoFV2F0Y2gSIi5jb2RlZm91bmRyeS52MS5XYXRjaEV2ZW50c1JlcXVlc3QaFS5jb2RlZm91bmRyeS52MS5FdmVudCIAMAFCwwEKEmNvbS5jb2RlZm91bmRyeS52MUILRXZlbnRzUHJvdG9QAVpHZ2l0aHViLmNvbS9hbGV4d2F1bWFubi9jb2RlLWZvdW5kcnkvZ2VuL2dvL2NvZGVmb3VuZHJ5L3YxO2NvZGVmb3VuZHJ5djGiAgNDWFiqAg5Db2RlZm91bmRyeS5WMcoCDkNvZGVmb3VuZHJ5XFYx4gIaQ29kZWZvdW5kcnlcVjFcR1BCTWV0YWRhdGHqAg9Db2RlZm91bmRyeTo6VjFiBnByb3RvMw", [file_codefoundry_v1_action, file_codefoundry_v1_gh, file_codefoundry_v1_gitops, file_codefoundry_v1_heartbeat, file_codefoundry_v1_repo, file_codefoundry_v1_settings, file_codefoundry_v1_terminal, file_codefoundry_v1_thread, file_codefoundry_v1_thread_lifecycle, file_codefoundry_v1_ui, file_codefoundry_v1_update, file_codefoundry_v1_workspace]);
+  fileDesc("Chtjb2RlZm91bmRyeS92MS9ldmVudHMucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIlUKEldhdGNoRXZlbnRzUmVxdWVzdBIsCgdzb3VyY2VzGAEgAygOMhsuY29kZWZvdW5kcnkudjEuRXZlbnRTb3VyY2USEQoJc2luY2Vfc2VxGAIgASgEItwECgVFdmVudBIpCgRyZXBvGAEgASgLMhkuY29kZWZvdW5kcnkudjEuUmVwb0V2ZW50SAASMQoIdGVybWluYWwYAiABKAsyHS5jb2RlZm91bmRyeS52MS5UZXJtaW5hbEV2ZW50SAASNgoLdGhyZWFkX2xpc3QYAyABKAsyHy5jb2RlZm91bmRyeS52MS5UaHJlYWRMaXN0RXZlbnRIABIlCgJnaBgEIAEoCzIXLmNvZGVmb3VuZHJ5LnYxLkdoRXZlbnRIABImCgJ1aRgFIAEoCzIYLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50SAASLQoGZ2l0b3BzGAYgASgLMhsuY29kZWZvdW5kcnkudjEuR2l0T3BzRXZlbnRIABIxCghzZXR0aW5ncxgHIAEoCzIdLmNvZGVmb3VuZHJ5LnYxLlNldHRpbmdzRXZlbnRIABItCgZ1cGRhdGUYCiABKAsyGy5jb2RlZm91bmRyeS52MS5VcGRhdGVFdmVudEgAEjMKCXdvcmtzcGFjZRgLIAEoCzIeLmNvZGVmb3VuZHJ5LnYxLldvcmtzcGFjZUV2ZW50SAASLQoGdGhyZWFkGAwgASgLMhsuY29kZWZvdW5kcnkudjEuVGhyZWFkRXZlbnRIABI0CgloZWFydGJlYXQYDSABKAsyHy5jb2RlZm91bmRyeS52MS5TdHJlYW1IZWFydGJlYXRIABItCgZhY3Rpb24YDiABKAsyGy5jb2RlZm91bmRyeS52MS5BY3Rpb25FdmVudEgAEgsKA3NlcRgUIAEoBEIHCgVldmVudCrAAgoLRXZlbnRTb3VyY2USHAoYRVZFTlRfU09VUkNFX1VOU1BFQ0lGSUVEEAASFQoRRVZFTlRfU09VUkNFX1JFUE8QARIZChVFVkVOVF9TT1VSQ0VfVEVSTUlOQUwQAhIcChhFVkVOVF9TT1VSQ0VfVEhSRUFEX0xJU1QQAxITCg9FVkVOVF9TT1VSQ0VfR0gQBBITCg9FVkVOVF9TT1VSQ0VfVUkQBRIXChNFVkVOVF9TT1VSQ0VfR0lUT1BTEAYSGQoVRVZFTlRfU09VUkNFX1NFVFRJTkdTEAcSFwoTRVZFTlRfU09VUkNFX1VQREFURRAKEhoKFkVWRU5UX1NPVVJDRV9XT1JLU1BBQ0UQCxIXChNFVkVOVF9TT1VSQ0VfVEhSRUFEEAwSFwoTRVZFTlRfU09VUkNFX0FDVElPThANMlYKDEV2ZW50U2VydmljZRJGCgVXYXRjaBIiLmNvZGVmb3VuZHJ5LnYxLldhdGNoRXZlbnRzUmVxdWVzdBoVLmNvZGVmb3VuZHJ5LnYxLkV2ZW50IgAwAULDAQoSY29tLmNvZGVmb3VuZHJ5LnYxQgtFdmVudHNQcm90b1ABWkdnaXRodWIuY29tL2FsZXh3YXVtYW5uL2NvZGUtZm91bmRyeS9nZW4vZ28vY29kZWZvdW5kcnkvdjE7Y29kZWZvdW5kcnl2MaICA0NYWKoCDkNvZGVmb3VuZHJ5LlYxygIOQ29kZWZvdW5kcnlcVjHiAhpDb2RlZm91bmRyeVxWMVxHUEJNZXRhZGF0YeoCD0NvZGVmb3VuZHJ5OjpWMWIGcHJvdG8z", [file_codefoundry_v1_action, file_codefoundry_v1_gh, file_codefoundry_v1_gitops, file_codefoundry_v1_heartbeat, file_codefoundry_v1_repo, file_codefoundry_v1_settings, file_codefoundry_v1_terminal, file_codefoundry_v1_thread, file_codefoundry_v1_thread_lifecycle, file_codefoundry_v1_ui, file_codefoundry_v1_update, file_codefoundry_v1_workspace]);
 
 /**
  * @generated from message codefoundry.v1.WatchEventsRequest
@@ -46,6 +46,19 @@ export type WatchEventsRequest = Message<"codefoundry.v1.WatchEventsRequest"> & 
    * @generated from field: repeated codefoundry.v1.EventSource sources = 1;
    */
   sources: EventSource[];
+
+  /**
+   * Resume after this Event.seq (the last one the client applied). When the daemon
+   * still holds every live event after it (it keeps the last 4096), the stream skips
+   * the snapshots and replays those events (of the requested sources), then goes on
+   * live. Otherwise (too old, or ahead of the daemon's counter, as after a daemon
+   * restart) the stream starts as without it: snapshots, then live. A client tells the
+   * two apart by the first event: a replayed or live event has seq > 0, a snapshot 0.
+   * Zero: no resume.
+   *
+   * @generated from field: uint64 since_seq = 2;
+   */
+  sinceSeq: bigint;
 };
 
 /**
@@ -146,6 +159,17 @@ export type Event = Message<"codefoundry.v1.Event"> & {
     value: ActionEvent;
     case: "action";
   } | { case: undefined; value?: undefined };
+
+  /**
+   * Position of a live event in the daemon's one event sequence: 1, 2, 3, ... per
+   * daemon lifetime, shared by every client and source (the same event has the same
+   * seq on every stream; a stream filtered by source sees gaps). Snapshots, resyncs
+   * and heartbeats carry 0: they are not resumable. Pass the last seq applied as
+   * WatchEventsRequest.since_seq to resume.
+   *
+   * @generated from field: uint64 seq = 20;
+   */
+  seq: bigint;
 };
 
 /**

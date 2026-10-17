@@ -43,6 +43,8 @@ type ThreadBackend interface {
 	SetModel(context.Context, *connect.Request[v1.SetThreadModelRequest]) (*connect.Response[v1.SetThreadModelResponse], error)
 	SetPermissionMode(context.Context, *connect.Request[v1.SetThreadPermissionModeRequest]) (*connect.Response[v1.SetThreadPermissionModeResponse], error)
 	SetEffort(context.Context, *connect.Request[v1.SetThreadEffortRequest]) (*connect.Response[v1.SetThreadEffortResponse], error)
+	// Wait backs thread.wait (commands_thread_wait.go).
+	Wait(context.Context, *connect.Request[v1.WaitThreadRequest]) (*connect.Response[v1.WaitThreadResponse], error)
 	// McpBackend backs thread.mcp and thread.mcp-reconnect (commands_mcp.go).
 	McpBackend
 	// SlashBackend backs thread.commands (commands_slash.go).
@@ -64,7 +66,7 @@ var threadDecisions = map[string]v1.ThreadDecision{
 }
 
 // RegisterThread registers thread.send, thread.respond, thread.interrupt,
-// thread.items, thread.set-model, thread.set-mode and thread.set-effort.
+// thread.items, thread.set-model, thread.set-mode, thread.set-effort and thread.wait.
 func RegisterThread(r *Registry, b ThreadBackend) error {
 	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextThread, Description: "Thread id"}
 	return r.RegisterAll(
@@ -250,6 +252,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 				return Result{Message: msg, JSON: s}, nil
 			},
 		},
+		threadWait(b, idArg),
 	)
 }
 

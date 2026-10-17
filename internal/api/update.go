@@ -84,7 +84,7 @@ func (h *Update) Watch(ctx context.Context, _ *connect.Request[v1.WatchUpdateReq
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	src := updateSource{svc: h.svc, bus: h.bus}
-	live := src.subscribe(ctx)
+	live := subscribeTopics(ctx, src.topics())
 	send := func(evs []*v1.Event) error {
 		for _, ev := range evs {
 			if err := stream.Send(ev.GetUpdate()); err != nil {
@@ -181,16 +181,19 @@ func updateStatusEvent(s update.Status) *v1.Event {
 	return updateWrap(&v1.UpdateEvent{Event: &v1.UpdateEvent_Status{Status: updateStatusToProto(s)}})
 }
 
-func (s updateSource) subscribe(ctx context.Context) <-chan *v1.Event {
-	return fanIn(ctx,
-		newTap(s.bus, updateWatchBuffer, func(e update.Event) *v1.Event { return updateStatusEvent(e.Status) }),
-		newTap(s.bus, updateWatchBuffer, func(update.RelaunchRequested) *v1.Event {
+// topics: the relaunch and restart requests are transient (see topic): their delivery
+// count tells app.relaunch and app.restart whether a window is connected, and a resumed
+// stream must never replay one.
+func (s updateSource) topics() []topic {
+	return []topic{
+		busTopic(s.bus, updateWatchBuffer, func(e update.Event) *v1.Event { return updateStatusEvent(e.Status) }),
+		transientTopic(s.bus, updateWatchBuffer, func(update.RelaunchRequested) *v1.Event {
 			return updateWrap(&v1.UpdateEvent{Event: &v1.UpdateEvent_RelaunchRequested{RelaunchRequested: &v1.RelaunchRequested{}}})
 		}),
-		newTap(s.bus, updateWatchBuffer, func(update.RestartRequested) *v1.Event {
+		transientTopic(s.bus, updateWatchBuffer, func(update.RestartRequested) *v1.Event {
 			return updateWrap(&v1.UpdateEvent{Event: &v1.UpdateEvent_RestartRequested{RestartRequested: &v1.RestartRequested{}}})
 		}),
-	)
+	}
 }
 
 func (s updateSource) snapshot(context.Context) []*v1.Event {

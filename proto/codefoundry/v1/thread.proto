@@ -22,6 +22,11 @@ service ThreadService {
   rpc List(ListThreadsRequest) returns (ListThreadsResponse) {}
   // Get returns one thread.
   rpc Get(GetThreadRequest) returns (GetThreadResponse) {}
+  // Wait blocks until a thread meets a condition (ThreadWaitCondition), returning at
+  // once when it already does, or until the timeout (timed_out set, not an error). It
+  // follows the thread list's changes, never polls. NOT_FOUND for an unknown thread or
+  // one removed while waiting. The thread.wait command (docs/notes/agents-1-wait-events.md).
+  rpc Wait(WaitThreadRequest) returns (WaitThreadResponse) {}
   // Rename sets a user-chosen name and disables auto-naming for the thread.
   rpc Rename(RenameThreadRequest) returns (RenameThreadResponse) {}
   // Close ends the Claude process gracefully (interrupt, stdin closed, bounded wait,

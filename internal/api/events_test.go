@@ -43,6 +43,7 @@ type eventsFixture struct {
 	update *update.Store
 	ws     *workspacetest.Fake
 	done   chan struct{}
+	events *Events
 	client codefoundryv1connect.EventServiceClient
 }
 
@@ -58,7 +59,8 @@ func newEventsFixture(t *testing.T) *eventsFixture {
 	upd := update.Start(context.Background(), update.Options{Current: "dev", DisabledReason: "dev build", Bus: b, InitialDelay: time.Hour})
 	t.Cleanup(upd.Close)
 	f := &eventsFixture{bus: b, repo: repotest.New(b), term: terminaltest.New(b), th: threadtest.New(b), gh: ghtest.New(b), gitops: gitopstest.New(b), set: set, update: upd, ws: workspacetest.New(b), done: make(chan struct{})}
-	route := NewEvents(EventsDeps{Bus: b, Repo: f.repo, Terminal: f.term, Thread: f.th, Gh: f.gh, GitOps: f.gitops, Settings: f.set, Update: f.update, Workspace: f.ws, Done: f.done}).Route()
+	f.events = NewEvents(EventsDeps{Bus: b, Repo: f.repo, Terminal: f.term, Thread: f.th, Gh: f.gh, GitOps: f.gitops, Settings: f.set, Update: f.update, Workspace: f.ws, Done: f.done})
+	route := f.events.Route()
 	mux := http.NewServeMux()
 	mux.Handle(route.Path, route.Handler)
 	// HTTP/2 like the repo drop test: flow-control windows bound how much the handler
@@ -352,10 +354,10 @@ func TestEventsResyncsSourceAfterDrops(t *testing.T) {
 	if got := describe(s.next()); got != "repo.snapshot(0)" {
 		t.Fatalf("first = %q", got)
 	}
-	// Overflow the repo subscription while the client is not reading (more than the
-	// HTTP/2 flow-control windows the handler can fill first).
+	// Overflow the stream's hub queue while the client is not reading (more than the
+	// HTTP/2 flow-control windows the handler can fill first, plus hubClientBuffer).
 	big := strings.Repeat("x", 4096)
-	for i := range 2000 {
+	for i := range 5000 {
 		f.repo.Put(repo.Repo{ID: fmt.Sprint(i % 3), Name: fmt.Sprint(i), Path: big})
 	}
 	for {

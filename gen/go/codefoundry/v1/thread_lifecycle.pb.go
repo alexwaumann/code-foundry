@@ -9,6 +9,7 @@ package codefoundryv1
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	durationpb "google.golang.org/protobuf/types/known/durationpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
@@ -260,6 +261,71 @@ func (x AgentRunStatus) Number() protoreflect.EnumNumber {
 // Deprecated: Use AgentRunStatus.Descriptor instead.
 func (AgentRunStatus) EnumDescriptor() ([]byte, []int) {
 	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{3}
+}
+
+// ThreadWaitCondition is what ThreadService.Wait waits for. Each is a fact about the
+// Thread record (state, status, status_reason), checked at once and on every change.
+type ThreadWaitCondition int32
+
+const (
+	// Means IDLE.
+	ThreadWaitCondition_THREAD_WAIT_CONDITION_UNSPECIFIED ThreadWaitCondition = 0
+	// Claude is not working and no answer is pending: the thread is not STARTING and its
+	// status is IDLE, ERROR (the process ended mid-turn), or NEEDS_ATTENTION for anything
+	// but a pending permission prompt or question (a turn that ended unseen, "finished"
+	// or "error: <code>"; a snooze that ended).
+	ThreadWaitCondition_THREAD_WAIT_CONDITION_IDLE ThreadWaitCondition = 1
+	// status NEEDS_ATTENTION, whatever the reason.
+	ThreadWaitCondition_THREAD_WAIT_CONDITION_ATTENTION ThreadWaitCondition = 2
+	// status ERROR.
+	ThreadWaitCondition_THREAD_WAIT_CONDITION_ERROR ThreadWaitCondition = 3
+	// state DISCONNECTED (no Claude process).
+	ThreadWaitCondition_THREAD_WAIT_CONDITION_DISCONNECTED ThreadWaitCondition = 4
+)
+
+// Enum value maps for ThreadWaitCondition.
+var (
+	ThreadWaitCondition_name = map[int32]string{
+		0: "THREAD_WAIT_CONDITION_UNSPECIFIED",
+		1: "THREAD_WAIT_CONDITION_IDLE",
+		2: "THREAD_WAIT_CONDITION_ATTENTION",
+		3: "THREAD_WAIT_CONDITION_ERROR",
+		4: "THREAD_WAIT_CONDITION_DISCONNECTED",
+	}
+	ThreadWaitCondition_value = map[string]int32{
+		"THREAD_WAIT_CONDITION_UNSPECIFIED":  0,
+		"THREAD_WAIT_CONDITION_IDLE":         1,
+		"THREAD_WAIT_CONDITION_ATTENTION":    2,
+		"THREAD_WAIT_CONDITION_ERROR":        3,
+		"THREAD_WAIT_CONDITION_DISCONNECTED": 4,
+	}
+)
+
+func (x ThreadWaitCondition) Enum() *ThreadWaitCondition {
+	p := new(ThreadWaitCondition)
+	*p = x
+	return p
+}
+
+func (x ThreadWaitCondition) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ThreadWaitCondition) Descriptor() protoreflect.EnumDescriptor {
+	return file_codefoundry_v1_thread_lifecycle_proto_enumTypes[4].Descriptor()
+}
+
+func (ThreadWaitCondition) Type() protoreflect.EnumType {
+	return &file_codefoundry_v1_thread_lifecycle_proto_enumTypes[4]
+}
+
+func (x ThreadWaitCondition) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ThreadWaitCondition.Descriptor instead.
+func (ThreadWaitCondition) EnumDescriptor() ([]byte, []int) {
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{4}
 }
 
 // Ownership: a thread has at most one owner. When workspace_id is set the owner is that
@@ -2012,6 +2078,121 @@ func (x *GetThreadResponse) GetThread() *Thread {
 	return nil
 }
 
+type WaitThreadRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Until ThreadWaitCondition    `protobuf:"varint,2,opt,name=until,proto3,enum=codefoundry.v1.ThreadWaitCondition" json:"until,omitempty"`
+	// How long to wait. Unset or zero: until the call is cancelled.
+	Timeout       *durationpb.Duration `protobuf:"bytes,3,opt,name=timeout,proto3" json:"timeout,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WaitThreadRequest) Reset() {
+	*x = WaitThreadRequest{}
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WaitThreadRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WaitThreadRequest) ProtoMessage() {}
+
+func (x *WaitThreadRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WaitThreadRequest.ProtoReflect.Descriptor instead.
+func (*WaitThreadRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *WaitThreadRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *WaitThreadRequest) GetUntil() ThreadWaitCondition {
+	if x != nil {
+		return x.Until
+	}
+	return ThreadWaitCondition_THREAD_WAIT_CONDITION_UNSPECIFIED
+}
+
+func (x *WaitThreadRequest) GetTimeout() *durationpb.Duration {
+	if x != nil {
+		return x.Timeout
+	}
+	return nil
+}
+
+type WaitThreadResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The thread when the condition held, or when the timeout passed.
+	Thread *Thread `protobuf:"bytes,1,opt,name=thread,proto3" json:"thread,omitempty"`
+	// The timeout passed before the condition held; thread is the current record.
+	TimedOut      bool `protobuf:"varint,2,opt,name=timed_out,json=timedOut,proto3" json:"timed_out,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WaitThreadResponse) Reset() {
+	*x = WaitThreadResponse{}
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WaitThreadResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WaitThreadResponse) ProtoMessage() {}
+
+func (x *WaitThreadResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WaitThreadResponse.ProtoReflect.Descriptor instead.
+func (*WaitThreadResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *WaitThreadResponse) GetThread() *Thread {
+	if x != nil {
+		return x.Thread
+	}
+	return nil
+}
+
+func (x *WaitThreadResponse) GetTimedOut() bool {
+	if x != nil {
+		return x.TimedOut
+	}
+	return false
+}
+
 type RenameThreadRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -2022,7 +2203,7 @@ type RenameThreadRequest struct {
 
 func (x *RenameThreadRequest) Reset() {
 	*x = RenameThreadRequest{}
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[19]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2034,7 +2215,7 @@ func (x *RenameThreadRequest) String() string {
 func (*RenameThreadRequest) ProtoMessage() {}
 
 func (x *RenameThreadRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[19]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2047,7 +2228,7 @@ func (x *RenameThreadRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RenameThreadRequest.ProtoReflect.Descriptor instead.
 func (*RenameThreadRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{19}
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *RenameThreadRequest) GetId() string {
@@ -2073,7 +2254,7 @@ type RenameThreadResponse struct {
 
 func (x *RenameThreadResponse) Reset() {
 	*x = RenameThreadResponse{}
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[20]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2085,7 +2266,7 @@ func (x *RenameThreadResponse) String() string {
 func (*RenameThreadResponse) ProtoMessage() {}
 
 func (x *RenameThreadResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[20]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2098,7 +2279,7 @@ func (x *RenameThreadResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RenameThreadResponse.ProtoReflect.Descriptor instead.
 func (*RenameThreadResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{20}
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *RenameThreadResponse) GetThread() *Thread {
@@ -2117,7 +2298,7 @@ type CloseThreadRequest struct {
 
 func (x *CloseThreadRequest) Reset() {
 	*x = CloseThreadRequest{}
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[21]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2129,7 +2310,7 @@ func (x *CloseThreadRequest) String() string {
 func (*CloseThreadRequest) ProtoMessage() {}
 
 func (x *CloseThreadRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[21]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2142,7 +2323,7 @@ func (x *CloseThreadRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CloseThreadRequest.ProtoReflect.Descriptor instead.
 func (*CloseThreadRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{21}
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *CloseThreadRequest) GetId() string {
@@ -2160,7 +2341,7 @@ type CloseThreadResponse struct {
 
 func (x *CloseThreadResponse) Reset() {
 	*x = CloseThreadResponse{}
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[22]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2172,7 +2353,7 @@ func (x *CloseThreadResponse) String() string {
 func (*CloseThreadResponse) ProtoMessage() {}
 
 func (x *CloseThreadResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[22]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2185,7 +2366,7 @@ func (x *CloseThreadResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CloseThreadResponse.ProtoReflect.Descriptor instead.
 func (*CloseThreadResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{22}
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{24}
 }
 
 type ReconnectThreadRequest struct {
@@ -2197,7 +2378,7 @@ type ReconnectThreadRequest struct {
 
 func (x *ReconnectThreadRequest) Reset() {
 	*x = ReconnectThreadRequest{}
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[23]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2209,7 +2390,7 @@ func (x *ReconnectThreadRequest) String() string {
 func (*ReconnectThreadRequest) ProtoMessage() {}
 
 func (x *ReconnectThreadRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[23]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2222,7 +2403,7 @@ func (x *ReconnectThreadRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReconnectThreadRequest.ProtoReflect.Descriptor instead.
 func (*ReconnectThreadRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{23}
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *ReconnectThreadRequest) GetId() string {
@@ -2241,7 +2422,7 @@ type ReconnectThreadResponse struct {
 
 func (x *ReconnectThreadResponse) Reset() {
 	*x = ReconnectThreadResponse{}
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[24]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2253,7 +2434,7 @@ func (x *ReconnectThreadResponse) String() string {
 func (*ReconnectThreadResponse) ProtoMessage() {}
 
 func (x *ReconnectThreadResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[24]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2266,7 +2447,7 @@ func (x *ReconnectThreadResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReconnectThreadResponse.ProtoReflect.Descriptor instead.
 func (*ReconnectThreadResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{24}
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *ReconnectThreadResponse) GetThread() *Thread {
@@ -2285,7 +2466,7 @@ type RemoveThreadRequest struct {
 
 func (x *RemoveThreadRequest) Reset() {
 	*x = RemoveThreadRequest{}
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[25]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2297,7 +2478,7 @@ func (x *RemoveThreadRequest) String() string {
 func (*RemoveThreadRequest) ProtoMessage() {}
 
 func (x *RemoveThreadRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[25]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2310,7 +2491,7 @@ func (x *RemoveThreadRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveThreadRequest.ProtoReflect.Descriptor instead.
 func (*RemoveThreadRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{25}
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *RemoveThreadRequest) GetId() string {
@@ -2328,7 +2509,7 @@ type RemoveThreadResponse struct {
 
 func (x *RemoveThreadResponse) Reset() {
 	*x = RemoveThreadResponse{}
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[26]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2340,7 +2521,7 @@ func (x *RemoveThreadResponse) String() string {
 func (*RemoveThreadResponse) ProtoMessage() {}
 
 func (x *RemoveThreadResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[26]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2353,7 +2534,7 @@ func (x *RemoveThreadResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveThreadResponse.ProtoReflect.Descriptor instead.
 func (*RemoveThreadResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{26}
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{28}
 }
 
 type RunInThreadRequest struct {
@@ -2369,7 +2550,7 @@ type RunInThreadRequest struct {
 
 func (x *RunInThreadRequest) Reset() {
 	*x = RunInThreadRequest{}
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[27]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2381,7 +2562,7 @@ func (x *RunInThreadRequest) String() string {
 func (*RunInThreadRequest) ProtoMessage() {}
 
 func (x *RunInThreadRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[27]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2394,7 +2575,7 @@ func (x *RunInThreadRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunInThreadRequest.ProtoReflect.Descriptor instead.
 func (*RunInThreadRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{27}
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *RunInThreadRequest) GetId() string {
@@ -2427,7 +2608,7 @@ type RunInThreadResponse struct {
 
 func (x *RunInThreadResponse) Reset() {
 	*x = RunInThreadResponse{}
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[28]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2439,7 +2620,7 @@ func (x *RunInThreadResponse) String() string {
 func (*RunInThreadResponse) ProtoMessage() {}
 
 func (x *RunInThreadResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[28]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2452,7 +2633,7 @@ func (x *RunInThreadResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunInThreadResponse.ProtoReflect.Descriptor instead.
 func (*RunInThreadResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{28}
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *RunInThreadResponse) GetThread() *Thread {
@@ -2472,7 +2653,7 @@ type PinThreadRequest struct {
 
 func (x *PinThreadRequest) Reset() {
 	*x = PinThreadRequest{}
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[29]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2484,7 +2665,7 @@ func (x *PinThreadRequest) String() string {
 func (*PinThreadRequest) ProtoMessage() {}
 
 func (x *PinThreadRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[29]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2497,7 +2678,7 @@ func (x *PinThreadRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PinThreadRequest.ProtoReflect.Descriptor instead.
 func (*PinThreadRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{29}
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *PinThreadRequest) GetId() string {
@@ -2523,7 +2704,7 @@ type PinThreadResponse struct {
 
 func (x *PinThreadResponse) Reset() {
 	*x = PinThreadResponse{}
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[30]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2535,7 +2716,7 @@ func (x *PinThreadResponse) String() string {
 func (*PinThreadResponse) ProtoMessage() {}
 
 func (x *PinThreadResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[30]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2548,7 +2729,7 @@ func (x *PinThreadResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PinThreadResponse.ProtoReflect.Descriptor instead.
 func (*PinThreadResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{30}
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *PinThreadResponse) GetThread() *Thread {
@@ -2569,7 +2750,7 @@ type ArchiveThreadRequest struct {
 
 func (x *ArchiveThreadRequest) Reset() {
 	*x = ArchiveThreadRequest{}
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[31]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2581,7 +2762,7 @@ func (x *ArchiveThreadRequest) String() string {
 func (*ArchiveThreadRequest) ProtoMessage() {}
 
 func (x *ArchiveThreadRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[31]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2594,7 +2775,7 @@ func (x *ArchiveThreadRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ArchiveThreadRequest.ProtoReflect.Descriptor instead.
 func (*ArchiveThreadRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{31}
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *ArchiveThreadRequest) GetId() string {
@@ -2620,7 +2801,7 @@ type ArchiveThreadResponse struct {
 
 func (x *ArchiveThreadResponse) Reset() {
 	*x = ArchiveThreadResponse{}
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[32]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2632,7 +2813,7 @@ func (x *ArchiveThreadResponse) String() string {
 func (*ArchiveThreadResponse) ProtoMessage() {}
 
 func (x *ArchiveThreadResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[32]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2645,7 +2826,7 @@ func (x *ArchiveThreadResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ArchiveThreadResponse.ProtoReflect.Descriptor instead.
 func (*ArchiveThreadResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{32}
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *ArchiveThreadResponse) GetThread() *Thread {
@@ -2666,7 +2847,7 @@ type SnoozeThreadRequest struct {
 
 func (x *SnoozeThreadRequest) Reset() {
 	*x = SnoozeThreadRequest{}
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[33]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2678,7 +2859,7 @@ func (x *SnoozeThreadRequest) String() string {
 func (*SnoozeThreadRequest) ProtoMessage() {}
 
 func (x *SnoozeThreadRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[33]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2691,7 +2872,7 @@ func (x *SnoozeThreadRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SnoozeThreadRequest.ProtoReflect.Descriptor instead.
 func (*SnoozeThreadRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{33}
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *SnoozeThreadRequest) GetId() string {
@@ -2717,7 +2898,7 @@ type SnoozeThreadResponse struct {
 
 func (x *SnoozeThreadResponse) Reset() {
 	*x = SnoozeThreadResponse{}
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[34]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2729,7 +2910,7 @@ func (x *SnoozeThreadResponse) String() string {
 func (*SnoozeThreadResponse) ProtoMessage() {}
 
 func (x *SnoozeThreadResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[34]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2742,7 +2923,7 @@ func (x *SnoozeThreadResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SnoozeThreadResponse.ProtoReflect.Descriptor instead.
 func (*SnoozeThreadResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{34}
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *SnoozeThreadResponse) GetThread() *Thread {
@@ -2760,7 +2941,7 @@ type WatchThreadsRequest struct {
 
 func (x *WatchThreadsRequest) Reset() {
 	*x = WatchThreadsRequest{}
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[35]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2772,7 +2953,7 @@ func (x *WatchThreadsRequest) String() string {
 func (*WatchThreadsRequest) ProtoMessage() {}
 
 func (x *WatchThreadsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[35]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2785,7 +2966,7 @@ func (x *WatchThreadsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchThreadsRequest.ProtoReflect.Descriptor instead.
 func (*WatchThreadsRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{35}
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{37}
 }
 
 type ThreadListEvent struct {
@@ -2803,7 +2984,7 @@ type ThreadListEvent struct {
 
 func (x *ThreadListEvent) Reset() {
 	*x = ThreadListEvent{}
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[36]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2815,7 +2996,7 @@ func (x *ThreadListEvent) String() string {
 func (*ThreadListEvent) ProtoMessage() {}
 
 func (x *ThreadListEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[36]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2828,7 +3009,7 @@ func (x *ThreadListEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ThreadListEvent.ProtoReflect.Descriptor instead.
 func (*ThreadListEvent) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{36}
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *ThreadListEvent) GetEvent() isThreadListEvent_Event {
@@ -2916,7 +3097,7 @@ type ThreadListSnapshot struct {
 
 func (x *ThreadListSnapshot) Reset() {
 	*x = ThreadListSnapshot{}
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[37]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2928,7 +3109,7 @@ func (x *ThreadListSnapshot) String() string {
 func (*ThreadListSnapshot) ProtoMessage() {}
 
 func (x *ThreadListSnapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[37]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2941,7 +3122,7 @@ func (x *ThreadListSnapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ThreadListSnapshot.ProtoReflect.Descriptor instead.
 func (*ThreadListSnapshot) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{37}
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *ThreadListSnapshot) GetThreads() []*Thread {
@@ -2968,7 +3149,7 @@ type RetiredUsage struct {
 
 func (x *RetiredUsage) Reset() {
 	*x = RetiredUsage{}
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[38]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2980,7 +3161,7 @@ func (x *RetiredUsage) String() string {
 func (*RetiredUsage) ProtoMessage() {}
 
 func (x *RetiredUsage) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[38]
+	mi := &file_codefoundry_v1_thread_lifecycle_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2993,7 +3174,7 @@ func (x *RetiredUsage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RetiredUsage.ProtoReflect.Descriptor instead.
 func (*RetiredUsage) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{38}
+	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *RetiredUsage) GetBuckets() []*UsageBucket {
@@ -3007,7 +3188,7 @@ var File_codefoundry_v1_thread_lifecycle_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\n" +
-	"%codefoundry/v1/thread_lifecycle.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x9e\x0e\n" +
+	"%codefoundry/v1/thread_lifecycle.proto\x12\x0ecodefoundry.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x9e\x0e\n" +
 	"\x06Thread\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12*\n" +
 	"\x11claude_session_id\x18\x02 \x01(\tR\x0fclaudeSessionId\x12\x17\n" +
@@ -3156,7 +3337,14 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\x10GetThreadRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"C\n" +
 	"\x11GetThreadResponse\x12.\n" +
-	"\x06thread\x18\x01 \x01(\v2\x16.codefoundry.v1.ThreadR\x06thread\"9\n" +
+	"\x06thread\x18\x01 \x01(\v2\x16.codefoundry.v1.ThreadR\x06thread\"\x93\x01\n" +
+	"\x11WaitThreadRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x129\n" +
+	"\x05until\x18\x02 \x01(\x0e2#.codefoundry.v1.ThreadWaitConditionR\x05until\x123\n" +
+	"\atimeout\x18\x03 \x01(\v2\x19.google.protobuf.DurationR\atimeout\"a\n" +
+	"\x12WaitThreadResponse\x12.\n" +
+	"\x06thread\x18\x01 \x01(\v2\x16.codefoundry.v1.ThreadR\x06thread\x12\x1b\n" +
+	"\ttimed_out\x18\x02 \x01(\bR\btimedOut\"9\n" +
 	"\x13RenameThreadRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\"F\n" +
@@ -3226,7 +3414,13 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\x0eAgentRunStatus\x12 \n" +
 	"\x1cAGENT_RUN_STATUS_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15AGENT_RUN_STATUS_OPEN\x10\x01\x12\x1b\n" +
-	"\x17AGENT_RUN_STATUS_CLOSED\x10\x02B\xcc\x01\n" +
+	"\x17AGENT_RUN_STATUS_CLOSED\x10\x02*\xca\x01\n" +
+	"\x13ThreadWaitCondition\x12%\n" +
+	"!THREAD_WAIT_CONDITION_UNSPECIFIED\x10\x00\x12\x1e\n" +
+	"\x1aTHREAD_WAIT_CONDITION_IDLE\x10\x01\x12#\n" +
+	"\x1fTHREAD_WAIT_CONDITION_ATTENTION\x10\x02\x12\x1f\n" +
+	"\x1bTHREAD_WAIT_CONDITION_ERROR\x10\x03\x12&\n" +
+	"\"THREAD_WAIT_CONDITION_DISCONNECTED\x10\x04B\xcc\x01\n" +
 	"\x12com.codefoundry.v1B\x14ThreadLifecycleProtoP\x01ZGgithub.com/alexwaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
 
 var (
@@ -3241,99 +3435,106 @@ func file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP() []byte {
 	return file_codefoundry_v1_thread_lifecycle_proto_rawDescData
 }
 
-var file_codefoundry_v1_thread_lifecycle_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_codefoundry_v1_thread_lifecycle_proto_msgTypes = make([]protoimpl.MessageInfo, 39)
+var file_codefoundry_v1_thread_lifecycle_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
+var file_codefoundry_v1_thread_lifecycle_proto_msgTypes = make([]protoimpl.MessageInfo, 41)
 var file_codefoundry_v1_thread_lifecycle_proto_goTypes = []any{
 	(PermissionMode)(0),             // 0: codefoundry.v1.PermissionMode
 	(ThreadState)(0),                // 1: codefoundry.v1.ThreadState
 	(ThreadStatus)(0),               // 2: codefoundry.v1.ThreadStatus
 	(AgentRunStatus)(0),             // 3: codefoundry.v1.AgentRunStatus
-	(*Thread)(nil),                  // 4: codefoundry.v1.Thread
-	(*ApiRetry)(nil),                // 5: codefoundry.v1.ApiRetry
-	(*AgentRun)(nil),                // 6: codefoundry.v1.AgentRun
-	(*UsageBucket)(nil),             // 7: codefoundry.v1.UsageBucket
-	(*LinkedPullRequest)(nil),       // 8: codefoundry.v1.LinkedPullRequest
-	(*CreateThreadRequest)(nil),     // 9: codefoundry.v1.CreateThreadRequest
-	(*NewWorktree)(nil),             // 10: codefoundry.v1.NewWorktree
-	(*NewWorkspace)(nil),            // 11: codefoundry.v1.NewWorkspace
-	(*StageAttachmentRequest)(nil),  // 12: codefoundry.v1.StageAttachmentRequest
-	(*StageAttachmentResponse)(nil), // 13: codefoundry.v1.StageAttachmentResponse
-	(*ReadAttachmentRequest)(nil),   // 14: codefoundry.v1.ReadAttachmentRequest
-	(*ReadAttachmentResponse)(nil),  // 15: codefoundry.v1.ReadAttachmentResponse
-	(*CreateThreadResponse)(nil),    // 16: codefoundry.v1.CreateThreadResponse
-	(*ForkThreadRequest)(nil),       // 17: codefoundry.v1.ForkThreadRequest
-	(*ForkThreadResponse)(nil),      // 18: codefoundry.v1.ForkThreadResponse
-	(*ListThreadsRequest)(nil),      // 19: codefoundry.v1.ListThreadsRequest
-	(*ListThreadsResponse)(nil),     // 20: codefoundry.v1.ListThreadsResponse
-	(*GetThreadRequest)(nil),        // 21: codefoundry.v1.GetThreadRequest
-	(*GetThreadResponse)(nil),       // 22: codefoundry.v1.GetThreadResponse
-	(*RenameThreadRequest)(nil),     // 23: codefoundry.v1.RenameThreadRequest
-	(*RenameThreadResponse)(nil),    // 24: codefoundry.v1.RenameThreadResponse
-	(*CloseThreadRequest)(nil),      // 25: codefoundry.v1.CloseThreadRequest
-	(*CloseThreadResponse)(nil),     // 26: codefoundry.v1.CloseThreadResponse
-	(*ReconnectThreadRequest)(nil),  // 27: codefoundry.v1.ReconnectThreadRequest
-	(*ReconnectThreadResponse)(nil), // 28: codefoundry.v1.ReconnectThreadResponse
-	(*RemoveThreadRequest)(nil),     // 29: codefoundry.v1.RemoveThreadRequest
-	(*RemoveThreadResponse)(nil),    // 30: codefoundry.v1.RemoveThreadResponse
-	(*RunInThreadRequest)(nil),      // 31: codefoundry.v1.RunInThreadRequest
-	(*RunInThreadResponse)(nil),     // 32: codefoundry.v1.RunInThreadResponse
-	(*PinThreadRequest)(nil),        // 33: codefoundry.v1.PinThreadRequest
-	(*PinThreadResponse)(nil),       // 34: codefoundry.v1.PinThreadResponse
-	(*ArchiveThreadRequest)(nil),    // 35: codefoundry.v1.ArchiveThreadRequest
-	(*ArchiveThreadResponse)(nil),   // 36: codefoundry.v1.ArchiveThreadResponse
-	(*SnoozeThreadRequest)(nil),     // 37: codefoundry.v1.SnoozeThreadRequest
-	(*SnoozeThreadResponse)(nil),    // 38: codefoundry.v1.SnoozeThreadResponse
-	(*WatchThreadsRequest)(nil),     // 39: codefoundry.v1.WatchThreadsRequest
-	(*ThreadListEvent)(nil),         // 40: codefoundry.v1.ThreadListEvent
-	(*ThreadListSnapshot)(nil),      // 41: codefoundry.v1.ThreadListSnapshot
-	(*RetiredUsage)(nil),            // 42: codefoundry.v1.RetiredUsage
-	(*timestamppb.Timestamp)(nil),   // 43: google.protobuf.Timestamp
+	(ThreadWaitCondition)(0),        // 4: codefoundry.v1.ThreadWaitCondition
+	(*Thread)(nil),                  // 5: codefoundry.v1.Thread
+	(*ApiRetry)(nil),                // 6: codefoundry.v1.ApiRetry
+	(*AgentRun)(nil),                // 7: codefoundry.v1.AgentRun
+	(*UsageBucket)(nil),             // 8: codefoundry.v1.UsageBucket
+	(*LinkedPullRequest)(nil),       // 9: codefoundry.v1.LinkedPullRequest
+	(*CreateThreadRequest)(nil),     // 10: codefoundry.v1.CreateThreadRequest
+	(*NewWorktree)(nil),             // 11: codefoundry.v1.NewWorktree
+	(*NewWorkspace)(nil),            // 12: codefoundry.v1.NewWorkspace
+	(*StageAttachmentRequest)(nil),  // 13: codefoundry.v1.StageAttachmentRequest
+	(*StageAttachmentResponse)(nil), // 14: codefoundry.v1.StageAttachmentResponse
+	(*ReadAttachmentRequest)(nil),   // 15: codefoundry.v1.ReadAttachmentRequest
+	(*ReadAttachmentResponse)(nil),  // 16: codefoundry.v1.ReadAttachmentResponse
+	(*CreateThreadResponse)(nil),    // 17: codefoundry.v1.CreateThreadResponse
+	(*ForkThreadRequest)(nil),       // 18: codefoundry.v1.ForkThreadRequest
+	(*ForkThreadResponse)(nil),      // 19: codefoundry.v1.ForkThreadResponse
+	(*ListThreadsRequest)(nil),      // 20: codefoundry.v1.ListThreadsRequest
+	(*ListThreadsResponse)(nil),     // 21: codefoundry.v1.ListThreadsResponse
+	(*GetThreadRequest)(nil),        // 22: codefoundry.v1.GetThreadRequest
+	(*GetThreadResponse)(nil),       // 23: codefoundry.v1.GetThreadResponse
+	(*WaitThreadRequest)(nil),       // 24: codefoundry.v1.WaitThreadRequest
+	(*WaitThreadResponse)(nil),      // 25: codefoundry.v1.WaitThreadResponse
+	(*RenameThreadRequest)(nil),     // 26: codefoundry.v1.RenameThreadRequest
+	(*RenameThreadResponse)(nil),    // 27: codefoundry.v1.RenameThreadResponse
+	(*CloseThreadRequest)(nil),      // 28: codefoundry.v1.CloseThreadRequest
+	(*CloseThreadResponse)(nil),     // 29: codefoundry.v1.CloseThreadResponse
+	(*ReconnectThreadRequest)(nil),  // 30: codefoundry.v1.ReconnectThreadRequest
+	(*ReconnectThreadResponse)(nil), // 31: codefoundry.v1.ReconnectThreadResponse
+	(*RemoveThreadRequest)(nil),     // 32: codefoundry.v1.RemoveThreadRequest
+	(*RemoveThreadResponse)(nil),    // 33: codefoundry.v1.RemoveThreadResponse
+	(*RunInThreadRequest)(nil),      // 34: codefoundry.v1.RunInThreadRequest
+	(*RunInThreadResponse)(nil),     // 35: codefoundry.v1.RunInThreadResponse
+	(*PinThreadRequest)(nil),        // 36: codefoundry.v1.PinThreadRequest
+	(*PinThreadResponse)(nil),       // 37: codefoundry.v1.PinThreadResponse
+	(*ArchiveThreadRequest)(nil),    // 38: codefoundry.v1.ArchiveThreadRequest
+	(*ArchiveThreadResponse)(nil),   // 39: codefoundry.v1.ArchiveThreadResponse
+	(*SnoozeThreadRequest)(nil),     // 40: codefoundry.v1.SnoozeThreadRequest
+	(*SnoozeThreadResponse)(nil),    // 41: codefoundry.v1.SnoozeThreadResponse
+	(*WatchThreadsRequest)(nil),     // 42: codefoundry.v1.WatchThreadsRequest
+	(*ThreadListEvent)(nil),         // 43: codefoundry.v1.ThreadListEvent
+	(*ThreadListSnapshot)(nil),      // 44: codefoundry.v1.ThreadListSnapshot
+	(*RetiredUsage)(nil),            // 45: codefoundry.v1.RetiredUsage
+	(*timestamppb.Timestamp)(nil),   // 46: google.protobuf.Timestamp
+	(*durationpb.Duration)(nil),     // 47: google.protobuf.Duration
 }
 var file_codefoundry_v1_thread_lifecycle_proto_depIdxs = []int32{
 	1,  // 0: codefoundry.v1.Thread.state:type_name -> codefoundry.v1.ThreadState
 	2,  // 1: codefoundry.v1.Thread.status:type_name -> codefoundry.v1.ThreadStatus
-	43, // 2: codefoundry.v1.Thread.created_at:type_name -> google.protobuf.Timestamp
-	43, // 3: codefoundry.v1.Thread.last_activity_at:type_name -> google.protobuf.Timestamp
+	46, // 2: codefoundry.v1.Thread.created_at:type_name -> google.protobuf.Timestamp
+	46, // 3: codefoundry.v1.Thread.last_activity_at:type_name -> google.protobuf.Timestamp
 	0,  // 4: codefoundry.v1.Thread.permission_mode:type_name -> codefoundry.v1.PermissionMode
-	8,  // 5: codefoundry.v1.Thread.linked_pull_requests:type_name -> codefoundry.v1.LinkedPullRequest
-	43, // 6: codefoundry.v1.Thread.status_changed_at:type_name -> google.protobuf.Timestamp
-	7,  // 7: codefoundry.v1.Thread.usage:type_name -> codefoundry.v1.UsageBucket
-	6,  // 8: codefoundry.v1.Thread.agent_runs:type_name -> codefoundry.v1.AgentRun
-	43, // 9: codefoundry.v1.Thread.cache_expires_at:type_name -> google.protobuf.Timestamp
-	5,  // 10: codefoundry.v1.Thread.retry:type_name -> codefoundry.v1.ApiRetry
-	43, // 11: codefoundry.v1.Thread.archived_at:type_name -> google.protobuf.Timestamp
-	43, // 12: codefoundry.v1.Thread.snoozed_until:type_name -> google.protobuf.Timestamp
-	43, // 13: codefoundry.v1.ApiRetry.retry_at:type_name -> google.protobuf.Timestamp
+	9,  // 5: codefoundry.v1.Thread.linked_pull_requests:type_name -> codefoundry.v1.LinkedPullRequest
+	46, // 6: codefoundry.v1.Thread.status_changed_at:type_name -> google.protobuf.Timestamp
+	8,  // 7: codefoundry.v1.Thread.usage:type_name -> codefoundry.v1.UsageBucket
+	7,  // 8: codefoundry.v1.Thread.agent_runs:type_name -> codefoundry.v1.AgentRun
+	46, // 9: codefoundry.v1.Thread.cache_expires_at:type_name -> google.protobuf.Timestamp
+	6,  // 10: codefoundry.v1.Thread.retry:type_name -> codefoundry.v1.ApiRetry
+	46, // 11: codefoundry.v1.Thread.archived_at:type_name -> google.protobuf.Timestamp
+	46, // 12: codefoundry.v1.Thread.snoozed_until:type_name -> google.protobuf.Timestamp
+	46, // 13: codefoundry.v1.ApiRetry.retry_at:type_name -> google.protobuf.Timestamp
 	3,  // 14: codefoundry.v1.AgentRun.status:type_name -> codefoundry.v1.AgentRunStatus
-	43, // 15: codefoundry.v1.AgentRun.started_at:type_name -> google.protobuf.Timestamp
-	7,  // 16: codefoundry.v1.AgentRun.usage:type_name -> codefoundry.v1.UsageBucket
-	43, // 17: codefoundry.v1.LinkedPullRequest.linked_at:type_name -> google.protobuf.Timestamp
+	46, // 15: codefoundry.v1.AgentRun.started_at:type_name -> google.protobuf.Timestamp
+	8,  // 16: codefoundry.v1.AgentRun.usage:type_name -> codefoundry.v1.UsageBucket
+	46, // 17: codefoundry.v1.LinkedPullRequest.linked_at:type_name -> google.protobuf.Timestamp
 	0,  // 18: codefoundry.v1.CreateThreadRequest.permission_mode:type_name -> codefoundry.v1.PermissionMode
-	10, // 19: codefoundry.v1.CreateThreadRequest.new_worktree:type_name -> codefoundry.v1.NewWorktree
-	11, // 20: codefoundry.v1.CreateThreadRequest.new_workspace:type_name -> codefoundry.v1.NewWorkspace
-	4,  // 21: codefoundry.v1.CreateThreadResponse.thread:type_name -> codefoundry.v1.Thread
-	4,  // 22: codefoundry.v1.ForkThreadResponse.thread:type_name -> codefoundry.v1.Thread
-	4,  // 23: codefoundry.v1.ListThreadsResponse.threads:type_name -> codefoundry.v1.Thread
-	7,  // 24: codefoundry.v1.ListThreadsResponse.retired_usage:type_name -> codefoundry.v1.UsageBucket
-	4,  // 25: codefoundry.v1.GetThreadResponse.thread:type_name -> codefoundry.v1.Thread
-	4,  // 26: codefoundry.v1.RenameThreadResponse.thread:type_name -> codefoundry.v1.Thread
-	4,  // 27: codefoundry.v1.ReconnectThreadResponse.thread:type_name -> codefoundry.v1.Thread
-	4,  // 28: codefoundry.v1.RunInThreadResponse.thread:type_name -> codefoundry.v1.Thread
-	4,  // 29: codefoundry.v1.PinThreadResponse.thread:type_name -> codefoundry.v1.Thread
-	4,  // 30: codefoundry.v1.ArchiveThreadResponse.thread:type_name -> codefoundry.v1.Thread
-	43, // 31: codefoundry.v1.SnoozeThreadRequest.until:type_name -> google.protobuf.Timestamp
-	4,  // 32: codefoundry.v1.SnoozeThreadResponse.thread:type_name -> codefoundry.v1.Thread
-	41, // 33: codefoundry.v1.ThreadListEvent.snapshot:type_name -> codefoundry.v1.ThreadListSnapshot
-	4,  // 34: codefoundry.v1.ThreadListEvent.updated:type_name -> codefoundry.v1.Thread
-	42, // 35: codefoundry.v1.ThreadListEvent.retired_usage:type_name -> codefoundry.v1.RetiredUsage
-	4,  // 36: codefoundry.v1.ThreadListSnapshot.threads:type_name -> codefoundry.v1.Thread
-	7,  // 37: codefoundry.v1.ThreadListSnapshot.retired_usage:type_name -> codefoundry.v1.UsageBucket
-	7,  // 38: codefoundry.v1.RetiredUsage.buckets:type_name -> codefoundry.v1.UsageBucket
-	39, // [39:39] is the sub-list for method output_type
-	39, // [39:39] is the sub-list for method input_type
-	39, // [39:39] is the sub-list for extension type_name
-	39, // [39:39] is the sub-list for extension extendee
-	0,  // [0:39] is the sub-list for field type_name
+	11, // 19: codefoundry.v1.CreateThreadRequest.new_worktree:type_name -> codefoundry.v1.NewWorktree
+	12, // 20: codefoundry.v1.CreateThreadRequest.new_workspace:type_name -> codefoundry.v1.NewWorkspace
+	5,  // 21: codefoundry.v1.CreateThreadResponse.thread:type_name -> codefoundry.v1.Thread
+	5,  // 22: codefoundry.v1.ForkThreadResponse.thread:type_name -> codefoundry.v1.Thread
+	5,  // 23: codefoundry.v1.ListThreadsResponse.threads:type_name -> codefoundry.v1.Thread
+	8,  // 24: codefoundry.v1.ListThreadsResponse.retired_usage:type_name -> codefoundry.v1.UsageBucket
+	5,  // 25: codefoundry.v1.GetThreadResponse.thread:type_name -> codefoundry.v1.Thread
+	4,  // 26: codefoundry.v1.WaitThreadRequest.until:type_name -> codefoundry.v1.ThreadWaitCondition
+	47, // 27: codefoundry.v1.WaitThreadRequest.timeout:type_name -> google.protobuf.Duration
+	5,  // 28: codefoundry.v1.WaitThreadResponse.thread:type_name -> codefoundry.v1.Thread
+	5,  // 29: codefoundry.v1.RenameThreadResponse.thread:type_name -> codefoundry.v1.Thread
+	5,  // 30: codefoundry.v1.ReconnectThreadResponse.thread:type_name -> codefoundry.v1.Thread
+	5,  // 31: codefoundry.v1.RunInThreadResponse.thread:type_name -> codefoundry.v1.Thread
+	5,  // 32: codefoundry.v1.PinThreadResponse.thread:type_name -> codefoundry.v1.Thread
+	5,  // 33: codefoundry.v1.ArchiveThreadResponse.thread:type_name -> codefoundry.v1.Thread
+	46, // 34: codefoundry.v1.SnoozeThreadRequest.until:type_name -> google.protobuf.Timestamp
+	5,  // 35: codefoundry.v1.SnoozeThreadResponse.thread:type_name -> codefoundry.v1.Thread
+	44, // 36: codefoundry.v1.ThreadListEvent.snapshot:type_name -> codefoundry.v1.ThreadListSnapshot
+	5,  // 37: codefoundry.v1.ThreadListEvent.updated:type_name -> codefoundry.v1.Thread
+	45, // 38: codefoundry.v1.ThreadListEvent.retired_usage:type_name -> codefoundry.v1.RetiredUsage
+	5,  // 39: codefoundry.v1.ThreadListSnapshot.threads:type_name -> codefoundry.v1.Thread
+	8,  // 40: codefoundry.v1.ThreadListSnapshot.retired_usage:type_name -> codefoundry.v1.UsageBucket
+	8,  // 41: codefoundry.v1.RetiredUsage.buckets:type_name -> codefoundry.v1.UsageBucket
+	42, // [42:42] is the sub-list for method output_type
+	42, // [42:42] is the sub-list for method input_type
+	42, // [42:42] is the sub-list for extension type_name
+	42, // [42:42] is the sub-list for extension extendee
+	0,  // [0:42] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_thread_lifecycle_proto_init() }
@@ -3341,7 +3542,7 @@ func file_codefoundry_v1_thread_lifecycle_proto_init() {
 	if File_codefoundry_v1_thread_lifecycle_proto != nil {
 		return
 	}
-	file_codefoundry_v1_thread_lifecycle_proto_msgTypes[36].OneofWrappers = []any{
+	file_codefoundry_v1_thread_lifecycle_proto_msgTypes[38].OneofWrappers = []any{
 		(*ThreadListEvent_Snapshot)(nil),
 		(*ThreadListEvent_Updated)(nil),
 		(*ThreadListEvent_RemovedId)(nil),
@@ -3352,8 +3553,8 @@ func file_codefoundry_v1_thread_lifecycle_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_thread_lifecycle_proto_rawDesc), len(file_codefoundry_v1_thread_lifecycle_proto_rawDesc)),
-			NumEnums:      4,
-			NumMessages:   39,
+			NumEnums:      5,
+			NumMessages:   41,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
