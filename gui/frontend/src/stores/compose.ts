@@ -5,22 +5,30 @@
  * files behind the attachments do not survive a reload anyway. Also caches each repo's
  * base refs (RepoService.ListRefs) for the base-ref picker.
  *
- * The draft's text is the prompt with inline tags as tokens (lib/prompt.ts: image chips,
- * skills, files); the attachments are the images themselves (the thumbnails). A chip
- * refers to an attachment by id; removing a chip from the text keeps the attachment.
- * Skill and file tags of a project go when the project leaves the draft.
+ * The draft's text is the prompt with inline tags as tokens (lib/prompt.ts: attachment
+ * chips, skills, files); the attachments are the images and PDFs themselves (the tiles).
+ * A chip refers to an attachment by id; removing a chip from the text keeps the
+ * attachment. Skill and file tags of a project go when the project leaves the draft.
+ *
+ * A PDF's page count and first-page thumbnail come from pdf.js (lib/pdf.ts, loaded on
+ * the first PDF) a moment after it is added; the inline cap and the "reads it page by
+ * page" notice apply then (settlePdf).
  *
  * Sending stages the attachments (ThreadService.StageAttachment) and invokes the
  * thread.new registry command, like every other user action.
  */
 import { create } from "zustand";
 import { listRefs, type RepoView } from "@/api/repo";
-import { ATTACHMENT_MAX_BYTES, ATTACHMENT_MIME_TYPES, stageAttachment } from "@/api/threads";
+import { ATTACHMENT_MIME_TYPES, attachmentMaxBytes, MAX_INLINE_PDF_PAGES, MESSAGE_INLINE_MAX_BYTES, PDF_MIME_TYPE, stageAttachment } from "@/api/threads";
 import { isOutdatedDaemon } from "@/api/errors";
 import { errorMessage } from "@/api/stream";
 import {
   checkAttachments,
   createdThreadId,
+  inlineBytes,
+  inlineCapNotice,
+  longPdfNotice,
+  sentInline,
   DEFAULT_PERMISSION,
   defaultWorktree,
   draftKey,
@@ -31,12 +39,14 @@ import {
   threadPlace,
   WORK_IN_SETTING_KEY,
   workInMemory,
+  type AttachmentLimits,
   type ComposePermission,
   type ComposeTarget,
   type ProjectWorktree,
   type ThreadPlace,
   type WorktreeChoice,
 } from "@/lib/compose";
+import { pdfSummary } from "@/lib/pdf";
 import { NO_PROJECT } from "@/lib/threadRow";
 import { sentComposerText } from "@/lib/userMessage";
 import { projectPrompt, removeReferences, removeRepoTags, repoTagCount, tagsByRepo } from "@/lib/prompt";
@@ -53,13 +63,30 @@ import { useWorkspacesStore } from "./workspaces";
 export interface DraftAttachment {
   id: string;
   file: File;
-  /** Object URL for the thumbnail; revoked when the attachment goes away. */
+  kind: "image" | "pdf";
+  /** Object URL of the file (an image's thumbnail, the preview); revoked when the attachment goes away. */
   url: string;
   /** Daemon path once staged; a retry after a failed send reuses it. */
   stagedPath: string | null;
+  /** A PDF's page count: null while it is counted, or when pdf.js could not read it. Always null for an image. */
+  pages: number | null;
+  /** A PDF's first page as a data URL PDF_THUMB_WIDTH px wide; null until rendered (or when it did not render), and for an image. */
+  thumb: string | null;
 }
 
-/** idle: editable. attaching: staging images. starting: thread.new in flight. */
+/** The width a PDF's first-page thumbnail is rendered at (the 64px tile at 2x). */
+export const PDF_THUMB_WIDTH = 128;
+
+/** What the composers accept (the daemon's limits, api/threads.ts). */
+export const ATTACHMENT_LIMITS: AttachmentLimits = {
+  types: ATTACHMENT_MIME_TYPES,
+  pdfType: PDF_MIME_TYPE,
+  maxBytes: attachmentMaxBytes,
+  maxInlineBytes: MESSAGE_INLINE_MAX_BYTES,
+  maxInlinePages: MAX_INLINE_PDF_PAGES,
+};
+
+/** idle: editable. attaching: staging attachments. starting: thread.new in flight. */
 export type DraftPhase = "idle" | "attaching" | "starting";
 
 export interface Draft {
@@ -84,7 +111,7 @@ export interface Draft {
   phase: DraftPhase;
   /** Why the last send failed. */
   error: string | null;
-  /** Attachments that were rejected (type, size, count). */
+  /** Attachments that were rejected (type, size, count, inline cap), and PDFs Claude reads page by page; " · " between. */
   notice: string | null;
 }
 
@@ -186,17 +213,83 @@ export function isDraftEmpty(d: Pick<Draft, "text" | "attachments">): boolean {
 
 let nextAttachmentId = 1;
 
+/** A file with no type but a .pdf name (some drags and pastes) typed as a PDF. */
+function withPdfType(file: File): File {
+  if (file.type !== "" || !/\.pdf$/i.test(file.name)) return file;
+  return new File([file], file.name, { type: PDF_MIME_TYPE, lastModified: file.lastModified });
+}
+
+function inlineOf(a: DraftAttachment) {
+  return { kind: a.kind, size: a.file.size, pages: a.pages };
+}
+
+/** The bytes a draft's attachments send inline so far (lib/compose sentInline). */
+function draftInlineBytes(list: readonly DraftAttachment[]): number {
+  return inlineBytes(list.map(inlineOf), MAX_INLINE_PDF_PAGES);
+}
+
+function withNotice(notice: string | null, add: string): string {
+  return notice ? `${notice} · ${add}` : add;
+}
+
 /**
- * Adds pasted, dropped or picked files; rejects other types, oversized files and more
- * than 10. Returns the ones added (the editor puts chips for them into the text).
+ * Adds pasted, dropped or picked files; rejects other types, oversized files, more than
+ * 10, and images over the inline cap. Returns the ones added (the editor puts chips for
+ * them into the text). Each PDF is then counted and its first page rendered (settlePdf).
  */
 export function addAttachments(key: string, files: readonly File[]): DraftAttachment[] {
   if (files.length === 0) return [];
   const d = getDraft(key);
-  const { accepted, rejected } = checkAttachments(files, d.attachments.length, { types: ATTACHMENT_MIME_TYPES, maxBytes: ATTACHMENT_MAX_BYTES });
-  const added = accepted.map<DraftAttachment>((file) => ({ id: `a${String(nextAttachmentId++)}`, file, url: URL.createObjectURL(file), stagedPath: null }));
+  const { accepted, rejected } = checkAttachments(files.map(withPdfType), { count: d.attachments.length, inlineBytes: draftInlineBytes(d.attachments) }, ATTACHMENT_LIMITS);
+  const added = accepted.map<DraftAttachment>((file) => ({
+    id: `a${String(nextAttachmentId++)}`,
+    file,
+    kind: file.type === PDF_MIME_TYPE ? "pdf" : "image",
+    url: URL.createObjectURL(file),
+    stagedPath: null,
+    pages: null,
+    thumb: null,
+  }));
   updateDraft(key, { attachments: [...d.attachments, ...added], notice: rejected.length > 0 ? rejected.join(" · ") : null });
+  for (const a of added) if (a.kind === "pdf") void summarizePdf(a);
   return added;
+}
+
+/** Counts a PDF's pages and renders its thumbnail (pdf.js, loaded on the first PDF: lib/pdf.ts). */
+async function summarizePdf(a: DraftAttachment): Promise<void> {
+  try {
+    settlePdf(a.id, await pdfSummary(a.file, PDF_THUMB_WIDTH));
+  } catch {
+    // Not a PDF pdf.js reads: no count and no thumbnail. The daemon still takes it (it
+    // counts with pdfinfo, else estimates) and checks the inline cap on send.
+  }
+}
+
+/**
+ * A PDF's page count and thumbnail arrived. They go to the draft that holds the PDF now
+ * (a draft can have moved to another target meanwhile; one that is gone ignores them).
+ * A PDF short enough to go inline that takes the message over the inline cap is removed
+ * again, chips and all, with a notice (while the draft is idle and the PDF not staged yet;
+ * a send under way, or a failed one the user may retry, leaves it to the daemon); a longer
+ * one gets the "reads it page by page" notice.
+ */
+export function settlePdf(id: string, info: { pages: number; thumb: string | null }): void {
+  const drafts = useComposeStore.getState().drafts;
+  const key = Object.keys(drafts).find((k) => drafts[k]?.attachments.some((a) => a.id === id));
+  const d = key === undefined ? undefined : drafts[key];
+  const a = d?.attachments.find((x) => x.id === id);
+  if (key === undefined || !d || !a) return;
+  const settled: DraftAttachment = { ...a, pages: info.pages, thumb: info.thumb };
+  const others = d.attachments.filter((x) => x.id !== id);
+  if (d.phase === "idle" && a.stagedPath === null && sentInline(inlineOf(settled), MAX_INLINE_PDF_PAGES) && draftInlineBytes(others) + a.file.size > MESSAGE_INLINE_MAX_BYTES) {
+    URL.revokeObjectURL(a.url);
+    updateDraft(key, { attachments: others, text: removeReferences(d.text, id), notice: withNotice(d.notice, inlineCapNotice(a.file.name, MESSAGE_INLINE_MAX_BYTES)) });
+    return;
+  }
+  updateDraft(key, {
+    attachments: d.attachments.map((x) => (x.id === id ? settled : x)),
+    notice: info.pages > MAX_INLINE_PDF_PAGES ? withNotice(d.notice, longPdfNotice(a.file.name, info.pages)) : d.notice,
+  });
 }
 
 /** Removes an attachment and every chip that refers to it. */
@@ -311,7 +404,7 @@ export async function switchDraftTarget(from: ComposeTarget, to: ComposeTarget):
   if (!isDraftEmpty(getDraft(fromKey)) && waiting && !isDraftEmpty(waiting)) {
     const yes = await requestConfirm({
       title: `Replace the draft in ${targetName(to)}?`,
-      message: "It has unsent text or images.",
+      message: "It has unsent text or attachments.",
       confirmLabel: "Replace",
       centered: true,
     });
@@ -321,7 +414,7 @@ export async function switchDraftTarget(from: ComposeTarget, to: ComposeTarget):
   if (cur.phase !== "idle") return false;
   const moved = movedDraft(cur, from, to, isGit, workspaceMemberIds(to));
   useComposeStore.setState((s) => {
-    // The replaced draft's images go away with it.
+    // The replaced draft's attachments go away with it.
     for (const a of s.drafts[toKey]?.attachments ?? []) URL.revokeObjectURL(a.url);
     const { [fromKey]: _moved, ...drafts } = s.drafts;
     return { drafts: { ...drafts, [toKey]: moved }, preview: null };
@@ -459,7 +552,7 @@ export function noGitCheckout(r: Pick<RepoView, "git" | "path" | "worktrees"> | 
 }
 
 /**
- * Sends a draft: stages its images one by one, then invokes thread.new. On success the
+ * Sends a draft: stages its attachments one by one, then invokes thread.new. On success the
  * draft is cleared and the new thread selected (the daemon's FocusThread intent usually
  * got there first). On failure the draft stays, with the error.
  */
@@ -471,7 +564,7 @@ export async function sendDraft(target: ComposeTarget, defaults: { model: string
   updateDraft(key, { phase: pending.length > 0 ? "attaching" : "starting", error: null, notice: null });
   try {
     for (const a of pending) {
-      const path = await stageAttachment(a.file);
+      const path = await stageAttachment(a.file, a.pages);
       const cur = getDraft(key);
       updateDraft(key, { attachments: cur.attachments.map((x) => (x.id === a.id ? { ...x, stagedPath: path } : x)) });
     }
@@ -482,7 +575,7 @@ export async function sendDraft(target: ComposeTarget, defaults: { model: string
     const staged = new Map(cur.attachments.map((a) => [a.id, a]));
     const text = projectPrompt(cur.text, (id) => {
       const a = staged.get(id);
-      return a?.stagedPath ? { name: a.file.name, ref: a.stagedPath } : undefined;
+      return a?.stagedPath ? { name: a.file.name, ref: a.stagedPath, kind: a.kind } : undefined;
     });
     const sent = cur.attachments.filter((a) => a.stagedPath !== null);
     const args = threadArgs(

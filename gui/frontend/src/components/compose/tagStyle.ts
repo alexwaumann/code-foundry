@@ -3,7 +3,7 @@ import type { TagKind } from "@/lib/prompt";
 
 /**
  * The accent of a text tag, as `--chip-accent`: a theme token, so it follows the scheme.
- * Image chips sample theirs from the thumbnail (AttachmentChip).
+ * Image chips sample theirs from the thumbnail; PDF chips use the file accent (AttachmentChip).
  */
 export const TAG_ACCENT: Record<Exclude<TagKind, "image">, string> = {
   skill: "[--chip-accent:var(--highlight)]",

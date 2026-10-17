@@ -1,11 +1,13 @@
 import { useContext, useEffect, useState } from "react";
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
-import { ImageIcon } from "lucide-react";
+import { FileText, ImageIcon } from "lucide-react";
 import { Tip } from "@/components/ui/tooltip";
-import { formatAttachmentSize, middleTruncate } from "@/lib/prompt";
+import { pageCount } from "@/lib/compose";
+import { formatAttachmentSize, kindFromName, middleTruncate } from "@/lib/prompt";
+import { cn } from "@/lib/utils";
 import { openPreview, useComposeStore } from "@/stores/compose";
 import { TagDraftContext } from "./tagContext";
-import { tagClass } from "./tagStyle";
+import { TAG_ACCENT, tagClass } from "./tagStyle";
 
 const DEFAULT_ACCENT = "oklch(0.62 0.16 16)";
 const accents = new Map<string, string | null>();
@@ -59,28 +61,35 @@ function useAccent(url: string | undefined): string {
 }
 
 /**
- * An inline image chip in the prompt (a TagView of kind image): mini thumbnail,
- * (middle-truncated) name and size. A click opens the image preview. A chip whose
- * attachment is gone (pasted from elsewhere, or the image was removed while the text was
+ * An inline attachment chip in the prompt (a TagView of kind image): for an image, its
+ * mini thumbnail, (middle-truncated) name and size, tinted with the image's colour; for a
+ * PDF, its first page (an icon until it renders), name and page count (the size while
+ * counting, and in the tooltip), in the file tags' accent. A click opens the preview. A
+ * chip whose attachment is gone (pasted from elsewhere, or removed while the text was
  * being undone) still renders, with a dashed border, and a click on it only selects it.
  */
 export function AttachmentChip({ id, label, selected, editor }: { id: string; label: string; selected: boolean; editor: NodeViewProps["editor"] }) {
   const draftKey = useContext(TagDraftContext);
   const att = useComposeStore((s) => s.drafts[draftKey]?.attachments.find((a) => a.id === id));
-  const accent = useAccent(att?.url);
+  const pdf = (att?.kind ?? kindFromName(label)) === "pdf";
+  const accent = useAccent(pdf ? undefined : att?.url);
   const name = att?.file.name ?? label;
   const size = att ? formatAttachmentSize(att.file.size) : "";
-  // A removed image says so in its tooltip; a present one shows its name and opens on click.
+  const detail = pdf && att?.pages != null ? pageCount(att.pages) : size;
+  const what = pdf ? "PDF" : "Image";
+  // A removed attachment says so in its tooltip; a PDF shows its size there (the chip shows pages).
+  const tip = !att ? `${name} (removed)` : pdf && detail !== size ? size : null;
   return (
-    <Tip label={att ? null : `${name} (removed)`}>
+    <Tip label={tip}>
       <NodeViewWrapper
         as="span"
         data-testid="prompt-chip"
         data-tag-kind="image"
+        data-attachment-kind={pdf ? "pdf" : "image"}
         data-attachment-id={id}
         data-missing={att ? undefined : "true"}
         role="img"
-        aria-label={size ? `Image attachment, ${name}, ${size}` : `Image attachment, ${name} (removed)`}
+        aria-label={att ? `${what} attachment, ${name}, ${detail}` : `${what} attachment, ${name} (removed)`}
         aria-keyshortcuts={att ? "Space" : undefined}
         // A click selects the node (ProseMirror, on mousedown) and opens the preview; focus
         // returns to the prompt with the chip still selected, where Space opens it again.
@@ -91,13 +100,19 @@ export function AttachmentChip({ id, label, selected, editor }: { id: string; la
               }
             : undefined
         }
-        style={{ "--chip-accent": accent }}
-        className={tagClass(selected, att ? "cursor-pointer" : "border-dashed")}
+        style={pdf ? undefined : { "--chip-accent": accent }}
+        className={tagClass(selected, cn(pdf && TAG_ACCENT.file, att ? "cursor-pointer" : "border-dashed"))}
       >
-        {att ? <img src={att.url} alt="" draggable={false} className="size-[1.17em] shrink-0 rounded-sm object-cover" /> : <ImageIcon aria-hidden className="size-[1.17em] shrink-0" />}
+        <ChipIcon pdf={pdf} src={att ? (pdf ? att.thumb : att.url) : null} />
         <span className="truncate">{middleTruncate(name)}</span>
-        {size && <span className="shrink-0 text-caption-sm leading-none text-inherit opacity-70">{size}</span>}
+        {detail && <span className="shrink-0 text-caption-sm leading-none text-inherit opacity-70">{detail}</span>}
       </NodeViewWrapper>
     </Tip>
   );
+}
+
+function ChipIcon({ pdf, src }: { pdf: boolean; src: string | null }) {
+  if (src) return <img src={src} alt="" draggable={false} className={cn("size-[1.17em] shrink-0 rounded-sm object-cover", pdf && "object-top ring-1 ring-border")} />;
+  const Icon = pdf ? FileText : ImageIcon;
+  return <Icon aria-hidden className="size-[1.17em] shrink-0" />;
 }

@@ -101,8 +101,9 @@ export function threadDraftKey(threadId: string): string {
 }
 
 /**
- * Sends the thread's draft: stages its images, projects the prompt exactly like the
- * new-thread composer (image chips become `[Image: <name>; ref=<path>]`, skills `/name`,
+ * Sends the thread's draft: stages its attachments, projects the prompt exactly like the
+ * new-thread composer (attachment chips become `[Image: <name>; ref=<path>]` or
+ * `[PDF: <name>; ref=<path>]`, skills `/name`,
  * files `@cf-file://…`, which the daemon resolves and stores as sent), then thread.send
  * with the staged paths and the composer's text (lib/userMessage sentComposerText) that
  * the message's bubble draws its tags from. On success the draft is cleared; on failure it stays with the
@@ -116,7 +117,7 @@ export async function sendThreadDraft(threadId: string): Promise<boolean> {
   updateDraft(key, { phase: pending.length > 0 ? "attaching" : "starting", error: null, notice: null });
   try {
     for (const a of pending) {
-      const path = await stageAttachment(a.file);
+      const path = await stageAttachment(a.file, a.pages);
       const cur = getDraft(key);
       updateDraft(key, { attachments: cur.attachments.map((x) => (x.id === a.id ? { ...x, stagedPath: path } : x)) });
     }
@@ -125,7 +126,7 @@ export async function sendThreadDraft(threadId: string): Promise<boolean> {
     const staged = new Map(cur.attachments.map((a) => [a.id, a]));
     const text = projectPrompt(cur.text, (id) => {
       const a = staged.get(id);
-      return a?.stagedPath ? { name: a.file.name, ref: a.stagedPath } : undefined;
+      return a?.stagedPath ? { name: a.file.name, ref: a.stagedPath, kind: a.kind } : undefined;
     }).trim();
     const sent = cur.attachments.filter((a) => a.stagedPath !== null);
     const attachments = sent.map((a) => a.stagedPath ?? "");

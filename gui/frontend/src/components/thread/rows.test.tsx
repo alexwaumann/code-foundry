@@ -152,3 +152,15 @@ describe("the latest turn", () => {
     expect(useThreadStore.getState().folds.s?.u).toBe(false);
   });
 });
+
+describe("a user message's attachments the text does not refer to", () => {
+  it("shows an image as a thumbnail and a PDF as an icon tile, never an <img> of the PDF", () => {
+    const c = show([{ ...base, id: "u", ordinal: 1, kind: "user", text: "look", attachments: ["/att/a.png", "/att/0123-3p.pdf"], composerText: "" }]);
+    const list = c.querySelector('[aria-label="Attached files"]');
+    expect(list?.querySelectorAll('[data-testid="thread-attachment"]')).toHaveLength(2);
+    const pdf = list?.querySelector('[data-attachment-kind="pdf"]');
+    expect(pdf?.getAttribute("aria-label")).toBe("PDF 0123-3p.pdf");
+    expect(pdf?.textContent).toBe("PDF");
+    expect(pdf?.querySelector("img")).toBeNull();
+  });
+});

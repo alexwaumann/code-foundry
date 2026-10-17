@@ -167,7 +167,7 @@ test("switching onto a project with its own draft asks before replacing it", asy
   const dialog = page.getByTestId("confirm-dialog");
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText("Replace the draft in ghostty-playground?");
-  await expect(dialog).toContainText("It has unsent text or images.");
+  await expect(dialog).toContainText("It has unsent text or attachments.");
   await expect(page.getByTestId("confirm-ok")).toHaveText("Replace");
   await page.getByTestId("confirm-cancel").click();
   await expect(dialog).toHaveCount(0);

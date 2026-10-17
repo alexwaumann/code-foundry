@@ -52,4 +52,17 @@ describe("parseUserMessage", () => {
     expect(pieces[4]).toEqual({ kind: "image", name: "c.png", path: "" });
     expect([...inlineImagePaths(pieces)]).toEqual(["/att/b.png"]);
   });
+
+  it("a chip whose staged file is a PDF (Claude got [PDF: …]) is a pdf piece", () => {
+    const composer = `Summarize ${image("0", "spec.pdf")} next to ${image("1", "shot.png")} and ${image("x", "gone.pdf")}`;
+    const sent = sentComposerText(composer.replace("](cf-attachment://0)", "](cf-attachment://p1)"), (id) => (id === "p1" ? 0 : undefined));
+    expect(sent).toBe(`Summarize ${image("0", "spec.pdf")} next to ${image("x", "shot.png")} and ${image("x", "gone.pdf")}`);
+    const pieces = parseUserMessage("(projected)", composer, ["/att/0a.pdf", "/att/1b.png"]);
+    expect(pieces.filter((p) => p.kind !== "text")).toEqual([
+      { kind: "pdf", name: "spec.pdf", path: "/att/0a.pdf" },
+      { kind: "image", name: "shot.png", path: "/att/1b.png" },
+      { kind: "pdf", name: "gone.pdf", path: "" },
+    ]);
+    expect([...inlineImagePaths(pieces)]).toEqual(["/att/0a.pdf", "/att/1b.png"]);
+  });
 });

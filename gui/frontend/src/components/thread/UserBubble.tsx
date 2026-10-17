@@ -1,5 +1,5 @@
 import { memo, useMemo, useState } from "react";
-import { ImageIcon, X } from "lucide-react";
+import { FileText, ImageIcon, X } from "lucide-react";
 import { TAG_ACCENT, tagClass } from "@/components/compose/tagStyle";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Tip } from "@/components/ui/tooltip";
@@ -113,6 +113,32 @@ function Thumbnail({ path }: { path: string }) {
   );
 }
 
+/** A PDF the text does not refer to: an icon tile above the bubble (no preview here yet). */
+function PdfTile({ path }: { path: string }) {
+  const name = path.slice(path.lastIndexOf("/") + 1);
+  return (
+    <li
+      className="flex size-16 flex-col items-center justify-center gap-1 rounded-lg border bg-muted/40 text-muted-foreground"
+      data-testid="thread-attachment"
+      data-attachment-kind="pdf"
+      aria-label={`PDF ${name}`}
+    >
+      <FileText className="size-5" aria-hidden />
+      <span className="text-caption-sm font-medium">PDF</span>
+    </li>
+  );
+}
+
+/** A PDF the message sent, inline: icon and name (no preview here yet). */
+function PdfChip({ name }: { name: string }) {
+  return (
+    <span data-testid="thread-tag" data-tag-kind="pdf" aria-label={`PDF ${name}`} className={tagClass(false, TAG_ACCENT.file)}>
+      <FileText aria-hidden className="size-[1.17em] shrink-0" />
+      <span className="truncate">{middleTruncate(name)}</span>
+    </span>
+  );
+}
+
 function FileChip({ repoId, path }: { repoId: string; path: string }) {
   const project = useReposStore((s) => s.byId[repoId]?.name ?? repoId);
   return (
@@ -135,7 +161,7 @@ function timeOf(ms: number | null): string {
 /**
  * A user message: a right-aligned bubble with the composer's tags (from the composer text
  * the item carries, lib/userMessage), attachments the text does not refer to as
- * thumbnails above it, and the time under it.
+ * thumbnails (a PDF as an icon tile) above it, and the time under it.
  */
 export const UserBubble = memo(function UserBubble({
   text,
@@ -154,10 +180,8 @@ export const UserBubble = memo(function UserBubble({
   return (
     <div className="u" data-testid="thread-user">
       {extra.length > 0 && (
-        <ul className="flex flex-wrap justify-end gap-2" aria-label="Attached images">
-          {extra.map((p) => (
-            <Thumbnail key={p} path={p} />
-          ))}
+        <ul className="flex flex-wrap justify-end gap-2" aria-label="Attached files">
+          {extra.map((p) => (/\.pdf$/i.test(p) ? <PdfTile key={p} path={p} /> : <Thumbnail key={p} path={p} />))}
         </ul>
       )}
       {pieces.length > 0 && (
@@ -176,6 +200,8 @@ export const UserBubble = memo(function UserBubble({
                 return <FileChip key={i} repoId={p.repoId} path={p.path} />;
               case "image":
                 return <ImageChip key={i} name={p.name} path={p.path} />;
+              case "pdf":
+                return <PdfChip key={i} name={p.name} />;
             }
           })}
         </div>
