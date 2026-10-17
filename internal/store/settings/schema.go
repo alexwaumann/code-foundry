@@ -145,7 +145,7 @@ var Pages = []Page{
 		Sections:    []Section{{ID: "alerts"}}},
 	{ID: PageSource, Title: "Source control", Sections: []Section{
 		{ID: "github", Title: "GitHub", Description: "Your pull requests and default-branch checks, polled with gh's login."},
-		{ID: "projects", Title: "Projects", Description: "Fetching, where new worktrees go, and how they open."},
+		{ID: "projects", Title: "Projects", Description: "Fetching, and how worktrees open."},
 	}},
 	{ID: PageKeybindings, Title: "Keybindings",
 		Description: `Override a command's chord, or unbind it. Reserved app chords (cmd+k, cmd+b, cmd+1..9, ...) can't be bound.`},
@@ -159,7 +159,7 @@ var Pages = []Page{
 var Groups = []Group{
 	{GroupThreads, "Threads", "Defaults for new threads."},
 	{GroupGitHub, "GitHub", "Your pull requests and default-branch checks, polled with gh's login."},
-	{GroupProjects, "Projects", "Git fetching and where new worktrees go."},
+	{GroupProjects, "Projects", "Git fetching."},
 	{GroupGitOps, "Git operations", "How worktrees are handed to other apps."},
 	{GroupAppearance, "Appearance", "Scheme, themes, terminal font, density, and backdrop. Applied live in every window."},
 	{GroupNotify, "Notifications", "Dock badge and alerts for threads that need you. macOS banners aren't available to an app without a bundle."},
@@ -181,7 +181,6 @@ const (
 	KeyGhPollInterval    = "github.poll_interval_seconds"
 	KeyDashboards        = "github.dashboards_enabled"
 	KeyFetchInterval     = "projects.fetch_interval_seconds"
-	KeyWorktreeDir       = "projects.worktree_dir"
 	KeyEditorCommand     = "gitops.editor_command"
 	KeyTheme             = "appearance.theme"
 	KeyThemeDark         = "appearance.theme_dark"
@@ -390,12 +389,6 @@ var staticFields = []Field{
 		Description: "How often each project runs git fetch --prune. 0 turns background fetching off.",
 		Default:     strconv.Itoa(defaultFetchSeconds), Min: 0, Max: 86400, Restart: true,
 		bind: func(s *Settings) any { return &s.Projects.FetchIntervalSeconds },
-	},
-	{
-		Key: KeyWorktreeDir, Group: GroupProjects, Page: PageSource, Section: "projects", Type: Path, Title: "Worktree directory",
-		Description: "Where New Worktree puts worktrees; {project} is the project's name. Empty uses ~/.code-foundry/worktrees/<owner>/<repo>.",
-		Placeholder: "~/worktrees/{project}",
-		bind:        func(s *Settings) any { return &s.Projects.WorktreeDir },
 	},
 	{
 		Key: KeyEditorCommand, Group: GroupGitOps, Page: PageSource, Section: "projects", Type: String, Title: "Editor command",

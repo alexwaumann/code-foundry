@@ -40,14 +40,10 @@ const (
 type Options struct {
 	DB  *sql.DB  // required; holds the projects table
 	Bus *bus.Bus // required; receives Event values
-	// WorktreeRoot is where CreateWorktree puts worktrees without an explicit path:
-	// <WorktreeRoot>/<owner>/<repo>/<branch>. Required, absolute.
+	// WorktreeRoot is where CreateWorktree puts every worktree:
+	// <WorktreeRoot>/<owner>/<repo>/<branch>. Required, absolute. Only a worktree inside
+	// it is Worktree.Managed, so only those can be cleaned up.
 	WorktreeRoot string
-	// ManagedRoots lists more directories the app makes worktrees in for the project
-	// named projectName (the projects.worktree_dir setting); WorktreeRoot always counts. Only a
-	// worktree inside one of them is Worktree.Managed, so only those can be cleaned up.
-	// Nil: WorktreeRoot only.
-	ManagedRoots func(projectName string) []string
 	// AllowedRoot is the directory every registered project must resolve inside
 	// (symlinks followed). Empty means the user's home directory; tests set a temp dir.
 	AllowedRoot string
@@ -128,8 +124,6 @@ type Git struct {
 	runner Runner
 	now    func() time.Time
 	wtRoot string
-	// managed is Options.ManagedRoots.
-	managed func(projectName string) []string
 	// root is Options.AllowedRoot with symlinks resolved.
 	root string
 
@@ -173,7 +167,6 @@ func Start(ctx context.Context, opts Options) (*Git, error) {
 		db:       opts.DB,
 		bus:      opts.Bus,
 		wtRoot:   opts.WorktreeRoot,
-		managed:  opts.ManagedRoots,
 		log:      cmp.Or(opts.Log, slog.Default()).With("store", "project"),
 		runner:   opts.Runner,
 		now:      opts.Now,
@@ -309,10 +302,9 @@ func (g *Git) buildLocked() *Snapshot {
 			DefaultBranch: m.DefaultBranch, GitHubSlug: m.GitHubSlug, Remotes: m.Remotes, Git: m.Git, Error: m.Error,
 			Worktrees: make([]Worktree, 0, len(st.wts)),
 		}
-		roots := g.managedRoots(m.Name)
 		for _, slot := range st.wts {
 			w := *slot.cur.Load()
-			w.Managed = InsideRoot(w.Path, roots...)
+			w.Managed = InsideRoot(w.Path, g.wtRoot)
 			r.Worktrees = append(r.Worktrees, w)
 		}
 		slices.SortFunc(r.Worktrees, func(a, b Worktree) int {
@@ -566,19 +558,13 @@ func (g *Git) CreateWorktree(ctx context.Context, opts CreateWorktreeOptions) (W
 	if _, err := g.runner.Run(ctx, m.Path, "check-ref-format", "--branch", opts.Branch); err != nil {
 		return Worktree{}, fmt.Errorf("%w: invalid branch name %q", ErrInvalidArgument, opts.Branch)
 	}
-	path := opts.Path
-	if path == "" {
-		// Read origin now rather than m.GitHubSlug, which is empty until the project's
-		// first reconcile after a daemon start.
-		slug := ""
-		if out, err := g.runner.Run(ctx, m.Path, "remote", "get-url", "origin"); err == nil {
-			slug = parseGitHubSlug(string(trimNL(out)))
-		}
-		path = defaultWorktreePath(g.wtRoot, slug, m.Name, opts.Branch)
-	} else if !filepath.IsAbs(path) {
-		return Worktree{}, fmt.Errorf("%w: path %q must be absolute", ErrInvalidArgument, path)
+	// Read origin now rather than m.GitHubSlug, which is empty until the project's
+	// first reconcile after a daemon start.
+	slug := ""
+	if out, err := g.runner.Run(ctx, m.Path, "remote", "get-url", "origin"); err == nil {
+		slug = parseGitHubSlug(string(trimNL(out)))
 	}
-	path = filepath.Clean(path)
+	path := filepath.Clean(defaultWorktreePath(g.wtRoot, slug, m.Name, opts.Branch))
 
 	ctx, cancel := context.WithTimeout(ctx, worktreeTimeout)
 	defer cancel()

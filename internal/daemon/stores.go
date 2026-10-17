@@ -103,7 +103,6 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	}
 	if s.project, err = project.Start(ctx, project.Options{
 		DB: s.db, Bus: s.bus, Log: log, WorktreeRoot: p.Worktrees(), AllowedRoot: s.home, FetchInterval: cfg.FetchInterval(),
-		ManagedRoots: settingsManagedRoots(s.settings),
 	}); err != nil {
 		return nil, err
 	}
@@ -172,7 +171,6 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 			}
 			return s.thread.PreTrust(dir)
 		},
-		WorktreePath: settingsWorktreePath(s.settings),
 	}); err != nil {
 		return nil, err
 	}
@@ -193,8 +191,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 		DB: s.db, Terminals: s.terminal, Projects: s.project, Workspaces: s.workspace, Bus: s.bus, Log: threadLog,
 		Claude: claude, CloseTimeout: cfg.CloseGrace(),
 		Namer:          settingsNamer(s.settings, thread.ClaudeNamer(claude, "/tmp", threadLog)),
-		AttachmentsDir: p.Attachments(), WorktreePath: settingsWorktreePath(s.settings),
-		Env: threadEnv, CacheTTL: cfg.CacheTTL(),
+		AttachmentsDir: p.Attachments(), Env: threadEnv, CacheTTL: cfg.CacheTTL(),
 		// Development aids: how long a thread's process stays up at least, and how often
 		// idle threads are checked against their cache expiry (Go durations; unset or
 		// invalid: the defaults, 5m and 30s). See docs/notes/thread-lifecycle.md.

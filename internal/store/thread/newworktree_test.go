@@ -169,24 +169,6 @@ func TestCreateNewWorktree(t *testing.T) {
 	}
 }
 
-func TestCreateNewWorktreeUsesWorktreePathOption(t *testing.T) {
-	dir := t.TempDir()
-	e, rr := newWorktreeEnv(t, nil, func(o *Options) {
-		o.WorktreePath = func(r project.Project, branch string) string {
-			return dir + "/" + r.Name + "/" + strings.ReplaceAll(branch, "/", "-")
-		}
-	})
-	e.namer = func(string) (string, error) { return "Do x", nil }
-	s, err := e.m.Create(e.ctx(), CreateOptions{ProjectID: "r1", InitialPrompt: "x", NewWorktree: &NewWorktree{}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := dir + "/repo/cf-do-x"
-	if got := rr.created(); len(got) != 1 || got[0].Path != want || s.WorktreePath != want {
-		t.Fatalf("CreateWorktree calls = %+v, thread path %q", got, s.WorktreePath)
-	}
-}
-
 func TestCreateNewWorktreeSlugTimeoutNamesLater(t *testing.T) {
 	e, rr := newWorktreeEnv(t, nil)
 	release := make(chan struct{})

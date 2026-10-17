@@ -263,7 +263,7 @@ type Worktree struct {
 	// HEAD is detached (branch is empty).
 	Detached bool `protobuf:"varint,7,opt,name=detached,proto3" json:"detached,omitempty"`
 	// The git half of "safe to clean up": not the main worktree, created by Code Foundry
-	// (its path is under the app's worktrees directory or projects.worktree_dir; worktrees
+	// (its path is under the app's worktrees directory; worktrees
 	// made by hand or by other tools never qualify), on a branch, no staged,
 	// modified, untracked or conflicted entries, no status error, and status.base_ref is
 	// set with base_ahead 0 (every commit on HEAD is in origin/<default>). Whether a live
@@ -871,6 +871,9 @@ func (x *GetProjectResponse) GetProject() *Project {
 	return nil
 }
 
+// The worktree always goes to <config home>/worktrees/<owner>/<repo>/<branch>
+// (_local/<repo name> in place of owner/repo when origin is not on GitHub); where
+// worktrees go is the app's, not the caller's.
 type CreateWorktreeRequest struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	ProjectId string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
@@ -878,9 +881,6 @@ type CreateWorktreeRequest struct {
 	Branch string `protobuf:"bytes,2,opt,name=branch,proto3" json:"branch,omitempty"`
 	// Ref to branch from when creating. Defaults to the default branch.
 	BaseRef string `protobuf:"bytes,3,opt,name=base_ref,json=baseRef,proto3" json:"base_ref,omitempty"`
-	// Optional explicit path. Defaults to <config home>/worktrees/<owner>/<repo>/<branch>
-	// (_local/<repo name> in place of owner/repo when origin is not on GitHub).
-	Path string `protobuf:"bytes,4,opt,name=path,proto3" json:"path,omitempty"`
 	// Fetch base_ref's remote branch first when base_ref is a remote-tracking ref
 	// (origin/<name>). Bounded; a failed fetch is logged and the stale ref is used.
 	Fetch         bool `protobuf:"varint,5,opt,name=fetch,proto3" json:"fetch,omitempty"`
@@ -935,13 +935,6 @@ func (x *CreateWorktreeRequest) GetBranch() string {
 func (x *CreateWorktreeRequest) GetBaseRef() string {
 	if x != nil {
 		return x.BaseRef
-	}
-	return ""
-}
-
-func (x *CreateWorktreeRequest) GetPath() string {
-	if x != nil {
-		return x.Path
 	}
 	return ""
 }
@@ -3326,14 +3319,13 @@ const file_codefoundry_v1_project_proto_rawDesc = "" +
 	"\x11GetProjectRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"G\n" +
 	"\x12GetProjectResponse\x121\n" +
-	"\aproject\x18\x01 \x01(\v2\x17.codefoundry.v1.ProjectR\aproject\"\x93\x01\n" +
+	"\aproject\x18\x01 \x01(\v2\x17.codefoundry.v1.ProjectR\aproject\"\x8b\x01\n" +
 	"\x15CreateWorktreeRequest\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\x12\x16\n" +
 	"\x06branch\x18\x02 \x01(\tR\x06branch\x12\x19\n" +
-	"\bbase_ref\x18\x03 \x01(\tR\abaseRef\x12\x12\n" +
-	"\x04path\x18\x04 \x01(\tR\x04path\x12\x14\n" +
-	"\x05fetch\x18\x05 \x01(\bR\x05fetch\"N\n" +
+	"\bbase_ref\x18\x03 \x01(\tR\abaseRef\x12\x14\n" +
+	"\x05fetch\x18\x05 \x01(\bR\x05fetchJ\x04\b\x04\x10\x05R\x04path\"N\n" +
 	"\x16CreateWorktreeResponse\x124\n" +
 	"\bworktree\x18\x01 \x01(\v2\x18.codefoundry.v1.WorktreeR\bworktree\"\x85\x01\n" +
 	"\x15RemoveWorktreeRequest\x12\x1d\n" +

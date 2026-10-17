@@ -83,12 +83,8 @@ func (m *Manager) newWorktree(ctx context.Context, id, name string, o CreateOpti
 	}
 	nw.name, nw.namerCalled, nw.late = sl.name, sl.namerCalled, sl.late
 	branch := m.pickBranch(ctx, []string{r.Path}, sl.slug, id, nil)
-	path := ""
-	if m.opts.WorktreePath != nil {
-		path = m.opts.WorktreePath(r, branch)
-	}
 	wt, err := m.opts.Projects.CreateWorktree(ctx, project.CreateWorktreeOptions{
-		ProjectID: r.ID, Branch: branch, BaseRef: base, Path: path, Fetch: true,
+		ProjectID: r.ID, Branch: branch, BaseRef: base, Fetch: true,
 	})
 	if err != nil {
 		return nw, projectError("create worktree "+branch, err)

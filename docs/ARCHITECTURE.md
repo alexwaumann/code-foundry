@@ -530,7 +530,10 @@ from the pull request (docs/notes/pr-thread-commands.md).
 * `project`: registered projects and their worktrees. Shells out to `git` for worktree
   create/list/remove and status (branch, ahead/behind, dirty, conflicts, and the
   operation in progress, read from marker files in the admin dir without another git
-  command; `docs/notes/worktree-op-state.md`). One filesystem watcher
+  command; `docs/notes/worktree-op-state.md`). Every worktree the app makes goes to
+  `<config home>/worktrees/<owner>/<repo>/<branch>` (`_local/<name>` without a GitHub
+  origin); no setting or request field moves it, and only worktrees under that root are
+  `Managed` (cleanable; `docs/notes/drop-worktree-dir.md`). One filesystem watcher
   (fsnotify) across all registered roots feeds a debounced reconcile. Workers write
   disjoint per-path snapshot pointers. A project may be a plain folder (`Project.Git`
   false): one synthetic checkout, no git commands or watches, the poll notices a later
