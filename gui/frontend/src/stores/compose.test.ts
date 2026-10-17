@@ -117,10 +117,10 @@ describe("Work in: the setting, the per-project memory, the draft's own pick", (
   });
 
   it.each<[string, string | undefined, Record<string, "new" | "current">, { kind: string; path?: string }]>([
-    ["no settings yet: a fresh copy", undefined, {}, { kind: "new" }],
+    ["no settings yet: the main checkout", undefined, {}, { kind: "existing", path: "/src/repo-cf" }],
     ["setting new", "new", {}, { kind: "new" }],
     ["setting current: the main checkout", "current", {}, { kind: "existing", path: "/src/repo-cf" }],
-    ["an unknown setting value: a fresh copy", "elsewhere", {}, { kind: "new" }],
+    ["an unknown setting value: the main checkout", "elsewhere", {}, { kind: "existing", path: "/src/repo-cf" }],
     ["remembered in place beats the setting", "new", { "repo-cf": "current" }, { kind: "existing", path: "/src/repo-cf" }],
     ["remembered fresh copy beats the setting", "current", { "repo-cf": "new" }, { kind: "new" }],
     ["another project's memory does not apply", "new", { "repo-gp": "current" }, { kind: "new" }],
@@ -133,6 +133,8 @@ describe("Work in: the setting, the per-project memory, the draft's own pick", (
 
   it("current with an unknown main checkout falls back to a fresh copy", () => {
     setting("current");
+    expect(projectWorktree("repo-unknown")).toEqual({ kind: "new" });
+    setting(undefined);
     expect(projectWorktree("repo-unknown")).toEqual({ kind: "new" });
   });
 

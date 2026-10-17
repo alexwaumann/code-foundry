@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, expectTooltip, invocations, mockPost, mockUrl, openApp, resetMock, row, testPdf } from "./fixtures";
+import { CF, expectTooltip, freshCopyByDefault, invocations, mockPost, mockUrl, openApp, resetMock, row, testPdf } from "./fixtures";
 
 const OUTDATED = "The running daemon is older than the app. Restart it (Daemon → Restart) to use this feature.";
 
@@ -52,6 +52,7 @@ function promptFocused(page: Page): Promise<boolean> {
 }
 
 test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktree", async ({ page }) => {
+  await freshCopyByDefault();
   await mockPost("thread-new?delay=1500");
   await openApp(page);
   await page.keyboard.press("Meta+n");
@@ -84,9 +85,10 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
   await expect(page.getByTestId("composer")).toContainText("Describe what to build…");
   // A composer has no sidebar row: nothing in the thread list is selected.
   await expect(page.getByTestId("thread-list").locator('[aria-selected="true"]')).toHaveCount(0);
-  // Defaults: settings (opus / high), Auto, a new worktree from ListRefs' default ref.
-  await expect(page.getByTestId("composer-model")).toHaveText("Opus 4.8");
-  await expect(page.getByTestId("composer-effort")).toHaveText("High");
+  // Defaults: settings (Sonnet 5 / medium), Auto, a new worktree (pinned above) from
+  // ListRefs' default ref.
+  await expect(page.getByTestId("composer-model")).toHaveText("Sonnet 5");
+  await expect(page.getByTestId("composer-effort")).toHaveText("Medium");
   await expect(page.getByTestId("composer-permission")).toHaveText("Auto");
   await expect(page.getByTestId("composer-worktree")).toHaveText("Fresh copy");
   await expect(page.getByTestId("composer-worktree")).toHaveAccessibleName("Work in: Fresh copy");
@@ -120,8 +122,8 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
     project: "repo-cf",
     "new-worktree": "true",
     base: "origin/main",
-    model: "claude-opus-4-8[1m]",
-    effort: "high",
+    model: "claude-sonnet-5[1m]",
+    effort: "medium",
     permission: "auto",
     prompt: "Add a dark mode toggle\nin settings",
   });
@@ -145,6 +147,7 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
 });
 
 test("pickers are keyboard operable; Tab goes prompt → pickers → send", async ({ page }) => {
+  await freshCopyByDefault();
   await openApp(page);
   await compose(page);
   await page.keyboard.type("Refactor the sidebar");
@@ -164,18 +167,18 @@ test("pickers are keyboard operable; Tab goes prompt → pickers → send", asyn
     "Haiku 5.5",
     "Haiku 4.5",
   ]);
-  await page.keyboard.press("ArrowDown"); // Opus 4.8 -> Opus 4.7
+  await page.keyboard.press("ArrowDown"); // Sonnet 5 -> Sonnet 4.6
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("composer-model-list")).toHaveCount(0);
-  await expect(page.getByTestId("composer-model")).toHaveText("Opus 4.7");
+  await expect(page.getByTestId("composer-model")).toHaveText("Sonnet 4.6");
   await expect(page.getByTestId("composer-model")).toBeFocused();
 
   await page.keyboard.press("Tab");
   await expect(page.getByTestId("composer-effort")).toBeFocused();
   await page.keyboard.press("ArrowDown"); // opens
-  await page.keyboard.press("ArrowDown"); // high -> xhigh
+  await page.keyboard.press("ArrowDown"); // medium -> high
   await page.keyboard.press("Enter");
-  await expect(page.getByTestId("composer-effort")).toHaveText("Extra high");
+  await expect(page.getByTestId("composer-effort")).toHaveText("High");
 
   await page.keyboard.press("Tab");
   await expect(page.getByTestId("composer-permission")).toBeFocused();
@@ -219,8 +222,8 @@ test("pickers are keyboard operable; Tab goes prompt → pickers → send", asyn
     project: "repo-cf",
     "new-worktree": "true",
     base: "origin/release/v0.3",
-    model: "claude-opus-4-7[1m]",
-    effort: "xhigh",
+    model: "claude-sonnet-4-6[1m]",
+    effort: "high",
     permission: "supervised",
     prompt: "Refactor the sidebar",
   });
@@ -228,6 +231,7 @@ test("pickers are keyboard operable; Tab goes prompt → pickers → send", asyn
 });
 
 test("a failed start keeps the draft editable and shows why", async ({ page }) => {
+  await freshCopyByDefault();
   await mockPost("thread-new?delay=300");
   await openApp(page);
   const before = await threadCount();
@@ -263,11 +267,12 @@ test("a failed start keeps the draft editable and shows why", async ({ page }) =
   await input.press("Enter");
   await expect(page.locator('[data-row-kind="thread"][aria-selected="true"]')).toBeVisible();
   const last = (await invocations()).at(-1);
-  expect(last?.args).toEqual({ project: "repo-cf", worktree: CF, model: "claude-opus-4-8[1m]", effort: "high", permission: "auto", prompt: "Please work" });
+  expect(last?.args).toEqual({ project: "repo-cf", worktree: CF, model: "claude-sonnet-5[1m]", effort: "medium", permission: "auto", prompt: "Please work" });
   expect(await threadCount()).toBe(before + 1);
 });
 
 test("an existing worktree or the current checkout shows its branch, read-only and live", async ({ page }) => {
+  await freshCopyByDefault();
   await openApp(page);
   await compose(page);
   await page.keyboard.type("Look around");
@@ -321,8 +326,8 @@ test("an existing worktree or the current checkout shows its branch, read-only a
   await expect(page.getByTestId("composer-base")).toHaveText("From origin/main");
 });
 
-test("Work in: threads.default_worktree = current starts in place; a pick is remembered per project", async ({ page }) => {
-  await mockPost("settings/external?threads.default_worktree=current");
+test("Work in: by default a thread starts in place; a pick is remembered per project", async ({ page }) => {
+  // threads.default_worktree is unset: its default is the project folder itself.
   await openApp(page);
   await compose(page);
   const worktree = page.getByTestId("composer-worktree");
@@ -342,7 +347,7 @@ test("Work in: threads.default_worktree = current starts in place; a pick is rem
   expect((await invocations()).at(-1)?.args).toMatchObject({ project: "repo-cf", "new-worktree": "true", base: "origin/main" });
   await expect.poll(() => promptFocused(page)).toBe(true);
 
-  // The next code-foundry draft starts from the memory; another project from the setting.
+  // The next code-foundry draft starts from the memory; another project from the default.
   await compose(page);
   await expect(page.getByTestId("composer-worktree")).toHaveText("Fresh copy");
   await row(page, "s:s-1").click();
@@ -551,6 +556,7 @@ test("the composer stays centered in the content pane at any size, as the draft 
 });
 
 test("a local-only repository: local refs from main, no remote git commands", async ({ page }) => {
+  await freshCopyByDefault();
   await openApp(page);
   await compose(page, 4);
   await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in sketches?");
@@ -574,6 +580,7 @@ test("a local-only repository: local refs from main, no remote git commands", as
 });
 
 test("a daemon older than ListRefs/StageAttachment: a clear restart hint, not HTTP 404", async ({ page }) => {
+  await freshCopyByDefault();
   await mockPost("missing-rpc?rpc=ProjectService/ListRefs&rpc=ThreadService/StageAttachment");
   await openApp(page);
   await compose(page);

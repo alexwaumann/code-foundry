@@ -46,8 +46,11 @@ describe("Composer without a project", () => {
   it("a project's composer still has them", () => {
     render(<Composer projectId="web" />);
     expect(screen.getByTestId("composer-heading").textContent).toBe("What should we build in web?");
-    expect(screen.getByTestId("composer-worktree")).not.toBeNull();
-    expect(screen.getByTestId("composer-base")).not.toBeNull();
+    // By default a project's thread works in the project folder itself: no base picker,
+    // the checkout's branch instead.
+    expect(screen.getByTestId("composer-worktree").textContent).toContain("In place");
+    expect(screen.queryByTestId("composer-base")).toBeNull();
+    expect(screen.getByTestId("composer-checkout-branch").textContent).toBe("On main");
     expect(screen.getByTestId("composer-members")).not.toBeNull();
   });
 });

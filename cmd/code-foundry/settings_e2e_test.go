@@ -35,7 +35,7 @@ func TestCLISettings(t *testing.T) {
 	}{
 		{"get one", []string{"settings", "get", "appearance.font_size"}, nil, "13\n", ""},
 		{"get all", []string{"settings", "get"}, nil, `threads.auto_name = "true"`, ""},
-		{"naming model default", []string{"settings", "get", "threads.naming_model"}, nil, "claude-sonnet-5[1m]\n", ""},
+		{"naming model default", []string{"settings", "get", "threads.naming_model"}, nil, "claude-sonnet-4-6[1m]\n", ""},
 		{"set naming model", []string{"settings", "set", "threads.naming_model", "claude-4.5-haiku[1m]"}, nil, `threads.naming_model = "claude-4.5-haiku[1m]"`, ""},
 		{"invalid naming model", []string{"settings", "set", "threads.naming_model", "gpt-5"}, errAny, "", ""},
 		{"set positional", []string{"settings", "set", "appearance.font_size", "15"}, nil, `appearance.font_size = "15"`, ""},

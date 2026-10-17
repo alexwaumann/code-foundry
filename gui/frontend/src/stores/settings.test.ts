@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SettingsSnapshotView } from "@/api/settings";
 import { activeTheme, effectiveScheme, themeSlots } from "@/lib/theme";
 import { answerConfirm, useConfirmStore } from "./confirm";
-import { applySettingsSnapshot, terminalFontFamily, threadWidthOf, useSettingsStore, zoomUi } from "./settings";
+import { applySettingsSnapshot, densityOf, terminalFontFamily, threadWidthOf, useSettingsStore, zoomUi } from "./settings";
 import { useUiStore } from "./ui";
 import { showView, useViewsStore } from "./views";
 
@@ -44,6 +44,17 @@ describe("applySettingsSnapshot", () => {
     expect(activeTheme().id).toBe("rose-pine-dawn");
     applySettingsSnapshot(snap({ "appearance.theme": "dark", "appearance.theme_dark": "catppuccin-mocha", "appearance.theme_light": "catppuccin-latte" }, 3));
     expect(activeTheme().id).toBe("catppuccin-mocha");
+  });
+
+  it.each([
+    ["compact", "compact"],
+    ["comfortable", "comfortable"],
+    [undefined, "comfortable"],
+    ["", "comfortable"],
+  ])("density %s sets data-density=%s", (value, want) => {
+    applySettingsSnapshot(snap(value === undefined ? {} : { "appearance.density": value }));
+    expect(document.documentElement.dataset.density).toBe(want);
+    expect(densityOf(value)).toBe(want);
   });
 
   it.each([

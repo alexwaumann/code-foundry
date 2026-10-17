@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { CF, invocations, openApp, openProjects, resetMock, row } from "./fixtures";
+import { CF, freshCopyByDefault, invocations, openApp, openProjects, resetMock, row } from "./fixtures";
 
 const FIX_RESIZE = `${CF}.worktrees/fix-resize`;
 const DOTFILES = "/Users/dev/dotfiles";
@@ -19,6 +19,7 @@ test("no footer and no chord hints outside the palette and help", async ({ page 
 });
 
 test("sidebar new-thread button opens the project picker, then the composer", async ({ page }) => {
+  await freshCopyByDefault();
   await openApp(page);
   const button = page.getByTestId("sidebar-new-thread");
   // Nothing selected: the picker supplies the project, so the button is enabled anyway.

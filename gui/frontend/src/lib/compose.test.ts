@@ -247,11 +247,12 @@ describe("workspaces", () => {
 
 describe("Work in", () => {
   it.each<[string, { setting?: string; remembered?: string; mainPath?: string }, WorktreeChoice]>([
-    ["nothing set: a fresh copy", { mainPath: "/src/cf" }, { kind: "new" }],
+    ["nothing set: the main checkout", { mainPath: "/src/cf" }, { kind: "existing", path: "/src/cf" }],
+    ["nothing set, main checkout unknown: a fresh copy", {}, { kind: "new" }],
     ["setting new", { setting: "new", mainPath: "/src/cf" }, { kind: "new" }],
     ["setting current: the main checkout", { setting: "current", mainPath: "/src/cf" }, { kind: "existing", path: "/src/cf" }],
     ["setting current, main checkout unknown: a fresh copy", { setting: "current" }, { kind: "new" }],
-    ["an unknown setting value: a fresh copy", { setting: "", mainPath: "/src/cf" }, { kind: "new" }],
+    ["an unknown setting value: the main checkout", { setting: "", mainPath: "/src/cf" }, { kind: "existing", path: "/src/cf" }],
     ["remembered current over setting new", { setting: "new", remembered: "current", mainPath: "/src/cf" }, { kind: "existing", path: "/src/cf" }],
     ["remembered new over setting current", { setting: "current", remembered: "new", mainPath: "/src/cf" }, { kind: "new" }],
     ["a garbled memory is ignored", { setting: "current", remembered: "elsewhere", mainPath: "/src/cf" }, { kind: "existing", path: "/src/cf" }],

@@ -233,7 +233,7 @@ var staticFields = []Field{
 	{
 		Key: KeyDefaultEffort, Group: GroupThreads, Page: PageGeneral, Section: "threads", Row: "model", Type: Enum, Title: "Effort",
 		Description: "Effort level new threads use unless you pick otherwise.",
-		Enum:        command.ThreadEfforts, EnumLabels: effortLabels(command.ThreadEfforts), Default: "high",
+		Enum:        command.ThreadEfforts, EnumLabels: effortLabels(command.ThreadEfforts), Default: "medium",
 		bind: func(s *Settings) any { return &s.Threads.DefaultEffort },
 	},
 	{
@@ -241,10 +241,10 @@ var staticFields = []Field{
 		// remembered per project wins). thread.new itself stays explicit (--new-worktree
 		// or --worktree).
 		Key: KeyDefaultWorktree, Group: GroupThreads, Page: PageGeneral, Section: "threads", Type: Enum, Title: "New threads work in",
-		Description: "A fresh copy keeps each thread on its own branch and folder. The project folder itself edits your files in place.",
+		Description: "The project folder itself edits your files in place. A fresh copy gives each thread its own folder and branch, so several can run at once.",
 		Enum:        []string{WorktreeNew, WorktreeCurrent},
 		EnumLabels:  []string{"A fresh copy of the project", "The project folder itself"},
-		Default:     WorktreeNew,
+		Default:     WorktreeCurrent,
 		bind:        func(s *Settings) any { return &s.Threads.DefaultWorktree },
 	},
 	{
@@ -303,7 +303,7 @@ var staticFields = []Field{
 	{
 		Key: KeyDensity, Group: GroupAppearance, Page: PageAppearance, Section: "window", Type: Enum, Title: "Density",
 		Description: "Row height and spacing in the sidebar and lists.",
-		Enum:        []string{"compact", "comfortable"}, EnumLabels: []string{"Compact", "Comfortable"}, Default: "compact",
+		Enum:        []string{"compact", "comfortable"}, EnumLabels: []string{"Compact", "Comfortable"}, Default: "comfortable",
 		bind: func(s *Settings) any { return &s.Appearance.Density },
 	},
 	{

@@ -17,7 +17,7 @@ import (
 // File format: TOML, one table per group, keys without the group prefix:
 //
 //	[threads]
-//	default_model = "claude-opus-4-8[1m]"
+//	default_model = "claude-sonnet-5[1m]"
 //
 //	[keybindings]
 //	"thread.new" = "cmd+shift+n"

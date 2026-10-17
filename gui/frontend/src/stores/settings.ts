@@ -33,6 +33,11 @@ const KEYBINDING_PREFIX = "keybindings.";
 
 export const ROW_HEIGHTS = { compact: 26, comfortable: 30 } as const;
 
+/** appearance.density as a known value; anything else is the default (comfortable). */
+export function densityOf(v: string | undefined): keyof typeof ROW_HEIGHTS {
+  return v === "compact" ? "compact" : "comfortable";
+}
+
 const THREAD_WIDTHS = ["compact", "comfortable", "full"] as const;
 export type ThreadWidth = (typeof THREAD_WIDTHS)[number];
 
@@ -82,7 +87,7 @@ export function applySettingsSnapshot(next: SettingsSnapshotView): void {
     const n = Number(next.values[KEYS.zoom]);
     if (Number.isFinite(n) && n > 0) useUiStore.getState().setZoom(n);
   }
-  document.documentElement.dataset.density = next.values[KEYS.density] === "comfortable" ? "comfortable" : "compact";
+  document.documentElement.dataset.density = densityOf(next.values[KEYS.density]);
   // thread.css sizes a thread's column and composer from html[data-thread-width].
   document.documentElement.dataset.threadWidth = threadWidthOf(next.values[KEYS.threadWidth]);
   // CommandService.List reports keybinding overrides; the daemon applied them before
@@ -111,7 +116,7 @@ export function useScrollbackLines(): number {
 }
 
 export function useRowHeight(): number {
-  return useSettingValue(KEYS.density) === "comfortable" ? ROW_HEIGHTS.comfortable : ROW_HEIGHTS.compact;
+  return ROW_HEIGHTS[densityOf(useSettingValue(KEYS.density))];
 }
 
 /** The models the composer offers and threads are named by: the daemon's registry, else the family aliases. */

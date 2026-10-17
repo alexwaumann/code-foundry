@@ -86,25 +86,26 @@ test("cmd+, opens settings on General; the nav switches pages, one at a time", a
   await expect(setting(page, "threads.auto_name").getByTestId("setting-key")).toHaveCount(0);
   await expect(setting(page, "threads.auto_name")).not.toContainText("threads.auto_name");
 
-  await expect(select(page, "threads.default_model")).toHaveAttribute("data-value", "claude-opus-4-8[1m]");
+  await expect(select(page, "threads.default_model")).toHaveAttribute("data-value", "claude-sonnet-5[1m]");
   // The trigger names the value alone; the list marks the setting's own default.
-  await expect(select(page, "threads.default_model")).toHaveText("Opus 4.8", { useInnerText: true });
+  await expect(select(page, "threads.default_model")).toHaveText("Sonnet 5", { useInnerText: true });
+  await expect(select(page, "threads.default_effort")).toHaveAttribute("data-value", "medium");
   await expectOptions(page, "threads.default_model", [
     "Opus 5.5",
-    "Opus 4.8 (default)",
+    "Opus 4.8",
     "Opus 4.7",
     "Sonnet 5.5",
-    "Sonnet 5",
+    "Sonnet 5 (default)",
     "Sonnet 4.6",
     "Haiku 5.5",
     "Haiku 4.5",
   ]);
-  // Where new threads work: a dropdown with plain-language labels, a fresh copy by default.
+  // Where new threads work: a dropdown with plain-language labels, the project folder by default.
   await expect(setting(page, "threads.default_worktree")).toContainText("New threads work in");
-  await expect(select(page, "threads.default_worktree")).toHaveAttribute("data-value", "new");
-  await expectOptions(page, "threads.default_worktree", ["A fresh copy of the project (default)", "The project folder itself"]);
-  // The naming model is its own live setting, defaulting to Sonnet 5.
-  await expect(select(page, "threads.naming_model")).toHaveAttribute("data-value", "claude-sonnet-5[1m]");
+  await expect(select(page, "threads.default_worktree")).toHaveAttribute("data-value", "current");
+  await expectOptions(page, "threads.default_worktree", ["A fresh copy of the project", "The project folder itself (default)"]);
+  // The naming model is its own live setting, defaulting to Sonnet 4.6.
+  await expect(select(page, "threads.naming_model")).toHaveAttribute("data-value", "claude-sonnet-4-6[1m]");
   await expect(setting(page, "threads.naming_model").getByTestId("restart-hint")).toHaveCount(0);
   // Every thread is rendered: no view setting (the schema has none).
   await expect(setting(page, "threads.render")).toHaveCount(0);
@@ -439,9 +440,11 @@ test("a keybinding override rejects a reserved chord and applies a valid one", a
 
 test("hand edits to the file update the open page and the terminal font", async ({ page }) => {
   await openSettings(page, "appearance");
-  await mockPost("settings/external?appearance.font_size=18&appearance.density=comfortable");
-  await expect(setting(page, "appearance.font_size").getByRole("spinbutton")).toHaveValue("18");
+  // Comfortable is the default density; a hand edit to compact applies live.
   await expect(page.locator("html")).toHaveAttribute("data-density", "comfortable");
+  await mockPost("settings/external?appearance.font_size=18&appearance.density=compact");
+  await expect(setting(page, "appearance.font_size").getByRole("spinbutton")).toHaveValue("18");
+  await expect(page.locator("html")).toHaveAttribute("data-density", "compact");
 
   await mockPost("settings/external?loadError=toml%3A+line+2%3A+expected+%27%5D%27");
   await expect(page.getByTestId("settings-load-error")).toContainText("expected ']'");
