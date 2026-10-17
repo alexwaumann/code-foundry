@@ -213,11 +213,8 @@ func (f *Fake) CreateWorktree(_ context.Context, o project.CreateWorktreeOptions
 		f.mu.Unlock()
 		return project.Worktree{}, fmt.Errorf("%w: branch is required", project.ErrInvalidArgument)
 	}
-	path := o.Path
-	if path == "" {
-		slug := cmp.Or(r.GitHubSlug, "_local/"+r.Name)
-		path = filepath.Join(f.WorktreeRoot, filepath.FromSlash(slug), strings.ReplaceAll(o.Branch, "/", "-"))
-	}
+	slug := cmp.Or(r.GitHubSlug, "_local/"+r.Name)
+	path := filepath.Join(f.WorktreeRoot, filepath.FromSlash(slug), strings.ReplaceAll(o.Branch, "/", "-"))
 	w := project.Worktree{ProjectID: r.ID, Path: path, Branch: o.Branch}
 	r.Worktrees = append(slices.Clone(r.Worktrees), w)
 	makeDirs := f.MakeDirs

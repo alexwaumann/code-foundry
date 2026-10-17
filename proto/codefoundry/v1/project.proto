@@ -118,7 +118,7 @@ message Worktree {
   // HEAD is detached (branch is empty).
   bool detached = 7;
   // The git half of "safe to clean up": not the main worktree, created by Code Foundry
-  // (its path is under the app's worktrees directory or projects.worktree_dir; worktrees
+  // (its path is under the app's worktrees directory; worktrees
   // made by hand or by other tools never qualify), on a branch, no staged,
   // modified, untracked or conflicted entries, no status error, and status.base_ref is
   // set with base_ahead 0 (every commit on HEAD is in origin/<default>). Whether a live
@@ -185,15 +185,18 @@ message GetProjectResponse {
   Project project = 1;
 }
 
+// The worktree always goes to <config home>/worktrees/<owner>/<repo>/<branch>
+// (_local/<repo name> in place of owner/repo when origin is not on GitHub); where
+// worktrees go is the app's, not the caller's.
 message CreateWorktreeRequest {
+  // Field 4 was an explicit path.
+  reserved 4;
+  reserved "path";
   string project_id = 1;
   // Branch to check out. Created from base_ref when it does not exist.
   string branch = 2;
   // Ref to branch from when creating. Defaults to the default branch.
   string base_ref = 3;
-  // Optional explicit path. Defaults to <config home>/worktrees/<owner>/<repo>/<branch>
-  // (_local/<repo name> in place of owner/repo when origin is not on GitHub).
-  string path = 4;
   // Fetch base_ref's remote branch first when base_ref is a remote-tracking ref
   // (origin/<name>). Bounded; a failed fetch is logged and the stale ref is used.
   bool fetch = 5;

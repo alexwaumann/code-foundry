@@ -53,8 +53,8 @@ type Worktree struct {
 	IsMain    bool
 	Detached  bool
 	Status    Status
-	// Managed: the worktree is inside a directory the app creates worktrees in
-	// (Options.WorktreeRoot or Options.ManagedRoots), so the app made it. Only managed
+	// Managed: the worktree is inside the directory the app creates worktrees in
+	// (Options.WorktreeRoot), so the app made it. Only managed
 	// worktrees can be cleaned up; others (made by hand or by other tools) never are.
 	// Set when the snapshot is built.
 	Managed bool
@@ -172,7 +172,9 @@ func (ProjectRemoved) isProjectEvent()  {}
 func (WorktreeUpdated) isProjectEvent() {}
 func (WorktreeRemoved) isProjectEvent() {}
 
-// CreateWorktreeOptions configures Store.CreateWorktree.
+// CreateWorktreeOptions configures Store.CreateWorktree. The path is always the app's:
+// <Options.WorktreeRoot>/<owner>/<repo>/<branch, "/" -> "-">, with _local/<repo name>
+// in place of owner/repo when origin is not on GitHub.
 type CreateWorktreeOptions struct {
 	ProjectID string
 	// Branch to check out. If neither a local branch nor origin/<Branch> exists (or
@@ -180,9 +182,6 @@ type CreateWorktreeOptions struct {
 	Branch string
 	// BaseRef to branch from. Defaults to origin/<default branch>, else <default branch>.
 	BaseRef string
-	// Path defaults to <Options.WorktreeRoot>/<owner>/<repo>/<branch, "/" -> "-">, with
-	// _local/<repo name> in place of owner/repo when origin is not on GitHub.
-	Path string
 	// Fetch refreshes the start point before branching from it: when the new branch
 	// starts at a remote-tracking ref ("<remote>/<branch>": BaseRef, the default base
 	// origin/<default>, or origin/<Branch> for git's DWIM), that one remote branch is

@@ -158,7 +158,7 @@ func Run(ctx context.Context, opts Options) error {
 			return terminal.AwaitOutput(ctx, st.terminal, id, promptSettle)
 		},
 		TerminalBracketedPaste: st.terminal.BracketedPaste,
-		Project:                worktreeDirProject{ProjectBackend: projectAPI, projects: st.project, settings: st.settings},
+		Project:                projectAPI,
 		Clone:                  projectAPI.CloneRef,
 		NewProjects: command.NewProjectDeps{
 			Backend: projectAPI,

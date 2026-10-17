@@ -306,9 +306,9 @@ func TestCreateWorktreeBranchResolution(t *testing.T) {
 	git(t, f.other, "checkout", "-q", "-b", "remote-only")
 	git(t, f.other, "push", "-q", "-u", "origin", "remote-only")
 	git(t, f.project, "fetch", "-q")
-	explicit := filepath.Join(f.base, "elsewhere", "ro")
-	w, err = h.store.CreateWorktree(ctx, CreateWorktreeOptions{ProjectID: r.ID, Branch: "remote-only", Path: explicit})
-	if err != nil || w.Path != explicit || w.Branch != "remote-only" || w.Status.Upstream != "origin/remote-only" {
+	wantRO := filepath.Join("worktrees", "_local", "proj", "remote-only")
+	w, err = h.store.CreateWorktree(ctx, CreateWorktreeOptions{ProjectID: r.ID, Branch: "remote-only"})
+	if err != nil || !strings.HasSuffix(w.Path, wantRO) || w.Branch != "remote-only" || w.Status.Upstream != "origin/remote-only" {
 		t.Fatalf("remote branch: %+v, %v", w, err)
 	}
 
@@ -321,9 +321,6 @@ func TestCreateWorktreeBranchResolution(t *testing.T) {
 	// Errors.
 	if _, err := h.store.CreateWorktree(ctx, CreateWorktreeOptions{ProjectID: r.ID, Branch: "bad..name"}); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("bad branch: %v", err)
-	}
-	if _, err := h.store.CreateWorktree(ctx, CreateWorktreeOptions{ProjectID: r.ID, Branch: "x", Path: "rel/path"}); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("relative path: %v", err)
 	}
 	if _, err := h.store.CreateWorktree(ctx, CreateWorktreeOptions{ProjectID: r.ID, Branch: "main"}); !errors.Is(err, ErrFailedPrecondition) {
 		t.Fatalf("branch already checked out: %v", err)

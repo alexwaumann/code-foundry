@@ -38,10 +38,7 @@ type Options struct {
 	// Trust pre-trusts a new member worktree for Claude, as a thread's worktree is
 	// before claude starts. Nil skips it. A failure is logged, not returned.
 	Trust func(dir string) error
-	// WorktreePath, when set, picks the path of a member worktree for branch in r; ""
-	// leaves it to the project store's default. The daemon applies projects.worktree_dir.
-	WorktreePath func(r project.Project, branch string) string
-	Now          func() time.Time
+	Now   func() time.Time
 }
 
 // Manager is the Store backed by SQLite and the project store.
@@ -327,12 +324,8 @@ func (m *Manager) createMember(ctx context.Context, r project.Project, branch, b
 	if refs, err := m.opts.Projects.ListRefs(ctx, r.ID); err == nil {
 		existed = slices.Contains(refs.Local, branch)
 	}
-	path := ""
-	if m.opts.WorktreePath != nil {
-		path = m.opts.WorktreePath(r, branch)
-	}
 	wt, err := m.opts.Projects.CreateWorktree(ctx, project.CreateWorktreeOptions{
-		ProjectID: r.ID, Branch: branch, BaseRef: base, Path: path, Fetch: fetch,
+		ProjectID: r.ID, Branch: branch, BaseRef: base, Fetch: fetch,
 	})
 	if err != nil {
 		return created{}, projectError("create worktree "+branch+" in "+r.Name, err)

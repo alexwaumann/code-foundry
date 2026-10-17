@@ -34,7 +34,8 @@ file and <kbd>/</kbd> to run one of the project's skills or commands.
 
 * **A fresh copy of the project** (the pill reads **Fresh copy**) gives the thread its
   own folder and branch, so several threads can work at once and you keep or discard
-  each one. This is the default.
+  each one. This is the default. The app keeps these copies under
+  `~/.code-foundry/worktrees`.
 * **The project folder itself** (**In place**) edits your files where they are.
 
 The app remembers your last choice for each project. Set the default for every project

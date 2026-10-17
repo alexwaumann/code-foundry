@@ -45,7 +45,7 @@ func MergedCleanReason(w Worktree) string {
 	return ""
 }
 
-// NotManagedReason is why a worktree outside the app's worktree directories is kept.
+// NotManagedReason is why a worktree outside the app's worktrees directory is kept.
 const NotManagedReason = "not a Code Foundry worktree"
 
 // InsideRoot reports whether path is strictly inside one of roots (never a root
@@ -79,15 +79,6 @@ func resolved(p string) string {
 		return r
 	}
 	return p
-}
-
-// managedRoots is where the app makes worktrees for the project named name.
-func (g *Git) managedRoots(name string) []string {
-	roots := []string{g.wtRoot}
-	if g.managed != nil {
-		roots = append(roots, g.managed(name)...)
-	}
-	return roots
 }
 
 // MergedClean reports MergedCleanReason(w) == "".

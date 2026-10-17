@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"os"
 	"path/filepath"
 	"slices"
 	"testing"
@@ -12,66 +11,10 @@ import (
 
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/command/commandtest"
-	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/settings"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 	"github.com/alexwaumann/code-foundry/internal/store/update"
 )
-
-func TestWorktreePath(t *testing.T) {
-	home, _ := os.UserHomeDir()
-	tests := []struct {
-		dir, project, branch, want string
-	}{
-		{"", "cf", "main", ""},
-		{"/wt", "cf", "", ""},
-		{"/wt", "cf", "alex/fix-x", "/wt/alex-fix-x"},
-		{"/wt/{project}", "cf", "feat", "/wt/cf/feat"},
-		{"~/worktrees/{project}", "cf", "feat", filepath.Join(home, "worktrees/cf/feat")},
-		{"relative/{project}", "cf", "feat", ""},
-		// {repo} is the placeholder's name before the rename; it still expands.
-		{"/wt/{project}", "cf", "feat", "/wt/cf/feat"},
-	}
-	for _, tt := range tests {
-		if got := worktreePath(tt.dir, tt.project, tt.branch); got != tt.want {
-			t.Errorf("worktreePath(%q, %q, %q) = %q, want %q", tt.dir, tt.project, tt.branch, got, tt.want)
-		}
-	}
-}
-
-// worktreeBase is the cleanup's managed root from projects.worktree_dir.
-func TestWorktreeBase(t *testing.T) {
-	home, _ := os.UserHomeDir()
-	tests := []struct{ dir, project, want string }{
-		{"", "cf", ""},
-		{"/wt", "cf", "/wt"},
-		{"/wt/{project}", "cf", "/wt/cf"},
-		{"~/worktrees/{project}", "cf", filepath.Join(home, "worktrees/cf")},
-		{"relative/{project}", "cf", ""},
-		{"/wt/{project}", "cf", "/wt/cf"},
-	}
-	for _, tt := range tests {
-		if got := worktreeBase(tt.dir, tt.project); got != tt.want {
-			t.Errorf("worktreeBase(%q, %q) = %q, want %q", tt.dir, tt.project, got, tt.want)
-		}
-	}
-}
-
-// projects.worktree_dir applies live to the worktrees new threads create.
-func TestSettingsWorktreePath(t *testing.T) {
-	st := openSettings(t)
-	pick := settingsWorktreePath(st)
-	r := project.Project{ID: "r1", Name: "cf"}
-	if got := pick(r, "cf/fix-x"); got != "" {
-		t.Errorf("unset setting = %q, want the project store's default", got)
-	}
-	if _, err := st.Update(context.Background(), map[string]string{settings.KeyWorktreeDir: "/wt/{repo}"}); err != nil {
-		t.Fatal(err)
-	}
-	if got := pick(r, "cf/fix-x"); got != "/wt/cf/cf-fix-x" {
-		t.Errorf("with setting = %q", got)
-	}
-}
 
 func TestLogLevel(t *testing.T) {
 	for in, want := range map[string]slog.Level{"debug": slog.LevelDebug, "info": slog.LevelInfo, "warn": slog.LevelWarn, "error": slog.LevelError, "bogus": slog.LevelInfo} {

@@ -63,10 +63,6 @@ type Options struct {
 	// AttachmentReapInterval is how often staged attachments are reaped while the
 	// Manager runs. Default AttachmentReapInterval (the package constant).
 	AttachmentReapInterval time.Duration
-	// WorktreePath, when set, picks the path of a worktree Create makes for branch in
-	// r; "" leaves it to the project store's default. The daemon applies the
-	// projects.worktree_dir setting with it, as project.worktree.new does.
-	WorktreePath func(r project.Project, branch string) string
 	// RefExists reports whether ref exists in the repository at dir; Create uses it
 	// to keep new worktree branches unique. Default: git rev-parse --verify.
 	RefExists func(ctx context.Context, dir, ref string) bool

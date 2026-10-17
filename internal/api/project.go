@@ -96,7 +96,7 @@ func (h *Project) Get(_ context.Context, req *connect.Request[v1.GetProjectReque
 func (h *Project) CreateWorktree(ctx context.Context, req *connect.Request[v1.CreateWorktreeRequest]) (*connect.Response[v1.CreateWorktreeResponse], error) {
 	m := req.Msg
 	w, err := h.store.CreateWorktree(ctx, project.CreateWorktreeOptions{
-		ProjectID: m.GetProjectId(), Branch: m.GetBranch(), BaseRef: m.GetBaseRef(), Path: m.GetPath(),
+		ProjectID: m.GetProjectId(), Branch: m.GetBranch(), BaseRef: m.GetBaseRef(),
 		Fetch: m.GetFetch(),
 	})
 	if err != nil {

@@ -61,7 +61,26 @@ func decode(data []byte) (map[string]string, error) {
 		flatten(raw, group, tbl, group == GroupKeybindings)
 	}
 	renameLegacyKeys(raw)
+	dropRetiredKeys(raw)
 	return raw, nil
+}
+
+// retiredKeys are settings that no longer exist; a file that still sets one reads
+// without an "unknown setting" issue, and the next save leaves it out.
+// projects.worktree_dir went when the app took over where worktrees go (always
+// <config home>/worktrees/<owner>/<repo>/<branch>); repos.worktree_dir is its name from
+// before the repo -> project rename (renameLegacyKeys maps it to the new one first, but
+// it is listed so the retirement does not depend on that order).
+var retiredKeys = []string{
+	GroupProjects + ".worktree_dir",
+	"repos.worktree_dir",
+}
+
+// dropRetiredKeys deletes raw's retiredKeys.
+func dropRetiredKeys(raw map[string]string) {
+	for _, k := range retiredKeys {
+		delete(raw, k)
+	}
 }
 
 // legacyPrefixes are key prefixes from before threads were renamed from sessions (the

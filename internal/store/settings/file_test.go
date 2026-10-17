@@ -58,8 +58,8 @@ func TestDecodeLegacyNames(t *testing.T) {
 			want: map[string]string{"keybindings.thread.new": "cmd+shift+n", "keybindings.thread.rename": "none"}},
 		{name: "unquoted session.* keybindings are thread.*", in: "[keybindings]\nsession.new = \"cmd+j\"\nproject.worktree.new = \"cmd+alt+n\"\n",
 			want: map[string]string{"keybindings.thread.new": "cmd+j", "keybindings.project.worktree.new": "cmd+alt+n"}},
-		{name: "[repos] is [projects]", in: "[repos]\nfetch_interval_seconds = 60\nworktree_dir = \"~/wt/{repo}\"\n",
-			want: map[string]string{"projects.fetch_interval_seconds": "60", "projects.worktree_dir": "~/wt/{repo}"}},
+		{name: "[repos] is [projects]", in: "[repos]\nfetch_interval_seconds = 60\n",
+			want: map[string]string{"projects.fetch_interval_seconds": "60"}},
 		{name: "repo.* keybindings are project.*", in: "[keybindings]\n\"repo.worktree.new\" = \"cmd+alt+n\"\nrepo.refresh = \"none\"\n\"ui.focus.repo\" = \"cmd+5\"\n\"workspace.add-repo\" = \"cmd+6\"\n\"workspace.remove-repo\" = \"cmd+7\"\n",
 			want: map[string]string{"keybindings.project.worktree.new": "cmd+alt+n", "keybindings.project.refresh": "none", "keybindings.ui.focus.project": "cmd+5",
 				"keybindings.workspace.add-project": "cmd+6", "keybindings.workspace.remove-project": "cmd+7"}},
@@ -83,13 +83,48 @@ func TestDecodeLegacyNames(t *testing.T) {
 	}
 }
 
+// Retired settings read silently: no "unknown setting" issue, and the next save (render
+// of the accepted values) leaves them out of the file.
+func TestDecodeRetiredKeys(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want map[string]string
+	}{
+		{name: "projects.worktree_dir is dropped", in: "[projects]\nfetch_interval_seconds = 60\nworktree_dir = \"~/tmp/x\"\n",
+			want: map[string]string{"projects.fetch_interval_seconds": "60"}},
+		{name: "legacy repos.worktree_dir is dropped", in: "[repos]\nworktree_dir = \"~/wt/{repo}\"\n",
+			want: map[string]string{}},
+		{name: "both names are dropped", in: "[repos]\nworktree_dir = \"~/a\"\n[projects]\nworktree_dir = \"~/b\"\n",
+			want: map[string]string{}},
+		{name: "worktree_dir in another table is not retired", in: "[gitops]\nworktree_dir = \"~/c\"\n",
+			want: map[string]string{"gitops.worktree_dir": "~/c"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			raw, err := decode([]byte(tt.in))
+			if err != nil || !maps.Equal(raw, tt.want) {
+				t.Fatalf("decode = %v, %v; want %v", raw, err, tt.want)
+			}
+			r := resolve(raw, testCmds)
+			for _, is := range r.issues {
+				if strings.Contains(is.Key, "worktree_dir") && strings.HasPrefix(is.Key, GroupProjects) {
+					t.Errorf("retired key reported: %+v", is)
+				}
+			}
+			if strings.Contains(string(render(r.accepted)), "worktree_dir") {
+				t.Errorf("rendered file still has worktree_dir")
+			}
+		})
+	}
+}
+
 func TestRenderRoundTrip(t *testing.T) {
 	accepted := map[string]string{
 		KeyAutoName:                   "false",
 		KeyNamingModel:                "claude-4.5-haiku[1m]",
 		KeyFontSize:                   "15",
 		KeyFontFamily:                 `Weird "Font" \ Name`,
-		KeyWorktreeDir:                "~/wt/{repo}",
 		KeybindingKey("thread.new"):   "cmd+shift+n",
 		KeybindingKey("terminal.new"): "none",
 	}
