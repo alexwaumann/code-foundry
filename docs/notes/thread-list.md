@@ -97,7 +97,8 @@ daemon step in `thread-status-persistence.md` (persisted status, `status_reason`
   meta package already in use). Unlike upstream shadcn, `Tooltip` does not wrap its own
   provider; `SidebarList` has one `TooltipProvider` (`delayDuration` 500), so moving from
   one row to the next opens the next tooltip without a second delay (Radix's skip delay).
-* Per thread row, `side="right"`, `align="start"`, `sideOffset` 12, 220px wide,
+* Per thread row, `side="right"`, `align="start"`, `sideOffset` 12, 220px wide
+  (widened to 260px on 2026-10-17, see docs/notes/claude-mark-tooltip.md),
   `disableHoverableContent` (it closes as soon as the pointer leaves the row). Contents,
   mounted only while open: the name (13px semibold); project with `FolderGit2` (or `Folder`
   and a muted "no git" chip); branch with `GitBranch` in mono and a muted "worktree" chip

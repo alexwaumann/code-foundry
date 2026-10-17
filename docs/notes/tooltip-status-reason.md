@@ -11,6 +11,7 @@ hello.txt?") is usually cut off; the tooltip now carries all of it.
   (`TipStatus` in `components/sidebar/SidebarRow.tsx`, `data-testid="tip-status"`,
   `data-tone="amber" | "red"`). The text is the row's own line-2 text, `statusText(statusLine(s), now)`,
   untruncated and wrapping inside the unchanged 220px tooltip.
+  (Widened to 260px on 2026-10-17, see docs/notes/claude-mark-tooltip.md.)
 * **Only for amber and red.** `tipStatusTone(kind)` (`lib/statusLine.ts`, table-tested)
   returns the tone from `statusTones` when it is amber (permission / dialog "Needs input",
   "Asked a question", "Plan ready for review") or red ("Error · <code>", "Interrupted while
