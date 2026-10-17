@@ -135,7 +135,7 @@ const SCRIPTS: { match: (cmd: string) => boolean; script: (cwd: string) => Scrip
           `${R}FAIL${X}`,
           `${R}FAIL${X}\t${PKG}/internal/store/pr\t0.412s`,
         ]),
-        ...lines(2300, 200, [`${G}ok${X}  \t${PKG}/internal/store/session\t1.902s`, `${R}FAIL${X}`]),
+        ...lines(2300, 200, [`${G}ok${X}  \t${PKG}/internal/store/thread\t1.902s`, `${R}FAIL${X}`]),
       ],
       exit: { at: 2600, code: 1 },
     }),

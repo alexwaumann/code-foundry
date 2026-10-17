@@ -80,7 +80,7 @@ function deriveSelectionContext(sel: Selection, repos: ReposData, threads: Threa
       const s = threads.byId[sel.id];
       const place = s ? placeThread(s, allWorktrees(repos)) : null;
       // A thread without a project runs in home, which is no worktree: no repo or
-      // worktree in its context, so project-scoped commands (and session.new without
+      // worktree in its context, so project-scoped commands (and thread.new without
       // no-project, which would refuse home) are not offered.
       const home = s !== undefined && isNoProject(s, repos);
       return {
@@ -93,8 +93,8 @@ function deriveSelectionContext(sel: Selection, repos: ReposData, threads: Threa
       };
     }
     // The composer has no worktree yet (it may make one): only the repo, which is
-    // what session.new needs to be available. A composer without a project has no repo
-    // either (the daemon offers session.new in the compose view for it).
+    // what thread.new needs to be available. A composer without a project has no repo
+    // either (the daemon offers thread.new in the compose view for it).
     case "compose":
       return { ...emptyContext, activeRepoId: sel.repoId, activeView: "compose", activeWorkspaceId: sel.workspaceId ?? "" };
     case "view":

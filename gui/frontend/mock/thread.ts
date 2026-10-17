@@ -1033,7 +1033,7 @@ export class MockThreadLogs {
   }
 
   /**
-   * session.fork, like the daemon (internal/store/thread/fork.go): the fork's log starts
+   * thread.fork, like the daemon (internal/store/thread/fork.go): the fork's log starts
    * as a copy of the parent's items, renumbered, never live (streaming text dropped, a
    * running tool an error, a pending request cancelled), then the note "Forked from
    * <parent>" where the copy ends.

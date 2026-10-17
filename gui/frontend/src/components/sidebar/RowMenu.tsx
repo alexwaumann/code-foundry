@@ -44,7 +44,7 @@ function MemberItem({ threadId, repoId, path, current, queued }: { threadId: str
 
 /**
  * "Run in…" for a workspace thread: its workspace's members, the current one disabled.
- * Picking one invokes session.run-in; the row shows the queued move until it happens.
+ * Picking one invokes thread.run-in; the row shows the queued move until it happens.
  */
 function RunInMenu({ threadId, workspaceId }: { threadId: string; workspaceId: string }) {
   const cwd = useThreadsStore((s) => s.byId[threadId]?.worktreePath ?? "");
@@ -81,7 +81,7 @@ export function RowMenu({ id }: { id: string }) {
   return (
     <ContextMenuContent
       data-testid="row-menu"
-      data-session={id}
+      data-thread={id}
       onCloseAutoFocus={(e) => {
         // Rename puts an input in the row; closing must not move focus back to the list.
         if (useUiStore.getState().renamingThreadId === id) e.preventDefault();

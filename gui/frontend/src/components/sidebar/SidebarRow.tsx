@@ -31,7 +31,7 @@ interface RowProps {
   onActivate: (row: Row, how: "click") => void;
 }
 
-/** Inline name editor; Enter or blur commits via session.rename, Escape cancels. */
+/** Inline name editor; Enter or blur commits via thread.rename, Escape cancels. */
 function RenameField({ id, name }: { id: string; name: string }) {
   const ref = useRef<HTMLInputElement>(null);
   const done = useRef(false);
@@ -187,7 +187,7 @@ function ThreadLine({ id }: { id: string }) {
   const { project, branch, noGit, noProject, movingTo } = useThreadPlace(id);
   const status = line.kind !== "place";
   return (
-    <span className="flex min-w-0 items-center gap-1 text-caption-sm" data-testid="row-place" data-status-line={line.kind} data-session-badge={badge}>
+    <span className="flex min-w-0 items-center gap-1 text-caption-sm" data-testid="row-place" data-status-line={line.kind} data-thread-badge={badge}>
       {movingTo !== null ? (
         <span className="flex min-w-0 items-center gap-1 text-warning" data-testid="row-moving">
           <ArrowRightLeft className="size-3 shrink-0" aria-hidden />
@@ -236,13 +236,13 @@ function ThreadLabel({ id }: { id: string }) {
   const renaming = useUiStore((s) => s.renamingThreadId === id);
   return (
     // Whether Claude runs for the thread never shows: a stopped thread looks like any other.
-    <span className="flex min-w-0 flex-1 flex-col gap-0.5" data-testid="session-body">
+    <span className="flex min-w-0 flex-1 flex-col gap-0.5" data-testid="thread-body">
       <span className="flex min-w-0 items-center gap-1.5">
         {renaming ? (
           <RenameField id={id} name={name} />
         ) : (
           <>
-            <span className={cn("truncate", !name && "text-muted-foreground")} data-testid="session-name">
+            <span className={cn("truncate", !name && "text-muted-foreground")} data-testid="thread-name">
               {name || id}
             </span>
             <span className="ml-auto flex min-w-0 shrink-0 items-center gap-1 pl-1">
@@ -394,7 +394,7 @@ function ThreadTooltip({ id, children }: { id: string; children: ReactElement })
       disableHoverableContent
     >
       <TooltipTrigger asChild>{children}</TooltipTrigger>
-      <TooltipContent side="right" align="start" sideOffset={12} className="w-[220px] px-2.5 py-2 text-body-sm" data-testid="thread-tooltip" data-session-id={id}>
+      <TooltipContent side="right" align="start" sideOffset={12} className="w-[220px] px-2.5 py-2 text-body-sm" data-testid="thread-tooltip" data-thread-id={id}>
         <ThreadTipBody id={id} />
       </TooltipContent>
     </Tooltip>
@@ -478,12 +478,12 @@ function SingleLineLabel({ id, section }: { id: string; section: "archived" | "s
   const name = useThreadsStore((s) => s.byId[id]?.name ?? "");
   const renaming = useUiStore((s) => s.renamingThreadId === id);
   return (
-    <span className="flex min-w-0 flex-1 items-center gap-1.5" data-testid="session-body" data-archived={section === "archived" || undefined} data-snoozed={section === "snoozed" || undefined}>
+    <span className="flex min-w-0 flex-1 items-center gap-1.5" data-testid="thread-body" data-archived={section === "archived" || undefined} data-snoozed={section === "snoozed" || undefined}>
       {renaming ? (
         <RenameField id={id} name={name} />
       ) : (
         <>
-          <span className={cn("truncate", !name && "text-muted-foreground")} data-testid="session-name">
+          <span className={cn("truncate", !name && "text-muted-foreground")} data-testid="thread-name">
             {name || id}
           </span>
           {section === "archived" ? <ArchivedAge id={id} /> : <SnoozeLeft id={id} />}

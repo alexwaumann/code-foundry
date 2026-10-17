@@ -24,7 +24,7 @@ export interface Trigger {
 /** One row of the completion card. */
 export interface CompletionItem {
   key: string;
-  /** Bold: `/deploy`, `session.go`. */
+  /** Bold: `/deploy`, `thread.go`. */
   label: string;
   /** The label in monospace (file names). */
   mono?: boolean;

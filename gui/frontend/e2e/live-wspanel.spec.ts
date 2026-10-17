@@ -67,7 +67,7 @@ test("workspace surface with a real thread: members' state, member tab, add and 
 
     await test.step("the badge opens the surface: members, their state, the current member", async () => {
       await row.getByTestId("row-workspace").click();
-      await expect(page.getByTestId("side-panel")).toHaveAttribute("data-panel-key", `session:${thread}`);
+      await expect(page.getByTestId("side-panel")).toHaveAttribute("data-panel-key", `thread:${thread}`);
       await expect(page.getByTestId("workspace-surface-name")).toHaveText(ws.workspace.name);
       await expect(page.getByTestId("workspace-surface-branch")).toHaveText(ws.workspace.branch);
       await expect(surface.getByTestId("member-name")).toHaveText([first.repoName, second.repoName]);

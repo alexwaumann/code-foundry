@@ -39,7 +39,7 @@ export async function refreshCommands(ctx: UiContextView = getUiContext()): Prom
   inflight = ctl;
   useCommandsStore.setState({ loading: true });
   try {
-    // Unavailable ones too: session.new's keybinding and title are needed with nothing
+    // Unavailable ones too: thread.new's keybinding and title are needed with nothing
     // selected, where the project picker supplies the repo (keys/bindings.ts).
     const fresh = await listCommands(ctx, { includeUnavailable: true, signal: ctl.signal });
     if (inflight !== ctl) return;

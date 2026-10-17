@@ -172,13 +172,13 @@ test("dragging the handle resizes the panel within its bounds, and the width per
   // leaves s-1's alone.
   await selectThread(page, "s-2");
   await page.getByTestId("panel-toggle").click();
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-2");
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-2");
   expect((await box(page, "side-panel")).width).toBe(420);
   await handle.focus();
   await page.keyboard.press("ArrowLeft");
   await expect.poll(async () => (await box(page, "side-panel")).width).toBe(436);
   await selectThread(page, "s-1");
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-1");
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-1");
   expect((await box(page, "side-panel")).width).toBe(max);
 
   // Widths, open state, tabs and the active tab all survive a reload.
@@ -190,7 +190,7 @@ test("dragging the handle resizes the panel within its bounds, and the width per
   await expect(panel(page).getByRole("tab")).toHaveText(["Files", "Diff"]);
   await expect(panel(page).getByTestId("panel-body")).toHaveAttribute("data-tab-id", "diff");
   await selectThread(page, "s-2");
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-2");
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-2");
   expect((await box(page, "side-panel")).width).toBe(436);
   await expect(panel(page).getByTestId("panel-empty")).toBeVisible();
 
@@ -221,7 +221,7 @@ test("each session has its own panel state", async ({ page }) => {
   await openApp(page);
   await selectThread(page, "s-1");
   await page.getByTestId("panel-toggle").click();
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-1");
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-1");
 
   await selectThread(page, "s-2");
   await expect(panel(page)).toHaveCount(0);
@@ -229,12 +229,12 @@ test("each session has its own panel state", async ({ page }) => {
 
   await selectThread(page, "s-1");
   await expect(panel(page)).toBeVisible();
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-1");
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-1");
 
   // Hiding it on s-1 leaves s-2's (still hidden) alone, and vice versa.
   await selectThread(page, "s-2");
   await page.getByTestId("panel-toggle").click();
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-2");
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-2");
   await selectThread(page, "s-1");
   await page.getByTestId("panel-toggle").click();
   await expect(panel(page)).toHaveCount(0);
@@ -521,7 +521,7 @@ test("worktrees and the Pull Requests page have their own panels and toggles", a
   await expect(page.getByTestId("thread-composer")).toBeVisible();
   await expect(panel(page)).toHaveCount(0);
   await page.getByTestId("thread-header").getByTestId("panel-toggle").click();
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-3");
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-3");
 });
 
 /** The thread pane's width (it narrows as the side panel widens; 0 while hidden). */
@@ -615,13 +615,13 @@ test("expanded is per panel, survives a reload, and outlives hiding the panel", 
   await expect(panel(page)).toHaveCount(0);
   await expect(page.getByTestId("content-pane")).toBeVisible();
   await page.getByTestId("panel-toggle").click();
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-2");
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-2");
   await expect(panel(page).getByTestId("panel-expand")).toHaveAttribute("aria-pressed", "false");
   await expect(page.getByTestId("content-pane")).toBeVisible();
   expect((await box(page, "side-panel")).width).toBe(420);
 
   await row(page, "s:s-1").click();
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-1");
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-1");
   await expect(page.getByTestId("content-pane")).toBeHidden();
   // Selecting a thread focuses its prompt; hidden, the panel takes that focus.
   await expect.poll(() => region(page)).toBe("panel");
@@ -638,10 +638,10 @@ test("expanded is per panel, survives a reload, and outlives hiding the panel", 
   await page.reload();
   await expect(row(page, "s:s-1")).toBeVisible();
   await row(page, "s:s-1").click();
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-1");
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-1");
   await expect(page.getByTestId("content-pane")).toBeHidden();
   await expect(panel(page).getByTestId("panel-expand")).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-session-id", "s-1");
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-1");
   await selectThread(page, "s-2");
   await expect(panel(page).getByTestId("panel-expand")).toHaveAttribute("aria-pressed", "false");
 });

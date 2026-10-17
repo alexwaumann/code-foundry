@@ -18,7 +18,7 @@ import { orOutdatedDaemon } from "./errors";
  * Where the thread's Claude process is. The daemon manages it (starts it on a message,
  * stops it at cache expiry) and it is internal to the GUI: nothing on screen says it
  * (docs/notes/hide-connection-state.md). Read it only where behaviour needs it, through
- * lib/session (threadBadge, threadGroup, restartCutsOff).
+ * lib/thread (threadBadge, threadGroup, restartCutsOff).
  */
 export type ThreadStateView = "starting" | "connected" | "closing" | "disconnected" | "unknown";
 /**
@@ -27,7 +27,7 @@ export type ThreadStateView = "starting" | "connected" | "closing" | "disconnect
  * session whose process ended mid-turn (statusReason "interrupted") or did not start.
  */
 export type ThreadStatusView = "busy" | "idle" | "attention" | "error" | "unknown";
-/** claude --permission-mode, as session.new's `permission` arg spells it; "" = Claude's default. */
+/** claude --permission-mode, as thread.new's `permission` arg spells it; "" = Claude's default. */
 export type PermissionModeView = "supervised" | "accept-edits" | "auto" | "";
 
 /** View model for a Claude session. Generated types stay inside src/api. */
@@ -44,7 +44,7 @@ export interface ThreadView {
   status: ThreadStatusView;
   /**
    * The reason for status, e.g. "finished", "at prompt", "permission: Bash git push",
-   * "question: Which one?", or "interrupted" for "error". Classify it with statusKind / statusDetail (lib/session), not by hand.
+   * "question: Which one?", or "interrupted" for "error". Classify it with statusKind / statusDetail (lib/thread), not by hand.
    */
   statusReason: string;
   /** When status or statusReason last changed, epoch ms; null if never known. */
@@ -55,7 +55,7 @@ export interface ThreadView {
   permissionMode: PermissionModeView;
   /** Ref the session's worktree branch was created from ("" unless createdWorktree). */
   baseRef: string;
-  /** session.new made the worktree for this session. */
+  /** thread.new made the worktree for this session. */
   createdWorktree: boolean;
   /**
    * The workspace that owns the thread; "" for a project thread (owned by repoId).
@@ -67,16 +67,16 @@ export interface ThreadView {
    * prompt; "" when nothing is queued. worktreePath changes when the move happens.
    */
   pendingWorktreePath: string;
-  /** The user pinned the thread (session.pin): it sits in the sidebar's Pinned section. */
+  /** The user pinned the thread (thread.pin): it sits in the sidebar's Pinned section. */
   pinned: boolean;
   /**
-   * When the user archived the thread (session.archive), epoch ms; null when it is not
+   * When the user archived the thread (thread.archive), epoch ms; null when it is not
    * archived. An archived thread is stopped, unpinned and has no shells; pinning or
    * sending unarchives it. docs/notes/archive-threads-1-daemon.md.
    */
   archivedAtMs: number | null;
   /**
-   * When a snoozed thread wakes (session.snooze), epoch ms; null when it is not snoozed. A
+   * When a snoozed thread wakes (thread.snooze), epoch ms; null when it is not snoozed. A
    * snoozed thread is stopped, unpinned, not archived and has no shells. The daemon
    * wakes it: this becomes null and the thread needs attention with status reason
    * "snooze ended" (statusChangedAtMs = the wake). Pinning, archiving or sending

@@ -4,7 +4,7 @@
  * with a prompt about the pull request. The daemon picks the worktree (ask and explain
  * prefer the caller's active worktree, which getUiContext already sends, so no worktree
  * arg is passed; fix.findings may fetch and create one) and focuses the new session with
- * a FocusThread intent, as session.new does (stores/intents.ts selects it). Model and
+ * a FocusThread intent, as thread.new does (stores/intents.ts selects it). Model and
  * effort come from the settings defaults. The originating selection's panel keeps its
  * PR tab; the new session's panel is left as it is.
  */

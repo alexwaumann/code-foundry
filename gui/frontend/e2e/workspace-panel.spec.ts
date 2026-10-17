@@ -45,7 +45,7 @@ async function lastInvocation(name: string) {
 }
 
 async function expectWorkspaceTab(page: Page, threadId: string): Promise<void> {
-  await expect(panel(page)).toHaveAttribute("data-panel-key", `session:${threadId}`);
+  await expect(panel(page)).toHaveAttribute("data-panel-key", `thread:${threadId}`);
   await expect(page.getByTestId("panel-tabs").getByRole("tab", { selected: true })).toHaveText("checkout");
   await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "workspace");
 }
@@ -206,7 +206,7 @@ test("remove member confirms and the mock applies it; add member and Run in go t
   expect(add?.args).toEqual({ repo: "sketches", workspace: WS });
   await expect(surface(page).getByTestId("member-name")).toHaveText(["ghostty-playground", "dotfiles", "sketches"]);
 
-  // Run in dotfiles (session.run-in with the thread's context): queued until the thread is idle.
+  // Run in dotfiles (thread.run-in with the thread's context): queued until the thread is idle.
   const dot = member(page, "repo-dot");
   await dot.hover();
   await expect(gp.getByTestId("member-run-in")).toHaveCount(0);
@@ -265,7 +265,7 @@ test("a Projects page workspace row opens the surface in a thread's panel, and o
   const s = (await mockPost("workspace-thread?workspace=checkout&repo=repo-gp&name=driver")) as { id: string };
   await expect(ws.getByTestId("workspace-show-panel")).toHaveCount(1);
   // Stopped (the idle stop) it still counts: whether Claude runs never matters here.
-  await mockPost(`session/stop?id=${s.id}&reason=idle&code=0&status=idle`);
+  await mockPost(`thread/stop?id=${s.id}&reason=idle&code=0&status=idle`);
   await expect(ws.getByTestId("workspace-show-panel")).toHaveCount(1);
   await ws.getByTestId("workspace-show-panel").click();
   await expect(page.getByTestId("projects-page")).toHaveCount(0);

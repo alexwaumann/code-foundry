@@ -26,7 +26,7 @@ export interface TreeRepo {
 export interface ListThread {
   id: string;
   pinned: boolean;
-  /** Where it sorts when unpinned (lib/session.ts threadGroup). */
+  /** Where it sorts when unpinned (lib/thread.ts threadGroup). */
   group: ThreadGroup;
   /** When the user archived it (epoch ms), null when not archived: it then sorts under Archived, whatever its pin and group. */
   archivedAtMs: number | null;
@@ -138,7 +138,7 @@ export interface Sections {
  * sessions store's order) within each group, so a thread moves only when it changes group.
  * Main: pinned ones (whatever their status); then unpinned ones waiting on the user
  * (prompts, then error and interrupted threads); finished turns; idle ones (idle, unknown;
- * lib/session threadGroup); all without headers. Working: the working ones (busy or starting)
+ * lib/thread threadGroup); all without headers. Working: the working ones (busy or starting)
  * under a Working header that counts them. Snoozed: every snoozed thread (pinned or not,
  * whatever its group; it appears nowhere else) under a Snoozed header, soonest wake first.
  * Archived: every archived thread (pinned or not, whatever its group; it appears nowhere

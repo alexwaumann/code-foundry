@@ -5,7 +5,7 @@ import { useThreadsStore } from "./threads";
 /**
  * The custom snooze dialog ("Pick a date and time…" in the snooze menus,
  * components/snooze/SnoozeDialog.tsx): which thread it snoozes. The dialog invokes
- * session.snooze itself (snoozeThread); it adds no user action of its own.
+ * thread.snooze itself (snoozeThread); it adds no user action of its own.
  */
 interface SnoozeDialogState {
   open: boolean;
@@ -31,7 +31,7 @@ export function closeSnoozeDialog(): void {
 }
 
 /**
- * session.snooze's presenter (the palette, a chord): a snoozed thread is unsnoozed, any
+ * thread.snooze's presenter (the palette, a chord): a snoozed thread is unsnoozed, any
  * other opens the custom dialog, since the command needs a time the palette would not ask
  * for (until is optional, so it is not prompted). False without such a thread, so the
  * command falls back to its default presentation.

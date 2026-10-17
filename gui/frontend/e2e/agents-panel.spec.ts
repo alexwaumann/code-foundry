@@ -24,7 +24,7 @@ async function openThread(page: Page, state = "agents"): Promise<void> {
 }
 
 async function expectAgentsTab(page: Page): Promise<void> {
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-r1");
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-r1");
   await expect(tabs(page).and(page.locator('[aria-selected="true"]'))).toHaveText("Agents");
   await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "agents");
 }

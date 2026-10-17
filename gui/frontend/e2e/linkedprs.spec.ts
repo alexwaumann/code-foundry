@@ -33,7 +33,7 @@ async function linkFour(): Promise<void> {
 }
 
 async function expectLinkedTab(page: Page, thread = "s-1"): Promise<void> {
-  await expect(panel(page)).toHaveAttribute("data-panel-key", `session:${thread}`);
+  await expect(panel(page)).toHaveAttribute("data-panel-key", `thread:${thread}`);
   await expect(tabs(page).and(page.locator('[aria-selected="true"]'))).toHaveText("Linked PRs");
   await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "linkedprs");
 }
@@ -131,7 +131,7 @@ test("L and the header button open the list newest first; Enter opens a PR tab a
   await page.keyboard.press("Enter");
   await expect(tabs(page)).toHaveText(["Linked PRs", "#147"]);
   await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "pullrequest");
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-1");
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-1");
   await expect(page.getByTestId("pr-surface")).toContainText("link pull requests from pr-link transcript records");
   // Focus stayed in the panel: cmd+w closes the PR tab, back to the list.
   await expect.poll(() => inPanel(page)).toBe(true);
@@ -185,7 +185,7 @@ test("one link: the header shows that PR in its state's colour and opens it as a
   // No tooltip: the number is visible.
   await expect(pr).not.toHaveAttribute("title", /.*/);
   await pr.click();
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-1");
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-1");
   await expect(tabs(page)).toHaveText(["#138"]);
   await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "pullrequest");
   await expect(page.getByTestId("pr-surface")).toContainText("pace requests through one worker");

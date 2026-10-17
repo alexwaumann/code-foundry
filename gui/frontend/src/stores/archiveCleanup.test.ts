@@ -85,11 +85,11 @@ describe("startArchiveCleanup", () => {
     useThreadsStore.setState({ ...replaceThreads(emptyThreads, [thread("a"), thread("b")]) });
     usePanelStore.setState({
       byKey: {
-        "session:a": { open: true, tabs: [tab], activeTabId: tab.id, width: 500 },
-        "session:b": { open: true, tabs: [tab], activeTabId: tab.id },
+        "thread:a": { open: true, tabs: [tab], activeTabId: tab.id, width: 500 },
+        "thread:b": { open: true, tabs: [tab], activeTabId: tab.id },
       },
     });
-    useBottomStore.setState({ byKey: { "session:a": { open: true, height: 300, activeTerminalId: "t1" }, "session:b": { open: true } } });
+    useBottomStore.setState({ byKey: { "thread:a": { open: true, height: 300, activeTerminalId: "t1" }, "thread:b": { open: true } } });
     stop = startArchiveCleanup();
   });
   afterEach(() => {
@@ -98,37 +98,37 @@ describe("startArchiveCleanup", () => {
 
   it("an archived thread's side panel loses its tabs and closes, and its bottom panel closes; others are untouched", () => {
     useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: thread("a", 42) }));
-    expect(usePanelStore.getState().byKey["session:a"]).toEqual(emptyEntry);
-    expect(useBottomStore.getState().byKey["session:a"]).toEqual({ open: false });
-    expect(usePanelStore.getState().byKey["session:b"]?.open).toBe(true);
-    expect(useBottomStore.getState().byKey["session:b"]?.open).toBe(true);
+    expect(usePanelStore.getState().byKey["thread:a"]).toEqual(emptyEntry);
+    expect(useBottomStore.getState().byKey["thread:a"]).toEqual({ open: false });
+    expect(usePanelStore.getState().byKey["thread:b"]?.open).toBe(true);
+    expect(useBottomStore.getState().byKey["thread:b"]?.open).toBe(true);
   });
 
   it("unarchiving, and opening an archived thread's panels afterwards, change nothing", () => {
     useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: thread("a", 42) }));
-    usePanelStore.setState((s) => ({ byKey: { ...s.byKey, "session:a": { open: true, tabs: [tab], activeTabId: tab.id } } }));
+    usePanelStore.setState((s) => ({ byKey: { ...s.byKey, "thread:a": { open: true, tabs: [tab], activeTabId: tab.id } } }));
     useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: thread("b") })); // unrelated update
     useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: thread("a") })); // unarchived
-    expect(usePanelStore.getState().byKey["session:a"]?.open).toBe(true);
+    expect(usePanelStore.getState().byKey["thread:a"]?.open).toBe(true);
   });
 
   it("a snoozed thread's panels reset like an archived one's; a re-snooze or a wake changes nothing", () => {
     useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: snoozed("b", 42) }));
-    expect(usePanelStore.getState().byKey["session:b"]).toEqual(emptyEntry);
-    expect(useBottomStore.getState().byKey["session:b"]).toEqual({ open: false });
-    expect(usePanelStore.getState().byKey["session:a"]?.open).toBe(true);
-    expect(useBottomStore.getState().byKey["session:a"]?.open).toBe(true);
-    usePanelStore.setState((s) => ({ byKey: { ...s.byKey, "session:b": { open: true, tabs: [tab], activeTabId: tab.id } } }));
+    expect(usePanelStore.getState().byKey["thread:b"]).toEqual(emptyEntry);
+    expect(useBottomStore.getState().byKey["thread:b"]).toEqual({ open: false });
+    expect(usePanelStore.getState().byKey["thread:a"]?.open).toBe(true);
+    expect(useBottomStore.getState().byKey["thread:a"]?.open).toBe(true);
+    usePanelStore.setState((s) => ({ byKey: { ...s.byKey, "thread:b": { open: true, tabs: [tab], activeTabId: tab.id } } }));
     useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: snoozed("b", 43) })); // another time
     useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: thread("b") })); // woke
-    expect(usePanelStore.getState().byKey["session:b"]?.open).toBe(true);
+    expect(usePanelStore.getState().byKey["thread:b"]?.open).toBe(true);
   });
 
   it("a thread with no stored panels gets no entries", () => {
     useThreadsStore.setState((s) => ({ ...replaceThreads(s, [thread("a"), thread("b"), thread("z")]) }));
     useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: thread("z", 1) }));
-    expect("session:z" in usePanelStore.getState().byKey).toBe(false);
-    expect("session:z" in useBottomStore.getState().byKey).toBe(false);
+    expect("thread:z" in usePanelStore.getState().byKey).toBe(false);
+    expect("thread:z" in useBottomStore.getState().byKey).toBe(false);
   });
 
   describe("selection", () => {

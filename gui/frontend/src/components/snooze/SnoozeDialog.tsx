@@ -105,7 +105,7 @@ function Calendar({ now, selected, onSelect }: { now: number; selected: Day; onS
 /**
  * The dialog's body for one thread: the calendar (tomorrow selected), a time (9:00 AM),
  * the chosen day spelled out, Cancel and Snooze. Snooze is disabled while the chosen time
- * is not in the future; it invokes session.snooze with the absolute time (the daemon
+ * is not in the future; it invokes thread.snooze with the absolute time (the daemon
  * confirms only mid-turn).
  */
 function SnoozeBody({ threadId }: { threadId: string }) {
@@ -172,7 +172,7 @@ export function SnoozeDialog() {
         if (!o) closeSnoozeDialog();
       }}
     >
-      <DialogContent className="max-w-[300px] p-4" data-testid="snooze-dialog" data-session={threadId}>
+      <DialogContent className="max-w-[300px] p-4" data-testid="snooze-dialog" data-thread={threadId}>
         <DialogTitle className="truncate">Snooze “{name || threadId}”</DialogTitle>
         <DialogDescription className="sr-only">Pick the day and time the thread comes back to the list.</DialogDescription>
         {open && <SnoozeBody key={seq} threadId={threadId} />}

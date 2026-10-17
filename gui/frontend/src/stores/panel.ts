@@ -60,7 +60,7 @@ export function keyOf(sel: Selection): string | null {
     case "none":
       return null;
     case "thread":
-      return `session:${sel.id}`;
+      return `thread:${sel.id}`;
     case "view":
       return `view:${sel.name}`;
     case "compose":

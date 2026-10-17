@@ -12,7 +12,7 @@ import { useThreadsStore } from "@/stores/threads";
  */
 export function ThreadStatusIcon({ id, className }: { id: string; className?: string }) {
   const badge = useThreadsStore((s) => threadBadge(s.byId[id]));
-  const common = { "aria-label": badgeLabels[badge], "data-session-badge": badge, role: "img" } as const;
+  const common = { "aria-label": badgeLabels[badge], "data-thread-badge": badge, role: "img" } as const;
   switch (badge) {
     case "busy":
       return <Loader2 className={cn("size-3.5 shrink-0 animate-spin text-info", className)} {...common} />;

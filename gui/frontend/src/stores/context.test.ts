@@ -21,7 +21,7 @@ describe("the bottom panel's shell in the command context", () => {
     useTerminalsStore.setState({ byId: Object.fromEntries(list.map((t) => [t.id, t])), order: list.map((t) => t.id), loaded: true });
     useReposStore.setState({ byId: {}, order: [] });
     useThreadsStore.setState({ byId: {}, order: [] });
-    useBottomStore.setState({ byKey: { "session:s1": { open: true, activeTerminalId: "a" } }, pendingFocus: null, pendingFocusId: null });
+    useBottomStore.setState({ byKey: { "thread:s1": { open: true, activeTerminalId: "a" } }, pendingFocus: null, pendingFocusId: null });
     useUiStore.setState({ selection: { kind: "thread", id: "s1" }, focus: "bottom", palette: closed });
   });
 
@@ -37,7 +37,7 @@ describe("the bottom panel's shell in the command context", () => {
     ["keyboard in the bottom panel: its active shell", () => undefined, "a"],
     ["the palette opened from there: still that shell", () => useUiStore.setState({ focus: "palette", palette: { ...closed, open: true, returnTo: "bottom" } }), "a"],
     ["keyboard in the content pane: nothing from the bottom panel", () => useUiStore.setState({ focus: "content" }), ""],
-    ["the panel closed", () => useBottomStore.setState({ byKey: { "session:s1": { open: false, activeTerminalId: "a" } } }), ""],
+    ["the panel closed", () => useBottomStore.setState({ byKey: { "thread:s1": { open: false, activeTerminalId: "a" } } }), ""],
   ];
   it.each(cases)("getUiContext: %s", (_name, arrange, want) => {
     arrange();

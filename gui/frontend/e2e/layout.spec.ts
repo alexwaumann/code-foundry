@@ -85,7 +85,7 @@ test("the sidebar band holds only the empty traffic-light gutter and the app nam
   const toolbar = await box(page, "sidebar-toolbar");
   expect([toolbar.top, toolbar.left, toolbar.height]).toEqual([BAND, GAP, 32]);
   expect(await drag(page, '[data-testid="sidebar-toolbar"]')).toBe("no-drag");
-  expect(await drag(page, '[data-testid="sidebar-new-session"]')).toBe("no-drag");
+  expect(await drag(page, '[data-testid="sidebar-new-thread"]')).toBe("no-drag");
   const buttons = await page
     .getByTestId("sidebar-toolbar")
     .locator("button")
@@ -96,7 +96,7 @@ test("the sidebar band holds only the empty traffic-light gutter and the app nam
   expect(await page.getByTestId("sidebar-dashboard").locator("svg").evaluate((el) => el.getBoundingClientRect().left)).toBe(GAP);
   // New thread is a full-width button under the toolbar: 12px from the window edge, and it
   // ends where the sidebar does (the content pane's 12px margin is the gap beyond it).
-  const newThread = await box(page, "sidebar-new-session");
+  const newThread = await box(page, "sidebar-new-thread");
   const sidebar = await box(page, "sidebar");
   expect(newThread.left).toBe(GAP);
   expect(newThread.top).toBeGreaterThan(BAND + 32);

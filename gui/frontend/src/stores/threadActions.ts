@@ -5,7 +5,7 @@
  *
  * The follow-up composer and controls (docs/notes/rendered-threads-2-gui.md).
  * Every action is a thread.* registry command invoked with the thread's context, like
- * the new-thread composer's session.new: thread.send (ThreadService.Send),
+ * the new-thread composer's thread.new: thread.send (ThreadService.Send),
  * thread.interrupt, thread.respond, thread.set-model, thread.set-mode and thread.set-effort. The draft lives in the compose
  * store under `thread:<id>` (its text with the composer's tags as tokens, its images), so
  * switching threads keeps what was typed.
@@ -45,7 +45,7 @@ export function threadContext(id: string) {
   return getUiContext({ kind: "thread", id });
 }
 
-/** The arg session.rename takes the new name in: its first required string arg, else "name". */
+/** The arg thread.rename takes the new name in: its first required string arg, else "name". */
 export function renameArgName(): string {
   const spec = useCommandsStore.getState().commands.find((c) => c.name === THREAD_COMMANDS.rename);
   return spec?.args.find((a) => a.required && a.type === "string")?.name ?? "name";
@@ -63,13 +63,13 @@ export function forkThread(id: string): Promise<boolean> {
   return runCommand(THREAD_COMMANDS.fork, {}, threadContext(id));
 }
 
-/** session.pin with an explicit value (the menu knows the current pin). */
+/** thread.pin with an explicit value (the menu knows the current pin). */
 export function pinThread(id: string, pinned: boolean): Promise<boolean> {
   return runCommand(THREAD_COMMANDS.pin, { pinned: String(pinned) }, threadContext(id));
 }
 
 /**
- * session.archive with an explicit value. Archiving stops Claude, removes the thread's
+ * thread.archive with an explicit value. Archiving stops Claude, removes the thread's
  * shells and unpins it; the daemon asks for confirmation (runCommand opens the dialog) only
  * while Claude is working, waiting on an answer or running background work. Unarchiving
  * never asks; a message starts Claude again.
@@ -79,7 +79,7 @@ export function archiveThread(id: string, archived: boolean): Promise<boolean> {
 }
 
 /**
- * session.snooze until an absolute time (epoch ms, sent as RFC 3339; the caller computes
+ * thread.snooze until an absolute time (epoch ms, sent as RFC 3339; the caller computes
  * presets such as "tomorrow 9 AM" itself), or null to unsnooze. Snoozing stops Claude,
  * removes the thread's shells and unpins and unarchives it; the daemon asks for
  * confirmation (runCommand opens the dialog) only while Claude is working or waiting on an
@@ -90,7 +90,7 @@ export function snoozeThread(id: string, untilMs: number | null): Promise<boolea
   return runCommand(THREAD_COMMANDS.snooze, args, threadContext(id));
 }
 
-/** session.run-in ("Run in…"): moves a workspace thread to the member in repoId. */
+/** thread.run-in ("Run in…"): moves a workspace thread to the member in repoId. */
 export function runThreadIn(id: string, repoId: string): Promise<boolean> {
   return runCommand(THREAD_COMMANDS.runIn, { repo: repoId }, threadContext(id));
 }

@@ -3,7 +3,7 @@ import { invocations, openApp, resetMock } from "./fixtures";
 
 // Project-less threads, the GUI (docs/notes/no-project-2-gui.md): cmd+N's "No project"
 // row, its composer, and the thread it starts (sidebar row, header, side and bottom
-// panels), against the mock's session.new --no-project (a thread in /Users/dev).
+// panels), against the mock's thread.new --no-project (a thread in /Users/dev).
 
 test.beforeEach(async () => {
   await resetMock();

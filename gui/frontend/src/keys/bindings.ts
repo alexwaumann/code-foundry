@@ -94,7 +94,7 @@ export function isViewActionChord(chord: string): boolean {
 }
 
 /**
- * Commands whose GUI presenter supplies the context the daemon needs: session.new's
+ * Commands whose GUI presenter supplies the context the daemon needs: thread.new's
  * project picker picks the repo. They start (palette, chord, button) even where the
  * daemon lists them as unavailable, e.g. with nothing selected.
  */
@@ -128,7 +128,7 @@ export function commandBindings(commands: readonly CommandView[]): Map<string, C
 /**
  * The command a focused terminal (a bottom panel shell) or thread prompt
  * ([data-chord-yield]) yields this chord to (see terminalYieldable), so
- * session.rename, cmd+j and cmd+t still fire while typing to Claude or a shell.
+ * thread.rename, cmd+j and cmd+t still fire while typing to Claude or a shell.
  */
 function terminalYields(chord: string): CommandView | undefined {
   if (!terminalYieldable(chord)) return undefined;
@@ -171,20 +171,20 @@ export function beginRename(threadId: string | null = getUiContext().activeThrea
 
 /**
  * GUI presentations of specific registry commands. The command still runs through the
- * registry (session.rename is invoked when the inline edit is committed); this only
+ * registry (thread.rename is invoked when the inline edit is committed); this only
  * replaces the generic palette prompt. Return false to fall back to the default.
  */
 const commandPresenters: Readonly<Record<string, () => boolean>> = {
   "thread.rename": () => beginRename(),
-  // The project picker, then the composer; the composer invokes session.new.
+  // The project picker, then the composer; the composer invokes thread.new.
   "thread.new": () => {
     openNewThreadPicker();
     return true;
   },
-  // "Run in…": the member picker for the active workspace thread; it invokes session.run-in.
+  // "Run in…": the member picker for the active workspace thread; it invokes thread.run-in.
   "thread.run-in": () => openRunInPicker(getUiContext().activeThreadId),
   // Snooze: the custom date dialog for the active thread (the menus offer presets), or
-  // unsnooze it when it is snoozed; both invoke session.snooze.
+  // unsnooze it when it is snoozed; both invoke thread.snooze.
   "thread.snooze": () => presentSnooze(getUiContext().activeThreadId),
   // The Add Project dialog; its tabs call RepoService.Register (repo.add's CLI form with
   // a folder), stream RepoService.Clone (repo.clone's CLI form), or invoke repo.create.
@@ -272,7 +272,7 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
     return true;
   },
   // Update commands show their progress in the update dialog. daemon.restart has no
-  // presenter: the registry's confirm flow asks (with the live-session count).
+  // presenter: the registry's confirm flow asks (with the live-thread count).
   "app.update.check": () => {
     openUpdateDialog({ check: true });
     return true;

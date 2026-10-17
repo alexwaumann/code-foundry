@@ -206,34 +206,34 @@ describe("submitReview", () => {
 
 describe("revertPullRequest", () => {
   it("a result without a number toasts the daemon's message and opens no tab", async () => {
-    openSurface("session:a", makeTab("pullrequest", "#5", { slug: SLUG, number: "5" }));
+    openSurface("thread:a", makeTab("pullrequest", "#5", { slug: SLUG, number: "5" }));
     invokeCommand.mockResolvedValueOnce({ message: "Revert requested", resultJson: "{}" });
-    await expect(revertPullRequest({ slug: SLUG, number: 5 }, "session:a")).resolves.toBeNull();
+    await expect(revertPullRequest({ slug: SLUG, number: 5 }, "thread:a")).resolves.toBeNull();
     expect(toast.success).toHaveBeenCalledWith("Revert requested");
-    expect(usePanelStore.getState().byKey["session:a"]?.tabs.map((t) => t.title)).toEqual(["#5"]);
+    expect(usePanelStore.getState().byKey["thread:a"]?.tabs.map((t) => t.title)).toEqual(["#5"]);
   });
 
   it("opens the new pull request as a tab of the same panel", async () => {
-    openSurface("session:a", makeTab("pullrequest", "#5", { slug: SLUG, number: "5" }));
+    openSurface("thread:a", makeTab("pullrequest", "#5", { slug: SLUG, number: "5" }));
     invokeCommand.mockResolvedValueOnce({ message: "Opened #9", resultJson: JSON.stringify({ number: 9, url: "https://github.com/acme/repo/pull/9" }) });
-    await expect(revertPullRequest({ slug: SLUG, number: 5 }, "session:a")).resolves.toEqual({ slug: SLUG, number: 9 });
-    expect(usePanelStore.getState().byKey["session:a"]?.tabs.map((t) => t.title)).toEqual(["#5", "#9"]);
+    await expect(revertPullRequest({ slug: SLUG, number: 5 }, "thread:a")).resolves.toEqual({ slug: SLUG, number: 9 });
+    expect(usePanelStore.getState().byKey["thread:a"]?.tabs.map((t) => t.title)).toEqual(["#5", "#9"]);
   });
 });
 
 describe("inner state per tab", () => {
   it("is dropped when its tab closes, and kept while another panel still has the tab", () => {
     const tab = makeTab("pullrequest", "#7", { slug: SLUG, number: "7" });
-    openSurface("session:a", tab);
-    openSurface("session:b", tab);
-    setInnerTab(prTabKey("session:a", tab.id), "timeline");
-    setInnerTab(prTabKey("session:b", tab.id), "timeline");
+    openSurface("thread:a", tab);
+    openSurface("thread:b", tab);
+    setInnerTab(prTabKey("thread:a", tab.id), "timeline");
+    setInnerTab(prTabKey("thread:b", tab.id), "timeline");
 
-    closePanelTab("session:a", tab.id);
-    expect(Object.keys(usePrPanelStore.getState().byTab)).toEqual([prTabKey("session:b", tab.id)]);
+    closePanelTab("thread:a", tab.id);
+    expect(Object.keys(usePrPanelStore.getState().byTab)).toEqual([prTabKey("thread:b", tab.id)]);
 
     // Reopened, it starts fresh.
-    openSurface("session:a", tab);
-    expect(usePrPanelStore.getState().byTab[prTabKey("session:a", tab.id)]).toBeUndefined();
+    openSurface("thread:a", tab);
+    expect(usePrPanelStore.getState().byTab[prTabKey("thread:a", tab.id)]).toBeUndefined();
   });
 });

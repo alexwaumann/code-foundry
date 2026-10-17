@@ -16,20 +16,20 @@
  *   RepoService.Create / ListPublishOwners / Publish, repo.create, repo.github.publish:
  *        mock/create.ts (publishing private to octo-org, or a repository named "taken", fails like gh)
  *   GET  /__mock/projects/calls                   ("create <name>", "publish <id> <o/n> <visibility>", "delete <id>")
- *   POST /__mock/session/attention?id=s-1
- *   POST /__mock/session/status?id=s-1&status=busy|idle|attention[&reason=question: Which color?]
- *   POST /__mock/session/stop?id=s-1&reason=crashed&code=139[&status=busy|idle|attention]   (the process ends: a crash, or reason=idle for the idle stop)
+ *   POST /__mock/thread/attention?id=s-1
+ *   POST /__mock/thread/status?id=s-1&status=busy|idle|attention[&reason=question: Which color?]
+ *   POST /__mock/thread/stop?id=s-1&reason=crashed&code=139[&status=busy|idle|attention]   (the process ends: a crash, or reason=idle for the idle stop)
  *        (status: what it was doing at that moment; busy ends as ERROR "interrupted", other
  *        statuses persist, like the daemon)
  *   POST /__mock/status-kinds                     (one thread per status kind: approval, question,
  *        plan, finished, Claude error, busy, idle, interrupted, and a stopped one still asking
  *        a question; MOCK_SCENARIO=status-kinds seeds them at startup and on reset)
- *   POST /__mock/session/focus?id=s-3     (FocusThread intent)
- *   POST /__mock/session/archive?id=s-1[&archived=false]   (session.archive as the CLI's --yes does it:
+ *   POST /__mock/thread/focus?id=s-3     (FocusThread intent)
+ *   POST /__mock/thread/archive?id=s-1[&archived=false]   (thread.archive as the CLI's --yes does it:
  *                                                 closes, removes its shells, unpins, stamps; false unarchives)
- *   POST /__mock/session/snooze?id=s-1&until=2m|<RFC 3339>[&clear=true]   (session.snooze as the CLI's
+ *   POST /__mock/thread/snooze?id=s-1&until=2m|<RFC 3339>[&clear=true]   (thread.snooze as the CLI's
  *                                                 --yes does it: closes, removes its shells, unpins, unarchives)
- *   POST /__mock/session/wake?id=s-8              (the daemon's wake: unsnoozed, attention "snooze ended")
+ *   POST /__mock/thread/wake?id=s-8              (the daemon's wake: unsnoozed, attention "snooze ended")
  *   POST /__mock/thread/cache?id=s-r1&ago=<seconds>[&tokens=N&model=M]   (a thread's last result that long ago; mock/context.ts)
  *   POST /__mock/thread?state=permission|question|streaming|idle   (the scripted thread s-r1:
  *        mock/thread.ts, also parallel|multi); POST /__mock/thread/delta?text=… | /__mock/thread/stream?text=… |
@@ -45,18 +45,18 @@
  *                                                 fails with that reason; reset: at once, no failure)
  *   POST /__mock/daemon/restart                   (every shell goes without a removed event and the
  *                                                 event streams end: the GUI reconnects and Lists)
- *   POST /__mock/session/hold?id=s-1&id=s-5   (the clock stops changing them: s-1 stops flipping
+ *   POST /__mock/thread/hold?id=s-1&id=s-5   (the clock stops changing them: s-1 stops flipping
  *        busy/idle, a starting or closing one does not settle; the sidebar order then holds still.
- *        e2e's resetMock holds s-1 and s-5.) POST /__mock/session/release?id=s-5 undoes it.
+ *        e2e's resetMock holds s-1 and s-5.) POST /__mock/thread/release?id=s-5 undoes it.
  *   POST /__mock/link-pr?session=s-1&slug=owner/name&number=12[&ago=<ms>]   (Claude linked a pull
  *                                                 request ago ms ago; deduplicated by URL like the daemon)
  *   POST /__mock/usage?session=s-2&model=claude-opus-5&requests=3&cacheRead=1000[&input=…&output=…
  *        &cacheWrite5m=…&cacheWrite1h=…&day=YYYY-MM-DD]   (Claude made requests: added to the
  *                                                 session's (model, day) bucket; s-1 is seeded)
- *   POST /__mock/sessions-service?enabled=false   (simulate a daemon without ThreadService)
+ *   POST /__mock/threads-service?enabled=false   (simulate a daemon without ThreadService)
  *   POST /__mock/missing-rpc?rpc=RepoService/ListRefs&rpc=ThreadService/StageAttachment
  *                                                 (simulate a daemon older than those RPCs: 404)
- *   POST /__mock/session-new?delay=700            (how long session.new takes to make a worktree)
+ *   POST /__mock/thread-new?delay=700            (how long thread.new takes to make a worktree)
  *   POST /__mock/worktree/checkout?path=…&branch=…   (the worktree switches branch; no branch detaches HEAD)
  *   POST /__mock/worktree/operation?path=…&op=rebase&step=3&total=6&conflicted=2[&file=a.go]
  *                                                 (a git operation stops in that worktree: status
@@ -73,8 +73,8 @@
  *                                                 (a connected thread owned by the workspace)
  *   POST /__mock/workspace-mixed?name=checkout    (a workspace over code-foundry, ghostty-playground
  *                                                 and dotfiles: an open PR with failing CI, 2 ahead, dirty)
- *   session.run-in queues a move (pendingWorktreePath) that lands ~2s after the thread is not busy.
- *   session.new takes workspace (a member thread) or new-worktree + repos (a new workspace),
+ *   thread.run-in queues a move (pendingWorktreePath) that lands ~2s after the thread is not busy.
+ *   thread.new takes workspace (a member thread) or new-worktree + repos (a new workspace),
  *   or no-project (a thread in the home directory with no repo or workspace).
  *   GET  /__mock/attachments                      (StageAttachment uploads: path, name, type, size)
  *   FilesystemService.ListSkills / SearchFiles: mock/filesystem.ts (project skills review and
@@ -83,7 +83,7 @@
  *                                                 none; reset restores DEFAULT_FILES)
  *   GET  /__mock/files/calls                      ("skills <repo,…|-> <includeUser>", "search <repo> <query>")
  *   POST /__mock/files/search?delay=700&fail=1    (SearchFiles answers after 700ms; fail=1: Internal; reset: at once)
- *   session.new with a prompt containing FAIL fails (after the worktree delay, if any).
+ *   thread.new with a prompt containing FAIL fails (after the worktree delay, if any).
  *   POST /__mock/gitops?fail=git.push&delay=800   (next git.push fails; ops take 800ms)
  *   GET  /__mock/gitops
  *   GET  /__mock/settings                          ({ raw, values } of the settings "file")
@@ -169,7 +169,7 @@ function seedScenario(): void {
 }
 seedScenario();
 
-/** False simulates a pre-Phase-2a daemon (see POST /__mock/sessions-service). */
+/** False simulates a pre-Phase-2a daemon (see POST /__mock/threads-service). */
 let threadsEnabled = true;
 /** "Service/Method" paths that 404 like a daemon built before they existed. */
 const missingRpcs = new Set<string>();
@@ -616,7 +616,7 @@ function threadSummary(id: string): Record<string, unknown> {
 
 const statusNames: Record<string, ThreadStatus> = { busy: ThreadStatus.BUSY, idle: ThreadStatus.IDLE, attention: ThreadStatus.NEEDS_ATTENTION };
 
-/** Session controls: POST /__mock/session/{attention|status|stop|hold|release|focus|archive}?id=…[&status=…][&reason=…&code=…] */
+/** Thread controls: POST /__mock/thread/{attention|status|stop|hold|release|focus|archive|snooze|wake}?id=…[&status=…][&reason=…&code=…] */
 function threadControl(res: ServerResponse, action: string, q: URLSearchParams): void {
   const id = q.get("id") ?? "";
   try {
@@ -664,7 +664,7 @@ function threadControl(res: ServerResponse, action: string, q: URLSearchParams):
 }
 
 function control(req: IncomingMessage, res: ServerResponse, path: string, q: URLSearchParams): void {
-  const thread = /^\/__mock\/session\/([a-z]+)$/.exec(path);
+  const thread = /^\/__mock\/thread\/(attention|status|stop|hold|release|focus|archive|snooze|wake)$/.exec(path);
   if (req.method === "POST" && thread?.[1]) {
     threadControl(res, thread[1], q);
     return;
@@ -698,7 +698,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       world.restartDaemon();
       json(res, 200, { ok: true });
       break;
-    case "POST /__mock/sessions-service":
+    case "POST /__mock/threads-service":
       // enabled=false simulates a daemon without Phase 2a: ThreadService 404s and the
       // events stream carries no session source. Reset turns it back on.
       threadsEnabled = q.get("enabled") !== "false";
@@ -890,7 +890,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     case "GET /__mock/workspaces":
       json(res, 200, [...world.workspaces.values()]);
       break;
-    case "POST /__mock/session-new":
+    case "POST /__mock/thread-new":
       if (q.has("delay")) world.worktreeDelayMs = Number(q.get("delay"));
       json(res, 200, { delayMs: world.worktreeDelayMs });
       break;
@@ -954,7 +954,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     case "GET /__mock/streams":
       json(res, 200, Object.fromEntries(openStreams));
       break;
-    case "GET /__mock/sessions":
+    case "GET /__mock/threads":
       json(res, 200, [...world.threads.keys()].map(threadSummary));
       break;
     case "GET /__mock/actions":

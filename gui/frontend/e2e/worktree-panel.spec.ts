@@ -73,7 +73,7 @@ test("a project without git: its tab says so and offers Initialize Git; the thre
   // Show worktree on a thread row: the thread's own panel, with its worktree tab, focused.
   await row(page, "s:s-3").click({ button: "right" });
   await page.getByTestId("row-menu").getByText("Show worktree").click();
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-3");
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-3");
   await expect(tabs(page)).toHaveText(["code-foundry · fix/resize"]);
   await expect.poll(() => inPanel(page)).toBe(true);
 });
@@ -83,7 +83,7 @@ test("a thread's panel lists Worktree with T; T, the list entry and the palette 
   await row(page, "s:s-1").click();
   await expect(page.getByTestId("thread-pane")).toBeVisible();
   await page.keyboard.press("Meta+Shift+e");
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-1");
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-1");
   const entry = page.getByTestId("panel-empty").locator('[data-surface="worktree"]');
   await expect(entry).toHaveAttribute("data-availability", "enabled");
   await expect(entry).toContainText("Worktree");
@@ -114,7 +114,7 @@ test("the CLI's ShowView reaches the window; a page has no Worktree entry", asyn
   await row(page, "s:s-2").click();
   await expect(page.getByTestId("thread-pane")).toBeVisible();
   expect(await emit({ showView: { name: "panel.worktree" } })).toBe(1);
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-2");
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-2");
   await expect(tabs(page)).toHaveText(["ghostty-playground"]);
   await expect(surface(page).getByTestId("worktree-surface-title")).toHaveText("ghostty-playground@main");
 

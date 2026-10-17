@@ -45,7 +45,7 @@ describe("keyOf", () => {
   const cases: [string, Selection, string | null][] = [
     ["none has no panel", { kind: "none" }, null],
     ["the dashboard has no panel", { kind: "view", name: "dashboard" }, null],
-    ["thread", { kind: "thread", id: "s-1" }, "session:s-1"],
+    ["thread", { kind: "thread", id: "s-1" }, "thread:s-1"],
     ["composer", { kind: "compose", repoId: "r-1" }, "compose:r-1"],
     ["workspace composer", { kind: "compose", repoId: "r-1", workspaceId: "w-1" }, "compose:ws:w-1"],
     ["view", { kind: "view", name: "pullrequests" }, "view:pullrequests"],
@@ -301,26 +301,26 @@ describe("panel store", () => {
 
   it("setPanelWidth sizes one panel, clamped to the current window and sidebar", () => {
     setPanelWidth("current", 500);
-    expect(getPanel("session:a").width).toBe(500);
-    expect(getPanel("session:b")).not.toHaveProperty("width");
-    setPanelWidth("session:b", 2000);
-    expect(getPanel("session:b").width).toBe(panelMax(1400, 260));
+    expect(getPanel("thread:a").width).toBe(500);
+    expect(getPanel("thread:b")).not.toHaveProperty("width");
+    setPanelWidth("thread:b", 2000);
+    expect(getPanel("thread:b").width).toBe(panelMax(1400, 260));
     useUiStore.setState({ sidebarVisible: false });
-    setPanelWidth("session:b", 2000);
-    expect(getPanel("session:b").width).toBe(840);
-    setPanelWidth("session:b", 10);
-    expect(getPanel("session:b").width).toBe(PANEL_MIN);
-    expect(getPanel("session:a").width).toBe(500);
+    setPanelWidth("thread:b", 2000);
+    expect(getPanel("thread:b").width).toBe(840);
+    setPanelWidth("thread:b", 10);
+    expect(getPanel("thread:b").width).toBe(PANEL_MIN);
+    expect(getPanel("thread:a").width).toBe(500);
     // Sizing does not open the panel.
-    expect(getPanel("session:b").open).toBe(false);
+    expect(getPanel("thread:b").open).toBe(false);
   });
 
   it("resetPanelWidth drops one panel's width", () => {
-    setPanelWidth("session:a", 500);
-    setPanelWidth("session:b", 600);
-    resetPanelWidth("session:a");
-    expect(getPanel("session:a")).not.toHaveProperty("width");
-    expect(getPanel("session:b").width).toBe(600);
+    setPanelWidth("thread:a", 500);
+    setPanelWidth("thread:b", 600);
+    resetPanelWidth("thread:a");
+    expect(getPanel("thread:a")).not.toHaveProperty("width");
+    expect(getPanel("thread:b").width).toBe(600);
   });
 
   it("a window resize does not change stored widths", () => {
@@ -339,20 +339,20 @@ describe("panel store", () => {
     usePanelStore.setState({ byKey: {} });
     localStorage.setItem("code-foundry.panel", saved ?? "");
     await usePanelStore.persist.rehydrate();
-    expect(getPanel("session:a")).toEqual({ ...entry(true, [pr], pr.id), width: 500, expanded: true });
+    expect(getPanel("thread:a")).toEqual({ ...entry(true, [pr], pr.id), width: 500, expanded: true });
   });
 
   it("movePanelTab reorders one panel's tabs, and the order is persisted", async () => {
     openSurface("current", files);
     openSurface("current", diff);
     openSurface("current", pr);
-    openSurface("session:b", files);
-    openSurface("session:b", diff);
+    openSurface("thread:b", files);
+    openSurface("thread:b", diff);
     movePanelTab("current", pr.id, 0);
     expect(getPanel()).toEqual(entry(true, [pr, files, diff], pr.id));
-    expect(getPanel("session:b").tabs).toEqual([files, diff]);
-    movePanelTab("session:b", files.id, 1);
-    expect(getPanel("session:b").tabs).toEqual([diff, files]);
+    expect(getPanel("thread:b").tabs).toEqual([files, diff]);
+    movePanelTab("thread:b", files.id, 1);
+    expect(getPanel("thread:b").tabs).toEqual([diff, files]);
     // No change, no new state (and no write).
     const before = usePanelStore.getState();
     movePanelTab("current", pr.id, 0);
@@ -362,8 +362,8 @@ describe("panel store", () => {
     usePanelStore.setState({ byKey: {} });
     localStorage.setItem("code-foundry.panel", saved);
     await usePanelStore.persist.rehydrate();
-    expect(getPanel("session:a").tabs).toEqual([pr, files, diff]);
-    expect(getPanel("session:b").tabs).toEqual([diff, files]);
+    expect(getPanel("thread:a").tabs).toEqual([pr, files, diff]);
+    expect(getPanel("thread:b").tabs).toEqual([diff, files]);
   });
 
   it("movePanelTab does nothing with nothing selected", () => {
@@ -376,7 +376,7 @@ describe("panel store", () => {
     expect(togglePanel()).toBe(true);
     useUiStore.getState().select({ kind: "thread", id: "b" });
     expect(getPanel().open).toBe(false);
-    expect(getPanel("session:a").open).toBe(true);
+    expect(getPanel("thread:a").open).toBe(true);
   });
 
   it("does nothing with nothing selected", () => {
@@ -395,8 +395,8 @@ describe("panel store", () => {
 
   it("expandPanel shows a hidden panel expanded, flips per key, and keeps it when hidden", () => {
     expect(expandPanel("current", true)).toBe(true);
-    expect(getPanel("session:a")).toEqual({ ...emptyEntry, open: true, expanded: true });
-    expect(getPanel("session:b")).toEqual(emptyEntry);
+    expect(getPanel("thread:a")).toEqual({ ...emptyEntry, open: true, expanded: true });
+    expect(getPanel("thread:b")).toEqual(emptyEntry);
     // Hiding keeps it; showing brings the panel back expanded.
     togglePanel("current", false);
     expect(getPanel()).toEqual({ ...emptyEntry, expanded: true });
@@ -406,8 +406,8 @@ describe("panel store", () => {
     expect(expandPanel()).toBe(false);
     expect(getPanel()).toEqual({ ...emptyEntry, open: true });
     // Restoring a hidden panel does not show it.
-    expect(expandPanel("session:b", false)).toBe(false);
-    expect(getPanel("session:b")).toEqual(emptyEntry);
+    expect(expandPanel("thread:b", false)).toBe(false);
+    expect(getPanel("thread:b")).toEqual(emptyEntry);
   });
 
   it("expandPanel asks for focus only when told to and only when it expands", () => {
@@ -440,7 +440,7 @@ describe("panel store", () => {
     expect(getPanel()).toEqual(entry(true, [files, diff], diff.id));
     // Persisted like the rest (a reload keeps the picker).
     startPanelPicking("current", { focus: false });
-    expect(JSON.parse(localStorage.getItem("code-foundry.panel") ?? "{}")).toMatchObject({ state: { byKey: { "session:a": { activeTabId: null, pickFrom: diff.id } } } });
+    expect(JSON.parse(localStorage.getItem("code-foundry.panel") ?? "{}")).toMatchObject({ state: { byKey: { "thread:a": { activeTabId: null, pickFrom: diff.id } } } });
   });
 
   it("startPanelPicking without tabs only shows the panel; with nothing selected it does nothing", () => {

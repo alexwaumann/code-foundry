@@ -14,13 +14,13 @@ test("no footer and no chord hints outside the palette and help", async ({ page 
   await expect(page.getByTestId("hints")).toHaveCount(0);
   // The welcome panel names no chords; the sidebar only New thread's (onboarding-1).
   await expect(page.locator("kbd")).toHaveCount(1);
-  await expect(page.getByTestId("sidebar-new-session").locator("kbd")).toHaveCount(1);
+  await expect(page.getByTestId("sidebar-new-thread").locator("kbd")).toHaveCount(1);
   await expect(page.getByTestId("nav-pullrequests")).toHaveText("Pull Requests");
 });
 
 test("sidebar new-thread button opens the project picker, then the composer", async ({ page }) => {
   await openApp(page);
-  const button = page.getByTestId("sidebar-new-session");
+  const button = page.getByTestId("sidebar-new-thread");
   // Nothing selected: the picker supplies the repo, so the button is enabled anyway.
   await expect(button).toBeEnabled();
   // A thread in ghostty-playground (s-2) is selected.

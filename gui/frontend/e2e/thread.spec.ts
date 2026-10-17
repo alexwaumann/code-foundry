@@ -459,7 +459,7 @@ test("only the visible thread holds a Watch; a page holds none", async ({ page }
   await expect.poll(async () => (await openStreams())["ThreadService/WatchThread"] ?? 0).toBe(1);
   // Another thread: its Watch replaces this one.
   await row(page, "s:s-2").click();
-  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-session-id", "s-2");
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-2");
   await expect.poll(async () => (await openStreams())["ThreadService/WatchThread"] ?? 0).toBe(1);
   expect((await openStreams())["TerminalService/Attach"] ?? 0).toBe(0);
 });
@@ -476,7 +476,7 @@ test("the thread.* commands are offered for a thread, not for a page", async ({ 
   await page.keyboard.press("Escape");
   // Every thread has them: the seeded s-3 too, stopped.
   await row(page, "s:s-3").click();
-  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-session-id", "s-3");
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-3");
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("Send to Thread");
   await expect(page.getByRole("option", { name: /Send to Thread/ })).toBeVisible();
@@ -524,7 +524,7 @@ test("a stopped thread at its prompt keeps its conversation, the composer and th
   await expect(pane(page).locator('[data-testid="thread-text"]').last()).toContainText("All 412 tests pass and the branch is pushed");
   await expect(page.getByTestId("thread-working")).toHaveCount(0);
   await expect(page.getByTestId("thread-empty")).toHaveCount(0);
-  await expect(row(page, "s:s-r1").getByTestId("row-place")).toHaveAttribute("data-session-badge", "idle");
+  await expect(row(page, "s:s-r1").getByTestId("row-place")).toHaveAttribute("data-thread-badge", "idle");
 });
 
 test("a fork shows its parent's conversation, ended by a Forked from note", async ({ page }) => {

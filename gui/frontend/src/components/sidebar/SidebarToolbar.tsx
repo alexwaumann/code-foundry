@@ -87,7 +87,7 @@ export function SidebarToolbar() {
 }
 
 /**
- * The sidebar's primary action: a full-width "New thread" button (session.new) under the
+ * The sidebar's primary action: a full-width "New thread" button (thread.new) under the
  * toolbar, with the command's first chord (cmd+n unless rebound; none when unbound) as a
  * muted hint on the right. Runs exactly what the palette does (the project picker).
  */
@@ -99,12 +99,12 @@ export function SidebarNewThread() {
       variant="default"
       whenUnavailable="disable"
       className="mt-1.5 h-8 w-full shrink-0 justify-start gap-2 px-2 text-body-sm font-medium has-[>svg]:px-2 [--wails-draggable:no-drag]"
-      data-testid="sidebar-new-session"
+      data-testid="sidebar-new-thread"
     >
       <SquarePen aria-hidden className="size-4" />
       <span className="min-w-0 flex-1 truncate text-left">New thread</span>
       {chord && (
-        <Kbd variant="inherit" data-testid="sidebar-new-session-chord">
+        <Kbd variant="inherit" data-testid="sidebar-new-thread-chord">
           {formatChord(chord)}
         </Kbd>
       )}

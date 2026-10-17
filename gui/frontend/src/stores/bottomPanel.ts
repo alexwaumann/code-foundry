@@ -1,6 +1,6 @@
 /**
  * The bottom terminal panel under the content pane (components/bottom), keyed like the
- * side panel (stores/panel.ts keyOf) but only for a thread (`session:<id>`) and the
+ * side panel (stores/panel.ts keyOf) but only for a thread (`thread:<id>`) and the
  * Projects page (`view:projects`); every other selection has none.
  *
  * Tabs are derived, not stored: a key's tabs are the shells in the terminals store that
@@ -21,7 +21,7 @@ import { useTerminalsStore, type TerminalsData } from "./terminals";
 import { BOTTOM_DEFAULT, useUiStore, type Selection } from "./ui";
 
 export const PROJECTS_KEY = "view:projects";
-const THREAD_PREFIX = "session:";
+const THREAD_PREFIX = "thread:";
 
 export interface BottomEntry {
   open: boolean;
@@ -42,7 +42,7 @@ export function bottomKeyOf(sel: Selection): string | null {
   return key !== null && (key.startsWith(THREAD_PREFIX) || key === PROJECTS_KEY) ? key : null;
 }
 
-/** The thread id of a `session:<id>` key, else null. */
+/** The thread id of a `thread:<id>` key, else null. */
 export function threadOfKey(key: string): string | null {
   return key.startsWith(THREAD_PREFIX) ? key.slice(THREAD_PREFIX.length) : null;
 }

@@ -11,7 +11,7 @@
  * Skill and file tags of a project go when the project leaves the draft.
  *
  * Sending stages the attachments (ThreadService.StageAttachment) and invokes the
- * session.new registry command, like every other user action.
+ * thread.new registry command, like every other user action.
  */
 import { create } from "zustand";
 import { listRefs, type RepoView } from "@/api/repo";
@@ -59,7 +59,7 @@ export interface DraftAttachment {
   stagedPath: string | null;
 }
 
-/** idle: editable. attaching: staging images. starting: session.new in flight. */
+/** idle: editable. attaching: staging images. starting: thread.new in flight. */
 export type DraftPhase = "idle" | "attaching" | "starting";
 
 export interface Draft {
@@ -229,7 +229,7 @@ export function clearDraft(key: string): void {
   });
 }
 
-/** Opens the project picker (session.new's GUI presentation; see keys/bindings.ts). */
+/** Opens the project picker (thread.new's GUI presentation; see keys/bindings.ts). */
 export function openNewThreadPicker(): void {
   const ui = useUiStore.getState();
   const returnTo = ui.palette.open ? ui.palette.returnTo : ui.focus;
@@ -249,7 +249,7 @@ export function composeIn(repoId: string, worktreePath?: string): void {
 
 /**
  * Shows the composer for a workspace and focuses it. The selection carries the first
- * member's repo for the command context (session.new's availability); the draft names
+ * member's repo for the command context (thread.new's availability); the draft names
  * the member the thread runs in.
  */
 export function composeInWorkspace(workspaceId: string): void {
@@ -261,7 +261,7 @@ export function composeInWorkspace(workspaceId: string): void {
 
 /**
  * Shows the composer for a thread without a project and focuses it. Its selection has
- * no repo, so the command context is the compose view alone (session.new --no-project).
+ * no repo, so the command context is the compose view alone (thread.new --no-project).
  */
 export function composeNoProject(): void {
   const ui = useUiStore.getState();
@@ -459,7 +459,7 @@ export function noGitCheckout(r: Pick<RepoView, "git" | "path" | "worktrees"> | 
 }
 
 /**
- * Sends a draft: stages its images one by one, then invokes session.new. On success the
+ * Sends a draft: stages its images one by one, then invokes thread.new. On success the
  * draft is cleared and the new thread selected (the daemon's FocusThread intent usually
  * got there first). On failure the draft stays, with the error.
  */

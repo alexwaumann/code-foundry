@@ -50,10 +50,10 @@ describe("the side panel of a thread without a project", () => {
   it("lists no files, diff, pull request, workspace or worktree surface; thread surfaces stay", () => {
     useReposStore.setState(repos);
     useThreadsStore.setState(threads);
-    const ctx = { selection: { kind: "thread", id: "home" } as Selection, panelKey: "session:home" };
+    const ctx = { selection: { kind: "thread", id: "home" } as Selection, panelKey: "thread:home" };
     for (const spec of [filesSurface, diffSurface, pullRequestSurface, workspaceSurface, worktreeSurface]) expect([spec.kind, spec.available(ctx)]).toEqual([spec.kind, "hidden"]);
     for (const spec of [linkedPrsSurface, usageSurface, mcpSurface]) expect([spec.kind, spec.available(ctx)]).toEqual([spec.kind, "enabled"]);
-    const proj = { selection: { kind: "thread", id: "proj" } as Selection, panelKey: "session:proj" };
+    const proj = { selection: { kind: "thread", id: "proj" } as Selection, panelKey: "thread:proj" };
     expect(filesSurface.available(proj)).toBe("disabled");
     expect(worktreeSurface.available(proj)).toBe("enabled");
   });

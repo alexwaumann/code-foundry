@@ -5,7 +5,7 @@ import { surfaceByHotkey, surfaceOf, surfaces } from "@/surfaces/registry";
 import type { SurfaceContext } from "@/surfaces/types";
 import { isPanelChord, panelKeyAction, tabMoveIndex } from "./keys";
 
-const ctx: SurfaceContext = { selection: { kind: "thread", id: "s-1" }, panelKey: "session:s-1" };
+const ctx: SurfaceContext = { selection: { kind: "thread", id: "s-1" }, panelKey: "thread:s-1" };
 const files = makeTab("files", "Files");
 const withTab: PanelEntry = { open: true, tabs: [files], activeTabId: files.id };
 const picking: PanelEntry = { open: true, tabs: [files], activeTabId: null, pickFrom: files.id };

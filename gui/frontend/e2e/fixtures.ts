@@ -19,7 +19,7 @@ export async function resetMock(): Promise<void> {
   expect(res.ok).toBe(true);
   await holdThreads("s-1", "s-5");
   // s-1 may have flipped to idle between the reset and the hold.
-  await mockPost("session/status?id=s-1&status=busy");
+  await mockPost("thread/status?id=s-1&status=busy");
 }
 
 export interface Invocation {
@@ -60,12 +60,12 @@ export async function mockPost(pathAndQuery: string): Promise<unknown> {
 
 /** Stops the mock's clock from changing these threads (status, settling); controls and input still do. */
 export async function holdThreads(...ids: string[]): Promise<void> {
-  await mockPost(`session/hold?${ids.map((id) => `id=${id}`).join("&")}`);
+  await mockPost(`thread/hold?${ids.map((id) => `id=${id}`).join("&")}`);
 }
 
 /** Lets the mock's clock change these threads again (resetMock holds s-1 and s-5). */
 export async function releaseThreads(...ids: string[]): Promise<void> {
-  await mockPost(`session/release?${ids.map((id) => `id=${id}`).join("&")}`);
+  await mockPost(`thread/release?${ids.map((id) => `id=${id}`).join("&")}`);
 }
 
 /**
@@ -107,7 +107,7 @@ export async function openApp(page: Page): Promise<void> {
  * sidebar's New thread button, then the project picker's "Add a project…" row.
  */
 export async function openAddProjectDialog(page: Page): Promise<void> {
-  await page.getByTestId("sidebar-new-session").click();
+  await page.getByTestId("sidebar-new-thread").click();
   await page.getByTestId("palette").getByTestId("picker-add-project").click();
   await expect(page.getByTestId("add-project-dialog")).toBeVisible();
 }

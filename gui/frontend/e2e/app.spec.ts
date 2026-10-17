@@ -23,14 +23,14 @@ test("selecting a thread shows its conversation; switching watches the other one
   await openApp(page);
   await row(page, "s:s-1").click();
   const pane = page.getByTestId("thread-pane");
-  await expect(pane).toHaveAttribute("data-session-id", "s-1");
+  await expect(pane).toHaveAttribute("data-thread-id", "s-1");
   await expect(pane.getByTestId("thread-user").first()).toContainText("Refactor the sidebar tree into a virtualized list.");
   // The prompt takes the keyboard.
   await expect(pane.getByTestId("thread-composer").getByTestId("composer-input")).toBeFocused();
 
   // Switching closes the old Watch and shows the new snapshot only.
   await row(page, "s:s-2").click();
-  await expect(pane).toHaveAttribute("data-session-id", "s-2");
+  await expect(pane).toHaveAttribute("data-thread-id", "s-2");
   await expect(pane.getByTestId("thread-user").first()).toContainText("Port the grid renderer to libghostty-vt.");
   await expect(pane).not.toContainText("Refactor the sidebar tree");
   await expect.poll(async () => (await openStreams())["ThreadService/WatchThread"] ?? 0).toBe(1);
@@ -65,7 +65,7 @@ test("palette opens with cmd+k and lists only commands available in context", as
   await openApp(page);
   await page.keyboard.press("Meta+k");
   const palette = page.getByTestId("palette");
-  // session.new is unavailable with nothing selected, but its project picker supplies the repo.
+  // thread.new is unavailable with nothing selected, but its project picker supplies the repo.
   await expect(palette.locator('[data-command="thread.new"]')).toBeVisible();
   // A terminal belongs to a thread or a worktree: the dashboard offers none.
   await expect(palette.locator('[data-command="terminal.new"]')).toHaveCount(0);
@@ -197,13 +197,13 @@ test("sidebar is keyboard navigable", async ({ page }) => {
     await expect(list).toHaveAttribute("aria-activedescendant", `row-s:${want}`);
   }
   await page.keyboard.press("Enter");
-  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-session-id", "s-1");
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-1");
   await list.focus();
   await page.keyboard.press("End");
   await expect(list).toHaveAttribute("aria-activedescendant", "row-s:s-1");
   // cmd+N jumps to the Nth thread in sidebar order: s-2, s-6, s-4, s-3, s-5, s-1.
   await page.keyboard.press("Meta+1");
-  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-session-id", "s-2");
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-2");
   await page.keyboard.press("Meta+3");
   await expect(row(page, "s:s-4")).toHaveAttribute("aria-selected", "true");
   await expect(page.getByTestId("thread-composer")).toBeVisible();

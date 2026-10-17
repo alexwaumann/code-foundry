@@ -74,22 +74,22 @@ interface MockThread {
   disconnectReason: string;
   /** Why the last start or run failed (stderr's last line); "" when nothing did. */
   lastError: string;
-  /** session.fork: the session this one was forked from. */
+  /** thread.fork: the session this one was forked from. */
   parentId: string;
   permissionMode: PermissionMode;
   baseRef: string;
   createdWorktree: boolean;
   /** The owning workspace; "" for a project thread. */
   workspaceId: string;
-  /** A queued session.run-in target; "" when none (published, not "persisted"). */
+  /** A queued thread.run-in target; "" when none (published, not "persisted"). */
   pendingWorktreePath: string;
-  /** session.pin. */
+  /** thread.pin. */
   pinned: boolean;
-  /** session.archive: when it was archived; null when not. A message and pin(true) clear it, like the daemon. */
+  /** thread.archive: when it was archived; null when not. A message and pin(true) clear it, like the daemon. */
   archivedAt: Date | null;
   /**
-   * session.snooze: when it wakes; null when not snoozed. A message, pin(true) and archive
-   * clear it, like the daemon; the tick (or POST /__mock/session/wake) wakes it.
+   * thread.snooze: when it wakes; null when not snoozed. A message, pin(true) and archive
+   * clear it, like the daemon; the tick (or POST /__mock/thread/wake) wakes it.
    */
   snoozedUntil: Date | null;
   /** An effort change waiting for the turn to end (thread.set-effort). */
@@ -117,7 +117,7 @@ interface MockThread {
   pendingName: string;
   /**
    * Mock-only: the clock leaves it alone (no settling, no busy/idle flip, no naming, no
-   * queued move); POST /__mock/session/hold. Specs that pin the sidebar order use it, since
+   * queued move); POST /__mock/thread/hold. Specs that pin the sidebar order use it, since
    * starting and busy threads sit in the Working section.
    */
   held: boolean;
@@ -166,13 +166,13 @@ function shellLabels(threadId: string, repoId: string, worktree: string): Record
   return l;
 }
 
-/** session.archive archives (rather than unarchives): its `archived` arg, else the opposite of now. */
+/** thread.archive archives (rather than unarchives): its `archived` arg, else the opposite of now. */
 function archiving(s: { archivedAt: Date | null }, args: Record<string, string>): boolean {
   return args.archived === undefined || args.archived === "" ? s.archivedAt === null : args.archived === "true";
 }
 
 /**
- * session.snooze's time: `clear` unsnoozes (null); `until` is RFC 3339 (what the GUI sends)
+ * thread.snooze's time: `clear` unsnoozes (null); `until` is RFC 3339 (what the GUI sends)
  * or a duration from now ("90s", "2m", "1h"; the CLI forms the tests need). It must be in
  * the future, like the daemon's.
  */
@@ -342,7 +342,7 @@ function runKeys(run: string): string {
   return `${s.replace(/\n/g, "\r")}\r`;
 }
 
-/** session.new's `permission` arg values. */
+/** thread.new's `permission` arg values. */
 const permissionModes: Record<string, PermissionMode> = {
   supervised: PermissionMode.SUPERVISED,
   "accept-edits": PermissionMode.ACCEPT_EDITS,
@@ -363,7 +363,7 @@ export function promptSlug(prompt: string): string {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** A typical detector reason for a status (captured strings; see src/lib/session.test.ts). */
+/** A typical detector reason for a status (captured strings; see src/lib/thread.test.ts). */
 function defaultReason(status: ThreadStatus): string {
   switch (status) {
     case ThreadStatus.BUSY:
@@ -459,7 +459,7 @@ function initialRepos(): MockRepo[] {
 }
 
 /**
- * session.new's first message: its prompt (and attachments), sent once the thread has
+ * thread.new's first message: its prompt (and attachments), sent once the thread has
  * connected, with the composer's text for display. null without either.
  */
 function firstMessageOf(args: Record<string, string>): MockThread["firstMessage"] {
@@ -635,12 +635,12 @@ export class World {
   uiEventWatchers = 0;
   /** ThreadService.StageAttachment uploads, by returned path. */
   attachments = new Map<string, { name: string; mimeType: string; size: number }>();
-  /** How long session.new takes to create a worktree (ms). */
+  /** How long thread.new takes to create a worktree (ms). */
   worktreeDelayMs = 700;
   /** terminal.new: how long it takes (ms), and whether its next run fails (the reason). POST /__mock/terminal/new. */
   terminalNewDelayMs = 0;
   terminalNewFail: string | null = null;
-  /** Bumped by reset(), so a session.new still sleeping from before a reset does nothing. */
+  /** Bumped by reset(), so a thread.new still sleeping from before a reset does nothing. */
   private generation = 0;
   invocations: Invocation[] = [];
   writes: { id: string; data: string }[] = [];
@@ -873,7 +873,7 @@ export class World {
   }
 
   /**
-   * Scenario: one thread per status kind the sidebar distinguishes (lib/session statusKind),
+   * Scenario: one thread per status kind the sidebar distinguishes (lib/thread statusKind),
    * with captured reasons and staggered statusChangedAt. POST /__mock/status-kinds, or
    * MOCK_SCENARIO=status-kinds. Idempotent. Not in the default world, whose rows e2e pins.
    */
@@ -914,7 +914,7 @@ export class World {
   }
 
   /**
-   * session.run-in: a stopped thread moves at once; a running one gets the target as
+   * thread.run-in: a stopped thread moves at once; a running one gets the target as
    * pendingWorktreePath and moves ~2s after it stops being busy (MockThread.moveIn).
    * Asking for the current member cancels a queued move.
    */
@@ -1281,7 +1281,7 @@ export class World {
   }
 
   /**
-   * session.archive without its confirmation (POST /__mock/session/archive does what the CLI
+   * thread.archive without its confirmation (POST /__mock/thread/archive does what the CLI
    * with --yes does). Archiving closes Claude (busy becomes ERROR "interrupted"), removes the
    * thread's shells, unpins it and stamps archivedAt (the first stamp is kept); unarchiving
    * only clears the stamp. Returns the command's message.
@@ -1304,7 +1304,7 @@ export class World {
   }
 
   /**
-   * session.snooze without its confirmation (POST /__mock/session/snooze does what the CLI
+   * thread.snooze without its confirmation (POST /__mock/thread/snooze does what the CLI
    * with --yes does). Snoozing closes Claude like archiving (busy becomes ERROR
    * "interrupted"), removes the thread's shells, unpins and unarchives it and sets the wake
    * time (a re-snooze replaces it); null unsnoozes (no attention). Returns the message.
@@ -1327,7 +1327,7 @@ export class World {
   }
 
   /**
-   * The daemon's wake (POST /__mock/session/wake, or the tick once the time passed): the
+   * The daemon's wake (POST /__mock/thread/wake, or the tick once the time passed): the
    * snooze is cleared and a stopped thread needs attention, "snooze ended", stamped
    * now (re-stamped when it already read so).
    */
@@ -1675,7 +1675,7 @@ export class World {
   }
 
   /**
-   * session.new like the daemon: an explicit worktree, or (new-worktree) a cf/<slug>
+   * thread.new like the daemon: an explicit worktree, or (new-worktree) a cf/<slug>
    * worktree made from `base` first, which takes a moment. A prompt containing FAIL
    * fails the way a git error would, before any session exists.
    */
@@ -1734,7 +1734,7 @@ export class World {
   }
 
   /**
-   * session.new --no-project like the daemon: a thread with no repo or workspace in the
+   * thread.new --no-project like the daemon: a thread with no repo or workspace in the
    * home directory. Refuses any arg that places it, a repo or worktree from the caller's
    * context included.
    */
@@ -1762,7 +1762,7 @@ export class World {
   }
 
   /**
-   * session.new with `workspace` (a thread owned by it, in the member `worktree` or
+   * thread.new with `workspace` (a thread owned by it, in the member `worktree` or
    * `repo` names, else the first) or `repos` with new-worktree (a new workspace named
    * from the prompt with cf/<slug> in every repo, the thread in `repo`'s member).
    */
@@ -2854,7 +2854,7 @@ export class World {
     ];
   }
 
-  /** The registry with settings applied: keybinding overrides and session.new defaults. */
+  /** The registry with settings applied: keybinding overrides and thread.new defaults. */
   /** sessions.default_model and sessions.default_effort ("" when unset). */
   private threadDefaults(): { model: string; effort: string } {
     const v = this.settings.values();

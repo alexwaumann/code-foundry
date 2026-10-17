@@ -33,7 +33,7 @@ const hints = [
 ] as const;
 
 /**
- * The palette's project picker: session.new's presentation in the GUI. Workspaces are
+ * The palette's project picker: thread.new's presentation in the GUI. Workspaces are
  * listed above projects (ProjectRows), "No project" last; picking any opens the
  * new-thread composer for it. The active thread's workspace, else the project in the
  * current context, is highlighted first; cmd+1..9 pick projects by position. With no

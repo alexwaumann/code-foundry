@@ -25,7 +25,7 @@ beforeEach(() => {
   getBranchPullRequests.mockImplementation((_slug: string, head: string) => Promise.resolve(prs(head === "fix/resize" ? [145] : [])));
   useReposStore.setState({ byId: { r1: repo("feat/nopr") }, order: ["r1"] });
   useThreadsStore.setState({ byId: { s1: thread }, order: ["s1"] });
-  usePanelStore.setState({ byKey: { "session:s1": { open: true, tabs: [], activeTabId: null } } });
+  usePanelStore.setState({ byKey: { "thread:s1": { open: true, tabs: [], activeTabId: null } } });
   useViewsStore.setState({ settingsOpen: false });
   useUiStore.setState({ selection: { kind: "thread", id: "s1" }, windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260 });
 });
@@ -52,7 +52,7 @@ describe("Pull request surface availability", () => {
       expect(row()?.getAttribute("data-availability")).toBe("enabled");
     });
     expect(getBranchPullRequests).toHaveBeenLastCalledWith("alex/cf", "fix/resize", undefined, expect.anything());
-    expect(pullRequestSurface.openDefault({ selection: { kind: "thread", id: "s1" }, panelKey: "session:s1" })?.title).toBe("#145");
+    expect(pullRequestSurface.openDefault({ selection: { kind: "thread", id: "s1" }, panelKey: "thread:s1" })?.title).toBe("#145");
 
     act(() => {
       useReposStore.setState({ byId: { r1: repo("feat/nopr") } });

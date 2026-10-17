@@ -53,7 +53,7 @@ test("Run in terminal runs the block once in a new shell of the thread, which st
   expect(shellsOf(THREAD)).toEqual([]);
   await page.goto("/");
   await page.locator(`[data-row-key="s:${THREAD}"]`).click();
-  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-session-id", THREAD);
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", THREAD);
   const block = page.locator('[data-testid="thread-text"]').last().locator(".cf-code").filter({ has: page.locator('pre[data-lang="bash"]') });
   await expect(block).toContainText("echo run-$((6*7))");
   await block.hover();

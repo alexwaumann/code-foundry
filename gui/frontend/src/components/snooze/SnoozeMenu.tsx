@@ -19,7 +19,7 @@ type MenuItem = ComponentType<{ onSelect: () => void; children: ReactNode; "data
 /**
  * The snooze presets (lib/snooze.ts snoozePresets, computed when the menu opens), each with
  * its resolved time on the right, then "Pick a date and time…" (the custom dialog). A
- * preset invokes session.snooze with the absolute time (snoozeThread); the daemon asks
+ * preset invokes thread.snooze with the absolute time (snoozeThread); the daemon asks
  * for confirmation only mid-turn. Shared by the row menu's Snooze submenu and the thread
  * header's Snooze button.
  */
@@ -96,7 +96,7 @@ export function SnoozeRowItems({ id, snoozed }: { id: string; snoozed: boolean }
  * The thread header's snooze button (icon-only, `AlarmClock`, "Snooze Thread"): opens the
  * presets as a dropdown. While the thread is snoozed it is "Unsnooze Thread"
  * (`AlarmClockOff`) and unsnoozes on click. Hidden when the daemon does not list
- * session.snooze here (an older daemon), like a CommandButton. Keeps focus where it is.
+ * thread.snooze here (an older daemon), like a CommandButton. Keeps focus where it is.
  */
 export function SnoozeButton({ threadId }: { threadId: string }) {
   const available = useCommandsStore((s) => s.commands.some((c) => c.name === THREAD_COMMANDS.snooze && isStartable(c)));

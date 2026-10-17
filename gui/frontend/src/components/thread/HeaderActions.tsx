@@ -79,7 +79,7 @@ function WorkspaceChip({ threadId }: { threadId: string }) {
 }
 
 /**
- * session.archive for this thread: Archive, or Unarchive (its own icon and tooltip) while
+ * thread.archive for this thread: Archive, or Unarchive (its own icon and tooltip) while
  * it is archived. Run without args, the command toggles; the daemon asks for confirmation
  * only while Claude is mid-turn.
  */

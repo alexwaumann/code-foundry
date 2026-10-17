@@ -155,9 +155,9 @@ interface UiState {
   focusSidebar: () => void;
   setCursor: (key: string | null) => void;
   openPalette: (query?: string, commandName?: string | null, context?: UiContextView) => void;
-  /** Opens the palette on the project picker (session.new's presenter). */
+  /** Opens the palette on the project picker (thread.new's presenter). */
   openProjectPicker: (returnTo?: FocusRegion) => void;
-  /** Opens the palette on the "Run in…" member picker for a thread (session.run-in's presenter). */
+  /** Opens the palette on the "Run in…" member picker for a thread (thread.run-in's presenter). */
   openRunInPicker: (threadId: string, returnTo?: FocusRegion) => void;
   closePalette: () => void;
   focusComposer: () => void;

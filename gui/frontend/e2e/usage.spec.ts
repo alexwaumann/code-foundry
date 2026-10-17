@@ -14,7 +14,7 @@ const tabs = (page: Page) => page.getByTestId("panel-tabs").getByRole("tab");
 const surface = (page: Page) => page.getByTestId("usage-surface");
 
 async function expectUsageTab(page: Page, thread = "s-1"): Promise<void> {
-  await expect(panel(page)).toHaveAttribute("data-panel-key", `session:${thread}`);
+  await expect(panel(page)).toHaveAttribute("data-panel-key", `thread:${thread}`);
   await expect(tabs(page).and(page.locator('[aria-selected="true"]'))).toHaveText("Usage");
   await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "usage");
 }

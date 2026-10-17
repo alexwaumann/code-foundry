@@ -10,7 +10,7 @@ import { Chip } from "./Chip";
 const NO_WORKSPACES: WorkspaceLookup = { byId: {} };
 
 /**
- * The thread's name. A click runs session.rename exactly as the palette does (the inline
+ * The thread's name. A click runs thread.rename exactly as the palette does (the inline
  * editor in the sidebar row), so it adds no user action of its own; where rename is not
  * available the name is plain text.
  */

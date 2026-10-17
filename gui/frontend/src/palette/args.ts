@@ -2,7 +2,7 @@ import type { ArgSpecView, CommandView } from "@/api/command";
 
 /**
  * Args the palette prompts for: required ones, plus enums (a pick list costs one Enter on
- * the highlighted default, and is how session.new offers model/effort from its ArgSpec).
+ * the highlighted default, and is how thread.new offers model/effort from its ArgSpec).
  * Other optional args take daemon defaults.
  */
 export function promptedArgs(c: CommandView): ArgSpecView[] {

@@ -73,7 +73,7 @@ test("every entry point opens the dialog", async ({ page }) => {
   // The sidebar has no Add project button; New thread's project picker ends with
   // "Add a project…" under a border, which closes the picker and opens the dialog.
   await expect(page.getByTestId("sidebar-add-project")).toHaveCount(0);
-  await page.getByTestId("sidebar-new-session").click();
+  await page.getByTestId("sidebar-new-thread").click();
   const picker = page.getByTestId("palette");
   await expect(picker).toHaveAttribute("data-mode", "projects");
   const add = picker.locator("[cmdk-item]").last();
@@ -103,7 +103,7 @@ test("the project picker's empty state opens the dialog", async ({ page }) => {
     await rpc("CommandService/Invoke", { name: "repo.unregister", context: { activeRepoId: r.id }, confirmed: true });
   }
   await openApp(page);
-  await page.getByTestId("sidebar-new-session").click();
+  await page.getByTestId("sidebar-new-thread").click();
   const picker = page.getByTestId("palette");
   await expect(picker).toHaveAttribute("data-mode", "projects");
   const add = picker.getByTestId("picker-add-project");

@@ -51,7 +51,7 @@ test("cmd+j starts a real shell, exit hides the panel, cmd+j starts a fresh one"
   expect(shellsOf(THREAD)).toEqual([]);
   await page.goto("/");
   await page.locator(`[data-row-key="s:${THREAD}"]`).click();
-  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-session-id", THREAD);
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", THREAD);
   await expect(bottom(page)).toHaveCount(0);
 
   await page.keyboard.press("Meta+j");
@@ -111,7 +111,7 @@ test("a panel whose shells went while the page was away comes back closed", asyn
   await expect.poll(() => shellsOf(THREAD)).toEqual([]);
   await page.goto("/");
   await page.locator(`[data-row-key="s:${THREAD}"]`).click();
-  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-session-id", THREAD);
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", THREAD);
   await expect(page.getByTestId("thread-header").getByTestId("bottom-toggle")).toHaveAttribute("aria-pressed", "false");
   await expect(bottom(page)).toHaveCount(0);
 });

@@ -12,7 +12,7 @@ import { pullRequestSurface } from "@/surfaces/pullrequest";
 import { revealTab } from "./reveal";
 import { SidePanel } from "./SidePanel";
 
-const KEY = "session:a";
+const KEY = "thread:a";
 
 const newTabCommand: CommandView = { name: "view.panel.new-tab", title: "New Side Panel Tab", description: "", category: "View", args: [], keybindings: [], available: true };
 
@@ -118,14 +118,14 @@ describe("SidePanel", () => {
   });
 
   it("sizes only the current selection's panel; double-click resets it to the default", () => {
-    usePanelStore.setState({ byKey: { [KEY]: { open: true, tabs: [], activeTabId: null }, "session:b": { open: true, tabs: [], activeTabId: null, width: 500 } } });
+    usePanelStore.setState({ byKey: { [KEY]: { open: true, tabs: [], activeTabId: null }, "thread:b": { open: true, tabs: [], activeTabId: null, width: 500 } } });
     render(<SidePanel />);
     const sep = () => screen.getByRole("separator");
     const wrapper = () => screen.getByTestId("side-panel-wrapper");
     expect(wrapper().style.width).toBe("420px");
     fireEvent.keyDown(sep(), { key: "ArrowLeft" });
     expect(wrapper().style.width).toBe("436px");
-    expect(getPanel("session:b").width).toBe(500);
+    expect(getPanel("thread:b").width).toBe(500);
 
     // The other selection's panel shows at its own width.
     act(() => {
@@ -135,7 +135,7 @@ describe("SidePanel", () => {
     expect(sep().getAttribute("aria-valuenow")).toBe("500");
     fireEvent.doubleClick(sep());
     expect(wrapper().style.width).toBe("420px");
-    expect(getPanel("session:b")).not.toHaveProperty("width");
+    expect(getPanel("thread:b")).not.toHaveProperty("width");
     expect(getPanel(KEY).width).toBe(436);
   });
 
@@ -510,7 +510,7 @@ describe("reordering tabs", () => {
     layOutTabs();
     const other = makeTab("files", "Files");
     act(() => {
-      openSurface("session:b", other);
+      openSurface("thread:b", other);
     });
     render(<SidePanel />);
     const t = tab("#1");

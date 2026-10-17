@@ -46,7 +46,7 @@ function data(list: TerminalView[]): TerminalsData {
 
 describe("bottomKeyOf", () => {
   const cases: [string, Selection, string | null][] = [
-    ["a thread", { kind: "thread", id: "s1" }, "session:s1"],
+    ["a thread", { kind: "thread", id: "s1" }, "thread:s1"],
     ["the Projects page", { kind: "view", name: "projects" }, "view:projects"],
     ["the dashboard", DASHBOARD, null],
     ["nothing", { kind: "none" }, null],
@@ -60,12 +60,12 @@ describe("bottomKeyOf", () => {
 
 describe("ownerKeyOf", () => {
   const cases: [string, Record<string, string>, string | null][] = [
-    ["a thread's shell", shell("s1"), "session:s1"],
+    ["a thread's shell", shell("s1"), "thread:s1"],
     ["a worktree's shell", shell(""), "view:projects"],
     ["a thread-labelled terminal that is no shell (thread, no kind)", { thread: "s1", worktree: "/src/app" }, null],
     ["an unlabelled terminal", {}, null],
     ["another kind", { kind: "job", thread: "s1" }, null],
-    ["a thread's action run", { kind: "action", thread: "s1", action: "a-1", "action.name": "Test", "action.run": "r-1" }, "session:s1"],
+    ["a thread's action run", { kind: "action", thread: "s1", action: "a-1", "action.name": "Test", "action.run": "r-1" }, "thread:s1"],
     ["a worktree's action run", { kind: "action", repo: "r", worktree: "/src/app", action: "a-1" }, "view:projects"],
   ];
   it.each(cases)("%s", (_name, labels, want) => {
@@ -85,9 +85,9 @@ describe("bottomTabIds", () => {
     term("run", { kind: "action", thread: "s1", "action.name": "Test" }, { state: "exited", exitCode: 1 }),
   ]);
   const cases: [string, string, string[]][] = [
-    ["a thread: its shells and action runs (exited too) in store order, not a non-shell terminal", "session:s1", ["a", "c", "run"]],
-    ["another thread", "session:s2", ["b"]],
-    ["a thread without shells", "session:s3", []],
+    ["a thread: its shells and action runs (exited too) in store order, not a non-shell terminal", "thread:s1", ["a", "c", "run"]],
+    ["another thread", "thread:s2", ["b"]],
+    ["a thread without shells", "thread:s3", []],
     ["the Projects page: every shell no thread owns", "view:projects", ["w1", "w2"]],
     ["any other key", "view:pullrequests", []],
   ];
@@ -110,11 +110,11 @@ describe("activeTabOf", () => {
 
 describe("bottomTabTitle", () => {
   const cases: [string, Partial<TerminalView>, string, string][] = [
-    ["a thread's shell: its title", { title: "vim main.go", cwd: "/src/app/cmd" }, "session:s1", "vim main.go"],
-    ["a thread's shell without a title: its cwd's last segment", { cwd: "/src/app/cmd/" }, "session:s1", "cmd"],
+    ["a thread's shell: its title", { title: "vim main.go", cwd: "/src/app/cmd" }, "thread:s1", "vim main.go"],
+    ["a thread's shell without a title: its cwd's last segment", { cwd: "/src/app/cmd/" }, "thread:s1", "cmd"],
     ["the Projects page: the worktree's folder, whatever the title", { title: "vim", cwd: "/src/app.worktrees/x/sub", labels: shell("", "/src/app.worktrees/x") }, "view:projects", "x"],
     ["the Projects page without a worktree label: the cwd's", { cwd: "/src/other", labels: { kind: "shell" } }, "view:projects", "other"],
-    ["an action run: the action's name, not its OSC title", { title: "zsh", labels: { kind: "action", thread: "s1", "action.name": "Test" } }, "session:s1", "Test"],
+    ["an action run: the action's name, not its OSC title", { title: "zsh", labels: { kind: "action", thread: "s1", "action.name": "Test" } }, "thread:s1", "Test"],
     ["an action run on the Projects page: the action's name", { labels: { kind: "action", worktree: "/src/app", "action.name": "Build" } }, "view:projects", "Build"],
   ];
   it.each(cases)("%s", (_name, extra, key, want) => {
@@ -125,7 +125,7 @@ describe("bottomTabTitle", () => {
     ["one elsewhere: its folder", { cwd: "/Users/dev/notes", labels: { kind: "shell", thread: "s1", repo: "", worktree: "/Users/dev" } }, "notes"],
     ["its own title wins", { title: "htop", cwd: "/Users/dev", labels: { kind: "shell", thread: "s1", repo: "", worktree: "/Users/dev" } }, "htop"],
   ] as [string, Partial<TerminalView>, string][])("a thread without a project: %s", (_name, extra, want) => {
-    expect(bottomTabTitle(term("t", {}, extra), "session:s1", true)).toBe(want);
+    expect(bottomTabTitle(term("t", {}, extra), "thread:s1", true)).toBe(want);
   });
 });
 
@@ -135,25 +135,25 @@ describe("bottomTabTitles (duplicates numbered)", () => {
     [
       "two runs of one action: the second is numbered",
       [term("a", { kind: "action", thread: "s1", "action.name": "Test" }, { title: "zsh" }), term("b", shell("s1")), term("c", { kind: "action", thread: "s1", "action.name": "Test" })],
-      "session:s1",
+      "thread:s1",
       { a: "Test", b: "app", c: "Test 2" },
     ],
     [
       "two shells in one folder: the second is numbered",
       [term("a", shell("s1")), term("b", shell("s1"))],
-      "session:s1",
+      "thread:s1",
       { a: "app", b: "app 2" },
     ],
     [
       "an OSC title wins and takes no number",
       [term("a", shell("s1")), term("b", shell("s1"), { title: "vim" }), term("c", shell("s1"))],
-      "session:s1",
+      "thread:s1",
       { a: "app", b: "vim", c: "app 2" },
     ],
     [
       "different folders are not numbered; other keys' shells do not count",
       [term("a", shell("s1")), term("x", shell("s2")), term("b", shell("s1"), { cwd: "/src/app/cmd" }), term("c", shell("s1"))],
-      "session:s1",
+      "thread:s1",
       { a: "app", b: "cmd", c: "app 2" },
     ],
     [
@@ -168,8 +168,8 @@ describe("bottomTabTitles (duplicates numbered)", () => {
   });
   it("bottomTabTitleOf: one tab's title, the id for a stranger", () => {
     const t = terms([term("a", shell("s1")), term("b", shell("s1"))]);
-    expect(bottomTabTitleOf(t, "session:s1", "b")).toBe("app 2");
-    expect(bottomTabTitleOf(t, "session:s1", "zz")).toBe("zz");
+    expect(bottomTabTitleOf(t, "thread:s1", "b")).toBe("app 2");
+    expect(bottomTabTitleOf(t, "thread:s1", "zz")).toBe("zz");
   });
 });
 
@@ -187,11 +187,11 @@ describe("neighbourOf", () => {
 
 describe("bottomVisible", () => {
   const cases: [string, string | null, boolean, boolean, boolean, boolean][] = [
-    ["open, nothing over it", "session:a", true, false, false, true],
+    ["open, nothing over it", "thread:a", true, false, false, true],
     ["no key", null, true, false, false, false],
-    ["closed", "session:a", false, false, false, false],
-    ["settings or usage up", "session:a", true, true, false, false],
-    ["side panel expanded", "session:a", true, false, true, false],
+    ["closed", "thread:a", false, false, false, false],
+    ["settings or usage up", "thread:a", true, true, false, false],
+    ["side panel expanded", "thread:a", true, false, true, false],
   ];
   it.each(cases)("%s", (_name, key, open, page, side, want) => {
     expect(bottomVisible(key, open, page, side)).toBe(want);
@@ -202,12 +202,12 @@ describe("focusedBottomShell", () => {
   const terminals = data([term("claude", { thread: "s1" }), term("a", shell("s1")), term("b", shell("s1"))]);
   const closed = { open: false, returnTo: "content" };
   const cases: [string, Selection, string, { open: boolean; returnTo: string }, Record<string, BottomEntry>, string][] = [
-    ["keyboard in the panel: its active shell", { kind: "thread", id: "s1" }, "bottom", closed, { "session:s1": { open: true, activeTerminalId: "a" } }, "a"],
-    ["no remembered tab: the last", { kind: "thread", id: "s1" }, "bottom", closed, { "session:s1": { open: true } }, "b"],
-    ["the palette returns there", { kind: "thread", id: "s1" }, "palette", { open: true, returnTo: "bottom" }, { "session:s1": { open: true } }, "b"],
-    ["keyboard in the content pane", { kind: "thread", id: "s1" }, "terminal", closed, { "session:s1": { open: true } }, ""],
-    ["panel closed", { kind: "thread", id: "s1" }, "bottom", closed, { "session:s1": { open: false } }, ""],
-    ["no tabs", { kind: "thread", id: "s2" }, "bottom", closed, { "session:s2": { open: true } }, ""],
+    ["keyboard in the panel: its active shell", { kind: "thread", id: "s1" }, "bottom", closed, { "thread:s1": { open: true, activeTerminalId: "a" } }, "a"],
+    ["no remembered tab: the last", { kind: "thread", id: "s1" }, "bottom", closed, { "thread:s1": { open: true } }, "b"],
+    ["the palette returns there", { kind: "thread", id: "s1" }, "palette", { open: true, returnTo: "bottom" }, { "thread:s1": { open: true } }, "b"],
+    ["keyboard in the content pane", { kind: "thread", id: "s1" }, "terminal", closed, { "thread:s1": { open: true } }, ""],
+    ["panel closed", { kind: "thread", id: "s1" }, "bottom", closed, { "thread:s1": { open: false } }, ""],
+    ["no tabs", { kind: "thread", id: "s2" }, "bottom", closed, { "thread:s2": { open: true } }, ""],
     ["no bottom key", { kind: "view", name: "pullrequests" }, "bottom", closed, {}, ""],
   ];
   it.each(cases)("%s", (_name, selection, focus, palette, byKey, want) => {
@@ -243,12 +243,12 @@ describe("reducers", () => {
 describe("emptyOpenKeys", () => {
   const terminals = data([term("claude", { thread: "s1" }), term("a", shell("s1")), term("w", shell(""))]);
   const cases: [string, Record<string, BottomEntry>, Record<string, number>, string[]][] = [
-    ["an open thread panel with a shell stays", { "session:s1": { open: true } }, {}, []],
-    ["an open thread panel without shells (its Claude terminal does not count)", { "session:s2": { open: true } }, {}, ["session:s2"]],
-    ["a closed one is left alone", { "session:s2": { open: false } }, {}, []],
-    ["one waiting on a shell this window starts", { "session:s2": { open: true } }, { "session:s2": 1 }, []],
+    ["an open thread panel with a shell stays", { "thread:s1": { open: true } }, {}, []],
+    ["an open thread panel without shells (its Claude terminal does not count)", { "thread:s2": { open: true } }, {}, ["thread:s2"]],
+    ["a closed one is left alone", { "thread:s2": { open: false } }, {}, []],
+    ["one waiting on a shell this window starts", { "thread:s2": { open: true } }, { "thread:s2": 1 }, []],
     ["the Projects page with a worktree shell stays", { "view:projects": { open: true } }, {}, []],
-    ["several", { "session:s1": { open: true }, "session:s3": { open: true, height: 300 }, "session:s4": { open: true } }, {}, ["session:s3", "session:s4"]],
+    ["several", { "thread:s1": { open: true }, "thread:s3": { open: true, height: 300 }, "thread:s4": { open: true } }, {}, ["thread:s3", "thread:s4"]],
   ];
   it.each(cases)("%s", (_name, byKey, starting, want) => {
     expect(emptyOpenKeys(byKey, terminals, starting)).toEqual(want);
@@ -267,7 +267,7 @@ describe("store", () => {
 
   it("toggleBottom works on the current selection's key and asks for focus only when showing", () => {
     expect(toggleBottom("current", undefined, { focus: true })).toBe(true);
-    expect(getBottom("session:s1").open).toBe(true);
+    expect(getBottom("thread:s1").open).toBe(true);
     expect(useUiStore.getState().bottomFocusSeq).toBe(1);
     expect(toggleBottom("current", undefined, { focus: true })).toBe(false);
     expect(useUiStore.getState().bottomFocusSeq).toBe(1);
@@ -281,17 +281,17 @@ describe("store", () => {
   });
 
   it("keeps heights per key", () => {
-    setBottomHeight("session:s1", 333.4);
-    expect(getBottom("session:s1").height).toBe(333);
-    expect(getBottom("session:s2").height).toBeUndefined();
+    setBottomHeight("thread:s1", 333.4);
+    expect(getBottom("thread:s1").height).toBe(333);
+    expect(getBottom("thread:s2").height).toBeUndefined();
   });
 
   it("pending focus is taken once, for its key, while recent", () => {
-    markPendingFocus("session:s1", 1000);
-    expect(takePendingFocus("session:s2", 1001)).toBe(false);
-    expect(takePendingFocus("session:s1", 1000 + PENDING_FOCUS_MS + 1)).toBe(false);
-    expect(takePendingFocus("session:s1", 1002)).toBe(true);
-    expect(takePendingFocus("session:s1", 1003)).toBe(false);
+    markPendingFocus("thread:s1", 1000);
+    expect(takePendingFocus("thread:s2", 1001)).toBe(false);
+    expect(takePendingFocus("thread:s1", 1000 + PENDING_FOCUS_MS + 1)).toBe(false);
+    expect(takePendingFocus("thread:s1", 1002)).toBe(true);
+    expect(takePendingFocus("thread:s1", 1003)).toBe(false);
     markPendingFocus(null);
     expect(useBottomStore.getState().pendingFocus).toBeNull();
   });
@@ -305,30 +305,30 @@ describe("store", () => {
   });
 
   it("a start mark is per key, waits PENDING_FOCUS_MS, and is cleared only by its own start when `at` is given", () => {
-    markStarting("session:s1", 1000);
-    expect(isStarting("session:s1", 1000 + PENDING_FOCUS_MS)).toBe(true);
-    expect(isStarting("session:s1", 1000 + PENDING_FOCUS_MS + 1)).toBe(false);
-    expect(isStarting("session:s2", 1001)).toBe(false);
-    clearStarting("session:s1", 999); // an older start's timer
-    expect(useBottomStore.getState().starting).toEqual({ "session:s1": 1000 });
-    clearStarting("session:s1", 1000);
+    markStarting("thread:s1", 1000);
+    expect(isStarting("thread:s1", 1000 + PENDING_FOCUS_MS)).toBe(true);
+    expect(isStarting("thread:s1", 1000 + PENDING_FOCUS_MS + 1)).toBe(false);
+    expect(isStarting("thread:s2", 1001)).toBe(false);
+    clearStarting("thread:s1", 999); // an older start's timer
+    expect(useBottomStore.getState().starting).toEqual({ "thread:s1": 1000 });
+    clearStarting("thread:s1", 1000);
     expect(useBottomStore.getState().starting).toEqual({});
-    markStarting("session:s1", 2000);
-    clearStarting("session:s1");
+    markStarting("thread:s1", 2000);
+    clearStarting("thread:s1");
     expect(useBottomStore.getState().starting).toEqual({});
   });
 
   it("persists byKey (not the pending focus or start marks) and rehydrates it", async () => {
-    toggleBottom("session:s1", true);
-    setBottomHeight("session:s1", 360);
-    markPendingFocus("session:s1");
-    markStarting("session:s2");
+    toggleBottom("thread:s1", true);
+    setBottomHeight("thread:s1", 360);
+    markPendingFocus("thread:s1");
+    markStarting("thread:s2");
     const raw = localStorage.getItem("code-foundry.bottom") ?? "{}";
-    expect((JSON.parse(raw) as { state: unknown }).state).toEqual({ byKey: { "session:s1": { open: true, height: 360 } } });
+    expect((JSON.parse(raw) as { state: unknown }).state).toEqual({ byKey: { "thread:s1": { open: true, height: 360 } } });
     // Clearing the store saves too; put the saved value back before loading it.
     useBottomStore.setState({ byKey: {}, pendingFocus: null, pendingFocusId: null, starting: {} });
     localStorage.setItem("code-foundry.bottom", raw);
     await useBottomStore.persist.rehydrate();
-    expect(getBottom("session:s1")).toEqual({ open: true, height: 360 });
+    expect(getBottom("thread:s1")).toEqual({ open: true, height: 360 });
   });
 });

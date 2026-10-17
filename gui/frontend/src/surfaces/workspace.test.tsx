@@ -32,7 +32,7 @@ beforeEach(() => {
   useReposStore.setState({ byId: { web: repo("web", [wt("web", WEB, "cf/demo")]), api: repo("api", [wt("api", API, "cf/demo")]) }, order: ["api", "web"] });
   useThreadsStore.setState({ byId: { "s-ws": thread("s-ws", { workspaceId: "w1", worktreePath: API, repoId: "api" }), "s-proj": thread("s-proj", { repoId: "web", worktreePath: "/src/web" }) }, order: ["s-ws", "s-proj"] });
   useWorkspacesStore.setState({ byId: { w1: ws }, order: ["w1"], loaded: true });
-  usePanelStore.setState({ byKey: { "session:s-ws": { open: true, tabs: [], activeTabId: null }, "session:s-proj": { open: true, tabs: [], activeTabId: null } } });
+  usePanelStore.setState({ byKey: { "thread:s-ws": { open: true, tabs: [], activeTabId: null }, "thread:s-proj": { open: true, tabs: [], activeTabId: null } } });
   useViewsStore.setState({ settingsOpen: false });
   useUiStore.setState({ windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260, palette: { ...useUiStore.getState().palette, open: false } });
   select("s-ws");
@@ -71,7 +71,7 @@ describe("Workspace surface availability", () => {
   it("W opens the workspace tab: name, branch, members, the thread's member marked", () => {
     render(<SidePanel />);
     fireEvent.keyDown(screen.getByTestId("side-panel"), { key: "w" });
-    expect(getPanel("session:s-ws").activeTabId).toBe("workspace?workspace=w1");
+    expect(getPanel("thread:s-ws").activeTabId).toBe("workspace?workspace=w1");
     expect(screen.getByTestId("workspace-surface-name").textContent).toBe("demo");
     expect(screen.getByTestId("workspace-surface-branch").textContent).toBe("cf/demo");
     expect(screen.getByTestId("workspace-surface-count").textContent).toBe("2 members");
@@ -89,7 +89,7 @@ describe("Workspace surface availability", () => {
     const open = screen.getAllByTestId("member-open")[0];
     if (!open) throw new Error("no open button");
     fireEvent.click(open);
-    const p = getPanel("session:s-ws");
+    const p = getPanel("thread:s-ws");
     expect(p.tabs.map((t) => t.kind)).toEqual(["workspace", "worktree"]);
     expect(p.tabs[1]?.title).toBe("web");
     expect(screen.getByTestId("worktree-surface").getAttribute("data-path")).toBe(WEB);
@@ -101,19 +101,19 @@ describe("workspacePanelCommand (view.panel.workspace)", () => {
   it("opens the tab and shows a hidden panel for a workspace thread", () => {
     usePanelStore.setState({ byKey: {} });
     expect(workspacePanelCommand()).toBe(true);
-    expect(getPanel("session:s-ws")).toMatchObject({ open: true, activeTabId: "workspace?workspace=w1" });
-    expect(getPanel("session:s-ws").tabs[0]?.title).toBe("demo");
+    expect(getPanel("thread:s-ws")).toMatchObject({ open: true, activeTabId: "workspace?workspace=w1" });
+    expect(getPanel("thread:s-ws").tabs[0]?.title).toBe("demo");
   });
 
   it("does nothing for a project thread or under the settings page", () => {
     usePanelStore.setState({ byKey: {} });
     select("s-proj");
     expect(workspacePanelCommand()).toBe(false);
-    expect(getPanel("session:s-proj").open).toBe(false);
+    expect(getPanel("thread:s-proj").open).toBe(false);
     select("s-ws");
     useViewsStore.setState({ settingsOpen: true });
     expect(workspacePanelCommand()).toBe(false);
-    expect(getPanel("session:s-ws").open).toBe(false);
+    expect(getPanel("thread:s-ws").open).toBe(false);
   });
 
   it("from the palette, sends the palette's focus back to the panel", () => {

@@ -41,7 +41,7 @@ beforeEach(() => {
   });
   useTerminalsStore.setState({ byId: {}, order: [] });
   const open = { open: true, tabs: [], activeTabId: null };
-  usePanelStore.setState({ byKey: { "session:s-main": open, "session:s-feat": open, "session:s-sub": open, "view:projects": open } });
+  usePanelStore.setState({ byKey: { "thread:s-main": open, "thread:s-feat": open, "thread:s-sub": open, "view:projects": open } });
   useViewsStore.setState({ settingsOpen: false });
   useUiStore.setState({ windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260, palette: { ...useUiStore.getState().palette, open: false } });
   select("s-feat");
@@ -88,7 +88,7 @@ describe("Worktree surface availability", () => {
   it("T opens the thread's own worktree: title with the branch, the overview body", () => {
     render(<SidePanel />);
     fireEvent.keyDown(screen.getByTestId("side-panel"), { key: "t" });
-    const p = getPanel("session:s-feat");
+    const p = getPanel("thread:s-feat");
     expect(p.activeTabId).toBe(`worktree?path=${encodeURIComponent(WEB_FEAT)}&repo=web`);
     expect(p.tabs[0]?.title).toBe("web · cf/feat");
     expect(screen.getByTestId("worktree-surface").getAttribute("data-path")).toBe(WEB_FEAT);
@@ -112,7 +112,7 @@ describe("Worktree surface availability", () => {
     select("s-sub");
     render(<SidePanel />);
     fireEvent.keyDown(screen.getByTestId("side-panel"), { key: "t" });
-    expect(getPanel("session:s-sub").tabs[0]?.params).toEqual({ repo: "web", path: WEB_FEAT });
+    expect(getPanel("thread:s-sub").tabs[0]?.params).toEqual({ repo: "web", path: WEB_FEAT });
   });
 });
 
@@ -121,29 +121,29 @@ describe("worktreePanelCommand (view.panel.worktree)", () => {
     usePanelStore.setState({ byKey: {} });
     select("s-main");
     expect(worktreePanelCommand()).toBe(true);
-    expect(getPanel("session:s-main")).toMatchObject({ open: true, activeTabId: `worktree?path=${encodeURIComponent(WEB_MAIN)}&repo=web` });
-    expect(getPanel("session:s-main").tabs[0]?.title).toBe("web");
+    expect(getPanel("thread:s-main")).toMatchObject({ open: true, activeTabId: `worktree?path=${encodeURIComponent(WEB_MAIN)}&repo=web` });
+    expect(getPanel("thread:s-main").tabs[0]?.title).toBe("web");
   });
 
   it("does nothing for a thread outside any worktree, on a page, or under the settings page", () => {
     usePanelStore.setState({ byKey: {} });
     select("s-lost");
     expect(worktreePanelCommand()).toBe(false);
-    expect(getPanel("session:s-lost").open).toBe(false);
+    expect(getPanel("thread:s-lost").open).toBe(false);
     useUiStore.setState({ selection: { kind: "view", name: "projects" } });
     expect(worktreePanelCommand()).toBe(false);
     expect(getPanel("view:projects").open).toBe(false);
     select("s-feat");
     useViewsStore.setState({ settingsOpen: true });
     expect(worktreePanelCommand()).toBe(false);
-    expect(getPanel("session:s-feat").open).toBe(false);
+    expect(getPanel("thread:s-feat").open).toBe(false);
   });
 
   it("is reached through ShowView panel.worktree and, from the palette, returns focus to the panel", () => {
     usePanelStore.setState({ byKey: {} });
     useUiStore.setState((s) => ({ palette: { ...s.palette, open: true, returnTo: "content" } }));
     expect(showView("panel.worktree")).toBe(true);
-    expect(getPanel("session:s-feat").open).toBe(true);
+    expect(getPanel("thread:s-feat").open).toBe(true);
     expect(useUiStore.getState().palette.returnTo).toBe("panel");
   });
 });

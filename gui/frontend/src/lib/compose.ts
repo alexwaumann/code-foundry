@@ -1,6 +1,6 @@
 /**
  * Pure pieces of the new-thread composer: picker options, attachment checks, and the
- * session.new args a draft turns into. The store (stores/compose.ts) and components
+ * thread.new args a draft turns into. The store (stores/compose.ts) and components
  * (components/compose) use these; they hold no state.
  */
 import type { PermissionModeView } from "@/api/threads";
@@ -21,7 +21,7 @@ export const EFFORT_CHOICES: readonly Choice[] = [
 
 export type ComposePermission = Exclude<PermissionModeView, "">;
 
-/** session.new `permission` values. Full access (bypassPermissions) is never offered. */
+/** thread.new `permission` values. Full access (bypassPermissions) is never offered. */
 export const PERMISSION_CHOICES: readonly (Choice & { value: ComposePermission; hint: string })[] = [
   { value: "supervised", label: "Supervised", hint: "Confirm every tool call" },
   { value: "accept-edits", label: "Accept edits", hint: "File edits run; the rest asks" },
@@ -42,7 +42,7 @@ export function pickDefault(choices: readonly Choice[], setting: string | undefi
 }
 
 /**
- * Where the thread runs: a worktree session.new creates, an existing one (the main one is
+ * Where the thread runs: a worktree thread.new creates, an existing one (the main one is
  * the current checkout), or, for a workspace, the workspace's own member worktrees.
  */
 export type WorktreeChoice = { kind: "new" } | { kind: "existing"; path: string } | { kind: "members" };
@@ -101,7 +101,7 @@ export function workInText(p: {
 
 /**
  * What a composer starts a thread in: a project, a workspace and its members, or no
- * project at all (`home`: the thread runs in the daemon's home directory, session.new
+ * project at all (`home`: the thread runs in the daemon's home directory, thread.new
  * --no-project; docs/notes/no-project-2-gui.md).
  */
 export type ComposeTarget = { kind: "project"; repoId: string } | { kind: "workspace"; workspaceId: string } | { kind: "home" };
@@ -220,7 +220,7 @@ export function draftMembers(
 }
 
 /**
- * Where session.new starts the thread: in a project (a new or existing worktree, exactly
+ * Where thread.new starts the thread: in a project (a new or existing worktree, exactly
  * as before workspaces), in a workspace's member worktree (the thread belongs to the
  * workspace), or in a new workspace with a cf/<slug> worktree in every member (a
  * project with "Also in" projects, or a workspace in new-worktree mode), or without a
@@ -231,7 +231,7 @@ export type ThreadPlace =
   | { kind: "workspace"; workspaceId: string; repoId: string; worktreePath: string }
   /** `base` applies to the primary member only ("" : every member's default). */
   | { kind: "new-workspace"; repoIds: readonly string[]; repoId: string; base: string }
-  /** session.new --no-project: no repo, worktree or workspace. */
+  /** thread.new --no-project: no repo, worktree or workspace. */
   | { kind: "home" };
 
 export interface PlaceEnv {
@@ -328,7 +328,7 @@ export function checkAttachments<F extends FileLike>(
   return { accepted, rejected };
 }
 
-/** The prompt and Claude options of a draft, as session.new takes them. */
+/** The prompt and Claude options of a draft, as thread.new takes them. */
 export interface PromptArgsInput {
   /** The prompt as Claude gets it (lib/prompt.ts projectPrompt). */
   text: string;
@@ -345,13 +345,13 @@ export interface DraftArgsInput extends PromptArgsInput {
   base: string;
 }
 
-/** session.new's args for a project draft (threadArgs with a project place). */
+/** thread.new's args for a project draft (threadArgs with a project place). */
 export function threadNewArgs(repoId: string, d: DraftArgsInput, attachments: readonly string[]): Record<string, string> {
   return threadArgs({ kind: "project", repoId, worktree: d.worktree, base: d.base }, d, attachments);
 }
 
 /**
- * session.new's args for a thread. Empty values are omitted so the daemon applies its
+ * thread.new's args for a thread. Empty values are omitted so the daemon applies its
  * defaults. A project: `worktree` is the path for an existing worktree, `new-worktree` +
  * `base` otherwise. A workspace: `workspace` and the member (`repo` + its `worktree`).
  * A new workspace: `new-worktree` + `repos`, the primary's own base as `<repo>:<base>`,
@@ -392,7 +392,7 @@ export function threadArgs(place: ThreadPlace, d: PromptArgsInput, attachments: 
   return args;
 }
 
-/** The session id in session.new's result JSON (the created Session), or null. */
+/** The session id in thread.new's result JSON (the created Session), or null. */
 export function createdThreadId(resultJson: string): string | null {
   if (!resultJson) return null;
   try {

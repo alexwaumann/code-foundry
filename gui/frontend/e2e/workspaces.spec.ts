@@ -20,7 +20,7 @@ interface WorkspaceSummary {
 }
 
 async function threads(): Promise<ThreadSummary[]> {
-  const res = await fetch(`${mockUrl}/__mock/sessions`);
+  const res = await fetch(`${mockUrl}/__mock/threads`);
   return (await res.json()) as ThreadSummary[];
 }
 

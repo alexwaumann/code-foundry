@@ -549,7 +549,7 @@ test("a daemon restart that pruned the shells leaves the panel closed; cmd+j sta
 
 test("a persisted open panel whose shells are gone comes back closed", async ({ page }) => {
   await page.addInitScript(() => {
-    localStorage.setItem("code-foundry.bottom", JSON.stringify({ state: { byKey: { "session:s-2": { open: true } } }, version: 1 }));
+    localStorage.setItem("code-foundry.bottom", JSON.stringify({ state: { byKey: { "thread:s-2": { open: true } } }, version: 1 }));
   });
   await openApp(page);
   await selectThread(page, "s-2");

@@ -371,7 +371,7 @@ function ThreadsUnavailable() {
   if (!unavailable) return null;
   return (
     <Tip label={error} side="right">
-      <p className="shrink-0 border-t border-sidebar-border px-2 py-1.5 text-caption-sm" data-testid="sessions-unavailable">
+      <p className="shrink-0 border-t border-sidebar-border px-2 py-1.5 text-caption-sm" data-testid="threads-unavailable">
         Threads: service unavailable
       </p>
     </Tip>

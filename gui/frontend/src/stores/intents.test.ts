@@ -91,7 +91,7 @@ describe("a pending focusTerminal", () => {
     setTerminals([term("relist", shell)]);
     revealArrived();
     expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s1" });
-    expect(getBottom("session:s1")).toEqual({ open: true, activeTerminalId: "relist" });
+    expect(getBottom("thread:s1")).toEqual({ open: true, activeTerminalId: "relist" });
     useUiStore.setState({ selection: { kind: "view", name: "dashboard" } });
     revealArrived();
     expect(useUiStore.getState().selection).toEqual({ kind: "view", name: "dashboard" });
@@ -102,7 +102,7 @@ describe("the focusTerminal intent", () => {
   it("a shell shows in its owner's bottom panel, focused there", () => {
     focusTerminal("sh");
     expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s1" });
-    expect(getBottom("session:s1")).toEqual({ open: true, activeTerminalId: "sh" });
+    expect(getBottom("thread:s1")).toEqual({ open: true, activeTerminalId: "sh" });
     expect(useUiStore.getState().bottomFocusSeq).toBe(1);
     expect(useUiStore.getState().promptFocusSeq).toBe(0);
   });
@@ -123,7 +123,7 @@ describe("the focusTerminal intent", () => {
     const later = term("later", shell);
     setTerminals([later]);
     onNewTerminal(later);
-    expect(getBottom("session:s1")).toEqual({ open: true, activeTerminalId: "later" });
+    expect(getBottom("thread:s1")).toEqual({ open: true, activeTerminalId: "later" });
     expect(useUiStore.getState().bottomFocusSeq).toBe(1);
     expect(useUiStore.getState().promptFocusSeq).toBe(0);
   });

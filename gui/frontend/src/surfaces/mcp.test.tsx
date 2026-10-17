@@ -56,7 +56,7 @@ const row = () => screen.queryByTestId("panel-empty")?.querySelector('[data-surf
 beforeEach(() => {
   useReposStore.setState({ byId: {}, order: [] });
   useThreadsStore.setState({ byId: { "s-r": thread("s-r"), "s-off": thread("s-off", "disconnected") }, order: ["s-r", "s-off"] });
-  usePanelStore.setState({ byKey: { "session:s-r": { open: true, tabs: [], activeTabId: null }, "session:s-off": { open: true, tabs: [], activeTabId: null }, "view:projects": { open: true, tabs: [], activeTabId: null } } });
+  usePanelStore.setState({ byKey: { "thread:s-r": { open: true, tabs: [], activeTabId: null }, "thread:s-off": { open: true, tabs: [], activeTabId: null }, "view:projects": { open: true, tabs: [], activeTabId: null } } });
   useViewsStore.setState({ settingsOpen: false });
   useUiStore.setState({ windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260, selection: { kind: "thread", id: "s-r" }, palette: { ...useUiStore.getState().palette, open: false } });
   useThreadStore.setState({ logs: {} });
@@ -84,7 +84,7 @@ describe("MCP surface", () => {
   it("shows the header and one card per server in every state", () => {
     render(<SidePanel />);
     fireEvent.keyDown(screen.getByTestId("side-panel"), { key: "m" });
-    expect(getPanel("session:s-r").activeTabId).toBe("mcp");
+    expect(getPanel("thread:s-r").activeTabId).toBe("mcp");
     expect(screen.getByTestId("mcp-count").textContent).toBe("1 of 5 connected");
     expect(screen.getByTestId("mcp-checked").textContent).toBe("Checked 12s ago, at the start of the last turn");
     expect(cards().map((c) => [c.getAttribute("data-server"), c.getAttribute("data-status"), within(c, "mcp-pill")?.textContent])).toEqual([

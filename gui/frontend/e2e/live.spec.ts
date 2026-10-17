@@ -57,7 +57,7 @@ function threadInfo(id: string): LiveThread | undefined {
 }
 
 function badge(page: Page, id: string) {
-  return row(page, `s:${id}`).locator("[data-session-badge]");
+  return row(page, `s:${id}`).locator("[data-thread-badge]");
 }
 
 async function shot(page: Page, name: string): Promise<void> {
@@ -75,10 +75,10 @@ async function recordBadge(page: Page, id: string): Promise<void> {
     if (w.__badgeTimer) clearInterval(w.__badgeTimer);
     w.__badgeTimer = window.setInterval(() => {
       const v =
-        document.querySelector(sel)?.getAttribute("data-session-badge") ?? "";
+        document.querySelector(sel)?.getAttribute("data-thread-badge") ?? "";
       if (v && w.__badgeLog.at(-1) !== v) w.__badgeLog.push(v);
     }, 50);
-  }, `[data-row-key="s:${id}"] [data-session-badge]`);
+  }, `[data-row-key="s:${id}"] [data-thread-badge]`);
 }
 
 async function badgeLog(page: Page): Promise<string[]> {
@@ -117,7 +117,7 @@ test("sessions end to end against the real daemon", async ({ page }) => {
       await openApp(page);
       await expect(row(page, `s:${s1.id}`)).toBeVisible();
       await expect(badge(page, s1.id)).toHaveAttribute(
-        "data-session-badge",
+        "data-thread-badge",
         "idle",
         { timeout: 30_000 },
       );
@@ -126,7 +126,7 @@ test("sessions end to end against the real daemon", async ({ page }) => {
     // (b) Selecting it shows the (empty) conversation with the prompt focused.
     await test.step("b: selecting shows the thread, its prompt focused", async () => {
       await row(page, `s:${s1.id}`).click();
-      await expect(pane(page)).toHaveAttribute("data-session-id", s1.id);
+      await expect(pane(page)).toHaveAttribute("data-thread-id", s1.id);
       await expect(pane(page).getByTestId("thread-empty")).toHaveText(
         "No messages yet.",
       );
@@ -143,12 +143,12 @@ test("sessions end to end against the real daemon", async ({ page }) => {
         "reply with the single word pong",
       );
       await expect(badge(page, s1.id)).toHaveAttribute(
-        "data-session-badge",
+        "data-thread-badge",
         "busy",
         { timeout: 20_000 },
       );
       await expect(badge(page, s1.id)).toHaveAttribute(
-        "data-session-badge",
+        "data-thread-badge",
         "idle",
         { timeout: 90_000 },
       );
@@ -203,7 +203,7 @@ test("sessions end to end against the real daemon", async ({ page }) => {
       );
       await openApp(page);
       await expect(badge(page, s2.id)).toHaveAttribute(
-        "data-session-badge",
+        "data-thread-badge",
         "attention",
       );
       await expect(page).toHaveTitle("Code Foundry (1)");
@@ -212,7 +212,7 @@ test("sessions end to end against the real daemon", async ({ page }) => {
         "reply with the single word ping",
       );
       await expect(badge(page, s2.id)).toHaveAttribute(
-        "data-session-badge",
+        "data-thread-badge",
         "idle",
       );
       await expect
@@ -225,7 +225,7 @@ test("sessions end to end against the real daemon", async ({ page }) => {
     // composer), and a message starts it again with the conversation kept.
     await test.step("d: a stopped thread keeps its composer; a message continues it", async () => {
       await row(page, `s:${s1.id}`).click();
-      await expect(pane(page)).toHaveAttribute("data-session-id", s1.id);
+      await expect(pane(page)).toHaveAttribute("data-thread-id", s1.id);
       cli("thread", "archive", "--id", s1.id, "--yes");
       await expect
         .poll(() => threadInfo(s1.id)?.state, { timeout: 20_000 })
@@ -245,7 +245,7 @@ test("sessions end to end against the real daemon", async ({ page }) => {
         { timeout: 60_000 },
       );
       await expect(badge(page, s1.id)).toHaveAttribute(
-        "data-session-badge",
+        "data-thread-badge",
         /^(idle|attention)$/,
         { timeout: 30_000 },
       );
@@ -290,7 +290,7 @@ test("sessions end to end against the real daemon", async ({ page }) => {
         "aria-selected",
         "true",
       );
-      await expect(pane(page)).toHaveAttribute("data-session-id", s1.id);
+      await expect(pane(page)).toHaveAttribute("data-thread-id", s1.id);
     });
   } finally {
     for (const id of created) {
@@ -299,7 +299,7 @@ test("sessions end to end against the real daemon", async ({ page }) => {
     }
     // For the caller's cleanup of ~/.claude/projects/<slug>/<id>.jsonl.
     console.log(
-      "live sessions:",
+      "live threads:",
       JSON.stringify(
         listThreads().map((s) => ({
           id: s.id,

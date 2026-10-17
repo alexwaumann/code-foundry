@@ -65,7 +65,7 @@ const entry = () => screen.queryByTestId("panel-empty")?.querySelector('[data-su
 beforeEach(() => {
   useReposStore.setState({ byId: {}, order: [] });
   useThreadsStore.setState({ byId: { "s-r": thread("s-r"), "s-off": thread("s-off", "disconnected") }, order: ["s-r", "s-off"] });
-  usePanelStore.setState({ byKey: { "session:s-r": { open: true, tabs: [], activeTabId: null }, "view:projects": { open: true, tabs: [], activeTabId: null } } });
+  usePanelStore.setState({ byKey: { "thread:s-r": { open: true, tabs: [], activeTabId: null }, "view:projects": { open: true, tabs: [], activeTabId: null } } });
   useViewsStore.setState({ settingsOpen: false });
   useUiStore.setState({ windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260, selection: { kind: "thread", id: "s-r" }, palette: { ...useUiStore.getState().palette, open: false } });
   useThreadStore.setState({ logs: {} });
@@ -89,7 +89,7 @@ describe("Agents surface", () => {
   it("A opens it: the header counts, rows in spawn order with the nested run under its parent", () => {
     render(<SidePanel />);
     fireEvent.keyDown(screen.getByTestId("side-panel"), { key: "a" });
-    expect(getPanel("session:s-r").activeTabId).toBe("agents");
+    expect(getPanel("thread:s-r").activeTabId).toBe("agents");
     expect(screen.getByTestId("agents-count").textContent).toBe("3 running · 5 this thread");
     expect(screen.getByTestId("agents-subline").textContent).toBe("2 in the background keep running after the turn ends");
     expect(rows().map((r) => [r.getAttribute("data-agent"), r.getAttribute("data-level"), r.getAttribute("data-status")])).toEqual([
@@ -184,7 +184,7 @@ describe("Agents surface", () => {
 
   it("a disconnected thread still lists its runs; no thread selected says so", () => {
     setAgents("s-off", [run("z", { status: "failed", error: "the daemon stopped before the agent finished", endedAtMs: NOW })]);
-    usePanelStore.setState((s) => ({ byKey: { ...s.byKey, "session:s-off": { open: true, tabs: [], activeTabId: null } } }));
+    usePanelStore.setState((s) => ({ byKey: { ...s.byKey, "thread:s-off": { open: true, tabs: [], activeTabId: null } } }));
     act(() => {
       useUiStore.setState({ selection: { kind: "thread", id: "s-off" } });
       showView("panel.agents");

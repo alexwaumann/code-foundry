@@ -87,7 +87,7 @@ function PaletteBody({ initialQuery, initialCommand, initialContext, close }: Bo
   };
 
   const pick = (c: CommandView) => {
-    // session.new: the project picker replaces the model/effort prompts.
+    // thread.new: the project picker replaces the model/effort prompts.
     if (presentInPalette(c.name)) {
       close();
       return;
