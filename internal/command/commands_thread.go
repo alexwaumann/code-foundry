@@ -374,6 +374,10 @@ func FormatThreadItems(snap *v1.ThreadItemsSnapshot, full bool) string {
 		case it.GetUserMessage() != nil:
 			u := it.GetUserMessage()
 			body = "you: " + line(u.GetText())
+			if u.GetOrigin() == v1.MessageOrigin_MESSAGE_ORIGIN_WAKE {
+				// The daemon's, for a wake subscription (commands_thread_subscribe.go).
+				body = "wake: " + line(u.GetWakeTitle())
+			}
 			for _, a := range u.GetAttachments() {
 				kind := "image"
 				if strings.EqualFold(filepath.Ext(a), ".pdf") {
