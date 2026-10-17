@@ -11,6 +11,16 @@ keys absent from `settings.toml` change behaviour.
 | `threads.default_worktree` | `new` (a fresh copy) | `current` (the project folder itself) |
 | `appearance.density` | compact | comfortable |
 
+Status: `make check` green; `make gui-e2e` (both browsers) failed 15 tests per browser on
+the old defaults, all fixed here (the touched specs rerun: 128 passed). Live pass with an
+isolated `CODE_FOUNDRY_HOME`: the fresh `settings.toml` comments out the new defaults,
+`settings get` and `help thread.new` report them, Settings › General shows them, and a
+new composer for a project with no remembered pick reads Sonnet 5 · Medium · In place.
+
+| Dark | Light |
+|---|---|
+| ![Settings › General, dark](new-defaults/settings-dark.png) | ![Settings › General, light](new-defaults/settings-light.png) |
+
 ## Decisions
 
 * **One source per default.** The daemon schema (`internal/store/settings/schema.go`,
