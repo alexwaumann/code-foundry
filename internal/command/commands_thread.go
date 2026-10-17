@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"connectrpc.com/connect"
 
@@ -90,9 +91,20 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 				{Name: "text", Type: String, Required: true, Positional: true, Description: "The message"},
 				{Name: "attachments", Type: String, Description: "Comma-separated image or PDF paths from StageAttachment"},
 				{Name: "composer-text", Type: String, Description: "The GUI composer's text with its tag tokens, kept on the message for display (the GUI sets it)"},
+				{Name: "wait", Type: Bool, Description: "Then wait until Claude has answered the message and the thread is idle, and print the thread " +
+					"like thread.wait (--json: the thread instead of the message item; exits 1 when the time runs out)"},
+				withDefault(ArgSpec{Name: "for", Type: String, Description: "With wait: how long to wait at most, a Go duration such as 30s, 10m or 2h (at most 24h)"},
+					waitForArg.Default),
 			},
 			When: hasThread,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
+				var limit time.Duration
+				if a.Bool("wait") {
+					var err error
+					if limit, err = waitLimit(a); err != nil {
+						return Result{}, err
+					}
+				}
 				res, err := b.Send(ctx, connect.NewRequest(&v1.SendThreadMessageRequest{
 					ThreadId: a.String("id"), Text: a.String("text"), Attachments: splitList(a.String("attachments")),
 					ComposerText: a.String("composer-text"),
@@ -100,7 +112,13 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 				if err != nil {
 					return Result{}, err
 				}
-				return Result{Message: "sent to thread " + a.String("id"), JSON: res.Msg.GetItem()}, nil
+				sent := "sent to thread " + a.String("id")
+				if !a.Bool("wait") {
+					return Result{Message: sent, JSON: res.Msg.GetItem()}, nil
+				}
+				// Past the message's own item: the status of the turn before it (still
+				// "finished" until the new turn's busy is published) does not count.
+				return waitThread(ctx, b, a.String("id"), "idle", res.Msg.GetItem().GetId(), limit, sent+"; ")
 			},
 		},
 		Command{

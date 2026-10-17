@@ -50,32 +50,52 @@ func threadWait(b ThreadBackend, idArg ArgSpec) Command {
 			idArg,
 			{Name: "until", Type: Enum, Enum: ThreadWaitConditions, Default: "idle",
 				Description: "idle, attention (needs attention: a prompt, a question or a finished turn), error, or disconnected"},
-			{Name: "for", Type: String, Default: "10m", Description: "How long to wait at most: a Go duration such as 30s, 10m or 2h (at most 24h)"},
+			waitForArg,
+			{Name: "after", Type: String, Description: "An item id or ordinal (#N in thread read): count the condition only once Claude reacted after it " +
+				"(a turn end, error, permission request or question follows it), so the status of an earlier turn does not count"},
 		},
 		When: hasThread,
 		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-			id, until := a.String("id"), a.String("until")
-			limit, err := time.ParseDuration(strings.TrimSpace(a.String("for")))
-			switch {
-			case err != nil:
-				return Result{}, InvalidArg("for", "%q is not a duration (30s, 10m, 2h)", a.String("for"))
-			case limit <= 0 || limit > maxThreadWait:
-				return Result{}, InvalidArg("for", "%s is out of range: give more than 0 and at most 24h", limit)
-			}
-			res, err := b.Wait(ctx, connect.NewRequest(&v1.WaitThreadRequest{
-				Id: id, Until: threadWaitConditions[until], Timeout: durationpb.New(limit),
-			}))
+			limit, err := waitLimit(a)
 			if err != nil {
 				return Result{}, err
 			}
-			s := res.Msg.GetThread()
-			if res.Msg.GetTimedOut() {
-				return Result{}, connect.NewError(connect.CodeDeadlineExceeded,
-					fmt.Errorf("timed out after %s waiting for thread %s to %s; it is %s", limit, id, threadWaitGoals[until], waitStatus(s)))
-			}
-			return Result{Message: waitLine(s), JSON: s}, nil
+			return waitThread(ctx, b, a.String("id"), a.String("until"), a.String("after"), limit, "")
 		},
 	}
+}
+
+// waitForArg is thread.wait's and thread.send's for.
+var waitForArg = ArgSpec{Name: "for", Type: String, Default: "10m", Description: "How long to wait at most: a Go duration such as 30s, 10m or 2h (at most 24h)"}
+
+// waitLimit reads the for arg.
+func waitLimit(a Args) (time.Duration, error) {
+	limit, err := time.ParseDuration(strings.TrimSpace(a.String("for")))
+	switch {
+	case err != nil:
+		return 0, InvalidArg("for", "%q is not a duration (30s, 10m, 2h)", a.String("for"))
+	case limit <= 0 || limit > maxThreadWait:
+		return 0, InvalidArg("for", "%s is out of range: give more than 0 and at most 24h", limit)
+	}
+	return limit, nil
+}
+
+// waitThread waits (ThreadService.Wait) and answers like thread.wait: the thread's
+// status line and the thread, or DEADLINE_EXCEEDED naming its status. what, when set,
+// starts the timeout message ("sent to thread s-1; ").
+func waitThread(ctx context.Context, b ThreadBackend, id, until, after string, limit time.Duration, what string) (Result, error) {
+	res, err := b.Wait(ctx, connect.NewRequest(&v1.WaitThreadRequest{
+		Id: id, Until: threadWaitConditions[until], Timeout: durationpb.New(limit), After: after,
+	}))
+	if err != nil {
+		return Result{}, err
+	}
+	s := res.Msg.GetThread()
+	if res.Msg.GetTimedOut() {
+		return Result{}, connect.NewError(connect.CodeDeadlineExceeded,
+			fmt.Errorf("%stimed out after %s waiting for thread %s to %s; it is %s", what, limit, id, threadWaitGoals[until], waitStatus(s)))
+	}
+	return Result{Message: waitLine(s), JSON: s}, nil
 }
 
 // waitLine is thread.wait's answer: "thread s-1 fix: idle (at prompt)".

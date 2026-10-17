@@ -534,6 +534,16 @@ func (f *Fake) appendItem(id string, it thread.Item) (thread.Item, thread.Thread
 	return it, thread.ItemAppended{ThreadID: id, Seq: snap.Seq, Item: it}
 }
 
+// AppendItem adds it to id's items (the next ordinal) and publishes ItemAppended, as
+// the runner does for what Claude streams.
+func (f *Fake) AppendItem(id string, it thread.Item) thread.Item {
+	f.mu.Lock()
+	it, ev := f.appendItem(id, it)
+	f.mu.Unlock()
+	bus.Publish(f.bus, ev)
+	return it
+}
+
 // Send records "Send <id> <text>" (" attachments=<a,b>" and " composer=<text>" when
 // set) and appends a user_message item. A disconnected thread becomes CONNECTED (the
 // Manager starts it). Sending unarchives and unsnoozes.
