@@ -10,9 +10,10 @@ import (
 // watched, and due. Every string that comes from outside (search queries, owners, names,
 // branches, ids, times) is a variable; only our own constants (search types, sizes) are
 // written into the text. Aliases: s_<section> for searches, r<i> for repositories with
-// b<j> for watched branches inside; for the stats (k is the month: 0 current, 1 the one
-// before, ...) m<k> global merged counts, r<i>_m<k> per-repository merged counts,
-// contributions { c<k> }, and history { h<k> } inside r<i>.
+// b<j> for watched branches inside; for the stats (k indexes the plan's months, newest
+// first) m<k> global merged counts, r<i>_m<k> per-repository merged counts,
+// contributions { c<k> }, and history { h<k> } inside r<i>. The poll carries the
+// current month; the closed months go in their own PollStats documents (statsOnly).
 
 // Search sections of the poll, in dashboard order.
 const (
@@ -34,6 +35,12 @@ const (
 	// branch name reused by many people (or a watched default branch) still leaves room
 	// for the viewer's own pull requests; the fingerprint is cheap (~11ms per PR).
 	branchFirst = 25
+	// closedReposPerRequest caps the repositories in one closed-month stats request.
+	// Each repository's five closed months are five first: 0 searches (~115ms of
+	// server time each, serially) and five history counts (~85ms): about 1s, so four
+	// plus the global months stay near 5s, well inside GitHub's ~10s budget (measured
+	// 2026-10: 66 searches took 7.6s; 6 months of 10 repositories timed out at 11s).
+	closedReposPerRequest = 4
 )
 
 // searchSection is one dashboard search.
@@ -71,7 +78,7 @@ type repoPlan struct {
 	branches []string
 	// months selects this repository's stats (stats due, tracked): the viewer's merged
 	// pull requests and default-branch commits in each month, newest first (the current
-	// month, or every month when its closed months are due).
+	// month in the poll, the closed ones in a statsOnly plan).
 	months []monthWindow
 }
 
@@ -79,8 +86,9 @@ type repoPlan struct {
 type statsPlan struct {
 	// all are the statsMonths windows, newest first.
 	all []monthWindow
-	// months are the global months asked for, newest first: the current month, plus the
-	// closed ones when due. Each repository has its own (repoPlan.months).
+	// months are the global months asked for, newest first: the current month in the
+	// poll, the closed ones (or none) in a statsOnly plan. Each repository has its own
+	// (repoPlan.months).
 	months []monthWindow
 	// login is whose contributions are counted; author is its node id (history).
 	login, author string
@@ -98,17 +106,22 @@ func (st *statsPlan) mergedQuery(w monthWindow, repo string) string {
 	return q
 }
 
-// closed reports whether the plan asks for any closed month.
-func (st *statsPlan) closed(repos []repoPlan) bool {
-	if len(st.months) > 1 {
-		return true
-	}
-	for _, r := range repos {
-		if len(r.months) > 1 {
-			return true
+// closedPlans splits the closed months that are due into statsOnly requests of at
+// most closedReposPerRequest repositories each; the first also carries the global
+// closed months when they are due.
+func closedPlans(st *statsPlan, global bool, repos []repoPlan) []*pollPlan {
+	var out []*pollPlan
+	for len(repos) > 0 || global {
+		n := min(closedReposPerRequest, len(repos))
+		cs := *st
+		cs.months = nil
+		if global {
+			cs.months = st.all[1:]
 		}
+		out = append(out, &pollPlan{statsOnly: true, stats: &cs, repos: repos[:n:n]})
+		repos, global = repos[n:], false
 	}
-	return false
+	return out
 }
 
 func monthAlias(k int) string { return fmt.Sprintf("m%d", k) }
@@ -126,6 +139,11 @@ type pollPlan struct {
 	// statsDeferred is set when the stats are due but wait for the author's node id,
 	// which this poll learns: the next poll follows right away.
 	statsDeferred bool
+	// closed are the closed-month stats requests (statsOnly plans) that follow this
+	// poll when those months are due; the poll itself carries the current month only.
+	closed []*pollPlan
+	// statsOnly names the document PollStats: a closed-month stats request.
+	statsOnly bool
 }
 
 // repoAlias is the alias of plan.repos[i].
@@ -174,7 +192,7 @@ func (p *pollPlan) build() (string, map[string]any, error) {
 		}
 		for k, w := range deep {
 			since = append(since, declare(fmt.Sprintf("h%ds", k), "GitTimestamp!", w.Start.Format(time.RFC3339)))
-			if k == 0 {
+			if w.Label == p.stats.all[0].Label {
 				until = append(until, "") // the current month runs to now
 			} else {
 				until = append(until, declare(fmt.Sprintf("h%du", k), "GitTimestamp!", w.next().Format(time.RFC3339)))
@@ -215,7 +233,7 @@ func (p *pollPlan) build() (string, map[string]any, error) {
 				fmt.Fprintf(&body, "  %s: search(query: %s, type: ISSUE, first: 0) { issueCount }\n", a, declare(a, "String!", st.mergedQuery(w, r.slug)))
 			}
 		}
-		if st.login != "" {
+		if st.login != "" && len(st.months) > 0 {
 			fmt.Fprintf(&body, "  contributions: user(login: %s) {", declare("statsLogin", "String!", st.login))
 			for k, w := range st.months {
 				fmt.Fprintf(&body, " c%d: contributionsCollection(from: %s, to: %s) { totalCommitContributions }", k,
@@ -225,6 +243,9 @@ func (p *pollPlan) build() (string, map[string]any, error) {
 		}
 	}
 	head := "query Poll"
+	if p.statsOnly {
+		head = "query PollStats"
+	}
 	if len(decls) > 0 {
 		head += "(" + strings.Join(decls, ", ") + ")"
 	}
@@ -248,7 +269,7 @@ func (p *pollPlan) summary() []any {
 		for _, r := range p.repos {
 			aliases += len(r.months)
 		}
-		out = append(out, "stats_months", len(p.stats.months), "stats_closed", p.stats.closed(p.repos), "stats_merged_searches", aliases)
+		out = append(out, "stats_months", len(p.stats.months), "stats_merged_searches", aliases, "stats_closed_requests", len(p.closed))
 	}
 	return out
 }

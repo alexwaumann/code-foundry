@@ -297,7 +297,9 @@ func (s *Store) Track(slug string) error {
 		s.pollSoonLocked(now)
 	}
 	if a.Stats.FetchedAt.IsZero() {
-		s.statsNext = now // the next poll brings its stats (and refreshes the others)
+		// The next poll brings its stats (and refreshes the others). Zero, not now: a
+		// poll that started a moment ago and plans after this sees them due.
+		s.statsNext = time.Time{}
 	}
 	s.mu.Unlock()
 	s.setTracked(key, true)

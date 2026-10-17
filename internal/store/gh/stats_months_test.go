@@ -195,37 +195,35 @@ func TestMergeObserved(t *testing.T) {
 	}
 }
 
-// TestPlanPollStatsMonths: which months a stats poll asks for, globally and per
-// repository.
+// TestPlanPollStatsMonths: a stats poll carries the current month; the closed months
+// that are due follow in their own requests (globally and per repository).
 func TestPlanPollStatsMonths(t *testing.T) {
 	oct := time.Date(2026, 10, 17, 12, 0, 0, 0, time.Local)
 	nov := time.Date(2026, 11, 1, 0, 30, 0, 0, time.Local)
 	hourAgo := fullStats(oct.Add(-time.Hour))
+	dayOld := fullStats(oct.Add(-25 * time.Hour))
 	tests := []struct {
-		name      string
-		now       time.Time
-		global    MonthlyStats
-		repos     map[string]MonthlyStats
-		notDue    bool
-		want      int            // global months asked; 0: no stats part
-		wantRepos map[string]int // months asked per repository
+		name   string
+		now    time.Time
+		global MonthlyStats
+		repos  map[string]MonthlyStats
+		notDue bool
+		// want: the closed-month requests, each "global" (or "-") and its repositories.
+		want string
 	}{
-		{name: "nothing cached: everything", now: oct,
-			want: 6, wantRepos: map[string]int{"o/r": 6, "o/s": 6}},
+		{name: "nothing cached: everything", now: oct, want: "[global o/r o/s]"},
 		{name: "closed months fresh: current only", now: oct, global: hourAgo,
-			repos: map[string]MonthlyStats{"o/r": hourAgo, "o/s": hourAgo},
-			want:  1, wantRepos: map[string]int{"o/r": 1, "o/s": 1}},
-		{name: "a day old: everything", now: oct, global: fullStats(oct.Add(-25 * time.Hour)),
-			repos: map[string]MonthlyStats{"o/r": fullStats(oct.Add(-25 * time.Hour)), "o/s": fullStats(oct.Add(-25 * time.Hour))},
-			want:  6, wantRepos: map[string]int{"o/r": 6, "o/s": 6}},
-		{name: "newly tracked repository: its six, the rest current", now: oct, global: hourAgo,
-			repos: map[string]MonthlyStats{"o/r": hourAgo},
-			want:  1, wantRepos: map[string]int{"o/r": 1, "o/s": 6}},
+			repos: map[string]MonthlyStats{"o/r": hourAgo, "o/s": hourAgo}, want: "[]"},
+		{name: "a day old: everything", now: oct, global: dayOld,
+			repos: map[string]MonthlyStats{"o/r": dayOld, "o/s": dayOld}, want: "[global o/r o/s]"},
+		{name: "newly tracked repository: only its closed months", now: oct, global: hourAgo,
+			repos: map[string]MonthlyStats{"o/r": hourAgo}, want: "[- o/s]"},
+		{name: "global only", now: oct, global: dayOld,
+			repos: map[string]MonthlyStats{"o/r": hourAgo, "o/s": hourAgo}, want: "[global]"},
 		{name: "month rolled over", now: nov, global: fullStats(nov.Add(-90 * time.Minute)),
 			repos: map[string]MonthlyStats{"o/r": fullStats(nov.Add(-90 * time.Minute)), "o/s": fullStats(nov.Add(-90 * time.Minute))},
-			want:  6, wantRepos: map[string]int{"o/r": 6, "o/s": 6}},
-		{name: "not due: no stats", now: oct, global: hourAgo, notDue: true,
-			repos: map[string]MonthlyStats{"o/r": hourAgo, "o/s": hourAgo}},
+			want:  "[global o/r o/s]"},
+		{name: "not due: no stats", now: oct, notDue: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -255,9 +253,9 @@ func TestPlanPollStatsMonths(t *testing.T) {
 			}
 			s.mu.Unlock()
 			plan, _ := s.planPoll(s.config(), tt.now)
-			if tt.want == 0 {
-				if plan.stats != nil {
-					t.Errorf("stats planned: %v", labelsOf(plan.stats.months))
+			if tt.notDue {
+				if plan.stats != nil || plan.closed != nil {
+					t.Errorf("stats planned")
 				}
 				for _, r := range plan.repos {
 					if r.months != nil {
@@ -266,17 +264,90 @@ func TestPlanPollStatsMonths(t *testing.T) {
 				}
 				return
 			}
-			if plan.stats == nil {
-				t.Fatal("no stats planned")
-			}
 			ws := monthWindows(tt.now, statsMonths)
-			if got := labelsOf(plan.stats.months); !slices.Equal(got, labelsOf(ws[:tt.want])) {
-				t.Errorf("global months = %v, want %d", got, tt.want)
+			cur := fmt.Sprint(labelsOf(ws[:1]))
+			if plan.stats == nil || fmt.Sprint(labelsOf(plan.stats.months)) != cur {
+				t.Fatalf("poll stats = %+v, want the current month", plan.stats)
 			}
 			for _, r := range plan.repos {
-				if got := labelsOf(r.months); !slices.Equal(got, labelsOf(ws[:tt.wantRepos[r.slug]])) {
-					t.Errorf("%s months = %v, want %d", r.slug, got, tt.wantRepos[r.slug])
+				if fmt.Sprint(labelsOf(r.months)) != cur {
+					t.Errorf("%s: poll months = %v", r.slug, labelsOf(r.months))
 				}
+			}
+			var got []string
+			closed := fmt.Sprint(labelsOf(ws[1:]))
+			for _, cp := range plan.closed {
+				if !cp.statsOnly || len(cp.sections) > 0 {
+					t.Errorf("closed request is not stats only: %+v", cp)
+				}
+				switch g := labelsOf(cp.stats.months); len(g) {
+				case 0:
+					got = append(got, "-")
+				default:
+					if fmt.Sprint(g) != closed {
+						t.Errorf("global closed months = %v", g)
+					}
+					got = append(got, "global")
+				}
+				for _, r := range cp.repos {
+					if fmt.Sprint(labelsOf(r.months)) != closed || r.defaultBranch || r.branches != nil {
+						t.Errorf("%s: closed request = %+v", r.slug, r)
+					}
+					got = append(got, r.slug)
+				}
+			}
+			if fmt.Sprint(got) != tt.want {
+				t.Errorf("closed requests = %v, want %s", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestClosedPlans(t *testing.T) {
+	all := monthWindows(time.Date(2026, 10, 17, 12, 0, 0, 0, time.UTC), statsMonths)
+	st := &statsPlan{all: all, months: all[:1], login: "octocat", author: "A1", me: "@me"}
+	repos := func(n int) []repoPlan {
+		var out []repoPlan
+		for i := range n {
+			out = append(out, repoPlan{slug: fmt.Sprintf("o/r%d", i), months: all[1:]})
+		}
+		return out
+	}
+	tests := []struct {
+		name   string
+		global bool
+		repos  int
+		want   string // per request: global months, repositories
+	}{
+		{"nothing due", false, 0, "[]"},
+		{"global only", true, 0, "[5/0]"},
+		{"global and three", true, 3, "[5/3]"},
+		{"nine repositories", false, 9, "[0/4 0/4 0/1]"},
+		{"global and five", true, 5, "[5/4 0/1]"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var got []string
+			for _, p := range closedPlans(st, tt.global, repos(tt.repos)) {
+				got = append(got, fmt.Sprintf("%d/%d", len(p.stats.months), len(p.repos)))
+				doc, vars, err := p.build()
+				if err != nil {
+					t.Fatal(err)
+				}
+				checkDoc(t, tt.name, doc, vars)
+				if !strings.HasPrefix(doc, "query PollStats(") || strings.Contains(doc, "search(query: $q_") {
+					t.Errorf("doc = %s", doc)
+				}
+				// Closed months end where the next month starts; none runs to now.
+				if len(p.repos) > 0 && (!strings.Contains(doc, "h0: history(author: {id: $author}, since: $h0s, until: $h0u)") || vars["h0u"] != all[0].Start.Format(time.RFC3339)) {
+					t.Errorf("closed history = %s %v", doc, vars)
+				}
+			}
+			if st.months[0].Label != all[0].Label || len(st.months) != 1 {
+				t.Errorf("closedPlans changed the poll's stats plan")
+			}
+			if fmt.Sprint(got) != tt.want {
+				t.Errorf("requests = %v, want %s", got, tt.want)
 			}
 		})
 	}
@@ -384,23 +455,33 @@ func TestPollStatsSixMonths(t *testing.T) {
 	pollOnce(t, s, f) // settles any poll still running
 	all := fmt.Sprint(labelsOf(w))
 	cur := fmt.Sprint(labelsOf(w[:1]))
-	checkAsk := func(what string, i int, global string, repos map[string]string) {
+	// checkAsk checks the months asked for since mark (the poll and the closed-month
+	// requests after it, together) and the number of documents; it returns the new mark.
+	mark := 0
+	checkAsk := func(what string, docs int, global string, repos map[string]string) {
 		t.Helper()
-		asks := g.asks()
-		if len(asks) != i+1 {
-			t.Fatalf("%s: %d stats polls, want %d", what, len(asks), i+1)
+		asks := g.asks()[mark:]
+		mark += len(asks)
+		if len(asks) != docs {
+			t.Errorf("%s: %d stats documents, want %d", what, len(asks), docs)
 		}
-		a := asks[i]
-		if fmt.Sprint(a.global) != global {
-			t.Errorf("%s: global months = %v, want %s", what, a.global, global)
+		union := fakeStatsAsk{repos: map[string][]string{}}
+		for _, a := range asks {
+			union.global = append(union.global, a.global...)
+			for slug, ms := range a.repos {
+				union.repos[slug] = append(union.repos[slug], ms...)
+			}
+		}
+		if fmt.Sprint(union.global) != global {
+			t.Errorf("%s: global months = %v, want %s", what, union.global, global)
 		}
 		for slug, want := range repos {
-			if fmt.Sprint(a.repos[slug]) != want {
-				t.Errorf("%s: %s months = %v, want %s", what, slug, a.repos[slug], want)
+			if fmt.Sprint(union.repos[slug]) != want {
+				t.Errorf("%s: %s months = %v, want %s", what, slug, union.repos[slug], want)
 			}
 		}
 	}
-	checkAsk("first", 0, all, map[string]string{"o/r": all, "o/other": all})
+	checkAsk("first", 2, all, map[string]string{"o/r": all, "o/other": all})
 	check := func(what string, st MonthlyStats, commits, merged string) {
 		t.Helper()
 		labels, c, m := columns(st)
@@ -459,14 +540,14 @@ func TestPollStatsSixMonths(t *testing.T) {
 	}
 	s2.statsDueNow("test")
 	pollOnce(t, s2, f2)
-	checkAsk("after restart", 2, cur, map[string]string{"o/r": cur, "o/other": cur})
+	checkAsk("after restart", 1, cur, map[string]string{"o/r": cur, "o/other": cur})
 
 	// A day later the closed months are refetched with the current one.
 	clk.advance(25 * time.Hour)
 	pollOnce(t, s2, f2)
 	w = monthWindows(clk.now(), statsMonths)
 	all, cur = fmt.Sprint(labelsOf(w)), fmt.Sprint(labelsOf(w[:1]))
-	checkAsk("a day later", 3, all, map[string]string{"o/r": all, "o/other": all})
+	checkAsk("a day later", 2, all, map[string]string{"o/r": all, "o/other": all})
 
 	// A newly tracked repository gets its six months; the others the current one.
 	g.setRepo("o/new", &fakeRepo{branch: "main", sha: "n1"})
@@ -474,16 +555,30 @@ func TestPollStatsSixMonths(t *testing.T) {
 		t.Fatal(err)
 	}
 	pollOnce(t, s2, f2)
-	checkAsk("new repository", 4, cur, map[string]string{"o/r": cur, "o/other": cur, "o/new": all})
+	checkAsk("new repository", 2, cur, map[string]string{"o/r": cur, "o/other": cur, "o/new": all})
 	if st := s2.Snapshot().Repos["o/new"].Activity.Stats; len(st.Months) != statsMonths || st.ClosedAt.IsZero() {
 		t.Errorf("o/new stats = %+v", st)
 	}
 
 	// Within the interval, no stats.
 	pollOnce(t, s2, f2)
-	if n := len(g.asks()); n != 5 {
-		t.Errorf("stats polls = %d, want 5", n)
+	checkAsk("within the interval", 0, "[]", nil)
+
+	// A failed closed-month request: the current month still applies, the closed months
+	// stay as they were (ClosedAt too), and the next stats poll asks for them again.
+	clk.advance(25 * time.Hour)
+	w = monthWindows(clk.now(), statsMonths)
+	all, cur = fmt.Sprint(labelsOf(w)), fmt.Sprint(labelsOf(w[:1]))
+	closedBefore := s2.Snapshot().Dashboard.Stats.ClosedAt
+	g.failNext("PollStats", fmt.Errorf("HTTP 504: %w", ErrServerTimeout))
+	pollOnce(t, s2, f2)
+	checkAsk("closed request failed", 1, cur, map[string]string{"o/r": cur})
+	if st := s2.Snapshot().Dashboard.Stats; !st.ClosedAt.Equal(closedBefore) || st.LastError != "" || len(st.Months) != statsMonths {
+		t.Errorf("after a failed closed request: ClosedAt %v (was %v), err %q, %d months", st.ClosedAt, closedBefore, st.LastError, len(st.Months))
 	}
+	s2.statsDueNow("test")
+	pollOnce(t, s2, f2)
+	checkAsk("closed months again", 2, all, map[string]string{"o/r": all, "o/other": all, "o/new": all})
 }
 
 // TestPollStatsDueOnObservedMerge: a poll whose recently merged list gains a pull

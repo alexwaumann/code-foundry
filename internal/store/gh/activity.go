@@ -318,18 +318,19 @@ func closedDue(st MonthlyStats, windows []monthWindow, now time.Time, interval t
 	return false
 }
 
-// mergeMonths lays fresh counts (newest first, a prefix of windows) over prev: one entry
-// per window, newest first; a window in neither is zero.
+// mergeMonths lays fresh counts over prev, by month: one entry per window, newest
+// first; a window in neither is zero.
 func mergeMonths(windows []monthWindow, prev MonthlyStats, fresh []MonthCount) []MonthCount {
 	out := make([]MonthCount, len(windows))
 	for i, w := range windows {
-		switch c, ok := prev.Month(w.Label); {
-		case i < len(fresh):
-			out[i] = fresh[i]
-		case ok:
+		out[i] = MonthCount{Month: w.Label}
+		if c, ok := prev.Month(w.Label); ok {
 			out[i] = c
-		default:
-			out[i] = MonthCount{Month: w.Label}
+		}
+		for _, c := range fresh {
+			if c.Month == w.Label {
+				out[i] = c
+			}
 		}
 	}
 	return out

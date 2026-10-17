@@ -133,13 +133,17 @@ func (s *Store) planPoll(cfg Config, now time.Time) (pollPlan, bool) {
 		}
 	}
 	author := s.authorID()
-	var windows []monthWindow
 	snap := s.Snapshot()
+	var (
+		windows      []monthWindow
+		closedRepos  []repoPlan
+		globalClosed bool
+	)
 	switch {
 	case statsDue && author != "":
 		windows = monthWindows(now, statsMonths)
-		plan.stats = &statsPlan{all: windows, months: s.statsMonthsFor(snap.Dashboard.Stats, windows, now),
-			login: s.viewerLogin(), author: author, me: s.searchLogin()}
+		plan.stats = &statsPlan{all: windows, months: windows[:1], login: s.viewerLogin(), author: author, me: s.searchLogin()}
+		globalClosed = closedDue(snap.Dashboard.Stats, windows, now, s.opts.HistoryInterval)
 	case statsDue:
 		plan.statsDeferred = true
 	}
@@ -158,20 +162,17 @@ func (s *Store) planPoll(cfg Config, now time.Time) (pollPlan, bool) {
 		slices.Sort(heads[slug])
 		rp := repoPlan{slug: slug, defaultBranch: isTracked[slug], branches: heads[slug]}
 		if plan.stats != nil && isTracked[slug] {
-			rp.months = s.statsMonthsFor(snap.Repos[slug].Activity.Stats, windows, now)
+			rp.months = windows[:1]
+			if closedDue(snap.Repos[slug].Activity.Stats, windows, now, s.opts.HistoryInterval) {
+				closedRepos = append(closedRepos, repoPlan{slug: slug, months: windows[1:]})
+			}
 		}
 		plan.repos = append(plan.repos, rp)
 	}
-	return plan, len(tracked) == 0 && len(heads) == 0
-}
-
-// statsMonthsFor picks the months a stats poll asks for, given what st holds: every
-// month when its closed months are due (closedDue), else the current one.
-func (s *Store) statsMonthsFor(st MonthlyStats, windows []monthWindow, now time.Time) []monthWindow {
-	if closedDue(st, windows, now, s.opts.HistoryInterval) {
-		return windows
+	if plan.stats != nil {
+		plan.closed = closedPlans(plan.stats, globalClosed, closedRepos)
 	}
-	return windows[:1]
+	return plan, len(tracked) == 0 && len(heads) == 0
 }
 
 // nextStatsAt is when the current month's stats are next due after a fetch at t:
@@ -191,7 +192,7 @@ func (s *Store) statsDueNow(reason string, attrs ...any) {
 		return
 	}
 	s.mu.Lock()
-	s.statsNext = s.opts.Now()
+	s.statsNext = time.Time{} // due for any poll planned from now on (see Track)
 	s.mu.Unlock()
 	s.log.Debug("gh stats due", append([]any{"reason", reason}, attrs...)...)
 }
@@ -721,9 +722,11 @@ func (s *Store) fetchFailing(ctx context.Context, reqs []ciRequest, cis map[stri
 	}
 }
 
-// applyStats turns the poll's stats part (and the REST commit searches) into the
-// global stats, which it returns, and per-repository stats, which it adds to repoStats.
-// The months asked for replace the held ones; the others (closed months not due) stay.
+// applyStats turns the poll's stats part, the closed-month requests that follow it
+// (plan.closed), and the REST commit searches into the global stats, which it returns,
+// and per-repository stats, which it adds to repoStats. The months fetched replace the
+// held ones; the others stay. A failed closed-month request leaves its months (and
+// ClosedAt) as they were, so the next stats poll asks again.
 func (s *Store) applyStats(ctx context.Context, cfg Config, plan *pollPlan, res *pollResult, snap *Snapshot, repoStats map[string]MonthlyStats) *MonthlyStats {
 	sp, st := plan.stats, res.Stats
 	start := s.opts.Now()
@@ -742,18 +745,45 @@ func (s *Store) applyStats(ctx context.Context, cfg Config, plan *pollPlan, res 
 		g.LastError = err.Error()
 		return &g
 	}
-	fresh := make([]MonthCount, len(sp.months))
-	for k, w := range sp.months {
-		fresh[k] = MonthCount{Month: w.Label, Merged: st.Merged[k]}
-		if st.HasContrib {
-			fresh[k].Commits, fresh[k].Source = st.Contrib[k], CommitsFromContributions
+	parts := []statsPart{{plan, res}}
+	for _, cp := range plan.closed {
+		r, err := s.fetchClosedStats(ctx, cp)
+		if err != nil {
+			if ctx.Err() != nil {
+				return nil
+			}
+			s.log.Warn("gh closed-month stats failed; asked again with the next stats", "repos", len(cp.repos), "global", len(cp.stats.months) > 0, "err", err)
+			continue
+		}
+		parts = append(parts, statsPart{cp, r})
+	}
+
+	// Global: every month a part brought, then REST commit counts for them.
+	var (
+		fresh   []MonthCount
+		windows []monthWindow
+	)
+	for _, p := range parts {
+		gs := p.res.Stats
+		if gs == nil || gs.Err != nil {
+			if p.plan != plan {
+				s.log.Warn("gh closed-month stats failed", "err", cmpErr(gs.Err, errors.New("no stats in the response")))
+			}
+			continue
+		}
+		for k, w := range p.plan.stats.months {
+			c := MonthCount{Month: w.Label, Merged: gs.Merged[k]}
+			if gs.HasContrib {
+				c.Commits, c.Source = gs.Contrib[k], CommitsFromContributions
+			}
+			fresh, windows = append(fresh, c), append(windows, w)
 		}
 	}
 	// REST search/commits counts commits by author date in our time zone, which
 	// contributionsCollection cannot (it buckets by UTC day). Prefer it when it works;
 	// after a failure the remaining months keep the contributions counts.
 	if rr, ok := s.opts.Runner.(RESTRunner); ok {
-		for k, w := range sp.months {
+		for k, w := range windows {
 			n, err := s.searchCommits(ctx, rr, fmt.Sprintf("author:%s author-date:%s", sp.me, w.searchRange()))
 			if err != nil {
 				if ctx.Err() == nil {
@@ -767,27 +797,48 @@ func (s *Store) applyStats(ctx context.Context, cfg Config, plan *pollPlan, res 
 	fetched := s.opts.Now()
 	merge := func(prev MonthlyStats, fresh []MonthCount) MonthlyStats {
 		out := MonthlyStats{Months: mergeMonths(sp.all, prev, fresh), FetchedAt: fetched, ClosedAt: prev.ClosedAt}
-		if len(fresh) > 1 {
-			out.ClosedAt = fetched
+		for _, c := range fresh {
+			if c.Month != sp.all[0].Label {
+				out.ClosedAt = fetched
+			}
 		}
 		out.CommitsSource = commitsSource(out.Months)
 		return out
 	}
 	global := merge(snap.Dashboard.Stats, fresh)
+
+	// Per repository: the poll's current month, plus closed months from the requests.
 	for _, rp := range plan.repos {
 		if len(rp.months) == 0 {
 			continue
 		}
-		rr := res.Repos[rp.slug]
 		prev := snap.Repos[rp.slug].Activity.Stats
-		if rr.Commits == nil || rr.Merged == nil {
-			prev.LastError = cmpErr(rr.Err, rr.StatsErr, errors.New("no commit history in the response")).Error()
+		var counts []MonthCount
+		var failed error
+		for _, p := range parts {
+			for _, cr := range p.plan.repos {
+				if cr.slug != rp.slug || len(cr.months) == 0 {
+					continue
+				}
+				rr := p.res.Repos[cr.slug]
+				if rr.Commits == nil || rr.Merged == nil {
+					err := cmpErr(rr.Err, rr.StatsErr, errors.New("no commit history in the response"))
+					if p.plan == plan {
+						failed = err
+					} else {
+						s.log.Warn("gh closed-month stats failed", "slug", cr.slug, "err", err)
+					}
+					continue
+				}
+				for k, w := range cr.months {
+					counts = append(counts, MonthCount{Month: w.Label, Commits: rr.Commits[k], Merged: rr.Merged[k], Source: CommitsFromSearch})
+				}
+			}
+		}
+		if failed != nil {
+			prev.LastError = failed.Error()
 			repoStats[rp.slug] = prev
 			continue
-		}
-		counts := make([]MonthCount, len(rp.months))
-		for k, w := range rp.months {
-			counts[k] = MonthCount{Month: w.Label, Commits: rr.Commits[k], Merged: rr.Merged[k], Source: CommitsFromSearch}
 		}
 		repoStats[rp.slug] = merge(prev, counts)
 	}
@@ -796,6 +847,30 @@ func (s *Store) applyStats(ctx context.Context, cfg Config, plan *pollPlan, res 
 	s.statsNext = s.nextStatsAt(start)
 	s.mu.Unlock()
 	return &global
+}
+
+// statsPart is one stats request: the poll, or a closed-month request.
+type statsPart struct {
+	plan *pollPlan
+	res  *pollResult
+}
+
+// fetchClosedStats runs one closed-month stats request.
+func (s *Store) fetchClosedStats(ctx context.Context, cp *pollPlan) (*pollResult, error) {
+	doc, vars, err := cp.build()
+	if err != nil {
+		return nil, err
+	}
+	data, err := s.callDoc(ctx, queryPollStats, doc, vars)
+	var partial *PartialError
+	if err != nil && !errors.As(err, &partial) {
+		return nil, err
+	}
+	res, err := decodePoll(cp, data, partial)
+	if err != nil {
+		return nil, err
+	}
+	return &res, nil
 }
 
 // searchCommits returns REST search/commits' total_count for q. REST search has its

@@ -27,8 +27,9 @@ type fakeGitHub struct {
 	merged []mergedItem
 	// contrib are the commit contributions by month ("YYYY-MM").
 	contrib map[string]int
-	// statsMonths records, per poll that carried stats, the global months asked for
-	// (labels, newest first) and each repository's (by slug).
+	// statsMonths records, per document that carried stats (the poll or a closed-month
+	// request), the global months asked for (labels, newest first) and each
+	// repository's (by slug).
 	statsMonths []fakeStatsAsk
 	cost        int
 	// fail makes the next request of an operation fail with err (then clears).
@@ -165,7 +166,7 @@ func (g *fakeGitHub) respond(op, doc string, vars map[string]any) (json.RawMessa
 		"resetAt": time.Now().Add(time.Hour).UTC().Format(time.RFC3339)}}
 	var errs []map[string]any
 	switch op {
-	case "Poll":
+	case "Poll", "PollStats":
 		g.poll(doc, vars, data, &errs)
 	case "PullRequestDetails":
 		for _, list := range []string{"open", "closed"} {
