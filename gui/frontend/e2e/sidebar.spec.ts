@@ -9,7 +9,7 @@ const WS = "w-000000000001";
 
 interface ThreadSummary {
   id: string;
-  repoId: string;
+  projectId: string;
   worktreePath: string;
   workspaceId: string;
   pendingWorktreePath: string;
@@ -165,7 +165,7 @@ test("Run in… from the context menu moves a workspace thread; the row shows th
   await members.locator('[data-member="repo-cf"]').click();
 
   const inv = await lastInvocation("thread.run-in");
-  expect(inv?.args).toEqual({ repo: "repo-cf" });
+  expect(inv?.args).toEqual({ project: "repo-cf" });
   expect(inv?.context).toMatchObject({ activeThreadId: driver, activeWorkspaceId: WS, activeView: "thread" });
   // Queued until the thread is idle at its prompt (the mock: ~2s), then the row's worktree changes.
   await expect(d.getByTestId("row-moving")).toHaveText("moving to code-foundry…");
@@ -173,7 +173,7 @@ test("Run in… from the context menu moves a workspace thread; the row shows th
   await expect(d.getByTestId("row-project")).toHaveText("code-foundry");
   await expect(d.getByTestId("row-branch")).toHaveText("cf/login");
   await expect(d.getByTestId("row-workspace")).toHaveText("login");
-  expect(await thread(driver)).toMatchObject({ repoId: "repo-cf", worktreePath: CF_LOGIN, pendingWorktreePath: "" });
+  expect(await thread(driver)).toMatchObject({ projectId: "repo-cf", worktreePath: CF_LOGIN, pendingWorktreePath: "" });
 });
 
 test("Run in… is absent for a project thread and offered in the palette for a workspace thread", async ({ page }) => {
@@ -202,7 +202,7 @@ test("Run in… is absent for a project thread and offered in the palette for a 
   await picker.locator('[data-member="repo-cf"]').click();
   await expect(picker).toHaveCount(0);
   const inv = await lastInvocation("thread.run-in");
-  expect(inv?.args).toEqual({ repo: "repo-cf" });
+  expect(inv?.args).toEqual({ project: "repo-cf" });
   expect(inv?.context).toMatchObject({ activeThreadId: driver, activeWorkspaceId: WS });
   await expect(row(page, `s:${driver}`).getByTestId("row-moving")).toBeVisible();
 });
@@ -233,16 +233,16 @@ test("the Projects page lists projects with their own worktrees and workspaces w
   await expect(ws.getByTestId("member-name")).toHaveText(["code-foundry", "ghostty-playground"]);
   await expect(ws.getByTestId("worktree-branch")).toHaveText(["cf/login", "cf/login"]);
 
-  // Add a member (workspace.add-repo).
+  // Add a member (workspace.add-project).
   await ws.getByTestId("workspace-add-member").click();
   await page.getByTestId("workspace-add-member-list").getByRole("option", { name: "dotfiles" }).click();
-  const add = await lastInvocation("workspace.add-repo");
-  expect(add?.args).toEqual({ repo: "dotfiles", workspace: WS });
+  const add = await lastInvocation("workspace.add-project");
+  expect(add?.args).toEqual({ project: "dotfiles", workspace: WS });
   await expect(ws.getByTestId("member-name")).toHaveText(["code-foundry", "ghostty-playground", "dotfiles"]);
 
-  // Remove one (workspace.remove-repo, confirmed).
+  // Remove one (workspace.remove-project, confirmed).
   const member = ws.locator('[data-nav-key="m:w-000000000001::repo-cf"]');
-  // By keyboard: the add-repo toast sits over the menu's bottom-right corner.
+  // By keyboard: the add-project toast sits over the menu's bottom-right corner.
   await member.getByTestId("member-more").click();
   await page.getByTestId("member-remove").focus();
   await page.keyboard.press("Enter");
@@ -250,9 +250,9 @@ test("the Projects page lists projects with their own worktrees and workspaces w
   await expect(dialog).toContainText("Remove project code-foundry from its workspace?");
   await dialog.getByTestId("confirm-ok").click();
   await expect(ws.getByTestId("member-name")).toHaveText(["ghostty-playground", "dotfiles"]);
-  const removed = (await invocations()).filter((i) => i.name === "workspace.remove-repo");
+  const removed = (await invocations()).filter((i) => i.name === "workspace.remove-project");
   expect(removed.map((i) => i.confirmed)).toEqual([false, true]);
-  expect(removed.at(-1)?.args).toEqual({ repo: "code-foundry", workspace: WS });
+  expect(removed.at(-1)?.args).toEqual({ project: "code-foundry", workspace: WS });
   // The worktree is gone from disk (and so from the projects too).
   await expect(cf.getByTestId("project-in-workspaces")).toHaveCount(0);
 
@@ -292,15 +292,15 @@ test("the Projects page removes a workspace and offers project actions", async (
   await gp.getByTestId("project-new-thread").click();
   await expect(page.getByTestId("composer-heading")).toContainText("ghostty-playground");
 
-  // Remove a worktree (repo.worktree.remove with that worktree's context, confirmed).
+  // Remove a worktree (project.worktree.remove with that worktree's context, confirmed).
   await openProjects(page);
   const fix = page.locator(`[data-nav-key="pw:repo-cf::${CF}.worktrees/fix-resize"]`);
   await fix.getByTestId("worktree-more").click();
   await page.getByTestId("worktree-remove").click();
   await page.getByTestId("confirm-dialog").getByTestId("confirm-ok").click();
   await expect(fix).toHaveCount(0);
-  const rm = (await invocations()).filter((i) => i.name === "repo.worktree.remove").at(-1);
-  expect(rm?.context).toMatchObject({ activeRepoId: "repo-cf", activeWorktreePath: `${CF}.worktrees/fix-resize`, activeView: "projects" });
+  const rm = (await invocations()).filter((i) => i.name === "project.worktree.remove").at(-1);
+  expect(rm?.context).toMatchObject({ activeProjectId: "repo-cf", activeWorktreePath: `${CF}.worktrees/fix-resize`, activeView: "projects" });
   // The main worktree has no remove action.
   const main = page.locator(`[data-nav-key="pw:repo-cf::${CF}"]`);
   await expect(main.getByTestId("worktree-new-terminal")).toBeVisible();

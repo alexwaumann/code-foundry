@@ -2,8 +2,8 @@ import { expect, test, type Page } from "@playwright/test";
 import { MOCK_TOKEN } from "../playwright.config";
 import { invocations, mockUrl, openAddProjectDialog, openApp, openProjects, resetMock, row, selectProject } from "./fixtures";
 
-// Add-project PR 4: the Add Project dialog's New tab (repo.create, then optionally
-// repo.github.publish) and the overview's Publish to GitHub dialog, against the mock's
+// Add-project PR 4: the Add Project dialog's New tab (project.create, then optionally
+// project.github.publish) and the overview's Publish to GitHub dialog, against the mock's
 // owners (mock/create.ts): "dev" (Public/Private), "octo-org" (known: Public and
 // Internal), "acme" (policy unknown: all three). Publishing a repository named "taken"
 // fails like gh. docs/notes/add-project-4-create.md.
@@ -78,8 +78,8 @@ test("New: the name is checked as typed, Create makes the project and opens it",
   await expect(page.getByTestId("worktree-surface-title")).toHaveText("my-app@main");
   // A new project has no remote: the overview offers to publish it.
   await expect(page.getByTestId("publish-github")).toBeVisible();
-  expect((await lastInvocation("repo.create"))?.args).toEqual({ name: "my-app" });
-  expect(await lastInvocation("repo.github.publish")).toBeUndefined();
+  expect((await lastInvocation("project.create"))?.args).toEqual({ name: "my-app" });
+  expect(await lastInvocation("project.github.publish")).toBeUndefined();
 
   // The same name again is AlreadyExists, shown under the name.
   await openAddProjectDialog(page);
@@ -111,7 +111,7 @@ test("New with publish to octo-org: Public by default, Private not offered", asy
   await expect(page.getByTestId("worktree-surface-title")).toHaveText("octo-app@main");
   // Published: origin on GitHub, so no Publish button any more.
   await expect(page.getByTestId("publish-github")).toHaveCount(0);
-  expect((await lastInvocation("repo.github.publish"))?.args).toEqual({ repo: "repo-octo-app", owner: "octo-org", name: "octo-app", visibility: "public" });
+  expect((await lastInvocation("project.github.publish"))?.args).toEqual({ project: "repo-octo-app", owner: "octo-org", name: "octo-app", visibility: "public" });
   expect(await projectCalls()).toEqual(["create octo-app", "publish repo-octo-app octo-org/octo-app public"]);
 });
 
@@ -132,7 +132,7 @@ test("an organization whose policy is unknown offers all three, Public by defaul
   await page.getByTestId("publish-visibility-internal").click();
   await page.getByTestId("add-project-create").click();
   await expect(dialog(page)).toHaveCount(0);
-  expect((await lastInvocation("repo.github.publish"))?.args).toMatchObject({ owner: "acme", visibility: "internal" });
+  expect((await lastInvocation("project.github.publish"))?.args).toMatchObject({ owner: "acme", visibility: "internal" });
 });
 
 test("a refused publish shows gh's error, keeps the picker, and the project exists", async ({ page }) => {
@@ -151,13 +151,13 @@ test("a refused publish shows gh's error, keeps the picker, and the project exis
   await expect(page.getByTestId("add-project-new-created")).toContainText("Created taken");
   await expect(name).toBeDisabled();
   await expect(page.getByTestId("add-project-create")).toHaveText("Publish");
-  const res = await fetch(`${mockUrl}/codefoundry.v1.RepoService/List`, {
+  const res = await fetch(`${mockUrl}/codefoundry.v1.ProjectService/List`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${MOCK_TOKEN}` },
     body: "{}",
   });
-  const projects = (await res.json()) as { repos: { id: string; path: string }[] };
-  expect(projects.repos.find((r) => r.id === "repo-taken")?.path).toBe(`${PROJECTS}/taken`);
+  const projects = (await res.json()) as { projects: { id: string; path: string }[] };
+  expect(projects.projects.find((r) => r.id === "repo-taken")?.path).toBe(`${PROJECTS}/taken`);
 
   // Retrying publishes again (same refusal); Keep it local closes on the project.
   await page.getByTestId("add-project-create").click();
@@ -191,19 +191,19 @@ test("cancelling after a refused publish deletes the new project; Keep it local 
   await expect(page.getByTestId("add-project-create")).toHaveText("Publish");
   await expect(page.getByTestId("add-project-create").locator("svg")).toHaveCount(1);
 
-  // Cancelling (Escape) deletes the project again: repo.delete, confirmed, and it is gone.
+  // Cancelling (Escape) deletes the project again: project.delete, confirmed, and it is gone.
   await page.keyboard.press("Escape");
   await expect(dialog(page)).toHaveCount(0);
   await expect.poll(projectCalls).toEqual(["create taken", "publish repo-taken dev/taken public", "delete repo-taken"]);
-  const del = await lastInvocation("repo.delete");
-  expect(del).toMatchObject({ name: "repo.delete", args: { repo: "repo-taken" }, confirmed: true });
-  const res = await fetch(`${mockUrl}/codefoundry.v1.RepoService/List`, {
+  const del = await lastInvocation("project.delete");
+  expect(del).toMatchObject({ name: "project.delete", args: { project: "repo-taken" }, confirmed: true });
+  const res = await fetch(`${mockUrl}/codefoundry.v1.ProjectService/List`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${MOCK_TOKEN}` },
     body: "{}",
   });
-  const projects = (await res.json()) as { repos: { id: string }[] };
-  expect(projects.repos.find((r) => r.id === "repo-taken")).toBeUndefined();
+  const projects = (await res.json()) as { projects: { id: string }[] };
+  expect(projects.projects.find((r) => r.id === "repo-taken")).toBeUndefined();
   await expect(page.getByText("Deleted taken")).toBeVisible();
 
   // The close button is the same cancel; nothing to delete this time.
@@ -240,10 +240,10 @@ test("the overview's Publish to GitHub opens the publish dialog for sketches", a
   await page.getByTestId("publish-submit").click();
   await expect(pub).toHaveCount(0);
   await expect(page.getByTestId("publish-github")).toHaveCount(0);
-  expect((await lastInvocation("repo.github.publish"))?.args).toEqual({ repo: "repo-sk", owner: "acme", name: "sketchbook", visibility: "private" });
+  expect((await lastInvocation("project.github.publish"))?.args).toEqual({ project: "repo-sk", owner: "acme", name: "sketchbook", visibility: "private" });
 });
 
-test("repo.github.publish in the palette opens the publish dialog; repo.create opens New", async ({ page }) => {
+test("project.github.publish in the palette opens the publish dialog; project.create opens New", async ({ page }) => {
   await openApp(page);
   // The composer for sketches (its Projects page row's New thread) gives the palette the
   // project's context; the Projects page itself has none.
@@ -254,7 +254,7 @@ test("repo.github.publish in the palette opens the publish dialog; repo.create o
   await expect(page.getByTestId("composer")).toBeVisible();
   await page.keyboard.press("Meta+k");
   const palette = page.getByTestId("palette");
-  await palette.locator('[data-command="repo.github.publish"]').click();
+  await palette.locator('[data-command="project.github.publish"]').click();
   await expect(page.getByTestId("publish-dialog")).toHaveAttribute("data-repo", "repo-sk");
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("publish-dialog")).toHaveCount(0);
@@ -262,7 +262,7 @@ test("repo.github.publish in the palette opens the publish dialog; repo.create o
   // A project with origin does not offer it.
   await row(page, "s:s-1").click();
   await page.keyboard.press("Meta+k");
-  await expect(palette.locator('[data-command="repo.github.publish"]')).toHaveCount(0);
-  await palette.locator('[data-command="repo.create"]').click();
+  await expect(palette.locator('[data-command="project.github.publish"]')).toHaveCount(0);
+  await palette.locator('[data-command="project.create"]').click();
   await expect(dialog(page)).toHaveAttribute("data-tab", "new");
 });

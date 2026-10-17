@@ -31,7 +31,7 @@ function cli(...args: string[]): string {
 
 interface Members {
   workspace: { id: string; name: string; branch: string };
-  members: { repoId: string; repoName: string; worktreePath: string }[];
+  members: { projectId: string; projectName: string; worktreePath: string }[];
 }
 
 function members(): Members {
@@ -54,11 +54,11 @@ test("workspace surface with a real thread: members' state, member tab, add and 
   if (!first || !second) throw new Error(`workspace ${WORKSPACE} needs two members`);
   const thread = (
     JSON.parse(
-      cli("thread", "new", "--workspace", ws.workspace.id, "--repo", first.repoId, "--model", "haiku", "--effort", "medium", "--permission", "auto", "--prompt", "say hi and stop", "--json"),
+      cli("thread", "new", "--workspace", ws.workspace.id, "--project", first.projectId, "--model", "haiku", "--effort", "medium", "--permission", "auto", "--prompt", "say hi and stop", "--json"),
     ) as { id: string }
   ).id;
   const surface = page.getByTestId("workspace-surface");
-  const member = (repoId: string) => surface.locator(`[data-nav-key="m:${ws.workspace.id}::${repoId}"]`);
+  const member = (projectId: string) => surface.locator(`[data-nav-key="m:${ws.workspace.id}::${projectId}"]`);
   try {
     await page.goto("/");
     const row = page.getByTestId("thread-list").locator(`[data-row-key="s:${thread}"]`);
@@ -70,24 +70,24 @@ test("workspace surface with a real thread: members' state, member tab, add and 
       await expect(page.getByTestId("side-panel")).toHaveAttribute("data-panel-key", `thread:${thread}`);
       await expect(page.getByTestId("workspace-surface-name")).toHaveText(ws.workspace.name);
       await expect(page.getByTestId("workspace-surface-branch")).toHaveText(ws.workspace.branch);
-      await expect(surface.getByTestId("member-name")).toHaveText([first.repoName, second.repoName]);
-      await expect(member(first.repoId).getByTestId("worktree-ahead")).toHaveText("1");
-      await expect(member(first.repoId).getByTestId("worktree-dirty")).toHaveCount(0);
-      await expect(member(first.repoId).getByTestId("member-at")).toHaveText("here");
-      await expect(member(second.repoId).getByTestId("worktree-dirty")).toBeVisible();
-      await expect(member(second.repoId).getByTestId("worktree-ahead")).toHaveCount(0);
-      await expect(member(second.repoId).getByTestId("member-at")).toHaveCount(0);
+      await expect(surface.getByTestId("member-name")).toHaveText([first.projectName, second.projectName]);
+      await expect(member(first.projectId).getByTestId("worktree-ahead")).toHaveText("1");
+      await expect(member(first.projectId).getByTestId("worktree-dirty")).toHaveCount(0);
+      await expect(member(first.projectId).getByTestId("member-at")).toHaveText("here");
+      await expect(member(second.projectId).getByTestId("worktree-dirty")).toBeVisible();
+      await expect(member(second.projectId).getByTestId("worktree-ahead")).toHaveCount(0);
+      await expect(member(second.projectId).getByTestId("member-at")).toHaveCount(0);
       await page.waitForTimeout(300);
       await shot(page, "live-wspanel-surface");
     });
 
     await test.step("a member tab shows that worktree", async () => {
-      const m = member(first.repoId);
+      const m = member(first.projectId);
       await m.hover();
       await m.getByTestId("member-open").click();
       const wt = page.getByTestId("worktree-surface");
       await expect(wt).toHaveAttribute("data-path", first.worktreePath);
-      await expect(wt.getByTestId("worktree-surface-title")).toHaveText(`${first.repoName}@${ws.workspace.branch}`);
+      await expect(wt.getByTestId("worktree-surface-title")).toHaveText(`${first.projectName}@${ws.workspace.branch}`);
       await expect(wt.getByTestId("worktree-facts")).toContainText("↑1");
       await wt.getByTestId("worktree-commits").locator('[data-nav-key="commits"]').click();
       await expect(wt.getByTestId("commits-list")).toContainText("ahead commit");
@@ -99,8 +99,8 @@ test("workspace surface with a real thread: members' state, member tab, add and 
     await test.step("add and remove a member round-trip", async () => {
       await surface.getByTestId("workspace-add-member").click();
       await page.getByTestId("workspace-add-member-list").getByRole("option", { name: ADD_REPO }).click();
-      await expect(surface.getByTestId("member-name")).toHaveText([first.repoName, second.repoName, ADD_REPO], { timeout: 60_000 });
-      expect(members().members.map((m) => m.repoName)).toEqual([first.repoName, second.repoName, ADD_REPO]);
+      await expect(surface.getByTestId("member-name")).toHaveText([first.projectName, second.projectName, ADD_REPO], { timeout: 60_000 });
+      expect(members().members.map((m) => m.projectName)).toEqual([first.projectName, second.projectName, ADD_REPO]);
       await shot(page, "live-wspanel-added");
 
       const added = surface.locator('[data-testid="workspace-member"]').filter({ hasText: ADD_REPO });
@@ -109,8 +109,8 @@ test("workspace surface with a real thread: members' state, member tab, add and 
       const dialog = page.getByTestId("confirm-dialog");
       await expect(dialog).toContainText(`Remove project ${ADD_REPO} from its workspace?`);
       await dialog.getByTestId("confirm-ok").click();
-      await expect(surface.getByTestId("member-name")).toHaveText([first.repoName, second.repoName], { timeout: 60_000 });
-      expect(members().members.map((m) => m.repoName)).toEqual([first.repoName, second.repoName]);
+      await expect(surface.getByTestId("member-name")).toHaveText([first.projectName, second.projectName], { timeout: 60_000 });
+      expect(members().members.map((m) => m.projectName)).toEqual([first.projectName, second.projectName]);
     });
   } finally {
     try {

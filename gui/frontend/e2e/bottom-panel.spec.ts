@@ -48,7 +48,7 @@ async function createShell(labels: Record<string, string>, cwd: string): Promise
   return ((await res.json()) as { terminal: { id: string } }).terminal.id;
 }
 
-const threadShell = (thread: string, worktree = CF) => ({ kind: "shell", thread, repo: "repo-cf", worktree });
+const threadShell = (thread: string, worktree = CF) => ({ kind: "shell", thread, project: "repo-cf", worktree });
 
 async function attachStreams(): Promise<number> {
   return (await openStreams())["TerminalService/Attach"] ?? 0;
@@ -312,7 +312,7 @@ test("the Projects page's panel lists the worktree shells; its + starts one in t
 
   await bottom(page).getByTestId("bottom-new-terminal").click();
   await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("terminal.new");
-  expect((await invocations()).at(-1)?.context).toMatchObject({ activeRepoId: "repo-cf", activeWorktreePath: `${CFW}/feat-sidebar`, activeThreadId: "" });
+  expect((await invocations()).at(-1)?.context).toMatchObject({ activeProjectId: "repo-cf", activeWorktreePath: `${CFW}/feat-sidebar`, activeThreadId: "" });
   await expect(tabs(page)).toHaveText(["feat-sidebar", "feat-sidebar 2"]);
   await expect(tabs(page).nth(1)).toHaveAttribute("aria-selected", "true");
   await expect(page.getByTestId("projects-page")).toBeVisible();

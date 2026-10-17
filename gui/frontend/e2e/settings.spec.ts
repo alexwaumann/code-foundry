@@ -235,7 +235,7 @@ test("search lists matches from every page with their page and section; Esc clea
   const results = page.getByTestId("settings-results");
   await expect(page.getByTestId("settings-result-count")).toHaveText("2 results for “interval” in every page");
   await expect(results.locator("[data-setting]")).toHaveCount(2);
-  await expect(results.getByTestId("setting-crumb")).toHaveText(["Source control › GitHub", "Source control › Repositories"]);
+  await expect(results.getByTestId("setting-crumb")).toHaveText(["Source control › GitHub", "Source control › Projects"]);
   // The key shows, the words marked.
   await expect(setting(page, "github.poll_interval_seconds").getByTestId("setting-key")).toHaveText("github.poll_interval_seconds");
   await expect(setting(page, "github.poll_interval_seconds").getByTestId("setting-key").locator("mark")).toHaveText("interval");

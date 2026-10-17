@@ -41,10 +41,10 @@ async function calls(name: string) {
 }
 
 /** The action ids of a project, in list order (GET /__mock/actions). */
-async function actionsOf(repoId: string): Promise<{ id: string; name: string; command: string; icon: string; onWorktreeCreate?: boolean }[]> {
+async function actionsOf(projectId: string): Promise<{ id: string; name: string; command: string; icon: string; onWorktreeCreate?: boolean }[]> {
   const res = await fetch(`${mockUrl}/__mock/actions`);
-  const body = (await res.json()) as { actions: { id: string; repoId: string; name: string; command: string; icon: string; onWorktreeCreate?: boolean }[] };
-  return body.actions.filter((a) => a.repoId === repoId);
+  const body = (await res.json()) as { actions: { id: string; projectId: string; name: string; command: string; icon: string; onWorktreeCreate?: boolean }[] };
+  return body.actions.filter((a) => a.projectId === projectId);
 }
 
 /** Runs an action from the header menu and waits for its tab to be the active one. */
@@ -182,7 +182,7 @@ test("add, then edit (pencil and ArrowRight), then delete an action", async ({ p
   await save.click();
   await expect(dialog(page)).toHaveCount(0);
   const [add] = await calls("action.add");
-  expect(add?.args).toEqual({ name: "Lint", command: "golangci-lint run\nstaticcheck ./...", icon: "lint", "in-terminal": "true", "on-worktree-create": "true", repo: "repo-cf" });
+  expect(add?.args).toEqual({ name: "Lint", command: "golangci-lint run\nstaticcheck ./...", icon: "lint", "in-terminal": "true", "on-worktree-create": "true", project: "repo-cf" });
   await trigger(page).click();
   await expect(items(page)).toHaveText([...NAMES, "Lint"]);
   await page.keyboard.press("Escape");
@@ -219,7 +219,7 @@ test("add, then edit (pencil and ArrowRight), then delete an action", async ({ p
   await dialog(page).getByTestId("action-command").press("ControlOrMeta+Enter");
   await expect(dialog(page)).toHaveCount(0);
   const [edit] = await calls("action.edit");
-  expect(edit?.args).toEqual({ action: lint?.id, command: "make lint", repo: "repo-cf" });
+  expect(edit?.args).toEqual({ action: lint?.id, command: "make lint", project: "repo-cf" });
 
   // ArrowRight on a highlighted row is the pencil's keyboard path.
   await trigger(page).click();
@@ -245,7 +245,7 @@ test("add, then edit (pencil and ArrowRight), then delete an action", async ({ p
   await dialog(page).getByTestId("action-delete-yes").click();
   await expect(dialog(page)).toHaveCount(0);
   const [remove] = await calls("action.remove");
-  expect(remove?.args).toEqual({ action: lint?.id, repo: "repo-cf" });
+  expect(remove?.args).toEqual({ action: lint?.id, project: "repo-cf" });
   await trigger(page).click();
   await expect(items(page)).toHaveText(NAMES);
 });
@@ -328,7 +328,7 @@ test("the Projects page: a worktree row runs an action for that worktree; the pr
   const rowMenu = page.getByTestId("worktree-actions-menu-menu");
   await expect(rowMenu.getByTestId("action-item")).toHaveText(NAMES);
   await rowMenu.getByTestId("action-item").filter({ hasText: "Build" }).click();
-  await expect.poll(async () => (await calls("action.run")).map((c) => [c.args, c.context?.activeRepoId, c.context?.activeWorktreePath])).toEqual([[{ action: IDS.build, terminal: "true" }, "repo-cf", CF]]);
+  await expect.poll(async () => (await calls("action.run")).map((c) => [c.args, c.context?.activeProjectId, c.context?.activeWorktreePath])).toEqual([[{ action: IDS.build, terminal: "true" }, "repo-cf", CF]]);
   await expect(bottom(page)).toBeVisible();
   await expect(bottom(page)).toHaveAttribute("data-panel-key", "view:projects");
   await expect(bottom(page).locator('[data-kind="action"]')).toHaveText("Build");

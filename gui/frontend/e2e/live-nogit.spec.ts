@@ -27,7 +27,7 @@ function cli(...args: string[]): string {
 test.skip(!LIVE || !HOME || !DIR, "LIVE_DAEMON=1, CODE_FOUNDRY_HOME and LIVE_NOGIT_DIR are required");
 
 test("register a plain folder, see No git everywhere, then repo git init turns it into a git project", async ({ page }) => {
-  const repo = JSON.parse(cli("repo", "register", "--path", DIR, "--json")) as { id: string; name: string; git?: boolean };
+  const repo = JSON.parse(cli("project", "add", DIR, "--json")) as { id: string; name: string; git?: boolean };
   expect(repo.git ?? false).toBe(false);
   const term = JSON.parse(cli("terminal", "new", "--cwd", DIR, "--json")) as { id: string };
 
@@ -50,7 +50,7 @@ test("register a plain folder, see No git everywhere, then repo git init turns i
     await expect(page.getByTestId("worktree-changes")).toHaveCount(0);
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "nogit-overview.png") });
 
-    const after = JSON.parse(cli("repo", "git", "init", "--repo", repo.id, "--json")) as { git?: boolean; defaultBranch?: string };
+    const after = JSON.parse(cli("project", "git", "init", "--project", repo.id, "--json")) as { git?: boolean; defaultBranch?: string };
     expect(after.git).toBe(true);
     const branch = after.defaultBranch ?? "";
     expect(branch).not.toBe("");

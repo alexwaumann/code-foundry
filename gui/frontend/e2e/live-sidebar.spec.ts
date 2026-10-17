@@ -26,7 +26,7 @@ function cli(...args: string[]): string {
 
 interface LiveThread {
   id: string;
-  repoId?: string;
+  projectId?: string;
   worktreePath?: string;
   workspaceId?: string;
   pendingWorktreePath?: string;
@@ -47,14 +47,14 @@ test.skip(!LIVE || !HOME, "LIVE_DAEMON=1 and CODE_FOUNDRY_HOME are required");
 test("flat sidebar, Projects page and Run in… with real threads", async ({ page }) => {
   const ws = JSON.parse(cli("workspace", "members", WORKSPACE, "--json")) as {
     workspace: { id: string; name: string };
-    members: { repoId: string; repoName: string; worktreePath: string }[];
+    members: { projectId: string; projectName: string; worktreePath: string }[];
   };
   const [first, second] = ws.members;
   if (!first || !second) throw new Error(`workspace ${WORKSPACE} needs two members`);
   const start = (...args: string[]) =>
     (JSON.parse(cli("thread", "new", ...args, "--model", "haiku", "--effort", "medium", "--permission", "auto", "--prompt", "say hi and stop", "--json")) as LiveThread).id;
-  const wsThread = start("--workspace", ws.workspace.id, "--repo", first.repoId);
-  const projThread = start("--repo", second.repoId);
+  const wsThread = start("--workspace", ws.workspace.id, "--project", first.projectId);
+  const projThread = start("--project", second.projectId);
   try {
     await page.goto("/");
     const list = page.getByTestId("thread-list");
@@ -65,9 +65,9 @@ test("flat sidebar, Projects page and Run in… with real threads", async ({ pag
       await expect(wsRow).toBeVisible({ timeout: 20_000 });
       await expect(projRow).toBeVisible();
       await expect(wsRow.getByTestId("row-workspace")).toHaveText(ws.workspace.name);
-      await expect(wsRow.getByTestId("row-project")).toHaveText(first.repoName);
+      await expect(wsRow.getByTestId("row-project")).toHaveText(first.projectName);
       await expect(projRow.getByTestId("row-workspace")).toHaveCount(0);
-      await expect(projRow.getByTestId("row-project")).toHaveText(second.repoName);
+      await expect(projRow.getByTestId("row-project")).toHaveText(second.projectName);
       await expect(list.locator('[data-row-kind="repo"], [data-row-kind="worktree"]')).toHaveCount(0);
       // Both turns end (the unwatched ones then wait under Needs attention, "finished").
       await expect.poll(() => threadInfo(wsThread)?.status, { timeout: 120_000 }).toMatch(/IDLE|NEEDS_ATTENTION/);
@@ -78,10 +78,10 @@ test("flat sidebar, Projects page and Run in… with real threads", async ({ pag
 
     await test.step("Projects page: both projects, the workspace and its members", async () => {
       await page.getByTestId("nav-projects").click();
-      await expect(page.getByTestId("project-name")).toHaveText([first.repoName, second.repoName].sort((a, b) => a.localeCompare(b)));
+      await expect(page.getByTestId("project-name")).toHaveText([first.projectName, second.projectName].sort((a, b) => a.localeCompare(b)));
       const block = page.locator(`[data-testid="workspace"][data-workspace="${ws.workspace.id}"]`);
       await expect(block.getByTestId("workspace-name")).toHaveText(ws.workspace.name);
-      await expect(block.getByTestId("member-name")).toHaveText([first.repoName, second.repoName]);
+      await expect(block.getByTestId("member-name")).toHaveText([first.projectName, second.projectName]);
       await page.waitForTimeout(300);
       await shot(page, "live-projects-page");
     });
@@ -96,12 +96,12 @@ test("flat sidebar, Projects page and Run in… with real threads", async ({ pag
     await test.step("Run in… moves the workspace thread: pending, then the new member", async () => {
       await wsRow.click({ button: "right" });
       await page.getByTestId("menu-run-in").click();
-      await page.getByTestId("menu-run-in-members").locator(`[data-member="${second.repoId}"]`).click();
-      await expect(wsRow.getByTestId("row-moving")).toHaveText(`moving to ${second.repoName}…`, { timeout: 5000 });
+      await page.getByTestId("menu-run-in-members").locator(`[data-member="${second.projectId}"]`).click();
+      await expect(wsRow.getByTestId("row-moving")).toHaveText(`moving to ${second.projectName}…`, { timeout: 5000 });
       await shot(page, "live-sidebar-moving");
       await expect(wsRow.getByTestId("row-moving")).toHaveCount(0, { timeout: 60_000 });
-      await expect(wsRow.getByTestId("row-project")).toHaveText(second.repoName);
-      expect(threadInfo(wsThread)).toMatchObject({ repoId: second.repoId, worktreePath: second.worktreePath, workspaceId: ws.workspace.id });
+      await expect(wsRow.getByTestId("row-project")).toHaveText(second.projectName);
+      expect(threadInfo(wsThread)).toMatchObject({ projectId: second.projectId, worktreePath: second.worktreePath, workspaceId: ws.workspace.id });
       await page.waitForTimeout(300);
       await shot(page, "live-sidebar-moved");
     });

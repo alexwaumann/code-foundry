@@ -7,7 +7,7 @@ const GP_LOGIN = `${WT}/ghostty-playground/cf-login`;
 
 interface ThreadSummary {
   id: string;
-  repoId: string;
+  projectId: string;
   worktreePath: string;
   workspaceId: string;
 }
@@ -16,7 +16,7 @@ interface WorkspaceSummary {
   id: string;
   name: string;
   branch: string;
-  members: { repoId: string; worktreePath: string }[];
+  members: { projectId: string; worktreePath: string }[];
 }
 
 async function threads(): Promise<ThreadSummary[]> {
@@ -92,7 +92,7 @@ test("pick a workspace: member chips, the primary is changeable, the thread is t
   await page.keyboard.press("Enter");
 
   expect(await lastNewThread()).toEqual({
-    repo: "repo-gp",
+    project: "repo-gp",
     workspace: "w-000000000001",
     worktree: GP_LOGIN,
     model: "claude-opus-4-8[1m]",
@@ -103,7 +103,7 @@ test("pick a workspace: member chips, the primary is changeable, the thread is t
   const created = page.locator('[data-row-kind="thread"][aria-selected="true"]');
   await expect(created).toBeVisible();
   const id = ((await created.getAttribute("data-row-key")) ?? "").slice(2);
-  expect((await threads()).find((s) => s.id === id)).toMatchObject({ repoId: "repo-gp", worktreePath: GP_LOGIN, workspaceId: "w-000000000001" });
+  expect((await threads()).find((s) => s.id === id)).toMatchObject({ projectId: "repo-gp", worktreePath: GP_LOGIN, workspaceId: "w-000000000001" });
   await expect(page.getByTestId("composer")).toHaveCount(0);
 });
 
@@ -128,9 +128,9 @@ test("a workspace in new-worktree mode makes a new workspace with the same proje
   await page.getByTestId("composer-send").click();
   await expect(page.getByTestId("composer-send")).toHaveText("Creating worktrees…");
   expect(await lastNewThread()).toEqual({
-    repo: "repo-cf",
+    project: "repo-cf",
     "new-worktree": "true",
-    repos: "repo-cf,repo-gp",
+    projects: "repo-cf,repo-gp",
     model: "claude-opus-4-8[1m]",
     effort: "high",
     permission: "auto",
@@ -196,9 +196,9 @@ test("pick a project, add Also in: a new workspace with a cf/<slug> worktree in 
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("composer-send")).toHaveText("Creating worktrees…");
   expect(await lastNewThread()).toEqual({
-    repo: "repo-cf",
+    project: "repo-cf",
     "new-worktree": "true",
-    repos: "repo-cf:origin/release/v0.3,repo-gp",
+    projects: "repo-cf:origin/release/v0.3,repo-gp",
     model: "claude-opus-4-8[1m]",
     effort: "high",
     permission: "auto",
@@ -210,8 +210,8 @@ test("pick a project, add Also in: a new workspace with a cf/<slug> worktree in 
   await expect.poll(workspaces).toHaveLength(1);
   const [ws] = await workspaces();
   expect(ws).toMatchObject({ name: "add-a-dark-mode", branch: "cf/add-a-dark-mode" });
-  expect(ws?.members.map((m) => m.repoId)).toEqual(["repo-cf", "repo-gp"]);
-  expect((await threads()).find((s) => s.id === id)).toMatchObject({ repoId: "repo-cf", workspaceId: ws?.id, worktreePath: `${WT}/code-foundry/cf-add-a-dark-mode` });
+  expect(ws?.members.map((m) => m.projectId)).toEqual(["repo-cf", "repo-gp"]);
+  expect((await threads()).find((s) => s.id === id)).toMatchObject({ projectId: "repo-cf", workspaceId: ws?.id, worktreePath: `${WT}/code-foundry/cf-add-a-dark-mode` });
 
   // The new workspace is in the picker now; the project's draft is clear again.
   await page.keyboard.press("Meta+n");
@@ -232,7 +232,7 @@ test("with workspaces around, a single-project thread sends exactly what it did 
   await page.keyboard.type("Port the renderer");
   await page.keyboard.press("Enter");
   expect(await lastNewThread()).toEqual({
-    repo: "repo-gp",
+    project: "repo-gp",
     "new-worktree": "true",
     base: "origin/main",
     model: "claude-opus-4-8[1m]",
