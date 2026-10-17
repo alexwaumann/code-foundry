@@ -1,10 +1,10 @@
 import { create } from "zustand";
 import { Code, ConnectError } from "@connectrpc/connect";
 import { daemon, invalidateOnTransportError } from "@/api/endpoint";
-import { watchEvents, type EventView } from "@/api/events";
+import { reportVisibility, watchEvents, type EventView } from "@/api/events";
 import { listRepos } from "@/api/repo";
 import { listThreads } from "@/api/threads";
-import { errorMessage, isAbort, runStream, type StreamStatus } from "@/api/stream";
+import { errorMessage, isAbort, onVisibilityChange, runStream, type StreamStatus } from "@/api/stream";
 import { listTerminals } from "@/api/terminal";
 import { applyActionEvent, useActionsStore } from "./actions";
 import { onActionRunFinished } from "./actionActions";
@@ -135,12 +135,15 @@ export function startEventSync(threadRetryMs = 10_000): () => void {
     },
     onError: invalidateOnTransportError,
   });
+  // The daemon polls GitHub less while no GUI window is visible.
+  const unwatchVisibility = onVisibilityChange(() => void reportVisibility());
   const retry = setInterval(() => {
     if (useThreadsStore.getState().availability === "unavailable" && useEventsStore.getState().stream === "open") {
       void reconcileThreads(new AbortController().signal).catch(() => undefined);
     }
   }, threadRetryMs);
   return () => {
+    unwatchVisibility();
     clearInterval(retry);
     stop();
   };
