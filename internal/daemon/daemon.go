@@ -30,6 +30,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/command/all"
 	"github.com/alexwaumann/code-foundry/internal/paths"
+	"github.com/alexwaumann/code-foundry/internal/store/gh"
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 	"github.com/alexwaumann/code-foundry/internal/termlabel"
@@ -109,7 +110,16 @@ func Run(ctx context.Context, opts Options) error {
 	defer func() { _ = tcpLn.Close() }() // no-op once the server has shut it down
 	port := tcpLn.Addr().(*net.TCPAddr).Port
 
-	st, err := openStores(ctx, log, p, threadEnv(port, token))
+	// The GUI clients of EventService.Watch and their visibility pace the GitHub poll
+	// (docs/notes/gh-poll-tiers.md). ghStore is set before any server starts, so before
+	// any stream can join.
+	var ghStore *gh.Store
+	clients := api.NewClients(func(from, to gh.Presence) {
+		if ghStore != nil {
+			ghStore.PresenceChanged(from, to)
+		}
+	})
+	st, err := openStores(ctx, log, p, threadEnv(port, token), clients.Presence)
 	if err != nil {
 		// In the log file too: an auto-started daemon's stderr goes nowhere a user
 		// looks (db.ErrNewerSchema, say, after reinstalling an older build).
@@ -117,6 +127,7 @@ func Run(ctx context.Context, opts Options) error {
 		return err
 	}
 	defer func() { _ = st.close() }() // after the servers have shut down
+	ghStore = st.gh
 
 	started := time.Now()
 	events := st.bus
@@ -197,7 +208,7 @@ func Run(ctx context.Context, opts Options) error {
 		workspaceAPI.Route(),
 		actionAPI.Route(),
 		api.NewFilesystem(st.home, st.repo).Route(),
-		api.NewEvents(api.EventsDeps{Bus: events, Repo: st.repo, Terminal: st.terminal, Thread: st.thread, Gh: st.gh, GitOps: st.gitops, Settings: st.settings, Update: st.update, Workspace: st.workspace, Action: st.action, Done: ctx.Done()}).Route(),
+		api.NewEvents(api.EventsDeps{Bus: events, Repo: st.repo, Terminal: st.terminal, Thread: st.thread, Gh: st.gh, GitOps: st.gitops, Settings: st.settings, Update: st.update, Workspace: st.workspace, Action: st.action, Done: ctx.Done(), Clients: clients}).Route(),
 	}
 	mux := http.NewServeMux()
 	for _, r := range routes {
