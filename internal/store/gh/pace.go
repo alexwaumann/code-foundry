@@ -24,7 +24,15 @@ const (
 	DefaultPollInterval = 60 * time.Second
 	// DefaultIdleInterval is the poll cadence with nothing tracked or watched: only the
 	// viewer is fetched.
-	DefaultIdleInterval   = 10 * time.Minute
+	DefaultIdleInterval = 10 * time.Minute
+	// DefaultBackgroundInterval is the shortest poll interval while GUI clients are
+	// connected but every one is hidden (Presence). Not a setting: the configured
+	// interval is a floor, so a longer one still wins.
+	DefaultBackgroundInterval = 5 * time.Minute
+	// DefaultNoGUIInterval is the shortest poll interval while no GUI client is
+	// connected: the CLI and threads read the cache, and a GUI connecting brings the
+	// next poll forward (PresenceChanged).
+	DefaultNoGUIInterval  = 15 * time.Minute
 	DefaultAuthRetry      = 60 * time.Second
 	DefaultNetworkBackoff = 15 * time.Second
 	// DefaultSecondaryBackoff follows GitHub's guidance to wait at least a minute after a

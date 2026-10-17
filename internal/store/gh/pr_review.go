@@ -88,10 +88,7 @@ func (s *Store) SubmitPullRequestReview(ctx context.Context, slug string, number
 	}
 	s.log.Info("gh pull request review submitted", "pr", k.String(), "event", r.Event, "review", res.ID)
 	// The viewer's dashboards (awaiting review, reviewed) move: poll soon.
-	s.mu.Lock()
-	s.pollSoonLocked(s.opts.Now())
-	s.mu.Unlock()
-	s.nudge()
+	s.pollSoon()
 	return res, nil
 }
 
@@ -109,6 +106,8 @@ func (s *Store) AddPullRequestComment(ctx context.Context, slug string, number i
 		return PostedComment{}, err
 	}
 	s.log.Info("gh pull request comment added", "pr", k.String(), "comment", res.ID)
+	// Its updatedAt moved: the poll refetches it for the lists soon.
+	s.pollSoon()
 	return res, nil
 }
 

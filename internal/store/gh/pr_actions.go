@@ -107,6 +107,8 @@ func (s *Store) SetReviewRequest(ctx context.Context, slug string, number int, r
 	}
 	s.log.Info("gh review request set", "pr", k.String(), "kind", kind, "login", login, "requested", r.Requested)
 	s.invalidateFull(k)
+	// The review requests (and the requested reviewer's dashboard) moved: poll soon.
+	s.pollSoon()
 	return requested, nil
 }
 
@@ -176,10 +178,7 @@ func (s *Store) RevertPullRequest(ctx context.Context, slug string, number int) 
 	s.log.Info("gh pull request reverted", "pr", k.String(), "revert", res.Number)
 	s.invalidateFull(k)
 	// The revert is the viewer's new pull request: let the dashboard see it soon.
-	s.mu.Lock()
-	s.pollSoonLocked(s.opts.Now())
-	s.mu.Unlock()
-	s.nudge()
+	s.pollSoon()
 	return res, nil
 }
 

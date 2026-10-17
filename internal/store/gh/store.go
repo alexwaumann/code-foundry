@@ -55,6 +55,10 @@ type Options struct {
 	// Config returns the user settings the poll follows. It is read before every poll,
 	// so changes apply from the next one. Nil means PollInterval with dashboards on.
 	Config func() Config
+	// Presence reports whether a GUI is connected and visible; each poll derives the
+	// interval to the next one from it (nextInterval). The daemon reports changes with
+	// PresenceChanged. Nil means PresenceForeground: the configured interval always.
+	Presence func() Presence
 
 	// Now and Rand are injectable for tests.
 	Now  func() time.Time
@@ -120,6 +124,7 @@ type Store struct {
 	pollNext       time.Time
 	pollAgain      bool // a poll was asked for while one was running
 	pollFailures   int
+	lastPoll       time.Time // when the last poll ended (or the cached poll's time after New)
 	statsNext      time.Time
 	statsFailures  int
 	authBad        bool
@@ -218,6 +223,7 @@ func New(ctx context.Context, opts Options) (*Store, error) {
 	// A recent poll in the cache (with the viewer's id, which stats need) waits out its
 	// interval, so restarts do not poll in a burst.
 	s.pollNext = now
+	s.lastPoll = snap.Poll.FetchedAt
 	if v := snap.Viewer.Viewer; v != nil && v.ID != "" && !snap.Poll.FetchedAt.IsZero() {
 		s.pollNext = laterOf(now, snap.Poll.FetchedAt.Add(s.config().PollInterval))
 	}
