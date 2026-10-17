@@ -624,3 +624,26 @@ test("the follow-up placeholder says a message while Claude works is picked up m
   await expect(editor).toHaveAttribute("aria-placeholder", "Send a follow-up…");
   await expect(pane(page).getByRole("button", { name: /Interrupt/ })).toHaveCount(0);
 });
+
+test("a message sent mid-turn is a steer: it stays inside the running turn, which ends with one footer", async ({ page }) => {
+  await openThread(page, "streaming");
+  const before = await footers(page).count();
+  const editor = page.getByTestId("thread-composer").locator('[contenteditable="true"]');
+  await editor.click();
+  await page.keyboard.type("Also say hi when you are done");
+  await page.keyboard.press("Enter");
+  await expect.poll(calls).toContain("send s-r1 Also say hi when you are done");
+  // A smaller bubble inside the turn, not a new turn's message.
+  const steer = pane(page).getByTestId("thread-steer");
+  await expect(steer).toContainText("Also say hi when you are done");
+  await expect(steer.getByTestId("thread-steer-caption")).toHaveText(/^sent mid-turn · \d/);
+  await expect(pane(page).getByTestId("thread-user").filter({ hasText: "Also say hi" })).toHaveCount(0);
+  // Claude answers it in the same turn: one footer more, the turn folds, the steer stays.
+  await expect(pane(page).locator('[data-testid="thread-text"]').last()).toContainText("Got it: I'll take a look now.");
+  await expect(footers(page)).toHaveCount(before + 1);
+  await expect(footers(page).last()).toHaveAttribute("data-folded", "true");
+  await expect(steer).toBeVisible();
+  await expect(footers(page).last()).toContainText("steps");
+  await expect(pane(page).getByTestId("thread-user").filter({ hasText: "Also say hi" })).toHaveCount(0);
+  await shot(page, "steer");
+});

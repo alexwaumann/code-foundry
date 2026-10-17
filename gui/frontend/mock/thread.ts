@@ -52,8 +52,8 @@ type PendingInit = MessageInitShape<typeof ThreadPendingRequestSchema>;
 /**
  * A default-world thread's history (MockThreadLogs.seed): the prompt, Claude's first words
  * and one Bash call, then by `end`: a finished turn ("done"), a reply still streaming
- * ("working"), the next Bash call waiting for permission ("permission"), or nothing more
- * ("cut": the process ended mid-turn).
+ * ("working"), the next Bash call waiting for permission ("permission"), or the daemon's
+ * "Claude stopped unexpectedly" ("cut": the process ended mid-turn; no turn_end follows).
  */
 export interface SeedHistory {
   prompt: string;
@@ -64,6 +64,8 @@ export interface SeedHistory {
   reply: string;
   minutesAgo: number;
   end: "done" | "working" | "permission" | "cut";
+  /** "cut": the exit code the error item names. */
+  exitCode?: number;
   /** A daemon note before the first message (an agent-made thread's "Created by …", id note-created-by). */
   note?: { id: string; text: string };
   /** Wake messages the daemon sent after the history (docs/notes/agents-4-wake.md): header line and JSON payload. */
@@ -1033,6 +1035,8 @@ export class MockThreadLogs {
         { at: at(21) },
       );
       l.pending = [{ requestId: `req-${id}`, itemId: perm.id, question: false, toolName: "Bash", summary: `Bash ${h.reply}` }];
+    } else {
+      push({ case: "error", value: { text: `Claude stopped unexpectedly (exit code ${String(h.exitCode ?? 1)})` } }, { at: at(12) });
     }
     for (const [i, w] of (h.wakes ?? []).entries()) {
       const text = `[code-foundry wake] ${w.title}\n\`\`\`json\n${w.json}\n\`\`\``;
@@ -1074,8 +1078,14 @@ export class MockThreadLogs {
   /**
    * thread.send: the user message at once, then a short streamed reply and the turn's end.
    * A stopped thread starts first, like the daemon's Send: the reply waits for Claude.
+   * Sent while a turn runs it is a steer, like the daemon's: the message lands inside the
+   * turn (the text streaming at the moment completes first), Claude replies to it in the
+   * same turn, and one turn_end ends it.
    */
   send(id: string, text: string, attachments: string[], composerText = ""): ItemInit {
+    if (this.world.statusOf(id) === ThreadStatus.BUSY) {
+      for (const x of this.log(id).items) if (x.streaming) this.update(id, { ...x, streaming: false, updatedAt: timestampFromDate(new Date()) });
+    }
     const msg = this.append(id, this.item(id, { case: "userMessage", value: { text, attachments, composerText } }));
     if (this.world.isConnected(id)) this.reply(id);
     else {

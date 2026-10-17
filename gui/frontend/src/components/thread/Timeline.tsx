@@ -17,6 +17,8 @@ function estimate(r: TimelineRow | undefined): number {
   switch (r?.type) {
     case "user":
       return 72;
+    case "steer":
+      return 64;
     case "text":
       return 64;
     case "footer":

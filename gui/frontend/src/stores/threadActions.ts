@@ -107,7 +107,8 @@ export function threadDraftKey(threadId: string): string {
  * files `@cf-file://…`, which the daemon resolves and stores as sent), then thread.send
  * with the staged paths and the composer's text (lib/userMessage sentComposerText) that
  * the message's bubble draws its tags from. On success the draft is cleared; on failure it stays with the
- * error. Allowed while Claude works: it queues the message or folds it in.
+ * error. Allowed while Claude works: Claude picks the message up mid-turn (a steer), and
+ * the timeline shows it inside the running turn (lib/threadTimeline).
  */
 export async function sendThreadDraft(threadId: string): Promise<boolean> {
   const key = threadDraftKey(threadId);

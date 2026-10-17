@@ -613,6 +613,8 @@ export function WorkNodeView({ node, nested }: { node: WorkNode; nested?: boolea
       return <NoteRow id={node.id} />;
     case "system":
       return <SystemNoteRow id={node.id} />;
+    case "steer":
+      return <UserRow id={node.id} steer />;
   }
 }
 
@@ -680,18 +682,20 @@ function WakeNoteRow({ wake, atMs }: { wake: WakeView; atMs: number | null }) {
   );
 }
 
-const UserRow = memo(function UserRow({ id }: { id: string }) {
+/** A user message: a turn's opening bubble, or a steer's smaller one inside the turn; a wake message is a note either way. */
+const UserRow = memo(function UserRow({ id, steer }: { id: string; steer?: boolean }) {
   const { threadId } = useThreadCtx();
   const it = useThreadItem(threadId, id);
   if (it?.kind !== "user") return null;
   if (it.wake) return <WakeNoteRow wake={it.wake} atMs={it.createdAtMs} />;
-  return <UserBubble text={it.text} composerText={it.composerText} attachments={it.attachments} createdAtMs={it.createdAtMs} />;
+  return <UserBubble text={it.text} composerText={it.composerText} attachments={it.attachments} createdAtMs={it.createdAtMs} steer={steer} />;
 });
 
 /**
  * A finished turn's footer: "Worked for 4m 08s · 12 steps · $1.12 · Opus" on a hairline,
  * the latest turn's too. It folds the turn: a click hides (or shows again) the turn's work,
- * so the answer stays. The copy button copies the final answer.
+ * so the answer stays. A turn without work (no steps) has nothing to fold: the line is
+ * plain text. The copy button copies the final answer.
  */
 const FooterRow = memo(function FooterRow({ row }: { row: Extract<TimelineRow, { type: "footer" }> }) {
   const { threadId } = useThreadCtx();
@@ -716,25 +720,32 @@ const FooterRow = memo(function FooterRow({ row }: { row: Extract<TimelineRow, {
       .join("\n\n");
     void copyText(text);
   };
+  const line = parts.map((p, i) => (
+    <span key={i} className="contents">
+      {i > 0 && <span className="sep">·</span>}
+      <span className={it.isError && i === 0 ? "t-red" : undefined}>{p}</span>
+    </span>
+  ));
   return (
     <div className="tfoot" data-testid="thread-footer" data-folded={row.folded || undefined}>
-      <button
-        type="button"
-        className="fold"
-        aria-expanded={!row.folded}
-        aria-label={row.folded ? "Show this turn's work" : "Hide this turn's work"}
-        onClick={() => {
-          setTurnFolded(threadId, row.turn, !row.folded);
-        }}
-      >
-        <ChevronRight aria-hidden />
-        {parts.map((p, i) => (
-          <span key={i} className="contents">
-            {i > 0 && <span className="sep">·</span>}
-            <span className={it.isError && i === 0 ? "t-red" : undefined}>{p}</span>
-          </span>
-        ))}
-      </button>
+      {row.steps === 0 ? (
+        <span className="line" data-testid="thread-footer-line">
+          {line}
+        </span>
+      ) : (
+        <button
+          type="button"
+          className="fold"
+          aria-expanded={!row.folded}
+          aria-label={row.folded ? "Show this turn's work" : "Hide this turn's work"}
+          onClick={() => {
+            setTurnFolded(threadId, row.turn, !row.folded);
+          }}
+        >
+          <ChevronRight aria-hidden />
+          {line}
+        </button>
+      )}
       <span className="flex-1" />
       {row.finals.length > 0 && (
         <Tip label="Copy answer">

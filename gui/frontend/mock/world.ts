@@ -519,6 +519,7 @@ const SEEDS: Readonly<Record<string, SeedHistory | undefined>> = {
     reply: "",
     minutesAgo: 18,
     end: "cut",
+    exitCode: 139,
   },
   "s-6": {
     prompt: "Tidy my zshrc: drop the unused plugins.",
