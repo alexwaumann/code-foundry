@@ -50,6 +50,12 @@ function thread(id: string, over: Partial<ThreadView> = {}): ThreadView {
     backgroundShellsRunning: 0,
     backgroundWakePending: false,
     retry: null,
+    createdBy: "",
+    createdByName: "",
+    brief: "",
+    labels: [],
+    report: null,
+    budgetUsd: 0,
     ...over,
   };
 }
@@ -93,6 +99,15 @@ describe("thread reducers", () => {
     const next = applyThreadListEvent(prev, { kind: "updated", thread: thread("a", { linkedPullRequests: [pr(5), pr(6)] }) });
     expect(next).not.toBe(prev);
     expect(next.byId.a?.linkedPullRequests.map((l) => l.number)).toEqual([5, 6]);
+  });
+
+  it("labels and the report compare by content", () => {
+    const report = (summary: string) => ({ status: "done" as const, summary, data: "", atMs: 1000 });
+    const prev = replaceThreads(emptyThreads, [thread("a", { labels: ["x"], report: report("ok") })]);
+    expect(applyThreadListEvent(prev, { kind: "updated", thread: thread("a", { labels: ["x"], report: report("ok") }) })).toBe(prev);
+    expect(applyThreadListEvent(prev, { kind: "updated", thread: thread("a", { labels: ["x", "y"], report: report("ok") }) })).not.toBe(prev);
+    expect(applyThreadListEvent(prev, { kind: "updated", thread: thread("a", { labels: ["x"], report: report("later") }) })).not.toBe(prev);
+    expect(applyThreadListEvent(prev, { kind: "updated", thread: thread("a", { labels: ["x"], report: null }) })).not.toBe(prev);
   });
 
   it("usage compares by content; the retired ledger follows snapshots and retiredUsage events", () => {
