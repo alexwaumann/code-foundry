@@ -59,8 +59,8 @@ Decided while building (not in the brief; flagged for review):
   It stops on Ctrl-C, when the daemon ends the stream, and when stdin closes, but it
   watches stdin only when stdin is a pipe or socket: Claude's Bash tool and background
   jobs have `/dev/null`, which would end it at once.
-* `thread.wait` shows in the palette like `action.wait` (no mechanism hides CLI-only
-  commands). A thread's agent waiting for its own thread just times out: the registry
+* `thread.wait` is `NoKeybinding` and shows in the palette, like `action.wait` (no
+  mechanism hides CLI-only commands). A thread's agent waiting for its own thread just times out: the registry
   overlays an explicit id onto the context, so the command cannot tell "my thread" from
   "the thread I named".
 
