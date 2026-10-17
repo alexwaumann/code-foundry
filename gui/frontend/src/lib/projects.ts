@@ -1,5 +1,5 @@
 /**
- * The Projects page's view models: every project (registered repository) with its own
+ * The Projects page's view models: every registered project with its own
  * worktrees, and every workspace with its members. A workspace's member worktrees are
  * listed under the workspace only, never under their project (one change stays in one
  * place). Pure; inputs are the projects and workspaces slices' shapes.
@@ -70,7 +70,7 @@ export function addableProjects(ws: Pick<WorkspaceView, "members"> | undefined, 
 }
 
 /**
- * How a command names a repository: its name when no other registered repository has it
+ * How a command names a project: its name when no other registered project has it
  * (confirm prompts read better), else its id. The daemon resolves both.
  */
 export function projectRef(projects: ProjectsSlice, projectId: string): string {
@@ -146,7 +146,7 @@ export function collapsedWorkspaceSummary(members: number): string {
 }
 
 /**
- * What kind of project a repository is, as the Projects page's header shows it: a GitHub
+ * What kind of project it is, as the Projects page's header shows it: a GitHub
  * repository (pull requests and checks), a git repository without a GitHub remote (local
  * only, or a remote elsewhere), or a plain folder without git.
  */

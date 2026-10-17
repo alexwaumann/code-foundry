@@ -196,7 +196,7 @@ export interface WorkspaceMembersInput {
 }
 
 /**
- * The repositories a draft's thread works in, in member order, and the one it runs in
+ * The projects a draft's thread works in, in member order, and the one it runs in
  * (its cwd). A project: itself, then its registered "Also in" projects. A workspace: its
  * members (none when it is gone). No project: none (primary ""). A primary that is not
  * among them falls back to the first.
@@ -239,7 +239,7 @@ export interface PlaceEnv {
   workspace?: WorkspaceMembersInput;
   isGitProject: (id: string) => boolean;
   hasWorktree: (projectId: string, path: string) => boolean;
-  /** The primary repository's default base (ListRefs.default_ref); "" when unknown. */
+  /** The primary project's default base (ListRefs.default_ref); "" when unknown. */
   defaultRef: string;
   /**
    * The one checkout of a project without git (its folder); undefined for a git project.

@@ -729,7 +729,7 @@ export class World {
   /** A project by id or (unique) name, like the daemon's project refs. */
   private projectRef(ref: string): MockProject {
     const r = this.projects.get(ref) ?? [...this.projects.values()].find((x) => x.name === ref);
-    if (!r) throw new CommandError("notfound", `repository ${ref} not found`);
+    if (!r) throw new CommandError("notfound", `project ${ref} not found`);
     return r;
   }
 
@@ -806,7 +806,7 @@ export class World {
    */
   addWorkspace(name: string, refs: readonly string[], branch = `cf/${name}`): MockWorkspace {
     if ([...this.workspaces.values()].some((w) => w.name === name)) throw new CommandError("unavailable", `a workspace named "${name}" exists`);
-    if (refs.length === 0) throw new CommandError("invalid", "a workspace needs at least one repository");
+    if (refs.length === 0) throw new CommandError("invalid", "a workspace needs at least one project");
     const specs = refs.map((ref) => {
       const [id = "", base = ""] = ref.split(":");
       const project = this.memberProjectRef(id.trim());
@@ -2393,7 +2393,7 @@ export class World {
           name: "workspace.add-project",
           title: "Add Project to Workspace",
           category: "Workspace",
-          description: "Create a worktree on the workspace branch in another repository and add it to the workspace.",
+          description: "Create a worktree on the workspace branch in another project and add it to the workspace.",
           keybindings: [],
           args: [
             { name: "project", type: ArgType.STRING, required: true, description: "Project id, name, or absolute path" },
@@ -2413,7 +2413,7 @@ export class World {
           name: "workspace.remove-project",
           title: "Remove Project from Workspace",
           category: "Workspace",
-          description: "Delete a member repository's worktree and drop it from the workspace.",
+          description: "Delete a member project's worktree and drop it from the workspace.",
           keybindings: [],
           args: [
             { name: "project", type: ArgType.STRING, required: true, description: "Project id, name, or path" },
@@ -2686,7 +2686,7 @@ export class World {
           name: "worktree.create",
           title: "Create Worktree",
           category: "Worktree",
-          description: "New worktree for a branch in the active repository",
+          description: "New worktree for a branch in the active project",
           keybindings: [],
           args: [
             { name: "branch", type: ArgType.STRING, required: true, description: "Branch name" },

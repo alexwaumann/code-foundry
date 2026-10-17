@@ -143,7 +143,7 @@ test("required args are prompted inline before invoking", async ({ page }) => {
   expect(last?.name).toBe("worktree.create");
   expect(last?.args).toEqual({ branch: "feat/palette" });
   expect(last?.context?.activeWorktreePath).toBe(`${CF}.worktrees/feat-sidebar`);
-  // The command emits FocusRepo for the new worktree, created under ~/.code-foundry/worktrees/<owner>/<repo>:
+  // The command emits FocusProject for the new worktree, created under ~/.code-foundry/worktrees/<owner>/<repo>:
   // the Projects page shows it in its side panel.
   await expect(page.getByTestId("projects-page")).toBeVisible();
   await expect(page.getByTestId("worktree-surface-title")).toHaveText("code-foundry@feat/palette");

@@ -716,7 +716,7 @@ export class MockActions {
 
   // ---- Commands -----------------------------------------------------------------
 
-  /** The project the action commands work on (see commands_action.go actionRepo). */
+  /** The project the action commands work on (see commands_action.go actionProject). */
   private projectFor(ctx: UiContext | undefined, args: Record<string, string>): string {
     const projects = this.host.projects();
     const inside = (path: string) => {

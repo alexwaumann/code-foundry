@@ -83,7 +83,7 @@
  *        deploy in every project, user skill commit; DEFAULT_FILES in every project)
  *   POST /__mock/files?project=repo-cf&path=a.ts&path=src/b.ts   (that project's files; no path:
  *                                                 none; reset restores DEFAULT_FILES)
- *   GET  /__mock/files/calls                      ("skills <repo,…|-> <includeUser>", "search <project> <query>")
+ *   GET  /__mock/files/calls                      ("skills <project,…|-> <includeUser>", "search <project> <query>")
  *   POST /__mock/files/search?delay=700&fail=1    (SearchFiles answers after 700ms; fail=1: Internal; reset: at once)
  *   thread.new with a prompt containing FAIL fails (after the worktree delay, if any).
  *   POST /__mock/gitops?fail=git.push&delay=800   (next git.push fails; ops take 800ms)

@@ -424,7 +424,7 @@ function WorkspaceBlock({ id, collapsed, filtering }: { id: string; collapsed: b
 }
 
 /**
- * The Projects page: what the sidebar's repository tree used to show. Per project its
+ * The Projects page: what the sidebar's project tree used to show. Per project its
  * own worktrees with git and pull request state and actions (new thread, new terminal,
  * remove worktree, unregister); per workspace its members (add, remove, remove the
  * workspace). Workspace member worktrees are listed under their workspace only. Projects
