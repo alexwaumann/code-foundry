@@ -405,6 +405,12 @@ func (f *Fake) Snapshot() *thread.Snapshot {
 	return f.snap
 }
 
+// List filters the snapshot like the store (thread.FilterThreads), comparing Repo and
+// Workspace as ids.
+func (f *Fake) List(_ context.Context, o thread.ListOptions) ([]thread.Thread, error) {
+	return thread.FilterThreads(f.Snapshot().Threads, o), nil
+}
+
 // PutItems replaces a thread's items (and pending requests, derived from the
 // request items) and publishes ItemAppended for each.
 func (f *Fake) PutItems(id string, items ...thread.Item) {

@@ -107,6 +107,7 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterRepoCleanup(r, command.RepoCleanupDeps{Repo: d.Repo, GitOps: d.GitOps.Backend, NotGit: d.NotGit}),
 		command.RegisterProjects(r, d.Projects),
 		command.RegisterThreadLifecycle(r, d.Thread, d.Emitter),
+		command.RegisterThreadList(r, command.ThreadListDeps{Thread: d.Thread, Repo: d.Repo}),
 		command.RegisterThread(r, d.Thread),
 		command.RegisterMcp(r, d.Thread, d.Emitter),
 		command.RegisterAgents(r, d.Thread, d.Emitter),

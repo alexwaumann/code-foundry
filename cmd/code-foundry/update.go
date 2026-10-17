@@ -256,7 +256,9 @@ func (cl *cli) followDownload(ctx context.Context, c *client.Client) (*v1.Update
 func restartCostOf(ctx context.Context, c *client.Client) command.RestartCost {
 	// Only threads working, waiting on an answer or running background work lose
 	// anything to the restart; an idle one starts again with its next message.
-	res, err := c.Command.Invoke(ctx, connect.NewRequest(&v1.InvokeCommandRequest{Name: "thread.list"}))
+	// Every thread (thread.list leaves archived ones out and stops at 50 by default).
+	res, err := c.Command.Invoke(ctx, connect.NewRequest(&v1.InvokeCommandRequest{Name: "thread.list",
+		Args: map[string]string{"all": "true", "limit": "0"}}))
 	if err != nil {
 		return command.RestartCost{}
 	}

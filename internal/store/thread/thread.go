@@ -411,6 +411,9 @@ type Store interface {
 	ReadAttachment(ctx context.Context, path string) ([]byte, string, error)
 	// Snapshot returns the current immutable snapshot.
 	Snapshot() *Snapshot
+	// List returns the threads o selects, the most recently active first (filter.go).
+	// A Repo or Workspace that names nothing is ErrInvalidArgument.
+	List(ctx context.Context, o ListOptions) ([]Thread, error)
 
 	// Thread conversations (conversation.go, items.go).
 
