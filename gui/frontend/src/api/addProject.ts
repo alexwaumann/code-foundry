@@ -1,12 +1,12 @@
 import { Code, ConnectError } from "@connectrpc/connect";
-import { RepoService, RepositoryVisibility, type GitHubRepository } from "@/gen/codefoundry/v1/repo_pb";
+import { ProjectService, RepositoryVisibility, type GitHubRepository } from "@/gen/codefoundry/v1/project_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
 import { orOutdatedDaemon } from "./errors";
 import { toRepoView, type RepoView } from "./repo";
 
 /**
- * The Add Project dialog's Local folder tab (RepoService.Register) and GitHub tab
- * (RepoService.SearchGitHub, LookupGitHub and Clone).
+ * The Add Project dialog's Local folder tab (ProjectService.Register) and GitHub tab
+ * (ProjectService.SearchGitHub, LookupGitHub and Clone).
  */
 
 /** A project just added: what the dialog needs to say so and open it. */
@@ -16,15 +16,15 @@ export interface AddedProjectView {
 }
 
 /**
- * Adds a folder under home as a project (RepoService.Register): a git repository adds
+ * Adds a folder under home as a project (ProjectService.Register): a git repository adds
  * that repository, any other folder a project without git. The daemon expands "~" and
  * refuses paths outside home; errors are the daemon's ConnectError.
  */
 export async function registerRepo(path: string, conn: DaemonConnection = daemon): Promise<AddedProjectView> {
-  const c = await conn.client(RepoService);
+  const c = await conn.client(ProjectService);
   const res = await c.register({ path });
-  if (!res.repo) throw new Error("the daemon did not say which project it added");
-  return { id: res.repo.id, name: res.repo.name || res.repo.id };
+  if (!res.project) throw new Error("the daemon did not say which project it added");
+  return { id: res.project.id, name: res.project.name || res.project.id };
 }
 
 export type RepoVisibility = "public" | "private" | "internal" | "";
@@ -70,7 +70,7 @@ export function toGitHubRepoView(r: GitHubRepository): GitHubRepoView {
 
 /** Searches github.com (first 20, best match first). */
 export async function searchGitHub(query: string, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<GitHubRepoView[]> {
-  const c = await conn.client(RepoService);
+  const c = await conn.client(ProjectService);
   try {
     const res = await c.searchGitHub({ query }, { signal });
     return res.repositories.map(toGitHubRepoView);
@@ -81,7 +81,7 @@ export async function searchGitHub(query: string, conn: DaemonConnection = daemo
 
 /** One github.com repository; null when it does not exist or the viewer cannot see it. */
 export async function lookupGitHub(owner: string, name: string, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<GitHubRepoView | null> {
-  const c = await conn.client(RepoService);
+  const c = await conn.client(ProjectService);
   try {
     const res = await c.lookupGitHub({ owner, name }, { signal });
     return res.repository ? toGitHubRepoView(res.repository) : null;
@@ -109,12 +109,12 @@ export async function cloneRepo(
   conn: DaemonConnection = daemon,
   signal?: AbortSignal,
 ): Promise<RepoView> {
-  const c = await conn.client(RepoService);
+  const c = await conn.client(ProjectService);
   try {
     let repo: RepoView | null = null;
     for await (const ev of c.clone({ owner, name }, { signal })) {
       if (ev.event.case === "progress") onProgress({ line: ev.event.value.line, transient: ev.event.value.transient });
-      else if (ev.event.case === "repo") repo = toRepoView(ev.event.value);
+      else if (ev.event.case === "project") repo = toRepoView(ev.event.value);
     }
     if (!repo) throw new Error("the clone ended without a project");
     return repo;

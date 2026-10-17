@@ -293,7 +293,7 @@ export function toThreadView(s: Thread): ThreadView {
   return {
     id: s.id,
     claudeSessionId: s.claudeSessionId,
-    repoId: s.repoId,
+    repoId: s.projectId,
     worktreePath: s.worktreePath,
     name: s.name,
     autoNamed: s.autoNamed,

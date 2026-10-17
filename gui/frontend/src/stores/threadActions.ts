@@ -92,7 +92,7 @@ export function snoozeThread(id: string, untilMs: number | null): Promise<boolea
 
 /** thread.run-in ("Run in…"): moves a workspace thread to the member in repoId. */
 export function runThreadIn(id: string, repoId: string): Promise<boolean> {
-  return runCommand(THREAD_COMMANDS.runIn, { repo: repoId }, threadContext(id));
+  return runCommand(THREAD_COMMANDS.runIn, { project: repoId }, threadContext(id));
 }
 
 /** The compose store key of a thread's follow-up draft. */

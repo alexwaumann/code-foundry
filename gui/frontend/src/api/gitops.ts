@@ -51,7 +51,7 @@ export function toGitOpView(o: GitOp): GitOpView {
     state: stateMap[o.state],
     title: o.title,
     worktreePath: o.worktreePath,
-    repoId: o.repoId,
+    repoId: o.projectId,
     branch: o.branch,
     durationMs: Number(o.durationMs),
     summary: o.summary,

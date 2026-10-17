@@ -113,14 +113,14 @@ describe("threadNewArgs", () => {
       "new worktree from a base, with attachments",
       {},
       ["/a/1.png", "/a/2.png"],
-      { repo: "r", "new-worktree": "true", base: "origin/main", model: "opus", effort: "high", permission: "auto", prompt: "Add a dark mode toggle", attachments: "/a/1.png,/a/2.png" },
+      { project: "r", "new-worktree": "true", base: "origin/main", model: "opus", effort: "high", permission: "auto", prompt: "Add a dark mode toggle", attachments: "/a/1.png,/a/2.png" },
     ],
-    ["new worktree without a known base lets the daemon pick", { base: "" }, [], { repo: "r", "new-worktree": "true", model: "opus", effort: "high", permission: "auto", prompt: "Add a dark mode toggle" }],
+    ["new worktree without a known base lets the daemon pick", { base: "" }, [], { project: "r", "new-worktree": "true", model: "opus", effort: "high", permission: "auto", prompt: "Add a dark mode toggle" }],
     [
       "existing worktree: its path, no base",
       { worktree: { kind: "existing", path: "/src/app" }, model: "", effort: "", text: "" },
       [],
-      { repo: "r", worktree: "/src/app", permission: "auto" },
+      { project: "r", worktree: "/src/app", permission: "auto" },
     ],
   ])("%s", (_name, over, staged, want) => {
     expect(threadNewArgs("r", { ...base, ...over }, staged)).toEqual(want);
@@ -206,17 +206,17 @@ describe("workspaces", () => {
     [
       "a workspace member",
       { kind: "workspace", workspaceId: "w-1", repoId: "api", worktreePath: "/wt/api/cf-login" },
-      { repo: "api", workspace: "w-1", worktree: "/wt/api/cf-login", model: "haiku", effort: "medium", permission: "auto", prompt: "Fix login" },
+      { project: "api", workspace: "w-1", worktree: "/wt/api/cf-login", model: "haiku", effort: "medium", permission: "auto", prompt: "Fix login" },
     ],
     [
       "a new workspace, default bases",
       { kind: "new-workspace", repoIds: ["web", "api"], repoId: "web", base: "" },
-      { repo: "web", "new-worktree": "true", repos: "web,api", model: "haiku", effort: "medium", permission: "auto", prompt: "Fix login" },
+      { project: "web", "new-worktree": "true", projects: "web,api", model: "haiku", effort: "medium", permission: "auto", prompt: "Fix login" },
     ],
     [
       "a new workspace, the primary's own base",
       { kind: "new-workspace", repoIds: ["web", "api"], repoId: "api", base: "origin/dev" },
-      { repo: "api", "new-worktree": "true", repos: "web,api:origin/dev", model: "haiku", effort: "medium", permission: "auto", prompt: "Fix login" },
+      { project: "api", "new-worktree": "true", projects: "web,api:origin/dev", model: "haiku", effort: "medium", permission: "auto", prompt: "Fix login" },
     ],
   ])("threadArgs: %s", (_name, place, want) => {
     expect(threadArgs(place, prompt, [])).toEqual(want);

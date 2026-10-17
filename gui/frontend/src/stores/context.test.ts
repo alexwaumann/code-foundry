@@ -12,7 +12,7 @@ function term(id: string, labels: Record<string, string>): TerminalView {
   return { id, argv: ["/bin/zsh"], cwd: "/src/app", cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: null, exitedAtMs: null, altScreen: false, labels };
 }
 
-const shell = { kind: "shell", thread: "s1", repo: "r1", worktree: "/src/app" };
+const shell = { kind: "shell", thread: "s1", project: "r1", worktree: "/src/app" };
 const closed = { open: false, query: "", commandName: null, page: "commands" as const, returnTo: "content" as const };
 
 describe("the bottom panel's shell in the command context", () => {
@@ -51,7 +51,7 @@ describe("the bottom panel's shell in the command context", () => {
 });
 
 describe("a Projects-page shell in the command context", () => {
-  const wtShell = { kind: "shell", repo: "r1", worktree: "/src/app.worktrees/x" };
+  const wtShell = { kind: "shell", project: "r1", worktree: "/src/app.worktrees/x" };
   beforeEach(() => {
     const list = [term("p", wtShell), term("q", { kind: "shell", worktree: "/src/y" })];
     useTerminalsStore.setState({ byId: Object.fromEntries(list.map((t) => [t.id, t])), order: list.map((t) => t.id), loaded: true });

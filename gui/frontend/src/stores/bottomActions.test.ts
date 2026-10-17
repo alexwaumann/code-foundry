@@ -24,7 +24,7 @@ const { useViewsStore } = await import("./views");
 function term(id: string, labels: Record<string, string>, extra: Partial<TerminalView> = {}): TerminalView {
   return { id, argv: ["/bin/zsh"], cwd: "/src/app", cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: null, exitedAtMs: null, altScreen: false, labels, ...extra };
 }
-const shell = (thread: string, worktree = "/src/app") => ({ kind: "shell", repo: "r1", worktree, ...(thread ? { thread } : {}) });
+const shell = (thread: string, worktree = "/src/app") => ({ kind: "shell", project: "r1", worktree, ...(thread ? { thread } : {}) });
 
 function setTerminals(list: TerminalView[]): void {
   useTerminalsStore.setState({ byId: Object.fromEntries(list.map((t) => [t.id, t])), order: list.map((t) => t.id), loaded: true });

@@ -327,7 +327,7 @@ function NoGitBody({ repoId, path }: { repoId: string; path: string }) {
           data-testid="init-git"
           onClick={() => {
             setBusy(true);
-            void runCommand("repo.git.init", {}, worktreeContext(repoId, path)).finally(() => {
+            void runCommand("project.git.init", {}, worktreeContext(repoId, path)).finally(() => {
               setBusy(false);
             });
           }}

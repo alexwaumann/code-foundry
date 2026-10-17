@@ -1,11 +1,11 @@
 import { timestampMs } from "@bufbuild/protobuf/wkt";
 import {
-  RepoService,
+  ProjectService,
   type GitStatus,
-  type Repo,
-  type RepoEvent,
+  type Project,
+  type ProjectEvent,
   type Worktree,
-} from "@/gen/codefoundry/v1/repo_pb";
+} from "@/gen/codefoundry/v1/project_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
 import { orOutdatedDaemon } from "./errors";
 
@@ -46,7 +46,7 @@ export interface WorktreeView {
   isMain: boolean;
   status: GitStatusView;
   /**
-   * The git half of "safe to clean up" (the daemon's repo.MergedCleanReason): not main,
+   * The git half of "safe to clean up" (the daemon's project.MergedCleanReason): not main,
    * on a branch, nothing uncommitted, every commit in status.baseRef. Live threads,
    * terminals and workspaces are checked against their own slices (lib/projects.ts
    * isCleanable). Absent counts as false.
@@ -130,10 +130,10 @@ export function toGitStatusView(s: GitStatus | undefined): GitStatusView {
 }
 
 export function toWorktreeView(w: Worktree): WorktreeView {
-  return { repoId: w.repoId, path: w.path, branch: w.branch, head: w.head, detached: w.detached, isMain: w.isMain, status: toGitStatusView(w.status), mergedClean: w.mergedClean };
+  return { repoId: w.projectId, path: w.path, branch: w.branch, head: w.head, detached: w.detached, isMain: w.isMain, status: toGitStatusView(w.status), mergedClean: w.mergedClean };
 }
 
-export function toRepoView(r: Repo): RepoView {
+export function toRepoView(r: Project): RepoView {
   return {
     id: r.id,
     path: r.path,
@@ -146,30 +146,30 @@ export function toRepoView(r: Repo): RepoView {
   };
 }
 
-export function toRepoEventView(ev: RepoEvent): RepoEventView | null {
+export function toRepoEventView(ev: ProjectEvent): RepoEventView | null {
   const e = ev.event;
   switch (e.case) {
     case "snapshot":
-      return { kind: "snapshot", repos: e.value.repos.map(toRepoView) };
-    case "repoUpdated":
+      return { kind: "snapshot", repos: e.value.projects.map(toRepoView) };
+    case "projectUpdated":
       return { kind: "repoUpdated", repo: toRepoView(e.value) };
-    case "repoRemovedId":
+    case "projectRemovedId":
       return { kind: "repoRemoved", id: e.value };
     case "worktreeUpdated":
       return { kind: "worktreeUpdated", worktree: toWorktreeView(e.value) };
     case "worktreeRemoved":
-      return { kind: "worktreeRemoved", repoId: e.value.repoId, path: e.value.path };
+      return { kind: "worktreeRemoved", repoId: e.value.projectId, path: e.value.path };
     case "worktreeDetailUpdated":
-      return { kind: "worktreeDetailUpdated", repoId: e.value.repoId, path: e.value.path };
+      return { kind: "worktreeDetailUpdated", repoId: e.value.projectId, path: e.value.path };
     default:
       return null;
   }
 }
 
 export async function listRepos(conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<RepoView[]> {
-  const c = await conn.client(RepoService);
+  const c = await conn.client(ProjectService);
   const res = await c.list({}, { signal });
-  return res.repos.map(toRepoView);
+  return res.projects.map(toRepoView);
 }
 
 export interface RefsView {
@@ -180,13 +180,13 @@ export interface RefsView {
 }
 
 /**
- * Refs a new worktree can be based on (RepoService.ListRefs). A daemon older than the
+ * Refs a new worktree can be based on (ProjectService.ListRefs). A daemon older than the
  * RPC fails with OutdatedDaemonError.
  */
 export async function listRefs(repoId: string, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<RefsView> {
-  const c = await conn.client(RepoService);
+  const c = await conn.client(ProjectService);
   try {
-    const res = await c.listRefs({ repoId }, { signal });
+    const res = await c.listRefs({ projectId: repoId }, { signal });
     return { refs: [...res.refs], defaultRef: res.defaultRef };
   } catch (err) {
     throw orOutdatedDaemon(err);

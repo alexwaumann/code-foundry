@@ -35,7 +35,7 @@ export type EventView =
 export function toEventView(ev: Event): EventView | null {
   const e = ev.event;
   switch (e.case) {
-    case "repo": {
+    case "project": {
       const v = toRepoEventView(e.value);
       return v && { source: "repo", event: v };
     }

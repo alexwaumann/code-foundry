@@ -49,7 +49,7 @@ export interface CreatedProject {
 /** repo.create: a new project in the projects directory, git initialized. */
 export async function createProject(name: string): Promise<CreatedProject> {
   try {
-    const res = await invokeConfirmed("repo.create", { name });
+    const res = await invokeConfirmed("project.create", { name });
     if (!res) throw new Error("cancelled");
     const repo = JSON.parse(res.resultJson || "{}") as { id?: string; name?: string; path?: string };
     if (!repo.id) throw new Error(res.message || "the daemon did not say which project it created");
@@ -74,7 +74,7 @@ export interface PublishRequest {
 export async function publishProject(req: PublishRequest): Promise<string> {
   const ctx = { ...getUiContext(), activeRepoId: req.repoId, activeWorktreePath: "", activeThreadId: "", activeTerminalId: "", activeWorkspaceId: "" };
   try {
-    const res = await invokeConfirmed("repo.github.publish", { repo: req.repoId, owner: req.owner, name: req.name, visibility: req.visibility }, ctx);
+    const res = await invokeConfirmed("project.github.publish", { project: req.repoId, owner: req.owner, name: req.name, visibility: req.visibility }, ctx);
     if (!res) throw new Error("cancelled");
     return res.message;
   } finally {
@@ -89,7 +89,7 @@ export async function publishProject(req: PublishRequest): Promise<string> {
 export async function deleteProject(repoId: string): Promise<void> {
   const ctx = { ...getUiContext(), activeRepoId: repoId, activeWorktreePath: "", activeThreadId: "", activeTerminalId: "", activeWorkspaceId: "" };
   try {
-    await invokeCommand("repo.delete", ctx, { repo: repoId }, undefined, { confirmed: true });
+    await invokeCommand("project.delete", ctx, { project: repoId }, undefined, { confirmed: true });
   } finally {
     void refreshCommands();
   }

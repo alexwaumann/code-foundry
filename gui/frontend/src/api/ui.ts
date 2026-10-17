@@ -25,8 +25,8 @@ export function toUiIntentView(i: UiIntent): UiIntentView | null {
       return { kind: "focusTerminal", terminalId: e.value.terminalId };
     case "focusThread":
       return { kind: "focusThread", threadId: e.value.threadId };
-    case "focusRepo":
-      return { kind: "focusRepo", repoId: e.value.repoId, worktreePath: e.value.worktreePath };
+    case "focusProject":
+      return { kind: "focusRepo", repoId: e.value.projectId, worktreePath: e.value.worktreePath };
     case "openPalette":
       return { kind: "openPalette", query: e.value.query };
     case "notify":

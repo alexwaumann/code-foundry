@@ -1,10 +1,10 @@
-import { PublishOwnerKind, RepoService, RepositoryVisibility, type PublishOwner } from "@/gen/codefoundry/v1/repo_pb";
+import { PublishOwnerKind, ProjectService, RepositoryVisibility, type PublishOwner } from "@/gen/codefoundry/v1/project_pb";
 import type { PublishOwnerView, Visibility } from "@/lib/publish";
 import { daemon, type DaemonConnection } from "./endpoint";
 import { orOutdatedDaemon } from "./errors";
 
 /**
- * RepoService.ListPublishOwners for the publish picker (the Add Project dialog's New tab
+ * ProjectService.ListPublishOwners for the publish picker (the Add Project dialog's New tab
  * and the publish dialog). Creating and publishing go through repo.create and
  * repo.github.publish (stores/publish.ts).
  */
@@ -40,7 +40,7 @@ export interface PublishOwnersResult {
  * older than its TTL is fetched again first.
  */
 export async function listPublishOwners(opts: { allowStale?: boolean } = {}, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<PublishOwnersResult> {
-  const c = await conn.client(RepoService);
+  const c = await conn.client(ProjectService);
   try {
     const res = await c.listPublishOwners({ allowStale: opts.allowStale ?? false }, { signal });
     return { owners: res.owners.map(toPublishOwnerView), stale: res.stale };

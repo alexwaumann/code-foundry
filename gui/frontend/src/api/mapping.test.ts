@@ -20,7 +20,7 @@ import {
   ReviewerCandidateSchema,
   ReviewerKind,
 } from "@/gen/codefoundry/v1/gh_pb";
-import { RepoEventSchema, RepoSchema } from "@/gen/codefoundry/v1/repo_pb";
+import { ProjectEventSchema, ProjectSchema } from "@/gen/codefoundry/v1/project_pb";
 import { AgentRunStatus, ThreadListEventSchema, ThreadSchema, ThreadState, ThreadStatus } from "@/gen/codefoundry/v1/thread_lifecycle_pb";
 import { AttachEventSchema, TerminalEventSchema, TerminalSchema, TerminalState } from "@/gen/codefoundry/v1/terminal_pb";
 import { UiIntent_Notify_Level, UiIntentSchema } from "@/gen/codefoundry/v1/ui_pb";
@@ -95,35 +95,35 @@ describe("terminal mapping", () => {
 
 describe("repo mapping", () => {
   it("defaults a missing git status to clean", () => {
-    const r = toRepoView(create(RepoSchema, { id: "r", name: "app", worktrees: [{ repoId: "r", path: "/a", isMain: true }] }));
+    const r = toRepoView(create(ProjectSchema, { id: "r", name: "app", worktrees: [{ projectId: "r", path: "/a", isMain: true }] }));
     expect(r.worktrees[0]?.status).toMatchObject({ dirty: false, ahead: 0, refreshedAtMs: null });
     expect(r.remotes).toEqual([]);
-    expect(toRepoView(create(RepoSchema, { id: "r", remotes: ["origin", "upstream"] })).remotes).toEqual(["origin", "upstream"]);
+    expect(toRepoView(create(ProjectSchema, { id: "r", remotes: ["origin", "upstream"] })).remotes).toEqual(["origin", "upstream"]);
   });
 
   it("maps conflicts and the git operation in progress", () => {
     const status = { conflicted: 2, dirty: true, operation: "rebase", operationStep: 3, operationTotal: 6 };
-    const r = toRepoView(create(RepoSchema, { id: "r", worktrees: [{ repoId: "r", path: "/a", status }] }));
+    const r = toRepoView(create(ProjectSchema, { id: "r", worktrees: [{ projectId: "r", path: "/a", status }] }));
     expect(r.worktrees[0]?.status).toMatchObject(status);
-    const idle = toRepoView(create(RepoSchema, { id: "r", worktrees: [{ repoId: "r", path: "/a", status: {} }] }));
+    const idle = toRepoView(create(ProjectSchema, { id: "r", worktrees: [{ projectId: "r", path: "/a", status: {} }] }));
     expect(idle.worktrees[0]?.status).toMatchObject({ conflicted: 0, operation: "", operationStep: 0, operationTotal: 0 });
   });
 
   it("maps git, and tells a remoteless git repository from one without git", () => {
-    const wt = [{ repoId: "r", path: "/a", isMain: true }];
-    const plain = toRepoView(create(RepoSchema, { id: "r", worktrees: wt }));
-    const local = toRepoView(create(RepoSchema, { id: "r", git: true, worktrees: wt }));
-    const cloned = toRepoView(create(RepoSchema, { id: "r", git: true, remotes: ["origin"], worktrees: wt }));
-    const pending = toRepoView(create(RepoSchema, { id: "r", git: true }));
+    const wt = [{ projectId: "r", path: "/a", isMain: true }];
+    const plain = toRepoView(create(ProjectSchema, { id: "r", worktrees: wt }));
+    const local = toRepoView(create(ProjectSchema, { id: "r", git: true, worktrees: wt }));
+    const cloned = toRepoView(create(ProjectSchema, { id: "r", git: true, remotes: ["origin"], worktrees: wt }));
+    const pending = toRepoView(create(ProjectSchema, { id: "r", git: true }));
     expect([plain.git, local.git]).toEqual([false, true]);
     expect([plain, local, cloned, pending].map(isRemoteless)).toEqual([false, true, false, false]);
   });
 
   it.each([
-    [{ case: "repoRemovedId" as const, value: "r1" }, { kind: "repoRemoved", id: "r1" }],
-    [{ case: "worktreeRemoved" as const, value: { repoId: "r1", path: "/p" } }, { kind: "worktreeRemoved", repoId: "r1", path: "/p" }],
-  ])("maps RepoEvent %#", (event, want) => {
-    expect(toRepoEventView(create(RepoEventSchema, { event }))).toEqual(want);
+    [{ case: "projectRemovedId" as const, value: "r1" }, { kind: "repoRemoved", id: "r1" }],
+    [{ case: "worktreeRemoved" as const, value: { projectId: "r1", path: "/p" } }, { kind: "worktreeRemoved", repoId: "r1", path: "/p" }],
+  ])("maps ProjectEvent %#", (event, want) => {
+    expect(toRepoEventView(create(ProjectEventSchema, { event }))).toEqual(want);
   });
 });
 
@@ -154,7 +154,7 @@ describe("ui intent mapping", () => {
   it.each([
     [{ case: "focusTerminal" as const, value: { terminalId: "t" } }, { kind: "focusTerminal", terminalId: "t" }],
     [{ case: "focusThread" as const, value: { threadId: "s1" } }, { kind: "focusThread", threadId: "s1" }],
-    [{ case: "focusRepo" as const, value: { repoId: "r", worktreePath: "/w" } }, { kind: "focusRepo", repoId: "r", worktreePath: "/w" }],
+    [{ case: "focusProject" as const, value: { projectId: "r", worktreePath: "/w" } }, { kind: "focusRepo", repoId: "r", worktreePath: "/w" }],
     [{ case: "openPalette" as const, value: { query: "new" } }, { kind: "openPalette", query: "new" }],
     [
       { case: "notify" as const, value: { level: UiIntent_Notify_Level.ERROR, title: "x", body: "y" } },
@@ -332,7 +332,7 @@ describe("gh mapping", () => {
 
 describe("events mapping", () => {
   it.each([
-    [{ case: "repo" as const, value: create(RepoEventSchema, { event: { case: "snapshot", value: { repos: [] } } }) }, { source: "repo", event: { kind: "snapshot", repos: [] } }],
+    [{ case: "project" as const, value: create(ProjectEventSchema, { event: { case: "snapshot", value: { projects: [] } } }) }, { source: "repo", event: { kind: "snapshot", repos: [] } }],
     [{ case: "terminal" as const, value: create(TerminalEventSchema, { event: { case: "removedId", value: "t1" } }) }, { source: "terminal", event: { kind: "removed", id: "t1" } }],
     [{ case: "threadList" as const, value: create(ThreadListEventSchema, { event: { case: "removedId", value: "s1" } }) }, { source: "threadList", event: { kind: "removed", id: "s1" } }],
     [{ case: "gh" as const, value: create(GhEventSchema, { event: { case: "polled", value: { fetchedAt: timestampFromMs(5000), lastError: "boom" } } }) }, { source: "gh", event: { kind: "polled", fetchedAtMs: 5000, lastError: "boom" } }],
@@ -368,7 +368,7 @@ describe("events mapping", () => {
     expect(
       toThreadView(create(ThreadSchema, { id: "s3", status: ThreadStatus.ERROR, statusReason: "interrupted", statusChangedAt: timestampFromMs(7000) })),
     ).toMatchObject({ status: "error", statusReason: "interrupted", statusChangedAtMs: 7000 });
-    expect(toThreadView(create(ThreadSchema, { id: "s2", repoId: "web", workspaceId: "w-1" }))).toMatchObject({ repoId: "web", workspaceId: "w-1" });
+    expect(toThreadView(create(ThreadSchema, { id: "s2", projectId: "web", workspaceId: "w-1" }))).toMatchObject({ repoId: "web", workspaceId: "w-1" });
   });
 
   it("maps linked pull requests in order", () => {
@@ -523,8 +523,8 @@ describe("workspace mapping", () => {
       name: "login",
       branch: "cf/login",
       members: [
-        { repoId: "web", worktreePath: "/wt/web/cf-login" },
-        { repoId: "api", worktreePath: "/wt/api/cf-login" },
+        { projectId: "web", worktreePath: "/wt/web/cf-login" },
+        { projectId: "api", worktreePath: "/wt/api/cf-login" },
       ],
       createdAt: timestampFromMs(7000),
     };

@@ -1,6 +1,6 @@
 import { create } from "@bufbuild/protobuf";
 import { describe, expect, it } from "vitest";
-import { PublishOwnerKind, PublishOwnerSchema, RepositoryVisibility } from "@/gen/codefoundry/v1/repo_pb";
+import { PublishOwnerKind, PublishOwnerSchema, RepositoryVisibility } from "@/gen/codefoundry/v1/project_pb";
 import { toPublishOwnerView } from "./publish";
 
 describe("toPublishOwnerView", () => {
