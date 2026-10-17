@@ -8,6 +8,7 @@ require (
 	connectrpc.com/connect v1.21.0
 	github.com/BurntSushi/toml v1.6.0
 	github.com/creack/pty v1.1.24
+	github.com/fsnotify/fsevents v0.2.0
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/wailsapp/wails/v3 v3.0.0-beta.28
 	go.mitchellh.com/libghostty v0.0.0-20261007030428-8812ad0e0f79

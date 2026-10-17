@@ -204,8 +204,8 @@ func TestRegisterReportsProjectWorktreesAndStatus(t *testing.T) {
 		t.Fatalf("snapshot has %d projects", n)
 	}
 
-	// Edits inside a subdirectory are not seen by the non-recursive watcher, but
-	// Refresh picks them up; untracked + modified + staged are counted.
+	// Refresh picks up edits without waiting for the stream; untracked + modified +
+	// staged are counted.
 	writeFile(t, filepath.Join(f.project, "sub", "x.txt"), "changed\n")
 	writeFile(t, filepath.Join(f.project, "sub", "new.txt"), "new\n")
 	writeFile(t, filepath.Join(f.project, "staged.txt"), "s\n")

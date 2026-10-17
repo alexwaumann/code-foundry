@@ -15,8 +15,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/fsnotify/fsnotify"
-
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/fsx"
 )
@@ -26,7 +24,9 @@ const (
 	DefaultWorkers       = 4
 	DefaultDebounce      = 300 * time.Millisecond
 	DefaultFetchInterval = 2 * time.Minute
-	DefaultPollInterval  = 30 * time.Second
+	// DefaultPollInterval is a backstop: the FSEvents stream sees edits anywhere in a
+	// worktree, so the poll only covers what it cannot (fsevents-watcher.md).
+	DefaultPollInterval = 2 * time.Minute
 	// fetchTimeout bounds one `git fetch`; worktreeTimeout bounds worktree add/remove,
 	// which may check out or delete a large tree.
 	fetchTimeout    = 2 * time.Minute
@@ -58,8 +58,8 @@ type Options struct {
 	// DefaultFetchInterval; negative disables fetching.
 	FetchInterval time.Duration
 	// PollInterval is a backstop status refresh of every worktree, for changes the
-	// non-recursive watcher cannot see (edits below the top level of a worktree).
-	// Zero means DefaultPollInterval; negative disables polling.
+	// FSEvents stream cannot see (a ref moved in a packed or reftable store, a stream
+	// that failed to start). Zero means DefaultPollInterval; negative disables polling.
 	PollInterval time.Duration
 	// Now returns the current time. Defaults to time.Now.
 	Now func() time.Time
@@ -124,6 +124,8 @@ type Git struct {
 	runner Runner
 	now    func() time.Time
 	wtRoot string
+	// wtRootReal is wtRoot with symlinks resolved as far as it exists: a stream path.
+	wtRootReal string
 	// root is Options.AllowedRoot with symlinks resolved.
 	root string
 
@@ -131,15 +133,18 @@ type Git struct {
 
 	mu       sync.RWMutex
 	projects map[string]*projectState
-	watches  map[string]watchTarget // watched dir -> owner
+	// routes is the fs event routing table (watch.go): every known directory of every
+	// project -> owner. Each project's entries are written only by its reconcile job
+	// (and dropped by Unregister).
+	routes map[string]watchTarget
 
 	// pubMu serializes snapshot rebuild + store + publish so events are ordered and
 	// each one reflects the snapshot current when it was published.
 	pubMu sync.Mutex
 
-	watcher *fsnotify.Watcher
-	sched   *scheduler
-	deb     *debouncer
+	fs    *fsWatcher
+	sched *scheduler
+	deb   *debouncer
 
 	details detailState // worktree detail cache (detail.go)
 
@@ -163,15 +168,16 @@ func Start(ctx context.Context, opts Options) (*Git, error) {
 		return nil, err
 	}
 	g := &Git{
-		root:     root,
-		db:       opts.DB,
-		bus:      opts.Bus,
-		wtRoot:   opts.WorktreeRoot,
-		log:      cmp.Or(opts.Log, slog.Default()).With("store", "project"),
-		runner:   opts.Runner,
-		now:      opts.Now,
-		projects: map[string]*projectState{},
-		watches:  map[string]watchTarget{},
+		root:       root,
+		db:         opts.DB,
+		bus:        opts.Bus,
+		wtRoot:     opts.WorktreeRoot,
+		wtRootReal: resolveMissing(opts.WorktreeRoot),
+		log:        cmp.Or(opts.Log, slog.Default()).With("store", "project"),
+		runner:     opts.Runner,
+		now:        opts.Now,
+		projects:   map[string]*projectState{},
+		routes:     map[string]watchTarget{},
 	}
 	if g.runner == nil {
 		g.runner = ExecRunner{}
@@ -188,15 +194,13 @@ func Start(ctx context.Context, opts Options) (*Git, error) {
 		st.meta.Store(m)
 		g.projects[m.ID] = st
 	}
-	g.watcher, err = fsnotify.NewWatcher()
-	if err != nil {
-		return nil, fmt.Errorf("project: start watcher: %w", err)
-	}
 
 	ctx, g.cancel = context.WithCancel(context.WithoutCancel(ctx))
 	g.sched = newScheduler(ctx, cmp.Or(opts.Workers, DefaultWorkers), g.runJob)
 	g.deb = newDebouncer(cmp.Or(opts.Debounce, DefaultDebounce), func(k jobKey) { g.sched.request(k) })
-	g.wg.Go(func() { g.watchLoop(ctx) })
+	g.fs = newFSWatcher(g.log, g.streamPaths, g.onEvents)
+	g.wg.Go(func() { g.fs.run(ctx) })
+	g.wg.Go(g.fs.dispatch)
 	if d := interval(opts.FetchInterval, DefaultFetchInterval); d > 0 {
 		g.wg.Go(func() { g.fetchLoop(ctx, d) })
 	}
@@ -234,14 +238,14 @@ func interval(v, def time.Duration) time.Duration {
 	return v
 }
 
-// Close stops all goroutines and the watcher. In-flight git commands are cancelled.
+// Close stops all goroutines and the FSEvents stream. In-flight git commands are
+// cancelled.
 func (g *Git) Close() error {
 	g.cancel()
 	g.deb.close()
 	g.sched.close()
-	err := g.watcher.Close()
 	g.wg.Wait()
-	return err
+	return nil
 }
 
 // Snapshot implements Store.
@@ -507,19 +511,19 @@ func (g *Git) Unregister(ctx context.Context, id string) error {
 	g.mu.Lock()
 	_, inMem := g.projects[id]
 	delete(g.projects, id)
-	var dirs []string
-	for dir, t := range g.watches {
+	routed := false
+	for dir, t := range g.routes {
 		if t.projectID == id {
-			dirs = append(dirs, dir)
-			delete(g.watches, dir)
+			delete(g.routes, dir)
+			routed = true
 		}
 	}
 	g.mu.Unlock()
 	if n, _ := res.RowsAffected(); n == 0 && !inMem {
 		return fmt.Errorf("%w: project %q", ErrNotFound, id)
 	}
-	for _, d := range dirs {
-		_ = g.watcher.Remove(d)
+	if routed {
+		g.fs.sync(ctx) // the stream may drop the project's directories
 	}
 	g.log.Info("project unregistered", "id", id)
 	g.commit(func(*Snapshot) []Event { return []Event{ProjectRemoved{ID: id}} })
@@ -828,7 +832,7 @@ func (g *Git) runJob(ctx context.Context, k jobKey) {
 	}
 }
 
-// reconcile re-lists a project's worktrees and metadata, syncs slots and watches,
+// reconcile re-lists a project's worktrees and metadata, syncs slots and fs routes,
 // publishes, then requests jobBase, which re-resolves the base and refreshes the
 // status of every worktree.
 func (g *Git) reconcile(ctx context.Context, id string) {
@@ -916,24 +920,32 @@ func (g *Git) reconcile(ctx context.Context, id string) {
 		st.meta.Store(&next)
 	}
 	var want map[string]watchTarget
-	if next.Error == "" && next.Git {
+	switch {
+	case next.Error != "":
+		// No routes: the poll retries the reconcile (a moved project, a deleted one).
+	case next.Git:
 		want = desiredWatches(id, next.Path, next.commonDir(), wwts)
+	default:
+		want = map[string]watchTarget{next.Path: {kind: wkPlainRoot, projectID: id, wtPath: next.Path}}
 	}
-	var toRemove []string
-	for dir, t := range g.watches {
-		if t.projectID != id {
-			continue
+	routesChanged := false
+	for dir, t := range g.routes {
+		if t.projectID == id && want[dir] != t {
+			delete(g.routes, dir)
+			routesChanged = true
 		}
-		if w, ok := want[dir]; ok && w == t {
-			delete(want, dir) // already watched as the same target
-			continue
+	}
+	for dir, t := range want {
+		if g.routes[dir] != t {
+			g.routes[dir] = t
+			routesChanged = true
 		}
-		toRemove = append(toRemove, dir)
-		delete(g.watches, dir)
 	}
 	g.mu.Unlock()
 
-	g.syncWatches(id, st, want, toRemove)
+	if routesChanged {
+		g.fs.sync(ctx) // a worktree root may have appeared outside the stream's paths
+	}
 
 	if metaChanged || setChanged {
 		g.commit(func(s *Snapshot) []Event {
@@ -946,39 +958,6 @@ func (g *Git) reconcile(ctx context.Context, id string) {
 	}
 	if next.Git {
 		g.sched.request(jobKey{kind: jobBase, projectID: id})
-	}
-}
-
-// syncWatches removes stale watches and adds wanted ones. Directories that do not
-// exist yet (refs/remotes/origin before the first fetch, worktrees/ before the first
-// linked worktree) are skipped; an event on their parent triggers a reconcile that
-// retries.
-func (g *Git) syncWatches(id string, st *projectState, want map[string]watchTarget, toRemove []string) {
-	for _, d := range toRemove {
-		_ = g.watcher.Remove(d)
-	}
-	added := map[string]watchTarget{}
-	for dir, t := range want {
-		if err := g.watcher.Add(dir); err != nil {
-			if !errors.Is(err, os.ErrNotExist) {
-				g.log.Warn("watch failed", "project", id, "dir", dir, "err", err)
-			}
-			continue
-		}
-		added[dir] = t
-	}
-	g.mu.Lock()
-	stillRegistered := g.projects[id] == st
-	if stillRegistered {
-		for dir, t := range added {
-			g.watches[dir] = t
-		}
-	}
-	g.mu.Unlock()
-	if !stillRegistered {
-		for dir := range added {
-			_ = g.watcher.Remove(dir)
-		}
 	}
 }
 
@@ -1156,62 +1135,6 @@ func (g *Git) publishedBefore(projectID, path string, t time.Time) bool {
 }
 
 // --- loops -----------------------------------------------------------------------
-
-func (g *Git) watchLoop(ctx context.Context) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case err, ok := <-g.watcher.Errors:
-			if !ok {
-				return
-			}
-			g.log.Warn("watcher error", "err", err)
-		case ev, ok := <-g.watcher.Events:
-			if !ok {
-				return
-			}
-			for _, k := range g.keysFor(ev) {
-				g.deb.trigger(k)
-			}
-		}
-	}
-}
-
-// keysFor maps an fs event to the jobs it should trigger.
-func (g *Git) keysFor(ev fsnotify.Event) []jobKey {
-	g.mu.RLock()
-	t, self := g.watches[ev.Name]
-	g.mu.RUnlock()
-	var act action
-	switch {
-	case self && (ev.Has(fsnotify.Remove) || ev.Has(fsnotify.Rename)):
-		// A watched directory itself went away (worktree deleted by hand, project moved).
-		act = actReconcile
-	default:
-		g.mu.RLock()
-		t, self = g.watches[filepath.Dir(ev.Name)]
-		g.mu.RUnlock()
-		if !self {
-			return nil
-		}
-		act = classify(t.kind, filepath.Base(ev.Name), ev.Op)
-	}
-	if act != actNone {
-		g.log.Debug("fs event", "path", ev.Name, "op", ev.Op.String(), "kind", t.kind.String(), "action", act.String())
-	}
-	switch act {
-	case actStatus:
-		return []jobKey{{kind: jobStatus, projectID: t.projectID, path: t.wtPath}}
-	case actStatusAll:
-		// A remote-tracking ref moved: re-resolve the base, which then refreshes
-		// every worktree (upstream and base ahead/behind).
-		return []jobKey{{kind: jobBase, projectID: t.projectID}}
-	case actReconcile:
-		return []jobKey{{kind: jobReconcile, projectID: t.projectID}}
-	}
-	return nil
-}
 
 // fetchLoop fetches every project, one at a time, every interval. The first round runs
 // shortly after start, once the initial reconcile has learned each project's origin.

@@ -31,7 +31,7 @@ cd gui && wails3 dev   # GUI with hot reload (needs a running daemon or auto-sta
 
 - Go 1.26 (the libghostty-vt bindings require it). `context.Context` first. Wrap errors with `%w`. No panics outside `main`.
 - `log/slog` only. No `fmt.Println` in library code.
-- cgo (libghostty-vt) is touched only inside the terminal actor goroutine.
+- cgo is touched only inside its owning goroutine: libghostty-vt in the terminal actor, FSEvents in the project store's stream goroutine (`internal/store/project/fsevents.go`).
 - Table tests for anything with branches. Fakes live in `<pkg>/<pkg>test`.
 - Proto changes: edit `proto/`, run `make gen`, commit generated code.
 

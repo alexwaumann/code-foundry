@@ -14,9 +14,10 @@ import (
 // Register accepts a directory outside any git repository as a project with Git
 // false. Its reconcile runs no git command: it checks that the directory exists and
 // whether .git has appeared, and publishes one synthetic main worktree at the project
-// path (empty branch and head, zero status). Status and base jobs are no-ops for it,
-// it has no watches, and the poll loop reconciles it every round (a stat), which is
-// how a `git init` run outside the app is noticed. InitGit runs git init and an empty
+// path (empty branch and head, zero status). Status and base jobs are no-ops for it.
+// Its directory is in the FSEvents stream, where only .git appearing counts
+// (wkPlainRoot), and the poll loop reconciles it every round (a stat) as a backstop;
+// that is how a `git init` run outside the app is noticed. InitGit runs git init and an empty
 // initial commit, then refreshes, which flips the project to git and lets the normal
 // reconcile take over.
 
