@@ -38,7 +38,7 @@ const (
 
 // Options configures Start.
 type Options struct {
-	DB  *sql.DB  // required; holds the repos table
+	DB  *sql.DB  // required; holds the projects table
 	Bus *bus.Bus // required; receives Event values
 	// WorktreeRoot is where CreateWorktree puts worktrees without an explicit path:
 	// <WorktreeRoot>/<owner>/<repo>/<branch>. Required, absolute.
@@ -255,7 +255,7 @@ func (g *Git) Close() error {
 func (g *Git) Snapshot() *Snapshot { return g.snap.Load() }
 
 func (g *Git) load(ctx context.Context) ([]*projectMeta, error) {
-	rows, err := g.db.QueryContext(ctx, `SELECT id, path, name, registered_at FROM repos`)
+	rows, err := g.db.QueryContext(ctx, `SELECT id, path, name, registered_at FROM projects`)
 	if err != nil {
 		return nil, fmt.Errorf("project: load: %w", err)
 	}
@@ -433,7 +433,7 @@ func (g *Git) Register(ctx context.Context, path string) (Project, error) {
 
 	if !exists {
 		if _, err := g.db.ExecContext(ctx,
-			`INSERT INTO repos (id, path, name, registered_at) VALUES (?, ?, ?, ?) ON CONFLICT (id) DO NOTHING`,
+			`INSERT INTO projects (id, path, name, registered_at) VALUES (?, ?, ?, ?) ON CONFLICT (id) DO NOTHING`,
 			m.ID, m.Path, m.Name, m.RegisteredAt.UnixMilli()); err != nil {
 			g.mu.Lock()
 			if g.projects[m.ID] == st {
@@ -508,7 +508,7 @@ func resolveDir(path string) (string, error) {
 
 // Unregister implements Store.
 func (g *Git) Unregister(ctx context.Context, id string) error {
-	res, err := g.db.ExecContext(ctx, `DELETE FROM repos WHERE id = ?`, id)
+	res, err := g.db.ExecContext(ctx, `DELETE FROM projects WHERE id = ?`, id)
 	if err != nil {
 		return fmt.Errorf("project: unregister %s: %w", id, err)
 	}

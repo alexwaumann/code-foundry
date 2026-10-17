@@ -29,7 +29,7 @@ import (
 var discard = slog.New(slog.NewTextHandler(io.Discard, nil))
 
 // harness is a Manager over a real database, the project fake with two projects ("web",
-// with a second worktree "feat", and "api") whose rows exist in the repos table (the
+// with a second worktree "feat", and "api") whose rows exist in the projects table (the
 // actions table references it), and the terminal fake.
 type harness struct {
 	t        *testing.T
@@ -70,7 +70,7 @@ func newHarness(t *testing.T, mut ...func(*Options)) *harness {
 	}})
 	h.projects.Put(project.Project{ID: "api", Path: h.api, Name: "api", Git: true, Worktrees: []project.Worktree{{ProjectID: "api", Path: h.api, IsMain: true}}})
 	for _, r := range h.projects.Snapshot().Projects {
-		if _, err := d.ExecContext(ctx, `INSERT INTO repos (id, path, name, registered_at) VALUES (?, ?, ?, 0)`, r.ID, r.Path, r.Name); err != nil {
+		if _, err := d.ExecContext(ctx, `INSERT INTO projects (id, path, name, registered_at) VALUES (?, ?, ?, 0)`, r.ID, r.Path, r.Name); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -265,7 +265,7 @@ func TestProjectRemovedForgetsActionsAndRuns(t *testing.T) {
 	rec := h.m.runs[run.ID]
 	h.m.mu.Unlock()
 	// Unregistering cascades in the database.
-	if _, err := h.db.ExecContext(context.Background(), `DELETE FROM repos WHERE id = 'web'`); err != nil {
+	if _, err := h.db.ExecContext(context.Background(), `DELETE FROM projects WHERE id = 'web'`); err != nil {
 		t.Fatal(err)
 	}
 	h.m.ProjectRemoved(context.Background(), "web")
