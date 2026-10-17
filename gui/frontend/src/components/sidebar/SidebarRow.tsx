@@ -394,7 +394,7 @@ function ThreadTooltip({ id, children }: { id: string; children: ReactElement })
       disableHoverableContent
     >
       <TooltipTrigger asChild>{children}</TooltipTrigger>
-      <TooltipContent side="right" align="start" sideOffset={12} className="w-[220px] px-2.5 py-2 text-body-sm" data-testid="thread-tooltip" data-thread-id={id}>
+      <TooltipContent side="right" align="start" sideOffset={12} className="w-[260px] px-2.5 py-2 text-body-sm" data-testid="thread-tooltip" data-thread-id={id}>
         <ThreadTipBody id={id} />
       </TooltipContent>
     </Tooltip>

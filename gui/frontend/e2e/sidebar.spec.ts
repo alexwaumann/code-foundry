@@ -506,11 +506,11 @@ test("hovering a thread row shows its tooltip: name, project, branch with a work
   await expect(tip.getByTestId("tip-branch-chip")).toHaveText("worktree");
   await expect(tip.getByTestId("tip-model")).toHaveText("Opus 4.8 (medium)");
   await expect(tip.getByTestId("tip-project-chip")).toHaveCount(0);
-  // To the right of the sidebar, 220px wide.
+  // To the right of the sidebar, 260px wide.
   const sidebar = await page.getByTestId("sidebar").boundingBox();
   const box = await tip.boundingBox();
   expect(box && sidebar && box.x >= sidebar.x + sidebar.width - 1).toBe(true);
-  expect(Math.round(box?.width ?? 0)).toBe(220);
+  expect(Math.round(box?.width ?? 0)).toBe(260);
 
   // Moving to the next row: s-2 in ghostty-playground's main checkout, no effort.
   await row(page, "s:s-2").hover();
@@ -569,8 +569,8 @@ test("the tooltip shows the full status, wrapped, under the name for threads tha
   await expect(status).toHaveClass(/text-warning/);
   const line2 = await approval.getByTestId("row-place").locator("span.truncate").evaluate((el) => el.scrollWidth > el.clientWidth);
   expect(line2).toBe(true);
-  // Wrapped over several lines inside the 220px tooltip, between the name and the project.
-  expect(Math.round((await tip.boundingBox())?.width ?? 0)).toBe(220);
+  // Wrapped over several lines inside the 260px tooltip, between the name and the project.
+  expect(Math.round((await tip.boundingBox())?.width ?? 0)).toBe(260);
   const [name, st, project] = [await tip.getByTestId("tip-name").boundingBox(), await status.boundingBox(), await tip.getByTestId("tip-project").boundingBox()];
   expect(st && st.height >= 40).toBe(true);
   expect(name && st && project && name.y < st.y && st.y + st.height <= project.y).toBe(true);
