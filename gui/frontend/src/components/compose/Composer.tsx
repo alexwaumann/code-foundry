@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { ArrowUp, Brain, FileText, Folder, FolderGit2, Gauge, GitBranch, GitBranchPlus, GitCommitHorizontal, Layers, Loader2, Paperclip, ShieldCheck, X } from "lucide-react";
+import { ArrowUp, Brain, Folder, FolderGit2, Gauge, GitBranch, GitBranchPlus, GitCommitHorizontal, Layers, Loader2, Paperclip, ShieldCheck, X } from "lucide-react";
 import { AttachmentPreview } from "./AttachmentPreview";
+import { PdfTile } from "./attachmentFaces";
 import { BranchIndicator } from "./BranchIndicator";
 import { ComposerPicker, type PickerGroup } from "./ComposerPicker";
 import { CompletionCard } from "./CompletionCard";
@@ -24,7 +25,7 @@ import {
   draftMembers,
   EFFORT_CHOICES,
   NEW_BRANCH,
-  pageCount,
+  previewLabel,
   PERMISSION_CHOICES,
   pickDefault,
   projectChipBranch,
@@ -216,31 +217,6 @@ async function removeWithConfirm(key: string, a: DraftAttachment, refocus: () =>
 /** What the composers' file pickers offer: the accepted types, and any file named .pdf. */
 export const ATTACHMENT_ACCEPT = `image/*,${ATTACHMENT_MIME_TYPES.join(",")},.pdf`;
 
-/** A tile's label: "Preview a.png, 58 KB", "Preview spec.pdf, PDF, 12 pages, 1.4 MB". */
-function tileLabel(a: DraftAttachment): string {
-  const size = formatAttachmentSize(a.file.size);
-  if (a.kind === "image") return `Preview ${a.file.name}, ${size}`;
-  return `Preview ${a.file.name}, PDF, ${a.pages === null ? "" : `${pageCount(a.pages)}, `}${size}`;
-}
-
-/** A PDF tile's face: the first page on a muted ground (the icon until it renders) over a "PDF" strip. */
-function PdfTile({ thumb }: { thumb: string | null }) {
-  return (
-    <span className="flex size-full flex-col bg-muted">
-      <span className="flex min-h-0 flex-1 items-center justify-center p-1">
-        {thumb ? (
-          <img src={thumb} alt="" draggable={false} className="max-h-full max-w-full object-contain shadow-sm ring-1 ring-border" />
-        ) : (
-          <FileText aria-hidden className="size-5 text-muted-foreground" />
-        )}
-      </span>
-      <span aria-hidden className="border-t bg-popover text-center text-caption-sm font-medium text-muted-foreground">
-        PDF
-      </span>
-    </span>
-  );
-}
-
 /** A draft's attachment tiles (preview on click, × to remove); also a thread's follow-up composer's. */
 export function Attachments({ draftKey, disabled, refocus }: { draftKey: string; disabled: boolean; refocus: () => void }) {
   const attachments = useDraft(draftKey, "attachments");
@@ -258,7 +234,7 @@ export function Attachments({ draftKey, disabled, refocus }: { draftKey: string;
         >
           <button
             type="button"
-            aria-label={tileLabel(a)}
+            aria-label={previewLabel(a.file.name, a.kind, a.pages, formatAttachmentSize(a.file.size))}
             aria-haspopup="dialog"
             data-testid="attachment-open"
             className="block size-full cursor-pointer rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:ring-inset"

@@ -16,6 +16,7 @@ import {
   repoTagCount,
   retainRepoTags,
   serializePrompt,
+  stagedPdfPages,
   tagLabel,
   tagsByRepo,
   tagToken,
@@ -69,6 +70,16 @@ describe("prompt tokens", () => {
     expect(projectPrompt(`Read ${spec} then ${gone}`, (id) => staged[id])).toBe("Read [PDF: spec.pdf; ref=/att/2.pdf] then [PDF: old.PDF]");
     expect(kindFromName("notes.pdf ")).toBe("pdf");
     expect(kindFromName("shot.png")).toBe("image");
+  });
+
+  it.each([
+    ["/att/0123abcd-2p.pdf", 2],
+    ["/att/0123abcd-30P.PDF", 30],
+    ["/att/0123abcd-~10p.pdf", null],
+    ["/att/0123abcd.pdf", null],
+    ["/att/0123abcd.png", null],
+  ])("reads a staged PDF's page count from %s", (path, pages) => {
+    expect(stagedPdfPages(path)).toBe(pages);
   });
 });
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { tagToken } from "./prompt";
-import { inlineImagePaths, parseUserMessage, sentComposerText } from "./userMessage";
+import { inlineAttachmentPaths, parseUserMessage, sentComposerText } from "./userMessage";
 
 const image = (id: string, name: string) => tagToken({ tagKind: "image", id, name });
 const file = (repoId: string, path: string) => tagToken({ tagKind: "file", repoId, path });
@@ -50,7 +50,7 @@ describe("parseUserMessage", () => {
     const pieces = parseUserMessage("", `${image("x", "shot.png")} and ${image("1", "b.png")} ${image("5", "c.png")}`, ["/att/a.png", "/att/b.png"]);
     expect(pieces[0]).toEqual({ kind: "image", name: "shot.png", path: "" });
     expect(pieces[4]).toEqual({ kind: "image", name: "c.png", path: "" });
-    expect([...inlineImagePaths(pieces)]).toEqual(["/att/b.png"]);
+    expect([...inlineAttachmentPaths(pieces)]).toEqual(["/att/b.png"]);
   });
 
   it("a chip whose staged file is a PDF (Claude got [PDF: …]) is a pdf piece", () => {
@@ -63,6 +63,6 @@ describe("parseUserMessage", () => {
       { kind: "image", name: "shot.png", path: "/att/1b.png" },
       { kind: "pdf", name: "gone.pdf", path: "" },
     ]);
-    expect([...inlineImagePaths(pieces)]).toEqual(["/att/0a.pdf", "/att/1b.png"]);
+    expect([...inlineAttachmentPaths(pieces)]).toEqual(["/att/0a.pdf", "/att/1b.png"]);
   });
 });

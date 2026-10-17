@@ -41,8 +41,7 @@ const ALLOW: { file: string; match: string; why: string }[] = [
   { file: "/src/components/compose/AttachmentChip.tsx", match: "return `rgb(${", why: "an image chip's tint: the thumbnail's average colour" },
   { file: "/src/components/compose/ProjectRows.tsx", match: "tracking-wide text-white", why: "the initials on a project's identity tile (the hashed hue above), not a theme colour" },
   { file: "/src/components/ui/dialog.tsx", match: "bg-black/40", why: "the dialog scrim dims whatever is under it, black in every theme" },
-  { file: "/src/components/compose/AttachmentPreview.tsx", match: 'overlayClassName="bg-black/80"', why: "the image lightbox scrim" },
-  { file: "/src/components/thread/UserBubble.tsx", match: 'overlayClassName="bg-black/80"', why: "the image lightbox scrim" },
+  { file: "/src/components/compose/AttachmentLightbox.tsx", match: 'overlayClassName="bg-black/80"', why: "the attachment lightbox scrim (composers and thread)" },
   { file: "/src/components/compose/Composer.tsx", match: "rounded-full bg-black/70 text-white", why: "the remove button sits on an image thumbnail, not on a theme surface" },
 ];
 
