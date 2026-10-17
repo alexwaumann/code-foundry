@@ -115,14 +115,16 @@ func commandToProto(c command.Listed) *v1.Command {
 			desc += " (default: " + a.Context.Describe() + ")"
 		}
 		args[i] = &v1.ArgSpec{
-			Name:         a.Name,
-			Type:         argTypes[a.Type],
-			Required:     a.Required && a.Context == command.NoContext,
-			Description:  desc,
-			EnumValues:   a.Enum,
-			DefaultValue: a.Default,
-			Positional:   a.Positional,
-			DefaultToCwd: a.DefaultToCwd,
+			Name:               a.Name,
+			Type:               argTypes[a.Type],
+			Required:           a.Required && a.Context == command.NoContext,
+			Description:        desc,
+			EnumValues:         a.Enum,
+			DefaultValue:       a.Default,
+			Positional:         a.Positional,
+			DefaultToCwd:       a.DefaultToCwd,
+			DefaultToThreadEnv: a.DefaultToThreadEnv,
+			FileOrStdin:        a.FileOrStdin,
 		}
 	}
 	return &v1.Command{

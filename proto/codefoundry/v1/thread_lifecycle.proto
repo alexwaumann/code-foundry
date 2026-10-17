@@ -7,8 +7,8 @@ import "google/protobuf/timestamp.proto";
 
 // Thread lifecycle messages: the thread record (Thread), its state and status, and the
 // requests and events of ThreadService's lifecycle RPCs (Create, Fork, List, Get, Rename,
-// Close, Reconnect, Remove, RunIn, Pin, Archive, Snooze, Watch, StageAttachment,
-// ReadAttachment). The service itself is in thread.proto.
+// Close, Reconnect, Remove, RunIn, Pin, Archive, Snooze, Label, Report, SetBudget, Watch,
+// StageAttachment, ReadAttachment). The service itself is in thread.proto.
 
 // PermissionMode maps to claude --permission-mode. Full access (bypassPermissions) is
 // deliberately not offered.
@@ -104,7 +104,9 @@ message Thread {
   // Short explanation of status from the detector, e.g. "finished", "at prompt",
   // "permission: Do you want to proceed?", "snooze ended" (NEEDS_ATTENTION on a
   // disconnected thread whose snooze ran out; cleared like "finished" on a disconnected
-  // thread, by the next start), or "interrupted" / "did not start" for ERROR. Persisted with
+  // thread, by the next start), "budget reached" (NEEDS_ATTENTION: the thread's cost
+  // reached budget_usd mid-turn and the daemon interrupted Claude; cleared by the next
+  // message, or once seen like "finished"), or "interrupted" / "did not start" for ERROR. Persisted with
   // status: a DISCONNECTED thread keeps the status and reason it had when its process
   // ended (a busy one becomes ERROR "interrupted"), across daemon restarts. Empty when
   // unknown.
@@ -208,6 +210,48 @@ message Thread {
   // Stopping Claude now loses that report: archive, snooze and restarts confirm it like
   // running background work. Not persisted. See docs/notes/thread-lifecycle.md.
   bool background_wake_pending = 42;
+  // The thread whose agent created this one (thread.new run from that thread's Claude:
+  // the CLI sends $CODE_FOUNDRY_THREAD); empty when the user made it. Set once at
+  // Create; Fork does not set it. The creator may since have been removed.
+  string created_by = 43;
+  // The creator's display name (its id when it had none) when this thread was created,
+  // kept verbatim when the creator is renamed, archived or removed.
+  string created_by_name = 44;
+  // What the thread was started for, in its creator's words (thread.new --brief):
+  // trimmed, at most 500 characters, empty when none. Persisted.
+  string brief = 45;
+  // Labels: lowercase tokens of letters, digits and - _ . / (1 to 40 characters each,
+  // at most 32), deduplicated and sorted. Set at Create and by Label. Persisted.
+  repeated string labels = 46;
+  // The thread's latest report (Report; thread.report): its agent saying how its task
+  // went. A new report replaces the previous one. UNSPECIFIED with the other report
+  // fields empty when the thread never reported. Persisted.
+  ThreadReportStatus report_status = 47;
+  // At most 1000 characters.
+  string report_summary = 48;
+  // A JSON object (compacted), at most 16 KiB; empty when the report had none.
+  string report_data = 49;
+  // When the report was made; unset when none.
+  google.protobuf.Timestamp report_at = 50;
+  // Spending limit in USD at the same first-party API rates as cost_usd; 0 for none.
+  // When cost_usd first reaches it while Claude is working, the daemon interrupts the
+  // turn, sets NEEDS_ATTENTION "budget reached" and appends a note to the thread. Once
+  // per budget value: setting a budget above the cost re-arms it. Messages can still be
+  // sent. Set at Create and by SetBudget. Persisted.
+  double budget_usd = 51;
+}
+
+// How a thread's task went, as its agent reports it (Thread.report_status).
+enum ThreadReportStatus {
+  THREAD_REPORT_STATUS_UNSPECIFIED = 0;
+  // The task is done.
+  THREAD_REPORT_STATUS_DONE = 1;
+  // The agent cannot go on without help (an answer, an access, a decision).
+  THREAD_REPORT_STATUS_BLOCKED = 2;
+  // The task failed.
+  THREAD_REPORT_STATUS_FAILED = 3;
+  // Work in progress: an intermediate report.
+  THREAD_REPORT_STATUS_PROGRESS = 4;
 }
 
 // ApiRetry is a thread's pending API retry: Claude's system/api_retry frame.
@@ -338,6 +382,17 @@ message CreateThreadRequest {
   // repo_id, worktree_path, new_worktree, workspace_id and new_workspace
   // (InvalidArgument). RunIn refuses such a thread; Fork and Reconnect keep its cwd.
   bool no_project = 14;
+  // The thread whose agent asks for this one (Thread.created_by); it must exist
+  // (INVALID_ARGUMENT otherwise). The CLI sends $CODE_FOUNDRY_THREAD; the GUI never
+  // sets it. The daemon writes a "Created by <name> · brief: <brief>" note as the new
+  // thread's first item.
+  string created_by = 15;
+  // Thread.brief: trimmed, at most 500 characters (INVALID_ARGUMENT otherwise).
+  string brief = 16;
+  // Thread.labels: each validated (lowercased first), then deduplicated and sorted.
+  repeated string labels = 17;
+  // Thread.budget_usd; 0 for none, never negative.
+  double budget_usd = 18;
 }
 
 message NewWorktree {
@@ -514,6 +569,45 @@ message SnoozeThreadRequest {
 }
 
 message SnoozeThreadResponse {
+  Thread thread = 1;
+}
+
+message LabelThreadRequest {
+  string id = 1;
+  // Removes every label first.
+  bool clear = 2;
+  // Labels to add (validated like CreateThreadRequest.labels).
+  repeated string add = 3;
+  // Labels to remove; a label not on the thread is ignored. A label in both add and
+  // remove is INVALID_ARGUMENT.
+  repeated string remove = 4;
+}
+
+message LabelThreadResponse {
+  Thread thread = 1;
+}
+
+message ReportThreadRequest {
+  string id = 1;
+  // Required (not UNSPECIFIED).
+  ThreadReportStatus status = 2;
+  // At most 1000 characters (trimmed).
+  string summary = 3;
+  // A JSON object, at most 16 KiB once compacted; empty for none.
+  string data = 4;
+}
+
+message ReportThreadResponse {
+  Thread thread = 1;
+}
+
+message SetThreadBudgetRequest {
+  string id = 1;
+  // USD; 0 clears the budget. Not negative, not NaN or infinite.
+  double budget_usd = 2;
+}
+
+message SetThreadBudgetResponse {
   Thread thread = 1;
 }
 
