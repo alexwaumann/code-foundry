@@ -45,6 +45,11 @@ func TestGuide(t *testing.T) {
 	if n := strings.Count(guide, "\n"); n > 420 {
 		t.Errorf("the guide has %d lines; keep it under ~400", n)
 	}
+	// Claude's Bash tool sets an output over 30,000 characters aside in a file, and the
+	// agent then greps it instead of reading the guide (seen in the e2e).
+	if n := len(guide); n > 29_000 {
+		t.Errorf("the guide has %d bytes; keep it under 29,000 so it reaches the agent whole", n)
+	}
 	for _, want := range []string{
 		"# code-foundry: a guide for agents",
 		"You are thread `s-7754a478e649` (`$CODE_FOUNDRY_THREAD`)",

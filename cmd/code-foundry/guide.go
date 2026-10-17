@@ -37,10 +37,11 @@ func runGuide(ctx context.Context, cl *cli, args []string) error {
 // guideCategoryOrder puts the categories an agent needs first; the rest follow by name.
 var guideCategoryOrder = []string{"Thread", "Action", "Workspace", "Project", "Repository", "Terminal"}
 
-// guideDetailed are the categories whose args are listed one per line with their
-// descriptions; the others list their flags only (the guide stays short; `--help` has
-// the rest).
-var guideDetailed = []string{"Thread", "Action"}
+// guideDetailed are the categories whose commands are listed with their whole
+// description and one line per arg; the others get the first sentence (`--help` has
+// the rest). The guide must stay short: Claude's Bash tool sets a long output aside
+// in a file (about 30,000 characters), and an agent reading it then greps.
+var guideDetailed = []string{"Thread"}
 
 // writeGuide writes the guide for cmds; self is $CODE_FOUNDRY_THREAD ("" outside a
 // thread).
@@ -127,34 +128,56 @@ func writeGuideCommands(w io.Writer, cmds []*v1.Command) {
 		slices.SortFunc(list, func(a, b *v1.Command) int { return cmp.Compare(a.GetName(), b.GetName()) })
 		detailed := slices.Contains(guideDetailed, cat)
 		for _, c := range list {
-			fmt.Fprintf(w, "- `%s` %s\n", guideUsage(c, !detailed), oneLine(c.GetDescription()))
 			if !detailed {
+				fmt.Fprintf(w, "- `%s` %s\n", guideUsage(c), firstSentence(c.GetDescription()))
 				continue
 			}
+			fmt.Fprintf(w, "- `%s` %s\n", guideUsage(c), oneLine(c.GetDescription()))
 			for _, a := range c.GetArgs() {
+				if !guideShowsArg(a) {
+					continue
+				}
 				fmt.Fprintf(w, "  - `%s`%s\n", guideArg(a), guideArgDetail(a))
 			}
 		}
 	}
 }
 
-// guideUsage is "thread.wait <id>", with the flags when withFlags: "repo.refresh
-// [--repo string]".
-func guideUsage(c *v1.Command, withFlags bool) string {
+// guideShowsArg: the arg gets its own line. Not the thread id every thread command
+// takes (the intro explains it; the usage shows [--id]), nor the args only the GUI
+// sets (its composer's text, staged attachments).
+func guideShowsArg(a *v1.ArgSpec) bool {
+	d := a.GetDescription()
+	return !threadIDArg(a) && !strings.Contains(d, "(the GUI sets it)") && !strings.Contains(d, "from StageAttachment")
+}
+
+// threadIDArg: a's the "id" of a thread command (defaulting to the thread it runs in).
+func threadIDArg(a *v1.ArgSpec) bool {
+	return a.GetName() == "id" && strings.HasPrefix(a.GetDescription(), "Thread id")
+}
+
+// guideUsage is the command and its positional args, "thread.wait <id>", with
+// "[--id]" for a thread command's id flag.
+func guideUsage(c *v1.Command) string {
 	parts := []string{c.GetName()}
 	for _, a := range c.GetArgs() {
-		if a.GetPositional() {
+		switch {
+		case a.GetPositional():
 			parts = append(parts, "<"+a.GetName()+">")
-		}
-	}
-	if withFlags {
-		for _, a := range c.GetArgs() {
-			if !a.GetPositional() {
-				parts = append(parts, "["+guideArg(a)+"]")
-			}
+		case threadIDArg(a):
+			parts = append(parts, "[--id]")
 		}
 	}
 	return strings.Join(parts, " ")
+}
+
+// firstSentence is a description up to its first full stop.
+func firstSentence(s string) string {
+	s = oneLine(s)
+	if i := strings.Index(s, ". "); i >= 0 {
+		return s[:i+1]
+	}
+	return s
 }
 
 // guideArg is "--until idle|attention", "--wait", "<text>".
