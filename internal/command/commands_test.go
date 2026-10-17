@@ -62,6 +62,7 @@ func TestAllRegistersEveryDomain(t *testing.T) {
 		"repo.add", "repo.clone", "repo.create", "repo.github.publish", "repo.delete",
 		"thread.new", "thread.list", "thread.focus",
 		"thread.rename", "thread.fork", "thread.remove", "thread.run-in", "thread.pin", "thread.archive", "thread.snooze",
+		"thread.get", "thread.label", "thread.report", "thread.budget",
 		"thread.send", "thread.respond", "thread.interrupt", "thread.items", "thread.set-model", "thread.set-mode", "thread.set-effort", "thread.wait",
 		"thread.mcp", "thread.mcp-reconnect", "view.panel.mcp", "thread.commands", "thread.agents", "view.panel.agents",
 		"git.fetch", "git.pull", "git.push", "pr.create", "pr.open",

@@ -199,6 +199,19 @@ func (cl *cli) runRegistry(ctx context.Context, args []string) error {
 			}
 			f.value, f.set = wd, true
 		}
+		if !f.set && f.spec.GetDefaultToThreadEnv() {
+			// --flag= (set, empty) opts out.
+			if id := cl.threadEnv(); id != "" {
+				f.value, f.set = id, true
+			}
+		}
+		if f.set && f.spec.GetFileOrStdin() {
+			v, err := cl.readArgSource(f.spec.GetName(), f.value)
+			if err != nil {
+				return err
+			}
+			f.value = v
+		}
 	}
 	for _, f := range flags {
 		if !f.set {

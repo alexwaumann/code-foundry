@@ -17,7 +17,7 @@ func TestNoKeybindingCommands(t *testing.T) {
 		"app.version", "daemon.status", "daemon.version",
 		"settings.get", "settings.path", "settings.reset", "settings.set",
 		"terminal.list", "theme.list",
-		"thread.agents", "thread.commands", "thread.focus", "thread.items", "thread.list", "thread.mcp", "thread.respond", "thread.wait",
+		"thread.agents", "thread.commands", "thread.focus", "thread.get", "thread.items", "thread.list", "thread.mcp", "thread.report", "thread.respond", "thread.wait",
 		"ui.focus.repo", "ui.focus.terminal", "ui.notify", "ui.palette.open",
 		"usage.show", "view.open.url",
 		"workspace.list", "workspace.members",
