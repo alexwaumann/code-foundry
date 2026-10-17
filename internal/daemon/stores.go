@@ -79,8 +79,9 @@ type stores struct {
 
 // openStores opens the database, applies migrations, and starts every store. On
 // error, whatever was started is closed again. threadEnv is added to every Claude
-// process's environment (see threadEnv in daemon.go).
-func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv []string) (_ *stores, err error) {
+// process's environment (see threadEnv in daemon.go). presence paces the GitHub poll
+// (gh.Options.Presence).
+func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv []string, presence func() gh.Presence) (_ *stores, err error) {
 	s := &stores{bus: bus.New()}
 	defer func() {
 		if err != nil {
@@ -111,6 +112,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	ghOpts := gh.Options{
 		DB: s.db, Bus: s.bus, Log: log.With("store", "gh"), PollInterval: cfg.GhPollInterval(),
 		SearchAs: os.Getenv("CODE_FOUNDRY_GH_SEARCH_AS"),
+		Presence: presence,
 		Config: func() gh.Config {
 			c := s.settings.Settings()
 			return gh.Config{PollInterval: c.GhPollInterval(), Dashboards: c.GitHub.DashboardsEnabled}

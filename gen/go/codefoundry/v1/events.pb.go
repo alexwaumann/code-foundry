@@ -21,6 +21,57 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type ClientKind int32
+
+const (
+	ClientKind_CLIENT_KIND_UNSPECIFIED ClientKind = 0
+	// The desktop app's window.
+	ClientKind_CLIENT_KIND_GUI ClientKind = 1
+	// The code-foundry CLI (events verb, scripts). Not counted.
+	ClientKind_CLIENT_KIND_CLI ClientKind = 2
+)
+
+// Enum value maps for ClientKind.
+var (
+	ClientKind_name = map[int32]string{
+		0: "CLIENT_KIND_UNSPECIFIED",
+		1: "CLIENT_KIND_GUI",
+		2: "CLIENT_KIND_CLI",
+	}
+	ClientKind_value = map[string]int32{
+		"CLIENT_KIND_UNSPECIFIED": 0,
+		"CLIENT_KIND_GUI":         1,
+		"CLIENT_KIND_CLI":         2,
+	}
+)
+
+func (x ClientKind) Enum() *ClientKind {
+	p := new(ClientKind)
+	*p = x
+	return p
+}
+
+func (x ClientKind) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ClientKind) Descriptor() protoreflect.EnumDescriptor {
+	return file_codefoundry_v1_events_proto_enumTypes[0].Descriptor()
+}
+
+func (ClientKind) Type() protoreflect.EnumType {
+	return &file_codefoundry_v1_events_proto_enumTypes[0]
+}
+
+func (x ClientKind) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ClientKind.Descriptor instead.
+func (ClientKind) EnumDescriptor() ([]byte, []int) {
+	return file_codefoundry_v1_events_proto_rawDescGZIP(), []int{0}
+}
+
 type EventSource int32
 
 const (
@@ -92,11 +143,11 @@ func (x EventSource) String() string {
 }
 
 func (EventSource) Descriptor() protoreflect.EnumDescriptor {
-	return file_codefoundry_v1_events_proto_enumTypes[0].Descriptor()
+	return file_codefoundry_v1_events_proto_enumTypes[1].Descriptor()
 }
 
 func (EventSource) Type() protoreflect.EnumType {
-	return &file_codefoundry_v1_events_proto_enumTypes[0]
+	return &file_codefoundry_v1_events_proto_enumTypes[1]
 }
 
 func (x EventSource) Number() protoreflect.EnumNumber {
@@ -105,7 +156,7 @@ func (x EventSource) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use EventSource.Descriptor instead.
 func (EventSource) EnumDescriptor() ([]byte, []int) {
-	return file_codefoundry_v1_events_proto_rawDescGZIP(), []int{0}
+	return file_codefoundry_v1_events_proto_rawDescGZIP(), []int{1}
 }
 
 type WatchEventsRequest struct {
@@ -124,7 +175,16 @@ type WatchEventsRequest struct {
 	// epoch (the daemon restarted since), since_seq is ignored and the stream starts with
 	// snapshots. Empty: since_seq alone decides (after a restart a seq below the new
 	// counter would "resume" with unrelated events; pass the epoch).
-	SinceEpoch    string `protobuf:"bytes,3,opt,name=since_epoch,json=sinceEpoch,proto3" json:"since_epoch,omitempty"`
+	SinceEpoch string `protobuf:"bytes,3,opt,name=since_epoch,json=sinceEpoch,proto3" json:"since_epoch,omitempty"`
+	// Who is watching. Only GUI clients count toward the daemon's presence, which paces
+	// the GitHub poll: a visible GUI polls at github.poll_interval_seconds, only hidden
+	// ones every 5 minutes, none every 15 (docs/notes/gh-poll-tiers.md).
+	ClientKind ClientKind `protobuf:"varint,4,opt,name=client_kind,json=clientKind,proto3,enum=codefoundry.v1.ClientKind" json:"client_kind,omitempty"`
+	// A token the client makes up for this stream, naming it in SetClientState. A GUI
+	// stream without one counts with the visibility it opened with.
+	ClientId string `protobuf:"bytes,5,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
+	// Whether the client's window is visible now (GUI: document.visibilityState).
+	Visible       bool `protobuf:"varint,6,opt,name=visible,proto3" json:"visible,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -180,6 +240,116 @@ func (x *WatchEventsRequest) GetSinceEpoch() string {
 	return ""
 }
 
+func (x *WatchEventsRequest) GetClientKind() ClientKind {
+	if x != nil {
+		return x.ClientKind
+	}
+	return ClientKind_CLIENT_KIND_UNSPECIFIED
+}
+
+func (x *WatchEventsRequest) GetClientId() string {
+	if x != nil {
+		return x.ClientId
+	}
+	return ""
+}
+
+func (x *WatchEventsRequest) GetVisible() bool {
+	if x != nil {
+		return x.Visible
+	}
+	return false
+}
+
+type SetClientStateRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// WatchEventsRequest.client_id of an open stream.
+	ClientId      string `protobuf:"bytes,1,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
+	Visible       bool   `protobuf:"varint,2,opt,name=visible,proto3" json:"visible,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetClientStateRequest) Reset() {
+	*x = SetClientStateRequest{}
+	mi := &file_codefoundry_v1_events_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetClientStateRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetClientStateRequest) ProtoMessage() {}
+
+func (x *SetClientStateRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_events_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetClientStateRequest.ProtoReflect.Descriptor instead.
+func (*SetClientStateRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_events_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *SetClientStateRequest) GetClientId() string {
+	if x != nil {
+		return x.ClientId
+	}
+	return ""
+}
+
+func (x *SetClientStateRequest) GetVisible() bool {
+	if x != nil {
+		return x.Visible
+	}
+	return false
+}
+
+type SetClientStateResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetClientStateResponse) Reset() {
+	*x = SetClientStateResponse{}
+	mi := &file_codefoundry_v1_events_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetClientStateResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetClientStateResponse) ProtoMessage() {}
+
+func (x *SetClientStateResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_events_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetClientStateResponse.ProtoReflect.Descriptor instead.
+func (*SetClientStateResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_events_proto_rawDescGZIP(), []int{2}
+}
+
 type Event struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Event:
@@ -214,7 +384,7 @@ type Event struct {
 
 func (x *Event) Reset() {
 	*x = Event{}
-	mi := &file_codefoundry_v1_events_proto_msgTypes[1]
+	mi := &file_codefoundry_v1_events_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -226,7 +396,7 @@ func (x *Event) String() string {
 func (*Event) ProtoMessage() {}
 
 func (x *Event) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_events_proto_msgTypes[1]
+	mi := &file_codefoundry_v1_events_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -239,7 +409,7 @@ func (x *Event) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Event.ProtoReflect.Descriptor instead.
 func (*Event) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_events_proto_rawDescGZIP(), []int{1}
+	return file_codefoundry_v1_events_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *Event) GetEvent() isEvent_Event {
@@ -457,12 +627,20 @@ var File_codefoundry_v1_events_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_events_proto_rawDesc = "" +
 	"\n" +
-	"\x1bcodefoundry/v1/events.proto\x12\x0ecodefoundry.v1\x1a\x1bcodefoundry/v1/action.proto\x1a\x17codefoundry/v1/gh.proto\x1a\x1bcodefoundry/v1/gitops.proto\x1a\x1ecodefoundry/v1/heartbeat.proto\x1a\x19codefoundry/v1/repo.proto\x1a\x1dcodefoundry/v1/settings.proto\x1a\x1dcodefoundry/v1/terminal.proto\x1a\x1bcodefoundry/v1/thread.proto\x1a%codefoundry/v1/thread_lifecycle.proto\x1a\x17codefoundry/v1/ui.proto\x1a\x1bcodefoundry/v1/update.proto\x1a\x1ecodefoundry/v1/workspace.proto\"\x89\x01\n" +
+	"\x1bcodefoundry/v1/events.proto\x12\x0ecodefoundry.v1\x1a\x1bcodefoundry/v1/action.proto\x1a\x17codefoundry/v1/gh.proto\x1a\x1bcodefoundry/v1/gitops.proto\x1a\x1ecodefoundry/v1/heartbeat.proto\x1a\x19codefoundry/v1/repo.proto\x1a\x1dcodefoundry/v1/settings.proto\x1a\x1dcodefoundry/v1/terminal.proto\x1a\x1bcodefoundry/v1/thread.proto\x1a%codefoundry/v1/thread_lifecycle.proto\x1a\x17codefoundry/v1/ui.proto\x1a\x1bcodefoundry/v1/update.proto\x1a\x1ecodefoundry/v1/workspace.proto\"\xfd\x01\n" +
 	"\x12WatchEventsRequest\x125\n" +
 	"\asources\x18\x01 \x03(\x0e2\x1b.codefoundry.v1.EventSourceR\asources\x12\x1b\n" +
 	"\tsince_seq\x18\x02 \x01(\x04R\bsinceSeq\x12\x1f\n" +
 	"\vsince_epoch\x18\x03 \x01(\tR\n" +
-	"sinceEpoch\"\xdb\x05\n" +
+	"sinceEpoch\x12;\n" +
+	"\vclient_kind\x18\x04 \x01(\x0e2\x1a.codefoundry.v1.ClientKindR\n" +
+	"clientKind\x12\x1b\n" +
+	"\tclient_id\x18\x05 \x01(\tR\bclientId\x12\x18\n" +
+	"\avisible\x18\x06 \x01(\bR\avisible\"N\n" +
+	"\x15SetClientStateRequest\x12\x1b\n" +
+	"\tclient_id\x18\x01 \x01(\tR\bclientId\x12\x18\n" +
+	"\avisible\x18\x02 \x01(\bR\avisible\"\x18\n" +
+	"\x16SetClientStateResponse\"\xdb\x05\n" +
 	"\x05Event\x12/\n" +
 	"\x04repo\x18\x01 \x01(\v2\x19.codefoundry.v1.RepoEventH\x00R\x04repo\x12;\n" +
 	"\bterminal\x18\x02 \x01(\v2\x1d.codefoundry.v1.TerminalEventH\x00R\bterminal\x12B\n" +
@@ -480,7 +658,12 @@ const file_codefoundry_v1_events_proto_rawDesc = "" +
 	"\x06action\x18\x0e \x01(\v2\x1b.codefoundry.v1.ActionEventH\x00R\x06action\x12\x10\n" +
 	"\x03seq\x18\x14 \x01(\x04R\x03seq\x12\x14\n" +
 	"\x05epoch\x18\x15 \x01(\tR\x05epochB\a\n" +
-	"\x05event*\xc0\x02\n" +
+	"\x05event*S\n" +
+	"\n" +
+	"ClientKind\x12\x1b\n" +
+	"\x17CLIENT_KIND_UNSPECIFIED\x10\x00\x12\x13\n" +
+	"\x0fCLIENT_KIND_GUI\x10\x01\x12\x13\n" +
+	"\x0fCLIENT_KIND_CLI\x10\x02*\xc0\x02\n" +
 	"\vEventSource\x12\x1c\n" +
 	"\x18EVENT_SOURCE_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11EVENT_SOURCE_REPO\x10\x01\x12\x19\n" +
@@ -494,9 +677,10 @@ const file_codefoundry_v1_events_proto_rawDesc = "" +
 	"\x12\x1a\n" +
 	"\x16EVENT_SOURCE_WORKSPACE\x10\v\x12\x17\n" +
 	"\x13EVENT_SOURCE_THREAD\x10\f\x12\x17\n" +
-	"\x13EVENT_SOURCE_ACTION\x10\r2V\n" +
+	"\x13EVENT_SOURCE_ACTION\x10\r2\xb9\x01\n" +
 	"\fEventService\x12F\n" +
-	"\x05Watch\x12\".codefoundry.v1.WatchEventsRequest\x1a\x15.codefoundry.v1.Event\"\x000\x01B\xc3\x01\n" +
+	"\x05Watch\x12\".codefoundry.v1.WatchEventsRequest\x1a\x15.codefoundry.v1.Event\"\x000\x01\x12a\n" +
+	"\x0eSetClientState\x12%.codefoundry.v1.SetClientStateRequest\x1a&.codefoundry.v1.SetClientStateResponse\"\x00B\xc3\x01\n" +
 	"\x12com.codefoundry.v1B\vEventsProtoP\x01ZGgithub.com/alexwaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
 
 var (
@@ -511,46 +695,52 @@ func file_codefoundry_v1_events_proto_rawDescGZIP() []byte {
 	return file_codefoundry_v1_events_proto_rawDescData
 }
 
-var file_codefoundry_v1_events_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_codefoundry_v1_events_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_codefoundry_v1_events_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_codefoundry_v1_events_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_codefoundry_v1_events_proto_goTypes = []any{
-	(EventSource)(0),           // 0: codefoundry.v1.EventSource
-	(*WatchEventsRequest)(nil), // 1: codefoundry.v1.WatchEventsRequest
-	(*Event)(nil),              // 2: codefoundry.v1.Event
-	(*RepoEvent)(nil),          // 3: codefoundry.v1.RepoEvent
-	(*TerminalEvent)(nil),      // 4: codefoundry.v1.TerminalEvent
-	(*ThreadListEvent)(nil),    // 5: codefoundry.v1.ThreadListEvent
-	(*GhEvent)(nil),            // 6: codefoundry.v1.GhEvent
-	(*UiIntent)(nil),           // 7: codefoundry.v1.UiIntent
-	(*GitOpsEvent)(nil),        // 8: codefoundry.v1.GitOpsEvent
-	(*SettingsEvent)(nil),      // 9: codefoundry.v1.SettingsEvent
-	(*UpdateEvent)(nil),        // 10: codefoundry.v1.UpdateEvent
-	(*WorkspaceEvent)(nil),     // 11: codefoundry.v1.WorkspaceEvent
-	(*ThreadEvent)(nil),        // 12: codefoundry.v1.ThreadEvent
-	(*StreamHeartbeat)(nil),    // 13: codefoundry.v1.StreamHeartbeat
-	(*ActionEvent)(nil),        // 14: codefoundry.v1.ActionEvent
+	(ClientKind)(0),                // 0: codefoundry.v1.ClientKind
+	(EventSource)(0),               // 1: codefoundry.v1.EventSource
+	(*WatchEventsRequest)(nil),     // 2: codefoundry.v1.WatchEventsRequest
+	(*SetClientStateRequest)(nil),  // 3: codefoundry.v1.SetClientStateRequest
+	(*SetClientStateResponse)(nil), // 4: codefoundry.v1.SetClientStateResponse
+	(*Event)(nil),                  // 5: codefoundry.v1.Event
+	(*RepoEvent)(nil),              // 6: codefoundry.v1.RepoEvent
+	(*TerminalEvent)(nil),          // 7: codefoundry.v1.TerminalEvent
+	(*ThreadListEvent)(nil),        // 8: codefoundry.v1.ThreadListEvent
+	(*GhEvent)(nil),                // 9: codefoundry.v1.GhEvent
+	(*UiIntent)(nil),               // 10: codefoundry.v1.UiIntent
+	(*GitOpsEvent)(nil),            // 11: codefoundry.v1.GitOpsEvent
+	(*SettingsEvent)(nil),          // 12: codefoundry.v1.SettingsEvent
+	(*UpdateEvent)(nil),            // 13: codefoundry.v1.UpdateEvent
+	(*WorkspaceEvent)(nil),         // 14: codefoundry.v1.WorkspaceEvent
+	(*ThreadEvent)(nil),            // 15: codefoundry.v1.ThreadEvent
+	(*StreamHeartbeat)(nil),        // 16: codefoundry.v1.StreamHeartbeat
+	(*ActionEvent)(nil),            // 17: codefoundry.v1.ActionEvent
 }
 var file_codefoundry_v1_events_proto_depIdxs = []int32{
-	0,  // 0: codefoundry.v1.WatchEventsRequest.sources:type_name -> codefoundry.v1.EventSource
-	3,  // 1: codefoundry.v1.Event.repo:type_name -> codefoundry.v1.RepoEvent
-	4,  // 2: codefoundry.v1.Event.terminal:type_name -> codefoundry.v1.TerminalEvent
-	5,  // 3: codefoundry.v1.Event.thread_list:type_name -> codefoundry.v1.ThreadListEvent
-	6,  // 4: codefoundry.v1.Event.gh:type_name -> codefoundry.v1.GhEvent
-	7,  // 5: codefoundry.v1.Event.ui:type_name -> codefoundry.v1.UiIntent
-	8,  // 6: codefoundry.v1.Event.gitops:type_name -> codefoundry.v1.GitOpsEvent
-	9,  // 7: codefoundry.v1.Event.settings:type_name -> codefoundry.v1.SettingsEvent
-	10, // 8: codefoundry.v1.Event.update:type_name -> codefoundry.v1.UpdateEvent
-	11, // 9: codefoundry.v1.Event.workspace:type_name -> codefoundry.v1.WorkspaceEvent
-	12, // 10: codefoundry.v1.Event.thread:type_name -> codefoundry.v1.ThreadEvent
-	13, // 11: codefoundry.v1.Event.heartbeat:type_name -> codefoundry.v1.StreamHeartbeat
-	14, // 12: codefoundry.v1.Event.action:type_name -> codefoundry.v1.ActionEvent
-	1,  // 13: codefoundry.v1.EventService.Watch:input_type -> codefoundry.v1.WatchEventsRequest
-	2,  // 14: codefoundry.v1.EventService.Watch:output_type -> codefoundry.v1.Event
-	14, // [14:15] is the sub-list for method output_type
-	13, // [13:14] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	1,  // 0: codefoundry.v1.WatchEventsRequest.sources:type_name -> codefoundry.v1.EventSource
+	0,  // 1: codefoundry.v1.WatchEventsRequest.client_kind:type_name -> codefoundry.v1.ClientKind
+	6,  // 2: codefoundry.v1.Event.repo:type_name -> codefoundry.v1.RepoEvent
+	7,  // 3: codefoundry.v1.Event.terminal:type_name -> codefoundry.v1.TerminalEvent
+	8,  // 4: codefoundry.v1.Event.thread_list:type_name -> codefoundry.v1.ThreadListEvent
+	9,  // 5: codefoundry.v1.Event.gh:type_name -> codefoundry.v1.GhEvent
+	10, // 6: codefoundry.v1.Event.ui:type_name -> codefoundry.v1.UiIntent
+	11, // 7: codefoundry.v1.Event.gitops:type_name -> codefoundry.v1.GitOpsEvent
+	12, // 8: codefoundry.v1.Event.settings:type_name -> codefoundry.v1.SettingsEvent
+	13, // 9: codefoundry.v1.Event.update:type_name -> codefoundry.v1.UpdateEvent
+	14, // 10: codefoundry.v1.Event.workspace:type_name -> codefoundry.v1.WorkspaceEvent
+	15, // 11: codefoundry.v1.Event.thread:type_name -> codefoundry.v1.ThreadEvent
+	16, // 12: codefoundry.v1.Event.heartbeat:type_name -> codefoundry.v1.StreamHeartbeat
+	17, // 13: codefoundry.v1.Event.action:type_name -> codefoundry.v1.ActionEvent
+	2,  // 14: codefoundry.v1.EventService.Watch:input_type -> codefoundry.v1.WatchEventsRequest
+	3,  // 15: codefoundry.v1.EventService.SetClientState:input_type -> codefoundry.v1.SetClientStateRequest
+	5,  // 16: codefoundry.v1.EventService.Watch:output_type -> codefoundry.v1.Event
+	4,  // 17: codefoundry.v1.EventService.SetClientState:output_type -> codefoundry.v1.SetClientStateResponse
+	16, // [16:18] is the sub-list for method output_type
+	14, // [14:16] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_events_proto_init() }
@@ -570,7 +760,7 @@ func file_codefoundry_v1_events_proto_init() {
 	file_codefoundry_v1_ui_proto_init()
 	file_codefoundry_v1_update_proto_init()
 	file_codefoundry_v1_workspace_proto_init()
-	file_codefoundry_v1_events_proto_msgTypes[1].OneofWrappers = []any{
+	file_codefoundry_v1_events_proto_msgTypes[3].OneofWrappers = []any{
 		(*Event_Repo)(nil),
 		(*Event_Terminal)(nil),
 		(*Event_ThreadList)(nil),
@@ -589,8 +779,8 @@ func file_codefoundry_v1_events_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_events_proto_rawDesc), len(file_codefoundry_v1_events_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   2,
+			NumEnums:      2,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -227,7 +227,10 @@ Services (v1):
   the last 4096; `since_seq` resumes a stream without snapshots while they cover it
   (`code-foundry events --since`; `docs/notes/agents-1-wait-events.md`). Every event
   carries the daemon's `epoch` (drawn at startup); a `since_epoch` of another daemon
-  starts over with snapshots (`docs/notes/agents-5-cli.md`).
+  starts over with snapshots (`docs/notes/agents-5-cli.md`). The GUI opens it as
+  `client_kind` GUI with a per-stream `client_id` and its visibility, and updates that
+  with SetClientState; the registry of GUI clients paces the GitHub poll
+  (`docs/notes/gh-poll-tiers.md`).
 * `SettingsService` — GetSchema, Get, Update, Watch over `$CONFIG/settings.toml` (TOML,
   hand-editable, reloaded on change). See `docs/notes/phase3b-settings.md`.
 * `UpdateService` — Get, Check, Download, Install, Relaunch, RequestRestart, Watch. The

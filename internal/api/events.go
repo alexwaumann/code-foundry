@@ -48,6 +48,9 @@ type EventsDeps struct {
 	Done <-chan struct{}
 	// Epoch is Event.epoch, the daemon instance; empty draws a random one (NewEvents).
 	Epoch string
+	// Clients records the GUI streams and their visibility (events_clients.go). May be
+	// nil: nothing is recorded and SetClientState answers NotFound.
+	Clients *Clients
 }
 
 // Events implements codefoundryv1connect.EventServiceHandler: one server stream that
@@ -192,6 +195,8 @@ func (h *Events) Watch(ctx context.Context, req *connect.Request[v1.WatchEventsR
 	}
 	c, replay, resumed := hub.join(mask, since)
 	defer hub.leave(c)
+	// Before the first send: a GUI that sees an event knows SetClientState will find it.
+	defer h.joinClient(req.Msg)()
 
 	// Quiet sources (gh polling off, no thread busy) get a heartbeat every
 	// HeartbeatInterval (see heartbeat.proto).

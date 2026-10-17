@@ -34,7 +34,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/events.proto.
  */
 export const file_codefoundry_v1_events: GenFile = /*@__PURE__*/
-  fileDesc("Chtjb2RlZm91bmRyeS92MS9ldmVudHMucHJvdG8SDmNvZGVmb3VuZHJ5LnYxImoKEldhdGNoRXZlbnRzUmVxdWVzdBIsCgdzb3VyY2VzGAEgAygOMhsuY29kZWZvdW5kcnkudjEuRXZlbnRTb3VyY2USEQoJc2luY2Vfc2VxGAIgASgEEhMKC3NpbmNlX2Vwb2NoGAMgASgJIusECgVFdmVudBIpCgRyZXBvGAEgASgLMhkuY29kZWZvdW5kcnkudjEuUmVwb0V2ZW50SAASMQoIdGVybWluYWwYAiABKAsyHS5jb2RlZm91bmRyeS52MS5UZXJtaW5hbEV2ZW50SAASNgoLdGhyZWFkX2xpc3QYAyABKAsyHy5jb2RlZm91bmRyeS52MS5UaHJlYWRMaXN0RXZlbnRIABIlCgJnaBgEIAEoCzIXLmNvZGVmb3VuZHJ5LnYxLkdoRXZlbnRIABImCgJ1aRgFIAEoCzIYLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50SAASLQoGZ2l0b3BzGAYgASgLMhsuY29kZWZvdW5kcnkudjEuR2l0T3BzRXZlbnRIABIxCghzZXR0aW5ncxgHIAEoCzIdLmNvZGVmb3VuZHJ5LnYxLlNldHRpbmdzRXZlbnRIABItCgZ1cGRhdGUYCiABKAsyGy5jb2RlZm91bmRyeS52MS5VcGRhdGVFdmVudEgAEjMKCXdvcmtzcGFjZRgLIAEoCzIeLmNvZGVmb3VuZHJ5LnYxLldvcmtzcGFjZUV2ZW50SAASLQoGdGhyZWFkGAwgASgLMhsuY29kZWZvdW5kcnkudjEuVGhyZWFkRXZlbnRIABI0CgloZWFydGJlYXQYDSABKAsyHy5jb2RlZm91bmRyeS52MS5TdHJlYW1IZWFydGJlYXRIABItCgZhY3Rpb24YDiABKAsyGy5jb2RlZm91bmRyeS52MS5BY3Rpb25FdmVudEgAEgsKA3NlcRgUIAEoBBINCgVlcG9jaBgVIAEoCUIHCgVldmVudCrAAgoLRXZlbnRTb3VyY2USHAoYRVZFTlRfU09VUkNFX1VOU1BFQ0lGSUVEEAASFQoRRVZFTlRfU09VUkNFX1JFUE8QARIZChVFVkVOVF9TT1VSQ0VfVEVSTUlOQUwQAhIcChhFVkVOVF9TT1VSQ0VfVEhSRUFEX0xJU1QQAxITCg9FVkVOVF9TT1VSQ0VfR0gQBBITCg9FVkVOVF9TT1VSQ0VfVUkQBRIXChNFVkVOVF9TT1VSQ0VfR0lUT1BTEAYSGQoVRVZFTlRfU09VUkNFX1NFVFRJTkdTEAcSFwoTRVZFTlRfU09VUkNFX1VQREFURRAKEhoKFkVWRU5UX1NPVVJDRV9XT1JLU1BBQ0UQCxIXChNFVkVOVF9TT1VSQ0VfVEhSRUFEEAwSFwoTRVZFTlRfU09VUkNFX0FDVElPThANMlYKDEV2ZW50U2VydmljZRJGCgVXYXRjaBIiLmNvZGVmb3VuZHJ5LnYxLldhdGNoRXZlbnRzUmVxdWVzdBoVLmNvZGVmb3VuZHJ5LnYxLkV2ZW50IgAwAULDAQoSY29tLmNvZGVmb3VuZHJ5LnYxQgtFdmVudHNQcm90b1ABWkdnaXRodWIuY29tL2FsZXh3YXVtYW5uL2NvZGUtZm91bmRyeS9nZW4vZ28vY29kZWZvdW5kcnkvdjE7Y29kZWZvdW5kcnl2MaICA0NYWKoCDkNvZGVmb3VuZHJ5LlYxygIOQ29kZWZvdW5kcnlcVjHiAhpDb2RlZm91bmRyeVxWMVxHUEJNZXRhZGF0YeoCD0NvZGVmb3VuZHJ5OjpWMWIGcHJvdG8z", [file_codefoundry_v1_action, file_codefoundry_v1_gh, file_codefoundry_v1_gitops, file_codefoundry_v1_heartbeat, file_codefoundry_v1_repo, file_codefoundry_v1_settings, file_codefoundry_v1_terminal, file_codefoundry_v1_thread, file_codefoundry_v1_thread_lifecycle, file_codefoundry_v1_ui, file_codefoundry_v1_update, file_codefoundry_v1_workspace]);
+  fileDesc("Chtjb2RlZm91bmRyeS92MS9ldmVudHMucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIr8BChJXYXRjaEV2ZW50c1JlcXVlc3QSLAoHc291cmNlcxgBIAMoDjIbLmNvZGVmb3VuZHJ5LnYxLkV2ZW50U291cmNlEhEKCXNpbmNlX3NlcRgCIAEoBBITCgtzaW5jZV9lcG9jaBgDIAEoCRIvCgtjbGllbnRfa2luZBgEIAEoDjIaLmNvZGVmb3VuZHJ5LnYxLkNsaWVudEtpbmQSEQoJY2xpZW50X2lkGAUgASgJEg8KB3Zpc2libGUYBiABKAgiOwoVU2V0Q2xpZW50U3RhdGVSZXF1ZXN0EhEKCWNsaWVudF9pZBgBIAEoCRIPCgd2aXNpYmxlGAIgASgIIhgKFlNldENsaWVudFN0YXRlUmVzcG9uc2Ui6wQKBUV2ZW50EikKBHJlcG8YASABKAsyGS5jb2RlZm91bmRyeS52MS5SZXBvRXZlbnRIABIxCgh0ZXJtaW5hbBgCIAEoCzIdLmNvZGVmb3VuZHJ5LnYxLlRlcm1pbmFsRXZlbnRIABI2Cgt0aHJlYWRfbGlzdBgDIAEoCzIfLmNvZGVmb3VuZHJ5LnYxLlRocmVhZExpc3RFdmVudEgAEiUKAmdoGAQgASgLMhcuY29kZWZvdW5kcnkudjEuR2hFdmVudEgAEiYKAnVpGAUgASgLMhguY29kZWZvdW5kcnkudjEuVWlJbnRlbnRIABItCgZnaXRvcHMYBiABKAsyGy5jb2RlZm91bmRyeS52MS5HaXRPcHNFdmVudEgAEjEKCHNldHRpbmdzGAcgASgLMh0uY29kZWZvdW5kcnkudjEuU2V0dGluZ3NFdmVudEgAEi0KBnVwZGF0ZRgKIAEoCzIbLmNvZGVmb3VuZHJ5LnYxLlVwZGF0ZUV2ZW50SAASMwoJd29ya3NwYWNlGAsgASgLMh4uY29kZWZvdW5kcnkudjEuV29ya3NwYWNlRXZlbnRIABItCgZ0aHJlYWQYDCABKAsyGy5jb2RlZm91bmRyeS52MS5UaHJlYWRFdmVudEgAEjQKCWhlYXJ0YmVhdBgNIAEoCzIfLmNvZGVmb3VuZHJ5LnYxLlN0cmVhbUhlYXJ0YmVhdEgAEi0KBmFjdGlvbhgOIAEoCzIbLmNvZGVmb3VuZHJ5LnYxLkFjdGlvbkV2ZW50SAASCwoDc2VxGBQgASgEEg0KBWVwb2NoGBUgASgJQgcKBWV2ZW50KlMKCkNsaWVudEtpbmQSGwoXQ0xJRU5UX0tJTkRfVU5TUEVDSUZJRUQQABITCg9DTElFTlRfS0lORF9HVUkQARITCg9DTElFTlRfS0lORF9DTEkQAirAAgoLRXZlbnRTb3VyY2USHAoYRVZFTlRfU09VUkNFX1VOU1BFQ0lGSUVEEAASFQoRRVZFTlRfU09VUkNFX1JFUE8QARIZChVFVkVOVF9TT1VSQ0VfVEVSTUlOQUwQAhIcChhFVkVOVF9TT1VSQ0VfVEhSRUFEX0xJU1QQAxITCg9FVkVOVF9TT1VSQ0VfR0gQBBITCg9FVkVOVF9TT1VSQ0VfVUkQBRIXChNFVkVOVF9TT1VSQ0VfR0lUT1BTEAYSGQoVRVZFTlRfU09VUkNFX1NFVFRJTkdTEAcSFwoTRVZFTlRfU09VUkNFX1VQREFURRAKEhoKFkVWRU5UX1NPVVJDRV9XT1JLU1BBQ0UQCxIXChNFVkVOVF9TT1VSQ0VfVEhSRUFEEAwSFwoTRVZFTlRfU09VUkNFX0FDVElPThANMrkBCgxFdmVudFNlcnZpY2USRgoFV2F0Y2gSIi5jb2RlZm91bmRyeS52MS5XYXRjaEV2ZW50c1JlcXVlc3QaFS5jb2RlZm91bmRyeS52MS5FdmVudCIAMAESYQoOU2V0Q2xpZW50U3RhdGUSJS5jb2RlZm91bmRyeS52MS5TZXRDbGllbnRTdGF0ZVJlcXVlc3QaJi5jb2RlZm91bmRyeS52MS5TZXRDbGllbnRTdGF0ZVJlc3BvbnNlIgBCwwEKEmNvbS5jb2RlZm91bmRyeS52MUILRXZlbnRzUHJvdG9QAVpHZ2l0aHViLmNvbS9hbGV4d2F1bWFubi9jb2RlLWZvdW5kcnkvZ2VuL2dvL2NvZGVmb3VuZHJ5L3YxO2NvZGVmb3VuZHJ5djGiAgNDWFiqAg5Db2RlZm91bmRyeS5WMcoCDkNvZGVmb3VuZHJ5XFYx4gIaQ29kZWZvdW5kcnlcVjFcR1BCTWV0YWRhdGHqAg9Db2RlZm91bmRyeTo6VjFiBnByb3RvMw", [file_codefoundry_v1_action, file_codefoundry_v1_gh, file_codefoundry_v1_gitops, file_codefoundry_v1_heartbeat, file_codefoundry_v1_repo, file_codefoundry_v1_settings, file_codefoundry_v1_terminal, file_codefoundry_v1_thread, file_codefoundry_v1_thread_lifecycle, file_codefoundry_v1_ui, file_codefoundry_v1_update, file_codefoundry_v1_workspace]);
 
 /**
  * @generated from message codefoundry.v1.WatchEventsRequest
@@ -69,6 +69,30 @@ export type WatchEventsRequest = Message<"codefoundry.v1.WatchEventsRequest"> & 
    * @generated from field: string since_epoch = 3;
    */
   sinceEpoch: string;
+
+  /**
+   * Who is watching. Only GUI clients count toward the daemon's presence, which paces
+   * the GitHub poll: a visible GUI polls at github.poll_interval_seconds, only hidden
+   * ones every 5 minutes, none every 15 (docs/notes/gh-poll-tiers.md).
+   *
+   * @generated from field: codefoundry.v1.ClientKind client_kind = 4;
+   */
+  clientKind: ClientKind;
+
+  /**
+   * A token the client makes up for this stream, naming it in SetClientState. A GUI
+   * stream without one counts with the visibility it opened with.
+   *
+   * @generated from field: string client_id = 5;
+   */
+  clientId: string;
+
+  /**
+   * Whether the client's window is visible now (GUI: document.visibilityState).
+   *
+   * @generated from field: bool visible = 6;
+   */
+  visible: boolean;
 };
 
 /**
@@ -77,6 +101,43 @@ export type WatchEventsRequest = Message<"codefoundry.v1.WatchEventsRequest"> & 
  */
 export const WatchEventsRequestSchema: GenMessage<WatchEventsRequest> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_events, 0);
+
+/**
+ * @generated from message codefoundry.v1.SetClientStateRequest
+ */
+export type SetClientStateRequest = Message<"codefoundry.v1.SetClientStateRequest"> & {
+  /**
+   * WatchEventsRequest.client_id of an open stream.
+   *
+   * @generated from field: string client_id = 1;
+   */
+  clientId: string;
+
+  /**
+   * @generated from field: bool visible = 2;
+   */
+  visible: boolean;
+};
+
+/**
+ * Describes the message codefoundry.v1.SetClientStateRequest.
+ * Use `create(SetClientStateRequestSchema)` to create a new message.
+ */
+export const SetClientStateRequestSchema: GenMessage<SetClientStateRequest> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_events, 1);
+
+/**
+ * @generated from message codefoundry.v1.SetClientStateResponse
+ */
+export type SetClientStateResponse = Message<"codefoundry.v1.SetClientStateResponse"> & {
+};
+
+/**
+ * Describes the message codefoundry.v1.SetClientStateResponse.
+ * Use `create(SetClientStateResponseSchema)` to create a new message.
+ */
+export const SetClientStateResponseSchema: GenMessage<SetClientStateResponse> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_events, 2);
 
 /**
  * @generated from message codefoundry.v1.Event
@@ -197,7 +258,37 @@ export type Event = Message<"codefoundry.v1.Event"> & {
  * Use `create(EventSchema)` to create a new message.
  */
 export const EventSchema: GenMessage<Event> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_events, 1);
+  messageDesc(file_codefoundry_v1_events, 3);
+
+/**
+ * @generated from enum codefoundry.v1.ClientKind
+ */
+export enum ClientKind {
+  /**
+   * @generated from enum value: CLIENT_KIND_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * The desktop app's window.
+   *
+   * @generated from enum value: CLIENT_KIND_GUI = 1;
+   */
+  GUI = 1,
+
+  /**
+   * The code-foundry CLI (events verb, scripts). Not counted.
+   *
+   * @generated from enum value: CLIENT_KIND_CLI = 2;
+   */
+  CLI = 2,
+}
+
+/**
+ * Describes the enum codefoundry.v1.ClientKind.
+ */
+export const ClientKindSchema: GenEnum<ClientKind> = /*@__PURE__*/
+  enumDesc(file_codefoundry_v1_events, 0);
 
 /**
  * @generated from enum codefoundry.v1.EventSource
@@ -284,7 +375,7 @@ export enum EventSource {
  * Describes the enum codefoundry.v1.EventSource.
  */
 export const EventSourceSchema: GenEnum<EventSource> = /*@__PURE__*/
-  enumDesc(file_codefoundry_v1_events, 0);
+  enumDesc(file_codefoundry_v1_events, 1);
 
 /**
  * EventService multiplexes every store's Watch stream and UI intents onto one server
@@ -306,6 +397,18 @@ export const EventService: GenService<{
     methodKind: "server_streaming";
     input: typeof WatchEventsRequestSchema;
     output: typeof EventSchema;
+  },
+  /**
+   * SetClientState updates what a GUI client's open Watch stream reported about itself
+   * (WatchEventsRequest.client_id): a stream request cannot change once open. NotFound
+   * when no open stream has that client_id.
+   *
+   * @generated from rpc codefoundry.v1.EventService.SetClientState
+   */
+  setClientState: {
+    methodKind: "unary";
+    input: typeof SetClientStateRequestSchema;
+    output: typeof SetClientStateResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_codefoundry_v1_events, 0);

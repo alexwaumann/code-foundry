@@ -121,10 +121,7 @@ func (s *Store) MergePullRequest(ctx context.Context, slug string, number int, r
 		"sha", res.SHA, "branch_deleted", res.BranchDeleted)
 	s.invalidateFull(k)
 	// The dashboards move it to recently merged: poll soon.
-	s.mu.Lock()
-	s.pollSoonLocked(s.opts.Now())
-	s.mu.Unlock()
-	s.nudge()
+	s.pollSoon()
 	return res, nil
 }
 

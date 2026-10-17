@@ -453,6 +453,8 @@ function routes(router: ConnectRouter): void {
   });
 
   router.service(EventService, {
+    // The real daemon paces GitHub polling by it; the mock has nothing to pace.
+    setClientState: () => ({}),
     // Snapshots first in the order events.proto promises (repo, workspace, terminal,
     // thread, gh, gitops, settings, update, action), then everything published, filtered by `sources`.
     watch: (req, ctx) => {

@@ -54,8 +54,14 @@ func (s *Store) poll(ctx context.Context) error {
 	s.cycle = cycleStats{}
 	err := s.runPoll(ctx, cfg, &plan, idle)
 	if ctx.Err() == nil {
+		end := s.opts.Now()
+		s.mu.Lock()
+		s.lastPoll = end
+		next := s.pollNext.Sub(end)
+		s.mu.Unlock()
 		attrs := append([]any{"requests", s.cycle.requests, "cost", s.cycle.cost, "details", s.cycle.details,
-			"dur", s.opts.Now().Sub(start).Round(time.Millisecond).String()}, plan.summary()...)
+			"dur", end.Sub(start).Round(time.Millisecond).String(), "tier", s.presence().String(),
+			"next_in", max(0, next).Round(time.Second).String()}, plan.summary()...)
 		if err != nil {
 			attrs = append(attrs, "err", err)
 		}
@@ -91,7 +97,7 @@ func (s *Store) runPoll(ctx context.Context, cfg Config, plan *pollPlan, idle bo
 }
 
 // planPoll decides what this poll asks for. idle is set when nothing is tracked or
-// watched (only the viewer is fetched, at IdleInterval).
+// watched (only the viewer is fetched, at least every IdleInterval; see nextInterval).
 func (s *Store) planPoll(cfg Config, now time.Time) (pollPlan, bool) {
 	s.mu.Lock()
 	tracked := slices.Sorted(maps.Keys(s.tracked))
@@ -427,12 +433,9 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 	}
 	publish(s, Polled{FetchedAt: now, LastError: pollErr})
 
-	interval := cfg.PollInterval
-	switch {
-	case plan.statsDeferred && s.authorID() != "":
+	interval := nextInterval(cfg, s.presence(), idle, s.opts.IdleInterval)
+	if plan.statsDeferred && s.authorID() != "" {
 		interval = 0 // the stats waited for the viewer's id, which this poll brought
-	case idle:
-		interval = s.opts.IdleInterval
 	}
 	s.mu.Lock()
 	s.pollFailures = 0

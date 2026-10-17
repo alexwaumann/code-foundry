@@ -56,24 +56,38 @@ export function isPermanent(err: unknown): boolean {
   return err instanceof ConnectError && (err.code === Code.NotFound || err.code === Code.InvalidArgument);
 }
 
+/** Whether the page is visible now (true outside a browser). */
+export function isPageVisible(): boolean {
+  return typeof document === "undefined" || document.visibilityState !== "hidden";
+}
+
 /**
- * Calls `cb` each time the page becomes visible after having been hidden (the Wails
- * window was hidden, minimized or fully covered). Returns the unsubscribe function.
+ * Calls `cb` with the page's visibility each time it changes (the Wails window was
+ * hidden, minimized or fully covered, or came back). Returns the unsubscribe function.
  */
-export function onBecameVisible(cb: () => void): () => void {
+export function onVisibilityChange(cb: (visible: boolean) => void): () => void {
   if (typeof document === "undefined") return () => undefined;
-  let hidden = document.visibilityState === "hidden";
+  let visible = isPageVisible();
   const onChange = () => {
-    if (document.visibilityState === "hidden") hidden = true;
-    else if (hidden) {
-      hidden = false;
-      cb();
-    }
+    const now = isPageVisible();
+    if (now === visible) return;
+    visible = now;
+    cb(now);
   };
   document.addEventListener("visibilitychange", onChange);
   return () => {
     document.removeEventListener("visibilitychange", onChange);
   };
+}
+
+/**
+ * Calls `cb` each time the page becomes visible after having been hidden. Returns the
+ * unsubscribe function.
+ */
+export function onBecameVisible(cb: () => void): () => void {
+  return onVisibilityChange((visible) => {
+    if (visible) cb();
+  });
 }
 
 export interface StreamHandlers<T> {

@@ -51,7 +51,7 @@ func runEvents(ctx context.Context, cl *cli, args []string) error {
 			cancel()
 		}()
 	}
-	stream, err := c.Events.Watch(ctx, connect.NewRequest(&v1.WatchEventsRequest{Sources: sources, SinceSeq: *since, SinceEpoch: *sinceEpoch}))
+	stream, err := c.Events.Watch(ctx, connect.NewRequest(&v1.WatchEventsRequest{Sources: sources, SinceSeq: *since, SinceEpoch: *sinceEpoch, ClientKind: v1.ClientKind_CLIENT_KIND_CLI}))
 	if err != nil {
 		return cl.eventsFailed(ctx, err)
 	}
