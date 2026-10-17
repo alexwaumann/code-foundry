@@ -104,7 +104,7 @@ test("invoking a command sends the current context", async ({ page }) => {
   expect(last?.context).toEqual({
     activeTerminalId: "t-s1-shell",
     activeThreadId: "s-1",
-    activeRepoId: "repo-cf",
+    activeProjectId: "repo-cf",
     activeWorktreePath: CF,
     activeView: "thread",
     activeWorkspaceId: "",
@@ -120,7 +120,7 @@ test("invoking a command sends the current context", async ({ page }) => {
   expect((await invocations()).at(-1)?.context).toEqual({
     activeTerminalId: "",
     activeThreadId: "s-1",
-    activeRepoId: "repo-cf",
+    activeProjectId: "repo-cf",
     activeWorktreePath: CF,
     activeView: "thread",
     activeWorkspaceId: "",
@@ -183,7 +183,7 @@ test("OpenPalette and Notify intents", async ({ page }) => {
   await expect(page.getByText("Disk almost full")).toBeVisible();
   await emit({ openPalette: { query: "refresh" } });
   await expect(page.getByRole("combobox")).toHaveValue("refresh");
-  await expect(page.getByTestId("palette").locator('[data-command="repo.refresh"]')).toBeVisible();
+  await expect(page.getByTestId("palette").locator('[data-command="project.refresh"]')).toBeVisible();
 });
 
 test("sidebar is keyboard navigable", async ({ page }) => {

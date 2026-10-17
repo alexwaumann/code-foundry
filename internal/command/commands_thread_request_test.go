@@ -17,12 +17,12 @@ func TestThreadNewRequestID(t *testing.T) {
 		reg, b, e := newLifecycleRegistry(t)
 		b.Reused = reused
 		res, err := reg.Invoke(context.Background(), command.Context{}, "thread.new",
-			map[string]string{"repo": "r1", "request-id": "k1", "name": "fix"})
+			map[string]string{"project": "r1", "request-id": "k1", "name": "fix"})
 		if err != nil {
 			t.Fatal(err)
 		}
 		reqs := b.Requests()
-		want := &v1.CreateThreadRequest{RepoId: "r1", Name: "fix", RequestId: "k1", PermissionMode: v1.PermissionMode_PERMISSION_MODE_AUTO}
+		want := &v1.CreateThreadRequest{ProjectId: "r1", Name: "fix", RequestId: "k1", PermissionMode: v1.PermissionMode_PERMISSION_MODE_AUTO}
 		if len(reqs) != 1 || !proto.Equal(reqs[0], want) {
 			t.Errorf("requests = %v", reqs)
 		}

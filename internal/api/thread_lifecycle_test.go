@@ -17,7 +17,7 @@ import (
 func TestThreadUnaryAndErrorCodes(t *testing.T) {
 	fake, c := newThreadServer(t)
 	ctx := context.Background()
-	res, err := c.Create(ctx, connect.NewRequest(&v1.CreateThreadRequest{RepoId: "r1", WorktreePath: "/w", Model: "opus", Effort: "high", Name: "n"}))
+	res, err := c.Create(ctx, connect.NewRequest(&v1.CreateThreadRequest{ProjectId: "r1", WorktreePath: "/w", Model: "opus", Effort: "high", Name: "n"}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +102,7 @@ func TestThreadCreateNewThreadFields(t *testing.T) {
 	fake, c := newThreadServer(t)
 	ctx := context.Background()
 	res, err := c.Create(ctx, connect.NewRequest(&v1.CreateThreadRequest{
-		RepoId: "r1", InitialPrompt: "fix it", ComposerPrompt: "fix [it](cf-file://r1/it)", PermissionMode: v1.PermissionMode_PERMISSION_MODE_ACCEPT_EDITS,
+		ProjectId: "r1", InitialPrompt: "fix it", ComposerPrompt: "fix [it](cf-file://r1/it)", PermissionMode: v1.PermissionMode_PERMISSION_MODE_ACCEPT_EDITS,
 		NewWorktree: &v1.NewWorktree{BaseRef: "origin/dev"}, Attachments: []string{"/a/1.png", "/a/2.png"},
 	}))
 	if err != nil {
@@ -118,7 +118,7 @@ func TestThreadCreateNewThreadFields(t *testing.T) {
 		t.Errorf("calls = %q, want %q", calls, want)
 	}
 	// Without new_worktree nothing is created.
-	if _, err := c.Create(ctx, connect.NewRequest(&v1.CreateThreadRequest{RepoId: "r1"})); err != nil {
+	if _, err := c.Create(ctx, connect.NewRequest(&v1.CreateThreadRequest{ProjectId: "r1"})); err != nil {
 		t.Fatal(err)
 	}
 	if calls := fake.Calls(); calls[1] != "Create r1   " {
@@ -129,12 +129,12 @@ func TestThreadCreateNewThreadFields(t *testing.T) {
 func TestThreadCreateWorkspaceFields(t *testing.T) {
 	fake, c := newThreadServer(t)
 	ctx := context.Background()
-	res, err := c.Create(ctx, connect.NewRequest(&v1.CreateThreadRequest{WorkspaceId: "login", RepoId: "api"}))
+	res, err := c.Create(ctx, connect.NewRequest(&v1.CreateThreadRequest{WorkspaceId: "login", ProjectId: "api"}))
 	if err != nil || res.Msg.GetThread().GetWorkspaceId() != "login" {
 		t.Fatalf("Create in workspace = %v, %v", res, err)
 	}
 	res, err = c.Create(ctx, connect.NewRequest(&v1.CreateThreadRequest{
-		RepoId: "api", NewWorkspace: &v1.NewWorkspace{Repos: []string{"web", "api"}, BaseRef: "origin/dev", Name: "login"},
+		ProjectId: "api", NewWorkspace: &v1.NewWorkspace{Projects: []string{"web", "api"}, BaseRef: "origin/dev", Name: "login"},
 	}))
 	if err != nil {
 		t.Fatal(err)
@@ -154,7 +154,7 @@ func TestThreadCreateNoProject(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s := res.Msg.GetThread(); s.GetRepoId() != "" || s.GetWorkspaceId() != "" || s.GetWorktreePath() != "/home" {
+	if s := res.Msg.GetThread(); s.GetProjectId() != "" || s.GetWorkspaceId() != "" || s.GetWorktreePath() != "/home" {
 		t.Errorf("Create without a project = %v", s)
 	}
 	if want := []string{"Create   haiku  no-project"}; !slices.Equal(fake.Calls(), want) {
@@ -167,14 +167,14 @@ func TestThreadRunIn(t *testing.T) {
 	ctx := context.Background()
 	fake.Put(thread.Thread{ID: "s-1", WorkspaceID: "w-1", WorktreePath: "/wt/web", State: thread.StateConnected})
 	fake.Put(thread.Thread{ID: "s-2", WorktreePath: "/src/app", State: thread.StateConnected})
-	res, err := c.RunIn(ctx, connect.NewRequest(&v1.RunInThreadRequest{Id: "s-1", RepoId: "api"}))
+	res, err := c.RunIn(ctx, connect.NewRequest(&v1.RunInThreadRequest{Id: "s-1", ProjectId: "api"}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if s := res.Msg.GetThread(); s.GetPendingWorktreePath() != "/worktrees/api" || s.GetWorktreePath() != "/wt/web" || s.GetWorkspaceId() != "w-1" {
 		t.Errorf("RunIn = %v", s)
 	}
-	if _, err := c.RunIn(ctx, connect.NewRequest(&v1.RunInThreadRequest{Id: "s-2", RepoId: "api"})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
+	if _, err := c.RunIn(ctx, connect.NewRequest(&v1.RunInThreadRequest{Id: "s-2", ProjectId: "api"})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Errorf("RunIn on a project thread = %v", err)
 	}
 }

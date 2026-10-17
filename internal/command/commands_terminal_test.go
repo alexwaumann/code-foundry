@@ -23,7 +23,7 @@ import (
 func TestTerminalNewOwner(t *testing.T) {
 	t.Setenv("SHELL", "/bin/fish")
 	// A real directory behind a symlink (t.TempDir is under /var, which is /private/var
-	// on macOS): repo paths are stored resolved, the CLI sends what the shell sees.
+	// on macOS): project paths are stored resolved, the CLI sends what the shell sees.
 	real := t.TempDir()
 	if r, err := filepath.EvalSymlinks(real); err == nil {
 		real = r
@@ -36,11 +36,11 @@ func TestTerminalNewOwner(t *testing.T) {
 		app  = "/cf-test/src/app"
 		feat = "/cf-test/src/app/.claude/worktrees/feat"
 	)
-	repos := []*v1.Repo{
-		{Id: "r1", Path: app, Worktrees: []*v1.Worktree{{RepoId: "r1", Path: app}, {RepoId: "r1", Path: feat}}},
-		{Id: "r2", Path: real, Worktrees: []*v1.Worktree{{RepoId: "r2", Path: real}}},
+	projects := []*v1.Project{
+		{Id: "r1", Path: app, Worktrees: []*v1.Worktree{{ProjectId: "r1", Path: app}, {ProjectId: "r1", Path: feat}}},
+		{Id: "r2", Path: real, Worktrees: []*v1.Worktree{{ProjectId: "r2", Path: real}}},
 	}
-	thread := &v1.Thread{RepoId: "r1", WorktreePath: feat}
+	thread := &v1.Thread{ProjectId: "r1", WorktreePath: feat}
 	cli := command.Context{} // ActiveView is empty only from the CLI
 	gui := func(c command.Context) command.Context {
 		if c.ActiveView == "" {
@@ -63,7 +63,7 @@ func TestTerminalNewOwner(t *testing.T) {
 		wantArgv   []string
 	}{
 		// A thread owns it.
-		{name: "thread in the GUI", ctx: gui(command.Context{ActiveThreadID: "s1", ActiveRepoID: "r1", ActiveWorktreePath: feat}),
+		{name: "thread in the GUI", ctx: gui(command.Context{ActiveThreadID: "s1", ActiveProjectID: "r1", ActiveWorktreePath: feat}),
 			wantCwd: feat, wantLabels: termlabel.Shell("s1", "r1", feat)},
 		{name: "thread without a worktree in context starts in the thread's worktree", ctx: gui(command.Context{ActiveThreadID: "s1"}),
 			wantCwd: feat, wantLabels: termlabel.Shell("s1", "r1", feat)},
@@ -71,18 +71,18 @@ func TestTerminalNewOwner(t *testing.T) {
 			wantCwd: feat, wantLabels: termlabel.Shell("s1", "r1", feat)},
 		{name: "thread with --cwd starts there", ctx: command.Context{ActiveThreadID: "s1"}, args: map[string]string{"cwd": app + "/docs"},
 			wantCwd: app + "/docs", wantLabels: termlabel.Shell("s1", "r1", feat)},
-		{name: "thread without a project starts in its home and has no repo", ctx: gui(command.Context{ActiveThreadID: "s1", ActiveWorktreePath: "/cf-test/home"}),
+		{name: "thread without a project starts in its home and has no project", ctx: gui(command.Context{ActiveThreadID: "s1", ActiveWorktreePath: "/cf-test/home"}),
 			thread: &v1.Thread{WorktreePath: "/cf-test/home"}, wantCwd: "/cf-test/home", wantLabels: termlabel.Shell("s1", "", "/cf-test/home")},
 		{name: "thread lookup fails", ctx: command.Context{ActiveThreadID: "s1"},
 			threadErr: connect.NewError(connect.CodeNotFound, errors.New("no such thread")), wantMsg: "no such thread"},
 		// Else the context's worktree.
-		{name: "worktree in the GUI", ctx: command.Context{ActiveRepoID: "r1", ActiveWorktreePath: feat, ActiveView: "projects"},
+		{name: "worktree in the GUI", ctx: command.Context{ActiveProjectID: "r1", ActiveWorktreePath: feat, ActiveView: "projects"},
 			wantCwd: feat, wantLabels: termlabel.Shell("", "r1", feat)},
 		{name: "--context-worktree beats the working directory", ctx: command.Context{ActiveWorktreePath: feat}, args: here(app + "/docs"),
 			wantCwd: feat, wantLabels: termlabel.Shell("", "r1", feat)},
 		{name: "--context-worktree with --cwd: owner from the context, starts in --cwd", ctx: command.Context{ActiveWorktreePath: feat},
 			args: map[string]string{"cwd": app + "/docs"}, wantCwd: app + "/docs", wantLabels: termlabel.Shell("", "r1", feat)},
-		{name: "stale repo in context falls back to the worktree path", ctx: command.Context{ActiveRepoID: "r9", ActiveWorktreePath: feat},
+		{name: "stale project in context falls back to the worktree path", ctx: command.Context{ActiveProjectID: "r9", ActiveWorktreePath: feat},
 			wantCwd: feat, wantLabels: termlabel.Shell("", "r1", feat)},
 		{name: "an unregistered context worktree is refused", ctx: command.Context{ActiveWorktreePath: "/cf-test/gone"}, args: here(app),
 			wantErr: command.ErrInvalidArgs, wantMsg: "/cf-test/gone is not inside a registered project"},
@@ -109,7 +109,7 @@ func TestTerminalNewOwner(t *testing.T) {
 		// The GUI offers it only with a thread or a worktree.
 		{name: "dashboard", ctx: command.Context{ActiveView: "dashboard"}, wantErr: command.ErrUnavailable},
 		{name: "pull requests page", ctx: command.Context{ActiveView: "pullrequests"}, wantErr: command.ErrUnavailable},
-		{name: "a repo alone is not enough", ctx: command.Context{ActiveRepoID: "r1", ActiveView: "compose"}, wantErr: command.ErrUnavailable},
+		{name: "a project alone is not enough", ctx: command.Context{ActiveProjectID: "r1", ActiveView: "compose"}, wantErr: command.ErrUnavailable},
 		{name: "bad argv", ctx: cli, args: map[string]string{"here": app, "argv": `"oops`}, wantErr: command.ErrInvalidArgs},
 	}
 	for _, tt := range tests {
@@ -121,7 +121,7 @@ func TestTerminalNewOwner(t *testing.T) {
 			reg := command.NewRegistry()
 			if err := command.RegisterTerminal(reg, command.TerminalDeps{
 				Terminal: term,
-				Repo:     &commandtest.Repo{Repos: repos},
+				Project:  &commandtest.Project{Projects: projects},
 				Thread:   &commandtest.Thread{Current: cmp.Or(tt.thread, thread), Err: tt.threadErr},
 			}); err != nil {
 				t.Fatal(err)
@@ -242,7 +242,7 @@ func TestTerminalList(t *testing.T) {
 	lines := strings.Split(res.Message, "\n")
 	want := [][]string{
 		{"ID", "STATE", "CWD", "LABELS"},
-		{"t-1", "running", "/src/app/sub", "kind=shell", "repo=r1", "worktree=/src/app"},
+		{"t-1", "running", "/src/app/sub", "kind=shell", "project=r1", "worktree=/src/app"},
 		{"t-2", "exited", "2", "/tmp", "-"},
 	}
 	if len(lines) != len(want) {

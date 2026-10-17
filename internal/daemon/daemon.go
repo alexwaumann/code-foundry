@@ -31,7 +31,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/command/all"
 	"github.com/alexwaumann/code-foundry/internal/paths"
 	"github.com/alexwaumann/code-foundry/internal/store/gh"
-	"github.com/alexwaumann/code-foundry/internal/store/repo"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 	"github.com/alexwaumann/code-foundry/internal/termlabel"
 	"github.com/alexwaumann/code-foundry/internal/version"
@@ -131,8 +131,8 @@ func Run(ctx context.Context, opts Options) error {
 
 	started := time.Now()
 	events := st.bus
-	repoAPI := api.NewRepo(st.repo, events).WithGitHub(st.gh, st.cloner).WithProjects(st.projects, st.gh).
-		WithCleanupHold(func(w repo.Worktree) string {
+	projectAPI := api.NewProject(st.project, events).WithGitHub(st.gh, st.cloner).WithNewProjects(st.newProjects, st.gh).
+		WithCleanupHold(func(w project.Worktree) string {
 			return cleanupHold(w.Path, worktreeThreads(st.thread.Snapshot()), st.terminal.List(context.Background()), st.workspace.Snapshot())
 		})
 	terminalAPI := api.NewTerminal(st.terminal)
@@ -158,28 +158,28 @@ func Run(ctx context.Context, opts Options) error {
 			return terminal.AwaitOutput(ctx, st.terminal, id, promptSettle)
 		},
 		TerminalBracketedPaste: st.terminal.BracketedPaste,
-		Repo:                   worktreeDirRepo{RepoBackend: repoAPI, repos: st.repo, settings: st.settings},
-		Clone:                  repoAPI.CloneRef,
-		Projects: command.ProjectDeps{
-			Backend: repoAPI,
+		Project:                worktreeDirProject{ProjectBackend: projectAPI, projects: st.project, settings: st.settings},
+		Clone:                  projectAPI.CloneRef,
+		NewProjects: command.NewProjectDeps{
+			Backend: projectAPI,
 			HasOrigin: func(c command.Context) bool {
-				r, ok := st.repo.Snapshot().Owner(c.ActiveRepoID, c.ActiveWorktreePath)
+				r, ok := st.project.Snapshot().Owner(c.ActiveProjectID, c.ActiveWorktreePath)
 				return ok && slices.Contains(r.Remotes, "origin")
 			},
 			Deletable: func(c command.Context) bool {
-				r, ok := st.repo.Snapshot().Owner(c.ActiveRepoID, c.ActiveWorktreePath)
-				return ok && st.projects.Deletable(r.Path)
+				r, ok := st.project.Snapshot().Owner(c.ActiveProjectID, c.ActiveWorktreePath)
+				return ok && st.newProjects.Deletable(r.Path)
 			},
 		},
 		NotGit: func(c command.Context) bool {
-			r, ok := st.repo.Snapshot().Owner(c.ActiveRepoID, c.ActiveWorktreePath)
+			r, ok := st.project.Snapshot().Owner(c.ActiveProjectID, c.ActiveWorktreePath)
 			return ok && !r.Git
 		},
 		Thread: threadAPI,
 		GitOps: command.GitOpsDeps{
 			Backend:    gitopsAPI,
-			GitHubSlug: func(c command.Context) string { return st.gitops.GitHubSlug(c.ActiveRepoID, c.ActiveWorktreePath) },
-			LocalOnly:  func(c command.Context) bool { return st.gitops.LocalOnly(c.ActiveRepoID, c.ActiveWorktreePath) },
+			GitHubSlug: func(c command.Context) string { return st.gitops.GitHubSlug(c.ActiveProjectID, c.ActiveWorktreePath) },
+			LocalOnly:  func(c command.Context) bool { return st.gitops.LocalOnly(c.ActiveProjectID, c.ActiveWorktreePath) },
 		},
 		Gh:        ghAPI,
 		Settings:  settingsAPI,
@@ -200,15 +200,15 @@ func Run(ctx context.Context, opts Options) error {
 		api.NewUI(events).Route(),
 		terminalAPI.Route(),
 		threadAPI.Route(),
-		repoAPI.Route(),
+		projectAPI.Route(),
 		ghAPI.Route(),
 		gitopsAPI.Route(),
 		settingsAPI.Route(),
 		updateAPI.Route(),
 		workspaceAPI.Route(),
 		actionAPI.Route(),
-		api.NewFilesystem(st.home, st.repo).Route(),
-		api.NewEvents(api.EventsDeps{Bus: events, Repo: st.repo, Terminal: st.terminal, Thread: st.thread, Gh: st.gh, GitOps: st.gitops, Settings: st.settings, Update: st.update, Workspace: st.workspace, Action: st.action, Done: ctx.Done(), Clients: clients}).Route(),
+		api.NewFilesystem(st.home, st.project).Route(),
+		api.NewEvents(api.EventsDeps{Bus: events, Project: st.project, Terminal: st.terminal, Thread: st.thread, Gh: st.gh, GitOps: st.gitops, Settings: st.settings, Update: st.update, Workspace: st.workspace, Action: st.action, Done: ctx.Done(), Clients: clients}).Route(),
 	}
 	mux := http.NewServeMux()
 	for _, r := range routes {

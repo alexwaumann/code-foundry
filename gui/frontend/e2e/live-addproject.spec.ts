@@ -28,12 +28,12 @@ function cli(...args: string[]): string {
 /** The registered project at dir, over the daemon's loopback listener. */
 async function projectAt(dir: string): Promise<string> {
   const read = (f: string) => readFileSync(path.join(HOME, f), "utf8").trim();
-  const res = await fetch(`http://127.0.0.1:${read("daemon.port")}/codefoundry.v1.RepoService/List`, {
+  const res = await fetch(`http://127.0.0.1:${read("daemon.port")}/codefoundry.v1.ProjectService/List`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${read("daemon.token")}` },
     body: "{}",
   });
-  const { repos = [] } = (await res.json()) as { repos?: { id: string; path: string }[] };
+  const { projects: repos = [] } = (await res.json()) as { projects?: { id: string; path: string }[] };
   return repos.find((r) => r.path.toLowerCase() === dir.toLowerCase())?.id ?? "";
 }
 
@@ -69,7 +69,7 @@ test("search, look up and clone a GitHub repository with the dialog", async ({ p
     expect(await projectAt(dest)).not.toBe("");
   } finally {
     const id = await projectAt(dest);
-    if (id) cli("repo", "unregister", "--context-repo", id, "--yes");
+    if (id) cli("project", "unregister", "--context-project", id, "--yes");
     rmSync(dest, { recursive: true, force: true });
   }
 });

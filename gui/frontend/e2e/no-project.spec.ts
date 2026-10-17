@@ -46,7 +46,7 @@ test("No project: picker row last, composer without worktree, thread placed nowh
   await expect(page.getByTestId("thread-branch")).toHaveCount(0);
   const created = (await invocations()).filter((i) => i.name === "thread.new").at(-1);
   expect(created?.args).toMatchObject({ "no-project": "true", prompt: "Reply with just OK" });
-  expect(created?.args).not.toHaveProperty("repo");
+  expect(created?.args).not.toHaveProperty("project");
   expect(created?.args).not.toHaveProperty("worktree");
   const id = page.locator('[data-row-kind="thread"][aria-selected="true"]');
   await expect(id.getByTestId("row-project")).toHaveText("No project");
@@ -62,7 +62,7 @@ test("No project: picker row last, composer without worktree, thread placed nowh
   await page.keyboard.press("Meta+t");
   await expect(page.locator("[data-tab-id]")).toHaveText("No project");
   const shell = (await invocations()).filter((i) => i.name === "terminal.new").at(-1);
-  expect(shell?.context).toMatchObject({ activeRepoId: "", activeWorktreePath: "" });
+  expect(shell?.context).toMatchObject({ activeProjectId: "", activeWorktreePath: "" });
   expect(shell?.context?.activeThreadId).toMatch(/^s-new-/);
 
   // cmd+N from the thread still opens the picker (home is never sent as a worktree).

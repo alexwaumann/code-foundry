@@ -98,7 +98,7 @@ export function addArgs(repoId: string, d: ActionDraft): Record<string, string> 
     icon: d.icon,
     "in-terminal": "true",
     "on-worktree-create": String(d.onWorktreeCreate),
-    repo: repoId,
+    project: repoId,
   };
 }
 
@@ -115,5 +115,5 @@ export function editArgs(a: ActionView, d: ActionDraft): Record<string, string> 
   if (d.icon !== a.icon) out.icon = d.icon;
   if (d.onWorktreeCreate !== a.onWorktreeCreate) out["on-worktree-create"] = String(d.onWorktreeCreate);
   if (Object.keys(out).length === 0) return null;
-  return { action: a.id, ...out, repo: a.repoId };
+  return { action: a.id, ...out, project: a.repoId };
 }

@@ -29,9 +29,9 @@ type ListOptions struct {
 	// match any.
 	Status Status
 	State  State
-	// Repo: only threads whose cwd is in this repository. Store.List takes an id, a
+	// Project: only threads whose cwd is in this project. Store.List takes an id, a
 	// name or a path inside one of its worktrees; FilterThreads compares the id.
-	Repo string
+	Project string
 	// Workspace: only threads the workspace owns. Store.List takes an id or a name;
 	// FilterThreads compares the id.
 	Workspace string
@@ -45,7 +45,7 @@ type ListOptions struct {
 
 // FilterThreads returns the threads o selects, the most recently active first (last
 // activity, else creation; then the newest created, then by id), at most o.Limit of
-// them. o.Repo and o.Workspace are compared as ids.
+// them. o.Project and o.Workspace are compared as ids.
 func FilterThreads(threads []Thread, o ListOptions) []Thread {
 	var out []Thread
 	for _, t := range threads {
@@ -70,7 +70,7 @@ func (o ListOptions) matches(t Thread) bool {
 		return false
 	case o.State != StateUnspecified && t.State != o.State:
 		return false
-	case o.Repo != "" && t.RepoID != o.Repo:
+	case o.Project != "" && t.ProjectID != o.Project:
 		return false
 	case o.Workspace != "" && t.WorkspaceID != o.Workspace:
 		return false
@@ -95,16 +95,16 @@ func lastActive(t Thread) time.Time {
 	return t.CreatedAt
 }
 
-// List returns the threads o selects (FilterThreads), resolving its Repo (an id, a
+// List returns the threads o selects (FilterThreads), resolving its Project (an id, a
 // name, or a path inside a worktree) and Workspace (an id or a name) first. A ref that
 // names nothing is ErrInvalidArgument.
 func (m *Manager) List(_ context.Context, o ListOptions) ([]Thread, error) {
-	if o.Repo != "" && !o.All && m.opts.Repos != nil { // without a repo store (tests): an id
-		r, err := workspace.ResolveRepo(m.opts.Repos.Snapshot(), o.Repo)
+	if o.Project != "" && !o.All && m.opts.Projects != nil { // without a project store (tests): an id
+		r, err := workspace.ResolveProject(m.opts.Projects.Snapshot(), o.Project)
 		if err != nil {
-			return nil, listRefError("repo", o.Repo, err)
+			return nil, listRefError("project", o.Project, err)
 		}
-		o.Repo = r.ID
+		o.Project = r.ID
 	}
 	if o.Workspace != "" && !o.All {
 		if m.opts.Workspaces == nil {

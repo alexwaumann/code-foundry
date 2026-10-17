@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/ui.proto.
  */
 export const file_codefoundry_v1_ui: GenFile = /*@__PURE__*/
-  fileDesc("Chdjb2RlZm91bmRyeS92MS91aS5wcm90bxIOY29kZWZvdW5kcnkudjEiFQoTV2F0Y2hJbnRlbnRzUmVxdWVzdCLFBgoIVWlJbnRlbnQSQAoOZm9jdXNfdGVybWluYWwYASABKAsyJi5jb2RlZm91bmRyeS52MS5VaUludGVudC5Gb2N1c1Rlcm1pbmFsSAASOAoKZm9jdXNfcmVwbxgCIAEoCzIiLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50LkZvY3VzUmVwb0gAEjwKDG9wZW5fcGFsZXR0ZRgDIAEoCzIkLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50Lk9wZW5QYWxldHRlSAASMQoGbm90aWZ5GAQgASgLMh8uY29kZWZvdW5kcnkudjEuVWlJbnRlbnQuTm90aWZ5SAASPAoMZm9jdXNfdGhyZWFkGAUgASgLMiQuY29kZWZvdW5kcnkudjEuVWlJbnRlbnQuRm9jdXNUaHJlYWRIABI2CglzaG93X3ZpZXcYBiABKAsyIS5jb2RlZm91bmRyeS52MS5VaUludGVudC5TaG93Vmlld0gAEkMKEHBsYXlfYWxlcnRfc291bmQYByABKAsyJy5jb2RlZm91bmRyeS52MS5VaUludGVudC5QbGF5QWxlcnRTb3VuZEgAGiAKDlBsYXlBbGVydFNvdW5kEg4KBnZvbHVtZRgBIAEoBRoYCghTaG93VmlldxIMCgRuYW1lGAEgASgJGiAKC0ZvY3VzVGhyZWFkEhEKCXRocmVhZF9pZBgBIAEoCRokCg1Gb2N1c1Rlcm1pbmFsEhMKC3Rlcm1pbmFsX2lkGAEgASgJGjMKCUZvY3VzUmVwbxIPCgdyZXBvX2lkGAEgASgJEhUKDXdvcmt0cmVlX3BhdGgYAiABKAkaHAoLT3BlblBhbGV0dGUSDQoFcXVlcnkYASABKAkarwEKBk5vdGlmeRI0CgVsZXZlbBgBIAEoDjIlLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50Lk5vdGlmeS5MZXZlbBINCgV0aXRsZRgCIAEoCRIMCgRib2R5GAMgASgJIlIKBUxldmVsEhUKEUxFVkVMX1VOU1BFQ0lGSUVEEAASDgoKTEVWRUxfSU5GTxABEhEKDUxFVkVMX1dBUk5JTkcQAhIPCgtMRVZFTF9FUlJPUhADQggKBmludGVudCI9ChFFbWl0SW50ZW50UmVxdWVzdBIoCgZpbnRlbnQYASABKAsyGC5jb2RlZm91bmRyeS52MS5VaUludGVudCInChJFbWl0SW50ZW50UmVzcG9uc2USEQoJZGVsaXZlcmVkGAEgASgNMq8BCglVaVNlcnZpY2USUQoMV2F0Y2hJbnRlbnRzEiMuY29kZWZvdW5kcnkudjEuV2F0Y2hJbnRlbnRzUmVxdWVzdBoYLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50IgAwARJPCgRFbWl0EiEuY29kZWZvdW5kcnkudjEuRW1pdEludGVudFJlcXVlc3QaIi5jb2RlZm91bmRyeS52MS5FbWl0SW50ZW50UmVzcG9uc2UiAEK/AQoSY29tLmNvZGVmb3VuZHJ5LnYxQgdVaVByb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM");
+  fileDesc("Chdjb2RlZm91bmRyeS92MS91aS5wcm90bxIOY29kZWZvdW5kcnkudjEiFQoTV2F0Y2hJbnRlbnRzUmVxdWVzdCLRBgoIVWlJbnRlbnQSQAoOZm9jdXNfdGVybWluYWwYASABKAsyJi5jb2RlZm91bmRyeS52MS5VaUludGVudC5Gb2N1c1Rlcm1pbmFsSAASPgoNZm9jdXNfcHJvamVjdBgCIAEoCzIlLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50LkZvY3VzUHJvamVjdEgAEjwKDG9wZW5fcGFsZXR0ZRgDIAEoCzIkLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50Lk9wZW5QYWxldHRlSAASMQoGbm90aWZ5GAQgASgLMh8uY29kZWZvdW5kcnkudjEuVWlJbnRlbnQuTm90aWZ5SAASPAoMZm9jdXNfdGhyZWFkGAUgASgLMiQuY29kZWZvdW5kcnkudjEuVWlJbnRlbnQuRm9jdXNUaHJlYWRIABI2CglzaG93X3ZpZXcYBiABKAsyIS5jb2RlZm91bmRyeS52MS5VaUludGVudC5TaG93Vmlld0gAEkMKEHBsYXlfYWxlcnRfc291bmQYByABKAsyJy5jb2RlZm91bmRyeS52MS5VaUludGVudC5QbGF5QWxlcnRTb3VuZEgAGiAKDlBsYXlBbGVydFNvdW5kEg4KBnZvbHVtZRgBIAEoBRoYCghTaG93VmlldxIMCgRuYW1lGAEgASgJGiAKC0ZvY3VzVGhyZWFkEhEKCXRocmVhZF9pZBgBIAEoCRokCg1Gb2N1c1Rlcm1pbmFsEhMKC3Rlcm1pbmFsX2lkGAEgASgJGjkKDEZvY3VzUHJvamVjdBISCgpwcm9qZWN0X2lkGAEgASgJEhUKDXdvcmt0cmVlX3BhdGgYAiABKAkaHAoLT3BlblBhbGV0dGUSDQoFcXVlcnkYASABKAkarwEKBk5vdGlmeRI0CgVsZXZlbBgBIAEoDjIlLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50Lk5vdGlmeS5MZXZlbBINCgV0aXRsZRgCIAEoCRIMCgRib2R5GAMgASgJIlIKBUxldmVsEhUKEUxFVkVMX1VOU1BFQ0lGSUVEEAASDgoKTEVWRUxfSU5GTxABEhEKDUxFVkVMX1dBUk5JTkcQAhIPCgtMRVZFTF9FUlJPUhADQggKBmludGVudCI9ChFFbWl0SW50ZW50UmVxdWVzdBIoCgZpbnRlbnQYASABKAsyGC5jb2RlZm91bmRyeS52MS5VaUludGVudCInChJFbWl0SW50ZW50UmVzcG9uc2USEQoJZGVsaXZlcmVkGAEgASgNMq8BCglVaVNlcnZpY2USUQoMV2F0Y2hJbnRlbnRzEiMuY29kZWZvdW5kcnkudjEuV2F0Y2hJbnRlbnRzUmVxdWVzdBoYLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50IgAwARJPCgRFbWl0EiEuY29kZWZvdW5kcnkudjEuRW1pdEludGVudFJlcXVlc3QaIi5jb2RlZm91bmRyeS52MS5FbWl0SW50ZW50UmVzcG9uc2UiAEK/AQoSY29tLmNvZGVmb3VuZHJ5LnYxQgdVaVByb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM");
 
 /**
  * @generated from message codefoundry.v1.WatchIntentsRequest
@@ -40,10 +40,10 @@ export type UiIntent = Message<"codefoundry.v1.UiIntent"> & {
     case: "focusTerminal";
   } | {
     /**
-     * @generated from field: codefoundry.v1.UiIntent.FocusRepo focus_repo = 2;
+     * @generated from field: codefoundry.v1.UiIntent.FocusProject focus_project = 2;
      */
-    value: UiIntent_FocusRepo;
-    case: "focusRepo";
+    value: UiIntent_FocusProject;
+    case: "focusProject";
   } | {
     /**
      * @generated from field: codefoundry.v1.UiIntent.OpenPalette open_palette = 3;
@@ -161,13 +161,13 @@ export const UiIntent_FocusTerminalSchema: GenMessage<UiIntent_FocusTerminal> = 
   messageDesc(file_codefoundry_v1_ui, 1, 3);
 
 /**
- * @generated from message codefoundry.v1.UiIntent.FocusRepo
+ * @generated from message codefoundry.v1.UiIntent.FocusProject
  */
-export type UiIntent_FocusRepo = Message<"codefoundry.v1.UiIntent.FocusRepo"> & {
+export type UiIntent_FocusProject = Message<"codefoundry.v1.UiIntent.FocusProject"> & {
   /**
-   * @generated from field: string repo_id = 1;
+   * @generated from field: string project_id = 1;
    */
-  repoId: string;
+  projectId: string;
 
   /**
    * @generated from field: string worktree_path = 2;
@@ -176,10 +176,10 @@ export type UiIntent_FocusRepo = Message<"codefoundry.v1.UiIntent.FocusRepo"> & 
 };
 
 /**
- * Describes the message codefoundry.v1.UiIntent.FocusRepo.
- * Use `create(UiIntent_FocusRepoSchema)` to create a new message.
+ * Describes the message codefoundry.v1.UiIntent.FocusProject.
+ * Use `create(UiIntent_FocusProjectSchema)` to create a new message.
  */
-export const UiIntent_FocusRepoSchema: GenMessage<UiIntent_FocusRepo> = /*@__PURE__*/
+export const UiIntent_FocusProjectSchema: GenMessage<UiIntent_FocusProject> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_ui, 1, 4);
 
 /**

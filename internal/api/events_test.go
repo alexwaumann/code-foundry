@@ -20,8 +20,8 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/gh/ghtest"
 	"github.com/alexwaumann/code-foundry/internal/store/gitops"
 	"github.com/alexwaumann/code-foundry/internal/store/gitops/gitopstest"
-	"github.com/alexwaumann/code-foundry/internal/store/repo"
-	"github.com/alexwaumann/code-foundry/internal/store/repo/repotest"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
+	"github.com/alexwaumann/code-foundry/internal/store/project/projecttest"
 	"github.com/alexwaumann/code-foundry/internal/store/settings/settingstest"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal/terminaltest"
@@ -33,18 +33,18 @@ import (
 )
 
 type eventsFixture struct {
-	bus    *bus.Bus
-	repo   *repotest.Fake
-	term   *terminaltest.Fake
-	th     *threadtest.Fake
-	gh     *ghtest.Store
-	gitops *gitopstest.Fake
-	set    *settingstest.Fake
-	update *update.Store
-	ws     *workspacetest.Fake
-	done   chan struct{}
-	events *Events
-	client codefoundryv1connect.EventServiceClient
+	bus     *bus.Bus
+	project *projecttest.Fake
+	term    *terminaltest.Fake
+	th      *threadtest.Fake
+	gh      *ghtest.Store
+	gitops  *gitopstest.Fake
+	set     *settingstest.Fake
+	update  *update.Store
+	ws      *workspacetest.Fake
+	done    chan struct{}
+	events  *Events
+	client  codefoundryv1connect.EventServiceClient
 	// clients is the GUI registry; presence records its changes ("none>foreground").
 	clients  *Clients
 	presence *changeLog
@@ -61,14 +61,14 @@ func newEventsFixture(t *testing.T) *eventsFixture {
 	// A disabled updater: its snapshot is the status and it never checks.
 	upd := update.Start(context.Background(), update.Options{Current: "dev", DisabledReason: "dev build", Bus: b, InitialDelay: time.Hour})
 	t.Cleanup(upd.Close)
-	f := &eventsFixture{bus: b, repo: repotest.New(b), term: terminaltest.New(b), th: threadtest.New(b), gh: ghtest.New(b), gitops: gitopstest.New(b), set: set, update: upd, ws: workspacetest.New(b), done: make(chan struct{})}
+	f := &eventsFixture{bus: b, project: projecttest.New(b), term: terminaltest.New(b), th: threadtest.New(b), gh: ghtest.New(b), gitops: gitopstest.New(b), set: set, update: upd, ws: workspacetest.New(b), done: make(chan struct{})}
 	f.presence = &changeLog{}
 	f.clients = NewClients(f.presence.record)
-	f.events = NewEvents(EventsDeps{Bus: b, Repo: f.repo, Terminal: f.term, Thread: f.th, Gh: f.gh, GitOps: f.gitops, Settings: f.set, Update: f.update, Workspace: f.ws, Done: f.done, Clients: f.clients})
+	f.events = NewEvents(EventsDeps{Bus: b, Project: f.project, Terminal: f.term, Thread: f.th, Gh: f.gh, GitOps: f.gitops, Settings: f.set, Update: f.update, Workspace: f.ws, Done: f.done, Clients: f.clients})
 	route := f.events.Route()
 	mux := http.NewServeMux()
 	mux.Handle(route.Path, route.Handler)
-	// HTTP/2 like the repo drop test: flow-control windows bound how much the handler
+	// HTTP/2 like the project drop test: flow-control windows bound how much the handler
 	// can write ahead of a client that is not reading.
 	srv := httptest.NewUnstartedServer(mux)
 	srv.EnableHTTP2 = true
@@ -104,18 +104,18 @@ func (e *eventStream) next() *v1.Event {
 // describe renders an event compactly for order assertions.
 func describe(ev *v1.Event) string {
 	switch e := ev.GetEvent().(type) {
-	case *v1.Event_Repo:
-		switch r := e.Repo.GetEvent().(type) {
-		case *v1.RepoEvent_Snapshot:
-			return fmt.Sprintf("repo.snapshot(%d)", len(r.Snapshot.GetRepos()))
-		case *v1.RepoEvent_RepoUpdated:
-			return "repo.updated " + r.RepoUpdated.GetName()
-		case *v1.RepoEvent_RepoRemovedId:
-			return "repo.removed"
-		case *v1.RepoEvent_WorktreeDetailUpdated:
-			return "repo.detail " + r.WorktreeDetailUpdated.GetPath()
+	case *v1.Event_Project:
+		switch r := e.Project.GetEvent().(type) {
+		case *v1.ProjectEvent_Snapshot:
+			return fmt.Sprintf("project.snapshot(%d)", len(r.Snapshot.GetProjects()))
+		case *v1.ProjectEvent_ProjectUpdated:
+			return "project.updated " + r.ProjectUpdated.GetName()
+		case *v1.ProjectEvent_ProjectRemovedId:
+			return "project.removed"
+		case *v1.ProjectEvent_WorktreeDetailUpdated:
+			return "project.detail " + r.WorktreeDetailUpdated.GetPath()
 		default:
-			return "repo.other"
+			return "project.other"
 		}
 	case *v1.Event_Workspace:
 		switch w := e.Workspace.GetEvent().(type) {
@@ -207,7 +207,7 @@ func TestEventsSnapshotOrderThenLive(t *testing.T) {
 	f := newEventsFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	_, _ = f.repo.Register(ctx, "/code/a")
+	_, _ = f.project.Register(ctx, "/code/a")
 	t1, _ := f.term.Create(ctx, terminal.Spec{Argv: []string{"zsh"}})
 	t2, _ := f.term.Create(ctx, terminal.Spec{Argv: []string{"zsh"}, Labels: map[string]string{"kind": "shell", "thread": "s1"}})
 	f.th.Put(thread.Thread{ID: "s1", State: thread.StateConnected, Status: thread.StatusIdle})
@@ -216,11 +216,11 @@ func TestEventsSnapshotOrderThenLive(t *testing.T) {
 	f.gh.SetRepo(gh.RepoState{Slug: "o/b"})
 	f.gh.SetRepo(gh.RepoState{Slug: "o/a"})
 	f.gitops.Put(gitops.Op{ID: "op-0", Kind: gitops.KindFetch, State: gitops.StateRunning})
-	f.ws.Put(workspace.Workspace{ID: "w-1", Name: "login", Branch: "cf/login", Members: []workspace.Member{{RepoID: "a", WorktreePath: "/wt/a"}}})
+	f.ws.Put(workspace.Workspace{ID: "w-1", Name: "login", Branch: "cf/login", Members: []workspace.Member{{ProjectID: "a", WorktreePath: "/wt/a"}}})
 
 	s := f.watch(t, ctx)
 	want := []string{
-		"repo.snapshot(1)",
+		"project.snapshot(1)",
 		"workspace.snapshot(1)",
 		"terminal.updated " + t1.ID,
 		"terminal.updated " + t2.ID,
@@ -242,9 +242,9 @@ func TestEventsSnapshotOrderThenLive(t *testing.T) {
 	}
 
 	// Live events from every source, each in its own source's order.
-	_, _ = f.repo.Register(ctx, "/code/b")
-	if got := describe(s.next()); got != "repo.updated b" {
-		t.Fatalf("got %q, want repo.updated b", got)
+	_, _ = f.project.Register(ctx, "/code/b")
+	if got := describe(s.next()); got != "project.updated b" {
+		t.Fatalf("got %q, want project.updated b", got)
 	}
 	f.ws.Put(workspace.Workspace{ID: "w-2", Name: "billing", Branch: "cf/billing"})
 	if got := describe(s.next()); got != "workspace.updated billing" {
@@ -300,9 +300,9 @@ func TestEventsSnapshotOrderThenLive(t *testing.T) {
 	if want := []string{"gh.activity o/a", "gh.branch o/a feat", "gh.dashboard"}; !slices.Equal(got, want) {
 		t.Fatalf("got %q, want %q", got, want)
 	}
-	f.repo.SetDetail(repo.WorktreeDetail{RepoID: "r", Path: "/code/a"})
-	if got := describe(s.next()); got != "repo.detail /code/a" {
-		t.Fatalf("got %q, want repo.detail", got)
+	f.project.SetDetail(project.WorktreeDetail{ProjectID: "r", Path: "/code/a"})
+	if got := describe(s.next()); got != "project.detail /code/a" {
+		t.Fatalf("got %q, want project.detail", got)
 	}
 	n := command.BusEmitter{Bus: f.bus}.Emit(&v1.UiIntent{Intent: &v1.UiIntent_OpenPalette_{OpenPalette: &v1.UiIntent_OpenPalette{Query: "x"}}})
 	if n != 1 {
@@ -325,7 +325,7 @@ func TestEventsSourceFilter(t *testing.T) {
 	}{
 		{"ui only", []v1.EventSource{v1.EventSource_EVENT_SOURCE_UI}, "ui.palette go"},
 		{"terminal only", []v1.EventSource{v1.EventSource_EVENT_SOURCE_TERMINAL}, "terminal.updated fake-1"},
-		{"repo and ui", []v1.EventSource{v1.EventSource_EVENT_SOURCE_UI, v1.EventSource_EVENT_SOURCE_REPO}, "repo.snapshot(0)"},
+		{"project and ui", []v1.EventSource{v1.EventSource_EVENT_SOURCE_UI, v1.EventSource_EVENT_SOURCE_PROJECT}, "project.snapshot(0)"},
 		{"thread only", []v1.EventSource{v1.EventSource_EVENT_SOURCE_THREAD_LIST}, "thread.snapshot(0)"},
 		{"gh only", []v1.EventSource{v1.EventSource_EVENT_SOURCE_GH}, "gh.viewer"},
 		{"gitops only", []v1.EventSource{v1.EventSource_EVENT_SOURCE_GITOPS}, "gitops.snapshot(0)"},
@@ -355,19 +355,19 @@ func TestEventsResyncsSourceAfterDrops(t *testing.T) {
 	f := newEventsFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	s := f.watch(t, ctx, v1.EventSource_EVENT_SOURCE_REPO, v1.EventSource_EVENT_SOURCE_UI)
-	if got := describe(s.next()); got != "repo.snapshot(0)" {
+	s := f.watch(t, ctx, v1.EventSource_EVENT_SOURCE_PROJECT, v1.EventSource_EVENT_SOURCE_UI)
+	if got := describe(s.next()); got != "project.snapshot(0)" {
 		t.Fatalf("first = %q", got)
 	}
 	// Overflow the stream's hub queue while the client is not reading (more than the
 	// HTTP/2 flow-control windows the handler can fill first, plus hubClientBuffer).
 	big := strings.Repeat("x", 4096)
 	for i := range 5000 {
-		f.repo.Put(repo.Repo{ID: fmt.Sprint(i % 3), Name: fmt.Sprint(i), Path: big})
+		f.project.Put(project.Project{ID: fmt.Sprint(i % 3), Name: fmt.Sprint(i), Path: big})
 	}
 	for {
 		ev := s.next()
-		if snap := ev.GetRepo().GetSnapshot(); snap != nil && len(snap.GetRepos()) == 3 {
+		if snap := ev.GetProject().GetSnapshot(); snap != nil && len(snap.GetProjects()) == 3 {
 			break
 		}
 	}

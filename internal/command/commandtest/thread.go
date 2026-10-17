@@ -44,15 +44,15 @@ func (s *Thread) do(m proto.Message) error {
 
 // Create echoes the request as a STARTING thread "s1". With new_worktree the thread
 // is in /worktrees/s1 with created_worktree and base_ref set. workspace_id is echoed;
-// with new_workspace the thread belongs to "w-new" and runs in /worktrees/<repo>
-// (repo_id, else the first repo). With no_project it runs in /home.
+// with new_workspace the thread belongs to "w-new" and runs in /worktrees/<project>
+// (project_id, else the first project). With no_project it runs in /home.
 func (s *Thread) Create(_ context.Context, r *connect.Request[v1.CreateThreadRequest]) (*connect.Response[v1.CreateThreadResponse], error) {
 	if err := s.do(r.Msg); err != nil {
 		return nil, err
 	}
 	m := r.Msg
 	out := &v1.Thread{
-		Id: "s1", RepoId: m.GetRepoId(), WorktreePath: m.GetWorktreePath(), Model: m.GetModel(), Effort: m.GetEffort(),
+		Id: "s1", ProjectId: m.GetProjectId(), WorktreePath: m.GetWorktreePath(), Model: m.GetModel(), Effort: m.GetEffort(),
 		Name: m.GetName(), State: v1.ThreadState_THREAD_STATE_STARTING, PermissionMode: m.GetPermissionMode(),
 		WorkspaceId: m.GetWorkspaceId(), CreatedBy: m.GetCreatedBy(), Brief: m.GetBrief(), Labels: m.GetLabels(),
 		BudgetUsd: m.GetBudgetUsd(),
@@ -60,11 +60,11 @@ func (s *Thread) Create(_ context.Context, r *connect.Request[v1.CreateThreadReq
 	if nw := m.GetNewWorktree(); nw != nil {
 		out.WorktreePath, out.CreatedWorktree, out.BaseRef = "/worktrees/s1", true, nw.GetBaseRef()
 	}
-	if nw := m.GetNewWorkspace(); nw != nil && len(nw.GetRepos()) > 0 {
-		if out.RepoId == "" {
-			out.RepoId = nw.GetRepos()[0]
+	if nw := m.GetNewWorkspace(); nw != nil && len(nw.GetProjects()) > 0 {
+		if out.ProjectId == "" {
+			out.ProjectId = nw.GetProjects()[0]
 		}
-		out.WorkspaceId, out.WorktreePath, out.CreatedWorktree, out.BaseRef = "w-new", "/worktrees/"+out.RepoId, true, nw.GetBaseRef()
+		out.WorkspaceId, out.WorktreePath, out.CreatedWorktree, out.BaseRef = "w-new", "/worktrees/"+out.ProjectId, true, nw.GetBaseRef()
 	}
 	if m.GetNoProject() {
 		out.WorktreePath = "/home"
@@ -179,7 +179,7 @@ func (s *Thread) Snooze(_ context.Context, r *connect.Request[v1.SnoozeThreadReq
 
 // RunIn returns Current (default: a CONNECTED thread in workspace "w-1") with the
 // requested id. A disconnected thread runs in the target at once; a live one gets it
-// as pending_worktree_path. The target is worktree_path, else /worktrees/<repo_id>.
+// as pending_worktree_path. The target is worktree_path, else /worktrees/<project_id>.
 func (s *Thread) RunIn(_ context.Context, r *connect.Request[v1.RunInThreadRequest]) (*connect.Response[v1.RunInThreadResponse], error) {
 	if err := s.do(r.Msg); err != nil {
 		return nil, err
@@ -191,7 +191,7 @@ func (s *Thread) RunIn(_ context.Context, r *connect.Request[v1.RunInThreadReque
 	cur.Id = r.Msg.GetId()
 	path := r.Msg.GetWorktreePath()
 	if path == "" {
-		path = "/worktrees/" + r.Msg.GetRepoId()
+		path = "/worktrees/" + r.Msg.GetProjectId()
 	}
 	if cur.GetState() == v1.ThreadState_THREAD_STATE_DISCONNECTED {
 		cur.WorktreePath = path

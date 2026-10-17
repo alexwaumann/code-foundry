@@ -203,7 +203,7 @@ func gitOpToProto(o gitops.Op) *v1.GitOp {
 		State:        v1.GitOpState(o.State),
 		Title:        o.Title,
 		WorktreePath: o.WorktreePath,
-		RepoId:       o.RepoID,
+		ProjectId:    o.ProjectID,
 		Branch:       o.Branch,
 		QueuedAt:     timestamp(o.QueuedAt),
 		StartedAt:    timestamp(o.StartedAt),

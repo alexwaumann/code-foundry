@@ -37,7 +37,7 @@ func TestThreadMetadataMapping(t *testing.T) {
 		t.Errorf("empty mapping = %v", p)
 	}
 
-	res, err := c.Create(ctx, connect.NewRequest(&v1.CreateThreadRequest{RepoId: "r1", CreatedBy: "s-1", Brief: " b ",
+	res, err := c.Create(ctx, connect.NewRequest(&v1.CreateThreadRequest{ProjectId: "r1", CreatedBy: "s-1", Brief: " b ",
 		Labels: []string{"Y", "x"}, BudgetUsd: 1.5}))
 	if err != nil {
 		t.Fatal(err)
@@ -47,9 +47,9 @@ func TestThreadMetadataMapping(t *testing.T) {
 		t.Errorf("Create = %v", s)
 	}
 	for _, req := range []*v1.CreateThreadRequest{
-		{RepoId: "r1", CreatedBy: "s-nope"},
-		{RepoId: "r1", Labels: []string{"no way"}},
-		{RepoId: "r1", BudgetUsd: -1},
+		{ProjectId: "r1", CreatedBy: "s-nope"},
+		{ProjectId: "r1", Labels: []string{"no way"}},
+		{ProjectId: "r1", BudgetUsd: -1},
 	} {
 		if _, err := c.Create(ctx, connect.NewRequest(req)); connect.CodeOf(err) != connect.CodeInvalidArgument {
 			t.Errorf("Create(%v) = %v, want invalid argument", req, err)

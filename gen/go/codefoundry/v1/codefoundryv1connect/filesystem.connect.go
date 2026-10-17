@@ -58,7 +58,7 @@ type FilesystemServiceClient interface {
 	// ~/.claude/commands/*.md when include_user. Project skills come in request order,
 	// sorted by name within a source; user skills last. Unreadable entries are skipped,
 	// and so is a source whose project or checkout is gone (logged). A source without a
-	// repo id, or with a path that is relative or outside the home directory, is
+	// project id, or with a path that is relative or outside the home directory, is
 	// InvalidArgument.
 	ListSkills(context.Context, *connect.Request[v1.ListSkillsRequest]) (*connect.Response[v1.ListSkillsResponse], error)
 	// SearchFiles fuzzy-matches query against the files and directories of one checkout
@@ -66,7 +66,7 @@ type FilesystemServiceClient interface {
 	// ignored files (and their parent directories); a project without git is walked,
 	// skipping .git, node_modules and dot-directories, at most 50,000 entries. The
 	// candidate list is cached for a few seconds per checkout. An empty query returns
-	// the shallowest entries. An unknown repo is NotFound; a path outside the home
+	// the shallowest entries. An unknown project is NotFound; a path outside the home
 	// directory is InvalidArgument.
 	SearchFiles(context.Context, *connect.Request[v1.SearchFilesRequest]) (*connect.Response[v1.SearchFilesResponse], error)
 }
@@ -139,7 +139,7 @@ type FilesystemServiceHandler interface {
 	// ~/.claude/commands/*.md when include_user. Project skills come in request order,
 	// sorted by name within a source; user skills last. Unreadable entries are skipped,
 	// and so is a source whose project or checkout is gone (logged). A source without a
-	// repo id, or with a path that is relative or outside the home directory, is
+	// project id, or with a path that is relative or outside the home directory, is
 	// InvalidArgument.
 	ListSkills(context.Context, *connect.Request[v1.ListSkillsRequest]) (*connect.Response[v1.ListSkillsResponse], error)
 	// SearchFiles fuzzy-matches query against the files and directories of one checkout
@@ -147,7 +147,7 @@ type FilesystemServiceHandler interface {
 	// ignored files (and their parent directories); a project without git is walked,
 	// skipping .git, node_modules and dot-directories, at most 50,000 entries. The
 	// candidate list is cached for a few seconds per checkout. An empty query returns
-	// the shallowest entries. An unknown repo is NotFound; a path outside the home
+	// the shallowest entries. An unknown project is NotFound; a path outside the home
 	// directory is InvalidArgument.
 	SearchFiles(context.Context, *connect.Request[v1.SearchFilesRequest]) (*connect.Response[v1.SearchFilesResponse], error)
 }

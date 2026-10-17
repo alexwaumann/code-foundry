@@ -46,12 +46,12 @@ test("a project without git: No git on the Projects page, its overview, then Ini
   // Nothing git-shaped renders: facts, pull request, changes, commits.
   for (const id of ["worktree-facts", "overview-pr", "worktree-changes", "worktree-commits"]) await expect(page.getByTestId(id)).toHaveCount(0);
 
-  // Initialize Git runs repo.git.init on the project (the page itself has no repo context).
+  // Initialize Git runs project.git.init on the project (the page itself has no repo context).
   const init = page.getByTestId("init-git");
   await expect(init).toBeEnabled();
   await expect(init).toHaveText("Initialize Git");
   await init.click();
-  await expect.poll(async () => (await lastInvocation("repo.git.init"))?.context?.activeRepoId).toBe("repo-wr");
+  await expect.poll(async () => (await lastInvocation("project.git.init"))?.context?.activeProjectId).toBe("repo-wr");
   // A git repository on main now: the normal overview takes over.
   await expect(overview).toHaveAttribute("data-git", "true");
   await expect(page.getByTestId("worktree-surface-title")).toHaveText("writing@main");
@@ -96,7 +96,7 @@ test("the composer in a project without git offers only its current checkout; th
   await page.keyboard.press("Enter");
   await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("thread.new");
   const args = (await invocations()).at(-1)?.args;
-  expect(args).toMatchObject({ repo: "repo-wr", worktree: WR });
+  expect(args).toMatchObject({ project: "repo-wr", worktree: WR });
   expect(args).not.toHaveProperty("new-worktree");
 
   const row = page.locator('[data-row-kind="thread"][aria-selected="true"]');

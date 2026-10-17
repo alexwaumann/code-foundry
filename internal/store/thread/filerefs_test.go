@@ -45,7 +45,7 @@ func TestRewriteFileRefs(t *testing.T) {
 			want: "@/Users/me/.code-foundry/worktrees/web/cf-x/odd!'()*[x].md" +
 				" @/Users/me/.code-foundry/worktrees/web/cf-x/nb sp.md" +
 				" @/Users/me/.code-foundry/worktrees/web/cf-x/my dir/"},
-		{name: "unknown repo keeps the relative path",
+		{name: "unknown project keeps the relative path",
 			prompt:  "@cf-file://r-gone/src/a.ts ok",
 			want:    "@src/a.ts ok",
 			dropped: []string{"cf-file://r-gone/src/a.ts"}},
@@ -71,7 +71,7 @@ func TestRewriteFileRefs(t *testing.T) {
 		{name: "dots inside names are fine",
 			prompt: "@cf-file://r-web/a..b/.env",
 			want:   "@/Users/me/.code-foundry/worktrees/web/cf-x/a..b/.env"},
-		{name: "no slash after the repo id is left alone",
+		{name: "no slash after the project id is left alone",
 			prompt: "see cf-file://r-web and cf-file:///x",
 			want:   "see cf-file://r-web and cf-file:///x"},
 		{name: "without the @ too",
@@ -83,7 +83,7 @@ func TestRewriteFileRefs(t *testing.T) {
 		{name: "trailing punctuation is part of the path",
 			prompt: "(see @cf-file://r-web/a.md) then @cf-file://r-web/b.md, ok",
 			want:   "(see @/Users/me/.code-foundry/worktrees/web/cf-x/a.md) then @/Users/me/.code-foundry/worktrees/web/cf-x/b.md, ok"},
-		{name: "unknown repo with a trailing paren drops the scheme only",
+		{name: "unknown project with a trailing paren drops the scheme only",
 			prompt:  "(ignore @cf-file://r-gone/x.md)",
 			want:    "(ignore @x.md)",
 			dropped: []string{"cf-file://r-gone/x.md)"}},

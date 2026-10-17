@@ -107,7 +107,7 @@ const triggerNames: Record<ActionRunTrigger, ActionRunTriggerView> = {
 export function toActionView(a: Action): ActionView {
   return {
     id: a.id,
-    repoId: a.repoId,
+    repoId: a.projectId,
     name: a.name,
     command: a.command,
     icon: iconNames[a.icon],
@@ -123,7 +123,7 @@ export function toActionRunView(r: ActionRun): ActionRunView {
     actionId: r.actionId,
     actionName: r.actionName,
     command: r.command,
-    repoId: r.repoId,
+    repoId: r.projectId,
     threadId: r.threadId,
     worktreePath: r.worktreePath,
     mode: modeNames[r.mode],
@@ -141,7 +141,7 @@ export function toActionRunFinishedView(f: ActionRunFinished): ActionRunFinished
     runId: f.runId,
     actionId: f.actionId,
     actionName: f.actionName,
-    repoId: f.repoId,
+    repoId: f.projectId,
     threadId: f.threadId,
     exitCode: f.exitCode,
     mode: modeNames[f.mode],

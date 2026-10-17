@@ -19,8 +19,8 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/db"
 	"github.com/alexwaumann/code-foundry/internal/db/dbtest"
 	"github.com/alexwaumann/code-foundry/internal/paths"
-	"github.com/alexwaumann/code-foundry/internal/store/repo"
-	"github.com/alexwaumann/code-foundry/internal/store/repo/repotest"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
+	"github.com/alexwaumann/code-foundry/internal/store/project/projecttest"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal/terminaltest"
 	"github.com/alexwaumann/code-foundry/internal/termlabel"
@@ -28,16 +28,16 @@ import (
 
 var discard = slog.New(slog.NewTextHandler(io.Discard, nil))
 
-// harness is a Manager over a real database, the repo fake with two projects ("web",
+// harness is a Manager over a real database, the project fake with two projects ("web",
 // with a second worktree "feat", and "api") whose rows exist in the repos table (the
 // actions table references it), and the terminal fake.
 type harness struct {
-	t     *testing.T
-	db    *sql.DB
-	bus   *bus.Bus
-	repos *repotest.Fake
-	terms *terminaltest.Fake
-	m     *Manager
+	t        *testing.T
+	db       *sql.DB
+	bus      *bus.Bus
+	projects *projecttest.Fake
+	terms    *terminaltest.Fake
+	m        *Manager
 	// web, feat and api are real directories: background runs start in them.
 	web, feat, api string
 	// threads are the threads Options.Thread knows.
@@ -54,7 +54,7 @@ func newHarness(t *testing.T, mut ...func(*Options)) *harness {
 	}
 	t.Cleanup(func() { _ = d.Close() })
 	b := bus.New()
-	h := &harness{t: t, bus: b, repos: repotest.New(b), terms: terminaltest.New(b), threads: map[string]Owner{}}
+	h := &harness{t: t, bus: b, projects: projecttest.New(b), terms: terminaltest.New(b), threads: map[string]Owner{}}
 	root := t.TempDir()
 	if r, err := filepath.EvalSymlinks(root); err == nil {
 		root = r
@@ -65,19 +65,19 @@ func newHarness(t *testing.T, mut ...func(*Options)) *harness {
 			t.Fatal(err)
 		}
 	}
-	h.repos.Put(repo.Repo{ID: "web", Path: h.web, Name: "web", Git: true, Worktrees: []repo.Worktree{
-		{RepoID: "web", Path: h.web, IsMain: true}, {RepoID: "web", Path: h.feat},
+	h.projects.Put(project.Project{ID: "web", Path: h.web, Name: "web", Git: true, Worktrees: []project.Worktree{
+		{ProjectID: "web", Path: h.web, IsMain: true}, {ProjectID: "web", Path: h.feat},
 	}})
-	h.repos.Put(repo.Repo{ID: "api", Path: h.api, Name: "api", Git: true, Worktrees: []repo.Worktree{{RepoID: "api", Path: h.api, IsMain: true}}})
-	for _, r := range h.repos.Snapshot().Repos {
+	h.projects.Put(project.Project{ID: "api", Path: h.api, Name: "api", Git: true, Worktrees: []project.Worktree{{ProjectID: "api", Path: h.api, IsMain: true}}})
+	for _, r := range h.projects.Snapshot().Projects {
 		if _, err := d.ExecContext(ctx, `INSERT INTO repos (id, path, name, registered_at) VALUES (?, ?, ?, 0)`, r.ID, r.Path, r.Name); err != nil {
 			t.Fatal(err)
 		}
 	}
-	h.threads["s1"] = Owner{RepoID: "web", Worktree: h.feat}
+	h.threads["s1"] = Owner{ProjectID: "web", Worktree: h.feat}
 	h.threads["home"] = Owner{Worktree: root}
 	opts := Options{
-		DB: d, Repos: h.repos, Terminals: h.terms, Bus: b, Log: discard, Shell: "/bin/sh",
+		DB: d, Projects: h.projects, Terminals: h.terms, Bus: b, Log: discard, Shell: "/bin/sh",
 		Thread: func(id string) (Owner, bool) {
 			h.mu.Lock()
 			defer h.mu.Unlock()
@@ -139,32 +139,32 @@ func TestCreateUpdateDelete(t *testing.T) {
 		want []string
 	}{
 		{name: "create appends", run: func(h *harness) error {
-			h.create(CreateOptions{RepoID: "web", Name: "Lint", Command: "make lint"})
+			h.create(CreateOptions{ProjectID: "web", Name: "Lint", Command: "make lint"})
 			return nil
 		},
 			want: []string{"Test", "Build", "Lint"}},
 		{name: "a name is unique ignoring case", run: func(h *harness) error {
-			_, err := h.m.Create(context.Background(), CreateOptions{RepoID: "web", Name: "  test ", Command: "x"})
+			_, err := h.m.Create(context.Background(), CreateOptions{ProjectID: "web", Name: "  test ", Command: "x"})
 			return err
 		}, wantErr: ErrFailedPrecondition, want: []string{"Test", "Build"}},
 		{name: "the same name in another project is fine", run: func(h *harness) error {
-			_, err := h.m.Create(context.Background(), CreateOptions{RepoID: "api", Name: "Test", Command: "x"})
+			_, err := h.m.Create(context.Background(), CreateOptions{ProjectID: "api", Name: "Test", Command: "x"})
 			return err
 		}, want: []string{"Test", "Build"}},
 		{name: "unknown icon", run: func(h *harness) error {
-			_, err := h.m.Create(context.Background(), CreateOptions{RepoID: "web", Name: "X", Command: "x", Icon: "rocket"})
+			_, err := h.m.Create(context.Background(), CreateOptions{ProjectID: "web", Name: "X", Command: "x", Icon: "rocket"})
 			return err
 		}, wantErr: ErrInvalidArgument, want: []string{"Test", "Build"}},
 		{name: "blank command", run: func(h *harness) error {
-			_, err := h.m.Create(context.Background(), CreateOptions{RepoID: "web", Name: "X", Command: " \n"})
+			_, err := h.m.Create(context.Background(), CreateOptions{ProjectID: "web", Name: "X", Command: " \n"})
 			return err
 		}, wantErr: ErrInvalidArgument, want: []string{"Test", "Build"}},
 		{name: "multi-line name", run: func(h *harness) error {
-			_, err := h.m.Create(context.Background(), CreateOptions{RepoID: "web", Name: "a\nb", Command: "x"})
+			_, err := h.m.Create(context.Background(), CreateOptions{ProjectID: "web", Name: "a\nb", Command: "x"})
 			return err
 		}, wantErr: ErrInvalidArgument, want: []string{"Test", "Build"}},
 		{name: "unregistered project", run: func(h *harness) error {
-			_, err := h.m.Create(context.Background(), CreateOptions{RepoID: "nope", Name: "X", Command: "x"})
+			_, err := h.m.Create(context.Background(), CreateOptions{ProjectID: "nope", Name: "X", Command: "x"})
 			return err
 		}, wantErr: ErrNotFound, want: []string{"Test", "Build"}},
 		{name: "rename onto another's name", run: func(h *harness) error {
@@ -197,26 +197,26 @@ func TestCreateUpdateDelete(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h := newHarness(t)
-			h.create(CreateOptions{RepoID: "web", Name: "Test", Command: "go test ./...", Icon: IconTest, InTerminal: true})
-			h.create(CreateOptions{RepoID: "web", Name: "Build", Command: "make build"})
+			h.create(CreateOptions{ProjectID: "web", Name: "Test", Command: "go test ./...", Icon: IconTest, InTerminal: true})
+			h.create(CreateOptions{ProjectID: "web", Name: "Build", Command: "make build"})
 			err := tt.run(h)
 			if tt.wantErr == nil && err != nil || tt.wantErr != nil && !errors.Is(err, tt.wantErr) {
 				t.Fatalf("err = %v, want %v", err, tt.wantErr)
 			}
-			if got := names(h.m.Snapshot().ForRepo("web")); !slices.Equal(got, tt.want) {
+			if got := names(h.m.Snapshot().ForProject("web")); !slices.Equal(got, tt.want) {
 				t.Errorf("web's actions = %q, want %q", got, tt.want)
 			}
-			for i, a := range h.m.Snapshot().ForRepo("web") {
+			for i, a := range h.m.Snapshot().ForProject("web") {
 				if a.Position != i {
 					t.Errorf("%s at position %d, want %d", a.Name, a.Position, i)
 				}
 			}
 			// The database agrees: a new Manager loads the same list.
-			m2, err := New(context.Background(), Options{DB: h.m.opts.DB, Repos: h.repos, Log: discard})
+			m2, err := New(context.Background(), Options{DB: h.m.opts.DB, Projects: h.projects, Log: discard})
 			if err != nil {
 				t.Fatal(err)
 			}
-			if got := names(m2.Snapshot().ForRepo("web")); !slices.Equal(got, tt.want) {
+			if got := names(m2.Snapshot().ForProject("web")); !slices.Equal(got, tt.want) {
 				t.Errorf("reloaded = %q, want %q", got, tt.want)
 			}
 		})
@@ -235,7 +235,7 @@ func (h *harness) id(name string) string {
 
 func TestCreateDefaultsAndFields(t *testing.T) {
 	h := newHarness(t)
-	a := h.create(CreateOptions{RepoID: "web", Name: " Dev server ", Command: "pnpm dev\r\n", InTerminal: true, OnWorktreeCreate: true})
+	a := h.create(CreateOptions{ProjectID: "web", Name: " Dev server ", Command: "pnpm dev\r\n", InTerminal: true, OnWorktreeCreate: true})
 	if a.Name != "Dev server" || a.Command != "pnpm dev" || a.Icon != IconPlay || !a.InTerminal || !a.OnWorktreeCreate ||
 		a.Position != 0 || !strings.HasPrefix(a.ID, "a-") || a.CreatedAt.IsZero() {
 		t.Errorf("created %+v", a)
@@ -251,10 +251,10 @@ func TestCreateDefaultsAndFields(t *testing.T) {
 	}
 }
 
-func TestRepoRemovedForgetsActionsAndRuns(t *testing.T) {
+func TestProjectRemovedForgetsActionsAndRuns(t *testing.T) {
 	h := newHarness(t)
-	web := h.create(CreateOptions{RepoID: "web", Name: "Sleep", Command: "sleep 30"})
-	api := h.create(CreateOptions{RepoID: "api", Name: "Sleep", Command: "sleep 30"})
+	web := h.create(CreateOptions{ProjectID: "web", Name: "Sleep", Command: "sleep 30"})
+	api := h.create(CreateOptions{ProjectID: "api", Name: "Sleep", Command: "sleep 30"})
 	sub := bus.Subscribe[Event](h.bus, 64)
 	defer sub.Close()
 	run, err := h.m.Run(context.Background(), RunOptions{Action: "sleep", Worktree: h.web})
@@ -268,7 +268,7 @@ func TestRepoRemovedForgetsActionsAndRuns(t *testing.T) {
 	if _, err := h.db.ExecContext(context.Background(), `DELETE FROM repos WHERE id = 'web'`); err != nil {
 		t.Fatal(err)
 	}
-	h.m.RepoRemoved(context.Background(), "web")
+	h.m.ProjectRemoved(context.Background(), "web")
 	snap := h.m.Snapshot()
 	if _, ok := snap.Action(web.ID); ok {
 		t.Error("web's action is still in the snapshot")
@@ -303,11 +303,11 @@ func TestRepoRemovedForgetsActionsAndRuns(t *testing.T) {
 	if !removed || !runRemoved {
 		t.Errorf("events: Removed %v RunRemoved %v", removed, runRemoved)
 	}
-	m2, err := New(context.Background(), Options{DB: h.m.opts.DB, Repos: h.repos, Log: discard})
+	m2, err := New(context.Background(), Options{DB: h.m.opts.DB, Projects: h.projects, Log: discard})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := names(m2.Snapshot().Actions); !slices.Equal(got, []string{"Sleep"}) || m2.Snapshot().Actions[0].RepoID != "api" {
+	if got := names(m2.Snapshot().Actions); !slices.Equal(got, []string{"Sleep"}) || m2.Snapshot().Actions[0].ProjectID != "api" {
 		t.Errorf("reloaded = %+v", m2.Snapshot().Actions)
 	}
 }
@@ -324,17 +324,17 @@ func TestRunOwnerAndAction(t *testing.T) {
 		wantName  string
 	}{
 		{name: "a thread owns it and names the project", opts: RunOptions{Action: "echo", ThreadID: "s1"},
-			wantOwner: Owner{ThreadID: "s1", RepoID: "web", Worktree: "%feat"}, wantName: "Echo"},
+			wantOwner: Owner{ThreadID: "s1", ProjectID: "web", Worktree: "%feat"}, wantName: "Echo"},
 		{name: "a worktree owns it", opts: RunOptions{Action: "ECHO", Worktree: "%web"},
-			wantOwner: Owner{RepoID: "web", Worktree: "%web"}, wantName: "Echo"},
+			wantOwner: Owner{ProjectID: "web", Worktree: "%web"}, wantName: "Echo"},
 		{name: "by id", opts: RunOptions{Action: "#apiEcho", Worktree: "%api"},
-			wantOwner: Owner{RepoID: "api", Worktree: "%api"}, wantName: "Echo"},
+			wantOwner: Owner{ProjectID: "api", Worktree: "%api"}, wantName: "Echo"},
 		{name: "the thread wins over a worktree", opts: RunOptions{Action: "echo", ThreadID: "s1", Worktree: "%api"},
-			wantOwner: Owner{ThreadID: "s1", RepoID: "web", Worktree: "%feat"}, wantName: "Echo"},
+			wantOwner: Owner{ThreadID: "s1", ProjectID: "web", Worktree: "%feat"}, wantName: "Echo"},
 		{name: "unknown thread", opts: RunOptions{Action: "echo", ThreadID: "s9"}, wantErr: ErrNotFound, wantMsg: "thread s9"},
 		{name: "a thread without a project", opts: RunOptions{Action: "echo", ThreadID: "home"}, wantErr: ErrFailedPrecondition,
 			wantMsg: "has no project"},
-		{name: "the thread is in another project than --repo", opts: RunOptions{Action: "echo", ThreadID: "s1", RepoID: "api"},
+		{name: "the thread is in another project than --project", opts: RunOptions{Action: "echo", ThreadID: "s1", ProjectID: "api"},
 			wantErr: ErrInvalidArgument},
 		{name: "an unregistered worktree", opts: RunOptions{Action: "echo", Worktree: "/nowhere"}, wantErr: ErrInvalidArgument,
 			wantMsg: "/nowhere is not a worktree of a registered project"},
@@ -348,8 +348,8 @@ func TestRunOwnerAndAction(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h := newHarness(t)
-			h.create(CreateOptions{RepoID: "web", Name: "Echo", Command: "true"})
-			apiEcho := h.create(CreateOptions{RepoID: "api", Name: "Echo", Command: "true"})
+			h.create(CreateOptions{ProjectID: "web", Name: "Echo", Command: "true"})
+			apiEcho := h.create(CreateOptions{ProjectID: "api", Name: "Echo", Command: "true"})
 			sub := func(s string) string {
 				return strings.NewReplacer("%feat", h.feat, "%web", h.web, "%api", h.api, "#apiEcho", apiEcho.ID).Replace(s)
 			}
@@ -367,7 +367,7 @@ func TestRunOwnerAndAction(t *testing.T) {
 			}
 			want := tt.wantOwner
 			want.Worktree = sub(want.Worktree)
-			if got := (Owner{ThreadID: r.ThreadID, RepoID: r.RepoID, Worktree: r.Worktree}); got != want || r.ActionName != tt.wantName {
+			if got := (Owner{ThreadID: r.ThreadID, ProjectID: r.ProjectID, Worktree: r.Worktree}); got != want || r.ActionName != tt.wantName {
 				t.Errorf("run owner %+v %q, want %+v %q", got, r.ActionName, want, tt.wantName)
 			}
 			if r.Mode != ModeBackground || r.Trigger != TriggerUser {
@@ -409,7 +409,7 @@ func TestBackgroundRun(t *testing.T) {
 			})
 			sub := bus.Subscribe[Event](h.bus, 64)
 			defer sub.Close()
-			a := h.create(CreateOptions{RepoID: "web", Name: "Run", Command: tt.command, InTerminal: true})
+			a := h.create(CreateOptions{ProjectID: "web", Name: "Run", Command: tt.command, InTerminal: true})
 			o := RunOptions{Action: "run", Worktree: h.web, Mode: ModeBackground}
 			if tt.thread {
 				o = RunOptions{Action: "run", ThreadID: "s1", Mode: ModeBackground}
@@ -439,7 +439,7 @@ func TestBackgroundRun(t *testing.T) {
 					finished = append(finished, e)
 				}
 			}
-			want := RunFinished{RunID: r.ID, ActionID: a.ID, ActionName: "Run", RepoID: "web", ThreadID: r.ThreadID,
+			want := RunFinished{RunID: r.ID, ActionID: a.ID, ActionName: "Run", ProjectID: "web", ThreadID: r.ThreadID,
 				Mode: ModeBackground, Trigger: TriggerUser, ExitCode: tt.code}
 			if len(finished) != 1 || finished[0] != want {
 				t.Errorf("RunFinished = %+v, want one %+v", finished, want)
@@ -450,7 +450,7 @@ func TestBackgroundRun(t *testing.T) {
 
 func TestTerminalRun(t *testing.T) {
 	h := newHarness(t)
-	a := h.create(CreateOptions{RepoID: "web", Name: "Dev", Command: "pnpm dev", InTerminal: true})
+	a := h.create(CreateOptions{ProjectID: "web", Name: "Dev", Command: "pnpm dev", InTerminal: true})
 	sub := bus.Subscribe[Event](h.bus, 64)
 	defer sub.Close()
 	r, err := h.m.Run(context.Background(), RunOptions{Action: "dev", ThreadID: "s1"})
@@ -465,7 +465,7 @@ func TestTerminalRun(t *testing.T) {
 		t.Fatal("no terminal")
 	}
 	wantLabels := map[string]string{
-		termlabel.Kind: termlabel.KindAction, termlabel.Thread: "s1", termlabel.Repo: "web", termlabel.Worktree: h.feat,
+		termlabel.Kind: termlabel.KindAction, termlabel.Thread: "s1", termlabel.Project: "web", termlabel.Worktree: h.feat,
 		termlabel.Action: a.ID, termlabel.ActionName: "Dev", termlabel.ActionRun: r.ID,
 	}
 	if !slices.Equal(spec.Argv, []string{"/bin/sh", "-lc", "pnpm dev"}) || spec.Cwd != h.feat || !maps.Equal(spec.Labels, wantLabels) {
@@ -525,7 +525,7 @@ func (l lossyTerminals) Create(ctx context.Context, spec terminal.Spec) (termina
 
 func TestTerminalRunGoneWithoutExit(t *testing.T) {
 	h := newHarness(t, func(o *Options) { o.Terminals = lossyTerminals{o.Terminals.(*terminaltest.Fake)} })
-	h.create(CreateOptions{RepoID: "web", Name: "Dev", Command: "pnpm dev", InTerminal: true})
+	h.create(CreateOptions{ProjectID: "web", Name: "Dev", Command: "pnpm dev", InTerminal: true})
 	r, err := h.m.Run(context.Background(), RunOptions{Action: "dev", Worktree: h.web})
 	if err != nil {
 		t.Fatal(err)
@@ -541,9 +541,9 @@ func TestTerminalRunGoneWithoutExit(t *testing.T) {
 
 func TestRunHistoryCap(t *testing.T) {
 	h := newHarness(t, func(o *Options) { o.RunHistory = 2 })
-	h.create(CreateOptions{RepoID: "web", Name: "Quick", Command: "true"})
-	h.create(CreateOptions{RepoID: "web", Name: "Slow", Command: "sleep 30"})
-	h.create(CreateOptions{RepoID: "api", Name: "Quick", Command: "true"})
+	h.create(CreateOptions{ProjectID: "web", Name: "Quick", Command: "true"})
+	h.create(CreateOptions{ProjectID: "web", Name: "Slow", Command: "sleep 30"})
+	h.create(CreateOptions{ProjectID: "api", Name: "Quick", Command: "true"})
 	slow, err := h.m.Run(context.Background(), RunOptions{Action: "slow", Worktree: h.web})
 	if err != nil {
 		t.Fatal(err)
@@ -578,10 +578,10 @@ func TestRunHistoryCap(t *testing.T) {
 
 func TestWorktreeCreated(t *testing.T) {
 	h := newHarness(t)
-	h.create(CreateOptions{RepoID: "web", Name: "Install", Command: "echo one >> setup.log", OnWorktreeCreate: true})
-	h.create(CreateOptions{RepoID: "web", Name: "Manual", Command: "echo manual >> setup.log", InTerminal: true})
-	h.create(CreateOptions{RepoID: "web", Name: "Env", Command: `cat setup.log; echo "$` + paths.EnvThread + `"; exit 4`, OnWorktreeCreate: true, InTerminal: true})
-	h.create(CreateOptions{RepoID: "api", Name: "Other", Command: "echo api >> setup.log", OnWorktreeCreate: true})
+	h.create(CreateOptions{ProjectID: "web", Name: "Install", Command: "echo one >> setup.log", OnWorktreeCreate: true})
+	h.create(CreateOptions{ProjectID: "web", Name: "Manual", Command: "echo manual >> setup.log", InTerminal: true})
+	h.create(CreateOptions{ProjectID: "web", Name: "Env", Command: `cat setup.log; echo "$` + paths.EnvThread + `"; exit 4`, OnWorktreeCreate: true, InTerminal: true})
+	h.create(CreateOptions{ProjectID: "api", Name: "Other", Command: "echo api >> setup.log", OnWorktreeCreate: true})
 	sub := bus.Subscribe[Event](h.bus, 64)
 	defer sub.Close()
 	h.m.WorktreeCreated("s1", "web", h.feat)
@@ -617,7 +617,7 @@ func TestWorktreeCreated(t *testing.T) {
 func TestCloseKillsBackgroundRuns(t *testing.T) {
 	h := newHarness(t, func(o *Options) { o.KillGrace = 200 * time.Millisecond })
 	// Ignores SIGTERM: SIGKILL after the grace period.
-	h.create(CreateOptions{RepoID: "web", Name: "Stubborn", Command: "trap '' TERM; sleep 30 & wait"})
+	h.create(CreateOptions{ProjectID: "web", Name: "Stubborn", Command: "trap '' TERM; sleep 30 & wait"})
 	r, err := h.m.Run(context.Background(), RunOptions{Action: "stubborn", Worktree: h.web})
 	if err != nil {
 		t.Fatal(err)

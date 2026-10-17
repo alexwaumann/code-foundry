@@ -15,7 +15,7 @@ import (
 type Action struct {
 	Calls
 	Err error
-	// Actions is what List returns (filtered by repo).
+	// Actions is what List returns (filtered by project).
 	Actions []*v1.Action
 	// Started is what Run returns; its owner fields and mode are filled from the
 	// request (mode BACKGROUND when unspecified). Default: run r1 of the action.
@@ -31,14 +31,14 @@ func (f *Action) do(m proto.Message) error {
 	return f.Err
 }
 
-// List returns Actions in repo_id (all without one).
+// List returns Actions in project_id (all without one).
 func (f *Action) List(_ context.Context, r *connect.Request[v1.ListActionsRequest]) (*connect.Response[v1.ListActionsResponse], error) {
 	if err := f.do(r.Msg); err != nil {
 		return nil, err
 	}
 	out := &v1.ListActionsResponse{}
 	for _, a := range f.Actions {
-		if r.Msg.GetRepoId() == "" || a.GetRepoId() == r.Msg.GetRepoId() {
+		if r.Msg.GetProjectId() == "" || a.GetProjectId() == r.Msg.GetProjectId() {
 			out.Actions = append(out.Actions, a)
 		}
 	}
@@ -52,7 +52,7 @@ func (f *Action) Create(_ context.Context, r *connect.Request[v1.CreateActionReq
 	}
 	m := r.Msg
 	return connect.NewResponse(&v1.CreateActionResponse{Action: &v1.Action{
-		Id: "a-new", RepoId: m.GetRepoId(), Name: m.GetName(), Command: m.GetCommand(), Icon: m.GetIcon(),
+		Id: "a-new", ProjectId: m.GetProjectId(), Name: m.GetName(), Command: m.GetCommand(), Icon: m.GetIcon(),
 		InTerminal: m.GetInTerminal(), OnWorktreeCreate: m.GetOnWorktreeCreate(),
 	}}), nil
 }
@@ -91,7 +91,7 @@ func (f *Action) Run(_ context.Context, r *connect.Request[v1.RunActionRequest])
 	if f.Started != nil {
 		run = proto.CloneOf(f.Started)
 	}
-	run.ThreadId, run.WorktreePath, run.RepoId = r.Msg.GetThreadId(), r.Msg.GetWorktreePath(), r.Msg.GetRepoId()
+	run.ThreadId, run.WorktreePath, run.ProjectId = r.Msg.GetThreadId(), r.Msg.GetWorktreePath(), r.Msg.GetProjectId()
 	if run.Mode == v1.ActionRunMode_ACTION_RUN_MODE_UNSPECIFIED {
 		run.Mode = r.Msg.GetMode()
 	}

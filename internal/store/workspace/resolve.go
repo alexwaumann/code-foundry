@@ -12,7 +12,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/alexwaumann/code-foundry/internal/store/repo"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
 )
 
 // Pure lookups and validation shared by the Manager and the fake.
@@ -104,28 +104,28 @@ func realPath(p string) string {
 // RequireGit refuses a project without git as a workspace member: a member is a
 // worktree on the workspace branch, which needs git. Repositories without a remote
 // are fine.
-func RequireGit(r repo.Repo) error {
+func RequireGit(r project.Project) error {
 	if r.Git {
 		return nil
 	}
 	return fmt.Errorf("%w: %s is not a git repository; workspaces need git in every project", ErrFailedPrecondition, r.Name)
 }
 
-// ResolveRepo finds a registered repository by id, by name when exactly one has it,
+// ResolveProject finds a registered project by id, by name when exactly one has it,
 // or by an absolute path inside its main worktree or any of its worktrees.
-func ResolveRepo(snap *repo.Snapshot, ref string) (repo.Repo, error) {
+func ResolveProject(snap *project.Snapshot, ref string) (project.Project, error) {
 	ref = strings.TrimSpace(ref)
 	if ref == "" {
-		return repo.Repo{}, fmt.Errorf("%w: a repository is required", ErrInvalidArgument)
+		return project.Project{}, fmt.Errorf("%w: a project is required", ErrInvalidArgument)
 	}
 	if snap == nil {
-		snap = &repo.Snapshot{}
+		snap = &project.Snapshot{}
 	}
-	if r, ok := snap.Repo(ref); ok {
+	if r, ok := snap.Project(ref); ok {
 		return r, nil
 	}
-	var named []repo.Repo
-	for _, r := range snap.Repos {
+	var named []project.Project
+	for _, r := range snap.Projects {
 		if r.Name == ref {
 			named = append(named, r)
 		}
@@ -139,13 +139,13 @@ func ResolveRepo(snap *repo.Snapshot, ref string) (repo.Repo, error) {
 		for i, r := range named {
 			ids[i] = r.ID + " (" + r.Path + ")"
 		}
-		return repo.Repo{}, fmt.Errorf("%w: more than one repository is named %q; use its id: %s",
+		return project.Project{}, fmt.Errorf("%w: more than one project is named %q; use its id: %s",
 			ErrInvalidArgument, ref, strings.Join(ids, ", "))
 	}
 	if filepath.IsAbs(ref) {
-		var best repo.Repo
+		var best project.Project
 		depth := -1
-		for _, r := range snap.Repos {
+		for _, r := range snap.Projects {
 			roots := []string{r.Path}
 			for _, w := range r.Worktrees {
 				roots = append(roots, w.Path)
@@ -160,15 +160,15 @@ func ResolveRepo(snap *repo.Snapshot, ref string) (repo.Repo, error) {
 			return best, nil
 		}
 	}
-	return repo.Repo{}, fmt.Errorf("%w: repository %q is not registered (add it with `code-foundry repo add <folder>`)", ErrNotFound, ref)
+	return project.Project{}, fmt.Errorf("%w: project %q is not registered (add it with `code-foundry project add <folder>`)", ErrNotFound, ref)
 }
 
 // memberFor finds the member of w that ref names: a path inside its worktree, its
-// repository's id or name, or a path inside its repository.
-func memberFor(w Workspace, repos *repo.Snapshot, ref string) (Member, error) {
+// project's id or name, or a path inside its project.
+func memberFor(w Workspace, projects *project.Snapshot, ref string) (Member, error) {
 	ref = strings.TrimSpace(ref)
 	if ref == "" {
-		return Member{}, fmt.Errorf("%w: a repository is required", ErrInvalidArgument)
+		return Member{}, fmt.Errorf("%w: a project is required", ErrInvalidArgument)
 	}
 	if filepath.IsAbs(ref) {
 		for _, m := range w.Members {
@@ -180,14 +180,14 @@ func memberFor(w Workspace, repos *repo.Snapshot, ref string) (Member, error) {
 	if m, ok := w.Member(ref); ok {
 		return m, nil
 	}
-	if repos != nil {
+	if projects != nil {
 		for _, m := range w.Members {
-			if r, ok := repos.Repo(m.RepoID); ok && r.Name == ref {
+			if r, ok := projects.Project(m.ProjectID); ok && r.Name == ref {
 				return m, nil
 			}
 		}
 	}
-	r, err := ResolveRepo(repos, ref)
+	r, err := ResolveProject(projects, ref)
 	if err == nil {
 		if m, ok := w.Member(r.ID); ok {
 			return m, nil
@@ -196,17 +196,17 @@ func memberFor(w Workspace, repos *repo.Snapshot, ref string) (Member, error) {
 	return Member{}, fmt.Errorf("%w: %q is not a member of workspace %s", ErrNotFound, ref, w.Name)
 }
 
-// Join lists w's members with the repo store's current state; the member containing
+// Join lists w's members with the project store's current state; the member containing
 // cwd (if any) is Current.
-func Join(w Workspace, repos *repo.Snapshot, cwd string) Membership {
+func Join(w Workspace, projects *project.Snapshot, cwd string) Membership {
 	out := Membership{Workspace: w, Members: make([]MemberInfo, len(w.Members))}
 	current := -1
 	depth := -1
 	for i, m := range w.Members {
 		info := MemberInfo{Member: m, Branch: w.Branch, Missing: true}
-		if r, ok := repos.Repo(m.RepoID); ok {
-			info.RepoName = r.Name
-			if wt, ok := repos.Worktree(r.ID, m.WorktreePath); ok {
+		if r, ok := projects.Project(m.ProjectID); ok {
+			info.ProjectName = r.Name
+			if wt, ok := projects.Worktree(r.ID, m.WorktreePath); ok {
 				info.Missing = false
 				if wt.Branch != "" {
 					info.Branch = wt.Branch
@@ -306,7 +306,7 @@ func branchFor(name, branch string) (string, error) {
 }
 
 // validateRef rejects refs that could be read as a git option or are not one word.
-// git validates the rest (repo.Store.CreateWorktree runs check-ref-format).
+// git validates the rest (project.Store.CreateWorktree runs check-ref-format).
 func validateRef(what, ref string) error {
 	if ref == "" {
 		return nil

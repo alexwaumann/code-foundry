@@ -114,7 +114,7 @@ type UiIntent struct {
 	// Types that are valid to be assigned to Intent:
 	//
 	//	*UiIntent_FocusTerminal_
-	//	*UiIntent_FocusRepo_
+	//	*UiIntent_FocusProject_
 	//	*UiIntent_OpenPalette_
 	//	*UiIntent_Notify_
 	//	*UiIntent_FocusThread_
@@ -171,10 +171,10 @@ func (x *UiIntent) GetFocusTerminal() *UiIntent_FocusTerminal {
 	return nil
 }
 
-func (x *UiIntent) GetFocusRepo() *UiIntent_FocusRepo {
+func (x *UiIntent) GetFocusProject() *UiIntent_FocusProject {
 	if x != nil {
-		if x, ok := x.Intent.(*UiIntent_FocusRepo_); ok {
-			return x.FocusRepo
+		if x, ok := x.Intent.(*UiIntent_FocusProject_); ok {
+			return x.FocusProject
 		}
 	}
 	return nil
@@ -233,8 +233,8 @@ type UiIntent_FocusTerminal_ struct {
 	FocusTerminal *UiIntent_FocusTerminal `protobuf:"bytes,1,opt,name=focus_terminal,json=focusTerminal,proto3,oneof"`
 }
 
-type UiIntent_FocusRepo_ struct {
-	FocusRepo *UiIntent_FocusRepo `protobuf:"bytes,2,opt,name=focus_repo,json=focusRepo,proto3,oneof"`
+type UiIntent_FocusProject_ struct {
+	FocusProject *UiIntent_FocusProject `protobuf:"bytes,2,opt,name=focus_project,json=focusProject,proto3,oneof"`
 }
 
 type UiIntent_OpenPalette_ struct {
@@ -259,7 +259,7 @@ type UiIntent_PlayAlertSound_ struct {
 
 func (*UiIntent_FocusTerminal_) isUiIntent_Intent() {}
 
-func (*UiIntent_FocusRepo_) isUiIntent_Intent() {}
+func (*UiIntent_FocusProject_) isUiIntent_Intent() {}
 
 func (*UiIntent_OpenPalette_) isUiIntent_Intent() {}
 
@@ -541,28 +541,28 @@ func (x *UiIntent_FocusTerminal) GetTerminalId() string {
 	return ""
 }
 
-type UiIntent_FocusRepo struct {
+type UiIntent_FocusProject struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	RepoId        string                 `protobuf:"bytes,1,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
+	ProjectId     string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
 	WorktreePath  string                 `protobuf:"bytes,2,opt,name=worktree_path,json=worktreePath,proto3" json:"worktree_path,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *UiIntent_FocusRepo) Reset() {
-	*x = UiIntent_FocusRepo{}
+func (x *UiIntent_FocusProject) Reset() {
+	*x = UiIntent_FocusProject{}
 	mi := &file_codefoundry_v1_ui_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *UiIntent_FocusRepo) String() string {
+func (x *UiIntent_FocusProject) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*UiIntent_FocusRepo) ProtoMessage() {}
+func (*UiIntent_FocusProject) ProtoMessage() {}
 
-func (x *UiIntent_FocusRepo) ProtoReflect() protoreflect.Message {
+func (x *UiIntent_FocusProject) ProtoReflect() protoreflect.Message {
 	mi := &file_codefoundry_v1_ui_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -574,19 +574,19 @@ func (x *UiIntent_FocusRepo) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use UiIntent_FocusRepo.ProtoReflect.Descriptor instead.
-func (*UiIntent_FocusRepo) Descriptor() ([]byte, []int) {
+// Deprecated: Use UiIntent_FocusProject.ProtoReflect.Descriptor instead.
+func (*UiIntent_FocusProject) Descriptor() ([]byte, []int) {
 	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{1, 4}
 }
 
-func (x *UiIntent_FocusRepo) GetRepoId() string {
+func (x *UiIntent_FocusProject) GetProjectId() string {
 	if x != nil {
-		return x.RepoId
+		return x.ProjectId
 	}
 	return ""
 }
 
-func (x *UiIntent_FocusRepo) GetWorktreePath() string {
+func (x *UiIntent_FocusProject) GetWorktreePath() string {
 	if x != nil {
 		return x.WorktreePath
 	}
@@ -703,11 +703,10 @@ var File_codefoundry_v1_ui_proto protoreflect.FileDescriptor
 const file_codefoundry_v1_ui_proto_rawDesc = "" +
 	"\n" +
 	"\x17codefoundry/v1/ui.proto\x12\x0ecodefoundry.v1\"\x15\n" +
-	"\x13WatchIntentsRequest\"\xf0\a\n" +
+	"\x13WatchIntentsRequest\"\x82\b\n" +
 	"\bUiIntent\x12O\n" +
-	"\x0efocus_terminal\x18\x01 \x01(\v2&.codefoundry.v1.UiIntent.FocusTerminalH\x00R\rfocusTerminal\x12C\n" +
-	"\n" +
-	"focus_repo\x18\x02 \x01(\v2\".codefoundry.v1.UiIntent.FocusRepoH\x00R\tfocusRepo\x12I\n" +
+	"\x0efocus_terminal\x18\x01 \x01(\v2&.codefoundry.v1.UiIntent.FocusTerminalH\x00R\rfocusTerminal\x12L\n" +
+	"\rfocus_project\x18\x02 \x01(\v2%.codefoundry.v1.UiIntent.FocusProjectH\x00R\ffocusProject\x12I\n" +
 	"\fopen_palette\x18\x03 \x01(\v2$.codefoundry.v1.UiIntent.OpenPaletteH\x00R\vopenPalette\x129\n" +
 	"\x06notify\x18\x04 \x01(\v2\x1f.codefoundry.v1.UiIntent.NotifyH\x00R\x06notify\x12I\n" +
 	"\ffocus_thread\x18\x05 \x01(\v2$.codefoundry.v1.UiIntent.FocusThreadH\x00R\vfocusThread\x12@\n" +
@@ -721,9 +720,10 @@ const file_codefoundry_v1_ui_proto_rawDesc = "" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x1a0\n" +
 	"\rFocusTerminal\x12\x1f\n" +
 	"\vterminal_id\x18\x01 \x01(\tR\n" +
-	"terminalId\x1aI\n" +
-	"\tFocusRepo\x12\x17\n" +
-	"\arepo_id\x18\x01 \x01(\tR\x06repoId\x12#\n" +
+	"terminalId\x1aR\n" +
+	"\fFocusProject\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\x01 \x01(\tR\tprojectId\x12#\n" +
 	"\rworktree_path\x18\x02 \x01(\tR\fworktreePath\x1a#\n" +
 	"\vOpenPalette\x12\x14\n" +
 	"\x05query\x18\x01 \x01(\tR\x05query\x1a\xc3\x01\n" +
@@ -771,13 +771,13 @@ var file_codefoundry_v1_ui_proto_goTypes = []any{
 	(*UiIntent_ShowView)(nil),       // 6: codefoundry.v1.UiIntent.ShowView
 	(*UiIntent_FocusThread)(nil),    // 7: codefoundry.v1.UiIntent.FocusThread
 	(*UiIntent_FocusTerminal)(nil),  // 8: codefoundry.v1.UiIntent.FocusTerminal
-	(*UiIntent_FocusRepo)(nil),      // 9: codefoundry.v1.UiIntent.FocusRepo
+	(*UiIntent_FocusProject)(nil),   // 9: codefoundry.v1.UiIntent.FocusProject
 	(*UiIntent_OpenPalette)(nil),    // 10: codefoundry.v1.UiIntent.OpenPalette
 	(*UiIntent_Notify)(nil),         // 11: codefoundry.v1.UiIntent.Notify
 }
 var file_codefoundry_v1_ui_proto_depIdxs = []int32{
 	8,  // 0: codefoundry.v1.UiIntent.focus_terminal:type_name -> codefoundry.v1.UiIntent.FocusTerminal
-	9,  // 1: codefoundry.v1.UiIntent.focus_repo:type_name -> codefoundry.v1.UiIntent.FocusRepo
+	9,  // 1: codefoundry.v1.UiIntent.focus_project:type_name -> codefoundry.v1.UiIntent.FocusProject
 	10, // 2: codefoundry.v1.UiIntent.open_palette:type_name -> codefoundry.v1.UiIntent.OpenPalette
 	11, // 3: codefoundry.v1.UiIntent.notify:type_name -> codefoundry.v1.UiIntent.Notify
 	7,  // 4: codefoundry.v1.UiIntent.focus_thread:type_name -> codefoundry.v1.UiIntent.FocusThread
@@ -803,7 +803,7 @@ func file_codefoundry_v1_ui_proto_init() {
 	}
 	file_codefoundry_v1_ui_proto_msgTypes[1].OneofWrappers = []any{
 		(*UiIntent_FocusTerminal_)(nil),
-		(*UiIntent_FocusRepo_)(nil),
+		(*UiIntent_FocusProject_)(nil),
 		(*UiIntent_OpenPalette_)(nil),
 		(*UiIntent_Notify_)(nil),
 		(*UiIntent_FocusThread_)(nil),

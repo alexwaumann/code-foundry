@@ -40,8 +40,8 @@ test("sidebar new-thread button opens the project picker, then the composer", as
 
   await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("thread.new");
   const last = (await invocations()).at(-1);
-  expect(last?.args).toMatchObject({ repo: "repo-gp", "new-worktree": "true", prompt: "Port the renderer" });
-  expect(last?.context).toMatchObject({ activeRepoId: "repo-gp", activeWorktreePath: "", activeView: "compose" });
+  expect(last?.args).toMatchObject({ project: "repo-gp", "new-worktree": "true", prompt: "Port the renderer" });
+  expect(last?.context).toMatchObject({ activeProjectId: "repo-gp", activeWorktreePath: "", activeView: "compose" });
   const created = page.locator('[data-row-kind="thread"][aria-selected="true"]');
   await expect(created).toBeVisible();
   expect(await created.getAttribute("data-row-key")).toMatch(/^s:s-new-/);

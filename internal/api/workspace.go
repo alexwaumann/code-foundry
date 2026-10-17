@@ -44,7 +44,7 @@ func (h *Workspace) Create(ctx context.Context, req *connect.Request[v1.CreateWo
 	m := req.Msg
 	o := workspace.CreateOptions{Name: m.GetName(), Branch: m.GetBranch(), BaseRef: m.GetBaseRef(), Fetch: m.GetFetch()}
 	for _, s := range m.GetMembers() {
-		o.Members = append(o.Members, workspace.MemberSpec{Repo: s.GetRepo(), BaseRef: s.GetBaseRef()})
+		o.Members = append(o.Members, workspace.MemberSpec{Project: s.GetProject(), BaseRef: s.GetBaseRef()})
 	}
 	w, err := h.store.Create(ctx, o)
 	if err != nil {
@@ -53,31 +53,31 @@ func (h *Workspace) Create(ctx context.Context, req *connect.Request[v1.CreateWo
 	return connect.NewResponse(&v1.CreateWorkspaceResponse{Workspace: workspaceToProto(w)}), nil
 }
 
-// AddRepo adds a member repository.
-func (h *Workspace) AddRepo(ctx context.Context, req *connect.Request[v1.AddWorkspaceRepoRequest]) (*connect.Response[v1.AddWorkspaceRepoResponse], error) {
+// AddProject adds a member project.
+func (h *Workspace) AddProject(ctx context.Context, req *connect.Request[v1.AddWorkspaceProjectRequest]) (*connect.Response[v1.AddWorkspaceProjectResponse], error) {
 	m := req.Msg
-	w, err := h.store.AddRepo(ctx, workspace.AddRepoOptions{
+	w, err := h.store.AddProject(ctx, workspace.AddProjectOptions{
 		Ref:    workspace.Ref{Workspace: m.GetWorkspace(), Cwd: m.GetCwd()},
-		Member: workspace.MemberSpec{Repo: m.GetRepo(), BaseRef: m.GetBaseRef()},
+		Member: workspace.MemberSpec{Project: m.GetProject(), BaseRef: m.GetBaseRef()},
 		Fetch:  m.GetFetch(),
 	})
 	if err != nil {
 		return nil, workspaceError(err)
 	}
-	return connect.NewResponse(&v1.AddWorkspaceRepoResponse{Workspace: workspaceToProto(w)}), nil
+	return connect.NewResponse(&v1.AddWorkspaceProjectResponse{Workspace: workspaceToProto(w)}), nil
 }
 
-// RemoveRepo removes a member repository's worktree.
-func (h *Workspace) RemoveRepo(ctx context.Context, req *connect.Request[v1.RemoveWorkspaceRepoRequest]) (*connect.Response[v1.RemoveWorkspaceRepoResponse], error) {
+// RemoveProject removes a member project's worktree.
+func (h *Workspace) RemoveProject(ctx context.Context, req *connect.Request[v1.RemoveWorkspaceProjectRequest]) (*connect.Response[v1.RemoveWorkspaceProjectResponse], error) {
 	m := req.Msg
-	w, err := h.store.RemoveRepo(ctx, workspace.RemoveRepoOptions{
-		Ref:  workspace.Ref{Workspace: m.GetWorkspace(), Cwd: m.GetCwd()},
-		Repo: m.GetRepo(), Force: m.GetForce(), DeleteBranch: m.GetDeleteBranch(),
+	w, err := h.store.RemoveProject(ctx, workspace.RemoveProjectOptions{
+		Ref:     workspace.Ref{Workspace: m.GetWorkspace(), Cwd: m.GetCwd()},
+		Project: m.GetProject(), Force: m.GetForce(), DeleteBranch: m.GetDeleteBranch(),
 	})
 	if err != nil {
 		return nil, workspaceError(err)
 	}
-	return connect.NewResponse(&v1.RemoveWorkspaceRepoResponse{Workspace: workspaceToProto(w)}), nil
+	return connect.NewResponse(&v1.RemoveWorkspaceProjectResponse{Workspace: workspaceToProto(w)}), nil
 }
 
 // Remove removes every member worktree and forgets the workspace.
@@ -100,7 +100,7 @@ func (h *Workspace) Members(ctx context.Context, req *connect.Request[v1.Workspa
 	out := &v1.WorkspaceMembersResponse{Workspace: workspaceToProto(ms.Workspace)}
 	for _, m := range ms.Members {
 		out.Members = append(out.Members, &v1.WorkspaceMemberInfo{
-			RepoId: m.RepoID, RepoName: m.RepoName, WorktreePath: m.WorktreePath, Branch: m.Branch,
+			ProjectId: m.ProjectID, ProjectName: m.ProjectName, WorktreePath: m.WorktreePath, Branch: m.Branch,
 			Missing: m.Missing, Current: m.Current,
 		})
 	}
@@ -167,7 +167,7 @@ func workspacesToProto(snap *workspace.Snapshot) []*v1.Workspace {
 func workspaceToProto(w workspace.Workspace) *v1.Workspace {
 	p := &v1.Workspace{Id: w.ID, Name: w.Name, Branch: w.Branch}
 	for _, m := range w.Members {
-		p.Members = append(p.Members, &v1.WorkspaceMember{RepoId: m.RepoID, WorktreePath: m.WorktreePath})
+		p.Members = append(p.Members, &v1.WorkspaceMember{ProjectId: m.ProjectID, WorktreePath: m.WorktreePath})
 	}
 	if !w.CreatedAt.IsZero() {
 		p.CreatedAt = timestamppb.New(w.CreatedAt)

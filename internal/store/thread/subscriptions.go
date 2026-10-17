@@ -171,10 +171,10 @@ type UnsubscribeOptions struct {
 
 // ActionRun is what a wake about an action run says (Options.ActionRun).
 type ActionRun struct {
-	ID, ActionID, ActionName, RepoID string
-	Finished                         bool
-	ExitCode                         int
-	StartedAt, FinishedAt            time.Time
+	ID, ActionID, ActionName, ProjectID string
+	Finished                            bool
+	ExitCode                            int
+	StartedAt, FinishedAt               time.Time
 	// Output is a background run's captured output (its tail); "" for a terminal run.
 	Output string
 }

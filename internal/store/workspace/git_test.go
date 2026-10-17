@@ -12,10 +12,10 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/db"
 	"github.com/alexwaumann/code-foundry/internal/db/dbtest"
-	"github.com/alexwaumann/code-foundry/internal/store/repo"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
 )
 
-// End to end against real git through the real repo store.
+// End to end against real git through the real project store.
 
 func gitCmd(t *testing.T, dir string, args ...string) string {
 	t.Helper()
@@ -66,19 +66,19 @@ func TestWithGit(t *testing.T) {
 	}
 	defer func() { _ = d.Close() }()
 	b := bus.New()
-	repos, err := repo.Start(ctx, repo.Options{DB: d, Bus: b, WorktreeRoot: filepath.Join(base, "worktrees"), AllowedRoot: base,
+	projects, err := project.Start(ctx, project.Options{DB: d, Bus: b, WorktreeRoot: filepath.Join(base, "worktrees"), AllowedRoot: base,
 		FetchInterval: -1, PollInterval: -1})
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = repos.Close() }()
+	defer func() { _ = projects.Close() }()
 	for _, p := range []string{web, api} {
-		if _, err := repos.Register(ctx, p); err != nil {
+		if _, err := projects.Register(ctx, p); err != nil {
 			t.Fatal(err)
 		}
 	}
 	var threads []Thread
-	m, err := New(ctx, Options{DB: d, Repos: repos, Bus: b, Threads: func() []Thread { return threads }})
+	m, err := New(ctx, Options{DB: d, Projects: projects, Bus: b, Threads: func() []Thread { return threads }})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func TestWithGit(t *testing.T) {
 	// The second member fails (its branch is checked out elsewhere): the first
 	// member's worktree and new branch are rolled back.
 	gitCmd(t, api, "worktree", "add", "-q", "-b", "cf/busy", filepath.Join(base, "busy"))
-	if _, err := m.Create(ctx, CreateOptions{Name: "busy", Members: []MemberSpec{{Repo: "web"}, {Repo: "api"}}, Fetch: true}); !errors.Is(err, ErrFailedPrecondition) {
+	if _, err := m.Create(ctx, CreateOptions{Name: "busy", Members: []MemberSpec{{Project: "web"}, {Project: "api"}}, Fetch: true}); !errors.Is(err, ErrFailedPrecondition) {
 		t.Fatalf("create with a busy branch: %v", err)
 	}
 	if out := gitCmd(t, web, "branch", "--list", "cf/busy"); out != "" {
@@ -96,7 +96,7 @@ func TestWithGit(t *testing.T) {
 		t.Fatalf("rollback left the web worktree: %v", err)
 	}
 
-	w, err := m.Create(ctx, CreateOptions{Name: "login", Members: []MemberSpec{{Repo: "web"}, {Repo: api}}, Fetch: true})
+	w, err := m.Create(ctx, CreateOptions{Name: "login", Members: []MemberSpec{{Project: "web"}, {Project: api}}, Fetch: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,20 +111,20 @@ func TestWithGit(t *testing.T) {
 		t.Fatalf("web worktree tracks %s", up)
 	}
 	ms, err := m.Members(ctx, Ref{Cwd: filepath.Join(apiWT, ".")})
-	if err != nil || len(ms.Members) != 2 || !ms.Members[1].Current || ms.Members[1].RepoName != "api" || ms.Members[0].Missing {
+	if err != nil || len(ms.Members) != 2 || !ms.Members[1].Current || ms.Members[1].ProjectName != "api" || ms.Members[0].Missing {
 		t.Fatalf("members = %+v, %v", ms, err)
 	}
 
 	// Remove api: refused while a thread runs there, then by git while dirty.
 	threads = []Thread{{ID: "s-1", Cwd: apiWT}}
-	if _, err := m.RemoveRepo(ctx, RemoveRepoOptions{Ref: Ref{Workspace: "login"}, Repo: "api"}); !errors.Is(err, ErrFailedPrecondition) {
+	if _, err := m.RemoveProject(ctx, RemoveProjectOptions{Ref: Ref{Workspace: "login"}, Project: "api"}); !errors.Is(err, ErrFailedPrecondition) {
 		t.Fatalf("remove with a live thread: %v", err)
 	}
 	threads = nil
 	if err := os.WriteFile(filepath.Join(apiWT, "wip.txt"), []byte("wip\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := m.RemoveRepo(ctx, RemoveRepoOptions{Ref: Ref{Workspace: "login"}, Repo: "api"}); !errors.Is(err, ErrFailedPrecondition) ||
+	if _, err := m.RemoveProject(ctx, RemoveProjectOptions{Ref: Ref{Workspace: "login"}, Project: "api"}); !errors.Is(err, ErrFailedPrecondition) ||
 		!strings.Contains(err.Error(), "--force") {
 		t.Fatalf("remove dirty: %v", err)
 	}
@@ -135,7 +135,7 @@ func TestWithGit(t *testing.T) {
 	if _, err := os.Stat(webWT); err != nil {
 		t.Fatalf("web worktree removed: %v", err)
 	}
-	if _, err := m.RemoveRepo(ctx, RemoveRepoOptions{Ref: Ref{Workspace: "login"}, Repo: "api", Force: true, DeleteBranch: true}); err != nil {
+	if _, err := m.RemoveProject(ctx, RemoveProjectOptions{Ref: Ref{Workspace: "login"}, Project: "api", Force: true, DeleteBranch: true}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(apiWT); !os.IsNotExist(err) {
@@ -146,9 +146,9 @@ func TestWithGit(t *testing.T) {
 	}
 
 	// Add it back: same branch name, new worktree.
-	w, err = m.AddRepo(ctx, AddRepoOptions{Ref: Ref{Cwd: webWT}, Member: MemberSpec{Repo: "api"}, Fetch: true})
+	w, err = m.AddProject(ctx, AddProjectOptions{Ref: Ref{Cwd: webWT}, Member: MemberSpec{Project: "api"}, Fetch: true})
 	if err != nil || len(w.Members) != 2 {
-		t.Fatalf("add repo: %+v, %v", w, err)
+		t.Fatalf("add project: %+v, %v", w, err)
 	}
 	if err := m.Remove(ctx, RemoveOptions{Workspace: w.ID}); err != nil {
 		t.Fatal(err)

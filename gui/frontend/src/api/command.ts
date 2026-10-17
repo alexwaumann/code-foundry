@@ -103,7 +103,15 @@ export function isUnknownCommand(err: unknown): boolean {
 }
 
 export function toUiContext(ctx: UiContextView): UiContext {
-  return create(UiContextSchema, ctx);
+  // Field by field: the view model's names need not be the proto's (activeRepoId).
+  return create(UiContextSchema, {
+    activeTerminalId: ctx.activeTerminalId,
+    activeThreadId: ctx.activeThreadId,
+    activeProjectId: ctx.activeRepoId,
+    activeWorktreePath: ctx.activeWorktreePath,
+    activeView: ctx.activeView,
+    activeWorkspaceId: ctx.activeWorkspaceId,
+  });
 }
 
 export async function listCommands(

@@ -41,7 +41,7 @@ func TestInvokeConfirm(t *testing.T) {
 	ran := 0
 	r := NewRegistry()
 	if err := r.Register(Command{
-		Name: "repo.worktree.remove", Title: "Remove Worktree", Category: "Repository",
+		Name: "project.worktree.remove", Title: "Remove Worktree", Category: "Project",
 		Args: []ArgSpec{
 			{Name: "path", Type: Path, Required: true, Context: ContextWorktree},
 			{Name: "force", Type: Bool},
@@ -76,7 +76,7 @@ func TestInvokeConfirm(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			before := ran
-			_, err := r.Invoke(context.Background(), tt.ctx, "repo.worktree.remove", tt.args, tt.opts...)
+			_, err := r.Invoke(context.Background(), tt.ctx, "project.worktree.remove", tt.args, tt.opts...)
 			switch {
 			case tt.wantErr != nil:
 				if !errors.Is(err, tt.wantErr) {
@@ -87,7 +87,7 @@ func TestInvokeConfirm(t *testing.T) {
 				if !errors.As(err, &ce) || !errors.Is(err, ErrNeedsConfirmation) {
 					t.Fatalf("err = %v, want *ConfirmError", err)
 				}
-				if ce.Message != tt.wantMsg || ce.Command != "repo.worktree.remove" || ce.Title != "Remove Worktree" {
+				if ce.Message != tt.wantMsg || ce.Command != "project.worktree.remove" || ce.Title != "Remove Worktree" {
 					t.Fatalf("confirm = %+v, want message %q", ce, tt.wantMsg)
 				}
 				if ran != before {
@@ -157,7 +157,7 @@ func TestOverrides(t *testing.T) {
 
 // ConfirmIf decides per call whether Confirm applies; DynamicConfirm returning "" keeps
 // the static message (it never means "no confirmation": pr.merge, app.restart and
-// repo.worktree.cleanup fall back on it).
+// project.worktree.cleanup fall back on it).
 func TestInvokeConfirmIf(t *testing.T) {
 	tests := []struct {
 		name      string

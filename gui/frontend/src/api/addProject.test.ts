@@ -1,6 +1,6 @@
 import { create } from "@bufbuild/protobuf";
 import { describe, expect, it } from "vitest";
-import { GitHubRepositorySchema, RepositoryVisibility } from "@/gen/codefoundry/v1/repo_pb";
+import { GitHubRepositorySchema, RepositoryVisibility } from "@/gen/codefoundry/v1/project_pb";
 import { appendProgress, toGitHubRepoView, type CloneProgressView } from "./addProject";
 
 describe("toGitHubRepoView", () => {

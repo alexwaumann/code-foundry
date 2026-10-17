@@ -1,0 +1,747 @@
+package project
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/db"
+	"github.com/alexwaumann/code-foundry/internal/db/dbtest"
+)
+
+// isolateGit points git at a throwaway global config so the developer's config
+// (signing, hooks, default branch, fsmonitor) cannot affect the tests. The store's
+// runner inherits this environment.
+func isolateGit(t *testing.T) {
+	t.Helper()
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	cfg := filepath.Join(t.TempDir(), "gitconfig")
+	content := "[user]\n\tname = Test\n\temail = test@example.com\n[init]\n\tdefaultBranch = main\n[commit]\n\tgpgsign = false\n"
+	if err := os.WriteFile(cfg, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GIT_CONFIG_GLOBAL", cfg)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+}
+
+func git(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %s (in %s): %v\n%s", strings.Join(args, " "), dir, err, out)
+	}
+	return strings.TrimSpace(string(out))
+}
+
+// fixture is a project "proj" with one commit pushed to a bare "origin", plus a second
+// clone ("other") that can push to origin. All paths are symlink-resolved.
+type fixture struct {
+	base, origin, project, other string
+}
+
+func newFixture(t *testing.T) fixture {
+	t.Helper()
+	isolateGit(t)
+	base, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := fixture{
+		base:    base,
+		origin:  filepath.Join(base, "origin.git"),
+		project: filepath.Join(base, "proj"),
+		other:   filepath.Join(base, "other"),
+	}
+	git(t, base, "init", "-q", "--bare", "-b", "main", f.origin)
+	git(t, base, "init", "-q", "-b", "main", f.project)
+	writeFile(t, filepath.Join(f.project, "README.md"), "hello\n")
+	if err := os.MkdirAll(filepath.Join(f.project, "sub"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(f.project, "sub", "x.txt"), "x\n")
+	git(t, f.project, "add", ".")
+	git(t, f.project, "commit", "-q", "-m", "init")
+	git(t, f.project, "remote", "add", "origin", f.origin)
+	git(t, f.project, "push", "-q", "-u", "origin", "main")
+	git(t, f.project, "remote", "set-head", "origin", "main")
+	git(t, base, "clone", "-q", f.origin, f.other)
+	return f
+}
+
+func writeFile(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+type harness struct {
+	t     *testing.T
+	store *Git
+	bus   *bus.Bus
+	sub   *bus.Subscription[Event]
+	db    *sql.DB
+}
+
+func startHarness(t *testing.T, dbPath string, opts Options) *harness {
+	t.Helper()
+	if dbPath == "" {
+		dbPath = dbtest.Path(t)
+	}
+	d, err := db.Open(context.Background(), dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := bus.New()
+	sub := bus.Subscribe[Event](b, 1024)
+	opts.DB, opts.Bus = d, b
+	if opts.WorktreeRoot == "" {
+		opts.WorktreeRoot = filepath.Join(t.TempDir(), "worktrees")
+	}
+	// Fixtures live in temp dirs, not under $HOME.
+	if opts.AllowedRoot == "" {
+		opts.AllowedRoot = os.TempDir()
+	}
+	opts.Debounce = 50 * time.Millisecond
+	if opts.FetchInterval == 0 {
+		opts.FetchInterval = -1
+	}
+	if opts.PollInterval == 0 {
+		opts.PollInterval = -1
+	}
+	s, err := Start(context.Background(), opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := &harness{t: t, store: s, bus: b, sub: sub, db: d}
+	t.Cleanup(h.close)
+	return h
+}
+
+func (h *harness) close() {
+	if h.store != nil {
+		_ = h.store.Close()
+		h.store = nil
+		h.sub.Close()
+		_ = h.db.Close()
+	}
+}
+
+// waitFor returns the first event matching pred, failing after timeout.
+func (h *harness) waitFor(what string, pred func(Event) bool) Event {
+	h.t.Helper()
+	deadline := time.After(10 * time.Second)
+	for {
+		select {
+		case ev := <-h.sub.C():
+			if pred(ev) {
+				return ev
+			}
+		case <-deadline:
+			h.t.Fatalf("timed out waiting for %s", what)
+			return nil
+		}
+	}
+}
+
+func worktreeUpdated(path string, pred func(Worktree) bool) func(Event) bool {
+	return func(ev Event) bool {
+		u, ok := ev.(WorktreeUpdated)
+		return ok && u.Worktree.Path == path && pred(u.Worktree)
+	}
+}
+
+func TestRegisterReportsProjectWorktreesAndStatus(t *testing.T) {
+	f := newFixture(t)
+	h := startHarness(t, "", Options{})
+	ctx := context.Background()
+
+	// Any path inside the project works, including a symlinked one.
+	link := filepath.Join(f.base, "link")
+	if err := os.Symlink(f.project, link); err != nil {
+		t.Fatal(err)
+	}
+	r, err := h.store.Register(ctx, filepath.Join(link, "sub"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Path != f.project || r.Name != "proj" || r.ID != projectID(f.project) || r.DefaultBranch != "main" ||
+		r.GitHubSlug != "" || r.Error != "" || r.RegisteredAt.IsZero() {
+		t.Fatalf("project = %+v", r)
+	}
+	if len(r.Worktrees) != 1 {
+		t.Fatalf("worktrees = %+v", r.Worktrees)
+	}
+	w := r.Worktrees[0]
+	want := Status{Upstream: "origin/main", BaseRef: "origin/main"}
+	got := w.Status
+	got.RefreshedAt = time.Time{}
+	if !w.IsMain || w.Path != f.project || w.Branch != "main" || len(w.Head) != 40 || got != want {
+		t.Fatalf("main worktree = %+v", w)
+	}
+	if _, ok := h.waitFor("ProjectUpdated", func(ev Event) bool { _, ok := ev.(ProjectUpdated); return ok }).(ProjectUpdated); !ok {
+		t.Fatal("no ProjectUpdated")
+	}
+
+	// Registering again (from the .git dir even) is idempotent.
+	again, err := h.store.Register(ctx, filepath.Join(f.project, ".git"))
+	if err != nil || again.ID != r.ID || !again.RegisteredAt.Equal(r.RegisteredAt) {
+		t.Fatalf("re-register = %+v, %v", again, err)
+	}
+	if n := len(h.store.Snapshot().Projects); n != 1 {
+		t.Fatalf("snapshot has %d projects", n)
+	}
+
+	// Edits inside a subdirectory are not seen by the non-recursive watcher, but
+	// Refresh picks them up; untracked + modified + staged are counted.
+	writeFile(t, filepath.Join(f.project, "sub", "x.txt"), "changed\n")
+	writeFile(t, filepath.Join(f.project, "sub", "new.txt"), "new\n")
+	writeFile(t, filepath.Join(f.project, "staged.txt"), "s\n")
+	git(t, f.project, "add", "staged.txt")
+	if err := h.store.Refresh(ctx, r.ID); err != nil {
+		t.Fatal(err)
+	}
+	wt, _ := h.store.Snapshot().Worktree(r.ID, f.project)
+	if s := wt.Status; s.Modified != 1 || s.Untracked != 1 || s.Staged != 1 || !s.Dirty {
+		t.Fatalf("status after edits = %+v", s)
+	}
+}
+
+func TestWorktreeLifecycleAndWatcher(t *testing.T) {
+	f := newFixture(t)
+	h := startHarness(t, "", Options{WorktreeRoot: filepath.Join(f.base, "wt")})
+	ctx := context.Background()
+	r, err := h.store.Register(ctx, f.project)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// New branch from origin/main at the default path, without tracking origin/main.
+	// origin is a local path, so the project files under _local.
+	w, err := h.store.CreateWorktree(ctx, CreateWorktreeOptions{ProjectID: r.ID, Branch: "alex/feat"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantPath := filepath.Join(f.base, "wt", "_local", "proj", "alex-feat")
+	if w.Path != wantPath || w.Branch != "alex/feat" || w.IsMain || w.Status.Upstream != "" ||
+		w.Status.BaseRef != "origin/main" || w.Status.BaseAhead != 0 || w.Status.Dirty {
+		t.Fatalf("worktree = %+v", w)
+	}
+	if got := len(h.store.Snapshot().Projects[0].Worktrees); got != 2 {
+		t.Fatalf("worktrees in snapshot = %d", got)
+	}
+
+	// Top-level file in the worktree root -> watcher -> WorktreeUpdated.
+	writeFile(t, filepath.Join(w.Path, "dirty.txt"), "x\n")
+	h.waitFor("untracked file", worktreeUpdated(w.Path, func(w Worktree) bool { return w.Status.Untracked == 1 }))
+
+	// Commit inside the worktree: reflog/index in its admin dir -> new head, ahead of base.
+	git(t, w.Path, "add", "dirty.txt")
+	git(t, w.Path, "commit", "-q", "-m", "wip")
+	h.waitFor("commit", worktreeUpdated(w.Path, func(w Worktree) bool {
+		return !w.Status.Dirty && w.Status.BaseAhead == 1
+	}))
+
+	// Someone else pushes to main; a fetch (run by hand here) moves origin/main and the
+	// main worktree goes behind.
+	writeFile(t, filepath.Join(f.other, "o.txt"), "o\n")
+	git(t, f.other, "add", ".")
+	git(t, f.other, "commit", "-q", "-m", "other")
+	git(t, f.other, "push", "-q")
+	git(t, f.project, "fetch", "-q")
+	h.waitFor("behind after fetch", worktreeUpdated(f.project, func(w Worktree) bool { return w.Status.Behind == 1 }))
+
+	// The main worktree cannot be removed; a dirty worktree needs force.
+	if err := h.store.RemoveWorktree(ctx, RemoveWorktreeOptions{ProjectID: r.ID, Path: f.project}); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("remove main: %v", err)
+	}
+	writeFile(t, filepath.Join(w.Path, "more.txt"), "m\n")
+	if err := h.store.RemoveWorktree(ctx, RemoveWorktreeOptions{ProjectID: r.ID, Path: w.Path}); !errors.Is(err, ErrFailedPrecondition) {
+		t.Fatalf("remove dirty without force: %v", err)
+	}
+	if err := h.store.RemoveWorktree(ctx, RemoveWorktreeOptions{ProjectID: r.ID, Path: w.Path, Force: true, DeleteBranch: true}); err != nil {
+		t.Fatal(err)
+	}
+	h.waitFor("WorktreeRemoved", func(ev Event) bool {
+		rm, ok := ev.(WorktreeRemoved)
+		return ok && rm.Path == w.Path && rm.ProjectID == r.ID
+	})
+	if got := len(h.store.Snapshot().Projects[0].Worktrees); got != 1 {
+		t.Fatalf("worktrees after remove = %d", got)
+	}
+	if out := git(t, f.project, "branch", "--list", "alex/feat"); out != "" {
+		t.Fatalf("branch not deleted: %q", out)
+	}
+}
+
+func TestCreateWorktreeBranchResolution(t *testing.T) {
+	f := newFixture(t)
+	h := startHarness(t, "", Options{})
+	ctx := context.Background()
+	r, err := h.store.Register(ctx, f.project)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Existing local branch is checked out as is.
+	git(t, f.project, "branch", "local-only")
+	w, err := h.store.CreateWorktree(ctx, CreateWorktreeOptions{ProjectID: r.ID, Branch: "local-only"})
+	if err != nil || w.Branch != "local-only" {
+		t.Fatalf("local branch: %+v, %v", w, err)
+	}
+
+	// Remote-only branch: git's DWIM creates a local branch tracking origin/<branch>.
+	git(t, f.other, "checkout", "-q", "-b", "remote-only")
+	git(t, f.other, "push", "-q", "-u", "origin", "remote-only")
+	git(t, f.project, "fetch", "-q")
+	explicit := filepath.Join(f.base, "elsewhere", "ro")
+	w, err = h.store.CreateWorktree(ctx, CreateWorktreeOptions{ProjectID: r.ID, Branch: "remote-only", Path: explicit})
+	if err != nil || w.Path != explicit || w.Branch != "remote-only" || w.Status.Upstream != "origin/remote-only" {
+		t.Fatalf("remote branch: %+v, %v", w, err)
+	}
+
+	// Explicit base ref.
+	w, err = h.store.CreateWorktree(ctx, CreateWorktreeOptions{ProjectID: r.ID, Branch: "from-head", BaseRef: "HEAD"})
+	if err != nil || w.Branch != "from-head" {
+		t.Fatalf("base ref: %+v, %v", w, err)
+	}
+
+	// Errors.
+	if _, err := h.store.CreateWorktree(ctx, CreateWorktreeOptions{ProjectID: r.ID, Branch: "bad..name"}); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("bad branch: %v", err)
+	}
+	if _, err := h.store.CreateWorktree(ctx, CreateWorktreeOptions{ProjectID: r.ID, Branch: "x", Path: "rel/path"}); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("relative path: %v", err)
+	}
+	if _, err := h.store.CreateWorktree(ctx, CreateWorktreeOptions{ProjectID: r.ID, Branch: "main"}); !errors.Is(err, ErrFailedPrecondition) {
+		t.Fatalf("branch already checked out: %v", err)
+	}
+	if _, err := h.store.CreateWorktree(ctx, CreateWorktreeOptions{ProjectID: "nope", Branch: "x"}); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("unknown project: %v", err)
+	}
+}
+
+// A new branch tracks its base only when the base is origin/<the branch itself>.
+func TestCreateWorktreeUpstream(t *testing.T) {
+	f := newFixture(t)
+	h := startHarness(t, "", Options{})
+	ctx := context.Background()
+	r, err := h.store.Register(ctx, f.project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	git(t, f.other, "checkout", "-q", "-b", "pr-head")
+	git(t, f.other, "commit", "-q", "--allow-empty", "-m", "pr")
+	git(t, f.other, "push", "-q", "origin", "pr-head")
+	git(t, f.project, "fetch", "-q")
+	prHead := git(t, f.project, "rev-parse", "origin/pr-head")
+	tests := []struct {
+		name, branch, base   string
+		wantUpstream, wantAt string
+	}{
+		{name: "the branch's own remote branch is tracked", branch: "pr-head", base: "origin/pr-head", wantUpstream: "origin/pr-head", wantAt: prHead},
+		{name: "another remote branch is not", branch: "pr-copy", base: "origin/pr-head", wantAt: prHead},
+		{name: "the default branch is not", branch: "from-main", base: "origin/main"},
+		{name: "a local ref is not", branch: "from-head", base: "HEAD"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w, err := h.store.CreateWorktree(ctx, CreateWorktreeOptions{ProjectID: r.ID, Branch: tt.branch, BaseRef: tt.base})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if w.Branch != tt.branch || w.Status.Upstream != tt.wantUpstream {
+				t.Errorf("branch %q upstream %q, want %q %q", w.Branch, w.Status.Upstream, tt.branch, tt.wantUpstream)
+			}
+			if tt.wantAt != "" && w.Head != tt.wantAt {
+				t.Errorf("head = %s, want %s", w.Head, tt.wantAt)
+			}
+		})
+	}
+
+	// A single-branch clone that fetched the branch by an explicit refspec: git refuses
+	// --track there, so the branch is created without an upstream.
+	t.Run("single-branch clone", func(t *testing.T) {
+		git(t, f.other, "checkout", "-q", "-b", "pr-two")
+		git(t, f.other, "commit", "-q", "--allow-empty", "-m", "pr two")
+		git(t, f.other, "push", "-q", "origin", "pr-two")
+		git(t, f.project, "config", "remote.origin.fetch", "+refs/heads/main:refs/remotes/origin/main")
+		git(t, f.project, "fetch", "-q", "origin", "+refs/heads/pr-two:refs/remotes/origin/pr-two")
+		w, err := h.store.CreateWorktree(ctx, CreateWorktreeOptions{ProjectID: r.ID, Branch: "pr-two", BaseRef: "origin/pr-two"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if w.Status.Upstream != "" || w.Head != git(t, f.project, "rev-parse", "origin/pr-two") {
+			t.Errorf("upstream %q head %s", w.Status.Upstream, w.Head)
+		}
+	})
+}
+
+func TestRefspecWrites(t *testing.T) {
+	const ref = "refs/remotes/origin/feat/x"
+	tests := []struct {
+		spec string
+		want bool
+	}{
+		{"+refs/heads/*:refs/remotes/origin/*", true},
+		{"refs/heads/*:refs/remotes/origin/*", true},
+		{"+refs/heads/main:refs/remotes/origin/main", false},
+		{"+refs/heads/feat/x:refs/remotes/origin/feat/x", true},
+		{"+refs/heads/feat/*:refs/remotes/origin/feat/*", true},
+		{"+refs/heads/*-pr:refs/remotes/origin/*-pr", false},
+		{"+refs/heads/*:refs/remotes/upstream/*", false},
+		{"^refs/heads/feat/x", false},
+		{"refs/heads/feat/x", false},
+		{"", false},
+	}
+	for _, tt := range tests {
+		if got := refspecWrites(tt.spec, ref); got != tt.want {
+			t.Errorf("refspecWrites(%q) = %v, want %v", tt.spec, got, tt.want)
+		}
+	}
+}
+
+func TestExternalWorktreeAddAndRemoveAreDetected(t *testing.T) {
+	f := newFixture(t)
+	h := startHarness(t, "", Options{})
+	r, err := h.store.Register(context.Background(), f.project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ext := filepath.Join(f.base, "ext")
+	// First linked worktree: creates .git/worktrees (event on the common dir).
+	git(t, f.project, "worktree", "add", "-q", "-b", "ext", ext)
+	h.waitFor("ProjectUpdated with external worktree", func(ev Event) bool {
+		u, ok := ev.(ProjectUpdated)
+		return ok && u.Project.ID == r.ID && len(u.Project.Worktrees) == 2
+	})
+	// Second one: entry in .git/worktrees.
+	ext2 := filepath.Join(f.base, "ext2")
+	git(t, f.project, "worktree", "add", "-q", "--detach", ext2)
+	h.waitFor("detached external worktree", func(ev Event) bool {
+		u, ok := ev.(ProjectUpdated)
+		if !ok || len(u.Project.Worktrees) != 3 {
+			return false
+		}
+		for _, w := range u.Project.Worktrees {
+			if w.Path == ext2 {
+				return w.Detached && w.Branch == ""
+			}
+		}
+		return false
+	})
+	git(t, f.project, "worktree", "remove", ext)
+	h.waitFor("external remove", func(ev Event) bool {
+		rm, ok := ev.(WorktreeRemoved)
+		return ok && rm.Path == ext
+	})
+}
+
+func TestUnregisterAndReloadFromDB(t *testing.T) {
+	f := newFixture(t)
+	second := filepath.Join(f.base, "second")
+	git(t, f.base, "init", "-q", "-b", "main", second)
+	git(t, second, "remote", "add", "origin", "git@github.com:acme/second.git")
+
+	dbPath := filepath.Join(t.TempDir(), "db.sqlite")
+	h := startHarness(t, dbPath, Options{})
+	ctx := context.Background()
+	r1, err := h.store.Register(ctx, f.project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r2, err := h.store.Register(ctx, second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Unborn branch: no head, no base comparison, default branch falls back to main.
+	if r2.GitHubSlug != "acme/second" || r2.DefaultBranch != "main" || len(r2.Worktrees) != 1 ||
+		r2.Worktrees[0].Head != "" || r2.Worktrees[0].Branch != "main" || r2.Worktrees[0].Status.Error != "" {
+		t.Fatalf("second = %+v", r2)
+	}
+	if err := h.store.Unregister(ctx, r1.ID); err != nil {
+		t.Fatal(err)
+	}
+	h.waitFor("ProjectRemoved", func(ev Event) bool { rm, ok := ev.(ProjectRemoved); return ok && rm.ID == r1.ID })
+	if err := h.store.Unregister(ctx, r1.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("second unregister: %v", err)
+	}
+	if _, err := os.Stat(f.project); err != nil {
+		t.Fatal("unregister touched the project on disk")
+	}
+	h.close()
+
+	// A fresh store on the same DB loads the remaining project and reconciles it async.
+	h2 := startHarness(t, dbPath, Options{})
+	snap := h2.store.Snapshot()
+	if len(snap.Projects) != 1 || snap.Projects[0].ID != r2.ID || !snap.Projects[0].RegisteredAt.Equal(r2.RegisteredAt) {
+		t.Fatalf("reloaded = %+v", snap.Projects)
+	}
+	h2.waitFor("initial reconcile", func(ev Event) bool {
+		u, ok := ev.(ProjectUpdated)
+		return ok && u.Project.ID == r2.ID && len(u.Project.Worktrees) == 1
+	})
+}
+
+// TestRegisterAllowedRoot covers the home boundary: a project must resolve inside
+// Options.AllowedRoot, through symlinks and linked worktrees.
+func TestRegisterAllowedRoot(t *testing.T) {
+	isolateGit(t)
+	base, _ := filepath.EvalSymlinks(t.TempDir())
+	root, outside := filepath.Join(base, "home"), filepath.Join(base, "outside")
+	for _, d := range []string{root, outside} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	inside := filepath.Join(root, "proj")
+	git(t, base, "init", "-q", "-b", "main", inside)
+	git(t, inside, "commit", "-q", "--allow-empty", "-m", "init")
+	git(t, base, "init", "-q", "-b", "main", filepath.Join(outside, "proj"))
+	git(t, filepath.Join(outside, "proj"), "commit", "-q", "--allow-empty", "-m", "init")
+	git(t, filepath.Join(outside, "proj"), "worktree", "add", "-q", "-b", "wt", filepath.Join(root, "wt"))
+	if err := os.Symlink(filepath.Join(outside, "proj"), filepath.Join(root, "link")); err != nil {
+		t.Fatal(err)
+	}
+	h := startHarness(t, "", Options{AllowedRoot: root})
+
+	tests := []struct {
+		name, path string
+		wantErr    string // empty: registers
+	}{
+		{"inside", inside, ""},
+		{"inside subdirectory spelled with dotdot", filepath.Join(root, "x", "..", "proj"), ""},
+		{"outside", filepath.Join(outside, "proj"), filepath.Join(outside, "proj") + " is outside your home directory"},
+		{"dotdot escape", filepath.Join(root, "..", "outside", "proj"), "is outside your home directory"},
+		{"symlink to outside", filepath.Join(root, "link"), filepath.Join(root, "link") + " is outside your home directory"},
+		{"worktree of an outside project", filepath.Join(root, "wt"), filepath.Join(outside, "proj") + " is outside your home directory"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := h.store.Register(context.Background(), tt.path)
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatalf("Register(%q): %v", tt.path, err)
+				}
+				return
+			}
+			if !errors.Is(err, ErrInvalidArgument) || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("Register(%q) err = %v, want ErrInvalidArgument containing %q", tt.path, err, tt.wantErr)
+			}
+		})
+	}
+	if n := len(h.store.Snapshot().Projects); n != 1 {
+		t.Errorf("registered %d projects, want 1", n)
+	}
+}
+
+func TestRegisterErrors(t *testing.T) {
+	isolateGit(t)
+	base, _ := filepath.EvalSymlinks(t.TempDir())
+	bare := filepath.Join(base, "bare.git")
+	git(t, base, "init", "-q", "--bare", bare)
+	// A file outside any repository: a project is a directory.
+	file := filepath.Join(base, "notes.txt")
+	writeFile(t, file, "x\n")
+	h := startHarness(t, "", Options{})
+	for _, p := range []string{"", bare, filepath.Join(base, "missing"), file} {
+		if _, err := h.store.Register(context.Background(), p); !errors.Is(err, ErrInvalidArgument) {
+			t.Errorf("Register(%q) err = %v, want ErrInvalidArgument", p, err)
+		}
+	}
+	if err := h.store.Refresh(context.Background(), "nope"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("Refresh(unknown) = %v", err)
+	}
+}
+
+func TestMissingProjectReportsErrorAndRecovers(t *testing.T) {
+	f := newFixture(t)
+	h := startHarness(t, "", Options{PollInterval: 100 * time.Millisecond})
+	r, err := h.store.Register(context.Background(), f.project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	moved := f.project + "-moved"
+	if err := os.Rename(f.project, moved); err != nil {
+		t.Fatal(err)
+	}
+	h.waitFor("project error", func(ev Event) bool {
+		u, ok := ev.(ProjectUpdated)
+		return ok && u.Project.ID == r.ID && u.Project.Error != "" && len(u.Project.Worktrees) == 0
+	})
+	if err := os.Rename(moved, f.project); err != nil {
+		t.Fatal(err)
+	}
+	h.waitFor("project recovered", func(ev Event) bool {
+		u, ok := ev.(ProjectUpdated)
+		return ok && u.Project.ID == r.ID && u.Project.Error == "" && len(u.Project.Worktrees) == 1
+	})
+}
+
+// countingRunner counts git subcommands.
+type countingRunner struct {
+	next Runner
+	mu   sync.Mutex
+	n    map[string]int
+}
+
+func (c *countingRunner) Run(ctx context.Context, dir string, args ...string) ([]byte, error) {
+	c.mu.Lock()
+	c.n[args[0]]++
+	c.mu.Unlock()
+	return c.next.Run(ctx, dir, args...)
+}
+
+func (c *countingRunner) count(sub string) int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.n[sub]
+}
+
+// Our own git commands must not trigger the watcher. `git status` would rewrite the
+// index (and fire the watcher, forever) without GIT_OPTIONAL_LOCKS=0.
+func TestNoSelfTriggeredRefreshLoop(t *testing.T) {
+	f := newFixture(t)
+	// Make the index stale so a plain `git status` would want to rewrite it.
+	future := time.Now().Add(time.Hour)
+	if err := os.Chtimes(filepath.Join(f.project, "README.md"), future, future); err != nil {
+		t.Fatal(err)
+	}
+	cr := &countingRunner{next: ExecRunner{}, n: map[string]int{}}
+	h := startHarness(t, "", Options{Runner: cr})
+	if _, err := h.store.Register(context.Background(), f.project); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(300 * time.Millisecond) // let any echo settle
+	before := cr.count("status")
+	time.Sleep(time.Second)
+	if after := cr.count("status"); after != before {
+		t.Fatalf("status ran %d more times while idle: refresh loop", after-before)
+	}
+}
+
+func TestFetchErrorIsNotFatal(t *testing.T) {
+	f := newFixture(t)
+	git(t, f.project, "remote", "set-url", "origin", filepath.Join(f.base, "does-not-exist.git"))
+	cr := &countingRunner{next: ExecRunner{}, n: map[string]int{}}
+	h := startHarness(t, "", Options{Runner: cr, FetchInterval: 50 * time.Millisecond})
+	r, err := h.store.Register(context.Background(), f.project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for cr.count("fetch") < 2 {
+		if time.Now().After(deadline) {
+			t.Fatal("fetch never retried")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if err := h.store.Refresh(context.Background(), r.ID); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := h.store.Snapshot().Project(r.ID)
+	if got.Error != "" || len(got.Worktrees) != 1 || got.Worktrees[0].Status.Error != "" {
+		t.Fatalf("fetch failure leaked into state: %+v", got)
+	}
+}
+
+func TestPeriodicFetch(t *testing.T) {
+	f := newFixture(t)
+	h := startHarness(t, "", Options{FetchInterval: 200 * time.Millisecond})
+	if _, err := h.store.Register(context.Background(), f.project); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(f.other, "o.txt"), "o\n")
+	git(t, f.other, "add", ".")
+	git(t, f.other, "commit", "-q", "-m", "other")
+	git(t, f.other, "push", "-q")
+	h.waitFor("behind via periodic fetch", worktreeUpdated(f.project, func(w Worktree) bool { return w.Status.Behind == 1 }))
+}
+
+// TestCreateWorktreeUnbornBase covers a `git init` folder with no commit: the default
+// base, or an explicit base naming the checkout's unborn branch, gets the empty
+// initial commit first; another base and a project with commits are left alone; a
+// failing commit is a clear failed precondition.
+func TestCreateWorktreeUnbornBase(t *testing.T) {
+	tests := []struct {
+		name     string
+		base     string
+		breakGit bool // make the commit fail (no identity)
+		wantErr  error
+		wantLog  string // subjects after the call, newest first
+	}{
+		{name: "default base", wantLog: "chore: initial commit"},
+		{name: "explicit unborn branch", base: "main", wantLog: "chore: initial commit"},
+		{name: "explicit full ref", base: "refs/heads/main", wantLog: "chore: initial commit"},
+		{name: "other base", base: "nope", wantErr: ErrFailedPrecondition},
+		{name: "commit fails", breakGit: true, wantErr: ErrFailedPrecondition},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			isolateGit(t)
+			base, err := filepath.EvalSymlinks(t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
+			dir := filepath.Join(base, "pad")
+			git(t, base, "init", "-q", "-b", "main", dir)
+			writeFile(t, filepath.Join(dir, "notes.md"), "todo\n")
+			if tt.breakGit {
+				git(t, dir, "config", "user.name", "")
+				git(t, dir, "config", "user.email", "")
+			}
+			h := startHarness(t, "", Options{})
+			ctx := context.Background()
+			r, err := h.store.Register(ctx, dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if r.DefaultBranch != "main" || r.Worktrees[0].Head != "" {
+				t.Fatalf("registered = %+v", r)
+			}
+			w, err := h.store.CreateWorktree(ctx, CreateWorktreeOptions{ProjectID: r.ID, Branch: "cf/x", BaseRef: tt.base})
+			if tt.wantErr != nil {
+				if !errors.Is(err, tt.wantErr) {
+					t.Fatalf("err = %v, want %v", err, tt.wantErr)
+				}
+				if tt.breakGit && !strings.Contains(err.Error(), "has no commits yet") {
+					t.Fatalf("err = %v", err)
+				}
+				if n := git(t, dir, "rev-list", "--count", "--all"); n != "0" {
+					t.Fatalf("commits after failure = %s", n)
+				}
+				return
+			}
+			if err != nil || w.Branch != "cf/x" || len(w.Head) != 40 {
+				t.Fatalf("worktree = %+v, %v", w, err)
+			}
+			if subj := git(t, dir, "log", "--format=%s"); subj != tt.wantLog {
+				t.Fatalf("log = %q", subj)
+			}
+			// The untracked file stays untracked; the main checkout now has a head.
+			got, _ := h.store.Snapshot().Project(r.ID)
+			if m := got.Worktrees[0]; !m.IsMain || len(m.Head) != 40 || m.Status.Untracked != 1 {
+				t.Fatalf("main worktree = %+v", m)
+			}
+			// A second worktree makes no second commit.
+			if _, err := h.store.CreateWorktree(ctx, CreateWorktreeOptions{ProjectID: r.ID, Branch: "cf/y"}); err != nil {
+				t.Fatal(err)
+			}
+			if n := git(t, dir, "rev-list", "--count", "HEAD"); n != "1" {
+				t.Fatalf("commits = %s", n)
+			}
+		})
+	}
+}

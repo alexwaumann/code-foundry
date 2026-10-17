@@ -141,7 +141,7 @@ func (l launch) argv(claude string, a spawnArgs) []string {
 // blank line, one line per attachment (attachmentLine). A prompt of only whitespace
 // counts as none.
 //
-// The text may carry file references, "@cf-file://<repoId>/<percent-encoded relative
+// The text may carry file references, "@cf-file://<projectId>/<percent-encoded relative
 // path>" (the composer's file tags), which name a file in a worktree that may not
 // exist yet. buildPrompt leaves them alone; Create rewrites them to absolute paths with
 // rewriteFileRefs once the thread's worktrees exist, before claude is spawned. See

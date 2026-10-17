@@ -192,7 +192,7 @@ test("new thread: a worktree's + on the Projects page opens the composer with th
   await page.keyboard.press("Enter");
   await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("thread.new");
   const last = (await invocations()).at(-1);
-  expect(last?.args).toEqual({ repo: "repo-cf", worktree: FIX_RESIZE, model: "claude-opus-4-8[1m]", effort: "high", permission: "auto", prompt: "Fix the resize race" });
+  expect(last?.args).toEqual({ project: "repo-cf", worktree: FIX_RESIZE, model: "claude-opus-4-8[1m]", effort: "high", permission: "auto", prompt: "Fix the resize race" });
   // The thread is the newest row, in that worktree, selected and shown.
   const created = page.locator('[data-row-kind="thread"][aria-selected="true"]');
   await expect(created).toBeVisible();
@@ -274,7 +274,7 @@ test("the whole app runs on one events stream plus one thread Watch", async ({ p
   // per-service Watch at all, only the visible thread's Watch is still open, and no
   // terminal is attached (threads have none; the bottom panel is closed).
   expect(started.get("EventService/Watch")).toBe(1);
-  for (const legacy of ["RepoService/Watch", "TerminalService/Watch", "UiService/WatchIntents", "ThreadService/Watch", "GhService/Watch"]) {
+  for (const legacy of ["ProjectService/Watch", "TerminalService/Watch", "UiService/WatchIntents", "ThreadService/Watch", "GhService/Watch"]) {
     expect(started.get(legacy) ?? 0, legacy).toBe(0);
   }
   await expect.poll(() => open.get("EventService/Watch")).toBe(1);

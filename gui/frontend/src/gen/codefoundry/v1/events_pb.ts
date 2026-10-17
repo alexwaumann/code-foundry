@@ -12,8 +12,8 @@ import type { GitOpsEvent } from "./gitops_pb";
 import { file_codefoundry_v1_gitops } from "./gitops_pb";
 import type { StreamHeartbeat } from "./heartbeat_pb";
 import { file_codefoundry_v1_heartbeat } from "./heartbeat_pb";
-import type { RepoEvent } from "./repo_pb";
-import { file_codefoundry_v1_repo } from "./repo_pb";
+import type { ProjectEvent } from "./project_pb";
+import { file_codefoundry_v1_project } from "./project_pb";
 import type { SettingsEvent } from "./settings_pb";
 import { file_codefoundry_v1_settings } from "./settings_pb";
 import type { TerminalEvent } from "./terminal_pb";
@@ -34,7 +34,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/events.proto.
  */
 export const file_codefoundry_v1_events: GenFile = /*@__PURE__*/
-  fileDesc("Chtjb2RlZm91bmRyeS92MS9ldmVudHMucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIr8BChJXYXRjaEV2ZW50c1JlcXVlc3QSLAoHc291cmNlcxgBIAMoDjIbLmNvZGVmb3VuZHJ5LnYxLkV2ZW50U291cmNlEhEKCXNpbmNlX3NlcRgCIAEoBBITCgtzaW5jZV9lcG9jaBgDIAEoCRIvCgtjbGllbnRfa2luZBgEIAEoDjIaLmNvZGVmb3VuZHJ5LnYxLkNsaWVudEtpbmQSEQoJY2xpZW50X2lkGAUgASgJEg8KB3Zpc2libGUYBiABKAgiOwoVU2V0Q2xpZW50U3RhdGVSZXF1ZXN0EhEKCWNsaWVudF9pZBgBIAEoCRIPCgd2aXNpYmxlGAIgASgIIhgKFlNldENsaWVudFN0YXRlUmVzcG9uc2Ui6wQKBUV2ZW50EikKBHJlcG8YASABKAsyGS5jb2RlZm91bmRyeS52MS5SZXBvRXZlbnRIABIxCgh0ZXJtaW5hbBgCIAEoCzIdLmNvZGVmb3VuZHJ5LnYxLlRlcm1pbmFsRXZlbnRIABI2Cgt0aHJlYWRfbGlzdBgDIAEoCzIfLmNvZGVmb3VuZHJ5LnYxLlRocmVhZExpc3RFdmVudEgAEiUKAmdoGAQgASgLMhcuY29kZWZvdW5kcnkudjEuR2hFdmVudEgAEiYKAnVpGAUgASgLMhguY29kZWZvdW5kcnkudjEuVWlJbnRlbnRIABItCgZnaXRvcHMYBiABKAsyGy5jb2RlZm91bmRyeS52MS5HaXRPcHNFdmVudEgAEjEKCHNldHRpbmdzGAcgASgLMh0uY29kZWZvdW5kcnkudjEuU2V0dGluZ3NFdmVudEgAEi0KBnVwZGF0ZRgKIAEoCzIbLmNvZGVmb3VuZHJ5LnYxLlVwZGF0ZUV2ZW50SAASMwoJd29ya3NwYWNlGAsgASgLMh4uY29kZWZvdW5kcnkudjEuV29ya3NwYWNlRXZlbnRIABItCgZ0aHJlYWQYDCABKAsyGy5jb2RlZm91bmRyeS52MS5UaHJlYWRFdmVudEgAEjQKCWhlYXJ0YmVhdBgNIAEoCzIfLmNvZGVmb3VuZHJ5LnYxLlN0cmVhbUhlYXJ0YmVhdEgAEi0KBmFjdGlvbhgOIAEoCzIbLmNvZGVmb3VuZHJ5LnYxLkFjdGlvbkV2ZW50SAASCwoDc2VxGBQgASgEEg0KBWVwb2NoGBUgASgJQgcKBWV2ZW50KlMKCkNsaWVudEtpbmQSGwoXQ0xJRU5UX0tJTkRfVU5TUEVDSUZJRUQQABITCg9DTElFTlRfS0lORF9HVUkQARITCg9DTElFTlRfS0lORF9DTEkQAirAAgoLRXZlbnRTb3VyY2USHAoYRVZFTlRfU09VUkNFX1VOU1BFQ0lGSUVEEAASFQoRRVZFTlRfU09VUkNFX1JFUE8QARIZChVFVkVOVF9TT1VSQ0VfVEVSTUlOQUwQAhIcChhFVkVOVF9TT1VSQ0VfVEhSRUFEX0xJU1QQAxITCg9FVkVOVF9TT1VSQ0VfR0gQBBITCg9FVkVOVF9TT1VSQ0VfVUkQBRIXChNFVkVOVF9TT1VSQ0VfR0lUT1BTEAYSGQoVRVZFTlRfU09VUkNFX1NFVFRJTkdTEAcSFwoTRVZFTlRfU09VUkNFX1VQREFURRAKEhoKFkVWRU5UX1NPVVJDRV9XT1JLU1BBQ0UQCxIXChNFVkVOVF9TT1VSQ0VfVEhSRUFEEAwSFwoTRVZFTlRfU09VUkNFX0FDVElPThANMrkBCgxFdmVudFNlcnZpY2USRgoFV2F0Y2gSIi5jb2RlZm91bmRyeS52MS5XYXRjaEV2ZW50c1JlcXVlc3QaFS5jb2RlZm91bmRyeS52MS5FdmVudCIAMAESYQoOU2V0Q2xpZW50U3RhdGUSJS5jb2RlZm91bmRyeS52MS5TZXRDbGllbnRTdGF0ZVJlcXVlc3QaJi5jb2RlZm91bmRyeS52MS5TZXRDbGllbnRTdGF0ZVJlc3BvbnNlIgBCwwEKEmNvbS5jb2RlZm91bmRyeS52MUILRXZlbnRzUHJvdG9QAVpHZ2l0aHViLmNvbS9hbGV4d2F1bWFubi9jb2RlLWZvdW5kcnkvZ2VuL2dvL2NvZGVmb3VuZHJ5L3YxO2NvZGVmb3VuZHJ5djGiAgNDWFiqAg5Db2RlZm91bmRyeS5WMcoCDkNvZGVmb3VuZHJ5XFYx4gIaQ29kZWZvdW5kcnlcVjFcR1BCTWV0YWRhdGHqAg9Db2RlZm91bmRyeTo6VjFiBnByb3RvMw", [file_codefoundry_v1_action, file_codefoundry_v1_gh, file_codefoundry_v1_gitops, file_codefoundry_v1_heartbeat, file_codefoundry_v1_repo, file_codefoundry_v1_settings, file_codefoundry_v1_terminal, file_codefoundry_v1_thread, file_codefoundry_v1_thread_lifecycle, file_codefoundry_v1_ui, file_codefoundry_v1_update, file_codefoundry_v1_workspace]);
+  fileDesc("Chtjb2RlZm91bmRyeS92MS9ldmVudHMucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIr8BChJXYXRjaEV2ZW50c1JlcXVlc3QSLAoHc291cmNlcxgBIAMoDjIbLmNvZGVmb3VuZHJ5LnYxLkV2ZW50U291cmNlEhEKCXNpbmNlX3NlcRgCIAEoBBITCgtzaW5jZV9lcG9jaBgDIAEoCRIvCgtjbGllbnRfa2luZBgEIAEoDjIaLmNvZGVmb3VuZHJ5LnYxLkNsaWVudEtpbmQSEQoJY2xpZW50X2lkGAUgASgJEg8KB3Zpc2libGUYBiABKAgiOwoVU2V0Q2xpZW50U3RhdGVSZXF1ZXN0EhEKCWNsaWVudF9pZBgBIAEoCRIPCgd2aXNpYmxlGAIgASgIIhgKFlNldENsaWVudFN0YXRlUmVzcG9uc2Ui8QQKBUV2ZW50Ei8KB3Byb2plY3QYASABKAsyHC5jb2RlZm91bmRyeS52MS5Qcm9qZWN0RXZlbnRIABIxCgh0ZXJtaW5hbBgCIAEoCzIdLmNvZGVmb3VuZHJ5LnYxLlRlcm1pbmFsRXZlbnRIABI2Cgt0aHJlYWRfbGlzdBgDIAEoCzIfLmNvZGVmb3VuZHJ5LnYxLlRocmVhZExpc3RFdmVudEgAEiUKAmdoGAQgASgLMhcuY29kZWZvdW5kcnkudjEuR2hFdmVudEgAEiYKAnVpGAUgASgLMhguY29kZWZvdW5kcnkudjEuVWlJbnRlbnRIABItCgZnaXRvcHMYBiABKAsyGy5jb2RlZm91bmRyeS52MS5HaXRPcHNFdmVudEgAEjEKCHNldHRpbmdzGAcgASgLMh0uY29kZWZvdW5kcnkudjEuU2V0dGluZ3NFdmVudEgAEi0KBnVwZGF0ZRgKIAEoCzIbLmNvZGVmb3VuZHJ5LnYxLlVwZGF0ZUV2ZW50SAASMwoJd29ya3NwYWNlGAsgASgLMh4uY29kZWZvdW5kcnkudjEuV29ya3NwYWNlRXZlbnRIABItCgZ0aHJlYWQYDCABKAsyGy5jb2RlZm91bmRyeS52MS5UaHJlYWRFdmVudEgAEjQKCWhlYXJ0YmVhdBgNIAEoCzIfLmNvZGVmb3VuZHJ5LnYxLlN0cmVhbUhlYXJ0YmVhdEgAEi0KBmFjdGlvbhgOIAEoCzIbLmNvZGVmb3VuZHJ5LnYxLkFjdGlvbkV2ZW50SAASCwoDc2VxGBQgASgEEg0KBWVwb2NoGBUgASgJQgcKBWV2ZW50KlMKCkNsaWVudEtpbmQSGwoXQ0xJRU5UX0tJTkRfVU5TUEVDSUZJRUQQABITCg9DTElFTlRfS0lORF9HVUkQARITCg9DTElFTlRfS0lORF9DTEkQAirDAgoLRXZlbnRTb3VyY2USHAoYRVZFTlRfU09VUkNFX1VOU1BFQ0lGSUVEEAASGAoURVZFTlRfU09VUkNFX1BST0pFQ1QQARIZChVFVkVOVF9TT1VSQ0VfVEVSTUlOQUwQAhIcChhFVkVOVF9TT1VSQ0VfVEhSRUFEX0xJU1QQAxITCg9FVkVOVF9TT1VSQ0VfR0gQBBITCg9FVkVOVF9TT1VSQ0VfVUkQBRIXChNFVkVOVF9TT1VSQ0VfR0lUT1BTEAYSGQoVRVZFTlRfU09VUkNFX1NFVFRJTkdTEAcSFwoTRVZFTlRfU09VUkNFX1VQREFURRAKEhoKFkVWRU5UX1NPVVJDRV9XT1JLU1BBQ0UQCxIXChNFVkVOVF9TT1VSQ0VfVEhSRUFEEAwSFwoTRVZFTlRfU09VUkNFX0FDVElPThANMrkBCgxFdmVudFNlcnZpY2USRgoFV2F0Y2gSIi5jb2RlZm91bmRyeS52MS5XYXRjaEV2ZW50c1JlcXVlc3QaFS5jb2RlZm91bmRyeS52MS5FdmVudCIAMAESYQoOU2V0Q2xpZW50U3RhdGUSJS5jb2RlZm91bmRyeS52MS5TZXRDbGllbnRTdGF0ZVJlcXVlc3QaJi5jb2RlZm91bmRyeS52MS5TZXRDbGllbnRTdGF0ZVJlc3BvbnNlIgBCwwEKEmNvbS5jb2RlZm91bmRyeS52MUILRXZlbnRzUHJvdG9QAVpHZ2l0aHViLmNvbS9hbGV4d2F1bWFubi9jb2RlLWZvdW5kcnkvZ2VuL2dvL2NvZGVmb3VuZHJ5L3YxO2NvZGVmb3VuZHJ5djGiAgNDWFiqAg5Db2RlZm91bmRyeS5WMcoCDkNvZGVmb3VuZHJ5XFYx4gIaQ29kZWZvdW5kcnlcVjFcR1BCTWV0YWRhdGHqAg9Db2RlZm91bmRyeTo6VjFiBnByb3RvMw", [file_codefoundry_v1_action, file_codefoundry_v1_gh, file_codefoundry_v1_gitops, file_codefoundry_v1_heartbeat, file_codefoundry_v1_project, file_codefoundry_v1_settings, file_codefoundry_v1_terminal, file_codefoundry_v1_thread, file_codefoundry_v1_thread_lifecycle, file_codefoundry_v1_ui, file_codefoundry_v1_update, file_codefoundry_v1_workspace]);
 
 /**
  * @generated from message codefoundry.v1.WatchEventsRequest
@@ -148,10 +148,10 @@ export type Event = Message<"codefoundry.v1.Event"> & {
    */
   event: {
     /**
-     * @generated from field: codefoundry.v1.RepoEvent repo = 1;
+     * @generated from field: codefoundry.v1.ProjectEvent project = 1;
      */
-    value: RepoEvent;
-    case: "repo";
+    value: ProjectEvent;
+    case: "project";
   } | {
     /**
      * @generated from field: codefoundry.v1.TerminalEvent terminal = 2;
@@ -300,9 +300,9 @@ export enum EventSource {
   UNSPECIFIED = 0,
 
   /**
-   * @generated from enum value: EVENT_SOURCE_REPO = 1;
+   * @generated from enum value: EVENT_SOURCE_PROJECT = 1;
    */
-  REPO = 1,
+  PROJECT = 1,
 
   /**
    * @generated from enum value: EVENT_SOURCE_TERMINAL = 2;
@@ -345,8 +345,8 @@ export enum EventSource {
   UPDATE = 10,
 
   /**
-   * Workspaces (branch sets). Sent right after repo, before terminal: members name
-   * repositories, and threads name workspaces.
+   * Workspaces (branch sets). Sent right after project, before terminal: members name
+   * projects, and threads name workspaces.
    *
    * @generated from enum value: EVENT_SOURCE_WORKSPACE = 11;
    */
@@ -388,7 +388,7 @@ export const EventSourceSchema: GenEnum<EventSource> = /*@__PURE__*/
 export const EventService: GenService<{
   /**
    * Watch streams all events. Each store's snapshot event is sent first, in the order
-   * repo, workspace, terminal, thread list, thread, gh, gitops, settings, update, action, so a
+   * project, workspace, terminal, thread list, thread, gh, gitops, settings, update, action, so a
    * client can replace its state wholesale on connect.
    *
    * @generated from rpc codefoundry.v1.EventService.Watch

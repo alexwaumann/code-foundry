@@ -19,7 +19,7 @@ service FilesystemService {
   // ~/.claude/commands/*.md when include_user. Project skills come in request order,
   // sorted by name within a source; user skills last. Unreadable entries are skipped,
   // and so is a source whose project or checkout is gone (logged). A source without a
-  // repo id, or with a path that is relative or outside the home directory, is
+  // project id, or with a path that is relative or outside the home directory, is
   // InvalidArgument.
   rpc ListSkills(ListSkillsRequest) returns (ListSkillsResponse) {}
 
@@ -28,7 +28,7 @@ service FilesystemService {
   // ignored files (and their parent directories); a project without git is walked,
   // skipping .git, node_modules and dot-directories, at most 50,000 entries. The
   // candidate list is cached for a few seconds per checkout. An empty query returns
-  // the shallowest entries. An unknown repo is NotFound; a path outside the home
+  // the shallowest entries. An unknown project is NotFound; a path outside the home
   // directory is InvalidArgument.
   rpc SearchFiles(SearchFilesRequest) returns (SearchFilesResponse) {}
 }
@@ -63,7 +63,7 @@ message ListDirectoriesResponse {
 // SkillSource is one checkout to read skills from.
 message SkillSource {
   // The registered project.
-  string repo_id = 1;
+  string project_id = 1;
   // Absolute path of the checkout to read (a worktree of the project). Empty: the
   // project's main worktree.
   string path = 2;
@@ -91,7 +91,7 @@ message Skill {
   string description = 2;
   SkillScope scope = 3;
   // The project, for SKILL_SCOPE_PROJECT.
-  string repo_id = 4;
+  string project_id = 4;
   // Absolute path of the SKILL.md or command .md file.
   string path = 5;
 }
@@ -102,7 +102,7 @@ message ListSkillsResponse {
 
 message SearchFilesRequest {
   // The registered project.
-  string repo_id = 1;
+  string project_id = 1;
   // Absolute path of the checkout to search (a worktree of the project). Empty: the
   // project's main worktree.
   string path = 2;

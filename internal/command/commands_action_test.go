@@ -20,18 +20,18 @@ const (
 	actLib  = "/cf-test/src/lib"
 )
 
-var actionRepos = []*v1.Repo{
-	{Id: "r1", Name: "app", Path: actApp, Worktrees: []*v1.Worktree{{RepoId: "r1", Path: actApp}, {RepoId: "r1", Path: actFeat}}},
-	{Id: "r2", Name: "lib", Path: actLib, Worktrees: []*v1.Worktree{{RepoId: "r2", Path: actLib}}},
+var actionProjects = []*v1.Project{
+	{Id: "r1", Name: "app", Path: actApp, Worktrees: []*v1.Worktree{{ProjectId: "r1", Path: actApp}, {ProjectId: "r1", Path: actFeat}}},
+	{Id: "r2", Name: "lib", Path: actLib, Worktrees: []*v1.Worktree{{ProjectId: "r2", Path: actLib}}},
 }
 
 func actionRegistry(t *testing.T, act *commandtest.Action, th *v1.Thread) *command.Registry {
 	t.Helper()
 	reg := command.NewRegistry()
 	if err := command.RegisterAction(reg, command.ActionDeps{
-		Action: act,
-		Repo:   &commandtest.Repo{Repos: actionRepos},
-		Thread: &commandtest.Thread{Current: cmp.Or(th, &v1.Thread{RepoId: "r1", WorktreePath: actFeat})},
+		Action:  act,
+		Project: &commandtest.Project{Projects: actionProjects},
+		Thread:  &commandtest.Thread{Current: cmp.Or(th, &v1.Thread{ProjectId: "r1", WorktreePath: actFeat})},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -52,18 +52,18 @@ func TestActionRunOwnerAndMode(t *testing.T) {
 		// The same owner terminal.new would pick.
 		{name: "a thread (the agent's CODE_FOUNDRY_THREAD) owns it", ctx: command.Context{ActiveThreadID: "s1"},
 			args: map[string]string{"action": "test", "here": "/cf-test/elsewhere"},
-			want: &v1.RunActionRequest{Action: "test", ThreadId: "s1", RepoId: "r1", WorktreePath: actFeat}},
-		{name: "a thread in the GUI", ctx: gui(command.Context{ActiveThreadID: "s1", ActiveRepoID: "r1", ActiveWorktreePath: actFeat}),
+			want: &v1.RunActionRequest{Action: "test", ThreadId: "s1", ProjectId: "r1", WorktreePath: actFeat}},
+		{name: "a thread in the GUI", ctx: gui(command.Context{ActiveThreadID: "s1", ActiveProjectID: "r1", ActiveWorktreePath: actFeat}),
 			args: map[string]string{"action": "test"},
-			want: &v1.RunActionRequest{Action: "test", ThreadId: "s1", RepoId: "r1", WorktreePath: actFeat}},
-		{name: "a worktree in the GUI", ctx: command.Context{ActiveRepoID: "r1", ActiveWorktreePath: actApp, ActiveView: "projects"},
-			args: map[string]string{"action": "test"}, want: &v1.RunActionRequest{Action: "test", RepoId: "r1", WorktreePath: actApp}},
+			want: &v1.RunActionRequest{Action: "test", ThreadId: "s1", ProjectId: "r1", WorktreePath: actFeat}},
+		{name: "a worktree in the GUI", ctx: command.Context{ActiveProjectID: "r1", ActiveWorktreePath: actApp, ActiveView: "projects"},
+			args: map[string]string{"action": "test"}, want: &v1.RunActionRequest{Action: "test", ProjectId: "r1", WorktreePath: actApp}},
 		{name: "the CLI's working directory", args: map[string]string{"action": "Lint", "here": actFeat + "/pkg"},
-			want: &v1.RunActionRequest{Action: "Lint", RepoId: "r1", WorktreePath: actFeat}},
+			want: &v1.RunActionRequest{Action: "Lint", ProjectId: "r1", WorktreePath: actFeat}},
 		{name: "--background", args: map[string]string{"action": "dev", "here": actLib, "background": "true"},
-			want: &v1.RunActionRequest{Action: "dev", RepoId: "r2", WorktreePath: actLib, Mode: v1.ActionRunMode_ACTION_RUN_MODE_BACKGROUND}},
+			want: &v1.RunActionRequest{Action: "dev", ProjectId: "r2", WorktreePath: actLib, Mode: v1.ActionRunMode_ACTION_RUN_MODE_BACKGROUND}},
 		{name: "--terminal", args: map[string]string{"action": "dev", "here": actLib, "terminal": "true"},
-			want: &v1.RunActionRequest{Action: "dev", RepoId: "r2", WorktreePath: actLib, Mode: v1.ActionRunMode_ACTION_RUN_MODE_TERMINAL}},
+			want: &v1.RunActionRequest{Action: "dev", ProjectId: "r2", WorktreePath: actLib, Mode: v1.ActionRunMode_ACTION_RUN_MODE_TERMINAL}},
 		{name: "--background with --terminal", args: map[string]string{"action": "dev", "here": actLib, "background": "true", "terminal": "true"},
 			wantErr: command.ErrInvalidArgs, wantMsg: "exclude each other"},
 		{name: "outside every project", args: map[string]string{"action": "dev", "here": "/cf-test/elsewhere"},
@@ -152,23 +152,23 @@ func TestActionRunWait(t *testing.T) {
 func TestActionProject(t *testing.T) {
 	gui := func(c command.Context) command.Context { c.ActiveView = "projects"; return c }
 	tests := []struct {
-		name     string
-		ctx      command.Context
-		args     map[string]string
-		thread   *v1.Thread
-		wantRepo string
-		wantErr  error
-		wantMsg  string
+		name        string
+		ctx         command.Context
+		args        map[string]string
+		thread      *v1.Thread
+		wantProject string
+		wantErr     error
+		wantMsg     string
 	}{
-		{name: "the thread's project", ctx: command.Context{ActiveThreadID: "s1"}, args: map[string]string{"here": actLib}, wantRepo: "r1"},
-		{name: "the GUI's project", ctx: gui(command.Context{ActiveRepoID: "r2"}), wantRepo: "r2"},
-		{name: "the GUI's worktree", ctx: gui(command.Context{ActiveWorktreePath: actFeat}), wantRepo: "r1"},
-		{name: "the working directory", args: map[string]string{"here": actLib + "/src"}, wantRepo: "r2"},
-		{name: "--repo by id", args: map[string]string{"repo": "r2", "here": actApp}, wantRepo: "r2"},
-		{name: "--repo by name", args: map[string]string{"repo": "lib"}, wantRepo: "r2"},
-		{name: "--repo by path", args: map[string]string{"repo": actFeat + "/x"}, wantRepo: "r1"},
-		{name: "--repo unknown", args: map[string]string{"repo": "nope"}, wantErr: command.ErrInvalidArgs, wantMsg: `no project "nope"`},
-		{name: "--repo outside every project", args: map[string]string{"repo": "/cf-test/elsewhere"}, wantErr: command.ErrInvalidArgs,
+		{name: "the thread's project", ctx: command.Context{ActiveThreadID: "s1"}, args: map[string]string{"here": actLib}, wantProject: "r1"},
+		{name: "the GUI's project", ctx: gui(command.Context{ActiveProjectID: "r2"}), wantProject: "r2"},
+		{name: "the GUI's worktree", ctx: gui(command.Context{ActiveWorktreePath: actFeat}), wantProject: "r1"},
+		{name: "the working directory", args: map[string]string{"here": actLib + "/src"}, wantProject: "r2"},
+		{name: "--project by id", args: map[string]string{"project": "r2", "here": actApp}, wantProject: "r2"},
+		{name: "--project by name", args: map[string]string{"project": "lib"}, wantProject: "r2"},
+		{name: "--project by path", args: map[string]string{"project": actFeat + "/x"}, wantProject: "r1"},
+		{name: "--project unknown", args: map[string]string{"project": "nope"}, wantErr: command.ErrInvalidArgs, wantMsg: `no project "nope"`},
+		{name: "--project outside every project", args: map[string]string{"project": "/cf-test/elsewhere"}, wantErr: command.ErrInvalidArgs,
 			wantMsg: "not inside a registered project"},
 		{name: "a thread without a project", ctx: command.Context{ActiveThreadID: "s1"}, thread: &v1.Thread{WorktreePath: "/cf-test/home"},
 			wantErr: command.ErrInvalidArgs, wantMsg: "has no project"},
@@ -190,8 +190,8 @@ func TestActionProject(t *testing.T) {
 				t.Fatal(err)
 			}
 			reqs := act.Requests()
-			if len(reqs) != 1 || reqs[0].(*v1.ListActionsRequest).GetRepoId() != tt.wantRepo {
-				t.Errorf("requests = %v, want List in %s", reqs, tt.wantRepo)
+			if len(reqs) != 1 || reqs[0].(*v1.ListActionsRequest).GetProjectId() != tt.wantProject {
+				t.Errorf("requests = %v, want List in %s", reqs, tt.wantProject)
 			}
 		})
 	}
@@ -199,8 +199,8 @@ func TestActionProject(t *testing.T) {
 
 func TestActionAddEditRemove(t *testing.T) {
 	existing := []*v1.Action{
-		{Id: "a-1", RepoId: "r1", Name: "Test", Command: "go test ./...", InTerminal: true},
-		{Id: "a-2", RepoId: "r2", Name: "Test", Command: "pnpm test"},
+		{Id: "a-1", ProjectId: "r1", Name: "Test", Command: "go test ./...", InTerminal: true},
+		{Id: "a-2", ProjectId: "r2", Name: "Test", Command: "pnpm test"},
 	}
 	ptr := func(b bool) *bool { return &b }
 	str := func(s string) *string { return &s }
@@ -214,10 +214,10 @@ func TestActionAddEditRemove(t *testing.T) {
 		wantMsg string
 	}{
 		{name: "add with defaults", cmd: "action.add", args: map[string]string{"name": "Lint", "command": "make lint", "here": actApp},
-			want: &v1.CreateActionRequest{RepoId: "r1", Name: "Lint", Command: "make lint", Icon: v1.ActionIcon_ACTION_ICON_PLAY, InTerminal: true}},
+			want: &v1.CreateActionRequest{ProjectId: "r1", Name: "Lint", Command: "make lint", Icon: v1.ActionIcon_ACTION_ICON_PLAY, InTerminal: true}},
 		{name: "add in the background for new worktrees", cmd: "action.add", ctx: command.Context{ActiveThreadID: "s1"},
 			args: map[string]string{"name": "Setup", "command": "pnpm i", "icon": "configure", "in-terminal": "false", "on-worktree-create": "true"},
-			want: &v1.CreateActionRequest{RepoId: "r1", Name: "Setup", Command: "pnpm i", Icon: v1.ActionIcon_ACTION_ICON_CONFIGURE, OnWorktreeCreate: true}},
+			want: &v1.CreateActionRequest{ProjectId: "r1", Name: "Setup", Command: "pnpm i", Icon: v1.ActionIcon_ACTION_ICON_CONFIGURE, OnWorktreeCreate: true}},
 		{name: "add with an unknown icon", cmd: "action.add", args: map[string]string{"name": "X", "command": "x", "icon": "rocket", "here": actApp},
 			wantErr: command.ErrInvalidArgs},
 		{name: "edit by name in the working directory's project", cmd: "action.edit",

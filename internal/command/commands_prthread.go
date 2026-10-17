@@ -22,9 +22,9 @@ import (
 type PullRequestThreadDeps struct {
 	// Gh reads the pull request (GetPullRequestDetail).
 	Gh GhBackend
-	// Repo lists registered repositories (to find the clone of the slug and its
+	// Project lists registered projects (to find the clone of the slug and its
 	// worktrees) and creates the head branch's worktree for pr.fix.findings.
-	Repo RepoBackend
+	Project ProjectBackend
 	// Thread starts the thread (Create with an initial prompt).
 	Thread ThreadBackend
 	// GitOps fetches origin before pr.fix.findings creates a worktree.
@@ -77,9 +77,9 @@ func (h prHead) checkedOutIn(wt *v1.Worktree) bool {
 
 // clonesOf returns the registered repositories whose github_slug is slug
 // (case-insensitively), in order.
-func clonesOf(repos []*v1.Repo, slug string) []*v1.Repo {
-	var clones []*v1.Repo
-	for _, r := range repos {
+func clonesOf(projects []*v1.Project, slug string) []*v1.Project {
+	var clones []*v1.Project
+	for _, r := range projects {
 		if r.GetGithubSlug() != "" && strings.EqualFold(r.GetGithubSlug(), slug) {
 			clones = append(clones, r)
 		}
@@ -88,13 +88,13 @@ func clonesOf(repos []*v1.Repo, slug string) []*v1.Repo {
 }
 
 // headWorktree is the first worktree of clones that has h checked out, or nil.
-func headWorktree(clones []*v1.Repo, h prHead) *v1.Worktree {
+func headWorktree(clones []*v1.Project, h prHead) *v1.Worktree {
 	for _, r := range clones {
 		for _, wt := range r.GetWorktrees() {
 			if h.checkedOutIn(wt) {
-				if wt.GetRepoId() == "" {
+				if wt.GetProjectId() == "" {
 					wt = proto.CloneOf(wt)
-					wt.RepoId = r.GetId()
+					wt.ProjectId = r.GetId()
 				}
 				return wt
 			}
@@ -104,9 +104,9 @@ func headWorktree(clones []*v1.Repo, h prHead) *v1.Worktree {
 }
 
 // worktreeStatus is the status of the registered worktree at path, or nil.
-func worktreeStatus(repos []*v1.Repo, path string) *v1.GitStatus {
+func worktreeStatus(projects []*v1.Project, path string) *v1.GitStatus {
 	path = filepath.Clean(path)
-	for _, r := range repos {
+	for _, r := range projects {
 		for _, wt := range r.GetWorktrees() {
 			if filepath.Clean(wt.GetPath()) == path {
 				return wt.GetStatus()
@@ -118,44 +118,44 @@ func worktreeStatus(repos []*v1.Repo, path string) *v1.GitStatus {
 
 // prWorktreePick is where a pull request thread runs.
 type prWorktreePick struct {
-	// RepoID is the registered repository; empty for an explicit worktree, which the
+	// ProjectID is the registered project; empty for an explicit worktree, which the
 	// thread store resolves itself.
-	RepoID string
+	ProjectID string
 	// Path is the worktree; empty when Create.
 	Path string
-	// Create: create a worktree for the head branch in RepoID first.
+	// Create: create a worktree for the head branch in ProjectID first.
 	Create bool
-	// MainPath is RepoID's main worktree (Create fetches there).
+	// MainPath is ProjectID's main worktree (Create fetches there).
 	MainPath string
 }
 
 // pickPRWorktree chooses the worktree for a pull request thread. repos are the
-// registered repositories in RepoService.List order; the clones of slug are those
+// registered projects in ProjectService.List order; the clones of slug are those
 // whose github_slug matches it (case-insensitively). explicit is the worktree arg,
 // active the caller's active worktree. Errors are FailedPrecondition.
-func pickPRWorktree(kind prThreadKind, repos []*v1.Repo, slug string, number int, head prHead, explicit, active string) (prWorktreePick, error) {
+func pickPRWorktree(kind prThreadKind, projects []*v1.Project, slug string, number int, head prHead, explicit, active string) (prWorktreePick, error) {
 	if explicit != "" {
 		return prWorktreePick{Path: filepath.Clean(explicit)}, nil
 	}
-	clones := clonesOf(repos, slug)
+	clones := clonesOf(projects, slug)
 	if len(clones) == 0 {
 		return prWorktreePick{}, connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf(
-			"no registered repository is a clone of %s: add one with `code-foundry repo add <folder>`, or pass --worktree", slug))
+			"no registered project is a clone of %s: add one with `code-foundry project add <folder>`, or pass --worktree", slug))
 	}
 	if kind == prThreadRead && active != "" {
 		active = filepath.Clean(active)
 		for _, r := range clones {
 			for _, wt := range r.GetWorktrees() {
 				if filepath.Clean(wt.GetPath()) == active {
-					return prWorktreePick{RepoID: r.GetId(), Path: wt.GetPath()}, nil
+					return prWorktreePick{ProjectID: r.GetId(), Path: wt.GetPath()}, nil
 				}
 			}
 		}
 	}
 	if wt := headWorktree(clones, head); wt != nil {
-		return prWorktreePick{RepoID: wt.GetRepoId(), Path: wt.GetPath()}, nil
+		return prWorktreePick{ProjectID: wt.GetProjectId(), Path: wt.GetPath()}, nil
 	}
-	main := func(r *v1.Repo) string {
+	main := func(r *v1.Project) string {
 		for _, wt := range r.GetWorktrees() {
 			if wt.GetIsMain() {
 				return wt.GetPath()
@@ -164,7 +164,7 @@ func pickPRWorktree(kind prThreadKind, repos []*v1.Repo, slug string, number int
 		return r.GetPath()
 	}
 	if kind == prThreadRead {
-		return prWorktreePick{RepoID: clones[0].GetId(), Path: main(clones[0])}, nil
+		return prWorktreePick{ProjectID: clones[0].GetId(), Path: main(clones[0])}, nil
 	}
 	switch {
 	case head.Ref == "":
@@ -175,7 +175,7 @@ func pickPRWorktree(kind prThreadKind, repos []*v1.Repo, slug string, number int
 			"#%d comes from a fork and no worktree of %s has its head checked out: check it out (for example `gh pr checkout %d` in a worktree) and pass --worktree",
 			number, slug, number))
 	}
-	return prWorktreePick{RepoID: clones[0].GetId(), Create: true, MainPath: main(clones[0])}, nil
+	return prWorktreePick{ProjectID: clones[0].GetId(), Create: true, MainPath: main(clones[0])}, nil
 }
 
 // stepError prefixes a backend error with the step that failed, keeping its Connect
@@ -215,8 +215,8 @@ func RegisterPullRequestThreads(r *Registry, d PullRequestThreadDeps) error {
 	if d.Gh == nil {
 		d.Gh = codefoundryv1connect.UnimplementedGhServiceHandler{}
 	}
-	if d.Repo == nil {
-		d.Repo = codefoundryv1connect.UnimplementedRepoServiceHandler{}
+	if d.Project == nil {
+		d.Project = codefoundryv1connect.UnimplementedProjectServiceHandler{}
 	}
 	if d.Thread == nil {
 		d.Thread = codefoundryv1connect.UnimplementedThreadServiceHandler{}
@@ -256,31 +256,31 @@ func RegisterPullRequestThreads(r *Registry, d PullRequestThreadDeps) error {
 				"the prompt for #%d would be %d KiB, over the %d KiB a thread can start with", n, (len(p)+1023)>>10, MaxPRPromptBytes>>10))
 		}
 		explicit := a.Path("worktree")
-		var repos []*v1.Repo
+		var projects []*v1.Project
 		if explicit == "" || kind == prThreadFix {
-			list, err := d.Repo.List(ctx, connect.NewRequest(&v1.ListReposRequest{}))
+			list, err := d.Project.List(ctx, connect.NewRequest(&v1.ListProjectsRequest{}))
 			switch {
 			case err == nil:
-				repos = list.Msg.GetRepos()
+				projects = list.Msg.GetProjects()
 			case explicit == "":
-				return Result{}, wrapStep("list repositories", err)
+				return Result{}, wrapStep("list projects", err)
 			} // An explicit worktree only loses its status line in the prompt.
 		}
 		head := prHeadOf(pr)
-		pick, err := pickPRWorktree(kind, repos, s, n, head, explicit, uctx.ActiveWorktreePath)
+		pick, err := pickPRWorktree(kind, projects, s, n, head, explicit, uctx.ActiveWorktreePath)
 		if err != nil {
 			return Result{}, err
 		}
-		status := worktreeStatus(repos, pick.Path)
+		status := worktreeStatus(projects, pick.Path)
 		if pick.Create {
 			wt, err := createPRWorktree(ctx, d, pick, s, head)
 			if err != nil {
 				return Result{}, err
 			}
-			pick.RepoID, pick.Path, status = cmp.Or(wt.GetRepoId(), pick.RepoID), wt.GetPath(), wt.GetStatus()
+			pick.ProjectID, pick.Path, status = cmp.Or(wt.GetProjectId(), pick.ProjectID), wt.GetPath(), wt.GetStatus()
 		}
 		created, err := d.Thread.Create(ctx, connect.NewRequest(&v1.CreateThreadRequest{
-			RepoId: pick.RepoID, WorktreePath: pick.Path, Model: a.String("model"), Effort: a.String("effort"),
+			ProjectId: pick.ProjectID, WorktreePath: pick.Path, Model: a.String("model"), Effort: a.String("effort"),
 			InitialPrompt: prompt(detail, prCheckoutOf(status)),
 		}))
 		if err != nil {
@@ -355,15 +355,15 @@ func createPRWorktree(ctx context.Context, d PullRequestThreadDeps, pick prWorkt
 	if _, err := gitOpResult(fetched.Msg.GetOp()); err != nil {
 		return nil, wrapStep(step, err)
 	}
-	res, err := d.Repo.CreateWorktree(ctx, connect.NewRequest(&v1.CreateWorktreeRequest{
-		RepoId: pick.RepoID, Branch: head.Ref, BaseRef: "origin/" + head.Ref,
+	res, err := d.Project.CreateWorktree(ctx, connect.NewRequest(&v1.CreateWorktreeRequest{
+		ProjectId: pick.ProjectID, Branch: head.Ref, BaseRef: "origin/" + head.Ref,
 	}))
 	if err == nil {
 		return res.Msg.GetWorktree(), nil
 	}
 	if connect.CodeOf(err) == connect.CodeFailedPrecondition {
-		if list, lerr := d.Repo.List(ctx, connect.NewRequest(&v1.ListReposRequest{})); lerr == nil {
-			if wt := headWorktree(clonesOf(list.Msg.GetRepos(), slug), head); wt != nil {
+		if list, lerr := d.Project.List(ctx, connect.NewRequest(&v1.ListProjectsRequest{})); lerr == nil {
+			if wt := headWorktree(clonesOf(list.Msg.GetProjects(), slug), head); wt != nil {
 				return wt, nil
 			}
 		}

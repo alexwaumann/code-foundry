@@ -130,7 +130,7 @@ export async function saveAction(target: { repoId: string; actionId?: string }, 
 /** Delete in the editor: action.remove. Resolves to null, or the daemon's refusal. */
 export async function deleteAction(actionId: string, repoId: string): Promise<string | null> {
   const failed = { message: "Could not delete the action." };
-  const res = await runCommandForResult("action.remove", { action: actionId, repo: repoId }, {
+  const res = await runCommandForResult("action.remove", { action: actionId, project: repoId }, {
     ctx: repoContext(repoId),
     quiet: true,
     onError: (m) => {

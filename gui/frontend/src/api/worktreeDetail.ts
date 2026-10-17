@@ -1,5 +1,5 @@
 import { timestampMs } from "@bufbuild/protobuf/wkt";
-import { RepoService, type WorktreeDetail } from "@/gen/codefoundry/v1/repo_pb";
+import { ProjectService, type WorktreeDetail } from "@/gen/codefoundry/v1/project_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
 
 /** One changed path. `status` is a git letter (A M D R C T U) or "?" for untracked. */
@@ -23,7 +23,7 @@ export interface LogEntryView {
   authoredAtMs: number | null;
 }
 
-/** RepoService.GetWorktreeDetail: a worktree against its base. */
+/** ProjectService.GetWorktreeDetail: a worktree against its base. */
 export interface WorktreeDetailView {
   repoId: string;
   path: string;
@@ -40,7 +40,7 @@ export interface WorktreeDetailView {
 
 export function toWorktreeDetailView(d: WorktreeDetail): WorktreeDetailView {
   return {
-    repoId: d.repoId,
+    repoId: d.projectId,
     path: d.path,
     baseRef: d.baseRef,
     mergeBase: d.mergeBase,
@@ -71,8 +71,8 @@ export function toWorktreeDetailView(d: WorktreeDetail): WorktreeDetailView {
 }
 
 export async function getWorktreeDetail(repoId: string, path: string, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<WorktreeDetailView> {
-  const c = await conn.client(RepoService);
-  const r = await c.getWorktreeDetail({ repoId, path }, { signal });
+  const c = await conn.client(ProjectService);
+  const r = await c.getWorktreeDetail({ projectId: repoId, path }, { signal });
   if (!r.detail) throw new Error("GetWorktreeDetail returned no detail");
   return toWorktreeDetailView(r.detail);
 }

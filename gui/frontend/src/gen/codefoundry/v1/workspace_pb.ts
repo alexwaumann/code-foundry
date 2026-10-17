@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/workspace.proto.
  */
 export const file_codefoundry_v1_workspace: GenFile = /*@__PURE__*/
-  fileDesc("Ch5jb2RlZm91bmRyeS92MS93b3Jrc3BhY2UucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIpcBCglXb3Jrc3BhY2USCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRIOCgZicmFuY2gYAyABKAkSMAoHbWVtYmVycxgEIAMoCzIfLmNvZGVmb3VuZHJ5LnYxLldvcmtzcGFjZU1lbWJlchIuCgpjcmVhdGVkX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCI5Cg9Xb3Jrc3BhY2VNZW1iZXISDwoHcmVwb19pZBgBIAEoCRIVCg13b3JrdHJlZV9wYXRoGAIgASgJIoIBChNXb3Jrc3BhY2VNZW1iZXJJbmZvEg8KB3JlcG9faWQYASABKAkSEQoJcmVwb19uYW1lGAIgASgJEhUKDXdvcmt0cmVlX3BhdGgYAyABKAkSDgoGYnJhbmNoGAQgASgJEg8KB21pc3NpbmcYBSABKAgSDwoHY3VycmVudBgGIAEoCCI1ChNXb3Jrc3BhY2VNZW1iZXJTcGVjEgwKBHJlcG8YASABKAkSEAoIYmFzZV9yZWYYAiABKAkiFwoVTGlzdFdvcmtzcGFjZXNSZXF1ZXN0IkcKFkxpc3RXb3Jrc3BhY2VzUmVzcG9uc2USLQoKd29ya3NwYWNlcxgBIAMoCzIZLmNvZGVmb3VuZHJ5LnYxLldvcmtzcGFjZSKNAQoWQ3JlYXRlV29ya3NwYWNlUmVxdWVzdBIMCgRuYW1lGAEgASgJEg4KBmJyYW5jaBgCIAEoCRI0CgdtZW1iZXJzGAMgAygLMiMuY29kZWZvdW5kcnkudjEuV29ya3NwYWNlTWVtYmVyU3BlYxIQCghiYXNlX3JlZhgEIAEoCRINCgVmZXRjaBgFIAEoCCJHChdDcmVhdGVXb3Jrc3BhY2VSZXNwb25zZRIsCgl3b3Jrc3BhY2UYASABKAsyGS5jb2RlZm91bmRyeS52MS5Xb3Jrc3BhY2UiaAoXQWRkV29ya3NwYWNlUmVwb1JlcXVlc3QSEQoJd29ya3NwYWNlGAEgASgJEgsKA2N3ZBgCIAEoCRIMCgRyZXBvGAMgASgJEhAKCGJhc2VfcmVmGAQgASgJEg0KBWZldGNoGAUgASgIIkgKGEFkZFdvcmtzcGFjZVJlcG9SZXNwb25zZRIsCgl3b3Jrc3BhY2UYASABKAsyGS5jb2RlZm91bmRyeS52MS5Xb3Jrc3BhY2UicAoaUmVtb3ZlV29ya3NwYWNlUmVwb1JlcXVlc3QSEQoJd29ya3NwYWNlGAEgASgJEgsKA2N3ZBgCIAEoCRIMCgRyZXBvGAMgASgJEg0KBWZvcmNlGAQgASgIEhUKDWRlbGV0ZV9icmFuY2gYBSABKAgiSwobUmVtb3ZlV29ya3NwYWNlUmVwb1Jlc3BvbnNlEiwKCXdvcmtzcGFjZRgBIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLldvcmtzcGFjZSJRChZSZW1vdmVXb3Jrc3BhY2VSZXF1ZXN0EhEKCXdvcmtzcGFjZRgBIAEoCRINCgVmb3JjZRgCIAEoCBIVCg1kZWxldGVfYnJhbmNoGAMgASgIIhkKF1JlbW92ZVdvcmtzcGFjZVJlc3BvbnNlIjkKF1dvcmtzcGFjZU1lbWJlcnNSZXF1ZXN0EhEKCXdvcmtzcGFjZRgBIAEoCRILCgNjd2QYAiABKAkifgoYV29ya3NwYWNlTWVtYmVyc1Jlc3BvbnNlEiwKCXdvcmtzcGFjZRgBIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLldvcmtzcGFjZRI0CgdtZW1iZXJzGAIgAygLMiMuY29kZWZvdW5kcnkudjEuV29ya3NwYWNlTWVtYmVySW5mbyIYChZXYXRjaFdvcmtzcGFjZXNSZXF1ZXN0IpQBCg5Xb3Jrc3BhY2VFdmVudBI1CghzbmFwc2hvdBgBIAEoCzIhLmNvZGVmb3VuZHJ5LnYxLldvcmtzcGFjZVNuYXBzaG90SAASLAoHdXBkYXRlZBgCIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLldvcmtzcGFjZUgAEhQKCnJlbW92ZWRfaWQYAyABKAlIAEIHCgVldmVudCJCChFXb3Jrc3BhY2VTbmFwc2hvdBItCgp3b3Jrc3BhY2VzGAEgAygLMhkuY29kZWZvdW5kcnkudjEuV29ya3NwYWNlMqMFChBXb3Jrc3BhY2VTZXJ2aWNlElcKBExpc3QSJS5jb2RlZm91bmRyeS52MS5MaXN0V29ya3NwYWNlc1JlcXVlc3QaJi5jb2RlZm91bmRyeS52MS5MaXN0V29ya3NwYWNlc1Jlc3BvbnNlIgASWwoGQ3JlYXRlEiYuY29kZWZvdW5kcnkudjEuQ3JlYXRlV29ya3NwYWNlUmVxdWVzdBonLmNvZGVmb3VuZHJ5LnYxLkNyZWF0ZVdvcmtzcGFjZVJlc3BvbnNlIgASXgoHQWRkUmVwbxInLmNvZGVmb3VuZHJ5LnYxLkFkZFdvcmtzcGFjZVJlcG9SZXF1ZXN0GiguY29kZWZvdW5kcnkudjEuQWRkV29ya3NwYWNlUmVwb1Jlc3BvbnNlIgASZwoKUmVtb3ZlUmVwbxIqLmNvZGVmb3VuZHJ5LnYxLlJlbW92ZVdvcmtzcGFjZVJlcG9SZXF1ZXN0GisuY29kZWZvdW5kcnkudjEuUmVtb3ZlV29ya3NwYWNlUmVwb1Jlc3BvbnNlIgASWwoGUmVtb3ZlEiYuY29kZWZvdW5kcnkudjEuUmVtb3ZlV29ya3NwYWNlUmVxdWVzdBonLmNvZGVmb3VuZHJ5LnYxLlJlbW92ZVdvcmtzcGFjZVJlc3BvbnNlIgASXgoHTWVtYmVycxInLmNvZGVmb3VuZHJ5LnYxLldvcmtzcGFjZU1lbWJlcnNSZXF1ZXN0GiguY29kZWZvdW5kcnkudjEuV29ya3NwYWNlTWVtYmVyc1Jlc3BvbnNlIgASUwoFV2F0Y2gSJi5jb2RlZm91bmRyeS52MS5XYXRjaFdvcmtzcGFjZXNSZXF1ZXN0Gh4uY29kZWZvdW5kcnkudjEuV29ya3NwYWNlRXZlbnQiADABQsYBChJjb20uY29kZWZvdW5kcnkudjFCDldvcmtzcGFjZVByb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM", [file_google_protobuf_timestamp]);
+  fileDesc("Ch5jb2RlZm91bmRyeS92MS93b3Jrc3BhY2UucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIpcBCglXb3Jrc3BhY2USCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRIOCgZicmFuY2gYAyABKAkSMAoHbWVtYmVycxgEIAMoCzIfLmNvZGVmb3VuZHJ5LnYxLldvcmtzcGFjZU1lbWJlchIuCgpjcmVhdGVkX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCI8Cg9Xb3Jrc3BhY2VNZW1iZXISEgoKcHJvamVjdF9pZBgBIAEoCRIVCg13b3JrdHJlZV9wYXRoGAIgASgJIogBChNXb3Jrc3BhY2VNZW1iZXJJbmZvEhIKCnByb2plY3RfaWQYASABKAkSFAoMcHJvamVjdF9uYW1lGAIgASgJEhUKDXdvcmt0cmVlX3BhdGgYAyABKAkSDgoGYnJhbmNoGAQgASgJEg8KB21pc3NpbmcYBSABKAgSDwoHY3VycmVudBgGIAEoCCI4ChNXb3Jrc3BhY2VNZW1iZXJTcGVjEg8KB3Byb2plY3QYASABKAkSEAoIYmFzZV9yZWYYAiABKAkiFwoVTGlzdFdvcmtzcGFjZXNSZXF1ZXN0IkcKFkxpc3RXb3Jrc3BhY2VzUmVzcG9uc2USLQoKd29ya3NwYWNlcxgBIAMoCzIZLmNvZGVmb3VuZHJ5LnYxLldvcmtzcGFjZSKNAQoWQ3JlYXRlV29ya3NwYWNlUmVxdWVzdBIMCgRuYW1lGAEgASgJEg4KBmJyYW5jaBgCIAEoCRI0CgdtZW1iZXJzGAMgAygLMiMuY29kZWZvdW5kcnkudjEuV29ya3NwYWNlTWVtYmVyU3BlYxIQCghiYXNlX3JlZhgEIAEoCRINCgVmZXRjaBgFIAEoCCJHChdDcmVhdGVXb3Jrc3BhY2VSZXNwb25zZRIsCgl3b3Jrc3BhY2UYASABKAsyGS5jb2RlZm91bmRyeS52MS5Xb3Jrc3BhY2UibgoaQWRkV29ya3NwYWNlUHJvamVjdFJlcXVlc3QSEQoJd29ya3NwYWNlGAEgASgJEgsKA2N3ZBgCIAEoCRIPCgdwcm9qZWN0GAMgASgJEhAKCGJhc2VfcmVmGAQgASgJEg0KBWZldGNoGAUgASgIIksKG0FkZFdvcmtzcGFjZVByb2plY3RSZXNwb25zZRIsCgl3b3Jrc3BhY2UYASABKAsyGS5jb2RlZm91bmRyeS52MS5Xb3Jrc3BhY2UidgodUmVtb3ZlV29ya3NwYWNlUHJvamVjdFJlcXVlc3QSEQoJd29ya3NwYWNlGAEgASgJEgsKA2N3ZBgCIAEoCRIPCgdwcm9qZWN0GAMgASgJEg0KBWZvcmNlGAQgASgIEhUKDWRlbGV0ZV9icmFuY2gYBSABKAgiTgoeUmVtb3ZlV29ya3NwYWNlUHJvamVjdFJlc3BvbnNlEiwKCXdvcmtzcGFjZRgBIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLldvcmtzcGFjZSJRChZSZW1vdmVXb3Jrc3BhY2VSZXF1ZXN0EhEKCXdvcmtzcGFjZRgBIAEoCRINCgVmb3JjZRgCIAEoCBIVCg1kZWxldGVfYnJhbmNoGAMgASgIIhkKF1JlbW92ZVdvcmtzcGFjZVJlc3BvbnNlIjkKF1dvcmtzcGFjZU1lbWJlcnNSZXF1ZXN0EhEKCXdvcmtzcGFjZRgBIAEoCRILCgNjd2QYAiABKAkifgoYV29ya3NwYWNlTWVtYmVyc1Jlc3BvbnNlEiwKCXdvcmtzcGFjZRgBIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLldvcmtzcGFjZRI0CgdtZW1iZXJzGAIgAygLMiMuY29kZWZvdW5kcnkudjEuV29ya3NwYWNlTWVtYmVySW5mbyIYChZXYXRjaFdvcmtzcGFjZXNSZXF1ZXN0IpQBCg5Xb3Jrc3BhY2VFdmVudBI1CghzbmFwc2hvdBgBIAEoCzIhLmNvZGVmb3VuZHJ5LnYxLldvcmtzcGFjZVNuYXBzaG90SAASLAoHdXBkYXRlZBgCIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLldvcmtzcGFjZUgAEhQKCnJlbW92ZWRfaWQYAyABKAlIAEIHCgVldmVudCJCChFXb3Jrc3BhY2VTbmFwc2hvdBItCgp3b3Jrc3BhY2VzGAEgAygLMhkuY29kZWZvdW5kcnkudjEuV29ya3NwYWNlMrUFChBXb3Jrc3BhY2VTZXJ2aWNlElcKBExpc3QSJS5jb2RlZm91bmRyeS52MS5MaXN0V29ya3NwYWNlc1JlcXVlc3QaJi5jb2RlZm91bmRyeS52MS5MaXN0V29ya3NwYWNlc1Jlc3BvbnNlIgASWwoGQ3JlYXRlEiYuY29kZWZvdW5kcnkudjEuQ3JlYXRlV29ya3NwYWNlUmVxdWVzdBonLmNvZGVmb3VuZHJ5LnYxLkNyZWF0ZVdvcmtzcGFjZVJlc3BvbnNlIgASZwoKQWRkUHJvamVjdBIqLmNvZGVmb3VuZHJ5LnYxLkFkZFdvcmtzcGFjZVByb2plY3RSZXF1ZXN0GisuY29kZWZvdW5kcnkudjEuQWRkV29ya3NwYWNlUHJvamVjdFJlc3BvbnNlIgAScAoNUmVtb3ZlUHJvamVjdBItLmNvZGVmb3VuZHJ5LnYxLlJlbW92ZVdvcmtzcGFjZVByb2plY3RSZXF1ZXN0Gi4uY29kZWZvdW5kcnkudjEuUmVtb3ZlV29ya3NwYWNlUHJvamVjdFJlc3BvbnNlIgASWwoGUmVtb3ZlEiYuY29kZWZvdW5kcnkudjEuUmVtb3ZlV29ya3NwYWNlUmVxdWVzdBonLmNvZGVmb3VuZHJ5LnYxLlJlbW92ZVdvcmtzcGFjZVJlc3BvbnNlIgASXgoHTWVtYmVycxInLmNvZGVmb3VuZHJ5LnYxLldvcmtzcGFjZU1lbWJlcnNSZXF1ZXN0GiguY29kZWZvdW5kcnkudjEuV29ya3NwYWNlTWVtYmVyc1Jlc3BvbnNlIgASUwoFV2F0Y2gSJi5jb2RlZm91bmRyeS52MS5XYXRjaFdvcmtzcGFjZXNSZXF1ZXN0Gh4uY29kZWZvdW5kcnkudjEuV29ya3NwYWNlRXZlbnQiADABQsYBChJjb20uY29kZWZvdW5kcnkudjFCDldvcmtzcGFjZVByb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM", [file_google_protobuf_timestamp]);
 
 /**
  * @generated from message codefoundry.v1.Workspace
@@ -64,9 +64,9 @@ export const WorkspaceSchema: GenMessage<Workspace> = /*@__PURE__*/
  */
 export type WorkspaceMember = Message<"codefoundry.v1.WorkspaceMember"> & {
   /**
-   * @generated from field: string repo_id = 1;
+   * @generated from field: string project_id = 1;
    */
-  repoId: string;
+  projectId: string;
 
   /**
    * @generated from field: string worktree_path = 2;
@@ -82,22 +82,22 @@ export const WorkspaceMemberSchema: GenMessage<WorkspaceMember> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_workspace, 1);
 
 /**
- * MemberInfo is a member joined with the repository store's current state.
+ * MemberInfo is a member joined with the project store's current state.
  *
  * @generated from message codefoundry.v1.WorkspaceMemberInfo
  */
 export type WorkspaceMemberInfo = Message<"codefoundry.v1.WorkspaceMemberInfo"> & {
   /**
-   * @generated from field: string repo_id = 1;
+   * @generated from field: string project_id = 1;
    */
-  repoId: string;
+  projectId: string;
 
   /**
-   * Empty when the repository is no longer registered.
+   * Empty when the project is no longer registered.
    *
-   * @generated from field: string repo_name = 2;
+   * @generated from field: string project_name = 2;
    */
-  repoName: string;
+  projectName: string;
 
   /**
    * @generated from field: string worktree_path = 3;
@@ -112,8 +112,8 @@ export type WorkspaceMemberInfo = Message<"codefoundry.v1.WorkspaceMemberInfo"> 
   branch: string;
 
   /**
-   * The worktree is not among the repository's worktrees (deleted by hand, or the
-   * repository is unregistered or not reconciled yet).
+   * The worktree is not among the project's worktrees (deleted by hand, or the
+   * project is unregistered or not reconciled yet).
    *
    * @generated from field: bool missing = 5;
    */
@@ -135,17 +135,17 @@ export const WorkspaceMemberInfoSchema: GenMessage<WorkspaceMemberInfo> = /*@__P
   messageDesc(file_codefoundry_v1_workspace, 2);
 
 /**
- * WorkspaceMemberSpec names a repository to add and the ref its branch starts from.
+ * WorkspaceMemberSpec names a project to add and the ref its branch starts from.
  *
  * @generated from message codefoundry.v1.WorkspaceMemberSpec
  */
 export type WorkspaceMemberSpec = Message<"codefoundry.v1.WorkspaceMemberSpec"> & {
   /**
-   * Repository id, name (when unique), or a path inside it.
+   * Project id, name (when unique), or a path inside it.
    *
-   * @generated from field: string repo = 1;
+   * @generated from field: string project = 1;
    */
-  repo: string;
+  project: string;
 
   /**
    * Ref to branch from when the branch does not exist yet. Empty: the request's
@@ -254,9 +254,9 @@ export const CreateWorkspaceResponseSchema: GenMessage<CreateWorkspaceResponse> 
   messageDesc(file_codefoundry_v1_workspace, 7);
 
 /**
- * @generated from message codefoundry.v1.AddWorkspaceRepoRequest
+ * @generated from message codefoundry.v1.AddWorkspaceProjectRequest
  */
-export type AddWorkspaceRepoRequest = Message<"codefoundry.v1.AddWorkspaceRepoRequest"> & {
+export type AddWorkspaceProjectRequest = Message<"codefoundry.v1.AddWorkspaceProjectRequest"> & {
   /**
    * Workspace id or name. Empty: the workspace whose member contains cwd.
    *
@@ -270,11 +270,11 @@ export type AddWorkspaceRepoRequest = Message<"codefoundry.v1.AddWorkspaceRepoRe
   cwd: string;
 
   /**
-   * Repository id, name (when unique), or a path inside it.
+   * Project id, name (when unique), or a path inside it.
    *
-   * @generated from field: string repo = 3;
+   * @generated from field: string project = 3;
    */
-  repo: string;
+  project: string;
 
   /**
    * @generated from field: string base_ref = 4;
@@ -288,16 +288,16 @@ export type AddWorkspaceRepoRequest = Message<"codefoundry.v1.AddWorkspaceRepoRe
 };
 
 /**
- * Describes the message codefoundry.v1.AddWorkspaceRepoRequest.
- * Use `create(AddWorkspaceRepoRequestSchema)` to create a new message.
+ * Describes the message codefoundry.v1.AddWorkspaceProjectRequest.
+ * Use `create(AddWorkspaceProjectRequestSchema)` to create a new message.
  */
-export const AddWorkspaceRepoRequestSchema: GenMessage<AddWorkspaceRepoRequest> = /*@__PURE__*/
+export const AddWorkspaceProjectRequestSchema: GenMessage<AddWorkspaceProjectRequest> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_workspace, 8);
 
 /**
- * @generated from message codefoundry.v1.AddWorkspaceRepoResponse
+ * @generated from message codefoundry.v1.AddWorkspaceProjectResponse
  */
-export type AddWorkspaceRepoResponse = Message<"codefoundry.v1.AddWorkspaceRepoResponse"> & {
+export type AddWorkspaceProjectResponse = Message<"codefoundry.v1.AddWorkspaceProjectResponse"> & {
   /**
    * @generated from field: codefoundry.v1.Workspace workspace = 1;
    */
@@ -305,16 +305,16 @@ export type AddWorkspaceRepoResponse = Message<"codefoundry.v1.AddWorkspaceRepoR
 };
 
 /**
- * Describes the message codefoundry.v1.AddWorkspaceRepoResponse.
- * Use `create(AddWorkspaceRepoResponseSchema)` to create a new message.
+ * Describes the message codefoundry.v1.AddWorkspaceProjectResponse.
+ * Use `create(AddWorkspaceProjectResponseSchema)` to create a new message.
  */
-export const AddWorkspaceRepoResponseSchema: GenMessage<AddWorkspaceRepoResponse> = /*@__PURE__*/
+export const AddWorkspaceProjectResponseSchema: GenMessage<AddWorkspaceProjectResponse> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_workspace, 9);
 
 /**
- * @generated from message codefoundry.v1.RemoveWorkspaceRepoRequest
+ * @generated from message codefoundry.v1.RemoveWorkspaceProjectRequest
  */
-export type RemoveWorkspaceRepoRequest = Message<"codefoundry.v1.RemoveWorkspaceRepoRequest"> & {
+export type RemoveWorkspaceProjectRequest = Message<"codefoundry.v1.RemoveWorkspaceProjectRequest"> & {
   /**
    * Workspace id or name. Empty: the workspace whose member contains cwd.
    *
@@ -328,11 +328,11 @@ export type RemoveWorkspaceRepoRequest = Message<"codefoundry.v1.RemoveWorkspace
   cwd: string;
 
   /**
-   * Repository id, name, or a path inside it (or the member worktree path).
+   * Project id, name, or a path inside it (or the member worktree path).
    *
-   * @generated from field: string repo = 3;
+   * @generated from field: string project = 3;
    */
-  repo: string;
+  project: string;
 
   /**
    * Remove the worktree even with uncommitted changes.
@@ -350,16 +350,16 @@ export type RemoveWorkspaceRepoRequest = Message<"codefoundry.v1.RemoveWorkspace
 };
 
 /**
- * Describes the message codefoundry.v1.RemoveWorkspaceRepoRequest.
- * Use `create(RemoveWorkspaceRepoRequestSchema)` to create a new message.
+ * Describes the message codefoundry.v1.RemoveWorkspaceProjectRequest.
+ * Use `create(RemoveWorkspaceProjectRequestSchema)` to create a new message.
  */
-export const RemoveWorkspaceRepoRequestSchema: GenMessage<RemoveWorkspaceRepoRequest> = /*@__PURE__*/
+export const RemoveWorkspaceProjectRequestSchema: GenMessage<RemoveWorkspaceProjectRequest> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_workspace, 10);
 
 /**
- * @generated from message codefoundry.v1.RemoveWorkspaceRepoResponse
+ * @generated from message codefoundry.v1.RemoveWorkspaceProjectResponse
  */
-export type RemoveWorkspaceRepoResponse = Message<"codefoundry.v1.RemoveWorkspaceRepoResponse"> & {
+export type RemoveWorkspaceProjectResponse = Message<"codefoundry.v1.RemoveWorkspaceProjectResponse"> & {
   /**
    * @generated from field: codefoundry.v1.Workspace workspace = 1;
    */
@@ -367,10 +367,10 @@ export type RemoveWorkspaceRepoResponse = Message<"codefoundry.v1.RemoveWorkspac
 };
 
 /**
- * Describes the message codefoundry.v1.RemoveWorkspaceRepoResponse.
- * Use `create(RemoveWorkspaceRepoResponseSchema)` to create a new message.
+ * Describes the message codefoundry.v1.RemoveWorkspaceProjectResponse.
+ * Use `create(RemoveWorkspaceProjectResponseSchema)` to create a new message.
  */
-export const RemoveWorkspaceRepoResponseSchema: GenMessage<RemoveWorkspaceRepoResponse> = /*@__PURE__*/
+export const RemoveWorkspaceProjectResponseSchema: GenMessage<RemoveWorkspaceProjectResponse> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_workspace, 11);
 
 /**
@@ -530,7 +530,7 @@ export const WorkspaceSnapshotSchema: GenMessage<WorkspaceSnapshot> = /*@__PURE_
 
 /**
  * WorkspaceService manages workspaces: one branch checked out as a worktree in each of
- * several repositories (a branch set), for changes that span repositories. See
+ * several projects (a branch set), for changes that span projects. See
  * docs/notes/workspaces-handoff.md and docs/notes/workspaces-1-store.md.
  *
  * @generated from service codefoundry.v1.WorkspaceService
@@ -547,7 +547,7 @@ export const WorkspaceService: GenService<{
     output: typeof ListWorkspacesResponseSchema;
   },
   /**
-   * Create makes a workspace and one worktree per member repository on its branch
+   * Create makes a workspace and one worktree per member project on its branch
    * (fetching each base first). All or nothing: on failure, worktrees it made are
    * removed again.
    *
@@ -559,28 +559,28 @@ export const WorkspaceService: GenService<{
     output: typeof CreateWorkspaceResponseSchema;
   },
   /**
-   * AddRepo creates a worktree on the workspace branch in another repository.
+   * AddProject creates a worktree on the workspace branch in another project.
    *
-   * @generated from rpc codefoundry.v1.WorkspaceService.AddRepo
+   * @generated from rpc codefoundry.v1.WorkspaceService.AddProject
    */
-  addRepo: {
+  addProject: {
     methodKind: "unary";
-    input: typeof AddWorkspaceRepoRequestSchema;
-    output: typeof AddWorkspaceRepoResponseSchema;
+    input: typeof AddWorkspaceProjectRequestSchema;
+    output: typeof AddWorkspaceProjectResponseSchema;
   },
   /**
-   * RemoveRepo removes a member's worktree (refused while a live thread runs in it, or
+   * RemoveProject removes a member's worktree (refused while a live thread runs in it, or
    * when it has uncommitted changes and force is not set) and drops the member.
    *
-   * @generated from rpc codefoundry.v1.WorkspaceService.RemoveRepo
+   * @generated from rpc codefoundry.v1.WorkspaceService.RemoveProject
    */
-  removeRepo: {
+  removeProject: {
     methodKind: "unary";
-    input: typeof RemoveWorkspaceRepoRequestSchema;
-    output: typeof RemoveWorkspaceRepoResponseSchema;
+    input: typeof RemoveWorkspaceProjectRequestSchema;
+    output: typeof RemoveWorkspaceProjectResponseSchema;
   },
   /**
-   * Remove removes every member worktree (same guards as RemoveRepo) and forgets the
+   * Remove removes every member worktree (same guards as RemoveProject) and forgets the
    * workspace.
    *
    * @generated from rpc codefoundry.v1.WorkspaceService.Remove
@@ -592,7 +592,7 @@ export const WorkspaceService: GenService<{
   },
   /**
    * Members resolves a workspace by id, name, or a path inside one of its member
-   * worktrees, and lists its members with repository names and checked-out branches.
+   * worktrees, and lists its members with project names and checked-out branches.
    *
    * @generated from rpc codefoundry.v1.WorkspaceService.Members
    */

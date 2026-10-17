@@ -15,7 +15,7 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-const project = (page: Page, repoId: string) => page.locator(`[data-testid="project"][data-repo="${repoId}"]`);
+const project = (page: Page, projectId: string) => page.locator(`[data-testid="project"][data-repo="${projectId}"]`);
 const navKeys = (page: Page) => page.getByTestId("projects-list").locator("[data-nav-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-nav-key")));
 
 test("each project's header says what kind it is", async ({ page }) => {
@@ -132,7 +132,7 @@ test("the filter: / focuses it, it hides what does not match, shows collapsed ma
   await expect(page.getByTestId("projects-counts")).toHaveText("5 projects · 1 workspace");
 });
 
-const wtRow = (page: Page, repoId: string, path: string) => page.locator(`[data-nav-key="pw:${repoId}::${path}"]`);
+const wtRow = (page: Page, projectId: string, path: string) => page.locator(`[data-nav-key="pw:${projectId}::${path}"]`);
 const FEAT = `${CF}.worktrees/feat-sidebar`;
 const FIX = `${CF}.worktrees/fix-resize`;
 const opacity = (testId: string, within: Locator) => within.getByTestId(testId).evaluate((el) => getComputedStyle(el).opacity);
@@ -281,11 +281,11 @@ test("Publish to GitHub only on the remoteless project, Initialize git only on t
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("publish-dialog")).toHaveCount(0);
 
-  // Initialize git runs repo.git.init on that project; it then is a git project without a remote.
+  // Initialize git runs project.git.init on that project; it then is a git project without a remote.
   await project(page, "repo-wr").getByTestId("project-init-git").click();
-  const init = await lastInvocation("repo.git.init");
-  expect(init?.args).toEqual({ repo: "repo-wr" });
-  expect(init?.context).toMatchObject({ activeRepoId: "repo-wr", activeView: "projects" });
+  const init = await lastInvocation("project.git.init");
+  expect(init?.args).toEqual({ project: "repo-wr" });
+  expect(init?.context).toMatchObject({ activeProjectId: "repo-wr", activeView: "projects" });
   await expect(project(page, "repo-wr")).toHaveAttribute("data-kind", "git");
   await expect(project(page, "repo-wr").getByTestId("project-init-git")).toHaveCount(0);
   await expect(project(page, "repo-wr").getByTestId("project-publish")).toHaveCount(1);
@@ -306,22 +306,22 @@ test("freshness shows on git projects; Refresh fetches (with a remote) then refr
   await expect(refresh).toBeEnabled();
   const fetch = await lastInvocation("git.fetch");
   expect(fetch?.args).toEqual({ worktree: CF });
-  expect(fetch?.context).toMatchObject({ activeRepoId: "repo-cf", activeWorktreePath: CF });
-  expect((await lastInvocation("repo.refresh"))?.args).toEqual({ repo: "repo-cf" });
-  const names = (await invocations()).map((i) => i.name).filter((n) => n === "git.fetch" || n === "repo.refresh");
-  expect(names).toEqual(["git.fetch", "repo.refresh"]);
+  expect(fetch?.context).toMatchObject({ activeProjectId: "repo-cf", activeWorktreePath: CF });
+  expect((await lastInvocation("project.refresh"))?.args).toEqual({ project: "repo-cf" });
+  const names = (await invocations()).map((i) => i.name).filter((n) => n === "git.fetch" || n === "project.refresh");
+  expect(names).toEqual(["git.fetch", "project.refresh"]);
   await expect(page.getByText("fetched 2 updated refs")).toBeVisible();
 
-  // Without a remote there is nothing to fetch: only repo.refresh.
+  // Without a remote there is nothing to fetch: only project.refresh.
   await project(page, "repo-sk").getByTestId("project-refresh").click();
-  await expect.poll(async () => (await invocations()).filter((i) => i.name === "repo.refresh").length).toBe(2);
+  await expect.poll(async () => (await invocations()).filter((i) => i.name === "project.refresh").length).toBe(2);
   expect((await invocations()).filter((i) => i.name === "git.fetch")).toHaveLength(1);
 
   // A failed fetch shows the gitops failure toast; the refresh still runs.
   await mockPost("gitops?fail=git.fetch");
   await project(page, "repo-dot").getByTestId("project-refresh").click();
   await expect(page.getByText(/Fetch .* failed/)).toBeVisible();
-  await expect.poll(async () => (await invocations()).filter((i) => i.name === "repo.refresh").length).toBe(3);
+  await expect.poll(async () => (await invocations()).filter((i) => i.name === "project.refresh").length).toBe(3);
 });
 
 test("New worktree… asks for the branch in the palette, in that project", async ({ page }) => {
@@ -336,9 +336,9 @@ test("New worktree… asks for the branch in the palette, in that project", asyn
   await page.keyboard.type("exp/x");
   await page.keyboard.press("Enter");
   await expect(palette).toHaveCount(0);
-  const inv = await lastInvocation("repo.worktree.new");
+  const inv = await lastInvocation("project.worktree.new");
   expect(inv?.args).toEqual({ branch: "exp/x" });
-  expect(inv?.context).toMatchObject({ activeRepoId: "repo-sk", activeView: "projects" });
+  expect(inv?.context).toMatchObject({ activeProjectId: "repo-sk", activeView: "projects" });
   await expect(project(page, "repo-sk").getByTestId("worktree-branch")).toHaveText(["main", "exp/x"]);
 });
 
@@ -372,9 +372,9 @@ test("a merged, clean worktree shows 'in main' and a broom that removes it after
   await dialog.getByTestId("confirm-ok").click();
   await expect(row).toHaveCount(0);
   await expect(page.getByText("Removed 1 worktree: cf/usage-polish")).toBeVisible();
-  const inv = await lastInvocation("repo.worktree.cleanup");
-  expect(inv?.args).toEqual({ repo: "repo-cf", path: MERGED });
-  expect(inv?.context).toMatchObject({ activeRepoId: "repo-cf", activeWorktreePath: MERGED });
+  const inv = await lastInvocation("project.worktree.cleanup");
+  expect(inv?.args).toEqual({ project: "repo-cf", path: MERGED });
+  expect(inv?.context).toMatchObject({ activeProjectId: "repo-cf", activeWorktreePath: MERGED });
   await expect(page.getByTestId("worktree-cleanup")).toHaveCount(0);
 });
 
@@ -408,7 +408,7 @@ test("the project menu counts merged worktrees, cleans them all up, and is disab
   await dialog.getByTestId("confirm-ok").click();
   await expect(page.getByTestId("worktree-cleanable")).toHaveCount(0);
   await expect(page.getByText(/^Removed 2 worktrees: cf\/usage-polish, cf\/old-docs; kept 3 worktrees: .*t3code\/elsewhere \(not a Code Foundry worktree\)/)).toBeVisible();
-  expect((await lastInvocation("repo.worktree.cleanup"))?.args).toEqual({ repo: "repo-cf" });
+  expect((await lastInvocation("project.worktree.cleanup"))?.args).toEqual({ project: "repo-cf" });
   await expect(project(page, "repo-cf").getByTestId("worktree-branch")).toHaveText(["main", "feat/sidebar", "fix/resize", "t3code/elsewhere"]);
 
   await project(page, "repo-cf").getByTestId("project-more").click();

@@ -1,5 +1,5 @@
 /**
- * RepoService.SearchGitHub, LookupGitHub and Clone over a fixed set of GitHub
+ * ProjectService.SearchGitHub, LookupGitHub and Clone over a fixed set of GitHub
  * repositories (the Add Project dialog's GitHub tab).
  *
  * - Search matches owner/name and description, case-insensitively, at most 20.
@@ -11,12 +11,12 @@
  */
 import { Code, ConnectError } from "@connectrpc/connect";
 import type { MessageInitShape } from "@bufbuild/protobuf";
-import { RepositoryVisibility, type CloneRepoEventSchema, type GitHubRepositorySchema } from "../src/gen/codefoundry/v1/repo_pb";
+import { RepositoryVisibility, type CloneProjectEventSchema, type GitHubRepositorySchema } from "../src/gen/codefoundry/v1/project_pb";
 import { HOME } from "./filesystem";
 import type { World } from "./world";
 
 type GitHubRepoInit = MessageInitShape<typeof GitHubRepositorySchema>;
-type CloneEventInit = MessageInitShape<typeof CloneRepoEventSchema>;
+type CloneEventInit = MessageInitShape<typeof CloneProjectEventSchema>;
 
 export const PROJECTS = `${HOME}/.code-foundry/projects`;
 
@@ -50,7 +50,7 @@ const existing = new Set<string>();
 /** Every SearchGitHub, LookupGitHub and Clone call ("search <q>", ...), for tests. */
 export const githubCalls: string[] = [];
 
-/** Whether a clone destination exists on the mock's disk (RepoService.Register adds it as git). */
+/** Whether a clone destination exists on the mock's disk (ProjectService.Register adds it as git). */
 export function cloneExists(path: string): boolean {
   return existing.has(path.toLowerCase());
 }
@@ -139,5 +139,5 @@ export async function* cloneRepo(world: World, owner: string, name: string, sign
     yield ev;
   }
   existing.add(dest.toLowerCase());
-  yield { event: { case: "repo", value: world.repoMsg(world.addClone(f.owner, f.name, dest)) } };
+  yield { event: { case: "project", value: world.repoMsg(world.addClone(f.owner, f.name, dest)) } };
 }

@@ -89,7 +89,7 @@ func TestCLIConfirm(t *testing.T) {
 		// Confirmed, the command runs and reaches the store, which has no terminal t1.
 		{"prompt answered yes", []string{"terminal", "kill", "--id", "t1"}, "y\n", true, errUsage, "terminal not found: t1"},
 		{"--yes skips the prompt", []string{"terminal", "kill", "--id", "t1", "--yes"}, "", true, errUsage, "terminal not found: t1"},
-		{"worktree remove asks", []string{"repo", "worktree", "remove", "--repo", "r1", "--path", "/wt/x"}, "", false, errUsage,
+		{"worktree remove asks", []string{"project", "worktree", "remove", "--project", "r1", "--path", "/wt/x"}, "", false, errUsage,
 			"Remove worktree /wt/x? This deletes files on disk."},
 		{"--yes on a command without confirmation is unknown", []string{"settings", "path", "--yes"}, "", false, errUsage, "flag provided but not defined: -yes"},
 	}

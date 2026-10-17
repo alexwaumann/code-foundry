@@ -7,9 +7,9 @@ import (
 	"testing"
 )
 
-// The commands fixture is a real run (Claude Code 2.1.296, haiku, a scratch repo): the
+// The commands fixture is a real run (Claude Code 2.1.296, haiku, a scratch project): the
 // initialize reply (trimmed to its commands and process fields), then two
-// system/commands_changed pushes: a skill written to the repo's .claude/skills while
+// system/commands_changed pushes: a skill written to the project's .claude/skills while
 // idle (Claude watches the directory), and a skill in sub/.claude/skills discovered
 // when the agent read a file under sub/ during a turn.
 func TestCommandsFixture(t *testing.T) {

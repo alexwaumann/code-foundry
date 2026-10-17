@@ -17,7 +17,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/clone"
 	"github.com/alexwaumann/code-foundry/internal/store/clone/clonetest"
 	"github.com/alexwaumann/code-foundry/internal/store/gh/ghtest"
-	"github.com/alexwaumann/code-foundry/internal/store/repo/repotest"
+	"github.com/alexwaumann/code-foundry/internal/store/project/projecttest"
 )
 
 func TestPresentClone(t *testing.T) {
@@ -27,14 +27,14 @@ func TestPresentClone(t *testing.T) {
 		{Line: "Receiving objects: 100%, done."}}
 	cloner.Take("octo/taken")
 	cloner.Fail("octo/broken", fmt.Errorf("%w: fatal: early EOF", clone.ErrFailed))
-	route := api.NewRepo(repotest.New(b), b).WithGitHub(ghtest.New(b), cloner).Route()
+	route := api.NewProject(projecttest.New(b), b).WithGitHub(ghtest.New(b), cloner).Route()
 	mux := http.NewServeMux()
 	mux.Handle(route.Path, route.Handler)
 	srv := httptest.NewUnstartedServer(mux)
 	srv.EnableHTTP2 = true
 	srv.StartTLS()
 	t.Cleanup(srv.Close)
-	c := &client.Client{Repo: codefoundryv1connect.NewRepoServiceClient(srv.Client(), srv.URL)}
+	c := &client.Client{Project: codefoundryv1connect.NewProjectServiceClient(srv.Client(), srv.URL)}
 
 	tests := []struct {
 		name       string

@@ -73,8 +73,8 @@ message GitOp {
   string title = 4;
   // The worktree the operation runs in. Empty for open_url.
   string worktree_path = 5;
-  // The registered repository containing worktree_path, or empty.
-  string repo_id = 6;
+  // The registered project containing worktree_path, or empty.
+  string project_id = 6;
   // Branch when the operation was requested, if known.
   string branch = 7;
   google.protobuf.Timestamp queued_at = 8;

@@ -38,7 +38,7 @@ function term(id: string, labels: Record<string, string>, extra: Partial<Termina
   return { id, argv: ["/bin/zsh"], cwd: "/src/app", cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: null, exitedAtMs: null, altScreen: false, labels, ...extra };
 }
 
-const shell = (thread: string, worktree = "/src/app") => ({ kind: "shell", repo: "r", worktree, ...(thread ? { thread } : {}) });
+const shell = (thread: string, worktree = "/src/app") => ({ kind: "shell", project: "r", worktree, ...(thread ? { thread } : {}) });
 
 function data(list: TerminalView[]): TerminalsData {
   return { byId: Object.fromEntries(list.map((t) => [t.id, t])), order: list.map((t) => t.id) };
@@ -66,7 +66,7 @@ describe("ownerKeyOf", () => {
     ["an unlabelled terminal", {}, null],
     ["another kind", { kind: "job", thread: "s1" }, null],
     ["a thread's action run", { kind: "action", thread: "s1", action: "a-1", "action.name": "Test", "action.run": "r-1" }, "thread:s1"],
-    ["a worktree's action run", { kind: "action", repo: "r", worktree: "/src/app", action: "a-1" }, "view:projects"],
+    ["a worktree's action run", { kind: "action", project: "r", worktree: "/src/app", action: "a-1" }, "view:projects"],
   ];
   it.each(cases)("%s", (_name, labels, want) => {
     expect(ownerKeyOf({ labels })).toBe(want);
@@ -121,9 +121,9 @@ describe("bottomTabTitle", () => {
     expect(bottomTabTitle(term("t", shell("s1"), extra), key)).toBe(want);
   });
   it.each([
-    ["a shell in the thread's home: No project", { cwd: "/Users/dev", labels: { kind: "shell", thread: "s1", repo: "", worktree: "/Users/dev" } }, "No project"],
-    ["one elsewhere: its folder", { cwd: "/Users/dev/notes", labels: { kind: "shell", thread: "s1", repo: "", worktree: "/Users/dev" } }, "notes"],
-    ["its own title wins", { title: "htop", cwd: "/Users/dev", labels: { kind: "shell", thread: "s1", repo: "", worktree: "/Users/dev" } }, "htop"],
+    ["a shell in the thread's home: No project", { cwd: "/Users/dev", labels: { kind: "shell", thread: "s1", project: "", worktree: "/Users/dev" } }, "No project"],
+    ["one elsewhere: its folder", { cwd: "/Users/dev/notes", labels: { kind: "shell", thread: "s1", project: "", worktree: "/Users/dev" } }, "notes"],
+    ["its own title wins", { title: "htop", cwd: "/Users/dev", labels: { kind: "shell", thread: "s1", project: "", worktree: "/Users/dev" } }, "htop"],
   ] as [string, Partial<TerminalView>, string][])("a thread without a project: %s", (_name, extra, want) => {
     expect(bottomTabTitle(term("t", {}, extra), "thread:s1", true)).toBe(want);
   });

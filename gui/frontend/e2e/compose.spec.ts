@@ -117,7 +117,7 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
   const last = (await invocations()).at(-1);
   expect(last?.name).toBe("thread.new");
   expect(last?.args).toEqual({
-    repo: "repo-cf",
+    project: "repo-cf",
     "new-worktree": "true",
     base: "origin/main",
     model: "claude-opus-4-8[1m]",
@@ -216,7 +216,7 @@ test("pickers are keyboard operable; Tab goes prompt → pickers → send", asyn
   await page.keyboard.press("Enter");
   await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("thread.new");
   expect((await invocations()).at(-1)?.args).toEqual({
-    repo: "repo-cf",
+    project: "repo-cf",
     "new-worktree": "true",
     base: "origin/release/v0.3",
     model: "claude-opus-4-7[1m]",
@@ -263,7 +263,7 @@ test("a failed start keeps the draft editable and shows why", async ({ page }) =
   await input.press("Enter");
   await expect(page.locator('[data-row-kind="thread"][aria-selected="true"]')).toBeVisible();
   const last = (await invocations()).at(-1);
-  expect(last?.args).toEqual({ repo: "repo-cf", worktree: CF, model: "claude-opus-4-8[1m]", effort: "high", permission: "auto", prompt: "Please work" });
+  expect(last?.args).toEqual({ project: "repo-cf", worktree: CF, model: "claude-opus-4-8[1m]", effort: "high", permission: "auto", prompt: "Please work" });
   expect(await threadCount()).toBe(before + 1);
 });
 
@@ -339,7 +339,7 @@ test("Work in: threads.default_worktree = current starts in place; a pick is rem
   await page.keyboard.type("Tidy the README");
   await page.keyboard.press("Enter");
   await expect(page.locator('[data-row-kind="thread"][aria-selected="true"]')).toBeVisible();
-  expect((await invocations()).at(-1)?.args).toMatchObject({ repo: "repo-cf", "new-worktree": "true", base: "origin/main" });
+  expect((await invocations()).at(-1)?.args).toMatchObject({ project: "repo-cf", "new-worktree": "true", base: "origin/main" });
   await expect.poll(() => promptFocused(page)).toBe(true);
 
   // The next code-foundry draft starts from the memory; another project from the setting.
@@ -563,7 +563,7 @@ test("a local-only repository: local refs from main, no remote git commands", as
   await page.keyboard.type("Try a new shader");
   await page.keyboard.press("Enter");
   await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("thread.new");
-  expect((await invocations()).at(-1)?.args).toMatchObject({ repo: "repo-sk", "new-worktree": "true", base: "main" });
+  expect((await invocations()).at(-1)?.args).toMatchObject({ project: "repo-sk", "new-worktree": "true", base: "main" });
   await expect(page.locator('[data-row-kind="thread"][aria-selected="true"]')).toBeVisible();
 
   // The new thread is selected: fetch/pull/push/PR are not offered for a project without git.
@@ -574,7 +574,7 @@ test("a local-only repository: local refs from main, no remote git commands", as
 });
 
 test("a daemon older than ListRefs/StageAttachment: a clear restart hint, not HTTP 404", async ({ page }) => {
-  await mockPost("missing-rpc?rpc=RepoService/ListRefs&rpc=ThreadService/StageAttachment");
+  await mockPost("missing-rpc?rpc=ProjectService/ListRefs&rpc=ThreadService/StageAttachment");
   await openApp(page);
   await compose(page);
   await expect(page.getByTestId("composer-base")).toHaveText("From the default branch");

@@ -107,7 +107,7 @@ const KeybindingNone = "none"
 const (
 	GroupThreads     = "threads"
 	GroupGitHub      = "github"
-	GroupRepos       = "repos"
+	GroupProjects    = "projects"
 	GroupGitOps      = "gitops"
 	GroupAppearance  = "appearance"
 	GroupNotify      = "notifications"
@@ -145,7 +145,7 @@ var Pages = []Page{
 		Sections:    []Section{{ID: "alerts"}}},
 	{ID: PageSource, Title: "Source control", Sections: []Section{
 		{ID: "github", Title: "GitHub", Description: "Your pull requests and default-branch checks, polled with gh's login."},
-		{ID: "repos", Title: "Repositories", Description: "Fetching, where new worktrees go, and how they open."},
+		{ID: "projects", Title: "Projects", Description: "Fetching, where new worktrees go, and how they open."},
 	}},
 	{ID: PageKeybindings, Title: "Keybindings",
 		Description: `Override a command's chord, or unbind it. Reserved app chords (cmd+k, cmd+b, cmd+1..9, ...) can't be bound.`},
@@ -159,7 +159,7 @@ var Pages = []Page{
 var Groups = []Group{
 	{GroupThreads, "Threads", "Defaults for new threads."},
 	{GroupGitHub, "GitHub", "Your pull requests and default-branch checks, polled with gh's login."},
-	{GroupRepos, "Repositories", "Git fetching and where new worktrees go."},
+	{GroupProjects, "Projects", "Git fetching and where new worktrees go."},
 	{GroupGitOps, "Git operations", "How worktrees are handed to other apps."},
 	{GroupAppearance, "Appearance", "Scheme, themes, terminal font, density, and backdrop. Applied live in every window."},
 	{GroupNotify, "Notifications", "Dock badge and alerts for threads that need you. macOS banners aren't available to an app without a bundle."},
@@ -180,8 +180,8 @@ const (
 	KeyScrollback        = "threads.scrollback_lines"
 	KeyGhPollInterval    = "github.poll_interval_seconds"
 	KeyDashboards        = "github.dashboards_enabled"
-	KeyFetchInterval     = "repos.fetch_interval_seconds"
-	KeyWorktreeDir       = "repos.worktree_dir"
+	KeyFetchInterval     = "projects.fetch_interval_seconds"
+	KeyWorktreeDir       = "projects.worktree_dir"
 	KeyEditorCommand     = "gitops.editor_command"
 	KeyTheme             = "appearance.theme"
 	KeyThemeDark         = "appearance.theme_dark"
@@ -384,21 +384,21 @@ var staticFields = []Field{
 		Default:     strconv.Itoa(defaultGhPollSeconds), Min: 15, Max: 3600,
 		bind: func(s *Settings) any { return &s.GitHub.PollIntervalSeconds },
 	},
-	// Source control › Repositories.
+	// Source control › Projects.
 	{
-		Key: KeyFetchInterval, Group: GroupRepos, Page: PageSource, Section: "repos", Unit: "s", Type: Int, Title: "Fetch interval",
-		Description: "How often each repository runs git fetch --prune. 0 turns background fetching off.",
+		Key: KeyFetchInterval, Group: GroupProjects, Page: PageSource, Section: "projects", Unit: "s", Type: Int, Title: "Fetch interval",
+		Description: "How often each project runs git fetch --prune. 0 turns background fetching off.",
 		Default:     strconv.Itoa(defaultFetchSeconds), Min: 0, Max: 86400, Restart: true,
-		bind: func(s *Settings) any { return &s.Repos.FetchIntervalSeconds },
+		bind: func(s *Settings) any { return &s.Projects.FetchIntervalSeconds },
 	},
 	{
-		Key: KeyWorktreeDir, Group: GroupRepos, Page: PageSource, Section: "repos", Type: Path, Title: "Worktree directory",
-		Description: "Where New Worktree puts worktrees; {repo} is the repository's name. Empty uses ~/.code-foundry/worktrees/<owner>/<repo>.",
-		Placeholder: "~/worktrees/{repo}",
-		bind:        func(s *Settings) any { return &s.Repos.WorktreeDir },
+		Key: KeyWorktreeDir, Group: GroupProjects, Page: PageSource, Section: "projects", Type: Path, Title: "Worktree directory",
+		Description: "Where New Worktree puts worktrees; {project} is the project's name. Empty uses ~/.code-foundry/worktrees/<owner>/<repo>.",
+		Placeholder: "~/worktrees/{project}",
+		bind:        func(s *Settings) any { return &s.Projects.WorktreeDir },
 	},
 	{
-		Key: KeyEditorCommand, Group: GroupGitOps, Page: PageSource, Section: "repos", Type: String, Title: "Editor command",
+		Key: KeyEditorCommand, Group: GroupGitOps, Page: PageSource, Section: "projects", Type: String, Title: "Editor command",
 		Description: "Opens a worktree (Open in Editor), e.g. \"code\" or \"open -a Zed\"; {path} is the worktree path, else the path is appended. Empty detects an editor ($VISUAL/$EDITOR if graphical, then common editors).",
 		Placeholder: "auto-detect",
 		bind:        func(s *Settings) any { return &s.GitOps.EditorCommand },

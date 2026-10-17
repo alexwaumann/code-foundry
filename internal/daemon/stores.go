@@ -19,8 +19,8 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/clone"
 	"github.com/alexwaumann/code-foundry/internal/store/gh"
 	"github.com/alexwaumann/code-foundry/internal/store/gitops"
+	"github.com/alexwaumann/code-foundry/internal/store/newproject"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
-	"github.com/alexwaumann/code-foundry/internal/store/repo"
 	"github.com/alexwaumann/code-foundry/internal/store/settings"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
@@ -36,17 +36,17 @@ type stores struct {
 	// settings is opened first: the other stores take start-time options from it.
 	settings *settings.Store
 	db       *sql.DB
-	repo     *repo.Git
+	project  *project.Git
 	gh       *gh.Store
 	// cloner clones GitHub repositories into the projects dir and registers them in
-	// repo. It holds no resources: a clone in flight dies with its request.
+	// project. It holds no resources: a clone in flight dies with its request.
 	cloner *clone.Cloner
 	// projects creates new projects in the projects dir and publishes projects to
 	// GitHub with gh; like cloner, it holds no resources.
-	projects *project.Store
-	// stopGh cancels the gh poller and the repo→gh tracking glue, and waits for both.
+	newProjects *newproject.Store
+	// stopGh cancels the gh poller and the project→gh tracking glue, and waits for both.
 	stopGh func()
-	// gitops runs git/gh operations and refreshes repo afterwards; closed before repo.
+	// gitops runs git/gh operations and refreshes project afterwards; closed before project.
 	gitops *gitops.Manager
 	// terminal owns PTYs; closed first so every child gets hung up before the db goes.
 	terminal *terminal.Manager
@@ -58,8 +58,8 @@ type stores struct {
 	thread *thread.Manager
 	// update checks for and installs new releases (disabled in dev builds).
 	update *update.Store
-	// workspace holds branch sets across repos; it creates and removes worktrees
-	// through repo and asks thread which threads are live. Opened before thread,
+	// workspace holds branch sets across projects; it creates and removes worktrees
+	// through project and asks thread which threads are live. Opened before thread,
 	// which reads workspace members at launch.
 	workspace *workspace.Manager
 	// action holds each project's actions and runs them (in a terminal, or in the
@@ -101,7 +101,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	if s.home, err = fsx.HomeRoot(); err != nil {
 		return nil, err
 	}
-	if s.repo, err = repo.Start(ctx, repo.Options{
+	if s.project, err = project.Start(ctx, project.Options{
 		DB: s.db, Bus: s.bus, Log: log, WorktreeRoot: p.Worktrees(), AllowedRoot: s.home, FetchInterval: cfg.FetchInterval(),
 		ManagedRoots: settingsManagedRoots(s.settings),
 	}); err != nil {
@@ -127,7 +127,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	if s.gh, err = gh.New(ctx, ghOpts); err != nil {
 		return nil, err
 	}
-	s.stopGh = startGh(ctx, log, s.gh, s.repo, s.bus)
+	s.stopGh = startGh(ctx, log, s.gh, s.project, s.bus)
 	// Clones use the configured gh, else PATH, else Homebrew's (gh.LookPath), like the
 	// token lookup.
 	ghBin := settings.ExpandedPath(cfg.Advanced.GhPath)
@@ -135,17 +135,17 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 		ghBin, _ = gh.LookPath() // "" when missing: the clone then fails saying so
 	}
 	if s.cloner, err = clone.New(clone.Options{
-		Root: p.Projects(), AllowedRoot: s.home, Repos: s.repo, Gh: ghBin, Log: log.With("store", "clone"),
+		Root: p.Projects(), AllowedRoot: s.home, Projects: s.project, Gh: ghBin, Log: log.With("store", "clone"),
 	}); err != nil {
 		return nil, err
 	}
-	if s.projects, err = project.New(project.Options{
-		Root: p.Projects(), AllowedRoot: s.home, Repos: s.repo, Gh: ghBin, Log: log.With("store", "project"),
+	if s.newProjects, err = newproject.New(newproject.Options{
+		Root: p.Projects(), AllowedRoot: s.home, Projects: s.project, Gh: ghBin, Log: log.With("store", "project"),
 	}); err != nil {
 		return nil, err
 	}
 	s.gitops = gitops.New(gitops.Options{
-		Bus: s.bus, Repos: s.repo, Log: log.With("store", "gitops"),
+		Bus: s.bus, Projects: s.project, Log: log.With("store", "gitops"),
 		// Read on every open, so gitops.editor_command applies live. CODE_FOUNDRY_EDITOR
 		// is the fallback when the setting is empty; both empty means auto-detect.
 		Editor: func() string {
@@ -159,7 +159,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	// every spawn, and the workspace store asks threads about their threads (and
 	// pre-trusts worktrees) only through these closures, which run after both exist.
 	if s.workspace, err = workspace.New(ctx, workspace.Options{
-		DB: s.db, Repos: s.repo, Bus: s.bus, Log: log.With("store", "workspace"),
+		DB: s.db, Projects: s.project, Bus: s.bus, Log: log.With("store", "workspace"),
 		Threads: func() []workspace.Thread {
 			if s.thread == nil {
 				return nil
@@ -177,7 +177,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 		return nil, err
 	}
 	if s.action, err = action.New(ctx, action.Options{
-		DB: s.db, Repos: s.repo, Terminals: s.terminal, Bus: s.bus, Log: log.With("store", "action"),
+		DB: s.db, Projects: s.project, Terminals: s.terminal, Bus: s.bus, Log: log.With("store", "action"),
 		Thread: func(id string) (action.Owner, bool) {
 			if s.thread == nil {
 				return action.Owner{}, false
@@ -190,7 +190,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	claude := cmp.Or(settings.ExpandedPath(cfg.Advanced.ClaudePath), "claude")
 	threadLog := log.With("store", "thread")
 	if s.thread, err = thread.New(ctx, thread.Options{
-		DB: s.db, Terminals: s.terminal, Repos: s.repo, Workspaces: s.workspace, Bus: s.bus, Log: threadLog,
+		DB: s.db, Terminals: s.terminal, Projects: s.project, Workspaces: s.workspace, Bus: s.bus, Log: threadLog,
 		Claude: claude, CloseTimeout: cfg.CloseGrace(),
 		Namer:          settingsNamer(s.settings, thread.ClaudeNamer(claude, "/tmp", threadLog)),
 		AttachmentsDir: p.Attachments(), WorktreePath: settingsWorktreePath(s.settings),
@@ -212,7 +212,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	// After thread: the reaper's sweep asks it which threads exist.
 	if s.stopShells, err = startShellReaper(ctx, shellReaperOptions{
 		Log: log.With("store", "terminal"), Terminals: s.terminal, Bus: s.bus,
-		RepoExists: func(id string) bool { _, ok := s.repo.Snapshot().Repo(id); return ok },
+		ProjectExists: func(id string) bool { _, ok := s.project.Snapshot().Project(id); return ok },
 		ThreadExists: func(id string) bool {
 			snap := s.thread.Snapshot()
 			return snap == nil || slices.ContainsFunc(snap.Threads, func(x thread.Thread) bool { return x.ID == id })
@@ -255,7 +255,7 @@ func threadOwner(snap *thread.Snapshot, id string) (action.Owner, bool) {
 	if i < 0 {
 		return action.Owner{}, false
 	}
-	return action.Owner{ThreadID: id, RepoID: snap.Threads[i].RepoID, Worktree: snap.Threads[i].WorktreePath}, true
+	return action.Owner{ThreadID: id, ProjectID: snap.Threads[i].ProjectID, Worktree: snap.Threads[i].WorktreePath}, true
 }
 
 // worktreeThreads lists the threads that own their cwd, for the cleanup rule and the
@@ -311,8 +311,8 @@ func (s *stores) close() error {
 	if s.stopGh != nil {
 		s.stopGh()
 	}
-	if s.repo != nil {
-		errs = append(errs, s.repo.Close())
+	if s.project != nil {
+		errs = append(errs, s.project.Close())
 	}
 	if s.db != nil {
 		errs = append(errs, s.db.Close())

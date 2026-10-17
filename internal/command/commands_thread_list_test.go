@@ -18,11 +18,11 @@ import (
 
 func TestThreadList(t *testing.T) {
 	ago := func(d time.Duration) *timestamppb.Timestamp { return timestamppb.New(time.Now().Add(-d)) }
-	repos := []*v1.Repo{{Id: "r1", Name: "app", Worktrees: []*v1.Worktree{
-		{RepoId: "r1", Path: "/src/app", Branch: "main"}, {RepoId: "r1", Path: "/wt/fix", Branch: "cf/fix"}}}}
-	busy := &v1.Thread{Id: "s-7754a478e649", Name: "Fix the login", RepoId: "r1", WorktreePath: "/wt/fix",
+	projects := []*v1.Project{{Id: "r1", Name: "app", Worktrees: []*v1.Worktree{
+		{ProjectId: "r1", Path: "/src/app", Branch: "main"}, {ProjectId: "r1", Path: "/wt/fix", Branch: "cf/fix"}}}}
+	busy := &v1.Thread{Id: "s-7754a478e649", Name: "Fix the login", ProjectId: "r1", WorktreePath: "/wt/fix",
 		Status: v1.ThreadStatus_THREAD_STATUS_BUSY, StatusReason: "working", LastActivityAt: ago(5 * time.Minute)}
-	child := &v1.Thread{Id: "s-867564981c98", RepoId: "r1", WorktreePath: "/src/app",
+	child := &v1.Thread{Id: "s-867564981c98", ProjectId: "r1", WorktreePath: "/src/app",
 		Status: v1.ThreadStatus_THREAD_STATUS_NEEDS_ATTENTION, StatusReason: "finished", LastActivityAt: ago(3 * time.Hour),
 		CreatedBy: "s-7754a478e649", CreatedByName: "Fix the login"}
 	home := &v1.Thread{Id: "s-000000000001", Name: "notes", Status: v1.ThreadStatus_THREAD_STATUS_ERROR, StatusReason: "interrupted",
@@ -42,10 +42,10 @@ func TestThreadList(t *testing.T) {
 				"s-867564981c98  attention (finished)  (unnamed)      app@main    3h  ↳ Fix the login",
 				"s-000000000001  error (interrupted)   notes          no project  3d  [archived]",
 			}},
-		{name: "every filter", args: map[string]string{"archived": "true", "status": "attention", "state": "disconnected", "repo": "app",
+		{name: "every filter", args: map[string]string{"archived": "true", "status": "attention", "state": "disconnected", "project": "app",
 			"workspace": "w", "created-by": "user", "label": "a, b", "limit": "0"},
 			wantFilter: &v1.ThreadFilter{IncludeArchived: true, Status: v1.ThreadStatus_THREAD_STATUS_NEEDS_ATTENTION,
-				State: v1.ThreadState_THREAD_STATE_DISCONNECTED, Repo: "app", Workspace: "w", CreatedBy: "user", Labels: []string{"a", "b"}},
+				State: v1.ThreadState_THREAD_STATE_DISCONNECTED, Project: "app", Workspace: "w", CreatedBy: "user", Labels: []string{"a", "b"}},
 			wantLines: []string{"no threads"}},
 		{name: "all", args: map[string]string{"all": "true"}, wantFilter: &v1.ThreadFilter{All: true, Limit: 50}, wantLines: []string{"no threads"}},
 		{name: "empty says archived threads are left out", wantFilter: &v1.ThreadFilter{Limit: 50},
@@ -65,7 +65,7 @@ func TestThreadList(t *testing.T) {
 			if len(tt.threads) > 0 {
 				b.Current, b.Others = tt.threads[0], tt.threads[1:]
 			}
-			if err := command.RegisterThreadList(reg, command.ThreadListDeps{Thread: b, Repo: &commandtest.Repo{Repos: repos}}); err != nil {
+			if err := command.RegisterThreadList(reg, command.ThreadListDeps{Thread: b, Project: &commandtest.Project{Projects: projects}}); err != nil {
 				t.Fatal(err)
 			}
 			res, err := reg.Invoke(context.Background(), command.Context{}, "thread.list", tt.args)

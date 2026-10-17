@@ -24,7 +24,7 @@ export async function resetMock(): Promise<void> {
 
 export interface Invocation {
   name: string;
-  context: { activeTerminalId: string; activeThreadId: string; activeRepoId: string; activeWorktreePath: string; activeView: string; activeWorkspaceId?: string } | null;
+  context: { activeTerminalId: string; activeThreadId: string; activeProjectId: string; activeWorktreePath: string; activeView: string; activeWorkspaceId?: string } | null;
   args: Record<string, string>;
   confirmed?: boolean;
 }
@@ -34,15 +34,15 @@ export async function invocations(): Promise<Invocation[]> {
   return (await res.json()) as Invocation[];
 }
 
-/** The mock's registered projects (RepoService.List). protojson omits git: false. */
+/** The mock's registered projects (ProjectService.List). protojson omits git: false. */
 export async function listRepos(): Promise<{ id: string; path: string; name: string; git: boolean }[]> {
-  const res = await fetch(`${mockUrl}/codefoundry.v1.RepoService/List`, {
+  const res = await fetch(`${mockUrl}/codefoundry.v1.ProjectService/List`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${MOCK_TOKEN}` },
     body: "{}",
   });
   expect(res.ok).toBe(true);
-  const { repos = [] } = (await res.json()) as { repos?: { id: string; path: string; name: string; git?: boolean }[] };
+  const { projects: repos = [] } = (await res.json()) as { projects?: { id: string; path: string; name: string; git?: boolean }[] };
   return repos.map((r) => ({ id: r.id, path: r.path, name: r.name, git: r.git ?? false }));
 }
 
@@ -103,7 +103,7 @@ export async function openApp(page: Page): Promise<void> {
 }
 
 /**
- * Opens the Add Project dialog (repo.add) the way a user without a shortcut does: the
+ * Opens the Add Project dialog (project.add) the way a user without a shortcut does: the
  * sidebar's New thread button, then the project picker's "Add a project…" row.
  */
 export async function openAddProjectDialog(page: Page): Promise<void> {
@@ -124,18 +124,18 @@ export async function openProjects(page: Page): Promise<void> {
  * member row when `workspaceId` is given). The page stays selected: the palette has no
  * worktree context here; tests that need one select a thread in the worktree.
  */
-export async function selectWorktree(page: Page, repoId: string, path: string, workspaceId?: string): Promise<void> {
+export async function selectWorktree(page: Page, projectId: string, path: string, workspaceId?: string): Promise<void> {
   await openProjects(page);
-  const key = workspaceId ? `m:${workspaceId}::${repoId}` : `pw:${repoId}::${path}`;
+  const key = workspaceId ? `m:${workspaceId}::${projectId}` : `pw:${projectId}::${path}`;
   await page.locator(`[data-nav-key="${key}"]`).dblclick();
   await expect(page.getByTestId("worktree-surface")).toHaveAttribute("data-path", path);
 }
 
 /** Shows a project's main worktree in the Projects page's side panel by double-clicking the project row. */
-export async function selectProject(page: Page, repoId: string): Promise<void> {
+export async function selectProject(page: Page, projectId: string): Promise<void> {
   await openProjects(page);
-  await page.locator(`[data-nav-key="p:${repoId}"]`).dblclick();
-  await expect(page.getByTestId("worktree-surface")).toHaveAttribute("data-repo", repoId);
+  await page.locator(`[data-nav-key="p:${projectId}"]`).dblclick();
+  await expect(page.getByTestId("worktree-surface")).toHaveAttribute("data-repo", projectId);
 }
 
 export function row(page: Page, key: string) {

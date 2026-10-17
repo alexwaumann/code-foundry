@@ -107,20 +107,20 @@ func (m *Manager) Send(ctx context.Context, id string, msg Message) (Item, error
 }
 
 // fileRefRoots resolves a file reference's repository to its worktree for thread s:
-// the workspace's member in that repository, else s's own worktree for its repo. A
+// the workspace's member in that project, else s's own worktree for its project. A
 // thread without a project resolves none.
-func (m *Manager) fileRefRoots(s Thread) func(repoID string) (string, bool) {
+func (m *Manager) fileRefRoots(s Thread) func(projectID string) (string, bool) {
 	var members []workspace.Member
 	if s.WorkspaceID != "" && m.opts.Workspaces != nil {
 		if w, ok := m.opts.Workspaces.Snapshot().Workspace(s.WorkspaceID); ok {
 			members = w.Members
 		}
 	}
-	return func(repoID string) (string, bool) {
-		if i := slices.IndexFunc(members, func(mem workspace.Member) bool { return mem.RepoID == repoID }); i >= 0 {
+	return func(projectID string) (string, bool) {
+		if i := slices.IndexFunc(members, func(mem workspace.Member) bool { return mem.ProjectID == projectID }); i >= 0 {
 			return members[i].WorktreePath, true
 		}
-		return s.WorktreePath, s.RepoID != "" && repoID == s.RepoID
+		return s.WorktreePath, s.ProjectID != "" && projectID == s.ProjectID
 	}
 }
 

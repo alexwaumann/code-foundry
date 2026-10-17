@@ -17,7 +17,7 @@
 //
 // Runs live in memory only, newest RunHistory per project. Background runs are killed
 // when the store closes (daemon shutdown), when their project is unregistered
-// (RepoRemoved), and by KillRuns (the daemon calls it when a thread or worktree goes
+// (ProjectRemoved), and by KillRuns (the daemon calls it when a thread or worktree goes
 // away). See docs/notes/actions-1-daemon.md.
 package action
 
@@ -53,13 +53,13 @@ var Icons = []string{IconPlay, IconTest, IconLint, IconConfigure, IconBuild, Ico
 // Action is an immutable snapshot of one action.
 type Action struct {
 	ID               string // "a-" + 12 hex digits
-	RepoID           string
-	Name             string // unique within RepoID, ignoring case
+	ProjectID        string
+	Name             string // unique within ProjectID, ignoring case
 	Command          string
 	Icon             string // one of Icons
 	InTerminal       bool
 	OnWorktreeCreate bool
-	Position         int // 0-based within RepoID
+	Position         int // 0-based within ProjectID
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 }
@@ -115,7 +115,7 @@ type Run struct {
 	ActionID   string
 	ActionName string // when it started
 	Command    string // when it started
-	RepoID     string
+	ProjectID  string
 	ThreadID   string // empty for a worktree's run
 	Worktree   string // cwd and CODE_FOUNDRY_WORKTREE
 	Mode       Mode   // ModeTerminal or ModeBackground
@@ -154,17 +154,17 @@ func (s *Snapshot) Action(id string) (Action, bool) {
 	return s.Actions[i], true
 }
 
-// ForRepo returns repoID's actions in order (all actions when repoID is empty).
-func (s *Snapshot) ForRepo(repoID string) []Action {
+// ForProject returns projectID's actions in order (all actions when projectID is empty).
+func (s *Snapshot) ForProject(projectID string) []Action {
 	if s == nil {
 		return nil
 	}
-	if repoID == "" {
+	if projectID == "" {
 		return s.Actions
 	}
 	var out []Action
 	for _, a := range s.Actions {
-		if a.RepoID == repoID {
+		if a.ProjectID == projectID {
 			out = append(out, a)
 		}
 	}
@@ -183,22 +183,22 @@ func (s *Snapshot) Run(id string) (Run, bool) {
 	return s.Runs[i], true
 }
 
-// Resolve finds an action by id, else by name (ignoring case) within repoID.
-func (s *Snapshot) Resolve(repoID, ref string) (Action, error) {
+// Resolve finds an action by id, else by name (ignoring case) within projectID.
+func (s *Snapshot) Resolve(projectID, ref string) (Action, error) {
 	ref = strings.TrimSpace(ref)
 	if ref == "" {
 		return Action{}, &resolveError{kind: ErrInvalidArgument, msg: "an action id or name is required"}
 	}
 	if a, ok := s.Action(ref); ok {
-		if repoID != "" && a.RepoID != repoID {
+		if projectID != "" && a.ProjectID != projectID {
 			return Action{}, &resolveError{kind: ErrFailedPrecondition, msg: "action " + a.Name + " (" + a.ID + ") belongs to another project"}
 		}
 		return a, nil
 	}
-	if repoID == "" {
+	if projectID == "" {
 		return Action{}, &resolveError{kind: ErrInvalidArgument, msg: "action " + ref + ": name a project to find it by name"}
 	}
-	for _, a := range s.ForRepo(repoID) {
+	for _, a := range s.ForProject(projectID) {
 		if strings.EqualFold(a.Name, ref) {
 			return a, nil
 		}
@@ -236,7 +236,7 @@ type RunRemoved struct{ ID string }
 // RunFinished follows a finished run's RunUpdated, once per run.
 type RunFinished struct {
 	RunID, ActionID, ActionName string
-	RepoID, ThreadID            string
+	ProjectID, ThreadID         string
 	TerminalID                  string
 	Mode                        Mode
 	Trigger                     Trigger
@@ -252,7 +252,7 @@ func (*Snapshot) isActionEvent()   {}
 
 // CreateOptions configures Store.Create.
 type CreateOptions struct {
-	RepoID           string
+	ProjectID        string
 	Name             string
 	Command          string
 	Icon             string // "": IconPlay
@@ -272,25 +272,25 @@ type UpdateOptions struct {
 	Position *int
 }
 
-// Owner is who a run belongs to: a thread (ThreadID set; RepoID and Worktree are the
+// Owner is who a run belongs to: a thread (ThreadID set; ProjectID and Worktree are the
 // thread's) or a worktree.
 type Owner struct {
-	ThreadID string
-	RepoID   string
-	Worktree string
+	ThreadID  string
+	ProjectID string
+	Worktree  string
 }
 
 // RunOptions configures Store.Run.
 type RunOptions struct {
-	// Action is an action id, or its name within RepoID (default: the owner's project).
+	// Action is an action id, or its name within ProjectID (default: the owner's project).
 	Action string
 	// ThreadID makes the thread the owner; it wins over Worktree.
 	ThreadID string
 	// Worktree is the owner when there is no thread: a registered worktree of the
 	// action's project.
-	Worktree string
-	RepoID   string
-	Mode     Mode
+	Worktree  string
+	ProjectID string
+	Mode      Mode
 }
 
 // Store is the action store API. *Manager implements it; actiontest.Fake is an

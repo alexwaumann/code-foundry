@@ -75,7 +75,7 @@ func TestThreadSubscriptions(t *testing.T) {
 	if _, err := c.Unsubscribe(ctx, connect.NewRequest(&v1.UnsubscribeThreadRequest{SubscriptionId: "sub-nope"})); connect.CodeOf(err) != connect.CodeNotFound {
 		t.Errorf("Unsubscribe unknown = %v", err)
 	}
-	if _, err := c.Create(ctx, connect.NewRequest(&v1.CreateThreadRequest{RepoId: "r1", CreatedBy: "s-p", Notify: true})); err != nil {
+	if _, err := c.Create(ctx, connect.NewRequest(&v1.CreateThreadRequest{ProjectId: "r1", CreatedBy: "s-p", Notify: true})); err != nil {
 		t.Fatal(err)
 	}
 	if calls := fake.Calls(); !slices.ContainsFunc(calls, func(c string) bool { return c == "Create r1    created-by=s-p notify" }) {

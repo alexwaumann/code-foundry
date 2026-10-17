@@ -79,8 +79,8 @@ test("switch the project from the heading: the draft moves, Also in is swapped, 
   await page.keyboard.press("Enter");
   await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("thread.new");
   const args = (await invocations()).at(-1)?.args ?? {};
-  expect(args).toMatchObject({ repo: "repo-gp", "new-worktree": "true", model: "claude-4.5-haiku[1m]", prompt: "Port the login form" });
-  expect(args.repos).toBeUndefined();
+  expect(args).toMatchObject({ project: "repo-gp", "new-worktree": "true", model: "claude-4.5-haiku[1m]", prompt: "Port the login form" });
+  expect(args.projects).toBeUndefined();
   await expect(page.locator('[data-row-kind="thread"][aria-selected="true"]')).toBeVisible();
 
   // The draft moved: code-foundry's composer starts empty.

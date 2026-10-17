@@ -11,7 +11,7 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/alexwaumann/code-foundry/internal/store/repo"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
 )
 
 // New-worktree threads (CreateOptions.NewWorktree).
@@ -39,7 +39,7 @@ type namingResult struct {
 
 // createdWorktree is what newWorktree made.
 type createdWorktree struct {
-	repoID, path, baseRef string
+	projectID, path, baseRef string
 	// name is the namer's title when it arrived within SlugTimeout.
 	name string
 	// namerCalled: the namer was started for this thread (in time or not).
@@ -51,26 +51,26 @@ type createdWorktree struct {
 // newWorktree resolves the branch and creates the worktree for a new thread.
 func (m *Manager) newWorktree(ctx context.Context, id, name string, o CreateOptions) (createdWorktree, error) {
 	var nw createdWorktree
-	if m.opts.Repos == nil {
-		return nw, fmt.Errorf("%w: creating a worktree needs the repo store", ErrFailedPrecondition)
+	if m.opts.Projects == nil {
+		return nw, fmt.Errorf("%w: creating a worktree needs the project store", ErrFailedPrecondition)
 	}
 	base := strings.TrimSpace(o.NewWorktree.BaseRef)
 	if err := validateRef(base); err != nil {
 		return nw, err
 	}
-	repoID := o.RepoID
-	if repoID == "" {
+	projectID := o.ProjectID
+	if projectID == "" {
 		if o.WorktreePath == "" {
-			return nw, fmt.Errorf("%w: a repo is required for a new worktree", ErrInvalidArgument)
+			return nw, fmt.Errorf("%w: a project is required for a new worktree", ErrInvalidArgument)
 		}
 		var err error
-		if repoID, _, err = m.resolveWorktree("", o.WorktreePath); err != nil {
+		if projectID, _, err = m.resolveWorktree("", o.WorktreePath); err != nil {
 			return nw, err
 		}
 	}
-	r, ok := m.opts.Repos.Snapshot().Repo(repoID)
+	r, ok := m.opts.Projects.Snapshot().Project(projectID)
 	if !ok {
-		return nw, fmt.Errorf("%w: repo %s", ErrNotFound, repoID)
+		return nw, fmt.Errorf("%w: project %s", ErrNotFound, projectID)
 	}
 	if !r.Git {
 		// Before the namer: a project without git runs threads in its one checkout.
@@ -87,15 +87,15 @@ func (m *Manager) newWorktree(ctx context.Context, id, name string, o CreateOpti
 	if m.opts.WorktreePath != nil {
 		path = m.opts.WorktreePath(r, branch)
 	}
-	wt, err := m.opts.Repos.CreateWorktree(ctx, repo.CreateWorktreeOptions{
-		RepoID: r.ID, Branch: branch, BaseRef: base, Path: path, Fetch: true,
+	wt, err := m.opts.Projects.CreateWorktree(ctx, project.CreateWorktreeOptions{
+		ProjectID: r.ID, Branch: branch, BaseRef: base, Path: path, Fetch: true,
 	})
 	if err != nil {
-		return nw, repoError("create worktree "+branch, err)
+		return nw, projectError("create worktree "+branch, err)
 	}
-	nw.repoID, nw.path = r.ID, wt.Path
+	nw.projectID, nw.path = r.ID, wt.Path
 	nw.baseRef = cmp.Or(base, wt.Status.BaseRef, r.DefaultBranch)
-	m.log.Info("worktree created for thread", "thread", id, "repo", r.ID, "branch", branch,
+	m.log.Info("worktree created for thread", "thread", id, "project", r.ID, "branch", branch,
 		"path", wt.Path, "base", nw.baseRef)
 	return nw, nil
 }
@@ -215,14 +215,14 @@ func (m *Manager) applyLateName(id string, ch <-chan namingResult) {
 }
 
 // pickBranch returns cf/<slug>, or cf/<slug>-N when that branch exists locally or on
-// origin in any of repoPaths (or taken reports its name part, "<slug>" or
+// origin in any of projectPaths (or taken reports its name part, "<slug>" or
 // "<slug>-N", as used), or cf/<id> when the slug is empty or every suffix is taken.
-func (m *Manager) pickBranch(ctx context.Context, repoPaths []string, slug, id string, taken func(string) bool) string {
+func (m *Manager) pickBranch(ctx context.Context, projectPaths []string, slug, id string, taken func(string) bool) string {
 	if slug == "" {
 		return branchPrefix + id
 	}
 	free := func(b string) bool {
-		for _, p := range repoPaths {
+		for _, p := range projectPaths {
 			if m.opts.RefExists(ctx, p, "refs/heads/"+b) || m.opts.RefExists(ctx, p, "refs/remotes/origin/"+b) {
 				return false
 			}
@@ -262,16 +262,16 @@ func validateRef(ref string) error {
 	return nil
 }
 
-// repoError wraps a repo store error in the thread error class with the same
+// projectError wraps a project store error in the thread error class with the same
 // meaning, so API codes survive.
-func repoError(what string, err error) error {
+func projectError(what string, err error) error {
 	var kind error
 	switch {
 	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
 		return fmt.Errorf("%s: %w", what, err)
-	case errors.Is(err, repo.ErrNotFound):
+	case errors.Is(err, project.ErrNotFound):
 		kind = ErrNotFound
-	case errors.Is(err, repo.ErrInvalidArgument):
+	case errors.Is(err, project.ErrInvalidArgument):
 		kind = ErrInvalidArgument
 	default:
 		kind = ErrFailedPrecondition
@@ -280,7 +280,7 @@ func repoError(what string, err error) error {
 }
 
 // classified adds a thread error class to an error without repeating it in the
-// message (repo errors already start with "failed precondition: ...").
+// message (project errors already start with "failed precondition: ...").
 type classified struct{ kind, err error }
 
 func (c classified) Error() string   { return c.err.Error() }

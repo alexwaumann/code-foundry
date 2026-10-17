@@ -18,7 +18,7 @@ import (
 	"unicode"
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
-	"github.com/alexwaumann/code-foundry/internal/store/repo"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 )
 
@@ -35,15 +35,15 @@ const (
 	MaxNameLen = 64
 )
 
-// RepoSource is the part of the repo store actions need. *repo.Git implements it.
-type RepoSource interface {
-	Snapshot() *repo.Snapshot
+// ProjectSource is the part of the project store actions need. *project.Git implements it.
+type ProjectSource interface {
+	Snapshot() *project.Snapshot
 }
 
-// Options configures a Manager. DB and Repos are required.
+// Options configures a Manager. DB and Projects are required.
 type Options struct {
-	DB    *sql.DB
-	Repos RepoSource
+	DB       *sql.DB
+	Projects ProjectSource
 	// Terminals runs terminal-mode actions. Nil refuses them.
 	Terminals terminal.Store
 	// Thread resolves a thread to its owner (project and worktree). Nil: runs need a
@@ -65,7 +65,7 @@ type Options struct {
 	Now         func() time.Time
 }
 
-// Manager is the Store backed by SQLite, the repo store and the terminal store.
+// Manager is the Store backed by SQLite, the project store and the terminal store.
 type Manager struct {
 	opts   Options
 	log    *slog.Logger
@@ -86,8 +86,8 @@ var _ Store = (*Manager)(nil)
 // New loads persisted actions and returns the Manager. Close it to kill background
 // runs.
 func New(ctx context.Context, opts Options) (*Manager, error) {
-	if opts.DB == nil || opts.Repos == nil {
-		return nil, errors.New("action: Options.DB and Options.Repos are required")
+	if opts.DB == nil || opts.Projects == nil {
+		return nil, errors.New("action: Options.DB and Options.Projects are required")
 	}
 	if opts.Bus == nil {
 		opts.Bus = bus.New()
@@ -136,7 +136,7 @@ func (m *Manager) rebuild() {
 		as = append(as, a)
 	}
 	slices.SortFunc(as, func(a, b Action) int {
-		return cmp.Or(cmp.Compare(a.RepoID, b.RepoID), cmp.Compare(a.Position, b.Position), cmp.Compare(a.Name, b.Name))
+		return cmp.Or(cmp.Compare(a.ProjectID, b.ProjectID), cmp.Compare(a.Position, b.Position), cmp.Compare(a.Name, b.Name))
 	})
 	rs := make([]Run, 0, len(m.runs))
 	for _, r := range m.runs {
@@ -153,11 +153,11 @@ func sortRuns(rs []Run) {
 	})
 }
 
-// repoActions returns repoID's actions in position order. Callers hold m.mu.
-func (m *Manager) repoActions(repoID string) []Action {
+// projectActions returns projectID's actions in position order. Callers hold m.mu.
+func (m *Manager) projectActions(projectID string) []Action {
 	var out []Action
 	for _, a := range m.byID {
-		if a.RepoID == repoID {
+		if a.ProjectID == projectID {
 			out = append(out, a)
 		}
 	}
@@ -181,8 +181,8 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Action, error) {
 	if err != nil {
 		return Action{}, err
 	}
-	if _, ok := m.opts.Repos.Snapshot().Repo(o.RepoID); !ok {
-		return Action{}, fmt.Errorf("%w: project %q is not registered", ErrNotFound, o.RepoID)
+	if _, ok := m.opts.Projects.Snapshot().Project(o.ProjectID); !ok {
+		return Action{}, fmt.Errorf("%w: project %q is not registered", ErrNotFound, o.ProjectID)
 	}
 	id, err := newID("a-")
 	if err != nil {
@@ -190,13 +190,13 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Action, error) {
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	existing := m.repoActions(o.RepoID)
+	existing := m.projectActions(o.ProjectID)
 	if err := nameFree(existing, name, ""); err != nil {
 		return Action{}, err
 	}
 	now := m.opts.Now().Truncate(time.Millisecond)
 	a := Action{
-		ID: id, RepoID: o.RepoID, Name: name, Command: command, Icon: icon,
+		ID: id, ProjectID: o.ProjectID, Name: name, Command: command, Icon: icon,
 		InTerminal: o.InTerminal, OnWorktreeCreate: o.OnWorktreeCreate,
 		Position: len(existing), CreatedAt: now, UpdatedAt: now,
 	}
@@ -206,7 +206,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Action, error) {
 	m.byID[a.ID] = a
 	m.rebuild()
 	bus.Publish[Event](m.opts.Bus, Updated{Action: a})
-	m.log.Info("action created", "action", a.ID, "repo", a.RepoID, "name", a.Name)
+	m.log.Info("action created", "action", a.ID, "project", a.ProjectID, "name", a.Name)
 	return a, nil
 }
 
@@ -218,7 +218,7 @@ func (m *Manager) Update(ctx context.Context, o UpdateOptions) (Action, error) {
 	if !ok {
 		return Action{}, fmt.Errorf("%w: action %q", ErrNotFound, o.ID)
 	}
-	siblings := m.repoActions(a.RepoID)
+	siblings := m.projectActions(a.ProjectID)
 	if o.Name != nil {
 		name, err := cleanName(*o.Name)
 		if err != nil {
@@ -294,14 +294,14 @@ func (m *Manager) Delete(ctx context.Context, id string) error {
 	delete(m.byID, id)
 	// Close the gap so positions stay 0..n-1.
 	var moved []Action
-	for i, x := range m.repoActions(a.RepoID) {
+	for i, x := range m.projectActions(a.ProjectID) {
 		if x.Position != i {
 			x.Position = i
 			moved = append(moved, x)
 		}
 	}
 	if err := saveActions(context.WithoutCancel(ctx), m.opts.DB, moved); err != nil {
-		m.log.Warn("renumber actions after a delete", "repo", a.RepoID, "err", err)
+		m.log.Warn("renumber actions after a delete", "project", a.ProjectID, "err", err)
 		moved = nil
 	}
 	for _, x := range moved {
@@ -312,31 +312,31 @@ func (m *Manager) Delete(ctx context.Context, id string) error {
 	for _, x := range moved {
 		bus.Publish[Event](m.opts.Bus, Updated{Action: x})
 	}
-	m.log.Info("action deleted", "action", id, "repo", a.RepoID, "name", a.Name)
+	m.log.Info("action deleted", "action", id, "project", a.ProjectID, "name", a.Name)
 	return nil
 }
 
-// RepoRemoved forgets an unregistered project's actions (the database cascades; this
+// ProjectRemoved forgets an unregistered project's actions (the database cascades; this
 // deletes them too and updates the snapshot) and its runs, killing the background ones
-// still running. Its terminal runs are the shell reaper's: they carry the repo label.
-func (m *Manager) RepoRemoved(ctx context.Context, repoID string) {
-	if repoID == "" {
+// still running. Its terminal runs are the shell reaper's: they carry the project label.
+func (m *Manager) ProjectRemoved(ctx context.Context, projectID string) {
+	if projectID == "" {
 		return
 	}
-	if err := deleteRepoActions(context.WithoutCancel(ctx), m.opts.DB, repoID); err != nil {
-		m.log.Warn("forget an unregistered project's actions", "repo", repoID, "err", err)
+	if err := deleteProjectActions(context.WithoutCancel(ctx), m.opts.DB, projectID); err != nil {
+		m.log.Warn("forget an unregistered project's actions", "project", projectID, "err", err)
 	}
 	m.mu.Lock()
 	var gone []string
 	for id, a := range m.byID {
-		if a.RepoID == repoID {
+		if a.ProjectID == projectID {
 			delete(m.byID, id)
 			gone = append(gone, id)
 		}
 	}
 	var dropped []string
 	for id, r := range m.runs {
-		if r.run.RepoID == repoID {
+		if r.run.ProjectID == projectID {
 			r.kill(m.opts.KillGrace, &m.wg)
 			delete(m.runs, id)
 			dropped = append(dropped, id)
@@ -355,7 +355,7 @@ func (m *Manager) RepoRemoved(ctx context.Context, repoID string) {
 		bus.Publish[Event](m.opts.Bus, RunRemoved{ID: id})
 	}
 	if len(gone)+len(dropped) > 0 {
-		m.log.Info("forgot an unregistered project's actions and runs", "repo", repoID, "actions", len(gone), "runs", len(dropped))
+		m.log.Info("forgot an unregistered project's actions and runs", "project", projectID, "actions", len(gone), "runs", len(dropped))
 	}
 }
 

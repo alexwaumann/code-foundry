@@ -7,7 +7,7 @@
 // with GIT_TERMINAL_PROMPT=0 and without a controlling terminal, and records every
 // command it ran with its output. Queued, Started and Finished events are published on
 // the bus (one topic, gitops.Event) and an immutable Snapshot holds the running and
-// recent operations. After fetch, pull, push and PR create the repo store is asked to
+// recent operations. After fetch, pull, push and PR create the project store is asked to
 // Refresh, so ahead/behind updates without waiting for its poll.
 //
 // A failed operation is a result, not an error: methods return the finished Op with
@@ -20,7 +20,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/alexwaumann/code-foundry/internal/store/repo"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
 )
 
 // Errors returned by Store methods. They are wrapped with detail; test with errors.Is.
@@ -28,7 +28,7 @@ var (
 	ErrInvalidArgument = errors.New("invalid argument")
 	ErrClosed          = errors.New("gitops store closed")
 	// ErrNoRemote is returned by Fetch, Pull, Push, CreatePR and OpenPR for a worktree
-	// of a registered repository that has no git remote (see LocalOnly).
+	// of a registered project that has no git remote (see LocalOnly).
 	ErrNoRemote = errors.New("repository has no remote")
 )
 
@@ -85,8 +85,8 @@ type Op struct {
 	Title string
 	// WorktreePath is where the operation runs (symlinks resolved). Empty for open-url.
 	WorktreePath string
-	// RepoID is the registered repo containing WorktreePath, or empty.
-	RepoID string
+	// ProjectID is the registered project containing WorktreePath, or empty.
+	ProjectID string
 	// Branch when the operation was requested, if known.
 	Branch     string
 	QueuedAt   time.Time
@@ -179,26 +179,26 @@ type Store interface {
 	OpenEditor(ctx context.Context, worktreePath string) (Op, error)
 	Reveal(ctx context.Context, worktreePath string) (Op, error)
 	OpenURL(ctx context.Context, url string) (Op, error)
-	// GitHubSlug returns the GitHub "owner/name" of the registered repo containing
-	// worktreePath, else of repo repoID, else "".
-	GitHubSlug(repoID, worktreePath string) string
-	// LocalOnly reports whether the registered repo containing worktreePath (else repo
-	// repoID) has no git remote. It is false for an unknown path or repo and for a repo
+	// GitHubSlug returns the GitHub "owner/name" of the registered project containing
+	// worktreePath, else of project projectID, else "".
+	GitHubSlug(projectID, worktreePath string) string
+	// LocalOnly reports whether the registered project containing worktreePath (else project
+	// projectID) has no git remote. It is false for an unknown path or project and for a project
 	// not yet (or not currently) reconciled, so it never hides an action by mistake.
-	LocalOnly(repoID, worktreePath string) bool
+	LocalOnly(projectID, worktreePath string) bool
 }
 
 // IsLocalOnly reports whether r is a reconciled repository with no git remote.
-func IsLocalOnly(r repo.Repo) bool {
+func IsLocalOnly(r project.Project) bool {
 	return r.ID != "" && r.Error == "" && len(r.Worktrees) > 0 && len(r.Remotes) == 0
 }
 
-// Repos is the part of the repo store gitops uses: the snapshot to map a path to its
-// repo (id, slug, branch) and Refresh after operations that move refs. repo.Store
+// Projects is the part of the project store gitops uses: the snapshot to map a path to its
+// project (id, slug, branch) and Refresh after operations that move refs. project.Store
 // satisfies it.
-type Repos interface {
-	Snapshot() *repo.Snapshot
+type Projects interface {
+	Snapshot() *project.Snapshot
 	Refresh(ctx context.Context, id string) error
 }
 
-var _ Repos = repo.Store(nil)
+var _ Projects = project.Store(nil)

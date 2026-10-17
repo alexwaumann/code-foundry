@@ -21,7 +21,7 @@ export interface InvokeOut {
 }
 
 interface Wt {
-  repoId: string;
+  projectId: string;
   path: string;
   branch: string;
   githubSlug: string;
@@ -169,7 +169,7 @@ export class MockGitOps {
     const now = new Date();
     const op = create(GitOpSchema, {
       id: `op-${String(++this.seq)}`, kind: s.kind, state: GitOpState.QUEUED, title: s.label(w, args).trim(),
-      worktreePath: w?.path ?? "", repoId: w?.repoId ?? "", branch: w?.branch ?? "", queuedAt: timestampFromDate(now),
+      worktreePath: w?.path ?? "", projectId: w?.projectId ?? "", branch: w?.branch ?? "", queuedAt: timestampFromDate(now),
     });
     const fail = this.failNext.delete(s.name);
     const key = w?.path ?? "";

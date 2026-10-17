@@ -14,7 +14,7 @@ import (
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/paths"
-	"github.com/alexwaumann/code-foundry/internal/store/repo"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 	"github.com/alexwaumann/code-foundry/internal/termlabel"
 )
@@ -80,11 +80,11 @@ func (r *runRec) kill(grace time.Duration, wg *sync.WaitGroup) {
 
 // Run implements Store.
 func (m *Manager) Run(ctx context.Context, o RunOptions) (Run, error) {
-	owner, err := m.owner(o.ThreadID, o.Worktree, o.RepoID)
+	owner, err := m.owner(o.ThreadID, o.Worktree, o.ProjectID)
 	if err != nil {
 		return Run{}, err
 	}
-	a, err := m.Snapshot().Resolve(owner.RepoID, o.Action)
+	a, err := m.Snapshot().Resolve(owner.ProjectID, o.Action)
 	if err != nil {
 		return Run{}, err
 	}
@@ -92,8 +92,8 @@ func (m *Manager) Run(ctx context.Context, o RunOptions) (Run, error) {
 }
 
 // owner resolves a run's owner: the thread threadID, else the registered worktree at
-// worktree (in repoID when given).
-func (m *Manager) owner(threadID, worktree, repoID string) (Owner, error) {
+// worktree (in projectID when given).
+func (m *Manager) owner(threadID, worktree, projectID string) (Owner, error) {
 	switch {
 	case threadID != "":
 		if m.opts.Thread == nil {
@@ -103,21 +103,21 @@ func (m *Manager) owner(threadID, worktree, repoID string) (Owner, error) {
 		if !ok {
 			return Owner{}, fmt.Errorf("%w: thread %s", ErrNotFound, threadID)
 		}
-		if ow.RepoID == "" {
+		if ow.ProjectID == "" {
 			return Owner{}, fmt.Errorf("%w: thread %s has no project; actions belong to a project", ErrFailedPrecondition, threadID)
 		}
-		if repoID != "" && repoID != ow.RepoID {
-			return Owner{}, fmt.Errorf("%w: thread %s is in project %s, not %s", ErrInvalidArgument, threadID, ow.RepoID, repoID)
+		if projectID != "" && projectID != ow.ProjectID {
+			return Owner{}, fmt.Errorf("%w: thread %s is in project %s, not %s", ErrInvalidArgument, threadID, ow.ProjectID, projectID)
 		}
 		ow.ThreadID = threadID
 		return ow, nil
 	case worktree != "":
-		for _, r := range m.opts.Repos.Snapshot().Repos {
-			if repoID != "" && r.ID != repoID {
+		for _, r := range m.opts.Projects.Snapshot().Projects {
+			if projectID != "" && r.ID != projectID {
 				continue
 			}
-			if slices.ContainsFunc(r.Worktrees, func(w repo.Worktree) bool { return w.Path == worktree }) {
-				return Owner{RepoID: r.ID, Worktree: worktree}, nil
+			if slices.ContainsFunc(r.Worktrees, func(w project.Worktree) bool { return w.Path == worktree }) {
+				return Owner{ProjectID: r.ID, Worktree: worktree}, nil
 			}
 		}
 		return Owner{}, fmt.Errorf("%w: %s is not a worktree of a registered project", ErrInvalidArgument, worktree)
@@ -128,9 +128,9 @@ func (m *Manager) owner(threadID, worktree, repoID string) (Owner, error) {
 
 // start runs a for owner and returns the run once it has started.
 func (m *Manager) start(ctx context.Context, a Action, owner Owner, mode Mode, trigger Trigger) (Run, error) {
-	r, ok := m.opts.Repos.Snapshot().Repo(owner.RepoID)
+	r, ok := m.opts.Projects.Snapshot().Project(owner.ProjectID)
 	if !ok {
-		return Run{}, fmt.Errorf("%w: project %s is not registered", ErrNotFound, owner.RepoID)
+		return Run{}, fmt.Errorf("%w: project %s is not registered", ErrNotFound, owner.ProjectID)
 	}
 	if mode == ModeDefault {
 		mode = ModeBackground
@@ -148,7 +148,7 @@ func (m *Manager) start(ctx context.Context, a Action, owner Owner, mode Mode, t
 	rec := &runRec{
 		run: Run{
 			ID: id, ActionID: a.ID, ActionName: a.Name, Command: a.Command,
-			RepoID: owner.RepoID, ThreadID: owner.ThreadID, Worktree: owner.Worktree,
+			ProjectID: owner.ProjectID, ThreadID: owner.ThreadID, Worktree: owner.Worktree,
 			Mode: mode, Trigger: trigger, State: RunRunning, StartedAt: m.opts.Now(),
 		},
 		started: make(chan struct{}),
@@ -170,7 +170,7 @@ func (m *Manager) start(ctx context.Context, a Action, owner Owner, mode Mode, t
 	case ModeTerminal:
 		t, err := m.opts.Terminals.Create(ctx, terminal.Spec{
 			Argv: []string{m.opts.Shell, "-lc", a.Command}, Cwd: owner.Worktree, Env: env,
-			Labels:   termlabel.ActionTerminal(owner.ThreadID, owner.RepoID, owner.Worktree, a.ID, a.Name, id),
+			Labels:   termlabel.ActionTerminal(owner.ThreadID, owner.ProjectID, owner.Worktree, a.ID, a.Name, id),
 			Observer: m.observer(rec),
 		})
 		if err != nil {
@@ -189,7 +189,7 @@ func (m *Manager) start(ctx context.Context, a Action, owner Owner, mode Mode, t
 	if m.closed {
 		rec.kill(m.opts.KillGrace, &m.wg) // Close ran while it started
 	}
-	dropped := m.trim(owner.RepoID)
+	dropped := m.trim(owner.ProjectID)
 	m.rebuild()
 	bus.Publish[Event](m.opts.Bus, RunUpdated{Run: rec.public(false)})
 	for _, d := range dropped {
@@ -284,17 +284,17 @@ func (m *Manager) finish(rec *runRec, code int) {
 	m.rebuild()
 	bus.Publish[Event](m.opts.Bus, RunUpdated{Run: rec.public(false)})
 	bus.Publish[Event](m.opts.Bus, RunFinished{
-		RunID: r.ID, ActionID: r.ActionID, ActionName: r.ActionName, RepoID: r.RepoID, ThreadID: r.ThreadID,
+		RunID: r.ID, ActionID: r.ActionID, ActionName: r.ActionName, ProjectID: r.ProjectID, ThreadID: r.ThreadID,
 		TerminalID: r.TerminalID, Mode: r.Mode, Trigger: r.Trigger, ExitCode: code,
 	})
 }
 
-// trim forgets repoID's oldest finished runs beyond RunHistory and returns their ids.
+// trim forgets projectID's oldest finished runs beyond RunHistory and returns their ids.
 // Callers hold m.mu.
-func (m *Manager) trim(repoID string) []string {
+func (m *Manager) trim(projectID string) []string {
 	var rs []Run
 	for _, r := range m.runs {
-		if r.run.RepoID == repoID {
+		if r.run.ProjectID == projectID {
 			rs = append(rs, r.run)
 		}
 	}
@@ -356,17 +356,17 @@ func (m *Manager) Wait(ctx context.Context, id string) (Run, error) {
 	}
 }
 
-// WorktreeCreated runs repoID's on-worktree-create actions in the background, one
+// WorktreeCreated runs projectID's on-worktree-create actions in the background, one
 // after another in their order, for the thread threadID whose new worktree is at
 // worktree. It returns at once; failures are logged and published as RunFinished.
-func (m *Manager) WorktreeCreated(threadID, repoID, worktree string) {
+func (m *Manager) WorktreeCreated(threadID, projectID, worktree string) {
 	m.mu.Lock()
 	if m.closed {
 		m.mu.Unlock()
 		return
 	}
 	var acts []Action
-	for _, a := range m.repoActions(repoID) {
+	for _, a := range m.projectActions(projectID) {
 		if a.OnWorktreeCreate {
 			acts = append(acts, a)
 		}
@@ -377,7 +377,7 @@ func (m *Manager) WorktreeCreated(threadID, repoID, worktree string) {
 	}
 	m.wg.Add(1)
 	m.mu.Unlock()
-	owner := Owner{ThreadID: threadID, RepoID: repoID, Worktree: worktree}
+	owner := Owner{ThreadID: threadID, ProjectID: projectID, Worktree: worktree}
 	go func() {
 		defer m.wg.Done()
 		for _, a := range acts {

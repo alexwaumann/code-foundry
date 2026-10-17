@@ -38,7 +38,7 @@ describe("toSkillView", () => {
   it.each([
     [
       "project scope",
-      { name: "review", description: "Review it.", scope: SkillScope.PROJECT, repoId: "r-1", path: "/w/.claude/skills/review/SKILL.md" },
+      { name: "review", description: "Review it.", scope: SkillScope.PROJECT, projectId: "r-1", path: "/w/.claude/skills/review/SKILL.md" },
       { name: "review", description: "Review it.", scope: "project", repoId: "r-1", path: "/w/.claude/skills/review/SKILL.md" },
     ],
     [
@@ -100,8 +100,8 @@ describe("listSkills and searchFiles requests", () => {
         method: "listSkills",
         req: {
           sources: [
-            { repoId: "r-1", path: "" },
-            { repoId: "r-2", path: "/w/r-2" },
+            { projectId: "r-1", path: "" },
+            { projectId: "r-2", path: "/w/r-2" },
           ],
           includeUser: true,
         },
@@ -113,7 +113,7 @@ describe("listSkills and searchFiles requests", () => {
   it("searchFiles defaults path and limit to the proto's zero values", async () => {
     const { conn, calls } = fakeConn(create(SearchFilesResponseSchema, { matches: [{ path: "a.ts" }] }));
     const got = await searchFiles({ repoId: "r-1", query: "a" }, conn);
-    expect(calls).toEqual([{ method: "searchFiles", req: { repoId: "r-1", path: "", query: "a", limit: 0 } }]);
+    expect(calls).toEqual([{ method: "searchFiles", req: { projectId: "r-1", path: "", query: "a", limit: 0 } }]);
     expect(got).toEqual({ matches: [{ path: "a.ts", isDir: false }], truncated: false });
   });
 

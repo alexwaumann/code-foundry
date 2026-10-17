@@ -418,13 +418,13 @@ export function threadNewArgs(repoId: string, d: DraftArgsInput, attachments: re
 /**
  * thread.new's args for a thread. Empty values are omitted so the daemon applies its
  * defaults. A project: `worktree` is the path for an existing worktree, `new-worktree` +
- * `base` otherwise. A workspace: `workspace` and the member (`repo` + its `worktree`).
- * A new workspace: `new-worktree` + `repos`, the primary's own base as `<repo>:<base>`,
- * `repo` the member the thread runs in. No project: `no-project` alone (the daemon
+ * `base` otherwise. A workspace: `workspace` and the member (`project` + its `worktree`).
+ * A new workspace: `new-worktree` + `projects`, the primary's own base as `<project>:<base>`,
+ * `project` the member the thread runs in. No project: `no-project` alone (the daemon
  * refuses it beside any of the others).
  */
 export function threadArgs(place: ThreadPlace, d: PromptArgsInput, attachments: readonly string[]): Record<string, string> {
-  const args: Record<string, string> = place.kind === "home" ? { "no-project": "true" } : { repo: place.repoId };
+  const args: Record<string, string> = place.kind === "home" ? { "no-project": "true" } : { project: place.repoId };
   switch (place.kind) {
     case "home":
       break;
@@ -441,7 +441,7 @@ export function threadArgs(place: ThreadPlace, d: PromptArgsInput, attachments: 
       break;
     case "new-workspace":
       args["new-worktree"] = "true";
-      args.repos = place.repoIds.map((id) => (id === place.repoId && place.base ? `${id}:${place.base}` : id)).join(",");
+      args.projects = place.repoIds.map((id) => (id === place.repoId && place.base ? `${id}:${place.base}` : id)).join(",");
       break;
   }
   if (d.model) args.model = d.model;

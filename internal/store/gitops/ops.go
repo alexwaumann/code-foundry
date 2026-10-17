@@ -23,8 +23,8 @@ func (t target) label() string {
 // local-only repository fails with ErrNoRemote before any operation is recorded.
 func (m *Manager) resolveRemote(worktreePath string) (target, error) {
 	t, err := m.resolve(worktreePath)
-	if err == nil && IsLocalOnly(t.repo) {
-		return target{}, fmt.Errorf("%s: %w", t.repo.Name, ErrNoRemote)
+	if err == nil && IsLocalOnly(t.project) {
+		return target{}, fmt.Errorf("%s: %w", t.project.Name, ErrNoRemote)
 	}
 	return t, err
 }
@@ -166,7 +166,7 @@ func (x *run) branch(ctx context.Context) (string, error) {
 }
 
 // push pushes branch. Without an upstream it runs `git push -u origin <branch>`, so a
-// new feature branch (created with --no-track by the repo store) gets origin/<branch>
+// new feature branch (created with --no-track by the project store) gets origin/<branch>
 // as its upstream; with one it runs plain `git push`.
 func (x *run) push(ctx context.Context, branch string, force bool) (string, string, error) {
 	args := []string{"push"}
@@ -205,7 +205,7 @@ func (m *Manager) CreatePR(ctx context.Context, o CreatePROptions) (Op, error) {
 	if err != nil {
 		return Op{}, err
 	}
-	slug := t.repo.GitHubSlug
+	slug := t.project.GitHubSlug
 	return m.submit(ctx, KindPRCreate, "Create PR for "+t.label(), t, true, func(ctx context.Context, x *run) (string, string, error) {
 		ghBin, err := m.gh()
 		if err != nil {
@@ -264,7 +264,7 @@ func (m *Manager) OpenPR(ctx context.Context, worktreePath string) (Op, error) {
 	if err != nil {
 		return Op{}, err
 	}
-	slug := t.repo.GitHubSlug
+	slug := t.project.GitHubSlug
 	return m.submit(ctx, KindPROpen, "Open PR for "+t.label(), t, false, func(ctx context.Context, x *run) (string, string, error) {
 		ghBin, err := m.gh()
 		if err != nil {

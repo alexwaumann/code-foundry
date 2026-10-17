@@ -11,36 +11,36 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexwaumann/code-foundry/internal/store/repo"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 	"github.com/alexwaumann/code-foundry/internal/store/workspace/workspacetest"
 )
 
 func TestPickMember(t *testing.T) {
 	w := workspace.Workspace{Name: "login", Members: []workspace.Member{
-		{RepoID: "web", WorktreePath: "/wt/web"}, {RepoID: "api", WorktreePath: "/wt/api"},
+		{ProjectID: "web", WorktreePath: "/wt/web"}, {ProjectID: "api", WorktreePath: "/wt/api"},
 	}}
 	tests := []struct {
-		name         string
-		w            workspace.Workspace
-		repoID, path string
-		want         string // worktree path
-		wantErr      error
+		name            string
+		w               workspace.Workspace
+		projectID, path string
+		want            string // worktree path
+		wantErr         error
 	}{
 		{name: "default is the first member", w: w, want: "/wt/web"},
-		{name: "by repo", w: w, repoID: "api", want: "/wt/api"},
+		{name: "by project", w: w, projectID: "api", want: "/wt/api"},
 		{name: "by path", w: w, path: "/wt/api", want: "/wt/api"},
 		{name: "path is cleaned", w: w, path: "/wt/api/", want: "/wt/api"},
-		{name: "repo and path agree", w: w, repoID: "api", path: "/wt/api", want: "/wt/api"},
-		{name: "repo and path disagree", w: w, repoID: "web", path: "/wt/api", wantErr: ErrInvalidArgument},
-		{name: "repo not a member", w: w, repoID: "lib", wantErr: ErrFailedPrecondition},
+		{name: "project and path agree", w: w, projectID: "api", path: "/wt/api", want: "/wt/api"},
+		{name: "project and path disagree", w: w, projectID: "web", path: "/wt/api", wantErr: ErrInvalidArgument},
+		{name: "project not a member", w: w, projectID: "lib", wantErr: ErrFailedPrecondition},
 		{name: "path not a member", w: w, path: "/wt/lib", wantErr: ErrFailedPrecondition},
 		{name: "a subdirectory is not the member", w: w, path: "/wt/api/src", wantErr: ErrFailedPrecondition},
 		{name: "no members", w: workspace.Workspace{Name: "empty"}, wantErr: ErrFailedPrecondition},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := pickMember(tt.w, tt.repoID, tt.path)
+			got, err := pickMember(tt.w, tt.projectID, tt.path)
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("err = %v, want %v", err, tt.wantErr)
 			}
@@ -76,9 +76,9 @@ func newWSFixtureEnv(t *testing.T, fixture string, mutate ...func(*Options)) *ws
 	if err := os.MkdirAll(we.wt2, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	we.repos.Put(repo.Repo{ID: "r2", Path: we.wt2, Name: "api", Git: true, Worktrees: []repo.Worktree{{RepoID: "r2", Path: we.wt2, IsMain: true}}})
+	we.projects.Put(project.Project{ID: "r2", Path: we.wt2, Name: "api", Git: true, Worktrees: []project.Worktree{{ProjectID: "r2", Path: we.wt2, IsMain: true}}})
 	ws.Put(workspace.Workspace{ID: "w-login", Name: "login", Branch: "cf/login", Members: []workspace.Member{
-		{RepoID: "r1", WorktreePath: we.wt}, {RepoID: "r2", WorktreePath: we.wt2},
+		{ProjectID: "r1", WorktreePath: we.wt}, {ProjectID: "r2", WorktreePath: we.wt2},
 	}})
 	return we
 }
@@ -86,20 +86,20 @@ func newWSFixtureEnv(t *testing.T, fixture string, mutate ...func(*Options)) *ws
 func TestCreateInWorkspace(t *testing.T) {
 	e := newWSEnv(t)
 	tests := []struct {
-		name     string
-		o        CreateOptions
-		wantRepo string
-		wantPath func() string
-		wantErr  error
+		name        string
+		o           CreateOptions
+		wantProject string
+		wantPath    func() string
+		wantErr     error
 	}{
-		{name: "first member by default", o: CreateOptions{WorkspaceID: "w-login"}, wantRepo: "r1", wantPath: func() string { return e.wt }},
-		{name: "by name and repo", o: CreateOptions{WorkspaceID: "login", RepoID: "r2"}, wantRepo: "r2", wantPath: func() string { return e.wt2 }},
-		{name: "by member path", o: CreateOptions{WorkspaceID: "login", WorktreePath: e.wt2}, wantRepo: "r2", wantPath: func() string { return e.wt2 }},
+		{name: "first member by default", o: CreateOptions{WorkspaceID: "w-login"}, wantProject: "r1", wantPath: func() string { return e.wt }},
+		{name: "by name and project", o: CreateOptions{WorkspaceID: "login", ProjectID: "r2"}, wantProject: "r2", wantPath: func() string { return e.wt2 }},
+		{name: "by member path", o: CreateOptions{WorkspaceID: "login", WorktreePath: e.wt2}, wantProject: "r2", wantPath: func() string { return e.wt2 }},
 		{name: "path that is not a member", o: CreateOptions{WorkspaceID: "login", WorktreePath: t.TempDir()}, wantErr: ErrFailedPrecondition},
 		{name: "relative path", o: CreateOptions{WorkspaceID: "login", WorktreePath: "api"}, wantErr: ErrInvalidArgument},
 		{name: "unknown workspace", o: CreateOptions{WorkspaceID: "nope"}, wantErr: ErrNotFound},
 		{name: "not with a new worktree", o: CreateOptions{WorkspaceID: "login", NewWorktree: &NewWorktree{}}, wantErr: ErrInvalidArgument},
-		{name: "not with a new workspace", o: CreateOptions{WorkspaceID: "login", NewWorkspace: &NewWorkspace{Repos: []string{"r1"}}}, wantErr: ErrInvalidArgument},
+		{name: "not with a new workspace", o: CreateOptions{WorkspaceID: "login", NewWorkspace: &NewWorkspace{Projects: []string{"r1"}}}, wantErr: ErrInvalidArgument},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -110,7 +110,7 @@ func TestCreateInWorkspace(t *testing.T) {
 			if err != nil {
 				return
 			}
-			if s.WorkspaceID != "w-login" || s.RepoID != tt.wantRepo || s.WorktreePath != tt.wantPath() {
+			if s.WorkspaceID != "w-login" || s.ProjectID != tt.wantProject || s.WorktreePath != tt.wantPath() {
 				t.Errorf("thread = %+v", s)
 			}
 			if spec := e.spec(s.ID); !samePath(spec.Cwd, tt.wantPath()) {
@@ -125,14 +125,14 @@ func TestWorkspaceThreadNeedsTheWorkspaceStore(t *testing.T) {
 	if _, err := e.m.Create(e.ctx(), CreateOptions{WorkspaceID: "login"}); !errors.Is(err, ErrFailedPrecondition) {
 		t.Errorf("Create = %v, want failed precondition", err)
 	}
-	if _, err := e.m.Create(e.ctx(), CreateOptions{NewWorkspace: &NewWorkspace{Repos: []string{"r1"}}}); !errors.Is(err, ErrFailedPrecondition) {
+	if _, err := e.m.Create(e.ctx(), CreateOptions{NewWorkspace: &NewWorkspace{Projects: []string{"r1"}}}); !errors.Is(err, ErrFailedPrecondition) {
 		t.Errorf("Create new workspace = %v, want failed precondition", err)
 	}
 }
 
 func TestWorkspaceOwnerSurvivesRestartAndFork(t *testing.T) {
 	e := newWSEnv(t)
-	s := e.connected(CreateOptions{WorkspaceID: "login", RepoID: "r2", Name: "driver"})
+	s := e.connected(CreateOptions{WorkspaceID: "login", ProjectID: "r2", Name: "driver"})
 	cid := argOf(e.spec(s.ID).Argv, "--session-id")
 	e.writeTranscriptIn(e.wt2, cid, userLine("hi"))
 	e.waitFor(s.ID, "discovered", func(s Thread) bool { return s.ClaudeSessionID == cid })
@@ -141,7 +141,7 @@ func TestWorkspaceOwnerSurvivesRestartAndFork(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if f.WorkspaceID != "w-login" || f.RepoID != "r2" || f.WorktreePath != e.wt2 {
+	if f.WorkspaceID != "w-login" || f.ProjectID != "r2" || f.WorktreePath != e.wt2 {
 		t.Errorf("fork = %+v", f)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -152,7 +152,7 @@ func TestWorkspaceOwnerSurvivesRestartAndFork(t *testing.T) {
 	e.open(e.withSource)
 	for _, id := range []string{s.ID, f.ID} {
 		got, err := e.m.Get(e.ctx(), id)
-		if err != nil || got.WorkspaceID != "w-login" || got.RepoID != "r2" || got.WorktreePath != e.wt2 {
+		if err != nil || got.WorkspaceID != "w-login" || got.ProjectID != "r2" || got.WorktreePath != e.wt2 {
 			t.Errorf("after restart %s = %+v (%v)", id, got, err)
 		}
 	}
@@ -169,50 +169,50 @@ func (e *env) writeTranscriptIn(wt, cid string, lines ...string) {
 
 func TestCreateNewWorkspace(t *testing.T) {
 	tests := []struct {
-		name       string
-		o          CreateOptions
-		taken      []string // refs RefExists reports, in any repo
-		existing   string   // a workspace with this name exists already
-		wantCall   string   // the workspace store's Create call
-		wantBranch string
-		wantRepo   string
-		wantName   string // thread name
-		wantBase   string // thread base ref; default: the request's
-		wantErr    error
+		name        string
+		o           CreateOptions
+		taken       []string // refs RefExists reports, in any project
+		existing    string   // a workspace with this name exists already
+		wantCall    string   // the workspace store's Create call
+		wantBranch  string
+		wantProject string
+		wantName    string // thread name
+		wantBase    string // thread base ref; default: the request's
+		wantErr     error
 	}{
-		{name: "title names the thread, its slug the branch and workspace; first repo is the cwd",
-			o:        CreateOptions{InitialPrompt: "fix login", NewWorkspace: &NewWorkspace{Repos: []string{"r1", "api"}}},
-			wantCall: "Create named-fix r1,r2", wantBranch: "cf/named-fix", wantRepo: "r1", wantName: "Named fix"},
-		{name: "repo picks the cwd member, by name too",
-			o:        CreateOptions{RepoID: "api", InitialPrompt: "fix login", NewWorkspace: &NewWorkspace{Repos: []string{"repo", "api"}}},
-			wantCall: "Create named-fix r1,r2", wantBranch: "cf/named-fix", wantRepo: "r2", wantName: "Named fix"},
-		{name: "repo picks the cwd member",
-			o:        CreateOptions{RepoID: "r2", InitialPrompt: "fix login", NewWorkspace: &NewWorkspace{Repos: []string{"r1", "r2"}, BaseRef: "origin/dev"}},
-			wantCall: "Create named-fix r1,r2", wantBranch: "cf/named-fix", wantRepo: "r2", wantName: "Named fix"},
+		{name: "title names the thread, its slug the branch and workspace; first project is the cwd",
+			o:        CreateOptions{InitialPrompt: "fix login", NewWorkspace: &NewWorkspace{Projects: []string{"r1", "api"}}},
+			wantCall: "Create named-fix r1,r2", wantBranch: "cf/named-fix", wantProject: "r1", wantName: "Named fix"},
+		{name: "project picks the cwd member, by name too",
+			o:        CreateOptions{ProjectID: "api", InitialPrompt: "fix login", NewWorkspace: &NewWorkspace{Projects: []string{"repo", "api"}}},
+			wantCall: "Create named-fix r1,r2", wantBranch: "cf/named-fix", wantProject: "r2", wantName: "Named fix"},
+		{name: "project picks the cwd member",
+			o:        CreateOptions{ProjectID: "r2", InitialPrompt: "fix login", NewWorkspace: &NewWorkspace{Projects: []string{"r1", "r2"}, BaseRef: "origin/dev"}},
+			wantCall: "Create named-fix r1,r2", wantBranch: "cf/named-fix", wantProject: "r2", wantName: "Named fix"},
 		{name: "a member's own base; the cwd member's base is the thread's",
-			o:        CreateOptions{RepoID: "r2", InitialPrompt: "fix login", NewWorkspace: &NewWorkspace{Repos: []string{"r1", "api: origin/feat"}, BaseRef: "origin/dev"}},
-			wantCall: "Create named-fix r1,r2:origin/feat", wantBranch: "cf/named-fix", wantRepo: "r2", wantName: "Named fix", wantBase: "origin/feat"},
+			o:        CreateOptions{ProjectID: "r2", InitialPrompt: "fix login", NewWorkspace: &NewWorkspace{Projects: []string{"r1", "api: origin/feat"}, BaseRef: "origin/dev"}},
+			wantCall: "Create named-fix r1,r2:origin/feat", wantBranch: "cf/named-fix", wantProject: "r2", wantName: "Named fix", wantBase: "origin/feat"},
 		{name: "a member's own base; another member is the cwd",
-			o:        CreateOptions{InitialPrompt: "fix login", NewWorkspace: &NewWorkspace{Repos: []string{"r1", "r2:origin/feat"}}},
-			wantCall: "Create named-fix r1,r2:origin/feat", wantBranch: "cf/named-fix", wantRepo: "r1", wantName: "Named fix"},
-		{name: "a bad member base", o: CreateOptions{NewWorkspace: &NewWorkspace{Repos: []string{"r1:-x"}}}, wantErr: ErrInvalidArgument},
+			o:        CreateOptions{InitialPrompt: "fix login", NewWorkspace: &NewWorkspace{Projects: []string{"r1", "r2:origin/feat"}}},
+			wantCall: "Create named-fix r1,r2:origin/feat", wantBranch: "cf/named-fix", wantProject: "r1", wantName: "Named fix"},
+		{name: "a bad member base", o: CreateOptions{NewWorkspace: &NewWorkspace{Projects: []string{"r1:-x"}}}, wantErr: ErrInvalidArgument},
 		{name: "a branch taken in any member gets a suffix",
-			o:     CreateOptions{InitialPrompt: "fix login", NewWorkspace: &NewWorkspace{Repos: []string{"r1", "r2"}}},
+			o:     CreateOptions{InitialPrompt: "fix login", NewWorkspace: &NewWorkspace{Projects: []string{"r1", "r2"}}},
 			taken: []string{"refs/remotes/origin/cf/named-fix"}, wantCall: "Create named-fix-2 r1,r2", wantBranch: "cf/named-fix-2",
-			wantRepo: "r1", wantName: "Named fix"},
+			wantProject: "r1", wantName: "Named fix"},
 		{name: "a taken workspace name gets a suffix",
-			o:        CreateOptions{InitialPrompt: "fix login", NewWorkspace: &NewWorkspace{Repos: []string{"r1", "r2"}}},
-			existing: "named-fix", wantCall: "Create named-fix-2 r1,r2", wantBranch: "cf/named-fix-2", wantRepo: "r1", wantName: "Named fix"},
+			o:        CreateOptions{InitialPrompt: "fix login", NewWorkspace: &NewWorkspace{Projects: []string{"r1", "r2"}}},
+			existing: "named-fix", wantCall: "Create named-fix-2 r1,r2", wantBranch: "cf/named-fix-2", wantProject: "r1", wantName: "Named fix"},
 		{name: "explicit thread name, explicit workspace name",
-			o:        CreateOptions{Name: "Driver One", NewWorkspace: &NewWorkspace{Repos: []string{"r1", "r2"}, Name: "Login work"}},
-			wantCall: "Create Login work r1,r2", wantBranch: "cf/driver-one", wantRepo: "r1", wantName: "Driver One"},
-		{name: "unknown repository", o: CreateOptions{NewWorkspace: &NewWorkspace{Repos: []string{"r1", "nope"}}}, wantErr: ErrNotFound},
-		{name: "repository twice", o: CreateOptions{NewWorkspace: &NewWorkspace{Repos: []string{"r1", "repo"}}}, wantErr: ErrInvalidArgument},
-		{name: "cwd repo not listed", o: CreateOptions{RepoID: "r2", NewWorkspace: &NewWorkspace{Repos: []string{"r1"}}}, wantErr: ErrInvalidArgument},
+			o:        CreateOptions{Name: "Driver One", NewWorkspace: &NewWorkspace{Projects: []string{"r1", "r2"}, Name: "Login work"}},
+			wantCall: "Create Login work r1,r2", wantBranch: "cf/driver-one", wantProject: "r1", wantName: "Driver One"},
+		{name: "unknown repository", o: CreateOptions{NewWorkspace: &NewWorkspace{Projects: []string{"r1", "nope"}}}, wantErr: ErrNotFound},
+		{name: "project twice", o: CreateOptions{NewWorkspace: &NewWorkspace{Projects: []string{"r1", "repo"}}}, wantErr: ErrInvalidArgument},
+		{name: "cwd project not listed", o: CreateOptions{ProjectID: "r2", NewWorkspace: &NewWorkspace{Projects: []string{"r1"}}}, wantErr: ErrInvalidArgument},
 		{name: "no repositories", o: CreateOptions{NewWorkspace: &NewWorkspace{}}, wantErr: ErrInvalidArgument},
-		{name: "a project without git", o: CreateOptions{NewWorkspace: &NewWorkspace{Repos: []string{"r1", "notes"}}}, wantErr: ErrFailedPrecondition},
-		{name: "bad base", o: CreateOptions{NewWorkspace: &NewWorkspace{Repos: []string{"r1"}, BaseRef: "-x"}}, wantErr: ErrInvalidArgument},
-		{name: "not with a new worktree", o: CreateOptions{NewWorktree: &NewWorktree{}, NewWorkspace: &NewWorkspace{Repos: []string{"r1"}}}, wantErr: ErrInvalidArgument},
+		{name: "a project without git", o: CreateOptions{NewWorkspace: &NewWorkspace{Projects: []string{"r1", "notes"}}}, wantErr: ErrFailedPrecondition},
+		{name: "bad base", o: CreateOptions{NewWorkspace: &NewWorkspace{Projects: []string{"r1"}, BaseRef: "-x"}}, wantErr: ErrInvalidArgument},
+		{name: "not with a new worktree", o: CreateOptions{NewWorktree: &NewWorktree{}, NewWorkspace: &NewWorkspace{Projects: []string{"r1"}}}, wantErr: ErrInvalidArgument},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -220,7 +220,7 @@ func TestCreateNewWorkspace(t *testing.T) {
 				o.RefExists = func(_ context.Context, _, ref string) bool { return slices.Contains(tt.taken, ref) }
 			})
 			e.namer = func(string) (string, error) { return "Named fix", nil }
-			e.repos.Put(repo.Repo{ID: "r3", Path: "/src/notes", Name: "notes", Worktrees: []repo.Worktree{{RepoID: "r3", Path: "/src/notes", IsMain: true}}})
+			e.projects.Put(project.Project{ID: "r3", Path: "/src/notes", Name: "notes", Worktrees: []project.Worktree{{ProjectID: "r3", Path: "/src/notes", IsMain: true}}})
 			if tt.existing != "" {
 				e.ws.Put(workspace.Workspace{ID: "w-old", Name: tt.existing, Branch: "cf/other"})
 			}
@@ -242,9 +242,9 @@ func TestCreateNewWorkspace(t *testing.T) {
 			if !ok || w.Branch != tt.wantBranch {
 				t.Fatalf("workspace %s = %+v, want branch %s", s.WorkspaceID, w, tt.wantBranch)
 			}
-			mem, _ := w.Member(tt.wantRepo)
-			if s.RepoID != tt.wantRepo || s.WorktreePath != mem.WorktreePath || !s.CreatedWorktree || s.Name != tt.wantName {
-				t.Errorf("thread = %+v, want cwd %s in %s", s, mem.WorktreePath, tt.wantRepo)
+			mem, _ := w.Member(tt.wantProject)
+			if s.ProjectID != tt.wantProject || s.WorktreePath != mem.WorktreePath || !s.CreatedWorktree || s.Name != tt.wantName {
+				t.Errorf("thread = %+v, want cwd %s in %s", s, mem.WorktreePath, tt.wantProject)
 			}
 			if base := cmp.Or(tt.wantBase, tt.o.NewWorkspace.BaseRef); base != "" && s.BaseRef != base {
 				t.Errorf("base = %q, want %q", s.BaseRef, base)
@@ -255,7 +255,7 @@ func TestCreateNewWorkspace(t *testing.T) {
 
 func TestWorkspaceLaunch(t *testing.T) {
 	snap := &workspace.Snapshot{Workspaces: []workspace.Workspace{{ID: "w-1", Name: "login", Members: []workspace.Member{
-		{RepoID: "web", WorktreePath: "/wt/web"}, {RepoID: "api", WorktreePath: "/wt/api"}, {RepoID: "lib", WorktreePath: "/wt/lib"},
+		{ProjectID: "web", WorktreePath: "/wt/web"}, {ProjectID: "api", WorktreePath: "/wt/api"}, {ProjectID: "lib", WorktreePath: "/wt/lib"},
 	}}}}
 	line := "This thread belongs to workspace login. Run `code-foundry workspace members` for the current worktrees."
 	exists := func(p string) bool { return p != "/wt/lib" }
@@ -334,15 +334,15 @@ func TestWorkspaceThreadSpawn(t *testing.T) {
 	e.writeTranscript(cid, userLine("hi"))
 	e.waitFor(s.ID, "discovered", func(s Thread) bool { return s.ClaudeSessionID == cid })
 
-	// A repo added since: reconnect and fork see it. A member whose worktree is gone is
+	// A project added since: reconnect and fork see it. A member whose worktree is gone is
 	// skipped (claude refuses a missing --add-dir).
 	lib := filepath.Join(t.TempDir(), "lib")
 	if err := os.MkdirAll(lib, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	w, _ := e.ws.Snapshot().Workspace("w-login")
-	w.Members = append(slices.Clone(w.Members), workspace.Member{RepoID: "r3", WorktreePath: lib},
-		workspace.Member{RepoID: "r4", WorktreePath: filepath.Join(lib, "gone")})
+	w.Members = append(slices.Clone(w.Members), workspace.Member{ProjectID: "r3", WorktreePath: lib},
+		workspace.Member{ProjectID: "r4", WorktreePath: filepath.Join(lib, "gone")})
 	e.ws.Put(w)
 	e.exit(s.ID, 0)
 	e.waitFor(s.ID, "disconnected", func(s Thread) bool { return s.State == StateDisconnected })

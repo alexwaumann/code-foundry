@@ -17,19 +17,19 @@ func TestInvokeFailed(t *testing.T) {
 		wantStderr string
 	}{
 		{"caller mistake", connect.NewError(connect.CodeInvalidArgument, errors.New("bad")), errUsage, "",
-			"code-foundry repo.create: bad\nRun `code-foundry help repo.create` for usage.\n"},
+			"code-foundry project.create: bad\nRun `code-foundry help project.create` for usage.\n"},
 		{"one line from the tool", connect.NewError(connect.CodeUnknown, errors.New("GraphQL: Name already exists on this account")), nil,
-			"repo.create: GraphQL: Name already exists on this account (unknown)", ""},
+			"project.create: GraphQL: Name already exists on this account (unknown)", ""},
 		{"several lines from the tool, as is", connect.NewError(connect.CodeUnknown, errors.New("To https://github.com/me/x.git\n ! [rejected] main -> main\nerror: failed to push")),
-			errReported, "", "code-foundry repo.create failed:\nTo https://github.com/me/x.git\n ! [rejected] main -> main\nerror: failed to push\n"},
+			errReported, "", "code-foundry project.create failed:\nTo https://github.com/me/x.git\n ! [rejected] main -> main\nerror: failed to push\n"},
 		{"other codes", connect.NewError(connect.CodeDeadlineExceeded, errors.New("took too long\nreally")), nil,
-			"repo.create: took too long\nreally (deadline_exceeded)", ""},
+			"project.create: took too long\nreally (deadline_exceeded)", ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var stderr bytes.Buffer
 			cl := &cli{stderr: &stderr}
-			err := cl.invokeFailed("repo.create", tt.err)
+			err := cl.invokeFailed("project.create", tt.err)
 			switch {
 			case tt.wantErr != nil && !errors.Is(err, tt.wantErr):
 				t.Fatalf("err = %v, want %v", err, tt.wantErr)

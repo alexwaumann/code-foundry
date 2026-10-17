@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
-	"github.com/alexwaumann/code-foundry/internal/store/repo"
-	"github.com/alexwaumann/code-foundry/internal/store/repo/repotest"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
+	"github.com/alexwaumann/code-foundry/internal/store/project/projecttest"
 )
 
 // fakeTracker records the tracked set.
@@ -46,14 +46,14 @@ func (f *fakeTracker) slugs() []string {
 	return out
 }
 
-func TestStartGhTracksOnlyGitHubRepos(t *testing.T) {
+func TestStartGhTracksOnlyGitHubProjects(t *testing.T) {
 	b := bus.New()
-	repos := repotest.New(b)
-	repos.Put(repo.Repo{ID: "gh", Name: "gh", GitHubSlug: "Acme/App", Remotes: []string{"origin"}})
-	repos.Put(repo.Repo{ID: "local", Name: "momentum"})
-	repos.Put(repo.Repo{ID: "gitlab", Name: "gitlab", Remotes: []string{"origin"}})
+	projects := projecttest.New(b)
+	projects.Put(project.Project{ID: "gh", Name: "gh", GitHubSlug: "Acme/App", Remotes: []string{"origin"}})
+	projects.Put(project.Project{ID: "local", Name: "momentum"})
+	projects.Put(project.Project{ID: "gitlab", Name: "gitlab", Remotes: []string{"origin"}})
 	tr := &fakeTracker{tracked: map[string]bool{}}
-	stop := startGh(context.Background(), slog.New(slog.DiscardHandler), tr, repos, b)
+	stop := startGh(context.Background(), slog.New(slog.DiscardHandler), tr, projects, b)
 	defer stop()
 
 	waitTracked := func(want ...string) {
@@ -68,9 +68,9 @@ func TestStartGhTracksOnlyGitHubRepos(t *testing.T) {
 	}
 	waitTracked("acme/app")
 
-	// The local-only repo gains a GitHub origin, then loses it again.
-	repos.Put(repo.Repo{ID: "local", Name: "momentum", GitHubSlug: "me/momentum", Remotes: []string{"origin"}})
+	// The local-only project gains a GitHub origin, then loses it again.
+	projects.Put(project.Project{ID: "local", Name: "momentum", GitHubSlug: "me/momentum", Remotes: []string{"origin"}})
 	waitTracked("acme/app", "me/momentum")
-	repos.Put(repo.Repo{ID: "local", Name: "momentum"})
+	projects.Put(project.Project{ID: "local", Name: "momentum"})
 	waitTracked("acme/app")
 }

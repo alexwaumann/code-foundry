@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
-	"github.com/alexwaumann/code-foundry/internal/store/repo"
-	"github.com/alexwaumann/code-foundry/internal/store/repo/repotest"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
+	"github.com/alexwaumann/code-foundry/internal/store/project/projecttest"
 )
 
 // isolateGit keeps a developer's global git config (signing, hooks) out of the tests.
@@ -51,7 +51,7 @@ func commit(t *testing.T, dir, file, content, msg string) {
 // world is a bare origin with two clones, a and b, both on main and in sync.
 type world struct {
 	origin, a, b string
-	repos        *repotest.Fake
+	projects     *projecttest.Fake
 	bus          *bus.Bus
 	m            *Manager
 }
@@ -76,9 +76,9 @@ func newWorld(t *testing.T, opts Options) *world {
 	git(t, w.a, "push", "-q", "-u", "origin", "main")
 	git(t, root, "clone", "-q", w.origin, w.b)
 
-	w.repos = repotest.New(w.bus)
-	w.repos.Put(repo.Repo{ID: "ra", Path: w.a, Name: "a", GitHubSlug: "me/a", Remotes: []string{"origin"}, Worktrees: []repo.Worktree{{RepoID: "ra", Path: w.a, Branch: "main", IsMain: true}}})
-	opts.Bus, opts.Repos = w.bus, w.repos
+	w.projects = projecttest.New(w.bus)
+	w.projects.Put(project.Project{ID: "ra", Path: w.a, Name: "a", GitHubSlug: "me/a", Remotes: []string{"origin"}, Worktrees: []project.Worktree{{ProjectID: "ra", Path: w.a, Branch: "main", IsMain: true}}})
+	opts.Bus, opts.Projects = w.bus, w.projects
 	w.m = New(opts)
 	t.Cleanup(func() { _ = w.m.Close() })
 	return w
@@ -130,7 +130,7 @@ func TestPushFetchPullRoundTrip(t *testing.T) {
 	if !strings.Contains(op.Output, "$ git push -u origin feat") {
 		t.Errorf("output lacks the push command:\n%s", op.Output)
 	}
-	if op.RepoID != "ra" || op.Branch != "feat" || op.Title != "Push feat" || op.WorktreePath != w.a || op.Duration <= 0 {
+	if op.ProjectID != "ra" || op.Branch != "feat" || op.Title != "Push feat" || op.WorktreePath != w.a || op.Duration <= 0 {
 		t.Errorf("op = %+v", op)
 	}
 
@@ -155,8 +155,8 @@ func TestPushFetchPullRoundTrip(t *testing.T) {
 	wantOK(t, mustOp(t)(w.m.Fetch(ctx, FetchOptions{WorktreePath: w.b})), "pruned 1 ref")
 
 	_ = w.m.Close()
-	if !slices.Contains(w.repos.Calls, "Refresh ra") {
-		t.Errorf("repo store was not refreshed after ops on a: %v", w.repos.Calls)
+	if !slices.Contains(w.projects.Calls, "Refresh ra") {
+		t.Errorf("project store was not refreshed after ops on a: %v", w.projects.Calls)
 	}
 }
 
@@ -396,7 +396,7 @@ func TestGitHubSlug(t *testing.T) {
 	if err := os.Mkdir(sub, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	tests := []struct{ repoID, path, want string }{
+	tests := []struct{ projectID, path, want string }{
 		{"", w.a, "me/a"},
 		{"", sub, "me/a"},
 		{"ra", "", "me/a"},
@@ -404,8 +404,8 @@ func TestGitHubSlug(t *testing.T) {
 		{"nope", "", ""},
 	}
 	for _, tt := range tests {
-		if got := w.m.GitHubSlug(tt.repoID, tt.path); got != tt.want {
-			t.Errorf("GitHubSlug(%q, %q) = %q, want %q", tt.repoID, tt.path, got, tt.want)
+		if got := w.m.GitHubSlug(tt.projectID, tt.path); got != tt.want {
+			t.Errorf("GitHubSlug(%q, %q) = %q, want %q", tt.projectID, tt.path, got, tt.want)
 		}
 	}
 }
@@ -415,20 +415,20 @@ func TestLocalOnly(t *testing.T) {
 	local := resolved(t, t.TempDir())
 	git(t, local, "init", "-q")
 	commit(t, local, "README", "local\n", "initial")
-	main := []repo.Worktree{{RepoID: "rl", Path: local, Branch: "main", IsMain: true}}
-	w.repos.Put(repo.Repo{ID: "rl", Path: local, Name: "momentum", Worktrees: main})
+	main := []project.Worktree{{ProjectID: "rl", Path: local, Branch: "main", IsMain: true}}
+	w.projects.Put(project.Project{ID: "rl", Path: local, Name: "momentum", Worktrees: main})
 	// Not reconciled yet (no worktrees) and failing to reconcile: remotes unknown.
-	w.repos.Put(repo.Repo{ID: "pending", Path: "/nowhere/pending", Name: "pending"})
-	w.repos.Put(repo.Repo{ID: "broken", Path: "/nowhere/broken", Name: "broken", Error: "gone",
-		Worktrees: []repo.Worktree{{RepoID: "broken", Path: "/nowhere/broken", IsMain: true}}})
+	w.projects.Put(project.Project{ID: "pending", Path: "/nowhere/pending", Name: "pending"})
+	w.projects.Put(project.Project{ID: "broken", Path: "/nowhere/broken", Name: "broken", Error: "gone",
+		Worktrees: []project.Worktree{{ProjectID: "broken", Path: "/nowhere/broken", IsMain: true}}})
 
 	tests := []struct {
-		repoID, path string
-		want         bool
+		projectID, path string
+		want            bool
 	}{
 		{"rl", "", true},
 		{"", local, true},
-		{"ra", local, true}, // the worktree path wins over the repo id
+		{"ra", local, true}, // the worktree path wins over the project id
 		{"rl", w.a, false},
 		{"ra", "", false},
 		{"", w.b, false}, // unregistered: unknown, so not local-only
@@ -438,8 +438,8 @@ func TestLocalOnly(t *testing.T) {
 		{"", "", false},
 	}
 	for _, tt := range tests {
-		if got := w.m.LocalOnly(tt.repoID, tt.path); got != tt.want {
-			t.Errorf("LocalOnly(%q, %q) = %v, want %v", tt.repoID, tt.path, got, tt.want)
+		if got := w.m.LocalOnly(tt.projectID, tt.path); got != tt.want {
+			t.Errorf("LocalOnly(%q, %q) = %v, want %v", tt.projectID, tt.path, got, tt.want)
 		}
 	}
 

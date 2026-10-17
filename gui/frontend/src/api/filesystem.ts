@@ -100,7 +100,7 @@ export function toSkillView(s: Skill): SkillView {
     name: s.name,
     description: s.description,
     scope: s.scope === SkillScope.USER ? "user" : "project",
-    repoId: s.repoId,
+    repoId: s.projectId,
     path: s.path,
   };
 }
@@ -121,7 +121,7 @@ export async function listSkills(
 ): Promise<SkillView[]> {
   const c = await conn.client(FilesystemService);
   try {
-    const res = await c.listSkills({ sources: sources.map((s) => ({ repoId: s.repoId, path: s.path ?? "" })), includeUser }, { signal });
+    const res = await c.listSkills({ sources: sources.map((s) => ({ projectId: s.repoId, path: s.path ?? "" })), includeUser }, { signal });
     return res.skills.map(toSkillView);
   } catch (err) {
     throw orOutdatedDaemon(err);
@@ -145,7 +145,7 @@ export interface FileSearchRequest {
 export async function searchFiles(req: FileSearchRequest, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<FileSearchView> {
   const c = await conn.client(FilesystemService);
   try {
-    const res = await c.searchFiles({ repoId: req.repoId, path: req.path ?? "", query: req.query, limit: req.limit ?? 0 }, { signal });
+    const res = await c.searchFiles({ projectId: req.repoId, path: req.path ?? "", query: req.query, limit: req.limit ?? 0 }, { signal });
     return toFileSearchView(res);
   } catch (err) {
     throw orOutdatedDaemon(err);

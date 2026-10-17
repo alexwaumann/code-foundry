@@ -19,19 +19,19 @@ import (
 )
 
 type fixture struct {
-	reg  *command.Registry
-	emit *commandtest.Emitter
-	term *commandtest.Terminal
-	repo *commandtest.Repo
+	reg     *command.Registry
+	emit    *commandtest.Emitter
+	term    *commandtest.Terminal
+	project *commandtest.Project
 }
 
 func newFixture(t *testing.T) fixture {
 	t.Helper()
 	f := fixture{
-		reg:  command.NewRegistry(),
-		emit: &commandtest.Emitter{Delivered: 2},
-		term: &commandtest.Terminal{},
-		repo: &commandtest.Repo{},
+		reg:     command.NewRegistry(),
+		emit:    &commandtest.Emitter{Delivered: 2},
+		term:    &commandtest.Terminal{},
+		project: &commandtest.Project{},
 	}
 	start := time.Unix(1000, 0)
 	err := all.Register(f.reg, all.Deps{
@@ -42,9 +42,9 @@ func newFixture(t *testing.T) fixture {
 		},
 		Emitter:  f.emit,
 		Terminal: f.term,
-		Repo:     f.repo,
+		Project:  f.project,
 		// "plain" (at /plain) is a project without git.
-		NotGit: func(c command.Context) bool { return c.ActiveRepoID == "plain" || c.ActiveWorktreePath == "/plain" },
+		NotGit: func(c command.Context) bool { return c.ActiveProjectID == "plain" || c.ActiveWorktreePath == "/plain" },
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -56,10 +56,10 @@ func TestAllRegistersEveryDomain(t *testing.T) {
 	f := newFixture(t)
 	want := []string{
 		"daemon.status", "daemon.version",
-		"ui.palette.open", "ui.notify", "ui.focus.terminal", "ui.focus.repo",
+		"ui.palette.open", "ui.notify", "ui.focus.terminal", "ui.focus.project",
 		"terminal.new", "terminal.list", "terminal.close", "terminal.kill", "terminal.remove",
-		"repo.unregister", "repo.worktree.new", "repo.worktree.remove", "repo.worktree.cleanup", "repo.refresh", "repo.git.init",
-		"repo.add", "repo.clone", "repo.create", "repo.github.publish", "repo.delete",
+		"project.list", "project.unregister", "project.worktree.new", "project.worktree.remove", "project.worktree.cleanup", "project.refresh", "project.git.init",
+		"project.add", "project.clone", "project.create", "project.github.publish", "project.delete",
 		"thread.new", "thread.list", "thread.focus",
 		"thread.rename", "thread.fork", "thread.remove", "thread.run-in", "thread.pin", "thread.archive", "thread.snooze",
 		"thread.get", "thread.label", "thread.report", "thread.budget",
@@ -73,7 +73,7 @@ func TestAllRegistersEveryDomain(t *testing.T) {
 		"view.settings", "view.help", "notifications.test", "theme.list", "theme.set-dark", "theme.set-light", "theme.pick",
 		"app.version", "app.update.check", "app.update", "app.relaunch", "app.restart", "daemon.restart",
 		"view.dashboard", "view.usage", "usage.show", "view.pullrequests", "view.projects", "view.panel.toggle", "view.bottom.toggle", "view.panel.expand", "view.panel.new-tab", "view.panel.workspace", "view.panel.linked-prs", "view.panel.usage", "view.panel.threads", "view.panel.worktree",
-		"workspace.new", "workspace.list", "workspace.members", "workspace.add-repo", "workspace.remove-repo", "workspace.remove",
+		"workspace.new", "workspace.list", "workspace.members", "workspace.add-project", "workspace.remove-project", "workspace.remove",
 		"action.list", "action.add", "action.edit", "action.remove", "action.run", "action.wait", "action.runs",
 	}
 	for _, n := range want {
@@ -115,33 +115,33 @@ func TestAvailability(t *testing.T) {
 		{"terminal.kill", command.Context{}, false},
 		{"terminal.kill", command.Context{ActiveTerminalID: "t1"}, true},
 		{"terminal.remove", command.Context{ActiveTerminalID: "t1"}, true},
-		{"repo.add", command.Context{}, true},
-		{"repo.unregister", command.Context{}, false},
-		{"repo.unregister", command.Context{ActiveRepoID: "r1"}, true},
-		{"repo.worktree.new", command.Context{}, false},
-		{"repo.worktree.new", command.Context{ActiveRepoID: "r1"}, true},
-		{"repo.worktree.remove", command.Context{ActiveRepoID: "r1"}, false},
-		{"repo.worktree.remove", command.Context{ActiveRepoID: "r1", ActiveWorktreePath: "/wt"}, true},
-		{"repo.refresh", command.Context{}, true},
+		{"project.add", command.Context{}, true},
+		{"project.unregister", command.Context{}, false},
+		{"project.unregister", command.Context{ActiveProjectID: "r1"}, true},
+		{"project.worktree.new", command.Context{}, false},
+		{"project.worktree.new", command.Context{ActiveProjectID: "r1"}, true},
+		{"project.worktree.remove", command.Context{ActiveProjectID: "r1"}, false},
+		{"project.worktree.remove", command.Context{ActiveProjectID: "r1", ActiveWorktreePath: "/wt"}, true},
+		{"project.refresh", command.Context{}, true},
 		// A project without git: its one checkout, no worktrees, Initialize Git.
-		{"repo.worktree.new", command.Context{ActiveRepoID: "plain"}, false},
-		{"repo.worktree.remove", command.Context{ActiveRepoID: "plain", ActiveWorktreePath: "/plain"}, false},
-		{"repo.git.init", command.Context{}, false},
-		{"repo.git.init", command.Context{ActiveRepoID: "r1"}, false},
-		{"repo.git.init", command.Context{ActiveRepoID: "plain"}, true},
-		{"repo.git.init", command.Context{ActiveRepoID: "plain", ActiveWorktreePath: "/plain"}, true},
-		{"repo.unregister", command.Context{ActiveRepoID: "plain"}, true},
-		{"repo.refresh", command.Context{ActiveRepoID: "plain"}, true},
-		{"git.fetch", command.Context{ActiveRepoID: "plain", ActiveWorktreePath: "/plain"}, false},
-		{"git.push", command.Context{ActiveRepoID: "plain", ActiveWorktreePath: "/plain"}, false},
-		{"pr.create", command.Context{ActiveRepoID: "plain", ActiveWorktreePath: "/plain"}, false},
-		{"worktree.reveal", command.Context{ActiveRepoID: "plain", ActiveWorktreePath: "/plain"}, true},
-		{"worktree.open.editor", command.Context{ActiveRepoID: "plain", ActiveWorktreePath: "/plain"}, true},
-		{"thread.new", command.Context{ActiveRepoID: "plain", ActiveWorktreePath: "/plain"}, true},
+		{"project.worktree.new", command.Context{ActiveProjectID: "plain"}, false},
+		{"project.worktree.remove", command.Context{ActiveProjectID: "plain", ActiveWorktreePath: "/plain"}, false},
+		{"project.git.init", command.Context{}, false},
+		{"project.git.init", command.Context{ActiveProjectID: "r1"}, false},
+		{"project.git.init", command.Context{ActiveProjectID: "plain"}, true},
+		{"project.git.init", command.Context{ActiveProjectID: "plain", ActiveWorktreePath: "/plain"}, true},
+		{"project.unregister", command.Context{ActiveProjectID: "plain"}, true},
+		{"project.refresh", command.Context{ActiveProjectID: "plain"}, true},
+		{"git.fetch", command.Context{ActiveProjectID: "plain", ActiveWorktreePath: "/plain"}, false},
+		{"git.push", command.Context{ActiveProjectID: "plain", ActiveWorktreePath: "/plain"}, false},
+		{"pr.create", command.Context{ActiveProjectID: "plain", ActiveWorktreePath: "/plain"}, false},
+		{"worktree.reveal", command.Context{ActiveProjectID: "plain", ActiveWorktreePath: "/plain"}, true},
+		{"worktree.open.editor", command.Context{ActiveProjectID: "plain", ActiveWorktreePath: "/plain"}, true},
+		{"thread.new", command.Context{ActiveProjectID: "plain", ActiveWorktreePath: "/plain"}, true},
 		// The composer may target no project at all (thread.new --no-project).
 		{"thread.new", command.Context{ActiveView: "compose"}, true},
 		{"thread.new", command.Context{ActiveView: "prs"}, false},
-		{"terminal.new", command.Context{ActiveRepoID: "plain", ActiveWorktreePath: "/plain"}, true},
+		{"terminal.new", command.Context{ActiveProjectID: "plain", ActiveWorktreePath: "/plain"}, true},
 	}
 	for _, tt := range tests {
 		c, _ := f.reg.Get(tt.cmd)
@@ -184,8 +184,8 @@ func TestBuiltinCommands(t *testing.T) {
 		{name: "ui.focus.terminal from context", cmd: "ui.focus.terminal", ctx: command.Context{ActiveTerminalID: "t9"},
 			wantReq: &v1.UiIntent{Intent: &v1.UiIntent_FocusTerminal_{FocusTerminal: &v1.UiIntent_FocusTerminal{TerminalId: "t9"}}}},
 		{name: "ui.focus.terminal needs an id", cmd: "ui.focus.terminal", wantErr: command.ErrInvalidArgs},
-		{name: "ui.focus.repo", cmd: "ui.focus.repo", args: map[string]string{"repo": "r1", "worktree": "~/wt"},
-			wantReq: &v1.UiIntent{Intent: &v1.UiIntent_FocusRepo_{FocusRepo: &v1.UiIntent_FocusRepo{RepoId: "r1", WorktreePath: "/Users/me/wt"}}}},
+		{name: "ui.focus.project", cmd: "ui.focus.project", args: map[string]string{"project": "r1", "worktree": "~/wt"},
+			wantReq: &v1.UiIntent{Intent: &v1.UiIntent_FocusProject_{FocusProject: &v1.UiIntent_FocusProject{ProjectId: "r1", WorktreePath: "/Users/me/wt"}}}},
 		// terminal.new's owners and defaults: commands_terminal_test.go.
 		{name: "terminal.new relative cwd", cmd: "terminal.new", args: map[string]string{"cwd": "rel"}, wantErr: command.ErrInvalidArgs},
 		{name: "terminal.kill", cmd: "terminal.kill", args: map[string]string{"id": "t3"}, wantMsg: "killed terminal t3",
@@ -194,39 +194,40 @@ func TestBuiltinCommands(t *testing.T) {
 			backendEr: notFound, wantErr: notFound},
 		{name: "terminal.remove from context", cmd: "terminal.remove", ctx: command.Context{ActiveTerminalID: "t4"},
 			wantMsg: "removed terminal t4", wantReq: &v1.RemoveTerminalRequest{Id: "t4"}},
-		{name: "repo.add with a folder registers it", cmd: "repo.add", args: map[string]string{"path": "~/src/app"},
+		{name: "project.add with a folder registers it", cmd: "project.add", args: map[string]string{"path": "~/src/app"},
 			wantMsg: "registered repo (r1)", wantJSON: `"path":"/Users/me/src/app"`,
-			wantReq: &v1.RegisterRepoRequest{Path: "/Users/me/src/app"}},
-		{name: "repo.add without a folder prints the hint", cmd: "repo.add", wantMsg: command.AddProjectHint},
-		{name: "repo.unregister unavailable", cmd: "repo.unregister", wantErr: command.ErrUnavailable},
-		{name: "repo.worktree.new with explicit repo", cmd: "repo.worktree.new", args: map[string]string{"repo": "r2", "branch": "feat", "base": "main"},
+			wantReq: &v1.RegisterProjectRequest{Path: "/Users/me/src/app"}},
+		{name: "project.add without a folder prints the hint", cmd: "project.add", wantMsg: command.AddProjectHint},
+		{name: "project.list without projects", cmd: "project.list", wantMsg: "no projects", wantReq: &v1.ListProjectsRequest{}},
+		{name: "project.unregister unavailable", cmd: "project.unregister", wantErr: command.ErrUnavailable},
+		{name: "project.worktree.new with explicit project", cmd: "project.worktree.new", args: map[string]string{"project": "r2", "branch": "feat", "base": "main"},
 			wantMsg: "created worktree /wt/feat on feat",
-			wantReq: &v1.CreateWorktreeRequest{RepoId: "r2", Branch: "feat", BaseRef: "main", Fetch: true}},
-		{name: "repo.worktree.new from context", cmd: "repo.worktree.new", ctx: command.Context{ActiveRepoID: "r1"}, args: map[string]string{"branch": "x"},
-			wantReq: &v1.CreateWorktreeRequest{RepoId: "r1", Branch: "x", Fetch: true}},
-		{name: "repo.worktree.new without fetch", cmd: "repo.worktree.new", ctx: command.Context{ActiveRepoID: "r1"},
+			wantReq: &v1.CreateWorktreeRequest{ProjectId: "r2", Branch: "feat", BaseRef: "main", Fetch: true}},
+		{name: "project.worktree.new from context", cmd: "project.worktree.new", ctx: command.Context{ActiveProjectID: "r1"}, args: map[string]string{"branch": "x"},
+			wantReq: &v1.CreateWorktreeRequest{ProjectId: "r1", Branch: "x", Fetch: true}},
+		{name: "project.worktree.new without fetch", cmd: "project.worktree.new", ctx: command.Context{ActiveProjectID: "r1"},
 			args:    map[string]string{"branch": "x", "base": "origin/dev", "fetch": "false"},
-			wantReq: &v1.CreateWorktreeRequest{RepoId: "r1", Branch: "x", BaseRef: "origin/dev"}},
-		{name: "repo.worktree.new needs a branch", cmd: "repo.worktree.new", ctx: command.Context{ActiveRepoID: "r1"}, wantErr: command.ErrInvalidArgs},
-		{name: "repo.worktree.new unavailable", cmd: "repo.worktree.new", args: map[string]string{"branch": "x"}, wantErr: command.ErrUnavailable},
-		{name: "repo.worktree.remove", cmd: "repo.worktree.remove", ctx: command.Context{ActiveRepoID: "r1", ActiveWorktreePath: "/wt/x"},
+			wantReq: &v1.CreateWorktreeRequest{ProjectId: "r1", Branch: "x", BaseRef: "origin/dev"}},
+		{name: "project.worktree.new needs a branch", cmd: "project.worktree.new", ctx: command.Context{ActiveProjectID: "r1"}, wantErr: command.ErrInvalidArgs},
+		{name: "project.worktree.new unavailable", cmd: "project.worktree.new", args: map[string]string{"branch": "x"}, wantErr: command.ErrUnavailable},
+		{name: "project.worktree.remove", cmd: "project.worktree.remove", ctx: command.Context{ActiveProjectID: "r1", ActiveWorktreePath: "/wt/x"},
 			args: map[string]string{"force": "true"}, wantMsg: "removed worktree /wt/x",
-			wantReq: &v1.RemoveWorktreeRequest{RepoId: "r1", Path: "/wt/x", Force: true}},
-		{name: "repo.refresh all", cmd: "repo.refresh", wantMsg: "refreshed all repositories", wantReq: &v1.RefreshRepoRequest{}},
-		{name: "repo.refresh active", cmd: "repo.refresh", ctx: command.Context{ActiveRepoID: "r1"}, wantMsg: "refreshed r1",
-			wantReq: &v1.RefreshRepoRequest{Id: "r1"}},
-		{name: "repo.git.init from context", cmd: "repo.git.init", ctx: command.Context{ActiveRepoID: "plain"},
+			wantReq: &v1.RemoveWorktreeRequest{ProjectId: "r1", Path: "/wt/x", Force: true}},
+		{name: "project.refresh all", cmd: "project.refresh", wantMsg: "refreshed all projects", wantReq: &v1.RefreshProjectRequest{}},
+		{name: "project.refresh active", cmd: "project.refresh", ctx: command.Context{ActiveProjectID: "r1"}, wantMsg: "refreshed r1",
+			wantReq: &v1.RefreshProjectRequest{Id: "r1"}},
+		{name: "project.git.init from context", cmd: "project.git.init", ctx: command.Context{ActiveProjectID: "plain"},
 			wantMsg: "initialized git in notes on main", wantJSON: `"git":true`, wantReq: &v1.InitGitRequest{Id: "plain"}},
-		{name: "repo.git.init with an explicit repo", cmd: "repo.git.init", args: map[string]string{"repo": "plain"},
+		{name: "project.git.init with an explicit project", cmd: "project.git.init", args: map[string]string{"project": "plain"},
 			wantReq: &v1.InitGitRequest{Id: "plain"}},
-		{name: "repo.git.init in a git project", cmd: "repo.git.init", ctx: command.Context{ActiveRepoID: "r1"}, wantErr: command.ErrUnavailable},
-		{name: "repo.worktree.new in a project without git", cmd: "repo.worktree.new", ctx: command.Context{ActiveRepoID: "plain"},
+		{name: "project.git.init in a git project", cmd: "project.git.init", ctx: command.Context{ActiveProjectID: "r1"}, wantErr: command.ErrUnavailable},
+		{name: "project.worktree.new in a project without git", cmd: "project.worktree.new", ctx: command.Context{ActiveProjectID: "plain"},
 			args: map[string]string{"branch": "x"}, wantErr: command.ErrUnavailable},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			f := newFixture(t)
-			f.term.Err, f.repo.Err = tt.backendEr, tt.backendEr
+			f.term.Err, f.project.Err = tt.backendEr, tt.backendEr
 			res, err := f.reg.Invoke(context.Background(), tt.ctx, tt.cmd, tt.args, command.Confirmed(true))
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("err = %v, want %v", err, tt.wantErr)
@@ -248,7 +249,7 @@ func TestBuiltinCommands(t *testing.T) {
 						last = in[len(in)-1]
 					}
 				} else {
-					reqs := append(f.term.Requests(), f.repo.Requests()...)
+					reqs := append(f.term.Requests(), f.project.Requests()...)
 					if len(reqs) > 0 {
 						last = reqs[len(reqs)-1]
 					}

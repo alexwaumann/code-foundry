@@ -23,7 +23,7 @@ function field(key: string, page: string, section: string, extra: Partial<Settin
 
 const pages: SettingPageView[] = [
   { id: "general", title: "General", description: "", sections: [{ id: "threads", title: "Threads", description: "" }, { id: "lifecycle", title: "Lifecycle", description: "" }] },
-  { id: "source", title: "Source control", description: "", sections: [{ id: "github", title: "GitHub", description: "" }, { id: "repos", title: "Repositories", description: "" }] },
+  { id: "source", title: "Source control", description: "", sections: [{ id: "github", title: "GitHub", description: "" }, { id: "projects", title: "Projects", description: "" }] },
   { id: "empty", title: "Empty", description: "", sections: [{ id: "nothing", title: "Nothing", description: "" }] },
 ];
 
@@ -36,7 +36,7 @@ const schema: SettingsSchemaView = {
     field("threads.auto_name", "general", "threads", { title: "Name threads automatically", description: "Uses the naming model." }),
     field("threads.cache_ttl_seconds", "general", "lifecycle", { title: "Prompt cache lifetime" }),
     // Out of section order in the list: search still follows the page's sections.
-    field("repos.fetch_interval_seconds", "source", "repos", { title: "Fetch interval" }),
+    field("projects.fetch_interval_seconds", "source", "projects", { title: "Fetch interval" }),
     field("github.poll_interval_seconds", "source", "github", { title: "Poll interval" }),
   ],
 };
@@ -62,7 +62,7 @@ describe("search", () => {
     const res = searchSettings(schema, ["interval"]);
     expect(res.hits.map((h) => [h.page.id, h.section?.title, h.field.key])).toEqual([
       ["source", "GitHub", "github.poll_interval_seconds"],
-      ["source", "Repositories", "repos.fetch_interval_seconds"],
+      ["source", "Projects", "projects.fetch_interval_seconds"],
     ]);
     expect(res.counts).toEqual({ general: 0, source: 2, empty: 0 });
   });

@@ -33,7 +33,7 @@ export function toWorkspaceView(w: Workspace): WorkspaceView {
     id: w.id,
     name: w.name,
     branch: w.branch,
-    members: w.members.map((m) => ({ repoId: m.repoId, worktreePath: m.worktreePath })),
+    members: w.members.map((m) => ({ repoId: m.projectId, worktreePath: m.worktreePath })),
     createdAtMs: w.createdAt ? timestampMs(w.createdAt) : null,
   };
 }

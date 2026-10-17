@@ -1,9 +1,9 @@
 // Package workspace is the workspace store. A workspace is a branch set: one branch
-// checked out as a worktree in each of several registered repositories, for a change
+// checked out as a worktree in each of several registered projects, for a change
 // that spans them. The store persists workspaces in SQLite, publishes an immutable
 // Snapshot behind an atomic pointer, and emits Updated/Removed events on the bus.
 //
-// Worktrees are made and removed through the repo store (the same fetch-then-`git
+// Worktrees are made and removed through the project store (the same fetch-then-`git
 // worktree add` path a new thread's worktree takes) and pre-trusted for Claude like a
 // thread's worktree. The store never looks at threads directly: the daemon hands it
 // a function listing live threads, so a member worktree a thread runs in is not
@@ -33,15 +33,15 @@ type Workspace struct {
 	Members   []Member // in the order they were added
 }
 
-// Member is one repository's worktree in a workspace.
+// Member is one project's worktree in a workspace.
 type Member struct {
-	RepoID       string
+	ProjectID    string
 	WorktreePath string
 }
 
-// Member returns the member for repoID.
-func (w Workspace) Member(repoID string) (Member, bool) {
-	i := slices.IndexFunc(w.Members, func(m Member) bool { return m.RepoID == repoID })
+// Member returns the member for projectID.
+func (w Workspace) Member(projectID string) (Member, bool) {
+	i := slices.IndexFunc(w.Members, func(m Member) bool { return m.ProjectID == projectID })
 	if i < 0 {
 		return Member{}, false
 	}
@@ -87,12 +87,12 @@ type Ref struct {
 	Cwd       string // absolute path
 }
 
-// MemberSpec names a repository to add.
+// MemberSpec names a project to add.
 type MemberSpec struct {
-	// Repo is a repository id, its name when unique, or a path inside it.
-	Repo string
+	// Project is a project id, its name when unique, or a path inside it.
+	Project string
 	// BaseRef is where the branch starts when it does not exist yet. Empty: the
-	// operation's default base, else the repo store's default (origin/<default>).
+	// operation's default base, else the project store's default (origin/<default>).
 	BaseRef string
 }
 
@@ -104,23 +104,23 @@ type CreateOptions struct {
 	Members []MemberSpec
 	// BaseRef is the default base for members without their own.
 	BaseRef string
-	// Fetch refreshes each remote-tracking base first (see repo.CreateWorktreeOptions).
+	// Fetch refreshes each remote-tracking base first (see project.CreateWorktreeOptions).
 	Fetch bool
 }
 
-// AddRepoOptions configures Store.AddRepo.
-type AddRepoOptions struct {
+// AddProjectOptions configures Store.AddProject.
+type AddProjectOptions struct {
 	Ref
 	Member MemberSpec
 	Fetch  bool
 }
 
-// RemoveRepoOptions configures Store.RemoveRepo.
-type RemoveRepoOptions struct {
+// RemoveProjectOptions configures Store.RemoveProject.
+type RemoveProjectOptions struct {
 	Ref
-	// Repo is a repository id, name, or a path inside it (the member worktree path
+	// Project is a project id, name, or a path inside it (the member worktree path
 	// works too).
-	Repo string
+	Project string
 	// Force removes the worktree even with uncommitted changes.
 	Force bool
 	// DeleteBranch also deletes the member's branch.
@@ -134,19 +134,19 @@ type RemoveOptions struct {
 	DeleteBranch bool
 }
 
-// Membership is a workspace with its members joined to the repo store's state.
+// Membership is a workspace with its members joined to the project store's state.
 type Membership struct {
 	Workspace Workspace
 	Members   []MemberInfo
 }
 
-// MemberInfo is a member with what the repo store knows about it now.
+// MemberInfo is a member with what the project store knows about it now.
 type MemberInfo struct {
 	Member
-	RepoName string // empty when the repo is no longer registered
+	ProjectName string // empty when the project is no longer registered
 	// Branch checked out in the worktree now; the workspace branch when unknown.
 	Branch string
-	// Missing: the worktree is not among its repository's worktrees.
+	// Missing: the worktree is not among its project's worktrees.
 	Missing bool
 	// Current: the Ref's Cwd is inside this worktree.
 	Current bool
@@ -166,15 +166,15 @@ type Store interface {
 	// Create makes a workspace and a worktree on its branch in every member
 	// repository. On failure, worktrees it made are removed again.
 	Create(ctx context.Context, opts CreateOptions) (Workspace, error)
-	// AddRepo creates a worktree on the workspace branch in another repository.
-	AddRepo(ctx context.Context, opts AddRepoOptions) (Workspace, error)
-	// RemoveRepo removes a member's worktree and drops the member. It refuses while a
+	// AddProject creates a worktree on the workspace branch in another project.
+	AddProject(ctx context.Context, opts AddProjectOptions) (Workspace, error)
+	// RemoveProject removes a member's worktree and drops the member. It refuses while a
 	// live thread runs in the worktree, and (without Force) when git refuses because
 	// of uncommitted changes.
-	RemoveRepo(ctx context.Context, opts RemoveRepoOptions) (Workspace, error)
+	RemoveProject(ctx context.Context, opts RemoveProjectOptions) (Workspace, error)
 	// Remove removes every member worktree and forgets the workspace, with the same
 	// guards across all members, checked before anything is removed.
 	Remove(ctx context.Context, opts RemoveOptions) error
-	// Members resolves ref and joins its members with the repo store's state.
+	// Members resolves ref and joins its members with the project store's state.
 	Members(ctx context.Context, ref Ref) (Membership, error)
 }

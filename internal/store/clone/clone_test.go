@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexwaumann/code-foundry/internal/store/repo"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
 )
 
 // fakeRunner plays gh repo clone: it emits lines, optionally creates the destination
@@ -53,20 +53,20 @@ func (f *fakeRunner) ncalls() int {
 	return len(f.calls)
 }
 
-type fakeRepos struct {
+type fakeProjects struct {
 	mu    sync.Mutex
 	paths []string
 	err   error
 }
 
-func (r *fakeRepos) Register(_ context.Context, path string) (repo.Repo, error) {
+func (r *fakeProjects) Register(_ context.Context, path string) (project.Project, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.err != nil {
-		return repo.Repo{}, r.err
+		return project.Project{}, r.err
 	}
 	r.paths = append(r.paths, path)
-	return repo.Repo{ID: "id-" + filepath.Base(path), Path: path, Name: filepath.Base(path), Git: true}, nil
+	return project.Project{ID: "id-" + filepath.Base(path), Path: path, Name: filepath.Base(path), Git: true}, nil
 }
 
 func exists(path string) bool {
@@ -81,26 +81,26 @@ func TestClone(t *testing.T) {
 		{Line: "Receiving objects: 100% (2/2), done."},
 	}
 	tests := []struct {
-		name        string
-		owner, repo string
-		setup       func(t *testing.T, root string) // before the clone
-		runner      *fakeRunner
-		repos       *fakeRepos
-		allowed     func(home, root string) string
-		timeout     time.Duration
-		wantErr     error  // errors.Is
-		wantMsg     string // substring of the error
-		wantRun     bool
-		wantDest    bool // the destination exists afterwards
-		wantOwner   bool // the owner directory exists afterwards
-		wantRegistr bool
+		name           string
+		owner, project string
+		setup          func(t *testing.T, root string) // before the clone
+		runner         *fakeRunner
+		projects       *fakeProjects
+		allowed        func(home, root string) string
+		timeout        time.Duration
+		wantErr        error  // errors.Is
+		wantMsg        string // substring of the error
+		wantRun        bool
+		wantDest       bool // the destination exists afterwards
+		wantOwner      bool // the owner directory exists afterwards
+		wantRegistr    bool
 	}{
 		{
-			name: "clones, streams and registers", owner: "Octo", repo: "hello.world",
+			name: "clones, streams and registers", owner: "Octo", project: "hello.world",
 			runner: &fakeRunner{lines: progress, create: true}, wantRun: true, wantDest: true, wantOwner: true, wantRegistr: true,
 		},
 		{
-			name: "destination exists: refused before gh runs", owner: "octo", repo: "taken",
+			name: "destination exists: refused before gh runs", owner: "octo", project: "taken",
 			setup: func(t *testing.T, root string) {
 				if err := os.MkdirAll(filepath.Join(root, "octo", "taken"), 0o755); err != nil {
 					t.Fatal(err)
@@ -109,20 +109,20 @@ func TestClone(t *testing.T) {
 			wantErr: ErrExists, wantMsg: "taken already exists", wantDest: true, wantOwner: true,
 		},
 		{
-			name: "invalid owner/repo: refused before anything", owner: "-bad", repo: "x",
+			name: "invalid owner/repo: refused before anything", owner: "-bad", project: "x",
 			wantErr: ErrInvalidArgument,
 		},
 		{
-			name: "path traversal in the name: refused", owner: "octo", repo: "..",
+			name: "path traversal in the name: refused", owner: "octo", project: "..",
 			wantErr: ErrInvalidArgument,
 		},
 		{
-			name: "missing repository: not found, owner dir removed again", owner: "octo", repo: "nope",
+			name: "missing repository: not found, owner dir removed again", owner: "octo", project: "nope",
 			runner:  &fakeRunner{err: &ExitError{ExitCode: 1, Tail: []string{"GraphQL: Could not resolve to a Repository with the name 'octo/nope'. (repository)"}}},
 			wantErr: ErrNotFound, wantMsg: "Could not resolve", wantRun: true,
 		},
 		{
-			name: "gh fails midway: partial clone removed, existing owner dir kept", owner: "octo", repo: "flaky",
+			name: "gh fails midway: partial clone removed, existing owner dir kept", owner: "octo", project: "flaky",
 			setup: func(t *testing.T, root string) {
 				if err := os.MkdirAll(filepath.Join(root, "octo", "other"), 0o755); err != nil {
 					t.Fatal(err)
@@ -132,17 +132,17 @@ func TestClone(t *testing.T) {
 			wantErr: ErrFailed, wantMsg: "error: RPC failed\nfatal: early EOF", wantRun: true, wantOwner: true,
 		},
 		{
-			name: "timeout: killed and removed", owner: "octo", repo: "huge",
+			name: "timeout: killed and removed", owner: "octo", project: "huge",
 			runner: &fakeRunner{create: true, block: true}, timeout: 30 * time.Millisecond,
 			wantErr: context.DeadlineExceeded, wantMsg: "longer than 30ms", wantRun: true,
 		},
 		{
-			name: "registration fails: the clone stays", owner: "octo", repo: "kept",
-			runner: &fakeRunner{create: true}, repos: &fakeRepos{err: errors.New("database is locked")},
+			name: "registration fails: the clone stays", owner: "octo", project: "kept",
+			runner: &fakeRunner{create: true}, projects: &fakeProjects{err: errors.New("database is locked")},
 			wantMsg: "but could not add it as a project: database is locked", wantRun: true, wantDest: true, wantOwner: true,
 		},
 		{
-			name: "projects directory outside home: refused before gh runs", owner: "octo", repo: "far",
+			name: "projects directory outside home: refused before gh runs", owner: "octo", project: "far",
 			allowed: func(home, _ string) string { return filepath.Join(home, "elsewhere") },
 			wantErr: ErrOutsideRoot,
 		},
@@ -152,8 +152,8 @@ func TestClone(t *testing.T) {
 			if tt.runner == nil {
 				tt.runner = &fakeRunner{}
 			}
-			if tt.repos == nil {
-				tt.repos = &fakeRepos{}
+			if tt.projects == nil {
+				tt.projects = &fakeProjects{}
 			}
 			home := t.TempDir()
 			home, _ = filepath.EvalSymlinks(home)
@@ -165,13 +165,13 @@ func TestClone(t *testing.T) {
 			if tt.allowed != nil {
 				allowed = tt.allowed(home, root)
 			}
-			c, err := New(Options{Root: root, AllowedRoot: allowed, Repos: tt.repos, Runner: tt.runner, Timeout: tt.timeout})
+			c, err := New(Options{Root: root, AllowedRoot: allowed, Projects: tt.projects, Runner: tt.runner, Timeout: tt.timeout})
 			if err != nil {
 				t.Fatal(err)
 			}
 			var got []Progress
-			r, err := c.Clone(context.Background(), tt.owner, tt.repo, func(p Progress) { got = append(got, p) })
-			dest := filepath.Join(root, tt.owner, tt.repo)
+			r, err := c.Clone(context.Background(), tt.owner, tt.project, func(p Progress) { got = append(got, p) })
+			dest := filepath.Join(root, tt.owner, tt.project)
 			switch {
 			case tt.wantErr != nil || tt.wantMsg != "":
 				if err == nil || (tt.wantErr != nil && !errors.Is(err, tt.wantErr)) || !strings.Contains(err.Error(), tt.wantMsg) {
@@ -181,14 +181,14 @@ func TestClone(t *testing.T) {
 				t.Fatal(err)
 			default:
 				if r.Path != dest || !reflect.DeepEqual(got, progress) {
-					t.Fatalf("repo %+v, progress %+v", r, got)
+					t.Fatalf("project %+v, progress %+v", r, got)
 				}
 			}
 			if ran := tt.runner.ncalls() > 0; ran != tt.wantRun {
 				t.Fatalf("gh ran = %t, want %t", ran, tt.wantRun)
 			}
 			if tt.wantRun {
-				want := []string{"gh", "repo", "clone", tt.owner + "/" + tt.repo, dest, "--", "--progress"}
+				want := []string{"gh", "repo", "clone", tt.owner + "/" + tt.project, dest, "--", "--progress"}
 				if !reflect.DeepEqual(tt.runner.calls[0], want) || tt.runner.dirs[0] != filepath.Dir(dest) {
 					t.Errorf("ran %v in %s, want %v in %s", tt.runner.calls[0], tt.runner.dirs[0], want, filepath.Dir(dest))
 				}
@@ -199,7 +199,7 @@ func TestClone(t *testing.T) {
 			if tt.wantErr != ErrInvalidArgument && exists(filepath.Dir(dest)) != tt.wantOwner {
 				t.Errorf("owner dir exists = %t, want %t", exists(filepath.Dir(dest)), tt.wantOwner)
 			}
-			if registered := len(tt.repos.paths) > 0; registered != tt.wantRegistr {
+			if registered := len(tt.projects.paths) > 0; registered != tt.wantRegistr {
 				t.Errorf("registered = %t, want %t", registered, tt.wantRegistr)
 			}
 			if tt.wantRun && tt.setup == nil {
@@ -215,7 +215,7 @@ func TestCloneBusyAndCancel(t *testing.T) {
 	home, _ := filepath.EvalSymlinks(t.TempDir())
 	root := filepath.Join(home, "projects")
 	run := &fakeRunner{create: true, block: true}
-	c, err := New(Options{Root: root, AllowedRoot: home, Repos: &fakeRepos{}, Runner: run})
+	c, err := New(Options{Root: root, AllowedRoot: home, Projects: &fakeProjects{}, Runner: run})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -246,7 +246,7 @@ func TestCloneBusyAndCancel(t *testing.T) {
 }
 
 func TestNewValidates(t *testing.T) {
-	for _, o := range []Options{{Root: "rel", Repos: &fakeRepos{}}, {Root: "/abs"}} {
+	for _, o := range []Options{{Root: "rel", Projects: &fakeProjects{}}, {Root: "/abs"}} {
 		if _, err := New(o); err == nil {
 			t.Errorf("New(%+v): want error", o)
 		}

@@ -10,7 +10,7 @@ import (
 )
 
 func TestPickPRWorktree(t *testing.T) {
-	repos := []*v1.Repo{
+	projects := []*v1.Project{
 		{Id: "other", GithubSlug: "x/y", Path: "/src/y", Worktrees: []*v1.Worktree{
 			{Path: "/src/y", Branch: "feat/foo", IsMain: true},
 		}},
@@ -32,7 +32,7 @@ func TestPickPRWorktree(t *testing.T) {
 	fork := func(ref, sha string) prHead { return prHead{Ref: ref, SHA: sha, Cross: true} }
 	type args struct {
 		kind     prThreadKind
-		repos    []*v1.Repo
+		projects []*v1.Project
 		head     prHead
 		explicit string
 		active   string
@@ -45,64 +45,64 @@ func TestPickPRWorktree(t *testing.T) {
 		wantMsg  string
 	}{
 		{name: "read: explicit wins, even outside the clones",
-			args: args{kind: prThreadRead, repos: repos, head: same("feat/foo"), explicit: "/src/y/", active: "/wt/r/topic"},
+			args: args{kind: prThreadRead, projects: projects, head: same("feat/foo"), explicit: "/src/y/", active: "/wt/r/topic"},
 			want: prWorktreePick{Path: "/src/y"}},
 		{name: "read: active worktree of a clone (slug matched case-insensitively)",
-			args: args{kind: prThreadRead, repos: repos, head: same("feat/foo"), active: "/wt/r/topic/"},
-			want: prWorktreePick{RepoID: "r1", Path: "/wt/r/topic"}},
-		{name: "read: active worktree of another repo is ignored, head branch next",
-			args: args{kind: prThreadRead, repos: repos, head: same("feat/foo"), active: "/src/y"},
-			want: prWorktreePick{RepoID: "r2", Path: "/wt/r2/feat-foo"}},
+			args: args{kind: prThreadRead, projects: projects, head: same("feat/foo"), active: "/wt/r/topic/"},
+			want: prWorktreePick{ProjectID: "r1", Path: "/wt/r/topic"}},
+		{name: "read: active worktree of another project is ignored, head branch next",
+			args: args{kind: prThreadRead, projects: projects, head: same("feat/foo"), active: "/src/y"},
+			want: prWorktreePick{ProjectID: "r2", Path: "/wt/r2/feat-foo"}},
 		{name: "read: no head worktree, the first clone's main worktree",
-			args: args{kind: prThreadRead, repos: repos, head: same("gone")},
-			want: prWorktreePick{RepoID: "r1", Path: "/src/r"}},
+			args: args{kind: prThreadRead, projects: projects, head: same("gone")},
+			want: prWorktreePick{ProjectID: "r1", Path: "/src/r"}},
 		{name: "read: a detached worktree never matches a same-repository head",
-			args: args{kind: prThreadRead, repos: repos, head: same("")},
-			want: prWorktreePick{RepoID: "r1", Path: "/src/r"}},
+			args: args{kind: prThreadRead, projects: projects, head: same("")},
+			want: prWorktreePick{ProjectID: "r1", Path: "/src/r"}},
 		{name: "read: a fork's head on a same-named branch is not matched",
-			args: args{kind: prThreadRead, repos: repos, head: fork("topic", "")},
-			want: prWorktreePick{RepoID: "r1", Path: "/src/r"}},
+			args: args{kind: prThreadRead, projects: projects, head: fork("topic", "")},
+			want: prWorktreePick{ProjectID: "r1", Path: "/src/r"}},
 		{name: "read: a fork's head by commit",
-			args: args{kind: prThreadRead, repos: repos, head: fork("topic", "f00d")},
-			want: prWorktreePick{RepoID: "r2", Path: "/wt/r2/at-sha"}},
-		{name: "read: main worktree missing (repo error), the repo path",
-			args: args{kind: prThreadRead, repos: []*v1.Repo{{Id: "r1", GithubSlug: "o/r", Path: "/src/r"}}, head: same("x")},
-			want: prWorktreePick{RepoID: "r1", Path: "/src/r"}},
+			args: args{kind: prThreadRead, projects: projects, head: fork("topic", "f00d")},
+			want: prWorktreePick{ProjectID: "r2", Path: "/wt/r2/at-sha"}},
+		{name: "read: main worktree missing (project error), the project path",
+			args: args{kind: prThreadRead, projects: []*v1.Project{{Id: "r1", GithubSlug: "o/r", Path: "/src/r"}}, head: same("x")},
+			want: prWorktreePick{ProjectID: "r1", Path: "/src/r"}},
 		{name: "read: no clone",
-			args:     args{kind: prThreadRead, repos: repos[:1], head: same("feat/foo")},
-			wantCode: connect.CodeFailedPrecondition, wantMsg: "no registered repository is a clone of o/r"},
+			args:     args{kind: prThreadRead, projects: projects[:1], head: same("feat/foo")},
+			wantCode: connect.CodeFailedPrecondition, wantMsg: "no registered project is a clone of o/r"},
 		{name: "fix: explicit",
-			args: args{kind: prThreadFix, repos: repos, head: same("feat/foo"), explicit: "/elsewhere"},
+			args: args{kind: prThreadFix, projects: projects, head: same("feat/foo"), explicit: "/elsewhere"},
 			want: prWorktreePick{Path: "/elsewhere"}},
 		{name: "fix: the active worktree does not count",
-			args: args{kind: prThreadFix, repos: repos, head: same("feat/foo"), active: "/wt/r/topic"},
-			want: prWorktreePick{RepoID: "r2", Path: "/wt/r2/feat-foo"}},
+			args: args{kind: prThreadFix, projects: projects, head: same("feat/foo"), active: "/wt/r/topic"},
+			want: prWorktreePick{ProjectID: "r2", Path: "/wt/r2/feat-foo"}},
 		{name: "fix: head branch in the main worktree",
-			args: args{kind: prThreadFix, repos: repos, head: same("main")},
-			want: prWorktreePick{RepoID: "r1", Path: "/src/r"}},
+			args: args{kind: prThreadFix, projects: projects, head: same("main")},
+			want: prWorktreePick{ProjectID: "r1", Path: "/src/r"}},
 		{name: "fix: a fork from the contributor's main is not our main, but the worktree tracking the fork",
-			args: args{kind: prThreadFix, repos: repos, head: fork("main", "beef")},
-			want: prWorktreePick{RepoID: "r1", Path: "/wt/r/contrib-main"}},
+			args: args{kind: prThreadFix, projects: projects, head: fork("main", "beef")},
+			want: prWorktreePick{ProjectID: "r1", Path: "/wt/r/contrib-main"}},
 		{name: "fix: a fork's head by commit, case-insensitively",
-			args: args{kind: prThreadFix, repos: repos, head: fork("whatever", "F00D")},
-			want: prWorktreePick{RepoID: "r2", Path: "/wt/r2/at-sha"}},
+			args: args{kind: prThreadFix, projects: projects, head: fork("whatever", "F00D")},
+			want: prWorktreePick{ProjectID: "r2", Path: "/wt/r2/at-sha"}},
 		{name: "fix: a fork's head by commit with no head ref",
-			args: args{kind: prThreadFix, repos: repos, head: fork("", "aaa")},
-			want: prWorktreePick{RepoID: "r1", Path: "/src/r"}},
+			args: args{kind: prThreadFix, projects: projects, head: fork("", "aaa")},
+			want: prWorktreePick{ProjectID: "r1", Path: "/src/r"}},
 		{name: "fix: a fork on a same-named branch is not matched",
-			args:     args{kind: prThreadFix, repos: repos, head: fork("topic", "beef")},
+			args:     args{kind: prThreadFix, projects: projects, head: fork("topic", "beef")},
 			wantCode: connect.CodeFailedPrecondition, wantMsg: "#7 comes from a fork and no worktree of o/r has its head checked out: check it out (for example `gh pr checkout 7` in a worktree) and pass --worktree"},
 		{name: "fix: a fork never matches origin/<head>",
-			args:     args{kind: prThreadFix, repos: repos, head: fork("feature", "beef")},
+			args:     args{kind: prThreadFix, projects: projects, head: fork("feature", "beef")},
 			wantCode: connect.CodeFailedPrecondition, wantMsg: "gh pr checkout 7"},
 		{name: "fix: no worktree, same repository: create in the first clone",
-			args: args{kind: prThreadFix, repos: repos, head: same("new/branch")},
-			want: prWorktreePick{RepoID: "r1", Create: true, MainPath: "/src/r"}},
+			args: args{kind: prThreadFix, projects: projects, head: same("new/branch")},
+			want: prWorktreePick{ProjectID: "r1", Create: true, MainPath: "/src/r"}},
 		{name: "fix: no worktree, fork",
-			args:     args{kind: prThreadFix, repos: repos, head: fork("new/branch", "beef")},
+			args:     args{kind: prThreadFix, projects: projects, head: fork("new/branch", "beef")},
 			wantCode: connect.CodeFailedPrecondition, wantMsg: "comes from a fork"},
 		{name: "fix: no head branch",
-			args:     args{kind: prThreadFix, repos: repos, head: same("")},
+			args:     args{kind: prThreadFix, projects: projects, head: same("")},
 			wantCode: connect.CodeFailedPrecondition, wantMsg: "#7 has no head branch to check out: pass --worktree"},
 		{name: "fix: no clone",
 			args:     args{kind: prThreadFix, head: same("x")},
@@ -111,7 +111,7 @@ func TestPickPRWorktree(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			a := tt.args
-			got, err := pickPRWorktree(a.kind, a.repos, "o/r", 7, a.head, a.explicit, a.active)
+			got, err := pickPRWorktree(a.kind, a.projects, "o/r", 7, a.head, a.explicit, a.active)
 			if tt.wantCode != 0 {
 				if connect.CodeOf(err) != tt.wantCode || !strings.Contains(err.Error(), tt.wantMsg) {
 					t.Fatalf("err = %v, want code %v and %q", err, tt.wantCode, tt.wantMsg)

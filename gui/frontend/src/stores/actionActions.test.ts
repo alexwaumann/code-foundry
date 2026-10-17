@@ -81,8 +81,8 @@ describe("openFailedRun", () => {
 
 describe("ownerOfTerminal", () => {
   it.each([
-    ["a thread's", { kind: "action", thread: "s-1", repo: "r", worktree: "/w" }, { kind: "thread", threadId: "s-1" }],
-    ["a worktree's", { kind: "action", repo: "r", worktree: "/w" }, { kind: "worktree", repoId: "r", path: "/w" }],
+    ["a thread's", { kind: "action", thread: "s-1", project: "r", worktree: "/w" }, { kind: "thread", threadId: "s-1" }],
+    ["a worktree's", { kind: "action", project: "r", worktree: "/w" }, { kind: "worktree", repoId: "r", path: "/w" }],
     ["neither", { kind: "action" }, null],
   ])("%s", (_n, labels, want) => {
     expect(ownerOfTerminal(labels)).toEqual(want);
@@ -164,7 +164,7 @@ describe("saveAction and deleteAction", () => {
   it("a new action: action.add with the project", async () => {
     await expect(saveAction({ repoId: "repo-cf" }, { name: "Lint", command: "make lint", icon: "lint", onWorktreeCreate: false })).resolves.toBeNull();
     expect(runCommandForResult.mock.calls[0]?.[0]).toBe("action.add");
-    expect(runCommandForResult.mock.calls[0]?.[1]).toMatchObject({ name: "Lint", repo: "repo-cf", "in-terminal": "true" });
+    expect(runCommandForResult.mock.calls[0]?.[1]).toMatchObject({ name: "Lint", project: "repo-cf", "in-terminal": "true" });
   });
 
   it("an unchanged edit asks nothing", async () => {
@@ -189,6 +189,6 @@ describe("saveAction and deleteAction", () => {
 
   it("deleteAction: action.remove by id in the project", async () => {
     await expect(deleteAction("a-1", "repo-cf")).resolves.toBeNull();
-    expect(runCommandForResult.mock.calls[0]?.slice(0, 2)).toEqual(["action.remove", { action: "a-1", repo: "repo-cf" }]);
+    expect(runCommandForResult.mock.calls[0]?.slice(0, 2)).toEqual(["action.remove", { action: "a-1", project: "repo-cf" }]);
   });
 });

@@ -15,13 +15,13 @@ import (
 )
 
 type prThreadFixture struct {
-	log    *commandtest.Calls // gh, repo and gitops requests, in call order
-	reg    *command.Registry
-	gh     *commandtest.Gh
-	repo   *commandtest.Repo
-	thread *commandtest.Thread
-	gitops *commandtest.GitOps
-	emit   *commandtest.Emitter
+	log     *commandtest.Calls // gh, project and gitops requests, in call order
+	reg     *command.Registry
+	gh      *commandtest.Gh
+	project *commandtest.Project
+	thread  *commandtest.Thread
+	gitops  *commandtest.GitOps
+	emit    *commandtest.Emitter
 }
 
 func newPRThreadFixture(t *testing.T) *prThreadFixture {
@@ -31,7 +31,7 @@ func newPRThreadFixture(t *testing.T) *prThreadFixture {
 		gh: &commandtest.Gh{Detail: &v1.PullRequestDetail{PullRequest: &v1.PullRequest{
 			Number: 7, Title: "Fix it", Url: "https://github.com/o/r/pull/7", HeadRef: "fix/it", BaseRef: "main",
 		}}},
-		repo: &commandtest.Repo{Repos: []*v1.Repo{{Id: "r1", GithubSlug: "o/r", Path: "/src/r", Worktrees: []*v1.Worktree{
+		project: &commandtest.Project{Projects: []*v1.Project{{Id: "r1", GithubSlug: "o/r", Path: "/src/r", Worktrees: []*v1.Worktree{
 			{Path: "/src/r", Branch: "main", IsMain: true},
 			{Path: "/wt/topic", Branch: "topic"},
 		}}}},
@@ -40,9 +40,9 @@ func newPRThreadFixture(t *testing.T) *prThreadFixture {
 		emit:   &commandtest.Emitter{},
 	}
 	f.log = &commandtest.Calls{}
-	f.gh.Shared, f.repo.Shared, f.gitops.Shared = f.log, f.log, f.log
+	f.gh.Shared, f.project.Shared, f.gitops.Shared = f.log, f.log, f.log
 	if err := command.RegisterPullRequestThreads(f.reg, command.PullRequestThreadDeps{
-		Gh: f.gh, Repo: f.repo, Thread: f.thread, GitOps: f.gitops, Emitter: f.emit,
+		Gh: f.gh, Project: f.project, Thread: f.thread, GitOps: f.gitops, Emitter: f.emit,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -70,10 +70,12 @@ func TestPullRequestThreadCommands(t *testing.T) {
 		return &v1.GetPullRequestDetailRequest{RepoSlug: "o/r", Number: 7, Refresh: refresh}
 	}
 	fetch := &v1.GitFetchRequest{WorktreePath: "/src/r", Remote: "origin", Branch: "fix/it"}
-	create := &v1.CreateWorktreeRequest{RepoId: "r1", Branch: "fix/it", BaseRef: "origin/fix/it"}
-	list := &v1.ListReposRequest{}
+	create := &v1.CreateWorktreeRequest{ProjectId: "r1", Branch: "fix/it", BaseRef: "origin/fix/it"}
+	list := &v1.ListProjectsRequest{}
 	addWorktree := func(wt *v1.Worktree) func(*prThreadFixture) {
-		return func(f *prThreadFixture) { f.repo.Repos[0].Worktrees = append(f.repo.Repos[0].Worktrees, wt) }
+		return func(f *prThreadFixture) {
+			f.project.Projects[0].Worktrees = append(f.project.Projects[0].Worktrees, wt)
+		}
 	}
 	tests := []struct {
 		name    string
@@ -81,7 +83,7 @@ func TestPullRequestThreadCommands(t *testing.T) {
 		args    map[string]string
 		uctx    command.Context
 		setup   func(*prThreadFixture)
-		wantReq []proto.Message // gh, repo and gitops requests, in call order
+		wantReq []proto.Message // gh, project and gitops requests, in call order
 		// wantThread checks the CreateThreadRequest (prompt by prefix and contents).
 		wantThread   *v1.CreateThreadRequest
 		wantPrompt   string
@@ -94,14 +96,14 @@ func TestPullRequestThreadCommands(t *testing.T) {
 		{name: "explain in the main worktree with model and effort, not refreshed", cmd: "pr.explain",
 			args:       map[string]string{"repo-slug": "o/r", "number": "7", "model": "claude-4.5-haiku[1m]", "effort": "medium"},
 			wantReq:    []proto.Message{detail(false), list},
-			wantThread: &v1.CreateThreadRequest{RepoId: "r1", WorktreePath: "/src/r", Model: "claude-4.5-haiku[1m]", Effort: "medium"},
+			wantThread: &v1.CreateThreadRequest{ProjectId: "r1", WorktreePath: "/src/r", Model: "claude-4.5-haiku[1m]", Effort: "medium"},
 			wantPrompt: "Explain this pull request.\n\nThe pull request is #7, titled `Fix it`",
 			wantMsg:    "Started thread s1 for PR #7"},
 		{name: "ask in the active worktree of the clone, not refreshed", cmd: "pr.ask",
 			args:       map[string]string{"repo-slug": "O/R", "number": "7", "question": "/why?"},
 			uctx:       command.Context{ActiveWorktreePath: "/wt/topic"},
 			wantReq:    []proto.Message{&v1.GetPullRequestDetailRequest{RepoSlug: "O/R", Number: 7}, list},
-			wantThread: &v1.CreateThreadRequest{RepoId: "r1", WorktreePath: "/wt/topic"},
+			wantThread: &v1.CreateThreadRequest{ProjectId: "r1", WorktreePath: "/wt/topic"},
 			wantPrompt: "Question about PR #7:\n/why?\n\nThe pull request is #7",
 			wantMsg:    "Started thread s1 for PR #7"},
 		{name: "ask needs a question", cmd: "pr.ask",
@@ -113,7 +115,7 @@ func TestPullRequestThreadCommands(t *testing.T) {
 			wantReq:    []proto.Message{detail(false)},
 			wantCode:   connect.CodeInvalidArgument,
 			wantErrMsg: "the prompt for #7 would be 201 KiB, over the 200 KiB a thread can start with"},
-		{name: "explain with an explicit worktree skips the repo list", cmd: "pr.explain",
+		{name: "explain with an explicit worktree skips the project list", cmd: "pr.explain",
 			args:       map[string]string{"repo-slug": "o/r", "number": "7", "worktree": "/some/where"},
 			wantReq:    []proto.Message{detail(false)},
 			wantThread: &v1.CreateThreadRequest{WorktreePath: "/some/where"},
@@ -131,18 +133,18 @@ func TestPullRequestThreadCommands(t *testing.T) {
 				f.gh.Err = connect.NewError(connect.CodeNotFound, errors.New("no such pull request"))
 			},
 			wantCode: connect.CodeNotFound, wantErrMsg: "read #7: no such pull request"},
-		{name: "explain: a repository list failure keeps its code", cmd: "pr.explain",
+		{name: "explain: a project list failure keeps its code", cmd: "pr.explain",
 			args: map[string]string{"repo-slug": "o/r", "number": "7"},
 			setup: func(f *prThreadFixture) {
-				f.repo.Err = connect.NewError(connect.CodeUnavailable, errors.New("daemon busy"))
+				f.project.Err = connect.NewError(connect.CodeUnavailable, errors.New("daemon busy"))
 			},
 			wantReq:  []proto.Message{detail(false), list},
-			wantCode: connect.CodeUnavailable, wantErrMsg: "list repositories: daemon busy"},
+			wantCode: connect.CodeUnavailable, wantErrMsg: "list projects: daemon busy"},
 		{name: "fix on the head branch's worktree, refreshed, with its state in the prompt", cmd: "pr.fix.findings",
 			args:       map[string]string{"repo-slug": "o/r", "number": "7"},
 			setup:      addWorktree(&v1.Worktree{Path: "/wt/fix-it", Branch: "fix/it", Status: &v1.GitStatus{Upstream: "origin/fix/it", Behind: 2, Dirty: true}}),
 			wantReq:    []proto.Message{detail(true), list},
-			wantThread: &v1.CreateThreadRequest{RepoId: "r1", WorktreePath: "/wt/fix-it"},
+			wantThread: &v1.CreateThreadRequest{ProjectId: "r1", WorktreePath: "/wt/fix-it"},
 			wantPrompt: "Fix the actionable findings on PR #7",
 			wantInPrompt: []string{
 				"\nBefore changing anything, make sure the checkout is up to date with `origin/fix/it`",
@@ -151,7 +153,7 @@ func TestPullRequestThreadCommands(t *testing.T) {
 			wantMsg: "Started thread s1 for PR #7"},
 		{name: "fix with an explicit worktree reads its state", cmd: "pr.fix.findings",
 			args:         map[string]string{"repo-slug": "o/r", "number": "7", "worktree": "/wt/topic/"},
-			setup:        func(f *prThreadFixture) { f.repo.Repos[0].Worktrees[1].Status = &v1.GitStatus{Dirty: true} },
+			setup:        func(f *prThreadFixture) { f.project.Projects[0].Worktrees[1].Status = &v1.GitStatus{Dirty: true} },
 			wantReq:      []proto.Message{detail(true), list},
 			wantThread:   &v1.CreateThreadRequest{WorktreePath: "/wt/topic"},
 			wantPrompt:   "Fix the actionable findings on PR #7",
@@ -160,7 +162,7 @@ func TestPullRequestThreadCommands(t *testing.T) {
 		{name: "fix with an explicit worktree goes ahead when the list fails", cmd: "pr.fix.findings",
 			args: map[string]string{"repo-slug": "o/r", "number": "7", "worktree": "/wt/topic"},
 			setup: func(f *prThreadFixture) {
-				f.repo.Err = connect.NewError(connect.CodeUnavailable, errors.New("daemon busy"))
+				f.project.Err = connect.NewError(connect.CodeUnavailable, errors.New("daemon busy"))
 			},
 			wantReq:    []proto.Message{detail(true), list},
 			wantThread: &v1.CreateThreadRequest{WorktreePath: "/wt/topic"},
@@ -169,7 +171,7 @@ func TestPullRequestThreadCommands(t *testing.T) {
 		{name: "fix fetches the head branch from origin, then creates its worktree", cmd: "pr.fix.findings",
 			args:       map[string]string{"repo-slug": "o/r", "number": "7"},
 			wantReq:    []proto.Message{detail(true), list, fetch, create},
-			wantThread: &v1.CreateThreadRequest{RepoId: "r1", WorktreePath: "/wt/fix/it"},
+			wantThread: &v1.CreateThreadRequest{ProjectId: "r1", WorktreePath: "/wt/fix/it"},
 			wantPrompt: "Fix the actionable findings on PR #7",
 			wantMsg:    "Started thread s1 for PR #7"},
 		{name: "fix: a failed fetch stops before creating a worktree", cmd: "pr.fix.findings",
@@ -182,27 +184,27 @@ func TestPullRequestThreadCommands(t *testing.T) {
 		{name: "fix: a create failure keeps its code and names the step", cmd: "pr.fix.findings",
 			args: map[string]string{"repo-slug": "o/r", "number": "7"},
 			setup: func(f *prThreadFixture) {
-				f.repo.CreateWorktreeErr = connect.NewError(connect.CodeInternal, errors.New("disk full"))
+				f.project.CreateWorktreeErr = connect.NewError(connect.CodeInternal, errors.New("disk full"))
 			},
 			wantReq:  []proto.Message{detail(true), list, fetch, create},
 			wantCode: connect.CodeInternal, wantErrMsg: "create a worktree for fix/it: disk full"},
 		{name: "fix: a create conflict with nothing on the head re-lists once and fails", cmd: "pr.fix.findings",
 			args: map[string]string{"repo-slug": "o/r", "number": "7"},
 			setup: func(f *prThreadFixture) {
-				f.repo.CreateWorktreeErr = connect.NewError(connect.CodeFailedPrecondition, errors.New("already exists"))
+				f.project.CreateWorktreeErr = connect.NewError(connect.CodeFailedPrecondition, errors.New("already exists"))
 			},
 			wantReq:  []proto.Message{detail(true), list, fetch, create, list},
 			wantCode: connect.CodeFailedPrecondition, wantErrMsg: "create a worktree for fix/it: already exists"},
 		{name: "fix: a concurrent run created the worktree, which is used", cmd: "pr.fix.findings",
 			args: map[string]string{"repo-slug": "o/r", "number": "7"},
 			setup: func(f *prThreadFixture) {
-				f.repo.CreateWorktreeErr = connect.NewError(connect.CodeFailedPrecondition, errors.New("already exists"))
-				f.repo.OnCreateWorktree = func(*v1.CreateWorktreeRequest) {
+				f.project.CreateWorktreeErr = connect.NewError(connect.CodeFailedPrecondition, errors.New("already exists"))
+				f.project.OnCreateWorktree = func(*v1.CreateWorktreeRequest) {
 					addWorktree(&v1.Worktree{Path: "/wt/other-run", Branch: "fix/it", Status: &v1.GitStatus{Behind: 1}})(f)
 				}
 			},
 			wantReq:      []proto.Message{detail(true), list, fetch, create, list},
-			wantThread:   &v1.CreateThreadRequest{RepoId: "r1", WorktreePath: "/wt/other-run"},
+			wantThread:   &v1.CreateThreadRequest{ProjectId: "r1", WorktreePath: "/wt/other-run"},
 			wantPrompt:   "Fix the actionable findings on PR #7",
 			wantInPrompt: []string{"\nThe checkout is 1 commit behind its upstream.\n"},
 			wantMsg:      "Started thread s1 for PR #7"},
@@ -220,7 +222,7 @@ func TestPullRequestThreadCommands(t *testing.T) {
 				addWorktree(&v1.Worktree{Path: "/wt/pr-7", Branch: "pr-7", Head: "c0ffee"})(f)
 			},
 			wantReq:      []proto.Message{detail(true), list},
-			wantThread:   &v1.CreateThreadRequest{RepoId: "r1", WorktreePath: "/wt/pr-7"},
+			wantThread:   &v1.CreateThreadRequest{ProjectId: "r1", WorktreePath: "/wt/pr-7"},
 			wantPrompt:   "Fix the actionable findings on PR #7",
 			wantInPrompt: []string{"on the contributor's fork (for example with `gh pr checkout 7`)"},
 			wantMsg:      "Started thread s1 for PR #7"},

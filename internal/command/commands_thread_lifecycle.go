@@ -47,20 +47,22 @@ func splitList(v string) []string {
 
 func hasThread(c Context) bool { return c.ActiveThreadID != "" }
 
-func hasRepoOrWorktree(c Context) bool { return c.ActiveRepoID != "" || c.ActiveWorktreePath != "" }
+func hasProjectOrWorktree(c Context) bool {
+	return c.ActiveProjectID != "" || c.ActiveWorktreePath != ""
+}
 
 // canStartThread is thread.new's availability: a GUI caller needs an active
 // repository or worktree, or the composer (whose target may be no project at all). A
-// CLI caller (no active view) names everything with flags, and --workspace, --repos or
+// CLI caller (no active view) names everything with flags, and --workspace, --projects or
 // --no-project alone are enough, which When cannot see, so Run validates instead.
 func canStartThread(c Context) bool {
-	return hasRepoOrWorktree(c) || c.ActiveView == "" || c.ActiveView == "compose"
+	return hasProjectOrWorktree(c) || c.ActiveView == "" || c.ActiveView == "compose"
 }
 
 // noProjectAlone refuses thread.new's no-project with any arg that places the thread
 // in a project or workspace.
 func noProjectAlone(a Args) error {
-	for _, name := range []string{"repo", "worktree", "workspace", "repos", "new-worktree", "base"} {
+	for _, name := range []string{"project", "worktree", "workspace", "projects", "new-worktree", "base"} {
 		if a.String(name) != "" || a.Bool(name) {
 			return InvalidArg(name, "no-project starts a thread without a project; it does not take %s", name)
 		}
@@ -90,16 +92,16 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 		Command{
 			Name:  "thread.new",
 			Title: "New Thread",
-			Description: "Start Claude Code in a worktree (default: the active worktree, else the active repository's main worktree), or in a new worktree. " +
-				"With workspace the thread belongs to that workspace and runs in one of its member worktrees; with new-worktree and repos it gets a new workspace. " +
+			Description: "Start Claude Code in a worktree (default: the active worktree, else the active project's main worktree), or in a new worktree. " +
+				"With workspace the thread belongs to that workspace and runs in one of its member worktrees; with new-worktree and projects it gets a new workspace. " +
 				"With no-project it belongs to no project and runs in your home directory.",
 			Category:    "Thread",
 			Keybindings: []string{"cmd+n"},
 			Args: []ArgSpec{
-				{Name: "repo", Type: String, Context: ContextRepo, Description: "Repository id (with workspace or repos: the member the thread runs in, by id or name)"},
+				{Name: "project", Type: String, Context: ContextProject, Description: "Project id (with workspace or projects: the member the thread runs in, by id or name)"},
 				{Name: "worktree", Type: Path, Context: ContextWorktree, Description: "Worktree path (with workspace: a member worktree)"},
-				{Name: "workspace", Type: String, Description: "Workspace id or name the thread belongs to; it runs in the member repo or worktree names (default: the first member)"},
-				{Name: "repos", Type: String, Description: "With new-worktree: comma-separated repositories (id, name, or path; repo:base gives that one its own base) for a new workspace, a cf/<slug of the thread name> worktree in each; repo picks the member the thread runs in (default: the first)"},
+				{Name: "workspace", Type: String, Description: "Workspace id or name the thread belongs to; it runs in the member project or worktree names (default: the first member)"},
+				{Name: "projects", Type: String, Description: "With new-worktree: comma-separated projects (id, name, or path; project:base gives that one its own base) for a new workspace, a cf/<slug of the thread name> worktree in each; repo picks the member the thread runs in (default: the first)"},
 				{Name: "model", Type: Enum, Enum: ThreadModels, Description: threadModelHelp + " (default: settings threads.default_model)"},
 				{Name: "effort", Type: Enum, Enum: ThreadEfforts, Description: "Effort level (default: settings threads.default_effort)"},
 				{Name: "permission", Type: Enum, Enum: ThreadPermissions, Default: "auto",
@@ -110,7 +112,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				{Name: "prompt", Type: String, Description: "First prompt, sent as the thread's first message once Claude is up"},
 				{Name: "attachments", Type: String, Description: "Comma-separated image or PDF paths from StageAttachment, appended to the prompt"},
 				{Name: "composer-prompt", Type: String, Description: "The GUI composer's text of prompt with its tag tokens, kept on the first message for display (the GUI sets it)"},
-				{Name: "no-project", Type: Bool, Description: "Start the thread without a project, in your home directory (not with repo, worktree, workspace, repos, new-worktree or base)"},
+				{Name: "no-project", Type: Bool, Description: "Start the thread without a project, in your home directory (not with project, worktree, workspace, projects, new-worktree or base)"},
 				{Name: "created-by", Type: String, DefaultToThreadEnv: true, ID: ThreadID,
 					Description: "Id of the thread whose agent creates this one, noted at the top of the new thread (default: the thread this command runs in, $CODE_FOUNDRY_THREAD; pass an empty value to opt out)"},
 				{Name: "brief", Type: String, Description: "What the thread is for, in at most 500 characters (shown with the creator's note)"},
@@ -122,16 +124,16 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 			},
 			When: canStartThread,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-				ws, repos := a.String("workspace"), splitList(a.String("repos"))
+				ws, projects := a.String("workspace"), splitList(a.String("projects"))
 				if a.Bool("no-project") {
 					if err := noProjectAlone(a); err != nil {
 						return Result{}, err
 					}
-				} else if a.String("repo") == "" && a.Path("worktree") == "" && ws == "" && len(repos) == 0 {
-					return Result{}, InvalidArg("worktree", "a worktree, repository, or workspace is required (or no-project)")
+				} else if a.String("project") == "" && a.Path("worktree") == "" && ws == "" && len(projects) == 0 {
+					return Result{}, InvalidArg("worktree", "a worktree, project, or workspace is required (or no-project)")
 				}
 				req := &v1.CreateThreadRequest{
-					RepoId: a.String("repo"), WorktreePath: a.Path("worktree"), Model: a.String("model"),
+					ProjectId: a.String("project"), WorktreePath: a.Path("worktree"), Model: a.String("model"),
 					Effort: a.String("effort"), Name: a.String("name"), InitialPrompt: a.String("prompt"),
 					ComposerPrompt: a.String("composer-prompt"), PermissionMode: threadPermissionModes[a.String("permission")], Attachments: splitList(a.String("attachments")),
 					WorkspaceId: ws, NoProject: a.Bool("no-project"),
@@ -149,12 +151,12 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 					req.BudgetUsd = usd
 				}
 				switch {
-				case len(repos) > 0 && !a.Bool("new-worktree"):
-					return Result{}, InvalidArg("repos", "only applies with new-worktree (a new workspace); for an existing one use workspace")
+				case len(projects) > 0 && !a.Bool("new-worktree"):
+					return Result{}, InvalidArg("projects", "only applies with new-worktree (a new workspace); for an existing one use workspace")
 				case ws != "" && a.Bool("new-worktree"):
-					return Result{}, InvalidArg("workspace", "a workspace thread runs in an existing member; for a new workspace use new-worktree with repos")
-				case len(repos) > 0:
-					req.NewWorkspace = &v1.NewWorkspace{Repos: repos, BaseRef: a.String("base")}
+					return Result{}, InvalidArg("workspace", "a workspace thread runs in an existing member; for a new workspace use new-worktree with projects")
+				case len(projects) > 0:
+					req.NewWorkspace = &v1.NewWorkspace{Projects: projects, BaseRef: a.String("base")}
 				case a.Bool("new-worktree"):
 					req.NewWorktree = &v1.NewWorktree{BaseRef: a.String("base")}
 				case a.String("base") != "":

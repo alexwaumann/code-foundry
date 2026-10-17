@@ -114,7 +114,7 @@ func (p Paths) DaemonLog() string { return filepath.Join(p.Logs(), "daemon.log")
 func (p Paths) Worktrees() string { return filepath.Join(p.home, "worktrees") }
 
 // Projects is where projects the app creates live: clones at
-// <Projects>/<owner>/<repo> (RepoService.Clone), new projects at <Projects>/<name>.
+// <Projects>/<owner>/<repo> (ProjectService.Clone), new projects at <Projects>/<name>.
 // Not configurable. The clone store creates it (0700) on first use.
 func (p Paths) Projects() string { return filepath.Join(p.home, "projects") }
 

@@ -22,8 +22,8 @@ func TestDecode(t *testing.T) {
 		{name: "float stays a float", in: "[appearance]\nfont_size = 13.5\n", want: map[string]string{"appearance.font_size": "13.5"}},
 		{name: "quoted keybinding keys", in: "[keybindings]\n\"thread.new\" = \"cmd+shift+n\"\n",
 			want: map[string]string{"keybindings.thread.new": "cmd+shift+n"}},
-		{name: "unquoted dotted keybinding keys are flattened", in: "[keybindings]\nthread.new = \"cmd+j\"\nrepo.worktree.new = \"cmd+alt+n\"\n",
-			want: map[string]string{"keybindings.thread.new": "cmd+j", "keybindings.repo.worktree.new": "cmd+alt+n"}},
+		{name: "unquoted dotted keybinding keys are flattened", in: "[keybindings]\nthread.new = \"cmd+j\"\nproject.worktree.new = \"cmd+alt+n\"\n",
+			want: map[string]string{"keybindings.thread.new": "cmd+j", "keybindings.project.worktree.new": "cmd+alt+n"}},
 		{name: "top-level key", in: "theme = \"dark\"\n", want: map[string]string{"theme": "dark"}},
 		{name: "syntax error", in: "[threads\n", wantErr: true},
 	}
@@ -44,7 +44,8 @@ func TestDecode(t *testing.T) {
 }
 
 // Files written before threads were renamed from sessions: [sessions] and the session.*
-// keybindings read as [threads] and thread.*.
+// keybindings read as [threads] and thread.*. Files written before projects were renamed
+// from repos: [repos] and the repo.* keybindings read as [projects] and project.*.
 func TestDecodeLegacyNames(t *testing.T) {
 	tests := []struct {
 		name string
@@ -55,8 +56,17 @@ func TestDecodeLegacyNames(t *testing.T) {
 			want: map[string]string{"threads.auto_name": "false", "threads.default_effort": "max"}},
 		{name: "quoted session.* keybindings are thread.*", in: "[keybindings]\n\"session.new\" = \"cmd+shift+n\"\n\"session.rename\" = \"none\"\n",
 			want: map[string]string{"keybindings.thread.new": "cmd+shift+n", "keybindings.thread.rename": "none"}},
-		{name: "unquoted session.* keybindings are thread.*", in: "[keybindings]\nsession.new = \"cmd+j\"\nrepo.worktree.new = \"cmd+alt+n\"\n",
-			want: map[string]string{"keybindings.thread.new": "cmd+j", "keybindings.repo.worktree.new": "cmd+alt+n"}},
+		{name: "unquoted session.* keybindings are thread.*", in: "[keybindings]\nsession.new = \"cmd+j\"\nproject.worktree.new = \"cmd+alt+n\"\n",
+			want: map[string]string{"keybindings.thread.new": "cmd+j", "keybindings.project.worktree.new": "cmd+alt+n"}},
+		{name: "[repos] is [projects]", in: "[repos]\nfetch_interval_seconds = 60\nworktree_dir = \"~/wt/{repo}\"\n",
+			want: map[string]string{"projects.fetch_interval_seconds": "60", "projects.worktree_dir": "~/wt/{repo}"}},
+		{name: "repo.* keybindings are project.*", in: "[keybindings]\n\"repo.worktree.new\" = \"cmd+alt+n\"\nrepo.refresh = \"none\"\n\"ui.focus.repo\" = \"cmd+5\"\n\"workspace.add-repo\" = \"cmd+6\"\n\"workspace.remove-repo\" = \"cmd+7\"\n",
+			want: map[string]string{"keybindings.project.worktree.new": "cmd+alt+n", "keybindings.project.refresh": "none", "keybindings.ui.focus.project": "cmd+5",
+				"keybindings.workspace.add-project": "cmd+6", "keybindings.workspace.remove-project": "cmd+7"}},
+		{name: "[projects] wins over [repos]", in: "[repos]\nfetch_interval_seconds = 60\n[projects]\nfetch_interval_seconds = 0\n",
+			want: map[string]string{"projects.fetch_interval_seconds": "0"}},
+		{name: "repository-like keybindings are left alone", in: "[keybindings]\n\"repository.x\" = \"cmd+8\"\n",
+			want: map[string]string{"keybindings.repository.x": "cmd+8"}},
 		{name: "the new name wins when both are set", in: "[sessions]\nauto_name = false\nfont_size = 9\n[threads]\nauto_name = true\n[keybindings]\n\"session.new\" = \"cmd+1\"\n\"thread.new\" = \"cmd+2\"\n",
 			want: map[string]string{"threads.auto_name": "true", "threads.font_size": "9", "keybindings.thread.new": "cmd+2"}},
 		{name: "other groups and keybindings are left alone", in: "[appearance]\ntheme = \"dark\"\n[keybindings]\n\"sessionx.new\" = \"cmd+3\"\n\"terminal.new\" = \"cmd+t\"\n",

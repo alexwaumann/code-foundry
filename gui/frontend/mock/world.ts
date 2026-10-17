@@ -7,7 +7,7 @@ import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { Code, ConnectError } from "@connectrpc/connect";
 import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
 import { EventSource, type EventSchema } from "../src/gen/codefoundry/v1/events_pb";
-import type { RepoEventSchema, RepoSchema, WorktreeSchema } from "../src/gen/codefoundry/v1/repo_pb";
+import type { ProjectEventSchema, ProjectSchema, WorktreeSchema } from "../src/gen/codefoundry/v1/project_pb";
 import { PermissionMode, ThreadState, ThreadStatus, type ThreadListEventSchema, type ThreadSchema } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
 import { TerminalState, type AttachEventSchema, type TerminalEventSchema, type TerminalSchema } from "../src/gen/codefoundry/v1/terminal_pb";
 import { UiIntent_Notify_Level, UiIntentSchema } from "../src/gen/codefoundry/v1/ui_pb";
@@ -34,9 +34,9 @@ import { contextFields, recordResult, type MockContext } from "./context";
 type TerminalInit = MessageInitShape<typeof TerminalSchema>;
 type AttachEventInit = MessageInitShape<typeof AttachEventSchema>;
 type TerminalEventInit = MessageInitShape<typeof TerminalEventSchema>;
-type RepoInit = MessageInitShape<typeof RepoSchema>;
+type RepoInit = MessageInitShape<typeof ProjectSchema>;
 type WorktreeInit = MessageInitShape<typeof WorktreeSchema>;
-type RepoEventInit = MessageInitShape<typeof RepoEventSchema>;
+type RepoEventInit = MessageInitShape<typeof ProjectEventSchema>;
 type ThreadInit = MessageInitShape<typeof ThreadSchema>;
 type ThreadListEventInit = MessageInitShape<typeof ThreadListEventSchema>;
 export type EventInit = MessageInitShape<typeof EventSchema>;
@@ -48,14 +48,14 @@ export interface MockWorkspace {
   id: string;
   name: string;
   branch: string;
-  members: { repoId: string; worktreePath: string }[];
+  members: { projectId: string; worktreePath: string }[];
   createdAt: Date;
 }
 
 interface MockThread {
   id: string;
   claudeSessionId: string;
-  repoId: string;
+  projectId: string;
   worktreePath: string;
   name: string;
   autoNamed: boolean;
@@ -160,7 +160,7 @@ type Kind = "top" | "shell" | "action";
 // The terminal label contract (internal/termlabel, proto Terminal.labels).
 const LABEL_KIND = "kind";
 const LABEL_THREAD = "thread";
-const LABEL_REPO = "repo";
+const LABEL_REPO = "project";
 const LABEL_WORKTREE = "worktree";
 const KIND_SHELL = "shell";
 const KIND_ACTION = "action";
@@ -169,8 +169,8 @@ const KIND_ACTION = "action";
 const isPanel = (labels: Record<string, string>) => labels[LABEL_KIND] === KIND_SHELL || labels[LABEL_KIND] === KIND_ACTION;
 
 /** Labels of a shell terminal.new starts: owned by a worktree, and by a thread when threadId is set. */
-function shellLabels(threadId: string, repoId: string, worktree: string): Record<string, string> {
-  const l: Record<string, string> = { [LABEL_KIND]: KIND_SHELL, [LABEL_REPO]: repoId, [LABEL_WORKTREE]: worktree };
+function shellLabels(threadId: string, projectId: string, worktree: string): Record<string, string> {
+  const l: Record<string, string> = { [LABEL_KIND]: KIND_SHELL, [LABEL_REPO]: projectId, [LABEL_WORKTREE]: worktree };
   if (threadId) l[LABEL_THREAD] = threadId;
   return l;
 }
@@ -540,7 +540,7 @@ export class World {
   /** EventService: every hub below tees into this one, so its order is publish order. */
   readonly events = new Hub<{ source: EventSource; event: EventInit }>();
   readonly termEvents = new Hub<TerminalEventInit>((v) => this.events.publish({ source: EventSource.TERMINAL, event: { event: { case: "terminal", value: v } } }));
-  readonly repoEvents = new Hub<RepoEventInit>((v) => this.events.publish({ source: EventSource.REPO, event: { event: { case: "repo", value: v } } }));
+  readonly repoEvents = new Hub<RepoEventInit>((v) => this.events.publish({ source: EventSource.PROJECT, event: { event: { case: "project", value: v } } }));
   readonly workspaceEvents = new Hub<WorkspaceEventInit>((v) => this.events.publish({ source: EventSource.WORKSPACE, event: { event: { case: "workspace", value: v } } }));
   readonly threadListEvents = new Hub<ThreadListEventInit>((v) => this.events.publish({ source: EventSource.THREAD_LIST, event: { event: { case: "threadList", value: v } } }));
   readonly intents = new Hub<UiIntentInit>((v) => this.events.publish({ source: EventSource.UI, event: { event: { case: "ui", value: v } } }));
@@ -605,7 +605,7 @@ export class World {
     repos: () => [...this.repos.values()].map((r) => ({ id: r.id, name: r.name, worktrees: r.worktrees.map((w) => w.path) })),
     thread: (id) => {
       const s = this.threads.get(id);
-      return s && { repoId: s.repoId, worktreePath: s.worktreePath };
+      return s && { projectId: s.projectId, worktreePath: s.worktreePath };
     },
     startTerminal: (argv, cwd, labels) => this.create(argv, cwd, labels, "action").id,
     write: (id, text) => {
@@ -692,23 +692,23 @@ export class World {
     // Threads in every state, each with a short history (SEEDS).
     this.threads.clear();
     const ago = (min: number) => new Date(Date.now() - min * 60_000);
-    this.addThread({ id: "s-1", repoId: "repo-cf", worktreePath: CF, name: "Refactor sidebar tree", model: "claude-opus-4-8[1m]", effort: "high", status: ThreadStatus.BUSY, statusReason: "working: Refactor sidebar tree", createdAt: ago(42), usage: sampleUsage() });
-    this.addThread({ id: "s-2", repoId: "repo-gp", worktreePath: GP, name: "Port renderer", model: "claude-sonnet-5[1m]", effort: "", status: ThreadStatus.NEEDS_ATTENTION, statusReason: `permission: Bash ${SEEDS["s-2"]?.reply ?? ""}`, statusChangedAt: ago(3), createdAt: ago(40) });
-    this.addThread({ id: "s-3", repoId: "repo-cf", worktreePath: `${CFW}/fix-resize`, name: "Fix resize race", model: "claude-opus-4-8[1m]", effort: "medium", state: ThreadState.DISCONNECTED, disconnectReason: "idle", createdAt: ago(300), lastActivityAt: ago(95), usage: pageUsage("s-3") });
-    this.addThread({ id: "s-4", repoId: "repo-cf", worktreePath: `${CFW}/feat-sidebar`, name: "Investigate flaky e2e", model: "claude-4.5-haiku[1m]", effort: "", state: ThreadState.DISCONNECTED, disconnectReason: "crashed", exitCode: 139, createdAt: ago(200), lastActivityAt: ago(17), usage: pageUsage("s-4") });
-    this.addThread({ id: "s-5", repoId: "repo-cf", worktreePath: `${CFW}/feat-sidebar`, name: "Write thread docs", model: "claude-opus-4-8[1m]", effort: "low", state: ThreadState.STARTING, settleIn: 8, createdAt: ago(0) });
-    this.addThread({ id: "s-6", repoId: "repo-dot", worktreePath: `${HOME}/dotfiles`, name: "Tidy zshrc", model: "claude-sonnet-5[1m]", effort: "", state: ThreadState.CLOSING, settleIn: 8, createdAt: ago(60) });
+    this.addThread({ id: "s-1", projectId: "repo-cf", worktreePath: CF, name: "Refactor sidebar tree", model: "claude-opus-4-8[1m]", effort: "high", status: ThreadStatus.BUSY, statusReason: "working: Refactor sidebar tree", createdAt: ago(42), usage: sampleUsage() });
+    this.addThread({ id: "s-2", projectId: "repo-gp", worktreePath: GP, name: "Port renderer", model: "claude-sonnet-5[1m]", effort: "", status: ThreadStatus.NEEDS_ATTENTION, statusReason: `permission: Bash ${SEEDS["s-2"]?.reply ?? ""}`, statusChangedAt: ago(3), createdAt: ago(40) });
+    this.addThread({ id: "s-3", projectId: "repo-cf", worktreePath: `${CFW}/fix-resize`, name: "Fix resize race", model: "claude-opus-4-8[1m]", effort: "medium", state: ThreadState.DISCONNECTED, disconnectReason: "idle", createdAt: ago(300), lastActivityAt: ago(95), usage: pageUsage("s-3") });
+    this.addThread({ id: "s-4", projectId: "repo-cf", worktreePath: `${CFW}/feat-sidebar`, name: "Investigate flaky e2e", model: "claude-4.5-haiku[1m]", effort: "", state: ThreadState.DISCONNECTED, disconnectReason: "crashed", exitCode: 139, createdAt: ago(200), lastActivityAt: ago(17), usage: pageUsage("s-4") });
+    this.addThread({ id: "s-5", projectId: "repo-cf", worktreePath: `${CFW}/feat-sidebar`, name: "Write thread docs", model: "claude-opus-4-8[1m]", effort: "low", state: ThreadState.STARTING, settleIn: 8, createdAt: ago(0) });
+    this.addThread({ id: "s-6", projectId: "repo-dot", worktreePath: `${HOME}/dotfiles`, name: "Tidy zshrc", model: "claude-sonnet-5[1m]", effort: "", state: ThreadState.CLOSING, settleIn: 8, createdAt: ago(60) });
     // Archived 90 min ago (the sidebar's Archived section, collapsed by default).
-    this.addThread({ id: "s-7", repoId: "repo-cf", worktreePath: CF, name: "Spike a canvas sidebar", model: "claude-sonnet-5[1m]", effort: "", state: ThreadState.DISCONNECTED, disconnectReason: "closed", status: ThreadStatus.NEEDS_ATTENTION, statusReason: "finished", statusChangedAt: ago(95), createdAt: ago(600), lastActivityAt: ago(95), archivedAt: ago(90) });
+    this.addThread({ id: "s-7", projectId: "repo-cf", worktreePath: CF, name: "Spike a canvas sidebar", model: "claude-sonnet-5[1m]", effort: "", state: ThreadState.DISCONNECTED, disconnectReason: "closed", status: ThreadStatus.NEEDS_ATTENTION, statusReason: "finished", statusChangedAt: ago(95), createdAt: ago(600), lastActivityAt: ago(95), archivedAt: ago(90) });
     // Snoozed (the sidebar's Snoozed section, collapsed by default): s-8 wakes in 2.5 h (a
     // finished turn, so it does not count as attention while snoozed), s-9 in 4 days.
     const later = (min: number) => new Date(Date.now() + min * 60_000);
-    this.addThread({ id: "s-8", repoId: "repo-cf", worktreePath: CF, name: "Refactor the gh poller", model: "claude-sonnet-5[1m]", effort: "", state: ThreadState.DISCONNECTED, disconnectReason: "closed", status: ThreadStatus.NEEDS_ATTENTION, statusReason: "finished", statusChangedAt: ago(30), createdAt: ago(500), lastActivityAt: ago(30), snoozedUntil: later(150) });
-    this.addThread({ id: "s-9", repoId: "repo-gp", worktreePath: GP, name: "Bump wails to v3.1", model: "claude-opus-4-8[1m]", effort: "medium", state: ThreadState.DISCONNECTED, disconnectReason: "closed", createdAt: ago(450), lastActivityAt: ago(20), snoozedUntil: later(4 * 24 * 60 + 60) });
+    this.addThread({ id: "s-8", projectId: "repo-cf", worktreePath: CF, name: "Refactor the gh poller", model: "claude-sonnet-5[1m]", effort: "", state: ThreadState.DISCONNECTED, disconnectReason: "closed", status: ThreadStatus.NEEDS_ATTENTION, statusReason: "finished", statusChangedAt: ago(30), createdAt: ago(500), lastActivityAt: ago(30), snoozedUntil: later(150) });
+    this.addThread({ id: "s-9", projectId: "repo-gp", worktreePath: GP, name: "Bump wails to v3.1", model: "claude-opus-4-8[1m]", effort: "medium", state: ThreadState.DISCONNECTED, disconnectReason: "closed", createdAt: ago(450), lastActivityAt: ago(20), snoozedUntil: later(4 * 24 * 60 + 60) });
     for (const [id, h] of Object.entries(SEEDS)) if (h) this.logs.seed(id, h);
     // Republish so connected watchers converge on the reset state.
     for (const t of this.terms.values()) this.termEvents.publish({ event: { case: "updated", value: this.terminalMsg(t) } });
-    for (const r of this.repos.values()) this.repoEvents.publish({ event: { case: "repoUpdated", value: this.repoMsg(r) } });
+    for (const r of this.repos.values()) this.repoEvents.publish({ event: { case: "projectUpdated", value: this.repoMsg(r) } });
     this.workspaceEvents.publish(this.workspaceSnapshot());
     this.threadListEvents.publish(this.threadListSnapshot());
     this.actions.reset();
@@ -750,7 +750,7 @@ export class World {
     const w = this.addWorktree(repo, branch, `origin/${repo.defaultBranch || "main"}`);
     if (path) {
       w.path = path;
-      this.repoEvents.publish({ event: { case: "repoUpdated", value: this.repoMsg(repo) } });
+      this.repoEvents.publish({ event: { case: "projectUpdated", value: this.repoMsg(repo) } });
     }
     return w;
   }
@@ -766,7 +766,7 @@ export class World {
     return "";
   }
 
-  /** RepoService.CleanupWorktrees: what repo.worktree.cleanup removes (dry: only says so) and what it keeps, with why. */
+  /** ProjectService.CleanupWorktrees: what repo.worktree.cleanup removes (dry: only says so) and what it keeps, with why. */
   cleanupWorktrees(repoRef: string, path: string, dry: boolean): { removed: MockWorktree[]; skipped: { w: MockWorktree; reason: string }[] } {
     const repo = this.repoRef(repoRef);
     requireGit(repo, "a cleanup");
@@ -816,7 +816,7 @@ export class World {
       id: `w-${String(this.workspaces.size + 1).padStart(12, "0")}`,
       name,
       branch,
-      members: specs.map(({ repo, base }) => ({ repoId: repo.id, worktreePath: this.addWorktree(repo, branch, base).path })),
+      members: specs.map(({ repo, base }) => ({ projectId: repo.id, worktreePath: this.addWorktree(repo, branch, base).path })),
       createdAt: new Date(),
     };
     this.workspaces.set(w.id, w);
@@ -838,9 +838,9 @@ export class World {
    */
   addMixedWorkspace(name: string): MockWorkspace {
     const ws = this.addWorkspace(name, ["repo-cf", "repo-gp", "repo-dot"]);
-    const set = (repoId: string, status: Partial<MockWorktree["status"]>) => {
-      const repo = this.repos.get(repoId);
-      const path = ws.members.find((m) => m.repoId === repoId)?.worktreePath;
+    const set = (projectId: string, status: Partial<MockWorktree["status"]>) => {
+      const repo = this.repos.get(projectId);
+      const path = ws.members.find((m) => m.projectId === projectId)?.worktreePath;
       const w = repo?.worktrees.find((x) => x.path === path);
       if (!repo || !w) return;
       w.status = { ...w.status, ...status };
@@ -864,7 +864,7 @@ export class World {
     this.workspaces.clear();
     for (const id of [...this.repos.keys()]) {
       this.actions.removeRepo(id);
-      this.repoEvents.publish({ event: { case: "repoRemovedId", value: id } });
+      this.repoEvents.publish({ event: { case: "projectRemovedId", value: id } });
     }
     this.repos.clear();
     this.workspaceEvents.publish(this.workspaceSnapshot());
@@ -877,7 +877,7 @@ export class World {
     const path = r.worktrees.find((w) => w.isMain)?.path ?? r.path;
     const out: MockThread[] = [];
     for (let i = 1; i <= count; i++) {
-      const s = this.addThread({ id: `s-t-${String(this.nextId++)}`, repoId: r.id, worktreePath: path, name: `${prefix} ${String(i)}`, model: "claude-4.5-haiku[1m]", effort: "", status, createdAt: new Date() });
+      const s = this.addThread({ id: `s-t-${String(this.nextId++)}`, projectId: r.id, worktreePath: path, name: `${prefix} ${String(i)}`, model: "claude-4.5-haiku[1m]", effort: "", status, createdAt: new Date() });
       this.publishThread(s);
       out.push(s);
     }
@@ -909,7 +909,7 @@ export class World {
     for (const { min, ...k } of kinds) {
       out.push(k.id);
       if (this.threads.has(k.id)) continue;
-      const s = this.addThread({ repoId: "repo-cf", worktreePath: CF, model: "claude-4.5-haiku[1m]", effort: "medium", createdAt: ago(min + 5), lastActivityAt: ago(min), statusChangedAt: ago(min), ...k });
+      const s = this.addThread({ projectId: "repo-cf", worktreePath: CF, model: "claude-4.5-haiku[1m]", effort: "medium", createdAt: ago(min + 5), lastActivityAt: ago(min), statusChangedAt: ago(min), ...k });
       this.publishThread(s);
     }
     return out;
@@ -936,7 +936,7 @@ export class World {
       { id: P, name: PN, status: ThreadStatus.BUSY, statusReason: "working", min: 41, worktreePath: `${CFW}/feat-sidebar` },
       { id: C, name: CN, createdBy: P, createdByName: PN, brief: "Add retry to the login redirect, keep the PR small", status: A, statusReason: "finished", state: D, min: 18, worktreePath: `${CFW}/fix-resize`, labels: ["auth"] },
       { id: "s-l-e2e", name: "Update redirect e2e tests", createdBy: P, createdByName: PN, brief: "Cover the new retry path in the redirect e2e suite", status: ThreadStatus.BUSY, statusReason: "working", min: 17 },
-      { id: "s-l-cookie", name: "Audit session cookie flags", createdBy: P, createdByName: PN, brief: "Check SameSite and Secure on the session cookie in every env; report, don't fix", status: A, statusReason: "permission: Bash", min: 15, repoId: "repo-gp", worktreePath: GP },
+      { id: "s-l-cookie", name: "Audit session cookie flags", createdBy: P, createdByName: PN, brief: "Check SameSite and Secure on the session cookie in every env; report, don't fix", status: A, statusReason: "permission: Bash", min: 15, projectId: "repo-gp", worktreePath: GP },
       { id: "s-l-allow", name: "Bump redirect allowlist", createdBy: P, createdByName: PN, brief: "Add staging.acme.dev to the redirect allowlist and its test", status: A, statusReason: "error: overloaded", state: D, min: 14 },
       { id: "s-l-spike", name: "Old redirect spike", createdBy: P, createdByName: PN, status: A, statusReason: "finished", state: D, min: 13, archivedAt: ago(5) },
       { id: "s-l-logs", name: "Tidy redirect logging", createdBy: P, createdByName: PN, brief: "Drop the debug logs around the redirect", state: D, min: 12 },
@@ -947,7 +947,7 @@ export class World {
     for (const { min, ...o } of specs) {
       out.push(o.id);
       if (this.threads.has(o.id)) continue;
-      const s = this.addThread({ repoId: "repo-cf", worktreePath: CF, model: "claude-4.5-haiku[1m]", effort: "medium", createdAt: ago(min), lastActivityAt: ago(min - 1), statusChangedAt: ago(min - 1), held: true, ...o });
+      const s = this.addThread({ projectId: "repo-cf", worktreePath: CF, model: "claude-4.5-haiku[1m]", effort: "medium", createdAt: ago(min), lastActivityAt: ago(min - 1), statusChangedAt: ago(min - 1), held: true, ...o });
       if (s.id === P) {
         // The creator was woken when its child settled (thread.new --notify): a wake message.
         const payload = {
@@ -955,7 +955,7 @@ export class World {
           subscription_id: "sub-l-1",
           condition: "settled",
           fired_at: ago(min - 20).toISOString(),
-          thread: { id: C, name: CN, state: "disconnected", status: "needs_attention", status_reason: "finished", repo_id: "repo-cf", worktree_path: `${CFW}/fix-resize`, created_by: P, labels: ["auth"], report: { status: "done", summary: "Retry added around exchangeToken, 3 attempts; PR opened", data: { pr: 412 }, at: ago(min - 20).toISOString() } },
+          thread: { id: C, name: CN, state: "disconnected", status: "needs_attention", status_reason: "finished", project_id: "repo-cf", worktree_path: `${CFW}/fix-resize`, created_by: P, labels: ["auth"], report: { status: "done", summary: "Retry added around exchangeToken, 3 attempts; PR opened", data: { pr: 412 }, at: ago(min - 20).toISOString() } },
         };
         this.logs.seed(s.id, {
           prompt: "Split the login redirect fix into threads with code-foundry thread new, and wake me when they settle.",
@@ -988,9 +988,9 @@ export class World {
   /** Test control: a connected thread owned by the workspace, running in `repo`'s member (else the first). */
   addWorkspaceThread(workspace: string, repo: string, name: string, status: ThreadStatus = ThreadStatus.IDLE): MockThread {
     const ws = this.workspaceRef(workspace);
-    const member = repo ? ws.members.find((m) => m.repoId === this.repoRef(repo).id) : ws.members[0];
+    const member = repo ? ws.members.find((m) => m.projectId === this.repoRef(repo).id) : ws.members[0];
     if (!member) throw new CommandError("unavailable", `repo ${repo} is not a member of workspace ${ws.name}`);
-    const s = this.addThread({ id: `s-ws-${String(this.nextId++)}`, repoId: member.repoId, worktreePath: member.worktreePath, name, model: "claude-4.5-haiku[1m]", effort: "", workspaceId: ws.id, status, createdAt: new Date() });
+    const s = this.addThread({ id: `s-ws-${String(this.nextId++)}`, projectId: member.projectId, worktreePath: member.worktreePath, name, model: "claude-4.5-haiku[1m]", effort: "", workspaceId: ws.id, status, createdAt: new Date() });
     this.publishThread(s);
     return s;
   }
@@ -1003,14 +1003,14 @@ export class World {
   runIn(s: MockThread, repoRef: string, worktree: string): MockThread {
     if (!s.workspaceId) throw new CommandError("unavailable", `thread ${s.id} does not belong to a workspace`);
     const ws = this.workspaceRef(s.workspaceId);
-    const member = worktree ? ws.members.find((m) => m.worktreePath === worktree) : ws.members.find((m) => m.repoId === this.repoRef(repoRef).id);
+    const member = worktree ? ws.members.find((m) => m.worktreePath === worktree) : ws.members.find((m) => m.projectId === this.repoRef(repoRef).id);
     if (!member) throw new CommandError("unavailable", `${repoRef || worktree} is not a member of workspace ${ws.name}`);
     if (s.state === ThreadState.CLOSING) throw new CommandError("unavailable", `thread ${s.id} is closing`);
     if (s.state === ThreadState.DISCONNECTED || member.worktreePath === s.worktreePath) {
       s.pendingWorktreePath = "";
       if (member.worktreePath !== s.worktreePath) {
         s.worktreePath = member.worktreePath;
-        s.repoId = member.repoId;
+        s.projectId = member.projectId;
       }
     } else {
       s.pendingWorktreePath = member.worktreePath;
@@ -1027,7 +1027,7 @@ export class World {
     s.pendingWorktreePath = "";
     if (member) {
       s.worktreePath = member.worktreePath;
-      s.repoId = member.repoId;
+      s.projectId = member.projectId;
     }
     this.publishThread(s);
   }
@@ -1036,9 +1036,9 @@ export class World {
   addWorkspaceRepo(workspace: string, repoRef: string, base: string): MockWorkspace {
     const ws = this.workspaceRef(workspace);
     const repo = this.memberRepoRef(repoRef);
-    if (ws.members.some((m) => m.repoId === repo.id)) throw new CommandError("unavailable", `${repo.name} is already a member of workspace ${ws.name}`);
+    if (ws.members.some((m) => m.projectId === repo.id)) throw new CommandError("unavailable", `${repo.name} is already a member of workspace ${ws.name}`);
     const w = this.addWorktree(repo, ws.branch, base || (repo.remotes.length > 0 ? `origin/${repo.defaultBranch}` : repo.defaultBranch));
-    ws.members.push({ repoId: repo.id, worktreePath: w.path });
+    ws.members.push({ projectId: repo.id, worktreePath: w.path });
     this.workspaceEvents.publish({ event: { case: "updated", value: this.workspaceMsg(ws) } });
     return ws;
   }
@@ -1053,7 +1053,7 @@ export class World {
     for (const repo of this.repos.values()) {
       if (!repo.worktrees.some((w) => w.path === path)) continue;
       repo.worktrees = repo.worktrees.filter((w) => w.path !== path);
-      this.repoEvents.publish({ event: { case: "worktreeRemoved", value: { repoId: repo.id, path } } });
+      this.repoEvents.publish({ event: { case: "worktreeRemoved", value: { projectId: repo.id, path } } });
     }
     this.closeShells((l) => l[LABEL_WORKTREE] === path);
     this.actions.stopBackground((r) => r.worktreePath === path);
@@ -1062,7 +1062,7 @@ export class World {
   /** workspace.remove-repo: refused while a thread's Claude runs there or with changes (unless force). */
   removeWorkspaceRepo(workspace: string, repoRef: string, force: boolean): MockWorkspace {
     const ws = this.workspaceRef(workspace);
-    const member = ws.members.find((m) => m.worktreePath === repoRef) ?? ws.members.find((m) => m.repoId === this.repoRef(repoRef).id);
+    const member = ws.members.find((m) => m.worktreePath === repoRef) ?? ws.members.find((m) => m.projectId === this.repoRef(repoRef).id);
     if (!member) throw new CommandError("unavailable", `${repoRef} is not a member of workspace ${ws.name}`);
     const busy = this.threadsIn([member.worktreePath])[0];
     if (busy) throw new CommandError("unavailable", `thread ${busy.name || busy.id} (${busy.id}) is on ${member.worktreePath}; archive it first`);
@@ -1089,7 +1089,7 @@ export class World {
 
   // ---- Threads -----------------------------------------------------------------
 
-  private addThread(o: Partial<MockThread> & Pick<MockThread, "id" | "repoId" | "worktreePath" | "name" | "model" | "effort">): MockThread {
+  private addThread(o: Partial<MockThread> & Pick<MockThread, "id" | "projectId" | "worktreePath" | "name" | "model" | "effort">): MockThread {
     const state = o.state ?? ThreadState.CONNECTED;
     const status = o.status ?? ThreadStatus.IDLE;
     const s: MockThread = {
@@ -1141,7 +1141,7 @@ export class World {
     return {
       id: s.id,
       claudeSessionId: s.claudeSessionId,
-      repoId: s.repoId,
+      projectId: s.projectId,
       worktreePath: s.worktreePath,
       name: s.name,
       autoNamed: s.autoNamed,
@@ -1282,7 +1282,7 @@ export class World {
     }
     const s = this.addThread({
       id,
-      repoId: "repo-cf",
+      projectId: "repo-cf",
       worktreePath: CF,
       name: "Fix stale PR badge",
       model: "claude-opus-4-8[1m]",
@@ -1361,11 +1361,11 @@ export class World {
    * A new thread in STARTING. Unnamed for ~1s, then named `pendingName` (the daemon
    * names it in the background), connected after ~2s.
    */
-  private createThread(repoId: string, path: string, model: string, effort: string, extra: Partial<MockThread> = {}): MockThread {
+  private createThread(projectId: string, path: string, model: string, effort: string, extra: Partial<MockThread> = {}): MockThread {
     const id = `s-new-${String(this.nextId++)}`;
     // With a first prompt the thread is on that turn already (the daemon says busy at spawn).
     const busy = extra.firstMessage ? { status: ThreadStatus.BUSY, statusReason: "working" } : {};
-    const s = this.addThread({ id, repoId, worktreePath: path, name: "", model, effort, state: ThreadState.STARTING, settleIn: 2, nameIn: 1, pendingName: `thread-${id}`, createdAt: new Date(), ...busy, ...extra });
+    const s = this.addThread({ id, projectId, worktreePath: path, name: "", model, effort, state: ThreadState.STARTING, settleIn: 2, nameIn: 1, pendingName: `thread-${id}`, createdAt: new Date(), ...busy, ...extra });
     this.publishThread(s);
     return s;
   }
@@ -1724,19 +1724,19 @@ export class World {
     const s = ctx?.activeThreadId ? this.threads.get(ctx.activeThreadId) : undefined;
     if (ctx?.activeThreadId) {
       if (!s) throw new CommandError("notfound", `thread ${ctx.activeThreadId} not found`);
-      return { labels: shellLabels(s.id, s.repoId, s.worktreePath), cwd: cwd || s.worktreePath };
+      return { labels: shellLabels(s.id, s.projectId, s.worktreePath), cwd: cwd || s.worktreePath };
     }
-    const exact = ctx?.activeRepoId ? this.repos.get(ctx.activeRepoId)?.worktrees.find((w) => w.path === ctx.activeWorktreePath) : undefined;
-    if (exact && ctx) return { labels: shellLabels("", ctx.activeRepoId, exact.path), cwd: cwd || exact.path };
+    const exact = ctx?.activeProjectId ? this.repos.get(ctx.activeProjectId)?.worktrees.find((w) => w.path === ctx.activeWorktreePath) : undefined;
+    if (exact && ctx) return { labels: shellLabels("", ctx.activeProjectId, exact.path), cwd: cwd || exact.path };
     const path = cwd || ctx?.activeWorktreePath || "";
-    let best: { repoId: string; path: string } | null = null;
+    let best: { projectId: string; path: string } | null = null;
     for (const repo of this.repos.values()) {
       for (const w of repo.worktrees) {
-        if ((path === w.path || path.startsWith(`${w.path}/`)) && w.path.length > (best?.path.length ?? 0)) best = { repoId: repo.id, path: w.path };
+        if ((path === w.path || path.startsWith(`${w.path}/`)) && w.path.length > (best?.path.length ?? 0)) best = { projectId: repo.id, path: w.path };
       }
     }
     if (!best) throw new CommandError("invalid", `${path} is not inside a registered project`);
-    return { labels: shellLabels("", best.repoId, best.path), cwd: cwd || best.path };
+    return { labels: shellLabels("", best.projectId, best.path), cwd: cwd || best.path };
   }
 
   /**
@@ -1771,8 +1771,8 @@ export class World {
    */
   private async newThread(ctx: UiContext | undefined, args: Record<string, string>): Promise<InvokeOut> {
     if (args["no-project"] === "true") return this.newHomeThread(ctx, args);
-    if (args.workspace || args.repos) return this.newWorkspaceThread(args);
-    const repo = this.repos.get(args.repo || ctx?.activeRepoId || "") ?? this.worktreeOf(ctx)?.repo;
+    if (args.workspace || args.projects) return this.newWorkspaceThread(args);
+    const repo = this.repos.get(args.project || ctx?.activeProjectId || "") ?? this.worktreeOf(ctx)?.repo;
     if (!repo) throw new CommandError("invalid", "a worktree or repository is required");
     const first = firstMessageOf(args);
     const prompt = args.prompt ?? "";
@@ -1829,10 +1829,10 @@ export class World {
    * context included.
    */
   private async newHomeThread(ctx: UiContext | undefined, args: Record<string, string>): Promise<InvokeOut> {
-    for (const name of ["repo", "worktree", "workspace", "repos", "new-worktree", "base"]) {
+    for (const name of ["project", "worktree", "workspace", "projects", "new-worktree", "base"]) {
       if (args[name]) throw new CommandError("invalid", `no-project starts a thread without a project; it does not take ${name}`);
     }
-    if (ctx?.activeRepoId) throw new CommandError("invalid", "no-project starts a thread without a project; it does not take repo");
+    if (ctx?.activeProjectId) throw new CommandError("invalid", "no-project starts a thread without a project; it does not take repo");
     if (ctx?.activeWorktreePath) throw new CommandError("invalid", "no-project starts a thread without a project; it does not take worktree");
     const prompt = args.prompt ?? "";
     const permission = args.permission ?? "";
@@ -1861,7 +1861,7 @@ export class World {
     const prompt = args.prompt ?? "";
     const permission = args.permission ?? "";
     if (args.workspace && created) throw new CommandError("invalid", "a workspace thread runs in an existing member; for a new workspace use new-worktree with repos");
-    if (args.repos && !created) throw new CommandError("invalid", "repos only applies with new-worktree");
+    if (args.projects && !created) throw new CommandError("invalid", "projects only applies with new-worktree");
     const first = firstMessageOf(args);
     for (const p of (args.attachments ?? "").split(",").filter(Boolean)) {
       if (!this.attachments.has(p)) throw new CommandError("invalid", `attachment ${p} was not staged`);
@@ -1879,25 +1879,25 @@ export class World {
       await settle(150);
       if (prompt.includes("FAIL")) throw new CommandError("unavailable", "start claude: exec: \"claude\": executable file not found in $PATH");
     } else {
-      const refs = (args.repos ?? "").split(",").map((r) => r.trim()).filter(Boolean);
+      const refs = (args.projects ?? "").split(",").map((r) => r.trim()).filter(Boolean);
       for (const ref of refs) this.memberRepoRef(ref.split(":")[0] ?? "");
       await settle(this.worktreeDelayMs);
       if (prompt.includes("FAIL")) throw new CommandError("unavailable", "create workspace: git worktree add: invalid reference: origin/nope");
       let name = slug || `s-new-${String(this.nextId)}`;
       for (let i = 2; [...this.workspaces.values()].some((w) => w.name === name); i++) name = `${slug}-${String(i)}`;
       ws = this.addWorkspace(name, refs);
-      const own = refs.find((r) => this.repoRef(r.split(":")[0] ?? "").id === (args.repo ? this.repoRef(args.repo).id : ws.members[0]?.repoId));
+      const own = refs.find((r) => this.repoRef(r.split(":")[0] ?? "").id === (args.project ? this.repoRef(args.project).id : ws.members[0]?.projectId));
       baseRef = own?.split(":")[1] ?? "";
     }
     const byPath = args.worktree ? ws.members.find((m) => m.worktreePath === args.worktree) : undefined;
     if (args.worktree && !byPath) throw new CommandError("unavailable", `${args.worktree} is not a member worktree of workspace ${ws.name}`);
-    const repoId = args.repo ? this.repoRef(args.repo).id : "";
-    if (byPath && repoId && byPath.repoId !== repoId) throw new CommandError("invalid", `worktree ${byPath.worktreePath} belongs to repo ${byPath.repoId}, not ${repoId}`);
-    const member = byPath ?? (repoId ? ws.members.find((m) => m.repoId === repoId) : ws.members[0]);
-    if (!member) throw new CommandError("unavailable", `repo ${repoId} is not a member of workspace ${ws.name}`);
-    const repo = this.repoRef(member.repoId);
+    const projectId = args.project ? this.repoRef(args.project).id : "";
+    if (byPath && projectId && byPath.projectId !== projectId) throw new CommandError("invalid", `worktree ${byPath.worktreePath} belongs to repo ${byPath.projectId}, not ${projectId}`);
+    const member = byPath ?? (projectId ? ws.members.find((m) => m.projectId === projectId) : ws.members[0]);
+    if (!member) throw new CommandError("unavailable", `repo ${projectId} is not a member of workspace ${ws.name}`);
+    const repo = this.repoRef(member.projectId);
     if (created && !baseRef) baseRef = repo.remotes.length > 0 ? `origin/${repo.defaultBranch}` : repo.defaultBranch;
-    const s = this.createThread(member.repoId, member.worktreePath, args.model || "claude-opus-4-8[1m]", args.effort ?? "", {
+    const s = this.createThread(member.projectId, member.worktreePath, args.model || "claude-opus-4-8[1m]", args.effort ?? "", {
       name: args.name ?? "",
       autoNamed: !args.name,
       nameIn: args.name ? 0 : 2,
@@ -1929,10 +1929,10 @@ export class World {
     return path;
   }
 
-  /** RepoService.ListRefs: local branches, then remote-tracking refs, and the default base. */
-  listRefs(repoId: string): { refs: string[]; defaultRef: string } {
-    const repo = this.repos.get(repoId);
-    if (!repo) throw new CommandError("notfound", `repo ${repoId} not found`);
+  /** ProjectService.ListRefs: local branches, then remote-tracking refs, and the default base. */
+  listRefs(projectId: string): { refs: string[]; defaultRef: string } {
+    const repo = this.repos.get(projectId);
+    if (!repo) throw new CommandError("notfound", `repo ${projectId} not found`);
     requireGit(repo, "listing refs");
     const local = [...new Set([...repo.worktrees.map((w) => w.branch), ...(repo.branches ?? [])].filter(Boolean))].sort();
     const remote = !repo.remotes.includes("origin") ? [] : repo.githubSlug ? ["origin/main", "origin/release/v0.3", "origin/feat/sidebar"].sort() : [`origin/${repo.defaultBranch}`];
@@ -1975,8 +1975,8 @@ export class World {
 
   // ---- Repo API -----------------------------------------------------------------
 
-  worktreeMsg(repoId: string, w: MockWorktree): WorktreeInit {
-    return { repoId, path: w.path, branch: w.branch, head: w.head, detached: w.detached ?? false, isMain: w.isMain, mergedClean: mergedClean(w), status: { ...w.status, refreshedAt: timestampFromDate(new Date()) } };
+  worktreeMsg(projectId: string, w: MockWorktree): WorktreeInit {
+    return { projectId, path: w.path, branch: w.branch, head: w.head, detached: w.detached ?? false, isMain: w.isMain, mergedClean: mergedClean(w), status: { ...w.status, refreshedAt: timestampFromDate(new Date()) } };
   }
 
   repoMsg(r: MockRepo): RepoInit {
@@ -1984,7 +1984,7 @@ export class World {
   }
 
   /**
-   * RepoService.Register (the Add Project dialog's Local folder tab and an existing clone
+   * ProjectService.Register (the Add Project dialog's Local folder tab and an existing clone
    * destination), with the daemon's rules: "~" expands, the path must be absolute and
    * under home, a folder inside a git repository adds that repository, any other folder
    * a project without git, and an already registered project is returned unchanged.
@@ -2026,11 +2026,11 @@ export class World {
           worktrees: [{ path: folder.path, branch: "", head: "", isMain: true, status: clean() }],
         };
     this.repos.set(id, repo);
-    this.repoEvents.publish({ event: { case: "repoUpdated", value: this.repoMsg(repo) } });
+    this.repoEvents.publish({ event: { case: "projectUpdated", value: this.repoMsg(repo) } });
     return repo;
   }
 
-  /** RepoService.Clone's last step: a cloned GitHub repository registered at path. */
+  /** ProjectService.Clone's last step: a cloned GitHub repository registered at path. */
   addClone(owner: string, name: string, path: string): MockRepo {
     let id = `repo-${name.toLowerCase()}`;
     for (let n = 2; this.repos.has(id); n++) id = `repo-${name.toLowerCase()}-${String(n)}`;
@@ -2044,12 +2044,12 @@ export class World {
       worktrees: [{ path, branch: "main", head: "c1013ed0", isMain: true, status: clean() }],
     };
     this.repos.set(id, repo);
-    this.repoEvents.publish({ event: { case: "repoUpdated", value: this.repoMsg(repo) } });
+    this.repoEvents.publish({ event: { case: "projectUpdated", value: this.repoMsg(repo) } });
     return repo;
   }
 
   /**
-   * RepoService.InitGit and repo.git.init: a project without git becomes a git repository
+   * ProjectService.InitGit and repo.git.init: a project without git becomes a git repository
    * on main (the empty "Initial commit"), its folder the main worktree on that branch.
    */
   initGit(id: string): MockRepo {
@@ -2059,7 +2059,7 @@ export class World {
     repo.git = true;
     repo.defaultBranch = "main";
     repo.worktrees = repo.worktrees.map((w) => (w.isMain ? { ...w, branch: "main", head: "1a1t1a10", status: clean({ upstream: "", baseRef: "", untracked: 3, dirty: true }) } : w));
-    this.repoEvents.publish({ event: { case: "repoUpdated", value: this.repoMsg(repo) } });
+    this.repoEvents.publish({ event: { case: "projectUpdated", value: this.repoMsg(repo) } });
     return repo;
   }
 
@@ -2075,14 +2075,14 @@ export class World {
     return r && { name: r.name, path: r.path, git: r.git !== false, remotes: r.remotes };
   }
 
-  /** RepoService.Delete (and repo.unregister): the project is gone. */
+  /** ProjectService.Delete (and repo.unregister): the project is gone. */
   removeRepo(id: string): void {
     this.actions.removeRepo(id);
     this.repos.delete(id);
-    this.repoEvents.publish({ event: { case: "repoRemovedId", value: id } });
+    this.repoEvents.publish({ event: { case: "projectRemovedId", value: id } });
   }
 
-  /** RepoService.Create: a git project on main with its empty first commit, no remote. */
+  /** ProjectService.Create: a git project on main with its empty first commit, no remote. */
   addCreated(name: string, path: string): { id: string; name: string; path: string } {
     let id = `repo-${name.toLowerCase()}`;
     for (let n = 2; this.repos.has(id); n++) id = `repo-${name.toLowerCase()}-${String(n)}`;
@@ -2096,18 +2096,18 @@ export class World {
       worktrees: [{ path, branch: "main", head: "1n1t1a10", isMain: true, status: clean({ upstream: "", baseRef: "" }) }],
     };
     this.repos.set(id, repo);
-    this.repoEvents.publish({ event: { case: "repoUpdated", value: this.repoMsg(repo) } });
+    this.repoEvents.publish({ event: { case: "projectUpdated", value: this.repoMsg(repo) } });
     return { id, name, path };
   }
 
-  /** RepoService.Publish succeeded: origin on GitHub, main tracking origin/main. */
+  /** ProjectService.Publish succeeded: origin on GitHub, main tracking origin/main. */
   setOrigin(id: string, slug: string): void {
     const repo = this.repos.get(id);
     if (!repo) return;
     repo.remotes = ["origin"];
     repo.githubSlug = slug;
     repo.worktrees = repo.worktrees.map((w) => (w.isMain ? { ...w, status: { ...w.status, upstream: "origin/main", baseRef: "origin/main" } } : w));
-    this.repoEvents.publish({ event: { case: "repoUpdated", value: this.repoMsg(repo) } });
+    this.repoEvents.publish({ event: { case: "projectUpdated", value: this.repoMsg(repo) } });
   }
 
   // ---- Commands -----------------------------------------------------------------
@@ -2166,24 +2166,24 @@ export class World {
           return remote !== "" && remote !== "origin";
         };
         const clones = [...this.repos.values()].filter((r) => r.githubSlug !== "" && r.githubSlug.toLowerCase() === slug.toLowerCase());
-        const find = (pred: (w: MockWorktree) => boolean): { repoId: string; path: string } | null => {
+        const find = (pred: (w: MockWorktree) => boolean): { projectId: string; path: string } | null => {
           for (const r of clones) {
             const w = r.worktrees.find(pred);
-            if (w) return { repoId: r.id, path: w.path };
+            if (w) return { projectId: r.id, path: w.path };
           }
           return null;
         };
-        let target: { repoId: string; path: string } | null = null;
+        let target: { projectId: string; path: string } | null = null;
         if (args.worktree) {
           const owner = [...this.repos.values()].find((r) => r.worktrees.some((w) => w.path === args.worktree));
-          target = { repoId: owner?.id ?? "", path: args.worktree };
+          target = { projectId: owner?.id ?? "", path: args.worktree };
         } else {
           const first = clones[0];
           if (!first) throw new CommandError("unavailable", `no registered repository is a clone of ${slug}: add one with \`code-foundry repo add <folder>\`, or pass --worktree`);
           const active = ctx?.activeWorktreePath;
           if (!fix && active) target = find((w) => w.path === active);
           if (!target) target = find(onHead);
-          if (!target && !fix) target = { repoId: first.id, path: first.worktrees.find((w) => w.isMain)?.path ?? first.path };
+          if (!target && !fix) target = { projectId: first.id, path: first.worktrees.find((w) => w.isMain)?.path ?? first.path };
           if (!target) {
             if (!head) throw new CommandError("unavailable", `#${String(n)} has no head branch to check out: pass --worktree`);
             if (cross) throw new CommandError("unavailable", `#${String(n)} comes from a fork and no worktree of ${slug} has its head checked out: check it out (for example \`gh pr checkout ${String(n)}\` in a worktree) and pass --worktree`);
@@ -2191,16 +2191,16 @@ export class World {
             const w: MockWorktree = { path: `${HOME}/.code-foundry/worktrees/${first.githubSlug}/${head.replace(/\//g, "-")}`, branch: head, head: pr?.headSha ?? "c0ffee00", isMain: false, status: clean({ upstream: `origin/${head}`, baseRef: "" }) };
             first.worktrees.push(w);
             this.repoEvents.publish({ event: { case: "worktreeUpdated", value: this.worktreeMsg(first.id, w) } });
-            target = { repoId: first.id, path: w.path };
+            target = { projectId: first.id, path: w.path };
           }
         }
         const defaults = this.threadDefaults();
-        const s = this.createThread(target.repoId, target.path, args.model ?? defaults.model, args.effort ?? defaults.effort);
+        const s = this.createThread(target.projectId, target.path, args.model ?? defaults.model, args.effort ?? defaults.effort);
         this.focusThread(s.id);
         // Like the daemon: the result JSON is the created Thread (protojson).
         return {
           message: `Started thread ${s.id} for PR #${String(n)}`,
-          resultJson: JSON.stringify({ id: s.id, repoId: s.repoId, worktreePath: s.worktreePath, model: s.model, effort: s.effort }),
+          resultJson: JSON.stringify({ id: s.id, projectId: s.projectId, worktreePath: s.worktreePath, model: s.model, effort: s.effort }),
         };
       };
     const always = () => true;
@@ -2299,10 +2299,10 @@ export class World {
           description: "Start Claude Code in a worktree (or a new one), with a first prompt",
           keybindings: ["cmd+n"],
           args: [
-            { name: "repo", type: ArgType.STRING, required: false, description: "Repository id" },
+            { name: "project", type: ArgType.STRING, required: false, description: "Project id" },
             { name: "worktree", type: ArgType.PATH, required: false, description: "Worktree path" },
             { name: "workspace", type: ArgType.STRING, required: false, description: "Workspace id or name the thread belongs to" },
-            { name: "repos", type: ArgType.STRING, required: false, description: "With new-worktree: repositories for a new workspace (repo[:base], comma-separated)" },
+            { name: "projects", type: ArgType.STRING, required: false, description: "With new-worktree: projects for a new workspace (project[:base], comma-separated)" },
             { name: "model", type: ArgType.ENUM, required: false, description: "Model", enumValues: MODEL_VALUES, defaultValue: "claude-opus-4-8[1m]" },
             { name: "effort", type: ArgType.ENUM, required: false, description: "Effort", enumValues: ["low", "medium", "high", "xhigh", "max"], defaultValue: "high" },
             { name: "permission", type: ArgType.ENUM, required: false, description: "Permission mode", enumValues: ["supervised", "accept-edits", "auto"] },
@@ -2316,7 +2316,7 @@ export class World {
           ],
         },
         // Like the daemon: also in the composer, whose no-project target has no repo.
-        when: (ctx) => this.worktreeOf(ctx) !== null || Boolean(ctx?.activeRepoId && this.repos.has(ctx.activeRepoId)) || ctx?.activeView === "compose",
+        when: (ctx) => this.worktreeOf(ctx) !== null || Boolean(ctx?.activeProjectId && this.repos.has(ctx.activeProjectId)) || ctx?.activeView === "compose",
         run: (ctx, args) => this.newThread(ctx, args),
       },
       {
@@ -2325,7 +2325,7 @@ export class World {
         run: (ctx) => {
           const s = activeThread(ctx);
           if (!s) throw new CommandError("unavailable", "no active thread");
-          const f = this.createThread(s.repoId, s.worktreePath, s.model, s.effort, { pendingName: `${s.name || s.id} (fork)`, permissionMode: s.permissionMode, parentId: s.id });
+          const f = this.createThread(s.projectId, s.worktreePath, s.model, s.effort, { pendingName: `${s.name || s.id} (fork)`, permissionMode: s.permissionMode, parentId: s.id });
           this.logs.fork(s.id, f.id, s.name || s.id);
           this.focusThread(f.id);
           return `Forked ${s.name || s.id}`;
@@ -2351,7 +2351,7 @@ export class World {
           description: "Move a workspace thread to another member worktree of its workspace.",
           keybindings: [],
           args: [
-            { name: "repo", type: ArgType.STRING, required: false, description: "Member repository (id or name)" },
+            { name: "project", type: ArgType.STRING, required: false, description: "Member project (id or name)" },
             { name: "worktree", type: ArgType.PATH, required: false, description: "Member worktree path" },
           ],
         },
@@ -2360,8 +2360,8 @@ export class World {
         run: (ctx, args) => {
           const s = activeThread(ctx);
           if (!s) throw new CommandError("unavailable", "no active thread");
-          if (!args.repo && !args.worktree) throw new CommandError("invalid", "name the member: a repository or a worktree path");
-          const out = this.runIn(s, args.repo ?? "", args.worktree ?? "");
+          if (!args.project && !args.worktree) throw new CommandError("invalid", "name the member: a project or a worktree path");
+          const out = this.runIn(s, args.project ?? "", args.worktree ?? "");
           const label = out.name ? `${out.name} (${out.id})` : out.id;
           return out.pendingWorktreePath ? `thread ${label} moves to ${out.pendingWorktreePath} once it is idle` : `thread ${label} runs in ${out.worktreePath}`;
         },
@@ -2390,42 +2390,42 @@ export class World {
       },
       {
         cmd: {
-          name: "workspace.add-repo",
+          name: "workspace.add-project",
           title: "Add Project to Workspace",
           category: "Workspace",
           description: "Create a worktree on the workspace branch in another repository and add it to the workspace.",
           keybindings: [],
           args: [
-            { name: "repo", type: ArgType.STRING, required: true, description: "Repository id, name, or absolute path" },
+            { name: "project", type: ArgType.STRING, required: true, description: "Project id, name, or absolute path" },
             { name: "workspace", type: ArgType.STRING, required: false, description: "Workspace id or name" },
             { name: "base", type: ArgType.STRING, required: false, description: "Ref to branch from" },
           ],
         },
         when: always,
         run: (_ctx, args) => {
-          const ws = this.addWorkspaceRepo(args.workspace ?? "", args.repo ?? "", args.base ?? "");
+          const ws = this.addWorkspaceRepo(args.workspace ?? "", args.project ?? "", args.base ?? "");
           const last = ws.members[ws.members.length - 1];
-          return `added ${args.repo ?? ""} to workspace ${ws.name}: ${last?.worktreePath ?? ""} on ${ws.branch}`;
+          return `added ${args.project ?? ""} to workspace ${ws.name}: ${last?.worktreePath ?? ""} on ${ws.branch}`;
         },
       },
       {
         cmd: {
-          name: "workspace.remove-repo",
+          name: "workspace.remove-project",
           title: "Remove Project from Workspace",
           category: "Workspace",
           description: "Delete a member repository's worktree and drop it from the workspace.",
           keybindings: [],
           args: [
-            { name: "repo", type: ArgType.STRING, required: true, description: "Repository id, name, or path" },
+            { name: "project", type: ArgType.STRING, required: true, description: "Project id, name, or path" },
             { name: "workspace", type: ArgType.STRING, required: false, description: "Workspace id or name" },
             { name: "force", type: ArgType.BOOL, required: false, description: "Remove even with uncommitted changes" },
           ],
-          confirm: (_ctx, args) => `Remove project ${args.repo ?? ""} from its workspace? This deletes its worktree from disk.`,
+          confirm: (_ctx, args) => `Remove project ${args.project ?? ""} from its workspace? This deletes its worktree from disk.`,
         },
         when: always,
         run: (_ctx, args) => {
-          const ws = this.removeWorkspaceRepo(args.workspace ?? "", args.repo ?? "", args.force === "true");
-          return `removed ${args.repo ?? ""} from workspace ${ws.name} (${String(ws.members.length)} left)`;
+          const ws = this.removeWorkspaceRepo(args.workspace ?? "", args.project ?? "", args.force === "true");
+          return `removed ${args.project ?? ""} from workspace ${ws.name} (${String(ws.members.length)} left)`;
         },
       },
       {
@@ -2585,7 +2585,7 @@ export class World {
       },
       {
         cmd: {
-          name: "repo.add",
+          name: "project.add",
           title: "Add Project",
           category: "Project",
           description: "Add a project: start a new one, add a folder on this Mac, or clone a repository from GitHub. Opens the Add Project dialog in the app.",
@@ -2602,7 +2602,7 @@ export class World {
       },
       {
         cmd: {
-          name: "repo.clone",
+          name: "project.clone",
           title: "Clone from GitHub",
           category: "Project",
           description: "Clone a github.com repository with `gh repo clone` into ~/.code-foundry/projects/<owner>/<repo> and add it as a project.",
@@ -2611,67 +2611,67 @@ export class World {
         },
         when: always,
         run: () => {
-          throw new CommandError("unavailable", "the mock clones through RepoService.Clone (the Add Project dialog)");
+          throw new CommandError("unavailable", "the mock clones through ProjectService.Clone (the Add Project dialog)");
         },
       },
       {
         cmd: {
-          name: "repo.unregister", title: "Remove Project", category: "Project", description: "Stop tracking the active project", keybindings: [], args: [],
-          confirm: (ctx) => `Stop tracking project ${ctx?.activeRepoId ?? ""}? Nothing on disk is touched.`,
+          name: "project.unregister", title: "Remove Project", category: "Project", description: "Stop tracking the active project", keybindings: [], args: [],
+          confirm: (ctx) => `Stop tracking project ${ctx?.activeProjectId ?? ""}? Nothing on disk is touched.`,
         },
-        when: (ctx) => Boolean(ctx?.activeRepoId && this.repos.has(ctx.activeRepoId)),
+        when: (ctx) => Boolean(ctx?.activeProjectId && this.repos.has(ctx.activeProjectId)),
         run: (ctx) => {
-          const id = ctx?.activeRepoId ?? "";
+          const id = ctx?.activeProjectId ?? "";
           this.repos.delete(id);
-          this.repoEvents.publish({ event: { case: "repoRemovedId", value: id } });
+          this.repoEvents.publish({ event: { case: "projectRemovedId", value: id } });
           return `Unregistered ${id}`;
         },
       },
       {
         cmd: {
-          name: "repo.git.init",
+          name: "project.git.init",
           title: "Initialize Git",
           category: "Project",
           description: "Make a project without git a git repository: git init on the default branch (init.defaultBranch, else main) and an empty initial commit, so worktrees can branch from it.",
           keybindings: [],
-          args: [{ name: "repo", type: ArgType.STRING, required: false, description: "Repository id (default: the active repository)" }],
+          args: [{ name: "project", type: ArgType.STRING, required: false, description: "Project id (default: the active project)" }],
         },
         // Like the daemon: a project is active and it is not a git repository.
-        when: (ctx) => this.repos.get(ctx?.activeRepoId ?? "")?.git === false,
+        when: (ctx) => this.repos.get(ctx?.activeProjectId ?? "")?.git === false,
         run: (ctx, args) => {
-          const repo = this.initGit(args.repo || ctx?.activeRepoId || "");
+          const repo = this.initGit(args.project || ctx?.activeProjectId || "");
           return `initialized git in ${repo.name} on ${repo.defaultBranch}`;
         },
       },
       {
         cmd: {
-          name: "repo.refresh", title: "Refresh Git Status", category: "Repository", description: "Reconcile git status now", keybindings: ["cmd+alt+r"],
-          args: [{ name: "repo", type: ArgType.STRING, required: false, description: "Repository id (default: all)" }],
+          name: "project.refresh", title: "Refresh Git Status", category: "Project", description: "Reconcile git status now", keybindings: [],
+          args: [{ name: "project", type: ArgType.STRING, required: false, description: "Project id (default: all)" }],
         },
         when: always,
         run: (_ctx, args) => {
-          for (const r of this.repos.values()) if (!args.repo || args.repo === r.id) this.repoEvents.publish({ event: { case: "repoUpdated", value: this.repoMsg(r) } });
-          return args.repo ? `refreshed ${args.repo}` : "Git status refreshed";
+          for (const r of this.repos.values()) if (!args.project || args.project === r.id) this.repoEvents.publish({ event: { case: "projectUpdated", value: this.repoMsg(r) } });
+          return args.project ? `refreshed ${args.project}` : "Git status refreshed";
         },
       },
       {
         // As internal/command/commands_repo.go: repo (context), branch (prompted), base, fetch.
         cmd: {
-          name: "repo.worktree.new",
+          name: "project.worktree.new",
           title: "New Worktree",
           category: "Project",
           description: "Create a worktree for a branch, creating the branch from base when it does not exist.",
           keybindings: [],
           args: [
-            { name: "repo", type: ArgType.STRING, required: false, description: "Repository id (default: the active repository)" },
+            { name: "project", type: ArgType.STRING, required: false, description: "Project id (default: the active project)" },
             { name: "branch", type: ArgType.STRING, required: true, description: "Branch to check out" },
             { name: "base", type: ArgType.STRING, required: false, description: "Ref to branch from (default: the default branch)" },
             { name: "fetch", type: ArgType.BOOL, required: false, description: "Fetch the remote base branch first", defaultValue: "true" },
           ],
         },
-        when: (ctx) => this.repos.get(ctx?.activeRepoId ?? "")?.git !== false && Boolean(ctx?.activeRepoId && this.repos.has(ctx.activeRepoId)),
+        when: (ctx) => this.repos.get(ctx?.activeProjectId ?? "")?.git !== false && Boolean(ctx?.activeProjectId && this.repos.has(ctx.activeProjectId)),
         run: (ctx, args) => {
-          const repo = this.repos.get(args.repo || ctx?.activeRepoId || "");
+          const repo = this.repos.get(args.project || ctx?.activeProjectId || "");
           if (!repo) throw new CommandError("unavailable", "no active repository");
           requireGit(repo, "a new worktree");
           const branch = args.branch ?? "";
@@ -2693,22 +2693,22 @@ export class World {
             { name: "base_ref", type: ArgType.STRING, required: false, description: "Base ref" },
           ],
         },
-        when: (ctx) => this.repos.get(ctx?.activeRepoId ?? "")?.git !== false && Boolean(ctx?.activeRepoId && this.repos.has(ctx.activeRepoId)),
+        when: (ctx) => this.repos.get(ctx?.activeProjectId ?? "")?.git !== false && Boolean(ctx?.activeProjectId && this.repos.has(ctx.activeProjectId)),
         run: (ctx, args) => {
-          const repo = this.repos.get(ctx?.activeRepoId ?? "");
+          const repo = this.repos.get(ctx?.activeProjectId ?? "");
           if (!repo) throw new CommandError("unavailable", "no active repository");
           requireGit(repo, "a new worktree");
           const branch = args.branch ?? "";
           const w: MockWorktree = { path: `${HOME}/.code-foundry/worktrees/${repo.githubSlug || `_local/${repo.name}`}/${branch.replace(/\//g, "-")}`, branch, head: "c0ffee00", isMain: false, status: clean({ upstream: "", baseRef: "" }) };
           repo.worktrees.push(w);
           this.repoEvents.publish({ event: { case: "worktreeUpdated", value: this.worktreeMsg(repo.id, w) } });
-          this.intents.publish({ intent: { case: "focusRepo", value: { repoId: repo.id, worktreePath: w.path } } });
+          this.intents.publish({ intent: { case: "focusProject", value: { projectId: repo.id, worktreePath: w.path } } });
           return `Created worktree ${branch}`;
         },
       },
       {
         cmd: {
-          name: "repo.worktree.remove", title: "Remove Worktree", category: "Worktree", description: "Remove the active worktree", keybindings: [],
+          name: "project.worktree.remove", title: "Remove Worktree", category: "Worktree", description: "Remove the active worktree", keybindings: [],
           args: [{ name: "force", type: ArgType.BOOL, required: false, description: "Remove even with uncommitted changes" }],
           confirm: (ctx) => `Remove worktree ${ctx?.activeWorktreePath ?? ""}? This deletes files on disk.`,
         },
@@ -2727,26 +2727,26 @@ export class World {
       {
         // As internal/command/commands_repo_cleanup.go (the fetch is not modelled).
         cmd: {
-          name: "repo.worktree.cleanup",
+          name: "project.worktree.cleanup",
           title: "Clean Up Merged Worktrees",
           category: "Project",
           description: "Fetch, then remove the project's worktrees (or one) whose work is already in origin/<default>. Branches are kept.",
           keybindings: [],
           args: [
-            { name: "repo", type: ArgType.STRING, required: true, description: "Repository name or id" },
+            { name: "project", type: ArgType.STRING, required: true, description: "Project name or id" },
             { name: "path", type: ArgType.PATH, required: false, description: "One worktree (default: every merged one)" },
           ],
           confirm: (ctx, args) => {
-            const ref = args.repo || ctx?.activeRepoId || "";
+            const ref = args.project || ctx?.activeProjectId || "";
             const rm = this.cleanupWorktrees(ref, args.path ?? "", true).removed;
             if (rm.length === 0) return `Fetch ${ref} and remove the worktrees created by Code Foundry (under its worktrees directory) whose work is already in the default branch? Branches are kept.`;
             if (args.path) return `Remove the worktree of ${rm[0]?.branch ?? ""} (${args.path})? Code Foundry created it (under its worktrees directory) and its work is in origin/main; the branch is kept. It is checked again after a fetch.`;
             return `Remove ${String(rm.length)} ${rm.length === 1 ? "worktree" : "worktrees"} created by Code Foundry (under its worktrees directory) whose work is in origin/main: ${rm.map((w) => w.branch).join(", ")}? Branches are kept; each is checked again after a fetch.`;
           },
         },
-        when: (ctx) => Boolean(ctx?.activeRepoId && this.repos.get(ctx.activeRepoId)?.git !== false),
+        when: (ctx) => Boolean(ctx?.activeProjectId && this.repos.get(ctx.activeProjectId)?.git !== false),
         run: (ctx, args) => {
-          const res = this.cleanupWorktrees(args.repo || ctx?.activeRepoId || "", args.path ?? "", false);
+          const res = this.cleanupWorktrees(args.project || ctx?.activeProjectId || "", args.path ?? "", false);
           const parts: string[] = [];
           const n = (k: number) => `${String(k)} ${k === 1 ? "worktree" : "worktrees"}`;
           if (res.removed.length > 0) parts.push(`Removed ${n(res.removed.length)}: ${res.removed.map((w) => w.branch).join(", ")}`);
@@ -2784,7 +2784,7 @@ export class World {
       ...this.gitops.entries((path) => {
         for (const repo of this.repos.values()) {
           const wt = repo.worktrees.find((w) => w.path === path);
-          if (wt) return { repoId: repo.id, path: wt.path, branch: wt.branch, githubSlug: repo.githubSlug, hasRemote: repo.remotes.length > 0 };
+          if (wt) return { projectId: repo.id, path: wt.path, branch: wt.branch, githubSlug: repo.githubSlug, hasRemote: repo.remotes.length > 0 };
         }
         return null;
       }),
@@ -2849,7 +2849,7 @@ export class World {
           args: [],
         },
         // Like the daemon: a thread is active and it sits in a registered worktree.
-        when: (ctx) => Boolean(ctx?.activeThreadId && ctx.activeRepoId && ctx.activeWorktreePath),
+        when: (ctx) => Boolean(ctx?.activeThreadId && ctx.activeProjectId && ctx.activeWorktreePath),
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "panel.worktree" } } }))}`,
       },
       {
@@ -3007,7 +3007,7 @@ export class World {
         ? {
             activeTerminalId: ctx.activeTerminalId,
             activeThreadId: ctx.activeThreadId,
-            activeRepoId: ctx.activeRepoId,
+            activeProjectId: ctx.activeProjectId,
             activeWorktreePath: ctx.activeWorktreePath,
             activeView: ctx.activeView,
             activeWorkspaceId: ctx.activeWorkspaceId,

@@ -5,25 +5,25 @@ package codefoundry.v1;
 import "google/protobuf/timestamp.proto";
 
 // WorkspaceService manages workspaces: one branch checked out as a worktree in each of
-// several repositories (a branch set), for changes that span repositories. See
+// several projects (a branch set), for changes that span projects. See
 // docs/notes/workspaces-handoff.md and docs/notes/workspaces-1-store.md.
 service WorkspaceService {
   // List returns every workspace.
   rpc List(ListWorkspacesRequest) returns (ListWorkspacesResponse) {}
-  // Create makes a workspace and one worktree per member repository on its branch
+  // Create makes a workspace and one worktree per member project on its branch
   // (fetching each base first). All or nothing: on failure, worktrees it made are
   // removed again.
   rpc Create(CreateWorkspaceRequest) returns (CreateWorkspaceResponse) {}
-  // AddRepo creates a worktree on the workspace branch in another repository.
-  rpc AddRepo(AddWorkspaceRepoRequest) returns (AddWorkspaceRepoResponse) {}
-  // RemoveRepo removes a member's worktree (refused while a live thread runs in it, or
+  // AddProject creates a worktree on the workspace branch in another project.
+  rpc AddProject(AddWorkspaceProjectRequest) returns (AddWorkspaceProjectResponse) {}
+  // RemoveProject removes a member's worktree (refused while a live thread runs in it, or
   // when it has uncommitted changes and force is not set) and drops the member.
-  rpc RemoveRepo(RemoveWorkspaceRepoRequest) returns (RemoveWorkspaceRepoResponse) {}
-  // Remove removes every member worktree (same guards as RemoveRepo) and forgets the
+  rpc RemoveProject(RemoveWorkspaceProjectRequest) returns (RemoveWorkspaceProjectResponse) {}
+  // Remove removes every member worktree (same guards as RemoveProject) and forgets the
   // workspace.
   rpc Remove(RemoveWorkspaceRequest) returns (RemoveWorkspaceResponse) {}
   // Members resolves a workspace by id, name, or a path inside one of its member
-  // worktrees, and lists its members with repository names and checked-out branches.
+  // worktrees, and lists its members with project names and checked-out branches.
   rpc Members(WorkspaceMembersRequest) returns (WorkspaceMembersResponse) {}
   // Watch sends a snapshot, then every change. A client that falls behind gets a new
   // snapshot.
@@ -43,29 +43,29 @@ message Workspace {
 }
 
 message WorkspaceMember {
-  string repo_id = 1;
+  string project_id = 1;
   string worktree_path = 2;
 }
 
-// MemberInfo is a member joined with the repository store's current state.
+// MemberInfo is a member joined with the project store's current state.
 message WorkspaceMemberInfo {
-  string repo_id = 1;
-  // Empty when the repository is no longer registered.
-  string repo_name = 2;
+  string project_id = 1;
+  // Empty when the project is no longer registered.
+  string project_name = 2;
   string worktree_path = 3;
   // The branch checked out in the worktree now; the workspace branch when unknown.
   string branch = 4;
-  // The worktree is not among the repository's worktrees (deleted by hand, or the
-  // repository is unregistered or not reconciled yet).
+  // The worktree is not among the project's worktrees (deleted by hand, or the
+  // project is unregistered or not reconciled yet).
   bool missing = 5;
   // The request's cwd is inside this worktree.
   bool current = 6;
 }
 
-// WorkspaceMemberSpec names a repository to add and the ref its branch starts from.
+// WorkspaceMemberSpec names a project to add and the ref its branch starts from.
 message WorkspaceMemberSpec {
-  // Repository id, name (when unique), or a path inside it.
-  string repo = 1;
+  // Project id, name (when unique), or a path inside it.
+  string project = 1;
   // Ref to branch from when the branch does not exist yet. Empty: the request's
   // base_ref, else origin/<default branch>, else <default branch>.
   string base_ref = 2;
@@ -92,33 +92,33 @@ message CreateWorkspaceResponse {
   Workspace workspace = 1;
 }
 
-message AddWorkspaceRepoRequest {
+message AddWorkspaceProjectRequest {
   // Workspace id or name. Empty: the workspace whose member contains cwd.
   string workspace = 1;
   string cwd = 2;
-  // Repository id, name (when unique), or a path inside it.
-  string repo = 3;
+  // Project id, name (when unique), or a path inside it.
+  string project = 3;
   string base_ref = 4;
   bool fetch = 5;
 }
 
-message AddWorkspaceRepoResponse {
+message AddWorkspaceProjectResponse {
   Workspace workspace = 1;
 }
 
-message RemoveWorkspaceRepoRequest {
+message RemoveWorkspaceProjectRequest {
   // Workspace id or name. Empty: the workspace whose member contains cwd.
   string workspace = 1;
   string cwd = 2;
-  // Repository id, name, or a path inside it (or the member worktree path).
-  string repo = 3;
+  // Project id, name, or a path inside it (or the member worktree path).
+  string project = 3;
   // Remove the worktree even with uncommitted changes.
   bool force = 4;
   // Also delete the member's branch.
   bool delete_branch = 5;
 }
 
-message RemoveWorkspaceRepoResponse {
+message RemoveWorkspaceProjectResponse {
   Workspace workspace = 1;
 }
 

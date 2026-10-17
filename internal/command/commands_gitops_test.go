@@ -35,17 +35,17 @@ func newGitOpsRegistry(t *testing.T) (*command.Registry, *commandtest.GitOps) {
 
 func TestGitOpsAvailability(t *testing.T) {
 	reg, _ := newGitOpsRegistry(t)
-	wt := command.Context{ActiveRepoID: "r", ActiveWorktreePath: "/wt"}
-	gh := command.Context{ActiveRepoID: "r", ActiveWorktreePath: "/gh"}
-	local := command.Context{ActiveRepoID: "l", ActiveWorktreePath: "/local"}
-	plain := command.Context{ActiveRepoID: "p", ActiveWorktreePath: "/plain"}
+	wt := command.Context{ActiveProjectID: "r", ActiveWorktreePath: "/wt"}
+	gh := command.Context{ActiveProjectID: "r", ActiveWorktreePath: "/gh"}
+	local := command.Context{ActiveProjectID: "l", ActiveWorktreePath: "/local"}
+	plain := command.Context{ActiveProjectID: "p", ActiveWorktreePath: "/plain"}
 	tests := []struct {
 		cmd  string
 		ctx  command.Context
 		want bool
 	}{
 		{"git.fetch", command.Context{}, false},
-		{"git.fetch", command.Context{ActiveRepoID: "r"}, false},
+		{"git.fetch", command.Context{ActiveProjectID: "r"}, false},
 		{"git.fetch", wt, true},
 		{"git.pull", wt, true},
 		{"git.push", wt, true},
@@ -130,7 +130,7 @@ func TestGitOpsUnavailableSaysWhy(t *testing.T) {
 
 func TestGitOpsCommands(t *testing.T) {
 	t.Setenv("HOME", "/Users/me")
-	wt := command.Context{ActiveRepoID: "r", ActiveWorktreePath: "/wt"}
+	wt := command.Context{ActiveProjectID: "r", ActiveWorktreePath: "/wt"}
 	tests := []struct {
 		name    string
 		cmd     string

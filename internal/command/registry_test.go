@@ -25,7 +25,7 @@ func TestRegisterValidation(t *testing.T) {
 		wantErr string // substring; "" means success
 	}{
 		{"valid", valid(nil), ""},
-		{"three segments", valid(func(c *Command) { c.Name = "repo.worktree.new" }), ""},
+		{"three segments", valid(func(c *Command) { c.Name = "project.worktree.new" }), ""},
 		{"digits after first char", valid(func(c *Command) { c.Name = "a.b2c" }), ""},
 		{"single segment", valid(func(c *Command) { c.Name = "thing" }), "name must match"},
 		{"uppercase", valid(func(c *Command) { c.Name = "Test.thing" }), "name must match"},
@@ -54,7 +54,7 @@ func TestRegisterValidation(t *testing.T) {
 		{"arg ok", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "delete-branch", Type: Bool}} }), ""},
 		{"arg bad name", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "Bad_Name", Type: String}} }), "name must match"},
 		{"arg reserved", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "json", Type: Bool}} }), "reserved"},
-		{"arg reserved context", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "context-repo", Type: String}} }), "reserved"},
+		{"arg reserved context", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "context-project", Type: String}} }), "reserved"},
 		{"arg no type", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "x"}} }), "unknown type"},
 		{"arg duplicate", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "x", Type: String}, {Name: "x", Type: Int}} }), "declared twice"},
 		{"enum without values", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "x", Type: Enum}} }), "needs values"},
@@ -63,7 +63,7 @@ func TestRegisterValidation(t *testing.T) {
 		{"bad int default", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "x", Type: Int, Default: "ten"}} }), "default: want an integer"},
 		{"bad enum default", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "x", Type: Enum, Enum: []string{"a"}, Default: "b"}} }), "default: want one of"},
 		{"relative path default", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "x", Type: Path, Default: "rel"}} }), "absolute"},
-		{"context on bool", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "x", Type: Bool, Context: ContextRepo}} }), "string or path"},
+		{"context on bool", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "x", Type: Bool, Context: ContextProject}} }), "string or path"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

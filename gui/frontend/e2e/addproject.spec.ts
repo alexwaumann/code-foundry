@@ -2,8 +2,8 @@ import { expect, test, type Page } from "@playwright/test";
 import { MOCK_TOKEN } from "../playwright.config";
 import { invocations, listRepos, mockUrl, openAddProjectDialog, openApp, openProjects, repoAt, resetMock } from "./fixtures";
 
-// The Add Project dialog (repo.add): its entry points, the tab order, the Local folder
-// tab (RepoService.Register with path completion; completion itself is e2e/paths.spec.ts),
+// The Add Project dialog (project.add): its entry points, the tab order, the Local folder
+// tab (ProjectService.Register with path completion; completion itself is e2e/paths.spec.ts),
 // and the GitHub tab (lookup, search, clone with streamed progress) against the mock's
 // GitHub (mock/clone.ts).
 
@@ -50,22 +50,22 @@ async function openGitHub(page: Page) {
 test("every entry point opens the dialog", async ({ page }) => {
   await openApp(page);
 
-  // The palette has one "Add Project" (repo.add), and no separate folder prompt.
+  // The palette has one "Add Project" (project.add), and no separate folder prompt.
   await page.keyboard.press("Meta+k");
   const palette = page.getByTestId("palette");
   await page.keyboard.type("add project");
-  await expect(palette.locator('[data-command="repo.add"]')).toContainText("Add Project");
+  await expect(palette.locator('[data-command="project.add"]')).toContainText("Add Project");
   await expect(palette.getByText("Add Project (local folder)")).toHaveCount(0);
   await page.keyboard.press("Escape");
-  await openFromPalette(page, "repo.add");
+  await openFromPalette(page, "project.add");
   await expect(dialog(page)).toBeVisible();
   await expect(dialog(page)).toHaveAttribute("data-tab", "local");
   await expect(page.getByTestId("add-project-local-input")).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(dialog(page)).toHaveCount(0);
 
-  // repo.clone in the palette opens it on GitHub instead of prompting for a repo.
-  await openFromPalette(page, "repo.clone");
+  // project.clone in the palette opens it on GitHub instead of prompting for a repo.
+  await openFromPalette(page, "project.clone");
   await expect(dialog(page)).toHaveAttribute("data-tab", "github");
   await expect(page.getByTestId("add-project-github-input")).toBeFocused();
   await page.keyboard.press("Escape");
@@ -93,14 +93,14 @@ test("every entry point opens the dialog", async ({ page }) => {
   await page.keyboard.press("Escape");
   await expect(dialog(page)).toHaveCount(0);
 
-  // None of them invoked anything: the dialog is the GUI presentation of repo.add.
+  // None of them invoked anything: the dialog is the GUI presentation of project.add.
   expect((await invocations()).filter((i) => i.name.startsWith("repo."))).toEqual([]);
 });
 
 test("the project picker's empty state opens the dialog", async ({ page }) => {
-  const { repos } = (await rpc("RepoService/List", {})) as { repos: { id: string }[] };
+  const { projects: repos } = (await rpc("ProjectService/List", {})) as { projects: { id: string }[] };
   for (const r of repos) {
-    await rpc("CommandService/Invoke", { name: "repo.unregister", context: { activeRepoId: r.id }, confirmed: true });
+    await rpc("CommandService/Invoke", { name: "project.unregister", context: { activeProjectId: r.id }, confirmed: true });
   }
   await openApp(page);
   await page.getByTestId("sidebar-new-thread").click();
@@ -148,7 +148,7 @@ test("Local folder: Tab completes, Enter adds, and the new project opens", async
   await expect(page.getByTestId("path-entry").first()).toHaveAttribute("data-entry-name", "api");
   await page.keyboard.press("Enter");
   await expect(dialog(page)).toHaveCount(0);
-  // RepoService.Register, not a command: "~" expanded, the trailing slash dropped.
+  // ProjectService.Register, not a command: "~" expanded, the trailing slash dropped.
   expect(await repoAt("/Users/dev/src/new-app")).toMatchObject({ name: "new-app", git: true });
   expect((await invocations()).filter((i) => i.name.startsWith("repo."))).toEqual([]);
   await expect(page.getByTestId("worktree-surface-title")).toHaveText("new-app@main");

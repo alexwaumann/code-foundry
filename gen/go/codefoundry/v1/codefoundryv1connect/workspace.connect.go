@@ -37,12 +37,12 @@ const (
 	WorkspaceServiceListProcedure = "/codefoundry.v1.WorkspaceService/List"
 	// WorkspaceServiceCreateProcedure is the fully-qualified name of the WorkspaceService's Create RPC.
 	WorkspaceServiceCreateProcedure = "/codefoundry.v1.WorkspaceService/Create"
-	// WorkspaceServiceAddRepoProcedure is the fully-qualified name of the WorkspaceService's AddRepo
-	// RPC.
-	WorkspaceServiceAddRepoProcedure = "/codefoundry.v1.WorkspaceService/AddRepo"
-	// WorkspaceServiceRemoveRepoProcedure is the fully-qualified name of the WorkspaceService's
-	// RemoveRepo RPC.
-	WorkspaceServiceRemoveRepoProcedure = "/codefoundry.v1.WorkspaceService/RemoveRepo"
+	// WorkspaceServiceAddProjectProcedure is the fully-qualified name of the WorkspaceService's
+	// AddProject RPC.
+	WorkspaceServiceAddProjectProcedure = "/codefoundry.v1.WorkspaceService/AddProject"
+	// WorkspaceServiceRemoveProjectProcedure is the fully-qualified name of the WorkspaceService's
+	// RemoveProject RPC.
+	WorkspaceServiceRemoveProjectProcedure = "/codefoundry.v1.WorkspaceService/RemoveProject"
 	// WorkspaceServiceRemoveProcedure is the fully-qualified name of the WorkspaceService's Remove RPC.
 	WorkspaceServiceRemoveProcedure = "/codefoundry.v1.WorkspaceService/Remove"
 	// WorkspaceServiceMembersProcedure is the fully-qualified name of the WorkspaceService's Members
@@ -56,20 +56,20 @@ const (
 type WorkspaceServiceClient interface {
 	// List returns every workspace.
 	List(context.Context, *connect.Request[v1.ListWorkspacesRequest]) (*connect.Response[v1.ListWorkspacesResponse], error)
-	// Create makes a workspace and one worktree per member repository on its branch
+	// Create makes a workspace and one worktree per member project on its branch
 	// (fetching each base first). All or nothing: on failure, worktrees it made are
 	// removed again.
 	Create(context.Context, *connect.Request[v1.CreateWorkspaceRequest]) (*connect.Response[v1.CreateWorkspaceResponse], error)
-	// AddRepo creates a worktree on the workspace branch in another repository.
-	AddRepo(context.Context, *connect.Request[v1.AddWorkspaceRepoRequest]) (*connect.Response[v1.AddWorkspaceRepoResponse], error)
-	// RemoveRepo removes a member's worktree (refused while a live thread runs in it, or
+	// AddProject creates a worktree on the workspace branch in another project.
+	AddProject(context.Context, *connect.Request[v1.AddWorkspaceProjectRequest]) (*connect.Response[v1.AddWorkspaceProjectResponse], error)
+	// RemoveProject removes a member's worktree (refused while a live thread runs in it, or
 	// when it has uncommitted changes and force is not set) and drops the member.
-	RemoveRepo(context.Context, *connect.Request[v1.RemoveWorkspaceRepoRequest]) (*connect.Response[v1.RemoveWorkspaceRepoResponse], error)
-	// Remove removes every member worktree (same guards as RemoveRepo) and forgets the
+	RemoveProject(context.Context, *connect.Request[v1.RemoveWorkspaceProjectRequest]) (*connect.Response[v1.RemoveWorkspaceProjectResponse], error)
+	// Remove removes every member worktree (same guards as RemoveProject) and forgets the
 	// workspace.
 	Remove(context.Context, *connect.Request[v1.RemoveWorkspaceRequest]) (*connect.Response[v1.RemoveWorkspaceResponse], error)
 	// Members resolves a workspace by id, name, or a path inside one of its member
-	// worktrees, and lists its members with repository names and checked-out branches.
+	// worktrees, and lists its members with project names and checked-out branches.
 	Members(context.Context, *connect.Request[v1.WorkspaceMembersRequest]) (*connect.Response[v1.WorkspaceMembersResponse], error)
 	// Watch sends a snapshot, then every change. A client that falls behind gets a new
 	// snapshot.
@@ -99,16 +99,16 @@ func NewWorkspaceServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(workspaceServiceMethods.ByName("Create")),
 			connect.WithClientOptions(opts...),
 		),
-		addRepo: connect.NewClient[v1.AddWorkspaceRepoRequest, v1.AddWorkspaceRepoResponse](
+		addProject: connect.NewClient[v1.AddWorkspaceProjectRequest, v1.AddWorkspaceProjectResponse](
 			httpClient,
-			baseURL+WorkspaceServiceAddRepoProcedure,
-			connect.WithSchema(workspaceServiceMethods.ByName("AddRepo")),
+			baseURL+WorkspaceServiceAddProjectProcedure,
+			connect.WithSchema(workspaceServiceMethods.ByName("AddProject")),
 			connect.WithClientOptions(opts...),
 		),
-		removeRepo: connect.NewClient[v1.RemoveWorkspaceRepoRequest, v1.RemoveWorkspaceRepoResponse](
+		removeProject: connect.NewClient[v1.RemoveWorkspaceProjectRequest, v1.RemoveWorkspaceProjectResponse](
 			httpClient,
-			baseURL+WorkspaceServiceRemoveRepoProcedure,
-			connect.WithSchema(workspaceServiceMethods.ByName("RemoveRepo")),
+			baseURL+WorkspaceServiceRemoveProjectProcedure,
+			connect.WithSchema(workspaceServiceMethods.ByName("RemoveProject")),
 			connect.WithClientOptions(opts...),
 		),
 		remove: connect.NewClient[v1.RemoveWorkspaceRequest, v1.RemoveWorkspaceResponse](
@@ -134,13 +134,13 @@ func NewWorkspaceServiceClient(httpClient connect.HTTPClient, baseURL string, op
 
 // workspaceServiceClient implements WorkspaceServiceClient.
 type workspaceServiceClient struct {
-	list       *connect.Client[v1.ListWorkspacesRequest, v1.ListWorkspacesResponse]
-	create     *connect.Client[v1.CreateWorkspaceRequest, v1.CreateWorkspaceResponse]
-	addRepo    *connect.Client[v1.AddWorkspaceRepoRequest, v1.AddWorkspaceRepoResponse]
-	removeRepo *connect.Client[v1.RemoveWorkspaceRepoRequest, v1.RemoveWorkspaceRepoResponse]
-	remove     *connect.Client[v1.RemoveWorkspaceRequest, v1.RemoveWorkspaceResponse]
-	members    *connect.Client[v1.WorkspaceMembersRequest, v1.WorkspaceMembersResponse]
-	watch      *connect.Client[v1.WatchWorkspacesRequest, v1.WorkspaceEvent]
+	list          *connect.Client[v1.ListWorkspacesRequest, v1.ListWorkspacesResponse]
+	create        *connect.Client[v1.CreateWorkspaceRequest, v1.CreateWorkspaceResponse]
+	addProject    *connect.Client[v1.AddWorkspaceProjectRequest, v1.AddWorkspaceProjectResponse]
+	removeProject *connect.Client[v1.RemoveWorkspaceProjectRequest, v1.RemoveWorkspaceProjectResponse]
+	remove        *connect.Client[v1.RemoveWorkspaceRequest, v1.RemoveWorkspaceResponse]
+	members       *connect.Client[v1.WorkspaceMembersRequest, v1.WorkspaceMembersResponse]
+	watch         *connect.Client[v1.WatchWorkspacesRequest, v1.WorkspaceEvent]
 }
 
 // List calls codefoundry.v1.WorkspaceService.List.
@@ -153,14 +153,14 @@ func (c *workspaceServiceClient) Create(ctx context.Context, req *connect.Reques
 	return c.create.CallUnary(ctx, req)
 }
 
-// AddRepo calls codefoundry.v1.WorkspaceService.AddRepo.
-func (c *workspaceServiceClient) AddRepo(ctx context.Context, req *connect.Request[v1.AddWorkspaceRepoRequest]) (*connect.Response[v1.AddWorkspaceRepoResponse], error) {
-	return c.addRepo.CallUnary(ctx, req)
+// AddProject calls codefoundry.v1.WorkspaceService.AddProject.
+func (c *workspaceServiceClient) AddProject(ctx context.Context, req *connect.Request[v1.AddWorkspaceProjectRequest]) (*connect.Response[v1.AddWorkspaceProjectResponse], error) {
+	return c.addProject.CallUnary(ctx, req)
 }
 
-// RemoveRepo calls codefoundry.v1.WorkspaceService.RemoveRepo.
-func (c *workspaceServiceClient) RemoveRepo(ctx context.Context, req *connect.Request[v1.RemoveWorkspaceRepoRequest]) (*connect.Response[v1.RemoveWorkspaceRepoResponse], error) {
-	return c.removeRepo.CallUnary(ctx, req)
+// RemoveProject calls codefoundry.v1.WorkspaceService.RemoveProject.
+func (c *workspaceServiceClient) RemoveProject(ctx context.Context, req *connect.Request[v1.RemoveWorkspaceProjectRequest]) (*connect.Response[v1.RemoveWorkspaceProjectResponse], error) {
+	return c.removeProject.CallUnary(ctx, req)
 }
 
 // Remove calls codefoundry.v1.WorkspaceService.Remove.
@@ -182,20 +182,20 @@ func (c *workspaceServiceClient) Watch(ctx context.Context, req *connect.Request
 type WorkspaceServiceHandler interface {
 	// List returns every workspace.
 	List(context.Context, *connect.Request[v1.ListWorkspacesRequest]) (*connect.Response[v1.ListWorkspacesResponse], error)
-	// Create makes a workspace and one worktree per member repository on its branch
+	// Create makes a workspace and one worktree per member project on its branch
 	// (fetching each base first). All or nothing: on failure, worktrees it made are
 	// removed again.
 	Create(context.Context, *connect.Request[v1.CreateWorkspaceRequest]) (*connect.Response[v1.CreateWorkspaceResponse], error)
-	// AddRepo creates a worktree on the workspace branch in another repository.
-	AddRepo(context.Context, *connect.Request[v1.AddWorkspaceRepoRequest]) (*connect.Response[v1.AddWorkspaceRepoResponse], error)
-	// RemoveRepo removes a member's worktree (refused while a live thread runs in it, or
+	// AddProject creates a worktree on the workspace branch in another project.
+	AddProject(context.Context, *connect.Request[v1.AddWorkspaceProjectRequest]) (*connect.Response[v1.AddWorkspaceProjectResponse], error)
+	// RemoveProject removes a member's worktree (refused while a live thread runs in it, or
 	// when it has uncommitted changes and force is not set) and drops the member.
-	RemoveRepo(context.Context, *connect.Request[v1.RemoveWorkspaceRepoRequest]) (*connect.Response[v1.RemoveWorkspaceRepoResponse], error)
-	// Remove removes every member worktree (same guards as RemoveRepo) and forgets the
+	RemoveProject(context.Context, *connect.Request[v1.RemoveWorkspaceProjectRequest]) (*connect.Response[v1.RemoveWorkspaceProjectResponse], error)
+	// Remove removes every member worktree (same guards as RemoveProject) and forgets the
 	// workspace.
 	Remove(context.Context, *connect.Request[v1.RemoveWorkspaceRequest]) (*connect.Response[v1.RemoveWorkspaceResponse], error)
 	// Members resolves a workspace by id, name, or a path inside one of its member
-	// worktrees, and lists its members with repository names and checked-out branches.
+	// worktrees, and lists its members with project names and checked-out branches.
 	Members(context.Context, *connect.Request[v1.WorkspaceMembersRequest]) (*connect.Response[v1.WorkspaceMembersResponse], error)
 	// Watch sends a snapshot, then every change. A client that falls behind gets a new
 	// snapshot.
@@ -221,16 +221,16 @@ func NewWorkspaceServiceHandler(svc WorkspaceServiceHandler, opts ...connect.Han
 		connect.WithSchema(workspaceServiceMethods.ByName("Create")),
 		connect.WithHandlerOptions(opts...),
 	)
-	workspaceServiceAddRepoHandler := connect.NewUnaryHandler(
-		WorkspaceServiceAddRepoProcedure,
-		svc.AddRepo,
-		connect.WithSchema(workspaceServiceMethods.ByName("AddRepo")),
+	workspaceServiceAddProjectHandler := connect.NewUnaryHandler(
+		WorkspaceServiceAddProjectProcedure,
+		svc.AddProject,
+		connect.WithSchema(workspaceServiceMethods.ByName("AddProject")),
 		connect.WithHandlerOptions(opts...),
 	)
-	workspaceServiceRemoveRepoHandler := connect.NewUnaryHandler(
-		WorkspaceServiceRemoveRepoProcedure,
-		svc.RemoveRepo,
-		connect.WithSchema(workspaceServiceMethods.ByName("RemoveRepo")),
+	workspaceServiceRemoveProjectHandler := connect.NewUnaryHandler(
+		WorkspaceServiceRemoveProjectProcedure,
+		svc.RemoveProject,
+		connect.WithSchema(workspaceServiceMethods.ByName("RemoveProject")),
 		connect.WithHandlerOptions(opts...),
 	)
 	workspaceServiceRemoveHandler := connect.NewUnaryHandler(
@@ -257,10 +257,10 @@ func NewWorkspaceServiceHandler(svc WorkspaceServiceHandler, opts ...connect.Han
 			workspaceServiceListHandler.ServeHTTP(w, r)
 		case WorkspaceServiceCreateProcedure:
 			workspaceServiceCreateHandler.ServeHTTP(w, r)
-		case WorkspaceServiceAddRepoProcedure:
-			workspaceServiceAddRepoHandler.ServeHTTP(w, r)
-		case WorkspaceServiceRemoveRepoProcedure:
-			workspaceServiceRemoveRepoHandler.ServeHTTP(w, r)
+		case WorkspaceServiceAddProjectProcedure:
+			workspaceServiceAddProjectHandler.ServeHTTP(w, r)
+		case WorkspaceServiceRemoveProjectProcedure:
+			workspaceServiceRemoveProjectHandler.ServeHTTP(w, r)
 		case WorkspaceServiceRemoveProcedure:
 			workspaceServiceRemoveHandler.ServeHTTP(w, r)
 		case WorkspaceServiceMembersProcedure:
@@ -284,12 +284,12 @@ func (UnimplementedWorkspaceServiceHandler) Create(context.Context, *connect.Req
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.WorkspaceService.Create is not implemented"))
 }
 
-func (UnimplementedWorkspaceServiceHandler) AddRepo(context.Context, *connect.Request[v1.AddWorkspaceRepoRequest]) (*connect.Response[v1.AddWorkspaceRepoResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.WorkspaceService.AddRepo is not implemented"))
+func (UnimplementedWorkspaceServiceHandler) AddProject(context.Context, *connect.Request[v1.AddWorkspaceProjectRequest]) (*connect.Response[v1.AddWorkspaceProjectResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.WorkspaceService.AddProject is not implemented"))
 }
 
-func (UnimplementedWorkspaceServiceHandler) RemoveRepo(context.Context, *connect.Request[v1.RemoveWorkspaceRepoRequest]) (*connect.Response[v1.RemoveWorkspaceRepoResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.WorkspaceService.RemoveRepo is not implemented"))
+func (UnimplementedWorkspaceServiceHandler) RemoveProject(context.Context, *connect.Request[v1.RemoveWorkspaceProjectRequest]) (*connect.Response[v1.RemoveWorkspaceProjectResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.WorkspaceService.RemoveProject is not implemented"))
 }
 
 func (UnimplementedWorkspaceServiceHandler) Remove(context.Context, *connect.Request[v1.RemoveWorkspaceRequest]) (*connect.Response[v1.RemoveWorkspaceResponse], error) {

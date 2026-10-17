@@ -29,7 +29,7 @@ func actionRunForWake(runs runGetter) func(ctx context.Context, id string) (thre
 			return thread.ActionRun{}, false
 		}
 		return thread.ActionRun{
-			ID: r.ID, ActionID: r.ActionID, ActionName: r.ActionName, RepoID: r.RepoID, Finished: r.Finished(),
+			ID: r.ID, ActionID: r.ActionID, ActionName: r.ActionName, ProjectID: r.ProjectID, Finished: r.Finished(),
 			ExitCode: r.ExitCode, StartedAt: r.StartedAt, FinishedAt: r.FinishedAt, Output: r.Output,
 		}, true
 	}

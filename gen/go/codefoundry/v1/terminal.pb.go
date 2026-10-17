@@ -99,7 +99,7 @@ type Terminal struct {
 	//	          unregistered, or their worktree directory is removed.
 	//	thread    the thread (thread id) the terminal belongs to: on a shell or action
 	//	          run started for a thread.
-	//	repo      the repository id of the worktree a shell belongs to.
+	//	project   the project id of the worktree a shell belongs to.
 	//	worktree  the worktree path (symlinks resolved) the terminal belongs to: the
 	//	          owner worktree of a shell or action run (the thread's worktree when it
 	//	          belongs to a thread).
@@ -107,7 +107,7 @@ type Terminal struct {
 	//	action.name  on kind "action": the action's name when the run started.
 	//	action.run   on kind "action": the run's id (ActionRun.id).
 	//
-	// An action terminal carries the same thread / repo / worktree owner labels as a
+	// An action terminal carries the same thread / project / worktree owner labels as a
 	// shell, so a bottom panel shows both the same way.
 	// A terminal created through Create without labels belongs to nothing.
 	Labels        map[string]string `protobuf:"bytes,12,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`

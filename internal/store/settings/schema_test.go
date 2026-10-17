@@ -122,7 +122,7 @@ func TestSchemaShape(t *testing.T) {
 	d := Defaults()
 	if d.Appearance.FontSize != 13 || !d.Threads.AutoName || d.Threads.ScrollbackLines != 10000 || d.Appearance.Theme != "system" || d.Appearance.Backdrop != "forest" ||
 		d.Appearance.ThreadWidth != "comfortable" ||
-		d.GitHub.PollIntervalSeconds != 60 || d.Repos.FetchIntervalSeconds != 120 || d.Advanced.LogLevel != "info" {
+		d.GitHub.PollIntervalSeconds != 60 || d.Projects.FetchIntervalSeconds != 120 || d.Advanced.LogLevel != "info" {
 		t.Errorf("Defaults() = %+v", d)
 	}
 }
@@ -194,7 +194,7 @@ func TestNamingModelField(t *testing.T) {
 var testCmds = []CommandInfo{
 	{Name: "thread.new", Title: "New Thread", Category: "Thread", Keybindings: []string{"cmd+n"}},
 	{Name: "terminal.new", Title: "New Terminal", Category: "Terminal", Keybindings: []string{"cmd+t"}},
-	{Name: "repo.refresh", Title: "Refresh", Category: "Repository"},
+	{Name: "project.refresh", Title: "Refresh", Category: "Project"},
 	{Name: "pr.open", Title: "Open Pull Request", Category: "Pull Request"},
 	{Name: "thread.list", Title: "List Threads", Category: "Thread", NoKeybinding: true},
 	{Name: "daemon.status", Title: "Daemon Status", Category: "Daemon", NoKeybinding: true},
@@ -210,9 +210,9 @@ func TestResolveKeybindings(t *testing.T) {
 		wantValue map[string]string
 	}{
 		{name: "defaults", cmds: testCmds, wantOver: map[string]string{},
-			wantValue: map[string]string{"keybindings.thread.new": "cmd+n", "keybindings.repo.refresh": ""}},
-		{name: "override normalizes", cmds: testCmds, raw: map[string]string{"keybindings.repo.refresh": "Alt+Cmd+R"},
-			wantOver: map[string]string{"repo.refresh": "cmd+alt+r"}, wantValue: map[string]string{"keybindings.repo.refresh": "cmd+alt+r"}},
+			wantValue: map[string]string{"keybindings.thread.new": "cmd+n", "keybindings.project.refresh": ""}},
+		{name: "override normalizes", cmds: testCmds, raw: map[string]string{"keybindings.project.refresh": "Alt+Cmd+R"},
+			wantOver: map[string]string{"project.refresh": "cmd+alt+r"}, wantValue: map[string]string{"keybindings.project.refresh": "cmd+alt+r"}},
 		{name: "NoKeybinding command", cmds: testCmds, raw: map[string]string{"keybindings.thread.list": "cmd+y"},
 			wantOver: map[string]string{}, wantIssue: map[string]string{"keybindings.thread.list": "thread.list cannot have a keybinding"}},
 		{name: "none unbinds", cmds: testCmds, raw: map[string]string{"keybindings.thread.new": "NONE"},
@@ -220,11 +220,11 @@ func TestResolveKeybindings(t *testing.T) {
 		{name: "reserved chord", cmds: testCmds, raw: map[string]string{"keybindings.thread.new": "cmd+k"},
 			wantOver: map[string]string{}, wantIssue: map[string]string{"keybindings.thread.new": "cmd+k is reserved by the app"},
 			wantValue: map[string]string{"keybindings.thread.new": "cmd+n"}},
-		{name: "collides with a default", cmds: testCmds, raw: map[string]string{"keybindings.repo.refresh": "cmd+t"},
-			wantOver: map[string]string{}, wantIssue: map[string]string{"keybindings.repo.refresh": "cmd+t is already bound to terminal.new"}},
+		{name: "collides with a default", cmds: testCmds, raw: map[string]string{"keybindings.project.refresh": "cmd+t"},
+			wantOver: map[string]string{}, wantIssue: map[string]string{"keybindings.project.refresh": "cmd+t is already bound to terminal.new"}},
 		{name: "unbinding frees the chord", cmds: testCmds,
-			raw:      map[string]string{"keybindings.terminal.new": "none", "keybindings.repo.refresh": "cmd+t"},
-			wantOver: map[string]string{"terminal.new": "none", "repo.refresh": "cmd+t"}},
+			raw:      map[string]string{"keybindings.terminal.new": "none", "keybindings.project.refresh": "cmd+t"},
+			wantOver: map[string]string{"terminal.new": "none", "project.refresh": "cmd+t"}},
 		{name: "swap", cmds: testCmds,
 			raw:      map[string]string{"keybindings.terminal.new": "cmd+n", "keybindings.thread.new": "cmd+t"},
 			wantOver: map[string]string{"terminal.new": "cmd+n", "thread.new": "cmd+t"}},
@@ -269,7 +269,7 @@ func TestKeybindingFields(t *testing.T) {
 		keys = append(keys, f.Key)
 	}
 	// Sorted by category, then title; NoKeybinding commands left out.
-	want := []string{"keybindings.pr.open", "keybindings.repo.refresh", "keybindings.terminal.new", "keybindings.thread.new"}
+	want := []string{"keybindings.project.refresh", "keybindings.pr.open", "keybindings.terminal.new", "keybindings.thread.new"}
 	if !slices.Equal(keys, want) {
 		t.Fatalf("keys = %v, want %v", keys, want)
 	}
@@ -277,7 +277,7 @@ func TestKeybindingFields(t *testing.T) {
 		f.Page != PageKeybindings || f.Section != "thread" {
 		t.Errorf("thread.new field = %+v", f)
 	}
-	if fs[0].Section != "pull-request" || fs[1].Default != "" {
+	if fs[1].Section != "pull-request" || fs[0].Default != "" {
 		t.Errorf("fields = %+v", fs)
 	}
 	// The section names the category, so a "<Category>: " prefix goes.
@@ -297,7 +297,7 @@ func TestKeybindingFields(t *testing.T) {
 			secs = p.Sections
 		}
 	}
-	wantSecs := []Section{{ID: "pull-request", Title: "Pull Request"}, {ID: "repository", Title: "Repository"}, {ID: "terminal", Title: "Terminal"}, {ID: "thread", Title: "Thread"}}
+	wantSecs := []Section{{ID: "project", Title: "Project"}, {ID: "pull-request", Title: "Pull Request"}, {ID: "terminal", Title: "Terminal"}, {ID: "thread", Title: "Thread"}}
 	if !slices.Equal(secs, wantSecs) {
 		t.Errorf("keybinding sections = %v, want %v", secs, wantSecs)
 	}

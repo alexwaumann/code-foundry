@@ -106,7 +106,7 @@ export function isStartable(c: CommandView): boolean {
 }
 
 /** Presenters that also replace the palette's arg prompts when the command is picked there. */
-const paletteSupplied: ReadonlySet<string> = new Set(["thread.new", "thread.run-in", "thread.snooze", "repo.clone", "repo.create", "repo.github.publish", "theme.pick"]);
+const paletteSupplied: ReadonlySet<string> = new Set(["thread.new", "thread.run-in", "thread.snooze", "project.clone", "project.create", "project.github.publish", "theme.pick"]);
 
 let bindingCache: { commands: readonly CommandView[]; map: Map<string, CommandView> } | null = null;
 
@@ -189,22 +189,22 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
   // The Add Project dialog; its tabs call RepoService.Register (repo.add's CLI form with
   // a folder), stream RepoService.Clone (repo.clone's CLI form), or invoke repo.create.
   // repo.add's optional path is never prompted for. repo.clone opens it on the GitHub tab.
-  "repo.add": () => {
+  "project.add": () => {
     openAddProject();
     return true;
   },
-  "repo.clone": () => {
+  "project.clone": () => {
     openAddProject("github");
     return true;
   },
   // The New tab invokes repo.create itself; from the palette it opens the dialog there.
-  "repo.create": () => {
+  "project.create": () => {
     openAddProject("new");
     return true;
   },
   // The publish dialog (owner and visibility pickers) for the active project; it
   // invokes repo.github.publish.
-  "repo.github.publish": () => openPublishDialog(getUiContext().activeRepoId),
+  "project.github.publish": () => openPublishDialog(getUiContext().activeRepoId),
   // Window-local: only this window opens, without a round trip (the CLI and palette
   // reach every window through UiIntent.ShowView instead).
   "view.settings": () => showView("settings"),

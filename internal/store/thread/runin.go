@@ -23,13 +23,13 @@ const cdSettle = time.Second
 
 // cdRequest is a queued move. An empty path cancels the queued move.
 type cdRequest struct {
-	path, repoID string
+	path, projectID string
 }
 
 // RunIn implements Store.
 func (m *Manager) RunIn(_ context.Context, id string, t RunInTarget) (Thread, error) {
-	if t.RepoID == "" && t.WorktreePath == "" {
-		return Thread{}, fmt.Errorf("%w: a member repo or worktree path is required", ErrInvalidArgument)
+	if t.ProjectID == "" && t.WorktreePath == "" {
+		return Thread{}, fmt.Errorf("%w: a member project or worktree path is required", ErrInvalidArgument)
 	}
 	cur, err := m.Get(context.Background(), id)
 	if err != nil {
@@ -38,7 +38,7 @@ func (m *Manager) RunIn(_ context.Context, id string, t RunInTarget) (Thread, er
 	if cur.WorkspaceID == "" {
 		return Thread{}, fmt.Errorf("%w: thread %s does not belong to a workspace", ErrFailedPrecondition, id)
 	}
-	w, mem, err := m.workspaceMember(cur.WorkspaceID, t.RepoID, t.WorktreePath)
+	w, mem, err := m.workspaceMember(cur.WorkspaceID, t.ProjectID, t.WorktreePath)
 	if err != nil {
 		return Thread{}, err
 	}
@@ -58,12 +58,12 @@ func (m *Manager) RunIn(_ context.Context, id string, t RunInTarget) (Thread, er
 	case rec.reserved != nil:
 		return Thread{}, fmt.Errorf("%w: thread %s is starting; try again in a moment", ErrFailedPrecondition, id)
 	case rec.run == nil:
-		rec.s.WorktreePath, rec.s.RepoID, rec.s.PendingWorktreePath = mem.WorktreePath, mem.RepoID, ""
+		rec.s.WorktreePath, rec.s.ProjectID, rec.s.PendingWorktreePath = mem.WorktreePath, mem.ProjectID, ""
 		m.commitLocked(rec, true)
 		m.log.Info("thread moved to another workspace member", "thread", id, "path", mem.WorktreePath)
 		return rec.s, nil
 	}
-	req := cdRequest{path: mem.WorktreePath, repoID: mem.RepoID}
+	req := cdRequest{path: mem.WorktreePath, projectID: mem.ProjectID}
 	if samePath(rec.s.WorktreePath, mem.WorktreePath) {
 		req = cdRequest{} // already there: cancel whatever is queued
 	}

@@ -112,14 +112,14 @@ const ReasonInterrupted = "interrupted"
 // Thread is an immutable snapshot of one thread. Field meanings follow
 // codefoundry.v1.Thread.
 //
-// Owner: WorkspaceID when set, else the project RepoID when set, else none (a thread
-// without a project, CreateOptions.NoProject, running in Options.Home). RepoID and
+// Owner: WorkspaceID when set, else the project ProjectID when set, else none (a thread
+// without a project, CreateOptions.NoProject, running in Options.Home). ProjectID and
 // WorktreePath are the cwd (for a workspace thread, the member worktree it runs in),
 // never the owner beyond that order.
 type Thread struct {
 	ID              string
 	ClaudeSessionID string // set once the transcript file is discovered
-	RepoID          string // repository of the cwd; the owner when WorkspaceID is empty
+	ProjectID       string // repository of the cwd; the owner when WorkspaceID is empty
 	WorktreePath    string // the cwd
 	Name            string
 	AutoNamed       bool
@@ -286,21 +286,21 @@ func (*Snapshot) isThreadListEvent()    {}
 
 // CreateOptions configures Store.Create.
 type CreateOptions struct {
-	// RepoID and WorktreePath select the worktree. Either may be empty: a repo alone
-	// means its main worktree; a path alone is looked up among registered repos. With
+	// ProjectID and WorktreePath select the worktree. Either may be empty: a project alone
+	// means its main worktree; a path alone is looked up among registered projects. With
 	// WorkspaceID or NewWorkspace they pick the member worktree instead.
-	RepoID       string
+	ProjectID    string
 	WorktreePath string
 	// WorkspaceID (an id or a name), when set, makes the workspace the thread's owner.
-	// The thread runs in the member WorktreePath or RepoID names, else the first
+	// The thread runs in the member WorktreePath or ProjectID names, else the first
 	// member. Exclusive with NewWorktree and NewWorkspace.
 	WorkspaceID string
 	// NewWorkspace, when set, makes Create make a workspace (a worktree on cf/<slug>
 	// in every repository, the slug as for NewWorktree) and run the thread in the
-	// member RepoID names, else the first. Exclusive with NewWorktree and WorkspaceID.
+	// member ProjectID names, else the first. Exclusive with NewWorktree and WorkspaceID.
 	NewWorkspace *NewWorkspace
 	// NoProject, when set, starts a thread without a project: it runs in Options.Home
-	// with an empty RepoID and WorkspaceID. Exclusive with RepoID, WorktreePath,
+	// with an empty ProjectID and WorkspaceID. Exclusive with ProjectID, WorktreePath,
 	// NewWorktree, WorkspaceID and NewWorkspace.
 	NoProject bool
 	// Model is a claude --model value (registry id like "claude-opus-4-8[1m]", or any full model name).
@@ -310,7 +310,7 @@ type CreateOptions struct {
 	// Name, if set, is the display name and disables auto-naming.
 	Name string
 	// InitialPrompt is sent as the thread's first user message once Claude answers the
-	// handshake. File references "cf-file://<repoId>/<path>" in it become absolute
+	// handshake. File references "cf-file://<projectId>/<path>" in it become absolute
 	// paths in the thread's worktrees (filerefs.go); the item keeps it as typed.
 	InitialPrompt string
 	// ComposerPrompt is the GUI composer's text of InitialPrompt (its tags as tokens),
@@ -342,10 +342,10 @@ type CreateOptions struct {
 	Notify bool
 }
 
-// RunInTarget names the member a workspace thread should run in: its repository id or
+// RunInTarget names the member a workspace thread should run in: its project id or
 // its worktree path (both, if given, must agree).
 type RunInTarget struct {
-	RepoID       string
+	ProjectID    string
 	WorktreePath string
 }
 
@@ -416,7 +416,7 @@ type Store interface {
 	// Snapshot returns the current immutable snapshot.
 	Snapshot() *Snapshot
 	// List returns the threads o selects, the most recently active first (filter.go).
-	// A Repo or Workspace that names nothing is ErrInvalidArgument.
+	// A Project or Workspace that names nothing is ErrInvalidArgument.
 	List(ctx context.Context, o ListOptions) ([]Thread, error)
 
 	// Thread conversations (conversation.go, items.go).

@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// The mcp fixture is a real run (Claude Code 2.1.296, haiku, the probe repo, plus a
+// The mcp fixture is a real run (Claude Code 2.1.296, haiku, the probe project, plus a
 // --mcp-config server that cannot start): system/init (trimmed to its MCP fields), then
 // mcp_status, mcp_reconnect of the broken server (an error), mcp_reconnect of a
 // needs-auth claude.ai connector (success), and mcp_status again.

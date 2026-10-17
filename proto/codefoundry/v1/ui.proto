@@ -15,7 +15,7 @@ message WatchIntentsRequest {}
 message UiIntent {
   oneof intent {
     FocusTerminal focus_terminal = 1;
-    FocusRepo focus_repo = 2;
+    FocusProject focus_project = 2;
     OpenPalette open_palette = 3;
     Notify notify = 4;
     FocusThread focus_thread = 5;
@@ -44,8 +44,8 @@ message UiIntent {
     string terminal_id = 1;
   }
 
-  message FocusRepo {
-    string repo_id = 1;
+  message FocusProject {
+    string project_id = 1;
     string worktree_path = 2;
   }
 

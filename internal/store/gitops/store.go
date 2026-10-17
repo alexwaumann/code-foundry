@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
-	"github.com/alexwaumann/code-foundry/internal/store/repo"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
 )
 
 // Defaults for Options.
@@ -24,7 +24,7 @@ const (
 	KeepFinished = 20
 	// MaxOutput caps Op.Output; the tail is kept.
 	MaxOutput = 64 << 10
-	// RefreshTimeout bounds the repo refresh after an operation.
+	// RefreshTimeout bounds the project refresh after an operation.
 	RefreshTimeout = 30 * time.Second
 )
 
@@ -44,10 +44,10 @@ var DefaultTimeouts = map[Kind]time.Duration{
 type Options struct {
 	// Bus receives Event. Required.
 	Bus *bus.Bus
-	// Repos maps paths to repos and is refreshed after ref-moving operations. May be nil
-	// (no repo ids, slugs or refreshes).
-	Repos Repos
-	Log   *slog.Logger
+	// Projects maps paths to projects and is refreshed after ref-moving operations. May be nil
+	// (no project ids, slugs or refreshes).
+	Projects Projects
+	Log      *slog.Logger
 	// Runner runs processes. Default ExecRunner{}.
 	Runner Runner
 	// Workers bounds operations running at once across worktrees. Default DefaultWorkers.
@@ -136,15 +136,15 @@ func (m *Manager) timeout(k Kind) time.Duration {
 	return DefaultTimeouts[k]
 }
 
-// target is where an operation runs, resolved against the repo snapshot.
+// target is where an operation runs, resolved against the project snapshot.
 type target struct {
-	path   string // symlinks resolved
-	repo   repo.Repo
-	branch string // from the snapshot; ops that need it exactly re-read it from git
+	path    string // symlinks resolved
+	project project.Project
+	branch  string // from the snapshot; ops that need it exactly re-read it from git
 }
 
 // resolve validates worktreePath (absolute, an existing directory) and finds the
-// registered repo containing it: an exact worktree match, else the longest containing
+// registered project containing it: an exact worktree match, else the longest containing
 // worktree path.
 func (m *Manager) resolve(worktreePath string) (target, error) {
 	if worktreePath == "" {
@@ -162,9 +162,9 @@ func (m *Manager) resolve(worktreePath string) (target, error) {
 	}
 	t := target{path: p}
 	if r, w, ok := m.lookup(p); ok {
-		t.repo, t.branch = r, w.Branch
+		t.project, t.branch = r, w.Branch
 	}
-	// The repo snapshot can trail a `git switch` by a debounce; titles should name the
+	// The project snapshot can trail a `git switch` by a debounce; titles should name the
 	// branch that is actually checked out.
 	ctx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
 	defer cancel()
@@ -174,42 +174,42 @@ func (m *Manager) resolve(worktreePath string) (target, error) {
 	return t, nil
 }
 
-func (m *Manager) lookup(path string) (repo.Repo, repo.Worktree, bool) {
-	if m.opts.Repos == nil {
-		return repo.Repo{}, repo.Worktree{}, false
+func (m *Manager) lookup(path string) (project.Project, project.Worktree, bool) {
+	if m.opts.Projects == nil {
+		return project.Project{}, project.Worktree{}, false
 	}
-	var best repo.Worktree
-	var bestRepo repo.Repo
+	var best project.Worktree
+	var bestProject project.Project
 	found := false
-	for _, r := range m.opts.Repos.Snapshot().Repos {
+	for _, r := range m.opts.Projects.Snapshot().Projects {
 		for _, w := range r.Worktrees {
 			if w.Path == path {
 				return r, w, true
 			}
 			if strings.HasPrefix(path, w.Path+string(filepath.Separator)) && len(w.Path) > len(best.Path) {
-				best, bestRepo, found = w, r, true
+				best, bestProject, found = w, r, true
 			}
 		}
 	}
-	return bestRepo, best, found
+	return bestProject, best, found
 }
 
 // GitHubSlug implements Store.
-func (m *Manager) GitHubSlug(repoID, worktreePath string) string {
-	r, _ := m.repoFor(repoID, worktreePath)
+func (m *Manager) GitHubSlug(projectID, worktreePath string) string {
+	r, _ := m.projectFor(projectID, worktreePath)
 	return r.GitHubSlug
 }
 
 // LocalOnly implements Store.
-func (m *Manager) LocalOnly(repoID, worktreePath string) bool {
-	r, ok := m.repoFor(repoID, worktreePath)
+func (m *Manager) LocalOnly(projectID, worktreePath string) bool {
+	r, ok := m.projectFor(projectID, worktreePath)
 	return ok && IsLocalOnly(r)
 }
 
-// repoFor returns the registered repo containing worktreePath, else repo repoID.
-func (m *Manager) repoFor(repoID, worktreePath string) (repo.Repo, bool) {
-	if m.opts.Repos == nil {
-		return repo.Repo{}, false
+// projectFor returns the registered project containing worktreePath, else project projectID.
+func (m *Manager) projectFor(projectID, worktreePath string) (project.Project, bool) {
+	if m.opts.Projects == nil {
+		return project.Project{}, false
 	}
 	if worktreePath != "" {
 		p := worktreePath
@@ -220,10 +220,10 @@ func (m *Manager) repoFor(repoID, worktreePath string) (repo.Repo, bool) {
 			return r, true
 		}
 	}
-	if repoID != "" {
-		return m.opts.Repos.Snapshot().Repo(repoID)
+	if projectID != "" {
+		return m.opts.Projects.Snapshot().Project(projectID)
 	}
-	return repo.Repo{}, false
+	return project.Project{}, false
 }
 
 // body is an operation's work. It returns the summary and URL on success; on error,
@@ -245,7 +245,7 @@ func (m *Manager) submit(ctx context.Context, kind Kind, title string, t target,
 		State:        StateQueued,
 		Title:        title,
 		WorktreePath: t.path,
-		RepoID:       t.repo.ID,
+		ProjectID:    t.project.ID,
 		Branch:       t.branch,
 		QueuedAt:     m.opts.Now(),
 	}
@@ -307,8 +307,8 @@ func (m *Manager) execute(op *Op, refresh bool, b body) Op {
 		m.finished = m.finished[:KeepFinished]
 	}
 	m.publishLocked(Finished, final)
-	if refresh && final.RepoID != "" && m.opts.Repos != nil {
-		m.bg.Go(func() { m.refresh(final.RepoID) })
+	if refresh && final.ProjectID != "" && m.opts.Projects != nil {
+		m.bg.Go(func() { m.refresh(final.ProjectID) })
 	}
 	m.mu.Unlock()
 	m.log.Info("gitops", "op", final.ID, "kind", final.Kind.String(), "path", final.WorktreePath,
@@ -316,12 +316,12 @@ func (m *Manager) execute(op *Op, refresh bool, b body) Op {
 	return final
 }
 
-// refresh asks the repo store to re-read the repo after its refs moved.
-func (m *Manager) refresh(repoID string) {
+// refresh asks the project store to re-read the project after its refs moved.
+func (m *Manager) refresh(projectID string) {
 	ctx, cancel := context.WithTimeout(m.ctx, RefreshTimeout)
 	defer cancel()
-	if err := m.opts.Repos.Refresh(ctx, repoID); err != nil && m.ctx.Err() == nil {
-		m.log.Warn("gitops: repo refresh", "repo", repoID, "err", err)
+	if err := m.opts.Projects.Refresh(ctx, projectID); err != nil && m.ctx.Err() == nil {
+		m.log.Warn("gitops: project refresh", "project", projectID, "err", err)
 	}
 }
 

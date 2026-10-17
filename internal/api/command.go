@@ -89,7 +89,7 @@ func contextFromProto(c *v1.UiContext) command.Context {
 	return command.Context{
 		ActiveTerminalID:   c.GetActiveTerminalId(),
 		ActiveThreadID:     c.GetActiveThreadId(),
-		ActiveRepoID:       c.GetActiveRepoId(),
+		ActiveProjectID:    c.GetActiveProjectId(),
 		ActiveWorktreePath: c.GetActiveWorktreePath(),
 		ActiveView:         c.GetActiveView(),
 		ActiveWorkspaceID:  c.GetActiveWorkspaceId(),

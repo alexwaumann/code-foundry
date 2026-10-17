@@ -18,7 +18,7 @@ import (
 func (h *Thread) Create(ctx context.Context, req *connect.Request[v1.CreateThreadRequest]) (*connect.Response[v1.CreateThreadResponse], error) {
 	m := req.Msg
 	o := thread.CreateOptions{
-		RepoID: m.GetRepoId(), WorktreePath: m.GetWorktreePath(), Model: m.GetModel(), Effort: m.GetEffort(),
+		ProjectID: m.GetProjectId(), WorktreePath: m.GetWorktreePath(), Model: m.GetModel(), Effort: m.GetEffort(),
 		Name: m.GetName(), InitialPrompt: m.GetInitialPrompt(), ComposerPrompt: m.GetComposerPrompt(), PermissionMode: thread.PermissionMode(m.GetPermissionMode()),
 		Attachments: m.GetAttachments(), WorkspaceID: m.GetWorkspaceId(), NoProject: m.GetNoProject(),
 		CreatedBy: m.GetCreatedBy(), Brief: m.GetBrief(), Labels: m.GetLabels(), BudgetUSD: m.GetBudgetUsd(),
@@ -28,7 +28,7 @@ func (h *Thread) Create(ctx context.Context, req *connect.Request[v1.CreateThrea
 		o.NewWorktree = &thread.NewWorktree{BaseRef: nw.GetBaseRef()}
 	}
 	if nw := m.GetNewWorkspace(); nw != nil {
-		o.NewWorkspace = &thread.NewWorkspace{Repos: nw.GetRepos(), BaseRef: nw.GetBaseRef(), Name: nw.GetName()}
+		o.NewWorkspace = &thread.NewWorkspace{Projects: nw.GetProjects(), BaseRef: nw.GetBaseRef(), Name: nw.GetName()}
 	}
 	s, reused, err := h.store.CreateOnce(ctx, m.GetRequestId(), o)
 	if err != nil {
@@ -154,7 +154,7 @@ func (h *Thread) Remove(ctx context.Context, req *connect.Request[v1.RemoveThrea
 // RunIn moves a workspace thread to another member worktree.
 func (h *Thread) RunIn(ctx context.Context, req *connect.Request[v1.RunInThreadRequest]) (*connect.Response[v1.RunInThreadResponse], error) {
 	m := req.Msg
-	s, err := h.store.RunIn(ctx, m.GetId(), thread.RunInTarget{RepoID: m.GetRepoId(), WorktreePath: m.GetWorktreePath()})
+	s, err := h.store.RunIn(ctx, m.GetId(), thread.RunInTarget{ProjectID: m.GetProjectId(), WorktreePath: m.GetWorktreePath()})
 	if err != nil {
 		return nil, threadError(err)
 	}
@@ -227,7 +227,7 @@ func threadToProto(s thread.Thread) *v1.Thread {
 	p := &v1.Thread{
 		Id:                  s.ID,
 		ClaudeSessionId:     s.ClaudeSessionID,
-		RepoId:              s.RepoID,
+		ProjectId:           s.ProjectID,
 		WorktreePath:        s.WorktreePath,
 		Name:                s.Name,
 		AutoNamed:           s.AutoNamed,
@@ -335,7 +335,7 @@ func listOptionsFromProto(f *v1.ThreadFilter) thread.ListOptions {
 	return thread.ListOptions{
 		All: f.GetAll(), IncludeArchived: f.GetIncludeArchived(),
 		Status: thread.Status(f.GetStatus()), State: thread.State(f.GetState()),
-		Repo: f.GetRepo(), Workspace: f.GetWorkspace(), CreatedBy: f.GetCreatedBy(), Labels: f.GetLabels(),
+		Project: f.GetProject(), Workspace: f.GetWorkspace(), CreatedBy: f.GetCreatedBy(), Labels: f.GetLabels(),
 		Limit: int(f.GetLimit()),
 	}
 }

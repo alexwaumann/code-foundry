@@ -53,7 +53,7 @@ const (
 
 // ActionServiceClient is a client for the codefoundry.v1.ActionService service.
 type ActionServiceClient interface {
-	// List returns a project's actions in order (every project's when repo_id is empty)
+	// List returns a project's actions in order (every project's when project_id is empty)
 	// and the runs the daemon remembers, without their output.
 	List(context.Context, *connect.Request[v1.ListActionsRequest]) (*connect.Response[v1.ListActionsResponse], error)
 	// Create adds an action at the end of its project's list. Names are unique within a
@@ -193,7 +193,7 @@ func (c *actionServiceClient) Watch(ctx context.Context, req *connect.Request[v1
 
 // ActionServiceHandler is an implementation of the codefoundry.v1.ActionService service.
 type ActionServiceHandler interface {
-	// List returns a project's actions in order (every project's when repo_id is empty)
+	// List returns a project's actions in order (every project's when project_id is empty)
 	// and the runs the daemon remembers, without their output.
 	List(context.Context, *connect.Request[v1.ListActionsRequest]) (*connect.Response[v1.ListActionsResponse], error)
 	// Create adds an action at the end of its project's list. Names are unique within a

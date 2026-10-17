@@ -111,7 +111,7 @@ test("cmd+t from a Projects-page shell starts another in its worktree", async ({
   await expect(host(page)).toHaveAttribute("data-terminal-id", "t-top");
   await expect.poll(() => page.evaluate(() => document.activeElement?.closest("[data-region]")?.getAttribute("data-region"))).toBe("bottom");
   await page.keyboard.press("Meta+t");
-  expect((await lastNew())?.context).toMatchObject({ activeTerminalId: "t-top", activeRepoId: "repo-cf", activeWorktreePath: `${CF}.worktrees/feat-sidebar`, activeView: "projects" });
+  expect((await lastNew())?.context).toMatchObject({ activeTerminalId: "t-top", activeProjectId: "repo-cf", activeWorktreePath: `${CF}.worktrees/feat-sidebar`, activeView: "projects" });
   await expect(bottom(page).getByRole("tab")).toHaveText(["feat-sidebar", "feat-sidebar 2"]);
   await expect(bottom(page).getByRole("tab").nth(1)).toHaveAttribute("aria-selected", "true");
   await expect.poll(() => page.evaluate(() => document.activeElement?.closest("[data-region]")?.getAttribute("data-region"))).toBe("bottom");
@@ -123,7 +123,7 @@ test("a project row's New terminal: the Projects page's bottom panel", async ({ 
   const cf = page.locator('[data-nav-key="p:repo-cf"]');
   await cf.hover();
   await cf.getByTestId("project-new-terminal").click();
-  expect((await lastNew())?.context).toMatchObject({ activeRepoId: "repo-cf", activeWorktreePath: CF, activeThreadId: "" });
+  expect((await lastNew())?.context).toMatchObject({ activeProjectId: "repo-cf", activeWorktreePath: CF, activeThreadId: "" });
   // t-top (feat/sidebar) and the new one (main).
   await expect(bottom(page).getByRole("tab")).toHaveText(["feat-sidebar", "code-foundry"]);
   await expect(bottom(page).getByRole("tab").nth(1)).toHaveAttribute("aria-selected", "true");

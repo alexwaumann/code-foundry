@@ -23,7 +23,7 @@ function cli(...args: string[]): string {
 
 interface LiveThread {
   id: string;
-  repoId?: string;
+  projectId?: string;
   worktreePath?: string;
   workspaceId?: string;
   state?: string;
@@ -35,7 +35,7 @@ test.skip(!LIVE || !HOME, "LIVE_DAEMON=1 and CODE_FOUNDRY_HOME are required");
 test("composer: pick a workspace, make the second member primary, start a haiku thread", async ({ page }) => {
   const members = JSON.parse(cli("workspace", "members", WORKSPACE, "--json")) as {
     workspace: { id: string; name: string };
-    members: { repoId: string; repoName: string; worktreePath: string }[];
+    members: { projectId: string; projectName: string; worktreePath: string }[];
   };
   const second = members.members[1];
   if (!second) throw new Error(`workspace ${WORKSPACE} needs two members`);
@@ -60,7 +60,7 @@ test("composer: pick a workspace, make the second member primary, start a haiku 
   await expect(created).toBeVisible({ timeout: 30_000 });
   const id = ((await created.getAttribute("data-row-key")) ?? "").slice(2);
   const find = () => ((JSON.parse(cli("thread", "list", "--json")) as { threads?: LiveThread[] }).threads ?? []).find((s) => s.id === id);
-  expect(find()).toMatchObject({ workspaceId: members.workspace.id, repoId: second.repoId, worktreePath: second.worktreePath });
+  expect(find()).toMatchObject({ workspaceId: members.workspace.id, projectId: second.projectId, worktreePath: second.worktreePath });
   await expect.poll(() => find()?.status, { timeout: 120_000 }).toBe("THREAD_STATUS_IDLE");
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "live-workspace-thread.png") });
   cli("thread", "archive", "--id", id, "--yes");

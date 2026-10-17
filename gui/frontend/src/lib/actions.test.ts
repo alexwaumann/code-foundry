@@ -89,15 +89,15 @@ describe("drafts", () => {
       icon: "lint",
       "in-terminal": "true",
       "on-worktree-create": "true",
-      repo: "repo-cf",
+      project: "repo-cf",
     });
   });
 
   it.each([
     ["nothing changed", {}, null],
-    ["the command", { command: "go test -race ./..." }, { action: "a-1", command: "go test -race ./...", repo: "repo-cf" }],
-    ["name (trimmed) and icon", { name: " Tests ", icon: "debug" as const }, { action: "a-1", name: "Tests", icon: "debug", repo: "repo-cf" }],
-    ["the switch", { onWorktreeCreate: true }, { action: "a-1", "on-worktree-create": "true", repo: "repo-cf" }],
+    ["the command", { command: "go test -race ./..." }, { action: "a-1", command: "go test -race ./...", project: "repo-cf" }],
+    ["name (trimmed) and icon", { name: " Tests ", icon: "debug" as const }, { action: "a-1", name: "Tests", icon: "debug", project: "repo-cf" }],
+    ["the switch", { onWorktreeCreate: true }, { action: "a-1", "on-worktree-create": "true", project: "repo-cf" }],
     ["a name only differing by spaces is no change", { name: "Test  " }, null],
   ])("editArgs: %s", (_n, change, want) => {
     expect(editArgs(action, { ...draftOf(action), ...change })).toEqual(want);

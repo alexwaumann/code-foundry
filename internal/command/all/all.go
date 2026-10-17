@@ -15,7 +15,7 @@ import (
 type Deps struct {
 	Daemon  command.DaemonInfo
 	Emitter command.Emitter
-	// Terminal backs terminal.* (terminal.new also reads Repo and Thread to find a
+	// Terminal backs terminal.* (terminal.new also reads Project and Thread to find a
 	// shell's owner). Nil registers the commands against
 	// UnimplementedTerminalServiceHandler, so they list but fail with Unimplemented.
 	Terminal command.TerminalBackend
@@ -29,17 +29,17 @@ type Deps struct {
 	// TerminalBracketedPaste reports whether a terminal reads bracketed pastes;
 	// terminal.new --run then pastes its command. Nil: it types it.
 	TerminalBracketedPaste func(ctx context.Context, id string) (bool, error)
-	// Repo backs repo.*. Nil works like Terminal.
-	Repo command.RepoBackend
-	// NotGit reports a context in a project without git: it gates repo.worktree.*,
-	// repo.git.init, and (unless GitOps.NotGit is set) git.* and pr.*. Nil: every
+	// Project backs project.*. Nil works like Terminal.
+	Project command.ProjectBackend
+	// NotGit reports a context in a project without git: it gates project.worktree.*,
+	// project.git.init, and (unless GitOps.NotGit is set) git.* and pr.*. Nil: every
 	// project is git.
 	NotGit command.NotGitFunc
-	// Clone backs repo.clone. Nil makes it fail with Unimplemented.
+	// Clone backs project.clone. Nil makes it fail with Unimplemented.
 	Clone command.CloneFunc
-	// Projects backs repo.create, repo.github.publish and repo.delete (its NotGit
+	// Projects backs project.create, project.github.publish and project.delete (its NotGit
 	// defaults to NotGit). A nil Backend works like Terminal.
-	Projects command.ProjectDeps
+	NewProjects command.NewProjectDeps
 	// Thread backs thread.*. Nil works like Terminal.
 	Thread command.ThreadBackend
 	// GitOps backs git.*, pr.*, worktree.open.editor, worktree.reveal and view.open.url.
@@ -47,7 +47,7 @@ type Deps struct {
 	GitOps command.GitOpsDeps
 	// Gh backs pr.revert, pr.merge, pr.review.request, pr.refresh, pr.review and
 	// pr.comment (the pull request detail panel's actions), and reads the pull request for pr.ask, pr.explain and
-	// pr.fix.findings (which also use Repo, Thread, GitOps.Backend and Emitter). Nil
+	// pr.fix.findings (which also use Project, Thread, GitOps.Backend and Emitter). Nil
 	// works like Terminal.
 	Gh command.GhBackend
 	// Settings backs settings.*, theme.* and notifications.test (the alert volume). Nil works like
@@ -61,7 +61,7 @@ type Deps struct {
 	Restart func()
 	// Workspace backs workspace.*. Nil works like Terminal.
 	Workspace command.WorkspaceBackend
-	// Action backs action.* (which also use Repo and Thread to find a run's owner).
+	// Action backs action.* (which also use Project and Thread to find a run's owner).
 	// Nil works like Terminal.
 	Action command.ActionBackend
 }
@@ -74,8 +74,8 @@ func Register(r *command.Registry, d Deps) error {
 	if d.Terminal == nil {
 		d.Terminal = codefoundryv1connect.UnimplementedTerminalServiceHandler{}
 	}
-	if d.Repo == nil {
-		d.Repo = codefoundryv1connect.UnimplementedRepoServiceHandler{}
+	if d.Project == nil {
+		d.Project = codefoundryv1connect.UnimplementedProjectServiceHandler{}
 	}
 	if d.Thread == nil {
 		d.Thread = codefoundryv1connect.UnimplementedThreadServiceHandler{}
@@ -95,19 +95,19 @@ func Register(r *command.Registry, d Deps) error {
 	if d.GitOps.NotGit == nil {
 		d.GitOps.NotGit = d.NotGit
 	}
-	if d.Projects.NotGit == nil {
-		d.Projects.NotGit = d.NotGit
+	if d.NewProjects.NotGit == nil {
+		d.NewProjects.NotGit = d.NotGit
 	}
 	return errors.Join(
 		command.RegisterDaemon(r, d.Daemon),
 		command.RegisterUI(r, d.Emitter),
-		command.RegisterTerminal(r, command.TerminalDeps{Terminal: d.Terminal, Repo: d.Repo, Thread: d.Thread, IsShell: d.IsShellTerminal, AwaitOutput: d.AwaitTerminalOutput, BracketedPaste: d.TerminalBracketedPaste}),
-		command.RegisterRepo(r, d.Repo, d.NotGit),
-		command.RegisterRepoAdd(r, d.Repo, d.Clone),
-		command.RegisterRepoCleanup(r, command.RepoCleanupDeps{Repo: d.Repo, GitOps: d.GitOps.Backend, NotGit: d.NotGit}),
-		command.RegisterProjects(r, d.Projects),
+		command.RegisterTerminal(r, command.TerminalDeps{Terminal: d.Terminal, Project: d.Project, Thread: d.Thread, IsShell: d.IsShellTerminal, AwaitOutput: d.AwaitTerminalOutput, BracketedPaste: d.TerminalBracketedPaste}),
+		command.RegisterProject(r, d.Project, d.NotGit),
+		command.RegisterProjectAdd(r, d.Project, d.Clone),
+		command.RegisterProjectCleanup(r, command.ProjectCleanupDeps{Project: d.Project, GitOps: d.GitOps.Backend, NotGit: d.NotGit}),
+		command.RegisterNewProjects(r, d.NewProjects),
 		command.RegisterThreadLifecycle(r, d.Thread, d.Emitter),
-		command.RegisterThreadList(r, command.ThreadListDeps{Thread: d.Thread, Repo: d.Repo}),
+		command.RegisterThreadList(r, command.ThreadListDeps{Thread: d.Thread, Project: d.Project}),
 		command.RegisterThread(r, d.Thread),
 		command.RegisterMcp(r, d.Thread, d.Emitter),
 		command.RegisterAgents(r, d.Thread, d.Emitter),
@@ -115,7 +115,7 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterGitOps(r, d.GitOps),
 		command.RegisterPullRequest(r, d.Gh),
 		command.RegisterPullRequestThreads(r, command.PullRequestThreadDeps{
-			Gh: d.Gh, Repo: d.Repo, Thread: d.Thread, GitOps: d.GitOps.Backend, Emitter: d.Emitter,
+			Gh: d.Gh, Project: d.Project, Thread: d.Thread, GitOps: d.GitOps.Backend, Emitter: d.Emitter,
 		}),
 		command.RegisterSettings(r, d.Settings, d.Emitter, d.Reveal),
 		command.RegisterNotifications(r, d.Settings, d.Emitter),
@@ -125,6 +125,6 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterView(r, d.Emitter),
 		command.RegisterUsage(r, d.Thread),
 		command.RegisterWorkspace(r, d.Workspace),
-		command.RegisterAction(r, command.ActionDeps{Action: d.Action, Repo: d.Repo, Thread: d.Thread}),
+		command.RegisterAction(r, command.ActionDeps{Action: d.Action, Project: d.Project, Thread: d.Thread}),
 	)
 }

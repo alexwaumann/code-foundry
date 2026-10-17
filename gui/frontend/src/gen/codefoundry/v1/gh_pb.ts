@@ -2659,7 +2659,7 @@ export const PullRequestReviewEventSchema: GenEnum<PullRequestReviewEvent> = /*@
  * response carries fetched_at so the UI can show staleness; an unset fetched_at means
  * "never fetched".
  *
- * Repositories are identified by their "owner/name" slug (RepoService's github_slug).
+ * Repositories are identified by their "owner/name" slug (Project.github_slug).
  * Slugs are case-insensitive and are normalised to lower case.
  *
  * @generated from service codefoundry.v1.GhService
@@ -2712,7 +2712,7 @@ export const GhService: GenService<{
   },
   /**
    * Track adds a repository to the poll (its default branch CI; the dashboards count
-   * its pull requests as tracked). RepoService's repositories with a GitHub remote are
+   * its pull requests as tracked). The GitHub repositories of registered projects are
    * tracked automatically; this is exposed for the CLI and debugging.
    *
    * @generated from rpc codefoundry.v1.GhService.Track

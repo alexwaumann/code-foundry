@@ -21,7 +21,7 @@ async function mixedWorkspace(thread = true): Promise<string> {
 
 const panel = (page: Page) => page.getByTestId("side-panel");
 const surface = (page: Page) => page.getByTestId("workspace-surface");
-const member = (page: Page, repoId: string) => surface(page).locator(`[data-nav-key="m:${WS}::${repoId}"]`);
+const member = (page: Page, projectId: string) => surface(page).locator(`[data-nav-key="m:${WS}::${projectId}"]`);
 
 async function setPanelWidth(page: Page, width: number): Promise<void> {
   await page.evaluate(`import("/src/stores/panel.ts").then((m) => m.setPanelWidth("current", ${String(width)}))`);
@@ -178,7 +178,7 @@ test("remove member confirms and the mock applies it; add member and Run in go t
   await row(page, `s:${driver}`).getByTestId("row-workspace").click();
   await expectWorkspaceTab(page, driver);
 
-  // Remove code-foundry (workspace.remove-repo, confirmed by the daemon's prompt).
+  // Remove code-foundry (workspace.remove-project, confirmed by the daemon's prompt).
   const cf = member(page, "repo-cf");
   await cf.hover();
   await cf.getByTestId("member-remove").click();
@@ -187,9 +187,9 @@ test("remove member confirms and the mock applies it; add member and Run in go t
   await dialog.getByTestId("confirm-ok").click();
   await expect(surface(page).getByTestId("member-name")).toHaveText(["ghostty-playground", "dotfiles"]);
   await expect(page.getByTestId("workspace-surface-count")).toHaveText("2 members");
-  const removed = (await invocations()).filter((i) => i.name === "workspace.remove-repo");
+  const removed = (await invocations()).filter((i) => i.name === "workspace.remove-project");
   expect(removed.map((i) => i.confirmed)).toEqual([false, true]);
-  expect(removed.at(-1)?.args).toEqual({ repo: "code-foundry", workspace: WS });
+  expect(removed.at(-1)?.args).toEqual({ project: "code-foundry", workspace: WS });
 
   // The member the thread runs in is refused (the daemon names the thread), and stays.
   const gp = member(page, "repo-gp");
@@ -199,11 +199,11 @@ test("remove member confirms and the mock applies it; add member and Run in go t
   await expect(page.getByText(/is on .*ghostty-playground\/cf-checkout; archive it first/)).toBeVisible();
   await expect(surface(page).getByTestId("member-name")).toHaveText(["ghostty-playground", "dotfiles"]);
 
-  // Add sketches (workspace.add-repo).
+  // Add sketches (workspace.add-project).
   await surface(page).getByTestId("workspace-add-member").click();
   await page.getByTestId("workspace-add-member-list").getByRole("option", { name: "sketches" }).click();
-  const add = await lastInvocation("workspace.add-repo");
-  expect(add?.args).toEqual({ repo: "sketches", workspace: WS });
+  const add = await lastInvocation("workspace.add-project");
+  expect(add?.args).toEqual({ project: "sketches", workspace: WS });
   await expect(surface(page).getByTestId("member-name")).toHaveText(["ghostty-playground", "dotfiles", "sketches"]);
 
   // Run in dotfiles (thread.run-in with the thread's context): queued until the thread is idle.
@@ -212,7 +212,7 @@ test("remove member confirms and the mock applies it; add member and Run in go t
   await expect(gp.getByTestId("member-run-in")).toHaveCount(0);
   await dot.getByTestId("member-run-in").click();
   const runIn = await lastInvocation("thread.run-in");
-  expect(runIn?.args).toEqual({ repo: "repo-dot" });
+  expect(runIn?.args).toEqual({ project: "repo-dot" });
   expect(runIn?.context).toMatchObject({ activeThreadId: driver, activeWorkspaceId: WS });
   // The mock moves an idle thread ~2s later; the marker follows.
   await expect(dot.getByTestId("member-at")).toHaveText("here", { timeout: 8000 });
@@ -229,8 +229,8 @@ test("at 280px nothing overflows: the workspace surface and a member tab", async
   expect(await overflowX(page, "panel-body")).toBeLessThanOrEqual(0);
   expect(await overflowX(page, "workspace-surface-header")).toBeLessThanOrEqual(0);
   // Every member row keeps its state and its actions inside the row.
-  for (const repoId of ["repo-cf", "repo-gp", "repo-dot"]) {
-    const m = member(page, repoId);
+  for (const projectId of ["repo-cf", "repo-gp", "repo-dot"]) {
+    const m = member(page, projectId);
     await m.hover();
     const rowBox = await m.boundingBox();
     const actions = await m.getByTestId("member-remove").boundingBox();

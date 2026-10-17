@@ -2,7 +2,7 @@
 // the GUI palette, keybindings, and CLI verbs are three front doors to one Registry.
 //
 // Commands are registered explicitly, never from init(). Each domain exposes a
-// Register<Domain> function (RegisterDaemon, RegisterUI, RegisterTerminal, RegisterRepo)
+// Register<Domain> function (RegisterDaemon, RegisterUI, RegisterTerminal, RegisterProject)
 // that takes the registry plus the narrow dependencies it needs. The daemon calls them
 // once at startup through internal/command/all. Explicit registration keeps the full set
 // of commands visible at one call site, lets tests build a registry with fakes, and
@@ -76,7 +76,7 @@ func (c *Command) Available(uctx Context) bool {
 type Context struct {
 	ActiveTerminalID   string
 	ActiveThreadID     string
-	ActiveRepoID       string
+	ActiveProjectID    string
 	ActiveWorktreePath string
 	// ActiveView is a logical view name ("thread", "projects", ...). Empty from the CLI.
 	ActiveView string
@@ -96,8 +96,8 @@ const (
 	ContextTerminal
 	// ContextThread is Context.ActiveThreadID.
 	ContextThread
-	// ContextRepo is Context.ActiveRepoID.
-	ContextRepo
+	// ContextProject is Context.ActiveProjectID.
+	ContextProject
 	// ContextWorktree is Context.ActiveWorktreePath.
 	ContextWorktree
 )
@@ -109,8 +109,8 @@ func (c Context) Get(f ContextField) string {
 		return c.ActiveTerminalID
 	case ContextThread:
 		return c.ActiveThreadID
-	case ContextRepo:
-		return c.ActiveRepoID
+	case ContextProject:
+		return c.ActiveProjectID
 	case ContextWorktree:
 		return c.ActiveWorktreePath
 	default:
@@ -125,8 +125,8 @@ func (c Context) With(f ContextField, v string) Context {
 		c.ActiveTerminalID = v
 	case ContextThread:
 		c.ActiveThreadID = v
-	case ContextRepo:
-		c.ActiveRepoID = v
+	case ContextProject:
+		c.ActiveProjectID = v
 	case ContextWorktree:
 		c.ActiveWorktreePath = v
 	}
@@ -140,8 +140,8 @@ func (f ContextField) Describe() string {
 		return "the active terminal"
 	case ContextThread:
 		return "the active thread"
-	case ContextRepo:
-		return "the active repository"
+	case ContextProject:
+		return "the active project"
 	case ContextWorktree:
 		return "the active worktree"
 	default:
@@ -163,8 +163,8 @@ type Result struct {
 }
 
 // NamePattern is the required shape of command names: lowercase dotted segments, at
-// least two, e.g. "terminal.new", "repo.worktree.new". Segments after the first may be
-// kebab-case ("workspace.add-repo"), which the CLI accepts as a word as it is.
+// least two, e.g. "terminal.new", "project.worktree.new". Segments after the first may be
+// kebab-case ("workspace.add-project"), which the CLI accepts as a word as it is.
 var NamePattern = regexp.MustCompile(`^[a-z]+(\.[a-z][a-z0-9]*(-[a-z0-9]+)*)+$`)
 
 // argNamePattern is the required shape of argument names. Kebab-case, so names map
@@ -174,7 +174,7 @@ var argNamePattern = regexp.MustCompile(`^[a-z][a-z0-9]*(-[a-z0-9]+)*$`)
 // ReservedArgNames are CLI flags every generated verb has; commands may not use them.
 var ReservedArgNames = []string{
 	"json", "help", "h", "yes",
-	"context-terminal", "context-thread", "context-repo", "context-worktree", "context-workspace",
+	"context-terminal", "context-thread", "context-project", "context-worktree", "context-workspace",
 }
 
 // Sentinel errors. Use errors.Is; internal/api maps them to Connect codes.

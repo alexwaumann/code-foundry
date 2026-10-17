@@ -17,7 +17,7 @@ func scanAction(row scanner) (Action, error) {
 	var a Action
 	var inTerm, onCreate int
 	var created, updated int64
-	if err := row.Scan(&a.ID, &a.RepoID, &a.Name, &a.Command, &a.Icon, &inTerm, &onCreate, &a.Position, &created, &updated); err != nil {
+	if err := row.Scan(&a.ID, &a.ProjectID, &a.Name, &a.Command, &a.Icon, &inTerm, &onCreate, &a.Position, &created, &updated); err != nil {
 		return Action{}, err
 	}
 	a.InTerminal, a.OnWorktreeCreate = inTerm != 0, onCreate != 0
@@ -54,7 +54,7 @@ func b2i(b bool) int {
 
 func insertAction(ctx context.Context, db *sql.DB, a Action) error {
 	if _, err := db.ExecContext(ctx, `INSERT INTO actions (`+actionColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		a.ID, a.RepoID, a.Name, a.Command, a.Icon, b2i(a.InTerminal), b2i(a.OnWorktreeCreate), a.Position,
+		a.ID, a.ProjectID, a.Name, a.Command, a.Icon, b2i(a.InTerminal), b2i(a.OnWorktreeCreate), a.Position,
 		a.CreatedAt.UnixMilli(), a.UpdatedAt.UnixMilli()); err != nil {
 		return fmt.Errorf("action: save %s: %w", a.Name, err)
 	}
@@ -93,11 +93,11 @@ func deleteAction(ctx context.Context, db *sql.DB, id string) error {
 	return nil
 }
 
-// deleteRepoActions removes a project's actions. Unregistering the project cascades
-// already (actions.repo_id references repos); this makes RepoRemoved exact either way.
-func deleteRepoActions(ctx context.Context, db *sql.DB, repoID string) error {
-	if _, err := db.ExecContext(ctx, `DELETE FROM actions WHERE repo_id = ?`, repoID); err != nil {
-		return fmt.Errorf("action: delete project %s's actions: %w", repoID, err)
+// deleteProjectActions removes a project's actions. Unregistering the project cascades
+// already (actions.repo_id references repos); this makes ProjectRemoved exact either way.
+func deleteProjectActions(ctx context.Context, db *sql.DB, projectID string) error {
+	if _, err := db.ExecContext(ctx, `DELETE FROM actions WHERE repo_id = ?`, projectID); err != nil {
+		return fmt.Errorf("action: delete project %s's actions: %w", projectID, err)
 	}
 	return nil
 }

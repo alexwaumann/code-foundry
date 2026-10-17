@@ -7,12 +7,12 @@
 //
 // Two kinds of terminal carry labels, both shown in the bottom panel of their owner:
 //
-//   - A shell started by terminal.new has Kind = KindShell, Repo and Worktree for the
-//     worktree it belongs to, and Thread when it belongs to a thread (Repo and
-//     Worktree are then the thread's: for a thread without a project, Repo is empty
+//   - A shell started by terminal.new has Kind = KindShell, Project and Worktree for the
+//     worktree it belongs to, and Thread when it belongs to a thread (Project and
+//     Worktree are then the thread's: for a thread without a project, Project is empty
 //     and Worktree is its cwd, the home directory).
 //   - An action run in a terminal (internal/store/action) has Kind = KindAction, the
-//     same owner labels as a shell (Thread, Repo, Worktree), plus Action (the action's
+//     same owner labels as a shell (Thread, Project, Worktree), plus Action (the action's
 //     id), ActionName (its name when it started) and ActionRun (the run's id).
 //
 // Claude itself never runs in a terminal. A terminal without labels
@@ -24,9 +24,9 @@ const (
 	Kind = "kind"
 	// Thread is the id of the thread the terminal belongs to.
 	Thread = "thread"
-	// Repo is the id of the registered repository whose worktree the terminal belongs to.
-	Repo = "repo"
-	// Worktree is the path (symlinks resolved, as in the repo snapshot) of the worktree
+	// Project is the id of the registered project whose worktree the terminal belongs to.
+	Project = "project"
+	// Worktree is the path (symlinks resolved, as in the project snapshot) of the worktree
 	// the terminal belongs to.
 	Worktree = "worktree"
 	// Action is the id of the action a KindAction terminal runs.
@@ -59,10 +59,10 @@ func IsAction(labels map[string]string) bool { return labels[Kind] == KindAction
 // owner goes away.
 func IsPanel(labels map[string]string) bool { return IsShell(labels) || IsAction(labels) }
 
-// Shell returns the labels of a shell owned by worktree path of repo repoID, and by
+// Shell returns the labels of a shell owned by worktree path of project projectID, and by
 // thread threadID when it is not empty.
-func Shell(threadID, repoID, worktree string) map[string]string {
-	l := map[string]string{Kind: KindShell, Repo: repoID, Worktree: worktree}
+func Shell(threadID, projectID, worktree string) map[string]string {
+	l := map[string]string{Kind: KindShell, Project: projectID, Worktree: worktree}
 	if threadID != "" {
 		l[Thread] = threadID
 	}
@@ -71,8 +71,8 @@ func Shell(threadID, repoID, worktree string) map[string]string {
 
 // ActionTerminal returns the labels of run runID of action actionID (named name) in a
 // terminal owned like a shell (see Shell).
-func ActionTerminal(threadID, repoID, worktree, actionID, name, runID string) map[string]string {
-	l := Shell(threadID, repoID, worktree)
+func ActionTerminal(threadID, projectID, worktree, actionID, name, runID string) map[string]string {
+	l := Shell(threadID, projectID, worktree)
 	l[Kind] = KindAction
 	l[Action] = actionID
 	l[ActionName] = name

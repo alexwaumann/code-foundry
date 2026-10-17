@@ -28,10 +28,10 @@ type Fake struct {
 	Fail string
 	// URL is set on every op's URL.
 	URL string
-	// Slugs maps a repo id or worktree path to its GitHub slug for GitHubSlug.
+	// Slugs maps a project id or worktree path to its GitHub slug for GitHubSlug.
 	Slugs map[string]string
-	// LocalOnlyRepos holds the repo ids and worktree paths LocalOnly reports true for.
-	LocalOnlyRepos map[string]bool
+	// LocalOnlyProjects holds the project ids and worktree paths LocalOnly reports true for.
+	LocalOnlyProjects map[string]bool
 	// Calls records calls, e.g. "Push /w force=true".
 	Calls []string
 }
@@ -40,7 +40,7 @@ var _ gitops.Store = (*Fake)(nil)
 
 // New returns a fake publishing to b (which may be nil).
 func New(b *bus.Bus) *Fake {
-	return &Fake{bus: b, Slugs: map[string]string{}, LocalOnlyRepos: map[string]bool{}}
+	return &Fake{bus: b, Slugs: map[string]string{}, LocalOnlyProjects: map[string]bool{}}
 }
 
 // Snapshot implements gitops.Store.
@@ -139,23 +139,23 @@ func (f *Fake) OpenURL(_ context.Context, url string) (gitops.Op, error) {
 	return f.do(gitops.KindOpenURL, "", "OpenURL "+url)
 }
 
-// GitHubSlug implements gitops.Store: Slugs[worktreePath], else Slugs[repoID].
-func (f *Fake) GitHubSlug(repoID, worktreePath string) string {
+// GitHubSlug implements gitops.Store: Slugs[worktreePath], else Slugs[projectID].
+func (f *Fake) GitHubSlug(projectID, worktreePath string) string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if s, ok := f.Slugs[worktreePath]; ok && worktreePath != "" {
 		return s
 	}
-	return f.Slugs[repoID]
+	return f.Slugs[projectID]
 }
 
-// LocalOnly implements gitops.Store: LocalOnlyRepos[worktreePath], else
-// LocalOnlyRepos[repoID].
-func (f *Fake) LocalOnly(repoID, worktreePath string) bool {
+// LocalOnly implements gitops.Store: LocalOnlyProjects[worktreePath], else
+// LocalOnlyProjects[projectID].
+func (f *Fake) LocalOnly(projectID, worktreePath string) bool {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if worktreePath != "" && f.LocalOnlyRepos[worktreePath] {
+	if worktreePath != "" && f.LocalOnlyProjects[worktreePath] {
 		return true
 	}
-	return f.LocalOnlyRepos[repoID]
+	return f.LocalOnlyProjects[projectID]
 }

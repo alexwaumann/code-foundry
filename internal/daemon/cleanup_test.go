@@ -13,7 +13,7 @@ import (
 
 func TestCleanupHold(t *testing.T) {
 	const wt = "/wt/cf-a"
-	ws := &workspace.Snapshot{Workspaces: []workspace.Workspace{{ID: "w-1", Name: "pay", Members: []workspace.Member{{RepoID: "r1", WorktreePath: "/wt/cf-pay"}}}}}
+	ws := &workspace.Snapshot{Workspaces: []workspace.Workspace{{ID: "w-1", Name: "pay", Members: []workspace.Member{{ProjectID: "r1", WorktreePath: "/wt/cf-pay"}}}}}
 	shell := func(state terminal.State, cwd, owner string) terminal.Terminal {
 		l := map[string]string{termlabel.Kind: termlabel.KindShell}
 		if owner != "" {

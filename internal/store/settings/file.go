@@ -65,10 +65,17 @@ func decode(data []byte) (map[string]string, error) {
 }
 
 // legacyPrefixes are key prefixes from before threads were renamed from sessions (the
-// [sessions] table, keybindings of the session.* commands) and what they are now.
+// [sessions] table, keybindings of the session.* commands) and projects from repos (the
+// [repos] table, keybindings of the repo.* commands, ui.focus.repo and the workspace
+// add-repo / remove-repo commands), and what they are now.
 var legacyPrefixes = []struct{ old, new string }{
 	{"sessions.", GroupThreads + "."},
 	{GroupKeybindings + ".session.", GroupKeybindings + ".thread."},
+	{"repos.", GroupProjects + "."},
+	{GroupKeybindings + ".repo.", GroupKeybindings + ".project."},
+	{GroupKeybindings + ".ui.focus.repo", GroupKeybindings + ".ui.focus.project"},
+	{GroupKeybindings + ".workspace.add-repo", GroupKeybindings + ".workspace.add-project"},
+	{GroupKeybindings + ".workspace.remove-repo", GroupKeybindings + ".workspace.remove-project"},
 }
 
 // renameLegacyKeys rewrites raw's legacy keys to the current names, so a settings file
