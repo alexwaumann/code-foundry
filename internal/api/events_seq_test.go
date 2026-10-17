@@ -56,10 +56,6 @@ func TestEventsSeqSharedAcrossClients(t *testing.T) {
 	f.th.Put(thread.Thread{ID: "s1", State: thread.StateConnected, Status: thread.StatusBusy})
 	f.repo.Put(repoNamed("two"))
 
-	type seen struct {
-		what string
-		seq  uint64
-	}
 	read := func(s *eventStream) map[string]uint64 {
 		out := map[string]uint64{}
 		for range 3 {
@@ -170,9 +166,14 @@ func TestEventsResumeOutsideLogFallsBack(t *testing.T) {
 	if ev := old.next(); describe(ev) != "repo.snapshot(1)" || ev.GetSeq() != 0 {
 		t.Fatalf("too old: first %q seq %d, want the snapshot", describe(ev), ev.GetSeq())
 	}
+	// Then live (the hub may still be numbering the burst above, and a drop in it may
+	// bring another snapshot).
 	f.repo.Put(repoNamed("after"))
-	if got := describe(old.nextLive()); got != "repo.updated after" {
-		t.Fatalf("then live: %q", got)
+	for {
+		ev := old.nextLive()
+		if describe(ev) == "repo.updated after" || describe(ev) == "repo.snapshot(2)" {
+			break
+		}
 	}
 }
 

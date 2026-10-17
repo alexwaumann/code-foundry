@@ -11,9 +11,15 @@ import (
 // eventLogSize is how many live events the hub keeps for resuming streams (since_seq).
 const eventLogSize = 4096
 
-// hubClientBuffer is a stream's backlog of live events. A stream that falls further
-// behind misses events of a source and gets its snapshot again (Watch's resync).
-const hubClientBuffer = 1024
+// hubClientBuffer is a stream's backlog of live events, in seq order. A stream that
+// falls further behind misses events of a source and gets its snapshot again (Watch's
+// resync). hubTransientBuffer is its separate backlog of transient events (intents,
+// restart requests), which no snapshot restores: a flood of state events must not
+// crowd them out (as when every source had its own subscription).
+const (
+	hubClientBuffer    = 1024
+	hubTransientBuffer = 64
+)
 
 // kindMask is a set of EventSource values (all below 64).
 type kindMask uint64
@@ -59,7 +65,8 @@ type transientTopics struct {
 // hubClient is one Watch stream's end of the hub.
 type hubClient struct {
 	mask kindMask
-	ch   chan hubEvent
+	ch   chan hubEvent // kept events, in seq order
+	tch  chan hubEvent // transient events
 	// dirty: sources whose events this client missed; poke wakes it to resync.
 	dirty atomic.Uint64
 	poke  chan struct{}
@@ -142,8 +149,12 @@ func (h *eventHub) publish(k v1.EventSource, transient bool, ev *v1.Event) {
 		if !c.mask.has(k) {
 			continue
 		}
+		q := c.ch
+		if transient {
+			q = c.tch
+		}
 		select {
-		case c.ch <- e:
+		case q <- e:
 		default:
 			c.markDirty(k)
 		}
@@ -176,7 +187,7 @@ func (h *eventHub) lastSeq() uint64 {
 func (h *eventHub) join(mask kindMask, since uint64) (c *hubClient, replay []hubEvent, resumed bool) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	c = &hubClient{mask: mask, ch: make(chan hubEvent, hubClientBuffer), poke: make(chan struct{}, 1)}
+	c = &hubClient{mask: mask, ch: make(chan hubEvent, hubClientBuffer), tch: make(chan hubEvent, hubTransientBuffer), poke: make(chan struct{}, 1)}
 	h.clients[c] = struct{}{}
 	for k, tt := range h.transient {
 		if !mask.has(k) {

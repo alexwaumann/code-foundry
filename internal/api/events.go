@@ -255,9 +255,14 @@ func (h *Events) Watch(ctx context.Context, req *connect.Request[v1.WatchEventsR
 			if err := resync(); err != nil {
 				return err
 			}
-			if !e.transient && e.ev.GetSeq() <= covered[e.kind] {
+			if e.ev.GetSeq() <= covered[e.kind] {
 				continue // older than the snapshot just sent
 			}
+			if err := deliver(e); err != nil {
+				return err
+			}
+		case e := <-c.tch:
+			// No snapshot restores a transient event: never skipped.
 			if err := deliver(e); err != nil {
 				return err
 			}

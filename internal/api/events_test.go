@@ -354,10 +354,10 @@ func TestEventsResyncsSourceAfterDrops(t *testing.T) {
 	if got := describe(s.next()); got != "repo.snapshot(0)" {
 		t.Fatalf("first = %q", got)
 	}
-	// Overflow the repo subscription while the client is not reading (more than the
-	// HTTP/2 flow-control windows the handler can fill first).
+	// Overflow the stream's hub queue while the client is not reading (more than the
+	// HTTP/2 flow-control windows the handler can fill first, plus hubClientBuffer).
 	big := strings.Repeat("x", 4096)
-	for i := range 2000 {
+	for i := range 5000 {
 		f.repo.Put(repo.Repo{ID: fmt.Sprint(i % 3), Name: fmt.Sprint(i), Path: big})
 	}
 	for {
