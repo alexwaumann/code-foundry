@@ -100,6 +100,28 @@ test("header: the from chip after the name opens the Threads tab; the timeline o
   await expect(chip(page)).toHaveCount(0);
 });
 
+test("timeline: a wake message is a collapsed Woken by note that expands to its payload", async ({ page }) => {
+  await openApp(page);
+  await open(page, P);
+  const note = page.getByTestId("thread-wake-note");
+  await expect(note).toBeVisible();
+  await expect(note.getByTestId("thread-wake-note-link")).toHaveText("Add retry to login redirect");
+  await expect(note.getByTestId("thread-wake-note-detail")).toHaveText(": needs attention, finished");
+  await expect(note.getByTestId("thread-wake-note-summary")).toHaveText("Retry added around exchangeToken, 3 attempts; PR opened");
+  await expect(note.locator("svg.t-emerald")).toHaveCount(1);
+  // Not a bubble: the wake text with its fenced block is not shown.
+  await expect(page.getByTestId("thread-pane")).not.toContainText("[code-foundry wake]");
+  await expect(note.getByTestId("thread-wake-note-body")).toHaveCount(0);
+  await note.getByTestId("thread-wake-note-line").click();
+  await expect(note.getByTestId("thread-wake-note-body").locator("pre")).toContainText('"subscription_id": "sub-l-1"');
+  await expect(note.getByTestId("thread-wake-note-body").locator("pre")).toContainText('"pr": 412');
+  await note.getByTestId("thread-wake-note-line").click();
+  await expect(note.getByTestId("thread-wake-note-body")).toHaveCount(0);
+  // The name opens the thread that woke it.
+  await note.getByTestId("thread-wake-note-link").click();
+  await expect(header(page).getByTestId("thread-title")).toHaveText("Add retry to login redirect");
+});
+
 test("header: a removed creator leaves an inert chip saying so; an archived one still opens", async ({ page }) => {
   await openApp(page);
   await open(page, "s-l-grand");

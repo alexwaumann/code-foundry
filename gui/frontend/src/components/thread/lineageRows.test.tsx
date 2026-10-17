@@ -99,6 +99,40 @@ describe("Created by note", () => {
     expect(q(el, "thread-created-by-note-name")?.textContent).toBe("Fix login redirect");
   });
 
+  it("a wake message: a collapsed Woken by note instead of a bubble, its payload once expanded", () => {
+    const json = JSON.stringify({ kind: "thread", thread: { id: "p", name: "", status: "needs_attention", status_reason: "finished", report: { status: "done", summary: "6 tests pass" } } });
+    const wake: ThreadItemView = { ...user, id: "w", text: `[code-foundry wake] Thread p is idle: finished.\n\`\`\`json\n${json}\n\`\`\``, wake: { title: "Thread p is idle: finished.", json } };
+    const el = show([wake]);
+    expect(el.querySelector(".bubble")).toBeNull();
+    const row = q(el, "thread-wake-note") as HTMLElement;
+    expect(row.querySelector("svg")?.getAttribute("class")).toContain("t-emerald");
+    // The thread's current name (the payload had none yet), a link.
+    expect(row.textContent).toBe("Woken byFix login redirect: needs attention, finished·6 tests passjust now");
+    expect(q(row, "thread-wake-note-body")).toBeNull();
+    fireEvent.click(q(row, "thread-wake-note-line") as HTMLElement);
+    expect(q(row, "thread-wake-note-body")?.querySelector("pre")?.textContent).toBe(JSON.stringify(JSON.parse(json), null, 2));
+    fireEvent.click(q(row, "thread-wake-note-link") as HTMLElement);
+    expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "p" });
+    // The link does not toggle the body.
+    expect(q(row, "thread-wake-note-body")).not.toBeNull();
+  });
+
+  it("a wake for an action run: a red cross, the action's name as plain text", () => {
+    const json = JSON.stringify({ kind: "action_run", run: { id: "r-1", action_name: "Slow", exit_code: 3, output_tail: "built 42 files\n" } });
+    const el = show([{ ...user, id: "w", text: "x", wake: { title: 'Action "Slow" run r-1 finished with exit 3.', json } }]);
+    const row = q(el, "thread-wake-note") as HTMLElement;
+    expect(row.querySelector("svg")?.getAttribute("class")).toContain("t-red");
+    expect(q(row, "thread-wake-note-link")).toBeNull();
+    expect(q(row, "thread-wake-note-name")?.className).toBe("nm plain");
+    expect(q(row, "thread-wake-note-detail")?.textContent).toBe(": exit 3");
+    expect(q(row, "thread-wake-note-summary")?.textContent).toBe("built 42 files");
+  });
+
+  it("a user message without wake stays a bubble", () => {
+    const el = show([user]);
+    expect(q(el, "thread-wake-note")).toBeNull();
+  });
+
   it("a fork's note stays the centered divider", () => {
     const el = show([note("note-fork-p", "Forked from Fix login redirect")]);
     expect(q(el, "thread-created-by-note")).toBeNull();

@@ -29,6 +29,7 @@ import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
 import { ThreadStatus } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
 import {
+  MessageOrigin,
   ThreadAgentStatus,
   ThreadItemDelta_Field,
   ThreadRequestState,
@@ -65,6 +66,8 @@ export interface SeedHistory {
   end: "done" | "working" | "permission" | "cut";
   /** A daemon note before the first message (an agent-made thread's "Created by …", id note-created-by). */
   note?: { id: string; text: string };
+  /** Wake messages the daemon sent after the history (docs/notes/agents-4-wake.md): header line and JSON payload. */
+  wakes?: { title: string; json: string }[];
 }
 
 /** The world the threads live in (mock/world.ts implements it). */
@@ -1030,6 +1033,10 @@ export class MockThreadLogs {
         { at: at(21) },
       );
       l.pending = [{ requestId: `req-${id}`, itemId: perm.id, question: false, toolName: "Bash", summary: `Bash ${h.reply}` }];
+    }
+    for (const [i, w] of (h.wakes ?? []).entries()) {
+      const text = `[code-foundry wake] ${w.title}\n\`\`\`json\n${w.json}\n\`\`\``;
+      push({ case: "userMessage", value: { text, attachments: [], origin: MessageOrigin.WAKE, wakeTitle: w.title, wakeJson: w.json } }, { at: at(30 + i) });
     }
     l.seq = l.items.length;
     if (l.pending.length > 0) this.source({ event: { case: "pending", value: { threadId: id, seq: BigInt(l.seq), pending: l.pending } } });

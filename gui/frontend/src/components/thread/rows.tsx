@@ -26,7 +26,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { AgentRunView } from "@/api/agents";
-import type { ThreadItemView, ToolCallView } from "@/api/thread";
+import type { ThreadItemView, ToolCallView, WakeView } from "@/api/thread";
 import { Tip } from "@/components/ui/tooltip";
 import { agentElapsedMs, fmtElapsed, parseAgentNote } from "@/lib/agents";
 import { copyText } from "@/lib/clipboard";
@@ -35,6 +35,7 @@ import { CREATED_BY_NOTE_ID, parseCreatedByNote } from "@/lib/lineage";
 import { canonicalModelName } from "@/lib/models";
 import { formatAgo } from "@/lib/thread";
 import { questionsOf } from "@/lib/threadRequest";
+import { wakeLine, type WakeTone } from "@/lib/wake";
 import { groupLabel, turnCostLabel, type TimelineRow, type WorkNode } from "@/lib/threadTimeline";
 import { formatDuration, parseObject, splitPath, str, toolSummary, type Tense } from "@/lib/toolSummary";
 import { useAgentRunOfCall, useAgentRunOfNote } from "@/stores/agents";
@@ -615,10 +616,75 @@ export function WorkNodeView({ node, nested }: { node: WorkNode; nested?: boolea
   }
 }
 
+const WAKE_ICONS: Readonly<Record<WakeTone, { icon: LucideIcon; cls: string; label: string }>> = {
+  ok: { icon: CircleCheck, cls: "t-emerald", label: "Finished" },
+  attention: { icon: CircleAlert, cls: "t-amber", label: "Needs attention" },
+  fail: { icon: CircleX, cls: "t-red", label: "Failed" },
+};
+
+/**
+ * A message the daemon sent for a wake subscription (docs/notes/agents-4-wake.md), drawn
+ * as a lineage note instead of a bubble (docs/notes/agents-3-lineage-gui.md): the tone's
+ * icon, "Woken by <thread>: idle, finished", the report's summary, the age, and the
+ * payload as a JSON block once expanded. The thread's name is a link while it exists
+ * (its current name; the payload's otherwise); an action run's name is plain text.
+ */
+function WakeNoteRow({ wake, atMs }: { wake: WakeView; atMs: number | null }) {
+  const line = useMemo(() => wakeLine(wake), [wake]);
+  const exists = useThreadsStore((s) => line.threadId !== "" && line.threadId in s.byId);
+  const current = useThreadsStore((s) => (line.threadId ? (s.byId[line.threadId]?.name ?? "") : ""));
+  const name = current || line.name;
+  const look = WAKE_ICONS[line.tone];
+  const Icon = look.icon;
+  return (
+    <LineageNote icon={<Icon className={look.cls} aria-label={look.label} />} atMs={atMs} body={{ label: "Wake payload", lang: "json", code: line.json }} testId="thread-wake-note">
+      <span className="lead">Woken by</span>
+      {name && (
+        <span className="who">
+          {exists ? (
+            <button
+              type="button"
+              className="nm"
+              data-testid="thread-wake-note-link"
+              data-thread={line.threadId}
+              onClick={(e) => {
+                e.stopPropagation();
+                useUiStore.getState().select({ kind: "thread", id: line.threadId }, { focusPrompt: true });
+              }}
+            >
+              {name}
+            </button>
+          ) : (
+            <span className={line.threadId ? "nm gone" : "nm plain"} data-testid="thread-wake-note-name">
+              {name}
+            </span>
+          )}
+          {line.detail && <span data-testid="thread-wake-note-detail">: {line.detail}</span>}
+        </span>
+      )}
+      {line.summary && (
+        <>
+          {name && (
+            <span className="ghost" aria-hidden>
+              ·
+            </span>
+          )}
+          <Tip label={line.summary} whenTruncated>
+            <span className="sum" data-testid="thread-wake-note-summary">
+              {line.summary}
+            </span>
+          </Tip>
+        </>
+      )}
+    </LineageNote>
+  );
+}
+
 const UserRow = memo(function UserRow({ id }: { id: string }) {
   const { threadId } = useThreadCtx();
   const it = useThreadItem(threadId, id);
   if (it?.kind !== "user") return null;
+  if (it.wake) return <WakeNoteRow wake={it.wake} atMs={it.createdAtMs} />;
   return <UserBubble text={it.text} composerText={it.composerText} attachments={it.attachments} createdAtMs={it.createdAtMs} />;
 });
 

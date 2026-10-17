@@ -1,0 +1,82 @@
+/**
+ * A wake message (docs/notes/agents-4-wake.md) as the timeline's one-line "Woken by …"
+ * note (docs/notes/agents-3-lineage-gui.md): who woke the thread, how it ended, a summary,
+ * from the payload the daemon sent with it. Pure.
+ */
+import type { WakeView } from "@/api/thread";
+
+/** ok: finished, idle or exit 0; attention: waits on someone; fail: an error, a failed report, a non-zero exit. */
+export type WakeTone = "ok" | "attention" | "fail";
+
+export interface WakeLine {
+  tone: WakeTone;
+  /** The thread that woke this one ("" for an action run, or an unreadable payload). */
+  threadId: string;
+  /** Its name in the payload (the thread's id when unnamed then), or the action's name; "" when unknown. */
+  name: string;
+  /** "idle, finished", "needs attention, permission: Bash", "exit 3"; "" when unknown. */
+  detail: string;
+  /** The report's summary, a run's last output line, or (unreadable payload) the header line. */
+  summary: string;
+  /** The payload pretty-printed for the expandable body (the raw text when it does not parse). */
+  json: string;
+}
+
+type Obj = Record<string, unknown>;
+
+function obj(v: unknown): Obj | null {
+  return v !== null && typeof v === "object" && !Array.isArray(v) ? (v as Obj) : null;
+}
+
+function str(v: unknown): string {
+  return typeof v === "string" ? v : "";
+}
+
+function threadLine(t: Obj, json: string): WakeLine {
+  const id = str(t.id);
+  const status = str(t.status);
+  const reason = str(t.status_reason);
+  const report = obj(t.report);
+  const failed = status === "error" || reason.startsWith("error") || str(report?.status) === "failed";
+  const waits = status === "needs_attention" && reason !== "finished" && reason !== "";
+  return {
+    tone: failed ? "fail" : waits ? "attention" : "ok",
+    threadId: id,
+    name: str(t.name) || id,
+    detail: [status.replace(/_/g, " "), reason].filter(Boolean).join(", "),
+    summary: str(report?.summary),
+    json,
+  };
+}
+
+function runLine(r: Obj, json: string): WakeLine {
+  const code = typeof r.exit_code === "number" ? r.exit_code : null;
+  const tail = str(r.output_tail)
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  return {
+    tone: code === 0 ? "ok" : "fail",
+    threadId: "",
+    name: str(r.action_name) || str(r.id),
+    detail: code === null ? "" : `exit ${String(code)}`,
+    summary: tail.at(-1) ?? "",
+    json,
+  };
+}
+
+/** The note's line for a wake message. */
+export function wakeLine(w: WakeView): WakeLine {
+  let p: Obj | null;
+  try {
+    p = obj(JSON.parse(w.json));
+  } catch {
+    p = null;
+  }
+  const json = p ? JSON.stringify(p, null, 2) : w.json;
+  const thread = obj(p?.thread);
+  if (thread) return threadLine(thread, json);
+  const run = obj(p?.run);
+  if (run) return runLine(run, json);
+  return { tone: "ok", threadId: "", name: "", detail: "", summary: w.title, json };
+}

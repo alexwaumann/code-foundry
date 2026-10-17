@@ -675,6 +675,20 @@ html[data-thread-width="full"] .cf-thread {
 .cf-thread .lnote button.nm {
   cursor: default;
 }
+.cf-thread .lnote .nm.plain {
+  text-decoration: none;
+}
+/* "<name>: idle, finished": the name and its state as one unit that ellipsises. */
+.cf-thread .lnote .who {
+  flex: none;
+  max-width: 55%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cf-thread .lnote .who .nm {
+  max-width: none;
+}
 .cf-thread .lnote button.nm:hover {
   text-decoration-color: currentColor;
 }

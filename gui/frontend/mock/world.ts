@@ -948,6 +948,26 @@ export class World {
       out.push(o.id);
       if (this.threads.has(o.id)) continue;
       const s = this.addThread({ repoId: "repo-cf", worktreePath: CF, model: "claude-4.5-haiku[1m]", effort: "medium", createdAt: ago(min), lastActivityAt: ago(min - 1), statusChangedAt: ago(min - 1), held: true, ...o });
+      if (s.id === P) {
+        // The creator was woken when its child settled (thread.new --notify): a wake message.
+        const payload = {
+          kind: "thread",
+          subscription_id: "sub-l-1",
+          condition: "settled",
+          fired_at: ago(min - 20).toISOString(),
+          thread: { id: C, name: CN, state: "disconnected", status: "needs_attention", status_reason: "finished", repo_id: "repo-cf", worktree_path: `${CFW}/fix-resize`, created_by: P, labels: ["auth"], report: { status: "done", summary: "Retry added around exchangeToken, 3 attempts; PR opened", data: { pr: 412 }, at: ago(min - 20).toISOString() } },
+        };
+        this.logs.seed(s.id, {
+          prompt: "Split the login redirect fix into threads with code-foundry thread new, and wake me when they settle.",
+          intro: "Starting the threads.",
+          command: `code-foundry thread new --repo code-foundry --brief "Add retry to the login redirect" "Add a bounded retry"`,
+          output: `created thread ${CN} (${C})`,
+          reply: "Started seven threads; I'll pick up their reports as they finish.",
+          minutesAgo: min,
+          end: "done",
+          wakes: [{ title: `Thread "${CN}" (${C}) is idle: finished. Report: done — Retry added around exchangeToken, 3 attempts; PR opened.`, json: JSON.stringify(payload, null, 2) }],
+        });
+      }
       if (s.createdBy) {
         this.logs.seed(s.id, {
           note: { id: "note-created-by", text: `Created by ${s.createdByName}${s.brief ? ` · brief: ${s.brief}` : ""}` },
