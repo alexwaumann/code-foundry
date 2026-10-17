@@ -27,6 +27,10 @@ type Thread struct {
 	Others []*v1.Thread
 	// RetiredUsage is List's retired usage ledger.
 	RetiredUsage []*v1.UsageBucket
+	// Fired and Existed are Subscribe's answer flags; Subscriptions is what
+	// ListSubscriptions returns and Unsubscribe removes from (thread_subscriptions.go).
+	Fired, Existed bool
+	Subscriptions  []*v1.ThreadSubscription
 }
 
 var _ command.ThreadBackend = (*Thread)(nil)
