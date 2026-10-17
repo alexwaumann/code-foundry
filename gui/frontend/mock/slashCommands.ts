@@ -8,7 +8,7 @@
  * POST /__mock/thread/commands replaces it and publishes the Watch's `commands` event.
  *
  * Send refuses a message whose first word is a command the app replaces, with the
- * daemon's exact text (internal/store/session/slashdeny.go).
+ * daemon's exact text (internal/store/thread/slashdeny.go).
  */
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import type { SlashCommandSchema } from "../src/gen/codefoundry/v1/thread_pb";

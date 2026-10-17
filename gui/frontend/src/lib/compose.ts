@@ -346,7 +346,7 @@ export interface DraftArgsInput extends PromptArgsInput {
 }
 
 /** session.new's args for a project draft (threadArgs with a project place). */
-export function sessionNewArgs(repoId: string, d: DraftArgsInput, attachments: readonly string[]): Record<string, string> {
+export function threadNewArgs(repoId: string, d: DraftArgsInput, attachments: readonly string[]): Record<string, string> {
   return threadArgs({ kind: "project", repoId, worktree: d.worktree, base: d.base }, d, attachments);
 }
 
@@ -393,7 +393,7 @@ export function threadArgs(place: ThreadPlace, d: PromptArgsInput, attachments: 
 }
 
 /** The session id in session.new's result JSON (the created Session), or null. */
-export function createdSessionId(resultJson: string): string | null {
+export function createdThreadId(resultJson: string): string | null {
   if (!resultJson) return null;
   try {
     const v = JSON.parse(resultJson) as unknown;

@@ -6,11 +6,11 @@
 import { linkedPrsTab, selectionLinkedThread, selectionThread } from "@/surfaces/linkedprsTarget";
 import { keyOf, openSurface } from "./panel";
 import { useReposStore } from "./repos";
-import { useSessionsStore } from "./threads";
+import { useThreadsStore } from "./threads";
 import { useUiStore, type Selection } from "./ui";
 
 function stores() {
-  return { repos: useReposStore.getState(), sessions: useSessionsStore.getState() };
+  return { repos: useReposStore.getState(), threads: useThreadsStore.getState() };
 }
 
 /** What the selection is for the surface: a thread with links, a thread without any, or no thread. */

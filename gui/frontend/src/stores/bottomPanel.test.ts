@@ -38,7 +38,7 @@ function term(id: string, labels: Record<string, string>, extra: Partial<Termina
   return { id, argv: ["/bin/zsh"], cwd: "/src/app", cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: null, exitedAtMs: null, altScreen: false, labels, ...extra };
 }
 
-const shell = (session: string, worktree = "/src/app") => ({ kind: "shell", repo: "r", worktree, ...(session ? { thread: session } : {}) });
+const shell = (thread: string, worktree = "/src/app") => ({ kind: "shell", repo: "r", worktree, ...(thread ? { thread: thread } : {}) });
 
 function data(list: TerminalView[]): TerminalsData {
   return { byId: Object.fromEntries(list.map((t) => [t.id, t])), order: list.map((t) => t.id) };
@@ -46,7 +46,7 @@ function data(list: TerminalView[]): TerminalsData {
 
 describe("bottomKeyOf", () => {
   const cases: [string, Selection, string | null][] = [
-    ["a thread", { kind: "session", id: "s1" }, "session:s1"],
+    ["a thread", { kind: "thread", id: "s1" }, "session:s1"],
     ["the Projects page", { kind: "view", name: "projects" }, "view:projects"],
     ["the dashboard", DASHBOARD, null],
     ["nothing", { kind: "none" }, null],
@@ -62,9 +62,9 @@ describe("ownerKeyOf", () => {
   const cases: [string, Record<string, string>, string | null][] = [
     ["a thread's shell", shell("s1"), "session:s1"],
     ["a worktree's shell", shell(""), "view:projects"],
-    ["a thread-labelled terminal that is no shell (session, no kind)", { session: "s1", worktree: "/src/app" }, null],
+    ["a thread-labelled terminal that is no shell (thread, no kind)", { thread: "s1", worktree: "/src/app" }, null],
     ["an unlabelled terminal", {}, null],
-    ["another kind", { kind: "job", session: "s1" }, null],
+    ["another kind", { kind: "job", thread: "s1" }, null],
     ["a thread's action run", { kind: "action", thread: "s1", action: "a-1", "action.name": "Test", "action.run": "r-1" }, "session:s1"],
     ["a worktree's action run", { kind: "action", repo: "r", worktree: "/src/app", action: "a-1" }, "view:projects"],
   ];
@@ -75,7 +75,7 @@ describe("ownerKeyOf", () => {
 
 describe("bottomTabIds", () => {
   const terminals = data([
-    term("claude", { session: "s1", worktree: "/src/app" }),
+    term("claude", { thread: "s1", worktree: "/src/app" }),
     term("a", shell("s1")),
     term("w1", shell("")),
     term("b", shell("s2")),
@@ -199,15 +199,15 @@ describe("bottomVisible", () => {
 });
 
 describe("focusedBottomShell", () => {
-  const terminals = data([term("claude", { session: "s1" }), term("a", shell("s1")), term("b", shell("s1"))]);
+  const terminals = data([term("claude", { thread: "s1" }), term("a", shell("s1")), term("b", shell("s1"))]);
   const closed = { open: false, returnTo: "content" };
   const cases: [string, Selection, string, { open: boolean; returnTo: string }, Record<string, BottomEntry>, string][] = [
-    ["keyboard in the panel: its active shell", { kind: "session", id: "s1" }, "bottom", closed, { "session:s1": { open: true, activeTerminalId: "a" } }, "a"],
-    ["no remembered tab: the last", { kind: "session", id: "s1" }, "bottom", closed, { "session:s1": { open: true } }, "b"],
-    ["the palette returns there", { kind: "session", id: "s1" }, "palette", { open: true, returnTo: "bottom" }, { "session:s1": { open: true } }, "b"],
-    ["keyboard in the content pane", { kind: "session", id: "s1" }, "terminal", closed, { "session:s1": { open: true } }, ""],
-    ["panel closed", { kind: "session", id: "s1" }, "bottom", closed, { "session:s1": { open: false } }, ""],
-    ["no tabs", { kind: "session", id: "s2" }, "bottom", closed, { "session:s2": { open: true } }, ""],
+    ["keyboard in the panel: its active shell", { kind: "thread", id: "s1" }, "bottom", closed, { "session:s1": { open: true, activeTerminalId: "a" } }, "a"],
+    ["no remembered tab: the last", { kind: "thread", id: "s1" }, "bottom", closed, { "session:s1": { open: true } }, "b"],
+    ["the palette returns there", { kind: "thread", id: "s1" }, "palette", { open: true, returnTo: "bottom" }, { "session:s1": { open: true } }, "b"],
+    ["keyboard in the content pane", { kind: "thread", id: "s1" }, "terminal", closed, { "session:s1": { open: true } }, ""],
+    ["panel closed", { kind: "thread", id: "s1" }, "bottom", closed, { "session:s1": { open: false } }, ""],
+    ["no tabs", { kind: "thread", id: "s2" }, "bottom", closed, { "session:s2": { open: true } }, ""],
     ["no bottom key", { kind: "view", name: "pullrequests" }, "bottom", closed, {}, ""],
   ];
   it.each(cases)("%s", (_name, selection, focus, palette, byKey, want) => {
@@ -241,7 +241,7 @@ describe("reducers", () => {
 });
 
 describe("emptyOpenKeys", () => {
-  const terminals = data([term("claude", { session: "s1" }), term("a", shell("s1")), term("w", shell(""))]);
+  const terminals = data([term("claude", { thread: "s1" }), term("a", shell("s1")), term("w", shell(""))]);
   const cases: [string, Record<string, BottomEntry>, Record<string, number>, string[]][] = [
     ["an open thread panel with a shell stays", { "session:s1": { open: true } }, {}, []],
     ["an open thread panel without shells (its Claude terminal does not count)", { "session:s2": { open: true } }, {}, ["session:s2"]],
@@ -262,7 +262,7 @@ describe("emptyOpenKeys", () => {
 describe("store", () => {
   beforeEach(() => {
     useBottomStore.setState({ byKey: {}, pendingFocus: null, pendingFocusId: null, starting: {} });
-    useUiStore.setState({ selection: { kind: "session", id: "s1" }, bottomFocusSeq: 0 });
+    useUiStore.setState({ selection: { kind: "thread", id: "s1" }, bottomFocusSeq: 0 });
   });
 
   it("toggleBottom works on the current selection's key and asks for focus only when showing", () => {

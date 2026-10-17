@@ -38,7 +38,7 @@ function members(): Members {
   return JSON.parse(cli("workspace", "members", WORKSPACE, "--json")) as Members;
 }
 
-function sessionStatus(id: string): string | undefined {
+function threadStatus(id: string): string | undefined {
   return ((JSON.parse(cli("thread", "list", "--json")) as { threads?: { id: string; status?: string }[] }).threads ?? []).find((s) => s.id === id)?.status;
 }
 
@@ -63,7 +63,7 @@ test("workspace surface with a real thread: members' state, member tab, add and 
     await page.goto("/");
     const row = page.getByTestId("thread-list").locator(`[data-row-key="s:${thread}"]`);
     await expect(row).toBeVisible({ timeout: 20_000 });
-    await expect.poll(() => sessionStatus(thread), { timeout: 120_000 }).toMatch(/IDLE|NEEDS_ATTENTION/);
+    await expect.poll(() => threadStatus(thread), { timeout: 120_000 }).toMatch(/IDLE|NEEDS_ATTENTION/);
 
     await test.step("the badge opens the surface: members, their state, the current member", async () => {
       await row.getByTestId("row-workspace").click();

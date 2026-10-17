@@ -9,7 +9,7 @@ import { isStartable } from "@/keys/bindings";
 import { useAction, useRepoActionIds } from "@/stores/actions";
 import { useCommandsStore } from "@/stores/commands";
 import { useReposStore } from "@/stores/repos";
-import { useSessionsStore } from "@/stores/threads";
+import { useThreadsStore } from "@/stores/threads";
 import { ACTION_ICON } from "./actionIcons";
 
 type From = "thread" | "projects";
@@ -73,11 +73,11 @@ function ActionItem({ id, onRun, onEdit }: { id: string; onRun: (id: string) => 
  * The thread header's actions menu: only for a thread with a project (actions belong to
  * one), and hidden when the daemon does not list action.run here, like a CommandButton.
  */
-export function ThreadActionsMenu({ sessionId }: { sessionId: string }) {
-  const repoId = useSessionsStore((s) => s.byId[sessionId]?.repoId ?? "");
+export function ThreadActionsMenu({ threadId }: { threadId: string }) {
+  const repoId = useThreadsStore((s) => s.byId[threadId]?.repoId ?? "");
   const available = useCommandsStore((s) => s.commands.some((c) => c.name === "action.run" && isStartable(c)));
   if (!repoId || !available) return null;
-  return <ActionsMenu repoId={repoId} owner={{ kind: "thread", sessionId }} from="thread" variant="header" testId="pane-actions-menu" />;
+  return <ActionsMenu repoId={repoId} owner={{ kind: "thread", threadId }} from="thread" variant="header" testId="pane-actions-menu" />;
 }
 
 /**

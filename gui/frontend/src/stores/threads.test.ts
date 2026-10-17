@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import type { SessionView } from "@/api/threads";
+import type { ThreadView } from "@/api/threads";
 import type { TerminalView } from "@/api/terminal";
 import { formatAgo } from "@/lib/thread";
 import { windowTitle } from "@/lib/title";
@@ -7,11 +7,11 @@ import { deriveContext, emptyContext } from "./context";
 import { dispatchEvent } from "./events";
 import { applyIntent } from "./intents";
 import { emptyRepos, replaceRepos, useReposStore } from "./repos";
-import { activeThreadIds, applyRetiredUsage, applySessionEvent, attentionIds, emptySessions, replaceSessions, runningCount, useSessionsStore } from "./threads";
+import { activeThreadIds, applyRetiredUsage, applyThreadListEvent, attentionIds, emptyThreads, replaceThreads, runningCount, useThreadsStore } from "./threads";
 import { emptyTerminals, useTerminalsStore } from "./terminals";
 import { useUiStore } from "./ui";
 
-function session(id: string, over: Partial<SessionView> = {}): SessionView {
+function thread(id: string, over: Partial<ThreadView> = {}): ThreadView {
   return {
     id,
     claudeSessionId: "",
@@ -60,37 +60,37 @@ function term(id: string, labels: Record<string, string> = {}): TerminalView {
 
 describe("session reducers", () => {
   it("replace keeps identity for unchanged sessions and orders by creation", () => {
-    const a = session("a", { createdAtMs: 2 });
-    const b = session("b", { createdAtMs: 1 });
-    const s1 = replaceSessions(emptySessions, [a, b]);
+    const a = thread("a", { createdAtMs: 2 });
+    const b = thread("b", { createdAtMs: 1 });
+    const s1 = replaceThreads(emptyThreads, [a, b]);
     expect(s1.order).toEqual(["b", "a"]);
-    const s2 = replaceSessions(s1, [{ ...a }, { ...b }]);
+    const s2 = replaceThreads(s1, [{ ...a }, { ...b }]);
     expect(s2).toBe(s1);
-    const s3 = replaceSessions(s1, [{ ...a, name: "renamed" }, { ...b }]);
+    const s3 = replaceThreads(s1, [{ ...a, name: "renamed" }, { ...b }]);
     expect(s3.byId.b).toBe(s1.byId.b);
     expect(s3.byId.a?.name).toBe("renamed");
   });
 
   it.each([
-    ["snapshot replaces", { kind: "snapshot" as const, sessions: [session("z")], retiredUsage: [] }, ["z"]],
-    ["updated appends", { kind: "updated" as const, session: session("c", { createdAtMs: 99 }) }, ["a", "b", "c"]],
+    ["snapshot replaces", { kind: "snapshot" as const, threads: [thread("z")], retiredUsage: [] }, ["z"]],
+    ["updated appends", { kind: "updated" as const, thread: thread("c", { createdAtMs: 99 }) }, ["a", "b", "c"]],
     ["removed drops", { kind: "removed" as const, id: "a" }, ["b"]],
     ["unknown removal is a no-op", { kind: "removed" as const, id: "nope" }, ["a", "b"]],
   ])("%s", (_name, ev, order) => {
-    const prev = replaceSessions(emptySessions, [session("a", { createdAtMs: 1 }), session("b", { createdAtMs: 2 })]);
-    expect(applySessionEvent(prev, ev).order).toEqual(order);
+    const prev = replaceThreads(emptyThreads, [thread("a", { createdAtMs: 1 }), thread("b", { createdAtMs: 2 })]);
+    expect(applyThreadListEvent(prev, ev).order).toEqual(order);
   });
 
   it("an identical update returns the same state", () => {
-    const prev = replaceSessions(emptySessions, [session("a")]);
-    expect(applySessionEvent(prev, { kind: "updated", session: session("a") })).toBe(prev);
+    const prev = replaceThreads(emptyThreads, [thread("a")]);
+    expect(applyThreadListEvent(prev, { kind: "updated", thread: thread("a") })).toBe(prev);
   });
 
   it("linked pull requests compare by content", () => {
     const pr = (n: number) => ({ slug: "o/r", number: n, url: `https://github.com/o/r/pull/${String(n)}`, linkedAt: 1000 });
-    const prev = replaceSessions(emptySessions, [session("a", { linkedPullRequests: [pr(5)] })]);
-    expect(applySessionEvent(prev, { kind: "updated", session: session("a", { linkedPullRequests: [pr(5)] }) })).toBe(prev);
-    const next = applySessionEvent(prev, { kind: "updated", session: session("a", { linkedPullRequests: [pr(5), pr(6)] }) });
+    const prev = replaceThreads(emptyThreads, [thread("a", { linkedPullRequests: [pr(5)] })]);
+    expect(applyThreadListEvent(prev, { kind: "updated", thread: thread("a", { linkedPullRequests: [pr(5)] }) })).toBe(prev);
+    const next = applyThreadListEvent(prev, { kind: "updated", thread: thread("a", { linkedPullRequests: [pr(5), pr(6)] }) });
     expect(next).not.toBe(prev);
     expect(next.byId.a?.linkedPullRequests.map((l) => l.number)).toEqual([5, 6]);
   });
@@ -116,14 +116,14 @@ describe("session reducers", () => {
       cacheWrite1hCostUsd: 0.001,
       cacheSavingsUsd: 0,
     });
-    const prev = replaceSessions(emptySessions, [session("a", { usage: [bucket(1)] })]);
-    expect(applySessionEvent(prev, { kind: "updated", session: session("a", { usage: [bucket(1)] }) })).toBe(prev);
-    const next = applySessionEvent(prev, { kind: "updated", session: session("a", { usage: [bucket(2)] }) });
+    const prev = replaceThreads(emptyThreads, [thread("a", { usage: [bucket(1)] })]);
+    expect(applyThreadListEvent(prev, { kind: "updated", thread: thread("a", { usage: [bucket(1)] }) })).toBe(prev);
+    const next = applyThreadListEvent(prev, { kind: "updated", thread: thread("a", { usage: [bucket(2)] }) });
     expect(next.byId.a?.usage[0]?.requests).toBe(2);
-    expect(applySessionEvent(prev, { kind: "retiredUsage", buckets: [bucket(1)] })).toBe(prev);
+    expect(applyThreadListEvent(prev, { kind: "retiredUsage", buckets: [bucket(1)] })).toBe(prev);
 
     const retired = [bucket(5)];
-    expect(applyRetiredUsage([], { kind: "snapshot", sessions: [], retiredUsage: retired })).toBe(retired);
+    expect(applyRetiredUsage([], { kind: "snapshot", threads: [], retiredUsage: retired })).toBe(retired);
     expect(applyRetiredUsage(retired, { kind: "retiredUsage", buckets: [bucket(5)] })).toBe(retired);
     expect(applyRetiredUsage(retired, { kind: "retiredUsage", buckets: [bucket(6)] })[0]?.requests).toBe(6);
     expect(applyRetiredUsage(retired, { kind: "removed", id: "a" })).toBe(retired);
@@ -143,52 +143,52 @@ describe("session reducers", () => {
       costUsd: 0,
       unpriced: false,
     });
-    const withRun = replaceSessions(emptySessions, [session("a", { agentRuns: [run("open", 1)] })]);
-    expect(applySessionEvent(withRun, { kind: "updated", session: session("a", { agentRuns: [run("open", 1)] }) })).toBe(withRun);
-    expect(applySessionEvent(withRun, { kind: "updated", session: session("a", { agentRuns: [run("closed", 1)] }) }).byId.a?.agentRuns[0]?.status).toBe("closed");
-    expect(applySessionEvent(withRun, { kind: "updated", session: session("a", { agentRuns: [run("open", 2)] }) })).not.toBe(withRun);
+    const withRun = replaceThreads(emptyThreads, [thread("a", { agentRuns: [run("open", 1)] })]);
+    expect(applyThreadListEvent(withRun, { kind: "updated", thread: thread("a", { agentRuns: [run("open", 1)] }) })).toBe(withRun);
+    expect(applyThreadListEvent(withRun, { kind: "updated", thread: thread("a", { agentRuns: [run("closed", 1)] }) }).byId.a?.agentRuns[0]?.status).toBe("closed");
+    expect(applyThreadListEvent(withRun, { kind: "updated", thread: thread("a", { agentRuns: [run("open", 2)] }) })).not.toBe(withRun);
   });
 
   it("attentionIds counts a stopped session's persisted attention, not an interrupted one", () => {
-    const d = replaceSessions(emptySessions, [
-      session("a", { status: "attention" }),
-      session("b", { status: "attention", statusReason: "question: Which color do you prefer?", state: "disconnected" }),
-      session("c"),
-      session("d", { status: "error", statusReason: "interrupted", state: "disconnected" }),
-      session("e", { status: "attention", statusReason: "finished", state: "disconnected", archivedAtMs: 7 }),
-      session("f", { status: "attention", statusReason: "finished", state: "disconnected", snoozedUntilMs: 9 }),
-      session("g", { status: "attention", statusReason: "snooze ended", state: "disconnected" }),
+    const d = replaceThreads(emptyThreads, [
+      thread("a", { status: "attention" }),
+      thread("b", { status: "attention", statusReason: "question: Which color do you prefer?", state: "disconnected" }),
+      thread("c"),
+      thread("d", { status: "error", statusReason: "interrupted", state: "disconnected" }),
+      thread("e", { status: "attention", statusReason: "finished", state: "disconnected", archivedAtMs: 7 }),
+      thread("f", { status: "attention", statusReason: "finished", state: "disconnected", snoozedUntilMs: 9 }),
+      thread("g", { status: "attention", statusReason: "snooze ended", state: "disconnected" }),
     ]);
     // e waits (a finished turn) but is archived, f is snoozed: not counted. g woke: counted.
     expect(attentionIds(d)).toEqual(["a", "b", "g"]);
   });
 
   it("start page counts and thread list: waiting first, then running (starting included); a stopped busy never", () => {
-    const d = replaceSessions(emptySessions, [
-      session("busy1", { status: "busy", createdAtMs: 1 }),
-      session("idle", { createdAtMs: 2 }),
-      session("wait1", { status: "attention", createdAtMs: 3 }),
-      session("gone", { status: "busy", state: "disconnected", createdAtMs: 4 }),
-      session("start", { status: "idle", state: "starting", createdAtMs: 5 }),
-      session("wait2", { status: "attention", state: "closing", createdAtMs: 6 }),
-      session("stopped", { status: "idle", state: "disconnected", createdAtMs: 7 }),
+    const d = replaceThreads(emptyThreads, [
+      thread("busy1", { status: "busy", createdAtMs: 1 }),
+      thread("idle", { createdAtMs: 2 }),
+      thread("wait1", { status: "attention", createdAtMs: 3 }),
+      thread("gone", { status: "busy", state: "disconnected", createdAtMs: 4 }),
+      thread("start", { status: "idle", state: "starting", createdAtMs: 5 }),
+      thread("wait2", { status: "attention", state: "closing", createdAtMs: 6 }),
+      thread("stopped", { status: "idle", state: "disconnected", createdAtMs: 7 }),
     ]);
     expect(runningCount(d)).toBe(2);
     expect(activeThreadIds(d)).toEqual(["wait1", "wait2", "busy1", "start"]);
   });
 
   it("a thread is never both waiting and running: attention wins (an MCP start keeps a saved finished turn)", () => {
-    const d = replaceSessions(emptySessions, [
-      session("mcp", { status: "attention", statusReason: "finished", state: "starting", createdAtMs: 1 }),
-      session("busy", { status: "busy", createdAtMs: 2 }),
-      session("asking", { status: "attention", statusReason: "question: Which?", state: "starting", createdAtMs: 3 }),
+    const d = replaceThreads(emptyThreads, [
+      thread("mcp", { status: "attention", statusReason: "finished", state: "starting", createdAtMs: 1 }),
+      thread("busy", { status: "busy", createdAtMs: 2 }),
+      thread("asking", { status: "attention", statusReason: "question: Which?", state: "starting", createdAtMs: 3 }),
     ]);
     expect(attentionIds(d)).toEqual(["mcp", "asking"]);
     expect(runningCount(d)).toBe(1);
     const ids = activeThreadIds(d);
     expect(ids).toEqual(["mcp", "asking", "busy"]);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(activeThreadIds(emptySessions)).toEqual([]);
+    expect(activeThreadIds(emptyThreads)).toEqual([]);
   });
 });
 
@@ -206,75 +206,75 @@ describe("deriveContext for a session", () => {
     },
   ]);
   it("carries the session and its worktree; no terminal (a thread has none)", () => {
-    const sessions = replaceSessions(emptySessions, [session("s1")]);
-    expect(deriveContext({ kind: "session", id: "s1" }, repos, sessions)).toEqual({
-      activeSessionId: "s1",
+    const threads = replaceThreads(emptyThreads, [thread("s1")]);
+    expect(deriveContext({ kind: "thread", id: "s1" }, repos, threads)).toEqual({
+      activeThreadId: "s1",
       activeTerminalId: "",
       activeRepoId: "r1",
       activeWorktreePath: "/src/app",
-      activeView: "session",
+      activeView: "thread",
       activeWorkspaceId: "",
     });
   });
-  it("a workspace thread carries its workspace (session.run-in's availability)", () => {
-    const sessions = replaceSessions(emptySessions, [session("s1", { workspaceId: "w-1" })]);
-    expect(deriveContext({ kind: "session", id: "s1" }, repos, sessions).activeWorkspaceId).toBe("w-1");
-    expect(deriveContext({ kind: "compose", repoId: "r1", workspaceId: "w-2" }, repos, sessions).activeWorkspaceId).toBe("w-2");
+  it("a workspace thread carries its workspace (thread.run-in's availability)", () => {
+    const threads = replaceThreads(emptyThreads, [thread("s1", { workspaceId: "w-1" })]);
+    expect(deriveContext({ kind: "thread", id: "s1" }, repos, threads).activeWorkspaceId).toBe("w-1");
+    expect(deriveContext({ kind: "compose", repoId: "r1", workspaceId: "w-2" }, repos, threads).activeWorkspaceId).toBe("w-2");
   });
-  it("a thread without a project: no repo or worktree (home is none), so project commands and plain session.new are not offered", () => {
-    const sessions = replaceSessions(emptySessions, [session("s1", { repoId: "", workspaceId: "", worktreePath: "/Users/dev" })]);
-    expect(deriveContext({ kind: "session", id: "s1" }, repos, sessions)).toMatchObject({ activeSessionId: "s1", activeRepoId: "", activeWorktreePath: "", activeView: "session" });
+  it("a thread without a project: no repo or worktree (home is none), so project commands and plain thread.new are not offered", () => {
+    const threads = replaceThreads(emptyThreads, [thread("s1", { repoId: "", workspaceId: "", worktreePath: "/Users/dev" })]);
+    expect(deriveContext({ kind: "thread", id: "s1" }, repos, threads)).toMatchObject({ activeThreadId: "s1", activeRepoId: "", activeWorktreePath: "", activeView: "thread" });
   });
   it("an older thread without a repo id inside a project keeps its place", () => {
-    const sessions = replaceSessions(emptySessions, [session("s1", { repoId: "", workspaceId: "", worktreePath: "/src/app/docs" })]);
-    expect(deriveContext({ kind: "session", id: "s1" }, repos, sessions)).toMatchObject({ activeRepoId: "r1", activeWorktreePath: "/src/app" });
+    const threads = replaceThreads(emptyThreads, [thread("s1", { repoId: "", workspaceId: "", worktreePath: "/src/app/docs" })]);
+    expect(deriveContext({ kind: "thread", id: "s1" }, repos, threads)).toMatchObject({ activeRepoId: "r1", activeWorktreePath: "/src/app" });
   });
   it("a composer without a project: the compose view alone", () => {
     expect(deriveContext({ kind: "compose", repoId: "", noProject: true }, repos)).toEqual({ ...emptyContext, activeView: "compose" });
   });
   it("an unknown session keeps the id", () => {
-    const sessions = replaceSessions(emptySessions, [session("s1", { state: "disconnected" })]);
-    expect(deriveContext({ kind: "session", id: "gone" }, emptyRepos, sessions)).toMatchObject({ activeSessionId: "gone", activeView: "session" });
+    const threads = replaceThreads(emptyThreads, [thread("s1", { state: "disconnected" })]);
+    expect(deriveContext({ kind: "thread", id: "gone" }, emptyRepos, threads)).toMatchObject({ activeThreadId: "gone", activeView: "thread" });
   });
 });
 
 describe("event dispatch", () => {
   beforeEach(() => {
-    useSessionsStore.setState({ ...emptySessions, availability: "unknown", error: null });
+    useThreadsStore.setState({ ...emptyThreads, availability: "unknown", error: null });
     useTerminalsStore.setState({ ...emptyTerminals });
     useReposStore.setState({ ...emptyRepos });
     useUiStore.setState({ selection: { kind: "none" } });
   });
 
   it("routes each source to its slice", () => {
-    dispatchEvent({ source: "session", event: { kind: "snapshot", sessions: [session("s1")], retiredUsage: [] } });
+    dispatchEvent({ source: "threadList", event: { kind: "snapshot", threads: [thread("s1")], retiredUsage: [] } });
     dispatchEvent({ source: "terminal", event: { kind: "updated", terminal: term("t1") } });
     dispatchEvent({ source: "repo", event: { kind: "snapshot", repos: [] } });
     dispatchEvent({ source: "gh", event: { kind: "viewer" } });
-    dispatchEvent({ source: "ui", event: { kind: "focusSession", sessionId: "s1" } });
-    expect(useSessionsStore.getState()).toMatchObject({ order: ["s1"], availability: "available" });
+    dispatchEvent({ source: "ui", event: { kind: "focusThread", threadId: "s1" } });
+    expect(useThreadsStore.getState()).toMatchObject({ order: ["s1"], availability: "available" });
     expect(useTerminalsStore.getState().order).toEqual(["t1"]);
-    expect(useUiStore.getState().selection).toEqual({ kind: "session", id: "s1" });
+    expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s1" });
   });
 
   it("a session snapshot bumps the epoch; updates and removals do not", () => {
-    const start = useSessionsStore.getState().epoch;
-    dispatchEvent({ source: "session", event: { kind: "snapshot", sessions: [session("s1")], retiredUsage: [] } });
-    expect(useSessionsStore.getState().epoch).toBe(start + 1);
-    dispatchEvent({ source: "session", event: { kind: "updated", session: session("s2") } });
-    dispatchEvent({ source: "session", event: { kind: "removed", id: "s1" } });
-    expect(useSessionsStore.getState().epoch).toBe(start + 1);
-    dispatchEvent({ source: "session", event: { kind: "snapshot", sessions: [], retiredUsage: [] } });
-    expect(useSessionsStore.getState().epoch).toBe(start + 2);
+    const start = useThreadsStore.getState().epoch;
+    dispatchEvent({ source: "threadList", event: { kind: "snapshot", threads: [thread("s1")], retiredUsage: [] } });
+    expect(useThreadsStore.getState().epoch).toBe(start + 1);
+    dispatchEvent({ source: "threadList", event: { kind: "updated", thread: thread("s2") } });
+    dispatchEvent({ source: "threadList", event: { kind: "removed", id: "s1" } });
+    expect(useThreadsStore.getState().epoch).toBe(start + 1);
+    dispatchEvent({ source: "threadList", event: { kind: "snapshot", threads: [], retiredUsage: [] } });
+    expect(useThreadsStore.getState().epoch).toBe(start + 2);
   });
 
   it("a FocusTerminal that races its shell reveals the shell once it arrives", () => {
-    useSessionsStore.setState({ ...replaceSessions(emptySessions, [session("s1")]), availability: "available" });
+    useThreadsStore.setState({ ...replaceThreads(emptyThreads, [thread("s1")]), availability: "available" });
     useTerminalsStore.setState({ ...emptyTerminals, loaded: true });
     applyIntent({ kind: "focusTerminal", terminalId: "t1" });
     expect(useUiStore.getState().selection).toEqual({ kind: "none" });
     dispatchEvent({ source: "terminal", event: { kind: "updated", terminal: term("t1", { thread: "s1", kind: "shell" }) } });
-    expect(useUiStore.getState().selection).toEqual({ kind: "session", id: "s1" });
+    expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s1" });
   });
 });
 

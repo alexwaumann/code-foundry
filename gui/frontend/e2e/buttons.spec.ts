@@ -42,7 +42,7 @@ test("sidebar new-thread button opens the project picker, then the composer", as
   const last = (await invocations()).at(-1);
   expect(last?.args).toMatchObject({ repo: "repo-gp", "new-worktree": "true", prompt: "Port the renderer" });
   expect(last?.context).toMatchObject({ activeRepoId: "repo-gp", activeWorktreePath: "", activeView: "compose" });
-  const created = page.locator('[data-row-kind="session"][aria-selected="true"]');
+  const created = page.locator('[data-row-kind="thread"][aria-selected="true"]');
   await expect(created).toBeVisible();
   expect(await created.getAttribute("data-row-key")).toMatch(/^s:s-new-/);
   await expect(page.getByTestId("thread-pane")).toBeVisible();
@@ -63,7 +63,7 @@ test("New Terminal from the palette starts a terminal in the selected thread's w
   // The shell belongs to the thread (labels session=s-3): the thread stays selected, the
   // sidebar gains no row, and the shell opens in the thread's bottom panel.
   await expect(row(page, "s:s-3")).toHaveAttribute("aria-selected", "true");
-  await expect(page.locator('[data-row-kind]:not([data-row-kind="session"]):not([data-row-kind="header"])')).toHaveCount(0);
+  await expect(page.locator('[data-row-kind]:not([data-row-kind="thread"]):not([data-row-kind="header"])')).toHaveCount(0);
   await expect(page.getByTestId("bottom-panel").getByRole("tab")).toHaveCount(1);
   await expect(page.getByTestId("bottom-terminal-host")).toHaveAttribute("data-attach-phase", "live");
 });
@@ -127,7 +127,7 @@ test("session pane header: the name renames, the location opens the worktree; no
   await page.getByTestId("palette").locator('[data-command="thread.fork"]').click();
   await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("thread.fork");
   expect((await invocations()).at(-1)?.context?.activeThreadId).toBe("s-1");
-  const fork = page.locator('[data-row-kind="session"][aria-selected="true"]');
+  const fork = page.locator('[data-row-kind="thread"][aria-selected="true"]');
   await expect(fork).toHaveAttribute("data-row-key", /^s:s-new-/);
 
   // No Close: the daemon starts and stops Claude itself (docs/notes/hide-connection-state.md).

@@ -3,7 +3,7 @@
  * exit hides the panel (docs/notes/bottom-panel-autoshell.md), against a REAL daemon.
  * Opt-in (LIVE_DAEMON=1), run with playwright.live.config.ts, which starts nothing: bring
  * up an isolated daemon (CODE_FOUNDRY_HOME) and the Vite dev server pointed at it (recipe
- * in docs/notes/phase2-integration.md), and name a thread of that daemon (LIVE_SESSION)
+ * in docs/notes/phase2-integration.md), and name a thread of that daemon (LIVE_THREAD)
  * that owns no shells yet.
  *
  * It presses cmd+j (a real terminal.new; the shell takes the keyboard), types into the
@@ -20,7 +20,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 const LIVE = process.env.LIVE_DAEMON === "1";
 const HOME = process.env.CODE_FOUNDRY_HOME ?? "";
-const SESSION = process.env.LIVE_SESSION ?? "";
+const THREAD = process.env.LIVE_THREAD ?? "";
 const BIN = process.env.LIVE_BIN ?? path.join(path.resolve(process.cwd(), "../.."), "bin/code-foundry");
 const SHOTS = process.env.LIVE_SHOTS ?? "";
 
@@ -29,9 +29,9 @@ function cli(...args: string[]): string {
 }
 
 /** The thread's shells, from the daemon. */
-function shellsOf(session: string): string[] {
+function shellsOf(thread: string): string[] {
   const list = (JSON.parse(cli("terminal", "list", "--json")) as { terminals?: { id: string; labels?: Record<string, string> }[] }).terminals ?? [];
-  return list.filter((t) => t.labels?.kind === "shell" && t.labels.thread === session).map((t) => t.id);
+  return list.filter((t) => t.labels?.kind === "shell" && t.labels.thread === thread).map((t) => t.id);
 }
 
 const bottom = (page: Page) => page.getByTestId("bottom-panel");
@@ -45,13 +45,13 @@ function focusInBottomTerminal(page: Page) {
   return page.evaluate(() => document.activeElement?.closest('[data-testid="bottom-terminal-host"]') !== null);
 }
 
-test.skip(!LIVE || !HOME || !SESSION, "LIVE_DAEMON=1, CODE_FOUNDRY_HOME and LIVE_SESSION are required");
+test.skip(!LIVE || !HOME || !THREAD, "LIVE_DAEMON=1, CODE_FOUNDRY_HOME and LIVE_THREAD are required");
 
 test("cmd+j starts a real shell, exit hides the panel, cmd+j starts a fresh one", async ({ page }) => {
-  expect(shellsOf(SESSION)).toEqual([]);
+  expect(shellsOf(THREAD)).toEqual([]);
   await page.goto("/");
-  await page.locator(`[data-row-key="s:${SESSION}"]`).click();
-  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-session-id", SESSION);
+  await page.locator(`[data-row-key="s:${THREAD}"]`).click();
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-session-id", THREAD);
   await expect(bottom(page)).toHaveCount(0);
 
   await page.keyboard.press("Meta+j");
@@ -60,7 +60,7 @@ test("cmd+j starts a real shell, exit hides the panel, cmd+j starts a fresh one"
   await expect(bottom(page).getByTestId("bottom-empty")).toHaveCount(0);
   await expect.poll(() => focusInBottomTerminal(page)).toBe(true);
   const first = await host(page).getAttribute("data-terminal-id");
-  expect(shellsOf(SESSION)).toEqual([first]);
+  expect(shellsOf(THREAD)).toEqual([first]);
 
   // The keyboard is in the real shell.
   await page.keyboard.type("echo autoshell-$((6*7))");
@@ -84,7 +84,7 @@ test("cmd+j starts a real shell, exit hides the panel, cmd+j starts a fresh one"
   await page.keyboard.press("Enter");
   await expect(bottom(page)).toHaveCount(0);
   await expect.poll(() => region(page)).toBe("content");
-  await expect.poll(() => shellsOf(SESSION)).toEqual([]);
+  await expect.poll(() => shellsOf(THREAD)).toEqual([]);
 
   // cmd+j again: a fresh shell.
   await page.keyboard.press("Meta+j");
@@ -96,22 +96,22 @@ test("cmd+j starts a real shell, exit hides the panel, cmd+j starts a fresh one"
   // cmd+w closes it (terminal.close), the last one: the panel hides again.
   await page.keyboard.press("Meta+w");
   await expect(bottom(page)).toHaveCount(0);
-  await expect.poll(() => shellsOf(SESSION)).toEqual([]);
+  await expect.poll(() => shellsOf(THREAD)).toEqual([]);
 });
 
 test("a panel whose shells went while the page was away comes back closed", async ({ page }) => {
-  expect(shellsOf(SESSION)).toEqual([]);
+  expect(shellsOf(THREAD)).toEqual([]);
   await page.goto("/");
-  await page.locator(`[data-row-key="s:${SESSION}"]`).click();
+  await page.locator(`[data-row-key="s:${THREAD}"]`).click();
   await page.keyboard.press("Meta+j");
   await expect(host(page)).toHaveAttribute("data-attach-phase", "live");
   const id = (await host(page).getAttribute("data-terminal-id")) ?? "";
   await page.goto("about:blank");
   cli("terminal", "close", "--id", id);
-  await expect.poll(() => shellsOf(SESSION)).toEqual([]);
+  await expect.poll(() => shellsOf(THREAD)).toEqual([]);
   await page.goto("/");
-  await page.locator(`[data-row-key="s:${SESSION}"]`).click();
-  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-session-id", SESSION);
+  await page.locator(`[data-row-key="s:${THREAD}"]`).click();
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-session-id", THREAD);
   await expect(page.getByTestId("thread-header").getByTestId("bottom-toggle")).toHaveAttribute("aria-pressed", "false");
   await expect(bottom(page)).toHaveCount(0);
 });

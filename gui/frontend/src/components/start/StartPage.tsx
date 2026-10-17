@@ -4,16 +4,16 @@ import { useShallow } from "zustand/react/shallow";
 import { Backdrop } from "@/components/backdrop/Backdrop";
 import { CommandButton } from "@/components/command/CommandButton";
 import { DragBand } from "@/components/window/DragBand";
-import { SessionLink } from "@/components/thread/ThreadLink";
+import { ThreadLink } from "@/components/thread/ThreadLink";
 import { useNoProjectThread } from "@/components/thread/useNoProject";
 import { greeting } from "@/lib/greeting";
 import { NO_PROJECT } from "@/lib/threadRow";
-import { placeSession } from "@/lib/tree";
+import { placeThread } from "@/lib/tree";
 import { cn } from "@/lib/utils";
 import { decodeRepoKeys, useRepoStructureKeys } from "@/stores/context";
 import { useReposStore } from "@/stores/repos";
 import { openHelp } from "@/stores/views";
-import { activeThreadIds, attentionIds, isAttention, runningCount, useSessionsStore } from "@/stores/threads";
+import { activeThreadIds, attentionIds, isAttention, runningCount, useThreadsStore } from "@/stores/threads";
 
 /** Rows in the start page's thread list before "+N more". */
 const MAX_THREADS = 6;
@@ -46,31 +46,31 @@ function Onboarding() {
 }
 
 /** The registered project a session's worktree belongs to, by name; "No project" for a thread without one; null when it cannot be placed. */
-function useSessionProject(id: string): string | null {
+function useThreadProject(id: string): string | null {
   const noProject = useNoProjectThread(id);
-  const worktreePath = useSessionsStore((s) => s.byId[id]?.worktreePath ?? "");
+  const worktreePath = useThreadsStore((s) => s.byId[id]?.worktreePath ?? "");
   const repoKeys = useRepoStructureKeys();
   const repoId = useMemo(() => {
     const worktrees = decodeRepoKeys(repoKeys).flatMap((r) => r.worktreePaths.map((path) => ({ repoId: r.id, path })));
-    return placeSession({ worktreePath }, worktrees)?.repoId ?? null;
+    return placeThread({ worktreePath }, worktrees)?.repoId ?? null;
   }, [repoKeys, worktreePath]);
   const name = useReposStore((s) => (repoId ? (s.byId[repoId]?.name ?? null) : null));
   return noProject ? NO_PROJECT : name;
 }
 
 function StartThreadRow({ id }: { id: string }) {
-  const waiting = useSessionsStore((s) => {
+  const waiting = useThreadsStore((s) => {
     const x = s.byId[id];
     return x !== undefined && isAttention(x);
   });
-  const project = useSessionProject(id);
+  const project = useThreadProject(id);
   const dot = <span aria-hidden className={cn("size-[7px] rounded-full", waiting ? "bg-warning" : "bg-success")} />;
-  return <SessionLink id={id} icon={dot} detail={`${waiting ? "waiting" : "running"}${project ? ` · ${project}` : ""}`} />;
+  return <ThreadLink id={id} icon={dot} detail={`${waiting ? "waiting" : "running"}${project ? ` · ${project}` : ""}`} />;
 }
 
 /** Threads waiting on the user, then running ones; hidden when there are none. */
 function ActiveThreads() {
-  const ids = useSessionsStore(useShallow((s) => activeThreadIds(s)));
+  const ids = useThreadsStore(useShallow((s) => activeThreadIds(s)));
   if (ids.length === 0) return null;
   const more = ids.length - MAX_THREADS;
   return (
@@ -114,8 +114,8 @@ function Counts({ running, waiting }: { running: number; waiting: number }) {
 
 /** Projects exist: a greeting, the fleet's counts, actions, and the threads that matter now. */
 function Fleet() {
-  const running = useSessionsStore((s) => runningCount(s));
-  const waiting = useSessionsStore((s) => attentionIds(s).length);
+  const running = useThreadsStore((s) => runningCount(s));
+  const waiting = useThreadsStore((s) => attentionIds(s).length);
   return (
     <>
       <Header title={greeting(new Date().getHours())}>

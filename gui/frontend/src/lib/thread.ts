@@ -1,4 +1,4 @@
-import type { SessionView } from "@/api/threads";
+import type { ThreadView } from "@/api/threads";
 
 /**
  * The one badge a session row shows. It never tells whether Claude's process runs (the
@@ -12,9 +12,9 @@ import type { SessionView } from "@/api/threads";
  * - a stopped or stopping thread is otherwise "idle" (a busy left by an older daemon
  *   included: nothing runs).
  */
-export type SessionBadge = "busy" | "idle" | "attention" | "error" | "unknown";
+export type ThreadBadge = "busy" | "idle" | "attention" | "error" | "unknown";
 
-export function sessionBadge(s: Pick<SessionView, "state" | "status"> | undefined): SessionBadge {
+export function threadBadge(s: Pick<ThreadView, "state" | "status"> | undefined): ThreadBadge {
   if (!s) return "unknown";
   if (s.status === "attention" || s.status === "error") return s.status;
   if (s.state === "starting") return "busy";
@@ -22,7 +22,7 @@ export function sessionBadge(s: Pick<SessionView, "state" | "status"> | undefine
   return s.status;
 }
 
-export const badgeLabels: Record<SessionBadge, string> = {
+export const badgeLabels: Record<ThreadBadge, string> = {
   busy: "busy",
   idle: "idle",
   attention: "needs attention",
@@ -74,7 +74,7 @@ function splitReason(reason: string): [string, string] {
   return i < 0 ? [reason.trim(), ""] : [reason.slice(0, i).trim(), reason.slice(i + 2).trim()];
 }
 
-export function statusKind(s: Pick<SessionView, "status" | "statusReason">): StatusKind {
+export function statusKind(s: Pick<ThreadView, "status" | "statusReason">): StatusKind {
   if (s.status === "error") return s.statusReason === "interrupted" ? "interrupted" : "error";
   if (s.status !== "attention") return "other";
   return reasonKinds[splitReason(s.statusReason)[0]] ?? "other";
@@ -86,7 +86,7 @@ export function statusKind(s: Pick<SessionView, "status" | "statusReason">): Sta
  * ("Bash"), the question, plan or notification text, the error code. "" when the reason has
  * none ("finished", "bell", "waiting for input", "interrupted").
  */
-export function statusDetail(s: Pick<SessionView, "statusReason">): string {
+export function statusDetail(s: Pick<ThreadView, "statusReason">): string {
   return splitReason(s.statusReason)[1];
 }
 
@@ -95,7 +95,7 @@ export function statusDetail(s: Pick<SessionView, "statusReason">): string {
  * "waiting for input") or an error status's own text ("daemon restarted"). "" when there is
  * nothing more to say than the kind. For the sidebar's "Needs input · …" and "Error · …".
  */
-export function statusNote(s: Pick<SessionView, "statusReason">): string {
+export function statusNote(s: Pick<ThreadView, "statusReason">): string {
   const [head, detail] = splitReason(s.statusReason);
   if (detail) return detail;
   return head in reasonKinds || head === "interrupted" ? "" : head;
@@ -109,7 +109,7 @@ export function statusNote(s: Pick<SessionView, "statusReason">): string {
  */
 export type AttentionTier = "prompt" | "done" | "";
 
-export function attentionTier(s: Pick<SessionView, "status" | "statusReason">): AttentionTier {
+export function attentionTier(s: Pick<ThreadView, "status" | "statusReason">): AttentionTier {
   if (s.status !== "attention") return "";
   return statusKind(s) === "done" ? "done" : "prompt";
 }
@@ -118,7 +118,7 @@ export function attentionTier(s: Pick<SessionView, "status" | "statusReason">): 
  * The sidebar group an unpinned thread sorts in (lib/tree.ts buildRows): "prompt" (waits on
  * the user, attentionTier), "error" (error / interrupted), "done" (an unseen finished turn),
  * "working" (busy, or Claude starting), "idle" (everything else). The same reading as
- * sessionBadge: attention and error win, so a thread waiting on the user never hides in the
+ * threadBadge: attention and error win, so a thread waiting on the user never hides in the
  * collapsible Working section (keys/bindings.ts jumpToAttention); a stopped or stopping
  * busy thread is idle.
  */
@@ -133,13 +133,13 @@ export type CutOff = "working" | "waiting" | "background" | "reporting";
 
 /**
  * What a restart (of the daemon or the app) cuts off, as the daemon's
- * command.ActiveSession counts it: "working" (Claude starting for a message or on a turn),
+ * command.ActiveThread counts it: "working" (Claude starting for a message or on a turn),
  * "waiting" (a permission request or question pending), "background" (its background
  * agents or shells), "reporting" (the turn reporting background work that just ended),
  * else null. An idle or stopped thread loses nothing: a message starts it again.
  */
 export function restartCutsOff(
-  s: Pick<SessionView, "state" | "status" | "statusReason" | "backgroundAgentsRunning" | "backgroundShellsRunning" | "backgroundWakePending">,
+  s: Pick<ThreadView, "state" | "status" | "statusReason" | "backgroundAgentsRunning" | "backgroundShellsRunning" | "backgroundWakePending">,
 ): CutOff | null {
   if (s.state === "starting") return "working";
   if (s.state !== "connected") return null;
@@ -149,11 +149,11 @@ export function restartCutsOff(
   return s.backgroundWakePending ? "reporting" : null;
 }
 
-export function threadGroup(s: Pick<SessionView, "state" | "status" | "statusReason">): ThreadGroup {
+export function threadGroup(s: Pick<ThreadView, "state" | "status" | "statusReason">): ThreadGroup {
   const tier = attentionTier(s);
   if (tier !== "") return tier;
   if (s.status === "error") return "error";
-  return sessionBadge(s) === "busy" ? "working" : "idle";
+  return threadBadge(s) === "busy" ? "working" : "idle";
 }
 
 /** "just now", "5 min ago", "3 h ago", "2 d ago"; "never" for null. */

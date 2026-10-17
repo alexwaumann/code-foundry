@@ -9,7 +9,7 @@ import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
 import { openUrl, pullRequestKey, useFreshness } from "@/stores/gh";
 import { copyPullRequestLink, refreshPullRequest, revertPullRequest, usePrPanelStore } from "@/stores/prPanel";
-import { startingKey, startPrSession, usePrSessionsStore, type PrSessionKind } from "@/stores/prThreads";
+import { startingKey, startPrThread, usePrThreadsStore, type PrThreadKind } from "@/stores/prThreads";
 import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { COPY_LINK_CHORD, POPUP_COLLISION_PADDING, POPUP_FIT, stopPlainKeys, usePanelBoundary } from "./keys";
 
@@ -43,8 +43,8 @@ function RefreshHint({ fetchedAtMs, lastError, busy }: { fetchedAtMs: number | n
 }
 
 /** Whether kind's command is running for ref (its menu item shows a spinner). */
-function useStarting(prRef: PrRef, kind: PrSessionKind): boolean {
-  return usePrSessionsStore((s) => s.starting[startingKey(prRef, kind)] ?? false);
+function useStarting(prRef: PrRef, kind: PrThreadKind): boolean {
+  return usePrThreadsStore((s) => s.starting[startingKey(prRef, kind)] ?? false);
 }
 
 /**
@@ -61,8 +61,8 @@ export function PrMenu({ prRef, detail, panelKey, onAsk }: { prRef: PrRef; detai
   const [open, setOpen] = useState(false);
   // Ask hands focus to the composer, so the menu must not take it back to its button.
   const keepFocus = useRef(false);
-  const start = (kind: PrSessionKind) => {
-    void startPrSession(kind, prRef).then((id) => {
+  const start = (kind: PrThreadKind) => {
+    void startPrThread(kind, prRef).then((id) => {
       if (id !== null) setOpen(false);
     });
   };

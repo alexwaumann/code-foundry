@@ -5,11 +5,11 @@
  * Projects page workspace row opens it for. The member rows' current/queued marker is
  * lib/projects.ts threadAt. Pure: callers feed it the stores' current state.
  */
-import type { SessionView } from "@/api/threads";
+import type { ThreadView } from "@/api/threads";
 import { deriveContext } from "@/stores/context";
 import { makeTab, type Tab } from "@/stores/panel";
 import type { ReposData } from "@/stores/repos";
-import type { SessionsData } from "@/stores/threads";
+import type { ThreadsData } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
 
 export const WORKSPACE_KIND = "workspace";
@@ -17,24 +17,24 @@ export const WORKTREE_KIND = "worktree";
 
 export interface SelectionStores {
   repos: ReposData;
-  sessions: SessionsData;
+  threads: ThreadsData;
 }
 
 /** A workspace thread: the thread and the workspace that owns it. */
 export interface WorkspaceThread {
-  sessionId: string;
+  threadId: string;
   workspaceId: string;
 }
 
 /**
  * The selection's workspace thread: a thread owned by a workspace (deriveContext's
- * activeSessionId + activeWorkspaceId, which is what view.panel.workspace's availability
+ * activeThreadId + activeWorkspaceId, which is what view.panel.workspace's availability
  * sees). Null for a project thread, a page, or a workspace composer (it has no thread yet).
  */
 export function selectionWorkspaceThread(sel: Selection, s: SelectionStores): WorkspaceThread | null {
-  if (sel.kind !== "session") return null;
-  const ctx = deriveContext(sel, s.repos, s.sessions);
-  return ctx.activeSessionId && ctx.activeWorkspaceId ? { sessionId: ctx.activeSessionId, workspaceId: ctx.activeWorkspaceId } : null;
+  if (sel.kind !== "thread") return null;
+  const ctx = deriveContext(sel, s.repos, s.threads);
+  return ctx.activeThreadId && ctx.activeWorkspaceId ? { threadId: ctx.activeThreadId, workspaceId: ctx.activeWorkspaceId } : null;
 }
 
 /** A worktree: the project it belongs to and its path. */
@@ -49,8 +49,8 @@ export interface WorktreeTarget {
  * already), a top-level page, a composer, or a thread whose cwd is in no worktree.
  */
 export function selectionWorktree(sel: Selection, s: SelectionStores): WorktreeTarget | null {
-  if (sel.kind !== "session") return null;
-  const ctx = deriveContext(sel, s.repos, s.sessions);
+  if (sel.kind !== "thread") return null;
+  const ctx = deriveContext(sel, s.repos, s.threads);
   return ctx.activeRepoId && ctx.activeWorktreePath ? { repoId: ctx.activeRepoId, path: ctx.activeWorktreePath } : null;
 }
 
@@ -92,10 +92,10 @@ export const memberOfTab = worktreeOfTab;
  * it; archived threads are passed over. Null when the workspace has no such thread: the
  * row then keeps step 4's actions only.
  */
-export function workspaceThread(sessions: SessionsData, workspaceId: string): string | null {
-  let best: SessionView | null = null;
-  for (const id of sessions.order) {
-    const s = sessions.byId[id];
+export function workspaceThread(threads: ThreadsData, workspaceId: string): string | null {
+  let best: ThreadView | null = null;
+  for (const id of threads.order) {
+    const s = threads.byId[id];
     if (s?.workspaceId !== workspaceId || s.archivedAtMs !== null) continue;
     const at = s.lastActivityAtMs ?? s.createdAtMs ?? 0;
     const bestAt = best ? (best.lastActivityAtMs ?? best.createdAtMs ?? 0) : -1;

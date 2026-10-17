@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { pullRequestDetailResource, pullRequestKey } from "@/stores/gh";
 import { openPullRequestInPanel } from "@/stores/prPanel";
-import { useSessionsStore } from "@/stores/threads";
+import { useThreadsStore } from "@/stores/threads";
 import { useWorkspacesStore } from "@/stores/workspaces";
 
 /**
@@ -19,9 +19,9 @@ import { useWorkspacesStore } from "@/stores/workspaces";
  * colour (the PR's cached detail, read and kept fresh like a Linked PRs row). A click opens
  * it as a tab of the thread's side panel, as a Linked PRs row does.
  */
-function SingleLinkedPr({ sessionId }: { sessionId: string }) {
-  const slug = useSessionsStore((s) => s.byId[sessionId]?.linkedPullRequests[0]?.slug ?? "");
-  const number = useSessionsStore((s) => s.byId[sessionId]?.linkedPullRequests[0]?.number ?? 0);
+function SingleLinkedPr({ threadId }: { threadId: string }) {
+  const slug = useThreadsStore((s) => s.byId[threadId]?.linkedPullRequests[0]?.slug ?? "");
+  const number = useThreadsStore((s) => s.byId[threadId]?.linkedPullRequests[0]?.number ?? 0);
   const key = pullRequestKey(slug, number);
   useEffect(() => pullRequestDetailResource.watch(key), [key]);
   const state = pullRequestDetailResource.store((s) => s.entries[key]?.data?.pullRequest.state ?? null);
@@ -53,16 +53,16 @@ function SingleLinkedPr({ sessionId }: { sessionId: string }) {
  * The thread's linked pull requests: one shows as that PR (SingleLinkedPr); two or more as
  * a muted count that opens the Linked PRs surface (view.panel.linked-prs); none, nothing.
  */
-function LinkedPrs({ sessionId }: { sessionId: string }) {
-  const count = useSessionsStore((s) => s.byId[sessionId]?.linkedPullRequests.length ?? 0);
+function LinkedPrs({ threadId }: { threadId: string }) {
+  const count = useThreadsStore((s) => s.byId[threadId]?.linkedPullRequests.length ?? 0);
   if (count === 0) return null;
-  if (count === 1) return <SingleLinkedPr sessionId={sessionId} />;
+  if (count === 1) return <SingleLinkedPr threadId={threadId} />;
   return <CommandButton command="view.panel.linked-prs" icon={GitPullRequest} count={count} className="text-muted-foreground" data-testid="pane-linked-prs" />;
 }
 
 /** The owning workspace by name, opening its surface (view.panel.workspace); only listed for a workspace thread. */
-function WorkspaceChip({ sessionId }: { sessionId: string }) {
-  const workspaceId = useSessionsStore((s) => s.byId[sessionId]?.workspaceId ?? "");
+function WorkspaceChip({ threadId }: { threadId: string }) {
+  const workspaceId = useThreadsStore((s) => s.byId[threadId]?.workspaceId ?? "");
   // A workspace the slice does not know (older daemon, or just removed) shows its id, like the sidebar badge.
   const name = useWorkspacesStore((s) => (workspaceId ? (s.byId[workspaceId]?.name ?? workspaceId) : ""));
   if (!workspaceId) return null;
@@ -83,8 +83,8 @@ function WorkspaceChip({ sessionId }: { sessionId: string }) {
  * it is archived. Run without args, the command toggles; the daemon asks for confirmation
  * only while Claude is mid-turn.
  */
-function ArchiveButton({ sessionId }: { sessionId: string }) {
-  const archived = useSessionsStore((s) => (s.byId[sessionId]?.archivedAtMs ?? null) !== null);
+function ArchiveButton({ threadId }: { threadId: string }) {
+  const archived = useThreadsStore((s) => (s.byId[threadId]?.archivedAtMs ?? null) !== null);
   return <CommandButton command="thread.archive" icon={archived ? ArchiveRestore : Archive} tooltip={archived ? "Unarchive Thread" : "Archive Thread"} />;
 }
 
@@ -94,14 +94,14 @@ function ArchiveButton({ sessionId }: { sessionId: string }) {
  * as the palette runs them. Each command button hides when the daemon does not list it as
  * available.
  */
-export function HeaderActions({ sessionId }: { sessionId: string }) {
+export function HeaderActions({ threadId }: { threadId: string }) {
   return (
     <span className="-mr-1.5 flex items-center [--wails-draggable:no-drag]" data-testid="pane-actions">
-      <WorkspaceChip sessionId={sessionId} />
-      <LinkedPrs sessionId={sessionId} />
-      <SnoozeButton sessionId={sessionId} />
-      <ArchiveButton sessionId={sessionId} />
-      <ThreadActionsMenu sessionId={sessionId} />
+      <WorkspaceChip threadId={threadId} />
+      <LinkedPrs threadId={threadId} />
+      <SnoozeButton threadId={threadId} />
+      <ArchiveButton threadId={threadId} />
+      <ThreadActionsMenu threadId={threadId} />
       <BottomToggle />
       <PanelToggle />
     </span>

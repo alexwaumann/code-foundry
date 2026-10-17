@@ -1,5 +1,5 @@
 import { expect, test, type Page, type Request } from "@playwright/test";
-import { appPath, CF, emit, invocations, mockPost, openApp, openProjects, openStreams, releaseSessions, resetMock, row } from "./fixtures";
+import { appPath, CF, emit, invocations, mockPost, openApp, openProjects, openStreams, releaseThreads, resetMock, row } from "./fixtures";
 
 const FIX_RESIZE = `${CF}.worktrees/fix-resize`;
 
@@ -7,8 +7,8 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-function badge(page: Page, sessionId: string) {
-  return row(page, `s:${sessionId}`).locator("[data-session-badge]");
+function badge(page: Page, threadId: string) {
+  return row(page, `s:${threadId}`).locator("[data-session-badge]");
 }
 
 test("session rows render with status badges, above the terminals no thread owns; none says whether Claude runs", async ({ page }) => {
@@ -34,7 +34,7 @@ test("session rows render with status badges, above the terminals no thread owns
   }
   await expect(tree).not.toContainText(/disconnected|starting|closing/i);
   // resetMock holds s-5 starting; released, the mock's clock settles it.
-  await releaseSessions("s-5");
+  await releaseThreads("s-5");
   // Starting reads as busy; once Claude is up the mock leaves it idle.
   await expect(badge(page, "s-5")).toHaveAttribute("data-session-badge", "idle", { timeout: 12_000 });
   await expect(row(page, "s:s-5")).toHaveAttribute("data-section", "idle");
@@ -194,7 +194,7 @@ test("new thread: a worktree's + on the Projects page opens the composer with th
   const last = (await invocations()).at(-1);
   expect(last?.args).toEqual({ repo: "repo-cf", worktree: FIX_RESIZE, model: "claude-opus-4-8[1m]", effort: "high", permission: "auto", prompt: "Fix the resize race" });
   // The thread is the newest row, in that worktree, selected and shown.
-  const created = page.locator('[data-row-kind="session"][aria-selected="true"]');
+  const created = page.locator('[data-row-kind="thread"][aria-selected="true"]');
   await expect(created).toBeVisible();
   await expect(created.getByTestId("row-branch")).toHaveText("fix/resize");
   const key = await created.getAttribute("data-row-key");
@@ -209,7 +209,7 @@ test("new thread: a worktree's + on the Projects page opens the composer with th
   await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-session-id", (key ?? "").slice(2));
 });
 
-test("rename inline: double-click commits via session.rename, cmd+r from the prompt, Escape cancels", async ({ page }) => {
+test("rename inline: double-click commits via thread.rename, cmd+r from the prompt, Escape cancels", async ({ page }) => {
   await openApp(page);
   await row(page, "s:s-3").dblclick();
   const input = page.getByTestId("rename-input");
@@ -231,7 +231,7 @@ test("rename inline: double-click commits via session.rename, cmd+r from the pro
   expect((await invocations()).length).toBe(before);
 });
 
-test("FocusSession intent selects the session", async ({ page }) => {
+test("FocusThread intent selects the session", async ({ page }) => {
   await openApp(page);
   await expect.poll(async () => ((await mockPost("session/focus?id=s-3")) as { delivered: number }).delivered).toBeGreaterThan(0);
   await expect(row(page, "s:s-3")).toHaveAttribute("aria-selected", "true");
@@ -291,7 +291,7 @@ test("a daemon without ThreadService degrades to 'service unavailable'", async (
   await page.goto(appPath);
   await expect(page.getByTestId("sessions-unavailable")).toHaveText("Threads: service unavailable");
   // No thread rows; repos still work (the Projects page, and its shells' bottom panel).
-  await expect(page.locator('[data-row-kind="session"]')).toHaveCount(0);
+  await expect(page.locator('[data-row-kind="thread"]')).toHaveCount(0);
   await expect(page.getByTestId("daemon-status")).not.toContainText("syncing");
   await openProjects(page);
   await expect(page.getByTestId("project-name").first()).toBeVisible();

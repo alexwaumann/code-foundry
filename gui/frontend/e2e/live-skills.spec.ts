@@ -26,7 +26,7 @@ function cli(...args: string[]): string {
   return execFileSync(BIN, args, { env: { ...process.env, CODE_FOUNDRY_HOME: HOME }, encoding: "utf8", timeout: 30_000 });
 }
 
-interface LiveSession {
+interface LiveThread {
   id: string;
   status?: string;
   claudeSessionId?: string;
@@ -56,11 +56,11 @@ test("composer: a /skill tag from the card starts a haiku thread that runs the s
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "live-skills-tag.png") });
   await page.keyboard.press("Enter");
 
-  const created = page.locator('[data-row-kind="session"][aria-selected="true"]');
+  const created = page.locator('[data-row-kind="thread"][aria-selected="true"]');
   await expect(created).toBeVisible({ timeout: 30_000 });
   const id = ((await created.getAttribute("data-row-key")) ?? "").slice(2);
   console.log(`live-skills session ${id}`);
-  const find = () => ((JSON.parse(cli("thread", "list", "--json")) as { threads?: LiveSession[] }).threads ?? []).find((s) => s.id === id);
+  const find = () => ((JSON.parse(cli("thread", "list", "--json")) as { threads?: LiveThread[] }).threads ?? []).find((s) => s.id === id);
   // The status reads idle before the first turn starts: wait for Claude's answer in the
   // transcript (~/.claude/projects/<slug>/<claude session id>.jsonl) instead.
   await expect.poll(() => find()?.claudeSessionId ?? "", { timeout: 30_000 }).not.toBe("");
@@ -84,7 +84,7 @@ test("composer: a /skill tag from the card starts a haiku thread that runs the s
     .find((l) => l.includes('"type":"user"'));
   console.log(`first user message: ${firstUser?.slice(0, 400) ?? ""}`);
   console.log(`answer: ${answer().slice(0, 600)}`);
-  await expect.poll(() => find()?.status, { timeout: 60_000 }).toBe("SESSION_STATUS_IDLE");
+  await expect.poll(() => find()?.status, { timeout: 60_000 }).toBe("THREAD_STATUS_IDLE");
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "live-skills-thread.png") });
   cli("thread", "archive", "--id", id, "--yes");
 });

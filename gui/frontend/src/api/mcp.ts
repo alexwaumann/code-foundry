@@ -95,8 +95,8 @@ export function toMcpStatusView(s: ThreadMcpStatus | undefined): McpStatusView |
  * a user action: the refresh button and Reconnect go through thread.mcp and
  * thread.mcp-reconnect.
  */
-export async function getMcpStatus(sessionId: string, conn: DaemonConnection = daemon): Promise<McpStatusView | null> {
+export async function getMcpStatus(threadId: string, conn: DaemonConnection = daemon): Promise<McpStatusView | null> {
   const c = await conn.client(ThreadService);
-  const res = await c.mcpStatus({ threadId: sessionId });
+  const res = await c.mcpStatus({ threadId: threadId });
   return toMcpStatusView(res.status);
 }

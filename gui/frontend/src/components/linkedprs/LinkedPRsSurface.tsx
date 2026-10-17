@@ -14,7 +14,7 @@ import { NavProvider, NavRow } from "@/lib/NavRow";
 import { cn } from "@/lib/utils";
 import { openUrl, pullRequestDetailResource, pullRequestKey } from "@/stores/gh";
 import { copyPullRequestLink, openPullRequestInPanel } from "@/stores/prPanel";
-import { useSessionsStore } from "@/stores/threads";
+import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { linkedCount, newestFirst, spansRepos, urlHost } from "@/surfaces/linkedprsTarget";
 
@@ -36,12 +36,12 @@ export interface LinkRow {
  * shows the current selection's panel, so the selection is the panel's owner.)
  */
 function useThreadId(): string {
-  return useUiStore((s) => (s.selection.kind === "session" ? s.selection.id : ""));
+  return useUiStore((s) => (s.selection.kind === "thread" ? s.selection.id : ""));
 }
 
 /** The thread's links, newest first. Re-renders only when the list changes. */
 function useLinkRows(threadId: string): LinkRow[] {
-  const encoded = useSessionsStore(
+  const encoded = useThreadsStore(
     useShallow((s) => (s.byId[threadId]?.linkedPullRequests ?? []).map((l) => [l.url, l.slug, String(l.number), l.linkedAt === null ? "" : String(l.linkedAt)].join(SEP))),
   );
   return useMemo(
@@ -55,8 +55,8 @@ function useLinkRows(threadId: string): LinkRow[] {
 }
 
 function Header({ threadId }: { threadId: string }) {
-  const name = useSessionsStore((s) => s.byId[threadId]?.name || threadId);
-  const count = useSessionsStore((s) => s.byId[threadId]?.linkedPullRequests.length ?? 0);
+  const name = useThreadsStore((s) => s.byId[threadId]?.name || threadId);
+  const count = useThreadsStore((s) => s.byId[threadId]?.linkedPullRequests.length ?? 0);
   return (
     <header className="flex min-w-0 items-center gap-1.5 border-b border-pane-border px-4 py-2.5 text-heading @max-[340px]:px-3" data-testid="linkedprs-header">
       <GitPullRequestArrow className="size-4 shrink-0 text-success" aria-hidden />
@@ -182,9 +182,9 @@ function openLink(list: HTMLElement | null, link: LinkRow): void {
  */
 export function LinkedPRsSurface() {
   const threadId = useThreadId();
-  const known = useSessionsStore((s) => threadId !== "" && s.byId[threadId] !== undefined);
+  const known = useThreadsStore((s) => threadId !== "" && s.byId[threadId] !== undefined);
   const rows = useLinkRows(threadId);
-  const showRepo = useSessionsStore((s) => spansRepos(s.byId[threadId]?.linkedPullRequests ?? []));
+  const showRepo = useThreadsStore((s) => spansRepos(s.byId[threadId]?.linkedPullRequests ?? []));
   const listRef = useRef<HTMLDivElement>(null);
 
   const items = useMemo<NavItem[]>(

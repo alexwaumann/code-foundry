@@ -15,7 +15,7 @@ vi.mock("@/api/thread", async (orig) => ({
   // A stream that delivers its snapshot and then nothing (the held tail never arrives).
   watchThread: async function* (_id: string, signal: AbortSignal) {
     watched.opened++;
-    yield { kind: "snapshot", sessionId: "s", seq: watched.opened, items: [], pending: [], mcp: null, commands: [], agents: [] } satisfies ThreadEventView;
+    yield { kind: "snapshot", threadId: "s", seq: watched.opened, items: [], pending: [], mcp: null, commands: [], agents: [] } satisfies ThreadEventView;
     await new Promise<void>((resolve) => {
       signal.addEventListener("abort", () => {
         resolve();

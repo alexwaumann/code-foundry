@@ -58,9 +58,9 @@ export function applyIntent(intent: UiIntentView): void {
     case "focusTerminal":
       focusTerminal(intent.terminalId);
       break;
-    case "focusSession":
+    case "focusThread":
       clearPendingFocus();
-      ui.select({ kind: "session", id: intent.sessionId }, { focusPrompt: true });
+      ui.select({ kind: "thread", id: intent.threadId }, { focusPrompt: true });
       break;
     case "focusRepo":
       // The Projects page with the worktree (default: the project's main one) in its panel.

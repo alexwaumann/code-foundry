@@ -319,7 +319,7 @@ export function CommandPalette() {
   const query = useUiStore((s) => s.palette.query);
   const commandName = useUiStore((s) => s.palette.commandName);
   const page = useUiStore((s) => s.palette.page);
-  const runInSession = useUiStore((s) => s.palette.sessionId ?? "");
+  const runInThread = useUiStore((s) => s.palette.threadId ?? "");
   const context = useUiStore((s) => s.palette.context);
   const close = useUiStore((s) => s.closePalette);
   const title = page === "projects" ? "New thread" : page === "runin" ? "Run thread in" : "Command palette";
@@ -344,7 +344,7 @@ export function CommandPalette() {
         {page === "projects" ? (
           <ProjectPicker close={close} />
         ) : page === "runin" ? (
-          <RunInPicker sessionId={runInSession} close={close} />
+          <RunInPicker threadId={runInThread} close={close} />
         ) : (
           <PaletteBody key={`${query}\u0000${commandName ?? ""}`} initialQuery={query} initialCommand={commandName} initialContext={context} close={close} />
         )}

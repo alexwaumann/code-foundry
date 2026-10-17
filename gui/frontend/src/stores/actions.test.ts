@@ -9,7 +9,7 @@ const run = (id: string, running = true): ActionRunView => ({
   actionName: "A",
   command: "x",
   repoId: "r",
-  sessionId: "s-1",
+  threadId: "s-1",
   worktreePath: "/w",
   mode: "terminal",
   terminalId: "t",
@@ -49,7 +49,7 @@ describe("actions store", () => {
     expect(s.runs["r-1"]?.running).toBe(false);
     const same = applyActionEvent(s, {
       kind: "runFinished",
-      finished: { runId: "r-1", actionId: "a", actionName: "A", repoId: "r", sessionId: "", exitCode: 0, mode: "terminal", trigger: "user", terminalId: "" },
+      finished: { runId: "r-1", actionId: "a", actionName: "A", repoId: "r", threadId: "", exitCode: 0, mode: "terminal", trigger: "user", terminalId: "" },
     });
     expect(same).toBe(s);
     s = applyActionEvent(s, { kind: "runRemoved", id: "r-1" });

@@ -1,14 +1,14 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { SessionView } from "@/api/threads";
+import type { ThreadView } from "@/api/threads";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useReposStore } from "@/stores/repos";
-import { useSessionsStore } from "@/stores/threads";
+import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { SidebarRow } from "./SidebarRow";
 
-const thread = (o: Partial<SessionView>) =>
-  ({ id: "s-1", name: "t", repoId: "cf", worktreePath: "/src/cf", workspaceId: "", pendingWorktreePath: "", state: "connected", status: "idle", statusReason: "", statusChangedAtMs: null, linkedPullRequests: [], pinned: false, ...o }) as SessionView;
+const thread = (o: Partial<ThreadView>) =>
+  ({ id: "s-1", name: "t", repoId: "cf", worktreePath: "/src/cf", workspaceId: "", pendingWorktreePath: "", state: "connected", status: "idle", statusReason: "", statusChangedAtMs: null, linkedPullRequests: [], pinned: false, ...o }) as ThreadView;
 
 beforeEach(() => {
   useReposStore.setState({
@@ -22,11 +22,11 @@ beforeEach(() => {
 
 afterEach(cleanup);
 
-function renderRow(o: Partial<SessionView>): HTMLElement {
-  useSessionsStore.setState({ byId: { "s-1": thread(o) }, order: ["s-1"] });
+function renderRow(o: Partial<ThreadView>): HTMLElement {
+  useThreadsStore.setState({ byId: { "s-1": thread(o) }, order: ["s-1"] });
   render(
     <TooltipProvider>
-      <SidebarRow row={{ key: "s:s-1", kind: "session", section: "idle", sessionId: "s-1" }} selected={false} cursor={false} onActivate={() => undefined} />
+      <SidebarRow row={{ key: "s:s-1", kind: "thread", section: "idle", threadId: "s-1" }} selected={false} cursor={false} onActivate={() => undefined} />
     </TooltipProvider>,
   );
   return screen.getByTestId("row-place");
@@ -81,11 +81,11 @@ describe("SidebarRow running agents", () => {
 });
 
 describe("SidebarRow archived", () => {
-  function renderArchived(o: Partial<SessionView>): HTMLElement {
-    useSessionsStore.setState({ byId: { "s-1": thread({ state: "disconnected", status: "attention", statusReason: "finished", ...o }) }, order: ["s-1"] });
+  function renderArchived(o: Partial<ThreadView>): HTMLElement {
+    useThreadsStore.setState({ byId: { "s-1": thread({ state: "disconnected", status: "attention", statusReason: "finished", ...o }) }, order: ["s-1"] });
     render(
       <TooltipProvider>
-        <SidebarRow row={{ key: "s:s-1", kind: "session", section: "archived", sessionId: "s-1" }} selected={false} cursor={false} onActivate={() => undefined} />
+        <SidebarRow row={{ key: "s:s-1", kind: "thread", section: "archived", threadId: "s-1" }} selected={false} cursor={false} onActivate={() => undefined} />
       </TooltipProvider>,
     );
     return screen.getByRole("option");
@@ -108,11 +108,11 @@ describe("SidebarRow archived", () => {
 });
 
 describe("SidebarRow snoozed", () => {
-  function renderSnoozed(o: Partial<SessionView>): HTMLElement {
-    useSessionsStore.setState({ byId: { "s-1": thread({ state: "disconnected", status: "attention", statusReason: "finished", ...o }) }, order: ["s-1"] });
+  function renderSnoozed(o: Partial<ThreadView>): HTMLElement {
+    useThreadsStore.setState({ byId: { "s-1": thread({ state: "disconnected", status: "attention", statusReason: "finished", ...o }) }, order: ["s-1"] });
     render(
       <TooltipProvider>
-        <SidebarRow row={{ key: "s:s-1", kind: "session", section: "snoozed", sessionId: "s-1" }} selected={false} cursor={false} onActivate={() => undefined} />
+        <SidebarRow row={{ key: "s:s-1", kind: "thread", section: "snoozed", threadId: "s-1" }} selected={false} cursor={false} onActivate={() => undefined} />
       </TooltipProvider>,
     );
     return screen.getByRole("option");

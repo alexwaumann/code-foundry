@@ -1,37 +1,37 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { SessionView } from "@/api/threads";
+import type { ThreadView } from "@/api/threads";
 
-const snoozeSession = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
-vi.mock("./threadActions", async (orig) => ({ ...(await orig<typeof import("./threadActions")>()), snoozeSession }));
+const snoozeThread = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
+vi.mock("./threadActions", async (orig) => ({ ...(await orig<typeof import("./threadActions")>()), snoozeThread }));
 
 const { presentSnooze, useSnoozeDialogStore } = await import("./snoozeDialog");
 const { presentInPalette } = await import("@/keys/bindings");
-const { useSessionsStore } = await import("./threads");
+const { useThreadsStore } = await import("./threads");
 const { useUiStore } = await import("./ui");
 
-const thread = (id: string, snoozedUntilMs: number | null) => ({ id, name: id, repoId: "", worktreePath: "", workspaceId: "", linkedPullRequests: [], snoozedUntilMs }) as unknown as SessionView;
+const thread = (id: string, snoozedUntilMs: number | null) => ({ id, name: id, repoId: "", worktreePath: "", workspaceId: "", linkedPullRequests: [], snoozedUntilMs }) as unknown as ThreadView;
 
 beforeEach(() => {
-  useSessionsStore.setState({ byId: { a: thread("a", null), b: thread("b", 5_000) }, order: ["a", "b"] });
-  useSnoozeDialogStore.setState({ open: false, sessionId: "", seq: 0 });
+  useThreadsStore.setState({ byId: { a: thread("a", null), b: thread("b", 5_000) }, order: ["a", "b"] });
+  useSnoozeDialogStore.setState({ open: false, threadId: "", seq: 0 });
 });
 
 afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("presentSnooze (session.snooze's presenter)", () => {
+describe("presentSnooze (thread.snooze's presenter)", () => {
   it("opens the custom dialog for a thread that is not snoozed", async () => {
     expect(presentSnooze("a")).toBe(true);
     await Promise.resolve();
-    expect(useSnoozeDialogStore.getState()).toMatchObject({ open: true, sessionId: "a", seq: 1 });
-    expect(snoozeSession).not.toHaveBeenCalled();
+    expect(useSnoozeDialogStore.getState()).toMatchObject({ open: true, threadId: "a", seq: 1 });
+    expect(snoozeThread).not.toHaveBeenCalled();
   });
 
   it("unsnoozes a snoozed thread", async () => {
     expect(presentSnooze("b")).toBe(true);
     await Promise.resolve();
-    expect(snoozeSession).toHaveBeenCalledWith("b", null);
+    expect(snoozeThread).toHaveBeenCalledWith("b", null);
     expect(useSnoozeDialogStore.getState().open).toBe(false);
   });
 
@@ -41,9 +41,9 @@ describe("presentSnooze (session.snooze's presenter)", () => {
   });
 
   it("replaces the palette's prompts for the selected thread", async () => {
-    useUiStore.setState({ selection: { kind: "session", id: "a" } });
+    useUiStore.setState({ selection: { kind: "thread", id: "a" } });
     expect(presentInPalette("thread.snooze")).toBe(true);
     await Promise.resolve();
-    expect(useSnoozeDialogStore.getState()).toMatchObject({ open: true, sessionId: "a" });
+    expect(useSnoozeDialogStore.getState()).toMatchObject({ open: true, threadId: "a" });
   });
 });

@@ -45,11 +45,11 @@ describe("files store", () => {
     expect(calls).toHaveLength(0);
     await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
     expect(calls.map((c) => c.req)).toEqual([{ repoId: "r1", query: "ses", limit: FILE_LIMIT }]);
-    calls[0]?.resolve(hit("internal/api/session.go"));
+    calls[0]?.resolve(hit("internal/api/thread.go"));
     await flush();
     expect(entry(R1)).toEqual({
       answered: "ses",
-      results: [{ repoId: "r1", matches: [{ path: "internal/api/session.go", isDir: false }] }],
+      results: [{ repoId: "r1", matches: [{ path: "internal/api/thread.go", isDir: false }] }],
       searching: false,
       outdated: false,
     });

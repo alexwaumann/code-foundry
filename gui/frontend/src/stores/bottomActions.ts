@@ -31,7 +31,7 @@ import {
   PENDING_FOCUS_MS,
   PROJECTS_KEY,
   requestBottomFocus,
-  sessionOfKey,
+  threadOfKey,
   setOpen,
   takePendingFocus,
   takePendingFocusId,
@@ -53,8 +53,8 @@ import { bottomCanShow, toggleBottomCommand, useViewsStore, visibleBottomKey } f
  * tabs, or a key that is neither).
  */
 export function paneContext(key: string): UiContextView | null {
-  const session = sessionOfKey(key);
-  if (session !== null) return getUiContext({ kind: "session", id: session });
+  const thread = threadOfKey(key);
+  if (thread !== null) return getUiContext({ kind: "thread", id: thread });
   if (key !== PROJECTS_KEY) return null;
   const active = getBottomActiveId(key);
   const place = projectsShellPlace(active === null ? undefined : useTerminalsStore.getState().byId[active]);
@@ -197,8 +197,8 @@ export async function openBottomShell(key: string, opts: BottomShellOptions = {}
  * the thread's bottom panel that runs `command` and stays open (openBottomShell, fresh,
  * terminal.new --run).
  */
-export function runInThreadTerminal(sessionId: string, command: string): Promise<string | null> {
-  const key = bottomKeyOf({ kind: "session", id: sessionId });
+export function runInThreadTerminal(threadId: string, command: string): Promise<string | null> {
+  const key = bottomKeyOf({ kind: "thread", id: threadId });
   if (key === null) return Promise.resolve(null);
   return openBottomShell(key, { fresh: true, command });
 }
@@ -246,8 +246,8 @@ export function markTerminalNewFromHere(): void {
  * worktree), or a member row of its side panel's Workspace surface (`cwd`: that member's
  * worktree). Either way the thread owns the shell, so it opens in the thread's panel.
  */
-export function newThreadTerminal(sessionId: string, cwd?: string): Promise<boolean> {
-  return startShell(getUiContext({ kind: "session", id: sessionId }), cwd ? { cwd } : {});
+export function newThreadTerminal(threadId: string, cwd?: string): Promise<boolean> {
+  return startShell(getUiContext({ kind: "thread", id: threadId }), cwd ? { cwd } : {});
 }
 
 /** terminal.new in a worktree from the Projects page (its rows): the shell lands in the page's panel. */
@@ -326,8 +326,8 @@ export function revealShell(id: string): boolean {
   }
   const key = ownerKeyOf(t);
   if (key === null) return false;
-  const session = sessionOfKey(key);
-  useUiStore.getState().select(session !== null ? { kind: "session", id: session } : { kind: "view", name: "projects" });
+  const thread = threadOfKey(key);
+  useUiStore.getState().select(thread !== null ? { kind: "thread", id: thread } : { kind: "view", name: "projects" });
   uncoverBottom(key);
   updateBottom(key, (e) => openOn(e, id));
   focusBottom();

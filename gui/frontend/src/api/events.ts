@@ -5,7 +5,7 @@ import { HEARTBEAT, type Heartbeat } from "./stream";
 import { toGhEventView, type GhEventView } from "./gh";
 import { toGitOpsEventView, type GitOpsEventView } from "./gitops";
 import { toRepoEventView, type RepoEventView } from "./repo";
-import { toSessionEventView, type SessionEventView } from "./threads";
+import { toThreadListEventView, type ThreadListEventView } from "./threads";
 import { toSettingsSnapshotView, type SettingsSnapshotView } from "./settings";
 import { toTerminalEventView, type TerminalEventView } from "./terminal";
 import { toThreadEventView, type ThreadEventView } from "./thread";
@@ -23,7 +23,7 @@ export type EventView =
   | { source: "repo"; event: RepoEventView }
   | { source: "workspace"; event: WorkspaceEventView }
   | { source: "terminal"; event: TerminalEventView }
-  | { source: "session"; event: SessionEventView }
+  | { source: "threadList"; event: ThreadListEventView }
   | { source: "thread"; event: ThreadEventView }
   | { source: "gh"; event: GhEventView }
   | { source: "gitops"; event: GitOpsEventView }
@@ -48,8 +48,8 @@ export function toEventView(ev: Event): EventView | null {
       return v && { source: "terminal", event: v };
     }
     case "threadList": {
-      const v = toSessionEventView(e.value);
-      return v && { source: "session", event: v };
+      const v = toThreadListEventView(e.value);
+      return v && { source: "threadList", event: v };
     }
     case "thread": {
       const v = toThreadEventView(e.value);

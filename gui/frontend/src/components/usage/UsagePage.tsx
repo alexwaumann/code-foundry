@@ -7,7 +7,7 @@ import { Tip } from "@/components/ui/tooltip";
 import { PaneHeader } from "@/components/window/PaneHeader";
 import { useEscapeCloses } from "@/components/window/useEscapeCloses";
 import { fmtShare, fmtTok, fmtUsd, type ModelUsage, type UsageTotals } from "@/lib/usage";
-import { useSessionsStore } from "@/stores/threads";
+import { useThreadsStore } from "@/stores/threads";
 import { USAGE_RANGES, useUiStore, type UsageRange } from "@/stores/ui";
 import { closeUsage } from "@/stores/views";
 import { Segmented } from "./Segmented";
@@ -27,7 +27,7 @@ const MODE_OPTIONS: { value: ChartMode; label: string }[] = [
  * array) re-folds.
  */
 function useAllUsage(): readonly (readonly UsageBucketView[])[] {
-  return useSessionsStore(useShallow((s) => [...s.order.map((id) => s.byId[id]?.usage ?? NONE), s.retiredUsage]));
+  return useThreadsStore(useShallow((s) => [...s.order.map((id) => s.byId[id]?.usage ?? NONE), s.retiredUsage]));
 }
 
 function plural(n: number, one: string, many: string): string {

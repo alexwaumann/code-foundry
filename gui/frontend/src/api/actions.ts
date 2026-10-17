@@ -48,7 +48,7 @@ export interface ActionRunView {
   command: string;
   repoId: string;
   /** The owning thread; "" for a worktree's run. */
-  sessionId: string;
+  threadId: string;
   worktreePath: string;
   mode: ActionRunModeView;
   /** The terminal of a terminal run; "" otherwise. */
@@ -67,7 +67,7 @@ export interface ActionRunFinishedView {
   actionId: string;
   actionName: string;
   repoId: string;
-  sessionId: string;
+  threadId: string;
   exitCode: number;
   mode: ActionRunModeView;
   trigger: ActionRunTriggerView;
@@ -124,7 +124,7 @@ export function toActionRunView(r: ActionRun): ActionRunView {
     actionName: r.actionName,
     command: r.command,
     repoId: r.repoId,
-    sessionId: r.threadId,
+    threadId: r.threadId,
     worktreePath: r.worktreePath,
     mode: modeNames[r.mode],
     terminalId: r.terminalId,
@@ -142,7 +142,7 @@ export function toActionRunFinishedView(f: ActionRunFinished): ActionRunFinished
     actionId: f.actionId,
     actionName: f.actionName,
     repoId: f.repoId,
-    sessionId: f.threadId,
+    threadId: f.threadId,
     exitCode: f.exitCode,
     mode: modeNames[f.mode],
     trigger: triggerNames[f.trigger],

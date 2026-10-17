@@ -17,12 +17,12 @@ import {
 } from "@/lib/mcp";
 import { cn } from "@/lib/utils";
 import { ensureMcpStatus, reconnectMcp, refreshMcp, useMcpHeader, useMcpReconnecting, useMcpRefreshing, useMcpServer, useMcpServerNames, useMcpStatus } from "@/stores/mcp";
-import { useSessionsStore } from "@/stores/threads";
+import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 
 /** The thread this panel belongs to: the selected session ("" otherwise). */
 function useThreadId(): string {
-  return useUiStore((s) => (s.selection.kind === "session" ? s.selection.id : ""));
+  return useUiStore((s) => (s.selection.kind === "thread" ? s.selection.id : ""));
 }
 
 const DOT: Record<McpServerStatusView, string> = {
@@ -256,10 +256,10 @@ function Message({ testId, children }: { testId: string; children: string }) {
  */
 export function McpSurface() {
   const threadId = useThreadId();
-  const known = useSessionsStore((s) => threadId !== "" && threadId in s.byId);
+  const known = useThreadsStore((s) => threadId !== "" && threadId in s.byId);
   // Internal only: a running Claude answers the status ask below, so the empty state says
   // a check is on its way; a stopped one has nothing new to say until a refresh.
-  const asking = useSessionsStore((s) => s.byId[threadId]?.state === "connected" || s.byId[threadId]?.state === "starting");
+  const asking = useThreadsStore((s) => s.byId[threadId]?.state === "connected" || s.byId[threadId]?.state === "starting");
   const refreshing = useMcpRefreshing(threadId);
   const status = useMcpStatus(threadId);
   const names = useMcpServerNames(threadId);

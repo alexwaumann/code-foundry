@@ -26,7 +26,7 @@ function cli(...args: string[]): string {
   return execFileSync(BIN, args, { env: { ...process.env, CODE_FOUNDRY_HOME: HOME }, encoding: "utf8", timeout: 30_000 });
 }
 
-interface LiveSession {
+interface LiveThread {
   id: string;
   status?: string;
   claudeSessionId?: string;
@@ -58,11 +58,11 @@ test("composer: an @file tag from the card starts a haiku thread that reads the 
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "live-files-tag.png") });
   await page.keyboard.press("Enter");
 
-  const created = page.locator('[data-row-kind="session"][aria-selected="true"]');
+  const created = page.locator('[data-row-kind="thread"][aria-selected="true"]');
   await expect(created).toBeVisible({ timeout: 60_000 });
   const id = ((await created.getAttribute("data-row-key")) ?? "").slice(2);
   console.log(`live-files session ${id}`);
-  const find = () => ((JSON.parse(cli("thread", "list", "--json")) as { threads?: LiveSession[] }).threads ?? []).find((s) => s.id === id);
+  const find = () => ((JSON.parse(cli("thread", "list", "--json")) as { threads?: LiveThread[] }).threads ?? []).find((s) => s.id === id);
   await expect.poll(() => find()?.claudeSessionId ?? "", { timeout: 60_000 }).not.toBe("");
   console.log(`worktree: ${find()?.worktreePath ?? ""}`);
   const transcript = () => {
@@ -80,7 +80,7 @@ test("composer: an @file tag from the card starts a haiku thread that reads the 
   console.log(`first user message: ${lines().find((l) => l.includes('"type":"user"'))?.slice(0, 600) ?? ""}`);
   for (const l of lines().filter((x) => x.includes('"type":"tool_use"'))) console.log(`tool use: ${l.slice(l.indexOf('"type":"tool_use"'), l.indexOf('"type":"tool_use"') + 300)}`);
   console.log(`answer: ${answer().slice(0, 800)}`);
-  await expect.poll(() => find()?.status, { timeout: 60_000 }).toBe("SESSION_STATUS_IDLE");
+  await expect.poll(() => find()?.status, { timeout: 60_000 }).toBe("THREAD_STATUS_IDLE");
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "live-files-thread.png") });
   cli("thread", "archive", "--id", id, "--yes");
 });

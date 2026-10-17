@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PullRequestDetailView, PullRequestView } from "@/api/gh";
-import type { LinkedPullRequestView, SessionView } from "@/api/threads";
+import type { LinkedPullRequestView, ThreadView } from "@/api/threads";
 
 // Details resolve per test (pending until then: the rows show their skeleton).
 const pending = new Map<string, (d: PullRequestDetailView) => void>();
@@ -15,12 +15,12 @@ const { SidePanel } = await import("@/components/panel/SidePanel");
 const { pullRequestDetailResource } = await import("@/stores/gh");
 const { getPanel, usePanelStore } = await import("@/stores/panel");
 const { useReposStore } = await import("@/stores/repos");
-const { useSessionsStore } = await import("@/stores/threads");
+const { useThreadsStore } = await import("@/stores/threads");
 const { useUiStore } = await import("@/stores/ui");
 const { linkedPrsPanelCommand, showView, useViewsStore } = await import("@/stores/views");
 
 const link = (slug: string, number: number): LinkedPullRequestView => ({ slug, number, url: `https://github.com/${slug}/pull/${String(number)}`, linkedAt: Date.now() - number * 60_000 });
-const thread = (id: string, links: LinkedPullRequestView[]) => ({ id, name: `thread ${id}`, repoId: "web", worktreePath: "/src/web", workspaceId: "", pendingWorktreePath: "", state: "connected", linkedPullRequests: links }) as SessionView;
+const thread = (id: string, links: LinkedPullRequestView[]) => ({ id, name: `thread ${id}`, repoId: "web", worktreePath: "/src/web", workspaceId: "", pendingWorktreePath: "", state: "connected", linkedPullRequests: links }) as ThreadView;
 const pr = (slug: string, number: number, o: Partial<PullRequestView>): PullRequestDetailView =>
   ({
     pullRequest: { repoSlug: slug, number, title: `title ${String(number)}`, state: "open", draft: false, headRef: `branch-${String(number)}`, checks: { state: "success", total: 1, passed: 1, failed: 0, pending: 0, skipped: 0 }, ...o },
@@ -35,7 +35,7 @@ async function resolve(slug: string, number: number, o: Partial<PullRequestView>
 }
 
 function select(id: string): void {
-  useUiStore.setState({ selection: { kind: "session", id } });
+  useUiStore.setState({ selection: { kind: "thread", id } });
 }
 
 beforeEach(() => {
@@ -45,7 +45,7 @@ beforeEach(() => {
   pullRequestDetailResource.store.setState({ entries: {} });
   useReposStore.setState({ byId: {}, order: [] });
   // First-seen order 5, 7, 6: the list shows 6, 7, 5.
-  useSessionsStore.setState({ byId: { "s-1": thread("s-1", [link("o/web", 5), link("o/web", 7), link("o/web", 6)]), "s-0": thread("s-0", []) }, order: ["s-1", "s-0"] });
+  useThreadsStore.setState({ byId: { "s-1": thread("s-1", [link("o/web", 5), link("o/web", 7), link("o/web", 6)]), "s-0": thread("s-0", []) }, order: ["s-1", "s-0"] });
   usePanelStore.setState({ byKey: { "session:s-1": { open: true, tabs: [], activeTabId: null }, "session:s-0": { open: true, tabs: [], activeTabId: null } } });
   useViewsStore.setState({ settingsOpen: false });
   useUiStore.setState({ windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260, palette: { ...useUiStore.getState().palette, open: false } });
@@ -72,7 +72,7 @@ describe("Linked PRs surface", () => {
     });
     expect(row()).toBeNull();
     act(() => {
-      useSessionsStore.setState((s) => ({ byId: { ...s.byId, "s-0": thread("s-0", [link("o/web", 9)]) } }));
+      useThreadsStore.setState((s) => ({ byId: { ...s.byId, "s-0": thread("s-0", [link("o/web", 9)]) } }));
     });
     expect(row()?.getAttribute("data-availability")).toBe("enabled");
   });
@@ -103,7 +103,7 @@ describe("Linked PRs surface", () => {
 
   it("names the repository when the links span repositories", () => {
     act(() => {
-      useSessionsStore.setState((s) => ({ byId: { ...s.byId, "s-1": thread("s-1", [link("o/web", 5), link("o/api", 2)]) } }));
+      useThreadsStore.setState((s) => ({ byId: { ...s.byId, "s-1": thread("s-1", [link("o/web", 5), link("o/api", 2)]) } }));
     });
     render(<SidePanel />);
     fireEvent.keyDown(screen.getByTestId("side-panel"), { key: "l" });

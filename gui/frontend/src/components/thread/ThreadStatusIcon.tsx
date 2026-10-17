@@ -1,17 +1,17 @@
 import { Bot, Circle, CircleX, Loader2 } from "lucide-react";
-import { badgeLabels, sessionBadge } from "@/lib/thread";
+import { badgeLabels, threadBadge } from "@/lib/thread";
 import { cn } from "@/lib/utils";
-import { useSessionsStore } from "@/stores/threads";
+import { useThreadsStore } from "@/stores/threads";
 
 /**
  * Session status badge: busy spinner (Claude starting for a message included), idle dot,
  * needs-attention accent with a subtle pulse, error (the process ended mid-turn:
- * interrupted) a red crossed circle. Whether the process runs never shows (sessionBadge).
+ * interrupted) a red crossed circle. Whether the process runs never shows (threadBadge).
  * The sidebar's thread rows do not use it (they say the status in words, lib/statusLine);
- * SessionLink and SessionParts do.
+ * ThreadLink and ThreadParts do.
  */
-export function SessionStatusIcon({ id, className }: { id: string; className?: string }) {
-  const badge = useSessionsStore((s) => sessionBadge(s.byId[id]));
+export function ThreadStatusIcon({ id, className }: { id: string; className?: string }) {
+  const badge = useThreadsStore((s) => threadBadge(s.byId[id]));
   const common = { "aria-label": badgeLabels[badge], "data-session-badge": badge, role: "img" } as const;
   switch (badge) {
     case "busy":

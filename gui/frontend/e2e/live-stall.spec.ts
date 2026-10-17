@@ -3,13 +3,13 @@
  * (docs/notes/thread-render-stall.md). Opt-in (LIVE_DAEMON=1), run with
  * playwright.live.config.ts against an isolated daemon and a Vite dev server pointed at it.
  *
- * It opens LIVE_STALL_SESSION, sends LIVE_STALL_PROMPT with the CLI, and samples three
+ * It opens LIVE_STALL_THREAD, sends LIVE_STALL_PROMPT with the CLI, and samples three
  * layers every 500 ms while the turn runs: the daemon (ListItems), the GUI's thread store
  * (imported from the Vite dev server: the same module instance the app uses) and the DOM
  * (which virtualized rows are mounted, scroll position). A layer that lags the one below
  * it for several samples is a stall, and the test fails naming the layer.
  *
- * Env: LIVE_DAEMON=1, CODE_FOUNDRY_HOME, LIVE_STALL_SESSION (required); LIVE_BIN,
+ * Env: LIVE_DAEMON=1, CODE_FOUNDRY_HOME, LIVE_STALL_THREAD (required); LIVE_BIN,
  * LIVE_APP_URL, LIVE_STALL_PROMPT, LIVE_STALL_SECS (default 150), LIVE_STALL_SCROLL=1
  * (scroll up and back down during the turn, like a user reading), LIVE_STALL_IDLE (seconds
  * the Watch stays idle before the prompt is sent), LIVE_STALL_SWITCH (another thread id: switch to
@@ -23,7 +23,7 @@ import { row } from "./fixtures";
 
 const LIVE = process.env.LIVE_DAEMON === "1";
 const HOME = process.env.CODE_FOUNDRY_HOME ?? "";
-const ID = process.env.LIVE_STALL_SESSION ?? "";
+const ID = process.env.LIVE_STALL_THREAD ?? "";
 const ROOT = path.resolve(process.cwd(), "../..");
 const BIN = process.env.LIVE_BIN ?? path.join(ROOT, "bin/code-foundry");
 const SECS = Number(process.env.LIVE_STALL_SECS ?? 150);
@@ -60,7 +60,7 @@ interface StoreModule {
     getState(): {
       logs: Record<string, { seq: number; order: string[]; byId: Record<string, StoreItem | undefined> } | undefined>;
       folds: Record<string, Record<string, boolean> | undefined>;
-      watch: { sessionId: string; status: string } | null;
+      watch: { threadId: string; status: string } | null;
     };
   };
   structOf(it: StoreItem): unknown;
@@ -82,7 +82,7 @@ async function daemonItems(): Promise<{ seq: number; items: number }> {
   return { seq: Number(body.snapshot?.seq ?? 0), items: body.snapshot?.items?.length ?? 0 };
 }
 
-test.skip(!LIVE || !HOME || !ID, "live diagnostic: LIVE_DAEMON=1, CODE_FOUNDRY_HOME and LIVE_STALL_SESSION");
+test.skip(!LIVE || !HOME || !ID, "live diagnostic: LIVE_DAEMON=1, CODE_FOUNDRY_HOME and LIVE_STALL_THREAD");
 
 test("the timeline keeps up with a long turn", async ({ page }) => {
   test.setTimeout((SECS + IDLE + 60) * 1000);
@@ -115,7 +115,7 @@ test("the timeline keeps up with a long turn", async ({ page }) => {
       return {
         storeSeq: log?.seq ?? -1,
         storeItems: log?.order.length ?? -1,
-        watch: s.watch?.sessionId === id ? s.watch.status : "none",
+        watch: s.watch?.threadId === id ? s.watch.status : "none",
         rows,
         maxIdx: idx.length ? Math.max(...idx) : -1,
         atBottom: el?.dataset.atBottom !== undefined,

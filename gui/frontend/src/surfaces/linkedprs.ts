@@ -2,13 +2,13 @@ import { createElement } from "react";
 import { GitPullRequestArrow } from "lucide-react";
 import { LinkedPRsSurface } from "@/components/linkedprs/LinkedPRsSurface";
 import { useReposStore } from "@/stores/repos";
-import { useSessionsStore } from "@/stores/threads";
+import { useThreadsStore } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
 import { LINKED_PRS_KIND, LINKED_PRS_TITLE, linkedPrsTab, selectionLinkedThread } from "./linkedprsTarget";
 import type { SurfaceSpec } from "./types";
 
 function thread(sel: Selection): string | null {
-  return selectionLinkedThread(sel, { repos: useReposStore.getState(), sessions: useSessionsStore.getState() });
+  return selectionLinkedThread(sel, { repos: useReposStore.getState(), threads: useThreadsStore.getState() });
 }
 
 /**
@@ -26,7 +26,7 @@ export const linkedPrsSurface: SurfaceSpec = {
   hotkey: "l",
   available: (ctx) => (thread(ctx.selection) ? "enabled" : "hidden"),
   // deriveContext reads the repos store too (placement); the links come from sessions.
-  watches: [useSessionsStore, useReposStore],
+  watches: [useThreadsStore, useReposStore],
   render: () => createElement(LinkedPRsSurface),
   openDefault: (ctx) => (thread(ctx.selection) ? linkedPrsTab() : null),
 };

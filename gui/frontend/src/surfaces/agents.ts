@@ -2,13 +2,13 @@ import { createElement } from "react";
 import { Bot } from "lucide-react";
 import { AgentsSurface } from "@/components/agents/AgentsSurface";
 import { useReposStore } from "@/stores/repos";
-import { useSessionsStore } from "@/stores/threads";
+import { useThreadsStore } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
 import { AGENTS_KIND, AGENTS_TITLE, agentsTab, selectionAgentsThread } from "./agentsTarget";
 import type { SurfaceSpec } from "./types";
 
 function thread(sel: Selection): string | null {
-  return selectionAgentsThread(sel, { repos: useReposStore.getState(), sessions: useSessionsStore.getState() });
+  return selectionAgentsThread(sel, { repos: useReposStore.getState(), threads: useThreadsStore.getState() });
 }
 
 /**
@@ -26,7 +26,7 @@ export const agentsSurface: SurfaceSpec = {
   icon: Bot,
   hotkey: "a",
   available: (ctx) => (thread(ctx.selection) ? "enabled" : "hidden"),
-  watches: [useSessionsStore, useReposStore],
+  watches: [useThreadsStore, useReposStore],
   render: () => createElement(AgentsSurface),
   openDefault: (ctx) => (thread(ctx.selection) ? agentsTab() : null),
 };

@@ -7,14 +7,14 @@ import { agentElapsedMs, agentMeta, agentName, agentStatusText, agentsSubline, f
 import { fmtTok } from "@/lib/usage";
 import { cn } from "@/lib/utils";
 import { useAgentCounts, useAgentLevel, useAgentRowIds, useAgentRun } from "@/stores/agents";
-import { useSessionsStore } from "@/stores/threads";
+import { useThreadsStore } from "@/stores/threads";
 import { useThreadStore } from "@/stores/thread";
 import { useUiStore } from "@/stores/ui";
 import "./agents.css";
 
 /** The thread this panel belongs to: the selected session ("" otherwise). */
 function useThreadId(): string {
-  return useUiStore((s) => (s.selection.kind === "session" ? s.selection.id : ""));
+  return useUiStore((s) => (s.selection.kind === "thread" ? s.selection.id : ""));
 }
 
 const STATUS_TONE: Readonly<Record<AgentStatusView, string>> = {
@@ -184,7 +184,7 @@ function Message({ testId, children }: { testId: string; children: string }) {
  */
 export function AgentsSurface() {
   const threadId = useThreadId();
-  const known = useSessionsStore((s) => threadId !== "" && threadId in s.byId);
+  const known = useThreadsStore((s) => threadId !== "" && threadId in s.byId);
   const loaded = useThreadStore((s) => threadId in s.logs);
   const ids = useAgentRowIds(threadId);
   if (!known) return <Message testId="agents-missing">Select a thread to see its agents.</Message>;

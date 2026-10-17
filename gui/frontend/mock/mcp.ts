@@ -77,7 +77,7 @@ export function mcpFixture(now = Date.now()): McpStatusInit {
   return { checkedAt: timestampFromDate(new Date(now - 12_000)), trigger: McpCheckTrigger.TURN_START, servers: mcpServers() };
 }
 
-/** What MockThreads offers the MCP commands. */
+/** What MockThreadLogs offers the MCP commands. */
 export interface McpThreads {
   /** The thread's MCP status; undefined when Claude never reported one. Throws for an unknown thread. */
   mcpOf(id: string): McpStatusInit | undefined;

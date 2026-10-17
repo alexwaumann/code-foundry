@@ -3,7 +3,7 @@
  * the branch there, the owning workspace (the badge), and a queued "Run in…" move. Pure,
  * over the repos and workspaces slices.
  */
-import type { SessionView } from "@/api/threads";
+import type { ThreadView } from "@/api/threads";
 import type { WorkspaceView } from "@/api/workspace";
 import type { Choice } from "./compose";
 import { modelName } from "./models";
@@ -30,7 +30,7 @@ export const NO_PROJECT = "No project";
  * rows with an empty repo id whose path is inside a project are placed by their path
  * instead, so they are not this.
  */
-export function isNoProject(s: Pick<SessionView, "repoId" | "workspaceId" | "worktreePath">, repos: RepoLookup): boolean {
+export function isNoProject(s: Pick<ThreadView, "repoId" | "workspaceId" | "worktreePath">, repos: RepoLookup): boolean {
   if (s.repoId || s.workspaceId) return false;
   for (const r of Object.values(repos.byId)) if (r?.worktrees.some((w) => isWithin(s.worktreePath, w.path))) return false;
   return true;
@@ -87,7 +87,7 @@ export function memberName(repos: RepoLookup, workspace: Pick<WorkspaceView, "me
 }
 
 export function threadRowModel(
-  s: Pick<SessionView, "repoId" | "worktreePath" | "workspaceId" | "pendingWorktreePath">,
+  s: Pick<ThreadView, "repoId" | "worktreePath" | "workspaceId" | "pendingWorktreePath">,
   repos: RepoLookup,
   workspaces: WorkspaceLookup,
 ): ThreadRowModel {

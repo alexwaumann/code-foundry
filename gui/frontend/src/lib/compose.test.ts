@@ -3,7 +3,7 @@ import { FALLBACK_MODEL_CHOICES } from "./models";
 import {
   checkAttachments,
   checkoutBranch,
-  createdSessionId,
+  createdThreadId,
   DEFAULT_MODEL,
   draftKey,
   draftMembers,
@@ -15,7 +15,7 @@ import {
   projectHue,
   projectInitials,
   repoSource,
-  sessionNewArgs,
+  threadNewArgs,
   threadArgs,
   threadPlace,
   defaultWorktree,
@@ -49,7 +49,7 @@ describe("checkAttachments", () => {
   });
 });
 
-describe("sessionNewArgs", () => {
+describe("threadNewArgs", () => {
   const base: DraftArgsInput = { text: "  Add a dark mode toggle \n", model: "opus", effort: "high", permission: "auto", worktree: { kind: "new" }, base: "origin/main" };
   it.each<[string, Partial<DraftArgsInput>, string[], Record<string, string>]>([
     [
@@ -66,7 +66,7 @@ describe("sessionNewArgs", () => {
       { repo: "r", worktree: "/src/app", permission: "auto" },
     ],
   ])("%s", (_name, over, staged, want) => {
-    expect(sessionNewArgs("r", { ...base, ...over }, staged)).toEqual(want);
+    expect(threadNewArgs("r", { ...base, ...over }, staged)).toEqual(want);
   });
 });
 
@@ -172,7 +172,7 @@ describe("workspaces", () => {
     expect(threadArgs(place, { ...prompt, text: "no tags", composerText: "no tags" }, [])).not.toHaveProperty("composer-prompt");
   });
 
-  it("no project: the thread starts at home, whatever the draft says; session.new gets no-project alone", () => {
+  it("no project: the thread starts at home, whatever the draft says; thread.new gets no-project alone", () => {
     const d: PlaceInput = { target: { kind: "home" }, worktree: { kind: "existing", path: "/src/web-fix" }, base: "origin/dev", alsoIn: ["api"], primary: "api" };
     const place = threadPlace(d, env);
     expect(place).toEqual({ kind: "home" });
@@ -256,11 +256,11 @@ describe("projectChipBranch", () => {
 });
 
 describe("helpers", () => {
-  it("createdSessionId reads the Session JSON", () => {
-    expect(createdSessionId('{"id":"s-1a2b","worktreePath":"/x"}')).toBe("s-1a2b");
-    expect(createdSessionId("")).toBeNull();
-    expect(createdSessionId("not json")).toBeNull();
-    expect(createdSessionId('{"name":"x"}')).toBeNull();
+  it("createdThreadId reads the Session JSON", () => {
+    expect(createdThreadId('{"id":"s-1a2b","worktreePath":"/x"}')).toBe("s-1a2b");
+    expect(createdThreadId("")).toBeNull();
+    expect(createdThreadId("not json")).toBeNull();
+    expect(createdThreadId('{"name":"x"}')).toBeNull();
   });
 
   it("pickDefault uses a known setting, else the fallback", () => {

@@ -17,7 +17,7 @@ const modelField = {
 };
 
 describe("modelChoicesFromSchema", () => {
-  it("reads the registry from sessions.default_model, in order", () => {
+  it("reads the registry from threads.default_model, in order", () => {
     const got = modelChoicesFromSchema([{ key: "appearance.theme", enumValues: ["dark"], enumLabels: [] }, modelField]);
     expect(got?.map((c) => c.value)).toEqual(modelField.enumValues);
     expect(got?.map((c) => c.label)).toEqual(modelField.enumLabels);

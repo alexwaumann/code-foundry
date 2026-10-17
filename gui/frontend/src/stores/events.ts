@@ -3,7 +3,7 @@ import { Code, ConnectError } from "@connectrpc/connect";
 import { daemon, invalidateOnTransportError } from "@/api/endpoint";
 import { watchEvents, type EventView } from "@/api/events";
 import { listRepos } from "@/api/repo";
-import { listSessions } from "@/api/threads";
+import { listThreads } from "@/api/threads";
 import { errorMessage, isAbort, runStream, type StreamStatus } from "@/api/stream";
 import { listTerminals } from "@/api/terminal";
 import { applyActionEvent, useActionsStore } from "./actions";
@@ -13,7 +13,7 @@ import { applyGhEvent } from "./gh";
 import { applyGitOpsEvent } from "./gitops";
 import { applyIntent } from "./intents";
 import { applyRepoEvent, replaceRepos, useReposStore } from "./repos";
-import { applyRetiredUsage, applySessionEvent, replaceSessions, useSessionsStore } from "./threads";
+import { applyRetiredUsage, applyThreadListEvent, replaceThreads, useThreadsStore } from "./threads";
 import { applySettingsSnapshot, loadSettingsSchema } from "./settings";
 import { applyTerminalEvent, replaceTerminals, useTerminalsStore } from "./terminals";
 import { applyThreadSourceEvent, pruneThreadLogs } from "./thread";
@@ -55,17 +55,17 @@ const handlers: Handlers = {
     if (fresh) onNewTerminal(fresh);
     if (removed) onRemovedTerminal(removed, before);
   },
-  session: (ev) => {
+  threadList: (ev) => {
     // Session events prove the service exists, even if List failed transiently.
-    useSessionsStore.setState((s) => ({
-      ...applySessionEvent(s, ev),
+    useThreadsStore.setState((s) => ({
+      ...applyThreadListEvent(s, ev),
       retiredUsage: applyRetiredUsage(s.retiredUsage, ev),
       availability: "available",
       error: null,
       epoch: ev.kind === "snapshot" ? s.epoch + 1 : s.epoch,
     }));
     // A removed thread's items go with it.
-    if (ev.kind === "removed" || ev.kind === "snapshot") pruneThreadLogs((id) => id in useSessionsStore.getState().byId);
+    if (ev.kind === "removed" || ev.kind === "snapshot") pruneThreadLogs((id) => id in useThreadsStore.getState().byId);
   },
   // Pending requests of every thread; the visible one's items come from its Watch.
   thread: applyThreadSourceEvent,
@@ -92,15 +92,15 @@ function isMissingService(err: unknown): boolean {
 }
 
 /** Lists sessions without failing the resync: a daemon without ThreadService still works. */
-async function reconcileSessions(signal: AbortSignal): Promise<void> {
+async function reconcileThreads(signal: AbortSignal): Promise<void> {
   try {
-    const list = await listSessions(daemon, signal);
-    useSessionsStore.setState((s) => ({ ...replaceSessions(s, list), loaded: true, availability: "available", error: null, epoch: s.epoch + 1 }));
+    const list = await listThreads(daemon, signal);
+    useThreadsStore.setState((s) => ({ ...replaceThreads(s, list), loaded: true, availability: "available", error: null, epoch: s.epoch + 1 }));
   } catch (err) {
     if (isAbort(err)) throw err;
     const missing = isMissingService(err);
-    useSessionsStore.setState((s) => ({
-      ...(missing ? replaceSessions(s, []) : s),
+    useThreadsStore.setState((s) => ({
+      ...(missing ? replaceThreads(s, []) : s),
       availability: missing ? "unavailable" : s.availability,
       error: missing ? "service unavailable" : errorMessage(err),
     }));
@@ -111,16 +111,16 @@ async function reconcileSessions(signal: AbortSignal): Promise<void> {
  * Keeps every slice in sync over one EventService.Watch. On each (re)connect the
  * per-service List calls run alongside the stream (events are buffered until they
  * resolve), so a reconnect reconciles removals the stream's snapshot cannot express
- * (terminal.proto has no snapshot message). Sessions are retried every `sessionRetryMs`
+ * (terminal.proto has no snapshot message). Sessions are retried every `threadRetryMs`
  * while the service is unavailable.
  */
-export function startEventSync(sessionRetryMs = 10_000): () => void {
+export function startEventSync(threadRetryMs = 10_000): () => void {
   const stop = runStream<EventView>({
     open: (signal) => watchEvents(signal),
     onConnect: async (signal) => {
       // The schema carries the model registry; a restarted daemon may have a new one.
       void loadSettingsSchema();
-      const [repos, terminals] = await Promise.all([listRepos(daemon, signal), listTerminals(daemon, signal), reconcileSessions(signal)]);
+      const [repos, terminals] = await Promise.all([listRepos(daemon, signal), listTerminals(daemon, signal), reconcileThreads(signal)]);
       useReposStore.setState({ ...replaceRepos(repos), loaded: true });
       useTerminalsStore.setState((s) => ({ ...replaceTerminals(s, terminals), loaded: true }));
       // The List brings terminals without updated events: a pending reveal's shell may be here now.
@@ -136,10 +136,10 @@ export function startEventSync(sessionRetryMs = 10_000): () => void {
     onError: invalidateOnTransportError,
   });
   const retry = setInterval(() => {
-    if (useSessionsStore.getState().availability === "unavailable" && useEventsStore.getState().stream === "open") {
-      void reconcileSessions(new AbortController().signal).catch(() => undefined);
+    if (useThreadsStore.getState().availability === "unavailable" && useEventsStore.getState().stream === "open") {
+      void reconcileThreads(new AbortController().signal).catch(() => undefined);
     }
-  }, sessionRetryMs);
+  }, threadRetryMs);
   return () => {
     clearInterval(retry);
     stop();

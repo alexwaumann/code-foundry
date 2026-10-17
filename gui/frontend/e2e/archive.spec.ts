@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { holdSessions, invocations, mockPost, openApp, resetMock, row } from "./fixtures";
+import { holdThreads, invocations, mockPost, openApp, resetMock, row } from "./fixtures";
 
 // Archived threads in the sidebar (docs/notes/archive-threads-2-sidebar.md). The default
 // world has one archived thread, s-7 ("Spike a canvas sidebar", archived 90 min ago); the
@@ -225,7 +225,7 @@ test("the footers stay pinned under a long main list, are capped, and scroll the
   // 30 idle threads make the main list scroll; 12 busy ones overflow Working's cap.
   await mockPost("threads?repo=repo-cf&count=30&status=idle&prefix=Idle");
   const busy = (await mockPost("threads?repo=repo-cf&count=12&status=busy&prefix=Job")) as string[];
-  await holdSessions(...busy);
+  await holdThreads(...busy);
   await openApp(page);
   await expect(page.getByTestId("working-count")).toHaveText("14");
 

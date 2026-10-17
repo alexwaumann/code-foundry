@@ -11,7 +11,7 @@ describe("togglePanelCommand", () => {
     usePanelStore.setState({ byKey: {} });
     useViewsStore.setState({ settingsOpen: false, helpOpen: false });
     useUiStore.setState({
-      selection: { kind: "session", id: "a" },
+      selection: { kind: "thread", id: "a" },
       focus: "content",
       panelFocusSeq: 0,
       contentFocusSeq: 0,
@@ -70,7 +70,7 @@ describe("expandPanelCommand", () => {
     usePanelStore.setState({ byKey: {} });
     useViewsStore.setState({ settingsOpen: false, helpOpen: false });
     useUiStore.setState({
-      selection: { kind: "session", id: "a" },
+      selection: { kind: "thread", id: "a" },
       focus: "content",
       panelFocusSeq: 0,
       contentFocusSeq: 0,
@@ -154,7 +154,7 @@ describe("newPanelTabCommand", () => {
   beforeEach(() => {
     usePanelStore.setState({ byKey: {} });
     useViewsStore.setState({ settingsOpen: false, usageOpen: false, helpOpen: false });
-    useUiStore.setState({ selection: { kind: "session", id: "a" }, focus: "content", panelFocusSeq: 0, palette: closedPalette });
+    useUiStore.setState({ selection: { kind: "thread", id: "a" }, focus: "content", panelFocusSeq: 0, palette: closedPalette });
   });
 
   it("starts picking in a hidden panel with tabs, shows it, and focuses it", () => {
@@ -195,7 +195,7 @@ describe("newPanelTabCommand", () => {
 
 describe("showView", () => {
   it("\"dashboard\" selects the dashboard and closes settings", () => {
-    useUiStore.setState({ selection: { kind: "session", id: "a" } });
+    useUiStore.setState({ selection: { kind: "thread", id: "a" } });
     useViewsStore.setState({ settingsOpen: true, helpOpen: false });
     expect(showView("dashboard")).toBe(true);
     expect(useUiStore.getState().selection).toEqual({ kind: "view", name: "dashboard" });
@@ -207,7 +207,7 @@ describe("the usage page", () => {
   beforeEach(() => {
     usePanelStore.setState({ byKey: {} });
     useViewsStore.setState({ settingsOpen: false, usageOpen: false, helpOpen: false });
-    useUiStore.setState({ selection: { kind: "session", id: "a" }, promptFocusSeq: 0, palette: closedPalette });
+    useUiStore.setState({ selection: { kind: "thread", id: "a" }, promptFocusSeq: 0, palette: closedPalette });
   });
   const views = () => {
     const { settingsOpen, usageOpen, helpOpen } = useViewsStore.getState();
@@ -254,9 +254,9 @@ describe("the usage page", () => {
     const stop = startViewSync();
     try {
       useViewsStore.setState({ usageOpen: true });
-      useUiStore.getState().select({ kind: "session", id: "a" }); // same selection: stays open
+      useUiStore.getState().select({ kind: "thread", id: "a" }); // same selection: stays open
       expect(views().usageOpen).toBe(true);
-      useUiStore.getState().select({ kind: "session", id: "b" });
+      useUiStore.getState().select({ kind: "thread", id: "b" });
       expect(views().usageOpen).toBe(false);
     } finally {
       stop();
@@ -278,7 +278,7 @@ describe("toggleBottomCommand", () => {
     usePanelStore.setState({ byKey: {} });
     useViewsStore.setState({ settingsOpen: false, usageOpen: false, helpOpen: false });
     useUiStore.setState({
-      selection: { kind: "session", id: "a" },
+      selection: { kind: "thread", id: "a" },
       focus: "content",
       bottomFocusSeq: 0,
       contentFocusSeq: 0,
@@ -349,7 +349,7 @@ describe("expandPanelCommand from the bottom panel", () => {
   beforeEach(() => {
     usePanelStore.setState({ byKey: {} });
     useViewsStore.setState({ settingsOpen: false, usageOpen: false, helpOpen: false });
-    useUiStore.setState({ selection: { kind: "session", id: "a" }, focus: "bottom", panelFocusSeq: 0, palette: closedPalette });
+    useUiStore.setState({ selection: { kind: "thread", id: "a" }, focus: "bottom", panelFocusSeq: 0, palette: closedPalette });
   });
 
   it("moves focus to the panel: expanding hides the bottom panel with the content column", () => {

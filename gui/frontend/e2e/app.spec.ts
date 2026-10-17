@@ -11,7 +11,7 @@ test("sidebar lists threads only; repos and worktrees are on the Projects page, 
   // The waiting thread, the idle ones, then the working ones under Working. No terminal rows:
   // shells (t-top, t-s1-shell) show in their owner's bottom panel.
   await expect.poll(() => list.locator("[data-row-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")))).toEqual(DEFAULT_ORDER);
-  await expect(list.locator('[data-row-kind]:not([data-row-kind="session"]):not([data-row-kind="header"])')).toHaveCount(0);
+  await expect(list.locator('[data-row-kind]:not([data-row-kind="thread"]):not([data-row-kind="header"])')).toHaveCount(0);
   await expect.poll(() => list.locator('[data-row-kind="header"]').evaluateAll((els) => els.map((e) => e.getAttribute("data-section")))).toEqual(["working", "snoozed", "archived"]);
   await openProjects(page);
   await expect(page.getByTestId("project-name")).toHaveText(["code-foundry", "dotfiles", "ghostty-playground", "sketches", "writing"]);
@@ -106,7 +106,7 @@ test("invoking a command sends the current context", async ({ page }) => {
     activeThreadId: "s-1",
     activeRepoId: "repo-cf",
     activeWorktreePath: CF,
-    activeView: "session",
+    activeView: "thread",
     activeWorkspaceId: "",
   });
 
@@ -122,7 +122,7 @@ test("invoking a command sends the current context", async ({ page }) => {
     activeThreadId: "s-1",
     activeRepoId: "repo-cf",
     activeWorktreePath: CF,
-    activeView: "session",
+    activeView: "thread",
     activeWorkspaceId: "",
   });
 });

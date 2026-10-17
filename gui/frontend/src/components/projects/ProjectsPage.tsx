@@ -69,7 +69,7 @@ import {
   unregisterProject,
 } from "@/stores/projectActions";
 import { findWorktree, mainWorktreePath, useReposStore } from "@/stores/repos";
-import { useSessionsStore } from "@/stores/threads";
+import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { showWorkspaceInThread } from "@/stores/workspacePanel";
 import { showWorktreeInPanel } from "@/stores/worktreePanel";
@@ -369,8 +369,8 @@ function WorkspaceBlock({ id, collapsed, filtering }: { id: string; collapsed: b
   const branch = useWorkspacesStore((s) => s.byId[id]?.branch ?? "");
   const members = useWorkspacesStore((s) => s.byId[id]?.members.length ?? 0);
   // A thread of the workspace: the row can show the workspace surface in its panel.
-  const thread = useSessionsStore((s) => workspaceThread(s, id));
-  const threadName = useSessionsStore((s) => (thread ? s.byId[thread]?.name || thread : ""));
+  const thread = useThreadsStore((s) => workspaceThread(s, id));
+  const threadName = useThreadsStore((s) => (thread ? s.byId[thread]?.name || thread : ""));
   return (
     <section className="group/card rounded-lg border" data-testid="workspace" data-workspace={id} data-collapsed={collapsed}>
       <NavRow navKey={workspaceKey(id)} className={cn("group/ws flex h-9 items-center gap-2 rounded-lg px-2", !collapsed && "rounded-b-none border-b")}>

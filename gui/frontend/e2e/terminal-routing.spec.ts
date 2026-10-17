@@ -21,7 +21,7 @@ async function shellLabels(page: Page, id: string): Promise<Record<string, strin
 }
 
 async function noTerminalRows(page: Page): Promise<void> {
-  await expect(page.getByTestId("thread-list").locator('[data-row-kind]:not([data-row-kind="session"]):not([data-row-kind="header"])')).toHaveCount(0);
+  await expect(page.getByTestId("thread-list").locator('[data-row-kind]:not([data-row-kind="thread"]):not([data-row-kind="header"])')).toHaveCount(0);
 }
 
 test.beforeEach(async () => {
@@ -34,7 +34,7 @@ test("a thread row's New terminal here: the thread owns the shell, in its bottom
   // s-2 is not selected: its panel opens on the shell, the selection stays.
   await row(page, "s:s-2").click({ button: "right" });
   await page.getByTestId("row-menu").getByText("New terminal here").click();
-  expect((await lastNew())?.context).toMatchObject({ activeThreadId: "s-2", activeView: "session" });
+  expect((await lastNew())?.context).toMatchObject({ activeThreadId: "s-2", activeView: "thread" });
   await expect(row(page, "s:s-1")).toHaveAttribute("aria-selected", "true");
   await noTerminalRows(page);
   await row(page, "s:s-2").click();
@@ -75,7 +75,7 @@ test("a workspace member's New terminal here in a thread's side panel: the threa
   await cf.getByTestId("member-terminal").click();
   const call = await lastNew();
   expect(call?.args).toEqual({ cwd: CF_MEMBER });
-  expect(call?.context).toMatchObject({ activeThreadId: driver, activeView: "session" });
+  expect(call?.context).toMatchObject({ activeThreadId: driver, activeView: "thread" });
   // The thread's bottom panel, not the Projects page's.
   await expect(row(page, `s:${driver}`)).toHaveAttribute("aria-selected", "true");
   await expect(bottom(page).getByRole("tab")).toHaveCount(1);

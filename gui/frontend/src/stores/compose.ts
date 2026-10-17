@@ -20,7 +20,7 @@ import { isOutdatedDaemon } from "@/api/errors";
 import { errorMessage } from "@/api/stream";
 import {
   checkAttachments,
-  createdSessionId,
+  createdThreadId,
   DEFAULT_PERMISSION,
   defaultWorktree,
   draftKey,
@@ -460,7 +460,7 @@ export function noGitCheckout(r: Pick<RepoView, "git" | "path" | "worktrees"> | 
 
 /**
  * Sends a draft: stages its images one by one, then invokes session.new. On success the
- * draft is cleared and the new thread selected (the daemon's FocusSession intent usually
+ * draft is cleared and the new thread selected (the daemon's FocusThread intent usually
  * got there first). On failure the draft stays, with the error.
  */
 export async function sendDraft(target: ComposeTarget, defaults: { model: string; effort: string }): Promise<boolean> {
@@ -502,10 +502,10 @@ export async function sendDraft(target: ComposeTarget, defaults: { model: string
       return false;
     }
     clearDraft(key);
-    const id = createdSessionId(res.resultJson);
+    const id = createdThreadId(res.resultJson);
     const ui = useUiStore.getState();
     // Replace the composer with the new thread unless the user has moved on.
-    if (id && ui.selection.kind === "compose" && draftKey(composeTarget(ui.selection)) === key) ui.select({ kind: "session", id }, { focusPrompt: true });
+    if (id && ui.selection.kind === "compose" && draftKey(composeTarget(ui.selection)) === key) ui.select({ kind: "thread", id }, { focusPrompt: true });
     return true;
   } catch (err) {
     updateDraft(key, { phase: "idle", error: errorMessage(err) });

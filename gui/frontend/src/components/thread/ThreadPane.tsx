@@ -1,10 +1,10 @@
 import { Loader2 } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Backdrop } from "@/components/backdrop/Backdrop";
-import { SessionTitle } from "@/components/thread/ThreadParts";
+import { ThreadTitle } from "@/components/thread/ThreadParts";
 import { DragBand } from "@/components/window/DragBand";
 import { PaneHeader } from "@/components/window/PaneHeader";
-import { useSessionsStore } from "@/stores/threads";
+import { useThreadsStore } from "@/stores/threads";
 import { startThreadWatch, useOpenRequests, useThreadEmpty, useThreadLoaded, useThreadPending, useThreadStore } from "@/stores/thread";
 import { AgentsStrip } from "./AgentsStrip";
 import { ThreadContext } from "./context";
@@ -37,7 +37,7 @@ function useHeight(ref: React.RefObject<HTMLElement | null>): number {
  * thread (a stale selection), or one the first List has not brought yet.
  */
 function ThreadMissing() {
-  const loaded = useSessionsStore((st) => st.loaded || st.availability !== "unknown");
+  const loaded = useThreadsStore((st) => st.loaded || st.availability !== "unknown");
   return (
     <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
       <Backdrop />
@@ -57,23 +57,23 @@ function ThreadMissing() {
  * a message and stops it at cache expiry; docs/notes/hide-connection-state.md). While
  * shown it holds the thread's ThreadService.WatchThread (which also marks finished turns seen).
  */
-export function ThreadPane({ sessionId }: { sessionId: string }) {
-  const exists = useSessionsStore((s) => sessionId in s.byId);
-  return exists ? <ThreadBody sessionId={sessionId} /> : <ThreadMissing />;
+export function ThreadPane({ threadId }: { threadId: string }) {
+  const exists = useThreadsStore((s) => threadId in s.byId);
+  return exists ? <ThreadBody threadId={threadId} /> : <ThreadMissing />;
 }
 
-function ThreadBody({ sessionId }: { sessionId: string }) {
-  useEffect(() => startThreadWatch(sessionId), [sessionId]);
-  const cwd = useSessionsStore((s) => s.byId[sessionId]?.worktreePath ?? "");
-  const state = useSessionsStore((s) => s.byId[sessionId]?.state ?? "unknown");
-  const status = useSessionsStore((s) => s.byId[sessionId]?.status ?? "unknown");
-  const pendingList = useThreadPending(sessionId);
-  const loaded = useThreadLoaded(sessionId);
-  const empty = useThreadEmpty(sessionId);
-  const watchError = useThreadStore((s) => (s.watch?.sessionId === sessionId && s.watch.status === "retrying" ? s.watch.error : null));
-  const catchingUp = useThreadStore((s) => s.watch?.sessionId === sessionId && s.watch.status === "retrying");
+function ThreadBody({ threadId }: { threadId: string }) {
+  useEffect(() => startThreadWatch(threadId), [threadId]);
+  const cwd = useThreadsStore((s) => s.byId[threadId]?.worktreePath ?? "");
+  const state = useThreadsStore((s) => s.byId[threadId]?.state ?? "unknown");
+  const status = useThreadsStore((s) => s.byId[threadId]?.status ?? "unknown");
+  const pendingList = useThreadPending(threadId);
+  const loaded = useThreadLoaded(threadId);
+  const empty = useThreadEmpty(threadId);
+  const watchError = useThreadStore((s) => (s.watch?.threadId === threadId && s.watch.status === "retrying" ? s.watch.error : null));
+  const catchingUp = useThreadStore((s) => s.watch?.threadId === threadId && s.watch.status === "retrying");
   // The prompts to dock: pending requests minus the ones just answered (their answer is on its way).
-  const open = useOpenRequests(sessionId);
+  const open = useOpenRequests(threadId);
   const waiting = pendingList.length > 0;
   // Internal only: a process on its way out or gone makes a busy status (an older
   // daemon's) mean nothing. Nothing on screen says whether it runs.
@@ -84,14 +84,14 @@ function ThreadBody({ sessionId }: { sessionId: string }) {
   const working = running && (status === "busy" || state === "starting") && open.length === 0;
   const dockRef = useRef<HTMLDivElement>(null);
   const dockHeight = useHeight(dockRef);
-  const ctx = useMemo(() => ({ sessionId, cwd }), [sessionId, cwd]);
+  const ctx = useMemo(() => ({ threadId, cwd }), [threadId, cwd]);
   return (
     <ThreadContext.Provider value={ctx}>
-      <section className="cf-thread flex min-h-0 min-w-0 flex-1 flex-col outline-none" tabIndex={-1} aria-label="Thread" data-session-id={sessionId} data-testid="thread-pane" data-region="content">
+      <section className="cf-thread flex min-h-0 min-w-0 flex-1 flex-col outline-none" tabIndex={-1} aria-label="Thread" data-session-id={threadId} data-testid="thread-pane" data-region="content">
         <PaneHeader className="gap-2 px-3" data-testid="thread-header">
-          <SessionTitle id={sessionId} />
+          <ThreadTitle id={threadId} />
           <span className="ml-auto flex shrink-0 items-center gap-2 pl-2 text-muted-foreground tabular-nums">
-            <HeaderActions sessionId={sessionId} />
+            <HeaderActions threadId={threadId} />
           </span>
         </PaneHeader>
         <div className="relative flex min-h-0 flex-1 flex-col">
@@ -112,10 +112,10 @@ function ThreadBody({ sessionId }: { sessionId: string }) {
               No messages yet.
             </p>
           )}
-          <Timeline key={sessionId} sessionId={sessionId} working={working} bottomInset={dockHeight} />
+          <Timeline key={threadId} threadId={threadId} working={working} bottomInset={dockHeight} />
           <div className="dock" ref={dockRef}>
-            <AgentsStrip sessionId={sessionId} />
-            <ThreadComposer key={sessionId} sessionId={sessionId} pending={open} busy={busy} />
+            <AgentsStrip threadId={threadId} />
+            <ThreadComposer key={threadId} threadId={threadId} pending={open} busy={busy} />
           </div>
         </div>
       </section>

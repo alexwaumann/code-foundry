@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import type { SessionStateView, SessionStatusView } from "@/api/threads";
+import type { ThreadStateView, ThreadStatusView } from "@/api/threads";
 import { showsPlace, statusLine, statusText, statusTones, tipStatusTone, type StatusLineKind, type TipStatusTone } from "./statusLine";
 
 const NOW = Date.UTC(2026, 9, 10, 12, 0, 0);
 const MIN = 60_000;
 
 describe("statusLine / statusText", () => {
-  it.each<[string, SessionStateView, SessionStatusView, string, number | null, StatusLineKind, string]>([
+  it.each<[string, ThreadStateView, ThreadStatusView, string, number | null, StatusLineKind, string]>([
     ["busy", "connected", "busy", "working: Say hi", null, "working", "Working"],
     ["permission dialog", "connected", "attention", "permission: Do you want to create hello.txt?", 1, "input", "Needs input · Do you want to create hello.txt?"],
     ["permission without a screen", "connected", "attention", "waiting for approval: Bash", 1, "input", "Needs input · Bash"],
@@ -76,7 +76,7 @@ describe("statusLine / statusText", () => {
 
 describe("tipStatusTone", () => {
   // The tooltip's status row: the full line-2 text, only when the thread needs the user or failed.
-  it.each<[string, SessionStateView, SessionStatusView, string, number | null, TipStatusTone | null, string]>([
+  it.each<[string, ThreadStateView, ThreadStatusView, string, number | null, TipStatusTone | null, string]>([
     ["permission dialog", "connected", "attention", "permission: Do you want to create hello.txt and then run the whole test suite?", 1, "amber", "Needs input · Do you want to create hello.txt and then run the whole test suite?"],
     ["permission without a screen", "connected", "attention", "waiting for approval: Bash", 1, "amber", "Needs input · Bash"],
     ["question", "connected", "attention", "question: Which color do you prefer?", 1, "amber", "Asked a question"],

@@ -20,11 +20,11 @@ import { statusLine, statusText } from "@/lib/statusLine";
 import { cn } from "@/lib/utils";
 import { addAttachments, openPreview, updateDraft, useDraft } from "@/stores/compose";
 import { getPanel } from "@/stores/panel";
-import { useSessionsStore } from "@/stores/threads";
+import { useThreadsStore } from "@/stores/threads";
 import { useModelChoices } from "@/stores/settings";
 import { loadSkills } from "@/stores/skills";
 import { useSlashCommands } from "@/stores/thread";
-import { interruptThread, sendThreadDraft, snoozeSession, setThreadEffort, setThreadModel, setThreadPermission, threadDraftKey } from "@/stores/threadActions";
+import { interruptThread, sendThreadDraft, snoozeThread, setThreadEffort, setThreadModel, setThreadPermission, threadDraftKey } from "@/stores/threadActions";
 import { useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { ColdCacheNote } from "./ColdCacheNote";
@@ -52,11 +52,11 @@ const SEP = "\u0001";
  * The thread's projects for "/" and "@": its workspace's members, else its project at its
  * worktree; none without a project (only the user's skills, and no "@").
  */
-function useThreadSources(sessionId: string) {
-  const noProject = useNoProjectThread(sessionId);
-  const repoId = useSessionsStore((s) => s.byId[sessionId]?.repoId ?? "");
-  const worktreePath = useSessionsStore((s) => s.byId[sessionId]?.worktreePath ?? "");
-  const workspaceId = useSessionsStore((s) => s.byId[sessionId]?.workspaceId ?? "");
+function useThreadSources(threadId: string) {
+  const noProject = useNoProjectThread(threadId);
+  const repoId = useThreadsStore((s) => s.byId[threadId]?.repoId ?? "");
+  const worktreePath = useThreadsStore((s) => s.byId[threadId]?.worktreePath ?? "");
+  const workspaceId = useThreadsStore((s) => s.byId[threadId]?.workspaceId ?? "");
   const memberKeys = useWorkspacesStore(useShallow((s) => (workspaceId ? (s.byId[workspaceId]?.members ?? []).map((m) => m.repoId + SEP + m.worktreePath) : [])));
   return useMemo(() => {
     if (noProject) return { noProject, repoIds: [], skills: [], files: [] };
@@ -98,10 +98,10 @@ function SnoozeEnded({ at }: { at: number | null }) {
  * Unsnooze (a message unsnoozes too); a thread the daemon woke says "Snooze ended · <ago>"
  * (the header's Snooze button snoozes again). Nothing otherwise.
  */
-function SnoozeNote({ sessionId }: { sessionId: string }) {
-  const snoozedUntil = useSessionsStore((s) => s.byId[sessionId]?.snoozedUntilMs ?? null);
-  const wokeAt = useSessionsStore((s) => {
-    const l = statusLine(s.byId[sessionId]);
+function SnoozeNote({ threadId }: { threadId: string }) {
+  const snoozedUntil = useThreadsStore((s) => s.byId[threadId]?.snoozedUntilMs ?? null);
+  const wokeAt = useThreadsStore((s) => {
+    const l = statusLine(s.byId[threadId]);
     return l.kind === "snoozeEnded" ? (l.at ?? 0) : null;
   });
   if (snoozedUntil === null && wokeAt === null) return null;
@@ -114,7 +114,7 @@ function SnoozeNote({ sessionId }: { sessionId: string }) {
           className="btn outline ml-auto"
           data-testid="thread-unsnooze"
           onClick={() => {
-            void snoozeSession(sessionId, null);
+            void snoozeThread(threadId, null);
           }}
         >
           <AlarmClockOff aria-hidden />
@@ -136,28 +136,28 @@ function SnoozeNote({ sessionId }: { sessionId: string }) {
  * turns by accident); only the Interrupt button does. An effort change restarts Claude,
  * after the turn when one runs. The draft is the compose store's `thread:<id>`.
  */
-export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string; pending: readonly ThreadPendingView[]; busy: boolean }) {
-  const draftKey = threadDraftKey(sessionId);
+export function ThreadComposer({ threadId, pending, busy }: { threadId: string; pending: readonly ThreadPendingView[]; busy: boolean }) {
+  const draftKey = threadDraftKey(threadId);
   const text = useDraft(draftKey, "text");
   const hasAttachments = useDraft(draftKey, "attachments").length > 0;
   const phase = useDraft(draftKey, "phase");
   const error = useDraft(draftKey, "error");
   const notice = useDraft(draftKey, "notice");
-  const model = useSessionsStore((s) => s.byId[sessionId]?.model ?? "");
-  const effort = useSessionsStore((s) => s.byId[sessionId]?.effort ?? "");
-  const permission = useSessionsStore((s) => s.byId[sessionId]?.permissionMode ?? "");
-  const effortPending = useSessionsStore((s) => s.byId[sessionId]?.effortPending ?? false);
+  const model = useThreadsStore((s) => s.byId[threadId]?.model ?? "");
+  const effort = useThreadsStore((s) => s.byId[threadId]?.effort ?? "");
+  const permission = useThreadsStore((s) => s.byId[threadId]?.permissionMode ?? "");
+  const effortPending = useThreadsStore((s) => s.byId[threadId]?.effortPending ?? false);
   const promptKeys = useRef<PromptKeys | null>(null);
   const modelChoices = useModelChoices();
   const modelGroups = useMemo(() => [{ options: modelChoices }], [modelChoices]);
-  const sources = useThreadSources(sessionId);
+  const sources = useThreadSources(threadId);
   const editorRef = useRef<PromptEditorHandle>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [trigger, setTrigger] = useState<EditorTrigger | null>(null);
   // "/": the running process's own list (what "/name" runs); the disk scan while there is
   // none (not running yet, or a daemon that predates the list).
-  const commands = useSlashCommands(sessionId);
+  const commands = useSlashCommands(threadId);
   const skillSource = useSkillSource(trigger, skillSourcesKey(sources.skills), sources.repoIds);
   const commandSource = useCommandSource(trigger, commands, skillSourcesKey(sources.skills), sources.repoIds);
   const slashSource = commands.length > 0 ? commandSource : skillSource;
@@ -230,7 +230,7 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
     return () => {
       cancelAnimationFrame(raf);
     };
-  }, [focusSeq, contentFocusSeq, sessionId]);
+  }, [focusSeq, contentFocusSeq, threadId]);
 
   // The editor turns read-only while a send is in flight. Chromium drops its focus then;
   // WebKit keeps the element focused but no longer edits in it, and the editor's focus()
@@ -253,7 +253,7 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
   }, [sending]);
 
   const send = () => {
-    if (canSend) void sendThreadDraft(sessionId);
+    if (canSend) void sendThreadDraft(threadId);
   };
   const attach = (files: File[]) => {
     const added = addAttachments(draftKey, files);
@@ -289,9 +289,9 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
         }}
       >
         {docked && <PendingPrompts pending={pending} keysRef={promptKeys} refocus={refocus} />}
-        <SnoozeNote sessionId={sessionId} />
-        <RetryNote sessionId={sessionId} />
-        <ColdCacheNote sessionId={sessionId} pending={pending.length} />
+        <SnoozeNote threadId={threadId} />
+        <RetryNote threadId={threadId} />
+        <ColdCacheNote threadId={threadId} pending={pending.length} />
         <div
           className="col-span-2 flex min-w-0 flex-col"
           onKeyDownCapture={(e) => {
@@ -334,7 +334,7 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
             value={model}
             groups={modelGroups}
             onChange={(v) => {
-              if (v !== model) void setThreadModel(sessionId, v);
+              if (v !== model) void setThreadModel(threadId, v);
             }}
             contentClassName="w-44"
             data-testid="thread-model"
@@ -347,7 +347,7 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
             value={effort}
             groups={EFFORT_GROUPS}
             onChange={(v) => {
-              if (v !== effort) void setThreadEffort(sessionId, v);
+              if (v !== effort) void setThreadEffort(threadId, v);
             }}
             contentClassName="w-44"
             data-testid="thread-effort"
@@ -359,7 +359,7 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
             value={permission}
             groups={[{ options: PERMISSION_CHOICES.map((p) => ({ value: p.value, label: p.label, detail: p.hint })) }]}
             onChange={(v) => {
-              if (v !== permission) void setThreadPermission(sessionId, v as ComposePermission);
+              if (v !== permission) void setThreadPermission(threadId, v as ComposePermission);
             }}
             contentClassName="w-60"
             data-testid="thread-permission-mode"
@@ -398,7 +398,7 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
               className="intr"
               data-testid="thread-interrupt"
               onClick={() => {
-                void interruptThread(sessionId);
+                void interruptThread(threadId);
               }}
             >
               <i aria-hidden />

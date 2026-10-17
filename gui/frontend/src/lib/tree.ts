@@ -23,7 +23,7 @@ export interface TreeRepo {
 }
 
 /** One thread as the sidebar list needs it. */
-export interface ListSession {
+export interface ListThread {
   id: string;
   pinned: boolean;
   /** Where it sorts when unpinned (lib/session.ts threadGroup). */
@@ -74,24 +74,24 @@ export type HeaderRow = {
 };
 
 /** A thread row: the only rows that select something. */
-export type SessionRow = {
+export type ThreadRow = {
   key: string;
-  kind: "session";
+  kind: "thread";
   section: Section;
-  sessionId: string;
+  threadId: string;
 };
 
-export type Row = HeaderRow | SessionRow;
+export type Row = HeaderRow | ThreadRow;
 
-export function isSessionRow(row: Row): row is SessionRow {
-  return row.kind === "session";
+export function isThreadRow(row: Row): row is ThreadRow {
+  return row.kind === "thread";
 }
 
 export function headerKey(section: Section): string {
   return `h:${section}`;
 }
 
-export function sessionKey(id: string): string {
+export function threadKey(id: string): string {
   return `s:${id}`;
 }
 
@@ -104,7 +104,7 @@ function trimSlash(p: string): string {
  * one whose path is the longest prefix of it (on a path-segment boundary). Null when
  * nothing matches.
  */
-export function placeSession(s: { worktreePath: string }, worktrees: readonly WorktreeRef[]): WorktreeRef | null {
+export function placeThread(s: { worktreePath: string }, worktrees: readonly WorktreeRef[]): WorktreeRef | null {
   const path = trimSlash(s.worktreePath);
   if (!path) return null;
   const exact = worktrees.find((w) => trimSlash(w.path) === path);
@@ -146,12 +146,12 @@ export interface Sections {
  * archived first. A footer has its header only when it has threads; collapsed, the header
  * alone.
  */
-export function buildSections(sessions: readonly ListSession[], opts: ListOptions = {}): Sections {
-  const newest = [...sessions].reverse();
+export function buildSections(threads: readonly ListThread[], opts: ListOptions = {}): Sections {
+  const newest = [...threads].reverse();
   const live = newest.filter((s) => s.archivedAtMs === null && s.snoozedUntilMs === null);
   const unpinned = (...groups: ThreadGroup[]) => groups.flatMap((g) => live.filter((s) => !s.pinned && s.group === g));
-  const rowsOf = (section: Section, list: readonly ListSession[]): Row[] => list.map((s) => ({ key: sessionKey(s.id), kind: "session", section, sessionId: s.id }));
-  const footer = (section: FooterSection, label: string, list: readonly ListSession[], collapsed: boolean): Row[] =>
+  const rowsOf = (section: Section, list: readonly ListThread[]): Row[] => list.map((s) => ({ key: threadKey(s.id), kind: "thread", section, threadId: s.id }));
+  const footer = (section: FooterSection, label: string, list: readonly ListThread[], collapsed: boolean): Row[] =>
     list.length === 0 ? [] : [{ key: headerKey(section), kind: "header", section, label, count: list.length, collapsed }, ...(collapsed ? [] : rowsOf(section, list))];
   // Stable sort: equal archive times keep newest-created first.
   const archived = newest.filter((s) => s.archivedAtMs !== null).sort((a, b) => (b.archivedAtMs ?? 0) - (a.archivedAtMs ?? 0));
@@ -171,8 +171,8 @@ export function buildSections(sessions: readonly ListSession[], opts: ListOption
 }
 
 /** The sidebar rows in one order: the main list, then Working, Snoozed and Archived (buildSections). */
-export function buildRows(sessions: readonly ListSession[], opts: ListOptions = {}): Row[] {
-  const sec = buildSections(sessions, opts);
+export function buildRows(threads: readonly ListThread[], opts: ListOptions = {}): Row[] {
+  const sec = buildSections(threads, opts);
   return [...sec.main, ...FOOTERS.flatMap((f) => sec[f])];
 }
 
@@ -203,8 +203,8 @@ export function rowCache(): (rows: readonly Row[]) => Row[] {
 }
 
 /** Thread ids in sidebar order (cmd+1..9, cmd+shift+a); a collapsed section's threads are not in it. */
-export function sessionOrder(sessions: readonly ListSession[], opts: ListOptions = {}): string[] {
-  return buildRows(sessions, opts).flatMap((r) => (r.kind === "session" ? [r.sessionId] : []));
+export function threadOrder(threads: readonly ListThread[], opts: ListOptions = {}): string[] {
+  return buildRows(threads, opts).flatMap((r) => (r.kind === "thread" ? [r.threadId] : []));
 }
 
 /**

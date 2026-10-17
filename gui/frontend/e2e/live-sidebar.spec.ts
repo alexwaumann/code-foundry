@@ -24,7 +24,7 @@ function cli(...args: string[]): string {
   return execFileSync(BIN, args, { env: { ...process.env, CODE_FOUNDRY_HOME: HOME }, encoding: "utf8", timeout: 60_000 });
 }
 
-interface LiveSession {
+interface LiveThread {
   id: string;
   repoId?: string;
   worktreePath?: string;
@@ -34,8 +34,8 @@ interface LiveSession {
   status?: string;
 }
 
-function sessionInfo(id: string): LiveSession | undefined {
-  return ((JSON.parse(cli("thread", "list", "--json")) as { threads?: LiveSession[] }).threads ?? []).find((s) => s.id === id);
+function threadInfo(id: string): LiveThread | undefined {
+  return ((JSON.parse(cli("thread", "list", "--json")) as { threads?: LiveThread[] }).threads ?? []).find((s) => s.id === id);
 }
 
 async function shot(page: Page, name: string): Promise<void> {
@@ -52,7 +52,7 @@ test("flat sidebar, Projects page and Run in… with real threads", async ({ pag
   const [first, second] = ws.members;
   if (!first || !second) throw new Error(`workspace ${WORKSPACE} needs two members`);
   const start = (...args: string[]) =>
-    (JSON.parse(cli("thread", "new", ...args, "--model", "haiku", "--effort", "medium", "--permission", "auto", "--prompt", "say hi and stop", "--json")) as LiveSession).id;
+    (JSON.parse(cli("thread", "new", ...args, "--model", "haiku", "--effort", "medium", "--permission", "auto", "--prompt", "say hi and stop", "--json")) as LiveThread).id;
   const wsThread = start("--workspace", ws.workspace.id, "--repo", first.repoId);
   const projThread = start("--repo", second.repoId);
   try {
@@ -70,8 +70,8 @@ test("flat sidebar, Projects page and Run in… with real threads", async ({ pag
       await expect(projRow.getByTestId("row-project")).toHaveText(second.repoName);
       await expect(list.locator('[data-row-kind="repo"], [data-row-kind="worktree"]')).toHaveCount(0);
       // Both turns end (the unwatched ones then wait under Needs attention, "finished").
-      await expect.poll(() => sessionInfo(wsThread)?.status, { timeout: 120_000 }).toMatch(/IDLE|NEEDS_ATTENTION/);
-      await expect.poll(() => sessionInfo(projThread)?.status, { timeout: 120_000 }).toMatch(/IDLE|NEEDS_ATTENTION/);
+      await expect.poll(() => threadInfo(wsThread)?.status, { timeout: 120_000 }).toMatch(/IDLE|NEEDS_ATTENTION/);
+      await expect.poll(() => threadInfo(projThread)?.status, { timeout: 120_000 }).toMatch(/IDLE|NEEDS_ATTENTION/);
       await page.waitForTimeout(500);
       await shot(page, "live-sidebar-list");
     });
@@ -101,7 +101,7 @@ test("flat sidebar, Projects page and Run in… with real threads", async ({ pag
       await shot(page, "live-sidebar-moving");
       await expect(wsRow.getByTestId("row-moving")).toHaveCount(0, { timeout: 60_000 });
       await expect(wsRow.getByTestId("row-project")).toHaveText(second.repoName);
-      expect(sessionInfo(wsThread)).toMatchObject({ repoId: second.repoId, worktreePath: second.worktreePath, workspaceId: ws.workspace.id });
+      expect(threadInfo(wsThread)).toMatchObject({ repoId: second.repoId, worktreePath: second.worktreePath, workspaceId: ws.workspace.id });
       await page.waitForTimeout(300);
       await shot(page, "live-sidebar-moved");
     });

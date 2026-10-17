@@ -126,7 +126,7 @@ export function updateBadge(status: UpdateStatusView | null, guiVersion: string 
 
 /**
  * Threads a restart would cut off: busy = working, waiting on the user or running background work (restartCutsOff,
- * the daemon's command.ActiveSession). Any other thread loses nothing: a message starts it
+ * the daemon's command.ActiveThread). Any other thread loses nothing: a message starts it
  * again.
  */
 export interface ThreadActivity {

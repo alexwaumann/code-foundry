@@ -59,7 +59,7 @@ export function keyOf(sel: Selection): string | null {
   switch (sel.kind) {
     case "none":
       return null;
-    case "session":
+    case "thread":
       return `session:${sel.id}`;
     case "view":
       return `view:${sel.name}`;

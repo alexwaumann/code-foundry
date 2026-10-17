@@ -25,14 +25,14 @@ function tool(id: string, ordinal: number, input = ""): ThreadItemView {
   return { id, ordinal, parentToolUseId: "", createdAtMs: 1, updatedAtMs: 1, streaming: true, kind: "tool", toolUseId: id, name: "Bash", inputJson: input, status: "running", output: "", isError: false, resultJson: "" };
 }
 const pend = (requestId: string): ThreadPendingView => ({ requestId, itemId: `perm-${requestId}`, question: false, toolName: "Bash", summary: "Bash ls" });
-const snapshot = (seq: number, items: ThreadItemView[], pending: ThreadPendingView[] = []): ThreadEventView => ({ kind: "snapshot", sessionId: "s", seq, items, pending, mcp: null, commands: [], agents: [] });
+const snapshot = (seq: number, items: ThreadItemView[], pending: ThreadPendingView[] = []): ThreadEventView => ({ kind: "snapshot", threadId: "s", seq, items, pending, mcp: null, commands: [], agents: [] });
 
 function apply(log: ThreadLog | undefined, ...evs: ThreadEventView[]): ThreadLog | undefined {
   return evs.reduce(applyThreadEvent, log);
 }
 
 describe("applyThreadEvents (a batch)", () => {
-  const d = (seq: number, itemId: string, t: string): ThreadEventView => ({ kind: "delta", sessionId: "s", seq, itemId, ordinal: 1, field: "text", text: t });
+  const d = (seq: number, itemId: string, t: string): ThreadEventView => ({ kind: "delta", threadId: "s", seq, itemId, ordinal: 1, field: "text", text: t });
 
   it("matches one-by-one application, a resync snapshot mid-batch included, without touching its input", () => {
     const start = apply(undefined, snapshot(1, [text("a", 1, "x"), text("b", 2, "y")]));
@@ -40,7 +40,7 @@ describe("applyThreadEvents (a batch)", () => {
     const events: ThreadEventView[] = [
       d(2, "a", "1"),
       d(3, "a", "2"),
-      { kind: "appended", sessionId: "s", seq: 4, item: text("c", 3) },
+      { kind: "appended", threadId: "s", seq: 4, item: text("c", 3) },
       d(5, "c", "z"),
       // The daemon restarted: a new snapshot with a lower seq, then events above it; the
       // stale delta is dropped and nothing is duplicated.
@@ -68,18 +68,18 @@ describe("applyThreadEvents (a batch)", () => {
 
 describe("applyThreadEvent", () => {
   it("drops everything before the first snapshot", () => {
-    expect(apply(undefined, { kind: "appended", sessionId: "s", seq: 5, item: text("a", 1) })).toBeUndefined();
+    expect(apply(undefined, { kind: "appended", threadId: "s", seq: 5, item: text("a", 1) })).toBeUndefined();
   });
 
   it("applies events above the snapshot's seq and drops the rest (snapshot+seq dedupe)", () => {
     const log = apply(
       undefined,
       snapshot(10, [text("a", 1, "hi")]),
-      { kind: "appended", sessionId: "s", seq: 9, item: text("old", 2) },
-      { kind: "delta", sessionId: "s", seq: 10, itemId: "a", ordinal: 1, field: "text", text: " again" },
-      { kind: "delta", sessionId: "s", seq: 11, itemId: "a", ordinal: 1, field: "text", text: " there" },
-      { kind: "appended", sessionId: "s", seq: 12, item: text("b", 3) },
-      { kind: "delta", sessionId: "s", seq: 12, itemId: "b", ordinal: 3, field: "text", text: "dup" },
+      { kind: "appended", threadId: "s", seq: 9, item: text("old", 2) },
+      { kind: "delta", threadId: "s", seq: 10, itemId: "a", ordinal: 1, field: "text", text: " again" },
+      { kind: "delta", threadId: "s", seq: 11, itemId: "a", ordinal: 1, field: "text", text: " there" },
+      { kind: "appended", threadId: "s", seq: 12, item: text("b", 3) },
+      { kind: "delta", threadId: "s", seq: 12, itemId: "b", ordinal: 3, field: "text", text: "dup" },
     );
     expect(log?.seq).toBe(12);
     expect(log?.order).toEqual(["a", "b"]);
@@ -91,9 +91,9 @@ describe("applyThreadEvent", () => {
     const log = apply(
       undefined,
       snapshot(1, [tool("t", 1, '{"comm')]),
-      { kind: "delta", sessionId: "s", seq: 2, itemId: "t", ordinal: 1, field: "input", text: 'and":"ls"}' },
-      { kind: "delta", sessionId: "s", seq: 3, itemId: "t", ordinal: 1, field: "text", text: "nope" },
-      { kind: "delta", sessionId: "s", seq: 4, itemId: "missing", ordinal: 9, field: "text", text: "x" },
+      { kind: "delta", threadId: "s", seq: 2, itemId: "t", ordinal: 1, field: "input", text: 'and":"ls"}' },
+      { kind: "delta", threadId: "s", seq: 3, itemId: "t", ordinal: 1, field: "text", text: "nope" },
+      { kind: "delta", threadId: "s", seq: 4, itemId: "missing", ordinal: 9, field: "text", text: "x" },
     );
     expect(log?.byId.t).toMatchObject({ inputJson: '{"command":"ls"}' });
     expect(log?.seq).toBe(4);
@@ -104,10 +104,10 @@ describe("applyThreadEvent", () => {
     let log = apply(undefined, snapshot(1, [a, text("b", 2)]));
     expect(log?.order).toEqual(["b", "a"]);
     const order = log?.order;
-    log = apply(log, { kind: "updated", sessionId: "s", seq: 2, item: { ...a } });
+    log = apply(log, { kind: "updated", threadId: "s", seq: 2, item: { ...a } });
     expect(log?.byId.a).toBe(a);
     expect(log?.order).toBe(order);
-    log = apply(log, { kind: "updated", sessionId: "s", seq: 3, item: text("a", 5, "y") });
+    log = apply(log, { kind: "updated", threadId: "s", seq: 3, item: text("a", 5, "y") });
     expect(log?.byId.a).toMatchObject({ text: "y" });
     expect(log?.order).toBe(order);
   });
@@ -127,11 +127,11 @@ describe("applyThreadEvent", () => {
 
   it("replaces pending requests from pending events", () => {
     let log = apply(undefined, snapshot(1, []));
-    log = apply(log, { kind: "pending", sessionId: "s", seq: 2, pending: [pend("r1")] });
+    log = apply(log, { kind: "pending", threadId: "s", seq: 2, pending: [pend("r1")] });
     expect(log?.pending.map((p) => p.requestId)).toEqual(["r1"]);
-    log = apply(log, { kind: "pending", sessionId: "s", seq: 2, pending: [] });
+    log = apply(log, { kind: "pending", threadId: "s", seq: 2, pending: [] });
     expect(log?.pending).toHaveLength(1);
-    log = apply(log, { kind: "pending", sessionId: "s", seq: 3, pending: [] });
+    log = apply(log, { kind: "pending", threadId: "s", seq: 3, pending: [] });
     expect(log?.pending).toEqual([]);
   });
 });
@@ -146,7 +146,7 @@ describe("the MCP status on the log", () => {
       { name: "b", status: st, serverName: "", version: "", error: st === "failed" ? "boom" : "", scope: "user", source: "user", transport: "http", tools: [] },
     ],
   });
-  const mcp = (seq: number, s: McpStatusView | null): ThreadEventView => ({ kind: "mcp", sessionId: "s", seq, status: s });
+  const mcp = (seq: number, s: McpStatusView | null): ThreadEventView => ({ kind: "mcp", threadId: "s", seq, status: s });
 
   it("comes with the snapshot, follows mcp events by seq, keeps unchanged servers, and drops to null", () => {
     const start = apply(undefined, { ...snapshot(1, [text("a", 1)]), mcp: status(10, "failed") } as ThreadEventView);
@@ -171,7 +171,7 @@ describe("the MCP status on the log", () => {
 
 describe("slash commands", () => {
   const cmd = (name: string, builtin = true): SlashCommandView => ({ name, description: `${name} it`, argumentHint: "", aliases: [], builtin });
-  const commands = (seq: number, list: SlashCommandView[]): ThreadEventView => ({ kind: "commands", sessionId: "s", seq, commands: list });
+  const commands = (seq: number, list: SlashCommandView[]): ThreadEventView => ({ kind: "commands", threadId: "s", seq, commands: list });
 
   it("come with the snapshot, follow commands events above its seq, keep an unchanged list, and drop to empty", () => {
     const start = apply(undefined, { ...snapshot(3, [text("a", 1)]), commands: [cmd("compact"), cmd("deploy", false)] } as ThreadEventView);
@@ -201,7 +201,7 @@ describe("slash commands", () => {
 
   it("are batched like any other event", () => {
     const start = apply(undefined, snapshot(1, []));
-    const out = applyThreadEvents(start, [commands(2, [cmd("compact")]), { kind: "delta", sessionId: "s", seq: 3, itemId: "x", ordinal: 1, field: "text", text: "y" }]);
+    const out = applyThreadEvents(start, [commands(2, [cmd("compact")]), { kind: "delta", threadId: "s", seq: 3, itemId: "x", ordinal: 1, field: "text", text: "y" }]);
     expect(out?.seq).toBe(3);
     expect(out?.commands.map((c) => c.name)).toEqual(["compact"]);
   });
@@ -221,16 +221,16 @@ describe("sameItem", () => {
 
 describe("applyPendingEvent (EventService thread source)", () => {
   it("replaces on the snapshot, follows pending events by seq, and ignores item events", () => {
-    let p = applyPendingEvent({}, { kind: "pendingSnapshot", threads: [{ sessionId: "a", seq: 4, pending: [pend("r1")] }] });
+    let p = applyPendingEvent({}, { kind: "pendingSnapshot", threads: [{ threadId: "a", seq: 4, pending: [pend("r1")] }] });
     expect(Object.keys(p)).toEqual(["a"]);
-    const same = applyPendingEvent(p, { kind: "pendingSnapshot", threads: [{ sessionId: "a", seq: 4, pending: [pend("r1")] }] });
+    const same = applyPendingEvent(p, { kind: "pendingSnapshot", threads: [{ threadId: "a", seq: 4, pending: [pend("r1")] }] });
     expect(same).toBe(p);
-    p = applyPendingEvent(p, { kind: "pending", sessionId: "b", seq: 1, pending: [pend("r2")] });
+    p = applyPendingEvent(p, { kind: "pending", threadId: "b", seq: 1, pending: [pend("r2")] });
     expect(Object.keys(p).sort()).toEqual(["a", "b"]);
-    expect(applyPendingEvent(p, { kind: "pending", sessionId: "a", seq: 3, pending: [] })).toBe(p);
-    p = applyPendingEvent(p, { kind: "pending", sessionId: "a", seq: 5, pending: [] });
+    expect(applyPendingEvent(p, { kind: "pending", threadId: "a", seq: 3, pending: [] })).toBe(p);
+    p = applyPendingEvent(p, { kind: "pending", threadId: "a", seq: 5, pending: [] });
     expect(Object.keys(p)).toEqual(["b"]);
-    expect(applyPendingEvent(p, { kind: "appended", sessionId: "b", seq: 9, item: text("x", 1) })).toBe(p);
+    expect(applyPendingEvent(p, { kind: "appended", threadId: "b", seq: 9, item: text("x", 1) })).toBe(p);
   });
 });
 
@@ -247,8 +247,8 @@ describe("startThreadWatch", () => {
   it("applies the stream's events in one batch per frame and reports its status", async () => {
     watched.events = [
       snapshot(1, [text("a", 1, "he")]),
-      { kind: "delta", sessionId: "s", seq: 2, itemId: "a", ordinal: 1, field: "text", text: "l" },
-      { kind: "delta", sessionId: "s", seq: 3, itemId: "a", ordinal: 1, field: "text", text: "lo" },
+      { kind: "delta", threadId: "s", seq: 2, itemId: "a", ordinal: 1, field: "text", text: "l" },
+      { kind: "delta", threadId: "s", seq: 3, itemId: "a", ordinal: 1, field: "text", text: "lo" },
     ];
     const updates = vi.fn();
     const unsub = useThreadStore.subscribe((s, prev) => {
@@ -256,7 +256,7 @@ describe("startThreadWatch", () => {
     });
     const stop = startThreadWatch("s");
     await vi.advanceTimersByTimeAsync(0);
-    expect(useThreadStore.getState().watch).toMatchObject({ sessionId: "s", status: "open" });
+    expect(useThreadStore.getState().watch).toMatchObject({ threadId: "s", status: "open" });
     expect(useThreadStore.getState().logs.s).toBeUndefined();
     await vi.advanceTimersByTimeAsync(WATCH_BATCH_MS);
     expect(useThreadStore.getState().logs.s?.byId.a).toMatchObject({ text: "hello" });
@@ -270,7 +270,7 @@ describe("startThreadWatch", () => {
   it("keeps the logs of the last KEPT_LOGS watched threads only", async () => {
     const ids = Array.from({ length: KEPT_LOGS + 2 }, (_, i) => `t${String(i)}`);
     for (const id of ids) {
-      watched.events = [{ ...snapshot(1, [text("a", 1)]), sessionId: id }];
+      watched.events = [{ ...snapshot(1, [text("a", 1)]), threadId: id }];
       const stop = startThreadWatch(id);
       await vi.advanceTimersByTimeAsync(WATCH_BATCH_MS);
       stop();

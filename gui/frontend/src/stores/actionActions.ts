@@ -10,23 +10,23 @@ import { runFromResult, type ActionRunFinishedView } from "@/api/actions";
 import { invokeCommand, type UiContextView } from "@/api/command";
 import { errorMessage } from "@/api/stream";
 import { addArgs, editArgs, refusalText, type ActionDraft } from "@/lib/actions";
-import { ACTION_LABEL, REPO_LABEL, SESSION_LABEL, WORKTREE_LABEL } from "@/lib/termlabel";
+import { ACTION_LABEL, REPO_LABEL, THREAD_LABEL, WORKTREE_LABEL } from "@/lib/termlabel";
 import { useActionsStore } from "./actions";
 import { openActionRunOutput } from "./actionDialog";
 import { clearStopRequested, markStopRequested } from "./actionStops";
 import { closeBottomTerminal, revealShell, showOwnTerminal } from "./bottomActions";
 import { refreshCommands, runCommandForResult, useCommandsStore } from "./commands";
 import { getUiContext, repoContext, worktreeContext } from "./context";
-import { useSessionsStore } from "./threads";
+import { useThreadsStore } from "./threads";
 import { useTerminalsStore } from "./terminals";
 import { useUiStore } from "./ui";
 
 /** Who a run belongs to: a thread (its bottom panel) or a worktree (the Projects page's panel). */
-export type ActionOwner = { kind: "thread"; sessionId: string } | { kind: "worktree"; repoId: string; path: string };
+export type ActionOwner = { kind: "thread"; threadId: string } | { kind: "worktree"; repoId: string; path: string };
 
 /** The command context a run for `owner` is started in (action.run takes its owner from it). */
 export function ownerContext(owner: ActionOwner): UiContextView {
-  return owner.kind === "thread" ? getUiContext({ kind: "session", id: owner.sessionId }) : worktreeContext(owner.repoId, owner.path);
+  return owner.kind === "thread" ? getUiContext({ kind: "thread", id: owner.threadId }) : worktreeContext(owner.repoId, owner.path);
 }
 
 /**
@@ -45,8 +45,8 @@ export async function runAction(actionId: string, owner: ActionOwner): Promise<s
 
 /** The owner an action run's terminal belongs to, from its labels; null when it is not one. */
 export function ownerOfTerminal(labels: Readonly<Record<string, string>>): ActionOwner | null {
-  const session = labels[SESSION_LABEL];
-  if (session) return { kind: "thread", sessionId: session };
+  const thread = labels[THREAD_LABEL];
+  if (thread) return { kind: "thread", threadId: thread };
   const repoId = labels[REPO_LABEL] ?? "";
   const path = labels[WORKTREE_LABEL] ?? "";
   return repoId && path ? { kind: "worktree", repoId, path } : null;
@@ -150,9 +150,9 @@ export function setupFailedMessage(f: Pick<ActionRunFinishedView, "actionName" |
  * A failed worktree-create run's Open: select its thread, then its tab when the run had a
  * terminal, else (the daemon runs setup in the background) its captured output.
  */
-export function openFailedRun(f: Pick<ActionRunFinishedView, "runId" | "sessionId" | "terminalId" | "actionName">): void {
+export function openFailedRun(f: Pick<ActionRunFinishedView, "runId" | "threadId" | "terminalId" | "actionName">): void {
   if (f.terminalId && revealShell(f.terminalId)) return;
-  if (f.sessionId && f.sessionId in useSessionsStore.getState().byId) useUiStore.getState().select({ kind: "session", id: f.sessionId });
+  if (f.threadId && f.threadId in useThreadsStore.getState().byId) useUiStore.getState().select({ kind: "thread", id: f.threadId });
   openActionRunOutput(f.runId, f.actionName);
 }
 

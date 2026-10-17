@@ -215,7 +215,7 @@ describe("isDashboard", () => {
     ["the dashboard view", DASHBOARD, true],
     ["nothing selected (renders the dashboard too)", { kind: "none" }, true],
     ["another page", { kind: "view", name: "projects" }, false],
-    ["a thread", { kind: "session", id: "s-1" }, false],
+    ["a thread", { kind: "thread", id: "s-1" }, false],
   ];
   it.each(cases)("%s", (_name, sel, want) => {
     expect(isDashboard(sel)).toBe(want);

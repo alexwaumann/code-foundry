@@ -31,9 +31,9 @@ function estimate(r: TimelineRow | undefined): number {
 }
 
 /** The timeline's rows from the items' structure (lib/threadTimeline); text deltas do not rebuild it. */
-function useRows(sessionId: string, working: boolean): TimelineRow[] {
-  const keys = useTimelineKeys(sessionId);
-  const folds = useTurnFolds(sessionId);
+function useRows(threadId: string, working: boolean): TimelineRow[] {
+  const keys = useTimelineKeys(threadId);
+  const folds = useTurnFolds(threadId);
   const turns = useMemo(() => buildTurns(keys.map(decodeTimelineKey)), [keys]);
   return useMemo(() => buildRows(turns, { fold: (k) => folds[k], working }), [turns, folds, working]);
 }
@@ -51,8 +51,8 @@ function useRows(sessionId: string, working: boolean): TimelineRow[] {
  * Away from the bottom, a "Jump to bottom" chip floats above the composer; it scrolls
  * down and pins the list again.
  */
-export function Timeline({ sessionId, working, bottomInset }: { sessionId: string; working: boolean; bottomInset: number }) {
-  const rows = useRows(sessionId, working);
+export function Timeline({ threadId, working, bottomInset }: { threadId: string; working: boolean; bottomInset: number }) {
+  const rows = useRows(threadId, working);
   const scrollRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const pinned = useRef(true);

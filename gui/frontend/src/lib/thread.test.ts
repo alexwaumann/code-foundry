@@ -1,24 +1,24 @@
 import { describe, expect, it } from "vitest";
-import type { SessionStateView, SessionStatusView } from "@/api/threads";
+import type { ThreadStateView, ThreadStatusView } from "@/api/threads";
 import {
   attentionTier,
   badgeLabels,
   isThreadGroup,
   restartCutsOff,
-  sessionBadge,
+  threadBadge,
   shortAge,
   statusDetail,
   statusKind,
   statusNote,
   threadGroup,
   type CutOff,
-  type SessionBadge,
+  type ThreadBadge,
   type StatusKind,
   type ThreadGroup,
 } from "./thread";
 
 describe("threadGroup (the sidebar group of an unpinned thread)", () => {
-  it.each<[SessionStateView, SessionStatusView, string, ThreadGroup]>([
+  it.each<[ThreadStateView, ThreadStatusView, string, ThreadGroup]>([
     ["connected", "attention", "permission: Do you want to proceed?", "prompt"],
     ["connected", "attention", "question: Which?", "prompt"],
     ["connected", "attention", "error: overloaded", "prompt"],
@@ -56,7 +56,7 @@ describe("threadGroup (the sidebar group of an unpinned thread)", () => {
 // error), the store's "interrupted", and the removed screen detector's (Claude Code
 // 2.1.294 fixtures), which rows persisted before rendered-only threads still carry.
 describe("statusKind / statusDetail", () => {
-  it.each<[SessionStatusView, string, StatusKind, string]>([
+  it.each<[ThreadStatusView, string, StatusKind, string]>([
     ["attention", "finished", "done", ""],
     ["attention", "permission: Do you want to proceed?", "permission", "Do you want to proceed?"],
     ["attention", "waiting for approval: Bash", "permission", "Bash"],
@@ -84,8 +84,8 @@ describe("statusKind / statusDetail", () => {
 
 // The badge never tells whether Claude's process runs: a stopped thread reads as its
 // status (idle when that would be idle, unknown or a stale busy), starting reads as busy.
-describe("sessionBadge", () => {
-  it.each<[SessionStateView, SessionStatusView, SessionBadge]>([
+describe("threadBadge", () => {
+  it.each<[ThreadStateView, ThreadStatusView, ThreadBadge]>([
     ["connected", "busy", "busy"],
     ["connected", "idle", "idle"],
     ["connected", "attention", "attention"],
@@ -106,19 +106,19 @@ describe("sessionBadge", () => {
     ["disconnected", "attention", "attention"],
     ["disconnected", "error", "error"],
   ])("%s %s", (state, status, want) => {
-    expect(sessionBadge({ state, status })).toBe(want);
+    expect(threadBadge({ state, status })).toBe(want);
   });
   it("is unknown without a session", () => {
-    expect(sessionBadge(undefined)).toBe("unknown");
+    expect(threadBadge(undefined)).toBe("unknown");
   });
   it("has no lifecycle badges", () => {
     expect(Object.keys(badgeLabels).sort()).toEqual(["attention", "busy", "error", "idle", "unknown"]);
   });
 });
 
-// The daemon's command.ActiveSession: what a restart cuts off.
+// The daemon's command.ActiveThread: what a restart cuts off.
 describe("restartCutsOff", () => {
-  it.each<[SessionStateView, SessionStatusView, string, CutOff | null]>([
+  it.each<[ThreadStateView, ThreadStatusView, string, CutOff | null]>([
     ["starting", "idle", "", "working"],
     ["starting", "attention", "finished", "working"],
     ["connected", "busy", "working", "working"],
@@ -136,7 +136,7 @@ describe("restartCutsOff", () => {
   });
 
   // Background work counts like the daemon's archiveInterrupts, after mid-turn, only with a process.
-  it.each<[SessionStateView, SessionStatusView, number, number, boolean, CutOff | null]>([
+  it.each<[ThreadStateView, ThreadStatusView, number, number, boolean, CutOff | null]>([
     ["connected", "idle", 1, 0, false, "background"],
     ["connected", "attention", 0, 2, false, "background"],
     ["connected", "idle", 0, 0, true, "reporting"],
@@ -149,7 +149,7 @@ describe("restartCutsOff", () => {
 });
 
 describe("statusNote / attentionTier", () => {
-  it.each<[SessionStatusView, string, string, string]>([
+  it.each<[ThreadStatusView, string, string, string]>([
     ["attention", "permission: Do you want to proceed?", "Do you want to proceed?", "prompt"],
     ["attention", "waiting for approval: Bash", "Bash", "prompt"],
     ["attention", "question: Which?", "Which?", "prompt"],

@@ -30,8 +30,8 @@ function run(id: string, o: Partial<AgentRunView> = {}): AgentRunView {
   };
 }
 
-const snapshot = (seq: number, agents: AgentRunView[]): ThreadEventView => ({ kind: "snapshot", sessionId: "s", seq, items: [], pending: [], mcp: null, commands: [], agents });
-const agentsEv = (seq: number, agents: AgentRunView[]): ThreadEventView => ({ kind: "agents", sessionId: "s", seq, agents });
+const snapshot = (seq: number, agents: AgentRunView[]): ThreadEventView => ({ kind: "snapshot", threadId: "s", seq, items: [], pending: [], mcp: null, commands: [], agents });
+const agentsEv = (seq: number, agents: AgentRunView[]): ThreadEventView => ({ kind: "agents", threadId: "s", seq, agents });
 
 describe("the thread log's agents", () => {
   it("the snapshot sets them; an agents event replaces them, sharing unchanged runs", () => {

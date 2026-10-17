@@ -44,7 +44,7 @@ export interface ConfirmationView {
 /** What the user is looking at. Mirrors codefoundry.v1.UiContext; empty string = none. */
 export interface UiContextView {
   activeTerminalId: string;
-  activeSessionId: string;
+  activeThreadId: string;
   activeRepoId: string;
   activeWorktreePath: string;
   activeView: string;
@@ -103,8 +103,8 @@ export function isUnknownCommand(err: unknown): boolean {
 }
 
 export function toUiContext(ctx: UiContextView): UiContext {
-  const { activeSessionId, ...rest } = ctx;
-  return create(UiContextSchema, { ...rest, activeThreadId: activeSessionId });
+  const { activeThreadId, ...rest } = ctx;
+  return create(UiContextSchema, { ...rest, activeThreadId: activeThreadId });
 }
 
 export async function listCommands(

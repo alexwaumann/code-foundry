@@ -1,9 +1,9 @@
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { AgentRunView } from "@/api/agents";
-import type { SessionView } from "@/api/threads";
+import type { ThreadView } from "@/api/threads";
 import { useCommandsStore } from "@/stores/commands";
-import { useSessionsStore } from "@/stores/threads";
+import { useThreadsStore } from "@/stores/threads";
 import { useThreadStore } from "@/stores/thread";
 import { AgentsStrip } from "./AgentsStrip";
 
@@ -34,12 +34,12 @@ function run(id: string, o: Partial<AgentRunView> = {}): AgentRunView {
   };
 }
 
-const session = (o: Partial<SessionView>) => ({ id: "s", state: "connected", status: "idle", archivedAtMs: null, agentsRunning: 0, backgroundAgentsRunning: 0, backgroundShellsRunning: 0, ...o }) as SessionView;
+const thread = (o: Partial<ThreadView>) => ({ id: "s", state: "connected", status: "idle", archivedAtMs: null, agentsRunning: 0, backgroundAgentsRunning: 0, backgroundShellsRunning: 0, ...o }) as ThreadView;
 
-function setup(o: Partial<SessionView>, agents: AgentRunView[]) {
-  useSessionsStore.setState({ byId: { s: session(o) }, order: ["s"] });
+function setup(o: Partial<ThreadView>, agents: AgentRunView[]) {
+  useThreadsStore.setState({ byId: { s: thread(o) }, order: ["s"] });
   useThreadStore.setState({ logs: { s: { seq: 1, byId: {}, order: [], pending: [], mcp: null, commands: [], agents } } });
-  render(<AgentsStrip sessionId="s" />);
+  render(<AgentsStrip threadId="s" />);
 }
 
 const RUNS = [
@@ -110,7 +110,7 @@ describe("AgentsStrip", () => {
     setup({ agentsRunning: 1, backgroundAgentsRunning: 1 }, [run("PR 1")]);
     expect(screen.getByTestId("agents-strip")).not.toBeNull();
     act(() => {
-      useSessionsStore.setState({ byId: { s: session({ backgroundAgentsRunning: 0 }) } });
+      useThreadsStore.setState({ byId: { s: thread({ backgroundAgentsRunning: 0 }) } });
     });
     expect(screen.queryByTestId("agents-strip")).toBeNull();
   });
@@ -119,12 +119,12 @@ describe("AgentsStrip", () => {
     setup({ agentsRunning: 1, backgroundAgentsRunning: 1, backgroundShellsRunning: 1 }, [run("PR 1")]);
     expect(screen.getByTestId("agents-strip").getAttribute("data-kind")).toBe("agents");
     act(() => {
-      useSessionsStore.setState({ byId: { s: session({ backgroundShellsRunning: 1 }) } });
+      useThreadsStore.setState({ byId: { s: thread({ backgroundShellsRunning: 1 }) } });
     });
     expect(screen.getByTestId("agents-strip").getAttribute("data-kind")).toBe("shells");
     expect(screen.getByTestId("agents-strip-count").textContent).toBe("1 shell running in the background");
     act(() => {
-      useSessionsStore.setState({ byId: { s: session({}) } });
+      useThreadsStore.setState({ byId: { s: thread({}) } });
     });
     expect(screen.queryByTestId("agents-strip")).toBeNull();
   });

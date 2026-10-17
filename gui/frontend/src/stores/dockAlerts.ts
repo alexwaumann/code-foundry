@@ -10,7 +10,7 @@
  */
 import { bounceDock, playAlertSound, setDockBadge } from "@/api/app";
 import type { SettingsSnapshotView } from "@/api/settings";
-import { attentionIds, useSessionsStore } from "./threads";
+import { attentionIds, useThreadsStore } from "./threads";
 import { useSettingsStore } from "./settings";
 
 /** The notifications.* settings (internal/store/settings/schema.go). */
@@ -71,7 +71,7 @@ export interface DockAlertsState {
 export const initialDockAlerts: DockAlertsState = { epoch: null, attention: new Set(), badge: null, lastAlertAtMs: null };
 
 export interface DockAlertsInput {
-  /** useSessionsStore's epoch: a change means the set was replaced (startup, reconnect). */
+  /** useThreadsStore's epoch: a change means the set was replaced (startup, reconnect). */
   epoch: number;
   /** attentionIds of the current sessions: the bell and window title count. */
   attention: readonly string[];
@@ -151,10 +151,10 @@ function sameAlertSettings(a: SettingsSnapshotView | null, b: SettingsSnapshotVi
 export function startDockAlerts(deps: DockAlertsDeps = hostDeps): () => void {
   let state = initialDockAlerts;
   const evaluate = () => {
-    const sessions = useSessionsStore.getState();
+    const threads = useThreadsStore.getState();
     const next = stepDockAlerts(state, {
-      epoch: sessions.epoch,
-      attention: attentionIds(sessions),
+      epoch: threads.epoch,
+      attention: attentionIds(threads),
       focused: deps.focused(),
       nowMs: deps.now(),
       settings: alertSettings(useSettingsStore.getState().snapshot),
@@ -171,7 +171,7 @@ export function startDockAlerts(deps: DockAlertsDeps = hostDeps): () => void {
   };
   evaluate();
   const stops = [
-    useSessionsStore.subscribe((s, prev) => {
+    useThreadsStore.subscribe((s, prev) => {
       if (s.byId !== prev.byId || s.order !== prev.order || s.epoch !== prev.epoch) evaluate();
     }),
     useSettingsStore.subscribe((s, prev) => {

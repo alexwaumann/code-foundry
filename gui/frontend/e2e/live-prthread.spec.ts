@@ -11,7 +11,7 @@
  *
  *   LIVE_DAEMON=1 LIVE_APP_URL=http://127.0.0.1:9372 LIVE_REPO=code-foundry \
  *   LIVE_PR_SLUG=alexwaumann/code-foundry LIVE_PR=1 LIVE_SHOTS=<dir> \
- *   pnpm run e2e:live e2e/live-prsession.spec.ts
+ *   pnpm run e2e:live e2e/live-prthread.spec.ts
  */
 import { expect, test } from "@playwright/test";
 
@@ -39,7 +39,7 @@ test("Explain this PR starts a real Claude session with the explain prompt", asy
 
   await page.getByTestId("pr-menu-button").click();
   await page.getByTestId("pr-menu-explain").click();
-  const selected = page.locator('[data-row-kind="session"][aria-selected="true"]');
+  const selected = page.locator('[data-row-kind="thread"][aria-selected="true"]');
   await expect(selected).toHaveAttribute("data-row-key", /^s:s-/, { timeout: 60_000 });
   const key = (await selected.getAttribute("data-row-key")) ?? "";
   console.log(`session ${key.slice(2)}`);

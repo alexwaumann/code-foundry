@@ -49,7 +49,7 @@ function RunOutput({ runId }: { runId: string }) {
   const { run, output, truncated } = load.data;
   const took = run.startedAtMs !== null && run.finishedAtMs !== null ? formatRunDuration(run.finishedAtMs - run.startedAtMs) : null;
   const path = splitPathTail(tildify(run.worktreePath));
-  const owner = run.sessionId ? ({ kind: "thread", sessionId: run.sessionId } as const) : ({ kind: "worktree", repoId: run.repoId, path: run.worktreePath } as const);
+  const owner = run.threadId ? ({ kind: "thread", threadId: run.threadId } as const) : ({ kind: "worktree", repoId: run.repoId, path: run.worktreePath } as const);
   return (
     <>
       {/* One line: only the path gives way, its directory first (a middle ellipsis), so the

@@ -12,7 +12,7 @@ import { useShallow } from "zustand/react/shallow";
 import { getMcpStatus, type McpServerView, type McpStatusView } from "@/api/mcp";
 import { errorMessage } from "@/api/stream";
 import { runCommandForResult } from "./commands";
-import { sessionContext } from "./threadActions";
+import { threadContext } from "./threadActions";
 import { useThreadStore } from "./thread";
 
 export const MCP_COMMANDS = { status: "thread.mcp", reconnect: "thread.mcp-reconnect" } as const;
@@ -29,51 +29,51 @@ export const useMcpStore = create<McpState>()(() => ({ reconnecting: {}, refresh
 const NO_NAMES: readonly string[] = [];
 
 /** The thread's MCP status: undefined before its Watch's snapshot, null when it has none. */
-export function useMcpStatus(sessionId: string): McpStatusView | null | undefined {
-  return useThreadStore((s) => (s.logs[sessionId] ? s.logs[sessionId].mcp : undefined));
+export function useMcpStatus(threadId: string): McpStatusView | null | undefined {
+  return useThreadStore((s) => (s.logs[threadId] ? s.logs[threadId].mcp : undefined));
 }
 
 /** The servers' names in Claude's order (shallow-stable across checks that change nothing). */
-export function useMcpServerNames(sessionId: string): readonly string[] {
-  return useThreadStore(useShallow((s) => s.logs[sessionId]?.mcp?.servers.map((x) => x.name) ?? NO_NAMES));
+export function useMcpServerNames(threadId: string): readonly string[] {
+  return useThreadStore(useShallow((s) => s.logs[threadId]?.mcp?.servers.map((x) => x.name) ?? NO_NAMES));
 }
 
 /** One server (narrow: a check keeps unchanged servers by identity, lib/mcp shareMcp). */
-export function useMcpServer(sessionId: string, name: string): McpServerView | undefined {
-  return useThreadStore((s) => s.logs[sessionId]?.mcp?.servers.find((x) => x.name === name));
+export function useMcpServer(threadId: string, name: string): McpServerView | undefined {
+  return useThreadStore((s) => s.logs[threadId]?.mcp?.servers.find((x) => x.name === name));
 }
 
 /** The header's figures: when and why checked, how many connected of how many. */
-export function useMcpHeader(sessionId: string): { checkedAtMs: number | null; trigger: McpStatusView["trigger"]; server: string; connected: number; total: number } | null {
+export function useMcpHeader(threadId: string): { checkedAtMs: number | null; trigger: McpStatusView["trigger"]; server: string; connected: number; total: number } | null {
   return useThreadStore(
     useShallow((s) => {
-      const m = s.logs[sessionId]?.mcp;
+      const m = s.logs[threadId]?.mcp;
       if (!m) return null;
       return { checkedAtMs: m.checkedAtMs, trigger: m.trigger, server: m.server, connected: m.servers.filter((x) => x.status === "connected").length, total: m.servers.length };
     }),
   );
 }
 
-export function useMcpReconnecting(sessionId: string, name: string): boolean {
-  return useMcpStore((s) => s.reconnecting[sessionId]?.[name] === true);
+export function useMcpReconnecting(threadId: string, name: string): boolean {
+  return useMcpStore((s) => s.reconnecting[threadId]?.[name] === true);
 }
 
-export function useMcpRefreshing(sessionId: string): boolean {
-  return useMcpStore((s) => s.refreshing[sessionId] === true);
+export function useMcpRefreshing(threadId: string): boolean {
+  return useMcpStore((s) => s.refreshing[threadId] === true);
 }
 
-function setReconnecting(sessionId: string, name: string, on: boolean): void {
+function setReconnecting(threadId: string, name: string, on: boolean): void {
   useMcpStore.setState((s) => {
-    const cur: Record<string, true> = Object.fromEntries(Object.entries(s.reconnecting[sessionId] ?? {}).filter(([k]) => k !== name));
+    const cur: Record<string, true> = Object.fromEntries(Object.entries(s.reconnecting[threadId] ?? {}).filter(([k]) => k !== name));
     if (on) cur[name] = true;
-    return { reconnecting: { ...s.reconnecting, [sessionId]: cur } };
+    return { reconnecting: { ...s.reconnecting, [threadId]: cur } };
   });
 }
 
-function setRefreshing(sessionId: string, on: boolean): void {
+function setRefreshing(threadId: string, on: boolean): void {
   useMcpStore.setState((s) => {
-    const { [sessionId]: _was, ...rest } = s.refreshing;
-    return { refreshing: on ? { ...rest, [sessionId]: true } : rest };
+    const { [threadId]: _was, ...rest } = s.refreshing;
+    return { refreshing: on ? { ...rest, [threadId]: true } : rest };
   });
 }
 
@@ -92,28 +92,28 @@ export function reconnectError(resultJson: string): string {
  * with a spinner on its button. A server that still fails is toasted with Claude's reason
  * (the card shows it too, from the check that follows). Resolves whether it connected.
  */
-export async function reconnectMcp(sessionId: string, name: string): Promise<boolean> {
-  if (useMcpStore.getState().reconnecting[sessionId]?.[name]) return false;
-  setReconnecting(sessionId, name, true);
+export async function reconnectMcp(threadId: string, name: string): Promise<boolean> {
+  if (useMcpStore.getState().reconnecting[threadId]?.[name]) return false;
+  setReconnecting(threadId, name, true);
   try {
-    const res = await runCommandForResult(MCP_COMMANDS.reconnect, { id: sessionId, server: name }, { ctx: sessionContext(sessionId), quiet: true });
+    const res = await runCommandForResult(MCP_COMMANDS.reconnect, { id: threadId, server: name }, { ctx: threadContext(threadId), quiet: true });
     if (!res) return false;
     const err = reconnectError(res.resultJson);
     if (err) toast.error(`Could not reconnect ${name}`, { description: err });
     return err === "";
   } finally {
-    setReconnecting(sessionId, name, false);
+    setReconnecting(threadId, name, false);
   }
 }
 
 /** Re-checks the thread's servers (thread.mcp --refresh, the header's button). */
-export async function refreshMcp(sessionId: string): Promise<boolean> {
-  if (useMcpStore.getState().refreshing[sessionId]) return false;
-  setRefreshing(sessionId, true);
+export async function refreshMcp(threadId: string): Promise<boolean> {
+  if (useMcpStore.getState().refreshing[threadId]) return false;
+  setRefreshing(threadId, true);
   try {
-    return (await runCommandForResult(MCP_COMMANDS.status, { id: sessionId, refresh: "true" }, { ctx: sessionContext(sessionId), quiet: true })) !== null;
+    return (await runCommandForResult(MCP_COMMANDS.status, { id: threadId, refresh: "true" }, { ctx: threadContext(threadId), quiet: true })) !== null;
   } finally {
-    setRefreshing(sessionId, false);
+    setRefreshing(threadId, false);
   }
 }
 
@@ -123,10 +123,10 @@ export async function refreshMcp(sessionId: string): Promise<boolean> {
  * arrives through the Watch. The surface calls it from an effect keyed on the thread and
  * whether a status is there, so it does not repeat.
  */
-export function ensureMcpStatus(sessionId: string): void {
-  const log = useThreadStore.getState().logs[sessionId];
+export function ensureMcpStatus(threadId: string): void {
+  const log = useThreadStore.getState().logs[threadId];
   if (!log || log.mcp !== null) return;
-  getMcpStatus(sessionId).catch((err: unknown) => {
+  getMcpStatus(threadId).catch((err: unknown) => {
     console.warn("mcp status", errorMessage(err));
   });
 }

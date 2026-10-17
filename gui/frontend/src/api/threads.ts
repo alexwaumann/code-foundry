@@ -18,20 +18,20 @@ import { orOutdatedDaemon } from "./errors";
  * Where the thread's Claude process is. The daemon manages it (starts it on a message,
  * stops it at cache expiry) and it is internal to the GUI: nothing on screen says it
  * (docs/notes/hide-connection-state.md). Read it only where behaviour needs it, through
- * lib/session (sessionBadge, threadGroup, restartCutsOff).
+ * lib/session (threadBadge, threadGroup, restartCutsOff).
  */
-export type SessionStateView = "starting" | "connected" | "closing" | "disconnected" | "unknown";
+export type ThreadStateView = "starting" | "connected" | "closing" | "disconnected" | "unknown";
 /**
  * What Claude is doing. Persisted by the daemon: a stopped session keeps the status it
  * ended with ("attention" with its reason survives a restart). "error" is set on a
  * session whose process ended mid-turn (statusReason "interrupted") or did not start.
  */
-export type SessionStatusView = "busy" | "idle" | "attention" | "error" | "unknown";
+export type ThreadStatusView = "busy" | "idle" | "attention" | "error" | "unknown";
 /** claude --permission-mode, as session.new's `permission` arg spells it; "" = Claude's default. */
 export type PermissionModeView = "supervised" | "accept-edits" | "auto" | "";
 
 /** View model for a Claude session. Generated types stay inside src/api. */
-export interface SessionView {
+export interface ThreadView {
   id: string;
   claudeSessionId: string;
   repoId: string;
@@ -40,8 +40,8 @@ export interface SessionView {
   autoNamed: boolean;
   model: string;
   effort: string;
-  state: SessionStateView;
-  status: SessionStatusView;
+  state: ThreadStateView;
+  status: ThreadStatusView;
   /**
    * The reason for status, e.g. "finished", "at prompt", "permission: Bash git push",
    * "question: Which one?", or "interrupted" for "error". Classify it with statusKind / statusDetail (lib/session), not by hand.
@@ -226,13 +226,13 @@ export interface LinkedPullRequestView {
  * speed, day): usage over every thread is the sessions' usage plus it. A "retiredUsage"
  * event follows "removed" when the removed thread had usage and carries the whole ledger.
  */
-export type SessionEventView =
-  | { kind: "snapshot"; sessions: SessionView[]; retiredUsage: UsageBucketView[] }
-  | { kind: "updated"; session: SessionView }
+export type ThreadListEventView =
+  | { kind: "snapshot"; threads: ThreadView[]; retiredUsage: UsageBucketView[] }
+  | { kind: "updated"; thread: ThreadView }
   | { kind: "removed"; id: string }
   | { kind: "retiredUsage"; buckets: UsageBucketView[] };
 
-const stateMap: Record<ThreadState, SessionStateView> = {
+const stateMap: Record<ThreadState, ThreadStateView> = {
   [ThreadState.UNSPECIFIED]: "unknown",
   [ThreadState.STARTING]: "starting",
   [ThreadState.CONNECTED]: "connected",
@@ -240,7 +240,7 @@ const stateMap: Record<ThreadState, SessionStateView> = {
   [ThreadState.DISCONNECTED]: "disconnected",
 };
 
-const statusMap: Record<ThreadStatus, SessionStatusView> = {
+const statusMap: Record<ThreadStatus, ThreadStatusView> = {
   [ThreadStatus.UNSPECIFIED]: "unknown",
   [ThreadStatus.BUSY]: "busy",
   [ThreadStatus.IDLE]: "idle",
@@ -255,7 +255,7 @@ const permissionMap: Record<PermissionMode, PermissionModeView> = {
   [PermissionMode.AUTO]: "auto",
 };
 
-export function toSessionView(s: Thread): SessionView {
+export function toThreadView(s: Thread): ThreadView {
   return {
     id: s.id,
     claudeSessionId: s.claudeSessionId,
@@ -344,13 +344,13 @@ export function toUsageBucketView(b: UsageBucket): UsageBucketView {
   };
 }
 
-export function toSessionEventView(ev: ThreadListEvent): SessionEventView | null {
+export function toThreadListEventView(ev: ThreadListEvent): ThreadListEventView | null {
   const e = ev.event;
   switch (e.case) {
     case "snapshot":
-      return { kind: "snapshot", sessions: e.value.threads.map(toSessionView), retiredUsage: e.value.retiredUsage.map(toUsageBucketView) };
+      return { kind: "snapshot", threads: e.value.threads.map(toThreadView), retiredUsage: e.value.retiredUsage.map(toUsageBucketView) };
     case "updated":
-      return { kind: "updated", session: toSessionView(e.value) };
+      return { kind: "updated", thread: toThreadView(e.value) };
     case "removedId":
       return { kind: "removed", id: e.value };
     case "retiredUsage":
@@ -360,10 +360,10 @@ export function toSessionEventView(ev: ThreadListEvent): SessionEventView | null
   }
 }
 
-export async function listSessions(conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<SessionView[]> {
+export async function listThreads(conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<ThreadView[]> {
   const c = await conn.client(ThreadService);
   const res = await c.list({}, { signal });
-  return res.threads.map(toSessionView);
+  return res.threads.map(toThreadView);
 }
 
 /**

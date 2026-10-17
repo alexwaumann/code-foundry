@@ -185,7 +185,7 @@ export class GhWorld {
         this.pr(gp, 12, "renderer: port glyph cache to the new atlas", { headRef: "atlas", checks: rollup(CheckRollupState.PENDING, 9, 0, 4), ageMs: 2 * DAY }),
       ],
       reviewRequested: [
-        this.pr(cf, 139, "feat(session): JSONL transcript discovery", { author: "teammate-kim", headRef: "jsonl", checks: rollup(CheckRollupState.SUCCESS, 30), ageMs: 3 * HOUR }),
+        this.pr(cf, 139, "feat(thread): JSONL transcript discovery", { author: "teammate-kim", headRef: "jsonl", checks: rollup(CheckRollupState.SUCCESS, 30), ageMs: 3 * HOUR }),
         this.pr("other-org/lib", 77, "chore: bump deps", { author: "renovate", checks: rollup(CheckRollupState.SUCCESS, 4), ageMs: 6 * HOUR }),
       ],
       reviewed: [this.pr(cf, 133, "refactor(api): one events stream", { author: "teammate-kim", headRef: "events", ageMs: 9 * HOUR })],

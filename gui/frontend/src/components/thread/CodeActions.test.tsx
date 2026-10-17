@@ -25,7 +25,7 @@ function show(items: ThreadItemView[]): HTMLElement {
   const rows = buildRows(buildTurns(items.map((it) => decodeTimelineKey(timelineKey(structOf(it))))), { fold: () => undefined, working: false });
   return render(
     <div className="cf-thread">
-      <ThreadContext.Provider value={{ sessionId: "s", cwd: "/w" }}>
+      <ThreadContext.Provider value={{ threadId: "s", cwd: "/w" }}>
         {rows.map((r) => (
           <TimelineRowView key={r.key} row={r} />
         ))}

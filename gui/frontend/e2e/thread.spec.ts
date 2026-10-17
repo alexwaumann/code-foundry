@@ -374,7 +374,7 @@ test("a follow-up goes through thread.send with the composer's tags projected; t
   const send = (await invocations()).find((i) => i.name === "thread.send");
   expect(send?.args).toMatchObject({ id: "s-r1", text: "Ship it with /review" });
   expect(send?.args["composer-text"]).toMatch(/^Ship it with \[\/review\]\(cf-skill:\/\/[\w.~-]+\/review\)$/);
-  expect(send?.context).toMatchObject({ activeThreadId: "s-r1", activeView: "session" });
+  expect(send?.context).toMatchObject({ activeThreadId: "s-r1", activeView: "thread" });
   await expect(page.getByTestId("thread-user").last()).toContainText("Ship it with");
   await expect(page.getByTestId("thread-user").last().locator('[data-tag-kind="skill"]')).toHaveText("/review");
   await expect(pane(page).locator('[data-testid="thread-text"]').last()).toContainText("Got it: I'll take a look now.");
@@ -533,7 +533,7 @@ test("a fork shows its parent's conversation, ended by a Forked from note", asyn
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("Fork Thread");
   await page.keyboard.press("Enter");
-  const fork = page.locator('[data-row-kind="session"][aria-selected="true"]');
+  const fork = page.locator('[data-row-kind="thread"][aria-selected="true"]');
   await expect(fork).not.toHaveAttribute("data-row-key", "s:s-r1");
   await expect(page.getByTestId("thread-pane")).toBeVisible();
   const note = pane(page).getByTestId("thread-note");

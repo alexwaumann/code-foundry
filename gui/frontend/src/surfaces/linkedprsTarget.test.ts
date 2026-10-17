@@ -1,38 +1,38 @@
 import { describe, expect, it } from "vitest";
-import type { LinkedPullRequestView, SessionView } from "@/api/threads";
+import type { LinkedPullRequestView, ThreadView } from "@/api/threads";
 import type { ReposData } from "@/stores/repos";
-import type { SessionsData } from "@/stores/threads";
+import type { ThreadsData } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
 import { linkedCount, linkedPrsTab, newestFirst, prBadge, selectionLinkedThread, selectionThread, spansRepos, urlHost } from "./linkedprsTarget";
 
 const WEB = "/src/web";
 const link = (slug: string, number: number, linkedAt: number | null = number): LinkedPullRequestView => ({ slug, number, url: `https://github.com/${slug}/pull/${String(number)}`, linkedAt });
 
-function session(id: string, o: Partial<SessionView> = {}): SessionView {
-  return { id, repoId: "web", worktreePath: WEB, workspaceId: "", pendingWorktreePath: "", state: "connected", terminalId: "", linkedPullRequests: [], ...o } as SessionView;
+function thread(id: string, o: Partial<ThreadView> = {}): ThreadView {
+  return { id, repoId: "web", worktreePath: WEB, workspaceId: "", pendingWorktreePath: "", state: "connected", terminalId: "", linkedPullRequests: [], ...o } as ThreadView;
 }
 
 const repos: ReposData = { byId: {}, order: [] };
 
-function sessions(...list: SessionView[]): SessionsData {
+function threads(...list: ThreadView[]): ThreadsData {
   return { byId: Object.fromEntries(list.map((s) => [s.id, s])), order: list.map((s) => s.id) };
 }
 
 const s = {
   repos,
-  sessions: sessions(session("s-linked", { linkedPullRequests: [link("o/web", 5)], workspaceId: "w1" }), session("s-bare")),
+  threads: threads(thread("s-linked", { linkedPullRequests: [link("o/web", 5)], workspaceId: "w1" }), thread("s-bare")),
 };
 
 describe("selectionThread / selectionLinkedThread (the surface's availability)", () => {
   it.each<[string, Selection, string | null, string | null]>([
-    ["a thread with links", { kind: "session", id: "s-linked" }, "s-linked", "s-linked"],
-    ["a thread without links", { kind: "session", id: "s-bare" }, "s-bare", null],
-    ["an unknown thread", { kind: "session", id: "s-404" }, null, null],
+    ["a thread with links", { kind: "thread", id: "s-linked" }, "s-linked", "s-linked"],
+    ["a thread without links", { kind: "thread", id: "s-bare" }, "s-bare", null],
+    ["an unknown thread", { kind: "thread", id: "s-404" }, null, null],
     ["a composer", { kind: "compose", repoId: "web" }, null, null],
     ["a page", { kind: "view", name: "pullrequests" }, null, null],
     ["nothing", { kind: "none" }, null, null],
-  ])("%s", (_name, sel, thread, linked) => {
-    expect(selectionThread(sel, s)).toBe(thread);
+  ])("%s", (_name, sel, want, linked) => {
+    expect(selectionThread(sel, s)).toBe(want);
     expect(selectionLinkedThread(sel, s)).toBe(linked);
   });
 });

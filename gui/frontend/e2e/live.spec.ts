@@ -25,7 +25,7 @@ const SHOTS = process.env.LIVE_SHOTS ?? "";
 // Model for the watched turn (LIVE_MODEL, default opus; haiku keeps a test run cheap).
 const MODEL = process.env.LIVE_MODEL ?? "opus";
 
-interface LiveSession {
+interface LiveThread {
   id: string;
   state?: string;
   status?: string;
@@ -42,18 +42,18 @@ function cli(...args: string[]): string {
   });
 }
 
-function listSessions(): LiveSession[] {
+function listThreads(): LiveThread[] {
   return (
     (
       JSON.parse(cli("thread", "list", "--json")) as {
-        threads?: LiveSession[];
+        threads?: LiveThread[];
       }
     ).threads ?? []
   );
 }
 
-function sessionInfo(id: string): LiveSession | undefined {
-  return listSessions().find((s) => s.id === id);
+function threadInfo(id: string): LiveThread | undefined {
+  return listThreads().find((s) => s.id === id);
 }
 
 function badge(page: Page, id: string) {
@@ -111,7 +111,7 @@ test("sessions end to end against the real daemon", async ({ page }) => {
     // (a) A session created from the CLI shows up in the sidebar, idle.
     const s1 = JSON.parse(
       cli("thread", "new", "--worktree", WORKTREE, "--model", MODEL, "--json"),
-    ) as LiveSession;
+    ) as LiveThread;
     created.push(s1.id);
     await test.step("a: CLI-created session is listed idle", async () => {
       await openApp(page);
@@ -164,18 +164,18 @@ test("sessions end to end against the real daemon", async ({ page }) => {
       expect(log).not.toContain("attention");
       expect(log.at(-1)).toBe("idle");
       await expect
-        .poll(() => sessionInfo(s1.id)?.status)
-        .toBe("SESSION_STATUS_IDLE");
+        .poll(() => threadInfo(s1.id)?.status)
+        .toBe("THREAD_STATUS_IDLE");
       await expect(page).toHaveTitle("Code Foundry");
     });
 
     // (c') The other half of the rule: a turn nobody watches ends as needs-attention
     // "finished" in the CLI; showing the session in the GUI clears it to idle.
     await test.step("c': an unwatched turn needs attention until viewed", async () => {
-      await page.goto("about:blank"); // no GUI attached (session.new would focus it)
+      await page.goto("about:blank"); // no GUI attached (thread.new would focus it)
       const s2 = JSON.parse(
         cli(
-          "session",
+          "thread",
           "new",
           "--worktree",
           WORKTREE,
@@ -187,17 +187,17 @@ test("sessions end to end against the real daemon", async ({ page }) => {
           "reply with the single word ping",
           "--json",
         ),
-      ) as LiveSession;
+      ) as LiveThread;
       created.push(s2.id);
       await expect
         .poll(
           () => {
-            const s = sessionInfo(s2.id);
+            const s = threadInfo(s2.id);
             return `${s?.status ?? ""} ${s?.statusReason ?? ""}`;
           },
           { timeout: 90_000 },
         )
-        .toBe("SESSION_STATUS_NEEDS_ATTENTION finished");
+        .toBe("THREAD_STATUS_NEEDS_ATTENTION finished");
       expect(cli("thread", "list")).toMatch(
         /unwatched\s+needs_attention\s+finished/,
       );
@@ -216,8 +216,8 @@ test("sessions end to end against the real daemon", async ({ page }) => {
         "idle",
       );
       await expect
-        .poll(() => sessionInfo(s2.id)?.status)
-        .toBe("SESSION_STATUS_IDLE");
+        .poll(() => threadInfo(s2.id)?.status)
+        .toBe("THREAD_STATUS_IDLE");
       await expect(page).toHaveTitle("Code Foundry");
     });
 
@@ -228,8 +228,8 @@ test("sessions end to end against the real daemon", async ({ page }) => {
       await expect(pane(page)).toHaveAttribute("data-session-id", s1.id);
       cli("thread", "archive", "--id", s1.id, "--yes");
       await expect
-        .poll(() => sessionInfo(s1.id)?.state, { timeout: 20_000 })
-        .toBe("SESSION_STATE_DISCONNECTED");
+        .poll(() => threadInfo(s1.id)?.state, { timeout: 20_000 })
+        .toBe("THREAD_STATE_DISCONNECTED");
       await expect(page.getByTestId("thread-disconnected")).toHaveCount(0);
       await expect(page.getByTestId("thread-composer")).toBeVisible();
       await expect(pane(page)).not.toContainText(/Not connected|Reconnect/);
@@ -254,7 +254,7 @@ test("sessions end to end against the real daemon", async ({ page }) => {
     // (e) cmd+n (from the focused prompt) opens the project picker, then the new-thread
     // composer for the picked project; Escape leaves without creating anything.
     await test.step("e: cmd+n opens the picker, then the composer", async () => {
-      const before = listSessions().length;
+      const before = listThreads().length;
       await threadPrompt(page).click();
       await page.keyboard.press("Meta+n");
       const palette = page.getByTestId("palette");
@@ -275,7 +275,7 @@ test("sessions end to end against the real daemon", async ({ page }) => {
         await expect(models.filter({ hasText: m }).first()).toBeVisible();
       await page.keyboard.press("Escape");
       await page.keyboard.press("Escape");
-      expect(listSessions()).toHaveLength(before); // nothing was created
+      expect(listThreads()).toHaveLength(before); // nothing was created
     });
 
     // (f) `session focus` from the CLI selects the session in the GUI.
@@ -294,14 +294,14 @@ test("sessions end to end against the real daemon", async ({ page }) => {
     });
   } finally {
     for (const id of created) {
-      if (sessionInfo(id)?.state !== "SESSION_STATE_DISCONNECTED")
+      if (threadInfo(id)?.state !== "THREAD_STATE_DISCONNECTED")
         cli("thread", "archive", "--id", id, "--yes");
     }
     // For the caller's cleanup of ~/.claude/projects/<slug>/<id>.jsonl.
     console.log(
       "live sessions:",
       JSON.stringify(
-        listSessions().map((s) => ({
+        listThreads().map((s) => ({
           id: s.id,
           claudeSessionId: s.claudeSessionId,
         })),

@@ -45,7 +45,7 @@ describe("keyOf", () => {
   const cases: [string, Selection, string | null][] = [
     ["none has no panel", { kind: "none" }, null],
     ["the dashboard has no panel", { kind: "view", name: "dashboard" }, null],
-    ["session", { kind: "session", id: "s-1" }, "session:s-1"],
+    ["thread", { kind: "thread", id: "s-1" }, "session:s-1"],
     ["composer", { kind: "compose", repoId: "r-1" }, "compose:r-1"],
     ["workspace composer", { kind: "compose", repoId: "r-1", workspaceId: "w-1" }, "compose:ws:w-1"],
     ["view", { kind: "view", name: "pullrequests" }, "view:pullrequests"],
@@ -296,7 +296,7 @@ describe("expanded", () => {
 describe("panel store", () => {
   beforeEach(() => {
     usePanelStore.setState({ byKey: {} });
-    useUiStore.setState({ selection: { kind: "session", id: "a" }, focus: "content", panelFocusSeq: 0, windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260 });
+    useUiStore.setState({ selection: { kind: "thread", id: "a" }, focus: "content", panelFocusSeq: 0, windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260 });
   });
 
   it("setPanelWidth sizes one panel, clamped to the current window and sidebar", () => {
@@ -374,7 +374,7 @@ describe("panel store", () => {
 
   it("keeps state per selection", () => {
     expect(togglePanel()).toBe(true);
-    useUiStore.getState().select({ kind: "session", id: "b" });
+    useUiStore.getState().select({ kind: "thread", id: "b" });
     expect(getPanel().open).toBe(false);
     expect(getPanel("session:a").open).toBe(true);
   });

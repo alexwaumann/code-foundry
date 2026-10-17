@@ -48,7 +48,7 @@ test("No project: picker row last, composer without worktree, thread placed nowh
   expect(created?.args).toMatchObject({ "no-project": "true", prompt: "Reply with just OK" });
   expect(created?.args).not.toHaveProperty("repo");
   expect(created?.args).not.toHaveProperty("worktree");
-  const id = page.locator('[data-row-kind="session"][aria-selected="true"]');
+  const id = page.locator('[data-row-kind="thread"][aria-selected="true"]');
   await expect(id.getByTestId("row-project")).toHaveText("No project");
   await expect(id.getByTestId("row-branch")).toHaveCount(0);
 

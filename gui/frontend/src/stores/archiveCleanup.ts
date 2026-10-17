@@ -3,7 +3,7 @@
  * side panel and bottom panel entries are reset: the side panel's tabs go and it is
  * closed, and the bottom panel is closed (the daemon removed the thread's shells, so its
  * tabs went on their own). Reacting to the sessions store rather than wrapping
- * archiveSession / snoozeSession makes every archive and snooze behave the same. Only a
+ * archiveThread / snoozeThread makes every archive and snooze behave the same. Only a
  * transition counts (archivedAtMs or snoozedUntilMs null to set, on a thread this window
  * already knew), so panels opened later on an archived or snoozed thread are left alone,
  * a re-snooze to another time resets nothing, and neither does the first snapshot.
@@ -17,14 +17,14 @@
  */
 import { emptyBottom, useBottomStore } from "./bottomPanel";
 import { emptyEntry, keyOf, usePanelStore } from "./panel";
-import { useSessionsStore, type SessionsData } from "./threads";
+import { useThreadsStore, type ThreadsData } from "./threads";
 import { DASHBOARD, useUiStore, type Selection } from "./ui";
 
 /** The fields whose null → set transition puts a thread away. */
 type PutAwayField = "archivedAtMs" | "snoozedUntilMs";
 
 /** Ids whose `field` was set between two session sets: known and unset before, set now. */
-function newlySet(prev: SessionsData, next: SessionsData, field: PutAwayField): string[] {
+function newlySet(prev: ThreadsData, next: ThreadsData, field: PutAwayField): string[] {
   if (prev.byId === next.byId) return [];
   return next.order.filter((id) => {
     const was = prev.byId[id];
@@ -33,32 +33,32 @@ function newlySet(prev: SessionsData, next: SessionsData, field: PutAwayField): 
 }
 
 /** Ids archived between two session sets: known and not archived before, archived now. */
-export function newlyArchived(prev: SessionsData, next: SessionsData): string[] {
+export function newlyArchived(prev: ThreadsData, next: ThreadsData): string[] {
   return newlySet(prev, next, "archivedAtMs");
 }
 
 /** Ids snoozed between two session sets: known and not snoozed before, snoozed now. */
-export function newlySnoozed(prev: SessionsData, next: SessionsData): string[] {
+export function newlySnoozed(prev: ThreadsData, next: ThreadsData): string[] {
   return newlySet(prev, next, "snoozedUntilMs");
 }
 
 /** Resets a thread's side panel (no tabs, closed) and bottom panel (closed) entries. */
 export function resetThreadPanels(id: string): void {
-  const key = keyOf({ kind: "session", id });
+  const key = keyOf({ kind: "thread", id });
   if (key === null) return;
   if (key in usePanelStore.getState().byKey) usePanelStore.setState((s) => ({ byKey: { ...s.byKey, [key]: emptyEntry } }));
   if (key in useBottomStore.getState().byKey) useBottomStore.setState((s) => ({ byKey: { ...s.byKey, [key]: emptyBottom } }));
 }
 
 /** Ids the store had before and not now (a removed event, or a snapshot without them). */
-export function newlyRemoved(prev: SessionsData, next: SessionsData): string[] {
+export function newlyRemoved(prev: ThreadsData, next: ThreadsData): string[] {
   if (prev.byId === next.byId) return [];
   return prev.order.filter((id) => !(id in next.byId));
 }
 
 /** True when the selection is a thread among `putAway` (archived, snoozed or removed just now). */
 export function putAwaySelected(selection: Selection, putAway: ReadonlySet<string>): boolean {
-  return selection.kind === "session" && putAway.has(selection.id);
+  return selection.kind === "thread" && putAway.has(selection.id);
 }
 
 /**
@@ -66,7 +66,7 @@ export function putAwaySelected(selection: Selection, putAway: ReadonlySet<strin
  * the selected thread is archived, snoozed or removed; returns the unsubscribe.
  */
 export function startArchiveCleanup(): () => void {
-  return useSessionsStore.subscribe((s, prev) => {
+  return useThreadsStore.subscribe((s, prev) => {
     const putAway = new Set([...newlyArchived(prev, s), ...newlySnoozed(prev, s)]);
     for (const id of putAway) resetThreadPanels(id);
     for (const id of newlyRemoved(prev, s)) putAway.add(id);

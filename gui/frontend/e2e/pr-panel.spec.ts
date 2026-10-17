@@ -557,13 +557,13 @@ test("long conversations and timelines are virtualized in the panel's scroll", a
 
 // ---- Sessions about a pull request (pr.ask, pr.explain, pr.fix.findings) ----
 
-const selectedSession = (page: Page) => page.locator('[data-row-kind="session"][aria-selected="true"]');
+const selectedThread = (page: Page) => page.locator('[data-row-kind="thread"][aria-selected="true"]');
 
-async function sessionInvocations(name: string): Promise<{ args: Record<string, string>; worktree: string | undefined }[]> {
+async function threadInvocations(name: string): Promise<{ args: Record<string, string>; worktree: string | undefined }[]> {
   return (await invocations()).filter((i) => i.name === name).map((i) => ({ args: i.args, worktree: i.context?.activeWorktreePath }));
 }
 
-test("Explain this PR runs pr.explain, selects the new session, and the PR tab stays on the Pull Requests page", async ({ page }) => {
+test("Explain this PR runs pr.explain, selects the new thread, and the PR tab stays on the Pull Requests page", async ({ page }) => {
   await shotViewport(page);
   await openPrPage(page);
   await prRow(page, "authored", 145).click();
@@ -580,9 +580,9 @@ test("Explain this PR runs pr.explain, selects the new session, and the PR tab s
   await expect(page.getByTestId("pr-menu-explain")).toHaveAttribute("aria-busy", "true");
   await expect(page.getByTestId("pr-menu")).toBeVisible();
   // No worktree, model or effort args: the daemon picks them.
-  await expect.poll(() => sessionInvocations("pr.explain")).toEqual([{ args: { "repo-slug": SLUG, number: "145" }, worktree: "" }]);
-  // The daemon's FocusSession selects the new session; its own panel is untouched.
-  await expect(selectedSession(page)).toHaveAttribute("data-row-key", /^s:s-new-\d+$/);
+  await expect.poll(() => threadInvocations("pr.explain")).toEqual([{ args: { "repo-slug": SLUG, number: "145" }, worktree: "" }]);
+  // The daemon's FocusThread selects the new session; its own panel is untouched.
+  await expect(selectedThread(page)).toHaveAttribute("data-row-key", /^s:s-new-\d+$/);
   await expect(page.getByText(/^Started session s-new-\d+ for PR #145$/)).toBeVisible();
   await expect(panel(page)).toHaveCount(0);
   await expect(page.getByText("Preparing worktree for #145…")).toHaveCount(0);
@@ -623,14 +623,14 @@ test("Ask a question: a composer under the header; Escape cancels, Enter sends p
   await page.keyboard.press("Shift+Enter");
   await input.pressSequentially("And is the fix covered by a test?");
   await expect(input).toHaveValue("Why does attach race the first output?\nAnd is the fix covered by a test?");
-  expect(await sessionInvocations("pr.ask")).toEqual([]);
+  expect(await threadInvocations("pr.ask")).toEqual([]);
   await shot(page, "chunk4-ask");
   await page.keyboard.press("Enter");
 
   await expect
-    .poll(() => sessionInvocations("pr.ask"))
+    .poll(() => threadInvocations("pr.ask"))
     .toEqual([{ args: { "repo-slug": SLUG, number: "145", question: "Why does attach race the first output?\nAnd is the fix covered by a test?" }, worktree: CF }]);
-  await expect(selectedSession(page)).toHaveAttribute("data-row-key", /^s:s-new-\d+$/);
+  await expect(selectedThread(page)).toHaveAttribute("data-row-key", /^s:s-new-\d+$/);
   await expect(panel(page)).toHaveCount(0);
 
   // The originating session's panel keeps #145; the composer is gone.
@@ -650,7 +650,7 @@ test("Fix findings: a failure toasts the daemon's hint; a retry prepares the wor
   // A quick answer leaves no "Preparing" toast behind.
   await expect(page.getByText("Preparing worktree for #145…")).toHaveCount(0);
   // Nothing was selected; the menu stays open for a retry.
-  await expect(selectedSession(page)).toHaveCount(0);
+  await expect(selectedThread(page)).toHaveCount(0);
   await expect(page.getByTestId("pr-menu")).toBeVisible();
   await expect(page.getByTestId("pr-menu-fix")).not.toHaveAttribute("aria-busy");
 
@@ -658,9 +658,9 @@ test("Fix findings: a failure toasts the daemon's hint; a retry prepares the wor
   await page.getByTestId("pr-menu-fix").click();
   await expect(page.getByTestId("pr-menu-fix")).toHaveAttribute("aria-busy", "true");
   await expect(page.getByText("Preparing worktree for #145…")).toBeVisible();
-  await expect(selectedSession(page)).toHaveAttribute("data-row-key", /^s:s-new-\d+$/);
+  await expect(selectedThread(page)).toHaveAttribute("data-row-key", /^s:s-new-\d+$/);
   await expect(page.getByText("Preparing worktree for #145…")).toHaveCount(0);
-  expect(await sessionInvocations("pr.fix.findings")).toEqual([
+  expect(await threadInvocations("pr.fix.findings")).toEqual([
     { args: { "repo-slug": SLUG, number: "145" }, worktree: "" },
     { args: { "repo-slug": SLUG, number: "145" }, worktree: "" },
   ]);
@@ -694,9 +694,9 @@ test("Ask from the Pull Requests page sends no worktree; while it starts, Cancel
   await expect(page.getByTestId("pr-ask")).toBeVisible();
   await expect(tabs(page)).toHaveText(["#145"]);
 
-  await expect(selectedSession(page)).toHaveAttribute("data-row-key", /^s:s-new-\d+$/);
+  await expect(selectedThread(page)).toHaveAttribute("data-row-key", /^s:s-new-\d+$/);
   // From the Pull Requests page there is no active worktree: the daemon picks one.
-  expect(await sessionInvocations("pr.ask")).toEqual([{ args: { "repo-slug": SLUG, number: "145", question: "What changed?" }, worktree: "" }]);
+  expect(await threadInvocations("pr.ask")).toEqual([{ args: { "repo-slug": SLUG, number: "145", question: "What changed?" }, worktree: "" }]);
   await page.getByTestId("nav-pullrequests").click();
   await expect(tabs(page)).toHaveText(["#145"]);
   await expect(page.getByTestId("pr-ask")).toHaveCount(0);
@@ -712,7 +712,7 @@ test("a failed pr.ask is toasted and keeps the question for a retry", async ({ p
 
   await expect(page.getByText("Ask About Pull Request failed")).toBeVisible();
   await expect(page.getByText("read #145: github graphql: 502 Bad Gateway")).toBeVisible();
-  await expect(selectedSession(page)).toHaveCount(0);
+  await expect(selectedThread(page)).toHaveCount(0);
   await expect(page.getByTestId("pr-ask")).toBeVisible();
   await expect(askInput(page)).toHaveValue("Is the retry bounded?");
   await expect(askInput(page)).toHaveJSProperty("readOnly", false);
@@ -721,8 +721,8 @@ test("a failed pr.ask is toasted and keeps the question for a retry", async ({ p
 
   // The retry goes through.
   await page.getByTestId("pr-ask-send").click();
-  await expect(selectedSession(page)).toHaveAttribute("data-row-key", /^s:s-new-\d+$/);
-  expect((await sessionInvocations("pr.ask")).map((i) => i.args.question)).toEqual(["Is the retry bounded?", "Is the retry bounded?"]);
+  await expect(selectedThread(page)).toHaveAttribute("data-row-key", /^s:s-new-\d+$/);
+  expect((await threadInvocations("pr.ask")).map((i) => i.args.question)).toEqual(["Is the retry bounded?", "Is the retry bounded?"]);
 });
 
 test("choosing Ask again with the composer open focuses it; the menu reopened right after Ask stays open", async ({ page }) => {
@@ -784,8 +784,8 @@ test("a pull request's running sessions show on every surface that shows it", as
   await expect(askInput(page)).toHaveValue("From the page");
 
   // s-1's question starts its session; this one was never sent.
-  await expect(selectedSession(page)).toHaveAttribute("data-row-key", /^s:s-new-\d+$/);
-  expect(await sessionInvocations("pr.ask")).toEqual([{ args: { "repo-slug": SLUG, number: "145", question: "From s-1" }, worktree: CF }]);
+  await expect(selectedThread(page)).toHaveAttribute("data-row-key", /^s:s-new-\d+$/);
+  expect(await threadInvocations("pr.ask")).toEqual([{ args: { "repo-slug": SLUG, number: "145", question: "From s-1" }, worktree: CF }]);
 
   // Explain from the Pull Requests page; s-1's menu shows it running and disabled.
   await page.getByTestId("nav-pullrequests").click();
@@ -801,9 +801,9 @@ test("a pull request's running sessions show on every surface that shows it", as
   await expect(page.getByTestId("pr-menu-fix")).not.toHaveAttribute("aria-disabled");
   // aria-disabled keeps it focusable; a select sends nothing (Playwright will not click it unforced).
   await page.getByTestId("pr-menu-explain").click({ force: true });
-  await expect(selectedSession(page)).not.toHaveAttribute("data-row-key", /^s:s-1$/);
+  await expect(selectedThread(page)).not.toHaveAttribute("data-row-key", /^s:s-1$/);
   await expect(page.getByText(/^Started session s-new-\d+ for PR #145$/)).toHaveCount(2);
-  expect(await sessionInvocations("pr.explain")).toHaveLength(1);
+  expect(await threadInvocations("pr.explain")).toHaveLength(1);
 });
 
 test("at 280px the composer's hint fits and its field grows to six rows, then scrolls", async ({ page }) => {

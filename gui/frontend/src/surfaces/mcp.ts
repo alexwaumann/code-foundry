@@ -2,13 +2,13 @@ import { createElement } from "react";
 import { Plug } from "lucide-react";
 import { McpSurface } from "@/components/mcp/McpSurface";
 import { useReposStore } from "@/stores/repos";
-import { useSessionsStore } from "@/stores/threads";
+import { useThreadsStore } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
 import { MCP_KIND, MCP_TITLE, mcpTab, selectionMcpThread } from "./mcpTarget";
 import type { SurfaceSpec } from "./types";
 
 function thread(sel: Selection): string | null {
-  return selectionMcpThread(sel, { repos: useReposStore.getState(), sessions: useSessionsStore.getState() });
+  return selectionMcpThread(sel, { repos: useReposStore.getState(), threads: useThreadsStore.getState() });
 }
 
 /**
@@ -25,7 +25,7 @@ export const mcpSurface: SurfaceSpec = {
   icon: Plug,
   hotkey: "m",
   available: (ctx) => (thread(ctx.selection) ? "enabled" : "hidden"),
-  watches: [useSessionsStore, useReposStore],
+  watches: [useThreadsStore, useReposStore],
   render: () => createElement(McpSurface),
   openDefault: (ctx) => (thread(ctx.selection) ? mcpTab() : null),
 };

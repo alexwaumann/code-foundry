@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { RepoView } from "@/api/repo";
-import type { SessionView } from "@/api/threads";
+import type { ThreadView } from "@/api/threads";
 import type { ReposData } from "@/stores/repos";
-import type { SessionsData } from "@/stores/threads";
+import type { ThreadsData } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
 import {
   memberOfTab,
@@ -16,8 +16,8 @@ import {
 const WEB = "/wt/web/cf-demo";
 const API = "/wt/api/cf-demo";
 
-function session(id: string, o: Partial<SessionView> = {}): SessionView {
-  return { id, repoId: "web", worktreePath: WEB, workspaceId: "", pendingWorktreePath: "", state: "connected", archivedAtMs: null, createdAtMs: 1, lastActivityAtMs: null, ...o } as SessionView;
+function thread(id: string, o: Partial<ThreadView> = {}): ThreadView {
+  return { id, repoId: "web", worktreePath: WEB, workspaceId: "", pendingWorktreePath: "", state: "connected", archivedAtMs: null, createdAtMs: 1, lastActivityAtMs: null, ...o } as ThreadView;
 }
 
 const repos: ReposData = {
@@ -28,16 +28,16 @@ const repos: ReposData = {
   order: ["api", "web"],
 };
 
-function sessions(...list: SessionView[]): SessionsData {
+function threads(...list: ThreadView[]): ThreadsData {
   return { byId: Object.fromEntries(list.map((s) => [s.id, s])), order: list.map((s) => s.id) };
 }
 
 describe("selectionWorkspaceThread (the surface's availability)", () => {
-  const s = { repos, sessions: sessions(session("s-ws", { workspaceId: "w1" }), session("s-proj")) };
-  it.each<[string, Selection, { sessionId: string; workspaceId: string } | null]>([
-    ["a workspace thread", { kind: "session", id: "s-ws" }, { sessionId: "s-ws", workspaceId: "w1" }],
-    ["a project thread", { kind: "session", id: "s-proj" }, null],
-    ["an unknown thread", { kind: "session", id: "s-404" }, null],
+  const s = { repos, threads: threads(thread("s-ws", { workspaceId: "w1" }), thread("s-proj")) };
+  it.each<[string, Selection, { threadId: string; workspaceId: string } | null]>([
+    ["a workspace thread", { kind: "thread", id: "s-ws" }, { threadId: "s-ws", workspaceId: "w1" }],
+    ["a project thread", { kind: "thread", id: "s-proj" }, null],
+    ["an unknown thread", { kind: "thread", id: "s-404" }, null],
     ["a workspace composer (no thread yet)", { kind: "compose", repoId: "web", workspaceId: "w1" }, null],
     ["the Projects page", { kind: "view", name: "projects" }, null],
     ["nothing", { kind: "none" }, null],
@@ -66,21 +66,21 @@ describe("tabs", () => {
 });
 
 describe("workspaceThread (the Projects page's workspace rows)", () => {
-  it.each<[string, SessionView[], string | null]>([
+  it.each<[string, ThreadView[], string | null]>([
     ["no thread", [], null],
-    ["only project threads", [session("p1")], null],
-    ["a stopped workspace thread counts", [session("d1", { workspaceId: "w1", state: "disconnected" })], "d1"],
-    ["only archived workspace threads", [session("a1", { workspaceId: "w1", archivedAtMs: 5 })], null],
-    ["another workspace's thread", [session("o1", { workspaceId: "w2" })], null],
-    ["a stopped one active more recently wins", [session("d1", { workspaceId: "w1", state: "disconnected", lastActivityAtMs: 99 }), session("l1", { workspaceId: "w1" })], "d1"],
-    ["an archived one never wins", [session("a1", { workspaceId: "w1", archivedAtMs: 5, lastActivityAtMs: 99 }), session("l1", { workspaceId: "w1" })], "l1"],
+    ["only project threads", [thread("p1")], null],
+    ["a stopped workspace thread counts", [thread("d1", { workspaceId: "w1", state: "disconnected" })], "d1"],
+    ["only archived workspace threads", [thread("a1", { workspaceId: "w1", archivedAtMs: 5 })], null],
+    ["another workspace's thread", [thread("o1", { workspaceId: "w2" })], null],
+    ["a stopped one active more recently wins", [thread("d1", { workspaceId: "w1", state: "disconnected", lastActivityAtMs: 99 }), thread("l1", { workspaceId: "w1" })], "d1"],
+    ["an archived one never wins", [thread("a1", { workspaceId: "w1", archivedAtMs: 5, lastActivityAtMs: 99 }), thread("l1", { workspaceId: "w1" })], "l1"],
     [
       "the most recently active of several",
-      [session("a", { workspaceId: "w1", lastActivityAtMs: 10 }), session("b", { workspaceId: "w1", lastActivityAtMs: 30 }), session("c", { workspaceId: "w1", lastActivityAtMs: 20 })],
+      [thread("a", { workspaceId: "w1", lastActivityAtMs: 10 }), thread("b", { workspaceId: "w1", lastActivityAtMs: 30 }), thread("c", { workspaceId: "w1", lastActivityAtMs: 20 })],
       "b",
     ],
-    ["the newest when none has activity", [session("a", { workspaceId: "w1", createdAtMs: 5 }), session("b", { workspaceId: "w1", createdAtMs: 7 })], "b"],
+    ["the newest when none has activity", [thread("a", { workspaceId: "w1", createdAtMs: 5 }), thread("b", { workspaceId: "w1", createdAtMs: 7 })], "b"],
   ])("%s", (_name, list, want) => {
-    expect(workspaceThread(sessions(...list), "w1")).toBe(want);
+    expect(workspaceThread(threads(...list), "w1")).toBe(want);
   });
 });

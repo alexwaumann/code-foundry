@@ -1,19 +1,19 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CommandView } from "@/api/command";
-import type { SessionView } from "@/api/threads";
+import type { ThreadView } from "@/api/threads";
 import { useCommandsStore } from "@/stores/commands";
 import { useReposStore } from "@/stores/repos";
-import { useSessionsStore } from "@/stores/threads";
-import { SessionTitle } from "./ThreadParts";
+import { useThreadsStore } from "@/stores/threads";
+import { ThreadTitle } from "./ThreadParts";
 
 const startCommandNamed = vi.hoisted(() => vi.fn(() => true));
 vi.mock("@/keys/bindings", async (orig) => ({ ...(await orig<typeof import("@/keys/bindings")>()), startCommandNamed }));
 
 const cmd = (name: string): CommandView => ({ name, title: name, description: "", category: "", args: [], keybindings: [], available: true });
 
-const thread = (o: Partial<SessionView>) =>
-  ({ id: "s-1", name: "Fix the stale PR badge", repoId: "cf", worktreePath: "/src/cf.worktrees/pr-badge", workspaceId: "", pendingWorktreePath: "", state: "connected", status: "idle", model: "opus", effort: "high", linkedPullRequests: [], ...o }) as SessionView;
+const thread = (o: Partial<ThreadView>) =>
+  ({ id: "s-1", name: "Fix the stale PR badge", repoId: "cf", worktreePath: "/src/cf.worktrees/pr-badge", workspaceId: "", pendingWorktreePath: "", state: "connected", status: "idle", model: "opus", effort: "high", linkedPullRequests: [], ...o }) as ThreadView;
 
 type Worktree = { path: string; branch: string; head: string; isMain?: boolean };
 function repo(name: string, worktrees: Worktree[], git = true) {
@@ -32,7 +32,7 @@ beforeEach(() => {
     },
     order: ["cf", "notes"],
   });
-  useSessionsStore.setState({ byId: { "s-1": thread({}) }, order: ["s-1"] });
+  useThreadsStore.setState({ byId: { "s-1": thread({}) }, order: ["s-1"] });
 });
 
 afterEach(() => {
@@ -43,9 +43,9 @@ afterEach(() => {
 const title = () => screen.getByTestId("thread-title");
 const location = () => screen.getByTestId("thread-location");
 
-describe("SessionTitle", () => {
-  it("names the thread; a click renames it through session.rename", () => {
-    render(<SessionTitle id="s-1" />);
+describe("ThreadTitle", () => {
+  it("names the thread; a click renames it through thread.rename", () => {
+    render(<ThreadTitle id="s-1" />);
     expect(title().tagName).toBe("BUTTON");
     expect(title().textContent).toBe("Fix the stale PR badge");
     expect(title().getAttribute("title")).toBeNull();
@@ -54,7 +54,7 @@ describe("SessionTitle", () => {
   });
 
   it("shows no status, badge text, model or path", () => {
-    render(<SessionTitle id="s-1" />);
+    render(<ThreadTitle id="s-1" />);
     const text = document.body.textContent;
     expect(text).not.toContain("opus");
     expect(text).not.toContain("Connected");
@@ -67,8 +67,8 @@ describe("SessionTitle", () => {
     ["the main checkout: no chip", "/src/cf", "cf", "code-foundry@main", false],
     ["no git: the folder and No git, no branch", "/src/notes", "notes", "scratch notesNo git", false],
   ])("%s", (_name, worktreePath, repoId, text, chip) => {
-    useSessionsStore.setState({ byId: { "s-1": thread({ worktreePath, repoId }) } });
-    render(<SessionTitle id="s-1" />);
+    useThreadsStore.setState({ byId: { "s-1": thread({ worktreePath, repoId }) } });
+    render(<ThreadTitle id="s-1" />);
     expect(location().textContent).toBe(text);
     expect(screen.queryByTestId("thread-worktree-chip") !== null).toBe(chip);
     expect(screen.queryByTestId("thread-branch") === null).toBe(repoId === "notes");
@@ -76,7 +76,7 @@ describe("SessionTitle", () => {
   });
 
   it("opens the worktree surface through view.panel.worktree; plain text where it is unavailable", () => {
-    render(<SessionTitle id="s-1" />);
+    render(<ThreadTitle id="s-1" />);
     expect(location().tagName).toBe("BUTTON");
     expect(location().getAttribute("title")).toBeNull();
     fireEvent.click(location());
@@ -84,7 +84,7 @@ describe("SessionTitle", () => {
     cleanup();
 
     useCommandsStore.setState({ commands: [] });
-    render(<SessionTitle id="s-1" />);
+    render(<ThreadTitle id="s-1" />);
     expect(location().tagName).toBe("SPAN");
     expect(location().textContent).toBe("code-foundry@cf/pr-badge-staleworktree");
     expect(title().tagName).toBe("SPAN");
@@ -93,8 +93,8 @@ describe("SessionTitle", () => {
 
   it("no project: the House icon and No project, no branch or chip, plain text without view.panel.worktree", () => {
     useCommandsStore.setState({ commands: [cmd("thread.rename")] });
-    useSessionsStore.setState({ byId: { "s-1": thread({ repoId: "", worktreePath: "/Users/dev" }) } });
-    render(<SessionTitle id="s-1" />);
+    useThreadsStore.setState({ byId: { "s-1": thread({ repoId: "", worktreePath: "/Users/dev" }) } });
+    render(<ThreadTitle id="s-1" />);
     expect(location().tagName).toBe("SPAN");
     expect(location().textContent).toBe("No project");
     expect(location().querySelector("svg.lucide-house")).not.toBeNull();
@@ -103,8 +103,8 @@ describe("SessionTitle", () => {
   });
 
   it("an unnamed thread shows its id", () => {
-    useSessionsStore.setState({ byId: { "s-1": thread({ name: "" }) } });
-    render(<SessionTitle id="s-1" />);
+    useThreadsStore.setState({ byId: { "s-1": thread({ name: "" }) } });
+    render(<ThreadTitle id="s-1" />);
     expect(title().textContent).toBe("s-1");
   });
 });

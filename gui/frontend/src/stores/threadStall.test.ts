@@ -28,7 +28,7 @@ class DaemonLog {
   private nextOrd = 1;
 
   snapshot(): ThreadEventView {
-    return { kind: "snapshot", sessionId: "s", seq: this.seq, items: this.items.map((it) => ({ ...it })), pending: [], mcp: null, commands: [], agents: [] };
+    return { kind: "snapshot", threadId: "s", seq: this.seq, items: this.items.map((it) => ({ ...it })), pending: [], mcp: null, commands: [], agents: [] };
   }
 
   append(id: string, streaming: boolean): ThreadEventView {
@@ -37,11 +37,11 @@ class DaemonLog {
     if (i >= 0) {
       const it = { ...(this.items[i] as ThreadItemView), streaming };
       this.items[i] = it;
-      return { kind: "updated", sessionId: "s", seq: this.seq, item: { ...it } };
+      return { kind: "updated", threadId: "s", seq: this.seq, item: { ...it } };
     }
     const it: ThreadItemView = { id, kind: "text", text: "", ordinal: this.nextOrd++, parentToolUseId: "", createdAtMs: null, updatedAtMs: null, streaming };
     this.items.push(it);
-    return { kind: "appended", sessionId: "s", seq: this.seq, item: { ...it } };
+    return { kind: "appended", threadId: "s", seq: this.seq, item: { ...it } };
   }
 
   delta(id: string, text: string): ThreadEventView | null {
@@ -50,7 +50,7 @@ class DaemonLog {
     const it = this.items[i] as Extract<ThreadItemView, { kind: "text" }>;
     this.items[i] = { ...it, text: it.text + text };
     this.seq++;
-    return { kind: "delta", sessionId: "s", seq: this.seq, itemId: id, ordinal: it.ordinal, field: "text", text };
+    return { kind: "delta", threadId: "s", seq: this.seq, itemId: id, ordinal: it.ordinal, field: "text", text };
   }
 
   finish(id: string): ThreadEventView | null {
@@ -58,7 +58,7 @@ class DaemonLog {
     if (i < 0) return null;
     this.items[i] = { ...(this.items[i] as ThreadItemView), streaming: false };
     this.seq++;
-    return { kind: "updated", sessionId: "s", seq: this.seq, item: { ...(this.items[i]) } };
+    return { kind: "updated", threadId: "s", seq: this.seq, item: { ...(this.items[i]) } };
   }
 }
 

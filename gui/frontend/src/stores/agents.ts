@@ -14,39 +14,39 @@ import { useThreadStore } from "./thread";
 const NO_IDS: readonly string[] = [];
 
 /** The list's run ids in order (lib/agents agentRows): spawn order, nested runs under their parent. */
-export function useAgentRowIds(sessionId: string): readonly string[] {
-  return useThreadStore(useShallow((s) => (s.logs[sessionId] ? agentRows(s.logs[sessionId].agents).map((r) => r.id) : NO_IDS)));
+export function useAgentRowIds(threadId: string): readonly string[] {
+  return useThreadStore(useShallow((s) => (s.logs[threadId] ? agentRows(s.logs[threadId].agents).map((r) => r.id) : NO_IDS)));
 }
 
 /** A run's nesting level in the list: 0 for the thread's own. */
-export function useAgentLevel(sessionId: string, id: string): number {
+export function useAgentLevel(threadId: string, id: string): number {
   return useThreadStore((s) => {
-    const runs = s.logs[sessionId]?.agents;
+    const runs = s.logs[threadId]?.agents;
     return runs ? (agentRows(runs).find((r) => r.id === id)?.level ?? 0) : 0;
   });
 }
 
 /** One run (narrow: re-renders only when that run changes). */
-export function useAgentRun(sessionId: string, id: string): AgentRunView | undefined {
-  return useThreadStore((s) => s.logs[sessionId]?.agents.find((r) => r.id === id));
+export function useAgentRun(threadId: string, id: string): AgentRunView | undefined {
+  return useThreadStore((s) => s.logs[threadId]?.agents.find((r) => r.id === id));
 }
 
 /** The run an Agent call (by its tool_use id, which is its item id) spawned, if the daemon follows it. */
-export function useAgentRunOfCall(sessionId: string, toolUseId: string): AgentRunView | undefined {
-  return useThreadStore((s) => (toolUseId ? s.logs[sessionId]?.agents.find((r) => r.toolUseId === toolUseId) : undefined));
+export function useAgentRunOfCall(threadId: string, toolUseId: string): AgentRunView | undefined {
+  return useThreadStore((s) => (toolUseId ? s.logs[threadId]?.agents.find((r) => r.toolUseId === toolUseId) : undefined));
 }
 
 /** The run whose end a note item announced (its `noteItemId`), if any. */
-export function useAgentRunOfNote(sessionId: string, noteItemId: string): AgentRunView | undefined {
-  return useThreadStore((s) => s.logs[sessionId]?.agents.find((r) => r.noteItemId === noteItemId));
+export function useAgentRunOfNote(threadId: string, noteItemId: string): AgentRunView | undefined {
+  return useThreadStore((s) => s.logs[threadId]?.agents.find((r) => r.noteItemId === noteItemId));
 }
 
 /** The header's figures (lib/agents agentCounts); null before the thread's snapshot. */
-export function useAgentCounts(sessionId: string): { running: number; total: number; background: number } | null {
-  return useThreadStore(useShallow((s) => (s.logs[sessionId] ? agentCounts(s.logs[sessionId].agents) : null)));
+export function useAgentCounts(threadId: string): { running: number; total: number; background: number } | null {
+  return useThreadStore(useShallow((s) => (s.logs[threadId] ? agentCounts(s.logs[threadId].agents) : null)));
 }
 
 /** The strip's "name · activity" parts for the running background runs. */
-export function useStripParts(sessionId: string): readonly string[] {
-  return useThreadStore(useShallow((s) => (s.logs[sessionId] ? stripRuns(s.logs[sessionId].agents).map(stripPart) : NO_IDS)));
+export function useStripParts(threadId: string): readonly string[] {
+  return useThreadStore(useShallow((s) => (s.logs[threadId] ? stripRuns(s.logs[threadId].agents).map(stripPart) : NO_IDS)));
 }

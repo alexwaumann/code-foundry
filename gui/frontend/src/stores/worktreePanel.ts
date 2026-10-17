@@ -9,7 +9,7 @@
 import { selectionWorktree, worktreeTab } from "@/surfaces/workspaceTarget";
 import { keyOf, openSurface, togglePanel, type PanelTarget } from "./panel";
 import { findWorktree, mainWorktreePath, useReposStore, type ReposData } from "./repos";
-import { useSessionsStore } from "./threads";
+import { useThreadsStore } from "./threads";
 import { useUiStore, type Selection } from "./ui";
 
 /**
@@ -56,8 +56,8 @@ export function showWorktreeOnProjectsPage(repoId: string, path = ""): boolean {
  * The thread row menu's Show worktree: selects the thread and opens its own worktree's
  * tab in its panel, which takes focus. False when the thread is in no registered worktree.
  */
-export function showWorktreeInThread(sessionId: string): boolean {
-  const sel: Selection = { kind: "session", id: sessionId };
+export function showWorktreeInThread(threadId: string): boolean {
+  const sel: Selection = { kind: "thread", id: threadId };
   useUiStore.getState().select(sel);
   const key = openWorktreeSurface(sel);
   if (key === null) return false;
@@ -72,7 +72,7 @@ export function showWorktreeInThread(sessionId: string): boolean {
  */
 export function openWorktreeSurface(sel: Selection = useUiStore.getState().selection): string | null {
   const key = keyOf(sel);
-  const w = selectionWorktree(sel, { repos: useReposStore.getState(), sessions: useSessionsStore.getState() });
+  const w = selectionWorktree(sel, { repos: useReposStore.getState(), threads: useThreadsStore.getState() });
   if (key === null || w === null) return null;
   return openWorktreeTab(key, w.repoId, w.path) ? key : null;
 }

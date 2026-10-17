@@ -135,7 +135,7 @@ export interface ThreadPendingView {
 
 /** A thread's pending requests at seq. */
 export interface ThreadPendingListView {
-  sessionId: string;
+  threadId: string;
   seq: number;
   pending: readonly ThreadPendingView[];
 }
@@ -143,7 +143,7 @@ export interface ThreadPendingListView {
 export type ThreadEventView =
   | {
       kind: "snapshot";
-      sessionId: string;
+      threadId: string;
       seq: number;
       items: ThreadItemView[];
       pending: ThreadPendingView[];
@@ -152,15 +152,15 @@ export type ThreadEventView =
       /** The thread's subagent runs in spawn order (docs/notes/agents-1-daemon.md). */
       agents: AgentRunView[];
     }
-  | { kind: "appended" | "updated"; sessionId: string; seq: number; item: ThreadItemView }
-  | { kind: "delta"; sessionId: string; seq: number; itemId: string; ordinal: number; field: "text" | "input"; text: string }
+  | { kind: "appended" | "updated"; threadId: string; seq: number; item: ThreadItemView }
+  | { kind: "delta"; threadId: string; seq: number; itemId: string; ordinal: number; field: "text" | "input"; text: string }
   | ({ kind: "pending" } & ThreadPendingListView)
   /** Watch only: the thread's MCP servers were checked again, or dropped (null: its process ended). */
-  | { kind: "mcp"; sessionId: string; seq: number; status: McpStatusView | null }
+  | { kind: "mcp"; threadId: string; seq: number; status: McpStatusView | null }
   /** Watch only: the thread's slash commands changed (the whole new list; empty: its process ended). */
-  | { kind: "commands"; sessionId: string; seq: number; commands: SlashCommandView[] }
+  | { kind: "commands"; threadId: string; seq: number; commands: SlashCommandView[] }
   /** Watch only: the thread's subagent runs changed (the whole list, in spawn order). */
-  | { kind: "agents"; sessionId: string; seq: number; agents: AgentRunView[] }
+  | { kind: "agents"; threadId: string; seq: number; agents: AgentRunView[] }
   /** EventService only: the pending requests of every thread that has any. */
   | { kind: "pendingSnapshot"; threads: ThreadPendingListView[] };
 
@@ -285,7 +285,7 @@ export function toThreadEventView(ev: ThreadEvent): ThreadEventView | null {
     case "snapshot":
       return {
         kind: "snapshot",
-        sessionId: e.value.threadId,
+        threadId: e.value.threadId,
         seq: Number(e.value.seq),
         items: items(e.value.items),
         pending: e.value.pending.map(toPendingView),
@@ -296,24 +296,24 @@ export function toThreadEventView(ev: ThreadEvent): ThreadEventView | null {
     case "appended":
     case "updated": {
       const item = e.value.item ? toThreadItemView(e.value.item) : null;
-      return item && { kind: e.case, sessionId: e.value.threadId, seq: Number(e.value.seq), item };
+      return item && { kind: e.case, threadId: e.value.threadId, seq: Number(e.value.seq), item };
     }
     case "delta": {
       const field = e.value.field === ThreadItemDelta_Field.TEXT ? "text" : e.value.field === ThreadItemDelta_Field.INPUT ? "input" : null;
-      return field && { kind: "delta", sessionId: e.value.threadId, seq: Number(e.value.seq), itemId: e.value.itemId, ordinal: Number(e.value.ordinal), field, text: e.value.text };
+      return field && { kind: "delta", threadId: e.value.threadId, seq: Number(e.value.seq), itemId: e.value.itemId, ordinal: Number(e.value.ordinal), field, text: e.value.text };
     }
     case "pending":
-      return { kind: "pending", sessionId: e.value.threadId, seq: Number(e.value.seq), pending: e.value.pending.map(toPendingView) };
+      return { kind: "pending", threadId: e.value.threadId, seq: Number(e.value.seq), pending: e.value.pending.map(toPendingView) };
     case "mcp":
-      return { kind: "mcp", sessionId: e.value.threadId, seq: Number(e.value.seq), status: toMcpStatusView(e.value.status) };
+      return { kind: "mcp", threadId: e.value.threadId, seq: Number(e.value.seq), status: toMcpStatusView(e.value.status) };
     case "commands":
-      return { kind: "commands", sessionId: e.value.threadId, seq: Number(e.value.seq), commands: toSlashCommandViews(e.value.commands) };
+      return { kind: "commands", threadId: e.value.threadId, seq: Number(e.value.seq), commands: toSlashCommandViews(e.value.commands) };
     case "agents":
-      return { kind: "agents", sessionId: e.value.threadId, seq: Number(e.value.seq), agents: toAgentRunViews(e.value.agents) };
+      return { kind: "agents", threadId: e.value.threadId, seq: Number(e.value.seq), agents: toAgentRunViews(e.value.agents) };
     case "pendingSnapshot":
       return {
         kind: "pendingSnapshot",
-        threads: e.value.threads.map((t) => ({ sessionId: t.threadId, seq: Number(t.seq), pending: t.pending.map(toPendingView) })),
+        threads: e.value.threads.map((t) => ({ threadId: t.threadId, seq: Number(t.seq), pending: t.pending.map(toPendingView) })),
       };
     default:
       return null;
@@ -321,9 +321,9 @@ export function toThreadEventView(ev: ThreadEvent): ThreadEventView | null {
 }
 
 /** Opens ThreadService.WatchThread for one thread and yields mapped events (a snapshot first) and HEARTBEAT for heartbeats. */
-export async function* watchThread(sessionId: string, signal: AbortSignal, conn: DaemonConnection = daemon): AsyncGenerator<ThreadEventView | Heartbeat> {
+export async function* watchThread(threadId: string, signal: AbortSignal, conn: DaemonConnection = daemon): AsyncGenerator<ThreadEventView | Heartbeat> {
   const c = await conn.client(ThreadService);
-  for await (const ev of c.watchThread({ threadId: sessionId }, { signal })) {
+  for await (const ev of c.watchThread({ threadId: threadId }, { signal })) {
     if (ev.event.case === "heartbeat") {
       yield HEARTBEAT;
       continue;

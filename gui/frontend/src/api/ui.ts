@@ -4,7 +4,7 @@ export type NotifyLevel = "info" | "warning" | "error";
 
 export type UiIntentView =
   | { kind: "focusTerminal"; terminalId: string }
-  | { kind: "focusSession"; sessionId: string }
+  | { kind: "focusThread"; threadId: string }
   | { kind: "focusRepo"; repoId: string; worktreePath: string }
   | { kind: "openPalette"; query: string }
   | { kind: "notify"; level: NotifyLevel; title: string; body: string }
@@ -24,7 +24,7 @@ export function toUiIntentView(i: UiIntent): UiIntentView | null {
     case "focusTerminal":
       return { kind: "focusTerminal", terminalId: e.value.terminalId };
     case "focusThread":
-      return { kind: "focusSession", sessionId: e.value.threadId };
+      return { kind: "focusThread", threadId: e.value.threadId };
     case "focusRepo":
       return { kind: "focusRepo", repoId: e.value.repoId, worktreePath: e.value.worktreePath };
     case "openPalette":

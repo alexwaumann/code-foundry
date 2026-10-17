@@ -351,7 +351,7 @@ export function agentsPanelCommand(): boolean {
 
 /** Asks the selected thread's prompt for the keyboard; nothing when no thread is selected. */
 function requestPromptFocus(): void {
-  if (useUiStore.getState().selection.kind === "session") useUiStore.setState((s) => ({ promptFocusSeq: s.promptFocusSeq + 1 }));
+  if (useUiStore.getState().selection.kind === "thread") useUiStore.setState((s) => ({ promptFocusSeq: s.promptFocusSeq + 1 }));
 }
 
 export function closeSettings(): void {

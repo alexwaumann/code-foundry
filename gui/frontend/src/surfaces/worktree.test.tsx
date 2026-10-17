@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RepoView, WorktreeView } from "@/api/repo";
-import type { SessionView } from "@/api/threads";
+import type { ThreadView } from "@/api/threads";
 import type { TerminalView } from "@/api/terminal";
 
 // The tab body reads the branch's pull requests; nothing to fetch here.
@@ -11,7 +11,7 @@ vi.mock("@/api/gh", async (orig) => ({ ...(await orig<typeof import("@/api/gh")>
 const { SidePanel } = await import("@/components/panel/SidePanel");
 const { getPanel, usePanelStore } = await import("@/stores/panel");
 const { useReposStore } = await import("@/stores/repos");
-const { useSessionsStore } = await import("@/stores/threads");
+const { useThreadsStore } = await import("@/stores/threads");
 const { useTerminalsStore } = await import("@/stores/terminals");
 const { useUiStore } = await import("@/stores/ui");
 const { showView, useViewsStore, worktreePanelCommand } = await import("@/stores/views");
@@ -22,15 +22,15 @@ const WEB_FEAT = "/wt/web/cf-feat";
 const status = { upstream: "", ahead: 0, behind: 0, staged: 0, modified: 0, untracked: 0, dirty: false, refreshedAtMs: null };
 const wt = (repoId: string, path: string, branch: string, isMain = false): WorktreeView => ({ repoId, path, branch, head: "abc", detached: false, isMain, status });
 const repo = (id: string, extra: WorktreeView[] = []): RepoView => ({ id, path: `/src/${id}`, name: id, defaultBranch: "main", githubSlug: "", remotes: [], git: true, worktrees: [wt(id, `/src/${id}`, "main", true), ...extra] });
-const thread = (id: string, o: Partial<SessionView>) => ({ id, repoId: "web", worktreePath: WEB_MAIN, workspaceId: "", pendingWorktreePath: "", terminalId: "", state: "connected", linkedPullRequests: [], ...o }) as SessionView;
+const thread = (id: string, o: Partial<ThreadView>) => ({ id, repoId: "web", worktreePath: WEB_MAIN, workspaceId: "", pendingWorktreePath: "", terminalId: "", state: "connected", linkedPullRequests: [], ...o }) as ThreadView;
 
 function select(id: string): void {
-  useUiStore.setState({ selection: { kind: "session", id } });
+  useUiStore.setState({ selection: { kind: "thread", id } });
 }
 
 beforeEach(() => {
   useReposStore.setState({ byId: { web: repo("web", [wt("web", WEB_FEAT, "cf/feat")]) }, order: ["web"] });
-  useSessionsStore.setState({
+  useThreadsStore.setState({
     byId: {
       "s-main": thread("s-main", {}),
       "s-feat": thread("s-feat", { worktreePath: WEB_FEAT }),
@@ -71,7 +71,7 @@ describe("Worktree surface availability", () => {
     expect(row()?.textContent).toContain("Worktree");
     expect(row()?.textContent).toContain("T");
     act(() => {
-      useUiStore.setState({ selection: { kind: "session", id: "s-lost" } });
+      useUiStore.setState({ selection: { kind: "thread", id: "s-lost" } });
     });
     expect(row()).toBeNull();
   });
@@ -96,14 +96,14 @@ describe("Worktree surface availability", () => {
   });
 
   it("the tab's who-else line counts the worktree's other threads and shells, not the thread it is open for", () => {
-    useSessionsStore.setState((s) => ({ byId: { ...s.byId, "s-feat2": thread("s-feat2", { worktreePath: WEB_FEAT }) }, order: [...s.order, "s-feat2"] }));
+    useThreadsStore.setState((s) => ({ byId: { ...s.byId, "s-feat2": thread("s-feat2", { worktreePath: WEB_FEAT }) }, order: [...s.order, "s-feat2"] }));
     useTerminalsStore.setState({ byId: { t1: { id: "t1", cwd: WEB_FEAT, state: "running" } as TerminalView }, order: ["t1"] });
     render(<SidePanel />);
     fireEvent.keyDown(screen.getByTestId("side-panel"), { key: "t" });
     expect(screen.getByTestId("worktree-who").textContent).toBe("1 other thread1 shell");
     act(() => {
       useTerminalsStore.setState({ byId: {}, order: [] });
-      useSessionsStore.setState((s) => ({ byId: { ...s.byId, "s-feat2": { ...thread("s-feat2", { worktreePath: WEB_FEAT }), archivedAtMs: 1 } } }));
+      useThreadsStore.setState((s) => ({ byId: { ...s.byId, "s-feat2": { ...thread("s-feat2", { worktreePath: WEB_FEAT }), archivedAtMs: 1 } } }));
     });
     expect(screen.queryByTestId("worktree-who")).toBeNull();
   });

@@ -2,14 +2,14 @@ import { createElement } from "react";
 import { Layers } from "lucide-react";
 import { WorkspaceSurface } from "@/components/workspace/WorkspaceSurface";
 import { useReposStore } from "@/stores/repos";
-import { useSessionsStore } from "@/stores/threads";
+import { useThreadsStore } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import type { SurfaceSpec } from "./types";
 import { selectionWorkspaceThread, WORKSPACE_KIND, workspaceOfTab, workspaceTab, type WorkspaceThread } from "./workspaceTarget";
 
 function thread(sel: Selection): WorkspaceThread | null {
-  return selectionWorkspaceThread(sel, { repos: useReposStore.getState(), sessions: useSessionsStore.getState() });
+  return selectionWorkspaceThread(sel, { repos: useReposStore.getState(), threads: useThreadsStore.getState() });
 }
 
 /**
@@ -27,7 +27,7 @@ export const workspaceSurface: SurfaceSpec = {
   hotkey: "w",
   available: (ctx) => (thread(ctx.selection) ? "enabled" : "hidden"),
   // deriveContext reads the repos store too (placement); the name comes from workspaces.
-  watches: [useSessionsStore, useReposStore],
+  watches: [useThreadsStore, useReposStore],
   render: (tab) => {
     const id = workspaceOfTab(tab);
     return id ? createElement(WorkspaceSurface, { workspaceId: id }) : null;

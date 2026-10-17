@@ -9,7 +9,7 @@ import { composeIn, composeInWorkspace, composeNoProject } from "@/stores/compos
 import { addProject } from "@/stores/projectActions";
 import { getUiContext } from "@/stores/context";
 import { useReposStore } from "@/stores/repos";
-import { useSessionsStore } from "@/stores/threads";
+import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
 
@@ -19,7 +19,7 @@ const ADD_PROJECT_VALUE = "__add-project";
 /** The row to highlight first: the active thread's workspace, else the active project. */
 function initialValue(): string | undefined {
   const ctx = getUiContext();
-  const ws = useSessionsStore.getState().byId[ctx.activeSessionId]?.workspaceId;
+  const ws = useThreadsStore.getState().byId[ctx.activeThreadId]?.workspaceId;
   if (ws && useWorkspacesStore.getState().byId[ws]) return draftKey({ kind: "workspace", workspaceId: ws });
   const id = ctx.activeRepoId;
   return id && useReposStore.getState().byId[id] ? id : undefined;

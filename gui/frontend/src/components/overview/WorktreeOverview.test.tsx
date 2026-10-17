@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PullRequestView } from "@/api/gh";
 import type { GitStatusView, RepoView, WorktreeView } from "@/api/repo";
-import type { SessionView } from "@/api/threads";
+import type { ThreadView } from "@/api/threads";
 import type { TerminalView } from "@/api/terminal";
 import type { FileChangeView, LogEntryView, WorktreeDetailView } from "@/api/worktreeDetail";
 
@@ -19,7 +19,7 @@ vi.mock("@/stores/gh", async (orig) => ({ ...(await orig<typeof import("@/stores
 
 const { WorktreePanelView } = await import("./WorktreeOverview");
 const { useReposStore } = await import("@/stores/repos");
-const { useSessionsStore } = await import("@/stores/threads");
+const { useThreadsStore } = await import("@/stores/threads");
 const { useTerminalsStore } = await import("@/stores/terminals");
 const { useUiStore } = await import("@/stores/ui");
 
@@ -73,7 +73,7 @@ const pr = (number: number, o: Partial<PullRequestView> = {}): PullRequestView =
     ...o,
   }) as PullRequestView;
 
-const thread = (id: string, worktreePath: string, o: Partial<SessionView> = {}) => ({ id, worktreePath, archivedAtMs: null, ...o }) as SessionView;
+const thread = (id: string, worktreePath: string, o: Partial<ThreadView> = {}) => ({ id, worktreePath, archivedAtMs: null, ...o }) as ThreadView;
 const term = (id: string, cwd: string, state: TerminalView["state"] = "running") => ({ id, cwd, state }) as TerminalView;
 
 async function show(): Promise<void> {
@@ -100,7 +100,7 @@ beforeEach(() => {
   P = `/src/web.worktrees/feat-${String(++n)}`;
   details.clear();
   prs.clear();
-  useSessionsStore.setState({ byId: {}, order: [] });
+  useThreadsStore.setState({ byId: {}, order: [] });
   useTerminalsStore.setState({ byId: {}, order: [] });
   useUiStore.setState({ selection: { kind: "none" } });
 });
@@ -154,12 +154,12 @@ describe("WorktreePanelView", () => {
   it("who else: other unarchived threads on the path (not the selected one) and live shells; hidden when alone", async () => {
     world(status());
     detail([], []);
-    useSessionsStore.setState({
+    useThreadsStore.setState({
       byId: { me: thread("me", P), a: thread("a", P), b: thread("b", P), old: thread("old", P, { archivedAtMs: 5 }), sub: thread("sub", `${P}/sub`), else: thread("else", "/src/web") },
       order: ["me", "a", "b", "old", "sub", "else"],
     });
     useTerminalsStore.setState({ byId: { t1: term("t1", P), t2: term("t2", P, "exited") }, order: ["t1", "t2"] });
-    useUiStore.setState({ selection: { kind: "session", id: "me" } });
+    useUiStore.setState({ selection: { kind: "thread", id: "me" } });
     await show();
     const who = screen.getByTestId("worktree-who");
     expect(who.textContent).toBe("2 other threads1 shell");
@@ -172,9 +172,9 @@ describe("WorktreePanelView", () => {
     expect(screen.getByTestId("worktree-who").textContent).toBe("3 other threads1 shell");
 
     act(() => {
-      useSessionsStore.setState({ byId: { me: thread("me", P) }, order: ["me"] });
+      useThreadsStore.setState({ byId: { me: thread("me", P) }, order: ["me"] });
       useTerminalsStore.setState({ byId: {}, order: [] });
-      useUiStore.setState({ selection: { kind: "session", id: "me" } });
+      useUiStore.setState({ selection: { kind: "thread", id: "me" } });
     });
     expect(q("worktree-who")).toBeNull();
   });

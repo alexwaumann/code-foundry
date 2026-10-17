@@ -5,7 +5,7 @@
  * a finished foreground Explore with its report, two background general-purpose runs
  * still running with their activity, a nested run (spawn depth 2) under the first, and a
  * failed background run with its "Agent failed · …" note. The session's
- * agents_running / background_agents_running follow the list (mock/world.ts sessionMsg).
+ * agents_running / background_agents_running follow the list (mock/world.ts threadMsg).
  *
  *   POST /__mock/thread/agent-end?id=s-r1&run=a1[&status=done|failed]   a run ends: its
  *        Agent call's item finishes, a note follows, the list and the counts are published.
@@ -24,7 +24,7 @@ export type AgentRunInit = MessageInitShape<typeof ThreadAgentRunSchema>;
 type ItemInit = MessageInitShape<typeof ThreadItemSchema>;
 type Over = Partial<ItemInit> & { at?: Date; until?: Date };
 
-/** What the "agents" script needs from MockThreads.load. */
+/** What the "agents" script needs from MockThreadLogs.load. */
 export interface AgentsScript {
   cwd: string;
   it(payload: ItemInit["payload"], over?: Over): ItemInit;
@@ -106,7 +106,7 @@ export function scriptAgents(s: AgentsScript, now = Date.now()): AgentRunInit[] 
     { status: ToolCallStatus.RUNNING },
     { at: ago(38), parentToolUseId: pr1Id },
   );
-  s.tool("Read", { file_path: p("internal/store/session/usage_runs.go") }, { status: ToolCallStatus.RUNNING }, { at: ago(5), parentToolUseId: callId(review) });
+  s.tool("Read", { file_path: p("internal/store/thread/usage_runs.go") }, { status: ToolCallStatus.RUNNING }, { at: ago(5), parentToolUseId: callId(review) });
   const pr2 = s.tool(
     "Agent",
     { description: "PR 2: Agents surface in the panel", subagent_type: "general-purpose", model: "opus", effort: "high", run_in_background: true, prompt: "Build PR 2." },
@@ -224,7 +224,7 @@ export function agentCounts(runs: readonly AgentRunInit[]): { agentsRunning: num
   return { agentsRunning: running.length, backgroundAgentsRunning: running.filter((r) => r.background && (r.spawnDepth ?? 1) <= 1).length };
 }
 
-/** What MockThreads offers the agent commands and the control. */
+/** What MockThreadLogs offers the agent commands and the control. */
 export interface AgentThreads {
   /** The thread's runs in spawn order ([] for none). Throws for an unknown thread. */
   agentsOf(id: string): AgentRunInit[];

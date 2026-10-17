@@ -18,7 +18,7 @@ function show(items: ThreadItemView[]) {
   useThreadStore.setState({ logs: { s: { seq: 1, byId, order: items.map((it) => it.id), pending: [], mcp: null, commands: [], agents: [] } } });
   const rows = buildRows(buildTurns(items.map((it) => decodeTimelineKey(timelineKey(structOf(it))))), { fold: () => undefined, working: false });
   return render(
-    <ThreadContext.Provider value={{ sessionId: "s", cwd: "/w" }}>
+    <ThreadContext.Provider value={{ threadId: "s", cwd: "/w" }}>
       {rows.map((r) => (
         <TimelineRowView key={r.key} row={r} />
       ))}

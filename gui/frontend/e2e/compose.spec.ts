@@ -10,7 +10,7 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-async function sessionCount(): Promise<number> {
+async function threadCount(): Promise<number> {
   const res = await fetch(`${mockUrl}/__mock/sessions`);
   return ((await res.json()) as unknown[]).length;
 }
@@ -101,7 +101,7 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
   await expect(page.getByTestId("composer-input")).toBeDisabled();
 
   // The daemon's focus intent replaces the composer with the thread; its prompt has focus.
-  const created = page.locator('[data-row-kind="session"][aria-selected="true"]');
+  const created = page.locator('[data-row-kind="thread"][aria-selected="true"]');
   await expect(created).toBeVisible();
   const key = (await created.getAttribute("data-row-key")) ?? "";
   expect(key).toMatch(/^s:s-new-\d+$/);
@@ -224,13 +224,13 @@ test("pickers are keyboard operable; Tab goes prompt → pickers → send", asyn
     permission: "supervised",
     prompt: "Refactor the sidebar",
   });
-  await expect(page.locator('[data-row-kind="session"][aria-selected="true"]')).toBeVisible();
+  await expect(page.locator('[data-row-kind="thread"][aria-selected="true"]')).toBeVisible();
 });
 
 test("a failed start keeps the draft editable and shows why", async ({ page }) => {
   await mockPost("session-new?delay=300");
   await openApp(page);
-  const before = await sessionCount();
+  const before = await threadCount();
   await compose(page);
   await page.keyboard.type("Please FAIL here");
   await page.keyboard.press("Enter");
@@ -241,7 +241,7 @@ test("a failed start keeps the draft editable and shows why", async ({ page }) =
   await expect(prompt(page)).toHaveAttribute("data-value", "Please FAIL here");
   await expect(input).toBeFocused();
   await expect(page.getByTestId("composer")).toBeVisible();
-  expect(await sessionCount()).toBe(before);
+  expect(await threadCount()).toBe(before);
 
   // Work in the project folder instead: the base picker goes away. Editing clears the error.
   await page.getByTestId("composer-worktree").click();
@@ -261,10 +261,10 @@ test("a failed start keeps the draft editable and shows why", async ({ page }) =
   await input.fill("Please work");
   await expect(error).toHaveCount(0);
   await input.press("Enter");
-  await expect(page.locator('[data-row-kind="session"][aria-selected="true"]')).toBeVisible();
+  await expect(page.locator('[data-row-kind="thread"][aria-selected="true"]')).toBeVisible();
   const last = (await invocations()).at(-1);
   expect(last?.args).toEqual({ repo: "repo-cf", worktree: CF, model: "claude-opus-4-8[1m]", effort: "high", permission: "auto", prompt: "Please work" });
-  expect(await sessionCount()).toBe(before + 1);
+  expect(await threadCount()).toBe(before + 1);
 });
 
 test("an existing worktree or the current checkout shows its branch, read-only and live", async ({ page }) => {
@@ -338,7 +338,7 @@ test("Work in: threads.default_worktree = current starts in place; a pick is rem
   await page.getByTestId("composer-input").focus();
   await page.keyboard.type("Tidy the README");
   await page.keyboard.press("Enter");
-  await expect(page.locator('[data-row-kind="session"][aria-selected="true"]')).toBeVisible();
+  await expect(page.locator('[data-row-kind="thread"][aria-selected="true"]')).toBeVisible();
   expect((await invocations()).at(-1)?.args).toMatchObject({ repo: "repo-cf", "new-worktree": "true", base: "origin/main" });
   await expect.poll(() => promptFocused(page)).toBe(true);
 
@@ -392,7 +392,7 @@ test("attachments: picked, rejected, removed, staged on send", async ({ page }) 
     ["pasted.png", "image/png", PNG.length],
   ]);
   expect((await invocations()).at(-1)?.args.attachments).toBe(up.map((a) => a.path).join(","));
-  await expect(page.locator('[data-row-kind="session"][aria-selected="true"]')).toBeVisible();
+  await expect(page.locator('[data-row-kind="thread"][aria-selected="true"]')).toBeVisible();
 });
 
 test("the draft survives switching away; Backspace goes back; Esc on an empty draft shows the repo", async ({ page }) => {
@@ -564,7 +564,7 @@ test("a local-only repository: local refs from main, no remote git commands", as
   await page.keyboard.press("Enter");
   await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("thread.new");
   expect((await invocations()).at(-1)?.args).toMatchObject({ repo: "repo-sk", "new-worktree": "true", base: "main" });
-  await expect(page.locator('[data-row-kind="session"][aria-selected="true"]')).toBeVisible();
+  await expect(page.locator('[data-row-kind="thread"][aria-selected="true"]')).toBeVisible();
 
   // The new thread is selected: fetch/pull/push/PR are not offered for a project without git.
   await page.keyboard.press("Meta+k");

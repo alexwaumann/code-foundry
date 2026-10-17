@@ -72,8 +72,8 @@ test("Run in terminal: hidden while the block streams, then a new shell in the t
   await run.click();
   // One terminal.new with --run in the thread's context, nothing typed by the GUI.
   await expect
-    .poll(async () => (await invocations()).filter((i) => i.name === "terminal.new").map((i) => ({ run: i.args.run, session: i.context?.activeThreadId })))
-    .toEqual([{ run: BASH_CMD, session: "s-r1" }]);
+    .poll(async () => (await invocations()).filter((i) => i.name === "terminal.new").map((i) => ({ run: i.args.run, thread: i.context?.activeThreadId })))
+    .toEqual([{ run: BASH_CMD, thread: "s-r1" }]);
   // A new tab in s-r1's panel, active, live, with the keyboard.
   await expect(bottom(page)).toBeVisible();
   await expect(bottom(page).getByRole("tab")).toHaveCount(1);

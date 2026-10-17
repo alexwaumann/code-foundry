@@ -15,13 +15,13 @@ import { persist } from "zustand/middleware";
 import { useShallow } from "zustand/react/shallow";
 import { basename } from "@/lib/path";
 import { NO_PROJECT } from "@/lib/threadRow";
-import { ACTION_NAME_LABEL, isActionLabels, isPanelLabels, SESSION_LABEL, WORKTREE_LABEL } from "@/lib/termlabel";
+import { ACTION_NAME_LABEL, isActionLabels, isPanelLabels, THREAD_LABEL, WORKTREE_LABEL } from "@/lib/termlabel";
 import { keyOf } from "./panel";
 import { useTerminalsStore, type TerminalsData } from "./terminals";
 import { BOTTOM_DEFAULT, useUiStore, type Selection } from "./ui";
 
 export const PROJECTS_KEY = "view:projects";
-const SESSION_PREFIX = "session:";
+const THREAD_PREFIX = "session:";
 
 export interface BottomEntry {
   open: boolean;
@@ -39,12 +39,12 @@ export const emptyBottom: BottomEntry = { open: false };
 /** Bottom panel key for a selection: a thread or the Projects page; null for anything else. */
 export function bottomKeyOf(sel: Selection): string | null {
   const key = keyOf(sel);
-  return key !== null && (key.startsWith(SESSION_PREFIX) || key === PROJECTS_KEY) ? key : null;
+  return key !== null && (key.startsWith(THREAD_PREFIX) || key === PROJECTS_KEY) ? key : null;
 }
 
 /** The thread id of a `session:<id>` key, else null. */
-export function sessionOfKey(key: string): string | null {
-  return key.startsWith(SESSION_PREFIX) ? key.slice(SESSION_PREFIX.length) : null;
+export function threadOfKey(key: string): string | null {
+  return key.startsWith(THREAD_PREFIX) ? key.slice(THREAD_PREFIX.length) : null;
 }
 
 type LabelledTerminal = { labels: Readonly<Record<string, string>> };
@@ -57,8 +57,8 @@ type LabelledTerminal = { labels: Readonly<Record<string, string>> };
  */
 export function ownerKeyOf(t: LabelledTerminal): string | null {
   if (!isPanelLabels(t.labels)) return null;
-  const session = t.labels[SESSION_LABEL];
-  return session ? `${SESSION_PREFIX}${session}` : PROJECTS_KEY;
+  const thread = t.labels[THREAD_LABEL];
+  return thread ? `${THREAD_PREFIX}${thread}` : PROJECTS_KEY;
 }
 
 /** A key's tabs: the ids of the shells and action runs it owns, in the terminals store's order. */

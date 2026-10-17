@@ -24,7 +24,7 @@ const { useViewsStore } = await import("./views");
 function term(id: string, labels: Record<string, string>, extra: Partial<TerminalView> = {}): TerminalView {
   return { id, argv: ["/bin/zsh"], cwd: "/src/app", cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: null, exitedAtMs: null, altScreen: false, labels, ...extra };
 }
-const shell = (session: string, worktree = "/src/app") => ({ kind: "shell", repo: "r1", worktree, ...(session ? { thread: session } : {}) });
+const shell = (thread: string, worktree = "/src/app") => ({ kind: "shell", repo: "r1", worktree, ...(thread ? { thread: thread } : {}) });
 
 function setTerminals(list: TerminalView[]): void {
   useTerminalsStore.setState({ byId: Object.fromEntries(list.map((t) => [t.id, t])), order: list.map((t) => t.id), loaded: true });
@@ -40,8 +40,8 @@ beforeEach(() => {
   useBottomStore.setState({ byKey: {}, pendingFocus: null, pendingFocusId: null, starting: {} });
   usePanelStore.setState({ byKey: {} });
   useViewsStore.setState({ settingsOpen: false, usageOpen: false, helpOpen: false });
-  useUiStore.setState({ selection: { kind: "session", id: "s1" }, focus: "content", bottomFocusSeq: 0, contentFocusSeq: 0, palette: closedPalette });
-  setTerminals([term("claude", { session: "s1" }), term("a", shell("s1")), term("w", shell("", "/src/app.worktrees/x"))]);
+  useUiStore.setState({ selection: { kind: "thread", id: "s1" }, focus: "content", bottomFocusSeq: 0, contentFocusSeq: 0, palette: closedPalette });
+  setTerminals([term("claude", { thread: "s1" }), term("a", shell("s1")), term("w", shell("", "/src/app.worktrees/x"))]);
 });
 
 describe("onNewTerminal", () => {
@@ -58,7 +58,7 @@ describe("onNewTerminal", () => {
   });
 
   const ignored: [string, TerminalView][] = [
-    ["a thread-labelled terminal that is no shell", term("c2", { session: "s1" })],
+    ["a thread-labelled terminal that is no shell", term("c2", { thread: "s1" })],
     ["an unlabelled terminal", term("loose", {})],
     ["an exited shell", term("gone", shell("s1"), { state: "exited" })],
   ];
@@ -74,7 +74,7 @@ describe("onNewTerminal", () => {
   ];
   it.each(focus)("%s", (_name, pending, selected, want) => {
     markPendingFocus(pending);
-    useUiStore.setState({ selection: { kind: "session", id: selected } });
+    useUiStore.setState({ selection: { kind: "thread", id: selected } });
     onNewTerminal(term("b", shell("s1")));
     expect(useUiStore.getState().bottomFocusSeq).toBe(want);
     expect(getBottom("session:s1").activeTerminalId).toBe("b");
@@ -102,7 +102,7 @@ describe("revealShell (focusTerminal)", () => {
     useViewsStore.setState({ settingsOpen: true });
     usePanelStore.setState({ byKey: { "session:s1": { open: true, tabs: [], activeTabId: null, expanded: true } } });
     expect(revealShell("a")).toBe(true);
-    expect(useUiStore.getState().selection).toEqual({ kind: "session", id: "s1" });
+    expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s1" });
     expect(getBottom("session:s1")).toEqual({ open: true, activeTerminalId: "a" });
     expect(useUiStore.getState().bottomFocusSeq).toBe(1);
     expect(useViewsStore.getState().settingsOpen).toBe(false);
@@ -118,7 +118,7 @@ describe("revealShell (focusTerminal)", () => {
   it("not a shell: false, nothing changes", () => {
     expect(revealShell("claude")).toBe(false);
     expect(useBottomStore.getState().byKey).toEqual({});
-    expect(useUiStore.getState().selection).toEqual({ kind: "session", id: "s1" });
+    expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s1" });
   });
 
   it("an unknown terminal is revealed when it arrives as a shell", () => {
@@ -128,7 +128,7 @@ describe("revealShell (focusTerminal)", () => {
     const later = term("later", shell("s2"));
     setTerminals([later]);
     onNewTerminal(later);
-    expect(useUiStore.getState().selection).toEqual({ kind: "session", id: "s2" });
+    expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s2" });
     expect(getBottom("session:s2")).toEqual({ open: true, activeTerminalId: "later" });
     expect(useUiStore.getState().bottomFocusSeq).toBe(1);
   });
@@ -136,11 +136,11 @@ describe("revealShell (focusTerminal)", () => {
 
 describe("paneContext and newBottomTerminal", () => {
   it("a thread's panel runs in the thread's context", () => {
-    expect(paneContext("session:s1")).toMatchObject({ activeSessionId: "s1", activeView: "session" });
+    expect(paneContext("session:s1")).toMatchObject({ activeThreadId: "s1", activeView: "thread" });
   });
 
   it("the Projects page's panel runs in its active tab's worktree, or nowhere without tabs", () => {
-    expect(paneContext("view:projects")).toMatchObject({ activeRepoId: "r1", activeWorktreePath: "/src/app.worktrees/x", activeSessionId: "" });
+    expect(paneContext("view:projects")).toMatchObject({ activeRepoId: "r1", activeWorktreePath: "/src/app.worktrees/x", activeThreadId: "" });
     setTerminals([]);
     expect(paneContext("view:projects")).toBeNull();
     expect(paneContext("view:pullrequests")).toBeNull();
@@ -148,7 +148,7 @@ describe("paneContext and newBottomTerminal", () => {
 
   it("newBottomTerminal runs terminal.new there; no context, no run", async () => {
     expect(await newBottomTerminal("session:s1")).toBe(true);
-    expect(commands.runCommandForResult).toHaveBeenCalledWith("terminal.new", {}, { ctx: expect.objectContaining({ activeSessionId: "s1" }) as unknown, quiet: true });
+    expect(commands.runCommandForResult).toHaveBeenCalledWith("terminal.new", {}, { ctx: expect.objectContaining({ activeThreadId: "s1" }) as unknown, quiet: true });
     commands.runCommandForResult.mockClear();
     setTerminals([]);
     expect(await newBottomTerminal("view:projects")).toBe(false);
@@ -198,7 +198,7 @@ describe("focus for this window's own shells (by id)", () => {
     ["a workspace member in the thread's panel: that member's worktree", "/src/api.worktrees/x", { cwd: "/src/api.worktrees/x" }],
   ])("newThreadTerminal from %s runs in the thread's context", async (_name, cwd, args) => {
     await newThreadTerminal("s2", cwd);
-    expect(commands.runCommandForResult).toHaveBeenCalledWith("terminal.new", args, { ctx: expect.objectContaining({ activeSessionId: "s2", activeView: "session" }) as unknown, quiet: true });
+    expect(commands.runCommandForResult).toHaveBeenCalledWith("terminal.new", args, { ctx: expect.objectContaining({ activeThreadId: "s2", activeView: "thread" }) as unknown, quiet: true });
   });
 
   const uncover: [string, string, boolean, boolean][] = [
@@ -294,7 +294,7 @@ describe("the last tab going hides its panel", () => {
 
   const cases: [string, () => void, number, string][] = [
     ["shown, the keyboard elsewhere: focus stays", () => useUiStore.setState({ focus: "sidebar" }), 0, "content"],
-    ["another thread selected: hidden all the same", () => useUiStore.setState({ selection: { kind: "session", id: "s9" }, focus: "bottom" }), 0, "content"],
+    ["another thread selected: hidden all the same", () => useUiStore.setState({ selection: { kind: "thread", id: "s9" }, focus: "bottom" }), 0, "content"],
     ["the palette open over it: it returns to the content pane", () => useUiStore.setState({ palette: { ...closedPalette, open: true, returnTo: "bottom" } }), 0, "content"],
   ];
   it.each(cases)("%s", (_name, arrange, contentFocus, returnTo) => {
@@ -341,9 +341,9 @@ describe("closeEmptyPanels (after the reconnect's List)", () => {
       byKey: { "session:s1": { open: true }, "session:s2": { open: true, height: 200 }, "view:projects": { open: true }, "session:s3": { open: true } },
     });
     markStarting("session:s3");
-    useUiStore.setState({ selection: { kind: "session", id: "s1" }, focus: "bottom" });
+    useUiStore.setState({ selection: { kind: "thread", id: "s1" }, focus: "bottom" });
     // The restarted daemon has none of s1's shells: only the worktree shell is left.
-    setTerminals([term("claude", { session: "s1" }), term("w", shell("", "/src/app.worktrees/x"))]);
+    setTerminals([term("claude", { thread: "s1" }), term("w", shell("", "/src/app.worktrees/x"))]);
     closeEmptyPanels();
     expect(useBottomStore.getState().byKey).toEqual({
       "session:s1": { open: false },
@@ -364,7 +364,7 @@ describe("openBottomShell", () => {
   });
 
   it("no tab: opens at once, blank while the shell starts, and the shell takes it when it arrives", async () => {
-    setTerminals([term("claude", { session: "s1" })]);
+    setTerminals([term("claude", { thread: "s1" })]);
     useViewsStore.setState({ usageOpen: true });
     const pending = openBottomShell("session:s1");
     // Before terminal.new returns: open, uncovered, focused (the panel), waiting.
@@ -373,10 +373,10 @@ describe("openBottomShell", () => {
     expect(useUiStore.getState().bottomFocusSeq).toBe(1);
     expect("session:s1" in useBottomStore.getState().starting).toBe(true);
     expect(await pending).toBe("t-new");
-    expect(commands.runCommandForResult).toHaveBeenCalledWith("terminal.new", {}, { ctx: expect.objectContaining({ activeSessionId: "s1" }) as unknown, quiet: true });
+    expect(commands.runCommandForResult).toHaveBeenCalledWith("terminal.new", {}, { ctx: expect.objectContaining({ activeThreadId: "s1" }) as unknown, quiet: true });
     expect("session:s1" in useBottomStore.getState().starting).toBe(true);
     const t = term("t-new", shell("s1"));
-    setTerminals([term("claude", { session: "s1" }), t]);
+    setTerminals([term("claude", { thread: "s1" }), t]);
     onNewTerminal(t);
     expect(getBottom("session:s1")).toEqual({ open: true, activeTerminalId: "t-new" });
     expect(useBottomStore.getState().starting).toEqual({});
@@ -395,7 +395,7 @@ describe("openBottomShell", () => {
     useUiStore.setState({ focus: "bottom" });
     const pending = openBottomShell("session:s1", { fresh: true, command: "ls" });
     const t = term("t-new", shell("s1"));
-    setTerminals([term("claude", { session: "s1" }), term("a", shell("s1")), t]);
+    setTerminals([term("claude", { thread: "s1" }), term("a", shell("s1")), t]);
     onNewTerminal(t);
     expect(getBottom("session:s1")).toEqual({ open: true, activeTerminalId: "t-new" });
     const focused = useUiStore.getState().bottomFocusSeq;
@@ -417,7 +417,7 @@ describe("openBottomShell", () => {
     expect(commands.runCommandForResult).toHaveBeenCalledWith(
       "terminal.new",
       { run: "go test ./..." },
-      { ctx: expect.objectContaining({ activeSessionId: "s2" }) as unknown, quiet: true },
+      { ctx: expect.objectContaining({ activeThreadId: "s2" }) as unknown, quiet: true },
     );
     expect(getBottom("session:s2").open).toBe(true);
   });
@@ -449,7 +449,7 @@ describe("openBottomShell", () => {
 
 describe("toggleBottomFromHere (cmd+j, the header toggle, the palette)", () => {
   const cases: [string, () => void, boolean, boolean][] = [
-    ["a thread's panel without tabs opens with a new shell", () => { setTerminals([term("claude", { session: "s1" })]); }, true, true],
+    ["a thread's panel without tabs opens with a new shell", () => { setTerminals([term("claude", { thread: "s1" })]); }, true, true],
     ["a thread's panel with a tab just opens", () => undefined, true, false],
     ["an open panel just hides", () => useBottomStore.setState({ byKey: { "session:s1": { open: true } } }), false, false],
     [
@@ -508,7 +508,7 @@ describe("toggleBottomFromHere (cmd+j, the header toggle, the palette)", () => {
 describe("closeBottomTerminal", () => {
   it("runs terminal.close with --id and that terminal as the active one", async () => {
     await closeBottomTerminal("a");
-    expect(commands.invokeConfirmed).toHaveBeenCalledWith("terminal.close", { id: "a" }, expect.objectContaining({ activeTerminalId: "a", activeSessionId: "s1" }));
+    expect(commands.invokeConfirmed).toHaveBeenCalledWith("terminal.close", { id: "a" }, expect.objectContaining({ activeTerminalId: "a", activeThreadId: "s1" }));
     expect(toastError).not.toHaveBeenCalled();
   });
 

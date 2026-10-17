@@ -110,8 +110,8 @@ function daily(model: string, values: readonly number[], perRequest: number): Mo
 }
 
 /** s-3: Opus 5.5 every day, plus claude-opus-5 (no rate: "unpriced"). s-4: Fable, Sonnet and Haiku. */
-export function pageUsage(sessionId: string): MockUsage[] {
-  switch (sessionId) {
+export function pageUsage(threadId: string): MockUsage[] {
+  switch (threadId) {
     case "s-3":
       return [...daily("claude-opus-5-5", OPUS, 1), mix("claude-opus-5", 2, 18, 9), mix("claude-opus-5", 1, 10.4, 5)];
     case "s-4":
@@ -121,7 +121,7 @@ export function pageUsage(sessionId: string): MockUsage[] {
   }
 }
 
-/** SessionSnapshot.retired_usage / ListSessionsResponse.retired_usage: removed threads' usage. */
+/** ThreadListSnapshot.retired_usage / ListThreadsResponse.retired_usage: removed threads' usage. */
 export function retiredUsage(): UsageBucketInit[] {
   return usageFields([mix("claude-opus-5-5", 20, 64, 70), mix("claude-fable-5-1", 20, 21, 25), mix("claude-opus-5-5", 33, 90, 80), mix("claude-opus-5-5", 60, 45, 40), mix("claude-opus-4-8", 12, 6, 4)]).usage;
 }

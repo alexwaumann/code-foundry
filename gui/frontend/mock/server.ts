@@ -24,7 +24,7 @@
  *   POST /__mock/status-kinds                     (one thread per status kind: approval, question,
  *        plan, finished, Claude error, busy, idle, interrupted, and a stopped one still asking
  *        a question; MOCK_SCENARIO=status-kinds seeds them at startup and on reset)
- *   POST /__mock/session/focus?id=s-3     (FocusSession intent)
+ *   POST /__mock/session/focus?id=s-3     (FocusThread intent)
  *   POST /__mock/session/archive?id=s-1[&archived=false]   (session.archive as the CLI's --yes does it:
  *                                                 closes, removes its shells, unpins, stamps; false unarchives)
  *   POST /__mock/session/snooze?id=s-1&until=2m|<RFC 3339>[&clear=true]   (session.snooze as the CLI's
@@ -154,7 +154,7 @@ import { retiredUsage, utcDay } from "./usage";
 import { reconnectMcp, refreshMcp } from "./mcp";
 import type { ActionEventInit } from "./actions";
 import { refuseSlashCommand, slashCommandsFor } from "./slashCommands";
-import { MOCK_ATTACHMENT, MOCK_ATTACHMENT_PNG, MockThreads, THREAD_STATES, type ThreadState as ScriptedThreadState } from "./thread";
+import { MOCK_ATTACHMENT, MOCK_ATTACHMENT_PNG, MockThreadLogs, THREAD_STATES, type ThreadState as ScriptedThreadState } from "./thread";
 import { CommandError, ConfirmNeeded, snoozeUntil, World, type EventInit } from "./world";
 
 type AttachEventInit = MessageInitShape<typeof AttachEventSchema>;
@@ -170,7 +170,7 @@ function seedScenario(): void {
 seedScenario();
 
 /** False simulates a pre-Phase-2a daemon (see POST /__mock/sessions-service). */
-let sessionsEnabled = true;
+let threadsEnabled = true;
 /** "Service/Method" paths that 404 like a daemon built before they existed. */
 const missingRpcs = new Set<string>();
 
@@ -367,8 +367,8 @@ function routes(router: ConnectRouter): void {
   });
 
   router.service(ThreadService, {
-    list: () => ({ threads: [...world.sessions.values()].map((s) => world.sessionMsg(s)), retiredUsage: retiredUsage() }),
-    get: (req) => guard(() => ({ thread: world.sessionMsg(world.session(req.id)) })),
+    list: () => ({ threads: [...world.threads.values()].map((s) => world.threadMsg(s)), retiredUsage: retiredUsage() }),
+    get: (req) => guard(() => ({ thread: world.threadMsg(world.thread(req.id)) })),
     create: () => {
       throw new ConnectError("use the thread.new command in the mock", Code.Unimplemented);
     },
@@ -395,7 +395,7 @@ function routes(router: ConnectRouter): void {
       if (req.path === MOCK_ATTACHMENT || world.attachments.has(req.path)) return { data: new Uint8Array(MOCK_ATTACHMENT_PNG), mimeType: "image/png" };
       throw new ConnectError(`attachment ${req.path} not found`, Code.NotFound);
     },
-    watch: (_req, ctx) => tracked("ThreadService/Watch", world.sessionEvents.subscribe(ctx.signal, [world.sessionSnapshot()])),
+    watch: (_req, ctx) => tracked("ThreadService/Watch", world.threadListEvents.subscribe(ctx.signal, [world.threadListSnapshot()])),
     // The conversation (mock/thread.ts). The GUI goes through the thread.* commands for
     // Send / Interrupt / Respond / SetModel / SetPermissionMode / SetEffort; these serve the RPCs themselves.
     listItems: (req) => guard(() => ({ snapshot: world.logs.snapshotValue(req.threadId) })),
@@ -408,7 +408,7 @@ function routes(router: ConnectRouter): void {
         const decision = req.decision === ThreadDecision.DENY ? "deny" : req.decision === ThreadDecision.ALLOW_FOR_SESSION ? "allow-session" : "allow";
         return { item: world.logs.respond(req.threadId, req.requestId, decision, req.answers, req.message) };
       }),
-    setEffort: (req) => guard(() => (world.logs.setEffort(req.threadId, req.effort), { thread: world.sessionMsg(world.session(req.threadId)) })),
+    setEffort: (req) => guard(() => (world.logs.setEffort(req.threadId, req.effort), { thread: world.threadMsg(world.thread(req.threadId)) })),
     // MCP (mock/mcp.ts): the GUI reads McpStatus once for a thread never checked; refresh and reconnect go through thread.mcp / thread.mcp-reconnect.
     mcpStatus: (req) => guard(() => ({ status: req.refresh ? refreshMcp(world.logs, req.threadId) : world.logs.mcpOf(req.threadId) })),
     mcpReconnect: async (req) => {
@@ -456,12 +456,12 @@ function routes(router: ConnectRouter): void {
           ? req.sources
           : [EventSource.REPO, EventSource.WORKSPACE, EventSource.TERMINAL, EventSource.THREAD_LIST, EventSource.THREAD, EventSource.GH, EventSource.GITOPS, EventSource.SETTINGS, EventSource.UPDATE, EventSource.UI, EventSource.ACTION],
       );
-      if (!sessionsEnabled) want.delete(EventSource.THREAD_LIST);
+      if (!threadsEnabled) want.delete(EventSource.THREAD_LIST);
       const initial: { source: EventSource; event: EventInit }[] = [
         { source: EventSource.REPO, event: { event: { case: "repo", value: { event: { case: "snapshot", value: { repos: [...world.repos.values()].map((r) => world.repoMsg(r)) } } } } } },
         { source: EventSource.WORKSPACE, event: { event: { case: "workspace", value: world.workspaceSnapshot() } } },
         ...[...world.terms.values()].map((t) => ({ source: EventSource.TERMINAL, event: { event: { case: "terminal" as const, value: { event: { case: "updated" as const, value: world.terminalMsg(t) } } } } })),
-        { source: EventSource.THREAD_LIST, event: { event: { case: "threadList", value: world.sessionSnapshot() } } },
+        { source: EventSource.THREAD_LIST, event: { event: { case: "threadList", value: world.threadListSnapshot() } } },
         { source: EventSource.THREAD, event: { event: { case: "thread", value: world.logs.pendingSnapshot() } } },
         ghEvent(world.gh.polledEvent()),
         { source: EventSource.GITOPS, event: { event: { case: "gitops", value: world.gitops.snapshot() } } },
@@ -496,12 +496,12 @@ function actionControl(res: ServerResponse, action: string, q: URLSearchParams):
         run = world.actions.finishNow({ run: q.get("run") ?? undefined, terminal: q.get("terminal") ?? undefined }, Number(q.get("code") ?? "0"));
         break;
       case "setup":
-        run = world.actions.setupRun(q.get("session") ?? "", Number(q.get("code") ?? "1"), q.get("action") ?? "");
+        run = world.actions.setupRun(q.get("thread") ?? "", Number(q.get("code") ?? "1"), q.get("action") ?? "");
         break;
       case "run": {
         const mode = q.get("mode") ?? "";
         if (mode && modes[mode] === undefined) throw new CommandError("invalid", "mode must be terminal or background");
-        run = world.actions.run({ action: q.get("action") ?? "", threadId: q.get("session") ?? "", worktreePath: q.get("worktree") ?? "", mode: modes[mode] ?? ActionRunMode.UNSPECIFIED });
+        run = world.actions.run({ action: q.get("action") ?? "", threadId: q.get("thread") ?? "", worktreePath: q.get("worktree") ?? "", mode: modes[mode] ?? ActionRunMode.UNSPECIFIED });
         break;
       }
       default:
@@ -594,8 +594,8 @@ function json(res: ServerResponse, status: number, body: unknown): void {
 }
 
 /** JSON-safe session summary (proto timestamps carry bigints). */
-function sessionSummary(id: string): Record<string, unknown> {
-  const s = world.session(id);
+function threadSummary(id: string): Record<string, unknown> {
+  const s = world.thread(id);
   return {
     id: s.id,
     name: s.name,
@@ -617,56 +617,56 @@ function sessionSummary(id: string): Record<string, unknown> {
 const statusNames: Record<string, ThreadStatus> = { busy: ThreadStatus.BUSY, idle: ThreadStatus.IDLE, attention: ThreadStatus.NEEDS_ATTENTION };
 
 /** Session controls: POST /__mock/session/{attention|status|stop|hold|release|focus|archive}?id=…[&status=…][&reason=…&code=…] */
-function sessionControl(res: ServerResponse, action: string, q: URLSearchParams): void {
+function threadControl(res: ServerResponse, action: string, q: URLSearchParams): void {
   const id = q.get("id") ?? "";
   try {
     switch (action) {
       case "attention":
-        world.setSessionStatus(id, ThreadStatus.NEEDS_ATTENTION, q.get("reason") ?? undefined);
+        world.setThreadStatus(id, ThreadStatus.NEEDS_ATTENTION, q.get("reason") ?? undefined);
         break;
       case "status": {
         const status = statusNames[q.get("status") ?? ""];
         if (status === undefined) throw new CommandError("invalid", "status must be busy, idle or attention");
-        world.setSessionStatus(id, status, q.get("reason") ?? undefined);
+        world.setThreadStatus(id, status, q.get("reason") ?? undefined);
         break;
       }
       case "stop": {
         const at = q.get("status");
         const status = at === null ? undefined : statusNames[at];
         if (at !== null && status === undefined) throw new CommandError("invalid", "status must be busy, idle or attention");
-        world.stopSession(id, q.get("reason") ?? "crashed", Number(q.get("code") ?? 1), status);
+        world.stopThread(id, q.get("reason") ?? "crashed", Number(q.get("code") ?? 1), status);
         break;
       }
       case "hold":
       case "release":
-        for (const each of q.getAll("id")) world.holdSession(each, action === "hold");
+        for (const each of q.getAll("id")) world.holdThread(each, action === "hold");
         break;
       case "focus":
-        json(res, 200, { delivered: world.focusSession(id) });
+        json(res, 200, { delivered: world.focusThread(id) });
         return;
       case "archive":
-        world.archiveSession(id, q.get("archived") !== "false");
+        world.archiveThread(id, q.get("archived") !== "false");
         break;
       case "snooze":
-        world.snoozeSession(id, snoozeUntil({ until: q.get("until") ?? "", clear: q.get("clear") ?? "" }));
+        world.snoozeThread(id, snoozeUntil({ until: q.get("until") ?? "", clear: q.get("clear") ?? "" }));
         break;
       case "wake":
-        world.wakeSession(id);
+        world.wakeThread(id);
         break;
       default:
         json(res, 404, { error: "unknown session action" });
         return;
     }
-    json(res, 200, sessionSummary(id));
+    json(res, 200, threadSummary(id));
   } catch (err) {
     json(res, err instanceof CommandError && err.kind === "notfound" ? 404 : 400, { error: err instanceof Error ? err.message : String(err) });
   }
 }
 
 function control(req: IncomingMessage, res: ServerResponse, path: string, q: URLSearchParams): void {
-  const session = /^\/__mock\/session\/([a-z]+)$/.exec(path);
-  if (req.method === "POST" && session?.[1]) {
-    sessionControl(res, session[1], q);
+  const thread = /^\/__mock\/session\/([a-z]+)$/.exec(path);
+  if (req.method === "POST" && thread?.[1]) {
+    threadControl(res, thread[1], q);
     return;
   }
   const actionCtl = /^\/__mock\/action\/([a-z]+)$/.exec(path);
@@ -701,8 +701,8 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     case "POST /__mock/sessions-service":
       // enabled=false simulates a daemon without Phase 2a: ThreadService 404s and the
       // events stream carries no session source. Reset turns it back on.
-      sessionsEnabled = q.get("enabled") !== "false";
-      json(res, 200, { enabled: sessionsEnabled });
+      threadsEnabled = q.get("enabled") !== "false";
+      json(res, 200, { enabled: threadsEnabled });
       break;
     case "POST /__mock/missing-rpc":
       for (const rpc of q.getAll("rpc")) missingRpcs.add(rpc);
@@ -746,7 +746,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       // workspace=login[&repo=repo-gp][&name=driver][&status=busy]: a connected thread owned by the workspace.
       try {
         const s = world.addWorkspaceThread(q.get("workspace") ?? "", q.get("repo") ?? "", q.get("name") ?? "driver", statusNames[q.get("status") ?? "idle"] ?? ThreadStatus.IDLE);
-        json(res, 200, sessionSummary(s.id));
+        json(res, 200, threadSummary(s.id));
       } catch (err) {
         json(res, 400, { error: err instanceof Error ? err.message : String(err) });
       }
@@ -761,9 +761,9 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     case "POST /__mock/link-pr":
       // session=s-1&slug=owner/name&number=12: a pr-link record; the session is republished if the URL is new.
       try {
-        const id = q.get("session") ?? "";
+        const id = q.get("thread") ?? "";
         const added = world.linkPullRequest(id, q.get("slug") ?? "", Number(q.get("number") ?? ""), Number(q.get("ago") ?? "0"));
-        json(res, 200, { added, ...sessionSummary(id) });
+        json(res, 200, { added, ...threadSummary(id) });
       } catch (err) {
         json(res, err instanceof CommandError && err.kind === "notfound" ? 404 : 400, { error: err instanceof Error ? err.message : String(err) });
       }
@@ -771,7 +771,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     case "POST /__mock/usage":
       // session=s-2&model=claude-opus-5&requests=3&cacheRead=1000[&input=…&output=…&cacheWrite5m=…&cacheWrite1h=…&day=YYYY-MM-DD]
       try {
-        const id = q.get("session") ?? "";
+        const id = q.get("thread") ?? "";
         const n = (k: string) => Number(q.get(k) ?? "0");
         world.addUsage(id, {
           model: q.get("model") ?? "",
@@ -849,7 +849,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "POST /__mock/thread/finish":
       world.logs.finish(q.get("id") ?? "s-r1", {
-        rest: q.get("rest") ?? MockThreads.answerRest,
+        rest: q.get("rest") ?? MockThreadLogs.answerRest,
         total: q.has("total") ? Number(q.get("total")) : undefined,
         turnCost: q.has("turnCost") ? Number(q.get("turnCost")) : undefined,
         model: q.get("model") ?? undefined,
@@ -942,8 +942,8 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       json(res, 200, { fail: [...world.gh.prDetails.failNext] });
       break;
     case "POST /__mock/gh/pr-delay":
-      world.gh.prDetails.sessionDelayMs = Number(q.get("ms") ?? "0");
-      json(res, 200, { delayMs: world.gh.prDetails.sessionDelayMs });
+      world.gh.prDetails.threadDelayMs = Number(q.get("ms") ?? "0");
+      json(res, 200, { delayMs: world.gh.prDetails.threadDelayMs });
       break;
     case "POST /__mock/gh/pr-comment": {
       // A poll saw a new comment on a pull request with a detail: pull_request_detail_updated.
@@ -955,7 +955,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       json(res, 200, Object.fromEntries(openStreams));
       break;
     case "GET /__mock/sessions":
-      json(res, 200, [...world.sessions.keys()].map(sessionSummary));
+      json(res, 200, [...world.threads.keys()].map(threadSummary));
       break;
     case "GET /__mock/actions":
       json(res, 200, world.actions.json());
@@ -979,7 +979,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       json(res, 200, world.resizes);
       break;
     case "POST /__mock/reset":
-      sessionsEnabled = true;
+      threadsEnabled = true;
       missingRpcs.clear();
       world.reset();
       seedScenario();
@@ -1032,7 +1032,7 @@ const server = createServer((req, res) => {
     control(req, res, url.pathname, url.searchParams);
     return;
   }
-  if (!sessionsEnabled && url.pathname.startsWith("/codefoundry.v1.ThreadService/")) {
+  if (!threadsEnabled && url.pathname.startsWith("/codefoundry.v1.ThreadService/")) {
     res.writeHead(404, { "Content-Type": "text/plain" });
     res.end("404 page not found\n");
     return;

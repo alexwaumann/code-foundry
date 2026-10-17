@@ -2,7 +2,7 @@
  * A thread's own background shells in the mock daemon (docs/notes/background-shells.md):
  * Bash calls with run_in_background and Monitor calls. Their result comes at once and
  * their item stays running until the shell ends; Session.background_shells_running
- * counts the running ones (mock/world.ts sessionMsg), so the strip above the composer
+ * counts the running ones (mock/world.ts threadMsg), so the strip above the composer
  * shows them.
  *
  *   POST /__mock/thread?state=shells   shells only: a Bash run_in_background and a Monitor

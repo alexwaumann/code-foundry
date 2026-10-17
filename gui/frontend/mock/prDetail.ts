@@ -209,7 +209,7 @@ export class PrDetailWorld {
   /** Commands whose next run fails (POST /__mock/gh/pr-fail?command=…). */
   readonly failNext = new Set<string>();
   /** How long pr.ask, pr.explain, pr.fix.findings, pr.merge and pr.review take (POST /__mock/gh/pr-delay?ms=…). */
-  sessionDelayMs = 0;
+  threadDelayMs = 0;
 
   constructor(private readonly h: PrDetailHooks) {
     const open = h.findPr(CF, 145);
@@ -486,7 +486,7 @@ export class PrDetailWorld {
    * the Linked PRs row shows matches the runs the PR tab lists).
    */
   private linkedDetail(): DetailInit {
-    const pr = this.h.makePr(CF, 147, "feat(session): link pull requests from pr-link transcript records", {
+    const pr = this.h.makePr(CF, 147, "feat(thread): link pull requests from pr-link transcript records", {
       headRef: "cf/linked-prs",
       headSha: "a71c147000000000000000000000000000000000",
       ageMs: 25 * MIN,
@@ -504,11 +504,11 @@ export class PrDetailWorld {
     });
     return {
       pullRequest: pr,
-      body: "Claude Code writes a `pr-link` record to the session transcript whenever it sees a pull request. The runner parses them, stores every distinct URL per thread and publishes `Session.linked_pull_requests`.\n\n- migration 0010 `session_pull_requests`\n- backfill on reconnect from the skipped transcript bytes\n- `session list` PRS column",
+      body: "Claude Code writes a `pr-link` record to the session transcript whenever it sees a pull request. The runner parses them, stores every distinct URL per thread and publishes `Thread.linked_pull_requests`.\n\n- migration 0010 `thread_pull_requests`\n- backfill on reconnect from the skipped transcript bytes\n- `session list` PRS column",
       commits: [
-        { sha: "e589570000000000000000000000000000000000", headline: "feat(session): linked pull requests from Claude's pr-link transcript records", authorLogin: this.h.viewer, authorName: "Alex", committedAt: this.at(40 * MIN) },
-        { sha: "f6990c6000000000000000000000000000000000", headline: "feat(api): Session.linked_pull_requests in the proto, API and session.list", authorLogin: this.h.viewer, authorName: "Alex", committedAt: this.at(33 * MIN) },
-        { sha: "a71c147000000000000000000000000000000000", headline: "feat(gui): map linked pull requests into SessionView", authorLogin: this.h.viewer, authorName: "Alex", committedAt: this.at(25 * MIN) },
+        { sha: "e589570000000000000000000000000000000000", headline: "feat(thread): linked pull requests from Claude's pr-link transcript records", authorLogin: this.h.viewer, authorName: "Alex", committedAt: this.at(40 * MIN) },
+        { sha: "f6990c6000000000000000000000000000000000", headline: "feat(api): Thread.linked_pull_requests in the proto, API and thread.list", authorLogin: this.h.viewer, authorName: "Alex", committedAt: this.at(33 * MIN) },
+        { sha: "a71c147000000000000000000000000000000000", headline: "feat(gui): map linked pull requests into ThreadView", authorLogin: this.h.viewer, authorName: "Alex", committedAt: this.at(25 * MIN) },
       ],
       commitCount: 3,
       checks: [
@@ -691,7 +691,7 @@ export class PrDetailWorld {
           const [slug, n] = target(args);
           const method = methodNames[args.method ?? ""];
           if (method === undefined) throw new ConnectError("method must be merge, squash, or rebase", Code.InvalidArgument);
-          if (this.sessionDelayMs > 0) await new Promise((r) => setTimeout(r, this.sessionDelayMs));
+          if (this.threadDelayMs > 0) await new Promise((r) => setTimeout(r, this.threadDelayMs));
           const r = prDetailCall(() => this.merge(slug, n, method, args["delete-branch"] === "true", args["head-sha"] ?? ""));
           return out(r.message, r);
         },
@@ -757,7 +757,7 @@ export class PrDetailWorld {
           const [slug, n] = target(args);
           const v = reviewVerdicts[args.verdict ?? ""];
           if (!v) throw new ConnectError("verdict must be approve, request-changes, or comment", Code.InvalidArgument);
-          if (this.sessionDelayMs > 0) await new Promise((r) => setTimeout(r, this.sessionDelayMs));
+          if (this.threadDelayMs > 0) await new Promise((r) => setTimeout(r, this.threadDelayMs));
           // Like the daemon's command: the body as typed; the write checks it.
           const r = prDetailCall(() => this.submitReview(slug, n, v.event, args.body ?? "", this.failNext.delete("pr.review")));
           // The daemon's result is protojson of the response.

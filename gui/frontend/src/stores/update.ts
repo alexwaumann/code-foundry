@@ -9,7 +9,7 @@ import type { Restarting } from "@/lib/update";
 import { invokeConfirmed, refreshCommands, useCommandsStore } from "./commands";
 import { getUiContext } from "./context";
 import { restartCutsOff } from "@/lib/thread";
-import { useSessionsStore } from "./threads";
+import { useThreadsStore } from "./threads";
 
 export type UpdateAction = "check" | "download" | "relaunch" | "restart";
 
@@ -59,7 +59,7 @@ export function applyUpdateEvent(ev: UpdateEventView): void {
  * the daemon's own count), in sidebar order.
  */
 export function useCutOffThreadIds(): string[] {
-  return useSessionsStore(
+  return useThreadsStore(
     useShallow((s) => {
       const ids: string[] = [];
       for (const id of s.order) {

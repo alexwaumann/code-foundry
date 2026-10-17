@@ -28,7 +28,7 @@ import { CommandError } from "./errors";
 import { agentCounts, agentsCommands } from "./agents";
 import { mcpCommands } from "./mcp";
 import { MockActions } from "./actions";
-import { CRASH_STDERR, MockThreads, type SeedHistory, type ThreadState as ScriptedThreadState } from "./thread";
+import { CRASH_STDERR, MockThreadLogs, type SeedHistory, type ThreadState as ScriptedThreadState } from "./thread";
 import { contextFields, recordResult, type MockContext } from "./context";
 
 type TerminalInit = MessageInitShape<typeof TerminalSchema>;
@@ -37,8 +37,8 @@ type TerminalEventInit = MessageInitShape<typeof TerminalEventSchema>;
 type RepoInit = MessageInitShape<typeof RepoSchema>;
 type WorktreeInit = MessageInitShape<typeof WorktreeSchema>;
 type RepoEventInit = MessageInitShape<typeof RepoEventSchema>;
-type SessionInit = MessageInitShape<typeof ThreadSchema>;
-type SessionEventInit = MessageInitShape<typeof ThreadListEventSchema>;
+type ThreadInit = MessageInitShape<typeof ThreadSchema>;
+type ThreadListEventInit = MessageInitShape<typeof ThreadListEventSchema>;
 export type EventInit = MessageInitShape<typeof EventSchema>;
 type WorkspaceInit = MessageInitShape<typeof WorkspaceSchema>;
 type WorkspaceEventInit = MessageInitShape<typeof WorkspaceEventSchema>;
@@ -52,7 +52,7 @@ export interface MockWorkspace {
   createdAt: Date;
 }
 
-interface MockSession {
+interface MockThread {
   id: string;
   claudeSessionId: string;
   repoId: string;
@@ -150,7 +150,7 @@ type Kind = "top" | "shell" | "action";
 
 // The terminal label contract (internal/termlabel, proto Terminal.labels).
 const LABEL_KIND = "kind";
-const LABEL_SESSION = "thread";
+const LABEL_THREAD = "thread";
 const LABEL_REPO = "repo";
 const LABEL_WORKTREE = "worktree";
 const KIND_SHELL = "shell";
@@ -159,10 +159,10 @@ const KIND_ACTION = "action";
 /** termlabel.IsPanel: a shell or an action run (the bottom panel's terminals; what close and thread removal take). */
 const isPanel = (labels: Record<string, string>) => labels[LABEL_KIND] === KIND_SHELL || labels[LABEL_KIND] === KIND_ACTION;
 
-/** Labels of a shell terminal.new starts: owned by a worktree, and by a thread when sessionId is set. */
-function shellLabels(sessionId: string, repoId: string, worktree: string): Record<string, string> {
+/** Labels of a shell terminal.new starts: owned by a worktree, and by a thread when threadId is set. */
+function shellLabels(threadId: string, repoId: string, worktree: string): Record<string, string> {
   const l: Record<string, string> = { [LABEL_KIND]: KIND_SHELL, [LABEL_REPO]: repoId, [LABEL_WORKTREE]: worktree };
-  if (sessionId) l[LABEL_SESSION] = sessionId;
+  if (threadId) l[LABEL_THREAD] = threadId;
   return l;
 }
 
@@ -192,7 +192,7 @@ export function snoozeUntil(args: Record<string, string>, now = Date.now()): Dat
 /**
  * Why stopping Claude now cuts something off (the daemon's midTurn): starting, or
  * connected and busy, or waiting on a permission request or question; "" otherwise.
- * Restarts count the threads this is set for (command.ActiveSession).
+ * Restarts count the threads this is set for (command.ActiveThread).
  */
 function midTurn(s: { state: ThreadState; status: ThreadStatus; statusReason: string }): string {
   if (s.state === ThreadState.STARTING) return "Claude is still working";
@@ -462,14 +462,14 @@ function initialRepos(): MockRepo[] {
  * session.new's first message: its prompt (and attachments), sent once the thread has
  * connected, with the composer's text for display. null without either.
  */
-function firstMessageOf(args: Record<string, string>): MockSession["firstMessage"] {
+function firstMessageOf(args: Record<string, string>): MockThread["firstMessage"] {
   const text = (args.prompt ?? "").trim();
   const attachments = (args.attachments ?? "").split(",").filter(Boolean);
   return text || attachments.length > 0 ? { text, attachments, composerText: args["composer-prompt"] ?? "" } : null;
 }
 
 /**
- * The default world's thread histories (MockThreads.seed), so every thread's timeline has
+ * The default world's thread histories (MockThreadLogs.seed), so every thread's timeline has
  * something to show: s-1 is mid-reply, s-2 waits on a Bash permission (its status reason
  * names it), s-3 finished before it exited, s-4 crashed mid-turn, s-6 finished before its
  * close. s-5 is still starting: nothing yet.
@@ -526,56 +526,56 @@ export class World {
   readonly startedAt = Date.now();
   terms = new Map<string, MockTerm>();
   repos = new Map<string, MockRepo>();
-  sessions = new Map<string, MockSession>();
+  threads = new Map<string, MockThread>();
   workspaces = new Map<string, MockWorkspace>();
   /** EventService: every hub below tees into this one, so its order is publish order. */
   readonly events = new Hub<{ source: EventSource; event: EventInit }>();
   readonly termEvents = new Hub<TerminalEventInit>((v) => this.events.publish({ source: EventSource.TERMINAL, event: { event: { case: "terminal", value: v } } }));
   readonly repoEvents = new Hub<RepoEventInit>((v) => this.events.publish({ source: EventSource.REPO, event: { event: { case: "repo", value: v } } }));
   readonly workspaceEvents = new Hub<WorkspaceEventInit>((v) => this.events.publish({ source: EventSource.WORKSPACE, event: { event: { case: "workspace", value: v } } }));
-  readonly sessionEvents = new Hub<SessionEventInit>((v) => this.events.publish({ source: EventSource.THREAD_LIST, event: { event: { case: "threadList", value: v } } }));
+  readonly threadListEvents = new Hub<ThreadListEventInit>((v) => this.events.publish({ source: EventSource.THREAD_LIST, event: { event: { case: "threadList", value: v } } }));
   readonly intents = new Hub<UiIntentInit>((v) => this.events.publish({ source: EventSource.UI, event: { event: { case: "ui", value: v } } }));
   readonly gitopsEvents = new Hub<GitOpsEventInit>((v) => this.events.publish({ source: EventSource.GITOPS, event: { event: { case: "gitops", value: v } } }));
   /** Threads' conversations (mock/thread.ts); the EventService thread source carries their pending requests. */
-  readonly logs = new MockThreads(
+  readonly logs = new MockThreadLogs(
     {
-      worktreeOf: (id) => this.session(id).worktreePath,
-      modelOf: (id) => this.session(id).model,
-      isConnected: (id) => this.session(id).state === ThreadState.CONNECTED,
+      worktreeOf: (id) => this.thread(id).worktreePath,
+      modelOf: (id) => this.thread(id).model,
+      isConnected: (id) => this.thread(id).state === ThreadState.CONNECTED,
       start: (id, ready) => {
         this.startThread(id, ready);
       },
       setStatus: (id, status, reason) => {
-        const s = this.session(id);
+        const s = this.thread(id);
         this.setStatus(s, status, reason);
         s.lastActivityAt = new Date();
-        this.publishSession(s);
+        this.publishThread(s);
       },
       setModel: (id, model) => {
-        const s = this.session(id);
+        const s = this.thread(id);
         s.model = model;
-        this.publishSession(s);
+        this.publishThread(s);
       },
       setPermission: (id, permission) => {
-        const s = this.session(id);
+        const s = this.thread(id);
         s.permissionMode = permissionModes[permission] ?? s.permissionMode;
-        this.publishSession(s);
+        this.publishThread(s);
       },
       setEffort: (id, effort, pending) => {
-        const s = this.session(id);
+        const s = this.thread(id);
         s.effort = effort;
         s.effortPending = pending;
-        this.publishSession(s);
+        this.publishThread(s);
       },
-      statusOf: (id) => this.session(id).status,
+      statusOf: (id) => this.thread(id).status,
       recordResult: (id, model) => {
-        const s = this.session(id);
+        const s = this.thread(id);
         recordResult(s, model);
-        this.publishSession(s);
+        this.publishThread(s);
       },
       agentsChanged: (id) => {
-        const s = this.sessions.get(id);
-        if (s) this.publishSession(s);
+        const s = this.threads.get(id);
+        if (s) this.publishThread(s);
       },
     },
     (ev) => this.events.publish({ source: EventSource.THREAD, event: { event: { case: "thread", value: ev } } }),
@@ -587,15 +587,15 @@ export class World {
     (snap) => {
       this.events.publish({ source: EventSource.SETTINGS, event: { event: { case: "settings", value: { event: { case: "snapshot", value: snap } } } } });
       // Like the daemon: a new cache TTL moves every expiry, so those threads are republished.
-      for (const s of this.sessions.values()) if (s.lastResultAt) this.publishSession(s);
+      for (const s of this.threads.values()) if (s.lastResultAt) this.publishThread(s);
     },
   );
   /** Actions and their runs (mock/actions.ts); terminal runs are kind=action terminals here. */
   readonly actions = new MockActions({
     publish: (v) => this.events.publish({ source: EventSource.ACTION, event: { event: { case: "action", value: v } } }),
     repos: () => [...this.repos.values()].map((r) => ({ id: r.id, name: r.name, worktrees: r.worktrees.map((w) => w.path) })),
-    session: (id) => {
-      const s = this.sessions.get(id);
+    thread: (id) => {
+      const s = this.threads.get(id);
       return s && { repoId: s.repoId, worktreePath: s.worktreePath };
     },
     startTerminal: (argv, cwd, labels) => this.create(argv, cwd, labels, "action").id,
@@ -613,10 +613,10 @@ export class World {
     () => this.restartCost(),
   );
 
-  /** The daemon's command.RestartCostOf over the threads (ActiveSession: archiveInterrupts). */
+  /** The daemon's command.RestartCostOf over the threads (ActiveThread: archiveInterrupts). */
   private restartCost(): RestartCost {
     const c: RestartCost = { threads: 0, midTurn: 0, agents: 0, shells: 0 };
-    for (const s of this.sessions.values()) {
+    for (const s of this.threads.values()) {
       if (this.interrupts(s).why === "") continue;
       c.threads++;
       if (midTurn(s) !== "") c.midTurn++;
@@ -678,27 +678,27 @@ export class World {
     // A shell terminal.new started in thread s-1 (thread-owned: s-1's bottom panel).
     this.addTerm({ id: "t-s1-shell", argv: ["/bin/zsh", "-l"], cwd: CF, title: "", kind: "shell", labels: shellLabels("s-1", "repo-cf", CF), startedAt: started });
     // Threads in every state, each with a short history (SEEDS).
-    this.sessions.clear();
+    this.threads.clear();
     const ago = (min: number) => new Date(Date.now() - min * 60_000);
-    this.addSession({ id: "s-1", repoId: "repo-cf", worktreePath: CF, name: "Refactor sidebar tree", model: "claude-opus-4-8[1m]", effort: "high", status: ThreadStatus.BUSY, statusReason: "working: Refactor sidebar tree", createdAt: ago(42), usage: sampleUsage() });
-    this.addSession({ id: "s-2", repoId: "repo-gp", worktreePath: GP, name: "Port renderer", model: "claude-sonnet-5[1m]", effort: "", status: ThreadStatus.NEEDS_ATTENTION, statusReason: `permission: Bash ${SEEDS["s-2"]?.reply ?? ""}`, statusChangedAt: ago(3), createdAt: ago(40) });
-    this.addSession({ id: "s-3", repoId: "repo-cf", worktreePath: `${CFW}/fix-resize`, name: "Fix resize race", model: "claude-opus-4-8[1m]", effort: "medium", state: ThreadState.DISCONNECTED, disconnectReason: "idle", createdAt: ago(300), lastActivityAt: ago(95), usage: pageUsage("s-3") });
-    this.addSession({ id: "s-4", repoId: "repo-cf", worktreePath: `${CFW}/feat-sidebar`, name: "Investigate flaky e2e", model: "claude-4.5-haiku[1m]", effort: "", state: ThreadState.DISCONNECTED, disconnectReason: "crashed", exitCode: 139, createdAt: ago(200), lastActivityAt: ago(17), usage: pageUsage("s-4") });
-    this.addSession({ id: "s-5", repoId: "repo-cf", worktreePath: `${CFW}/feat-sidebar`, name: "Write session docs", model: "claude-opus-4-8[1m]", effort: "low", state: ThreadState.STARTING, settleIn: 8, createdAt: ago(0) });
-    this.addSession({ id: "s-6", repoId: "repo-dot", worktreePath: `${HOME}/dotfiles`, name: "Tidy zshrc", model: "claude-sonnet-5[1m]", effort: "", state: ThreadState.CLOSING, settleIn: 8, createdAt: ago(60) });
+    this.addThread({ id: "s-1", repoId: "repo-cf", worktreePath: CF, name: "Refactor sidebar tree", model: "claude-opus-4-8[1m]", effort: "high", status: ThreadStatus.BUSY, statusReason: "working: Refactor sidebar tree", createdAt: ago(42), usage: sampleUsage() });
+    this.addThread({ id: "s-2", repoId: "repo-gp", worktreePath: GP, name: "Port renderer", model: "claude-sonnet-5[1m]", effort: "", status: ThreadStatus.NEEDS_ATTENTION, statusReason: `permission: Bash ${SEEDS["s-2"]?.reply ?? ""}`, statusChangedAt: ago(3), createdAt: ago(40) });
+    this.addThread({ id: "s-3", repoId: "repo-cf", worktreePath: `${CFW}/fix-resize`, name: "Fix resize race", model: "claude-opus-4-8[1m]", effort: "medium", state: ThreadState.DISCONNECTED, disconnectReason: "idle", createdAt: ago(300), lastActivityAt: ago(95), usage: pageUsage("s-3") });
+    this.addThread({ id: "s-4", repoId: "repo-cf", worktreePath: `${CFW}/feat-sidebar`, name: "Investigate flaky e2e", model: "claude-4.5-haiku[1m]", effort: "", state: ThreadState.DISCONNECTED, disconnectReason: "crashed", exitCode: 139, createdAt: ago(200), lastActivityAt: ago(17), usage: pageUsage("s-4") });
+    this.addThread({ id: "s-5", repoId: "repo-cf", worktreePath: `${CFW}/feat-sidebar`, name: "Write session docs", model: "claude-opus-4-8[1m]", effort: "low", state: ThreadState.STARTING, settleIn: 8, createdAt: ago(0) });
+    this.addThread({ id: "s-6", repoId: "repo-dot", worktreePath: `${HOME}/dotfiles`, name: "Tidy zshrc", model: "claude-sonnet-5[1m]", effort: "", state: ThreadState.CLOSING, settleIn: 8, createdAt: ago(60) });
     // Archived 90 min ago (the sidebar's Archived section, collapsed by default).
-    this.addSession({ id: "s-7", repoId: "repo-cf", worktreePath: CF, name: "Spike a canvas sidebar", model: "claude-sonnet-5[1m]", effort: "", state: ThreadState.DISCONNECTED, disconnectReason: "closed", status: ThreadStatus.NEEDS_ATTENTION, statusReason: "finished", statusChangedAt: ago(95), createdAt: ago(600), lastActivityAt: ago(95), archivedAt: ago(90) });
+    this.addThread({ id: "s-7", repoId: "repo-cf", worktreePath: CF, name: "Spike a canvas sidebar", model: "claude-sonnet-5[1m]", effort: "", state: ThreadState.DISCONNECTED, disconnectReason: "closed", status: ThreadStatus.NEEDS_ATTENTION, statusReason: "finished", statusChangedAt: ago(95), createdAt: ago(600), lastActivityAt: ago(95), archivedAt: ago(90) });
     // Snoozed (the sidebar's Snoozed section, collapsed by default): s-8 wakes in 2.5 h (a
     // finished turn, so it does not count as attention while snoozed), s-9 in 4 days.
     const later = (min: number) => new Date(Date.now() + min * 60_000);
-    this.addSession({ id: "s-8", repoId: "repo-cf", worktreePath: CF, name: "Refactor the gh poller", model: "claude-sonnet-5[1m]", effort: "", state: ThreadState.DISCONNECTED, disconnectReason: "closed", status: ThreadStatus.NEEDS_ATTENTION, statusReason: "finished", statusChangedAt: ago(30), createdAt: ago(500), lastActivityAt: ago(30), snoozedUntil: later(150) });
-    this.addSession({ id: "s-9", repoId: "repo-gp", worktreePath: GP, name: "Bump wails to v3.1", model: "claude-opus-4-8[1m]", effort: "medium", state: ThreadState.DISCONNECTED, disconnectReason: "closed", createdAt: ago(450), lastActivityAt: ago(20), snoozedUntil: later(4 * 24 * 60 + 60) });
+    this.addThread({ id: "s-8", repoId: "repo-cf", worktreePath: CF, name: "Refactor the gh poller", model: "claude-sonnet-5[1m]", effort: "", state: ThreadState.DISCONNECTED, disconnectReason: "closed", status: ThreadStatus.NEEDS_ATTENTION, statusReason: "finished", statusChangedAt: ago(30), createdAt: ago(500), lastActivityAt: ago(30), snoozedUntil: later(150) });
+    this.addThread({ id: "s-9", repoId: "repo-gp", worktreePath: GP, name: "Bump wails to v3.1", model: "claude-opus-4-8[1m]", effort: "medium", state: ThreadState.DISCONNECTED, disconnectReason: "closed", createdAt: ago(450), lastActivityAt: ago(20), snoozedUntil: later(4 * 24 * 60 + 60) });
     for (const [id, h] of Object.entries(SEEDS)) if (h) this.logs.seed(id, h);
     // Republish so connected watchers converge on the reset state.
     for (const t of this.terms.values()) this.termEvents.publish({ event: { case: "updated", value: this.terminalMsg(t) } });
     for (const r of this.repos.values()) this.repoEvents.publish({ event: { case: "repoUpdated", value: this.repoMsg(r) } });
     this.workspaceEvents.publish(this.workspaceSnapshot());
-    this.sessionEvents.publish(this.sessionSnapshot());
+    this.threadListEvents.publish(this.threadListSnapshot());
     this.actions.reset();
     this.update.reset();
   }
@@ -848,7 +848,7 @@ export class World {
       this.termEvents.publish({ event: { case: "removedId", value: id } });
     }
     this.terms.clear();
-    this.sessions.clear();
+    this.threads.clear();
     this.workspaces.clear();
     for (const id of [...this.repos.keys()]) {
       this.actions.removeRepo(id);
@@ -856,17 +856,17 @@ export class World {
     }
     this.repos.clear();
     this.workspaceEvents.publish(this.workspaceSnapshot());
-    this.sessionEvents.publish(this.sessionSnapshot());
+    this.threadListEvents.publish(this.threadListSnapshot());
   }
 
   /** Test control: `count` connected project threads with `status` in `repo`'s main worktree. POST /__mock/threads. */
-  addThreads(repo: string, count: number, status: ThreadStatus, prefix: string): MockSession[] {
+  addThreads(repo: string, count: number, status: ThreadStatus, prefix: string): MockThread[] {
     const r = this.repoRef(repo);
     const path = r.worktrees.find((w) => w.isMain)?.path ?? r.path;
-    const out: MockSession[] = [];
+    const out: MockThread[] = [];
     for (let i = 1; i <= count; i++) {
-      const s = this.addSession({ id: `s-t-${String(this.nextId++)}`, repoId: r.id, worktreePath: path, name: `${prefix} ${String(i)}`, model: "claude-4.5-haiku[1m]", effort: "", status, createdAt: new Date() });
-      this.publishSession(s);
+      const s = this.addThread({ id: `s-t-${String(this.nextId++)}`, repoId: r.id, worktreePath: path, name: `${prefix} ${String(i)}`, model: "claude-4.5-haiku[1m]", effort: "", status, createdAt: new Date() });
+      this.publishThread(s);
       out.push(s);
     }
     return out;
@@ -881,7 +881,7 @@ export class World {
     const ago = (min: number) => new Date(Date.now() - min * 60_000);
     const A = ThreadStatus.NEEDS_ATTENTION;
     const D = ThreadState.DISCONNECTED;
-    type Kind = Partial<MockSession> & Pick<MockSession, "id" | "name" | "status" | "statusReason"> & { min: number };
+    type Kind = Partial<MockThread> & Pick<MockThread, "id" | "name" | "status" | "statusReason"> & { min: number };
     const kinds: Kind[] = [
       { id: "s-k-approval", name: "Run the migration script", status: A, statusReason: "waiting for approval: Bash", min: 2 },
       { id: "s-k-question", name: "Pick a color palette", status: A, statusReason: "question: Which color do you prefer?", min: 6 },
@@ -896,29 +896,29 @@ export class World {
     const out: string[] = [];
     for (const { min, ...k } of kinds) {
       out.push(k.id);
-      if (this.sessions.has(k.id)) continue;
-      const s = this.addSession({ repoId: "repo-cf", worktreePath: CF, model: "claude-4.5-haiku[1m]", effort: "medium", createdAt: ago(min + 5), lastActivityAt: ago(min), statusChangedAt: ago(min), ...k });
-      this.publishSession(s);
+      if (this.threads.has(k.id)) continue;
+      const s = this.addThread({ repoId: "repo-cf", worktreePath: CF, model: "claude-4.5-haiku[1m]", effort: "medium", createdAt: ago(min + 5), lastActivityAt: ago(min), statusChangedAt: ago(min), ...k });
+      this.publishThread(s);
     }
     return out;
   }
 
   /** Test control: a connected thread owned by the workspace, running in `repo`'s member (else the first). */
-  addWorkspaceThread(workspace: string, repo: string, name: string, status: ThreadStatus = ThreadStatus.IDLE): MockSession {
+  addWorkspaceThread(workspace: string, repo: string, name: string, status: ThreadStatus = ThreadStatus.IDLE): MockThread {
     const ws = this.workspaceRef(workspace);
     const member = repo ? ws.members.find((m) => m.repoId === this.repoRef(repo).id) : ws.members[0];
     if (!member) throw new CommandError("unavailable", `repo ${repo} is not a member of workspace ${ws.name}`);
-    const s = this.addSession({ id: `s-ws-${String(this.nextId++)}`, repoId: member.repoId, worktreePath: member.worktreePath, name, model: "claude-4.5-haiku[1m]", effort: "", workspaceId: ws.id, status, createdAt: new Date() });
-    this.publishSession(s);
+    const s = this.addThread({ id: `s-ws-${String(this.nextId++)}`, repoId: member.repoId, worktreePath: member.worktreePath, name, model: "claude-4.5-haiku[1m]", effort: "", workspaceId: ws.id, status, createdAt: new Date() });
+    this.publishThread(s);
     return s;
   }
 
   /**
    * session.run-in: a stopped thread moves at once; a running one gets the target as
-   * pendingWorktreePath and moves ~2s after it stops being busy (MockSession.moveIn).
+   * pendingWorktreePath and moves ~2s after it stops being busy (MockThread.moveIn).
    * Asking for the current member cancels a queued move.
    */
-  runIn(s: MockSession, repoRef: string, worktree: string): MockSession {
+  runIn(s: MockThread, repoRef: string, worktree: string): MockThread {
     if (!s.workspaceId) throw new CommandError("unavailable", `thread ${s.id} does not belong to a workspace`);
     const ws = this.workspaceRef(s.workspaceId);
     const member = worktree ? ws.members.find((m) => m.worktreePath === worktree) : ws.members.find((m) => m.repoId === this.repoRef(repoRef).id);
@@ -934,11 +934,11 @@ export class World {
       s.pendingWorktreePath = member.worktreePath;
       s.moveIn = 2;
     }
-    this.publishSession(s);
+    this.publishThread(s);
     return s;
   }
 
-  private applyMove(s: MockSession): void {
+  private applyMove(s: MockThread): void {
     const path = s.pendingWorktreePath;
     const ws = this.workspaces.get(s.workspaceId);
     const member = ws?.members.find((m) => m.worktreePath === path);
@@ -947,7 +947,7 @@ export class World {
       s.worktreePath = member.worktreePath;
       s.repoId = member.repoId;
     }
-    this.publishSession(s);
+    this.publishThread(s);
   }
 
   /** workspace.add-repo: a worktree on the workspace branch in another repo. */
@@ -962,9 +962,9 @@ export class World {
   }
 
   /** Live threads whose cwd is in one of these worktrees (the daemon's removal guard). */
-  private threadsIn(paths: readonly string[]): MockSession[] {
+  private threadsIn(paths: readonly string[]): MockThread[] {
     // The daemon's worktreeThreads: every thread but an archived one, whatever its state.
-    return [...this.sessions.values()].filter((s) => s.archivedAt === null && paths.some((p) => s.worktreePath === p || s.worktreePath.startsWith(`${p}/`)));
+    return [...this.threads.values()].filter((s) => s.archivedAt === null && paths.some((p) => s.worktreePath === p || s.worktreePath.startsWith(`${p}/`)));
   }
 
   private dropWorktree(path: string): void {
@@ -1007,10 +1007,10 @@ export class World {
 
   // ---- Sessions -----------------------------------------------------------------
 
-  private addSession(o: Partial<MockSession> & Pick<MockSession, "id" | "repoId" | "worktreePath" | "name" | "model" | "effort">): MockSession {
+  private addThread(o: Partial<MockThread> & Pick<MockThread, "id" | "repoId" | "worktreePath" | "name" | "model" | "effort">): MockThread {
     const state = o.state ?? ThreadState.CONNECTED;
     const status = o.status ?? ThreadStatus.IDLE;
-    const s: MockSession = {
+    const s: MockThread = {
       claudeSessionId: `cl-${o.id}`,
       autoNamed: true,
       status,
@@ -1047,11 +1047,11 @@ export class World {
       ...o,
       state,
     };
-    this.sessions.set(s.id, s);
+    this.threads.set(s.id, s);
     return s;
   }
 
-  sessionMsg(s: MockSession): SessionInit {
+  threadMsg(s: MockThread): ThreadInit {
     return {
       id: s.id,
       claudeSessionId: s.claudeSessionId,
@@ -1090,18 +1090,18 @@ export class World {
     };
   }
 
-  sessionSnapshot(): SessionEventInit {
-    return { event: { case: "snapshot", value: { threads: [...this.sessions.values()].map((s) => this.sessionMsg(s)), retiredUsage: retiredUsage() } } };
+  threadListSnapshot(): ThreadListEventInit {
+    return { event: { case: "snapshot", value: { threads: [...this.threads.values()].map((s) => this.threadMsg(s)), retiredUsage: retiredUsage() } } };
   }
 
-  session(id: string): MockSession {
-    const s = this.sessions.get(id);
+  thread(id: string): MockThread {
+    const s = this.threads.get(id);
     if (!s) throw new CommandError("notfound", `session ${id} not found`);
     return s;
   }
 
-  private publishSession(s: MockSession): void {
-    this.sessionEvents.publish({ event: { case: "updated", value: this.sessionMsg(s) } });
+  private publishThread(s: MockThread): void {
+    this.threadListEvents.publish({ event: { case: "updated", value: this.threadMsg(s) } });
   }
 
   /**
@@ -1110,8 +1110,8 @@ export class World {
    * `status`, when given, is the status it had at that moment (tests use it: s-1 flips
    * busy/idle on a timer).
    */
-  stopSession(id: string, reason: string, code: number, status?: ThreadStatus): void {
-    const s = this.session(id);
+  stopThread(id: string, reason: string, code: number, status?: ThreadStatus): void {
+    const s = this.thread(id);
     if (status !== undefined) this.setStatus(s, status);
     if (s.status === ThreadStatus.BUSY) this.setStatus(s, ThreadStatus.ERROR, "interrupted");
     s.state = ThreadState.DISCONNECTED;
@@ -1121,7 +1121,7 @@ export class World {
     // A stop while starting: the queued reply never comes (the daemon drops it with the process).
     s.onReady = [];
     s.lastActivityAt = new Date();
-    this.publishSession(s);
+    this.publishThread(s);
   }
 
   /**
@@ -1130,13 +1130,13 @@ export class World {
    * record's timestamp). Returns whether it was new.
    */
   linkPullRequest(id: string, slug: string, number: number, agoMs = 0): boolean {
-    const s = this.session(id);
+    const s = this.thread(id);
     if (!/^[^/\s]+\/[^/\s]+$/.test(slug) || !Number.isInteger(number) || number <= 0) throw new CommandError("invalid", "slug must be owner/name and number a positive integer");
     if (!Number.isFinite(agoMs) || agoMs < 0) throw new CommandError("invalid", "ago must be a non-negative number of milliseconds");
     const url = `https://github.com/${slug}/pull/${String(number)}`;
     if (s.linkedPullRequests.some((l) => l.url === url)) return false;
     s.linkedPullRequests = [...s.linkedPullRequests, { slug, number, url, linkedAt: new Date(Date.now() - agoMs) }];
-    this.publishSession(s);
+    this.publishThread(s);
     return true;
   }
 
@@ -1145,7 +1145,7 @@ export class World {
    * bucket, and republishes the session (the daemon's live fold, coarser).
    */
   addUsage(id: string, u: MockUsage): void {
-    const s = this.session(id);
+    const s = this.thread(id);
     if (!u.model) throw new CommandError("invalid", "model is required");
     const counters = [u.requests, u.input, u.output, u.cacheRead, u.cacheWrite5m, u.cacheWrite1h];
     if (counters.some((n) => !Number.isInteger(n) || n < 0)) throw new CommandError("invalid", "counters must be non-negative integers");
@@ -1155,26 +1155,26 @@ export class World {
       ? { ...old, requests: old.requests + u.requests, input: old.input + u.input, output: old.output + u.output, cacheRead: old.cacheRead + u.cacheRead, cacheWrite5m: old.cacheWrite5m + u.cacheWrite5m, cacheWrite1h: old.cacheWrite1h + u.cacheWrite1h }
       : u;
     s.usage = old ? s.usage.map((b, j) => (j === i ? merged : b)) : [...s.usage, merged];
-    this.publishSession(s);
+    this.publishThread(s);
   }
 
   /** The detector's reading changed (reason defaults to a typical one for the status). */
-  /** Test control: the clock stops (or, held false, resumes) changing this thread (MockSession.held); controls and input always do. */
-  holdSession(id: string, held = true): void {
-    this.session(id).held = held;
+  /** Test control: the clock stops (or, held false, resumes) changing this thread (MockThread.held); controls and input always do. */
+  holdThread(id: string, held = true): void {
+    this.thread(id).held = held;
   }
 
-  setSessionStatus(id: string, status: ThreadStatus, reason?: string): void {
-    const s = this.session(id);
+  setThreadStatus(id: string, status: ThreadStatus, reason?: string): void {
+    const s = this.thread(id);
     if (s.state === ThreadState.DISCONNECTED) throw new CommandError("unavailable", "session is disconnected");
     if (status === ThreadStatus.ERROR) throw new CommandError("invalid", "error is set only by a disconnect while busy");
     this.setStatus(s, status, reason);
     s.lastActivityAt = new Date();
-    this.publishSession(s);
+    this.publishThread(s);
   }
 
   /** Sets status and reason, stamping statusChangedAt when either changes (Session.setStatus). */
-  private setStatus(s: MockSession, status: ThreadStatus, reason: string = defaultReason(status)): void {
+  private setStatus(s: MockThread, status: ThreadStatus, reason: string = defaultReason(status)): void {
     if (s.status === status && s.statusReason === reason) return;
     s.status = status;
     s.statusReason = reason;
@@ -1185,12 +1185,12 @@ export class World {
    * The sketch's scripted thread (mock/thread.ts) in a state: "Fix stale PR badge" in
    * code-foundry, connected, accept-edits. Replaces it when it exists.
    */
-  addScriptedThread(state: ScriptedThreadState, id = "s-r1"): MockSession {
-    if (this.sessions.has(id)) {
-      this.sessions.delete(id);
-      this.sessionEvents.publish({ event: { case: "removedId", value: id } });
+  addScriptedThread(state: ScriptedThreadState, id = "s-r1"): MockThread {
+    if (this.threads.has(id)) {
+      this.threads.delete(id);
+      this.threadListEvents.publish({ event: { case: "removedId", value: id } });
     }
-    const s = this.addSession({
+    const s = this.addThread({
       id,
       repoId: "repo-cf",
       worktreePath: CF,
@@ -1212,17 +1212,17 @@ export class World {
       // Stopped at its prompt cache expiry: the last result is past the TTL, so the
       // composer's cold-cache note shows (the daemon's idle stop).
       s.lastResultAt = new Date(Date.now() - (this.cacheTTLSeconds() + 120) * 1000);
-      this.stopSession(id, "idle", 0, ThreadStatus.IDLE);
+      this.stopThread(id, "idle", 0, ThreadStatus.IDLE);
     }
     if (state === "crashed") {
       // Before the handshake (the daemon's failStart): no turn ran; status error "did not start".
       s.lastError = `Claude did not start: exit code 1: ${CRASH_STDERR}`;
       s.contextTokens = 0;
       s.lastResultAt = null;
-      this.stopSession(id, "spawn failed", 1, ThreadStatus.UNSPECIFIED);
+      this.stopThread(id, "spawn failed", 1, ThreadStatus.UNSPECIFIED);
       this.setStatus(s, ThreadStatus.ERROR, "did not start");
     }
-    this.publishSession(s);
+    this.publishThread(s);
     return s;
   }
 
@@ -1233,11 +1233,11 @@ export class World {
 
   /** POST /__mock/thread/cache: the thread's last result `agoSeconds` ago (optionally with `tokens`, answered by `model`). */
   ageThreadCache(id: string, agoSeconds: number, tokens?: number, model?: string): void {
-    const s = this.session(id);
+    const s = this.thread(id);
     s.lastResultAt = new Date(Date.now() - agoSeconds * 1000);
     if (tokens !== undefined) s.contextTokens = tokens;
     if (model !== undefined) s.contextModel = model;
-    this.publishSession(s);
+    this.publishThread(s);
   }
 
   /**
@@ -1246,19 +1246,19 @@ export class World {
    * retry went through. The thread says busy meanwhile, as the daemon's would.
    */
   setThreadRetry(id: string, r: { inSeconds: number; attempt: number; maxRetries: number; errorStatus: number; error: string } | null): void {
-    const s = this.session(id);
+    const s = this.thread(id);
     if (r) {
       s.retry = { attempt: r.attempt, maxRetries: r.maxRetries, retryAt: new Date(Date.now() + r.inSeconds * 1000), errorStatus: r.errorStatus, error: r.error };
       this.setStatus(s, ThreadStatus.BUSY);
     } else {
       s.retry = null;
     }
-    this.publishSession(s);
+    this.publishThread(s);
   }
 
-  /** Emits FocusSession for an existing session. */
-  focusSession(id: string): number {
-    this.session(id);
+  /** Emits FocusThread for an existing session. */
+  focusThread(id: string): number {
+    this.thread(id);
     return this.emit({ intent: { case: "focusThread", value: { threadId: id } } });
   }
 
@@ -1271,12 +1271,12 @@ export class World {
    * A new session in STARTING. Unnamed for ~1s, then named `pendingName` (the daemon
    * names it in the background), connected after ~2s.
    */
-  private createSession(repoId: string, path: string, model: string, effort: string, extra: Partial<MockSession> = {}): MockSession {
+  private createThread(repoId: string, path: string, model: string, effort: string, extra: Partial<MockThread> = {}): MockThread {
     const id = `s-new-${String(this.nextId++)}`;
     // With a first prompt the thread is on that turn already (the daemon says busy at spawn).
     const busy = extra.firstMessage ? { status: ThreadStatus.BUSY, statusReason: "working" } : {};
-    const s = this.addSession({ id, repoId, worktreePath: path, name: "", model, effort, state: ThreadState.STARTING, settleIn: 2, nameIn: 1, pendingName: `thread-${id}`, createdAt: new Date(), ...busy, ...extra });
-    this.publishSession(s);
+    const s = this.addThread({ id, repoId, worktreePath: path, name: "", model, effort, state: ThreadState.STARTING, settleIn: 2, nameIn: 1, pendingName: `thread-${id}`, createdAt: new Date(), ...busy, ...extra });
+    this.publishThread(s);
     return s;
   }
 
@@ -1286,20 +1286,20 @@ export class World {
    * thread's shells, unpins it and stamps archivedAt (the first stamp is kept); unarchiving
    * only clears the stamp. Returns the command's message.
    */
-  archiveSession(id: string, archived: boolean): string {
-    const s = this.session(id);
+  archiveThread(id: string, archived: boolean): string {
+    const s = this.thread(id);
     const label = s.name ? `${s.name} (${s.id})` : s.id;
     if (!archived) {
       s.archivedAt = null;
-      this.publishSession(s);
+      this.publishThread(s);
       return `unarchived thread ${label}`;
     }
-    if (s.state !== ThreadState.DISCONNECTED) this.stopSession(s.id, "closed", 0);
-    this.closeShells((l) => l[LABEL_SESSION] === s.id);
+    if (s.state !== ThreadState.DISCONNECTED) this.stopThread(s.id, "closed", 0);
+    this.closeShells((l) => l[LABEL_THREAD] === s.id);
     s.pinned = false;
     s.archivedAt ??= new Date();
     s.snoozedUntil = null;
-    this.publishSession(s);
+    this.publishThread(s);
     return `archived thread ${label}`;
   }
 
@@ -1309,20 +1309,20 @@ export class World {
    * "interrupted"), removes the thread's shells, unpins and unarchives it and sets the wake
    * time (a re-snooze replaces it); null unsnoozes (no attention). Returns the message.
    */
-  snoozeSession(id: string, until: Date | null): string {
-    const s = this.session(id);
+  snoozeThread(id: string, until: Date | null): string {
+    const s = this.thread(id);
     const label = s.name ? `${s.name} (${s.id})` : s.id;
     if (until === null) {
       s.snoozedUntil = null;
-      this.publishSession(s);
+      this.publishThread(s);
       return `unsnoozed thread ${label}`;
     }
-    if (s.state !== ThreadState.DISCONNECTED) this.stopSession(s.id, "closed", 0);
-    this.closeShells((l) => l[LABEL_SESSION] === s.id);
+    if (s.state !== ThreadState.DISCONNECTED) this.stopThread(s.id, "closed", 0);
+    this.closeShells((l) => l[LABEL_THREAD] === s.id);
     s.pinned = false;
     s.archivedAt = null;
     s.snoozedUntil = until;
-    this.publishSession(s);
+    this.publishThread(s);
     return `snoozed thread ${label} until ${until.toISOString()}`;
   }
 
@@ -1331,15 +1331,15 @@ export class World {
    * snooze is cleared and a stopped thread needs attention, "snooze ended", stamped
    * now (re-stamped when it already read so).
    */
-  wakeSession(id: string): void {
-    const s = this.session(id);
+  wakeThread(id: string): void {
+    const s = this.thread(id);
     s.snoozedUntil = null;
     if (s.state === ThreadState.DISCONNECTED) {
       s.status = ThreadStatus.NEEDS_ATTENTION;
       s.statusReason = "snooze ended";
       s.statusChangedAt = new Date();
     }
-    this.publishSession(s);
+    this.publishThread(s);
   }
 
   /**
@@ -1349,7 +1349,7 @@ export class World {
    * thread already starting (or stopping: the mock just starts it again) queues it.
    */
   startThread(id: string, ready: () => void): void {
-    const s = this.session(id);
+    const s = this.thread(id);
     s.onReady.push(ready);
     if (s.state === ThreadState.STARTING) return;
     s.state = ThreadState.STARTING;
@@ -1362,31 +1362,31 @@ export class World {
     s.exitCode = 0;
     s.lastError = "";
     s.lastActivityAt = new Date();
-    this.publishSession(s);
+    this.publishThread(s);
   }
 
   /** archiveInterrupts over the thread's own background agents and shells. */
-  private interrupts(s: MockSession): { why: string; ends: string } {
+  private interrupts(s: MockThread): { why: string; ends: string } {
     const { backgroundAgentsRunning } = agentCounts(this.logs.agentRunsOf(s.id));
     return archiveInterrupts(s, backgroundAgentsRunning, this.logs.shellsOf(s.id));
   }
 
-  private tickSessions(): void {
-    for (const s of this.sessions.values()) {
+  private tickThreads(): void {
+    for (const s of this.threads.values()) {
       if (s.held) continue;
-      if (s.snoozedUntil !== null && s.snoozedUntil.getTime() <= Date.now()) this.wakeSession(s.id);
+      if (s.snoozedUntil !== null && s.snoozedUntil.getTime() <= Date.now()) this.wakeThread(s.id);
       // A queued run-in: the daemon sends set_cwd once the thread is idle.
       if (s.pendingWorktreePath && s.status !== ThreadStatus.BUSY && --s.moveIn <= 0) this.applyMove(s);
       if (s.nameIn > 0 && --s.nameIn === 0 && !s.name) {
         s.name = s.pendingName;
-        this.publishSession(s);
+        this.publishThread(s);
       }
       if (s.settleIn > 0 && --s.settleIn === 0) {
         if (s.state === ThreadState.STARTING) {
           s.state = ThreadState.CONNECTED;
           // A message waiting for the handshake keeps it busy (the reply follows below).
           if (s.onReady.length === 0 && !s.firstMessage) this.setStatus(s, ThreadStatus.IDLE);
-          this.publishSession(s);
+          this.publishThread(s);
           // A new thread: its first message goes out once Claude answered the handshake.
           const first = s.firstMessage;
           s.firstMessage = null;
@@ -1396,7 +1396,7 @@ export class World {
           s.onReady = [];
           for (const f of ready) f();
         } else if (s.state === ThreadState.CLOSING) {
-          this.stopSession(s.id, "closed", 0);
+          this.stopThread(s.id, "closed", 0);
         }
         continue;
       }
@@ -1404,7 +1404,7 @@ export class World {
       if (s.id === "s-1" && s.state === ThreadState.CONNECTED && s.status !== ThreadStatus.NEEDS_ATTENTION && this.seconds % 4 === 0) {
         this.setStatus(s, s.status === ThreadStatus.BUSY ? ThreadStatus.IDLE : ThreadStatus.BUSY);
         s.lastActivityAt = new Date();
-        this.publishSession(s);
+        this.publishThread(s);
       }
     }
   }
@@ -1458,7 +1458,7 @@ export class World {
 
   private tick(): void {
     this.seconds++;
-    this.tickSessions();
+    this.tickThreads();
     for (const t of this.terms.values()) {
       if (t.state !== TerminalState.RUNNING) continue;
       t.tick++;
@@ -1631,7 +1631,7 @@ export class World {
    * containing cwd. Refuses a cwd outside every project.
    */
   private shellOwner(ctx: UiContext | undefined, cwd: string): { labels: Record<string, string>; cwd: string } {
-    const s = ctx?.activeThreadId ? this.sessions.get(ctx.activeThreadId) : undefined;
+    const s = ctx?.activeThreadId ? this.threads.get(ctx.activeThreadId) : undefined;
     if (ctx?.activeThreadId) {
       if (!s) throw new CommandError("notfound", `session ${ctx.activeThreadId} not found`);
       return { labels: shellLabels(s.id, s.repoId, s.worktreePath), cwd: cwd || s.worktreePath };
@@ -1679,9 +1679,9 @@ export class World {
    * worktree made from `base` first, which takes a moment. A prompt containing FAIL
    * fails the way a git error would, before any session exists.
    */
-  private async newSession(ctx: UiContext | undefined, args: Record<string, string>): Promise<InvokeOut> {
-    if (args["no-project"] === "true") return this.newHomeSession(ctx, args);
-    if (args.workspace || args.repos) return this.newWorkspaceSession(args);
+  private async newThread(ctx: UiContext | undefined, args: Record<string, string>): Promise<InvokeOut> {
+    if (args["no-project"] === "true") return this.newHomeThread(ctx, args);
+    if (args.workspace || args.repos) return this.newWorkspaceThread(args);
     const repo = this.repos.get(args.repo || ctx?.activeRepoId || "") ?? this.worktreeOf(ctx)?.repo;
     if (!repo) throw new CommandError("invalid", "a worktree or repository is required");
     const first = firstMessageOf(args);
@@ -1695,7 +1695,7 @@ export class World {
     const gen = this.generation;
     const settle = async (ms: number) => {
       await sleep(ms);
-      if (gen !== this.generation) throw new CommandError("unavailable", "mock reset while session.new ran");
+      if (gen !== this.generation) throw new CommandError("unavailable", "mock reset while thread.new ran");
     };
     let path = args.worktree ?? "";
     let baseRef = "";
@@ -1716,7 +1716,7 @@ export class World {
       if (prompt.includes("FAIL")) throw new CommandError("unavailable", "start claude: exec: \"claude\": executable file not found in $PATH");
     }
     const model = args.model || "claude-opus-4-8[1m]";
-    const s = this.createSession(repo.id, path, model, args.effort ?? "", {
+    const s = this.createThread(repo.id, path, model, args.effort ?? "", {
       name: args.name ?? "",
       autoNamed: !args.name,
       // Named in the background a moment after it starts (1–2 ticks), like the daemon.
@@ -1729,7 +1729,7 @@ export class World {
     });
     // Like the daemon's WorktreeCreated: the project's on-worktree-create actions, in the background.
     if (created) this.actions.worktreeCreated(s.id, repo.id, path);
-    this.focusSession(s.id);
+    this.focusThread(s.id);
     return { message: `created session ${s.id} in ${path}`, resultJson: JSON.stringify({ id: s.id, worktreePath: path }) };
   }
 
@@ -1738,7 +1738,7 @@ export class World {
    * home directory. Refuses any arg that places it, a repo or worktree from the caller's
    * context included.
    */
-  private async newHomeSession(ctx: UiContext | undefined, args: Record<string, string>): Promise<InvokeOut> {
+  private async newHomeThread(ctx: UiContext | undefined, args: Record<string, string>): Promise<InvokeOut> {
     for (const name of ["repo", "worktree", "workspace", "repos", "new-worktree", "base"]) {
       if (args[name]) throw new CommandError("invalid", `no-project starts a thread without a project; it does not take ${name}`);
     }
@@ -1748,8 +1748,8 @@ export class World {
     const permission = args.permission ?? "";
     const gen = this.generation;
     await sleep(150);
-    if (gen !== this.generation) throw new CommandError("unavailable", "mock reset while session.new ran");
-    const s = this.createSession("", HOME, args.model || "opus", args.effort ?? "", {
+    if (gen !== this.generation) throw new CommandError("unavailable", "mock reset while thread.new ran");
+    const s = this.createThread("", HOME, args.model || "opus", args.effort ?? "", {
       name: args.name ?? "",
       autoNamed: !args.name,
       nameIn: args.name ? 0 : 2,
@@ -1757,7 +1757,7 @@ export class World {
       permissionMode: permissionModes[permission] ?? PermissionMode.UNSPECIFIED,
       firstMessage: firstMessageOf(args),
     });
-    this.focusSession(s.id);
+    this.focusThread(s.id);
     return { message: `created thread ${s.id} in ${HOME} (no project)`, resultJson: JSON.stringify({ id: s.id, worktreePath: HOME }) };
   }
 
@@ -1766,7 +1766,7 @@ export class World {
    * `repo` names, else the first) or `repos` with new-worktree (a new workspace named
    * from the prompt with cf/<slug> in every repo, the thread in `repo`'s member).
    */
-  private async newWorkspaceSession(args: Record<string, string>): Promise<InvokeOut> {
+  private async newWorkspaceThread(args: Record<string, string>): Promise<InvokeOut> {
     const created = args["new-worktree"] === "true";
     const prompt = args.prompt ?? "";
     const permission = args.permission ?? "";
@@ -1779,7 +1779,7 @@ export class World {
     const gen = this.generation;
     const settle = async (ms: number) => {
       await sleep(ms);
-      if (gen !== this.generation) throw new CommandError("unavailable", "mock reset while session.new ran");
+      if (gen !== this.generation) throw new CommandError("unavailable", "mock reset while thread.new ran");
     };
     const slug = promptSlug(prompt);
     let ws: MockWorkspace;
@@ -1807,7 +1807,7 @@ export class World {
     if (!member) throw new CommandError("unavailable", `repo ${repoId} is not a member of workspace ${ws.name}`);
     const repo = this.repoRef(member.repoId);
     if (created && !baseRef) baseRef = repo.remotes.length > 0 ? `origin/${repo.defaultBranch}` : repo.defaultBranch;
-    const s = this.createSession(member.repoId, member.worktreePath, args.model || "claude-opus-4-8[1m]", args.effort ?? "", {
+    const s = this.createThread(member.repoId, member.worktreePath, args.model || "claude-opus-4-8[1m]", args.effort ?? "", {
       name: args.name ?? "",
       autoNamed: !args.name,
       nameIn: args.name ? 0 : 2,
@@ -1818,7 +1818,7 @@ export class World {
       workspaceId: ws.id,
       firstMessage: first,
     });
-    this.focusSession(s.id);
+    this.focusThread(s.id);
     return { message: `created thread ${s.id} in ${member.worktreePath} (workspace ${ws.id})`, resultJson: JSON.stringify({ id: s.id, worktreePath: member.worktreePath, workspaceId: ws.id }) };
   }
 
@@ -2025,27 +2025,27 @@ export class World {
   }
 
   /**
-   * pr.ask, pr.explain and pr.fix.findings (internal/command/commands_prsession.go): start a
+   * pr.ask, pr.explain and pr.fix.findings (internal/command/commands_prthread.go): start a
    * session about a pull request and focus it. The worktree rules follow the daemon's
    * pickPRWorktree; the prompt is not built here (the mock's sessions never read it).
    */
-  private prSessionCommands(): ReturnType<World["registry"]> {
+  private prThreadCommands(): ReturnType<World["registry"]> {
     const slugArg = { name: "repo-slug", type: ArgType.STRING, required: true, description: 'GitHub repository, "owner/name"' };
     const numberArg = { name: "number", type: ArgType.INT, required: true, description: "Pull request number" };
     const worktreeArg = { name: "worktree", type: ArgType.PATH, required: false, description: "Worktree to start the session in (default: picked from the registered clones of repo-slug and the pull request's branch)" };
-    const modelArg = { name: "model", type: ArgType.ENUM, required: false, description: "Model (default: settings sessions.default_model, else Claude's default)", enumValues: MODEL_VALUES };
-    const effortArg = { name: "effort", type: ArgType.ENUM, required: false, description: "Effort level (default: settings sessions.default_effort, else Claude's default)", enumValues: ["low", "medium", "high", "xhigh", "max"] };
+    const modelArg = { name: "model", type: ArgType.ENUM, required: false, description: "Model (default: settings threads.default_model, else Claude's default)", enumValues: MODEL_VALUES };
+    const effortArg = { name: "effort", type: ArgType.ENUM, required: false, description: "Effort level (default: settings threads.default_effort, else Claude's default)", enumValues: ["low", "medium", "high", "xhigh", "max"] };
     const start =
       (fix: boolean) =>
       async (ctx: UiContext | undefined, args: Record<string, string>): Promise<InvokeOut> => {
         // POST /__mock/gh/pr-delay?ms=800: these commands take that long (fetch, worktree, start).
-        if (this.gh.prDetails.sessionDelayMs > 0) await new Promise((r) => setTimeout(r, this.gh.prDetails.sessionDelayMs));
+        if (this.gh.prDetails.threadDelayMs > 0) await new Promise((r) => setTimeout(r, this.gh.prDetails.threadDelayMs));
         const slug = args["repo-slug"] ?? "";
         const n = Number(args.number);
         if (!slug.trim()) throw new CommandError("invalid", "repo-slug is required");
         if (!Number.isInteger(n) || n <= 0) throw new CommandError("invalid", "number must be a positive pull request number");
         // POST /__mock/gh/pr-fail?command=pr.fix.findings (or pr.ask, pr.explain): the next run fails.
-        // Codes as the daemon's (internal/command/commands_prsession.go): the fork is a
+        // Codes as the daemon's (internal/command/commands_prthread.go): the fork is a
         // FailedPrecondition, a GitHub 502 while reading the pull request is Unavailable.
         if (this.gh.prDetails.failNext.delete(fix ? "pr.fix.findings" : (args.question ?? "") !== "" ? "pr.ask" : "pr.explain")) {
           throw fix
@@ -2097,9 +2097,9 @@ export class World {
             target = { repoId: first.id, path: w.path };
           }
         }
-        const defaults = this.sessionDefaults();
-        const s = this.createSession(target.repoId, target.path, args.model ?? defaults.model, args.effort ?? defaults.effort);
-        this.focusSession(s.id);
+        const defaults = this.threadDefaults();
+        const s = this.createThread(target.repoId, target.path, args.model ?? defaults.model, args.effort ?? defaults.effort);
+        this.focusThread(s.id);
         // Like the daemon: the result JSON is the created Session (protojson).
         return {
           message: `Started session ${s.id} for PR #${String(n)}`,
@@ -2153,7 +2153,7 @@ export class World {
   /** The registry: definitions plus a `when` predicate over the caller's context. */
   private registry(): { cmd: CmdDef; when: (ctx: UiContext | undefined) => boolean; run: (ctx: UiContext | undefined, args: Record<string, string>) => string | Promise<InvokeOut> }[] {
     const activeTerm = (ctx: UiContext | undefined) => (ctx?.activeTerminalId ? this.terms.get(ctx.activeTerminalId) : undefined);
-    const activeSession = (ctx: UiContext | undefined) => (ctx?.activeThreadId ? this.sessions.get(ctx.activeThreadId) : undefined);
+    const activeThread = (ctx: UiContext | undefined) => (ctx?.activeThreadId ? this.threads.get(ctx.activeThreadId) : undefined);
     const always = () => true;
     return [
       ...viewCommands((i) => this.emit(i)),
@@ -2220,29 +2220,29 @@ export class World {
         },
         // Like the daemon: also in the composer, whose no-project target has no repo.
         when: (ctx) => this.worktreeOf(ctx) !== null || Boolean(ctx?.activeRepoId && this.repos.has(ctx.activeRepoId)) || ctx?.activeView === "compose",
-        run: (ctx, args) => this.newSession(ctx, args),
+        run: (ctx, args) => this.newThread(ctx, args),
       },
       {
-        cmd: { name: "thread.fork", title: "Fork Thread", category: "Thread", description: "Start a new session that continues this one's conversation", keybindings: [], args: [{ name: "name", type: ArgType.STRING, required: false, description: "Name for the fork" }] },
-        when: (ctx) => activeSession(ctx) !== undefined,
+        cmd: { name: "thread.fork", title: "Fork Thread", category: "Thread", description: "Start a new thread that continues this one's conversation", keybindings: [], args: [{ name: "name", type: ArgType.STRING, required: false, description: "Name for the fork" }] },
+        when: (ctx) => activeThread(ctx) !== undefined,
         run: (ctx) => {
-          const s = activeSession(ctx);
+          const s = activeThread(ctx);
           if (!s) throw new CommandError("unavailable", "no active session");
-          const f = this.createSession(s.repoId, s.worktreePath, s.model, s.effort, { pendingName: `${s.name || s.id} (fork)`, permissionMode: s.permissionMode, parentId: s.id });
+          const f = this.createThread(s.repoId, s.worktreePath, s.model, s.effort, { pendingName: `${s.name || s.id} (fork)`, permissionMode: s.permissionMode, parentId: s.id });
           this.logs.fork(s.id, f.id, s.name || s.id);
-          this.focusSession(f.id);
+          this.focusThread(f.id);
           return `Forked ${s.name || s.id}`;
         },
       },
       {
         cmd: { name: "thread.rename", title: "Rename Thread", category: "Thread", description: "Set the session's name", keybindings: ["cmd+r"], args: [{ name: "name", type: ArgType.STRING, required: true, description: "New name" }] },
-        when: (ctx) => activeSession(ctx) !== undefined,
+        when: (ctx) => activeThread(ctx) !== undefined,
         run: (ctx, args) => {
-          const s = activeSession(ctx);
+          const s = activeThread(ctx);
           if (!s) throw new CommandError("unavailable", "no active session");
           s.name = args.name ?? s.name;
           s.autoNamed = false;
-          this.publishSession(s);
+          this.publishThread(s);
           return "";
         },
       },
@@ -2259,9 +2259,9 @@ export class World {
           ],
         },
         // Like the daemon: the GUI passes the thread's workspace; the CLI (no view) names the thread.
-        when: (ctx) => activeSession(ctx) !== undefined && Boolean(ctx?.activeWorkspaceId || !ctx?.activeView),
+        when: (ctx) => activeThread(ctx) !== undefined && Boolean(ctx?.activeWorkspaceId || !ctx?.activeView),
         run: (ctx, args) => {
-          const s = activeSession(ctx);
+          const s = activeThread(ctx);
           if (!s) throw new CommandError("unavailable", "no active session");
           if (!args.repo && !args.worktree) throw new CommandError("invalid", "name the member: a repository or a worktree path");
           const out = this.runIn(s, args.repo ?? "", args.worktree ?? "");
@@ -2278,16 +2278,16 @@ export class World {
           keybindings: [],
           args: [{ name: "pinned", type: ArgType.BOOL, required: false, description: "Pin (true) or unpin (false)" }],
         },
-        when: (ctx) => activeSession(ctx) !== undefined,
+        when: (ctx) => activeThread(ctx) !== undefined,
         run: (ctx, args) => {
-          const s = activeSession(ctx);
+          const s = activeThread(ctx);
           if (!s) throw new CommandError("unavailable", "no active session");
           s.pinned = args.pinned === undefined || args.pinned === "" ? !s.pinned : args.pinned === "true";
           if (s.pinned) {
             s.archivedAt = null;
             s.snoozedUntil = null;
           }
-          this.publishSession(s);
+          this.publishThread(s);
           return `${s.pinned ? "pinned" : "unpinned"} thread ${s.name ? `${s.name} (${s.id})` : s.id}`;
         },
       },
@@ -2361,20 +2361,20 @@ export class World {
           args: [{ name: "archived", type: ArgType.BOOL, required: false, description: "Archive (true) or unarchive (false); default: the opposite of now" }],
           // Like the daemon: only archiving a thread that is mid-turn or running background work asks.
           confirmIf: (ctx, args) => {
-            const s = activeSession(ctx);
+            const s = activeThread(ctx);
             return s !== undefined && archiving(s, args) && this.interrupts(s).why !== "";
           },
           confirm: (ctx) => {
-            const s = activeSession(ctx);
+            const s = activeThread(ctx);
             const { why, ends } = s ? this.interrupts(s) : { why: "", ends: "" };
             return `Archive thread ${s?.name || (s?.id ?? "")}? ${why}; archiving ${ends}.`;
           },
         },
-        when: (ctx) => activeSession(ctx) !== undefined,
+        when: (ctx) => activeThread(ctx) !== undefined,
         run: (ctx, args) => {
-          const s = activeSession(ctx);
+          const s = activeThread(ctx);
           if (!s) throw new CommandError("unavailable", "no active session");
-          return this.archiveSession(s.id, archiving(s, args));
+          return this.archiveThread(s.id, archiving(s, args));
         },
       },
       {
@@ -2391,7 +2391,7 @@ export class World {
           ],
           // Like the daemon: only snoozing (a valid time) a thread that is mid-turn asks.
           confirmIf: (ctx, args) => {
-            const s = activeSession(ctx);
+            const s = activeThread(ctx);
             if (s === undefined || args.clear === "true" || this.interrupts(s).why === "") return false;
             try {
               return snoozeUntil(args) !== null;
@@ -2400,32 +2400,32 @@ export class World {
             }
           },
           confirm: (ctx) => {
-            const s = activeSession(ctx);
+            const s = activeThread(ctx);
             const { why, ends } = s ? this.interrupts(s) : { why: "", ends: "" };
             return `Snooze thread ${s?.name || (s?.id ?? "")}? ${why}; snoozing ${ends}.`;
           },
         },
-        when: (ctx) => activeSession(ctx) !== undefined,
+        when: (ctx) => activeThread(ctx) !== undefined,
         run: (ctx, args) => {
-          const s = activeSession(ctx);
+          const s = activeThread(ctx);
           if (!s) throw new CommandError("unavailable", "no active session");
-          return this.snoozeSession(s.id, snoozeUntil(args));
+          return this.snoozeThread(s.id, snoozeUntil(args));
         },
       },
       {
         cmd: {
-          name: "thread.remove", title: "Remove Thread", category: "Thread", description: "Forget the session (closes it first if connected)", keybindings: [], args: [],
+          name: "thread.remove", title: "Remove Thread", category: "Thread", description: "Forget the thread (closes it first if connected)", keybindings: [], args: [],
           confirm: (ctx) => `Remove session ${ctx?.activeThreadId ?? ""}? It is closed first if connected, and its row is forgotten.`,
         },
-        when: (ctx) => activeSession(ctx) !== undefined,
+        when: (ctx) => activeThread(ctx) !== undefined,
         run: (ctx) => {
-          const s = activeSession(ctx);
+          const s = activeThread(ctx);
           if (!s) throw new CommandError("unavailable", "no active session");
-          if (s.state !== ThreadState.DISCONNECTED) this.stopSession(s.id, "closed", 0);
-          this.closeShells((l) => l[LABEL_SESSION] === s.id);
-          this.actions.stopBackground((r) => r.sessionId === s.id);
-          this.sessions.delete(s.id);
-          this.sessionEvents.publish({ event: { case: "removedId", value: s.id } });
+          if (s.state !== ThreadState.DISCONNECTED) this.stopThread(s.id, "closed", 0);
+          this.closeShells((l) => l[LABEL_THREAD] === s.id);
+          this.actions.stopBackground((r) => r.threadId === s.id);
+          this.threads.delete(s.id);
+          this.threadListEvents.publish({ event: { case: "removedId", value: s.id } });
           return `Removed ${s.name || s.id}`;
         },
       },
@@ -2692,7 +2692,7 @@ export class World {
         return null;
       }),
       ...this.gh.prDetails.commands(),
-      ...this.prSessionCommands(),
+      ...this.prThreadCommands(),
       ...projectCommands(this),
       {
         cmd: { name: "view.settings", title: "Settings", category: "View", description: "Show the settings page, or close it where it already shows", keybindings: ["cmd+,"], args: [] },
@@ -2856,7 +2856,7 @@ export class World {
 
   /** The registry with settings applied: keybinding overrides and session.new defaults. */
   /** sessions.default_model and sessions.default_effort ("" when unset). */
-  private sessionDefaults(): { model: string; effort: string } {
+  private threadDefaults(): { model: string; effort: string } {
     const v = this.settings.values();
     return { model: v["threads.default_model"] ?? "", effort: v["threads.default_effort"] ?? "" };
   }
@@ -2868,15 +2868,15 @@ export class World {
   private effectiveRegistry(): ReturnType<World["registry"]> {
     const entries = this.registry();
     const kb = this.settings.keybindings();
-    const defaults: Record<string, string> = this.sessionDefaults();
-    const startsSession = new Set(["thread.new", "pr.ask", "pr.explain", "pr.fix.findings"]);
+    const defaults: Record<string, string> = this.threadDefaults();
+    const startsThread = new Set(["thread.new", "pr.ask", "pr.explain", "pr.fix.findings"]);
     return entries.map((e) => ({
       ...e,
       cmd: {
         ...e.cmd,
         keybindings: kb[e.cmd.name] ?? e.cmd.keybindings,
         args: e.cmd.args.map((a) => {
-          const d = startsSession.has(e.cmd.name) && (a.name === "model" || a.name === "effort") ? defaults[a.name] : "";
+          const d = startsThread.has(e.cmd.name) && (a.name === "model" || a.name === "effort") ? defaults[a.name] : "";
           return d && a.enumValues?.includes(d) ? { ...a, defaultValue: d } : a;
         }),
       },

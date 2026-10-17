@@ -113,12 +113,12 @@ function Row({
 
 /** Whether a row is open, with its toggle (the user's choice per thread, else `fallback`). */
 function useToggle(rowKey: string, fallback: boolean): [boolean, () => void] {
-  const { sessionId } = useThreadCtx();
-  const open = useRowExpanded(sessionId, rowKey, fallback);
+  const { threadId } = useThreadCtx();
+  const open = useRowExpanded(threadId, rowKey, fallback);
   return [
     open,
     () => {
-      setRowExpanded(sessionId, rowKey, !open);
+      setRowExpanded(threadId, rowKey, !open);
     },
   ];
 }
@@ -192,14 +192,14 @@ function AgentMeta({ run, itemRunning, fallback }: { run: AgentRunView; itemRunn
  * Open by default: a running subagent, and a file edit waiting for permission.
  */
 const ToolRow = memo(function ToolRow({ node }: { node: Extract<WorkNode, { type: "tool" }> }) {
-  const { sessionId, cwd } = useThreadCtx();
-  const item = useThreadItem(sessionId, node.id);
-  const perm = useThreadItem(sessionId, node.permissionId);
+  const { threadId, cwd } = useThreadCtx();
+  const item = useThreadItem(threadId, node.id);
+  const perm = useThreadItem(threadId, node.permissionId);
   const t = item?.kind === "tool" ? item : null;
   const agent = node.name === "Agent" || node.name === "Task";
   // The run the daemon follows for this Agent call (docs/notes/agents-1-daemon.md); a
   // background call's item stays running until the run ends.
-  const run = useAgentRunOfCall(sessionId, agent ? node.id : "");
+  const run = useAgentRunOfCall(threadId, agent ? node.id : "");
   const request = perm?.kind === "permission" ? perm.request : null;
   const waiting = request?.state === "pending";
   // A running foreground subagent opens to show its work; a background one stays a line
@@ -261,10 +261,10 @@ const ToolRow = memo(function ToolRow({ node }: { node: Extract<WorkNode, { type
 
 /** Base names of a group's files and patterns, for its meta ("poller.go, poller_test.go, gh/client.go"). */
 function useGroupTargets(ids: readonly string[]): string[] {
-  const { sessionId } = useThreadCtx();
+  const { threadId } = useThreadCtx();
   return useThreadStore(
     useShallow((s) => {
-      const log = s.logs[sessionId];
+      const log = s.logs[threadId];
       return ids.flatMap((id) => {
         const it = log?.byId[id];
         if (it?.kind !== "tool" || it.name !== "Read") return [];
@@ -302,11 +302,11 @@ const GroupRow = memo(function GroupRow({ node }: { node: Extract<WorkNode, { ty
 
 /** Thinking (one or more consecutive items): "Thought for 9s"; open, its text when Claude streamed any. */
 const ThinkingRow = memo(function ThinkingRow({ node }: { node: Extract<WorkNode, { type: "thinking" }> }) {
-  const { sessionId } = useThreadCtx();
+  const { threadId } = useThreadCtx();
   const [open, toggle] = useToggle(node.key, false);
   const info = useThreadStore(
     useShallow((s) => {
-      const log = s.logs[sessionId];
+      const log = s.logs[threadId];
       const its = node.ids.flatMap((id) => (log?.byId[id] ? [log.byId[id]] : []));
       const text = its.map((it) => (it.kind === "thinking" ? it.text : "")).filter(Boolean).join("\n\n");
       const start = its[0]?.createdAtMs ?? null;
@@ -326,12 +326,12 @@ const ThinkingRow = memo(function ThinkingRow({ node }: { node: Extract<WorkNode
 
 /** Claude's text: markdown, with a caret while it streams; the turn's final answer gets more air. */
 const TextRow = memo(function TextRow({ id, final, nested }: { id: string; final: boolean; nested?: boolean }) {
-  const { sessionId } = useThreadCtx();
-  const it = useThreadItem(sessionId, id);
+  const { threadId } = useThreadCtx();
+  const it = useThreadItem(threadId, id);
   const text = it?.kind === "text" ? it.text : "";
   const streaming = it?.kind === "text" && it.streaming;
   // Claude's reply: its shell blocks offer Run in terminal (CodeActions).
-  const run = useMemo(() => ({ sessionId, text, streaming }), [sessionId, text, streaming]);
+  const run = useMemo(() => ({ threadId, text, streaming }), [threadId, text, streaming]);
   if (it?.kind !== "text") return null;
   const md = (
     <CodeRunContext.Provider value={run}>
@@ -354,8 +354,8 @@ const TextRow = memo(function TextRow({ id, final, nested }: { id: string; final
 
 /** An AskUserQuestion: "Asked [Header] answer" once answered, amber "waiting for you" while it asks. */
 const QuestionRow = memo(function QuestionRow({ id }: { id: string }) {
-  const { sessionId } = useThreadCtx();
-  const it = useThreadItem(sessionId, id);
+  const { threadId } = useThreadCtx();
+  const it = useThreadItem(threadId, id);
   const [open, toggle] = useToggle(id, false);
   if (it?.kind !== "question") return null;
   const r = it.request;
@@ -417,8 +417,8 @@ const QuestionRow = memo(function QuestionRow({ id }: { id: string }) {
 
 /** A permission request without a tool row (a call denied before it ran). */
 const PermissionRow = memo(function PermissionRow({ id }: { id: string }) {
-  const { sessionId } = useThreadCtx();
-  const it = useThreadItem(sessionId, id);
+  const { threadId } = useThreadCtx();
+  const it = useThreadItem(threadId, id);
   if (it?.kind !== "permission") return null;
   const r = it.request;
   const waiting = r.state === "pending";
@@ -439,8 +439,8 @@ const PermissionRow = memo(function PermissionRow({ id }: { id: string }) {
 
 /** An error, a compaction, or a local command's output. */
 const NoteRow = memo(function NoteRow({ id }: { id: string }) {
-  const { sessionId } = useThreadCtx();
-  const it = useThreadItem(sessionId, id);
+  const { threadId } = useThreadCtx();
+  const it = useThreadItem(threadId, id);
   const [open, toggle] = useToggle(id, false);
   if (!it) return null;
   if (it.kind === "error") {
@@ -484,9 +484,9 @@ const NoteRow = memo(function NoteRow({ id }: { id: string }) {
  * where the history it copied from its parent ends.
  */
 const SystemNoteRow = memo(function SystemNoteRow({ id }: { id: string }) {
-  const { sessionId } = useThreadCtx();
-  const it = useThreadItem(sessionId, id);
-  const run = useAgentRunOfNote(sessionId, id);
+  const { threadId } = useThreadCtx();
+  const it = useThreadItem(threadId, id);
+  const run = useAgentRunOfNote(threadId, id);
   if (it?.kind !== "note") return null;
   const note = parseAgentNote(it.text, run?.description ?? "");
   if (note) return <AgentNoteRow note={note} atMs={it.createdAtMs} />;
@@ -559,8 +559,8 @@ export function WorkNodeView({ node, nested }: { node: WorkNode; nested?: boolea
 }
 
 const UserRow = memo(function UserRow({ id }: { id: string }) {
-  const { sessionId } = useThreadCtx();
-  const it = useThreadItem(sessionId, id);
+  const { threadId } = useThreadCtx();
+  const it = useThreadItem(threadId, id);
   if (it?.kind !== "user") return null;
   return <UserBubble text={it.text} composerText={it.composerText} attachments={it.attachments} createdAtMs={it.createdAtMs} />;
 });
@@ -571,8 +571,8 @@ const UserRow = memo(function UserRow({ id }: { id: string }) {
  * so the answer stays. The copy button copies the final answer.
  */
 const FooterRow = memo(function FooterRow({ row }: { row: Extract<TimelineRow, { type: "footer" }> }) {
-  const { sessionId } = useThreadCtx();
-  const it = useThreadItem(sessionId, row.id);
+  const { threadId } = useThreadCtx();
+  const it = useThreadItem(threadId, row.id);
   const models = useModelChoices();
   if (it?.kind !== "turnEnd") return null;
   const took = formatDuration(it.durationMs);
@@ -588,7 +588,7 @@ const FooterRow = memo(function FooterRow({ row }: { row: Extract<TimelineRow, {
   if (it.model) parts.push(canonicalModelName(models, it.model));
   const copy = () => {
     const finals = new Set(row.finals);
-    const text = getThreadItems(sessionId)
+    const text = getThreadItems(threadId)
       .flatMap((x: ThreadItemView) => (finals.has(x.id) && x.kind === "text" ? [x.text] : []))
       .join("\n\n");
     void copyText(text);
@@ -601,7 +601,7 @@ const FooterRow = memo(function FooterRow({ row }: { row: Extract<TimelineRow, {
         aria-expanded={!row.folded}
         aria-label={row.folded ? "Show this turn's work" : "Hide this turn's work"}
         onClick={() => {
-          setTurnFolded(sessionId, row.turn, !row.folded);
+          setTurnFolded(threadId, row.turn, !row.folded);
         }}
       >
         <ChevronRight aria-hidden />
@@ -626,8 +626,8 @@ const FooterRow = memo(function FooterRow({ row }: { row: Extract<TimelineRow, {
 
 /** "Working 3m 52s" while the turn runs, since its user message (Claude starting up for it included). */
 function WorkingRow({ since }: { since: string }) {
-  const { sessionId } = useThreadCtx();
-  const start = useThreadStore((s) => s.logs[sessionId]?.byId[since]?.createdAtMs ?? null);
+  const { threadId } = useThreadCtx();
+  const start = useThreadStore((s) => s.logs[threadId]?.byId[since]?.createdAtMs ?? null);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => {

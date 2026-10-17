@@ -3,7 +3,7 @@ import type { UsageBucketView } from "@/api/threads";
 import { Tip } from "@/components/ui/tooltip";
 import { fmtRequests, fmtShare, fmtTok, fmtUsd, modelColorVars, SWATCH_BG, TOKEN_KINDS, totalUsage, usageByModel, type ModelUsage } from "@/lib/usage";
 import { cn } from "@/lib/utils";
-import { sameUsage, useSessionsStore } from "@/stores/threads";
+import { sameUsage, useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 
 const NONE: readonly UsageBucketView[] = [];
@@ -13,7 +13,7 @@ const NONE: readonly UsageBucketView[] = [];
  * shows the current selection's panel).
  */
 function useThreadId(): string {
-  return useUiStore((s) => (s.selection.kind === "session" ? s.selection.id : ""));
+  return useUiStore((s) => (s.selection.kind === "thread" ? s.selection.id : ""));
 }
 
 /**
@@ -22,7 +22,7 @@ function useThreadId(): string {
  */
 function useUsage(threadId: string): readonly UsageBucketView[] {
   const last = useRef<readonly UsageBucketView[]>(NONE);
-  return useSessionsStore((s) => {
+  return useThreadsStore((s) => {
     const next = s.byId[threadId]?.usage ?? NONE;
     if (!sameUsage(last.current, next)) last.current = next;
     return last.current;
@@ -77,7 +77,7 @@ function ModelRow({ row, total }: { row: ModelUsage; total: number }) {
  */
 export function UsageSurface() {
   const threadId = useThreadId();
-  const known = useSessionsStore((s) => threadId !== "" && s.byId[threadId] !== undefined);
+  const known = useThreadsStore((s) => threadId !== "" && s.byId[threadId] !== undefined);
   const usage = useUsage(threadId);
   const total = useMemo(() => totalUsage(usage), [usage]);
   const models = useMemo(() => usageByModel(usage), [usage]);

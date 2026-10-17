@@ -19,7 +19,7 @@ const newTabCommand: CommandView = { name: "view.panel.new-tab", title: "New Sid
 beforeEach(() => {
   usePanelStore.setState({ byKey: { [KEY]: { open: true, tabs: [], activeTabId: null } } });
   useViewsStore.setState({ settingsOpen: false });
-  useUiStore.setState({ selection: { kind: "session", id: "a" }, windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260 });
+  useUiStore.setState({ selection: { kind: "thread", id: "a" }, windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260 });
   useCommandsStore.setState({ commands: [newTabCommand] });
 });
 
@@ -129,7 +129,7 @@ describe("SidePanel", () => {
 
     // The other selection's panel shows at its own width.
     act(() => {
-      useUiStore.getState().select({ kind: "session", id: "b" });
+      useUiStore.getState().select({ kind: "thread", id: "b" });
     });
     expect(wrapper().style.width).toBe("500px");
     expect(sep().getAttribute("aria-valuenow")).toBe("500");
@@ -516,7 +516,7 @@ describe("reordering tabs", () => {
     const t = tab("#1");
     drag(t, 210);
     act(() => {
-      useUiStore.setState({ selection: { kind: "session", id: "b" } });
+      useUiStore.setState({ selection: { kind: "thread", id: "b" } });
     });
     expect(screen.getByRole("tab", { name: "Files" })).toBeTruthy();
     fireEvent.pointerUp(document, { isPrimary: true, button: 0, clientX: 210, clientY: 10 });

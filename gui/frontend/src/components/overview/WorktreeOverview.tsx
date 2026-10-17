@@ -19,7 +19,7 @@ import { openPullRequestInPanel } from "@/stores/prPanel";
 import { openPublishDialog } from "@/stores/publish";
 import { findWorktree, useReposStore } from "@/stores/repos";
 import { useResource } from "@/stores/resource";
-import { useSessionsStore } from "@/stores/threads";
+import { useThreadsStore } from "@/stores/threads";
 import { useTerminalsStore } from "@/stores/terminals";
 import { useUiStore } from "@/stores/ui";
 import { detailKey, worktreeDetailResource } from "@/stores/worktreeDetail";
@@ -45,8 +45,8 @@ const toneText: Record<FactTone, string> = {
  * not re-render the panel.
  */
 function WhoElse({ path }: { path: string }) {
-  const self = useUiStore((s) => (s.selection.kind === "session" ? s.selection.id : ""));
-  const threads = useSessionsStore((s) => otherThreads(s, path, self));
+  const self = useUiStore((s) => (s.selection.kind === "thread" ? s.selection.id : ""));
+  const threads = useThreadsStore((s) => otherThreads(s, path, self));
   const shells = useTerminalsStore((s) => shellsIn(s, path));
   if (threads === 0 && shells === 0) return null;
   return (

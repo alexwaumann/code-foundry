@@ -6,7 +6,7 @@ import { useNav, type NavItem } from "@/lib/nav";
 import { NavProvider } from "@/lib/NavRow";
 import { memberKey } from "@/lib/projects";
 import { useCurrentPanelKey } from "@/stores/panel";
-import { useSessionsStore } from "@/stores/threads";
+import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { openMemberTab } from "@/stores/workspacePanel";
 import { useWorkspacesStore } from "@/stores/workspaces";
@@ -19,8 +19,8 @@ const SEP = "\u0000";
  * shows the current selection's panel, so the selection is the panel's owner.)
  */
 function useThreadOf(workspaceId: string): string {
-  const id = useUiStore((s) => (s.selection.kind === "session" ? s.selection.id : ""));
-  const owned = useSessionsStore((s) => id !== "" && s.byId[id]?.workspaceId === workspaceId);
+  const id = useUiStore((s) => (s.selection.kind === "thread" ? s.selection.id : ""));
+  const owned = useThreadsStore((s) => id !== "" && s.byId[id]?.workspaceId === workspaceId);
   return owned ? id : "";
 }
 

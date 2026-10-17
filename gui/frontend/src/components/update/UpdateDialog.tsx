@@ -9,7 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { formatAgo, restartCutsOff } from "@/lib/thread";
 import { busyHeading, cutOffLabel, displayVersion, failureHeadline, updateView, type UpdateVariant, type UpdateView } from "@/lib/update";
 import { cn } from "@/lib/utils";
-import { useSessionsStore } from "@/stores/threads";
+import { useThreadsStore } from "@/stores/threads";
 import { closeUpdateDialog, runUpdateAction, useCutOffThreadIds, useUpdateStore, type UpdateAction } from "@/stores/update";
 
 const linkTone = "text-link hover:underline";
@@ -104,8 +104,8 @@ function Meta({ items, lead }: { items: ReactNode[]; lead: string }) {
 
 /** One thread a restart would cut off: its name, and what it loses (cutOffLabel). */
 function BusyThread({ id }: { id: string }) {
-  const name = useSessionsStore((s) => s.byId[id]?.name || "Untitled thread");
-  const label = useSessionsStore((s) => {
+  const name = useThreadsStore((s) => s.byId[id]?.name || "Untitled thread");
+  const label = useThreadsStore((s) => {
     const x = s.byId[id];
     const kind = x ? restartCutsOff(x) : null;
     return x && kind ? cutOffLabel(kind, x.backgroundAgentsRunning, x.backgroundShellsRunning) : "";

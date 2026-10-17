@@ -1,10 +1,10 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const startPrSession = vi.hoisted(() => vi.fn());
-vi.mock("@/stores/prThreads", async (orig) => ({ ...(await orig<typeof import("@/stores/prThreads")>()), startPrSession }));
+const startPrThread = vi.hoisted(() => vi.fn());
+vi.mock("@/stores/prThreads", async (orig) => ({ ...(await orig<typeof import("@/stores/prThreads")>()), startPrThread }));
 
-const { usePrSessionsStore, startingKey } = await import("@/stores/prThreads");
+const { usePrThreadsStore, startingKey } = await import("@/stores/prThreads");
 const { ASK_ELSEWHERE_HINT, ASK_KEYS_HINT, ASK_SENDING_HINT, PrAskComposer } = await import("./PrAskComposer");
 const { composerKeyAction } = await import("./keys");
 
@@ -18,14 +18,14 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-/** startPrSession as the store runs it: the shared busy flag is set while it runs. */
+/** startPrThread as the store runs it: the shared busy flag is set while it runs. */
 function runningAsk(answer: Promise<string | null>) {
   return async () => {
-    usePrSessionsStore.setState({ starting: { [startingKey(REF, "ask")]: true } });
+    usePrThreadsStore.setState({ starting: { [startingKey(REF, "ask")]: true } });
     try {
       return await answer;
     } finally {
-      usePrSessionsStore.setState({ starting: {} });
+      usePrThreadsStore.setState({ starting: {} });
     }
   };
 }
@@ -36,7 +36,7 @@ afterEach(() => {
 });
 
 beforeEach(() => {
-  usePrSessionsStore.setState({ starting: {} });
+  usePrThreadsStore.setState({ starting: {} });
 });
 
 describe("composerKeyAction", () => {
@@ -63,8 +63,8 @@ describe("composerKeyAction", () => {
 describe("PrAskComposer", () => {
   const input = () => screen.getByTestId("pr-ask-input");
 
-  it("Enter sends the question through startPrSession, closes on success and hands focus to the panel", async () => {
-    startPrSession.mockResolvedValueOnce("s-1");
+  it("Enter sends the question through startPrThread, closes on success and hands focus to the panel", async () => {
+    startPrThread.mockResolvedValueOnce("s-1");
     const onClose = vi.fn();
     render(
       <aside data-region="panel" tabIndex={-1} data-testid="panel">
@@ -76,11 +76,11 @@ describe("PrAskComposer", () => {
     });
     fireEvent.change(input(), { target: { value: "Why the lock?" } });
     fireEvent.keyDown(input(), { key: "Enter" });
-    expect(startPrSession).toHaveBeenCalledWith("ask", REF, "Why the lock?");
+    expect(startPrThread).toHaveBeenCalledWith("ask", REF, "Why the lock?");
     await vi.waitFor(() => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
-    // If the daemon's FocusSession never arrives, panel keys still work.
+    // If the daemon's FocusThread never arrives, panel keys still work.
     expect(document.activeElement).toBe(screen.getByTestId("panel"));
   });
 
@@ -89,7 +89,7 @@ describe("PrAskComposer", () => {
     fireEvent.change(input(), { target: { value: "日本" } });
     const notPrevented = fireEvent.keyDown(input(), { key: "Enter", keyCode: 229 });
     expect(notPrevented).toBe(true);
-    expect(startPrSession).not.toHaveBeenCalled();
+    expect(startPrThread).not.toHaveBeenCalled();
   });
 
   it("shows the short key hint while idle", () => {
@@ -102,14 +102,14 @@ describe("PrAskComposer", () => {
     fireEvent.change(input(), { target: { value: "line one" } });
     const notPrevented = fireEvent.keyDown(input(), { key: "Enter", shiftKey: true });
     expect(notPrevented).toBe(true); // the textarea inserts the newline
-    expect(startPrSession).not.toHaveBeenCalled();
+    expect(startPrThread).not.toHaveBeenCalled();
   });
 
   it("Enter on a blank question sends nothing", () => {
     render(<PrAskComposer prRef={REF} focusRequest={1} onClose={vi.fn()} />);
     fireEvent.change(input(), { target: { value: "   " } });
     fireEvent.keyDown(input(), { key: "Enter" });
-    expect(startPrSession).not.toHaveBeenCalled();
+    expect(startPrThread).not.toHaveBeenCalled();
     expect(screen.getByTestId("pr-ask-send")).toHaveProperty("disabled", true);
   });
 
@@ -119,17 +119,17 @@ describe("PrAskComposer", () => {
     fireEvent.change(input(), { target: { value: "never mind" } });
     fireEvent.keyDown(input(), { key: "Escape" });
     expect(onClose).toHaveBeenCalledTimes(1);
-    expect(startPrSession).not.toHaveBeenCalled();
+    expect(startPrThread).not.toHaveBeenCalled();
   });
 
   it("a failure keeps the composer open with its text", async () => {
-    startPrSession.mockResolvedValueOnce(null);
+    startPrThread.mockResolvedValueOnce(null);
     const onClose = vi.fn();
     render(<PrAskComposer prRef={REF} focusRequest={1} onClose={onClose} />);
     fireEvent.change(input(), { target: { value: "Why?" } });
     fireEvent.click(screen.getByTestId("pr-ask-send"));
     await vi.waitFor(() => {
-      expect(startPrSession).toHaveBeenCalledTimes(1);
+      expect(startPrThread).toHaveBeenCalledTimes(1);
     });
     await Promise.resolve();
     expect(onClose).not.toHaveBeenCalled();
@@ -138,7 +138,7 @@ describe("PrAskComposer", () => {
 
   it("while its pr.ask runs: read-only, Cancel disabled, Escape and Enter ignored; it closes when the session starts", async () => {
     const d = deferred<string | null>();
-    startPrSession.mockImplementationOnce(runningAsk(d.promise));
+    startPrThread.mockImplementationOnce(runningAsk(d.promise));
     const onClose = vi.fn();
     render(<PrAskComposer prRef={REF} focusRequest={1} onClose={onClose} />);
     fireEvent.change(input(), { target: { value: "Why?" } });
@@ -153,7 +153,7 @@ describe("PrAskComposer", () => {
     fireEvent.click(screen.getByTestId("pr-ask-cancel"));
     fireEvent.keyDown(input(), { key: "Enter" });
     expect(onClose).not.toHaveBeenCalled();
-    expect(startPrSession).toHaveBeenCalledTimes(1);
+    expect(startPrThread).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId("pr-ask")).toBeTruthy();
 
     await act(async () => {
@@ -164,7 +164,7 @@ describe("PrAskComposer", () => {
   });
 
   it("while pr.ask for the same pull request runs from another surface: the shared spinner, the hint, nothing sent", () => {
-    usePrSessionsStore.setState({ starting: { [startingKey(REF, "ask")]: true } });
+    usePrThreadsStore.setState({ starting: { [startingKey(REF, "ask")]: true } });
     const onClose = vi.fn();
     render(<PrAskComposer prRef={REF} focusRequest={1} onClose={onClose} />);
     expect(screen.getByTestId("pr-ask-hint").textContent).toBe(ASK_ELSEWHERE_HINT);
@@ -174,11 +174,11 @@ describe("PrAskComposer", () => {
     expect(input()).toHaveProperty("readOnly", false);
     fireEvent.change(input(), { target: { value: "again" } });
     fireEvent.keyDown(input(), { key: "Enter" });
-    expect(startPrSession).not.toHaveBeenCalled();
+    expect(startPrThread).not.toHaveBeenCalled();
     expect(screen.getByTestId("pr-ask-hint").textContent).toBe(ASK_ELSEWHERE_HINT);
     expect(input()).toHaveProperty("value", "again");
     act(() => {
-      usePrSessionsStore.setState({ starting: {} });
+      usePrThreadsStore.setState({ starting: {} });
     });
     expect(screen.getByTestId("pr-ask-hint").textContent).toBe(ASK_KEYS_HINT);
     expect(screen.getByTestId("pr-ask-send")).toHaveProperty("disabled", false);
@@ -188,7 +188,7 @@ describe("PrAskComposer", () => {
 
   it("two surfaces on the same pull request share the spinner; the sender says it is starting, the other that it already is", async () => {
     const d = deferred<string | null>();
-    startPrSession.mockImplementationOnce(runningAsk(d.promise));
+    startPrThread.mockImplementationOnce(runningAsk(d.promise));
     render(
       <>
         <div data-testid="a">
