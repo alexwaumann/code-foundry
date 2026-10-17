@@ -35,6 +35,9 @@ const (
 const (
 	// EventServiceWatchProcedure is the fully-qualified name of the EventService's Watch RPC.
 	EventServiceWatchProcedure = "/codefoundry.v1.EventService/Watch"
+	// EventServiceSetClientStateProcedure is the fully-qualified name of the EventService's
+	// SetClientState RPC.
+	EventServiceSetClientStateProcedure = "/codefoundry.v1.EventService/SetClientState"
 )
 
 // EventServiceClient is a client for the codefoundry.v1.EventService service.
@@ -43,6 +46,10 @@ type EventServiceClient interface {
 	// repo, workspace, terminal, thread list, thread, gh, gitops, settings, update, action, so a
 	// client can replace its state wholesale on connect.
 	Watch(context.Context, *connect.Request[v1.WatchEventsRequest]) (*connect.ServerStreamForClient[v1.Event], error)
+	// SetClientState updates what a GUI client's open Watch stream reported about itself
+	// (WatchEventsRequest.client_id): a stream request cannot change once open. NotFound
+	// when no open stream has that client_id.
+	SetClientState(context.Context, *connect.Request[v1.SetClientStateRequest]) (*connect.Response[v1.SetClientStateResponse], error)
 }
 
 // NewEventServiceClient constructs a client for the codefoundry.v1.EventService service. By
@@ -62,17 +69,29 @@ func NewEventServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(eventServiceMethods.ByName("Watch")),
 			connect.WithClientOptions(opts...),
 		),
+		setClientState: connect.NewClient[v1.SetClientStateRequest, v1.SetClientStateResponse](
+			httpClient,
+			baseURL+EventServiceSetClientStateProcedure,
+			connect.WithSchema(eventServiceMethods.ByName("SetClientState")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // eventServiceClient implements EventServiceClient.
 type eventServiceClient struct {
-	watch *connect.Client[v1.WatchEventsRequest, v1.Event]
+	watch          *connect.Client[v1.WatchEventsRequest, v1.Event]
+	setClientState *connect.Client[v1.SetClientStateRequest, v1.SetClientStateResponse]
 }
 
 // Watch calls codefoundry.v1.EventService.Watch.
 func (c *eventServiceClient) Watch(ctx context.Context, req *connect.Request[v1.WatchEventsRequest]) (*connect.ServerStreamForClient[v1.Event], error) {
 	return c.watch.CallServerStream(ctx, req)
+}
+
+// SetClientState calls codefoundry.v1.EventService.SetClientState.
+func (c *eventServiceClient) SetClientState(ctx context.Context, req *connect.Request[v1.SetClientStateRequest]) (*connect.Response[v1.SetClientStateResponse], error) {
+	return c.setClientState.CallUnary(ctx, req)
 }
 
 // EventServiceHandler is an implementation of the codefoundry.v1.EventService service.
@@ -81,6 +100,10 @@ type EventServiceHandler interface {
 	// repo, workspace, terminal, thread list, thread, gh, gitops, settings, update, action, so a
 	// client can replace its state wholesale on connect.
 	Watch(context.Context, *connect.Request[v1.WatchEventsRequest], *connect.ServerStream[v1.Event]) error
+	// SetClientState updates what a GUI client's open Watch stream reported about itself
+	// (WatchEventsRequest.client_id): a stream request cannot change once open. NotFound
+	// when no open stream has that client_id.
+	SetClientState(context.Context, *connect.Request[v1.SetClientStateRequest]) (*connect.Response[v1.SetClientStateResponse], error)
 }
 
 // NewEventServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -96,10 +119,18 @@ func NewEventServiceHandler(svc EventServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(eventServiceMethods.ByName("Watch")),
 		connect.WithHandlerOptions(opts...),
 	)
+	eventServiceSetClientStateHandler := connect.NewUnaryHandler(
+		EventServiceSetClientStateProcedure,
+		svc.SetClientState,
+		connect.WithSchema(eventServiceMethods.ByName("SetClientState")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/codefoundry.v1.EventService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case EventServiceWatchProcedure:
 			eventServiceWatchHandler.ServeHTTP(w, r)
+		case EventServiceSetClientStateProcedure:
+			eventServiceSetClientStateHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -111,4 +142,8 @@ type UnimplementedEventServiceHandler struct{}
 
 func (UnimplementedEventServiceHandler) Watch(context.Context, *connect.Request[v1.WatchEventsRequest], *connect.ServerStream[v1.Event]) error {
 	return connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.EventService.Watch is not implemented"))
+}
+
+func (UnimplementedEventServiceHandler) SetClientState(context.Context, *connect.Request[v1.SetClientStateRequest]) (*connect.Response[v1.SetClientStateResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.EventService.SetClientState is not implemented"))
 }

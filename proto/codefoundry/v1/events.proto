@@ -24,6 +24,10 @@ service EventService {
   // repo, workspace, terminal, thread list, thread, gh, gitops, settings, update, action, so a
   // client can replace its state wholesale on connect.
   rpc Watch(WatchEventsRequest) returns (stream Event) {}
+  // SetClientState updates what a GUI client's open Watch stream reported about itself
+  // (WatchEventsRequest.client_id): a stream request cannot change once open. NotFound
+  // when no open stream has that client_id.
+  rpc SetClientState(SetClientStateRequest) returns (SetClientStateResponse) {}
 }
 
 message WatchEventsRequest {
@@ -42,7 +46,32 @@ message WatchEventsRequest {
   // snapshots. Empty: since_seq alone decides (after a restart a seq below the new
   // counter would "resume" with unrelated events; pass the epoch).
   string since_epoch = 3;
+  // Who is watching. Only GUI clients count toward the daemon's presence, which paces
+  // the GitHub poll: a visible GUI polls at github.poll_interval_seconds, only hidden
+  // ones every 5 minutes, none every 15 (docs/notes/gh-poll-tiers.md).
+  ClientKind client_kind = 4;
+  // A token the client makes up for this stream, naming it in SetClientState. A GUI
+  // stream without one counts with the visibility it opened with.
+  string client_id = 5;
+  // Whether the client's window is visible now (GUI: document.visibilityState).
+  bool visible = 6;
 }
+
+enum ClientKind {
+  CLIENT_KIND_UNSPECIFIED = 0;
+  // The desktop app's window.
+  CLIENT_KIND_GUI = 1;
+  // The code-foundry CLI (events verb, scripts). Not counted.
+  CLIENT_KIND_CLI = 2;
+}
+
+message SetClientStateRequest {
+  // WatchEventsRequest.client_id of an open stream.
+  string client_id = 1;
+  bool visible = 2;
+}
+
+message SetClientStateResponse {}
 
 enum EventSource {
   EVENT_SOURCE_UNSPECIFIED = 0;
