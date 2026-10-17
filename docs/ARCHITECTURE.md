@@ -202,8 +202,8 @@ Services (v1):
   for a git project without origin; gh's error verbatim;
   `docs/notes/add-project-4-create.md`).
 * `GhService` — GetViewer, GetDashboard, GetRepoActivity, GetBranchPullRequests (the
-  viewer's PR dashboards, monthly stats, default-branch CI, the viewer's PRs on a
-  branch), GetPullRequest and ListChecks (on demand), Refresh, Track, Untrack, Watch.
+  viewer's PR dashboards, six months of stats (`docs/notes/gh-stats-six-months.md`),
+  default-branch CI, the viewer's PRs on a branch), GetPullRequest and ListChecks (on demand), Refresh, Track, Untrack, Watch.
   Data events go out only when data changed; `Polled` after every poll carries the
   freshness time. The PR detail panel: GetPullRequestDetail (on demand, cached per PR,
   invalidated by the poll's fingerprints), ListReviewerCandidates, SetReviewRequest,
