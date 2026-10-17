@@ -124,6 +124,14 @@ func startHarness(t *testing.T, dbPath string, opts Options) *harness {
 	if opts.PollInterval == 0 {
 		opts.PollInterval = -1
 	}
+	// Tests that set an interval mean it for every project, live or idle, unless
+	// they set the idle one too (activity_test.go).
+	if opts.IdleFetchInterval == 0 {
+		opts.IdleFetchInterval = opts.FetchInterval
+	}
+	if opts.IdlePollInterval == 0 {
+		opts.IdlePollInterval = opts.PollInterval
+	}
 	s, err := Start(context.Background(), opts)
 	if err != nil {
 		t.Fatal(err)

@@ -18,7 +18,7 @@ import (
 
 // Worktree detail (Phase 3a): the files changed and commits on a worktree against its
 // base, computed by git on demand. A worktree someone asked about within DetailWatch is
-// recomputed after each of its status refreshes (fs events, the 30s poll, Refresh), so
+// recomputed after each of its status refreshes (fs events, the backstop poll, Refresh), so
 // the overview page stays live; others cost nothing.
 
 // Detail limits.
@@ -151,6 +151,9 @@ func (g *Git) WorktreeDetail(ctx context.Context, projectID, path string) (Workt
 	ds.mu.Unlock()
 	if cached && watched && now.Sub(last) <= DetailWatch {
 		return d, nil // kept fresh by status refreshes
+	}
+	if !watched || now.Sub(last) > DetailWatch {
+		g.nudgeTiers() // the worktree, and so its project, turned live (activity.go)
 	}
 	if err := g.sched.wait(ctx, jobKey{kind: jobDetail, projectID: projectID, path: path}); err != nil {
 		return WorktreeDetail{}, err

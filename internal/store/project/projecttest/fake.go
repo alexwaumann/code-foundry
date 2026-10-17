@@ -31,6 +31,8 @@ type Fake struct {
 	details map[string]project.WorktreeDetail
 	// refs backs ListRefs; nil until SetRefs.
 	refs map[string]project.Refs
+	// live is the last SetLiveWorktrees (activity.go).
+	live []string
 
 	// WorktreeRoot is where CreateWorktree puts worktrees without a path, like
 	// project.Options.WorktreeRoot. New sets it to DefaultWorktreeRoot.
