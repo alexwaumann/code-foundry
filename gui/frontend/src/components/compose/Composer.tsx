@@ -229,7 +229,7 @@ function PdfTile({ thumb }: { thumb: string | null }) {
     <span className="flex size-full flex-col bg-muted">
       <span className="flex min-h-0 flex-1 items-center justify-center p-1">
         {thumb ? (
-          <img src={thumb} alt="" draggable={false} className="max-h-full max-w-full object-contain shadow-sm" />
+          <img src={thumb} alt="" draggable={false} className="max-h-full max-w-full object-contain shadow-sm ring-1 ring-border" />
         ) : (
           <FileText aria-hidden className="size-5 text-muted-foreground" />
         )}

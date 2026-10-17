@@ -112,7 +112,7 @@ export function AttachmentChip({ id, label, selected, editor }: { id: string; la
 }
 
 function ChipIcon({ pdf, src }: { pdf: boolean; src: string | null }) {
-  if (src) return <img src={src} alt="" draggable={false} className={cn("size-[1.17em] shrink-0 rounded-sm object-cover", pdf && "object-top")} />;
+  if (src) return <img src={src} alt="" draggable={false} className={cn("size-[1.17em] shrink-0 rounded-sm object-cover", pdf && "object-top ring-1 ring-border")} />;
   const Icon = pdf ? FileText : ImageIcon;
   return <Icon aria-hidden className="size-[1.17em] shrink-0" />;
 }
