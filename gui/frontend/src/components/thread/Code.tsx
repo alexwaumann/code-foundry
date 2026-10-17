@@ -3,7 +3,7 @@ import { ImageIcon } from "lucide-react";
 import { Markdown, type MarkdownExtras } from "@/components/pr/Markdown";
 import { Tip } from "@/components/ui/tooltip";
 import { grammarFor, highlightLines, type MarkedToken, type Token } from "@/lib/highlight";
-import { useAttachmentUrl } from "@/stores/attachmentImages";
+import { useAttachmentUrl } from "@/stores/attachments";
 import { CodeActions } from "./CodeActions";
 
 /** One line's tokens as spans (marked tokens wrapped in `mark`: ins or del). */

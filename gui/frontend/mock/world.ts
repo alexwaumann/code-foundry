@@ -635,6 +635,8 @@ export class World {
   uiEventWatchers = 0;
   /** ThreadService.StageAttachment uploads, by returned path. */
   attachments = new Map<string, { name: string; mimeType: string; size: number; pages: number }>();
+  /** The bytes of staged PDFs, which ReadAttachment serves back (staged images read as the scripted PNG). */
+  attachmentBytes = new Map<string, Uint8Array>();
   /** How long thread.new takes to create a worktree (ms). */
   worktreeDelayMs = 700;
   /** terminal.new: how long it takes (ms), and whether its next run fails (the reason). POST /__mock/terminal/new. */
@@ -660,6 +662,7 @@ export class World {
     this.workspaces.clear();
     this.invocations = [];
     this.attachments.clear();
+    this.attachmentBytes.clear();
     this.logs.reset();
     this.worktreeDelayMs = 700;
     this.terminalNewDelayMs = 0;
@@ -1823,10 +1826,11 @@ export class World {
   }
 
   /**
-   * ThreadService.StageAttachment: keeps the bytes' size and the page hint, returns a fake
-   * path; a PDF's carries the count like the daemon's (the hint, else "~1").
+   * ThreadService.StageAttachment: keeps the bytes' size, the page hint and a PDF's bytes,
+   * returns a fake path; a PDF's carries the count like the daemon's (the hint, else "~1").
    */
-  stageAttachment(name: string, mimeType: string, size: number, pages = 0): string {
+  stageAttachment(name: string, mimeType: string, data: Uint8Array, pages = 0): string {
+    const size = data.length;
     if (!["image/png", "image/jpeg", "image/gif", "image/webp", "application/pdf"].includes(mimeType)) throw new CommandError("invalid", `unsupported attachment type ${mimeType}`);
     const max = mimeType === "application/pdf" ? 20 : 10;
     if (size > max * 1024 * 1024) throw new CommandError("invalid", `attachment larger than ${String(max)} MiB`);
@@ -1834,6 +1838,7 @@ export class World {
     const count = mimeType === "application/pdf" ? `-${pages > 0 ? String(pages) : "~1"}p` : "";
     const path = `${HOME}/.code-foundry/attachments/att-${String(this.attachments.size + 1)}${count}${ext}`;
     this.attachments.set(path, { name, mimeType, size, pages });
+    if (mimeType === "application/pdf") this.attachmentBytes.set(path, data.slice());
     return path;
   }
 

@@ -73,7 +73,7 @@ export function parseUserMessage(text: string, composerText: string, attachments
   return out;
 }
 
-/** The staged image and PDF paths the text refers to inline. */
-export function inlineImagePaths(pieces: readonly MessagePiece[]): Set<string> {
+/** The staged image and PDF paths the text refers to inline (the bubble shows the rest as tiles). */
+export function inlineAttachmentPaths(pieces: readonly MessagePiece[]): Set<string> {
   return new Set(pieces.flatMap((p) => ((p.kind === "image" || p.kind === "pdf") && p.path ? [p.path] : [])));
 }

@@ -1,68 +1,32 @@
-import { X } from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { Tip } from "@/components/ui/tooltip";
-import { pageCount } from "@/lib/compose";
 import { formatAttachmentSize } from "@/lib/prompt";
-import { cn } from "@/lib/utils";
 import { closePreview, useComposeStore } from "@/stores/compose";
-import { PdfPages } from "./PdfPages";
+import { AttachmentLightbox } from "./AttachmentLightbox";
 
 /**
- * The lightbox for a draft attachment (opened from its tile or an inline chip): an image
- * at natural size, capped to the window; a PDF's pages in a scrolling column at the
- * dialog's width (the same caps), drawn as they come into view. Over either, a line with
- * its name and size (and a PDF's page count). Escape, the backdrop and × close it; focus
- * goes back to where it was opened from.
+ * The lightbox for a draft attachment (opened from its tile or an inline chip; see
+ * AttachmentLightbox). Focus goes back to where it was opened from.
  */
 export function AttachmentPreview({ draftKey }: { draftKey: string }) {
   const preview = useComposeStore((s) => (s.preview?.draftKey === draftKey ? s.preview : null));
   const att = useComposeStore((s) => (preview ? s.drafts[draftKey]?.attachments.find((a) => a.id === preview.id) : undefined));
   return (
-    <Dialog
+    <AttachmentLightbox
       open={preview?.open === true && att !== undefined}
-      onOpenChange={(open) => {
-        if (!open) closePreview();
+      onClose={closePreview}
+      testId="attachment-preview"
+      attachmentId={att?.id}
+      kind={att?.kind}
+      name={att?.file.name ?? ""}
+      size={att ? formatAttachmentSize(att.file.size) : ""}
+      pages={att?.pages ?? null}
+      url={att?.url ?? null}
+      file={att?.file ?? null}
+      onCloseAutoFocus={(e) => {
+        const el = preview?.returnFocus;
+        if (!el?.isConnected) return;
+        e.preventDefault();
+        el.focus();
       }}
-    >
-      <DialogContent
-        data-testid="attachment-preview"
-        data-attachment-id={att?.id}
-        overlayClassName="bg-black/80"
-        data-kind={att?.kind}
-        className={cn(
-          "top-1/2 flex min-w-72 -translate-y-1/2 flex-col overflow-hidden bg-popover/95 p-0",
-          att?.kind === "pdf" ? "w-[calc(90vw/var(--cf-zoom))] max-w-4xl" : "w-auto max-w-[calc(90vw/var(--cf-zoom))]",
-        )}
-        onCloseAutoFocus={(e) => {
-          const el = preview?.returnFocus;
-          if (!el?.isConnected) return;
-          e.preventDefault();
-          el.focus();
-        }}
-      >
-        <div className="flex min-w-0 items-center gap-3 border-b py-2 pr-2 pl-4">
-          <DialogTitle className="min-w-0 truncate" data-testid="attachment-preview-name">
-            {att?.file.name}
-          </DialogTitle>
-          <DialogDescription className="shrink-0" data-testid="attachment-preview-size">
-            {att ? formatAttachmentSize(att.file.size) : ""}
-            {att?.pages != null && ` · ${pageCount(att.pages)}`}
-          </DialogDescription>
-          <Tip label="Close">
-            <button
-              type="button"
-              aria-label="Close preview"
-              data-testid="attachment-preview-close"
-              className="ml-auto flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
-              onClick={closePreview}
-            >
-              <X className="size-4" />
-            </button>
-          </Tip>
-        </div>
-        {att?.kind === "pdf" && <PdfPages file={att.file} />}
-        {att?.kind === "image" && <img src={att.url} alt={att.file.name} draggable={false} className="mx-auto block h-auto max-h-[calc(85vh/var(--cf-zoom))] w-auto max-w-[calc(90vw/var(--cf-zoom))] object-contain" />}
-      </DialogContent>
-    </Dialog>
+    />
   );
 }

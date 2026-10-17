@@ -355,6 +355,12 @@ export function pageCount(pages: number): string {
   return `${String(pages)} ${pages === 1 ? "page" : "pages"}`;
 }
 
+/** An attachment tile's label: "Preview a.png, 58 KB", "Preview spec.pdf, PDF, 12 pages, 1.4 MB" (pages and size when known). */
+export function previewLabel(name: string, kind: "image" | "pdf", pages: number | null, size: string): string {
+  const parts = [`Preview ${name}`, kind === "pdf" ? "PDF" : "", pages === null ? "" : pageCount(pages), size];
+  return parts.filter(Boolean).join(", ");
+}
+
 /**
  * Splits dropped/pasted/picked files into the ones to attach and one message per
  * rejection (wrong type, too big, over the count cap, over the inline cap). `existing`

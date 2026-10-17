@@ -371,6 +371,60 @@ test("a follow-up takes a PDF: a tile, a chip with its pages, sent as [PDF: …]
   await expect.poll(async () => (await invocations()).find((i) => i.name === "thread.send")?.args.text ?? "").toMatch(/^Check \[PDF: spec\.pdf; ref=\S+-3p\.pdf\]$/);
 });
 
+test("a first message's PDFs: an inline chip with its pages, an unreferenced PDF tile, both open the paged preview", async ({ page }) => {
+  await openApp(page);
+  await page.keyboard.press("Meta+n");
+  await expect(page.getByTestId("palette")).toHaveAttribute("data-mode", "projects");
+  await page.keyboard.press("Meta+1");
+  await expect(page.getByTestId("composer-input")).toBeFocused();
+  const input = page.getByTestId("composer-file-input");
+  // Into the empty prompt: a tile only, so the message does not refer to it.
+  await input.setInputFiles([{ name: "notes.pdf", mimeType: "application/pdf", buffer: testPdf(1) }]);
+  await expect(page.getByTestId("attachment")).toHaveCount(1);
+  await page.keyboard.type("Summarize");
+  await input.setInputFiles([{ name: "spec.pdf", mimeType: "application/pdf", buffer: testPdf(2) }]);
+  await expect(page.getByTestId("prompt-chip")).toHaveAttribute("aria-label", "PDF attachment, spec.pdf, 2 pages");
+  await page.getByTestId("composer-input").press("Enter");
+
+  const bubble = page.getByTestId("thread-user").first();
+  await expect(bubble).toContainText("Summarize", { timeout: 8000 });
+  const chip = bubble.locator('[data-tag-kind="pdf"]');
+  await expect(chip).toHaveAttribute("aria-label", "PDF spec.pdf, 2 pages");
+  await expect(chip).toContainText("2 pages");
+  await expect(chip.locator("img")).toHaveAttribute("src", /^data:image\/png;base64,/);
+  // The unreferenced PDF is the one tile above the bubble, its first page over a "PDF" strip.
+  const tiles = bubble.getByRole("list", { name: "Attached files" }).getByTestId("thread-attachment");
+  await expect(tiles).toHaveCount(1);
+  await expect(tiles.first()).toHaveAttribute("data-kind", "pdf");
+  await expect(tiles.first()).toHaveAttribute("data-pages", "1");
+  await expect(tiles.first()).toContainText("PDF");
+  await expect(tiles.first().locator("img")).toHaveAttribute("src", /^data:image\/png;base64,/);
+
+  // The chip opens the preview: name, size and pages, a drawn canvas per page.
+  const preview = page.getByTestId("thread-attachment-preview");
+  await chip.click();
+  await expect(preview).toHaveAttribute("data-kind", "pdf");
+  await expect(page.getByTestId("thread-attachment-preview-name")).toHaveText("spec.pdf");
+  await expect(page.getByTestId("thread-attachment-preview-size")).toHaveText("1 KB · 2 pages");
+  const pages = preview.getByTestId("pdf-page");
+  await expect(pages).toHaveCount(2);
+  await expect(pages.locator("canvas")).toHaveCount(2);
+  await expect(pages.first()).toHaveAttribute("data-rendered", "true");
+  await pages.nth(1).scrollIntoViewIfNeeded();
+  await expect(pages.nth(1)).toHaveAttribute("data-rendered", "true");
+  await shot(page, "thread-pdf-preview");
+  await page.keyboard.press("Escape");
+  await expect(preview).toHaveCount(0);
+
+  // So does the tile.
+  await tiles.first().getByRole("button").click();
+  await expect(page.getByTestId("thread-attachment-preview-size")).toHaveText("1 KB · 1 page");
+  await expect(preview.getByTestId("pdf-page")).toHaveCount(1);
+  await expect(preview.getByTestId("pdf-page").first()).toHaveAttribute("data-rendered", "true");
+  await page.getByTestId("thread-attachment-preview-close").click();
+  await expect(preview).toHaveCount(0);
+});
+
 test("a follow-up goes through thread.send with the composer's tags projected; the reply streams in", async ({ page }) => {
   await openThread(page, "idle");
   const editor = page.getByTestId("thread-composer").locator('[contenteditable="true"]');

@@ -1,11 +1,11 @@
 import { useContext, useEffect, useState } from "react";
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
-import { FileText, ImageIcon } from "lucide-react";
 import { Tip } from "@/components/ui/tooltip";
 import { pageCount } from "@/lib/compose";
 import { formatAttachmentSize, kindFromName, middleTruncate } from "@/lib/prompt";
 import { cn } from "@/lib/utils";
 import { openPreview, useComposeStore } from "@/stores/compose";
+import { ChipFace } from "./attachmentFaces";
 import { TagDraftContext } from "./tagContext";
 import { TAG_ACCENT, tagClass } from "./tagStyle";
 
@@ -103,16 +103,8 @@ export function AttachmentChip({ id, label, selected, editor }: { id: string; la
         style={pdf ? undefined : { "--chip-accent": accent }}
         className={tagClass(selected, cn(pdf && TAG_ACCENT.file, att ? "cursor-pointer" : "border-dashed"))}
       >
-        <ChipIcon pdf={pdf} src={att ? (pdf ? att.thumb : att.url) : null} />
-        <span className="truncate">{middleTruncate(name)}</span>
-        {detail && <span className="shrink-0 text-caption-sm leading-none text-inherit opacity-70">{detail}</span>}
+        <ChipFace pdf={pdf} src={att ? (pdf ? att.thumb : att.url) : null} name={middleTruncate(name)} detail={detail} />
       </NodeViewWrapper>
     </Tip>
   );
-}
-
-function ChipIcon({ pdf, src }: { pdf: boolean; src: string | null }) {
-  if (src) return <img src={src} alt="" draggable={false} className={cn("size-[1.17em] shrink-0 rounded-sm object-cover", pdf && "object-top ring-1 ring-border")} />;
-  const Icon = pdf ? FileText : ImageIcon;
-  return <Icon aria-hidden className="size-[1.17em] shrink-0" />;
 }

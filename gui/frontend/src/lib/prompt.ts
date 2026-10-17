@@ -229,6 +229,15 @@ export function kindFromName(name: string): "image" | "pdf" {
 }
 
 /**
+ * A staged PDF's page count from its path: the daemon stores the count it settled in the
+ * name (`<hex>-2p.pdf`). Null for an estimate (`-~10p.pdf`) or a name without one.
+ */
+export function stagedPdfPages(path: string): number | null {
+  const m = /-(\d+)p\.pdf$/i.exec(path);
+  return m ? Number(m[1]) : null;
+}
+
+/**
  * The prompt Claude gets. An attachment chip becomes `[Image: <name>; ref=<ref>]`, or
  * `[PDF: <name>; ref=<ref>]` for a PDF, at its position (ref is the staged path; a chip
  * whose attachment is gone keeps only its name, its kind guessed from the name).

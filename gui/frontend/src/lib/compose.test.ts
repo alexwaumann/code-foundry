@@ -7,6 +7,7 @@ import {
   inlineCapNotice,
   longPdfNotice,
   pageCount,
+  previewLabel,
   sentInline,
   type AttachmentLimits,
   type InlineLike,
@@ -99,6 +100,9 @@ describe("inline bytes", () => {
     expect(inlineCapNotice("a.pdf", 24 * MB)).toBe(`${CAP}; a.pdf not attached`);
     expect(longPdfNotice("book.pdf", 30)).toBe("book.pdf has 30 pages; Claude reads it page by page");
     expect([pageCount(1), pageCount(12)]).toEqual(["1 page", "12 pages"]);
+    expect(previewLabel("a.png", "image", null, "58 KB")).toBe("Preview a.png, 58 KB");
+    expect(previewLabel("spec.pdf", "pdf", 12, "1.4 MB")).toBe("Preview spec.pdf, PDF, 12 pages, 1.4 MB");
+    expect(previewLabel("spec.pdf", "pdf", null, "")).toBe("Preview spec.pdf, PDF");
   });
 });
 

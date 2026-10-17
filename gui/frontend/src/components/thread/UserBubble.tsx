@@ -1,141 +1,125 @@
 import { memo, useMemo, useState } from "react";
-import { FileText, ImageIcon, X } from "lucide-react";
+import { FileText, ImageIcon } from "lucide-react";
+import { AttachmentLightbox } from "@/components/compose/AttachmentLightbox";
+import { ChipFace, PdfTile } from "@/components/compose/attachmentFaces";
 import { TAG_ACCENT, tagClass } from "@/components/compose/tagStyle";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Tip } from "@/components/ui/tooltip";
-import { middleTruncate, tagLabel } from "@/lib/prompt";
-import { inlineImagePaths, parseUserMessage } from "@/lib/userMessage";
-import { useAttachmentUrl } from "@/stores/attachmentImages";
+import { pageCount, previewLabel } from "@/lib/compose";
+import { formatAttachmentSize, kindFromName, middleTruncate, stagedPdfPages, tagLabel } from "@/lib/prompt";
+import { inlineAttachmentPaths, parseUserMessage } from "@/lib/userMessage";
+import { cn } from "@/lib/utils";
+import { type PdfSummary, useAttachment, usePdfSummary } from "@/stores/attachments";
 import { useReposStore } from "@/stores/repos";
 
 /** The image chip's accent: green, the success token. */
 const IMAGE_ACCENT = "[--chip-accent:var(--success)]";
 
-/** The lightbox for an image the message sent. */
-function ImagePreview({ open, onClose, url, name }: { open: boolean; onClose: () => void; url: string; name: string }) {
+/** A sent PDF's page count: the one the daemon put in its staged name, else pdf.js's (null while counting). */
+function sentPages(path: string, summary: PdfSummary | null): number | null {
+  return stagedPdfPages(path) ?? summary?.pages ?? null;
+}
+
+/** The lightbox for an attachment the message sent (AttachmentLightbox), with its size and a PDF's pages. */
+function SentPreview({ open, onClose, path, name, pdf }: { open: boolean; onClose: () => void; path: string; name: string; pdf: boolean }) {
+  const { url, file } = useAttachment(path);
+  const summary = usePdfSummary(pdf ? path : "");
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => {
-        if (!o) onClose();
-      }}
-    >
-      <DialogContent
-        data-testid="thread-image-preview"
-        overlayClassName="bg-black/80"
-        className="top-1/2 flex w-auto max-w-[calc(90vw/var(--cf-zoom))] min-w-72 -translate-y-1/2 flex-col overflow-hidden bg-popover/95 p-0"
-      >
-        <div className="flex min-w-0 items-center gap-3 border-b py-2 pr-2 pl-4">
-          <DialogTitle className="min-w-0 truncate">{name}</DialogTitle>
-          <button
-            type="button"
-            aria-label="Close preview"
-            className="ml-auto flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
-            onClick={onClose}
-          >
-            <X className="size-4" />
-          </button>
-        </div>
-        <img src={url} alt={name} className="mx-auto block h-auto max-h-[calc(85vh/var(--cf-zoom))] w-auto max-w-[calc(90vw/var(--cf-zoom))] object-contain" />
-      </DialogContent>
-    </Dialog>
+    <AttachmentLightbox
+      open={open && url !== null}
+      onClose={onClose}
+      testId="thread-attachment-preview"
+      kind={pdf ? "pdf" : "image"}
+      name={name}
+      size={file ? formatAttachmentSize(file.size) : ""}
+      pages={pdf ? sentPages(path, summary) : null}
+      url={url}
+      file={file}
+    />
   );
 }
 
-/** An image the message sent, inline as the composer's chip: thumbnail and name; a click previews it. */
-function ImageChip({ name, path }: { name: string; path: string }) {
-  const { url } = useAttachmentUrl(path);
+/**
+ * An image or PDF the message sent, inline as the composer's chip: its mini thumbnail (a
+ * PDF's first page) and name, and a PDF's page count (its size in the tooltip); a click
+ * previews it. A path the daemon no longer has shows dashed and does nothing.
+ */
+function AttachmentChip({ name, path, pdf }: { name: string; path: string; pdf: boolean }) {
+  const { url, file } = useAttachment(path);
+  const summary = usePdfSummary(pdf ? path : "");
   const [open, setOpen] = useState(false);
+  const size = file ? formatAttachmentSize(file.size) : "";
+  const count = pdf ? sentPages(path, summary) : null;
+  const pages = count === null ? "" : pageCount(count);
   return (
     <>
-      <button
-        type="button"
-        data-testid="thread-tag"
-        data-tag-kind="image"
-        aria-label={`Image ${name}`}
-        className={tagClass(false, `${IMAGE_ACCENT} ${url ? "cursor-pointer" : "border-dashed"}`)}
-        disabled={!url}
-        onClick={() => {
-          setOpen(true);
-        }}
-      >
-        {url ? <img src={url} alt="" className="size-[1.17em] shrink-0 rounded-sm object-cover" /> : <ImageIcon aria-hidden className="size-[1.17em] shrink-0" />}
-        <span className="truncate">{middleTruncate(name)}</span>
-      </button>
-      {url && (
-        <ImagePreview
-          open={open}
-          onClose={() => {
-            setOpen(false);
-          }}
-          url={url}
-          name={name}
-        />
-      )}
-    </>
-  );
-}
-
-/** An attachment the text does not refer to: a thumbnail above the bubble. */
-function Thumbnail({ path }: { path: string }) {
-  const { url } = useAttachmentUrl(path);
-  const [open, setOpen] = useState(false);
-  const name = path.slice(path.lastIndexOf("/") + 1);
-  return (
-    <li className="size-16 overflow-hidden rounded-lg border bg-muted/40" data-testid="thread-attachment">
-      {url ? (
+      <Tip label={pages && size ? size : null}>
         <button
           type="button"
-          className="block size-full cursor-pointer"
-          aria-label={`Preview ${name}`}
+          data-testid="thread-tag"
+          data-tag-kind={pdf ? "pdf" : "image"}
+          data-pages={count ?? undefined}
+          aria-label={pdf ? `PDF ${name}${pages ? `, ${pages}` : ""}` : `Image ${name}`}
+          aria-haspopup="dialog"
+          className={tagClass(false, cn(pdf ? TAG_ACCENT.file : IMAGE_ACCENT, url ? "cursor-pointer" : "border-dashed"))}
+          disabled={!url}
           onClick={() => {
             setOpen(true);
           }}
         >
-          <img src={url} alt={name} className="size-full object-cover" />
+          <ChipFace pdf={pdf} src={pdf ? (summary?.thumb ?? null) : url} name={middleTruncate(name)} detail={pages} />
+        </button>
+      </Tip>
+      <SentPreview
+        open={open}
+        onClose={() => {
+          setOpen(false);
+        }}
+        path={path}
+        name={name}
+        pdf={pdf}
+      />
+    </>
+  );
+}
+
+/** An attachment the text does not refer to: a tile above the bubble (an image, or a PDF's first page over a "PDF" strip). */
+function Thumbnail({ path }: { path: string }) {
+  const pdf = kindFromName(path) === "pdf";
+  const { url, file } = useAttachment(path);
+  const summary = usePdfSummary(pdf ? path : "");
+  const pages = pdf ? sentPages(path, summary) : null;
+  const [open, setOpen] = useState(false);
+  const name = path.slice(path.lastIndexOf("/") + 1);
+  const Icon = pdf ? FileText : ImageIcon;
+  return (
+    <li className="size-16 overflow-hidden rounded-lg border bg-muted/40" data-testid="thread-attachment" data-kind={pdf ? "pdf" : "image"} data-pages={pages ?? undefined}>
+      {url ? (
+        <button
+          type="button"
+          className="block size-full cursor-pointer"
+          aria-label={previewLabel(name, pdf ? "pdf" : "image", pages, file ? formatAttachmentSize(file.size) : "")}
+          aria-haspopup="dialog"
+          onClick={() => {
+            setOpen(true);
+          }}
+        >
+          {pdf ? <PdfTile thumb={summary?.thumb ?? null} /> : <img src={url} alt={name} className="size-full object-cover" />}
         </button>
       ) : (
         <span className="flex size-full items-center justify-center text-muted-foreground">
-          <ImageIcon className="size-4" aria-hidden />
+          <Icon className="size-4" aria-hidden />
         </span>
       )}
-      {url && (
-        <ImagePreview
-          open={open}
-          onClose={() => {
-            setOpen(false);
-          }}
-          url={url}
-          name={name}
-        />
-      )}
+      <SentPreview
+        open={open}
+        onClose={() => {
+          setOpen(false);
+        }}
+        path={path}
+        name={name}
+        pdf={pdf}
+      />
     </li>
-  );
-}
-
-/** A PDF the text does not refer to: an icon tile above the bubble (no preview here yet). */
-function PdfTile({ path }: { path: string }) {
-  const name = path.slice(path.lastIndexOf("/") + 1);
-  return (
-    <li
-      className="flex size-16 flex-col items-center justify-center gap-1 rounded-lg border bg-muted/40 text-muted-foreground"
-      data-testid="thread-attachment"
-      data-attachment-kind="pdf"
-      aria-label={`PDF ${name}`}
-    >
-      <FileText className="size-5" aria-hidden />
-      <span className="text-caption-sm font-medium">PDF</span>
-    </li>
-  );
-}
-
-/** A PDF the message sent, inline: icon and name (no preview here yet). */
-function PdfChip({ name }: { name: string }) {
-  return (
-    <span data-testid="thread-tag" data-tag-kind="pdf" aria-label={`PDF ${name}`} className={tagClass(false, TAG_ACCENT.file)}>
-      <FileText aria-hidden className="size-[1.17em] shrink-0" />
-      <span className="truncate">{middleTruncate(name)}</span>
-    </span>
   );
 }
 
@@ -160,8 +144,8 @@ function timeOf(ms: number | null): string {
 
 /**
  * A user message: a right-aligned bubble with the composer's tags (from the composer text
- * the item carries, lib/userMessage), attachments the text does not refer to as
- * thumbnails (a PDF as an icon tile) above it, and the time under it.
+ * the item carries, lib/userMessage), attachments (images and PDFs) the text does not
+ * refer to as tiles above it, and the time under it.
  */
 export const UserBubble = memo(function UserBubble({
   text,
@@ -175,13 +159,15 @@ export const UserBubble = memo(function UserBubble({
   createdAtMs: number | null;
 }) {
   const pieces = useMemo(() => parseUserMessage(text, composerText, attachments), [text, composerText, attachments]);
-  const inline = useMemo(() => inlineImagePaths(pieces), [pieces]);
+  const inline = useMemo(() => inlineAttachmentPaths(pieces), [pieces]);
   const extra = attachments.filter((p) => !inline.has(p));
   return (
     <div className="u" data-testid="thread-user">
       {extra.length > 0 && (
         <ul className="flex flex-wrap justify-end gap-2" aria-label="Attached files">
-          {extra.map((p) => (/\.pdf$/i.test(p) ? <PdfTile key={p} path={p} /> : <Thumbnail key={p} path={p} />))}
+          {extra.map((p) => (
+            <Thumbnail key={p} path={p} />
+          ))}
         </ul>
       )}
       {pieces.length > 0 && (
@@ -199,9 +185,8 @@ export const UserBubble = memo(function UserBubble({
               case "file":
                 return <FileChip key={i} repoId={p.repoId} path={p.path} />;
               case "image":
-                return <ImageChip key={i} name={p.name} path={p.path} />;
               case "pdf":
-                return <PdfChip key={i} name={p.name} />;
+                return <AttachmentChip key={i} name={p.name} path={p.path} pdf={p.kind === "pdf"} />;
             }
           })}
         </div>
