@@ -22,6 +22,8 @@ Feedback from daily use, decisions confirmed by Alex.
   footer the moment its `turn_end` arrives, whatever the user scrolled to or expanded
   meanwhile; a running turn is open. The footer's choice (`setTurnFolded`) still wins both
   ways. A running turn has no footer, so no choice can fold it.
+  (Since `thread-fold-4-pinned-fold.md` a turn folds as it ends only while the list is
+  pinned at the bottom; scrolled up, it stays open until the list pins again.)
 * Timeline (`components/thread/Timeline.tsx`): pinned, nothing new is needed; the row change
   re-runs `toBottom` and the ResizeObserver keeps the bottom while rows are re-measured, so
   the new footer lands just above the composer.

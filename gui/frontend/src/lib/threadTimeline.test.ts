@@ -175,6 +175,20 @@ describe("buildTurns / buildRows", () => {
     expect(shape(buildRows(buildTurns(items.slice(0, 4)), { fold: () => undefined, working: true }))).toEqual(["user:u1", "header(folded 1)", "final:a"]);
   });
 
+  it("a turn that ended while the list was scrolled up stays open (deferred); the user's choice still wins", () => {
+    const items = [user("u1"), tool("Bash"), text("a"), end("e1"), user("u2"), tool("Edit"), text("b"), end("e2")];
+    const turns = buildTurns(items);
+    const deferred = (e: string) => e === "e2";
+    // Only the deferred turn stays open: the header reads as finished (not live), its work shows.
+    expect(shape(buildRows(turns, { fold: () => undefined, deferred, working: false }))).toEqual(["user:u1", "header(folded 1)", "final:a", "user:u2", "header", "tool:Edit", "final:b"]);
+    // A click on its header folds it all the same.
+    expect(shape(buildRows(turns, { fold: (k) => (k === "u2" ? true : undefined), deferred, working: false })).slice(3)).toEqual(["user:u2", "header(folded 1)", "final:b"]);
+    // Re-pinned (no deferral): the default, folded.
+    expect(shape(buildRows(turns, { fold: () => undefined, deferred: () => false, working: false })).slice(3)).toEqual(["user:u2", "header(folded 1)", "final:b"]);
+    // A running turn has no turn_end to defer: open and live as before.
+    expect(shape(buildRows(buildTurns(items.slice(0, 7)), { fold: () => undefined, deferred, working: true })).slice(3)).toEqual(["user:u2", "live(u2,1)", "tool:Edit", "final:b"]);
+  });
+
   it("the live header becomes the finished one in place: same row key, same position", () => {
     const running = [user("u1"), user("u2"), tool("Bash"), tool("Edit"), text("a")];
     const live = buildRows(buildTurns(running), { fold: () => undefined, working: true });

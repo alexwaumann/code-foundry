@@ -1,8 +1,8 @@
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ArrowDown } from "lucide-react";
 import { buildRows, buildTurns, decodeTimelineKey, type TimelineRow } from "@/lib/threadTimeline";
-import { useTimelineKeys, useTurnFolds } from "@/stores/thread";
+import { deferTurnFolds, foldDeferredTurns, forgetTurnView, useDeferredTurns, useTimelineKeys, useTurnFolds, watchTurnEnds } from "@/stores/thread";
 import { KeepRowContext } from "./context";
 import { TimelineRowView } from "./rows";
 
@@ -35,8 +35,9 @@ function estimate(r: TimelineRow | undefined): number {
 function useRows(threadId: string, working: boolean): TimelineRow[] {
   const keys = useTimelineKeys(threadId);
   const folds = useTurnFolds(threadId);
+  const deferred = useDeferredTurns(threadId);
   const turns = useMemo(() => buildTurns(keys.map(decodeTimelineKey)), [keys]);
-  return useMemo(() => buildRows(turns, { fold: (k) => folds[k], working }), [turns, folds, working]);
+  return useMemo(() => buildRows(turns, { fold: (k) => folds[k], deferred: (e) => deferred[e] === true, working }), [turns, folds, deferred, working]);
 }
 
 /**
@@ -49,6 +50,11 @@ function useRows(threadId: string, working: boolean): TimelineRow[] {
  * measures the ones above, the browser clamping a shrinking list) never do, or the list
  * would stop short of the last rows (a finished turn's answer under the composer). A turn's
  * header keeps its place on screen when the user folds or unfolds the turn with it.
+ * A turn that ends folds only while the list is pinned; scrolled up, it stays open under
+ * the reader (its header turns from "Working" into "Worked for" in place) and folds once
+ * the list is pinned again (docs/notes/thread-fold-4-pinned-fold.md). Leaving the thread
+ * (this list unmounts) forgets its fold and expand choices: every finished turn is folded
+ * on the next visit.
  * `bottomInset` is the floating composer's height: the last row scrolls clear of it.
  * Away from the bottom, a "Jump to bottom" chip floats above the composer; it scrolls
  * down and pins the list again.
@@ -64,6 +70,28 @@ export function Timeline({ threadId, working, bottomInset }: { threadId: string;
     if (userInput.current !== Infinity) userInput.current = performance.now();
   }, []);
   const [atBottom, setAtBottom] = useState(true);
+  /** Pins the list (it follows the bottom again); the turns left open while it was scrolled up fold. */
+  const pin = useCallback(() => {
+    pinned.current = true;
+    foldDeferredTurns(threadId);
+  }, [threadId]);
+
+  // A turn's end arrives: scrolled up, the turn stays open (decided inside the store update
+  // that brings the turn_end, so the rows never render folded first).
+  useLayoutEffect(
+    () =>
+      watchTurnEnds(threadId, (ids) => {
+        if (!pinned.current) deferTurnFolds(threadId, ids);
+      }),
+    [threadId],
+  );
+  // Leaving the thread: the next visit shows every finished turn folded.
+  useEffect(
+    () => () => {
+      forgetTurnView(threadId);
+    },
+    [threadId],
+  );
 
   // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual returns unstable functions by design.
   const v = useVirtualizer({
@@ -120,16 +148,15 @@ export function Timeline({ threadId, working, bottomInset }: { threadId: string;
     [v],
   );
 
-  // Rows change (a turn folds when it ends, the user folds one, rows arrive). A header the
-  // user just clicked stays where it was on screen: its turn's work opens or closes below
-  // it, so the rows above it, and its start, do not move; the list unpins unless the fold
-  // left too little below to keep the place (then it sits at the bottom). Otherwise, pinned,
-  // the list follows the bottom. Scrolled up, the anchor row keeps its place; when it
-  // folded away (the user was reading the turn's work as it ended) the nearest row before
-  // it that is still there (the turn's header, or a steer or note under it) takes that
-  // place: the work folded up under the header, so the viewport never jumps to an
-  // unrelated part of the conversation. When that place is past the new bottom, the list
-  // pins again.
+  // Rows change (a turn folds when it ends pinned or when the list pins again, the user
+  // folds one, rows arrive). A header the user just clicked stays where it was on screen:
+  // its turn's work opens or closes below it, so the rows above it, and its start, do not
+  // move; the list unpins unless the fold left too little below to keep the place (then it
+  // sits at the bottom). Otherwise, pinned, the list follows the bottom. Scrolled up (a turn
+  // that ends then stays open), the anchor row keeps its place; when it went away (an
+  // explore row merging into a group) the nearest row before it that is still there takes
+  // that place, so the viewport never jumps to an unrelated part of the conversation. When
+  // that place is past the new bottom, the list pins again.
   useLayoutEffect(() => {
     const el = scrollRef.current;
     const a = anchor.current;
@@ -139,7 +166,8 @@ export function Timeline({ threadId, working, bottomInset }: { threadId: string;
     if (k && el && held) {
       const top = held.start - k.offset;
       const max = el.scrollHeight - el.clientHeight;
-      pinned.current = top >= max;
+      if (top >= max) pin();
+      else pinned.current = false;
       el.scrollTop = Math.min(top, max);
       setAtBottom(max - el.scrollTop < PIN_SLACK);
     } else if (!pinned.current && el && a && a.rows !== rows) {
@@ -156,13 +184,13 @@ export function Timeline({ threadId, working, bottomInset }: { threadId: string;
         const top = start - (own ? a.offset : Math.max(a.offset, 0));
         // Past the new bottom (the fold left too little below to keep the place): pin, so
         // the turn's answer ends up in view rather than wherever the clamp leaves it.
-        if (top > el.scrollHeight - el.clientHeight) pinned.current = true;
+        if (top > el.scrollHeight - el.clientHeight) pin();
         else el.scrollTop = top;
       }
     }
     if (pinned.current) toBottom();
     captureAnchor();
-  }, [rows, bottomInset, toBottom, v, captureAnchor]);
+  }, [rows, bottomInset, toBottom, v, captureAnchor, pin]);
 
   return (
     <KeepRowContext.Provider value={keepRow}>
@@ -189,7 +217,7 @@ export function Timeline({ threadId, working, bottomInset }: { threadId: string;
         onScroll={(e) => {
           const el = e.currentTarget;
           const bottom = el.scrollHeight - el.scrollTop - el.clientHeight < PIN_SLACK;
-          if (bottom) pinned.current = true;
+          if (bottom) pin();
           else if (performance.now() - userInput.current < USER_SCROLL_MS) pinned.current = false;
           else if (pinned.current) toBottom();
           if (bottom !== atBottom) setAtBottom(bottom);
@@ -231,7 +259,7 @@ export function Timeline({ threadId, working, bottomInset }: { threadId: string;
           e.preventDefault();
         }}
         onClick={() => {
-          pinned.current = true;
+          pin();
           toBottom();
         }}
       >

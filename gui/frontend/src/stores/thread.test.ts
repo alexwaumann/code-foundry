@@ -2,7 +2,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { McpStatusView } from "@/api/mcp";
 import type { SlashCommandView } from "@/api/slashCommands";
 import type { ThreadEventView, ThreadItemView, ThreadPendingView } from "@/api/thread";
-import { applyPendingEvent, applyThreadEvent, applyThreadEvents, KEPT_LOGS, sameItem, startThreadWatch, useThreadStore, WATCH_BATCH_MS, type ThreadLog } from "./thread";
+import {
+  applyPendingEvent,
+  applyThreadEvent,
+  applyThreadEvents,
+  applyWatchBatch,
+  deferTurnFolds,
+  foldDeferredTurns,
+  forgetTurnView,
+  KEPT_LOGS,
+  sameItem,
+  setRowExpanded,
+  setTurnFolded,
+  startThreadWatch,
+  useThreadStore,
+  WATCH_BATCH_MS,
+  watchTurnEnds,
+  type ThreadLog,
+} from "./thread";
 
 const watched = vi.hoisted(() => ({ events: [] as unknown[], opened: 0 }));
 vi.mock("@/api/thread", async (orig) => ({
@@ -282,5 +299,71 @@ describe("startThreadWatch", () => {
     watched.events = [];
     startThreadWatch("new")();
     expect(Object.keys(useThreadStore.getState().logs)).toContain(ids[ids.length - KEPT_LOGS]);
+  });
+});
+
+describe("turns left open while scrolled up (deferTurnFolds, watchTurnEnds)", () => {
+  const end = (id: string, ordinal: number) => text(id, ordinal, "", { kind: "turnEnd" });
+  const put = (threadId: string, ...evs: ThreadEventView[]) => {
+    applyWatchBatch(threadId, evs);
+  };
+  beforeEach(() => {
+    useThreadStore.setState({ logs: {}, pending: {}, watch: null, folds: {}, expanded: {}, deferred: {} });
+  });
+
+  it("reports a turn_end once, when it arrives, inside the store update that brings it", () => {
+    put("s", snapshot(1, [text("u", 1), end("e0", 2)]));
+    const got: string[][] = [];
+    const stop = watchTurnEnds("s", (ids) => {
+      // The log already has it: a deferral lands with it, before React renders the rows.
+      expect(useThreadStore.getState().logs.s?.byId[ids[0] ?? ""]).toBeDefined();
+      got.push(ids);
+    });
+    // Text deltas and other items report nothing; the end already there is not new.
+    put("s", { kind: "appended", threadId: "s", seq: 2, item: text("a", 3) });
+    put("s", { kind: "delta", threadId: "s", seq: 3, itemId: "a", ordinal: 3, field: "text", text: "hi" });
+    expect(got).toEqual([]);
+    put("s", { kind: "appended", threadId: "s", seq: 4, item: end("e1", 4) });
+    expect(got).toEqual([["e1"]]);
+    // A resync snapshot with the same ends reports nothing new; another thread's never.
+    put("s", snapshot(5, [text("u", 1), end("e0", 2), text("a", 3, "hi"), end("e1", 4)]));
+    put("t", snapshot(1, [end("x", 1)]));
+    expect(got).toEqual([["e1"]]);
+    stop();
+    put("s", { kind: "appended", threadId: "s", seq: 6, item: end("e2", 5) });
+    expect(got).toEqual([["e1"]]);
+  });
+
+  it("the first snapshot of a thread opening is not a turn ending", () => {
+    const got: string[][] = [];
+    const stop = watchTurnEnds("s", (ids) => got.push(ids));
+    put("s", snapshot(1, [text("u", 1), end("e0", 2)]));
+    expect(got).toEqual([]);
+    put("s", { kind: "appended", threadId: "s", seq: 2, item: end("e1", 3) });
+    expect(got).toEqual([["e1"]]);
+    stop();
+  });
+
+  it("deferred turns fold on re-pin; leaving the thread forgets its folds, expanded rows and deferrals", () => {
+    deferTurnFolds("s", ["e1"]);
+    deferTurnFolds("s", ["e2"]);
+    deferTurnFolds("t", ["x"]);
+    setTurnFolded("s", "u1", false);
+    setRowExpanded("s", "tool-1", true);
+    setTurnFolded("t", "v1", false);
+    expect(useThreadStore.getState().deferred).toEqual({ s: { e1: true, e2: true }, t: { x: true } });
+    foldDeferredTurns("s");
+    expect(useThreadStore.getState().deferred).toEqual({ t: { x: true } });
+    // Nothing deferred: no store update at all (it runs on every scroll event at the bottom).
+    const before = useThreadStore.getState();
+    foldDeferredTurns("s");
+    expect(useThreadStore.getState()).toBe(before);
+    forgetTurnView("s");
+    const s = useThreadStore.getState();
+    expect(s.folds).toEqual({ t: { v1: false } });
+    expect(s.expanded).toEqual({});
+    expect(s.deferred).toEqual({ t: { x: true } });
+    forgetTurnView("s");
+    expect(useThreadStore.getState()).toBe(s);
   });
 });

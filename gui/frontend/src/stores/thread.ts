@@ -56,13 +56,19 @@ export interface ThreadState {
   /** Rows the user expanded (true) or collapsed (false), by thread and row key; absent: the row's default. */
   expanded: Readonly<Record<string, Readonly<Record<string, boolean>>>>;
   /**
+   * Finished turns left open because they ended while the timeline was scrolled up, by
+   * thread and turn_end id (docs/notes/thread-fold-4-pinned-fold.md): they fold when the
+   * list is pinned at the bottom again.
+   */
+  deferred: Readonly<Record<string, Readonly<Record<string, true>>>>;
+  /**
    * Requests the user answered whose answer is on its way, by thread and request id: their
    * prompt leaves at once (threadActions respondThread) and comes back if the answer fails.
    */
   answering: Readonly<Record<string, Readonly<Record<string, true>>>>;
 }
 
-export const useThreadStore = create<ThreadState>()(() => ({ logs: {}, pending: {}, watch: null, folds: {}, expanded: {}, answering: {} }));
+export const useThreadStore = create<ThreadState>()(() => ({ logs: {}, pending: {}, watch: null, folds: {}, expanded: {}, deferred: {}, answering: {} }));
 
 function sameArray<T>(a: readonly T[], b: readonly T[], eq: (x: T, y: T) => boolean = Object.is): boolean {
   return a === b || (a.length === b.length && a.every((x, i) => eq(x, b[i] as T)));
@@ -320,12 +326,78 @@ export function setRowExpanded(threadId: string, rowKey: string, expanded: boole
   useThreadStore.setState((s) => ({ expanded: { ...s.expanded, [threadId]: { ...s.expanded[threadId], [rowKey]: expanded } } }));
 }
 
+/** Leaves the turns that just ended (their turn_end ids) open: the timeline is scrolled up (TimelineOptions.deferred). */
+export function deferTurnFolds(threadId: string, turnEndIds: readonly string[]): void {
+  if (turnEndIds.length === 0) return;
+  useThreadStore.setState((s) => {
+    const cur: Record<string, true> = { ...s.deferred[threadId] };
+    for (const id of turnEndIds) cur[id] = true;
+    return { deferred: { ...s.deferred, [threadId]: cur } };
+  });
+}
+
+/** The timeline is pinned at the bottom again: the turns left open fold (their default). No-op when there are none. */
+export function foldDeferredTurns(threadId: string): void {
+  useThreadStore.setState((s) => {
+    if (!s.deferred[threadId]) return s;
+    const { [threadId]: _gone, ...rest } = s.deferred;
+    return { deferred: rest };
+  });
+}
+
+/**
+ * The user left the thread (its timeline unmounted): its turns left open, its fold choices
+ * and its rows' expanded state go, so the next visit shows every finished turn folded.
+ */
+export function forgetTurnView(threadId: string): void {
+  useThreadStore.setState((s) => {
+    if (!(threadId in s.folds) && !(threadId in s.expanded) && !(threadId in s.deferred)) return s;
+    const { [threadId]: _f, ...folds } = s.folds;
+    const { [threadId]: _e, ...expanded } = s.expanded;
+    const { [threadId]: _d, ...deferred } = s.deferred;
+    return { folds, expanded, deferred };
+  });
+}
+
+/** The turn_end item ids of a log. */
+function turnEndIds(log: ThreadLog): string[] {
+  return log.order.filter((id) => log.byId[id]?.kind === "turnEnd");
+}
+
+/**
+ * Calls `onEnd` with the turn_end ids that arrive in a thread's log from now on (a turn
+ * ended), synchronously inside the store update that brings them, so before React renders
+ * the rows they change: the timeline decides there whether the turn folds or stays open
+ * (deferTurnFolds). The ends already in the log, and those in the log's first snapshot
+ * when there was none yet (the thread opening), are not new. Returns the unsubscribe.
+ */
+export function watchTurnEnds(threadId: string, onEnd: (turnEndIds: string[]) => void): () => void {
+  const first = useThreadStore.getState().logs[threadId];
+  let order = first?.order;
+  const seen = new Set(first ? turnEndIds(first) : []);
+  return useThreadStore.subscribe((s) => {
+    const log = s.logs[threadId];
+    if (!log || log.order === order) return;
+    const baseline = order === undefined;
+    order = log.order;
+    const fresh = turnEndIds(log).filter((id) => !seen.has(id));
+    for (const id of fresh) seen.add(id);
+    if (!baseline && fresh.length > 0) onEnd(fresh);
+  });
+}
+
 const NO_FOLDS: Readonly<Record<string, boolean>> = {};
+const NO_DEFERRED: Readonly<Record<string, true>> = {};
 const NO_PENDING: readonly ThreadPendingView[] = [];
 
 /** The user's fold choices for a thread's turns. */
 export function useTurnFolds(threadId: string): Readonly<Record<string, boolean>> {
   return useThreadStore((s) => s.folds[threadId] ?? NO_FOLDS);
+}
+
+/** A thread's turns left open because they ended while its timeline was scrolled up, by turn_end id. */
+export function useDeferredTurns(threadId: string): Readonly<Record<string, true>> {
+  return useThreadStore((s) => s.deferred[threadId] ?? NO_DEFERRED);
 }
 
 /** Whether a row is expanded: the user's choice, else `fallback`. */

@@ -260,31 +260,66 @@ for (const scheme of ["dark", "light"] as const) {
       }
     });
 
-    test("scrolled up, new content does not move the list and the fold on end keeps the user's place", async ({ page }) => {
+    test("scrolled up when the turn ends: it stays open in place, its header now Worked for; Jump to bottom folds it", async ({ page }) => {
       await openThread(page, "streaming", scheme);
       const timeline = page.getByTestId("thread-timeline");
       await expect(timeline).toHaveAttribute("data-at-bottom", "true");
-      // The user's wheel unpins: the streamed text no longer moves the list.
-      const box = await timeline.boundingBox();
-      await page.mouse.move((box?.x ?? 0) + 200, (box?.y ?? 0) + 200);
-      await page.mouse.wheel(0, -400);
+      // The user's wheel unpins (up to the running turn's header, into its work): the
+      // streamed text no longer moves the list.
+      const live = pane(page).locator('[data-testid="thread-turn-header"][data-live]');
+      await wheelUpTo(page, live);
       await expect(timeline).not.toHaveAttribute("data-at-bottom", "true");
       const top = await timeline.evaluate((el) => el.scrollTop);
       await mockPost("thread/delta?text=" + encodeURIComponent("ewDecision,\n"));
       await expect(pane(page).locator('[data-testid="thread-text"][data-streaming]')).toContainText("ReviewState: pr.ReviewDecision,");
       expect(await timeline.evaluate((el) => el.scrollTop)).toBe(top);
 
-      // The turn ends and folds under the user's eyes: the turn's message they scrolled
-      // to stays where it was instead of the list jumping.
-      const bubble = page.getByTestId("thread-user").last();
-      const before = await bubble.boundingBox();
+      // The turn ends: nothing folds under the reader. The header turns into the finished
+      // one in place (same element, same y) and the work row under it stays where it was.
+      const element = await live.elementHandle();
+      const liveRow = live.locator("xpath=ancestor::*[@data-index][1]");
+      const work = pane(page).locator(`[data-index="${(await liveRow.getAttribute("data-index")) ?? ""}"] + [data-index]`);
+      await expect(work).not.toHaveAttribute("data-row-type", "user");
+      const y = async (l: Locator) => Math.round((await l.boundingBox())?.y ?? -1);
+      const before = { header: await y(liveRow), work: await y(work) };
+      // No flash: the header is never folded on the way (decided before the rows render).
+      await element.evaluate((el) => {
+        const w = window as unknown as { foldedSeen: boolean };
+        w.foldedSeen = false;
+        new MutationObserver(() => {
+          if (el.getAttribute("data-folded") === "true") w.foldedSeen = true;
+        }).observe(el, { attributes: true });
+      });
       await mockPost("thread/finish");
-      await expect(headers(page).last()).toHaveAttribute("data-folded", "true");
-      await expect.poll(async () => Math.round((await bubble.boundingBox())?.y ?? -1)).toBe(Math.round(before?.y ?? 0));
+      const header = headers(page).last();
+      await expect(header).toContainText(/^Worked for .*·12 steps·\$0\.04·Opus 4\.8/);
+      await expect(header).not.toHaveAttribute("data-folded", "true");
+      await expect(header.locator("button.fold")).toHaveAttribute("aria-expanded", "true");
+      expect(await element.evaluate((el) => el.isConnected && !el.hasAttribute("data-live"))).toBe(true);
+      await expect(pane(page).locator('[data-testid="thread-text"][data-streaming]')).toHaveCount(0);
+      await expect.poll(async () => [await y(header.locator("xpath=ancestor::*[@data-index][1]")), await y(work)]).toEqual([before.header, before.work]);
       await expect(timeline).not.toHaveAttribute("data-at-bottom", "true");
+      expect(await page.evaluate(() => (window as unknown as { foldedSeen: boolean }).foldedSeen)).toBe(false);
+      await shot(page, `thread-open-on-end-${scheme}`);
+
+      // Jump to bottom pins the list again: the turn folds there, its header and answer in view.
+      await page.getByTestId("thread-jump-bottom").click();
+      await expect(header).toHaveAttribute("data-folded", "true");
+      await expect(pane(page).locator('[data-tool="Edit"]')).toHaveCount(0);
+      await expect(timeline).toHaveAttribute("data-at-bottom", "true");
+      const answer = pane(page).locator('[data-testid="thread-text"][data-final]').last();
+      await expect
+        .poll(async () => {
+          const h = await header.boundingBox();
+          const a = await answer.boundingBox();
+          const t = await timeline.boundingBox();
+          const composer = await page.getByTestId("thread-composer").boundingBox();
+          return !!h && !!a && !!t && !!composer && h.y >= t.y && h.y < a.y && a.y + a.height <= composer.y;
+        })
+        .toBe(true);
     });
 
-    test("reading the answer when the turn ends: the work above it folds away and the answer stays put", async ({ page }) => {
+    test("reading the answer when the turn ends: nothing moves; scrolling back to the bottom folds the work", async ({ page }) => {
       await openThread(page, "streaming", scheme);
       const timeline = page.getByTestId("thread-timeline");
       // A long answer, so the user reads it scrolled into its middle.
@@ -300,38 +335,32 @@ for (const scheme of ["dark", "light"] as const) {
       const before = await answer.boundingBox();
       // The answer starts above the viewport: the work rows above it are off screen.
       expect((before?.y ?? 0) < (box?.y ?? 0)).toBe(true);
+      const height = await timeline.evaluate((el) => el.scrollHeight);
       const text = pane(page).locator('[data-testid="thread-text"][data-final]').last();
       await mockPost("thread/finish");
-      await expect(headers(page).last()).toHaveAttribute("data-folded", "true");
-      await expect(pane(page).locator('[data-tool="Edit"]')).toHaveCount(0);
+      await expect(answer).toHaveCount(0);
+      await expect(text).toContainText("I have not pushed.");
       await expect.poll(async () => Math.round((await text.boundingBox())?.y ?? -1)).toBe(Math.round(before?.y ?? 0));
       await expect(timeline).not.toHaveAttribute("data-at-bottom", "true");
-    });
+      // Still open: the list's height grew by the answer's rest, it lost no work rows.
+      expect(await timeline.evaluate((el) => el.scrollHeight)).toBeGreaterThanOrEqual(height);
 
-    test("scrolled into the turn's work when it ends: the header that replaces it is past the new bottom, so the list pins", async ({ page }) => {
-      await openThread(page, "streaming", scheme);
-      const timeline = page.getByTestId("thread-timeline");
-      const box = await timeline.boundingBox();
-      await page.mouse.move((box?.x ?? 0) + 200, (box?.y ?? 0) + 200);
-      await page.mouse.wheel(0, -200);
-      await expect(timeline).not.toHaveAttribute("data-at-bottom", "true");
-      await mockPost("thread/finish");
-      const header = headers(page).last();
-      await expect(header).toHaveAttribute("data-folded", "true");
+      // The user scrolls back down: at the bottom the list pins and the turn folds.
+      for (let i = 0; i < 40 && (await timeline.getAttribute("data-at-bottom")) !== "true"; i++) {
+        await page.mouse.wheel(0, 400);
+        await page.waitForTimeout(50);
+      }
       await expect(timeline).toHaveAttribute("data-at-bottom", "true");
-      await expect
-        .poll(async () => {
-          const h = await header.boundingBox();
-          const t = await timeline.boundingBox();
-          const composer = await page.getByTestId("thread-composer").boundingBox();
-          return !!h && !!t && !!composer && h.y >= t.y && h.y + h.height <= composer.y;
-        })
-        .toBe(true);
+      const header = headers(page).last();
+      await expect(header).toContainText(/·\$0\.04·Opus 4\.8/);
+      await expect(header).toHaveAttribute("data-folded", "true");
+      await expect.poll(async () => timeline.evaluate((el) => el.scrollHeight)).toBeLessThan(height);
+      await expect(timeline).toHaveAttribute("data-at-bottom", "true");
     });
   });
 }
 
-test("reading deep into an open tool row when the turn ends: the work folds up under the header, which takes the top", async ({ page }) => {
+test("reading deep into an open tool row when the turn ends: the row stays open where it is until Jump to bottom folds the turn", async ({ page }) => {
   await openThread(page, "streaming");
   const timeline = page.getByTestId("thread-timeline");
   // A long answer below the work, so there is room to keep the place.
@@ -358,12 +387,51 @@ test("reading deep into an open tool row when the turn ends: the work folds up u
     el.scrollTop += r.getBoundingClientRect().top - el.getBoundingClientRect().top + 150;
   });
   await page.waitForTimeout(100);
+  const before = Math.round(((await row.boundingBox())?.y ?? 0) - (box?.y ?? 0));
   await mockPost("thread/finish");
-  await expect(headers(page).last()).toHaveAttribute("data-folded", "true");
-  await expect(pane(page).locator('[data-tool="Edit"]')).toHaveCount(0);
-  const header = headers(page).last().locator("xpath=ancestor::*[@data-index][1]");
-  await expect.poll(async () => Math.round(((await header.boundingBox())?.y ?? -1) - (box?.y ?? 0))).toBe(0);
+  await expect(pane(page).locator('[data-testid="thread-text"][data-streaming]')).toHaveCount(0);
+  // The row the user reads stays open, where it was.
+  await expect(edit.getByTestId("thread-tool")).toHaveAttribute("aria-expanded", "true");
+  await expect.poll(async () => Math.round(((await row.boundingBox())?.y ?? -1) - (box?.y ?? 0))).toBe(before);
   await expect(timeline).not.toHaveAttribute("data-at-bottom", "true");
+  await page.getByTestId("thread-jump-bottom").click();
+  await expect(timeline).toHaveAttribute("data-at-bottom", "true");
+  await expect(pane(page).locator('[data-tool="Edit"]')).toHaveCount(0);
+  await expect(headers(page).last()).toHaveAttribute("data-folded", "true");
+});
+
+test("leaving a thread forgets how it was folded: back on it, every finished turn is folded and its rows closed", async ({ page }) => {
+  await openThread(page, "streaming");
+  const timeline = page.getByTestId("thread-timeline");
+  // Scrolled up into the running turn (the user's wheel, so the list unpins even when the
+  // Edit row is already on screen), the user opens its Edit row; the turn ends (open).
+  const box = await timeline.boundingBox();
+  await page.mouse.move((box?.x ?? 0) + 200, (box?.y ?? 0) + 200);
+  await page.mouse.wheel(0, -200);
+  await wheelUpTo(page, pane(page).locator('[data-tool="Edit"]'));
+  await expect(timeline).not.toHaveAttribute("data-at-bottom", "true");
+  const editButton = () => pane(page).locator('[data-tool="Edit"]').getByTestId("thread-tool");
+  await editButton().click();
+  await expect(editButton()).toHaveAttribute("aria-expanded", "true");
+  await mockPost("thread/finish");
+  await expect(page.getByTestId("thread-working")).toHaveCount(0);
+  await expect(editButton()).toHaveAttribute("aria-expanded", "true");
+
+  await row(page, "s:s-2").click();
+  await expect(pane(page)).toHaveAttribute("data-thread-id", "s-2");
+  await row(page, "s:s-r1").click();
+  await expect(pane(page)).toHaveAttribute("data-thread-id", "s-r1");
+  // Back at the bottom with the turn folded.
+  await expect(timeline).toHaveAttribute("data-at-bottom", "true");
+  const header = headers(page).last();
+  await expect(header).toContainText(/·\$0\.04·Opus 4\.8/);
+  await expect(header).toHaveAttribute("data-folded", "true");
+  await expect(pane(page).locator('[data-tool="Edit"]')).toHaveCount(0);
+  // Unfolded again, the Edit row the user had opened is closed.
+  await header.locator("button.fold").click();
+  await expect(header).not.toHaveAttribute("data-folded", "true");
+  await wheelUpTo(page, pane(page).locator('[data-tool="Edit"]'));
+  await expect(editButton()).toHaveAttribute("aria-expanded", "false");
 });
 
 test("a click on a header folds or unfolds its turn without moving the header on screen", async ({ page }) => {
