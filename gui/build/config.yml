@@ -8,7 +8,7 @@ info:
   companyName: "Alejandro Waumann" # The name of the company
   productName: "Code Foundry" # The name of the application
   productIdentifier: "dev.alexwaumann.codefoundry" # The unique product identifier
-  description: "Supervise fleets of Claude Code sessions" # The application description
+  description: "Supervise fleets of Claude Code threads" # The application description
   copyright: "(c) 2026 Alejandro Waumann" # Copyright text
   comments: "" # Comments
   version: "0.0.0" # The application version; `make package VERSION=vX.Y.Z` stamps the bundle

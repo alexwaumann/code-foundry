@@ -9,10 +9,14 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 )
 
 // StderrTail is how much of the process's stderr is kept for LastError.
 const StderrTail = 16 << 10
+
+// stderrSettle is how long Done waits for stderr to reach EOF after the process exited.
+const stderrSettle = 200 * time.Millisecond
 
 // Spec describes a CLI process to start.
 type Spec struct {
@@ -37,8 +41,9 @@ type Process struct {
 	exitCode int
 	waitErr  error
 
-	errMu  sync.Mutex
-	stderr []byte
+	errMu      sync.Mutex
+	stderr     []byte
+	stderrDone chan struct{} // closed when readStderr saw EOF
 }
 
 // Start starts the process in its own process group and returns once it runs.
@@ -76,13 +81,20 @@ func Start(spec Spec) (*Process, error) {
 	}
 	_ = pw.Close()
 	_ = ew.Close()
-	p := &Process{cmd: cmd, pr: pr, done: make(chan struct{})}
+	p := &Process{cmd: cmd, pr: pr, done: make(chan struct{}), stderrDone: make(chan struct{})}
 	p.conn = NewConn(pr, stdin, spec.Conn)
 	go p.readStderr(er)
 	go func() {
 		err := cmd.Wait()
 		p.waitErr = err
 		p.exitCode = exitCode(cmd, err)
+		// Let the stderr reader catch up first, so LastStderrLine after Done has the
+		// line a crashing process wrote on its way out. Bounded: a grandchild holding
+		// the pipe open must not delay the exit.
+		select {
+		case <-p.stderrDone:
+		case <-time.After(stderrSettle):
+		}
 		close(p.done)
 	}()
 	return p, nil
@@ -99,6 +111,7 @@ func exitCode(cmd *exec.Cmd, err error) int {
 }
 
 func (p *Process) readStderr(r *os.File) {
+	defer close(p.stderrDone)
 	defer func() { _ = r.Close() }()
 	buf := make([]byte, 4096)
 	for {

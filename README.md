@@ -1,7 +1,7 @@
 # Code Foundry
 
-A macOS desktop app for running fleets of Claude Code sessions across git worktrees.
-One daemon owns the sessions; the app and the `code-foundry` CLI are clients of it.
+A macOS desktop app for running fleets of Claude Code threads across git worktrees.
+One daemon owns the threads; the app and the `code-foundry` CLI are clients of it.
 
 ## Install
 

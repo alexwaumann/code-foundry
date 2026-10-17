@@ -28,7 +28,7 @@ Three processes, one protocol.
 * **Daemon** (`code-foundry daemon`) owns PTYs and terminal emulation (libghostty-vt) for
   shells, the Claude session lifecycle (claude -p over stream-json) and its status, git
   and GitHub workers, SQLite, and the command registry. It never renders. It outlives the window: closing or crashing the GUI
-  does not kill sessions.
+  does not kill threads.
 * **GUI** is a Wails v3 shell hosting a React frontend. The frontend talks to the daemon
   *directly* with Connect-Web over a loopback HTTP listener. The Go host process in Wails is
   deliberately thin: window, menu, native dialogs, and injecting the daemon's address and
@@ -37,16 +37,16 @@ Three processes, one protocol.
   and relaunches itself when the daemon asks (`app.relaunch` at once, `app.restart` once
   the daemon has exited). It sets the Dock badge, bounces the Dock icon and plays the
   alert sound (NSSound, an embedded WAV) when the frontend asks (`SetBadge`, `Bounce`,
-  `PlaySound`; the frontend's `stores/dockAlerts.ts` decides from the sessions and the
+  `PlaySound`; the frontend's `stores/dockAlerts.ts` decides from the threads and the
   `notifications.*` settings, and `notifications.test` previews the sound through a
   `PlayAlertSound` UI intent; no notification banners for a bare executable,
   `docs/notes/dock-alerts.md`). It paints the window behind the page in the active
   theme's sheet and keeps those colours for the next launch (`SetWindowBackground`,
   `window-background.json` in the config home; `docs/notes/theme-engine-3-settings.md`).
   No business logic lives in the Wails host.
-* **CLI** subcommands (`code-foundry new-session --repo foo`, `code-foundry focus <id>`, …)
+* **CLI** subcommands (`code-foundry thread new --repo foo`, `code-foundry focus <id>`, …)
   are clients of the same daemon API. A Claude Code session running inside the app can call
-  the CLI, so sessions can orchestrate other sessions.
+  the CLI, so threads can orchestrate other threads.
 
 Two binaries from one version stamp, installed side by side as plain executables (no
 `.app` bundle; managed Macs often block unsigned bundles) in `~/.code-foundry/app`:
@@ -83,7 +83,7 @@ internal/
   command/                 command registry: name, arg schema, when-predicate, handler
   store/
     terminal/              PTY + libghostty-vt actor per terminal; output tee; snapshots
-    session/               Claude threads: claude -p over stream-json, items, naming, status, resume
+    thread/                threads: claude -p over stream-json, items, naming, status, resume
     claudestream/          the stream-json / control protocol client (pure Go)
     repo/                  registered repos, worktrees, git status, filesystem watcher
     gh/                    GitHub GraphQL/REST polling over HTTP (token via gh), PR/CI cache
@@ -123,10 +123,10 @@ Transport:
 |---|---|---|
 | CLI, Wails host | Unix socket `$CONFIG/daemon.sock` | filesystem permissions (0600) |
 | Frontend | `http://127.0.0.1:<random port>` | bearer token from `$CONFIG/daemon.token` (0600) |
-| CLI inside a session | `CODE_FOUNDRY_ENDPOINT` (the loopback listener) | `CODE_FOUNDRY_TOKEN`; both set in every session's env, never auto-starts a daemon |
+| CLI inside a thread | `CODE_FOUNDRY_ENDPOINT` (the loopback listener) | `CODE_FOUNDRY_TOKEN`; both set in every thread's Claude env, never auto-starts a daemon |
 
-Every Claude process also gets `CODE_FOUNDRY_SESSION=<its thread id>`, which the CLI sends
-as its default `--context-session`: an agent's `code-foundry terminal new` or `action run`
+Every Claude process also gets `CODE_FOUNDRY_THREAD=<its thread id>`, which the CLI sends
+as its default `--context-thread`: an agent's `code-foundry terminal new` or `action run`
 lands in its own thread's bottom panel (`docs/notes/actions-1-daemon.md`).
 
 Both listeners serve the same handlers. The port and token are written by the daemon on
@@ -134,12 +134,12 @@ start; the Wails host reads them and injects them into the page before load.
 
 Services (v1):
 
-* `SessionService` — Create, Fork, List, Get, Rename, Remove, RunIn,
+* `ThreadService`, the lifecycle — Create, Fork, List, Get, Rename, Remove, RunIn,
   Pin (the user's pin, persisted; `docs/notes/workspaces-4-sidebar.md`), Archive (close,
   remove the thread's shells, unpin, stamp `archived_at`; pin and send
   unarchive; `docs/notes/archive-threads-1-daemon.md`), Snooze (close, remove the
   thread's shells, unpin, unarchive, set `snoozed_until`; the store wakes it on the wall
-  clock into NEEDS_ATTENTION "snooze ended"; `docs/notes/snooze-threads-1-daemon.md`), Watch (server stream), StageAttachment (images the first prompt refers to).
+  clock into NEEDS_ATTENTION "snooze ended"; `docs/notes/snooze-threads-1-daemon.md`), Watch (server stream of every thread), StageAttachment (images the first prompt refers to).
   Close and Reconnect remain in the proto for compatibility; no command calls them: the
   daemon starts a thread's process when a message is sent and stops it once the thread
   has idled at its prompt past its prompt cache expiry
@@ -153,7 +153,7 @@ Services (v1):
   `docs/notes/workspaces-2-launch.md`. Every thread runs headless (`claude -p` over
   stream-json, no terminal; the conversation is ThreadService items). The terminal
   thread mode (Claude's own interface in a PTY) was removed on 2026-10-12
-  (`docs/notes/rendered-only.md`). A session carries lifecycle `state` (starting,
+  (`docs/notes/rendered-only.md`). A thread carries lifecycle `state` (starting,
   connected, closing, disconnected; the daemon's business, internal to clients: the GUI
   never shows it, `docs/notes/hide-connection-state.md`) and
   `status` (busy, idle, needs-attention; error when the process ended mid-turn or did
@@ -166,8 +166,8 @@ Services (v1):
   allow for session, deny with a reason, answers), Interrupt, SetModel,
   SetPermissionMode, SetEffort (Claude has no live effort switch: the runner restarts
   the process with `--resume` and the new `--effort`, at once when idle, else when the
-  running turn ends, `Session.effort_pending` meanwhile; the thread stays connected; the
-  new process gets the session's allow-for-session grants again as `--allowedTools` /
+  running turn ends, `Thread.effort_pending` meanwhile; the thread stays connected; the
+  new process gets the thread's allow-for-session grants again as `--allowedTools` /
   `--add-dir`; a stopped thread's model, mode and effort changes only go to its row), McpStatus and McpReconnect (the thread's MCP servers as Claude last
   reported them, checked at the start of every turn, kept and persisted while the thread
   is stopped; a refresh or reconnect starts a stopped thread without a prompt; Watch carries
@@ -215,10 +215,10 @@ Services (v1):
   is a result (state FAILED, output), not an RPC error. The GUI reaches it only through
   the git.*, pr.*, worktree.open.editor, worktree.reveal and view.open.url commands.
 * `CommandService` — List(context) → available commands with their arg schemas; Invoke.
-* `UiService` — WatchIntents (server stream: focus session, open palette, …); Emit (from
+* `UiService` — WatchIntents (server stream: focus thread, open palette, …); Emit (from
   CLI).
 * `EventService` — Watch: one server stream that multiplexes every store's events and UI
-  intents (sources repo, workspace, terminal, session, thread, gh, gitops, settings,
+  intents (sources repo, workspace, terminal, thread list, thread, gh, gitops, settings,
   update, action, ui; the thread source carries threads' pending requests only, a
   snapshot then changes, never items; filterable). On connect it sends each source's snapshot in that order, then live events; a source that drops events for a
   slow client resends only its own snapshot. This is the GUI's only long-lived sync
@@ -291,7 +291,7 @@ PTY (creack/pty) ──reader goroutine──► tee ──► libghostty-vt (fe
   With no attachment, size is the last known size.
 * Labels are opaque to the store; their contract lives in `internal/termlabel`: `kind`
   (`shell` on a shell `terminal.new` started, `action` on an action run in a terminal),
-  `session` (the owning thread), `repo` and `worktree` (the owning worktree), and on
+  `thread` (the owning thread), `repo` and `worktree` (the owning worktree), and on
   action terminals `action`, `action.name` and `action.run`. `terminal.new`
   gives every shell an owner (thread, else worktree) and refuses a cwd outside every
   registered project. The shell reaper (`internal/daemon/shells.go`) removes a shell when
@@ -300,14 +300,14 @@ PTY (creack/pty) ──reader goroutine──► tee ──► libghostty-vt (fe
   (the user reads its output; the GUI closes it), but goes with its owner like a shell
   (`docs/notes/actions-1-daemon.md`).
 
-## 6. Session store
+## 6. Thread store
 
 Owns the Claude processes. It uses the terminal store only to reap a thread's shells.
 
 * Spawns `claude -p` over stream-json in a worktree with the chosen
   model/effort/permission-mode flags through `internal/claudestream` and sends the first
   prompt as the first user message (with image blocks; see below). It records the Claude
-  session id (from `~/.claude/projects/<slug>/*.jsonl`) so dead sessions can be resumed
+  session id (from `~/.claude/projects/<slug>/*.jsonl`) so dead threads can be resumed
   with `claude --resume`.
 * A thread has at most one owner: its workspace when `workspace_id` is set, else its
   project when `repo_id` is set, else none: a thread without a project runs in the home
@@ -317,7 +317,7 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   store and adds `--add-dir` for each other member,
   `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1`, and one static
   `--append-system-prompt` line pointing at `code-foundry workspace members`.
-  `SessionService.RunIn` moves a workspace thread to another member with the control
+  `ThreadService.RunIn` moves a workspace thread to another member with the control
   protocol's `set_cwd` once it is idle (`docs/notes/workspaces-2-launch.md`, superseded
   on the typing detail by `docs/notes/rendered-only.md`).
 * **Status** (busy / idle / needs-attention) comes from the stream, never from a screen:
@@ -348,23 +348,23 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   read at spawn; unset when the totals do not fit) and the model that replied
   (`docs/notes/rendered-threads-4-optin.md`). Each result also records the thread's
   context size (the last top-level response's tokens) and when, persisted; the cache
-  expiry is that plus the `sessions.cache_ttl_seconds` setting, and the composer says
+  expiry is that plus the `threads.cache_ttl_seconds` setting, and the composer says
   when the next message re-reads a cold context
   (`docs/notes/rendered-threads-cold-cache.md`).
 * Auto-naming via an independent `claude -p` call producing a short natural title
   ("Fix the login redirect"); a new worktree's branch is `cf/` + the title's slug
   (`docs/notes/natural-thread-names.md`). Once a thread whose worktree Create made has
   started, `Options.WorktreeCreated` hands the worktree to the daemon, which runs the
-  project's on-worktree-create actions in the background (the session store does not
+  project's on-worktree-create actions in the background (the thread store does not
   know about actions; `docs/notes/actions-1-daemon.md`).
 * **Linked pull requests** come from Claude's own `pr-link` transcript records: every
-  distinct URL in first-seen order, persisted in `session_pull_requests`, backfilled from
+  distinct URL in first-seen order, persisted in `thread_pull_requests`, backfilled from
   the transcript's history when a thread is resumed (`docs/notes/linked-prs.md`).
 * **Token usage** is a pure fold over assistant records (each request once), per
   (model, tier, speed, UTC day), summed over the thread's sources: every transcript it
   used (`/clear` starts a new one) and every subagent run under them, followed from the
-  transcripts' own Agent tool records. The total is persisted in `session_usage`, each
-  source in `session_source_usage`, runs in `session_agent_runs`; values are only ever
+  transcripts' own Agent tool records. The total is persisted in `thread_usage`, each
+  source in `thread_source_usage`, runs in `thread_agent_runs`; values are only ever
   replaced by complete folds (a resume rescans every source from byte zero). Removing a
   thread adds its buckets to `usage_retired`. Cost is priced at read time by
   `internal/pricing` (`docs/notes/session-usage.md`).
@@ -374,7 +374,7 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   Agent call stays running until the run ends, which adds a note item. Runs still
   running when their process ends fail: subagents run inside it
   (`docs/notes/agents-1-daemon.md`).
-* Persists session metadata in SQLite so the sidebar can show resumable sessions after a
+* Persists thread metadata in SQLite so the sidebar can show resumable threads after a
   daemon restart. v1 does not keep Claude processes alive across daemon restarts.
 
 ## 7. Command registry
@@ -383,7 +383,7 @@ Every user-facing action is a `command.Command`:
 
 ```go
 type Command struct {
-    Name    string            // "session.rename"
+    Name    string            // "thread.rename"
     Title   string            // "Rename Thread"
     Args    ArgSchema         // for CLI flags and palette prompts
     When    func(Context) bool // context-aware availability
@@ -391,8 +391,8 @@ type Command struct {
 }
 ```
 
-`Context` is what the caller is looking at: active session, active repo/worktree, active
-view, and the workspace that owns the active thread or composer (so `session.run-in` is
+`Context` is what the caller is looking at: active thread, active repo/worktree, active
+view, and the workspace that owns the active thread or composer (so `thread.run-in` is
 offered for workspace threads only; the `thread.*` commands,
 send/respond/interrupt/items/set-model/set-mode/set-effort/mcp/mcp-reconnect/commands/agents, are
 offered whenever a thread is active). The GUI sends its context with `List` and `Invoke`;
@@ -403,7 +403,7 @@ switch.
 Pull request commands: the detail panel's actions (`pr.merge`, `pr.revert`,
 `pr.review.request`, `pr.refresh`; docs/notes/gh-pr-detail.md; `pr.review`, `pr.comment`;
 docs/notes/pr-review-submit-1-daemon.md, with the panel's Review menu in
-docs/notes/pr-review-submit-2-gui.md) and the session starters `pr.ask`,
+docs/notes/pr-review-submit-2-gui.md) and the thread starters `pr.ask`,
 `pr.explain`, `pr.fix.findings`, which pick or create a worktree and type a prompt built
 from the pull request (docs/notes/pr-thread-commands.md).
 
@@ -447,8 +447,8 @@ from the pull request (docs/notes/pr-thread-commands.md).
   --run` (the daemon types the line once the shell has printed its prompt;
   `docs/notes/code-block-actions.md`).
 * Only the visible thread is watched and only the visible shell is attached. Switching
-  sessions (or bottom panel tabs) ends the old stream and opens the new one. Background
-  sessions cost nothing in the frontend. Watching is also how the daemon knows a thread
+  threads (or bottom panel tabs) ends the old stream and opens the new one. Background
+  threads cost nothing in the frontend. Watching is also how the daemon knows a thread
   is being looked at: while a thread has a Watch subscriber, finished turns count as
   seen (`docs/notes/phase2-integration.md` describes the same rule for the old Attach).
 * Layout: a draggable title strip under the hidden-inset traffic lights, sidebar (Pull
@@ -470,7 +470,7 @@ from the pull request (docs/notes/pr-thread-commands.md).
   page each have a bottom terminal panel (cmd+j, `view.bottom.toggle`; opening a thread's
   empty one starts a shell, and a panel hides when its last shell goes:
   `docs/notes/bottom-panel-autoshell.md`), the only place shells show: tabs for the shells it owns, derived from the terminal list by the owner
-  labels (`session` for a thread's, none for the Projects page's worktree shells). Every
+  labels (`thread` for a thread's, none for the Projects page's worktree shells). Every
   way to start one lands there: cmd+t and the palette's New Terminal, a thread row's New
   terminal here, the Projects page's rows, a workspace member (in a thread's side panel
   the thread owns it), the panel's own "+", a code block's Run in terminal, and `terminal new` on the CLI; the
@@ -479,7 +479,7 @@ from the pull request (docs/notes/pr-thread-commands.md).
   the content is a rounded pane on it (see `docs/notes/phase3-ui-panes.md`). Each
   selection can open a side panel right of the content: a second pane with tabs whose
   bodies come from the surface registry (`src/surfaces`, `docs/notes/side-panel.md`):
-  Files and Diff (placeholders), Pull request, whose menu starts sessions about the pull
+  Files and Diff (placeholders), Pull request, whose menu starts threads about the pull
   request through `pr.ask`, `pr.explain` and `pr.fix.findings`, Workspace (a workspace
   thread's members with their git, PR and CI state, add/remove, Run in; opened by W,
   `view.panel.workspace`, the sidebar's workspace badge, the thread header and the
