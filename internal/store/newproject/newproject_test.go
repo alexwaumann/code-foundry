@@ -14,78 +14,78 @@ import (
 	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/store/clone"
-	"github.com/alexwaumann/code-foundry/internal/store/repo"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
 )
 
 // fakeRepos is an in-memory Repos: Register adds a git project at the path, Refresh
 // applies onRefresh (what the reconcile would discover).
-type fakeRepos struct {
+type fakeProjects struct {
 	mu           sync.Mutex
-	repos        map[string]repo.Repo
+	projects     map[string]project.Project
 	registered   []string
 	refreshed    []string
 	unregistered []string
 	regErr       error
 	unregErr     error
-	onRefresh    func(*repo.Repo)
+	onRefresh    func(*project.Project)
 }
 
-func newFakeRepos(rs ...repo.Repo) *fakeRepos {
-	f := &fakeRepos{repos: map[string]repo.Repo{}}
+func newFakeProjects(rs ...project.Project) *fakeProjects {
+	f := &fakeProjects{projects: map[string]project.Project{}}
 	for _, r := range rs {
-		f.repos[r.ID] = r
+		f.projects[r.ID] = r
 	}
 	return f
 }
 
-func (f *fakeRepos) Snapshot() *repo.Snapshot {
+func (f *fakeProjects) Snapshot() *project.Snapshot {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	s := &repo.Snapshot{}
-	for _, r := range f.repos {
-		s.Repos = append(s.Repos, r)
+	s := &project.Snapshot{}
+	for _, r := range f.projects {
+		s.Projects = append(s.Projects, r)
 	}
 	return s
 }
 
-func (f *fakeRepos) Register(_ context.Context, path string) (repo.Repo, error) {
+func (f *fakeProjects) Register(_ context.Context, path string) (project.Project, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.registered = append(f.registered, path)
 	if f.regErr != nil {
-		return repo.Repo{}, f.regErr
+		return project.Project{}, f.regErr
 	}
-	r := repo.Repo{ID: "id-" + filepath.Base(path), Path: path, Name: filepath.Base(path), Git: true, DefaultBranch: "main"}
-	f.repos[r.ID] = r
+	r := project.Project{ID: "id-" + filepath.Base(path), Path: path, Name: filepath.Base(path), Git: true, DefaultBranch: "main"}
+	f.projects[r.ID] = r
 	return r, nil
 }
 
-func (f *fakeRepos) Refresh(_ context.Context, id string) error {
+func (f *fakeProjects) Refresh(_ context.Context, id string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.refreshed = append(f.refreshed, id)
-	r, ok := f.repos[id]
+	r, ok := f.projects[id]
 	if !ok {
-		return fmt.Errorf("%w: %s", repo.ErrNotFound, id)
+		return fmt.Errorf("%w: %s", project.ErrNotFound, id)
 	}
 	if f.onRefresh != nil {
 		f.onRefresh(&r)
-		f.repos[id] = r
+		f.projects[id] = r
 	}
 	return nil
 }
 
-func (f *fakeRepos) Unregister(_ context.Context, id string) error {
+func (f *fakeProjects) Unregister(_ context.Context, id string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.unregistered = append(f.unregistered, id)
 	if f.unregErr != nil {
 		return f.unregErr
 	}
-	if _, ok := f.repos[id]; !ok {
-		return fmt.Errorf("%w: %s", repo.ErrNotFound, id)
+	if _, ok := f.projects[id]; !ok {
+		return fmt.Errorf("%w: %s", project.ErrNotFound, id)
 	}
-	delete(f.repos, id)
+	delete(f.projects, id)
 	return nil
 }
 
@@ -101,7 +101,7 @@ func (g *fakeGit) Run(_ context.Context, dir string, args ...string) ([]byte, er
 	g.calls = append(g.calls, strings.Join(args, " "))
 	g.mu.Unlock()
 	if len(args) > 0 && args[0] == g.fail {
-		return nil, &repo.GitError{Dir: dir, Args: args, ExitCode: 128, Stderr: "fatal: " + g.fail + " failed"}
+		return nil, &project.GitError{Dir: dir, Args: args, ExitCode: 128, Stderr: "fatal: " + g.fail + " failed"}
 	}
 	switch args[0] {
 	case "config":
@@ -198,10 +198,10 @@ func TestCreate(t *testing.T) {
 			if tt.outside {
 				allowed = filepath.Join(home, "elsewhere")
 			}
-			repos := newFakeRepos()
-			repos.regErr = tt.regErr
+			projects := newFakeProjects()
+			projects.regErr = tt.regErr
 			g := &fakeGit{fail: tt.gitFail}
-			s, err := New(Options{Root: root, AllowedRoot: resolve(t, allowed), Repos: repos, Git: g})
+			s, err := New(Options{Root: root, AllowedRoot: resolve(t, allowed), Projects: projects, Git: g})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -221,7 +221,7 @@ func TestCreate(t *testing.T) {
 			if fmt.Sprint(g.calls) != fmt.Sprint(tt.wantGit) {
 				t.Errorf("git calls = %q, want %q", g.calls, tt.wantGit)
 			}
-			if got := len(repos.registered) > 0; got != tt.register {
+			if got := len(projects.registered) > 0; got != tt.register {
 				t.Errorf("registered = %t, want %t", got, tt.register)
 			}
 			if err == nil {
@@ -264,7 +264,7 @@ func TestCreateRealGit(t *testing.T) {
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 	home := t.TempDir()
 	root := filepath.Join(home, "projects")
-	s, err := New(Options{Root: root, AllowedRoot: resolve(t, home), Repos: newFakeRepos()})
+	s, err := New(Options{Root: root, AllowedRoot: resolve(t, home), Projects: newFakeProjects()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -310,10 +310,10 @@ func (f *fakeGh) Run(ctx context.Context, dir, name string, args []string, _ fun
 }
 
 func TestPublish(t *testing.T) {
-	local := repo.Repo{ID: "r1", Name: "demo", Path: "/home/me/projects/demo", Git: true}
-	plain := repo.Repo{ID: "r2", Name: "notes", Path: "/home/me/notes"}
-	withOrigin := repo.Repo{ID: "r3", Name: "cf", Path: "/home/me/cf", Git: true, Remotes: []string{"origin"}, GitHubSlug: "me/cf"}
-	upstreamOnly := repo.Repo{ID: "r4", Name: "fork", Path: "/home/me/fork", Git: true, Remotes: []string{"upstream"}}
+	local := project.Project{ID: "r1", Name: "demo", Path: "/home/me/projects/demo", Git: true}
+	plain := project.Project{ID: "r2", Name: "notes", Path: "/home/me/notes"}
+	withOrigin := project.Project{ID: "r3", Name: "cf", Path: "/home/me/cf", Git: true, Remotes: []string{"origin"}, GitHubSlug: "me/cf"}
+	upstreamOnly := project.Project{ID: "r4", Name: "fork", Path: "/home/me/fork", Git: true, Remotes: []string{"upstream"}}
 	ghTail := "GraphQL: Visibility can't be private. Organization policy: only internal and public repositories (createRepository)"
 
 	tests := []struct {
@@ -325,29 +325,29 @@ func TestPublish(t *testing.T) {
 		wantArgs  []string
 		refreshed bool
 	}{
-		{name: "public to the user", opts: PublishOptions{RepoID: "r1", Owner: "me", Visibility: Public},
+		{name: "public to the user", opts: PublishOptions{ProjectID: "r1", Owner: "me", Visibility: Public},
 			wantArgs: []string{"gh", "repo", "create", "me/demo", "--source", "/home/me/projects/demo", "--remote", "origin", "--push", "--public"}, refreshed: true},
-		{name: "internal to an org under another name", opts: PublishOptions{RepoID: "r1", Owner: "octo-org", Name: "demo-app", Visibility: "INTERNAL"},
+		{name: "internal to an org under another name", opts: PublishOptions{ProjectID: "r1", Owner: "octo-org", Name: "demo-app", Visibility: "INTERNAL"},
 			wantArgs: []string{"gh", "repo", "create", "octo-org/demo-app", "--source", "/home/me/projects/demo", "--remote", "origin", "--push", "--internal"}, refreshed: true},
-		{name: "a remote other than origin is fine", opts: PublishOptions{RepoID: "r4", Owner: "me", Visibility: Private},
+		{name: "a remote other than origin is fine", opts: PublishOptions{ProjectID: "r4", Owner: "me", Visibility: Private},
 			wantArgs: []string{"gh", "repo", "create", "me/fork", "--source", "/home/me/fork", "--remote", "origin", "--push", "--private"}, refreshed: true},
-		{name: "gh refuses: its words verbatim, refreshed anyway", opts: PublishOptions{RepoID: "r1", Owner: "octo-org", Visibility: Private},
+		{name: "gh refuses: its words verbatim, refreshed anyway", opts: PublishOptions{ProjectID: "r1", Owner: "octo-org", Visibility: Private},
 			ghErr: &clone.ExitError{ExitCode: 1, Tail: []string{ghTail}}, err: ErrFailed, errExact: ghTail,
 			wantArgs: []string{"gh", "repo", "create", "octo-org/demo", "--source", "/home/me/projects/demo", "--remote", "origin", "--push", "--private"}, refreshed: true},
-		{name: "gh missing", opts: PublishOptions{RepoID: "r1", Owner: "me", Visibility: Public},
+		{name: "gh missing", opts: PublishOptions{ProjectID: "r1", Owner: "me", Visibility: Public},
 			ghErr: &clone.ExitError{ExitCode: -1, Err: exec.ErrNotFound}, err: ErrFailed,
 			wantArgs: []string{"gh", "repo", "create", "me/demo", "--source", "/home/me/projects/demo", "--remote", "origin", "--push", "--public"}, refreshed: true},
-		{name: "bad visibility", opts: PublishOptions{RepoID: "r1", Owner: "me", Visibility: "secret"}, err: ErrInvalidArgument},
-		{name: "no owner", opts: PublishOptions{RepoID: "r1", Visibility: Public}, err: ErrInvalidArgument},
-		{name: "bad name", opts: PublishOptions{RepoID: "r1", Owner: "me", Name: "a b", Visibility: Public}, err: ErrInvalidArgument},
-		{name: "unknown project", opts: PublishOptions{RepoID: "nope", Owner: "me", Visibility: Public}, err: ErrNotFound},
-		{name: "not git", opts: PublishOptions{RepoID: "r2", Owner: "me", Visibility: Public}, err: ErrFailedPrecondition},
-		{name: "already has origin", opts: PublishOptions{RepoID: "r3", Owner: "me", Visibility: Public}, err: ErrFailedPrecondition},
+		{name: "bad visibility", opts: PublishOptions{ProjectID: "r1", Owner: "me", Visibility: "secret"}, err: ErrInvalidArgument},
+		{name: "no owner", opts: PublishOptions{ProjectID: "r1", Visibility: Public}, err: ErrInvalidArgument},
+		{name: "bad name", opts: PublishOptions{ProjectID: "r1", Owner: "me", Name: "a b", Visibility: Public}, err: ErrInvalidArgument},
+		{name: "unknown project", opts: PublishOptions{ProjectID: "nope", Owner: "me", Visibility: Public}, err: ErrNotFound},
+		{name: "not git", opts: PublishOptions{ProjectID: "r2", Owner: "me", Visibility: Public}, err: ErrFailedPrecondition},
+		{name: "already has origin", opts: PublishOptions{ProjectID: "r3", Owner: "me", Visibility: Public}, err: ErrFailedPrecondition},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			repos := newFakeRepos(local, plain, withOrigin, upstreamOnly)
-			repos.onRefresh = func(r *repo.Repo) {
+			projects := newFakeProjects(local, plain, withOrigin, upstreamOnly)
+			projects.onRefresh = func(r *project.Project) {
 				if tt.ghErr == nil {
 					r.Remotes = append(r.Remotes, "origin")
 					slices.Sort(r.Remotes)
@@ -355,7 +355,7 @@ func TestPublish(t *testing.T) {
 				}
 			}
 			f := &fakeGh{err: tt.ghErr}
-			s, err := New(Options{Root: "/home/me/.code-foundry/projects", Repos: repos, Runner: f, Gh: "gh"})
+			s, err := New(Options{Root: "/home/me/.code-foundry/projects", Projects: projects, Runner: f, Gh: "gh"})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -382,28 +382,28 @@ func TestPublish(t *testing.T) {
 			if fmt.Sprint(got) != fmt.Sprint(tt.wantArgs) {
 				t.Errorf("gh args = %q, want %q", got, tt.wantArgs)
 			}
-			if (len(repos.refreshed) > 0) != tt.refreshed {
-				t.Errorf("refreshed = %v, want %t", repos.refreshed, tt.refreshed)
+			if (len(projects.refreshed) > 0) != tt.refreshed {
+				t.Errorf("refreshed = %v, want %t", projects.refreshed, tt.refreshed)
 			}
 		})
 	}
 }
 
 func TestPublishBusyAndTimeout(t *testing.T) {
-	local := repo.Repo{ID: "r1", Name: "demo", Path: "/home/me/demo", Git: true}
-	repos := newFakeRepos(local)
+	local := project.Project{ID: "r1", Name: "demo", Path: "/home/me/demo", Git: true}
+	projects := newFakeProjects(local)
 	f := &fakeGh{block: true, ran: make(chan struct{}, 1)}
-	s, err := New(Options{Root: "/home/me/p", Repos: repos, Runner: f, PublishTimeout: 200 * time.Millisecond})
+	s, err := New(Options{Root: "/home/me/p", Projects: projects, Runner: f, PublishTimeout: 200 * time.Millisecond})
 	if err != nil {
 		t.Fatal(err)
 	}
 	done := make(chan error, 1)
 	go func() {
-		_, err := s.Publish(context.Background(), PublishOptions{RepoID: "r1", Owner: "me", Visibility: Public})
+		_, err := s.Publish(context.Background(), PublishOptions{ProjectID: "r1", Owner: "me", Visibility: Public})
 		done <- err
 	}()
 	<-f.ran
-	if _, err := s.Publish(context.Background(), PublishOptions{RepoID: "r1", Owner: "me", Visibility: Public}); !errors.Is(err, ErrFailedPrecondition) {
+	if _, err := s.Publish(context.Background(), PublishOptions{ProjectID: "r1", Owner: "me", Visibility: Public}); !errors.Is(err, ErrFailedPrecondition) {
 		t.Errorf("second publish: err = %v, want ErrFailedPrecondition (busy)", err)
 	}
 	if err := <-done; !errors.Is(err, context.DeadlineExceeded) {
@@ -416,7 +416,7 @@ func TestPublishBusyAndTimeout(t *testing.T) {
 		<-f.ran
 		cancel()
 	}()
-	if _, err := s.Publish(ctx, PublishOptions{RepoID: "r1", Owner: "me", Visibility: Public}); !errors.Is(err, context.Canceled) {
+	if _, err := s.Publish(ctx, PublishOptions{ProjectID: "r1", Owner: "me", Visibility: Public}); !errors.Is(err, context.Canceled) {
 		t.Errorf("err = %v, want Canceled", err)
 	}
 }
@@ -433,7 +433,7 @@ func TestDelete(t *testing.T) {
 	tests := []struct {
 		name         string
 		id           string
-		repos        func(t *testing.T) *fakeRepos
+		projects     func(t *testing.T) *fakeProjects
 		unregErr     error
 		err          error
 		errText      string
@@ -441,31 +441,31 @@ func TestDelete(t *testing.T) {
 		unregistered []string
 	}{
 		{name: "deletes a created project", id: "p", unregistered: []string{"p"},
-			repos: func(t *testing.T) *fakeRepos {
-				return newFakeRepos(repo.Repo{ID: "p", Name: "demo", Path: mk(t, "demo"), Git: true})
+			projects: func(t *testing.T) *fakeProjects {
+				return newFakeProjects(project.Project{ID: "p", Name: "demo", Path: mk(t, "demo"), Git: true})
 			}},
-		{name: "unknown project", id: "nope", err: ErrNotFound, repos: func(*testing.T) *fakeRepos { return newFakeRepos() }},
+		{name: "unknown project", id: "nope", err: ErrNotFound, projects: func(*testing.T) *fakeProjects { return newFakeProjects() }},
 		{name: "outside the projects directory", id: "o", err: ErrFailedPrecondition, wantDir: true,
-			repos: func(t *testing.T) *fakeRepos {
+			projects: func(t *testing.T) *fakeProjects {
 				p := filepath.Join(t.TempDir(), "elsewhere")
 				if err := os.MkdirAll(p, 0o755); err != nil {
 					t.Fatal(err)
 				}
-				return newFakeRepos(repo.Repo{ID: "o", Name: "elsewhere", Path: p})
+				return newFakeProjects(project.Project{ID: "o", Name: "elsewhere", Path: p})
 			}},
 		{name: "nested under the projects directory", id: "n", err: ErrFailedPrecondition, wantDir: true,
-			repos: func(t *testing.T) *fakeRepos {
-				return newFakeRepos(repo.Repo{ID: "n", Name: "deep", Path: mk(t, "a/deep")})
+			projects: func(t *testing.T) *fakeProjects {
+				return newFakeProjects(project.Project{ID: "n", Name: "deep", Path: mk(t, "a/deep")})
 			}},
 		{name: "the projects directory itself", id: "r", err: ErrFailedPrecondition, wantDir: true,
-			repos: func(t *testing.T) *fakeRepos {
+			projects: func(t *testing.T) *fakeProjects {
 				mk(t, "x")
-				return newFakeRepos(repo.Repo{ID: "r", Name: "projects", Path: root})
+				return newFakeProjects(project.Project{ID: "r", Name: "projects", Path: root})
 			}},
 		{name: "unregister fails: the folder stays", id: "u", unregErr: errors.New("boom"), errText: "unregister demo: boom", wantDir: true,
 			unregistered: []string{"u"},
-			repos: func(t *testing.T) *fakeRepos {
-				return newFakeRepos(repo.Repo{ID: "u", Name: "demo", Path: mk(t, "demo"), Git: true})
+			projects: func(t *testing.T) *fakeProjects {
+				return newFakeProjects(project.Project{ID: "u", Name: "demo", Path: mk(t, "demo"), Git: true})
 			}},
 	}
 	for _, tt := range tests {
@@ -473,14 +473,14 @@ func TestDelete(t *testing.T) {
 			if err := os.RemoveAll(root); err != nil {
 				t.Fatal(err)
 			}
-			repos := tt.repos(t)
-			repos.unregErr = tt.unregErr
-			s, err := New(Options{Root: root, Repos: repos})
+			projects := tt.projects(t)
+			projects.unregErr = tt.unregErr
+			s, err := New(Options{Root: root, Projects: projects})
 			if err != nil {
 				t.Fatal(err)
 			}
 			var path string
-			if r, ok := repos.Snapshot().Repo(tt.id); ok {
+			if r, ok := projects.Snapshot().Project(tt.id); ok {
 				path = r.Path
 			}
 			err = s.Delete(context.Background(), tt.id)
@@ -498,8 +498,8 @@ func TestDelete(t *testing.T) {
 					t.Errorf("folder exists = %t, want %t", exists, tt.wantDir)
 				}
 			}
-			if fmt.Sprint(repos.unregistered) != fmt.Sprint(tt.unregistered) {
-				t.Errorf("unregistered = %v, want %v", repos.unregistered, tt.unregistered)
+			if fmt.Sprint(projects.unregistered) != fmt.Sprint(tt.unregistered) {
+				t.Errorf("unregistered = %v, want %v", projects.unregistered, tt.unregistered)
 			}
 		})
 	}
@@ -511,8 +511,8 @@ func TestDeleteWhilePublishing(t *testing.T) {
 	if err := os.MkdirAll(p, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	repos := newFakeRepos(repo.Repo{ID: "p", Name: "demo", Path: p, Git: true})
-	s, err := New(Options{Root: root, Repos: repos})
+	projects := newFakeProjects(project.Project{ID: "p", Name: "demo", Path: p, Git: true})
+	s, err := New(Options{Root: root, Projects: projects})
 	if err != nil {
 		t.Fatal(err)
 	}

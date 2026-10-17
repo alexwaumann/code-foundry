@@ -107,7 +107,7 @@ const KeybindingNone = "none"
 const (
 	GroupThreads     = "threads"
 	GroupGitHub      = "github"
-	GroupRepos       = "repos"
+	GroupProjects    = "repos"
 	GroupGitOps      = "gitops"
 	GroupAppearance  = "appearance"
 	GroupNotify      = "notifications"
@@ -159,7 +159,7 @@ var Pages = []Page{
 var Groups = []Group{
 	{GroupThreads, "Threads", "Defaults for new threads."},
 	{GroupGitHub, "GitHub", "Your pull requests and default-branch checks, polled with gh's login."},
-	{GroupRepos, "Repositories", "Git fetching and where new worktrees go."},
+	{GroupProjects, "Repositories", "Git fetching and where new worktrees go."},
 	{GroupGitOps, "Git operations", "How worktrees are handed to other apps."},
 	{GroupAppearance, "Appearance", "Scheme, themes, terminal font, density, and backdrop. Applied live in every window."},
 	{GroupNotify, "Notifications", "Dock badge and alerts for threads that need you. macOS banners aren't available to an app without a bundle."},
@@ -386,16 +386,16 @@ var staticFields = []Field{
 	},
 	// Source control › Repositories.
 	{
-		Key: KeyFetchInterval, Group: GroupRepos, Page: PageSource, Section: "repos", Unit: "s", Type: Int, Title: "Fetch interval",
+		Key: KeyFetchInterval, Group: GroupProjects, Page: PageSource, Section: "repos", Unit: "s", Type: Int, Title: "Fetch interval",
 		Description: "How often each repository runs git fetch --prune. 0 turns background fetching off.",
 		Default:     strconv.Itoa(defaultFetchSeconds), Min: 0, Max: 86400, Restart: true,
-		bind: func(s *Settings) any { return &s.Repos.FetchIntervalSeconds },
+		bind: func(s *Settings) any { return &s.Projects.FetchIntervalSeconds },
 	},
 	{
-		Key: KeyWorktreeDir, Group: GroupRepos, Page: PageSource, Section: "repos", Type: Path, Title: "Worktree directory",
+		Key: KeyWorktreeDir, Group: GroupProjects, Page: PageSource, Section: "repos", Type: Path, Title: "Worktree directory",
 		Description: "Where New Worktree puts worktrees; {repo} is the repository's name. Empty uses ~/.code-foundry/worktrees/<owner>/<repo>.",
 		Placeholder: "~/worktrees/{repo}",
-		bind:        func(s *Settings) any { return &s.Repos.WorktreeDir },
+		bind:        func(s *Settings) any { return &s.Projects.WorktreeDir },
 	},
 	{
 		Key: KeyEditorCommand, Group: GroupGitOps, Page: PageSource, Section: "repos", Type: String, Title: "Editor command",

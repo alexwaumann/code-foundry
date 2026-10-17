@@ -30,7 +30,7 @@ type Deps struct {
 	// terminal.new --run then pastes its command. Nil: it types it.
 	TerminalBracketedPaste func(ctx context.Context, id string) (bool, error)
 	// Repo backs repo.*. Nil works like Terminal.
-	Repo command.RepoBackend
+	Project command.ProjectBackend
 	// NotGit reports a context in a project without git: it gates repo.worktree.*,
 	// repo.git.init, and (unless GitOps.NotGit is set) git.* and pr.*. Nil: every
 	// project is git.
@@ -39,7 +39,7 @@ type Deps struct {
 	Clone command.CloneFunc
 	// Projects backs repo.create, repo.github.publish and repo.delete (its NotGit
 	// defaults to NotGit). A nil Backend works like Terminal.
-	Projects command.ProjectDeps
+	NewProjects command.NewProjectDeps
 	// Thread backs thread.*. Nil works like Terminal.
 	Thread command.ThreadBackend
 	// GitOps backs git.*, pr.*, worktree.open.editor, worktree.reveal and view.open.url.
@@ -74,8 +74,8 @@ func Register(r *command.Registry, d Deps) error {
 	if d.Terminal == nil {
 		d.Terminal = codefoundryv1connect.UnimplementedTerminalServiceHandler{}
 	}
-	if d.Repo == nil {
-		d.Repo = codefoundryv1connect.UnimplementedRepoServiceHandler{}
+	if d.Project == nil {
+		d.Project = codefoundryv1connect.UnimplementedProjectServiceHandler{}
 	}
 	if d.Thread == nil {
 		d.Thread = codefoundryv1connect.UnimplementedThreadServiceHandler{}
@@ -95,19 +95,19 @@ func Register(r *command.Registry, d Deps) error {
 	if d.GitOps.NotGit == nil {
 		d.GitOps.NotGit = d.NotGit
 	}
-	if d.Projects.NotGit == nil {
-		d.Projects.NotGit = d.NotGit
+	if d.NewProjects.NotGit == nil {
+		d.NewProjects.NotGit = d.NotGit
 	}
 	return errors.Join(
 		command.RegisterDaemon(r, d.Daemon),
 		command.RegisterUI(r, d.Emitter),
-		command.RegisterTerminal(r, command.TerminalDeps{Terminal: d.Terminal, Repo: d.Repo, Thread: d.Thread, IsShell: d.IsShellTerminal, AwaitOutput: d.AwaitTerminalOutput, BracketedPaste: d.TerminalBracketedPaste}),
-		command.RegisterRepo(r, d.Repo, d.NotGit),
-		command.RegisterRepoAdd(r, d.Repo, d.Clone),
-		command.RegisterRepoCleanup(r, command.RepoCleanupDeps{Repo: d.Repo, GitOps: d.GitOps.Backend, NotGit: d.NotGit}),
-		command.RegisterProjects(r, d.Projects),
+		command.RegisterTerminal(r, command.TerminalDeps{Terminal: d.Terminal, Project: d.Project, Thread: d.Thread, IsShell: d.IsShellTerminal, AwaitOutput: d.AwaitTerminalOutput, BracketedPaste: d.TerminalBracketedPaste}),
+		command.RegisterProject(r, d.Project, d.NotGit),
+		command.RegisterProjectAdd(r, d.Project, d.Clone),
+		command.RegisterProjectCleanup(r, command.ProjectCleanupDeps{Project: d.Project, GitOps: d.GitOps.Backend, NotGit: d.NotGit}),
+		command.RegisterNewProjects(r, d.NewProjects),
 		command.RegisterThreadLifecycle(r, d.Thread, d.Emitter),
-		command.RegisterThreadList(r, command.ThreadListDeps{Thread: d.Thread, Repo: d.Repo}),
+		command.RegisterThreadList(r, command.ThreadListDeps{Thread: d.Thread, Project: d.Project}),
 		command.RegisterThread(r, d.Thread),
 		command.RegisterMcp(r, d.Thread, d.Emitter),
 		command.RegisterAgents(r, d.Thread, d.Emitter),
@@ -115,7 +115,7 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterGitOps(r, d.GitOps),
 		command.RegisterPullRequest(r, d.Gh),
 		command.RegisterPullRequestThreads(r, command.PullRequestThreadDeps{
-			Gh: d.Gh, Repo: d.Repo, Thread: d.Thread, GitOps: d.GitOps.Backend, Emitter: d.Emitter,
+			Gh: d.Gh, Project: d.Project, Thread: d.Thread, GitOps: d.GitOps.Backend, Emitter: d.Emitter,
 		}),
 		command.RegisterSettings(r, d.Settings, d.Emitter, d.Reveal),
 		command.RegisterNotifications(r, d.Settings, d.Emitter),
@@ -125,6 +125,6 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterView(r, d.Emitter),
 		command.RegisterUsage(r, d.Thread),
 		command.RegisterWorkspace(r, d.Workspace),
-		command.RegisterAction(r, command.ActionDeps{Action: d.Action, Repo: d.Repo, Thread: d.Thread}),
+		command.RegisterAction(r, command.ActionDeps{Action: d.Action, Project: d.Project, Thread: d.Thread}),
 	)
 }

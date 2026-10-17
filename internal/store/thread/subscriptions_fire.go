@@ -234,7 +234,7 @@ type wakeThread struct {
 	State        string      `json:"state"`
 	Status       string      `json:"status"`
 	StatusReason string      `json:"status_reason"`
-	RepoID       string      `json:"repo_id"`
+	ProjectID    string      `json:"repo_id"`
 	WorktreePath string      `json:"worktree_path"`
 	CreatedBy    string      `json:"created_by"`
 	Labels       []string    `json:"labels"`
@@ -260,7 +260,7 @@ type wakeRun struct {
 	ID         string `json:"id"`
 	ActionID   string `json:"action_id"`
 	ActionName string `json:"action_name"`
-	RepoID     string `json:"repo_id"`
+	ProjectID  string `json:"repo_id"`
 	ExitCode   int    `json:"exit_code"`
 	StartedAt  string `json:"started_at"`
 	FinishedAt string `json:"finished_at"`
@@ -284,7 +284,7 @@ var statusNames = map[Status]string{
 func threadWake(sub Subscription, t Thread, at time.Time) Message {
 	p := wakeThreadPayload{Kind: "thread", SubscriptionID: sub.ID, Condition: sub.Condition, FiredAt: wakeTime(at), Thread: wakeThread{
 		ID: t.ID, Name: t.Name, State: t.State.String(), Status: statusNames[t.Status], StatusReason: t.StatusReason,
-		RepoID: t.RepoID, WorktreePath: t.WorktreePath, CreatedBy: t.CreatedBy, Labels: t.Labels,
+		ProjectID: t.ProjectID, WorktreePath: t.WorktreePath, CreatedBy: t.CreatedBy, Labels: t.Labels,
 	}}
 	if p.Thread.Labels == nil {
 		p.Thread.Labels = []string{}
@@ -344,7 +344,7 @@ func threadWakeTitle(c Condition, t Thread) string {
 // runWake is the wake message of sub about run, fired at.
 func runWake(sub Subscription, run ActionRun, at time.Time) Message {
 	p := wakeRunPayload{Kind: "action_run", SubscriptionID: sub.ID, Condition: CondFinished, FiredAt: wakeTime(at), Run: wakeRun{
-		ID: run.ID, ActionID: run.ActionID, ActionName: run.ActionName, RepoID: run.RepoID, ExitCode: run.ExitCode,
+		ID: run.ID, ActionID: run.ActionID, ActionName: run.ActionName, ProjectID: run.ProjectID, ExitCode: run.ExitCode,
 		StartedAt: wakeTime(run.StartedAt), FinishedAt: wakeTime(run.FinishedAt), OutputTail: outputTail(run.Output, maxOutputTail),
 	}}
 	name := run.ActionName

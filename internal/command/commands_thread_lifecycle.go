@@ -47,14 +47,16 @@ func splitList(v string) []string {
 
 func hasThread(c Context) bool { return c.ActiveThreadID != "" }
 
-func hasRepoOrWorktree(c Context) bool { return c.ActiveRepoID != "" || c.ActiveWorktreePath != "" }
+func hasProjectOrWorktree(c Context) bool {
+	return c.ActiveProjectID != "" || c.ActiveWorktreePath != ""
+}
 
 // canStartThread is thread.new's availability: a GUI caller needs an active
 // repository or worktree, or the composer (whose target may be no project at all). A
 // CLI caller (no active view) names everything with flags, and --workspace, --repos or
 // --no-project alone are enough, which When cannot see, so Run validates instead.
 func canStartThread(c Context) bool {
-	return hasRepoOrWorktree(c) || c.ActiveView == "" || c.ActiveView == "compose"
+	return hasProjectOrWorktree(c) || c.ActiveView == "" || c.ActiveView == "compose"
 }
 
 // noProjectAlone refuses thread.new's no-project with any arg that places the thread
@@ -96,7 +98,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 			Category:    "Thread",
 			Keybindings: []string{"cmd+n"},
 			Args: []ArgSpec{
-				{Name: "repo", Type: String, Context: ContextRepo, Description: "Repository id (with workspace or repos: the member the thread runs in, by id or name)"},
+				{Name: "repo", Type: String, Context: ContextProject, Description: "Repository id (with workspace or repos: the member the thread runs in, by id or name)"},
 				{Name: "worktree", Type: Path, Context: ContextWorktree, Description: "Worktree path (with workspace: a member worktree)"},
 				{Name: "workspace", Type: String, Description: "Workspace id or name the thread belongs to; it runs in the member repo or worktree names (default: the first member)"},
 				{Name: "repos", Type: String, Description: "With new-worktree: comma-separated repositories (id, name, or path; repo:base gives that one its own base) for a new workspace, a cf/<slug of the thread name> worktree in each; repo picks the member the thread runs in (default: the first)"},
@@ -122,16 +124,16 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 			},
 			When: canStartThread,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-				ws, repos := a.String("workspace"), splitList(a.String("repos"))
+				ws, projects := a.String("workspace"), splitList(a.String("repos"))
 				if a.Bool("no-project") {
 					if err := noProjectAlone(a); err != nil {
 						return Result{}, err
 					}
-				} else if a.String("repo") == "" && a.Path("worktree") == "" && ws == "" && len(repos) == 0 {
+				} else if a.String("repo") == "" && a.Path("worktree") == "" && ws == "" && len(projects) == 0 {
 					return Result{}, InvalidArg("worktree", "a worktree, repository, or workspace is required (or no-project)")
 				}
 				req := &v1.CreateThreadRequest{
-					RepoId: a.String("repo"), WorktreePath: a.Path("worktree"), Model: a.String("model"),
+					ProjectId: a.String("repo"), WorktreePath: a.Path("worktree"), Model: a.String("model"),
 					Effort: a.String("effort"), Name: a.String("name"), InitialPrompt: a.String("prompt"),
 					ComposerPrompt: a.String("composer-prompt"), PermissionMode: threadPermissionModes[a.String("permission")], Attachments: splitList(a.String("attachments")),
 					WorkspaceId: ws, NoProject: a.Bool("no-project"),
@@ -149,12 +151,12 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 					req.BudgetUsd = usd
 				}
 				switch {
-				case len(repos) > 0 && !a.Bool("new-worktree"):
+				case len(projects) > 0 && !a.Bool("new-worktree"):
 					return Result{}, InvalidArg("repos", "only applies with new-worktree (a new workspace); for an existing one use workspace")
 				case ws != "" && a.Bool("new-worktree"):
 					return Result{}, InvalidArg("workspace", "a workspace thread runs in an existing member; for a new workspace use new-worktree with repos")
-				case len(repos) > 0:
-					req.NewWorkspace = &v1.NewWorkspace{Repos: repos, BaseRef: a.String("base")}
+				case len(projects) > 0:
+					req.NewWorkspace = &v1.NewWorkspace{Projects: projects, BaseRef: a.String("base")}
 				case a.Bool("new-worktree"):
 					req.NewWorktree = &v1.NewWorktree{BaseRef: a.String("base")}
 				case a.String("base") != "":

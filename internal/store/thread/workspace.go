@@ -97,7 +97,7 @@ type NewWorkspace struct {
 	// one), in member order, each optionally followed by ":<base ref>" for that member
 	// (as `workspace new --repos`). CreateOptions.RepoID picks the member the thread
 	// runs in (default: the first).
-	Repos []string
+	Projects []string
 	// BaseRef every member without its own base branches from. Empty: each
 	// repository's default.
 	BaseRef string
@@ -107,7 +107,7 @@ type NewWorkspace struct {
 
 // createdWorkspace is what newWorkspace made.
 type createdWorkspace struct {
-	workspaceID, repoID, path, baseRef string
+	workspaceID, projectID, path, baseRef string
 	// members of the new workspace, in member order.
 	members []workspace.Member
 	// name, namerCalled, late: as createdWorktree.
@@ -118,7 +118,7 @@ type createdWorkspace struct {
 
 // workspaceMember resolves the member a thread of workspace ref (id or name) runs in;
 // see pickMember. repoID may also be a repository name.
-func (m *Manager) workspaceMember(ref, repoID, path string) (workspace.Workspace, workspace.Member, error) {
+func (m *Manager) workspaceMember(ref, projectID, path string) (workspace.Workspace, workspace.Member, error) {
 	if m.opts.Workspaces == nil {
 		return workspace.Workspace{}, workspace.Member{}, fmt.Errorf("%w: workspace threads need the workspace store", ErrFailedPrecondition)
 	}
@@ -129,20 +129,20 @@ func (m *Manager) workspaceMember(ref, repoID, path string) (workspace.Workspace
 	if err != nil {
 		return workspace.Workspace{}, workspace.Member{}, workspaceError("workspace", err)
 	}
-	if _, ok := w.Member(repoID); repoID != "" && !ok && m.opts.Repos != nil {
+	if _, ok := w.Member(projectID); projectID != "" && !ok && m.opts.Projects != nil {
 		// A repository name (or path) instead of the id.
-		if r, err := workspace.ResolveRepo(m.opts.Repos.Snapshot(), repoID); err == nil {
-			repoID = r.ID
+		if r, err := workspace.ResolveProject(m.opts.Projects.Snapshot(), projectID); err == nil {
+			projectID = r.ID
 		}
 	}
-	mem, err := pickMember(w, repoID, path)
+	mem, err := pickMember(w, projectID, path)
 	return w, mem, err
 }
 
 // pickMember chooses the member of w a thread runs in: the one whose worktree is path,
 // else the one for repoID, else the first. When both are given they must name the same
 // member. A path inside a member worktree but not the worktree itself is not a member.
-func pickMember(w workspace.Workspace, repoID, path string) (workspace.Member, error) {
+func pickMember(w workspace.Workspace, projectID, path string) (workspace.Member, error) {
 	if len(w.Members) == 0 {
 		return workspace.Member{}, fmt.Errorf("%w: workspace %s has no members", ErrFailedPrecondition, w.Name)
 	}
@@ -152,16 +152,16 @@ func pickMember(w workspace.Workspace, repoID, path string) (workspace.Member, e
 			return workspace.Member{}, fmt.Errorf("%w: %s is not a member worktree of workspace %s (members: %s)",
 				ErrFailedPrecondition, path, w.Name, memberPaths(w))
 		}
-		if repoID != "" && w.Members[i].RepoID != repoID {
-			return workspace.Member{}, fmt.Errorf("%w: worktree %s belongs to repo %s, not %s", ErrInvalidArgument, path, w.Members[i].RepoID, repoID)
+		if projectID != "" && w.Members[i].ProjectID != projectID {
+			return workspace.Member{}, fmt.Errorf("%w: worktree %s belongs to repo %s, not %s", ErrInvalidArgument, path, w.Members[i].ProjectID, projectID)
 		}
 		return w.Members[i], nil
 	}
-	if repoID != "" {
-		mem, ok := w.Member(repoID)
+	if projectID != "" {
+		mem, ok := w.Member(projectID)
 		if !ok {
 			return workspace.Member{}, fmt.Errorf("%w: repo %s is not a member of workspace %s (members: %s)",
-				ErrFailedPrecondition, repoID, w.Name, memberPaths(w))
+				ErrFailedPrecondition, projectID, w.Name, memberPaths(w))
 		}
 		return mem, nil
 	}
@@ -176,7 +176,7 @@ func samePath(a, b string) bool {
 func memberPaths(w workspace.Workspace) string {
 	out := make([]string, len(w.Members))
 	for i, mem := range w.Members {
-		out[i] = mem.RepoID + " " + mem.WorktreePath
+		out[i] = mem.ProjectID + " " + mem.WorktreePath
 	}
 	return strings.Join(out, ", ")
 }
@@ -190,9 +190,9 @@ func (m *Manager) newWorkspace(ctx context.Context, id, name string, o CreateOpt
 	switch {
 	case m.opts.Workspaces == nil:
 		return cw, fmt.Errorf("%w: creating a workspace needs the workspace store", ErrFailedPrecondition)
-	case m.opts.Repos == nil:
+	case m.opts.Projects == nil:
 		return cw, fmt.Errorf("%w: creating a workspace needs the repo store", ErrFailedPrecondition)
-	case len(nw.Repos) == 0:
+	case len(nw.Projects) == 0:
 		return cw, fmt.Errorf("%w: a new workspace needs at least one repository", ErrInvalidArgument)
 	}
 	base := strings.TrimSpace(nw.BaseRef)
@@ -200,15 +200,15 @@ func (m *Manager) newWorkspace(ctx context.Context, id, name string, o CreateOpt
 		return cw, err
 	}
 	// Resolve every repository before waiting for a name, so a typo fails fast.
-	snap := m.opts.Repos.Snapshot()
+	snap := m.opts.Projects.Snapshot()
 	var ids, paths, bases []string
-	for _, item := range nw.Repos {
+	for _, item := range nw.Projects {
 		ref, own, _ := strings.Cut(item, ":")
 		ref, own = strings.TrimSpace(ref), strings.TrimSpace(own)
 		if err := validateRef(own); err != nil {
 			return cw, err
 		}
-		r, err := workspace.ResolveRepo(snap, ref)
+		r, err := workspace.ResolveProject(snap, ref)
 		if err != nil {
 			return cw, workspaceError("repository", err)
 		}
@@ -220,16 +220,16 @@ func (m *Manager) newWorkspace(ctx context.Context, id, name string, o CreateOpt
 		}
 		ids, paths, bases = append(ids, r.ID), append(paths, r.Path), append(bases, own)
 	}
-	cwdRepo := ids[0]
-	if o.RepoID != "" {
+	cwdProject := ids[0]
+	if o.ProjectID != "" {
 		// An id, or a name or path like the repository refs.
-		cwdRepo = o.RepoID
-		if r, err := workspace.ResolveRepo(snap, o.RepoID); err == nil {
-			cwdRepo = r.ID
+		cwdProject = o.ProjectID
+		if r, err := workspace.ResolveProject(snap, o.ProjectID); err == nil {
+			cwdProject = r.ID
 		}
 	}
-	if !slices.Contains(ids, cwdRepo) {
-		return cw, fmt.Errorf("%w: repo %s is not among the new workspace's repositories", ErrInvalidArgument, cwdRepo)
+	if !slices.Contains(ids, cwdProject) {
+		return cw, fmt.Errorf("%w: repo %s is not among the new workspace's repositories", ErrInvalidArgument, cwdProject)
 	}
 	wsName := strings.TrimSpace(nw.Name)
 
@@ -255,8 +255,8 @@ func (m *Manager) newWorkspace(ctx context.Context, id, name string, o CreateOpt
 	specs := make([]workspace.MemberSpec, len(ids))
 	cwdBase := base
 	for i, rid := range ids {
-		specs[i] = workspace.MemberSpec{Repo: rid, BaseRef: bases[i]}
-		if rid == cwdRepo && bases[i] != "" {
+		specs[i] = workspace.MemberSpec{Project: rid, BaseRef: bases[i]}
+		if rid == cwdProject && bases[i] != "" {
 			cwdBase = bases[i]
 		}
 	}
@@ -266,16 +266,16 @@ func (m *Manager) newWorkspace(ctx context.Context, id, name string, o CreateOpt
 	if err != nil {
 		return cw, workspaceError("create workspace "+wsName, err)
 	}
-	mem, ok := w.Member(cwdRepo)
+	mem, ok := w.Member(cwdProject)
 	if !ok { // the store made every member or failed; this is a broken fake
-		return cw, fmt.Errorf("%w: workspace %s has no member for repo %s", ErrFailedPrecondition, w.ID, cwdRepo)
+		return cw, fmt.Errorf("%w: workspace %s has no member for repo %s", ErrFailedPrecondition, w.ID, cwdProject)
 	}
-	cw.workspaceID, cw.repoID, cw.path, cw.members = w.ID, mem.RepoID, mem.WorktreePath, w.Members
+	cw.workspaceID, cw.projectID, cw.path, cw.members = w.ID, mem.ProjectID, mem.WorktreePath, w.Members
 	cw.baseRef = cwdBase
 	if cw.baseRef == "" {
-		if r, ok := m.opts.Repos.Snapshot().Repo(cwdRepo); ok {
+		if r, ok := m.opts.Projects.Snapshot().Project(cwdProject); ok {
 			cw.baseRef = r.DefaultBranch
-			if wt, ok := m.opts.Repos.Snapshot().Worktree(cwdRepo, mem.WorktreePath); ok {
+			if wt, ok := m.opts.Projects.Snapshot().Worktree(cwdProject, mem.WorktreePath); ok {
 				cw.baseRef = cmp.Or(wt.Status.BaseRef, cw.baseRef)
 			}
 		}

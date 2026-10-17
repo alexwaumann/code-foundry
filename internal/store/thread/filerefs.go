@@ -29,7 +29,7 @@ const fileRefScheme = "cf-file://"
 // the worktree resolve returns for its repo id (see the comment above). It also
 // returns the tokens that could not be resolved, as written, for the caller to log.
 // A token without a "/" after the repo id is left alone.
-func rewriteFileRefs(prompt string, resolve func(repoID string) (worktree string, ok bool)) (string, []string) {
+func rewriteFileRefs(prompt string, resolve func(projectID string) (worktree string, ok bool)) (string, []string) {
 	if !strings.Contains(prompt, fileRefScheme) {
 		return prompt, nil
 	}
@@ -49,15 +49,15 @@ func rewriteFileRefs(prompt string, resolve func(repoID string) (worktree string
 		}
 		rest = rest[i+len(tok):]
 
-		repoID, raw, ok := strings.Cut(tok[len(fileRefScheme):], "/")
-		if !ok || repoID == "" {
+		projectID, raw, ok := strings.Cut(tok[len(fileRefScheme):], "/")
+		if !ok || projectID == "" {
 			b.WriteString(tok)
 			continue
 		}
 		rel, safe := decodeRel(raw)
 		var worktree string
 		if safe {
-			worktree, safe = resolve(repoID)
+			worktree, safe = resolve(projectID)
 		}
 		if !safe || worktree == "" {
 			dropped = append(dropped, tok)

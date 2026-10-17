@@ -34,13 +34,13 @@ func TestThreadMetadataCommands(t *testing.T) {
 		{name: "new with metadata", cmd: "thread.new",
 			args:    map[string]string{"repo": "r1", "created-by": "s-parent", "brief": "say hi", "labels": "test, b", "budget": "5.00"},
 			wantMsg: "created thread s1 in ",
-			wantReqs: []proto.Message{&v1.CreateThreadRequest{RepoId: "r1", PermissionMode: auto, CreatedBy: "s-parent", Brief: "say hi",
+			wantReqs: []proto.Message{&v1.CreateThreadRequest{ProjectId: "r1", PermissionMode: auto, CreatedBy: "s-parent", Brief: "say hi",
 				Labels: []string{"test", "b"}, BudgetUsd: 5}}},
 		// The active thread is the one the user views in the GUI: never the creator.
-		{name: "new never takes the creator from the context", cmd: "thread.new", ctx: command.Context{ActiveThreadID: "s-viewed", ActiveRepoID: "r1"},
-			wantReqs: []proto.Message{&v1.CreateThreadRequest{RepoId: "r1", PermissionMode: auto}}},
+		{name: "new never takes the creator from the context", cmd: "thread.new", ctx: command.Context{ActiveThreadID: "s-viewed", ActiveProjectID: "r1"},
+			wantReqs: []proto.Message{&v1.CreateThreadRequest{ProjectId: "r1", PermissionMode: auto}}},
 		{name: "new with a $ budget", cmd: "thread.new", args: map[string]string{"repo": "r1", "budget": "$0.25"},
-			wantReqs: []proto.Message{&v1.CreateThreadRequest{RepoId: "r1", PermissionMode: auto, BudgetUsd: 0.25}}},
+			wantReqs: []proto.Message{&v1.CreateThreadRequest{ProjectId: "r1", PermissionMode: auto, BudgetUsd: 0.25}}},
 		{name: "new with a bad budget", cmd: "thread.new", args: map[string]string{"repo": "r1", "budget": "five"}, wantErr: command.ErrInvalidArgs},
 		{name: "new with a negative budget", cmd: "thread.new", args: map[string]string{"repo": "r1", "budget": "-1"}, wantErr: command.ErrInvalidArgs},
 

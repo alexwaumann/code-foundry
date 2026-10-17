@@ -18,7 +18,7 @@ func TestKillReachesTheGroupAfterTheShellExits(t *testing.T) {
 	h := newHarness(t, func(o *Options) { o.KillGrace = grace })
 	// The child ignores SIGTERM and does not hold the output pipes, so the run finishes
 	// as soon as the shell is gone.
-	h.create(CreateOptions{RepoID: "web", Name: "Leaves", Command: "(trap '' TERM; exec sleep 30) >/dev/null 2>&1 & echo $!; wait"})
+	h.create(CreateOptions{ProjectID: "web", Name: "Leaves", Command: "(trap '' TERM; exec sleep 30) >/dev/null 2>&1 & echo $!; wait"})
 	r, err := h.m.Run(context.Background(), RunOptions{Action: "leaves", Worktree: h.web})
 	if err != nil {
 		t.Fatal(err)

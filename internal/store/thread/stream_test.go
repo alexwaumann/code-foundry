@@ -366,10 +366,10 @@ func TestRenderedRunInUsesSetCwd(t *testing.T) {
 	re.m.mu.Lock()
 	run := re.m.recs[s.ID].run
 	re.m.recs[s.ID].s.PendingWorktreePath = other
-	run.cdReq <- cdRequest{path: other, repoID: "r2"}
+	run.cdReq <- cdRequest{path: other, projectID: "r2"}
 	re.m.mu.Unlock()
 	got := re.waitFor(s.ID, "moved", func(s Thread) bool { return s.WorktreePath == other })
-	if got.RepoID != "r2" || got.PendingWorktreePath != "" {
+	if got.ProjectID != "r2" || got.PendingWorktreePath != "" {
 		t.Errorf("after move %+v", got)
 	}
 	re.waitSent("set_cwd", func(m map[string]any) bool {

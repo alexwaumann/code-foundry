@@ -158,7 +158,7 @@ func TestRenderedContextTotals(t *testing.T) {
 // A thread before its first result has no totals.
 func TestNoContextTotalsBeforeAResult(t *testing.T) {
 	e := newEnv(t)
-	s := e.connected(CreateOptions{RepoID: "r1", Name: "t"})
+	s := e.connected(CreateOptions{ProjectID: "r1", Name: "t"})
 	e.m.SetCacheTTL(time.Minute)
 	got, _ := e.m.Get(e.ctx(), s.ID)
 	if got.ContextTokens != 0 || !got.LastResultAt.IsZero() || !got.CacheExpiresAt.IsZero() {

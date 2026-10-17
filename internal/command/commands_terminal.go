@@ -45,7 +45,7 @@ var (
 // thread (Thread) or the registered worktrees (Repo) to find who owns a new shell.
 type TerminalDeps struct {
 	Terminal TerminalBackend
-	Repo     RepoBackend
+	Project  ProjectBackend
 	Thread   ThreadBackend
 	// IsShell reports whether terminal id is a shell terminal.new started or an action
 	// run (termlabel.IsPanel). It gates terminal.close, which refuses other terminals
@@ -124,13 +124,13 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 				if err != nil {
 					return Result{}, err
 				}
-				owner, err := shellOwner(ctx, d.Repo, d.Thread, c, a.Path("cwd"), a.Path("here"),
+				owner, err := shellOwner(ctx, d.Project, d.Thread, c, a.Path("cwd"), a.Path("here"),
 					"terminal.new needs a thread, a worktree, or --cwd inside a registered project")
 				if err != nil {
 					return Result{}, err
 				}
 				res, err := d.Terminal.Create(ctx, connect.NewRequest(&v1.CreateTerminalRequest{
-					Argv: argv, Cwd: owner.cwd, Labels: termlabel.Shell(owner.thread, owner.repo, owner.worktree),
+					Argv: argv, Cwd: owner.cwd, Labels: termlabel.Shell(owner.thread, owner.project, owner.worktree),
 				}))
 				if err != nil {
 					return Result{}, err
@@ -313,8 +313,8 @@ func formatLabels(l map[string]string) string {
 
 // owner is who a new shell belongs to (its labels) and where it starts.
 type owner struct {
-	thread, repo, worktree string
-	cwd                    string
+	thread, project, worktree string
+	cwd                       string
 }
 
 // shellOwner decides who owns a shell terminal.new starts (and an action run action.run
@@ -323,14 +323,14 @@ type owner struct {
 // registered worktree containing cwd, else here (the CLI's working directory). The shell
 // starts in cwd, else in here when here chose the owner, else in the thread's worktree or
 // the context's worktree path. Without any of them it fails with missing.
-func shellOwner(ctx context.Context, repos RepoBackend, threads ThreadBackend, c Context, cwd, here, missing string) (owner, error) {
+func shellOwner(ctx context.Context, projects ProjectBackend, threads ThreadBackend, c Context, cwd, here, missing string) (owner, error) {
 	if c.ActiveThreadID != "" {
 		res, err := threads.Get(ctx, connect.NewRequest(&v1.GetThreadRequest{Id: c.ActiveThreadID}))
 		if err != nil {
 			return owner{}, err
 		}
 		s := res.Msg.GetThread()
-		return owner{thread: s.GetId(), repo: s.GetRepoId(), worktree: s.GetWorktreePath(), cwd: cmp.Or(cwd, s.GetWorktreePath())}, nil
+		return owner{thread: s.GetId(), project: s.GetProjectId(), worktree: s.GetWorktreePath(), cwd: cmp.Or(cwd, s.GetWorktreePath())}, nil
 	}
 	path, start := c.ActiveWorktreePath, cmp.Or(cwd, c.ActiveWorktreePath)
 	if path == "" {
@@ -340,32 +340,32 @@ func shellOwner(ctx context.Context, repos RepoBackend, threads ThreadBackend, c
 	if path == "" {
 		return owner{}, InvalidArg("cwd", "%s", missing)
 	}
-	res, err := repos.List(ctx, connect.NewRequest(&v1.ListReposRequest{}))
+	res, err := projects.List(ctx, connect.NewRequest(&v1.ListProjectsRequest{}))
 	if err != nil {
 		return owner{}, err
 	}
-	repoID, wt, ok := ownerWorktree(res.Msg.GetRepos(), c.ActiveRepoID, c.ActiveWorktreePath, realPath(path))
+	projectID, wt, ok := ownerWorktree(res.Msg.GetProjects(), c.ActiveProjectID, c.ActiveWorktreePath, realPath(path))
 	if !ok {
 		return owner{}, InvalidArg("cwd", "%s %s", path, notInProject)
 	}
-	return owner{repo: repoID, worktree: wt, cwd: start}, nil
+	return owner{project: projectID, worktree: wt, cwd: start}, nil
 }
 
 // ownerWorktree returns the registered worktree at wtPath (in repo repoID when that is
 // given), else the deepest registered worktree containing path.
-func ownerWorktree(repos []*v1.Repo, repoID, wtPath, path string) (string, string, bool) {
-	var bestRepo, best string
-	for _, r := range repos {
+func ownerWorktree(projects []*v1.Project, projectID, wtPath, path string) (string, string, bool) {
+	var bestProject, best string
+	for _, r := range projects {
 		for _, w := range r.GetWorktrees() {
-			if wtPath != "" && w.GetPath() == wtPath && (repoID == "" || r.GetId() == repoID) {
+			if wtPath != "" && w.GetPath() == wtPath && (projectID == "" || r.GetId() == projectID) {
 				return r.GetId(), w.GetPath(), true
 			}
 			if path != "" && within(path, w.GetPath()) && len(w.GetPath()) > len(best) {
-				bestRepo, best = r.GetId(), w.GetPath()
+				bestProject, best = r.GetId(), w.GetPath()
 			}
 		}
 	}
-	return bestRepo, best, best != ""
+	return bestProject, best, best != ""
 }
 
 // foldCase is whether paths compare case-insensitively: macOS volumes (APFS, HFS+) are

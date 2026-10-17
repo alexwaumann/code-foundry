@@ -36,7 +36,7 @@ func threadRunIn(b ThreadBackend, idArg ArgSpec) Command {
 				return Result{}, InvalidArg("repo", "name the member: a repository or a worktree path")
 			}
 			res, err := b.RunIn(ctx, connect.NewRequest(&v1.RunInThreadRequest{
-				Id: a.String("id"), RepoId: a.String("repo"), WorktreePath: a.Path("worktree"),
+				Id: a.String("id"), ProjectId: a.String("repo"), WorktreePath: a.Path("worktree"),
 			}))
 			if err != nil {
 				return Result{}, err

@@ -52,7 +52,7 @@ func (s *Thread) Create(_ context.Context, r *connect.Request[v1.CreateThreadReq
 	}
 	m := r.Msg
 	out := &v1.Thread{
-		Id: "s1", RepoId: m.GetRepoId(), WorktreePath: m.GetWorktreePath(), Model: m.GetModel(), Effort: m.GetEffort(),
+		Id: "s1", ProjectId: m.GetProjectId(), WorktreePath: m.GetWorktreePath(), Model: m.GetModel(), Effort: m.GetEffort(),
 		Name: m.GetName(), State: v1.ThreadState_THREAD_STATE_STARTING, PermissionMode: m.GetPermissionMode(),
 		WorkspaceId: m.GetWorkspaceId(), CreatedBy: m.GetCreatedBy(), Brief: m.GetBrief(), Labels: m.GetLabels(),
 		BudgetUsd: m.GetBudgetUsd(),
@@ -60,11 +60,11 @@ func (s *Thread) Create(_ context.Context, r *connect.Request[v1.CreateThreadReq
 	if nw := m.GetNewWorktree(); nw != nil {
 		out.WorktreePath, out.CreatedWorktree, out.BaseRef = "/worktrees/s1", true, nw.GetBaseRef()
 	}
-	if nw := m.GetNewWorkspace(); nw != nil && len(nw.GetRepos()) > 0 {
-		if out.RepoId == "" {
-			out.RepoId = nw.GetRepos()[0]
+	if nw := m.GetNewWorkspace(); nw != nil && len(nw.GetProjects()) > 0 {
+		if out.ProjectId == "" {
+			out.ProjectId = nw.GetProjects()[0]
 		}
-		out.WorkspaceId, out.WorktreePath, out.CreatedWorktree, out.BaseRef = "w-new", "/worktrees/"+out.RepoId, true, nw.GetBaseRef()
+		out.WorkspaceId, out.WorktreePath, out.CreatedWorktree, out.BaseRef = "w-new", "/worktrees/"+out.ProjectId, true, nw.GetBaseRef()
 	}
 	if m.GetNoProject() {
 		out.WorktreePath = "/home"
@@ -191,7 +191,7 @@ func (s *Thread) RunIn(_ context.Context, r *connect.Request[v1.RunInThreadReque
 	cur.Id = r.Msg.GetId()
 	path := r.Msg.GetWorktreePath()
 	if path == "" {
-		path = "/worktrees/" + r.Msg.GetRepoId()
+		path = "/worktrees/" + r.Msg.GetProjectId()
 	}
 	if cur.GetState() == v1.ThreadState_THREAD_STATE_DISCONNECTED {
 		cur.WorktreePath = path

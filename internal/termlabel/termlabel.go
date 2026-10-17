@@ -25,7 +25,7 @@ const (
 	// Thread is the id of the thread the terminal belongs to.
 	Thread = "thread"
 	// Repo is the id of the registered repository whose worktree the terminal belongs to.
-	Repo = "repo"
+	Project = "repo"
 	// Worktree is the path (symlinks resolved, as in the repo snapshot) of the worktree
 	// the terminal belongs to.
 	Worktree = "worktree"
@@ -61,8 +61,8 @@ func IsPanel(labels map[string]string) bool { return IsShell(labels) || IsAction
 
 // Shell returns the labels of a shell owned by worktree path of repo repoID, and by
 // thread threadID when it is not empty.
-func Shell(threadID, repoID, worktree string) map[string]string {
-	l := map[string]string{Kind: KindShell, Repo: repoID, Worktree: worktree}
+func Shell(threadID, projectID, worktree string) map[string]string {
+	l := map[string]string{Kind: KindShell, Project: projectID, Worktree: worktree}
 	if threadID != "" {
 		l[Thread] = threadID
 	}
@@ -71,8 +71,8 @@ func Shell(threadID, repoID, worktree string) map[string]string {
 
 // ActionTerminal returns the labels of run runID of action actionID (named name) in a
 // terminal owned like a shell (see Shell).
-func ActionTerminal(threadID, repoID, worktree, actionID, name, runID string) map[string]string {
-	l := Shell(threadID, repoID, worktree)
+func ActionTerminal(threadID, projectID, worktree, actionID, name, runID string) map[string]string {
+	l := Shell(threadID, projectID, worktree)
 	l[Kind] = KindAction
 	l[Action] = actionID
 	l[ActionName] = name

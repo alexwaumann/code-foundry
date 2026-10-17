@@ -61,12 +61,12 @@ func (f fakeRunGetter) GetRun(_ context.Context, id string) (action.Run, error) 
 func TestActionRunForWake(t *testing.T) {
 	at := time.Unix(100, 0)
 	get := actionRunForWake(fakeRunGetter{
-		"r-1": {ID: "r-1", ActionID: "a-1", ActionName: "Test", RepoID: "web", State: action.RunExited, ExitCode: 2,
+		"r-1": {ID: "r-1", ActionID: "a-1", ActionName: "Test", ProjectID: "web", State: action.RunExited, ExitCode: 2,
 			StartedAt: at, FinishedAt: at.Add(time.Second), Output: "out"},
 		"r-2": {ID: "r-2", State: action.RunRunning},
 	})
 	r, ok := get(context.Background(), "r-1")
-	if !ok || !r.Finished || r.ExitCode != 2 || r.ActionName != "Test" || r.RepoID != "web" || r.Output != "out" || !r.FinishedAt.Equal(at.Add(time.Second)) {
+	if !ok || !r.Finished || r.ExitCode != 2 || r.ActionName != "Test" || r.ProjectID != "web" || r.Output != "out" || !r.FinishedAt.Equal(at.Add(time.Second)) {
 		t.Errorf("r-1 = %+v, %v", r, ok)
 	}
 	if r, ok := get(context.Background(), "r-2"); !ok || r.Finished {

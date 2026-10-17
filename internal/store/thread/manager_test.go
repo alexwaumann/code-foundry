@@ -20,24 +20,24 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/db"
 	"github.com/alexwaumann/code-foundry/internal/db/dbtest"
-	"github.com/alexwaumann/code-foundry/internal/store/repo"
-	"github.com/alexwaumann/code-foundry/internal/store/repo/repotest"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
+	"github.com/alexwaumann/code-foundry/internal/store/project/projecttest"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal/terminaltest"
 )
 
 // env is a Manager whose claude is the fake (fakeclaude_test.go) replaying a captured
 // stream, with a fake repo store (r1 at wt) and a fake terminal store for the shells.
 type env struct {
-	t      *testing.T
-	m      *Manager
-	terms  *terminaltest.Fake
-	repos  *repotest.Fake
-	paths  ClaudePaths
-	wt     string
-	home   string // Options.Home: the cwd of a thread without a project
-	dbPath string
-	bus    *bus.Bus
-	events *bus.Subscription[Event]
+	t        *testing.T
+	m        *Manager
+	terms    *terminaltest.Fake
+	projects *projecttest.Fake
+	paths    ClaudePaths
+	wt       string
+	home     string // Options.Home: the cwd of a thread without a project
+	dbPath   string
+	bus      *bus.Bus
+	events   *bus.Subscription[Event]
 
 	// log and argv are the fake's stdin log and latest argv; spawns is the directory of
 	// its per-process records (fakeclaude_test.go).
@@ -80,14 +80,14 @@ func newFixtureEnvAt(t *testing.T, path string, vars []string, mutate ...func(*O
 		o.DisablePreTrust = true
 	}
 	e.terms = terminaltest.New(nil)
-	e.repos = repotest.New(nil)
+	e.projects = projecttest.New(nil)
 	// claude starts in the worktrees Create makes: they must exist.
-	e.repos.WorktreeRoot, e.repos.MakeDirs = filepath.Join(dir, "worktrees"), true
+	e.projects.WorktreeRoot, e.projects.MakeDirs = filepath.Join(dir, "worktrees"), true
 	e.wt = filepath.Join(dir, "repo")
 	if err := os.MkdirAll(e.wt, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	e.repos.Put(repo.Repo{ID: "r1", Path: e.wt, Name: "repo", Git: true, Worktrees: []repo.Worktree{{RepoID: "r1", Path: e.wt, IsMain: true}}})
+	e.projects.Put(project.Project{ID: "r1", Path: e.wt, Name: "repo", Git: true, Worktrees: []project.Worktree{{ProjectID: "r1", Path: e.wt, IsMain: true}}})
 	e.home = filepath.Join(dir, "home")
 	if err := os.MkdirAll(e.home, 0o755); err != nil {
 		t.Fatal(err)
@@ -108,7 +108,7 @@ func (e *env) open(mutate ...func(*Options)) {
 		e.t.Fatal(err)
 	}
 	opts := Options{
-		DB: d, Terminals: e.terms, Repos: e.repos, Bus: e.bus, Paths: e.paths, Home: e.home,
+		DB: d, Terminals: e.terms, Projects: e.projects, Bus: e.bus, Paths: e.paths, Home: e.home,
 		Log:            slog.New(slog.NewTextHandler(io.Discard, nil)),
 		Tick:           20 * time.Millisecond,
 		StatusDebounce: 10 * time.Millisecond,
@@ -177,7 +177,7 @@ func (e *env) waitFor(id, what string, cond func(Thread) bool) Thread {
 
 func (e *env) create(o CreateOptions) Thread {
 	e.t.Helper()
-	if o.WorktreePath == "" && o.RepoID == "" && !o.NoProject {
+	if o.WorktreePath == "" && o.ProjectID == "" && !o.NoProject {
 		o.WorktreePath = e.wt
 	}
 	s, err := e.m.Create(e.ctx(), o)
@@ -356,7 +356,7 @@ func userLine(text string) string {
 func TestCreateSpawnsClaude(t *testing.T) {
 	e := newEnv(t, func(o *Options) { o.DisablePreTrust = false })
 	s := e.create(CreateOptions{WorktreePath: e.wt, Model: "opus", Effort: "high"})
-	if s.State != StateStarting || s.RepoID != "r1" || s.WorktreePath != e.wt {
+	if s.State != StateStarting || s.ProjectID != "r1" || s.WorktreePath != e.wt {
 		t.Fatalf("created = %+v", s)
 	}
 	spec := e.spec(s.ID)
@@ -384,14 +384,14 @@ func TestCreateResolvesWorktree(t *testing.T) {
 		o       CreateOptions
 		wantErr error
 	}{
-		{"repo only uses main worktree", CreateOptions{RepoID: "r1"}, nil},
-		{"unknown repo", CreateOptions{RepoID: "nope"}, ErrNotFound},
+		{"repo only uses main worktree", CreateOptions{ProjectID: "r1"}, nil},
+		{"unknown repo", CreateOptions{ProjectID: "nope"}, ErrNotFound},
 		{"unregistered path", CreateOptions{WorktreePath: other}, ErrFailedPrecondition},
-		{"path not in repo", CreateOptions{RepoID: "r1", WorktreePath: other}, ErrFailedPrecondition},
+		{"path not in repo", CreateOptions{ProjectID: "r1", WorktreePath: other}, ErrFailedPrecondition},
 		{"relative path", CreateOptions{WorktreePath: "repo"}, ErrInvalidArgument},
 		{"nothing", CreateOptions{}, ErrInvalidArgument},
-		{"bad effort", CreateOptions{RepoID: "r1", Effort: "huge"}, ErrInvalidArgument},
-		{"bad model", CreateOptions{RepoID: "r1", Model: "-x"}, ErrInvalidArgument},
+		{"bad effort", CreateOptions{ProjectID: "r1", Effort: "huge"}, ErrInvalidArgument},
+		{"bad model", CreateOptions{ProjectID: "r1", Model: "-x"}, ErrInvalidArgument},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -399,14 +399,14 @@ func TestCreateResolvesWorktree(t *testing.T) {
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("err = %v, want %v", err, tt.wantErr)
 			}
-			if err == nil && (s.WorktreePath != e.wt || s.RepoID != "r1") {
+			if err == nil && (s.WorktreePath != e.wt || s.ProjectID != "r1") {
 				t.Errorf("thread = %+v", s)
 			}
 		})
 	}
 	missing := filepath.Join(t.TempDir(), "no-such-claude")
 	bad := newEnv(t, func(o *Options) { o.Claude = missing })
-	if _, err := bad.m.Create(bad.ctx(), CreateOptions{RepoID: "r1"}); err == nil {
+	if _, err := bad.m.Create(bad.ctx(), CreateOptions{ProjectID: "r1"}); err == nil {
 		t.Fatal("spawn failure not reported")
 	}
 	if n := len(bad.m.Snapshot().Threads); n != 0 {

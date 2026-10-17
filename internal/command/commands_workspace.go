@@ -17,8 +17,8 @@ import (
 type WorkspaceBackend interface {
 	List(context.Context, *connect.Request[v1.ListWorkspacesRequest]) (*connect.Response[v1.ListWorkspacesResponse], error)
 	Create(context.Context, *connect.Request[v1.CreateWorkspaceRequest]) (*connect.Response[v1.CreateWorkspaceResponse], error)
-	AddRepo(context.Context, *connect.Request[v1.AddWorkspaceRepoRequest]) (*connect.Response[v1.AddWorkspaceRepoResponse], error)
-	RemoveRepo(context.Context, *connect.Request[v1.RemoveWorkspaceRepoRequest]) (*connect.Response[v1.RemoveWorkspaceRepoResponse], error)
+	AddProject(context.Context, *connect.Request[v1.AddWorkspaceProjectRequest]) (*connect.Response[v1.AddWorkspaceProjectResponse], error)
+	RemoveProject(context.Context, *connect.Request[v1.RemoveWorkspaceProjectRequest]) (*connect.Response[v1.RemoveWorkspaceProjectResponse], error)
 	Remove(context.Context, *connect.Request[v1.RemoveWorkspaceRequest]) (*connect.Response[v1.RemoveWorkspaceResponse], error)
 	Members(context.Context, *connect.Request[v1.WorkspaceMembersRequest]) (*connect.Response[v1.WorkspaceMembersResponse], error)
 }
@@ -58,8 +58,8 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 					Name: a.String("name"), Branch: a.String("branch"), BaseRef: a.String("base"), Fetch: a.Bool("fetch"),
 				}
 				for _, item := range splitList(a.String("repos")) {
-					repo, base, _ := strings.Cut(item, ":")
-					req.Members = append(req.Members, &v1.WorkspaceMemberSpec{Repo: strings.TrimSpace(repo), BaseRef: strings.TrimSpace(base)})
+					project, base, _ := strings.Cut(item, ":")
+					req.Members = append(req.Members, &v1.WorkspaceMemberSpec{Project: strings.TrimSpace(project), BaseRef: strings.TrimSpace(base)})
 				}
 				if len(req.Members) == 0 {
 					return Result{}, InvalidArg("repos", "argument \"repos\": name at least one repository")
@@ -128,8 +128,8 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 				fetchArg,
 			},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-				res, err := b.AddRepo(ctx, connect.NewRequest(&v1.AddWorkspaceRepoRequest{
-					Workspace: a.String("workspace"), Cwd: a.Path("cwd"), Repo: a.String("repo"),
+				res, err := b.AddProject(ctx, connect.NewRequest(&v1.AddWorkspaceProjectRequest{
+					Workspace: a.String("workspace"), Cwd: a.Path("cwd"), Project: a.String("repo"),
 					BaseRef: a.String("base"), Fetch: a.Bool("fetch"),
 				}))
 				if err != nil {
@@ -157,8 +157,8 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 			},
 			Confirm: "Remove project {repo} from its workspace? This deletes its worktree from disk.",
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-				res, err := b.RemoveRepo(ctx, connect.NewRequest(&v1.RemoveWorkspaceRepoRequest{
-					Workspace: a.String("workspace"), Cwd: a.Path("cwd"), Repo: a.String("repo"),
+				res, err := b.RemoveProject(ctx, connect.NewRequest(&v1.RemoveWorkspaceProjectRequest{
+					Workspace: a.String("workspace"), Cwd: a.Path("cwd"), Project: a.String("repo"),
 					Force: a.Bool("force"), DeleteBranch: a.Bool("delete-branch"),
 				}))
 				if err != nil {
@@ -228,11 +228,11 @@ func formatMembers(m *v1.WorkspaceMembersResponse) string {
 		if mem.GetMissing() {
 			branch += " (missing)"
 		}
-		name := mem.GetRepoName()
+		name := mem.GetProjectName()
 		if name == "" {
 			name = "?"
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", name, mem.GetRepoId(), mem.GetWorktreePath(), branch)
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", name, mem.GetProjectId(), mem.GetWorktreePath(), branch)
 	}
 	_ = tw.Flush()
 	return strings.TrimRight(b.String(), "\n")

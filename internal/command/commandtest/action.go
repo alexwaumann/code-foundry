@@ -38,7 +38,7 @@ func (f *Action) List(_ context.Context, r *connect.Request[v1.ListActionsReques
 	}
 	out := &v1.ListActionsResponse{}
 	for _, a := range f.Actions {
-		if r.Msg.GetRepoId() == "" || a.GetRepoId() == r.Msg.GetRepoId() {
+		if r.Msg.GetProjectId() == "" || a.GetProjectId() == r.Msg.GetProjectId() {
 			out.Actions = append(out.Actions, a)
 		}
 	}
@@ -52,7 +52,7 @@ func (f *Action) Create(_ context.Context, r *connect.Request[v1.CreateActionReq
 	}
 	m := r.Msg
 	return connect.NewResponse(&v1.CreateActionResponse{Action: &v1.Action{
-		Id: "a-new", RepoId: m.GetRepoId(), Name: m.GetName(), Command: m.GetCommand(), Icon: m.GetIcon(),
+		Id: "a-new", ProjectId: m.GetProjectId(), Name: m.GetName(), Command: m.GetCommand(), Icon: m.GetIcon(),
 		InTerminal: m.GetInTerminal(), OnWorktreeCreate: m.GetOnWorktreeCreate(),
 	}}), nil
 }
@@ -91,7 +91,7 @@ func (f *Action) Run(_ context.Context, r *connect.Request[v1.RunActionRequest])
 	if f.Started != nil {
 		run = proto.CloneOf(f.Started)
 	}
-	run.ThreadId, run.WorktreePath, run.RepoId = r.Msg.GetThreadId(), r.Msg.GetWorktreePath(), r.Msg.GetRepoId()
+	run.ThreadId, run.WorktreePath, run.ProjectId = r.Msg.GetThreadId(), r.Msg.GetWorktreePath(), r.Msg.GetProjectId()
 	if run.Mode == v1.ActionRunMode_ACTION_RUN_MODE_UNSPECIFIED {
 		run.Mode = r.Msg.GetMode()
 	}

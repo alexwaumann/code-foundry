@@ -18,7 +18,7 @@ func TestCreateNoProject(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.RepoID != "" || s.WorkspaceID != "" || s.WorktreePath != e.home || s.CreatedWorktree || s.BaseRef != "" {
+	if s.ProjectID != "" || s.WorkspaceID != "" || s.WorktreePath != e.home || s.CreatedWorktree || s.BaseRef != "" {
 		t.Fatalf("created = %+v", s)
 	}
 	if spec := e.spec(s.ID); !samePath(spec.Cwd, e.home) {
@@ -37,12 +37,12 @@ func TestCreateNoProjectIsExclusive(t *testing.T) {
 		name string
 		o    CreateOptions
 	}{
-		{"repo", CreateOptions{RepoID: "r1"}},
+		{"repo", CreateOptions{ProjectID: "r1"}},
 		{"worktree", CreateOptions{WorktreePath: e.wt}},
-		{"new worktree", CreateOptions{RepoID: "r1", NewWorktree: &NewWorktree{}}},
+		{"new worktree", CreateOptions{ProjectID: "r1", NewWorktree: &NewWorktree{}}},
 		{"new worktree alone", CreateOptions{NewWorktree: &NewWorktree{}}},
 		{"workspace", CreateOptions{WorkspaceID: "login"}},
-		{"new workspace", CreateOptions{NewWorkspace: &NewWorkspace{Repos: []string{"r1"}}}},
+		{"new workspace", CreateOptions{NewWorkspace: &NewWorkspace{Projects: []string{"r1"}}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -64,12 +64,12 @@ func TestCreateNoProjectIsExclusive(t *testing.T) {
 func TestRunInRefusesNoProjectThread(t *testing.T) {
 	e := newWSEnv(t)
 	s := e.connected(CreateOptions{NoProject: true})
-	for _, target := range []RunInTarget{{RepoID: "r1"}, {WorktreePath: e.wt2}} {
+	for _, target := range []RunInTarget{{ProjectID: "r1"}, {WorktreePath: e.wt2}} {
 		if _, err := e.m.RunIn(e.ctx(), s.ID, target); !errors.Is(err, ErrFailedPrecondition) {
 			t.Errorf("RunIn %+v = %v, want %v", target, err, ErrFailedPrecondition)
 		}
 	}
-	if got, _ := e.m.Get(e.ctx(), s.ID); got.WorktreePath != e.home || got.RepoID != "" || got.PendingWorktreePath != "" {
+	if got, _ := e.m.Get(e.ctx(), s.ID); got.WorktreePath != e.home || got.ProjectID != "" || got.PendingWorktreePath != "" {
 		t.Errorf("after refusals = %+v", got)
 	}
 }
@@ -86,7 +86,7 @@ func TestNoProjectThreadSurvivesForkReconnectAndRestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if f.RepoID != "" || f.WorkspaceID != "" || f.WorktreePath != e.home || f.ParentID != s.ID {
+	if f.ProjectID != "" || f.WorkspaceID != "" || f.WorktreePath != e.home || f.ParentID != s.ID {
 		t.Errorf("fork = %+v", f)
 	}
 	if spec := e.spec(f.ID); !samePath(spec.Cwd, e.home) || argOf(spec.Argv, "--resume") != cid {
@@ -99,7 +99,7 @@ func TestNoProjectThreadSurvivesForkReconnectAndRestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r.RepoID != "" || r.WorkspaceID != "" || r.WorktreePath != e.home || r.LastError != "" {
+	if r.ProjectID != "" || r.WorkspaceID != "" || r.WorktreePath != e.home || r.LastError != "" {
 		t.Errorf("reconnected = %+v", r)
 	}
 	if spec := e.spec(s.ID); !samePath(spec.Cwd, e.home) || argOf(spec.Argv, "--resume") != cid {
@@ -114,7 +114,7 @@ func TestNoProjectThreadSurvivesForkReconnectAndRestart(t *testing.T) {
 	e.open()
 	for _, id := range []string{s.ID, f.ID} {
 		got, err := e.m.Get(e.ctx(), id)
-		if err != nil || got.RepoID != "" || got.WorkspaceID != "" || got.WorktreePath != e.home {
+		if err != nil || got.ProjectID != "" || got.WorkspaceID != "" || got.WorktreePath != e.home {
 			t.Errorf("after restart %s = %+v (%v)", id, got, err)
 		}
 	}
@@ -126,9 +126,9 @@ func TestNoProjectFileRefs(t *testing.T) {
 	e := newEnv(t)
 	s := e.connected(CreateOptions{NoProject: true})
 	roots := e.m.fileRefRoots(s)
-	for _, repoID := range []string{"", "r1"} {
-		if wt, ok := roots(repoID); ok {
-			t.Errorf("roots(%q) = %q, true", repoID, wt)
+	for _, projectID := range []string{"", "r1"} {
+		if wt, ok := roots(projectID); ok {
+			t.Errorf("roots(%q) = %q, true", projectID, wt)
 		}
 	}
 	got, dropped := rewriteFileRefs("read @cf-file://r1/README.md and @cf-file:///x.go", roots)

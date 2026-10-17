@@ -119,7 +119,7 @@ const ReasonInterrupted = "interrupted"
 type Thread struct {
 	ID              string
 	ClaudeSessionID string // set once the transcript file is discovered
-	RepoID          string // repository of the cwd; the owner when WorkspaceID is empty
+	ProjectID       string // repository of the cwd; the owner when WorkspaceID is empty
 	WorktreePath    string // the cwd
 	Name            string
 	AutoNamed       bool
@@ -289,7 +289,7 @@ type CreateOptions struct {
 	// RepoID and WorktreePath select the worktree. Either may be empty: a repo alone
 	// means its main worktree; a path alone is looked up among registered repos. With
 	// WorkspaceID or NewWorkspace they pick the member worktree instead.
-	RepoID       string
+	ProjectID    string
 	WorktreePath string
 	// WorkspaceID (an id or a name), when set, makes the workspace the thread's owner.
 	// The thread runs in the member WorktreePath or RepoID names, else the first
@@ -345,7 +345,7 @@ type CreateOptions struct {
 // RunInTarget names the member a workspace thread should run in: its repository id or
 // its worktree path (both, if given, must agree).
 type RunInTarget struct {
-	RepoID       string
+	ProjectID    string
 	WorktreePath string
 }
 

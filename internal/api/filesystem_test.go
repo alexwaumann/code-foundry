@@ -12,8 +12,8 @@ import (
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
-	"github.com/alexwaumann/code-foundry/internal/store/repo"
-	"github.com/alexwaumann/code-foundry/internal/store/repo/repotest"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
+	"github.com/alexwaumann/code-foundry/internal/store/project/projecttest"
 )
 
 func TestFilesystemListDirectories(t *testing.T) {
@@ -26,11 +26,11 @@ func TestFilesystemListDirectories(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	fake := repotest.New(nil)
+	fake := projecttest.New(nil)
 	proj := filepath.Join(root, "proj")
-	fake.Put(repo.Repo{ID: "p", Path: proj, Worktrees: []repo.Worktree{
-		{RepoID: "p", Path: proj, IsMain: true},
-		{RepoID: "p", Path: filepath.Join(root, "proj-wt")},
+	fake.Put(project.Project{ID: "p", Path: proj, Worktrees: []project.Worktree{
+		{ProjectID: "p", Path: proj, IsMain: true},
+		{ProjectID: "p", Path: filepath.Join(root, "proj-wt")},
 	}})
 
 	route := NewFilesystem(root, fake).Route()
@@ -88,10 +88,10 @@ func TestFilesystemListDirectories(t *testing.T) {
 	}
 }
 
-func TestRepoRegisterOutsideHome(t *testing.T) {
-	fake, c := newRepoServer(t)
+func TestProjectRegisterOutsideHome(t *testing.T) {
+	fake, c := newProjectServer(t)
 	fake.AllowedRoot = "/Users/me"
-	_, err := c.Register(context.Background(), connect.NewRequest(&v1.RegisterRepoRequest{Path: "/opt/proj"}))
+	_, err := c.Register(context.Background(), connect.NewRequest(&v1.RegisterProjectRequest{Path: "/opt/proj"}))
 	if connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Fatalf("Register outside home err = %v, want InvalidArgument", err)
 	}

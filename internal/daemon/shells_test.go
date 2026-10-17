@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
-	"github.com/alexwaumann/code-foundry/internal/store/repo"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal/terminaltest"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
@@ -28,12 +28,12 @@ func TestShellReaper(t *testing.T) {
 			if path == "%dir" {
 				path = dir
 			}
-			return repo.WorktreeRemoved{RepoID: "r1", Path: path}
+			return project.WorktreeRemoved{ProjectID: "r1", Path: path}
 		}
 	}
 	event := func(ev any) func(string) any { return func(string) any { return ev } }
-	action := func(threadID, repoID, worktree string) map[string]string {
-		return termlabel.ActionTerminal(threadID, repoID, worktree, "a-1", "Test", "r-1")
+	action := func(threadID, projectID, worktree string) map[string]string {
+		return termlabel.ActionTerminal(threadID, projectID, worktree, "a-1", "Test", "r-1")
 	}
 	tests := []struct {
 		name string
@@ -61,8 +61,8 @@ func TestShellReaper(t *testing.T) {
 		{name: "removing another worktree leaves a shell", labels: termlabel.Shell("", "r1", "%dir"), event: worktreeRemoved(gone)},
 		{name: "removing its worktree leaves an owned non-shell terminal", labels: owned, event: worktreeRemoved(gone)},
 		{name: "unregistering its project kills and removes a shell", labels: termlabel.Shell("s1", "r1", "%dir"),
-			event: event(repo.RepoRemoved{ID: "r1"}), wantGone: true},
-		{name: "unregistering another project leaves a shell", labels: termlabel.Shell("", "r1", "%dir"), event: event(repo.RepoRemoved{ID: "r2"})},
+			event: event(project.ProjectRemoved{ID: "r1"}), wantGone: true},
+		{name: "unregistering another project leaves a shell", labels: termlabel.Shell("", "r1", "%dir"), event: event(project.ProjectRemoved{ID: "r2"})},
 		{name: "removing its thread kills and removes a shell", labels: termlabel.Shell("s1", "r1", "%dir"),
 			event: event(thread.Removed{ID: "s1"}), wantGone: true},
 		{name: "removing another thread leaves a shell", labels: termlabel.Shell("s1", "r1", "%dir"), event: event(thread.Removed{ID: "s2"})},
@@ -74,7 +74,7 @@ func TestShellReaper(t *testing.T) {
 		// A thread without a project: no repo label, its worktree label is the home dir.
 		{name: "the sweep leaves a no-project thread's shell", labels: termlabel.Shell("s1", "", "%dir")},
 		{name: "unregistering a project leaves a no-project thread's shell", labels: termlabel.Shell("s1", "", "%dir"),
-			event: event(repo.RepoRemoved{ID: "r1"})},
+			event: event(project.ProjectRemoved{ID: "r1"})},
 		{name: "removing a no-project thread kills and removes its shell", labels: termlabel.Shell("s1", "", "%dir"),
 			event: event(thread.Removed{ID: "s1"}), wantGone: true},
 		// Action runs in a terminal: they stay when they exit (the user reads the output,
@@ -87,7 +87,7 @@ func TestShellReaper(t *testing.T) {
 		{name: "removing its thread removes an exited action terminal", labels: action("s1", "r1", "%dir"), exitedBefore: true,
 			event: event(thread.Removed{ID: "s1"}), wantGone: true},
 		{name: "unregistering its project kills and removes an action terminal", labels: action("", "r1", "%dir"),
-			event: event(repo.RepoRemoved{ID: "r1"}), wantGone: true},
+			event: event(project.ProjectRemoved{ID: "r1"}), wantGone: true},
 		{name: "removing its worktree kills and removes an action terminal", labels: action("", "r1", gone),
 			event: worktreeRemoved(gone), wantGone: true},
 		{name: "the sweep removes an exited action terminal whose worktree is gone", labels: action("", "r1", gone), exitedBefore: true,
@@ -123,8 +123,8 @@ func TestShellReaper(t *testing.T) {
 			}
 			stop, err := startShellReaper(t.Context(), shellReaperOptions{
 				Log: discard, Terminals: f, Bus: b, SweepEvery: sweep,
-				RepoExists:   func(id string) bool { return id == "r1" || id == "r2" },
-				ThreadExists: func(id string) bool { return id == "s1" || id == "s2" },
+				ProjectExists: func(id string) bool { return id == "r1" || id == "r2" },
+				ThreadExists:  func(id string) bool { return id == "s1" || id == "s2" },
 			})
 			if err != nil {
 				t.Fatal(err)
@@ -135,7 +135,7 @@ func TestShellReaper(t *testing.T) {
 			}
 			if tt.event != nil {
 				switch e := tt.event(dir).(type) {
-				case repo.Event:
+				case project.Event:
 					bus.Publish(b, e)
 				case thread.Event:
 					bus.Publish(b, e)
@@ -183,7 +183,7 @@ func TestShellReaperStopsDuringACleanup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bus.Publish[repo.Event](b, repo.WorktreeRemoved{RepoID: "r1", Path: gone})
+	bus.Publish[project.Event](b, project.WorktreeRemoved{ProjectID: "r1", Path: gone})
 	deadline := time.Now().Add(5 * time.Second)
 	for f.kills.Load() == 0 && time.Now().Before(deadline) {
 		time.Sleep(5 * time.Millisecond)

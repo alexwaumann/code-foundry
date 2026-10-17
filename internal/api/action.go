@@ -35,10 +35,10 @@ func (h *Action) Route(opts ...connect.HandlerOption) Route {
 // List returns a project's actions (every project's without repo_id) and the runs.
 func (h *Action) List(_ context.Context, req *connect.Request[v1.ListActionsRequest]) (*connect.Response[v1.ListActionsResponse], error) {
 	snap := h.store.Snapshot()
-	repoID := req.Msg.GetRepoId()
-	out := &v1.ListActionsResponse{Actions: actionsToProto(snap.ForRepo(repoID))}
+	projectID := req.Msg.GetProjectId()
+	out := &v1.ListActionsResponse{Actions: actionsToProto(snap.ForProject(projectID))}
 	for _, r := range snap.Runs {
-		if repoID == "" || r.RepoID == repoID {
+		if projectID == "" || r.ProjectID == projectID {
 			out.Runs = append(out.Runs, actionRunToProto(r))
 		}
 	}
@@ -49,7 +49,7 @@ func (h *Action) List(_ context.Context, req *connect.Request[v1.ListActionsRequ
 func (h *Action) Create(ctx context.Context, req *connect.Request[v1.CreateActionRequest]) (*connect.Response[v1.CreateActionResponse], error) {
 	m := req.Msg
 	a, err := h.store.Create(ctx, action.CreateOptions{
-		RepoID: m.GetRepoId(), Name: m.GetName(), Command: m.GetCommand(), Icon: actionIconFromProto(m.GetIcon()),
+		ProjectID: m.GetProjectId(), Name: m.GetName(), Command: m.GetCommand(), Icon: actionIconFromProto(m.GetIcon()),
 		InTerminal: m.GetInTerminal(), OnWorktreeCreate: m.GetOnWorktreeCreate(),
 	})
 	if err != nil {
@@ -99,7 +99,7 @@ func (h *Action) Run(ctx context.Context, req *connect.Request[v1.RunActionReque
 		mode = action.ModeBackground
 	}
 	r, err := h.store.Run(ctx, action.RunOptions{
-		Action: m.GetAction(), ThreadID: m.GetThreadId(), Worktree: m.GetWorktreePath(), RepoID: m.GetRepoId(), Mode: mode,
+		Action: m.GetAction(), ThreadID: m.GetThreadId(), Worktree: m.GetWorktreePath(), ProjectID: m.GetProjectId(), Mode: mode,
 	})
 	if err != nil {
 		return nil, actionError(err)
@@ -175,7 +175,7 @@ func actionEventToProto(ev action.Event) *v1.ActionEvent {
 		return &v1.ActionEvent{Event: &v1.ActionEvent_RunRemovedId{RunRemovedId: e.ID}}
 	case action.RunFinished:
 		return &v1.ActionEvent{Event: &v1.ActionEvent_RunFinished{RunFinished: &v1.ActionRunFinished{
-			RunId: e.RunID, ActionId: e.ActionID, ActionName: e.ActionName, RepoId: e.RepoID, ThreadId: e.ThreadID,
+			RunId: e.RunID, ActionId: e.ActionID, ActionName: e.ActionName, ProjectId: e.ProjectID, ThreadId: e.ThreadID,
 			ExitCode: int32(e.ExitCode), Mode: actionModeToProto(e.Mode), Trigger: actionTriggerToProto(e.Trigger),
 			TerminalId: e.TerminalID,
 		}}}
@@ -212,7 +212,7 @@ func actionsToProto(as []action.Action) []*v1.Action {
 
 func actionToProto(a action.Action) *v1.Action {
 	p := &v1.Action{
-		Id: a.ID, RepoId: a.RepoID, Name: a.Name, Command: a.Command, Icon: actionIcons[a.Icon],
+		Id: a.ID, ProjectId: a.ProjectID, Name: a.Name, Command: a.Command, Icon: actionIcons[a.Icon],
 		InTerminal: a.InTerminal, OnWorktreeCreate: a.OnWorktreeCreate, Position: int32(a.Position),
 	}
 	if !a.CreatedAt.IsZero() {
@@ -246,7 +246,7 @@ func actionTriggerToProto(t action.Trigger) v1.ActionRunTrigger {
 
 func actionRunToProto(r action.Run) *v1.ActionRun {
 	p := &v1.ActionRun{
-		Id: r.ID, ActionId: r.ActionID, ActionName: r.ActionName, Command: r.Command, RepoId: r.RepoID,
+		Id: r.ID, ActionId: r.ActionID, ActionName: r.ActionName, Command: r.Command, ProjectId: r.ProjectID,
 		ThreadId: r.ThreadID, WorktreePath: r.Worktree, Mode: actionModeToProto(r.Mode), TerminalId: r.TerminalID,
 		// A proto string must be valid UTF-8 (the store already replaces invalid bytes).
 		Trigger: actionTriggerToProto(r.Trigger), Output: strings.ToValidUTF8(r.Output, "\uFFFD"), OutputTruncated: r.Truncated,

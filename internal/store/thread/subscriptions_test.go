@@ -76,7 +76,7 @@ func TestSubscribeTarget(t *testing.T) {
 func TestThreadWakeMessage(t *testing.T) {
 	at := time.Date(2026, 10, 17, 12, 0, 0, 5e6, time.UTC)
 	child := Thread{ID: "s-c", Name: "Write retry backoff tests", State: StateConnected, Status: StatusNeedsAttention,
-		StatusReason: "finished", RepoID: "r1", WorktreePath: "/w", CreatedBy: "s-p", Labels: []string{"tests"},
+		StatusReason: "finished", ProjectID: "r1", WorktreePath: "/w", CreatedBy: "s-p", Labels: []string{"tests"},
 		Report: Report{Status: ReportDone, Summary: "6 table tests, all passing", Data: `{"n":6}`, At: at}}
 	msg := threadWake(Subscription{ID: "sub-1", Condition: CondSettled}, child, at)
 	wantTitle := `Thread "Write retry backoff tests" (s-c) is idle: finished. Report: done — 6 table tests, all passing.`
@@ -89,9 +89,9 @@ func TestThreadWakeMessage(t *testing.T) {
 	var p struct {
 		Kind, SubscriptionID, Condition, FiredAt string
 		Thread                                   struct {
-			ID, Name, State, Status, StatusReason, RepoID, WorktreePath, CreatedBy string
-			Labels                                                                 []string
-			Report                                                                 struct {
+			ID, Name, State, Status, StatusReason, ProjectID, WorktreePath, CreatedBy string
+			Labels                                                                    []string
+			Report                                                                    struct {
 				Status, Summary, At string
 				Data                map[string]int
 			}
@@ -142,7 +142,7 @@ func TestThreadWakeMessage(t *testing.T) {
 func TestRunWakeMessage(t *testing.T) {
 	at := time.Date(2026, 10, 17, 12, 0, 0, 0, time.UTC)
 	out := strings.Repeat("a", 5000) + "é" + strings.Repeat("b", 4094)
-	msg := runWake(Subscription{ID: "sub-r"}, ActionRun{ID: "r-1", ActionID: "a-1", ActionName: "Test", RepoID: "r1", Finished: true,
+	msg := runWake(Subscription{ID: "sub-r"}, ActionRun{ID: "r-1", ActionID: "a-1", ActionName: "Test", ProjectID: "r1", Finished: true,
 		ExitCode: 3, StartedAt: at, FinishedAt: at.Add(time.Second), Output: out}, at)
 	if want := `Action "Test" run r-1 finished with exit 3.`; msg.WakeTitle != want {
 		t.Errorf("title = %q, want %q", msg.WakeTitle, want)

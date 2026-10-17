@@ -38,8 +38,8 @@ const threadListDefaultLimit = "50"
 // ThreadListDeps are thread.list's dependencies: the threads, and the projects for
 // their names and branches.
 type ThreadListDeps struct {
-	Thread ThreadBackend
-	Repo   RepoBackend
+	Thread  ThreadBackend
+	Project ProjectBackend
 }
 
 // RegisterThreadList registers thread.list.
@@ -70,7 +70,7 @@ func RegisterThreadList(r *Registry, d ThreadListDeps) error {
 			f := &v1.ThreadFilter{
 				All: a.Bool("all"), IncludeArchived: a.Bool("archived"),
 				Status: threadListStatuses[a.String("status")], State: threadListState(a.String("state")),
-				Repo: strings.TrimSpace(a.String("repo")), Workspace: strings.TrimSpace(a.String("workspace")),
+				Project: strings.TrimSpace(a.String("repo")), Workspace: strings.TrimSpace(a.String("workspace")),
 				Labels: splitList(a.String("label")), Limit: int32(a.Int("limit")),
 			}
 			if by := strings.TrimSpace(a.String("created-by")); by != "" && by != "user" {
@@ -88,11 +88,11 @@ func RegisterThreadList(r *Registry, d ThreadListDeps) error {
 			if err != nil {
 				return Result{}, err
 			}
-			repos, err := d.Repo.List(ctx, connect.NewRequest(&v1.ListReposRequest{}))
+			projects, err := d.Project.List(ctx, connect.NewRequest(&v1.ListProjectsRequest{}))
 			if err != nil {
 				return Result{}, err
 			}
-			return Result{Message: formatThreadList(res.Msg.GetThreads(), repos.Msg.GetRepos(), f, time.Now()), JSON: res.Msg}, nil
+			return Result{Message: formatThreadList(res.Msg.GetThreads(), projects.Msg.GetProjects(), f, time.Now()), JSON: res.Msg}, nil
 		},
 	})
 }
@@ -106,7 +106,7 @@ func threadListState(s string) v1.ThreadState {
 
 // formatThreadList is thread.list's text: one aligned line per thread, then a hint when
 // the limit cut the list, or why it is empty.
-func formatThreadList(threads []*v1.Thread, repos []*v1.Repo, f *v1.ThreadFilter, now time.Time) string {
+func formatThreadList(threads []*v1.Thread, projects []*v1.Project, f *v1.ThreadFilter, now time.Time) string {
 	if len(threads) == 0 {
 		if !f.GetAll() && !f.GetIncludeArchived() {
 			return "no threads (archived threads are left out; --archived includes them)"
@@ -116,7 +116,7 @@ func formatThreadList(threads []*v1.Thread, repos []*v1.Repo, f *v1.ThreadFilter
 	var sb strings.Builder
 	tw := tabwriter.NewWriter(&sb, 0, 4, 2, ' ', 0)
 	for _, s := range threads {
-		line := fmt.Sprintf("%s\t%s\t%s\t%s\t%s", s.GetId(), threadStatusWord(s), threadDisplayName(s), threadPlace(s, repos), age(lastActivity(s), now))
+		line := fmt.Sprintf("%s\t%s\t%s\t%s\t%s", s.GetId(), threadStatusWord(s), threadDisplayName(s), threadPlace(s, projects), age(lastActivity(s), now))
 		var marks []string
 		if s.GetArchivedAt() != nil {
 			marks = append(marks, "archived")
@@ -172,12 +172,12 @@ func threadDisplayName(s *v1.Thread) string {
 
 // threadPlace is "<project>@<branch>" for a thread's cwd ("<project>" alone when the
 // branch is unknown), "no project" for a thread without one.
-func threadPlace(s *v1.Thread, repos []*v1.Repo) string {
-	if s.GetRepoId() == "" && s.GetWorkspaceId() == "" {
+func threadPlace(s *v1.Thread, projects []*v1.Project) string {
+	if s.GetProjectId() == "" && s.GetWorkspaceId() == "" {
 		return "no project"
 	}
-	for _, r := range repos {
-		if r.GetId() != s.GetRepoId() {
+	for _, r := range projects {
+		if r.GetId() != s.GetProjectId() {
 			continue
 		}
 		for _, w := range r.GetWorktrees() {
@@ -187,7 +187,7 @@ func threadPlace(s *v1.Thread, repos []*v1.Repo) string {
 		}
 		return r.GetName()
 	}
-	return cmp.Or(s.GetRepoId(), filepath.Base(s.GetWorktreePath()))
+	return cmp.Or(s.GetProjectId(), filepath.Base(s.GetWorktreePath()))
 }
 
 // lastActivity is when the thread last did something (else when it was created).

@@ -34,7 +34,7 @@ func TestActionUnary(t *testing.T) {
 	fake, c := newActionServer(t)
 	ctx := context.Background()
 	res, err := c.Create(ctx, connect.NewRequest(&v1.CreateActionRequest{
-		RepoId: "web", Name: "Test", Command: "go test ./...", Icon: v1.ActionIcon_ACTION_ICON_TEST, InTerminal: true,
+		ProjectId: "web", Name: "Test", Command: "go test ./...", Icon: v1.ActionIcon_ACTION_ICON_TEST, InTerminal: true,
 	}))
 	if err != nil {
 		t.Fatal(err)
@@ -43,11 +43,11 @@ func TestActionUnary(t *testing.T) {
 	if a.GetId() == "" || a.GetIcon() != v1.ActionIcon_ACTION_ICON_TEST || !a.GetInTerminal() || a.GetCreatedAt() == nil {
 		t.Fatalf("Create = %v", a)
 	}
-	if _, err := c.Create(ctx, connect.NewRequest(&v1.CreateActionRequest{RepoId: "web", Name: "test", Command: "x"})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
+	if _, err := c.Create(ctx, connect.NewRequest(&v1.CreateActionRequest{ProjectId: "web", Name: "test", Command: "x"})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Errorf("duplicate: %v", err)
 	}
 	// An unset icon is the default; only set fields change.
-	plain, err := c.Create(ctx, connect.NewRequest(&v1.CreateActionRequest{RepoId: "web", Name: "Build", Command: "make"}))
+	plain, err := c.Create(ctx, connect.NewRequest(&v1.CreateActionRequest{ProjectId: "web", Name: "Build", Command: "make"}))
 	if err != nil || plain.Msg.GetAction().GetIcon() != v1.ActionIcon_ACTION_ICON_PLAY {
 		t.Fatalf("Create default icon = %v, %v", plain, err)
 	}
@@ -64,7 +64,7 @@ func TestActionUnary(t *testing.T) {
 		t.Errorf("Update to no icon: %v", err)
 	}
 
-	run, err := c.Run(ctx, connect.NewRequest(&v1.RunActionRequest{Action: "unit TESTS", ThreadId: "s1", RepoId: "web",
+	run, err := c.Run(ctx, connect.NewRequest(&v1.RunActionRequest{Action: "unit TESTS", ThreadId: "s1", ProjectId: "web",
 		Mode: v1.ActionRunMode_ACTION_RUN_MODE_TERMINAL}))
 	if err != nil {
 		t.Fatal(err)
@@ -74,10 +74,10 @@ func TestActionUnary(t *testing.T) {
 		r.GetTerminalId() == "" || r.GetTrigger() != v1.ActionRunTrigger_ACTION_RUN_TRIGGER_USER {
 		t.Fatalf("Run = %v", r)
 	}
-	if ran := fake.Ran(); len(ran) != 1 || ran[0] != (action.RunOptions{Action: "unit TESTS", ThreadID: "s1", RepoID: "web", Mode: action.ModeTerminal}) {
+	if ran := fake.Ran(); len(ran) != 1 || ran[0] != (action.RunOptions{Action: "unit TESTS", ThreadID: "s1", ProjectID: "web", Mode: action.ModeTerminal}) {
 		t.Errorf("Ran = %+v", ran)
 	}
-	if _, err := c.Run(ctx, connect.NewRequest(&v1.RunActionRequest{Action: "deploy", RepoId: "web"})); connect.CodeOf(err) != connect.CodeNotFound {
+	if _, err := c.Run(ctx, connect.NewRequest(&v1.RunActionRequest{Action: "deploy", ProjectId: "web"})); connect.CodeOf(err) != connect.CodeNotFound {
 		t.Errorf("Run unknown: %v", err)
 	}
 
@@ -103,11 +103,11 @@ func TestActionUnary(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("WaitRun did not return")
 	}
-	list, err := c.List(ctx, connect.NewRequest(&v1.ListActionsRequest{RepoId: "web"}))
+	list, err := c.List(ctx, connect.NewRequest(&v1.ListActionsRequest{ProjectId: "web"}))
 	if err != nil || len(list.Msg.GetActions()) != 2 || len(list.Msg.GetRuns()) != 1 || list.Msg.GetRuns()[0].GetOutput() != "" {
 		t.Fatalf("List = %v, %v", list, err)
 	}
-	if other, _ := c.List(ctx, connect.NewRequest(&v1.ListActionsRequest{RepoId: "api"})); len(other.Msg.GetActions())+len(other.Msg.GetRuns()) != 0 {
+	if other, _ := c.List(ctx, connect.NewRequest(&v1.ListActionsRequest{ProjectId: "api"})); len(other.Msg.GetActions())+len(other.Msg.GetRuns()) != 0 {
 		t.Errorf("List api = %v", other.Msg)
 	}
 	if _, err := c.Delete(ctx, connect.NewRequest(&v1.DeleteActionRequest{Id: a.GetId()})); err != nil {
@@ -122,7 +122,7 @@ func TestActionWatch(t *testing.T) {
 	fake, c := newActionServer(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	if _, err := fake.Create(ctx, action.CreateOptions{RepoID: "web", Name: "Lint", Command: "make lint"}); err != nil {
+	if _, err := fake.Create(ctx, action.CreateOptions{ProjectID: "web", Name: "Lint", Command: "make lint"}); err != nil {
 		t.Fatal(err)
 	}
 	stream, err := c.Watch(ctx, connect.NewRequest(&v1.WatchActionsRequest{}))
@@ -139,7 +139,7 @@ func TestActionWatch(t *testing.T) {
 	if s := next().GetSnapshot(); len(s.GetActions()) != 1 || s.GetActions()[0].GetName() != "Lint" {
 		t.Fatalf("snapshot = %v", s)
 	}
-	r, err := fake.Run(ctx, action.RunOptions{Action: "lint", RepoID: "web", Worktree: "/w"})
+	r, err := fake.Run(ctx, action.RunOptions{Action: "lint", ProjectID: "web", Worktree: "/w"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +153,7 @@ func TestActionWatch(t *testing.T) {
 		t.Fatalf("run_updated = %v", u)
 	}
 	f := next().GetRunFinished()
-	if f.GetRunId() != r.ID || f.GetExitCode() != 1 || f.GetActionName() != "Lint" || f.GetRepoId() != "web" ||
+	if f.GetRunId() != r.ID || f.GetExitCode() != 1 || f.GetActionName() != "Lint" || f.GetProjectId() != "web" ||
 		f.GetMode() != v1.ActionRunMode_ACTION_RUN_MODE_BACKGROUND || f.GetTrigger() != v1.ActionRunTrigger_ACTION_RUN_TRIGGER_USER {
 		t.Fatalf("run_finished = %v", f)
 	}

@@ -52,7 +52,7 @@ func (f *Fake) Snapshot() *action.Snapshot {
 func (f *Fake) snapshot() *action.Snapshot {
 	as := slices.Clone(f.actions)
 	slices.SortFunc(as, func(a, b action.Action) int {
-		return cmp.Or(cmp.Compare(a.RepoID, b.RepoID), cmp.Compare(a.Position, b.Position))
+		return cmp.Or(cmp.Compare(a.ProjectID, b.ProjectID), cmp.Compare(a.Position, b.Position))
 	})
 	rs := make([]action.Run, len(f.runs))
 	for i, r := range f.runs {
@@ -76,7 +76,7 @@ func (f *Fake) Create(_ context.Context, o action.CreateOptions) (action.Action,
 	}
 	n := 0
 	for _, a := range f.actions {
-		if a.RepoID == o.RepoID {
+		if a.ProjectID == o.ProjectID {
 			if strings.EqualFold(a.Name, o.Name) {
 				return action.Action{}, fmt.Errorf("%w: name %q taken", action.ErrFailedPrecondition, o.Name)
 			}
@@ -84,7 +84,7 @@ func (f *Fake) Create(_ context.Context, o action.CreateOptions) (action.Action,
 		}
 	}
 	a := action.Action{
-		ID: f.id("a-"), RepoID: o.RepoID, Name: o.Name, Command: o.Command, Icon: cmp.Or(o.Icon, action.IconPlay),
+		ID: f.id("a-"), ProjectID: o.ProjectID, Name: o.Name, Command: o.Command, Icon: cmp.Or(o.Icon, action.IconPlay),
 		InTerminal: o.InTerminal, OnWorktreeCreate: o.OnWorktreeCreate, Position: n, CreatedAt: time.Now(), UpdatedAt: time.Now(),
 	}
 	f.actions = append(f.actions, a)
@@ -146,13 +146,13 @@ func (f *Fake) Run(_ context.Context, o action.RunOptions) (action.Run, error) {
 	if f.Err != nil {
 		return action.Run{}, f.Err
 	}
-	a, err := f.snapshot().Resolve(o.RepoID, o.Action)
+	a, err := f.snapshot().Resolve(o.ProjectID, o.Action)
 	if err != nil {
 		return action.Run{}, err
 	}
 	f.ran = append(f.ran, o)
 	r := action.Run{
-		ID: f.id("r-"), ActionID: a.ID, ActionName: a.Name, Command: a.Command, RepoID: a.RepoID,
+		ID: f.id("r-"), ActionID: a.ID, ActionName: a.Name, Command: a.Command, ProjectID: a.ProjectID,
 		ThreadID: o.ThreadID, Worktree: o.Worktree, Mode: cmp.Or(o.Mode, action.ModeBackground),
 		Trigger: action.TriggerUser, State: action.RunRunning, StartedAt: time.Now(),
 	}
@@ -187,7 +187,7 @@ func (f *Fake) Finish(id string, code int, output string) error {
 	pub.Output = ""
 	bus.Publish[action.Event](f.bus, action.RunUpdated{Run: pub})
 	bus.Publish[action.Event](f.bus, action.RunFinished{
-		RunID: r.ID, ActionID: r.ActionID, ActionName: r.ActionName, RepoID: r.RepoID, ThreadID: r.ThreadID,
+		RunID: r.ID, ActionID: r.ActionID, ActionName: r.ActionName, ProjectID: r.ProjectID, ThreadID: r.ThreadID,
 		TerminalID: r.TerminalID, Mode: r.Mode, Trigger: r.Trigger, ExitCode: code,
 	})
 	return nil

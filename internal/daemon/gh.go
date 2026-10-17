@@ -8,7 +8,7 @@ import (
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/store/gh"
-	"github.com/alexwaumann/code-foundry/internal/store/repo"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
 )
 
 // ghTracker is the part of *gh.Store startGh drives.
@@ -26,7 +26,7 @@ var _ ghTracker = (*gh.Store)(nil)
 // tracked set is not persisted, so this runs on every daemon start: subscribe first,
 // then seed from the snapshot, so no event is missed. The returned func stops both and
 // waits for them.
-func startGh(ctx context.Context, log *slog.Logger, store ghTracker, repos interface{ Snapshot() *repo.Snapshot }, b *bus.Bus) func() {
+func startGh(ctx context.Context, log *slog.Logger, store ghTracker, projects interface{ Snapshot() *project.Snapshot }, b *bus.Bus) func() {
 	runCtx, cancel := context.WithCancel(ctx)
 	var wg sync.WaitGroup
 
@@ -38,7 +38,7 @@ func startGh(ctx context.Context, log *slog.Logger, store ghTracker, repos inter
 		}
 	}()
 
-	sub := bus.Subscribe[repo.Event](b, 0)
+	sub := bus.Subscribe[project.Event](b, 0)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -64,7 +64,7 @@ func startGh(ctx context.Context, log *slog.Logger, store ghTracker, repos inter
 			}
 			slugs[id] = slug
 		}
-		for _, r := range repos.Snapshot().Repos {
+		for _, r := range projects.Snapshot().Projects {
 			track(r.ID, r.GitHubSlug)
 		}
 		for {
@@ -73,9 +73,9 @@ func startGh(ctx context.Context, log *slog.Logger, store ghTracker, repos inter
 				return
 			case ev := <-sub.C():
 				switch e := ev.(type) {
-				case repo.RepoUpdated:
-					track(e.Repo.ID, e.Repo.GitHubSlug)
-				case repo.RepoRemoved:
+				case project.ProjectUpdated:
+					track(e.Project.ID, e.Project.GitHubSlug)
+				case project.ProjectRemoved:
 					track(e.ID, "")
 				}
 			}

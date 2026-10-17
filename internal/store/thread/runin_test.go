@@ -17,11 +17,11 @@ func TestRunInRefuses(t *testing.T) {
 		target  RunInTarget
 		wantErr error
 	}{
-		{name: "project thread", id: project.ID, target: RunInTarget{RepoID: "r2"}, wantErr: ErrFailedPrecondition},
+		{name: "project thread", id: project.ID, target: RunInTarget{ProjectID: "r2"}, wantErr: ErrFailedPrecondition},
 		{name: "no target", id: ws.ID, wantErr: ErrInvalidArgument},
-		{name: "repo not a member", id: ws.ID, target: RunInTarget{RepoID: "r9"}, wantErr: ErrFailedPrecondition},
+		{name: "repo not a member", id: ws.ID, target: RunInTarget{ProjectID: "r9"}, wantErr: ErrFailedPrecondition},
 		{name: "path not a member", id: ws.ID, target: RunInTarget{WorktreePath: t.TempDir()}, wantErr: ErrFailedPrecondition},
-		{name: "unknown thread", id: "s-nope", target: RunInTarget{RepoID: "r2"}, wantErr: ErrNotFound},
+		{name: "unknown thread", id: "s-nope", target: RunInTarget{ProjectID: "r2"}, wantErr: ErrNotFound},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -61,7 +61,7 @@ func TestRunInMovesWhenIdle(t *testing.T) {
 	s := e.create(CreateOptions{WorkspaceID: "login", InitialPrompt: "write"})
 	e.waitFor(s.ID, "permission", func(s Thread) bool { return s.Status == StatusNeedsAttention })
 
-	got, err := e.m.RunIn(e.ctx(), s.ID, RunInTarget{RepoID: "api"}) // a repo name works too
+	got, err := e.m.RunIn(e.ctx(), s.ID, RunInTarget{ProjectID: "api"}) // a repo name works too
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,12 +75,12 @@ func TestRunInMovesWhenIdle(t *testing.T) {
 	e.answer(s.ID)
 	e.waitSent("set_cwd", isSetCwd(e.wt2))
 	moved := e.waitFor(s.ID, "moved", func(s Thread) bool { return s.WorktreePath == e.wt2 })
-	if moved.RepoID != "r2" || moved.PendingWorktreePath != "" || moved.WorkspaceID != "w-login" {
+	if moved.ProjectID != "r2" || moved.PendingWorktreePath != "" || moved.WorkspaceID != "w-login" {
 		t.Errorf("moved = %+v", moved)
 	}
 
 	e.restart(e.withSource)
-	if got, _ := e.m.Get(e.ctx(), s.ID); got.WorktreePath != e.wt2 || got.RepoID != "r2" {
+	if got, _ := e.m.Get(e.ctx(), s.ID); got.WorktreePath != e.wt2 || got.ProjectID != "r2" {
 		t.Errorf("after restart = %+v", got)
 	}
 }
@@ -90,7 +90,7 @@ func TestRunInBackCancels(t *testing.T) {
 	e := newWSPermissionEnv(t)
 	s := e.create(CreateOptions{WorkspaceID: "login", InitialPrompt: "write"})
 	e.waitFor(s.ID, "permission", func(s Thread) bool { return s.Status == StatusNeedsAttention })
-	if _, err := e.m.RunIn(e.ctx(), s.ID, RunInTarget{RepoID: "r2"}); err != nil {
+	if _, err := e.m.RunIn(e.ctx(), s.ID, RunInTarget{ProjectID: "r2"}); err != nil {
 		t.Fatal(err)
 	}
 	got, err := e.m.RunIn(e.ctx(), s.ID, RunInTarget{WorktreePath: e.wt})
@@ -114,17 +114,17 @@ func TestRunInWithoutAProcess(t *testing.T) {
 	e := newWSPermissionEnv(t)
 	s := e.create(CreateOptions{WorkspaceID: "login", InitialPrompt: "write"})
 	e.waitFor(s.ID, "permission", func(s Thread) bool { return s.Status == StatusNeedsAttention })
-	if _, err := e.m.RunIn(e.ctx(), s.ID, RunInTarget{RepoID: "r2"}); err != nil {
+	if _, err := e.m.RunIn(e.ctx(), s.ID, RunInTarget{ProjectID: "r2"}); err != nil {
 		t.Fatal(err)
 	}
 	e.exit(s.ID, 0)
 	got := e.waitFor(s.ID, "disconnected", func(s Thread) bool { return s.State == StateDisconnected })
-	if got.WorktreePath != e.wt2 || got.RepoID != "r2" || got.PendingWorktreePath != "" {
+	if got.WorktreePath != e.wt2 || got.ProjectID != "r2" || got.PendingWorktreePath != "" {
 		t.Fatalf("after exit with a queued move = %+v", got)
 	}
 
-	got, err := e.m.RunIn(e.ctx(), s.ID, RunInTarget{RepoID: "r1"})
-	if err != nil || got.WorktreePath != e.wt || got.RepoID != "r1" || got.PendingWorktreePath != "" {
+	got, err := e.m.RunIn(e.ctx(), s.ID, RunInTarget{ProjectID: "r1"})
+	if err != nil || got.WorktreePath != e.wt || got.ProjectID != "r1" || got.PendingWorktreePath != "" {
 		t.Fatalf("disconnected move = %+v, %v", got, err)
 	}
 	if _, err := e.m.Reconnect(e.ctx(), s.ID); err != nil {

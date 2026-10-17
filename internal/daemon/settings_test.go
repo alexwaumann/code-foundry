@@ -12,7 +12,7 @@ import (
 
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/command/commandtest"
-	"github.com/alexwaumann/code-foundry/internal/store/repo"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/settings"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 	"github.com/alexwaumann/code-foundry/internal/store/update"
@@ -21,7 +21,7 @@ import (
 func TestWorktreePath(t *testing.T) {
 	home, _ := os.UserHomeDir()
 	tests := []struct {
-		dir, repo, branch, want string
+		dir, project, branch, want string
 	}{
 		{"", "cf", "main", ""},
 		{"/wt", "cf", "", ""},
@@ -31,8 +31,8 @@ func TestWorktreePath(t *testing.T) {
 		{"relative/{repo}", "cf", "feat", ""},
 	}
 	for _, tt := range tests {
-		if got := worktreePath(tt.dir, tt.repo, tt.branch); got != tt.want {
-			t.Errorf("worktreePath(%q, %q, %q) = %q, want %q", tt.dir, tt.repo, tt.branch, got, tt.want)
+		if got := worktreePath(tt.dir, tt.project, tt.branch); got != tt.want {
+			t.Errorf("worktreePath(%q, %q, %q) = %q, want %q", tt.dir, tt.project, tt.branch, got, tt.want)
 		}
 	}
 }
@@ -40,7 +40,7 @@ func TestWorktreePath(t *testing.T) {
 // worktreeBase is the cleanup's managed root from repos.worktree_dir.
 func TestWorktreeBase(t *testing.T) {
 	home, _ := os.UserHomeDir()
-	tests := []struct{ dir, repo, want string }{
+	tests := []struct{ dir, project, want string }{
 		{"", "cf", ""},
 		{"/wt", "cf", "/wt"},
 		{"/wt/{repo}", "cf", "/wt/cf"},
@@ -48,8 +48,8 @@ func TestWorktreeBase(t *testing.T) {
 		{"relative/{repo}", "cf", ""},
 	}
 	for _, tt := range tests {
-		if got := worktreeBase(tt.dir, tt.repo); got != tt.want {
-			t.Errorf("worktreeBase(%q, %q) = %q, want %q", tt.dir, tt.repo, got, tt.want)
+		if got := worktreeBase(tt.dir, tt.project); got != tt.want {
+			t.Errorf("worktreeBase(%q, %q) = %q, want %q", tt.dir, tt.project, got, tt.want)
 		}
 	}
 }
@@ -58,7 +58,7 @@ func TestWorktreeBase(t *testing.T) {
 func TestSettingsWorktreePath(t *testing.T) {
 	st := openSettings(t)
 	pick := settingsWorktreePath(st)
-	r := repo.Repo{ID: "r1", Name: "cf"}
+	r := project.Project{ID: "r1", Name: "cf"}
 	if got := pick(r, "cf/fix-x"); got != "" {
 		t.Errorf("unset setting = %q, want the repo store's default", got)
 	}

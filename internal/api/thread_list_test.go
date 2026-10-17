@@ -62,11 +62,11 @@ func TestThreadListFilter(t *testing.T) {
 
 func TestListOptionsFromProto(t *testing.T) {
 	got := listOptionsFromProto(&v1.ThreadFilter{All: true, IncludeArchived: true, Status: v1.ThreadStatus_THREAD_STATUS_ERROR,
-		State: v1.ThreadState_THREAD_STATE_CLOSING, Repo: "app", Workspace: "w", CreatedBy: "user", Labels: []string{"a"}, Limit: 3})
+		State: v1.ThreadState_THREAD_STATE_CLOSING, Project: "app", Workspace: "w", CreatedBy: "user", Labels: []string{"a"}, Limit: 3})
 	want := thread.ListOptions{All: true, IncludeArchived: true, Status: thread.StatusError, State: thread.StateClosing,
-		Repo: "app", Workspace: "w", CreatedBy: thread.CreatedByUser, Labels: []string{"a"}, Limit: 3}
+		Project: "app", Workspace: "w", CreatedBy: thread.CreatedByUser, Labels: []string{"a"}, Limit: 3}
 	if got.All != want.All || got.IncludeArchived != want.IncludeArchived || got.Status != want.Status || got.State != want.State ||
-		got.Repo != want.Repo || got.Workspace != want.Workspace || got.CreatedBy != want.CreatedBy ||
+		got.Project != want.Project || got.Workspace != want.Workspace || got.CreatedBy != want.CreatedBy ||
 		!slices.Equal(got.Labels, want.Labels) || got.Limit != want.Limit {
 		t.Errorf("listOptionsFromProto = %+v, want %+v", got, want)
 	}

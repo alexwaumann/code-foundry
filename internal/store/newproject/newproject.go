@@ -27,7 +27,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/fsx"
 	"github.com/alexwaumann/code-foundry/internal/store/clone"
 	"github.com/alexwaumann/code-foundry/internal/store/gh"
-	"github.com/alexwaumann/code-foundry/internal/store/repo"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
 )
 
 // DefaultPublishTimeout bounds one `gh repo create`, push included.
@@ -91,7 +91,7 @@ func ParseVisibility(s string) (Visibility, error) {
 
 // PublishOptions says where to publish a project.
 type PublishOptions struct {
-	RepoID string
+	ProjectID string
 	// Owner is the GitHub user or organization.
 	Owner string
 	// Name is the GitHub repository name; the project's name when empty.
@@ -103,10 +103,10 @@ type PublishOptions struct {
 // projecttest provides a fake.
 type Service interface {
 	// Create starts a project named name in the projects directory and registers it.
-	Create(ctx context.Context, name string) (repo.Repo, error)
+	Create(ctx context.Context, name string) (project.Project, error)
 	// Publish creates the project's GitHub repository, pushes, and returns the
 	// refreshed project.
-	Publish(ctx context.Context, opts PublishOptions) (repo.Repo, error)
+	Publish(ctx context.Context, opts PublishOptions) (project.Project, error)
 	// Delete unregisters a project directly inside the projects directory and removes
 	// its folder. ErrFailedPrecondition for any other project.
 	Delete(ctx context.Context, id string) error
@@ -115,9 +115,9 @@ type Service interface {
 var _ Service = (*Store)(nil)
 
 // Repos is what the store needs from the repo store. *repo.Git implements it.
-type Repos interface {
-	Snapshot() *repo.Snapshot
-	Register(ctx context.Context, path string) (repo.Repo, error)
+type Projects interface {
+	Snapshot() *project.Snapshot
+	Register(ctx context.Context, path string) (project.Project, error)
 	Refresh(ctx context.Context, id string) error
 	Unregister(ctx context.Context, id string) error
 }
@@ -130,9 +130,9 @@ type Options struct {
 	// home). Empty skips the check (the repo store still enforces it on register).
 	AllowedRoot string
 	// Repos registers and refreshes projects. Required.
-	Repos Repos
+	Projects Projects
 	// Git runs git for Create; repo.ExecRunner{} when nil.
-	Git repo.Runner
+	Git project.Runner
 	// Gh is the gh binary; "gh" from PATH when empty.
 	Gh string
 	// Runner runs gh for Publish; clone.ExecRunner{} when nil.
@@ -154,11 +154,11 @@ func New(opts Options) (*Store, error) {
 	if opts.Root == "" || !filepath.IsAbs(opts.Root) {
 		return nil, fmt.Errorf("project: root %q must be an absolute path", opts.Root)
 	}
-	if opts.Repos == nil {
+	if opts.Projects == nil {
 		return nil, errors.New("project: Repos is required")
 	}
 	if opts.Git == nil {
-		opts.Git = repo.ExecRunner{}
+		opts.Git = project.ExecRunner{}
 	}
 	if opts.Gh == "" {
 		opts.Gh = "gh"
@@ -201,44 +201,44 @@ func (s *Store) Destination(name string) string { return filepath.Join(s.opts.Ro
 
 // Create implements Service. On any failure before registration the new folder is
 // removed again, so a failed create leaves nothing behind.
-func (s *Store) Create(ctx context.Context, name string) (repo.Repo, error) {
+func (s *Store) Create(ctx context.Context, name string) (project.Project, error) {
 	if err := ValidateName(name); err != nil {
-		return repo.Repo{}, err
+		return project.Project{}, err
 	}
 	dest := s.Destination(name)
 	if _, err := os.Lstat(dest); err == nil {
-		return repo.Repo{}, fmt.Errorf("%s %w", dest, ErrExists)
+		return project.Project{}, fmt.Errorf("%s %w", dest, ErrExists)
 	} else if !errors.Is(err, os.ErrNotExist) {
-		return repo.Repo{}, fmt.Errorf("check %s: %w", dest, err)
+		return project.Project{}, fmt.Errorf("check %s: %w", dest, err)
 	}
 	if err := os.MkdirAll(s.opts.Root, 0o700); err != nil {
-		return repo.Repo{}, fmt.Errorf("create %s: %w", s.opts.Root, err)
+		return project.Project{}, fmt.Errorf("create %s: %w", s.opts.Root, err)
 	}
 	if err := s.checkRoot(); err != nil {
-		return repo.Repo{}, err
+		return project.Project{}, err
 	}
 	// Mkdir, not MkdirAll: of two creates racing for one name, one gets EEXIST.
 	if err := os.Mkdir(dest, 0o755); err != nil {
 		if errors.Is(err, os.ErrExist) {
-			return repo.Repo{}, fmt.Errorf("%s %w", dest, ErrExists)
+			return project.Project{}, fmt.Errorf("%s %w", dest, ErrExists)
 		}
-		return repo.Repo{}, fmt.Errorf("create %s: %w", dest, err)
+		return project.Project{}, fmt.Errorf("create %s: %w", dest, err)
 	}
 	log := s.opts.Log.With("name", name, "dest", dest)
-	branch, err := repo.InitRepository(ctx, s.opts.Git, dest)
+	branch, err := project.InitRepository(ctx, s.opts.Git, dest)
 	if err != nil {
 		if rmErr := os.RemoveAll(dest); rmErr != nil {
 			log.Warn("remove failed project", "err", rmErr)
 		}
 		log.Warn("create failed", "err", err)
-		return repo.Repo{}, fmt.Errorf("%w: git init in %s: %w", ErrFailed, dest, err)
+		return project.Project{}, fmt.Errorf("%w: git init in %s: %w", ErrFailed, dest, err)
 	}
 	log.Info("project created", "branch", branch)
 	regCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), settleTimeout)
 	defer cancel()
-	r, err := s.opts.Repos.Register(regCtx, dest)
+	r, err := s.opts.Projects.Register(regCtx, dest)
 	if err != nil {
-		return repo.Repo{}, fmt.Errorf("created %s but could not add it as a project: %w", dest, err)
+		return project.Project{}, fmt.Errorf("created %s but could not add it as a project: %w", dest, err)
 	}
 	return r, nil
 }
@@ -260,34 +260,34 @@ func (s *Store) checkRoot() error {
 
 // Publish implements Service. The project is refreshed after gh ran, failed or not: gh
 // may have created the repository and added origin before a failed push.
-func (s *Store) Publish(ctx context.Context, opts PublishOptions) (repo.Repo, error) {
+func (s *Store) Publish(ctx context.Context, opts PublishOptions) (project.Project, error) {
 	vis, err := ParseVisibility(string(opts.Visibility))
 	if err != nil {
-		return repo.Repo{}, err
+		return project.Project{}, err
 	}
-	r, ok := s.opts.Repos.Snapshot().Repo(opts.RepoID)
+	r, ok := s.opts.Projects.Snapshot().Project(opts.ProjectID)
 	if !ok {
-		return repo.Repo{}, fmt.Errorf("%w: %q", ErrNotFound, opts.RepoID)
+		return project.Project{}, fmt.Errorf("%w: %q", ErrNotFound, opts.ProjectID)
 	}
 	owner, name := strings.TrimSpace(opts.Owner), strings.TrimSpace(opts.Name)
 	if name == "" {
 		name = r.Name
 	}
 	if owner == "" {
-		return repo.Repo{}, fmt.Errorf("%w: a GitHub owner is required", ErrInvalidArgument)
+		return project.Project{}, fmt.Errorf("%w: a GitHub owner is required", ErrInvalidArgument)
 	}
 	slug := owner + "/" + name
 	if _, err := gh.NormalizeSlug(slug); err != nil {
-		return repo.Repo{}, fmt.Errorf("%w: %q is not a valid GitHub owner/name", ErrInvalidArgument, slug)
+		return project.Project{}, fmt.Errorf("%w: %q is not a valid GitHub owner/name", ErrInvalidArgument, slug)
 	}
 	switch {
 	case !r.Git:
-		return repo.Repo{}, fmt.Errorf("%w: %s is not a git repository; initialize git first", ErrFailedPrecondition, r.Name)
+		return project.Project{}, fmt.Errorf("%w: %s is not a git repository; initialize git first", ErrFailedPrecondition, r.Name)
 	case slices.Contains(r.Remotes, "origin"):
-		return repo.Repo{}, fmt.Errorf("%w: %s already has an origin remote", ErrFailedPrecondition, r.Name)
+		return project.Project{}, fmt.Errorf("%w: %s already has an origin remote", ErrFailedPrecondition, r.Name)
 	}
 	if !s.claim(r.ID) {
-		return repo.Repo{}, fmt.Errorf("%w: %s is being published", ErrFailedPrecondition, r.Name)
+		return project.Project{}, fmt.Errorf("%w: %s is being published", ErrFailedPrecondition, r.Name)
 	}
 	defer s.release(r.ID)
 
@@ -302,19 +302,19 @@ func (s *Store) Publish(ctx context.Context, opts PublishOptions) (repo.Repo, er
 
 	refreshCtx, refreshCancel := context.WithTimeout(context.WithoutCancel(ctx), settleTimeout)
 	defer refreshCancel()
-	refreshErr := s.opts.Repos.Refresh(refreshCtx, r.ID)
+	refreshErr := s.opts.Projects.Refresh(refreshCtx, r.ID)
 	if runErr != nil {
 		err := s.classify(ctx, runCtx, runErr)
 		log.Warn("publish failed", "dur", dur, "err", err)
-		return repo.Repo{}, err
+		return project.Project{}, err
 	}
 	log.Info("published", "dur", dur)
 	if refreshErr != nil {
-		return repo.Repo{}, fmt.Errorf("published %s but could not refresh %s: %w", slug, r.Name, refreshErr)
+		return project.Project{}, fmt.Errorf("published %s but could not refresh %s: %w", slug, r.Name, refreshErr)
 	}
-	out, ok := s.opts.Repos.Snapshot().Repo(r.ID)
+	out, ok := s.opts.Projects.Snapshot().Project(r.ID)
 	if !ok {
-		return repo.Repo{}, fmt.Errorf("%w: %s was removed while it was published", ErrNotFound, r.Name)
+		return project.Project{}, fmt.Errorf("%w: %s was removed while it was published", ErrNotFound, r.Name)
 	}
 	return out, nil
 }
@@ -324,7 +324,7 @@ func (s *Store) Publish(ctx context.Context, opts PublishOptions) (repo.Repo, er
 // project being published, is refused. The project is unregistered first, so a failed
 // removal leaves a folder but no project; nothing on GitHub is touched.
 func (s *Store) Delete(ctx context.Context, id string) error {
-	r, ok := s.opts.Repos.Snapshot().Repo(id)
+	r, ok := s.opts.Projects.Snapshot().Project(id)
 	if !ok {
 		return fmt.Errorf("%w: %q", ErrNotFound, id)
 	}
@@ -336,7 +336,7 @@ func (s *Store) Delete(ctx context.Context, id string) error {
 	}
 	defer s.release(r.ID)
 	log := s.opts.Log.With("repo", r.ID, "path", r.Path)
-	if err := s.opts.Repos.Unregister(ctx, r.ID); err != nil {
+	if err := s.opts.Projects.Unregister(ctx, r.ID); err != nil {
 		return fmt.Errorf("unregister %s: %w", r.Name, err)
 	}
 	if err := os.RemoveAll(r.Path); err != nil {

@@ -148,9 +148,9 @@ func (f *Fake) add(call string, s thread.Thread) (thread.Thread, error) {
 // " new-workspace=<a,b>", " no-project", " prompt=<text>"
 // " composer=<text>" and " attachments=<a,b>" when set.
 func (f *Fake) Create(_ context.Context, o thread.CreateOptions) (thread.Thread, error) {
-	call := fmt.Sprintf("Create %s %s %s %s", o.RepoID, o.WorktreePath, o.Model, o.Effort)
+	call := fmt.Sprintf("Create %s %s %s %s", o.ProjectID, o.WorktreePath, o.Model, o.Effort)
 	s := thread.Thread{
-		RepoID: o.RepoID, WorktreePath: o.WorktreePath, Model: o.Model, Effort: o.Effort, Name: o.Name,
+		ProjectID: o.ProjectID, WorktreePath: o.WorktreePath, Model: o.Model, Effort: o.Effort, Name: o.Name,
 		PermissionMode: o.PermissionMode,
 	}
 	if o.PermissionMode != thread.PermissionDefault {
@@ -167,13 +167,13 @@ func (f *Fake) Create(_ context.Context, o thread.CreateOptions) (thread.Thread,
 		call += " workspace=" + o.WorkspaceID
 		s.WorkspaceID = o.WorkspaceID
 	}
-	if nw := o.NewWorkspace; nw != nil && len(nw.Repos) > 0 {
-		call += " new-workspace=" + strings.Join(nw.Repos, ",")
-		s.RepoID = o.RepoID
-		if s.RepoID == "" {
-			s.RepoID = nw.Repos[0]
+	if nw := o.NewWorkspace; nw != nil && len(nw.Projects) > 0 {
+		call += " new-workspace=" + strings.Join(nw.Projects, ",")
+		s.ProjectID = o.ProjectID
+		if s.ProjectID == "" {
+			s.ProjectID = nw.Projects[0]
 		}
-		s.WorkspaceID, s.WorktreePath, s.CreatedWorktree, s.BaseRef = "w-new", "/worktrees/"+s.RepoID, true, nw.BaseRef
+		s.WorkspaceID, s.WorktreePath, s.CreatedWorktree, s.BaseRef = "w-new", "/worktrees/"+s.ProjectID, true, nw.BaseRef
 	}
 	if o.NoProject {
 		call += " no-project"
@@ -271,7 +271,7 @@ func (f *Fake) Fork(_ context.Context, id, name string) (thread.Thread, error) {
 		return thread.Thread{}, err
 	}
 	return f.add("Fork "+id, thread.Thread{
-		RepoID: parent.RepoID, WorktreePath: parent.WorktreePath, Model: parent.Model, Effort: parent.Effort,
+		ProjectID: parent.ProjectID, WorktreePath: parent.WorktreePath, Model: parent.Model, Effort: parent.Effort,
 		Name: name, ParentID: id, PermissionMode: parent.PermissionMode, WorkspaceID: parent.WorkspaceID,
 	})
 }
@@ -378,16 +378,16 @@ func (f *Fake) Reconnect(_ context.Context, id string) (thread.Thread, error) {
 // disconnected thread moves at once to the path (else /worktrees/<repo>); a live one
 // gets it as PendingWorktreePath.
 func (f *Fake) RunIn(_ context.Context, id string, t thread.RunInTarget) (thread.Thread, error) {
-	return f.mutate("RunIn "+id+" "+t.RepoID+" "+t.WorktreePath, id, func(s *thread.Thread) error {
+	return f.mutate("RunIn "+id+" "+t.ProjectID+" "+t.WorktreePath, id, func(s *thread.Thread) error {
 		if s.WorkspaceID == "" {
 			return fmt.Errorf("%w: thread %s does not belong to a workspace", thread.ErrFailedPrecondition, id)
 		}
 		path := t.WorktreePath
 		if path == "" {
-			path = "/worktrees/" + t.RepoID
+			path = "/worktrees/" + t.ProjectID
 		}
 		if s.State == thread.StateDisconnected {
-			s.WorktreePath, s.RepoID = path, t.RepoID
+			s.WorktreePath, s.ProjectID = path, t.ProjectID
 		} else {
 			s.PendingWorktreePath = path
 		}

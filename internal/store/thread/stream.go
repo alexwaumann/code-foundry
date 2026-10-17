@@ -735,7 +735,7 @@ func (r *runner) streamCd(req cdRequest) {
 	r.cwd = req.path
 	r.tail.cwd = req.path
 	r.m.update(r.id, true, func(rec *record) {
-		rec.s.WorktreePath, rec.s.RepoID = req.path, req.repoID
+		rec.s.WorktreePath, rec.s.ProjectID = req.path, req.projectID
 		if rec.s.PendingWorktreePath == req.path {
 			rec.s.PendingWorktreePath = ""
 		}

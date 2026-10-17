@@ -10,32 +10,32 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexwaumann/code-foundry/internal/store/repo"
-	"github.com/alexwaumann/code-foundry/internal/store/repo/repotest"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
+	"github.com/alexwaumann/code-foundry/internal/store/project/projecttest"
 )
 
 // recordingRepos records CreateWorktree options and can fail them.
-type recordingRepos struct {
-	*repotest.Fake
+type recordingProjects struct {
+	*projecttest.Fake
 	mu   sync.Mutex
-	opts []repo.CreateWorktreeOptions
+	opts []project.CreateWorktreeOptions
 	err  error
 }
 
-func (r *recordingRepos) CreateWorktree(ctx context.Context, o repo.CreateWorktreeOptions) (repo.Worktree, error) {
+func (r *recordingProjects) CreateWorktree(ctx context.Context, o project.CreateWorktreeOptions) (project.Worktree, error) {
 	r.mu.Lock()
 	r.opts = append(r.opts, o)
 	err := r.err
 	r.mu.Unlock()
 	if err != nil {
-		return repo.Worktree{}, err
+		return project.Worktree{}, err
 	}
 	wt, err := r.Fake.CreateWorktree(ctx, o)
 	wt.Status.BaseRef = "origin/main"
 	return wt, err
 }
 
-func (r *recordingRepos) created() []repo.CreateWorktreeOptions {
+func (r *recordingProjects) created() []project.CreateWorktreeOptions {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return slices.Clone(r.opts)
@@ -43,13 +43,13 @@ func (r *recordingRepos) created() []repo.CreateWorktreeOptions {
 
 // newWorktreeEnv is an env whose repo source records worktree creation and whose
 // RefExists reports the refs in taken.
-func newWorktreeEnv(t *testing.T, taken []string, mutate ...func(*Options)) (*env, *recordingRepos) {
+func newWorktreeEnv(t *testing.T, taken []string, mutate ...func(*Options)) (*env, *recordingProjects) {
 	t.Helper()
-	var rr *recordingRepos
+	var rr *recordingProjects
 	e := newEnv(t, append([]func(*Options){func(o *Options) {
-		rr = &recordingRepos{Fake: o.Repos.(*repotest.Fake)}
+		rr = &recordingProjects{Fake: o.Projects.(*projecttest.Fake)}
 		rr.WorktreeRoot = t.TempDir()
-		o.Repos = rr
+		o.Projects = rr
 		o.SlugTimeout = 300 * time.Millisecond
 		o.NamingRetryDelay = 10 * time.Millisecond
 		o.RefExists = func(_ context.Context, dir, ref string) bool { return slices.Contains(taken, ref) }
@@ -68,39 +68,39 @@ func TestCreateNewWorktree(t *testing.T) {
 		wantCalls  int
 		wantBase   string
 	}{
-		{name: "title in time names the thread, its slug the branch", o: CreateOptions{RepoID: "r1", InitialPrompt: "fix the login bug"},
+		{name: "title in time names the thread, its slug the branch", o: CreateOptions{ProjectID: "r1", InitialPrompt: "fix the login bug"},
 			namer: func(int, string) (string, error) { return "Fix the login bug", nil }, wantBranch: "cf/fix-the-login-bug",
 			wantName: "Fix the login bug", wantCalls: 1, wantBase: "origin/main"},
-		{name: "a six-word title keeps every word in the branch", o: CreateOptions{RepoID: "r1", InitialPrompt: "x"},
+		{name: "a six-word title keeps every word in the branch", o: CreateOptions{ProjectID: "r1", InitialPrompt: "x"},
 			namer:      func(int, string) (string, error) { return "Add README usage section for tests", nil },
 			wantBranch: "cf/add-readme-usage-section-for-tests", wantName: "Add README usage section for tests", wantCalls: 1,
 			wantBase: "origin/main"},
-		{name: "a title with nothing to slugify names the thread, the branch is the id", o: CreateOptions{RepoID: "r1", InitialPrompt: "x"},
+		{name: "a title with nothing to slugify names the thread, the branch is the id", o: CreateOptions{ProjectID: "r1", InitialPrompt: "x"},
 			namer: func(int, string) (string, error) { return "Добавить тёмную тему", nil }, wantBranch: "<id>",
 			wantName: "Добавить тёмную тему", wantCalls: 1, wantBase: "origin/main"},
-		{name: "explicit base ref", o: CreateOptions{RepoID: "r1", InitialPrompt: "x", NewWorktree: &NewWorktree{BaseRef: "origin/dev"}},
+		{name: "explicit base ref", o: CreateOptions{ProjectID: "r1", InitialPrompt: "x", NewWorktree: &NewWorktree{BaseRef: "origin/dev"}},
 			namer: func(int, string) (string, error) { return "Do x", nil }, wantBranch: "cf/do-x", wantName: "Do x", wantCalls: 1,
 			wantBase: "origin/dev"},
-		{name: "taken branch gets a suffix", o: CreateOptions{RepoID: "r1", InitialPrompt: "x"},
+		{name: "taken branch gets a suffix", o: CreateOptions{ProjectID: "r1", InitialPrompt: "x"},
 			taken: []string{"refs/heads/cf/do-x", "refs/remotes/origin/cf/do-x-2"},
 			namer: func(int, string) (string, error) { return "Do x", nil }, wantBranch: "cf/do-x-3", wantName: "Do x", wantCalls: 1,
 			wantBase: "origin/main"},
-		{name: "namer error uses the id", o: CreateOptions{RepoID: "r1", InitialPrompt: "x"},
+		{name: "namer error uses the id", o: CreateOptions{ProjectID: "r1", InitialPrompt: "x"},
 			namer: func(int, string) (string, error) { return "", errors.New("exit status 1") }, wantBranch: "<id>", wantCalls: 1,
 			wantBase: "origin/main"},
-		{name: "rate limit is retried once", o: CreateOptions{RepoID: "r1", InitialPrompt: "x"},
+		{name: "rate limit is retried once", o: CreateOptions{ProjectID: "r1", InitialPrompt: "x"},
 			namer: func(n int, _ string) (string, error) {
 				if n == 1 {
 					return "", errors.New("claude -p: exit status 1: API Error: 429 rate limit")
 				}
 				return "After retry", nil
 			}, wantBranch: "cf/after-retry", wantName: "After retry", wantCalls: 2, wantBase: "origin/main"},
-		{name: "second rate limit gives up", o: CreateOptions{RepoID: "r1", InitialPrompt: "x"},
+		{name: "second rate limit gives up", o: CreateOptions{ProjectID: "r1", InitialPrompt: "x"},
 			namer: func(int, string) (string, error) { return "", errors.New("Rate limit reached") }, wantBranch: "<id>",
 			wantCalls: 2, wantBase: "origin/main"},
-		{name: "explicit name is the slug without the namer", o: CreateOptions{RepoID: "r1", Name: "My Big Feature!", InitialPrompt: "x"},
+		{name: "explicit name is the slug without the namer", o: CreateOptions{ProjectID: "r1", Name: "My Big Feature!", InitialPrompt: "x"},
 			wantBranch: "cf/my-big-feature", wantName: "My Big Feature!", wantCalls: 0, wantBase: "origin/main"},
-		{name: "no prompt uses the id", o: CreateOptions{RepoID: "r1"}, wantBranch: "<id>", wantCalls: 0, wantBase: "origin/main"},
+		{name: "no prompt uses the id", o: CreateOptions{ProjectID: "r1"}, wantBranch: "<id>", wantCalls: 0, wantBase: "origin/main"},
 		{name: "repo from a worktree path", o: CreateOptions{WorktreePath: "<wt>", InitialPrompt: "x"},
 			namer: func(int, string) (string, error) { return "From path", nil }, wantBranch: "cf/from-path", wantName: "From path",
 			wantCalls: 1, wantBase: "origin/main"},
@@ -129,12 +129,12 @@ func TestCreateNewWorktree(t *testing.T) {
 			}
 			branch := strings.ReplaceAll(tt.wantBranch, "<id>", "cf/"+s.ID)
 			got := rr.created()
-			if len(got) != 1 || got[0].Branch != branch || got[0].RepoID != "r1" || !got[0].Fetch ||
+			if len(got) != 1 || got[0].Branch != branch || got[0].ProjectID != "r1" || !got[0].Fetch ||
 				got[0].BaseRef != o.NewWorktree.BaseRef {
 				t.Fatalf("CreateWorktree calls = %+v, want branch %s", got, branch)
 			}
 			wantPath := rr.WorktreeRoot + "/_local/repo/" + strings.ReplaceAll(branch, "/", "-")
-			if !s.CreatedWorktree || s.WorktreePath != wantPath || s.RepoID != "r1" || s.BaseRef != tt.wantBase ||
+			if !s.CreatedWorktree || s.WorktreePath != wantPath || s.ProjectID != "r1" || s.BaseRef != tt.wantBase ||
 				s.Name != tt.wantName || s.AutoNamed != (tt.wantName != "" && tt.o.Name == "") {
 				t.Errorf("thread = %+v", s)
 			}
@@ -172,12 +172,12 @@ func TestCreateNewWorktree(t *testing.T) {
 func TestCreateNewWorktreeUsesWorktreePathOption(t *testing.T) {
 	dir := t.TempDir()
 	e, rr := newWorktreeEnv(t, nil, func(o *Options) {
-		o.WorktreePath = func(r repo.Repo, branch string) string {
+		o.WorktreePath = func(r project.Project, branch string) string {
 			return dir + "/" + r.Name + "/" + strings.ReplaceAll(branch, "/", "-")
 		}
 	})
 	e.namer = func(string) (string, error) { return "Do x", nil }
-	s, err := e.m.Create(e.ctx(), CreateOptions{RepoID: "r1", InitialPrompt: "x", NewWorktree: &NewWorktree{}})
+	s, err := e.m.Create(e.ctx(), CreateOptions{ProjectID: "r1", InitialPrompt: "x", NewWorktree: &NewWorktree{}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -195,7 +195,7 @@ func TestCreateNewWorktreeSlugTimeoutNamesLater(t *testing.T) {
 		return "Slow name", nil
 	}
 	start := time.Now()
-	s, err := e.m.Create(e.ctx(), CreateOptions{RepoID: "r1", InitialPrompt: "x", NewWorktree: &NewWorktree{}})
+	s, err := e.m.Create(e.ctx(), CreateOptions{ProjectID: "r1", InitialPrompt: "x", NewWorktree: &NewWorktree{}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -226,7 +226,7 @@ func TestCreateNewWorktreeSlugTimeoutKeepsRename(t *testing.T) {
 		<-release
 		return "Slow name", nil
 	}
-	s, err := e.m.Create(e.ctx(), CreateOptions{RepoID: "r1", InitialPrompt: "x", NewWorktree: &NewWorktree{}})
+	s, err := e.m.Create(e.ctx(), CreateOptions{ProjectID: "r1", InitialPrompt: "x", NewWorktree: &NewWorktree{}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -242,23 +242,23 @@ func TestCreateNewWorktreeSlugTimeoutKeepsRename(t *testing.T) {
 
 func TestCreateNewWorktreeFailures(t *testing.T) {
 	tests := []struct {
-		name    string
-		o       CreateOptions
-		repoErr error
-		wantErr error
+		name       string
+		o          CreateOptions
+		projectErr error
+		wantErr    error
 	}{
-		{"worktree creation fails", CreateOptions{RepoID: "r1"}, fmt.Errorf("%w: git: fatal: invalid reference", repo.ErrFailedPrecondition), ErrFailedPrecondition},
-		{"repo store rejects the branch", CreateOptions{RepoID: "r1"}, fmt.Errorf("%w: bad branch", repo.ErrInvalidArgument), ErrInvalidArgument},
-		{"unknown repo", CreateOptions{RepoID: "nope"}, nil, ErrNotFound},
+		{"worktree creation fails", CreateOptions{ProjectID: "r1"}, fmt.Errorf("%w: git: fatal: invalid reference", project.ErrFailedPrecondition), ErrFailedPrecondition},
+		{"repo store rejects the branch", CreateOptions{ProjectID: "r1"}, fmt.Errorf("%w: bad branch", project.ErrInvalidArgument), ErrInvalidArgument},
+		{"unknown repo", CreateOptions{ProjectID: "nope"}, nil, ErrNotFound},
 		{"no repo", CreateOptions{}, nil, ErrInvalidArgument},
-		{"base ref like a flag", CreateOptions{RepoID: "r1", NewWorktree: &NewWorktree{BaseRef: "--upload-pack=x"}}, nil, ErrInvalidArgument},
-		{"base ref with a space", CreateOptions{RepoID: "r1", NewWorktree: &NewWorktree{BaseRef: "a b"}}, nil, ErrInvalidArgument},
-		{"bad permission mode", CreateOptions{RepoID: "r1", PermissionMode: PermissionMode(7)}, nil, ErrInvalidArgument},
+		{"base ref like a flag", CreateOptions{ProjectID: "r1", NewWorktree: &NewWorktree{BaseRef: "--upload-pack=x"}}, nil, ErrInvalidArgument},
+		{"base ref with a space", CreateOptions{ProjectID: "r1", NewWorktree: &NewWorktree{BaseRef: "a b"}}, nil, ErrInvalidArgument},
+		{"bad permission mode", CreateOptions{ProjectID: "r1", PermissionMode: PermissionMode(7)}, nil, ErrInvalidArgument},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			e, rr := newWorktreeEnv(t, nil)
-			rr.err = tt.repoErr
+			rr.err = tt.projectErr
 			o := tt.o
 			if o.NewWorktree == nil {
 				o.NewWorktree = &NewWorktree{}
@@ -282,8 +282,8 @@ func TestCreateNewWorktreeFailures(t *testing.T) {
 func TestCreateNewWorktreeInProjectWithoutGit(t *testing.T) {
 	e, rr := newWorktreeEnv(t, nil)
 	dir := t.TempDir()
-	rr.Put(repo.Repo{ID: "plain", Path: dir, Name: "notes", Worktrees: []repo.Worktree{{RepoID: "plain", Path: dir, IsMain: true}}})
-	_, err := e.m.Create(e.ctx(), CreateOptions{RepoID: "plain", NewWorktree: &NewWorktree{}, InitialPrompt: "fix it"})
+	rr.Put(project.Project{ID: "plain", Path: dir, Name: "notes", Worktrees: []project.Worktree{{ProjectID: "plain", Path: dir, IsMain: true}}})
+	_, err := e.m.Create(e.ctx(), CreateOptions{ProjectID: "plain", NewWorktree: &NewWorktree{}, InitialPrompt: "fix it"})
 	if !errors.Is(err, ErrFailedPrecondition) || !strings.Contains(err.Error(), "notes is not a git repository") {
 		t.Fatalf("err = %v", err)
 	}
@@ -296,15 +296,15 @@ func TestCreateNewWorktreeInProjectWithoutGit(t *testing.T) {
 	if len(named) != 0 {
 		t.Fatalf("namer called: %v", named)
 	}
-	s, err := e.m.Create(e.ctx(), CreateOptions{RepoID: "plain"})
+	s, err := e.m.Create(e.ctx(), CreateOptions{ProjectID: "plain"})
 	if err != nil || s.WorktreePath != dir {
 		t.Fatalf("thread in the checkout = %+v, %v", s, err)
 	}
 }
 
-func TestCreateNewWorktreeNeedsRepoStore(t *testing.T) {
-	e := newEnv(t, func(o *Options) { o.Repos = nil })
-	if _, err := e.m.Create(e.ctx(), CreateOptions{RepoID: "r1", NewWorktree: &NewWorktree{}}); !errors.Is(err, ErrFailedPrecondition) {
+func TestCreateNewWorktreeNeedsProjectStore(t *testing.T) {
+	e := newEnv(t, func(o *Options) { o.Projects = nil })
+	if _, err := e.m.Create(e.ctx(), CreateOptions{ProjectID: "r1", NewWorktree: &NewWorktree{}}); !errors.Is(err, ErrFailedPrecondition) {
 		t.Fatalf("err = %v", err)
 	}
 }

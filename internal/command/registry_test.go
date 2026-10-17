@@ -63,7 +63,7 @@ func TestRegisterValidation(t *testing.T) {
 		{"bad int default", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "x", Type: Int, Default: "ten"}} }), "default: want an integer"},
 		{"bad enum default", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "x", Type: Enum, Enum: []string{"a"}, Default: "b"}} }), "default: want one of"},
 		{"relative path default", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "x", Type: Path, Default: "rel"}} }), "absolute"},
-		{"context on bool", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "x", Type: Bool, Context: ContextRepo}} }), "string or path"},
+		{"context on bool", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "x", Type: Bool, Context: ContextProject}} }), "string or path"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

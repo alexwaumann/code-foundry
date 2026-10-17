@@ -18,7 +18,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/action"
 	"github.com/alexwaumann/code-foundry/internal/store/gh"
 	"github.com/alexwaumann/code-foundry/internal/store/gitops"
-	"github.com/alexwaumann/code-foundry/internal/store/repo"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/settings"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
@@ -33,7 +33,7 @@ const terminalWatchBuffer = 256
 // source out of the stream.
 type EventsDeps struct {
 	Bus      *bus.Bus
-	Repo     repo.Store
+	Project  project.Store
 	Terminal terminal.Store
 	Thread   thread.Store
 	Gh       gh.Service
@@ -135,8 +135,8 @@ type eventResumer interface{ resume(ctx context.Context) }
 func (h *Events) sources() []eventSource {
 	d := h.deps
 	var out []eventSource
-	if d.Repo != nil {
-		out = append(out, repoSource{store: d.Repo, bus: d.Bus})
+	if d.Project != nil {
+		out = append(out, projectSource{store: d.Project, bus: d.Bus})
 	}
 	if d.Workspace != nil {
 		out = append(out, workspaceSource{store: d.Workspace, bus: d.Bus})
@@ -403,25 +403,25 @@ func subscribeTopics(ctx context.Context, topics []topic) <-chan *v1.Event {
 
 // ---- repo ----------------------------------------------------------------------
 
-type repoSource struct {
-	store repo.Store
+type projectSource struct {
+	store project.Store
 	bus   *bus.Bus
 }
 
-func (repoSource) kind() v1.EventSource { return v1.EventSource_EVENT_SOURCE_REPO }
+func (projectSource) kind() v1.EventSource { return v1.EventSource_EVENT_SOURCE_PROJECT }
 
-func (s repoSource) topics() []topic {
-	return []topic{busTopic(s.bus, watchBuffer, func(ev repo.Event) *v1.Event {
+func (s projectSource) topics() []topic {
+	return []topic{busTopic(s.bus, watchBuffer, func(ev project.Event) *v1.Event {
 		if m := eventToProto(ev); m != nil {
-			return &v1.Event{Event: &v1.Event_Repo{Repo: m}}
+			return &v1.Event{Event: &v1.Event_Project{Project: m}}
 		}
 		return nil
 	})}
 }
 
-func (s repoSource) snapshot(context.Context) []*v1.Event {
-	return []*v1.Event{{Event: &v1.Event_Repo{Repo: &v1.RepoEvent{Event: &v1.RepoEvent_Snapshot{
-		Snapshot: &v1.RepoSnapshot{Repos: reposToProto(s.store.Snapshot().Repos)},
+func (s projectSource) snapshot(context.Context) []*v1.Event {
+	return []*v1.Event{{Event: &v1.Event_Project{Project: &v1.ProjectEvent{Event: &v1.ProjectEvent_Snapshot{
+		Snapshot: &v1.ProjectSnapshot{Projects: projectsToProto(s.store.Snapshot().Projects)},
 	}}}}}
 }
 

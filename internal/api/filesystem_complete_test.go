@@ -14,8 +14,8 @@ import (
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
-	"github.com/alexwaumann/code-foundry/internal/store/repo"
-	"github.com/alexwaumann/code-foundry/internal/store/repo/repotest"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
+	"github.com/alexwaumann/code-foundry/internal/store/project/projecttest"
 )
 
 // completionHome is a home directory with a git project "proj" (skills, a command, an
@@ -63,10 +63,10 @@ func completionHome(t *testing.T) (root, outside string, c codefoundryv1connect.
 		}
 	}
 
-	fake := repotest.New(nil)
-	fake.Put(repo.Repo{ID: "p", Path: proj, Git: true, Worktrees: []repo.Worktree{{RepoID: "p", Path: proj, IsMain: true}}})
+	fake := projecttest.New(nil)
+	fake.Put(project.Project{ID: "p", Path: proj, Git: true, Worktrees: []project.Worktree{{ProjectID: "p", Path: proj, IsMain: true}}})
 	plain := filepath.Join(root, "plain")
-	fake.Put(repo.Repo{ID: "n", Path: plain, Worktrees: []repo.Worktree{{RepoID: "n", Path: plain, IsMain: true}}})
+	fake.Put(project.Project{ID: "n", Path: plain, Worktrees: []project.Worktree{{ProjectID: "n", Path: plain, IsMain: true}}})
 
 	route := NewFilesystem(root, fake).Route()
 	mux := http.NewServeMux()
@@ -91,9 +91,9 @@ func TestFilesystemListSkills(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
 	type item struct {
-		name, desc string
-		scope      v1.SkillScope
-		repo, rel  string
+		name, desc   string
+		scope        v1.SkillScope
+		project, rel string
 	}
 	P, U := v1.SkillScope_SKILL_SCOPE_PROJECT, v1.SkillScope_SKILL_SCOPE_USER
 	tests := []struct {
@@ -102,12 +102,12 @@ func TestFilesystemListSkills(t *testing.T) {
 		want []item
 		code connect.Code
 	}{
-		{name: "project main worktree", req: &v1.ListSkillsRequest{Sources: []*v1.SkillSource{{RepoId: "p"}}}, want: []item{
+		{name: "project main worktree", req: &v1.ListSkillsRequest{Sources: []*v1.SkillSource{{ProjectId: "p"}}}, want: []item{
 			{"demo", "A demo skill.", P, "p", "proj/.claude/skills/demo/SKILL.md"},
 			{"fix", "Fix the bug.", P, "p", "proj/.claude/commands/fix.md"},
 		}},
 		{name: "sources in request order, user last", req: &v1.ListSkillsRequest{
-			Sources:     []*v1.SkillSource{{RepoId: "n"}, {RepoId: "p", Path: filepath.Join(root, "proj")}},
+			Sources:     []*v1.SkillSource{{ProjectId: "n"}, {ProjectId: "p", Path: filepath.Join(root, "proj")}},
 			IncludeUser: true,
 		}, want: []item{
 			{"plainskill", "Plain.", P, "n", "plain/.claude/skills/plainskill/SKILL.md"},
@@ -120,13 +120,13 @@ func TestFilesystemListSkills(t *testing.T) {
 			{"commit", "Commit.", U, "", ".claude/skills/commit/SKILL.md"},
 			{"user-cmd", "User command.", U, "", ".claude/commands/user-cmd.md"},
 		}},
-		{name: "unknown repo is skipped", req: &v1.ListSkillsRequest{Sources: []*v1.SkillSource{{RepoId: "zz"}}}},
+		{name: "unknown repo is skipped", req: &v1.ListSkillsRequest{Sources: []*v1.SkillSource{{ProjectId: "zz"}}}},
 		{name: "bad sources are skipped, the good one and the user's listed", req: &v1.ListSkillsRequest{
 			Sources: []*v1.SkillSource{
-				{RepoId: "p", Path: filepath.Join(root, "gone")}, // a removed worktree
-				{RepoId: "zz"}, // a removed project
-				{RepoId: "p", Path: filepath.Join(root, "locked")}, // unreadable
-				{RepoId: "p"},
+				{ProjectId: "p", Path: filepath.Join(root, "gone")}, // a removed worktree
+				{ProjectId: "zz"}, // a removed project
+				{ProjectId: "p", Path: filepath.Join(root, "locked")}, // unreadable
+				{ProjectId: "p"},
 			},
 			IncludeUser: true,
 		}, want: []item{
@@ -136,8 +136,8 @@ func TestFilesystemListSkills(t *testing.T) {
 			{"user-cmd", "User command.", U, "", ".claude/commands/user-cmd.md"},
 		}},
 		{name: "missing repo id", req: &v1.ListSkillsRequest{Sources: []*v1.SkillSource{{Path: root}}}, code: connect.CodeInvalidArgument},
-		{name: "outside home", req: &v1.ListSkillsRequest{Sources: []*v1.SkillSource{{RepoId: "p", Path: outside}}}, code: connect.CodeInvalidArgument},
-		{name: "relative path", req: &v1.ListSkillsRequest{Sources: []*v1.SkillSource{{RepoId: "p", Path: "proj"}}}, code: connect.CodeInvalidArgument},
+		{name: "outside home", req: &v1.ListSkillsRequest{Sources: []*v1.SkillSource{{ProjectId: "p", Path: outside}}}, code: connect.CodeInvalidArgument},
+		{name: "relative path", req: &v1.ListSkillsRequest{Sources: []*v1.SkillSource{{ProjectId: "p", Path: "proj"}}}, code: connect.CodeInvalidArgument},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -154,7 +154,7 @@ func TestFilesystemListSkills(t *testing.T) {
 			var got []item
 			for _, s := range res.Msg.GetSkills() {
 				rel, _ := filepath.Rel(root, s.GetPath())
-				got = append(got, item{s.GetName(), s.GetDescription(), s.GetScope(), s.GetRepoId(), rel})
+				got = append(got, item{s.GetName(), s.GetDescription(), s.GetScope(), s.GetProjectId(), rel})
 			}
 			if !slices.Equal(got, tt.want) {
 				t.Fatalf("skills = %v\nwant %v", got, tt.want)
@@ -178,25 +178,25 @@ func TestFilesystemSearchFiles(t *testing.T) {
 		wantTruncated bool
 		code          connect.Code
 	}{
-		{name: "git: tracked files", req: &v1.SearchFilesRequest{RepoId: "p", Query: "index"}, want: []string{"src/index.ts"}},
-		{name: "git: directories", req: &v1.SearchFilesRequest{RepoId: "p", Query: "src"}, want: []string{"src/", "src/index.ts"}},
-		{name: "git: ignored files excluded", req: &v1.SearchFilesRequest{RepoId: "p", Query: "debug"}},
-		{name: "git: empty query, limited", req: &v1.SearchFilesRequest{RepoId: "p", Limit: 2},
+		{name: "git: tracked files", req: &v1.SearchFilesRequest{ProjectId: "p", Query: "index"}, want: []string{"src/index.ts"}},
+		{name: "git: directories", req: &v1.SearchFilesRequest{ProjectId: "p", Query: "src"}, want: []string{"src/", "src/index.ts"}},
+		{name: "git: ignored files excluded", req: &v1.SearchFilesRequest{ProjectId: "p", Query: "debug"}},
+		{name: "git: empty query, limited", req: &v1.SearchFilesRequest{ProjectId: "p", Limit: 2},
 			want: []string{".claude/", ".gitignore"}, wantTruncated: true},
-		{name: "explicit path", req: &v1.SearchFilesRequest{RepoId: "p", Path: filepath.Join(root, "proj"), Query: "readme"},
+		{name: "explicit path", req: &v1.SearchFilesRequest{ProjectId: "p", Path: filepath.Join(root, "proj"), Query: "readme"},
 			want: []string{"README.md"}},
-		{name: "no git: walk skips dot-directories", req: &v1.SearchFilesRequest{RepoId: "n", Query: "md"},
+		{name: "no git: walk skips dot-directories", req: &v1.SearchFilesRequest{ProjectId: "n", Query: "md"},
 			want: []string{"notes.md"}},
-		{name: "unknown repo", req: &v1.SearchFilesRequest{RepoId: "zz"}, code: connect.CodeNotFound},
+		{name: "unknown repo", req: &v1.SearchFilesRequest{ProjectId: "zz"}, code: connect.CodeNotFound},
 		{name: "missing repo id", req: &v1.SearchFilesRequest{Query: "x"}, code: connect.CodeInvalidArgument},
-		{name: "outside home", req: &v1.SearchFilesRequest{RepoId: "p", Path: outside}, code: connect.CodeInvalidArgument},
-		{name: "symlink under home to outside", req: &v1.SearchFilesRequest{RepoId: "p", Path: filepath.Join(root, "escape")}, code: connect.CodeInvalidArgument},
-		{name: "dot-dot out of home", req: &v1.SearchFilesRequest{RepoId: "p", Path: root + "/proj/../../outside"}, code: connect.CodeInvalidArgument},
-		{name: "symlink to a checkout under home", req: &v1.SearchFilesRequest{RepoId: "p", Path: filepath.Join(root, "projlink"), Query: "readme"},
+		{name: "outside home", req: &v1.SearchFilesRequest{ProjectId: "p", Path: outside}, code: connect.CodeInvalidArgument},
+		{name: "symlink under home to outside", req: &v1.SearchFilesRequest{ProjectId: "p", Path: filepath.Join(root, "escape")}, code: connect.CodeInvalidArgument},
+		{name: "dot-dot out of home", req: &v1.SearchFilesRequest{ProjectId: "p", Path: root + "/proj/../../outside"}, code: connect.CodeInvalidArgument},
+		{name: "symlink to a checkout under home", req: &v1.SearchFilesRequest{ProjectId: "p", Path: filepath.Join(root, "projlink"), Query: "readme"},
 			want: []string{"README.md"}},
-		{name: "missing checkout", req: &v1.SearchFilesRequest{RepoId: "p", Path: filepath.Join(root, "gone")}, code: connect.CodeNotFound},
-		{name: "a file is not a checkout", req: &v1.SearchFilesRequest{RepoId: "p", Path: filepath.Join(root, "proj", "README.md")}, code: connect.CodeInvalidArgument},
-		{name: "negative limit", req: &v1.SearchFilesRequest{RepoId: "p", Limit: -1}, code: connect.CodeInvalidArgument},
+		{name: "missing checkout", req: &v1.SearchFilesRequest{ProjectId: "p", Path: filepath.Join(root, "gone")}, code: connect.CodeNotFound},
+		{name: "a file is not a checkout", req: &v1.SearchFilesRequest{ProjectId: "p", Path: filepath.Join(root, "proj", "README.md")}, code: connect.CodeInvalidArgument},
+		{name: "negative limit", req: &v1.SearchFilesRequest{ProjectId: "p", Limit: -1}, code: connect.CodeInvalidArgument},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -35,7 +35,7 @@ type Client struct {
 	UI      codefoundryv1connect.UiServiceClient
 	Update  codefoundryv1connect.UpdateServiceClient
 	// Repo is for the repo.clone CLI verb, which streams RepoService.Clone itself.
-	Repo codefoundryv1connect.RepoServiceClient
+	Project codefoundryv1connect.ProjectServiceClient
 	// Events is for the events CLI verb, which streams EventService.Watch.
 	Events codefoundryv1connect.EventServiceClient
 
@@ -62,7 +62,7 @@ func newClient(p paths.Paths, hc *http.Client, baseURL string) *Client {
 		Command: codefoundryv1connect.NewCommandServiceClient(hc, baseURL),
 		UI:      codefoundryv1connect.NewUiServiceClient(hc, baseURL),
 		Update:  codefoundryv1connect.NewUpdateServiceClient(hc, baseURL),
-		Repo:    codefoundryv1connect.NewRepoServiceClient(hc, baseURL),
+		Project: codefoundryv1connect.NewProjectServiceClient(hc, baseURL),
 		Events:  codefoundryv1connect.NewEventServiceClient(hc, baseURL),
 		paths:   p,
 	}

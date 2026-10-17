@@ -16,15 +16,15 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/fsx"
-	"github.com/alexwaumann/code-foundry/internal/store/repo"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
 )
 
 // Filesystem implements codefoundryv1connect.FilesystemServiceHandler.
 type Filesystem struct {
-	root  string
-	repos repo.Store
-	files *fsx.FileIndex
-	log   *slog.Logger
+	root     string
+	projects project.Store
+	files    *fsx.FileIndex
+	log      *slog.Logger
 }
 
 var _ codefoundryv1connect.FilesystemServiceHandler = (*Filesystem)(nil)
@@ -33,9 +33,9 @@ var _ codefoundryv1connect.FilesystemServiceHandler = (*Filesystem)(nil)
 // (the user's home directory, symlinks resolved; see fsx.HomeRoot), marks the
 // registered projects of repos, and lists skills (root/.claude for the user's) and
 // files of their checkouts.
-func NewFilesystem(root string, repos repo.Store) *Filesystem {
+func NewFilesystem(root string, projects project.Store) *Filesystem {
 	log := slog.Default().With("api", "filesystem")
-	return &Filesystem{root: root, repos: repos, files: fsx.NewFileIndex(log), log: log}
+	return &Filesystem{root: root, projects: projects, files: fsx.NewFileIndex(log), log: log}
 }
 
 // Route mounts the service.
@@ -48,7 +48,7 @@ func (h *Filesystem) Route(opts ...connect.HandlerOption) Route {
 func (h *Filesystem) ListDirectories(_ context.Context, req *connect.Request[v1.ListDirectoriesRequest]) (*connect.Response[v1.ListDirectoriesResponse], error) {
 	// A worktree path registers its repository, so it counts as added too.
 	registered := map[string]bool{}
-	for _, r := range h.repos.Snapshot().Repos {
+	for _, r := range h.projects.Snapshot().Projects {
 		registered[r.Path] = true
 		for _, w := range r.Worktrees {
 			registered[w.Path] = true
@@ -75,24 +75,24 @@ func (h *Filesystem) ListDirectories(_ context.Context, req *connect.Request[v1.
 // malformed one fails the request.
 func (h *Filesystem) ListSkills(_ context.Context, req *connect.Request[v1.ListSkillsRequest]) (*connect.Response[v1.ListSkillsResponse], error) {
 	out := &v1.ListSkillsResponse{}
-	add := func(skills []fsx.Skill, scope v1.SkillScope, repoID string) {
+	add := func(skills []fsx.Skill, scope v1.SkillScope, projectID string) {
 		for _, s := range skills {
 			out.Skills = append(out.Skills, &v1.Skill{
-				Name: s.Name, Description: s.Description, Scope: scope, RepoId: repoID, Path: s.Path,
+				Name: s.Name, Description: s.Description, Scope: scope, ProjectId: projectID, Path: s.Path,
 			})
 		}
 	}
 	for _, src := range req.Msg.GetSources() {
-		dir, _, err := h.checkout(src.GetRepoId(), src.GetPath())
+		dir, _, err := h.checkout(src.GetProjectId(), src.GetPath())
 		switch code := connect.CodeOf(err); {
 		case err == nil:
 		case code == connect.CodeInvalidArgument: // a malformed request, not a missing checkout
 			return nil, err
 		default: // a removed project or worktree, or one that cannot be resolved: skip it
-			h.log.Warn("skill source skipped", "repo", src.GetRepoId(), "path", src.GetPath(), "err", err)
+			h.log.Warn("skill source skipped", "repo", src.GetProjectId(), "path", src.GetPath(), "err", err)
 			continue
 		}
-		add(fsx.ReadSkills(filepath.Join(dir, ".claude"), true, h.log), v1.SkillScope_SKILL_SCOPE_PROJECT, src.GetRepoId())
+		add(fsx.ReadSkills(filepath.Join(dir, ".claude"), true, h.log), v1.SkillScope_SKILL_SCOPE_PROJECT, src.GetProjectId())
 	}
 	if req.Msg.GetIncludeUser() {
 		add(fsx.ReadSkills(filepath.Join(h.root, ".claude"), false, h.log), v1.SkillScope_SKILL_SCOPE_USER, "")
@@ -105,7 +105,7 @@ func (h *Filesystem) SearchFiles(ctx context.Context, req *connect.Request[v1.Se
 	if req.Msg.GetLimit() < 0 {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("limit %d is negative", req.Msg.GetLimit()))
 	}
-	dir, git, err := h.checkout(req.Msg.GetRepoId(), req.Msg.GetPath())
+	dir, git, err := h.checkout(req.Msg.GetProjectId(), req.Msg.GetPath())
 	if err != nil {
 		return nil, err
 	}
@@ -129,13 +129,13 @@ func (h *Filesystem) SearchFiles(ctx context.Context, req *connect.Request[v1.Se
 // checkout resolves a request's checkout: path (absolute, symlinks resolved, under
 // home, an existing directory) or the repo's main worktree, and whether to list it
 // with git. The repo must be registered.
-func (h *Filesystem) checkout(repoID, path string) (dir string, git bool, err error) {
-	if repoID == "" {
+func (h *Filesystem) checkout(projectID, path string) (dir string, git bool, err error) {
+	if projectID == "" {
 		return "", false, connect.NewError(connect.CodeInvalidArgument, errors.New("repo_id is required"))
 	}
-	r, ok := h.repos.Snapshot().Repo(repoID)
+	r, ok := h.projects.Snapshot().Project(projectID)
 	if !ok {
-		return "", false, connect.NewError(connect.CodeNotFound, fmt.Errorf("repo %s not found", repoID))
+		return "", false, connect.NewError(connect.CodeNotFound, fmt.Errorf("repo %s not found", projectID))
 	}
 	dir = cmp.Or(path, r.Path)
 	if !filepath.IsAbs(dir) {

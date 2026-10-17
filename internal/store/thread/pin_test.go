@@ -9,7 +9,7 @@ import (
 
 func TestPinPersistsAcrossRestart(t *testing.T) {
 	e := newEnv(t)
-	s := e.connected(CreateOptions{RepoID: "r1", Name: "driver"})
+	s := e.connected(CreateOptions{ProjectID: "r1", Name: "driver"})
 	if s.Pinned {
 		t.Fatalf("new thread pinned: %+v", s)
 	}

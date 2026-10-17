@@ -10,7 +10,7 @@ import (
 	"sync"
 
 	"github.com/alexwaumann/code-foundry/internal/store/clone"
-	"github.com/alexwaumann/code-foundry/internal/store/repo"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
 )
 
 // Fake is a clone.Service. Clone emits Lines, then fails with Errs[owner/name] when
@@ -61,7 +61,7 @@ func (f *Fake) Destination(owner, name string) (string, bool) {
 }
 
 // Clone implements clone.Service.
-func (f *Fake) Clone(_ context.Context, owner, name string, progress func(clone.Progress)) (repo.Repo, error) {
+func (f *Fake) Clone(_ context.Context, owner, name string, progress func(clone.Progress)) (project.Project, error) {
 	slug := owner + "/" + name
 	f.mu.Lock()
 	f.calls = append(f.calls, slug)
@@ -69,7 +69,7 @@ func (f *Fake) Clone(_ context.Context, owner, name string, progress func(clone.
 	f.mu.Unlock()
 	dest := path.Join(f.Root, owner, name)
 	if taken {
-		return repo.Repo{}, fmt.Errorf("%s %w", dest, clone.ErrExists)
+		return project.Project{}, fmt.Errorf("%s %w", dest, clone.ErrExists)
 	}
 	for _, l := range f.Lines {
 		if progress != nil {
@@ -77,9 +77,9 @@ func (f *Fake) Clone(_ context.Context, owner, name string, progress func(clone.
 		}
 	}
 	if err != nil {
-		return repo.Repo{}, err
+		return project.Project{}, err
 	}
 	f.Take(slug)
-	return repo.Repo{ID: "repo-" + strings.ToLower(name), Path: dest, Name: name, Git: true,
+	return project.Project{ID: "repo-" + strings.ToLower(name), Path: dest, Name: name, Git: true,
 		GitHubSlug: strings.ToLower(slug), Remotes: []string{"origin"}}, nil
 }

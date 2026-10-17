@@ -93,7 +93,7 @@ func TestThreadSubscriptionCommands(t *testing.T) {
 
 		{name: "new with notify", cmd: "thread.new", args: map[string]string{"repo": "r1", "created-by": "s-me", "notify": "true"},
 			wantMsg:  "created thread s1 in ; s-me is woken each time it settles",
-			wantReqs: []proto.Message{&v1.CreateThreadRequest{RepoId: "r1", PermissionMode: auto, CreatedBy: "s-me", Notify: true}}},
+			wantReqs: []proto.Message{&v1.CreateThreadRequest{ProjectId: "r1", PermissionMode: auto, CreatedBy: "s-me", Notify: true}}},
 		{name: "notify needs created-by", cmd: "thread.new", ctx: inThread, args: map[string]string{"repo": "r1", "notify": "true"}, wantErr: command.ErrInvalidArgs},
 	}
 	for _, tt := range tests {

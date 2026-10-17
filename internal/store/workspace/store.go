@@ -13,24 +13,24 @@ import (
 	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
-	"github.com/alexwaumann/code-foundry/internal/store/repo"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
 )
 
 // RepoSource is the part of the repo store workspaces need. *repo.Git implements it.
-type RepoSource interface {
-	Snapshot() *repo.Snapshot
-	CreateWorktree(ctx context.Context, opts repo.CreateWorktreeOptions) (repo.Worktree, error)
-	RemoveWorktree(ctx context.Context, opts repo.RemoveWorktreeOptions) error
-	ListRefs(ctx context.Context, repoID string) (repo.Refs, error)
+type ProjectSource interface {
+	Snapshot() *project.Snapshot
+	CreateWorktree(ctx context.Context, opts project.CreateWorktreeOptions) (project.Worktree, error)
+	RemoveWorktree(ctx context.Context, opts project.RemoveWorktreeOptions) error
+	ListRefs(ctx context.Context, projectID string) (project.Refs, error)
 	Refresh(ctx context.Context, id string) error
 }
 
 // Options configures a Manager. DB and Repos are required.
 type Options struct {
-	DB    *sql.DB
-	Repos RepoSource
-	Bus   *bus.Bus     // default: a private bus
-	Log   *slog.Logger // default: slog.Default()
+	DB       *sql.DB
+	Projects ProjectSource
+	Bus      *bus.Bus     // default: a private bus
+	Log      *slog.Logger // default: slog.Default()
 	// Threads lists the threads that own their cwd (every one but an archived one, in any
 	// state: the daemon's worktreeThreads). Removing a member
 	// worktree a thread is on is refused. Nil: none.
@@ -40,7 +40,7 @@ type Options struct {
 	Trust func(dir string) error
 	// WorktreePath, when set, picks the path of a member worktree for branch in r; ""
 	// leaves it to the repo store's default. The daemon applies repos.worktree_dir.
-	WorktreePath func(r repo.Repo, branch string) string
+	WorktreePath func(r project.Project, branch string) string
 	Now          func() time.Time
 }
 
@@ -59,7 +59,7 @@ var _ Store = (*Manager)(nil)
 
 // New loads persisted workspaces and returns the Manager.
 func New(ctx context.Context, opts Options) (*Manager, error) {
-	if opts.DB == nil || opts.Repos == nil {
+	if opts.DB == nil || opts.Projects == nil {
 		return nil, errors.New("workspace: Options.DB and Options.Repos are required")
 	}
 	if opts.Bus == nil {
@@ -136,14 +136,14 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Workspace, error
 			return Workspace{}, fmt.Errorf("%w: a workspace named %q exists (%s)", ErrFailedPrecondition, name, w.ID)
 		}
 	}
-	repos := m.opts.Repos.Snapshot()
+	projects := m.opts.Projects.Snapshot()
 	type plan struct {
-		r    repo.Repo
+		r    project.Project
 		base string
 	}
 	plans := make([]plan, 0, len(o.Members))
 	for _, spec := range o.Members {
-		r, err := ResolveRepo(repos, spec.Repo)
+		r, err := ResolveProject(projects, spec.Project)
 		if err != nil {
 			return Workspace{}, err
 		}
@@ -189,7 +189,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Workspace, error
 }
 
 // AddRepo implements Store.
-func (m *Manager) AddRepo(ctx context.Context, o AddRepoOptions) (Workspace, error) {
+func (m *Manager) AddProject(ctx context.Context, o AddProjectOptions) (Workspace, error) {
 	if err := validateRef("base ref", o.Member.BaseRef); err != nil {
 		return Workspace{}, err
 	}
@@ -199,7 +199,7 @@ func (m *Manager) AddRepo(ctx context.Context, o AddRepoOptions) (Workspace, err
 	if err != nil {
 		return Workspace{}, err
 	}
-	r, err := ResolveRepo(m.opts.Repos.Snapshot(), o.Member.Repo)
+	r, err := ResolveProject(m.opts.Projects.Snapshot(), o.Member.Project)
 	if err != nil {
 		return Workspace{}, err
 	}
@@ -224,14 +224,14 @@ func (m *Manager) AddRepo(ctx context.Context, o AddRepoOptions) (Workspace, err
 }
 
 // RemoveRepo implements Store.
-func (m *Manager) RemoveRepo(ctx context.Context, o RemoveRepoOptions) (Workspace, error) {
+func (m *Manager) RemoveProject(ctx context.Context, o RemoveProjectOptions) (Workspace, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	w, err := ResolveWorkspace(m.Snapshot(), o.Ref)
 	if err != nil {
 		return Workspace{}, err
 	}
-	mem, err := memberFor(w, m.opts.Repos.Snapshot(), o.Repo)
+	mem, err := memberFor(w, m.opts.Projects.Snapshot(), o.Project)
 	if err != nil {
 		return Workspace{}, err
 	}
@@ -310,7 +310,7 @@ func (m *Manager) Members(_ context.Context, ref Ref) (Membership, error) {
 	if err != nil {
 		return Membership{}, err
 	}
-	return Join(w, m.opts.Repos.Snapshot(), ref.Cwd), nil
+	return Join(w, m.opts.Projects.Snapshot(), ref.Cwd), nil
 }
 
 // created is a member worktree an operation made, for rollback.
@@ -322,20 +322,20 @@ type created struct {
 
 // createMember makes r's worktree on branch (the same path a new thread's worktree
 // takes: fetch the base, git worktree add) and pre-trusts it.
-func (m *Manager) createMember(ctx context.Context, r repo.Repo, branch, base string, fetch bool) (created, error) {
+func (m *Manager) createMember(ctx context.Context, r project.Project, branch, base string, fetch bool) (created, error) {
 	existed := true
-	if refs, err := m.opts.Repos.ListRefs(ctx, r.ID); err == nil {
+	if refs, err := m.opts.Projects.ListRefs(ctx, r.ID); err == nil {
 		existed = slices.Contains(refs.Local, branch)
 	}
 	path := ""
 	if m.opts.WorktreePath != nil {
 		path = m.opts.WorktreePath(r, branch)
 	}
-	wt, err := m.opts.Repos.CreateWorktree(ctx, repo.CreateWorktreeOptions{
-		RepoID: r.ID, Branch: branch, BaseRef: base, Path: path, Fetch: fetch,
+	wt, err := m.opts.Projects.CreateWorktree(ctx, project.CreateWorktreeOptions{
+		ProjectID: r.ID, Branch: branch, BaseRef: base, Path: path, Fetch: fetch,
 	})
 	if err != nil {
-		return created{}, repoError("create worktree "+branch+" in "+r.Name, err)
+		return created{}, projectError("create worktree "+branch+" in "+r.Name, err)
 	}
 	if m.opts.Trust != nil {
 		if err := m.opts.Trust(wt.Path); err != nil {
@@ -343,7 +343,7 @@ func (m *Manager) createMember(ctx context.Context, r repo.Repo, branch, base st
 		}
 	}
 	m.log.Info("workspace worktree created", "repo", r.ID, "branch", branch, "path", wt.Path, "base", base)
-	return created{member: Member{RepoID: r.ID, WorktreePath: wt.Path}, newBranch: !existed}, nil
+	return created{member: Member{ProjectID: r.ID, WorktreePath: wt.Path}, newBranch: !existed}, nil
 }
 
 // rollback removes worktrees an operation made before it failed, newest first. It
@@ -353,10 +353,10 @@ func (m *Manager) rollback(ctx context.Context, made []created) {
 	defer cancel()
 	for i := len(made) - 1; i >= 0; i-- {
 		c := made[i]
-		if err := m.opts.Repos.RemoveWorktree(ctx, repo.RemoveWorktreeOptions{
-			RepoID: c.member.RepoID, Path: c.member.WorktreePath, Force: true, DeleteBranch: c.newBranch,
+		if err := m.opts.Projects.RemoveWorktree(ctx, project.RemoveWorktreeOptions{
+			ProjectID: c.member.ProjectID, Path: c.member.WorktreePath, Force: true, DeleteBranch: c.newBranch,
 		}); err != nil {
-			m.log.Warn("workspace rollback: remove worktree", "repo", c.member.RepoID, "path", c.member.WorktreePath, "err", err)
+			m.log.Warn("workspace rollback: remove worktree", "repo", c.member.ProjectID, "path", c.member.WorktreePath, "err", err)
 		}
 	}
 }
@@ -366,23 +366,23 @@ func (m *Manager) rollback(ctx context.Context, made []created) {
 // the member can be dropped: removed now, already deleted by hand, or its repository
 // is no longer registered (the files are then left alone).
 func (m *Manager) removeMember(ctx context.Context, mem Member, force, deleteBranch bool) (gone bool, err error) {
-	if _, ok := m.opts.Repos.Snapshot().Repo(mem.RepoID); !ok {
+	if _, ok := m.opts.Projects.Snapshot().Project(mem.ProjectID); !ok {
 		m.log.Warn("workspace member's repository is not registered; leaving its worktree on disk",
-			"repo", mem.RepoID, "path", mem.WorktreePath)
+			"repo", mem.ProjectID, "path", mem.WorktreePath)
 		return true, nil
 	}
-	err = m.opts.Repos.RemoveWorktree(ctx, repo.RemoveWorktreeOptions{
-		RepoID: mem.RepoID, Path: mem.WorktreePath, Force: force, DeleteBranch: deleteBranch,
+	err = m.opts.Projects.RemoveWorktree(ctx, project.RemoveWorktreeOptions{
+		ProjectID: mem.ProjectID, Path: mem.WorktreePath, Force: force, DeleteBranch: deleteBranch,
 	})
 	gone = !exists(mem.WorktreePath)
 	switch {
 	case err == nil:
 		return true, nil
-	case gone && errors.Is(err, repo.ErrNotFound):
-		m.log.Info("workspace member worktree was already gone", "repo", mem.RepoID, "path", mem.WorktreePath)
+	case gone && errors.Is(err, project.ErrNotFound):
+		m.log.Info("workspace member worktree was already gone", "repo", mem.ProjectID, "path", mem.WorktreePath)
 		return true, nil
 	default:
-		return gone, repoError("remove worktree "+mem.WorktreePath, err)
+		return gone, projectError("remove worktree "+mem.WorktreePath, err)
 	}
 }
 
@@ -399,7 +399,7 @@ func (m *Manager) dropMembers(ctx context.Context, w *Workspace, drop ...Member)
 			kept = append(kept, mem)
 			continue
 		}
-		if err := deleteMember(ctx, m.opts.DB, w.ID, mem.RepoID); err != nil {
+		if err := deleteMember(ctx, m.opts.DB, w.ID, mem.ProjectID); err != nil {
 			errs = append(errs, err)
 			kept = append(kept, mem)
 		}
@@ -414,13 +414,13 @@ func (m *Manager) dropMembers(ctx context.Context, w *Workspace, drop ...Member)
 func (m *Manager) dirtyMembers(ctx context.Context, w Workspace) []string {
 	var out []string
 	for _, mem := range w.Members {
-		if err := m.opts.Repos.Refresh(ctx, mem.RepoID); err != nil {
+		if err := m.opts.Projects.Refresh(ctx, mem.ProjectID); err != nil {
 			continue // unregistered or failing: removal reports it
 		}
-		snap := m.opts.Repos.Snapshot()
-		if wt, ok := snap.Worktree(mem.RepoID, mem.WorktreePath); ok && wt.Status.Dirty {
-			name := mem.RepoID
-			if r, ok := snap.Repo(mem.RepoID); ok {
+		snap := m.opts.Projects.Snapshot()
+		if wt, ok := snap.Worktree(mem.ProjectID, mem.WorktreePath); ok && wt.Status.Dirty {
+			name := mem.ProjectID
+			if r, ok := snap.Project(mem.ProjectID); ok {
 				name = r.Name
 			}
 			out = append(out, name+" ("+mem.WorktreePath+")")
@@ -431,14 +431,14 @@ func (m *Manager) dirtyMembers(ctx context.Context, w Workspace) []string {
 
 // repoError wraps a repo store error in the workspace error class with the same
 // meaning, so API codes survive.
-func repoError(what string, err error) error {
+func projectError(what string, err error) error {
 	var kind error
 	switch {
 	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
 		return fmt.Errorf("%s: %w", what, err)
-	case errors.Is(err, repo.ErrNotFound):
+	case errors.Is(err, project.ErrNotFound):
 		kind = ErrNotFound
-	case errors.Is(err, repo.ErrInvalidArgument):
+	case errors.Is(err, project.ErrInvalidArgument):
 		kind = ErrInvalidArgument
 	default:
 		kind = ErrFailedPrecondition

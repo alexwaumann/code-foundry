@@ -169,10 +169,10 @@ func (o *Output) IDs() []string {
 // Repo is a fake command.RepoBackend. Err, when set, is returned by every call. List
 // returns Repos. CreateWorktree calls OnCreateWorktree (when set) and then fails with
 // CreateWorktreeErr (when set).
-type Repo struct {
+type Project struct {
 	Calls
 	Err               error
-	Repos             []*v1.Repo
+	Projects          []*v1.Project
 	CreateWorktreeErr error
 	OnCreateWorktree  func(*v1.CreateWorktreeRequest)
 	// OnCleanup answers CleanupWorktrees (dry runs included); nil answers an empty
@@ -180,25 +180,25 @@ type Repo struct {
 	OnCleanup func(*v1.CleanupWorktreesRequest) (*v1.CleanupWorktreesResponse, error)
 }
 
-var _ command.RepoBackend = (*Repo)(nil)
+var _ command.ProjectBackend = (*Project)(nil)
 
 // Register records the request and returns a repo named after the path.
-func (f *Repo) Register(_ context.Context, r *connect.Request[v1.RegisterRepoRequest]) (*connect.Response[v1.RegisterRepoResponse], error) {
+func (f *Project) Register(_ context.Context, r *connect.Request[v1.RegisterProjectRequest]) (*connect.Response[v1.RegisterProjectResponse], error) {
 	f.record(r.Msg)
 	if f.Err != nil {
 		return nil, f.Err
 	}
-	return connect.NewResponse(&v1.RegisterRepoResponse{Repo: &v1.Repo{Id: "r1", Name: "repo", Path: r.Msg.GetPath()}}), nil
+	return connect.NewResponse(&v1.RegisterProjectResponse{Project: &v1.Project{Id: "r1", Name: "repo", Path: r.Msg.GetPath()}}), nil
 }
 
 // Unregister records the request.
-func (f *Repo) Unregister(_ context.Context, r *connect.Request[v1.UnregisterRepoRequest]) (*connect.Response[v1.UnregisterRepoResponse], error) {
+func (f *Project) Unregister(_ context.Context, r *connect.Request[v1.UnregisterProjectRequest]) (*connect.Response[v1.UnregisterProjectResponse], error) {
 	f.record(r.Msg)
-	return connect.NewResponse(&v1.UnregisterRepoResponse{}), f.Err
+	return connect.NewResponse(&v1.UnregisterProjectResponse{}), f.Err
 }
 
 // CreateWorktree records the request and echoes it as a worktree.
-func (f *Repo) CreateWorktree(_ context.Context, r *connect.Request[v1.CreateWorktreeRequest]) (*connect.Response[v1.CreateWorktreeResponse], error) {
+func (f *Project) CreateWorktree(_ context.Context, r *connect.Request[v1.CreateWorktreeRequest]) (*connect.Response[v1.CreateWorktreeResponse], error) {
 	f.record(r.Msg)
 	if f.OnCreateWorktree != nil {
 		f.OnCreateWorktree(r.Msg)
@@ -207,24 +207,24 @@ func (f *Repo) CreateWorktree(_ context.Context, r *connect.Request[v1.CreateWor
 		return nil, err
 	}
 	return connect.NewResponse(&v1.CreateWorktreeResponse{Worktree: &v1.Worktree{
-		RepoId: r.Msg.GetRepoId(), Branch: r.Msg.GetBranch(), Path: "/wt/" + r.Msg.GetBranch(),
+		ProjectId: r.Msg.GetProjectId(), Branch: r.Msg.GetBranch(), Path: "/wt/" + r.Msg.GetBranch(),
 	}}), nil
 }
 
 // RemoveWorktree records the request.
-func (f *Repo) RemoveWorktree(_ context.Context, r *connect.Request[v1.RemoveWorktreeRequest]) (*connect.Response[v1.RemoveWorktreeResponse], error) {
+func (f *Project) RemoveWorktree(_ context.Context, r *connect.Request[v1.RemoveWorktreeRequest]) (*connect.Response[v1.RemoveWorktreeResponse], error) {
 	f.record(r.Msg)
 	return connect.NewResponse(&v1.RemoveWorktreeResponse{}), f.Err
 }
 
 // CleanupWorktrees records the request and answers with OnCleanup.
-func (f *Repo) CleanupWorktrees(_ context.Context, r *connect.Request[v1.CleanupWorktreesRequest]) (*connect.Response[v1.CleanupWorktreesResponse], error) {
+func (f *Project) CleanupWorktrees(_ context.Context, r *connect.Request[v1.CleanupWorktreesRequest]) (*connect.Response[v1.CleanupWorktreesResponse], error) {
 	f.record(r.Msg)
 	if f.Err != nil {
 		return nil, f.Err
 	}
 	if f.OnCleanup == nil {
-		return connect.NewResponse(&v1.CleanupWorktreesResponse{RepoId: r.Msg.GetRepo()}), nil
+		return connect.NewResponse(&v1.CleanupWorktreesResponse{ProjectId: r.Msg.GetProject()}), nil
 	}
 	res, err := f.OnCleanup(r.Msg)
 	if err != nil {
@@ -234,29 +234,29 @@ func (f *Repo) CleanupWorktrees(_ context.Context, r *connect.Request[v1.Cleanup
 }
 
 // List records the request and returns copies of Repos.
-func (f *Repo) List(_ context.Context, r *connect.Request[v1.ListReposRequest]) (*connect.Response[v1.ListReposResponse], error) {
+func (f *Project) List(_ context.Context, r *connect.Request[v1.ListProjectsRequest]) (*connect.Response[v1.ListProjectsResponse], error) {
 	f.record(r.Msg)
 	if f.Err != nil {
 		return nil, f.Err
 	}
-	out := make([]*v1.Repo, len(f.Repos))
-	for i, repo := range f.Repos {
-		out[i] = proto.CloneOf(repo)
+	out := make([]*v1.Project, len(f.Projects))
+	for i, project := range f.Projects {
+		out[i] = proto.CloneOf(project)
 	}
-	return connect.NewResponse(&v1.ListReposResponse{Repos: out}), nil
+	return connect.NewResponse(&v1.ListProjectsResponse{Projects: out}), nil
 }
 
 // Refresh records the request.
-func (f *Repo) Refresh(_ context.Context, r *connect.Request[v1.RefreshRepoRequest]) (*connect.Response[v1.RefreshRepoResponse], error) {
+func (f *Project) Refresh(_ context.Context, r *connect.Request[v1.RefreshProjectRequest]) (*connect.Response[v1.RefreshProjectResponse], error) {
 	f.record(r.Msg)
-	return connect.NewResponse(&v1.RefreshRepoResponse{}), f.Err
+	return connect.NewResponse(&v1.RefreshProjectResponse{}), f.Err
 }
 
 // InitGit records the request and returns a git repo on main with that id.
-func (f *Repo) InitGit(_ context.Context, r *connect.Request[v1.InitGitRequest]) (*connect.Response[v1.InitGitResponse], error) {
+func (f *Project) InitGit(_ context.Context, r *connect.Request[v1.InitGitRequest]) (*connect.Response[v1.InitGitResponse], error) {
 	f.record(r.Msg)
 	if f.Err != nil {
 		return nil, f.Err
 	}
-	return connect.NewResponse(&v1.InitGitResponse{Repo: &v1.Repo{Id: r.Msg.GetId(), Name: "notes", Git: true, DefaultBranch: "main"}}), nil
+	return connect.NewResponse(&v1.InitGitResponse{Project: &v1.Project{Id: r.Msg.GetId(), Name: "notes", Git: true, DefaultBranch: "main"}}), nil
 }

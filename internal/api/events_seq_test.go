@@ -10,7 +10,7 @@ import (
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/command"
-	"github.com/alexwaumann/code-foundry/internal/store/repo"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
 
@@ -34,7 +34,9 @@ func (e *eventStream) nextLive() *v1.Event {
 	}
 }
 
-func repoNamed(name string) repo.Repo { return repo.Repo{ID: name, Name: name, Path: "/code/" + name} }
+func projectNamed(name string) project.Project {
+	return project.Project{ID: name, Name: name, Path: "/code/" + name}
+}
 
 // One event has one seq on every stream; seqs grow by one per published event, whatever
 // the source; snapshots carry none.
@@ -42,8 +44,8 @@ func TestEventsSeqSharedAcrossClients(t *testing.T) {
 	f := newEventsFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	a := f.watch(t, ctx, v1.EventSource_EVENT_SOURCE_REPO, v1.EventSource_EVENT_SOURCE_THREAD_LIST)
-	b := f.watch(t, ctx, v1.EventSource_EVENT_SOURCE_REPO, v1.EventSource_EVENT_SOURCE_THREAD_LIST)
+	a := f.watch(t, ctx, v1.EventSource_EVENT_SOURCE_PROJECT, v1.EventSource_EVENT_SOURCE_THREAD_LIST)
+	b := f.watch(t, ctx, v1.EventSource_EVENT_SOURCE_PROJECT, v1.EventSource_EVENT_SOURCE_THREAD_LIST)
 	for _, s := range []*eventStream{a, b} {
 		for _, want := range []string{"repo.snapshot(0)", "thread.snapshot(0)"} {
 			ev := s.next()
@@ -52,9 +54,9 @@ func TestEventsSeqSharedAcrossClients(t *testing.T) {
 			}
 		}
 	}
-	f.repo.Put(repoNamed("one"))
+	f.project.Put(projectNamed("one"))
 	f.th.Put(thread.Thread{ID: "s1", State: thread.StateConnected, Status: thread.StatusBusy})
-	f.repo.Put(repoNamed("two"))
+	f.project.Put(projectNamed("two"))
 
 	read := func(s *eventStream) map[string]uint64 {
 		out := map[string]uint64{}
@@ -90,9 +92,9 @@ func TestEventsResumeReplaysMissed(t *testing.T) {
 	f := newEventsFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	first := f.watch(t, ctx, v1.EventSource_EVENT_SOURCE_REPO)
+	first := f.watch(t, ctx, v1.EventSource_EVENT_SOURCE_PROJECT)
 	first.next() // snapshot
-	f.repo.Put(repoNamed("one"))
+	f.project.Put(projectNamed("one"))
 	ev := first.nextLive()
 	last := ev.GetSeq()
 	if describe(ev) != "repo.updated one" || last == 0 {
@@ -100,14 +102,14 @@ func TestEventsResumeReplaysMissed(t *testing.T) {
 	}
 	// Missed by a client that disconnected after "one": a repo, a thread (not asked
 	// for), and another repo.
-	f.repo.Put(repoNamed("two"))
+	f.project.Put(projectNamed("two"))
 	f.th.Put(thread.Thread{ID: "s1", State: thread.StateConnected})
-	f.repo.Put(repoNamed("three"))
+	f.project.Put(projectNamed("three"))
 	for range 2 {
 		first.nextLive() // the hub has numbered them
 	}
 
-	s := f.watchSince(t, ctx, last, v1.EventSource_EVENT_SOURCE_REPO)
+	s := f.watchSince(t, ctx, last, v1.EventSource_EVENT_SOURCE_PROJECT)
 	var got []string
 	prev := last
 	for range 2 {
@@ -121,15 +123,15 @@ func TestEventsResumeReplaysMissed(t *testing.T) {
 	if want := "[repo.updated two repo.updated three]"; fmt.Sprint(got) != want {
 		t.Fatalf("replay = %v, want %s", got, want)
 	}
-	f.repo.Put(repoNamed("four"))
+	f.project.Put(projectNamed("four"))
 	if ev := s.nextLive(); describe(ev) != "repo.updated four" || ev.GetSeq() <= prev {
 		t.Fatalf("live %q seq %d, want repo.updated four after seq %d", describe(ev), ev.GetSeq(), prev)
 	}
 	prev = f.events.eventHub().lastSeq()
 
 	// Resuming at the newest seq replays nothing and goes on live.
-	cur := f.watchSince(t, ctx, prev, v1.EventSource_EVENT_SOURCE_REPO)
-	f.repo.Put(repoNamed("five"))
+	cur := f.watchSince(t, ctx, prev, v1.EventSource_EVENT_SOURCE_PROJECT)
+	f.project.Put(projectNamed("five"))
 	if got := describe(cur.nextLive()); got != "repo.updated five" {
 		t.Fatalf("after resuming at the head: %q", got)
 	}
@@ -141,12 +143,12 @@ func TestEventsResumeOutsideLogFallsBack(t *testing.T) {
 	f := newEventsFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	first := f.watch(t, ctx, v1.EventSource_EVENT_SOURCE_REPO)
+	first := f.watch(t, ctx, v1.EventSource_EVENT_SOURCE_PROJECT)
 	first.next()
-	f.repo.Put(repoNamed("r"))
+	f.project.Put(projectNamed("r"))
 	first.nextLive()
 
-	ahead := f.watchSince(t, ctx, 1_000_000, v1.EventSource_EVENT_SOURCE_REPO)
+	ahead := f.watchSince(t, ctx, 1_000_000, v1.EventSource_EVENT_SOURCE_PROJECT)
 	if ev := ahead.next(); describe(ev) != "repo.snapshot(1)" || ev.GetSeq() != 0 {
 		t.Fatalf("ahead: first %q seq %d, want the snapshot", describe(ev), ev.GetSeq())
 	}
@@ -157,18 +159,18 @@ func TestEventsResumeOutsideLogFallsBack(t *testing.T) {
 		if i > 4*eventLogSize {
 			t.Fatalf("the log still holds seq 1 after %d events", i)
 		}
-		f.repo.Put(repo.Repo{ID: "r", Name: fmt.Sprint(i)})
+		f.project.Put(project.Project{ID: "r", Name: fmt.Sprint(i)})
 		if i >= eventLogSize {
 			time.Sleep(time.Millisecond) // let the hub catch up
 		}
 	}
-	old := f.watchSince(t, ctx, 1, v1.EventSource_EVENT_SOURCE_REPO)
+	old := f.watchSince(t, ctx, 1, v1.EventSource_EVENT_SOURCE_PROJECT)
 	if ev := old.next(); describe(ev) != "repo.snapshot(1)" || ev.GetSeq() != 0 {
 		t.Fatalf("too old: first %q seq %d, want the snapshot", describe(ev), ev.GetSeq())
 	}
 	// Then live (the hub may still be numbering the burst above, and a drop in it may
 	// bring another snapshot).
-	f.repo.Put(repoNamed("after"))
+	f.project.Put(projectNamed("after"))
 	for {
 		ev := old.nextLive()
 		if describe(ev) == "repo.updated after" || describe(ev) == "repo.snapshot(2)" {
@@ -195,9 +197,9 @@ func TestEventsTransientTopics(t *testing.T) {
 		return command.BusEmitter{Bus: f.bus}.Emit(&v1.UiIntent{Intent: &v1.UiIntent_OpenPalette_{OpenPalette: &v1.UiIntent_OpenPalette{Query: q}}})
 	}
 	sctx, stop := context.WithCancel(ctx)
-	s := f.watch(t, sctx, v1.EventSource_EVENT_SOURCE_UI, v1.EventSource_EVENT_SOURCE_REPO)
+	s := f.watch(t, sctx, v1.EventSource_EVENT_SOURCE_UI, v1.EventSource_EVENT_SOURCE_PROJECT)
 	s.next() // repo snapshot
-	f.repo.Put(repoNamed("a"))
+	f.project.Put(projectNamed("a"))
 	before := s.nextLive()
 	if describe(before) != "repo.updated a" {
 		t.Fatalf("got %q", describe(before))
@@ -208,7 +210,7 @@ func TestEventsTransientTopics(t *testing.T) {
 	if ev := s.nextLive(); describe(ev) != "ui.palette one" || ev.GetSeq() <= before.GetSeq() {
 		t.Fatalf("got %q seq %d", describe(ev), ev.GetSeq())
 	}
-	f.repo.Put(repoNamed("b"))
+	f.project.Put(projectNamed("b"))
 	if got := describe(s.nextLive()); got != "repo.updated b" {
 		t.Fatalf("got %q", got)
 	}
@@ -221,7 +223,7 @@ func TestEventsTransientTopics(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	// A resume from before the intent replays the repo event after it only.
-	r := f.watchSince(t, ctx, before.GetSeq(), v1.EventSource_EVENT_SOURCE_UI, v1.EventSource_EVENT_SOURCE_REPO)
+	r := f.watchSince(t, ctx, before.GetSeq(), v1.EventSource_EVENT_SOURCE_UI, v1.EventSource_EVENT_SOURCE_PROJECT)
 	if got := describe(r.next()); got != "repo.updated b" {
 		t.Fatalf("replay = %q, want repo.updated b", got)
 	}

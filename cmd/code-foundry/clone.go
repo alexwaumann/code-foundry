@@ -37,37 +37,37 @@ func presentClone(ctx context.Context, cl *cli, c *client.Client, vals map[strin
 		fmt.Fprintf(cl.stderr, "Run `code-foundry help %s` for usage.\n", name)
 		return errUsage
 	}
-	stream, err := c.Repo.Clone(ctx, connect.NewRequest(&v1.CloneRepoRequest{Owner: owner, Name: repoName}))
+	stream, err := c.Project.Clone(ctx, connect.NewRequest(&v1.CloneProjectRequest{Owner: owner, Name: repoName}))
 	if err != nil {
 		return cl.invokeFailed(name, err)
 	}
 	defer func() { _ = stream.Close() }()
 	out := progressPrinter{w: cl.stderr, live: cl.interactive != nil && cl.interactive()}
-	var repo *v1.Repo
+	var project *v1.Project
 	for stream.Receive() {
 		switch ev := stream.Msg().GetEvent().(type) {
-		case *v1.CloneRepoEvent_Progress:
+		case *v1.CloneProjectEvent_Progress:
 			out.print(ev.Progress.GetLine(), ev.Progress.GetTransient())
-		case *v1.CloneRepoEvent_Repo:
-			repo = ev.Repo
+		case *v1.CloneProjectEvent_Project:
+			project = ev.Project
 		}
 	}
 	out.end()
 	if err := stream.Err(); err != nil {
 		return cl.invokeFailed(name, err)
 	}
-	if repo == nil {
+	if project == nil {
 		return errors.New(name + ": the clone ended without a project")
 	}
 	if asJSON {
-		b, err := protojson.Marshal(repo)
+		b, err := protojson.Marshal(project)
 		if err != nil {
 			return fmt.Errorf("encode result: %w", err)
 		}
 		fmt.Fprintln(cl.stdout, string(b))
 		return nil
 	}
-	fmt.Fprintf(cl.stdout, "cloned %s into %s (%s)\n", repo.GetName(), repo.GetPath(), repo.GetId())
+	fmt.Fprintf(cl.stdout, "cloned %s into %s (%s)\n", project.GetName(), project.GetPath(), project.GetId())
 	return nil
 }
 

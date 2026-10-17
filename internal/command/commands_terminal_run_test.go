@@ -17,7 +17,7 @@ import (
 
 func TestTerminalNewRun(t *testing.T) {
 	const app = "/cf-test/src/app"
-	repos := []*v1.Repo{{Id: "r1", Path: app, Worktrees: []*v1.Worktree{{RepoId: "r1", Path: app}}}}
+	projects := []*v1.Project{{Id: "r1", Path: app, Worktrees: []*v1.Worktree{{ProjectId: "r1", Path: app}}}}
 	exited := connect.NewError(connect.CodeFailedPrecondition, errors.New("terminal has exited"))
 	tests := []struct {
 		name     string
@@ -66,7 +66,7 @@ func TestTerminalNewRun(t *testing.T) {
 			out := &commandtest.Output{Block: tt.block, Err: tt.awaitErr}
 			writesAtAwait := -1
 			out.OnAwait = func(string) { writesAtAwait = len(writesOf(term.Requests())) }
-			deps := command.TerminalDeps{Terminal: term, Repo: &commandtest.Repo{Repos: repos}, Thread: &commandtest.Thread{}, RunWait: tt.runWait}
+			deps := command.TerminalDeps{Terminal: term, Project: &commandtest.Project{Projects: projects}, Thread: &commandtest.Thread{}, RunWait: tt.runWait}
 			if !tt.noAwait {
 				deps.AwaitOutput = out.Await
 			}

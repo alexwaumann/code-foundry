@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alexwaumann/code-foundry/internal/store/repo/repotest"
+	"github.com/alexwaumann/code-foundry/internal/store/project/projecttest"
 )
 
 // File references reach claude as absolute paths in the worktree of the project they
@@ -19,7 +19,7 @@ func TestCreateRewritesFileRefs(t *testing.T) {
 		want func(s Thread, e *wsEnv) string
 	}{
 		{name: "existing worktree: only the thread's project resolves",
-			o: CreateOptions{RepoID: "r1"},
+			o: CreateOptions{ProjectID: "r1"},
 			want: func(s Thread, _ *wsEnv) string {
 				return "read @" + s.WorktreePath + "/README.md and @docs/a b.md and @x.go"
 			}},
@@ -29,17 +29,17 @@ func TestCreateRewritesFileRefs(t *testing.T) {
 				return "read @README.md and @docs/a b.md and @x.go"
 			}},
 		{name: "new worktree: the created worktree",
-			o: CreateOptions{RepoID: "r1", NewWorktree: &NewWorktree{}},
+			o: CreateOptions{ProjectID: "r1", NewWorktree: &NewWorktree{}},
 			want: func(s Thread, _ *wsEnv) string {
 				return "read @" + s.WorktreePath + "/README.md and @docs/a b.md and @x.go"
 			}},
 		{name: "workspace thread: every member",
-			o: CreateOptions{WorkspaceID: "login", RepoID: "r2"},
+			o: CreateOptions{WorkspaceID: "login", ProjectID: "r2"},
 			want: func(s Thread, e *wsEnv) string {
 				return "read @" + e.wt + "/README.md and @" + e.wt2 + "/docs/a b.md and @x.go"
 			}},
 		{name: "new workspace: the new members' worktrees",
-			o: CreateOptions{NewWorkspace: &NewWorkspace{Repos: []string{"r1", "r2"}}},
+			o: CreateOptions{NewWorkspace: &NewWorkspace{Projects: []string{"r1", "r2"}}},
 			want: func(s Thread, e *wsEnv) string {
 				w, _ := e.ws.Snapshot().Workspace(s.WorkspaceID)
 				m1, _ := w.Member("r1")
@@ -50,7 +50,7 @@ func TestCreateRewritesFileRefs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			e := newWSEnv(t, func(o *Options) {
-				o.Repos.(*repotest.Fake).WorktreeRoot = t.TempDir()
+				o.Projects.(*projecttest.Fake).WorktreeRoot = t.TempDir()
 			})
 			e.namer = func(string) (string, error) { return "refs", nil }
 			o := tt.o

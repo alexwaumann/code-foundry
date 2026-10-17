@@ -24,7 +24,7 @@ import (
 
 	"github.com/alexwaumann/code-foundry/internal/fsx"
 	"github.com/alexwaumann/code-foundry/internal/store/gh"
-	"github.com/alexwaumann/code-foundry/internal/store/repo"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
 )
 
 // DefaultTimeout bounds one clone, download included.
@@ -56,14 +56,14 @@ type Service interface {
 	// Destination is where owner/name would be cloned, and whether it exists.
 	Destination(owner, name string) (path string, exists bool)
 	// Clone clones owner/name, streaming output to progress, and registers it.
-	Clone(ctx context.Context, owner, name string, progress func(Progress)) (repo.Repo, error)
+	Clone(ctx context.Context, owner, name string, progress func(Progress)) (project.Project, error)
 }
 
 var _ Service = (*Cloner)(nil)
 
 // Registrar registers a directory as a project. *repo.Git implements it.
 type Registrar interface {
-	Register(ctx context.Context, path string) (repo.Repo, error)
+	Register(ctx context.Context, path string) (project.Project, error)
 }
 
 // Options configures a Cloner.
@@ -74,7 +74,7 @@ type Options struct {
 	// home). Empty skips the check (the repo store still enforces it on register).
 	AllowedRoot string
 	// Repos registers finished clones. Required.
-	Repos Registrar
+	Projects Registrar
 	// Gh is the gh binary; "gh" from PATH when empty.
 	Gh string
 	// Runner runs gh. Defaults to ExecRunner{}.
@@ -97,7 +97,7 @@ func New(opts Options) (*Cloner, error) {
 	if opts.Root == "" || !filepath.IsAbs(opts.Root) {
 		return nil, fmt.Errorf("clone: root %q must be an absolute path", opts.Root)
 	}
-	if opts.Repos == nil {
+	if opts.Projects == nil {
 		return nil, errors.New("clone: Repos is required")
 	}
 	if opts.Gh == "" {
@@ -125,34 +125,34 @@ func (c *Cloner) Destination(owner, name string) (path string, exists bool) {
 
 // Clone clones owner/name into its destination, streaming output to progress (which
 // may be nil), then registers it. It returns the registered project.
-func (c *Cloner) Clone(ctx context.Context, owner, name string, progress func(Progress)) (repo.Repo, error) {
+func (c *Cloner) Clone(ctx context.Context, owner, name string, progress func(Progress)) (project.Project, error) {
 	owner, name = strings.TrimSpace(owner), strings.TrimSpace(name)
 	if _, err := gh.NormalizeSlug(owner + "/" + name); err != nil {
-		return repo.Repo{}, fmt.Errorf("%w: %q is not a GitHub owner/repo", ErrInvalidArgument, owner+"/"+name)
+		return project.Project{}, fmt.Errorf("%w: %q is not a GitHub owner/repo", ErrInvalidArgument, owner+"/"+name)
 	}
 	dest := filepath.Join(c.opts.Root, owner, name)
 	if !c.claim(dest) {
-		return repo.Repo{}, fmt.Errorf("%w: %s is being cloned", ErrBusy, dest)
+		return project.Project{}, fmt.Errorf("%w: %s is being cloned", ErrBusy, dest)
 	}
 	defer c.release(dest)
 	if _, err := os.Lstat(dest); err == nil {
-		return repo.Repo{}, fmt.Errorf("%s %w", dest, ErrExists)
+		return project.Project{}, fmt.Errorf("%s %w", dest, ErrExists)
 	} else if !errors.Is(err, os.ErrNotExist) {
-		return repo.Repo{}, fmt.Errorf("check %s: %w", dest, err)
+		return project.Project{}, fmt.Errorf("check %s: %w", dest, err)
 	}
 	parent := filepath.Dir(dest)
 	if err := os.MkdirAll(c.opts.Root, 0o700); err != nil {
-		return repo.Repo{}, fmt.Errorf("create %s: %w", c.opts.Root, err)
+		return project.Project{}, fmt.Errorf("create %s: %w", c.opts.Root, err)
 	}
 	if err := c.checkRoot(); err != nil {
-		return repo.Repo{}, err
+		return project.Project{}, err
 	}
 	createdParent := false
 	if _, err := os.Stat(parent); errors.Is(err, os.ErrNotExist) {
 		createdParent = true
 	}
 	if err := os.MkdirAll(parent, 0o700); err != nil {
-		return repo.Repo{}, fmt.Errorf("create %s: %w", parent, err)
+		return project.Project{}, fmt.Errorf("create %s: %w", parent, err)
 	}
 
 	slug := owner + "/" + name
@@ -171,15 +171,15 @@ func (c *Cloner) Clone(ctx context.Context, owner, name string, progress func(Pr
 		c.cleanup(log, dest, parent, createdParent)
 		err = c.classify(ctx, runCtx, err)
 		log.Warn("clone failed", "dur", time.Since(start).Round(time.Millisecond).String(), "err", err)
-		return repo.Repo{}, err
+		return project.Project{}, err
 	}
 	log.Info("clone finished", "dur", time.Since(start).Round(time.Millisecond).String())
 
 	regCtx, regCancel := context.WithTimeout(context.WithoutCancel(ctx), registerTimeout)
 	defer regCancel()
-	r, err := c.opts.Repos.Register(regCtx, dest)
+	r, err := c.opts.Projects.Register(regCtx, dest)
 	if err != nil {
-		return repo.Repo{}, fmt.Errorf("cloned into %s but could not add it as a project: %w", dest, err)
+		return project.Project{}, fmt.Errorf("cloned into %s but could not add it as a project: %w", dest, err)
 	}
 	return r, nil
 }

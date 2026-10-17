@@ -27,7 +27,7 @@ const FileName = "settings.toml"
 type Settings struct {
 	Threads    Threads
 	GitHub     GitHub
-	Repos      Repos
+	Projects   Projects
 	GitOps     GitOps
 	Appearance Appearance
 	// Notifications are consumed by the GUI (the Dock badge and alerts).
@@ -58,7 +58,7 @@ type GitHub struct {
 }
 
 // Repos configures the repo store.
-type Repos struct {
+type Projects struct {
 	FetchIntervalSeconds int    // 0 = off
 	WorktreeDir          string // "" = <config home>/worktrees/<owner>/<repo>; {repo} expands
 }
@@ -133,10 +133,10 @@ func (s Settings) GhPollInterval() time.Duration {
 // FetchInterval is Repos.FetchIntervalSeconds as a duration; negative (off) for 0, as
 // repo.Options.FetchInterval expects.
 func (s Settings) FetchInterval() time.Duration {
-	if s.Repos.FetchIntervalSeconds <= 0 {
+	if s.Projects.FetchIntervalSeconds <= 0 {
 		return -1
 	}
-	return time.Duration(s.Repos.FetchIntervalSeconds) * time.Second
+	return time.Duration(s.Projects.FetchIntervalSeconds) * time.Second
 }
 
 // ExpandedPath returns a Path setting with ~ expanded, or "" when unset.

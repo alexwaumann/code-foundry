@@ -10,7 +10,7 @@ import (
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/store/gh"
-	"github.com/alexwaumann/code-foundry/internal/store/repo"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
 )
 
 func TestGhDashboardFiltersToTracked(t *testing.T) {
@@ -19,8 +19,8 @@ func TestGhDashboardFiltersToTracked(t *testing.T) {
 	at := time.Date(2026, 10, 8, 6, 0, 0, 0, time.UTC)
 	store.SetViewer(gh.ViewerState{Viewer: &gh.Viewer{Login: "octocat"}, Authenticated: true, FetchedAt: at})
 	_ = store.Track("o/tracked")
-	pr := func(repo string, n int, state gh.PullRequestState) gh.PullRequest {
-		return gh.PullRequest{Repo: repo, Number: n, Title: "t", State: state, CreatedAt: at, UpdatedAt: at,
+	pr := func(slug string, n int, state gh.PullRequestState) gh.PullRequest {
+		return gh.PullRequest{Repo: slug, Number: n, Title: "t", State: state, CreatedAt: at, UpdatedAt: at,
 			ReviewDecision: gh.ReviewApproved, Checks: gh.CheckRollup{State: gh.RollupSuccess, Total: 1, Passed: 1}}
 	}
 	merged := pr("o/tracked", 3, gh.PullRequestMerged)
@@ -144,22 +144,22 @@ func TestGhRepoActivityAndBranch(t *testing.T) {
 	}
 }
 
-func TestRepoGetWorktreeDetail(t *testing.T) {
-	fake, c := newRepoServer(t)
+func TestProjectGetWorktreeDetail(t *testing.T) {
+	fake, c := newProjectServer(t)
 	ctx := context.Background()
-	reg, err := c.Register(ctx, connect.NewRequest(&v1.RegisterRepoRequest{Path: "/code/proj"}))
+	reg, err := c.Register(ctx, connect.NewRequest(&v1.RegisterProjectRequest{Path: "/code/proj"}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	id := reg.Msg.GetRepo().GetId()
+	id := reg.Msg.GetProject().GetId()
 	at := time.Unix(1700000000, 0)
-	fake.SetDetail(repo.WorktreeDetail{
-		RepoID: id, Path: "/code/proj", BaseRef: "origin/main", MergeBase: "m", Head: "h", LogTotal: 101, ComputedAt: at,
-		Files: []repo.FileChange{{Path: "b", OldPath: "a", Status: "R", Added: 1, Deleted: 2, Uncommitted: true},
+	fake.SetDetail(project.WorktreeDetail{
+		ProjectID: id, Path: "/code/proj", BaseRef: "origin/main", MergeBase: "m", Head: "h", LogTotal: 101, ComputedAt: at,
+		Files: []project.FileChange{{Path: "b", OldPath: "a", Status: "R", Added: 1, Deleted: 2, Uncommitted: true},
 			{Path: "d/", Status: "?", IsDir: true, Uncommitted: true}},
-		Log: []repo.LogEntry{{SHA: "h", ShortSHA: "h", Subject: "s", AuthorName: "A", AuthorEmail: "a@x", AuthoredAt: at}},
+		Log: []project.LogEntry{{SHA: "h", ShortSHA: "h", Subject: "s", AuthorName: "A", AuthorEmail: "a@x", AuthoredAt: at}},
 	})
-	res, err := c.GetWorktreeDetail(ctx, connect.NewRequest(&v1.GetWorktreeDetailRequest{RepoId: id, Path: "/code/proj"}))
+	res, err := c.GetWorktreeDetail(ctx, connect.NewRequest(&v1.GetWorktreeDetailRequest{ProjectId: id, Path: "/code/proj"}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -169,7 +169,7 @@ func TestRepoGetWorktreeDetail(t *testing.T) {
 		!d.GetComputedAt().AsTime().Equal(at) {
 		t.Errorf("detail = %v", d)
 	}
-	if _, err := c.GetWorktreeDetail(ctx, connect.NewRequest(&v1.GetWorktreeDetailRequest{RepoId: id, Path: "/nope"})); connect.CodeOf(err) != connect.CodeNotFound {
+	if _, err := c.GetWorktreeDetail(ctx, connect.NewRequest(&v1.GetWorktreeDetailRequest{ProjectId: id, Path: "/nope"})); connect.CodeOf(err) != connect.CodeNotFound {
 		t.Errorf("unknown worktree err = %v", err)
 	}
 }

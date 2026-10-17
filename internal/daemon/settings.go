@@ -13,7 +13,7 @@ import (
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/command"
-	"github.com/alexwaumann/code-foundry/internal/store/repo"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/settings"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 	"github.com/alexwaumann/code-foundry/internal/store/update"
@@ -101,24 +101,24 @@ func settingsNamer(st *settings.Store, next thread.Namer) thread.Namer {
 // settingsWorktreePath applies repos.worktree_dir to the worktrees the thread store
 // makes for new threads (thread.Options.WorktreePath), the same way worktreeDirRepo
 // does for repo.worktree.new. "" leaves the repo store's default.
-func settingsWorktreePath(st *settings.Store) func(repo.Repo, string) string {
-	return func(r repo.Repo, branch string) string {
-		return worktreePath(st.Settings().Repos.WorktreeDir, r.Name, branch)
+func settingsWorktreePath(st *settings.Store) func(project.Project, string) string {
+	return func(r project.Project, branch string) string {
+		return worktreePath(st.Settings().Projects.WorktreeDir, r.Name, branch)
 	}
 }
 
 // worktreeDirRepo applies repos.worktree_dir to repo.worktree.new: when the request has
 // no explicit path and the setting is set, the worktree goes to
 // <dir with {repo} expanded>/<branch, "/" -> "-">.
-type worktreeDirRepo struct {
-	command.RepoBackend
-	repos    *repo.Git
+type worktreeDirProject struct {
+	command.ProjectBackend
+	projects *project.Git
 	settings *settings.Store
 }
 
-func (w worktreeDirRepo) CreateWorktree(ctx context.Context, req *connect.Request[v1.CreateWorktreeRequest]) (*connect.Response[v1.CreateWorktreeResponse], error) {
+func (w worktreeDirProject) CreateWorktree(ctx context.Context, req *connect.Request[v1.CreateWorktreeRequest]) (*connect.Response[v1.CreateWorktreeResponse], error) {
 	if req.Msg.GetPath() == "" {
-		if r, ok := w.repos.Snapshot().Repo(req.Msg.GetRepoId()); ok {
+		if r, ok := w.projects.Snapshot().Project(req.Msg.GetProjectId()); ok {
 			if p := settingsWorktreePath(w.settings)(r, req.Msg.GetBranch()); p != "" {
 				m := proto.CloneOf(req.Msg)
 				m.Path = p
@@ -126,13 +126,13 @@ func (w worktreeDirRepo) CreateWorktree(ctx context.Context, req *connect.Reques
 			}
 		}
 	}
-	return w.RepoBackend.CreateWorktree(ctx, req)
+	return w.ProjectBackend.CreateWorktree(ctx, req)
 }
 
 // worktreePath is dir (~ and {repo} expanded) joined with the branch's directory name,
 // or "" when dir is unset or the branch is empty.
-func worktreePath(dir, repoName, branch string) string {
-	base := worktreeBase(dir, repoName)
+func worktreePath(dir, projectName, branch string) string {
+	base := worktreeBase(dir, projectName)
 	if base == "" || branch == "" {
 		return ""
 	}
@@ -141,19 +141,19 @@ func worktreePath(dir, repoName, branch string) string {
 
 // worktreeBase is dir with ~ and {repo} expanded: where repos.worktree_dir puts the
 // worktrees of repoName. "" when dir is unset.
-func worktreeBase(dir, repoName string) string {
+func worktreeBase(dir, projectName string) string {
 	if dir == "" {
 		return ""
 	}
-	return settings.ExpandedPath(strings.ReplaceAll(dir, "{repo}", repoName))
+	return settings.ExpandedPath(strings.ReplaceAll(dir, "{repo}", projectName))
 }
 
 // settingsManagedRoots is repo.Options.ManagedRoots: besides the worktrees directory,
 // the repos.worktree_dir setting's directory for the repository (read live), so the
 // worktrees the app made there count as its own for cleanup.
 func settingsManagedRoots(st *settings.Store) func(string) []string {
-	return func(repoName string) []string {
-		if base := worktreeBase(st.Settings().Repos.WorktreeDir, repoName); base != "" {
+	return func(projectName string) []string {
+		if base := worktreeBase(st.Settings().Projects.WorktreeDir, projectName); base != "" {
 			return []string{base}
 		}
 		return nil

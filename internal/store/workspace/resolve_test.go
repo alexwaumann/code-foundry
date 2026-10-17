@@ -7,17 +7,17 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alexwaumann/code-foundry/internal/store/repo"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
 )
 
 func testSnapshot() *Snapshot {
 	return &Snapshot{Workspaces: []Workspace{
 		{ID: "w-000000000001", Name: "login", Branch: "cf/login", Members: []Member{
-			{RepoID: "web", WorktreePath: "/wt/web/cf-login"},
-			{RepoID: "api", WorktreePath: "/wt/api/cf-login"},
+			{ProjectID: "web", WorktreePath: "/wt/web/cf-login"},
+			{ProjectID: "api", WorktreePath: "/wt/api/cf-login"},
 		}},
 		{ID: "w-000000000002", Name: "nested", Branch: "cf/nested", Members: []Member{
-			{RepoID: "lib", WorktreePath: "/wt/web/cf-login/vendor/lib"},
+			{ProjectID: "lib", WorktreePath: "/wt/web/cf-login/vendor/lib"},
 		}},
 	}}
 }
@@ -84,23 +84,23 @@ func TestWithinResolvesSymlinks(t *testing.T) {
 	}
 }
 
-func repoSnapshot() *repo.Snapshot {
-	return &repo.Snapshot{Repos: []repo.Repo{
-		{ID: "api", Name: "api", Path: "/src/api", Worktrees: []repo.Worktree{
-			{RepoID: "api", Path: "/src/api", Branch: "main", IsMain: true},
-			{RepoID: "api", Path: "/wt/api/cf-login", Branch: "cf/login"},
+func projectSnapshot() *project.Snapshot {
+	return &project.Snapshot{Projects: []project.Project{
+		{ID: "api", Name: "api", Path: "/src/api", Worktrees: []project.Worktree{
+			{ProjectID: "api", Path: "/src/api", Branch: "main", IsMain: true},
+			{ProjectID: "api", Path: "/wt/api/cf-login", Branch: "cf/login"},
 		}},
-		{ID: "web", Name: "web", Path: "/src/web", Worktrees: []repo.Worktree{
-			{RepoID: "web", Path: "/src/web", Branch: "main", IsMain: true},
-			{RepoID: "web", Path: "/wt/web/cf-login", Detached: true},
+		{ID: "web", Name: "web", Path: "/src/web", Worktrees: []project.Worktree{
+			{ProjectID: "web", Path: "/src/web", Branch: "main", IsMain: true},
+			{ProjectID: "web", Path: "/wt/web/cf-login", Detached: true},
 		}},
 		{ID: "dup1", Name: "dup", Path: "/a/dup"},
 		{ID: "dup2", Name: "dup", Path: "/b/dup"},
 	}}
 }
 
-func TestResolveRepo(t *testing.T) {
-	snap := repoSnapshot()
+func TestResolveProject(t *testing.T) {
+	snap := projectSnapshot()
 	tests := []struct {
 		name, ref, want string
 		wantErr         error
@@ -118,7 +118,7 @@ func TestResolveRepo(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r, err := ResolveRepo(snap, tt.ref)
+			r, err := ResolveProject(snap, tt.ref)
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("err = %v, want %v", err, tt.wantErr)
 			}
@@ -134,7 +134,7 @@ func TestResolveRepo(t *testing.T) {
 
 func TestMemberFor(t *testing.T) {
 	w := testSnapshot().Workspaces[0]
-	snap := repoSnapshot()
+	snap := projectSnapshot()
 	tests := []struct {
 		name, ref, want string
 		wantErr         error
@@ -153,8 +153,8 @@ func TestMemberFor(t *testing.T) {
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("err = %v, want %v", err, tt.wantErr)
 			}
-			if m.RepoID != tt.want {
-				t.Fatalf("member = %q, want %q", m.RepoID, tt.want)
+			if m.ProjectID != tt.want {
+				t.Fatalf("member = %q, want %q", m.ProjectID, tt.want)
 			}
 		})
 	}
@@ -162,11 +162,11 @@ func TestMemberFor(t *testing.T) {
 
 func TestJoin(t *testing.T) {
 	w := testSnapshot().Workspaces[0]
-	w.Members = append(w.Members, Member{RepoID: "gone", WorktreePath: "/wt/gone/cf-login"})
-	got := Join(w, repoSnapshot(), "/wt/api/cf-login/src")
+	w.Members = append(w.Members, Member{ProjectID: "gone", WorktreePath: "/wt/gone/cf-login"})
+	got := Join(w, projectSnapshot(), "/wt/api/cf-login/src")
 	want := []MemberInfo{
-		{Member: w.Members[0], RepoName: "web", Branch: "(detached)"},
-		{Member: w.Members[1], RepoName: "api", Branch: "cf/login", Current: true},
+		{Member: w.Members[0], ProjectName: "web", Branch: "(detached)"},
+		{Member: w.Members[1], ProjectName: "api", Branch: "cf/login", Current: true},
 		{Member: w.Members[2], Branch: "cf/login", Missing: true},
 	}
 	if len(got.Members) != len(want) {

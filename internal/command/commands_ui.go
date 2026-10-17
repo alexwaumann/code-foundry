@@ -84,12 +84,12 @@ func RegisterUI(r *Registry, e Emitter) error {
 			Category:     "View",
 			NoKeybinding: true,
 			Args: []ArgSpec{
-				{Name: "repo", Type: String, Required: true, Context: ContextRepo, Description: "Repository id"},
+				{Name: "repo", Type: String, Required: true, Context: ContextProject, Description: "Repository id"},
 				{Name: "worktree", Type: Path, Context: ContextWorktree, Description: "Worktree path"},
 			},
 			Run: func(_ context.Context, _ Context, a Args) (Result, error) {
-				return emit(&v1.UiIntent{Intent: &v1.UiIntent_FocusRepo_{FocusRepo: &v1.UiIntent_FocusRepo{
-					RepoId:       a.String("repo"),
+				return emit(&v1.UiIntent{Intent: &v1.UiIntent_FocusProject_{FocusProject: &v1.UiIntent_FocusProject{
+					ProjectId:    a.String("repo"),
 					WorktreePath: a.Path("worktree"),
 				}}}), nil
 			},

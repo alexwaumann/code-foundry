@@ -33,9 +33,9 @@ var (
 // ActionDeps are the action.* commands' dependencies. Repo and Thread find the
 // project and the owner of a run the way terminal.new finds a shell's.
 type ActionDeps struct {
-	Action ActionBackend
-	Repo   RepoBackend
-	Thread ThreadBackend
+	Action  ActionBackend
+	Project ProjectBackend
+	Thread  ThreadBackend
 }
 
 // actionIcons maps the icon names the commands take to the proto enum; the first is
@@ -81,7 +81,7 @@ func actionIconName(i v1.ActionIcon) string {
 // canUseActions: a thread, a project or worktree in context, or the CLI (which finds
 // the project from its working directory).
 func canUseActions(c Context) bool {
-	return hasThread(c) || hasRepoOrWorktree(c) || c.ActiveView == ""
+	return hasThread(c) || hasProjectOrWorktree(c) || c.ActiveView == ""
 }
 
 // noProject is how the action commands refuse a context without a project.
@@ -91,7 +91,7 @@ const noProject = "actions belong to a project: pass --repo, select a thread or 
 // action.run, action.wait and action.runs.
 func RegisterAction(r *Registry, d ActionDeps) error {
 	r.SetIDLister(RunID, runIDs(d.Action))
-	repoArg := ArgSpec{Name: "repo", Type: String, Context: ContextRepo,
+	projectArg := ArgSpec{Name: "repo", Type: String, Context: ContextProject,
 		Description: "Project: id, name, or a path inside it (default: the thread's, the worktree's, or the working directory's)"}
 	hereArg := ArgSpec{Name: "here", Type: Path, DefaultToCwd: true,
 		Description: "Where the CLI runs: without a thread, worktree or --repo, its project is used (CLI default: the working directory)"}
@@ -106,15 +106,15 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 				"The project is the thread's, else the worktree's, else the working directory's.",
 			Category:       "Action",
 			NoKeybinding:   true,
-			Args:           []ArgSpec{repoArg, hereArg},
+			Args:           []ArgSpec{projectArg, hereArg},
 			When:           canUseActions,
 			WhyUnavailable: whyNoProject,
 			Run: func(ctx context.Context, c Context, a Args) (Result, error) {
-				repoID, err := actionRepo(ctx, d, c, a)
+				projectID, err := actionProject(ctx, d, c, a)
 				if err != nil {
 					return Result{}, err
 				}
-				res, err := d.Action.List(ctx, connect.NewRequest(&v1.ListActionsRequest{RepoId: repoID}))
+				res, err := d.Action.List(ctx, connect.NewRequest(&v1.ListActionsRequest{ProjectId: projectID}))
 				if err != nil {
 					return Result{}, err
 				}
@@ -134,17 +134,17 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 				withDefault(iconArg, "play"),
 				{Name: "in-terminal", Type: Bool, Default: "true", Description: "Run in a terminal in the bottom panel (--in-terminal=false: in the background)"},
 				{Name: "on-worktree-create", Type: Bool, Default: "false", Description: "Also run (in the background) when a new thread creates its worktree"},
-				repoArg, hereArg,
+				projectArg, hereArg,
 			},
 			When:           canUseActions,
 			WhyUnavailable: whyNoProject,
 			Run: func(ctx context.Context, c Context, a Args) (Result, error) {
-				repoID, err := actionRepo(ctx, d, c, a)
+				projectID, err := actionProject(ctx, d, c, a)
 				if err != nil {
 					return Result{}, err
 				}
 				res, err := d.Action.Create(ctx, connect.NewRequest(&v1.CreateActionRequest{
-					RepoId: repoID, Name: a.String("name"), Command: a.String("command"), Icon: actionIcon(a.String("icon")),
+					ProjectId: projectID, Name: a.String("name"), Command: a.String("command"), Icon: actionIcon(a.String("icon")),
 					InTerminal: a.Bool("in-terminal"), OnWorktreeCreate: a.Bool("on-worktree-create"),
 				}))
 				if err != nil {
@@ -167,7 +167,7 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 				{Name: "in-terminal", Type: Bool, Description: "Run in a terminal (--in-terminal=false: in the background)"},
 				{Name: "on-worktree-create", Type: Bool, Description: "Run when a new thread creates its worktree"},
 				{Name: "position", Type: Int, Description: "Move to this 0-based place in the project's list"},
-				repoArg, hereArg,
+				projectArg, hereArg,
 			},
 			When:           canUseActions,
 			WhyUnavailable: whyNoProject,
@@ -217,7 +217,7 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 			Title:          "Remove Action",
 			Description:    "Remove an action from its project. Runs in progress keep going.",
 			Category:       "Action",
-			Args:           []ArgSpec{refArg, repoArg, hereArg},
+			Args:           []ArgSpec{refArg, projectArg, hereArg},
 			When:           canUseActions,
 			WhyUnavailable: whyNoProject,
 			Run: func(ctx context.Context, c Context, a Args) (Result, error) {
@@ -261,13 +261,13 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 				case a.Bool("terminal"):
 					mode = v1.ActionRunMode_ACTION_RUN_MODE_TERMINAL
 				}
-				o, err := shellOwner(ctx, d.Repo, d.Thread, c, "", a.Path("here"),
+				o, err := shellOwner(ctx, d.Project, d.Thread, c, "", a.Path("here"),
 					"action.run needs a thread, a worktree, or to run inside a registered project")
 				if err != nil {
 					return Result{}, err
 				}
 				res, err := d.Action.Run(ctx, connect.NewRequest(&v1.RunActionRequest{
-					Action: a.String("action"), ThreadId: o.thread, WorktreePath: o.worktree, RepoId: o.repo, Mode: mode,
+					Action: a.String("action"), ThreadId: o.thread, WorktreePath: o.worktree, ProjectId: o.project, Mode: mode,
 				}))
 				if err != nil {
 					return Result{}, err
@@ -300,15 +300,15 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 			Description:    "List a project's recent action runs (the daemon remembers the last 50 per project until it restarts), newest first.",
 			Category:       "Action",
 			NoKeybinding:   true,
-			Args:           []ArgSpec{repoArg, hereArg},
+			Args:           []ArgSpec{projectArg, hereArg},
 			When:           canUseActions,
 			WhyUnavailable: whyNoProject,
 			Run: func(ctx context.Context, c Context, a Args) (Result, error) {
-				repoID, err := actionRepo(ctx, d, c, a)
+				projectID, err := actionProject(ctx, d, c, a)
 				if err != nil {
 					return Result{}, err
 				}
-				res, err := d.Action.List(ctx, connect.NewRequest(&v1.ListActionsRequest{RepoId: repoID}))
+				res, err := d.Action.List(ctx, connect.NewRequest(&v1.ListActionsRequest{ProjectId: projectID}))
 				if err != nil {
 					return Result{}, err
 				}
@@ -326,29 +326,29 @@ func withDefault(a ArgSpec, def string) ArgSpec {
 // actionRepo is the project the action commands work on: --repo (id, name, or a path
 // inside it; the GUI's active project), else the owner terminal.new would pick (thread,
 // worktree, the CLI's working directory).
-func actionRepo(ctx context.Context, d ActionDeps, c Context, a Args) (string, error) {
+func actionProject(ctx context.Context, d ActionDeps, c Context, a Args) (string, error) {
 	if ref := strings.TrimSpace(a.String("repo")); ref != "" {
-		return resolveRepoRef(ctx, d.Repo, ref)
+		return resolveProjectRef(ctx, d.Project, ref)
 	}
-	o, err := shellOwner(ctx, d.Repo, d.Thread, c, "", a.Path("here"), noProject)
+	o, err := shellOwner(ctx, d.Project, d.Thread, c, "", a.Path("here"), noProject)
 	if err != nil {
 		return "", err
 	}
-	if o.repo == "" {
+	if o.project == "" {
 		return "", InvalidArg("repo", "thread %s has no project; %s", o.thread, noProject)
 	}
-	return o.repo, nil
+	return o.project, nil
 }
 
 // resolveRepoRef finds a registered project by id, else by name (when unique), else as
 // the deepest worktree containing an absolute path.
-func resolveRepoRef(ctx context.Context, repos RepoBackend, ref string) (string, error) {
-	res, err := repos.List(ctx, connect.NewRequest(&v1.ListReposRequest{}))
+func resolveProjectRef(ctx context.Context, projects ProjectBackend, ref string) (string, error) {
+	res, err := projects.List(ctx, connect.NewRequest(&v1.ListProjectsRequest{}))
 	if err != nil {
 		return "", err
 	}
 	var byName []string
-	for _, r := range res.Msg.GetRepos() {
+	for _, r := range res.Msg.GetProjects() {
 		if r.GetId() == ref {
 			return ref, nil
 		}
@@ -363,7 +363,7 @@ func resolveRepoRef(ctx context.Context, repos RepoBackend, ref string) (string,
 		return "", InvalidArg("repo", "%d projects are named %s; pass an id (code-foundry repo list)", len(byName), ref)
 	}
 	if p, err := ExpandPath(ref); err == nil && filepath.IsAbs(p) {
-		if id, _, ok := ownerWorktree(res.Msg.GetRepos(), "", "", realPath(p)); ok {
+		if id, _, ok := ownerWorktree(res.Msg.GetProjects(), "", "", realPath(p)); ok {
 			return id, nil
 		}
 		return "", InvalidArg("repo", "%s %s", ref, notInProject)
@@ -384,12 +384,12 @@ func findAction(ctx context.Context, d ActionDeps, c Context, a Args) (*v1.Actio
 			return act, nil
 		}
 	}
-	repoID, err := actionRepo(ctx, d, c, a)
+	projectID, err := actionProject(ctx, d, c, a)
 	if err != nil {
 		return nil, err
 	}
 	for _, act := range all.Msg.GetActions() {
-		if act.GetRepoId() == repoID && strings.EqualFold(act.GetName(), ref) {
+		if act.GetProjectId() == projectID && strings.EqualFold(act.GetName(), ref) {
 			return act, nil
 		}
 	}

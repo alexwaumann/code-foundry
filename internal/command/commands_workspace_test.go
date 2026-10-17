@@ -9,7 +9,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/api"
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/command"
-	"github.com/alexwaumann/code-foundry/internal/store/repo"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 	"github.com/alexwaumann/code-foundry/internal/store/workspace/workspacetest"
 )
@@ -18,10 +18,10 @@ func newWorkspaceRegistry(t *testing.T) (*command.Registry, *workspacetest.Fake)
 	t.Helper()
 	b := bus.New()
 	fake := workspacetest.New(b)
-	fake.Repos = func() *repo.Snapshot {
-		return &repo.Snapshot{Repos: []repo.Repo{
-			{ID: "web", Name: "web-ui", Worktrees: []repo.Worktree{{RepoID: "web", Path: "/worktrees/web/cf-login", Branch: "cf/login"}}},
-			{ID: "api", Name: "api", Worktrees: []repo.Worktree{{RepoID: "api", Path: "/worktrees/api/cf-login", Branch: "cf/login"}}},
+	fake.Projects = func() *project.Snapshot {
+		return &project.Snapshot{Projects: []project.Project{
+			{ID: "web", Name: "web-ui", Worktrees: []project.Worktree{{ProjectID: "web", Path: "/worktrees/web/cf-login", Branch: "cf/login"}}},
+			{ID: "api", Name: "api", Worktrees: []project.Worktree{{ProjectID: "api", Path: "/worktrees/api/cf-login", Branch: "cf/login"}}},
 		}}
 	}
 	reg := command.NewRegistry()
@@ -157,10 +157,10 @@ func TestWorkspaceRemovalsNeedConfirmation(t *testing.T) {
 
 var errAnyCmd = errors.New("any error")
 
-func wsCreate(name string, repos ...string) workspace.CreateOptions {
+func wsCreate(name string, projects ...string) workspace.CreateOptions {
 	o := workspace.CreateOptions{Name: name, Branch: "cf/login"}
-	for _, r := range repos {
-		o.Members = append(o.Members, workspace.MemberSpec{Repo: r})
+	for _, r := range projects {
+		o.Members = append(o.Members, workspace.MemberSpec{Project: r})
 	}
 	return o
 }

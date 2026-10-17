@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
-	"github.com/alexwaumann/code-foundry/internal/store/repo"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 )
 
@@ -25,7 +25,7 @@ type Fake struct {
 	bus *bus.Bus
 	// Repos, when set, is joined into Members (repo names, branches). Nil: members
 	// are reported with no repo name and Missing.
-	Repos func() *repo.Snapshot
+	Projects func() *project.Snapshot
 	// WorktreeRoot is where member worktrees "are": <root>/<repo>/<branch, / -> ->.
 	WorktreeRoot string
 	// MakeDirs makes Create create the member worktrees' directories, for callers that
@@ -90,8 +90,8 @@ func (f *Fake) record(call string) error {
 	return f.Err
 }
 
-func (f *Fake) path(repoID, branch string) string {
-	return filepath.Join(f.WorktreeRoot, repoID, strings.ReplaceAll(branch, "/", "-"))
+func (f *Fake) path(projectID, branch string) string {
+	return filepath.Join(f.WorktreeRoot, projectID, strings.ReplaceAll(branch, "/", "-"))
 }
 
 // Snapshot implements workspace.Store.
@@ -106,14 +106,14 @@ func (f *Fake) Snapshot() *workspace.Snapshot {
 func (f *Fake) Create(_ context.Context, o workspace.CreateOptions) (workspace.Workspace, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	repos := make([]string, len(o.Members))
+	projects := make([]string, len(o.Members))
 	for i, m := range o.Members {
-		repos[i] = m.Repo
+		projects[i] = m.Project
 		if m.BaseRef != "" {
-			repos[i] += ":" + m.BaseRef
+			projects[i] += ":" + m.BaseRef
 		}
 	}
-	if err := f.record("Create " + o.Name + " " + strings.Join(repos, ",")); err != nil {
+	if err := f.record("Create " + o.Name + " " + strings.Join(projects, ",")); err != nil {
 		return workspace.Workspace{}, err
 	}
 	if o.Name == "" || len(o.Members) == 0 {
@@ -130,7 +130,7 @@ func (f *Fake) Create(_ context.Context, o workspace.CreateOptions) (workspace.W
 		w.Branch = "cf/" + o.Name
 	}
 	for _, m := range o.Members {
-		w.Members = append(w.Members, workspace.Member{RepoID: m.Repo, WorktreePath: f.path(m.Repo, w.Branch)})
+		w.Members = append(w.Members, workspace.Member{ProjectID: m.Project, WorktreePath: f.path(m.Project, w.Branch)})
 		if f.MakeDirs {
 			if err := os.MkdirAll(w.Members[len(w.Members)-1].WorktreePath, 0o755); err != nil {
 				return workspace.Workspace{}, err
@@ -142,29 +142,29 @@ func (f *Fake) Create(_ context.Context, o workspace.CreateOptions) (workspace.W
 }
 
 // AddRepo implements workspace.Store.
-func (f *Fake) AddRepo(_ context.Context, o workspace.AddRepoOptions) (workspace.Workspace, error) {
+func (f *Fake) AddProject(_ context.Context, o workspace.AddProjectOptions) (workspace.Workspace, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if err := f.record("AddRepo " + o.Workspace + o.Cwd + " " + o.Member.Repo); err != nil {
+	if err := f.record("AddRepo " + o.Workspace + o.Cwd + " " + o.Member.Project); err != nil {
 		return workspace.Workspace{}, err
 	}
 	w, err := workspace.ResolveWorkspace(f.snap, o.Ref)
 	if err != nil {
 		return workspace.Workspace{}, err
 	}
-	if _, ok := w.Member(o.Member.Repo); ok {
-		return workspace.Workspace{}, fmt.Errorf("%w: %s is already in workspace %s", workspace.ErrFailedPrecondition, o.Member.Repo, w.Name)
+	if _, ok := w.Member(o.Member.Project); ok {
+		return workspace.Workspace{}, fmt.Errorf("%w: %s is already in workspace %s", workspace.ErrFailedPrecondition, o.Member.Project, w.Name)
 	}
-	w.Members = append(slices.Clone(w.Members), workspace.Member{RepoID: o.Member.Repo, WorktreePath: f.path(o.Member.Repo, w.Branch)})
+	w.Members = append(slices.Clone(w.Members), workspace.Member{ProjectID: o.Member.Project, WorktreePath: f.path(o.Member.Project, w.Branch)})
 	f.putLocked(w)
 	return w, nil
 }
 
 // RemoveRepo implements workspace.Store. Repo is matched against member repo ids.
-func (f *Fake) RemoveRepo(_ context.Context, o workspace.RemoveRepoOptions) (workspace.Workspace, error) {
+func (f *Fake) RemoveProject(_ context.Context, o workspace.RemoveProjectOptions) (workspace.Workspace, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	call := "RemoveRepo " + o.Workspace + o.Cwd + " " + o.Repo
+	call := "RemoveRepo " + o.Workspace + o.Cwd + " " + o.Project
 	if o.Force {
 		call += " force"
 	}
@@ -178,9 +178,9 @@ func (f *Fake) RemoveRepo(_ context.Context, o workspace.RemoveRepoOptions) (wor
 	if err != nil {
 		return workspace.Workspace{}, err
 	}
-	i := slices.IndexFunc(w.Members, func(m workspace.Member) bool { return m.RepoID == o.Repo })
+	i := slices.IndexFunc(w.Members, func(m workspace.Member) bool { return m.ProjectID == o.Project })
 	if i < 0 {
-		return workspace.Workspace{}, fmt.Errorf("%w: %q is not a member of workspace %s", workspace.ErrNotFound, o.Repo, w.Name)
+		return workspace.Workspace{}, fmt.Errorf("%w: %q is not a member of workspace %s", workspace.ErrNotFound, o.Project, w.Name)
 	}
 	w.Members = slices.Delete(slices.Clone(w.Members), i, i+1)
 	f.putLocked(w)
@@ -221,9 +221,9 @@ func (f *Fake) Members(_ context.Context, ref workspace.Ref) (workspace.Membersh
 	if err != nil {
 		return workspace.Membership{}, err
 	}
-	var repos *repo.Snapshot
-	if f.Repos != nil {
-		repos = f.Repos()
+	var projects *project.Snapshot
+	if f.Projects != nil {
+		projects = f.Projects()
 	}
-	return workspace.Join(w, repos, ref.Cwd), nil
+	return workspace.Join(w, projects, ref.Cwd), nil
 }

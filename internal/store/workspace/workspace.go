@@ -35,13 +35,13 @@ type Workspace struct {
 
 // Member is one repository's worktree in a workspace.
 type Member struct {
-	RepoID       string
+	ProjectID    string
 	WorktreePath string
 }
 
 // Member returns the member for repoID.
-func (w Workspace) Member(repoID string) (Member, bool) {
-	i := slices.IndexFunc(w.Members, func(m Member) bool { return m.RepoID == repoID })
+func (w Workspace) Member(projectID string) (Member, bool) {
+	i := slices.IndexFunc(w.Members, func(m Member) bool { return m.ProjectID == projectID })
 	if i < 0 {
 		return Member{}, false
 	}
@@ -90,7 +90,7 @@ type Ref struct {
 // MemberSpec names a repository to add.
 type MemberSpec struct {
 	// Repo is a repository id, its name when unique, or a path inside it.
-	Repo string
+	Project string
 	// BaseRef is where the branch starts when it does not exist yet. Empty: the
 	// operation's default base, else the repo store's default (origin/<default>).
 	BaseRef string
@@ -109,18 +109,18 @@ type CreateOptions struct {
 }
 
 // AddRepoOptions configures Store.AddRepo.
-type AddRepoOptions struct {
+type AddProjectOptions struct {
 	Ref
 	Member MemberSpec
 	Fetch  bool
 }
 
 // RemoveRepoOptions configures Store.RemoveRepo.
-type RemoveRepoOptions struct {
+type RemoveProjectOptions struct {
 	Ref
 	// Repo is a repository id, name, or a path inside it (the member worktree path
 	// works too).
-	Repo string
+	Project string
 	// Force removes the worktree even with uncommitted changes.
 	Force bool
 	// DeleteBranch also deletes the member's branch.
@@ -143,7 +143,7 @@ type Membership struct {
 // MemberInfo is a member with what the repo store knows about it now.
 type MemberInfo struct {
 	Member
-	RepoName string // empty when the repo is no longer registered
+	ProjectName string // empty when the repo is no longer registered
 	// Branch checked out in the worktree now; the workspace branch when unknown.
 	Branch string
 	// Missing: the worktree is not among its repository's worktrees.
@@ -167,11 +167,11 @@ type Store interface {
 	// repository. On failure, worktrees it made are removed again.
 	Create(ctx context.Context, opts CreateOptions) (Workspace, error)
 	// AddRepo creates a worktree on the workspace branch in another repository.
-	AddRepo(ctx context.Context, opts AddRepoOptions) (Workspace, error)
+	AddProject(ctx context.Context, opts AddProjectOptions) (Workspace, error)
 	// RemoveRepo removes a member's worktree and drops the member. It refuses while a
 	// live thread runs in the worktree, and (without Force) when git refuses because
 	// of uncommitted changes.
-	RemoveRepo(ctx context.Context, opts RemoveRepoOptions) (Workspace, error)
+	RemoveProject(ctx context.Context, opts RemoveProjectOptions) (Workspace, error)
 	// Remove removes every member worktree and forgets the workspace, with the same
 	// guards across all members, checked before anything is removed.
 	Remove(ctx context.Context, opts RemoveOptions) error

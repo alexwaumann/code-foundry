@@ -16,42 +16,42 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/db"
 	"github.com/alexwaumann/code-foundry/internal/db/dbtest"
-	"github.com/alexwaumann/code-foundry/internal/store/repo"
-	"github.com/alexwaumann/code-foundry/internal/store/repo/repotest"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
+	"github.com/alexwaumann/code-foundry/internal/store/project/projecttest"
 )
 
 // faultyRepos wraps the repo fake to fail CreateWorktree for one repo and
 // RemoveWorktree for one path (as git does for a dirty worktree).
-type faultyRepos struct {
-	*repotest.Fake
+type faultyProjects struct {
+	*projecttest.Fake
 	failCreate string // repo id
 	failRemove string // worktree path
 }
 
-func (f *faultyRepos) CreateWorktree(ctx context.Context, o repo.CreateWorktreeOptions) (repo.Worktree, error) {
-	if o.RepoID == f.failCreate {
-		return repo.Worktree{}, fmt.Errorf("%w: git: fatal: invalid reference: %s", repo.ErrFailedPrecondition, o.BaseRef)
+func (f *faultyProjects) CreateWorktree(ctx context.Context, o project.CreateWorktreeOptions) (project.Worktree, error) {
+	if o.ProjectID == f.failCreate {
+		return project.Worktree{}, fmt.Errorf("%w: git: fatal: invalid reference: %s", project.ErrFailedPrecondition, o.BaseRef)
 	}
 	return f.Fake.CreateWorktree(ctx, o)
 }
 
-func (f *faultyRepos) RemoveWorktree(ctx context.Context, o repo.RemoveWorktreeOptions) error {
+func (f *faultyProjects) RemoveWorktree(ctx context.Context, o project.RemoveWorktreeOptions) error {
 	if o.Path == f.failRemove && !o.Force {
-		return fmt.Errorf("%w: git: fatal: '%s' contains modified or untracked files, use --force to delete it", repo.ErrFailedPrecondition, o.Path)
+		return fmt.Errorf("%w: git: fatal: '%s' contains modified or untracked files, use --force to delete it", project.ErrFailedPrecondition, o.Path)
 	}
 	return f.Fake.RemoveWorktree(ctx, o)
 }
 
 type harness struct {
-	t       *testing.T
-	db      *sql.DB
-	bus     *bus.Bus
-	repos   *faultyRepos
-	m       *Manager
-	root    string // worktree root; member worktrees are real directories under it
-	trusted []string
-	threads []Thread
-	mu      sync.Mutex
+	t        *testing.T
+	db       *sql.DB
+	bus      *bus.Bus
+	projects *faultyProjects
+	m        *Manager
+	root     string // worktree root; member worktrees are real directories under it
+	trusted  []string
+	threads  []Thread
+	mu       sync.Mutex
 }
 
 func newHarness(t *testing.T) *harness {
@@ -63,19 +63,19 @@ func newHarness(t *testing.T) *harness {
 	}
 	t.Cleanup(func() { _ = d.Close() })
 	b := bus.New()
-	h := &harness{t: t, db: d, bus: b, repos: &faultyRepos{Fake: repotest.New(b)}, root: t.TempDir()}
-	h.repos.WorktreeRoot = h.root
+	h := &harness{t: t, db: d, bus: b, projects: &faultyProjects{Fake: projecttest.New(b)}, root: t.TempDir()}
+	h.projects.WorktreeRoot = h.root
 	for _, name := range []string{"web", "api", "lib"} {
-		if _, err := h.repos.Register(ctx, "/src/"+name); err != nil {
+		if _, err := h.projects.Register(ctx, "/src/"+name); err != nil {
 			t.Fatal(err)
 		}
 	}
 	// A project without git: never a member.
-	h.repos.NotGit = true
-	if _, err := h.repos.Register(ctx, "/src/notes"); err != nil {
+	h.projects.NotGit = true
+	if _, err := h.projects.Register(ctx, "/src/notes"); err != nil {
 		t.Fatal(err)
 	}
-	h.repos.NotGit = false
+	h.projects.NotGit = false
 	h.m = h.open()
 	return h
 }
@@ -83,7 +83,7 @@ func newHarness(t *testing.T) *harness {
 func (h *harness) open() *Manager {
 	h.t.Helper()
 	m, err := New(context.Background(), Options{
-		DB: h.db, Repos: h.repos, Bus: h.bus,
+		DB: h.db, Projects: h.projects, Bus: h.bus,
 		Threads: func() []Thread {
 			h.mu.Lock()
 			defer h.mu.Unlock()
@@ -105,17 +105,17 @@ func (h *harness) open() *Manager {
 }
 
 // id is the fake repo id for /src/<name>.
-func id(name string) string { return repotest.ID("/src/" + name) }
+func id(name string) string { return projecttest.ID("/src/" + name) }
 
 func (h *harness) wt(name, branch string) string {
 	return filepath.Join(h.root, "_local", name, strings.ReplaceAll(branch, "/", "-"))
 }
 
-func (h *harness) create(name string, repos ...string) Workspace {
+func (h *harness) create(name string, projects ...string) Workspace {
 	h.t.Helper()
-	specs := make([]MemberSpec, len(repos))
-	for i, r := range repos {
-		specs[i] = MemberSpec{Repo: r}
+	specs := make([]MemberSpec, len(projects))
+	for i, r := range projects {
+		specs[i] = MemberSpec{Project: r}
 	}
 	w, err := h.m.Create(context.Background(), CreateOptions{Name: name, Members: specs, Fetch: true})
 	if err != nil {
@@ -124,8 +124,8 @@ func (h *harness) create(name string, repos ...string) Workspace {
 	return w
 }
 
-func (h *harness) worktrees(repoName string) []string {
-	r, _ := h.repos.Snapshot().Repo(id(repoName))
+func (h *harness) worktrees(projectName string) []string {
+	r, _ := h.projects.Snapshot().Project(id(projectName))
 	var out []string
 	for _, w := range r.Worktrees {
 		if !w.IsMain {
@@ -141,7 +141,7 @@ func TestCreate(t *testing.T) {
 	defer sub.Close()
 	w, err := h.m.Create(context.Background(), CreateOptions{
 		Name: "Login fix", BaseRef: "origin/develop", Fetch: true,
-		Members: []MemberSpec{{Repo: "web"}, {Repo: id("api"), BaseRef: "origin/main"}},
+		Members: []MemberSpec{{Project: "web"}, {Project: id("api"), BaseRef: "origin/main"}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -150,13 +150,13 @@ func TestCreate(t *testing.T) {
 		t.Fatalf("workspace = %+v", w)
 	}
 	want := []Member{
-		{RepoID: id("web"), WorktreePath: h.wt("web", "cf/login-fix")},
-		{RepoID: id("api"), WorktreePath: h.wt("api", "cf/login-fix")},
+		{ProjectID: id("web"), WorktreePath: h.wt("web", "cf/login-fix")},
+		{ProjectID: id("api"), WorktreePath: h.wt("api", "cf/login-fix")},
 	}
 	if !slices.Equal(w.Members, want) {
 		t.Fatalf("members = %+v, want %+v", w.Members, want)
 	}
-	creates := h.repos.Creates
+	creates := h.projects.Creates
 	if len(creates) != 2 || creates[0].BaseRef != "origin/develop" || creates[1].BaseRef != "origin/main" ||
 		!creates[0].Fetch || creates[0].Branch != "cf/login-fix" {
 		t.Fatalf("creates = %+v", creates)
@@ -190,25 +190,25 @@ func TestCreateRefusals(t *testing.T) {
 		wantErr error
 		errText string
 	}{
-		{"no name", CreateOptions{Members: []MemberSpec{{Repo: "web"}}}, ErrInvalidArgument, "name"},
+		{"no name", CreateOptions{Members: []MemberSpec{{Project: "web"}}}, ErrInvalidArgument, "name"},
 		{"no members", CreateOptions{Name: "x"}, ErrInvalidArgument, "at least one"},
-		{"unknown repo", CreateOptions{Name: "x", Members: []MemberSpec{{Repo: "web"}, {Repo: "nope"}}}, ErrNotFound, "nope"},
-		{"repo twice", CreateOptions{Name: "x", Members: []MemberSpec{{Repo: "web"}, {Repo: id("web")}}}, ErrInvalidArgument, "twice"},
-		{"bad base", CreateOptions{Name: "x", Members: []MemberSpec{{Repo: "web", BaseRef: "--upload-pack=x"}}}, ErrInvalidArgument, "base ref"},
-		{"name taken", CreateOptions{Name: "taken", Members: []MemberSpec{{Repo: "lib"}}}, ErrFailedPrecondition, "exists"},
-		{"project without git", CreateOptions{Name: "x", Members: []MemberSpec{{Repo: "web"}, {Repo: "notes"}}}, ErrFailedPrecondition, "notes is not a git repository"},
+		{"unknown repo", CreateOptions{Name: "x", Members: []MemberSpec{{Project: "web"}, {Project: "nope"}}}, ErrNotFound, "nope"},
+		{"repo twice", CreateOptions{Name: "x", Members: []MemberSpec{{Project: "web"}, {Project: id("web")}}}, ErrInvalidArgument, "twice"},
+		{"bad base", CreateOptions{Name: "x", Members: []MemberSpec{{Project: "web", BaseRef: "--upload-pack=x"}}}, ErrInvalidArgument, "base ref"},
+		{"name taken", CreateOptions{Name: "taken", Members: []MemberSpec{{Project: "lib"}}}, ErrFailedPrecondition, "exists"},
+		{"project without git", CreateOptions{Name: "x", Members: []MemberSpec{{Project: "web"}, {Project: "notes"}}}, ErrFailedPrecondition, "notes is not a git repository"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h := newHarness(t)
 			h.create("taken", "api")
-			before := len(h.repos.Creates)
+			before := len(h.projects.Creates)
 			_, err := h.m.Create(context.Background(), tt.opts)
 			if !errors.Is(err, tt.wantErr) || !strings.Contains(err.Error(), tt.errText) {
 				t.Fatalf("err = %v, want %v mentioning %q", err, tt.wantErr, tt.errText)
 			}
-			if n := len(h.repos.Creates); n != before {
-				t.Fatalf("a worktree was created: %+v", h.repos.Creates[before:])
+			if n := len(h.projects.Creates); n != before {
+				t.Fatalf("a worktree was created: %+v", h.projects.Creates[before:])
 			}
 			if n := len(h.m.Snapshot().Workspaces); n != 1 {
 				t.Fatalf("workspaces = %d", n)
@@ -219,8 +219,8 @@ func TestCreateRefusals(t *testing.T) {
 
 func TestCreateRollsBack(t *testing.T) {
 	h := newHarness(t)
-	h.repos.failCreate = id("api")
-	_, err := h.m.Create(context.Background(), CreateOptions{Name: "x", Members: []MemberSpec{{Repo: "web"}, {Repo: "api"}}})
+	h.projects.failCreate = id("api")
+	_, err := h.m.Create(context.Background(), CreateOptions{Name: "x", Members: []MemberSpec{{Project: "web"}, {Project: "api"}}})
 	if !errors.Is(err, ErrFailedPrecondition) || !strings.Contains(err.Error(), "create worktree cf/x in api") ||
 		!strings.Contains(err.Error(), "invalid reference") {
 		t.Fatalf("err = %v", err)
@@ -228,7 +228,7 @@ func TestCreateRollsBack(t *testing.T) {
 	if got := h.worktrees("web"); len(got) != 0 {
 		t.Fatalf("web worktrees after rollback = %v", got)
 	}
-	calls := strings.Join(h.repos.Calls, "\n")
+	calls := strings.Join(h.projects.Calls, "\n")
 	if !strings.Contains(calls, "RemoveWorktree "+id("web")+" "+h.wt("web", "cf/x")) {
 		t.Fatalf("calls = %s", calls)
 	}
@@ -241,25 +241,25 @@ func TestCreateRollsBack(t *testing.T) {
 	}
 }
 
-func TestAddRepo(t *testing.T) {
+func TestAddProject(t *testing.T) {
 	h := newHarness(t)
 	w := h.create("x", "web")
 	tests := []struct {
 		name    string
-		opts    AddRepoOptions
+		opts    AddProjectOptions
 		wantErr error
 		errText string
 	}{
-		{"by cwd", AddRepoOptions{Ref: Ref{Cwd: h.wt("web", "cf/x") + "/src"}, Member: MemberSpec{Repo: "api"}, Fetch: true}, nil, ""},
-		{"already a member", AddRepoOptions{Ref: Ref{Workspace: "x"}, Member: MemberSpec{Repo: "web"}}, ErrFailedPrecondition, "already in workspace x"},
-		{"unknown workspace", AddRepoOptions{Ref: Ref{Workspace: "y"}, Member: MemberSpec{Repo: "lib"}}, ErrNotFound, "workspace"},
-		{"project without git", AddRepoOptions{Ref: Ref{Workspace: "x"}, Member: MemberSpec{Repo: "notes"}}, ErrFailedPrecondition, "not a git repository"},
-		{"cwd outside", AddRepoOptions{Ref: Ref{Cwd: "/elsewhere"}, Member: MemberSpec{Repo: "lib"}}, ErrNotFound, "not inside"},
-		{"by id with base", AddRepoOptions{Ref: Ref{Workspace: w.ID}, Member: MemberSpec{Repo: "lib", BaseRef: "v1.2"}}, nil, ""},
+		{"by cwd", AddProjectOptions{Ref: Ref{Cwd: h.wt("web", "cf/x") + "/src"}, Member: MemberSpec{Project: "api"}, Fetch: true}, nil, ""},
+		{"already a member", AddProjectOptions{Ref: Ref{Workspace: "x"}, Member: MemberSpec{Project: "web"}}, ErrFailedPrecondition, "already in workspace x"},
+		{"unknown workspace", AddProjectOptions{Ref: Ref{Workspace: "y"}, Member: MemberSpec{Project: "lib"}}, ErrNotFound, "workspace"},
+		{"project without git", AddProjectOptions{Ref: Ref{Workspace: "x"}, Member: MemberSpec{Project: "notes"}}, ErrFailedPrecondition, "not a git repository"},
+		{"cwd outside", AddProjectOptions{Ref: Ref{Cwd: "/elsewhere"}, Member: MemberSpec{Project: "lib"}}, ErrNotFound, "not inside"},
+		{"by id with base", AddProjectOptions{Ref: Ref{Workspace: w.ID}, Member: MemberSpec{Project: "lib", BaseRef: "v1.2"}}, nil, ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := h.m.AddRepo(context.Background(), tt.opts)
+			_, err := h.m.AddProject(context.Background(), tt.opts)
 			if !errors.Is(err, tt.wantErr) || (err != nil && !strings.Contains(err.Error(), tt.errText)) {
 				t.Fatalf("err = %v, want %v mentioning %q", err, tt.wantErr, tt.errText)
 			}
@@ -267,14 +267,14 @@ func TestAddRepo(t *testing.T) {
 	}
 	got, _ := h.m.Snapshot().Workspace(w.ID)
 	want := []Member{
-		{RepoID: id("web"), WorktreePath: h.wt("web", "cf/x")},
-		{RepoID: id("api"), WorktreePath: h.wt("api", "cf/x")},
-		{RepoID: id("lib"), WorktreePath: h.wt("lib", "cf/x")},
+		{ProjectID: id("web"), WorktreePath: h.wt("web", "cf/x")},
+		{ProjectID: id("api"), WorktreePath: h.wt("api", "cf/x")},
+		{ProjectID: id("lib"), WorktreePath: h.wt("lib", "cf/x")},
 	}
 	if !slices.Equal(got.Members, want) {
 		t.Fatalf("members = %+v", got.Members)
 	}
-	if last := h.repos.Creates[len(h.repos.Creates)-1]; last.Branch != "cf/x" || last.BaseRef != "v1.2" {
+	if last := h.projects.Creates[len(h.projects.Creates)-1]; last.Branch != "cf/x" || last.BaseRef != "v1.2" {
 		t.Fatalf("last create = %+v", last)
 	}
 	again, _ := h.open().Snapshot().Workspace(w.ID)
@@ -283,42 +283,42 @@ func TestAddRepo(t *testing.T) {
 	}
 }
 
-func TestRemoveRepo(t *testing.T) {
+func TestRemoveProject(t *testing.T) {
 	tests := []struct {
 		name    string
 		threads []Thread
 		dirty   bool
-		opts    RemoveRepoOptions
+		opts    RemoveProjectOptions
 		wantErr error
 		errText string
 		removed bool
 	}{
-		{name: "by name", opts: RemoveRepoOptions{Ref: Ref{Workspace: "x"}, Repo: "api"}, removed: true},
+		{name: "by name", opts: RemoveProjectOptions{Ref: Ref{Workspace: "x"}, Project: "api"}, removed: true},
 		{
 			name:    "a thread on the worktree",
 			threads: []Thread{{ID: "s-1", Name: "fix-login", Cwd: "API/src"}},
-			opts:    RemoveRepoOptions{Ref: Ref{Workspace: "x"}, Repo: "api"},
+			opts:    RemoveProjectOptions{Ref: Ref{Workspace: "x"}, Project: "api"},
 			wantErr: ErrFailedPrecondition, errText: "thread fix-login (s-1) is on API; archive it first",
 		},
 		{
 			name:    "two threads on the worktree",
 			threads: []Thread{{ID: "s-1", Cwd: "API"}, {ID: "s-2", Cwd: "API/src"}},
-			opts:    RemoveRepoOptions{Ref: Ref{Workspace: "x"}, Repo: "api"},
+			opts:    RemoveProjectOptions{Ref: Ref{Workspace: "x"}, Project: "api"},
 			wantErr: ErrFailedPrecondition, errText: "thread s-1, thread s-2 are on API; archive them first",
 		},
 		{
 			name:    "thread in another member is fine",
 			threads: []Thread{{ID: "s-1", Cwd: "WEB"}},
-			opts:    RemoveRepoOptions{Ref: Ref{Workspace: "x"}, Repo: "api"}, removed: true,
+			opts:    RemoveProjectOptions{Ref: Ref{Workspace: "x"}, Project: "api"}, removed: true,
 		},
 		{
 			name: "dirty", dirty: true,
-			opts:    RemoveRepoOptions{Ref: Ref{Workspace: "x"}, Repo: "api"},
+			opts:    RemoveProjectOptions{Ref: Ref{Workspace: "x"}, Project: "api"},
 			wantErr: ErrFailedPrecondition, errText: "use --force",
 		},
-		{name: "dirty with force", dirty: true, opts: RemoveRepoOptions{Ref: Ref{Workspace: "x"}, Repo: "api", Force: true}, removed: true},
-		{name: "by cwd and worktree path", opts: RemoveRepoOptions{Ref: Ref{Cwd: "WEB"}, Repo: "API"}, removed: true},
-		{name: "not a member", opts: RemoveRepoOptions{Ref: Ref{Workspace: "x"}, Repo: "lib"}, wantErr: ErrNotFound, errText: "not a member"},
+		{name: "dirty with force", dirty: true, opts: RemoveProjectOptions{Ref: Ref{Workspace: "x"}, Project: "api", Force: true}, removed: true},
+		{name: "by cwd and worktree path", opts: RemoveProjectOptions{Ref: Ref{Cwd: "WEB"}, Project: "API"}, removed: true},
+		{name: "not a member", opts: RemoveProjectOptions{Ref: Ref{Workspace: "x"}, Project: "lib"}, wantErr: ErrNotFound, errText: "not a member"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -329,11 +329,11 @@ func TestRemoveRepo(t *testing.T) {
 				th.Cwd = subst.Replace(th.Cwd)
 				h.threads = append(h.threads, th)
 			}
-			tt.opts.Cwd, tt.opts.Repo = subst.Replace(tt.opts.Cwd), subst.Replace(tt.opts.Repo)
+			tt.opts.Cwd, tt.opts.Project = subst.Replace(tt.opts.Cwd), subst.Replace(tt.opts.Project)
 			if tt.dirty {
-				h.repos.failRemove = h.wt("api", "cf/x")
+				h.projects.failRemove = h.wt("api", "cf/x")
 			}
-			got, err := h.m.RemoveRepo(context.Background(), tt.opts)
+			got, err := h.m.RemoveProject(context.Background(), tt.opts)
 			if !errors.Is(err, tt.wantErr) || (err != nil && !strings.Contains(err.Error(), subst.Replace(tt.errText))) {
 				t.Fatalf("err = %v, want %v mentioning %q", err, tt.wantErr, subst.Replace(tt.errText))
 			}
@@ -356,18 +356,18 @@ func TestRemoveRepo(t *testing.T) {
 	}
 }
 
-func TestRemoveRepoWhenWorktreeAlreadyGone(t *testing.T) {
+func TestRemoveProjectWhenWorktreeAlreadyGone(t *testing.T) {
 	h := newHarness(t)
 	w := h.create("x", "web", "api")
 	path := h.wt("api", "cf/x")
 	// Deleted by hand, and the repo store no longer lists it.
-	if err := h.repos.RemoveWorktree(context.Background(), repo.RemoveWorktreeOptions{RepoID: id("api"), Path: path}); err != nil {
+	if err := h.projects.RemoveWorktree(context.Background(), project.RemoveWorktreeOptions{ProjectID: id("api"), Path: path}); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.RemoveAll(path); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := h.m.RemoveRepo(context.Background(), RemoveRepoOptions{Ref: Ref{Workspace: w.ID}, Repo: "api"}); err != nil {
+	if _, err := h.m.RemoveProject(context.Background(), RemoveProjectOptions{Ref: Ref{Workspace: w.ID}, Project: "api"}); err != nil {
 		t.Fatal(err)
 	}
 	if got, _ := h.m.Snapshot().Workspace(w.ID); len(got.Members) != 1 {
@@ -409,10 +409,10 @@ func TestRemove(t *testing.T) {
 			}
 			if tt.dirty != "" {
 				p := h.wt(tt.dirty, "cf/x")
-				h.repos.UpdateWorktree(repo.Worktree{RepoID: id(tt.dirty), Path: p, Branch: "cf/x", Status: repo.Status{Dirty: true}})
+				h.projects.UpdateWorktree(project.Worktree{ProjectID: id(tt.dirty), Path: p, Branch: "cf/x", Status: project.Status{Dirty: true}})
 			}
 			if tt.gitDirt {
-				h.repos.failRemove = h.wt("api", "cf/x")
+				h.projects.failRemove = h.wt("api", "cf/x")
 			}
 			sub := bus.Subscribe[Event](h.bus, 8)
 			defer sub.Close()
@@ -442,7 +442,7 @@ func TestRemove(t *testing.T) {
 			}
 			var left []string
 			for _, m := range stored.Members {
-				left = append(left, strings.TrimPrefix(m.RepoID, "id-src-"))
+				left = append(left, strings.TrimPrefix(m.ProjectID, "id-src-"))
 			}
 			if !slices.Equal(left, tt.left) {
 				t.Fatalf("members left = %v, want %v", left, tt.left)
@@ -458,7 +458,7 @@ func TestMembers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if m.Workspace.ID != w.ID || len(m.Members) != 2 || m.Members[0].RepoName != "web" || m.Members[0].Current ||
+	if m.Workspace.ID != w.ID || len(m.Members) != 2 || m.Members[0].ProjectName != "web" || m.Members[0].Current ||
 		!m.Members[1].Current || m.Members[1].Branch != "cf/x" || m.Members[1].Missing {
 		t.Fatalf("membership = %+v", m)
 	}

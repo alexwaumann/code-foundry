@@ -22,7 +22,7 @@ func TestThreadNewRequestID(t *testing.T) {
 			t.Fatal(err)
 		}
 		reqs := b.Requests()
-		want := &v1.CreateThreadRequest{RepoId: "r1", Name: "fix", RequestId: "k1", PermissionMode: v1.PermissionMode_PERMISSION_MODE_AUTO}
+		want := &v1.CreateThreadRequest{ProjectId: "r1", Name: "fix", RequestId: "k1", PermissionMode: v1.PermissionMode_PERMISSION_MODE_AUTO}
 		if len(reqs) != 1 || !proto.Equal(reqs[0], want) {
 			t.Errorf("requests = %v", reqs)
 		}

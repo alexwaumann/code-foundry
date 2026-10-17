@@ -76,7 +76,7 @@ func (c *Command) Available(uctx Context) bool {
 type Context struct {
 	ActiveTerminalID   string
 	ActiveThreadID     string
-	ActiveRepoID       string
+	ActiveProjectID    string
 	ActiveWorktreePath string
 	// ActiveView is a logical view name ("thread", "projects", ...). Empty from the CLI.
 	ActiveView string
@@ -97,7 +97,7 @@ const (
 	// ContextThread is Context.ActiveThreadID.
 	ContextThread
 	// ContextRepo is Context.ActiveRepoID.
-	ContextRepo
+	ContextProject
 	// ContextWorktree is Context.ActiveWorktreePath.
 	ContextWorktree
 )
@@ -109,8 +109,8 @@ func (c Context) Get(f ContextField) string {
 		return c.ActiveTerminalID
 	case ContextThread:
 		return c.ActiveThreadID
-	case ContextRepo:
-		return c.ActiveRepoID
+	case ContextProject:
+		return c.ActiveProjectID
 	case ContextWorktree:
 		return c.ActiveWorktreePath
 	default:
@@ -125,8 +125,8 @@ func (c Context) With(f ContextField, v string) Context {
 		c.ActiveTerminalID = v
 	case ContextThread:
 		c.ActiveThreadID = v
-	case ContextRepo:
-		c.ActiveRepoID = v
+	case ContextProject:
+		c.ActiveProjectID = v
 	case ContextWorktree:
 		c.ActiveWorktreePath = v
 	}
@@ -140,7 +140,7 @@ func (f ContextField) Describe() string {
 		return "the active terminal"
 	case ContextThread:
 		return "the active thread"
-	case ContextRepo:
+	case ContextProject:
 		return "the active repository"
 	case ContextWorktree:
 		return "the active worktree"

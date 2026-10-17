@@ -10,14 +10,14 @@ import (
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/store/action"
-	"github.com/alexwaumann/code-foundry/internal/store/repo"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
 
 // actionRuns is the part of the action store the cleanup drives. *action.Manager
 // implements it.
 type actionRuns interface {
-	RepoRemoved(ctx context.Context, repoID string)
+	ProjectRemoved(ctx context.Context, projectID string)
 	KillRuns(match func(action.Run) bool) int
 }
 
@@ -42,11 +42,11 @@ func startActionCleanup(ctx context.Context, log *slog.Logger, runs actionRuns, 
 
 func startActionCleanupWith(ctx context.Context, log *slog.Logger, runs actionRuns, b *bus.Bus, dirGone func(string) bool) func() {
 	ctx, cancel := context.WithCancel(ctx)
-	repoEvents := bus.Subscribe[repo.Event](b, 256)
+	projectEvents := bus.Subscribe[project.Event](b, 256)
 	threadListEvents := bus.Subscribe[thread.Event](b, 256)
 	var wg sync.WaitGroup
 	wg.Go(func() {
-		defer repoEvents.Close()
+		defer projectEvents.Close()
 		defer threadListEvents.Close()
 		kill := func(why string, match func(action.Run) bool) {
 			if n := runs.KillRuns(match); n > 0 {
@@ -57,11 +57,11 @@ func startActionCleanupWith(ctx context.Context, log *slog.Logger, runs actionRu
 			select {
 			case <-ctx.Done():
 				return
-			case ev := <-repoEvents.C():
+			case ev := <-projectEvents.C():
 				switch e := ev.(type) {
-				case repo.RepoRemoved:
-					runs.RepoRemoved(ctx, e.ID)
-				case repo.WorktreeRemoved:
+				case project.ProjectRemoved:
+					runs.ProjectRemoved(ctx, e.ID)
+				case project.WorktreeRemoved:
 					if dirGone(e.Path) {
 						kill("worktree removed", func(r action.Run) bool { return r.Worktree == e.Path })
 					}

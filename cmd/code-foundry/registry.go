@@ -32,7 +32,7 @@ func quietHelp(err error) error {
 // contextFlags are the --context-* flags that set UiContext for availability checks
 // and context-defaulted args.
 type contextFlags struct {
-	terminal, thread, repo, worktree, workspace string
+	terminal, thread, project, worktree, workspace string
 }
 
 // addContextFlags adds the --context-* flags. --context-thread defaults to
@@ -43,7 +43,7 @@ func (cl *cli) addContextFlags(fs *flag.FlagSet) *contextFlags {
 	cf := &contextFlags{}
 	fs.StringVar(&cf.terminal, "context-terminal", "", "active terminal `id`")
 	fs.StringVar(&cf.thread, "context-thread", cl.threadEnv(), "active thread `id` (default $"+paths.EnvThread+")")
-	fs.StringVar(&cf.repo, "context-repo", "", "active repository `id`")
+	fs.StringVar(&cf.project, "context-repo", "", "active repository `id`")
 	fs.StringVar(&cf.worktree, "context-worktree", "", "active worktree `path`")
 	fs.StringVar(&cf.workspace, "context-workspace", "", "active workspace `id`")
 	return cf
@@ -74,7 +74,7 @@ func (cl *cli) uiContext(cf *contextFlags) (*v1.UiContext, error) {
 	return &v1.UiContext{
 		ActiveTerminalId:   cf.terminal,
 		ActiveThreadId:     cf.thread,
-		ActiveRepoId:       cf.repo,
+		ActiveProjectId:    cf.project,
 		ActiveWorktreePath: wt,
 		ActiveWorkspaceId:  cf.workspace,
 	}, nil

@@ -30,22 +30,22 @@ func TestSpawnPassesEnv(t *testing.T) {
 // A new worktree for a thread calls Options.WorktreeCreated once the thread started; a
 // thread in an existing worktree does not.
 func TestCreateNewWorktreeCallsWorktreeCreated(t *testing.T) {
-	type call struct{ thread, repo, worktree string }
+	type call struct{ thread, project, worktree string }
 	var calls []call
 	e, _ := newWorktreeEnv(t, nil, func(o *Options) {
-		o.WorktreeCreated = func(threadID, repoID, worktree string) {
-			calls = append(calls, call{threadID, repoID, worktree})
+		o.WorktreeCreated = func(threadID, projectID, worktree string) {
+			calls = append(calls, call{threadID, projectID, worktree})
 		}
 	})
 	e.namer = func(string) (string, error) { return "Do x", nil }
-	s, err := e.m.Create(e.ctx(), CreateOptions{RepoID: "r1", InitialPrompt: "x", NewWorktree: &NewWorktree{}})
+	s, err := e.m.Create(e.ctx(), CreateOptions{ProjectID: "r1", InitialPrompt: "x", NewWorktree: &NewWorktree{}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if want := (call{s.ID, "r1", s.WorktreePath}); len(calls) != 1 || calls[0] != want {
 		t.Fatalf("WorktreeCreated calls = %+v, want %+v", calls, want)
 	}
-	if _, err := e.m.Create(e.ctx(), CreateOptions{RepoID: "r1", WorktreePath: s.WorktreePath}); err != nil {
+	if _, err := e.m.Create(e.ctx(), CreateOptions{ProjectID: "r1", WorktreePath: s.WorktreePath}); err != nil {
 		t.Fatal(err)
 	}
 	if len(calls) != 1 {

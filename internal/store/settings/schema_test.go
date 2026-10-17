@@ -122,7 +122,7 @@ func TestSchemaShape(t *testing.T) {
 	d := Defaults()
 	if d.Appearance.FontSize != 13 || !d.Threads.AutoName || d.Threads.ScrollbackLines != 10000 || d.Appearance.Theme != "system" || d.Appearance.Backdrop != "forest" ||
 		d.Appearance.ThreadWidth != "comfortable" ||
-		d.GitHub.PollIntervalSeconds != 60 || d.Repos.FetchIntervalSeconds != 120 || d.Advanced.LogLevel != "info" {
+		d.GitHub.PollIntervalSeconds != 60 || d.Projects.FetchIntervalSeconds != 120 || d.Advanced.LogLevel != "info" {
 		t.Errorf("Defaults() = %+v", d)
 	}
 }
