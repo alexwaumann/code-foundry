@@ -85,11 +85,11 @@ internal/
     terminal/              PTY + libghostty-vt actor per terminal; output tee; snapshots
     thread/                threads: claude -p over stream-json, items, naming, status, resume
     claudestream/          the stream-json / control protocol client (pure Go)
-    repo/                  registered repos, worktrees, git status, filesystem watcher
+    project/               registered projects, worktrees, git status, filesystem watcher
     gh/                    GitHub GraphQL/REST polling over HTTP (token via gh), PR/CI cache
     gitops/                git/gh operations per worktree (fetch, pull, push, PR); editor, Finder, browser
     clone/                 gh repo clone into the projects dir with streamed output, then register
-    project/               new projects in the projects dir (git init, register); gh repo create to publish
+    newproject/            new projects in the projects dir (git init, register); gh repo create to publish
     update/                release checks via gh (stable or tip channel), downloads and installs with the embedded installer
     workspace/             branch sets: one branch as a worktree in several repos
                            (docs/notes/workspaces-1-store.md)
