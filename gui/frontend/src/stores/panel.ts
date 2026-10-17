@@ -197,6 +197,32 @@ export interface PanelState {
 }
 
 /**
+ * Version 1 to 2: a tab param `repo` (a worktree tab's project id, before the rename of
+ * repo to project) is `project`, and the ids derived from it follow.
+ */
+export function migratePanelV1(byKey: Readonly<Record<string, PanelEntry>>): Record<string, PanelEntry> {
+  const out: Record<string, PanelEntry> = {};
+  for (const [key, e] of Object.entries(byKey)) {
+    const ids = new Map<string, string>();
+    const tabs = e.tabs.map((t) => {
+      if (!("repo" in t.params)) return t;
+      const { repo, ...rest } = t.params;
+      const next = makeTab(t.kind, t.title, { ...rest, project: repo ?? "" });
+      ids.set(t.id, next.id);
+      return next;
+    });
+    const moved = (id: string) => ids.get(id) ?? id;
+    out[key] = {
+      ...e,
+      tabs,
+      activeTabId: e.activeTabId === null ? null : moved(e.activeTabId),
+      ...(e.pickFrom === undefined ? {} : { pickFrom: moved(e.pickFrom) }),
+    };
+  }
+  return out;
+}
+
+/**
  * Focus requests for the panel go through the ui store (panelFocusSeq), which the palette
  * also uses. Persisted whole: open state, tabs (in strip order), active tab, width, expanded and picking
  * survive a reload.
@@ -204,7 +230,12 @@ export interface PanelState {
 export const usePanelStore = create<PanelState>()(
   persist(() => ({ byKey: {} }), {
     name: "code-foundry.panel",
-    version: 1,
+    // 2: worktree tabs name their project with `project`, not `repo` (migratePanelV1).
+    version: 2,
+    migrate: (persisted, version) => {
+      const byKey = ((persisted ?? {}) as Partial<PanelState>).byKey ?? {};
+      return { byKey: version < 2 ? migratePanelV1(byKey) : byKey };
+    },
     partialize: (s) => ({ byKey: s.byKey }),
   }),
 );
