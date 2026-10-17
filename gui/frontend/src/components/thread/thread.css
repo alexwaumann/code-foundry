@@ -625,6 +625,128 @@ html[data-thread-width="full"] .cf-thread {
   flex: none;
   font-variant-numeric: tabular-nums;
 }
+/* A lineage note (LineageNote.tsx; the lineage sketch's .lnote): one muted line on a faint
+   fill with a hairline, the other thread's name as a quiet link, the age on the right; an
+   expandable one shows a chevron and, open, a code block under a hairline. */
+.cf-thread .lnote {
+  margin: 0 0 16px;
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--foreground) 3.5%, transparent);
+  border: 1px solid color-mix(in oklab, var(--foreground) 6%, transparent);
+}
+.dark .cf-thread:not(:where(.light *)) .lnote {
+  background: color-mix(in oklab, var(--foreground) 3%, transparent);
+}
+.cf-thread .lnote .ln {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 4px 10px;
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--muted-foreground);
+  border-radius: 9px;
+}
+.cf-thread .lnote .ln[role="button"]:hover {
+  background: var(--t-hover);
+}
+.cf-thread .lnote .ln > svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+.cf-thread .lnote .lead {
+  white-space: nowrap;
+  flex: none;
+}
+.cf-thread .lnote .nm {
+  color: var(--foreground);
+  font-weight: 500;
+  white-space: nowrap;
+  flex: none;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in oklab, var(--muted-foreground) 45%, transparent);
+  text-underline-offset: 2px;
+}
+.cf-thread .lnote button.nm {
+  cursor: default;
+}
+.cf-thread .lnote .nm.plain {
+  text-decoration: none;
+}
+/* "<name>: idle, finished": the name and its state as one unit that ellipsises. */
+.cf-thread .lnote .who {
+  flex: none;
+  max-width: 55%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cf-thread .lnote .who .nm {
+  max-width: none;
+}
+.cf-thread .lnote button.nm:hover {
+  text-decoration-color: currentColor;
+}
+.cf-thread .lnote .nm.gone {
+  color: var(--muted-foreground);
+  font-weight: 400;
+  text-decoration: none;
+}
+.cf-thread .lnote .ghost {
+  opacity: 0.5;
+  flex: none;
+}
+.cf-thread .lnote .sum {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cf-thread .lnote .ago {
+  margin-left: auto;
+  white-space: nowrap;
+  flex: none;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.cf-thread .lnote .chev {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  opacity: 0.6;
+}
+.cf-thread .lnote[data-open] .ln {
+  border-bottom: 1px solid color-mix(in oklab, var(--foreground) 6%, transparent);
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.cf-thread .lnote .lbody {
+  padding: 8px 12px 10px 32px;
+}
+.cf-thread .lnote .lhead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--muted-foreground);
+}
+.cf-thread .lnote .lbody pre {
+  margin: 0;
+  font-family: var(--t-mono);
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--syn-fg);
+  white-space: pre;
+  overflow-x: auto;
+}
 .cf-thread .tfoot {
   display: flex;
   align-items: center;

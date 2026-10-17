@@ -1,8 +1,10 @@
-import { Folder, FolderGit2, House } from "lucide-react";
+import { CornerDownRight, Folder, FolderGit2, House } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { CommandButton } from "@/components/command/CommandButton";
 import { NoGitBadge } from "@/components/projects/NoGitBadge";
+import { Tip } from "@/components/ui/tooltip";
 import { threadRowModel, type WorkspaceLookup } from "@/lib/threadRow";
+import { useCreator } from "@/stores/lineage";
 import { useReposStore } from "@/stores/repos";
 import { useThreadsStore } from "@/stores/threads";
 import { Chip } from "./Chip";
@@ -78,11 +80,47 @@ function ThreadLocation({ id }: { id: string }) {
   );
 }
 
-/** Left side of a thread's header: its name, then where it runs. */
+const CREATED_BY_CHIP = "flex h-[22px] max-w-60 min-w-0 shrink-[4] items-center gap-[5px] rounded-md bg-foreground/7 px-1.5 text-caption-sm font-normal whitespace-nowrap text-muted-foreground";
+
+/**
+ * "↳ from <creator>" for a thread an agent created (docs/notes/agents-3-lineage-gui.md,
+ * sketch variant A): the creator's name as recorded at creation. A click opens the
+ * Threads surface in the side panel (view.panel.threads). When the creator was removed
+ * the chip is inert and muted, with "Thread removed" as its tooltip; an archived creator
+ * still exists. Nothing for the user's threads.
+ */
+function CreatedByChip({ id }: { id: string }) {
+  const creator = useCreator(id);
+  if (creator === null) return null;
+  const content = (
+    <>
+      <CornerDownRight className="size-3 shrink-0" aria-hidden />
+      <span className="min-w-0 truncate">
+        from <span className={creator.exists ? "font-medium text-foreground/80" : undefined}>{creator.name}</span>
+      </span>
+    </>
+  );
+  if (!creator.exists)
+    return (
+      <Tip label="Thread removed">
+        <span className={`${CREATED_BY_CHIP} opacity-60`} data-testid="thread-created-by" data-removed="true">
+          {content}
+        </span>
+      </Tip>
+    );
+  return (
+    <CommandButton command="view.panel.threads" whenUnavailable="plain" size="xs" className={`${CREATED_BY_CHIP} hover:bg-foreground/12 hover:text-muted-foreground dark:hover:bg-foreground/12`} data-testid="thread-created-by">
+      {content}
+    </CommandButton>
+  );
+}
+
+/** Left side of a thread's header: its name, who created it (an agent's thread), then where it runs. */
 export function ThreadTitle({ id }: { id: string }) {
   return (
     <>
       <ThreadName id={id} />
+      <CreatedByChip id={id} />
       <ThreadLocation id={id} />
     </>
   );

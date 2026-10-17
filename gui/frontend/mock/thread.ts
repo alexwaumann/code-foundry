@@ -29,6 +29,7 @@ import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
 import { ThreadStatus } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
 import {
+  MessageOrigin,
   ThreadAgentStatus,
   ThreadItemDelta_Field,
   ThreadRequestState,
@@ -63,6 +64,10 @@ export interface SeedHistory {
   reply: string;
   minutesAgo: number;
   end: "done" | "working" | "permission" | "cut";
+  /** A daemon note before the first message (an agent-made thread's "Created by …", id note-created-by). */
+  note?: { id: string; text: string };
+  /** Wake messages the daemon sent after the history (docs/notes/agents-4-wake.md): header line and JSON payload. */
+  wakes?: { title: string; json: string }[];
 }
 
 /** The world the threads live in (mock/world.ts implements it). */
@@ -1011,6 +1016,7 @@ export class MockThreadLogs {
       const toolUseId = `toolu_bash_${id}_${String(l.nextOrdinal)}`;
       return push({ case: "toolCall", value: { toolUseId, name: "Bash", inputJson: JSON.stringify({ command }), status: ToolCallStatus.DONE, ...value } }, { id: toolUseId, at: at(sec), until: at(sec + 1) });
     };
+    if (h.note) push({ case: "note", value: { text: h.note.text } }, { id: h.note.id, at: at(0) });
     push({ case: "userMessage", value: { text: h.prompt, attachments: [] } }, { at: at(0) });
     push({ case: "assistantText", value: { text: h.intro } }, { at: at(5) });
     bash(h.command, { output: h.output }, 8);
@@ -1027,6 +1033,10 @@ export class MockThreadLogs {
         { at: at(21) },
       );
       l.pending = [{ requestId: `req-${id}`, itemId: perm.id, question: false, toolName: "Bash", summary: `Bash ${h.reply}` }];
+    }
+    for (const [i, w] of (h.wakes ?? []).entries()) {
+      const text = `[code-foundry wake] ${w.title}\n\`\`\`json\n${w.json}\n\`\`\``;
+      push({ case: "userMessage", value: { text, attachments: [], origin: MessageOrigin.WAKE, wakeTitle: w.title, wakeJson: w.json } }, { at: at(30 + i) });
     }
     l.seq = l.items.length;
     if (l.pending.length > 0) this.source({ event: { case: "pending", value: { threadId: id, seq: BigInt(l.seq), pending: l.pending } } });

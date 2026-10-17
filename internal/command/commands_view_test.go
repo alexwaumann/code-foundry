@@ -23,6 +23,7 @@ func TestViewCommandsEmitShowView(t *testing.T) {
 		{command: "view.panel.workspace", view: command.ViewPanelWorkspace},
 		{command: "view.panel.linked-prs", view: command.ViewPanelLinkedPRs},
 		{command: "view.panel.usage", view: command.ViewPanelUsage},
+		{command: "view.panel.threads", view: command.ViewPanelThreads},
 		{command: "view.panel.worktree", view: command.ViewPanelWorktree},
 	}
 	for _, tt := range tests {
@@ -102,8 +103,8 @@ func TestViewPanelThreadSurfacesAvailability(t *testing.T) {
 	if err := command.RegisterView(reg, &commandtest.Emitter{Delivered: 1}); err != nil {
 		t.Fatal(err)
 	}
-	// Both are available for any thread (the GUI says when there is nothing to show).
-	for _, name := range []string{"view.panel.linked-prs", "view.panel.usage"} {
+	// All are available for any thread (the GUI says when there is nothing to show).
+	for _, name := range []string{"view.panel.linked-prs", "view.panel.usage", "view.panel.threads"} {
 		for _, tt := range tests {
 			t.Run(name+"/"+tt.name, func(t *testing.T) {
 				got := false

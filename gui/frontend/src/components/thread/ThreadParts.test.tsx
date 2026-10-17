@@ -108,3 +108,42 @@ describe("ThreadTitle", () => {
     expect(title().textContent).toBe("s-1");
   });
 });
+
+describe("ThreadTitle created-by chip", () => {
+  const chip = () => screen.queryByTestId("thread-created-by");
+  const child = { createdBy: "s-p", createdByName: "Fix login redirect" };
+
+  it("is absent for the user's thread", () => {
+    render(<ThreadTitle id="s-1" />);
+    expect(chip()).toBeNull();
+  });
+
+  it("names the creator after the thread's name, before the location; a click opens the Threads surface", () => {
+    useCommandsStore.setState({ commands: [cmd("thread.rename"), cmd("view.panel.worktree"), cmd("view.panel.threads")] });
+    useThreadsStore.setState({ byId: { "s-1": thread(child), "s-p": thread({ id: "s-p", name: "Fix login redirect", archivedAtMs: 5 }) }, order: ["s-p", "s-1"] });
+    const { container } = render(<ThreadTitle id="s-1" />);
+    const c = chip() as HTMLElement;
+    expect(c.tagName).toBe("BUTTON");
+    expect(c.textContent).toBe("from Fix login redirect");
+    expect(c.querySelector("svg.lucide-corner-down-right")).not.toBeNull();
+    expect(c.getAttribute("data-removed")).toBeNull();
+    // Name, chip, location in that order.
+    expect([...container.children].map((e) => e.getAttribute("data-testid"))).toEqual(["thread-title", "thread-created-by", "thread-location"]);
+    fireEvent.click(c);
+    expect(startCommandNamed).toHaveBeenCalledWith("view.panel.threads");
+  });
+
+  it("is inert and muted once the creator was removed, keeping its recorded name", () => {
+    useCommandsStore.setState({ commands: [cmd("thread.rename"), cmd("view.panel.threads")] });
+    useThreadsStore.setState({ byId: { "s-1": thread(child) }, order: ["s-1"] });
+    render(<ThreadTitle id="s-1" />);
+    const c = chip() as HTMLElement;
+    expect(c.tagName).toBe("SPAN");
+    expect(c.getAttribute("data-removed")).toBe("true");
+    expect(c.className).toContain("opacity-60");
+    expect(c.className).not.toContain("hover:");
+    expect(c.textContent).toBe("from Fix login redirect");
+    fireEvent.click(c);
+    expect(startCommandNamed).not.toHaveBeenCalled();
+  });
+});

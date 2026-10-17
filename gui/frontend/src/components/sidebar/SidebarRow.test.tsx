@@ -171,3 +171,31 @@ describe("SidebarRow footer headers", () => {
     expect(useUiStore.getState()).toMatchObject({ workingCollapsed: false, snoozedCollapsed: false, archivedCollapsed: true });
   });
 });
+
+describe("SidebarRow created by a thread", () => {
+  const glyph = () => screen.queryByTestId("row-created-by");
+
+  it("a muted ↳ before the name of an agent's thread; line 2 unchanged", () => {
+    renderRow({ name: "Child", createdBy: "s-p", createdByName: "Parent" });
+    const g = glyph();
+    expect(g).not.toBeNull();
+    expect(g?.getAttribute("class")).toContain("text-muted-foreground");
+    expect(g?.nextElementSibling?.getAttribute("data-testid")).toBe("thread-name");
+    expect(screen.getByTestId("row-place").textContent).toBe("code-foundry @ main");
+  });
+
+  it("nothing for the user's thread", () => {
+    renderRow({ name: "Mine" });
+    expect(glyph()).toBeNull();
+  });
+
+  it("in the single-line footers too", () => {
+    useThreadsStore.setState({ byId: { "s-1": thread({ name: "Old child", createdBy: "s-p", archivedAtMs: Date.now() }) }, order: ["s-1"] });
+    render(
+      <TooltipProvider>
+        <SidebarRow row={{ key: "s:s-1", kind: "thread", section: "archived", threadId: "s-1" }} selected={false} cursor={false} onActivate={() => undefined} />
+      </TooltipProvider>,
+    );
+    expect(glyph()?.nextElementSibling?.textContent).toBe("Old child");
+  });
+});

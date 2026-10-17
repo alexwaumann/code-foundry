@@ -13,6 +13,7 @@ import { expandPanel, getPanel, startPanelPicking, togglePanel } from "./panel";
 import { useUiStore, viewNames, type FocusRegion } from "./ui";
 import { openAgentsSurface } from "./agentsPanel";
 import { openMcpSurface } from "./mcpPanel";
+import { openThreadsSurface } from "./threadsPanel";
 import { openUsageSurface } from "./usagePanel";
 import { openWorkspaceSurface } from "./workspacePanel";
 import { openWorktreeSurface } from "./worktreePanel";
@@ -135,6 +136,10 @@ export function showView(name: string): boolean {
     case "panel.agents":
       // view.panel.agents: the Agents surface in the current thread's panel.
       agentsPanelCommand();
+      return true;
+    case "panel.threads":
+      // view.panel.threads: the Threads surface (lineage) in the current thread's panel.
+      threadsPanelCommand();
       return true;
     case "panel.worktree":
       // view.panel.worktree: the thread's own worktree in the current thread's panel.
@@ -357,6 +362,23 @@ export function mcpPanelCommand(): boolean {
 export function agentsPanelCommand(): boolean {
   if (pageOpen()) return false;
   const key = openAgentsSurface();
+  if (key === null) return false;
+  const inPalette = useUiStore.getState().palette.open;
+  togglePanel(key, true, { focus: !inPalette });
+  if (inPalette) useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo: "panel" } }));
+  return true;
+}
+
+/**
+ * view.panel.threads for the current selection: opens (or activates) the Threads tab in
+ * the selected thread's panel and shows the panel, like view.panel.agents. A no-op while
+ * the settings or usage page is up and when no thread is selected.
+ *
+ * Focus moves to the panel; with the palette open, its return target moves there instead.
+ */
+export function threadsPanelCommand(): boolean {
+  if (pageOpen()) return false;
+  const key = openThreadsSurface();
   if (key === null) return false;
   const inPalette = useUiStore.getState().palette.open;
   togglePanel(key, true, { focus: !inPalette });
