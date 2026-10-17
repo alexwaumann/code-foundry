@@ -308,9 +308,11 @@ type CreateOptions struct {
 	// cf/<thread id>.
 	NewWorktree *NewWorktree
 	// Attachments are paths returned by StageAttachment. Each becomes an
-	// "Attached image: <path>" line after the prompt; Claude reads them with its Read
-	// tool, and each is also sent as a base64 image block. Paths outside the
-	// attachments directory are rejected.
+	// "Attached image: <path>" or "Attached PDF: <path> (<N> pages)" line after the
+	// prompt (buildPrompt) and is also sent as a base64 image or document block, except
+	// a PDF over MaxInlinePDFPages, which Claude reads with its Read tool. Paths outside
+	// the attachments directory are rejected, as are attachments sending more than
+	// MaxMessageMediaBytes inline.
 	Attachments []string
 }
 
@@ -362,12 +364,15 @@ type Store interface {
 	// clears it and the disconnected thread needs attention (ReasonSnoozeEnded). A zero
 	// until only clears SnoozedUntil.
 	Snooze(ctx context.Context, id string, until time.Time) (Thread, error)
-	// StageAttachment stores an image for a first prompt and returns its absolute
-	// path. mimeType must be one of AttachmentTypes; data at most MaxAttachmentBytes.
-	// name is the user's file name, used only in logs.
-	StageAttachment(ctx context.Context, name, mimeType string, data []byte) (string, error)
+	// StageAttachment stores an image or PDF for a message and returns its absolute
+	// path. mimeType must be one of AttachmentTypes; data at most MaxAttachmentBytes
+	// (an image) or MaxPDFAttachmentBytes (a PDF). pages is the client's page count
+	// for a PDF (0 when unknown), used when pdfinfo is not installed; the settled
+	// count is part of the returned file name. name is the user's file name, used
+	// only in logs.
+	StageAttachment(ctx context.Context, name, mimeType string, data []byte, pages int) (string, error)
 	// ReadAttachment returns a staged attachment's content and MIME type (a thread's
-	// user message shows its images). ErrNotFound once reaped.
+	// user message shows its images and PDFs). ErrNotFound once reaped.
 	ReadAttachment(ctx context.Context, path string) ([]byte, string, error)
 	// Snapshot returns the current immutable snapshot.
 	Snapshot() *Snapshot

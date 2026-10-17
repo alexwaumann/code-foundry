@@ -50,7 +50,7 @@ func (m *Manager) Send(ctx context.Context, id string, msg Message) (Item, error
 		m.log.Info("refused a slash command the app replaces", "thread", id, "command", ref.Command)
 		return Item{}, ref
 	}
-	attachments, err := checkAttachments(m.opts.AttachmentsDir, msg.Attachments)
+	attachments, err := messageAttachments(ctx, m.opts.AttachmentsDir, msg.Attachments)
 	if err != nil {
 		return Item{}, err
 	}

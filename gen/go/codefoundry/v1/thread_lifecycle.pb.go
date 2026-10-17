@@ -1215,7 +1215,7 @@ type CreateThreadRequest struct {
 	// Optional explicit name; disables auto-naming.
 	Name string `protobuf:"bytes,5,opt,name=name,proto3" json:"name,omitempty"`
 	// Optional first prompt, sent as the thread's first user message once Claude has
-	// started (attachments as image blocks).
+	// started (attachments as image or document blocks).
 	InitialPrompt  string         `protobuf:"bytes,6,opt,name=initial_prompt,json=initialPrompt,proto3" json:"initial_prompt,omitempty"`
 	PermissionMode PermissionMode `protobuf:"varint,7,opt,name=permission_mode,json=permissionMode,proto3,enum=codefoundry.v1.PermissionMode" json:"permission_mode,omitempty"`
 	// When set, Create makes a new worktree for the thread before claude starts and
@@ -1481,9 +1481,15 @@ type StageAttachmentRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Original file name (for the extension only).
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	// image/png, image/jpeg, image/gif or image/webp.
-	MimeType      string `protobuf:"bytes,2,opt,name=mime_type,json=mimeType,proto3" json:"mime_type,omitempty"`
-	Data          []byte `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
+	// image/png, image/jpeg, image/gif, image/webp or application/pdf.
+	MimeType string `protobuf:"bytes,2,opt,name=mime_type,json=mimeType,proto3" json:"mime_type,omitempty"`
+	Data     []byte `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
+	// A PDF's page count as the client counted it (0 = unknown). A hint: the daemon
+	// counts with pdfinfo when it is installed, else takes this, else estimates one
+	// page per 100 KiB. The count is settled once, here, and recorded in the returned
+	// path (<32 hex>-<N>p.pdf, or <32 hex>-~<N>p.pdf for an estimate), so every
+	// message that sends the PDF agrees on it.
+	Pages         uint32 `protobuf:"varint,4,opt,name=pages,proto3" json:"pages,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1537,6 +1543,13 @@ func (x *StageAttachmentRequest) GetData() []byte {
 		return x.Data
 	}
 	return nil
+}
+
+func (x *StageAttachmentRequest) GetPages() uint32 {
+	if x != nil {
+		return x.Pages
+	}
+	return 0
 }
 
 type StageAttachmentResponse struct {
@@ -1631,7 +1644,8 @@ func (x *ReadAttachmentRequest) GetPath() string {
 type ReadAttachmentResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Data  []byte                 `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
-	// Sniffed from the content: image/png, image/jpeg, image/gif or image/webp.
+	// Sniffed from the content: image/png, image/jpeg, image/gif, image/webp or
+	// application/pdf.
 	MimeType      string `protobuf:"bytes,2,opt,name=mime_type,json=mimeType,proto3" json:"mime_type,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -3115,11 +3129,12 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\fNewWorkspace\x12\x14\n" +
 	"\x05repos\x18\x01 \x03(\tR\x05repos\x12\x19\n" +
 	"\bbase_ref\x18\x02 \x01(\tR\abaseRef\x12\x12\n" +
-	"\x04name\x18\x03 \x01(\tR\x04name\"]\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\"s\n" +
 	"\x16StageAttachmentRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1b\n" +
 	"\tmime_type\x18\x02 \x01(\tR\bmimeType\x12\x12\n" +
-	"\x04data\x18\x03 \x01(\fR\x04data\"-\n" +
+	"\x04data\x18\x03 \x01(\fR\x04data\x12\x14\n" +
+	"\x05pages\x18\x04 \x01(\rR\x05pages\"-\n" +
 	"\x17StageAttachmentResponse\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\"+\n" +
 	"\x15ReadAttachmentRequest\x12\x12\n" +

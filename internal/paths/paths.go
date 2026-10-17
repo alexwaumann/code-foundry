@@ -118,9 +118,9 @@ func (p Paths) Worktrees() string { return filepath.Join(p.home, "worktrees") }
 // Not configurable. The clone store creates it (0700) on first use.
 func (p Paths) Projects() string { return filepath.Join(p.home, "projects") }
 
-// Attachments is where images staged for a new thread's first prompt are kept
+// Attachments is where images and PDFs staged for a thread's messages are kept
 // (ThreadService.StageAttachment). The thread store creates it on demand and
-// removes files older than a day on daemon start.
+// reaps files older than thread.AttachmentMaxAge.
 func (p Paths) Attachments() string { return filepath.Join(p.home, "attachments") }
 
 // WindowBackground is the GUI host's own state: the window colour of each scheme, so the

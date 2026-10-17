@@ -121,7 +121,7 @@ func TestThreadCommands(t *testing.T) {
 		{
 			name: "items", cmd: "thread.items", args: map[string]string{"id": "s1"},
 			items: []thread.Item{
-				{ID: "u", Kind: thread.KindUserMessage, Text: "write it", Attachments: []string{"/a.png"}},
+				{ID: "u", Kind: thread.KindUserMessage, Text: "write it", Attachments: []string{"/a.png", "/b.pdf"}},
 				{ID: "t", Kind: thread.KindToolCall, Tool: &thread.ToolCall{Name: "Write", InputJSON: `{"file_path":"/x"}`, Status: thread.ToolDone, Output: "File created\nmore"}},
 				{ID: "sub", Kind: thread.KindAssistantText, Text: "from the agent", ParentToolUseID: "t"},
 				{ID: "p", Kind: thread.KindPermission, Request: &thread.Request{RequestID: "r9", ToolName: "Bash", Description: "ls", State: thread.RequestPending}},
@@ -131,7 +131,7 @@ func TestThreadCommands(t *testing.T) {
 				{ID: "e2", Kind: thread.KindTurnEnd, Turn: &thread.TurnEnd{Subtype: "success", DurationMS: 1000, CostUSD: 0.0153, TurnCostUSD: new(0.003), Model: "claude-haiku-5-5"}},
 				{ID: "n", Kind: thread.KindNote, Text: "Forked from fix"},
 			},
-			wantMsg: "#1 you: write it\n    [image /a.png]\n#2 tool Write [done] {\"file_path\":\"/x\"}\n    → File created …\n    #3 claude: from the agent\n" +
+			wantMsg: "#1 you: write it\n    [image /a.png]\n    [pdf /b.pdf]\n#2 tool Write [done] {\"file_path\":\"/x\"}\n    → File created …\n    #3 claude: from the agent\n" +
 				"#4 permission Bash ls: pending (request r9)\n#5 claude: done\n#6 turn end: success, 2.5s, 1 in / 9 out tokens, $0.0123 so far\n" +
 				"#7 you: again\n#8 turn end: success, 1.0s, 0 in / 0 out tokens, $0.0030, $0.0153 so far, claude-haiku-5-5\n#9 note: Forked from fix",
 		},

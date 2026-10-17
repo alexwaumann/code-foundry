@@ -52,7 +52,7 @@ type Options struct {
 	// /tmp, which names with model.NamingDefault unless the ctx carries
 	// WithNamingModel (the daemon's settingsNamer sets it per call).
 	Namer Namer
-	// AttachmentsDir is where StageAttachment writes images. Empty disables
+	// AttachmentsDir is where StageAttachment writes images and PDFs. Empty disables
 	// attachments. New creates it and removes files older than
 	// AttachmentMaxAge, then again every AttachmentReapInterval until Shutdown;
 	// every claude gets --add-dir for it so Read of an attachment does not ask.
@@ -383,7 +383,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 	if err != nil {
 		return Thread{}, err
 	}
-	attachments, err := checkAttachments(m.opts.AttachmentsDir, o.Attachments)
+	attachments, err := messageAttachments(ctx, m.opts.AttachmentsDir, o.Attachments)
 	if err != nil {
 		return Thread{}, err
 	}

@@ -170,7 +170,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				{Name: "base", Type: String, Description: "Ref the new worktree branches from (default: origin/<default branch>); needs new-worktree"},
 				{Name: "name", Type: String, Description: "Thread name (default: generated from the first message)"},
 				{Name: "prompt", Type: String, Description: "First prompt, sent as the thread's first message once Claude is up"},
-				{Name: "attachments", Type: String, Description: "Comma-separated image paths from StageAttachment, appended to the prompt"},
+				{Name: "attachments", Type: String, Description: "Comma-separated image or PDF paths from StageAttachment, appended to the prompt"},
 				{Name: "composer-prompt", Type: String, Description: "The GUI composer's text of prompt with its tag tokens, kept on the first message for display (the GUI sets it)"},
 				{Name: "no-project", Type: Bool, Description: "Start the thread without a project, in your home directory (not with repo, worktree, workspace, repos, new-worktree or base)"},
 			},

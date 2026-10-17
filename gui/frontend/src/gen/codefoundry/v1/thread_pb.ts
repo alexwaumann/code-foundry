@@ -163,8 +163,8 @@ export type UserMessageItem = Message<"codefoundry.v1.UserMessageItem"> & {
   text: string;
 
   /**
-   * Staged image paths (StageAttachment); Claude got each as an image block and a
-   * path line.
+   * Staged image and PDF paths (StageAttachment); Claude got each as a path line and,
+   * unless a PDF over 10 pages, an image or document block.
    *
    * @generated from field: repeated string attachments = 2;
    */
@@ -173,8 +173,8 @@ export type UserMessageItem = Message<"codefoundry.v1.UserMessageItem"> & {
   /**
    * The composer's text with its tags as Markdown-link tokens (gui lib/prompt.ts):
    * "[/name](cf-skill://<repo id or ~>/<name>)", "[base](cf-file://<repo id>/<path>)",
-   * and "![name](cf-attachment://<n>)" where n is the image's index in attachments
-   * (not a number: the chip had lost its image). Empty for a message without tags or sent
+   * and "![name](cf-attachment://<n>)" where n is the attachment's index in
+   * attachments (not a number: the chip had lost its file). Empty for a message without tags or sent
    * without the composer (the CLI): text is then shown as is. Stored, never interpreted.
    *
    * @generated from field: string composer_text = 3;
@@ -2260,10 +2260,13 @@ export const ThreadService: GenService<{
     output: typeof ThreadListEventSchema;
   },
   /**
-   * StageAttachment stores an image the first prompt refers to and returns its path.
-   * Create appends "Attached image: <path>" lines for CreateThreadRequest.attachments;
-   * Claude reads them with its Read tool. Only image types are accepted, with size
-   * limits; unused staged files are reaped by the daemon.
+   * StageAttachment stores an image or PDF a message refers to and returns its path.
+   * Create and Send append an "Attached image: <path>" or "Attached PDF: <path> (<N>
+   * pages)" line per attachment and send its content as an image or document block; a
+   * PDF over 10 pages goes only as its path, and Claude reads it with its Read tool.
+   * Only image types and PDFs are accepted, with size limits (images 10 MiB, PDFs
+   * 20 MiB, 24 MiB sent inline per message); unused staged files are reaped by the
+   * daemon.
    *
    * @generated from rpc codefoundry.v1.ThreadService.StageAttachment
    */
@@ -2274,7 +2277,7 @@ export const ThreadService: GenService<{
   },
   /**
    * ReadAttachment returns a staged attachment's bytes (a user message shows its
-   * images). Only files directly in the attachments directory;
+   * images and PDFs). Only files directly in the attachments directory;
    * NOT_FOUND once the file was reaped.
    *
    * @generated from rpc codefoundry.v1.ThreadService.ReadAttachment

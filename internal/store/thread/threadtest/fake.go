@@ -186,12 +186,16 @@ func (f *Fake) Create(_ context.Context, o thread.CreateOptions) (thread.Thread,
 	return f.add(call, s)
 }
 
-// StageAttachment records "StageAttachment <name> <mime> <len>" and returns
-// /attachments/<N>-<name>.
-func (f *Fake) StageAttachment(_ context.Context, name, mimeType string, data []byte) (string, error) {
+// StageAttachment records "StageAttachment <name> <mime> <len>" (and " pages=<n>"
+// when pages is set) and returns /attachments/<N>-<name>.
+func (f *Fake) StageAttachment(_ context.Context, name, mimeType string, data []byte, pages int) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if err := f.record(fmt.Sprintf("StageAttachment %s %s %d", name, mimeType, len(data))); err != nil {
+	call := fmt.Sprintf("StageAttachment %s %s %d", name, mimeType, len(data))
+	if pages > 0 {
+		call += fmt.Sprintf(" pages=%d", pages)
+	}
+	if err := f.record(call); err != nil {
 		return "", err
 	}
 	f.staged++
