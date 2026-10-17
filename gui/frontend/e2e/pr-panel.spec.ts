@@ -685,7 +685,7 @@ test("Ask from the Pull Requests page sends no worktree; while it starts, Cancel
   await askInput(page).pressSequentially("What changed?");
   await page.keyboard.press("Enter");
 
-  await expect(page.getByTestId("pr-ask-hint")).toHaveText("Starting a session…");
+  await expect(page.getByTestId("pr-ask-hint")).toHaveText("Starting a thread…");
   await expect(page.getByTestId("pr-ask-send")).toHaveAttribute("aria-busy", "true");
   await expect(page.getByTestId("pr-ask-cancel")).toBeDisabled();
   await expect(askInput(page)).toHaveJSProperty("readOnly", true);

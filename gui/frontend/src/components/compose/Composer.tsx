@@ -281,7 +281,7 @@ const NEW_IN_EVERY = "A cf/… branch in every project (a new workspace)";
 const FRESH_COPY = "A fresh copy of the project";
 const FRESH_COPY_DETAIL = "Its own folder and branch (cf/…, named from your prompt). Run several threads at once; keep or discard each one.";
 const IN_PLACE = "The project folder itself";
-const WORK_IN_FOOTER = "Default for new threads: Settings › Sessions › New threads work in";
+const WORK_IN_FOOTER = "Default for new threads: Settings › Threads › New threads work in";
 
 function inPlaceDetail(path: string): string {
   return `Edits land in ${tildify(path)} directly. One thread at a time is safest.`;

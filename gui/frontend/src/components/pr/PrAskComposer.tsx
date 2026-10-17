@@ -7,7 +7,7 @@ import { PanelComposer } from "./PanelComposer";
 /** The hint while nothing runs: narrow enough for a 280px panel. */
 export const ASK_KEYS_HINT = "⏎ send · ⇧⏎ newline";
 /** The hint while this composer's pr.ask runs. */
-export const ASK_SENDING_HINT = "Starting a session…";
+export const ASK_SENDING_HINT = "Starting a thread…";
 /** The hint while pr.ask for the same pull request runs from another surface. */
 export const ASK_ELSEWHERE_HINT = "Already starting a thread for this pull request";
 

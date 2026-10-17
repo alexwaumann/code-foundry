@@ -254,7 +254,7 @@ test("a failed start keeps the draft editable and shows why", async ({ page }) =
     /^fix\/resize/,
   ]);
   await expect(list.locator("[cmdk-group-heading]")).toHaveText(["Work in", "An existing copy"]);
-  await expect(list.getByText("Default for new threads: Settings › Sessions › New threads work in")).toBeVisible();
+  await expect(list.getByText("Default for new threads: Settings › Threads › New threads work in")).toBeVisible();
   await options.filter({ hasText: "The project folder itself" }).click();
   await expect(page.getByTestId("composer-worktree")).toHaveText("In place");
   await expect(page.getByTestId("composer-base")).toHaveCount(0);

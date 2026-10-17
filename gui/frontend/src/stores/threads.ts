@@ -115,7 +115,7 @@ export function applyThreadListEvent(prev: ThreadsData, ev: ThreadListEventView)
       return { byId, order: prev.order.filter((id) => id !== ev.id) };
     }
     case "retiredUsage":
-      return prev; // no session changed: see applyRetiredUsage
+      return prev; // no thread changed: see applyRetiredUsage
   }
 }
 
