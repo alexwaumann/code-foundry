@@ -10,10 +10,10 @@
  *
  *   GET  /__mock/invocations | writes | resizes | threads | streams
  *   POST /__mock/reset
- *   RepoService.SearchGitHub / LookupGitHub / Clone: mock/clone.ts (a repo named "fail" fails
+ *   ProjectService.SearchGitHub / LookupGitHub / Clone: mock/clone.ts (a repo named "fail" fails
  *        to clone; octo-org/already-here's destination exists)
  *   GET  /__mock/github/calls                     ("search <q>", "lookup <o/n>", "clone <o/n>")
- *   RepoService.Create / ListPublishOwners / Publish, repo.create, repo.github.publish:
+ *   ProjectService.Create / ListPublishOwners / Publish, repo.create, repo.github.publish:
  *        mock/create.ts (publishing private to octo-org, or a repository named "taken", fails like gh)
  *   GET  /__mock/projects/calls                   ("create <name>", "publish <id> <o/n> <visibility>", "delete <id>")
  *   POST /__mock/thread/attention?id=s-1
@@ -56,7 +56,7 @@
  *        &cacheWrite5m=…&cacheWrite1h=…&day=YYYY-MM-DD]   (Claude made requests: added to the
  *                                                 thread's (model, day) bucket; s-1 is seeded)
  *   POST /__mock/threads-service?enabled=false   (simulate a daemon without ThreadService)
- *   POST /__mock/missing-rpc?rpc=RepoService/ListRefs&rpc=ThreadService/StageAttachment
+ *   POST /__mock/missing-rpc?rpc=ProjectService/ListRefs&rpc=ThreadService/StageAttachment
  *                                                 (simulate a daemon older than those RPCs: 404)
  *   POST /__mock/thread-new?delay=700            (how long thread.new takes to make a worktree)
  *   POST /__mock/worktree/checkout?path=…&branch=…   (the worktree switches branch; no branch detaches HEAD)
@@ -138,7 +138,7 @@ import { EventService, EventSource } from "../src/gen/codefoundry/v1/events_pb";
 import { FilesystemService } from "../src/gen/codefoundry/v1/filesystem_pb";
 import { GhService } from "../src/gen/codefoundry/v1/gh_pb";
 import { HealthService } from "../src/gen/codefoundry/v1/health_pb";
-import { RepoService } from "../src/gen/codefoundry/v1/repo_pb";
+import { ProjectService } from "../src/gen/codefoundry/v1/project_pb";
 import { ThreadState, ThreadStatus } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
 import { TerminalService, TerminalState, type AttachEventSchema } from "../src/gen/codefoundry/v1/terminal_pb";
 import { ThreadDecision, ThreadService } from "../src/gen/codefoundry/v1/thread_pb";
@@ -250,15 +250,15 @@ function routes(router: ConnectRouter): void {
     watch: (_req, ctx) => tracked("TerminalService/Watch", world.termEvents.subscribe(ctx.signal)),
   });
 
-  router.service(RepoService, {
-    list: () => ({ repos: [...world.repos.values()].map((r) => world.repoMsg(r)) }),
+  router.service(ProjectService, {
+    list: () => ({ projects: [...world.repos.values()].map((r) => world.repoMsg(r)) }),
     get: (req) => {
       const r = world.repos.get(req.id);
-      if (!r) throw new ConnectError(`repo ${req.id} not found`, Code.NotFound);
-      return { repo: world.repoMsg(r) };
+      if (!r) throw new ConnectError(`project ${req.id} not found`, Code.NotFound);
+      return { project: world.repoMsg(r) };
     },
     // The Add Project dialog's Local folder tab and an existing clone destination.
-    register: (req) => guard(() => ({ repo: world.repoMsg(world.registerFolder(req.path)) })),
+    register: (req) => guard(() => ({ project: world.repoMsg(world.registerFolder(req.path)) })),
     unregister: () => {
       throw new ConnectError("use the repo.unregister command in the mock", Code.Unimplemented);
     },
@@ -269,8 +269,8 @@ function routes(router: ConnectRouter): void {
       throw new ConnectError("use the worktree.remove command in the mock", Code.Unimplemented);
     },
     refresh: () => ({}),
-    listRefs: (req) => guard(() => world.listRefs(req.repoId)),
-    initGit: (req) => guard(() => ({ repo: world.repoMsg(world.initGit(req.id)) })),
+    listRefs: (req) => guard(() => world.listRefs(req.projectId)),
+    initGit: (req) => guard(() => ({ project: world.repoMsg(world.initGit(req.id)) })),
     // The Add Project dialog's GitHub tab (mock/clone.ts).
     searchGitHub: (req) => searchGitHub(req.query),
     lookupGitHub: (req) => lookupGitHub(req.owner, req.name),
@@ -281,7 +281,7 @@ function routes(router: ConnectRouter): void {
       const r = createProject(world, req.name);
       const repo = world.repos.get(r.id);
       if (!repo) throw new ConnectError("created project vanished", Code.Internal);
-      return { repo: world.repoMsg(repo) };
+      return { project: world.repoMsg(repo) };
     },
     listPublishOwners: () => listPublishOwners(),
     delete: (req) => {
@@ -290,17 +290,17 @@ function routes(router: ConnectRouter): void {
     },
     publish: async (req) => {
       const vis = visibilityFlag(req.visibility);
-      await publishProject(world, req.repoId, req.owner, req.name, vis);
-      const repo = world.repos.get(req.repoId);
+      await publishProject(world, req.projectId, req.owner, req.name, vis);
+      const repo = world.repos.get(req.projectId);
       if (!repo) throw new ConnectError("published project vanished", Code.Internal);
-      return { repo: world.repoMsg(repo) };
+      return { project: world.repoMsg(repo) };
     },
     getWorktreeDetail: (req) => {
-      const detail = world.gh.getWorktreeDetail(req.repoId, req.path);
+      const detail = world.gh.getWorktreeDetail(req.projectId, req.path);
       if (!detail) throw new ConnectError(`worktree ${req.path} not found`, Code.NotFound);
       return { detail };
     },
-    watch: (_req, ctx) => tracked("RepoService/Watch", world.repoEvents.subscribe(ctx.signal)),
+    watch: (_req, ctx) => tracked("ProjectService/Watch", world.repoEvents.subscribe(ctx.signal)),
   });
 
   router.service(FilesystemService, {
@@ -309,7 +309,7 @@ function routes(router: ConnectRouter): void {
       return listDirectories(req.prefix, registered);
     },
     listSkills: (req) => ({ skills: listSkills(world.repos, req.sources, req.includeUser) }),
-    searchFiles: (req) => searchFilesSlow(world.repos, req.repoId, req.path, req.query, req.limit),
+    searchFiles: (req) => searchFilesSlow(world.repos, req.projectId, req.path, req.query, req.limit),
   });
 
   router.service(GhService, {
@@ -427,7 +427,7 @@ function routes(router: ConnectRouter): void {
 
   // Actions (mock/actions.ts). The GUI may also go through the action.* commands.
   router.service(ActionService, {
-    list: (req) => world.actions.list(req.repoId),
+    list: (req) => world.actions.list(req.projectId),
     create: (req) => guard(() => ({ action: world.actions.create(req) })),
     update: (req) => guard(() => ({ action: world.actions.update(req) })),
     delete: (req) => guard(() => (world.actions.delete(req.id), {})),
@@ -461,11 +461,11 @@ function routes(router: ConnectRouter): void {
       const want = new Set(
         req.sources.length > 0
           ? req.sources
-          : [EventSource.REPO, EventSource.WORKSPACE, EventSource.TERMINAL, EventSource.THREAD_LIST, EventSource.THREAD, EventSource.GH, EventSource.GITOPS, EventSource.SETTINGS, EventSource.UPDATE, EventSource.UI, EventSource.ACTION],
+          : [EventSource.PROJECT, EventSource.WORKSPACE, EventSource.TERMINAL, EventSource.THREAD_LIST, EventSource.THREAD, EventSource.GH, EventSource.GITOPS, EventSource.SETTINGS, EventSource.UPDATE, EventSource.UI, EventSource.ACTION],
       );
       if (!threadsEnabled) want.delete(EventSource.THREAD_LIST);
       const initial: { source: EventSource; event: EventInit }[] = [
-        { source: EventSource.REPO, event: { event: { case: "repo", value: { event: { case: "snapshot", value: { repos: [...world.repos.values()].map((r) => world.repoMsg(r)) } } } } } },
+        { source: EventSource.PROJECT, event: { event: { case: "project", value: { event: { case: "snapshot", value: { projects: [...world.repos.values()].map((r) => world.repoMsg(r)) } } } } } },
         { source: EventSource.WORKSPACE, event: { event: { case: "workspace", value: world.workspaceSnapshot() } } },
         ...[...world.terms.values()].map((t) => ({ source: EventSource.TERMINAL, event: { event: { case: "terminal" as const, value: { event: { case: "updated" as const, value: world.terminalMsg(t) } } } } })),
         { source: EventSource.THREAD_LIST, event: { event: { case: "threadList", value: world.threadListSnapshot() } } },
@@ -610,7 +610,7 @@ function threadSummary(id: string): Record<string, unknown> {
     status: ThreadStatus[s.status],
     statusReason: s.statusReason,
     statusChangedAt: s.statusChangedAt.toISOString(),
-    repoId: s.repoId,
+    projectId: s.projectId,
     worktreePath: s.worktreePath,
     workspaceId: s.workspaceId,
     pendingWorktreePath: s.pendingWorktreePath,
@@ -999,13 +999,13 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       json(res, 200, { ok: true });
       break;
     case "POST /__mock/files": {
-      const repoId = q.get("repo") ?? "";
-      if (!world.repos.has(repoId)) {
-        json(res, 404, { error: `unknown repo ${repoId}` });
+      const projectId = q.get("repo") ?? "";
+      if (!world.repos.has(projectId)) {
+        json(res, 404, { error: `unknown repo ${projectId}` });
         break;
       }
-      setMockFiles(repoId, q.getAll("path"));
-      json(res, 200, { repo: repoId, files: q.getAll("path") });
+      setMockFiles(projectId, q.getAll("path"));
+      json(res, 200, { repo: projectId, files: q.getAll("path") });
       break;
     }
     case "POST /__mock/files/search":

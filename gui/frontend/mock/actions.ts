@@ -48,7 +48,7 @@ export interface ActionHost {
   /** Registered projects and their worktree paths. */
   repos(): { id: string; name: string; worktrees: string[] }[];
   /** A thread's project ("" for none) and worktree; undefined when unknown. */
-  thread(id: string): { repoId: string; worktreePath: string } | undefined;
+  thread(id: string): { projectId: string; worktreePath: string } | undefined;
   /** Starts a kind=action terminal and returns its id. */
   startTerminal(argv: string[], cwd: string, labels: Record<string, string>): string;
   /** Output to a running terminal (no-op when it is gone or exited). */
@@ -59,7 +59,7 @@ export interface ActionHost {
 
 interface MockAction {
   id: string;
-  repoId: string;
+  projectId: string;
   name: string;
   command: string;
   icon: ActionIcon;
@@ -75,7 +75,7 @@ interface MockRun {
   actionId: string;
   actionName: string;
   command: string;
-  repoId: string;
+  projectId: string;
   threadId: string;
   worktreePath: string;
   mode: ActionRunMode;
@@ -321,7 +321,7 @@ export class MockActions {
     const at = new Date(Date.now() - 3 * 24 * 3_600_000);
     const seed = (id: string, name: string, icon: ActionIcon, command: string, onWorktreeCreate = false) => {
       const position = this.actions.size;
-      this.actions.set(id, { id, repoId: "repo-cf", name, command, icon, inTerminal: true, onWorktreeCreate, position, createdAt: at, updatedAt: at });
+      this.actions.set(id, { id, projectId: "repo-cf", name, command, icon, inTerminal: true, onWorktreeCreate, position, createdAt: at, updatedAt: at });
     };
     if (this.host.repos().some((r) => r.id === "repo-cf")) {
       seed("a-dev000000000", "Dev", ActionIcon.PLAY, "pnpm dev");
@@ -352,21 +352,21 @@ export class MockActions {
     return { event: { case: "snapshot", value: this.list("") } };
   }
 
-  private sorted(repoId: string): MockAction[] {
-    return [...this.actions.values()].filter((a) => !repoId || a.repoId === repoId).sort((a, b) => (a.repoId === b.repoId ? a.position - b.position : a.repoId < b.repoId ? -1 : 1));
+  private sorted(projectId: string): MockAction[] {
+    return [...this.actions.values()].filter((a) => !projectId || a.projectId === projectId).sort((a, b) => (a.projectId === b.projectId ? a.position - b.position : a.projectId < b.projectId ? -1 : 1));
   }
 
-  list(repoId: string): { actions: ActionInit[]; runs: RunInit[] } {
+  list(projectId: string): { actions: ActionInit[]; runs: RunInit[] } {
     return {
-      actions: this.sorted(repoId).map((a) => this.actionMsg(a)),
-      runs: this.runs.filter((r) => !repoId || r.repoId === repoId).map((r) => this.runMsg(r, false)),
+      actions: this.sorted(projectId).map((a) => this.actionMsg(a)),
+      runs: this.runs.filter((r) => !projectId || r.projectId === projectId).map((r) => this.runMsg(r, false)),
     };
   }
 
   actionMsg(a: MockAction): ActionInit {
     return {
       id: a.id,
-      repoId: a.repoId,
+      projectId: a.projectId,
       name: a.name,
       command: a.command,
       icon: a.icon,
@@ -384,7 +384,7 @@ export class MockActions {
       actionId: r.actionId,
       actionName: r.actionName,
       command: r.command,
-      repoId: r.repoId,
+      projectId: r.projectId,
       threadId: r.threadId,
       worktreePath: r.worktreePath,
       mode: r.mode,
@@ -408,7 +408,7 @@ export class MockActions {
         actionId: r.actionId,
         actionName: r.actionName,
         command: r.command,
-        repoId: r.repoId,
+        projectId: r.projectId,
         threadId: r.threadId,
         worktreePath: r.worktreePath,
         mode: ActionRunMode[r.mode],
@@ -431,21 +431,21 @@ export class MockActions {
     return a;
   }
 
-  private checkUnique(repoId: string, name: string, self = ""): void {
+  private checkUnique(projectId: string, name: string, self = ""): void {
     const lower = name.toLowerCase();
-    const dup = [...this.actions.values()].find((a) => a.repoId === repoId && a.id !== self && a.name.toLowerCase() === lower);
+    const dup = [...this.actions.values()].find((a) => a.projectId === projectId && a.id !== self && a.name.toLowerCase() === lower);
     if (dup) throw new CommandError("unavailable", `failed precondition: this project already has an action named "${dup.name}"`);
   }
 
-  create(req: { repoId: string; name: string; command: string; icon: ActionIcon; inTerminal: boolean; onWorktreeCreate: boolean }): ActionInit {
-    if (!this.host.repos().some((r) => r.id === req.repoId)) throw new CommandError("notfound", `not found: project "${req.repoId}" is not registered`);
+  create(req: { projectId: string; name: string; command: string; icon: ActionIcon; inTerminal: boolean; onWorktreeCreate: boolean }): ActionInit {
+    if (!this.host.repos().some((r) => r.id === req.projectId)) throw new CommandError("notfound", `not found: project "${req.projectId}" is not registered`);
     const name = cleanName(req.name);
     const command = cleanCommand(req.command);
     const icon = checkIcon(req.icon);
-    this.checkUnique(req.repoId, name);
+    this.checkUnique(req.projectId, name);
     const now = new Date();
     const id = `a-${(this.nextAction++).toString(16).padStart(12, "0")}`;
-    const a: MockAction = { id, repoId: req.repoId, name, command, icon, inTerminal: req.inTerminal, onWorktreeCreate: req.onWorktreeCreate, position: this.sorted(req.repoId).length, createdAt: now, updatedAt: now };
+    const a: MockAction = { id, projectId: req.projectId, name, command, icon, inTerminal: req.inTerminal, onWorktreeCreate: req.onWorktreeCreate, position: this.sorted(req.projectId).length, createdAt: now, updatedAt: now };
     this.actions.set(id, a);
     this.host.publish({ event: { case: "updated", value: this.actionMsg(a) } });
     return this.actionMsg(a);
@@ -457,18 +457,18 @@ export class MockActions {
     const command = req.command === undefined ? a.command : cleanCommand(req.command);
     if (req.icon === ActionIcon.UNSPECIFIED) throw new CommandError("invalid", "icon: unspecified");
     const icon = req.icon === undefined ? a.icon : checkIcon(req.icon);
-    this.checkUnique(a.repoId, name, a.id);
+    this.checkUnique(a.projectId, name, a.id);
     Object.assign(a, { name, command, icon, inTerminal: req.inTerminal ?? a.inTerminal, onWorktreeCreate: req.onWorktreeCreate ?? a.onWorktreeCreate, updatedAt: new Date() });
     const moved = new Set<MockAction>([a]);
     if (req.position !== undefined) {
-      const list = this.sorted(a.repoId).filter((x) => x !== a);
+      const list = this.sorted(a.projectId).filter((x) => x !== a);
       list.splice(Math.max(0, Math.min(req.position, list.length)), 0, a);
       for (const [i, x] of list.entries()) {
         if (x.position !== i) moved.add(x);
         x.position = i;
       }
     }
-    for (const x of this.sorted(a.repoId)) if (moved.has(x)) this.host.publish({ event: { case: "updated", value: this.actionMsg(x) } });
+    for (const x of this.sorted(a.projectId)) if (moved.has(x)) this.host.publish({ event: { case: "updated", value: this.actionMsg(x) } });
     return this.actionMsg(a);
   }
 
@@ -476,7 +476,7 @@ export class MockActions {
     const a = this.action(id);
     this.actions.delete(id);
     this.host.publish({ event: { case: "removedId", value: id } });
-    for (const [i, x] of this.sorted(a.repoId).entries()) {
+    for (const [i, x] of this.sorted(a.projectId).entries()) {
       if (x.position === i) continue;
       x.position = i;
       this.host.publish({ event: { case: "updated", value: this.actionMsg(x) } });
@@ -484,13 +484,13 @@ export class MockActions {
   }
 
   /** A project was unregistered: its actions and runs go (background runs are stopped first). */
-  removeRepo(repoId: string): void {
-    this.stopBackground((r) => r.repoId === repoId);
-    for (const a of this.sorted(repoId)) {
+  removeRepo(projectId: string): void {
+    this.stopBackground((r) => r.projectId === projectId);
+    for (const a of this.sorted(projectId)) {
       this.actions.delete(a.id);
       this.host.publish({ event: { case: "removedId", value: a.id } });
     }
-    for (const r of this.runs.filter((x) => x.repoId === repoId)) this.forget(r);
+    for (const r of this.runs.filter((x) => x.projectId === projectId)) this.forget(r);
   }
 
   // ---- Runs ---------------------------------------------------------------------
@@ -523,45 +523,45 @@ export class MockActions {
     return this.runMsg(r, true);
   }
 
-  /** ActionService.Run: an action by id, else by name in the owner's project (or repoId's). */
+  /** ActionService.Run: an action by id, else by name in the owner's project (or projectId's). */
   run(
-    req: { action: string; threadId?: string; worktreePath?: string; repoId?: string; mode?: ActionRunMode },
+    req: { action: string; threadId?: string; worktreePath?: string; projectId?: string; mode?: ActionRunMode },
     trigger = ActionRunTrigger.USER,
     script?: Script,
   ): RunInit {
-    const owner = this.owner(req.threadId ?? "", req.worktreePath ?? "", req.repoId ?? "");
+    const owner = this.owner(req.threadId ?? "", req.worktreePath ?? "", req.projectId ?? "");
     const ref = req.action.trim();
     let a = this.actions.get(ref);
-    if (a && a.repoId !== owner.repoId) throw new CommandError("unavailable", `action ${a.name} (${a.id}) belongs to another project`);
-    a ??= this.sorted(req.repoId || owner.repoId).find((x) => x.name.toLowerCase() === ref.toLowerCase());
+    if (a && a.projectId !== owner.projectId) throw new CommandError("unavailable", `action ${a.name} (${a.id}) belongs to another project`);
+    a ??= this.sorted(req.projectId || owner.projectId).find((x) => x.name.toLowerCase() === ref.toLowerCase());
     if (!a) throw new CommandError("notfound", `no action "${ref}" in this project`);
     const mode = req.mode === ActionRunMode.TERMINAL || req.mode === ActionRunMode.BACKGROUND ? req.mode : a.inTerminal ? ActionRunMode.TERMINAL : ActionRunMode.BACKGROUND;
     return this.runMsg(this.start(a, owner, mode, trigger, script ?? scriptFor(a.command, owner.worktree)), true);
   }
 
-  private owner(threadId: string, worktree: string, repoId: string): { threadId: string; repoId: string; worktree: string } {
+  private owner(threadId: string, worktree: string, projectId: string): { threadId: string; projectId: string; worktree: string } {
     if (threadId) {
       const s = this.host.thread(threadId);
       if (!s) throw new CommandError("notfound", `not found: thread ${threadId}`);
-      if (!s.repoId) throw new CommandError("unavailable", `failed precondition: thread ${threadId} has no project; actions belong to a project`);
-      if (repoId && repoId !== s.repoId) throw new CommandError("invalid", `invalid argument: thread ${threadId} is in project ${s.repoId}, not ${repoId}`);
-      return { threadId, repoId: s.repoId, worktree: s.worktreePath };
+      if (!s.projectId) throw new CommandError("unavailable", `failed precondition: thread ${threadId} has no project; actions belong to a project`);
+      if (projectId && projectId !== s.projectId) throw new CommandError("invalid", `invalid argument: thread ${threadId} is in project ${s.projectId}, not ${projectId}`);
+      return { threadId, projectId: s.projectId, worktree: s.worktreePath };
     }
     if (worktree) {
       const repo = this.host.repos().find((r) => r.worktrees.includes(worktree));
       if (!repo) throw new CommandError("invalid", `invalid argument: ${worktree} is not a worktree of a registered project`);
-      return { threadId: "", repoId: repo.id, worktree };
+      return { threadId: "", projectId: repo.id, worktree };
     }
     throw new CommandError("invalid", "invalid argument: a run needs a thread or a worktree");
   }
 
-  private start(a: MockAction, owner: { threadId: string; repoId: string; worktree: string }, mode: ActionRunMode, trigger: ActionRunTrigger, script: Script): MockRun {
+  private start(a: MockAction, owner: { threadId: string; projectId: string; worktree: string }, mode: ActionRunMode, trigger: ActionRunTrigger, script: Script): MockRun {
     const r: MockRun = {
       id: `r-${(this.nextRun++).toString(16).padStart(12, "0")}`,
       actionId: a.id,
       actionName: a.name,
       command: a.command,
-      repoId: owner.repoId,
+      projectId: owner.projectId,
       threadId: owner.threadId,
       worktreePath: owner.worktree,
       mode,
@@ -579,12 +579,12 @@ export class MockActions {
     };
     this.runs.unshift(r);
     if (mode === ActionRunMode.TERMINAL) {
-      const labels: Record<string, string> = { kind: "action", repo: owner.repoId, worktree: owner.worktree, action: a.id, "action.name": a.name, "action.run": r.id };
+      const labels: Record<string, string> = { kind: "action", project: owner.projectId, worktree: owner.worktree, action: a.id, "action.name": a.name, "action.run": r.id };
       if (owner.threadId) labels.thread = owner.threadId;
       r.terminalId = this.host.startTerminal(["/bin/zsh", "-lc", a.command], owner.worktree, labels);
     }
     this.host.publish({ event: { case: "runUpdated", value: this.runMsg(r, false) } });
-    this.trim(r.repoId);
+    this.trim(r.projectId);
     for (const step of script.steps) r.timers.push(
         setTimeout(() => {
           this.emit(r, step.text);
@@ -631,16 +631,16 @@ export class MockActions {
     this.host.publish({
       event: {
         case: "runFinished",
-        value: { runId: r.id, actionId: r.actionId, actionName: r.actionName, repoId: r.repoId, threadId: r.threadId, exitCode: code, mode: r.mode, trigger: r.trigger, terminalId: r.terminalId },
+        value: { runId: r.id, actionId: r.actionId, actionName: r.actionName, projectId: r.projectId, threadId: r.threadId, exitCode: code, mode: r.mode, trigger: r.trigger, terminalId: r.terminalId },
       },
     });
     for (const w of r.waiters.splice(0)) w();
-    this.trim(r.repoId);
+    this.trim(r.projectId);
   }
 
   /** Keeps the newest RUNS_PER_PROJECT runs of a project; a running run is never dropped. */
-  private trim(repoId: string): void {
-    const mine = this.runs.filter((r) => r.repoId === repoId);
+  private trim(projectId: string): void {
+    const mine = this.runs.filter((r) => r.projectId === projectId);
     let extra = mine.length - RUNS_PER_PROJECT;
     for (let i = mine.length - 1; i >= 0 && extra > 0; i--) {
       const r = mine[i];
@@ -674,7 +674,7 @@ export class MockActions {
   }
 
   /** Background runs matching are killed (SIGTERM: 143): their thread, worktree or project went. */
-  stopBackground(match: (r: { threadId: string; worktreePath: string; repoId: string }) => boolean): void {
+  stopBackground(match: (r: { threadId: string; worktreePath: string; projectId: string }) => boolean): void {
     for (const r of this.runs) if (r.mode === ActionRunMode.BACKGROUND && r.state === ActionRunState.RUNNING && match(r)) this.finish(r, 143);
   }
 
@@ -688,14 +688,14 @@ export class MockActions {
   }
 
   /** A new thread created its worktree: the project's on-worktree-create actions, one after another, in the background. */
-  worktreeCreated(threadId: string, repoId: string, worktree: string): void {
-    const list = this.sorted(repoId).filter((a) => a.onWorktreeCreate);
+  worktreeCreated(threadId: string, projectId: string, worktree: string): void {
+    const list = this.sorted(projectId).filter((a) => a.onWorktreeCreate);
     const gen = this.generation;
     void (async () => {
       for (const a of list) {
         if (gen !== this.generation || !this.actions.has(a.id)) continue;
         try {
-          const r = this.start(a, { threadId, repoId, worktree }, ActionRunMode.BACKGROUND, ActionRunTrigger.WORKTREE_CREATE, scriptFor(a.command, worktree));
+          const r = this.start(a, { threadId, projectId, worktree }, ActionRunMode.BACKGROUND, ActionRunTrigger.WORKTREE_CREATE, scriptFor(a.command, worktree));
           await this.waitRun(r.id);
         } catch {
           // A reset dropped the run: stop.
@@ -708,9 +708,9 @@ export class MockActions {
   /** POST /__mock/action/setup: a worktree-create run for a thread that exits with `code` after ~600 ms. */
   setupRun(threadId: string, code: number, actionRef = ""): RunInit {
     const owner = this.owner(threadId, "", "");
-    const list = this.sorted(owner.repoId);
+    const list = this.sorted(owner.projectId);
     const a = actionRef ? list.find((x) => x.id === actionRef || x.name.toLowerCase() === actionRef.toLowerCase()) : (list.find((x) => x.onWorktreeCreate) ?? list[0]);
-    if (!a) throw new CommandError("notfound", `no action ${actionRef ? `"${actionRef}" ` : ""}in project ${owner.repoId}`);
+    if (!a) throw new CommandError("notfound", `no action ${actionRef ? `"${actionRef}" ` : ""}in project ${owner.projectId}`);
     return this.runMsg(this.start(a, owner, ActionRunMode.BACKGROUND, ActionRunTrigger.WORKTREE_CREATE, setupScript(code)), true);
   }
 
@@ -724,7 +724,7 @@ export class MockActions {
       for (const r of repos) for (const w of r.worktrees) if ((path === w || path.startsWith(`${w}/`)) && w.length > (best?.len ?? 0)) best = { id: r.id, len: w.length };
       return best?.id;
     };
-    const ref = (args.repo ?? "").trim();
+    const ref = (args.project ?? "").trim();
     if (ref) {
       if (repos.some((r) => r.id === ref)) return ref;
       const named = repos.filter((r) => r.name === ref);
@@ -736,10 +736,10 @@ export class MockActions {
     if (ctx?.activeThreadId) {
       const s = this.host.thread(ctx.activeThreadId);
       if (!s) throw new CommandError("notfound", `thread ${ctx.activeThreadId} not found`);
-      if (!s.repoId) throw new CommandError("invalid", `thread ${ctx.activeThreadId} has no project; ${noProject}`);
-      return s.repoId;
+      if (!s.projectId) throw new CommandError("invalid", `thread ${ctx.activeThreadId} has no project; ${noProject}`);
+      return s.projectId;
     }
-    if (ctx?.activeRepoId && repos.some((r) => r.id === ctx.activeRepoId)) return ctx.activeRepoId;
+    if (ctx?.activeProjectId && repos.some((r) => r.id === ctx.activeProjectId)) return ctx.activeProjectId;
     const id = (ctx?.activeWorktreePath && inside(ctx.activeWorktreePath)) || (args.here && inside(args.here));
     if (!id) throw new CommandError("invalid", noProject);
     return id;
@@ -750,8 +750,8 @@ export class MockActions {
     const ref = (args.action ?? "").trim();
     const byId = this.actions.get(ref);
     if (byId) return byId;
-    const repoId = this.repoFor(ctx, args);
-    const a = this.sorted(repoId).find((x) => x.name.toLowerCase() === ref.toLowerCase());
+    const projectId = this.repoFor(ctx, args);
+    const a = this.sorted(projectId).find((x) => x.name.toLowerCase() === ref.toLowerCase());
     if (!a) throw new CommandError("notfound", `no action "${ref}" in this project (code-foundry action list)`);
     return a;
   }
@@ -776,9 +776,9 @@ export class MockActions {
 
   /** action.list, action.add, action.edit, action.remove, action.run, action.wait, action.runs (internal/command/commands_action.go). */
   commands(): Command[] {
-    const canUse = (ctx: UiContext | undefined) => Boolean(ctx?.activeThreadId || ctx?.activeRepoId || ctx?.activeWorktreePath || !ctx?.activeView);
+    const canUse = (ctx: UiContext | undefined) => Boolean(ctx?.activeThreadId || ctx?.activeProjectId || ctx?.activeWorktreePath || !ctx?.activeView);
     const canRun = (ctx: UiContext | undefined) => Boolean(ctx?.activeThreadId || ctx?.activeWorktreePath || !ctx?.activeView);
-    const repoArg = { name: "repo", type: ArgType.STRING, required: false, description: "Project: id, name, or a path inside it (default: the thread's, the worktree's, or the working directory's)" };
+    const repoArg = { name: "project", type: ArgType.STRING, required: false, description: "Project: id, name, or a path inside it (default: the thread's, the worktree's, or the working directory's)" };
     const hereArg = {
       name: "here",
       type: ArgType.PATH,
@@ -822,7 +822,7 @@ export class MockActions {
         when: canUse,
         run: (ctx, args) => {
           const a = this.create({
-            repoId: this.repoFor(ctx, args),
+            projectId: this.repoFor(ctx, args),
             name: args.name ?? "",
             command: args.command ?? "",
             icon: icon(args.icon),

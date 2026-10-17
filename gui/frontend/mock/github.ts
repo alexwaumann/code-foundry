@@ -1,5 +1,5 @@
 /**
- * Mock GhService dashboards/activity/branch PRs and RepoService.GetWorktreeDetail data
+ * Mock GhService dashboards/activity/branch PRs and ProjectService.GetWorktreeDetail data
  * (Phase 3a). Deterministic, relative to the time the world was reset. Paths match
  * world.ts's repos.
  */
@@ -18,7 +18,7 @@ import {
   type GhEventSchema,
   type ActivityStatsSchema,
 } from "../src/gen/codefoundry/v1/gh_pb";
-import type { RepoEventSchema, WorktreeDetailSchema } from "../src/gen/codefoundry/v1/repo_pb";
+import type { ProjectEventSchema, WorktreeDetailSchema } from "../src/gen/codefoundry/v1/project_pb";
 import type { UiIntentSchema } from "../src/gen/codefoundry/v1/ui_pb";
 import { PrDetailWorld } from "./prDetail";
 
@@ -72,7 +72,7 @@ interface ActivityInit {
 }
 type DetailInit = MessageInitShape<typeof WorktreeDetailSchema>;
 type GhEventInit = MessageInitShape<typeof GhEventSchema>;
-type RepoEventInit = MessageInitShape<typeof RepoEventSchema>;
+type RepoEventInit = MessageInitShape<typeof ProjectEventSchema>;
 type IntentInit = MessageInitShape<typeof UiIntentSchema>;
 type FileInit = { path: string; status: string; added?: number; deleted?: number; binary?: boolean; uncommitted?: boolean; isDir?: boolean; oldPath?: string };
 
@@ -348,7 +348,7 @@ export class GhWorld {
     const rest = (d.files ?? []).filter((f) => f.status !== "U");
     d.files = [...names.map((p) => ({ path: p, status: "U", added: 0, deleted: 0, binary: false, uncommitted: true, isDir: false, oldPath: "" })), ...rest];
     d.computedAt = timestampFromDate(new Date());
-    this.publishRepo({ event: { case: "worktreeDetailUpdated", value: { repoId: d.repoId, path, computedAt: d.computedAt } } });
+    this.publishRepo({ event: { case: "worktreeDetailUpdated", value: { projectId: d.projectId, path, computedAt: d.computedAt } } });
   }
 
   /** A pull request any dashboard list or watched branch holds. */
@@ -360,7 +360,7 @@ export class GhWorld {
 
   private detail(path: string, baseRef: string, files: FileInit[], log: [string, string, number][]): DetailInit {
     return {
-      repoId: path.startsWith(GP) ? "repo-gp" : "repo-cf",
+      projectId: path.startsWith(GP) ? "repo-gp" : "repo-cf",
       path,
       baseRef,
       mergeBase: "3c3c4651aa",
@@ -405,9 +405,9 @@ export class GhWorld {
     return { pullRequests: prs, fetchedAt: this.at(30_000), lastError: "" };
   }
 
-  getWorktreeDetail(repoId: string, path: string): DetailInit | null {
+  getWorktreeDetail(projectId: string, path: string): DetailInit | null {
     this.count("GetWorktreeDetail");
-    return this.details.get(path) ?? (path.startsWith(HOME) ? { repoId, path, baseRef: "", files: [], log: [], computedAt: timestampFromDate(new Date()) } : null);
+    return this.details.get(path) ?? (path.startsWith(HOME) ? { projectId, path, baseRef: "", files: [], log: [], computedAt: timestampFromDate(new Date()) } : null);
   }
 
   // ---- controls (POST /__mock/gh/...) -------------------------------------------------
@@ -446,7 +446,7 @@ export class GhWorld {
     if (!d) return false;
     d.files = [...(d.files ?? []), { path: "later.txt", status: "?", added: 1, deleted: 0, binary: false, uncommitted: true, isDir: false, oldPath: "" }];
     d.computedAt = timestampFromDate(new Date());
-    this.publishRepo({ event: { case: "worktreeDetailUpdated", value: { repoId: d.repoId, path, computedAt: d.computedAt } } });
+    this.publishRepo({ event: { case: "worktreeDetailUpdated", value: { projectId: d.projectId, path, computedAt: d.computedAt } } });
     return true;
   }
 }

@@ -1,5 +1,5 @@
 /**
- * RepoService.Create, ListPublishOwners, Publish and Delete, and the repo.create,
+ * ProjectService.Create, ListPublishOwners, Publish and Delete, and the repo.create,
  * repo.github.publish and repo.delete commands (the Add Project dialog's New tab and the
  * publish dialog).
  *
@@ -15,7 +15,7 @@
 import { Code, ConnectError } from "@connectrpc/connect";
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
-import { PublishOwnerKind, RepositoryVisibility, type PublishOwnerSchema } from "../src/gen/codefoundry/v1/repo_pb";
+import { PublishOwnerKind, RepositoryVisibility, type PublishOwnerSchema } from "../src/gen/codefoundry/v1/project_pb";
 import { projectNameError } from "../src/lib/publish";
 import { PROJECTS } from "./clone";
 import type { InvokeOut } from "./gitops";
@@ -55,18 +55,18 @@ export function listPublishOwners(): { owners: PublishOwnerInit[]; stale: boolea
   return { owners: publishOwners, stale: false };
 }
 
-/** RepoService.Delete and repo.delete. */
-export function deleteProject(world: ProjectWorld, repoId: string): void {
-  projectCalls.push(`delete ${repoId}`);
-  const repo = world.repoInfo(repoId);
-  if (!repo) throw new ConnectError(`project not found: "${repoId}"`, Code.NotFound);
+/** ProjectService.Delete and repo.delete. */
+export function deleteProject(world: ProjectWorld, projectId: string): void {
+  projectCalls.push(`delete ${projectId}`);
+  const repo = world.repoInfo(projectId);
+  if (!repo) throw new ConnectError(`project not found: "${projectId}"`, Code.NotFound);
   if (repo.path.slice(0, repo.path.lastIndexOf("/")) !== PROJECTS) {
     throw new ConnectError(`failed precondition: ${repo.path} is not in the projects directory ${PROJECTS}`, Code.FailedPrecondition);
   }
-  world.removeRepo(repoId);
+  world.removeRepo(projectId);
 }
 
-/** RepoService.Create and repo.create. */
+/** ProjectService.Create and repo.create. */
 export function createProject(world: ProjectWorld, name: string): { id: string; name: string; path: string } {
   projectCalls.push(`create ${name}`);
   const why = projectNameError(name);
@@ -92,13 +92,13 @@ export function visibilityFlag(v: RepositoryVisibility): string {
   }
 }
 
-/** RepoService.Publish and repo.github.publish. */
-export async function publishProject(world: ProjectWorld, repoId: string, owner: string, name: string, visibility: string): Promise<{ name: string; slug: string }> {
-  const repo = world.repoInfo(repoId);
-  if (!repo) throw new ConnectError(`project not found: "${repoId}"`, Code.NotFound);
+/** ProjectService.Publish and repo.github.publish. */
+export async function publishProject(world: ProjectWorld, projectId: string, owner: string, name: string, visibility: string): Promise<{ name: string; slug: string }> {
+  const repo = world.repoInfo(projectId);
+  if (!repo) throw new ConnectError(`project not found: "${projectId}"`, Code.NotFound);
   const ghName = name || repo.name;
   const vis = visibilityNames[visibility.toLowerCase()];
-  projectCalls.push(`publish ${repoId} ${owner}/${ghName} ${visibility}`);
+  projectCalls.push(`publish ${projectId} ${owner}/${ghName} ${visibility}`);
   if (!vis) throw new ConnectError(`invalid argument: visibility "${visibility}" (want public, internal or private)`, Code.InvalidArgument);
   if (!owner) throw new ConnectError("invalid argument: a GitHub owner is required", Code.InvalidArgument);
   if (!repo.git) throw new ConnectError(`failed precondition: ${repo.name} is not a git repository; initialize git first`, Code.FailedPrecondition);
@@ -107,7 +107,7 @@ export async function publishProject(world: ProjectWorld, repoId: string, owner:
   if (owner === "octo-org" && vis === "private") throw new ConnectError(GH_PRIVATE_REFUSED, Code.Unknown);
   if (ghName.toLowerCase() === "taken") throw new ConnectError(GH_NAME_TAKEN, Code.Unknown);
   const slug = `${owner}/${ghName}`;
-  world.setOrigin(repoId, slug);
+  world.setOrigin(projectId, slug);
   return { name: repo.name, slug };
 }
 
@@ -139,7 +139,7 @@ export function projectCommands(world: ProjectWorld): CommandEntry[] {
   return [
     {
       cmd: {
-        name: "repo.create",
+        name: "project.create",
         title: "New Project",
         category: "Project",
         description:
@@ -155,22 +155,22 @@ export function projectCommands(world: ProjectWorld): CommandEntry[] {
     },
     {
       cmd: {
-        name: "repo.github.publish",
+        name: "project.github.publish",
         title: "Publish to GitHub",
         category: "Project",
         description:
           "Create a GitHub repository for a git project without an origin remote and push it, with `gh repo create <owner>/<name> --source <project> --remote origin --push`. Organizations may refuse some visibilities; gh's error is shown as is.",
         keybindings: [],
         args: [
-          { name: "repo", type: ArgType.STRING, required: true, description: "Repository id" },
+          { name: "project", type: ArgType.STRING, required: true, description: "Project id" },
           { name: "owner", type: ArgType.STRING, required: true, description: "GitHub user or organization" },
           { name: "name", type: ArgType.STRING, required: false, description: "Repository name on GitHub (default: the project's name)" },
           { name: "visibility", type: ArgType.ENUM, required: true, description: "Repository visibility", enumValues: ["public", "internal", "private"] },
         ],
       },
-      when: (ctx) => publishable(ctx?.activeRepoId ?? ""),
+      when: (ctx) => publishable(ctx?.activeProjectId ?? ""),
       run: async (ctx, args) => {
-        const id = args.repo || ctx?.activeRepoId || "";
+        const id = args.project || ctx?.activeProjectId || "";
         const vis = args.visibility ?? "";
         const r = await publishProject(world, id, args.owner ?? "", args.name ?? "", vis);
         return { message: `published ${r.name} to https://github.com/${r.slug} (${vis})`, resultJson: JSON.stringify({ id, name: r.name, githubSlug: r.slug, remotes: ["origin"], git: true }) };
@@ -178,18 +178,18 @@ export function projectCommands(world: ProjectWorld): CommandEntry[] {
     },
     {
       cmd: {
-        name: "repo.delete",
+        name: "project.delete",
         title: "Delete Project",
         category: "Project",
         description:
           "Stop tracking a project made by New Project and delete its folder in ~/.code-foundry/projects. Only projects there can be deleted; a repository on GitHub is not touched.",
         keybindings: [],
-        args: [{ name: "repo", type: ArgType.STRING, required: true, description: "Repository id" }],
-        confirm: (ctx, args) => `Delete project ${args.repo || ctx?.activeRepoId || ""} and its folder on disk? This cannot be undone.`,
+        args: [{ name: "project", type: ArgType.STRING, required: true, description: "Project id" }],
+        confirm: (ctx, args) => `Delete project ${args.project || ctx?.activeProjectId || ""} and its folder on disk? This cannot be undone.`,
       },
-      when: (ctx) => deletable(ctx?.activeRepoId ?? ""),
+      when: (ctx) => deletable(ctx?.activeProjectId ?? ""),
       run: (ctx, args) => {
-        const id = args.repo || ctx?.activeRepoId || "";
+        const id = args.project || ctx?.activeProjectId || "";
         deleteProject(world, id);
         return Promise.resolve({ message: `deleted ${id}`, resultJson: "" });
       },

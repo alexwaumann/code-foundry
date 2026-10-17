@@ -27,7 +27,7 @@ export const PATH = "/Users/dev/.code-foundry/settings.toml";
 export const groups: GroupInit[] = [
   { id: "threads", title: "Threads", description: "Defaults for new threads." },
   { id: "github", title: "GitHub", description: "Your pull requests and default-branch checks, polled with gh's login." },
-  { id: "repos", title: "Repositories", description: "Git fetching and where new worktrees go." },
+  { id: "projects", title: "Projects", description: "Git fetching and where new worktrees go." },
   { id: "gitops", title: "Git operations", description: "How worktrees are handed to other apps." },
   { id: "appearance", title: "Appearance", description: "Scheme, themes, terminal font, density, and backdrop. Applied live in every window." },
   { id: "notifications", title: "Notifications", description: "Dock badge and alerts for threads that need you. macOS banners aren't available to an app without a bundle." },
@@ -84,7 +84,7 @@ export const staticPages: PageInit[] = [
     title: "Source control",
     sections: [
       { id: "github", title: "GitHub", description: "Your pull requests and default-branch checks, polled with gh's login." },
-      { id: "repos", title: "Repositories", description: "Fetching, where new worktrees go, and how they open." },
+      { id: "projects", title: "Projects", description: "Fetching, where new worktrees go, and how they open." },
     ],
   },
   { id: "keybindings", title: "Keybindings", description: "Override a command's chord, or unbind it. Reserved app chords (cmd+k, cmd+b, cmd+1..9, ...) can't be bound." },
@@ -103,7 +103,7 @@ export const NO_KEYBINDING = new Set([
   "action.list", "action.runs", "action.wait", "app.version", "daemon.status", "daemon.version",
   "settings.get", "settings.path", "settings.reset", "settings.set", "terminal.list", "theme.list",
   "thread.agents", "thread.commands", "thread.focus", "thread.items", "thread.list", "thread.mcp", "thread.respond",
-  "ui.focus.repo", "ui.focus.terminal", "ui.notify", "ui.palette.open", "usage.show", "view.open.url",
+  "ui.focus.project", "ui.focus.terminal", "ui.notify", "ui.palette.open", "usage.show", "view.open.url",
   "workspace.list", "workspace.members",
 ]);
 
@@ -188,9 +188,9 @@ const staticFields: FieldInit[] = [
   { key: "notifications.cooldown_seconds", group: "notifications", page: "notifications", section: "alerts", unit: "s", type: S.INT, title: "Alert cooldown", description: "Minimum gap between alerts (bounce and sound); the badge still updates. 0 alerts every time.", defaultValue: "60", min: 0n, max: 3600n },
   { key: "github.dashboards_enabled", group: "github", page: "source", section: "github", type: S.BOOL, title: "Pull request dashboards", description: "Poll your pull requests (authored, awaiting your review, reviewed, recently merged) for the Pull Requests page. Off leaves only default-branch CI and watched branches.", defaultValue: "true" },
   { key: "github.poll_interval_seconds", group: "github", page: "source", section: "github", unit: "s", type: S.INT, title: "Poll interval", description: "How often one request checks your pull requests, watched branches and tracked default branches for changes while the app's window is visible. Details are fetched only for what changed. With the window hidden it checks every 5 minutes, with the app closed every 15 (or at this interval, if longer).", defaultValue: "60", min: 15n, max: 3600n },
-  { key: "repos.fetch_interval_seconds", group: "repos", page: "source", section: "repos", unit: "s", type: S.INT, title: "Fetch interval", description: "How often each repository runs git fetch --prune. 0 turns background fetching off.", defaultValue: "120", min: 0n, max: 86400n, restartRequired: true },
-  { key: "repos.worktree_dir", group: "repos", page: "source", section: "repos", type: S.PATH, title: "Worktree directory", description: "Where New Worktree puts worktrees; {repo} is the repository's name. Empty uses ~/.code-foundry/worktrees/<owner>/<repo>.", defaultValue: "", placeholder: "~/worktrees/{repo}" },
-  { key: "gitops.editor_command", group: "gitops", page: "source", section: "repos", type: S.STRING, title: "Editor command", description: "Opens a worktree (Open in Editor), e.g. \"code\" or \"open -a Zed\"; {path} is the worktree path, else the path is appended. Empty detects an editor.", defaultValue: "", placeholder: "auto-detect" },
+  { key: "projects.fetch_interval_seconds", group: "projects", page: "source", section: "projects", unit: "s", type: S.INT, title: "Fetch interval", description: "How often each project runs git fetch --prune. 0 turns background fetching off.", defaultValue: "120", min: 0n, max: 86400n, restartRequired: true },
+  { key: "projects.worktree_dir", group: "projects", page: "source", section: "projects", type: S.PATH, title: "Worktree directory", description: "Where New Worktree puts worktrees; {project} is the project's name. Empty uses ~/.code-foundry/worktrees/<owner>/<repo>.", defaultValue: "", placeholder: "~/worktrees/{project}" },
+  { key: "gitops.editor_command", group: "gitops", page: "source", section: "projects", type: S.STRING, title: "Editor command", description: "Opens a worktree (Open in Editor), e.g. \"code\" or \"open -a Zed\"; {path} is the worktree path, else the path is appended. Empty detects an editor.", defaultValue: "", placeholder: "auto-detect" },
   { key: "advanced.claude_path", group: "advanced", page: "advanced", section: "executables", type: S.PATH, title: "claude executable", description: "Absolute path to claude. Empty finds it on PATH.", defaultValue: "", placeholder: "claude (from PATH)", restartRequired: true },
   { key: "advanced.gh_path", group: "advanced", page: "advanced", section: "executables", type: S.PATH, title: "gh executable", description: "Absolute path to gh. Empty finds it on PATH or in Homebrew's locations.", defaultValue: "", placeholder: "gh (from PATH)", restartRequired: true },
   { key: "advanced.log_level", group: "advanced", page: "advanced", section: "logging", type: S.ENUM, title: "Log level", description: "Minimum level written to the daemon's log file (logs/daemon.log).", enumValues: ["debug", "info", "warn", "error"], enumLabels: ["Debug", "Info", "Warn", "Error"], defaultValue: "info" },
