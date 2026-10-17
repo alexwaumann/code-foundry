@@ -3,6 +3,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { ArrowDown } from "lucide-react";
 import { buildRows, buildTurns, decodeTimelineKey, type TimelineRow } from "@/lib/threadTimeline";
 import { useTimelineKeys, useTurnFolds } from "@/stores/thread";
+import { KeepRowContext } from "./context";
 import { TimelineRowView } from "./rows";
 
 /** Within this many px of the bottom the list follows new content. */
@@ -21,10 +22,8 @@ function estimate(r: TimelineRow | undefined): number {
       return 64;
     case "text":
       return 64;
-    case "footer":
-      return 58;
-    case "working":
-      return 58;
+    case "header":
+      return 28;
     case "system":
       return 46;
     default:
@@ -48,7 +47,8 @@ function useRows(threadId: string, working: boolean): TimelineRow[] {
  * scroll away from the bottom right after their wheel, touch, scroll key or a drag of the
  * scrollbar. Scrolls nobody asked for (the virtualizer keeping rows in place while it
  * measures the ones above, the browser clamping a shrinking list) never do, or the list
- * would stop short of the last rows (a finished turn's footer under the composer).
+ * would stop short of the last rows (a finished turn's answer under the composer). A turn's
+ * header keeps its place on screen when the user folds or unfolds the turn with it.
  * `bottomInset` is the floating composer's height: the last row scrolls clear of it.
  * Away from the bottom, a "Jump to bottom" chip floats above the composer; it scrolls
  * down and pins the list again.
@@ -108,19 +108,45 @@ export function Timeline({ threadId, working, bottomInset }: { threadId: string;
     anchor.current = el && vi ? { index: vi.index, offset: vi.start - el.scrollTop, rows } : null;
   }, [v, rows]);
 
-  // Rows change (a turn folds when it ends, the user folds one, rows arrive): pinned, the
-  // list follows the bottom. Scrolled up, the anchor row keeps its place; when it folded
-  // away (the user was reading the turn's work as it ended) the next row that is still
-  // there (its final text or footer) takes that place, so the viewport never jumps to an
+  // A header the user clicks (to fold or unfold its turn) and where it was on screen: the
+  // next change of rows puts it back there, pinned or not (KeepRowContext).
+  const kept = useRef<{ key: string; offset: number } | null>(null);
+  const keepRow = useCallback(
+    (key: string) => {
+      const el = scrollRef.current;
+      const m = v.measurementsCache.find((x) => x.key === key);
+      kept.current = el && m ? { key, offset: m.start - el.scrollTop } : null;
+    },
+    [v],
+  );
+
+  // Rows change (a turn folds when it ends, the user folds one, rows arrive). A header the
+  // user just clicked stays where it was on screen: its turn's work opens or closes below
+  // it, so the rows above it, and its start, do not move; the list unpins unless the fold
+  // left too little below to keep the place (then it sits at the bottom). Otherwise, pinned,
+  // the list follows the bottom. Scrolled up, the anchor row keeps its place; when it
+  // folded away (the user was reading the turn's work as it ended) the nearest row before
+  // it that is still there (the turn's header, or a steer or note under it) takes that
+  // place: the work folded up under the header, so the viewport never jumps to an
   // unrelated part of the conversation. When that place is past the new bottom, the list
   // pins again.
   useLayoutEffect(() => {
     const el = scrollRef.current;
     const a = anchor.current;
-    if (!pinned.current && el && a && a.rows !== rows) {
+    const k = kept.current;
+    kept.current = null;
+    const held = k && el ? v.measurementsCache.find((x) => x.key === k.key) : undefined;
+    if (k && el && held) {
+      const top = held.start - k.offset;
+      const max = el.scrollHeight - el.clientHeight;
+      pinned.current = top >= max;
+      el.scrollTop = Math.min(top, max);
+      setAtBottom(max - el.scrollTop < PIN_SLACK);
+    } else if (!pinned.current && el && a && a.rows !== rows) {
       const index = new Map(rows.map((r, i) => [r.key, i]));
-      let at: number | undefined;
-      for (let i = a.index; at === undefined && i < a.rows.length; i++) at = index.get(a.rows[i]?.key ?? "");
+      let at = index.get(a.rows[a.index]?.key ?? "");
+      for (let i = a.index - 1; at === undefined && i >= 0; i--) at = index.get(a.rows[i]?.key ?? "");
+      for (let i = a.index + 1; at === undefined && i < a.rows.length; i++) at = index.get(a.rows[i]?.key ?? "");
       const start = at === undefined ? undefined : v.measurementsCache[at]?.start;
       if (start !== undefined) {
         // The anchor row itself keeps its offset; a row that takes its place starts at the
@@ -129,8 +155,7 @@ export function Timeline({ threadId, working, bottomInset }: { threadId: string;
         const own = rows[at ?? -1]?.key === a.rows[a.index]?.key;
         const top = start - (own ? a.offset : Math.max(a.offset, 0));
         // Past the new bottom (the fold left too little below to keep the place): pin, so
-        // the footer the turn just got ends up in view rather than wherever the clamp
-        // leaves it.
+        // the turn's answer ends up in view rather than wherever the clamp leaves it.
         if (top > el.scrollHeight - el.clientHeight) pinned.current = true;
         else el.scrollTop = top;
       }
@@ -140,7 +165,7 @@ export function Timeline({ threadId, working, bottomInset }: { threadId: string;
   }, [rows, bottomInset, toBottom, v, captureAnchor]);
 
   return (
-    <>
+    <KeepRowContext.Provider value={keepRow}>
       <div
         ref={scrollRef}
         className="min-h-0 flex-1 overflow-y-auto"
@@ -175,11 +200,15 @@ export function Timeline({ threadId, working, bottomInset }: { threadId: string;
           {v.getVirtualItems().map((vi) => {
             const row = rows[vi.index];
             if (!row) return null;
+            // The last row of a turn before the next one gets the space between turns.
+            const next = rows[vi.index + 1];
+            const turnEnd = row.type !== "user" && row.type !== "system" && (next?.type === "user" || next?.type === "system");
             return (
               <div
                 key={vi.key}
                 data-index={vi.index}
                 data-row-type={row.type}
+                data-turn-end={turnEnd || undefined}
                 ref={v.measureElement}
                 style={{ position: "absolute", top: 0, left: 40, right: 40, transform: `translateY(${String(vi.start)}px)` }}
               >
@@ -209,6 +238,6 @@ export function Timeline({ threadId, working, bottomInset }: { threadId: string;
         <ArrowDown aria-hidden />
         Jump to bottom
       </button>
-    </>
+    </KeepRowContext.Provider>
   );
 }

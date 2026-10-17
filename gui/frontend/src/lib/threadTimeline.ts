@@ -3,7 +3,7 @@
  * functions over a structural view of the items (no text), so text deltas never rebuild
  * it. The design is the sketch's variant A (docs/sketches/rendered-thread):
  *
- * - a turn is a user message and what follows it up to its turn_end footer; a message the
+ * - a turn is a user message and what follows it up to its turn_end; a message the
  *   user sends while the turn runs (a steer: Claude picks it up mid-turn, and the turn ends
  *   with one turn_end) stays inside it as a steer row, which never folds;
  * - consecutive reads and searches fold into one group row ("Read 3 files, searched code
@@ -11,9 +11,12 @@
  * - a subagent's items (parent_tool_use_id) nest under its Agent tool row;
  * - AskUserQuestion's tool call is hidden (the question item stands for it), and a
  *   permission request annotates its tool call (pending: "waiting for you");
- * - every finished turn ends with a footer (duration, steps, its cost, model) that folds it;
- *   every finished turn, the latest included, folds by default: only the user message, the
- *   final assistant text (the trailing text of the turn), notes and the footer show;
+ * - every finished turn has a header under its user message, at the top of its work
+ *   (duration, steps, its cost, model) that folds it; every finished turn, the latest
+ *   included, folds by default: only the user message, the header, the final assistant text
+ *   (the trailing text of the turn), notes and steers show. The running turn has the same
+ *   header in its live form ("Working · 3 steps · 1m 12s"), under the same row key, so it
+ *   turns into the finished one in place (docs/notes/thread-fold-3-header.md);
  * - a system note (the daemon's, e.g. a fork's "Forked from …" where the copied history
  *   ends) stands alone between turns: it closes the turn before it and never folds.
  */
@@ -45,7 +48,12 @@ export type WorkNode =
   | { type: "tool"; key: string; id: string; name: string; permissionId: string; children: WorkNode[] }
   | { type: "group"; key: string; ids: string[]; names: string[] }
   | { type: "thinking"; key: string; ids: string[] }
-  | { type: "text"; key: string; id: string; final: boolean }
+  /**
+   * Claude's text. `answer` is set on the first final text row of a finished turn: the
+   * turn's final text ids joined by "\n" (what its copy action copies; a string, so a
+   * memoized row stays equal across rebuilds); "" otherwise.
+   */
+  | { type: "text"; key: string; id: string; final: boolean; answer: string }
   | { type: "question"; key: string; id: string }
   | { type: "permission"; key: string; id: string }
   | { type: "note"; key: string; id: string; kind: "error" | "compaction" | "commandOutput" }
@@ -59,19 +67,26 @@ export type TimelineRow =
   | { type: "user"; key: string; id: string }
   | WorkNode
   | {
-      type: "footer";
+      /**
+       * A turn's header, under its user message(s) and above its work. Finished: "Worked
+       * for 4m 08s · 12 steps · $1.12 · Opus", the turn's fold toggle. Live (no turn_end
+       * yet, the thread works): "Working · 3 steps · 1m 12s", always open. Its key is
+       * `h:<turn key>` in both forms, so the live row becomes the finished one in place.
+       */
+      type: "header";
       key: string;
-      /** The turn_end item. */
+      /** The turn_end item; "" for the live header. */
       id: string;
-      /** The turn the footer folds (TimelineTurn.key). */
+      /** The turn the header folds (TimelineTurn.key); "" for a live header with no turn yet. */
       turn: string;
       folded: boolean;
       /** The turn's work rows (what the fold hides; a group or Agent row counts as one). */
       steps: number;
-      /** The turn's final text items (what its copy button copies). */
+      /** The turn's final text items. */
       finals: string[];
-    }
-  | { type: "working"; key: string; /** The turn's user message, for the elapsed time; "" when none. */ since: string };
+      /** Live: the item the elapsed time counts from (the turn's last opening message, else its first item); "" when none. */
+      since: string;
+    };
 
 /** A turn: from a user message (or the thread's start) to its turn_end, inclusive. */
 export interface TimelineTurn {
@@ -138,7 +153,7 @@ export function workNodes(list: readonly TimelineItem[], children: ReadonlyMap<s
         break;
       }
       case "text":
-        out.push({ type: "text", key: it.id, id: it.id, final: false });
+        out.push({ type: "text", key: it.id, id: it.id, final: false, answer: "" });
         break;
       case "question":
         out.push({ type: "question", key: it.id, id: it.id });
@@ -166,13 +181,23 @@ export function workNodes(list: readonly TimelineItem[], children: ReadonlyMap<s
   return out;
 }
 
-/** Marks the trailing text rows of a turn's body as final (thinking may sit between them). */
-function markFinal(body: WorkNode[]): void {
+/**
+ * Marks the trailing text rows of a turn's body as final (thinking may sit between them);
+ * in a finished turn they carry the answer their copy action copies.
+ */
+function markFinal(body: WorkNode[], ended: boolean): void {
+  let from = body.length;
   for (let i = body.length - 1; i >= 0; i--) {
     const n = body[i];
-    if (!n) break;
-    if (n.type === "text") body[i] = { ...n, final: true };
-    else if (n.type !== "thinking") break;
+    if (n?.type === "text") from = i;
+    else if (n?.type !== "thinking") break;
+  }
+  const ids = body.slice(from).flatMap((n) => (n.type === "text" ? [n.id] : []));
+  const answer = ended ? ids.join("\n") : "";
+  for (let i = from; i < body.length; i++) {
+    const n = body[i];
+    // The copy action sits at the top right of the answer: on its first row.
+    if (n?.type === "text") body[i] = { ...n, final: true, answer: i === from ? answer : "" };
   }
 }
 
@@ -203,7 +228,7 @@ export function buildTurns(items: readonly TimelineItem[]): TimelineTurn[] {
   const close = () => {
     if (!cur) return;
     const body = workNodes(cur.items, children, permissions);
-    markFinal(body);
+    markFinal(body, cur.end !== "");
     turns.push({ key: cur.key, user: cur.user, body, end: cur.end });
     cur = null;
   };
@@ -252,33 +277,42 @@ function stepCount(body: readonly WorkNode[]): number {
 export interface TimelineOptions {
   /** The user's fold choice for a turn, by its key; undefined: the default. */
   fold: (turnKey: string) => boolean | undefined;
-  /** The thread works (busy or starting) and no request waits: a "Working" row ends the list. */
+  /** The thread works (busy or starting) and no request waits: the open turn shows its live ("Working") header. */
   working: boolean;
 }
 
 /**
  * The default fold of a turn: every finished turn folds, the latest one included, the
  * moment it ends (whatever the user scrolled to or expanded meanwhile); a running turn is
- * open. The user's choice on the footer (stores/thread.ts setTurnFolded) wins over it.
+ * open. The user's choice on the header (stores/thread.ts setTurnFolded) wins over it.
  */
 export function defaultFolded(turn: TimelineTurn): boolean {
   return turn.end !== "";
 }
 
-/** The rows to lay out, top to bottom. */
+/** A system note's turn of its own (buildTurns): no user message, no turn_end, no header. */
+function isNoteTurn(t: TimelineTurn): boolean {
+  return t.user.length === 0 && t.end === "" && t.body.length === 1 && t.body[0]?.type === "system";
+}
+
+/** The rows to lay out, top to bottom: per turn its user message(s), its header, its work (minus what the fold hides). */
 export function buildRows(turns: readonly TimelineTurn[], opts: TimelineOptions): TimelineRow[] {
   const rows: TimelineRow[] = [];
+  const last = turns[turns.length - 1];
+  // The open turn while the thread works; none when the last turn ended (nothing runs
+  // after a turn_end) or is a system note (Claude starts a turn that has no item yet).
+  const live = opts.working && last && last.end === "" && !isNoteTurn(last) ? last : undefined;
   turns.forEach((t) => {
     const folded = t.end !== "" && (opts.fold(t.key) ?? defaultFolded(t));
     for (const u of t.user) rows.push({ type: "user", key: u, id: u });
-    for (const n of t.body) if (!folded || !foldsAway(n)) rows.push(n);
-    const finals = t.body.flatMap((n) => (n.type === "text" && n.final ? [n.id] : []));
-    if (t.end) {
-      rows.push({ type: "footer", key: `f:${t.end}`, id: t.end, turn: t.key, folded, steps: stepCount(t.body), finals });
+    if (t.end || t === live) {
+      const finals = t.body.flatMap((n) => (n.type === "text" && n.final ? [n.id] : []));
+      rows.push({ type: "header", key: `h:${t.key}`, id: t.end, turn: t.key, folded, steps: stepCount(t.body), finals, since: t.user[t.user.length - 1] ?? t.key });
     }
+    for (const n of t.body) if (!folded || !foldsAway(n)) rows.push(n);
   });
-  const last = turns[turns.length - 1];
-  if (opts.working && (!last || last.end === "")) rows.push({ type: "working", key: "working", since: last?.user[last.user.length - 1] ?? "" });
+  // Working with no turn to head (an empty thread starting, a fork's note): a live header alone.
+  if (opts.working && (!last || isNoteTurn(last))) rows.push({ type: "header", key: "h:", id: "", turn: "", folded: false, steps: 0, finals: [], since: "" });
   return rows;
 }
 
@@ -317,7 +351,7 @@ export function decodeTimelineKey(k: string): TimelineItem {
   };
 }
 
-/** A turn's cost in its footer: "$1.12", "<$0.01" under a cent, "" when nothing or not known (null). */
+/** A turn's cost in its header: "$1.12", "<$0.01" under a cent, "" when nothing or not known (null). */
 export function turnCostLabel(usd: number | null): string {
   if (usd === null || !(usd > 0)) return "";
   return usd >= 0.005 ? `$${usd.toFixed(2)}` : "<$0.01";

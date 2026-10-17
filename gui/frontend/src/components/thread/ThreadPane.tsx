@@ -4,6 +4,7 @@ import { Backdrop } from "@/components/backdrop/Backdrop";
 import { ThreadTitle } from "@/components/thread/ThreadParts";
 import { DragBand } from "@/components/window/DragBand";
 import { PaneHeader } from "@/components/window/PaneHeader";
+import { useLinger } from "@/lib/linger";
 import { useThreadsStore } from "@/stores/threads";
 import { startThreadWatch, useOpenRequests, useThreadEmpty, useThreadLoaded, useThreadPending, useThreadStore } from "@/stores/thread";
 import { AgentsStrip } from "./AgentsStrip";
@@ -82,6 +83,10 @@ function ThreadBody({ threadId }: { threadId: string }) {
   const busy = running && (status === "busy" || waiting);
   // Working: busy, or Claude starting for a message just sent, which looks the same.
   const working = running && (status === "busy" || state === "starting") && open.length === 0;
+  // The timeline's live turn header outlasts a stop by a moment (not a docked request):
+  // the status can turn idle before the turn_end arrives on the Watch, and the header then
+  // turns into the finished one in place instead of vanishing and coming back.
+  const timelineWorking = useLinger(working, open.length === 0 ? 2000 : 0);
   const dockRef = useRef<HTMLDivElement>(null);
   const dockHeight = useHeight(dockRef);
   const ctx = useMemo(() => ({ threadId, cwd }), [threadId, cwd]);
@@ -112,7 +117,7 @@ function ThreadBody({ threadId }: { threadId: string }) {
               No messages yet.
             </p>
           )}
-          <Timeline key={threadId} threadId={threadId} working={working} bottomInset={dockHeight} />
+          <Timeline key={threadId} threadId={threadId} working={timelineWorking} bottomInset={dockHeight} />
           <div className="dock" ref={dockRef}>
             <AgentsStrip threadId={threadId} />
             <ThreadComposer key={threadId} threadId={threadId} pending={open} busy={busy} />
