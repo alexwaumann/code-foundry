@@ -95,7 +95,7 @@ type GhServiceClient interface {
 	// its error); an empty repo_slug only marks the poll due and returns without waiting.
 	Refresh(context.Context, *connect.Request[v1.RefreshGhRequest]) (*connect.Response[v1.RefreshGhResponse], error)
 	// Track adds a repository to the poll (its default branch CI; the dashboards count
-	// its pull requests as tracked). RepoService's repositories with a GitHub remote are
+	// its pull requests as tracked). The GitHub repositories of registered projects are
 	// tracked automatically; this is exposed for the CLI and debugging.
 	Track(context.Context, *connect.Request[v1.TrackGhRepoRequest]) (*connect.Response[v1.TrackGhRepoResponse], error)
 	// Untrack removes a repository from the poll. Its cache is kept.
@@ -395,7 +395,7 @@ type GhServiceHandler interface {
 	// its error); an empty repo_slug only marks the poll due and returns without waiting.
 	Refresh(context.Context, *connect.Request[v1.RefreshGhRequest]) (*connect.Response[v1.RefreshGhResponse], error)
 	// Track adds a repository to the poll (its default branch CI; the dashboards count
-	// its pull requests as tracked). RepoService's repositories with a GitHub remote are
+	// its pull requests as tracked). The GitHub repositories of registered projects are
 	// tracked automatically; this is exposed for the CLI and debugging.
 	Track(context.Context, *connect.Request[v1.TrackGhRepoRequest]) (*connect.Response[v1.TrackGhRepoResponse], error)
 	// Untrack removes a repository from the poll. Its cache is kept.

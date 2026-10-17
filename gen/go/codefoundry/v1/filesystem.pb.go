@@ -258,7 +258,7 @@ func (x *ListDirectoriesResponse) GetTruncated() bool {
 type SkillSource struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The registered project.
-	RepoId string `protobuf:"bytes,1,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
+	ProjectId string `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
 	// Absolute path of the checkout to read (a worktree of the project). Empty: the
 	// project's main worktree.
 	Path          string `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
@@ -296,9 +296,9 @@ func (*SkillSource) Descriptor() ([]byte, []int) {
 	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *SkillSource) GetRepoId() string {
+func (x *SkillSource) GetProjectId() string {
 	if x != nil {
-		return x.RepoId
+		return x.ProjectId
 	}
 	return ""
 }
@@ -372,7 +372,7 @@ type Skill struct {
 	Description string     `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
 	Scope       SkillScope `protobuf:"varint,3,opt,name=scope,proto3,enum=codefoundry.v1.SkillScope" json:"scope,omitempty"`
 	// The project, for SKILL_SCOPE_PROJECT.
-	RepoId string `protobuf:"bytes,4,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
+	ProjectId string `protobuf:"bytes,4,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
 	// Absolute path of the SKILL.md or command .md file.
 	Path          string `protobuf:"bytes,5,opt,name=path,proto3" json:"path,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -430,9 +430,9 @@ func (x *Skill) GetScope() SkillScope {
 	return SkillScope_SKILL_SCOPE_UNSPECIFIED
 }
 
-func (x *Skill) GetRepoId() string {
+func (x *Skill) GetProjectId() string {
 	if x != nil {
-		return x.RepoId
+		return x.ProjectId
 	}
 	return ""
 }
@@ -491,7 +491,7 @@ func (x *ListSkillsResponse) GetSkills() []*Skill {
 type SearchFilesRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The registered project.
-	RepoId string `protobuf:"bytes,1,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
+	ProjectId string `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
 	// Absolute path of the checkout to search (a worktree of the project). Empty: the
 	// project's main worktree.
 	Path string `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
@@ -533,9 +533,9 @@ func (*SearchFilesRequest) Descriptor() ([]byte, []int) {
 	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *SearchFilesRequest) GetRepoId() string {
+func (x *SearchFilesRequest) GetProjectId() string {
 	if x != nil {
-		return x.RepoId
+		return x.ProjectId
 	}
 	return ""
 }
@@ -687,23 +687,26 @@ const file_codefoundry_v1_filesystem_proto_rawDesc = "" +
 	"\n" +
 	"completion\x18\x02 \x01(\tR\n" +
 	"completion\x12\x1c\n" +
-	"\ttruncated\x18\x03 \x01(\bR\ttruncated\":\n" +
-	"\vSkillSource\x12\x17\n" +
-	"\arepo_id\x18\x01 \x01(\tR\x06repoId\x12\x12\n" +
+	"\ttruncated\x18\x03 \x01(\bR\ttruncated\"@\n" +
+	"\vSkillSource\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\x01 \x01(\tR\tprojectId\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\"m\n" +
 	"\x11ListSkillsRequest\x125\n" +
 	"\asources\x18\x01 \x03(\v2\x1b.codefoundry.v1.SkillSourceR\asources\x12!\n" +
-	"\finclude_user\x18\x02 \x01(\bR\vincludeUser\"\x9c\x01\n" +
+	"\finclude_user\x18\x02 \x01(\bR\vincludeUser\"\xa2\x01\n" +
 	"\x05Skill\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x120\n" +
-	"\x05scope\x18\x03 \x01(\x0e2\x1a.codefoundry.v1.SkillScopeR\x05scope\x12\x17\n" +
-	"\arepo_id\x18\x04 \x01(\tR\x06repoId\x12\x12\n" +
+	"\x05scope\x18\x03 \x01(\x0e2\x1a.codefoundry.v1.SkillScopeR\x05scope\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\x04 \x01(\tR\tprojectId\x12\x12\n" +
 	"\x04path\x18\x05 \x01(\tR\x04path\"C\n" +
 	"\x12ListSkillsResponse\x12-\n" +
-	"\x06skills\x18\x01 \x03(\v2\x15.codefoundry.v1.SkillR\x06skills\"m\n" +
-	"\x12SearchFilesRequest\x12\x17\n" +
-	"\arepo_id\x18\x01 \x01(\tR\x06repoId\x12\x12\n" +
+	"\x06skills\x18\x01 \x03(\v2\x15.codefoundry.v1.SkillR\x06skills\"s\n" +
+	"\x12SearchFilesRequest\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\x01 \x01(\tR\tprojectId\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\x12\x14\n" +
 	"\x05query\x18\x03 \x01(\tR\x05query\x12\x14\n" +
 	"\x05limit\x18\x04 \x01(\x05R\x05limit\"6\n" +

@@ -152,7 +152,7 @@ export const ThreadItemSchema: GenMessage<ThreadItem> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_thread, 0);
 
 /**
- * What the user sent: text as sent (file tags stay "@cf-file://<repo>/<path>" tokens,
+ * What the user sent: text as sent (file tags stay "@cf-file://<project id>/<path>" tokens,
  * not the paths Claude got) and, when it came from the GUI's composer, the composer's
  * own text, from which the GUI draws the message's tags.
  *
@@ -174,7 +174,7 @@ export type UserMessageItem = Message<"codefoundry.v1.UserMessageItem"> & {
 
   /**
    * The composer's text with its tags as Markdown-link tokens (gui lib/prompt.ts):
-   * "[/name](cf-skill://<repo id or ~>/<name>)", "[base](cf-file://<repo id>/<path>)",
+   * "[/name](cf-skill://<project id or ~>/<name>)", "[base](cf-file://<project id>/<path>)",
    * and "![name](cf-attachment://<n>)" where n is the attachment's index in
    * attachments (not a number: the chip had lost its file). Empty for a message without tags or sent
    * without the composer (the CLI): text is then shown as is. Stored, never interpreted.
@@ -1494,7 +1494,7 @@ export type SendThreadMessageRequest = Message<"codefoundry.v1.SendThreadMessage
   threadId: string;
 
   /**
-   * As typed; "@cf-file://<repo id>/<path>" tags become absolute paths for Claude.
+   * As typed; "@cf-file://<project id>/<path>" tags become absolute paths for Claude.
    *
    * @generated from field: string text = 2;
    */
@@ -2414,7 +2414,7 @@ export const ThreadService: GenService<{
   /**
    * RunIn moves a workspace thread's cwd to another member worktree of its workspace.
    * A live thread gets set_cwd once it is idle (pending_worktree_path shows the queued
-   * target until then) and the row's worktree_path and repo_id change when Claude
+   * target until then) and the row's worktree_path and project_id change when Claude
    * accepts it. A disconnected thread's row
    * changes at once; the next reconnect resumes there. Refused for a project thread or
    * a target that is not a member.

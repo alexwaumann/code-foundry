@@ -76,7 +76,7 @@ type EventSource int32
 
 const (
 	EventSource_EVENT_SOURCE_UNSPECIFIED EventSource = 0
-	EventSource_EVENT_SOURCE_REPO        EventSource = 1
+	EventSource_EVENT_SOURCE_PROJECT     EventSource = 1
 	EventSource_EVENT_SOURCE_TERMINAL    EventSource = 2
 	EventSource_EVENT_SOURCE_THREAD_LIST EventSource = 3
 	EventSource_EVENT_SOURCE_GH          EventSource = 4
@@ -87,8 +87,8 @@ const (
 	// Phase 3d. Numbered 10 to stay clear of the parallel Phase 3 steps. Sent after
 	// settings, before UI intents.
 	EventSource_EVENT_SOURCE_UPDATE EventSource = 10
-	// Workspaces (branch sets). Sent right after repo, before terminal: members name
-	// repositories, and threads name workspaces.
+	// Workspaces (branch sets). Sent right after project, before terminal: members name
+	// projects, and threads name workspaces.
 	EventSource_EVENT_SOURCE_WORKSPACE EventSource = 11
 	// Rendered threads' pending requests (permission prompts and questions), for
 	// every rendered thread: a ThreadPendingSnapshot (right after the thread list), then a
@@ -104,7 +104,7 @@ const (
 var (
 	EventSource_name = map[int32]string{
 		0:  "EVENT_SOURCE_UNSPECIFIED",
-		1:  "EVENT_SOURCE_REPO",
+		1:  "EVENT_SOURCE_PROJECT",
 		2:  "EVENT_SOURCE_TERMINAL",
 		3:  "EVENT_SOURCE_THREAD_LIST",
 		4:  "EVENT_SOURCE_GH",
@@ -118,7 +118,7 @@ var (
 	}
 	EventSource_value = map[string]int32{
 		"EVENT_SOURCE_UNSPECIFIED": 0,
-		"EVENT_SOURCE_REPO":        1,
+		"EVENT_SOURCE_PROJECT":     1,
 		"EVENT_SOURCE_TERMINAL":    2,
 		"EVENT_SOURCE_THREAD_LIST": 3,
 		"EVENT_SOURCE_GH":          4,
@@ -354,7 +354,7 @@ type Event struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Event:
 	//
-	//	*Event_Repo
+	//	*Event_Project
 	//	*Event_Terminal
 	//	*Event_ThreadList
 	//	*Event_Gh
@@ -419,10 +419,10 @@ func (x *Event) GetEvent() isEvent_Event {
 	return nil
 }
 
-func (x *Event) GetRepo() *RepoEvent {
+func (x *Event) GetProject() *ProjectEvent {
 	if x != nil {
-		if x, ok := x.Event.(*Event_Repo); ok {
-			return x.Repo
+		if x, ok := x.Event.(*Event_Project); ok {
+			return x.Project
 		}
 	}
 	return nil
@@ -545,8 +545,8 @@ type isEvent_Event interface {
 	isEvent_Event()
 }
 
-type Event_Repo struct {
-	Repo *RepoEvent `protobuf:"bytes,1,opt,name=repo,proto3,oneof"`
+type Event_Project struct {
+	Project *ProjectEvent `protobuf:"bytes,1,opt,name=project,proto3,oneof"`
 }
 
 type Event_Terminal struct {
@@ -599,7 +599,7 @@ type Event_Action struct {
 	Action *ActionEvent `protobuf:"bytes,14,opt,name=action,proto3,oneof"`
 }
 
-func (*Event_Repo) isEvent_Event() {}
+func (*Event_Project) isEvent_Event() {}
 
 func (*Event_Terminal) isEvent_Event() {}
 
@@ -627,7 +627,7 @@ var File_codefoundry_v1_events_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_events_proto_rawDesc = "" +
 	"\n" +
-	"\x1bcodefoundry/v1/events.proto\x12\x0ecodefoundry.v1\x1a\x1bcodefoundry/v1/action.proto\x1a\x17codefoundry/v1/gh.proto\x1a\x1bcodefoundry/v1/gitops.proto\x1a\x1ecodefoundry/v1/heartbeat.proto\x1a\x19codefoundry/v1/repo.proto\x1a\x1dcodefoundry/v1/settings.proto\x1a\x1dcodefoundry/v1/terminal.proto\x1a\x1bcodefoundry/v1/thread.proto\x1a%codefoundry/v1/thread_lifecycle.proto\x1a\x17codefoundry/v1/ui.proto\x1a\x1bcodefoundry/v1/update.proto\x1a\x1ecodefoundry/v1/workspace.proto\"\xfd\x01\n" +
+	"\x1bcodefoundry/v1/events.proto\x12\x0ecodefoundry.v1\x1a\x1bcodefoundry/v1/action.proto\x1a\x17codefoundry/v1/gh.proto\x1a\x1bcodefoundry/v1/gitops.proto\x1a\x1ecodefoundry/v1/heartbeat.proto\x1a\x1ccodefoundry/v1/project.proto\x1a\x1dcodefoundry/v1/settings.proto\x1a\x1dcodefoundry/v1/terminal.proto\x1a\x1bcodefoundry/v1/thread.proto\x1a%codefoundry/v1/thread_lifecycle.proto\x1a\x17codefoundry/v1/ui.proto\x1a\x1bcodefoundry/v1/update.proto\x1a\x1ecodefoundry/v1/workspace.proto\"\xfd\x01\n" +
 	"\x12WatchEventsRequest\x125\n" +
 	"\asources\x18\x01 \x03(\x0e2\x1b.codefoundry.v1.EventSourceR\asources\x12\x1b\n" +
 	"\tsince_seq\x18\x02 \x01(\x04R\bsinceSeq\x12\x1f\n" +
@@ -640,9 +640,9 @@ const file_codefoundry_v1_events_proto_rawDesc = "" +
 	"\x15SetClientStateRequest\x12\x1b\n" +
 	"\tclient_id\x18\x01 \x01(\tR\bclientId\x12\x18\n" +
 	"\avisible\x18\x02 \x01(\bR\avisible\"\x18\n" +
-	"\x16SetClientStateResponse\"\xdb\x05\n" +
-	"\x05Event\x12/\n" +
-	"\x04repo\x18\x01 \x01(\v2\x19.codefoundry.v1.RepoEventH\x00R\x04repo\x12;\n" +
+	"\x16SetClientStateResponse\"\xe4\x05\n" +
+	"\x05Event\x128\n" +
+	"\aproject\x18\x01 \x01(\v2\x1c.codefoundry.v1.ProjectEventH\x00R\aproject\x12;\n" +
 	"\bterminal\x18\x02 \x01(\v2\x1d.codefoundry.v1.TerminalEventH\x00R\bterminal\x12B\n" +
 	"\vthread_list\x18\x03 \x01(\v2\x1f.codefoundry.v1.ThreadListEventH\x00R\n" +
 	"threadList\x12)\n" +
@@ -663,10 +663,10 @@ const file_codefoundry_v1_events_proto_rawDesc = "" +
 	"ClientKind\x12\x1b\n" +
 	"\x17CLIENT_KIND_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fCLIENT_KIND_GUI\x10\x01\x12\x13\n" +
-	"\x0fCLIENT_KIND_CLI\x10\x02*\xc0\x02\n" +
+	"\x0fCLIENT_KIND_CLI\x10\x02*\xc3\x02\n" +
 	"\vEventSource\x12\x1c\n" +
-	"\x18EVENT_SOURCE_UNSPECIFIED\x10\x00\x12\x15\n" +
-	"\x11EVENT_SOURCE_REPO\x10\x01\x12\x19\n" +
+	"\x18EVENT_SOURCE_UNSPECIFIED\x10\x00\x12\x18\n" +
+	"\x14EVENT_SOURCE_PROJECT\x10\x01\x12\x19\n" +
 	"\x15EVENT_SOURCE_TERMINAL\x10\x02\x12\x1c\n" +
 	"\x18EVENT_SOURCE_THREAD_LIST\x10\x03\x12\x13\n" +
 	"\x0fEVENT_SOURCE_GH\x10\x04\x12\x13\n" +
@@ -704,7 +704,7 @@ var file_codefoundry_v1_events_proto_goTypes = []any{
 	(*SetClientStateRequest)(nil),  // 3: codefoundry.v1.SetClientStateRequest
 	(*SetClientStateResponse)(nil), // 4: codefoundry.v1.SetClientStateResponse
 	(*Event)(nil),                  // 5: codefoundry.v1.Event
-	(*RepoEvent)(nil),              // 6: codefoundry.v1.RepoEvent
+	(*ProjectEvent)(nil),           // 6: codefoundry.v1.ProjectEvent
 	(*TerminalEvent)(nil),          // 7: codefoundry.v1.TerminalEvent
 	(*ThreadListEvent)(nil),        // 8: codefoundry.v1.ThreadListEvent
 	(*GhEvent)(nil),                // 9: codefoundry.v1.GhEvent
@@ -720,7 +720,7 @@ var file_codefoundry_v1_events_proto_goTypes = []any{
 var file_codefoundry_v1_events_proto_depIdxs = []int32{
 	1,  // 0: codefoundry.v1.WatchEventsRequest.sources:type_name -> codefoundry.v1.EventSource
 	0,  // 1: codefoundry.v1.WatchEventsRequest.client_kind:type_name -> codefoundry.v1.ClientKind
-	6,  // 2: codefoundry.v1.Event.repo:type_name -> codefoundry.v1.RepoEvent
+	6,  // 2: codefoundry.v1.Event.project:type_name -> codefoundry.v1.ProjectEvent
 	7,  // 3: codefoundry.v1.Event.terminal:type_name -> codefoundry.v1.TerminalEvent
 	8,  // 4: codefoundry.v1.Event.thread_list:type_name -> codefoundry.v1.ThreadListEvent
 	9,  // 5: codefoundry.v1.Event.gh:type_name -> codefoundry.v1.GhEvent
@@ -752,7 +752,7 @@ func file_codefoundry_v1_events_proto_init() {
 	file_codefoundry_v1_gh_proto_init()
 	file_codefoundry_v1_gitops_proto_init()
 	file_codefoundry_v1_heartbeat_proto_init()
-	file_codefoundry_v1_repo_proto_init()
+	file_codefoundry_v1_project_proto_init()
 	file_codefoundry_v1_settings_proto_init()
 	file_codefoundry_v1_terminal_proto_init()
 	file_codefoundry_v1_thread_proto_init()
@@ -761,7 +761,7 @@ func file_codefoundry_v1_events_proto_init() {
 	file_codefoundry_v1_update_proto_init()
 	file_codefoundry_v1_workspace_proto_init()
 	file_codefoundry_v1_events_proto_msgTypes[3].OneofWrappers = []any{
-		(*Event_Repo)(nil),
+		(*Event_Project)(nil),
 		(*Event_Terminal)(nil),
 		(*Event_ThreadList)(nil),
 		(*Event_Gh)(nil),

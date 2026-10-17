@@ -156,8 +156,8 @@ type GitOp struct {
 	Title string `protobuf:"bytes,4,opt,name=title,proto3" json:"title,omitempty"`
 	// The worktree the operation runs in. Empty for open_url.
 	WorktreePath string `protobuf:"bytes,5,opt,name=worktree_path,json=worktreePath,proto3" json:"worktree_path,omitempty"`
-	// The registered repository containing worktree_path, or empty.
-	RepoId string `protobuf:"bytes,6,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
+	// The registered project containing worktree_path, or empty.
+	ProjectId string `protobuf:"bytes,6,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
 	// Branch when the operation was requested, if known.
 	Branch     string                 `protobuf:"bytes,7,opt,name=branch,proto3" json:"branch,omitempty"`
 	QueuedAt   *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=queued_at,json=queuedAt,proto3" json:"queued_at,omitempty"`
@@ -240,9 +240,9 @@ func (x *GitOp) GetWorktreePath() string {
 	return ""
 }
 
-func (x *GitOp) GetRepoId() string {
+func (x *GitOp) GetProjectId() string {
 	if x != nil {
-		return x.RepoId
+		return x.ProjectId
 	}
 	return ""
 }
@@ -1365,14 +1365,15 @@ var File_codefoundry_v1_gitops_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_gitops_proto_rawDesc = "" +
 	"\n" +
-	"\x1bcodefoundry/v1/gitops.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xfa\x03\n" +
+	"\x1bcodefoundry/v1/gitops.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x80\x04\n" +
 	"\x05GitOp\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12-\n" +
 	"\x04kind\x18\x02 \x01(\x0e2\x19.codefoundry.v1.GitOpKindR\x04kind\x120\n" +
 	"\x05state\x18\x03 \x01(\x0e2\x1a.codefoundry.v1.GitOpStateR\x05state\x12\x14\n" +
 	"\x05title\x18\x04 \x01(\tR\x05title\x12#\n" +
-	"\rworktree_path\x18\x05 \x01(\tR\fworktreePath\x12\x17\n" +
-	"\arepo_id\x18\x06 \x01(\tR\x06repoId\x12\x16\n" +
+	"\rworktree_path\x18\x05 \x01(\tR\fworktreePath\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\x06 \x01(\tR\tprojectId\x12\x16\n" +
 	"\x06branch\x18\a \x01(\tR\x06branch\x127\n" +
 	"\tqueued_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\bqueuedAt\x129\n" +
 	"\n" +

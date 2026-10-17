@@ -85,9 +85,9 @@ type UiContext struct {
 	state              protoimpl.MessageState `protogen:"open.v1"`
 	ActiveTerminalId   string                 `protobuf:"bytes,1,opt,name=active_terminal_id,json=activeTerminalId,proto3" json:"active_terminal_id,omitempty"`
 	ActiveThreadId     string                 `protobuf:"bytes,2,opt,name=active_thread_id,json=activeThreadId,proto3" json:"active_thread_id,omitempty"`
-	ActiveRepoId       string                 `protobuf:"bytes,3,opt,name=active_repo_id,json=activeRepoId,proto3" json:"active_repo_id,omitempty"`
+	ActiveProjectId    string                 `protobuf:"bytes,3,opt,name=active_project_id,json=activeProjectId,proto3" json:"active_project_id,omitempty"`
 	ActiveWorktreePath string                 `protobuf:"bytes,4,opt,name=active_worktree_path,json=activeWorktreePath,proto3" json:"active_worktree_path,omitempty"`
-	// Logical view name, e.g. "terminal", "repo", "dashboard". Empty from the CLI.
+	// Logical view name, e.g. "terminal", "project", "dashboard". Empty from the CLI.
 	ActiveView string `protobuf:"bytes,5,opt,name=active_view,json=activeView,proto3" json:"active_view,omitempty"`
 	// Workspace that owns what is active: the active thread's workspace, or the workspace
 	// a composer or page is for. Empty for project threads and from the CLI.
@@ -140,9 +140,9 @@ func (x *UiContext) GetActiveThreadId() string {
 	return ""
 }
 
-func (x *UiContext) GetActiveRepoId() string {
+func (x *UiContext) GetActiveProjectId() string {
 	if x != nil {
-		return x.ActiveRepoId
+		return x.ActiveProjectId
 	}
 	return ""
 }
@@ -294,12 +294,12 @@ func (x *ArgSpec) GetFileOrStdin() bool {
 
 type Command struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Dotted, stable identifier, e.g. "terminal.new", "repo.add".
+	// Dotted, stable identifier, e.g. "terminal.new", "project.add".
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// Palette title, e.g. "New Terminal".
 	Title       string `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
 	Description string `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
-	// Palette group, e.g. "Terminal", "Repository".
+	// Palette group, e.g. "Terminal", "Project".
 	Category string     `protobuf:"bytes,4,opt,name=category,proto3" json:"category,omitempty"`
 	Args     []*ArgSpec `protobuf:"bytes,5,rep,name=args,proto3" json:"args,omitempty"`
 	// Default keybindings in the GUI's chord syntax, e.g. "cmd+n".
@@ -695,11 +695,11 @@ var File_codefoundry_v1_command_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_command_proto_rawDesc = "" +
 	"\n" +
-	"\x1ccodefoundry/v1/command.proto\x12\x0ecodefoundry.v1\"\xab\x02\n" +
+	"\x1ccodefoundry/v1/command.proto\x12\x0ecodefoundry.v1\"\xb1\x02\n" +
 	"\tUiContext\x12,\n" +
 	"\x12active_terminal_id\x18\x01 \x01(\tR\x10activeTerminalId\x12(\n" +
-	"\x10active_thread_id\x18\x02 \x01(\tR\x0eactiveThreadId\x12$\n" +
-	"\x0eactive_repo_id\x18\x03 \x01(\tR\factiveRepoId\x120\n" +
+	"\x10active_thread_id\x18\x02 \x01(\tR\x0eactiveThreadId\x12*\n" +
+	"\x11active_project_id\x18\x03 \x01(\tR\x0factiveProjectId\x120\n" +
 	"\x14active_worktree_path\x18\x04 \x01(\tR\x12activeWorktreePath\x12\x1f\n" +
 	"\vactive_view\x18\x05 \x01(\tR\n" +
 	"activeView\x12.\n" +

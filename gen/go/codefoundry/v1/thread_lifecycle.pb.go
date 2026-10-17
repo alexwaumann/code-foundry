@@ -389,12 +389,12 @@ func (ThreadWaitCondition) EnumDescriptor() ([]byte, []int) {
 }
 
 // Ownership: a thread has at most one owner. When workspace_id is set the owner is that
-// workspace; otherwise, when repo_id is set, it is the project (repository) repo_id;
+// workspace; otherwise, when project_id is set, it is the project project_id;
 // otherwise the thread has no project (CreateThreadRequest.no_project) and runs in the
-// daemon's home directory. repo_id and worktree_path are facts about the thread's cwd
+// daemon's home directory. project_id and worktree_path are facts about the thread's cwd
 // (for a workspace thread, the member worktree it runs in) and never decide the owner
 // beyond that order. Rows from before projects were required may also have an empty
-// repo_id with a worktree_path inside a project; clients may place those by the path.
+// project_id with a worktree_path inside a project; clients may place those by the path.
 type Thread struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Our stable id (survives reconnects).
@@ -402,9 +402,9 @@ type Thread struct {
 	// Claude's own session id, once discovered from the transcript directory. Needed for
 	// resume; empty until known.
 	ClaudeSessionId string `protobuf:"bytes,2,opt,name=claude_session_id,json=claudeSessionId,proto3" json:"claude_session_id,omitempty"`
-	// Repository of the cwd. The owner when workspace_id is empty. Empty, with an empty
+	// Project of the cwd. The owner when workspace_id is empty. Empty, with an empty
 	// workspace_id, for a thread without a project.
-	RepoId string `protobuf:"bytes,3,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
+	ProjectId string `protobuf:"bytes,3,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
 	// The cwd: the worktree claude runs in (the home directory for a thread without a
 	// project).
 	WorktreePath string `protobuf:"bytes,4,opt,name=worktree_path,json=worktreePath,proto3" json:"worktree_path,omitempty"`
@@ -615,9 +615,9 @@ func (x *Thread) GetClaudeSessionId() string {
 	return ""
 }
 
-func (x *Thread) GetRepoId() string {
+func (x *Thread) GetProjectId() string {
 	if x != nil {
-		return x.RepoId
+		return x.ProjectId
 	}
 	return ""
 }
@@ -1430,7 +1430,7 @@ func (x *LinkedPullRequest) GetLinkedAt() *timestamppb.Timestamp {
 
 type CreateThreadRequest struct {
 	state        protoimpl.MessageState `protogen:"open.v1"`
-	RepoId       string                 `protobuf:"bytes,1,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
+	ProjectId    string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
 	WorktreePath string                 `protobuf:"bytes,2,opt,name=worktree_path,json=worktreePath,proto3" json:"worktree_path,omitempty"`
 	Model        string                 `protobuf:"bytes,3,opt,name=model,proto3" json:"model,omitempty"`
 	Effort       string                 `protobuf:"bytes,4,opt,name=effort,proto3" json:"effort,omitempty"`
@@ -1446,22 +1446,22 @@ type CreateThreadRequest struct {
 	NewWorktree *NewWorktree `protobuf:"bytes,8,opt,name=new_worktree,json=newWorktree,proto3" json:"new_worktree,omitempty"`
 	// Paths returned by StageAttachment, appended to initial_prompt.
 	Attachments []string `protobuf:"bytes,9,rep,name=attachments,proto3" json:"attachments,omitempty"`
-	// Workspace (id or name) the thread belongs to. repo_id or worktree_path then pick
+	// Workspace (id or name) the thread belongs to. project_id or worktree_path then pick
 	// the member worktree it runs in (default: the first member); a worktree_path must
 	// be a member's worktree. Not with new_worktree or new_workspace.
 	WorkspaceId string `protobuf:"bytes,10,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
 	// When set, Create makes a new workspace for the thread before claude starts: a
-	// worktree on branch cf/<slug> in every repository listed (the slug as for
+	// worktree on branch cf/<slug> in every project listed (the slug as for
 	// new_worktree, after the same single bounded wait), then runs the thread in the
-	// member repo_id names (default: the first). worktree_path is ignored. Not with
+	// member project_id names (default: the first). worktree_path is ignored. Not with
 	// new_worktree or workspace_id.
 	NewWorkspace *NewWorkspace `protobuf:"bytes,11,opt,name=new_workspace,json=newWorkspace,proto3" json:"new_workspace,omitempty"`
 	// The composer's text of initial_prompt, kept on the first user message for display
 	// (ThreadItem UserMessageItem.composer_text).
 	ComposerPrompt string `protobuf:"bytes,13,opt,name=composer_prompt,json=composerPrompt,proto3" json:"composer_prompt,omitempty"`
 	// When set, the thread has no project: it runs in the daemon's home directory with an
-	// empty repo_id and workspace_id (see the ownership rule on Thread). Exclusive with
-	// repo_id, worktree_path, new_worktree, workspace_id and new_workspace
+	// empty project_id and workspace_id (see the ownership rule on Thread). Exclusive with
+	// project_id, worktree_path, new_worktree, workspace_id and new_workspace
 	// (InvalidArgument). RunIn refuses such a thread; Fork and Reconnect keep its cwd.
 	NoProject bool `protobuf:"varint,14,opt,name=no_project,json=noProject,proto3" json:"no_project,omitempty"`
 	// The thread whose agent asks for this one (Thread.created_by); it must exist
@@ -1521,9 +1521,9 @@ func (*CreateThreadRequest) Descriptor() ([]byte, []int) {
 	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *CreateThreadRequest) GetRepoId() string {
+func (x *CreateThreadRequest) GetProjectId() string {
 	if x != nil {
-		return x.RepoId
+		return x.ProjectId
 	}
 	return ""
 }
@@ -1701,11 +1701,11 @@ func (x *NewWorktree) GetBaseRef() string {
 
 type NewWorkspace struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Repositories (id, name when unique, or an absolute path inside one), in member
-	// order. At least one. "<repo>:<base ref>" gives that member its own base.
-	Repos []string `protobuf:"bytes,1,rep,name=repos,proto3" json:"repos,omitempty"`
+	// Projects (id, name when unique, or an absolute path inside one), in member
+	// order. At least one. "<project>:<base ref>" gives that member its own base.
+	Projects []string `protobuf:"bytes,1,rep,name=projects,proto3" json:"projects,omitempty"`
 	// Ref every member without its own base branches from. Defaults to
-	// origin/<default branch>, else <default branch>, per repository.
+	// origin/<default branch>, else <default branch>, per project.
 	BaseRef string `protobuf:"bytes,2,opt,name=base_ref,json=baseRef,proto3" json:"base_ref,omitempty"`
 	// Workspace name. Default: the slug (cf/<slug> without the prefix).
 	Name          string `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
@@ -1743,9 +1743,9 @@ func (*NewWorkspace) Descriptor() ([]byte, []int) {
 	return file_codefoundry_v1_thread_lifecycle_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *NewWorkspace) GetRepos() []string {
+func (x *NewWorkspace) GetProjects() []string {
 	if x != nil {
-		return x.Repos
+		return x.Projects
 	}
 	return nil
 }
@@ -2190,10 +2190,10 @@ type ThreadFilter struct {
 	Status ThreadStatus `protobuf:"varint,3,opt,name=status,proto3,enum=codefoundry.v1.ThreadStatus" json:"status,omitempty"`
 	// Only threads in this state (UNSPECIFIED: any).
 	State ThreadState `protobuf:"varint,4,opt,name=state,proto3,enum=codefoundry.v1.ThreadState" json:"state,omitempty"`
-	// Only threads whose cwd is in this repository: an id, a name when exactly one
-	// repository has it, or an absolute path inside one of its worktrees
+	// Only threads whose cwd is in this project: an id, a name when exactly one
+	// project has it, or an absolute path inside one of its worktrees
 	// (INVALID_ARGUMENT when it names none or several).
-	Repo string `protobuf:"bytes,5,opt,name=repo,proto3" json:"repo,omitempty"`
+	Project string `protobuf:"bytes,5,opt,name=project,proto3" json:"project,omitempty"`
 	// Only threads owned by this workspace: an id or a name (INVALID_ARGUMENT when it
 	// names none).
 	Workspace string `protobuf:"bytes,6,opt,name=workspace,proto3" json:"workspace,omitempty"`
@@ -2266,9 +2266,9 @@ func (x *ThreadFilter) GetState() ThreadState {
 	return ThreadState_THREAD_STATE_UNSPECIFIED
 }
 
-func (x *ThreadFilter) GetRepo() string {
+func (x *ThreadFilter) GetProject() string {
 	if x != nil {
-		return x.Repo
+		return x.Project
 	}
 	return ""
 }
@@ -2917,9 +2917,9 @@ func (*RemoveThreadResponse) Descriptor() ([]byte, []int) {
 type RunInThreadRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	// The member to run in: its repository id, or its worktree path. One is required;
+	// The member to run in: its project id, or its worktree path. One is required;
 	// both must name the same member.
-	RepoId        string `protobuf:"bytes,2,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
+	ProjectId     string `protobuf:"bytes,2,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
 	WorktreePath  string `protobuf:"bytes,3,opt,name=worktree_path,json=worktreePath,proto3" json:"worktree_path,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2962,9 +2962,9 @@ func (x *RunInThreadRequest) GetId() string {
 	return ""
 }
 
-func (x *RunInThreadRequest) GetRepoId() string {
+func (x *RunInThreadRequest) GetProjectId() string {
 	if x != nil {
-		return x.RepoId
+		return x.ProjectId
 	}
 	return ""
 }
@@ -3893,11 +3893,12 @@ var File_codefoundry_v1_thread_lifecycle_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\n" +
-	"%codefoundry/v1/thread_lifecycle.proto\x12\x0ecodefoundry.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xfc\x10\n" +
+	"%codefoundry/v1/thread_lifecycle.proto\x12\x0ecodefoundry.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x82\x11\n" +
 	"\x06Thread\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12*\n" +
-	"\x11claude_session_id\x18\x02 \x01(\tR\x0fclaudeSessionId\x12\x17\n" +
-	"\arepo_id\x18\x03 \x01(\tR\x06repoId\x12#\n" +
+	"\x11claude_session_id\x18\x02 \x01(\tR\x0fclaudeSessionId\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\x03 \x01(\tR\tprojectId\x12#\n" +
 	"\rworktree_path\x18\x04 \x01(\tR\fworktreePath\x12\x12\n" +
 	"\x04name\x18\x05 \x01(\tR\x04name\x12\x1d\n" +
 	"\n" +
@@ -4005,9 +4006,10 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\x04slug\x18\x01 \x01(\tR\x04slug\x12\x16\n" +
 	"\x06number\x18\x02 \x01(\x05R\x06number\x12\x10\n" +
 	"\x03url\x18\x03 \x01(\tR\x03url\x127\n" +
-	"\tlinked_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\blinkedAt\"\xc6\x05\n" +
-	"\x13CreateThreadRequest\x12\x17\n" +
-	"\arepo_id\x18\x01 \x01(\tR\x06repoId\x12#\n" +
+	"\tlinked_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\blinkedAt\"\xcc\x05\n" +
+	"\x13CreateThreadRequest\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\x01 \x01(\tR\tprojectId\x12#\n" +
 	"\rworktree_path\x18\x02 \x01(\tR\fworktreePath\x12\x14\n" +
 	"\x05model\x18\x03 \x01(\tR\x05model\x12\x16\n" +
 	"\x06effort\x18\x04 \x01(\tR\x06effort\x12\x12\n" +
@@ -4032,9 +4034,9 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\n" +
 	"request_id\x18\x14 \x01(\tR\trequestIdJ\x04\b\f\x10\rR\x06render\"(\n" +
 	"\vNewWorktree\x12\x19\n" +
-	"\bbase_ref\x18\x01 \x01(\tR\abaseRef\"S\n" +
-	"\fNewWorkspace\x12\x14\n" +
-	"\x05repos\x18\x01 \x03(\tR\x05repos\x12\x19\n" +
+	"\bbase_ref\x18\x01 \x01(\tR\abaseRef\"Y\n" +
+	"\fNewWorkspace\x12\x1a\n" +
+	"\bprojects\x18\x01 \x03(\tR\bprojects\x12\x19\n" +
 	"\bbase_ref\x18\x02 \x01(\tR\abaseRef\x12\x12\n" +
 	"\x04name\x18\x03 \x01(\tR\x04name\"s\n" +
 	"\x16StageAttachmentRequest\x12\x12\n" +
@@ -4058,13 +4060,13 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\x12ForkThreadResponse\x12.\n" +
 	"\x06thread\x18\x01 \x01(\v2\x16.codefoundry.v1.ThreadR\x06thread\"J\n" +
 	"\x12ListThreadsRequest\x124\n" +
-	"\x06filter\x18\x01 \x01(\v2\x1c.codefoundry.v1.ThreadFilterR\x06filter\"\xb3\x02\n" +
+	"\x06filter\x18\x01 \x01(\v2\x1c.codefoundry.v1.ThreadFilterR\x06filter\"\xb9\x02\n" +
 	"\fThreadFilter\x12\x10\n" +
 	"\x03all\x18\x01 \x01(\bR\x03all\x12)\n" +
 	"\x10include_archived\x18\x02 \x01(\bR\x0fincludeArchived\x124\n" +
 	"\x06status\x18\x03 \x01(\x0e2\x1c.codefoundry.v1.ThreadStatusR\x06status\x121\n" +
-	"\x05state\x18\x04 \x01(\x0e2\x1b.codefoundry.v1.ThreadStateR\x05state\x12\x12\n" +
-	"\x04repo\x18\x05 \x01(\tR\x04repo\x12\x1c\n" +
+	"\x05state\x18\x04 \x01(\x0e2\x1b.codefoundry.v1.ThreadStateR\x05state\x12\x18\n" +
+	"\aproject\x18\x05 \x01(\tR\aproject\x12\x1c\n" +
 	"\tworkspace\x18\x06 \x01(\tR\tworkspace\x12\x1d\n" +
 	"\n" +
 	"created_by\x18\a \x01(\tR\tcreatedBy\x12\x16\n" +
@@ -4099,10 +4101,11 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\x06thread\x18\x01 \x01(\v2\x16.codefoundry.v1.ThreadR\x06thread\"%\n" +
 	"\x13RemoveThreadRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x16\n" +
-	"\x14RemoveThreadResponse\"b\n" +
+	"\x14RemoveThreadResponse\"h\n" +
 	"\x12RunInThreadRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
-	"\arepo_id\x18\x02 \x01(\tR\x06repoId\x12#\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\x02 \x01(\tR\tprojectId\x12#\n" +
 	"\rworktree_path\x18\x03 \x01(\tR\fworktreePath\"E\n" +
 	"\x13RunInThreadResponse\x12.\n" +
 	"\x06thread\x18\x01 \x01(\v2\x16.codefoundry.v1.ThreadR\x06thread\":\n" +

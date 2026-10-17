@@ -140,7 +140,7 @@ type ThreadServiceClient interface {
 	Remove(context.Context, *connect.Request[v1.RemoveThreadRequest]) (*connect.Response[v1.RemoveThreadResponse], error)
 	// RunIn moves a workspace thread's cwd to another member worktree of its workspace.
 	// A live thread gets set_cwd once it is idle (pending_worktree_path shows the queued
-	// target until then) and the row's worktree_path and repo_id change when Claude
+	// target until then) and the row's worktree_path and project_id change when Claude
 	// accepts it. A disconnected thread's row
 	// changes at once; the next reconnect resumes there. Refused for a project thread or
 	// a target that is not a member.
@@ -707,7 +707,7 @@ type ThreadServiceHandler interface {
 	Remove(context.Context, *connect.Request[v1.RemoveThreadRequest]) (*connect.Response[v1.RemoveThreadResponse], error)
 	// RunIn moves a workspace thread's cwd to another member worktree of its workspace.
 	// A live thread gets set_cwd once it is idle (pending_worktree_path shows the queued
-	// target until then) and the row's worktree_path and repo_id change when Claude
+	// target until then) and the row's worktree_path and project_id change when Claude
 	// accepts it. A disconnected thread's row
 	// changes at once; the next reconnect resumes there. Refused for a project thread or
 	// a target that is not a member.

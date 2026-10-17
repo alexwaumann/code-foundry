@@ -815,7 +815,7 @@ func (*ThreadItem_CommandOutput) isThreadItem_Payload() {}
 
 func (*ThreadItem_Note) isThreadItem_Payload() {}
 
-// What the user sent: text as sent (file tags stay "@cf-file://<repo>/<path>" tokens,
+// What the user sent: text as sent (file tags stay "@cf-file://<project id>/<path>" tokens,
 // not the paths Claude got) and, when it came from the GUI's composer, the composer's
 // own text, from which the GUI draws the message's tags.
 type UserMessageItem struct {
@@ -825,7 +825,7 @@ type UserMessageItem struct {
 	// unless a PDF over 10 pages, an image or document block.
 	Attachments []string `protobuf:"bytes,2,rep,name=attachments,proto3" json:"attachments,omitempty"`
 	// The composer's text with its tags as Markdown-link tokens (gui lib/prompt.ts):
-	// "[/name](cf-skill://<repo id or ~>/<name>)", "[base](cf-file://<repo id>/<path>)",
+	// "[/name](cf-skill://<project id or ~>/<name>)", "[base](cf-file://<project id>/<path>)",
 	// and "![name](cf-attachment://<n>)" where n is the attachment's index in
 	// attachments (not a number: the chip had lost its file). Empty for a message without tags or sent
 	// without the composer (the CLI): text is then shown as is. Stored, never interpreted.
@@ -3212,7 +3212,7 @@ func (x *WatchThreadRequest) GetThreadId() string {
 type SendThreadMessageRequest struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	ThreadId string                 `protobuf:"bytes,1,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
-	// As typed; "@cf-file://<repo id>/<path>" tags become absolute paths for Claude.
+	// As typed; "@cf-file://<project id>/<path>" tags become absolute paths for Claude.
 	Text string `protobuf:"bytes,2,opt,name=text,proto3" json:"text,omitempty"`
 	// StageAttachment paths.
 	Attachments []string `protobuf:"bytes,3,rep,name=attachments,proto3" json:"attachments,omitempty"`

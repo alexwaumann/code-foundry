@@ -241,8 +241,8 @@ type Action struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// "a-" + 12 hex digits.
 	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	// The project (repository id) the action belongs to.
-	RepoId string `protobuf:"bytes,2,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
+	// The project (project id) the action belongs to.
+	ProjectId string `protobuf:"bytes,2,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
 	// Unique within the project, ignoring case.
 	Name string `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
 	// A shell command line, run as `$SHELL -lc <command>`.
@@ -297,9 +297,9 @@ func (x *Action) GetId() string {
 	return ""
 }
 
-func (x *Action) GetRepoId() string {
+func (x *Action) GetProjectId() string {
 	if x != nil {
-		return x.RepoId
+		return x.ProjectId
 	}
 	return ""
 }
@@ -368,7 +368,7 @@ type ActionRun struct {
 	// The action's name and command when the run started.
 	ActionName string `protobuf:"bytes,3,opt,name=action_name,json=actionName,proto3" json:"action_name,omitempty"`
 	Command    string `protobuf:"bytes,4,opt,name=command,proto3" json:"command,omitempty"`
-	RepoId     string `protobuf:"bytes,5,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
+	ProjectId  string `protobuf:"bytes,5,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
 	// The thread the run belongs to; empty for a worktree's run.
 	ThreadId string `protobuf:"bytes,6,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
 	// Where it runs (its cwd and CODE_FOUNDRY_WORKTREE).
@@ -450,9 +450,9 @@ func (x *ActionRun) GetCommand() string {
 	return ""
 }
 
-func (x *ActionRun) GetRepoId() string {
+func (x *ActionRun) GetProjectId() string {
 	if x != nil {
-		return x.RepoId
+		return x.ProjectId
 	}
 	return ""
 }
@@ -537,7 +537,7 @@ func (x *ActionRun) GetOutputTruncated() bool {
 type ListActionsRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Empty: every project.
-	RepoId        string `protobuf:"bytes,1,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
+	ProjectId     string `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -572,9 +572,9 @@ func (*ListActionsRequest) Descriptor() ([]byte, []int) {
 	return file_codefoundry_v1_action_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *ListActionsRequest) GetRepoId() string {
+func (x *ListActionsRequest) GetProjectId() string {
 	if x != nil {
-		return x.RepoId
+		return x.ProjectId
 	}
 	return ""
 }
@@ -633,10 +633,10 @@ func (x *ListActionsResponse) GetRuns() []*ActionRun {
 }
 
 type CreateActionRequest struct {
-	state   protoimpl.MessageState `protogen:"open.v1"`
-	RepoId  string                 `protobuf:"bytes,1,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
-	Name    string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Command string                 `protobuf:"bytes,3,opt,name=command,proto3" json:"command,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	ProjectId string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
+	Name      string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Command   string                 `protobuf:"bytes,3,opt,name=command,proto3" json:"command,omitempty"`
 	// UNSPECIFIED: PLAY.
 	Icon             ActionIcon `protobuf:"varint,4,opt,name=icon,proto3,enum=codefoundry.v1.ActionIcon" json:"icon,omitempty"`
 	InTerminal       bool       `protobuf:"varint,5,opt,name=in_terminal,json=inTerminal,proto3" json:"in_terminal,omitempty"`
@@ -675,9 +675,9 @@ func (*CreateActionRequest) Descriptor() ([]byte, []int) {
 	return file_codefoundry_v1_action_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *CreateActionRequest) GetRepoId() string {
+func (x *CreateActionRequest) GetProjectId() string {
 	if x != nil {
-		return x.RepoId
+		return x.ProjectId
 	}
 	return ""
 }
@@ -982,7 +982,7 @@ func (*DeleteActionResponse) Descriptor() ([]byte, []int) {
 
 type RunActionRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Action id, or its name (ignoring case) within the owner's project or repo_id.
+	// Action id, or its name (ignoring case) within the owner's project or project_id.
 	Action string `protobuf:"bytes,1,opt,name=action,proto3" json:"action,omitempty"`
 	// The owning thread: the run uses its project and worktree. Wins over worktree_path.
 	ThreadId string `protobuf:"bytes,2,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
@@ -990,7 +990,7 @@ type RunActionRequest struct {
 	// project.
 	WorktreePath string `protobuf:"bytes,3,opt,name=worktree_path,json=worktreePath,proto3" json:"worktree_path,omitempty"`
 	// The project to find the action's name in; default: the owner's.
-	RepoId string `protobuf:"bytes,4,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
+	ProjectId string `protobuf:"bytes,4,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
 	// UNSPECIFIED: the action's in_terminal.
 	Mode          ActionRunMode `protobuf:"varint,5,opt,name=mode,proto3,enum=codefoundry.v1.ActionRunMode" json:"mode,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -1048,9 +1048,9 @@ func (x *RunActionRequest) GetWorktreePath() string {
 	return ""
 }
 
-func (x *RunActionRequest) GetRepoId() string {
+func (x *RunActionRequest) GetProjectId() string {
 	if x != nil {
-		return x.RepoId
+		return x.ProjectId
 	}
 	return ""
 }
@@ -1529,7 +1529,7 @@ type ActionRunFinished struct {
 	RunId         string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
 	ActionId      string                 `protobuf:"bytes,2,opt,name=action_id,json=actionId,proto3" json:"action_id,omitempty"`
 	ActionName    string                 `protobuf:"bytes,3,opt,name=action_name,json=actionName,proto3" json:"action_name,omitempty"`
-	RepoId        string                 `protobuf:"bytes,4,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
+	ProjectId     string                 `protobuf:"bytes,4,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
 	ThreadId      string                 `protobuf:"bytes,5,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
 	ExitCode      int32                  `protobuf:"varint,6,opt,name=exit_code,json=exitCode,proto3" json:"exit_code,omitempty"`
 	Mode          ActionRunMode          `protobuf:"varint,7,opt,name=mode,proto3,enum=codefoundry.v1.ActionRunMode" json:"mode,omitempty"`
@@ -1590,9 +1590,9 @@ func (x *ActionRunFinished) GetActionName() string {
 	return ""
 }
 
-func (x *ActionRunFinished) GetRepoId() string {
+func (x *ActionRunFinished) GetProjectId() string {
 	if x != nil {
-		return x.RepoId
+		return x.ProjectId
 	}
 	return ""
 }
@@ -1636,10 +1636,11 @@ var File_codefoundry_v1_action_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_action_proto_rawDesc = "" +
 	"\n" +
-	"\x1bcodefoundry/v1/action.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xf0\x02\n" +
+	"\x1bcodefoundry/v1/action.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xf6\x02\n" +
 	"\x06Action\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
-	"\arepo_id\x18\x02 \x01(\tR\x06repoId\x12\x12\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\x02 \x01(\tR\tprojectId\x12\x12\n" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12\x18\n" +
 	"\acommand\x18\x04 \x01(\tR\acommand\x12.\n" +
 	"\x04icon\x18\x05 \x01(\x0e2\x1a.codefoundry.v1.ActionIconR\x04icon\x12\x1f\n" +
@@ -1651,14 +1652,15 @@ const file_codefoundry_v1_action_proto_rawDesc = "" +
 	"created_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
 	"updated_at\x18\n" +
-	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xec\x04\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xf2\x04\n" +
 	"\tActionRun\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\taction_id\x18\x02 \x01(\tR\bactionId\x12\x1f\n" +
 	"\vaction_name\x18\x03 \x01(\tR\n" +
 	"actionName\x12\x18\n" +
-	"\acommand\x18\x04 \x01(\tR\acommand\x12\x17\n" +
-	"\arepo_id\x18\x05 \x01(\tR\x06repoId\x12\x1b\n" +
+	"\acommand\x18\x04 \x01(\tR\acommand\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\x05 \x01(\tR\tprojectId\x12\x1b\n" +
 	"\tthread_id\x18\x06 \x01(\tR\bthreadId\x12#\n" +
 	"\rworktree_path\x18\a \x01(\tR\fworktreePath\x121\n" +
 	"\x04mode\x18\b \x01(\x0e2\x1d.codefoundry.v1.ActionRunModeR\x04mode\x12\x1f\n" +
@@ -1673,14 +1675,16 @@ const file_codefoundry_v1_action_proto_rawDesc = "" +
 	"finishedAt\x12:\n" +
 	"\atrigger\x18\x0e \x01(\x0e2 .codefoundry.v1.ActionRunTriggerR\atrigger\x12\x16\n" +
 	"\x06output\x18\x0f \x01(\tR\x06output\x12)\n" +
-	"\x10output_truncated\x18\x10 \x01(\bR\x0foutputTruncated\"-\n" +
-	"\x12ListActionsRequest\x12\x17\n" +
-	"\arepo_id\x18\x01 \x01(\tR\x06repoId\"v\n" +
+	"\x10output_truncated\x18\x10 \x01(\bR\x0foutputTruncated\"3\n" +
+	"\x12ListActionsRequest\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\x01 \x01(\tR\tprojectId\"v\n" +
 	"\x13ListActionsResponse\x120\n" +
 	"\aactions\x18\x01 \x03(\v2\x16.codefoundry.v1.ActionR\aactions\x12-\n" +
-	"\x04runs\x18\x02 \x03(\v2\x19.codefoundry.v1.ActionRunR\x04runs\"\xdb\x01\n" +
-	"\x13CreateActionRequest\x12\x17\n" +
-	"\arepo_id\x18\x01 \x01(\tR\x06repoId\x12\x12\n" +
+	"\x04runs\x18\x02 \x03(\v2\x19.codefoundry.v1.ActionRunR\x04runs\"\xe1\x01\n" +
+	"\x13CreateActionRequest\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\x01 \x01(\tR\tprojectId\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n" +
 	"\acommand\x18\x03 \x01(\tR\acommand\x12.\n" +
 	"\x04icon\x18\x04 \x01(\x0e2\x1a.codefoundry.v1.ActionIconR\x04icon\x12\x1f\n" +
@@ -1709,12 +1713,13 @@ const file_codefoundry_v1_action_proto_rawDesc = "" +
 	"\x06action\x18\x01 \x01(\v2\x16.codefoundry.v1.ActionR\x06action\"%\n" +
 	"\x13DeleteActionRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x16\n" +
-	"\x14DeleteActionResponse\"\xb8\x01\n" +
+	"\x14DeleteActionResponse\"\xbe\x01\n" +
 	"\x10RunActionRequest\x12\x16\n" +
 	"\x06action\x18\x01 \x01(\tR\x06action\x12\x1b\n" +
 	"\tthread_id\x18\x02 \x01(\tR\bthreadId\x12#\n" +
-	"\rworktree_path\x18\x03 \x01(\tR\fworktreePath\x12\x17\n" +
-	"\arepo_id\x18\x04 \x01(\tR\x06repoId\x121\n" +
+	"\rworktree_path\x18\x03 \x01(\tR\fworktreePath\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\x04 \x01(\tR\tprojectId\x121\n" +
 	"\x04mode\x18\x05 \x01(\x0e2\x1d.codefoundry.v1.ActionRunModeR\x04mode\"@\n" +
 	"\x11RunActionResponse\x12+\n" +
 	"\x03run\x18\x01 \x01(\v2\x19.codefoundry.v1.ActionRunR\x03run\",\n" +
@@ -1739,13 +1744,14 @@ const file_codefoundry_v1_action_proto_rawDesc = "" +
 	"\x05event\"q\n" +
 	"\x0eActionSnapshot\x120\n" +
 	"\aactions\x18\x01 \x03(\v2\x16.codefoundry.v1.ActionR\aactions\x12-\n" +
-	"\x04runs\x18\x02 \x03(\v2\x19.codefoundry.v1.ActionRunR\x04runs\"\xcb\x02\n" +
+	"\x04runs\x18\x02 \x03(\v2\x19.codefoundry.v1.ActionRunR\x04runs\"\xd1\x02\n" +
 	"\x11ActionRunFinished\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12\x1b\n" +
 	"\taction_id\x18\x02 \x01(\tR\bactionId\x12\x1f\n" +
 	"\vaction_name\x18\x03 \x01(\tR\n" +
-	"actionName\x12\x17\n" +
-	"\arepo_id\x18\x04 \x01(\tR\x06repoId\x12\x1b\n" +
+	"actionName\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\x04 \x01(\tR\tprojectId\x12\x1b\n" +
 	"\tthread_id\x18\x05 \x01(\tR\bthreadId\x12\x1b\n" +
 	"\texit_code\x18\x06 \x01(\x05R\bexitCode\x121\n" +
 	"\x04mode\x18\a \x01(\x0e2\x1d.codefoundry.v1.ActionRunModeR\x04mode\x12:\n" +
