@@ -83,7 +83,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 		Command{
 			Name:  "thread.send",
 			Title: "Send to Thread",
-			Description: "Send a message to a thread, also while it works (Claude queues it or folds it in). " +
+			Description: "Send a message to a thread, also while it works: Claude picks it up mid-turn. " +
 				"A thread whose Claude is not running starts with it.",
 			Category: "Thread",
 			Args: []ArgSpec{

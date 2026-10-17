@@ -288,8 +288,9 @@ func (c *Conn) write(v any) error {
 	return nil
 }
 
-// Send writes a user message. The CLI accepts one while a turn runs (it queues or
-// folds it in, as typing while busy does in the TUI).
+// Send writes a user message. The CLI accepts one while a turn runs: Claude picks it
+// up mid-turn, inside the running turn (one result at its end), as typing while busy
+// does in the TUI.
 func (c *Conn) Send(_ context.Context, m UserMessage) error {
 	if len(m.Blocks) == 0 {
 		return errors.New("claudestream: empty user message")

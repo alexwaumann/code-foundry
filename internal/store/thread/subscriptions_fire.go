@@ -137,9 +137,9 @@ func (s *subscriptions) next(subscriber string) (delivery, bool) {
 	return d, true
 }
 
-// drain delivers subscriber's wakes in order through Send (a busy thread queues the
-// message, a stopped one starts with it, a snoozed one is unsnoozed), until its queue
-// is empty.
+// drain delivers subscriber's wakes in order through Send (a busy thread's Claude picks
+// the message up mid-turn, a stopped one starts with it, a snoozed one is unsnoozed),
+// until its queue is empty.
 func (m *Manager) drain(subscriber string) {
 	defer m.wg.Done()
 	for {
