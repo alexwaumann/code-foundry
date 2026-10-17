@@ -47,15 +47,36 @@ type statusInfo struct {
 	Behind     int
 	Staged     int
 	Modified   int
-	Untracked  int
+	Untracked  int // files: untracked directories are expanded (--untracked-files=all)
 	Conflicted int
-	// Unmerged lists the conflicted paths (the `u` records) in output order, nil when
-	// there are none. It stays here rather than on Status, which is compared with ==;
-	// the detail job uses it to mark those files U (wtSlot.unmerged).
-	Unmerged []string
+	// Entries lists every changed path in output order, nil when there are none. It
+	// stays here rather than on Status, which is compared with ==; the detail job
+	// derives the uncommitted file list from it (wtSlot.entries, uncommittedFiles).
+	Entries []statusEntry
 }
 
-// parseStatusV2 parses `git status --porcelain=v2 --branch -z`.
+// statusEntry is one path `git status --porcelain=v2` reports.
+type statusEntry struct {
+	Path string
+	// OrigPath is the source of a rename or copy (X is R or C); "" otherwise.
+	OrigPath string
+	// X and Y are the index (HEAD to index) and worktree (index to working tree)
+	// letters, '.' when unchanged. For an unmerged entry they are the two sides'
+	// letters (UU, AA, DU, ...); for an untracked one both are '?'.
+	X, Y      byte
+	Unmerged  bool
+	Untracked bool
+}
+
+// statusArgs runs `git status` so that its output depends on the repository, not on
+// user config: status.showUntrackedFiles (no, or normal, which collapses an untracked
+// directory to "dir/") and status.renames (false) are overridden. Every untracked,
+// non-ignored file is listed on its own. status.renames=copies still reports copies
+// (C): --find-renames raises detection to renames but never lowers it. Ignored files
+// are never listed (no --ignored).
+var statusArgs = []string{"status", "--porcelain=v2", "--branch", "-z", "--untracked-files=all", "--find-renames"}
+
+// parseStatusV2 parses `git status --porcelain=v2 --branch -z` (statusArgs).
 //
 //	# branch.oid <sha> | (initial)
 //	# branch.head <name> | (detached)
@@ -111,9 +132,24 @@ func parseStatusV2(out []byte) (statusInfo, error) {
 			if rec[3] != '.' {
 				st.Modified++
 			}
+			// Eight space-separated fields precede an ordinary entry's path, nine a
+			// rename's or copy's; the path may contain spaces.
+			n := 9
+			if rec[0] == '2' {
+				n = 10
+			}
+			f := strings.SplitN(rec, " ", n)
+			if len(f) != n || f[n-1] == "" {
+				return statusInfo{}, fmt.Errorf("parse status: bad entry %q", rec)
+			}
+			e := statusEntry{Path: f[n-1], X: rec[2], Y: rec[3]}
 			if rec[0] == '2' {
 				i++ // the original path of a rename/copy is the next NUL field
+				if i < len(fields) {
+					e.OrigPath = string(fields[i])
+				}
 			}
+			st.Entries = append(st.Entries, e)
 		case 'u':
 			// Ten space-separated fields precede the path, which may contain spaces.
 			f := strings.SplitN(rec, " ", 11)
@@ -121,9 +157,13 @@ func parseStatusV2(out []byte) (statusInfo, error) {
 				return statusInfo{}, fmt.Errorf("parse status: bad unmerged entry %q", rec)
 			}
 			st.Conflicted++
-			st.Unmerged = append(st.Unmerged, f[10])
+			st.Entries = append(st.Entries, statusEntry{Path: f[10], X: rec[2], Y: rec[3], Unmerged: true})
 		case '?':
+			if len(rec) < 3 || rec[1] != ' ' {
+				return statusInfo{}, fmt.Errorf("parse status: bad untracked entry %q", rec)
+			}
 			st.Untracked++
+			st.Entries = append(st.Entries, statusEntry{Path: rec[2:], X: '?', Y: '?', Untracked: true})
 		case '!':
 			// ignored files are only listed with --ignored; never counted
 		default:

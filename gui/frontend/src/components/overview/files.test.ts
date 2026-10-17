@@ -10,7 +10,6 @@ const f = (path: string, over: Partial<FileChangeView> = {}): FileChangeView => 
   deleted: 0,
   binary: false,
   uncommitted: false,
-  isDir: path.endsWith("/"),
   ...over,
 });
 
@@ -18,8 +17,7 @@ describe("splitPath", () => {
   it.each([
     ["a/b/c.ts", "a/b/", "c.ts"],
     ["top.md", "", "top.md"],
-    ["notes/", "", "notes/"],
-    ["a/notes/", "a/", "notes/"],
+    ["a/notes/todo.md", "a/notes/", "todo.md"],
     [".github/workflows/ci.yml", ".github/workflows/", "ci.yml"],
   ])("%s → %s + %s", (path, dir, name) => {
     expect(splitPath(path)).toEqual([dir, name]);

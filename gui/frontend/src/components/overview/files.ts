@@ -10,7 +10,7 @@ export interface FileRow {
   key: string;
   /** "gui/frontend/src/" (with its trailing slash); "" at the top level. */
   dir: string;
-  /** The basename; an untracked directory keeps its trailing slash ("notes/"). */
+  /** The basename. */
   name: string;
   path: string;
   /** Git status letter (A M D R C T U) or "?" for untracked. */
@@ -24,12 +24,10 @@ export interface FileRow {
   oldPath: string;
 }
 
-/** Splits "a/b/c.ts" into ["a/b/", "c.ts"]; an untracked directory "a/notes/" into ["a/", "notes/"]. */
+/** Splits "a/b/c.ts" into ["a/b/", "c.ts"]. Untracked directories arrive as their files. */
 export function splitPath(path: string): [dir: string, name: string] {
-  const trail = path.endsWith("/") ? "/" : "";
-  const bare = trail ? path.slice(0, -1) : path;
-  const i = bare.lastIndexOf("/");
-  return i < 0 ? ["", path] : [bare.slice(0, i + 1), bare.slice(i + 1) + trail];
+  const i = path.lastIndexOf("/");
+  return i < 0 ? ["", path] : [path.slice(0, i + 1), path.slice(i + 1)];
 }
 
 /** The Changes rows: conflicted files first, then the daemon's order. */

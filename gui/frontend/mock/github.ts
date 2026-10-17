@@ -74,7 +74,7 @@ type DetailInit = MessageInitShape<typeof WorktreeDetailSchema>;
 type GhEventInit = MessageInitShape<typeof GhEventSchema>;
 type ProjectEventInit = MessageInitShape<typeof ProjectEventSchema>;
 type IntentInit = MessageInitShape<typeof UiIntentSchema>;
-type FileInit = { path: string; status: string; added?: number; deleted?: number; binary?: boolean; uncommitted?: boolean; isDir?: boolean; oldPath?: string };
+type FileInit = { path: string; status: string; added?: number; deleted?: number; binary?: boolean; uncommitted?: boolean; oldPath?: string };
 
 const HOME = "/Users/dev";
 const CF = `${HOME}/src/code-foundry`;
@@ -254,8 +254,9 @@ export class GhWorld {
     this.details = new Map([
       [CF, this.detail(CF, "origin/main", [
         { path: ".pr1853.diff", status: "?", added: 1368, uncommitted: true },
-        { path: "notes/", status: "?", uncommitted: true, isDir: true },
         { path: "README.md", status: "M", added: 3, deleted: 1, uncommitted: true },
+        { path: "notes/plan.md", status: "?", added: 12, uncommitted: true },
+        { path: "notes/todo.md", status: "?", added: 4, uncommitted: true },
       ], [])],
       [`${CFW}/feat-sidebar`, this.detail(`${CFW}/feat-sidebar`, "origin/main", [
         { path: "gui/frontend/src/components/sidebar/Sidebar.tsx", status: "M", added: 120, deleted: 44 },
@@ -346,7 +347,7 @@ export class GhWorld {
     const d = this.details.get(path);
     if (!d) return;
     const rest = (d.files ?? []).filter((f) => f.status !== "U");
-    d.files = [...names.map((p) => ({ path: p, status: "U", added: 0, deleted: 0, binary: false, uncommitted: true, isDir: false, oldPath: "" })), ...rest];
+    d.files = [...names.map((p) => ({ path: p, status: "U", added: 0, deleted: 0, binary: false, uncommitted: true, oldPath: "" })), ...rest];
     d.computedAt = timestampFromDate(new Date());
     this.publishProjectEvent({ event: { case: "worktreeDetailUpdated", value: { projectId: d.projectId, path, computedAt: d.computedAt } } });
   }
@@ -365,7 +366,7 @@ export class GhWorld {
       baseRef,
       mergeBase: "3c3c4651aa",
       head: log[0]?.[0] ?? "3c3c4651aa",
-      files: files.map((f) => ({ oldPath: "", added: 0, deleted: 0, binary: false, uncommitted: false, isDir: false, ...f })),
+      files: files.map((f) => ({ oldPath: "", added: 0, deleted: 0, binary: false, uncommitted: false, ...f })),
       filesTruncated: false,
       log: log.map(([sha, subject, ago]) => ({ sha: `${sha}${"0".repeat(40 - sha.length)}`, shortSha: sha.slice(0, 7), subject, authorName: "Alex", authorEmail: "alex@example.com", authoredAt: this.at(ago) })),
       logTotal: log.length,
@@ -444,7 +445,7 @@ export class GhWorld {
   touch(path: string): boolean {
     const d = this.details.get(path);
     if (!d) return false;
-    d.files = [...(d.files ?? []), { path: "later.txt", status: "?", added: 1, deleted: 0, binary: false, uncommitted: true, isDir: false, oldPath: "" }];
+    d.files = [...(d.files ?? []), { path: "later.txt", status: "?", added: 1, deleted: 0, binary: false, uncommitted: true, oldPath: "" }];
     d.computedAt = timestampFromDate(new Date());
     this.publishProjectEvent({ event: { case: "worktreeDetailUpdated", value: { projectId: d.projectId, path, computedAt: d.computedAt } } });
     return true;

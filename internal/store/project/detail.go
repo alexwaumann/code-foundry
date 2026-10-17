@@ -51,8 +51,6 @@ type FileChange struct {
 	Binary         bool
 	// Uncommitted is set for working tree and index changes.
 	Uncommitted bool
-	// IsDir marks an untracked directory reported as one entry ("dir/").
-	IsDir bool
 }
 
 // LogEntry is one commit.
@@ -92,12 +90,25 @@ func (WorktreeDetailUpdated) isProjectEvent() {}
 type wtKey struct{ projectID, path string }
 
 // detailState is the Git store's detail cache. Zero value is ready to use. Each
-// worktree's entries in cache and heads are written only by its jobDetail.
+// worktree's entries in cache, heads, and lines are written only by its jobDetail.
 type detailState struct {
 	mu        sync.Mutex
 	requested map[wtKey]time.Time
 	cache     map[wtKey]WorktreeDetail
 	heads     map[wtKey]*headPart
+	lines     map[wtKey]lineMemo
+}
+
+// lineMemo is a worktree's untracked files' line counts by path, kept only for the
+// paths its last dirty detail listed as untracked. Immutable once stored.
+type lineMemo map[string]lineCount
+
+// lineCount is countLines' result for one file as os.Stat saw it.
+type lineCount struct {
+	size   int64
+	mtime  time.Time
+	lines  int
+	binary bool
 }
 
 // headKey is what the HEAD-only part of a detail depends on.
@@ -193,14 +204,15 @@ func (g *Git) detail(ctx context.Context, projectID, path string) {
 		ds.mu.Lock()
 		delete(ds.cache, k)
 		delete(ds.heads, k)
+		delete(ds.lines, k)
 		delete(ds.requested, k)
 		ds.mu.Unlock()
 		return
 	}
 	wt := *slot.cur.Load()
-	var unmerged []string
-	if u := slot.unmerged.Load(); u != nil {
-		unmerged = *u
+	var entries []statusEntry
+	if e := slot.entries.Load(); e != nil {
+		entries = *e
 	}
 	d := WorktreeDetail{ProjectID: projectID, Path: path, Head: wt.Head}
 	var baseSHA string
@@ -208,14 +220,18 @@ func (g *Git) detail(ctx context.Context, projectID, path string) {
 	// The status job that triggered this ran just before, so a clean status is current.
 	clean := !wt.Status.Dirty && wt.Status.Error == "" && !wt.Status.RefreshedAt.IsZero()
 	ds.mu.Lock()
-	hp := ds.heads[k]
+	hp, lm := ds.heads[k], ds.lines[k]
 	ds.mu.Unlock()
-	hp, runs, err := g.fillDetail(ctx, &d, baseSHA, clean, unmerged, hp)
+	hp, runs, err := g.fillDetail(ctx, &d, baseSHA, clean, entries, hp)
 	if ctx.Err() != nil {
 		return
 	}
+	var reads int
+	if err == nil {
+		lm, reads = countUntracked(d.Path, d.Files, lm)
+	}
 	g.log.Debug("worktree detail", "project", projectID, "path", path, "head", shortSHA(d.Head),
-		"base", d.BaseRef, "clean", clean, "git_runs", runs, "err", err)
+		"base", d.BaseRef, "clean", clean, "git_runs", runs, "untracked_reads", reads, "err", err)
 	ds.mu.Lock()
 	ds.initLocked()
 	prev, had := ds.cache[k]
@@ -223,7 +239,7 @@ func (g *Git) detail(ctx context.Context, projectID, path string) {
 		d = prev
 		d.ProjectID, d.Path, d.Error = projectID, path, err.Error()
 	} else {
-		ds.heads[k] = hp
+		ds.heads[k], ds.lines[k] = hp, lm
 	}
 	d.ComputedAt = g.now()
 	ds.cache[k] = d
@@ -240,6 +256,7 @@ func (g *Git) detail(ctx context.Context, projectID, path string) {
 func (ds *detailState) initLocked() {
 	if ds.cache == nil {
 		ds.requested, ds.cache, ds.heads = map[wtKey]time.Time{}, map[wtKey]WorktreeDetail{}, map[wtKey]*headPart{}
+		ds.lines = map[wtKey]lineMemo{}
 	}
 }
 
@@ -279,16 +296,16 @@ func gitDiff(extra ...string) []string {
 // exactly a function of its key even if a ref moves while this runs (the status job
 // that sees the move schedules another detail).
 //
-// unmerged is the worktree's conflicted paths as its last status saw them
-// (wtSlot.unmerged). The uncommitted diff against HEAD never looks at index stages, so
-// it reports them as M; they are marked U here instead, keeping their counts. That
-// needs no git command.
+// entries is the worktree's changed paths as its last status saw them
+// (wtSlot.entries). A dirty worktree's uncommitted letters and untracked files come
+// from them (uncommittedFiles), so the only working-tree command is the numstat from
+// the merge base, for the counts. Untracked files' counts are filled in afterwards
+// (countUntracked).
 //
-// A clean worktree (per status) skips the working-tree scans: the uncommitted diff and
-// the untracked listing are empty, and counts come from a tree-to-tree diff, which is
-// itself cached in the head part. A clean worktree whose key did not change therefore
-// runs no git at all.
-func (g *Git) fillDetail(ctx context.Context, d *WorktreeDetail, baseSHA string, clean bool, unmerged []string, hp *headPart) (*headPart, int, error) {
+// A clean worktree (per status) skips even that: counts come from a tree-to-tree diff,
+// which is itself cached in the head part. A clean worktree whose key did not change
+// therefore runs no git at all.
+func (g *Git) fillDetail(ctx context.Context, d *WorktreeDetail, baseSHA string, clean bool, entries []statusEntry, hp *headPart) (*headPart, int, error) {
 	dir := d.Path
 	runs := 0
 	run := func(args ...string) ([]byte, error) {
@@ -326,29 +343,99 @@ func (g *Git) fillDetail(ctx context.Context, d *WorktreeDetail, baseSHA string,
 	}
 
 	from := cmp.Or(hp.mergeBase, d.Head, emptyTree)
-	out, err := run(gitDiff("--name-status", cmp.Or(d.Head, emptyTree))...)
+	out, err := run(gitDiff("--numstat", from)...) // merge base to working tree
 	if err != nil {
 		return nil, runs, err
 	}
-	uncommitted := parseNameStatusZ(out)
-	for _, p := range unmerged { // after the diff's entry for the path, so U wins in mergeFiles
-		uncommitted = append(uncommitted, nameStatus{status: "U", path: p})
-	}
-	if out, err = run("ls-files", "--others", "--exclude-standard", "--directory", "--no-empty-directory", "-z"); err != nil {
-		return nil, runs, err
-	}
-	untracked := splitZ(out)
-	if out, err = run(gitDiff("--numstat", from)...); err != nil { // merge base to working tree
-		return nil, runs, err
-	}
+	uncommitted, untracked := uncommittedFiles(entries)
 	d.Files, d.FilesTruncated = mergeFiles(hp.committed, uncommitted, parseNumstatZ(out), untracked)
-	for i := range d.Files {
-		f := &d.Files[i]
-		if f.Status == "?" && !f.IsDir {
-			f.Added, f.Binary = countLines(filepath.Join(dir, f.Path))
+	return hp, runs, nil
+}
+
+// uncommittedFiles derives from status entries what `git diff --name-status -M HEAD`
+// and `git ls-files --others --exclude-standard` used to report: one letter per path
+// comparing HEAD with the working tree (headToWorktree), U for a conflicted path, and
+// the untracked paths.
+func uncommittedFiles(entries []statusEntry) (changes []nameStatus, untracked []string) {
+	for _, e := range entries {
+		switch {
+		case e.Untracked:
+			untracked = append(untracked, e.Path)
+		case e.Unmerged:
+			changes = append(changes, nameStatus{status: "U", path: e.Path})
+		default:
+			if ns, ok := headToWorktree(e); ok {
+				changes = append(changes, ns)
+			}
 		}
 	}
-	return hp, runs, nil
+	return changes, untracked
+}
+
+// headToWorktree maps a tracked entry's XY (HEAD → index, index → working tree) to
+// one letter for HEAD → working tree, in this order:
+//
+//   - AD, CD: added (or copied) in the index, then deleted from the working tree. The
+//     path is in neither HEAD nor the working tree, so nothing changed (the diff
+//     against HEAD does not list it either).
+//   - RD: renamed in the index, then the new path deleted. The old path is gone: D at
+//     the old path.
+//   - A on either side: A (Y is A for an intent-to-add path, `git add -N`).
+//   - D on either side: D.
+//   - R or C in the index: that letter, with the source path (RM, CM, RT included).
+//   - T on either side: T.
+//   - anything else (M., .M, MM): M.
+func headToWorktree(e statusEntry) (nameStatus, bool) {
+	x, y := e.X, e.Y
+	switch {
+	case y == 'D' && (x == 'A' || x == 'C'):
+		return nameStatus{}, false
+	case y == 'D' && x == 'R':
+		return nameStatus{status: "D", path: e.OrigPath}, true
+	case x == 'A' || y == 'A':
+		return nameStatus{status: "A", path: e.Path}, true
+	case x == 'D' || y == 'D':
+		return nameStatus{status: "D", path: e.Path}, true
+	case x == 'R' || x == 'C':
+		return nameStatus{status: string(x), path: e.Path, oldPath: e.OrigPath}, true
+	case x == 'T' || y == 'T':
+		return nameStatus{status: "T", path: e.Path}, true
+	default:
+		return nameStatus{status: "M", path: e.Path}, true
+	}
+}
+
+// countUntracked fills in the line counts of d's untracked files (status "?"), reusing
+// prev's count for a file whose size and modification time have not changed. It
+// returns the memo for the next run, holding only the files listed now, and how many
+// files it read. It writes only "?" rows, so a clean worktree's cached (shared) file
+// list, which has none, is never touched.
+func countUntracked(dir string, files []FileChange, prev lineMemo) (lineMemo, int) {
+	var next lineMemo
+	reads := 0
+	for i := range files {
+		f := &files[i]
+		if f.Status != "?" {
+			continue
+		}
+		p := filepath.Join(dir, f.Path)
+		fi, err := os.Stat(p)
+		if err != nil {
+			continue // gone since status ran: no count, nothing to remember
+		}
+		c, ok := prev[f.Path]
+		if !ok || c.size != fi.Size() || !c.mtime.Equal(fi.ModTime()) {
+			c = lineCount{size: fi.Size(), mtime: fi.ModTime()}
+			c.lines, c.binary = countLines(p)
+			reads++
+		}
+		f.Added, f.Binary = c.lines, c.binary
+		if next == nil {
+			next = lineMemo{}
+		}
+		next[f.Path] = c
+	}
+	return next, reads
 }
 
 // computeHeadPart runs the HEAD-only commands for key: merge-base, the committed
@@ -387,6 +474,9 @@ func computeHeadPart(key headKey, run func(...string) ([]byte, error)) (*headPar
 }
 
 // mergeFiles combines branch and working tree changes into one sorted, capped list.
+// A path in both keeps the working tree's letter. An untracked path that is also a
+// change (`git rm --cached` leaves D in the index and the file on disk) keeps the
+// change.
 func mergeFiles(committed, uncommitted []nameStatus, counts map[string]numstat, untracked []string) ([]FileChange, bool) {
 	byPath := map[string]*FileChange{}
 	put := func(ns nameStatus, unc bool) {
@@ -408,7 +498,7 @@ func mergeFiles(committed, uncommitted []nameStatus, counts map[string]numstat, 
 	}
 	for _, p := range untracked {
 		if _, ok := byPath[p]; !ok {
-			byPath[p] = &FileChange{Path: p, Status: "?", Uncommitted: true, IsDir: strings.HasSuffix(p, "/")}
+			byPath[p] = &FileChange{Path: p, Status: "?", Uncommitted: true}
 		}
 	}
 	out := make([]FileChange, 0, len(byPath))

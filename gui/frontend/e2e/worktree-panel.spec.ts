@@ -403,8 +403,10 @@ test.describe("the overview", () => {
     await expect(s.getByTestId("fact-base")).toHaveText("vs maineven");
     await expect(s.getByTestId("fact-tree")).toHaveText("working treeclean");
     await expect(fileRow(page, ".pr1853.diff")).toContainText("+1368");
-    await expect(fileRow(page, "notes/").locator("[data-status]")).toHaveText("?");
-    await expect(fileRow(page, "notes/").getByTestId("file-name")).toHaveText("notes/");
+    // An untracked directory arrives as its files, each with its line count.
+    await expect(fileRow(page, "notes/todo.md").locator("[data-status]")).toHaveText("?");
+    await expect(fileRow(page, "notes/todo.md").getByTestId("file-name")).toHaveText("todo.md");
+    await expect(fileRow(page, "notes/plan.md")).toContainText("+12");
     await expect(s.getByTestId("worktree-commits")).toHaveCount(0);
 
     const calls = async () => ((await (await fetch(`${mockUrl}/__mock/gh/calls`)).json()) as Record<string, number>).GetWorktreeDetail ?? 0;
