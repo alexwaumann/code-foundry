@@ -3,7 +3,7 @@ import { Plus, SquareTerminal, X } from "lucide-react";
 import { ActionEcho, ActionStatusLine, ActionTabIcon, ActionTabStatusMark } from "@/components/actions/ActionTabParts";
 import { CommandButton } from "@/components/command/CommandButton";
 import { revealTab } from "@/components/panel/reveal";
-import { useNoProjectThread } from "@/components/session/useNoProject";
+import { useNoProjectThread } from "@/components/thread/useNoProject";
 import { TerminalHost, type TerminalHostHandle } from "@/components/terminal/TerminalHost";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
@@ -19,7 +19,7 @@ import {
   bottomTabTitleOf,
   getBottomActiveId,
   requestBottomFocus,
-  sessionOfKey,
+  threadOfKey,
   toggleBottom,
   useBottomActiveId,
   useBottomHeight,
@@ -68,7 +68,7 @@ function useIsAction(id: string | null): boolean {
  * `focusable` is the roving tabindex: only the active tab (and its ×) is in the Tab order.
  */
 function TerminalTab({ panelKey, id, active, focusable }: { panelKey: string; id: string; active: boolean; focusable: boolean }) {
-  const noProject = useNoProjectThread(sessionOfKey(panelKey));
+  const noProject = useNoProjectThread(threadOfKey(panelKey));
   const title = useTerminalsStore((s) => bottomTabTitleOf(s, panelKey, id, noProject));
   const cwd = useTerminalsStore((s) => s.byId[id]?.cwd ?? "");
   const action = useIsAction(id);

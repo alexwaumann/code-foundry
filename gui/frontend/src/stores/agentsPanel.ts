@@ -5,7 +5,7 @@
 import { agentsTab, selectionAgentsThread } from "@/surfaces/agentsTarget";
 import { keyOf, openSurface } from "./panel";
 import { useReposStore } from "./repos";
-import { useSessionsStore } from "./sessions";
+import { useThreadsStore } from "./threads";
 import { useUiStore, type Selection } from "./ui";
 
 /**
@@ -14,7 +14,7 @@ import { useUiStore, type Selection } from "./ui";
  */
 export function openAgentsSurface(sel: Selection = useUiStore.getState().selection): string | null {
   const key = keyOf(sel);
-  const s = { repos: useReposStore.getState(), sessions: useSessionsStore.getState() };
+  const s = { repos: useReposStore.getState(), threads: useThreadsStore.getState() };
   if (key === null || selectionAgentsThread(sel, s) === null) return null;
   return openSurface(key, agentsTab()) ? key : null;
 }

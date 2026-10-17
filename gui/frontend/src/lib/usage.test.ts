@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { UsageBucketView } from "@/api/session";
+import type { UsageBucketView } from "@/api/threads";
 import { bucketTokens, emptyTotals, fmtRequests, fmtShare, fmtTok, fmtUsd, modelColorVars, modelSlot, TOKEN_KINDS, totalUsage, usageByModel } from "./usage";
 
 function bucket(model: string, o: Partial<UsageBucketView> = {}): UsageBucketView {

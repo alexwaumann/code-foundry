@@ -26,7 +26,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Chip } from "@/components/session/Chip";
+import { Chip } from "@/components/thread/Chip";
 import { ThreadMarkdown } from "@/components/thread/Code";
 import { UserBubble } from "@/components/thread/UserBubble";
 import "@/components/thread/thread.css";
@@ -488,7 +488,7 @@ function DialogCard() {
     <div className="rounded-md bg-sheet p-2">
       <div className="rounded-lg border bg-popover p-3 text-popover-foreground shadow-2xl">
         <p className="text-heading">Archive 2 busy threads?</p>
-        <p className="mt-1 text-caption">Their sessions stop and their shells close. You can unarchive them later.</p>
+        <p className="mt-1 text-caption">Claude stops in them and their shells close. You can unarchive them later.</p>
         <Input readOnly tabIndex={-1} aria-label="Reason" placeholder="Reason (optional)" className="mt-2 h-8" />
         <div className="mt-2.5 flex justify-end gap-2">
           <Button variant="outline" size="xs" tabIndex={-1}>

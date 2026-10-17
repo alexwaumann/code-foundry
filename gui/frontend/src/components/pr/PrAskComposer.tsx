@@ -1,22 +1,22 @@
 import { CornerDownLeft, MessageCircleQuestion } from "lucide-react";
 import { useState } from "react";
-import { startingKey, startPrSession, usePrSessionsStore } from "@/stores/prSessions";
+import { startingKey, startPrThread, usePrThreadsStore } from "@/stores/prThreads";
 import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { PanelComposer } from "./PanelComposer";
 
 /** The hint while nothing runs: narrow enough for a 280px panel. */
 export const ASK_KEYS_HINT = "⏎ send · ⇧⏎ newline";
 /** The hint while this composer's pr.ask runs. */
-export const ASK_SENDING_HINT = "Starting a session…";
+export const ASK_SENDING_HINT = "Starting a thread…";
 /** The hint while pr.ask for the same pull request runs from another surface. */
 export const ASK_ELSEWHERE_HINT = "Already starting a thread for this pull request";
 
 /**
  * Menu → Ask a question: an inline composer under the PR header (PanelComposer). Enter
- * sends the question through pr.ask (startPrSession), Shift+Enter is a newline, Escape
+ * sends the question through pr.ask (startPrThread), Shift+Enter is a newline, Escape
  * cancels. While its command runs the field is read-only and the composer cannot be
- * cancelled (the session starts either way); on success the daemon focuses the new
- * session and the composer closes, handing focus to the panel. A failure is toasted and
+ * cancelled (the thread starts either way); on success the daemon focuses the new
+ * thread and the composer closes, handing focus to the panel. A failure is toasted and
  * the text stays. While pr.ask for the same pull request runs from another surface, the
  * Ask button shows that spinner and the hint says so; the text stays editable.
  *
@@ -26,16 +26,16 @@ export const ASK_ELSEWHERE_HINT = "Already starting a thread for this pull reque
 export function PrAskComposer({ prRef, focusRequest, onClose }: { prRef: PrRef; focusRequest: number; onClose: () => void }) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
-  const busy = usePrSessionsStore((s) => s.starting[startingKey(prRef, "ask")] ?? false);
+  const busy = usePrThreadsStore((s) => s.starting[startingKey(prRef, "ask")] ?? false);
   const elsewhere = busy && !sending;
 
   const send = async (): Promise<boolean> => {
     if (sending || !text.trim()) return false;
-    // Another surface's pr.ask for this pull request: startPrSession would send nothing.
-    if (usePrSessionsStore.getState().starting[startingKey(prRef, "ask")]) return false;
+    // Another surface's pr.ask for this pull request: startPrThread would send nothing.
+    if (usePrThreadsStore.getState().starting[startingKey(prRef, "ask")]) return false;
     setSending(true);
     try {
-      return (await startPrSession("ask", prRef, text)) !== null;
+      return (await startPrThread("ask", prRef, text)) !== null;
     } finally {
       setSending(false);
     }

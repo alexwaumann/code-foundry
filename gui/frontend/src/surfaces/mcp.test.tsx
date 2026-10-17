@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { McpServerView, McpStatusView } from "@/api/mcp";
-import type { SessionView } from "@/api/session";
+import type { ThreadView } from "@/api/threads";
 
 const toast = vi.hoisted(() => Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), info: vi.fn() }));
 vi.mock("sonner", () => ({ toast }));
@@ -13,13 +13,13 @@ vi.mock("@/api/mcp", async (orig) => ({ ...(await orig<typeof import("@/api/mcp"
 const { SidePanel } = await import("@/components/panel/SidePanel");
 const { getPanel, usePanelStore } = await import("@/stores/panel");
 const { useReposStore } = await import("@/stores/repos");
-const { useSessionsStore } = await import("@/stores/sessions");
+const { useThreadsStore } = await import("@/stores/threads");
 const { useThreadStore } = await import("@/stores/thread");
 const { useUiStore } = await import("@/stores/ui");
 const { mcpPanelCommand, showView, useViewsStore } = await import("@/stores/views");
 
 const thread = (id: string, state = "connected") =>
-  ({ id, name: `thread ${id}`, repoId: "web", worktreePath: "/src/web", workspaceId: "", pendingWorktreePath: "", state, status: "idle", linkedPullRequests: [], usage: [] }) as unknown as SessionView;
+  ({ id, name: `thread ${id}`, repoId: "web", worktreePath: "/src/web", workspaceId: "", pendingWorktreePath: "", state, status: "idle", linkedPullRequests: [], usage: [] }) as unknown as ThreadView;
 
 function server(name: string, o: Partial<McpServerView> = {}): McpServerView {
   return { name, status: "connected", serverName: "", version: "", error: "", scope: "user", source: "user", transport: "stdio", tools: [], ...o };
@@ -55,10 +55,10 @@ const row = () => screen.queryByTestId("panel-empty")?.querySelector('[data-surf
 
 beforeEach(() => {
   useReposStore.setState({ byId: {}, order: [] });
-  useSessionsStore.setState({ byId: { "s-r": thread("s-r"), "s-off": thread("s-off", "disconnected") }, order: ["s-r", "s-off"] });
-  usePanelStore.setState({ byKey: { "session:s-r": { open: true, tabs: [], activeTabId: null }, "session:s-off": { open: true, tabs: [], activeTabId: null }, "view:projects": { open: true, tabs: [], activeTabId: null } } });
+  useThreadsStore.setState({ byId: { "s-r": thread("s-r"), "s-off": thread("s-off", "disconnected") }, order: ["s-r", "s-off"] });
+  usePanelStore.setState({ byKey: { "thread:s-r": { open: true, tabs: [], activeTabId: null }, "thread:s-off": { open: true, tabs: [], activeTabId: null }, "view:projects": { open: true, tabs: [], activeTabId: null } } });
   useViewsStore.setState({ settingsOpen: false });
-  useUiStore.setState({ windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260, selection: { kind: "session", id: "s-r" }, palette: { ...useUiStore.getState().palette, open: false } });
+  useUiStore.setState({ windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260, selection: { kind: "thread", id: "s-r" }, palette: { ...useUiStore.getState().palette, open: false } });
   useThreadStore.setState({ logs: {} });
   setMcp("s-r", STATUS);
   api.get.mockResolvedValue(null);
@@ -84,7 +84,7 @@ describe("MCP surface", () => {
   it("shows the header and one card per server in every state", () => {
     render(<SidePanel />);
     fireEvent.keyDown(screen.getByTestId("side-panel"), { key: "m" });
-    expect(getPanel("session:s-r").activeTabId).toBe("mcp");
+    expect(getPanel("thread:s-r").activeTabId).toBe("mcp");
     expect(screen.getByTestId("mcp-count").textContent).toBe("1 of 5 connected");
     expect(screen.getByTestId("mcp-checked").textContent).toBe("Checked 12s ago, at the start of the last turn");
     expect(cards().map((c) => [c.getAttribute("data-server"), c.getAttribute("data-status"), within(c, "mcp-pill")?.textContent])).toEqual([
@@ -179,7 +179,7 @@ describe("MCP surface", () => {
     expect(api.get).toHaveBeenCalledWith("s-r");
     cleanup();
 
-    useUiStore.setState({ selection: { kind: "session", id: "s-off" } });
+    useUiStore.setState({ selection: { kind: "thread", id: "s-off" } });
     setMcp("s-off", null);
     act(() => {
       showView("panel.mcp");
@@ -194,7 +194,7 @@ describe("MCP surface", () => {
 
   it("a stopped thread keeps its last status, with Refresh and Reconnect enabled (the daemon starts Claude for them)", () => {
     commands.run.mockResolvedValue({ message: "", resultJson: "{}" });
-    useUiStore.setState({ selection: { kind: "session", id: "s-off" } });
+    useUiStore.setState({ selection: { kind: "thread", id: "s-off" } });
     setMcp("s-off", STATUS);
     act(() => {
       showView("panel.mcp");

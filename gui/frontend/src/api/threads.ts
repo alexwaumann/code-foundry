@@ -18,20 +18,20 @@ import { orOutdatedDaemon } from "./errors";
  * Where the thread's Claude process is. The daemon manages it (starts it on a message,
  * stops it at cache expiry) and it is internal to the GUI: nothing on screen says it
  * (docs/notes/hide-connection-state.md). Read it only where behaviour needs it, through
- * lib/session (sessionBadge, threadGroup, restartCutsOff).
+ * lib/thread (threadBadge, threadGroup, restartCutsOff).
  */
-export type SessionStateView = "starting" | "connected" | "closing" | "disconnected" | "unknown";
+export type ThreadStateView = "starting" | "connected" | "closing" | "disconnected" | "unknown";
 /**
- * What Claude is doing. Persisted by the daemon: a stopped session keeps the status it
+ * What Claude is doing. Persisted by the daemon: a stopped thread keeps the status it
  * ended with ("attention" with its reason survives a restart). "error" is set on a
- * session whose process ended mid-turn (statusReason "interrupted") or did not start.
+ * thread whose process ended mid-turn (statusReason "interrupted") or did not start.
  */
-export type SessionStatusView = "busy" | "idle" | "attention" | "error" | "unknown";
-/** claude --permission-mode, as session.new's `permission` arg spells it; "" = Claude's default. */
+export type ThreadStatusView = "busy" | "idle" | "attention" | "error" | "unknown";
+/** claude --permission-mode, as thread.new's `permission` arg spells it; "" = Claude's default. */
 export type PermissionModeView = "supervised" | "accept-edits" | "auto" | "";
 
-/** View model for a Claude session. Generated types stay inside src/api. */
-export interface SessionView {
+/** View model for a thread (Claude Code session plus its worktree and status). Generated types stay inside src/api. */
+export interface ThreadView {
   id: string;
   claudeSessionId: string;
   repoId: string;
@@ -40,11 +40,11 @@ export interface SessionView {
   autoNamed: boolean;
   model: string;
   effort: string;
-  state: SessionStateView;
-  status: SessionStatusView;
+  state: ThreadStateView;
+  status: ThreadStatusView;
   /**
    * The reason for status, e.g. "finished", "at prompt", "permission: Bash git push",
-   * "question: Which one?", or "interrupted" for "error". Classify it with statusKind / statusDetail (lib/session), not by hand.
+   * "question: Which one?", or "interrupted" for "error". Classify it with statusKind / statusDetail (lib/thread), not by hand.
    */
   statusReason: string;
   /** When status or statusReason last changed, epoch ms; null if never known. */
@@ -53,9 +53,9 @@ export interface SessionView {
   lastActivityAtMs: number | null;
   parentId: string;
   permissionMode: PermissionModeView;
-  /** Ref the session's worktree branch was created from ("" unless createdWorktree). */
+  /** Ref the thread's worktree branch was created from ("" unless createdWorktree). */
   baseRef: string;
-  /** session.new made the worktree for this session. */
+  /** thread.new made the worktree for this thread. */
   createdWorktree: boolean;
   /**
    * The workspace that owns the thread; "" for a project thread (owned by repoId).
@@ -67,16 +67,16 @@ export interface SessionView {
    * prompt; "" when nothing is queued. worktreePath changes when the move happens.
    */
   pendingWorktreePath: string;
-  /** The user pinned the thread (session.pin): it sits in the sidebar's Pinned section. */
+  /** The user pinned the thread (thread.pin): it sits in the sidebar's Pinned section. */
   pinned: boolean;
   /**
-   * When the user archived the thread (session.archive), epoch ms; null when it is not
+   * When the user archived the thread (thread.archive), epoch ms; null when it is not
    * archived. An archived thread is stopped, unpinned and has no shells; pinning or
    * sending unarchives it. docs/notes/archive-threads-1-daemon.md.
    */
   archivedAtMs: number | null;
   /**
-   * When a snoozed thread wakes (session.snooze), epoch ms; null when it is not snoozed. A
+   * When a snoozed thread wakes (thread.snooze), epoch ms; null when it is not snoozed. A
    * snoozed thread is stopped, unpinned, not archived and has no shells. The daemon
    * wakes it: this becomes null and the thread needs attention with status reason
    * "snooze ended" (statusChangedAtMs = the wake). Pinning, archiving or sending
@@ -116,7 +116,7 @@ export interface SessionView {
   contextTokens: number;
   /**
    * When the conversation's prompt cache expires (its last result plus the
-   * sessions.cache_ttl_seconds setting), epoch ms; null before the first result. Past it, the next message re-reads contextTokens.
+   * threads.cache_ttl_seconds setting), epoch ms; null before the first result. Past it, the next message re-reads contextTokens.
    */
   cacheExpiresAtMs: number | null;
   /** What re-reading contextTokens costs once the cache expired, USD; 0 when unpriced. */
@@ -175,7 +175,7 @@ export interface AgentRunView {
   /** 1: spawned by the thread; 2+: by another run. */
   spawnDepth: number;
   startedAtMs: number | null;
-  /** The run's own usage, priced like the session's. */
+  /** The run's own usage, priced like the thread's. */
   usage: UsageBucketView[];
   costUsd: number;
   unpriced: boolean;
@@ -222,17 +222,17 @@ export interface LinkedPullRequestView {
 }
 
 /**
- * Session events. retiredUsage is the usage of removed threads summed per (model, tier,
- * speed, day): usage over every thread is the sessions' usage plus it. A "retiredUsage"
+ * Thread events. retiredUsage is the usage of removed threads summed per (model, tier,
+ * speed, day): usage over every thread is the threads' usage plus it. A "retiredUsage"
  * event follows "removed" when the removed thread had usage and carries the whole ledger.
  */
-export type SessionEventView =
-  | { kind: "snapshot"; sessions: SessionView[]; retiredUsage: UsageBucketView[] }
-  | { kind: "updated"; session: SessionView }
+export type ThreadListEventView =
+  | { kind: "snapshot"; threads: ThreadView[]; retiredUsage: UsageBucketView[] }
+  | { kind: "updated"; thread: ThreadView }
   | { kind: "removed"; id: string }
   | { kind: "retiredUsage"; buckets: UsageBucketView[] };
 
-const stateMap: Record<ThreadState, SessionStateView> = {
+const stateMap: Record<ThreadState, ThreadStateView> = {
   [ThreadState.UNSPECIFIED]: "unknown",
   [ThreadState.STARTING]: "starting",
   [ThreadState.CONNECTED]: "connected",
@@ -240,7 +240,7 @@ const stateMap: Record<ThreadState, SessionStateView> = {
   [ThreadState.DISCONNECTED]: "disconnected",
 };
 
-const statusMap: Record<ThreadStatus, SessionStatusView> = {
+const statusMap: Record<ThreadStatus, ThreadStatusView> = {
   [ThreadStatus.UNSPECIFIED]: "unknown",
   [ThreadStatus.BUSY]: "busy",
   [ThreadStatus.IDLE]: "idle",
@@ -255,7 +255,7 @@ const permissionMap: Record<PermissionMode, PermissionModeView> = {
   [PermissionMode.AUTO]: "auto",
 };
 
-export function toSessionView(s: Thread): SessionView {
+export function toThreadView(s: Thread): ThreadView {
   return {
     id: s.id,
     claudeSessionId: s.claudeSessionId,
@@ -344,13 +344,13 @@ export function toUsageBucketView(b: UsageBucket): UsageBucketView {
   };
 }
 
-export function toSessionEventView(ev: ThreadListEvent): SessionEventView | null {
+export function toThreadListEventView(ev: ThreadListEvent): ThreadListEventView | null {
   const e = ev.event;
   switch (e.case) {
     case "snapshot":
-      return { kind: "snapshot", sessions: e.value.threads.map(toSessionView), retiredUsage: e.value.retiredUsage.map(toUsageBucketView) };
+      return { kind: "snapshot", threads: e.value.threads.map(toThreadView), retiredUsage: e.value.retiredUsage.map(toUsageBucketView) };
     case "updated":
-      return { kind: "updated", session: toSessionView(e.value) };
+      return { kind: "updated", thread: toThreadView(e.value) };
     case "removedId":
       return { kind: "removed", id: e.value };
     case "retiredUsage":
@@ -360,10 +360,10 @@ export function toSessionEventView(ev: ThreadListEvent): SessionEventView | null
   }
 }
 
-export async function listSessions(conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<SessionView[]> {
+export async function listThreads(conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<ThreadView[]> {
   const c = await conn.client(ThreadService);
   const res = await c.list({}, { signal });
-  return res.threads.map(toSessionView);
+  return res.threads.map(toThreadView);
 }
 
 /**

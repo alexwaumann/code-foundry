@@ -11,7 +11,7 @@ describe("togglePanelCommand", () => {
     usePanelStore.setState({ byKey: {} });
     useViewsStore.setState({ settingsOpen: false, helpOpen: false });
     useUiStore.setState({
-      selection: { kind: "session", id: "a" },
+      selection: { kind: "thread", id: "a" },
       focus: "content",
       panelFocusSeq: 0,
       contentFocusSeq: 0,
@@ -51,7 +51,7 @@ describe("togglePanelCommand", () => {
       ["hiding keeps another return target", true, "sidebar", "sidebar"],
     ];
     it.each(cases)("%s", (_name, wasOpen, returnTo, want) => {
-      if (wasOpen) usePanelStore.setState({ byKey: { "session:a": { open: true, tabs: [], activeTabId: null } } });
+      if (wasOpen) usePanelStore.setState({ byKey: { "thread:a": { open: true, tabs: [], activeTabId: null } } });
       useUiStore.setState({ focus: "palette", palette: { ...closedPalette, open: true, returnTo } });
       expect(togglePanelCommand()).toBe(!wasOpen);
       const ui = useUiStore.getState();
@@ -70,7 +70,7 @@ describe("expandPanelCommand", () => {
     usePanelStore.setState({ byKey: {} });
     useViewsStore.setState({ settingsOpen: false, helpOpen: false });
     useUiStore.setState({
-      selection: { kind: "session", id: "a" },
+      selection: { kind: "thread", id: "a" },
       focus: "content",
       panelFocusSeq: 0,
       contentFocusSeq: 0,
@@ -97,7 +97,7 @@ describe("expandPanelCommand", () => {
   });
 
   it("a hidden expanded panel comes back expanded, not flipped", () => {
-    usePanelStore.setState({ byKey: { "session:a": { open: false, tabs: [], activeTabId: null, expanded: true } } });
+    usePanelStore.setState({ byKey: { "thread:a": { open: false, tabs: [], activeTabId: null, expanded: true } } });
     expect(expandPanelCommand()).toBe(true);
     expect(getPanel()).toMatchObject({ open: true, expanded: true });
   });
@@ -108,14 +108,14 @@ describe("expandPanelCommand", () => {
     ["from the panel leaves focus there", "panel", true, [0, 0, 0, 0]],
   ];
   it.each(focusCases)("expanding %s", (_name, focus, wasOpen, want) => {
-    if (wasOpen) usePanelStore.setState({ byKey: { "session:a": { open: true, tabs: [], activeTabId: null } } });
+    if (wasOpen) usePanelStore.setState({ byKey: { "thread:a": { open: true, tabs: [], activeTabId: null } } });
     useUiStore.setState({ focus });
     expect(expandPanelCommand()).toBe(true);
     expect(seqs()).toEqual(want);
   });
 
   it("restoring the split leaves focus where it is", () => {
-    usePanelStore.setState({ byKey: { "session:a": { open: true, tabs: [], activeTabId: null, expanded: true } } });
+    usePanelStore.setState({ byKey: { "thread:a": { open: true, tabs: [], activeTabId: null, expanded: true } } });
     useUiStore.setState({ focus: "panel" });
     expect(expandPanelCommand()).toBe(false);
     expect(seqs()).toEqual([0, 0, 0, 0]);
@@ -154,11 +154,11 @@ describe("newPanelTabCommand", () => {
   beforeEach(() => {
     usePanelStore.setState({ byKey: {} });
     useViewsStore.setState({ settingsOpen: false, usageOpen: false, helpOpen: false });
-    useUiStore.setState({ selection: { kind: "session", id: "a" }, focus: "content", panelFocusSeq: 0, palette: closedPalette });
+    useUiStore.setState({ selection: { kind: "thread", id: "a" }, focus: "content", panelFocusSeq: 0, palette: closedPalette });
   });
 
   it("starts picking in a hidden panel with tabs, shows it, and focuses it", () => {
-    usePanelStore.setState({ byKey: { "session:a": { open: false, tabs: [files, diff], activeTabId: diff.id } } });
+    usePanelStore.setState({ byKey: { "thread:a": { open: false, tabs: [files, diff], activeTabId: diff.id } } });
     expect(newPanelTabCommand()).toBe(true);
     expect(getPanel()).toEqual({ open: true, tabs: [files, diff], activeTabId: null, pickFrom: diff.id });
     expect(useUiStore.getState().panelFocusSeq).toBe(1);
@@ -187,7 +187,7 @@ describe("newPanelTabCommand", () => {
   });
 
   it("is what ShowView \"panel.new-tab\" runs", () => {
-    usePanelStore.setState({ byKey: { "session:a": { open: true, tabs: [files], activeTabId: files.id } } });
+    usePanelStore.setState({ byKey: { "thread:a": { open: true, tabs: [files], activeTabId: files.id } } });
     expect(showView("panel.new-tab")).toBe(true);
     expect(getPanel()).toMatchObject({ activeTabId: null, pickFrom: files.id });
   });
@@ -195,7 +195,7 @@ describe("newPanelTabCommand", () => {
 
 describe("showView", () => {
   it("\"dashboard\" selects the dashboard and closes settings", () => {
-    useUiStore.setState({ selection: { kind: "session", id: "a" } });
+    useUiStore.setState({ selection: { kind: "thread", id: "a" } });
     useViewsStore.setState({ settingsOpen: true, helpOpen: false });
     expect(showView("dashboard")).toBe(true);
     expect(useUiStore.getState().selection).toEqual({ kind: "view", name: "dashboard" });
@@ -207,7 +207,7 @@ describe("the usage page", () => {
   beforeEach(() => {
     usePanelStore.setState({ byKey: {} });
     useViewsStore.setState({ settingsOpen: false, usageOpen: false, helpOpen: false });
-    useUiStore.setState({ selection: { kind: "session", id: "a" }, promptFocusSeq: 0, palette: closedPalette });
+    useUiStore.setState({ selection: { kind: "thread", id: "a" }, promptFocusSeq: 0, palette: closedPalette });
   });
   const views = () => {
     const { settingsOpen, usageOpen, helpOpen } = useViewsStore.getState();
@@ -254,9 +254,9 @@ describe("the usage page", () => {
     const stop = startViewSync();
     try {
       useViewsStore.setState({ usageOpen: true });
-      useUiStore.getState().select({ kind: "session", id: "a" }); // same selection: stays open
+      useUiStore.getState().select({ kind: "thread", id: "a" }); // same selection: stays open
       expect(views().usageOpen).toBe(true);
-      useUiStore.getState().select({ kind: "session", id: "b" });
+      useUiStore.getState().select({ kind: "thread", id: "b" });
       expect(views().usageOpen).toBe(false);
     } finally {
       stop();
@@ -278,7 +278,7 @@ describe("toggleBottomCommand", () => {
     usePanelStore.setState({ byKey: {} });
     useViewsStore.setState({ settingsOpen: false, usageOpen: false, helpOpen: false });
     useUiStore.setState({
-      selection: { kind: "session", id: "a" },
+      selection: { kind: "thread", id: "a" },
       focus: "content",
       bottomFocusSeq: 0,
       contentFocusSeq: 0,
@@ -288,7 +288,7 @@ describe("toggleBottomCommand", () => {
 
   it("showing focuses the panel; hiding it from the panel focuses the content pane", () => {
     expect(toggleBottomCommand()).toBe(true);
-    expect(getBottom("session:a").open).toBe(true);
+    expect(getBottom("thread:a").open).toBe(true);
     expect(useUiStore.getState().bottomFocusSeq).toBe(1);
     useUiStore.setState({ focus: "bottom" });
     expect(toggleBottomCommand()).toBe(false);
@@ -307,7 +307,7 @@ describe("toggleBottomCommand", () => {
     ["the Pull Requests page", () => useUiStore.setState({ selection: { kind: "view", name: "pullrequests" } })],
     ["the settings page", () => { useViewsStore.setState({ settingsOpen: true }); }],
     ["the usage page", () => { useViewsStore.setState({ usageOpen: true }); }],
-    ["the side panel expanded", () => usePanelStore.setState({ byKey: { "session:a": { open: true, tabs: [], activeTabId: null, expanded: true } } })],
+    ["the side panel expanded", () => usePanelStore.setState({ byKey: { "thread:a": { open: true, tabs: [], activeTabId: null, expanded: true } } })],
   ];
   it.each(noops)("is a no-op with %s", (_name, arrange) => {
     arrange();
@@ -320,7 +320,7 @@ describe("toggleBottomCommand", () => {
     useUiStore.setState({ selection: { kind: "view", name: "projects" } });
     expect(toggleBottomCommand()).toBe(true);
     expect(getBottom("view:projects").open).toBe(true);
-    expect(getBottom("session:a").open).toBe(false);
+    expect(getBottom("thread:a").open).toBe(false);
   });
 
   describe("from the palette", () => {
@@ -330,7 +330,7 @@ describe("toggleBottomCommand", () => {
       ["hiding keeps another return target", true, "panel", "panel"],
     ];
     it.each(cases)("%s", (_name, wasOpen, returnTo, want) => {
-      if (wasOpen) useBottomStore.setState({ byKey: { "session:a": { open: true } } });
+      if (wasOpen) useBottomStore.setState({ byKey: { "thread:a": { open: true } } });
       useUiStore.setState({ focus: "palette", palette: { ...closedPalette, open: true, returnTo } });
       expect(toggleBottomCommand()).toBe(!wasOpen);
       expect(useUiStore.getState().palette.returnTo).toBe(want);
@@ -341,7 +341,7 @@ describe("toggleBottomCommand", () => {
 
   it("is what ShowView bottom.toggle does", () => {
     expect(showView("bottom.toggle")).toBe(true);
-    expect(getBottom("session:a").open).toBe(true);
+    expect(getBottom("thread:a").open).toBe(true);
   });
 });
 
@@ -349,7 +349,7 @@ describe("expandPanelCommand from the bottom panel", () => {
   beforeEach(() => {
     usePanelStore.setState({ byKey: {} });
     useViewsStore.setState({ settingsOpen: false, usageOpen: false, helpOpen: false });
-    useUiStore.setState({ selection: { kind: "session", id: "a" }, focus: "bottom", panelFocusSeq: 0, palette: closedPalette });
+    useUiStore.setState({ selection: { kind: "thread", id: "a" }, focus: "bottom", panelFocusSeq: 0, palette: closedPalette });
   });
 
   it("moves focus to the panel: expanding hides the bottom panel with the content column", () => {

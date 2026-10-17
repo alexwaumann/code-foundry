@@ -29,7 +29,7 @@ import { overrideEndpoint } from "./endpoint";
 import { toEventView } from "./events";
 import { toGhEventView, toPullRequestDetailView, toPullRequestView, toReviewerCandidateView } from "./gh";
 import { isRemoteless, toRepoEventView, toRepoView } from "./repo";
-import { toSessionEventView, toSessionView } from "./session";
+import { toThreadListEventView, toThreadView } from "./threads";
 import { toAttachEventView, toTerminalEventView, toTerminalView } from "./terminal";
 import { toUiIntentView } from "./ui";
 import { toWorkspaceEventView } from "./workspace";
@@ -152,7 +152,7 @@ describe("command mapping", () => {
 describe("ui intent mapping", () => {
   it.each([
     [{ case: "focusTerminal" as const, value: { terminalId: "t" } }, { kind: "focusTerminal", terminalId: "t" }],
-    [{ case: "focusThread" as const, value: { threadId: "s1" } }, { kind: "focusSession", sessionId: "s1" }],
+    [{ case: "focusThread" as const, value: { threadId: "s1" } }, { kind: "focusThread", threadId: "s1" }],
     [{ case: "focusRepo" as const, value: { repoId: "r", worktreePath: "/w" } }, { kind: "focusRepo", repoId: "r", worktreePath: "/w" }],
     [{ case: "openPalette" as const, value: { query: "new" } }, { kind: "openPalette", query: "new" }],
     [
@@ -318,7 +318,7 @@ describe("events mapping", () => {
   it.each([
     [{ case: "repo" as const, value: create(RepoEventSchema, { event: { case: "snapshot", value: { repos: [] } } }) }, { source: "repo", event: { kind: "snapshot", repos: [] } }],
     [{ case: "terminal" as const, value: create(TerminalEventSchema, { event: { case: "removedId", value: "t1" } }) }, { source: "terminal", event: { kind: "removed", id: "t1" } }],
-    [{ case: "threadList" as const, value: create(ThreadListEventSchema, { event: { case: "removedId", value: "s1" } }) }, { source: "session", event: { kind: "removed", id: "s1" } }],
+    [{ case: "threadList" as const, value: create(ThreadListEventSchema, { event: { case: "removedId", value: "s1" } }) }, { source: "threadList", event: { kind: "removed", id: "s1" } }],
     [{ case: "gh" as const, value: create(GhEventSchema, { event: { case: "polled", value: { fetchedAt: timestampFromMs(5000), lastError: "boom" } } }) }, { source: "gh", event: { kind: "polled", fetchedAtMs: 5000, lastError: "boom" } }],
     [{ case: "gh" as const, value: create(GhEventSchema, { event: { case: "repoActivityUpdated", value: { repoSlug: "o/r" } } }) }, { source: "gh", event: { kind: "repoActivity", repoSlug: "o/r" } }],
     [{ case: "ui" as const, value: create(UiIntentSchema, { intent: { case: "openPalette", value: { query: "q" } } }) }, { source: "ui", event: { kind: "openPalette", query: "q" } }],
@@ -327,7 +327,7 @@ describe("events mapping", () => {
     expect(toEventView(create(EventSchema, { event }))).toEqual(want);
   });
 
-  it("maps a session", () => {
+  it("maps a thread", () => {
     const s = create(ThreadSchema, {
       id: "s1",
       worktreePath: "/w",
@@ -339,24 +339,24 @@ describe("events mapping", () => {
       exitCode: 1,
       disconnectReason: "crashed",
     });
-    expect(toSessionView(s)).toMatchObject({ id: "s1", state: "disconnected", status: "attention", lastActivityAtMs: 5000, createdAtMs: null });
+    expect(toThreadView(s)).toMatchObject({ id: "s1", state: "disconnected", status: "attention", lastActivityAtMs: 5000, createdAtMs: null });
     // The process's exit is internal to the daemon: the view leaves it out.
-    expect(toSessionView(s)).not.toHaveProperty("disconnectReason");
-    expect(toSessionView(s)).not.toHaveProperty("exitCode");
-    expect(toSessionView(s).workspaceId).toBe("");
-    expect(toSessionView(s)).toMatchObject({ statusReason: "", statusChangedAtMs: null });
-    expect(toSessionView(s).archivedAtMs).toBeNull();
-    expect(toSessionView(create(ThreadSchema, { id: "s4", archivedAt: timestampFromMs(9000) })).archivedAtMs).toBe(9000);
-    expect(toSessionView(s).snoozedUntilMs).toBeNull();
-    expect(toSessionView(create(ThreadSchema, { id: "s5", snoozedUntil: timestampFromMs(12_345) })).snoozedUntilMs).toBe(12_345);
+    expect(toThreadView(s)).not.toHaveProperty("disconnectReason");
+    expect(toThreadView(s)).not.toHaveProperty("exitCode");
+    expect(toThreadView(s).workspaceId).toBe("");
+    expect(toThreadView(s)).toMatchObject({ statusReason: "", statusChangedAtMs: null });
+    expect(toThreadView(s).archivedAtMs).toBeNull();
+    expect(toThreadView(create(ThreadSchema, { id: "s4", archivedAt: timestampFromMs(9000) })).archivedAtMs).toBe(9000);
+    expect(toThreadView(s).snoozedUntilMs).toBeNull();
+    expect(toThreadView(create(ThreadSchema, { id: "s5", snoozedUntil: timestampFromMs(12_345) })).snoozedUntilMs).toBe(12_345);
     expect(
-      toSessionView(create(ThreadSchema, { id: "s3", status: ThreadStatus.ERROR, statusReason: "interrupted", statusChangedAt: timestampFromMs(7000) })),
+      toThreadView(create(ThreadSchema, { id: "s3", status: ThreadStatus.ERROR, statusReason: "interrupted", statusChangedAt: timestampFromMs(7000) })),
     ).toMatchObject({ status: "error", statusReason: "interrupted", statusChangedAtMs: 7000 });
-    expect(toSessionView(create(ThreadSchema, { id: "s2", repoId: "web", workspaceId: "w-1" }))).toMatchObject({ repoId: "web", workspaceId: "w-1" });
+    expect(toThreadView(create(ThreadSchema, { id: "s2", repoId: "web", workspaceId: "w-1" }))).toMatchObject({ repoId: "web", workspaceId: "w-1" });
   });
 
   it("maps linked pull requests in order", () => {
-    expect(toSessionView(create(ThreadSchema, { id: "s1" })).linkedPullRequests).toEqual([]);
+    expect(toThreadView(create(ThreadSchema, { id: "s1" })).linkedPullRequests).toEqual([]);
     const s = create(ThreadSchema, {
       id: "s1",
       linkedPullRequests: [
@@ -364,7 +364,7 @@ describe("events mapping", () => {
         { slug: "o/r", number: 6, url: "https://github.com/o/r/pull/6" },
       ],
     });
-    expect(toSessionView(s).linkedPullRequests).toEqual([
+    expect(toThreadView(s).linkedPullRequests).toEqual([
       { slug: "o/r", number: 5, url: "https://github.com/o/r/pull/5", linkedAt: 9000 },
       { slug: "o/r", number: 6, url: "https://github.com/o/r/pull/6", linkedAt: null },
     ]);
@@ -411,21 +411,21 @@ describe("events mapping", () => {
       cacheWrite1hCostUsd: 0.002,
       cacheSavingsUsd: 0.0135,
     };
-    expect(toSessionView(create(ThreadSchema, { id: "s0" }))).toMatchObject({ usage: [], costUsd: 0, unpriced: false });
-    expect(toSessionView(create(ThreadSchema, { id: "s1", usage: [bucket], costUsd: 0.0026, unpriced: true }))).toMatchObject({
+    expect(toThreadView(create(ThreadSchema, { id: "s0" }))).toMatchObject({ usage: [], costUsd: 0, unpriced: false });
+    expect(toThreadView(create(ThreadSchema, { id: "s1", usage: [bucket], costUsd: 0.0026, unpriced: true }))).toMatchObject({
       usage: [view],
       costUsd: 0.0026,
       unpriced: true,
     });
-    const snap = toSessionEventView(create(ThreadListEventSchema, { event: { case: "snapshot", value: { threads: [], retiredUsage: [bucket] } } }));
-    expect(snap).toEqual({ kind: "snapshot", sessions: [], retiredUsage: [view] });
-    const retired = toSessionEventView(create(ThreadListEventSchema, { event: { case: "retiredUsage", value: { buckets: [bucket] } } }));
+    const snap = toThreadListEventView(create(ThreadListEventSchema, { event: { case: "snapshot", value: { threads: [], retiredUsage: [bucket] } } }));
+    expect(snap).toEqual({ kind: "snapshot", threads: [], retiredUsage: [view] });
+    const retired = toThreadListEventView(create(ThreadListEventSchema, { event: { case: "retiredUsage", value: { buckets: [bucket] } } }));
     expect(retired).toEqual({ kind: "retiredUsage", buckets: [view] });
   });
 
   it("maps a thread's pending API retry", () => {
-    expect(toSessionView(create(ThreadSchema, { id: "s0" })).retry).toBeNull();
-    expect(toSessionView(create(ThreadSchema, { id: "s1", retry: { attempt: 3, maxRetries: 10, retryAt: timestampFromMs(20_000), errorStatus: 429, error: "rate_limit" } })).retry).toEqual({
+    expect(toThreadView(create(ThreadSchema, { id: "s0" })).retry).toBeNull();
+    expect(toThreadView(create(ThreadSchema, { id: "s1", retry: { attempt: 3, maxRetries: 10, retryAt: timestampFromMs(20_000), errorStatus: 429, error: "rate_limit" } })).retry).toEqual({
       attempt: 3,
       maxRetries: 10,
       retryAtMs: 20_000,
@@ -435,8 +435,8 @@ describe("events mapping", () => {
   });
 
   it("maps a thread's context totals and cache expiry", () => {
-    expect(toSessionView(create(ThreadSchema, { id: "s0" }))).toMatchObject({ contextTokens: 0, cacheExpiresAtMs: null, contextRereadUsd: 0 });
-    expect(toSessionView(create(ThreadSchema, { id: "s1", contextTokens: 25_700n, cacheExpiresAt: timestampFromMs(3_600_000), contextRereadUsd: 0.0514 }))).toMatchObject({
+    expect(toThreadView(create(ThreadSchema, { id: "s0" }))).toMatchObject({ contextTokens: 0, cacheExpiresAtMs: null, contextRereadUsd: 0 });
+    expect(toThreadView(create(ThreadSchema, { id: "s1", contextTokens: 25_700n, cacheExpiresAt: timestampFromMs(3_600_000), contextRereadUsd: 0.0514 }))).toMatchObject({
       contextTokens: 25_700,
       cacheExpiresAtMs: 3_600_000,
       contextRereadUsd: 0.0514,
@@ -445,7 +445,7 @@ describe("events mapping", () => {
 
   it("maps agent runs with their status, start and priced usage", () => {
     const usage = [{ model: "claude-haiku-5-5", day: "2026-10-11", requests: 2n, input: 3n, output: 4n, cacheRead: 5n, costUsd: 0.0001, cacheSavingsUsd: 0.00002 }];
-    const s = toSessionView(
+    const s = toThreadView(
       create(ThreadSchema, {
         id: "s1",
         agentRuns: [
@@ -492,7 +492,7 @@ describe("events mapping", () => {
       },
       { id: "a2", description: "", agentType: "", model: "", effort: "", background: true, status: "open", spawnDepth: 2, startedAtMs: null, usage: [], costUsd: 0, unpriced: true },
     ]);
-    expect(toSessionView(create(ThreadSchema, { id: "s0" })).agentRuns).toEqual([]);
+    expect(toThreadView(create(ThreadSchema, { id: "s0" })).agentRuns).toEqual([]);
   });
 
   it("empty events map to null", () => {

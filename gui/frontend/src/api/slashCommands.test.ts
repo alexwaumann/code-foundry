@@ -15,9 +15,9 @@ describe("slash commands on the Watch", () => {
 
   it("maps a commands event, empty when the process ended", () => {
     const v = toThreadEventView(create(ThreadEventSchema, { event: { case: "commands", value: { threadId: "s", seq: 9n, commands: [usage] } } }));
-    expect(v).toEqual({ kind: "commands", sessionId: "s", seq: 9, commands: [usage] });
+    expect(v).toEqual({ kind: "commands", threadId: "s", seq: 9, commands: [usage] });
     const gone = toThreadEventView(create(ThreadEventSchema, { event: { case: "commands", value: { threadId: "s", seq: 10n } } }));
-    expect(gone).toEqual({ kind: "commands", sessionId: "s", seq: 10, commands: [] });
+    expect(gone).toEqual({ kind: "commands", threadId: "s", seq: 10, commands: [] });
   });
 
   it("an older daemon's snapshot has none", () => {

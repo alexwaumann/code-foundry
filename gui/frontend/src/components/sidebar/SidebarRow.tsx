@@ -3,19 +3,19 @@ import { AlarmClock, ArrowRightLeft, Bot, ChevronDown, ChevronRight, CircleAlert
 import { useShallow } from "zustand/react/shallow";
 import { CLAUDE_ORANGE, ClaudeMark } from "@/components/icons/ClaudeMark";
 import { NoGitBadge } from "@/components/projects/NoGitBadge";
-import { Chip } from "@/components/session/Chip";
+import { Chip } from "@/components/thread/Chip";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { agentsLabel } from "@/lib/agents";
 import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
-import { sessionBadge, shortAge } from "@/lib/session";
+import { threadBadge, shortAge } from "@/lib/thread";
 import { shortRemaining, snoozeTimeFull } from "@/lib/snooze";
 import { showsPlace, statusLine, statusText, statusTones, tipStatusTone, type StatusLine, type StatusTone, type TipStatusTone } from "@/lib/statusLine";
 import { modelLabel, threadRowModel, type RepoLookup, type WorkspaceLookup } from "@/lib/threadRow";
 import type { HeaderRow, Row } from "@/lib/tree";
 import { useReposStore } from "@/stores/repos";
-import { renameSession } from "@/stores/sessionActions";
-import { useSessionsStore } from "@/stores/sessions";
+import { renameThread } from "@/stores/threadActions";
+import { useThreadsStore } from "@/stores/threads";
 import { useModelChoices } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
@@ -31,7 +31,7 @@ interface RowProps {
   onActivate: (row: Row, how: "click") => void;
 }
 
-/** Inline name editor; Enter or blur commits via session.rename, Escape cancels. */
+/** Inline name editor; Enter or blur commits via thread.rename, Escape cancels. */
 function RenameField({ id, name }: { id: string; name: string }) {
   const ref = useRef<HTMLInputElement>(null);
   const done = useRef(false);
@@ -45,7 +45,7 @@ function RenameField({ id, name }: { id: string; name: string }) {
     done.current = true;
     const value = ref.current?.value.trim() ?? "";
     useUiStore.getState().setRenaming(null);
-    if (commit && value && value !== name) void renameSession(id, value);
+    if (commit && value && value !== name) void renameThread(id, value);
     if (returnTo.current instanceof HTMLElement && returnTo.current.isConnected) returnTo.current.focus();
     else useUiStore.getState().focusSidebar();
   };
@@ -80,7 +80,7 @@ const NO_WORKSPACES: WorkspaceLookup = { byId: {} };
 
 /** The badge of the workspace that owns the thread; nothing for a project thread. */
 function WorkspaceBadge({ id }: { id: string }) {
-  const s = useSessionsStore(
+  const s = useThreadsStore(
     useShallow((st) => {
       const x = st.byId[id];
       return { repoId: x?.repoId ?? "", worktreePath: x?.worktreePath ?? "", workspaceId: x?.workspaceId ?? "", pendingWorktreePath: "" };
@@ -95,7 +95,7 @@ function WorkspaceBadge({ id }: { id: string }) {
       className="flex max-w-24 min-w-0 cursor-pointer items-center gap-0.5 rounded-sm bg-highlight/15 px-1 text-caption-sm font-medium text-highlight hover:bg-highlight/30"
       data-testid="row-workspace"
       onClick={() => {
-        openWorkspaceSurface({ kind: "session", id });
+        openWorkspaceSurface({ kind: "thread", id });
       }}
     >
       <Layers className="size-2.5 shrink-0" aria-hidden />
@@ -106,7 +106,7 @@ function WorkspaceBadge({ id }: { id: string }) {
 
 /** "N PRs" when the thread linked pull requests; nothing otherwise. */
 function LinkedPrsBadge({ id }: { id: string }) {
-  const count = useSessionsStore((st) => st.byId[id]?.linkedPullRequests.length ?? 0);
+  const count = useThreadsStore((st) => st.byId[id]?.linkedPullRequests.length ?? 0);
   if (count === 0) return null;
   return (
     // Like the workspace badge: a click opens the Linked PRs surface in the thread's side
@@ -115,7 +115,7 @@ function LinkedPrsBadge({ id }: { id: string }) {
       className="flex shrink-0 cursor-pointer items-center rounded-sm bg-success/15 px-1 text-caption-sm font-medium text-success tabular-nums hover:bg-success/30"
       data-testid="row-linked-prs"
       onClick={() => {
-        openLinkedPrsSurface({ kind: "session", id });
+        openLinkedPrsSurface({ kind: "thread", id });
       }}
     >
       {prBadge(count)}
@@ -125,7 +125,7 @@ function LinkedPrsBadge({ id }: { id: string }) {
 
 /** The project, branch and queued move of a thread, each from a narrow selector over threadRowModel. */
 function useThreadPlace(id: string) {
-  const s = useSessionsStore(
+  const s = useThreadsStore(
     useShallow((st) => {
       const x = st.byId[id];
       return { repoId: x?.repoId ?? "", worktreePath: x?.worktreePath ?? "", workspaceId: x?.workspaceId ?? "", pendingWorktreePath: x?.pendingWorktreePath ?? "" };
@@ -158,11 +158,11 @@ function TimedStatusText({ line }: { line: StatusLine }) {
 }
 
 /**
- * "N agents" (sky, with a bot) while the thread's subagents run (Session.agents_running,
+ * "N agents" (sky, with a bot) while the thread's subagents run (Thread.agents_running,
  * docs/notes/agents-2-gui.md), ahead of the status; nothing otherwise. The sort ignores it.
  */
 function AgentsRunning({ id, more }: { id: string; more: boolean }) {
-  const n = useSessionsStore((st) => st.byId[id]?.agentsRunning ?? 0);
+  const n = useThreadsStore((st) => st.byId[id]?.agentsRunning ?? 0);
   if (n <= 0) return null;
   return (
     <>
@@ -182,12 +182,12 @@ function AgentsRunning({ id, more }: { id: string; more: boolean }) {
  * thread's worktree changes.
  */
 function ThreadLine({ id }: { id: string }) {
-  const line = useSessionsStore(useShallow((st) => statusLine(st.byId[id])));
-  const badge = useSessionsStore((st) => sessionBadge(st.byId[id]));
+  const line = useThreadsStore(useShallow((st) => statusLine(st.byId[id])));
+  const badge = useThreadsStore((st) => threadBadge(st.byId[id]));
   const { project, branch, noGit, noProject, movingTo } = useThreadPlace(id);
   const status = line.kind !== "place";
   return (
-    <span className="flex min-w-0 items-center gap-1 text-caption-sm" data-testid="row-place" data-status-line={line.kind} data-session-badge={badge}>
+    <span className="flex min-w-0 items-center gap-1 text-caption-sm" data-testid="row-place" data-status-line={line.kind} data-thread-badge={badge}>
       {movingTo !== null ? (
         <span className="flex min-w-0 items-center gap-1 text-warning" data-testid="row-moving">
           <ArrowRightLeft className="size-3 shrink-0" aria-hidden />
@@ -229,20 +229,20 @@ function ThreadLine({ id }: { id: string }) {
   );
 }
 
-function SessionLabel({ id }: { id: string }) {
+function ThreadLabel({ id }: { id: string }) {
   // Unnamed until the daemon names it from the first prompt: the id stands in.
-  const name = useSessionsStore((s) => s.byId[id]?.name ?? "");
-  const pinned = useSessionsStore((s) => s.byId[id]?.pinned ?? false);
-  const renaming = useUiStore((s) => s.renamingSessionId === id);
+  const name = useThreadsStore((s) => s.byId[id]?.name ?? "");
+  const pinned = useThreadsStore((s) => s.byId[id]?.pinned ?? false);
+  const renaming = useUiStore((s) => s.renamingThreadId === id);
   return (
     // Whether Claude runs for the thread never shows: a stopped thread looks like any other.
-    <span className="flex min-w-0 flex-1 flex-col gap-0.5" data-testid="session-body">
+    <span className="flex min-w-0 flex-1 flex-col gap-0.5" data-testid="thread-body">
       <span className="flex min-w-0 items-center gap-1.5">
         {renaming ? (
           <RenameField id={id} name={name} />
         ) : (
           <>
-            <span className={cn("truncate", !name && "text-muted-foreground")} data-testid="session-name">
+            <span className={cn("truncate", !name && "text-muted-foreground")} data-testid="thread-name">
               {name || id}
             </span>
             <span className="ml-auto flex min-w-0 shrink-0 items-center gap-1 pl-1">
@@ -286,7 +286,7 @@ const tipStatusIcons: Readonly<Record<TipStatusTone, LucideIcon>> = { amber: Cir
  * while the tooltip is open (its body is mounted only then).
  */
 function TipStatus({ id }: { id: string }) {
-  const line = useSessionsStore(useShallow((st) => statusLine(st.byId[id])));
+  const line = useThreadsStore(useShallow((st) => statusLine(st.byId[id])));
   const tone = tipStatusTone(line.kind);
   if (tone === null) return null;
   const Icon = tipStatusIcons[tone];
@@ -303,7 +303,7 @@ function TipStatus({ id }: { id: string }) {
  * shows only the time left. Nothing for a thread that is not snoozed.
  */
 function TipSnooze({ id }: { id: string }) {
-  const until = useSessionsStore((s) => s.byId[id]?.snoozedUntilMs ?? null);
+  const until = useThreadsStore((s) => s.byId[id]?.snoozedUntilMs ?? null);
   const now = useNow(30_000);
   if (until === null) return null;
   return (
@@ -335,12 +335,12 @@ function TipMoving({ id }: { id: string }) {
  * branch (git only) and model. Mounted only while open.
  */
 function ThreadTipBody({ id }: { id: string }) {
-  const name = useSessionsStore((s) => s.byId[id]?.name ?? "");
-  const snoozed = useSessionsStore((s) => (s.byId[id]?.snoozedUntilMs ?? null) !== null);
-  const model = useSessionsStore((s) => s.byId[id]?.model ?? "");
-  const effort = useSessionsStore((s) => s.byId[id]?.effort ?? "");
+  const name = useThreadsStore((s) => s.byId[id]?.name ?? "");
+  const snoozed = useThreadsStore((s) => (s.byId[id]?.snoozedUntilMs ?? null) !== null);
+  const model = useThreadsStore((s) => s.byId[id]?.model ?? "");
+  const effort = useThreadsStore((s) => s.byId[id]?.effort ?? "");
   const models = useModelChoices();
-  const where = useSessionsStore(
+  const where = useThreadsStore(
     useShallow((st) => {
       const x = st.byId[id];
       return { repoId: x?.repoId ?? "", worktreePath: x?.worktreePath ?? "", workspaceId: x?.workspaceId ?? "", pendingWorktreePath: "" };
@@ -382,7 +382,7 @@ function ThreadTipBody({ id }: { id: string }) {
  */
 function ThreadTooltip({ id, children }: { id: string; children: ReactElement }) {
   const enabled = useContext(RowTooltipsEnabled);
-  const renaming = useUiStore((s) => s.renamingSessionId === id);
+  const renaming = useUiStore((s) => s.renamingThreadId === id);
   const [open, setOpen] = useState(false);
   const allowed = enabled && !renaming;
   return (
@@ -394,7 +394,7 @@ function ThreadTooltip({ id, children }: { id: string; children: ReactElement })
       disableHoverableContent
     >
       <TooltipTrigger asChild>{children}</TooltipTrigger>
-      <TooltipContent side="right" align="start" sideOffset={12} className="w-[220px] px-2.5 py-2 text-body-sm" data-testid="thread-tooltip" data-session-id={id}>
+      <TooltipContent side="right" align="start" sideOffset={12} className="w-[220px] px-2.5 py-2 text-body-sm" data-testid="thread-tooltip" data-thread-id={id}>
         <ThreadTipBody id={id} />
       </TooltipContent>
     </Tooltip>
@@ -447,7 +447,7 @@ function SectionHeader({ row }: { row: HeaderRow }) {
 
 /** How long ago the thread was archived ("5m", "3h", "2d"), on the shared 30 s clock. */
 function ArchivedAge({ id }: { id: string }) {
-  const at = useSessionsStore((s) => s.byId[id]?.archivedAtMs ?? null);
+  const at = useThreadsStore((s) => s.byId[id]?.archivedAtMs ?? null);
   const now = useNow(30_000);
   if (at === null) return null;
   return (
@@ -459,7 +459,7 @@ function ArchivedAge({ id }: { id: string }) {
 
 /** How long until the snoozed thread wakes ("45m", "2h", "4d"; "<1m"), on the shared 30 s clock. */
 function SnoozeLeft({ id }: { id: string }) {
-  const until = useSessionsStore((s) => s.byId[id]?.snoozedUntilMs ?? null);
+  const until = useThreadsStore((s) => s.byId[id]?.snoozedUntilMs ?? null);
   const now = useNow(30_000);
   if (until === null) return null;
   return (
@@ -475,15 +475,15 @@ function SnoozeLeft({ id }: { id: string }) {
  * badges or pin (such a thread is unpinned): the whole section is such threads.
  */
 function SingleLineLabel({ id, section }: { id: string; section: "archived" | "snoozed" }) {
-  const name = useSessionsStore((s) => s.byId[id]?.name ?? "");
-  const renaming = useUiStore((s) => s.renamingSessionId === id);
+  const name = useThreadsStore((s) => s.byId[id]?.name ?? "");
+  const renaming = useUiStore((s) => s.renamingThreadId === id);
   return (
-    <span className="flex min-w-0 flex-1 items-center gap-1.5" data-testid="session-body" data-archived={section === "archived" || undefined} data-snoozed={section === "snoozed" || undefined}>
+    <span className="flex min-w-0 flex-1 items-center gap-1.5" data-testid="thread-body" data-archived={section === "archived" || undefined} data-snoozed={section === "snoozed" || undefined}>
       {renaming ? (
         <RenameField id={id} name={name} />
       ) : (
         <>
-          <span className={cn("truncate", !name && "text-muted-foreground")} data-testid="session-name">
+          <span className={cn("truncate", !name && "text-muted-foreground")} data-testid="thread-name">
             {name || id}
           </span>
           {section === "archived" ? <ArchivedAge id={id} /> : <SnoozeLeft id={id} />}
@@ -496,7 +496,7 @@ function SingleLineLabel({ id, section }: { id: string; section: "archived" | "s
 export const SidebarRow = memo(function SidebarRow({ row, selected, cursor, onActivate }: RowProps) {
   if (row.kind === "header") return <SectionHeader row={row} />;
   return (
-    <ThreadTooltip id={row.sessionId}>
+    <ThreadTooltip id={row.threadId}>
       <div
         id={`row-${row.key}`}
         role="option"
@@ -514,10 +514,10 @@ export const SidebarRow = memo(function SidebarRow({ row, selected, cursor, onAc
           onActivate(row, "click");
         }}
         onDoubleClick={() => {
-          useUiStore.getState().setRenaming(row.sessionId);
+          useUiStore.getState().setRenaming(row.threadId);
         }}
       >
-        {row.section === "archived" || row.section === "snoozed" ? <SingleLineLabel id={row.sessionId} section={row.section} /> : <SessionLabel id={row.sessionId} />}
+        {row.section === "archived" || row.section === "snoozed" ? <SingleLineLabel id={row.threadId} section={row.section} /> : <ThreadLabel id={row.threadId} />}
       </div>
     </ThreadTooltip>
   );

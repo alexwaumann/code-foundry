@@ -1,13 +1,13 @@
 /**
  * Opening the workspace surface (surfaces/workspace.ts) and its member tabs. The
  * view.panel.workspace command (workspacePanelCommand in stores/views.ts), the sidebar's
- * workspace badge, the session header button (the command) and the Projects page's
+ * workspace badge, the thread header button (the command) and the Projects page's
  * workspace rows all end here.
  */
 import { memberTab, selectionWorkspaceThread, workspaceTab } from "@/surfaces/workspaceTarget";
 import { keyOf, openSurface, togglePanel, type PanelTarget } from "./panel";
 import { useReposStore } from "./repos";
-import { useSessionsStore } from "./sessions";
+import { useThreadsStore } from "./threads";
 import { useUiStore, type Selection } from "./ui";
 import { useWorkspacesStore } from "./workspaces";
 
@@ -18,7 +18,7 @@ import { useWorkspacesStore } from "./workspaces";
  */
 export function openWorkspaceSurface(sel: Selection = useUiStore.getState().selection): string | null {
   const key = keyOf(sel);
-  const thread = selectionWorkspaceThread(sel, { repos: useReposStore.getState(), sessions: useSessionsStore.getState() });
+  const thread = selectionWorkspaceThread(sel, { repos: useReposStore.getState(), threads: useThreadsStore.getState() });
   if (key === null || thread === null) return null;
   const name = useWorkspacesStore.getState().byId[thread.workspaceId]?.name ?? "";
   return openSurface(key, workspaceTab(thread.workspaceId, name)) ? key : null;
@@ -28,8 +28,8 @@ export function openWorkspaceSurface(sel: Selection = useUiStore.getState().sele
  * The Projects page's "Show in thread": selects the workspace thread and opens the
  * workspace surface in its panel, which takes focus.
  */
-export function showWorkspaceInThread(sessionId: string): boolean {
-  const sel: Selection = { kind: "session", id: sessionId };
+export function showWorkspaceInThread(threadId: string): boolean {
+  const sel: Selection = { kind: "thread", id: threadId };
   useUiStore.getState().select(sel);
   const key = openWorkspaceSurface(sel);
   if (key === null) return false;

@@ -11,8 +11,8 @@ import { newThreadTerminal } from "@/stores/bottomActions";
 import { addToWorkspace, newTerminalIn, removeFromWorkspace } from "@/stores/projectActions";
 import { openWorktreeTab } from "@/stores/worktreePanel";
 import { useReposStore } from "@/stores/repos";
-import { runSessionIn } from "@/stores/sessionActions";
-import { useSessionsStore } from "@/stores/sessions";
+import { runThreadIn } from "@/stores/threadActions";
+import { useThreadsStore } from "@/stores/threads";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { OverflowMenu } from "./OverflowMenu";
 import { RowAction, WorktreeState } from "./WorktreeState";
@@ -43,7 +43,7 @@ interface RowOptions {
 
 /** Where the thread is relative to this member: runs here, a Run in is queued here, or neither. */
 function useThreadAt(threadId: string | undefined, path: string): "current" | "queued" | null {
-  return useSessionsStore((s) => threadAt(threadId ? s.byId[threadId] : undefined, path));
+  return useThreadsStore((s) => threadAt(threadId ? s.byId[threadId] : undefined, path));
 }
 
 /** The panel layout's row: project (current marker) and actions, then branch and state. */
@@ -72,7 +72,7 @@ function PanelMemberRow({ workspaceId, member, threadId, onOpen }: RowOptions & 
             <PanelRightOpen />
           </RowAction>
           {threadId && at !== "current" && (
-            <RowAction label={`Run the thread in ${name}`} testId="member-run-in" onClick={() => void runSessionIn(threadId, member.repoId)}>
+            <RowAction label={`Run the thread in ${name}`} testId="member-run-in" onClick={() => void runThreadIn(threadId, member.repoId)}>
               <ArrowRightLeft />
             </RowAction>
           )}

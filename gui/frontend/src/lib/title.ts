@@ -3,7 +3,7 @@ import { Window } from "@wailsio/runtime";
 
 export const BASE_TITLE = "Code Foundry";
 
-/** "Code Foundry", or "Code Foundry (3)" when three sessions need attention. */
+/** "Code Foundry", or "Code Foundry (3)" when three threads need attention. */
 export function windowTitle(attention: number): string {
   return attention > 0 ? `${BASE_TITLE} (${String(attention)})` : BASE_TITLE;
 }

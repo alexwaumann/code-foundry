@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { holdSessions, invocations, mockPost, openApp, resetMock, row } from "./fixtures";
+import { holdThreads, invocations, mockPost, openApp, resetMock, row } from "./fixtures";
 
 // Archived threads in the sidebar (docs/notes/archive-threads-2-sidebar.md). The default
 // world has one archived thread, s-7 ("Spike a canvas sidebar", archived 90 min ago); the
@@ -62,7 +62,7 @@ test("Archived section: collapsed by default with its count; expanded, single-li
   const archived = row(page, "s:s-7");
   await expect(archived).toBeVisible();
   await expect(archived).toHaveAttribute("data-section", "archived");
-  await expect(archived.getByTestId("session-name")).toHaveText("Spike a canvas sidebar");
+  await expect(archived.getByTestId("thread-name")).toHaveText("Spike a canvas sidebar");
   await expect(archived.getByTestId("row-archived-age")).toHaveText("1h");
   // One line: no status line, and the row is the single-line height (a thread row is 15px taller).
   await expect(archived.getByTestId("row-place")).toHaveCount(0);
@@ -91,13 +91,13 @@ test("Archived section: collapsed by default with its count; expanded, single-li
   expect(await page.evaluate(() => (JSON.parse(localStorage.getItem("code-foundry.ui") ?? "{}") as { state?: { archivedCollapsed?: boolean } }).state?.archivedCollapsed)).toBe(false);
 
   // Unarchived (as from the CLI): no archived thread, no section; s-7 is back in the main list.
-  await mockPost("session/archive?id=s-7&archived=false");
+  await mockPost("thread/archive?id=s-7&archived=false");
   await expect(page.getByTestId("sidebar-archived")).toHaveCount(0);
   await expect(page.getByTestId("archived-header")).toHaveCount(0);
   await expect(row(page, "s:s-7")).toHaveAttribute("data-section", "done");
 
   // Collapsing again from the keyboard: the header is a button.
-  await mockPost("session/archive?id=s-7");
+  await mockPost("thread/archive?id=s-7");
   await expect(page.getByTestId("archived-count")).toHaveText("1");
   await page.getByTestId("archived-header").focus();
   await page.keyboard.press("Space");
@@ -136,7 +136,7 @@ test("archiving a working thread asks first (the daemon's confirmation); it then
   await openApp(page);
   // s-1 is busy and owns t-s1-shell; open its bottom panel and a side panel tab.
   await row(page, "s:s-1").click();
-  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-session-id", "s-1");
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-1");
   await page.getByTestId("thread-header").getByTestId("bottom-toggle").click();
   await expect(page.getByTestId("bottom-panel")).toBeVisible();
   await page.evaluate(`import("/src/stores/panel.ts").then((m) => m.openSurface("current", m.makeTab("files", "Files")))`);
@@ -158,12 +158,12 @@ test("archiving a working thread asks first (the daemon's confirmation); it then
   await expect(page.getByTestId("side-panel")).toHaveCount(0);
   await expect(page.getByTestId("bottom-panel")).toHaveCount(0);
   expect(
-    await page.evaluate(`import("/src/stores/panel.ts").then((m) => m.usePanelStore.getState().byKey["session:s-1"])`),
+    await page.evaluate(`import("/src/stores/panel.ts").then((m) => m.usePanelStore.getState().byKey["thread:s-1"])`),
   ).toEqual({ open: false, tabs: [], activeTabId: null });
   // Opened again from the Archived section: its composer, and neither panel comes back.
   await page.getByTestId("archived-header").click();
   await row(page, "s:s-1").click();
-  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-session-id", "s-1");
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-1");
   await expect(page.getByTestId("thread-composer")).toBeVisible();
   await expect(page.getByTestId("side-panel")).toHaveCount(0);
   await expect(page.getByTestId("bottom-panel")).toHaveCount(0);
@@ -176,7 +176,7 @@ test("archiving a working thread asks first (the daemon's confirmation); it then
   await row(page, "s:s-2").click();
   await page.evaluate(`import("/src/stores/panel.ts").then((m) => m.openSurface("current", m.makeTab("files", "Files")))`);
   await expect(page.getByTestId("side-panel")).toBeVisible();
-  await mockPost("session/archive?id=s-2");
+  await mockPost("thread/archive?id=s-2");
   await expect(page.getByTestId("archived-count")).toHaveText("3");
   await expect(page.getByTestId("side-panel")).toHaveCount(0);
 });
@@ -196,7 +196,7 @@ test("the keyboard walks one order across the main list, Working and Archived; c
   await expect(list(page)).toHaveAttribute("aria-activedescendant", "row-s:s-7");
   await expect(row(page, "s:s-7")).toHaveAttribute("data-cursor", "true");
   await page.keyboard.press("Enter");
-  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-session-id", "s-7");
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-7");
   // cmd+N counts the archived row too: s-2, s-6, s-4, s-3, s-5, s-1, s-7.
   await page.keyboard.press("Meta+1");
   await expect(row(page, "s:s-2")).toHaveAttribute("aria-selected", "true");
@@ -225,7 +225,7 @@ test("the footers stay pinned under a long main list, are capped, and scroll the
   // 30 idle threads make the main list scroll; 12 busy ones overflow Working's cap.
   await mockPost("threads?repo=repo-cf&count=30&status=idle&prefix=Idle");
   const busy = (await mockPost("threads?repo=repo-cf&count=12&status=busy&prefix=Job")) as string[];
-  await holdSessions(...busy);
+  await holdThreads(...busy);
   await openApp(page);
   await expect(page.getByTestId("working-count")).toHaveText("14");
 
@@ -274,7 +274,7 @@ test("archiving, snoozing or removing the selected thread selects the dashboard;
   // Archive the selected idle thread from its row menu: the start page shows and the
   // Dashboard button is current. The thread stays in the archived list.
   await row(page, "s:s-3").click();
-  await expect(pane).toHaveAttribute("data-session-id", "s-3");
+  await expect(pane).toHaveAttribute("data-thread-id", "s-3");
   let menu = await openMenu(page, "s:s-3");
   await menu.getByTestId("menu-archive").click();
   await expect(page.getByTestId("start-heading")).toBeVisible();
@@ -284,24 +284,24 @@ test("archiving, snoozing or removing the selected thread selects the dashboard;
 
   // Another thread's archive (as from the CLI) leaves the selection alone.
   await row(page, "s:s-2").click();
-  await expect(pane).toHaveAttribute("data-session-id", "s-2");
-  await mockPost("session/archive?id=s-6");
+  await expect(pane).toHaveAttribute("data-thread-id", "s-2");
+  await mockPost("thread/archive?id=s-6");
   await expect(page.getByTestId("archived-count")).toHaveText("3");
-  await expect(pane).toHaveAttribute("data-session-id", "s-2");
+  await expect(pane).toHaveAttribute("data-thread-id", "s-2");
 
   // The selected thread snoozed from the CLI: dashboard.
-  await mockPost("session/snooze?id=s-2&until=2m");
+  await mockPost("thread/snooze?id=s-2&until=2m");
   await expect(page.getByTestId("start-heading")).toBeVisible();
   await expect(pane).toHaveCount(0);
 
   // Remove the selected thread (the daemon's confirmation): dashboard, no "no longer exists" pane.
   await row(page, "s:s-4").click();
-  await expect(pane).toHaveAttribute("data-session-id", "s-4");
+  await expect(pane).toHaveAttribute("data-thread-id", "s-4");
   menu = await openMenu(page, "s:s-4");
   await menu.getByText("Remove…").click();
   await expect(page.getByTestId("confirm-dialog")).toBeVisible();
   await page.getByTestId("confirm-ok").click();
   await expect(page.getByTestId("start-heading")).toBeVisible();
-  await expect(page.getByTestId("session-missing")).toHaveCount(0);
+  await expect(page.getByTestId("thread-missing")).toHaveCount(0);
   await expect(row(page, "s:s-4")).toHaveCount(0);
 });

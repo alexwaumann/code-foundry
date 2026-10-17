@@ -626,10 +626,10 @@ export function parseMergeResult(resultJson: string): { merged: boolean; sha: st
 }
 
 /**
- * The session id in pr.ask's, pr.explain's or pr.fix.findings' result JSON (protojson of
- * the created Session); null when there is none.
+ * The thread id in pr.ask's, pr.explain's or pr.fix.findings' result JSON (protojson of
+ * the created Thread); null when there is none.
  */
-export function parseSessionResult(resultJson: string): string | null {
+export function parseThreadResult(resultJson: string): string | null {
   try {
     const v = JSON.parse(resultJson) as { id?: unknown } | null;
     return typeof v?.id === "string" && v.id !== "" ? v.id : null;

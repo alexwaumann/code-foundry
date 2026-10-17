@@ -4,7 +4,7 @@ import { timestampFromMs } from "@bufbuild/protobuf/wkt";
 import { ThreadSchema } from "@/gen/codefoundry/v1/thread_lifecycle_pb";
 import { ThreadAgentRunSchema, ThreadAgentStatus, ThreadEventSchema } from "@/gen/codefoundry/v1/thread_pb";
 import { toAgentRunView } from "./agents";
-import { toSessionView } from "./session";
+import { toThreadView } from "./threads";
 import { toThreadEventView } from "./thread";
 
 describe("toAgentRunView", () => {
@@ -82,19 +82,19 @@ describe("the Watch's agents", () => {
 
   it("an agents event carries the whole new list", () => {
     const ev = toThreadEventView(create(ThreadEventSchema, { event: { case: "agents", value: { threadId: "s", seq: 9n, agents: [{ id: "a1", status: ThreadAgentStatus.FAILED, error: "stopped" }] } } }));
-    expect(ev).toMatchObject({ kind: "agents", sessionId: "s", seq: 9 });
+    expect(ev).toMatchObject({ kind: "agents", threadId: "s", seq: 9 });
     expect(ev?.kind === "agents" && ev.agents[0]).toMatchObject({ id: "a1", status: "failed", error: "stopped" });
   });
 });
 
-describe("the session's running agents", () => {
+describe("the thread's running agents", () => {
   it("maps both counts", () => {
-    const v = toSessionView(create(ThreadSchema, { id: "s", agentsRunning: 3, backgroundAgentsRunning: 2 }));
+    const v = toThreadView(create(ThreadSchema, { id: "s", agentsRunning: 3, backgroundAgentsRunning: 2 }));
     expect([v.agentsRunning, v.backgroundAgentsRunning]).toEqual([3, 2]);
   });
 
   it("maps the background shells", () => {
-    expect(toSessionView(create(ThreadSchema, { id: "s", backgroundShellsRunning: 2 })).backgroundShellsRunning).toBe(2);
-    expect(toSessionView(create(ThreadSchema, { id: "s" })).backgroundShellsRunning).toBe(0);
+    expect(toThreadView(create(ThreadSchema, { id: "s", backgroundShellsRunning: 2 })).backgroundShellsRunning).toBe(2);
+    expect(toThreadView(create(ThreadSchema, { id: "s" })).backgroundShellsRunning).toBe(0);
   });
 });

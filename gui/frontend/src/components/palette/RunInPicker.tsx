@@ -3,9 +3,9 @@ import { FolderGit2 } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { tildify } from "@/lib/path";
 import { worktreeBranch } from "@/lib/threadRow";
-import { runSessionIn } from "@/stores/sessionActions";
+import { runThreadIn } from "@/stores/threadActions";
 import { useReposStore } from "@/stores/repos";
-import { useSessionsStore } from "@/stores/sessions";
+import { useThreadsStore } from "@/stores/threads";
 import { useWorkspacesStore } from "@/stores/workspaces";
 
 function MemberItem({ repoId, path, current, queued, onPick }: { repoId: string; path: string; current: boolean; queued: boolean; onPick: (repoId: string) => void }) {
@@ -36,18 +36,18 @@ function MemberItem({ repoId, path, current, queued, onPick }: { repoId: string;
 
 /**
  * The palette's "Run in…" page: the members of the thread's workspace; picking one
- * invokes session.run-in for the thread (the daemon moves a live thread once it is idle).
+ * invokes thread.run-in for the thread (the daemon moves a live thread once it is idle).
  */
-export function RunInPicker({ sessionId, close }: { sessionId: string; close: () => void }) {
-  const name = useSessionsStore((s) => s.byId[sessionId]?.name || sessionId);
-  const cwd = useSessionsStore((s) => s.byId[sessionId]?.worktreePath ?? "");
-  const pending = useSessionsStore((s) => s.byId[sessionId]?.pendingWorktreePath ?? "");
-  const workspaceId = useSessionsStore((s) => s.byId[sessionId]?.workspaceId ?? "");
+export function RunInPicker({ threadId, close }: { threadId: string; close: () => void }) {
+  const name = useThreadsStore((s) => s.byId[threadId]?.name || threadId);
+  const cwd = useThreadsStore((s) => s.byId[threadId]?.worktreePath ?? "");
+  const pending = useThreadsStore((s) => s.byId[threadId]?.pendingWorktreePath ?? "");
+  const workspaceId = useThreadsStore((s) => s.byId[threadId]?.workspaceId ?? "");
   const members = useWorkspacesStore(useShallow((s) => (s.byId[workspaceId]?.members ?? []).map((m) => `${m.repoId}\u0000${m.worktreePath}`)));
   const wsName = useWorkspacesStore((s) => s.byId[workspaceId]?.name ?? "");
   const pick = (repoId: string) => {
     close();
-    void runSessionIn(sessionId, repoId);
+    void runThreadIn(threadId, repoId);
   };
   return (
     <Command loop data-testid="runin-picker">

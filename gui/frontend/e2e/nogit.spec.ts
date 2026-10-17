@@ -99,7 +99,7 @@ test("the composer in a project without git offers only its current checkout; th
   expect(args).toMatchObject({ repo: "repo-wr", worktree: WR });
   expect(args).not.toHaveProperty("new-worktree");
 
-  const row = page.locator('[data-row-kind="session"][aria-selected="true"]');
+  const row = page.locator('[data-row-kind="thread"][aria-selected="true"]');
   await expect(row).toBeVisible();
   await expect(row.getByTestId("row-project")).toHaveText("writing");
   await expect(row.getByTestId("no-git-badge")).toBeVisible();

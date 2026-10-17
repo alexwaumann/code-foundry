@@ -7,7 +7,7 @@ import { errorMessage, isAbort } from "@/api/stream";
 import { requestConfirm } from "./confirm";
 import { contextKey, getUiContext } from "./context";
 import { useReposStore } from "./repos";
-import { useSessionsStore } from "./sessions";
+import { useThreadsStore } from "./threads";
 import { useTerminalsStore } from "./terminals";
 import { useUiStore } from "./ui";
 
@@ -39,7 +39,7 @@ export async function refreshCommands(ctx: UiContextView = getUiContext()): Prom
   inflight = ctl;
   useCommandsStore.setState({ loading: true });
   try {
-    // Unavailable ones too: session.new's keybinding and title are needed with nothing
+    // Unavailable ones too: thread.new's keybinding and title are needed with nothing
     // selected, where the project picker supplies the repo (keys/bindings.ts).
     const fresh = await listCommands(ctx, { includeUnavailable: true, signal: ctl.signal });
     if (inflight !== ctl) return;
@@ -145,7 +145,7 @@ export function startCommandSync(debounceMs = 60): () => void {
   const check = () => {
     const ctx = getUiContext();
     const sel = useUiStore.getState().selection;
-    const state = sel.kind === "session" ? (useSessionsStore.getState().byId[sel.id]?.state ?? "") : "";
+    const state = sel.kind === "thread" ? (useThreadsStore.getState().byId[sel.id]?.state ?? "") : "";
     const key = contextKey(ctx);
     if (key === lastKey && state === lastState) return;
     lastKey = key;
@@ -153,7 +153,7 @@ export function startCommandSync(debounceMs = 60): () => void {
     clearTimeout(timer);
     timer = setTimeout(() => void refreshCommands(ctx), debounceMs);
   };
-  const unsubs = [useUiStore.subscribe(check), useTerminalsStore.subscribe(check), useReposStore.subscribe(check), useSessionsStore.subscribe(check)];
+  const unsubs = [useUiStore.subscribe(check), useTerminalsStore.subscribe(check), useReposStore.subscribe(check), useThreadsStore.subscribe(check)];
   check();
   // Retry periodically while the list is failing (e.g. daemon restarting).
   const retry = setInterval(() => {

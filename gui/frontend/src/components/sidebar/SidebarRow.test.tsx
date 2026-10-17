@@ -1,14 +1,14 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { SessionView } from "@/api/session";
+import type { ThreadView } from "@/api/threads";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useReposStore } from "@/stores/repos";
-import { useSessionsStore } from "@/stores/sessions";
+import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { SidebarRow } from "./SidebarRow";
 
-const thread = (o: Partial<SessionView>) =>
-  ({ id: "s-1", name: "t", repoId: "cf", worktreePath: "/src/cf", workspaceId: "", pendingWorktreePath: "", state: "connected", status: "idle", statusReason: "", statusChangedAtMs: null, linkedPullRequests: [], pinned: false, ...o }) as SessionView;
+const thread = (o: Partial<ThreadView>) =>
+  ({ id: "s-1", name: "t", repoId: "cf", worktreePath: "/src/cf", workspaceId: "", pendingWorktreePath: "", state: "connected", status: "idle", statusReason: "", statusChangedAtMs: null, linkedPullRequests: [], pinned: false, ...o }) as ThreadView;
 
 beforeEach(() => {
   useReposStore.setState({
@@ -22,11 +22,11 @@ beforeEach(() => {
 
 afterEach(cleanup);
 
-function renderRow(o: Partial<SessionView>): HTMLElement {
-  useSessionsStore.setState({ byId: { "s-1": thread(o) }, order: ["s-1"] });
+function renderRow(o: Partial<ThreadView>): HTMLElement {
+  useThreadsStore.setState({ byId: { "s-1": thread(o) }, order: ["s-1"] });
   render(
     <TooltipProvider>
-      <SidebarRow row={{ key: "s:s-1", kind: "session", section: "idle", sessionId: "s-1" }} selected={false} cursor={false} onActivate={() => undefined} />
+      <SidebarRow row={{ key: "s:s-1", kind: "thread", section: "idle", threadId: "s-1" }} selected={false} cursor={false} onActivate={() => undefined} />
     </TooltipProvider>,
   );
   return screen.getByTestId("row-place");
@@ -48,10 +48,10 @@ describe("SidebarRow line 2", () => {
 
   it("a stopped thread looks like any other: not dimmed, no offline mark", () => {
     renderRow({ state: "disconnected" });
-    const body = screen.getByTestId("session-body");
+    const body = screen.getByTestId("thread-body");
     expect(body.className).not.toContain("opacity-50");
     expect(body.getAttribute("data-offline")).toBeNull();
-    expect(screen.getByTestId("row-place").getAttribute("data-session-badge")).toBe("idle");
+    expect(screen.getByTestId("row-place").getAttribute("data-thread-badge")).toBe("idle");
   });
 
   it("the @ is muted and the branch mono", () => {
@@ -81,11 +81,11 @@ describe("SidebarRow running agents", () => {
 });
 
 describe("SidebarRow archived", () => {
-  function renderArchived(o: Partial<SessionView>): HTMLElement {
-    useSessionsStore.setState({ byId: { "s-1": thread({ state: "disconnected", status: "attention", statusReason: "finished", ...o }) }, order: ["s-1"] });
+  function renderArchived(o: Partial<ThreadView>): HTMLElement {
+    useThreadsStore.setState({ byId: { "s-1": thread({ state: "disconnected", status: "attention", statusReason: "finished", ...o }) }, order: ["s-1"] });
     render(
       <TooltipProvider>
-        <SidebarRow row={{ key: "s:s-1", kind: "session", section: "archived", sessionId: "s-1" }} selected={false} cursor={false} onActivate={() => undefined} />
+        <SidebarRow row={{ key: "s:s-1", kind: "thread", section: "archived", threadId: "s-1" }} selected={false} cursor={false} onActivate={() => undefined} />
       </TooltipProvider>,
     );
     return screen.getByRole("option");
@@ -96,23 +96,23 @@ describe("SidebarRow archived", () => {
     expect(row.textContent).toBe("Old work3h");
     expect(screen.queryByTestId("row-place")).toBeNull();
     expect(screen.getByTestId("row-archived-age").className).toContain("tabular-nums");
-    expect(screen.getByTestId("session-body").className).not.toContain("opacity-50");
+    expect(screen.getByTestId("thread-body").className).not.toContain("opacity-50");
   });
 
   it("an unnamed thread shows its id, muted", () => {
     renderArchived({ name: "", archivedAtMs: Date.now() });
-    expect(screen.getByTestId("session-name").textContent).toBe("s-1");
-    expect(screen.getByTestId("session-name").className).toContain("text-muted-foreground");
+    expect(screen.getByTestId("thread-name").textContent).toBe("s-1");
+    expect(screen.getByTestId("thread-name").className).toContain("text-muted-foreground");
     expect(screen.getByTestId("row-archived-age").textContent).toBe("0m");
   });
 });
 
 describe("SidebarRow snoozed", () => {
-  function renderSnoozed(o: Partial<SessionView>): HTMLElement {
-    useSessionsStore.setState({ byId: { "s-1": thread({ state: "disconnected", status: "attention", statusReason: "finished", ...o }) }, order: ["s-1"] });
+  function renderSnoozed(o: Partial<ThreadView>): HTMLElement {
+    useThreadsStore.setState({ byId: { "s-1": thread({ state: "disconnected", status: "attention", statusReason: "finished", ...o }) }, order: ["s-1"] });
     render(
       <TooltipProvider>
-        <SidebarRow row={{ key: "s:s-1", kind: "session", section: "snoozed", sessionId: "s-1" }} selected={false} cursor={false} onActivate={() => undefined} />
+        <SidebarRow row={{ key: "s:s-1", kind: "thread", section: "snoozed", threadId: "s-1" }} selected={false} cursor={false} onActivate={() => undefined} />
       </TooltipProvider>,
     );
     return screen.getByRole("option");
@@ -131,14 +131,14 @@ describe("SidebarRow snoozed", () => {
     expect(screen.queryByTestId("row-place")).toBeNull();
     expect(screen.getByTestId("row-snooze-left").className).toContain("tabular-nums");
     expect(screen.getByTestId("row-snooze-left").className).toContain("text-caption-sm");
-    expect(screen.getByTestId("session-body").className).not.toContain("opacity-50");
-    expect(screen.getByTestId("session-body").hasAttribute("data-snoozed")).toBe(true);
+    expect(screen.getByTestId("thread-body").className).not.toContain("opacity-50");
+    expect(screen.getByTestId("thread-body").hasAttribute("data-snoozed")).toBe(true);
   });
 
   it("an unnamed thread shows its id, muted", () => {
     renderSnoozed({ name: "", snoozedUntilMs: Date.now() + 3_600_000 + 1000 });
-    expect(screen.getByTestId("session-name").textContent).toBe("s-1");
-    expect(screen.getByTestId("session-name").className).toContain("text-muted-foreground");
+    expect(screen.getByTestId("thread-name").textContent).toBe("s-1");
+    expect(screen.getByTestId("thread-name").className).toContain("text-muted-foreground");
     expect(screen.getByTestId("row-snooze-left").textContent).toBe("1h");
   });
 });

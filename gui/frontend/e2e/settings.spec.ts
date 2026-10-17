@@ -136,7 +136,7 @@ test("changing a bool and an enum saves to the file and applies live", async ({ 
   await expect(autoName).toHaveAttribute("aria-checked", "true");
   await autoName.click();
   await expect(autoName).toHaveAttribute("aria-checked", "false");
-  await expect(page.getByText("Saved Name sessions automatically")).toBeVisible();
+  await expect(page.getByText("Saved Name threads automatically")).toBeVisible();
   await expect.poll(async () => (await mockSettings()).raw["threads.auto_name"]).toBe("false");
 
   await pick(page, "appearance.theme", "Light");
@@ -310,7 +310,7 @@ test("cmd+/ opens the help overlay; its shortcuts tab lists commands and app cho
   await expect(help.locator('[data-help-section="App"]')).toContainText("Command palette");
   await expect(help.locator('[data-help-section="App"]')).toContainText("⌘K");
   // Registry commands with their effective chords, grouped by category; unavailable
-  // ones (session.new without a worktree) are still listed.
+  // ones (thread.new without a worktree) are still listed.
   await expect(help.locator('[data-help-command="thread.new"]')).toContainText("⌘N");
   await expect(help.locator('[data-help-command="terminal.new"]')).toContainText("⌘T");
   await expect(help.locator('[data-help-command="view.settings"]')).toContainText("⌘,");
@@ -332,14 +332,14 @@ test("ShowView intents from the daemon open settings and help", async ({ page })
 test("destructive commands ask first; cancel keeps, confirm runs", async ({ page }) => {
   await openApp(page);
   await row(page, "s:s-3").click();
-  // The thread row's menu: Remove… (session.remove).
+  // The thread row's menu: Remove… (thread.remove).
   const remove = async () => {
     await row(page, "s:s-3").click({ button: "right" });
     await page.getByTestId("row-menu").getByText("Remove…").click();
   };
   await remove();
   const dialog = page.getByTestId("confirm-dialog");
-  await expect(dialog).toContainText("Remove session s-3?");
+  await expect(dialog).toContainText("Remove thread s-3?");
   await dialog.getByTestId("confirm-cancel").click();
   await expect(dialog).toHaveCount(0);
   await expect(row(page, "s:s-3")).toBeVisible();

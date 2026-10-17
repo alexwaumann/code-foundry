@@ -50,7 +50,7 @@ export interface ThreadState {
   /** Pending requests per thread from the EventService thread source (badges without a Watch). */
   pending: Readonly<Record<string, ThreadPendingListView>>;
   /** The visible thread's Watch. */
-  watch: { sessionId: string; status: StreamStatus; error: string | null } | null;
+  watch: { threadId: string; status: StreamStatus; error: string | null } | null;
   /** Turns the user folded (true) or unfolded (false), by thread and turn key; absent: the default. */
   folds: Readonly<Record<string, Readonly<Record<string, boolean>>>>;
   /** Rows the user expanded (true) or collapsed (false), by thread and row key; absent: the row's default. */
@@ -179,21 +179,21 @@ export function applyPendingEvent(prev: Readonly<Record<string, ThreadPendingLis
     case "pendingSnapshot": {
       const next: Record<string, ThreadPendingListView> = {};
       for (const t of ev.threads) {
-        const old = prev[t.sessionId];
-        next[t.sessionId] = old && old.seq === t.seq && samePending(old.pending, t.pending) ? old : t;
+        const old = prev[t.threadId];
+        next[t.threadId] = old && old.seq === t.seq && samePending(old.pending, t.pending) ? old : t;
       }
       const keys = Object.keys(next);
       return keys.length === Object.keys(prev).length && keys.every((k) => prev[k] === next[k]) ? prev : next;
     }
     case "pending": {
-      const old = prev[ev.sessionId];
+      const old = prev[ev.threadId];
       if (old && ev.seq <= old.seq) return prev;
       if (ev.pending.length === 0) {
         if (!old) return prev;
-        const { [ev.sessionId]: _gone, ...rest } = prev;
+        const { [ev.threadId]: _gone, ...rest } = prev;
         return rest;
       }
-      return { ...prev, [ev.sessionId]: { sessionId: ev.sessionId, seq: ev.seq, pending: ev.pending } };
+      return { ...prev, [ev.threadId]: { threadId: ev.threadId, seq: ev.seq, pending: ev.pending } };
     }
     default:
       return prev;
@@ -236,11 +236,11 @@ export function applyThreadEvents(log: ThreadLog | undefined, events: readonly T
 }
 
 /** Applies a batch of Watch events to one thread's log in a single store update. */
-export function applyWatchBatch(sessionId: string, events: readonly ThreadEventView[]): void {
+export function applyWatchBatch(threadId: string, events: readonly ThreadEventView[]): void {
   if (events.length === 0) return;
   useThreadStore.setState((s) => {
-    const log = applyThreadEvents(s.logs[sessionId], events);
-    return log === s.logs[sessionId] || !log ? s : { logs: { ...s.logs, [sessionId]: log } };
+    const log = applyThreadEvents(s.logs[threadId], events);
+    return log === s.logs[threadId] || !log ? s : { logs: { ...s.logs, [threadId]: log } };
   });
 }
 
@@ -255,8 +255,8 @@ export const WATCH_BATCH_MS = 16;
 export const KEPT_LOGS = 4;
 let recentlyWatched: string[] = [];
 
-function keepRecent(sessionId: string): void {
-  recentlyWatched = [sessionId, ...recentlyWatched.filter((id) => id !== sessionId)];
+function keepRecent(threadId: string): void {
+  recentlyWatched = [threadId, ...recentlyWatched.filter((id) => id !== threadId)];
   const drop = new Set(recentlyWatched.slice(KEPT_LOGS));
   recentlyWatched = recentlyWatched.slice(0, KEPT_LOGS);
   if (drop.size > 0) pruneThreadLogs((id) => !drop.has(id));
@@ -266,21 +266,21 @@ function keepRecent(sessionId: string): void {
  * Opens the Watch for a thread (the visible thread; one at a time) and keeps it
  * open, reconnecting with backoff, until the returned function is called.
  */
-export function startThreadWatch(sessionId: string): () => void {
-  keepRecent(sessionId);
+export function startThreadWatch(threadId: string): () => void {
+  keepRecent(threadId);
   let queue: ThreadEventView[] = [];
   let timer: ReturnType<typeof setTimeout> | undefined;
   const flush = () => {
     timer = undefined;
     const batch = queue;
     queue = [];
-    applyWatchBatch(sessionId, batch);
+    applyWatchBatch(threadId, batch);
   };
   const setStatus = (status: StreamStatus, error: string | null) => {
-    useThreadStore.setState((s) => (s.watch?.sessionId === sessionId || status === "connecting" ? { watch: { sessionId, status, error } } : s));
+    useThreadStore.setState((s) => (s.watch?.threadId === threadId || status === "connecting" ? { watch: { threadId, status, error } } : s));
   };
   const stop = runStream<ThreadEventView>({
-    open: (signal) => watchThread(sessionId, signal),
+    open: (signal) => watchThread(threadId, signal),
     // WKWebView can hold the tail of the stream after the window was hidden, minimized or
     // covered (docs/notes/thread-render-stall.md): a fresh Watch's snapshot catches up at
     // once on return, as leaving and reopening the thread does.
@@ -298,12 +298,12 @@ export function startThreadWatch(sessionId: string): () => void {
     stop();
     clearTimeout(timer);
     flush();
-    useThreadStore.setState((s) => (s.watch?.sessionId === sessionId ? { watch: null } : s));
+    useThreadStore.setState((s) => (s.watch?.threadId === threadId ? { watch: null } : s));
   };
 }
 
-/** Forgets the logs of threads that are gone (sessions removed). */
-export function pruneThreadLogs(keep: (sessionId: string) => boolean): void {
+/** Forgets the logs of threads that are gone (threads removed). */
+export function pruneThreadLogs(keep: (threadId: string) => boolean): void {
   useThreadStore.setState((s) => {
     const kept = Object.entries(s.logs).filter(([id]) => keep(id));
     return kept.length === Object.keys(s.logs).length ? s : { logs: Object.fromEntries(kept) };
@@ -311,31 +311,31 @@ export function pruneThreadLogs(keep: (sessionId: string) => boolean): void {
 }
 
 /** Folds (true) or unfolds (false) a turn of a thread. */
-export function setTurnFolded(sessionId: string, turnKey: string, folded: boolean): void {
-  useThreadStore.setState((s) => ({ folds: { ...s.folds, [sessionId]: { ...s.folds[sessionId], [turnKey]: folded } } }));
+export function setTurnFolded(threadId: string, turnKey: string, folded: boolean): void {
+  useThreadStore.setState((s) => ({ folds: { ...s.folds, [threadId]: { ...s.folds[threadId], [turnKey]: folded } } }));
 }
 
 /** Expands (true) or collapses (false) a row of a thread. */
-export function setRowExpanded(sessionId: string, rowKey: string, expanded: boolean): void {
-  useThreadStore.setState((s) => ({ expanded: { ...s.expanded, [sessionId]: { ...s.expanded[sessionId], [rowKey]: expanded } } }));
+export function setRowExpanded(threadId: string, rowKey: string, expanded: boolean): void {
+  useThreadStore.setState((s) => ({ expanded: { ...s.expanded, [threadId]: { ...s.expanded[threadId], [rowKey]: expanded } } }));
 }
 
 const NO_FOLDS: Readonly<Record<string, boolean>> = {};
 const NO_PENDING: readonly ThreadPendingView[] = [];
 
 /** The user's fold choices for a thread's turns. */
-export function useTurnFolds(sessionId: string): Readonly<Record<string, boolean>> {
-  return useThreadStore((s) => s.folds[sessionId] ?? NO_FOLDS);
+export function useTurnFolds(threadId: string): Readonly<Record<string, boolean>> {
+  return useThreadStore((s) => s.folds[threadId] ?? NO_FOLDS);
 }
 
 /** Whether a row is expanded: the user's choice, else `fallback`. */
-export function useRowExpanded(sessionId: string, rowKey: string, fallback: boolean): boolean {
-  return useThreadStore((s) => s.expanded[sessionId]?.[rowKey] ?? fallback);
+export function useRowExpanded(threadId: string, rowKey: string, fallback: boolean): boolean {
+  return useThreadStore((s) => s.expanded[threadId]?.[rowKey] ?? fallback);
 }
 
 /** One item (narrow: re-renders only when that item changes). */
-export function useThreadItem(sessionId: string, id: string): ThreadItemView | undefined {
-  return useThreadStore((s) => s.logs[sessionId]?.byId[id]);
+export function useThreadItem(threadId: string, id: string): ThreadItemView | undefined {
+  return useThreadStore((s) => s.logs[threadId]?.byId[id]);
 }
 
 /** Items keep their identity while unchanged, so each one's key is built once. */
@@ -351,10 +351,10 @@ function keyOf(it: ThreadItemView): string {
 }
 
 /** The timeline's structural keys (lib/threadTimeline timelineKey): shallow-stable across text deltas. */
-export function useTimelineKeys(sessionId: string): string[] {
+export function useTimelineKeys(threadId: string): string[] {
   return useThreadStore(
     useShallow((s) => {
-      const log = s.logs[sessionId];
+      const log = s.logs[threadId];
       if (!log) return [];
       return log.order.flatMap((id) => {
         const it = log.byId[id];
@@ -369,9 +369,9 @@ export function useTimelineKeys(sessionId: string): string[] {
  * "" for the thread's own calls and calls not seen. A tool call's item id is its
  * tool_use id.
  */
-export function useAgentInputOf(sessionId: string, toolUseId: string): string {
+export function useAgentInputOf(threadId: string, toolUseId: string): string {
   return useThreadStore((s) => {
-    const log = s.logs[sessionId];
+    const log = s.logs[threadId];
     const call = toolUseId ? log?.byId[toolUseId] : undefined;
     const agent = call?.parentToolUseId ? log?.byId[call.parentToolUseId] : undefined;
     return agent?.kind === "tool" ? agent.inputJson : "";
@@ -379,13 +379,13 @@ export function useAgentInputOf(sessionId: string, toolUseId: string): string {
 }
 
 /** Whether the visible thread's snapshot arrived. */
-export function useThreadLoaded(sessionId: string): boolean {
-  return useThreadStore((s) => sessionId in s.logs);
+export function useThreadLoaded(threadId: string): boolean {
+  return useThreadStore((s) => threadId in s.logs);
 }
 
 /** The thread's log arrived and has no items (a thread started without a prompt, one still starting). */
-export function useThreadEmpty(sessionId: string): boolean {
-  return useThreadStore((s) => s.logs[sessionId]?.order.length === 0);
+export function useThreadEmpty(threadId: string): boolean {
+  return useThreadStore((s) => s.logs[threadId]?.order.length === 0);
 }
 
 /**
@@ -393,32 +393,32 @@ export function useThreadEmpty(sessionId: string): boolean {
  * identity); empty before its Watch's snapshot, when it is not running, or from a daemon
  * that predates the list.
  */
-export function useSlashCommands(sessionId: string): readonly SlashCommandView[] {
-  return useThreadStore((s) => s.logs[sessionId]?.commands ?? NO_COMMANDS);
+export function useSlashCommands(threadId: string): readonly SlashCommandView[] {
+  return useThreadStore((s) => s.logs[threadId]?.commands ?? NO_COMMANDS);
 }
 
 /** The thread's pending requests: the Watch's when it has the thread, else the EventService's. */
-export function useThreadPending(sessionId: string): readonly ThreadPendingView[] {
-  return useThreadStore((s) => s.logs[sessionId]?.pending ?? s.pending[sessionId]?.pending ?? NO_PENDING);
+export function useThreadPending(threadId: string): readonly ThreadPendingView[] {
+  return useThreadStore((s) => s.logs[threadId]?.pending ?? s.pending[threadId]?.pending ?? NO_PENDING);
 }
 
 /** The thread's pending requests without the ones being answered (their prompts left already). */
-export function useOpenRequests(sessionId: string): readonly ThreadPendingView[] {
+export function useOpenRequests(threadId: string): readonly ThreadPendingView[] {
   return useThreadStore(
     useShallow((s) => {
-      const all = s.logs[sessionId]?.pending ?? s.pending[sessionId]?.pending ?? NO_PENDING;
-      const answering = s.answering[sessionId];
+      const all = s.logs[threadId]?.pending ?? s.pending[threadId]?.pending ?? NO_PENDING;
+      const answering = s.answering[threadId];
       return answering ? all.filter((p) => !answering[p.requestId]) : all;
     }),
   );
 }
 
 /** Marks a request answered (its prompt leaves) or, when its answer failed, open again. */
-export function setAnswering(sessionId: string, requestId: string, on: boolean): void {
+export function setAnswering(threadId: string, requestId: string, on: boolean): void {
   useThreadStore.setState((s) => {
-    const cur: Record<string, true> = Object.fromEntries(Object.entries(s.answering[sessionId] ?? {}).filter(([k]) => k !== requestId));
+    const cur: Record<string, true> = Object.fromEntries(Object.entries(s.answering[threadId] ?? {}).filter(([k]) => k !== requestId));
     if (on) cur[requestId] = true;
-    return { answering: { ...s.answering, [sessionId]: cur } };
+    return { answering: { ...s.answering, [threadId]: cur } };
   });
 }
 
@@ -438,7 +438,7 @@ export function structOf(it: ThreadItemView): Parameters<typeof timelineKey>[0] 
 }
 
 /** A thread's items, read imperatively (copy actions). */
-export function getThreadItems(sessionId: string): ThreadItemView[] {
-  const log = useThreadStore.getState().logs[sessionId];
+export function getThreadItems(threadId: string): ThreadItemView[] {
+  const log = useThreadStore.getState().logs[threadId];
   return log ? log.order.flatMap((id) => (log.byId[id] ? [log.byId[id]] : [])) : [];
 }

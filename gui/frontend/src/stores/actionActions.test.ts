@@ -18,7 +18,7 @@ const { useActionsStore } = await import("./actions");
 const { useActionDialogStore } = await import("./actionDialog");
 const { useActionStopsStore } = await import("./actionStops");
 const { useTerminalsStore } = await import("./terminals");
-const { useSessionsStore } = await import("./sessions");
+const { useThreadsStore } = await import("./threads");
 const { useUiStore } = await import("./ui");
 
 const finished = (o: Partial<ActionRunFinishedView>): ActionRunFinishedView => ({
@@ -26,7 +26,7 @@ const finished = (o: Partial<ActionRunFinishedView>): ActionRunFinishedView => (
   actionId: "a-1",
   actionName: "Install deps",
   repoId: "repo-cf",
-  sessionId: "s-1",
+  threadId: "s-1",
   exitCode: 1,
   mode: "background",
   trigger: "worktree-create",
@@ -36,7 +36,7 @@ const finished = (o: Partial<ActionRunFinishedView>): ActionRunFinishedView => (
 
 beforeEach(() => {
   runCommandForResult.mockReset();
-  useSessionsStore.setState({ byId: {}, order: [] });
+  useThreadsStore.setState({ byId: {}, order: [] });
   runCommandForResult.mockResolvedValue({ message: "", resultJson: '{"id":"r-9","terminalId":"t-9"}' });
   useActionsStore.setState({ byId: { "a-1": { id: "a-1", repoId: "repo-cf", name: "Test", command: "go test", icon: "test", inTerminal: true, onWorktreeCreate: false, position: 0 } }, byRepo: { "repo-cf": ["a-1"] }, runs: {} });
 });
@@ -63,9 +63,9 @@ describe("onActionRunFinished", () => {
 
 describe("openFailedRun", () => {
   it("a background run: selects the thread and shows the output", () => {
-    useSessionsStore.setState({ byId: { "s-1": { id: "s-1" } as never }, order: ["s-1"] });
+    useThreadsStore.setState({ byId: { "s-1": { id: "s-1" } as never }, order: ["s-1"] });
     openFailedRun(finished({}));
-    expect(useUiStore.getState().selection).toEqual({ kind: "session", id: "s-1" });
+    expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s-1" });
     expect(useActionDialogStore.getState()).toMatchObject({ runId: "r-1", runName: "Install deps" });
     useUiStore.getState().select({ kind: "view", name: "projects" });
   });
@@ -81,7 +81,7 @@ describe("openFailedRun", () => {
 
 describe("ownerOfTerminal", () => {
   it.each([
-    ["a thread's", { kind: "action", thread: "s-1", repo: "r", worktree: "/w" }, { kind: "thread", sessionId: "s-1" }],
+    ["a thread's", { kind: "action", thread: "s-1", repo: "r", worktree: "/w" }, { kind: "thread", threadId: "s-1" }],
     ["a worktree's", { kind: "action", repo: "r", worktree: "/w" }, { kind: "worktree", repoId: "r", path: "/w" }],
     ["neither", { kind: "action" }, null],
   ])("%s", (_n, labels, want) => {
@@ -98,7 +98,7 @@ describe("runs", () => {
 
   it("runAction: a failed run shows nothing", async () => {
     runCommandForResult.mockResolvedValueOnce(null);
-    await expect(runAction("a-1", { kind: "thread", sessionId: "s-1" })).resolves.toBeNull();
+    await expect(runAction("a-1", { kind: "thread", threadId: "s-1" })).resolves.toBeNull();
     expect(showOwnTerminal).not.toHaveBeenCalled();
   });
 

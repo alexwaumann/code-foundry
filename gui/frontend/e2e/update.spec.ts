@@ -27,8 +27,8 @@ async function paletteRun(page: Page, name: string) {
  * restart cuts it off too ("waiting on you").
  */
 async function settleThreads(busy: number): Promise<void> {
-  await mockPost("session/status?id=s-1&status=attention&reason=finished");
-  for (const id of ["s-5", "s-6"]) await mockPost(`session/stop?id=${id}&reason=idle&code=0&status=idle`);
+  await mockPost("thread/status?id=s-1&status=attention&reason=finished");
+  for (const id of ["s-5", "s-6"]) await mockPost(`thread/stop?id=${id}&reason=idle&code=0&status=idle`);
   if (busy > 0) await mockPost(`threads?repo=repo-cf&count=${String(busy)}&status=busy&prefix=Job`);
 }
 
@@ -119,7 +119,7 @@ test("download shows progress, then lists busy threads; Install and Restart Now 
   await expectChip(page, "downloaded", "v0.2.0 downloaded", "Restart to apply");
 
   // Another busy thread shows up live.
-  await mockPost("session/status?id=s-1&status=busy");
+  await mockPost("thread/status?id=s-1&status=busy");
   await expect(box.getByTestId("update-busy-heading")).toHaveText("4 threads would be cut off");
   await expect(box).toContainText("Refactor sidebar tree");
 
@@ -141,7 +141,7 @@ test("download shows progress, then lists busy threads; Install and Restart Now 
 test("available → Download → downloading → downloaded → Install and Restart Now", async ({ page }) => {
   await openApp(page);
   await settleThreads(0);
-  await mockPost("session/stop?id=s-2&reason=idle&code=0");
+  await mockPost("thread/stop?id=s-2&reason=idle&code=0");
   await mockPost("update/latest?version=v0.2.0");
   await paletteRun(page, "app.update.check");
   const d = dialog(page);
@@ -190,7 +190,7 @@ test("installed with threads idle or stopped says nothing will be interrupted", 
   await settleThreads(0);
   // s-2 stops while waiting on a permission: its prompt is gone with the process, so a
   // restart cuts nothing off (it still shows as waiting on you in the sidebar).
-  await mockPost("session/stop?id=s-2&reason=idle&code=0");
+  await mockPost("thread/stop?id=s-2&reason=idle&code=0");
   await mockPost("update/state?state=installed&version=v0.2.0");
   await expectChip(page, "installed", "v0.2.0 installed", "Restart to apply");
   await indicator(page).click();

@@ -21,7 +21,7 @@ async function openThread(page: Page): Promise<void> {
 }
 
 async function expectMcpTab(page: Page): Promise<void> {
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-r1");
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-r1");
   await expect(tabs(page).and(page.locator('[aria-selected="true"]'))).toHaveText("MCP");
   await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "mcp");
 }

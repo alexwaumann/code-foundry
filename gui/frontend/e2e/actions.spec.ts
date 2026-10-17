@@ -24,14 +24,14 @@ const tabs = (page: Page) => bottom(page).getByRole("tab");
 const host = (page: Page) => page.getByTestId("bottom-terminal-host");
 const status = (page: Page) => page.getByTestId("action-status");
 
-async function selectSession(page: Page, id: string): Promise<void> {
+async function selectThread(page: Page, id: string): Promise<void> {
   await row(page, `s:${id}`).click();
   await expect(page.getByTestId("thread-pane")).toBeVisible();
 }
 
-async function openMenu(page: Page, session = "s-1"): Promise<void> {
+async function openMenu(page: Page, thread = "s-1"): Promise<void> {
   await openApp(page);
-  await selectSession(page, session);
+  await selectThread(page, thread);
   await trigger(page).click();
   await expect(menu(page)).toBeVisible();
 }
@@ -59,7 +59,7 @@ async function runFromMenu(page: Page, name: string): Promise<string> {
 
 test("the header's Play menu lists the project's actions and runs one in the thread's bottom panel", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   // Left of the bottom panel's toggle.
   await expect(page.getByTestId("thread-header").locator('[data-testid="pane-actions-menu"] + [data-testid="bottom-toggle"]')).toHaveCount(1);
   await expectTooltip(page, trigger(page), "Run an action");
@@ -111,7 +111,7 @@ test("the header's Play menu lists the project's actions and runs one in the thr
   // No toast for it. A failing setup run follows (events arrive in order): once its toast
   // shows, this run's run_finished was seen, and the toasts are counted then (a
   // toHaveCount(0) before it could pass before a toast had a chance to arrive).
-  await mockPost("action/setup?session=s-1&code=2&action=Build");
+  await mockPost("action/setup?thread=s-1&code=2&action=Build");
   await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Setup action Build failed (exit 2)" })).toBeVisible();
   expect(await page.locator("[data-sonner-toast]").count()).toBe(1);
 });
@@ -252,7 +252,7 @@ test("add, then edit (pencil and ArrowRight), then delete an action", async ({ p
 
 test("an action tab: Stop keeps the tab, stopped, Rerun replaces it with a new run, × closes it", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   const dev = await runFromMenu(page, "Dev");
   await expect(page.getByTestId("action-echo")).toHaveText("$ pnpm dev");
   await expect(status(page)).toHaveAttribute("data-status", "running");
@@ -295,7 +295,7 @@ test("an action tab: Stop keeps the tab, stopped, Rerun replaces it with a new r
 
 test("Stop on a run that ignores SIGHUP: Stopping… (Stop disabled) until SIGKILL, then Stopped", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   const debug = await runFromMenu(page, "Debug daemon");
   await expect(status(page)).toHaveAttribute("data-status", "running");
   await page.getByTestId("action-stop").click();
@@ -312,8 +312,8 @@ test("Stop on a run that ignores SIGHUP: Stopping… (Stop disabled) until SIGKI
 
 test("an action an agent ran shows up as a tab of its thread's panel", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
-  await mockPost("action/run?session=s-1&action=Check");
+  await selectThread(page, "s-1");
+  await mockPost("action/run?thread=s-1&action=Check");
   await expect(bottom(page)).toBeVisible();
   await expect(bottom(page).locator('[data-kind="action"]')).toHaveText("Check");
   await expect(page.getByTestId("action-echo")).toHaveText("$ make check");
@@ -349,7 +349,7 @@ test("the Projects page: a worktree row runs an action for that worktree; the pr
 test("a failed worktree-create action toasts; Open selects the thread and shows the run's output", async ({ page }) => {
   await openApp(page);
   await row(page, "s:s-2").click();
-  await mockPost("action/setup?session=s-1&code=1");
+  await mockPost("action/setup?thread=s-1&code=1");
   const toast = page.locator("[data-sonner-toast]").filter({ hasText: "Setup action Install deps failed (exit 1)" });
   await expect(toast).toBeVisible();
   await toast.getByRole("button", { name: "Open" }).click();
@@ -375,7 +375,7 @@ test("a failed worktree-create action toasts; Open selects the thread and shows 
   await expect(bottom(page).locator('[data-kind="action"]')).toHaveText("Install deps");
   // A successful setup run stays quiet. Once it has finished, a failing one follows: events
   // arrive in order, so when that one's toast shows, the passing run's run_finished was seen.
-  const passed = (await mockPost("action/setup?session=s-1&code=0")) as { id: string };
+  const passed = (await mockPost("action/setup?thread=s-1&code=0")) as { id: string };
   await expect
     .poll(async () => {
       const res = await fetch(`${mockUrl}/__mock/actions`);
@@ -383,7 +383,7 @@ test("a failed worktree-create action toasts; Open selects the thread and shows 
       return body.runs.find((r) => r.id === passed.id)?.state;
     })
     .toBe("EXITED");
-  await mockPost("action/setup?session=s-1&code=2&action=Build");
+  await mockPost("action/setup?thread=s-1&code=2&action=Build");
   await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Setup action Build failed (exit 2)" })).toBeVisible();
   // Counted now, after the ordering point (before it, a zero count would prove nothing).
   expect(await page.locator("[data-sonner-toast]").filter({ hasText: "(exit 0)" }).count()).toBe(0);
@@ -410,14 +410,14 @@ for (const scheme of ["dark", "light"] as const) {
       await page.keyboard.press("Escape");
       await expect(menu(page)).toHaveCount(0);
 
-      await selectSession(page, "s-2");
+      await selectThread(page, "s-2");
       await trigger(page).click();
       await settle();
       await page.screenshot({ path: `${dir}/menu-empty-${scheme}.png` });
       await page.keyboard.press("Escape");
       await expect(menu(page)).toHaveCount(0);
 
-      await selectSession(page, "s-1");
+      await selectThread(page, "s-1");
       await trigger(page).click();
       await menu(page).getByTestId("action-new").click();
       await dialog(page).getByTestId("action-name").fill("Install deps");

@@ -5,7 +5,7 @@ import { invocations, mockPost, mockUrl, openApp, resetMock } from "./fixtures";
 const WT = "/Users/dev/.code-foundry/worktrees/alexwaumann";
 const GP_LOGIN = `${WT}/ghostty-playground/cf-login`;
 
-interface SessionSummary {
+interface ThreadSummary {
   id: string;
   repoId: string;
   worktreePath: string;
@@ -19,9 +19,9 @@ interface WorkspaceSummary {
   members: { repoId: string; worktreePath: string }[];
 }
 
-async function sessions(): Promise<SessionSummary[]> {
-  const res = await fetch(`${mockUrl}/__mock/sessions`);
-  return (await res.json()) as SessionSummary[];
+async function threads(): Promise<ThreadSummary[]> {
+  const res = await fetch(`${mockUrl}/__mock/threads`);
+  return (await res.json()) as ThreadSummary[];
 }
 
 async function workspaces(): Promise<WorkspaceSummary[]> {
@@ -100,10 +100,10 @@ test("pick a workspace: member chips, the primary is changeable, the thread is t
     permission: "auto",
     prompt: "Wire the login form to the new API",
   });
-  const created = page.locator('[data-row-kind="session"][aria-selected="true"]');
+  const created = page.locator('[data-row-kind="thread"][aria-selected="true"]');
   await expect(created).toBeVisible();
   const id = ((await created.getAttribute("data-row-key")) ?? "").slice(2);
-  expect((await sessions()).find((s) => s.id === id)).toMatchObject({ repoId: "repo-gp", worktreePath: GP_LOGIN, workspaceId: "w-000000000001" });
+  expect((await threads()).find((s) => s.id === id)).toMatchObject({ repoId: "repo-gp", worktreePath: GP_LOGIN, workspaceId: "w-000000000001" });
   await expect(page.getByTestId("composer")).toHaveCount(0);
 });
 
@@ -136,7 +136,7 @@ test("a workspace in new-worktree mode makes a new workspace with the same proje
     permission: "auto",
     prompt: "Rename the session cookie",
   });
-  await expect(page.locator('[data-row-kind="session"][aria-selected="true"]')).toBeVisible();
+  await expect(page.locator('[data-row-kind="thread"][aria-selected="true"]')).toBeVisible();
   await expect.poll(async () => (await workspaces()).map((w) => w.name)).toEqual(["login", "rename-the-session-cookie"]);
 });
 
@@ -204,14 +204,14 @@ test("pick a project, add Also in: a new workspace with a cf/<slug> worktree in 
     permission: "auto",
     prompt: "Add a dark mode toggle",
   });
-  const created = page.locator('[data-row-kind="session"][aria-selected="true"]');
+  const created = page.locator('[data-row-kind="thread"][aria-selected="true"]');
   await expect(created).toBeVisible();
   const id = ((await created.getAttribute("data-row-key")) ?? "").slice(2);
   await expect.poll(workspaces).toHaveLength(1);
   const [ws] = await workspaces();
   expect(ws).toMatchObject({ name: "add-a-dark-mode", branch: "cf/add-a-dark-mode" });
   expect(ws?.members.map((m) => m.repoId)).toEqual(["repo-cf", "repo-gp"]);
-  expect((await sessions()).find((s) => s.id === id)).toMatchObject({ repoId: "repo-cf", workspaceId: ws?.id, worktreePath: `${WT}/code-foundry/cf-add-a-dark-mode` });
+  expect((await threads()).find((s) => s.id === id)).toMatchObject({ repoId: "repo-cf", workspaceId: ws?.id, worktreePath: `${WT}/code-foundry/cf-add-a-dark-mode` });
 
   // The new workspace is in the picker now; the project's draft is clear again.
   await page.keyboard.press("Meta+n");
@@ -240,10 +240,10 @@ test("with workspaces around, a single-project thread sends exactly what it did 
     permission: "auto",
     prompt: "Port the renderer",
   });
-  const created = page.locator('[data-row-kind="session"][aria-selected="true"]');
+  const created = page.locator('[data-row-kind="thread"][aria-selected="true"]');
   await expect(created).toBeVisible();
   const id = ((await created.getAttribute("data-row-key")) ?? "").slice(2);
-  expect((await sessions()).find((s) => s.id === id)?.workspaceId).toBe("");
+  expect((await threads()).find((s) => s.id === id)?.workspaceId).toBe("");
   expect(await workspaces()).toHaveLength(1);
 });
 

@@ -1,7 +1,7 @@
 /**
  * Snoozed threads in the GUI (docs/notes/snooze-threads-2-sidebar.md): the snooze menu's
  * presets, the custom date dialog's calendar, and how a wake time reads. Pure, over local
- * time with `now` injected; the GUI sends absolute times (snoozeSession), so the presets
+ * time with `now` injected; the GUI sends absolute times (snoozeThread), so the presets
  * mean what the user saw in the menu, whatever the daemon's clock. Day presets are local
  * wall times (9:00 AM stays 9:00 AM across DST), like the daemon's `tomorrow` and
  * `next-week` (internal/command/snooze_time.go).

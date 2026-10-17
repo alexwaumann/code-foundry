@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const readAttachment = vi.fn();
-vi.mock("@/api/session", () => ({ readAttachment: (...a: unknown[]) => readAttachment(...a) as unknown }));
+vi.mock("@/api/threads", () => ({ readAttachment: (...a: unknown[]) => readAttachment(...a) as unknown }));
 
 describe("loadAttachmentUrl", () => {
   beforeEach(() => {

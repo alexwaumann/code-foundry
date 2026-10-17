@@ -1,19 +1,19 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { AgentRunView } from "@/api/agents";
-import type { SessionView } from "@/api/session";
+import type { ThreadView } from "@/api/threads";
 
 const { SidePanel } = await import("@/components/panel/SidePanel");
 const { getPanel, usePanelStore } = await import("@/stores/panel");
 const { useReposStore } = await import("@/stores/repos");
-const { useSessionsStore } = await import("@/stores/sessions");
+const { useThreadsStore } = await import("@/stores/threads");
 const { applyWatchBatch, useThreadStore } = await import("@/stores/thread");
 const { useUiStore } = await import("@/stores/ui");
 const { agentsPanelCommand, showView, useViewsStore } = await import("@/stores/views");
 const { useAgentRowIds, useAgentRun } = await import("@/stores/agents");
 
 const thread = (id: string, state = "connected") =>
-  ({ id, name: `thread ${id}`, repoId: "web", worktreePath: "/src/web", workspaceId: "", pendingWorktreePath: "", state, status: "idle", linkedPullRequests: [], usage: [] }) as unknown as SessionView;
+  ({ id, name: `thread ${id}`, repoId: "web", worktreePath: "/src/web", workspaceId: "", pendingWorktreePath: "", state, status: "idle", linkedPullRequests: [], usage: [] }) as unknown as ThreadView;
 
 const NOW = Date.now();
 
@@ -64,10 +64,10 @@ const entry = () => screen.queryByTestId("panel-empty")?.querySelector('[data-su
 
 beforeEach(() => {
   useReposStore.setState({ byId: {}, order: [] });
-  useSessionsStore.setState({ byId: { "s-r": thread("s-r"), "s-off": thread("s-off", "disconnected") }, order: ["s-r", "s-off"] });
-  usePanelStore.setState({ byKey: { "session:s-r": { open: true, tabs: [], activeTabId: null }, "view:projects": { open: true, tabs: [], activeTabId: null } } });
+  useThreadsStore.setState({ byId: { "s-r": thread("s-r"), "s-off": thread("s-off", "disconnected") }, order: ["s-r", "s-off"] });
+  usePanelStore.setState({ byKey: { "thread:s-r": { open: true, tabs: [], activeTabId: null }, "view:projects": { open: true, tabs: [], activeTabId: null } } });
   useViewsStore.setState({ settingsOpen: false });
-  useUiStore.setState({ windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260, selection: { kind: "session", id: "s-r" }, palette: { ...useUiStore.getState().palette, open: false } });
+  useUiStore.setState({ windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260, selection: { kind: "thread", id: "s-r" }, palette: { ...useUiStore.getState().palette, open: false } });
   useThreadStore.setState({ logs: {} });
   setAgents("s-r", RUNS);
 });
@@ -89,7 +89,7 @@ describe("Agents surface", () => {
   it("A opens it: the header counts, rows in spawn order with the nested run under its parent", () => {
     render(<SidePanel />);
     fireEvent.keyDown(screen.getByTestId("side-panel"), { key: "a" });
-    expect(getPanel("session:s-r").activeTabId).toBe("agents");
+    expect(getPanel("thread:s-r").activeTabId).toBe("agents");
     expect(screen.getByTestId("agents-count").textContent).toBe("3 running · 5 this thread");
     expect(screen.getByTestId("agents-subline").textContent).toBe("2 in the background keep running after the turn ends");
     expect(rows().map((r) => [r.getAttribute("data-agent"), r.getAttribute("data-level"), r.getAttribute("data-status")])).toEqual([
@@ -170,23 +170,23 @@ describe("Agents surface", () => {
     const listBefore = listRenders;
     // A progress event: only a1's activity changes (the list arrives whole, like the daemon's).
     act(() => {
-      applyWatchBatch("s-r", [{ kind: "agents", sessionId: "s-r", seq: 2, agents: RUNS.map((r) => (r.id === "a1" ? { ...r, activity: "Running go vet" } : { ...r })) }]);
+      applyWatchBatch("s-r", [{ kind: "agents", threadId: "s-r", seq: 2, agents: RUNS.map((r) => (r.id === "a1" ? { ...r, activity: "Running go vet" } : { ...r })) }]);
     });
     expect(renders.a1).toBe((before.a1 ?? 0) + 1);
     for (const id of ["a0", "a1b", "a2", "a3"]) expect(renders[id]).toBe(before[id]);
     expect(listRenders).toBe(listBefore);
     // A new run: the list re-renders.
     act(() => {
-      applyWatchBatch("s-r", [{ kind: "agents", sessionId: "s-r", seq: 3, agents: [...RUNS, run("a5")] }]);
+      applyWatchBatch("s-r", [{ kind: "agents", threadId: "s-r", seq: 3, agents: [...RUNS, run("a5")] }]);
     });
     expect(listRenders).toBe(listBefore + 1);
   });
 
   it("a disconnected thread still lists its runs; no thread selected says so", () => {
     setAgents("s-off", [run("z", { status: "failed", error: "the daemon stopped before the agent finished", endedAtMs: NOW })]);
-    usePanelStore.setState((s) => ({ byKey: { ...s.byKey, "session:s-off": { open: true, tabs: [], activeTabId: null } } }));
+    usePanelStore.setState((s) => ({ byKey: { ...s.byKey, "thread:s-off": { open: true, tabs: [], activeTabId: null } } }));
     act(() => {
-      useUiStore.setState({ selection: { kind: "session", id: "s-off" } });
+      useUiStore.setState({ selection: { kind: "thread", id: "s-off" } });
       showView("panel.agents");
     });
     render(<SidePanel />);

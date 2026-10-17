@@ -1,6 +1,6 @@
 /**
  * Which pull request a selection resolves to, for the Pull request surface: the
- * selection's worktree (a session's, a worktree row, a repo row's main
+ * selection's worktree (a thread's, a worktree row, a repo row's main
  * worktree) → its branch → the branch's pull requests (branchPullRequestsResource).
  * Pure: the surface spec feeds it the stores' current state.
  */
@@ -9,7 +9,7 @@ import { deriveContext } from "@/stores/context";
 import { makeTab, type Tab } from "@/stores/panel";
 import { findWorktree, type ReposData } from "@/stores/repos";
 import type { ResourceEntry } from "@/stores/resource";
-import type { SessionsData } from "@/stores/sessions";
+import type { ThreadsData } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
 
 export const PULL_REQUEST_KIND = "pullrequest";
@@ -34,13 +34,13 @@ export function prRefOfTab(tab: Pick<Tab, "params">): PrRef | null {
 
 export interface SelectionStores {
   repos: ReposData;
-  sessions: SessionsData;
+  threads: ThreadsData;
 }
 
 /** GitHub slug (lower case, like branchKey's users) and branch the selection looks at; null without both. */
 export function selectionBranch(sel: Selection, s: SelectionStores): { slug: string; branch: string } | null {
   if (sel.kind === "none" || sel.kind === "view") return null;
-  const ctx = deriveContext(sel, s.repos, s.sessions);
+  const ctx = deriveContext(sel, s.repos, s.threads);
   const repo = s.repos.byId[ctx.activeRepoId];
   const slug = repo?.githubSlug.toLowerCase() ?? "";
   const branch = findWorktree(s.repos, ctx.activeRepoId, ctx.activeWorktreePath)?.branch ?? "";

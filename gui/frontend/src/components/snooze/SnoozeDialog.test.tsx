@@ -1,12 +1,12 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { SessionView } from "@/api/session";
+import type { ThreadView } from "@/api/threads";
 
-const snoozeSession = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
-vi.mock("@/stores/sessionActions", async (orig) => ({ ...(await orig<typeof import("@/stores/sessionActions")>()), snoozeSession }));
+const snoozeThread = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
+vi.mock("@/stores/threadActions", async (orig) => ({ ...(await orig<typeof import("@/stores/threadActions")>()), snoozeThread }));
 
 const { SnoozeDialog } = await import("./SnoozeDialog");
-const { useSessionsStore } = await import("@/stores/sessions");
+const { useThreadsStore } = await import("@/stores/threads");
 const { openSnoozeDialog, useSnoozeDialogStore } = await import("@/stores/snoozeDialog");
 
 // Wed Oct 14 2026, 1:12 PM local.
@@ -14,8 +14,8 @@ const NOW = new Date(2026, 9, 14, 13, 12).getTime();
 
 beforeEach(() => {
   vi.useFakeTimers({ now: NOW, toFake: ["Date", "setInterval", "clearInterval", "setTimeout", "clearTimeout", "queueMicrotask"] });
-  useSessionsStore.setState({ byId: { "s-1": { id: "s-1", name: "Bump wails to v3.1" } as SessionView }, order: ["s-1"] });
-  useSnoozeDialogStore.setState({ open: false, sessionId: "", seq: 0 });
+  useThreadsStore.setState({ byId: { "s-1": { id: "s-1", name: "Bump wails to v3.1" } as ThreadView }, order: ["s-1"] });
+  useSnoozeDialogStore.setState({ open: false, threadId: "", seq: 0 });
 });
 
 afterEach(() => {
@@ -55,7 +55,7 @@ describe("SnoozeDialog", () => {
     fireEvent.change(screen.getByTestId("snooze-time"), { target: { value: "14:30" } });
     expect(screen.getByTestId("snooze-summary").textContent).toBe("Fri, Oct 16");
     fireEvent.click(screen.getByTestId("snooze-submit"));
-    expect(snoozeSession).toHaveBeenCalledWith("s-1", new Date(2026, 9, 16, 14, 30).getTime());
+    expect(snoozeThread).toHaveBeenCalledWith("s-1", new Date(2026, 9, 16, 14, 30).getTime());
     expect(useSnoozeDialogStore.getState().open).toBe(false);
   });
 
@@ -88,6 +88,6 @@ describe("SnoozeDialog", () => {
     open();
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(useSnoozeDialogStore.getState().open).toBe(false);
-    expect(snoozeSession).not.toHaveBeenCalled();
+    expect(snoozeThread).not.toHaveBeenCalled();
   });
 });

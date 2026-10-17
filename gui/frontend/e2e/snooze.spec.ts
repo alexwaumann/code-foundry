@@ -70,7 +70,7 @@ test("Snoozed section: collapsed by default between Working and Archived; expand
   await expect.poll(() => rowKeys(page)).toEqual(["s:s-2", "s:s-6", "s:s-4", "s:s-3", "# Working 2", "s:s-5", "s:s-1", "# Snoozed 2", "s:s-8", "s:s-9", "# Archived 1"]);
   const s8 = row(page, "s:s-8");
   await expect(s8).toHaveAttribute("data-section", "snoozed");
-  await expect(s8.getByTestId("session-name")).toHaveText("Refactor the gh poller");
+  await expect(s8.getByTestId("thread-name")).toHaveText("Refactor the gh poller");
   await expect(s8.getByTestId("row-snooze-left")).toHaveText("2h");
   await expect(row(page, "s:s-9").getByTestId("row-snooze-left")).toHaveText("4d");
   // One line, same height as an archived row (a thread row is 15px taller); not dimmed.
@@ -78,7 +78,7 @@ test("Snoozed section: collapsed by default between Working and Archived; expand
   const one = (await s8.boundingBox())?.height ?? 0;
   const two = (await row(page, "s:s-3").boundingBox())?.height ?? 0;
   expect(two - one).toBe(15);
-  await expect(s8.getByTestId("session-body")).toHaveCSS("opacity", "1");
+  await expect(s8.getByTestId("thread-body")).toHaveCSS("opacity", "1");
   // Same left edge as the main list's rows.
   expect((await s8.boundingBox())?.x).toBe((await row(page, "s:s-3").boundingBox())?.x);
 
@@ -96,8 +96,8 @@ test("Snoozed section: collapsed by default between Working and Archived; expand
   expect(await page.evaluate(() => (JSON.parse(localStorage.getItem("code-foundry.ui") ?? "{}") as { state?: { snoozedCollapsed?: boolean } }).state?.snoozedCollapsed)).toBe(false);
 
   // Both unsnoozed (as from the CLI): no section.
-  await mockPost("session/snooze?id=s-8&clear=true");
-  await mockPost("session/snooze?id=s-9&clear=true");
+  await mockPost("thread/snooze?id=s-8&clear=true");
+  await mockPost("thread/snooze?id=s-9&clear=true");
   await expect(page.getByTestId("sidebar-snoozed")).toHaveCount(0);
   await expect(row(page, "s:s-8")).toHaveAttribute("data-section", "done");
   // Unsnoozing early is not a wake: s-8 is its finished turn again, and counts.
@@ -150,7 +150,7 @@ test("the row menu's Snooze submenu: presets with their times; 1 hour snoozes wi
 test("snoozing a working thread from the header asks first; it then drops its panels, and its page says until when", async ({ page }) => {
   await openApp(page);
   await row(page, "s:s-1").click();
-  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-session-id", "s-1");
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-1");
   await page.getByTestId("thread-header").getByTestId("bottom-toggle").click();
   await expect(page.getByTestId("bottom-panel")).toBeVisible();
   await page.evaluate(`import("/src/stores/panel.ts").then((m) => m.openSurface("current", m.makeTab("files", "Files")))`);
@@ -179,7 +179,7 @@ test("snoozing a working thread from the header asks first; it then drops its pa
   // Opened from the Snoozed section: the composer, with "Snoozed until <day> 9:00 AM" and Unsnooze above the prompt.
   await page.getByTestId("snoozed-header").click();
   await row(page, "s:s-1").click();
-  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-session-id", "s-1");
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-1");
   const card = page.getByTestId("thread-composer");
   const note = card.getByTestId("thread-snooze-note");
   await expect(note).toContainText(/^Snoozed until (Sun|Mon|Tue|Wed|Thu|Fri|Sat) 9:00 AM/);
@@ -187,7 +187,7 @@ test("snoozing a working thread from the header asks first; it then drops its pa
   await expect(page.getByTestId("reconnect")).toHaveCount(0);
   await expect(page.getByTestId("side-panel")).toHaveCount(0);
   await expect(page.getByTestId("bottom-panel")).toHaveCount(0);
-  expect(await page.evaluate(`import("/src/stores/panel.ts").then((m) => m.usePanelStore.getState().byKey["session:s-1"])`)).toEqual({ open: false, tabs: [], activeTabId: null });
+  expect(await page.evaluate(`import("/src/stores/panel.ts").then((m) => m.usePanelStore.getState().byKey["thread:s-1"])`)).toEqual({ open: false, tabs: [], activeTabId: null });
   // The header button unsnoozes now.
   await expect(header.getByRole("button", { name: "Unsnooze Thread" })).toBeVisible();
   await expect(header.getByRole("button", { name: "Snooze Thread", exact: true })).toHaveCount(0);
@@ -204,7 +204,7 @@ test("snoozing a working thread from the header asks first; it then drops its pa
   await row(page, "s:s-2").click();
   await page.evaluate(`import("/src/stores/panel.ts").then((m) => m.openSurface("current", m.makeTab("files", "Files")))`);
   await expect(page.getByTestId("side-panel")).toBeVisible();
-  await mockPost("session/snooze?id=s-2&until=2h");
+  await mockPost("thread/snooze?id=s-2&until=2h");
   await expect(page.getByTestId("snoozed-count")).toHaveText("3");
   await expect(page.getByTestId("side-panel")).toHaveCount(0);
 });
@@ -259,7 +259,7 @@ test("a wake brings the thread back needing attention: Snooze ended in amber, co
   await openApp(page);
   const bell = page.getByTestId("sidebar-notifications");
   await expect(bell.getByTestId("attention-badge")).toHaveText("1");
-  await mockPost("session/wake?id=s-8");
+  await mockPost("thread/wake?id=s-8");
   await expect(page.getByTestId("snoozed-count")).toHaveText("1");
   // Back in the main list, in the attention group (prompts: s-2, then s-8 by creation).
   await expect.poll(() => mainKeys(page)).toEqual(["s:s-2", "s:s-8", "s:s-6", "s:s-4", "s:s-3"]);
@@ -287,7 +287,7 @@ test("a wake brings the thread back needing attention: Snooze ended in amber, co
   await expect(page.getByTestId("thread-pane")).toHaveCount(0);
   await page.getByTestId("snoozed-header").click();
   await row(page, "s:s-8").click();
-  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-session-id", "s-8");
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-8");
   await expect(card.getByTestId("thread-snoozed")).toHaveText(/^Snoozed until (\w{3} )?\d{1,2}:\d\d [AP]M$/);
   // A message unsnoozes (the daemon's rule) and gets its answer.
   await card.getByTestId("composer-input").click();
@@ -339,7 +339,7 @@ test("the palette's Snooze opens the custom dialog for the selected thread", asy
   await page.keyboard.type("Snooze or Unsnooze");
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("snooze-dialog")).toBeVisible();
-  await expect(page.getByTestId("snooze-dialog")).toHaveAttribute("data-session", "s-3");
+  await expect(page.getByTestId("snooze-dialog")).toHaveAttribute("data-thread", "s-3");
   await page.getByTestId("snooze-dialog").getByTestId("snooze-submit").click();
   await expect(page.getByTestId("snoozed-count")).toHaveText("3");
 });

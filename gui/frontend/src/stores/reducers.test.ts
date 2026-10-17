@@ -129,7 +129,7 @@ describe("deriveContext", () => {
   it.each([
     ["nothing selected", { kind: "none" } as const, emptyContext],
     ["a page", { kind: "view", name: "projects" } as const, { ...emptyContext, activeView: "projects" }],
-    ["composer: the repo only (session.new is available, no worktree yet)", { kind: "compose", repoId: "r1" } as const, { ...emptyContext, activeRepoId: "r1", activeView: "compose" }],
+    ["composer: the repo only (thread.new is available, no worktree yet)", { kind: "compose", repoId: "r1" } as const, { ...emptyContext, activeRepoId: "r1", activeView: "compose" }],
   ])("%s", (_name, sel, want) => {
     expect(deriveContext(sel, repos)).toEqual(want);
   });

@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { SessionView, UsageBucketView } from "@/api/session";
-import { useSessionsStore } from "@/stores/sessions";
+import type { ThreadView, UsageBucketView } from "@/api/threads";
+import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { useViewsStore } from "@/stores/views";
 import { UsagePage } from "./UsagePage";
@@ -11,9 +11,9 @@ function bucket(over: Partial<UsageBucketView>): UsageBucketView {
 }
 
 function setUsage(threads: Record<string, UsageBucketView[]>, retired: UsageBucketView[] = []): void {
-  const byId: Record<string, SessionView> = {};
-  for (const [id, usage] of Object.entries(threads)) byId[id] = { id, usage } as SessionView;
-  useSessionsStore.setState({ byId, order: Object.keys(threads), retiredUsage: retired });
+  const byId: Record<string, ThreadView> = {};
+  for (const [id, usage] of Object.entries(threads)) byId[id] = { id, usage } as ThreadView;
+  useThreadsStore.setState({ byId, order: Object.keys(threads), retiredUsage: retired });
 }
 
 beforeEach(() => {

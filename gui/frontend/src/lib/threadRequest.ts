@@ -33,7 +33,7 @@ export function suggestionCount(json: string): number {
 
 const MODE_LABELS: Record<string, string> = { acceptEdits: "Accept edits", default: "Supervised", auto: "Auto", bypassPermissions: "Full access", dontAsk: "Don't ask" };
 
-/** The permission mode a "setMode" suggestion switches the session to ("Accept edits"), or "". */
+/** The permission mode a "setMode" suggestion switches the thread to ("Accept edits"), or "". */
 export function suggestedMode(json: string): string {
   if (!json) return "";
   try {

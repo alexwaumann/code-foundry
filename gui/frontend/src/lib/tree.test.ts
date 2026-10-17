@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRows, buildSections, rowCache, nextAfter, placeSession, sessionKey, sessionOrder, type ListSession, type Row } from "./tree";
+import { buildRows, buildSections, rowCache, nextAfter, placeThread, threadKey, threadOrder, type ListThread, type Row } from "./tree";
 
 const W = [
   { repoId: "r1", path: "/src/app" },
@@ -7,7 +7,7 @@ const W = [
   { repoId: "r2", path: "/src/lib" },
 ];
 
-describe("placeSession", () => {
+describe("placeThread", () => {
   it.each([
     ["exact", "/src/app", W[0]],
     ["exact with trailing slash", "/src/app/", W[0]],
@@ -17,18 +17,18 @@ describe("placeSession", () => {
     ["outside every worktree", "/tmp", null],
     ["empty", "", null],
   ])("%s", (_name, worktreePath, want) => {
-    expect(placeSession({ worktreePath }, W)).toEqual(want);
+    expect(placeThread({ worktreePath }, W)).toEqual(want);
   });
 });
 
-const thread = (id: string, over: Partial<ListSession> = {}): ListSession => ({ id, pinned: false, group: "idle", archivedAtMs: null, snoozedUntilMs: null, ...over });
+const thread = (id: string, over: Partial<ListThread> = {}): ListThread => ({ id, pinned: false, group: "idle", archivedAtMs: null, snoozedUntilMs: null, ...over });
 
 /** The row key per row, a header as "# <label> <count>" (and its state). */
 function shape(rows: readonly Row[]): string[] {
-  return rows.map((r) => (r.kind === "session" ? r.key : `# ${r.label} ${String(r.count)}${r.collapsed ? " (collapsed)" : ""}`));
+  return rows.map((r) => (r.kind === "thread" ? r.key : `# ${r.label} ${String(r.count)}${r.collapsed ? " (collapsed)" : ""}`));
 }
 
-const s = (...ids: string[]) => ids.map(sessionKey);
+const s = (...ids: string[]) => ids.map(threadKey);
 
 describe("buildRows (the flat thread list)", () => {
   it("lists idle threads newest first with no header", () => {
@@ -61,26 +61,26 @@ describe("buildRows (the flat thread list)", () => {
     const rows = buildRows(all, { workingCollapsed: true });
     expect(shape(rows)).toEqual([...s("s11", "s8", "s2", "s7", "s1", "s10", "s4", "s6", "s12", "s3"), "# Working 2 (collapsed)"]);
     // A pinned working thread is never hidden.
-    expect(rows.some((r) => r.key === sessionKey("s2"))).toBe(true);
+    expect(rows.some((r) => r.key === threadKey("s2"))).toBe(true);
   });
 
   it("has the Working header only when a thread is working, collapsed or not", () => {
     for (const workingCollapsed of [false, true]) {
       expect(shape(buildRows([thread("s1", { group: "prompt" }), thread("s2", { pinned: true, group: "working" })], { workingCollapsed }))).toEqual(s("s2", "s1"));
     }
-    expect(shape(buildRows([thread("s1", { group: "working" })]))).toEqual(["# Working 1", sessionKey("s1")]);
+    expect(shape(buildRows([thread("s1", { group: "working" })]))).toEqual(["# Working 1", threadKey("s1")]);
     expect(buildRows([])).toEqual([]);
   });
 
   it("orders threads (cmd+1..9, cmd+shift+a) as shown, the header skipped, collapsed rows absent", () => {
-    const sessions = [thread("s1"), thread("s2", { group: "done" }), thread("s3", { group: "working" }), thread("s4", { group: "prompt" }), thread("s5", { group: "error" })];
-    expect(sessionOrder(sessions)).toEqual(["s4", "s5", "s2", "s1", "s3"]);
-    expect(sessionOrder(sessions, { workingCollapsed: true })).toEqual(["s4", "s5", "s2", "s1"]);
+    const threads = [thread("s1"), thread("s2", { group: "done" }), thread("s3", { group: "working" }), thread("s4", { group: "prompt" }), thread("s5", { group: "error" })];
+    expect(threadOrder(threads)).toEqual(["s4", "s5", "s2", "s1", "s3"]);
+    expect(threadOrder(threads, { workingCollapsed: true })).toEqual(["s4", "s5", "s2", "s1"]);
   });
 });
 
 describe("buildSections (main list, Working and Archived footers)", () => {
-  const sessions = [
+  const threads = [
     thread("s1", { group: "prompt" }),
     thread("s2", { group: "working" }),
     thread("s3", { archivedAtMs: 3000 }),
@@ -92,19 +92,19 @@ describe("buildSections (main list, Working and Archived footers)", () => {
   ];
 
   it("splits the threads into the main list and the two footers, archived threads only under Archived, most recently archived first", () => {
-    const { main, working, archived } = buildSections(sessions);
+    const { main, working, archived } = buildSections(threads);
     expect(shape(main)).toEqual(s("s1", "s5"));
     expect(shape(working)).toEqual(["# Working 2", ...s("s7", "s2")]);
     expect(shape(archived)).toEqual(["# Archived 4", ...s("s8", "s3", "s6", "s4")]);
     expect(archived.map((r) => r.section)).toEqual(["archived", "archived", "archived", "archived", "archived"]);
-    expect(shape(buildRows(sessions))).toEqual([...shape(main), ...shape(working), ...shape(archived)]);
+    expect(shape(buildRows(threads))).toEqual([...shape(main), ...shape(working), ...shape(archived)]);
   });
 
   it("collapsed: each footer keeps its header and count, its rows are gone", () => {
-    const { working, archived } = buildSections(sessions, { workingCollapsed: true, archivedCollapsed: true });
+    const { working, archived } = buildSections(threads, { workingCollapsed: true, archivedCollapsed: true });
     expect(shape(working)).toEqual(["# Working 2 (collapsed)"]);
     expect(shape(archived)).toEqual(["# Archived 4 (collapsed)"]);
-    expect(shape(buildSections(sessions, { archivedCollapsed: true }).working)).toEqual(["# Working 2", ...s("s7", "s2")]);
+    expect(shape(buildSections(threads, { archivedCollapsed: true }).working)).toEqual(["# Working 2", ...s("s7", "s2")]);
   });
 
   it("has a footer only when it has threads", () => {
@@ -113,20 +113,20 @@ describe("buildSections (main list, Working and Archived footers)", () => {
       main: [],
       working: [],
       snoozed: [],
-      archived: [expect.objectContaining({ key: "h:archived", count: 1 }), expect.objectContaining({ key: sessionKey("s1") })],
+      archived: [expect.objectContaining({ key: "h:archived", count: 1 }), expect.objectContaining({ key: threadKey("s1") })],
     });
     expect(buildSections([])).toEqual({ main: [], working: [], snoozed: [], archived: [] });
   });
 
   it("orders threads (cmd+1..9, cmd+shift+a, arrows) across main, Working and Archived; collapsed rows absent", () => {
-    expect(sessionOrder(sessions)).toEqual(["s1", "s5", "s7", "s2", "s8", "s3", "s6", "s4"]);
-    expect(sessionOrder(sessions, { archivedCollapsed: true })).toEqual(["s1", "s5", "s7", "s2"]);
-    expect(sessionOrder(sessions, { workingCollapsed: true })).toEqual(["s1", "s5", "s8", "s3", "s6", "s4"]);
+    expect(threadOrder(threads)).toEqual(["s1", "s5", "s7", "s2", "s8", "s3", "s6", "s4"]);
+    expect(threadOrder(threads, { archivedCollapsed: true })).toEqual(["s1", "s5", "s7", "s2"]);
+    expect(threadOrder(threads, { workingCollapsed: true })).toEqual(["s1", "s5", "s8", "s3", "s6", "s4"]);
   });
 });
 
 describe("buildSections: the Snoozed footer", () => {
-  const sessions = [
+  const threads = [
     thread("s1", { group: "prompt" }),
     thread("s2", { group: "working" }),
     thread("s3", { snoozedUntilMs: 9000 }),
@@ -139,29 +139,29 @@ describe("buildSections: the Snoozed footer", () => {
   ];
 
   it("lists snoozed threads only under Snoozed, between Working and Archived, soonest wake first", () => {
-    const sec = buildSections(sessions);
+    const sec = buildSections(threads);
     expect(shape(sec.main)).toEqual(s("s1", "s9"));
     expect(shape(sec.working)).toEqual(["# Working 1", ...s("s2")]);
     expect(shape(sec.snoozed)).toEqual(["# Snoozed 4", ...s("s4", "s6", "s7", "s3")]);
     expect(sec.snoozed.map((r) => r.section)).toEqual(["snoozed", "snoozed", "snoozed", "snoozed", "snoozed"]);
     expect(shape(sec.archived)).toEqual(["# Archived 2", ...s("s8", "s5")]);
-    expect(shape(buildRows(sessions))).toEqual([...shape(sec.main), ...shape(sec.working), ...shape(sec.snoozed), ...shape(sec.archived)]);
+    expect(shape(buildRows(threads))).toEqual([...shape(sec.main), ...shape(sec.working), ...shape(sec.snoozed), ...shape(sec.archived)]);
   });
 
   it("collapsed: keeps its header and count; only when it has threads", () => {
-    expect(shape(buildSections(sessions, { snoozedCollapsed: true }).snoozed)).toEqual(["# Snoozed 4 (collapsed)"]);
-    expect(shape(buildSections(sessions, { snoozedCollapsed: true }).archived)).toEqual(["# Archived 2", ...s("s8", "s5")]);
+    expect(shape(buildSections(threads, { snoozedCollapsed: true }).snoozed)).toEqual(["# Snoozed 4 (collapsed)"]);
+    expect(shape(buildSections(threads, { snoozedCollapsed: true }).archived)).toEqual(["# Archived 2", ...s("s8", "s5")]);
     expect(buildSections([thread("s1"), thread("s2", { archivedAtMs: 1 })]).snoozed).toEqual([]);
   });
 
   it("orders threads across all four sections; collapsed rows absent", () => {
-    expect(sessionOrder(sessions)).toEqual(["s1", "s9", "s2", "s4", "s6", "s7", "s3", "s8", "s5"]);
-    expect(sessionOrder(sessions, { snoozedCollapsed: true })).toEqual(["s1", "s9", "s2", "s8", "s5"]);
-    expect(sessionOrder(sessions, { workingCollapsed: true, snoozedCollapsed: true, archivedCollapsed: true })).toEqual(["s1", "s9"]);
+    expect(threadOrder(threads)).toEqual(["s1", "s9", "s2", "s4", "s6", "s7", "s3", "s8", "s5"]);
+    expect(threadOrder(threads, { snoozedCollapsed: true })).toEqual(["s1", "s9", "s2", "s8", "s5"]);
+    expect(threadOrder(threads, { workingCollapsed: true, snoozedCollapsed: true, archivedCollapsed: true })).toEqual(["s1", "s9"]);
   });
 
   it("an unsnoozed thread goes back to its group in the main list", () => {
-    const woke = sessions.map((t) => (t.id === "s6" ? { ...t, snoozedUntilMs: null } : t));
+    const woke = threads.map((t) => (t.id === "s6" ? { ...t, snoozedUntilMs: null } : t));
     expect(shape(buildSections(woke).main)).toEqual(s("s6", "s1", "s9"));
   });
 });
@@ -173,10 +173,10 @@ describe("rowCache", () => {
     const stable = rowCache();
     const first = stable(buildRows([thread("s1"), thread("s2")]));
     const second = stable(buildRows([thread("s1"), thread("s2", { group: "prompt" }), thread("s3")]));
-    expect(byKey(second, sessionKey("s1"))).toBe(byKey(first, sessionKey("s1")));
+    expect(byKey(second, threadKey("s1"))).toBe(byKey(first, threadKey("s1")));
     // s2 moved into the attention group: a new object with the new section.
-    expect(byKey(second, sessionKey("s2"))).not.toBe(byKey(first, sessionKey("s2")));
-    expect(byKey(second, sessionKey("s2"))).toMatchObject({ section: "attention" });
+    expect(byKey(second, threadKey("s2"))).not.toBe(byKey(first, threadKey("s2")));
+    expect(byKey(second, threadKey("s2"))).toMatchObject({ section: "attention" });
     expect(second.map((r) => r.key)).toEqual(s("s2", "s3", "s1"));
   });
 
@@ -187,8 +187,8 @@ describe("rowCache", () => {
     const second = stable(buildRows([thread("s1", { group: "working" }), thread("s2", { group: "working" }), thread("s3", { group: "working" })]));
     expect(byKey(second, "h:working")).not.toBe(byKey(first, "h:working"));
     expect(byKey(second, "h:working")).toMatchObject({ count: 3, collapsed: false });
-    expect(byKey(second, sessionKey("s2"))).not.toBe(byKey(first, sessionKey("s2")));
-    for (const key of [sessionKey("s1"), sessionKey("s3")]) expect(byKey(second, key), key).toBe(byKey(first, key));
+    expect(byKey(second, threadKey("s2"))).not.toBe(byKey(first, threadKey("s2")));
+    for (const key of [threadKey("s1"), threadKey("s3")]) expect(byKey(second, key), key).toBe(byKey(first, key));
     // Nothing changed: every object is reused.
     const same = stable(buildRows([thread("s1", { group: "working" }), thread("s2", { group: "working" }), thread("s3", { group: "working" })]));
     same.forEach((r, i) => {
@@ -198,17 +198,17 @@ describe("rowCache", () => {
     const collapsed = stable(buildRows([thread("s1", { group: "working" }), thread("s2", { group: "working" }), thread("s3", { group: "working" }), thread("s4")], { workingCollapsed: true }));
     expect(byKey(collapsed, "h:working")).toMatchObject({ count: 3, collapsed: true });
     expect(byKey(collapsed, "h:working")).not.toBe(byKey(same, "h:working"));
-    expect(shape(collapsed)).toEqual([sessionKey("s4"), "# Working 3 (collapsed)"]);
+    expect(shape(collapsed)).toEqual([threadKey("s4"), "# Working 3 (collapsed)"]);
   });
 
   it("archiving a thread moves only that row (a new object in the archived section)", () => {
     const stable = rowCache();
     const first = stable(buildRows([thread("s1"), thread("s2"), thread("s3", { archivedAtMs: 1 })]));
     const second = stable(buildRows([thread("s1"), thread("s2", { archivedAtMs: 2 }), thread("s3", { archivedAtMs: 1 })]));
-    expect(shape(second)).toEqual([sessionKey("s1"), "# Archived 2", ...s("s2", "s3")]);
-    expect(byKey(second, sessionKey("s1"))).toBe(byKey(first, sessionKey("s1")));
-    expect(byKey(second, sessionKey("s3"))).toBe(byKey(first, sessionKey("s3")));
-    expect(byKey(second, sessionKey("s2"))).toMatchObject({ section: "archived" });
+    expect(shape(second)).toEqual([threadKey("s1"), "# Archived 2", ...s("s2", "s3")]);
+    expect(byKey(second, threadKey("s1"))).toBe(byKey(first, threadKey("s1")));
+    expect(byKey(second, threadKey("s3"))).toBe(byKey(first, threadKey("s3")));
+    expect(byKey(second, threadKey("s2"))).toMatchObject({ section: "archived" });
     expect(byKey(second, "h:archived")).not.toBe(byKey(first, "h:archived"));
   });
 
@@ -216,11 +216,11 @@ describe("rowCache", () => {
     const stable = rowCache();
     const first = stable(buildRows([thread("s1"), thread("s2"), thread("s3", { archivedAtMs: 1 })]));
     const second = stable(buildRows([thread("s1"), thread("s2", { snoozedUntilMs: 2 }), thread("s3", { archivedAtMs: 1 })]));
-    expect(shape(second)).toEqual([sessionKey("s1"), "# Snoozed 1", sessionKey("s2"), "# Archived 1", sessionKey("s3")]);
-    expect(byKey(second, sessionKey("s1"))).toBe(byKey(first, sessionKey("s1")));
-    expect(byKey(second, sessionKey("s3"))).toBe(byKey(first, sessionKey("s3")));
+    expect(shape(second)).toEqual([threadKey("s1"), "# Snoozed 1", threadKey("s2"), "# Archived 1", threadKey("s3")]);
+    expect(byKey(second, threadKey("s1"))).toBe(byKey(first, threadKey("s1")));
+    expect(byKey(second, threadKey("s3"))).toBe(byKey(first, threadKey("s3")));
     expect(byKey(second, "h:archived")).toBe(byKey(first, "h:archived"));
-    expect(byKey(second, sessionKey("s2"))).toMatchObject({ section: "snoozed" });
+    expect(byKey(second, threadKey("s2"))).toMatchObject({ section: "snoozed" });
   });
 });
 

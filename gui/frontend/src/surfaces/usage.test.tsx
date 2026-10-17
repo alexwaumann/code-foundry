@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { SessionView, UsageBucketView } from "@/api/session";
+import type { ThreadView, UsageBucketView } from "@/api/threads";
 
 const toast = vi.hoisted(() => Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), info: vi.fn() }));
 vi.mock("sonner", () => ({ toast }));
@@ -8,7 +8,7 @@ vi.mock("sonner", () => ({ toast }));
 const { SidePanel } = await import("@/components/panel/SidePanel");
 const { getPanel, usePanelStore } = await import("@/stores/panel");
 const { useReposStore } = await import("@/stores/repos");
-const { useSessionsStore } = await import("@/stores/sessions");
+const { useThreadsStore } = await import("@/stores/threads");
 const { useUiStore } = await import("@/stores/ui");
 const { showView, usagePanelCommand, useViewsStore } = await import("@/stores/views");
 
@@ -43,10 +43,10 @@ const FABLE = bucket("claude-fable-5-1", { requests: 122, input: 3100, output: 2
 const OLD = bucket("claude-opus-5", { requests: 14, cacheRead: 28_400_000, unpriced: true });
 
 const thread = (id: string, usage: UsageBucketView[]) =>
-  ({ id, name: `thread ${id}`, repoId: "web", worktreePath: "/src/web", workspaceId: "", pendingWorktreePath: "", terminalId: "", state: "connected", status: "idle", linkedPullRequests: [], usage, costUsd: 0, unpriced: false }) as unknown as SessionView;
+  ({ id, name: `thread ${id}`, repoId: "web", worktreePath: "/src/web", workspaceId: "", pendingWorktreePath: "", terminalId: "", state: "connected", status: "idle", linkedPullRequests: [], usage, costUsd: 0, unpriced: false }) as unknown as ThreadView;
 
 function select(id: string): void {
-  useUiStore.setState({ selection: { kind: "session", id } });
+  useUiStore.setState({ selection: { kind: "thread", id } });
 }
 
 const all = (id: string) => screen.getAllByTestId(id).map((e) => e.textContent);
@@ -55,8 +55,8 @@ const pressU = () => fireEvent.keyDown(screen.getByTestId("side-panel"), { key: 
 
 beforeEach(() => {
   useReposStore.setState({ byId: {}, order: [] });
-  useSessionsStore.setState({ byId: { "s-1": thread("s-1", [OPUS_A, FABLE, OPUS_B]), "s-0": thread("s-0", []), "s-x": thread("s-x", [OLD]) }, order: ["s-1", "s-0", "s-x"] });
-  usePanelStore.setState({ byKey: { "session:s-1": { open: true, tabs: [], activeTabId: null }, "session:s-0": { open: true, tabs: [], activeTabId: null }, "session:s-x": { open: true, tabs: [], activeTabId: null } } });
+  useThreadsStore.setState({ byId: { "s-1": thread("s-1", [OPUS_A, FABLE, OPUS_B]), "s-0": thread("s-0", []), "s-x": thread("s-x", [OLD]) }, order: ["s-1", "s-0", "s-x"] });
+  usePanelStore.setState({ byKey: { "thread:s-1": { open: true, tabs: [], activeTabId: null }, "thread:s-0": { open: true, tabs: [], activeTabId: null }, "thread:s-x": { open: true, tabs: [], activeTabId: null } } });
   useViewsStore.setState({ settingsOpen: false });
   useUiStore.setState({ windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260, palette: { ...useUiStore.getState().palette, open: false } });
   select("s-1");
@@ -86,7 +86,7 @@ describe("Usage surface", () => {
   it("U opens the tab: hero cost, summary, models by cost with share, token kinds", () => {
     render(<SidePanel />);
     pressU();
-    expect(getPanel("session:s-1").activeTabId).toBe("usage");
+    expect(getPanel("thread:s-1").activeTabId).toBe("usage");
     expect(screen.getByTestId("usage-cost").textContent).toBe("$141.20");
     expect(screen.getByTestId("usage-summary").textContent).toBe("362M tokens · 412 requests");
     expect(screen.getAllByTestId("usage-model").map((m) => m.getAttribute("data-model"))).toEqual(["claude-opus-5-5", "claude-fable-5-1"]);
@@ -105,7 +105,7 @@ describe("Usage surface", () => {
 
   it("tags an unpriced model and shows a dash for its cost and share", () => {
     act(() => {
-      useSessionsStore.setState((s) => ({ byId: { ...s.byId, "s-1": thread("s-1", [OPUS_A, OLD]) } }));
+      useThreadsStore.setState((s) => ({ byId: { ...s.byId, "s-1": thread("s-1", [OPUS_A, OLD]) } }));
     });
     render(<SidePanel />);
     pressU();
@@ -134,7 +134,7 @@ describe("Usage surface", () => {
     expect(screen.getByTestId("usage-empty").textContent).toContain("No usage yet");
     expect(screen.queryByTestId("usage-cost")).toBeNull();
     act(() => {
-      useSessionsStore.setState((s) => ({ byId: { ...s.byId, "s-0": thread("s-0", [FABLE]) } }));
+      useThreadsStore.setState((s) => ({ byId: { ...s.byId, "s-0": thread("s-0", [FABLE]) } }));
     });
     expect(screen.queryByTestId("usage-empty")).toBeNull();
     expect(screen.getByTestId("usage-cost").textContent).toBe("$39.60");
@@ -147,10 +147,10 @@ describe("usagePanelCommand (view.panel.usage)", () => {
   it("opens the tab and shows a hidden panel for a thread, with or without usage", () => {
     usePanelStore.setState({ byKey: {} });
     expect(usagePanelCommand()).toBe(true);
-    expect(getPanel("session:s-1")).toMatchObject({ open: true, activeTabId: "usage" });
+    expect(getPanel("thread:s-1")).toMatchObject({ open: true, activeTabId: "usage" });
     select("s-0");
     expect(showView("panel.usage")).toBe(true);
-    expect(getPanel("session:s-0")).toMatchObject({ open: true, activeTabId: "usage" });
+    expect(getPanel("thread:s-0")).toMatchObject({ open: true, activeTabId: "usage" });
     expect(toast).not.toHaveBeenCalled();
   });
 
@@ -161,7 +161,7 @@ describe("usagePanelCommand (view.panel.usage)", () => {
     select("s-1");
     useViewsStore.setState({ settingsOpen: true });
     expect(usagePanelCommand()).toBe(false);
-    expect(getPanel("session:s-1").open).toBe(false);
+    expect(getPanel("thread:s-1").open).toBe(false);
   });
 
   it("from the palette, sends the palette's focus back to the panel", () => {

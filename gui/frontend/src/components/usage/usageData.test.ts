@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { UsageBucketView } from "@/api/session";
+import type { UsageBucketView } from "@/api/threads";
 import { OTHER, dayLabel, labelledDays, niceStep, seriesOf, usagePageData, utcDays } from "./usageData";
 
 function bucket(over: Partial<UsageBucketView>): UsageBucketView {

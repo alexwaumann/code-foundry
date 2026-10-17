@@ -13,7 +13,7 @@ function box(page: Page, testId: string) {
   });
 }
 
-async function selectSession(page: Page, id: string): Promise<void> {
+async function selectThread(page: Page, id: string): Promise<void> {
   await row(page, `s:${id}`).click();
   await expect(page.getByTestId("thread-pane")).toBeVisible();
 }
@@ -77,7 +77,7 @@ async function dragHandle(page: Page, dx: number): Promise<void> {
 
 test("the header toggle shows the empty surface list and hides the panel again", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await expect(panel(page)).toHaveCount(0);
   const toggle = page.getByTestId("thread-header").getByTestId("panel-toggle");
   await expect(toggle).toHaveAttribute("aria-pressed", "false");
@@ -128,7 +128,7 @@ test("the header toggle shows the empty surface list and hides the panel again",
 
 test("dragging the handle resizes the panel within its bounds, and the width persists", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await page.getByTestId("panel-toggle").click();
   const handle = page.getByTestId("panel-resize-handle");
   const before = (await box(page, "side-panel")).width;
@@ -170,41 +170,41 @@ test("dragging the handle resizes the panel within its bounds, and the width per
 
   // Each selection's panel has its own width: s-2's opens at the default, and sizing it
   // leaves s-1's alone.
-  await selectSession(page, "s-2");
+  await selectThread(page, "s-2");
   await page.getByTestId("panel-toggle").click();
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-2");
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-2");
   expect((await box(page, "side-panel")).width).toBe(420);
   await handle.focus();
   await page.keyboard.press("ArrowLeft");
   await expect.poll(async () => (await box(page, "side-panel")).width).toBe(436);
-  await selectSession(page, "s-1");
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-1");
+  await selectThread(page, "s-1");
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-1");
   expect((await box(page, "side-panel")).width).toBe(max);
 
   // Widths, open state, tabs and the active tab all survive a reload.
   await page.reload();
   await expect(row(page, "s:s-1")).toBeVisible();
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await expect(panel(page)).toBeVisible();
   expect((await box(page, "side-panel")).width).toBe(max);
   await expect(panel(page).getByRole("tab")).toHaveText(["Files", "Diff"]);
   await expect(panel(page).getByTestId("panel-body")).toHaveAttribute("data-tab-id", "diff");
-  await selectSession(page, "s-2");
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-2");
+  await selectThread(page, "s-2");
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-2");
   expect((await box(page, "side-panel")).width).toBe(436);
   await expect(panel(page).getByTestId("panel-empty")).toBeVisible();
 
   // Double-click resets only that panel to the default.
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await handle.dblclick();
   await expect.poll(async () => (await box(page, "side-panel")).width).toBe(420);
-  await selectSession(page, "s-2");
+  await selectThread(page, "s-2");
   expect((await box(page, "side-panel")).width).toBe(436);
 });
 
 test("surface hotkeys do nothing while their surfaces are disabled", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await page.getByTestId("panel-toggle").click();
   // Opening the panel moves focus into it, so its hotkeys apply.
   await expect.poll(() => region(page)).toBe("panel");
@@ -217,34 +217,34 @@ test("surface hotkeys do nothing while their surfaces are disabled", async ({ pa
   await expect(panel(page).getByTestId("panel-tabs")).toHaveCount(0);
 });
 
-test("each session has its own panel state", async ({ page }) => {
+test("each thread has its own panel state", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await page.getByTestId("panel-toggle").click();
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-1");
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-1");
 
-  await selectSession(page, "s-2");
+  await selectThread(page, "s-2");
   await expect(panel(page)).toHaveCount(0);
   await expect(page.getByTestId("panel-toggle")).toHaveAttribute("aria-pressed", "false");
 
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await expect(panel(page)).toBeVisible();
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-1");
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-1");
 
   // Hiding it on s-1 leaves s-2's (still hidden) alone, and vice versa.
-  await selectSession(page, "s-2");
+  await selectThread(page, "s-2");
   await page.getByTestId("panel-toggle").click();
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-2");
-  await selectSession(page, "s-1");
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-2");
+  await selectThread(page, "s-1");
   await page.getByTestId("panel-toggle").click();
   await expect(panel(page)).toHaveCount(0);
-  await selectSession(page, "s-2");
+  await selectThread(page, "s-2");
   await expect(panel(page)).toBeVisible();
 });
 
 test("cmd+shift+e toggles the panel, even from the thread's prompt, and the daemon intent does too", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await threadPrompt(page).click();
   await expect.poll(() => page.evaluate(() => document.activeElement?.closest("[data-region]")?.getAttribute("data-region"))).toBe("content");
 
@@ -272,7 +272,7 @@ test("cmd+shift+e toggles the panel, even from the thread's prompt, and the daem
 
 test("toggling while the settings page is up does nothing", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await page.getByTestId("panel-toggle").click();
   await expect(panel(page)).toBeVisible();
 
@@ -297,7 +297,7 @@ test("toggling while the settings page is up does nothing", async ({ page }) => 
 
 test("cmd+w in the focused empty panel is handled and hides the panel", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await recordCmdW(page);
   await page.getByTestId("panel-toggle").click();
   await expect.poll(() => region(page)).toBe("panel");
@@ -310,7 +310,7 @@ test("cmd+w in the focused empty panel is handled and hides the panel", async ({
 
 test("tabs: cmd+w activates the neighbour, the × and middle click close, the last close hides", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await page.getByTestId("panel-toggle").click();
   await injectTab(page, "files", "Files");
   await injectTab(page, "diff", "Diff");
@@ -351,7 +351,7 @@ test("tabs: cmd+w activates the neighbour, the × and middle click close, the la
 
 test("tabs are keyboard reachable: arrows move, Enter activates, Tab reaches the ×", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await page.getByTestId("panel-toggle").click();
   await injectTab(page, "files", "Files");
   await injectTab(page, "diff", "Diff");
@@ -382,7 +382,7 @@ test("tabs are keyboard reachable: arrows move, Enter activates, Tab reaches the
 
 test("the resize separator is keyboard operable", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await page.getByTestId("panel-toggle").click();
   const handle = page.getByTestId("panel-resize-handle");
   await expect(handle).toHaveAttribute("aria-valuenow", "420");
@@ -399,7 +399,7 @@ test("the resize separator is keyboard operable", async ({ page }) => {
 
 test("a narrow window with a wide sidebar shrinks the panel, then hides it, never squeezing the content pane", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await setSidebarWidth(page, 520);
   await page.setViewportSize({ width: 1200, height: 800 });
   await page.getByTestId("panel-toggle").click();
@@ -426,7 +426,7 @@ test("a narrow window with a wide sidebar shrinks the panel, then hides it, neve
 
 test("dragging starts from the rendered width after the room shrinks", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await page.getByTestId("panel-toggle").click();
   await dragHandle(page, -200);
   // At 1280 with the 280px sidebar the room bound is 604, so 420+200 clamps to it.
@@ -457,7 +457,7 @@ test("dragging starts from the rendered width after the room shrinks", async ({ 
 
 test("the palette hands focus back to the panel, and its toggle moves focus", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await page.getByTestId("panel-toggle").click();
   await expect.poll(() => region(page)).toBe("panel");
 
@@ -521,7 +521,7 @@ test("worktrees and the Pull Requests page have their own panels and toggles", a
   await expect(page.getByTestId("thread-composer")).toBeVisible();
   await expect(panel(page)).toHaveCount(0);
   await page.getByTestId("thread-header").getByTestId("panel-toggle").click();
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-3");
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-3");
 });
 
 /** The thread pane's width (it narrows as the side panel widens; 0 while hidden). */
@@ -539,7 +539,7 @@ function expandIcon(page: Page) {
 
 test("expand fills the content area, keeps the thread mounted, and restores the split", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   // Each step narrows the thread pane; wait for each, so `split` is the settled width.
   await expect.poll(() => paneWidth(page)).toBeGreaterThan(400);
   const full = await paneWidth(page);
@@ -605,23 +605,23 @@ test("expand fills the content area, keeps the thread mounted, and restores the 
 
 test("expanded is per panel, survives a reload, and outlives hiding the panel", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await page.getByTestId("panel-toggle").click();
   await panel(page).getByTestId("panel-expand").click();
   await expect(page.getByTestId("content-pane")).toBeHidden();
 
   // s-2's panel is its own: hidden, then split when shown.
-  await selectSession(page, "s-2");
+  await selectThread(page, "s-2");
   await expect(panel(page)).toHaveCount(0);
   await expect(page.getByTestId("content-pane")).toBeVisible();
   await page.getByTestId("panel-toggle").click();
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-2");
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-2");
   await expect(panel(page).getByTestId("panel-expand")).toHaveAttribute("aria-pressed", "false");
   await expect(page.getByTestId("content-pane")).toBeVisible();
   expect((await box(page, "side-panel")).width).toBe(420);
 
   await row(page, "s:s-1").click();
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-1");
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-1");
   await expect(page.getByTestId("content-pane")).toBeHidden();
   // Selecting a thread focuses its prompt; hidden, the panel takes that focus.
   await expect.poll(() => region(page)).toBe("panel");
@@ -638,17 +638,17 @@ test("expanded is per panel, survives a reload, and outlives hiding the panel", 
   await page.reload();
   await expect(row(page, "s:s-1")).toBeVisible();
   await row(page, "s:s-1").click();
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-1");
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-1");
   await expect(page.getByTestId("content-pane")).toBeHidden();
   await expect(panel(page).getByTestId("panel-expand")).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-session-id", "s-1");
-  await selectSession(page, "s-2");
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-1");
+  await selectThread(page, "s-2");
   await expect(panel(page).getByTestId("panel-expand")).toHaveAttribute("aria-pressed", "false");
 });
 
 test("view.panel.expand from the palette and the CLI; focus follows the hidden thread", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await threadPrompt(page).click();
   await expect.poll(() => region(page)).toBe("content");
 
@@ -701,7 +701,7 @@ test("view.panel.expand from the palette and the CLI; focus follows the hidden t
 
 test("the + after the last tab shows the surface list without adding a tab; picking, a tab, Escape and cmd+w leave it", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await recordCmdW(page);
   await page.getByTestId("panel-toggle").click();
   await injectTab(page, "files", "Files");
@@ -770,7 +770,7 @@ test("the + after the last tab shows the surface list without adding a tab; pick
 
 test("closing the tab picking came from keeps picking; picking survives a reload", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await page.getByTestId("panel-toggle").click();
   await injectTab(page, "files", "Files");
   await injectTab(page, "diff", "Diff");
@@ -795,7 +795,7 @@ test("closing the tab picking came from keeps picking; picking survives a reload
 
 test("view.panel.new-tab from the palette and the CLI shows a hidden panel picking", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await page.getByTestId("panel-toggle").click();
   await injectTab(page, "files", "Files");
   await page.getByTestId("panel-toggle").click();
@@ -850,7 +850,7 @@ async function centerX(l: Locator): Promise<number> {
 
 test("dragging a tab onto its neighbour reorders the strip without activating it; the order survives a reload", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await page.getByTestId("panel-toggle").click();
   await injectTab(page, "files", "Files");
   await injectTab(page, "diff", "Diff");
@@ -886,7 +886,7 @@ test("dragging a tab onto its neighbour reorders the strip without activating it
 
 test("dropping a tab on the + puts it last; dragging back to the first tab puts it first", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await page.getByTestId("panel-toggle").click();
   await injectTab(page, "files", "Files");
   await injectTab(page, "diff", "Diff");
@@ -913,7 +913,7 @@ test("dropping a tab on the + puts it last; dragging back to the first tab puts 
 
 test("while picking, Escape mid-drag cancels the drag and leaves picking alone; alt+arrows do nothing mid-drag", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await page.getByTestId("panel-toggle").click();
   await injectTab(page, "files", "Files");
   await injectTab(page, "diff", "Diff");
@@ -943,7 +943,7 @@ test("while picking, Escape mid-drag cancels the drag and leaves picking alone; 
 
 test("the drop settle leaves no transform or animation behind, and a tab picked up again mid-settle follows the pointer", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await page.getByTestId("panel-toggle").click();
   await injectTab(page, "files", "Files");
   await injectTab(page, "diff", "Diff");
@@ -980,7 +980,7 @@ test("the drop settle leaves no transform or animation behind, and a tab picked 
 
 test("dragging a tab to the strip's edge scrolls the strip and lands it at the far end; alt+Right past the edge scrolls too", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await page.getByTestId("panel-toggle").click();
   for (let n = 1; n <= 12; n++) await injectTab(page, "pullrequest", `#${String(n)} tab`, { number: String(n) });
   const tabs = panel(page).getByRole("tab");
@@ -1030,7 +1030,7 @@ test("dragging a tab to the strip's edge scrolls the strip and lands it at the f
 
 test("alt+Left/Right move the focused tab one slot, keep focus on it, and stop at the ends", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await page.getByTestId("panel-toggle").click();
   await injectTab(page, "files", "Files");
   await injectTab(page, "diff", "Diff");
@@ -1066,7 +1066,7 @@ for (const scheme of ["dark", "light"] as const) {
     await page.emulateMedia({ colorScheme: scheme });
     await page.setViewportSize({ width: 1400, height: 900 });
     await openApp(page);
-    await selectSession(page, "s-1");
+    await selectThread(page, "s-1");
     await page.getByTestId("panel-toggle").click();
     const empty = panel(page).getByTestId("panel-empty");
     await empty.locator('[data-surface="worktree"]').click();
@@ -1101,7 +1101,7 @@ for (const scheme of ["dark", "light"] as const) {
     await page.emulateMedia({ colorScheme: scheme });
     await page.setViewportSize({ width: 1400, height: 900 });
     await openApp(page);
-    await selectSession(page, "s-1");
+    await selectThread(page, "s-1");
     await page.getByTestId("panel-toggle").click();
     const empty = panel(page).getByTestId("panel-empty");
     await empty.locator('[data-surface="worktree"]').click();

@@ -1,4 +1,4 @@
-import type { ApiRetryView, SessionView } from "@/api/session";
+import type { ApiRetryView, ThreadView } from "@/api/threads";
 
 /**
  * The composer's "Rate limited · retrying in 20 s (attempt 3 of 10)" line
@@ -9,7 +9,7 @@ import type { ApiRetryView, SessionView } from "@/api/session";
 /** How often a mounted note re-reads the clock, so the countdown moves. */
 export const RETRY_RECHECK_MS = 1_000;
 
-export type RetryNoteInput = Pick<SessionView, "retry"> & { nowMs: number };
+export type RetryNoteInput = Pick<ThreadView, "retry"> & { nowMs: number };
 
 /** What failed, in words: Claude's error category first, the HTTP status as a fallback. */
 export function retryCause(r: Pick<ApiRetryView, "error" | "errorStatus">): string {

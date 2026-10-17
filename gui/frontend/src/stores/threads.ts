@@ -1,9 +1,9 @@
 import { create } from "zustand";
-import type { AgentRunView, SessionEventView, SessionView, UsageBucketView } from "@/api/session";
-import { sessionBadge } from "@/lib/session";
+import type { AgentRunView, ThreadListEventView, ThreadView, UsageBucketView } from "@/api/threads";
+import { threadBadge } from "@/lib/thread";
 
-export interface SessionsData {
-  byId: Readonly<Record<string, SessionView>>;
+export interface ThreadsData {
+  byId: Readonly<Record<string, ThreadView>>;
   /** Display order: creation time, then id. */
   order: readonly string[];
 }
@@ -12,15 +12,15 @@ export interface SessionsData {
  * Whether the daemon serves ThreadService. "unavailable" (e.g. HTTP 404 from a daemon
  * without Phase 2a) leaves the rest of the UI working: thread rows are simply absent.
  */
-export type SessionsAvailability = "unknown" | "available" | "unavailable";
+export type ThreadsAvailability = "unknown" | "available" | "unavailable";
 
-interface SessionsState extends SessionsData {
+interface ThreadsState extends ThreadsData {
   loaded: boolean;
-  availability: SessionsAvailability;
+  availability: ThreadsAvailability;
   error: string | null;
   /**
    * Usage of removed threads (the daemon's retired ledger). Usage over every thread is the
-   * sessions' usage plus this. From the snapshot and "retiredUsage" events.
+   * threads' usage plus this. From the snapshot and "retiredUsage" events.
    */
   retiredUsage: readonly UsageBucketView[];
   /**
@@ -32,11 +32,11 @@ interface SessionsState extends SessionsData {
   epoch: number;
 }
 
-export const emptySessions: SessionsData = { byId: {}, order: [] };
+export const emptyThreads: ThreadsData = { byId: {}, order: [] };
 
-/** Structural equality, so unchanged sessions keep their identity and rows don't re-render. */
-export function sameSession(a: SessionView, b: SessionView): boolean {
-  return (Object.keys(a) as (keyof SessionView)[]).every((k) =>
+/** Structural equality, so unchanged threads keep their identity and rows don't re-render. */
+export function sameThread(a: ThreadView, b: ThreadView): boolean {
+  return (Object.keys(a) as (keyof ThreadView)[]).every((k) =>
     k === "linkedPullRequests"
       ? sameLinks(a[k], b[k])
       : k === "usage"
@@ -64,18 +64,18 @@ export function sameUsage(a: readonly UsageBucketView[], b: readonly UsageBucket
   return a === b || (a.length === b.length && a.every((x, i) => (Object.keys(x) as (keyof UsageBucketView)[]).every((k) => x[k] === b[i]?.[k])));
 }
 
-/** The retired ledger after a session event: kept by identity unless it changed. */
-export function applyRetiredUsage(prev: readonly UsageBucketView[], ev: SessionEventView): readonly UsageBucketView[] {
+/** The retired ledger after a thread event: kept by identity unless it changed. */
+export function applyRetiredUsage(prev: readonly UsageBucketView[], ev: ThreadListEventView): readonly UsageBucketView[] {
   const next = ev.kind === "snapshot" ? ev.retiredUsage : ev.kind === "retiredUsage" ? ev.buckets : prev;
   return sameUsage(prev, next) ? prev : next;
 }
 
 /** Links only ever grow, in order, and a URL's entry never changes: compare URLs. */
-function sameLinks(a: SessionView["linkedPullRequests"], b: SessionView["linkedPullRequests"]): boolean {
+function sameLinks(a: ThreadView["linkedPullRequests"], b: ThreadView["linkedPullRequests"]): boolean {
   return a === b || (a.length === b.length && a.every((l, i) => l.url === b[i]?.url));
 }
 
-function sortedOrder(byId: Readonly<Record<string, SessionView>>): string[] {
+function sortedOrder(byId: Readonly<Record<string, ThreadView>>): string[] {
   return Object.values(byId)
     .sort((a, b) => (a.createdAtMs ?? 0) - (b.createdAtMs ?? 0) || a.id.localeCompare(b.id))
     .map((s) => s.id);
@@ -85,26 +85,26 @@ function sameOrder(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((id, i) => id === b[i]);
 }
 
-/** Replaces the whole set (List result or snapshot), keeping identity for unchanged sessions. */
-export function replaceSessions(prev: SessionsData, list: readonly SessionView[]): SessionsData {
-  const byId: Record<string, SessionView> = {};
+/** Replaces the whole set (List result or snapshot), keeping identity for unchanged threads. */
+export function replaceThreads(prev: ThreadsData, list: readonly ThreadView[]): ThreadsData {
+  const byId: Record<string, ThreadView> = {};
   for (const s of list) {
     const old = prev.byId[s.id];
-    byId[s.id] = old && sameSession(old, s) ? old : s;
+    byId[s.id] = old && sameThread(old, s) ? old : s;
   }
   const order = sortedOrder(byId);
   const unchanged = sameOrder(order, prev.order) && order.every((id) => byId[id] === prev.byId[id]);
   return unchanged ? prev : { byId, order };
 }
 
-export function applySessionEvent(prev: SessionsData, ev: SessionEventView): SessionsData {
+export function applyThreadListEvent(prev: ThreadsData, ev: ThreadListEventView): ThreadsData {
   switch (ev.kind) {
     case "snapshot":
-      return replaceSessions(prev, ev.sessions);
+      return replaceThreads(prev, ev.threads);
     case "updated": {
-      const s = ev.session;
+      const s = ev.thread;
       const old = prev.byId[s.id];
-      if (old && sameSession(old, s)) return prev;
+      if (old && sameThread(old, s)) return prev;
       const byId = { ...prev.byId, [s.id]: s };
       const order = old && old.createdAtMs === s.createdAtMs ? prev.order : sortedOrder(byId);
       return { byId, order };
@@ -115,12 +115,12 @@ export function applySessionEvent(prev: SessionsData, ev: SessionEventView): Ses
       return { byId, order: prev.order.filter((id) => id !== ev.id) };
     }
     case "retiredUsage":
-      return prev; // no session changed: see applyRetiredUsage
+      return prev; // no thread changed: see applyRetiredUsage
   }
 }
 
-export const useSessionsStore = create<SessionsState>()(() => ({
-  ...emptySessions,
+export const useThreadsStore = create<ThreadsState>()(() => ({
+  ...emptyThreads,
   loaded: false,
   availability: "unknown",
   error: null,
@@ -129,22 +129,22 @@ export const useSessionsStore = create<SessionsState>()(() => ({
 }));
 
 /**
- * The session needs the user: needs-attention, in any state. The daemon persists status, so
+ * The thread needs the user: needs-attention, in any state. The daemon persists status, so
  * a thread whose process stopped (or outlived a daemon restart) while asking a question or
  * waiting on a permission prompt still counts. "error" (interrupted) does not.
  */
-export function isAttention(s: Pick<SessionView, "status" | "state">): boolean {
+export function isAttention(s: Pick<ThreadView, "status" | "state">): boolean {
   return s.status === "attention";
 }
 
 /**
- * Session ids that need the user, in `order`. An archived or snoozed thread never counts
+ * Thread ids that need the user, in `order`. An archived or snoozed thread never counts
  * (the bell, the window title, the dock badge, cmd+shift+a, the start page): archiving one
  * that was waiting (usually a finished turn) says the user is done with it, snoozing says
  * not until later, and it sits in a collapsed section. A snoozed thread counts again once
  * the daemon wakes it ("snooze ended" attention, snoozedUntilMs cleared).
  */
-export function attentionIds(data: SessionsData): string[] {
+export function attentionIds(data: ThreadsData): string[] {
   return data.order.filter((id) => {
     const s = data.byId[id];
     return s !== undefined && s.archivedAtMs === null && s.snoozedUntilMs === null && isAttention(s);
@@ -152,37 +152,37 @@ export function attentionIds(data: SessionsData): string[] {
 }
 
 /**
- * The session is working: the "busy" badge (busy, or Claude starting; sessionBadge), never
- * a session that needs attention.
+ * The thread is working: the "busy" badge (busy, or Claude starting; threadBadge), never
+ * a thread that needs attention.
  */
-export function isRunning(s: Pick<SessionView, "status" | "state">): boolean {
-  return !isAttention(s) && sessionBadge(s) === "busy";
+export function isRunning(s: Pick<ThreadView, "status" | "state">): boolean {
+  return !isAttention(s) && threadBadge(s) === "busy";
 }
 
-/** Sessions that are running (isRunning), in `order`; none of them in attentionIds. */
-function runningIds(data: SessionsData): string[] {
+/** Threads that are running (isRunning), in `order`; none of them in attentionIds. */
+function runningIds(data: ThreadsData): string[] {
   return data.order.filter((id) => {
     const s = data.byId[id];
     return s !== undefined && isRunning(s);
   });
 }
 
-/** Sessions that are running (isRunning). */
-export function runningCount(data: SessionsData): number {
+/** Threads that are running (isRunning). */
+export function runningCount(data: ThreadsData): number {
   return runningIds(data).length;
 }
 
 /**
- * The start page's thread list: sessions waiting on the user, then running ones, each in
+ * The start page's thread list: threads waiting on the user, then running ones, each in
  * `order`. An id is never in both (attention wins): the list keys rows by id.
  */
-export function activeThreadIds(data: SessionsData): string[] {
+export function activeThreadIds(data: ThreadsData): string[] {
   const waiting = attentionIds(data);
   const seen = new Set(waiting);
   return [...waiting, ...runningIds(data).filter((id) => !seen.has(id))];
 }
 
-/** Number of sessions needing attention (a narrow, primitive selector). */
+/** Number of threads needing attention (a narrow, primitive selector). */
 export function useAttentionCount(): number {
-  return useSessionsStore((s) => attentionIds(s).length);
+  return useThreadsStore((s) => attentionIds(s).length);
 }

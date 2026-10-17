@@ -72,7 +72,7 @@ export interface PublishRequest {
  * daemon judges availability (git, no origin) for it and not for what is selected.
  */
 export async function publishProject(req: PublishRequest): Promise<string> {
-  const ctx = { ...getUiContext(), activeRepoId: req.repoId, activeWorktreePath: "", activeSessionId: "", activeTerminalId: "", activeWorkspaceId: "" };
+  const ctx = { ...getUiContext(), activeRepoId: req.repoId, activeWorktreePath: "", activeThreadId: "", activeTerminalId: "", activeWorkspaceId: "" };
   try {
     const res = await invokeConfirmed("repo.github.publish", { repo: req.repoId, owner: req.owner, name: req.name, visibility: req.visibility }, ctx);
     if (!res) throw new Error("cancelled");
@@ -87,7 +87,7 @@ export async function publishProject(req: PublishRequest): Promise<string> {
  * Invoked as already confirmed: the user cancelled the dialog, which is the decision.
  */
 export async function deleteProject(repoId: string): Promise<void> {
-  const ctx = { ...getUiContext(), activeRepoId: repoId, activeWorktreePath: "", activeSessionId: "", activeTerminalId: "", activeWorkspaceId: "" };
+  const ctx = { ...getUiContext(), activeRepoId: repoId, activeWorktreePath: "", activeThreadId: "", activeTerminalId: "", activeWorkspaceId: "" };
   try {
     await invokeCommand("repo.delete", ctx, { repo: repoId }, undefined, { confirmed: true });
   } finally {

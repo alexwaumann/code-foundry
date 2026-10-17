@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { SessionView } from "@/api/session";
+import type { ThreadView } from "@/api/threads";
 import type { TerminalView } from "@/api/terminal";
 
 const toastInfo = vi.hoisted(() => vi.fn());
@@ -12,14 +12,14 @@ const { applyIntent, clearPendingFocus } = await import("./intents");
 const { getBottom, PENDING_FOCUS_MS, useBottomStore } = await import("./bottomPanel");
 const { onNewTerminal, revealArrived } = await import("./bottomActions");
 const { usePanelStore } = await import("./panel");
-const { useSessionsStore } = await import("./sessions");
+const { useThreadsStore } = await import("./threads");
 const { useTerminalsStore } = await import("./terminals");
 const { useUiStore } = await import("./ui");
 
 function term(id: string, labels: Record<string, string>): TerminalView {
   return { id, argv: ["/bin/zsh"], cwd: "/src/app", cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: null, exitedAtMs: null, altScreen: false, labels };
 }
-const thread = (id: string) => ({ id, repoId: "r1", worktreePath: "/src/app", workspaceId: "", state: "connected" }) as SessionView;
+const thread = (id: string) => ({ id, repoId: "r1", worktreePath: "/src/app", workspaceId: "", state: "connected" }) as ThreadView;
 const shell = { kind: "shell", thread: "s1", repo: "r1", worktree: "/src/app" };
 
 function setTerminals(list: TerminalView[]): void {
@@ -33,7 +33,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   useBottomStore.setState({ byKey: {}, pendingFocus: null, pendingFocusId: null });
   usePanelStore.setState({ byKey: {} });
-  useSessionsStore.setState({ byId: { s1: thread("s1") }, order: ["s1"] });
+  useThreadsStore.setState({ byId: { s1: thread("s1") }, order: ["s1"] });
   setTerminals([term("sh", shell), term("raw", {})]);
   useUiStore.setState({ selection: { kind: "view", name: "dashboard" }, promptFocusSeq: 0, bottomFocusSeq: 0 });
   clearPendingFocus();
@@ -59,7 +59,7 @@ describe("a pending focusTerminal", () => {
   it("a terminal that arrives as no shell is not shown, and the wait ends without a toast", () => {
     vi.useFakeTimers();
     focusTerminal("c9");
-    const c9 = term("c9", { session: "s1" });
+    const c9 = term("c9", { thread: "s1" });
     setTerminals([c9]);
     onNewTerminal(c9);
     expect(useUiStore.getState().selection).toEqual({ kind: "view", name: "dashboard" });
@@ -69,7 +69,7 @@ describe("a pending focusTerminal", () => {
 
   const cancels: [string, () => void][] = [
     ["the user selects something", () => { useUiStore.getState().select({ kind: "view", name: "pullrequests" }); }],
-    ["a focusSession intent", () => { applyIntent({ kind: "focusSession", sessionId: "s1" }); }],
+    ["a focusThread intent", () => { applyIntent({ kind: "focusThread", threadId: "s1" }); }],
     ["a showView intent", () => { applyIntent({ kind: "showView", name: "projects" }); }],
     ["another focusTerminal", () => { focusTerminal("sh"); }],
   ];
@@ -90,8 +90,8 @@ describe("a pending focusTerminal", () => {
     focusTerminal("relist");
     setTerminals([term("relist", shell)]);
     revealArrived();
-    expect(useUiStore.getState().selection).toEqual({ kind: "session", id: "s1" });
-    expect(getBottom("session:s1")).toEqual({ open: true, activeTerminalId: "relist" });
+    expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s1" });
+    expect(getBottom("thread:s1")).toEqual({ open: true, activeTerminalId: "relist" });
     useUiStore.setState({ selection: { kind: "view", name: "dashboard" } });
     revealArrived();
     expect(useUiStore.getState().selection).toEqual({ kind: "view", name: "dashboard" });
@@ -101,15 +101,15 @@ describe("a pending focusTerminal", () => {
 describe("the focusTerminal intent", () => {
   it("a shell shows in its owner's bottom panel, focused there", () => {
     focusTerminal("sh");
-    expect(useUiStore.getState().selection).toEqual({ kind: "session", id: "s1" });
-    expect(getBottom("session:s1")).toEqual({ open: true, activeTerminalId: "sh" });
+    expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s1" });
+    expect(getBottom("thread:s1")).toEqual({ open: true, activeTerminalId: "sh" });
     expect(useUiStore.getState().bottomFocusSeq).toBe(1);
     expect(useUiStore.getState().promptFocusSeq).toBe(0);
   });
 
   it.each([
     ["no labels", "raw", {}],
-    ["a thread's label but no shell", "labelled", { session: "s1" }],
+    ["a thread's label but no shell", "labelled", { thread: "s1" }],
   ])("a known terminal with %s changes nothing and says why", (_name, id, labels) => {
     setTerminals([term(id, labels)]);
     focusTerminal(id);
@@ -123,7 +123,7 @@ describe("the focusTerminal intent", () => {
     const later = term("later", shell);
     setTerminals([later]);
     onNewTerminal(later);
-    expect(getBottom("session:s1")).toEqual({ open: true, activeTerminalId: "later" });
+    expect(getBottom("thread:s1")).toEqual({ open: true, activeTerminalId: "later" });
     expect(useUiStore.getState().bottomFocusSeq).toBe(1);
     expect(useUiStore.getState().promptFocusSeq).toBe(0);
   });

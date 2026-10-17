@@ -43,7 +43,7 @@ describe("toThreadEventView", () => {
     expect(delta(ThreadItemDelta_Field.UNSPECIFIED)).toBeNull();
     expect(toThreadEventView(create(ThreadEventSchema, { event: { case: "pendingSnapshot", value: { threads: [{ threadId: "s", seq: 3n, pending: [] }] } } }))).toEqual({
       kind: "pendingSnapshot",
-      threads: [{ sessionId: "s", seq: 3, pending: [] }],
+      threads: [{ threadId: "s", seq: 3, pending: [] }],
     });
   });
 });

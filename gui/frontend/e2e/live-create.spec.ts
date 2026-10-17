@@ -41,7 +41,7 @@ test("create a project with the New tab; the publish picker lists the viewer", a
   const name = `cf-live-create-${String(Date.now() % 100000)}`;
   const dest = path.join(HOME, "projects", name);
   await page.goto("/");
-  await page.getByTestId("sidebar-new-session").click();
+  await page.getByTestId("sidebar-new-thread").click();
   await page.getByTestId("picker-add-project").click();
   await page.getByTestId("add-project-tab-new").click();
   await page.getByTestId("add-project-new-name").fill(name);

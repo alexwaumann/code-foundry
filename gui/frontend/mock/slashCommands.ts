@@ -8,7 +8,7 @@
  * POST /__mock/thread/commands replaces it and publishes the Watch's `commands` event.
  *
  * Send refuses a message whose first word is a command the app replaces, with the
- * daemon's exact text (internal/store/session/slashdeny.go).
+ * daemon's exact text (internal/store/thread/slashdeny.go).
  */
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import type { SlashCommandSchema } from "../src/gen/codefoundry/v1/thread_pb";
@@ -37,7 +37,7 @@ export function slashCommandsFixture(): SlashCommandInit[] {
     builtin("init", "Initialize a new CLAUDE.md file with codebase documentation"),
     builtin("security-review", "Complete a security review of the pending changes on the current branch"),
     builtin("usage", "Show session cost, plan usage, and what's contributing to your limits", "", ["cost", "stats"]),
-    builtin("recap", "Generate a one-line session recap now"),
+    builtin("recap", "Generate a one-line thread recap now"),
     { name: "pdf", description: "Use this skill whenever the user wants to do anything with PDF files.", aliases: ["anthropic-skills:pdf"] },
     { name: "anthropic-skills:deep-research", description: "Use this skill when the user's prompt requires researching a topic across multiple sources." },
   ];

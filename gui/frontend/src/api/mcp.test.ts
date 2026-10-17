@@ -72,8 +72,8 @@ describe("toMcpStatusView", () => {
     const none = toThreadEventView(create(ThreadEventSchema, { event: { case: "snapshot", value: { threadId: "s", seq: 3n } } }));
     expect(none).toMatchObject({ kind: "snapshot", mcp: null });
     const ev = toThreadEventView(create(ThreadEventSchema, { event: { case: "mcp", value: { threadId: "s", seq: 4n, status: { trigger: McpCheckTrigger.RECONNECT, server: "a" } } } }));
-    expect(ev).toEqual({ kind: "mcp", sessionId: "s", seq: 4, status: { checkedAtMs: null, trigger: "reconnect", server: "a", servers: [] } });
+    expect(ev).toEqual({ kind: "mcp", threadId: "s", seq: 4, status: { checkedAtMs: null, trigger: "reconnect", server: "a", servers: [] } });
     const gone = toThreadEventView(create(ThreadEventSchema, { event: { case: "mcp", value: { threadId: "s", seq: 5n } } }));
-    expect(gone).toEqual({ kind: "mcp", sessionId: "s", seq: 5, status: null });
+    expect(gone).toEqual({ kind: "mcp", threadId: "s", seq: 5, status: null });
   });
 });

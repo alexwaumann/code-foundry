@@ -32,7 +32,7 @@ function focusInBottomTerminal(page: Page) {
   return page.evaluate(() => document.activeElement?.closest('[data-testid="bottom-terminal-host"]') !== null);
 }
 
-async function selectSession(page: Page, id: string): Promise<void> {
+async function selectThread(page: Page, id: string): Promise<void> {
   await row(page, `s:${id}`).click();
   await expect(page.getByTestId("thread-pane")).toBeVisible();
 }
@@ -48,7 +48,7 @@ async function createShell(labels: Record<string, string>, cwd: string): Promise
   return ((await res.json()) as { terminal: { id: string } }).terminal.id;
 }
 
-const threadShell = (session: string, worktree = CF) => ({ kind: "shell", thread: session, repo: "repo-cf", worktree });
+const threadShell = (thread: string, worktree = CF) => ({ kind: "shell", thread, repo: "repo-cf", worktree });
 
 async function attachStreams(): Promise<number> {
   return (await openStreams())["TerminalService/Attach"] ?? 0;
@@ -56,7 +56,7 @@ async function attachStreams(): Promise<number> {
 
 test("the header toggle and cmd+j show and hide a thread's bottom panel", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await expect(bottom(page)).toHaveCount(0);
   const toggle = page.getByTestId("thread-header").getByTestId("bottom-toggle");
   await expect(toggle).toHaveAttribute("aria-pressed", "false");
@@ -105,7 +105,7 @@ test("the header toggle and cmd+j show and hide a thread's bottom panel", async 
 
 test("the palette returns to the bottom panel, and the panel is per thread", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await page.getByTestId("bottom-toggle").click();
   await expect.poll(() => focusInBottomTerminal(page)).toBe(true);
   await page.keyboard.press("Meta+k");
@@ -115,7 +115,7 @@ test("the palette returns to the bottom panel, and the panel is per thread", asy
 
   // s-2 has no shells and its own (closed) panel: Toggle Bottom Panel from the palette
   // opens it with a new shell, which the palette returns to.
-  await selectSession(page, "s-2");
+  await selectThread(page, "s-2");
   await expect(bottom(page)).toHaveCount(0);
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("Toggle Bottom Panel");
@@ -124,13 +124,13 @@ test("the palette returns to the bottom panel, and the panel is per thread", asy
   await expect(tabs(page)).toHaveText(["ghostty-playground"]);
   await expect(host(page)).toHaveAttribute("data-terminal-id", /^t-new-/);
   await expect.poll(() => focusInBottomTerminal(page)).toBe(true);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await expect(tabs(page)).toHaveText(["code-foundry"]);
 });
 
 test('the toggle and "+" start shells for the thread, which open there focused', async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-2");
+  await selectThread(page, "s-2");
   // The header's toggle on a thread without shells: the panel opens with one.
   await page.getByTestId("bottom-toggle").click();
   await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("terminal.new");
@@ -177,7 +177,7 @@ test("a stopped thread has the toggle left of the side panel's, and its panel", 
 
 test("× and cmd+w close terminals through terminal.close; closing the last one hides the panel", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await page.getByTestId("bottom-toggle").click();
   await bottom(page).getByTestId("bottom-new-terminal").click();
   await expect(tabs(page)).toHaveCount(2);
@@ -208,7 +208,7 @@ test("× and cmd+w close terminals through terminal.close; closing the last one 
 
 test("the resize handle sizes one panel by keyboard and double-click, and the height persists", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await page.getByTestId("bottom-toggle").click();
   const handle = page.getByTestId("bottom-resize-handle");
   await expect(handle).toHaveAttribute("aria-orientation", "horizontal");
@@ -244,13 +244,13 @@ test("the resize handle sizes one panel by keyboard and double-click, and the he
   await expect(handle).toHaveAttribute("aria-valuenow", "220");
 
   // s-2's panel keeps the default.
-  await selectSession(page, "s-2");
+  await selectThread(page, "s-2");
   await page.getByTestId("bottom-toggle").click();
   await expect(page.getByTestId("bottom-resize-handle")).toHaveAttribute("aria-valuenow", "280");
 
   // After a reload s-1's height and open state come back; double-click resets it.
   await page.reload();
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await expect(bottom(page)).toBeVisible();
   await expect(page.getByTestId("bottom-resize-handle")).toHaveAttribute("aria-valuenow", "220");
   await page.getByTestId("bottom-resize-handle").dblclick();
@@ -270,14 +270,14 @@ test("no bottom panel on the dashboard, the Pull Requests page, settings, or und
   await page.keyboard.press("Meta+j");
   await expect(bottom(page)).toHaveCount(0);
 
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await page.getByTestId("bottom-toggle").click();
   await expect(bottom(page)).toBeVisible();
   // Leaving for the Pull Requests page hides it (and detaches), coming back shows it.
   await page.getByTestId("nav-pullrequests").click();
   await expect(bottom(page)).toHaveCount(0);
   await expect.poll(attachStreams).toBe(0);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await expect(bottom(page)).toBeVisible();
 
   // Settings hides it; cmd+j is a no-op meanwhile.
@@ -327,7 +327,7 @@ test("the Projects page's panel lists the worktree shells; its + starts one in t
 
 test("a new shell opens its owner's panel with it active, whether or not the owner is selected", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await threadPrompt(page).click();
   await expect.poll(() => region(page)).toBe("content");
 
@@ -342,14 +342,14 @@ test("a new shell opens its owner's panel with it active, whether or not the own
   // For s-2, which is not selected: nothing changes here, but its panel is open on it.
   const other = await createShell(threadShell("s-2", "/Users/dev/src/ghostty-playground"), "/Users/dev/src/ghostty-playground");
   await expect(host(page)).toHaveAttribute("data-terminal-id", mine);
-  await selectSession(page, "s-2");
+  await selectThread(page, "s-2");
   await expect(bottom(page)).toBeVisible();
   await expect(host(page)).toHaveAttribute("data-terminal-id", other);
 });
 
 test("only the active tab of the visible panel holds an Attach stream", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   expect(await attachStreams()).toBe(0);
   await page.getByTestId("bottom-toggle").click();
   await expect(host(page)).toHaveAttribute("data-attach-phase", "live");
@@ -385,7 +385,7 @@ test("only the active tab of the visible panel holds an Attach stream", async ({
 
 test("a shell this window did not start does not take the keyboard from the bottom panel", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await page.getByTestId("bottom-toggle").click();
   await expect.poll(() => focusInBottomTerminal(page)).toBe(true);
   await page.keyboard.type("ec");
@@ -401,7 +401,7 @@ test("a shell this window did not start does not take the keyboard from the bott
 
 test("expanding the side panel from the bottom panel moves the keyboard to the side panel", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await page.getByTestId("bottom-toggle").click();
   await page.getByTestId("thread-header").getByTestId("panel-toggle").click();
   await expect(page.getByTestId("side-panel")).toBeVisible();
@@ -416,7 +416,7 @@ test("expanding the side panel from the bottom panel moves the keyboard to the s
 test("switching between two threads with open panels keeps one bottom stream", async ({ page }) => {
   await openApp(page);
   const s2shell = await createShell(threadShell("s-2", "/Users/dev/src/ghostty-playground"), "/Users/dev/src/ghostty-playground");
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await page.getByTestId("bottom-toggle").click();
   await expect(host(page)).toHaveAttribute("data-terminal-id", "t-s1-shell");
   await expect.poll(attachStreams).toBe(1);
@@ -429,14 +429,14 @@ test("switching between two threads with open panels keeps one bottom stream", a
   await expect.poll(attachStreams).toBe(1);
   await expect.poll(() => region(page)).toBe("content");
   // And back.
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await expect(host(page)).toHaveAttribute("data-terminal-id", "t-s1-shell");
   await expect.poll(attachStreams).toBe(1);
 });
 
 test("the resize handle is part of the panel: cmd+j from it hides the panel", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await page.getByTestId("bottom-toggle").click();
   await page.getByTestId("bottom-resize-handle").focus();
   await expect.poll(() => region(page)).toBe("bottom");
@@ -447,7 +447,7 @@ test("the resize handle is part of the panel: cmd+j from it hides the panel", as
 
 test("the Usage page hides the panel and brings it back when it closes", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await page.getByTestId("bottom-toggle").click();
   await expect(bottom(page)).toBeVisible();
   await page.getByTestId("status-usage").click();
@@ -464,7 +464,7 @@ test("the Usage page hides the panel and brings it back when it closes", async (
 
 test("cmd+j on a thread without shells starts one; its exit hides the panel; the next cmd+j starts a fresh one", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-2");
+  await selectThread(page, "s-2");
   await threadPrompt(page).click();
   // terminal.new takes a moment: the panel opens at once, blank (no "No terminals" flash).
   await mockPost("terminal/new?delay=600");
@@ -505,13 +505,13 @@ test("cmd+j on a thread without shells starts one; its exit hides the panel; the
 
 test("the last shell of a panel that is not on screen exiting closes that panel too", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-2");
+  await selectThread(page, "s-2");
   await page.keyboard.press("Meta+j");
   await expect(tabs(page)).toHaveCount(1);
   const shell = await host(page).getAttribute("data-terminal-id");
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await mockPost(`terminal/exit?id=${shell ?? ""}&code=0`);
-  await selectSession(page, "s-2");
+  await selectThread(page, "s-2");
   await expect(bottom(page)).toHaveCount(0);
   await expect(page.getByTestId("thread-header").getByTestId("bottom-toggle")).toHaveAttribute("aria-pressed", "false");
 });
@@ -531,7 +531,7 @@ test("the Projects page: its last shell exiting hides the panel, and cmd+j then 
 
 test("a daemon restart that pruned the shells leaves the panel closed; cmd+j starts a fresh one", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await page.getByTestId("bottom-toggle").click();
   await expect(host(page)).toHaveAttribute("data-terminal-id", "t-s1-shell");
   await expect.poll(() => focusInBottomTerminal(page)).toBe(true);
@@ -543,23 +543,23 @@ test("a daemon restart that pruned the shells leaves the panel closed; cmd+j sta
   await expect(host(page)).toHaveAttribute("data-terminal-id", /^t-new-/);
   // After a reload the panel comes back open, with the shell that is still there.
   await page.reload();
-  await selectSession(page, "s-1");
+  await selectThread(page, "s-1");
   await expect(tabs(page)).toHaveCount(1);
 });
 
 test("a persisted open panel whose shells are gone comes back closed", async ({ page }) => {
   await page.addInitScript(() => {
-    localStorage.setItem("code-foundry.bottom", JSON.stringify({ state: { byKey: { "session:s-2": { open: true } } }, version: 1 }));
+    localStorage.setItem("code-foundry.bottom", JSON.stringify({ state: { byKey: { "thread:s-2": { open: true } } }, version: 1 }));
   });
   await openApp(page);
-  await selectSession(page, "s-2");
+  await selectThread(page, "s-2");
   await expect(bottom(page)).toHaveCount(0);
   await expect(page.getByTestId("thread-header").getByTestId("bottom-toggle")).toHaveAttribute("aria-pressed", "false");
 });
 
 test("when terminal.new fails, the empty state is the fallback: its button retries, cmd+w hides it", async ({ page }) => {
   await openApp(page);
-  await selectSession(page, "s-2");
+  await selectThread(page, "s-2");
   await mockPost("terminal/new?fail=no%20shell%20for%20you");
   await page.keyboard.press("Meta+j");
   const empty = bottom(page).getByTestId("bottom-empty");

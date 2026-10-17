@@ -48,7 +48,7 @@ export interface ActionHost {
   /** Registered projects and their worktree paths. */
   repos(): { id: string; name: string; worktrees: string[] }[];
   /** A thread's project ("" for none) and worktree; undefined when unknown. */
-  session(id: string): { repoId: string; worktreePath: string } | undefined;
+  thread(id: string): { repoId: string; worktreePath: string } | undefined;
   /** Starts a kind=action terminal and returns its id. */
   startTerminal(argv: string[], cwd: string, labels: Record<string, string>): string;
   /** Output to a running terminal (no-op when it is gone or exited). */
@@ -76,7 +76,7 @@ interface MockRun {
   actionName: string;
   command: string;
   repoId: string;
-  sessionId: string;
+  threadId: string;
   worktreePath: string;
   mode: ActionRunMode;
   terminalId: string;
@@ -135,7 +135,7 @@ const SCRIPTS: { match: (cmd: string) => boolean; script: (cwd: string) => Scrip
           `${R}FAIL${X}`,
           `${R}FAIL${X}\t${PKG}/internal/store/pr\t0.412s`,
         ]),
-        ...lines(2300, 200, [`${G}ok${X}  \t${PKG}/internal/store/session\t1.902s`, `${R}FAIL${X}`]),
+        ...lines(2300, 200, [`${G}ok${X}  \t${PKG}/internal/store/thread\t1.902s`, `${R}FAIL${X}`]),
       ],
       exit: { at: 2600, code: 1 },
     }),
@@ -385,7 +385,7 @@ export class MockActions {
       actionName: r.actionName,
       command: r.command,
       repoId: r.repoId,
-      threadId: r.sessionId,
+      threadId: r.threadId,
       worktreePath: r.worktreePath,
       mode: r.mode,
       terminalId: r.terminalId,
@@ -409,7 +409,7 @@ export class MockActions {
         actionName: r.actionName,
         command: r.command,
         repoId: r.repoId,
-        sessionId: r.sessionId,
+        threadId: r.threadId,
         worktreePath: r.worktreePath,
         mode: ActionRunMode[r.mode],
         terminalId: r.terminalId,
@@ -539,30 +539,30 @@ export class MockActions {
     return this.runMsg(this.start(a, owner, mode, trigger, script ?? scriptFor(a.command, owner.worktree)), true);
   }
 
-  private owner(sessionId: string, worktree: string, repoId: string): { sessionId: string; repoId: string; worktree: string } {
-    if (sessionId) {
-      const s = this.host.session(sessionId);
-      if (!s) throw new CommandError("notfound", `not found: thread ${sessionId}`);
-      if (!s.repoId) throw new CommandError("unavailable", `failed precondition: thread ${sessionId} has no project; actions belong to a project`);
-      if (repoId && repoId !== s.repoId) throw new CommandError("invalid", `invalid argument: thread ${sessionId} is in project ${s.repoId}, not ${repoId}`);
-      return { sessionId, repoId: s.repoId, worktree: s.worktreePath };
+  private owner(threadId: string, worktree: string, repoId: string): { threadId: string; repoId: string; worktree: string } {
+    if (threadId) {
+      const s = this.host.thread(threadId);
+      if (!s) throw new CommandError("notfound", `not found: thread ${threadId}`);
+      if (!s.repoId) throw new CommandError("unavailable", `failed precondition: thread ${threadId} has no project; actions belong to a project`);
+      if (repoId && repoId !== s.repoId) throw new CommandError("invalid", `invalid argument: thread ${threadId} is in project ${s.repoId}, not ${repoId}`);
+      return { threadId, repoId: s.repoId, worktree: s.worktreePath };
     }
     if (worktree) {
       const repo = this.host.repos().find((r) => r.worktrees.includes(worktree));
       if (!repo) throw new CommandError("invalid", `invalid argument: ${worktree} is not a worktree of a registered project`);
-      return { sessionId: "", repoId: repo.id, worktree };
+      return { threadId: "", repoId: repo.id, worktree };
     }
     throw new CommandError("invalid", "invalid argument: a run needs a thread or a worktree");
   }
 
-  private start(a: MockAction, owner: { sessionId: string; repoId: string; worktree: string }, mode: ActionRunMode, trigger: ActionRunTrigger, script: Script): MockRun {
+  private start(a: MockAction, owner: { threadId: string; repoId: string; worktree: string }, mode: ActionRunMode, trigger: ActionRunTrigger, script: Script): MockRun {
     const r: MockRun = {
       id: `r-${(this.nextRun++).toString(16).padStart(12, "0")}`,
       actionId: a.id,
       actionName: a.name,
       command: a.command,
       repoId: owner.repoId,
-      sessionId: owner.sessionId,
+      threadId: owner.threadId,
       worktreePath: owner.worktree,
       mode,
       terminalId: "",
@@ -580,7 +580,7 @@ export class MockActions {
     this.runs.unshift(r);
     if (mode === ActionRunMode.TERMINAL) {
       const labels: Record<string, string> = { kind: "action", repo: owner.repoId, worktree: owner.worktree, action: a.id, "action.name": a.name, "action.run": r.id };
-      if (owner.sessionId) labels.thread = owner.sessionId;
+      if (owner.threadId) labels.thread = owner.threadId;
       r.terminalId = this.host.startTerminal(["/bin/zsh", "-lc", a.command], owner.worktree, labels);
     }
     this.host.publish({ event: { case: "runUpdated", value: this.runMsg(r, false) } });
@@ -631,7 +631,7 @@ export class MockActions {
     this.host.publish({
       event: {
         case: "runFinished",
-        value: { runId: r.id, actionId: r.actionId, actionName: r.actionName, repoId: r.repoId, threadId: r.sessionId, exitCode: code, mode: r.mode, trigger: r.trigger, terminalId: r.terminalId },
+        value: { runId: r.id, actionId: r.actionId, actionName: r.actionName, repoId: r.repoId, threadId: r.threadId, exitCode: code, mode: r.mode, trigger: r.trigger, terminalId: r.terminalId },
       },
     });
     for (const w of r.waiters.splice(0)) w();
@@ -674,7 +674,7 @@ export class MockActions {
   }
 
   /** Background runs matching are killed (SIGTERM: 143): their thread, worktree or project went. */
-  stopBackground(match: (r: { sessionId: string; worktreePath: string; repoId: string }) => boolean): void {
+  stopBackground(match: (r: { threadId: string; worktreePath: string; repoId: string }) => boolean): void {
     for (const r of this.runs) if (r.mode === ActionRunMode.BACKGROUND && r.state === ActionRunState.RUNNING && match(r)) this.finish(r, 143);
   }
 
@@ -688,14 +688,14 @@ export class MockActions {
   }
 
   /** A new thread created its worktree: the project's on-worktree-create actions, one after another, in the background. */
-  worktreeCreated(sessionId: string, repoId: string, worktree: string): void {
+  worktreeCreated(threadId: string, repoId: string, worktree: string): void {
     const list = this.sorted(repoId).filter((a) => a.onWorktreeCreate);
     const gen = this.generation;
     void (async () => {
       for (const a of list) {
         if (gen !== this.generation || !this.actions.has(a.id)) continue;
         try {
-          const r = this.start(a, { sessionId, repoId, worktree }, ActionRunMode.BACKGROUND, ActionRunTrigger.WORKTREE_CREATE, scriptFor(a.command, worktree));
+          const r = this.start(a, { threadId, repoId, worktree }, ActionRunMode.BACKGROUND, ActionRunTrigger.WORKTREE_CREATE, scriptFor(a.command, worktree));
           await this.waitRun(r.id);
         } catch {
           // A reset dropped the run: stop.
@@ -706,8 +706,8 @@ export class MockActions {
   }
 
   /** POST /__mock/action/setup: a worktree-create run for a thread that exits with `code` after ~600 ms. */
-  setupRun(sessionId: string, code: number, actionRef = ""): RunInit {
-    const owner = this.owner(sessionId, "", "");
+  setupRun(threadId: string, code: number, actionRef = ""): RunInit {
+    const owner = this.owner(threadId, "", "");
     const list = this.sorted(owner.repoId);
     const a = actionRef ? list.find((x) => x.id === actionRef || x.name.toLowerCase() === actionRef.toLowerCase()) : (list.find((x) => x.onWorktreeCreate) ?? list[0]);
     if (!a) throw new CommandError("notfound", `no action ${actionRef ? `"${actionRef}" ` : ""}in project ${owner.repoId}`);
@@ -734,7 +734,7 @@ export class MockActions {
       return id;
     }
     if (ctx?.activeThreadId) {
-      const s = this.host.session(ctx.activeThreadId);
+      const s = this.host.thread(ctx.activeThreadId);
       if (!s) throw new CommandError("notfound", `thread ${ctx.activeThreadId} not found`);
       if (!s.repoId) throw new CommandError("invalid", `thread ${ctx.activeThreadId} has no project; ${noProject}`);
       return s.repoId;
@@ -933,7 +933,7 @@ export class MockActions {
                       r.actionName,
                       r.state === ActionRunState.EXITED ? `exited ${String(r.exitCode)}` : "running",
                       r.mode === ActionRunMode.TERMINAL ? `terminal ${r.terminalId}` : "background",
-                      r.sessionId ? `thread ${r.sessionId}` : r.worktreePath,
+                      r.threadId ? `thread ${r.threadId}` : r.worktreePath,
                       r.startedAt.toTimeString().slice(0, 8),
                     ]),
                 ]);

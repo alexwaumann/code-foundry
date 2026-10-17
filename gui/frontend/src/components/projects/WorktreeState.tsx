@@ -11,7 +11,7 @@ import { branchKey, branchPullRequestsResource } from "@/stores/gh";
 import { openPullRequestInPanel } from "@/stores/prPanel";
 import { findWorktree, useReposStore } from "@/stores/repos";
 import { useResource } from "@/stores/resource";
-import { useSessionsStore } from "@/stores/sessions";
+import { useThreadsStore } from "@/stores/threads";
 
 /**
  * The viewer's pull request on the worktree's branch (GhService.GetBranchPullRequests,
@@ -45,7 +45,7 @@ function BranchPullRequest({ repoId, branch }: { repoId: string; branch: string 
 
 /** How many threads are on the worktree (hidden at 0); subscribes to the count only. */
 function WorktreeThreads({ path }: { path: string }) {
-  const n = useSessionsStore((s) => worktreeThreadCount(s, path));
+  const n = useThreadsStore((s) => worktreeThreadCount(s, path));
   if (n === 0) return null;
   return (
     <Tip label={`${String(n)} ${n === 1 ? "thread" : "threads"} on this worktree`}>

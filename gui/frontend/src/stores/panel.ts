@@ -1,11 +1,11 @@
 /**
  * The side panel ("surface panel") to the right of the content pane. Each selection
- * (session, terminal, composer, top-level page) has its own panel: whether it is
+ * (thread, terminal, composer, top-level page) has its own panel: whether it is
  * open, its tabs, the active tab, its width, and whether it is expanded to the full width
  * of the content area. A panel with tabs but no active tab is picking: its "+" was
  * clicked and it shows the surface list until a surface (or a tab) is picked. Switching
  * selection shows that selection's panel. All of it is persisted (localStorage
- * "code-foundry.panel"), so it survives a reload. Entries are never pruned: a deleted session's panel stays stored.
+ * "code-foundry.panel"), so it survives a reload. Entries are never pruned: a deleted thread's panel stays stored.
  * See docs/notes/side-panel.md.
  */
 import { create } from "zustand";
@@ -59,8 +59,8 @@ export function keyOf(sel: Selection): string | null {
   switch (sel.kind) {
     case "none":
       return null;
-    case "session":
-      return `session:${sel.id}`;
+    case "thread":
+      return `thread:${sel.id}`;
     case "view":
       return `view:${sel.name}`;
     case "compose":

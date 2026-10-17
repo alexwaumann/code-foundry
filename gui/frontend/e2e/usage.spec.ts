@@ -13,17 +13,17 @@ const empty = (page: Page) => page.getByTestId("panel-empty");
 const tabs = (page: Page) => page.getByTestId("panel-tabs").getByRole("tab");
 const surface = (page: Page) => page.getByTestId("usage-surface");
 
-async function expectUsageTab(page: Page, session = "s-1"): Promise<void> {
-  await expect(panel(page)).toHaveAttribute("data-panel-key", `session:${session}`);
+async function expectUsageTab(page: Page, thread = "s-1"): Promise<void> {
+  await expect(panel(page)).toHaveAttribute("data-panel-key", `thread:${thread}`);
   await expect(tabs(page).and(page.locator('[aria-selected="true"]'))).toHaveText("Usage");
   await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "usage");
 }
 
-async function addUsage(session: string, model: string, counters: Record<string, number>): Promise<void> {
+async function addUsage(thread: string, model: string, counters: Record<string, number>): Promise<void> {
   const q = Object.entries(counters)
     .map(([k, v]) => `&${k}=${String(v)}`)
     .join("");
-  expect(await mockPost(`usage?session=${session}&model=${encodeURIComponent(model)}${q}`)).toEqual({ ok: true });
+  expect(await mockPost(`usage?thread=${thread}&model=${encodeURIComponent(model)}${q}`)).toEqual({ ok: true });
 }
 
 test.beforeEach(async () => {

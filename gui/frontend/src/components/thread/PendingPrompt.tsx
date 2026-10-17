@@ -25,7 +25,7 @@ import {
   type QuestionPick,
 } from "@/lib/threadRequest";
 import { parseObject, relPath, str, toolHunks, type Json } from "@/lib/toolSummary";
-import { useSessionsStore } from "@/stores/sessions";
+import { useThreadsStore } from "@/stores/threads";
 import { useAgentInputOf, useThreadItem } from "@/stores/thread";
 import { respondThread } from "@/stores/threadActions";
 import { TokenSpans } from "./Code";
@@ -144,8 +144,8 @@ function PromptDiff({ r }: { r: ThreadRequestView }) {
 
 /** Which subagent asked: its Agent call's type and description ("subagent" until that call is known). */
 function AskingAgent({ toolUseId }: { toolUseId: string }) {
-  const { sessionId } = useThreadCtx();
-  const label = askingAgentLabel(useAgentInputOf(sessionId, toolUseId));
+  const { threadId } = useThreadCtx();
+  const label = askingAgentLabel(useAgentInputOf(threadId, toolUseId));
   // A tooltip only for a label a narrow pane cut short.
   return (
     <Tip label={label} whenTruncated>
@@ -158,8 +158,8 @@ function AskingAgent({ toolUseId }: { toolUseId: string }) {
 
 /** A pending permission prompt: what Claude wants to do and why it asks; Allow / Allow for session / Deny (with an optional reason). */
 function PermissionPrompt({ r, keysRef, refocus }: PromptProps) {
-  const { sessionId, cwd } = useThreadCtx();
-  const permissionMode = useSessionsStore((s) => s.byId[sessionId]?.permissionMode ?? "");
+  const { threadId, cwd } = useThreadCtx();
+  const permissionMode = useThreadsStore((s) => s.byId[threadId]?.permissionMode ?? "");
   const input = parseObject(r.inputJson);
   const command = str(input, "command");
   const path = str(input, "file_path") || str(input, "notebook_path") || str(input, "url");
@@ -182,7 +182,7 @@ function PermissionPrompt({ r, keysRef, refocus }: PromptProps) {
 
   const answer = (decision: PermissionDecision, message = "") => {
     refocus();
-    void respondThread(sessionId, r.requestId, decision, { message });
+    void respondThread(threadId, r.requestId, decision, { message });
   };
   const decide = (decision: PermissionDecision) => {
     if (decision !== "deny") {
@@ -333,7 +333,7 @@ function PermissionPrompt({ r, keysRef, refocus }: PromptProps) {
 
 /** A pending AskUserQuestion: a pager over its questions, options as radios (checkboxes for a multi-select), Other, Submit or Skip. */
 function QuestionPrompt({ r, keysRef, refocus }: PromptProps) {
-  const { sessionId } = useThreadCtx();
+  const { threadId } = useThreadCtx();
   const questions = useMemo(() => questionsOf(r.inputJson), [r.inputJson]);
   const [page, setPage] = useState(0);
   const [picks, setPicks] = useState<QuestionPick[]>(() => questions.map(() => NO_PICK));
@@ -367,11 +367,11 @@ function QuestionPrompt({ r, keysRef, refocus }: PromptProps) {
       return;
     }
     refocus();
-    void respondThread(sessionId, r.requestId, "allow", { answers });
+    void respondThread(threadId, r.requestId, "allow", { answers });
   };
   const skip = () => {
     refocus();
-    void respondThread(sessionId, r.requestId, "deny");
+    void respondThread(threadId, r.requestId, "deny");
   };
   const onKeyDown = usePromptKeys(
     { kind: "question", options: q?.options.length ?? 0 },
@@ -507,8 +507,8 @@ function QuestionPrompt({ r, keysRef, refocus }: PromptProps) {
 
 /** One pending request, docked. */
 function PendingPrompt({ pending, keysRef, refocus }: { pending: ThreadPendingView; keysRef: RefObject<PromptKeys | null> | null; refocus: () => void }) {
-  const { sessionId } = useThreadCtx();
-  const item = useThreadItem(sessionId, pending.itemId);
+  const { threadId } = useThreadCtx();
+  const item = useThreadItem(threadId, pending.itemId);
   if (!item || (item.kind !== "permission" && item.kind !== "question")) return null;
   return item.kind === "question" ? (
     <QuestionPrompt key={item.id} r={item.request} keysRef={keysRef} refocus={refocus} />

@@ -10,7 +10,7 @@ export const AGENTS_KIND = "agents";
 export const AGENTS_TITLE = "Agents";
 
 /**
- * The selection's thread when the sessions store knows it (selectionThread). Null
+ * The selection's thread when the threads store knows it (selectionThread). Null
  * otherwise, a page or a composer included. Whether Claude runs for it does not matter: its runs persist.
  */
 export function selectionAgentsThread(sel: Selection, s: SelectionStores): string | null {

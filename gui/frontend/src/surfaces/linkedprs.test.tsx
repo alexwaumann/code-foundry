@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PullRequestDetailView, PullRequestView } from "@/api/gh";
-import type { LinkedPullRequestView, SessionView } from "@/api/session";
+import type { LinkedPullRequestView, ThreadView } from "@/api/threads";
 
 // Details resolve per test (pending until then: the rows show their skeleton).
 const pending = new Map<string, (d: PullRequestDetailView) => void>();
@@ -15,12 +15,12 @@ const { SidePanel } = await import("@/components/panel/SidePanel");
 const { pullRequestDetailResource } = await import("@/stores/gh");
 const { getPanel, usePanelStore } = await import("@/stores/panel");
 const { useReposStore } = await import("@/stores/repos");
-const { useSessionsStore } = await import("@/stores/sessions");
+const { useThreadsStore } = await import("@/stores/threads");
 const { useUiStore } = await import("@/stores/ui");
 const { linkedPrsPanelCommand, showView, useViewsStore } = await import("@/stores/views");
 
 const link = (slug: string, number: number): LinkedPullRequestView => ({ slug, number, url: `https://github.com/${slug}/pull/${String(number)}`, linkedAt: Date.now() - number * 60_000 });
-const thread = (id: string, links: LinkedPullRequestView[]) => ({ id, name: `thread ${id}`, repoId: "web", worktreePath: "/src/web", workspaceId: "", pendingWorktreePath: "", state: "connected", linkedPullRequests: links }) as SessionView;
+const thread = (id: string, links: LinkedPullRequestView[]) => ({ id, name: `thread ${id}`, repoId: "web", worktreePath: "/src/web", workspaceId: "", pendingWorktreePath: "", state: "connected", linkedPullRequests: links }) as ThreadView;
 const pr = (slug: string, number: number, o: Partial<PullRequestView>): PullRequestDetailView =>
   ({
     pullRequest: { repoSlug: slug, number, title: `title ${String(number)}`, state: "open", draft: false, headRef: `branch-${String(number)}`, checks: { state: "success", total: 1, passed: 1, failed: 0, pending: 0, skipped: 0 }, ...o },
@@ -35,7 +35,7 @@ async function resolve(slug: string, number: number, o: Partial<PullRequestView>
 }
 
 function select(id: string): void {
-  useUiStore.setState({ selection: { kind: "session", id } });
+  useUiStore.setState({ selection: { kind: "thread", id } });
 }
 
 beforeEach(() => {
@@ -45,8 +45,8 @@ beforeEach(() => {
   pullRequestDetailResource.store.setState({ entries: {} });
   useReposStore.setState({ byId: {}, order: [] });
   // First-seen order 5, 7, 6: the list shows 6, 7, 5.
-  useSessionsStore.setState({ byId: { "s-1": thread("s-1", [link("o/web", 5), link("o/web", 7), link("o/web", 6)]), "s-0": thread("s-0", []) }, order: ["s-1", "s-0"] });
-  usePanelStore.setState({ byKey: { "session:s-1": { open: true, tabs: [], activeTabId: null }, "session:s-0": { open: true, tabs: [], activeTabId: null } } });
+  useThreadsStore.setState({ byId: { "s-1": thread("s-1", [link("o/web", 5), link("o/web", 7), link("o/web", 6)]), "s-0": thread("s-0", []) }, order: ["s-1", "s-0"] });
+  usePanelStore.setState({ byKey: { "thread:s-1": { open: true, tabs: [], activeTabId: null }, "thread:s-0": { open: true, tabs: [], activeTabId: null } } });
   useViewsStore.setState({ settingsOpen: false });
   useUiStore.setState({ windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260, palette: { ...useUiStore.getState().palette, open: false } });
   select("s-1");
@@ -72,7 +72,7 @@ describe("Linked PRs surface", () => {
     });
     expect(row()).toBeNull();
     act(() => {
-      useSessionsStore.setState((s) => ({ byId: { ...s.byId, "s-0": thread("s-0", [link("o/web", 9)]) } }));
+      useThreadsStore.setState((s) => ({ byId: { ...s.byId, "s-0": thread("s-0", [link("o/web", 9)]) } }));
     });
     expect(row()?.getAttribute("data-availability")).toBe("enabled");
   });
@@ -80,7 +80,7 @@ describe("Linked PRs surface", () => {
   it("L opens the tab: header, rows newest first, skeletons until the details load", async () => {
     render(<SidePanel />);
     fireEvent.keyDown(screen.getByTestId("side-panel"), { key: "l" });
-    expect(getPanel("session:s-1").activeTabId).toBe("linkedprs");
+    expect(getPanel("thread:s-1").activeTabId).toBe("linkedprs");
     expect(screen.getByTestId("linkedprs-thread").textContent).toBe("thread s-1");
     expect(screen.getByTestId("linkedprs-count").textContent).toBe("3 linked PRs");
     expect(numbers()).toEqual(["#6", "#7", "#5"]);
@@ -103,7 +103,7 @@ describe("Linked PRs surface", () => {
 
   it("names the repository when the links span repositories", () => {
     act(() => {
-      useSessionsStore.setState((s) => ({ byId: { ...s.byId, "s-1": thread("s-1", [link("o/web", 5), link("o/api", 2)]) } }));
+      useThreadsStore.setState((s) => ({ byId: { ...s.byId, "s-1": thread("s-1", [link("o/web", 5), link("o/api", 2)]) } }));
     });
     render(<SidePanel />);
     fireEvent.keyDown(screen.getByTestId("side-panel"), { key: "l" });
@@ -117,17 +117,17 @@ describe("Linked PRs surface", () => {
     fireEvent.keyDown(list, { key: "j" });
     fireEvent.keyDown(list, { key: "j" });
     fireEvent.keyDown(list, { key: "Enter" });
-    let p = getPanel("session:s-1");
+    let p = getPanel("thread:s-1");
     expect(p.tabs.map((t) => t.title)).toEqual(["Linked PRs", "#7"]);
     expect(p.activeTabId).toBe("pullrequest?number=7&slug=o%2Fweb");
 
     act(() => {
-      usePanelStore.setState((s) => ({ byKey: { ...s.byKey, "session:s-1": { ...p, activeTabId: "linkedprs" } } }));
+      usePanelStore.setState((s) => ({ byKey: { ...s.byKey, "thread:s-1": { ...p, activeTabId: "linkedprs" } } }));
     });
     const first = screen.getAllByTestId("linkedpr")[0]?.closest('[role="option"]');
     if (!first) throw new Error("no row");
     fireEvent.click(first);
-    p = getPanel("session:s-1");
+    p = getPanel("thread:s-1");
     expect(p.tabs.map((t) => t.title)).toEqual(["Linked PRs", "#7", "#6"]);
   });
 });
@@ -136,7 +136,7 @@ describe("linkedPrsPanelCommand (view.panel.linked-prs)", () => {
   it("opens the tab and shows a hidden panel for a thread with links", () => {
     usePanelStore.setState({ byKey: {} });
     expect(linkedPrsPanelCommand()).toBe(true);
-    expect(getPanel("session:s-1")).toMatchObject({ open: true, activeTabId: "linkedprs" });
+    expect(getPanel("thread:s-1")).toMatchObject({ open: true, activeTabId: "linkedprs" });
     expect(toast).not.toHaveBeenCalled();
   });
 
@@ -144,7 +144,7 @@ describe("linkedPrsPanelCommand (view.panel.linked-prs)", () => {
     usePanelStore.setState({ byKey: {} });
     select("s-0");
     expect(showView("panel.linked-prs")).toBe(true);
-    expect(getPanel("session:s-0").open).toBe(false);
+    expect(getPanel("thread:s-0").open).toBe(false);
     expect(toast).toHaveBeenCalledWith("No linked PRs yet", expect.anything());
     toast.mockClear();
 
@@ -155,7 +155,7 @@ describe("linkedPrsPanelCommand (view.panel.linked-prs)", () => {
     select("s-1");
     useViewsStore.setState({ settingsOpen: true });
     expect(linkedPrsPanelCommand()).toBe(false);
-    expect(getPanel("session:s-1").open).toBe(false);
+    expect(getPanel("thread:s-1").open).toBe(false);
   });
 
   it("from the palette, sends the palette's focus back to the panel", () => {

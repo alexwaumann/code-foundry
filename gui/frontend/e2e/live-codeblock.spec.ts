@@ -3,7 +3,7 @@
  * (docs/notes/code-block-actions.md). Opt-in (LIVE_DAEMON=1), run with
  * playwright.live.config.ts, which starts nothing: bring up an isolated daemon
  * (CODE_FOUNDRY_HOME) and the Vite dev server pointed at it, and name a thread
- * (LIVE_SESSION) whose last reply has a bash block running `echo run-$((6*7))` and `pwd`,
+ * (LIVE_THREAD) whose last reply has a bash block running `echo run-$((6*7))` and `pwd`,
  * and that owns no shells yet.
  *
  * It hovers the block (Copy and Run show), clicks Run: one new shell in the thread's
@@ -17,7 +17,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 const LIVE = process.env.LIVE_DAEMON === "1";
 const HOME = process.env.CODE_FOUNDRY_HOME ?? "";
-const SESSION = process.env.LIVE_SESSION ?? "";
+const THREAD = process.env.LIVE_THREAD ?? "";
 const BIN = process.env.LIVE_BIN ?? path.join(path.resolve(process.cwd(), "../.."), "bin/code-foundry");
 const SHOTS = process.env.LIVE_SHOTS ?? "";
 
@@ -26,9 +26,9 @@ function cli(...args: string[]): string {
 }
 
 /** The thread's running shells, from the daemon. */
-function shellsOf(session: string): string[] {
+function shellsOf(thread: string): string[] {
   const list = (JSON.parse(cli("terminal", "list", "--json")) as { terminals?: { id: string; state?: string; labels?: Record<string, string> }[] }).terminals ?? [];
-  return list.filter((t) => t.labels?.kind === "shell" && t.labels.thread === session && t.state !== "TERMINAL_STATE_EXITED").map((t) => t.id);
+  return list.filter((t) => t.labels?.kind === "shell" && t.labels.thread === thread && t.state !== "TERMINAL_STATE_EXITED").map((t) => t.id);
 }
 
 function screenText(page: Page): Promise<string> {
@@ -47,13 +47,13 @@ async function shots(page: Page, name: string): Promise<void> {
   await page.emulateMedia({ colorScheme: "dark" });
 }
 
-test.skip(!LIVE || !HOME || !SESSION, "LIVE_DAEMON=1, CODE_FOUNDRY_HOME and LIVE_SESSION are required");
+test.skip(!LIVE || !HOME || !THREAD, "LIVE_DAEMON=1, CODE_FOUNDRY_HOME and LIVE_THREAD are required");
 
 test("Run in terminal runs the block once in a new shell of the thread, which stays open", async ({ page }) => {
-  expect(shellsOf(SESSION)).toEqual([]);
+  expect(shellsOf(THREAD)).toEqual([]);
   await page.goto("/");
-  await page.locator(`[data-row-key="s:${SESSION}"]`).click();
-  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-session-id", SESSION);
+  await page.locator(`[data-row-key="s:${THREAD}"]`).click();
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", THREAD);
   const block = page.locator('[data-testid="thread-text"]').last().locator(".cf-code").filter({ has: page.locator('pre[data-lang="bash"]') });
   await expect(block).toContainText("echo run-$((6*7))");
   await block.hover();
@@ -69,7 +69,7 @@ test("Run in terminal runs the block once in a new shell of the thread, which st
   await expect(host).toHaveAttribute("data-attach-phase", "live");
   await expect.poll(() => page.evaluate(() => document.activeElement?.closest('[data-testid="bottom-terminal-host"]') !== null)).toBe(true);
   const id = await host.getAttribute("data-terminal-id");
-  expect(shellsOf(SESSION)).toEqual([id]);
+  expect(shellsOf(THREAD)).toEqual([id]);
   await expect.poll(() => screenText(page), { timeout: 15_000 }).toContain("run-42");
   await expect.poll(() => screenText(page)).toContain("/cf-cba-scratch");
   // Typed after the prompt: each line echoed once, not once more above the prompt.
@@ -78,7 +78,7 @@ test("Run in terminal runs the block once in a new shell of the thread, which st
   expect(count(text, "\npwd") + count(text, " pwd")).toBe(1);
   // The shell stays: still running a while later, still the panel's tab.
   await page.waitForTimeout(1500);
-  expect(shellsOf(SESSION)).toEqual([id]);
+  expect(shellsOf(THREAD)).toEqual([id]);
   await expect(host).toHaveAttribute("data-terminal-id", id ?? "");
   await page.mouse.move(0, 0);
   await shots(page, "ran");

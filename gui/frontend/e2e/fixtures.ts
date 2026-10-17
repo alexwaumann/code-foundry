@@ -12,14 +12,14 @@ export const appPath = `/?daemon=${encodeURIComponent(mockUrl)}&token=${MOCK_TOK
  * busy/idle every 4 s and settles s-5 from starting after 8 s, which would move them in and
  * out of the sidebar's Working section (and every row below them) under a spec's pointer.
  * Held, s-1 stays busy and s-5 starting, so the sidebar shows DEFAULT_ORDER. A spec that
- * needs the clock releases them (`releaseSessions`).
+ * needs the clock releases them (`releaseThreads`).
  */
 export async function resetMock(): Promise<void> {
   const res = await fetch(`${mockUrl}/__mock/reset`, { method: "POST" });
   expect(res.ok).toBe(true);
-  await holdSessions("s-1", "s-5");
+  await holdThreads("s-1", "s-5");
   // s-1 may have flipped to idle between the reset and the hold.
-  await mockPost("session/status?id=s-1&status=busy");
+  await mockPost("thread/status?id=s-1&status=busy");
 }
 
 export interface Invocation {
@@ -59,13 +59,13 @@ export async function mockPost(pathAndQuery: string): Promise<unknown> {
 }
 
 /** Stops the mock's clock from changing these threads (status, settling); controls and input still do. */
-export async function holdSessions(...ids: string[]): Promise<void> {
-  await mockPost(`session/hold?${ids.map((id) => `id=${id}`).join("&")}`);
+export async function holdThreads(...ids: string[]): Promise<void> {
+  await mockPost(`thread/hold?${ids.map((id) => `id=${id}`).join("&")}`);
 }
 
 /** Lets the mock's clock change these threads again (resetMock holds s-1 and s-5). */
-export async function releaseSessions(...ids: string[]): Promise<void> {
-  await mockPost(`session/release?${ids.map((id) => `id=${id}`).join("&")}`);
+export async function releaseThreads(...ids: string[]): Promise<void> {
+  await mockPost(`thread/release?${ids.map((id) => `id=${id}`).join("&")}`);
 }
 
 /**
@@ -107,7 +107,7 @@ export async function openApp(page: Page): Promise<void> {
  * sidebar's New thread button, then the project picker's "Add a project…" row.
  */
 export async function openAddProjectDialog(page: Page): Promise<void> {
-  await page.getByTestId("sidebar-new-session").click();
+  await page.getByTestId("sidebar-new-thread").click();
   await page.getByTestId("palette").getByTestId("picker-add-project").click();
   await expect(page.getByTestId("add-project-dialog")).toBeVisible();
 }

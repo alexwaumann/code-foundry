@@ -5,7 +5,7 @@
  * place). Pure; inputs are the repos and workspaces slices' shapes.
  */
 import { isRemoteless, type RepoView, type WorktreeView } from "@/api/repo";
-import type { SessionView } from "@/api/session";
+import type { ThreadView } from "@/api/threads";
 import type { TerminalView } from "@/api/terminal";
 import type { WorkspaceView } from "@/api/workspace";
 import { tildify } from "./path";
@@ -217,11 +217,11 @@ export const PROJECT_STALE_MS = 10 * 60_000;
  * How many threads are on exactly this worktree (a row's thread count): every thread whose
  * cwd it is, whether or not Claude runs for it, except archived ones (put away).
  */
-export function worktreeThreadCount(sessions: { order: readonly string[]; byId: Readonly<Record<string, Pick<SessionView, "worktreePath" | "archivedAtMs"> | undefined>> }, path: string): number {
+export function worktreeThreadCount(threads: { order: readonly string[]; byId: Readonly<Record<string, Pick<ThreadView, "worktreePath" | "archivedAtMs"> | undefined>> }, path: string): number {
   if (!path) return 0;
   let n = 0;
-  for (const id of sessions.order) {
-    const s = sessions.byId[id];
+  for (const id of threads.order) {
+    const s = threads.byId[id];
     if (s?.worktreePath === path && s.archivedAtMs === null) n++;
   }
   return n;
@@ -233,9 +233,9 @@ function inside(p: string, root: string): boolean {
   return p === root || p.startsWith(root.endsWith("/") ? root : `${root}/`);
 }
 
-export interface CleanupSessions {
+export interface CleanupThreads {
   order: readonly string[];
-  byId: Readonly<Record<string, Pick<SessionView, "archivedAtMs" | "worktreePath"> | undefined>>;
+  byId: Readonly<Record<string, Pick<ThreadView, "archivedAtMs" | "worktreePath"> | undefined>>;
 }
 
 export interface CleanupTerminals {
@@ -248,9 +248,9 @@ export interface CleanupTerminals {
  * archived ones are put away: the daemon's cleanup guard (cleanupHold over
  * worktreeThreads) counts exactly those.
  */
-export function threadHolds(sessions: CleanupSessions, path: string): boolean {
-  return sessions.order.some((id) => {
-    const s = sessions.byId[id];
+export function threadHolds(threads: CleanupThreads, path: string): boolean {
+  return threads.order.some((id) => {
+    const s = threads.byId[id];
     return s !== undefined && s.archivedAtMs === null && inside(s.worktreePath, path);
   });
 }
@@ -275,12 +275,12 @@ export function memberHolds(workspaces: ProjectsWorkspaces, path: string): boole
  */
 export function isCleanable(
   wt: Pick<WorktreeView, "path" | "mergedClean"> | undefined,
-  sessions: CleanupSessions,
+  threads: CleanupThreads,
   terminals: CleanupTerminals,
   workspaces: ProjectsWorkspaces,
 ): boolean {
   if (!wt?.mergedClean) return false;
-  return !threadHolds(sessions, wt.path) && !terminalHolds(terminals, wt.path) && !memberHolds(workspaces, wt.path);
+  return !threadHolds(threads, wt.path) && !terminalHolds(terminals, wt.path) && !memberHolds(workspaces, wt.path);
 }
 
 /** The "in main" tag's tooltip. */

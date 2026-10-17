@@ -6,8 +6,8 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { useNow } from "@/lib/clock";
 import { addDays, compareDays, dayOf, formatDay, monthGrid, monthTitle, parseTimeValue, sameDay, shiftMonth, SNOOZE_HOUR, wallTime, type Day } from "@/lib/snooze";
 import { cn } from "@/lib/utils";
-import { snoozeSession } from "@/stores/sessionActions";
-import { useSessionsStore } from "@/stores/sessions";
+import { snoozeThread } from "@/stores/threadActions";
+import { useThreadsStore } from "@/stores/threads";
 import { closeSnoozeDialog, useSnoozeDialogStore } from "@/stores/snoozeDialog";
 
 const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"] as const;
@@ -105,10 +105,10 @@ function Calendar({ now, selected, onSelect }: { now: number; selected: Day; onS
 /**
  * The dialog's body for one thread: the calendar (tomorrow selected), a time (9:00 AM),
  * the chosen day spelled out, Cancel and Snooze. Snooze is disabled while the chosen time
- * is not in the future; it invokes session.snooze with the absolute time (the daemon
+ * is not in the future; it invokes thread.snooze with the absolute time (the daemon
  * confirms only mid-turn).
  */
-function SnoozeBody({ sessionId }: { sessionId: string }) {
+function SnoozeBody({ threadId }: { threadId: string }) {
   const now = useNow(30_000);
   const [day, setDay] = useState<Day>(() => addDays(dayOf(Date.now()), 1));
   const [time, setTime] = useState(DEFAULT_TIME);
@@ -118,7 +118,7 @@ function SnoozeBody({ sessionId }: { sessionId: string }) {
   const submit = () => {
     if (!ready) return;
     closeSnoozeDialog();
-    void snoozeSession(sessionId, untilMs);
+    void snoozeThread(threadId, untilMs);
   };
   return (
     <form
@@ -162,9 +162,9 @@ function SnoozeBody({ sessionId }: { sessionId: string }) {
 /** "Pick a date and time…" from the snooze menus (stores/snoozeDialog.ts). */
 export function SnoozeDialog() {
   const open = useSnoozeDialogStore((s) => s.open);
-  const sessionId = useSnoozeDialogStore((s) => s.sessionId);
+  const threadId = useSnoozeDialogStore((s) => s.threadId);
   const seq = useSnoozeDialogStore((s) => s.seq);
-  const name = useSessionsStore((s) => s.byId[sessionId]?.name ?? "");
+  const name = useThreadsStore((s) => s.byId[threadId]?.name ?? "");
   return (
     <Dialog
       open={open}
@@ -172,10 +172,10 @@ export function SnoozeDialog() {
         if (!o) closeSnoozeDialog();
       }}
     >
-      <DialogContent className="max-w-[300px] p-4" data-testid="snooze-dialog" data-session={sessionId}>
-        <DialogTitle className="truncate">Snooze “{name || sessionId}”</DialogTitle>
+      <DialogContent className="max-w-[300px] p-4" data-testid="snooze-dialog" data-thread={threadId}>
+        <DialogTitle className="truncate">Snooze “{name || threadId}”</DialogTitle>
         <DialogDescription className="sr-only">Pick the day and time the thread comes back to the list.</DialogDescription>
-        {open && <SnoozeBody key={seq} sessionId={sessionId} />}
+        {open && <SnoozeBody key={seq} threadId={threadId} />}
       </DialogContent>
     </Dialog>
   );

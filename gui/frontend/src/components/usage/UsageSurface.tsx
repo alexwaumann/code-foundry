@@ -1,28 +1,28 @@
 import { useMemo, useRef, type CSSProperties } from "react";
-import type { UsageBucketView } from "@/api/session";
+import type { UsageBucketView } from "@/api/threads";
 import { Tip } from "@/components/ui/tooltip";
 import { fmtRequests, fmtShare, fmtTok, fmtUsd, modelColorVars, SWATCH_BG, TOKEN_KINDS, totalUsage, usageByModel, type ModelUsage } from "@/lib/usage";
 import { cn } from "@/lib/utils";
-import { sameUsage, useSessionsStore } from "@/stores/sessions";
+import { sameUsage, useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 
 const NONE: readonly UsageBucketView[] = [];
 
 /**
- * The thread this panel belongs to: the selected session; "" otherwise (the panel always
+ * The thread this panel belongs to: the selected thread; "" otherwise (the panel always
  * shows the current selection's panel).
  */
 function useThreadId(): string {
-  return useUiStore((s) => (s.selection.kind === "session" ? s.selection.id : ""));
+  return useUiStore((s) => (s.selection.kind === "thread" ? s.selection.id : ""));
 }
 
 /**
- * The thread's usage buckets. Every session update carries a new array, so the previous
+ * The thread's usage buckets. Every thread update carries a new array, so the previous
  * one is kept while its content is the same: status changes do not re-render the surface.
  */
 function useUsage(threadId: string): readonly UsageBucketView[] {
   const last = useRef<readonly UsageBucketView[]>(NONE);
-  return useSessionsStore((s) => {
+  return useThreadsStore((s) => {
     const next = s.byId[threadId]?.usage ?? NONE;
     if (!sameUsage(last.current, next)) last.current = next;
     return last.current;
@@ -69,7 +69,7 @@ function ModelRow({ row, total }: { row: ModelUsage; total: number }) {
 }
 
 /**
- * The side panel's Usage surface (docs/sketches/session-usage/DESIGN.md, session view):
+ * The side panel's Usage surface (docs/sketches/session-usage/DESIGN.md, thread view):
  * the selected thread's cost at Claude API rates, its tokens and requests, then per model
  * (swatch, id, tokens and requests; cost and share of cost) and per token kind (tokens
  * and cost). A model without a known rate is tagged "unpriced" and costs "—"; the totals
@@ -77,7 +77,7 @@ function ModelRow({ row, total }: { row: ModelUsage; total: number }) {
  */
 export function UsageSurface() {
   const threadId = useThreadId();
-  const known = useSessionsStore((s) => threadId !== "" && s.byId[threadId] !== undefined);
+  const known = useThreadsStore((s) => threadId !== "" && s.byId[threadId] !== undefined);
   const usage = useUsage(threadId);
   const total = useMemo(() => totalUsage(usage), [usage]);
   const models = useMemo(() => usageByModel(usage), [usage]);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PullRequestView } from "@/api/gh";
-import type { SessionView } from "@/api/session";
+import type { ThreadView } from "@/api/threads";
 import type { TerminalView } from "@/api/terminal";
 import { baseFact, branchPullRequest, operationStrip, originFact, otherThreads, shellsIn, shortRef, upstreamRemote, workingTreeFact, type FactPart } from "./facts";
 
@@ -102,15 +102,15 @@ describe("otherThreads and shellsIn", () => {
     { id: "c", worktreePath: `${P}/sub`, archivedAtMs: null },
     { id: "d", worktreePath: P, archivedAtMs: 5 },
     { id: "e", worktreePath: "/src/web", archivedAtMs: null },
-  ] as SessionView[];
-  const sessions = { byId: Object.fromEntries(threads.map((t) => [t.id, t])), order: threads.map((t) => t.id) };
+  ] as ThreadView[];
+  const data = { byId: Object.fromEntries(threads.map((t) => [t.id, t])), order: threads.map((t) => t.id) };
 
   it.each([
     ["no selection: every unarchived thread on the path", "", 2],
     ["the selected thread in this worktree is not other", "a", 1],
     ["a selected thread elsewhere changes nothing", "e", 2],
   ])("%s", (_name, self, want) => {
-    expect(otherThreads(sessions, P, self)).toBe(want);
+    expect(otherThreads(data, P, self)).toBe(want);
   });
 
   it("counts live terminals whose cwd is the path", () => {

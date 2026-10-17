@@ -45,7 +45,7 @@ describe("argChoices", () => {
   });
 });
 
-describe("optional enum prompts (session.new model/effort)", () => {
+describe("optional enum prompts (thread.new model/effort)", () => {
   const c = cmd({
     name: "thread.new",
     args: [

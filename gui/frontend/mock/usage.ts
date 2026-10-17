@@ -1,7 +1,7 @@
 /**
- * Mock token usage (docs/notes/session-usage.md): a session's buckets priced like the
+ * Mock token usage (docs/notes/session-usage.md): a thread's buckets priced like the
  * daemon's internal/pricing for the few models the fixtures use; any other model is
- * unpriced. Seeded on s-1; POST /__mock/usage adds a bucket to any session.
+ * unpriced. Seeded on s-1; POST /__mock/usage adds a bucket to any thread.
  */
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import type { UsageBucketSchema } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
@@ -61,7 +61,7 @@ function bucketMsg(u: MockUsage): UsageBucketInit {
   };
 }
 
-/** Session.usage, cost_usd and unpriced for a session's buckets. */
+/** Thread.usage, cost_usd and unpriced for a thread's buckets. */
 export function usageFields(list: readonly MockUsage[]): { usage: UsageBucketInit[]; costUsd: number; unpriced: boolean } {
   const usage = [...list].sort((a, b) => a.day.localeCompare(b.day) || a.model.localeCompare(b.model)).map(bucketMsg);
   return { usage, costUsd: usage.reduce((s, b) => s + (b.costUsd ?? 0), 0), unpriced: usage.some((b) => b.unpriced) };
@@ -110,8 +110,8 @@ function daily(model: string, values: readonly number[], perRequest: number): Mo
 }
 
 /** s-3: Opus 5.5 every day, plus claude-opus-5 (no rate: "unpriced"). s-4: Fable, Sonnet and Haiku. */
-export function pageUsage(sessionId: string): MockUsage[] {
-  switch (sessionId) {
+export function pageUsage(threadId: string): MockUsage[] {
+  switch (threadId) {
     case "s-3":
       return [...daily("claude-opus-5-5", OPUS, 1), mix("claude-opus-5", 2, 18, 9), mix("claude-opus-5", 1, 10.4, 5)];
     case "s-4":
@@ -121,7 +121,7 @@ export function pageUsage(sessionId: string): MockUsage[] {
   }
 }
 
-/** SessionSnapshot.retired_usage / ListSessionsResponse.retired_usage: removed threads' usage. */
+/** ThreadListSnapshot.retired_usage / ListThreadsResponse.retired_usage: removed threads' usage. */
 export function retiredUsage(): UsageBucketInit[] {
   return usageFields([mix("claude-opus-5-5", 20, 64, 70), mix("claude-fable-5-1", 20, 21, 25), mix("claude-opus-5-5", 33, 90, 80), mix("claude-opus-5-5", 60, 45, 40), mix("claude-opus-4-8", 12, 6, 4)]).usage;
 }

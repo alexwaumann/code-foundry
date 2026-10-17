@@ -1,19 +1,19 @@
 import { useShallow } from "zustand/react/shallow";
 import type { UiContextView } from "@/api/command";
-import type { SessionView } from "@/api/session";
-import { placeSession, type ListOptions, type ListSession, type TreeRepo, type WorktreeRef } from "@/lib/tree";
+import type { ThreadView } from "@/api/threads";
+import { placeThread, type ListOptions, type ListThread, type TreeRepo, type WorktreeRef } from "@/lib/tree";
 import { REPO_LABEL, WORKTREE_LABEL } from "@/lib/termlabel";
 import { focusedBottomShell, ownerKeyOf, PROJECTS_KEY, useBottomStore } from "./bottomPanel";
 import { useReposStore, type ReposData } from "./repos";
-import { useSessionsStore, type SessionsData } from "./sessions";
-import { isThreadGroup, threadGroup } from "@/lib/session";
+import { useThreadsStore, type ThreadsData } from "./threads";
+import { isThreadGroup, threadGroup } from "@/lib/thread";
 import { isNoProject } from "@/lib/threadRow";
 import { useTerminalsStore } from "./terminals";
 import { useUiStore, type Selection } from "./ui";
 
 export const emptyContext: UiContextView = {
   activeTerminalId: "",
-  activeSessionId: "",
+  activeThreadId: "",
   activeRepoId: "",
   activeWorktreePath: "",
   activeView: "dashboard",
@@ -53,15 +53,15 @@ export function projectsShellPlace(t: ContextShell | undefined): WorktreeRef | n
 }
 
 /**
- * Derives the UiContext the daemon sees from the current selection. A session contributes
+ * Derives the UiContext the daemon sees from the current selection. A thread contributes
  * its place (repo, worktree) and its workspace; a thread has no terminal of its own, so
  * activeTerminalId comes only from a focused bottom panel shell (focusedShell). The
  * composer looks only at its repo. Actions on a worktree that is not
  * selected (the Projects page, the panel's worktree tab) build their context with
  * worktreeContext / repoContext.
  */
-export function deriveContext(sel: Selection, repos: ReposData, sessions: SessionsData = { byId: {}, order: [] }, focusedShell?: ContextShell): UiContextView {
-  const ctx = deriveSelectionContext(sel, repos, sessions);
+export function deriveContext(sel: Selection, repos: ReposData, threads: ThreadsData = { byId: {}, order: [] }, focusedShell?: ContextShell): UiContextView {
+  const ctx = deriveSelectionContext(sel, repos, threads);
   if (!focusedShell) return ctx;
   // The keyboard is in a bottom panel shell (focusedBottomShell): terminal commands act on
   // it. On the Projects page, which carries no worktree, the shell's worktree is the
@@ -72,29 +72,29 @@ export function deriveContext(sel: Selection, repos: ReposData, sessions: Sessio
     : { ...ctx, activeTerminalId: focusedShell.id };
 }
 
-function deriveSelectionContext(sel: Selection, repos: ReposData, sessions: SessionsData): UiContextView {
+function deriveSelectionContext(sel: Selection, repos: ReposData, threads: ThreadsData): UiContextView {
   switch (sel.kind) {
     case "none":
       return emptyContext;
-    case "session": {
-      const s = sessions.byId[sel.id];
-      const place = s ? placeSession(s, allWorktrees(repos)) : null;
+    case "thread": {
+      const s = threads.byId[sel.id];
+      const place = s ? placeThread(s, allWorktrees(repos)) : null;
       // A thread without a project runs in home, which is no worktree: no repo or
-      // worktree in its context, so project-scoped commands (and session.new without
+      // worktree in its context, so project-scoped commands (and thread.new without
       // no-project, which would refuse home) are not offered.
       const home = s !== undefined && isNoProject(s, repos);
       return {
         ...emptyContext,
-        activeSessionId: sel.id,
+        activeThreadId: sel.id,
         activeRepoId: place?.repoId ?? s?.repoId ?? "",
         activeWorktreePath: place?.path ?? (home ? "" : (s?.worktreePath ?? "")),
-        activeView: "session",
+        activeView: "thread",
         activeWorkspaceId: s?.workspaceId ?? "",
       };
     }
     // The composer has no worktree yet (it may make one): only the repo, which is
-    // what session.new needs to be available. A composer without a project has no repo
-    // either (the daemon offers session.new in the compose view for it).
+    // what thread.new needs to be available. A composer without a project has no repo
+    // either (the daemon offers thread.new in the compose view for it).
     case "compose":
       return { ...emptyContext, activeRepoId: sel.repoId, activeView: "compose", activeWorkspaceId: sel.workspaceId ?? "" };
     case "view":
@@ -103,7 +103,7 @@ function deriveSelectionContext(sel: Selection, repos: ReposData, sessions: Sess
 }
 
 export function contextKey(c: UiContextView): string {
-  return [c.activeView, c.activeTerminalId, c.activeSessionId, c.activeRepoId, c.activeWorktreePath, c.activeWorkspaceId].join("\u0000");
+  return [c.activeView, c.activeTerminalId, c.activeThreadId, c.activeRepoId, c.activeWorktreePath, c.activeWorkspaceId].join("\u0000");
 }
 
 /**
@@ -116,7 +116,7 @@ export function getUiContext(sel?: Selection): UiContextView {
   const terminals = useTerminalsStore.getState();
   const focused = sel === undefined ? focusedBottomShell(ui, terminals, useBottomStore.getState().byKey) : "";
   const shell = focused ? (terminals.byId[focused] ?? { id: focused, labels: {} }) : undefined;
-  return deriveContext(sel ?? ui.selection, useReposStore.getState(), useSessionsStore.getState(), shell);
+  return deriveContext(sel ?? ui.selection, useReposStore.getState(), useThreadsStore.getState(), shell);
 }
 
 const SEP = "\u0001";
@@ -134,22 +134,22 @@ export function decodeRepoKeys(keys: readonly string[]): TreeRepo[] {
 }
 
 /**
- * One string per session for the sidebar list: id + pin + group + archive time + snooze
+ * One string per thread for the sidebar list: id + pin + group + archive time + snooze
  * end (name, model, a different dialog and the status line's text don't rebuild the list;
  * a question turning into a finished turn, an idle thread starting work, archiving,
  * snoozing and their undoing does, since it moves). In the store's order.
  */
-export function useSessionListKeys(): string[] {
-  return useSessionsStore(useShallow((s) => s.order.map((id) => encodeSessionListKey(id, s.byId[id]))));
+export function useThreadListKeys(): string[] {
+  return useThreadsStore(useShallow((s) => s.order.map((id) => encodeThreadListKey(id, s.byId[id]))));
 }
 
-/** One thread's list key (useSessionListKeys); decodeSessionListKeys reads it back. */
-export function encodeSessionListKey(id: string, x: SessionView | undefined): string {
+/** One thread's list key (useThreadListKeys); decodeThreadListKeys reads it back. */
+export function encodeThreadListKey(id: string, x: ThreadView | undefined): string {
   const ms = (v: number | null | undefined) => (v != null ? String(v) : "");
   return [id, x?.pinned ? "1" : "", x ? threadGroup(x) : "idle", ms(x?.archivedAtMs), ms(x?.snoozedUntilMs)].join(SEP);
 }
 
-export function decodeSessionListKeys(keys: readonly string[]): ListSession[] {
+export function decodeThreadListKeys(keys: readonly string[]): ListThread[] {
   return keys.map((k) => {
     const [id = "", pinned = "", group = "", archived = "", snoozed = ""] = k.split(SEP);
     return {
@@ -163,8 +163,8 @@ export function decodeSessionListKeys(keys: readonly string[]): ListSession[] {
 }
 
 /** The sidebar list's threads read imperatively (cmd+1..9, cmd+shift+a). */
-export function getListSessions(): ListSession[] {
-  const s = useSessionsStore.getState();
+export function getListThreads(): ListThread[] {
+  const s = useThreadsStore.getState();
   return s.order.flatMap((id) => {
     const x = s.byId[id];
     return x ? [{ id, pinned: x.pinned, group: threadGroup(x), archivedAtMs: x.archivedAtMs, snoozedUntilMs: x.snoozedUntilMs }] : [];

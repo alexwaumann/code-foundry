@@ -1,24 +1,24 @@
 import { describe, expect, it } from "vitest";
-import type { SessionView } from "@/api/session";
-import type { SessionsData } from "@/stores/sessions";
+import type { ThreadView } from "@/api/threads";
+import type { ThreadsData } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
 import { selectionUsageThread, usageTab } from "./usageTarget";
 
 const WEB = "/src/web";
 
-function session(id: string): SessionView {
-  return { id, repoId: "web", worktreePath: WEB, workspaceId: "", pendingWorktreePath: "", state: "connected", terminalId: "", linkedPullRequests: [], usage: [], costUsd: 0, unpriced: false } as unknown as SessionView;
+function thread(id: string): ThreadView {
+  return { id, repoId: "web", worktreePath: WEB, workspaceId: "", pendingWorktreePath: "", state: "connected", terminalId: "", linkedPullRequests: [], usage: [], costUsd: 0, unpriced: false } as unknown as ThreadView;
 }
 
-const sessions: SessionsData = { byId: { "s-used": session("s-used"), "s-new": session("s-new") }, order: ["s-used", "s-new"] };
+const threads: ThreadsData = { byId: { "s-used": thread("s-used"), "s-new": thread("s-new") }, order: ["s-used", "s-new"] };
 
-const s = { repos: { byId: {}, order: [] }, sessions };
+const s = { repos: { byId: {}, order: [] }, threads };
 
 describe("selectionUsageThread (the surface's availability)", () => {
   it.each<[string, Selection, string | null]>([
-    ["a thread", { kind: "session", id: "s-used" }, "s-used"],
-    ["a thread without usage yet", { kind: "session", id: "s-new" }, "s-new"],
-    ["an unknown thread", { kind: "session", id: "s-404" }, null],
+    ["a thread", { kind: "thread", id: "s-used" }, "s-used"],
+    ["a thread without usage yet", { kind: "thread", id: "s-new" }, "s-new"],
+    ["an unknown thread", { kind: "thread", id: "s-404" }, null],
     ["a composer", { kind: "compose", repoId: "web" }, null],
     ["a page", { kind: "view", name: "pullrequests" }, null],
     ["nothing", { kind: "none" }, null],

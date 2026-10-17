@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { BranchPullRequestsView, PullRequestView } from "@/api/gh";
 import type { RepoView, WorktreeView } from "@/api/repo";
-import type { SessionView } from "@/api/session";
+import type { ThreadView } from "@/api/threads";
 import type { ResourceEntry } from "@/stores/resource";
 import type { Selection } from "@/stores/ui";
 import { pickPullRequest, prRefOfTab, pullRequestTab, selectionPullRequest, type SelectionStores } from "./pullrequestTarget";
@@ -10,11 +10,11 @@ const status = { upstream: "", ahead: 0, behind: 0, staged: 0, modified: 0, untr
 const wt = (path: string, branch: string, isMain = false): WorktreeView => ({ repoId: "r1", path, branch, head: "abc", detached: false, isMain, status });
 const repo: RepoView = { id: "r1", path: "/src/cf", name: "cf", defaultBranch: "main", githubSlug: "Alex/CF", remotes: ["origin"], git: true, worktrees: [wt("/src/cf", "main", true), wt("/src/cf-fix", "fix/resize"), wt("/src/cf-nopr", "feat/nopr")] };
 const local: RepoView = { id: "r2", path: "/src/local", name: "local", defaultBranch: "main", githubSlug: "", remotes: [], git: true, worktrees: [{ ...wt("/src/local", "main", true), repoId: "r2" }] };
-const session = (id: string, worktreePath: string): SessionView => ({ id, worktreePath, repoId: "r1" }) as SessionView;
+const thread = (id: string, worktreePath: string): ThreadView => ({ id, worktreePath, repoId: "r1" }) as ThreadView;
 
 const stores: SelectionStores = {
   repos: { byId: { r1: repo, r2: local }, order: ["r1", "r2"] },
-  sessions: { byId: { s1: session("s1", "/src/cf-fix"), s2: session("s2", "/src/cf"), s3: session("s3", "/gone") }, order: ["s1", "s2", "s3"] },
+  threads: { byId: { s1: thread("s1", "/src/cf-fix"), s2: thread("s2", "/src/cf"), s3: thread("s3", "/gone") }, order: ["s1", "s2", "s3"] },
 };
 
 const pr = (number: number, state: PullRequestView["state"]): PullRequestView => ({ repoSlug: "alex/cf", number, state }) as PullRequestView;
@@ -26,11 +26,11 @@ const entryOf = (slug: string, branch: string) => entries[`${slug} ${branch}`];
 
 describe("selectionPullRequest", () => {
   it.each<[string, Selection, { slug: string; number: number } | null]>([
-    ["session on a branch with an open PR", { kind: "session", id: "s1" }, { slug: "alex/cf", number: 145 }],
-    ["session on main (no PR)", { kind: "session", id: "s2" }, null],
+    ["thread on a branch with an open PR", { kind: "thread", id: "s1" }, { slug: "alex/cf", number: 145 }],
+    ["thread on main (no PR)", { kind: "thread", id: "s2" }, null],
     ["composer (a repo, no worktree)", { kind: "compose", repoId: "r1" }, null],
-    ["session whose worktree is gone", { kind: "session", id: "s3" }, null],
-    ["unknown session", { kind: "session", id: "nope" }, null],
+    ["thread whose worktree is gone", { kind: "thread", id: "s3" }, null],
+    ["unknown thread", { kind: "thread", id: "nope" }, null],
     ["Pull Requests page", { kind: "view", name: "pullrequests" }, null],
     ["nothing selected", { kind: "none" }, null],
   ])("%s", (_name, sel, want) => {

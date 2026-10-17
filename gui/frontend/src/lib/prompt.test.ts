@@ -176,7 +176,7 @@ describe("skill and file tags", () => {
   });
 
   // The daemon ends a reference at whitespace and decodes it with url.PathUnescape
-  // (internal/store/session/filerefs.go); decodeURIComponent agrees with it on these.
+  // (internal/store/thread/filerefs.go); decodeURIComponent agrees with it on these.
   it.each<[string, string, string]>([
     ["# and %", "docs/#1 50%.md", "docs/%231%2050%25.md"],
     ["unicode", "src/naïve/日本.ts", "src/na%C3%AFve/%E6%97%A5%E6%9C%AC.ts"],

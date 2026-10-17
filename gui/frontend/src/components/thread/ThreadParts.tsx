@@ -4,18 +4,18 @@ import { CommandButton } from "@/components/command/CommandButton";
 import { NoGitBadge } from "@/components/projects/NoGitBadge";
 import { threadRowModel, type WorkspaceLookup } from "@/lib/threadRow";
 import { useReposStore } from "@/stores/repos";
-import { useSessionsStore } from "@/stores/sessions";
+import { useThreadsStore } from "@/stores/threads";
 import { Chip } from "./Chip";
 
 const NO_WORKSPACES: WorkspaceLookup = { byId: {} };
 
 /**
- * The thread's name. A click runs session.rename exactly as the palette does (the inline
+ * The thread's name. A click runs thread.rename exactly as the palette does (the inline
  * editor in the sidebar row), so it adds no user action of its own; where rename is not
  * available the name is plain text.
  */
 function ThreadName({ id }: { id: string }) {
-  const name = useSessionsStore((s) => s.byId[id]?.name || id);
+  const name = useThreadsStore((s) => s.byId[id]?.name || id);
   return (
     <CommandButton
       command="thread.rename"
@@ -38,7 +38,7 @@ function ThreadName({ id }: { id: string }) {
  * is plain text.
  */
 function ThreadLocation({ id }: { id: string }) {
-  const where = useSessionsStore(
+  const where = useThreadsStore(
     useShallow((st) => {
       const x = st.byId[id];
       return { repoId: x?.repoId ?? "", worktreePath: x?.worktreePath ?? "", workspaceId: x?.workspaceId ?? "", pendingWorktreePath: "" };
@@ -79,7 +79,7 @@ function ThreadLocation({ id }: { id: string }) {
 }
 
 /** Left side of a thread's header: its name, then where it runs. */
-export function SessionTitle({ id }: { id: string }) {
+export function ThreadTitle({ id }: { id: string }) {
   return (
     <>
       <ThreadName id={id} />

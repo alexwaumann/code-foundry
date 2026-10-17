@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RepoView, WorktreeView } from "@/api/repo";
-import type { SessionView } from "@/api/session";
+import type { ThreadView } from "@/api/threads";
 import type { TerminalView } from "@/api/terminal";
 
 // The tab body reads the branch's pull requests; nothing to fetch here.
@@ -11,7 +11,7 @@ vi.mock("@/api/gh", async (orig) => ({ ...(await orig<typeof import("@/api/gh")>
 const { SidePanel } = await import("@/components/panel/SidePanel");
 const { getPanel, usePanelStore } = await import("@/stores/panel");
 const { useReposStore } = await import("@/stores/repos");
-const { useSessionsStore } = await import("@/stores/sessions");
+const { useThreadsStore } = await import("@/stores/threads");
 const { useTerminalsStore } = await import("@/stores/terminals");
 const { useUiStore } = await import("@/stores/ui");
 const { showView, useViewsStore, worktreePanelCommand } = await import("@/stores/views");
@@ -22,15 +22,15 @@ const WEB_FEAT = "/wt/web/cf-feat";
 const status = { upstream: "", ahead: 0, behind: 0, staged: 0, modified: 0, untracked: 0, dirty: false, refreshedAtMs: null };
 const wt = (repoId: string, path: string, branch: string, isMain = false): WorktreeView => ({ repoId, path, branch, head: "abc", detached: false, isMain, status });
 const repo = (id: string, extra: WorktreeView[] = []): RepoView => ({ id, path: `/src/${id}`, name: id, defaultBranch: "main", githubSlug: "", remotes: [], git: true, worktrees: [wt(id, `/src/${id}`, "main", true), ...extra] });
-const thread = (id: string, o: Partial<SessionView>) => ({ id, repoId: "web", worktreePath: WEB_MAIN, workspaceId: "", pendingWorktreePath: "", terminalId: "", state: "connected", linkedPullRequests: [], ...o }) as SessionView;
+const thread = (id: string, o: Partial<ThreadView>) => ({ id, repoId: "web", worktreePath: WEB_MAIN, workspaceId: "", pendingWorktreePath: "", terminalId: "", state: "connected", linkedPullRequests: [], ...o }) as ThreadView;
 
 function select(id: string): void {
-  useUiStore.setState({ selection: { kind: "session", id } });
+  useUiStore.setState({ selection: { kind: "thread", id } });
 }
 
 beforeEach(() => {
   useReposStore.setState({ byId: { web: repo("web", [wt("web", WEB_FEAT, "cf/feat")]) }, order: ["web"] });
-  useSessionsStore.setState({
+  useThreadsStore.setState({
     byId: {
       "s-main": thread("s-main", {}),
       "s-feat": thread("s-feat", { worktreePath: WEB_FEAT }),
@@ -41,7 +41,7 @@ beforeEach(() => {
   });
   useTerminalsStore.setState({ byId: {}, order: [] });
   const open = { open: true, tabs: [], activeTabId: null };
-  usePanelStore.setState({ byKey: { "session:s-main": open, "session:s-feat": open, "session:s-sub": open, "view:projects": open } });
+  usePanelStore.setState({ byKey: { "thread:s-main": open, "thread:s-feat": open, "thread:s-sub": open, "view:projects": open } });
   useViewsStore.setState({ settingsOpen: false });
   useUiStore.setState({ windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260, palette: { ...useUiStore.getState().palette, open: false } });
   select("s-feat");
@@ -71,7 +71,7 @@ describe("Worktree surface availability", () => {
     expect(row()?.textContent).toContain("Worktree");
     expect(row()?.textContent).toContain("T");
     act(() => {
-      useUiStore.setState({ selection: { kind: "session", id: "s-lost" } });
+      useUiStore.setState({ selection: { kind: "thread", id: "s-lost" } });
     });
     expect(row()).toBeNull();
   });
@@ -88,7 +88,7 @@ describe("Worktree surface availability", () => {
   it("T opens the thread's own worktree: title with the branch, the overview body", () => {
     render(<SidePanel />);
     fireEvent.keyDown(screen.getByTestId("side-panel"), { key: "t" });
-    const p = getPanel("session:s-feat");
+    const p = getPanel("thread:s-feat");
     expect(p.activeTabId).toBe(`worktree?path=${encodeURIComponent(WEB_FEAT)}&repo=web`);
     expect(p.tabs[0]?.title).toBe("web · cf/feat");
     expect(screen.getByTestId("worktree-surface").getAttribute("data-path")).toBe(WEB_FEAT);
@@ -96,14 +96,14 @@ describe("Worktree surface availability", () => {
   });
 
   it("the tab's who-else line counts the worktree's other threads and shells, not the thread it is open for", () => {
-    useSessionsStore.setState((s) => ({ byId: { ...s.byId, "s-feat2": thread("s-feat2", { worktreePath: WEB_FEAT }) }, order: [...s.order, "s-feat2"] }));
+    useThreadsStore.setState((s) => ({ byId: { ...s.byId, "s-feat2": thread("s-feat2", { worktreePath: WEB_FEAT }) }, order: [...s.order, "s-feat2"] }));
     useTerminalsStore.setState({ byId: { t1: { id: "t1", cwd: WEB_FEAT, state: "running" } as TerminalView }, order: ["t1"] });
     render(<SidePanel />);
     fireEvent.keyDown(screen.getByTestId("side-panel"), { key: "t" });
     expect(screen.getByTestId("worktree-who").textContent).toBe("1 other thread1 shell");
     act(() => {
       useTerminalsStore.setState({ byId: {}, order: [] });
-      useSessionsStore.setState((s) => ({ byId: { ...s.byId, "s-feat2": { ...thread("s-feat2", { worktreePath: WEB_FEAT }), archivedAtMs: 1 } } }));
+      useThreadsStore.setState((s) => ({ byId: { ...s.byId, "s-feat2": { ...thread("s-feat2", { worktreePath: WEB_FEAT }), archivedAtMs: 1 } } }));
     });
     expect(screen.queryByTestId("worktree-who")).toBeNull();
   });
@@ -112,7 +112,7 @@ describe("Worktree surface availability", () => {
     select("s-sub");
     render(<SidePanel />);
     fireEvent.keyDown(screen.getByTestId("side-panel"), { key: "t" });
-    expect(getPanel("session:s-sub").tabs[0]?.params).toEqual({ repo: "web", path: WEB_FEAT });
+    expect(getPanel("thread:s-sub").tabs[0]?.params).toEqual({ repo: "web", path: WEB_FEAT });
   });
 });
 
@@ -121,29 +121,29 @@ describe("worktreePanelCommand (view.panel.worktree)", () => {
     usePanelStore.setState({ byKey: {} });
     select("s-main");
     expect(worktreePanelCommand()).toBe(true);
-    expect(getPanel("session:s-main")).toMatchObject({ open: true, activeTabId: `worktree?path=${encodeURIComponent(WEB_MAIN)}&repo=web` });
-    expect(getPanel("session:s-main").tabs[0]?.title).toBe("web");
+    expect(getPanel("thread:s-main")).toMatchObject({ open: true, activeTabId: `worktree?path=${encodeURIComponent(WEB_MAIN)}&repo=web` });
+    expect(getPanel("thread:s-main").tabs[0]?.title).toBe("web");
   });
 
   it("does nothing for a thread outside any worktree, on a page, or under the settings page", () => {
     usePanelStore.setState({ byKey: {} });
     select("s-lost");
     expect(worktreePanelCommand()).toBe(false);
-    expect(getPanel("session:s-lost").open).toBe(false);
+    expect(getPanel("thread:s-lost").open).toBe(false);
     useUiStore.setState({ selection: { kind: "view", name: "projects" } });
     expect(worktreePanelCommand()).toBe(false);
     expect(getPanel("view:projects").open).toBe(false);
     select("s-feat");
     useViewsStore.setState({ settingsOpen: true });
     expect(worktreePanelCommand()).toBe(false);
-    expect(getPanel("session:s-feat").open).toBe(false);
+    expect(getPanel("thread:s-feat").open).toBe(false);
   });
 
   it("is reached through ShowView panel.worktree and, from the palette, returns focus to the panel", () => {
     usePanelStore.setState({ byKey: {} });
     useUiStore.setState((s) => ({ palette: { ...s.palette, open: true, returnTo: "content" } }));
     expect(showView("panel.worktree")).toBe(true);
-    expect(getPanel("session:s-feat").open).toBe(true);
+    expect(getPanel("thread:s-feat").open).toBe(true);
     expect(useUiStore.getState().palette.returnTo).toBe("panel");
   });
 });

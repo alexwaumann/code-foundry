@@ -1,17 +1,17 @@
 /**
- * Live e2e for the PR surface's session actions: Explain this PR against a REAL daemon,
+ * Live e2e for the PR surface's thread actions: Explain this PR against a REAL daemon,
  * which reads the pull request through `gh`, picks a worktree of a registered clone and
  * starts Claude Code with the explain prompt. Opt-in (LIVE_DAEMON=1), run with
- * playwright.live.config.ts. It starts nothing itself; the session it starts is left
- * running for the caller to stop (`code-foundry session archive --id <id> --yes`).
+ * playwright.live.config.ts. It starts nothing itself; the thread it starts is left
+ * running for the caller to stop (`code-foundry thread archive --id <id> --yes`).
  *
  * Recipe (docs/notes/side-panel.md, chunk 4): an isolated daemon (CODE_FOUNDRY_HOME) with
- * a clone of LIVE_PR_SLUG registered and sessions.default_model=haiku, the Vite dev server
+ * a clone of LIVE_PR_SLUG registered and threads.default_model=haiku, the Vite dev server
  * pointed at it, then:
  *
  *   LIVE_DAEMON=1 LIVE_APP_URL=http://127.0.0.1:9372 LIVE_REPO=code-foundry \
  *   LIVE_PR_SLUG=alexwaumann/code-foundry LIVE_PR=1 LIVE_SHOTS=<dir> \
- *   pnpm run e2e:live e2e/live-prsession.spec.ts
+ *   pnpm run e2e:live e2e/live-prthread.spec.ts
  */
 import { expect, test } from "@playwright/test";
 
@@ -23,7 +23,7 @@ const NUMBER = Number(process.env.LIVE_PR ?? "1");
 
 test.skip(!LIVE || !REPO, "set LIVE_DAEMON=1 and LIVE_REPO (see the file header)");
 
-test("Explain this PR starts a real Claude session with the explain prompt", async ({ page }) => {
+test("Explain this PR starts a real thread with the explain prompt", async ({ page }) => {
   await page.setViewportSize({ width: 1400, height: 900 });
   await page.goto("/");
   // Projects live on the Projects page (docs/notes/workspaces-4-sidebar.md).
@@ -39,10 +39,10 @@ test("Explain this PR starts a real Claude session with the explain prompt", asy
 
   await page.getByTestId("pr-menu-button").click();
   await page.getByTestId("pr-menu-explain").click();
-  const selected = page.locator('[data-row-kind="session"][aria-selected="true"]');
+  const selected = page.locator('[data-row-kind="thread"][aria-selected="true"]');
   await expect(selected).toHaveAttribute("data-row-key", /^s:s-/, { timeout: 60_000 });
   const key = (await selected.getAttribute("data-row-key")) ?? "";
-  console.log(`session ${key.slice(2)}`);
+  console.log(`thread ${key.slice(2)}`);
   // The prompt goes out as the thread's first message once Claude is up.
   await expect(page.getByTestId("thread-pane").getByTestId("thread-user").first()).toContainText(/Explain this pull request|Walk through this pull request/i, { timeout: 120_000 });
   await page.waitForTimeout(1500);

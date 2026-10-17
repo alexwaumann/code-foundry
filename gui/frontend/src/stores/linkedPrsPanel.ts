@@ -1,16 +1,16 @@
 /**
  * Opening the Linked PRs surface (surfaces/linkedprs.ts). The view.panel.linked-prs
- * command (linkedPrsPanelCommand in stores/views.ts), the session header button (the
+ * command (linkedPrsPanelCommand in stores/views.ts), the thread header button (the
  * command) and the sidebar's PR badge end here.
  */
 import { linkedPrsTab, selectionLinkedThread, selectionThread } from "@/surfaces/linkedprsTarget";
 import { keyOf, openSurface } from "./panel";
 import { useReposStore } from "./repos";
-import { useSessionsStore } from "./sessions";
+import { useThreadsStore } from "./threads";
 import { useUiStore, type Selection } from "./ui";
 
 function stores() {
-  return { repos: useReposStore.getState(), sessions: useSessionsStore.getState() };
+  return { repos: useReposStore.getState(), threads: useThreadsStore.getState() };
 }
 
 /** What the selection is for the surface: a thread with links, a thread without any, or no thread. */

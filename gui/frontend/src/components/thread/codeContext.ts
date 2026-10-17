@@ -6,7 +6,7 @@ import { createContext, useContext } from "react";
  * copy. `text` and `streaming` are the reply's, to hide Run on a block still being written.
  */
 export interface CodeRunCtx {
-  sessionId: string;
+  threadId: string;
   text: string;
   streaming: boolean;
 }

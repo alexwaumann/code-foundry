@@ -5,11 +5,11 @@ import { ProjectsNav } from "@/components/projects/ProjectsPage";
 import { PullRequestsNav } from "@/components/prs/PullRequestsPage";
 import { Tip } from "@/components/ui/tooltip";
 import { TITLE_BAND_HEIGHT, trafficLightGutter } from "@/components/window/titleBand";
-import { buildSections, FOOTERS, isSessionRow, rowCache, sessionKey, type FooterSection, type HeaderRow, type Row, type SessionRow } from "@/lib/tree";
+import { buildSections, FOOTERS, isThreadRow, rowCache, threadKey, type FooterSection, type HeaderRow, type Row, type ThreadRow } from "@/lib/tree";
 import { zoomFactor } from "@/lib/zoom";
-import { decodeSessionListKeys, useSessionListKeys } from "@/stores/context";
+import { decodeThreadListKeys, useThreadListKeys } from "@/stores/context";
 import { useEventsStore } from "@/stores/events";
-import { useSessionsStore } from "@/stores/sessions";
+import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { useRowHeight } from "@/stores/settings";
 import { RowMenu } from "./RowMenu";
@@ -50,13 +50,13 @@ function splitFooter(rows: readonly Row[]): [HeaderRow | null, Row[]] {
  * rows that actually changed.
  */
 function useListRows(): ListRows {
-  const sessionKeys = useSessionListKeys();
+  const threadKeys = useThreadListKeys();
   const workingCollapsed = useUiStore((s) => s.workingCollapsed);
   const snoozedCollapsed = useUiStore((s) => s.snoozedCollapsed);
   const archivedCollapsed = useUiStore((s) => s.archivedCollapsed);
   const [stable] = useState(rowCache);
   return useMemo(() => {
-    const sec = buildSections(decodeSessionListKeys(sessionKeys), { workingCollapsed, snoozedCollapsed, archivedCollapsed });
+    const sec = buildSections(decodeThreadListKeys(threadKeys), { workingCollapsed, snoozedCollapsed, archivedCollapsed });
     const rows = stable([...sec.main, ...FOOTERS.flatMap((f) => sec[f])]);
     const headers: Record<FooterSection, HeaderRow | null> = { working: null, snoozed: null, archived: null };
     const footers: Record<FooterSection, Row[]> = { working: [], snoozed: [], archived: [] };
@@ -66,7 +66,7 @@ function useListRows(): ListRows {
       at += sec[f].length;
     }
     return { rows, main: rows.slice(0, sec.main.length), headers, footers };
-  }, [stable, sessionKeys, workingCollapsed, snoozedCollapsed, archivedCollapsed]);
+  }, [stable, threadKeys, workingCollapsed, snoozedCollapsed, archivedCollapsed]);
 }
 
 /** The panel a row is shown in. */
@@ -76,7 +76,7 @@ function panelOf(row: Row): Panel {
 
 /** Index of the next thread row from i in direction dir (skipping headers); i itself when none. */
 function stepThread(rows: readonly Row[], i: number, dir: 1 | -1): number {
-  for (let j = i + dir; j >= 0 && j < rows.length; j += dir) if (rows[j] && isSessionRow(rows[j] as Row)) return j;
+  for (let j = i + dir; j >= 0 && j < rows.length; j += dir) if (rows[j] && isThreadRow(rows[j] as Row)) return j;
   return i;
 }
 
@@ -187,15 +187,15 @@ function SidebarList({ bodyHeight }: { bodyHeight: number }) {
   const scrollWorking = useRef<ScrollTo>(null);
   const scrollSnoozed = useRef<ScrollTo>(null);
   const scrollArchived = useRef<ScrollTo>(null);
-  const selectedKey = useUiStore((s) => (s.selection.kind === "session" ? sessionKey(s.selection.id) : null));
+  const selectedKey = useUiStore((s) => (s.selection.kind === "thread" ? threadKey(s.selection.id) : null));
   const cursorKey = useUiStore((s) => s.cursorKey);
   const focusSeq = useUiStore((s) => s.sidebarFocusSeq);
-  const loaded = useSessionsStore((s) => s.loaded);
-  const unavailable = useSessionsStore((s) => s.availability === "unavailable");
+  const loaded = useThreadsStore((s) => s.loaded);
+  const unavailable = useThreadsStore((s) => s.availability === "unavailable");
   const streamError = useEventsStore((s) => s.streamError);
   const rowHeight = useRowHeight();
   // The row the context menu is open for (right-clicked), or null.
-  const [menuRow, setMenuRow] = useState<SessionRow | null>(null);
+  const [menuRow, setMenuRow] = useState<ThreadRow | null>(null);
 
   const sizeOf = useCallback(
     (row: Row | undefined) => (row?.kind === "header" ? HEADER_HEIGHT : row?.section === "archived" || row?.section === "snoozed" ? rowHeight : rowHeight + SECOND_LINE),
@@ -204,7 +204,7 @@ function SidebarList({ bodyHeight }: { bodyHeight: number }) {
 
   const cursorIndex = useMemo(() => {
     const key = cursorKey ?? selectedKey;
-    return key ? rows.findIndex((r) => r.key === key && isSessionRow(r)) : -1;
+    return key ? rows.findIndex((r) => r.key === key && isThreadRow(r)) : -1;
   }, [rows, cursorKey, selectedKey]);
   // The ring is drawn only for a keyboard cursor that is on a shown row.
   const shownCursor = cursorKey !== null && cursorIndex >= 0 ? cursorKey : null;
@@ -214,10 +214,10 @@ function SidebarList({ bodyHeight }: { bodyHeight: number }) {
   }, [focusSeq]);
 
   const activate = useCallback((row: Row) => {
-    if (!isSessionRow(row)) return;
+    if (!isThreadRow(row)) return;
     const ui = useUiStore.getState();
     ui.setCursor(row.key);
-    ui.select({ kind: "session", id: row.sessionId }, { focusPrompt: true });
+    ui.select({ kind: "thread", id: row.threadId }, { focusPrompt: true });
   }, []);
 
   const panels: Readonly<Record<Panel, { rows: readonly Row[]; scrollTo: RefObject<ScrollTo | null> }>> = {
@@ -230,7 +230,7 @@ function SidebarList({ bodyHeight }: { bodyHeight: number }) {
   // The cursor moves in the one order; the panel it lands in scrolls it into view.
   const moveCursor = (i: number) => {
     const row = rows[i];
-    if (!row || !isSessionRow(row)) return;
+    if (!row || !isThreadRow(row)) return;
     useUiStore.getState().setCursor(row.key);
     const panel = panels[panelOf(row)];
     const local = panel.rows.indexOf(row);
@@ -261,12 +261,12 @@ function SidebarList({ bodyHeight }: { bodyHeight: number }) {
         if (row) activate(row);
         break;
       case "F2":
-        if (row?.kind !== "session") return;
+        if (row?.kind !== "thread") return;
         activate(row);
-        ui.setRenaming(row.sessionId);
+        ui.setRenaming(row.threadId);
         break;
       case "Escape":
-        if (ui.selection.kind === "session") useUiStore.setState((s) => ({ promptFocusSeq: s.promptFocusSeq + 1 }));
+        if (ui.selection.kind === "thread") useUiStore.setState((s) => ({ promptFocusSeq: s.promptFocusSeq + 1 }));
         break;
       default:
         return;
@@ -278,7 +278,7 @@ function SidebarList({ bodyHeight }: { bodyHeight: number }) {
   const onContextMenu = (e: React.MouseEvent) => {
     const key = (e.target as Element).closest("[data-row-key]")?.getAttribute("data-row-key");
     const row = rows.find((r) => r.key === key);
-    if (!row || !isSessionRow(row)) {
+    if (!row || !isThreadRow(row)) {
       e.preventDefault();
       setMenuRow(null);
       return;
@@ -358,20 +358,20 @@ function SidebarList({ bodyHeight }: { bodyHeight: number }) {
             {FOOTERS.map(footer)}
           </div>
         </ContextMenuTrigger>
-        {menuRow && <RowMenu id={menuRow.sessionId} />}
+        {menuRow && <RowMenu id={menuRow.threadId} />}
       </ContextMenu>
     </RowTooltipsEnabled>
   );
 }
 
 /** Shown when the daemon has no ThreadService (older daemon): everything else still works. */
-function SessionsUnavailable() {
-  const unavailable = useSessionsStore((s) => s.availability === "unavailable");
-  const error = useSessionsStore((s) => s.error);
+function ThreadsUnavailable() {
+  const unavailable = useThreadsStore((s) => s.availability === "unavailable");
+  const error = useThreadsStore((s) => s.error);
   if (!unavailable) return null;
   return (
     <Tip label={error} side="right">
-      <p className="shrink-0 border-t border-sidebar-border px-2 py-1.5 text-caption-sm" data-testid="sessions-unavailable">
+      <p className="shrink-0 border-t border-sidebar-border px-2 py-1.5 text-caption-sm" data-testid="threads-unavailable">
         Threads: service unavailable
       </p>
     </Tip>
@@ -434,7 +434,7 @@ function SidebarShown({ width }: { width: number }) {
           <ProjectsNav />
         </nav>
         <SidebarList bodyHeight={bodyHeight} />
-        <SessionsUnavailable />
+        <ThreadsUnavailable />
         <SidebarStatus />
       </div>
       <ResizeHandle />

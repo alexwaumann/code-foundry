@@ -1,6 +1,6 @@
-import type { SessionView } from "@/api/session";
+import type { ThreadView } from "@/api/threads";
 import type { DraftPhase } from "@/stores/compose";
-import { sessionBadge } from "./session";
+import { threadBadge } from "./thread";
 import { fmtTok, fmtUsd } from "./usage";
 
 /**
@@ -12,7 +12,7 @@ import { fmtTok, fmtUsd } from "./usage";
 /** How often a mounted composer re-checks the expiry, so the note appears while the user looks. */
 export const COLD_CACHE_RECHECK_MS = 30_000;
 
-export type ColdCacheInput = Pick<SessionView, "state" | "status" | "contextTokens" | "cacheExpiresAtMs" | "contextRereadUsd"> & {
+export type ColdCacheInput = Pick<ThreadView, "state" | "status" | "contextTokens" | "cacheExpiresAtMs" | "contextRereadUsd"> & {
   /** Pending permission requests and questions docked in the composer. */
   pending: number;
   /** The composer draft's phase: anything but idle means a send is on its way. */
@@ -28,7 +28,7 @@ export type ColdCacheInput = Pick<SessionView, "state" | "status" | "contextToke
  * its expiry, so every stopped thread with a result shows it.
  */
 export function coldCacheNote(i: ColdCacheInput): string | null {
-  if (sessionBadge(i) === "busy") return null;
+  if (threadBadge(i) === "busy") return null;
   if (i.pending > 0 || i.phase !== "idle") return null;
   if (!(i.contextTokens > 0) || i.cacheExpiresAtMs === null || i.nowMs < i.cacheExpiresAtMs) return null;
   const cost = i.contextRereadUsd > 0 ? ` (${fmtRereadUsd(i.contextRereadUsd)})` : "";

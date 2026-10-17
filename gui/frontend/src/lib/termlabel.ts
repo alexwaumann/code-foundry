@@ -12,7 +12,7 @@ export const REPO_LABEL = "repo";
 /** The worktree path the terminal belongs to (the snapshot path, symlinks resolved). */
 export const WORKTREE_LABEL = "worktree";
 /** The thread that owns the terminal: a shell or an action run started for it. */
-export const SESSION_LABEL = "thread";
+export const THREAD_LABEL = "thread";
 /** An action run's action id, its name when the run started, and the run's id. */
 export const ACTION_LABEL = "action";
 export const ACTION_NAME_LABEL = "action.name";

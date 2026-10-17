@@ -3,10 +3,10 @@
  * linked pull requests (availability), the tab, and the list's order and labels. Pure:
  * callers feed it the stores' current state.
  */
-import type { LinkedPullRequestView } from "@/api/session";
+import type { LinkedPullRequestView } from "@/api/threads";
 import { makeTab, type Tab } from "@/stores/panel";
 import type { ReposData } from "@/stores/repos";
-import type { SessionsData } from "@/stores/sessions";
+import type { ThreadsData } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
 
 export const LINKED_PRS_KIND = "linkedprs";
@@ -14,21 +14,21 @@ export const LINKED_PRS_TITLE = "Linked PRs";
 
 export interface SelectionStores {
   repos: ReposData;
-  sessions: SessionsData;
+  threads: ThreadsData;
 }
 
 /**
  * The selection's thread (what view.panel.linked-prs's availability sees), when the
- * sessions store knows it. Null for a page or a composer.
+ * threads store knows it. Null for a page or a composer.
  */
 export function selectionThread(sel: Selection, s: SelectionStores): string | null {
-  return sel.kind === "session" && s.sessions.byId[sel.id] ? sel.id : null;
+  return sel.kind === "thread" && s.threads.byId[sel.id] ? sel.id : null;
 }
 
 /** The selection's thread when it has at least one linked pull request (the surface is enabled); else null. */
 export function selectionLinkedThread(sel: Selection, s: SelectionStores): string | null {
   const id = selectionThread(sel, s);
-  return id !== null && (s.sessions.byId[id]?.linkedPullRequests.length ?? 0) > 0 ? id : null;
+  return id !== null && (s.threads.byId[id]?.linkedPullRequests.length ?? 0) > 0 ? id : null;
 }
 
 /** The surface's one tab per panel: no params (it follows the selection's thread). */

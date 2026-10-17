@@ -11,16 +11,16 @@
  * Skill and file tags of a project go when the project leaves the draft.
  *
  * Sending stages the attachments (ThreadService.StageAttachment) and invokes the
- * session.new registry command, like every other user action.
+ * thread.new registry command, like every other user action.
  */
 import { create } from "zustand";
 import { listRefs, type RepoView } from "@/api/repo";
-import { ATTACHMENT_MAX_BYTES, ATTACHMENT_MIME_TYPES, stageAttachment } from "@/api/session";
+import { ATTACHMENT_MAX_BYTES, ATTACHMENT_MIME_TYPES, stageAttachment } from "@/api/threads";
 import { isOutdatedDaemon } from "@/api/errors";
 import { errorMessage } from "@/api/stream";
 import {
   checkAttachments,
-  createdSessionId,
+  createdThreadId,
   DEFAULT_PERMISSION,
   defaultWorktree,
   draftKey,
@@ -44,7 +44,7 @@ import { invokeConfirmed, refreshCommands } from "./commands";
 import { requestConfirm, type ConfirmRequest } from "./confirm";
 import { getUiContext } from "./context";
 import { useReposStore } from "./repos";
-import { SESSION_COMMANDS } from "./sessionActions";
+import { THREAD_COMMANDS } from "./threadActions";
 import { useSettingsStore } from "./settings";
 import { useUiStore, type Selection } from "./ui";
 import { rememberedWorkIn, rememberWorkIn } from "./workIn";
@@ -59,20 +59,20 @@ export interface DraftAttachment {
   stagedPath: string | null;
 }
 
-/** idle: editable. attaching: staging images. starting: session.new in flight. */
+/** idle: editable. attaching: staging images. starting: thread.new in flight. */
 export type DraftPhase = "idle" | "attaching" | "starting";
 
 export interface Draft {
   /** The prompt, tags as tokens (`![name](cf-attachment://<id>)`, `[/name](cf-skill://…)`, …). */
   text: string;
   attachments: readonly DraftAttachment[];
-  /** null: the settings default (sessions.default_model / default_effort). */
+  /** null: the settings default (threads.default_model / default_effort). */
   model: string | null;
   effort: string | null;
   permission: ComposePermission;
   /**
    * null: the project's default, resolved live (projectWorktree: the choice remembered
-   * for the project, else sessions.default_worktree). Workspace drafts always have one.
+   * for the project, else threads.default_worktree). Workspace drafts always have one.
    */
   worktree: WorktreeChoice | null;
   /** null: the primary repo's default base ref (ListRefs.default_ref). */
@@ -229,7 +229,7 @@ export function clearDraft(key: string): void {
   });
 }
 
-/** Opens the project picker (session.new's GUI presentation; see keys/bindings.ts). */
+/** Opens the project picker (thread.new's GUI presentation; see keys/bindings.ts). */
 export function openNewThreadPicker(): void {
   const ui = useUiStore.getState();
   const returnTo = ui.palette.open ? ui.palette.returnTo : ui.focus;
@@ -249,7 +249,7 @@ export function composeIn(repoId: string, worktreePath?: string): void {
 
 /**
  * Shows the composer for a workspace and focuses it. The selection carries the first
- * member's repo for the command context (session.new's availability); the draft names
+ * member's repo for the command context (thread.new's availability); the draft names
  * the member the thread runs in.
  */
 export function composeInWorkspace(workspaceId: string): void {
@@ -261,7 +261,7 @@ export function composeInWorkspace(workspaceId: string): void {
 
 /**
  * Shows the composer for a thread without a project and focuses it. Its selection has
- * no repo, so the command context is the compose view alone (session.new --no-project).
+ * no repo, so the command context is the compose view alone (thread.new --no-project).
  */
 export function composeNoProject(): void {
   const ui = useUiStore.getState();
@@ -430,7 +430,7 @@ function mainCheckout(repoId: string): string | undefined {
 
 /**
  * Where a project's new thread works until the user picks: the choice remembered for the
- * project, else sessions.default_worktree (lib/compose defaultWorktree). The composer
+ * project, else threads.default_worktree (lib/compose defaultWorktree). The composer
  * resolves the same inputs with hooks.
  */
 export function projectWorktree(repoId: string): ProjectWorktree {
@@ -459,8 +459,8 @@ export function noGitCheckout(r: Pick<RepoView, "git" | "path" | "worktrees"> | 
 }
 
 /**
- * Sends a draft: stages its images one by one, then invokes session.new. On success the
- * draft is cleared and the new thread selected (the daemon's FocusSession intent usually
+ * Sends a draft: stages its images one by one, then invokes thread.new. On success the
+ * draft is cleared and the new thread selected (the daemon's FocusThread intent usually
  * got there first). On failure the draft stays, with the error.
  */
 export async function sendDraft(target: ComposeTarget, defaults: { model: string; effort: string }): Promise<boolean> {
@@ -496,16 +496,16 @@ export async function sendDraft(target: ComposeTarget, defaults: { model: string
       },
       sent.map((a) => a.stagedPath ?? ""),
     );
-    const res = await invokeConfirmed(SESSION_COMMANDS.create, args, getUiContext(composeSelection(target, place)));
+    const res = await invokeConfirmed(THREAD_COMMANDS.create, args, getUiContext(composeSelection(target, place)));
     if (!res) {
       updateDraft(key, { phase: "idle" });
       return false;
     }
     clearDraft(key);
-    const id = createdSessionId(res.resultJson);
+    const id = createdThreadId(res.resultJson);
     const ui = useUiStore.getState();
     // Replace the composer with the new thread unless the user has moved on.
-    if (id && ui.selection.kind === "compose" && draftKey(composeTarget(ui.selection)) === key) ui.select({ kind: "session", id }, { focusPrompt: true });
+    if (id && ui.selection.kind === "compose" && draftKey(composeTarget(ui.selection)) === key) ui.select({ kind: "thread", id }, { focusPrompt: true });
     return true;
   } catch (err) {
     updateDraft(key, { phase: "idle", error: errorMessage(err) });

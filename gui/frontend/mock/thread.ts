@@ -22,7 +22,7 @@
  * nothing is pending, an allowed tool runs and Claude carries on, a denied one makes Claude
  * reply to the reason, answers are echoed; then the turn ends. thread.set-effort applies at
  * once when idle ("Set effort to …" after ~300 ms), else when the turn ends
- * (Session.effort_pending meanwhile).
+ * (Thread.effort_pending meanwhile).
  */
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
@@ -49,7 +49,7 @@ type ItemInit = MessageInitShape<typeof ThreadItemSchema>;
 type PendingInit = MessageInitShape<typeof ThreadPendingRequestSchema>;
 
 /**
- * A default-world thread's history (MockThreads.seed): the prompt, Claude's first words
+ * A default-world thread's history (MockThreadLogs.seed): the prompt, Claude's first words
  * and one Bash call, then by `end`: a finished turn ("done"), a reply still streaming
  * ("working"), the next Bash call waiting for permission ("permission"), or nothing more
  * ("cut": the process ended mid-turn).
@@ -67,7 +67,7 @@ export interface SeedHistory {
 
 /** The world the threads live in (mock/world.ts implements it). */
 export interface ThreadWorld {
-  /** The session's worktree; throws when the session does not exist. */
+  /** The thread's worktree; throws when the thread does not exist. */
   worktreeOf(id: string): string;
   /** Claude runs for the thread (CONNECTED). Internal to the daemon: the GUI never shows it. */
   isConnected(id: string): boolean;
@@ -85,7 +85,7 @@ export interface ThreadWorld {
   modelOf(id: string): string;
   /** A turn ended: the thread's context totals move to now (mock/context.ts). */
   recordResult(id: string, model: string): void;
-  /** The thread's subagent runs changed: its session's running counts follow (mock/agents.ts). */
+  /** The thread's subagent runs changed: its thread's running counts follow (mock/agents.ts). */
   agentsChanged(id: string): void;
 }
 
@@ -119,7 +119,7 @@ export const MOCK_ATTACHMENT_PNG = Buffer.from(
 export type ThreadState = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi" | "subagent" | "agents" | "shells" | "stopped" | "crashed";
 export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "parallel", "multi", "subagent", "agents", "shells", "stopped", "crashed"];
 
-/** The stderr line of the "crashed" state's claude (Session.last_error). */
+/** The stderr line of the "crashed" state's claude (Thread.last_error). */
 export const CRASH_STDERR = "error: unknown option '--bogus'";
 
 const ANSWER_HEAD = `## Fixed: stale badge after a force-push
@@ -246,7 +246,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-export class MockThreads {
+export class MockThreadLogs {
   private logs = new Map<string, Log>();
   /** MCP status per thread (mock/mcp.ts); absent: none (not running). */
   private mcp = new Map<string, McpStatusInit>();
@@ -257,7 +257,7 @@ export class MockThreads {
   /** Running background shells per thread, oldest first (mock/shells.ts); absent: none. */
   private shells = new Map<string, ShellCall[]>();
   /** Every thread event, for the Watch streams. */
-  private readonly hub = new Hub<{ sessionId: string; event: ThreadEventInit }>();
+  private readonly hub = new Hub<{ threadId: string; event: ThreadEventInit }>();
   /** thread.* calls, for GET /__mock/thread/calls. */
   calls: string[] = [];
   /** Bumped by reset(): a scripted reply still sleeping from before stops. */
@@ -299,14 +299,14 @@ export class MockThreads {
   }
 
   private publish(id: string, event: ThreadEventInit): void {
-    this.hub.publish({ sessionId: id, event });
+    this.hub.publish({ threadId: id, event });
   }
 
   /** ListItems' snapshot. */
-  snapshotValue(id: string): { sessionId: string; seq: bigint; items: ItemInit[]; pending: PendingInit[]; mcp?: McpStatusInit; commands: SlashCommandInit[]; agents: AgentRunInit[] } {
+  snapshotValue(id: string): { threadId: string; seq: bigint; items: ItemInit[]; pending: PendingInit[]; mcp?: McpStatusInit; commands: SlashCommandInit[]; agents: AgentRunInit[] } {
     this.world.worktreeOf(id);
     const l = this.log(id);
-    return { sessionId: id, seq: BigInt(l.seq), items: l.items, pending: l.pending, mcp: this.mcp.get(id), commands: this.slash.get(id) ?? [], agents: this.agents.get(id) ?? [] };
+    return { threadId: id, seq: BigInt(l.seq), items: l.items, pending: l.pending, mcp: this.mcp.get(id), commands: this.slash.get(id) ?? [], agents: this.agents.get(id) ?? [] };
   }
 
   /** The thread's subagent runs in spawn order ([] for none). Throws for an unknown thread. */
@@ -315,12 +315,12 @@ export class MockThreads {
     return this.agents.get(id) ?? [];
   }
 
-  /** The runs of a thread for its Session's counts (no check: the session may be going away). */
+  /** The runs of a thread for its Thread's counts (no check: the thread may be going away). */
   agentRunsOf(id: string): readonly AgentRunInit[] {
     return this.agents.get(id) ?? [];
   }
 
-  /** The thread's running background shells, for its Session's count. */
+  /** The thread's running background shells, for its Thread's count. */
   shellsOf(id: string): number {
     return this.shells.get(id)?.length ?? 0;
   }
@@ -347,7 +347,7 @@ export class MockThreads {
     this.world.agentsChanged(id);
   }
 
-  /** Replaces the thread's runs, publishes the Watch's `agents` event (the whole list) and the session's counts. */
+  /** Replaces the thread's runs, publishes the Watch's `agents` event (the whole list) and the thread's counts. */
   setAgents(id: string, runs: AgentRunInit[]): void {
     if (runs.length > 0) this.agents.set(id, runs);
     else this.agents.delete(id);
@@ -436,7 +436,7 @@ export class MockThreads {
 
   /** The EventService thread source's snapshot: pending requests of threads that have any. */
   pendingSnapshot(): ThreadEventInit {
-    const threads = [...this.logs.entries()].filter(([, l]) => l.pending.length > 0).map(([sessionId, l]) => ({ sessionId, seq: BigInt(l.seq), pending: l.pending }));
+    const threads = [...this.logs.entries()].filter(([, l]) => l.pending.length > 0).map(([threadId, l]) => ({ threadId, seq: BigInt(l.seq), pending: l.pending }));
     return { event: { case: "pendingSnapshot", value: { threads } } };
   }
 
@@ -449,7 +449,7 @@ export class MockThreads {
     try {
       const live = this.hub.subscribe(signal);
       yield this.snapshot(id);
-      for await (const { sessionId, event } of live) if (sessionId === id) yield event;
+      for await (const { threadId, event } of live) if (threadId === id) yield event;
     } finally {
       l.watchers--;
     }
@@ -491,7 +491,7 @@ export class MockThreads {
     const l = this.log(id);
     l.pending = pending;
     l.seq++;
-    const value = { sessionId: id, seq: BigInt(l.seq), pending };
+    const value = { threadId: id, seq: BigInt(l.seq), pending };
     this.publish(id, { event: { case: "pending", value } });
     this.source({ event: { case: "pending", value } });
   }
@@ -986,7 +986,7 @@ export class MockThreads {
 
   /**
    * A default-world thread's short history (mock/world.ts reset), so its timeline is not
-   * empty. Leaves the session's status alone (the world's seed sets it); a "permission"
+   * empty. Leaves the thread's status alone (the world's seed sets it); a "permission"
    * end publishes its pending request on the EventService thread source.
    */
   seed(id: string, h: SeedHistory): void {
@@ -1033,7 +1033,7 @@ export class MockThreads {
   }
 
   /**
-   * session.fork, like the daemon (internal/store/session/fork.go): the fork's log starts
+   * thread.fork, like the daemon (internal/store/thread/fork.go): the fork's log starts
    * as a copy of the parent's items, renumbered, never live (streaming text dropped, a
    * running tool an error, a pending request cancelled), then the note "Forked from
    * <parent>" where the copy ends.
@@ -1105,12 +1105,12 @@ export class MockThreads {
     when: (ctx: UiContext | undefined) => boolean;
     run: (ctx: UiContext | undefined, args: Record<string, string>) => string;
   }[] {
-    // Every thread (the CLI's context has no view; the GUI's has "session").
+    // Every thread (the CLI's context has no view; the GUI's has "thread").
     const when = (ctx: UiContext | undefined) => Boolean(ctx?.activeThreadId);
     // Like the daemon's: an arg with a context default is listed as not required (the GUI
     // does not prompt for it) and filled from the context when omitted.
     const id = { name: "id", type: ArgType.STRING, required: false, description: "Thread id (default: the active thread)" };
-    const list: ReturnType<MockThreads["commands"]> = [
+    const list: ReturnType<MockThreadLogs["commands"]> = [
       {
         cmd: { name: "thread.send", title: "Send to Thread", category: "Thread", description: "Send a message to a thread", keybindings: [], args: [id, { name: "text", type: ArgType.STRING, required: true, description: "The message" }, { name: "attachments", type: ArgType.STRING, required: false, description: "Comma-separated image paths" }, { name: "composer-text", type: ArgType.STRING, required: false, description: "The composer's text with its tag tokens" }] },
         when,

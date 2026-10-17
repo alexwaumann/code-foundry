@@ -292,15 +292,15 @@ describe("fileSources", () => {
 
 describe("emphasis", () => {
   it.each<[string, string, string, [number, number][]]>([
-    ["no query", "internal/api/session.go", "", []],
-    ["a run in the base name", "internal/api/session.go", "ses", [[13, 16]]],
+    ["no query", "internal/api/thread.go", "", []],
+    ["a run in the base name", "internal/api/thread.go", "thr", [[13, 16]]],
     ["case-insensitive", "src/components/Composer.tsx", "COMP", [[15, 19]]],
-    ["the base name before an earlier run", "src/api/session.ts", "s", [[8, 9]]],
+    ["the base name before an earlier run", "src/api/threads.ts", "s", [[14, 15]]],
     ["spread over the base name", "src/components/ThreadRow.tsx", "trw", [[15, 16], [17, 18], [23, 24]]],
     ["a run across directories", "src/components/Composer.tsx", "src/comp", [[0, 8]]],
-    ["spread over the path", "internal/store/session", "isse", [[0, 1], [9, 10], [15, 17]]],
+    ["spread over the path", "internal/store/thread", "isth", [[0, 1], [9, 11], [16, 17]]],
     ["no match", "README.md", "xyz", []],
-    ["a directory (no trailing slash)", "internal/store/session", "sess", [[15, 19]]],
+    ["a directory (no trailing slash)", "internal/store/thread", "thre", [[15, 19]]],
     ["repeated characters: the run in the base name", "assets/sass.ts", "ss", [[9, 11]]],
     ["repeated characters spread greedily", "banana/aria.ts", "aa", [[7, 8], [10, 11]]],
     ["a repeated character not in the base name twice: spread over the path", "a/xa.ts", "aa", [[0, 1], [3, 4]]],
@@ -315,32 +315,32 @@ describe("fileItems", () => {
   const cf: FileResults = {
     repoId: "cf",
     matches: [
-      { path: "internal/api/session.go", isDir: false },
-      { path: "internal/store/session", isDir: true },
+      { path: "internal/api/thread.go", isDir: false },
+      { path: "internal/store/thread", isDir: true },
     ],
   };
-  const api: FileResults = { repoId: "api", matches: [{ path: "internal/api/session.go", isDir: false }] };
+  const api: FileResults = { repoId: "api", matches: [{ path: "internal/api/thread.go", isDir: false }] };
 
   it("one project: no heading; base name, path, emphasis and the tag (a directory keeps its /)", () => {
-    const groups = fileItems([cf], "ses", ["cf"], "cf");
+    const groups = fileItems([cf], "thr", ["cf"], "cf");
     expect(groups).toHaveLength(1);
     expect(groups[0]?.heading).toBeNull();
     expect(groups[0]?.items).toEqual([
       {
-        key: "cf/internal/api/session.go",
-        label: "session.go",
+        key: "cf/internal/api/thread.go",
+        label: "thread.go",
         mono: true,
-        detail: "internal/api/session.go",
+        detail: "internal/api/thread.go",
         emphasis: [[13, 16]],
-        tag: { tagKind: "file", repoId: "cf", path: "internal/api/session.go" },
+        tag: { tagKind: "file", repoId: "cf", path: "internal/api/thread.go" },
       },
       {
-        key: "cf/internal/store/session/",
-        label: "session/",
+        key: "cf/internal/store/thread/",
+        label: "thread/",
         mono: true,
-        detail: "internal/store/session",
+        detail: "internal/store/thread",
         emphasis: [[15, 18]],
-        tag: { tagKind: "file", repoId: "cf", path: "internal/store/session/" },
+        tag: { tagKind: "file", repoId: "cf", path: "internal/store/thread/" },
       },
     ]);
   });

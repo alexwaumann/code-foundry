@@ -2,14 +2,14 @@ import { createElement } from "react";
 import { GitBranch } from "lucide-react";
 import { WorktreePanelView } from "@/components/overview/WorktreeOverview";
 import { useReposStore } from "@/stores/repos";
-import { useSessionsStore } from "@/stores/sessions";
+import { useThreadsStore } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
 import { worktreeTabTitle } from "@/stores/worktreePanel";
 import type { SurfaceSpec } from "./types";
 import { selectionWorktree, WORKTREE_KIND, worktreeOfTab, worktreeTab, type WorktreeTarget } from "./workspaceTarget";
 
 function worktree(sel: Selection): WorktreeTarget | null {
-  return selectionWorktree(sel, { repos: useReposStore.getState(), sessions: useSessionsStore.getState() });
+  return selectionWorktree(sel, { repos: useReposStore.getState(), threads: useThreadsStore.getState() });
 }
 
 /**
@@ -29,7 +29,7 @@ export const worktreeSurface: SurfaceSpec = {
   hotkey: "t",
   available: (ctx) => (worktree(ctx.selection) ? "enabled" : "hidden"),
   // deriveContext places a thread in a worktree from the repos store.
-  watches: [useSessionsStore, useReposStore],
+  watches: [useThreadsStore, useReposStore],
   render: (tab) => {
     const m = worktreeOfTab(tab);
     return m ? createElement(WorktreePanelView, { repoId: m.repoId, path: m.path }) : null;

@@ -1,13 +1,13 @@
 import { useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
-import type { UsageBucketView } from "@/api/session";
+import type { UsageBucketView } from "@/api/threads";
 import { Button } from "@/components/ui/button";
 import { Tip } from "@/components/ui/tooltip";
 import { PaneHeader } from "@/components/window/PaneHeader";
 import { useEscapeCloses } from "@/components/window/useEscapeCloses";
 import { fmtShare, fmtTok, fmtUsd, type ModelUsage, type UsageTotals } from "@/lib/usage";
-import { useSessionsStore } from "@/stores/sessions";
+import { useThreadsStore } from "@/stores/threads";
 import { USAGE_RANGES, useUiStore, type UsageRange } from "@/stores/ui";
 import { closeUsage } from "@/stores/views";
 import { Segmented } from "./Segmented";
@@ -23,11 +23,11 @@ const MODE_OPTIONS: { value: ChartMode; label: string }[] = [
 
 /**
  * Every thread's usage array, then the retired ledger last: one subscription, compared
- * element by element, so only a usage change (or a session update that brings a new
+ * element by element, so only a usage change (or a thread update that brings a new
  * array) re-folds.
  */
 function useAllUsage(): readonly (readonly UsageBucketView[])[] {
-  return useSessionsStore(useShallow((s) => [...s.order.map((id) => s.byId[id]?.usage ?? NONE), s.retiredUsage]));
+  return useThreadsStore(useShallow((s) => [...s.order.map((id) => s.byId[id]?.usage ?? NONE), s.retiredUsage]));
 }
 
 function plural(n: number, one: string, many: string): string {

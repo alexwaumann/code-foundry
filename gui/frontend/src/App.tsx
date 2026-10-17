@@ -31,7 +31,7 @@ import { startCommandSync } from "@/stores/commands";
 import { startEventSync } from "@/stores/events";
 import { startHealthPolling } from "@/stores/health";
 import { usePanelExpanded } from "@/stores/panel";
-import { useAttentionCount } from "@/stores/sessions";
+import { useAttentionCount } from "@/stores/threads";
 import { layoutWidth, startZoomSync, zoomFactor } from "@/lib/zoom";
 import { CONTENT_MIN, useUiStore, type FocusRegion } from "@/stores/ui";
 import { selectPageOpen, startViewSync, useViewsStore } from "@/stores/views";
@@ -84,7 +84,7 @@ function startApp(): () => void {
 }
 
 /**
- * Exactly one thing fills the content area. A session shows its conversation
+ * Exactly one thing fills the content area. A thread shows its conversation
  * (components/thread), connected or not; "compose" is the new-thread composer. Shells
  * never show here: they live in the bottom panel.
  */
@@ -95,7 +95,7 @@ function Content() {
   if (sel.kind === "view" && sel.name === "projects") return <ProjectsPage />;
   if (sel.kind === "compose")
     return <Composer key={sel.workspaceId ? `ws:${sel.workspaceId}` : sel.noProject ? "home:" : sel.repoId} repoId={sel.repoId} workspaceId={sel.workspaceId} noProject={sel.noProject} />;
-  if (sel.kind === "session") return <ThreadPane sessionId={sel.id} />;
+  if (sel.kind === "thread") return <ThreadPane threadId={sel.id} />;
   return <StartPage />;
 }
 

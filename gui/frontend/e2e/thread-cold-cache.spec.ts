@@ -36,7 +36,7 @@ for (const scheme of ["dark", "light"] as const) {
     // Warm: nothing.
     await expect(note(page)).toBeHidden();
 
-    // The last result an hour and a minute ago: the session update shows it at once.
+    // The last result an hour and a minute ago: the thread update shows it at once.
     await mockPost("thread/cache?id=s-r1&ago=3660");
     await expect(note(page)).toHaveText(NOTE);
     // Inside the card, above the prompt.

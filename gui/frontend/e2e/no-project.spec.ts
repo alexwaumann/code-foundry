@@ -3,7 +3,7 @@ import { invocations, openApp, resetMock } from "./fixtures";
 
 // Project-less threads, the GUI (docs/notes/no-project-2-gui.md): cmd+N's "No project"
 // row, its composer, and the thread it starts (sidebar row, header, side and bottom
-// panels), against the mock's session.new --no-project (a thread in /Users/dev).
+// panels), against the mock's thread.new --no-project (a thread in /Users/dev).
 
 test.beforeEach(async () => {
   await resetMock();
@@ -48,7 +48,7 @@ test("No project: picker row last, composer without worktree, thread placed nowh
   expect(created?.args).toMatchObject({ "no-project": "true", prompt: "Reply with just OK" });
   expect(created?.args).not.toHaveProperty("repo");
   expect(created?.args).not.toHaveProperty("worktree");
-  const id = page.locator('[data-row-kind="session"][aria-selected="true"]');
+  const id = page.locator('[data-row-kind="thread"][aria-selected="true"]');
   await expect(id.getByTestId("row-project")).toHaveText("No project");
   await expect(id.getByTestId("row-branch")).toHaveCount(0);
 

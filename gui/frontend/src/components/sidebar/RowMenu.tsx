@@ -9,19 +9,19 @@ import {
   ContextMenuSubContent,
   ContextMenuSubTrigger,
 } from "@/components/ui/context-menu";
-import { useNoProjectThread } from "@/components/session/useNoProject";
+import { useNoProjectThread } from "@/components/thread/useNoProject";
 import { SnoozeRowItems } from "@/components/snooze/SnoozeMenu";
 import { beginRename } from "@/keys/bindings";
 import { worktreeBranch } from "@/lib/threadRow";
 import { newThreadTerminal } from "@/stores/bottomActions";
 import { useReposStore } from "@/stores/repos";
-import { archiveSession, forkSession, pinSession, removeSession, runSessionIn } from "@/stores/sessionActions";
-import { useSessionsStore } from "@/stores/sessions";
+import { archiveThread, forkThread, pinThread, removeThread, runThreadIn } from "@/stores/threadActions";
+import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { showWorktreeInThread } from "@/stores/worktreePanel";
 
-function MemberItem({ sessionId, repoId, path, current, queued }: { sessionId: string; repoId: string; path: string; current: boolean; queued: boolean }) {
+function MemberItem({ threadId, repoId, path, current, queued }: { threadId: string; repoId: string; path: string; current: boolean; queued: boolean }) {
   const name = useReposStore((s) => s.byId[repoId]?.name ?? repoId);
   const branch = useReposStore((s) => worktreeBranch(s, repoId, path));
   return (
@@ -29,7 +29,7 @@ function MemberItem({ sessionId, repoId, path, current, queued }: { sessionId: s
       disabled={current}
       data-member={repoId}
       onSelect={() => {
-        void runSessionIn(sessionId, repoId);
+        void runThreadIn(threadId, repoId);
       }}
     >
       <FolderGit2 className="text-info/90" />
@@ -44,11 +44,11 @@ function MemberItem({ sessionId, repoId, path, current, queued }: { sessionId: s
 
 /**
  * "Run in…" for a workspace thread: its workspace's members, the current one disabled.
- * Picking one invokes session.run-in; the row shows the queued move until it happens.
+ * Picking one invokes thread.run-in; the row shows the queued move until it happens.
  */
-function RunInMenu({ sessionId, workspaceId }: { sessionId: string; workspaceId: string }) {
-  const cwd = useSessionsStore((s) => s.byId[sessionId]?.worktreePath ?? "");
-  const pending = useSessionsStore((s) => s.byId[sessionId]?.pendingWorktreePath ?? "");
+function RunInMenu({ threadId, workspaceId }: { threadId: string; workspaceId: string }) {
+  const cwd = useThreadsStore((s) => s.byId[threadId]?.worktreePath ?? "");
+  const pending = useThreadsStore((s) => s.byId[threadId]?.pendingWorktreePath ?? "");
   const members = useWorkspacesStore(useShallow((s) => (s.byId[workspaceId]?.members ?? []).map((m) => `${m.repoId}\u0000${m.worktreePath}`)));
   const wsName = useWorkspacesStore((s) => s.byId[workspaceId]?.name ?? workspaceId);
   return (
@@ -61,7 +61,7 @@ function RunInMenu({ sessionId, workspaceId }: { sessionId: string; workspaceId:
         <ContextMenuLabel>{wsName}</ContextMenuLabel>
         {members.map((k) => {
           const [repoId = "", path = ""] = k.split("\u0000");
-          return <MemberItem key={k} sessionId={sessionId} repoId={repoId} path={path} current={path === cwd} queued={path === pending} />;
+          return <MemberItem key={k} threadId={threadId} repoId={repoId} path={path} current={path === cwd} queued={path === pending} />;
         })}
       </ContextMenuSubContent>
     </ContextMenuSub>
@@ -74,17 +74,17 @@ function RunInMenu({ sessionId, workspaceId }: { sessionId: string; workspaceId:
  */
 export function RowMenu({ id }: { id: string }) {
   const noProject = useNoProjectThread(id);
-  const pinned = useSessionsStore((s) => s.byId[id]?.pinned ?? false);
-  const archived = useSessionsStore((s) => (s.byId[id]?.archivedAtMs ?? null) !== null);
-  const snoozed = useSessionsStore((s) => (s.byId[id]?.snoozedUntilMs ?? null) !== null);
-  const workspaceId = useSessionsStore((s) => s.byId[id]?.workspaceId ?? "");
+  const pinned = useThreadsStore((s) => s.byId[id]?.pinned ?? false);
+  const archived = useThreadsStore((s) => (s.byId[id]?.archivedAtMs ?? null) !== null);
+  const snoozed = useThreadsStore((s) => (s.byId[id]?.snoozedUntilMs ?? null) !== null);
+  const workspaceId = useThreadsStore((s) => s.byId[id]?.workspaceId ?? "");
   return (
     <ContextMenuContent
       data-testid="row-menu"
-      data-session={id}
+      data-thread={id}
       onCloseAutoFocus={(e) => {
         // Rename puts an input in the row; closing must not move focus back to the list.
-        if (useUiStore.getState().renamingSessionId === id) e.preventDefault();
+        if (useUiStore.getState().renamingThreadId === id) e.preventDefault();
       }}
     >
       <ContextMenuItem
@@ -98,7 +98,7 @@ export function RowMenu({ id }: { id: string }) {
       <ContextMenuItem
         data-testid="menu-pin"
         onSelect={() => {
-          void pinSession(id, !pinned);
+          void pinThread(id, !pinned);
         }}
       >
         {pinned ? <PinOff /> : <Pin />}
@@ -108,13 +108,13 @@ export function RowMenu({ id }: { id: string }) {
       <ContextMenuItem
         data-testid="menu-archive"
         onSelect={() => {
-          void archiveSession(id, !archived);
+          void archiveThread(id, !archived);
         }}
       >
         {archived ? <ArchiveRestore /> : <Archive />}
         {archived ? "Unarchive" : "Archive"}
       </ContextMenuItem>
-      {workspaceId && <RunInMenu sessionId={id} workspaceId={workspaceId} />}
+      {workspaceId && <RunInMenu threadId={id} workspaceId={workspaceId} />}
       <ContextMenuSeparator />
       <ContextMenuItem
         onSelect={() => {
@@ -137,7 +137,7 @@ export function RowMenu({ id }: { id: string }) {
       <ContextMenuSeparator />
       <ContextMenuItem
         onSelect={() => {
-          void forkSession(id);
+          void forkThread(id);
         }}
       >
         <GitFork />
@@ -146,7 +146,7 @@ export function RowMenu({ id }: { id: string }) {
       <ContextMenuItem
         variant="destructive"
         onSelect={() => {
-          void removeSession(id);
+          void removeThread(id);
         }}
       >
         <Trash2 />

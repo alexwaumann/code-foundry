@@ -21,7 +21,7 @@ function cli(...args: string[]): string {
   return execFileSync(BIN, args, { env: { ...process.env, CODE_FOUNDRY_HOME: HOME }, encoding: "utf8", timeout: 30_000 });
 }
 
-interface LiveSession {
+interface LiveThread {
   id: string;
   repoId?: string;
   worktreePath?: string;
@@ -56,12 +56,12 @@ test("composer: pick a workspace, make the second member primary, start a haiku 
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "live-workspace-composer.png") });
   await page.keyboard.press("Enter");
 
-  const created = page.locator('[data-row-kind="session"][aria-selected="true"]');
+  const created = page.locator('[data-row-kind="thread"][aria-selected="true"]');
   await expect(created).toBeVisible({ timeout: 30_000 });
   const id = ((await created.getAttribute("data-row-key")) ?? "").slice(2);
-  const find = () => ((JSON.parse(cli("thread", "list", "--json")) as { threads?: LiveSession[] }).threads ?? []).find((s) => s.id === id);
+  const find = () => ((JSON.parse(cli("thread", "list", "--json")) as { threads?: LiveThread[] }).threads ?? []).find((s) => s.id === id);
   expect(find()).toMatchObject({ workspaceId: members.workspace.id, repoId: second.repoId, worktreePath: second.worktreePath });
-  await expect.poll(() => find()?.status, { timeout: 120_000 }).toBe("SESSION_STATUS_IDLE");
+  await expect.poll(() => find()?.status, { timeout: 120_000 }).toBe("THREAD_STATUS_IDLE");
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "live-workspace-thread.png") });
   cli("thread", "archive", "--id", id, "--yes");
 });

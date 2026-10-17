@@ -5,7 +5,7 @@
  * structural sharing so a progress update re-renders only the row whose run changed.
  */
 import type { AgentRunView } from "@/api/agents";
-import { formatAgo } from "./session";
+import { formatAgo } from "./thread";
 
 /** The run's name: the Agent call's description, else its type. */
 export function agentName(r: Pick<AgentRunView, "description" | "agentType">): string {
@@ -53,7 +53,7 @@ export function agentStatusText(r: Pick<AgentRunView, "status" | "endedAtMs">, n
   return `${word} · ${formatAgo(r.endedAtMs, now)}`;
 }
 
-/** The header's figures: running runs (nested ones too, like Session.agents_running and the CLI), all runs, and the thread's own running background runs. */
+/** The header's figures: running runs (nested ones too, like Thread.agents_running and the CLI), all runs, and the thread's own running background runs. */
 export function agentCounts(runs: readonly AgentRunView[]): { running: number; total: number; background: number } {
   let running = 0;
   let background = 0;

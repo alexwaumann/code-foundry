@@ -46,10 +46,10 @@ describe("settings mapping", () => {
 
 describe("confirmationOf", () => {
   it("reads the ConfirmationRequired detail", () => {
-    const err = new ConnectError("Remove session s1?", Code.FailedPrecondition, undefined, [
-      { desc: ConfirmationRequiredSchema, value: { command: "thread.remove", title: "Remove Session", message: "Remove session s1?" } },
+    const err = new ConnectError("Remove thread s1?", Code.FailedPrecondition, undefined, [
+      { desc: ConfirmationRequiredSchema, value: { command: "thread.remove", title: "Remove Thread", message: "Remove thread s1?" } },
     ]);
-    expect(confirmationOf(err)).toEqual({ command: "thread.remove", title: "Remove Session", message: "Remove session s1?" });
+    expect(confirmationOf(err)).toEqual({ command: "thread.remove", title: "Remove Thread", message: "Remove thread s1?" });
     expect(confirmationOf(new ConnectError("nope", Code.FailedPrecondition))).toBeNull();
     expect(confirmationOf(new Error("x"))).toBeNull();
   });

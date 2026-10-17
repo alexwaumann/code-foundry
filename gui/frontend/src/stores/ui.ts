@@ -10,7 +10,7 @@ import { SHELL_GAP } from "@/design/tokens";
  */
 export type Selection =
   | { kind: "none" }
-  | { kind: "session"; id: string }
+  | { kind: "thread"; id: string }
   /**
    * The new-thread composer (picked in the project picker): for a project, or with
    * workspaceId for a workspace, repoId then being a member's (for the command context),
@@ -39,7 +39,7 @@ export type FocusRegion = "sidebar" | "content" | "palette" | "panel" | "bottom"
 
 /**
  * What the palette dialog shows: the command list (and arg prompts), the project picker,
- * or the member picker of "Run in…" (for `palette.sessionId`).
+ * or the member picker of "Run in…" (for `palette.threadId`).
  */
 export type PalettePage = "commands" | "projects" | "runin";
 
@@ -98,7 +98,7 @@ interface UiState {
   /**
    * Incremented to ask the selected thread's prompt to take focus (its composer,
    * components/thread/ThreadComposer.tsx): a thread picked from the sidebar, a palette
-   * jump, a focusSession intent.
+   * jump, a focusThread intent.
    */
   promptFocusSeq: number;
   /** Incremented to ask the sidebar list to take focus. */
@@ -123,11 +123,11 @@ interface UiState {
    * `context`: the command context the palette lists and invokes in, instead of the
    * selection's (a Projects page row's action on its own project).
    */
-  palette: { open: boolean; query: string; commandName: string | null; page: PalettePage; returnTo: FocusRegion; sessionId?: string; context?: UiContextView };
+  palette: { open: boolean; query: string; commandName: string | null; page: PalettePage; returnTo: FocusRegion; threadId?: string; context?: UiContextView };
   /** Incremented to ask the composer to take focus. */
   composerFocusSeq: number;
-  /** Session whose sidebar row is in inline-rename mode. */
-  renamingSessionId: string | null;
+  /** Thread whose sidebar row is in inline-rename mode. */
+  renamingThreadId: string | null;
 
   // Persisted settings.
   sidebarVisible: boolean;
@@ -155,13 +155,13 @@ interface UiState {
   focusSidebar: () => void;
   setCursor: (key: string | null) => void;
   openPalette: (query?: string, commandName?: string | null, context?: UiContextView) => void;
-  /** Opens the palette on the project picker (session.new's presenter). */
+  /** Opens the palette on the project picker (thread.new's presenter). */
   openProjectPicker: (returnTo?: FocusRegion) => void;
-  /** Opens the palette on the "Run in…" member picker for a thread (session.run-in's presenter). */
-  openRunInPicker: (sessionId: string, returnTo?: FocusRegion) => void;
+  /** Opens the palette on the "Run in…" member picker for a thread (thread.run-in's presenter). */
+  openRunInPicker: (threadId: string, returnTo?: FocusRegion) => void;
   closePalette: () => void;
   focusComposer: () => void;
-  setRenaming: (sessionId: string | null) => void;
+  setRenaming: (threadId: string | null) => void;
   toggleSidebar: () => void;
   setSidebarWidth: (w: number) => void;
   /**
@@ -248,7 +248,7 @@ export function sameSelection(a: Selection, b: Selection): boolean {
   switch (a.kind) {
     case "none":
       return true;
-    case "session":
+    case "thread":
       return a.id === (b as typeof a).id;
     case "compose":
       return a.repoId === (b as typeof a).repoId && a.workspaceId === (b as typeof a).workspaceId && Boolean(a.noProject) === Boolean((b as typeof a).noProject);
@@ -271,7 +271,7 @@ export const useUiStore = create<UiState>()(
       cursorKey: null,
       palette: { open: false, query: "", commandName: null, page: "commands", returnTo: "content" },
       composerFocusSeq: 0,
-      renamingSessionId: null,
+      renamingThreadId: null,
       sidebarVisible: true,
       sidebarWidth: SIDEBAR_DEFAULT,
       fontSize: FONT_DEFAULT,
@@ -286,11 +286,11 @@ export const useUiStore = create<UiState>()(
       select: (sel, opts) => {
         set((s) => ({
           selection: sameSelection(s.selection, sel) ? s.selection : sel,
-          promptFocusSeq: opts?.focusPrompt && sel.kind === "session" ? s.promptFocusSeq + 1 : s.promptFocusSeq,
+          promptFocusSeq: opts?.focusPrompt && sel.kind === "thread" ? s.promptFocusSeq + 1 : s.promptFocusSeq,
         }));
       },
-      setRenaming: (renamingSessionId) => {
-        set({ renamingSessionId });
+      setRenaming: (renamingThreadId) => {
+        set({ renamingThreadId });
       },
       setFocus: (focus) => {
         set({ focus });
@@ -307,8 +307,8 @@ export const useUiStore = create<UiState>()(
       openProjectPicker: (returnTo) => {
         set((s) => ({ palette: { open: true, query: "", commandName: null, page: "projects", returnTo: returnTo ?? (s.palette.open ? s.palette.returnTo : s.focus) } }));
       },
-      openRunInPicker: (sessionId, returnTo) => {
-        set((s) => ({ palette: { open: true, query: "", commandName: null, page: "runin", sessionId, returnTo: returnTo ?? (s.palette.open ? s.palette.returnTo : s.focus) } }));
+      openRunInPicker: (threadId, returnTo) => {
+        set((s) => ({ palette: { open: true, query: "", commandName: null, page: "runin", threadId, returnTo: returnTo ?? (s.palette.open ? s.palette.returnTo : s.focus) } }));
       },
       focusComposer: () => {
         set((s) => ({ composerFocusSeq: s.composerFocusSeq + 1 }));

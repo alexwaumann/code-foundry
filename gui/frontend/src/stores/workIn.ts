@@ -1,7 +1,7 @@
 /**
  * The composer's Work in choice remembered per project: picking "A fresh copy" or "The
  * project folder itself" for a project makes it that project's default for new threads,
- * over sessions.default_worktree (lib/compose defaultWorktree). Picking another existing
+ * over threads.default_worktree (lib/compose defaultWorktree). Picking another existing
  * worktree is a one-off and changes nothing. Persisted (localStorage
  * "code-foundry.workIn"); projects are never pruned.
  */

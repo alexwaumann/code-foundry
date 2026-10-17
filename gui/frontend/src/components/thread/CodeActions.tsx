@@ -70,7 +70,7 @@ function RunButton({ lang, code }: { lang: string; code: string }) {
         aria-label="Run in terminal"
         data-testid="code-run"
         onClick={() => {
-          void runInThreadTerminal(run.sessionId, command);
+          void runInThreadTerminal(run.threadId, command);
         }}
       >
         <Play aria-hidden />

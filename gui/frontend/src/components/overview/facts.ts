@@ -1,6 +1,6 @@
 import type { PullRequestView } from "@/api/gh";
 import type { GitStatusView } from "@/api/repo";
-import type { SessionsData } from "@/stores/sessions";
+import type { ThreadsData } from "@/stores/threads";
 import type { TerminalsData } from "@/stores/terminals";
 
 /**
@@ -121,10 +121,10 @@ export function branchPullRequest(prs: readonly PullRequestView[]): PullRequestV
  * Threads in the worktree other than `self` (the selected thread the panel belongs to;
  * "" for none): unarchived threads whose worktree path is exactly `path`.
  */
-export function otherThreads(sessions: SessionsData, path: string, self: string): number {
+export function otherThreads(threads: ThreadsData, path: string, self: string): number {
   let n = 0;
-  for (const id of sessions.order) {
-    const s = sessions.byId[id];
+  for (const id of threads.order) {
+    const s = threads.byId[id];
     if (s && id !== self && s.worktreePath === path && !s.archivedAtMs) n++;
   }
   return n;

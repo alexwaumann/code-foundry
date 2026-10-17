@@ -69,7 +69,7 @@ function SkillTag({ name, repoId, selected }: { name: string; repoId: string; se
 /**
  * A file or directory: the tooltip is its path (a directory's ends with "/"), prefixed
  * with the project's name when the draft has more than one project
- * (`api/internal/api/session.go`).
+ * (`api/internal/api/thread.go`).
  */
 function FileTag({ repoId, path, selected }: { repoId: string; path: string; selected: boolean }) {
   const project = useProjectName(repoId);

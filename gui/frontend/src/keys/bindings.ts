@@ -1,13 +1,13 @@
 import type { CommandView, UiContextView } from "@/api/command";
 import { promptedArgs } from "@/palette/args";
-import { nextAfter, sessionOrder } from "@/lib/tree";
+import { nextAfter, threadOrder } from "@/lib/tree";
 import { refreshCommands, runCommandForResult, useCommandsStore, whenListed } from "@/stores/commands";
-import { contextKey, getListOptions, getListSessions, getUiContext } from "@/stores/context";
+import { contextKey, getListOptions, getListThreads, getUiContext } from "@/stores/context";
 import { openAddProject } from "@/stores/addProject";
 import { openNewThreadPicker } from "@/stores/compose";
 import { openPublishDialog } from "@/stores/publish";
 import { presentSnooze } from "@/stores/snoozeDialog";
-import { attentionIds, useSessionsStore } from "@/stores/sessions";
+import { attentionIds, useThreadsStore } from "@/stores/threads";
 import { zoomUi } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
 import { openUpdateDialog, runUpdateAction } from "@/stores/update";
@@ -28,18 +28,18 @@ export interface ViewAction {
 
 /** Selects the Nth thread in sidebar order (rows of a collapsed section do not count). */
 function jumpTo(n: number): void {
-  const id = sessionOrder(getListSessions(), getListOptions())[n - 1];
-  if (id !== undefined) useUiStore.getState().select({ kind: "session", id }, { focusPrompt: true });
+  const id = threadOrder(getListThreads(), getListOptions())[n - 1];
+  if (id !== undefined) useUiStore.getState().select({ kind: "thread", id }, { focusPrompt: true });
 }
 
-/** Selects the next session that needs attention after the current one, wrapping. */
+/** Selects the next thread that needs attention after the current one, wrapping. */
 export function jumpToAttention(): boolean {
-  const waiting = new Set(attentionIds(useSessionsStore.getState()));
+  const waiting = new Set(attentionIds(useThreadsStore.getState()));
   const sel = useUiStore.getState().selection;
   // Threads that need attention are never in the collapsible Working section (threadGroup).
-  const next = nextAfter(sessionOrder(getListSessions(), getListOptions()), sel.kind === "session" ? sel.id : null, (id) => waiting.has(id));
+  const next = nextAfter(threadOrder(getListThreads(), getListOptions()), sel.kind === "thread" ? sel.id : null, (id) => waiting.has(id));
   if (next === null) return false;
-  useUiStore.getState().select({ kind: "session", id: next }, { focusPrompt: true });
+  useUiStore.getState().select({ kind: "thread", id: next }, { focusPrompt: true });
   return true;
 }
 
@@ -51,7 +51,7 @@ function togglePalette(): void {
 
 /** A selected thread's prompt takes the keyboard (ThreadComposer). */
 function focusThreadPrompt(): void {
-  if (useUiStore.getState().selection.kind === "session") useUiStore.setState((s) => ({ promptFocusSeq: s.promptFocusSeq + 1 }));
+  if (useUiStore.getState().selection.kind === "thread") useUiStore.setState((s) => ({ promptFocusSeq: s.promptFocusSeq + 1 }));
 }
 
 function toggleSidebar(): void {
@@ -94,7 +94,7 @@ export function isViewActionChord(chord: string): boolean {
 }
 
 /**
- * Commands whose GUI presenter supplies the context the daemon needs: session.new's
+ * Commands whose GUI presenter supplies the context the daemon needs: thread.new's
  * project picker picks the repo. They start (palette, chord, button) even where the
  * daemon lists them as unavailable, e.g. with nothing selected.
  */
@@ -128,7 +128,7 @@ export function commandBindings(commands: readonly CommandView[]): Map<string, C
 /**
  * The command a focused terminal (a bottom panel shell) or thread prompt
  * ([data-chord-yield]) yields this chord to (see terminalYieldable), so
- * session.rename, cmd+j and cmd+t still fire while typing to Claude or a shell.
+ * thread.rename, cmd+j and cmd+t still fire while typing to Claude or a shell.
  */
 function terminalYields(chord: string): CommandView | undefined {
   if (!terminalYieldable(chord)) return undefined;
@@ -149,43 +149,43 @@ export function isGlobalChord(chord: string): boolean {
  * Opens the "Run in…" member picker for a workspace thread. False for a project thread
  * (or none), so the command falls back to its default presentation.
  */
-export function openRunInPicker(sessionId: string): boolean {
-  if (!useSessionsStore.getState().byId[sessionId]?.workspaceId) return false;
+export function openRunInPicker(threadId: string): boolean {
+  if (!useThreadsStore.getState().byId[threadId]?.workspaceId) return false;
   const ui = useUiStore.getState();
   const returnTo = ui.palette.open ? ui.palette.returnTo : ui.focus;
   // Deferred: picked inside the palette, the palette closes after the presenter runs.
   queueMicrotask(() => {
-    useUiStore.getState().openRunInPicker(sessionId, returnTo);
+    useUiStore.getState().openRunInPicker(threadId, returnTo);
   });
   return true;
 }
 
-/** Starts inline rename of the active session's sidebar row. */
-export function beginRename(sessionId: string | null = getUiContext().activeSessionId || null): boolean {
-  if (!sessionId || !useSessionsStore.getState().byId[sessionId]) return false;
+/** Starts inline rename of the active thread's sidebar row. */
+export function beginRename(threadId: string | null = getUiContext().activeThreadId || null): boolean {
+  if (!threadId || !useThreadsStore.getState().byId[threadId]) return false;
   const ui = useUiStore.getState();
   if (!ui.sidebarVisible) ui.toggleSidebar();
-  ui.setRenaming(sessionId);
+  ui.setRenaming(threadId);
   return true;
 }
 
 /**
  * GUI presentations of specific registry commands. The command still runs through the
- * registry (session.rename is invoked when the inline edit is committed); this only
+ * registry (thread.rename is invoked when the inline edit is committed); this only
  * replaces the generic palette prompt. Return false to fall back to the default.
  */
 const commandPresenters: Readonly<Record<string, () => boolean>> = {
   "thread.rename": () => beginRename(),
-  // The project picker, then the composer; the composer invokes session.new.
+  // The project picker, then the composer; the composer invokes thread.new.
   "thread.new": () => {
     openNewThreadPicker();
     return true;
   },
-  // "Run in…": the member picker for the active workspace thread; it invokes session.run-in.
-  "thread.run-in": () => openRunInPicker(getUiContext().activeSessionId),
+  // "Run in…": the member picker for the active workspace thread; it invokes thread.run-in.
+  "thread.run-in": () => openRunInPicker(getUiContext().activeThreadId),
   // Snooze: the custom date dialog for the active thread (the menus offer presets), or
-  // unsnooze it when it is snoozed; both invoke session.snooze.
-  "thread.snooze": () => presentSnooze(getUiContext().activeSessionId),
+  // unsnooze it when it is snoozed; both invoke thread.snooze.
+  "thread.snooze": () => presentSnooze(getUiContext().activeThreadId),
   // The Add Project dialog; its tabs call RepoService.Register (repo.add's CLI form with
   // a folder), stream RepoService.Clone (repo.clone's CLI form), or invoke repo.create.
   // repo.add's optional path is never prompted for. repo.clone opens it on the GitHub tab.
@@ -272,7 +272,7 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
     return true;
   },
   // Update commands show their progress in the update dialog. daemon.restart has no
-  // presenter: the registry's confirm flow asks (with the live-session count).
+  // presenter: the registry's confirm flow asks (with the live-thread count).
   "app.update.check": () => {
     openUpdateDialog({ check: true });
     return true;
@@ -346,7 +346,7 @@ function isEditable(el: Element | null): boolean {
  *  2. A focused terminal or a thread prompt's text ([data-chord-yield]) consumes everything
  *     else, except cmd chords bound to commands (see terminalYields).
  *  3. A focused text field (palette input, rename field) consumes everything else.
- *  4. F2 renames the selected session (the cursor row inside the tree); command
+ *  4. F2 renames the selected thread (the cursor row inside the tree); command
  *     keybindings from CommandService.List for the current context.
  */
 export function handleKeyDown(e: KeyboardEvent): void {

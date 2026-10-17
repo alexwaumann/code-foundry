@@ -158,7 +158,7 @@ export class GhWorld {
     const last = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const cf = "alexwaumann/code-foundry";
     const gp = "alexwaumann/ghostty-playground";
-    const sidebarPr = this.pr(cf, 142, "feat(gui): virtualized sidebar tree with session rows", {
+    const sidebarPr = this.pr(cf, 142, "feat(gui): virtualized sidebar tree with thread rows", {
       headRef: "feat/sidebar",
       // The merge button sends it as pr.merge's head-sha; the mock refuses another.
       headSha: "5eb1d0a142000000000000000000000000000000",
@@ -185,7 +185,7 @@ export class GhWorld {
         this.pr(gp, 12, "renderer: port glyph cache to the new atlas", { headRef: "atlas", checks: rollup(CheckRollupState.PENDING, 9, 0, 4), ageMs: 2 * DAY }),
       ],
       reviewRequested: [
-        this.pr(cf, 139, "feat(session): JSONL transcript discovery", { author: "teammate-kim", headRef: "jsonl", checks: rollup(CheckRollupState.SUCCESS, 30), ageMs: 3 * HOUR }),
+        this.pr(cf, 139, "feat(thread): JSONL transcript discovery", { author: "teammate-kim", headRef: "jsonl", checks: rollup(CheckRollupState.SUCCESS, 30), ageMs: 3 * HOUR }),
         this.pr("other-org/lib", 77, "chore: bump deps", { author: "renovate", checks: rollup(CheckRollupState.SUCCESS, 4), ageMs: 6 * HOUR }),
       ],
       reviewed: [this.pr(cf, 133, "refactor(api): one events stream", { author: "teammate-kim", headRef: "events", ageMs: 9 * HOUR })],
@@ -259,7 +259,7 @@ export class GhWorld {
       ], [
         ["9a8b7c6d1e", "feat(gui): row virtualization", 2 * HOUR],
         ["4f3e2d1c0b", "refactor(tree): flatten placement", 5 * HOUR],
-        ["8e7d6c5b4a", "feat(gui): session rows in the sidebar", DAY],
+        ["8e7d6c5b4a", "feat(gui): thread rows in the sidebar", DAY],
       ])],
       [`${CFW}/fix-resize`, this.detail(`${CFW}/fix-resize`, "origin/main", manyFiles(), Array.from({ length: 12 }, (_, i): [string, string, number] => [`${(0x1f2e3d4c + i * 7919).toString(16)}aa`, `fix(terminal): step ${String(12 - i)} of the resize rework`, (i + 1) * 3 * HOUR]))],
       [GP, this.detail(GP, "origin/main", [{ path: "src/renderer/atlas.zig", status: "M", added: 12, deleted: 3, uncommitted: true }], [])],

@@ -11,7 +11,7 @@ const { openHelp, setHelpOpen, showView, toggleHelp, useViewsStore } = await imp
 
 beforeEach(() => {
   listCommands.mockResolvedValue([
-    { name: "thread.new", title: "New Thread", description: "", category: "Session", args: [], keybindings: ["cmd+n"], available: true },
+    { name: "thread.new", title: "New Thread", description: "", category: "Thread", args: [], keybindings: ["cmd+n"], available: true },
   ]);
   useViewsStore.setState({ settingsOpen: false, usageOpen: false, helpOpen: false, helpTab: "guide" });
 });

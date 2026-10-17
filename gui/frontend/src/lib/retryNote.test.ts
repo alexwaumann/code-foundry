@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ApiRetryView } from "@/api/session";
+import type { ApiRetryView } from "@/api/threads";
 import { fmtRetryIn, retryCause, retryNote, type RetryNoteInput } from "./retryNote";
 
 const DUE = Date.UTC(2026, 9, 13, 10, 0, 0);

@@ -5,12 +5,12 @@
  * fires when a thread starts needing them while Code Foundry is not the active app.
  *
  * stepDockAlerts is the whole decision, pure: state + inputs -> state + effects.
- * startDockAlerts feeds it from the sessions and settings stores and runs the effects
+ * startDockAlerts feeds it from the threads and settings stores and runs the effects
  * against the Wails host (api/app.ts; no-ops without one).
  */
 import { bounceDock, playAlertSound, setDockBadge } from "@/api/app";
 import type { SettingsSnapshotView } from "@/api/settings";
-import { attentionIds, useSessionsStore } from "./sessions";
+import { attentionIds, useThreadsStore } from "./threads";
 import { useSettingsStore } from "./settings";
 
 /** The notifications.* settings (internal/store/settings/schema.go). */
@@ -58,7 +58,7 @@ export function alertSettings(snap: SettingsSnapshotView | null): AlertSettings 
 }
 
 export interface DockAlertsState {
-  /** The sessions epoch `attention` was taken in; null before the first evaluation. */
+  /** The threads epoch `attention` was taken in; null before the first evaluation. */
   epoch: number | null;
   /** Thread ids that needed attention at the last evaluation. */
   attention: ReadonlySet<string>;
@@ -71,9 +71,9 @@ export interface DockAlertsState {
 export const initialDockAlerts: DockAlertsState = { epoch: null, attention: new Set(), badge: null, lastAlertAtMs: null };
 
 export interface DockAlertsInput {
-  /** useSessionsStore's epoch: a change means the set was replaced (startup, reconnect). */
+  /** useThreadsStore's epoch: a change means the set was replaced (startup, reconnect). */
   epoch: number;
-  /** attentionIds of the current sessions: the bell and window title count. */
+  /** attentionIds of the current threads: the bell and window title count. */
   attention: readonly string[];
   /** Code Foundry is the active app (its window has focus). */
   focused: boolean;
@@ -151,10 +151,10 @@ function sameAlertSettings(a: SettingsSnapshotView | null, b: SettingsSnapshotVi
 export function startDockAlerts(deps: DockAlertsDeps = hostDeps): () => void {
   let state = initialDockAlerts;
   const evaluate = () => {
-    const sessions = useSessionsStore.getState();
+    const threads = useThreadsStore.getState();
     const next = stepDockAlerts(state, {
-      epoch: sessions.epoch,
-      attention: attentionIds(sessions),
+      epoch: threads.epoch,
+      attention: attentionIds(threads),
       focused: deps.focused(),
       nowMs: deps.now(),
       settings: alertSettings(useSettingsStore.getState().snapshot),
@@ -171,7 +171,7 @@ export function startDockAlerts(deps: DockAlertsDeps = hostDeps): () => void {
   };
   evaluate();
   const stops = [
-    useSessionsStore.subscribe((s, prev) => {
+    useThreadsStore.subscribe((s, prev) => {
       if (s.byId !== prev.byId || s.order !== prev.order || s.epoch !== prev.epoch) evaluate();
     }),
     useSettingsStore.subscribe((s, prev) => {

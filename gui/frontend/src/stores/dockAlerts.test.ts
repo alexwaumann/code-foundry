@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { SessionView } from "@/api/session";
+import type { ThreadView } from "@/api/threads";
 import type { SettingsSnapshotView } from "@/api/settings";
 import {
   alertSettings,
@@ -12,7 +12,7 @@ import {
   type DockAlertsState,
   type DockEffect,
 } from "./dockAlerts";
-import { applySessionEvent, attentionIds, emptySessions, replaceSessions, useSessionsStore } from "./sessions";
+import { applyThreadListEvent, attentionIds, emptyThreads, replaceThreads, useThreadsStore } from "./threads";
 import { useSettingsStore } from "./settings";
 
 const on: AlertSettings = { dockBadge: true, bounce: true, sound: false, soundVolume: 50, cooldownMs: 60_000 };
@@ -164,7 +164,7 @@ describe("stepDockAlerts", () => {
   });
 });
 
-function thread(id: string, over: Partial<SessionView> = {}): SessionView {
+function thread(id: string, over: Partial<ThreadView> = {}): ThreadView {
   return {
     id,
     createdAtMs: 1,
@@ -178,12 +178,12 @@ function thread(id: string, over: Partial<SessionView> = {}): SessionView {
     usage: [],
     agentRuns: [],
     ...over,
-  } as unknown as SessionView;
+  } as unknown as ThreadView;
 }
 
 describe("attentionIds (the badge count)", () => {
   it("counts prompts and finished turns, pinned or not, never errors, archived, snoozed or working ones", () => {
-    const data = replaceSessions(emptySessions, [
+    const data = replaceThreads(emptyThreads, [
       thread("prompt", { status: "attention", statusReason: "permission: Bash" }),
       thread("done", { status: "attention", statusReason: "finished" }),
       thread("error", { state: "disconnected", status: "error", statusReason: "interrupted" }),
@@ -237,7 +237,7 @@ describe("startDockAlerts", () => {
     calls = [];
     focused = false;
     now = 0;
-    useSessionsStore.setState({ ...emptySessions, epoch: 0 });
+    useThreadsStore.setState({ ...emptyThreads, epoch: 0 });
     useSettingsStore.setState({ snapshot: null });
     const deps: DockAlertsDeps = {
       setBadge: (n) => calls.push(`badge ${String(n)}`),
@@ -256,21 +256,21 @@ describe("startDockAlerts", () => {
     settings({ "notifications.cooldown_seconds": "60" });
     expect(calls).toEqual(["badge 0"]);
     // The (re)connect's List: two threads already waiting. A new epoch, so no alert.
-    useSessionsStore.setState((s) => ({
-      ...replaceSessions(s, [thread("a", { status: "attention", statusReason: "finished" }), thread("b", { status: "attention", statusReason: "finished" }), thread("c", { status: "busy" })]),
+    useThreadsStore.setState((s) => ({
+      ...replaceThreads(s, [thread("a", { status: "attention", statusReason: "finished" }), thread("b", { status: "attention", statusReason: "finished" }), thread("c", { status: "busy" })]),
       epoch: s.epoch + 1,
     }));
     expect(calls).toEqual(["badge 0", "badge 2"]);
     now = 1000;
-    useSessionsStore.setState((s) => applySessionEvent(s, { kind: "updated", session: thread("c", { status: "attention", statusReason: "finished" }) }));
+    useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: thread("c", { status: "attention", statusReason: "finished" }) }));
     expect(calls).toEqual(["badge 0", "badge 2", "badge 3", "bounce"]);
   });
 
   it("does not bounce while focused, and turning the badge off clears it", () => {
     settings({ "notifications.sound": "true" });
-    useSessionsStore.setState((s) => ({ ...replaceSessions(s, [thread("a", { status: "busy" })]), epoch: s.epoch + 1 }));
+    useThreadsStore.setState((s) => ({ ...replaceThreads(s, [thread("a", { status: "busy" })]), epoch: s.epoch + 1 }));
     focused = true;
-    useSessionsStore.setState((s) => applySessionEvent(s, { kind: "updated", session: thread("a", { status: "attention", statusReason: "permission: Bash" }) }));
+    useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: thread("a", { status: "attention", statusReason: "permission: Bash" }) }));
     expect(calls).toEqual(["badge 0", "badge 1"]);
     settings({ "notifications.sound": "true", "notifications.dock_badge": "false" });
     expect(calls).toEqual(["badge 0", "badge 1", "badge 0"]);
@@ -278,26 +278,26 @@ describe("startDockAlerts", () => {
 
   it("an alert plays the sound with the bounce when both are on", () => {
     settings({ "notifications.sound": "true" });
-    useSessionsStore.setState((s) => ({ ...replaceSessions(s, [thread("a", { status: "busy" })]), epoch: s.epoch + 1 }));
-    useSessionsStore.setState((s) => applySessionEvent(s, { kind: "updated", session: thread("a", { status: "attention", statusReason: "finished" }) }));
+    useThreadsStore.setState((s) => ({ ...replaceThreads(s, [thread("a", { status: "busy" })]), epoch: s.epoch + 1 }));
+    useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: thread("a", { status: "attention", statusReason: "finished" }) }));
     expect(calls).toEqual(["badge 0", "badge 1", "bounce", "sound 50"]);
   });
 
   it("snoozing a waiting thread drops it from the badge; its wake badges and bounces", () => {
     settings({});
-    useSessionsStore.setState((s) => ({ ...replaceSessions(s, [thread("a", { status: "attention", statusReason: "finished" })]), epoch: s.epoch + 1 }));
+    useThreadsStore.setState((s) => ({ ...replaceThreads(s, [thread("a", { status: "attention", statusReason: "finished" })]), epoch: s.epoch + 1 }));
     expect(calls).toEqual(["badge 0", "badge 1"]);
-    useSessionsStore.setState((s) => applySessionEvent(s, { kind: "updated", session: thread("a", { state: "disconnected", status: "attention", statusReason: "finished", snoozedUntilMs: 5 }) }));
+    useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: thread("a", { state: "disconnected", status: "attention", statusReason: "finished", snoozedUntilMs: 5 }) }));
     expect(calls).toEqual(["badge 0", "badge 1", "badge 0"]);
     now = 120_000;
-    useSessionsStore.setState((s) => applySessionEvent(s, { kind: "updated", session: thread("a", { state: "disconnected", status: "attention", statusReason: "snooze ended", statusChangedAtMs: now }) }));
+    useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: thread("a", { state: "disconnected", status: "attention", statusReason: "snooze ended", statusChangedAtMs: now }) }));
     expect(calls).toEqual(["badge 0", "badge 1", "badge 0", "badge 1", "bounce"]);
   });
 
   it("plays the sound alone at the volume setting with the bounce off", () => {
     settings({ "notifications.sound": "true", "notifications.bounce": "false", "notifications.sound_volume": "15" });
-    useSessionsStore.setState((s) => ({ ...replaceSessions(s, [thread("a", { status: "busy" })]), epoch: s.epoch + 1 }));
-    useSessionsStore.setState((s) => applySessionEvent(s, { kind: "updated", session: thread("a", { status: "attention", statusReason: "finished" }) }));
+    useThreadsStore.setState((s) => ({ ...replaceThreads(s, [thread("a", { status: "busy" })]), epoch: s.epoch + 1 }));
+    useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: thread("a", { status: "attention", statusReason: "finished" }) }));
     expect(calls).toEqual(["badge 0", "badge 1", "sound 15"]);
   });
 });

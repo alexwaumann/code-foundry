@@ -1,10 +1,10 @@
 /**
  * The second line of a sidebar thread row (docs/notes/thread-list.md): what the thread is
  * doing or waiting on, in words and a colour, and whether "project @ branch" follows.
- * Pure, over the session view; the row renders it (components/sidebar/SidebarRow.tsx).
+ * Pure, over the thread view; the row renders it (components/sidebar/SidebarRow.tsx).
  */
-import type { SessionView } from "@/api/session";
-import { formatAgo, sessionBadge, statusKind, statusNote } from "./session";
+import type { ThreadView } from "@/api/threads";
+import { formatAgo, threadBadge, statusKind, statusNote } from "./thread";
 
 /**
  * - "place": just "project @ branch" (idle, unknown; whether Claude's process runs never shows)
@@ -47,9 +47,9 @@ export function showsPlace(kind: StatusLineKind): boolean {
 
 const PLACE: StatusLine = { kind: "place", detail: "", at: null };
 
-export function statusLine(s: Pick<SessionView, "state" | "status" | "statusReason" | "statusChangedAtMs"> | undefined): StatusLine {
+export function statusLine(s: Pick<ThreadView, "state" | "status" | "statusReason" | "statusChangedAtMs"> | undefined): StatusLine {
   if (!s) return PLACE;
-  const badge = sessionBadge(s);
+  const badge = threadBadge(s);
   switch (badge) {
     case "busy":
       return { kind: "working", detail: "", at: null };
