@@ -45,7 +45,7 @@ func RegisterAgents(r *Registry, b AgentsBackend, e Emitter) error {
 				"The header also counts the thread's own background shells (Bash run_in_background, Monitor) still running.",
 			Category:     "Thread",
 			NoKeybinding: true,
-			Args:         []ArgSpec{{Name: "id", Type: String, Required: true, Context: ContextThread, Description: "Thread id"}},
+			Args:         []ArgSpec{{Name: "id", Type: String, Required: true, Context: ContextThread, ID: ThreadID, Description: "Thread id" + IDHelp}},
 			When:         hasThread,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				res, err := b.ListItems(ctx, connect.NewRequest(&v1.ListThreadItemsRequest{ThreadId: a.String("id")}))

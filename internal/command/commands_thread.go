@@ -75,7 +75,9 @@ var threadDecisions = map[string]v1.ThreadDecision{
 // thread.items, thread.set-model, thread.set-mode, thread.set-effort, thread.wait,
 // thread.subscribe, thread.unsubscribe and thread.subscriptions.
 func RegisterThread(r *Registry, b ThreadBackend) error {
-	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextThread, Description: "Thread id"}
+	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextThread, ID: ThreadID, Description: "Thread id" + IDHelp}
+	r.SetIDLister(ThreadID, threadIDs(b))
+	r.SetIDLister(SubscriptionID, subscriptionIDs(b))
 	return r.RegisterAll(
 		Command{
 			Name:  "thread.send",

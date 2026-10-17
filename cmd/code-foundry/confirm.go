@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 
 	"connectrpc.com/connect"
@@ -82,17 +83,33 @@ func (cl *cli) invoke(ctx context.Context, cmd *v1.Command, uctx *v1.UiContext, 
 }
 
 // parseWithPositionals parses flags that may be interleaved with bare words
-// (`settings set --json key value`) and returns the words. "--" ends flags.
+// (`settings set --json key value`) and returns the words. "--" ends flags. A negative
+// number ("-1", "-0.5") is a word, not a flag, unless it is the value of the flag
+// before it (`thread budget -1`, `--usd -1`).
 func (cl *cli) parseWithPositionals(fs *flag.FlagSet, args []string) ([]string, error) {
 	var words []string
 	for {
+		if i := negativeWord(fs, args); i >= 0 {
+			head, err := cl.parseWithPositionals(fs, args[:i])
+			if err != nil {
+				return nil, err
+			}
+			words = append(append(words, head...), args[i])
+			args = args[i+1:]
+			continue
+		}
 		if err := fs.Parse(args); err != nil {
 			if errors.Is(err, flag.ErrHelp) {
 				return nil, errHelp
 			}
 			return nil, errUsage
 		}
-		args = fs.Args()
+		rest := fs.Args()
+		if n := len(args) - len(rest); n > 0 && args[n-1] == "--" {
+			// The flag package ate the "--" that ended its flags: the rest are words.
+			return append(words, rest...), nil
+		}
+		args = rest
 		if len(args) == 0 {
 			return words, nil
 		}
@@ -101,6 +118,38 @@ func (cl *cli) parseWithPositionals(fs *flag.FlagSet, args []string) ([]string, 
 		}
 		words, args = append(words, args[0]), args[1:]
 	}
+}
+
+// negativeWord is the index of the first negative number in args the flag package would
+// take for a flag, or -1. It stops at "--"; a number right after a flag that takes a
+// value (--usd -1) is that flag's.
+func negativeWord(fs *flag.FlagSet, args []string) int {
+	for i, a := range args {
+		if a == "--" {
+			return -1
+		}
+		if !negativeNumber.MatchString(a) || (i > 0 && takesValue(fs, args[i-1])) {
+			continue
+		}
+		return i
+	}
+	return -1
+}
+
+var negativeNumber = regexp.MustCompile(`^-[0-9]+(\.[0-9]*)?$|^-\.[0-9]+$`)
+
+// takesValue: tok is a defined flag without "=value" whose value is the next arg (not a
+// bool flag).
+func takesValue(fs *flag.FlagSet, tok string) bool {
+	if !strings.HasPrefix(tok, "-") || strings.Contains(tok, "=") || negativeNumber.MatchString(tok) {
+		return false
+	}
+	f := fs.Lookup(strings.TrimLeft(tok, "-"))
+	if f == nil {
+		return false
+	}
+	b, ok := f.Value.(interface{ IsBoolFlag() bool })
+	return !ok || !b.IsBoolFlag()
 }
 
 // assignPositionals gives each word to the next positional arg not already set by its

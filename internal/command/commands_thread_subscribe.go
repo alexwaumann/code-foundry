@@ -97,9 +97,9 @@ func threadSubscribe(b ThreadBackend) Command {
 		Category:     "Thread",
 		NoKeybinding: true,
 		Args: []ArgSpec{
-			{Name: "id", Type: String, Required: true, Context: ContextThread, Description: "The thread to wake (default: the thread this runs in)"},
-			{Name: "thread", Type: String, Description: "Target thread id"},
-			{Name: "run", Type: String, Description: "Target action run id (r-…; see action runs)"},
+			{Name: "id", Type: String, Required: true, Context: ContextThread, ID: ThreadID, Description: "The thread to wake (default: the thread this runs in)" + IDHelp},
+			{Name: "thread", Type: String, ID: ThreadID, Description: "Target thread id" + IDHelp},
+			{Name: "run", Type: String, ID: RunID, Description: "Target action run id (r-…; see action runs)" + IDHelp},
 			{Name: "until", Type: Enum, Enum: SubscriptionConditions, Default: "settled",
 				Description: "settled (idle or needs attention: Claude is not working), idle, attention, error or disconnected; a run: finished"},
 			{Name: "repeat", Type: Bool, Description: "Wake on every change into the condition (default: once, then the subscription goes)"},
@@ -149,10 +149,10 @@ func threadUnsubscribe(b ThreadBackend) Command {
 		Category:     "Thread",
 		NoKeybinding: true,
 		Args: []ArgSpec{
-			{Name: "subscription", Type: String, Positional: true, Description: "Subscription id (sub-…)"},
-			{Name: "id", Type: String, Context: ContextThread, Description: "With thread or run: the subscribed thread (default: the thread this runs in)"},
-			{Name: "thread", Type: String, Description: "Remove the subscriptions to this thread"},
-			{Name: "run", Type: String, Description: "Remove the subscriptions to this action run"},
+			{Name: "subscription", Type: String, Positional: true, ID: SubscriptionID, Description: "Subscription id (sub-…)" + IDHelp},
+			{Name: "id", Type: String, Context: ContextThread, ID: ThreadID, Description: "With thread or run: the subscribed thread (default: the thread this runs in)" + IDHelp},
+			{Name: "thread", Type: String, ID: ThreadID, Description: "Remove the subscriptions to this thread" + IDHelp},
+			{Name: "run", Type: String, ID: RunID, Description: "Remove the subscriptions to this action run" + IDHelp},
 		},
 		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 			req := &v1.UnsubscribeThreadRequest{SubscriptionId: strings.TrimSpace(a.String("subscription"))}
@@ -190,7 +190,7 @@ func threadSubscriptions(b ThreadBackend) Command {
 		Category:     "Thread",
 		NoKeybinding: true,
 		Args: []ArgSpec{
-			{Name: "id", Type: String, Context: ContextThread, Description: "Subscribed thread id (default: the thread this runs in)"},
+			{Name: "id", Type: String, Context: ContextThread, ID: ThreadID, Description: "Subscribed thread id (default: the thread this runs in)" + IDHelp},
 			{Name: "all", Type: Bool, Description: "Every thread's subscriptions"},
 		},
 		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {

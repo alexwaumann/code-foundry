@@ -88,7 +88,8 @@ const notInProject = "is not inside a registered project"
 // RegisterTerminal registers terminal.new, terminal.list, terminal.close, terminal.kill,
 // and terminal.remove.
 func RegisterTerminal(r *Registry, d TerminalDeps) error {
-	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextTerminal, Description: "Terminal id"}
+	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextTerminal, ID: TerminalID, Description: "Terminal id" + IDHelp}
+	r.SetIDLister(TerminalID, terminalIDs(d.Terminal))
 	return r.RegisterAll(
 		Command{
 			Name:  "terminal.new",

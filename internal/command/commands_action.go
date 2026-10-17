@@ -90,6 +90,7 @@ const noProject = "actions belong to a project: pass --repo, select a thread or 
 // RegisterAction registers action.list, action.add, action.edit, action.remove,
 // action.run, action.wait and action.runs.
 func RegisterAction(r *Registry, d ActionDeps) error {
+	r.SetIDLister(RunID, runIDs(d.Action))
 	repoArg := ArgSpec{Name: "repo", Type: String, Context: ContextRepo,
 		Description: "Project: id, name, or a path inside it (default: the thread's, the worktree's, or the working directory's)"}
 	hereArg := ArgSpec{Name: "here", Type: Path, DefaultToCwd: true,
@@ -288,7 +289,7 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 			Description:  "Wait for an action run to finish, print its output (a background run's last 64 KiB), and exit with its exit code.",
 			Category:     "Action",
 			NoKeybinding: true,
-			Args:         []ArgSpec{{Name: "run", Type: String, Required: true, Positional: true, Description: "Run id (r-...)"}},
+			Args:         []ArgSpec{{Name: "run", Type: String, Required: true, Positional: true, ID: RunID, Description: "Run id (r-...)" + IDHelp}},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				return waitRun(ctx, d, a.String("run"))
 			},
