@@ -156,7 +156,7 @@ test("threads end to end against the real daemon", async ({ page }) => {
         /pong/i,
       );
       await expect(
-        pane(page).getByTestId("thread-footer").last(),
+        pane(page).locator('[data-testid="thread-turn-header"]:not([data-live])').last(),
       ).toBeVisible();
       await page.waitForTimeout(1500); // let a late "finished" show, if the rule were broken
       const log = await badgeLog(page);

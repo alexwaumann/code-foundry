@@ -119,7 +119,7 @@ test("Copy puts the raw code on the clipboard and shows Copied; a Bash row copie
   // The turn's last Bash row: its command line has Copy, never Run. The timeline follows
   // the bottom unless the user scrolls, so scroll it with the wheel. The turn folded when
   // it ended: show its work first.
-  await pane(page).getByTestId("thread-footer").last().getByRole("button", { name: "Show this turn's work" }).click();
+  await pane(page).locator('[data-testid="thread-turn-header"]:not([data-live])').last().getByRole("button", { name: "Show this turn's work" }).click();
   const bash = pane(page).locator('[data-tool="Bash"]').last();
   await page.getByTestId("thread-timeline").hover();
   for (let i = 0; i < 40 && !(await inView(page, bash.locator("button[aria-expanded]").first())); i++) {
