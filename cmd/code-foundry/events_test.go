@@ -7,12 +7,16 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"google.golang.org/protobuf/encoding/protojson"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
@@ -147,7 +151,7 @@ func TestRunEvents(t *testing.T) {
 	}
 
 	lw, cancel, done := start(t, "--source", "repo,thread-list", "--json")
-	var seqs []uint64
+	var epoch string
 	for range 2 {
 		var ev map[string]any
 		if err := json.Unmarshal([]byte(lw.next(t)), &ev); err != nil {
@@ -156,42 +160,53 @@ func TestRunEvents(t *testing.T) {
 		if _, ok := ev["seq"]; ok {
 			t.Fatalf("snapshot with a seq: %v", ev)
 		}
+		if e, _ := ev["epoch"].(string); e == "" || (epoch != "" && e != epoch) {
+			t.Fatalf("snapshot epoch %v (first %q)", ev["epoch"], epoch)
+		} else {
+			epoch = e
+		}
 	}
 	repos.Put(repo.Repo{ID: "r1", Name: "app"})
 	threads.Put(thread.Thread{ID: "s1", State: thread.StateConnected, Status: thread.StatusBusy, StatusReason: "working"})
 	repos.Put(repo.Repo{ID: "r2", Name: "lib"})
+	// The text line of each live event by seq: the sources' topics race to the hub, so
+	// the three may be numbered in any order.
+	texts := map[uint64]string{}
 	for range 3 {
-		var ev struct {
-			Seq string `json:"seq"` // protojson writes uint64 as a string
-		}
 		line := lw.next(t)
-		if err := json.Unmarshal([]byte(line), &ev); err != nil || ev.Seq == "" {
-			t.Fatalf("line %q (err %v), want a seq", line, err)
+		var ev v1.Event
+		if err := protojson.Unmarshal([]byte(line), &ev); err != nil || ev.GetSeq() == 0 || ev.GetEpoch() != epoch {
+			t.Fatalf("line %q (err %v), want a seq and epoch %s", line, err, epoch)
 		}
-		n, err := strconv.ParseUint(ev.Seq, 10, 64)
-		if err != nil {
-			t.Fatal(err)
-		}
-		seqs = append(seqs, n)
+		texts[ev.GetSeq()] = eventLine(&ev)
 	}
 	cancel()
 	if err := <-done; err != nil {
 		t.Fatalf("after Ctrl-C: %v", err)
 	}
+	seqs := slices.Sorted(maps.Keys(texts))
 
-	// A second client resumes after the first event: the other two, as text lines.
-	first := seqs[0]
-	for _, s := range seqs {
-		first = min(first, s)
+	// A second client resumes after the first event: the other two, as text lines,
+	// with or without the epoch.
+	for _, args := range [][]string{{}, {"--since-epoch", epoch}} {
+		lw2, cancel2, done2 := start(t, append([]string{"--source", "repo,thread-list", "--since", strconv.FormatUint(seqs[0], 10)}, args...)...)
+		got := []string{lw2.next(t), lw2.next(t)}
+		if want := []string{texts[seqs[1]], texts[seqs[2]]}; !slices.Equal(got, want) {
+			t.Fatalf("replay %v = %q, want %q", args, got, want)
+		}
+		cancel2()
+		if err := <-done2; err != nil {
+			t.Fatal(err)
+		}
 	}
-	lw2, cancel2, done2 := start(t, "--source", "repo,thread-list", "--since", strconv.FormatUint(first, 10))
-	got := []string{lw2.next(t), lw2.next(t)}
-	joined := strings.Join(got, "\n")
-	if !strings.Contains(joined, "thread-list updated s1: busy (working)") || !strings.Contains(joined, "repo repo-updated r2") {
-		t.Fatalf("replay =\n%s", joined)
+
+	// Another daemon's epoch (it restarted): snapshots, not a replay.
+	lw3, cancel3, done3 := start(t, "--source", "repo", "--since", strconv.FormatUint(seqs[0], 10), "--since-epoch", "0123456789ab")
+	if got := lw3.next(t); got != "- repo snapshot" {
+		t.Fatalf("first line with another epoch = %q, want the snapshot", got)
 	}
-	cancel2()
-	if err := <-done2; err != nil {
+	cancel3()
+	if err := <-done3; err != nil {
 		t.Fatal(err)
 	}
 }

@@ -2,7 +2,10 @@ package api
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"slices"
+	"strconv"
 	"sync"
 	"time"
 
@@ -43,12 +46,15 @@ type EventsDeps struct {
 	Action action.Store
 	// Done ends every stream when closed (daemon shutdown). May be nil.
 	Done <-chan struct{}
+	// Epoch is Event.epoch, the daemon instance; empty draws a random one (NewEvents).
+	Epoch string
 }
 
 // Events implements codefoundryv1connect.EventServiceHandler: one server stream that
 // carries every store's Watch events and UI intents, so a browser holds one connection
 // instead of one per service. Live events pass through one hub (events_hub.go) that
-// numbers them (Event.seq) and keeps the last ones for clients that resume.
+// numbers them (Event.seq) and keeps the last ones for clients that resume. Every event
+// carries the epoch, so a client resuming across a daemon restart is told apart.
 type Events struct {
 	deps EventsDeps
 	beat time.Duration // Watch's heartbeat interval; zero is HeartbeatInterval (tests shorten it)
@@ -59,8 +65,27 @@ type Events struct {
 
 var _ codefoundryv1connect.EventServiceHandler = (*Events)(nil)
 
-// NewEvents returns an EventService handler.
-func NewEvents(deps EventsDeps) *Events { return &Events{deps: deps} }
+// NewEvents returns an EventService handler. The daemon makes one per lifetime, so its
+// epoch (deps.Epoch, else 12 random hex digits) names the daemon instance.
+func NewEvents(deps EventsDeps) *Events {
+	if deps.Epoch == "" {
+		deps.Epoch = newEpoch()
+	}
+	return &Events{deps: deps}
+}
+
+// newEpoch is 12 random hex digits, or the start time's nanoseconds in hex when the
+// system has no randomness to give.
+func newEpoch() string {
+	var b [6]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return strconv.FormatInt(time.Now().UnixNano(), 16)
+	}
+	return hex.EncodeToString(b[:])
+}
+
+// Epoch is the epoch every event of this handler carries.
+func (h *Events) Epoch() string { return h.deps.Epoch }
 
 // Route mounts the service.
 func (h *Events) Route(opts ...connect.HandlerOption) Route {
@@ -72,7 +97,7 @@ func (h *Events) Route(opts ...connect.HandlerOption) Route {
 // (for ever without one), so events published while no client is connected are still
 // numbered and kept for a later resume.
 func (h *Events) eventHub() *eventHub {
-	h.hubOnce.Do(func() { h.hub = newEventHub(h.deps.Done, h.sources()) })
+	h.hubOnce.Do(func() { h.hub = newEventHub(h.deps.Done, h.sources(), h.deps.Epoch) })
 	return h.hub
 }
 
@@ -161,7 +186,11 @@ func (h *Events) Watch(ctx context.Context, req *connect.Request[v1.WatchEventsR
 		mask |= kindBit(s.kind())
 	}
 	hub := h.eventHub()
-	c, replay, resumed := hub.join(mask, req.Msg.GetSinceSeq())
+	since := req.Msg.GetSinceSeq()
+	if e := req.Msg.GetSinceEpoch(); e != "" && e != h.deps.Epoch {
+		since = 0 // another daemon's seq: start over with the snapshots
+	}
+	c, replay, resumed := hub.join(mask, since)
 	defer hub.leave(c)
 
 	// Quiet sources (gh polling off, no thread busy) get a heartbeat every
@@ -172,6 +201,12 @@ func (h *Events) Watch(ctx context.Context, req *connect.Request[v1.WatchEventsR
 		beat.Reset()
 		return stream.Send(ev)
 	}
+	// Snapshots and heartbeats are this stream's own: stamp them (the hub stamped the
+	// live events it shares).
+	sendOwn := func(ev *v1.Event) error {
+		ev.Epoch = h.deps.Epoch
+		return send(ev)
+	}
 	deliver := func(e hubEvent) error {
 		if o, ok := byKind[e.kind].(eventObserver); ok {
 			o.observe(e.ev)
@@ -181,7 +216,7 @@ func (h *Events) Watch(ctx context.Context, req *connect.Request[v1.WatchEventsR
 	sendSnapshot := func(s eventSource) (int, error) {
 		evs := s.snapshot(ctx)
 		for _, ev := range evs {
-			if err := send(ev); err != nil {
+			if err := sendOwn(ev); err != nil {
 				return 0, err
 			}
 		}
@@ -244,7 +279,7 @@ func (h *Events) Watch(ctx context.Context, req *connect.Request[v1.WatchEventsR
 		case <-h.deps.Done:
 			return nil
 		case <-beat.C():
-			if err := send(&v1.Event{Event: &v1.Event_Heartbeat{Heartbeat: &v1.StreamHeartbeat{}}}); err != nil {
+			if err := sendOwn(&v1.Event{Event: &v1.Event_Heartbeat{Heartbeat: &v1.StreamHeartbeat{}}}); err != nil {
 				return err
 			}
 		case <-c.poke:

@@ -41,8 +41,10 @@ type hubEvent struct {
 // queues them to the streams that want their source. Snapshots and heartbeats are
 // per stream and carry no seq. See docs/notes/agents-1-wait-events.md.
 type eventHub struct {
-	ctx  context.Context // the topics' subscriptions end with it
-	stop context.CancelFunc
+	ctx context.Context // the topics' subscriptions end with it
+	// epoch is stamped on every event (Event.epoch): the daemon instance.
+	epoch string
+	stop  context.CancelFunc
 
 	mu  sync.Mutex
 	seq uint64 // the last seq given
@@ -84,10 +86,10 @@ func (c *hubClient) markDirty(k v1.EventSource) {
 func (c *hubClient) takeDirty() kindMask { return kindMask(c.dirty.Swap(0)) }
 
 // newEventHub subscribes srcs' topics (transient ones on demand) until done closes; a
-// nil done runs for ever.
-func newEventHub(done <-chan struct{}, srcs []eventSource) *eventHub {
+// nil done runs for ever. Every event it numbers carries epoch.
+func newEventHub(done <-chan struct{}, srcs []eventSource, epoch string) *eventHub {
 	ctx, stop := context.WithCancel(context.Background())
-	h := &eventHub{ctx: ctx, stop: stop, clients: map[*hubClient]struct{}{}, transient: map[v1.EventSource]*transientTopics{}}
+	h := &eventHub{ctx: ctx, stop: stop, epoch: epoch, clients: map[*hubClient]struct{}{}, transient: map[v1.EventSource]*transientTopics{}}
 	if done != nil {
 		go func() {
 			<-done
@@ -140,7 +142,7 @@ func (h *eventHub) publish(k v1.EventSource, transient bool, ev *v1.Event) {
 		return
 	}
 	h.seq++
-	ev.Seq = h.seq
+	ev.Seq, ev.Epoch = h.seq, h.epoch
 	e := hubEvent{kind: k, ev: ev, transient: transient}
 	if !transient {
 		h.keep(e)
