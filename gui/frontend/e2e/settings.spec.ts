@@ -15,7 +15,8 @@ async function mockSettings(): Promise<MockSettings> {
   return (await res.json()) as MockSettings;
 }
 
-async function openSettings(page: Page) {
+/** Opens the app and its settings page, on General or the page asked for. */
+async function openSettings(page: Page, pageId?: string) {
   await openApp(page);
   // cmd+, is view.settings's registry chord; a chord pressed before the command list
   // arrives is looked up again once it does (keys/bindings.ts).
@@ -23,6 +24,7 @@ async function openSettings(page: Page) {
   const settings = page.getByTestId("settings-page");
   await expect(settings).toBeVisible();
   await expect(settings.locator("[data-setting]").first()).toBeVisible();
+  if (pageId) await goTo(page, pageId);
   return settings;
 }
 
@@ -60,15 +62,33 @@ async function pick(page: Page, key: string, label: string) {
   await expect(listbox(page)).toHaveCount(0);
 }
 
-test("cmd+, opens settings rendered from the schema", async ({ page }) => {
+/** Shows a page of the settings page from its left nav. */
+async function goTo(page: Page, id: string) {
+  await page.getByTestId(`settings-nav-${id}`).click();
+  await expect(page.getByTestId(`settings-nav-${id}`)).toHaveAttribute("aria-current", "page");
+  await expect(page.getByTestId("settings-body")).toHaveAttribute("data-page", id);
+}
+
+function searchbox(page: Page) {
+  return page.getByRole("searchbox", { name: "Search settings" });
+}
+
+test("cmd+, opens settings on General; the nav switches pages, one at a time", async ({ page }) => {
   const settings = await openSettings(page);
-  for (const title of ["Threads", "GitHub", "Repositories", "Appearance", "Keybindings", "Advanced"]) {
-    await expect(settings.getByRole("heading", { name: title, exact: true })).toBeVisible();
-  }
-  await expect(setting(page, "appearance.font_size").getByRole("spinbutton")).toHaveValue("13");
+  const nav = settings.getByRole("navigation", { name: "Settings pages" });
+  await expect(nav.getByRole("button")).toHaveText(["General", "Appearance", "Notifications", "Source control", "Keybindings", "Advanced"]);
+  await expect(page.getByTestId("settings-nav-general")).toHaveAttribute("aria-current", "page");
+  await expect(settings.getByRole("heading", { name: "General", level: 2 })).toBeVisible();
+  // General's sections, each a card; only this page's fields render.
+  await expect(settings.getByTestId("settings-section").locator("h3")).toHaveText(["Threads", "Text generation", "Lifecycle", "Updates"]);
+  await expect(setting(page, "appearance.font_size")).toHaveCount(0);
+  // The raw key is not shown under a row any more.
+  await expect(setting(page, "threads.auto_name").getByTestId("setting-key")).toHaveCount(0);
+  await expect(setting(page, "threads.auto_name")).not.toContainText("threads.auto_name");
+
   await expect(select(page, "threads.default_model")).toHaveAttribute("data-value", "claude-opus-4-8[1m]");
-  await expect(select(page, "threads.default_model")).toHaveText("Opus 4.8 (default)");
-  // The model registry's labels; the setting's own default is marked.
+  // The trigger names the value alone; the list marks the setting's own default.
+  await expect(select(page, "threads.default_model")).toHaveText("Opus 4.8", { useInnerText: true });
   await expectOptions(page, "threads.default_model", [
     "Opus 5.5",
     "Opus 4.8 (default)",
@@ -85,32 +105,192 @@ test("cmd+, opens settings rendered from the schema", async ({ page }) => {
   await expectOptions(page, "threads.default_worktree", ["A fresh copy of the project (default)", "The project folder itself"]);
   // The naming model is its own live setting, defaulting to Sonnet 5.
   await expect(select(page, "threads.naming_model")).toHaveAttribute("data-value", "claude-sonnet-5[1m]");
-  await expect(select(page, "threads.naming_model")).toHaveText("Sonnet 5 (default)");
   await expect(setting(page, "threads.naming_model").getByTestId("restart-hint")).toHaveCount(0);
   // Every thread is rendered: no view setting (the schema has none).
   await expect(setting(page, "threads.render")).toHaveCount(0);
-  // Restart-required fields say so; live ones do not.
-  await expect(setting(page, "threads.scrollback_lines").getByTestId("restart-hint")).toBeVisible();
-  await expect(setting(page, "appearance.theme").getByTestId("restart-hint")).toHaveCount(0);
-  // One keybinding field per registry command, with its default chord.
-  await expect(setting(page, "keybindings.thread.new").getByRole("button", { name: /shortcut/ })).toHaveText("⌘N");
+  // A unit sits inside the number input.
+  await expect(setting(page, "threads.cache_ttl_seconds").getByTestId("setting-unit")).toHaveText("s");
+  await expect(setting(page, "threads.cache_ttl_seconds").getByRole("spinbutton")).toHaveValue("3600");
   await expect(page.getByTestId("settings-path")).toContainText("settings.toml");
 
-  // Search narrows the form.
-  await settings.getByRole("searchbox", { name: "Search settings" }).fill("font");
-  await expect(setting(page, "appearance.font_size")).toBeVisible();
-  await expect(setting(page, "appearance.font_family")).toBeVisible();
+  await goTo(page, "appearance");
+  await expect(settings.getByRole("heading", { name: "Appearance", level: 2 })).toBeVisible();
   await expect(setting(page, "threads.auto_name")).toHaveCount(0);
+  await expect(setting(page, "appearance.font_size").getByRole("spinbutton")).toHaveValue("13");
+  await expect(setting(page, "appearance.font_size").getByTestId("setting-unit")).toHaveText("pt");
+  // Restart-required fields say so; live ones do not. Scrollback shows under Terminal.
+  await expect(settings.locator('[data-section="terminal"] [data-setting="threads.scrollback_lines"]').getByTestId("restart-hint")).toBeVisible();
+  await expect(setting(page, "appearance.theme").getByTestId("restart-hint")).toHaveCount(0);
+
+  await goTo(page, "keybindings");
+  // One keybinding field per bindable registry command, with its default chord.
+  await expect(setting(page, "keybindings.thread.new").getByRole("button", { name: /shortcut/ })).toHaveText("⌘N");
+
+  // Leaving and coming back lands on General again.
+  await page.keyboard.press("Meta+Comma");
+  await expect(settings).toHaveCount(0);
+  await page.keyboard.press("Meta+Comma");
+  await expect(page.getByTestId("settings-nav-general")).toHaveAttribute("aria-current", "page");
 
   // Escape (outside a field) closes the page.
-  await settings.getByRole("searchbox", { name: "Search settings" }).fill("");
   await page.getByRole("heading", { name: "Settings", exact: true }).click();
   await page.keyboard.press("Escape");
   await expect(settings).toHaveCount(0);
 });
 
-test("the dark and light theme rows offer their scheme's themes and apply live", async ({ page }) => {
+test("model and effort share a row: both titles over their selects, the model's description under them", async ({ page }) => {
+  const settings = await openSettings(page);
+  const pair = settings.locator('[data-setting-row="model"]');
+  await expect(pair.locator("[data-setting]")).toHaveCount(2);
+  await expect(pair.locator("[data-setting]").first()).toHaveAttribute("data-setting", "threads.default_model");
+  await expect(pair.locator("[data-setting]").nth(1)).toHaveAttribute("data-setting", "threads.default_effort");
+  const model = await select(page, "threads.default_model").boundingBox();
+  const effort = await select(page, "threads.default_effort").boundingBox();
+  if (!model || !effort) throw new Error("no boxes");
+  expect(Math.abs(model.y - effort.y)).toBeLessThanOrEqual(1);
+  expect(effort.x).toBeGreaterThan(model.x + model.width);
+  await expect(pair).toContainText("Used by new threads unless you pick otherwise.");
+  await expect(pair).not.toContainText("Effort level new threads use");
+  await pick(page, "threads.default_effort", "Max");
+  await expect.poll(async () => (await mockSettings()).raw["threads.default_effort"]).toBe("max");
+});
+
+test("a dependent row is indented under its toggle and dims while it is off; across sections it says why", async ({ page }) => {
   await openSettings(page);
+  // Naming model (Text generation) depends on Name threads automatically (Threads).
+  const naming = setting(page, "threads.naming_model");
+  await expect(naming).not.toHaveAttribute("data-dimmed");
+  await setting(page, "threads.auto_name").getByRole("switch").click();
+  await expect(naming).toHaveAttribute("data-dimmed", "true");
+  await expect(naming).toContainText("Not used while Name threads automatically is off.");
+  // Dimmed, not disabled.
+  await expect(select(page, "threads.naming_model")).toBeEnabled();
+
+  await goTo(page, "notifications");
+  const volume = setting(page, "notifications.sound_volume");
+  const sound = setting(page, "notifications.sound");
+  // Alert sound is off by default: the volume row sits indented under it, dimmed.
+  await expect(volume).toHaveAttribute("data-dimmed", "true");
+  await expect(volume).not.toContainText("Not used while");
+  const v = await volume.boundingBox();
+  const s = await sound.boundingBox();
+  if (!v || !s) throw new Error("no boxes");
+  const indent = (await volume.locator(".text-label").first().boundingBox())?.x ?? 0;
+  const parent = (await sound.locator(".text-label").first().boundingBox())?.x ?? 0;
+  expect(indent - parent).toBeGreaterThanOrEqual(16);
+  await sound.getByRole("switch").click();
+  await expect(volume).not.toHaveAttribute("data-dimmed");
+});
+
+test("Keybindings: Bound only folds unbound commands, its count and choice persist", async ({ page }) => {
+  const settings = await openSettings(page);
+  await goTo(page, "keybindings");
+  const bound = page.getByTestId("settings-bound-only");
+  await expect(bound).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByTestId("settings-page-description")).toContainText(/\d+ of \d+ commands have a shortcut\./);
+  const [, have, total] = /(\d+) of (\d+) commands/.exec((await page.getByTestId("settings-page-description").textContent()) ?? "") ?? [];
+  // Every bound command shows as a row, and nothing else does.
+  await expect(settings.locator("[data-setting]")).toHaveCount(Number(have));
+
+  // Thread: its bound commands, then "N more unbound", which opens the rest in place.
+  const thread = settings.locator('[data-testid="settings-section"][data-section="thread"]');
+  await expect(thread.locator('[data-setting="keybindings.thread.new"]')).toBeVisible();
+  await expect(thread.locator('[data-setting="keybindings.thread.archive"]')).toHaveCount(0);
+  const more = page.getByTestId("keybindings-more-thread");
+  await expect(more).toContainText("more unbound");
+  await more.click();
+  await expect(more).toHaveAttribute("aria-expanded", "true");
+  await expect(thread.locator('[data-setting="keybindings.thread.archive"]')).toBeVisible();
+  await expect(thread.locator('[data-setting="keybindings.thread.archive"]').getByRole("button", { name: /shortcut/ })).toHaveText("Add shortcut");
+
+  // Categories with nothing bound share one card, each collapsed.
+  const empty = page.getByTestId("keybindings-unbound-card");
+  await expect(settings.getByRole("heading", { name: "No shortcuts yet" })).toBeVisible();
+  const project = page.getByTestId("keybindings-category-project");
+  await expect(project).toContainText("Project");
+  await expect(project).toContainText(/\d+ unbound/);
+  await expect(empty.locator("[data-setting]")).toHaveCount(0);
+  await project.click();
+  await expect(empty.locator("[data-setting]").first()).toBeVisible();
+
+  // The title's tooltip has the description and the command name.
+  await thread.locator('[data-setting="keybindings.thread.new"] span.truncate').hover();
+  await expect(page.locator('[data-slot="tooltip-content"]')).toContainText("thread.new");
+
+  // Off: every command, every category its own card. The choice survives a reload.
+  await bound.click();
+  await expect(bound).toHaveAttribute("aria-checked", "false");
+  await expect(settings.locator("[data-setting]")).toHaveCount(Number(total));
+  await expect(page.getByTestId("keybindings-unbound-card")).toHaveCount(0);
+  await page.reload();
+  await page.keyboard.press("Meta+Comma");
+  await goTo(page, "keybindings");
+  await expect(page.getByTestId("settings-bound-only")).toHaveAttribute("aria-checked", "false");
+});
+
+test("search lists matches from every page with their page and section; Esc clears, then closes", async ({ page }) => {
+  const settings = await openSettings(page);
+  await expect(searchbox(page)).toBeFocused();
+  await searchbox(page).fill("interval");
+  const results = page.getByTestId("settings-results");
+  await expect(page.getByTestId("settings-result-count")).toHaveText("2 results for “interval” in every page");
+  await expect(results.locator("[data-setting]")).toHaveCount(2);
+  await expect(results.getByTestId("setting-crumb")).toHaveText(["Source control › GitHub", "Source control › Repositories"]);
+  // The key shows, the words marked.
+  await expect(setting(page, "github.poll_interval_seconds").getByTestId("setting-key")).toHaveText("github.poll_interval_seconds");
+  await expect(setting(page, "github.poll_interval_seconds").getByTestId("setting-key").locator("mark")).toHaveText("interval");
+  // The nav counts matches per page and marks none current.
+  await expect(page.getByTestId("settings-nav-source").getByTestId("settings-nav-count")).toHaveText("2");
+  await expect(page.getByTestId("settings-nav-general").getByTestId("settings-nav-count")).toHaveText("0");
+  await expect(settings.locator('[aria-current="page"]')).toHaveCount(0);
+  // Same editors: a result saves like its row on its page.
+  const poll = setting(page, "github.poll_interval_seconds").getByRole("spinbutton");
+  await poll.fill("120");
+  await poll.press("Enter");
+  await expect.poll(async () => (await mockSettings()).raw["github.poll_interval_seconds"]).toBe("120");
+
+  // Keybindings and fields from any page: "font" finds Appearance's terminal font.
+  await searchbox(page).fill("font");
+  await expect(setting(page, "appearance.font_size")).toBeVisible();
+  await expect(setting(page, "appearance.font_family")).toBeVisible();
+  await expect(setting(page, "threads.auto_name")).toHaveCount(0);
+  await searchbox(page).fill("new terminal");
+  await expect(setting(page, "keybindings.terminal.new").getByTestId("setting-crumb")).toHaveText("Keybindings › Terminal");
+  await searchbox(page).fill("zzzz");
+  await expect(results).toContainText("No settings match “zzzz”.");
+
+  // Esc clears and goes back to the page; Esc again closes settings.
+  await searchbox(page).focus();
+  await page.keyboard.press("Escape");
+  await expect(searchbox(page)).toHaveValue("");
+  await expect(settings.getByRole("heading", { name: "General", level: 2 })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(settings).toHaveCount(0);
+
+  // A nav item while searching clears the search and shows that page.
+  await page.keyboard.press("Meta+Comma");
+  await searchbox(page).fill("interval");
+  await page.getByTestId("settings-nav-advanced").click();
+  await expect(searchbox(page)).toHaveValue("");
+  await expect(page.getByTestId("settings-body")).toHaveAttribute("data-page", "advanced");
+});
+
+test("Appearance › Theme ends in Browse themes, which opens the Themes page and comes back to Appearance", async ({ page }) => {
+  await openSettings(page);
+  await goTo(page, "appearance");
+  const link = page.getByTestId("settings-themes-link");
+  await expect(page.locator('[data-section="theme"]').getByTestId("settings-themes-link")).toBeVisible();
+  await expect(link).toContainText("Browse themes");
+  await expect(link).toContainText("Preview every theme in a gallery of the app's controls, then apply one.");
+  await link.click();
+  await expect(page.getByTestId("themes-page")).toBeVisible();
+  await page.getByRole("button", { name: "Close themes" }).click();
+  await expect(page.getByTestId("settings-page")).toBeVisible();
+  await expect(page.getByTestId("settings-body")).toHaveAttribute("data-page", "appearance");
+});
+
+test("the dark and light theme rows offer their scheme's themes and apply live", async ({ page }) => {
+  await openSettings(page, "appearance");
   await pick(page, "appearance.theme", "Dark");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "github-dark");
   await pick(page, "appearance.theme_dark", "Dracula");
@@ -139,6 +319,7 @@ test("changing a bool and an enum saves to the file and applies live", async ({ 
   await expect(page.getByText("Saved Name threads automatically")).toBeVisible();
   await expect.poll(async () => (await mockSettings()).raw["threads.auto_name"]).toBe("false");
 
+  await goTo(page, "appearance");
   await pick(page, "appearance.theme", "Light");
   await expect.poll(async () => (await mockSettings()).raw["appearance.theme"]).toBe("light");
   await expect(page.locator("html")).not.toHaveClass(/dark/);
@@ -160,7 +341,9 @@ test("changing a bool and an enum saves to the file and applies live", async ({ 
 });
 
 test("an enum select works from the keyboard and its list is themed", async ({ page }) => {
-  await openSettings(page);
+  // Tall enough for the list to open below the row (Appearance › Window's third).
+  await page.setViewportSize({ width: 1280, height: 1100 });
+  await openSettings(page, "appearance");
   const trigger = select(page, "appearance.thread_width");
   await trigger.focus();
   await page.keyboard.press("Enter");
@@ -200,7 +383,7 @@ test("an enum select works from the keyboard and its list is themed", async ({ p
 });
 
 test("a text setting reverts on Escape and commits on Enter", async ({ page }) => {
-  await openSettings(page);
+  await openSettings(page, "appearance");
   const size = setting(page, "appearance.font_size").getByRole("spinbutton");
   await size.fill("15");
   await size.press("Escape");
@@ -213,7 +396,7 @@ test("a text setting reverts on Escape and commits on Enter", async ({ page }) =
 });
 
 test("appearance.thread_width sets data-thread-width on <html>, live", async ({ page }) => {
-  await openSettings(page);
+  await openSettings(page, "appearance");
   const html = page.locator("html");
   await expect(html).toHaveAttribute("data-thread-width", "comfortable");
   await expect(select(page, "appearance.thread_width")).toHaveAttribute("data-value", "comfortable");
@@ -228,7 +411,7 @@ test("appearance.thread_width sets data-thread-width on <html>, live", async ({ 
 });
 
 test("a keybinding override rejects a reserved chord and applies a valid one", async ({ page }) => {
-  await openSettings(page);
+  await openSettings(page, "keybindings");
   const recorder = setting(page, "keybindings.thread.new").getByRole("button", { name: /shortcut/ });
   await recorder.click();
   await page.keyboard.press("Meta+k");
@@ -255,7 +438,7 @@ test("a keybinding override rejects a reserved chord and applies a valid one", a
 });
 
 test("hand edits to the file update the open page and the terminal font", async ({ page }) => {
-  await openSettings(page);
+  await openSettings(page, "appearance");
   await mockPost("settings/external?appearance.font_size=18&appearance.density=comfortable");
   await expect(setting(page, "appearance.font_size").getByRole("spinbutton")).toHaveValue("18");
   await expect(page.locator("html")).toHaveAttribute("data-density", "comfortable");
@@ -282,7 +465,7 @@ test("reveal settings file runs settings.reveal", async ({ page }) => {
 });
 
 test("the alert volume is a slider saved per step, with Play running notifications.test", async ({ page }) => {
-  await openSettings(page);
+  await openSettings(page, "notifications");
   const row = setting(page, "notifications.sound_volume");
   const thumb = row.getByRole("slider", { name: "Alert volume" });
   await expect(thumb).toHaveAttribute("aria-valuenow", "50");

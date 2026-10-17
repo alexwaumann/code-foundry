@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { openThemes } from "@/stores/views";
 import type { EditorProps, SettingEditor } from "./editor";
-import { EnumEditor } from "./SettingRow";
+import { EnumEditor } from "./editors";
 
 /**
  * appearance.theme_dark / appearance.theme_light: the enum select, and "Choose…", which
