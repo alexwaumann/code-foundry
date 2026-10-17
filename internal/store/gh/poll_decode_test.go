@@ -8,7 +8,9 @@ import (
 )
 
 // The poll fixtures are real responses to pollPlan.build documents, captured
-// 2026-10-08 (zz: see docs/notes/gh-viewer-polling.md for the recipe):
+// 2026-10-08 (see docs/notes/gh-viewer-polling.md for the recipe); their stats part
+// (m<k>, r<i>_m<k>, contributions, r<i>.history) was recaptured on 2026-10-17 for six
+// months (docs/notes/gh-stats-six-months.md):
 //
 //   - poll_partial.json: the authenticated account (no pull requests), viewer sanitized
 //     to octocat, with a repository that does not exist (a partial error at r3).
@@ -18,16 +20,16 @@ import (
 // Both used fixturePlan.
 func fixturePlan(login string) *pollPlan {
 	now := time.Date(2026, 10, 8, 20, 18, 0, 0, time.FixedZone("CDT", -5*3600))
-	this, last := monthWindows(now)
+	all := monthWindows(now, statsMonths)
 	return &pollPlan{
 		sections: dashboardSections(login, now),
 		repos: []repoPlan{
-			{slug: "alexwaumann/code-foundry", defaultBranch: true, branches: []string{"main", "t3code/review-gh-git-diff-services"}, history: true},
-			{slug: "ghostty-org/ghostty", defaultBranch: true, history: true},
+			{slug: "alexwaumann/code-foundry", defaultBranch: true, branches: []string{"main", "t3code/review-gh-git-diff-services"}, months: all},
+			{slug: "ghostty-org/ghostty", defaultBranch: true, months: all},
 			{slug: "neovim/neovim", defaultBranch: true},
 			{slug: "alexwaumann/does-not-exist-xyz", defaultBranch: true},
 		},
-		stats: &statsPlan{this: this, last: last, login: login, author: "A", me: login},
+		stats: &statsPlan{all: all, months: all, login: login, author: "A", me: login},
 	}
 }
 
@@ -87,18 +89,21 @@ func TestDecodePollPopulated(t *testing.T) {
 	if b, ok := cf.Branches["main"]; !ok || len(b) != 0 || len(cf.BranchErr) != 0 {
 		t.Errorf("branches = %+v, errs %v", cf.Branches, cf.BranchErr)
 	}
-	if g := res.Repos["ghostty-org/ghostty"]; g.History == nil || *g.History != [2]int{23, 127} {
-		t.Errorf("ghostty history = %v", g.History)
+	// Per repository, six months newest first: commits on the default branch and
+	// exact merged counts (one first: 0 search per month).
+	if g := res.Repos["ghostty-org/ghostty"]; g.StatsErr != nil || fmt.Sprint(g.Commits) != "[75 127 455 268 47 83]" ||
+		fmt.Sprint(g.Merged) != "[13 22 126 42 5 9]" {
+		t.Errorf("ghostty commits = %v, merged = %v, err %v", g.Commits, g.Merged, g.StatsErr)
 	}
-	if n := res.Repos["neovim/neovim"]; n.DefaultBranch == nil || n.DefaultBranch.Branch != "master" || n.History != nil {
+	if n := res.Repos["neovim/neovim"]; n.DefaultBranch == nil || n.DefaultBranch.Branch != "master" || n.Commits != nil || n.Merged != nil {
 		t.Errorf("neovim = %+v", n)
 	}
 	if gone := res.Repos["alexwaumann/does-not-exist-xyz"]; !errors.Is(gone.Err, ErrNotFound) || gone.DefaultBranch != nil {
 		t.Errorf("missing repository = %+v", gone)
 	}
 	st := res.Stats
-	if st == nil || st.Err != nil || st.MergedThis != 4 || st.MergedLast != 22 || st.RecentTotal != 26 || len(st.Recent) != 26 ||
-		!st.HasContrib || st.ContribThis != 36 || st.ContribLast != 143 || st.Recent[0].Repo != "ghostty-org/ghostty" {
+	if st == nil || st.Err != nil || fmt.Sprint(st.Merged) != "[13 22 126 42 7 11]" || !st.HasContrib ||
+		fmt.Sprint(st.Contrib) != "[84 143 478 300 72 142]" {
 		t.Errorf("stats = %+v", st)
 	}
 }
@@ -110,13 +115,13 @@ func TestDecodePollPartial(t *testing.T) {
 			t.Errorf("%s = %+v", sec, r)
 		}
 	}
-	if h := res.Repos["alexwaumann/code-foundry"].History; h == nil || h[0] != 135 {
-		t.Errorf("history = %v", h)
+	if cf := res.Repos["alexwaumann/code-foundry"]; fmt.Sprint(cf.Commits) != "[1462 0 0 0 0 0]" || fmt.Sprint(cf.Merged) != "[153 0 0 0 0 0]" {
+		t.Errorf("code-foundry commits = %v, merged = %v", cf.Commits, cf.Merged)
 	}
 	if gone := res.Repos["alexwaumann/does-not-exist-xyz"]; !errors.Is(gone.Err, ErrNotFound) {
 		t.Errorf("missing repository err = %v", gone.Err)
 	}
-	if st := res.Stats; st == nil || st.ContribThis != 214 || st.MergedThis != 0 {
+	if st := res.Stats; st == nil || fmt.Sprint(st.Contrib) != "[1524 0 0 0 0 0]" || fmt.Sprint(st.Merged) != "[153 0 0 0 0 0]" {
 		t.Errorf("stats = %+v", st)
 	}
 }
@@ -262,6 +267,9 @@ func TestMonthWindows(t *testing.T) {
 		thisR, lastR     string
 		thisLbl, lastLbl string
 	}{
+		{time.Date(2027, 2, 10, 9, 0, 0, 0, ny),
+			"2027-02-01T00:00:00-05:00..2027-02-28T23:59:59-05:00",
+			"2027-01-01T00:00:00-05:00..2027-01-31T23:59:59-05:00", "2027-02", "2027-01"},
 		{time.Date(2026, 10, 8, 4, 0, 0, 0, ny),
 			"2026-10-01T00:00:00-05:00..2026-10-31T23:59:59-05:00",
 			"2026-09-01T00:00:00-05:00..2026-09-30T23:59:59-05:00", "2026-10", "2026-09"},
@@ -273,7 +281,8 @@ func TestMonthWindows(t *testing.T) {
 			"2028-02-01T00:00:00+00:00..2028-02-29T23:59:59+00:00", "2028-03", "2028-02"},
 	}
 	for _, tt := range tests {
-		this, last := monthWindows(tt.now)
+		ws := monthWindows(tt.now, 2)
+		this, last := ws[0], ws[1]
 		if this.searchRange() != tt.thisR || last.searchRange() != tt.lastR || this.Label != tt.thisLbl || last.Label != tt.lastLbl {
 			t.Errorf("monthWindows(%v) = %s %s / %s %s", tt.now, this.Label, this.searchRange(), last.Label, last.searchRange())
 		}

@@ -23,8 +23,9 @@ var schemaSQL string
 
 // cacheVersion is bumped when the cached JSON shape changes incompatibly. Rows with
 // another version are treated as missing. 2: viewer-scoped polling (pull requests carry
-// ids and detail fields; the dashboard has the reviewed list).
-const cacheVersion = 2
+// ids and detail fields; the dashboard has the reviewed list). 3: six months of stats
+// (MonthlyStats.Months).
+const cacheVersion = 3
 
 // cacheRetention is how long on-demand detail rows (PR details, ref checks) are kept.
 const cacheRetention = 7 * 24 * time.Hour

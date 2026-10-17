@@ -7,8 +7,9 @@ import (
 	"testing"
 )
 
-// TestDumpQueries writes every static query document, plus request bodies for the poll
-// and DefaultBranchChecks documents of the poll fixtures (fixturePlan), to
+// TestDumpQueries writes every static query document, plus request bodies for the poll,
+// closed-month PollStats, and DefaultBranchChecks documents of the poll fixtures
+// (fixturePlan), to
 // $GH_DUMP_QUERIES, for recapturing fixtures by hand:
 //
 //	GH_DUMP_QUERIES=/tmp/q go test ./internal/store/gh -run TestDumpQueries
@@ -47,6 +48,16 @@ func TestDumpQueries(t *testing.T) {
 	for name, login := range map[string]string{"poll_me.json": "@me", "poll_mitchellh.json": "mitchellh"} {
 		write(name, body(fixturePlan(login).build()))
 	}
+	// A closed-month stats request (the fixture plan's repositories with stats, plus the
+	// global months).
+	fp := fixturePlan("@me")
+	var closed []repoPlan
+	for _, r := range fp.repos {
+		if r.months != nil {
+			closed = append(closed, repoPlan{slug: r.slug, months: fp.stats.all[1:]})
+		}
+	}
+	write("poll_stats_me.json", body(closedPlans(fp.stats, true, closed)[0].build()))
 	write("default_branch_checks.json", body(defaultBranchChecksDoc([]ciRequest{
 		{"neovim/neovim", "402a494f47808442f3de9266b147b274f8c7a5be"}, {"alexwaumann/code-foundry", "cfd8bdf4f3da13280a2186a0be3cbcb88fa1dd7e"}})))
 }

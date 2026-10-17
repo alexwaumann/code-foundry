@@ -124,8 +124,9 @@ func checkDoc(t *testing.T, name, doc string, vars map[string]any) {
 
 func TestPollPlanBuild(t *testing.T) {
 	now := time.Date(2026, 10, 8, 4, 0, 0, 0, time.FixedZone("EST", -5*3600))
-	this, last := monthWindows(now)
-	stats := &statsPlan{this: this, last: last, login: "octocat", author: "A1", me: "@me"}
+	all := monthWindows(now, statsMonths)
+	stats := &statsPlan{all: all, months: all, login: "octocat", author: "A1", me: "@me"}
+	current := &statsPlan{all: all, months: all[:1], login: "octocat", author: "A1", me: "@me"}
 	tests := []struct {
 		name      string
 		plan      pollPlan
@@ -144,19 +145,36 @@ func TestPollPlanBuild(t *testing.T) {
 			want: []string{"s_authored: search(query: $q_authored, type: ISSUE, first: 50)", "...PullRequestFingerprint",
 				"s_merged: search(query: $q_merged, type: ISSUE_ADVANCED, first: 50) { issueCount nodes { __typename ...PullRequestIdentity",
 				"r0: repository(owner: $r0o, name: $r0n) {\n    ...DefaultBranchFingerprint"},
-			notWant:   []string{"history", "mergedThis"},
+			notWant:   []string{"history", "m0:", "contributions"},
 			wantFrags: []string{"DefaultBranchFingerprint", "PullRequestFingerprint", "PullRequestIdentity", "RateLimitFields", "RollupCounts", "RollupFingerprint", "ViewerFields"}},
 		{name: "watched branches of an untracked repository", plan: pollPlan{
 			repos: []repoPlan{{slug: "o/r", branches: []string{"a", "b/c"}}},
 		},
 			want:    []string{"b0: pullRequests(headRefName: $r0b0, first: 25", "b1: pullRequests(headRefName: $r0b1"},
 			notWant: []string{"DefaultBranchFingerprint"}},
-		{name: "stats", plan: pollPlan{
-			repos: []repoPlan{{slug: "o/r", defaultBranch: true, history: true}, {slug: "o/s", defaultBranch: true}},
+		{name: "stats, six months", plan: pollPlan{
+			repos: []repoPlan{{slug: "o/r", defaultBranch: true, months: all}, {slug: "o/s", defaultBranch: true}},
 			stats: stats,
 		},
-			want: []string{"$author: ID!", "$hThis: GitTimestamp!", "history: defaultBranchRef", "mergedThis: search(query: $mergedThis, type: ISSUE, first: 0)",
-				"mergedRecent: search(query: $mergedRecent, type: ISSUE, first: 100)", "contributions: user(login: $statsLogin)", "$cThisFrom: DateTime!"}},
+			want: []string{"$author: ID!", "$h0s: GitTimestamp!", "$h5u: GitTimestamp!", "history: defaultBranchRef { target { ... on Commit {" +
+				" h0: history(author: {id: $author}, since: $h0s) { totalCount } h1: history(author: {id: $author}, since: $h1s, until: $h1u) { totalCount }",
+				"m0: search(query: $m0, type: ISSUE, first: 0) { issueCount }", "m5: search(query: $m5, type: ISSUE, first: 0) { issueCount }",
+				"r0_m0: search(query: $r0_m0, type: ISSUE, first: 0) { issueCount }", "r0_m5: search(query: $r0_m5",
+				"contributions: user(login: $statsLogin) { c0: contributionsCollection(from: $c0f, to: $c0t) { totalCommitContributions }", "c5: contributionsCollection"},
+			notWant: []string{"r1_m0", "m6:", "nodes { ... on PullRequest { mergedAt"}},
+		{name: "stats, current month; one repository with all six", plan: pollPlan{
+			repos: []repoPlan{{slug: "o/r", defaultBranch: true, months: all[:1]}, {slug: "o/s", defaultBranch: true, months: all}},
+			stats: current,
+		},
+			want: []string{"r0: repository(owner: $r0o, name: $r0n) {\n    ...DefaultBranchFingerprint\n    history: defaultBranchRef { target { ... on Commit { h0: history(author: {id: $author}, since: $h0s) { totalCount } } } }",
+				"r0_m0: search", "r1_m5: search", "m0: search", "c0: contributionsCollection"},
+			notWant: []string{"\n  m1: search", "r0_m1", "c1: contributionsCollection"}},
+		{name: "stats, no author yet: no history", plan: pollPlan{
+			repos: []repoPlan{{slug: "o/r", defaultBranch: true, months: all[:1]}},
+			stats: &statsPlan{all: all, months: all[:1], me: "@me"},
+		},
+			want:    []string{"m0: search", "r0_m0: search"},
+			notWant: []string{"history", "$author", "contributions"}},
 		{name: "SearchAs id", plan: pollPlan{searchAs: "mitchellh"},
 			want: []string{"searchAs: user(login: $searchAs) { id login }"}},
 	}
@@ -191,13 +209,16 @@ func TestPollPlanBuild(t *testing.T) {
 	}
 	// Values: the searches and stats windows.
 	_, vars, _ := (&pollPlan{sections: dashboardSections("@me", now), stats: stats,
-		repos: []repoPlan{{slug: "o/r", history: true}}}).build()
+		repos: []repoPlan{{slug: "o/r", months: all}}}).build()
 	if vars["q_reviewed"] != "is:pr is:open archived:false reviewed-by:@me -author:@me sort:updated-desc" ||
 		vars["q_review"] != "is:pr is:open archived:false review-requested:@me sort:updated-desc" ||
 		vars["q_merged"] != "is:pr is:merged merged:>=2026-10-01T04:00:00-05:00 (author:@me OR reviewed-by:@me OR assignee:@me) sort:updated-desc" ||
-		vars["mergedThis"] != "is:pr is:merged author:@me merged:2026-10-01T00:00:00-05:00..2026-10-31T23:59:59-05:00" ||
-		vars["mergedRecent"] != "is:pr is:merged author:@me merged:2026-09-01T00:00:00-05:00..2026-10-31T23:59:59-05:00 sort:updated-desc" ||
-		vars["hThis"] != "2026-10-01T00:00:00-05:00" || vars["author"] != "A1" || vars["r0o"] != "o" || vars["r0n"] != "r" {
+		vars["m0"] != "is:pr is:merged author:@me merged:2026-10-01T00:00:00-05:00..2026-10-31T23:59:59-05:00" ||
+		vars["m5"] != "is:pr is:merged author:@me merged:2026-05-01T00:00:00-05:00..2026-05-31T23:59:59-05:00" ||
+		vars["r0_m1"] != "repo:o/r is:pr is:merged author:@me merged:2026-09-01T00:00:00-05:00..2026-09-30T23:59:59-05:00" ||
+		vars["h0s"] != "2026-10-01T00:00:00-05:00" || vars["h1s"] != "2026-09-01T00:00:00-05:00" || vars["h1u"] != "2026-10-01T00:00:00-05:00" ||
+		vars["c5f"] != "2026-05-01T00:00:00-05:00" || vars["c5t"] != "2026-05-31T23:59:59-05:00" ||
+		vars["author"] != "A1" || vars["r0o"] != "o" || vars["r0n"] != "r" {
 		t.Errorf("vars = %v", vars)
 	}
 }

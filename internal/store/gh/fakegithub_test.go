@@ -22,12 +22,16 @@ type fakeGitHub struct {
 	sections map[string][]string     // section name -> PR ids, in order
 	repos    map[string]*fakeRepo    // by slug; missing slugs are NOT_FOUND
 	branches map[string][]string     // slug + "\x00" + head -> PR ids
-	merged   []mergedItem            // the stats' two-month merged list
-	// mergedThis/Last are the stats' global merged counts; contrib the commit
-	// contributions.
-	mergedThis, mergedLast   int
-	contribThis, contribLast int
-	cost                     int
+	// merged are the viewer's merged pull requests the stats' count searches see
+	// (global, or narrowed with repo:).
+	merged []mergedItem
+	// contrib are the commit contributions by month ("YYYY-MM").
+	contrib map[string]int
+	// statsMonths records, per document that carried stats (the poll or a closed-month
+	// request), the global months asked for (labels, newest first) and each
+	// repository's (by slug).
+	statsMonths []fakeStatsAsk
+	cost        int
 	// fail makes the next request of an operation fail with err (then clears).
 	fail map[string]error
 	// detail is the detail panel's extra state (fakegithub_detail_test.go).
@@ -43,7 +47,43 @@ type fakeRepo struct {
 	sha     string
 	rollup  CheckRollup
 	failing []CheckRun // first page of checks holds these failed runs
-	history [2]int
+	// history is the viewer's default-branch commits by month ("YYYY-MM").
+	history map[string]int
+}
+
+// mergedItem is a merged pull request the fake's stats searches count.
+type mergedItem struct {
+	Repo     string
+	MergedAt time.Time
+}
+
+// fakeStatsAsk is the months one poll's stats asked for.
+type fakeStatsAsk struct {
+	global []string
+	repos  map[string][]string
+}
+
+// mergedCount answers a stats count search: "[repo:o/n ]is:pr is:merged author:x
+// merged:<start>..<end>".
+func (g *fakeGitHub) mergedCount(q string) (int, string) {
+	repo := ""
+	if r, ok := strings.CutPrefix(q, "repo:"); ok {
+		repo, _, _ = strings.Cut(r, " ")
+	}
+	_, rng, _ := strings.Cut(q, " merged:")
+	from, to, _ := strings.Cut(rng, "..")
+	start, err1 := time.Parse(searchTimeLayout, from)
+	end, err2 := time.Parse(searchTimeLayout, to)
+	if err1 != nil || err2 != nil {
+		panic("fake: bad merged range " + rng)
+	}
+	n := 0
+	for _, m := range g.merged {
+		if (repo == "" || m.Repo == repo) && !m.MergedAt.Before(start) && !m.MergedAt.After(end) {
+			n++
+		}
+	}
+	return n, start.Format("2006-01")
 }
 
 func newFakeGitHub() *fakeGitHub {
@@ -107,6 +147,10 @@ func (g *fakeGitHub) failNext(op string, err error) {
 var (
 	repoBlockRE = regexp.MustCompile(`(?m)^  (r\d+): repository\(owner: \$\w+, name: \$\w+\) \{\n((?:    .*\n)*)  \}`)
 	branchRE    = regexp.MustCompile(`(b\d+): pullRequests\(headRefName: \$(\w+)`)
+	historyRE   = regexp.MustCompile(`(h\d+): history\(author: \{id: \$author\}, since: \$(\w+)`)
+	contribRE   = regexp.MustCompile(`(c\d+): contributionsCollection\(from: \$(\w+)`)
+	// statsCountRE matches the stats count variables: m<k> (global) and r<i>_m<k>.
+	statsCountRE = regexp.MustCompile(`^(?:(r\d+)_)?m\d+$`)
 )
 
 // respond is a fakeRunner handler. It needs the document: Poll and DefaultBranchChecks
@@ -122,7 +166,7 @@ func (g *fakeGitHub) respond(op, doc string, vars map[string]any) (json.RawMessa
 		"resetAt": time.Now().Add(time.Hour).UTC().Format(time.RFC3339)}}
 	var errs []map[string]any
 	switch op {
-	case "Poll":
+	case "Poll", "PollStats":
 		g.poll(doc, vars, data, &errs)
 	case "PullRequestDetails":
 		for _, list := range []string{"open", "closed"} {
@@ -216,24 +260,38 @@ func (g *fakeGitHub) poll(doc string, vars map[string]any, data map[string]any, 
 			out[bm[1]] = map[string]any{"nodes": nodes}
 		}
 		if strings.Contains(block, "history:") {
-			out["history"] = map[string]any{"target": map[string]any{
-				"thisMonth": map[string]any{"totalCount": r.history[0]}, "lastMonth": map[string]any{"totalCount": r.history[1]}}}
+			target := map[string]any{}
+			for _, hm := range historyRE.FindAllStringSubmatch(block, -1) {
+				target[hm[1]] = map[string]any{"totalCount": r.history[vars[hm[2]].(string)[:7]]}
+			}
+			out["history"] = map[string]any{"target": target}
 		}
 		data[alias] = out
 	}
-	if _, ok := vars["mergedThis"]; ok {
-		data["mergedThis"] = map[string]any{"issueCount": g.mergedThis}
-		data["mergedLast"] = map[string]any{"issueCount": g.mergedLast}
-		nodes := []any{}
-		for _, m := range g.merged {
-			nodes = append(nodes, map[string]any{"mergedAt": m.MergedAt.UTC().Format(time.RFC3339), "repository": map[string]any{"nameWithOwner": m.Repo}})
+	ask := fakeStatsAsk{repos: map[string][]string{}}
+	for _, name := range slices.Sorted(maps.Keys(vars)) {
+		m := statsCountRE.FindStringSubmatch(name)
+		if m == nil {
+			continue
 		}
-		data["mergedRecent"] = map[string]any{"issueCount": len(nodes), "nodes": nodes}
+		n, label := g.mergedCount(vars[name].(string))
+		data[name] = map[string]any{"issueCount": n}
+		if m[1] == "" {
+			ask.global = append(ask.global, label)
+		} else {
+			slug := vars[m[1]+"o"].(string) + "/" + vars[m[1]+"n"].(string)
+			ask.repos[slug] = append(ask.repos[slug], label)
+		}
+	}
+	if ask.global != nil || len(ask.repos) > 0 {
+		g.statsMonths = append(g.statsMonths, ask)
 	}
 	if _, ok := vars["statsLogin"]; ok {
-		data["contributions"] = map[string]any{
-			"thisMonth": map[string]any{"totalCommitContributions": g.contribThis},
-			"lastMonth": map[string]any{"totalCommitContributions": g.contribLast}}
+		out := map[string]any{}
+		for _, cm := range contribRE.FindAllStringSubmatch(doc, -1) {
+			out[cm[1]] = map[string]any{"totalCommitContributions": g.contrib[vars[cm[2]].(string)[:7]]}
+		}
+		data["contributions"] = out
 	}
 }
 
@@ -340,4 +398,18 @@ func fakePR(id, repo string, number int, updated time.Time) PullRequest {
 		ReviewDecision: ReviewRequired, Mergeable: MergeableMergeable, MergeStateStatus: "BLOCKED",
 		Additions: 10, Deletions: 2, ChangedFiles: 1,
 	}
+}
+
+// addMerged adds merged pull requests the stats' count searches see.
+func (g *fakeGitHub) addMerged(items ...mergedItem) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.merged = append(g.merged, items...)
+}
+
+// asks returns the months each stats poll asked for, in order.
+func (g *fakeGitHub) asks() []fakeStatsAsk {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return slices.Clone(g.statsMonths)
 }

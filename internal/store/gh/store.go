@@ -41,9 +41,12 @@ type Options struct {
 	// DetailBatch is how many open pull requests one detail request carries.
 	DetailBatch int
 
-	// StatsInterval is how often the monthly stats ride along with the poll. Negative
-	// disables them.
+	// StatsInterval is how often the current month's stats ride along with the poll.
+	// Negative disables the stats.
 	StatsInterval time.Duration
+	// HistoryInterval is how often the closed months' stats are refetched (sooner when
+	// some are missing).
+	HistoryInterval time.Duration
 	// BranchWatch is how long a branch stays in the poll after BranchPullRequests
 	// asked for it.
 	BranchWatch time.Duration
@@ -95,6 +98,7 @@ func (o *Options) setDefaults() {
 	if o.StatsInterval == 0 {
 		o.StatsInterval = DefaultStatsInterval
 	}
+	def(&o.HistoryInterval, DefaultHistoryInterval)
 	if o.Log == nil {
 		o.Log = slog.New(slog.DiscardHandler)
 	}
@@ -293,7 +297,9 @@ func (s *Store) Track(slug string) error {
 		s.pollSoonLocked(now)
 	}
 	if a.Stats.FetchedAt.IsZero() {
-		s.statsNext = now // the next poll brings its stats (and refreshes the others)
+		// The next poll brings its stats (and refreshes the others). Zero, not now: a
+		// poll that started a moment ago and plans after this sees them due.
+		s.statsNext = time.Time{}
 	}
 	s.mu.Unlock()
 	s.setTracked(key, true)
@@ -558,7 +564,7 @@ func (s *Store) callDoc(ctx context.Context, name, doc string, vars map[string]a
 		}
 	}
 	attrs := []any{"query", name, "dur", s.lastEnd.Sub(start).Round(time.Millisecond).String(), "bytes", len(data)}
-	if name != queryPoll { // the poll's variables are logged by poll.go in summary form
+	if name != queryPoll && name != queryPollStats { // logged by poll.go in summary form
 		attrs = append(attrs, "vars", loggedVars(vars))
 	}
 	if rl != nil {
@@ -569,6 +575,9 @@ func (s *Store) callDoc(ctx context.Context, name, doc string, vars map[string]a
 	}
 	s.log.Debug("gh request", attrs...)
 	s.cycle.requests++
+	if name == queryPoll {
+		s.cycle.pollDur = s.lastEnd.Sub(start)
+	}
 	if rl != nil {
 		s.cycle.cost += rl.Cost
 	}

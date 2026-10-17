@@ -18,6 +18,7 @@ const (
 	queryChecks              = "checks"
 	queryPullRequestDetails  = "pull_request_details"
 	queryPoll                = "poll"                  // built by pollPlan.build
+	queryPollStats           = "poll_stats"            // the closed months: pollPlan.build with statsOnly
 	queryDefaultBranchChecks = "default_branch_checks" // built by defaultBranchChecksDoc
 )
 

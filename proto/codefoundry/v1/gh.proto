@@ -392,8 +392,11 @@ message MonthActivity {
 }
 
 message ActivityStats {
-  MonthActivity this_month = 1;
-  MonthActivity last_month = 2;
+  reserved 1, 2;
+  reserved "this_month", "last_month";
+  // The last six calendar months, newest first: months[0] is the current month, then
+  // the five closed ones. Empty until fetched.
+  repeated MonthActivity months = 6;
   // Where commit counts came from: "search" (REST search/commits, or the default
   // branch's history for one repository) or "contributions" (contributionsCollection,
   // the fallback when commit search fails; buckets by UTC day).

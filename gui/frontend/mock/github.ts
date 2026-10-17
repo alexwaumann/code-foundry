@@ -90,6 +90,11 @@ function monthLabel(d: Date): string {
   return `${String(d.getFullYear())}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
+/** Stats months newest first from now: counts[i] is [commits, merged] of the month i back. */
+function statsMonths(now: Date, counts: [number, number][]) {
+  return counts.map(([commits, merged], i) => ({ month: monthLabel(new Date(now.getFullYear(), now.getMonth() - i, 1)), commits, merged }));
+}
+
 const rollup = (state: CheckRollupState, passed: number, failed = 0, pending = 0, skipped = 0) => ({
   state,
   total: passed + failed + pending + skipped,
@@ -155,7 +160,6 @@ export class GhWorld {
     this.calls = {};
     this.authenticated = true;
     const now = new Date(this.t0);
-    const last = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const cf = "alexwaumann/code-foundry";
     const gp = "alexwaumann/ghostty-playground";
     const sidebarPr = this.pr(cf, 142, "feat(gui): virtualized sidebar tree with thread rows", {
@@ -196,8 +200,14 @@ export class GhWorld {
         this.pr("other-org/lib", 70, "docs: README", { author: "someone", mergedAgoMs: 3 * DAY, ageMs: 3 * DAY }),
       ],
       stats: {
-        thisMonth: { month: monthLabel(now), commits: 16, merged: 2 },
-        lastMonth: { month: monthLabel(last), commits: 463, merged: 38 },
+        months: statsMonths(now, [
+          [16, 2],
+          [463, 38],
+          [210, 17],
+          [96, 9],
+          [0, 0],
+          [41, 3],
+        ]),
         commitsSource: "search",
         fetchedAt: this.at(8_000),
       },
@@ -210,7 +220,7 @@ export class GhWorld {
         {
           repoSlug: cf,
           tracked: true,
-          stats: { thisMonth: { month: monthLabel(now), commits: 9, merged: 2 }, lastMonth: { month: monthLabel(last), commits: 75, merged: 7 }, commitsSource: "search", fetchedAt: this.at(MIN) },
+          stats: { months: statsMonths(now, [[9, 2], [75, 7], [30, 4], [12, 1], [0, 0], [5, 1]]), commitsSource: "search", fetchedAt: this.at(MIN) },
           defaultBranch: {
             branch: "main",
             sha: "3c3c4651aa",
@@ -231,7 +241,7 @@ export class GhWorld {
         {
           repoSlug: gp,
           tracked: true,
-          stats: { thisMonth: { month: monthLabel(now), commits: 7, merged: 0 }, lastMonth: { month: monthLabel(last), commits: 12, merged: 1 }, commitsSource: "search", fetchedAt: this.at(MIN) },
+          stats: { months: statsMonths(now, [[7, 0], [12, 1], [3, 0], [0, 0], [0, 0], [1, 0]]), commitsSource: "search", fetchedAt: this.at(MIN) },
           defaultBranch: { branch: "main", sha: "77aa55cc", headline: "build: zig 0.16", committedAt: this.at(6 * DAY), rollup: rollup(CheckRollupState.SUCCESS, 9, 0, 0, 1), failing: [], fetchedAt: this.at(20_000) },
           recentlyMerged: [],
         },

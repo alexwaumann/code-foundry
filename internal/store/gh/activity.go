@@ -17,8 +17,15 @@ import (
 
 // Activity defaults.
 const (
+	// DefaultStatsInterval is the current month's stats cadence.
 	DefaultStatsInterval = 15 * time.Minute
-	DefaultBranchWatch   = 10 * time.Minute
+	// DefaultHistoryInterval is the closed months' cadence (they do not change; the
+	// daily refetch catches late corrections). Missing months are fetched sooner.
+	DefaultHistoryInterval = 24 * time.Hour
+	DefaultBranchWatch     = 10 * time.Minute
+
+	// statsMonths is how many months the stats hold: the current one and five closed.
+	statsMonths = 6
 
 	recentlyMergedWindow = 7 * 24 * time.Hour
 )
@@ -46,17 +53,34 @@ type MonthCount struct {
 	Month   string `json:"month"`
 	Commits int    `json:"commits"`
 	Merged  int    `json:"merged"`
+	// Source is where Commits came from (a CommitsFrom* value; "" when unknown), kept
+	// per month because closed months are fetched apart from the current one.
+	Source string `json:"source,omitempty"`
 }
 
-// MonthlyStats is the viewer's activity this month and last.
+// MonthlyStats is the viewer's activity over the last statsMonths calendar months.
 type MonthlyStats struct {
-	ThisMonth MonthCount `json:"thisMonth"`
-	LastMonth MonthCount `json:"lastMonth"`
-	// CommitsSource says where the commit counts came from: CommitsFromSearch or the
-	// contributionsCollection fallback.
-	CommitsSource string    `json:"commitsSource,omitempty"`
-	FetchedAt     time.Time `json:"fetchedAt"`
-	LastError     string    `json:"-"`
+	// Months are newest first: Months[0] is the current month. Every one is present
+	// once fetched (zero counts included).
+	Months []MonthCount `json:"months"`
+	// CommitsSource says where the commit counts came from: CommitsFromSearch, or the
+	// contributionsCollection fallback when any month used it.
+	CommitsSource string `json:"commitsSource,omitempty"`
+	// FetchedAt is when the current month was last fetched.
+	FetchedAt time.Time `json:"fetchedAt"`
+	// ClosedAt is when the closed months were last fetched (DefaultHistoryInterval).
+	ClosedAt  time.Time `json:"closedAt,omitzero"`
+	LastError string    `json:"-"`
+}
+
+// Month returns the count for label ("YYYY-MM"), if held.
+func (m MonthlyStats) Month(label string) (MonthCount, bool) {
+	for _, c := range m.Months {
+		if c.Month == label {
+			return c, true
+		}
+	}
+	return MonthCount{}, false
 }
 
 // Dashboard is the viewer's pull request dashboards across GitHub.
@@ -264,11 +288,64 @@ func (w monthWindow) contains(t time.Time) bool {
 	return !t.Before(w.Start) && !t.After(w.End)
 }
 
-// monthWindows returns the month containing now and the one before, in now's location.
-func monthWindows(now time.Time) (this, last monthWindow) {
-	mk := func(start time.Time) monthWindow {
-		return monthWindow{Start: start, End: start.AddDate(0, 1, 0).Add(-time.Second), Label: start.Format("2006-01")}
-	}
+// next is when the month after w starts.
+func (w monthWindow) next() time.Time { return w.End.Add(time.Second) }
+
+// monthWindows returns the n months up to the one containing now, newest first, in
+// now's location.
+func monthWindows(now time.Time, n int) []monthWindow {
 	start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
-	return mk(start), mk(start.AddDate(0, -1, 0))
+	out := make([]monthWindow, n)
+	for i := range out {
+		s := start.AddDate(0, -i, 0)
+		out[i] = monthWindow{Start: s, End: s.AddDate(0, 1, 0).Add(-time.Second), Label: s.Format("2006-01")}
+	}
+	return out
+}
+
+// closedDue reports whether st's closed months must be fetched: some are missing, they
+// were last fetched before the newest of them closed (a month rolled over), or
+// DefaultHistoryInterval has passed.
+func closedDue(st MonthlyStats, windows []monthWindow, now time.Time, interval time.Duration) bool {
+	if st.ClosedAt.IsZero() || st.ClosedAt.Before(windows[0].Start) || now.Sub(st.ClosedAt) >= interval {
+		return true
+	}
+	for _, w := range windows[1:] {
+		if _, ok := st.Month(w.Label); !ok {
+			return true
+		}
+	}
+	return false
+}
+
+// mergeMonths lays fresh counts over prev, by month: one entry per window, newest
+// first; a window in neither is zero.
+func mergeMonths(windows []monthWindow, prev MonthlyStats, fresh []MonthCount) []MonthCount {
+	out := make([]MonthCount, len(windows))
+	for i, w := range windows {
+		out[i] = MonthCount{Month: w.Label}
+		if c, ok := prev.Month(w.Label); ok {
+			out[i] = c
+		}
+		for _, c := range fresh {
+			if c.Month == w.Label {
+				out[i] = c
+			}
+		}
+	}
+	return out
+}
+
+// commitsSource is the stats' overall source: contributions when any month used it.
+func commitsSource(months []MonthCount) string {
+	src := ""
+	for _, m := range months {
+		switch m.Source {
+		case CommitsFromContributions:
+			return CommitsFromContributions
+		case CommitsFromSearch:
+			src = CommitsFromSearch
+		}
+	}
+	return src
 }
