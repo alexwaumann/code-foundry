@@ -28,8 +28,10 @@ const (
 	searchFirstMerged = 50
 	minSearchFirst    = 10
 	// branchFirst is how many pull requests per watched branch the poll lists (every
-	// author, forks included; the store keeps the viewer's).
-	branchFirst = 10
+	// author, forks included; the store keeps the viewer's). It is 25, not 10, so a
+	// branch name reused by many people (or a watched default branch) still leaves room
+	// for the viewer's own pull requests; the fingerprint is cheap (~11ms per PR).
+	branchFirst = 25
 	// mergedStatsFirst caps the merged pull requests listed for per-repository merged
 	// counts (two months). Beyond it, per-repository counts are lower bounds.
 	mergedStatsFirst = 100

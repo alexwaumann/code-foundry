@@ -184,7 +184,8 @@ func writeOnPullRequest[T any](ctx context.Context, s *Store, k fullKey, memo *w
 // nodeID returns k's GraphQL node id from the cached detail, whatever its age (the id
 // never changes), or fetches the detail when nothing is cached; that fetch must succeed.
 func (s *Store) nodeID(ctx context.Context, k fullKey) (string, error) {
-	d, _, ok := s.cachedFull(ctx, k)
+	e, ok := s.cachedFull(ctx, k)
+	d := e.d
 	if !ok || d.PullRequest.ID == "" {
 		var err error
 		if d, err = s.fetchFullJob(ctx, k); err != nil {

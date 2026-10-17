@@ -371,3 +371,73 @@ func TestRevertPullRequest(t *testing.T) {
 		t.Errorf("paused candidates err = %v", err)
 	}
 }
+
+// A poll that sees a pull request's fingerprint unchanged confirms its cached detail,
+// so reads past the poll interval are served from cache; pull requests the poll does
+// not cover keep the age rule, and merged ones age at closedDetailTTL.
+func TestFullPullRequestConfirmedByPoll(t *testing.T) {
+	g, t0 := changeDrivenWorld()
+	g.addPR(fakePR("PR_u", "o/r", 4, t0)) // on no dashboard: the poll never sees it
+	uncoveredMerged := fakePR("PR_m", "o/r", 5, t0)
+	uncoveredMerged.State, uncoveredMerged.MergedAt = PullRequestMerged, t0
+	g.addPR(uncoveredMerged)
+	f := (&fakeRunner{}).serve(g)
+	clk := &testClock{}
+	opts := testOptions(openTestDB(t), f, nil)
+	opts.Now = clk.now
+	opts.Config = func() Config { return Config{PollInterval: time.Minute, Dashboards: true} }
+	s := startStore(t, opts)
+	if err := s.Track("o/r"); err != nil {
+		t.Fatal(err)
+	}
+	pollOnce(t, s, f)
+	ctx := context.Background()
+	fetchesOf := map[int]int{}
+	read := func(number int) {
+		t.Helper()
+		before := f.count("PullRequestFull")
+		if _, err := s.FullPullRequest(ctx, "o/r", number, false); err != nil {
+			t.Fatal(err)
+		}
+		fetchesOf[number] += f.count("PullRequestFull") - before
+	}
+	expect := func(step string, want map[int]int) {
+		t.Helper()
+		for n, w := range want {
+			if fetchesOf[n] != w {
+				t.Errorf("%s: #%d fetched %d times, want %d", step, n, fetchesOf[n], w)
+			}
+		}
+	}
+	readAll := func() {
+		t.Helper()
+		for _, n := range []int{1, 3, 4, 5} {
+			read(n)
+		}
+	}
+
+	readAll()
+	expect("first reads", map[int]int{1: 1, 3: 1, 4: 1, 5: 1})
+
+	// Past the interval, after a poll that saw #1 (authored) and #3 (merged) unchanged.
+	clk.advance(61 * time.Second)
+	pollOnce(t, s, f)
+	readAll()
+	expect("past the interval, confirmed", map[int]int{1: 1, 3: 1, 4: 2, 5: 1})
+
+	// Keep polling and reading each minute: #1 and #3 stay confirmed until
+	// confirmedMaxAge, #4 refetches every interval, #5 (merged) once closedDetailTTL ends.
+	for range 9 {
+		clk.advance(61 * time.Second)
+		pollOnce(t, s, f)
+		readAll()
+	}
+	// 10 x 61s after the first fetch: #1, #3, and #5 crossed 10 minutes once.
+	expect("ten minutes on", map[int]int{1: 2, 3: 2, 4: 11, 5: 2})
+
+	// A move the poll sees still makes the next read fetch, confirmation or not.
+	g.edit("PR_a", func(p *PullRequest) { p.UpdatedAt = p.UpdatedAt.Add(time.Minute) })
+	pollOnce(t, s, f)
+	read(1)
+	expect("moved", map[int]int{1: 3})
+}

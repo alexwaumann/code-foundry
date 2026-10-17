@@ -11,11 +11,14 @@ import (
 // The pull request detail panel's data (GetPullRequestDetail). One GraphQL request
 // (pull_request_full.graphql) per fetch, plus Checks pages only beyond 100 checks.
 //
-// Cache rules (docs/notes/gh-pr-detail.md): an entry is served until the caller asks
-// for a refresh, it is older than the poll interval, or the poll saw the pull request's
-// fingerprint move (updatedAt, state, head, check rollup). The poll marks the entry
-// stale and publishes PullRequestDetailUpdated, so an open panel re-reads (and that
-// read fetches). A fetch whose result differs from a fresh previous entry (a refresh,
+// Cache rules (docs/notes/gh-pr-detail.md, docs/notes/gh-detail-cache-confirm.md): an
+// entry is served until the caller asks for a refresh, the poll saw the pull request's
+// fingerprint move (updatedAt, state, head, check rollup), or it is too old. The poll
+// marks a moved entry stale and publishes PullRequestDetailUpdated, so an open panel
+// re-reads (and that read fetches). Too old is past the poll interval (closedDetailTTL
+// for merged and closed pull requests), unless a recent poll confirmed the entry: it
+// saw the fingerprint unchanged (fullEntry.serves). Only pull requests the poll covers
+// (dashboards, watched branches) are ever confirmed. A fetch whose result differs from a fresh previous entry (a refresh,
 // or one past its age) publishes it too, for the other clients showing it.
 // Entries live in memory (fullCacheMax) and in gh_activity ("pr_detail:<slug>#<n>"),
 // which serves as the fallback when a fetch fails, also after a restart. A row read
@@ -24,6 +27,16 @@ import (
 
 // fullCacheMax bounds the in-memory entries; the least recently fetched go first.
 const fullCacheMax = 64
+
+// closedDetailTTL replaces the poll interval as the age limit of a merged or closed
+// pull request's detail (or the poll interval, when that is longer): little changes on
+// it after it closes, and a panel left open on one re-read it every interval.
+const closedDetailTTL = 10 * time.Minute
+
+// confirmedMaxAge bounds how long confirmations keep an entry: some changes do not move
+// the fingerprint (the base branch moving changes mergeStateStatus, a thread resolved),
+// so even a confirmed entry is refetched once it is this old.
+const confirmedMaxAge = 10 * time.Minute
 
 // writeMemoTTL is how long a revert's or a merge's outcome (or a review's or comment's,
 // for the same text) answers repeated calls for the same pull request instead of
@@ -51,6 +64,42 @@ func fullKeyOf(slug string, number int) (fullKey, error) {
 type fullEntry struct {
 	d     FullPullRequest
 	stale bool // the poll saw the pull request change since d was fetched
+	// confirmed is when a poll last saw the pull request's fingerprint unchanged since d
+	// was fetched; zero until one does.
+	confirmed time.Time
+}
+
+// serves reports whether e may be served at now without a fetch: it is not stale, and
+// it is younger than its age limit (the poll interval; closedDetailTTL once merged or
+// closed) or a poll confirmed it within confirmWindow, up to confirmedMaxAge.
+func (e fullEntry) serves(now time.Time, pollInterval time.Duration) bool {
+	if e.stale {
+		return false
+	}
+	age := now.Sub(e.d.FetchedAt)
+	limit := pollInterval
+	if st := e.d.PullRequest.State; st == PullRequestMerged || st == PullRequestClosed {
+		limit = max(limit, closedDetailTTL)
+	}
+	if age < limit {
+		return true
+	}
+	return !e.confirmed.IsZero() && now.Sub(e.confirmed) < confirmWindow(pollInterval) && age < confirmedMaxAge
+}
+
+// confirmWindow is how long a poll's confirmation holds: one interval plus half of one,
+// because the next poll is scheduled an interval after the previous one ended and
+// confirms only once its fingerprint request returns (seconds later).
+func confirmWindow(pollInterval time.Duration) time.Duration {
+	return pollInterval + pollInterval/2
+}
+
+// confirmable reports whether a poll that saw d's fingerprint unchanged vouches for
+// all of d. An open pull request whose mergeability GitHub is still computing is not:
+// the result lands without moving updatedAt, so it waits for the age rule.
+func confirmable(d FullPullRequest) bool {
+	p := d.PullRequest
+	return p.State != PullRequestOpen || (p.Mergeable != MergeableUnknown && p.MergeStateStatus != "UNKNOWN")
 }
 
 // writeMemo is a mutation's outcome for writeMemoTTL: its result (the pull request a
@@ -109,13 +158,19 @@ type fullCache struct {
 }
 
 func (c *fullCache) get(k fullKey) (d FullPullRequest, stale, ok bool) {
+	e, ok := c.entry(k)
+	return e.d, e.stale, ok
+}
+
+// entry returns a copy of k's entry.
+func (c *fullCache) entry(k fullKey) (fullEntry, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	e, ok := c.m[k]
 	if !ok {
-		return FullPullRequest{}, false, false
+		return fullEntry{}, false
 	}
-	return e.d, e.stale, true
+	return *e, true
 }
 
 // put stores d as fresh and returns the entry it replaced.
@@ -148,16 +203,17 @@ func (c *fullCache) putLocked(k fullKey, e *fullEntry) (prev fullEntry, had bool
 	return prev, had
 }
 
-// adopt stores d (loaded from SQLite) as stale unless an entry exists, in one step, and
-// returns the entry cached afterwards.
-func (c *fullCache) adopt(k fullKey, d FullPullRequest) (FullPullRequest, bool) {
+// adopt stores d (loaded from SQLite) as stale and unconfirmed unless an entry exists,
+// in one step, and returns the entry cached afterwards.
+func (c *fullCache) adopt(k fullKey, d FullPullRequest) fullEntry {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if e, ok := c.m[k]; ok {
-		return e.d, e.stale
+		return *e
 	}
-	c.putLocked(k, &fullEntry{d: d, stale: true})
-	return d, true
+	e := &fullEntry{d: d, stale: true}
+	c.putLocked(k, e)
+	return *e
 }
 
 // markStale marks k stale; it reports whether there was a fresh entry.
@@ -172,9 +228,10 @@ func (c *fullCache) markStale(k fullKey) bool {
 	return true
 }
 
-// staleMoved marks stale every fresh entry whose pull request's fingerprint in fps
-// moved, and returns their keys.
-func (c *fullCache) staleMoved(fps []prFingerprint) []fullKey {
+// applyPoll records what a poll saw: every fresh entry whose pull request's fingerprint
+// in fps moved goes stale (their keys are returned), and every other fresh one in fps
+// is confirmed at now when its detail allows (confirmable).
+func (c *fullCache) applyPoll(fps []prFingerprint, now time.Time) []fullKey {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if len(c.m) == 0 {
@@ -187,11 +244,14 @@ func (c *fullCache) staleMoved(fps []prFingerprint) []fullKey {
 	var out []fullKey
 	for k, e := range c.m {
 		f, ok := byID[e.d.PullRequest.ID]
-		if !ok || e.stale || !fingerprintMoved(e.d.PullRequest, f) {
-			continue
+		switch {
+		case !ok || e.stale:
+		case fingerprintMoved(e.d.PullRequest, f):
+			e.stale = true
+			out = append(out, k)
+		case confirmable(e.d):
+			e.confirmed = now
 		}
-		e.stale = true
-		out = append(out, k)
 	}
 	return out
 }
@@ -220,13 +280,14 @@ func (s *Store) FullPullRequest(ctx context.Context, slug string, number int, re
 	if err != nil {
 		return FullPullRequest{}, err
 	}
-	cached, stale, ok := s.cachedFull(ctx, k)
-	if ok && !refresh && !stale && s.opts.Now().Sub(cached.FetchedAt) < s.config().PollInterval {
-		return cached, nil
+	e, ok := s.cachedFull(ctx, k)
+	if ok && !refresh && e.serves(s.opts.Now(), s.config().PollInterval) {
+		return e.d, nil
 	}
 	d, err := s.fetchFullJob(ctx, k)
 	if err != nil {
 		if ok && ctx.Err() == nil {
+			cached := e.d
 			cached.LastError = err.Error()
 			return cached, nil
 		}
@@ -235,20 +296,19 @@ func (s *Store) FullPullRequest(ctx context.Context, slug string, number int, re
 	return d, nil
 }
 
-// cachedFull returns the cached detail of k from memory or, failing that, SQLite.
-func (s *Store) cachedFull(ctx context.Context, k fullKey) (d FullPullRequest, stale, ok bool) {
-	if d, stale, ok = s.full.get(k); ok {
-		return d, stale, true
+// cachedFull returns the cached entry of k from memory or, failing that, SQLite.
+func (s *Store) cachedFull(ctx context.Context, k fullKey) (fullEntry, bool) {
+	if e, ok := s.full.entry(k); ok {
+		return e, true
 	}
 	row, found, err := loadActivityRow[FullPullRequest](ctx, s.cache, activityFull+k.String())
 	if err != nil {
 		s.log.Warn("gh cache read failed", "err", err)
 	}
 	if !found {
-		return FullPullRequest{}, false, false
+		return fullEntry{}, false
 	}
-	d, stale = s.full.adopt(k, row)
-	return d, stale, true
+	return s.full.adopt(k, row), true
 }
 
 // fetchFullJob fetches k on the worker and returns GitHub's error, if any. Jobs with
@@ -322,9 +382,9 @@ func (s *Store) fetchFull(ctx context.Context, k fullKey) (FullPullRequest, erro
 }
 
 // staleFullDetails is the poll's hook: cached details whose pull request's fingerprint
-// moved go stale, and clients hear about it.
+// moved go stale, and clients hear about it; the others it saw are confirmed.
 func (s *Store) staleFullDetails(fps []prFingerprint) {
-	for _, k := range s.full.staleMoved(fps) {
+	for _, k := range s.full.applyPoll(fps, s.opts.Now()) {
 		publish(s, PullRequestDetailUpdated{Slug: k.slug, Number: k.number})
 	}
 }

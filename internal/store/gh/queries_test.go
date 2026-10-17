@@ -149,7 +149,7 @@ func TestPollPlanBuild(t *testing.T) {
 		{name: "watched branches of an untracked repository", plan: pollPlan{
 			repos: []repoPlan{{slug: "o/r", branches: []string{"a", "b/c"}}},
 		},
-			want:    []string{"b0: pullRequests(headRefName: $r0b0, first: 10", "b1: pullRequests(headRefName: $r0b1"},
+			want:    []string{"b0: pullRequests(headRefName: $r0b0, first: 25", "b1: pullRequests(headRefName: $r0b1"},
 			notWant: []string{"DefaultBranchFingerprint"}},
 		{name: "stats", plan: pollPlan{
 			repos: []repoPlan{{slug: "o/r", defaultBranch: true, history: true}, {slug: "o/s", defaultBranch: true}},

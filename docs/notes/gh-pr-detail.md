@@ -84,7 +84,9 @@ re-read. The GUI's `pullRequestDetailResource` (key `slug#number`) is invalidate
   argument sets.
 * **Cache rules.** An entry is served until one of these happens:
   * `refresh` is set
-  * it is older than `github.poll_interval_seconds` (the poll interval)
+  * it is older than `github.poll_interval_seconds` (the poll interval), or 10 minutes
+    for a merged or closed PR, and no recent poll confirmed it (saw its fingerprint
+    unchanged; capped at 10 minutes). See `docs/notes/gh-detail-cache-confirm.md`.
   * a poll's fingerprint for that PR moved: `updatedAt`, state, head, or check rollup
     (state or counts)
   * it was just read back from SQLite. Polls that ran while the row was only on disk
@@ -94,7 +96,8 @@ re-read. The GUI's `pullRequestDetailResource` (key `slug#number`) is invalidate
 
   The hook is one line in `applyPoll` (`staleFullDetails(fps)`). It compares by node id
   against every fingerprint the poll fetched, so it covers the viewer's dashboards and
-  watched branches. Other PRs fall back to the age rule.
+  watched branches. Other PRs fall back to the age rule. The same hook confirms the
+  entries whose fingerprint did not move.
 * **Events.** The poll marks an entry stale and publishes the event once. Every read of a
   stale entry then fetches, so the refetch does not announce again. A refresh or an
   age-expired fetch announces only when the content changed (JSON compared without
