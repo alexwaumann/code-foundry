@@ -59,10 +59,10 @@ function ThreadMissing() {
  */
 export function ThreadPane({ sessionId }: { sessionId: string }) {
   const exists = useSessionsStore((s) => sessionId in s.byId);
-  return exists ? <ThreadView sessionId={sessionId} /> : <ThreadMissing />;
+  return exists ? <ThreadBody sessionId={sessionId} /> : <ThreadMissing />;
 }
 
-function ThreadView({ sessionId }: { sessionId: string }) {
+function ThreadBody({ sessionId }: { sessionId: string }) {
   useEffect(() => startThreadWatch(sessionId), [sessionId]);
   const cwd = useSessionsStore((s) => s.byId[sessionId]?.worktreePath ?? "");
   const state = useSessionsStore((s) => s.byId[sessionId]?.state ?? "unknown");

@@ -398,22 +398,22 @@ function routes(router: ConnectRouter): void {
     watch: (_req, ctx) => tracked("ThreadService/Watch", world.sessionEvents.subscribe(ctx.signal, [world.sessionSnapshot()])),
     // The conversation (mock/thread.ts). The GUI goes through the thread.* commands for
     // Send / Interrupt / Respond / SetModel / SetPermissionMode / SetEffort; these serve the RPCs themselves.
-    listItems: (req) => guard(() => ({ snapshot: world.threads.snapshotValue(req.threadId) })),
-    watchThread: (req, ctx) => tracked("ThreadService/WatchThread", guard(() => world.threads.watch(req.threadId, ctx.signal))),
-    send: (req) => guard(() => (refuseSlashCommand(req.text), { item: world.threads.send(req.threadId, req.text, req.attachments, req.composerText) })),
-    slashCommands: (req) => guard(() => ({ commands: world.threads.slashCommandsOf(req.threadId) })),
-    interrupt: (req) => guard(() => (world.threads.finish(req.threadId, { interrupted: true }), {})),
+    listItems: (req) => guard(() => ({ snapshot: world.logs.snapshotValue(req.threadId) })),
+    watchThread: (req, ctx) => tracked("ThreadService/WatchThread", guard(() => world.logs.watch(req.threadId, ctx.signal))),
+    send: (req) => guard(() => (refuseSlashCommand(req.text), { item: world.logs.send(req.threadId, req.text, req.attachments, req.composerText) })),
+    slashCommands: (req) => guard(() => ({ commands: world.logs.slashCommandsOf(req.threadId) })),
+    interrupt: (req) => guard(() => (world.logs.finish(req.threadId, { interrupted: true }), {})),
     respond: (req) =>
       guard(() => {
         const decision = req.decision === ThreadDecision.DENY ? "deny" : req.decision === ThreadDecision.ALLOW_FOR_SESSION ? "allow-session" : "allow";
-        return { item: world.threads.respond(req.threadId, req.requestId, decision, req.answers, req.message) };
+        return { item: world.logs.respond(req.threadId, req.requestId, decision, req.answers, req.message) };
       }),
-    setEffort: (req) => guard(() => (world.threads.setEffort(req.threadId, req.effort), { thread: world.sessionMsg(world.session(req.threadId)) })),
+    setEffort: (req) => guard(() => (world.logs.setEffort(req.threadId, req.effort), { thread: world.sessionMsg(world.session(req.threadId)) })),
     // MCP (mock/mcp.ts): the GUI reads McpStatus once for a thread never checked; refresh and reconnect go through thread.mcp / thread.mcp-reconnect.
-    mcpStatus: (req) => guard(() => ({ status: req.refresh ? refreshMcp(world.threads, req.threadId) : world.threads.mcpOf(req.threadId) })),
+    mcpStatus: (req) => guard(() => ({ status: req.refresh ? refreshMcp(world.logs, req.threadId) : world.logs.mcpOf(req.threadId) })),
     mcpReconnect: async (req) => {
       try {
-        return await reconnectMcp(world.threads, req.threadId, req.serverName);
+        return await reconnectMcp(world.logs, req.threadId, req.serverName);
       } catch (err) {
         throw rpcError(err);
       }
@@ -462,7 +462,7 @@ function routes(router: ConnectRouter): void {
         { source: EventSource.WORKSPACE, event: { event: { case: "workspace", value: world.workspaceSnapshot() } } },
         ...[...world.terms.values()].map((t) => ({ source: EventSource.TERMINAL, event: { event: { case: "terminal" as const, value: { event: { case: "updated" as const, value: world.terminalMsg(t) } } } } })),
         { source: EventSource.THREAD_LIST, event: { event: { case: "threadList", value: world.sessionSnapshot() } } },
-        { source: EventSource.THREAD, event: { event: { case: "thread", value: world.threads.pendingSnapshot() } } },
+        { source: EventSource.THREAD, event: { event: { case: "thread", value: world.logs.pendingSnapshot() } } },
         ghEvent(world.gh.polledEvent()),
         { source: EventSource.GITOPS, event: { event: { case: "gitops", value: world.gitops.snapshot() } } },
         { source: EventSource.SETTINGS, event: { event: { case: "settings", value: { event: { case: "snapshot", value: world.settings.snapshot() } } } } },
@@ -802,7 +802,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     case "POST /__mock/thread/agent-end":
       // id=s-r1&run=a1[&status=done|failed]: a subagent run ends (mock/agents.ts).
       try {
-        world.threads.endAgent(q.get("id") ?? "s-r1", q.get("run") ?? "", q.get("status") === "failed");
+        world.logs.endAgent(q.get("id") ?? "s-r1", q.get("run") ?? "", q.get("status") === "failed");
         json(res, 200, { ok: true });
       } catch (err) {
         json(res, err instanceof CommandError && err.kind === "notfound" ? 404 : 400, { error: err instanceof Error ? err.message : String(err) });
@@ -811,7 +811,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     case "POST /__mock/thread/shell-end":
       // id=s-r1[&status=failed]: the oldest background shell ends (mock/shells.ts).
       try {
-        world.threads.endShell(q.get("id") ?? "s-r1", q.get("status") === "failed");
+        world.logs.endShell(q.get("id") ?? "s-r1", q.get("status") === "failed");
         json(res, 200, { ok: true });
       } catch (err) {
         json(res, err instanceof CommandError && err.kind === "notfound" ? 404 : 400, { error: err instanceof Error ? err.message : String(err) });
@@ -840,15 +840,15 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       }
       break;
     case "POST /__mock/thread/stream":
-      world.threads.stream(q.get("id") ?? "s-r1", q.get("text") ?? "");
+      world.logs.stream(q.get("id") ?? "s-r1", q.get("text") ?? "");
       json(res, 200, { ok: true });
       break;
     case "POST /__mock/thread/delta":
-      world.threads.delta(q.get("id") ?? "s-r1", q.get("text") ?? "");
+      world.logs.delta(q.get("id") ?? "s-r1", q.get("text") ?? "");
       json(res, 200, { ok: true });
       break;
     case "POST /__mock/thread/finish":
-      world.threads.finish(q.get("id") ?? "s-r1", {
+      world.logs.finish(q.get("id") ?? "s-r1", {
         rest: q.get("rest") ?? MockThreads.answerRest,
         total: q.has("total") ? Number(q.get("total")) : undefined,
         turnCost: q.has("turnCost") ? Number(q.get("turnCost")) : undefined,
@@ -858,18 +858,18 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "POST /__mock/thread/commands":
       try {
-        world.threads.setSlashCommands(q.get("id") ?? "s-r1", slashCommandsFor(q.get("set") ?? "default"));
+        world.logs.setSlashCommands(q.get("id") ?? "s-r1", slashCommandsFor(q.get("set") ?? "default"));
         json(res, 200, { ok: true });
       } catch (err) {
         json(res, 404, { error: err instanceof Error ? err.message : String(err) });
       }
       break;
     case "POST /__mock/thread/fail-respond":
-      world.threads.failRespond = q.get("withdrawn") ? "withdrawn" : "error";
+      world.logs.failRespond = q.get("withdrawn") ? "withdrawn" : "error";
       json(res, 200, { ok: true });
       break;
     case "GET /__mock/thread/calls":
-      json(res, 200, world.threads.calls);
+      json(res, 200, world.logs.calls);
       break;
     case "POST /__mock/status-kinds":
       json(res, 200, world.addStatusKinds());

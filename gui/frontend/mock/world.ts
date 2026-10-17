@@ -537,7 +537,7 @@ export class World {
   readonly intents = new Hub<UiIntentInit>((v) => this.events.publish({ source: EventSource.UI, event: { event: { case: "ui", value: v } } }));
   readonly gitopsEvents = new Hub<GitOpsEventInit>((v) => this.events.publish({ source: EventSource.GITOPS, event: { event: { case: "gitops", value: v } } }));
   /** Threads' conversations (mock/thread.ts); the EventService thread source carries their pending requests. */
-  readonly threads = new MockThreads(
+  readonly logs = new MockThreads(
     {
       worktreeOf: (id) => this.session(id).worktreePath,
       modelOf: (id) => this.session(id).model,
@@ -621,8 +621,8 @@ export class World {
       c.threads++;
       if (midTurn(s) !== "") c.midTurn++;
       if (s.state !== ThreadState.CONNECTED) continue;
-      c.agents += agentCounts(this.threads.agentRunsOf(s.id)).backgroundAgentsRunning;
-      c.shells += this.threads.shellsOf(s.id);
+      c.agents += agentCounts(this.logs.agentRunsOf(s.id)).backgroundAgentsRunning;
+      c.shells += this.logs.shellsOf(s.id);
     }
     return c;
   }
@@ -660,7 +660,7 @@ export class World {
     this.workspaces.clear();
     this.invocations = [];
     this.attachments.clear();
-    this.threads.reset();
+    this.logs.reset();
     this.worktreeDelayMs = 700;
     this.terminalNewDelayMs = 0;
     this.terminalNewFail = null;
@@ -693,7 +693,7 @@ export class World {
     const later = (min: number) => new Date(Date.now() + min * 60_000);
     this.addSession({ id: "s-8", repoId: "repo-cf", worktreePath: CF, name: "Refactor the gh poller", model: "claude-sonnet-5[1m]", effort: "", state: ThreadState.DISCONNECTED, disconnectReason: "closed", status: ThreadStatus.NEEDS_ATTENTION, statusReason: "finished", statusChangedAt: ago(30), createdAt: ago(500), lastActivityAt: ago(30), snoozedUntil: later(150) });
     this.addSession({ id: "s-9", repoId: "repo-gp", worktreePath: GP, name: "Bump wails to v3.1", model: "claude-opus-4-8[1m]", effort: "medium", state: ThreadState.DISCONNECTED, disconnectReason: "closed", createdAt: ago(450), lastActivityAt: ago(20), snoozedUntil: later(4 * 24 * 60 + 60) });
-    for (const [id, h] of Object.entries(SEEDS)) if (h) this.threads.seed(id, h);
+    for (const [id, h] of Object.entries(SEEDS)) if (h) this.logs.seed(id, h);
     // Republish so connected watchers converge on the reset state.
     for (const t of this.terms.values()) this.termEvents.publish({ event: { case: "updated", value: this.terminalMsg(t) } });
     for (const r of this.repos.values()) this.repoEvents.publish({ event: { case: "repoUpdated", value: this.repoMsg(r) } });
@@ -1083,9 +1083,9 @@ export class World {
       linkedPullRequests: s.linkedPullRequests.map((l) => ({ slug: l.slug, number: l.number, url: l.url, linkedAt: timestampFromDate(l.linkedAt) })),
       ...usageFields(s.usage),
       ...contextFields(s, this.cacheTTLSeconds()),
-      ...agentCounts(this.threads.agentRunsOf(s.id)),
+      ...agentCounts(this.logs.agentRunsOf(s.id)),
       // Shells die with the thread's process (mock/shells.ts).
-      backgroundShellsRunning: s.state === ThreadState.CONNECTED ? this.threads.shellsOf(s.id) : 0,
+      backgroundShellsRunning: s.state === ThreadState.CONNECTED ? this.logs.shellsOf(s.id) : 0,
       ...(s.retry ? { retry: { attempt: s.retry.attempt, maxRetries: s.retry.maxRetries, retryAt: timestampFromDate(s.retry.retryAt), errorStatus: s.retry.errorStatus, error: s.retry.error } } : {}),
     };
   }
@@ -1205,7 +1205,7 @@ export class World {
       lastResultAt: new Date(Date.now() - 2 * 60_000),
       retry: null,
     });
-    this.threads.load(id, state);
+    this.logs.load(id, state);
     // The agents panel sketch's thread (mock/agents.ts).
     if (state === "agents") s.name = "Agents panel";
     if (state === "stopped") {
@@ -1367,8 +1367,8 @@ export class World {
 
   /** archiveInterrupts over the thread's own background agents and shells. */
   private interrupts(s: MockSession): { why: string; ends: string } {
-    const { backgroundAgentsRunning } = agentCounts(this.threads.agentRunsOf(s.id));
-    return archiveInterrupts(s, backgroundAgentsRunning, this.threads.shellsOf(s.id));
+    const { backgroundAgentsRunning } = agentCounts(this.logs.agentRunsOf(s.id));
+    return archiveInterrupts(s, backgroundAgentsRunning, this.logs.shellsOf(s.id));
   }
 
   private tickSessions(): void {
@@ -1390,7 +1390,7 @@ export class World {
           // A new thread: its first message goes out once Claude answered the handshake.
           const first = s.firstMessage;
           s.firstMessage = null;
-          if (first) this.threads.send(s.id, first.text, first.attachments, first.composerText);
+          if (first) this.logs.send(s.id, first.text, first.attachments, first.composerText);
           // A stopped thread started by a message: the reply follows now.
           const ready = s.onReady;
           s.onReady = [];
@@ -2157,9 +2157,9 @@ export class World {
     const always = () => true;
     return [
       ...viewCommands((i) => this.emit(i)),
-      ...this.threads.commands(),
-      ...mcpCommands(this.threads, (i) => this.emit(i)),
-      ...agentsCommands(this.threads, (i) => this.emit(i)),
+      ...this.logs.commands(),
+      ...mcpCommands(this.logs, (i) => this.emit(i)),
+      ...agentsCommands(this.logs, (i) => this.emit(i)),
       ...this.actions.commands(),
       {
         cmd: {
@@ -2229,7 +2229,7 @@ export class World {
           const s = activeSession(ctx);
           if (!s) throw new CommandError("unavailable", "no active session");
           const f = this.createSession(s.repoId, s.worktreePath, s.model, s.effort, { pendingName: `${s.name || s.id} (fork)`, permissionMode: s.permissionMode, parentId: s.id });
-          this.threads.fork(s.id, f.id, s.name || s.id);
+          this.logs.fork(s.id, f.id, s.name || s.id);
           this.focusSession(f.id);
           return `Forked ${s.name || s.id}`;
         },

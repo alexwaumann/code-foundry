@@ -58,7 +58,7 @@ function useSessionProject(id: string): string | null {
   return noProject ? NO_PROJECT : name;
 }
 
-function ThreadRow({ id }: { id: string }) {
+function StartThreadRow({ id }: { id: string }) {
   const waiting = useSessionsStore((s) => {
     const x = s.byId[id];
     return x !== undefined && isAttention(x);
@@ -77,7 +77,7 @@ function ActiveThreads() {
     <section className="w-full max-w-[420px] text-left" aria-label="Threads" data-testid="start-threads">
       <h2 className="px-2 pb-1.5 text-overline">Threads</h2>
       {ids.slice(0, MAX_THREADS).map((id) => (
-        <ThreadRow key={id} id={id} />
+        <StartThreadRow key={id} id={id} />
       ))}
       {more > 0 && (
         <p className="px-2 pt-1 text-caption" data-testid="start-threads-more">
