@@ -14,7 +14,9 @@
  * - every finished turn has a header under its user message, at the top of its work
  *   (duration, steps, its cost, model) that folds it; every finished turn, the latest
  *   included, folds by default: only the user message, the header, the final assistant text
- *   (the trailing text of the turn), notes and steers show. The running turn has the same
+ *   (the trailing text of the turn), notes and steers show. A turn that ends while the
+ *   user reads scrolled up stays open until the list is at the bottom again (`deferred`,
+ *   docs/notes/thread-fold-4-pinned-fold.md). The running turn has the same
  *   header in its live form ("Working · 3 steps · 1m 12s"), under the same row key, so it
  *   turns into the finished one in place (docs/notes/thread-fold-3-header.md);
  * - a system note (the daemon's, e.g. a fork's "Forked from …" where the copied history
@@ -279,12 +281,19 @@ export interface TimelineOptions {
   fold: (turnKey: string) => boolean | undefined;
   /** The thread works (busy or starting) and no request waits: the open turn shows its live ("Working") header. */
   working: boolean;
+  /**
+   * Whether a finished turn (by its turn_end id) ended while the list was scrolled up: it
+   * stays open until the list is pinned at the bottom again (stores/thread.ts
+   * deferTurnFolds). The user's choice still wins. Absent: none.
+   */
+  deferred?: (turnEndId: string) => boolean;
 }
 
 /**
- * The default fold of a turn: every finished turn folds, the latest one included, the
- * moment it ends (whatever the user scrolled to or expanded meanwhile); a running turn is
- * open. The user's choice on the header (stores/thread.ts setTurnFolded) wins over it.
+ * The default fold of a turn: every finished turn folds, the latest one included; a
+ * running turn is open. A turn that ended while the list was scrolled up stays open until
+ * the list is pinned again (TimelineOptions.deferred), and the user's choice on the header
+ * (stores/thread.ts setTurnFolded) wins over both.
  */
 export function defaultFolded(turn: TimelineTurn): boolean {
   return turn.end !== "";
@@ -303,7 +312,7 @@ export function buildRows(turns: readonly TimelineTurn[], opts: TimelineOptions)
   // after a turn_end) or is a system note (Claude starts a turn that has no item yet).
   const live = opts.working && last && last.end === "" && !isNoteTurn(last) ? last : undefined;
   turns.forEach((t) => {
-    const folded = t.end !== "" && (opts.fold(t.key) ?? defaultFolded(t));
+    const folded = t.end !== "" && (opts.fold(t.key) ?? (opts.deferred?.(t.end) ? false : defaultFolded(t)));
     for (const u of t.user) rows.push({ type: "user", key: u, id: u });
     if (t.end || t === live) {
       const finals = t.body.flatMap((n) => (n.type === "text" && n.final ? [n.id] : []));
