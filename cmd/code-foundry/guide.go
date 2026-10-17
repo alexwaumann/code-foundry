@@ -35,7 +35,7 @@ func runGuide(ctx context.Context, cl *cli, args []string) error {
 }
 
 // guideCategoryOrder puts the categories an agent needs first; the rest follow by name.
-var guideCategoryOrder = []string{"Thread", "Action", "Workspace", "Project", "Repository", "Terminal"}
+var guideCategoryOrder = []string{"Thread", "Action", "Workspace", "Project", "Terminal"}
 
 // guideDetailed are the categories whose commands are listed with their whole
 // description and one line per arg; the others get the first sentence (`--help` has
@@ -70,7 +70,7 @@ func writeGuide(w io.Writer, cmds []*v1.Command, self string) {
 	p("## Conventions")
 	p("")
 	p("- Name threads after their task (`--name \"Fix the login redirect\"`). For delegated work give a brief, labels and")
-	p("  a wake: `code-foundry thread new --repo <project> --name ... --brief \"what and why\" --labels bug,auth --notify")
+	p("  a wake: `code-foundry thread new --project <project> --name ... --brief \"what and why\" --labels bug,auth --notify")
 	p("  --request-id <task-key> --prompt \"...\"`. The new thread starts at once; `--notify` wakes you each time it settles.")
 	p("- `--request-id` makes `thread new` safe to retry (after a CLI timeout): the same key returns the thread made the")
 	p("  first time instead of a second one.")
@@ -80,7 +80,7 @@ func writeGuide(w io.Writer, cmds []*v1.Command, self string) {
 	p("- `code-foundry thread read <id>` prints a thread's last items; `--since <nextSince>` (from `--json`) reads on.")
 	p("  `thread get <id>` has its status, brief, labels and report.")
 	p("- `thread list` leaves archived threads out (`--archived` includes them, `--all` lists everything) and shows the")
-	p("  50 most recently active (`--limit 0` for all); filter with `--status`, `--created-by`, `--label`, `--repo`.")
+	p("  50 most recently active (`--limit 0` for all); filter with `--status`, `--created-by`, `--label`, `--project`.")
 	p("- When your task is done (or blocked, or failed), say so: `code-foundry thread report done \"summary\" --data")
 	p("  '{\"key\": \"value\"}'`. The thread that created you reads it with `thread get`.")
 	p("- Never send input to your own thread: `thread send`, `thread respond` and `thread interrupt` default to it, so")

@@ -9,8 +9,8 @@ import (
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 )
 
-// ProjectBackend is the slice of RepoService repo.create, repo.github.publish and
-// repo.delete need, in generated Connect signatures. The RepoService handler, a
+// ProjectBackend is the slice of RepoService project.create, project.github.publish and
+// project.delete need, in generated Connect signatures. The RepoService handler, a
 // RepoServiceClient and codefoundryv1connect.UnimplementedRepoServiceHandler satisfy it.
 type NewProjectBackend interface {
 	Create(context.Context, *connect.Request[v1.CreateProjectRequest]) (*connect.Response[v1.CreateProjectResponse], error)
@@ -28,36 +28,36 @@ var (
 type HasOriginFunc func(Context) bool
 
 // DeletableFunc reports whether the context's project is directly inside the projects
-// directory (made by repo.create), so repo.delete may remove it. Nil means never.
+// directory (made by project.create), so project.delete may remove it. Nil means never.
 type DeletableFunc func(Context) bool
 
-// ProjectDeps are repo.create's, repo.github.publish's and repo.delete's dependencies.
+// ProjectDeps are project.create's, project.github.publish's and project.delete's dependencies.
 type NewProjectDeps struct {
 	// Backend runs them; nil registers against UnimplementedRepoServiceHandler.
 	Backend NewProjectBackend
-	// NotGit and HasOrigin gate repo.github.publish: a git project without origin.
+	// NotGit and HasOrigin gate project.github.publish: a git project without origin.
 	NotGit    NotGitFunc
 	HasOrigin HasOriginFunc
-	// Deletable gates repo.delete.
+	// Deletable gates project.delete.
 	Deletable DeletableFunc
 }
 
-// hasOriginReason is why repo.github.publish is unavailable for a project with origin.
+// hasOriginReason is why project.github.publish is unavailable for a project with origin.
 const hasOriginReason = "project already has an origin remote"
 
-// notDeletableReason is why repo.delete is unavailable for a project elsewhere.
+// notDeletableReason is why project.delete is unavailable for a project elsewhere.
 const notDeletableReason = "project is not in the projects directory; use Remove Project"
 
-// publishVisibilities maps repo.github.publish's visibility to the proto enum.
+// publishVisibilities maps project.github.publish's visibility to the proto enum.
 var publishVisibilities = map[string]v1.RepositoryVisibility{
 	"public":   v1.RepositoryVisibility_REPOSITORY_VISIBILITY_PUBLIC,
 	"internal": v1.RepositoryVisibility_REPOSITORY_VISIBILITY_INTERNAL,
 	"private":  v1.RepositoryVisibility_REPOSITORY_VISIBILITY_PRIVATE,
 }
 
-// RegisterProjects registers repo.create, repo.github.publish and repo.delete. In the
-// app, the Add Project dialog's New tab invokes repo.create (and repo.delete, confirmed,
-// when the new project is cancelled), and repo.github.publish opens the publish dialog
+// RegisterProjects registers project.create, project.github.publish and project.delete. In the
+// app, the Add Project dialog's New tab invokes project.create (and project.delete, confirmed,
+// when the new project is cancelled), and project.github.publish opens the publish dialog
 // (its owner and visibility pickers); the CLI runs all three directly.
 func RegisterNewProjects(r *Registry, d NewProjectDeps) error {
 	b := d.Backend
@@ -75,7 +75,7 @@ func RegisterNewProjects(r *Registry, d NewProjectDeps) error {
 	}
 	return r.RegisterAll(
 		Command{
-			Name:  "repo.create",
+			Name:  "project.create",
 			Title: "New Project",
 			Description: "Start an empty project in ~/.code-foundry/projects/<name>: git init on the default branch " +
 				"(init.defaultBranch, else main) and an empty initial commit. Refuses when that folder exists.",
@@ -94,14 +94,14 @@ func RegisterNewProjects(r *Registry, d NewProjectDeps) error {
 			},
 		},
 		Command{
-			Name:  "repo.github.publish",
+			Name:  "project.github.publish",
 			Title: "Publish to GitHub",
 			Description: "Create a GitHub repository for a git project without an origin remote and push it, with " +
 				"`gh repo create <owner>/<name> --source <project> --remote origin --push`. Organizations may refuse " +
 				"some visibilities; gh's error is shown as is.",
 			Category: "Project",
 			Args: []ArgSpec{
-				{Name: "repo", Type: String, Required: true, Context: ContextProject, Description: "Repository id"},
+				{Name: "project", Type: String, Required: true, Context: ContextProject, Description: "Project id"},
 				{Name: "owner", Type: String, Required: true, Description: "GitHub user or organization"},
 				{Name: "name", Type: String, Description: "Repository name on GitHub (default: the project's name)"},
 				{Name: "visibility", Type: Enum, Required: true, Enum: []string{"public", "internal", "private"},
@@ -120,7 +120,7 @@ func RegisterNewProjects(r *Registry, d NewProjectDeps) error {
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				vis := a.String("visibility")
 				res, err := b.Publish(ctx, connect.NewRequest(&v1.PublishProjectRequest{
-					ProjectId: a.String("repo"), Owner: a.String("owner"), Name: a.String("name"), Visibility: publishVisibilities[vis],
+					ProjectId: a.String("project"), Owner: a.String("owner"), Name: a.String("name"), Visibility: publishVisibilities[vis],
 				}))
 				if err != nil {
 					return Result{}, err
@@ -135,12 +135,12 @@ func RegisterNewProjects(r *Registry, d NewProjectDeps) error {
 			},
 		},
 		Command{
-			Name:  "repo.delete",
+			Name:  "project.delete",
 			Title: "Delete Project",
 			Description: "Stop tracking a project made by New Project and delete its folder in ~/.code-foundry/projects. " +
 				"Only projects there can be deleted; a repository on GitHub is not touched.",
 			Category: "Project",
-			Args:     []ArgSpec{{Name: "repo", Type: String, Required: true, Context: ContextProject, Description: "Repository id"}},
+			Args:     []ArgSpec{{Name: "project", Type: String, Required: true, Context: ContextProject, Description: "Project id"}},
 			When:     func(c Context) bool { return hasProject(c) && deletable(c) },
 			WhyUnavailable: func(c Context) string {
 				if hasProject(c) && !deletable(c) {
@@ -148,9 +148,9 @@ func RegisterNewProjects(r *Registry, d NewProjectDeps) error {
 				}
 				return ""
 			},
-			Confirm: "Delete project {repo} and its folder on disk? This cannot be undone.",
+			Confirm: "Delete project {project} and its folder on disk? This cannot be undone.",
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-				id := a.String("repo")
+				id := a.String("project")
 				if _, err := b.Delete(ctx, connect.NewRequest(&v1.DeleteProjectRequest{Id: id})); err != nil {
 					return Result{}, err
 				}

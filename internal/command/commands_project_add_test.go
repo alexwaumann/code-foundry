@@ -35,22 +35,22 @@ func TestProjectAddAndClone(t *testing.T) {
 		// wantInvalid: the error wraps command.ErrInvalidArgs.
 		wantInvalid bool
 	}{
-		{name: "repo.add without a folder answers the CLI with a hint", cmd: "repo.add", wantMsg: command.AddProjectHint},
-		{name: "repo.add with a folder registers it", cmd: "repo.add", args: map[string]string{"path": "~/src/app/"},
+		{name: "project.add without a folder answers the CLI with a hint", cmd: "project.add", wantMsg: command.AddProjectHint},
+		{name: "project.add with a folder registers it", cmd: "project.add", args: map[string]string{"path": "~/src/app/"},
 			wantMsg: "registered repo (r1)", wantPath: "/Users/me/src/app"},
-		{name: "repo.add refuses a relative folder", cmd: "repo.add", args: map[string]string{"path": "src/app"},
+		{name: "project.add refuses a relative folder", cmd: "project.add", args: map[string]string{"path": "src/app"},
 			wantInvalid: true},
-		{name: "repo.add refuses ~user", cmd: "repo.add", args: map[string]string{"path": "~bob/app"},
+		{name: "project.add refuses ~user", cmd: "project.add", args: map[string]string{"path": "~bob/app"},
 			wantInvalid: true},
-		{name: "repo.add backend error passes through", cmd: "repo.add", args: map[string]string{"path": "/tmp"},
+		{name: "project.add backend error passes through", cmd: "project.add", args: map[string]string{"path": "/tmp"},
 			backendErr: connect.NewError(connect.CodeInvalidArgument, errors.New("/tmp is outside your home directory")),
 			wantErr:    "outside your home directory", wantPath: "/tmp"},
-		{name: "repo.clone", cmd: "repo.clone", args: map[string]string{"repo": "octo/hello"},
+		{name: "project.clone", cmd: "project.clone", args: map[string]string{"repo": "octo/hello"},
 			wantMsg: "cloned hello into /p/octo/hello (r9)", wantRef: "octo/hello"},
-		{name: "repo.clone passes a URL through", cmd: "repo.clone", args: map[string]string{"repo": "https://github.com/octo/hello.git"},
+		{name: "project.clone passes a URL through", cmd: "project.clone", args: map[string]string{"repo": "https://github.com/octo/hello.git"},
 			wantRef: "https://github.com/octo/hello.git"},
-		{name: "repo.clone needs a repo", cmd: "repo.clone", wantErr: "repo"},
-		{name: "repo.clone backend error passes through", cmd: "repo.clone", args: map[string]string{"repo": "octo/taken"},
+		{name: "project.clone needs a repository", cmd: "project.clone", wantErr: "repo"},
+		{name: "project.clone backend error passes through", cmd: "project.clone", args: map[string]string{"repo": "octo/taken"},
 			wantErr: "already exists", wantRef: "octo/taken"},
 	}
 	for _, tt := range tests {
@@ -95,7 +95,7 @@ func TestProjectAddAndClone(t *testing.T) {
 		if err := command.RegisterProjectAdd(reg, nil, nil); err != nil {
 			t.Fatal(err)
 		}
-		for name, args := range map[string]map[string]string{"repo.clone": {"repo": "o/r"}, "repo.add": {"path": "/Users/me/x"}} {
+		for name, args := range map[string]map[string]string{"project.clone": {"repo": "o/r"}, "project.add": {"path": "/Users/me/x"}} {
 			_, err := reg.Invoke(context.Background(), command.Context{}, name, args)
 			if connect.CodeOf(err) != connect.CodeUnimplemented {
 				t.Fatalf("%s: err = %v", name, err)

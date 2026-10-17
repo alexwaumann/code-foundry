@@ -36,7 +36,7 @@ func hasWorktree(c Context) bool { return c.ActiveProjectID != "" && c.ActiveWor
 
 // NotGitFunc reports whether the context's worktree (else repo) belongs to a
 // registered project that is not a git repository. Worktree, git and pull request
-// commands are unavailable there; repo.git.init is available only there. A nil
+// commands are unavailable there; project.git.init is available only there. A nil
 // NotGitFunc means never (every project is git).
 type NotGitFunc func(Context) bool
 
@@ -58,22 +58,22 @@ func (f NotGitFunc) whyNotGit(c Context) string {
 	return ""
 }
 
-// RegisterRepo registers repo.unregister, repo.worktree.new, repo.worktree.remove,
-// repo.refresh and repo.git.init. Adding a project is repo.add (commands_repo_add.go).
+// RegisterRepo registers project.unregister, project.worktree.new, project.worktree.remove,
+// project.refresh and project.git.init. Adding a project is project.add (commands_repo_add.go).
 func RegisterProject(r *Registry, b ProjectBackend, notGit NotGitFunc) error {
 	notGit = notGit.or()
-	projectArg := ArgSpec{Name: "repo", Type: String, Required: true, Context: ContextProject, Description: "Repository id"}
+	projectArg := ArgSpec{Name: "project", Type: String, Required: true, Context: ContextProject, Description: "Project id"}
 	return r.RegisterAll(
 		Command{
-			Name:        "repo.unregister",
+			Name:        "project.unregister",
 			Title:       "Remove Project",
-			Description: "Stop tracking a project (a registered repository). Nothing on disk is touched.",
+			Description: "Stop tracking a project. Nothing on disk is touched.",
 			Category:    "Project",
 			Args:        []ArgSpec{projectArg},
 			When:        hasProject,
-			Confirm:     "Stop tracking project {repo}? Its threads lose their worktree; nothing on disk is touched.",
+			Confirm:     "Stop tracking project {project}? Its threads lose their worktree; nothing on disk is touched.",
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-				id := a.String("repo")
+				id := a.String("project")
 				if _, err := b.Unregister(ctx, connect.NewRequest(&v1.UnregisterProjectRequest{Id: id})); err != nil {
 					return Result{}, err
 				}
@@ -81,7 +81,7 @@ func RegisterProject(r *Registry, b ProjectBackend, notGit NotGitFunc) error {
 			},
 		},
 		Command{
-			Name:        "repo.worktree.new",
+			Name:        "project.worktree.new",
 			Title:       "New Worktree",
 			Description: "Create a worktree for a branch, creating the branch from base when it does not exist.",
 			Category:    "Project",
@@ -95,7 +95,7 @@ func RegisterProject(r *Registry, b ProjectBackend, notGit NotGitFunc) error {
 			WhyUnavailable: notGit.whyNotGit,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				res, err := b.CreateWorktree(ctx, connect.NewRequest(&v1.CreateWorktreeRequest{
-					ProjectId: a.String("repo"),
+					ProjectId: a.String("project"),
 					Branch:    a.String("branch"),
 					BaseRef:   a.String("base"),
 					Fetch:     a.Bool("fetch"),
@@ -108,7 +108,7 @@ func RegisterProject(r *Registry, b ProjectBackend, notGit NotGitFunc) error {
 			},
 		},
 		Command{
-			Name:        "repo.worktree.remove",
+			Name:        "project.worktree.remove",
 			Title:       "Remove Worktree",
 			Description: "Remove a worktree from disk, optionally deleting its branch.",
 			Category:    "Project",
@@ -124,7 +124,7 @@ func RegisterProject(r *Registry, b ProjectBackend, notGit NotGitFunc) error {
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				path := a.Path("path")
 				if _, err := b.RemoveWorktree(ctx, connect.NewRequest(&v1.RemoveWorktreeRequest{
-					ProjectId:    a.String("repo"),
+					ProjectId:    a.String("project"),
 					Path:         path,
 					DeleteBranch: a.Bool("delete-branch"),
 					Force:        a.Bool("force"),
@@ -135,20 +135,20 @@ func RegisterProject(r *Registry, b ProjectBackend, notGit NotGitFunc) error {
 			},
 		},
 		Command{
-			Name:        "repo.refresh",
+			Name:        "project.refresh",
 			Title:       "Refresh Project Status",
 			Description: "Re-read git status now, for one project or all of them.",
 			Category:    "Project",
 			Args: []ArgSpec{
-				{Name: "repo", Type: String, Context: ContextProject, Description: "Repository id (default: all)"},
+				{Name: "project", Type: String, Context: ContextProject, Description: "Project id (default: all)"},
 			},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-				id := a.String("repo")
+				id := a.String("project")
 				if _, err := b.Refresh(ctx, connect.NewRequest(&v1.RefreshProjectRequest{Id: id})); err != nil {
 					return Result{}, err
 				}
 				if id == "" {
-					return Result{Message: "refreshed all repositories"}, nil
+					return Result{Message: "refreshed all projects"}, nil
 				}
 				return Result{Message: "refreshed " + id}, nil
 			},

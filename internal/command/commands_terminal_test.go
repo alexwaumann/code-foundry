@@ -71,7 +71,7 @@ func TestTerminalNewOwner(t *testing.T) {
 			wantCwd: feat, wantLabels: termlabel.Shell("s1", "r1", feat)},
 		{name: "thread with --cwd starts there", ctx: command.Context{ActiveThreadID: "s1"}, args: map[string]string{"cwd": app + "/docs"},
 			wantCwd: app + "/docs", wantLabels: termlabel.Shell("s1", "r1", feat)},
-		{name: "thread without a project starts in its home and has no repo", ctx: gui(command.Context{ActiveThreadID: "s1", ActiveWorktreePath: "/cf-test/home"}),
+		{name: "thread without a project starts in its home and has no project", ctx: gui(command.Context{ActiveThreadID: "s1", ActiveWorktreePath: "/cf-test/home"}),
 			thread: &v1.Thread{WorktreePath: "/cf-test/home"}, wantCwd: "/cf-test/home", wantLabels: termlabel.Shell("s1", "", "/cf-test/home")},
 		{name: "thread lookup fails", ctx: command.Context{ActiveThreadID: "s1"},
 			threadErr: connect.NewError(connect.CodeNotFound, errors.New("no such thread")), wantMsg: "no such thread"},
@@ -82,7 +82,7 @@ func TestTerminalNewOwner(t *testing.T) {
 			wantCwd: feat, wantLabels: termlabel.Shell("", "r1", feat)},
 		{name: "--context-worktree with --cwd: owner from the context, starts in --cwd", ctx: command.Context{ActiveWorktreePath: feat},
 			args: map[string]string{"cwd": app + "/docs"}, wantCwd: app + "/docs", wantLabels: termlabel.Shell("", "r1", feat)},
-		{name: "stale repo in context falls back to the worktree path", ctx: command.Context{ActiveProjectID: "r9", ActiveWorktreePath: feat},
+		{name: "stale project in context falls back to the worktree path", ctx: command.Context{ActiveProjectID: "r9", ActiveWorktreePath: feat},
 			wantCwd: feat, wantLabels: termlabel.Shell("", "r1", feat)},
 		{name: "an unregistered context worktree is refused", ctx: command.Context{ActiveWorktreePath: "/cf-test/gone"}, args: here(app),
 			wantErr: command.ErrInvalidArgs, wantMsg: "/cf-test/gone is not inside a registered project"},
@@ -109,7 +109,7 @@ func TestTerminalNewOwner(t *testing.T) {
 		// The GUI offers it only with a thread or a worktree.
 		{name: "dashboard", ctx: command.Context{ActiveView: "dashboard"}, wantErr: command.ErrUnavailable},
 		{name: "pull requests page", ctx: command.Context{ActiveView: "pullrequests"}, wantErr: command.ErrUnavailable},
-		{name: "a repo alone is not enough", ctx: command.Context{ActiveProjectID: "r1", ActiveView: "compose"}, wantErr: command.ErrUnavailable},
+		{name: "a project alone is not enough", ctx: command.Context{ActiveProjectID: "r1", ActiveView: "compose"}, wantErr: command.ErrUnavailable},
 		{name: "bad argv", ctx: cli, args: map[string]string{"here": app, "argv": `"oops`}, wantErr: command.ErrInvalidArgs},
 	}
 	for _, tt := range tests {

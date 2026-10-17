@@ -62,7 +62,7 @@ func TestDispatchLocal(t *testing.T) {
 }
 
 func TestResolveCommand(t *testing.T) {
-	cmds := []*v1.Command{{Name: "terminal.new"}, {Name: "repo.worktree.new"}, {Name: "repo.refresh"},
+	cmds := []*v1.Command{{Name: "terminal.new"}, {Name: "project.worktree.new"}, {Name: "project.refresh"},
 		{Name: "usage.show"}, {Name: "usage.reset"}}
 	tests := []struct {
 		words    []string
@@ -71,9 +71,9 @@ func TestResolveCommand(t *testing.T) {
 	}{
 		{[]string{"terminal.new"}, "terminal.new", 1},
 		{[]string{"terminal", "new"}, "terminal.new", 2},
-		{[]string{"repo", "worktree", "new"}, "repo.worktree.new", 3},
-		{[]string{"repo.worktree", "new"}, "repo.worktree.new", 2},
-		{[]string{"repo", "refresh", "extra"}, "repo.refresh", 2},
+		{[]string{"project", "worktree", "new"}, "project.worktree.new", 3},
+		{[]string{"project.worktree", "new"}, "project.worktree.new", 2},
+		{[]string{"project", "refresh", "extra"}, "project.refresh", 2},
 		{[]string{"terminal"}, "", 0},
 		{[]string{"bogus", "thing"}, "", 0},
 		{nil, "", 0},
@@ -82,7 +82,7 @@ func TestResolveCommand(t *testing.T) {
 		{[]string{"usage", "show"}, "usage.show", 2},
 		{[]string{"usage", "reset"}, "usage.reset", 2},
 		{[]string{"usage", "extra"}, "usage.show", 1},
-		{[]string{"repo"}, "", 0},
+		{[]string{"project"}, "", 0},
 	}
 	for _, tt := range tests {
 		t.Run(strings.Join(tt.words, " "), func(t *testing.T) {

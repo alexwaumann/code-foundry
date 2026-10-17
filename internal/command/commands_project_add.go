@@ -16,15 +16,15 @@ import (
 // InvalidArgument. The daemon wires the RepoService handler's CloneRef.
 type CloneFunc func(ctx context.Context, ref string, progress func(*v1.CloneProgress)) (*v1.Project, error)
 
-// AddProjectHint is repo.add's answer outside the app without a folder, where there is
+// AddProjectHint is project.add's answer outside the app without a folder, where there is
 // no dialog.
-const AddProjectHint = "Add a project from the CLI with `code-foundry repo add <folder>` " +
-	"or `code-foundry repo clone <owner/repo>`; in the app, repo.add opens the Add Project dialog."
+const AddProjectHint = "Add a project from the CLI with `code-foundry project add <folder>` " +
+	"or `code-foundry project clone <owner/repo>`; in the app, project.add opens the Add Project dialog."
 
-// RegisterRepoAdd registers repo.add (the Add Project dialog in the app; on the CLI it
+// RegisterRepoAdd registers project.add (the Add Project dialog in the app; on the CLI it
 // registers a folder through repos.Register, or prints AddProjectHint without one) and
-// repo.clone. A nil repos makes repo.add with a folder fail with Unimplemented; a nil
-// clone does the same for repo.clone.
+// project.clone. A nil repos makes project.add with a folder fail with Unimplemented; a nil
+// clone does the same for project.clone.
 func RegisterProjectAdd(r *Registry, projects ProjectBackend, clone CloneFunc) error {
 	if projects == nil {
 		projects = codefoundryv1connect.UnimplementedProjectServiceHandler{}
@@ -36,7 +36,7 @@ func RegisterProjectAdd(r *Registry, projects ProjectBackend, clone CloneFunc) e
 	}
 	return r.RegisterAll(
 		Command{
-			Name:  "repo.add",
+			Name:  "project.add",
 			Title: "Add Project",
 			Description: "Add a project: start a new one, add a folder on this Mac, or clone a repository from GitHub. " +
 				"Opens the Add Project dialog in the app.",
@@ -62,7 +62,7 @@ func RegisterProjectAdd(r *Registry, projects ProjectBackend, clone CloneFunc) e
 			},
 		},
 		Command{
-			Name:  "repo.clone",
+			Name:  "project.clone",
 			Title: "Clone from GitHub",
 			Description: "Clone a github.com repository with `gh repo clone` into ~/.code-foundry/projects/<owner>/<repo> " +
 				"and add it as a project. Refuses when that folder exists.",

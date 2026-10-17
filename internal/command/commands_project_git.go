@@ -8,11 +8,11 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 )
 
-// gitInitCommand is repo.git.init: make a project without git a git repository
+// gitInitCommand is project.git.init: make a project without git a git repository
 // (RepoService.InitGit). Available only for such a project.
 func gitInitCommand(b ProjectBackend, projectArg ArgSpec, notGit NotGitFunc) Command {
 	return Command{
-		Name:  "repo.git.init",
+		Name:  "project.git.init",
 		Title: "Initialize Git",
 		Description: "Make a project without git a git repository: git init on the default branch " +
 			"(init.defaultBranch, else main) and an empty initial commit, so worktrees can branch from it.",
@@ -26,7 +26,7 @@ func gitInitCommand(b ProjectBackend, projectArg ArgSpec, notGit NotGitFunc) Com
 			return ""
 		},
 		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-			res, err := b.InitGit(ctx, connect.NewRequest(&v1.InitGitRequest{Id: a.String("repo")}))
+			res, err := b.InitGit(ctx, connect.NewRequest(&v1.InitGitRequest{Id: a.String("project")}))
 			if err != nil {
 				return Result{}, err
 			}

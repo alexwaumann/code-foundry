@@ -18,7 +18,7 @@ func cleanWt(branch, path string) *v1.Worktree {
 	return &v1.Worktree{ProjectId: "r1", Branch: branch, Path: path, MergedClean: true, Status: &v1.GitStatus{BaseRef: "origin/main"}}
 }
 
-// cleanupFixture is a registry with repo.worktree.cleanup over fakes sharing one call
+// cleanupFixture is a registry with project.worktree.cleanup over fakes sharing one call
 // log. Repo r1 ("proj", origin) has main at /p and the worktrees a (merged) and b
 // (unmerged); r2 ("local") has no remote.
 func cleanupFixture(t *testing.T, dry, real *v1.CleanupWorktreesResponse) (*command.Registry, *commandtest.Calls, *commandtest.Project, *commandtest.GitOps) {
@@ -71,41 +71,41 @@ func TestProjectCleanupArgsAndFlow(t *testing.T) {
 		wantMsg string
 	}{
 		{
-			name: "repo by name, every worktree", args: map[string]string{"repo": "proj"},
+			name: "project by name, every worktree", args: map[string]string{"project": "proj"},
 			real:    &v1.CleanupWorktreesResponse{ProjectId: "r1", Removed: []*v1.Worktree{merged}, Skipped: dry.Skipped},
-			wantSeq: []string{"CleanupWorktreesRequest", "ListReposRequest", "GitFetchRequest", "CleanupWorktreesRequest"},
+			wantSeq: []string{"CleanupWorktreesRequest", "ListProjectsRequest", "GitFetchRequest", "CleanupWorktreesRequest"},
 			wantReq: &v1.CleanupWorktreesRequest{Project: "proj"},
 			wantMsg: "Removed 1 worktree: cf/a; kept 1 worktree: cf/b (1 commit not in origin/main)",
 		},
 		{
 			name: "repo from the context, one path", ctx: command.Context{ActiveProjectID: "r1"}, args: map[string]string{"path": "/wt/a"},
 			real:    &v1.CleanupWorktreesResponse{ProjectId: "r1", Removed: []*v1.Worktree{merged}},
-			wantSeq: []string{"CleanupWorktreesRequest", "ListReposRequest", "GitFetchRequest", "CleanupWorktreesRequest"},
+			wantSeq: []string{"CleanupWorktreesRequest", "ListProjectsRequest", "GitFetchRequest", "CleanupWorktreesRequest"},
 			wantReq: &v1.CleanupWorktreesRequest{Project: "r1", Path: "/wt/a"},
 			wantMsg: "Removed 1 worktree: cf/a",
 		},
 		{
-			name: "after the fetch it is no longer merged", args: map[string]string{"repo": "r1", "path": "/wt/a"},
+			name: "after the fetch it is no longer merged", args: map[string]string{"project": "r1", "path": "/wt/a"},
 			real:    &v1.CleanupWorktreesResponse{ProjectId: "r1", Skipped: []*v1.SkippedWorktree{{Worktree: merged, Reason: "2 commits not in origin/main"}}},
-			wantSeq: []string{"CleanupWorktreesRequest", "ListReposRequest", "GitFetchRequest", "CleanupWorktreesRequest"},
+			wantSeq: []string{"CleanupWorktreesRequest", "ListProjectsRequest", "GitFetchRequest", "CleanupWorktreesRequest"},
 			wantReq: &v1.CleanupWorktreesRequest{Project: "r1", Path: "/wt/a"},
 			wantMsg: "Nothing removed; kept 1 worktree: cf/a (2 commits not in origin/main)",
 		},
 		{
-			name: "no origin: no fetch", args: map[string]string{"repo": "local"},
+			name: "no origin: no fetch", args: map[string]string{"project": "local"},
 			real:    &v1.CleanupWorktreesResponse{ProjectId: "r2"},
-			wantSeq: []string{"CleanupWorktreesRequest", "ListReposRequest", "CleanupWorktreesRequest"},
+			wantSeq: []string{"CleanupWorktreesRequest", "ListProjectsRequest", "CleanupWorktreesRequest"},
 			wantReq: &v1.CleanupWorktreesRequest{Project: "local"},
 			wantMsg: "No worktrees to clean up",
 		},
-		{name: "repo is required", args: map[string]string{}, wantErr: "repo"},
-		{name: "unknown repo: nothing fetched", args: map[string]string{"repo": "nope"}, wantErr: "not registered", wantSeq: []string{"CleanupWorktreesRequest"}},
+		{name: "project is required", args: map[string]string{}, wantErr: "project"},
+		{name: "unknown project: nothing fetched", args: map[string]string{"project": "nope"}, wantErr: "not registered", wantSeq: []string{"CleanupWorktreesRequest"}},
 		{name: "project without git", ctx: command.Context{ActiveProjectID: "plain"}, args: map[string]string{}, wantErr: "not a git repository"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			reg, shared, _, _ := cleanupFixture(t, dry, tt.real)
-			res, err := reg.Invoke(context.Background(), tt.ctx, "repo.worktree.cleanup", tt.args, command.Confirmed(true))
+			res, err := reg.Invoke(context.Background(), tt.ctx, "project.worktree.cleanup", tt.args, command.Confirmed(true))
 			if tt.wantErr != "" {
 				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 					t.Fatalf("err = %v, want it to contain %q", err, tt.wantErr)
@@ -140,7 +140,7 @@ func TestProjectCleanupArgsAndFlow(t *testing.T) {
 func TestProjectCleanupFetchFailureRemovesNothing(t *testing.T) {
 	reg, shared, _, ops := cleanupFixture(t, &v1.CleanupWorktreesResponse{ProjectId: "r1"}, &v1.CleanupWorktreesResponse{ProjectId: "r1"})
 	ops.Op = &v1.GitOp{Title: "Fetch origin", State: v1.GitOpState_GIT_OP_STATE_FAILED, Summary: "could not read from remote"}
-	_, err := reg.Invoke(context.Background(), command.Context{}, "repo.worktree.cleanup", map[string]string{"repo": "proj"}, command.Confirmed(true))
+	_, err := reg.Invoke(context.Background(), command.Context{}, "project.worktree.cleanup", map[string]string{"project": "proj"}, command.Confirmed(true))
 	if err == nil || !strings.Contains(err.Error(), "could not read from remote") {
 		t.Fatalf("err = %v, want the fetch failure", err)
 	}
@@ -160,17 +160,17 @@ func TestProjectCleanupConfirmListsBranches(t *testing.T) {
 		want string
 	}{
 		{
-			name: "every merged worktree", args: map[string]string{"repo": "proj"},
+			name: "every merged worktree", args: map[string]string{"project": "proj"},
 			dry:  &v1.CleanupWorktreesResponse{ProjectId: "r1", Removed: []*v1.Worktree{a, b}},
 			want: "Remove 2 worktrees created by Code Foundry (under its worktrees directory) whose work is in origin/main: cf/a, cf/b? Branches are kept; each is checked again after a fetch.",
 		},
 		{
-			name: "one path", args: map[string]string{"repo": "proj", "path": "/wt/a"},
+			name: "one path", args: map[string]string{"project": "proj", "path": "/wt/a"},
 			dry:  &v1.CleanupWorktreesResponse{ProjectId: "r1", Removed: []*v1.Worktree{a}},
 			want: "Remove the worktree of cf/a (/wt/a)? Code Foundry created it (under its worktrees directory) and its work is in origin/main; the branch is kept. It is checked again after a fetch.",
 		},
 		{
-			name: "nothing merged yet", args: map[string]string{"repo": "proj"},
+			name: "nothing merged yet", args: map[string]string{"project": "proj"},
 			dry:  &v1.CleanupWorktreesResponse{ProjectId: "r1"},
 			want: "Fetch proj and remove the worktrees created by Code Foundry (under its worktrees directory) whose work is already in the default branch? Branches are kept.",
 		},
@@ -178,7 +178,7 @@ func TestProjectCleanupConfirmListsBranches(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			reg, shared, _, _ := cleanupFixture(t, tt.dry, nil)
-			_, err := reg.Invoke(context.Background(), command.Context{}, "repo.worktree.cleanup", tt.args)
+			_, err := reg.Invoke(context.Background(), command.Context{}, "project.worktree.cleanup", tt.args)
 			var ce *command.ConfirmError
 			if !errors.As(err, &ce) {
 				t.Fatalf("err = %v, want a confirmation", err)

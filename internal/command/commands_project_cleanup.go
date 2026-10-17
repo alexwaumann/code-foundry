@@ -13,7 +13,7 @@ import (
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 )
 
-// RepoCleanupDeps are repo.worktree.cleanup's dependencies.
+// RepoCleanupDeps are project.worktree.cleanup's dependencies.
 type ProjectCleanupDeps struct {
 	// Repo resolves the project and removes worktrees (RepoService.CleanupWorktrees).
 	// Nil works like UnimplementedRepoServiceHandler.
@@ -27,9 +27,9 @@ type ProjectCleanupDeps struct {
 
 // cleanupConfirm is the prompt when nothing is cleanable before the fetch (or the dry
 // run failed; Run then reports why).
-const cleanupConfirm = "Fetch {repo} and remove the worktrees created by Code Foundry (under its worktrees directory) whose work is already in the default branch? Branches are kept."
+const cleanupConfirm = "Fetch {project} and remove the worktrees created by Code Foundry (under its worktrees directory) whose work is already in the default branch? Branches are kept."
 
-// RegisterRepoCleanup registers repo.worktree.cleanup: reclaim the disk space of
+// RegisterRepoCleanup registers project.worktree.cleanup: reclaim the disk space of
 // worktrees whose work is already in origin/<default>. A worktree goes only when it is
 // not the main one, created by Code Foundry (under its worktrees directory), on a branch, without staged, modified, untracked or conflicted
 // files, every commit on it is in origin/<default>, and no thread (but an archived one), running
@@ -48,7 +48,7 @@ func RegisterProjectCleanup(r *Registry, d ProjectCleanupDeps) error {
 	notGit := d.NotGit.or()
 	cleanup := func(ctx context.Context, a Args, dry bool) (*v1.CleanupWorktreesResponse, error) {
 		res, err := projectB.CleanupWorktrees(ctx, connect.NewRequest(&v1.CleanupWorktreesRequest{
-			Project: a.String("repo"), Path: a.Path("path"), DryRun: dry,
+			Project: a.String("project"), Path: a.Path("path"), DryRun: dry,
 		}))
 		if err != nil {
 			return nil, err
@@ -56,14 +56,14 @@ func RegisterProjectCleanup(r *Registry, d ProjectCleanupDeps) error {
 		return res.Msg, nil
 	}
 	return r.Register(Command{
-		Name:  "repo.worktree.cleanup",
+		Name:  "project.worktree.cleanup",
 		Title: "Clean Up Merged Worktrees",
 		Description: "Fetch, then remove the project's worktrees (or one) whose work is already in origin/<default>: " +
 			"created by Code Foundry (under its worktrees directory), no uncommitted changes, every commit merged, " +
 			"no thread (archived ones aside), terminal or workspace on it. Branches are kept.",
 		Category: "Project",
 		Args: []ArgSpec{
-			{Name: "repo", Type: String, Required: true, Context: ContextProject, Positional: true, Description: "Repository name or id"},
+			{Name: "project", Type: String, Required: true, Context: ContextProject, Positional: true, Description: "Project name or id"},
 			{Name: "path", Type: Path, Positional: true, Description: "One worktree (default: every merged one)"},
 		},
 		When:           func(c Context) bool { return hasProject(c) && !notGit(c) },
@@ -122,7 +122,7 @@ func fetchTarget(ctx context.Context, b ProjectBackend, id string) (main string,
 		}
 		return main, slices.Contains(r.GetRemotes(), "origin"), nil
 	}
-	return "", false, connect.NewError(connect.CodeNotFound, fmt.Errorf("repository %q is not registered", id))
+	return "", false, connect.NewError(connect.CodeNotFound, fmt.Errorf("project %q is not registered", id))
 }
 
 // worktreeLabel names a worktree in messages: its branch, else its directory.

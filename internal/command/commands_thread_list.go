@@ -57,7 +57,7 @@ func RegisterThreadList(r *Registry, d ThreadListDeps) error {
 			{Name: "all", Type: Bool, Description: "Every thread, archived ones too, ignoring the other filters except limit (--json: also the usage of removed threads)"},
 			{Name: "status", Type: Enum, Enum: ThreadListStatuses, Description: "Only threads with this status: busy, idle, attention (a prompt, a question or a finished turn), or error"},
 			{Name: "state", Type: Enum, Enum: ThreadListStates, Description: "Only threads whose Claude process is starting, connected, closing, or disconnected"},
-			{Name: "repo", Type: String, Description: "Only threads in this project: its id, name, or an absolute path inside it"},
+			{Name: "project", Type: String, Description: "Only threads in this project: its id, name, or an absolute path inside it"},
 			{Name: "workspace", Type: String, Description: "Only threads of this workspace: its id or name"},
 			{Name: "created-by", Type: String, Description: "Only threads this thread created (its id, or a unique suffix of 4+ characters), or user for threads no thread created"},
 			{Name: "label", Type: String, Description: "Comma-separated labels: only threads carrying all of them"},
@@ -70,7 +70,7 @@ func RegisterThreadList(r *Registry, d ThreadListDeps) error {
 			f := &v1.ThreadFilter{
 				All: a.Bool("all"), IncludeArchived: a.Bool("archived"),
 				Status: threadListStatuses[a.String("status")], State: threadListState(a.String("state")),
-				Project: strings.TrimSpace(a.String("repo")), Workspace: strings.TrimSpace(a.String("workspace")),
+				Project: strings.TrimSpace(a.String("project")), Workspace: strings.TrimSpace(a.String("workspace")),
 				Labels: splitList(a.String("label")), Limit: int32(a.Int("limit")),
 			}
 			if by := strings.TrimSpace(a.String("created-by")); by != "" && by != "user" {

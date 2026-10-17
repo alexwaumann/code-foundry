@@ -29,7 +29,7 @@ var (
 )
 
 // RegisterWorkspace registers workspace.new, workspace.list, workspace.members,
-// workspace.add-repo, workspace.remove-repo and workspace.remove.
+// workspace.add-project, workspace.remove-project and workspace.remove.
 func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 	// A workspace is named by id or name, else found from a path inside one of its
 	// member worktrees: the CLI's working directory, or the GUI's active worktree.
@@ -43,26 +43,26 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 		Command{
 			Name:  "workspace.new",
 			Title: "New Workspace",
-			Description: "Create a workspace: one branch checked out as a new worktree in each of several repositories. " +
+			Description: "Create a workspace: one branch checked out as a new worktree in each of several projects. " +
 				"Nothing is created unless every worktree can be.",
 			Category: "Workspace",
 			Args: []ArgSpec{
 				{Name: "name", Type: String, Required: true, Positional: true, Description: "Workspace name"},
-				{Name: "repos", Type: String, Required: true, Description: "Comma-separated repositories (id, name, or absolute path), each optionally repo:base-ref"},
+				{Name: "projects", Type: String, Required: true, Description: "Comma-separated projects (id, name, or absolute path), each optionally project:base-ref"},
 				{Name: "branch", Type: String, Description: "Branch for every worktree (default: cf/<name as a slug>)"},
-				{Name: "base", Type: String, Description: "Ref to branch from for repositories without their own (default: origin/<default branch>)"},
+				{Name: "base", Type: String, Description: "Ref to branch from for projects without their own (default: origin/<default branch>)"},
 				fetchArg,
 			},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				req := &v1.CreateWorkspaceRequest{
 					Name: a.String("name"), Branch: a.String("branch"), BaseRef: a.String("base"), Fetch: a.Bool("fetch"),
 				}
-				for _, item := range splitList(a.String("repos")) {
+				for _, item := range splitList(a.String("projects")) {
 					project, base, _ := strings.Cut(item, ":")
 					req.Members = append(req.Members, &v1.WorkspaceMemberSpec{Project: strings.TrimSpace(project), BaseRef: strings.TrimSpace(base)})
 				}
 				if len(req.Members) == 0 {
-					return Result{}, InvalidArg("repos", "argument \"repos\": name at least one repository")
+					return Result{}, InvalidArg("projects", "argument \"projects\": name at least one project")
 				}
 				res, err := b.Create(ctx, connect.NewRequest(req))
 				if err != nil {
@@ -79,7 +79,7 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 		Command{
 			Name:         "workspace.list",
 			Title:        "List Workspaces",
-			Description:  "List workspaces with their branch and member repositories.",
+			Description:  "List workspaces with their branch and member projects.",
 			Category:     "Workspace",
 			NoKeybinding: true,
 			Run: func(ctx context.Context, _ Context, _ Args) (Result, error) {
@@ -101,7 +101,7 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 		Command{
 			Name:  "workspace.members",
 			Title: "Workspace Members",
-			Description: "List a workspace's worktrees: one line per member repository with its worktree path and branch. " +
+			Description: "List a workspace's worktrees: one line per member project with its worktree path and branch. " +
 				"Without a workspace, the one whose worktree contains --cwd (the working directory) is used.",
 			Category:     "Workspace",
 			NoKeybinding: true,
@@ -117,26 +117,26 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 			},
 		},
 		Command{
-			Name:        "workspace.add-repo",
+			Name:        "workspace.add-project",
 			Title:       "Add Project to Workspace",
-			Description: "Create a worktree on the workspace branch in another project (repository) and add it to the workspace.",
+			Description: "Create a worktree on the workspace branch in another project and add it to the workspace.",
 			Category:    "Workspace",
 			Args: []ArgSpec{
-				{Name: "repo", Type: String, Required: true, Positional: true, Description: "Repository id, name, or absolute path"},
+				{Name: "project", Type: String, Required: true, Positional: true, Description: "Project id, name, or absolute path"},
 				wsArg, cwdArg,
 				{Name: "base", Type: String, Description: "Ref to branch from when the branch does not exist (default: origin/<default branch>)"},
 				fetchArg,
 			},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				res, err := b.AddProject(ctx, connect.NewRequest(&v1.AddWorkspaceProjectRequest{
-					Workspace: a.String("workspace"), Cwd: a.Path("cwd"), Project: a.String("repo"),
+					Workspace: a.String("workspace"), Cwd: a.Path("cwd"), Project: a.String("project"),
 					BaseRef: a.String("base"), Fetch: a.Bool("fetch"),
 				}))
 				if err != nil {
 					return Result{}, err
 				}
 				w := res.Msg.GetWorkspace()
-				msg := "added " + a.String("repo") + " to workspace " + w.GetName()
+				msg := "added " + a.String("project") + " to workspace " + w.GetName()
 				if ms := w.GetMembers(); len(ms) > 0 {
 					msg += ": " + ms[len(ms)-1].GetWorktreePath() + " on " + w.GetBranch()
 				}
@@ -144,28 +144,28 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 			},
 		},
 		Command{
-			Name:  "workspace.remove-repo",
+			Name:  "workspace.remove-project",
 			Title: "Remove Project from Workspace",
-			Description: "Delete a member repository's worktree and drop it from the workspace. Refused while a thread runs " +
+			Description: "Delete a member project's worktree and drop it from the workspace. Refused while a thread runs " +
 				"in that worktree, and when it has uncommitted changes unless --force.",
 			Category: "Workspace",
 			Args: []ArgSpec{
-				{Name: "repo", Type: String, Required: true, Positional: true, Description: "Repository id, name, or path (the member worktree path works too)"},
+				{Name: "project", Type: String, Required: true, Positional: true, Description: "Project id, name, or path (the member worktree path works too)"},
 				wsArg, cwdArg,
 				{Name: "force", Type: Bool, Description: "Remove even with uncommitted changes"},
 				{Name: "delete-branch", Type: Bool, Description: "Also delete the branch"},
 			},
-			Confirm: "Remove project {repo} from its workspace? This deletes its worktree from disk.",
+			Confirm: "Remove project {project} from its workspace? This deletes its worktree from disk.",
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				res, err := b.RemoveProject(ctx, connect.NewRequest(&v1.RemoveWorkspaceProjectRequest{
-					Workspace: a.String("workspace"), Cwd: a.Path("cwd"), Project: a.String("repo"),
+					Workspace: a.String("workspace"), Cwd: a.Path("cwd"), Project: a.String("project"),
 					Force: a.Bool("force"), DeleteBranch: a.Bool("delete-branch"),
 				}))
 				if err != nil {
 					return Result{}, err
 				}
 				w := res.Msg.GetWorkspace()
-				return Result{Message: fmt.Sprintf("removed %s from workspace %s (%d left)", a.String("repo"), w.GetName(), len(w.GetMembers())), JSON: w}, nil
+				return Result{Message: fmt.Sprintf("removed %s from workspace %s (%d left)", a.String("project"), w.GetName(), len(w.GetMembers())), JSON: w}, nil
 			},
 		},
 		Command{
@@ -198,28 +198,28 @@ func withPositional(s ArgSpec) ArgSpec {
 	return s
 }
 
-// describeWorkspace is "login (w-…) on cf/login, 2 repositories".
+// describeWorkspace is "login (w-…) on cf/login, 2 projects".
 func describeWorkspace(w *v1.Workspace) string {
 	n := len(w.GetMembers())
-	noun := "repositories"
+	noun := "projects"
 	if n == 1 {
-		noun = "repository"
+		noun = "project"
 	}
 	return fmt.Sprintf("%s (%s) on %s, %d %s", w.GetName(), w.GetId(), w.GetBranch(), n, noun)
 }
 
 // formatMembers renders a membership for people and for Claude: a header line, then
-// one aligned line per member with repository name, id, worktree path and branch.
+// one aligned line per member with project name, id, worktree path and branch.
 func formatMembers(m *v1.WorkspaceMembersResponse) string {
 	var b strings.Builder
 	w := m.GetWorkspace()
 	fmt.Fprintf(&b, "workspace %s (%s), branch %s\n", w.GetName(), w.GetId(), w.GetBranch())
 	if len(m.GetMembers()) == 0 {
-		b.WriteString("no member repositories")
+		b.WriteString("no member projects")
 		return b.String()
 	}
 	tw := tabwriter.NewWriter(&b, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "REPO\tID\tWORKTREE\tBRANCH")
+	fmt.Fprintln(tw, "PROJECT\tID\tWORKTREE\tBRANCH")
 	for _, mem := range m.GetMembers() {
 		branch := mem.GetBranch()
 		if mem.GetCurrent() {

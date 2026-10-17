@@ -90,20 +90,20 @@ func TestCLIAgainstDaemon(t *testing.T) {
 		{"stray positional", []string{"ui.notify", "--title", "x", "extra"}, errUsage, "", "unexpected arguments [extra]"},
 		{"workspace list", []string{"workspace", "list"}, nil, "no workspaces", ""},
 		{"workspace members defaults to the working directory", []string{"workspace", "members"}, errUsage, "", "/work is not inside a workspace worktree"},
-		{"kebab-case verb with a positional", []string{"workspace", "add-repo", "api", "--fetch=false"}, errUsage, "", "workspace.add-repo: not found: /work is not inside"},
+		{"kebab-case verb with a positional", []string{"workspace", "add-project", "api", "--fetch=false"}, errUsage, "", "workspace.add-project: not found: /work is not inside"},
 		{"explicit --cwd wins", []string{"workspace", "members", "--cwd", "/elsewhere"}, errUsage, "", "/elsewhere is not inside"},
-		{"repo add prints the CLI hint", []string{"repo", "add"}, nil, "code-foundry repo add <folder>", ""},
-		{"repo add resolves a relative folder against the working directory", []string{"repo", "add", "rel"}, errUsage, "",
-			"code-foundry repo.add: invalid argument: /work/rel: lstat /work: no such file or directory"},
-		{"repo clone refuses ssh before the daemon runs gh", []string{"repo", "clone", "git@github.com:o/r.git"}, errUsage, "",
-			"code-foundry repo.clone: invalid argument: SSH URLs are not supported"},
-		{"repo clone needs a repo", []string{"repo", "clone"}, errUsage, "", "no repository given"},
-		{"repo create refuses a dot name", []string{"repo", "create", ".hidden"}, errUsage, "",
-			`code-foundry repo.create: invalid argument: a project name cannot start with "."`},
+		{"project add prints the CLI hint", []string{"project", "add"}, nil, "code-foundry project add <folder>", ""},
+		{"project add resolves a relative folder against the working directory", []string{"project", "add", "rel"}, errUsage, "",
+			"code-foundry project.add: invalid argument: /work/rel: lstat /work: no such file or directory"},
+		{"project clone refuses ssh before the daemon runs gh", []string{"project", "clone", "git@github.com:o/r.git"}, errUsage, "",
+			"code-foundry project.clone: invalid argument: SSH URLs are not supported"},
+		{"project clone needs a project", []string{"project", "clone"}, errUsage, "", "no repository given"},
+		{"project create refuses a dot name", []string{"project", "create", ".hidden"}, errUsage, "",
+			`code-foundry project.create: invalid argument: a project name cannot start with "."`},
 		// The test daemon's config home is under /tmp, outside the home directory.
-		{"repo create keeps projects under home", []string{"repo", "create", "demo"}, errUsage, "", "outside your home directory"},
-		{"repo github publish needs a project", []string{"repo", "github", "publish", "--owner", "me", "--visibility", "public"}, errUsage, "",
-			"repo.github.publish: not available in this context"},
+		{"project create keeps projects under home", []string{"project", "create", "demo"}, errUsage, "", "outside your home directory"},
+		{"project github publish needs a project", []string{"project", "github", "publish", "--owner", "me", "--visibility", "public"}, errUsage, "",
+			"project.github.publish: not available in this context"},
 		// terminal.* is registered against the Unimplemented stub until 1a is wired.
 		{"store-backed stub", []string{"terminal.kill", "--id", "t1"}, errAny, "", ""},
 	}
@@ -132,7 +132,7 @@ func TestCLIAgainstDaemon(t *testing.T) {
 	}{
 		{"commands shows availability", []string{"commands"}, `(?m)^Terminal\s+terminal\.kill\s+no\s+Kill Terminal$`},
 		{"commands with context", []string{"commands", "--context-terminal", "t1"}, `(?m)^Terminal\s+terminal\.kill\s+yes\s`},
-		{"repo context enables worktree.new", []string{"commands", "--context-repo", "r1"}, `(?m)^Project\s+repo\.worktree\.new\s+yes\s`},
+		{"project context enables worktree.new", []string{"commands", "--context-project", "r1"}, `(?m)^Project\s+project\.worktree\.new\s+yes\s`},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			r := runCLI(c, tt.args...)

@@ -42,7 +42,7 @@ func TestThreadList(t *testing.T) {
 				"s-867564981c98  attention (finished)  (unnamed)      app@main    3h  ↳ Fix the login",
 				"s-000000000001  error (interrupted)   notes          no project  3d  [archived]",
 			}},
-		{name: "every filter", args: map[string]string{"archived": "true", "status": "attention", "state": "disconnected", "repo": "app",
+		{name: "every filter", args: map[string]string{"archived": "true", "status": "attention", "state": "disconnected", "project": "app",
 			"workspace": "w", "created-by": "user", "label": "a, b", "limit": "0"},
 			wantFilter: &v1.ThreadFilter{IncludeArchived: true, Status: v1.ThreadStatus_THREAD_STATUS_NEEDS_ATTENTION,
 				State: v1.ThreadState_THREAD_STATE_DISCONNECTED, Project: "app", Workspace: "w", CreatedBy: "user", Labels: []string{"a", "b"}},

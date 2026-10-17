@@ -17,7 +17,7 @@ func TestThreadNewRequestID(t *testing.T) {
 		reg, b, e := newLifecycleRegistry(t)
 		b.Reused = reused
 		res, err := reg.Invoke(context.Background(), command.Context{}, "thread.new",
-			map[string]string{"repo": "r1", "request-id": "k1", "name": "fix"})
+			map[string]string{"project": "r1", "request-id": "k1", "name": "fix"})
 		if err != nil {
 			t.Fatal(err)
 		}

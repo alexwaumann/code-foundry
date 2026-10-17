@@ -141,7 +141,7 @@ func (f ContextField) Describe() string {
 	case ContextThread:
 		return "the active thread"
 	case ContextProject:
-		return "the active repository"
+		return "the active project"
 	case ContextWorktree:
 		return "the active worktree"
 	default:
@@ -163,8 +163,8 @@ type Result struct {
 }
 
 // NamePattern is the required shape of command names: lowercase dotted segments, at
-// least two, e.g. "terminal.new", "repo.worktree.new". Segments after the first may be
-// kebab-case ("workspace.add-repo"), which the CLI accepts as a word as it is.
+// least two, e.g. "terminal.new", "project.worktree.new". Segments after the first may be
+// kebab-case ("workspace.add-project"), which the CLI accepts as a word as it is.
 var NamePattern = regexp.MustCompile(`^[a-z]+(\.[a-z][a-z0-9]*(-[a-z0-9]+)*)+$`)
 
 // argNamePattern is the required shape of argument names. Kebab-case, so names map
@@ -174,7 +174,7 @@ var argNamePattern = regexp.MustCompile(`^[a-z][a-z0-9]*(-[a-z0-9]+)*$`)
 // ReservedArgNames are CLI flags every generated verb has; commands may not use them.
 var ReservedArgNames = []string{
 	"json", "help", "h", "yes",
-	"context-terminal", "context-thread", "context-repo", "context-worktree", "context-workspace",
+	"context-terminal", "context-thread", "context-project", "context-worktree", "context-workspace",
 }
 
 // Sentinel errors. Use errors.Is; internal/api maps them to Connect codes.

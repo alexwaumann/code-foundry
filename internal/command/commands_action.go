@@ -85,16 +85,16 @@ func canUseActions(c Context) bool {
 }
 
 // noProject is how the action commands refuse a context without a project.
-const noProject = "actions belong to a project: pass --repo, select a thread or a worktree, or run inside a registered project"
+const noProject = "actions belong to a project: pass --project, select a thread or a worktree, or run inside a registered project"
 
 // RegisterAction registers action.list, action.add, action.edit, action.remove,
 // action.run, action.wait and action.runs.
 func RegisterAction(r *Registry, d ActionDeps) error {
 	r.SetIDLister(RunID, runIDs(d.Action))
-	projectArg := ArgSpec{Name: "repo", Type: String, Context: ContextProject,
+	projectArg := ArgSpec{Name: "project", Type: String, Context: ContextProject,
 		Description: "Project: id, name, or a path inside it (default: the thread's, the worktree's, or the working directory's)"}
 	hereArg := ArgSpec{Name: "here", Type: Path, DefaultToCwd: true,
-		Description: "Where the CLI runs: without a thread, worktree or --repo, its project is used (CLI default: the working directory)"}
+		Description: "Where the CLI runs: without a thread, worktree or --project, its project is used (CLI default: the working directory)"}
 	refArg := ArgSpec{Name: "action", Type: String, Required: true, Positional: true, Description: "Action name (ignoring case) or id"}
 	iconArg := ArgSpec{Name: "icon", Type: Enum, Enum: actionIconNames(), Description: "Icon"}
 	whyNoProject := func(Context) string { return noProject }
@@ -323,11 +323,11 @@ func withDefault(a ArgSpec, def string) ArgSpec {
 	return a
 }
 
-// actionRepo is the project the action commands work on: --repo (id, name, or a path
+// actionRepo is the project the action commands work on: --project (id, name, or a path
 // inside it; the GUI's active project), else the owner terminal.new would pick (thread,
 // worktree, the CLI's working directory).
 func actionProject(ctx context.Context, d ActionDeps, c Context, a Args) (string, error) {
-	if ref := strings.TrimSpace(a.String("repo")); ref != "" {
+	if ref := strings.TrimSpace(a.String("project")); ref != "" {
 		return resolveProjectRef(ctx, d.Project, ref)
 	}
 	o, err := shellOwner(ctx, d.Project, d.Thread, c, "", a.Path("here"), noProject)
@@ -335,7 +335,7 @@ func actionProject(ctx context.Context, d ActionDeps, c Context, a Args) (string
 		return "", err
 	}
 	if o.project == "" {
-		return "", InvalidArg("repo", "thread %s has no project; %s", o.thread, noProject)
+		return "", InvalidArg("project", "thread %s has no project; %s", o.thread, noProject)
 	}
 	return o.project, nil
 }
@@ -360,15 +360,15 @@ func resolveProjectRef(ctx context.Context, projects ProjectBackend, ref string)
 	case len(byName) == 1:
 		return byName[0], nil
 	case len(byName) > 1:
-		return "", InvalidArg("repo", "%d projects are named %s; pass an id (code-foundry repo list)", len(byName), ref)
+		return "", InvalidArg("project", "%d projects are named %s; pass an id (code-foundry project list)", len(byName), ref)
 	}
 	if p, err := ExpandPath(ref); err == nil && filepath.IsAbs(p) {
 		if id, _, ok := ownerWorktree(res.Msg.GetProjects(), "", "", realPath(p)); ok {
 			return id, nil
 		}
-		return "", InvalidArg("repo", "%s %s", ref, notInProject)
+		return "", InvalidArg("project", "%s %s", ref, notInProject)
 	}
-	return "", InvalidArg("repo", "no project %q (code-foundry repo list)", ref)
+	return "", InvalidArg("project", "no project %q (code-foundry project list)", ref)
 }
 
 // findAction resolves the action argument: an id anywhere, else a name in the project

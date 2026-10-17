@@ -30,34 +30,34 @@ func TestProjectCreateAndPublish(t *testing.T) {
 		wantErr  string
 		wantCall string // the backend request, as text
 	}{
-		{name: "create", cmd: "repo.create", args: map[string]string{"name": "demo"},
+		{name: "create", cmd: "project.create", args: map[string]string{"name": "demo"},
 			wantMsg: "created demo in /p/demo (repo-demo)", wantCall: `name:"demo"`},
-		{name: "create needs a name", cmd: "repo.create", wantErr: "name"},
-		{name: "publish with the active project", cmd: "repo.github.publish", uctx: command.Context{ActiveProjectID: "r1"},
+		{name: "create needs a name", cmd: "project.create", wantErr: "name"},
+		{name: "publish with the active project", cmd: "project.github.publish", uctx: command.Context{ActiveProjectID: "r1"},
 			args:     map[string]string{"owner": "alexwaumann", "visibility": "public"},
 			wantMsg:  "published demo to https://github.com/alexwaumann/demo (public)",
-			wantCall: `repo_id:"r1" owner:"alexwaumann" visibility:REPOSITORY_VISIBILITY_PUBLIC`},
-		{name: "publish with an explicit repo and name", cmd: "repo.github.publish",
-			args:     map[string]string{"repo": "r2", "owner": "octo-org", "name": "app", "visibility": "internal"},
+			wantCall: `project_id:"r1" owner:"alexwaumann" visibility:REPOSITORY_VISIBILITY_PUBLIC`},
+		{name: "publish with an explicit project and name", cmd: "project.github.publish",
+			args:     map[string]string{"project": "r2", "owner": "octo-org", "name": "app", "visibility": "internal"},
 			wantMsg:  "published demo to https://github.com/octo-org/app (internal)",
-			wantCall: `repo_id:"r2" owner:"octo-org" name:"app" visibility:REPOSITORY_VISIBILITY_INTERNAL`},
-		{name: "publish needs a visibility", cmd: "repo.github.publish", uctx: command.Context{ActiveProjectID: "r1"},
+			wantCall: `project_id:"r2" owner:"octo-org" name:"app" visibility:REPOSITORY_VISIBILITY_INTERNAL`},
+		{name: "publish needs a visibility", cmd: "project.github.publish", uctx: command.Context{ActiveProjectID: "r1"},
 			args: map[string]string{"owner": "me"}, wantErr: "visibility"},
-		{name: "publish refuses other visibilities", cmd: "repo.github.publish", uctx: command.Context{ActiveProjectID: "r1"},
+		{name: "publish refuses other visibilities", cmd: "project.github.publish", uctx: command.Context{ActiveProjectID: "r1"},
 			args: map[string]string{"owner": "me", "visibility": "secret"}, wantErr: "visibility"},
-		{name: "publish is unavailable without git", cmd: "repo.github.publish", uctx: command.Context{ActiveProjectID: "r-plain"},
+		{name: "publish is unavailable without git", cmd: "project.github.publish", uctx: command.Context{ActiveProjectID: "r-plain"},
 			args: map[string]string{"owner": "me", "visibility": "public"}, wantErr: "project is not a git repository"},
-		{name: "publish is unavailable with origin", cmd: "repo.github.publish", uctx: command.Context{ActiveProjectID: "r-origin"},
+		{name: "publish is unavailable with origin", cmd: "project.github.publish", uctx: command.Context{ActiveProjectID: "r-origin"},
 			args: map[string]string{"owner": "me", "visibility": "public"}, wantErr: "project already has an origin remote"},
-		{name: "gh's error passes through as is", cmd: "repo.github.publish", uctx: command.Context{ActiveProjectID: "r1"},
+		{name: "gh's error passes through as is", cmd: "project.github.publish", uctx: command.Context{ActiveProjectID: "r1"},
 			args: map[string]string{"owner": "me", "visibility": "private"}, err: ghErr,
 			wantErr:  "GraphQL: Name already exists on this account (createRepository)",
-			wantCall: `repo_id:"r1" owner:"me" visibility:REPOSITORY_VISIBILITY_PRIVATE`},
-		{name: "delete a project in the projects directory", cmd: "repo.delete", uctx: command.Context{ActiveProjectID: "r-made"},
+			wantCall: `project_id:"r1" owner:"me" visibility:REPOSITORY_VISIBILITY_PRIVATE`},
+		{name: "delete a project in the projects directory", cmd: "project.delete", uctx: command.Context{ActiveProjectID: "r-made"},
 			wantMsg: "deleted r-made", wantCall: `id:"r-made"`},
-		{name: "delete is unavailable elsewhere", cmd: "repo.delete", uctx: command.Context{ActiveProjectID: "r1"},
+		{name: "delete is unavailable elsewhere", cmd: "project.delete", uctx: command.Context{ActiveProjectID: "r1"},
 			wantErr: "not in the projects directory"},
-		{name: "delete needs a project", cmd: "repo.delete", wantErr: "not available"},
+		{name: "delete needs a project", cmd: "project.delete", wantErr: "not available"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -96,18 +96,18 @@ func TestProjectCreateUnconfigured(t *testing.T) {
 	if err := command.RegisterNewProjects(reg, command.NewProjectDeps{}); err != nil {
 		t.Fatal(err)
 	}
-	_, err := reg.Invoke(context.Background(), command.Context{}, "repo.create", map[string]string{"name": "x"})
+	_, err := reg.Invoke(context.Background(), command.Context{}, "project.create", map[string]string{"name": "x"})
 	if connect.CodeOf(err) != connect.CodeUnimplemented {
 		t.Fatalf("err = %v", err)
 	}
 	// Without predicates, publish is available for any project.
-	if _, ok := reg.Get("repo.github.publish"); !ok {
+	if _, ok := reg.Get("project.github.publish"); !ok {
 		t.Fatal("not registered")
 	}
 	for _, l := range reg.List(command.Context{ActiveProjectID: "r"}, false) {
-		if l.Name == "repo.github.publish" {
+		if l.Name == "project.github.publish" {
 			return
 		}
 	}
-	t.Error("repo.github.publish unavailable with a project and no predicates")
+	t.Error("project.github.publish unavailable with a project and no predicates")
 }

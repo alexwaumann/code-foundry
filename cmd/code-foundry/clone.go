@@ -22,15 +22,15 @@ type cliPresenter func(ctx context.Context, cl *cli, c *client.Client, vals map[
 
 // cliPresenters maps command names to their CLI presentation.
 var cliPresenters = map[string]cliPresenter{
-	// repo.clone streams RepoService.Clone so the clone's progress shows as it runs;
+	// project.clone streams RepoService.Clone so the clone's progress shows as it runs;
 	// Invoke would only answer once it is done.
-	"repo.clone": presentClone,
+	"project.clone": presentClone,
 }
 
 // presentClone clones vals["repo"] (owner/repo or an https://github.com URL), printing
 // gh's progress to stderr and the result to stdout.
 func presentClone(ctx context.Context, cl *cli, c *client.Client, vals map[string]string, asJSON bool) error {
-	const name = "repo.clone"
+	const name = "project.clone"
 	owner, repoName, err := gh.ParseRepoRef(vals["repo"])
 	if err != nil {
 		fmt.Fprintf(cl.stderr, "code-foundry %s: %s\n", name, err)

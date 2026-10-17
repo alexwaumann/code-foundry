@@ -131,13 +131,13 @@ func TestViewPanelWorktreeAvailability(t *testing.T) {
 		{name: "thread with its terminal", ctx: command.Context{ActiveThreadID: "s1", ActiveTerminalID: "t1", ActiveProjectID: "r1", ActiveWorktreePath: "/wt", ActiveView: "thread"}, want: true},
 		{name: "Projects page bottom shell in a worktree (no thread)", ctx: command.Context{ActiveTerminalID: "t1", ActiveProjectID: "r1", ActiveWorktreePath: "/wt", ActiveView: "projects"}, want: false},
 		{name: "thread outside any worktree", ctx: command.Context{ActiveThreadID: "s1", ActiveView: "thread"}, want: false},
-		{name: "thread with a repo but no worktree", ctx: command.Context{ActiveThreadID: "s1", ActiveProjectID: "r1", ActiveView: "thread"}, want: false},
+		{name: "thread with a project but no worktree", ctx: command.Context{ActiveThreadID: "s1", ActiveProjectID: "r1", ActiveView: "thread"}, want: false},
 		{name: "worktree page", ctx: command.Context{ActiveProjectID: "r1", ActiveWorktreePath: "/wt", ActiveView: "worktree"}, want: false},
-		{name: "repo page", ctx: command.Context{ActiveProjectID: "r1", ActiveWorktreePath: "/src", ActiveView: "repo"}, want: false},
+		{name: "projects page", ctx: command.Context{ActiveProjectID: "r1", ActiveWorktreePath: "/src", ActiveView: "projects"}, want: false},
 		{name: "composer", ctx: command.Context{ActiveProjectID: "r1", ActiveView: "compose"}, want: false},
 		{name: "nothing selected", ctx: command.Context{ActiveView: "dashboard"}, want: false},
 		{name: "CLI without context", ctx: command.Context{}, want: false},
-		{name: "CLI with --context-thread, --context-repo and --context-worktree", ctx: command.Context{ActiveThreadID: "s1", ActiveProjectID: "r1", ActiveWorktreePath: "/wt"}, want: true},
+		{name: "CLI with --context-thread, --context-project and --context-worktree", ctx: command.Context{ActiveThreadID: "s1", ActiveProjectID: "r1", ActiveWorktreePath: "/wt"}, want: true},
 	}
 	reg := command.NewRegistry()
 	if err := command.RegisterView(reg, &commandtest.Emitter{Delivered: 1}); err != nil {

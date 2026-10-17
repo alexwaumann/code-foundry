@@ -32,12 +32,12 @@ type Deps struct {
 	// Repo backs repo.*. Nil works like Terminal.
 	Project command.ProjectBackend
 	// NotGit reports a context in a project without git: it gates repo.worktree.*,
-	// repo.git.init, and (unless GitOps.NotGit is set) git.* and pr.*. Nil: every
+	// project.git.init, and (unless GitOps.NotGit is set) git.* and pr.*. Nil: every
 	// project is git.
 	NotGit command.NotGitFunc
-	// Clone backs repo.clone. Nil makes it fail with Unimplemented.
+	// Clone backs project.clone. Nil makes it fail with Unimplemented.
 	Clone command.CloneFunc
-	// Projects backs repo.create, repo.github.publish and repo.delete (its NotGit
+	// Projects backs project.create, project.github.publish and project.delete (its NotGit
 	// defaults to NotGit). A nil Backend works like Terminal.
 	NewProjects command.NewProjectDeps
 	// Thread backs thread.*. Nil works like Terminal.

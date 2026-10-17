@@ -87,7 +87,7 @@ func hasWorkspaceThreadContext(c Context) bool {
 
 // hasWorktreeThreadContext is view.panel.worktree's availability: a thread is active and
 // it sits in a registered worktree (the GUI passes the placement as ActiveRepoID and
-// ActiveWorktreePath; the CLI with --context-thread plus --context-repo and
+// ActiveWorktreePath; the CLI with --context-thread plus --context-project and
 // --context-worktree). A terminal alone does not count: the GUI never selects one (a
 // Projects-page bottom shell brings its worktree, but the page has no thread).
 func hasWorktreeThreadContext(c Context) bool {
@@ -137,7 +137,7 @@ func RegisterView(r *Registry, e Emitter) error {
 		Command{
 			Name:        "view.pullrequests",
 			Title:       "Show Pull Requests",
-			Description: "Show the Pull Requests page: your open pull requests, reviews requested from you, and recent merges across registered repositories.",
+			Description: "Show the Pull Requests page: your open pull requests, reviews requested from you, and recent merges across registered projects.",
 			Category:    "View",
 			Keybindings: []string{"cmd+shift+d"},
 			Run: func(context.Context, Context, Args) (Result, error) {

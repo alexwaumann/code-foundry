@@ -78,18 +78,18 @@ func RegisterUI(r *Registry, e Emitter) error {
 			},
 		},
 		Command{
-			Name:         "ui.focus.repo",
-			Title:        "Focus Repository",
+			Name:         "ui.focus.project",
+			Title:        "Focus Project",
 			Description:  "Show a project's worktree (default: its main one) in the Projects page's side panel in every connected window.",
 			Category:     "View",
 			NoKeybinding: true,
 			Args: []ArgSpec{
-				{Name: "repo", Type: String, Required: true, Context: ContextProject, Description: "Repository id"},
+				{Name: "project", Type: String, Required: true, Context: ContextProject, Description: "Project id"},
 				{Name: "worktree", Type: Path, Context: ContextWorktree, Description: "Worktree path"},
 			},
 			Run: func(_ context.Context, _ Context, a Args) (Result, error) {
 				return emit(&v1.UiIntent{Intent: &v1.UiIntent_FocusProject_{FocusProject: &v1.UiIntent_FocusProject{
-					ProjectId:    a.String("repo"),
+					ProjectId:    a.String("project"),
 					WorktreePath: a.Path("worktree"),
 				}}}), nil
 			},

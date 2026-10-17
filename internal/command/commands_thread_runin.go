@@ -27,16 +27,16 @@ func threadRunIn(b ThreadBackend, idArg ArgSpec) Command {
 		Category: "Thread",
 		Args: []ArgSpec{
 			idArg,
-			{Name: "repo", Type: String, Positional: true, Description: "Member repository (id or name)"},
+			{Name: "project", Type: String, Positional: true, Description: "Member project (id or name)"},
 			{Name: "worktree", Type: Path, Description: "Member worktree path"},
 		},
 		When: hasWorkspaceThread,
 		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-			if a.String("repo") == "" && a.Path("worktree") == "" {
-				return Result{}, InvalidArg("repo", "name the member: a repository or a worktree path")
+			if a.String("project") == "" && a.Path("worktree") == "" {
+				return Result{}, InvalidArg("project", "name the member: a project or a worktree path")
 			}
 			res, err := b.RunIn(ctx, connect.NewRequest(&v1.RunInThreadRequest{
-				Id: a.String("id"), ProjectId: a.String("repo"), WorktreePath: a.Path("worktree"),
+				Id: a.String("id"), ProjectId: a.String("project"), WorktreePath: a.Path("worktree"),
 			}))
 			if err != nil {
 				return Result{}, err
