@@ -2645,7 +2645,7 @@ export class World {
       },
       {
         cmd: {
-          name: "project.refresh", title: "Refresh Git Status", category: "Project", description: "Reconcile git status now", keybindings: ["cmd+alt+r"],
+          name: "project.refresh", title: "Refresh Git Status", category: "Project", description: "Reconcile git status now", keybindings: [],
           args: [{ name: "project", type: ArgType.STRING, required: false, description: "Project id (default: all)" }],
         },
         when: always,
