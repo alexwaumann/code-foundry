@@ -279,7 +279,7 @@ func RegisterUsage(r *Registry, b ThreadBackend) error {
 		Category:     "View",
 		NoKeybinding: true,
 		Args: []ArgSpec{
-			{Name: "thread", Type: String, Description: "Thread id (default: every thread, plus removed threads)"},
+			{Name: "thread", Type: String, ID: ThreadID, Description: "Thread id (default: every thread, plus removed threads)" + IDHelp},
 		},
 		// CLI only: the palette has view.usage, which opens the Usage page.
 		When: func(c Context) bool { return c.ActiveView == "" },

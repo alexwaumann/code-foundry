@@ -19,13 +19,17 @@ import (
 
 // runEvents is the events verb: EventService.Watch on stdout, one line per event, for
 // agents and scripts that follow the daemon (docs/notes/agents-1-wait-events.md). It is
-// a local verb because registry commands are unary. Heartbeats are not printed. It ends
+// a local verb because registry commands are unary. --json events carry the daemon's
+// epoch; resuming with --since and --since-epoch across a daemon restart starts over
+// with snapshots (docs/notes/agents-5-cli.md). Heartbeats are not printed. It ends
 // on Ctrl-C, when a piped stdin closes, or when the daemon stops.
 func runEvents(ctx context.Context, cl *cli, args []string) error {
 	fs := cl.newFlagSet("events")
 	sourceFlag := fs.String("source", "", "comma-separated `sources` to follow (default all): "+strings.Join(eventSourceNames(), ", "))
 	since := fs.Uint64("since", 0, "resume after this `seq` (the last one seen): replays the events after it if the daemon still has them, else starts with snapshots")
-	asJSON := fs.Bool("json", false, "print each event as one JSON object (protojson, with its seq)")
+	sinceEpoch := fs.String("since-epoch", "", "with --since: the `epoch` that seq was read under (every --json event has it); "+
+		"another daemon's epoch (it restarted) starts with snapshots instead of resuming")
+	asJSON := fs.Bool("json", false, "print each event as one JSON object (protojson, with its seq and epoch)")
 	if err := cl.parseFlags(fs, args); err != nil {
 		return quietHelp(err)
 	}
@@ -47,7 +51,7 @@ func runEvents(ctx context.Context, cl *cli, args []string) error {
 			cancel()
 		}()
 	}
-	stream, err := c.Events.Watch(ctx, connect.NewRequest(&v1.WatchEventsRequest{Sources: sources, SinceSeq: *since}))
+	stream, err := c.Events.Watch(ctx, connect.NewRequest(&v1.WatchEventsRequest{Sources: sources, SinceSeq: *since, SinceEpoch: *sinceEpoch}))
 	if err != nil {
 		return cl.eventsFailed(ctx, err)
 	}

@@ -360,6 +360,10 @@ type NewWorktree struct {
 // in-memory fake.
 type Store interface {
 	Create(ctx context.Context, opts CreateOptions) (Thread, error)
+	// CreateOnce is Create keyed by an idempotency key (requests.go): a key its creator
+	// used within RequestIDTTL returns that thread with reused set and makes nothing.
+	// An empty key is a plain Create.
+	CreateOnce(ctx context.Context, requestID string, opts CreateOptions) (t Thread, reused bool, err error)
 	// Fork starts a new thread continuing id's conversation (claude --fork-session).
 	Fork(ctx context.Context, id, name string) (Thread, error)
 	Get(ctx context.Context, id string) (Thread, error)
@@ -411,6 +415,9 @@ type Store interface {
 	ReadAttachment(ctx context.Context, path string) ([]byte, string, error)
 	// Snapshot returns the current immutable snapshot.
 	Snapshot() *Snapshot
+	// List returns the threads o selects, the most recently active first (filter.go).
+	// A Repo or Workspace that names nothing is ErrInvalidArgument.
+	List(ctx context.Context, o ListOptions) ([]Thread, error)
 
 	// Thread conversations (conversation.go, items.go).
 

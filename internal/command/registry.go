@@ -16,6 +16,8 @@ type Registry struct {
 	cmds map[string]*Command
 	// ov adjusts registered commands (user settings); applied by List, Get, and Invoke.
 	ov Overrides
+	// idListers resolve id suffixes (resolve.go).
+	idListers map[IDKind]IDLister
 }
 
 // Overrides adjust registered commands without re-registering them. The daemon sets
@@ -133,8 +135,8 @@ func (r *Registry) Get(name string) (Command, bool) {
 // Invoke validates raw args against the command's specs, checks availability, and runs
 // it. Errors wrap ErrUnknownCommand, ErrInvalidArgs (*ArgError), or ErrUnavailable;
 // anything else comes from Run. Checks run in this order: name, arg syntax,
-// availability (with explicit context-bound args overlaid), required args,
-// confirmation (*ConfirmError unless Confirmed(true) for a command with Confirm whose
+// availability (with explicit context-bound args overlaid), required args, id
+// suffixes (resolve.go), confirmation (*ConfirmError unless Confirmed(true) for a command with Confirm whose
 // ConfirmIf, if any, says this call needs it). Run
 // sees the overlaid context.
 func (r *Registry) Invoke(ctx context.Context, uctx Context, name string, raw map[string]string, opts ...InvokeOption) (Result, error) {
@@ -159,6 +161,9 @@ func (r *Registry) Invoke(ctx context.Context, uctx Context, name string, raw ma
 		return Result{}, fmt.Errorf("%s: %w", name, ErrUnavailable)
 	}
 	if err := checkRequired(c.Args, args); err != nil {
+		return Result{}, fmt.Errorf("%s: %w", name, err)
+	}
+	if eff, err = r.resolveIDs(ctx, c.Args, args, eff); err != nil {
 		return Result{}, fmt.Errorf("%s: %w", name, err)
 	}
 	if c.Confirm != "" && !o.confirmed && (c.ConfirmIf == nil || c.ConfirmIf(ctx, eff, args)) {

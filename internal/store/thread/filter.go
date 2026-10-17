@@ -1,0 +1,128 @@
+package thread
+
+import (
+	"cmp"
+	"context"
+	"errors"
+	"fmt"
+	"slices"
+	"strings"
+	"time"
+
+	"github.com/alexwaumann/code-foundry/internal/store/workspace"
+)
+
+// Listing threads for agents (thread.list; docs/notes/agents-5-cli.md): an agent with
+// hundreds of archived threads asks the daemon for the few it cares about instead of
+// reading them all.
+
+// CreatedByUser is ListOptions.CreatedBy for threads no thread created.
+const CreatedByUser = "user"
+
+// ListOptions selects threads for Store.List. Every set field must match.
+type ListOptions struct {
+	// All: every thread, archived ones too; the other fields except Limit are ignored.
+	All bool
+	// IncludeArchived keeps archived threads (they are left out by default).
+	IncludeArchived bool
+	// Status and State: only threads with them; StatusUnknown and StateUnspecified
+	// match any.
+	Status Status
+	State  State
+	// Repo: only threads whose cwd is in this repository. Store.List takes an id, a
+	// name or a path inside one of its worktrees; FilterThreads compares the id.
+	Repo string
+	// Workspace: only threads the workspace owns. Store.List takes an id or a name;
+	// FilterThreads compares the id.
+	Workspace string
+	// CreatedBy: only threads this thread created, or CreatedByUser for the user's.
+	CreatedBy string
+	// Labels: only threads carrying every one (lowercased like Store.Label's).
+	Labels []string
+	// Limit: at most this many, the most recently active; 0 for no limit.
+	Limit int
+}
+
+// FilterThreads returns the threads o selects, the most recently active first (last
+// activity, else creation; then the newest created, then by id), at most o.Limit of
+// them. o.Repo and o.Workspace are compared as ids.
+func FilterThreads(threads []Thread, o ListOptions) []Thread {
+	var out []Thread
+	for _, t := range threads {
+		if o.All || o.matches(t) {
+			out = append(out, t)
+		}
+	}
+	slices.SortStableFunc(out, func(a, b Thread) int {
+		return cmp.Or(lastActive(b).Compare(lastActive(a)), b.CreatedAt.Compare(a.CreatedAt), cmp.Compare(a.ID, b.ID))
+	})
+	if o.Limit > 0 && len(out) > o.Limit {
+		out = out[:o.Limit]
+	}
+	return out
+}
+
+func (o ListOptions) matches(t Thread) bool {
+	switch {
+	case !o.IncludeArchived && !t.ArchivedAt.IsZero():
+		return false
+	case o.Status != StatusUnknown && t.Status != o.Status:
+		return false
+	case o.State != StateUnspecified && t.State != o.State:
+		return false
+	case o.Repo != "" && t.RepoID != o.Repo:
+		return false
+	case o.Workspace != "" && t.WorkspaceID != o.Workspace:
+		return false
+	case o.CreatedBy == CreatedByUser && t.CreatedBy != "":
+		return false
+	case o.CreatedBy != "" && o.CreatedBy != CreatedByUser && t.CreatedBy != o.CreatedBy:
+		return false
+	}
+	for _, l := range o.Labels {
+		if l = strings.ToLower(strings.TrimSpace(l)); l != "" && !slices.Contains(t.Labels, l) {
+			return false
+		}
+	}
+	return true
+}
+
+// lastActive is when t last did something: its last activity, else its creation.
+func lastActive(t Thread) time.Time {
+	if !t.LastActivityAt.IsZero() {
+		return t.LastActivityAt
+	}
+	return t.CreatedAt
+}
+
+// List returns the threads o selects (FilterThreads), resolving its Repo (an id, a
+// name, or a path inside a worktree) and Workspace (an id or a name) first. A ref that
+// names nothing is ErrInvalidArgument.
+func (m *Manager) List(_ context.Context, o ListOptions) ([]Thread, error) {
+	if o.Repo != "" && !o.All && m.opts.Repos != nil { // without a repo store (tests): an id
+		r, err := workspace.ResolveRepo(m.opts.Repos.Snapshot(), o.Repo)
+		if err != nil {
+			return nil, listRefError("repo", o.Repo, err)
+		}
+		o.Repo = r.ID
+	}
+	if o.Workspace != "" && !o.All {
+		if m.opts.Workspaces == nil {
+			return nil, fmt.Errorf("%w: no workspace %q", ErrInvalidArgument, o.Workspace)
+		}
+		w, err := workspace.ResolveWorkspace(m.opts.Workspaces.Snapshot(), workspace.Ref{Workspace: o.Workspace})
+		if err != nil {
+			return nil, listRefError("workspace", o.Workspace, err)
+		}
+		o.Workspace = w.ID
+	}
+	return FilterThreads(m.Snapshot().Threads, o), nil
+}
+
+// listRefError is a filter ref that names nothing (or several), as InvalidArgument.
+func listRefError(what, ref string, err error) error {
+	if errors.Is(err, workspace.ErrInvalidArgument) {
+		return fmt.Errorf("%w: %s %q: %v", ErrInvalidArgument, what, ref, err)
+	}
+	return fmt.Errorf("%w: no %s %q", ErrInvalidArgument, what, ref)
+}

@@ -78,6 +78,9 @@ type ArgSpec struct {
 	// FileOrStdin makes the CLI read the value from a file when it is @<path>, or from
 	// stdin when it is - (String args only).
 	FileOrStdin bool
+	// ID makes the arg an id of that kind: Invoke replaces a unique suffix of one with
+	// the full id before Run (resolve.go). String args only.
+	ID IDKind
 }
 
 // validate checks the spec's static shape at Register time.
@@ -105,6 +108,8 @@ func (s ArgSpec) validate() error {
 		return errors.New("only a string arg without a context or default can default to $CODE_FOUNDRY_THREAD")
 	case s.FileOrStdin && s.Type != String:
 		return errors.New("only a string arg can be read from a file or stdin")
+	case s.ID != NoID && (s.Type != String || idKinds[s.ID].prefix == ""):
+		return errors.New("only a string arg can be an id, of a known kind")
 	}
 	if s.Default != "" {
 		if _, err := s.parse(s.Default); err != nil {

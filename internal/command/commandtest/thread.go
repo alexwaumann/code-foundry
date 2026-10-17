@@ -31,6 +31,8 @@ type Thread struct {
 	// ListSubscriptions returns and Unsubscribe removes from (thread_subscriptions.go).
 	Fired, Existed bool
 	Subscriptions  []*v1.ThreadSubscription
+	// Reused is Create's answer flag (a repeated request_id).
+	Reused bool
 }
 
 var _ command.ThreadBackend = (*Thread)(nil)
@@ -67,7 +69,7 @@ func (s *Thread) Create(_ context.Context, r *connect.Request[v1.CreateThreadReq
 	if m.GetNoProject() {
 		out.WorktreePath = "/home"
 	}
-	return connect.NewResponse(&v1.CreateThreadResponse{Thread: out}), nil
+	return connect.NewResponse(&v1.CreateThreadResponse{Thread: out, Reused: s.Reused}), nil
 }
 
 // Fork returns thread "s2" with ParentId set.

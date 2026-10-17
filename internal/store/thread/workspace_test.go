@@ -312,7 +312,8 @@ func TestWorkspaceThreadSpawn(t *testing.T) {
 	att := filepath.Join(t.TempDir(), "attachments")
 	base := []string{"CODE_FOUNDRY_ENDPOINT=http://127.0.0.1:1", "CODE_FOUNDRY_TOKEN=t"}
 	e := newWSEnv(t, func(o *Options) { o.AttachmentsDir, o.Env = att, append(o.Env, base...) })
-	line := "This thread belongs to workspace login. Run `code-foundry workspace members` for the current worktrees."
+	line := "This thread runs inside code-foundry. Run `code-foundry guide` to see how to create, wait on, read and wake other threads from the CLI. " +
+		"This thread belongs to workspace login. Run `code-foundry workspace members` for the current worktrees."
 	wantEnv := append(slices.Clone(base), "CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1")
 	check := func(what string, s Thread, wantDirs ...string) {
 		t.Helper()
@@ -356,10 +357,10 @@ func TestWorkspaceThreadSpawn(t *testing.T) {
 	}
 	check("fork", f, e.wt2, lib)
 
-	// A project thread gets none of it.
+	// A project thread gets none of it but the code-foundry line.
 	p := e.connected(CreateOptions{})
 	spec := e.spec(p.ID)
-	if got := addDirs(spec.Argv); !slices.Equal(got, []string{att}) || argOf(spec.Argv, "--append-system-prompt") != "" ||
+	if got := addDirs(spec.Argv); !slices.Equal(got, []string{att}) || argOf(spec.Argv, "--append-system-prompt") != ThreadPrompt ||
 		!hasAll(spec.Env, base) || slices.Contains(spec.Env, "CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1") {
 		t.Errorf("project thread argv = %q env = %q", spec.Argv, spec.Env)
 	}

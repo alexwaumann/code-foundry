@@ -30,11 +30,11 @@ func (h *Thread) Create(ctx context.Context, req *connect.Request[v1.CreateThrea
 	if nw := m.GetNewWorkspace(); nw != nil {
 		o.NewWorkspace = &thread.NewWorkspace{Repos: nw.GetRepos(), BaseRef: nw.GetBaseRef(), Name: nw.GetName()}
 	}
-	s, err := h.store.Create(ctx, o)
+	s, reused, err := h.store.CreateOnce(ctx, m.GetRequestId(), o)
 	if err != nil {
 		return nil, threadError(err)
 	}
-	return connect.NewResponse(&v1.CreateThreadResponse{Thread: threadToProto(s)}), nil
+	return connect.NewResponse(&v1.CreateThreadResponse{Thread: threadToProto(s), Reused: reused}), nil
 }
 
 // Fork continues a thread's conversation in a new thread.
@@ -46,8 +46,23 @@ func (h *Thread) Fork(ctx context.Context, req *connect.Request[v1.ForkThreadReq
 	return connect.NewResponse(&v1.ForkThreadResponse{Thread: threadToProto(s)}), nil
 }
 
-// List returns every thread, and the retired usage ledger.
-func (h *Thread) List(context.Context, *connect.Request[v1.ListThreadsRequest]) (*connect.Response[v1.ListThreadsResponse], error) {
+// List returns every thread, and the retired usage ledger; with a filter, the threads
+// it selects, the most recently active first (the ledger only with filter.all).
+func (h *Thread) List(ctx context.Context, req *connect.Request[v1.ListThreadsRequest]) (*connect.Response[v1.ListThreadsResponse], error) {
+	if f := req.Msg.GetFilter(); f != nil {
+		threads, err := h.store.List(ctx, listOptionsFromProto(f))
+		if err != nil {
+			return nil, threadError(err)
+		}
+		res := &v1.ListThreadsResponse{Threads: make([]*v1.Thread, len(threads))}
+		for i, t := range threads {
+			res.Threads[i] = threadToProto(t)
+		}
+		if snap := h.store.Snapshot(); f.GetAll() && snap != nil {
+			res.RetiredUsage = retiredToProto(snap.RetiredUsage)
+		}
+		return connect.NewResponse(res), nil
+	}
 	snap := h.store.Snapshot()
 	res := &v1.ListThreadsResponse{Threads: threadsToProto(snap)}
 	if snap != nil {
@@ -313,4 +328,14 @@ func (h *Thread) ReadAttachment(ctx context.Context, req *connect.Request[v1.Rea
 		return nil, threadError(err)
 	}
 	return connect.NewResponse(&v1.ReadAttachmentResponse{Data: data, MimeType: mimeType}), nil
+}
+
+// listOptionsFromProto maps ListThreadsRequest.filter to the store's options.
+func listOptionsFromProto(f *v1.ThreadFilter) thread.ListOptions {
+	return thread.ListOptions{
+		All: f.GetAll(), IncludeArchived: f.GetIncludeArchived(),
+		Status: thread.Status(f.GetStatus()), State: thread.State(f.GetState()),
+		Repo: f.GetRepo(), Workspace: f.GetWorkspace(), CreatedBy: f.GetCreatedBy(), Labels: f.GetLabels(),
+		Limit: int(f.GetLimit()),
+	}
 }

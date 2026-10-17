@@ -225,7 +225,9 @@ Services (v1):
   stream; the per-service Watch RPCs remain for the CLI and tests. Live events pass
   through one hub that numbers them (`Event.seq`, one daemon-wide sequence) and keeps
   the last 4096; `since_seq` resumes a stream without snapshots while they cover it
-  (`code-foundry events --since`; `docs/notes/agents-1-wait-events.md`).
+  (`code-foundry events --since`; `docs/notes/agents-1-wait-events.md`). Every event
+  carries the daemon's `epoch` (drawn at startup); a `since_epoch` of another daemon
+  starts over with snapshots (`docs/notes/agents-5-cli.md`).
 * `SettingsService` — GetSchema, Get, Update, Watch over `$CONFIG/settings.toml` (TOML,
   hand-editable, reloaded on change). See `docs/notes/phase3b-settings.md`.
 * `UpdateService` — Get, Check, Download, Install, Relaunch, RequestRestart, Watch. The
@@ -319,7 +321,9 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   (create, a start on send, fork) reads the workspace's current members from the workspace
   store and adds `--add-dir` for each other member,
   `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1`, and one static
-  `--append-system-prompt` line pointing at `code-foundry workspace members`.
+  `--append-system-prompt` line pointing at `code-foundry workspace members`, after the
+  static line every thread gets pointing at `code-foundry guide` (`ThreadPrompt`;
+  `docs/notes/agents-5-cli.md`).
   `ThreadService.RunIn` moves a workspace thread to another member with the control
   protocol's `set_cwd` once it is idle (`docs/notes/workspaces-2-launch.md`, superseded
   on the typing detail by `docs/notes/rendered-only.md`).
@@ -402,6 +406,14 @@ offered whenever a thread is active). The GUI sends its context with `List` and 
 the CLI passes an explicit context from flags or none. The palette, keybindings, and CLI subcommands are three front
 doors to this one registry. Adding a feature means registering commands, not editing a
 switch.
+
+Agents drive threads through the same registry (`docs/notes/agents-5-cli.md`): an arg
+with an `IDKind` (thread, action run, subscription, terminal) takes a unique suffix of
+the id, resolved by `Invoke` through the lister its domain registered; `thread.list`
+filters in the daemon (`ListThreadsRequest.filter`); `thread.new --request-id` is
+idempotent (`thread_requests`); `thread.read` pages items; `thread.send --wait` and
+`thread.wait --after` wait for the turn after a message. `code-foundry guide` (a local
+verb, like `--help`) prints a Markdown guide for agents generated from `CommandService.List`.
 
 Pull request commands: the detail panel's actions (`pr.merge`, `pr.revert`,
 `pr.review.request`, `pr.refresh`; docs/notes/gh-pr-detail.md; `pr.review`, `pr.comment`;

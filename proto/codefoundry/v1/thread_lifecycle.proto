@@ -400,6 +400,13 @@ message CreateThreadRequest {
   // thread settles. INVALID_ARGUMENT without created_by. See
   // docs/notes/agents-4-wake.md.
   bool notify = 19;
+  // An idempotency key (at most 128 characters): a Create with a key its creator
+  // (created_by, or the user when empty) already used within the last 24 hours returns
+  // the thread that first Create made (CreateThreadResponse.reused) and starts nothing;
+  // the repeat's other fields are ignored. A Create still making the thread for the
+  // key is waited for. Persisted (a removed thread forgets its key). See
+  // docs/notes/agents-5-cli.md.
+  string request_id = 20;
 }
 
 message NewWorktree {
@@ -450,6 +457,8 @@ message ReadAttachmentResponse {
 
 message CreateThreadResponse {
   Thread thread = 1;
+  // The request_id was seen before: thread is the one made then; nothing new started.
+  bool reused = 2;
 }
 
 message ForkThreadRequest {
@@ -461,7 +470,39 @@ message ForkThreadResponse {
   Thread thread = 1;
 }
 
-message ListThreadsRequest {}
+message ListThreadsRequest {
+  // Unset: every thread, in creation order, and the retired usage ledger (what the
+  // GUI and the daemon's own callers want). Set: the threads that match it, ordered by
+  // last activity, newest first (thread.list; docs/notes/agents-5-cli.md).
+  ThreadFilter filter = 1;
+}
+
+// ThreadFilter selects threads for ListThreadsRequest. Every set field must match.
+message ThreadFilter {
+  // Every thread, archived ones included, and the retired usage ledger; the fields
+  // below except limit are ignored.
+  bool all = 1;
+  // Include archived threads (default: they are left out).
+  bool include_archived = 2;
+  // Only threads with this status (UNSPECIFIED: any).
+  ThreadStatus status = 3;
+  // Only threads in this state (UNSPECIFIED: any).
+  ThreadState state = 4;
+  // Only threads whose cwd is in this repository: an id, a name when exactly one
+  // repository has it, or an absolute path inside one of its worktrees
+  // (INVALID_ARGUMENT when it names none or several).
+  string repo = 5;
+  // Only threads owned by this workspace: an id or a name (INVALID_ARGUMENT when it
+  // names none).
+  string workspace = 6;
+  // Only threads created by this thread (Thread.created_by), or "user" for threads no
+  // thread created.
+  string created_by = 7;
+  // Only threads carrying every one of these labels.
+  repeated string labels = 8;
+  // At most this many threads (the most recently active); 0: no limit.
+  int32 limit = 9;
+}
 
 message ListThreadsResponse {
   repeated Thread threads = 1;
@@ -500,6 +541,12 @@ message WaitThreadRequest {
   ThreadWaitCondition until = 2;
   // How long to wait. Unset or zero: until the call is cancelled.
   google.protobuf.Duration timeout = 3;
+  // An item of the thread (its id, or its ordinal in decimal): the condition counts
+  // only once Claude has reacted after that item, that is once a top-level turn end,
+  // error, permission request or question item follows it. Waiting with after set to a
+  // message just sent therefore never returns for the status of the turn before it.
+  // NOT_FOUND for an id that is not the thread's. Empty: no such check.
+  string after = 4;
 }
 
 message WaitThreadResponse {

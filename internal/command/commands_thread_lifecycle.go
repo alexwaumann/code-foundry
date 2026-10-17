@@ -1,13 +1,9 @@
 package command
 
 import (
-	"cmp"
 	"context"
 	"fmt"
-	"slices"
 	"strings"
-	"text/tabwriter"
-	"time"
 
 	"connectrpc.com/connect"
 
@@ -80,71 +76,13 @@ func threadLabel(s *v1.Thread) string {
 	return s.GetId()
 }
 
-// linkedPRs is thread.list's PRS cell: "#5,#6", each prefixed with its repository's
-// name when the thread linked pull requests in more than one; "-" when none.
-func linkedPRs(s *v1.Thread) string {
-	links := s.GetLinkedPullRequests()
-	if len(links) == 0 {
-		return "-"
-	}
-	mixed := slices.ContainsFunc(links, func(l *v1.LinkedPullRequest) bool { return l.GetSlug() != links[0].GetSlug() })
-	out := make([]string, len(links))
-	for i, l := range links {
-		out[i] = fmt.Sprintf("#%d", l.GetNumber())
-		if mixed {
-			_, name, _ := strings.Cut(l.GetSlug(), "/")
-			out[i] = name + out[i]
-		}
-	}
-	return strings.Join(out, ",")
-}
-
-// listStatus is thread.list's STATUS cell: the status, with the reason for ERROR
-// ("error (interrupted)").
-func listStatus(s *v1.Thread) string {
-	st := strings.ToLower(strings.TrimPrefix(s.GetStatus().String(), "THREAD_STATUS_"))
-	if s.GetStatus() == v1.ThreadStatus_THREAD_STATUS_ERROR && s.GetStatusReason() != "" {
-		st += " (" + s.GetStatusReason() + ")"
-	}
-	return st
-}
-
-// listContext is thread.list's CONTEXT cell for a thread with a result: its
-// context size and whether the prompt cache is still warm at now ("25.7K · cache
-// expires in 42 min", "25.7K · cache expired"); "-" otherwise.
-func listContext(s *v1.Thread, now time.Time) string {
-	if s.GetContextTokens() <= 0 || s.GetCacheExpiresAt() == nil {
-		return "-"
-	}
-	n := formatTokens(s.GetContextTokens())
-	left := s.GetCacheExpiresAt().AsTime().Sub(now)
-	if left <= 0 {
-		return n + " · cache expired"
-	}
-	return n + " · cache expires in " + minutesLeft(left)
-}
-
-// minutesLeft is a positive duration in whole minutes, rounded up: "1 min", "42 min",
-// "1 h", "2 h 5 min".
-func minutesLeft(d time.Duration) string {
-	m := int64((d + time.Minute - 1) / time.Minute)
-	switch {
-	case m < 60:
-		return fmt.Sprintf("%d min", m)
-	case m%60 == 0:
-		return fmt.Sprintf("%d h", m/60)
-	default:
-		return fmt.Sprintf("%d h %d min", m/60, m%60)
-	}
-}
-
-// RegisterThreadLifecycle registers thread.new, thread.list, thread.focus, thread.rename,
+// RegisterThreadLifecycle registers thread.new, thread.focus, thread.rename,
 // thread.fork, thread.remove, thread.run-in, thread.pin, thread.archive, and
 // thread.snooze. There is no close or reconnect: a message starts a stopped thread and
 // the daemon stops idle ones (docs/notes/thread-lifecycle.md). The user-facing word is "thread" (titles, descriptions, messages);
 // command names and identifiers keep "thread".
 func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
-	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextThread, Description: "Thread id"}
+	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextThread, ID: ThreadID, Description: "Thread id" + IDHelp}
 	focus := func(id string) int {
 		return e.Emit(&v1.UiIntent{Intent: &v1.UiIntent_FocusThread_{FocusThread: &v1.UiIntent_FocusThread{ThreadId: id}}})
 	}
@@ -173,12 +111,14 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				{Name: "attachments", Type: String, Description: "Comma-separated image or PDF paths from StageAttachment, appended to the prompt"},
 				{Name: "composer-prompt", Type: String, Description: "The GUI composer's text of prompt with its tag tokens, kept on the first message for display (the GUI sets it)"},
 				{Name: "no-project", Type: Bool, Description: "Start the thread without a project, in your home directory (not with repo, worktree, workspace, repos, new-worktree or base)"},
-				{Name: "created-by", Type: String, DefaultToThreadEnv: true,
+				{Name: "created-by", Type: String, DefaultToThreadEnv: true, ID: ThreadID,
 					Description: "Id of the thread whose agent creates this one, noted at the top of the new thread (default: the thread this command runs in, $CODE_FOUNDRY_THREAD; pass an empty value to opt out)"},
 				{Name: "brief", Type: String, Description: "What the thread is for, in at most 500 characters (shown with the creator's note)"},
 				{Name: "labels", Type: String, Description: "Comma-separated labels (lowercase letters, digits, -, _, . and /)"},
 				{Name: "budget", Type: String, Description: "Spending limit in USD at Claude API rates, e.g. 5.00: Claude is interrupted when the thread's cost reaches it"},
 				{Name: "notify", Type: Bool, Description: "With created-by: wake the creator with a message each time the new thread settles (a repeat thread.subscribe)"},
+				{Name: "request-id", Type: String, Description: "An idempotency key (at most 128 characters): repeating thread.new with a key its creator used " +
+					"in the last 24 hours prints the thread made then and starts nothing; use one per task so a retry after a timeout makes no duplicate"},
 			},
 			When: canStartThread,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
@@ -196,7 +136,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 					ComposerPrompt: a.String("composer-prompt"), PermissionMode: threadPermissionModes[a.String("permission")], Attachments: splitList(a.String("attachments")),
 					WorkspaceId: ws, NoProject: a.Bool("no-project"),
 					CreatedBy: a.String("created-by"), Brief: a.String("brief"), Labels: splitList(a.String("labels")),
-					Notify: a.Bool("notify"),
+					Notify: a.Bool("notify"), RequestId: a.String("request-id"),
 				}
 				if req.Notify && strings.TrimSpace(req.CreatedBy) == "" {
 					return Result{}, InvalidArg("notify", "needs created-by (the thread to wake; the CLI defaults it to $CODE_FOUNDRY_THREAD inside a thread)")
@@ -225,6 +165,11 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 					return Result{}, err
 				}
 				s := res.Msg.GetThread()
+				if res.Msg.GetReused() {
+					// The JSON is the thread, as the first time.
+					return Result{Message: "thread " + threadLabel(s) + " in " + s.GetWorktreePath() +
+						" was created earlier for request id " + req.GetRequestId() + "; nothing new started", JSON: s}, nil
+				}
 				focus(s.GetId())
 				msg := "created thread " + threadLabel(s) + " in " + s.GetWorktreePath()
 				if s.GetWorkspaceId() != "" {
@@ -240,32 +185,6 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 					msg += "; " + req.GetCreatedBy() + " is woken each time it settles"
 				}
 				return Result{Message: msg, JSON: s}, nil
-			},
-		},
-		Command{
-			Name:         "thread.list",
-			Title:        "List Threads",
-			Description:  "List every thread.",
-			Category:     "Thread",
-			NoKeybinding: true,
-			Run: func(ctx context.Context, _ Context, _ Args) (Result, error) {
-				res, err := b.List(ctx, connect.NewRequest(&v1.ListThreadsRequest{}))
-				if err != nil {
-					return Result{}, err
-				}
-				var sb strings.Builder
-				tw := tabwriter.NewWriter(&sb, 0, 4, 2, ' ', 0)
-				// No state column: whether Claude runs is the daemon's business (--json
-				// keeps state and disconnect_reason).
-				_, _ = fmt.Fprintln(tw, "ID\tNAME\tSTATUS\tREASON\tWORKSPACE\tPRS\tCONTEXT\tWORKTREE")
-				now := time.Now()
-				for _, s := range res.Msg.GetThreads() {
-					_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", s.GetId(), cmp.Or(s.GetName(), "-"),
-						listStatus(s), cmp.Or(s.GetStatusReason(), "-"), cmp.Or(s.GetWorkspaceId(), "-"), linkedPRs(s),
-						listContext(s, now), s.GetWorktreePath())
-				}
-				_ = tw.Flush()
-				return Result{Message: strings.TrimRight(sb.String(), "\n"), JSON: res.Msg}, nil
 			},
 		},
 		Command{

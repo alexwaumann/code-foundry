@@ -38,6 +38,8 @@ type Fake struct {
 	// subs are the wake subscriptions (subscriptions.go).
 	subs    []thread.Subscription
 	nextSub int
+	// requests are CreateOnce's keys (creator NUL key) to thread ids.
+	requests map[string]string
 }
 
 var _ thread.Store = (*Fake)(nil)
@@ -204,6 +206,36 @@ func (f *Fake) Create(_ context.Context, o thread.CreateOptions) (thread.Thread,
 		f.mu.Unlock()
 	}
 	return s, err
+}
+
+// CreateOnce is Create keyed by requestID (validated like the store's): a key its
+// creator used before returns that thread, reused, and records nothing. Keys never
+// expire in the fake.
+func (f *Fake) CreateOnce(ctx context.Context, requestID string, o thread.CreateOptions) (thread.Thread, bool, error) {
+	key, err := thread.CleanRequestID(requestID)
+	if err != nil {
+		return thread.Thread{}, false, err
+	}
+	slot := strings.TrimSpace(o.CreatedBy) + "\x00" + key
+	if key != "" {
+		f.mu.Lock()
+		id, ok := f.requests[slot]
+		s, exists := f.byID[id]
+		f.mu.Unlock()
+		if ok && exists {
+			return s, true, nil
+		}
+	}
+	s, err := f.Create(ctx, o)
+	if err == nil && key != "" {
+		f.mu.Lock()
+		if f.requests == nil {
+			f.requests = map[string]string{}
+		}
+		f.requests[slot] = s.ID
+		f.mu.Unlock()
+	}
+	return s, false, err
 }
 
 // StageAttachment records "StageAttachment <name> <mime> <len>" (and " pages=<n>"
@@ -405,6 +437,12 @@ func (f *Fake) Snapshot() *thread.Snapshot {
 	return f.snap
 }
 
+// List filters the snapshot like the store (thread.FilterThreads), comparing Repo and
+// Workspace as ids.
+func (f *Fake) List(_ context.Context, o thread.ListOptions) ([]thread.Thread, error) {
+	return thread.FilterThreads(f.Snapshot().Threads, o), nil
+}
+
 // PutItems replaces a thread's items (and pending requests, derived from the
 // request items) and publishes ItemAppended for each.
 func (f *Fake) PutItems(id string, items ...thread.Item) {
@@ -494,6 +532,16 @@ func (f *Fake) appendItem(id string, it thread.Item) (thread.Item, thread.Thread
 	snap.Seq++
 	snap.Items = append(snap.Items, it)
 	return it, thread.ItemAppended{ThreadID: id, Seq: snap.Seq, Item: it}
+}
+
+// AppendItem adds it to id's items (the next ordinal) and publishes ItemAppended, as
+// the runner does for what Claude streams.
+func (f *Fake) AppendItem(id string, it thread.Item) thread.Item {
+	f.mu.Lock()
+	it, ev := f.appendItem(id, it)
+	f.mu.Unlock()
+	bus.Publish(f.bus, ev)
+	return it
 }
 
 // Send records "Send <id> <text>" (" attachments=<a,b>" and " composer=<text>" when

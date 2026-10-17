@@ -31,7 +31,8 @@ var subcommands = []subcommand{
 	{"status", "Show daemon status, starting it if needed", runStatus},
 	{"version", "Print version information", runVersion},
 	{"commands", "List daemon commands and their availability (--context-* flags)", runCommands},
-	{"events", "Stream the daemon's events, one line each (--source, --since seq, --json); for agents and scripts", runEvents},
+	{"events", "Stream the daemon's events, one line each (--source, --since seq, --since-epoch, --json); for agents and scripts", runEvents},
+	{"guide", "Print a Markdown guide for an agent driving threads from the CLI (made from the command registry)", runGuide},
 	{"gui", "Start the app (the GUI installed next to this CLI, or the dev build)", runGUI},
 	{"update", "Download the latest release for `app restart`, or install it when no daemon runs (also --update; --version, --force, --yes)", runUpdate},
 }

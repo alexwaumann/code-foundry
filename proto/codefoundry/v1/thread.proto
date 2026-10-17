@@ -602,10 +602,56 @@ message ThreadAgentsChange {
 
 message ListThreadItemsRequest {
   string thread_id = 1;
+  // Unset: the whole snapshot. Set: one page of items (ListThreadItemsResponse.page),
+  // for an agent reading another thread (thread.read; docs/notes/agents-5-cli.md).
+  ThreadItemsQuery query = 2;
 }
 
 message ListThreadItemsResponse {
+  // Set when the request had no query.
   ThreadItemsSnapshot snapshot = 1;
+  // Set when the request had a query.
+  ThreadItemsPage page = 2;
+}
+
+// ThreadItemRole groups item kinds for ThreadItemsQuery.role.
+enum ThreadItemRole {
+  // Any item.
+  THREAD_ITEM_ROLE_UNSPECIFIED = 0;
+  // The user's messages (not wakes).
+  THREAD_ITEM_ROLE_USER = 1;
+  // Claude's text replies.
+  THREAD_ITEM_ROLE_ASSISTANT = 2;
+  // Tool calls, permission requests and questions.
+  THREAD_ITEM_ROLE_TOOL = 3;
+  // The daemon's notes.
+  THREAD_ITEM_ROLE_NOTE = 4;
+  // Wake messages (UserMessageItem.origin WAKE).
+  THREAD_ITEM_ROLE_WAKE = 5;
+}
+
+// ThreadItemsQuery selects a page of a thread's items: those of role (every item when
+// UNSPECIFIED); with since, the first last of them after it (oldest first, so paging
+// with next_since leaves no gap), else the last last of them. last 0: no limit.
+message ThreadItemsQuery {
+  int32 last = 1;
+  // An item id, or an ordinal in decimal: only items after it. NOT_FOUND for an id
+  // that is not the thread's.
+  string since = 2;
+  ThreadItemRole role = 3;
+}
+
+message ThreadItemsPage {
+  string thread_id = 1;
+  repeated ThreadItem items = 2;
+  // Pass as since to read on: the id of the page's last item, or of the last one before
+  // a text still streaming (which the next read returns again, complete by then); the
+  // request's since when the page has nothing settled. Items change after they were
+  // read (a tool call gets its result, a request its answer): read from an earlier
+  // since, or the whole snapshot, to see that.
+  string next_since = 3;
+  // More items match after this page (only with since and last).
+  bool more = 4;
 }
 
 message WatchThreadRequest {

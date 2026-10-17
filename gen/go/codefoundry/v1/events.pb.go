@@ -119,7 +119,12 @@ type WatchEventsRequest struct {
 	// restart) the stream starts as without it: snapshots, then live. A client tells the
 	// two apart by the first event: a replayed or live event has seq > 0, a snapshot 0.
 	// Zero: no resume.
-	SinceSeq      uint64 `protobuf:"varint,2,opt,name=since_seq,json=sinceSeq,proto3" json:"since_seq,omitempty"`
+	SinceSeq uint64 `protobuf:"varint,2,opt,name=since_seq,json=sinceSeq,proto3" json:"since_seq,omitempty"`
+	// The Event.epoch since_seq was read under. When set and not the daemon's current
+	// epoch (the daemon restarted since), since_seq is ignored and the stream starts with
+	// snapshots. Empty: since_seq alone decides (after a restart a seq below the new
+	// counter would "resume" with unrelated events; pass the epoch).
+	SinceEpoch    string `protobuf:"bytes,3,opt,name=since_epoch,json=sinceEpoch,proto3" json:"since_epoch,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -168,6 +173,13 @@ func (x *WatchEventsRequest) GetSinceSeq() uint64 {
 	return 0
 }
 
+func (x *WatchEventsRequest) GetSinceEpoch() string {
+	if x != nil {
+		return x.SinceEpoch
+	}
+	return ""
+}
+
 type Event struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Event:
@@ -190,7 +202,12 @@ type Event struct {
 	// seq on every stream; a stream filtered by source sees gaps). Snapshots, resyncs
 	// and heartbeats carry 0: they are not resumable. Pass the last seq applied as
 	// WatchEventsRequest.since_seq to resume.
-	Seq           uint64 `protobuf:"varint,20,opt,name=seq,proto3" json:"seq,omitempty"`
+	Seq uint64 `protobuf:"varint,20,opt,name=seq,proto3" json:"seq,omitempty"`
+	// The daemon instance the event comes from: a random id drawn when the daemon
+	// starts, the same on every event of its lifetime (snapshots and heartbeats too).
+	// seq values compare only within one epoch: pass it as
+	// WatchEventsRequest.since_epoch with since_seq.
+	Epoch         string `protobuf:"bytes,21,opt,name=epoch,proto3" json:"epoch,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -347,6 +364,13 @@ func (x *Event) GetSeq() uint64 {
 	return 0
 }
 
+func (x *Event) GetEpoch() string {
+	if x != nil {
+		return x.Epoch
+	}
+	return ""
+}
+
 type isEvent_Event interface {
 	isEvent_Event()
 }
@@ -433,10 +457,12 @@ var File_codefoundry_v1_events_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_events_proto_rawDesc = "" +
 	"\n" +
-	"\x1bcodefoundry/v1/events.proto\x12\x0ecodefoundry.v1\x1a\x1bcodefoundry/v1/action.proto\x1a\x17codefoundry/v1/gh.proto\x1a\x1bcodefoundry/v1/gitops.proto\x1a\x1ecodefoundry/v1/heartbeat.proto\x1a\x19codefoundry/v1/repo.proto\x1a\x1dcodefoundry/v1/settings.proto\x1a\x1dcodefoundry/v1/terminal.proto\x1a\x1bcodefoundry/v1/thread.proto\x1a%codefoundry/v1/thread_lifecycle.proto\x1a\x17codefoundry/v1/ui.proto\x1a\x1bcodefoundry/v1/update.proto\x1a\x1ecodefoundry/v1/workspace.proto\"h\n" +
+	"\x1bcodefoundry/v1/events.proto\x12\x0ecodefoundry.v1\x1a\x1bcodefoundry/v1/action.proto\x1a\x17codefoundry/v1/gh.proto\x1a\x1bcodefoundry/v1/gitops.proto\x1a\x1ecodefoundry/v1/heartbeat.proto\x1a\x19codefoundry/v1/repo.proto\x1a\x1dcodefoundry/v1/settings.proto\x1a\x1dcodefoundry/v1/terminal.proto\x1a\x1bcodefoundry/v1/thread.proto\x1a%codefoundry/v1/thread_lifecycle.proto\x1a\x17codefoundry/v1/ui.proto\x1a\x1bcodefoundry/v1/update.proto\x1a\x1ecodefoundry/v1/workspace.proto\"\x89\x01\n" +
 	"\x12WatchEventsRequest\x125\n" +
 	"\asources\x18\x01 \x03(\x0e2\x1b.codefoundry.v1.EventSourceR\asources\x12\x1b\n" +
-	"\tsince_seq\x18\x02 \x01(\x04R\bsinceSeq\"\xc5\x05\n" +
+	"\tsince_seq\x18\x02 \x01(\x04R\bsinceSeq\x12\x1f\n" +
+	"\vsince_epoch\x18\x03 \x01(\tR\n" +
+	"sinceEpoch\"\xdb\x05\n" +
 	"\x05Event\x12/\n" +
 	"\x04repo\x18\x01 \x01(\v2\x19.codefoundry.v1.RepoEventH\x00R\x04repo\x12;\n" +
 	"\bterminal\x18\x02 \x01(\v2\x1d.codefoundry.v1.TerminalEventH\x00R\bterminal\x12B\n" +
@@ -452,7 +478,8 @@ const file_codefoundry_v1_events_proto_rawDesc = "" +
 	"\x06thread\x18\f \x01(\v2\x1b.codefoundry.v1.ThreadEventH\x00R\x06thread\x12?\n" +
 	"\theartbeat\x18\r \x01(\v2\x1f.codefoundry.v1.StreamHeartbeatH\x00R\theartbeat\x125\n" +
 	"\x06action\x18\x0e \x01(\v2\x1b.codefoundry.v1.ActionEventH\x00R\x06action\x12\x10\n" +
-	"\x03seq\x18\x14 \x01(\x04R\x03seqB\a\n" +
+	"\x03seq\x18\x14 \x01(\x04R\x03seq\x12\x14\n" +
+	"\x05epoch\x18\x15 \x01(\tR\x05epochB\a\n" +
 	"\x05event*\xc0\x02\n" +
 	"\vEventSource\x12\x1c\n" +
 	"\x18EVENT_SOURCE_UNSPECIFIED\x10\x00\x12\x15\n" +

@@ -37,7 +37,7 @@ const ViewPanelMcp = "panel.mcp"
 
 // RegisterMcp registers thread.mcp, thread.mcp-reconnect and view.panel.mcp.
 func RegisterMcp(r *Registry, b McpBackend, e Emitter) error {
-	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextThread, Description: "Thread id"}
+	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextThread, ID: ThreadID, Description: "Thread id" + IDHelp}
 	return r.RegisterAll(
 		Command{
 			Name:  "thread.mcp",
