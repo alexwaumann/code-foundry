@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -24,6 +25,8 @@ func newSettingsFake(t *testing.T, b *bus.Bus) (*settingstest.Fake, string) {
 	dir := t.TempDir()
 	f, err := settingstest.New(context.Background(), dir, b, []settings.CommandInfo{
 		{Name: "thread.new", Title: "New Thread", Category: "Thread", Keybindings: []string{"cmd+n"}},
+		{Name: "thread.list", Title: "List Threads", Category: "Thread", NoKeybinding: true},
+		{Name: "daemon.status", Title: "Daemon Status", Category: "Daemon", NoKeybinding: true},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -54,8 +57,37 @@ func TestSettingsService(t *testing.T) {
 	if m := byKey["threads.default_model"]; len(m.GetEnumLabels()) != len(m.GetEnumValues()) || m.GetEnumValues()[1] != "claude-opus-4-8[1m]" || m.GetEnumLabels()[1] != "Opus 4.8" {
 		t.Errorf("default_model labels = %v for %v", m.GetEnumLabels(), m.GetEnumValues())
 	}
-	if d := byKey["appearance.density"]; len(d.GetEnumLabels()) != 0 {
-		t.Errorf("density labels = %v, want none", d.GetEnumLabels())
+	if d := byKey["appearance.density"]; !slices.Equal(d.GetEnumLabels(), []string{"Compact", "Comfortable"}) {
+		t.Errorf("density labels = %v", d.GetEnumLabels())
+	}
+	// Display placement and hints.
+	if f := byKey["threads.scrollback_lines"]; f.GetGroup() != "threads" || f.GetPage() != "appearance" || f.GetSection() != "terminal" {
+		t.Errorf("scrollback field = %v", f)
+	}
+	if f := byKey["threads.cache_ttl_seconds"]; f.GetUnit() != "s" || f.GetTitle() != "Prompt cache lifetime" {
+		t.Errorf("cache ttl field = %v", f)
+	}
+	if f := byKey["threads.naming_model"]; f.GetDependsOn() != "threads.auto_name" || f.GetSection() != "textgen" {
+		t.Errorf("naming model field = %v", f)
+	}
+	if m, e := byKey["threads.default_model"], byKey["threads.default_effort"]; m.GetRow() != "model" || e.GetRow() != "model" {
+		t.Errorf("model row = %q, effort row = %q", m.GetRow(), e.GetRow())
+	}
+	if kb := byKey["keybindings.thread.new"]; kb.GetPage() != "keybindings" || kb.GetSection() != "thread" || kb.GetTitle() != "New Thread" {
+		t.Errorf("keybinding field placement = %v", kb)
+	}
+	if _, ok := byKey["keybindings.thread.list"]; ok {
+		t.Errorf("thread.list (NoKeybinding) has a keybinding field")
+	}
+	var pageIDs []string
+	for _, p := range schema.Msg.GetPages() {
+		pageIDs = append(pageIDs, p.GetId())
+		if p.GetId() == "keybindings" && (len(p.GetSections()) != 1 || p.GetSections()[0].GetId() != "thread" || p.GetSections()[0].GetTitle() != "Thread") {
+			t.Errorf("keybindings sections = %v", p.GetSections())
+		}
+	}
+	if want := []string{"general", "appearance", "notifications", "source", "keybindings", "advanced"}; !slices.Equal(pageIDs, want) {
+		t.Errorf("pages = %v, want %v", pageIDs, want)
 	}
 	if th := byKey["appearance.theme_light"]; th.GetDefaultValue() != "github-light" || len(th.GetEnumLabels()) != len(th.GetEnumValues()) || th.GetEnumLabels()[0] != "GitHub Light" {
 		t.Errorf("theme_light field = %v", th)

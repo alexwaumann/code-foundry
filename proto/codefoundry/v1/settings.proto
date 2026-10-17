@@ -10,7 +10,8 @@ package codefoundry.v1;
 // int in decimal, everything else verbatim), like command args. The schema describes
 // each field, so a client renders a form without hardcoding any setting.
 service SettingsService {
-  // GetSchema returns every field, in display order, and the groups they belong to.
+  // GetSchema returns every field, the file groups they belong to, and the pages and
+  // sections the settings page shows them under.
   rpc GetSchema(GetSettingsSchemaRequest) returns (GetSettingsSchemaResponse) {}
   // Get returns the current values.
   rpc Get(GetSettingsRequest) returns (GetSettingsResponse) {}
@@ -58,11 +59,46 @@ message SettingField {
   // Display names for enum_values, parallel to it; empty when the values are shown as is.
   // threads.default_model carries the model registry's labels ("Opus 4.8").
   repeated string enum_labels = 12;
+  // Page id (SettingPage.id) the settings page shows the field on. Display only: the
+  // field's table in the file is its group.
+  string page = 13;
+  // Section id (SettingSection.id) within the page.
+  string section = 14;
+  // Unit shown as a suffix inside a number input ("s", "pt", "%"); empty for none.
+  string unit = 15;
+  // Key of a SETTING_TYPE_BOOL field this one depends on: while that field is false,
+  // this one renders indented and dimmed. Empty for none.
+  string depends_on = 16;
+  // Fields of a section sharing a non-empty row id render side by side in one row
+  // (model and effort), each under its own title, with the first field's description
+  // under the row.
+  string row = 17;
 }
 
+// SettingGroup is a table of the settings file ([threads], [github], ...).
 message SettingGroup {
   string id = 1;
   string title = 2;
+  string description = 3;
+}
+
+// SettingPage is one page (tab) of the settings page. Pages and their sections are
+// display only and independent of the file's groups: a page may show fields of several
+// groups.
+message SettingPage {
+  string id = 1;
+  string title = 2;
+  // Optional caption under the page title.
+  string description = 3;
+  // In display order. The keybindings page has one section per command category.
+  repeated SettingSection sections = 4;
+}
+
+message SettingSection {
+  string id = 1;
+  // Empty for a page's single unnamed section.
+  string title = 2;
+  // Optional caption under the section title.
   string description = 3;
 }
 
@@ -101,8 +137,12 @@ message SettingsEvent {
 message GetSettingsSchemaRequest {}
 
 message GetSettingsSchemaResponse {
+  // The file's tables, in file order.
   repeated SettingGroup groups = 1;
+  // Every field. Within a section, fields are in display order.
   repeated SettingField fields = 2;
+  // Pages in display order; every field's page and section are listed here.
+  repeated SettingPage pages = 3;
 }
 
 message GetSettingsRequest {}

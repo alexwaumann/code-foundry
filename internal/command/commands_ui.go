@@ -27,10 +27,11 @@ func RegisterUI(r *Registry, e Emitter) error {
 	}
 	return r.RegisterAll(
 		Command{
-			Name:        "ui.palette.open",
-			Title:       "Open Command Palette",
-			Description: "Open the command palette in every connected window.",
-			Category:    "View",
+			Name:         "ui.palette.open",
+			Title:        "Open Command Palette",
+			Description:  "Open the command palette in every connected window.",
+			Category:     "View",
+			NoKeybinding: true,
 			// No keybinding: in the GUI, cmd+k is a reserved view action that opens the
 			// palette locally (gui/frontend/src/keys/bindings.ts).
 			Args: []ArgSpec{
@@ -43,10 +44,11 @@ func RegisterUI(r *Registry, e Emitter) error {
 			},
 		},
 		Command{
-			Name:        "ui.notify",
-			Title:       "Show Notification",
-			Description: "Show a notification in every connected window.",
-			Category:    "View",
+			Name:         "ui.notify",
+			Title:        "Show Notification",
+			Description:  "Show a notification in every connected window.",
+			Category:     "View",
+			NoKeybinding: true,
 			Args: []ArgSpec{
 				{Name: "title", Type: String, Required: true, Description: "Notification title"},
 				{Name: "body", Type: String, Description: "Notification body"},
@@ -61,10 +63,11 @@ func RegisterUI(r *Registry, e Emitter) error {
 			},
 		},
 		Command{
-			Name:        "ui.focus.terminal",
-			Title:       "Focus Terminal",
-			Description: "Show a terminal in every connected window.",
-			Category:    "View",
+			Name:         "ui.focus.terminal",
+			Title:        "Focus Terminal",
+			Description:  "Show a terminal in every connected window.",
+			Category:     "View",
+			NoKeybinding: true,
 			Args: []ArgSpec{
 				{Name: "id", Type: String, Required: true, Context: ContextTerminal, Description: "Terminal id"},
 			},
@@ -75,10 +78,11 @@ func RegisterUI(r *Registry, e Emitter) error {
 			},
 		},
 		Command{
-			Name:        "ui.focus.repo",
-			Title:       "Focus Repository",
-			Description: "Show a project's worktree (default: its main one) in the Projects page's side panel in every connected window.",
-			Category:    "View",
+			Name:         "ui.focus.repo",
+			Title:        "Focus Repository",
+			Description:  "Show a project's worktree (default: its main one) in the Projects page's side panel in every connected window.",
+			Category:     "View",
+			NoKeybinding: true,
 			Args: []ArgSpec{
 				{Name: "repo", Type: String, Required: true, Context: ContextRepo, Description: "Repository id"},
 				{Name: "worktree", Type: Path, Context: ContextWorktree, Description: "Worktree path"},

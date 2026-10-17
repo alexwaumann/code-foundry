@@ -20,6 +20,11 @@ const base: Omit<SettingFieldView, "key" | "title" | "type"> = {
   min: 0,
   max: 0,
   placeholder: "",
+  page: "",
+  section: "",
+  unit: "",
+  dependsOn: "",
+  row: "",
 };
 const bool: SettingFieldView = { ...base, key: "threads.auto_name", title: "Auto name", type: "bool", defaultValue: "true" };
 // "" (no preference) is a value of its own; Radix Select cannot hold it as an item.

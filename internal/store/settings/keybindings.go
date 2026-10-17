@@ -32,8 +32,13 @@ func resolveKeybindings(raw map[string]string, cmds []CommandInfo) (map[string]s
 		}
 		name := strings.TrimPrefix(k, keybindingKeyPrefix)
 		if cmds != nil {
-			if _, ok := known[name]; !ok {
+			ci, ok := known[name]
+			if !ok {
 				issues = append(issues, Issue{k, fmt.Sprintf("unknown command %q", name)})
+				continue
+			}
+			if ci.NoKeybinding {
+				issues = append(issues, Issue{k, fmt.Sprintf("%s cannot have a keybinding", name)})
 				continue
 			}
 		}
@@ -81,6 +86,9 @@ func resolveKeybindings(raw map[string]string, cmds []CommandInfo) (map[string]s
 
 	values := make(map[string]string, len(cmds)+len(over))
 	for _, c := range cmds {
+		if c.NoKeybinding {
+			continue // no field, so no value
+		}
 		v := ""
 		if len(c.Keybindings) > 0 {
 			v, _ = command.NormalizeChord(c.Keybindings[0])

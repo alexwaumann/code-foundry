@@ -43,6 +43,7 @@ func TestRegisterValidation(t *testing.T) {
 		{"no category", valid(func(c *Command) { c.Category = "" }), "category is required"},
 		{"no run", valid(func(c *Command) { c.Run = nil }), "Run is required"},
 		{"empty keybinding", valid(func(c *Command) { c.Keybindings = []string{""} }), "empty keybinding"},
+		{"no keybinding with a default", valid(func(c *Command) { c.NoKeybinding = true; c.Keybindings = []string{"cmd+y"} }), "NoKeybinding with default keybindings"},
 		{"arg ok", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "delete-branch", Type: Bool}} }), ""},
 		{"arg bad name", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "Bad_Name", Type: String}} }), "name must match"},
 		{"arg reserved", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "json", Type: Bool}} }), "reserved"},

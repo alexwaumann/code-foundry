@@ -28,7 +28,8 @@ func (h *Settings) Route(opts ...connect.HandlerOption) Route {
 	return Route{Path: path, Handler: handler}
 }
 
-// GetSchema returns the groups and fields in display order.
+// GetSchema returns the file groups, the fields in display order, and the pages and
+// sections they are shown under.
 func (h *Settings) GetSchema(context.Context, *connect.Request[v1.GetSettingsSchemaRequest]) (*connect.Response[v1.GetSettingsSchemaResponse], error) {
 	groups := make([]*v1.SettingGroup, len(settings.Groups))
 	for i, g := range settings.Groups {
@@ -41,9 +42,19 @@ func (h *Settings) GetSchema(context.Context, *connect.Request[v1.GetSettingsSch
 			Key: f.Key, Title: f.Title, Description: f.Description, Group: f.Group, Type: settingTypes[f.Type],
 			EnumValues: f.Enum, EnumLabels: f.EnumLabels, DefaultValue: f.Default, RestartRequired: f.Restart,
 			Min: int64(f.Min), Max: int64(f.Max), Placeholder: f.Placeholder,
+			Page: f.Page, Section: f.Section, Unit: f.Unit, DependsOn: f.DependsOn, Row: f.Row,
 		}
 	}
-	return connect.NewResponse(&v1.GetSettingsSchemaResponse{Groups: groups, Fields: out}), nil
+	pages := h.store.Pages()
+	outPages := make([]*v1.SettingPage, len(pages))
+	for i, p := range pages {
+		secs := make([]*v1.SettingSection, len(p.Sections))
+		for j, s := range p.Sections {
+			secs[j] = &v1.SettingSection{Id: s.ID, Title: s.Title, Description: s.Description}
+		}
+		outPages[i] = &v1.SettingPage{Id: p.ID, Title: p.Title, Description: p.Description, Sections: secs}
+	}
+	return connect.NewResponse(&v1.GetSettingsSchemaResponse{Groups: groups, Fields: out, Pages: outPages}), nil
 }
 
 // Get returns the current values.

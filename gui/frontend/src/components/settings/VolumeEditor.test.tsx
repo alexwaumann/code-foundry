@@ -36,6 +36,11 @@ const field: SettingFieldView = {
   min: 0,
   max: 100,
   placeholder: "",
+  page: "",
+  section: "",
+  unit: "",
+  dependsOn: "",
+  row: "",
 };
 
 function setVolume(v: string | undefined, revision = 1): void {

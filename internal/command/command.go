@@ -34,6 +34,11 @@ type Command struct {
 	Args []ArgSpec
 	// Keybindings are default GUI chords, e.g. "cmd+t".
 	Keybindings []string
+	// NoKeybinding marks a command a GUI chord is no use for: a CLI query that prints
+	// (listings, settings.get, daemon.status), a wait, or a verb the CLI uses to drive
+	// the GUI (ui.notify, thread.focus). The settings page offers no keybinding for it,
+	// and it may not have default Keybindings. The palette still lists it.
+	NoKeybinding bool
 	// When reports whether the command is available in a context; nil means always.
 	// On Invoke it sees the caller's context with explicitly passed context-bound args
 	// overlaid (see ArgSpec.Context), so it must be a pure function of Context.
@@ -215,6 +220,9 @@ func (c *Command) validate() error {
 	}
 	if slices.Contains(c.Keybindings, "") {
 		return invalid("empty keybinding")
+	}
+	if c.NoKeybinding && len(c.Keybindings) > 0 {
+		return invalid("NoKeybinding with default keybindings")
 	}
 	if err := validateConfirm(c.Confirm, c.Args); err != nil {
 		return invalid("%v", err)

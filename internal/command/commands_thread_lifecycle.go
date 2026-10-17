@@ -222,10 +222,11 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 			},
 		},
 		Command{
-			Name:        "thread.list",
-			Title:       "List Threads",
-			Description: "List every thread.",
-			Category:    "Thread",
+			Name:         "thread.list",
+			Title:        "List Threads",
+			Description:  "List every thread.",
+			Category:     "Thread",
+			NoKeybinding: true,
 			Run: func(ctx context.Context, _ Context, _ Args) (Result, error) {
 				res, err := b.List(ctx, connect.NewRequest(&v1.ListThreadsRequest{}))
 				if err != nil {
@@ -247,12 +248,13 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 			},
 		},
 		Command{
-			Name:        "thread.focus",
-			Title:       "Focus Thread",
-			Description: "Show a thread in every connected window.",
-			Category:    "Thread",
-			Args:        []ArgSpec{idArg},
-			When:        hasThread,
+			Name:         "thread.focus",
+			Title:        "Focus Thread",
+			Description:  "Show a thread in every connected window.",
+			Category:     "Thread",
+			NoKeybinding: true,
+			Args:         []ArgSpec{idArg},
+			When:         hasThread,
 			Run: func(_ context.Context, _ Context, a Args) (Result, error) {
 				n := focus(a.String("id"))
 				return Result{Message: fmt.Sprintf("delivered=%d", n), JSON: EmitResult{Delivered: n}}, nil

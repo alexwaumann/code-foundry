@@ -97,7 +97,8 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 			Title: "Answer Thread Request",
 			Description: "Answer a thread's pending permission request or question (default: the oldest pending one). " +
 				"A question takes answer: the chosen option's label, or a JSON object of question to label.",
-			Category: "Thread",
+			Category:     "Thread",
+			NoKeybinding: true,
 			Args: []ArgSpec{
 				idArg,
 				{Name: "decision", Type: Enum, Enum: ThreadDecisions, Default: "allow", Positional: true,
@@ -163,10 +164,11 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 			},
 		},
 		Command{
-			Name:        "thread.items",
-			Title:       "Show Thread Conversation",
-			Description: "Print a thread's conversation as a readable log.",
-			Category:    "Thread",
+			Name:         "thread.items",
+			Title:        "Show Thread Conversation",
+			Description:  "Print a thread's conversation as a readable log.",
+			Category:     "Thread",
+			NoKeybinding: true,
 			Args: []ArgSpec{
 				idArg,
 				{Name: "full", Type: Bool, Description: "Print whole texts, tool inputs and outputs instead of one line each"},

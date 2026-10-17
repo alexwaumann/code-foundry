@@ -43,9 +43,10 @@ func RegisterAgents(r *Registry, b AgentsBackend, e Emitter) error {
 			Description: "Print a thread's subagent runs in spawn order, foreground and background, nested ones under their parent: " +
 				"type, model, mode, status, elapsed time, tool uses and tokens, then what each running one is doing and what each finished one reported. " +
 				"The header also counts the thread's own background shells (Bash run_in_background, Monitor) still running.",
-			Category: "Thread",
-			Args:     []ArgSpec{{Name: "id", Type: String, Required: true, Context: ContextThread, Description: "Thread id"}},
-			When:     hasThread,
+			Category:     "Thread",
+			NoKeybinding: true,
+			Args:         []ArgSpec{{Name: "id", Type: String, Required: true, Context: ContextThread, Description: "Thread id"}},
+			When:         hasThread,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				res, err := b.ListItems(ctx, connect.NewRequest(&v1.ListThreadItemsRequest{ThreadId: a.String("id")}))
 				if err != nil {

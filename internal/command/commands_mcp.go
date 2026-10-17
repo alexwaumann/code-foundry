@@ -44,7 +44,8 @@ func RegisterMcp(r *Registry, b McpBackend, e Emitter) error {
 			Title: "Show Thread MCP Servers",
 			Description: "Print a thread's MCP servers as Claude last reported them (checked at the start of every turn): " +
 				"status, scope, transport, version and tool count; --full adds each server's tools.",
-			Category: "Thread",
+			Category:     "Thread",
+			NoKeybinding: true,
 			Args: []ArgSpec{
 				idArg,
 				{Name: "refresh", Type: Bool, Description: "Ask Claude now instead of showing the last check (starts Claude if it is not running)"},

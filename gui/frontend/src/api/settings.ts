@@ -5,6 +5,7 @@ import {
   SettingsValidationErrorsSchema,
   type SettingField,
   type SettingGroup,
+  type SettingPage,
   type SettingsSnapshot,
 } from "@/gen/codefoundry/v1/settings_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
@@ -25,17 +26,47 @@ export interface SettingFieldView {
   min: number;
   max: number;
   placeholder: string;
+  /** SettingPageView.id of the page the field shows on. */
+  page: string;
+  /** SettingSectionView.id within the page. */
+  section: string;
+  /** Suffix inside a number input ("s", "pt", "%"); "" for none. */
+  unit: string;
+  /** Key of a bool field; while it is false this field renders indented and dimmed. "" for none. */
+  dependsOn: string;
+  /** Fields of a section sharing a non-empty row render side by side; the first one's description goes under the row. */
+  row: string;
 }
 
+/** A table of the settings file. */
 export interface SettingGroupView {
   id: string;
   title: string;
   description: string;
 }
 
+export interface SettingSectionView {
+  id: string;
+  /** "" for a page's single unnamed section. */
+  title: string;
+  description: string;
+}
+
+/** A page (tab) of the settings page; display only, independent of the file's groups. */
+export interface SettingPageView {
+  id: string;
+  title: string;
+  description: string;
+  sections: SettingSectionView[];
+}
+
 export interface SettingsSchemaView {
+  /** The file's tables, in file order. */
   groups: SettingGroupView[];
+  /** Every field; within a section, in display order. */
   fields: SettingFieldView[];
+  /** Pages in display order. */
+  pages: SettingPageView[];
 }
 
 export interface SettingIssueView {
@@ -86,11 +117,25 @@ export function toSettingFieldView(f: SettingField): SettingFieldView {
     min: Number(f.min),
     max: Number(f.max),
     placeholder: f.placeholder,
+    page: f.page,
+    section: f.section,
+    unit: f.unit,
+    dependsOn: f.dependsOn,
+    row: f.row,
   };
 }
 
 function toGroupView(g: SettingGroup): SettingGroupView {
   return { id: g.id, title: g.title || g.id, description: g.description };
+}
+
+export function toSettingPageView(p: SettingPage): SettingPageView {
+  return {
+    id: p.id,
+    title: p.title || p.id,
+    description: p.description,
+    sections: p.sections.map((s) => ({ id: s.id, title: s.title, description: s.description })),
+  };
 }
 
 export function toSettingsSnapshotView(s: SettingsSnapshot): SettingsSnapshotView {
@@ -107,7 +152,7 @@ export function toSettingsSnapshotView(s: SettingsSnapshot): SettingsSnapshotVie
 export async function getSettingsSchema(conn: DaemonConnection = daemon): Promise<SettingsSchemaView> {
   const c = await conn.client(SettingsService);
   const res = await c.getSchema({});
-  return { groups: res.groups.map(toGroupView), fields: res.fields.map(toSettingFieldView) };
+  return { groups: res.groups.map(toGroupView), fields: res.fields.map(toSettingFieldView), pages: res.pages.map(toSettingPageView) };
 }
 
 export async function getSettings(conn: DaemonConnection = daemon): Promise<SettingsSnapshotView | null> {

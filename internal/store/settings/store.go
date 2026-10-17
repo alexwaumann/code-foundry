@@ -45,8 +45,12 @@ type Service interface {
 	// Snapshot returns the current snapshot. Never nil.
 	Snapshot() *Snapshot
 	// Fields returns every field in display order, including one keybinding field per
-	// command once SetCommands has been called.
+	// bindable command once SetCommands has been called.
 	Fields() []Field
+	// Pages returns the settings page's pages and sections in display order; the
+	// keybindings page has one section per command category once SetCommands has been
+	// called.
+	Pages() []Page
 	// Update applies a partial change (key -> string-encoded value; "" resets the key).
 	// It fails with *ValidationError or ErrFileInvalid and then changes nothing.
 	Update(ctx context.Context, partial map[string]string) (*Snapshot, error)
@@ -172,6 +176,13 @@ func (s *Store) Fields() []Field {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return append(slices.Clone(staticFields), keybindingFields(s.cmds)...)
+}
+
+// Pages returns the pages and sections in display order.
+func (s *Store) Pages() []Page {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return pages(s.cmds)
 }
 
 // SetCommands tells the store which commands exist, which enables the keybinding

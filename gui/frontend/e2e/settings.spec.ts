@@ -185,10 +185,10 @@ test("an enum select works from the keyboard and its list is themed", async ({ p
   });
   expect(bg).toBe(popover);
   // The selected item has the focus; ArrowDown moves to the next and Enter picks it.
-  await expect(list.getByRole("option", { name: "comfortable (default)" })).toBeFocused();
+  await expect(list.getByRole("option", { name: "Comfortable (default)" })).toBeFocused();
   await page.keyboard.press("ArrowDown");
   // Radix moves the focus in a timeout; Enter picks whichever option has it.
-  await expect(list.getByRole("option", { name: "full" })).toBeFocused();
+  await expect(list.getByRole("option", { name: "Full" })).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(list).toHaveCount(0);
   await expect(trigger).toHaveAttribute("data-value", "full");
@@ -217,10 +217,10 @@ test("appearance.thread_width sets data-thread-width on <html>, live", async ({ 
   const html = page.locator("html");
   await expect(html).toHaveAttribute("data-thread-width", "comfortable");
   await expect(select(page, "appearance.thread_width")).toHaveAttribute("data-value", "comfortable");
-  await pick(page, "appearance.thread_width", "full");
+  await pick(page, "appearance.thread_width", "Full");
   await expect.poll(async () => (await mockSettings()).raw["appearance.thread_width"]).toBe("full");
   await expect(html).toHaveAttribute("data-thread-width", "full");
-  await pick(page, "appearance.thread_width", "compact");
+  await pick(page, "appearance.thread_width", "Compact");
   await expect(html).toHaveAttribute("data-thread-width", "compact");
   // A hand edit back to the default.
   await mockPost("settings/external?appearance.thread_width=");
