@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -136,8 +137,8 @@ func (l launch) argv(claude string, a spawnArgs) []string {
 	return argv
 }
 
-// buildPrompt is the first prompt claude gets: the user's text, then, after a blank
-// line, one "Attached image: <path>" line per attachment. A prompt of only whitespace
+// buildPrompt is the text claude gets for a message: the user's text, then, after a
+// blank line, one line per attachment (attachmentLine). A prompt of only whitespace
 // counts as none.
 //
 // The text may carry file references, "@cf-file://<repoId>/<percent-encoded relative
@@ -145,19 +146,40 @@ func (l launch) argv(claude string, a spawnArgs) []string {
 // exist yet. buildPrompt leaves them alone; Create rewrites them to absolute paths with
 // rewriteFileRefs once the thread's worktrees exist, before claude is spawned. See
 // filerefs.go for the token format.
-func buildPrompt(text string, attachments []string) string {
+func buildPrompt(text string, attachments []attachment) string {
 	text = strings.TrimSpace(text)
 	if len(attachments) == 0 {
 		return text
 	}
 	lines := make([]string, len(attachments))
 	for i, a := range attachments {
-		lines[i] = "Attached image: " + a
+		lines[i] = attachmentLine(a)
 	}
 	if text == "" {
 		return strings.Join(lines, "\n")
 	}
 	return text + "\n\n" + strings.Join(lines, "\n")
+}
+
+// attachmentLine names one attachment in the prompt: "Attached image: <path>", or for a
+// PDF "Attached PDF: <path> (<N> pages)" ("about N pages" when estimated). A PDF that
+// is not sent inline also tells Claude how to read it, the way Claude Code words its
+// own reference to a long pasted PDF.
+func attachmentLine(a attachment) string {
+	if !a.pdf {
+		return "Attached image: " + a.path
+	}
+	n := strconv.Itoa(a.pages) + " pages"
+	if a.pages == 1 {
+		n = "1 page"
+	}
+	if !a.exact {
+		n = "about " + n
+	}
+	if a.inline() {
+		return "Attached PDF: " + a.path + " (" + n + ")"
+	}
+	return "Attached PDF: " + a.path + " (" + n + ", not sent inline); read it with the Read tool's pages parameter, at most 20 pages per call"
 }
 
 // newUUID returns a random (version 4) UUID string.

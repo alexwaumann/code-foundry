@@ -189,7 +189,11 @@ func TestThreadStageAttachment(t *testing.T) {
 	if res.Msg.GetPath() != "/attachments/1-shot.png" {
 		t.Errorf("path = %q", res.Msg.GetPath())
 	}
-	if calls := fake.Calls(); len(calls) != 1 || calls[0] != "StageAttachment shot.png image/png 3" {
+	// A PDF's page hint reaches the store.
+	if _, err := c.StageAttachment(ctx, connect.NewRequest(&v1.StageAttachmentRequest{Name: "doc.pdf", MimeType: "application/pdf", Data: []byte("abcd"), Pages: 12})); err != nil {
+		t.Fatal(err)
+	}
+	if calls := fake.Calls(); len(calls) != 2 || calls[0] != "StageAttachment shot.png image/png 3" || calls[1] != "StageAttachment doc.pdf application/pdf 4 pages=12" {
 		t.Errorf("calls = %q", calls)
 	}
 	fake.Err = fmt.Errorf("%w: attachment type", thread.ErrInvalidArgument)

@@ -296,7 +296,7 @@ func threadError(err error) error {
 // StageAttachment stores an image or PDF for a message and returns its path.
 func (h *Thread) StageAttachment(ctx context.Context, req *connect.Request[v1.StageAttachmentRequest]) (*connect.Response[v1.StageAttachmentResponse], error) {
 	m := req.Msg
-	path, err := h.store.StageAttachment(ctx, m.GetName(), m.GetMimeType(), m.GetData())
+	path, err := h.store.StageAttachment(ctx, m.GetName(), m.GetMimeType(), m.GetData(), int(m.GetPages()))
 	if err != nil {
 		return nil, threadError(err)
 	}

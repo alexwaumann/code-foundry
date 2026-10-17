@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -76,7 +77,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 			Args: []ArgSpec{
 				idArg,
 				{Name: "text", Type: String, Required: true, Positional: true, Description: "The message"},
-				{Name: "attachments", Type: String, Description: "Comma-separated image paths from StageAttachment"},
+				{Name: "attachments", Type: String, Description: "Comma-separated image or PDF paths from StageAttachment"},
 				{Name: "composer-text", Type: String, Description: "The GUI composer's text with its tag tokens, kept on the message for display (the GUI sets it)"},
 			},
 			When: hasThread,
@@ -359,7 +360,11 @@ func FormatThreadItems(snap *v1.ThreadItemsSnapshot, full bool) string {
 			u := it.GetUserMessage()
 			body = "you: " + line(u.GetText())
 			for _, a := range u.GetAttachments() {
-				body += "\n" + indent + "    [image " + a + "]"
+				kind := "image"
+				if strings.EqualFold(filepath.Ext(a), ".pdf") {
+					kind = "pdf"
+				}
+				body += "\n" + indent + "    [" + kind + " " + a + "]"
 			}
 		case it.GetAssistantText() != nil:
 			body = "claude: " + line(it.GetAssistantText().GetText())

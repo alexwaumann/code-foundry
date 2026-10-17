@@ -22,7 +22,7 @@ type UserMessage struct {
 	// UUID, when set, is echoed back by the CLI (command_lifecycle, result
 	// user_message_uuid) so a reply can be bound to its send.
 	UUID string
-	// Blocks are the content blocks: TextBlock and ImageBlock values.
+	// Blocks are the content blocks: TextBlock, ImageBlock and DocumentBlock values.
 	Blocks []ContentBlock
 }
 
@@ -30,11 +30,11 @@ type UserMessage struct {
 type ContentBlock struct {
 	Type   string       `json:"type"`
 	Text   string       `json:"text,omitempty"`
-	Source *ImageSource `json:"source,omitempty"`
+	Source *MediaSource `json:"source,omitempty"`
 }
 
-// ImageSource is a base64 image block's source.
-type ImageSource struct {
+// MediaSource is a base64 image or document block's source.
+type MediaSource struct {
 	Type      string `json:"type"` // "base64"
 	MediaType string `json:"media_type"`
 	Data      string `json:"data"`
@@ -46,7 +46,14 @@ func TextBlock(text string) ContentBlock { return ContentBlock{Type: "text", Tex
 // ImageBlock returns a base64 image block; mediaType is image/png, image/jpeg,
 // image/gif or image/webp, data the base64 (standard encoding) of the image bytes.
 func ImageBlock(mediaType, data string) ContentBlock {
-	return ContentBlock{Type: "image", Source: &ImageSource{Type: "base64", MediaType: mediaType, Data: data}}
+	return ContentBlock{Type: "image", Source: &MediaSource{Type: "base64", MediaType: mediaType, Data: data}}
+}
+
+// DocumentBlock returns a base64 document block; mediaType is application/pdf, data
+// the base64 (standard encoding) of the file. Claude Code sends a pasted PDF of at most
+// 10 pages this way.
+func DocumentBlock(mediaType, data string) ContentBlock {
+	return ContentBlock{Type: "document", Source: &MediaSource{Type: "base64", MediaType: mediaType, Data: data}}
 }
 
 func (m UserMessage) wire() any {

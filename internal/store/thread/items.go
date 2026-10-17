@@ -111,7 +111,7 @@ type Item struct {
 	// Text: user_message (as typed), assistant_text, thinking, error, compaction (the
 	// summary), command_output, note.
 	Text string
-	// Attachments: user_message's staged image paths.
+	// Attachments: user_message's staged image and PDF paths.
 	Attachments []string
 	// ComposerText: user_message's composer text with its tag tokens, when the GUI
 	// sent it (Message.ComposerText); stored for display only.
@@ -241,7 +241,7 @@ type Message struct {
 	// and kept as typed in the item.
 	Text string
 	// Attachments are StageAttachment paths: a path line in the prompt and a base64
-	// image block each.
+	// image or document block each (none for a PDF over MaxInlinePDFPages).
 	Attachments []string
 	// ComposerText is the GUI composer's text with its tags as tokens, kept on the
 	// user_message item for display only (never sent to Claude).

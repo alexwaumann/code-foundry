@@ -353,14 +353,23 @@ func TestBuildPrompt(t *testing.T) {
 	tests := []struct {
 		name        string
 		text        string
-		attachments []string
+		attachments []attachment
 		want        string
 	}{
 		{"empty", "", nil, ""},
 		{"whitespace only", " \n\t", nil, ""},
 		{"text", " fix it \n", nil, "fix it"},
-		{"text and images", "fix it", []string{"/a/1.png", "/a/2.jpg"}, "fix it\n\nAttached image: /a/1.png\nAttached image: /a/2.jpg"},
-		{"images only", "", []string{"/a/1.png"}, "Attached image: /a/1.png"},
+		{"text and images", "fix it", []attachment{{path: "/a/1.png"}, {path: "/a/2.jpg"}}, "fix it\n\nAttached image: /a/1.png\nAttached image: /a/2.jpg"},
+		{"images only", "", []attachment{{path: "/a/1.png"}}, "Attached image: /a/1.png"},
+		{"short pdf", "read", []attachment{{path: "/a/1.pdf", pdf: true, pages: 2, exact: true}}, "read\n\nAttached PDF: /a/1.pdf (2 pages)"},
+		{"one page", "", []attachment{{path: "/a/1.pdf", pdf: true, pages: 1, exact: true}}, "Attached PDF: /a/1.pdf (1 page)"},
+		{"ten pages inline", "", []attachment{{path: "/a/1.pdf", pdf: true, pages: 10, exact: true}}, "Attached PDF: /a/1.pdf (10 pages)"},
+		{"estimated", "", []attachment{{path: "/a/1.pdf", pdf: true, pages: 3}}, "Attached PDF: /a/1.pdf (about 3 pages)"},
+		{"long pdf", "", []attachment{{path: "/a/1.pdf", pdf: true, pages: 30, exact: true}},
+			"Attached PDF: /a/1.pdf (30 pages, not sent inline); read it with the Read tool's pages parameter, at most 20 pages per call"},
+		{"long estimate", "", []attachment{{path: "/a/1.pdf", pdf: true, pages: 11}},
+			"Attached PDF: /a/1.pdf (about 11 pages, not sent inline); read it with the Read tool's pages parameter, at most 20 pages per call"},
+		{"image and pdf", "x", []attachment{{path: "/a/1.png"}, {path: "/a/2.pdf", pdf: true, pages: 4, exact: true}}, "x\n\nAttached image: /a/1.png\nAttached PDF: /a/2.pdf (4 pages)"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -2,6 +2,7 @@ package thread
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -18,6 +19,7 @@ var (
 	jpegData = append([]byte("\xff\xd8\xff\xe0"), make([]byte, 32)...)
 	gifData  = append([]byte("GIF89a"), make([]byte, 32)...)
 	webpData = append([]byte("RIFF\x00\x00\x00\x00WEBPVP8 "), make([]byte, 32)...)
+	pdfData  = append([]byte("%PDF-1.4\n"), make([]byte, 32)...)
 )
 
 func TestAttachmentType(t *testing.T) {
@@ -31,6 +33,12 @@ func TestAttachmentType(t *testing.T) {
 		{"jpeg", "image/jpeg", jpegData, ".jpg"},
 		{"gif", "image/gif", gifData, ".gif"},
 		{"webp", "image/webp", webpData, ".webp"},
+		{"pdf", "application/pdf", pdfData, ".pdf"},
+		{"pdf over the image limit", "application/pdf", append(bytes.Clone(pdfData), make([]byte, MaxAttachmentBytes)...), ".pdf"},
+		{"pdf too large", "application/pdf", append(bytes.Clone(pdfData), make([]byte, MaxPDFAttachmentBytes)...), ""},
+		{"pdf declared, image content", "application/pdf", pngData, ".png"},
+		{"image declared, large pdf content", "image/png", append(bytes.Clone(pdfData), make([]byte, MaxAttachmentBytes)...), ".pdf"},
+		{"pdf declared, text content", "application/pdf", []byte("hello, not a pdf"), ""},
 		{"mime parameters and case", "Image/PNG; charset=binary", pngData, ".png"},
 		{"extension follows content", "image/png", jpegData, ".jpg"},
 		{"svg refused", "image/svg+xml", []byte("<svg/>"), ""},
@@ -60,7 +68,7 @@ func TestAttachmentType(t *testing.T) {
 func TestStageAttachment(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "attachments")
 	e := newEnv(t, func(o *Options) { o.AttachmentsDir = dir })
-	p, err := e.m.StageAttachment(e.ctx(), "../../etc/passwd.png", "image/png", pngData)
+	p, err := e.m.StageAttachment(e.ctx(), "../../etc/passwd.png", "image/png", pngData, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,12 +82,16 @@ func TestStageAttachment(t *testing.T) {
 	if di, err := os.Stat(dir); err != nil || di.Mode().Perm() != 0o700 {
 		t.Fatalf("dir = %v, %v", di, err)
 	}
-	p2, err := e.m.StageAttachment(e.ctx(), "a.png", "image/png", pngData)
+	p2, err := e.m.StageAttachment(e.ctx(), "a.png", "image/png", pngData, 0)
 	if err != nil || p2 == p {
 		t.Fatalf("second stage = %q, %v", p2, err)
 	}
-	if _, err := e.m.StageAttachment(e.ctx(), "a.txt", "text/plain", []byte("x")); !errors.Is(err, ErrInvalidArgument) {
+	if _, err := e.m.StageAttachment(e.ctx(), "a.txt", "text/plain", []byte("x"), 0); !errors.Is(err, ErrInvalidArgument) {
 		t.Errorf("text staged: %v", err)
+	}
+	// An image ignores a page hint.
+	if p3, err := e.m.StageAttachment(e.ctx(), "b.png", "image/png", pngData, 4); err != nil || !regexp.MustCompile(`^[0-9a-f]{32}\.png$`).MatchString(filepath.Base(p3)) {
+		t.Errorf("image with a hint = %q, %v", p3, err)
 	}
 
 	// Create appends the staged paths to the first message's text.
@@ -104,8 +116,100 @@ func TestStageAttachment(t *testing.T) {
 	if argv := off.spec(plain.ID).Argv; slices.Contains(argv, "--add-dir") {
 		t.Errorf("argv without an attachments dir = %q", argv)
 	}
-	if _, err := off.m.StageAttachment(off.ctx(), "a.png", "image/png", pngData); !errors.Is(err, ErrFailedPrecondition) {
+	if _, err := off.m.StageAttachment(off.ctx(), "a.png", "image/png", pngData, 0); !errors.Is(err, ErrFailedPrecondition) {
 		t.Errorf("staging without a dir: %v", err)
+	}
+}
+
+// noPdfinfo hides pdfinfo from the test, as on a CI runner without poppler.
+func noPdfinfo(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	old := pdfinfoFallbacks
+	pdfinfoFallbacks = nil
+	t.Cleanup(func() { pdfinfoFallbacks = old })
+}
+
+// TestStageAttachmentPDFPages: the page count is settled at stage time and recorded
+// in the file name: pdfinfo's, else the hint, else the size estimate ("~").
+func TestStageAttachmentPDFPages(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "attachments")
+	e := newEnv(t, func(o *Options) { o.AttachmentsDir = dir })
+	stage := func(data []byte, hint int) string {
+		t.Helper()
+		p, err := e.m.StageAttachment(e.ctx(), "a.pdf", "application/pdf", data, hint)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, err := os.ReadFile(p); err != nil || !bytes.Equal(got, data) {
+			t.Fatalf("staged %q: %d bytes, %v", p, len(got), err)
+		}
+		if _, err := os.Stat(filepath.Join(dir, filepath.Base(p)[:32]+".pdf")); err == nil {
+			t.Errorf("the uncounted file is left next to %q", p)
+		}
+		return filepath.Base(p)
+	}
+	t.Run("pdfinfo", func(t *testing.T) {
+		if pdfinfoPath() == "" {
+			t.Skip("pdfinfo not installed")
+		}
+		// pdfinfo wins over a wrong hint.
+		if name := stage(testPDF(3, 0), 7); !regexp.MustCompile(`^[0-9a-f]{32}-3p\.pdf$`).MatchString(name) {
+			t.Errorf("name = %q", name)
+		}
+	})
+	t.Run("without pdfinfo", func(t *testing.T) {
+		noPdfinfo(t)
+		for _, tc := range []struct {
+			name string
+			data []byte
+			hint int
+			want string
+		}{
+			{"hint", testPDF(3, 0), 150, `-150p\.pdf`},
+			{"no hint, estimate", testPDF(3, 250<<10), 0, `-~3p\.pdf`},
+			{"no hint, tiny", testPDF(30, 0), 0, `-~1p\.pdf`},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				if name := stage(tc.data, tc.hint); !regexp.MustCompile(`^[0-9a-f]{32}` + tc.want + `$`).MatchString(name) {
+					t.Errorf("name = %q, want …%s", name, tc.want)
+				}
+			})
+		}
+	})
+}
+
+func TestStagedPDFPages(t *testing.T) {
+	const hex = "0123456789abcdef0123456789abcdef"
+	tests := []struct {
+		name  string
+		pages int
+		exact bool
+		ok    bool
+	}{
+		{hex + "-12p.pdf", 12, true, true},
+		{hex + "-~3p.pdf", 3, false, true},
+		{hex + "-1p.pdf", 1, true, true},
+		{hex + ".pdf", 0, false, false},
+		{hex + "-0p.pdf", 0, false, false},
+		{hex + "-p.pdf", 0, false, false},
+		{hex + "-12p.png", 0, false, false},
+		{"0123-12p.pdf", 0, false, false},
+		{hex + "-12.pdf", 0, false, false},
+		{hex + "-~~3p.pdf", 0, false, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			n, exact, ok := stagedPDFPages("/attachments/" + tt.name)
+			if n != tt.pages || exact != tt.exact || ok != tt.ok {
+				t.Errorf("= %d, %v, %v; want %d, %v, %v", n, exact, ok, tt.pages, tt.exact, tt.ok)
+			}
+		})
+	}
+	if got := pdfFileName(hex, 12, true); got != hex+"-12p.pdf" {
+		t.Errorf("pdfFileName exact = %q", got)
+	}
+	if got := pdfFileName(hex, 3, false); got != hex+"-~3p.pdf" {
+		t.Errorf("pdfFileName estimate = %q", got)
 	}
 }
 
@@ -122,6 +226,13 @@ func TestCheckAttachments(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	counted := filepath.Join(dir, "0123456789abcdef0123456789abcdef-~3p.pdf")
+	uncounted := filepath.Join(dir, "0123456789abcdef0123456789abcdef.pdf")
+	for _, p := range []string{counted, uncounted} {
+		if err := os.WriteFile(p, pdfData, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
 	link := filepath.Join(dir, "link.png")
 	if err := os.Symlink(outside, link); err != nil {
 		t.Fatal(err)
@@ -135,6 +246,7 @@ func TestCheckAttachments(t *testing.T) {
 		{"none", "", nil, true},
 		{"staged", dir, []string{ok}, true},
 		{"staged, uncleaned", dir, []string{dir + "/sub/../a.png"}, true},
+		{"pdf, both name shapes", dir, []string{counted, uncounted}, true},
 		{"outside", dir, []string{outside}, false},
 		{"escapes with dot-dot", dir, []string{dir + "/../b.png"}, false},
 		{"nested", dir, []string{filepath.Join(dir, "sub", "c.png")}, false},
@@ -152,8 +264,8 @@ func TestCheckAttachments(t *testing.T) {
 				if err != nil || len(got) != len(tt.paths) {
 					t.Fatalf("checkAttachments = %q, %v", got, err)
 				}
-				for _, p := range got {
-					if p != ok {
+				for i, p := range got {
+					if p != filepath.Clean(tt.paths[i]) || (filepath.Ext(p) == ".png" && p != ok) {
 						t.Errorf("cleaned path %q", p)
 					}
 				}
@@ -294,7 +406,7 @@ func TestReapAttachmentsOnTick(t *testing.T) {
 func TestReadAttachment(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "attachments")
 	e := newEnv(t, func(o *Options) { o.AttachmentsDir = dir })
-	p, err := e.m.StageAttachment(e.ctx(), "a.jpg", "image/jpeg", jpegData)
+	p, err := e.m.StageAttachment(e.ctx(), "a.jpg", "image/jpeg", jpegData, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -334,5 +446,102 @@ func TestReadAttachment(t *testing.T) {
 	off := newEnv(t)
 	if _, _, err := off.m.ReadAttachment(off.ctx(), p); !errors.Is(err, ErrNotFound) {
 		t.Errorf("without an attachments dir: %v", err)
+	}
+}
+
+func TestMessageAttachments(t *testing.T) {
+	dir := t.TempDir()
+	file := func(name string, head []byte, size int64) string {
+		p := filepath.Join(dir, name)
+		if err := os.WriteFile(p, head, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if size > int64(len(head)) {
+			if err := os.Truncate(p, size); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return p
+	}
+	const mib = 1 << 20
+	img1 := file("1.png", pngData, 9*mib)
+	img2 := file("2.png", pngData, 9*mib)
+	img3 := file("3.png", pngData, 9*mib)
+	// Staged before the name carried a count: 30 pages by pdfinfo, about 205 by the
+	// estimate, never inline either way.
+	long := file("long.pdf", testPDF(30, 20*mib-8<<10), 0)
+	short := file("short.pdf", testPDF(2, 0), 0)
+	// The name's count wins over pdfinfo and the size: 150 pages in 900 KB never goes
+	// whole; a large one counted at 3 pages does, and counts against the limit.
+	const stem = "0123456789abcdef0123456789abcdef"
+	manyPages := file(stem+"-150p.pdf", testPDF(2, 900<<10), 0)
+	fewPages := file("fedcba9876543210fedcba9876543210-~3p.pdf", testPDF(30, 9*mib), 0)
+	tests := []struct {
+		name   string
+		paths  []string
+		ok     bool
+		inline []bool
+	}{
+		{"none", nil, true, nil},
+		{"two images", []string{img1, img2}, true, []bool{true, true}},
+		{"three images over the message limit", []string{img1, img2, img3}, false, nil},
+		{"a long pdf does not count", []string{img1, long, img2}, true, []bool{true, false, true}},
+		{"short pdf with images", []string{short, img1, img2}, true, []bool{true, true, true}},
+		{"counted in the name: long", []string{manyPages, img1, img2}, true, []bool{false, true, true}},
+		{"counted in the name: short, over the message limit", []string{fewPages, img1, img2}, false, nil},
+		{"counted in the name: short", []string{fewPages, img1}, true, []bool{true, true}},
+		{"not staged", []string{"/etc/hosts"}, false, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := messageAttachments(context.Background(), dir, tt.paths)
+			if !tt.ok {
+				if !errors.Is(err, ErrInvalidArgument) {
+					t.Fatalf("err = %v, want invalid argument", err)
+				}
+				return
+			}
+			if err != nil || !slices.Equal(attachmentPaths(got), tt.paths) {
+				t.Fatalf("= %v, %v", got, err)
+			}
+			for i, a := range got {
+				if a.inline() != tt.inline[i] || a.pdf != strings.HasSuffix(a.path, ".pdf") {
+					t.Errorf("%s: %+v, want inline %v", filepath.Base(a.path), a, tt.inline[i])
+				}
+			}
+		})
+	}
+	if got, err := messageAttachments(context.Background(), dir, []string{manyPages, fewPages}); err != nil ||
+		got[0].pages != 150 || !got[0].exact || got[1].pages != 3 || got[1].exact {
+		t.Errorf("counts from the names = %+v, %v", got, err)
+	}
+	if _, err := messageAttachments(context.Background(), dir, []string{img1, img2, img3}); err == nil || !strings.Contains(err.Error(), "24 MiB") {
+		t.Errorf("message limit error %v does not name the limit", err)
+	}
+}
+
+func TestReadAttachmentPDF(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "attachments")
+	e := newEnv(t, func(o *Options) { o.AttachmentsDir = dir })
+	// Over the image limit, within the PDF one.
+	data := testPDF(2, MaxAttachmentBytes)
+	p, err := e.m.StageAttachment(e.ctx(), "a.pdf", "application/pdf", data, 0)
+	if err != nil || filepath.Ext(p) != ".pdf" {
+		t.Fatalf("stage = %q, %v", p, err)
+	}
+	got, mimeType, err := e.m.ReadAttachment(e.ctx(), p)
+	if err != nil || mimeType != "application/pdf" || !bytes.Equal(got, data) {
+		t.Fatalf("read = %d bytes, %q, %v", len(got), mimeType, err)
+	}
+	// A large image (written behind the daemon's back) is still refused.
+	big := filepath.Join(dir, "big.png")
+	if err := os.WriteFile(big, append(bytes.Clone(pngData), make([]byte, MaxAttachmentBytes)...), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := e.m.ReadAttachment(e.ctx(), big); err == nil {
+		t.Error("an image over its limit was read")
+	}
+	if _, err := e.m.StageAttachment(e.ctx(), "b.pdf", "application/pdf", testPDF(1, MaxPDFAttachmentBytes), 0); err == nil || !strings.Contains(err.Error(), "20 MiB") {
+		t.Errorf("a PDF over its limit: %v", err)
 	}
 }

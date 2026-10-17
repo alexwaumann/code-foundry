@@ -132,11 +132,11 @@ func TestConnRequestCorrelation(t *testing.T) {
 func TestConnSendAndCloseStdin(t *testing.T) {
 	f := newFakeCLI(t, Options{})
 	go func() {
-		_ = f.conn.Send(context.Background(), UserMessage{UUID: "u-1", Blocks: []ContentBlock{TextBlock("hi"), ImageBlock("image/png", "AAAA")}})
+		_ = f.conn.Send(context.Background(), UserMessage{UUID: "u-1", Blocks: []ContentBlock{TextBlock("hi"), ImageBlock("image/png", "AAAA"), DocumentBlock("application/pdf", "JVBE")}})
 	}()
 	m := f.read()
 	b, _ := json.Marshal(m)
-	want := `{"message":{"content":[{"text":"hi","type":"text"},{"source":{"data":"AAAA","media_type":"image/png","type":"base64"},"type":"image"}],"role":"user"},"parent_tool_use_id":null,"type":"user","uuid":"u-1"}`
+	want := `{"message":{"content":[{"text":"hi","type":"text"},{"source":{"data":"AAAA","media_type":"image/png","type":"base64"},"type":"image"},{"source":{"data":"JVBE","media_type":"application/pdf","type":"base64"},"type":"document"}],"role":"user"},"parent_tool_use_id":null,"type":"user","uuid":"u-1"}`
 	if string(b) != want {
 		t.Errorf("user line\n got %s\nwant %s", b, want)
 	}

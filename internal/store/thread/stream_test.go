@@ -2,6 +2,7 @@ package thread
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -452,7 +453,7 @@ func TestRenderedFirstPromptWithImage(t *testing.T) {
 	re := newFixtureEnv(t, "image", func(o *Options) { o.AttachmentsDir = filepath.Join(dir, "attachments") })
 	// A 1x1 PNG.
 	png := []byte("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\xcf\xc0\x00\x00\x03\x01\x01\x00\xc9\xfe\x92\xef\x00\x00\x00\x00IEND\xaeB`\x82")
-	path, err := re.m.StageAttachment(re.ctx(), "red.png", "image/png", png)
+	path, err := re.m.StageAttachment(re.ctx(), "red.png", "image/png", png, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -471,6 +472,45 @@ func TestRenderedFirstPromptWithImage(t *testing.T) {
 	}
 	items := re.waitItems(s.ID, "turn end", hasTurnEnd)
 	if items[0].Text != "What color?" || !slices.Equal(items[0].Attachments, []string{path}) {
+		t.Errorf("user item %+v", items[0])
+	}
+}
+
+// TestRenderedFirstPromptWithPDFs: a short PDF goes as a document block after the
+// text; a long one only as its path line, which tells Claude to read it in pages.
+func TestRenderedFirstPromptWithPDFs(t *testing.T) {
+	dir := t.TempDir()
+	re := newFixtureEnv(t, "image", func(o *Options) { o.AttachmentsDir = filepath.Join(dir, "attachments") })
+	// The GUI's counts as hints: pdfinfo agrees when it is installed.
+	short, err := re.m.StageAttachment(re.ctx(), "short.pdf", "application/pdf", testPDF(2, 0), 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	long, err := re.m.StageAttachment(re.ctx(), "long.pdf", "application/pdf", testPDF(30, 0), 30)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := re.create(CreateOptions{InitialPrompt: "Summarize", Attachments: []string{short, long}})
+	user := re.waitSent("the prompt", func(m map[string]any) bool { return m["type"] == "user" })
+	content := user["message"].(map[string]any)["content"].([]any)
+	if len(content) != 2 {
+		t.Fatalf("content %v", content)
+	}
+	text, _ := content[0].(map[string]any)["text"].(string)
+	lines := strings.Split(text, "\n")
+	if len(lines) != 4 || lines[0] != "Summarize" ||
+		lines[2] != "Attached PDF: "+short+" (2 pages)" ||
+		lines[3] != "Attached PDF: "+long+" (30 pages, not sent inline); read it with the Read tool's pages parameter, at most 20 pages per call" {
+		t.Errorf("text block %q", text)
+	}
+	doc := content[1].(map[string]any)
+	src := doc["source"].(map[string]any)
+	if doc["type"] != "document" || src["media_type"] != "application/pdf" || src["type"] != "base64" ||
+		src["data"] != base64.StdEncoding.EncodeToString(testPDF(2, 0)) {
+		t.Errorf("document block %v", doc)
+	}
+	items := re.waitItems(s.ID, "turn end", hasTurnEnd)
+	if !slices.Equal(items[0].Attachments, []string{short, long}) {
 		t.Errorf("user item %+v", items[0])
 	}
 }

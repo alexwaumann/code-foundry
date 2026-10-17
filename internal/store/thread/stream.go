@@ -34,10 +34,10 @@ const (
 
 // outgoing is a user message on its way to Claude.
 type outgoing struct {
-	text        string   // as typed: the item's text
-	composer    string   // the composer's text: the item's ComposerText
-	attachments []string // staged paths
-	prompt      string   // the text Claude gets (file refs rewritten, attachment lines)
+	text        string       // as typed: the item's text
+	composer    string       // the composer's text: the item's ComposerText
+	attachments []attachment // staged files
+	prompt      string       // the text Claude gets (file refs rewritten, attachment lines)
 	// itemID is the user item's id when the item was written before the message could
 	// go out (a message to a stopped or starting thread: recordUser); sendMessage then
 	// delivers it under that id without writing a second item.
@@ -518,8 +518,11 @@ func (r *runner) sendMessage(o *outgoing) (Item, error) {
 		return Item{}, fmt.Errorf("%w: thread %s is not ready for a message", ErrFailedPrecondition, r.id)
 	}
 	blocks := []claudestream.ContentBlock{claudestream.TextBlock(o.prompt)}
-	for _, p := range o.attachments {
-		b, err := imageBlock(p)
+	for _, a := range o.attachments {
+		if !a.inline() {
+			continue // the prompt names its path; Claude reads it with Read
+		}
+		b, err := mediaBlock(a.path)
 		if err != nil {
 			return Item{}, err
 		}
@@ -549,16 +552,19 @@ func (r *runner) sendMessage(o *outgoing) (Item, error) {
 	return it, nil
 }
 
-// imageBlock reads a staged attachment as a base64 image block, its media type
-// sniffed from the content.
-func imageBlock(path string) (claudestream.ContentBlock, error) {
+// mediaBlock reads a staged attachment as a base64 block, its media type sniffed from
+// the content: a document block for a PDF, else an image block.
+func mediaBlock(path string) (claudestream.ContentBlock, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return claudestream.ContentBlock{}, fmt.Errorf("%w: attachment %s: %v", ErrInvalidArgument, path, err)
 	}
 	mt := http.DetectContentType(data)
-	if AttachmentTypes[mt] == "" {
-		return claudestream.ContentBlock{}, fmt.Errorf("%w: attachment %s is %s, not an image", ErrInvalidArgument, path, mt)
+	switch {
+	case AttachmentTypes[mt] == "":
+		return claudestream.ContentBlock{}, fmt.Errorf("%w: attachment %s is %s, not an image or PDF", ErrInvalidArgument, path, mt)
+	case mt == pdfType:
+		return claudestream.DocumentBlock(mt, base64.StdEncoding.EncodeToString(data)), nil
 	}
 	return claudestream.ImageBlock(mt, base64.StdEncoding.EncodeToString(data)), nil
 }
