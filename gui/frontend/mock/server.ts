@@ -24,6 +24,8 @@
  *   POST /__mock/status-kinds                     (one thread per status kind: approval, question,
  *        plan, finished, Claude error, busy, idle, interrupted, and a stopped one still asking
  *        a question; MOCK_SCENARIO=status-kinds seeds them at startup and on reset)
+ *   POST /__mock/lineage                          (thread lineage: a creator, the child s-l-child with
+ *        six siblings, one archived, and a child of its own; World.addLineage)
  *   POST /__mock/thread/focus?id=s-3     (FocusThread intent)
  *   POST /__mock/thread/archive?id=s-1[&archived=false]   (thread.archive as the CLI's --yes does it:
  *                                                 closes, removes its shells, unpins, stamps; false unarchives)
@@ -876,6 +878,9 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "POST /__mock/status-kinds":
       json(res, 200, world.addStatusKinds());
+      break;
+    case "POST /__mock/lineage":
+      json(res, 200, world.addLineage());
       break;
     case "POST /__mock/empty":
       world.empty();

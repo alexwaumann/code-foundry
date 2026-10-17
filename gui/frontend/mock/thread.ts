@@ -63,6 +63,8 @@ export interface SeedHistory {
   reply: string;
   minutesAgo: number;
   end: "done" | "working" | "permission" | "cut";
+  /** A daemon note before the first message (an agent-made thread's "Created by …", id note-created-by). */
+  note?: { id: string; text: string };
 }
 
 /** The world the threads live in (mock/world.ts implements it). */
@@ -1011,6 +1013,7 @@ export class MockThreadLogs {
       const toolUseId = `toolu_bash_${id}_${String(l.nextOrdinal)}`;
       return push({ case: "toolCall", value: { toolUseId, name: "Bash", inputJson: JSON.stringify({ command }), status: ToolCallStatus.DONE, ...value } }, { id: toolUseId, at: at(sec), until: at(sec + 1) });
     };
+    if (h.note) push({ case: "note", value: { text: h.note.text } }, { id: h.note.id, at: at(0) });
     push({ case: "userMessage", value: { text: h.prompt, attachments: [] } }, { at: at(0) });
     push({ case: "assistantText", value: { text: h.intro } }, { at: at(5) });
     bash(h.command, { output: h.output }, 8);

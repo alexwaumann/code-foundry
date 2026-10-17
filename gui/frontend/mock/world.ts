@@ -76,6 +76,15 @@ interface MockThread {
   lastError: string;
   /** thread.fork: the thread this one was forked from. */
   parentId: string;
+  /**
+   * The thread whose agent created this one (thread.new's created-by), and its name then;
+   * "" when the user made it (docs/notes/agents-2-metadata.md). POST /__mock/lineage.
+   */
+  createdBy: string;
+  createdByName: string;
+  /** What the thread was started for, in its creator's words; "" when none. */
+  brief: string;
+  labels: string[];
   permissionMode: PermissionMode;
   baseRef: string;
   createdWorktree: boolean;
@@ -906,6 +915,56 @@ export class World {
     return out;
   }
 
+  /**
+   * Scenario: thread lineage (docs/notes/agents-3-lineage-gui.md). "Fix login redirect"
+   * (working) created "Add retry to login redirect" (finished; its log starts with the
+   * daemon's "Created by" note) and six siblings of it, one archived, so the Threads tab
+   * caps them at five; "Add retry…" created "Write retry backoff tests". All held (the
+   * clock leaves them alone). POST /__mock/lineage. Idempotent. Returns the ids, creator
+   * first, then the child, its siblings and its child in spawn order.
+   */
+  addLineage(): string[] {
+    const ago = (min: number) => new Date(Date.now() - min * 60_000);
+    const A = ThreadStatus.NEEDS_ATTENTION;
+    const D = ThreadState.DISCONNECTED;
+    const P = "s-l-parent";
+    const PN = "Fix login redirect";
+    const C = "s-l-child";
+    const CN = "Add retry to login redirect";
+    type Spec = Partial<MockThread> & Pick<MockThread, "id" | "name"> & { min: number };
+    const specs: Spec[] = [
+      { id: P, name: PN, status: ThreadStatus.BUSY, statusReason: "working", min: 41, worktreePath: `${CFW}/feat-sidebar` },
+      { id: C, name: CN, createdBy: P, createdByName: PN, brief: "Add retry to the login redirect, keep the PR small", status: A, statusReason: "finished", state: D, min: 18, worktreePath: `${CFW}/fix-resize`, labels: ["auth"] },
+      { id: "s-l-e2e", name: "Update redirect e2e tests", createdBy: P, createdByName: PN, brief: "Cover the new retry path in the redirect e2e suite", status: ThreadStatus.BUSY, statusReason: "working", min: 17 },
+      { id: "s-l-cookie", name: "Audit session cookie flags", createdBy: P, createdByName: PN, brief: "Check SameSite and Secure on the session cookie in every env; report, don't fix", status: A, statusReason: "permission: Bash", min: 15, repoId: "repo-gp", worktreePath: GP },
+      { id: "s-l-allow", name: "Bump redirect allowlist", createdBy: P, createdByName: PN, brief: "Add staging.acme.dev to the redirect allowlist and its test", status: A, statusReason: "error: overloaded", state: D, min: 14 },
+      { id: "s-l-spike", name: "Old redirect spike", createdBy: P, createdByName: PN, status: A, statusReason: "finished", state: D, min: 13, archivedAt: ago(5) },
+      { id: "s-l-logs", name: "Tidy redirect logging", createdBy: P, createdByName: PN, brief: "Drop the debug logs around the redirect", state: D, min: 12 },
+      { id: "s-l-metrics", name: "Check redirect metrics", createdBy: P, createdByName: PN, state: D, min: 11 },
+      { id: "s-l-grand", name: "Write retry backoff tests", createdBy: C, createdByName: CN, brief: "Write table tests for the retry backoff schedule (3 attempts, 200 ms base)", state: D, min: 9, worktreePath: `${CFW}/fix-resize` },
+    ];
+    const out: string[] = [];
+    for (const { min, ...o } of specs) {
+      out.push(o.id);
+      if (this.threads.has(o.id)) continue;
+      const s = this.addThread({ repoId: "repo-cf", worktreePath: CF, model: "claude-4.5-haiku[1m]", effort: "medium", createdAt: ago(min), lastActivityAt: ago(min - 1), statusChangedAt: ago(min - 1), held: true, ...o });
+      if (s.createdBy) {
+        this.logs.seed(s.id, {
+          note: { id: "note-created-by", text: `Created by ${s.createdByName}${s.brief ? ` · brief: ${s.brief}` : ""}` },
+          prompt: s.brief || s.name,
+          intro: "Reading the redirect handler first.",
+          command: "rg -n exchangeToken internal/auth",
+          output: "internal/auth/redirect.go:42:\ttok, err := exchangeToken(ctx, code)",
+          reply: "Done: the retry wraps exchangeToken with three attempts.",
+          minutesAgo: min,
+          end: "done",
+        });
+      }
+      this.publishThread(s);
+    }
+    return out;
+  }
+
   /** Test control: a connected thread owned by the workspace, running in `repo`'s member (else the first). */
   addWorkspaceThread(workspace: string, repo: string, name: string, status: ThreadStatus = ThreadStatus.IDLE): MockThread {
     const ws = this.workspaceRef(workspace);
@@ -1025,6 +1084,10 @@ export class World {
       disconnectReason: "",
       lastError: "",
       parentId: "",
+      createdBy: "",
+      createdByName: "",
+      brief: "",
+      labels: [],
       permissionMode: PermissionMode.AUTO,
       baseRef: "",
       createdWorktree: false,
@@ -1074,6 +1137,10 @@ export class World {
       disconnectReason: s.disconnectReason,
       lastError: s.lastError,
       parentId: s.parentId,
+      createdBy: s.createdBy,
+      createdByName: s.createdByName,
+      brief: s.brief,
+      labels: s.labels,
       permissionMode: s.permissionMode,
       baseRef: s.baseRef,
       createdWorktree: s.createdWorktree,
@@ -2790,6 +2857,19 @@ export class World {
         // Like the daemon: a thread is active (with or without usage).
         when: (ctx) => Boolean(ctx?.activeThreadId),
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "panel.usage" } } }))}`,
+      },
+      {
+        cmd: {
+          name: "view.panel.threads",
+          title: "Show Related Threads in Side Panel",
+          category: "View",
+          description: "Open the Threads surface in the selected thread's side panel: the thread whose agent created it, its siblings and the threads created from it, with status, place and brief.",
+          keybindings: [],
+          args: [],
+        },
+        // Like the daemon: a thread is active (with or without lineage).
+        when: (ctx) => Boolean(ctx?.activeThreadId),
+        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "panel.threads" } } }))}`,
       },
       {
         cmd: { name: "settings.reveal", title: "Reveal Settings File", category: "Settings", description: "Show the settings file in Finder", keybindings: [], args: [] },
