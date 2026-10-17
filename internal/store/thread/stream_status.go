@@ -87,10 +87,15 @@ func (d *streamStatus) AtPrompt() bool {
 
 func (d *streamStatus) initialized() { d.started = true }
 
-// sent: a user message went to Claude.
-func (d *streamStatus) sent() {
+// sent: a message went to Claude. The user's own message also clears the wake-limit
+// stop (they have seen it); a wake does not, so a wake queued behind the handshake
+// cannot clear a limit raised while it waited (TestWakeLimit).
+func (d *streamStatus) sent(byUser bool) {
 	d.busy = true
-	d.budget, d.budgetEnded, d.wakeLimit = false, false, false
+	d.budget, d.budgetEnded = false, false
+	if byUser {
+		d.wakeLimit = false
+	}
 }
 
 // turnStarted: Claude works (again); a budget stop whose turn ended gives way to a turn
