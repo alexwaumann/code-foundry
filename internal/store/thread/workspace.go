@@ -33,6 +33,20 @@ func workspacePrompt(name string) string {
 	return "This thread belongs to workspace " + name + ". Run `code-foundry workspace members` for the current worktrees."
 }
 
+// ThreadPrompt is the one line every thread's system prompt gets
+// (docs/notes/agents-5-cli.md): the CLI guide is where an agent learns to drive other
+// threads. Static for the same reason as workspacePrompt: it never varies per spawn.
+const ThreadPrompt = "This thread runs inside code-foundry. Run `code-foundry guide` to see how to create, wait on, read and wake other threads from the CLI."
+
+// systemPrompt is --append-system-prompt: ThreadPrompt, then the workspace's line
+// (workspacePrompt) for a workspace thread.
+func systemPrompt(workspaceLine string) string {
+	if workspaceLine == "" {
+		return ThreadPrompt
+	}
+	return ThreadPrompt + " " + workspaceLine
+}
+
 // wsLaunch is what a workspace thread's spawn adds to claude's.
 type wsLaunch struct {
 	addDirs []string // the other members' worktrees, in member order

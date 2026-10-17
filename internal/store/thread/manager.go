@@ -711,12 +711,12 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 
 // claudeCommand is the argv and environment of a claude spawn for s: its model,
 // effort and permission mode, the attachments dir and workspace members as --add-dir,
-// the workspace prompt and env. The prompt is never in argv (it is the first user
+// the system prompt line (ThreadPrompt, and the workspace's) and the workspace env. The prompt is never in argv (it is the first user
 // message). g is what the conversation's allow-for-thread answers granted (an effort
 // restart's; a fresh spawn starts without).
 func (m *Manager) claudeCommand(s Thread, l launch, g grants) (argv, env []string) {
 	sa := spawnArgs{model: s.Model, effort: s.Effort, perm: s.PermissionMode,
-		allowedTools: g.allow, disallowedTools: g.deny}
+		allowedTools: g.allow, disallowedTools: g.deny, appendSystemPrompt: systemPrompt("")}
 	if m.opts.AttachmentsDir != "" {
 		// Every spawn (not only the first prompt's): a resumed or forked conversation
 		// may read its images again.
@@ -732,7 +732,7 @@ func (m *Manager) claudeCommand(s Thread, l launch, g grants) (argv, env []strin
 		}
 		if wl, ok := workspaceLaunch(ws, s.WorkspaceID, s.WorktreePath, isDir); ok {
 			sa.addDirs = append(sa.addDirs, wl.addDirs...)
-			sa.appendSystemPrompt = wl.prompt
+			sa.appendSystemPrompt = systemPrompt(wl.prompt)
 			env = append(slices.Clip(env), wl.env...)
 			if len(wl.missing) > 0 {
 				m.log.Warn("workspace member worktrees missing; not passed to claude", "thread", s.ID,

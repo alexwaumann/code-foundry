@@ -126,7 +126,7 @@ func ResolveID(kind IDKind, arg, ref string, ids []string) (string, error) {
 }
 
 // IDHelp is the description suffix of an id arg: "id or unique suffix".
-const IDHelp = " (the id, or a unique suffix of it of at least 4 characters)"
+const IDHelp = " (or a unique suffix of 4+ characters)"
 
 // threadIDs lists every thread's id (archived ones too).
 func threadIDs(b ThreadBackend) IDLister {
