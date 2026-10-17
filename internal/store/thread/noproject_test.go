@@ -37,7 +37,7 @@ func TestCreateNoProjectIsExclusive(t *testing.T) {
 		name string
 		o    CreateOptions
 	}{
-		{"repo", CreateOptions{ProjectID: "r1"}},
+		{"project", CreateOptions{ProjectID: "r1"}},
 		{"worktree", CreateOptions{WorktreePath: e.wt}},
 		{"new worktree", CreateOptions{ProjectID: "r1", NewWorktree: &NewWorktree{}}},
 		{"new worktree alone", CreateOptions{NewWorktree: &NewWorktree{}}},

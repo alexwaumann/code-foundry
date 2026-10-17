@@ -25,7 +25,7 @@ const (
 	// Thread is the id of the thread the terminal belongs to.
 	Thread = "thread"
 	// Repo is the id of the registered repository whose worktree the terminal belongs to.
-	Project = "repo"
+	Project = "project"
 	// Worktree is the path (symlinks resolved, as in the repo snapshot) of the worktree
 	// the terminal belongs to.
 	Worktree = "worktree"

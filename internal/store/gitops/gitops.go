@@ -7,7 +7,7 @@
 // with GIT_TERMINAL_PROMPT=0 and without a controlling terminal, and records every
 // command it ran with its output. Queued, Started and Finished events are published on
 // the bus (one topic, gitops.Event) and an immutable Snapshot holds the running and
-// recent operations. After fetch, pull, push and PR create the repo store is asked to
+// recent operations. After fetch, pull, push and PR create the project store is asked to
 // Refresh, so ahead/behind updates without waiting for its poll.
 //
 // A failed operation is a result, not an error: methods return the finished Op with
@@ -193,7 +193,7 @@ func IsLocalOnly(r project.Project) bool {
 	return r.ID != "" && r.Error == "" && len(r.Worktrees) > 0 && len(r.Remotes) == 0
 }
 
-// Repos is the part of the repo store gitops uses: the snapshot to map a path to its
+// Repos is the part of the project store gitops uses: the snapshot to map a path to its
 // repo (id, slug, branch) and Refresh after operations that move refs. repo.Store
 // satisfies it.
 type Projects interface {

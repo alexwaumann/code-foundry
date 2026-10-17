@@ -33,7 +33,7 @@ func (f *Fake) WorktreeDetail(_ context.Context, projectID, path string) (projec
 		return d, nil
 	}
 	if _, ok := f.snap.Worktree(projectID, path); !ok {
-		return project.WorktreeDetail{}, fmt.Errorf("%w: worktree %q in repo %q", project.ErrNotFound, path, projectID)
+		return project.WorktreeDetail{}, fmt.Errorf("%w: worktree %q in project %q", project.ErrNotFound, path, projectID)
 	}
 	return project.WorktreeDetail{ProjectID: projectID, Path: path}, nil
 }

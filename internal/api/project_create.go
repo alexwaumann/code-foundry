@@ -102,7 +102,7 @@ func (h *Project) Publish(ctx context.Context, req *connect.Request[v1.PublishPr
 }
 
 // projectErrorCodes maps project store errors to Connect codes, first match wins.
-// Anything else (registering or refreshing failed) maps like the repo store's errors.
+// Anything else (registering or refreshing failed) maps like the project store's errors.
 var newProjectErrorCodes = []struct {
 	err  error
 	code connect.Code

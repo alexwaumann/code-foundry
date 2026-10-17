@@ -35,7 +35,7 @@ const (
 	MaxNameLen = 64
 )
 
-// RepoSource is the part of the repo store actions need. *repo.Git implements it.
+// RepoSource is the part of the project store actions need. *repo.Git implements it.
 type ProjectSource interface {
 	Snapshot() *project.Snapshot
 }
@@ -65,7 +65,7 @@ type Options struct {
 	Now         func() time.Time
 }
 
-// Manager is the Store backed by SQLite, the repo store and the terminal store.
+// Manager is the Store backed by SQLite, the project store and the terminal store.
 type Manager struct {
 	opts   Options
 	log    *slog.Logger
@@ -87,7 +87,7 @@ var _ Store = (*Manager)(nil)
 // runs.
 func New(ctx context.Context, opts Options) (*Manager, error) {
 	if opts.DB == nil || opts.Projects == nil {
-		return nil, errors.New("action: Options.DB and Options.Repos are required")
+		return nil, errors.New("action: Options.DB and Options.Projects are required")
 	}
 	if opts.Bus == nil {
 		opts.Bus = bus.New()
@@ -206,7 +206,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Action, error) {
 	m.byID[a.ID] = a
 	m.rebuild()
 	bus.Publish[Event](m.opts.Bus, Updated{Action: a})
-	m.log.Info("action created", "action", a.ID, "repo", a.ProjectID, "name", a.Name)
+	m.log.Info("action created", "action", a.ID, "project", a.ProjectID, "name", a.Name)
 	return a, nil
 }
 
@@ -301,7 +301,7 @@ func (m *Manager) Delete(ctx context.Context, id string) error {
 		}
 	}
 	if err := saveActions(context.WithoutCancel(ctx), m.opts.DB, moved); err != nil {
-		m.log.Warn("renumber actions after a delete", "repo", a.ProjectID, "err", err)
+		m.log.Warn("renumber actions after a delete", "project", a.ProjectID, "err", err)
 		moved = nil
 	}
 	for _, x := range moved {
@@ -312,7 +312,7 @@ func (m *Manager) Delete(ctx context.Context, id string) error {
 	for _, x := range moved {
 		bus.Publish[Event](m.opts.Bus, Updated{Action: x})
 	}
-	m.log.Info("action deleted", "action", id, "repo", a.ProjectID, "name", a.Name)
+	m.log.Info("action deleted", "action", id, "project", a.ProjectID, "name", a.Name)
 	return nil
 }
 
@@ -324,7 +324,7 @@ func (m *Manager) ProjectRemoved(ctx context.Context, projectID string) {
 		return
 	}
 	if err := deleteProjectActions(context.WithoutCancel(ctx), m.opts.DB, projectID); err != nil {
-		m.log.Warn("forget an unregistered project's actions", "repo", projectID, "err", err)
+		m.log.Warn("forget an unregistered project's actions", "project", projectID, "err", err)
 	}
 	m.mu.Lock()
 	var gone []string
@@ -355,7 +355,7 @@ func (m *Manager) ProjectRemoved(ctx context.Context, projectID string) {
 		bus.Publish[Event](m.opts.Bus, RunRemoved{ID: id})
 	}
 	if len(gone)+len(dropped) > 0 {
-		m.log.Info("forgot an unregistered project's actions and runs", "repo", projectID, "actions", len(gone), "runs", len(dropped))
+		m.log.Info("forgot an unregistered project's actions and runs", "project", projectID, "actions", len(gone), "runs", len(dropped))
 	}
 }
 

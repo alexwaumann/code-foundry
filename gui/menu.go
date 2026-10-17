@@ -31,7 +31,7 @@ var settingsItem = menuCommand{"Settings…", "view.settings"}
 
 // threadMenu is the Thread menu, one slice per separated group.
 var threadMenu = [][]menuCommand{
-	{{"New Thread", "thread.new"}, {"Add Project…", "repo.add"}},
+	{{"New Thread", "thread.new"}, {"Add Project…", "project.add"}},
 	{{"Rename Thread", "thread.rename"}, {"Fork Thread", "thread.fork"}, {"Snooze…", "thread.snooze"}, {"Archive", "thread.archive"}},
 	{{"Next Needing Attention", "attention.next"}},
 }

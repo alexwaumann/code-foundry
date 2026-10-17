@@ -103,7 +103,7 @@ func (h *Project) githubRepoToProto(r gh.Repository) *v1.GitHubRepository {
 }
 
 // cloneErrorCodes maps clone store errors to Connect codes, first match wins. Anything
-// else (registering the finished clone failed) maps like the repo store's errors.
+// else (registering the finished clone failed) maps like the project store's errors.
 var cloneErrorCodes = []struct {
 	err  error
 	code connect.Code

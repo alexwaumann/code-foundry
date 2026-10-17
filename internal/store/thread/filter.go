@@ -102,7 +102,7 @@ func (m *Manager) List(_ context.Context, o ListOptions) ([]Thread, error) {
 	if o.Project != "" && !o.All && m.opts.Projects != nil { // without a repo store (tests): an id
 		r, err := workspace.ResolveProject(m.opts.Projects.Snapshot(), o.Project)
 		if err != nil {
-			return nil, listRefError("repo", o.Project, err)
+			return nil, listRefError("project", o.Project, err)
 		}
 		o.Project = r.ID
 	}

@@ -234,7 +234,7 @@ type wakeThread struct {
 	State        string      `json:"state"`
 	Status       string      `json:"status"`
 	StatusReason string      `json:"status_reason"`
-	ProjectID    string      `json:"repo_id"`
+	ProjectID    string      `json:"project_id"`
 	WorktreePath string      `json:"worktree_path"`
 	CreatedBy    string      `json:"created_by"`
 	Labels       []string    `json:"labels"`
@@ -260,7 +260,7 @@ type wakeRun struct {
 	ID         string `json:"id"`
 	ActionID   string `json:"action_id"`
 	ActionName string `json:"action_name"`
-	ProjectID  string `json:"repo_id"`
+	ProjectID  string `json:"project_id"`
 	ExitCode   int    `json:"exit_code"`
 	StartedAt  string `json:"started_at"`
 	FinishedAt string `json:"finished_at"`

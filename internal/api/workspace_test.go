@@ -82,8 +82,8 @@ func TestWorkspaceUnaryAndErrorCodes(t *testing.T) {
 	if err != nil || len(list.Msg.GetWorkspaces()) != 0 {
 		t.Fatalf("List = %v, %v", list, err)
 	}
-	want := []string{"Create login web,api:origin/dev", "Create login x", "AddRepo /worktrees/web/cf-login/src lib",
-		"Members /worktrees/web/cf-login", "Members /elsewhere", "Members ", "RemoveRepo login api force", "Remove w-1 delete-branch"}
+	want := []string{"Create login web,api:origin/dev", "Create login x", "AddProject /worktrees/web/cf-login/src lib",
+		"Members /worktrees/web/cf-login", "Members /elsewhere", "Members ", "RemoveProject login api force", "Remove w-1 delete-branch"}
 	if got := fake.Calls(); len(got) != len(want) {
 		t.Fatalf("calls = %q", got)
 	} else {

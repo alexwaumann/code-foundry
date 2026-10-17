@@ -21,7 +21,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 )
 
-// RepoSource is the part of the repo store threads need: resolving worktrees and
+// RepoSource is the part of the project store threads need: resolving worktrees and
 // creating one for a new thread. *repo.Git implements it.
 type ProjectSource interface {
 	Snapshot() *project.Snapshot
@@ -64,7 +64,7 @@ type Options struct {
 	// Manager runs. Default AttachmentReapInterval (the package constant).
 	AttachmentReapInterval time.Duration
 	// WorktreePath, when set, picks the path of a worktree Create makes for branch in
-	// r; "" leaves it to the repo store's default. The daemon applies the
+	// r; "" leaves it to the project store's default. The daemon applies the
 	// repos.worktree_dir setting with it, as repo.worktree.new does.
 	WorktreePath func(r project.Project, branch string) string
 	// RefExists reports whether ref exists in the repository at dir; Create uses it
@@ -449,7 +449,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 		return Thread{}, fmt.Errorf("%w: new workspace, new worktree and workspace are exclusive", ErrInvalidArgument)
 	}
 	if o.NoProject && (o.ProjectID != "" || o.WorktreePath != "" || o.NewWorktree != nil || o.WorkspaceID != "" || o.NewWorkspace != nil) {
-		return Thread{}, fmt.Errorf("%w: no project excludes a repo, worktree, new worktree, workspace and new workspace", ErrInvalidArgument)
+		return Thread{}, fmt.Errorf("%w: no_project excludes a project, worktree, new worktree, workspace and new workspace", ErrInvalidArgument)
 	}
 	switch {
 	case o.NoProject:
@@ -500,7 +500,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 	})
 	if len(dropped) > 0 {
 		m.log.Warn("file references outside the thread's projects; passing their relative paths",
-			"thread", id, "repo", s.ProjectID, "workspace", s.WorkspaceID, "refs", dropped)
+			"thread", id, "project", s.ProjectID, "workspace", s.WorkspaceID, "refs", dropped)
 	}
 	now := m.opts.Now()
 	s.CreatedAt, s.LastActivityAt = now, now
@@ -920,7 +920,7 @@ func (m *Manager) resolveWorktree(projectID, path string) (string, string, error
 		path = filepath.Clean(path)
 	}
 	if projectID == "" && path == "" {
-		return "", "", fmt.Errorf("%w: a repo, a worktree path, a workspace or no project is required", ErrInvalidArgument)
+		return "", "", fmt.Errorf("%w: a project, a worktree path, a workspace or no project is required", ErrInvalidArgument)
 	}
 	if m.opts.Projects == nil {
 		if fi, err := os.Stat(path); err != nil || !fi.IsDir() {
@@ -933,7 +933,7 @@ func (m *Manager) resolveWorktree(projectID, path string) (string, string, error
 	if projectID != "" {
 		r, ok := snap.Project(projectID)
 		if !ok {
-			return "", "", fmt.Errorf("%w: repo %s", ErrNotFound, projectID)
+			return "", "", fmt.Errorf("%w: project %s", ErrNotFound, projectID)
 		}
 		if path == "" {
 			if len(r.Worktrees) > 0 {
@@ -957,9 +957,9 @@ func (m *Manager) resolveWorktree(projectID, path string) (string, string, error
 		}
 	}
 	if projectID != "" {
-		return "", "", fmt.Errorf("%w: %s is not a worktree of repo %s", ErrFailedPrecondition, path, projectID)
+		return "", "", fmt.Errorf("%w: %s is not a worktree of project %s", ErrFailedPrecondition, path, projectID)
 	}
-	return "", "", fmt.Errorf("%w: %s is not a worktree of a registered repository (register it first)", ErrFailedPrecondition, path)
+	return "", "", fmt.Errorf("%w: %s is not a worktree of a registered project (register it first)", ErrFailedPrecondition, path)
 }
 
 // cleanName trims and validates a display name.

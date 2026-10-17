@@ -3,12 +3,12 @@
 // repo.github.publish) and deletes projects it made (RepoService.Delete, repo.delete:
 // unregister, then remove the folder).
 //
-// Create makes <projects>/<name>, runs the repo store's InitRepository there (git init
+// Create makes <projects>/<name>, runs the project store's InitRepository there (git init
 // on init.defaultBranch, else main, and an empty "chore: initial commit") and registers the
-// folder through the repo store. Publish runs `gh repo create <owner>/<name> --source
+// folder through the project store. Publish runs `gh repo create <owner>/<name> --source
 // <path> --remote origin --push --<visibility>`, so the user's gh login applies, and
 // refreshes the project so origin and the GitHub slug show up. Neither keeps state
-// beyond the publishes in flight; the repo store publishes the results.
+// beyond the publishes in flight; the project store publishes the results.
 package newproject
 
 import (
@@ -114,7 +114,7 @@ type Service interface {
 
 var _ Service = (*Store)(nil)
 
-// Repos is what the store needs from the repo store. *repo.Git implements it.
+// Repos is what the store needs from the project store. *repo.Git implements it.
 type Projects interface {
 	Snapshot() *project.Snapshot
 	Register(ctx context.Context, path string) (project.Project, error)
@@ -127,7 +127,7 @@ type Options struct {
 	// Root is the projects directory (paths.Projects). Created 0700 on first use.
 	Root string
 	// AllowedRoot is the directory every project must lie under (the resolved user
-	// home). Empty skips the check (the repo store still enforces it on register).
+	// home). Empty skips the check (the project store still enforces it on register).
 	AllowedRoot string
 	// Repos registers and refreshes projects. Required.
 	Projects Projects
@@ -155,7 +155,7 @@ func New(opts Options) (*Store, error) {
 		return nil, fmt.Errorf("project: root %q must be an absolute path", opts.Root)
 	}
 	if opts.Projects == nil {
-		return nil, errors.New("project: Repos is required")
+		return nil, errors.New("newproject: Projects is required")
 	}
 	if opts.Git == nil {
 		opts.Git = project.ExecRunner{}
@@ -291,7 +291,7 @@ func (s *Store) Publish(ctx context.Context, opts PublishOptions) (project.Proje
 	}
 	defer s.release(r.ID)
 
-	log := s.opts.Log.With("repo", r.ID, "slug", slug, "visibility", string(vis))
+	log := s.opts.Log.With("project", r.ID, "slug", slug, "visibility", string(vis))
 	log.Info("publish started")
 	start := time.Now()
 	runCtx, cancel := context.WithTimeout(ctx, s.opts.PublishTimeout)
@@ -335,7 +335,7 @@ func (s *Store) Delete(ctx context.Context, id string) error {
 		return fmt.Errorf("%w: %s is being published", ErrFailedPrecondition, r.Name)
 	}
 	defer s.release(r.ID)
-	log := s.opts.Log.With("repo", r.ID, "path", r.Path)
+	log := s.opts.Log.With("project", r.ID, "path", r.Path)
 	if err := s.opts.Projects.Unregister(ctx, r.ID); err != nil {
 		return fmt.Errorf("unregister %s: %w", r.Name, err)
 	}

@@ -80,7 +80,7 @@ func requireGit(m *projectMeta) error {
 func (g *Git) InitGit(ctx context.Context, id string) (Project, error) {
 	st := g.project(id)
 	if st == nil {
-		return Project{}, fmt.Errorf("%w: repo %q", ErrNotFound, id)
+		return Project{}, fmt.Errorf("%w: project %q", ErrNotFound, id)
 	}
 	m := st.meta.Load()
 	if m.Git || hasDotGit(m.Path) {
@@ -92,7 +92,7 @@ func (g *Git) InitGit(ctx context.Context, id string) (Project, error) {
 	if initErr != nil && !hasDotGit(m.Path) {
 		return Project{}, fmt.Errorf("%w: git init in %s: %w", ErrFailedPrecondition, m.Path, initErr)
 	}
-	g.log.Info("git initialized", "repo", id, "path", m.Path, "branch", branch, "err", initErr)
+	g.log.Info("git initialized", "project", id, "path", m.Path, "branch", branch, "err", initErr)
 	if err := g.refresh(ctx, id); err != nil {
 		return Project{}, errors.Join(initErr, err)
 	}
@@ -103,7 +103,7 @@ func (g *Git) InitGit(ctx context.Context, id string) (Project, error) {
 	}
 	r, ok := g.Snapshot().Project(id)
 	if !ok {
-		return Project{}, fmt.Errorf("%w: repo %s was unregistered concurrently", ErrNotFound, id)
+		return Project{}, fmt.Errorf("%w: project %s was unregistered concurrently", ErrNotFound, id)
 	}
 	return r, nil
 }

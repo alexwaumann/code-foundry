@@ -159,10 +159,10 @@ var _ Store = (*Git)(nil)
 // schedules an initial reconcile of every repo. It returns without waiting for git.
 func Start(ctx context.Context, opts Options) (*Git, error) {
 	if opts.DB == nil || opts.Bus == nil {
-		return nil, errors.New("repo: Options.DB and Options.Bus are required")
+		return nil, errors.New("project: Options.DB and Options.Bus are required")
 	}
 	if !filepath.IsAbs(opts.WorktreeRoot) {
-		return nil, fmt.Errorf("repo: Options.WorktreeRoot must be an absolute path, got %q", opts.WorktreeRoot)
+		return nil, fmt.Errorf("project: Options.WorktreeRoot must be an absolute path, got %q", opts.WorktreeRoot)
 	}
 	root, err := allowedRoot(opts.AllowedRoot)
 	if err != nil {
@@ -174,7 +174,7 @@ func Start(ctx context.Context, opts Options) (*Git, error) {
 		bus:      opts.Bus,
 		wtRoot:   opts.WorktreeRoot,
 		managed:  opts.ManagedRoots,
-		log:      cmp.Or(opts.Log, slog.Default()).With("store", "repo"),
+		log:      cmp.Or(opts.Log, slog.Default()).With("store", "project"),
 		runner:   opts.Runner,
 		now:      opts.Now,
 		projects: map[string]*projectState{},
@@ -197,7 +197,7 @@ func Start(ctx context.Context, opts Options) (*Git, error) {
 	}
 	g.watcher, err = fsnotify.NewWatcher()
 	if err != nil {
-		return nil, fmt.Errorf("repo: start watcher: %w", err)
+		return nil, fmt.Errorf("project: start watcher: %w", err)
 	}
 
 	ctx, g.cancel = context.WithCancel(context.WithoutCancel(ctx))
@@ -223,13 +223,13 @@ func allowedRoot(root string) (string, error) {
 	if root == "" {
 		r, err := fsx.HomeRoot()
 		if err != nil {
-			return "", fmt.Errorf("repo: allowed root: %w", err)
+			return "", fmt.Errorf("project: allowed root: %w", err)
 		}
 		return r, nil
 	}
 	r, err := fsx.ResolveRoot(root)
 	if err != nil {
-		return "", fmt.Errorf("repo: Options.AllowedRoot: %w", err)
+		return "", fmt.Errorf("project: Options.AllowedRoot: %w", err)
 	}
 	return r, nil
 }
@@ -257,7 +257,7 @@ func (g *Git) Snapshot() *Snapshot { return g.snap.Load() }
 func (g *Git) load(ctx context.Context) ([]*projectMeta, error) {
 	rows, err := g.db.QueryContext(ctx, `SELECT id, path, name, registered_at FROM repos`)
 	if err != nil {
-		return nil, fmt.Errorf("repo: load: %w", err)
+		return nil, fmt.Errorf("project: load: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 	var out []*projectMeta
@@ -267,7 +267,7 @@ func (g *Git) load(ctx context.Context) ([]*projectMeta, error) {
 			ms int64
 		)
 		if err := rows.Scan(&m.ID, &m.Path, &m.Name, &ms); err != nil {
-			return nil, fmt.Errorf("repo: load: %w", err)
+			return nil, fmt.Errorf("project: load: %w", err)
 		}
 		m.RegisteredAt = time.UnixMilli(ms)
 		// Known before the first reconcile, so a git project never shows as one
@@ -276,7 +276,7 @@ func (g *Git) load(ctx context.Context) ([]*projectMeta, error) {
 		out = append(out, &m)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("repo: load: %w", err)
+		return nil, fmt.Errorf("project: load: %w", err)
 	}
 	return out, nil
 }
@@ -440,18 +440,18 @@ func (g *Git) Register(ctx context.Context, path string) (Project, error) {
 				delete(g.projects, m.ID)
 			}
 			g.mu.Unlock()
-			return Project{}, fmt.Errorf("repo: register %s: %w", mainPath, err)
+			return Project{}, fmt.Errorf("project: register %s: %w", mainPath, err)
 		}
 		// No publish here: the first reconcile always publishes RepoUpdated (its
 		// worktree set changes from empty), so watchers never see a worktree-less repo.
-		g.log.Info("repo registered", "id", m.ID, "path", m.Path)
+		g.log.Info("project registered", "id", m.ID, "path", m.Path)
 	}
 	if err := g.refresh(ctx, m.ID); err != nil {
 		return Project{}, err
 	}
 	r, ok := g.Snapshot().Project(m.ID)
 	if !ok {
-		return Project{}, fmt.Errorf("%w: repo %s was unregistered concurrently", ErrNotFound, m.ID)
+		return Project{}, fmt.Errorf("%w: project %s was unregistered concurrently", ErrNotFound, m.ID)
 	}
 	return r, nil
 }
@@ -510,7 +510,7 @@ func resolveDir(path string) (string, error) {
 func (g *Git) Unregister(ctx context.Context, id string) error {
 	res, err := g.db.ExecContext(ctx, `DELETE FROM repos WHERE id = ?`, id)
 	if err != nil {
-		return fmt.Errorf("repo: unregister %s: %w", id, err)
+		return fmt.Errorf("project: unregister %s: %w", id, err)
 	}
 	g.mu.Lock()
 	_, inMem := g.projects[id]
@@ -524,12 +524,12 @@ func (g *Git) Unregister(ctx context.Context, id string) error {
 	}
 	g.mu.Unlock()
 	if n, _ := res.RowsAffected(); n == 0 && !inMem {
-		return fmt.Errorf("%w: repo %q", ErrNotFound, id)
+		return fmt.Errorf("%w: project %q", ErrNotFound, id)
 	}
 	for _, d := range dirs {
 		_ = g.watcher.Remove(d)
 	}
-	g.log.Info("repo unregistered", "id", id)
+	g.log.Info("project unregistered", "id", id)
 	g.commit(func(*Snapshot) []Event { return []Event{ProjectRemoved{ID: id}} })
 	return nil
 }
@@ -540,7 +540,7 @@ func (g *Git) Refresh(ctx context.Context, id string) error {
 	if id == "" {
 		ids = g.projectIDs()
 	} else if g.project(id) == nil {
-		return fmt.Errorf("%w: repo %q", ErrNotFound, id)
+		return fmt.Errorf("%w: project %q", ErrNotFound, id)
 	}
 	for _, id := range ids {
 		if err := g.refresh(ctx, id); err != nil {
@@ -554,7 +554,7 @@ func (g *Git) Refresh(ctx context.Context, id string) error {
 func (g *Git) CreateWorktree(ctx context.Context, opts CreateWorktreeOptions) (Worktree, error) {
 	st := g.project(opts.ProjectID)
 	if st == nil {
-		return Worktree{}, fmt.Errorf("%w: repo %q", ErrNotFound, opts.ProjectID)
+		return Worktree{}, fmt.Errorf("%w: project %q", ErrNotFound, opts.ProjectID)
 	}
 	m := st.meta.Load()
 	if err := requireGit(m); err != nil {
@@ -627,13 +627,13 @@ func (g *Git) CreateWorktree(ctx context.Context, opts CreateWorktreeOptions) (W
 	if real, err := filepath.EvalSymlinks(path); err == nil {
 		path = real
 	}
-	g.log.Info("worktree created", "repo", m.ID, "path", path, "branch", opts.Branch)
+	g.log.Info("worktree created", "project", m.ID, "path", path, "branch", opts.Branch)
 	if err := g.refresh(ctx, m.ID); err != nil {
 		return Worktree{}, err
 	}
 	wt, ok := g.Snapshot().Worktree(m.ID, path)
 	if !ok {
-		return Worktree{}, fmt.Errorf("repo: created worktree %s is missing from git worktree list", path)
+		return Worktree{}, fmt.Errorf("project: created worktree %s is missing from git worktree list", path)
 	}
 	return wt, nil
 }
@@ -661,7 +661,7 @@ func (g *Git) ensureBorn(ctx context.Context, m *projectMeta, base string) error
 	if _, err := g.runner.Run(ctx, m.Path, "commit", "--quiet", "--allow-empty", "-m", initialCommitMessage); err != nil {
 		return fmt.Errorf("%w: %s has no commits yet and the initial commit failed: %w", ErrFailedPrecondition, m.Name, err)
 	}
-	g.log.Info("initial commit made for unborn branch", "repo", m.ID, "path", m.Path, "branch", unborn)
+	g.log.Info("initial commit made for unborn branch", "project", m.ID, "path", m.Path, "branch", unborn)
 	if err := g.refresh(ctx, m.ID); err != nil {
 		return err
 	}
@@ -707,7 +707,7 @@ func refspecWrites(spec, ref string) bool {
 func (g *Git) fetchStartPoint(ctx context.Context, m *projectMeta, ref string) {
 	out, err := g.runner.Run(ctx, m.Path, "remote")
 	if err != nil {
-		g.log.Warn("fetch before worktree: listing remotes failed", "repo", m.ID, "ref", ref, "err", err)
+		g.log.Warn("fetch before worktree: listing remotes failed", "project", m.ID, "ref", ref, "err", err)
 		return
 	}
 	remote, branch := splitRemoteRef(strings.Fields(string(out)), ref)
@@ -722,10 +722,10 @@ func (g *Git) fetchStartPoint(ctx context.Context, m *projectMeta, ref string) {
 	refspec := "+refs/heads/" + branch + ":refs/remotes/" + remote + "/" + branch
 	start := time.Now()
 	if _, err := g.runner.Run(fctx, m.Path, "fetch", "--quiet", "--no-tags", remote, refspec); err != nil {
-		g.log.Warn("fetch before worktree failed; using the existing ref", "repo", m.ID, "ref", ref, "err", err)
+		g.log.Warn("fetch before worktree failed; using the existing ref", "project", m.ID, "ref", ref, "err", err)
 		return
 	}
-	g.log.Debug("fetched start point", "repo", m.ID, "ref", ref, "took", time.Since(start))
+	g.log.Debug("fetched start point", "project", m.ID, "ref", ref, "took", time.Since(start))
 }
 
 // splitRemoteRef splits ref into (remote, branch) when it starts with "<remote>/" for
@@ -744,7 +744,7 @@ func splitRemoteRef(remotes []string, ref string) (remote, branch string) {
 func (g *Git) ListRefs(ctx context.Context, projectID string) (Refs, error) {
 	st := g.project(projectID)
 	if st == nil {
-		return Refs{}, fmt.Errorf("%w: repo %q", ErrNotFound, projectID)
+		return Refs{}, fmt.Errorf("%w: project %q", ErrNotFound, projectID)
 	}
 	m := st.meta.Load()
 	if err := requireGit(m); err != nil {
@@ -752,7 +752,7 @@ func (g *Git) ListRefs(ctx context.Context, projectID string) (Refs, error) {
 	}
 	out, err := g.runner.Run(ctx, m.Path, "for-each-ref", refsFormat, "refs/heads", "refs/remotes")
 	if err != nil {
-		return Refs{}, fmt.Errorf("repo: list refs of %s: %w", m.ID, err)
+		return Refs{}, fmt.Errorf("project: list refs of %s: %w", m.ID, err)
 	}
 	refs := parseRefs(out)
 	// DefaultBranch is empty until the repo's first reconcile after a daemon start.
@@ -786,7 +786,7 @@ func (g *Git) refExists(ctx context.Context, dir, ref string) bool {
 func (g *Git) RemoveWorktree(ctx context.Context, opts RemoveWorktreeOptions) error {
 	st := g.project(opts.ProjectID)
 	if st == nil {
-		return fmt.Errorf("%w: repo %q", ErrNotFound, opts.ProjectID)
+		return fmt.Errorf("%w: project %q", ErrNotFound, opts.ProjectID)
 	}
 	m := st.meta.Load()
 	if err := requireGit(m); err != nil {
@@ -798,7 +798,7 @@ func (g *Git) RemoveWorktree(ctx context.Context, opts RemoveWorktreeOptions) er
 	}
 	wt, ok := g.Snapshot().Worktree(m.ID, path)
 	if !ok {
-		return fmt.Errorf("%w: worktree %q in repo %s", ErrNotFound, opts.Path, m.ID)
+		return fmt.Errorf("%w: worktree %q in project %s", ErrNotFound, opts.Path, m.ID)
 	}
 	if wt.IsMain {
 		return fmt.Errorf("%w: cannot remove the main worktree", ErrInvalidArgument)
@@ -813,7 +813,7 @@ func (g *Git) RemoveWorktree(ctx context.Context, opts RemoveWorktreeOptions) er
 	if _, err := g.runner.Run(ctx, m.Path, args...); err != nil {
 		return fmt.Errorf("%w: %w", ErrFailedPrecondition, err)
 	}
-	g.log.Info("worktree removed", "repo", m.ID, "path", path)
+	g.log.Info("worktree removed", "project", m.ID, "path", path)
 	var branchErr error
 	if opts.DeleteBranch && wt.Branch != "" {
 		if _, err := g.runner.Run(ctx, m.Path, "branch", "-D", wt.Branch); err != nil {
@@ -869,7 +869,7 @@ func (g *Git) reconcile(ctx context.Context, id string) {
 		}
 		next.Error = err.Error()
 		listed = nil
-		g.log.Warn("reconcile failed", "repo", id, "path", next.Path, "err", err)
+		g.log.Warn("reconcile failed", "project", id, "path", next.Path, "err", err)
 	}
 	// A project that gained (or lost) .git reseeds its worktree from the listing, so
 	// the first event after the flip already carries the branch.
@@ -975,7 +975,7 @@ func (g *Git) syncWatches(id string, st *projectState, want map[string]watchTarg
 	for dir, t := range want {
 		if err := g.watcher.Add(dir); err != nil {
 			if !errors.Is(err, os.ErrNotExist) {
-				g.log.Warn("watch failed", "repo", id, "dir", dir, "err", err)
+				g.log.Warn("watch failed", "project", id, "dir", dir, "err", err)
 			}
 			continue
 		}
@@ -1029,7 +1029,7 @@ func (g *Git) inspect(ctx context.Context, m *projectMeta) ([]listedWorktree, er
 	} else {
 		listedRemotes = false
 		if ctx.Err() == nil {
-			g.log.Warn("listing remotes failed", "repo", m.ID, "err", err)
+			g.log.Warn("listing remotes failed", "project", m.ID, "err", err)
 		}
 	}
 	m.OriginURL = ""
@@ -1102,7 +1102,7 @@ func (g *Git) status(ctx context.Context, projectID, path string) {
 		}
 		next.Status.Error = err.Error()
 		next.Status.RefreshedAt = now
-		g.log.Debug("status failed", "repo", projectID, "path", path, "err", err)
+		g.log.Debug("status failed", "project", projectID, "path", path, "err", err)
 	} else {
 		next.Branch, next.Head, next.Detached = info.Branch, info.Head, info.Detached
 		op := readOperation(gitDir) // marker files only, no git command
@@ -1117,7 +1117,7 @@ func (g *Git) status(ctx context.Context, projectID, path string) {
 		if c, ok, reused := g.baseCounts(ctx, st, slot, path, info.Head); ok {
 			next.Status.BaseRef, next.Status.BaseAhead, next.Status.BaseBehind = c.ref, c.ahead, c.behind
 			if reused {
-				g.log.Debug("base counts reused", "repo", projectID, "path", path,
+				g.log.Debug("base counts reused", "project", projectID, "path", path,
 					"head", shortSHA(c.head), "base", shortSHA(c.sha))
 			}
 		}
@@ -1264,7 +1264,7 @@ func (g *Git) fetch(ctx context.Context, id string) {
 	defer cancel()
 	if _, err := g.runner.Run(fctx, m.Path, "fetch", "--prune", "--quiet"); err != nil {
 		if ctx.Err() == nil {
-			g.log.Warn("fetch failed", "repo", id, "path", m.Path, "err", err)
+			g.log.Warn("fetch failed", "project", id, "path", m.Path, "err", err)
 		}
 		return
 	}

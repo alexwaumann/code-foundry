@@ -57,14 +57,14 @@ func (g *Git) resolveBase(ctx context.Context, projectID string) {
 		case !isExit(err, 1):
 			// Not "missing": keep what we had rather than dropping the base comparison
 			// on a transient failure. The next round retries.
-			g.log.Debug("resolve base failed", "repo", projectID, "ref", next.ref, "err", err)
+			g.log.Debug("resolve base failed", "project", projectID, "ref", next.ref, "err", err)
 			if prev := st.base.Load(); prev != nil {
 				next = prev
 			}
 		}
 	}
 	if prev := st.base.Load(); prev == nil || *prev != *next {
-		g.log.Debug("base resolved", "repo", projectID, "ref", next.ref, "sha", next.sha)
+		g.log.Debug("base resolved", "project", projectID, "ref", next.ref, "sha", next.sha)
 	}
 	st.base.Store(next)
 	for _, k := range g.statusKeys(projectID) {

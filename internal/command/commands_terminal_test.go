@@ -242,7 +242,7 @@ func TestTerminalList(t *testing.T) {
 	lines := strings.Split(res.Message, "\n")
 	want := [][]string{
 		{"ID", "STATE", "CWD", "LABELS"},
-		{"t-1", "running", "/src/app/sub", "kind=shell", "repo=r1", "worktree=/src/app"},
+		{"t-1", "running", "/src/app/sub", "kind=shell", "project=r1", "worktree=/src/app"},
 		{"t-2", "exited", "2", "/tmp", "-"},
 	}
 	if len(lines) != len(want) {

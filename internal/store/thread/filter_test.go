@@ -31,7 +31,7 @@ func TestFilterThreads(t *testing.T) {
 		{name: "status", o: ListOptions{Status: StatusIdle}, want: []string{"s-e", "s-b"}},
 		{name: "status of an archived thread needs archived", o: ListOptions{Status: StatusError}, want: nil},
 		{name: "state", o: ListOptions{State: StateConnected}, want: []string{"s-a", "s-c"}},
-		{name: "repo", o: ListOptions{Project: "r1"}, want: []string{"s-a", "s-c"}},
+		{name: "project", o: ListOptions{Project: "r1"}, want: []string{"s-a", "s-c"}},
 		{name: "workspace", o: ListOptions{Workspace: "w-1"}, want: []string{"s-c"}},
 		{name: "created by a thread", o: ListOptions{CreatedBy: "s-a"}, want: []string{"s-b", "s-c"}},
 		{name: "created by the user", o: ListOptions{CreatedBy: CreatedByUser}, want: []string{"s-e", "s-a"}},
@@ -61,7 +61,7 @@ func TestListResolvesRefs(t *testing.T) {
 	for _, ref := range []string{"r1", "repo", e.wt} {
 		got, err := e.m.List(e.ctx(), ListOptions{Project: ref})
 		if err != nil || len(got) != 1 || got[0].ID != s.ID {
-			t.Errorf("List(repo %q) = %v, %v", ref, got, err)
+			t.Errorf("List(project %q) = %v, %v", ref, got, err)
 		}
 	}
 	if got, err := e.m.List(e.ctx(), ListOptions{Labels: []string{"other"}}); err != nil || len(got) != 0 {

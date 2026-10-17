@@ -166,7 +166,7 @@ func (x *run) branch(ctx context.Context) (string, error) {
 }
 
 // push pushes branch. Without an upstream it runs `git push -u origin <branch>`, so a
-// new feature branch (created with --no-track by the repo store) gets origin/<branch>
+// new feature branch (created with --no-track by the project store) gets origin/<branch>
 // as its upstream; with one it runs plain `git push`.
 func (x *run) push(ctx context.Context, branch string, force bool) (string, string, error) {
 	args := []string{"push"}

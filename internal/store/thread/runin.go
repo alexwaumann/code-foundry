@@ -29,7 +29,7 @@ type cdRequest struct {
 // RunIn implements Store.
 func (m *Manager) RunIn(_ context.Context, id string, t RunInTarget) (Thread, error) {
 	if t.ProjectID == "" && t.WorktreePath == "" {
-		return Thread{}, fmt.Errorf("%w: a member repo or worktree path is required", ErrInvalidArgument)
+		return Thread{}, fmt.Errorf("%w: a member project or worktree path is required", ErrInvalidArgument)
 	}
 	cur, err := m.Get(context.Background(), id)
 	if err != nil {

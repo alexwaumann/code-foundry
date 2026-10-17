@@ -1,5 +1,5 @@
 // Package repotest provides an in-memory repo.Store for tests of code that consumes
-// the repo store (API handlers, commands, the gh store).
+// the project store (API handlers, commands, the gh store).
 package projecttest
 
 import (
@@ -159,7 +159,7 @@ func (f *Fake) InitGit(_ context.Context, id string) (project.Project, error) {
 	r, ok := f.projects[id]
 	if !ok {
 		f.mu.Unlock()
-		return project.Project{}, fmt.Errorf("%w: repo %q", project.ErrNotFound, id)
+		return project.Project{}, fmt.Errorf("%w: project %q", project.ErrNotFound, id)
 	}
 	if r.Git {
 		f.mu.Unlock()
@@ -182,7 +182,7 @@ func (f *Fake) Unregister(_ context.Context, id string) error {
 	}
 	if _, ok := f.projects[id]; !ok {
 		f.mu.Unlock()
-		return fmt.Errorf("%w: repo %q", project.ErrNotFound, id)
+		return fmt.Errorf("%w: project %q", project.ErrNotFound, id)
 	}
 	delete(f.projects, id)
 	f.rebuild()
@@ -203,7 +203,7 @@ func (f *Fake) CreateWorktree(_ context.Context, o project.CreateWorktreeOptions
 	r, ok := f.projects[o.ProjectID]
 	if !ok {
 		f.mu.Unlock()
-		return project.Worktree{}, fmt.Errorf("%w: repo %q", project.ErrNotFound, o.ProjectID)
+		return project.Worktree{}, fmt.Errorf("%w: project %q", project.ErrNotFound, o.ProjectID)
 	}
 	if err := notGit(r); err != nil {
 		f.mu.Unlock()
@@ -242,7 +242,7 @@ func (f *Fake) RemoveWorktree(_ context.Context, o project.RemoveWorktreeOptions
 	r, ok := f.projects[o.ProjectID]
 	if !ok {
 		f.mu.Unlock()
-		return fmt.Errorf("%w: repo %q", project.ErrNotFound, o.ProjectID)
+		return fmt.Errorf("%w: project %q", project.ErrNotFound, o.ProjectID)
 	}
 	i := slices.IndexFunc(r.Worktrees, func(w project.Worktree) bool { return w.Path == o.Path })
 	if i < 0 {
@@ -271,7 +271,7 @@ func (f *Fake) Refresh(_ context.Context, id string) error {
 		return f.Err
 	}
 	if _, ok := f.projects[id]; id != "" && !ok {
-		return fmt.Errorf("%w: repo %q", project.ErrNotFound, id)
+		return fmt.Errorf("%w: project %q", project.ErrNotFound, id)
 	}
 	return nil
 }
@@ -294,7 +294,7 @@ func (f *Fake) ListRefs(_ context.Context, projectID string) (project.Refs, erro
 	f.Calls = append(f.Calls, "ListRefs "+projectID)
 	r, ok := f.projects[projectID]
 	if !ok {
-		return project.Refs{}, fmt.Errorf("%w: repo %q", project.ErrNotFound, projectID)
+		return project.Refs{}, fmt.Errorf("%w: project %q", project.ErrNotFound, projectID)
 	}
 	if err := notGit(r); err != nil {
 		return project.Refs{}, err

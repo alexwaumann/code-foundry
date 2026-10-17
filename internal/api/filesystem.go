@@ -89,7 +89,7 @@ func (h *Filesystem) ListSkills(_ context.Context, req *connect.Request[v1.ListS
 		case code == connect.CodeInvalidArgument: // a malformed request, not a missing checkout
 			return nil, err
 		default: // a removed project or worktree, or one that cannot be resolved: skip it
-			h.log.Warn("skill source skipped", "repo", src.GetProjectId(), "path", src.GetPath(), "err", err)
+			h.log.Warn("skill source skipped", "project", src.GetProjectId(), "path", src.GetPath(), "err", err)
 			continue
 		}
 		add(fsx.ReadSkills(filepath.Join(dir, ".claude"), true, h.log), v1.SkillScope_SKILL_SCOPE_PROJECT, src.GetProjectId())
@@ -131,11 +131,11 @@ func (h *Filesystem) SearchFiles(ctx context.Context, req *connect.Request[v1.Se
 // with git. The repo must be registered.
 func (h *Filesystem) checkout(projectID, path string) (dir string, git bool, err error) {
 	if projectID == "" {
-		return "", false, connect.NewError(connect.CodeInvalidArgument, errors.New("repo_id is required"))
+		return "", false, connect.NewError(connect.CodeInvalidArgument, errors.New("project_id is required"))
 	}
 	r, ok := h.projects.Snapshot().Project(projectID)
 	if !ok {
-		return "", false, connect.NewError(connect.CodeNotFound, fmt.Errorf("repo %s not found", projectID))
+		return "", false, connect.NewError(connect.CodeNotFound, fmt.Errorf("project %s not found", projectID))
 	}
 	dir = cmp.Or(path, r.Path)
 	if !filepath.IsAbs(dir) {

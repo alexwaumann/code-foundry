@@ -133,7 +133,7 @@ func (g *Git) WorktreeDetail(ctx context.Context, projectID, path string) (Workt
 		path = real
 	}
 	if _, ok := g.Snapshot().Worktree(projectID, path); !ok {
-		return WorktreeDetail{}, fmt.Errorf("%w: worktree %q in repo %q", ErrNotFound, path, projectID)
+		return WorktreeDetail{}, fmt.Errorf("%w: worktree %q in project %q", ErrNotFound, path, projectID)
 	}
 	if st := g.project(projectID); st != nil {
 		if err := requireGit(st.meta.Load()); err != nil {
@@ -159,7 +159,7 @@ func (g *Git) WorktreeDetail(ctx context.Context, projectID, path string) (Workt
 	d, cached = ds.cache[k]
 	ds.mu.Unlock()
 	if !cached {
-		return WorktreeDetail{}, fmt.Errorf("%w: worktree %q in repo %q", ErrNotFound, path, projectID)
+		return WorktreeDetail{}, fmt.Errorf("%w: worktree %q in project %q", ErrNotFound, path, projectID)
 	}
 	return d, nil
 }
@@ -211,7 +211,7 @@ func (g *Git) detail(ctx context.Context, projectID, path string) {
 	if ctx.Err() != nil {
 		return
 	}
-	g.log.Debug("worktree detail", "repo", projectID, "path", path, "head", shortSHA(d.Head),
+	g.log.Debug("worktree detail", "project", projectID, "path", path, "head", shortSHA(d.Head),
 		"base", d.BaseRef, "clean", clean, "git_runs", runs, "err", err)
 	ds.mu.Lock()
 	ds.initLocked()

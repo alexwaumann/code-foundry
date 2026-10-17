@@ -316,12 +316,12 @@ func (m *Manager) execute(op *Op, refresh bool, b body) Op {
 	return final
 }
 
-// refresh asks the repo store to re-read the repo after its refs moved.
+// refresh asks the project store to re-read the repo after its refs moved.
 func (m *Manager) refresh(projectID string) {
 	ctx, cancel := context.WithTimeout(m.ctx, RefreshTimeout)
 	defer cancel()
 	if err := m.opts.Projects.Refresh(ctx, projectID); err != nil && m.ctx.Err() == nil {
-		m.log.Warn("gitops: repo refresh", "repo", projectID, "err", err)
+		m.log.Warn("gitops: project refresh", "project", projectID, "err", err)
 	}
 }
 

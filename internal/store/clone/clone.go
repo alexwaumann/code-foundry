@@ -6,7 +6,7 @@
 // output as Progress lines. The destination is fixed (paths.Projects, not
 // configurable) and must not exist yet; it must also lie under the allowed root (the
 // user's home), checked before anything is downloaded. On success the clone is
-// registered through the repo store; on failure or cancellation a destination the
+// registered through the project store; on failure or cancellation a destination the
 // clone created is removed again.
 package clone
 
@@ -71,7 +71,7 @@ type Options struct {
 	// Root is the projects directory (paths.Projects). Created 0700 on first clone.
 	Root string
 	// AllowedRoot is the directory every project must lie under (the resolved user
-	// home). Empty skips the check (the repo store still enforces it on register).
+	// home). Empty skips the check (the project store still enforces it on register).
 	AllowedRoot string
 	// Repos registers finished clones. Required.
 	Projects Registrar
@@ -98,7 +98,7 @@ func New(opts Options) (*Cloner, error) {
 		return nil, fmt.Errorf("clone: root %q must be an absolute path", opts.Root)
 	}
 	if opts.Projects == nil {
-		return nil, errors.New("clone: Repos is required")
+		return nil, errors.New("clone: Projects is required")
 	}
 	if opts.Gh == "" {
 		opts.Gh = "gh"

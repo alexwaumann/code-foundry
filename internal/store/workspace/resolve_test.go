@@ -113,7 +113,7 @@ func TestResolveProject(t *testing.T) {
 		{"path in main worktree", "/src/web/pkg", "web", nil, ""},
 		{"path in linked worktree", "/wt/api/cf-login/x", "api", nil, ""},
 		{"repo without worktrees yet", "/b/dup", "dup2", nil, ""},
-		{"unknown", "nope", "", ErrNotFound, "repo add <folder>"},
+		{"unknown", "nope", "", ErrNotFound, "project add <folder>"},
 		{"empty", "", "", ErrInvalidArgument, ""},
 	}
 	for _, tt := range tests {

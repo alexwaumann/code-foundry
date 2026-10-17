@@ -16,7 +16,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 )
 
-// RepoSource is the part of the repo store workspaces need. *repo.Git implements it.
+// RepoSource is the part of the project store workspaces need. *repo.Git implements it.
 type ProjectSource interface {
 	Snapshot() *project.Snapshot
 	CreateWorktree(ctx context.Context, opts project.CreateWorktreeOptions) (project.Worktree, error)
@@ -39,12 +39,12 @@ type Options struct {
 	// before claude starts. Nil skips it. A failure is logged, not returned.
 	Trust func(dir string) error
 	// WorktreePath, when set, picks the path of a member worktree for branch in r; ""
-	// leaves it to the repo store's default. The daemon applies repos.worktree_dir.
+	// leaves it to the project store's default. The daemon applies repos.worktree_dir.
 	WorktreePath func(r project.Project, branch string) string
 	Now          func() time.Time
 }
 
-// Manager is the Store backed by SQLite and the repo store.
+// Manager is the Store backed by SQLite and the project store.
 type Manager struct {
 	opts Options
 	log  *slog.Logger
@@ -60,7 +60,7 @@ var _ Store = (*Manager)(nil)
 // New loads persisted workspaces and returns the Manager.
 func New(ctx context.Context, opts Options) (*Manager, error) {
 	if opts.DB == nil || opts.Projects == nil {
-		return nil, errors.New("workspace: Options.DB and Options.Repos are required")
+		return nil, errors.New("workspace: Options.DB and Options.Projects are required")
 	}
 	if opts.Bus == nil {
 		opts.Bus = bus.New()
@@ -127,7 +127,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Workspace, error
 		return Workspace{}, err
 	}
 	if len(o.Members) == 0 {
-		return Workspace{}, fmt.Errorf("%w: a workspace needs at least one repository", ErrInvalidArgument)
+		return Workspace{}, fmt.Errorf("%w: a workspace needs at least one project", ErrInvalidArgument)
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -151,7 +151,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Workspace, error
 			return Workspace{}, err
 		}
 		if slices.ContainsFunc(plans, func(p plan) bool { return p.r.ID == r.ID }) {
-			return Workspace{}, fmt.Errorf("%w: repository %s is listed twice", ErrInvalidArgument, r.Name)
+			return Workspace{}, fmt.Errorf("%w: project %s is listed twice", ErrInvalidArgument, r.Name)
 		}
 		base := strings.TrimSpace(spec.BaseRef)
 		if base == "" {
@@ -219,7 +219,7 @@ func (m *Manager) AddProject(ctx context.Context, o AddProjectOptions) (Workspac
 	}
 	w.Members = append(slices.Clone(w.Members), c.member)
 	m.put(w)
-	m.log.Info("workspace repo added", "workspace", w.ID, "repo", r.ID, "path", c.member.WorktreePath)
+	m.log.Info("workspace project added", "workspace", w.ID, "project", r.ID, "path", c.member.WorktreePath)
 	return w, nil
 }
 
@@ -342,7 +342,7 @@ func (m *Manager) createMember(ctx context.Context, r project.Project, branch, b
 			m.log.Warn("pre-trust workspace worktree failed; claude will ask", "path", wt.Path, "err", err)
 		}
 	}
-	m.log.Info("workspace worktree created", "repo", r.ID, "branch", branch, "path", wt.Path, "base", base)
+	m.log.Info("workspace worktree created", "project", r.ID, "branch", branch, "path", wt.Path, "base", base)
 	return created{member: Member{ProjectID: r.ID, WorktreePath: wt.Path}, newBranch: !existed}, nil
 }
 
@@ -356,19 +356,19 @@ func (m *Manager) rollback(ctx context.Context, made []created) {
 		if err := m.opts.Projects.RemoveWorktree(ctx, project.RemoveWorktreeOptions{
 			ProjectID: c.member.ProjectID, Path: c.member.WorktreePath, Force: true, DeleteBranch: c.newBranch,
 		}); err != nil {
-			m.log.Warn("workspace rollback: remove worktree", "repo", c.member.ProjectID, "path", c.member.WorktreePath, "err", err)
+			m.log.Warn("workspace rollback: remove worktree", "project", c.member.ProjectID, "path", c.member.WorktreePath, "err", err)
 		}
 	}
 }
 
-// removeMember removes mem's worktree through the repo store (git refuses a dirty
+// removeMember removes mem's worktree through the project store (git refuses a dirty
 // worktree without force). gone reports whether the worktree is no longer there, so
 // the member can be dropped: removed now, already deleted by hand, or its repository
 // is no longer registered (the files are then left alone).
 func (m *Manager) removeMember(ctx context.Context, mem Member, force, deleteBranch bool) (gone bool, err error) {
 	if _, ok := m.opts.Projects.Snapshot().Project(mem.ProjectID); !ok {
-		m.log.Warn("workspace member's repository is not registered; leaving its worktree on disk",
-			"repo", mem.ProjectID, "path", mem.WorktreePath)
+		m.log.Warn("workspace member's project is not registered; leaving its worktree on disk",
+			"project", mem.ProjectID, "path", mem.WorktreePath)
 		return true, nil
 	}
 	err = m.opts.Projects.RemoveWorktree(ctx, project.RemoveWorktreeOptions{
@@ -379,7 +379,7 @@ func (m *Manager) removeMember(ctx context.Context, mem Member, force, deleteBra
 	case err == nil:
 		return true, nil
 	case gone && errors.Is(err, project.ErrNotFound):
-		m.log.Info("workspace member worktree was already gone", "repo", mem.ProjectID, "path", mem.WorktreePath)
+		m.log.Info("workspace member worktree was already gone", "project", mem.ProjectID, "path", mem.WorktreePath)
 		return true, nil
 	default:
 		return gone, projectError("remove worktree "+mem.WorktreePath, err)

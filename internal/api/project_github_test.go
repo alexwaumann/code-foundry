@@ -166,7 +166,7 @@ func TestCloneStream(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			lines, r, err := cloneEvents(t, c, "octo", tt.project)
 			if connect.CodeOf(err) != tt.code || !strings.Contains(err.Error(), tt.msg) || r != nil || len(lines) != tt.lines {
-				t.Fatalf("err = %v (%v), repo %v, %d lines", err, connect.CodeOf(err), r, len(lines))
+				t.Fatalf("err = %v (%v), project %v, %d lines", err, connect.CodeOf(err), r, len(lines))
 			}
 		})
 	}
@@ -212,7 +212,7 @@ func TestCloneRef(t *testing.T) {
 				return
 			}
 			if len(calls) != 1 || calls[0] != tt.slug || r.GetPath() != "/p/"+tt.slug {
-				t.Fatalf("calls %v, repo %v", calls, r)
+				t.Fatalf("calls %v, project %v", calls, r)
 			}
 		})
 	}

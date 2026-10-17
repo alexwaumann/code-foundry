@@ -360,7 +360,7 @@ func TestRemoveProjectWhenWorktreeAlreadyGone(t *testing.T) {
 	h := newHarness(t)
 	w := h.create("x", "web", "api")
 	path := h.wt("api", "cf/x")
-	// Deleted by hand, and the repo store no longer lists it.
+	// Deleted by hand, and the project store no longer lists it.
 	if err := h.projects.RemoveWorktree(context.Background(), project.RemoveWorktreeOptions{ProjectID: id("api"), Path: path}); err != nil {
 		t.Fatal(err)
 	}
@@ -379,7 +379,7 @@ func TestRemove(t *testing.T) {
 	tests := []struct {
 		name    string
 		threads []Thread
-		dirty   string // repo name whose worktree the repo store reports dirty
+		dirty   string // repo name whose worktree the project store reports dirty
 		gitDirt bool   // git refuses to remove api's worktree
 		force   bool
 		wantErr error

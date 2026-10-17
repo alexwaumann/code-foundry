@@ -153,14 +153,14 @@ func pickMember(w workspace.Workspace, projectID, path string) (workspace.Member
 				ErrFailedPrecondition, path, w.Name, memberPaths(w))
 		}
 		if projectID != "" && w.Members[i].ProjectID != projectID {
-			return workspace.Member{}, fmt.Errorf("%w: worktree %s belongs to repo %s, not %s", ErrInvalidArgument, path, w.Members[i].ProjectID, projectID)
+			return workspace.Member{}, fmt.Errorf("%w: worktree %s belongs to project %s, not %s", ErrInvalidArgument, path, w.Members[i].ProjectID, projectID)
 		}
 		return w.Members[i], nil
 	}
 	if projectID != "" {
 		mem, ok := w.Member(projectID)
 		if !ok {
-			return workspace.Member{}, fmt.Errorf("%w: repo %s is not a member of workspace %s (members: %s)",
+			return workspace.Member{}, fmt.Errorf("%w: project %s is not a member of workspace %s (members: %s)",
 				ErrFailedPrecondition, projectID, w.Name, memberPaths(w))
 		}
 		return mem, nil
@@ -191,9 +191,9 @@ func (m *Manager) newWorkspace(ctx context.Context, id, name string, o CreateOpt
 	case m.opts.Workspaces == nil:
 		return cw, fmt.Errorf("%w: creating a workspace needs the workspace store", ErrFailedPrecondition)
 	case m.opts.Projects == nil:
-		return cw, fmt.Errorf("%w: creating a workspace needs the repo store", ErrFailedPrecondition)
+		return cw, fmt.Errorf("%w: creating a workspace needs the project store", ErrFailedPrecondition)
 	case len(nw.Projects) == 0:
-		return cw, fmt.Errorf("%w: a new workspace needs at least one repository", ErrInvalidArgument)
+		return cw, fmt.Errorf("%w: a new workspace needs at least one project", ErrInvalidArgument)
 	}
 	base := strings.TrimSpace(nw.BaseRef)
 	if err := validateRef(base); err != nil {
@@ -210,13 +210,13 @@ func (m *Manager) newWorkspace(ctx context.Context, id, name string, o CreateOpt
 		}
 		r, err := workspace.ResolveProject(snap, ref)
 		if err != nil {
-			return cw, workspaceError("repository", err)
+			return cw, workspaceError("project", err)
 		}
 		if err := workspace.RequireGit(r); err != nil {
-			return cw, workspaceError("repository", err)
+			return cw, workspaceError("project", err)
 		}
 		if slices.Contains(ids, r.ID) {
-			return cw, fmt.Errorf("%w: repository %s is listed twice", ErrInvalidArgument, r.Name)
+			return cw, fmt.Errorf("%w: project %s is listed twice", ErrInvalidArgument, r.Name)
 		}
 		ids, paths, bases = append(ids, r.ID), append(paths, r.Path), append(bases, own)
 	}
@@ -229,7 +229,7 @@ func (m *Manager) newWorkspace(ctx context.Context, id, name string, o CreateOpt
 		}
 	}
 	if !slices.Contains(ids, cwdProject) {
-		return cw, fmt.Errorf("%w: repo %s is not among the new workspace's repositories", ErrInvalidArgument, cwdProject)
+		return cw, fmt.Errorf("%w: project %s is not among the new workspace's projects", ErrInvalidArgument, cwdProject)
 	}
 	wsName := strings.TrimSpace(nw.Name)
 
@@ -268,7 +268,7 @@ func (m *Manager) newWorkspace(ctx context.Context, id, name string, o CreateOpt
 	}
 	mem, ok := w.Member(cwdProject)
 	if !ok { // the store made every member or failed; this is a broken fake
-		return cw, fmt.Errorf("%w: workspace %s has no member for repo %s", ErrFailedPrecondition, w.ID, cwdProject)
+		return cw, fmt.Errorf("%w: workspace %s has no member for project %s", ErrFailedPrecondition, w.ID, cwdProject)
 	}
 	cw.workspaceID, cw.projectID, cw.path, cw.members = w.ID, mem.ProjectID, mem.WorktreePath, w.Members
 	cw.baseRef = cwdBase

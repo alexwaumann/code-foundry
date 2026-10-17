@@ -116,7 +116,7 @@ func RequireGit(r project.Project) error {
 func ResolveProject(snap *project.Snapshot, ref string) (project.Project, error) {
 	ref = strings.TrimSpace(ref)
 	if ref == "" {
-		return project.Project{}, fmt.Errorf("%w: a repository is required", ErrInvalidArgument)
+		return project.Project{}, fmt.Errorf("%w: a project is required", ErrInvalidArgument)
 	}
 	if snap == nil {
 		snap = &project.Snapshot{}
@@ -139,7 +139,7 @@ func ResolveProject(snap *project.Snapshot, ref string) (project.Project, error)
 		for i, r := range named {
 			ids[i] = r.ID + " (" + r.Path + ")"
 		}
-		return project.Project{}, fmt.Errorf("%w: more than one repository is named %q; use its id: %s",
+		return project.Project{}, fmt.Errorf("%w: more than one project is named %q; use its id: %s",
 			ErrInvalidArgument, ref, strings.Join(ids, ", "))
 	}
 	if filepath.IsAbs(ref) {
@@ -160,7 +160,7 @@ func ResolveProject(snap *project.Snapshot, ref string) (project.Project, error)
 			return best, nil
 		}
 	}
-	return project.Project{}, fmt.Errorf("%w: repository %q is not registered (add it with `code-foundry repo add <folder>`)", ErrNotFound, ref)
+	return project.Project{}, fmt.Errorf("%w: project %q is not registered (add it with `code-foundry project add <folder>`)", ErrNotFound, ref)
 }
 
 // memberFor finds the member of w that ref names: a path inside its worktree, its
@@ -168,7 +168,7 @@ func ResolveProject(snap *project.Snapshot, ref string) (project.Project, error)
 func memberFor(w Workspace, projects *project.Snapshot, ref string) (Member, error) {
 	ref = strings.TrimSpace(ref)
 	if ref == "" {
-		return Member{}, fmt.Errorf("%w: a repository is required", ErrInvalidArgument)
+		return Member{}, fmt.Errorf("%w: a project is required", ErrInvalidArgument)
 	}
 	if filepath.IsAbs(ref) {
 		for _, m := range w.Members {
@@ -196,7 +196,7 @@ func memberFor(w Workspace, projects *project.Snapshot, ref string) (Member, err
 	return Member{}, fmt.Errorf("%w: %q is not a member of workspace %s", ErrNotFound, ref, w.Name)
 }
 
-// Join lists w's members with the repo store's current state; the member containing
+// Join lists w's members with the project store's current state; the member containing
 // cwd (if any) is Current.
 func Join(w Workspace, projects *project.Snapshot, cwd string) Membership {
 	out := Membership{Workspace: w, Members: make([]MemberInfo, len(w.Members))}

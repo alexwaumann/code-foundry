@@ -117,7 +117,7 @@ func (f *Fake) Create(_ context.Context, o workspace.CreateOptions) (workspace.W
 		return workspace.Workspace{}, err
 	}
 	if o.Name == "" || len(o.Members) == 0 {
-		return workspace.Workspace{}, fmt.Errorf("%w: a name and a repository are required", workspace.ErrInvalidArgument)
+		return workspace.Workspace{}, fmt.Errorf("%w: a name and a project are required", workspace.ErrInvalidArgument)
 	}
 	for _, w := range f.byID {
 		if w.Name == o.Name {
@@ -145,7 +145,7 @@ func (f *Fake) Create(_ context.Context, o workspace.CreateOptions) (workspace.W
 func (f *Fake) AddProject(_ context.Context, o workspace.AddProjectOptions) (workspace.Workspace, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if err := f.record("AddRepo " + o.Workspace + o.Cwd + " " + o.Member.Project); err != nil {
+	if err := f.record("AddProject " + o.Workspace + o.Cwd + " " + o.Member.Project); err != nil {
 		return workspace.Workspace{}, err
 	}
 	w, err := workspace.ResolveWorkspace(f.snap, o.Ref)
@@ -164,7 +164,7 @@ func (f *Fake) AddProject(_ context.Context, o workspace.AddProjectOptions) (wor
 func (f *Fake) RemoveProject(_ context.Context, o workspace.RemoveProjectOptions) (workspace.Workspace, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	call := "RemoveRepo " + o.Workspace + o.Cwd + " " + o.Project
+	call := "RemoveProject " + o.Workspace + o.Cwd + " " + o.Project
 	if o.Force {
 		call += " force"
 	}

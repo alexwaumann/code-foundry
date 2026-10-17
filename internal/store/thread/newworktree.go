@@ -52,7 +52,7 @@ type createdWorktree struct {
 func (m *Manager) newWorktree(ctx context.Context, id, name string, o CreateOptions) (createdWorktree, error) {
 	var nw createdWorktree
 	if m.opts.Projects == nil {
-		return nw, fmt.Errorf("%w: creating a worktree needs the repo store", ErrFailedPrecondition)
+		return nw, fmt.Errorf("%w: creating a worktree needs the project store", ErrFailedPrecondition)
 	}
 	base := strings.TrimSpace(o.NewWorktree.BaseRef)
 	if err := validateRef(base); err != nil {
@@ -61,7 +61,7 @@ func (m *Manager) newWorktree(ctx context.Context, id, name string, o CreateOpti
 	projectID := o.ProjectID
 	if projectID == "" {
 		if o.WorktreePath == "" {
-			return nw, fmt.Errorf("%w: a repo is required for a new worktree", ErrInvalidArgument)
+			return nw, fmt.Errorf("%w: a project is required for a new worktree", ErrInvalidArgument)
 		}
 		var err error
 		if projectID, _, err = m.resolveWorktree("", o.WorktreePath); err != nil {
@@ -70,7 +70,7 @@ func (m *Manager) newWorktree(ctx context.Context, id, name string, o CreateOpti
 	}
 	r, ok := m.opts.Projects.Snapshot().Project(projectID)
 	if !ok {
-		return nw, fmt.Errorf("%w: repo %s", ErrNotFound, projectID)
+		return nw, fmt.Errorf("%w: project %s", ErrNotFound, projectID)
 	}
 	if !r.Git {
 		// Before the namer: a project without git runs threads in its one checkout.
@@ -95,7 +95,7 @@ func (m *Manager) newWorktree(ctx context.Context, id, name string, o CreateOpti
 	}
 	nw.projectID, nw.path = r.ID, wt.Path
 	nw.baseRef = cmp.Or(base, wt.Status.BaseRef, r.DefaultBranch)
-	m.log.Info("worktree created for thread", "thread", id, "repo", r.ID, "branch", branch,
+	m.log.Info("worktree created for thread", "thread", id, "project", r.ID, "branch", branch,
 		"path", wt.Path, "base", nw.baseRef)
 	return nw, nil
 }

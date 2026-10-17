@@ -3,7 +3,7 @@
 // that spans them. The store persists workspaces in SQLite, publishes an immutable
 // Snapshot behind an atomic pointer, and emits Updated/Removed events on the bus.
 //
-// Worktrees are made and removed through the repo store (the same fetch-then-`git
+// Worktrees are made and removed through the project store (the same fetch-then-`git
 // worktree add` path a new thread's worktree takes) and pre-trusted for Claude like a
 // thread's worktree. The store never looks at threads directly: the daemon hands it
 // a function listing live threads, so a member worktree a thread runs in is not
@@ -92,7 +92,7 @@ type MemberSpec struct {
 	// Repo is a repository id, its name when unique, or a path inside it.
 	Project string
 	// BaseRef is where the branch starts when it does not exist yet. Empty: the
-	// operation's default base, else the repo store's default (origin/<default>).
+	// operation's default base, else the project store's default (origin/<default>).
 	BaseRef string
 }
 
@@ -134,13 +134,13 @@ type RemoveOptions struct {
 	DeleteBranch bool
 }
 
-// Membership is a workspace with its members joined to the repo store's state.
+// Membership is a workspace with its members joined to the project store's state.
 type Membership struct {
 	Workspace Workspace
 	Members   []MemberInfo
 }
 
-// MemberInfo is a member with what the repo store knows about it now.
+// MemberInfo is a member with what the project store knows about it now.
 type MemberInfo struct {
 	Member
 	ProjectName string // empty when the repo is no longer registered
@@ -175,6 +175,6 @@ type Store interface {
 	// Remove removes every member worktree and forgets the workspace, with the same
 	// guards across all members, checked before anything is removed.
 	Remove(ctx context.Context, opts RemoveOptions) error
-	// Members resolves ref and joins its members with the repo store's state.
+	// Members resolves ref and joins its members with the project store's state.
 	Members(ctx context.Context, ref Ref) (Membership, error)
 }

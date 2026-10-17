@@ -75,13 +75,13 @@ func TestWorkspaceCommands(t *testing.T) {
 			name: "add repo from a member's cwd", cmd: "workspace.add-project",
 			args:     map[string]string{"project": "lib", "cwd": "/worktrees/web/cf-login"},
 			wantMsg:  []string{"added lib to workspace base: /worktrees/lib/cf-login on cf/login"},
-			wantCall: "AddRepo /worktrees/web/cf-login lib",
+			wantCall: "AddProject /worktrees/web/cf-login lib",
 		},
 		{
 			name: "remove repo", cmd: "workspace.remove-project",
 			args:     map[string]string{"project": "api", "workspace": "base", "force": "true", "delete-branch": "true"},
 			wantMsg:  []string{"removed api from workspace base (1 left)"},
-			wantCall: "RemoveRepo base api force delete-branch",
+			wantCall: "RemoveProject base api force delete-branch",
 		},
 		{
 			name: "list", cmd: "workspace.list",

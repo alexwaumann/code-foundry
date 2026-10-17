@@ -162,7 +162,7 @@ func TestProjectRemotes(t *testing.T) {
 	want := map[string][]string{"gh": {"fork", "origin"}, "local": nil, projecttest.ID("/code/one"): {"origin"}}
 	for _, r := range list.Msg.GetProjects() {
 		if w, ok := want[r.GetId()]; !ok || !slices.Equal(r.GetRemotes(), w) {
-			t.Errorf("repo %s remotes = %q, want %q", r.GetId(), r.GetRemotes(), w)
+			t.Errorf("project %s remotes = %q, want %q", r.GetId(), r.GetRemotes(), w)
 		}
 	}
 	if n := len(list.Msg.GetProjects()); n != len(want) {

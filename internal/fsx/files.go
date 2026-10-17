@@ -42,7 +42,7 @@ const gitFilesTimeout = 15 * time.Second
 
 // gitEnv is base without the variables that would point git at another repository
 // (a daemon started from a git hook inherits them), plus GIT_OPTIONAL_LOCKS=0 so
-// listing never rewrites the index (which would fire the repo store's watcher) and
+// listing never rewrites the index (which would fire the project store's watcher) and
 // GIT_TERMINAL_PROMPT=0. The repo store's runner does the same for its commands.
 func gitEnv(base []string) []string {
 	out := make([]string, 0, len(base)+2)

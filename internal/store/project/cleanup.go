@@ -130,7 +130,7 @@ type CleanupResult struct {
 func Cleanup(ctx context.Context, s Store, opts CleanupOptions) (CleanupResult, error) {
 	r, ok := s.Snapshot().Project(opts.ProjectID)
 	if !ok {
-		return CleanupResult{}, fmt.Errorf("%w: repo %q", ErrNotFound, opts.ProjectID)
+		return CleanupResult{}, fmt.Errorf("%w: project %q", ErrNotFound, opts.ProjectID)
 	}
 	if !r.Git {
 		return CleanupResult{}, fmt.Errorf("%w: %w", ErrFailedPrecondition, ErrNotGit)
@@ -140,14 +140,14 @@ func Cleanup(ctx context.Context, s Store, opts CleanupOptions) (CleanupResult, 
 			return CleanupResult{}, fmt.Errorf("refresh %s: %w", r.Name, err)
 		}
 		if r, ok = s.Snapshot().Project(r.ID); !ok {
-			return CleanupResult{}, fmt.Errorf("%w: repo %q", ErrNotFound, opts.ProjectID)
+			return CleanupResult{}, fmt.Errorf("%w: project %q", ErrNotFound, opts.ProjectID)
 		}
 	}
 	candidates := r.Worktrees
 	if opts.Path != "" {
 		w, ok := findWorktree(r, opts.Path)
 		if !ok {
-			return CleanupResult{}, fmt.Errorf("%w: worktree %q in repo %s", ErrNotFound, opts.Path, r.Name)
+			return CleanupResult{}, fmt.Errorf("%w: worktree %q in project %s", ErrNotFound, opts.Path, r.Name)
 		}
 		candidates = []Worktree{w}
 	}

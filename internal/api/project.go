@@ -87,7 +87,7 @@ func (h *Project) List(context.Context, *connect.Request[v1.ListProjectsRequest]
 func (h *Project) Get(_ context.Context, req *connect.Request[v1.GetProjectRequest]) (*connect.Response[v1.GetProjectResponse], error) {
 	r, ok := h.store.Snapshot().Project(req.Msg.GetId())
 	if !ok {
-		return nil, connect.NewError(connect.CodeNotFound, errors.New("repo not found"))
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("project not found"))
 	}
 	return connect.NewResponse(&v1.GetProjectResponse{Project: projectToProto(r)}), nil
 }
