@@ -130,10 +130,13 @@ func TestThreadCommands(t *testing.T) {
 				{ID: "u2", Kind: thread.KindUserMessage, Text: "again"},
 				{ID: "e2", Kind: thread.KindTurnEnd, Turn: &thread.TurnEnd{Subtype: "success", DurationMS: 1000, CostUSD: 0.0153, TurnCostUSD: new(0.003), Model: "claude-haiku-5-5"}},
 				{ID: "n", Kind: thread.KindNote, Text: "Forked from fix"},
+				{ID: "w", Kind: thread.KindUserMessage, Text: "[code-foundry wake] Thread s2 is idle: finished.\n```json\n{}\n```",
+					Origin: thread.OriginWake, WakeTitle: "Thread s2 is idle: finished.", WakeJSON: "{}"},
 			},
 			wantMsg: "#1 you: write it\n    [image /a.png]\n    [pdf /b.pdf]\n#2 tool Write [done] {\"file_path\":\"/x\"}\n    → File created …\n    #3 claude: from the agent\n" +
 				"#4 permission Bash ls: pending (request r9)\n#5 claude: done\n#6 turn end: success, 2.5s, 1 in / 9 out tokens, $0.0123 so far\n" +
-				"#7 you: again\n#8 turn end: success, 1.0s, 0 in / 0 out tokens, $0.0030, $0.0153 so far, claude-haiku-5-5\n#9 note: Forked from fix",
+				"#7 you: again\n#8 turn end: success, 1.0s, 0 in / 0 out tokens, $0.0030, $0.0153 so far, claude-haiku-5-5\n#9 note: Forked from fix\n" +
+				"#10 wake: Thread s2 is idle: finished.",
 		},
 		{
 			name: "set mode", cmd: "thread.set-mode", args: map[string]string{"id": "s1", "permission": "accept-edits"},

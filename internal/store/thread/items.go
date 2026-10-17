@@ -116,10 +116,15 @@ type Item struct {
 	// ComposerText: user_message's composer text with its tag tokens, when the GUI
 	// sent it (Message.ComposerText); stored for display only.
 	ComposerText string
-	Tool         *ToolCall
-	Request      *Request // permission_request and question
-	Turn         *TurnEnd
-	Compaction   *Compaction
+	// Origin, WakeTitle and WakeJSON: user_message's sender (Message.Origin); a wake's
+	// header line without its prefix and its JSON payload (subscriptions_fire.go).
+	Origin     MessageOrigin
+	WakeTitle  string
+	WakeJSON   string
+	Tool       *ToolCall
+	Request    *Request // permission_request and question
+	Turn       *TurnEnd
+	Compaction *Compaction
 }
 
 // ToolCall is a tool_call item's payload.
@@ -246,7 +251,23 @@ type Message struct {
 	// ComposerText is the GUI composer's text with its tags as tokens, kept on the
 	// user_message item for display only (never sent to Claude).
 	ComposerText string
+	// Origin is who sends it: the user (OriginUser), or a wake subscription
+	// (OriginWake, with WakeTitle and WakeJSON kept on the item for display).
+	Origin    MessageOrigin
+	WakeTitle string
+	WakeJSON  string
 }
+
+// MessageOrigin is who sent a user message.
+type MessageOrigin string
+
+// Message origins.
+const (
+	// OriginUser: the user (the GUI, the CLI, an agent's CLI).
+	OriginUser MessageOrigin = ""
+	// OriginWake: the daemon, for a wake subscription (subscriptions_fire.go).
+	OriginWake MessageOrigin = "wake"
+)
 
 // Decision answers a pending request (Store.Respond).
 type Decision struct {

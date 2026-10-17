@@ -52,6 +52,9 @@ type ThreadBackend interface {
 	// MetadataBackend backs thread.label, thread.report and thread.budget
 	// (commands_thread_metadata.go).
 	MetadataBackend
+	// SubscriptionBackend backs thread.subscribe, thread.unsubscribe and
+	// thread.subscriptions (commands_thread_subscribe.go).
+	SubscriptionBackend
 }
 
 var (
@@ -69,7 +72,8 @@ var threadDecisions = map[string]v1.ThreadDecision{
 }
 
 // RegisterThread registers thread.send, thread.respond, thread.interrupt,
-// thread.items, thread.set-model, thread.set-mode, thread.set-effort and thread.wait.
+// thread.items, thread.set-model, thread.set-mode, thread.set-effort, thread.wait,
+// thread.subscribe, thread.unsubscribe and thread.subscriptions.
 func RegisterThread(r *Registry, b ThreadBackend) error {
 	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextThread, Description: "Thread id"}
 	return r.RegisterAll(
@@ -256,6 +260,9 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 			},
 		},
 		threadWait(b, idArg),
+		threadSubscribe(b),
+		threadUnsubscribe(b),
+		threadSubscriptions(b),
 	)
 }
 
@@ -367,6 +374,10 @@ func FormatThreadItems(snap *v1.ThreadItemsSnapshot, full bool) string {
 		case it.GetUserMessage() != nil:
 			u := it.GetUserMessage()
 			body = "you: " + line(u.GetText())
+			if u.GetOrigin() == v1.MessageOrigin_MESSAGE_ORIGIN_WAKE {
+				// The daemon's, for a wake subscription (commands_thread_subscribe.go).
+				body = "wake: " + line(u.GetWakeTitle())
+			}
 			for _, a := range u.GetAttachments() {
 				kind := "image"
 				if strings.EqualFold(filepath.Ext(a), ".pdf") {

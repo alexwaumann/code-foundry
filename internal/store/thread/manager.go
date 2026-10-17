@@ -83,6 +83,13 @@ type Options struct {
 	// Home is the cwd of a thread without a project (CreateOptions.NoProject). Default:
 	// os.UserHomeDir().
 	Home string
+	// ActionRun looks up an action run (with its output) for wake subscriptions to runs
+	// (subscriptions.go); nil refuses them. The daemon reads the action store; it also
+	// calls Manager.ActionRunFinished for every run that ends.
+	ActionRun func(ctx context.Context, id string) (ActionRun, bool)
+	// WakeLimit is how many wakes a subscriber gets per rolling WakeWindow at most
+	// (subscriptions_fire.go). Default WakeLimit (the package constant).
+	WakeLimit int
 	// DisablePreTrust skips writing folder trust into Claude's config before spawning
 	// and before a RunIn move (set_cwd refuses an untrusted folder). For tests.
 	DisablePreTrust bool
@@ -185,6 +192,9 @@ func (o Options) withDefaults() (Options, error) {
 	if o.Now == nil {
 		o.Now = time.Now
 	}
+	if o.WakeLimit <= 0 {
+		o.WakeLimit = WakeLimit
+	}
 	return o, nil
 }
 
@@ -210,6 +220,9 @@ type Manager struct {
 	// threads are the threads' item logs loaded so far (items.go).
 	tmu     sync.Mutex
 	threads map[string]*threadLog
+
+	// subs are the wake subscriptions (subscriptions.go).
+	subs *subscriptions
 }
 
 type record struct {
@@ -264,6 +277,10 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 		}
 		s.CacheExpiresAt = cacheExpiry(s.LastResultAt, opts.CacheTTL)
 		m.recs[s.ID] = &record{s: s, namingTried: s.Name != ""}
+	}
+	// Wake subscriptions, armed with the threads as loaded (subscriptions.go).
+	if m.subs, err = loadSubscriptionState(ctx, opts.DB, opts.Log, m.recs); err != nil {
+		return nil, err
 	}
 	m.mu.Lock()
 	m.rebuildLocked()
@@ -358,6 +375,7 @@ func (m *Manager) commitLocked(rec *record, persist bool) {
 	}
 	m.rebuildLocked()
 	bus.Publish[Event](m.opts.Bus, Updated{Thread: rec.s})
+	m.observeLocked(rec.s) // wake subscriptions (subscriptions.go)
 }
 
 func (m *Manager) record(id string) (*record, error) {
@@ -405,6 +423,9 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 	// The creator's name now: the note and created_by_name keep it (metadata.go).
 	creatorID, creatorName, err := m.creator(o.CreatedBy)
 	if err != nil {
+		return Thread{}, err
+	}
+	if err := m.checkNotify(o.Notify, creatorID); err != nil {
 		return Thread{}, err
 	}
 	id, err := newThreadID()
@@ -526,6 +547,9 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 	}
 	if o.NewWorktree != nil && m.opts.WorktreeCreated != nil {
 		m.opts.WorktreeCreated(id, s.RepoID, s.WorktreePath)
+	}
+	if o.Notify {
+		m.notifyCreator(ctx, creatorID, id)
 	}
 	return m.Get(ctx, id)
 }
@@ -810,6 +834,7 @@ func (m *Manager) Remove(ctx context.Context, id string) error {
 	}
 	m.rebuildLocked()
 	bus.Publish[Event](m.opts.Bus, Removed{ID: id})
+	m.forgetLocked(id, "removed") // wake subscriptions (subscriptions.go)
 	if len(rec.s.Usage) > 0 {
 		bus.Publish[Event](m.opts.Bus, RetiredUsage{Buckets: m.retired})
 	}

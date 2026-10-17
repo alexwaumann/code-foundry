@@ -21,6 +21,9 @@ import (
 //   - NeedsAttention "budget reached" from the budget stop (budget.go, budgetStop)
 //     until the next message, a turn Claude starts after the stopped one, or, once
 //     the stopped turn ended, until seen.
+//   - NeedsAttention "wake limit" once the thread's wake subscriptions reached their
+//     rate limit (subscriptions_fire.go), while Claude does not work, until the next
+//     message or until seen.
 //
 // The runner feeds it; all methods run on the runner goroutine. The GUI classifies the
 // reasons by prefix ("permission:", "question:", "finished", "error:"): keep them.
@@ -37,6 +40,8 @@ type streamStatus struct {
 	// budget: the budget stop interrupted the turn (budget.go); budgetEnded: that turn's
 	// result came.
 	budget, budgetEnded bool
+	// wakeLimit: wakes to the thread are being dropped (subscriptions_fire.go).
+	wakeLimit bool
 }
 
 type pendingReason struct{ id, reason string }
@@ -56,6 +61,8 @@ func (d *streamStatus) Status() (Status, string) {
 		return StatusBusy, "compacting"
 	case d.busy:
 		return StatusBusy, "working"
+	case d.wakeLimit:
+		return StatusNeedsAttention, ReasonWakeLimit
 	case d.unseen && d.turnError != "":
 		return StatusNeedsAttention, "error: " + d.turnError
 	case d.unseen:
@@ -67,7 +74,7 @@ func (d *streamStatus) Status() (Status, string) {
 // Acknowledge clears "finished" (and a turn error, and the budget stop once its turn
 // ended): the user has seen it.
 func (d *streamStatus) Acknowledge() {
-	d.unseen, d.turnError = false, ""
+	d.unseen, d.turnError, d.wakeLimit = false, "", false
 	if d.budgetEnded {
 		d.budget, d.budgetEnded = false, false
 	}
@@ -83,7 +90,7 @@ func (d *streamStatus) initialized() { d.started = true }
 // sent: a user message went to Claude.
 func (d *streamStatus) sent() {
 	d.busy = true
-	d.budget, d.budgetEnded = false, false
+	d.budget, d.budgetEnded, d.wakeLimit = false, false, false
 }
 
 // turnStarted: Claude works (again); a budget stop whose turn ended gives way to a turn

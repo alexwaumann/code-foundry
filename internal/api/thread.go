@@ -268,7 +268,7 @@ func itemToProto(it thread.Item) *v1.ThreadItem {
 	}
 	switch it.Kind {
 	case thread.KindUserMessage:
-		p.Payload = &v1.ThreadItem_UserMessage{UserMessage: &v1.UserMessageItem{Text: it.Text, Attachments: it.Attachments, ComposerText: it.ComposerText}}
+		p.Payload = &v1.ThreadItem_UserMessage{UserMessage: userMessageToProto(it)}
 	case thread.KindAssistantText:
 		p.Payload = &v1.ThreadItem_AssistantText{AssistantText: &v1.AssistantTextItem{Text: it.Text}}
 	case thread.KindThinking:

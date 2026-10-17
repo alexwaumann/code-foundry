@@ -178,6 +178,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				{Name: "brief", Type: String, Description: "What the thread is for, in at most 500 characters (shown with the creator's note)"},
 				{Name: "labels", Type: String, Description: "Comma-separated labels (lowercase letters, digits, -, _, . and /)"},
 				{Name: "budget", Type: String, Description: "Spending limit in USD at Claude API rates, e.g. 5.00: Claude is interrupted when the thread's cost reaches it"},
+				{Name: "notify", Type: Bool, Description: "With created-by: wake the creator with a message each time the new thread settles (a repeat thread.subscribe)"},
 			},
 			When: canStartThread,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
@@ -195,6 +196,10 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 					ComposerPrompt: a.String("composer-prompt"), PermissionMode: threadPermissionModes[a.String("permission")], Attachments: splitList(a.String("attachments")),
 					WorkspaceId: ws, NoProject: a.Bool("no-project"),
 					CreatedBy: a.String("created-by"), Brief: a.String("brief"), Labels: splitList(a.String("labels")),
+					Notify: a.Bool("notify"),
+				}
+				if req.Notify && strings.TrimSpace(req.CreatedBy) == "" {
+					return Result{}, InvalidArg("notify", "needs created-by (the thread to wake; the CLI defaults it to $CODE_FOUNDRY_THREAD inside a thread)")
 				}
 				if a.Has("budget") {
 					usd, err := parseUSD("budget", a.String("budget"))
@@ -230,6 +235,9 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				}
 				if s.GetCreatedWorktree() {
 					msg += " (new worktree from " + s.GetBaseRef() + ")"
+				}
+				if req.GetNotify() {
+					msg += "; " + req.GetCreatedBy() + " is woken each time it settles"
 				}
 				return Result{Message: msg, JSON: s}, nil
 			},

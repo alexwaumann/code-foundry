@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
+	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
 
 func TestThreadWaitMet(t *testing.T) {
@@ -59,7 +60,7 @@ func TestThreadWaitMet(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			th := &v1.Thread{Id: "s1", State: tt.state, Status: tt.status, StatusReason: tt.reason}
+			th := thread.Thread{ID: "s1", State: thread.State(tt.state), Status: thread.Status(tt.status), StatusReason: tt.reason}
 			if got := threadWaitMet(tt.until, th); got != tt.want {
 				t.Errorf("threadWaitMet(%s, %s %s %q) = %v, want %v", tt.until, tt.state, tt.status, tt.reason, got, tt.want)
 			}

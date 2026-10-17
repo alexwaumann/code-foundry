@@ -1,0 +1,112 @@
+syntax = "proto3";
+
+package codefoundry.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// Wake subscriptions (ThreadService.Subscribe, Unsubscribe, ListSubscriptions): a
+// subscriber thread is sent a message when a target thread meets a condition or a
+// target action run finishes, so an agent that started other threads is woken instead
+// of polling. See docs/notes/agents-4-wake.md.
+
+// ThreadSubscriptionTarget is what a subscription watches.
+enum ThreadSubscriptionTarget {
+  THREAD_SUBSCRIPTION_TARGET_UNSPECIFIED = 0;
+  // A thread (target_id is a thread id).
+  THREAD_SUBSCRIPTION_TARGET_THREAD = 1;
+  // An action run (target_id is a run id, "r-…"). Runs live in the daemon's memory, so
+  // these subscriptions do not survive a daemon restart.
+  THREAD_SUBSCRIPTION_TARGET_ACTION_RUN = 2;
+}
+
+// ThreadSubscriptionCondition is when a subscription fires: on a transition of the
+// target into it (edge-triggered), and once at subscribe time when the target already
+// meets it.
+enum ThreadSubscriptionCondition {
+  // SETTLED for a thread, FINISHED for an action run.
+  THREAD_SUBSCRIPTION_CONDITION_UNSPECIFIED = 0;
+  // IDLE or ATTENTION: Claude is not working (a turn ended, a prompt or question waits,
+  // the process ended).
+  THREAD_SUBSCRIPTION_CONDITION_SETTLED = 1;
+  // As ThreadWaitCondition IDLE (a finished turn counts; a pending prompt does not).
+  THREAD_SUBSCRIPTION_CONDITION_IDLE = 2;
+  // status NEEDS_ATTENTION, whatever the reason.
+  THREAD_SUBSCRIPTION_CONDITION_ATTENTION = 3;
+  // status ERROR.
+  THREAD_SUBSCRIPTION_CONDITION_ERROR = 4;
+  // state DISCONNECTED.
+  THREAD_SUBSCRIPTION_CONDITION_DISCONNECTED = 5;
+  // An action run's only condition: it exited. Fires once; the subscription goes.
+  THREAD_SUBSCRIPTION_CONDITION_FINISHED = 6;
+}
+
+message ThreadSubscription {
+  // "sub-" + 12 hex digits.
+  string id = 1;
+  // The thread that is woken.
+  string subscriber_thread_id = 2;
+  ThreadSubscriptionTarget target = 3;
+  string target_id = 4;
+  ThreadSubscriptionCondition condition = 5;
+  // Fires on every transition into the condition; otherwise it is removed once it fired.
+  bool repeat = 6;
+  google.protobuf.Timestamp created_at = 7;
+  // Wakes delivered (a wake dropped by the rate limit does not count).
+  int64 fired_count = 8;
+  // Unset until it fired.
+  google.protobuf.Timestamp last_fired_at = 9;
+  // The subscriber's and the target's names at read time (a run: its action's name);
+  // empty when unnamed or gone.
+  string subscriber_name = 10;
+  string target_name = 11;
+  // The target's state at read time, as words: a thread's status and reason
+  // ("needs attention (finished)"), a run's "running" or "exited 3"; "gone" when the
+  // target no longer exists.
+  string target_status = 12;
+}
+
+message SubscribeThreadRequest {
+  // The subscriber thread.
+  string subscriber_thread_id = 1;
+  // Exactly one target: a thread id or an action run id.
+  string target_thread_id = 2;
+  string target_run_id = 3;
+  // UNSPECIFIED: SETTLED for a thread, FINISHED for a run. A run takes only FINISHED
+  // (or SETTLED); a thread every condition but FINISHED (INVALID_ARGUMENT otherwise).
+  ThreadSubscriptionCondition condition = 4;
+  // Ignored for a run (fires once).
+  bool repeat = 5;
+}
+
+message SubscribeThreadResponse {
+  // The subscription; for a one-shot that fired at once, as it was when it fired (it
+  // is no longer listed).
+  ThreadSubscription subscription = 1;
+  // The target already met the condition: the wake was sent at once.
+  bool fired = 2;
+  // The same subscription (subscriber, target, condition) existed: it is returned, with
+  // repeat updated, and nothing fired.
+  bool existed = 3;
+}
+
+message UnsubscribeThreadRequest {
+  // By id; or, without it, every subscription of subscriber_thread_id to the target.
+  string subscription_id = 1;
+  string subscriber_thread_id = 2;
+  string target_thread_id = 3;
+  string target_run_id = 4;
+}
+
+message UnsubscribeThreadResponse {
+  repeated ThreadSubscription removed = 1;
+}
+
+message ListThreadSubscriptionsRequest {
+  // Empty: every thread's subscriptions.
+  string subscriber_thread_id = 1;
+}
+
+message ListThreadSubscriptionsResponse {
+  // By subscriber, then creation time.
+  repeated ThreadSubscription subscriptions = 1;
+}

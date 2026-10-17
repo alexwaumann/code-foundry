@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { create } from "@bufbuild/protobuf";
 import { timestampFromMs } from "@bufbuild/protobuf/wkt";
-import { ThreadEventSchema, ThreadItemDelta_Field, ThreadItemSchema, ThreadRequestState, ToolCallStatus } from "@/gen/codefoundry/v1/thread_pb";
+import { MessageOrigin, ThreadEventSchema, ThreadItemDelta_Field, ThreadItemSchema, ThreadRequestState, ToolCallStatus } from "@/gen/codefoundry/v1/thread_pb";
 import { toThreadEventView, toThreadItemView } from "./thread";
 
 describe("toThreadItemView", () => {
@@ -19,6 +19,12 @@ describe("toThreadItemView", () => {
       text: "hi",
       attachments: ["/a.png"],
       composerText: "![a.png](cf-attachment://0) hi",
+    });
+    expect(v({ case: "userMessage", value: { text: "hi", origin: MessageOrigin.USER } })).not.toHaveProperty("wake");
+    expect(v({ case: "userMessage", value: { text: "[code-foundry wake] T", origin: MessageOrigin.WAKE, wakeTitle: "T", wakeJson: "{}" } })).toMatchObject({
+      kind: "user",
+      text: "[code-foundry wake] T",
+      wake: { title: "T", json: "{}" },
     });
     expect(v({ case: "toolCall", value: { toolUseId: "t", name: "Bash", inputJson: "{}", status: ToolCallStatus.ERROR, output: "x", isError: true, resultJson: "" } })).toMatchObject({
       kind: "tool",

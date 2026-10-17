@@ -106,8 +106,10 @@ message Thread {
   // disconnected thread whose snooze ran out; cleared like "finished" on a disconnected
   // thread, by the next start), "budget reached" (NEEDS_ATTENTION: the thread's cost
   // reached budget_usd mid-turn and the daemon interrupted Claude; cleared by the next
-  // message, or once seen like "finished"), or "interrupted" / "did not start" for ERROR. Persisted with
-  // status: a DISCONNECTED thread keeps the status and reason it had when its process
+  // message, or once seen like "finished"), "wake limit" (NEEDS_ATTENTION: the thread's
+  // wake subscriptions woke it 60 times within an hour and further wakes are dropped;
+  // cleared by the next message, or once seen), or "interrupted" / "did not start" for
+  // ERROR. Persisted with status: a DISCONNECTED thread keeps the status and reason it had when its process
   // ended (a busy one becomes ERROR "interrupted"), across daemon restarts. Empty when
   // unknown.
   string status_reason = 18;
@@ -393,6 +395,11 @@ message CreateThreadRequest {
   repeated string labels = 17;
   // Thread.budget_usd; 0 for none, never negative.
   double budget_usd = 18;
+  // With created_by: also subscribe the creator to the new thread, condition SETTLED,
+  // repeat (ThreadService.Subscribe), so the creator's agent is woken each time the new
+  // thread settles. INVALID_ARGUMENT without created_by. See
+  // docs/notes/agents-4-wake.md.
+  bool notify = 19;
 }
 
 message NewWorktree {
