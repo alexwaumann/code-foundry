@@ -49,6 +49,9 @@ type ThreadBackend interface {
 	McpBackend
 	// SlashBackend backs thread.commands (commands_slash.go).
 	SlashBackend
+	// MetadataBackend backs thread.label, thread.report and thread.budget
+	// (commands_thread_metadata.go).
+	MetadataBackend
 }
 
 var (

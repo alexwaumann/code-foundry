@@ -63,6 +63,12 @@ function thread(id: string, over: Partial<ThreadView> = {}): ThreadView {
     backgroundShellsRunning: 0,
     backgroundWakePending: false,
     retry: null,
+    createdBy: "",
+    createdByName: "",
+    brief: "",
+    labels: [],
+    report: null,
+    budgetUsd: 0,
     ...over,
   };
 }

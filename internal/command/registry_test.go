@@ -36,6 +36,13 @@ func TestRegisterValidation(t *testing.T) {
 		{"trailing hyphen", valid(func(c *Command) { c.Name = "test.thing-" }), "name must match"},
 		{"default to cwd on a path", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "cwd", Type: Path, DefaultToCwd: true}} }), ""},
 		{"default to cwd on a string", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "cwd", Type: String, DefaultToCwd: true}} }), "only a path arg"},
+		{"default to the thread env on a string", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "by", Type: String, DefaultToThreadEnv: true}} }), ""},
+		{"default to the thread env on a path", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "by", Type: Path, DefaultToThreadEnv: true}} }), "only a string arg"},
+		{"default to the thread env with a context", valid(func(c *Command) {
+			c.Args = []ArgSpec{{Name: "by", Type: String, Context: ContextThread, DefaultToThreadEnv: true}}
+		}), "only a string arg"},
+		{"file or stdin on a string", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "data", Type: String, FileOrStdin: true}} }), ""},
+		{"file or stdin on a bool", valid(func(c *Command) { c.Args = []ArgSpec{{Name: "data", Type: Bool, FileOrStdin: true}} }), "only a string arg"},
 		{"segment starts with digit", valid(func(c *Command) { c.Name = "test.2d" }), "name must match"},
 		{"trailing dot", valid(func(c *Command) { c.Name = "test." }), "name must match"},
 		{"empty", valid(func(c *Command) { c.Name = "" }), "name must match"},

@@ -70,6 +70,14 @@ type ArgSpec struct {
 	// given (Path args only). A Claude session runs the CLI from its worktree, so
 	// `code-foundry workspace members` finds the thread's workspace.
 	DefaultToCwd bool
+	// DefaultToThreadEnv makes the CLI send $CODE_FOUNDRY_THREAD (the thread its Claude
+	// runs in) when the flag is not given; --flag= opts out (String args only). Unlike
+	// Context it never reads the caller's active thread: the GUI's active thread is
+	// the one the user is viewing.
+	DefaultToThreadEnv bool
+	// FileOrStdin makes the CLI read the value from a file when it is @<path>, or from
+	// stdin when it is - (String args only).
+	FileOrStdin bool
 }
 
 // validate checks the spec's static shape at Register time.
@@ -93,6 +101,10 @@ func (s ArgSpec) validate() error {
 		return errors.New("context-bound arg must be a string or path")
 	case s.DefaultToCwd && s.Type != Path:
 		return errors.New("only a path arg can default to the working directory")
+	case s.DefaultToThreadEnv && (s.Type != String || s.Context != NoContext || s.Default != ""):
+		return errors.New("only a string arg without a context or default can default to $CODE_FOUNDRY_THREAD")
+	case s.FileOrStdin && s.Type != String:
+		return errors.New("only a string arg can be read from a file or stdin")
 	}
 	if s.Default != "" {
 		if _, err := s.parse(s.Default); err != nil {

@@ -51,6 +51,12 @@ message ArgSpec {
   // The CLI sends its working directory when the flag is not given (a thread's Claude
   // runs `code-foundry workspace members` from the worktree it works in).
   bool default_to_cwd = 8;
+  // The CLI sends $CODE_FOUNDRY_THREAD (the thread its Claude runs in) when the flag is
+  // not given; an empty value (--flag=) opts out. thread.new's created-by.
+  bool default_to_thread_env = 9;
+  // The CLI reads the value from a file when it is @<path>, or from stdin when it is -
+  // (thread.report's data).
+  bool file_or_stdin = 10;
 }
 
 message Command {

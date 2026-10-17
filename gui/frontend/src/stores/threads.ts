@@ -36,15 +36,27 @@ export const emptyThreads: ThreadsData = { byId: {}, order: [] };
 
 /** Structural equality, so unchanged threads keep their identity and rows don't re-render. */
 export function sameThread(a: ThreadView, b: ThreadView): boolean {
-  return (Object.keys(a) as (keyof ThreadView)[]).every((k) =>
-    k === "linkedPullRequests"
-      ? sameLinks(a[k], b[k])
-      : k === "usage"
-        ? sameUsage(a[k], b[k])
-        : k === "agentRuns"
-          ? sameAgentRuns(a[k], b[k])
-          : a[k] === b[k],
-  );
+  return (Object.keys(a) as (keyof ThreadView)[]).every((k) => {
+    switch (k) {
+      case "linkedPullRequests":
+        return sameLinks(a[k], b[k]);
+      case "usage":
+        return sameUsage(a[k], b[k]);
+      case "agentRuns":
+        return sameAgentRuns(a[k], b[k]);
+      case "labels":
+        return a[k] === b[k] || (a[k].length === b[k].length && a[k].every((l, i) => l === b[k][i]));
+      case "report":
+        return sameReport(a[k], b[k]);
+      default:
+        return a[k] === b[k];
+    }
+  });
+}
+
+/** Field-by-field equality of reports (every Updated event carries a new object). */
+function sameReport(a: ThreadView["report"], b: ThreadView["report"]): boolean {
+  return a === b || (a !== null && b !== null && a.status === b.status && a.summary === b.summary && a.data === b.data && a.atMs === b.atMs);
 }
 
 /** Field-by-field equality of agent runs, their usage by sameUsage. */

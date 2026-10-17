@@ -3,6 +3,7 @@ import { Code, ConnectError } from "@connectrpc/connect";
 import {
   AgentRunStatus,
   PermissionMode,
+  ThreadReportStatus,
   ThreadState,
   ThreadStatus,
   type AgentRun,
@@ -144,6 +145,39 @@ export interface ThreadView {
    * error); null otherwise. docs/notes/api-retry-note.md.
    */
   retry: ApiRetryView | null;
+  /**
+   * The thread whose agent created this one (`code-foundry thread new` run from that
+   * thread's Claude); "" when the user made it. The creator may since be removed.
+   * docs/notes/agents-2-metadata.md.
+   */
+  createdBy: string;
+  /** The creator's name (its id when unnamed) when this thread was created, kept as it was. */
+  createdByName: string;
+  /** What the thread was started for, in its creator's words; "" when none. */
+  brief: string;
+  /** Sorted, distinct labels (lowercase letters, digits, - _ . /). */
+  labels: string[];
+  /** The thread's latest report (thread.report); null when it never reported. */
+  report: ThreadReportView | null;
+  /**
+   * Spending limit in USD at the rates of costUsd; 0 for none. Reaching it while Claude
+   * works interrupts the turn: status "attention", statusReason "budget reached".
+   */
+  budgetUsd: number;
+}
+
+/** How a thread's task went, as its agent reported it. */
+export type ThreadReportStatusView = "done" | "blocked" | "failed" | "progress";
+
+/** A thread's latest report (thread.report). */
+export interface ThreadReportView {
+  status: ThreadReportStatusView;
+  /** At most 1000 characters; "" when none. */
+  summary: string;
+  /** A compacted JSON object as the agent sent it; "" when none. */
+  data: string;
+  /** When it was reported, epoch ms; null if unknown. */
+  atMs: number | null;
 }
 
 /** A thread's pending API retry (Claude's system/api_retry frame). */
@@ -301,7 +335,28 @@ export function toThreadView(s: Thread): ThreadView {
     retry: s.retry
       ? { attempt: s.retry.attempt, maxRetries: s.retry.maxRetries, retryAtMs: s.retry.retryAt ? timestampMs(s.retry.retryAt) : 0, errorStatus: s.retry.errorStatus, error: s.retry.error }
       : null,
+    createdBy: s.createdBy,
+    createdByName: s.createdByName,
+    brief: s.brief,
+    labels: [...s.labels],
+    report: toThreadReportView(s),
+    budgetUsd: s.budgetUsd,
   };
+}
+
+const reportStatusMap: Record<ThreadReportStatus, ThreadReportStatusView | null> = {
+  [ThreadReportStatus.UNSPECIFIED]: null,
+  [ThreadReportStatus.DONE]: "done",
+  [ThreadReportStatus.BLOCKED]: "blocked",
+  [ThreadReportStatus.FAILED]: "failed",
+  [ThreadReportStatus.PROGRESS]: "progress",
+};
+
+/** The thread's report, or null when it has none (an unknown status from a newer daemon is none too). */
+export function toThreadReportView(s: Thread): ThreadReportView | null {
+  const status = reportStatusMap[s.reportStatus] ?? null;
+  if (!status) return null;
+  return { status, summary: s.reportSummary, data: s.reportData, atMs: s.reportAt ? timestampMs(s.reportAt) : null };
 }
 
 export function toAgentRunView(r: AgentRun): AgentRunView {

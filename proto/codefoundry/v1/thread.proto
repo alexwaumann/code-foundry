@@ -66,6 +66,15 @@ service ThreadService {
   // wake time). Unsnoozing before then only clears snoozed_until. Reconnect, Pin
   // (pinned), Send and Archive (archived) clear a snooze implicitly. Persisted.
   rpc Snooze(SnoozeThreadRequest) returns (SnoozeThreadResponse) {}
+  // Label adds and removes a thread's labels (clear first, then remove, then add) and
+  // returns the thread. Any state. Persisted. See docs/notes/agents-2-metadata.md.
+  rpc Label(LabelThreadRequest) returns (LabelThreadResponse) {}
+  // Report records the thread's report (status, summary, JSON data), replacing the
+  // previous one, stamped report_at. Any state. Persisted.
+  rpc Report(ReportThreadRequest) returns (ReportThreadResponse) {}
+  // SetBudget sets the thread's spending limit (Thread.budget_usd; 0 clears it). A
+  // budget above the thread's cost re-arms the budget stop. Any state. Persisted.
+  rpc SetBudget(SetThreadBudgetRequest) returns (SetThreadBudgetResponse) {}
   // Watch streams changes to the thread list (every thread's record, not its items).
   // The first event is a snapshot. WatchThread streams one thread's conversation.
   rpc Watch(WatchThreadsRequest) returns (stream ThreadListEvent) {}

@@ -18,6 +18,9 @@ import (
 //   - After a turn: NeedsAttention "finished" until seen (Acknowledge: a viewer is
 //     watching the items), "error: <code>" when the turn failed, then Idle "at
 //     prompt". An interrupted turn is seen: the user stopped it.
+//   - NeedsAttention "budget reached" from the budget stop (budget.go, budgetStop)
+//     until the next message, a turn Claude starts after the stopped one, or, once
+//     the stopped turn ended, until seen.
 //
 // The runner feeds it; all methods run on the runner goroutine. The GUI classifies the
 // reasons by prefix ("permission:", "question:", "finished", "error:"): keep them.
@@ -31,6 +34,9 @@ type streamStatus struct {
 	pending    []pendingReason
 	unseen     bool
 	turnError  string
+	// budget: the budget stop interrupted the turn (budget.go); budgetEnded: that turn's
+	// result came.
+	budget, budgetEnded bool
 }
 
 type pendingReason struct{ id, reason string }
@@ -44,6 +50,8 @@ func (d *streamStatus) Status() (Status, string) {
 		return StatusUnknown, "starting"
 	case len(d.pending) > 0:
 		return StatusNeedsAttention, d.pending[0].reason
+	case d.budget:
+		return StatusNeedsAttention, ReasonBudgetReached
 	case d.compacting:
 		return StatusBusy, "compacting"
 	case d.busy:
@@ -56,8 +64,14 @@ func (d *streamStatus) Status() (Status, string) {
 	return StatusIdle, "at prompt"
 }
 
-// Acknowledge clears "finished" (and a turn error): the user has seen it.
-func (d *streamStatus) Acknowledge() { d.unseen, d.turnError = false, "" }
+// Acknowledge clears "finished" (and a turn error, and the budget stop once its turn
+// ended): the user has seen it.
+func (d *streamStatus) Acknowledge() {
+	d.unseen, d.turnError = false, ""
+	if d.budgetEnded {
+		d.budget, d.budgetEnded = false, false
+	}
+}
 
 // AtPrompt: idle with nothing pending, so a RunIn move may happen (runin.go).
 func (d *streamStatus) AtPrompt() bool {
@@ -67,7 +81,19 @@ func (d *streamStatus) AtPrompt() bool {
 func (d *streamStatus) initialized() { d.started = true }
 
 // sent: a user message went to Claude.
-func (d *streamStatus) sent() { d.busy = true }
+func (d *streamStatus) sent() {
+	d.busy = true
+	d.budget, d.budgetEnded = false, false
+}
+
+// turnStarted: Claude works (again); a budget stop whose turn ended gives way to a turn
+// Claude starts on its own (a background task's notification).
+func (d *streamStatus) turnStarted() {
+	d.busy = true
+	if d.budgetEnded {
+		d.budget, d.budgetEnded = false, false
+	}
+}
 
 // event follows the stream.
 func (d *streamStatus) event(ev claudestream.Event) {
@@ -76,7 +102,7 @@ func (d *streamStatus) event(ev claudestream.Event) {
 		if e.Status != nil {
 			switch *e.Status {
 			case "requesting":
-				d.busy = true
+				d.turnStarted()
 			case "compacting":
 				d.compacting = true
 			}
@@ -87,13 +113,14 @@ func (d *streamStatus) event(ev claudestream.Event) {
 		}
 	case *claudestream.CommandLifecycle:
 		if e.State == "started" {
-			d.busy = true
+			d.turnStarted()
 		}
 	case *claudestream.Result:
 		if e.QueuedTurnCount > 0 {
 			return
 		}
 		d.busy, d.compacting = false, false
+		d.budgetEnded = d.budget
 		switch {
 		case e.Interrupted():
 			d.unseen, d.turnError = false, ""

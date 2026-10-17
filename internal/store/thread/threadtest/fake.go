@@ -183,6 +183,9 @@ func (f *Fake) Create(_ context.Context, o thread.CreateOptions) (thread.Thread,
 	if len(o.Attachments) > 0 {
 		call += " attachments=" + strings.Join(o.Attachments, ",")
 	}
+	if err := f.createMetadata(&s, o, &call); err != nil {
+		return thread.Thread{}, err
+	}
 	return f.add(call, s)
 }
 

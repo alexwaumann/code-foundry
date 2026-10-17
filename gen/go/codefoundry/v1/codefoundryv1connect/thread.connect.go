@@ -59,6 +59,12 @@ const (
 	ThreadServiceArchiveProcedure = "/codefoundry.v1.ThreadService/Archive"
 	// ThreadServiceSnoozeProcedure is the fully-qualified name of the ThreadService's Snooze RPC.
 	ThreadServiceSnoozeProcedure = "/codefoundry.v1.ThreadService/Snooze"
+	// ThreadServiceLabelProcedure is the fully-qualified name of the ThreadService's Label RPC.
+	ThreadServiceLabelProcedure = "/codefoundry.v1.ThreadService/Label"
+	// ThreadServiceReportProcedure is the fully-qualified name of the ThreadService's Report RPC.
+	ThreadServiceReportProcedure = "/codefoundry.v1.ThreadService/Report"
+	// ThreadServiceSetBudgetProcedure is the fully-qualified name of the ThreadService's SetBudget RPC.
+	ThreadServiceSetBudgetProcedure = "/codefoundry.v1.ThreadService/SetBudget"
 	// ThreadServiceWatchProcedure is the fully-qualified name of the ThreadService's Watch RPC.
 	ThreadServiceWatchProcedure = "/codefoundry.v1.ThreadService/Watch"
 	// ThreadServiceStageAttachmentProcedure is the fully-qualified name of the ThreadService's
@@ -149,6 +155,15 @@ type ThreadServiceClient interface {
 	// wake time). Unsnoozing before then only clears snoozed_until. Reconnect, Pin
 	// (pinned), Send and Archive (archived) clear a snooze implicitly. Persisted.
 	Snooze(context.Context, *connect.Request[v1.SnoozeThreadRequest]) (*connect.Response[v1.SnoozeThreadResponse], error)
+	// Label adds and removes a thread's labels (clear first, then remove, then add) and
+	// returns the thread. Any state. Persisted. See docs/notes/agents-2-metadata.md.
+	Label(context.Context, *connect.Request[v1.LabelThreadRequest]) (*connect.Response[v1.LabelThreadResponse], error)
+	// Report records the thread's report (status, summary, JSON data), replacing the
+	// previous one, stamped report_at. Any state. Persisted.
+	Report(context.Context, *connect.Request[v1.ReportThreadRequest]) (*connect.Response[v1.ReportThreadResponse], error)
+	// SetBudget sets the thread's spending limit (Thread.budget_usd; 0 clears it). A
+	// budget above the thread's cost re-arms the budget stop. Any state. Persisted.
+	SetBudget(context.Context, *connect.Request[v1.SetThreadBudgetRequest]) (*connect.Response[v1.SetThreadBudgetResponse], error)
 	// Watch streams changes to the thread list (every thread's record, not its items).
 	// The first event is a snapshot. WatchThread streams one thread's conversation.
 	Watch(context.Context, *connect.Request[v1.WatchThreadsRequest]) (*connect.ServerStreamForClient[v1.ThreadListEvent], error)
@@ -316,6 +331,24 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(threadServiceMethods.ByName("Snooze")),
 			connect.WithClientOptions(opts...),
 		),
+		label: connect.NewClient[v1.LabelThreadRequest, v1.LabelThreadResponse](
+			httpClient,
+			baseURL+ThreadServiceLabelProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("Label")),
+			connect.WithClientOptions(opts...),
+		),
+		report: connect.NewClient[v1.ReportThreadRequest, v1.ReportThreadResponse](
+			httpClient,
+			baseURL+ThreadServiceReportProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("Report")),
+			connect.WithClientOptions(opts...),
+		),
+		setBudget: connect.NewClient[v1.SetThreadBudgetRequest, v1.SetThreadBudgetResponse](
+			httpClient,
+			baseURL+ThreadServiceSetBudgetProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("SetBudget")),
+			connect.WithClientOptions(opts...),
+		),
 		watch: connect.NewClient[v1.WatchThreadsRequest, v1.ThreadListEvent](
 			httpClient,
 			baseURL+ThreadServiceWatchProcedure,
@@ -418,6 +451,9 @@ type threadServiceClient struct {
 	pin               *connect.Client[v1.PinThreadRequest, v1.PinThreadResponse]
 	archive           *connect.Client[v1.ArchiveThreadRequest, v1.ArchiveThreadResponse]
 	snooze            *connect.Client[v1.SnoozeThreadRequest, v1.SnoozeThreadResponse]
+	label             *connect.Client[v1.LabelThreadRequest, v1.LabelThreadResponse]
+	report            *connect.Client[v1.ReportThreadRequest, v1.ReportThreadResponse]
+	setBudget         *connect.Client[v1.SetThreadBudgetRequest, v1.SetThreadBudgetResponse]
 	watch             *connect.Client[v1.WatchThreadsRequest, v1.ThreadListEvent]
 	stageAttachment   *connect.Client[v1.StageAttachmentRequest, v1.StageAttachmentResponse]
 	readAttachment    *connect.Client[v1.ReadAttachmentRequest, v1.ReadAttachmentResponse]
@@ -497,6 +533,21 @@ func (c *threadServiceClient) Archive(ctx context.Context, req *connect.Request[
 // Snooze calls codefoundry.v1.ThreadService.Snooze.
 func (c *threadServiceClient) Snooze(ctx context.Context, req *connect.Request[v1.SnoozeThreadRequest]) (*connect.Response[v1.SnoozeThreadResponse], error) {
 	return c.snooze.CallUnary(ctx, req)
+}
+
+// Label calls codefoundry.v1.ThreadService.Label.
+func (c *threadServiceClient) Label(ctx context.Context, req *connect.Request[v1.LabelThreadRequest]) (*connect.Response[v1.LabelThreadResponse], error) {
+	return c.label.CallUnary(ctx, req)
+}
+
+// Report calls codefoundry.v1.ThreadService.Report.
+func (c *threadServiceClient) Report(ctx context.Context, req *connect.Request[v1.ReportThreadRequest]) (*connect.Response[v1.ReportThreadResponse], error) {
+	return c.report.CallUnary(ctx, req)
+}
+
+// SetBudget calls codefoundry.v1.ThreadService.SetBudget.
+func (c *threadServiceClient) SetBudget(ctx context.Context, req *connect.Request[v1.SetThreadBudgetRequest]) (*connect.Response[v1.SetThreadBudgetResponse], error) {
+	return c.setBudget.CallUnary(ctx, req)
 }
 
 // Watch calls codefoundry.v1.ThreadService.Watch.
@@ -623,6 +674,15 @@ type ThreadServiceHandler interface {
 	// wake time). Unsnoozing before then only clears snoozed_until. Reconnect, Pin
 	// (pinned), Send and Archive (archived) clear a snooze implicitly. Persisted.
 	Snooze(context.Context, *connect.Request[v1.SnoozeThreadRequest]) (*connect.Response[v1.SnoozeThreadResponse], error)
+	// Label adds and removes a thread's labels (clear first, then remove, then add) and
+	// returns the thread. Any state. Persisted. See docs/notes/agents-2-metadata.md.
+	Label(context.Context, *connect.Request[v1.LabelThreadRequest]) (*connect.Response[v1.LabelThreadResponse], error)
+	// Report records the thread's report (status, summary, JSON data), replacing the
+	// previous one, stamped report_at. Any state. Persisted.
+	Report(context.Context, *connect.Request[v1.ReportThreadRequest]) (*connect.Response[v1.ReportThreadResponse], error)
+	// SetBudget sets the thread's spending limit (Thread.budget_usd; 0 clears it). A
+	// budget above the thread's cost re-arms the budget stop. Any state. Persisted.
+	SetBudget(context.Context, *connect.Request[v1.SetThreadBudgetRequest]) (*connect.Response[v1.SetThreadBudgetResponse], error)
 	// Watch streams changes to the thread list (every thread's record, not its items).
 	// The first event is a snapshot. WatchThread streams one thread's conversation.
 	Watch(context.Context, *connect.Request[v1.WatchThreadsRequest], *connect.ServerStream[v1.ThreadListEvent]) error
@@ -786,6 +846,24 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(threadServiceMethods.ByName("Snooze")),
 		connect.WithHandlerOptions(opts...),
 	)
+	threadServiceLabelHandler := connect.NewUnaryHandler(
+		ThreadServiceLabelProcedure,
+		svc.Label,
+		connect.WithSchema(threadServiceMethods.ByName("Label")),
+		connect.WithHandlerOptions(opts...),
+	)
+	threadServiceReportHandler := connect.NewUnaryHandler(
+		ThreadServiceReportProcedure,
+		svc.Report,
+		connect.WithSchema(threadServiceMethods.ByName("Report")),
+		connect.WithHandlerOptions(opts...),
+	)
+	threadServiceSetBudgetHandler := connect.NewUnaryHandler(
+		ThreadServiceSetBudgetProcedure,
+		svc.SetBudget,
+		connect.WithSchema(threadServiceMethods.ByName("SetBudget")),
+		connect.WithHandlerOptions(opts...),
+	)
 	threadServiceWatchHandler := connect.NewServerStreamHandler(
 		ThreadServiceWatchProcedure,
 		svc.Watch,
@@ -898,6 +976,12 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 			threadServiceArchiveHandler.ServeHTTP(w, r)
 		case ThreadServiceSnoozeProcedure:
 			threadServiceSnoozeHandler.ServeHTTP(w, r)
+		case ThreadServiceLabelProcedure:
+			threadServiceLabelHandler.ServeHTTP(w, r)
+		case ThreadServiceReportProcedure:
+			threadServiceReportHandler.ServeHTTP(w, r)
+		case ThreadServiceSetBudgetProcedure:
+			threadServiceSetBudgetHandler.ServeHTTP(w, r)
 		case ThreadServiceWatchProcedure:
 			threadServiceWatchHandler.ServeHTTP(w, r)
 		case ThreadServiceStageAttachmentProcedure:
@@ -985,6 +1069,18 @@ func (UnimplementedThreadServiceHandler) Archive(context.Context, *connect.Reque
 
 func (UnimplementedThreadServiceHandler) Snooze(context.Context, *connect.Request[v1.SnoozeThreadRequest]) (*connect.Response[v1.SnoozeThreadResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Snooze is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) Label(context.Context, *connect.Request[v1.LabelThreadRequest]) (*connect.Response[v1.LabelThreadResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Label is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) Report(context.Context, *connect.Request[v1.ReportThreadRequest]) (*connect.Response[v1.ReportThreadResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Report is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) SetBudget(context.Context, *connect.Request[v1.SetThreadBudgetRequest]) (*connect.Response[v1.SetThreadBudgetResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.SetBudget is not implemented"))
 }
 
 func (UnimplementedThreadServiceHandler) Watch(context.Context, *connect.Request[v1.WatchThreadsRequest], *connect.ServerStream[v1.ThreadListEvent]) error {

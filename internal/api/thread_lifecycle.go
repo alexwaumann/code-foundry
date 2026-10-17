@@ -21,6 +21,7 @@ func (h *Thread) Create(ctx context.Context, req *connect.Request[v1.CreateThrea
 		RepoID: m.GetRepoId(), WorktreePath: m.GetWorktreePath(), Model: m.GetModel(), Effort: m.GetEffort(),
 		Name: m.GetName(), InitialPrompt: m.GetInitialPrompt(), ComposerPrompt: m.GetComposerPrompt(), PermissionMode: thread.PermissionMode(m.GetPermissionMode()),
 		Attachments: m.GetAttachments(), WorkspaceID: m.GetWorkspaceId(), NoProject: m.GetNoProject(),
+		CreatedBy: m.GetCreatedBy(), Brief: m.GetBrief(), Labels: m.GetLabels(), BudgetUSD: m.GetBudgetUsd(),
 	}
 	if nw := m.GetNewWorktree(); nw != nil {
 		o.NewWorktree = &thread.NewWorktree{BaseRef: nw.GetBaseRef()}
@@ -266,6 +267,7 @@ func threadToProto(s thread.Thread) *v1.Thread {
 	if r := s.Retry; r != nil {
 		p.Retry = &v1.ApiRetry{Attempt: int32(r.Attempt), MaxRetries: int32(r.MaxRetries), RetryAt: timestamppb.New(r.RetryAt), ErrorStatus: int32(r.Status), Error: r.Error}
 	}
+	metadataToProto(s, p) // thread_metadata.go
 	return p
 }
 
