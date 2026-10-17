@@ -166,7 +166,7 @@ func TestProjectRemotes(t *testing.T) {
 		}
 	}
 	if n := len(list.Msg.GetProjects()); n != len(want) {
-		t.Errorf("listed %d repos, want %d", n, len(want))
+		t.Errorf("listed %d projects, want %d", n, len(want))
 	}
 }
 
@@ -224,7 +224,7 @@ func TestProjectWatch(t *testing.T) {
 
 	snap := next().GetSnapshot()
 	if len(snap.GetProjects()) != 1 || snap.GetProjects()[0].GetId() != existing.ID {
-		t.Fatalf("first event = %v, want snapshot with the existing repo", snap)
+		t.Fatalf("first event = %v, want snapshot with the existing project", snap)
 	}
 
 	r, _ := fake.Register(ctx, "/code/new")
@@ -296,7 +296,7 @@ func TestProjectListRefsAndCreateFetch(t *testing.T) {
 		wantCode    connect.Code
 	}{
 		{"locals then remotes", r.ID, []string{"cf/x", "main", "origin/main", "upstream/dev"}, "origin/main", 0},
-		{"unknown repo", "nope", nil, "", connect.CodeNotFound},
+		{"unknown project", "nope", nil, "", connect.CodeNotFound},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

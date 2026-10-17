@@ -192,8 +192,8 @@ func TestCreateRefusals(t *testing.T) {
 	}{
 		{"no name", CreateOptions{Members: []MemberSpec{{Project: "web"}}}, ErrInvalidArgument, "name"},
 		{"no members", CreateOptions{Name: "x"}, ErrInvalidArgument, "at least one"},
-		{"unknown repo", CreateOptions{Name: "x", Members: []MemberSpec{{Project: "web"}, {Project: "nope"}}}, ErrNotFound, "nope"},
-		{"repo twice", CreateOptions{Name: "x", Members: []MemberSpec{{Project: "web"}, {Project: id("web")}}}, ErrInvalidArgument, "twice"},
+		{"unknown project", CreateOptions{Name: "x", Members: []MemberSpec{{Project: "web"}, {Project: "nope"}}}, ErrNotFound, "nope"},
+		{"project twice", CreateOptions{Name: "x", Members: []MemberSpec{{Project: "web"}, {Project: id("web")}}}, ErrInvalidArgument, "twice"},
 		{"bad base", CreateOptions{Name: "x", Members: []MemberSpec{{Project: "web", BaseRef: "--upload-pack=x"}}}, ErrInvalidArgument, "base ref"},
 		{"name taken", CreateOptions{Name: "taken", Members: []MemberSpec{{Project: "lib"}}}, ErrFailedPrecondition, "exists"},
 		{"project without git", CreateOptions{Name: "x", Members: []MemberSpec{{Project: "web"}, {Project: "notes"}}}, ErrFailedPrecondition, "notes is not a git repository"},

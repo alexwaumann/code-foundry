@@ -120,7 +120,7 @@ func TestFilesystemListSkills(t *testing.T) {
 			{"commit", "Commit.", U, "", ".claude/skills/commit/SKILL.md"},
 			{"user-cmd", "User command.", U, "", ".claude/commands/user-cmd.md"},
 		}},
-		{name: "unknown repo is skipped", req: &v1.ListSkillsRequest{Sources: []*v1.SkillSource{{ProjectId: "zz"}}}},
+		{name: "unknown project is skipped", req: &v1.ListSkillsRequest{Sources: []*v1.SkillSource{{ProjectId: "zz"}}}},
 		{name: "bad sources are skipped, the good one and the user's listed", req: &v1.ListSkillsRequest{
 			Sources: []*v1.SkillSource{
 				{ProjectId: "p", Path: filepath.Join(root, "gone")}, // a removed worktree
@@ -135,7 +135,7 @@ func TestFilesystemListSkills(t *testing.T) {
 			{"commit", "Commit.", U, "", ".claude/skills/commit/SKILL.md"},
 			{"user-cmd", "User command.", U, "", ".claude/commands/user-cmd.md"},
 		}},
-		{name: "missing repo id", req: &v1.ListSkillsRequest{Sources: []*v1.SkillSource{{Path: root}}}, code: connect.CodeInvalidArgument},
+		{name: "missing project id", req: &v1.ListSkillsRequest{Sources: []*v1.SkillSource{{Path: root}}}, code: connect.CodeInvalidArgument},
 		{name: "outside home", req: &v1.ListSkillsRequest{Sources: []*v1.SkillSource{{ProjectId: "p", Path: outside}}}, code: connect.CodeInvalidArgument},
 		{name: "relative path", req: &v1.ListSkillsRequest{Sources: []*v1.SkillSource{{ProjectId: "p", Path: "proj"}}}, code: connect.CodeInvalidArgument},
 	}
@@ -187,8 +187,8 @@ func TestFilesystemSearchFiles(t *testing.T) {
 			want: []string{"README.md"}},
 		{name: "no git: walk skips dot-directories", req: &v1.SearchFilesRequest{ProjectId: "n", Query: "md"},
 			want: []string{"notes.md"}},
-		{name: "unknown repo", req: &v1.SearchFilesRequest{ProjectId: "zz"}, code: connect.CodeNotFound},
-		{name: "missing repo id", req: &v1.SearchFilesRequest{Query: "x"}, code: connect.CodeInvalidArgument},
+		{name: "unknown project", req: &v1.SearchFilesRequest{ProjectId: "zz"}, code: connect.CodeNotFound},
+		{name: "missing project id", req: &v1.SearchFilesRequest{Query: "x"}, code: connect.CodeInvalidArgument},
 		{name: "outside home", req: &v1.SearchFilesRequest{ProjectId: "p", Path: outside}, code: connect.CodeInvalidArgument},
 		{name: "symlink under home to outside", req: &v1.SearchFilesRequest{ProjectId: "p", Path: filepath.Join(root, "escape")}, code: connect.CodeInvalidArgument},
 		{name: "dot-dot out of home", req: &v1.SearchFilesRequest{ProjectId: "p", Path: root + "/proj/../../outside"}, code: connect.CodeInvalidArgument},

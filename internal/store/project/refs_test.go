@@ -124,7 +124,7 @@ func TestListRefs(t *testing.T) {
 		})
 	}
 
-	t.Run("unknown repo", func(t *testing.T) {
+	t.Run("unknown project", func(t *testing.T) {
 		isolateGit(t)
 		h := startHarness(t, "", Options{})
 		if _, err := h.store.ListRefs(context.Background(), "nope"); !errors.Is(err, ErrNotFound) {

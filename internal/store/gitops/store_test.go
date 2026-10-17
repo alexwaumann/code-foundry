@@ -156,7 +156,7 @@ func TestPushFetchPullRoundTrip(t *testing.T) {
 
 	_ = w.m.Close()
 	if !slices.Contains(w.projects.Calls, "Refresh ra") {
-		t.Errorf("repo store was not refreshed after ops on a: %v", w.projects.Calls)
+		t.Errorf("project store was not refreshed after ops on a: %v", w.projects.Calls)
 	}
 }
 

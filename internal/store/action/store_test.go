@@ -334,7 +334,7 @@ func TestRunOwnerAndAction(t *testing.T) {
 		{name: "unknown thread", opts: RunOptions{Action: "echo", ThreadID: "s9"}, wantErr: ErrNotFound, wantMsg: "thread s9"},
 		{name: "a thread without a project", opts: RunOptions{Action: "echo", ThreadID: "home"}, wantErr: ErrFailedPrecondition,
 			wantMsg: "has no project"},
-		{name: "the thread is in another project than --repo", opts: RunOptions{Action: "echo", ThreadID: "s1", ProjectID: "api"},
+		{name: "the thread is in another project than --project", opts: RunOptions{Action: "echo", ThreadID: "s1", ProjectID: "api"},
 			wantErr: ErrInvalidArgument},
 		{name: "an unregistered worktree", opts: RunOptions{Action: "echo", Worktree: "/nowhere"}, wantErr: ErrInvalidArgument,
 			wantMsg: "/nowhere is not a worktree of a registered project"},

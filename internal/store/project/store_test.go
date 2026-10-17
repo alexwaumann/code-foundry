@@ -179,7 +179,7 @@ func TestRegisterReportsProjectWorktreesAndStatus(t *testing.T) {
 	}
 	if r.Path != f.project || r.Name != "proj" || r.ID != projectID(f.project) || r.DefaultBranch != "main" ||
 		r.GitHubSlug != "" || r.Error != "" || r.RegisteredAt.IsZero() {
-		t.Fatalf("repo = %+v", r)
+		t.Fatalf("project = %+v", r)
 	}
 	if len(r.Worktrees) != 1 {
 		t.Fatalf("worktrees = %+v", r.Worktrees)
@@ -192,7 +192,7 @@ func TestRegisterReportsProjectWorktreesAndStatus(t *testing.T) {
 		t.Fatalf("main worktree = %+v", w)
 	}
 	if _, ok := h.waitFor("RepoUpdated", func(ev Event) bool { _, ok := ev.(ProjectUpdated); return ok }).(ProjectUpdated); !ok {
-		t.Fatal("no RepoUpdated")
+		t.Fatal("no ProjectUpdated")
 	}
 
 	// Registering again (from the .git dir even) is idempotent.
@@ -201,7 +201,7 @@ func TestRegisterReportsProjectWorktreesAndStatus(t *testing.T) {
 		t.Fatalf("re-register = %+v, %v", again, err)
 	}
 	if n := len(h.store.Snapshot().Projects); n != 1 {
-		t.Fatalf("snapshot has %d repos", n)
+		t.Fatalf("snapshot has %d projects", n)
 	}
 
 	// Edits inside a subdirectory are not seen by the non-recursive watcher, but
@@ -329,7 +329,7 @@ func TestCreateWorktreeBranchResolution(t *testing.T) {
 		t.Fatalf("branch already checked out: %v", err)
 	}
 	if _, err := h.store.CreateWorktree(ctx, CreateWorktreeOptions{ProjectID: "nope", Branch: "x"}); !errors.Is(err, ErrNotFound) {
-		t.Fatalf("unknown repo: %v", err)
+		t.Fatalf("unknown project: %v", err)
 	}
 }
 
@@ -479,7 +479,7 @@ func TestUnregisterAndReloadFromDB(t *testing.T) {
 		t.Fatalf("second unregister: %v", err)
 	}
 	if _, err := os.Stat(f.project); err != nil {
-		t.Fatal("unregister touched the repo on disk")
+		t.Fatal("unregister touched the project on disk")
 	}
 	h.close()
 
@@ -526,7 +526,7 @@ func TestRegisterAllowedRoot(t *testing.T) {
 		{"outside", filepath.Join(outside, "proj"), filepath.Join(outside, "proj") + " is outside your home directory"},
 		{"dotdot escape", filepath.Join(root, "..", "outside", "proj"), "is outside your home directory"},
 		{"symlink to outside", filepath.Join(root, "link"), filepath.Join(root, "link") + " is outside your home directory"},
-		{"worktree of an outside repo", filepath.Join(root, "wt"), filepath.Join(outside, "proj") + " is outside your home directory"},
+		{"worktree of an outside project", filepath.Join(root, "wt"), filepath.Join(outside, "proj") + " is outside your home directory"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -543,7 +543,7 @@ func TestRegisterAllowedRoot(t *testing.T) {
 		})
 	}
 	if n := len(h.store.Snapshot().Projects); n != 1 {
-		t.Errorf("registered %d repos, want 1", n)
+		t.Errorf("registered %d projects, want 1", n)
 	}
 }
 

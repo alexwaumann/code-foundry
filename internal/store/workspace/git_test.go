@@ -148,7 +148,7 @@ func TestWithGit(t *testing.T) {
 	// Add it back: same branch name, new worktree.
 	w, err = m.AddProject(ctx, AddProjectOptions{Ref: Ref{Cwd: webWT}, Member: MemberSpec{Project: "api"}, Fetch: true})
 	if err != nil || len(w.Members) != 2 {
-		t.Fatalf("add repo: %+v, %v", w, err)
+		t.Fatalf("add project: %+v, %v", w, err)
 	}
 	if err := m.Remove(ctx, RemoveOptions{Workspace: w.ID}); err != nil {
 		t.Fatal(err)

@@ -30,7 +30,7 @@ func TestWorktreePath(t *testing.T) {
 		{"~/worktrees/{project}", "cf", "feat", filepath.Join(home, "worktrees/cf/feat")},
 		{"relative/{project}", "cf", "feat", ""},
 		// {repo} is the placeholder's name before the rename; it still expands.
-		{"/wt/{repo}", "cf", "feat", "/wt/cf/feat"},
+		{"/wt/{project}", "cf", "feat", "/wt/cf/feat"},
 	}
 	for _, tt := range tests {
 		if got := worktreePath(tt.dir, tt.project, tt.branch); got != tt.want {
@@ -48,7 +48,7 @@ func TestWorktreeBase(t *testing.T) {
 		{"/wt/{project}", "cf", "/wt/cf"},
 		{"~/worktrees/{project}", "cf", filepath.Join(home, "worktrees/cf")},
 		{"relative/{project}", "cf", ""},
-		{"/wt/{repo}", "cf", "/wt/cf"},
+		{"/wt/{project}", "cf", "/wt/cf"},
 	}
 	for _, tt := range tests {
 		if got := worktreeBase(tt.dir, tt.project); got != tt.want {

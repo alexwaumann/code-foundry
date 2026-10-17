@@ -148,7 +148,7 @@ func TestCloneStream(t *testing.T) {
 		t.Errorf("lines = %v", lines)
 	}
 	if r.GetPath() != "/home/me/.code-foundry/projects/octo/hello" || !r.GetGit() {
-		t.Errorf("repo = %v", r)
+		t.Errorf("project = %v", r)
 	}
 
 	tests := []struct {

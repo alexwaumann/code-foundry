@@ -94,7 +94,7 @@ func TestActionCleanup(t *testing.T) {
 			}
 			projects, killed := rec.state()
 			if !slices.Equal(projects, tt.wantProjects) || !slices.Equal(killed, tt.wantKilled) {
-				t.Errorf("RepoRemoved %q, killed %q; want %q, %q", projects, killed, tt.wantProjects, tt.wantKilled)
+				t.Errorf("ProjectRemoved %q, killed %q; want %q, %q", projects, killed, tt.wantProjects, tt.wantKilled)
 			}
 		})
 	}

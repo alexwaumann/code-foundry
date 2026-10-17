@@ -112,7 +112,7 @@ func TestResolveProject(t *testing.T) {
 		{"ambiguous name by id", "dup2", "dup2", nil, ""},
 		{"path in main worktree", "/src/web/pkg", "web", nil, ""},
 		{"path in linked worktree", "/wt/api/cf-login/x", "api", nil, ""},
-		{"repo without worktrees yet", "/b/dup", "dup2", nil, ""},
+		{"project without worktrees yet", "/b/dup", "dup2", nil, ""},
 		{"unknown", "nope", "", ErrNotFound, "project add <folder>"},
 		{"empty", "", "", ErrInvalidArgument, ""},
 	}
@@ -126,7 +126,7 @@ func TestResolveProject(t *testing.T) {
 				t.Fatalf("err = %v, want it to mention %q", err, tt.errText)
 			}
 			if r.ID != tt.want {
-				t.Fatalf("repo = %q, want %q", r.ID, tt.want)
+				t.Fatalf("project = %q, want %q", r.ID, tt.want)
 			}
 		})
 	}
@@ -139,10 +139,10 @@ func TestMemberFor(t *testing.T) {
 		name, ref, want string
 		wantErr         error
 	}{
-		{"repo id", "api", "api", nil},
-		{"repo name", "web", "web", nil},
+		{"project id", "api", "api", nil},
+		{"project name", "web", "web", nil},
 		{"member worktree path", "/wt/web/cf-login/src", "web", nil},
-		{"path in the repo's main worktree", "/src/api/x", "api", nil},
+		{"path in the project's main worktree", "/src/api/x", "api", nil},
 		{"not a member", "dup1", "", ErrNotFound},
 		{"unknown", "nope", "", ErrNotFound},
 		{"empty", "", "", ErrInvalidArgument},
@@ -178,7 +178,7 @@ func TestJoin(t *testing.T) {
 		}
 	}
 	if none := Join(w, nil, ""); none.Members[0].Current || !none.Members[0].Missing {
-		t.Errorf("without repos: %+v", none.Members[0])
+		t.Errorf("without projects: %+v", none.Members[0])
 	}
 }
 

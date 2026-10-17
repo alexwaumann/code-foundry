@@ -226,7 +226,7 @@ func TestCreate(t *testing.T) {
 			}
 			if err == nil {
 				if r.Path != dest || !r.Git {
-					t.Errorf("repo = %+v", r)
+					t.Errorf("project = %+v", r)
 				}
 				fi, _ := os.Stat(dest)
 				if fi.Mode().Perm() != 0o755 {
@@ -370,7 +370,7 @@ func TestPublish(t *testing.T) {
 			} else if err != nil {
 				t.Fatal(err)
 			} else if !slices.Contains(r.Remotes, "origin") {
-				t.Errorf("returned repo has no origin: %+v", r)
+				t.Errorf("returned project has no origin: %+v", r)
 			}
 			var got []string
 			if len(f.calls) > 0 {

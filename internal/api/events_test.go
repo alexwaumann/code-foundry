@@ -107,15 +107,15 @@ func describe(ev *v1.Event) string {
 	case *v1.Event_Project:
 		switch r := e.Project.GetEvent().(type) {
 		case *v1.ProjectEvent_Snapshot:
-			return fmt.Sprintf("repo.snapshot(%d)", len(r.Snapshot.GetProjects()))
+			return fmt.Sprintf("project.snapshot(%d)", len(r.Snapshot.GetProjects()))
 		case *v1.ProjectEvent_ProjectUpdated:
-			return "repo.updated " + r.ProjectUpdated.GetName()
+			return "project.updated " + r.ProjectUpdated.GetName()
 		case *v1.ProjectEvent_ProjectRemovedId:
-			return "repo.removed"
+			return "project.removed"
 		case *v1.ProjectEvent_WorktreeDetailUpdated:
-			return "repo.detail " + r.WorktreeDetailUpdated.GetPath()
+			return "project.detail " + r.WorktreeDetailUpdated.GetPath()
 		default:
-			return "repo.other"
+			return "project.other"
 		}
 	case *v1.Event_Workspace:
 		switch w := e.Workspace.GetEvent().(type) {
@@ -220,7 +220,7 @@ func TestEventsSnapshotOrderThenLive(t *testing.T) {
 
 	s := f.watch(t, ctx)
 	want := []string{
-		"repo.snapshot(1)",
+		"project.snapshot(1)",
 		"workspace.snapshot(1)",
 		"terminal.updated " + t1.ID,
 		"terminal.updated " + t2.ID,
@@ -243,8 +243,8 @@ func TestEventsSnapshotOrderThenLive(t *testing.T) {
 
 	// Live events from every source, each in its own source's order.
 	_, _ = f.project.Register(ctx, "/code/b")
-	if got := describe(s.next()); got != "repo.updated b" {
-		t.Fatalf("got %q, want repo.updated b", got)
+	if got := describe(s.next()); got != "project.updated b" {
+		t.Fatalf("got %q, want project.updated b", got)
 	}
 	f.ws.Put(workspace.Workspace{ID: "w-2", Name: "billing", Branch: "cf/billing"})
 	if got := describe(s.next()); got != "workspace.updated billing" {
@@ -301,8 +301,8 @@ func TestEventsSnapshotOrderThenLive(t *testing.T) {
 		t.Fatalf("got %q, want %q", got, want)
 	}
 	f.project.SetDetail(project.WorktreeDetail{ProjectID: "r", Path: "/code/a"})
-	if got := describe(s.next()); got != "repo.detail /code/a" {
-		t.Fatalf("got %q, want repo.detail", got)
+	if got := describe(s.next()); got != "project.detail /code/a" {
+		t.Fatalf("got %q, want project.detail", got)
 	}
 	n := command.BusEmitter{Bus: f.bus}.Emit(&v1.UiIntent{Intent: &v1.UiIntent_OpenPalette_{OpenPalette: &v1.UiIntent_OpenPalette{Query: "x"}}})
 	if n != 1 {
@@ -325,7 +325,7 @@ func TestEventsSourceFilter(t *testing.T) {
 	}{
 		{"ui only", []v1.EventSource{v1.EventSource_EVENT_SOURCE_UI}, "ui.palette go"},
 		{"terminal only", []v1.EventSource{v1.EventSource_EVENT_SOURCE_TERMINAL}, "terminal.updated fake-1"},
-		{"repo and ui", []v1.EventSource{v1.EventSource_EVENT_SOURCE_UI, v1.EventSource_EVENT_SOURCE_PROJECT}, "repo.snapshot(0)"},
+		{"project and ui", []v1.EventSource{v1.EventSource_EVENT_SOURCE_UI, v1.EventSource_EVENT_SOURCE_PROJECT}, "project.snapshot(0)"},
 		{"thread only", []v1.EventSource{v1.EventSource_EVENT_SOURCE_THREAD_LIST}, "thread.snapshot(0)"},
 		{"gh only", []v1.EventSource{v1.EventSource_EVENT_SOURCE_GH}, "gh.viewer"},
 		{"gitops only", []v1.EventSource{v1.EventSource_EVENT_SOURCE_GITOPS}, "gitops.snapshot(0)"},
@@ -356,7 +356,7 @@ func TestEventsResyncsSourceAfterDrops(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	s := f.watch(t, ctx, v1.EventSource_EVENT_SOURCE_PROJECT, v1.EventSource_EVENT_SOURCE_UI)
-	if got := describe(s.next()); got != "repo.snapshot(0)" {
+	if got := describe(s.next()); got != "project.snapshot(0)" {
 		t.Fatalf("first = %q", got)
 	}
 	// Overflow the stream's hub queue while the client is not reading (more than the

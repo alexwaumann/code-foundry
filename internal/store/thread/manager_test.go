@@ -384,10 +384,10 @@ func TestCreateResolvesWorktree(t *testing.T) {
 		o       CreateOptions
 		wantErr error
 	}{
-		{"repo only uses main worktree", CreateOptions{ProjectID: "r1"}, nil},
-		{"unknown repo", CreateOptions{ProjectID: "nope"}, ErrNotFound},
+		{"project only uses main worktree", CreateOptions{ProjectID: "r1"}, nil},
+		{"unknown project", CreateOptions{ProjectID: "nope"}, ErrNotFound},
 		{"unregistered path", CreateOptions{WorktreePath: other}, ErrFailedPrecondition},
-		{"path not in repo", CreateOptions{ProjectID: "r1", WorktreePath: other}, ErrFailedPrecondition},
+		{"path not in project", CreateOptions{ProjectID: "r1", WorktreePath: other}, ErrFailedPrecondition},
 		{"relative path", CreateOptions{WorktreePath: "repo"}, ErrInvalidArgument},
 		{"nothing", CreateOptions{}, ErrInvalidArgument},
 		{"bad effort", CreateOptions{ProjectID: "r1", Effort: "huge"}, ErrInvalidArgument},

@@ -45,7 +45,7 @@ func TestCreateProject(t *testing.T) {
 		t.Fatal(err)
 	}
 	if r := res.Msg.GetProject(); r.GetPath() != "/home/me/.code-foundry/projects/demo" || !r.GetGit() || r.GetName() != "demo" {
-		t.Errorf("repo = %v", r)
+		t.Errorf("project = %v", r)
 	}
 	tests := []struct {
 		name string
@@ -153,7 +153,7 @@ func TestPublishProject(t *testing.T) {
 		t.Fatal(err)
 	}
 	if r := res.Msg.GetProject(); r.GetGithubSlug() != "me/demo" || len(r.GetRemotes()) != 1 {
-		t.Errorf("repo = %v", r)
+		t.Errorf("project = %v", r)
 	}
 
 	tests := []struct {

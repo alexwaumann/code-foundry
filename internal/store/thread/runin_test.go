@@ -19,7 +19,7 @@ func TestRunInRefuses(t *testing.T) {
 	}{
 		{name: "project thread", id: project.ID, target: RunInTarget{ProjectID: "r2"}, wantErr: ErrFailedPrecondition},
 		{name: "no target", id: ws.ID, wantErr: ErrInvalidArgument},
-		{name: "repo not a member", id: ws.ID, target: RunInTarget{ProjectID: "r9"}, wantErr: ErrFailedPrecondition},
+		{name: "project not a member", id: ws.ID, target: RunInTarget{ProjectID: "r9"}, wantErr: ErrFailedPrecondition},
 		{name: "path not a member", id: ws.ID, target: RunInTarget{WorktreePath: t.TempDir()}, wantErr: ErrFailedPrecondition},
 		{name: "unknown thread", id: "s-nope", target: RunInTarget{ProjectID: "r2"}, wantErr: ErrNotFound},
 	}

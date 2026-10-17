@@ -101,7 +101,7 @@ func TestCreateNewWorktree(t *testing.T) {
 		{name: "explicit name is the slug without the namer", o: CreateOptions{ProjectID: "r1", Name: "My Big Feature!", InitialPrompt: "x"},
 			wantBranch: "cf/my-big-feature", wantName: "My Big Feature!", wantCalls: 0, wantBase: "origin/main"},
 		{name: "no prompt uses the id", o: CreateOptions{ProjectID: "r1"}, wantBranch: "<id>", wantCalls: 0, wantBase: "origin/main"},
-		{name: "repo from a worktree path", o: CreateOptions{WorktreePath: "<wt>", InitialPrompt: "x"},
+		{name: "project from a worktree path", o: CreateOptions{WorktreePath: "<wt>", InitialPrompt: "x"},
 			namer: func(int, string) (string, error) { return "From path", nil }, wantBranch: "cf/from-path", wantName: "From path",
 			wantCalls: 1, wantBase: "origin/main"},
 	}
@@ -248,9 +248,9 @@ func TestCreateNewWorktreeFailures(t *testing.T) {
 		wantErr    error
 	}{
 		{"worktree creation fails", CreateOptions{ProjectID: "r1"}, fmt.Errorf("%w: git: fatal: invalid reference", project.ErrFailedPrecondition), ErrFailedPrecondition},
-		{"repo store rejects the branch", CreateOptions{ProjectID: "r1"}, fmt.Errorf("%w: bad branch", project.ErrInvalidArgument), ErrInvalidArgument},
-		{"unknown repo", CreateOptions{ProjectID: "nope"}, nil, ErrNotFound},
-		{"no repo", CreateOptions{}, nil, ErrInvalidArgument},
+		{"project store rejects the branch", CreateOptions{ProjectID: "r1"}, fmt.Errorf("%w: bad branch", project.ErrInvalidArgument), ErrInvalidArgument},
+		{"unknown project", CreateOptions{ProjectID: "nope"}, nil, ErrNotFound},
+		{"no project", CreateOptions{}, nil, ErrInvalidArgument},
 		{"base ref like a flag", CreateOptions{ProjectID: "r1", NewWorktree: &NewWorktree{BaseRef: "--upload-pack=x"}}, nil, ErrInvalidArgument},
 		{"base ref with a space", CreateOptions{ProjectID: "r1", NewWorktree: &NewWorktree{BaseRef: "a b"}}, nil, ErrInvalidArgument},
 		{"bad permission mode", CreateOptions{ProjectID: "r1", PermissionMode: PermissionMode(7)}, nil, ErrInvalidArgument},

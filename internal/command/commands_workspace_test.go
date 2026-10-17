@@ -43,7 +43,7 @@ func TestWorkspaceCommands(t *testing.T) {
 		wantJSON string
 	}{
 		{
-			name: "new with per-repo bases", cmd: "workspace.new",
+			name: "new with per-project bases", cmd: "workspace.new",
 			args:     map[string]string{"name": "login", "projects": "web, api:origin/dev ,"},
 			wantMsg:  []string{"created workspace login (w-2), branch cf/login", "PROJECT", "web-ui   web  /worktrees/web/cf-login  cf/login"},
 			wantCall: "Create login web,api:origin/dev",
@@ -72,13 +72,13 @@ func TestWorkspaceCommands(t *testing.T) {
 		},
 		{name: "members outside a workspace", cmd: "workspace.members", args: map[string]string{"cwd": "/tmp"}, wantMsg: []string{"/tmp is not inside a workspace worktree"}, wantErr: errAnyCmd},
 		{
-			name: "add repo from a member's cwd", cmd: "workspace.add-project",
+			name: "add project from a member's cwd", cmd: "workspace.add-project",
 			args:     map[string]string{"project": "lib", "cwd": "/worktrees/web/cf-login"},
 			wantMsg:  []string{"added lib to workspace base: /worktrees/lib/cf-login on cf/login"},
 			wantCall: "AddProject /worktrees/web/cf-login lib",
 		},
 		{
-			name: "remove repo", cmd: "workspace.remove-project",
+			name: "remove project", cmd: "workspace.remove-project",
 			args:     map[string]string{"project": "api", "workspace": "base", "force": "true", "delete-branch": "true"},
 			wantMsg:  []string{"removed api from workspace base (1 left)"},
 			wantCall: "RemoveProject base api force delete-branch",

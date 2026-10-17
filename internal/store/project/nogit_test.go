@@ -111,7 +111,7 @@ func TestRegisterPlainDirectory(t *testing.T) {
 	want := Worktree{ProjectID: r.ID, Path: dir, IsMain: true}
 	if r.Git || r.Path != dir || r.Name != "notes" || r.ID != projectID(dir) || r.DefaultBranch != "" ||
 		r.GitHubSlug != "" || len(r.Remotes) != 0 || r.Error != "" || len(r.Worktrees) != 1 || r.Worktrees[0] != want {
-		t.Fatalf("repo = %+v", r)
+		t.Fatalf("project = %+v", r)
 	}
 	if n := cr.count("rev-parse"); n != 1 || cr.total() != 1 {
 		t.Fatalf("git runs = %v, want only the registration's rev-parse", cr.n)
@@ -195,7 +195,7 @@ func TestInitGit(t *testing.T) {
 				t.Fatal(err)
 			}
 			if !got.Git || got.ID != r.ID || got.DefaultBranch != tt.wantBranch || len(got.Worktrees) != 1 {
-				t.Fatalf("repo = %+v", got)
+				t.Fatalf("project = %+v", got)
 			}
 			w := got.Worktrees[0]
 			if !w.IsMain || w.Branch != tt.wantBranch || len(w.Head) != 40 || w.Status.RefreshedAt.IsZero() {
@@ -237,7 +237,7 @@ func TestInitGitErrors(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := h.store.InitGit(ctx, r.ID); !errors.Is(err, ErrFailedPrecondition) {
-		t.Errorf("InitGit(git repo) err = %v", err)
+		t.Errorf("InitGit(git project) err = %v", err)
 	}
 	if _, err := h.store.InitGit(ctx, "nope"); !errors.Is(err, ErrNotFound) {
 		t.Errorf("InitGit(unknown) err = %v", err)
@@ -381,6 +381,6 @@ func TestSnapshotOwner(t *testing.T) {
 		})
 	}
 	if _, ok := (*Snapshot)(nil).Owner("a", "/a"); ok {
-		t.Fatal("nil snapshot found a repo")
+		t.Fatal("nil snapshot found a project")
 	}
 }
