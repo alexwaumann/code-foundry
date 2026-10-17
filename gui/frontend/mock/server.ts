@@ -343,7 +343,7 @@ function routes(router: ConnectRouter): void {
   });
 
   router.service(SettingsService, {
-    getSchema: () => ({ groups: settingsGroups, fields: world.settings.fields() }),
+    getSchema: () => ({ groups: settingsGroups, fields: world.settings.fields(), pages: world.settings.pages() }),
     get: () => ({ settings: world.settings.snapshot() }),
     update: (req) => {
       try {
