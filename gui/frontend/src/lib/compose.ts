@@ -65,11 +65,12 @@ function workInMode(v: string | undefined): WorkInMode | undefined {
 
 /**
  * A project draft's worktree before the user picks one: the choice remembered for the
- * project, else the setting, else a fresh copy. "current" is the main checkout, or a
- * fresh copy while the main checkout is not known.
+ * project, else the setting, else the project folder itself (the daemon's default for
+ * threads.default_worktree). "current" is the main checkout, or a fresh copy while the
+ * main checkout is not known.
  */
 export function defaultWorktree(p: { setting?: string; remembered?: string; mainPath?: string }): ProjectWorktree {
-  const mode = workInMode(p.remembered) ?? workInMode(p.setting) ?? "new";
+  const mode = workInMode(p.remembered) ?? workInMode(p.setting) ?? "current";
   return mode === "current" && p.mainPath ? { kind: "existing", path: p.mainPath } : { kind: "new" };
 }
 

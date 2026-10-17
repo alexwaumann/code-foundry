@@ -132,7 +132,7 @@ func TestRenderRoundTrip(t *testing.T) {
 	text := string(out)
 	for _, want := range []string{
 		"[threads]\n", "auto_name = false\n", "naming_model = \"claude-4.5-haiku[1m]\"\n", "font_size = 15\n", `font_family = "Weird \"Font\" \\ Name"` + "\n",
-		"# default_model = \"claude-opus-4-8[1m]\"\n", "# default_effort = \"high\"\n", "# scrollback_lines = 10000\n", `"thread.new" = "cmd+shift+n"` + "\n",
+		"# default_model = \"claude-sonnet-5[1m]\"\n", "# default_effort = \"medium\"\n", "# scrollback_lines = 10000\n", `"thread.new" = "cmd+shift+n"` + "\n",
 		"Applies after a daemon restart.",
 	} {
 		if !strings.Contains(text, want) {

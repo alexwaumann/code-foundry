@@ -42,7 +42,7 @@ type Settings struct {
 // Threads are defaults for new Claude Code sessions.
 type Threads struct {
 	DefaultModel      string // default model.Default
-	DefaultEffort     string // default "high"
+	DefaultEffort     string // default "medium"
 	DefaultWorktree   string // WorktreeNew or WorktreeCurrent; read by the GUI's composer only
 	AutoName          bool
 	NamingModel       string // default model.NamingDefault; the effort is always low

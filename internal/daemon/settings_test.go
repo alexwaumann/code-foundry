@@ -93,14 +93,14 @@ func TestApplySettings(t *testing.T) {
 		t.Errorf("log level = %v", level.Level())
 	}
 
-	// Reset: back to the settings defaults (opus, high).
+	// Reset: back to the settings defaults (Sonnet 5, medium).
 	if _, err := st.Update(context.Background(), map[string]string{settings.KeyDefaultModel: "", settings.KeyDefaultEffort: ""}); err != nil {
 		t.Fatal(err)
 	}
-	if c, _ := reg.Get("thread.new"); c.Args[0].Default != "claude-opus-4-8[1m]" || c.Args[1].Default != "high" {
+	if c, _ := reg.Get("thread.new"); c.Args[0].Default != "claude-sonnet-5[1m]" || c.Args[1].Default != "medium" {
 		t.Errorf("defaults after reset = %q/%q", c.Args[0].Default, c.Args[1].Default)
 	}
-	if c, _ := reg.Get("pr.fix.findings"); argDefault(c, "model") != "claude-opus-4-8[1m]" || argDefault(c, "effort") != "high" {
+	if c, _ := reg.Get("pr.fix.findings"); argDefault(c, "model") != "claude-sonnet-5[1m]" || argDefault(c, "effort") != "medium" {
 		t.Errorf("pr.fix.findings defaults after reset = %q/%q", argDefault(c, "model"), argDefault(c, "effort"))
 	}
 }
@@ -124,7 +124,7 @@ func TestSettingsNamer(t *testing.T) {
 	if _, err := namer(context.Background(), "hi"); err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{"claude-sonnet-5[1m]", "claude-4.5-haiku[1m]"}; !slices.Equal(models, want) {
+	if want := []string{"claude-sonnet-4-6[1m]", "claude-4.5-haiku[1m]"}; !slices.Equal(models, want) {
 		t.Errorf("naming models = %q, want %q", models, want)
 	}
 	if _, err := st.Update(context.Background(), map[string]string{settings.KeyAutoName: "false"}); err != nil {

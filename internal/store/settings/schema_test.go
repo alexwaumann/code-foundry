@@ -165,16 +165,33 @@ func TestEnumLabels(t *testing.T) {
 			}
 		})
 	}
-	if f := field(t, KeyDefaultModel); f.Default != "claude-opus-4-8[1m]" {
-		t.Errorf("default model = %q, want Opus 4.8", f.Default)
+}
+
+// TestNewThreadDefaults pins the defaults a fresh install starts from (Alex,
+// 2026-10-17): Sonnet 5 at medium effort, Sonnet 4.6 naming, the project folder
+// itself, comfortable density.
+func TestNewThreadDefaults(t *testing.T) {
+	d := Defaults()
+	tests := []struct {
+		key, want, got string
+	}{
+		{KeyDefaultModel, "claude-sonnet-5[1m]", d.Threads.DefaultModel},
+		{KeyDefaultEffort, "medium", d.Threads.DefaultEffort},
+		{KeyNamingModel, "claude-sonnet-4-6[1m]", d.Threads.NamingModel},
+		{KeyDefaultWorktree, WorktreeCurrent, d.Threads.DefaultWorktree},
+		{KeyDensity, "comfortable", d.Appearance.Density},
+	}
+	for _, tt := range tests {
+		t.Run(tt.key, func(t *testing.T) {
+			if f := field(t, tt.key); f.Default != tt.want || tt.got != tt.want {
+				t.Errorf("field default = %q, Defaults() = %q, want %q", f.Default, tt.got, tt.want)
+			}
+		})
 	}
 }
 
 func TestNamingModelField(t *testing.T) {
 	f := field(t, KeyNamingModel)
-	if f.Default != "claude-sonnet-5[1m]" || Defaults().Threads.NamingModel != "claude-sonnet-5[1m]" {
-		t.Errorf("default = %q, Defaults() = %q; want Sonnet 5", f.Default, Defaults().Threads.NamingModel)
-	}
 	if f.Group != GroupThreads || f.Restart || !slices.Equal(f.Enum, field(t, KeyDefaultModel).Enum) ||
 		!slices.Equal(f.EnumLabels, field(t, KeyDefaultModel).EnumLabels) {
 		t.Errorf("field = %+v, want a live Threads enum over the model registry", f)
@@ -454,14 +471,11 @@ func TestNotificationFields(t *testing.T) {
 func TestDefaultWorktreeField(t *testing.T) {
 	f := field(t, KeyDefaultWorktree)
 	// Live (the composer reads every snapshot), in Threads, right after the default effort.
-	if f.Group != GroupThreads || f.Type != Enum || f.Default != WorktreeNew || f.Restart || f.Title != "New threads work in" {
+	if f.Group != GroupThreads || f.Type != Enum || f.Default != WorktreeCurrent || f.Restart || f.Title != "New threads work in" {
 		t.Errorf("field = %+v", f)
 	}
 	if i := slices.IndexFunc(staticFields, func(f Field) bool { return f.Key == KeyDefaultEffort }); staticFields[i+1].Key != KeyDefaultWorktree {
 		t.Errorf("field after %s = %s", KeyDefaultEffort, staticFields[i+1].Key)
-	}
-	if got := Defaults().Threads.DefaultWorktree; got != WorktreeNew {
-		t.Errorf("Defaults().Threads.DefaultWorktree = %q, want %q", got, WorktreeNew)
 	}
 	tests := []struct {
 		in, label string

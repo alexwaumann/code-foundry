@@ -32,11 +32,11 @@ file and <kbd>/</kbd> to run one of the project's skills or commands.
 
 **Work in**, under the prompt, decides where the thread edits files:
 
-* **A fresh copy of the project** (the pill reads **Fresh copy**) gives the thread its
-  own folder and branch, so several threads can work at once and you keep or discard
-  each one. This is the default. The app keeps these copies under
-  `~/.code-foundry/worktrees`.
-* **The project folder itself** (**In place**) edits your files where they are.
+* **The project folder itself** (the pill reads **In place**) edits your files where
+  they are. This is the default.
+* **A fresh copy of the project** (**Fresh copy**) gives the thread its own folder and
+  branch, so several threads can work at once and you keep or discard each one. The app
+  keeps these copies under `~/.code-foundry/worktrees`.
 
 The app remembers your last choice for each project. Set the default for every project
 under Settings › Threads › **New threads work in**.

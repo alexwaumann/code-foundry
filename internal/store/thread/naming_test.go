@@ -190,8 +190,8 @@ func TestNamingArgs(t *testing.T) {
 	}{
 		{"hardened", "claude-opus-4-8[1m]", false, `-p --model claude-opus-4-8[1m] --effort low --no-session-persistence --safe-mode --tools "" -- <prompt>`},
 		{"minimal", "claude-opus-4-8[1m]", true, `-p --model claude-opus-4-8[1m] --effort low --no-session-persistence -- <prompt>`},
-		{"default model, hardened", model.NamingDefault, false, `-p --model claude-sonnet-5[1m] --effort low --no-session-persistence --safe-mode --tools "" -- <prompt>`},
-		{"default model, minimal", model.NamingDefault, true, `-p --model claude-sonnet-5[1m] --effort low --no-session-persistence -- <prompt>`},
+		{"default model, hardened", model.NamingDefault, false, `-p --model claude-sonnet-4-6[1m] --effort low --no-session-persistence --safe-mode --tools "" -- <prompt>`},
+		{"default model, minimal", model.NamingDefault, true, `-p --model claude-sonnet-4-6[1m] --effort low --no-session-persistence -- <prompt>`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -208,10 +208,10 @@ func TestNamingModel(t *testing.T) {
 		ctx  context.Context
 		want string
 	}{
-		{"unset", context.Background(), "claude-sonnet-5[1m]"},
-		{"empty", WithNamingModel(context.Background(), ""), "claude-sonnet-5[1m]"},
-		{"unknown", WithNamingModel(context.Background(), "gpt-5"), "claude-sonnet-5[1m]"},
-		{"retired alias", WithNamingModel(context.Background(), "haiku"), "claude-sonnet-5[1m]"},
+		{"unset", context.Background(), "claude-sonnet-4-6[1m]"},
+		{"empty", WithNamingModel(context.Background(), ""), "claude-sonnet-4-6[1m]"},
+		{"unknown", WithNamingModel(context.Background(), "gpt-5"), "claude-sonnet-4-6[1m]"},
+		{"retired alias", WithNamingModel(context.Background(), "haiku"), "claude-sonnet-4-6[1m]"},
 		{"set", WithNamingModel(context.Background(), "claude-4.5-haiku[1m]"), "claude-4.5-haiku[1m]"},
 		{"newest", WithNamingModel(context.Background(), "claude-haiku-5-5[1m]"), "claude-haiku-5-5[1m]"},
 	}
@@ -235,7 +235,7 @@ func TestClaudeNamerModel(t *testing.T) {
 		}
 	}
 	want := [][]string{
-		append(namingArgs("claude-sonnet-5[1m]", false), "--", "<prompt>"),
+		append(namingArgs("claude-sonnet-4-6[1m]", false), "--", "<prompt>"),
 		append(namingArgs("claude-4.5-haiku[1m]", false), "--", "<prompt>"),
 	}
 	if got := fakeCalls(t, dir); !slices.EqualFunc(got, want, slices.Equal) {

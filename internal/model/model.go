@@ -38,12 +38,12 @@ var registry = []Model{
 }
 
 // Default is the model for new threads when the settings do not pick one.
-const Default = "claude-opus-4-8[1m]"
+const Default = "claude-sonnet-5[1m]"
 
 // NamingDefault is the model of the claude -p call that names a new thread when the
-// settings (threads.naming_model) do not pick one. Sonnet until Haiku 5.5 is
-// available everywhere the app runs.
-const NamingDefault = "claude-sonnet-5[1m]"
+// settings (threads.naming_model) do not pick one. Sonnet 4.6: cheap and fast, and a
+// name is a few words.
+const NamingDefault = "claude-sonnet-4-6[1m]"
 
 // All returns the registry in display order.
 func All() []Model { return slices.Clone(registry) }
