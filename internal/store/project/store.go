@@ -819,6 +819,11 @@ func (g *Git) RemoveWorktree(ctx context.Context, opts RemoveWorktreeOptions) er
 // --- jobs ------------------------------------------------------------------------
 
 func (g *Git) runJob(ctx context.Context, k jobKey) {
+	start := time.Now()
+	defer func() {
+		g.log.Debug("job done", "job", k.kind.String(), "project", k.projectID, "worktree", k.path,
+			"took", time.Since(start).Round(time.Millisecond))
+	}()
 	switch k.kind {
 	case jobReconcile:
 		g.reconcile(ctx, k.projectID)
