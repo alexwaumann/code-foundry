@@ -142,7 +142,12 @@ export function modelSlot(model: string): ModelSlot {
  * follows the theme without a stylesheet entry.
  */
 export function modelColorVars(model: string): Record<"--sw-l" | "--sw-d", string> {
-  const c = SLOT_COLORS[modelSlot(model)];
+  return slotColorVars(modelSlot(model));
+}
+
+/** A slot's colours as --sw-l / --sw-d, for series that are not models (PR activity). */
+export function slotColorVars(slot: ModelSlot): Record<"--sw-l" | "--sw-d", string> {
+  const c = SLOT_COLORS[slot];
   return { "--sw-l": c.light, "--sw-d": c.dark };
 }
 

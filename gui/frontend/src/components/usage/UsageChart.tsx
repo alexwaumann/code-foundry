@@ -1,5 +1,6 @@
-import { useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import { fmtTok, fmtUsd, modelColorVars, SWATCH_BG } from "@/lib/usage";
+import { useWidth } from "@/lib/useWidth";
 import { cn } from "@/lib/utils";
 import { dayLabel, labelledDays, niceStep, seriesLabel, type DayUsage } from "./usageData";
 
@@ -36,26 +37,6 @@ function formatTick(v: number, mode: ChartMode): string {
 function topRoundedRect(x: number, y: number, w: number, h: number, r: number): string {
   const rr = Math.max(0, Math.min(r, w / 2, h));
   return `M${String(x)},${String(y + h)}V${String(y + rr)}A${String(rr)},${String(rr)} 0 0 1 ${String(x + rr)},${String(y)}H${String(x + w - rr)}A${String(rr)},${String(rr)} 0 0 1 ${String(x + w)},${String(y + rr)}V${String(y + h)}Z`;
-}
-
-function useWidth(): [React.RefObject<HTMLDivElement | null>, number] {
-  const ref = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(960);
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const measure = () => {
-      if (el.clientWidth > 0) setWidth(el.clientWidth);
-    };
-    measure();
-    if (typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => {
-      ro.disconnect();
-    };
-  }, []);
-  return [ref, width];
 }
 
 interface Hover {
