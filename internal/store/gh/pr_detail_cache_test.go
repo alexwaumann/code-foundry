@@ -39,12 +39,12 @@ func TestFullCacheAdopt(t *testing.T) {
 	row := FullPullRequest{Body: "from sqlite"}
 
 	var c fullCache
-	if d, stale := c.adopt(k, row); d.Body != "from sqlite" || !stale {
-		t.Errorf("adopt into empty = %q stale %v, want the row, stale", d.Body, stale)
+	if e := c.adopt(k, row); e.d.Body != "from sqlite" || !e.stale || !e.confirmed.IsZero() {
+		t.Errorf("adopt into empty = %q stale %v confirmed %v, want the row, stale, unconfirmed", e.d.Body, e.stale, e.confirmed)
 	}
 	c.put(k, fresh)
-	if d, stale := c.adopt(k, row); d.Body != "fetched" || stale {
-		t.Errorf("adopt over a fetched entry = %q stale %v, want it kept", d.Body, stale)
+	if e := c.adopt(k, row); e.d.Body != "fetched" || e.stale {
+		t.Errorf("adopt over a fetched entry = %q stale %v, want it kept", e.d.Body, e.stale)
 	}
 
 	// Check and insert are one step: a fetch storing its result concurrently is never
@@ -135,5 +135,123 @@ func TestFullPullRequestReusesInFlightFetch(t *testing.T) {
 	// A refresh asked for after that fetch finished does fetch.
 	if r := <-read(true); r.err != nil || f.count("PullRequestFull") != 2 {
 		t.Errorf("later refresh: %v, fetches %d", r.err, f.count("PullRequestFull"))
+	}
+}
+
+func TestFullEntryServes(t *testing.T) {
+	now := time.Date(2026, 10, 17, 12, 0, 0, 0, time.UTC)
+	const interval = time.Minute
+	entry := func(state PullRequestState, age time.Duration, confirmedAgo time.Duration, stale bool) fullEntry {
+		e := fullEntry{d: FullPullRequest{PullRequest: PullRequest{State: state}, FetchedAt: now.Add(-age)}, stale: stale}
+		if confirmedAgo >= 0 {
+			e.confirmed = now.Add(-confirmedAgo)
+		}
+		return e
+	}
+	const never = -1
+	tests := []struct {
+		name string
+		e    fullEntry
+		want bool
+	}{
+		{"open, younger than the interval", entry(PullRequestOpen, 30*time.Second, never, false), true},
+		{"open, past the interval, never confirmed (uncovered)", entry(PullRequestOpen, 61*time.Second, never, false), false},
+		{"open, past the interval, confirmed just now", entry(PullRequestOpen, 5*time.Minute, 0, false), true},
+		{"open, confirmed within the window (interval plus half)", entry(PullRequestOpen, 5*time.Minute, 80*time.Second, false), true},
+		{"open, confirmation past the window", entry(PullRequestOpen, 5*time.Minute, 90*time.Second, false), false},
+		{"open, confirmed but older than confirmedMaxAge", entry(PullRequestOpen, confirmedMaxAge, 0, false), false},
+		{"open, stale though young and confirmed", entry(PullRequestOpen, time.Second, 0, true), false},
+		{"merged, past the interval, inside closedDetailTTL", entry(PullRequestMerged, 9*time.Minute, never, false), true},
+		{"merged, past closedDetailTTL, never confirmed", entry(PullRequestMerged, closedDetailTTL, never, false), false},
+		{"closed, inside closedDetailTTL", entry(PullRequestClosed, 9*time.Minute, never, false), true},
+		{"closed, past closedDetailTTL", entry(PullRequestClosed, 11*time.Minute, never, false), false},
+		{"merged, stale inside closedDetailTTL", entry(PullRequestMerged, time.Minute, never, true), false},
+		{"merged, confirmed but past confirmedMaxAge", entry(PullRequestMerged, 11*time.Minute, 0, false), false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.e.serves(now, interval); got != tt.want {
+				t.Errorf("serves = %v, want %v", got, tt.want)
+			}
+		})
+	}
+
+	// A poll interval longer than closedDetailTTL stays the closed limit too.
+	long := entry(PullRequestMerged, 15*time.Minute, never, false)
+	if !long.serves(now, 20*time.Minute) {
+		t.Error("merged under a 20 minute interval: refetched before the interval")
+	}
+}
+
+func TestFullCacheApplyPoll(t *testing.T) {
+	t0 := time.Date(2026, 10, 17, 12, 0, 0, 0, time.UTC)
+	now := t0.Add(5 * time.Minute)
+	pr := func(id string, mutate func(*PullRequest)) PullRequest {
+		p := PullRequest{ID: id, State: PullRequestOpen, UpdatedAt: t0, HeadSHA: "h1",
+			Mergeable: MergeableMergeable, MergeStateStatus: "CLEAN",
+			Checks: CheckRollup{State: RollupSuccess, Total: 2, Passed: 2}}
+		if mutate != nil {
+			mutate(&p)
+		}
+		return p
+	}
+	fp := func(p PullRequest) prFingerprint {
+		return prFingerprint{ID: p.ID, UpdatedAt: p.UpdatedAt, State: p.State, HeadSHA: p.HeadSHA, Checks: p.Checks, HasChecks: true}
+	}
+	unchanged := pr("PR_x", nil)
+	tests := []struct {
+		name          string
+		cached        PullRequest
+		stale         bool
+		seen          []prFingerprint
+		wantStale     bool
+		wantConfirmed bool
+		wantKeys      int
+	}{
+		{name: "unchanged: confirmed", cached: unchanged, seen: []prFingerprint{fp(unchanged)}, wantConfirmed: true},
+		{name: "updatedAt moved: stale", cached: unchanged,
+			seen:      []prFingerprint{fp(pr("PR_x", func(p *PullRequest) { p.UpdatedAt = t0.Add(time.Minute) }))},
+			wantStale: true, wantKeys: 1},
+		{name: "check counts moved: stale", cached: unchanged,
+			seen:      []prFingerprint{fp(pr("PR_x", func(p *PullRequest) { p.Checks.Total, p.Checks.Passed = 3, 3 }))},
+			wantStale: true, wantKeys: 1},
+		{name: "not in the poll (uncovered): untouched", cached: unchanged, seen: []prFingerprint{fp(pr("PR_other", nil))}},
+		{name: "already stale: stays stale, not confirmed, not announced again", cached: unchanged, stale: true,
+			seen: []prFingerprint{fp(unchanged)}, wantStale: true},
+		{name: "mergeability still computing: not confirmed",
+			cached: pr("PR_x", func(p *PullRequest) { p.Mergeable = MergeableUnknown }),
+			seen:   []prFingerprint{fp(unchanged)}},
+		{name: "merge state still computing: not confirmed",
+			cached: pr("PR_x", func(p *PullRequest) { p.MergeStateStatus = "UNKNOWN" }),
+			seen:   []prFingerprint{fp(unchanged)}},
+		{name: "merged with unknown mergeability: confirmed",
+			cached: pr("PR_x", func(p *PullRequest) { p.State, p.Mergeable, p.MergeStateStatus = PullRequestMerged, MergeableUnknown, "UNKNOWN" }),
+			seen:   []prFingerprint{fp(pr("PR_x", func(p *PullRequest) { p.State = PullRequestMerged }))}, wantConfirmed: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var c fullCache
+			k := fullKey{"o/r", 1}
+			c.put(k, FullPullRequest{PullRequest: tt.cached, FetchedAt: t0})
+			if tt.stale {
+				c.markStale(k)
+			}
+			keys := c.applyPoll(tt.seen, now)
+			e, _ := c.entry(k)
+			if len(keys) != tt.wantKeys || e.stale != tt.wantStale || e.confirmed.Equal(now) != tt.wantConfirmed {
+				t.Errorf("keys %v, stale %v, confirmed %v; want %d keys, stale %v, confirmed %v",
+					keys, e.stale, e.confirmed, tt.wantKeys, tt.wantStale, tt.wantConfirmed)
+			}
+		})
+	}
+
+	// A fetch replaces the entry unconfirmed: until the next poll, the age rule applies.
+	var c fullCache
+	k := fullKey{"o/r", 1}
+	c.put(k, FullPullRequest{PullRequest: unchanged, FetchedAt: t0})
+	c.applyPoll([]prFingerprint{fp(unchanged)}, now)
+	c.put(k, FullPullRequest{PullRequest: unchanged, FetchedAt: now})
+	if e, _ := c.entry(k); !e.confirmed.IsZero() {
+		t.Errorf("a new fetch kept the old confirmation %v", e.confirmed)
 	}
 }
