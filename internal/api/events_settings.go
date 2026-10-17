@@ -26,10 +26,10 @@ func settingsWrap(s *settings.Snapshot) *v1.Event {
 	return &v1.Event{Event: &v1.Event_Settings{Settings: settingsEvent(s)}}
 }
 
-func (s settingsSource) subscribe(ctx context.Context) <-chan *v1.Event {
-	return fanIn(ctx, newTap(s.bus, settingsWatchBuffer, func(ev settings.Changed) *v1.Event {
+func (s settingsSource) topics() []topic {
+	return []topic{busTopic(s.bus, settingsWatchBuffer, func(ev settings.Changed) *v1.Event {
 		return settingsWrap(ev.Snapshot)
-	}))
+	})}
 }
 
 func (s settingsSource) snapshot(context.Context) []*v1.Event {

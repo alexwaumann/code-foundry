@@ -47,10 +47,14 @@ type EventsDeps struct {
 
 // Events implements codefoundryv1connect.EventServiceHandler: one server stream that
 // carries every store's Watch events and UI intents, so a browser holds one connection
-// instead of one per service.
+// instead of one per service. Live events pass through one hub (events_hub.go) that
+// numbers them (Event.seq) and keeps the last ones for clients that resume.
 type Events struct {
 	deps EventsDeps
 	beat time.Duration // Watch's heartbeat interval; zero is HeartbeatInterval (tests shorten it)
+
+	hubOnce sync.Once
+	hub     *eventHub
 }
 
 var _ codefoundryv1connect.EventServiceHandler = (*Events)(nil)
@@ -64,19 +68,37 @@ func (h *Events) Route(opts ...connect.HandlerOption) Route {
 	return Route{Path: path, Handler: handler}
 }
 
-// eventSource is one store's contribution to Watch. Sources are built per stream, so
-// they may keep per-client state.
+// eventHub returns the hub, starting it on the first Watch. It runs until Done closes
+// (for ever without one), so events published while no client is connected are still
+// numbered and kept for a later resume.
+func (h *Events) eventHub() *eventHub {
+	h.hubOnce.Do(func() { h.hub = newEventHub(h.deps.Done, h.sources()) })
+	return h.hub
+}
+
+// eventSource is one store's contribution to Watch. The hub builds one set of sources
+// for their topics; each stream builds its own for snapshots, so a source may keep
+// per-client state (see eventObserver).
 type eventSource interface {
 	kind() v1.EventSource
-	// subscribe starts live delivery until ctx ends and closes the channel then. It is
-	// called before snapshot, so nothing published in between is lost; events queued
-	// before the snapshot carry full state, so applying them in order still converges.
-	// A nil event means the source dropped events for this client: the multiplexer
-	// resends snapshot instead.
-	subscribe(ctx context.Context) <-chan *v1.Event
+	// topics are the bus topics the source carries, each with its mapping to an Event.
+	// The hub subscribes them once and fans the events out to every stream that wants
+	// the source. A stream joins the hub before it takes the snapshots, so nothing
+	// published in between is lost; events queued before a snapshot carry full state,
+	// so applying them in order still converges.
+	topics() []topic
 	// snapshot returns the events that bring a client to the source's current state.
+	// It is sent on connect and again when the client missed events of the source.
 	snapshot(ctx context.Context) []*v1.Event
 }
+
+// eventObserver is a source that keeps per-client state from the live and replayed
+// events the stream sends (terminalSource's known ids).
+type eventObserver interface{ observe(ev *v1.Event) }
+
+// eventResumer is a source with per-client state to set up when a stream resumes
+// (since_seq) instead of starting with the snapshot.
+type eventResumer interface{ resume(ctx context.Context) }
 
 // sources lists the stream's sources in the order their snapshots are sent (see
 // events.proto: repo, workspace, terminal, thread, thread, gh, gitops, settings, update,
@@ -124,32 +146,23 @@ func selectSources(all []eventSource, want []v1.EventSource) []eventSource {
 	return slices.DeleteFunc(all, func(s eventSource) bool { return !slices.Contains(want, s.kind()) })
 }
 
-type tagged struct {
-	src int
-	ev  *v1.Event
-}
-
-// Watch subscribes every requested source, sends their snapshots, then live events
-// until the client goes away or the daemon stops. When a source drops events for a
-// slow client, that source's snapshot is sent again; other sources are unaffected.
+// Watch joins the hub for the requested sources, sends their snapshots (or, resuming
+// with since_seq, the kept events after it), then live events until the client goes
+// away or the daemon stops. When the client missed events of a source (its queue was
+// full, or the hub's own subscription dropped some), that source's snapshot is sent
+// again and its queued events the snapshot already covers are skipped; other sources
+// are unaffected.
 func (h *Events) Watch(ctx context.Context, req *connect.Request[v1.WatchEventsRequest], stream *connect.ServerStream[v1.Event]) error {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
 	srcs := selectSources(h.sources(), req.Msg.GetSources())
-
-	merged := make(chan tagged)
-	for i, s := range srcs {
-		ch := s.subscribe(ctx)
-		go func() {
-			for ev := range ch {
-				select {
-				case merged <- tagged{i, ev}:
-				case <-ctx.Done():
-					return
-				}
-			}
-		}()
+	byKind := make(map[v1.EventSource]eventSource, len(srcs))
+	var mask kindMask
+	for _, s := range srcs {
+		byKind[s.kind()] = s
+		mask |= kindBit(s.kind())
 	}
+	hub := h.eventHub()
+	c, replay, resumed := hub.join(mask, req.Msg.GetSinceSeq())
+	defer hub.leave(c)
 
 	// Quiet sources (gh polling off, no thread busy) get a heartbeat every
 	// HeartbeatInterval (see heartbeat.proto).
@@ -158,6 +171,12 @@ func (h *Events) Watch(ctx context.Context, req *connect.Request[v1.WatchEventsR
 	send := func(ev *v1.Event) error {
 		beat.Reset()
 		return stream.Send(ev)
+	}
+	deliver := func(e hubEvent) error {
+		if o, ok := byKind[e.kind].(eventObserver); ok {
+			o.observe(e.ev)
+		}
+		return send(e.ev)
 	}
 	sendSnapshot := func(s eventSource) (int, error) {
 		evs := s.snapshot(ctx)
@@ -169,14 +188,28 @@ func (h *Events) Watch(ctx context.Context, req *connect.Request[v1.WatchEventsR
 		return len(evs), nil
 	}
 	sent := 0
-	for _, s := range srcs {
-		n, err := sendSnapshot(s)
-		if err != nil {
-			return err
+	if resumed {
+		for _, s := range srcs {
+			if r, ok := s.(eventResumer); ok {
+				r.resume(ctx)
+			}
 		}
-		sent += n
+		for _, e := range replay {
+			if err := deliver(e); err != nil {
+				return err
+			}
+		}
+		sent = len(replay)
+	} else {
+		for _, s := range srcs {
+			n, err := sendSnapshot(s)
+			if err != nil {
+				return err
+			}
+			sent += n
+		}
 	}
-	// Flush response headers now if no snapshot did: clients block until they arrive,
+	// Flush response headers now if nothing was sent: clients block until they arrive,
 	// and the first live event may be a long way off.
 	if sent == 0 {
 		if err := send(nil); err != nil {
@@ -184,6 +217,26 @@ func (h *Events) Watch(ctx context.Context, req *connect.Request[v1.WatchEventsR
 		}
 	}
 
+	// covered[k]: the last resync snapshot of source k had every event up to this seq.
+	covered := make(map[v1.EventSource]uint64)
+	resync := func() error {
+		dirty := c.takeDirty()
+		if dirty == 0 {
+			return nil
+		}
+		for _, s := range srcs {
+			if !dirty.has(s.kind()) {
+				continue
+			}
+			// Read before the snapshot: an event numbered up to here was published
+			// after its store changed, so the snapshot has it.
+			covered[s.kind()] = hub.lastSeq()
+			if _, err := sendSnapshot(s); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
 	for {
 		select {
 		case <-ctx.Done():
@@ -194,23 +247,56 @@ func (h *Events) Watch(ctx context.Context, req *connect.Request[v1.WatchEventsR
 			if err := send(&v1.Event{Event: &v1.Event_Heartbeat{Heartbeat: &v1.StreamHeartbeat{}}}); err != nil {
 				return err
 			}
-		case t := <-merged:
-			if t.ev == nil {
-				if _, err := sendSnapshot(srcs[t.src]); err != nil {
-					return err
-				}
-				continue
+		case <-c.poke:
+			if err := resync(); err != nil {
+				return err
 			}
-			if err := send(t.ev); err != nil {
+		case e := <-c.ch:
+			if err := resync(); err != nil {
+				return err
+			}
+			if !e.transient && e.ev.GetSeq() <= covered[e.kind] {
+				continue // older than the snapshot just sent
+			}
+			if err := deliver(e); err != nil {
 				return err
 			}
 		}
 	}
 }
 
-// tap is one bus subscription feeding a source's channel.
+// topic is one bus topic of a source: open subscribes to it now.
+//
+// A transient topic carries fire-and-forget events (UI intents, relaunch and restart
+// requests): the hub subscribes it only while a stream wants its source, so the
+// publisher's delivery count (bus.Publish) still says whether anyone listens, and its
+// events are numbered but never kept for a resume.
+type topic struct {
+	open      func() tap
+	transient bool
+}
+
+// busTopic is the topic of bus events of type T with a buffer of n (the hub's backlog
+// before it drops; a drop makes every stream resync the source), each mapped by conv
+// (nil: not carried).
+func busTopic[T any](b *bus.Bus, n int, conv func(T) *v1.Event) topic {
+	return topic{open: func() tap { return &busTap[T]{sub: bus.Subscribe[T](b, n), conv: conv} }}
+}
+
+// transientTopic is busTopic for a transient topic.
+func transientTopic[T any](b *bus.Bus, n int, conv func(T) *v1.Event) topic {
+	t := busTopic(b, n, conv)
+	t.transient = true
+	return t
+}
+
+// tap is one bus subscription feeding a source's events to emit.
 type tap interface {
-	run(ctx context.Context, out chan<- *v1.Event)
+	// run delivers until ctx ends, the tap is closed, or emit returns false. A nil
+	// event means the subscription dropped events: the receiver resyncs the source.
+	run(ctx context.Context, emit func(*v1.Event) bool)
+	// close unsubscribes at once; run then returns.
+	close()
 }
 
 type busTap[T any] struct {
@@ -218,13 +304,9 @@ type busTap[T any] struct {
 	conv func(T) *v1.Event
 }
 
-// newTap subscribes to T now (so the caller can take a snapshot afterwards) with a
-// buffer of n events: the source's bounded backlog for a slow client.
-func newTap[T any](b *bus.Bus, n int, conv func(T) *v1.Event) tap {
-	return &busTap[T]{sub: bus.Subscribe[T](b, n), conv: conv}
-}
+func (t *busTap[T]) close() { t.sub.Close() }
 
-func (t *busTap[T]) run(ctx context.Context, out chan<- *v1.Event) {
+func (t *busTap[T]) run(ctx context.Context, emit func(*v1.Event) bool) {
 	defer t.sub.Close()
 	var dropped uint64
 	for {
@@ -242,21 +324,30 @@ func (t *busTap[T]) run(ctx context.Context, out chan<- *v1.Event) {
 				continue
 			}
 		}
-		select {
-		case out <- msg:
-		case <-ctx.Done():
+		if !emit(msg) {
 			return
 		}
 	}
 }
 
-// fanIn runs already subscribed taps and merges them into one channel, closed once all
-// have stopped. Order is kept within a tap, not across taps (as terminal.Manager.Watch).
-func fanIn(ctx context.Context, taps ...tap) <-chan *v1.Event {
+// subscribeTopics subscribes topics now and merges their events into one channel,
+// closed once all have stopped (when ctx ends). Order is kept within a topic, not
+// across topics (as terminal.Manager.Watch). For a single-source stream that does not
+// go through the hub (UpdateService.Watch).
+func subscribeTopics(ctx context.Context, topics []topic) <-chan *v1.Event {
 	out := make(chan *v1.Event)
+	emit := func(ev *v1.Event) bool {
+		select {
+		case out <- ev:
+			return true
+		case <-ctx.Done():
+			return false
+		}
+	}
 	var wg sync.WaitGroup
-	for _, t := range taps {
-		wg.Go(func() { t.run(ctx, out) })
+	for _, tp := range topics {
+		t := tp.open()
+		wg.Go(func() { t.run(ctx, emit) })
 	}
 	go func() {
 		wg.Wait()
@@ -274,13 +365,13 @@ type repoSource struct {
 
 func (repoSource) kind() v1.EventSource { return v1.EventSource_EVENT_SOURCE_REPO }
 
-func (s repoSource) subscribe(ctx context.Context) <-chan *v1.Event {
-	return fanIn(ctx, newTap(s.bus, watchBuffer, func(ev repo.Event) *v1.Event {
+func (s repoSource) topics() []topic {
+	return []topic{busTopic(s.bus, watchBuffer, func(ev repo.Event) *v1.Event {
 		if m := eventToProto(ev); m != nil {
 			return &v1.Event{Event: &v1.Event_Repo{Repo: m}}
 		}
 		return nil
-	}))
+	})}
 }
 
 func (s repoSource) snapshot(context.Context) []*v1.Event {
@@ -307,8 +398,8 @@ func workspaceWrap(ev workspace.Event) *v1.Event {
 	return nil
 }
 
-func (s workspaceSource) subscribe(ctx context.Context) <-chan *v1.Event {
-	return fanIn(ctx, newTap(s.bus, watchBuffer, workspaceWrap))
+func (s workspaceSource) topics() []topic {
+	return []topic{busTopic(s.bus, watchBuffer, workspaceWrap)}
 }
 
 func (s workspaceSource) snapshot(context.Context) []*v1.Event {
@@ -319,7 +410,9 @@ func (s workspaceSource) snapshot(context.Context) []*v1.Event {
 
 // terminalSource has no snapshot message in terminal.proto, so its snapshot is one
 // `updated` per terminal plus `removed_id` for every terminal this client was told
-// about that no longer exists. That makes a resync after drops converge too.
+// about that no longer exists. That makes a resync after drops converge too. known is
+// per client: snapshot records what it sends, observe what the hub delivered, and
+// resume starts it from the terminals that exist (a resumed client had them all).
 type terminalSource struct {
 	store terminal.Store
 	bus   *bus.Bus
@@ -329,26 +422,49 @@ type terminalSource struct {
 
 func (*terminalSource) kind() v1.EventSource { return v1.EventSource_EVENT_SOURCE_TERMINAL }
 
-func (s *terminalSource) wrap(ev terminal.Event) *v1.Event {
-	s.mu.Lock()
-	if ev.Updated != nil {
-		s.known[ev.Updated.ID] = true
-	} else {
-		delete(s.known, ev.RemovedID)
-	}
-	s.mu.Unlock()
+func terminalWrap(ev terminal.Event) *v1.Event {
 	return &v1.Event{Event: &v1.Event_Terminal{Terminal: terminalEventToProto(ev)}}
 }
 
-func (s *terminalSource) subscribe(ctx context.Context) <-chan *v1.Event {
-	return fanIn(ctx,
-		newTap(s.bus, terminalWatchBuffer, func(u terminal.TerminalUpdated) *v1.Event {
-			return s.wrap(terminal.Event{Updated: &u.Terminal})
+// wrap is terminalWrap that also records the id as known (or not).
+func (s *terminalSource) wrap(ev terminal.Event) *v1.Event {
+	out := terminalWrap(ev)
+	s.observe(out)
+	return out
+}
+
+func (s *terminalSource) observe(ev *v1.Event) {
+	t := ev.GetTerminal()
+	if t == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if u := t.GetUpdated(); u != nil {
+		s.known[u.GetId()] = true
+	} else {
+		delete(s.known, t.GetRemovedId())
+	}
+}
+
+func (s *terminalSource) resume(ctx context.Context) {
+	ts := s.store.List(ctx)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, t := range ts {
+		s.known[t.ID] = true
+	}
+}
+
+func (s *terminalSource) topics() []topic {
+	return []topic{
+		busTopic(s.bus, terminalWatchBuffer, func(u terminal.TerminalUpdated) *v1.Event {
+			return terminalWrap(terminal.Event{Updated: &u.Terminal})
 		}),
-		newTap(s.bus, terminalWatchBuffer, func(r terminal.TerminalRemoved) *v1.Event {
-			return s.wrap(terminal.Event{RemovedID: r.ID})
+		busTopic(s.bus, terminalWatchBuffer, func(r terminal.TerminalRemoved) *v1.Event {
+			return terminalWrap(terminal.Event{RemovedID: r.ID})
 		}),
-	)
+	}
 }
 
 func (s *terminalSource) snapshot(ctx context.Context) []*v1.Event {
@@ -391,8 +507,8 @@ func threadListWrap(ev thread.Event) *v1.Event {
 	return nil
 }
 
-func (s threadListSource) subscribe(ctx context.Context) <-chan *v1.Event {
-	return fanIn(ctx, newTap(s.bus, watchBuffer, threadListWrap))
+func (s threadListSource) topics() []topic {
+	return []topic{busTopic(s.bus, watchBuffer, threadListWrap)}
 }
 
 func (s threadListSource) snapshot(context.Context) []*v1.Event {
@@ -426,8 +542,8 @@ func threadWrap(ev thread.ThreadEvent) *v1.Event {
 	return nil
 }
 
-func (s threadSource) subscribe(ctx context.Context) <-chan *v1.Event {
-	return fanIn(ctx, newTap(s.bus, threadWatchBuffer, threadWrap))
+func (s threadSource) topics() []topic {
+	return []topic{busTopic(s.bus, threadWatchBuffer, threadWrap)}
 }
 
 func (s threadSource) snapshot(ctx context.Context) []*v1.Event {
@@ -460,15 +576,15 @@ func (ghSource) kind() v1.EventSource { return v1.EventSource_EVENT_SOURCE_GH }
 
 func ghWrap(e *v1.GhEvent) *v1.Event { return &v1.Event{Event: &v1.Event_Gh{Gh: e}} }
 
-func (s ghSource) subscribe(ctx context.Context) <-chan *v1.Event {
-	return fanIn(ctx,
-		newTap(s.bus, ghWatchBuffer, func(e gh.Polled) *v1.Event { return ghWrap(ghPolledEvent(e)) }),
-		newTap(s.bus, ghWatchBuffer, func(e gh.ViewerUpdated) *v1.Event { return ghWrap(ghViewerEvent(e)) }),
-		newTap(s.bus, ghWatchBuffer, func(e gh.DashboardUpdated) *v1.Event { return ghWrap(ghDashboardEvent(e)) }),
-		newTap(s.bus, ghWatchBuffer, func(e gh.RepoActivityUpdated) *v1.Event { return ghWrap(ghRepoActivityEvent(e)) }),
-		newTap(s.bus, ghWatchBuffer, func(e gh.BranchPullRequestsUpdated) *v1.Event { return ghWrap(ghBranchEvent(e)) }),
-		newTap(s.bus, ghWatchBuffer, func(e gh.PullRequestDetailUpdated) *v1.Event { return ghWrap(ghDetailEvent(e)) }),
-	)
+func (s ghSource) topics() []topic {
+	return []topic{
+		busTopic(s.bus, ghWatchBuffer, func(e gh.Polled) *v1.Event { return ghWrap(ghPolledEvent(e)) }),
+		busTopic(s.bus, ghWatchBuffer, func(e gh.ViewerUpdated) *v1.Event { return ghWrap(ghViewerEvent(e)) }),
+		busTopic(s.bus, ghWatchBuffer, func(e gh.DashboardUpdated) *v1.Event { return ghWrap(ghDashboardEvent(e)) }),
+		busTopic(s.bus, ghWatchBuffer, func(e gh.RepoActivityUpdated) *v1.Event { return ghWrap(ghRepoActivityEvent(e)) }),
+		busTopic(s.bus, ghWatchBuffer, func(e gh.BranchPullRequestsUpdated) *v1.Event { return ghWrap(ghBranchEvent(e)) }),
+		busTopic(s.bus, ghWatchBuffer, func(e gh.PullRequestDetailUpdated) *v1.Event { return ghWrap(ghDetailEvent(e)) }),
+	}
 }
 
 func (s ghSource) snapshot(context.Context) []*v1.Event {
@@ -502,13 +618,13 @@ func (gitopsSource) kind() v1.EventSource { return v1.EventSource_EVENT_SOURCE_G
 
 func gitopsWrap(e *v1.GitOpsEvent) *v1.Event { return &v1.Event{Event: &v1.Event_Gitops{Gitops: e}} }
 
-func (s gitopsSource) subscribe(ctx context.Context) <-chan *v1.Event {
-	return fanIn(ctx, newTap(s.bus, gitopsWatchBuffer, func(ev gitops.Event) *v1.Event {
+func (s gitopsSource) topics() []topic {
+	return []topic{busTopic(s.bus, gitopsWatchBuffer, func(ev gitops.Event) *v1.Event {
 		if m := gitopsEventToProto(ev); m != nil {
 			return gitopsWrap(m)
 		}
 		return nil
-	}))
+	})}
 }
 
 func (s gitopsSource) snapshot(context.Context) []*v1.Event {
@@ -518,20 +634,22 @@ func (s gitopsSource) snapshot(context.Context) []*v1.Event {
 // ---- ui ------------------------------------------------------------------------
 
 // uiSource carries intents. They are fire-and-forget: there is no state to snapshot,
-// and intents dropped for a slow client are lost (as with UiService.WatchIntents).
+// and intents dropped for a slow client are lost (as with UiService.WatchIntents). The
+// topic is transient: Emit's delivery count still counts connected windows, and a
+// resumed stream never replays an old intent.
 type uiSource struct {
 	bus *bus.Bus
 }
 
 func (uiSource) kind() v1.EventSource { return v1.EventSource_EVENT_SOURCE_UI }
 
-func (s uiSource) subscribe(ctx context.Context) <-chan *v1.Event {
-	return fanIn(ctx, newTap(s.bus, intentBuffer, func(ev command.IntentEvent) *v1.Event {
+func (s uiSource) topics() []topic {
+	return []topic{transientTopic(s.bus, intentBuffer, func(ev command.IntentEvent) *v1.Event {
 		if ev.Intent == nil {
 			return nil
 		}
 		return &v1.Event{Event: &v1.Event_Ui{Ui: ev.Intent}}
-	}))
+	})}
 }
 
 func (uiSource) snapshot(context.Context) []*v1.Event { return nil }

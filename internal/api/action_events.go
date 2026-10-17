@@ -24,8 +24,8 @@ func actionWrap(ev action.Event) *v1.Event {
 	return nil
 }
 
-func (s actionSource) subscribe(ctx context.Context) <-chan *v1.Event {
-	return fanIn(ctx, newTap(s.bus, watchBuffer, actionWrap))
+func (s actionSource) topics() []topic {
+	return []topic{busTopic(s.bus, watchBuffer, actionWrap)}
 }
 
 func (s actionSource) snapshot(context.Context) []*v1.Event {
