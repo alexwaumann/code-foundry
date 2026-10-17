@@ -13,8 +13,8 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-const R1: SkillSourceView[] = [{ repoId: "r1" }];
-const R12: SkillSourceView[] = [{ repoId: "r1" }, { repoId: "r2", path: "/h/w/r2" }];
+const R1: SkillSourceView[] = [{ projectId: "r1" }];
+const R12: SkillSourceView[] = [{ projectId: "r1" }, { projectId: "r2", path: "/h/w/r2" }];
 const entry = (sources: readonly SkillSourceView[]) => useFilesStore.getState().byKey[fileSourcesKey(sources)];
 
 /** A fake SearchFiles whose calls resolve when told to. */
@@ -44,12 +44,12 @@ describe("files store", () => {
     requestFiles(R1, "ses", fn);
     expect(calls).toHaveLength(0);
     await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
-    expect(calls.map((c) => c.req)).toEqual([{ repoId: "r1", query: "ses", limit: FILE_LIMIT }]);
+    expect(calls.map((c) => c.req)).toEqual([{ projectId: "r1", query: "ses", limit: FILE_LIMIT }]);
     calls[0]?.resolve(hit("internal/api/thread.go"));
     await flush();
     expect(entry(R1)).toEqual({
       answered: "ses",
-      results: [{ repoId: "r1", matches: [{ path: "internal/api/thread.go", isDir: false }] }],
+      results: [{ projectId: "r1", matches: [{ path: "internal/api/thread.go", isDir: false }] }],
       searching: false,
       outdated: false,
     });
@@ -60,15 +60,15 @@ describe("files store", () => {
     requestFiles(R12, "ses", fn);
     await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
     expect(calls.map((c) => c.req)).toEqual([
-      { repoId: "r1", query: "ses", limit: FILE_LIMIT },
-      { repoId: "r2", path: "/h/w/r2", query: "ses", limit: FILE_LIMIT },
+      { projectId: "r1", query: "ses", limit: FILE_LIMIT },
+      { projectId: "r2", path: "/h/w/r2", query: "ses", limit: FILE_LIMIT },
     ]);
     calls[1]?.resolve(hit("b.go"));
     await flush();
     expect(entry(R12)?.answered ?? null).toBeNull(); // waits for every member
     calls[0]?.resolve(hit("a.go"));
     await flush();
-    expect(entry(R12)?.results.map((r) => [r.repoId, r.matches[0]?.path])).toEqual([
+    expect(entry(R12)?.results.map((r) => [r.projectId, r.matches[0]?.path])).toEqual([
       ["r1", "a.go"],
       ["r2", "b.go"],
     ]);
@@ -82,8 +82,8 @@ describe("files store", () => {
     calls[1]?.resolve(hit("x.go"));
     await flush();
     expect(entry(R12)?.results).toEqual([
-      { repoId: "r1", matches: [] },
-      { repoId: "r2", matches: [{ path: "x.go", isDir: false }] },
+      { projectId: "r1", matches: [] },
+      { projectId: "r2", matches: [{ path: "x.go", isDir: false }] },
     ]);
   });
 
@@ -214,26 +214,26 @@ describe("files store", () => {
 
   describe("the checkout searched per worktree mode", () => {
     const wsMembers = [
-      { repoId: "r1", worktreePath: "/h/w/r1" },
-      { repoId: "r2", worktreePath: "/h/w/r2" },
+      { projectId: "r1", worktreePath: "/h/w/r1" },
+      { projectId: "r2", worktreePath: "/h/w/r2" },
     ];
     it.each<[string, FileSourceInput, Omit<FileSearchRequest, "query" | "limit">[]]>([
-      ["a project, new worktree: the main checkout", { target: "project", repoIds: ["r1"], worktree: { kind: "new" }, wsMembers: [] }, [{ repoId: "r1" }]],
+      ["a project, new worktree: the main checkout", { target: "project", projectIds: ["r1"], worktree: { kind: "new" }, wsMembers: [] }, [{ projectId: "r1" }]],
       [
         "a project, existing worktree: that worktree",
-        { target: "project", repoIds: ["r1"], worktree: { kind: "existing", path: "/h/r1-wt" }, wsMembers: [] },
-        [{ repoId: "r1", path: "/h/r1-wt" }],
+        { target: "project", projectIds: ["r1"], worktree: { kind: "existing", path: "/h/r1-wt" }, wsMembers: [] },
+        [{ projectId: "r1", path: "/h/r1-wt" }],
       ],
-      ["a project with Also in: each main checkout", { target: "project", repoIds: ["r1", "r3"], worktree: { kind: "new" }, wsMembers: [] }, [{ repoId: "r1" }, { repoId: "r3" }]],
+      ["a project with Also in: each main checkout", { target: "project", projectIds: ["r1", "r3"], worktree: { kind: "new" }, wsMembers: [] }, [{ projectId: "r1" }, { projectId: "r3" }]],
       [
         "a workspace, Workspace worktrees: each member's worktree",
-        { target: "workspace", repoIds: ["r1", "r2"], worktree: { kind: "members" }, wsMembers },
+        { target: "workspace", projectIds: ["r1", "r2"], worktree: { kind: "members" }, wsMembers },
         [
-          { repoId: "r1", path: "/h/w/r1" },
-          { repoId: "r2", path: "/h/w/r2" },
+          { projectId: "r1", path: "/h/w/r1" },
+          { projectId: "r2", path: "/h/w/r2" },
         ],
       ],
-      ["a workspace, new worktree: each main checkout", { target: "workspace", repoIds: ["r1", "r2"], worktree: { kind: "new" }, wsMembers }, [{ repoId: "r1" }, { repoId: "r2" }]],
+      ["a workspace, new worktree: each main checkout", { target: "workspace", projectIds: ["r1", "r2"], worktree: { kind: "new" }, wsMembers }, [{ projectId: "r1" }, { projectId: "r2" }]],
     ])("%s", async (_name, input, want) => {
       const { fn, calls } = deferred();
       requestFiles(fileSources(input), "q", fn);

@@ -87,7 +87,7 @@ function send(key: string, sources: readonly SkillSourceView[], query: string, s
   c.slow = setTimeout(() => {
     if (c.seq === seq && c.applied < seq) patch(key, { searching: true });
   }, SEARCHING_AFTER_MS);
-  const asks = sources.map((s) => search({ repoId: s.repoId, ...(s.path ? { path: s.path } : {}), query, limit: FILE_LIMIT }));
+  const asks = sources.map((s) => search({ projectId: s.projectId, ...(s.path ? { path: s.path } : {}), query, limit: FILE_LIMIT }));
   void Promise.allSettled(asks).then((settled) => {
     if (seq <= c.applied) return; // a later request's answer landed first
     c.applied = seq;
@@ -100,7 +100,7 @@ function send(key: string, sources: readonly SkillSourceView[], query: string, s
       patch(key, { answered: null, results: [], searching: false, outdated: true });
       return;
     }
-    const results = settled.map((r, i) => ({ repoId: sources[i]?.repoId ?? "", matches: r.status === "fulfilled" ? r.value.matches : [] }));
+    const results = settled.map((r, i) => ({ projectId: sources[i]?.projectId ?? "", matches: r.status === "fulfilled" ? r.value.matches : [] }));
     patch(key, { answered: query, results, ...(done ? { searching: false } : {}) });
   });
 }

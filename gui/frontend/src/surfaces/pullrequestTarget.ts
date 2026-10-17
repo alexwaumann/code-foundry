@@ -7,7 +7,7 @@
 import type { BranchPullRequestsView, PullRequestView } from "@/api/gh";
 import { deriveContext } from "@/stores/context";
 import { makeTab, type Tab } from "@/stores/panel";
-import { findWorktree, type ReposData } from "@/stores/repos";
+import { findWorktree, type ProjectsData } from "@/stores/projects";
 import type { ResourceEntry } from "@/stores/resource";
 import type { ThreadsData } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
@@ -33,7 +33,7 @@ export function prRefOfTab(tab: Pick<Tab, "params">): PrRef | null {
 }
 
 export interface SelectionStores {
-  repos: ReposData;
+  repos: ProjectsData;
   threads: ThreadsData;
 }
 
@@ -41,9 +41,9 @@ export interface SelectionStores {
 export function selectionBranch(sel: Selection, s: SelectionStores): { slug: string; branch: string } | null {
   if (sel.kind === "none" || sel.kind === "view") return null;
   const ctx = deriveContext(sel, s.repos, s.threads);
-  const repo = s.repos.byId[ctx.activeRepoId];
+  const repo = s.repos.byId[ctx.activeProjectId];
   const slug = repo?.githubSlug.toLowerCase() ?? "";
-  const branch = findWorktree(s.repos, ctx.activeRepoId, ctx.activeWorktreePath)?.branch ?? "";
+  const branch = findWorktree(s.repos, ctx.activeProjectId, ctx.activeWorktreePath)?.branch ?? "";
   return slug && branch ? { slug, branch } : null;
 }
 

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { ChevronRight, CloudUpload, Folder, GitBranch, GitBranchPlus, MessageSquare, Terminal, TriangleAlert } from "lucide-react";
 import type { PullRequestView } from "@/api/gh";
-import { isRemoteless, type GitStatusView, type RepoView, type WorktreeView } from "@/api/repo";
+import { isRemoteless, type GitStatusView, type ProjectView, type WorktreeView } from "@/api/project";
 import type { LogEntryView, WorktreeDetailView } from "@/api/worktreeDetail";
 import { NoGitBadge } from "@/components/projects/NoGitBadge";
 import { Age, ChecksBadge, PrStateIcon, ReviewBadge } from "@/components/prs/PrBits";
@@ -17,7 +17,7 @@ import { worktreeContext } from "@/stores/context";
 import { branchKey, branchPullRequestsResource, openUrl } from "@/stores/gh";
 import { openPullRequestInPanel } from "@/stores/prPanel";
 import { openPublishDialog } from "@/stores/publish";
-import { findWorktree, useReposStore } from "@/stores/repos";
+import { findWorktree, useProjectsStore } from "@/stores/projects";
 import { useResource } from "@/stores/resource";
 import { useThreadsStore } from "@/stores/threads";
 import { useTerminalsStore } from "@/stores/terminals";
@@ -280,7 +280,7 @@ function Commits({ detail, base, open }: { detail: WorktreeDetailView; base: str
  * A git repository with no remote: nothing to show from GitHub yet, and the way to put it
  * there: the publish dialog (repo.github.publish's presenter).
  */
-function PublishToGitHub({ repoId }: { repoId: string }) {
+function PublishToGitHub({ projectId }: { projectId: string }) {
   return (
     <div className="flex flex-wrap items-center gap-3" data-testid="no-remote">
       <p className="text-caption">No remote: this repository is only on this Mac.</p>
@@ -289,7 +289,7 @@ function PublishToGitHub({ repoId }: { repoId: string }) {
         variant="outline"
         size="xs"
         onClick={() => {
-          openPublishDialog(repoId);
+          openPublishDialog(projectId);
         }}
         data-testid="publish-github"
       >
@@ -305,7 +305,7 @@ function PublishToGitHub({ repoId }: { repoId: string }) {
  * files and log (none of which exist for it), and the Initialize Git button
  * (repo.git.init on the project, whichever selection the panel belongs to).
  */
-function NoGitBody({ repoId, path }: { repoId: string; path: string }) {
+function NoGitBody({ projectId, path }: { projectId: string; path: string }) {
   const [busy, setBusy] = useState(false);
   return (
     <div className="flex flex-col gap-6" data-testid="overview-nogit">
@@ -327,7 +327,7 @@ function NoGitBody({ repoId, path }: { repoId: string; path: string }) {
           data-testid="init-git"
           onClick={() => {
             setBusy(true);
-            void runCommand("project.git.init", {}, worktreeContext(repoId, path)).finally(() => {
+            void runCommand("project.git.init", {}, worktreeContext(projectId, path)).finally(() => {
               setBusy(false);
             });
           }}
@@ -346,7 +346,7 @@ function NoGitBody({ repoId, path }: { repoId: string; path: string }) {
  * the git operation in progress, the three facts, the branch's pull request, the changes
  * and the commits. Repository-wide GitHub data is the Projects page's.
  */
-function OverviewBody({ repo, wt }: { repo: RepoView; wt: WorktreeView }) {
+function OverviewBody({ repo, wt }: { repo: ProjectView; wt: WorktreeView }) {
   const slug = repo.githubSlug.toLowerCase();
   const st = wt.status;
   const detailEntry = useResource(worktreeDetailResource, detailKey(repo.id, wt.path));
@@ -403,7 +403,7 @@ function OverviewBody({ repo, wt }: { repo: RepoView; wt: WorktreeView }) {
             </span>
           </Tip>
         )}
-        {pr ? <PullRequestRow pr={pr} /> : isRemoteless(repo) ? <PublishToGitHub repoId={repo.id} /> : null}
+        {pr ? <PullRequestRow pr={pr} /> : isRemoteless(repo) ? <PublishToGitHub projectId={repo.id} /> : null}
         <Changes detail={detail} error={detailEntry?.error ?? ""} rows={fileRows} base={base} />
         {showCommits && <Commits detail={detail} base={base} open={commitsOpen} />}
       </div>
@@ -418,18 +418,18 @@ function OverviewBody({ repo, wt }: { repo: RepoView; wt: WorktreeView }) {
  * Initialize Git. The surface is its own CSS container: the facts wrap, and the header's
  * rule spans the panel border to border, by its width.
  */
-export function WorktreePanelView({ repoId, path }: { repoId: string; path: string }) {
-  const repo = useReposStore((s) => s.byId[repoId]);
-  const wt = useReposStore((s) => findWorktree(s, repoId, path));
+export function WorktreePanelView({ projectId, path }: { projectId: string; path: string }) {
+  const repo = useProjectsStore((s) => s.byId[projectId]);
+  const wt = useProjectsStore((s) => findWorktree(s, projectId, path));
   const noGit = repo?.git === false;
   return (
-    <div className="@container min-w-0" data-testid="worktree-surface" data-repo={repoId} data-path={path} data-git={repo ? !noGit : undefined}>
+    <div className="@container min-w-0" data-testid="worktree-surface" data-repo={projectId} data-path={path} data-git={repo ? !noGit : undefined}>
       <div className="flex min-w-0 flex-col gap-3 px-4 py-3 @max-[340px]:px-3">
         <header className="-mx-4 flex min-w-0 flex-col gap-0.5 border-b border-pane-border px-4 pb-2 @max-[340px]:-mx-3 @max-[340px]:px-3" data-testid="worktree-surface-header">
           <h2 className="flex min-w-0 items-center gap-1.5 text-heading">
             {noGit ? <Folder className="size-4 shrink-0 text-muted-foreground" aria-hidden /> : <GitBranch className="size-4 shrink-0 text-highlight" aria-hidden />}
             <span className="flex min-w-0 items-center gap-2 truncate" data-testid="worktree-surface-title">
-              {repo?.name ?? repoId}
+              {repo?.name ?? projectId}
               {noGit ? (
                 <NoGitBadge />
               ) : (
@@ -448,7 +448,7 @@ export function WorktreePanelView({ repoId, path }: { repoId: string; path: stri
         {!repo ? (
           <p className="text-body text-muted-foreground">Project not found.</p>
         ) : noGit ? (
-          <NoGitBody repoId={repoId} path={path} />
+          <NoGitBody projectId={projectId} path={path} />
         ) : !wt ? (
           <p className="text-body text-muted-foreground" data-testid="worktree-surface-missing">
             This worktree is gone (removed from the workspace, or deleted).

@@ -34,14 +34,14 @@ describe("toActionEventView", () => {
     });
     expect(toActionEventView(ev)).toEqual({
       kind: "snapshot",
-      actions: [{ id: "a-1", repoId: "r", name: "Test", command: "go test", icon: "test", inTerminal: true, onWorktreeCreate: true, position: 2 }],
+      actions: [{ id: "a-1", projectId: "r", name: "Test", command: "go test", icon: "test", inTerminal: true, onWorktreeCreate: true, position: 2 }],
       runs: [
         {
           id: "r-1",
           actionId: "a-1",
           actionName: "Test",
           command: "go test",
-          repoId: "r",
+          projectId: "r",
           threadId: "s-1",
           worktreePath: "/w",
           mode: "terminal",

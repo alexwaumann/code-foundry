@@ -14,7 +14,7 @@ const rows = (n: number, char: "/" | "@" = "@"): CompletionGroup[] => [
       key: String(i),
       label: `f${String(i)}`,
       detail: "",
-      tag: char === "@" ? { tagKind: "file" as const, repoId: "r1", path: `f${String(i)}` } : { tagKind: "skill" as const, repoId: "r1", name: `s${String(i)}` },
+      tag: char === "@" ? { tagKind: "file" as const, projectId: "r1", path: `f${String(i)}` } : { tagKind: "skill" as const, projectId: "r1", name: `s${String(i)}` },
     })),
   },
 ];
@@ -143,14 +143,14 @@ describe("useCompletion with skills (unchanged by the file source)", () => {
     expect(keys.map((k) => t.key(k))).toEqual(handled);
     expect(t.c().show).toBe(show);
     if (inserted === null) expect(t.insertTag).not.toHaveBeenCalled();
-    else expect(t.insertTag).toHaveBeenCalledWith({ from: 0, to: 3 }, { tagKind: "skill", repoId: "r1", name: `s${String(inserted)}` });
+    else expect(t.insertTag).toHaveBeenCalledWith({ from: 0, to: 3 }, { tagKind: "skill", projectId: "r1", name: `s${String(inserted)}` });
   });
 });
 
 describe("useCompletion with a running thread's slash commands", () => {
   it("a built-in row inserts its plain text, a skill row its tag", () => {
     const groups: CompletionGroup[] = [
-      { key: "~", heading: { kind: "user" }, items: [{ key: "commit", label: "/commit", detail: "", tag: { tagKind: "skill", repoId: "", name: "commit" } }] },
+      { key: "~", heading: { kind: "user" }, items: [{ key: "commit", label: "/commit", detail: "", tag: { tagKind: "skill", projectId: "", name: "commit" } }] },
       { key: "claude", heading: { kind: "label", text: "Claude Code" }, items: [{ key: "compact", label: "/compact", hint: "<instructions>", detail: "", tag: "/compact" }] },
     ];
     const src: CompletionSource = { ...skills(0, "co"), label: "Slash commands", groups, emptyText: "No commands match" };
@@ -161,6 +161,6 @@ describe("useCompletion with a running thread's slash commands", () => {
     expect(t.insertTag).not.toHaveBeenCalled();
     expect(t.key("up")).toBe(true);
     expect(t.key("tab")).toBe(true);
-    expect(t.insertTag).toHaveBeenCalledWith({ from: 4, to: 7 }, { tagKind: "skill", repoId: "", name: "commit" });
+    expect(t.insertTag).toHaveBeenCalledWith({ from: 4, to: 7 }, { tagKind: "skill", projectId: "", name: "commit" });
   });
 });

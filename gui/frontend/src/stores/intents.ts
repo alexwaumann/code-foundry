@@ -62,9 +62,9 @@ export function applyIntent(intent: UiIntentView): void {
       clearPendingFocus();
       ui.select({ kind: "thread", id: intent.threadId }, { focusPrompt: true });
       break;
-    case "focusRepo":
+    case "focusProject":
       // The Projects page with the worktree (default: the project's main one) in its panel.
-      showWorktreeOnProjectsPage(intent.repoId, intent.worktreePath);
+      showWorktreeOnProjectsPage(intent.projectId, intent.worktreePath);
       break;
     case "openPalette":
       ui.openPalette(intent.query);

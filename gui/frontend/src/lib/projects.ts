@@ -4,13 +4,13 @@
  * listed under the workspace only, never under their project (one change stays in one
  * place). Pure; inputs are the repos and workspaces slices' shapes.
  */
-import { isRemoteless, type RepoView, type WorktreeView } from "@/api/repo";
+import { isRemoteless, type ProjectView, type WorktreeView } from "@/api/project";
 import type { ThreadView } from "@/api/threads";
 import type { TerminalView } from "@/api/terminal";
 import type { WorkspaceView } from "@/api/workspace";
 import { tildify } from "./path";
 
-export interface ProjectsRepos {
+export interface ProjectsSlice {
   /** `git` false: a project without git (never a workspace member); absent counts as git. */
   byId: Readonly<Record<string, { id: string; name: string; git?: boolean; worktrees: readonly Pick<WorktreeView, "path" | "isMain">[] } | undefined>>;
   /** Sorted by name. */
@@ -24,7 +24,7 @@ export interface ProjectsWorkspaces {
 }
 
 export interface ProjectModel {
-  repoId: string;
+  projectId: string;
   /** Its worktrees that belong to no workspace, main first (the repos slice's order). */
   worktrees: string[];
   /** How many of its worktrees are workspace members (listed under their workspaces). */
@@ -43,14 +43,14 @@ export function memberPaths(workspaces: ProjectsWorkspaces): Set<string> {
   return out;
 }
 
-export function projectsModel(repos: ProjectsRepos, workspaces: ProjectsWorkspaces): ProjectsModel {
+export function projectsModel(repos: ProjectsSlice, workspaces: ProjectsWorkspaces): ProjectsModel {
   const members = memberPaths(workspaces);
   return {
     projects: repos.order.flatMap((id) => {
       const r = repos.byId[id];
       if (!r) return [];
       const own = r.worktrees.filter((w) => !members.has(w.path)).map((w) => w.path);
-      return [{ repoId: id, worktrees: own, inWorkspaces: r.worktrees.length - own.length }];
+      return [{ projectId: id, worktrees: own, inWorkspaces: r.worktrees.length - own.length }];
     }),
     workspaces: workspaces.order.filter((id) => workspaces.byId[id] !== undefined),
   };
@@ -61,8 +61,8 @@ export function projectsModel(repos: ProjectsRepos, workspaces: ProjectsWorkspac
  * the workspace branch; a repository without a remote is fine), and not yet members, by
  * name.
  */
-export function addableRepos(ws: Pick<WorkspaceView, "members"> | undefined, repos: ProjectsRepos): string[] {
-  const inWs = new Set(ws?.members.map((m) => m.repoId) ?? []);
+export function addableProjects(ws: Pick<WorkspaceView, "members"> | undefined, repos: ProjectsSlice): string[] {
+  const inWs = new Set(ws?.members.map((m) => m.projectId) ?? []);
   return repos.order.filter((id) => {
     const r = repos.byId[id];
     return !inWs.has(id) && r !== undefined && r.git !== false;
@@ -73,12 +73,12 @@ export function addableRepos(ws: Pick<WorkspaceView, "members"> | undefined, rep
  * How a command names a repository: its name when no other registered repository has it
  * (confirm prompts read better), else its id. The daemon resolves both.
  */
-export function repoRef(repos: ProjectsRepos, repoId: string): string {
-  const name = repos.byId[repoId]?.name;
-  if (!name) return repoId;
+export function projectRef(repos: ProjectsSlice, projectId: string): string {
+  const name = repos.byId[projectId]?.name;
+  if (!name) return projectId;
   let n = 0;
   for (const id of repos.order) if (repos.byId[id]?.name === name) n++;
-  return n === 1 ? name : repoId;
+  return n === 1 ? name : projectId;
 }
 
 /**
@@ -94,16 +94,16 @@ export function threadAt(thread: { worktreePath: string; pendingWorktreePath: st
 }
 
 /** Keyboard row keys of the page. */
-export const projectKey = (repoId: string): string => `p:${repoId}`;
-export const projectWorktreeKey = (repoId: string, path: string): string => `pw:${repoId}::${path}`;
+export const projectKey = (projectId: string): string => `p:${projectId}`;
+export const projectWorktreeKey = (projectId: string, path: string): string => `pw:${projectId}::${path}`;
 export const workspaceKey = (id: string): string => `ws:${id}`;
-export const memberKey = (workspaceId: string, repoId: string): string => `m:${workspaceId}::${repoId}`;
+export const memberKey = (workspaceId: string, projectId: string): string => `m:${workspaceId}::${projectId}`;
 
 export type PageItem =
-  | { key: string; kind: "project"; repoId: string }
-  | { key: string; kind: "worktree"; repoId: string; path: string }
+  | { key: string; kind: "project"; projectId: string }
+  | { key: string; kind: "worktree"; projectId: string; path: string }
   | { key: string; kind: "workspace"; workspaceId: string }
-  | { key: string; kind: "member"; workspaceId: string; repoId: string; path: string };
+  | { key: string; kind: "member"; workspaceId: string; projectId: string; path: string };
 
 /** Projects and workspaces whose rows are hidden (the UI store's persisted sets; empty while filtering). */
 export interface Collapsed {
@@ -120,14 +120,14 @@ export const NONE_COLLAPSED: Collapsed = { projects: new Set(), workspaces: new 
 export function pageItems(model: ProjectsModel, workspaces: ProjectsWorkspaces, collapsed: Collapsed = NONE_COLLAPSED): PageItem[] {
   const out: PageItem[] = [];
   for (const p of model.projects) {
-    out.push({ key: projectKey(p.repoId), kind: "project", repoId: p.repoId });
-    if (collapsed.projects.has(p.repoId)) continue;
-    for (const path of p.worktrees) out.push({ key: projectWorktreeKey(p.repoId, path), kind: "worktree", repoId: p.repoId, path });
+    out.push({ key: projectKey(p.projectId), kind: "project", projectId: p.projectId });
+    if (collapsed.projects.has(p.projectId)) continue;
+    for (const path of p.worktrees) out.push({ key: projectWorktreeKey(p.projectId, path), kind: "worktree", projectId: p.projectId, path });
   }
   for (const id of model.workspaces) {
     out.push({ key: workspaceKey(id), kind: "workspace", workspaceId: id });
     if (collapsed.workspaces.has(id)) continue;
-    for (const m of workspaces.byId[id]?.members ?? []) out.push({ key: memberKey(id, m.repoId), kind: "member", workspaceId: id, repoId: m.repoId, path: m.worktreePath });
+    for (const m of workspaces.byId[id]?.members ?? []) out.push({ key: memberKey(id, m.projectId), kind: "member", workspaceId: id, projectId: m.projectId, path: m.worktreePath });
   }
   return out;
 }
@@ -160,7 +160,7 @@ export interface ProjectKindInfo {
   title: string;
 }
 
-export function projectKind(r: Pick<RepoView, "githubSlug" | "remotes"> & { git?: boolean }): ProjectKindInfo {
+export function projectKind(r: Pick<ProjectView, "githubSlug" | "remotes"> & { git?: boolean }): ProjectKindInfo {
   if (r.git === false) return { kind: "nogit", meta: "", title: "Not a git repository: threads and terminals run in the folder itself." };
   if (r.githubSlug) return { kind: "github", meta: r.githubSlug, title: "A GitHub repository: its branches show their pull requests and checks." };
   const remote = r.remotes[0];
@@ -186,7 +186,7 @@ export function filterProjects(model: ProjectsModel, query: string, search: Proj
   const hit = (s: string | undefined) => s !== undefined && s.toLowerCase().includes(q);
   return {
     projects: model.projects.flatMap((p) => {
-      const r = search.repos[p.repoId];
+      const r = search.repos[p.projectId];
       if (hit(r?.name) || hit(r?.githubSlug)) return [p];
       const worktrees = p.worktrees.filter((path) => hit(r?.branches[path]) || hit(tildify(path)));
       return worktrees.length > 0 ? [{ ...p, worktrees, inWorkspaces: 0 }] : [];
@@ -205,7 +205,7 @@ export function filterProjects(model: ProjectsModel, query: string, search: Proj
  */
 export type ProjectNextStep = "publish" | "init" | null;
 
-export function projectNextStep(r: Pick<RepoView, "git" | "remotes" | "worktrees">): ProjectNextStep {
+export function projectNextStep(r: Pick<ProjectView, "git" | "remotes" | "worktrees">): ProjectNextStep {
   if (!r.git) return "init";
   return isRemoteless(r) ? "publish" : null;
 }

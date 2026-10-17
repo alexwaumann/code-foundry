@@ -8,7 +8,7 @@ import { draftKey } from "@/lib/compose";
 import { composeIn, composeInWorkspace, composeNoProject } from "@/stores/compose";
 import { addProject } from "@/stores/projectActions";
 import { getUiContext } from "@/stores/context";
-import { useReposStore } from "@/stores/repos";
+import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
@@ -21,8 +21,8 @@ function initialValue(): string | undefined {
   const ctx = getUiContext();
   const ws = useThreadsStore.getState().byId[ctx.activeThreadId]?.workspaceId;
   if (ws && useWorkspacesStore.getState().byId[ws]) return draftKey({ kind: "workspace", workspaceId: ws });
-  const id = ctx.activeRepoId;
-  return id && useReposStore.getState().byId[id] ? id : undefined;
+  const id = ctx.activeProjectId;
+  return id && useProjectsStore.getState().byId[id] ? id : undefined;
 }
 
 const hints = [
@@ -44,7 +44,7 @@ export function ProjectPicker({ close }: { close: () => void }) {
   const { workspaces, projects: order, loaded } = useProjectRows();
   // Highlight what the user was looking at when the picker opened.
   // With no projects, the empty state's Add a project row.
-  const [initial] = useState(() => initialValue() ?? (useReposStore.getState().order.length === 0 ? ADD_PROJECT_VALUE : undefined));
+  const [initial] = useState(() => initialValue() ?? (useProjectsStore.getState().order.length === 0 ? ADD_PROJECT_VALUE : undefined));
   const [query, setQuery] = useState("");
 
   const leave = () => {

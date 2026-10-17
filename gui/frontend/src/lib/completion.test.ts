@@ -81,12 +81,12 @@ describe("nextCard", () => {
   });
 });
 
-const skill = (name: string, repoId: string, description = ""): SkillView => ({
+const skill = (name: string, projectId: string, description = ""): SkillView => ({
   name,
   description,
-  scope: repoId ? "project" : "user",
-  repoId,
-  path: `/x/${repoId}/${name}`,
+  scope: projectId ? "project" : "user",
+  projectId,
+  path: `/x/${projectId}/${name}`,
 });
 
 describe("skillScore", () => {
@@ -123,7 +123,7 @@ describe("groupSkills", () => {
     ["empty groups are left out", "zz", ["r1"], []],
     ["a non-member's skills are left out", "old", ["r1"], []],
   ])("%s", (_name, query, members, want) => {
-    expect(groupSkills(skills, query, members).map((g) => [g.repoId, g.skills.map((s) => s.name)])).toEqual(want);
+    expect(groupSkills(skills, query, members).map((g) => [g.projectId, g.skills.map((s) => s.name)])).toEqual(want);
   });
 
   it("keeps the first of a duplicate", () => {
@@ -183,7 +183,7 @@ describe("commandItems", () => {
   ];
   const skills = [skill("deploy", "r1"), skill("lint", "r2"), skill("lint", "r1"), skill("commit", "")];
   const shape = (groups: ReturnType<typeof commandItems>) =>
-    groups.map((g) => [g.heading?.kind === "label" ? g.heading.text : g.heading?.kind === "project" ? g.heading.repoId : (g.heading?.kind ?? null), g.items.map((i) => i.label)]);
+    groups.map((g) => [g.heading?.kind === "label" ? g.heading.text : g.heading?.kind === "project" ? g.heading.projectId : (g.heading?.kind ?? null), g.items.map((i) => i.label)]);
 
   it.each<[string, string, string[], (string | null | string[])[][]]>([
     [
@@ -236,8 +236,8 @@ describe("commandItems", () => {
     const rows = commandItems(commands, skills, "", ["r1"]).flatMap((g) => g.items);
     const by = (label: string) => rows.find((r) => r.label === label);
     expect(by("/compact")).toEqual({ key: "compact", label: "/compact", hint: "<instructions>", detail: "Free up context", tag: "/compact" });
-    expect(by("/deploy")?.tag).toEqual({ tagKind: "skill", name: "deploy", repoId: "r1" });
-    expect(by("/commit")?.tag).toEqual({ tagKind: "skill", name: "commit", repoId: "" });
+    expect(by("/deploy")?.tag).toEqual({ tagKind: "skill", name: "deploy", projectId: "r1" });
+    expect(by("/commit")?.tag).toEqual({ tagKind: "skill", name: "commit", projectId: "" });
     expect(by("/pdf")?.tag).toBe("/pdf");
     expect(by("/code-review")?.hint).toBe("[low|high]");
   });
@@ -249,42 +249,42 @@ describe("commandItems", () => {
 
 describe("skillSources", () => {
   const ws = [
-    { repoId: "r1", worktreePath: "/h/w/r1" },
-    { repoId: "r2", worktreePath: "/h/w/r2" },
+    { projectId: "r1", worktreePath: "/h/w/r1" },
+    { projectId: "r2", worktreePath: "/h/w/r2" },
   ];
-  it.each<[string, Parameters<typeof skillSources>[0], { repoId: string; path?: string }[]]>([
-    ["a project in a new worktree: its main worktree", { target: "project", repoIds: ["r1"], worktree: { kind: "new" }, wsMembers: [] }, [{ repoId: "r1" }]],
-    ["a project in an existing worktree: that one", { target: "project", repoIds: ["r1"], worktree: { kind: "existing", path: "/h/r1-wt" }, wsMembers: [] }, [{ repoId: "r1", path: "/h/r1-wt" }]],
-    ["a project with Also in: main worktrees in order", { target: "project", repoIds: ["r1", "r3"], worktree: { kind: "new" }, wsMembers: [] }, [{ repoId: "r1" }, { repoId: "r3" }]],
-    ["a workspace: its member worktrees", { target: "workspace", repoIds: ["r2", "r1"], worktree: { kind: "members" }, wsMembers: ws }, [{ repoId: "r2", path: "/h/w/r2" }, { repoId: "r1", path: "/h/w/r1" }]],
-    ["a workspace in new-worktree mode: still its members", { target: "workspace", repoIds: ["r1", "r2"], worktree: { kind: "new" }, wsMembers: ws }, [{ repoId: "r1", path: "/h/w/r1" }, { repoId: "r2", path: "/h/w/r2" }]],
+  it.each<[string, Parameters<typeof skillSources>[0], { projectId: string; path?: string }[]]>([
+    ["a project in a new worktree: its main worktree", { target: "project", projectIds: ["r1"], worktree: { kind: "new" }, wsMembers: [] }, [{ projectId: "r1" }]],
+    ["a project in an existing worktree: that one", { target: "project", projectIds: ["r1"], worktree: { kind: "existing", path: "/h/r1-wt" }, wsMembers: [] }, [{ projectId: "r1", path: "/h/r1-wt" }]],
+    ["a project with Also in: main worktrees in order", { target: "project", projectIds: ["r1", "r3"], worktree: { kind: "new" }, wsMembers: [] }, [{ projectId: "r1" }, { projectId: "r3" }]],
+    ["a workspace: its member worktrees", { target: "workspace", projectIds: ["r2", "r1"], worktree: { kind: "members" }, wsMembers: ws }, [{ projectId: "r2", path: "/h/w/r2" }, { projectId: "r1", path: "/h/w/r1" }]],
+    ["a workspace in new-worktree mode: still its members", { target: "workspace", projectIds: ["r1", "r2"], worktree: { kind: "new" }, wsMembers: ws }, [{ projectId: "r1", path: "/h/w/r1" }, { projectId: "r2", path: "/h/w/r2" }]],
   ])("%s", (_name, input, want) => {
     expect(skillSources(input)).toEqual(want);
   });
 
   it("keys differ by member and path", () => {
-    const k = (s: { repoId: string; path?: string }[]) => skillSourcesKey(s);
-    expect(k([{ repoId: "r1" }])).toBe(k([{ repoId: "r1" }]));
-    expect(k([{ repoId: "r1" }])).not.toBe(k([{ repoId: "r1", path: "/h/r1" }]));
-    expect(k([{ repoId: "r1" }, { repoId: "r2" }])).not.toBe(k([{ repoId: "r2" }, { repoId: "r1" }]));
+    const k = (s: { projectId: string; path?: string }[]) => skillSourcesKey(s);
+    expect(k([{ projectId: "r1" }])).toBe(k([{ projectId: "r1" }]));
+    expect(k([{ projectId: "r1" }])).not.toBe(k([{ projectId: "r1", path: "/h/r1" }]));
+    expect(k([{ projectId: "r1" }, { projectId: "r2" }])).not.toBe(k([{ projectId: "r2" }, { projectId: "r1" }]));
     expect(k([])).toBe("");
   });
 });
 
 describe("fileSources", () => {
   const ws = [
-    { repoId: "r1", worktreePath: "/h/w/r1" },
-    { repoId: "r2", worktreePath: "/h/w/r2" },
+    { projectId: "r1", worktreePath: "/h/w/r1" },
+    { projectId: "r2", worktreePath: "/h/w/r2" },
   ];
-  it.each<[string, Parameters<typeof fileSources>[0], { repoId: string; path?: string }[]]>([
-    ["a project in a new worktree: its main worktree", { target: "project", repoIds: ["r1"], worktree: { kind: "new" }, wsMembers: [] }, [{ repoId: "r1" }]],
-    ["a project in an existing worktree: that one", { target: "project", repoIds: ["r1"], worktree: { kind: "existing", path: "/h/r1-wt" }, wsMembers: [] }, [{ repoId: "r1", path: "/h/r1-wt" }]],
-    ["a project without git: its folder", { target: "project", repoIds: ["r1"], worktree: { kind: "existing", path: "/h/notes" }, wsMembers: [] }, [{ repoId: "r1", path: "/h/notes" }]],
-    ["a project with Also in: main worktrees in member order", { target: "project", repoIds: ["r1", "r3"], worktree: { kind: "new" }, wsMembers: [] }, [{ repoId: "r1" }, { repoId: "r3" }]],
-    ["Also in with a stale existing choice: still main worktrees", { target: "project", repoIds: ["r1", "r3"], worktree: { kind: "existing", path: "/h/r1-wt" }, wsMembers: [] }, [{ repoId: "r1" }, { repoId: "r3" }]],
-    ["a workspace in Workspace worktrees: its member worktrees", { target: "workspace", repoIds: ["r2", "r1"], worktree: { kind: "members" }, wsMembers: ws }, [{ repoId: "r2", path: "/h/w/r2" }, { repoId: "r1", path: "/h/w/r1" }]],
-    ["a workspace in new-worktree mode: main worktrees", { target: "workspace", repoIds: ["r1", "r2"], worktree: { kind: "new" }, wsMembers: ws }, [{ repoId: "r1" }, { repoId: "r2" }]],
-    ["a workspace member without a known worktree: its main worktree", { target: "workspace", repoIds: ["r1", "r9"], worktree: { kind: "members" }, wsMembers: ws }, [{ repoId: "r1", path: "/h/w/r1" }, { repoId: "r9" }]],
+  it.each<[string, Parameters<typeof fileSources>[0], { projectId: string; path?: string }[]]>([
+    ["a project in a new worktree: its main worktree", { target: "project", projectIds: ["r1"], worktree: { kind: "new" }, wsMembers: [] }, [{ projectId: "r1" }]],
+    ["a project in an existing worktree: that one", { target: "project", projectIds: ["r1"], worktree: { kind: "existing", path: "/h/r1-wt" }, wsMembers: [] }, [{ projectId: "r1", path: "/h/r1-wt" }]],
+    ["a project without git: its folder", { target: "project", projectIds: ["r1"], worktree: { kind: "existing", path: "/h/notes" }, wsMembers: [] }, [{ projectId: "r1", path: "/h/notes" }]],
+    ["a project with Also in: main worktrees in member order", { target: "project", projectIds: ["r1", "r3"], worktree: { kind: "new" }, wsMembers: [] }, [{ projectId: "r1" }, { projectId: "r3" }]],
+    ["Also in with a stale existing choice: still main worktrees", { target: "project", projectIds: ["r1", "r3"], worktree: { kind: "existing", path: "/h/r1-wt" }, wsMembers: [] }, [{ projectId: "r1" }, { projectId: "r3" }]],
+    ["a workspace in Workspace worktrees: its member worktrees", { target: "workspace", projectIds: ["r2", "r1"], worktree: { kind: "members" }, wsMembers: ws }, [{ projectId: "r2", path: "/h/w/r2" }, { projectId: "r1", path: "/h/w/r1" }]],
+    ["a workspace in new-worktree mode: main worktrees", { target: "workspace", projectIds: ["r1", "r2"], worktree: { kind: "new" }, wsMembers: ws }, [{ projectId: "r1" }, { projectId: "r2" }]],
+    ["a workspace member without a known worktree: its main worktree", { target: "workspace", projectIds: ["r1", "r9"], worktree: { kind: "members" }, wsMembers: ws }, [{ projectId: "r1", path: "/h/w/r1" }, { projectId: "r9" }]],
   ])("%s", (_name, input, want) => {
     expect(fileSources(input)).toEqual(want);
   });
@@ -313,13 +313,13 @@ describe("emphasis", () => {
 
 describe("fileItems", () => {
   const cf: FileResults = {
-    repoId: "cf",
+    projectId: "cf",
     matches: [
       { path: "internal/api/thread.go", isDir: false },
       { path: "internal/store/thread", isDir: true },
     ],
   };
-  const api: FileResults = { repoId: "api", matches: [{ path: "internal/api/thread.go", isDir: false }] };
+  const api: FileResults = { projectId: "api", matches: [{ path: "internal/api/thread.go", isDir: false }] };
 
   it("one project: no heading; base name, path, emphasis and the tag (a directory keeps its /)", () => {
     const groups = fileItems([cf], "thr", ["cf"], "cf");
@@ -332,7 +332,7 @@ describe("fileItems", () => {
         mono: true,
         detail: "internal/api/thread.go",
         emphasis: [[13, 16]],
-        tag: { tagKind: "file", repoId: "cf", path: "internal/api/thread.go" },
+        tag: { tagKind: "file", projectId: "cf", path: "internal/api/thread.go" },
       },
       {
         key: "cf/internal/store/thread/",
@@ -340,7 +340,7 @@ describe("fileItems", () => {
         mono: true,
         detail: "internal/store/thread",
         emphasis: [[15, 18]],
-        tag: { tagKind: "file", repoId: "cf", path: "internal/store/thread/" },
+        tag: { tagKind: "file", projectId: "cf", path: "internal/store/thread/" },
       },
     ]);
   });
@@ -349,10 +349,10 @@ describe("fileItems", () => {
     ["several projects: headings in member order", [cf, api], ["cf", "api"], "cf", ["cf", "api"]],
     ["the primary first", [cf, api], ["cf", "api"], "api", ["api", "cf"]],
     ["results in another order: member order", [api, cf], ["cf", "api"], "cf", ["cf", "api"]],
-    ["a project without matches has no group", [cf, { repoId: "api", matches: [] }], ["cf", "api"], "cf", ["cf"]],
+    ["a project without matches has no group", [cf, { projectId: "api", matches: [] }], ["cf", "api"], "cf", ["cf"]],
     ["a non-member's results are left out (one project: no heading)", [cf, api], ["cf"], "cf", [null]],
     ["nothing", [], ["cf", "api"], "cf", []],
   ])("%s", (_name, results, members, primary, want) => {
-    expect(fileItems(results, "", members, primary).map((g) => (g.heading?.kind === "project" ? g.heading.repoId : null))).toEqual(want);
+    expect(fileItems(results, "", members, primary).map((g) => (g.heading?.kind === "project" ? g.heading.projectId : null))).toEqual(want);
   });
 });

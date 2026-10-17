@@ -90,9 +90,9 @@ export function snoozeThread(id: string, untilMs: number | null): Promise<boolea
   return runCommand(THREAD_COMMANDS.snooze, args, threadContext(id));
 }
 
-/** thread.run-in ("Run in…"): moves a workspace thread to the member in repoId. */
-export function runThreadIn(id: string, repoId: string): Promise<boolean> {
-  return runCommand(THREAD_COMMANDS.runIn, { project: repoId }, threadContext(id));
+/** thread.run-in ("Run in…"): moves a workspace thread to the member in projectId. */
+export function runThreadIn(id: string, projectId: string): Promise<boolean> {
+  return runCommand(THREAD_COMMANDS.runIn, { project: projectId }, threadContext(id));
 }
 
 /** The compose store key of a thread's follow-up draft. */

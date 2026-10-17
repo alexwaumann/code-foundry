@@ -3,7 +3,7 @@ import type { ThreadView } from "@/api/threads";
 import type { TerminalView } from "@/api/terminal";
 import { useBottomStore } from "./bottomPanel";
 import { decodeThreadListKeys, deriveContext, encodeThreadListKey, getListOptions, getListThreads, getUiContext } from "./context";
-import { useReposStore } from "./repos";
+import { useProjectsStore } from "./projects";
 import { useThreadsStore } from "./threads";
 import { useTerminalsStore } from "./terminals";
 import { useUiStore } from "./ui";
@@ -19,7 +19,7 @@ describe("the bottom panel's shell in the command context", () => {
   beforeEach(() => {
     const list = [term("claude", { thread: "s1" }), term("a", shell), term("b", shell)];
     useTerminalsStore.setState({ byId: Object.fromEntries(list.map((t) => [t.id, t])), order: list.map((t) => t.id), loaded: true });
-    useReposStore.setState({ byId: {}, order: [] });
+    useProjectsStore.setState({ byId: {}, order: [] });
     useThreadsStore.setState({ byId: {}, order: [] });
     useBottomStore.setState({ byKey: { "thread:s1": { open: true, activeTerminalId: "a" } }, pendingFocus: null, pendingFocusId: null });
     useUiStore.setState({ selection: { kind: "thread", id: "s1" }, focus: "bottom", palette: closed });
@@ -27,8 +27,8 @@ describe("the bottom panel's shell in the command context", () => {
 
   it("deriveContext puts the focused shell in activeTerminalId and keeps the rest", () => {
     const sel = { kind: "thread", id: "s1" } as const;
-    const plain = deriveContext(sel, useReposStore.getState());
-    const focused = deriveContext(sel, useReposStore.getState(), undefined, { id: "a", labels: shell });
+    const plain = deriveContext(sel, useProjectsStore.getState());
+    const focused = deriveContext(sel, useProjectsStore.getState(), undefined, { id: "a", labels: shell });
     expect(focused).toEqual({ ...plain, activeTerminalId: "a" });
     expect(focused.activeThreadId).toBe("s1");
   });
@@ -55,14 +55,14 @@ describe("a Projects-page shell in the command context", () => {
   beforeEach(() => {
     const list = [term("p", wtShell), term("q", { kind: "shell", worktree: "/src/y" })];
     useTerminalsStore.setState({ byId: Object.fromEntries(list.map((t) => [t.id, t])), order: list.map((t) => t.id), loaded: true });
-    useReposStore.setState({ byId: {}, order: [] });
+    useProjectsStore.setState({ byId: {}, order: [] });
     useThreadsStore.setState({ byId: {}, order: [] });
     useUiStore.setState({ selection: { kind: "view", name: "projects" }, focus: "bottom", palette: closed });
   });
 
   const cases: [string, string, Partial<ReturnType<typeof getUiContext>>][] = [
-    ["its repo and worktree become the context (terminal.new starts beside it)", "p", { activeTerminalId: "p", activeRepoId: "r1", activeWorktreePath: "/src/app.worktrees/x", activeView: "projects" }],
-    ["without a repo label: the terminal only", "q", { activeTerminalId: "q", activeRepoId: "", activeWorktreePath: "", activeView: "projects" }],
+    ["its repo and worktree become the context (terminal.new starts beside it)", "p", { activeTerminalId: "p", activeProjectId: "r1", activeWorktreePath: "/src/app.worktrees/x", activeView: "projects" }],
+    ["without a repo label: the terminal only", "q", { activeTerminalId: "q", activeProjectId: "", activeWorktreePath: "", activeView: "projects" }],
   ];
   it.each(cases)("%s", (_name, active, want) => {
     useBottomStore.setState({ byKey: { "view:projects": { open: true, activeTerminalId: active } }, pendingFocus: null, pendingFocusId: null });
@@ -70,8 +70,8 @@ describe("a Projects-page shell in the command context", () => {
   });
 
   it("a thread's shell keeps the thread's place", () => {
-    const ctx = deriveContext({ kind: "thread", id: "s1" }, useReposStore.getState(), undefined, { id: "a", labels: shell });
-    expect(ctx).toMatchObject({ activeTerminalId: "a", activeThreadId: "s1", activeRepoId: "", activeWorktreePath: "" });
+    const ctx = deriveContext({ kind: "thread", id: "s1" }, useProjectsStore.getState(), undefined, { id: "a", labels: shell });
+    expect(ctx).toMatchObject({ activeTerminalId: "a", activeThreadId: "s1", activeProjectId: "", activeWorktreePath: "" });
   });
 
   it("the keyboard elsewhere on the page: no shell, no worktree", () => {

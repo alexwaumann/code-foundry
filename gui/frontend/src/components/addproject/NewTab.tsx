@@ -95,7 +95,7 @@ export function NewTab({ active }: { active: boolean }) {
     setBusy("publish");
     setPublishError(null);
     try {
-      await publishProject({ repoId: project.id, owner: choice.owner, name: project.name, visibility: choice.visibility });
+      await publishProject({ projectId: project.id, owner: choice.owner, name: project.name, visibility: choice.visibility });
       finish(project, `Created ${project.name} and published it to ${choice.owner}/${project.name}`);
     } catch (err) {
       setPublishError(errorMessage(err));

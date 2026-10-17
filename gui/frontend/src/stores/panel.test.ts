@@ -46,8 +46,8 @@ describe("keyOf", () => {
     ["none has no panel", { kind: "none" }, null],
     ["the dashboard has no panel", { kind: "view", name: "dashboard" }, null],
     ["thread", { kind: "thread", id: "s-1" }, "thread:s-1"],
-    ["composer", { kind: "compose", repoId: "r-1" }, "compose:r-1"],
-    ["workspace composer", { kind: "compose", repoId: "r-1", workspaceId: "w-1" }, "compose:ws:w-1"],
+    ["composer", { kind: "compose", projectId: "r-1" }, "compose:r-1"],
+    ["workspace composer", { kind: "compose", projectId: "r-1", workspaceId: "w-1" }, "compose:ws:w-1"],
     ["view", { kind: "view", name: "pullrequests" }, "view:pullrequests"],
   ];
   it.each(cases)("%s", (_name, sel, want) => {

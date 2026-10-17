@@ -28,7 +28,7 @@ const doc = schema.node("doc", null, [
     image("a1", "x.png"),
     schema.text("c"),
     image("a2", "y.png"),
-    schema.node(TAG_NODE, tagAttrs({ tagKind: "skill", name: "deploy", repoId: "r1" })),
+    schema.node(TAG_NODE, tagAttrs({ tagKind: "skill", name: "deploy", projectId: "r1" })),
   ]),
 ]);
 
@@ -54,8 +54,8 @@ describe("selectedChipId", () => {
 describe("tag attributes", () => {
   it.each([
     { tagKind: "image", id: "a1", name: "x.png" },
-    { tagKind: "skill", name: "deploy", repoId: "" },
-    { tagKind: "file", repoId: "r1", path: "src/" },
+    { tagKind: "skill", name: "deploy", projectId: "" },
+    { tagKind: "file", projectId: "r1", path: "src/" },
   ] as const)("round-trip a $tagKind tag", (tag) => {
     expect(tagOf({ ...tagAttrs(tag) })).toEqual(tag);
   });

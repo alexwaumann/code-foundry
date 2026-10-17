@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { RepoView, WorktreeView } from "@/api/repo";
+import type { ProjectView, WorktreeView } from "@/api/project";
 import type { TerminalView } from "@/api/terminal";
 import { deriveContext, emptyContext } from "./context";
-import { applyRepoEvent, emptyRepos, replaceRepos } from "./repos";
+import { applyProjectEvent, emptyProjects, replaceProjects } from "./projects";
 import { applyTerminalEvent, emptyTerminals, replaceTerminals } from "./terminals";
 
 function term(id: string, over: Partial<TerminalView> = {}): TerminalView {
@@ -23,9 +23,9 @@ function term(id: string, over: Partial<TerminalView> = {}): TerminalView {
   };
 }
 
-function wt(repoId: string, path: string, over: Partial<WorktreeView> = {}): WorktreeView {
+function wt(projectId: string, path: string, over: Partial<WorktreeView> = {}): WorktreeView {
   return {
-    repoId,
+    projectId,
     path,
     branch: path.split("/").pop() ?? "",
     head: "abc",
@@ -36,7 +36,7 @@ function wt(repoId: string, path: string, over: Partial<WorktreeView> = {}): Wor
   };
 }
 
-function repo(id: string, name: string, worktrees: WorktreeView[]): RepoView {
+function repo(id: string, name: string, worktrees: WorktreeView[]): ProjectView {
   return { id, path: worktrees[0]?.path ?? "", name, defaultBranch: "main", githubSlug: "", remotes: [], git: true, worktrees };
 }
 
@@ -82,7 +82,7 @@ describe("terminals reducer", () => {
 });
 
 describe("repos reducer", () => {
-  const base = replaceRepos([
+  const base = replaceProjects([
     repo("r2", "zeta", [wt("r2", "/z", { isMain: true })]),
     repo("r1", "alpha", [wt("r1", "/a.worktrees/x"), wt("r1", "/a", { isMain: true, branch: "main" })]),
   ]);
@@ -93,43 +93,43 @@ describe("repos reducer", () => {
   });
 
   it.each([
-    ["repoUpdated adds and re-sorts", { kind: "repoUpdated", repo: repo("r0", "beta", []) } as const, ["r1", "r0", "r2"]],
-    ["repoRemoved drops", { kind: "repoRemoved", id: "r1" } as const, ["r2"]],
-    ["repoRemoved unknown is a no-op", { kind: "repoRemoved", id: "nope" } as const, ["r1", "r2"]],
+    ["projectUpdated adds and re-sorts", { kind: "projectUpdated", repo: repo("r0", "beta", []) } as const, ["r1", "r0", "r2"]],
+    ["projectRemoved drops", { kind: "projectRemoved", id: "r1" } as const, ["r2"]],
+    ["projectRemoved unknown is a no-op", { kind: "projectRemoved", id: "nope" } as const, ["r1", "r2"]],
   ])("%s", (_name, ev, order) => {
-    expect(applyRepoEvent(base, ev).order).toEqual(order);
+    expect(applyProjectEvent(base, ev).order).toEqual(order);
   });
 
   it("worktreeUpdated upserts within its repo", () => {
-    const s = applyRepoEvent(base, { kind: "worktreeUpdated", worktree: wt("r1", "/a.worktrees/a-new") });
+    const s = applyProjectEvent(base, { kind: "worktreeUpdated", worktree: wt("r1", "/a.worktrees/a-new") });
     expect(s.byId.r1?.worktrees.map((w) => w.path)).toEqual(["/a", "/a.worktrees/a-new", "/a.worktrees/x"]);
-    const dirty = applyRepoEvent(s, { kind: "worktreeUpdated", worktree: wt("r1", "/a.worktrees/x", { status: { ...wt("", "").status, dirty: true } }) });
+    const dirty = applyProjectEvent(s, { kind: "worktreeUpdated", worktree: wt("r1", "/a.worktrees/x", { status: { ...wt("", "").status, dirty: true } }) });
     expect(dirty.byId.r1?.worktrees.find((w) => w.path === "/a.worktrees/x")?.status.dirty).toBe(true);
     expect(dirty.byId.r2).toBe(base.byId.r2);
   });
 
   it("worktree events for unknown repos or paths are no-ops", () => {
-    expect(applyRepoEvent(base, { kind: "worktreeUpdated", worktree: wt("nope", "/q") })).toBe(base);
-    expect(applyRepoEvent(base, { kind: "worktreeRemoved", repoId: "r1", path: "/nope" })).toBe(base);
+    expect(applyProjectEvent(base, { kind: "worktreeUpdated", worktree: wt("nope", "/q") })).toBe(base);
+    expect(applyProjectEvent(base, { kind: "worktreeRemoved", projectId: "r1", path: "/nope" })).toBe(base);
   });
 
   it("worktreeRemoved removes", () => {
-    const s = applyRepoEvent(base, { kind: "worktreeRemoved", repoId: "r1", path: "/a.worktrees/x" });
+    const s = applyProjectEvent(base, { kind: "worktreeRemoved", projectId: "r1", path: "/a.worktrees/x" });
     expect(s.byId.r1?.worktrees.map((w) => w.path)).toEqual(["/a"]);
   });
 
   it("starts empty", () => {
-    expect(emptyRepos.order).toEqual([]);
+    expect(emptyProjects.order).toEqual([]);
   });
 });
 
 describe("deriveContext", () => {
-  const repos = replaceRepos([repo("r1", "app", [wt("r1", "/src/app", { isMain: true }), wt("r1", "/src/app.worktrees/feat")])]);
+  const repos = replaceProjects([repo("r1", "app", [wt("r1", "/src/app", { isMain: true }), wt("r1", "/src/app.worktrees/feat")])]);
 
   it.each([
     ["nothing selected", { kind: "none" } as const, emptyContext],
     ["a page", { kind: "view", name: "projects" } as const, { ...emptyContext, activeView: "projects" }],
-    ["composer: the repo only (thread.new is available, no worktree yet)", { kind: "compose", repoId: "r1" } as const, { ...emptyContext, activeRepoId: "r1", activeView: "compose" }],
+    ["composer: the repo only (thread.new is available, no worktree yet)", { kind: "compose", projectId: "r1" } as const, { ...emptyContext, activeProjectId: "r1", activeView: "compose" }],
   ])("%s", (_name, sel, want) => {
     expect(deriveContext(sel, repos)).toEqual(want);
   });

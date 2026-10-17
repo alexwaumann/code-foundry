@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ActionView } from "@/api/actions";
 
-const deleteAction = vi.hoisted(() => vi.fn<(id: string, repoId: string) => Promise<string | null>>());
+const deleteAction = vi.hoisted(() => vi.fn<(id: string, projectId: string) => Promise<string | null>>());
 const saveAction = vi.hoisted(() => vi.fn(() => Promise.resolve(null)));
 vi.mock("@/stores/actionActions", async (orig) => ({ ...(await orig<typeof import("@/stores/actionActions")>()), deleteAction, saveAction }));
 
@@ -10,11 +10,11 @@ const { ActionDialog } = await import("./ActionDialog");
 const { useActionDialogStore } = await import("@/stores/actionDialog");
 const { useActionsStore } = await import("@/stores/actions");
 
-const testAction: ActionView = { id: "a-1", repoId: "web", name: "Test", command: "go test", icon: "test", inTerminal: true, onWorktreeCreate: false, position: 0 };
+const testAction: ActionView = { id: "a-1", projectId: "web", name: "Test", command: "go test", icon: "test", inTerminal: true, onWorktreeCreate: false, position: 0 };
 
 beforeEach(() => {
-  useActionsStore.setState({ byId: { "a-1": testAction }, byRepo: { web: ["a-1"] }, runs: {} });
-  useActionDialogStore.setState({ editor: { mode: "edit", actionId: "a-1", repoId: "web", from: "thread" }, seq: 1 });
+  useActionsStore.setState({ byId: { "a-1": testAction }, byProject: { web: ["a-1"] }, runs: {} });
+  useActionDialogStore.setState({ editor: { mode: "edit", actionId: "a-1", projectId: "web", from: "thread" }, seq: 1 });
 });
 
 afterEach(() => {
@@ -30,7 +30,7 @@ describe("ActionDialog", () => {
       () =>
         new Promise((resolve) => {
           // The daemon publishes the removal before it answers.
-          useActionsStore.setState({ byId: {}, byRepo: {} });
+          useActionsStore.setState({ byId: {}, byProject: {} });
           answer = resolve;
         }),
     );
@@ -73,7 +73,7 @@ describe("ActionDialog", () => {
       await Promise.resolve();
     });
     expect(saveAction).toHaveBeenCalledTimes(1);
-    expect(saveAction).toHaveBeenCalledWith({ repoId: "web", actionId: "a-1" }, { name: "Test", command: "go test", icon: "test", onWorktreeCreate: false });
+    expect(saveAction).toHaveBeenCalledWith({ projectId: "web", actionId: "a-1" }, { name: "Test", command: "go test", icon: "test", onWorktreeCreate: false });
   });
 
   it("the icon tiles are one radio group: one tab stop, arrow keys move the choice", async () => {
@@ -100,7 +100,7 @@ describe("ActionDialog", () => {
       fireEvent.keyDown(tiles[2] as HTMLElement, { key: "Enter", metaKey: true });
       await Promise.resolve();
     });
-    expect(saveAction).toHaveBeenCalledWith({ repoId: "web", actionId: "a-1" }, { name: "Test", command: "go test", icon: "lint", onWorktreeCreate: false });
+    expect(saveAction).toHaveBeenCalledWith({ projectId: "web", actionId: "a-1" }, { name: "Test", command: "go test", icon: "lint", onWorktreeCreate: false });
   });
 
   it("Cmd+Enter does not save while the delete confirm is open", () => {
@@ -111,7 +111,7 @@ describe("ActionDialog", () => {
   });
 
   it("a refusal goes, with the Name field's red state, once the user edits the name", async () => {
-    useActionDialogStore.setState({ editor: { mode: "new", repoId: "web", from: "thread" }, seq: 2 });
+    useActionDialogStore.setState({ editor: { mode: "new", projectId: "web", from: "thread" }, seq: 2 });
     saveAction.mockImplementationOnce(() => Promise.resolve('this project already has an action named "Test"' as never));
     render(<ActionDialog />);
     const name = screen.getByTestId<HTMLInputElement>("action-name");
@@ -131,7 +131,7 @@ describe("ActionDialog", () => {
   it("an action deleted elsewhere while the editor is open says so and cannot be saved", () => {
     render(<ActionDialog />);
     act(() => {
-      useActionsStore.setState({ byId: {}, byRepo: {} });
+      useActionsStore.setState({ byId: {}, byProject: {} });
     });
     expect(screen.getByTestId("action-error").textContent).toBe("This action was deleted.");
     expect(screen.getByTestId<HTMLButtonElement>("action-save").disabled).toBe(true);

@@ -38,10 +38,10 @@ export const GH_NAME_TAKEN = "GraphQL: Name already exists on this account (crea
 /** What World offers this module (mock/world.ts). */
 export interface ProjectWorld {
   projectPaths(): string[];
-  repoInfo(id: string): { name: string; path: string; git: boolean; remotes: string[] } | undefined;
+  projectInfo(id: string): { name: string; path: string; git: boolean; remotes: string[] } | undefined;
   addCreated(name: string, path: string): { id: string; name: string; path: string };
   setOrigin(id: string, slug: string): void;
-  removeRepo(id: string): void;
+  removeProject(id: string): void;
 }
 
 /** Every Create, Publish and Delete ("create <name>", "publish <id> <owner>/<name> <visibility>", "delete <id>"). */
@@ -58,12 +58,12 @@ export function listPublishOwners(): { owners: PublishOwnerInit[]; stale: boolea
 /** ProjectService.Delete and repo.delete. */
 export function deleteProject(world: ProjectWorld, projectId: string): void {
   projectCalls.push(`delete ${projectId}`);
-  const repo = world.repoInfo(projectId);
+  const repo = world.projectInfo(projectId);
   if (!repo) throw new ConnectError(`project not found: "${projectId}"`, Code.NotFound);
   if (repo.path.slice(0, repo.path.lastIndexOf("/")) !== PROJECTS) {
     throw new ConnectError(`failed precondition: ${repo.path} is not in the projects directory ${PROJECTS}`, Code.FailedPrecondition);
   }
-  world.removeRepo(projectId);
+  world.removeProject(projectId);
 }
 
 /** ProjectService.Create and repo.create. */
@@ -94,7 +94,7 @@ export function visibilityFlag(v: RepositoryVisibility): string {
 
 /** ProjectService.Publish and repo.github.publish. */
 export async function publishProject(world: ProjectWorld, projectId: string, owner: string, name: string, visibility: string): Promise<{ name: string; slug: string }> {
-  const repo = world.repoInfo(projectId);
+  const repo = world.projectInfo(projectId);
   if (!repo) throw new ConnectError(`project not found: "${projectId}"`, Code.NotFound);
   const ghName = name || repo.name;
   const vis = visibilityNames[visibility.toLowerCase()];
@@ -129,11 +129,11 @@ interface CommandEntry {
 /** repo.create, repo.github.publish and repo.delete, as internal/command/commands_repo_create.go. */
 export function projectCommands(world: ProjectWorld): CommandEntry[] {
   const publishable = (id: string): boolean => {
-    const r = world.repoInfo(id);
+    const r = world.projectInfo(id);
     return r !== undefined && r.git && !r.remotes.includes("origin");
   };
   const deletable = (id: string): boolean => {
-    const r = world.repoInfo(id);
+    const r = world.projectInfo(id);
     return r !== undefined && r.path.slice(0, r.path.lastIndexOf("/")) === PROJECTS;
   };
   return [

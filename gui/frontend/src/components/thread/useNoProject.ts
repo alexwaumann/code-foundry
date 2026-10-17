@@ -1,6 +1,6 @@
 import { useShallow } from "zustand/react/shallow";
 import { isNoProject } from "@/lib/threadRow";
-import { useReposStore } from "@/stores/repos";
+import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 
 /**
@@ -12,8 +12,8 @@ export function useNoProjectThread(id: string | null): boolean {
   const s = useThreadsStore(
     useShallow((st) => {
       const x = id === null ? undefined : st.byId[id];
-      return x ? { repoId: x.repoId, workspaceId: x.workspaceId, worktreePath: x.worktreePath } : null;
+      return x ? { projectId: x.projectId, workspaceId: x.workspaceId, worktreePath: x.worktreePath } : null;
     }),
   );
-  return useReposStore((st) => s !== null && isNoProject(s, st));
+  return useProjectsStore((st) => s !== null && isNoProject(s, st));
 }

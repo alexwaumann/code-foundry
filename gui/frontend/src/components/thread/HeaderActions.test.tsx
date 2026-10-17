@@ -26,7 +26,7 @@ const { useActionsStore } = await import("@/stores/actions");
 
 const cmd = (name: string, title = name): CommandView => ({ name, title, description: "", category: "", args: [], keybindings: [], available: true });
 const link = (number: number): LinkedPullRequestView => ({ slug: "o/web", number, url: `https://github.com/o/web/pull/${String(number)}`, linkedAt: null });
-const thread = (o: Partial<ThreadView>) => ({ id: "s-1", name: "t", repoId: "web", worktreePath: "/src/web", workspaceId: "", pendingWorktreePath: "", state: "connected", linkedPullRequests: [], ...o }) as ThreadView;
+const thread = (o: Partial<ThreadView>) => ({ id: "s-1", name: "t", projectId: "web", worktreePath: "/src/web", workspaceId: "", pendingWorktreePath: "", state: "connected", linkedPullRequests: [], ...o }) as ThreadView;
 const detail = (o: Partial<PullRequestView>): PullRequestDetailView => ({ pullRequest: { repoSlug: "o/web", number: 78, title: "x", state: "open", draft: false, ...o }, lastError: "" }) as PullRequestDetailView;
 
 beforeEach(() => {
@@ -129,9 +129,9 @@ describe("HeaderActions", () => {
     ["a project thread with action.run listed: the Play menu, left of the bottom toggle", "web", true, true],
     ["a thread without a project: none", "", true, false],
     ["action.run not listed: none", "web", false, false],
-  ])("%s", (_name, repoId, listed, shown) => {
+  ])("%s", (_name, projectId, listed, shown) => {
     if (listed) useCommandsStore.setState({ commands: [...useCommandsStore.getState().commands, cmd("action.run", "Run Action")] });
-    setThread({ repoId });
+    setThread({ projectId });
     render(<HeaderActions threadId="s-1" />);
     const want = shown
       ? ["pane-snooze", "thread.archive", "pane-actions-menu", "bottom-toggle", "panel-toggle"]
@@ -142,8 +142,8 @@ describe("HeaderActions", () => {
   it("the Play menu lists the project's actions, or says it has none", () => {
     useCommandsStore.setState({ commands: [...useCommandsStore.getState().commands, cmd("action.run", "Run Action")] });
     useActionsStore.setState({
-      byId: { "a-1": { id: "a-1", repoId: "web", name: "Test", command: "go test", icon: "test", inTerminal: true, onWorktreeCreate: false, position: 0 } },
-      byRepo: { web: ["a-1"] },
+      byId: { "a-1": { id: "a-1", projectId: "web", name: "Test", command: "go test", icon: "test", inTerminal: true, onWorktreeCreate: false, position: 0 } },
+      byProject: { web: ["a-1"] },
       runs: {},
     });
     setThread({});
@@ -153,7 +153,7 @@ describe("HeaderActions", () => {
     expect(screen.getByTestId("action-edit").getAttribute("aria-label")).toBe("Edit Test");
     expect(screen.getByTestId("action-new").textContent).toBe("New action…");
     unmount();
-    useActionsStore.setState({ byId: {}, byRepo: {}, runs: {} });
+    useActionsStore.setState({ byId: {}, byProject: {}, runs: {} });
     render(<HeaderActions threadId="s-1" />);
     fireEvent.keyDown(screen.getByTestId("pane-actions-menu"), { key: "Enter" });
     expect(screen.getByTestId("actions-empty").textContent).toBe("No actions for web yet");

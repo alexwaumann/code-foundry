@@ -45,7 +45,7 @@ export interface ConfirmationView {
 export interface UiContextView {
   activeTerminalId: string;
   activeThreadId: string;
-  activeRepoId: string;
+  activeProjectId: string;
   activeWorktreePath: string;
   activeView: string;
   /** The workspace that owns the active thread (or the composer's workspace); "" otherwise. */
@@ -103,11 +103,11 @@ export function isUnknownCommand(err: unknown): boolean {
 }
 
 export function toUiContext(ctx: UiContextView): UiContext {
-  // Field by field: the view model's names need not be the proto's (activeRepoId).
+  // Field by field: the view model's names need not be the proto's (activeProjectId).
   return create(UiContextSchema, {
     activeTerminalId: ctx.activeTerminalId,
     activeThreadId: ctx.activeThreadId,
-    activeProjectId: ctx.activeRepoId,
+    activeProjectId: ctx.activeProjectId,
     activeWorktreePath: ctx.activeWorktreePath,
     activeView: ctx.activeView,
     activeWorkspaceId: ctx.activeWorkspaceId,

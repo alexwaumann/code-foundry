@@ -5,7 +5,7 @@ import type { Selection } from "@/stores/ui";
 import { mcpTab, selectionMcpThread } from "./mcpTarget";
 
 function thread(id: string, state = "connected"): ThreadView {
-  return { id, repoId: "web", worktreePath: "/src/web", state, linkedPullRequests: [], usage: [] } as unknown as ThreadView;
+  return { id, projectId: "web", worktreePath: "/src/web", state, linkedPullRequests: [], usage: [] } as unknown as ThreadView;
 }
 
 const threads: ThreadsData = {
@@ -19,7 +19,7 @@ describe("selectionMcpThread (the surface's availability)", () => {
     ["a thread", { kind: "thread", id: "s-r" }, "s-r"],
     ["a disconnected thread", { kind: "thread", id: "s-off" }, "s-off"],
     ["an unknown thread", { kind: "thread", id: "s-404" }, null],
-    ["a composer", { kind: "compose", repoId: "web" }, null],
+    ["a composer", { kind: "compose", projectId: "web" }, null],
     ["a page", { kind: "view", name: "pullrequests" }, null],
     ["nothing", { kind: "none" }, null],
   ])("%s", (_name, sel, want) => {

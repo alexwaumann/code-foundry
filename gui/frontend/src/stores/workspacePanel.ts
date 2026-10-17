@@ -6,7 +6,7 @@
  */
 import { memberTab, selectionWorkspaceThread, workspaceTab } from "@/surfaces/workspaceTarget";
 import { keyOf, openSurface, togglePanel, type PanelTarget } from "./panel";
-import { useReposStore } from "./repos";
+import { useProjectsStore } from "./projects";
 import { useThreadsStore } from "./threads";
 import { useUiStore, type Selection } from "./ui";
 import { useWorkspacesStore } from "./workspaces";
@@ -18,7 +18,7 @@ import { useWorkspacesStore } from "./workspaces";
  */
 export function openWorkspaceSurface(sel: Selection = useUiStore.getState().selection): string | null {
   const key = keyOf(sel);
-  const thread = selectionWorkspaceThread(sel, { repos: useReposStore.getState(), threads: useThreadsStore.getState() });
+  const thread = selectionWorkspaceThread(sel, { repos: useProjectsStore.getState(), threads: useThreadsStore.getState() });
   if (key === null || thread === null) return null;
   const name = useWorkspacesStore.getState().byId[thread.workspaceId]?.name ?? "";
   return openSurface(key, workspaceTab(thread.workspaceId, name)) ? key : null;
@@ -38,7 +38,7 @@ export function showWorkspaceInThread(threadId: string): boolean {
 }
 
 /** Opens a workspace member's worktree as a tab of the panel (the worktree overview, panel variant). */
-export function openMemberTab(target: PanelTarget, repoId: string, path: string): boolean {
-  const name = useReposStore.getState().byId[repoId]?.name ?? repoId;
-  return openSurface(target, memberTab(repoId, path, name));
+export function openMemberTab(target: PanelTarget, projectId: string, path: string): boolean {
+  const name = useProjectsStore.getState().byId[projectId]?.name ?? projectId;
+  return openSurface(target, memberTab(projectId, path, name));
 }

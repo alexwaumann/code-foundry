@@ -8,7 +8,7 @@
  */
 import { selectionWorktree, worktreeTab } from "@/surfaces/workspaceTarget";
 import { keyOf, openSurface, togglePanel, type PanelTarget } from "./panel";
-import { findWorktree, mainWorktreePath, useReposStore, type ReposData } from "./repos";
+import { findWorktree, mainWorktreePath, useProjectsStore, type ProjectsData } from "./projects";
 import { useThreadsStore } from "./threads";
 import { useUiStore, type Selection } from "./ui";
 
@@ -17,15 +17,15 @@ import { useUiStore, type Selection } from "./ui";
  * ("web · cf/demo"), so a project's worktrees opened side by side stay apart. A worktree
  * the store does not know (gone, or a project without git) gets the project alone.
  */
-export function worktreeTabTitle(repos: ReposData, repoId: string, path: string): string {
-  const name = repos.byId[repoId]?.name ?? repoId;
-  const wt = findWorktree(repos, repoId, path);
+export function worktreeTabTitle(repos: ProjectsData, projectId: string, path: string): string {
+  const name = repos.byId[projectId]?.name ?? projectId;
+  const wt = findWorktree(repos, projectId, path);
   return !wt || wt.isMain || !wt.branch ? name : `${name} · ${wt.branch}`;
 }
 
 /** Opens (or activates) the worktree's tab in a panel and shows the panel. It does not request focus. */
-export function openWorktreeTab(target: PanelTarget, repoId: string, path: string): boolean {
-  return openSurface(target, worktreeTab(repoId, path, worktreeTabTitle(useReposStore.getState(), repoId, path)));
+export function openWorktreeTab(target: PanelTarget, projectId: string, path: string): boolean {
+  return openSurface(target, worktreeTab(projectId, path, worktreeTabTitle(useProjectsStore.getState(), projectId, path)));
 }
 
 /**
@@ -33,8 +33,8 @@ export function openWorktreeTab(target: PanelTarget, repoId: string, path: strin
  * row: the worktree's tab in the current selection's panel (the page's), shown but not
  * focused, so the list keeps the keyboard. False with nothing selected.
  */
-export function showWorktreeInPanel(repoId: string, path: string): boolean {
-  if (!openWorktreeTab("current", repoId, path)) return false;
+export function showWorktreeInPanel(projectId: string, path: string): boolean {
+  if (!openWorktreeTab("current", projectId, path)) return false;
   togglePanel("current", true, { focus: false });
   return true;
 }
@@ -44,12 +44,12 @@ export function showWorktreeInPanel(repoId: string, path: string): boolean {
  * page with the worktree's tab in its panel. An empty path means the project's main
  * worktree. False for an unknown project.
  */
-export function showWorktreeOnProjectsPage(repoId: string, path = ""): boolean {
-  const repos = useReposStore.getState();
-  const at = path || mainWorktreePath(repos, repoId);
-  if (!repos.byId[repoId] || !at) return false;
+export function showWorktreeOnProjectsPage(projectId: string, path = ""): boolean {
+  const repos = useProjectsStore.getState();
+  const at = path || mainWorktreePath(repos, projectId);
+  if (!repos.byId[projectId] || !at) return false;
   useUiStore.getState().select({ kind: "view", name: "projects" });
-  return showWorktreeInPanel(repoId, at);
+  return showWorktreeInPanel(projectId, at);
 }
 
 /**
@@ -72,7 +72,7 @@ export function showWorktreeInThread(threadId: string): boolean {
  */
 export function openWorktreeSurface(sel: Selection = useUiStore.getState().selection): string | null {
   const key = keyOf(sel);
-  const w = selectionWorktree(sel, { repos: useReposStore.getState(), threads: useThreadsStore.getState() });
+  const w = selectionWorktree(sel, { repos: useProjectsStore.getState(), threads: useThreadsStore.getState() });
   if (key === null || w === null) return null;
-  return openWorktreeTab(key, w.repoId, w.path) ? key : null;
+  return openWorktreeTab(key, w.projectId, w.path) ? key : null;
 }

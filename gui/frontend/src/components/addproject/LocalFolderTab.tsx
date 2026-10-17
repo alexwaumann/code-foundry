@@ -17,7 +17,7 @@ const TYPED = "__typed";
 
 /**
  * Local folder: a path under home with the palette's folder completion (Tab, `/`, the
- * folder picker), added with RepoService.Register. The input's "~/" is permanent: what is
+ * folder picker), added with ProjectService.Register. The input's "~/" is permanent: what is
  * typed, pasted or picked is taken relative to home (homeRelative). A git repository adds
  * that repository, any other folder a project without git.
  *

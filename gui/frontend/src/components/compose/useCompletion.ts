@@ -50,13 +50,13 @@ export function useSkillSource(trigger: EditorTrigger | null, sourcesKey: string
     if (query === null) return [];
     const multi = members.length > 1;
     return groupSkills(skills, query, members).map((g) => ({
-      key: g.repoId || "~",
-      heading: g.repoId === "" ? { kind: "user" } : multi ? { kind: "project", repoId: g.repoId } : null,
+      key: g.projectId || "~",
+      heading: g.projectId === "" ? { kind: "user" } : multi ? { kind: "project", projectId: g.projectId } : null,
       items: g.skills.map((s) => ({
-        key: `${g.repoId}/${s.name}`,
+        key: `${g.projectId}/${s.name}`,
         label: `/${s.name}`,
         detail: s.description,
-        tag: { tagKind: "skill", name: s.name, repoId: g.repoId },
+        tag: { tagKind: "skill", name: s.name, projectId: g.projectId },
       })),
     }));
   }, [skills, query, members]);

@@ -3,7 +3,7 @@ import type { GitOpView, GitOpStateView } from "@/api/gitops";
 import { planGitOpToasts } from "./gitops";
 
 function op(id: string, state: GitOpStateView): GitOpView {
-  return { id, kind: "push", state, title: "Push feat", worktreePath: "/w", repoId: "r", branch: "feat", durationMs: 0, summary: "", output: "", url: "" };
+  return { id, kind: "push", state, title: "Push feat", worktreePath: "/w", projectId: "r", branch: "feat", durationMs: 0, summary: "", output: "", url: "" };
 }
 
 describe("planGitOpToasts", () => {

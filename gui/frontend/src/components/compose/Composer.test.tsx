@@ -1,17 +1,17 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { RepoView } from "@/api/repo";
+import type { ProjectView } from "@/api/project";
 import { useComposeStore } from "@/stores/compose";
-import { useReposStore } from "@/stores/repos";
+import { useProjectsStore } from "@/stores/projects";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { Composer } from "./Composer";
 
 // No daemon: refs and skills never load (the composer shows them loading).
-vi.mock("@/api/repo", async (orig) => ({ ...(await orig<typeof import("@/api/repo")>()), listRefs: () => new Promise(() => undefined) }));
+vi.mock("@/api/project", async (orig) => ({ ...(await orig<typeof import("@/api/project")>()), listRefs: () => new Promise(() => undefined) }));
 vi.mock("@/api/filesystem", async (orig) => ({ ...(await orig<typeof import("@/api/filesystem")>()), listSkills: () => new Promise(() => undefined) }));
 
-const repo = (id: string): RepoView => ({
+const repo = (id: string): ProjectView => ({
   id,
   path: `/src/${id}`,
   name: id,
@@ -19,11 +19,11 @@ const repo = (id: string): RepoView => ({
   githubSlug: "",
   remotes: [],
   git: true,
-  worktrees: [{ repoId: id, path: `/src/${id}`, branch: "main", head: "abc", detached: false, isMain: true, status: { upstream: "", ahead: 0, behind: 0, staged: 0, modified: 0, untracked: 0, dirty: false, refreshedAtMs: null } }],
+  worktrees: [{ projectId: id, path: `/src/${id}`, branch: "main", head: "abc", detached: false, isMain: true, status: { upstream: "", ahead: 0, behind: 0, staged: 0, modified: 0, untracked: 0, dirty: false, refreshedAtMs: null } }],
 });
 
 beforeEach(() => {
-  useReposStore.setState({ byId: { web: repo("web") }, order: ["web"], loaded: true });
+  useProjectsStore.setState({ byId: { web: repo("web") }, order: ["web"], loaded: true });
   useWorkspacesStore.setState({ byId: {}, order: [], loaded: true });
 });
 
@@ -34,7 +34,7 @@ afterEach(() => {
 
 describe("Composer without a project", () => {
   it("names No project and hides the worktree, base, branch and member chips", () => {
-    render(<Composer repoId="" noProject />);
+    render(<Composer projectId="" noProject />);
     expect(screen.getByTestId("composer-heading").textContent).toBe("What should we build with No project?");
     expect(screen.queryByTestId("composer-worktree")).toBeNull();
     expect(screen.queryByTestId("composer-base")).toBeNull();
@@ -44,7 +44,7 @@ describe("Composer without a project", () => {
   });
 
   it("a project's composer still has them", () => {
-    render(<Composer repoId="web" />);
+    render(<Composer projectId="web" />);
     expect(screen.getByTestId("composer-heading").textContent).toBe("What should we build in web?");
     expect(screen.getByTestId("composer-worktree")).not.toBeNull();
     expect(screen.getByTestId("composer-base")).not.toBeNull();

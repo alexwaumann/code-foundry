@@ -5,18 +5,18 @@ import { ComposerPicker, type PickerGroup } from "./ComposerPicker";
 import { NoGitBadge } from "@/components/projects/NoGitBadge";
 import { Tip } from "@/components/ui/tooltip";
 import { tildify } from "@/lib/path";
-import { repoTagCount } from "@/lib/prompt";
+import { projectTagCount } from "@/lib/prompt";
 import { cn } from "@/lib/utils";
 import { addAlsoIn, getDraft, removeAlsoIn, setPrimary } from "@/stores/compose";
 import { requestConfirm } from "@/stores/confirm";
-import { useReposStore } from "@/stores/repos";
+import { useProjectsStore } from "@/stores/projects";
 
 /**
  * Removes an "Also in" project. When tags in the text refer to it (its skills, files),
  * asks first: they go with it.
  */
-async function removeWithConfirm(draftKey: string, repoId: string, name: string): Promise<void> {
-  const n = repoTagCount(getDraft(draftKey).text, repoId);
+async function removeWithConfirm(draftKey: string, projectId: string, name: string): Promise<void> {
+  const n = projectTagCount(getDraft(draftKey).text, projectId);
   if (n > 0) {
     const yes = await requestConfirm({
       title: `Remove ${name} from the thread?`,
@@ -26,12 +26,12 @@ async function removeWithConfirm(draftKey: string, repoId: string, name: string)
     });
     if (!yes) return;
   }
-  removeAlsoIn(draftKey, repoId);
+  removeAlsoIn(draftKey, projectId);
 }
 
 /** One project the thread works in, as the chip row shows it. */
 export interface MemberChipModel {
-  repoId: string;
+  projectId: string;
   /**
    * The branch the thread works on there: the member worktree's or the chosen checkout's,
    * or "cf/…" for new worktrees. "" when there is none to show.
@@ -44,7 +44,7 @@ export interface MemberChipModel {
 }
 
 function MemberChip({ draftKey, member, primary, disabled }: { draftKey: string; member: MemberChipModel; primary: boolean; disabled: boolean }) {
-  const name = useReposStore((s) => s.byId[member.repoId]?.name ?? member.repoId);
+  const name = useProjectsStore((s) => s.byId[member.projectId]?.name ?? member.projectId);
   return (
     <li
       className={cn(
@@ -52,7 +52,7 @@ function MemberChip({ draftKey, member, primary, disabled }: { draftKey: string;
         primary ? "border-primary/50 bg-accent text-foreground" : "border-border bg-card text-muted-foreground",
       )}
       data-testid="composer-member"
-      data-repo={member.repoId}
+      data-repo={member.projectId}
       data-primary={primary || undefined}
     >
       <button
@@ -66,7 +66,7 @@ function MemberChip({ draftKey, member, primary, disabled }: { draftKey: string;
           member.removable && "pr-1",
         )}
         onClick={() => {
-          setPrimary(draftKey, member.repoId);
+          setPrimary(draftKey, member.projectId);
         }}
       >
         <span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", primary ? "bg-primary" : "bg-muted-foreground/40")} />
@@ -95,7 +95,7 @@ function MemberChip({ draftKey, member, primary, disabled }: { draftKey: string;
             data-compose-stop
             className="mr-1 flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-background hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:hidden"
             onClick={() => {
-              void removeWithConfirm(draftKey, member.repoId, name);
+              void removeWithConfirm(draftKey, member.projectId, name);
             }}
           >
             <X className="size-3" />
@@ -110,7 +110,7 @@ const SEP = "\u0001";
 
 /** "Also in": registered git projects the thread does not work in yet. */
 function AddProject({ draftKey, exclude, first, disabled }: { draftKey: string; exclude: readonly string[]; first: boolean; disabled: boolean }) {
-  const keys = useReposStore(
+  const keys = useProjectsStore(
     useShallow((s) =>
       s.order.flatMap((id) => {
         const r = s.byId[id];
@@ -173,10 +173,10 @@ export function MemberChips({
   disabled: boolean;
 }) {
   const single = canAdd && members.length <= 1;
-  const ids = useMemo(() => members.map((m) => m.repoId), [members]);
+  const ids = useMemo(() => members.map((m) => m.projectId), [members]);
   return (
     <ul className="mb-2 flex flex-wrap items-center gap-1.5 empty:hidden" aria-label="Projects" data-testid="composer-members">
-      {!single && members.map((m) => <MemberChip key={m.repoId} draftKey={draftKey} member={m} primary={m.repoId === primary} disabled={disabled} />)}
+      {!single && members.map((m) => <MemberChip key={m.projectId} draftKey={draftKey} member={m} primary={m.projectId === primary} disabled={disabled} />)}
       {canAdd && <AddProject draftKey={draftKey} exclude={ids} first={single} disabled={disabled} />}
     </ul>
   );

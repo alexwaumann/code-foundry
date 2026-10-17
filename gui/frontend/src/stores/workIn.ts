@@ -11,20 +11,20 @@ import type { WorkInMode } from "@/lib/compose";
 
 interface WorkInState {
   /** Repo id → the last fresh-copy / in-place pick. */
-  byRepo: Readonly<Record<string, WorkInMode>>;
+  byProject: Readonly<Record<string, WorkInMode>>;
 }
 
-export const useWorkInStore = create<WorkInState>()(persist((): WorkInState => ({ byRepo: {} }), { name: "code-foundry.workIn", version: 1 }));
+export const useWorkInStore = create<WorkInState>()(persist((): WorkInState => ({ byProject: {} }), { name: "code-foundry.workIn", version: 1 }));
 
-export function useRememberedWorkIn(repoId: string): WorkInMode | undefined {
-  return useWorkInStore((s) => s.byRepo[repoId]);
+export function useRememberedWorkIn(projectId: string): WorkInMode | undefined {
+  return useWorkInStore((s) => s.byProject[projectId]);
 }
 
-export function rememberedWorkIn(repoId: string): WorkInMode | undefined {
-  return useWorkInStore.getState().byRepo[repoId];
+export function rememberedWorkIn(projectId: string): WorkInMode | undefined {
+  return useWorkInStore.getState().byProject[projectId];
 }
 
-export function rememberWorkIn(repoId: string, mode: WorkInMode): void {
-  if (!repoId || useWorkInStore.getState().byRepo[repoId] === mode) return;
-  useWorkInStore.setState((s) => ({ byRepo: { ...s.byRepo, [repoId]: mode } }));
+export function rememberWorkIn(projectId: string, mode: WorkInMode): void {
+  if (!projectId || useWorkInStore.getState().byProject[projectId] === mode) return;
+  useWorkInStore.setState((s) => ({ byProject: { ...s.byProject, [projectId]: mode } }));
 }

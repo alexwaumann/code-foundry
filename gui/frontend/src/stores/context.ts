@@ -1,10 +1,10 @@
 import { useShallow } from "zustand/react/shallow";
 import type { UiContextView } from "@/api/command";
 import type { ThreadView } from "@/api/threads";
-import { placeThread, type ListOptions, type ListThread, type TreeRepo, type WorktreeRef } from "@/lib/tree";
-import { REPO_LABEL, WORKTREE_LABEL } from "@/lib/termlabel";
+import { placeThread, type ListOptions, type ListThread, type TreeProject, type WorktreeRef } from "@/lib/tree";
+import { PROJECT_LABEL, WORKTREE_LABEL } from "@/lib/termlabel";
 import { focusedBottomShell, ownerKeyOf, PROJECTS_KEY, useBottomStore } from "./bottomPanel";
-import { useReposStore, type ReposData } from "./repos";
+import { useProjectsStore, type ProjectsData } from "./projects";
 import { useThreadsStore, type ThreadsData } from "./threads";
 import { isThreadGroup, threadGroup } from "@/lib/thread";
 import { isNoProject } from "@/lib/threadRow";
@@ -14,24 +14,24 @@ import { useUiStore, type Selection } from "./ui";
 export const emptyContext: UiContextView = {
   activeTerminalId: "",
   activeThreadId: "",
-  activeRepoId: "",
+  activeProjectId: "",
   activeWorktreePath: "",
   activeView: "dashboard",
   activeWorkspaceId: "",
 };
 
-function allWorktrees(repos: ReposData): WorktreeRef[] {
-  return repos.order.flatMap((id) => repos.byId[id]?.worktrees.map((w) => ({ repoId: id, path: w.path })) ?? []);
+function allWorktrees(repos: ProjectsData): WorktreeRef[] {
+  return repos.order.flatMap((id) => repos.byId[id]?.worktrees.map((w) => ({ projectId: id, path: w.path })) ?? []);
 }
 
 /** The context of an action on one worktree (the Projects page's rows, the panel's worktree tab): no selection involved. */
-export function worktreeContext(repoId: string, path: string): UiContextView {
-  return { ...emptyContext, activeRepoId: repoId, activeWorktreePath: path, activeView: "projects" };
+export function worktreeContext(projectId: string, path: string): UiContextView {
+  return { ...emptyContext, activeProjectId: projectId, activeWorktreePath: path, activeView: "projects" };
 }
 
 /** The context of an action on one project (the Projects page's rows). */
-export function repoContext(repoId: string): UiContextView {
-  return { ...emptyContext, activeRepoId: repoId, activeView: "projects" };
+export function projectContext(projectId: string): UiContextView {
+  return { ...emptyContext, activeProjectId: projectId, activeView: "projects" };
 }
 
 /** A terminal as the command context needs it: its id and owner labels. */
@@ -47,9 +47,9 @@ export interface ContextShell {
  */
 export function projectsShellPlace(t: ContextShell | undefined): WorktreeRef | null {
   if (!t || ownerKeyOf(t) !== PROJECTS_KEY) return null;
-  const repoId = t.labels[REPO_LABEL] ?? "";
+  const projectId = t.labels[PROJECT_LABEL] ?? "";
   const path = t.labels[WORKTREE_LABEL] ?? "";
-  return repoId && path ? { repoId, path } : null;
+  return projectId && path ? { projectId, path } : null;
 }
 
 /**
@@ -58,9 +58,9 @@ export function projectsShellPlace(t: ContextShell | undefined): WorktreeRef | n
  * activeTerminalId comes only from a focused bottom panel shell (focusedShell). The
  * composer looks only at its repo. Actions on a worktree that is not
  * selected (the Projects page, the panel's worktree tab) build their context with
- * worktreeContext / repoContext.
+ * worktreeContext / projectContext.
  */
-export function deriveContext(sel: Selection, repos: ReposData, threads: ThreadsData = { byId: {}, order: [] }, focusedShell?: ContextShell): UiContextView {
+export function deriveContext(sel: Selection, repos: ProjectsData, threads: ThreadsData = { byId: {}, order: [] }, focusedShell?: ContextShell): UiContextView {
   const ctx = deriveSelectionContext(sel, repos, threads);
   if (!focusedShell) return ctx;
   // The keyboard is in a bottom panel shell (focusedBottomShell): terminal commands act on
@@ -68,11 +68,11 @@ export function deriveContext(sel: Selection, repos: ReposData, threads: Threads
   // context too, so cmd+t (terminal.new) starts another shell beside it.
   const place = projectsShellPlace(focusedShell);
   return place
-    ? { ...ctx, activeTerminalId: focusedShell.id, activeRepoId: place.repoId, activeWorktreePath: place.path }
+    ? { ...ctx, activeTerminalId: focusedShell.id, activeProjectId: place.projectId, activeWorktreePath: place.path }
     : { ...ctx, activeTerminalId: focusedShell.id };
 }
 
-function deriveSelectionContext(sel: Selection, repos: ReposData, threads: ThreadsData): UiContextView {
+function deriveSelectionContext(sel: Selection, repos: ProjectsData, threads: ThreadsData): UiContextView {
   switch (sel.kind) {
     case "none":
       return emptyContext;
@@ -86,7 +86,7 @@ function deriveSelectionContext(sel: Selection, repos: ReposData, threads: Threa
       return {
         ...emptyContext,
         activeThreadId: sel.id,
-        activeRepoId: place?.repoId ?? s?.repoId ?? "",
+        activeProjectId: place?.projectId ?? s?.projectId ?? "",
         activeWorktreePath: place?.path ?? (home ? "" : (s?.worktreePath ?? "")),
         activeView: "thread",
         activeWorkspaceId: s?.workspaceId ?? "",
@@ -96,14 +96,14 @@ function deriveSelectionContext(sel: Selection, repos: ReposData, threads: Threa
     // what thread.new needs to be available. A composer without a project has no repo
     // either (the daemon offers thread.new in the compose view for it).
     case "compose":
-      return { ...emptyContext, activeRepoId: sel.repoId, activeView: "compose", activeWorkspaceId: sel.workspaceId ?? "" };
+      return { ...emptyContext, activeProjectId: sel.projectId, activeView: "compose", activeWorkspaceId: sel.workspaceId ?? "" };
     case "view":
       return { ...emptyContext, activeView: sel.name };
   }
 }
 
 export function contextKey(c: UiContextView): string {
-  return [c.activeView, c.activeTerminalId, c.activeThreadId, c.activeRepoId, c.activeWorktreePath, c.activeWorkspaceId].join("\u0000");
+  return [c.activeView, c.activeTerminalId, c.activeThreadId, c.activeProjectId, c.activeWorktreePath, c.activeWorkspaceId].join("\u0000");
 }
 
 /**
@@ -116,17 +116,17 @@ export function getUiContext(sel?: Selection): UiContextView {
   const terminals = useTerminalsStore.getState();
   const focused = sel === undefined ? focusedBottomShell(ui, terminals, useBottomStore.getState().byKey) : "";
   const shell = focused ? (terminals.byId[focused] ?? { id: focused, labels: {} }) : undefined;
-  return deriveContext(sel ?? ui.selection, useReposStore.getState(), useThreadsStore.getState(), shell);
+  return deriveContext(sel ?? ui.selection, useProjectsStore.getState(), useThreadsStore.getState(), shell);
 }
 
 const SEP = "\u0001";
 
 /** One string per repo: id + worktree paths. Shallow-stable across unrelated updates. */
-export function useRepoStructureKeys(): string[] {
-  return useReposStore(useShallow((s) => s.order.map((id) => [id, ...(s.byId[id]?.worktrees.map((w) => w.path) ?? [])].join(SEP))));
+export function useProjectStructureKeys(): string[] {
+  return useProjectsStore(useShallow((s) => s.order.map((id) => [id, ...(s.byId[id]?.worktrees.map((w) => w.path) ?? [])].join(SEP))));
 }
 
-export function decodeRepoKeys(keys: readonly string[]): TreeRepo[] {
+export function decodeProjectKeys(keys: readonly string[]): TreeProject[] {
   return keys.map((k) => {
     const [id = "", ...worktreePaths] = k.split(SEP);
     return { id, worktreePaths };

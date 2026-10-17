@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { invocations, openAddProjectDialog, openApp, repoAt, resetMock } from "./fixtures";
+import { invocations, openAddProjectDialog, openApp, projectAt, resetMock } from "./fixtures";
 
 // Folder completion against FilesystemService.ListDirectories over the mock's fake home
 // (mock/filesystem.ts), driven through the Add Project dialog's Local folder tab. The
@@ -69,7 +69,7 @@ test("Local folder completes paths with Tab and submits with Enter", async ({ pa
   await expect(input).toHaveValue("src/new-app/");
   await page.keyboard.press("Enter");
   await expect(dialog).toHaveCount(0);
-  expect(await repoAt("/Users/dev/src/new-app")).toMatchObject({ name: "new-app", git: true });
+  expect(await projectAt("/Users/dev/src/new-app")).toMatchObject({ name: "new-app", git: true });
 });
 
 test("a highlighted folder: / descends, Tab descends, Enter submits it", async ({ page }) => {
@@ -92,7 +92,7 @@ test("a highlighted folder: / descends, Tab descends, Enter submits it", async (
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("Enter");
   await expect(dialog).toHaveCount(0);
-  await expect.poll(async () => (await repoAt("/Users/dev/Documents/Projects/side-project"))?.name).toBe("side-project");
+  await expect.poll(async () => (await projectAt("/Users/dev/Documents/Projects/side-project"))?.name).toBe("side-project");
 });
 
 test("an absolute path is taken under home, and long listings are bounded", async ({ page }) => {

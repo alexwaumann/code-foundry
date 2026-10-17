@@ -3,7 +3,7 @@ import type { Workspace, WorkspaceEvent } from "@/gen/codefoundry/v1/workspace_p
 
 /** A member of a workspace: a repository and its worktree on the workspace branch. */
 export interface WorkspaceMemberView {
-  repoId: string;
+  projectId: string;
   worktreePath: string;
 }
 
@@ -33,7 +33,7 @@ export function toWorkspaceView(w: Workspace): WorkspaceView {
     id: w.id,
     name: w.name,
     branch: w.branch,
-    members: w.members.map((m) => ({ repoId: m.projectId, worktreePath: m.worktreePath })),
+    members: w.members.map((m) => ({ projectId: m.projectId, worktreePath: m.worktreePath })),
     createdAtMs: w.createdAt ? timestampMs(w.createdAt) : null,
   };
 }

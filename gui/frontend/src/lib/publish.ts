@@ -13,7 +13,7 @@ export const visibilityOrder: readonly Visibility[] = ["public", "internal", "pr
 
 export const visibilityLabels: Record<Visibility, string> = { public: "Public", internal: "Internal", private: "Private" };
 
-/** Where the viewer can publish a repository (RepoService.ListPublishOwners). */
+/** Where the viewer can publish a repository (ProjectService.ListPublishOwners). */
 export interface PublishOwnerView {
   login: string;
   kind: "user" | "org";

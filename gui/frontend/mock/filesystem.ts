@@ -146,8 +146,8 @@ export function projectFolder(abs: string): { path: string; git: boolean } | und
 // internal/fuzzy: exact base name > base name prefix > base name subsequence > path
 // subsequence, then shorter path, then path; an empty query lists the shallowest first.
 
-/** A project the completion RPCs can see: its id and main worktree (world.ts MockRepo). */
-export interface CompletionRepo {
+/** A project the completion RPCs can see: its id and main worktree (world.ts MockProject). */
+export interface CompletionProject {
   id: string;
   path: string;
 }
@@ -173,19 +173,19 @@ const DEFAULT_FILE_LIMIT = 50;
 const MAX_FILE_LIMIT = 200;
 
 /** Files set by POST /__mock/files, by repo id. */
-const filesByRepo = new Map<string, string[]>();
+const filesByProject = new Map<string, string[]>();
 /** "skills <repo,repo|-> <user>" and "search <repo> <query>", for specs that assert calls. */
 export const completionCalls: string[] = [];
 
 export function setMockFiles(projectId: string, files: string[]): void {
-  filesByRepo.set(projectId, files);
+  filesByProject.set(projectId, files);
 }
 
 /** How SearchFiles answers (POST /__mock/files/search?delay=700&fail=1): after delayMs, failing when fail. */
 export const searchMode = { delayMs: 0, fail: false };
 
 export function resetCompletion(): void {
-  filesByRepo.clear();
+  filesByProject.clear();
   completionCalls.length = 0;
   searchMode.delayMs = 0;
   searchMode.fail = false;
@@ -195,7 +195,7 @@ type SkillInit = MessageInitShape<typeof SkillSchema>;
 type SearchInit = MessageInitShape<typeof SearchFilesResponseSchema>;
 
 /** The checkout a request names: path (one of the repo's) or the main worktree. */
-function completionCheckout(repos: ReadonlyMap<string, CompletionRepo>, projectId: string, path: string): CompletionRepo {
+function completionCheckout(repos: ReadonlyMap<string, CompletionProject>, projectId: string, path: string): CompletionProject {
   if (projectId === "") throw invalid("project_id is required");
   const repo = repos.get(projectId);
   if (!repo) throw new ConnectError(`repo ${projectId} not found`, Code.NotFound);
@@ -204,7 +204,7 @@ function completionCheckout(repos: ReadonlyMap<string, CompletionRepo>, projectI
 }
 
 export function listSkills(
-  repos: ReadonlyMap<string, CompletionRepo>,
+  repos: ReadonlyMap<string, CompletionProject>,
   sources: readonly { projectId: string; path: string }[],
   includeUser: boolean,
 ): SkillInit[] {
@@ -260,7 +260,7 @@ export function fileTier(path: string, query: string): number {
 }
 
 /** searchFiles as the router serves it: logged, then after searchMode.delayMs, failing when searchMode.fail. */
-export async function searchFilesSlow(repos: ReadonlyMap<string, CompletionRepo>, projectId: string, path: string, query: string, limit: number): Promise<SearchInit> {
+export async function searchFilesSlow(repos: ReadonlyMap<string, CompletionProject>, projectId: string, path: string, query: string, limit: number): Promise<SearchInit> {
   if (searchMode.delayMs > 0) await new Promise((r) => setTimeout(r, searchMode.delayMs));
   if (searchMode.fail) {
     completionCalls.push(`search ${projectId} ${query}`);
@@ -269,13 +269,13 @@ export async function searchFilesSlow(repos: ReadonlyMap<string, CompletionRepo>
   return searchFiles(repos, projectId, path, query, limit);
 }
 
-export function searchFiles(repos: ReadonlyMap<string, CompletionRepo>, projectId: string, path: string, query: string, limit: number): SearchInit {
+export function searchFiles(repos: ReadonlyMap<string, CompletionProject>, projectId: string, path: string, query: string, limit: number): SearchInit {
   if (limit < 0) throw invalid(`limit ${String(limit)} is negative`);
   const repo = completionCheckout(repos, projectId, path);
   completionCalls.push(`search ${repo.id} ${query}`);
   const q = query.trim();
   const depth = (p: string) => p.split("/").length;
-  const ranked = withParentDirs(filesByRepo.get(repo.id) ?? DEFAULT_FILES)
+  const ranked = withParentDirs(filesByProject.get(repo.id) ?? DEFAULT_FILES)
     .map((e) => ({ ...e, tier: fileTier(e.path, q) }))
     .filter((e) => e.tier > 0)
     .sort((a, b) =>

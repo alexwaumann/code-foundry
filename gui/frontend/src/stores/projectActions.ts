@@ -4,24 +4,24 @@
  * reach the same code), or a selection change.
  */
 import { startCommandNamed } from "@/keys/bindings";
-import { repoRef } from "@/lib/projects";
+import { projectRef } from "@/lib/projects";
 import { openAddProject } from "./addProject";
 import { newWorktreeTerminal } from "./bottomActions";
 import { runCommand, runCommandForResult } from "./commands";
-import { repoContext, worktreeContext } from "./context";
+import { projectContext, worktreeContext } from "./context";
 import { openPublishDialog } from "./publish";
-import { mainWorktreePath, useReposStore } from "./repos";
+import { mainWorktreePath, useProjectsStore } from "./projects";
 import { useUiStore } from "./ui";
 import { useWorkspacesStore } from "./workspaces";
 
 /** terminal.new in the worktree; the shell opens (focused) in the Projects page's bottom panel. */
-export function newTerminalIn(repoId: string, path: string): Promise<boolean> {
-  return newWorktreeTerminal(repoId, path);
+export function newTerminalIn(projectId: string, path: string): Promise<boolean> {
+  return newWorktreeTerminal(projectId, path);
 }
 
 /** repo.worktree.remove (the daemon asks for confirmation; dirty worktrees are refused without force). */
-export function removeWorktree(repoId: string, path: string): Promise<boolean> {
-  return runCommand("project.worktree.remove", {}, worktreeContext(repoId, path));
+export function removeWorktree(projectId: string, path: string): Promise<boolean> {
+  return runCommand("project.worktree.remove", {}, worktreeContext(projectId, path));
 }
 
 /**
@@ -29,33 +29,33 @@ export function removeWorktree(repoId: string, path: string): Promise<boolean> {
  * removes it without touching its branch). The fetch reports through the gitops toasts,
  * the result ("Removed 1 worktree: …" or why it was kept) as a toast.
  */
-export function cleanupWorktree(repoId: string, path: string): Promise<boolean> {
-  return runCommand("project.worktree.cleanup", { project: repoId, path }, worktreeContext(repoId, path));
+export function cleanupWorktree(projectId: string, path: string): Promise<boolean> {
+  return runCommand("project.worktree.cleanup", { project: projectId, path }, worktreeContext(projectId, path));
 }
 
 /** repo.worktree.cleanup for every merged, clean, unheld worktree of the project (confirmed; the prompt lists the branches). */
-export function cleanupMergedWorktrees(repoId: string): Promise<boolean> {
-  return runCommand("project.worktree.cleanup", { project: repoId }, repoContext(repoId));
+export function cleanupMergedWorktrees(projectId: string): Promise<boolean> {
+  return runCommand("project.worktree.cleanup", { project: projectId }, projectContext(projectId));
 }
 
 /** repo.unregister (confirmed). */
-export function unregisterProject(repoId: string): Promise<boolean> {
-  return runCommand("project.unregister", {}, repoContext(repoId));
+export function unregisterProject(projectId: string): Promise<boolean> {
+  return runCommand("project.unregister", {}, projectContext(projectId));
 }
 
 /** repo.worktree.new on the project: the palette asks for the branch (base and fetch keep their defaults). */
-export function newWorktreeIn(repoId: string): void {
-  useUiStore.getState().openPalette("", "project.worktree.new", repoContext(repoId));
+export function newWorktreeIn(projectId: string): void {
+  useUiStore.getState().openPalette("", "project.worktree.new", projectContext(projectId));
 }
 
 /** repo.github.publish's presenter for the project: the publish dialog (owner, name, visibility). */
-export function publishProject(repoId: string): void {
-  openPublishDialog(repoId);
+export function publishProject(projectId: string): void {
+  openPublishDialog(projectId);
 }
 
 /** repo.git.init: a folder without git becomes a repository with an empty first commit. */
-export function initGitIn(repoId: string): Promise<boolean> {
-  return runCommand("project.git.init", { project: repoId }, repoContext(repoId));
+export function initGitIn(projectId: string): Promise<boolean> {
+  return runCommand("project.git.init", { project: projectId }, projectContext(projectId));
 }
 
 /**
@@ -63,13 +63,13 @@ export function initGitIn(repoId: string): Promise<boolean> {
  * gitops toasts report it, a failure included), then repo.refresh for the project, quietly
  * (its result is the header's freshness). A refresh failure is toasted.
  */
-export async function refreshProject(repoId: string): Promise<void> {
-  const repos = useReposStore.getState();
-  const main = mainWorktreePath(repos, repoId);
-  if (main && (repos.byId[repoId]?.remotes.length ?? 0) > 0) {
-    await runCommandForResult("git.fetch", { worktree: main }, { ctx: worktreeContext(repoId, main), quiet: true });
+export async function refreshProject(projectId: string): Promise<void> {
+  const repos = useProjectsStore.getState();
+  const main = mainWorktreePath(repos, projectId);
+  if (main && (repos.byId[projectId]?.remotes.length ?? 0) > 0) {
+    await runCommandForResult("git.fetch", { worktree: main }, { ctx: worktreeContext(projectId, main), quiet: true });
   }
-  await runCommandForResult("project.refresh", { project: repoId }, { ctx: repoContext(repoId), quiet: true });
+  await runCommandForResult("project.refresh", { project: projectId }, { ctx: projectContext(projectId), quiet: true });
 }
 
 /**
@@ -85,13 +85,13 @@ function wsName(workspaceId: string): string {
 }
 
 /** workspace.add-repo: a worktree on the workspace branch in another project. */
-export function addToWorkspace(workspaceId: string, repoId: string): Promise<boolean> {
-  return runCommand("workspace.add-project", { project: repoRef(useReposStore.getState(), repoId), workspace: workspaceId });
+export function addToWorkspace(workspaceId: string, projectId: string): Promise<boolean> {
+  return runCommand("workspace.add-project", { project: projectRef(useProjectsStore.getState(), projectId), workspace: workspaceId });
 }
 
 /** workspace.remove-repo (confirmed; refused while a thread runs there or with changes). */
-export function removeFromWorkspace(workspaceId: string, repoId: string): Promise<boolean> {
-  return runCommand("workspace.remove-project", { project: repoRef(useReposStore.getState(), repoId), workspace: workspaceId });
+export function removeFromWorkspace(workspaceId: string, projectId: string): Promise<boolean> {
+  return runCommand("workspace.remove-project", { project: projectRef(useProjectsStore.getState(), projectId), workspace: workspaceId });
 }
 
 /** workspace.remove (confirmed): every member worktree is deleted. Named by name, which reads better in the prompt. */

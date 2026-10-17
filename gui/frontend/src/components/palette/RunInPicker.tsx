@@ -4,22 +4,22 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { tildify } from "@/lib/path";
 import { worktreeBranch } from "@/lib/threadRow";
 import { runThreadIn } from "@/stores/threadActions";
-import { useReposStore } from "@/stores/repos";
+import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { useWorkspacesStore } from "@/stores/workspaces";
 
-function MemberItem({ repoId, path, current, queued, onPick }: { repoId: string; path: string; current: boolean; queued: boolean; onPick: (repoId: string) => void }) {
-  const name = useReposStore((s) => s.byId[repoId]?.name ?? repoId);
-  const branch = useReposStore((s) => worktreeBranch(s, repoId, path));
+function MemberItem({ projectId, path, current, queued, onPick }: { projectId: string; path: string; current: boolean; queued: boolean; onPick: (projectId: string) => void }) {
+  const name = useProjectsStore((s) => s.byId[projectId]?.name ?? projectId);
+  const branch = useProjectsStore((s) => worktreeBranch(s, projectId, path));
   return (
     <CommandItem
-      value={repoId}
+      value={projectId}
       keywords={[name, branch, path]}
       disabled={current}
       onSelect={() => {
-        onPick(repoId);
+        onPick(projectId);
       }}
-      data-member={repoId}
+      data-member={projectId}
       className="gap-3 py-2"
     >
       <FolderGit2 className="size-4 text-info/90" aria-hidden />
@@ -43,11 +43,11 @@ export function RunInPicker({ threadId, close }: { threadId: string; close: () =
   const cwd = useThreadsStore((s) => s.byId[threadId]?.worktreePath ?? "");
   const pending = useThreadsStore((s) => s.byId[threadId]?.pendingWorktreePath ?? "");
   const workspaceId = useThreadsStore((s) => s.byId[threadId]?.workspaceId ?? "");
-  const members = useWorkspacesStore(useShallow((s) => (s.byId[workspaceId]?.members ?? []).map((m) => `${m.repoId}\u0000${m.worktreePath}`)));
+  const members = useWorkspacesStore(useShallow((s) => (s.byId[workspaceId]?.members ?? []).map((m) => `${m.projectId}\u0000${m.worktreePath}`)));
   const wsName = useWorkspacesStore((s) => s.byId[workspaceId]?.name ?? "");
-  const pick = (repoId: string) => {
+  const pick = (projectId: string) => {
     close();
-    void runThreadIn(threadId, repoId);
+    void runThreadIn(threadId, projectId);
   };
   return (
     <Command loop data-testid="runin-picker">
@@ -56,8 +56,8 @@ export function RunInPicker({ threadId, close }: { threadId: string; close: () =
         <CommandEmpty>{workspaceId ? "No matching members." : "This thread does not belong to a workspace."}</CommandEmpty>
         <CommandGroup heading={wsName ? `Members of ${wsName}` : "Members"}>
           {members.map((k) => {
-            const [repoId = "", path = ""] = k.split("\u0000");
-            return <MemberItem key={k} repoId={repoId} path={path} current={path === cwd} queued={path === pending} onPick={pick} />;
+            const [projectId = "", path = ""] = k.split("\u0000");
+            return <MemberItem key={k} projectId={projectId} path={path} current={path === cwd} queued={path === pending} onPick={pick} />;
           })}
         </CommandGroup>
       </CommandList>

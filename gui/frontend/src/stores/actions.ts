@@ -11,7 +11,7 @@ import type { ActionEventView, ActionRunView, ActionView } from "@/api/actions";
 export interface ActionsData {
   byId: Readonly<Record<string, ActionView>>;
   /** Each project's action ids in list order (position, then name). */
-  byRepo: Readonly<Record<string, readonly string[]>>;
+  byProject: Readonly<Record<string, readonly string[]>>;
   runs: Readonly<Record<string, ActionRunView>>;
 }
 
@@ -20,13 +20,13 @@ interface ActionsState extends ActionsData {
   loaded: boolean;
 }
 
-export const emptyActions: ActionsData = { byId: {}, byRepo: {}, runs: {} };
+export const emptyActions: ActionsData = { byId: {}, byProject: {}, runs: {} };
 
 const NONE: readonly string[] = [];
 
-function repoOrder(byId: Readonly<Record<string, ActionView>>, repoId: string): string[] {
+function projectOrder(byId: Readonly<Record<string, ActionView>>, projectId: string): string[] {
   return Object.values(byId)
-    .filter((a) => a.repoId === repoId)
+    .filter((a) => a.projectId === projectId)
     .sort((a, b) => a.position - b.position || a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
     .map((a) => a.id);
 }
@@ -35,25 +35,25 @@ function sameIds(a: readonly string[] | undefined, b: readonly string[]): boolea
   return a !== undefined && a.length === b.length && a.every((id, i) => id === b[i]);
 }
 
-/** byRepo with `repoId`'s list recomputed; the same object when its order did not change. */
-function withRepo(prev: ActionsData["byRepo"], byId: Readonly<Record<string, ActionView>>, repoId: string): ActionsData["byRepo"] {
-  const ids = repoOrder(byId, repoId);
-  if (sameIds(prev[repoId], ids)) return prev;
+/** byProject with `projectId`'s list recomputed; the same object when its order did not change. */
+function withProject(prev: ActionsData["byProject"], byId: Readonly<Record<string, ActionView>>, projectId: string): ActionsData["byProject"] {
+  const ids = projectOrder(byId, projectId);
+  if (sameIds(prev[projectId], ids)) return prev;
   if (ids.length === 0) {
-    const { [repoId]: _gone, ...rest } = prev;
+    const { [projectId]: _gone, ...rest } = prev;
     return rest;
   }
-  return { ...prev, [repoId]: ids };
+  return { ...prev, [projectId]: ids };
 }
 
 export function replaceActions(actions: readonly ActionView[], runs: readonly ActionRunView[]): ActionsData {
   const byId: Record<string, ActionView> = {};
   for (const a of actions) byId[a.id] = a;
-  let byRepo: ActionsData["byRepo"] = {};
-  for (const repoId of new Set(actions.map((a) => a.repoId))) byRepo = withRepo(byRepo, byId, repoId);
+  let byProject: ActionsData["byProject"] = {};
+  for (const projectId of new Set(actions.map((a) => a.projectId))) byProject = withProject(byProject, byId, projectId);
   const runsById: Record<string, ActionRunView> = {};
   for (const r of runs) runsById[r.id] = r;
-  return { byId, byRepo, runs: runsById };
+  return { byId, byProject, runs: runsById };
 }
 
 export function applyActionEvent(prev: ActionsData, ev: ActionEventView): ActionsData {
@@ -62,13 +62,13 @@ export function applyActionEvent(prev: ActionsData, ev: ActionEventView): Action
       return replaceActions(ev.actions, ev.runs);
     case "updated": {
       const byId = { ...prev.byId, [ev.action.id]: ev.action };
-      return { ...prev, byId, byRepo: withRepo(prev.byRepo, byId, ev.action.repoId) };
+      return { ...prev, byId, byProject: withProject(prev.byProject, byId, ev.action.projectId) };
     }
     case "removed": {
       const gone = prev.byId[ev.id];
       if (!gone) return prev;
       const { [ev.id]: _removed, ...byId } = prev.byId;
-      return { ...prev, byId, byRepo: withRepo(prev.byRepo, byId, gone.repoId) };
+      return { ...prev, byId, byProject: withProject(prev.byProject, byId, gone.projectId) };
     }
     case "runUpdated":
       return { ...prev, runs: { ...prev.runs, [ev.run.id]: ev.run } };
@@ -85,8 +85,8 @@ export function applyActionEvent(prev: ActionsData, ev: ActionEventView): Action
 export const useActionsStore = create<ActionsState>()(() => ({ ...emptyActions, loaded: false }));
 
 /** A project's action ids in list order (a stable empty list for none). */
-export function useRepoActionIds(repoId: string): readonly string[] {
-  return useActionsStore((s) => s.byRepo[repoId] ?? NONE);
+export function useProjectActionIds(projectId: string): readonly string[] {
+  return useActionsStore((s) => s.byProject[projectId] ?? NONE);
 }
 
 /** One action (a new object only when it changes), or undefined. */
@@ -100,6 +100,6 @@ export function useActionRun(runId: string): ActionRunView | undefined {
 }
 
 /** A project's action ids right now (read imperatively). */
-export function getRepoActionIds(repoId: string): readonly string[] {
-  return useActionsStore.getState().byRepo[repoId] ?? NONE;
+export function getProjectActionIds(projectId: string): readonly string[] {
+  return useActionsStore.getState().byProject[projectId] ?? NONE;
 }

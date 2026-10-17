@@ -57,7 +57,7 @@ import {
   type DraftPhase,
 } from "@/stores/compose";
 import { requestConfirm } from "@/stores/confirm";
-import { useReposStore } from "@/stores/repos";
+import { useProjectsStore } from "@/stores/projects";
 import { useModelChoices, useSettingValue } from "@/stores/settings";
 import { loadSkills } from "@/stores/skills";
 import { DASHBOARD, useUiStore } from "@/stores/ui";
@@ -93,9 +93,9 @@ function worktreeName(w: WorktreeOption): string {
 }
 
 /** The repo's worktrees (main first), as a shallow-stable list that follows branch changes live. */
-function useWorktrees(repoId: string): WorktreeOption[] {
-  const keys = useReposStore(
-    useShallow((s) => (s.byId[repoId]?.worktrees ?? []).map((w) => [w.path, w.branch, w.head, w.detached ? "1" : "", w.isMain ? "1" : ""].join(SEP))),
+function useWorktrees(projectId: string): WorktreeOption[] {
+  const keys = useProjectsStore(
+    useShallow((s) => (s.byId[projectId]?.worktrees ?? []).map((w) => [w.path, w.branch, w.head, w.detached ? "1" : "", w.isMain ? "1" : ""].join(SEP))),
   );
   return useMemo(
     () =>
@@ -120,22 +120,22 @@ function phaseText(phase: DraftPhase, newWorktrees: number): string {
 }
 
 /** A workspace's members (repo id + worktree path), shallow-stable. */
-function useWorkspaceMembers(workspaceId: string | null): { repoId: string; worktreePath: string }[] {
-  const keys = useWorkspacesStore(useShallow((s) => (workspaceId ? (s.byId[workspaceId]?.members ?? []).map((m) => m.repoId + SEP + m.worktreePath) : [])));
+function useWorkspaceMembers(workspaceId: string | null): { projectId: string; worktreePath: string }[] {
+  const keys = useWorkspacesStore(useShallow((s) => (workspaceId ? (s.byId[workspaceId]?.members ?? []).map((m) => m.projectId + SEP + m.worktreePath) : [])));
   return useMemo(
     () =>
       keys.map((k) => {
-        const [repoId = "", worktreePath = ""] = k.split(SEP);
-        return { repoId, worktreePath };
+        const [projectId = "", worktreePath = ""] = k.split(SEP);
+        return { projectId, worktreePath };
       }),
     [keys],
   );
 }
 
 /** The branch a member worktree has checked out now ("" when the repo store does not list it). */
-function useCheckout(repoId: string, path: string): WorktreeOption | undefined {
-  const key = useReposStore((s) => {
-    const w = s.byId[repoId]?.worktrees.find((x) => x.path === path);
+function useCheckout(projectId: string, path: string): WorktreeOption | undefined {
+  const key = useProjectsStore((s) => {
+    const w = s.byId[projectId]?.worktrees.find((x) => x.path === path);
     return w ? [w.path, w.branch, w.head, w.detached ? "1" : "", w.isMain ? "1" : ""].join(SEP) : "";
   });
   return useMemo(() => {
@@ -153,12 +153,12 @@ function useMembers(target: ComposeTarget, key: string) {
   const alsoIn = useDraft(key, "alsoIn");
   const primaryChoice = useDraft(key, "primary");
   // Git projects only: a project without git is never an Also in project.
-  const known = useReposStore(useShallow((s) => s.order.filter((id) => s.byId[id]?.git === true)));
+  const known = useProjectsStore(useShallow((s) => s.order.filter((id) => s.byId[id]?.git === true)));
   const wsMembers = useWorkspaceMembers(target.kind === "workspace" ? target.workspaceId : null);
   return useMemo(() => {
     const workspace = target.kind === "workspace" ? { id: target.workspaceId, members: wsMembers } : undefined;
-    const { repoIds, primary } = draftMembers({ target, alsoIn, primary: primaryChoice }, workspace, (id) => known.includes(id));
-    return { repoIds, primary, wsMembers };
+    const { projectIds, primary } = draftMembers({ target, alsoIn, primary: primaryChoice }, workspace, (id) => known.includes(id));
+    return { projectIds, primary, wsMembers };
   }, [target, alsoIn, primaryChoice, known, wsMembers]);
 }
 
@@ -170,16 +170,16 @@ function useMembers(target: ComposeTarget, key: string) {
  */
 function useMemberChips(
   target: ComposeTarget,
-  repoIds: readonly string[],
-  wsMembers: readonly { repoId: string; worktreePath: string }[],
+  projectIds: readonly string[],
+  wsMembers: readonly { projectId: string; worktreePath: string }[],
   newWorktrees: boolean,
   projectChip: { branch: string; noGit: boolean },
 ): MemberChipModel[] {
   const wsId = target.kind === "workspace" ? target.workspaceId : "";
-  const branches = useReposStore(
+  const branches = useProjectsStore(
     useShallow((s) =>
       wsMembers.map((m) => {
-        const w = s.byId[m.repoId]?.worktrees.find((x) => x.path === m.worktreePath);
+        const w = s.byId[m.projectId]?.worktrees.find((x) => x.path === m.worktreePath);
         return w ? w.branch || w.head.slice(0, 7) : "";
       }),
     ),
@@ -187,12 +187,12 @@ function useMemberChips(
   const wsBranch = useWorkspacesStore((s) => (wsId ? (s.byId[wsId]?.branch ?? "") : ""));
   return useMemo(
     () =>
-      repoIds.map((repoId, i) => {
-        if (target.kind === "project") return { repoId, branch: projectChip.branch, noGit: projectChip.noGit, removable: i > 0 };
-        const j = wsMembers.findIndex((m) => m.repoId === repoId);
-        return { repoId, branch: newWorktrees ? NEW_BRANCH : branches[j] || wsBranch, removable: false };
+      projectIds.map((projectId, i) => {
+        if (target.kind === "project") return { projectId, branch: projectChip.branch, noGit: projectChip.noGit, removable: i > 0 };
+        const j = wsMembers.findIndex((m) => m.projectId === projectId);
+        return { projectId, branch: newWorktrees ? NEW_BRANCH : branches[j] || wsBranch, removable: false };
       }),
-    [target, repoIds, wsMembers, branches, wsBranch, newWorktrees, projectChip.branch, projectChip.noGit],
+    [target, projectIds, wsMembers, branches, wsBranch, newWorktrees, projectChip.branch, projectChip.noGit],
   );
 }
 
@@ -323,21 +323,21 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
   const phase = useDraft(draftKey, "phase");
   const error = useDraft(draftKey, "error");
   const notice = useDraft(draftKey, "notice");
-  const { repoIds, primary, wsMembers } = useMembers(target, draftKey);
+  const { projectIds, primary, wsMembers } = useMembers(target, draftKey);
   const refsStatus = useComposeStore((s) => s.refs[primary]?.status ?? "loading");
   const refsError = useComposeStore((s) => s.refs[primary]?.error ?? null);
   const refsOutdated = useComposeStore((s) => s.refs[primary]?.outdated ?? false);
   const refs = useComposeStore((s) => s.refs[primary]?.refs);
   const defaultRef = useComposeStore((s) => s.refs[primary]?.defaultRef ?? "");
-  const projectId = target.kind === "project" ? target.repoId : "";
+  const projectId = target.kind === "project" ? target.projectId : "";
   const worktrees = useWorktrees(projectId);
   const mainPath = worktrees.find((w) => w.isMain)?.path;
   const workInSetting = useSettingValue(WORK_IN_SETTING_KEY);
   const remembered = useRememberedWorkIn(projectId);
   // A project without git runs threads in its folder only: Current checkout, no base.
-  const noGitPath = useReposStore((s) => noGitCheckout(s.byId[projectId]));
+  const noGitPath = useProjectsStore((s) => noGitCheckout(s.byId[projectId]));
   const wsBranch = useWorkspacesStore((s) => (target.kind === "workspace" ? (s.byId[target.workspaceId]?.branch ?? "") : ""));
-  const primaryCheckout = useCheckout(primary, wsMembers.find((m) => m.repoId === primary)?.worktreePath ?? "");
+  const primaryCheckout = useCheckout(primary, wsMembers.find((m) => m.projectId === primary)?.worktreePath ?? "");
   const focusSeq = useUiStore((s) => s.composerFocusSeq);
   const editorRef = useRef<PromptEditorHandle>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -347,7 +347,7 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
   // No project: no worktree, base, branch or member chips; "/" completes, "@" does not.
   const home = target.kind === "home";
   const sourceTarget = target.kind === "workspace" ? "workspace" : "project";
-  const multi = target.kind === "project" && repoIds.length > 1;
+  const multi = target.kind === "project" && projectIds.length > 1;
   const worktree: WorktreeChoice =
     target.kind === "workspace"
       ? choice?.kind === "new"
@@ -358,7 +358,7 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
         : multi
           ? { kind: "new" }
           : resolveWorktree(choice ?? defaultWorktree({ setting: workInSetting, remembered, mainPath }), worktrees);
-  const newWorktrees = home || worktree.kind !== "new" ? 0 : target.kind === "workspace" || multi ? repoIds.length : 1;
+  const newWorktrees = home || worktree.kind !== "new" ? 0 : target.kind === "workspace" || multi ? projectIds.length : 1;
   const base = baseChoice ?? defaultRef;
   const canSend = !busy && (text.trim() !== "" || hasAttachments);
 
@@ -366,8 +366,8 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
   // the user's, reloaded on mount and whenever those change.
   const existingPath = worktree.kind === "existing" ? worktree.path : "";
   const sources = useMemo(
-    () => skillSources({ target: sourceTarget, repoIds, worktree: existingPath ? { kind: "existing", path: existingPath } : { kind: "new" }, wsMembers }),
-    [sourceTarget, repoIds, existingPath, wsMembers],
+    () => skillSources({ target: sourceTarget, projectIds, worktree: existingPath ? { kind: "existing", path: existingPath } : { kind: "new" }, wsMembers }),
+    [sourceTarget, projectIds, existingPath, wsMembers],
   );
   useEffect(() => {
     void loadSkills(sources);
@@ -379,15 +379,15 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
     () =>
       fileSources({
         target: sourceTarget,
-        repoIds,
+        projectIds,
         worktree: worktreeKind === "existing" ? { kind: "existing", path: existingPath } : { kind: worktreeKind },
         wsMembers,
       }),
-    [sourceTarget, repoIds, worktreeKind, existingPath, wsMembers],
+    [sourceTarget, projectIds, worktreeKind, existingPath, wsMembers],
   );
   const [trigger, setTrigger] = useState<EditorTrigger | null>(null);
-  const skillSource = useSkillSource(trigger, skillSourcesKey(sources), repoIds);
-  const fileSource = useFileSource(trigger, fileSrcs, repoIds, primary);
+  const skillSource = useSkillSource(trigger, skillSourcesKey(sources), projectIds);
+  const fileSource = useFileSource(trigger, fileSrcs, projectIds, primary);
   const completion = useCompletion(trigger, setTrigger, trigger?.char === "@" ? fileSource : skillSource, editorRef);
 
   useEffect(() => {
@@ -421,7 +421,7 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
   };
   const refocus = () => editorRef.current?.focus();
 
-  const projects = repoIds.length;
+  const projects = projectIds.length;
   const worktreeGroups = useMemo<PickerGroup[]>(() => {
     if (target.kind === "workspace") {
       return [
@@ -456,7 +456,7 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
   const chosen = worktree.kind === "existing" ? worktrees.find((w) => w.path === worktree.path) : undefined;
   const chips = useMemberChips(
     target,
-    repoIds,
+    projectIds,
     wsMembers,
     worktree.kind === "new",
     projectChipBranch({ noGit: noGitPath !== undefined, newWorktree: worktree.kind === "new", checkout: chosen }),
@@ -510,7 +510,7 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
         <div className="col-span-2 col-start-1 row-start-1 flex min-w-0 flex-col">
           <Attachments draftKey={draftKey} disabled={busy} refocus={refocus} />
           <AttachmentPreview draftKey={draftKey} />
-          <TagMultiProjectContext.Provider value={repoIds.length > 1}>
+          <TagMultiProjectContext.Provider value={projectIds.length > 1}>
             <PromptEditor
               handleRef={editorRef}
               draftKey={draftKey}
@@ -525,7 +525,7 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
                 if (!isDraftEmpty(getDraft(draftKey))) return false;
                 // Back to the Projects page (the worktree overview is a panel tab there,
                 // not a page); the dashboard when the composer has no project at all.
-                const back = target.kind === "project" ? target.repoId : primary;
+                const back = target.kind === "project" ? target.projectId : primary;
                 useUiStore.getState().select(back ? { kind: "view", name: "projects" } : DASHBOARD);
                 return true;
               }}
@@ -635,7 +635,7 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
                 onChange={(v) => {
                   const next: WorktreeChoice = v === "new" || v === "members" ? { kind: v } : { kind: "existing", path: v };
                   // A project's own pick (not one forced by Also in or a missing git) is remembered for it.
-                  if (target.kind === "project" && !multi && noGitPath === undefined && next.kind !== "members") pickWorktree(target.repoId, next);
+                  if (target.kind === "project" && !multi && noGitPath === undefined && next.kind !== "members") pickWorktree(target.projectId, next);
                   else updateDraft(draftKey, { worktree: next });
                 }}
                 footer={target.kind === "project" && noGitPath === undefined && !multi ? WORK_IN_FOOTER : undefined}
@@ -713,18 +713,18 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
  * The new-thread composer for a project, a workspace with workspaceId, or no project with
  * noProject (Selection kind "compose").
  */
-export function Composer({ repoId, workspaceId, noProject = false }: { repoId: string; workspaceId?: string; noProject?: boolean }) {
+export function Composer({ projectId, workspaceId, noProject = false }: { projectId: string; workspaceId?: string; noProject?: boolean }) {
   const target = useMemo<ComposeTarget>(
-    () => (workspaceId ? { kind: "workspace", workspaceId } : noProject ? { kind: "home" } : { kind: "project", repoId }),
-    [repoId, workspaceId, noProject],
+    () => (workspaceId ? { kind: "workspace", workspaceId } : noProject ? { kind: "home" } : { kind: "project", projectId }),
+    [projectId, workspaceId, noProject],
   );
-  const projectName = useReposStore((s) => s.byId[repoId]?.name ?? null);
+  const projectName = useProjectsStore((s) => s.byId[projectId]?.name ?? null);
   const workspaceName = useWorkspacesStore((s) => (workspaceId ? (s.byId[workspaceId]?.name ?? null) : null));
-  const reposLoaded = useReposStore((s) => s.loaded);
+  const projectsLoaded = useProjectsStore((s) => s.loaded);
   const workspacesLoaded = useWorkspacesStore((s) => s.loaded);
   const busy = useDraft(keyOf(target), "phase") !== "idle";
   const name = workspaceId ? workspaceName : noProject ? NO_PROJECT : projectName;
-  const loaded = workspaceId ? workspacesLoaded : reposLoaded;
+  const loaded = workspaceId ? workspacesLoaded : projectsLoaded;
   const gone = workspaceId ? "This workspace no longer exists." : "This project is no longer registered.";
   return (
     // Centered in the pane both ways at any size: auto margins in a column flexbox center

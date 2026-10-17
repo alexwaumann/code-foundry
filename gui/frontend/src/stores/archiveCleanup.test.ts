@@ -71,7 +71,7 @@ describe("putAwaySelected", () => {
     ["the put-away thread is selected", { kind: "thread", id: "a" }, true],
     ["another thread is selected", { kind: "thread", id: "b" }, false],
     ["the dashboard is selected", DASHBOARD, false],
-    ["a composer is selected", { kind: "compose", repoId: "r" }, false],
+    ["a composer is selected", { kind: "compose", projectId: "r" }, false],
     ["nothing is selected", { kind: "none" }, false],
   ])("%s", (_name, sel, want) => {
     expect(putAwaySelected(sel, putAway)).toBe(want);

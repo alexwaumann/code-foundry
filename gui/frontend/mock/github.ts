@@ -72,7 +72,7 @@ interface ActivityInit {
 }
 type DetailInit = MessageInitShape<typeof WorktreeDetailSchema>;
 type GhEventInit = MessageInitShape<typeof GhEventSchema>;
-type RepoEventInit = MessageInitShape<typeof ProjectEventSchema>;
+type ProjectEventInit = MessageInitShape<typeof ProjectEventSchema>;
 type IntentInit = MessageInitShape<typeof UiIntentSchema>;
 type FileInit = { path: string; status: string; added?: number; deleted?: number; binary?: boolean; uncommitted?: boolean; isDir?: boolean; oldPath?: string };
 
@@ -119,7 +119,7 @@ export class GhWorld {
 
   constructor(
     private readonly publishGh: (e: GhEventInit) => void,
-    private readonly publishRepo: (e: RepoEventInit) => void,
+    private readonly publishProjectEvent: (e: ProjectEventInit) => void,
   ) {
     this.reset();
   }
@@ -348,7 +348,7 @@ export class GhWorld {
     const rest = (d.files ?? []).filter((f) => f.status !== "U");
     d.files = [...names.map((p) => ({ path: p, status: "U", added: 0, deleted: 0, binary: false, uncommitted: true, isDir: false, oldPath: "" })), ...rest];
     d.computedAt = timestampFromDate(new Date());
-    this.publishRepo({ event: { case: "worktreeDetailUpdated", value: { projectId: d.projectId, path, computedAt: d.computedAt } } });
+    this.publishProjectEvent({ event: { case: "worktreeDetailUpdated", value: { projectId: d.projectId, path, computedAt: d.computedAt } } });
   }
 
   /** A pull request any dashboard list or watched branch holds. */
@@ -446,7 +446,7 @@ export class GhWorld {
     if (!d) return false;
     d.files = [...(d.files ?? []), { path: "later.txt", status: "?", added: 1, deleted: 0, binary: false, uncommitted: true, isDir: false, oldPath: "" }];
     d.computedAt = timestampFromDate(new Date());
-    this.publishRepo({ event: { case: "worktreeDetailUpdated", value: { projectId: d.projectId, path, computedAt: d.computedAt } } });
+    this.publishProjectEvent({ event: { case: "worktreeDetailUpdated", value: { projectId: d.projectId, path, computedAt: d.computedAt } } });
     return true;
   }
 }

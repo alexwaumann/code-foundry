@@ -3,7 +3,7 @@
  * by draftKey in lib/compose.ts: the repo id, "ws:<workspace id>", or "home:"), so switching the selection away
  * and back keeps what was typed and attached. Kept in memory only (not persisted): the
  * files behind the attachments do not survive a reload anyway. Also caches each repo's
- * base refs (RepoService.ListRefs) for the base-ref picker.
+ * base refs (ProjectService.ListRefs) for the base-ref picker.
  *
  * The draft's text is the prompt with inline tags as tokens (lib/prompt.ts: attachment
  * chips, skills, files); the attachments are the images and PDFs themselves (the tiles).
@@ -18,7 +18,7 @@
  * thread.new registry command, like every other user action.
  */
 import { create } from "zustand";
-import { listRefs, type RepoView } from "@/api/repo";
+import { listRefs, type ProjectView } from "@/api/project";
 import { ATTACHMENT_MIME_TYPES, attachmentMaxBytes, MAX_INLINE_PDF_PAGES, MESSAGE_INLINE_MAX_BYTES, PDF_MIME_TYPE, stageAttachment } from "@/api/threads";
 import { isOutdatedDaemon } from "@/api/errors";
 import { errorMessage } from "@/api/stream";
@@ -49,11 +49,11 @@ import {
 import { pdfSummary } from "@/lib/pdf";
 import { NO_PROJECT } from "@/lib/threadRow";
 import { sentComposerText } from "@/lib/userMessage";
-import { projectPrompt, removeReferences, removeRepoTags, repoTagCount, tagsByRepo } from "@/lib/prompt";
+import { projectPrompt, removeReferences, removeProjectTags, projectTagCount, tagsByProject } from "@/lib/prompt";
 import { invokeConfirmed, refreshCommands } from "./commands";
 import { requestConfirm, type ConfirmRequest } from "./confirm";
 import { getUiContext } from "./context";
-import { useReposStore } from "./repos";
+import { useProjectsStore } from "./projects";
 import { THREAD_COMMANDS } from "./threadActions";
 import { useSettingsStore } from "./settings";
 import { useUiStore, type Selection } from "./ui";
@@ -179,30 +179,30 @@ export function updateDraft(key: string, patch: Partial<Draft>): void {
 }
 
 /** Runs the thread in another member. The base picker lists that repo's refs, so its choice resets. */
-export function setPrimary(key: string, repoId: string): void {
+export function setPrimary(key: string, projectId: string): void {
   const d = getDraft(key);
-  if (d.primary === repoId) return;
-  updateDraft(key, { primary: repoId, base: null, error: null });
+  if (d.primary === projectId) return;
+  updateDraft(key, { primary: projectId, base: null, error: null });
 }
 
 /** Adds a project the thread also works in ("Also in"). */
-export function addAlsoIn(key: string, repoId: string): void {
+export function addAlsoIn(key: string, projectId: string): void {
   const d = getDraft(key);
-  if (d.alsoIn.includes(repoId)) return;
-  updateDraft(key, { alsoIn: [...d.alsoIn, repoId], error: null });
+  if (d.alsoIn.includes(projectId)) return;
+  updateDraft(key, { alsoIn: [...d.alsoIn, projectId], error: null });
 }
 
 /**
  * Drops an "Also in" project and every tag in the text that refers to it (its skills and
  * files); if the thread was to run there, it runs in the project again.
  */
-export function removeAlsoIn(key: string, repoId: string): void {
+export function removeAlsoIn(key: string, projectId: string): void {
   const d = getDraft(key);
-  if (!d.alsoIn.includes(repoId)) return;
+  if (!d.alsoIn.includes(projectId)) return;
   updateDraft(key, {
-    alsoIn: d.alsoIn.filter((id) => id !== repoId),
-    text: removeRepoTags(d.text, repoId),
-    ...(d.primary === repoId ? { primary: null, base: null } : {}),
+    alsoIn: d.alsoIn.filter((id) => id !== projectId),
+    text: removeProjectTags(d.text, projectId),
+    ...(d.primary === projectId ? { primary: null, base: null } : {}),
     error: null,
   });
 }
@@ -333,10 +333,10 @@ export function openNewThreadPicker(): void {
 }
 
 /** Shows the composer for a repo and focuses it. */
-export function composeIn(repoId: string, worktreePath?: string): void {
-  if (worktreePath) updateDraft(repoId, { worktree: { kind: "existing", path: worktreePath } });
+export function composeIn(projectId: string, worktreePath?: string): void {
+  if (worktreePath) updateDraft(projectId, { worktree: { kind: "existing", path: worktreePath } });
   const ui = useUiStore.getState();
-  ui.select({ kind: "compose", repoId });
+  ui.select({ kind: "compose", projectId });
   ui.focusComposer();
 }
 
@@ -346,9 +346,9 @@ export function composeIn(repoId: string, worktreePath?: string): void {
  * the member the thread runs in.
  */
 export function composeInWorkspace(workspaceId: string): void {
-  const first = useWorkspacesStore.getState().byId[workspaceId]?.members[0]?.repoId ?? "";
+  const first = useWorkspacesStore.getState().byId[workspaceId]?.members[0]?.projectId ?? "";
   const ui = useUiStore.getState();
-  ui.select({ kind: "compose", repoId: first, workspaceId });
+  ui.select({ kind: "compose", projectId: first, workspaceId });
   ui.focusComposer();
 }
 
@@ -358,7 +358,7 @@ export function composeInWorkspace(workspaceId: string): void {
  */
 export function composeNoProject(): void {
   const ui = useUiStore.getState();
-  ui.select({ kind: "compose", repoId: "", noProject: true });
+  ui.select({ kind: "compose", projectId: "", noProject: true });
   ui.focusComposer();
 }
 
@@ -366,7 +366,7 @@ export function composeNoProject(): void {
 function targetName(t: ComposeTarget): string {
   switch (t.kind) {
     case "project":
-      return useReposStore.getState().byId[t.repoId]?.name ?? t.repoId;
+      return useProjectsStore.getState().byId[t.projectId]?.name ?? t.projectId;
     case "workspace":
       return useWorkspacesStore.getState().byId[t.workspaceId]?.name ?? t.workspaceId;
     case "home":
@@ -391,7 +391,7 @@ export async function switchDraftTarget(from: ComposeTarget, to: ComposeTarget):
   const toKey = draftKey(to);
   if (fromKey === toKey || getDraft(fromKey).phase !== "idle") return false;
   const waiting = useComposeStore.getState().drafts[toKey];
-  const isGit = (id: string) => useReposStore.getState().byId[id]?.git === true;
+  const isGit = (id: string) => useProjectsStore.getState().byId[id]?.git === true;
   if (isDraftEmpty(getDraft(fromKey))) {
     if (waiting && !isDraftEmpty(waiting)) {
       selectTarget(to);
@@ -425,7 +425,7 @@ export async function switchDraftTarget(from: ComposeTarget, to: ComposeTarget):
 
 /** A workspace target's member repo ids ([] for a project, or a workspace that is gone). */
 function workspaceMemberIds(t: ComposeTarget): string[] {
-  return t.kind === "workspace" ? (useWorkspacesStore.getState().byId[t.workspaceId]?.members.map((m) => m.repoId) ?? []) : [];
+  return t.kind === "workspace" ? (useWorkspacesStore.getState().byId[t.workspaceId]?.members.map((m) => m.projectId) ?? []) : [];
 }
 
 /** "a", "a and b", "a, b and c". */
@@ -438,11 +438,11 @@ function listNames(names: readonly string[]): string {
  * leave it), or null when it drops none.
  */
 function droppedTagsConfirm(before: string, after: string, to: ComposeTarget): ConfirmRequest | null {
-  const kept = tagsByRepo(after);
-  const gone = tagsByRepo(before).filter((id) => !kept.includes(id));
+  const kept = tagsByProject(after);
+  const gone = tagsByProject(before).filter((id) => !kept.includes(id));
   if (gone.length === 0) return null;
-  const n = gone.reduce((sum, id) => sum + repoTagCount(before, id), 0);
-  const repos = useReposStore.getState().byId;
+  const n = gone.reduce((sum, id) => sum + projectTagCount(before, id), 0);
+  const repos = useProjectsStore.getState().byId;
   return {
     title: `Switch to ${targetName(to)}?`,
     message: `${String(n)} ${n === 1 ? "reference" : "references"} to ${listNames(gone.map((id) => repos[id]?.name ?? id))} in your text will be removed.`,
@@ -453,7 +453,7 @@ function droppedTagsConfirm(before: string, after: string, to: ComposeTarget): C
 
 /** Shows a target's composer and focuses its prompt (no worktree side effect, unlike composeIn's path). */
 function selectTarget(to: ComposeTarget): void {
-  if (to.kind === "project") composeIn(to.repoId);
+  if (to.kind === "project") composeIn(to.projectId);
   else if (to.kind === "workspace") composeInWorkspace(to.workspaceId);
   else composeNoProject();
 }
@@ -461,30 +461,30 @@ function selectTarget(to: ComposeTarget): void {
 /** The composer target a compose selection shows. */
 export function composeTarget(sel: Extract<Selection, { kind: "compose" }>): ComposeTarget {
   if (sel.workspaceId) return { kind: "workspace", workspaceId: sel.workspaceId };
-  return sel.noProject ? { kind: "home" } : { kind: "project", repoId: sel.repoId };
+  return sel.noProject ? { kind: "home" } : { kind: "project", projectId: sel.projectId };
 }
 
 /** The compose selection that shows a target (sendDraft's command context): a workspace's with the member the thread runs in. */
 export function composeSelection(target: ComposeTarget, place: ThreadPlace): Selection {
   switch (target.kind) {
     case "project":
-      return { kind: "compose", repoId: target.repoId };
+      return { kind: "compose", projectId: target.projectId };
     case "workspace":
-      return { kind: "compose", repoId: place.kind === "home" ? "" : place.repoId, workspaceId: target.workspaceId };
+      return { kind: "compose", projectId: place.kind === "home" ? "" : place.projectId, workspaceId: target.workspaceId };
     case "home":
-      return { kind: "compose", repoId: "", noProject: true };
+      return { kind: "compose", projectId: "", noProject: true };
   }
 }
 
 /** Loads the repo's base refs (once per composer mount; the previous list shows meanwhile). */
-export async function loadRefs(repoId: string): Promise<void> {
-  const prev = useComposeStore.getState().refs[repoId];
+export async function loadRefs(projectId: string): Promise<void> {
+  const prev = useComposeStore.getState().refs[projectId];
   const set = (r: RefsState) => {
-    useComposeStore.setState((s) => ({ refs: { ...s.refs, [repoId]: r } }));
+    useComposeStore.setState((s) => ({ refs: { ...s.refs, [projectId]: r } }));
   };
   if (!prev) set({ status: "loading", refs: [], defaultRef: "", error: null, outdated: false });
   try {
-    const res = await listRefs(repoId);
+    const res = await listRefs(projectId);
     set({ status: "ready", refs: res.refs, defaultRef: res.defaultRef, error: null, outdated: false });
   } catch (err) {
     if (prev?.status === "ready") return;
@@ -494,31 +494,31 @@ export async function loadRefs(repoId: string): Promise<void> {
 
 /** Where a draft's thread would start now (null: its workspace is gone). */
 export function draftPlace(target: ComposeTarget, d: Draft): ThreadPlace | null {
-  const repos = useReposStore.getState().byId;
+  const repos = useProjectsStore.getState().byId;
   const workspace = target.kind === "workspace" ? useWorkspacesStore.getState().byId[target.workspaceId] : undefined;
   // A project without git is never an Also in project (a new workspace needs git).
-  const isRepo = (id: string) => repos[id]?.git === true;
-  const { primary } = draftMembers({ target, alsoIn: d.alsoIn, primary: d.primary }, workspace, isRepo);
+  const isGitProject = (id: string) => repos[id]?.git === true;
+  const { primary } = draftMembers({ target, alsoIn: d.alsoIn, primary: d.primary }, workspace, isGitProject);
   return threadPlace(
     {
       target,
-      worktree: d.worktree ?? (target.kind === "project" ? projectWorktree(target.repoId) : { kind: "members" }),
+      worktree: d.worktree ?? (target.kind === "project" ? projectWorktree(target.projectId) : { kind: "members" }),
       base: d.base,
       alsoIn: d.alsoIn,
       primary: d.primary,
     },
     {
       workspace,
-      isRepo,
-      hasWorktree: (repoId, path) => repos[repoId]?.worktrees.some((w) => w.path === path) ?? false,
+      isGitProject,
+      hasWorktree: (projectId, path) => repos[projectId]?.worktrees.some((w) => w.path === path) ?? false,
       defaultRef: useComposeStore.getState().refs[primary]?.defaultRef ?? "",
-      noGitCheckout: (repoId) => noGitCheckout(repos[repoId]),
+      noGitCheckout: (projectId) => noGitCheckout(repos[projectId]),
     },
   );
 }
 
-function mainCheckout(repoId: string): string | undefined {
-  return useReposStore.getState().byId[repoId]?.worktrees.find((w) => w.isMain)?.path;
+function mainCheckout(projectId: string): string | undefined {
+  return useProjectsStore.getState().byId[projectId]?.worktrees.find((w) => w.isMain)?.path;
 }
 
 /**
@@ -526,11 +526,11 @@ function mainCheckout(repoId: string): string | undefined {
  * project, else threads.default_worktree (lib/compose defaultWorktree). The composer
  * resolves the same inputs with hooks.
  */
-export function projectWorktree(repoId: string): ProjectWorktree {
+export function projectWorktree(projectId: string): ProjectWorktree {
   return defaultWorktree({
     setting: useSettingsStore.getState().snapshot?.values[WORK_IN_SETTING_KEY],
-    remembered: rememberedWorkIn(repoId),
-    mainPath: mainCheckout(repoId),
+    remembered: rememberedWorkIn(projectId),
+    mainPath: mainCheckout(projectId),
   });
 }
 
@@ -539,14 +539,14 @@ export function projectWorktree(repoId: string): ProjectWorktree {
  * it, and a fresh copy or the main checkout becomes the project's default for new
  * threads (another existing worktree is a one-off).
  */
-export function pickWorktree(repoId: string, choice: ProjectWorktree): void {
-  updateDraft(repoId, { worktree: choice });
-  const mode = workInMemory(choice, mainCheckout(repoId));
-  if (mode) rememberWorkIn(repoId, mode);
+export function pickWorktree(projectId: string, choice: ProjectWorktree): void {
+  updateDraft(projectId, { worktree: choice });
+  const mode = workInMemory(choice, mainCheckout(projectId));
+  if (mode) rememberWorkIn(projectId, mode);
 }
 
 /** The one checkout of a project without git (its main worktree, else its path); undefined for git or unknown. */
-export function noGitCheckout(r: Pick<RepoView, "git" | "path" | "worktrees"> | undefined): string | undefined {
+export function noGitCheckout(r: Pick<ProjectView, "git" | "path" | "worktrees"> | undefined): string | undefined {
   if (!r || r.git) return undefined;
   return r.worktrees.find((w) => w.isMain)?.path ?? r.path;
 }

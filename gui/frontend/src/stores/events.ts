@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { Code, ConnectError } from "@connectrpc/connect";
 import { daemon, invalidateOnTransportError } from "@/api/endpoint";
 import { reportVisibility, watchEvents, type EventView } from "@/api/events";
-import { listRepos } from "@/api/repo";
+import { listProjects } from "@/api/project";
 import { listThreads } from "@/api/threads";
 import { errorMessage, isAbort, onVisibilityChange, runStream, type StreamStatus } from "@/api/stream";
 import { listTerminals } from "@/api/terminal";
@@ -12,14 +12,14 @@ import { closeEmptyPanels, onNewTerminal, onRemovedTerminal, revealArrived } fro
 import { applyGhEvent } from "./gh";
 import { applyGitOpsEvent } from "./gitops";
 import { applyIntent } from "./intents";
-import { applyRepoEvent, replaceRepos, useReposStore } from "./repos";
+import { applyProjectEvent, replaceProjects, useProjectsStore } from "./projects";
 import { applyRetiredUsage, applyThreadListEvent, replaceThreads, useThreadsStore } from "./threads";
 import { applySettingsSnapshot, loadSettingsSchema } from "./settings";
 import { applyTerminalEvent, replaceTerminals, useTerminalsStore } from "./terminals";
 import { applyThreadSourceEvent, pruneThreadLogs } from "./thread";
 import { applyUpdateEvent } from "./update";
 import { applyWorkspaceEvent, useWorkspacesStore } from "./workspaces";
-import { applyRepoEventToDetails } from "./worktreeDetail";
+import { applyProjectEventToDetails } from "./worktreeDetail";
 
 interface EventsState {
   /** Status of the one EventService.Watch stream that feeds every slice. */
@@ -37,8 +37,8 @@ type Handlers = { [S in EventView["source"]]: (event: Extract<EventView, { sourc
  */
 const handlers: Handlers = {
   repo: (ev) => {
-    useReposStore.setState((s) => applyRepoEvent(s, ev));
-    applyRepoEventToDetails(ev);
+    useProjectsStore.setState((s) => applyProjectEvent(s, ev));
+    applyProjectEventToDetails(ev);
   },
   workspace: (ev) => {
     useWorkspacesStore.setState((s) => ({ ...applyWorkspaceEvent(s, ev), loaded: true }));
@@ -120,8 +120,8 @@ export function startEventSync(threadRetryMs = 10_000): () => void {
     onConnect: async (signal) => {
       // The schema carries the model registry; a restarted daemon may have a new one.
       void loadSettingsSchema();
-      const [repos, terminals] = await Promise.all([listRepos(daemon, signal), listTerminals(daemon, signal), reconcileThreads(signal)]);
-      useReposStore.setState({ ...replaceRepos(repos), loaded: true });
+      const [repos, terminals] = await Promise.all([listProjects(daemon, signal), listTerminals(daemon, signal), reconcileThreads(signal)]);
+      useProjectsStore.setState({ ...replaceProjects(repos), loaded: true });
       useTerminalsStore.setState((s) => ({ ...replaceTerminals(s, terminals), loaded: true }));
       // The List brings terminals without updated events: a pending reveal's shell may be here now.
       revealArrived();

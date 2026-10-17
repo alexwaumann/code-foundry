@@ -8,10 +8,10 @@ afterEach(() => {
   resetSkills();
 });
 
-const deploy: SkillView = { name: "deploy", description: "Ship it.", scope: "project", repoId: "r1", path: "/h/r1/.claude/skills/deploy/SKILL.md" };
-const commit: SkillView = { name: "commit", description: "Commit.", scope: "user", repoId: "", path: "/h/.claude/skills/commit/SKILL.md" };
+const deploy: SkillView = { name: "deploy", description: "Ship it.", scope: "project", projectId: "r1", path: "/h/r1/.claude/skills/deploy/SKILL.md" };
+const commit: SkillView = { name: "commit", description: "Commit.", scope: "user", projectId: "", path: "/h/.claude/skills/commit/SKILL.md" };
 
-const R1: SkillSourceView[] = [{ repoId: "r1" }];
+const R1: SkillSourceView[] = [{ projectId: "r1" }];
 const entry = (sources: readonly SkillSourceView[]) => useSkillsStore.getState().byKey[skillSourcesKey(sources)];
 
 /** A fake ListSkills whose calls resolve when told to. */
@@ -32,13 +32,13 @@ describe("skills store", () => {
     await p;
     expect(list).toHaveBeenCalledWith(R1, true);
     expect(entry(R1)).toEqual({ status: "ready", skills: [deploy, commit], outdated: false });
-    expect(entry([{ repoId: "r1", path: "/h/r1-wt" }])).toBeUndefined();
+    expect(entry([{ projectId: "r1", path: "/h/r1-wt" }])).toBeUndefined();
   });
 
   it("concurrent loads of one list share a request", async () => {
     const { fn, calls } = deferred();
     const a = loadSkills(R1, fn);
-    const b = loadSkills([{ repoId: "r1" }], fn);
+    const b = loadSkills([{ projectId: "r1" }], fn);
     expect(calls).toHaveLength(1);
     calls[0]?.resolve([deploy]);
     await Promise.all([a, b]);
@@ -47,7 +47,7 @@ describe("skills store", () => {
 
   it("a list that changes while its request is in flight: the late answer lands under the old list only", async () => {
     const { fn, calls } = deferred();
-    const R2: SkillSourceView[] = [{ repoId: "r1" }, { repoId: "r2" }];
+    const R2: SkillSourceView[] = [{ projectId: "r1" }, { projectId: "r2" }];
     const old = loadSkills(R1, fn);
     const cur = loadSkills(R2, fn);
     expect(calls.map((c) => c.sources)).toEqual([R1, R2]);

@@ -6,9 +6,9 @@ import { Tip } from "@/components/ui/tooltip";
 import { runAction, type ActionOwner } from "@/stores/actionActions";
 import { openActionEditor } from "@/stores/actionDialog";
 import { isStartable } from "@/keys/bindings";
-import { useAction, useRepoActionIds } from "@/stores/actions";
+import { useAction, useProjectActionIds } from "@/stores/actions";
 import { useCommandsStore } from "@/stores/commands";
-import { useReposStore } from "@/stores/repos";
+import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { ACTION_ICON } from "./actionIcons";
 
@@ -74,10 +74,10 @@ function ActionItem({ id, onRun, onEdit }: { id: string; onRun: (id: string) => 
  * one), and hidden when the daemon does not list action.run here, like a CommandButton.
  */
 export function ThreadActionsMenu({ threadId }: { threadId: string }) {
-  const repoId = useThreadsStore((s) => s.byId[threadId]?.repoId ?? "");
+  const projectId = useThreadsStore((s) => s.byId[threadId]?.projectId ?? "");
   const available = useCommandsStore((s) => s.commands.some((c) => c.name === "action.run" && isStartable(c)));
-  if (!repoId || !available) return null;
-  return <ActionsMenu repoId={repoId} owner={{ kind: "thread", threadId }} from="thread" variant="header" testId="pane-actions-menu" />;
+  if (!projectId || !available) return null;
+  return <ActionsMenu projectId={projectId} owner={{ kind: "thread", threadId }} from="thread" variant="header" testId="pane-actions-menu" />;
 }
 
 /**
@@ -87,9 +87,9 @@ export function ThreadActionsMenu({ threadId }: { threadId: string }) {
  * "New action…". What was picked runs once the menu has closed and handed focus back
  * (a run's tab or the editor then takes it), like the Projects page's overflow menus.
  */
-export function ActionsMenu({ repoId, owner, from, variant, testId }: { repoId: string; owner: ActionOwner; from: From; variant: "header" | "row"; testId: string }) {
-  const ids = useRepoActionIds(repoId);
-  const project = useReposStore((s) => s.byId[repoId]?.name ?? repoId);
+export function ActionsMenu({ projectId, owner, from, variant, testId }: { projectId: string; owner: ActionOwner; from: From; variant: "header" | "row"; testId: string }) {
+  const ids = useProjectActionIds(projectId);
+  const project = useProjectsStore((s) => s.byId[projectId]?.name ?? projectId);
   const [open, setOpen] = useState(false);
   const picked = useRef<(() => void) | null>(null);
   const before = useRef<Element | null>(null);
@@ -107,12 +107,12 @@ export function ActionsMenu({ repoId, owner, from, variant, testId }: { repoId: 
   };
   const onEdit = (id: string) => {
     pick(() => {
-      openActionEditor({ mode: "edit", actionId: id, repoId, from });
+      openActionEditor({ mode: "edit", actionId: id, projectId, from });
     });
   };
   const onNew = () => {
     pick(() => {
-      openActionEditor({ mode: "new", repoId, from });
+      openActionEditor({ mode: "new", projectId, from });
     });
   };
 

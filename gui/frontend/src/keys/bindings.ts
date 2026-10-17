@@ -186,8 +186,8 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
   // Snooze: the custom date dialog for the active thread (the menus offer presets), or
   // unsnooze it when it is snoozed; both invoke thread.snooze.
   "thread.snooze": () => presentSnooze(getUiContext().activeThreadId),
-  // The Add Project dialog; its tabs call RepoService.Register (repo.add's CLI form with
-  // a folder), stream RepoService.Clone (repo.clone's CLI form), or invoke repo.create.
+  // The Add Project dialog; its tabs call ProjectService.Register (repo.add's CLI form with
+  // a folder), stream ProjectService.Clone (repo.clone's CLI form), or invoke repo.create.
   // repo.add's optional path is never prompted for. repo.clone opens it on the GitHub tab.
   "project.add": () => {
     openAddProject();
@@ -204,7 +204,7 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
   },
   // The publish dialog (owner and visibility pickers) for the active project; it
   // invokes repo.github.publish.
-  "project.github.publish": () => openPublishDialog(getUiContext().activeRepoId),
+  "project.github.publish": () => openPublishDialog(getUiContext().activeProjectId),
   // Window-local: only this window opens, without a round trip (the CLI and palette
   // reach every window through UiIntent.ShowView instead).
   "view.settings": () => showView("settings"),

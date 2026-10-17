@@ -35,7 +35,7 @@ export type PermissionModeView = "supervised" | "accept-edits" | "auto" | "";
 export interface ThreadView {
   id: string;
   claudeSessionId: string;
-  repoId: string;
+  projectId: string;
   worktreePath: string;
   name: string;
   autoNamed: boolean;
@@ -59,8 +59,8 @@ export interface ThreadView {
   /** thread.new made the worktree for this thread. */
   createdWorktree: boolean;
   /**
-   * The workspace that owns the thread; "" for a project thread (owned by repoId).
-   * repoId/worktreePath are where it runs either way.
+   * The workspace that owns the thread; "" for a project thread (owned by projectId).
+   * projectId/worktreePath are where it runs either way.
    */
   workspaceId: string;
   /**
@@ -293,7 +293,7 @@ export function toThreadView(s: Thread): ThreadView {
   return {
     id: s.id,
     claudeSessionId: s.claudeSessionId,
-    repoId: s.projectId,
+    projectId: s.projectId,
     worktreePath: s.worktreePath,
     name: s.name,
     autoNamed: s.autoNamed,

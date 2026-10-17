@@ -2,7 +2,7 @@ import { Code, ConnectError } from "@connectrpc/connect";
 import { ProjectService, RepositoryVisibility, type GitHubRepository } from "@/gen/codefoundry/v1/project_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
 import { orOutdatedDaemon } from "./errors";
-import { toRepoView, type RepoView } from "./repo";
+import { toProjectView, type ProjectView } from "./project";
 
 /**
  * The Add Project dialog's Local folder tab (ProjectService.Register) and GitHub tab
@@ -20,7 +20,7 @@ export interface AddedProjectView {
  * that repository, any other folder a project without git. The daemon expands "~" and
  * refuses paths outside home; errors are the daemon's ConnectError.
  */
-export async function registerRepo(path: string, conn: DaemonConnection = daemon): Promise<AddedProjectView> {
+export async function registerProject(path: string, conn: DaemonConnection = daemon): Promise<AddedProjectView> {
   const c = await conn.client(ProjectService);
   const res = await c.register({ path });
   if (!res.project) throw new Error("the daemon did not say which project it added");
@@ -108,13 +108,13 @@ export async function cloneRepo(
   onProgress: (p: CloneProgressView) => void,
   conn: DaemonConnection = daemon,
   signal?: AbortSignal,
-): Promise<RepoView> {
+): Promise<ProjectView> {
   const c = await conn.client(ProjectService);
   try {
-    let repo: RepoView | null = null;
+    let repo: ProjectView | null = null;
     for await (const ev of c.clone({ owner, name }, { signal })) {
       if (ev.event.case === "progress") onProgress({ line: ev.event.value.line, transient: ev.event.value.transient });
-      else if (ev.event.case === "project") repo = toRepoView(ev.event.value);
+      else if (ev.event.case === "project") repo = toProjectView(ev.event.value);
     }
     if (!repo) throw new Error("the clone ended without a project");
     return repo;

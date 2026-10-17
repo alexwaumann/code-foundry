@@ -3,7 +3,7 @@ import { Kbd } from "@/components/ui/kbd";
 import { projectHue } from "@/lib/compose";
 import { cn } from "@/lib/utils";
 import { zoomFactor } from "@/lib/zoom";
-import { useReposStore } from "@/stores/repos";
+import { useProjectsStore } from "@/stores/projects";
 import { useUiStore } from "@/stores/ui";
 import type { Completion, CompletionGroup, CompletionItem } from "./useCompletion";
 
@@ -24,8 +24,8 @@ function Detail({ item }: { item: CompletionItem }) {
   return <span className="min-w-0 flex-1 truncate text-caption">{parts}</span>;
 }
 
-function ProjectHeading({ repoId }: { repoId: string }) {
-  const name = useReposStore((s) => s.byId[repoId]?.name ?? repoId);
+function ProjectHeading({ projectId }: { projectId: string }) {
+  const name = useProjectsStore((s) => s.byId[projectId]?.name ?? projectId);
   return (
     <>
       <span aria-hidden className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: `oklch(0.55 0.13 ${String(projectHue(name))})` }} />
@@ -37,7 +37,7 @@ function ProjectHeading({ repoId }: { repoId: string }) {
 function Heading({ heading }: { heading: NonNullable<CompletionGroup["heading"]> }) {
   return (
     <div role="presentation" className="flex items-center gap-1.5 px-3 pt-2 pb-0.5 text-caption-sm" data-testid="completion-group">
-      {heading.kind === "project" ? <ProjectHeading repoId={heading.repoId} /> : <span>{heading.kind === "user" ? "User" : heading.text}</span>}
+      {heading.kind === "project" ? <ProjectHeading projectId={heading.projectId} /> : <span>{heading.kind === "user" ? "User" : heading.text}</span>}
     </div>
   );
 }

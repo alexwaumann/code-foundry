@@ -484,7 +484,7 @@ export class MockActions {
   }
 
   /** A project was unregistered: its actions and runs go (background runs are stopped first). */
-  removeRepo(projectId: string): void {
+  removeProject(projectId: string): void {
     this.stopBackground((r) => r.projectId === projectId);
     for (const a of this.sorted(projectId)) {
       this.actions.delete(a.id);
@@ -717,7 +717,7 @@ export class MockActions {
   // ---- Commands -----------------------------------------------------------------
 
   /** The project the action commands work on (see commands_action.go actionRepo). */
-  private repoFor(ctx: UiContext | undefined, args: Record<string, string>): string {
+  private projectFor(ctx: UiContext | undefined, args: Record<string, string>): string {
     const repos = this.host.repos();
     const inside = (path: string) => {
       let best: { id: string; len: number } | null = null;
@@ -745,12 +745,12 @@ export class MockActions {
     return id;
   }
 
-  /** An action by id anywhere, else by name in repoFor's project. */
+  /** An action by id anywhere, else by name in projectFor's project. */
   private find(ctx: UiContext | undefined, args: Record<string, string>): MockAction {
     const ref = (args.action ?? "").trim();
     const byId = this.actions.get(ref);
     if (byId) return byId;
-    const projectId = this.repoFor(ctx, args);
+    const projectId = this.projectFor(ctx, args);
     const a = this.sorted(projectId).find((x) => x.name.toLowerCase() === ref.toLowerCase());
     if (!a) throw new CommandError("notfound", `no action "${ref}" in this project (code-foundry action list)`);
     return a;
@@ -778,7 +778,7 @@ export class MockActions {
   commands(): Command[] {
     const canUse = (ctx: UiContext | undefined) => Boolean(ctx?.activeThreadId || ctx?.activeProjectId || ctx?.activeWorktreePath || !ctx?.activeView);
     const canRun = (ctx: UiContext | undefined) => Boolean(ctx?.activeThreadId || ctx?.activeWorktreePath || !ctx?.activeView);
-    const repoArg = { name: "project", type: ArgType.STRING, required: false, description: "Project: id, name, or a path inside it (default: the thread's, the worktree's, or the working directory's)" };
+    const projectArg = { name: "project", type: ArgType.STRING, required: false, description: "Project: id, name, or a path inside it (default: the thread's, the worktree's, or the working directory's)" };
     const hereArg = {
       name: "here",
       type: ArgType.PATH,
@@ -794,10 +794,10 @@ export class MockActions {
     const cmd = (name: string, title: string, description: string, args: Command["cmd"]["args"]) => ({ name, title, category: "Action", description, keybindings: [], args });
     return [
       {
-        cmd: cmd("action.list", "List Actions", "List a project's actions: the commands `action run` starts, in order, with their ids.", [repoArg, hereArg]),
+        cmd: cmd("action.list", "List Actions", "List a project's actions: the commands `action run` starts, in order, with their ids.", [projectArg, hereArg]),
         when: canUse,
         run: (ctx, args) => {
-          const res = this.list(this.repoFor(ctx, args));
+          const res = this.list(this.projectFor(ctx, args));
           const acts = res.actions;
           const message =
             acts.length === 0
@@ -816,13 +816,13 @@ export class MockActions {
           { ...iconArg, defaultValue: "play" },
           bool("in-terminal", "Run in a terminal in the bottom panel (--in-terminal=false: in the background)", "true"),
           bool("on-worktree-create", "Also run (in the background) when a new thread creates its worktree", "false"),
-          repoArg,
+          projectArg,
           hereArg,
         ]),
         when: canUse,
         run: (ctx, args) => {
           const a = this.create({
-            projectId: this.repoFor(ctx, args),
+            projectId: this.projectFor(ctx, args),
             name: args.name ?? "",
             command: args.command ?? "",
             icon: icon(args.icon),
@@ -841,7 +841,7 @@ export class MockActions {
           bool("in-terminal", "Run in a terminal (--in-terminal=false: in the background)"),
           bool("on-worktree-create", "Run when a new thread creates its worktree"),
           { name: "position", type: ArgType.INT, required: false, description: "Move to this 0-based place in the project's list" },
-          repoArg,
+          projectArg,
           hereArg,
         ]),
         when: canUse,
@@ -865,7 +865,7 @@ export class MockActions {
         },
       },
       {
-        cmd: cmd("action.remove", "Remove Action", "Remove an action from its project. Runs in progress keep going.", [refArg, repoArg, hereArg]),
+        cmd: cmd("action.remove", "Remove Action", "Remove an action from its project. Runs in progress keep going.", [refArg, projectArg, hereArg]),
         when: canUse,
         run: (ctx, args) => {
           const a = this.find(ctx, args);
@@ -917,10 +917,10 @@ export class MockActions {
         run: (_ctx, args) => this.waitMessage(args.run ?? ""),
       },
       {
-        cmd: cmd("action.runs", "List Action Runs", "List a project's recent action runs (the daemon remembers the last 50 per project until it restarts), newest first.", [repoArg, hereArg]),
+        cmd: cmd("action.runs", "List Action Runs", "List a project's recent action runs (the daemon remembers the last 50 per project until it restarts), newest first.", [projectArg, hereArg]),
         when: canUse,
         run: (ctx, args) => {
-          const res = this.list(this.repoFor(ctx, args));
+          const res = this.list(this.projectFor(ctx, args));
           const message =
             res.runs.length === 0
               ? "no action runs in this project since the daemon started"

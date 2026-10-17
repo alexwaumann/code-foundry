@@ -1,14 +1,14 @@
 import { createElement } from "react";
 import { ChartColumn } from "lucide-react";
 import { UsageSurface } from "@/components/usage/UsageSurface";
-import { useReposStore } from "@/stores/repos";
+import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
 import type { SurfaceSpec } from "./types";
 import { selectionUsageThread, USAGE_KIND, USAGE_TITLE, usageTab } from "./usageTarget";
 
 function thread(sel: Selection): string | null {
-  return selectionUsageThread(sel, { repos: useReposStore.getState(), threads: useThreadsStore.getState() });
+  return selectionUsageThread(sel, { repos: useProjectsStore.getState(), threads: useThreadsStore.getState() });
 }
 
 /**
@@ -25,7 +25,7 @@ export const usageSurface: SurfaceSpec = {
   hotkey: "u",
   available: (ctx) => (thread(ctx.selection) ? "enabled" : "hidden"),
   // deriveContext reads the repos store too (placement); the thread comes from threads.
-  watches: [useThreadsStore, useReposStore],
+  watches: [useThreadsStore, useProjectsStore],
   render: () => createElement(UsageSurface),
   openDefault: (ctx) => (thread(ctx.selection) ? usageTab() : null),
 };

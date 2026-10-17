@@ -69,10 +69,10 @@ export function useSkills(key: string): readonly SkillView[] {
  * The description of a skill, from whichever cached list has it ("" when none does):
  * a tag's tooltip, which knows only the tag.
  */
-export function useSkillDescription(repoId: string, name: string): string {
+export function useSkillDescription(projectId: string, name: string): string {
   return useSkillsStore((s) => {
     for (const entry of Object.values(s.byKey)) {
-      const hit = entry.skills.find((k) => k.name === name && (repoId === "" ? k.scope === "user" : k.repoId === repoId));
+      const hit = entry.skills.find((k) => k.name === name && (projectId === "" ? k.scope === "user" : k.projectId === projectId));
       if (hit) return hit.description;
     }
     return "";

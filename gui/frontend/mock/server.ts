@@ -251,14 +251,14 @@ function routes(router: ConnectRouter): void {
   });
 
   router.service(ProjectService, {
-    list: () => ({ projects: [...world.repos.values()].map((r) => world.repoMsg(r)) }),
+    list: () => ({ projects: [...world.repos.values()].map((r) => world.projectMsg(r)) }),
     get: (req) => {
       const r = world.repos.get(req.id);
       if (!r) throw new ConnectError(`project ${req.id} not found`, Code.NotFound);
-      return { project: world.repoMsg(r) };
+      return { project: world.projectMsg(r) };
     },
     // The Add Project dialog's Local folder tab and an existing clone destination.
-    register: (req) => guard(() => ({ project: world.repoMsg(world.registerFolder(req.path)) })),
+    register: (req) => guard(() => ({ project: world.projectMsg(world.registerFolder(req.path)) })),
     unregister: () => {
       throw new ConnectError("use the repo.unregister command in the mock", Code.Unimplemented);
     },
@@ -270,7 +270,7 @@ function routes(router: ConnectRouter): void {
     },
     refresh: () => ({}),
     listRefs: (req) => guard(() => world.listRefs(req.projectId)),
-    initGit: (req) => guard(() => ({ project: world.repoMsg(world.initGit(req.id)) })),
+    initGit: (req) => guard(() => ({ project: world.projectMsg(world.initGit(req.id)) })),
     // The Add Project dialog's GitHub tab (mock/clone.ts).
     searchGitHub: (req) => searchGitHub(req.query),
     lookupGitHub: (req) => lookupGitHub(req.owner, req.name),
@@ -281,7 +281,7 @@ function routes(router: ConnectRouter): void {
       const r = createProject(world, req.name);
       const repo = world.repos.get(r.id);
       if (!repo) throw new ConnectError("created project vanished", Code.Internal);
-      return { project: world.repoMsg(repo) };
+      return { project: world.projectMsg(repo) };
     },
     listPublishOwners: () => listPublishOwners(),
     delete: (req) => {
@@ -293,14 +293,14 @@ function routes(router: ConnectRouter): void {
       await publishProject(world, req.projectId, req.owner, req.name, vis);
       const repo = world.repos.get(req.projectId);
       if (!repo) throw new ConnectError("published project vanished", Code.Internal);
-      return { project: world.repoMsg(repo) };
+      return { project: world.projectMsg(repo) };
     },
     getWorktreeDetail: (req) => {
       const detail = world.gh.getWorktreeDetail(req.projectId, req.path);
       if (!detail) throw new ConnectError(`worktree ${req.path} not found`, Code.NotFound);
       return { detail };
     },
-    watch: (_req, ctx) => tracked("ProjectService/Watch", world.repoEvents.subscribe(ctx.signal)),
+    watch: (_req, ctx) => tracked("ProjectService/Watch", world.projectEvents.subscribe(ctx.signal)),
   });
 
   router.service(FilesystemService, {
@@ -465,7 +465,7 @@ function routes(router: ConnectRouter): void {
       );
       if (!threadsEnabled) want.delete(EventSource.THREAD_LIST);
       const initial: { source: EventSource; event: EventInit }[] = [
-        { source: EventSource.PROJECT, event: { event: { case: "project", value: { event: { case: "snapshot", value: { projects: [...world.repos.values()].map((r) => world.repoMsg(r)) } } } } } },
+        { source: EventSource.PROJECT, event: { event: { case: "project", value: { event: { case: "snapshot", value: { projects: [...world.repos.values()].map((r) => world.projectMsg(r)) } } } } } },
         { source: EventSource.WORKSPACE, event: { event: { case: "workspace", value: world.workspaceSnapshot() } } },
         ...[...world.terms.values()].map((t) => ({ source: EventSource.TERMINAL, event: { event: { case: "terminal" as const, value: { event: { case: "updated" as const, value: world.terminalMsg(t) } } } } })),
         { source: EventSource.THREAD_LIST, event: { event: { case: "threadList", value: world.threadListSnapshot() } } },

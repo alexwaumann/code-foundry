@@ -1,14 +1,14 @@
 import { createElement } from "react";
 import { Network } from "lucide-react";
 import { ThreadsSurface } from "@/components/lineage/ThreadsSurface";
-import { useReposStore } from "@/stores/repos";
+import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
 import { selectionThreadsThread, THREADS_KIND, THREADS_TITLE, threadsTab } from "./threadsTarget";
 import type { SurfaceSpec } from "./types";
 
 function thread(sel: Selection): string | null {
-  return selectionThreadsThread(sel, { repos: useReposStore.getState(), threads: useThreadsStore.getState() });
+  return selectionThreadsThread(sel, { repos: useProjectsStore.getState(), threads: useThreadsStore.getState() });
 }
 
 /**
@@ -26,7 +26,7 @@ export const threadsSurface: SurfaceSpec = {
   icon: Network,
   hotkey: "h",
   available: (ctx) => (thread(ctx.selection) ? "enabled" : "hidden"),
-  watches: [useThreadsStore, useReposStore],
+  watches: [useThreadsStore, useProjectsStore],
   render: () => createElement(ThreadsSurface),
   openDefault: (ctx) => (thread(ctx.selection) ? threadsTab() : null),
 };

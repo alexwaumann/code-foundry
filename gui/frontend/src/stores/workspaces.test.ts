@@ -3,7 +3,7 @@ import type { WorkspaceView } from "@/api/workspace";
 import { applyWorkspaceEvent, emptyWorkspaces, replaceWorkspaces } from "./workspaces";
 
 function ws(id: string, name: string, repos: string[] = ["web"]): WorkspaceView {
-  return { id, name, branch: `cf/${name}`, members: repos.map((r) => ({ repoId: r, worktreePath: `/wt/${r}/cf-${name}` })), createdAtMs: null };
+  return { id, name, branch: `cf/${name}`, members: repos.map((r) => ({ projectId: r, worktreePath: `/wt/${r}/cf-${name}` })), createdAtMs: null };
 }
 
 describe("workspaces slice", () => {
@@ -25,7 +25,7 @@ describe("workspaces slice", () => {
   it("an update carries the members; removing an unknown id is a no-op", () => {
     const prev = replaceWorkspaces([ws("w-1", "login")]);
     const next = applyWorkspaceEvent(prev, { kind: "updated", workspace: ws("w-1", "login", ["web", "api"]) });
-    expect(next.byId["w-1"]?.members.map((m) => m.repoId)).toEqual(["web", "api"]);
+    expect(next.byId["w-1"]?.members.map((m) => m.projectId)).toEqual(["web", "api"]);
     expect(applyWorkspaceEvent(next, { kind: "removed", id: "w-404" })).toBe(next);
     expect(applyWorkspaceEvent(emptyWorkspaces, { kind: "removed", id: "w-1" })).toBe(emptyWorkspaces);
   });

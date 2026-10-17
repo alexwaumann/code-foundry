@@ -13,7 +13,7 @@ import { kindFromName, parsePrompt, type PromptPiece, type PromptTag, tagToken }
 export type MessagePiece =
   | { kind: "text"; text: string }
   | { kind: "skill"; name: string }
-  | { kind: "file"; repoId: string; path: string }
+  | { kind: "file"; projectId: string; path: string }
   /** path "" when the chip lost its attachment before sending. */
   | { kind: "image"; name: string; path: string }
   | { kind: "pdf"; name: string; path: string };
@@ -43,7 +43,7 @@ function tagPiece(tag: PromptTag, attachments: readonly string[]): MessagePiece 
     case "skill":
       return { kind: "skill", name: tag.name };
     case "file":
-      return { kind: "file", repoId: tag.repoId, path: tag.path };
+      return { kind: "file", projectId: tag.projectId, path: tag.path };
     case "image": {
       const i = /^\d+$/.test(tag.id) ? Number(tag.id) : -1;
       const path = attachments[i] ?? "";

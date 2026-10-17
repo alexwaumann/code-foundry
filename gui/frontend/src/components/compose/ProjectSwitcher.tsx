@@ -92,8 +92,8 @@ export function ProjectSwitcher({ target, name, disabled }: { target: ComposeTar
               workspaces={workspaces}
               projects={projects}
               current={current}
-              onPickProject={(repoId) => {
-                pick({ kind: "project", repoId });
+              onPickProject={(projectId) => {
+                pick({ kind: "project", projectId });
               }}
               onPickWorkspace={(workspaceId) => {
                 pick({ kind: "workspace", workspaceId });

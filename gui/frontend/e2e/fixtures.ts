@@ -35,7 +35,7 @@ export async function invocations(): Promise<Invocation[]> {
 }
 
 /** The mock's registered projects (ProjectService.List). protojson omits git: false. */
-export async function listRepos(): Promise<{ id: string; path: string; name: string; git: boolean }[]> {
+export async function listProjects(): Promise<{ id: string; path: string; name: string; git: boolean }[]> {
   const res = await fetch(`${mockUrl}/codefoundry.v1.ProjectService/List`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${MOCK_TOKEN}` },
@@ -47,8 +47,8 @@ export async function listRepos(): Promise<{ id: string; path: string; name: str
 }
 
 /** The registered project at path, or undefined. */
-export async function repoAt(path: string): Promise<{ id: string; path: string; name: string; git: boolean } | undefined> {
-  return (await listRepos()).find((r) => r.path === path);
+export async function projectAt(path: string): Promise<{ id: string; path: string; name: string; git: boolean } | undefined> {
+  return (await listProjects()).find((r) => r.path === path);
 }
 
 /** POSTs a /__mock control endpoint and returns its JSON. */

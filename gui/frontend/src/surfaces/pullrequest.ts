@@ -4,7 +4,7 @@ import { PullRequestSurface } from "@/components/pr/PullRequestSurface";
 import { COPY_LINK_CHORD } from "@/components/pr/keys";
 import { branchKey, branchPullRequestsResource } from "@/stores/gh";
 import { copyPullRequestLink } from "@/stores/prPanel";
-import { useReposStore } from "@/stores/repos";
+import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
 import { PULL_REQUEST_KIND, prRefOfTab, pullRequestTab, selectionBranch, selectionPullRequest, type PrRef } from "./pullrequestTarget";
@@ -14,7 +14,7 @@ import type { SurfaceSpec } from "./types";
 const noop = (): void => undefined;
 
 function stores() {
-  return { repos: useReposStore.getState(), threads: useThreadsStore.getState() };
+  return { repos: useProjectsStore.getState(), threads: useThreadsStore.getState() };
 }
 
 /** The pull request of the selection's worktree branch, from what is loaded now. */
@@ -37,7 +37,7 @@ export const pullRequestSurface: SurfaceSpec = {
   icon: GitPullRequest,
   hotkey: "p",
   available: (ctx) => (noProjectNow(ctx.selection) ? "hidden" : currentPullRequest(ctx.selection) ? "enabled" : "disabled"),
-  watches: [useReposStore, useThreadsStore, branchPullRequestsResource.store],
+  watches: [useProjectsStore, useThreadsStore, branchPullRequestsResource.store],
   // Keeps the selection's branch pull requests loaded while its panel shows, so the
   // empty list and the P hotkey know whether there is one. Follows a branch switch.
   warm: (ctx) => {
@@ -52,7 +52,7 @@ export const pullRequestSurface: SurfaceSpec = {
       release = next === null ? noop : branchPullRequestsResource.watch(next);
     };
     sync();
-    const stops = [useReposStore.subscribe(sync), useThreadsStore.subscribe(sync)];
+    const stops = [useProjectsStore.subscribe(sync), useThreadsStore.subscribe(sync)];
     return () => {
       for (const stop of stops) stop();
       release();

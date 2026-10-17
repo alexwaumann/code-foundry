@@ -13,11 +13,11 @@
 import type { ThreadGroup } from "./thread";
 
 export interface WorktreeRef {
-  repoId: string;
+  projectId: string;
   path: string;
 }
 
-export interface TreeRepo {
+export interface TreeProject {
   id: string;
   worktreePaths: readonly string[];
 }

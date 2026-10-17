@@ -1,5 +1,5 @@
 import { useShallow } from "zustand/react/shallow";
-import { useReposStore } from "@/stores/repos";
+import { useProjectsStore } from "@/stores/projects";
 import { useWorkspaceOrder } from "@/stores/workspaces";
 
 /**
@@ -8,8 +8,8 @@ import { useWorkspaceOrder } from "@/stores/workspaces";
  * is its target's draftKey (lib/compose): the repo id, or "ws:<workspace id>".
  */
 export function useProjectRows(): { workspaces: readonly string[]; projects: readonly string[]; loaded: boolean } {
-  const projects = useReposStore(useShallow((s) => s.order));
-  const loaded = useReposStore((s) => s.loaded);
+  const projects = useProjectsStore(useShallow((s) => s.order));
+  const loaded = useProjectsStore((s) => s.loaded);
   const workspaces = useWorkspaceOrder();
   return { workspaces, projects, loaded };
 }

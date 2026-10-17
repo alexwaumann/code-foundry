@@ -3,8 +3,8 @@ import { tagToken } from "./prompt";
 import { inlineAttachmentPaths, parseUserMessage, sentComposerText } from "./userMessage";
 
 const image = (id: string, name: string) => tagToken({ tagKind: "image", id, name });
-const file = (repoId: string, path: string) => tagToken({ tagKind: "file", repoId, path });
-const skill = (name: string, repoId = "") => tagToken({ tagKind: "skill", name, repoId });
+const file = (projectId: string, path: string) => tagToken({ tagKind: "file", projectId, path });
+const skill = (name: string, projectId = "") => tagToken({ tagKind: "skill", name, projectId });
 
 describe("sentComposerText", () => {
   it("replaces image chip ids with their attachment index, keeps other tags", () => {
@@ -22,7 +22,7 @@ describe("parseUserMessage", () => {
       { kind: "text", text: "The badge is stale, see " },
       { kind: "image", name: "pr-badge-stale.png", path: "/att/0a.png" },
       { kind: "text", text: " Look at " },
-      { kind: "file", repoId: "repo-cf", path: "internal/store/pr/poller.go" },
+      { kind: "file", projectId: "repo-cf", path: "internal/store/pr/poller.go" },
       { kind: "text", text: " and fix it with " },
       { kind: "skill", name: "tdd" },
       { kind: "text", text: ". Keep it." },
@@ -32,9 +32,9 @@ describe("parseUserMessage", () => {
   it("decodes file paths, keeps directories and lines", () => {
     const path = "docs/a b#%.md";
     expect(parseUserMessage("", `${file("r1", path)} and\n${file("r1", "src/")}`, [])).toEqual([
-      { kind: "file", repoId: "r1", path },
+      { kind: "file", projectId: "r1", path },
       { kind: "text", text: " and\n" },
-      { kind: "file", repoId: "r1", path: "src/" },
+      { kind: "file", projectId: "r1", path: "src/" },
     ]);
   });
 

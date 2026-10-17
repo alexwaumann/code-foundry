@@ -6,12 +6,12 @@
  * stores.
  */
 import { isNoProject } from "@/lib/threadRow";
-import { useReposStore, type ReposData } from "@/stores/repos";
+import { useProjectsStore, type ProjectsData } from "@/stores/projects";
 import { useThreadsStore, type ThreadsData } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
 import type { Subscribable } from "./types";
 
-export function selectionHasNoProject(sel: Selection, s: { repos: ReposData; threads: ThreadsData }): boolean {
+export function selectionHasNoProject(sel: Selection, s: { repos: ProjectsData; threads: ThreadsData }): boolean {
   if (sel.kind === "compose") return sel.noProject === true;
   if (sel.kind !== "thread") return false;
   const x = s.threads.byId[sel.id];
@@ -20,8 +20,8 @@ export function selectionHasNoProject(sel: Selection, s: { repos: ReposData; thr
 
 /** selectionHasNoProject over the stores now. */
 export function noProjectNow(sel: Selection): boolean {
-  return selectionHasNoProject(sel, { repos: useReposStore.getState(), threads: useThreadsStore.getState() });
+  return selectionHasNoProject(sel, { repos: useProjectsStore.getState(), threads: useThreadsStore.getState() });
 }
 
 /** What a spec using noProjectNow watches. */
-export const NO_PROJECT_WATCHES: readonly Subscribable[] = [useReposStore, useThreadsStore];
+export const NO_PROJECT_WATCHES: readonly Subscribable[] = [useProjectsStore, useThreadsStore];

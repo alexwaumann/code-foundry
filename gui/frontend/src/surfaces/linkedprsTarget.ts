@@ -5,7 +5,7 @@
  */
 import type { LinkedPullRequestView } from "@/api/threads";
 import { makeTab, type Tab } from "@/stores/panel";
-import type { ReposData } from "@/stores/repos";
+import type { ProjectsData } from "@/stores/projects";
 import type { ThreadsData } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
 
@@ -13,7 +13,7 @@ export const LINKED_PRS_KIND = "linkedprs";
 export const LINKED_PRS_TITLE = "Linked PRs";
 
 export interface SelectionStores {
-  repos: ReposData;
+  repos: ProjectsData;
   threads: ThreadsData;
 }
 

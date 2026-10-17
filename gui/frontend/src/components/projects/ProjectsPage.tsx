@@ -68,7 +68,7 @@ import {
   removeWorktree,
   unregisterProject,
 } from "@/stores/projectActions";
-import { findWorktree, mainWorktreePath, useReposStore } from "@/stores/repos";
+import { findWorktree, mainWorktreePath, useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { showWorkspaceInThread } from "@/stores/workspacePanel";
@@ -86,16 +86,16 @@ const SEP = "\u0001";
 
 /** The page's structure inputs as strings, so it rebuilds on membership changes only (not git status). */
 function useStructure(): { repos: string[]; workspaces: string[] } {
-  const repos = useReposStore(useShallow((s) => s.order.map((id) => [id, ...(s.byId[id]?.worktrees.map((w) => w.path) ?? [])].join(SEP))));
-  const workspaces = useWorkspacesStore(useShallow((s) => s.order.map((id) => [id, ...(s.byId[id]?.members.flatMap((m) => [m.repoId, m.worktreePath]) ?? [])].join(SEP))));
+  const repos = useProjectsStore(useShallow((s) => s.order.map((id) => [id, ...(s.byId[id]?.worktrees.map((w) => w.path) ?? [])].join(SEP))));
+  const workspaces = useWorkspacesStore(useShallow((s) => s.order.map((id) => [id, ...(s.byId[id]?.members.flatMap((m) => [m.projectId, m.worktreePath]) ?? [])].join(SEP))));
   return { repos, workspaces };
 }
 
-function decode(repoKeys: readonly string[], wsKeys: readonly string[]) {
+function decode(projectKeys: readonly string[], wsKeys: readonly string[]) {
   const repos = {
-    order: repoKeys.map((k) => k.split(SEP)[0] ?? ""),
+    order: projectKeys.map((k) => k.split(SEP)[0] ?? ""),
     byId: Object.fromEntries(
-      repoKeys.map((k) => {
+      projectKeys.map((k) => {
         const [id = "", ...paths] = k.split(SEP);
         return [id, { id, name: id, worktrees: paths.map((path) => ({ path, isMain: false })) }];
       }),
@@ -107,7 +107,7 @@ function decode(repoKeys: readonly string[], wsKeys: readonly string[]) {
       wsKeys.map((k) => {
         const [id = "", ...rest] = k.split(SEP);
         const members = [];
-        for (let i = 0; i + 1 < rest.length; i += 2) members.push({ repoId: rest[i] ?? "", worktreePath: rest[i + 1] ?? "" });
+        for (let i = 0; i + 1 < rest.length; i += 2) members.push({ projectId: rest[i] ?? "", worktreePath: rest[i + 1] ?? "" });
         return [id, { id, members }];
       }),
     ),
@@ -120,7 +120,7 @@ function decode(repoKeys: readonly string[], wsKeys: readonly string[]) {
  * slugs and branches then rebuild the page too (and git status still does not).
  */
 function useSearchInputs(active: boolean): { repos: string[]; workspaces: string[] } {
-  const repos = useReposStore(
+  const repos = useProjectsStore(
     useShallow((s) => (active ? s.order.map((id) => {
       const r = s.byId[id];
       return [id, r?.name ?? "", r?.githubSlug ?? "", ...(r?.worktrees.flatMap((w) => [w.path, w.branch]) ?? [])].join(SEP);
@@ -130,10 +130,10 @@ function useSearchInputs(active: boolean): { repos: string[]; workspaces: string
   return { repos, workspaces };
 }
 
-function decodeSearch(repoKeys: readonly string[], wsKeys: readonly string[]): ProjectsSearch {
+function decodeSearch(projectKeys: readonly string[], wsKeys: readonly string[]): ProjectsSearch {
   return {
     repos: Object.fromEntries(
-      repoKeys.map((k) => {
+      projectKeys.map((k) => {
         const [id = "", name = "", githubSlug = "", ...rest] = k.split(SEP);
         const branches: Record<string, string> = {};
         for (let i = 0; i + 1 < rest.length; i += 2) branches[rest[i] ?? ""] = rest[i + 1] ?? "";
@@ -185,39 +185,39 @@ const KIND_ICON: Record<ProjectKind, { Icon: React.ComponentType<{ className?: s
   nogit: { Icon: Folder, className: "text-muted-foreground" },
 };
 
-const UNKNOWN_REPO = { githubSlug: "", remotes: [] };
+const UNKNOWN_PROJECT = { githubSlug: "", remotes: [] };
 
 /**
  * One worktree of a project. `cleanupSlot`: some row of the project can be cleaned up,
  * so every row keeps a fifth action slot (the broom, or empty) and the columns stay
  * aligned; projects with nothing to clean up keep four.
  */
-function WorktreeRow({ repoId, path, cleanupSlot }: { repoId: string; path: string; cleanupSlot: boolean }) {
-  const isMain = useReposStore((s) => findWorktree(s, repoId, path)?.isMain ?? false);
-  const cleanable = useCleanable(repoId, path);
-  const show: OverflowItem = { label: "Show in side panel", icon: PanelRight, testId: "worktree-show-panel", onSelect: () => { showWorktreeInPanel(repoId, path); } };
+function WorktreeRow({ projectId, path, cleanupSlot }: { projectId: string; path: string; cleanupSlot: boolean }) {
+  const isMain = useProjectsStore((s) => findWorktree(s, projectId, path)?.isMain ?? false);
+  const cleanable = useCleanable(projectId, path);
+  const show: OverflowItem = { label: "Show in side panel", icon: PanelRight, testId: "worktree-show-panel", onSelect: () => { showWorktreeInPanel(projectId, path); } };
   const items: OverflowItem[] = isMain
     ? [show]
-    : [show, "separator", { label: "Remove worktree…", icon: Trash2, destructive: true, testId: "worktree-remove", onSelect: () => void removeWorktree(repoId, path) }];
+    : [show, "separator", { label: "Remove worktree…", icon: Trash2, destructive: true, testId: "worktree-remove", onSelect: () => void removeWorktree(projectId, path) }];
   return (
-    <NavRow navKey={projectWorktreeKey(repoId, path)} className="group/wt flex h-full items-center gap-2 rounded-md pr-2 pl-6 text-body" tip={path}>
+    <NavRow navKey={projectWorktreeKey(projectId, path)} className="group/wt flex h-full items-center gap-2 rounded-md pr-2 pl-6 text-body" tip={path}>
       <span className="flex h-full min-w-0 flex-1 items-center" data-testid="project-worktree" data-path={path}>
-        <WorktreeState repoId={repoId} path={path} />
+        <WorktreeState projectId={projectId} path={path} />
       </span>
       {/* Always shown, muted at rest; a fixed width so every row's state column ends at the same x. */}
       <span
         className={cn("flex shrink-0 items-center justify-end opacity-55", cleanupSlot ? "w-30" : "w-24", " transition-opacity group-hover/wt:opacity-100 group-focus-within/wt:opacity-100 group-aria-selected/wt:opacity-100 has-[[aria-expanded=true]]:opacity-100")}
         data-testid="worktree-actions"
       >
-        <RowAction label="New thread here" testId="worktree-new-thread" onClick={() => { composeIn(repoId, path); }}>
+        <RowAction label="New thread here" testId="worktree-new-thread" onClick={() => { composeIn(projectId, path); }}>
           <SquarePen />
         </RowAction>
-        <RowAction label="New terminal here" testId="worktree-new-terminal" onClick={() => void newTerminalIn(repoId, path)}>
+        <RowAction label="New terminal here" testId="worktree-new-terminal" onClick={() => void newTerminalIn(projectId, path)}>
           <SquareTerminal />
         </RowAction>
-        <ActionsMenu repoId={repoId} owner={{ kind: "worktree", repoId, path }} from="projects" variant="row" testId="worktree-actions-menu" />
+        <ActionsMenu projectId={projectId} owner={{ kind: "worktree", projectId, path }} from="projects" variant="row" testId="worktree-actions-menu" />
         {cleanable ? (
-          <RowAction label="Clean up: remove this worktree" testId="worktree-cleanup" className="text-success hover:text-success" onClick={() => void cleanupWorktree(repoId, path)}>
+          <RowAction label="Clean up: remove this worktree" testId="worktree-cleanup" className="text-success hover:text-success" onClick={() => void cleanupWorktree(projectId, path)}>
             <Broom />
           </RowAction>
         ) : (
@@ -230,9 +230,9 @@ function WorktreeRow({ repoId, path, cleanupSlot }: { repoId: string; path: stri
 }
 
 /** The main worktree's last git status refresh ("updated 2m ago", amber when stale, red after an error). */
-function ProjectFreshness({ repoId, main }: { repoId: string; main: string }) {
-  const at = useReposStore((s) => findWorktree(s, repoId, main)?.status.refreshedAtMs ?? null);
-  const error = useReposStore((s) => findWorktree(s, repoId, main)?.status.error ?? "");
+function ProjectFreshness({ projectId, main }: { projectId: string; main: string }) {
+  const at = useProjectsStore((s) => findWorktree(s, projectId, main)?.status.refreshedAtMs ?? null);
+  const error = useProjectsStore((s) => findWorktree(s, projectId, main)?.status.error ?? "");
   return (
     <span className="mr-1 shrink-0">
       <Freshness fetchedAtMs={at} lastError={error} staleAfterMs={PROJECT_STALE_MS} testId="project-freshness" />
@@ -241,7 +241,7 @@ function ProjectFreshness({ repoId, main }: { repoId: string; main: string }) {
 }
 
 /** Fetch (with a remote) and refresh the project's git status; the icon spins meanwhile. */
-function RefreshAction({ repoId }: { repoId: string }) {
+function RefreshAction({ projectId }: { projectId: string }) {
   const [busy, setBusy] = useState(false);
   return (
     <RowAction
@@ -250,7 +250,7 @@ function RefreshAction({ repoId }: { repoId: string }) {
       disabled={busy}
       onClick={() => {
         setBusy(true);
-        void refreshProject(repoId).finally(() => {
+        void refreshProject(projectId).finally(() => {
           setBusy(false);
         });
       }}
@@ -265,42 +265,42 @@ function RefreshAction({ repoId }: { repoId: string }) {
  * Clean up merged worktrees (git with a remote: merged means in origin/<default>;
  * disabled at 0), its setup step, then Remove project.
  */
-function projectMenu(repoId: string, kind: ProjectKind, step: ProjectNextStep, cleanup: number | null): OverflowItem[] {
+function projectMenu(projectId: string, kind: ProjectKind, step: ProjectNextStep, cleanup: number | null): OverflowItem[] {
   const items: OverflowItem[] = [];
-  if (kind !== "nogit") items.push({ label: "New worktree…", icon: GitBranchPlus, testId: "project-new-worktree", onSelect: () => { newWorktreeIn(repoId); } });
-  items.push({ label: "New action…", icon: Play, testId: "project-new-action", onSelect: () => { openActionEditor({ mode: "new", repoId, from: "projects" }); } });
+  if (kind !== "nogit") items.push({ label: "New worktree…", icon: GitBranchPlus, testId: "project-new-worktree", onSelect: () => { newWorktreeIn(projectId); } });
+  items.push({ label: "New action…", icon: Play, testId: "project-new-action", onSelect: () => { openActionEditor({ mode: "new", projectId, from: "projects" }); } });
   if (cleanup !== null) {
-    items.push({ label: "Clean up merged worktrees", icon: Broom, testId: "project-cleanup", badge: cleanup, disabled: cleanup === 0, onSelect: () => void cleanupMergedWorktrees(repoId) });
+    items.push({ label: "Clean up merged worktrees", icon: Broom, testId: "project-cleanup", badge: cleanup, disabled: cleanup === 0, onSelect: () => void cleanupMergedWorktrees(projectId) });
   }
-  if (step === "publish") items.push({ label: "Publish to GitHub…", icon: CloudUpload, testId: "project-menu-publish", onSelect: () => { publishProject(repoId); } });
-  if (step === "init") items.push({ label: "Initialize git", icon: GitBranchPlus, testId: "project-menu-init-git", onSelect: () => void initGitIn(repoId) });
+  if (step === "publish") items.push({ label: "Publish to GitHub…", icon: CloudUpload, testId: "project-menu-publish", onSelect: () => { publishProject(projectId); } });
+  if (step === "init") items.push({ label: "Initialize git", icon: GitBranchPlus, testId: "project-menu-init-git", onSelect: () => void initGitIn(projectId) });
   if (items.length > 0) items.push("separator");
-  items.push({ label: "Remove project", icon: Unlink, destructive: true, testId: "project-unregister", onSelect: () => void unregisterProject(repoId) });
+  items.push({ label: "Remove project", icon: Unlink, destructive: true, testId: "project-unregister", onSelect: () => void unregisterProject(projectId) });
   return items;
 }
 
 function ProjectBlock({ project, collapsed, filtering }: { project: ProjectModel; collapsed: boolean; filtering: boolean }) {
-  const { repoId } = project;
-  const name = useReposStore((s) => s.byId[repoId]?.name ?? repoId);
-  const main = useReposStore((s) => s.byId[repoId]?.worktrees.find((w) => w.isMain)?.path ?? s.byId[repoId]?.path ?? "");
-  const kind = useReposStore(useShallow((s) => projectKind(s.byId[repoId] ?? UNKNOWN_REPO)));
-  const step = useReposStore((s) => {
-    const r = s.byId[repoId];
+  const { projectId } = project;
+  const name = useProjectsStore((s) => s.byId[projectId]?.name ?? projectId);
+  const main = useProjectsStore((s) => s.byId[projectId]?.worktrees.find((w) => w.isMain)?.path ?? s.byId[projectId]?.path ?? "");
+  const kind = useProjectsStore(useShallow((s) => projectKind(s.byId[projectId] ?? UNKNOWN_PROJECT)));
+  const step = useProjectsStore((s) => {
+    const r = s.byId[projectId];
     return r ? projectNextStep(r) : null;
   });
-  const hasRemote = useReposStore((s) => (s.byId[repoId]?.remotes.length ?? 0) > 0);
-  const cleanable = useCleanableCount(repoId);
+  const hasRemote = useProjectsStore((s) => (s.byId[projectId]?.remotes.length ?? 0) > 0);
+  const cleanable = useCleanableCount(projectId);
   const { Icon, className: iconClass } = KIND_ICON[kind.kind];
   return (
-    <section className="group/card rounded-lg border" data-testid="project" data-repo={repoId} data-git={kind.kind !== "nogit"} data-kind={kind.kind} data-collapsed={collapsed}>
-      <NavRow navKey={projectKey(repoId)} className={cn("group/p flex h-9 items-center gap-2 rounded-lg px-2", !collapsed && "rounded-b-none border-b")}>
+    <section className="group/card rounded-lg border" data-testid="project" data-repo={projectId} data-git={kind.kind !== "nogit"} data-kind={kind.kind} data-collapsed={collapsed}>
+      <NavRow navKey={projectKey(projectId)} className={cn("group/p flex h-9 items-center gap-2 rounded-lg px-2", !collapsed && "rounded-b-none border-b")}>
         <CollapseToggle
           collapsed={collapsed}
           disabled={filtering}
           label={name}
           testId="project-collapse"
           onToggle={() => {
-            useUiStore.getState().setProjectCollapsed(repoId, !collapsed);
+            useUiStore.getState().setProjectCollapsed(projectId, !collapsed);
           }}
         />
         <Tip label={kind.title}>
@@ -324,35 +324,35 @@ function ProjectBlock({ project, collapsed, filtering }: { project: ProjectModel
           </span>
         )}
         <span className="ml-auto flex shrink-0 items-center">
-          {kind.kind !== "nogit" && <ProjectFreshness repoId={repoId} main={main} />}
+          {kind.kind !== "nogit" && <ProjectFreshness projectId={projectId} main={main} />}
           <span
             className="flex items-center opacity-70 transition-opacity group-hover/card:opacity-100 group-focus-within/p:opacity-100 group-aria-selected/p:opacity-100 has-[[aria-expanded=true]]:opacity-100"
             data-testid="project-actions"
           >
-            {kind.kind !== "nogit" && <RefreshAction repoId={repoId} />}
+            {kind.kind !== "nogit" && <RefreshAction projectId={projectId} />}
             {step === "publish" && (
-              <RowAction label="Publish to GitHub" testId="project-publish" onClick={() => { publishProject(repoId); }}>
+              <RowAction label="Publish to GitHub" testId="project-publish" onClick={() => { publishProject(projectId); }}>
                 <CloudUpload />
               </RowAction>
             )}
             {step === "init" && (
-              <RowAction label="Initialize git" testId="project-init-git" onClick={() => void initGitIn(repoId)}>
+              <RowAction label="Initialize git" testId="project-init-git" onClick={() => void initGitIn(projectId)}>
                 <GitBranchPlus />
               </RowAction>
             )}
-            <RowAction label="New thread" testId="project-new-thread" onClick={() => { composeIn(repoId); }}>
+            <RowAction label="New thread" testId="project-new-thread" onClick={() => { composeIn(projectId); }}>
               <SquarePen />
             </RowAction>
-            <RowAction label="New terminal" testId="project-new-terminal" onClick={() => void newTerminalIn(repoId, main)}>
+            <RowAction label="New terminal" testId="project-new-terminal" onClick={() => void newTerminalIn(projectId, main)}>
               <SquareTerminal />
             </RowAction>
-            <OverflowMenu label="More project actions" testId="project-more" items={projectMenu(repoId, kind.kind, step, kind.kind !== "nogit" && hasRemote ? cleanable : null)} />
+            <OverflowMenu label="More project actions" testId="project-more" items={projectMenu(projectId, kind.kind, step, kind.kind !== "nogit" && hasRemote ? cleanable : null)} />
           </span>
         </span>
       </NavRow>
       {!collapsed && (
         <div className="p-0.5">
-          <RowList rows={project.worktrees} rowKey={(p) => projectWorktreeKey(repoId, p)} rowHeight={ROW_H} render={(p) => <WorktreeRow repoId={repoId} path={p} cleanupSlot={cleanable > 0} />} />
+          <RowList rows={project.worktrees} rowKey={(p) => projectWorktreeKey(projectId, p)} rowHeight={ROW_H} render={(p) => <WorktreeRow projectId={projectId} path={p} cleanupSlot={cleanable > 0} />} />
           {project.inWorkspaces > 0 && (
             <p className="px-6 py-1 text-caption" data-testid="project-in-workspaces">
               {project.inWorkspaces} {project.inWorkspaces === 1 ? "worktree is" : "worktrees are"} in workspaces (below)
@@ -456,12 +456,12 @@ export function ProjectsPage() {
           case "project":
             return {
               key: it.key,
-              activate: () => { showWorktreeInPanel(it.repoId, mainWorktreePath(useReposStore.getState(), it.repoId)); },
-              toggle: (open) => !filtering && useUiStore.getState().setProjectCollapsed(it.repoId, !open),
+              activate: () => { showWorktreeInPanel(it.projectId, mainWorktreePath(useProjectsStore.getState(), it.projectId)); },
+              toggle: (open) => !filtering && useUiStore.getState().setProjectCollapsed(it.projectId, !open),
             };
           case "worktree":
           case "member":
-            return { key: it.key, activate: () => { showWorktreeInPanel(it.repoId, it.path); } };
+            return { key: it.key, activate: () => { showWorktreeInPanel(it.projectId, it.path); } };
           case "workspace":
             return {
               key: it.key,
@@ -473,7 +473,7 @@ export function ProjectsPage() {
     [items, filtering],
   );
   const nav = useNav(navItems);
-  const loaded = useReposStore((s) => s.loaded);
+  const loaded = useProjectsStore((s) => s.loaded);
   const rootRef = useRef<HTMLDivElement>(null);
   const filterRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -564,7 +564,7 @@ export function ProjectsPage() {
                   No matches.
                 </p>
               ) : (
-                model.projects.map((p) => <ProjectBlock key={p.repoId} project={p} collapsed={collapsed.projects.has(p.repoId)} filtering={filtering} />)
+                model.projects.map((p) => <ProjectBlock key={p.projectId} project={p} collapsed={collapsed.projects.has(p.projectId)} filtering={filtering} />)
               )}
             </div>
             <div className="flex flex-col gap-3" data-testid="workspaces-section">

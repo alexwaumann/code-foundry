@@ -69,14 +69,14 @@ export interface SkillView {
   /** "user": ~/.claude; "project": a checkout's .claude. */
   scope: "user" | "project";
   /** The project, for project scope; "" for user scope. */
-  repoId: string;
+  projectId: string;
   /** Absolute path of the SKILL.md or command file. */
   path: string;
 }
 
 /** A checkout to read skills from: the project's main worktree unless path is set. */
 export interface SkillSourceView {
-  repoId: string;
+  projectId: string;
   /** Absolute path of a worktree of the project. */
   path?: string;
 }
@@ -100,7 +100,7 @@ export function toSkillView(s: Skill): SkillView {
     name: s.name,
     description: s.description,
     scope: s.scope === SkillScope.USER ? "user" : "project",
-    repoId: s.projectId,
+    projectId: s.projectId,
     path: s.path,
   };
 }
@@ -121,7 +121,7 @@ export async function listSkills(
 ): Promise<SkillView[]> {
   const c = await conn.client(FilesystemService);
   try {
-    const res = await c.listSkills({ sources: sources.map((s) => ({ projectId: s.repoId, path: s.path ?? "" })), includeUser }, { signal });
+    const res = await c.listSkills({ sources: sources.map((s) => ({ projectId: s.projectId, path: s.path ?? "" })), includeUser }, { signal });
     return res.skills.map(toSkillView);
   } catch (err) {
     throw orOutdatedDaemon(err);
@@ -130,7 +130,7 @@ export async function listSkills(
 
 /** What to search: a project's checkout (main worktree unless path is set) and the typed query. */
 export interface FileSearchRequest {
-  repoId: string;
+  projectId: string;
   /** Absolute path of a worktree of the project. */
   path?: string;
   query: string;
@@ -145,7 +145,7 @@ export interface FileSearchRequest {
 export async function searchFiles(req: FileSearchRequest, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<FileSearchView> {
   const c = await conn.client(FilesystemService);
   try {
-    const res = await c.searchFiles({ projectId: req.repoId, path: req.path ?? "", query: req.query, limit: req.limit ?? 0 }, { signal });
+    const res = await c.searchFiles({ projectId: req.projectId, path: req.path ?? "", query: req.query, limit: req.limit ?? 0 }, { signal });
     return toFileSearchView(res);
   } catch (err) {
     throw orOutdatedDaemon(err);

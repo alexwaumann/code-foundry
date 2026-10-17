@@ -13,10 +13,10 @@ export type Selection =
   | { kind: "thread"; id: string }
   /**
    * The new-thread composer (picked in the project picker): for a project, or with
-   * workspaceId for a workspace, repoId then being a member's (for the command context),
-   * or with noProject for a thread without a project (repoId "").
+   * workspaceId for a workspace, projectId then being a member's (for the command context),
+   * or with noProject for a thread without a project (projectId "").
    */
-  | { kind: "compose"; repoId: string; workspaceId?: string; noProject?: boolean }
+  | { kind: "compose"; projectId: string; workspaceId?: string; noProject?: boolean }
   /** A top-level page that is not a sidebar row (see components/prs). */
   | { kind: "view"; name: string };
 
@@ -177,7 +177,7 @@ interface UiState {
   toggleArchivedCollapsed: () => void;
   toggleSnoozedCollapsed: () => void;
   /** Collapses (true) or expands a project on the Projects page; false when it already was. */
-  setProjectCollapsed: (repoId: string, collapsed: boolean) => boolean;
+  setProjectCollapsed: (projectId: string, collapsed: boolean) => boolean;
   /** Collapses (true) or expands a workspace on the Projects page; false when it already was. */
   setWorkspaceCollapsed: (workspaceId: string, collapsed: boolean) => boolean;
 }
@@ -251,7 +251,7 @@ export function sameSelection(a: Selection, b: Selection): boolean {
     case "thread":
       return a.id === (b as typeof a).id;
     case "compose":
-      return a.repoId === (b as typeof a).repoId && a.workspaceId === (b as typeof a).workspaceId && Boolean(a.noProject) === Boolean((b as typeof a).noProject);
+      return a.projectId === (b as typeof a).projectId && a.workspaceId === (b as typeof a).workspaceId && Boolean(a.noProject) === Boolean((b as typeof a).noProject);
     case "view":
       return a.name === (b as typeof a).name;
   }
@@ -357,9 +357,9 @@ export const useUiStore = create<UiState>()(
       toggleSnoozedCollapsed: () => {
         set((s) => ({ snoozedCollapsed: !s.snoozedCollapsed }));
       },
-      setProjectCollapsed: (repoId, collapsed) => {
+      setProjectCollapsed: (projectId, collapsed) => {
         const prev = get().collapsedProjects;
-        const next = withMember(prev, repoId, collapsed);
+        const next = withMember(prev, projectId, collapsed);
         if (next === prev) return false;
         set({ collapsedProjects: next });
         return true;

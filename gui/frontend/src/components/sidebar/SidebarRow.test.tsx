@@ -2,16 +2,16 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { ThreadView } from "@/api/threads";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { useReposStore } from "@/stores/repos";
+import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { SidebarRow } from "./SidebarRow";
 
 const thread = (o: Partial<ThreadView>) =>
-  ({ id: "s-1", name: "t", repoId: "cf", worktreePath: "/src/cf", workspaceId: "", pendingWorktreePath: "", state: "connected", status: "idle", statusReason: "", statusChangedAtMs: null, linkedPullRequests: [], pinned: false, ...o }) as ThreadView;
+  ({ id: "s-1", name: "t", projectId: "cf", worktreePath: "/src/cf", workspaceId: "", pendingWorktreePath: "", state: "connected", status: "idle", statusReason: "", statusChangedAtMs: null, linkedPullRequests: [], pinned: false, ...o }) as ThreadView;
 
 beforeEach(() => {
-  useReposStore.setState({
+  useProjectsStore.setState({
     byId: {
       cf: { id: "cf", name: "code-foundry", git: true, worktrees: [{ path: "/src/cf", branch: "main", head: "a", isMain: true }] },
       notes: { id: "notes", name: "writing", git: false, worktrees: [{ path: "/src/notes", branch: "", head: "", isMain: true }] },
@@ -38,10 +38,10 @@ describe("SidebarRow line 2", () => {
     ["working: the status, then the place", { status: "busy" as const }, "Working · code-foundry @ main"],
     ["starting reads as working", { state: "starting" as const }, "Working · code-foundry @ main"],
     ["stopped at its prompt: the place, like idle", { state: "disconnected" as const }, "code-foundry @ main"],
-    ["no git: the project and the No git badge, no @", { repoId: "notes", worktreePath: "/src/notes" }, "writing No git"],
+    ["no git: the project and the No git badge, no @", { projectId: "notes", worktreePath: "/src/notes" }, "writing No git"],
     ["a question: no place", { status: "attention" as const, statusReason: "question: Which one?" }, "Asked a question"],
-    ["no project: No project alone, no branch", { repoId: "", worktreePath: "/Users/dev" }, "No project"],
-    ["no project, working", { repoId: "", worktreePath: "/Users/dev", status: "busy" as const }, "Working · No project"],
+    ["no project: No project alone, no branch", { projectId: "", worktreePath: "/Users/dev" }, "No project"],
+    ["no project, working", { projectId: "", worktreePath: "/Users/dev", status: "busy" as const }, "Working · No project"],
   ])("%s", (_name, o, text) => {
     expect(renderRow(o).textContent).toBe(text);
   });

@@ -12,13 +12,13 @@ import {
   referencedIds,
   parseLine,
   removeReferences,
-  removeRepoTags,
-  repoTagCount,
-  retainRepoTags,
+  removeProjectTags,
+  projectTagCount,
+  retainProjectTags,
   serializePrompt,
   stagedPdfPages,
   tagLabel,
-  tagsByRepo,
+  tagsByProject,
   tagToken,
   type PromptTag,
 } from "./prompt";
@@ -118,11 +118,11 @@ describe("chipInsertText", () => {
   });
 });
 
-const DEPLOY = tagToken({ tagKind: "skill", name: "deploy", repoId: "r1" });
-const COMMIT = tagToken({ tagKind: "skill", name: "commit", repoId: "" });
-const API_DEPLOY = tagToken({ tagKind: "skill", name: "deploy", repoId: "r2" });
-const FILE = tagToken({ tagKind: "file", repoId: "r1", path: "src/my notes (1).md" });
-const DIR = tagToken({ tagKind: "file", repoId: "r2", path: "src/components/" });
+const DEPLOY = tagToken({ tagKind: "skill", name: "deploy", projectId: "r1" });
+const COMMIT = tagToken({ tagKind: "skill", name: "commit", projectId: "" });
+const API_DEPLOY = tagToken({ tagKind: "skill", name: "deploy", projectId: "r2" });
+const FILE = tagToken({ tagKind: "file", projectId: "r1", path: "src/my notes (1).md" });
+const DIR = tagToken({ tagKind: "file", projectId: "r2", path: "src/components/" });
 
 describe("skill and file tags", () => {
   it("writes the documented tokens", () => {
@@ -136,10 +136,10 @@ describe("skill and file tags", () => {
     const text = `Run ${DEPLOY} then ${COMMIT} on ${FILE} and ${DIR}, see ${A}`;
     const [line = []] = parsePrompt(text);
     expect(line.filter((p) => p.kind === "tag")).toEqual([
-      { kind: "tag", tagKind: "skill", name: "deploy", repoId: "r1" },
-      { kind: "tag", tagKind: "skill", name: "commit", repoId: "" },
-      { kind: "tag", tagKind: "file", repoId: "r1", path: "src/my notes (1).md" },
-      { kind: "tag", tagKind: "file", repoId: "r2", path: "src/components/" },
+      { kind: "tag", tagKind: "skill", name: "deploy", projectId: "r1" },
+      { kind: "tag", tagKind: "skill", name: "commit", projectId: "" },
+      { kind: "tag", tagKind: "file", projectId: "r1", path: "src/my notes (1).md" },
+      { kind: "tag", tagKind: "file", projectId: "r2", path: "src/components/" },
       { kind: "tag", tagKind: "image", id: "a1", name: "shot.png" },
     ]);
     expect(serializePrompt([line])).toBe(text);
@@ -149,18 +149,18 @@ describe("skill and file tags", () => {
   });
 
   it.each<[string, PromptTag, string]>([
-    ["a skill", { tagKind: "skill", name: "deploy", repoId: "r1" }, "/deploy"],
-    ["a file", { tagKind: "file", repoId: "r1", path: "src/a/Composer.tsx" }, "Composer.tsx"],
-    ["a top-level file", { tagKind: "file", repoId: "r1", path: "README.md" }, "README.md"],
-    ["a directory", { tagKind: "file", repoId: "r1", path: "src/components/" }, "components/"],
+    ["a skill", { tagKind: "skill", name: "deploy", projectId: "r1" }, "/deploy"],
+    ["a file", { tagKind: "file", projectId: "r1", path: "src/a/Composer.tsx" }, "Composer.tsx"],
+    ["a top-level file", { tagKind: "file", projectId: "r1", path: "README.md" }, "README.md"],
+    ["a directory", { tagKind: "file", projectId: "r1", path: "src/components/" }, "components/"],
     ["an image", { tagKind: "image", id: "a1", name: "x[1].png" }, "x 1 .png"],
   ])("tagLabel: %s", (_name, tag, want) => {
     expect(tagLabel(tag)).toBe(want);
   });
 
   it.each<[string, string, PromptTag]>([
-    ["the label is not trusted", "[/evil](cf-skill://r1/deploy)", { tagKind: "skill", name: "deploy", repoId: "r1" }],
-    ["a skill name is decoded", "[/a b](cf-skill://~/a%20b)", { tagKind: "skill", name: "a b", repoId: "" }],
+    ["the label is not trusted", "[/evil](cf-skill://r1/deploy)", { tagKind: "skill", name: "deploy", projectId: "r1" }],
+    ["a skill name is decoded", "[/a b](cf-skill://~/a%20b)", { tagKind: "skill", name: "a b", projectId: "" }],
   ])("parses: %s", (_name, token, want) => {
     expect(parseLine(token)).toEqual([{ kind: "tag", ...want }]);
   });
@@ -185,7 +185,7 @@ describe("skill and file tags", () => {
     expect(line.filter((p) => p.kind === "tag")).toHaveLength(1);
     expect(serializePrompt([line])).toBe(text);
     expect(projectPrompt(text, () => undefined)).toBe(sent);
-    expect(removeRepoTags(text, "r1")).toBe(removed);
+    expect(removeProjectTags(text, "r1")).toBe(removed);
   });
 
   it("projects skills to /name and files to @cf-file://, each followed by whitespace", () => {
@@ -206,7 +206,7 @@ describe("skill and file tags", () => {
     ["!'()* and brackets", "odd!'()*[x].md", "odd%21%27%28%29%2A%5Bx%5D.md"],
     ["a directory with a space", "my dir/", "my%20dir/"],
   ])("a file path round-trips through the token and the projection: %s", (_name, path, encoded) => {
-    const tag: PromptTag = { tagKind: "file", repoId: "r1", path };
+    const tag: PromptTag = { tagKind: "file", projectId: "r1", path };
     const token = tagToken(tag);
     expect(token.endsWith(`](cf-file://r1/${encoded})`)).toBe(true);
     expect(parseLine(token)).toEqual([{ kind: "tag", ...tag }]);
@@ -216,13 +216,13 @@ describe("skill and file tags", () => {
     expect(decodeURIComponent(ref.slice("@cf-file://r1/".length))).toBe(path);
   });
 
-  it("tagsByRepo and repoTagCount see project skills and files only", () => {
+  it("tagsByProject and projectTagCount see project skills and files only", () => {
     const text = `${COMMIT} ${API_DEPLOY} ${DEPLOY} ${A} ${FILE}\n${DIR}`;
-    expect(tagsByRepo(text)).toEqual(["r2", "r1"]);
-    expect(repoTagCount(text, "r1")).toBe(2);
-    expect(repoTagCount(text, "r2")).toBe(2);
-    expect(repoTagCount(text, "r3")).toBe(0);
-    expect(tagsByRepo(`${COMMIT} ${A}`)).toEqual([]);
+    expect(tagsByProject(text)).toEqual(["r2", "r1"]);
+    expect(projectTagCount(text, "r1")).toBe(2);
+    expect(projectTagCount(text, "r2")).toBe(2);
+    expect(projectTagCount(text, "r3")).toBe(0);
+    expect(tagsByProject(`${COMMIT} ${A}`)).toEqual([]);
   });
 
   it.each([
@@ -230,15 +230,15 @@ describe("skill and file tags", () => {
     ["else the preceding one", `Look at ${DIR}`, "Look at"],
     ["other repos, user skills and images stay", `${DEPLOY} ${API_DEPLOY} ${COMMIT} ${A}`, `${DEPLOY} ${COMMIT} ${A}`],
     ["nothing of the repo: unchanged", `Fix ${DEPLOY} `, `Fix ${DEPLOY} `],
-  ])("removeRepoTags: %s", (_name, text, want) => {
-    expect(removeRepoTags(text, "r2")).toBe(want);
+  ])("removeProjectTags: %s", (_name, text, want) => {
+    expect(removeProjectTags(text, "r2")).toBe(want);
   });
 
-  it("retainRepoTags keeps the listed repos' tags, images and user skills", () => {
+  it("retainProjectTags keeps the listed repos' tags, images and user skills", () => {
     const text = `${DEPLOY} ${API_DEPLOY} ${COMMIT} ${FILE} ${A}`;
-    expect(retainRepoTags(text, ["r1"])).toBe(`${DEPLOY} ${COMMIT} ${FILE} ${A}`);
-    expect(retainRepoTags(text, [])).toBe(`${COMMIT} ${A}`);
-    expect(retainRepoTags(text, ["r1", "r2"])).toBe(text);
+    expect(retainProjectTags(text, ["r1"])).toBe(`${DEPLOY} ${COMMIT} ${FILE} ${A}`);
+    expect(retainProjectTags(text, [])).toBe(`${COMMIT} ${A}`);
+    expect(retainProjectTags(text, ["r1", "r2"])).toBe(text);
   });
 
   it("removeReferences leaves skill and file tags alone", () => {

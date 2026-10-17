@@ -57,7 +57,7 @@ export function capIds(ids: readonly string[], expanded: boolean, cap = SIBLINGS
 
 /** How many projects the threads run in ("" for no project counts as one place). */
 export function projectCount(data: LineageData, ids: readonly string[]): number {
-  return new Set(ids.map((x) => data.byId[x]?.repoId ?? "")).size;
+  return new Set(ids.map((x) => data.byId[x]?.projectId ?? "")).size;
 }
 
 /** The figures of the panel's header. */

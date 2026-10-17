@@ -3,7 +3,7 @@ import { invokeCommand } from "@/api/command";
 import type { Visibility } from "@/lib/publish";
 import { invokeConfirmed, refreshCommands } from "./commands";
 import { getUiContext } from "./context";
-import { useReposStore } from "./repos";
+import { useProjectsStore } from "./projects";
 
 /**
  * Creating a project (repo.create, the Add Project dialog's New tab), publishing one to
@@ -16,22 +16,22 @@ import { useReposStore } from "./repos";
 
 interface PublishDialogState {
   open: boolean;
-  repoId: string;
+  projectId: string;
   /** Incremented on every open, so the dialog's body starts fresh. */
   seq: number;
 }
 
-export const usePublishDialogStore = create<PublishDialogState>()(() => ({ open: false, repoId: "", seq: 0 }));
+export const usePublishDialogStore = create<PublishDialogState>()(() => ({ open: false, projectId: "", seq: 0 }));
 
 /**
  * Opens the publish dialog for a project (repo.github.publish's presenter). False when
  * there is no such project, so the command falls back to its prompts. Deferred like
  * openAddProject, so a palette closing after its presenter ran keeps focus off.
  */
-export function openPublishDialog(repoId: string): boolean {
-  if (!repoId || !useReposStore.getState().byId[repoId]) return false;
+export function openPublishDialog(projectId: string): boolean {
+  if (!projectId || !useProjectsStore.getState().byId[projectId]) return false;
   queueMicrotask(() => {
-    usePublishDialogStore.setState((s) => ({ open: true, repoId, seq: s.seq + 1 }));
+    usePublishDialogStore.setState((s) => ({ open: true, projectId, seq: s.seq + 1 }));
   });
   return true;
 }
@@ -60,7 +60,7 @@ export async function createProject(name: string): Promise<CreatedProject> {
 }
 
 export interface PublishRequest {
-  repoId: string;
+  projectId: string;
   owner: string;
   /** GitHub repository name; the project's name when empty. */
   name: string;
@@ -72,9 +72,9 @@ export interface PublishRequest {
  * daemon judges availability (git, no origin) for it and not for what is selected.
  */
 export async function publishProject(req: PublishRequest): Promise<string> {
-  const ctx = { ...getUiContext(), activeRepoId: req.repoId, activeWorktreePath: "", activeThreadId: "", activeTerminalId: "", activeWorkspaceId: "" };
+  const ctx = { ...getUiContext(), activeProjectId: req.projectId, activeWorktreePath: "", activeThreadId: "", activeTerminalId: "", activeWorkspaceId: "" };
   try {
-    const res = await invokeConfirmed("project.github.publish", { project: req.repoId, owner: req.owner, name: req.name, visibility: req.visibility }, ctx);
+    const res = await invokeConfirmed("project.github.publish", { project: req.projectId, owner: req.owner, name: req.name, visibility: req.visibility }, ctx);
     if (!res) throw new Error("cancelled");
     return res.message;
   } finally {
@@ -86,10 +86,10 @@ export async function publishProject(req: PublishRequest): Promise<string> {
  * repo.delete for a project the New tab created: unregisters it and removes its folder.
  * Invoked as already confirmed: the user cancelled the dialog, which is the decision.
  */
-export async function deleteProject(repoId: string): Promise<void> {
-  const ctx = { ...getUiContext(), activeRepoId: repoId, activeWorktreePath: "", activeThreadId: "", activeTerminalId: "", activeWorkspaceId: "" };
+export async function deleteProject(projectId: string): Promise<void> {
+  const ctx = { ...getUiContext(), activeProjectId: projectId, activeWorktreePath: "", activeThreadId: "", activeTerminalId: "", activeWorkspaceId: "" };
   try {
-    await invokeCommand("project.delete", ctx, { project: repoId }, undefined, { confirmed: true });
+    await invokeCommand("project.delete", ctx, { project: projectId }, undefined, { confirmed: true });
   } finally {
     void refreshCommands();
   }

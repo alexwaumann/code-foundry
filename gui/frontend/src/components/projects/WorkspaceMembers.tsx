@@ -6,11 +6,11 @@ import { RowList } from "@/components/prs/RowList";
 import { Tip } from "@/components/ui/tooltip";
 import { NavRow } from "@/lib/NavRow";
 import { cn } from "@/lib/utils";
-import { addableRepos, memberKey, threadAt } from "@/lib/projects";
+import { addableProjects, memberKey, threadAt } from "@/lib/projects";
 import { newThreadTerminal } from "@/stores/bottomActions";
 import { addToWorkspace, newTerminalIn, removeFromWorkspace } from "@/stores/projectActions";
 import { openWorktreeTab } from "@/stores/worktreePanel";
-import { useReposStore } from "@/stores/repos";
+import { useProjectsStore } from "@/stores/projects";
 import { runThreadIn } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
 import { useWorkspacesStore } from "@/stores/workspaces";
@@ -22,7 +22,7 @@ export const MEMBER_ROW_HEIGHT = 32;
 export const PANEL_MEMBER_ROW_HEIGHT = 48;
 
 interface Member {
-  repoId: string;
+  projectId: string;
   path: string;
 }
 
@@ -38,7 +38,7 @@ interface RowOptions {
   /** The thread whose cwd is marked ("runs here") and that Run in moves; none on the Projects page. */
   threadId?: string;
   /** Opens the member (default: select its worktree overview). The panel opens it as a tab instead. */
-  onOpen?: (repoId: string, path: string) => void;
+  onOpen?: (projectId: string, path: string) => void;
 }
 
 /** Where the thread is relative to this member: runs here, a Run in is queued here, or neither. */
@@ -48,14 +48,14 @@ function useThreadAt(threadId: string | undefined, path: string): "current" | "q
 
 /** The panel layout's row: project (current marker) and actions, then branch and state. */
 function PanelMemberRow({ workspaceId, member, threadId, onOpen }: RowOptions & { member: Member }) {
-  const name = useReposStore((s) => s.byId[member.repoId]?.name ?? member.repoId);
+  const name = useProjectsStore((s) => s.byId[member.projectId]?.name ?? member.projectId);
   const at = useThreadAt(threadId, member.path);
   const open = () => {
-    (onOpen ?? ((repoId, path) => openWorktreeTab("current", repoId, path)))(member.repoId, member.path);
+    (onOpen ?? ((projectId, path) => openWorktreeTab("current", projectId, path)))(member.projectId, member.path);
   };
   return (
-    <NavRow navKey={memberKey(workspaceId, member.repoId)} className="group/member flex h-full flex-col justify-center gap-0.5 px-2 text-body" tip={member.path}>
-      <span className="flex min-w-0 items-center gap-1.5" data-testid="workspace-member" data-repo={member.repoId} data-current={at === "current" || undefined}>
+    <NavRow navKey={memberKey(workspaceId, member.projectId)} className="group/member flex h-full flex-col justify-center gap-0.5 px-2 text-body" tip={member.path}>
+      <span className="flex min-w-0 items-center gap-1.5" data-testid="workspace-member" data-repo={member.projectId} data-current={at === "current" || undefined}>
         <FolderGit2 className="size-3.5 shrink-0 text-info/90" aria-hidden />
         <span className="min-w-0 truncate font-medium" data-testid="member-name">
           {name}
@@ -72,7 +72,7 @@ function PanelMemberRow({ workspaceId, member, threadId, onOpen }: RowOptions & 
             <PanelRightOpen />
           </RowAction>
           {threadId && at !== "current" && (
-            <RowAction label={`Run the thread in ${name}`} testId="member-run-in" onClick={() => void runThreadIn(threadId, member.repoId)}>
+            <RowAction label={`Run the thread in ${name}`} testId="member-run-in" onClick={() => void runThreadIn(threadId, member.projectId)}>
               <ArrowRightLeft />
             </RowAction>
           )}
@@ -80,45 +80,45 @@ function PanelMemberRow({ workspaceId, member, threadId, onOpen }: RowOptions & 
           <RowAction
             label="New terminal here"
             testId="member-terminal"
-            onClick={() => void (threadId ? newThreadTerminal(threadId, member.path) : newTerminalIn(member.repoId, member.path))}
+            onClick={() => void (threadId ? newThreadTerminal(threadId, member.path) : newTerminalIn(member.projectId, member.path))}
           >
             <SquareTerminal />
           </RowAction>
-          <RowAction label={`Remove ${name} from the workspace`} destructive testId="member-remove" onClick={() => void removeFromWorkspace(workspaceId, member.repoId)}>
+          <RowAction label={`Remove ${name} from the workspace`} destructive testId="member-remove" onClick={() => void removeFromWorkspace(workspaceId, member.projectId)}>
             <X />
           </RowAction>
         </span>
       </span>
       <span className="flex min-w-0 items-center pl-5">
-        <WorktreeState repoId={member.repoId} path={member.path} showPath={false} />
+        <WorktreeState projectId={member.projectId} path={member.path} showPath={false} />
       </span>
     </NavRow>
   );
 }
 
 function MemberRow({ workspaceId, member }: { workspaceId: string; member: Member }) {
-  const name = useReposStore((s) => s.byId[member.repoId]?.name ?? member.repoId);
+  const name = useProjectsStore((s) => s.byId[member.projectId]?.name ?? member.projectId);
   return (
-    <NavRow navKey={memberKey(workspaceId, member.repoId)} className="group/member flex h-full items-center gap-2 rounded-md px-2 text-body" tip={member.path}>
-      <span className="flex h-full min-w-0 flex-1 items-center gap-2" data-testid="workspace-member" data-repo={member.repoId}>
+    <NavRow navKey={memberKey(workspaceId, member.projectId)} className="group/member flex h-full items-center gap-2 rounded-md px-2 text-body" tip={member.path}>
+      <span className="flex h-full min-w-0 flex-1 items-center gap-2" data-testid="workspace-member" data-repo={member.projectId}>
         <FolderGit2 className="size-3.5 shrink-0 text-info/90" aria-hidden />
         <span className="w-32 shrink-0 truncate font-medium" data-testid="member-name">
           {name}
         </span>
-        <WorktreeState repoId={member.repoId} path={member.path} />
+        <WorktreeState projectId={member.projectId} path={member.path} />
       </span>
       {/* Always shown, muted at rest; a fixed width so every member's state column ends at the same x. */}
       <span
         className="flex w-12 shrink-0 items-center justify-end opacity-55 transition-opacity group-hover/member:opacity-100 group-focus-within/member:opacity-100 group-aria-selected/member:opacity-100 has-[[aria-expanded=true]]:opacity-100"
         data-testid="member-actions"
       >
-        <RowAction label="New terminal here" testId="member-terminal" onClick={() => void newTerminalIn(member.repoId, member.path)}>
+        <RowAction label="New terminal here" testId="member-terminal" onClick={() => void newTerminalIn(member.projectId, member.path)}>
           <SquareTerminal />
         </RowAction>
         <OverflowMenu
           label="More member actions"
           testId="member-more"
-          items={[{ label: "Remove from workspace", icon: X, destructive: true, testId: "member-remove", onSelect: () => void removeFromWorkspace(workspaceId, member.repoId) }]}
+          items={[{ label: "Remove from workspace", icon: X, destructive: true, testId: "member-remove", onSelect: () => void removeFromWorkspace(workspaceId, member.projectId) }]}
         />
       </span>
     </NavRow>
@@ -128,8 +128,8 @@ function MemberRow({ workspaceId, member }: { workspaceId: string; member: Membe
 /** "Add project": the registered projects that are not members yet (workspace.add-repo). */
 function AddMember({ workspaceId }: { workspaceId: string }) {
   const ws = useWorkspacesStore((s) => s.byId[workspaceId]);
-  const addable = useReposStore(useShallow((s) => addableRepos(ws, s)));
-  const names = useReposStore(useShallow((s) => addable.map((id) => s.byId[id]?.name ?? id)));
+  const addable = useProjectsStore(useShallow((s) => addableProjects(ws, s)));
+  const names = useProjectsStore(useShallow((s) => addable.map((id) => s.byId[id]?.name ?? id)));
   const [adding, setAdding] = useState<{ id: string; name: string } | null>(null);
   const groups = useMemo<PickerGroup[]>(() => [{ heading: "Add a project", options: addable.map((id, i) => ({ value: id, label: names[i] ?? id })) }], [addable, names]);
   return (
@@ -143,9 +143,9 @@ function AddMember({ workspaceId }: { workspaceId: string }) {
       filterPlaceholder="Filter projects…"
       status={addable.length === 0 ? <p className="px-3 py-2 text-caption">Every project is a member.</p> : undefined}
       data-testid="workspace-add-member"
-      onChange={(repoId) => {
-        setAdding({ id: repoId, name: names[addable.indexOf(repoId)] ?? repoId });
-        void addToWorkspace(workspaceId, repoId).finally(() => {
+      onChange={(projectId) => {
+        setAdding({ id: projectId, name: names[addable.indexOf(projectId)] ?? projectId });
+        void addToWorkspace(workspaceId, projectId).finally(() => {
           setAdding(null);
         });
       }}
@@ -172,14 +172,14 @@ export function WorkspaceMembers({
   showAdd?: boolean;
   layout?: MembersLayout;
   threadId?: string;
-  onOpen?: (repoId: string, path: string) => void;
+  onOpen?: (projectId: string, path: string) => void;
 }) {
-  const keys = useWorkspacesStore(useShallow((s) => (s.byId[workspaceId]?.members ?? []).map((m) => `${m.repoId}\u0000${m.worktreePath}`)));
+  const keys = useWorkspacesStore(useShallow((s) => (s.byId[workspaceId]?.members ?? []).map((m) => `${m.projectId}\u0000${m.worktreePath}`)));
   const members = useMemo<Member[]>(
     () =>
       keys.map((k) => {
-        const [repoId = "", path = ""] = k.split("\u0000");
-        return { repoId, path };
+        const [projectId = "", path = ""] = k.split("\u0000");
+        return { projectId, path };
       }),
     [keys],
   );
@@ -190,7 +190,7 @@ export function WorkspaceMembers({
       ) : (
         <RowList
           rows={members}
-          rowKey={(m) => memberKey(workspaceId, m.repoId)}
+          rowKey={(m) => memberKey(workspaceId, m.projectId)}
           rowHeight={layout === "panel" ? PANEL_MEMBER_ROW_HEIGHT : MEMBER_ROW_HEIGHT}
           testId="workspace-member-list"
           render={(m) => (layout === "panel" ? <PanelMemberRow workspaceId={workspaceId} member={m} threadId={threadId} onOpen={onOpen} /> : <MemberRow workspaceId={workspaceId} member={m} />)}
