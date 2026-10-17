@@ -23,7 +23,7 @@ Every `github.poll_interval_seconds` (default 60s), one document built per cycle
 | open PRs the viewer reviewed and did not author | `s_reviewed` | `reviewed-by:@me -author:@me`, 50 (PRs also in `s_review` are dropped) |
 | PRs merged in the last 7 days involving the viewer | `s_merged` | `ISSUE_ADVANCED`, `(author OR reviewed-by OR assignee)`, 50 → `PullRequestIdentity` (no checks) |
 | each tracked repository | `r<i>` | `DefaultBranchFingerprint`: head oid, headline, committed date, rollup state and per-state counts |
-| each watched branch | `r<i>.b<j>` | `pullRequests(headRefName:, first: 10, any state)` → fingerprint; kept: the viewer's, not from a fork |
+| each watched branch | `r<i>.b<j>` | `pullRequests(headRefName:, first: 25, any state)` → fingerprint; kept: the viewer's, not from a fork (was 10 until `docs/notes/gh-detail-cache-confirm.md`) |
 | monthly stats, when due (15 min) | `mergedThis`, `mergedLast`, `mergedRecent`, `contributions`, `r<i>.history` | merged counts (`first: 0`), one two-month merged list (100) for per-repo merged counts, `contributionsCollection`, and default-branch `history(author: {id})` per tracked repo |
 
 A **fingerprint** is `id number updatedAt state headRefOid isCrossRepository author
