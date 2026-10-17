@@ -142,8 +142,13 @@ func TestEnumLabels(t *testing.T) {
 		{KeyThemeDark, "catppuccin-mocha", "Catppuccin Mocha"},
 		{KeyThemeDark, "dracula", "Dracula"},
 		{KeyThemeLight, "rose-pine-dawn", "Rosé Pine Dawn"},
-		// Fields without labels show their values as they are.
-		{KeyDensity, "compact", ""},
+		{KeyDefaultEffort, "low", "Low"},
+		{KeyDefaultEffort, "xhigh", "Extra high"},
+		{KeyDefaultEffort, "max", "Max"},
+		{KeyDensity, "compact", "Compact"},
+		{KeyThreadWidth, "full", "Full"},
+		{KeyBackdrop, "none", "None"},
+		{KeyLogLevel, "warn", "Warn"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.key+"="+tt.value, func(t *testing.T) {
@@ -190,6 +195,9 @@ var testCmds = []CommandInfo{
 	{Name: "thread.new", Title: "New Thread", Category: "Thread", Keybindings: []string{"cmd+n"}},
 	{Name: "terminal.new", Title: "New Terminal", Category: "Terminal", Keybindings: []string{"cmd+t"}},
 	{Name: "repo.refresh", Title: "Refresh", Category: "Repository"},
+	{Name: "pr.open", Title: "Open Pull Request", Category: "Pull Request"},
+	{Name: "thread.list", Title: "List Threads", Category: "Thread", NoKeybinding: true},
+	{Name: "daemon.status", Title: "Daemon Status", Category: "Daemon", NoKeybinding: true},
 }
 
 func TestResolveKeybindings(t *testing.T) {
@@ -205,6 +213,8 @@ func TestResolveKeybindings(t *testing.T) {
 			wantValue: map[string]string{"keybindings.thread.new": "cmd+n", "keybindings.repo.refresh": ""}},
 		{name: "override normalizes", cmds: testCmds, raw: map[string]string{"keybindings.repo.refresh": "Alt+Cmd+R"},
 			wantOver: map[string]string{"repo.refresh": "cmd+alt+r"}, wantValue: map[string]string{"keybindings.repo.refresh": "cmd+alt+r"}},
+		{name: "NoKeybinding command", cmds: testCmds, raw: map[string]string{"keybindings.thread.list": "cmd+y"},
+			wantOver: map[string]string{}, wantIssue: map[string]string{"keybindings.thread.list": "thread.list cannot have a keybinding"}},
 		{name: "none unbinds", cmds: testCmds, raw: map[string]string{"keybindings.thread.new": "NONE"},
 			wantOver: map[string]string{"thread.new": "none"}, wantValue: map[string]string{"keybindings.thread.new": "none"}},
 		{name: "reserved chord", cmds: testCmds, raw: map[string]string{"keybindings.thread.new": "cmd+k"},
@@ -258,13 +268,119 @@ func TestKeybindingFields(t *testing.T) {
 	for _, f := range fs {
 		keys = append(keys, f.Key)
 	}
-	// Sorted by category, then title.
-	want := []string{"keybindings.repo.refresh", "keybindings.terminal.new", "keybindings.thread.new"}
+	// Sorted by category, then title; NoKeybinding commands left out.
+	want := []string{"keybindings.pr.open", "keybindings.repo.refresh", "keybindings.terminal.new", "keybindings.thread.new"}
 	if !slices.Equal(keys, want) {
 		t.Fatalf("keys = %v, want %v", keys, want)
 	}
-	if fs[2].Default != "cmd+n" || fs[2].Type != Keybinding || fs[2].Title != "Thread: New Thread" || fs[0].Default != "" {
+	if f := fs[3]; f.Default != "cmd+n" || f.Type != Keybinding || f.Title != "New Thread" || f.Placeholder != "thread.new" ||
+		f.Page != PageKeybindings || f.Section != "thread" {
+		t.Errorf("thread.new field = %+v", f)
+	}
+	if fs[0].Section != "pull-request" || fs[1].Default != "" {
 		t.Errorf("fields = %+v", fs)
+	}
+	// No value for a command without a field.
+	if _, values, _ := resolveKeybindings(nil, testCmds); len(values) != len(fs) {
+		t.Errorf("values = %v, want one per field", values)
+	}
+
+	// The keybindings page: one section per category with a bindable command, in the
+	// palette's order; Daemon has none.
+	var secs []Section
+	for _, p := range pages(testCmds) {
+		if p.ID == PageKeybindings {
+			secs = p.Sections
+		}
+	}
+	wantSecs := []Section{{ID: "pull-request", Title: "Pull Request"}, {ID: "repository", Title: "Repository"}, {ID: "terminal", Title: "Terminal"}, {ID: "thread", Title: "Thread"}}
+	if !slices.Equal(secs, wantSecs) {
+		t.Errorf("keybinding sections = %v, want %v", secs, wantSecs)
+	}
+	if len(Pages[slices.IndexFunc(Pages, func(p Page) bool { return p.ID == PageKeybindings })].Sections) != 0 {
+		t.Errorf("pages() changed Pages")
+	}
+}
+
+// TestPages checks the display hierarchy: every field's page and section exist, every
+// section has fields, a row stays within one section, and DependsOn names a Bool field.
+func TestPages(t *testing.T) {
+	fields := append(slices.Clone(staticFields), keybindingFields(testCmds)...)
+	type ref struct{ page, section string }
+	count := map[ref]int{}
+	pageIDs := map[string]bool{}
+	for _, p := range pages(testCmds) {
+		if pageIDs[p.ID] {
+			t.Errorf("page %s declared twice", p.ID)
+		}
+		pageIDs[p.ID] = true
+		if p.Title == "" || len(p.Sections) == 0 {
+			t.Errorf("page %s: title and sections are required", p.ID)
+		}
+		for _, s := range p.Sections {
+			if _, dup := count[ref{p.ID, s.ID}]; dup {
+				t.Errorf("section %s/%s declared twice", p.ID, s.ID)
+			}
+			count[ref{p.ID, s.ID}] = 0
+		}
+		if len(p.Sections) > 1 {
+			for _, s := range p.Sections {
+				if s.Title == "" {
+					t.Errorf("section %s/%s: only a page's single section may be untitled", p.ID, s.ID)
+				}
+			}
+		}
+	}
+	byKey := map[string]Field{}
+	rowSection := map[string]ref{}
+	prevRow := ""
+	for _, f := range fields {
+		byKey[f.Key] = f
+	}
+	var prev ref
+	seen := map[ref]bool{}
+	for _, f := range fields {
+		at := ref{f.Page, f.Section}
+		n, ok := count[at]
+		if !ok {
+			t.Errorf("%s: page %q section %q is not in Pages", f.Key, f.Page, f.Section)
+			continue
+		}
+		count[at] = n + 1
+		// A section's fields are one run, so field order is display order.
+		if at != prev && seen[at] {
+			t.Errorf("%s: section %s/%s is split", f.Key, f.Page, f.Section)
+		}
+		seen[at], prev = true, at
+		if f.Row != "" {
+			if s, ok := rowSection[f.Row]; ok && (s != at || prevRow != f.Row) {
+				t.Errorf("%s: row %q is split or spans sections (%v, %v)", f.Key, f.Row, s, at)
+			}
+			rowSection[f.Row] = at
+		}
+		prevRow = f.Row
+		if f.DependsOn != "" {
+			if d, ok := byKey[f.DependsOn]; !ok || d.Type != Bool || d.DependsOn != "" {
+				t.Errorf("%s: depends on %q, want a top-level Bool field", f.Key, f.DependsOn)
+			}
+		}
+		if f.Unit != "" && f.Type != Int {
+			t.Errorf("%s: a unit on a non-Int field", f.Key)
+		}
+		if strings.Contains(f.Title, "(seconds)") {
+			t.Errorf("%s: title %q carries its unit", f.Key, f.Title)
+		}
+	}
+	for at, n := range count {
+		if n == 0 {
+			t.Errorf("section %s/%s has no fields", at.page, at.section)
+		}
+	}
+	// Every Int field measured in seconds says so with its unit.
+	for _, f := range staticFields {
+		if strings.HasSuffix(f.Key, "_seconds") && f.Unit != "s" {
+			t.Errorf("%s: unit %q, want s", f.Key, f.Unit)
+		}
 	}
 }
 

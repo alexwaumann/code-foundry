@@ -277,7 +277,7 @@ func TestSetCommandsRevalidates(t *testing.T) {
 	if !slices.Equal(snap.Issues, want) {
 		t.Errorf("issues = %v, want %v", snap.Issues, want)
 	}
-	if n := len(s.Fields()); n != len(staticFields)+len(testCmds) {
+	if n := len(s.Fields()); n != len(staticFields)+len(testCmds)-2 { // two NoKeybinding
 		t.Errorf("fields after SetCommands = %d", n)
 	}
 }

@@ -32,8 +32,27 @@ const (
 	Keybinding
 )
 
-// Group is a section of the settings page and a table in the file.
+// Group is a table in the file. Where the settings page shows a field is its Page and
+// Section, which need not follow the group.
 type Group struct {
+	ID          string
+	Title       string
+	Description string
+}
+
+// Page is one page (tab) of the settings page. Display only: pages and sections can
+// change without touching the file.
+type Page struct {
+	ID          string
+	Title       string
+	Description string
+	// Sections in display order.
+	Sections []Section
+}
+
+// Section is a titled card of fields on a page. Title is empty for a page's single
+// unnamed section.
+type Section struct {
 	ID          string
 	Title       string
 	Description string
@@ -46,8 +65,11 @@ type Field struct {
 	Title       string
 	Description string
 	Group       string
-	Type        Type
-	Enum        []string
+	// Page and Section say where the settings page shows the field (Page.ID,
+	// Section.ID).
+	Page, Section string
+	Type          Type
+	Enum          []string
 	// EnumLabels, when set, names each Enum value for display (parallel to Enum).
 	EnumLabels []string
 	// Default is the string-encoded value used when the file does not set the key.
@@ -57,6 +79,14 @@ type Field struct {
 	// Min and Max bound Int fields (inclusive).
 	Min, Max    int
 	Placeholder string
+	// Unit is the suffix shown inside a number input ("s", "pt", "%").
+	Unit string
+	// DependsOn is the key of a Bool field; while it is false the settings page shows
+	// this field indented and dimmed.
+	DependsOn string
+	// Row groups fields of one section into a single row (model and effort); the
+	// first field's description goes under the row.
+	Row string
 
 	// bind returns a pointer into s (*string, *int, or *bool) for static fields.
 	bind func(s *Settings) any
@@ -86,7 +116,46 @@ const (
 	GroupAdvanced    = "advanced"
 )
 
-// Groups in display order (also the order of tables in the file).
+// Page ids.
+const (
+	PageGeneral       = "general"
+	PageAppearance    = "appearance"
+	PageNotifications = "notifications"
+	PageSource        = "source"
+	PageKeybindings   = "keybindings"
+	PageAdvanced      = "advanced"
+)
+
+// Pages in display order. The keybindings page's sections are the command categories
+// (see Store.Pages); here it has none.
+var Pages = []Page{
+	{ID: PageGeneral, Title: "General", Sections: []Section{
+		{ID: "threads", Title: "Threads"},
+		{ID: "textgen", Title: "Text generation", Description: "Models for small side jobs such as naming a thread."},
+		{ID: "lifecycle", Title: "Lifecycle"},
+		{ID: "updates", Title: "Updates"},
+	}},
+	{ID: PageAppearance, Title: "Appearance", Description: "Applied live in every window.", Sections: []Section{
+		{ID: "theme", Title: "Theme"},
+		{ID: "window", Title: "Window"},
+		{ID: "terminal", Title: "Terminal"},
+	}},
+	{ID: PageNotifications, Title: "Notifications",
+		Description: "Dock badge and alerts for threads that need you. macOS banners aren't available to an app without a bundle.",
+		Sections:    []Section{{ID: "alerts"}}},
+	{ID: PageSource, Title: "Source control", Sections: []Section{
+		{ID: "github", Title: "GitHub", Description: "Your pull requests and default-branch checks, polled with gh's login."},
+		{ID: "repos", Title: "Repositories", Description: "Fetching, where new worktrees go, and how they open."},
+	}},
+	{ID: PageKeybindings, Title: "Keybindings",
+		Description: `Override a command's chord, or unbind it. Reserved app chords (cmd+k, cmd+b, cmd+1..9, ...) can't be bound.`},
+	{ID: PageAdvanced, Title: "Advanced", Sections: []Section{
+		{ID: "executables", Title: "Executables"},
+		{ID: "logging", Title: "Logging"},
+	}},
+}
+
+// Groups are the file's tables, in file order. The settings page follows Pages.
 var Groups = []Group{
 	{GroupThreads, "Threads", "Defaults for new threads."},
 	{GroupGitHub, "GitHub", "Your pull requests and default-branch checks, polled with gh's login."},
@@ -152,25 +221,27 @@ const (
 // KeybindingKey is the settings key of a command's keybinding override.
 func KeybindingKey(command string) string { return keybindingKeyPrefix + command }
 
-// staticFields are every field except the per-command keybindings, in display order.
+// staticFields are every field except the per-command keybindings, in display order:
+// by page and section as in Pages, then in order within a section.
 var staticFields = []Field{
+	// General › Threads.
 	{
-		Key: KeyDefaultModel, Group: GroupThreads, Type: Enum, Title: "Default model",
-		Description: "Model for new threads when none is picked. Every model runs with the 1M context window.",
+		Key: KeyDefaultModel, Group: GroupThreads, Page: PageGeneral, Section: "threads", Row: "model", Type: Enum, Title: "Model",
+		Description: "Used by new threads unless you pick otherwise. Every model runs with the 1M context window.",
 		Enum:        command.ThreadModels, EnumLabels: model.Labels(), Default: model.Default,
 		bind: func(s *Settings) any { return &s.Threads.DefaultModel },
 	},
 	{
-		Key: KeyDefaultEffort, Group: GroupThreads, Type: Enum, Title: "Default effort",
-		Description: "Effort level for new threads when none is picked.",
-		Enum:        command.ThreadEfforts, Default: "high",
+		Key: KeyDefaultEffort, Group: GroupThreads, Page: PageGeneral, Section: "threads", Row: "model", Type: Enum, Title: "Effort",
+		Description: "Effort level new threads use unless you pick otherwise.",
+		Enum:        command.ThreadEfforts, EnumLabels: effortLabels(command.ThreadEfforts), Default: "high",
 		bind: func(s *Settings) any { return &s.Threads.DefaultEffort },
 	},
 	{
 		// Read by the GUI only: the composer's "Work in" picker starts from it (a choice
 		// remembered per project wins). thread.new itself stays explicit (--new-worktree
 		// or --worktree).
-		Key: KeyDefaultWorktree, Group: GroupThreads, Type: Enum, Title: "New threads work in",
+		Key: KeyDefaultWorktree, Group: GroupThreads, Page: PageGeneral, Section: "threads", Type: Enum, Title: "New threads work in",
 		Description: "A fresh copy keeps each thread on its own branch and folder. The project folder itself edits your files in place.",
 		Enum:        []string{WorktreeNew, WorktreeCurrent},
 		EnumLabels:  []string{"A fresh copy of the project", "The project folder itself"},
@@ -178,69 +249,43 @@ var staticFields = []Field{
 		bind:        func(s *Settings) any { return &s.Threads.DefaultWorktree },
 	},
 	{
-		Key: KeyAutoName, Group: GroupThreads, Type: Bool, Title: "Name threads automatically",
-		Description: "Name a new thread from its first message with a short claude -p call.",
+		Key: KeyAutoName, Group: GroupThreads, Page: PageGeneral, Section: "threads", Type: Bool, Title: "Name threads automatically",
+		Description: "Name a new thread from its first message with a short claude -p call to the naming model.",
 		Default:     "true",
 		bind:        func(s *Settings) any { return &s.Threads.AutoName },
 	},
+	// General › Text generation.
 	{
-		Key: KeyNamingModel, Group: GroupThreads, Type: Enum, Title: "Naming model",
-		Description: "Model for the claude -p call that names a new thread. Always runs at low effort.",
+		Key: KeyNamingModel, Group: GroupThreads, Page: PageGeneral, Section: "textgen", DependsOn: KeyAutoName, Type: Enum, Title: "Naming model",
+		Description: "Names a new thread from its first message. Always runs at low effort.",
 		Enum:        command.ThreadModels, EnumLabels: model.Labels(), Default: model.NamingDefault,
 		bind: func(s *Settings) any { return &s.Threads.NamingModel },
 	},
+	// General › Lifecycle.
 	{
-		Key: KeyCacheTTL, Group: GroupThreads, Type: Int, Title: "Prompt cache lifetime (seconds)",
-		Description: "How long the Claude API in use keeps a conversation's prompt cache after its last request: 1 hour on Bedrock and the Anthropic API today (5 minutes only applies to subagents, which live inside a turn). A thread idle longer than this says its next message re-reads the whole context.",
+		Key: KeyCacheTTL, Group: GroupThreads, Page: PageGeneral, Section: "lifecycle", Unit: "s", Type: Int, Title: "Prompt cache lifetime",
+		Description: "How long the Claude API keeps a conversation's prompt cache after its last request (1 hour on Bedrock and the Anthropic API). Code Foundry uses it to predict when a thread's cache has expired; it does not change the API's behaviour.",
 		Default:     strconv.Itoa(defaultCacheTTL), Min: 60, Max: 86400,
 		bind: func(s *Settings) any { return &s.Threads.CacheTTLSeconds },
 	},
 	{
-		Key: KeyCloseGrace, Group: GroupThreads, Type: Int, Title: "Close grace (seconds)",
-		Description: "How long closing a thread waits for Claude to exit after its input is closed before terminating it.",
+		Key: KeyCloseGrace, Group: GroupThreads, Page: PageGeneral, Section: "lifecycle", Unit: "s", Type: Int, Title: "Close grace",
+		Description: "How long closing a thread waits for Claude to exit before terminating it.",
 		Default:     strconv.Itoa(defaultCloseGrace), Min: 1, Max: 120, Restart: true,
 		bind: func(s *Settings) any { return &s.Threads.CloseGraceSeconds },
 	},
+	// General › Updates.
 	{
-		Key: KeyScrollback, Group: GroupThreads, Type: Int, Title: "Scrollback lines",
-		Description: "Lines of history each terminal keeps, in the daemon and in the window.",
-		Default:     strconv.Itoa(defaultScrollback), Min: 1000, Max: 100000, Restart: true,
-		bind: func(s *Settings) any { return &s.Threads.ScrollbackLines },
+		Key: KeyUpdateChannel, Group: GroupUpdate, Page: PageGeneral, Section: "updates", Type: Enum, Title: "Channel",
+		Description: "Stable is a build promoted on purpose; tip is the newest build of main, published on every push. Switching never installs an older version.",
+		Enum:        []string{ChannelStable, ChannelTip}, EnumLabels: []string{"Stable", "Tip"}, Default: ChannelStable,
+		bind: func(s *Settings) any { return &s.Update.Channel },
 	},
-	{
-		Key: KeyGhPollInterval, Group: GroupGitHub, Type: Int, Title: "Poll interval (seconds)",
-		Description: "How often one request checks your pull requests, watched branches, and tracked default branches for changes. Details are fetched only for what changed.",
-		Default:     strconv.Itoa(defaultGhPollSeconds), Min: 15, Max: 3600,
-		bind: func(s *Settings) any { return &s.GitHub.PollIntervalSeconds },
-	},
-	{
-		Key: KeyDashboards, Group: GroupGitHub, Type: Bool, Title: "Pull request dashboards",
-		Description: "Poll your pull requests (authored, awaiting your review, reviewed, recently merged) for the Pull Requests page. Off leaves only default-branch CI and watched branches.",
-		Default:     "true",
-		bind:        func(s *Settings) any { return &s.GitHub.DashboardsEnabled },
-	},
-	{
-		Key: KeyFetchInterval, Group: GroupRepos, Type: Int, Title: "Fetch interval (seconds)",
-		Description: "How often each repository runs git fetch --prune. 0 turns background fetching off.",
-		Default:     strconv.Itoa(defaultFetchSeconds), Min: 0, Max: 86400, Restart: true,
-		bind: func(s *Settings) any { return &s.Repos.FetchIntervalSeconds },
-	},
-	{
-		Key: KeyWorktreeDir, Group: GroupRepos, Type: Path, Title: "Worktree directory",
-		Description: "Where New Worktree puts worktrees. {repo} is replaced by the repository's name. Empty uses ~/.code-foundry/worktrees/<owner>/<repo>.",
-		Placeholder: "~/worktrees/{repo}",
-		bind:        func(s *Settings) any { return &s.Repos.WorktreeDir },
-	},
-	{
-		Key: KeyEditorCommand, Group: GroupGitOps, Type: String, Title: "Editor command",
-		Description: "Command that opens a worktree (Open in Editor), e.g. \"code\" or \"open -a Zed\". {path} is replaced by the worktree path; without it the path is appended. Empty detects an editor ($VISUAL/$EDITOR if graphical, then common editors).",
-		Placeholder: "auto-detect",
-		bind:        func(s *Settings) any { return &s.GitOps.EditorCommand },
-	},
+	// Appearance › Theme.
 	{
 		// The key predates the theme slots: it is the scheme, and the slots below say which
 		// theme each scheme uses.
-		Key: KeyTheme, Group: GroupAppearance, Type: Enum, Title: "Scheme",
+		Key: KeyTheme, Group: GroupAppearance, Page: PageAppearance, Section: "theme", Type: Enum, Title: "Scheme",
 		Description: "Dark or light. System follows the macOS appearance.",
 		Enum:        []string{"system", "dark", "light"}, EnumLabels: []string{"System", "Dark", "Light"}, Default: "system",
 		bind: func(s *Settings) any { return &s.Appearance.Theme },
@@ -249,108 +294,159 @@ var staticFields = []Field{
 		func(s *Settings) any { return &s.Appearance.ThemeDark }),
 	themeField(KeyThemeLight, theme.SchemeLight, "Light theme", "Colours of the window, threads and terminals when the scheme is light.",
 		func(s *Settings) any { return &s.Appearance.ThemeLight }),
+	// Appearance › Window.
 	{
-		// The GUI bundles JetBrainsMono Nerd Font Mono (gui/frontend/public/fonts). Its own
-		// stack, used when this is empty, is DEFAULT_TERMINAL_FONT_FAMILY in src/terminal/fonts.ts.
-		Key: KeyFontFamily, Group: GroupAppearance, Type: String, Title: "Terminal font family",
-		Description: "Comma-separated font families, first available wins. JetBrainsMono Nerd Font Mono ships with the app; ui-monospace and Menlo are always appended as fallbacks.",
-		Default:     defaultFontFamily, Placeholder: defaultFontFamily,
-		bind: func(s *Settings) any { return &s.Appearance.FontFamily },
-	},
-	{
-		Key: KeyFontSize, Group: GroupAppearance, Type: Int, Title: "Terminal font size",
-		Description: "In points, before zoom.",
-		Default:     "13", Min: 9, Max: 28,
-		bind: func(s *Settings) any { return &s.Appearance.FontSize },
-	},
-	{
-		Key: KeyZoom, Group: GroupAppearance, Type: Int, Title: "Zoom",
-		Description: "Scale of the whole window in percent, terminal included. cmd+=, cmd+- and cmd+0 change it too.",
+		Key: KeyZoom, Group: GroupAppearance, Page: PageAppearance, Section: "window", Unit: "%", Type: Int, Title: "Zoom",
+		Description: "Scale of the whole window, terminal included. ⌘=, ⌘- and ⌘0 change it too.",
 		Default:     "100", Min: 90, Max: 200,
 		bind: func(s *Settings) any { return &s.Appearance.Zoom },
 	},
 	{
-		Key: KeyDensity, Group: GroupAppearance, Type: Enum, Title: "Density",
+		Key: KeyDensity, Group: GroupAppearance, Page: PageAppearance, Section: "window", Type: Enum, Title: "Density",
 		Description: "Row height and spacing in the sidebar and lists.",
-		Enum:        []string{"compact", "comfortable"}, Default: "compact",
+		Enum:        []string{"compact", "comfortable"}, EnumLabels: []string{"Compact", "Comfortable"}, Default: "compact",
 		bind: func(s *Settings) any { return &s.Appearance.Density },
 	},
 	{
-		Key: KeyThreadWidth, Group: GroupAppearance, Type: Enum, Title: "Thread width",
+		Key: KeyThreadWidth, Group: GroupAppearance, Page: PageAppearance, Section: "window", Type: Enum, Title: "Thread width",
 		Description: "Column width of a rendered thread's conversation and composer.",
-		Enum:        []string{"compact", "comfortable", "full"}, Default: "comfortable",
+		Enum:        []string{"compact", "comfortable", "full"}, EnumLabels: []string{"Compact", "Comfortable", "Full"}, Default: "comfortable",
 		bind: func(s *Settings) any { return &s.Appearance.ThreadWidth },
 	},
 	{
-		Key: KeyBackdrop, Group: GroupAppearance, Type: Enum, Title: "Backdrop",
+		Key: KeyBackdrop, Group: GroupAppearance, Page: PageAppearance, Section: "window", Type: Enum, Title: "Backdrop",
 		Description: "Faint artwork behind the start page and the new-thread composer.",
-		Enum:        []string{"forest", "none"}, Default: "forest",
+		Enum:        []string{"forest", "none"}, EnumLabels: []string{"Forest", "None"}, Default: "forest",
 		bind: func(s *Settings) any { return &s.Appearance.Backdrop },
 	},
+	// Appearance › Terminal.
 	{
-		Key: KeyDockBadge, Group: GroupNotify, Type: Bool, Title: "Dock badge",
+		// The GUI bundles JetBrainsMono Nerd Font Mono (gui/frontend/public/fonts). Its own
+		// stack, used when this is empty, is DEFAULT_TERMINAL_FONT_FAMILY in src/terminal/fonts.ts.
+		Key: KeyFontFamily, Group: GroupAppearance, Page: PageAppearance, Section: "terminal", Type: String, Title: "Font family",
+		Description: "Comma-separated font families; the first one installed wins. JetBrainsMono Nerd Font Mono ships with the app, and ui-monospace and Menlo are always appended.",
+		Default:     defaultFontFamily, Placeholder: defaultFontFamily,
+		bind: func(s *Settings) any { return &s.Appearance.FontFamily },
+	},
+	{
+		Key: KeyFontSize, Group: GroupAppearance, Page: PageAppearance, Section: "terminal", Unit: "pt", Type: Int, Title: "Font size",
+		Description: "Size of terminal text, before zoom.",
+		Default:     "13", Min: 9, Max: 28,
+		bind: func(s *Settings) any { return &s.Appearance.FontSize },
+	},
+	{
+		Key: KeyScrollback, Group: GroupThreads, Page: PageAppearance, Section: "terminal", Type: Int, Title: "Scrollback lines",
+		Description: "Lines of history each terminal keeps, in the daemon and in the window.",
+		Default:     strconv.Itoa(defaultScrollback), Min: 1000, Max: 100000, Restart: true,
+		bind: func(s *Settings) any { return &s.Threads.ScrollbackLines },
+	},
+	// Notifications.
+	{
+		Key: KeyDockBadge, Group: GroupNotify, Page: PageNotifications, Section: "alerts", Type: Bool, Title: "Dock badge",
 		Description: "Show how many threads need attention (waiting on you or finished) on the Dock icon.",
 		Default:     "true",
 		bind:        func(s *Settings) any { return &s.Notifications.DockBadge },
 	},
 	{
-		Key: KeyBounce, Group: GroupNotify, Type: Bool, Title: "Bounce the Dock icon",
-		Description: "Bounce the Dock icon once when a thread starts needing attention while Code Foundry is not the active app.",
+		Key: KeyBounce, Group: GroupNotify, Page: PageNotifications, Section: "alerts", Type: Bool, Title: "Bounce the Dock icon",
+		Description: "Bounce once when a thread starts needing attention while Code Foundry is not the active app.",
 		Default:     "true",
 		bind:        func(s *Settings) any { return &s.Notifications.Bounce },
 	},
 	{
-		Key: KeySound, Group: GroupNotify, Type: Bool, Title: "Alert sound",
+		Key: KeySound, Group: GroupNotify, Page: PageNotifications, Section: "alerts", Type: Bool, Title: "Alert sound",
 		Description: "Play a short sound when a thread starts needing attention while Code Foundry is not the active app.",
 		Default:     "false",
 		bind:        func(s *Settings) any { return &s.Notifications.Sound },
 	},
 	{
-		Key: KeySoundVolume, Group: GroupNotify, Type: Int, Title: "Alert volume",
-		Description: "Loudness of the alert sound, as a share (percent) of the Mac's output volume.",
+		Key: KeySoundVolume, Group: GroupNotify, Page: PageNotifications, Section: "alerts", DependsOn: KeySound, Unit: "%", Type: Int, Title: "Alert volume",
+		Description: "Loudness of the alert sound, as a share of the Mac's output volume.",
 		Default:     strconv.Itoa(defaultSoundVolume), Min: 0, Max: 100,
 		bind: func(s *Settings) any { return &s.Notifications.SoundVolume },
 	},
 	{
-		Key: KeyAlertCooldown, Group: GroupNotify, Type: Int, Title: "Alert cooldown (seconds)",
-		Description: "Minimum gap between alerts (bounce and sound). Alerts during the cooldown are skipped; the badge still updates. 0 alerts every time.",
+		Key: KeyAlertCooldown, Group: GroupNotify, Page: PageNotifications, Section: "alerts", Unit: "s", Type: Int, Title: "Alert cooldown",
+		Description: "Minimum gap between alerts (bounce and sound); the badge still updates. 0 alerts every time.",
 		Default:     strconv.Itoa(defaultAlertCooldown), Min: 0, Max: 3600,
 		bind: func(s *Settings) any { return &s.Notifications.CooldownSeconds },
 	},
+	// Source control › GitHub.
 	{
-		Key: KeyUpdateChannel, Group: GroupUpdate, Type: Enum, Title: "Channel",
-		Description: "Stable is a build promoted on purpose; tip is the newest build of main, published on every push. Switching never installs an older version: going from tip to stable keeps your build until the next stable release passes it.",
-		Enum:        []string{ChannelStable, ChannelTip}, EnumLabels: []string{"Stable", "Tip"}, Default: ChannelStable,
-		bind: func(s *Settings) any { return &s.Update.Channel },
+		Key: KeyDashboards, Group: GroupGitHub, Page: PageSource, Section: "github", Type: Bool, Title: "Pull request dashboards",
+		Description: "Poll your pull requests (authored, awaiting your review, reviewed, recently merged) for the Pull Requests page. Off leaves only default-branch CI and watched branches.",
+		Default:     "true",
+		bind:        func(s *Settings) any { return &s.GitHub.DashboardsEnabled },
 	},
 	{
-		Key: KeyClaudePath, Group: GroupAdvanced, Type: Path, Title: "claude executable",
+		Key: KeyGhPollInterval, Group: GroupGitHub, Page: PageSource, Section: "github", Unit: "s", Type: Int, Title: "Poll interval",
+		Description: "How often one request checks your pull requests, watched branches and tracked default branches for changes. Details are fetched only for what changed.",
+		Default:     strconv.Itoa(defaultGhPollSeconds), Min: 15, Max: 3600,
+		bind: func(s *Settings) any { return &s.GitHub.PollIntervalSeconds },
+	},
+	// Source control › Repositories.
+	{
+		Key: KeyFetchInterval, Group: GroupRepos, Page: PageSource, Section: "repos", Unit: "s", Type: Int, Title: "Fetch interval",
+		Description: "How often each repository runs git fetch --prune. 0 turns background fetching off.",
+		Default:     strconv.Itoa(defaultFetchSeconds), Min: 0, Max: 86400, Restart: true,
+		bind: func(s *Settings) any { return &s.Repos.FetchIntervalSeconds },
+	},
+	{
+		Key: KeyWorktreeDir, Group: GroupRepos, Page: PageSource, Section: "repos", Type: Path, Title: "Worktree directory",
+		Description: "Where New Worktree puts worktrees; {repo} is the repository's name. Empty uses ~/.code-foundry/worktrees/<owner>/<repo>.",
+		Placeholder: "~/worktrees/{repo}",
+		bind:        func(s *Settings) any { return &s.Repos.WorktreeDir },
+	},
+	{
+		Key: KeyEditorCommand, Group: GroupGitOps, Page: PageSource, Section: "repos", Type: String, Title: "Editor command",
+		Description: "Opens a worktree (Open in Editor), e.g. \"code\" or \"open -a Zed\"; {path} is the worktree path, else the path is appended. Empty detects an editor ($VISUAL/$EDITOR if graphical, then common editors).",
+		Placeholder: "auto-detect",
+		bind:        func(s *Settings) any { return &s.GitOps.EditorCommand },
+	},
+	// Advanced.
+	{
+		Key: KeyClaudePath, Group: GroupAdvanced, Page: PageAdvanced, Section: "executables", Type: Path, Title: "claude executable",
 		Description: "Absolute path to claude. Empty finds it on PATH.",
 		Placeholder: "claude (from PATH)", Restart: true, check: checkExecutable,
 		bind: func(s *Settings) any { return &s.Advanced.ClaudePath },
 	},
 	{
-		Key: KeyGhPath, Group: GroupAdvanced, Type: Path, Title: "gh executable",
+		Key: KeyGhPath, Group: GroupAdvanced, Page: PageAdvanced, Section: "executables", Type: Path, Title: "gh executable",
 		Description: "Absolute path to gh. Empty finds it on PATH or in Homebrew's locations.",
 		Placeholder: "gh (from PATH)", Restart: true, check: checkExecutable,
 		bind: func(s *Settings) any { return &s.Advanced.GhPath },
 	},
 	{
-		Key: KeyLogLevel, Group: GroupAdvanced, Type: Enum, Title: "Log level",
+		Key: KeyLogLevel, Group: GroupAdvanced, Page: PageAdvanced, Section: "logging", Type: Enum, Title: "Log level",
 		Description: "Minimum level written to the daemon's log file (logs/daemon.log).",
-		Enum:        []string{"debug", "info", "warn", "error"}, Default: "info",
+		Enum:        []string{"debug", "info", "warn", "error"}, EnumLabels: []string{"Debug", "Info", "Warn", "Error"}, Default: "info",
 		bind: func(s *Settings) any { return &s.Advanced.LogLevel },
 	},
 }
 
-// themeField is a theme slot: an Enum of the scheme's themes from the GUI's catalog
-// (internal/theme), labelled with their names. A theme of the other scheme is refused
-// with a message that says so. A value on disk the catalog no longer has (a theme removed
-// later) falls back to the default like any rejected value: reported in Issues and logged
-// at start, the file left as it is.
+// effortLabels names effort levels for display ("xhigh" is "Extra high", like the
+// composer's picker).
+func effortLabels(efforts []string) []string {
+	out := make([]string, len(efforts))
+	for i, e := range efforts {
+		switch e {
+		case "xhigh":
+			out[i] = "Extra high"
+		default:
+			out[i] = strings.ToUpper(e[:1]) + e[1:]
+		}
+	}
+	return out
+}
+
+// themeField is a theme slot on Appearance › Theme: an Enum of the scheme's themes from
+// the GUI's catalog (internal/theme), labelled with their names. A theme of the other
+// scheme is refused with a message that says so. A value on disk the catalog no longer
+// has (a theme removed later) falls back to the default like any rejected value:
+// reported in Issues and logged at start, the file left as it is.
 func themeField(key, scheme, title, desc string, bind func(s *Settings) any) Field {
 	return Field{
-		Key: key, Group: GroupAppearance, Type: Enum, Title: title, Description: desc,
+		Key: key, Group: GroupAppearance, Page: PageAppearance, Section: "theme", Type: Enum, Title: title, Description: desc,
 		Enum: theme.IDs(scheme), EnumLabels: theme.Names(scheme), Default: theme.Default(scheme),
 		bind:     bind,
 		unlisted: func(v string) error { return theme.Check(v, scheme) },
@@ -364,11 +460,13 @@ type CommandInfo struct {
 	Description string
 	Category    string
 	Keybindings []string
+	// NoKeybinding: a chord is no use for the command (command.Command.NoKeybinding).
+	// It gets no keybinding field, and an override for it is rejected.
+	NoKeybinding bool
 }
 
-// keybindingFields returns one Keybinding field per command, sorted by category then
-// title like the palette.
-func keybindingFields(cmds []CommandInfo) []Field {
+// sortCommands sorts commands by category, then title, like the palette.
+func sortCommands(cmds []CommandInfo) []CommandInfo {
 	sorted := slices.Clone(cmds)
 	slices.SortFunc(sorted, func(a, b CommandInfo) int {
 		if c := strings.Compare(a.Category, b.Category); c != 0 {
@@ -376,16 +474,54 @@ func keybindingFields(cmds []CommandInfo) []Field {
 		}
 		return strings.Compare(a.Title, b.Title)
 	})
-	out := make([]Field, 0, len(sorted))
-	for _, c := range sorted {
+	return sorted
+}
+
+// categorySection is the keybindings page's section id for a command category: the
+// category lowercased, spaces as dashes ("Pull Request" -> "pull-request").
+func categorySection(category string) string {
+	return strings.ReplaceAll(strings.ToLower(strings.TrimSpace(category)), " ", "-")
+}
+
+// keybindingFields returns one Keybinding field per bindable command, sorted by
+// category then title like the palette. Each is in the keybindings page's section for
+// its category, titled with the command's title alone.
+func keybindingFields(cmds []CommandInfo) []Field {
+	out := make([]Field, 0, len(cmds))
+	for _, c := range sortCommands(cmds) {
+		if c.NoKeybinding {
+			continue
+		}
 		def := ""
 		if len(c.Keybindings) > 0 {
 			def, _ = command.NormalizeChord(c.Keybindings[0])
 		}
 		out = append(out, Field{
-			Key: KeybindingKey(c.Name), Group: GroupKeybindings, Type: Keybinding,
-			Title: c.Category + ": " + c.Title, Description: c.Description, Default: def, Placeholder: c.Name,
+			Key: KeybindingKey(c.Name), Group: GroupKeybindings, Page: PageKeybindings, Section: categorySection(c.Category),
+			Type: Keybinding, Title: c.Title, Description: c.Description, Default: def, Placeholder: c.Name,
 		})
+	}
+	return out
+}
+
+// pages returns Pages with the keybindings page's sections filled in: one per category
+// that has a bindable command, in the palette's order (by category).
+func pages(cmds []CommandInfo) []Page {
+	var kb []Section
+	for _, c := range sortCommands(cmds) {
+		id := categorySection(c.Category)
+		if c.NoKeybinding || (len(kb) > 0 && kb[len(kb)-1].ID == id) {
+			continue
+		}
+		kb = append(kb, Section{ID: id, Title: c.Category})
+	}
+	out := make([]Page, len(Pages))
+	for i, p := range Pages {
+		p.Sections = slices.Clone(p.Sections)
+		if p.ID == PageKeybindings {
+			p.Sections = kb
+		}
+		out[i] = p
 	}
 	return out
 }

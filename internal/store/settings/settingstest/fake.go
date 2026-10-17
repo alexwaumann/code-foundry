@@ -48,6 +48,9 @@ func (f *Fake) Snapshot() *settings.Snapshot { return f.store.Snapshot() }
 // Fields implements settings.Service.
 func (f *Fake) Fields() []settings.Field { return f.store.Fields() }
 
+// Pages implements settings.Service.
+func (f *Fake) Pages() []settings.Page { return f.store.Pages() }
+
 // Update implements settings.Service and records the call.
 func (f *Fake) Update(ctx context.Context, partial map[string]string) (*settings.Snapshot, error) {
 	f.mu.Lock()

@@ -125,6 +125,10 @@ const fileHeader = `# code-foundry settings.
 # Saving from the app rewrites this file: comments you add and unknown keys are not kept.
 `
 
+// unitWords spells a field's Unit out for the file's comments, which have no input to
+// show it in (" seconds" in "Range 60 to 86400 seconds.").
+var unitWords = map[string]string{"s": " seconds", "pt": " points", "%": " percent"}
+
 // render produces the file for the accepted values (canonical, keyed by settings key).
 // Every static field is listed with its description; unset ones are commented out at
 // their default. Keybinding overrides are listed under [keybindings].
@@ -154,7 +158,7 @@ func render(accepted map[string]string) []byte {
 				desc += " One of: " + enumList(f.Enum) + "."
 			}
 			if f.Type == Int {
-				desc += fmt.Sprintf(" Range %d to %d.", f.Min, f.Max)
+				desc += fmt.Sprintf(" Range %d to %d%s.", f.Min, f.Max, unitWords[f.Unit])
 			}
 			if f.Restart {
 				desc += " Applies after a daemon restart."
