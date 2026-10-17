@@ -37,6 +37,11 @@ message WatchEventsRequest {
   // two apart by the first event: a replayed or live event has seq > 0, a snapshot 0.
   // Zero: no resume.
   uint64 since_seq = 2;
+  // The Event.epoch since_seq was read under. When set and not the daemon's current
+  // epoch (the daemon restarted since), since_seq is ignored and the stream starts with
+  // snapshots. Empty: since_seq alone decides (after a restart a seq below the new
+  // counter would "resume" with unrelated events; pass the epoch).
+  string since_epoch = 3;
 }
 
 enum EventSource {
@@ -92,4 +97,9 @@ message Event {
   // and heartbeats carry 0: they are not resumable. Pass the last seq applied as
   // WatchEventsRequest.since_seq to resume.
   uint64 seq = 20;
+  // The daemon instance the event comes from: a random id drawn when the daemon
+  // starts, the same on every event of its lifetime (snapshots and heartbeats too).
+  // seq values compare only within one epoch: pass it as
+  // WatchEventsRequest.since_epoch with since_seq.
+  string epoch = 21;
 }
