@@ -71,6 +71,13 @@ const ViewPanelUsage = "panel.usage"
 // ignores it.
 const ViewPanelWorktree = "panel.worktree"
 
+// ViewPanelThreads is the ShowView name that opens (or reveals) the Threads surface in
+// the side panel of the selected thread: its lineage, the thread whose agent created it,
+// its siblings and the threads created from it (docs/notes/agents-3-lineage-gui.md). An
+// action on per-selection GUI state like ViewPanelUsage; a window whose selection is not
+// a thread ignores it.
+const ViewPanelThreads = "panel.threads"
+
 // hasWorkspaceThreadContext is view.panel.workspace's availability: a thread is active
 // and it belongs to a workspace (the GUI passes the thread's workspace as
 // ActiveWorkspaceID; the CLI with --context-thread and --context-workspace).
@@ -95,7 +102,8 @@ func hasWorktreeThreadContext(c Context) bool {
 // view.panel.new-tab, which shows its surface list to open another tab, and
 // view.panel.workspace, which opens the workspace surface in it,
 // view.panel.linked-prs, which opens the thread's linked pull requests in it,
-// view.panel.usage, which opens the thread's usage in it, and
+// view.panel.usage, which opens the thread's usage in it,
+// view.panel.threads, which opens the thread's lineage in it, and
 // view.panel.worktree, which opens the thread's own worktree in it (all emitted as
 // UiIntent.ShowView). Links open through view.open.url (RegisterGitOps).
 func RegisterView(r *Registry, e Emitter) error {
@@ -224,6 +232,19 @@ func RegisterView(r *Registry, e Emitter) error {
 			When: hasThread,
 			Run: func(context.Context, Context, Args) (Result, error) {
 				return show(ViewPanelUsage), nil
+			},
+		},
+		Command{
+			Name:  "view.panel.threads",
+			Title: "Show Related Threads in Side Panel",
+			Description: "Open the Threads surface in the selected thread's side panel: " +
+				"the thread whose agent created it, its siblings and the threads created from it, with status, place and brief.",
+			Category: "View",
+			// No default chord, like view.panel.usage (H opens it while the panel has focus).
+			// Available for any thread, even one no agent created and that created none.
+			When: hasThread,
+			Run: func(context.Context, Context, Args) (Result, error) {
+				return show(ViewPanelThreads), nil
 			},
 		},
 		Command{
