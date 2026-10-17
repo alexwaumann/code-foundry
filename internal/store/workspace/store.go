@@ -35,7 +35,7 @@ type Options struct {
 	// state: the daemon's worktreeThreads). Removing a member
 	// worktree a thread is on is refused. Nil: none.
 	Threads func() []Thread
-	// Trust pre-trusts a new member worktree for Claude, as a session's worktree is
+	// Trust pre-trusts a new member worktree for Claude, as a thread's worktree is
 	// before claude starts. Nil skips it. A failure is logged, not returned.
 	Trust func(dir string) error
 	// WorktreePath, when set, picks the path of a member worktree for branch in r; ""

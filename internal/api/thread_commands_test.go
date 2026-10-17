@@ -11,18 +11,18 @@ import (
 	"connectrpc.com/connect"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
-	"github.com/alexwaumann/code-foundry/internal/store/session"
+	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
 
 func TestSlashCommandsToProto(t *testing.T) {
 	tests := []struct {
 		name string
-		in   []session.SlashCommand
+		in   []thread.SlashCommand
 		want []string // name|hint|aliases|builtin
 	}{
 		{"none", nil, nil},
-		{"empty", []session.SlashCommand{}, nil},
-		{"fields", []session.SlashCommand{
+		{"empty", []thread.SlashCommand{}, nil},
+		{"fields", []thread.SlashCommand{
 			{Name: "loop", Description: "Run on an interval", ArgumentHint: "[interval] [prompt]", Aliases: []string{"proactive"}, Builtin: true},
 			{Name: "mine", Description: "Mine (user)"},
 		}, []string{"loop|[interval] [prompt]|[proactive]|true", "mine||[]|false"}},
@@ -48,9 +48,9 @@ func TestSlashCommandsToProto(t *testing.T) {
 
 func TestThreadSlashCommands(t *testing.T) {
 	fake, c := newThreadServer(t)
-	fake.Put(session.Session{ID: "s1", State: session.StateConnected})
-	fake.PutItems("s1", session.Item{ID: "u1", Kind: session.KindUserMessage, Text: "hi"})
-	list := []session.SlashCommand{
+	fake.Put(thread.Thread{ID: "s1", State: thread.StateConnected})
+	fake.PutItems("s1", thread.Item{ID: "u1", Kind: thread.KindUserMessage, Text: "hi"})
+	list := []thread.SlashCommand{
 		{Name: "compact", Description: "Free up context", ArgumentHint: "<optional custom summarization instructions>", Builtin: true},
 		{Name: "deploy", Description: "Deploy it (project)"},
 	}
@@ -58,15 +58,15 @@ func TestThreadSlashCommands(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if _, err := c.SlashCommands(ctx, connect.NewRequest(&v1.SlashCommandsRequest{SessionId: "nope"})); connect.CodeOf(err) != connect.CodeNotFound {
+	if _, err := c.SlashCommands(ctx, connect.NewRequest(&v1.SlashCommandsRequest{ThreadId: "nope"})); connect.CodeOf(err) != connect.CodeNotFound {
 		t.Errorf("unknown thread: %v", err)
 	}
-	got, err := c.SlashCommands(ctx, connect.NewRequest(&v1.SlashCommandsRequest{SessionId: "s1"}))
+	got, err := c.SlashCommands(ctx, connect.NewRequest(&v1.SlashCommandsRequest{ThreadId: "s1"}))
 	if err != nil || len(got.Msg.GetCommands()) != 2 || got.Msg.GetCommands()[1].GetName() != "deploy" {
 		t.Fatalf("SlashCommands %v %v", got, err)
 	}
 
-	stream, err := c.Watch(ctx, connect.NewRequest(&v1.WatchThreadRequest{SessionId: "s1"}))
+	stream, err := c.WatchThread(ctx, connect.NewRequest(&v1.WatchThreadRequest{ThreadId: "s1"}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,8 +84,8 @@ func TestThreadSlashCommands(t *testing.T) {
 	}
 
 	// Claude pushes a new list.
-	fake.PutSlashCommands("s1", append(slices.Clone(list), session.SlashCommand{Name: "beta", Description: "Found (project)"}))
-	if ev := next().GetCommands(); ev.GetSessionId() != "s1" || ev.GetSeq() != 3 || len(ev.GetCommands()) != 3 || ev.GetCommands()[2].GetName() != "beta" {
+	fake.PutSlashCommands("s1", append(slices.Clone(list), thread.SlashCommand{Name: "beta", Description: "Found (project)"}))
+	if ev := next().GetCommands(); ev.GetThreadId() != "s1" || ev.GetSeq() != 3 || len(ev.GetCommands()) != 3 || ev.GetCommands()[2].GetName() != "beta" {
 		t.Errorf("push event %v", ev)
 	}
 	// The process ends: an empty list.
@@ -93,7 +93,7 @@ func TestThreadSlashCommands(t *testing.T) {
 	if ev := next().GetCommands(); ev == nil || ev.GetSeq() != 4 || len(ev.GetCommands()) != 0 {
 		t.Errorf("drop event %v", ev)
 	}
-	none, err := c.SlashCommands(ctx, connect.NewRequest(&v1.SlashCommandsRequest{SessionId: "s1"}))
+	none, err := c.SlashCommands(ctx, connect.NewRequest(&v1.SlashCommandsRequest{ThreadId: "s1"}))
 	if err != nil || len(none.Msg.GetCommands()) != 0 {
 		t.Errorf("not running %v %v", none, err)
 	}
@@ -102,7 +102,7 @@ func TestThreadSlashCommands(t *testing.T) {
 // A refused slash command reaches the client as InvalidArgument whose message is the
 // refusal alone (the GUI shows it under the composer).
 func TestSlashRefusalError(t *testing.T) {
-	err := sessionError(&session.SlashRefusal{Command: "clear", Replaces: "clear", Message: "Start a new thread instead of clearing this one."})
+	err := threadError(&thread.SlashRefusal{Command: "clear", Replaces: "clear", Message: "Start a new thread instead of clearing this one."})
 	var ce *connect.Error
 	if !errors.As(err, &ce) || ce.Code() != connect.CodeInvalidArgument || ce.Message() != "Start a new thread instead of clearing this one." {
 		t.Errorf("mapped to %v", err)

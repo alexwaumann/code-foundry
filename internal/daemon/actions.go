@@ -11,7 +11,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/store/action"
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
-	"github.com/alexwaumann/code-foundry/internal/store/session"
+	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
 
 // actionRuns is the part of the action store the cleanup drives. *action.Manager
@@ -26,9 +26,9 @@ type actionRuns interface {
 //
 //   - a project is unregistered (repo.RepoRemoved): its actions are forgotten (the
 //     database cascades) and its runs killed and forgotten;
-//   - a thread is removed (session.Removed), archived or snoozed (session.Updated with
+//   - a thread is removed (thread.Removed), archived or snoozed (thread.Updated with
 //     ArchivedAt or SnoozedUntil set): its background runs are killed, as its action
-//     terminals are by the session store;
+//     terminals are by the thread store;
 //   - a worktree's directory is removed (repo.WorktreeRemoved, directory gone): the
 //     background runs in it are killed.
 //
@@ -43,11 +43,11 @@ func startActionCleanup(ctx context.Context, log *slog.Logger, runs actionRuns, 
 func startActionCleanupWith(ctx context.Context, log *slog.Logger, runs actionRuns, b *bus.Bus, dirGone func(string) bool) func() {
 	ctx, cancel := context.WithCancel(ctx)
 	repoEvents := bus.Subscribe[repo.Event](b, 256)
-	sessionEvents := bus.Subscribe[session.Event](b, 256)
+	threadListEvents := bus.Subscribe[thread.Event](b, 256)
 	var wg sync.WaitGroup
 	wg.Go(func() {
 		defer repoEvents.Close()
-		defer sessionEvents.Close()
+		defer threadListEvents.Close()
 		kill := func(why string, match func(action.Run) bool) {
 			if n := runs.KillRuns(match); n > 0 {
 				log.Info("killed background action runs", "why", why, "count", n)
@@ -66,17 +66,17 @@ func startActionCleanupWith(ctx context.Context, log *slog.Logger, runs actionRu
 						kill("worktree removed", func(r action.Run) bool { return r.Worktree == e.Path })
 					}
 				}
-			case ev := <-sessionEvents.C():
+			case ev := <-threadListEvents.C():
 				switch e := ev.(type) {
-				case session.Removed:
-					kill("thread removed", func(r action.Run) bool { return r.SessionID == e.ID })
-				case session.Updated:
-					id := e.Session.ID
+				case thread.Removed:
+					kill("thread removed", func(r action.Run) bool { return r.ThreadID == e.ID })
+				case thread.Updated:
+					id := e.Thread.ID
 					switch {
-					case !e.Session.ArchivedAt.IsZero():
-						kill("thread archived", func(r action.Run) bool { return r.SessionID == id })
-					case !e.Session.SnoozedUntil.IsZero():
-						kill("thread snoozed", func(r action.Run) bool { return r.SessionID == id })
+					case !e.Thread.ArchivedAt.IsZero():
+						kill("thread archived", func(r action.Run) bool { return r.ThreadID == id })
+					case !e.Thread.SnoozedUntil.IsZero():
+						kill("thread snoozed", func(r action.Run) bool { return r.ThreadID == id })
 					}
 				}
 			}

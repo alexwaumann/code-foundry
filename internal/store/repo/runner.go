@@ -107,7 +107,7 @@ func (r ExecRunner) Run(ctx context.Context, dir string, args ...string) ([]byte
 	cmd.Dir = dir
 	cmd.Env = gitEnv(os.Environ())
 	cmd.Stdin = nil // /dev/null
-	// A new session has no controlling terminal, so neither git nor ssh can open
+	// A new thread has no controlling terminal, so neither git nor ssh can open
 	// /dev/tty to prompt for a password or host key, even when the daemon runs in a
 	// terminal with --dev.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}

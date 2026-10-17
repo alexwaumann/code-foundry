@@ -55,7 +55,7 @@ func TestEndpointFromEnv(t *testing.T) {
 }
 
 // With an endpoint, Connect uses it even when the socket path leads nowhere, which is
-// what a sandboxed session sees.
+// what a sandboxed thread sees.
 func TestConnectPrefersEndpoint(t *testing.T) {
 	p := shortHome(t)
 	startDaemon(t, p)

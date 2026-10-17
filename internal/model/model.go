@@ -1,5 +1,5 @@
 // Package model is the one list of Claude models the app offers: the composer's model
-// picker, the settings page's "Default model", and session.new's --model all read it.
+// picker, the settings page's "Default model", and thread.new's --model all read it.
 // Update the list here when Claude Code's models change; nothing else hardcodes them.
 //
 // Pricing (internal/pricing) is a different concern: it keys on the canonical ids Claude
@@ -23,7 +23,7 @@ type Model struct {
 // account's default is, which may not be the 1M variant.
 //
 // The 5.5 entries are listed before managed settings offer them, so they show up
-// without an app update; until then picking one fails at session start.
+// without an app update; until then picking one fails at thread start.
 // claude-4.5-haiku[1m] is the id the work Bedrock setup accepts; claude-haiku-4-5 is
 // refused there. Edit this list to add or retire models.
 var registry = []Model{
@@ -40,8 +40,8 @@ var registry = []Model{
 // Default is the model for new threads when the settings do not pick one.
 const Default = "claude-opus-4-8[1m]"
 
-// NamingDefault is the model of the claude -p call that names a new session when the
-// settings (sessions.naming_model) do not pick one. Sonnet until Haiku 5.5 is
+// NamingDefault is the model of the claude -p call that names a new thread when the
+// settings (threads.naming_model) do not pick one. Sonnet until Haiku 5.5 is
 // available everywhere the app runs.
 const NamingDefault = "claude-sonnet-5[1m]"
 
@@ -72,7 +72,7 @@ func Known(value string) bool {
 }
 
 // Label returns value's label, or value itself when the registry does not list it (the
-// SessionService API accepts any full model name).
+// ThreadService API accepts any full model name).
 func Label(value string) string {
 	for _, m := range registry {
 		if m.Value == value {

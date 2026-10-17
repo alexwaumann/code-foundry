@@ -21,10 +21,10 @@ const base: Omit<SettingFieldView, "key" | "title" | "type"> = {
   max: 0,
   placeholder: "",
 };
-const bool: SettingFieldView = { ...base, key: "sessions.auto_name", title: "Auto name", type: "bool", defaultValue: "true" };
+const bool: SettingFieldView = { ...base, key: "threads.auto_name", title: "Auto name", type: "bool", defaultValue: "true" };
 // "" (no preference) is a value of its own; Radix Select cannot hold it as an item.
 const theme: SettingFieldView = { ...base, key: "appearance.theme", title: "Theme", type: "enum", enumValues: ["", "light", "dark"], defaultValue: "light" };
-const text: SettingFieldView = { ...base, key: "sessions.branch_prefix", title: "Branch prefix", type: "string", defaultValue: "cf/" };
+const text: SettingFieldView = { ...base, key: "threads.branch_prefix", title: "Branch prefix", type: "string", defaultValue: "cf/" };
 
 function setValues(values: Record<string, string>): void {
   useSettingsStore.setState({ snapshot: { values, path: "", revision: 1, loadError: "", issues: [], restartPending: [] } });

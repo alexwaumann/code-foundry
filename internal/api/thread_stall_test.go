@@ -8,7 +8,7 @@ import (
 	"connectrpc.com/connect"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
-	"github.com/alexwaumann/code-foundry/internal/store/session"
+	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
 
 // threadWatchIdleBudget is how long an idle ThreadService.Watch may stay silent in the
@@ -23,11 +23,11 @@ const threadWatchIdleBudget = 8 * time.Second
 // the held tail, and give the client something to detect a dead stream with.
 func TestThreadWatchIdleHeartbeat(t *testing.T) {
 	fake, c := newThreadServer(t)
-	fake.Put(session.Session{ID: "s1", State: session.StateConnected})
-	fake.PutItems("s1", session.Item{ID: "u1", Kind: session.KindUserMessage, Text: "hi"})
+	fake.Put(thread.Thread{ID: "s1", State: thread.StateConnected})
+	fake.PutItems("s1", thread.Item{ID: "u1", Kind: thread.KindUserMessage, Text: "hi"})
 	ctx, cancel := context.WithTimeout(context.Background(), threadWatchIdleBudget+5*time.Second)
 	defer cancel()
-	stream, err := c.Watch(ctx, connect.NewRequest(&v1.WatchThreadRequest{SessionId: "s1"}))
+	stream, err := c.WatchThread(ctx, connect.NewRequest(&v1.WatchThreadRequest{ThreadId: "s1"}))
 	if err != nil {
 		t.Fatal(err)
 	}

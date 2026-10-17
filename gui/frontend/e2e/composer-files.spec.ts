@@ -35,7 +35,7 @@ const tags = (page: Page) => page.getByTestId("prompt-tag");
 const tip = (page: Page) => page.getByTestId("prompt-tag-tooltip").locator("p").first();
 
 async function newThreads(): Promise<number> {
-  return (await invocations()).filter((i) => i.name === "session.new").length;
+  return (await invocations()).filter((i) => i.name === "thread.new").length;
 }
 
 /** The mock's SearchFiles calls ("search <repo> <query>"). */

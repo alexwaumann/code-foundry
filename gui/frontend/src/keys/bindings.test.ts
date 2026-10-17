@@ -103,9 +103,9 @@ describe("handleKeyDown precedence", () => {
         cmd({ name: "terminal.new", keybindings: ["cmd+t"] }),
         cmd({ name: "terminal.clear", keybindings: ["ctrl+l"] }),
         cmd({ name: "edit.copy", keybindings: ["cmd+c"] }),
-        cmd({ name: "session.new", keybindings: ["cmd+n"], available: false, args: [{ name: "model", type: "enum", required: true, description: "", enumValues: ["opus"], defaultValue: "" }] }),
+        cmd({ name: "thread.new", keybindings: ["cmd+n"], available: false, args: [{ name: "model", type: "enum", required: true, description: "", enumValues: ["opus"], defaultValue: "" }] }),
         cmd({ name: "worktree.create", keybindings: ["cmd+alt+n"], args: [{ name: "branch", type: "string", required: true, description: "", enumValues: [], defaultValue: "" }] }),
-        cmd({ name: "session.rename", keybindings: ["cmd+r"], args: [{ name: "name", type: "string", required: true, description: "", enumValues: [], defaultValue: "" }] }),
+        cmd({ name: "thread.rename", keybindings: ["cmd+r"], args: [{ name: "name", type: "string", required: true, description: "", enumValues: [], defaultValue: "" }] }),
       ],
     });
     useSessionsStore.setState({ byId: {}, order: [] });
@@ -191,7 +191,7 @@ describe("handleKeyDown precedence", () => {
     });
   });
 
-  it("session.rename's chord starts the inline rename instead of the palette", () => {
+  it("thread.rename's chord starts the inline rename instead of the palette", () => {
     useSessionsStore.setState({ byId: { s1: session("s1") }, order: ["s1"] });
     useUiStore.setState({ selection: { kind: "session", id: "s1" } });
     press(terminal, { key: "r", code: "KeyR", metaKey: true });
@@ -313,7 +313,7 @@ describe("handleKeyDown precedence", () => {
     expect(useUiStore.getState().palette).toMatchObject({ open: true, commandName: "worktree.create", page: "commands" });
   });
 
-  it("session.new's chord opens the project picker, even where the daemon lists it unavailable", async () => {
+  it("thread.new's chord opens the project picker, even where the daemon lists it unavailable", async () => {
     const e = press(terminal, { key: "n", code: "KeyN", metaKey: true });
     expect(e.defaultPrevented).toBe(true);
     await Promise.resolve();

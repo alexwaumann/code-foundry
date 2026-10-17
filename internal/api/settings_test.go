@@ -23,7 +23,7 @@ func newSettingsFake(t *testing.T, b *bus.Bus) (*settingstest.Fake, string) {
 	t.Helper()
 	dir := t.TempDir()
 	f, err := settingstest.New(context.Background(), dir, b, []settings.CommandInfo{
-		{Name: "session.new", Title: "New Session", Category: "Session", Keybindings: []string{"cmd+n"}},
+		{Name: "thread.new", Title: "New Thread", Category: "Thread", Keybindings: []string{"cmd+n"}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -48,10 +48,10 @@ func TestSettingsService(t *testing.T) {
 	if fs := byKey["appearance.font_size"]; fs.GetType() != v1.SettingType_SETTING_TYPE_INT || fs.GetMin() != 9 || fs.GetMax() != 28 || fs.GetDefaultValue() != "13" {
 		t.Errorf("font_size field = %v", fs)
 	}
-	if kb := byKey["keybindings.session.new"]; kb.GetType() != v1.SettingType_SETTING_TYPE_KEYBINDING || kb.GetDefaultValue() != "cmd+n" {
+	if kb := byKey["keybindings.thread.new"]; kb.GetType() != v1.SettingType_SETTING_TYPE_KEYBINDING || kb.GetDefaultValue() != "cmd+n" {
 		t.Errorf("keybinding field = %v", kb)
 	}
-	if m := byKey["sessions.default_model"]; len(m.GetEnumLabels()) != len(m.GetEnumValues()) || m.GetEnumValues()[1] != "claude-opus-4-8[1m]" || m.GetEnumLabels()[1] != "Opus 4.8" {
+	if m := byKey["threads.default_model"]; len(m.GetEnumLabels()) != len(m.GetEnumValues()) || m.GetEnumValues()[1] != "claude-opus-4-8[1m]" || m.GetEnumLabels()[1] != "Opus 4.8" {
 		t.Errorf("default_model labels = %v for %v", m.GetEnumLabels(), m.GetEnumValues())
 	}
 	if d := byKey["appearance.density"]; len(d.GetEnumLabels()) != 0 {
@@ -60,7 +60,7 @@ func TestSettingsService(t *testing.T) {
 	if th := byKey["appearance.theme_light"]; th.GetDefaultValue() != "github-light" || len(th.GetEnumLabels()) != len(th.GetEnumValues()) || th.GetEnumLabels()[0] != "GitHub Light" {
 		t.Errorf("theme_light field = %v", th)
 	}
-	if !byKey["sessions.scrollback_lines"].GetRestartRequired() || len(schema.Msg.GetGroups()) != len(settings.Groups) {
+	if !byKey["threads.scrollback_lines"].GetRestartRequired() || len(schema.Msg.GetGroups()) != len(settings.Groups) {
 		t.Errorf("restart flag or groups missing")
 	}
 
@@ -74,7 +74,7 @@ func TestSettingsService(t *testing.T) {
 		t.Fatalf("Update = %v, %v", up, err)
 	}
 
-	_, err = h.Update(ctx, connect.NewRequest(&v1.UpdateSettingsRequest{Values: map[string]string{"keybindings.session.new": "cmd+k"}}))
+	_, err = h.Update(ctx, connect.NewRequest(&v1.UpdateSettingsRequest{Values: map[string]string{"keybindings.thread.new": "cmd+k"}}))
 	var ce *connect.Error
 	if !errors.As(err, &ce) || ce.Code() != connect.CodeInvalidArgument {
 		t.Fatalf("err = %v, want InvalidArgument", err)
@@ -85,7 +85,7 @@ func TestSettingsService(t *testing.T) {
 			detail, _ = m.(*v1.SettingsValidationErrors)
 		}
 	}
-	if detail == nil || len(detail.GetErrors()) != 1 || detail.GetErrors()[0].GetKey() != "keybindings.session.new" ||
+	if detail == nil || len(detail.GetErrors()) != 1 || detail.GetErrors()[0].GetKey() != "keybindings.thread.new" ||
 		detail.GetErrors()[0].GetMessage() != "cmd+k is reserved by the app" {
 		t.Fatalf("detail = %v", detail)
 	}

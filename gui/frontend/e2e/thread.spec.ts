@@ -374,7 +374,7 @@ test("a follow-up goes through thread.send with the composer's tags projected; t
   const send = (await invocations()).find((i) => i.name === "thread.send");
   expect(send?.args).toMatchObject({ id: "s-r1", text: "Ship it with /review" });
   expect(send?.args["composer-text"]).toMatch(/^Ship it with \[\/review\]\(cf-skill:\/\/[\w.~-]+\/review\)$/);
-  expect(send?.context).toMatchObject({ activeSessionId: "s-r1", activeView: "session" });
+  expect(send?.context).toMatchObject({ activeThreadId: "s-r1", activeView: "session" });
   await expect(page.getByTestId("thread-user").last()).toContainText("Ship it with");
   await expect(page.getByTestId("thread-user").last().locator('[data-tag-kind="skill"]')).toHaveText("/review");
   await expect(pane(page).locator('[data-testid="thread-text"]').last()).toContainText("Got it: I'll take a look now.");
@@ -450,17 +450,17 @@ test("Interrupt stops the running turn (thread.interrupt)", async ({ page }) => 
 
 test("only the visible thread holds a Watch; a page holds none", async ({ page }) => {
   await openThread(page, "idle");
-  await expect.poll(async () => (await openStreams())["ThreadService/Watch"] ?? 0).toBe(1);
+  await expect.poll(async () => (await openStreams())["ThreadService/WatchThread"] ?? 0).toBe(1);
   expect((await openStreams())["TerminalService/Attach"] ?? 0).toBe(0);
   await page.getByTestId("nav-projects").click();
   await expect(page.getByTestId("projects-page")).toBeVisible();
-  await expect.poll(async () => (await openStreams())["ThreadService/Watch"] ?? 0).toBe(0);
+  await expect.poll(async () => (await openStreams())["ThreadService/WatchThread"] ?? 0).toBe(0);
   await row(page, "s:s-r1").click();
-  await expect.poll(async () => (await openStreams())["ThreadService/Watch"] ?? 0).toBe(1);
+  await expect.poll(async () => (await openStreams())["ThreadService/WatchThread"] ?? 0).toBe(1);
   // Another thread: its Watch replaces this one.
   await row(page, "s:s-2").click();
   await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-session-id", "s-2");
-  await expect.poll(async () => (await openStreams())["ThreadService/Watch"] ?? 0).toBe(1);
+  await expect.poll(async () => (await openStreams())["ThreadService/WatchThread"] ?? 0).toBe(1);
   expect((await openStreams())["TerminalService/Attach"] ?? 0).toBe(0);
 });
 

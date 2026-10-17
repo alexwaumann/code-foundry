@@ -39,7 +39,7 @@ function members(): Members {
 }
 
 function sessionStatus(id: string): string | undefined {
-  return ((JSON.parse(cli("session", "list", "--json")) as { sessions?: { id: string; status?: string }[] }).sessions ?? []).find((s) => s.id === id)?.status;
+  return ((JSON.parse(cli("thread", "list", "--json")) as { threads?: { id: string; status?: string }[] }).threads ?? []).find((s) => s.id === id)?.status;
 }
 
 async function shot(page: Page, name: string): Promise<void> {
@@ -54,7 +54,7 @@ test("workspace surface with a real thread: members' state, member tab, add and 
   if (!first || !second) throw new Error(`workspace ${WORKSPACE} needs two members`);
   const thread = (
     JSON.parse(
-      cli("session", "new", "--workspace", ws.workspace.id, "--repo", first.repoId, "--model", "haiku", "--effort", "medium", "--permission", "auto", "--prompt", "say hi and stop", "--json"),
+      cli("thread", "new", "--workspace", ws.workspace.id, "--repo", first.repoId, "--model", "haiku", "--effort", "medium", "--permission", "auto", "--prompt", "say hi and stop", "--json"),
     ) as { id: string }
   ).id;
   const surface = page.getByTestId("workspace-surface");
@@ -114,7 +114,7 @@ test("workspace surface with a real thread: members' state, member tab, add and 
     });
   } finally {
     try {
-      cli("session", "archive", "--id", thread, "--yes");
+      cli("thread", "archive", "--id", thread, "--yes");
     } catch {
       // already closed
     }

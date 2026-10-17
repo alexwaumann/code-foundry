@@ -42,7 +42,7 @@ describe("presentSnooze (session.snooze's presenter)", () => {
 
   it("replaces the palette's prompts for the selected thread", async () => {
     useUiStore.setState({ selection: { kind: "session", id: "a" } });
-    expect(presentInPalette("session.snooze")).toBe(true);
+    expect(presentInPalette("thread.snooze")).toBe(true);
     await Promise.resolve();
     expect(useSnoozeDialogStore.getState()).toMatchObject({ open: true, sessionId: "a" });
   });

@@ -106,7 +106,7 @@ func TestOverrides(t *testing.T) {
 	r := NewRegistry()
 	if err := r.RegisterAll(
 		valid(func(c *Command) {
-			c.Name, c.Keybindings = "session.new", []string{"cmd+n"}
+			c.Name, c.Keybindings = "thread.new", []string{"cmd+n"}
 			c.Args = []ArgSpec{
 				{Name: "model", Type: Enum, Enum: []string{"opus", "sonnet"}},
 				{Name: "name", Type: String, Required: true},
@@ -120,32 +120,32 @@ func TestOverrides(t *testing.T) {
 		t.Fatal(err)
 	}
 	r.SetOverrides(Overrides{
-		Keybindings: map[string][]string{"session.new": {"cmd+shift+n"}, "terminal.new": {}},
-		ArgDefaults: map[string]map[string]string{"session.new": {"model": "sonnet", "name": "ignored-required"}},
+		Keybindings: map[string][]string{"thread.new": {"cmd+shift+n"}, "terminal.new": {}},
+		ArgDefaults: map[string]map[string]string{"thread.new": {"model": "sonnet", "name": "ignored-required"}},
 	})
 	listed := map[string]Command{}
 	for _, l := range r.List(Context{}, true) {
 		listed[l.Name] = l.Command
 	}
-	if kb := listed["session.new"].Keybindings; !slices.Equal(kb, []string{"cmd+shift+n"}) {
-		t.Errorf("session.new keybindings = %v", kb)
+	if kb := listed["thread.new"].Keybindings; !slices.Equal(kb, []string{"cmd+shift+n"}) {
+		t.Errorf("thread.new keybindings = %v", kb)
 	}
 	if kb := listed["terminal.new"].Keybindings; len(kb) != 0 {
 		t.Errorf("terminal.new keybindings = %v, want unbound", kb)
 	}
-	if d := listed["session.new"].Args[0].Default; d != "sonnet" {
+	if d := listed["thread.new"].Args[0].Default; d != "sonnet" {
 		t.Errorf("model default = %q", d)
 	}
-	if d := listed["session.new"].Args[1].Default; d != "" {
+	if d := listed["thread.new"].Args[1].Default; d != "" {
 		t.Errorf("required arg got default %q", d)
 	}
-	res, err := r.Invoke(context.Background(), Context{}, "session.new", map[string]string{"name": "x"})
+	res, err := r.Invoke(context.Background(), Context{}, "thread.new", map[string]string{"name": "x"})
 	if err != nil || res.Message != "model=sonnet" {
 		t.Fatalf("invoke = %q, %v", res.Message, err)
 	}
 	// An override that does not parse for the arg is ignored.
-	r.SetOverrides(Overrides{ArgDefaults: map[string]map[string]string{"session.new": {"model": "gpt"}}})
-	res, err = r.Invoke(context.Background(), Context{}, "session.new", map[string]string{"name": "x"})
+	r.SetOverrides(Overrides{ArgDefaults: map[string]map[string]string{"thread.new": {"model": "gpt"}}})
+	res, err = r.Invoke(context.Background(), Context{}, "thread.new", map[string]string{"name": "x"})
 	if err != nil || res.Message != "model=" {
 		t.Fatalf("invoke with bad override = %q, %v", res.Message, err)
 	}
@@ -178,7 +178,7 @@ func TestInvokeConfirmIf(t *testing.T) {
 			ran := false
 			r := NewRegistry()
 			if err := r.Register(Command{
-				Name: "session.archive", Title: "Archive", Category: "Thread",
+				Name: "thread.archive", Title: "Archive", Category: "Thread",
 				Args:      []ArgSpec{{Name: "id", Type: String}, {Name: "hot", Type: Bool}},
 				Confirm:   "Archive {id}?",
 				ConfirmIf: tt.confirmIf,
@@ -192,7 +192,7 @@ func TestInvokeConfirmIf(t *testing.T) {
 			}); err != nil {
 				t.Fatal(err)
 			}
-			_, err := r.Invoke(context.Background(), Context{}, "session.archive", map[string]string{"id": "s1", "hot": "true"}, tt.opts...)
+			_, err := r.Invoke(context.Background(), Context{}, "thread.archive", map[string]string{"id": "s1", "hot": "true"}, tt.opts...)
 			if tt.wantMsg == "" {
 				if err != nil || !ran {
 					t.Fatalf("err = %v, ran = %v; want it to run", err, ran)

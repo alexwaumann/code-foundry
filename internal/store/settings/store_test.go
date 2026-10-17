@@ -79,15 +79,15 @@ func TestOpenReportsBadValues(t *testing.T) {
 	}
 }
 
-// A setting the app no longer has (sessions.render, removed with terminal threads) is
+// A setting the app no longer has (threads.render, removed with terminal threads) is
 // an issue, not an error: the file still loads.
 func TestOpenReportsRemovedSettings(t *testing.T) {
-	s, _, _ := openTest(t, "[sessions]\nrender = \"terminal\"\ndefault_effort = \"low\"\n")
+	s, _, _ := openTest(t, "[threads]\nrender = \"terminal\"\ndefault_effort = \"low\"\n")
 	snap := s.Snapshot()
-	if snap.Settings.Sessions.DefaultEffort != "low" {
-		t.Errorf("settings = %+v", snap.Settings.Sessions)
+	if snap.Settings.Threads.DefaultEffort != "low" {
+		t.Errorf("settings = %+v", snap.Settings.Threads)
 	}
-	if want := []Issue{{"sessions.render", "unknown setting"}}; !slices.Equal(snap.Issues, want) {
+	if want := []Issue{{"threads.render", "unknown setting"}}; !slices.Equal(snap.Issues, want) {
 		t.Errorf("issues = %v, want %v", snap.Issues, want)
 	}
 }
@@ -106,8 +106,8 @@ func TestUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if snap.Settings.Appearance.FontSize != 16 || snap.Settings.Sessions.DefaultModel != "claude-opus-4-8[1m]" ||
-		snap.Settings.Sessions.NamingModel != "claude-4.5-haiku[1m]" ||
+	if snap.Settings.Appearance.FontSize != 16 || snap.Settings.Threads.DefaultModel != "claude-opus-4-8[1m]" ||
+		snap.Settings.Threads.NamingModel != "claude-4.5-haiku[1m]" ||
 		snap.Settings.Keybindings["repo.refresh"] != "cmd+alt+r" {
 		t.Fatalf("settings = %+v", snap.Settings)
 	}
@@ -146,6 +146,26 @@ func TestUpdate(t *testing.T) {
 	}
 }
 
+// A settings file from before threads were renamed from sessions keeps its values, and
+// the next Update writes them under the new names.
+func TestLegacyFileRewrittenOnUpdate(t *testing.T) {
+	s, _, path := openTest(t, "[sessions]\nauto_name = false\nscrollback_lines = 5000\n")
+	if got := s.Snapshot().Settings.Threads; got.AutoName || got.ScrollbackLines != 5000 {
+		t.Fatalf("legacy values not read: %+v", got)
+	}
+	if _, err := s.Update(context.Background(), map[string]string{KeyFontSize: "15"}); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	if strings.Contains(text, "[sessions]") || !strings.Contains(text, "[threads]\n") || !strings.Contains(text, "\nauto_name = false\n") || !strings.Contains(text, "scrollback_lines = 5000\n") {
+		t.Fatalf("file after Update:\n%s", text)
+	}
+}
+
 func TestUpdateRejects(t *testing.T) {
 	s, _, path := openTest(t, "")
 	s.SetCommands(testCmds)
@@ -157,12 +177,12 @@ func TestUpdateRejects(t *testing.T) {
 		want    []Issue
 	}{
 		{"bad int", map[string]string{KeyFontSize: "big", KeyTheme: "dark"}, []Issue{{KeyFontSize, `want an integer, got "big"`}}},
-		{"unknown key", map[string]string{"sessions.nope": "1"}, []Issue{{"sessions.nope", "unknown setting"}}},
-		{"reserved chord", map[string]string{KeybindingKey("session.new"): "cmd+b"},
-			[]Issue{{"keybindings.session.new", "cmd+b is reserved by the app"}}},
+		{"unknown key", map[string]string{"threads.nope": "1"}, []Issue{{"threads.nope", "unknown setting"}}},
+		{"reserved chord", map[string]string{KeybindingKey("thread.new"): "cmd+b"},
+			[]Issue{{"keybindings.thread.new", "cmd+b is reserved by the app"}}},
 		{"keybinding for an unknown command", map[string]string{KeybindingKey("x.y"): "cmd+j"}, []Issue{{"keybindings.x.y", "unknown setting"}}},
 		{"collision", map[string]string{KeybindingKey("repo.refresh"): "cmd+n"},
-			[]Issue{{"keybindings.repo.refresh", "cmd+n is already bound to session.new"}}},
+			[]Issue{{"keybindings.repo.refresh", "cmd+n is already bound to thread.new"}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -223,7 +243,7 @@ func TestExternalEdits(t *testing.T) {
 }
 
 func TestRestartPending(t *testing.T) {
-	s, _, _ := openTest(t, "[sessions]\nscrollback_lines = 5000\n")
+	s, _, _ := openTest(t, "[threads]\nscrollback_lines = 5000\n")
 	snap, err := s.Update(context.Background(), map[string]string{KeyScrollback: "20000", KeyFontSize: "15"})
 	if err != nil {
 		t.Fatal(err)

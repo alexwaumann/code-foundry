@@ -1,6 +1,6 @@
 /**
  * The terminal label contract (internal/termlabel, proto Terminal.labels). A shell
- * terminal.new starts carries kind=shell, repo and worktree, plus session when a thread
+ * terminal.new starts carries kind=shell, repo and worktree, plus thread when a thread
  * owns it. An action run in a terminal (action.run) carries kind=action, the same owner
  * labels, and the action, its name at the start, and the run. Threads have no terminal of
  * their own (Claude runs headless), but only kind identifies a panel terminal: a terminal
@@ -12,7 +12,7 @@ export const REPO_LABEL = "repo";
 /** The worktree path the terminal belongs to (the snapshot path, symlinks resolved). */
 export const WORKTREE_LABEL = "worktree";
 /** The thread that owns the terminal: a shell or an action run started for it. */
-export const SESSION_LABEL = "session";
+export const SESSION_LABEL = "thread";
 /** An action run's action id, its name when the run started, and the run's id. */
 export const ACTION_LABEL = "action";
 export const ACTION_NAME_LABEL = "action.name";

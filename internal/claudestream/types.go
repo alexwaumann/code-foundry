@@ -1,7 +1,7 @@
 // Package claudestream drives Claude Code headlessly over its stream-json stdio
 // protocol (`claude -p --input-format stream-json --output-format stream-json ...`).
 // It is pure: it knows the wire format and the control protocol, nothing about
-// sessions, stores or the GUI. The session store's runner builds on it.
+// threads, stores or the GUI. The thread store's runner builds on it.
 //
 // Wire facts are recorded in docs/notes/rendered-threads-handoff.md §2; the Agent SDK's
 // TypeScript types (sdk.d.ts: SDKMessage, SDKControlRequest, PermissionResult, ...) are

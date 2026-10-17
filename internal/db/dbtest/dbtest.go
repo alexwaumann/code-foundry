@@ -2,7 +2,7 @@
 // migrations each time. The first call in a process migrates an empty database once and
 // keeps its bytes; every call writes a copy under t.TempDir(). Under -race, applying the
 // schema through modernc sqlite costs about a quarter of a second per database, and the
-// session store's tests alone open a few hundred (docs/notes/fake-claude-binary.md).
+// thread store's tests alone open a few hundred (docs/notes/fake-claude-binary.md).
 package dbtest
 
 import (

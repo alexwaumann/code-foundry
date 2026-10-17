@@ -34,14 +34,14 @@ func TestTerminalServiceAttach(t *testing.T) {
 	c, fake := newTerminalClient(t)
 
 	created, err := c.Create(ctx, connect.NewRequest(&v1.CreateTerminalRequest{
-		Argv: []string{"/bin/zsh", "-il"}, Cols: 100, Rows: 30, Labels: map[string]string{"session": "s1"},
+		Argv: []string{"/bin/zsh", "-il"}, Cols: 100, Rows: 30, Labels: map[string]string{"thread": "s1"},
 	}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	pt := created.Msg.GetTerminal()
 	if pt.GetState() != v1.TerminalState_TERMINAL_STATE_RUNNING || pt.GetCols() != 100 ||
-		pt.GetLabels()["session"] != "s1" || pt.GetStartedAt() == nil {
+		pt.GetLabels()["thread"] != "s1" || pt.GetStartedAt() == nil {
 		t.Fatalf("Create = %v", pt)
 	}
 	id := pt.GetId()
@@ -191,7 +191,7 @@ func TestTerminalServiceCloseKillsThenRemoves(t *testing.T) {
 	defer cancel()
 	c, fake := newTerminalClient(t)
 	term, _ := fake.Create(ctx, terminal.Spec{Argv: []string{"cat"}, Labels: termlabel.Shell("", "r1", "/wt")})
-	other, _ := fake.Create(ctx, terminal.Spec{Argv: []string{"cat"}, Labels: map[string]string{termlabel.Session: "s1"}})
+	other, _ := fake.Create(ctx, terminal.Spec{Argv: []string{"cat"}, Labels: map[string]string{termlabel.Thread: "s1"}})
 	_, err := c.Close(ctx, connect.NewRequest(&v1.CloseTerminalRequest{Id: other.ID}))
 	if ce := new(connect.Error); !errors.As(err, &ce) || ce.Code() != connect.CodeFailedPrecondition {
 		t.Errorf("Close(non-shell terminal) = %v, want FailedPrecondition", err)

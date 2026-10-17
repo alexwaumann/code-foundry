@@ -10,7 +10,7 @@ import (
 )
 
 // RepoBackend is the slice of RepoService the repo.* commands (and the pull request
-// session commands, which list repositories) need, in generated Connect signatures (see
+// thread commands, which list repositories) need, in generated Connect signatures (see
 // TerminalBackend for why). The repo step's (1b) API handler, any
 // RepoServiceHandler, and a RepoServiceClient satisfy it. Until it is wired,
 // codefoundryv1connect.UnimplementedRepoServiceHandler stands in.

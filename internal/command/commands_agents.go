@@ -20,19 +20,13 @@ import (
 // with the items snapshot), in generated Connect signatures.
 type AgentsBackend interface {
 	ListItems(context.Context, *connect.Request[v1.ListThreadItemsRequest]) (*connect.Response[v1.ListThreadItemsResponse], error)
-}
-
-// AgentsSessions is the slice of SessionService thread.agents reads: the thread's
-// count of background shells is on its Session.
-type AgentsSessions interface {
-	Get(context.Context, *connect.Request[v1.GetSessionRequest]) (*connect.Response[v1.GetSessionResponse], error)
+	// Get reads the thread's count of background shells (on its Thread).
+	Get(context.Context, *connect.Request[v1.GetThreadRequest]) (*connect.Response[v1.GetThreadResponse], error)
 }
 
 var (
-	_ AgentsBackend  = codefoundryv1connect.ThreadServiceHandler(nil)
-	_ AgentsBackend  = codefoundryv1connect.ThreadServiceClient(nil)
-	_ AgentsSessions = codefoundryv1connect.SessionServiceHandler(nil)
-	_ AgentsSessions = codefoundryv1connect.SessionServiceClient(nil)
+	_ AgentsBackend = codefoundryv1connect.ThreadServiceHandler(nil)
+	_ AgentsBackend = codefoundryv1connect.ThreadServiceClient(nil)
 )
 
 // ViewPanelAgents is the ShowView name that opens (or reveals) the Agents surface in the
@@ -41,7 +35,7 @@ var (
 const ViewPanelAgents = "panel.agents"
 
 // RegisterAgents registers thread.agents and view.panel.agents.
-func RegisterAgents(r *Registry, b AgentsBackend, s AgentsSessions, e Emitter) error {
+func RegisterAgents(r *Registry, b AgentsBackend, e Emitter) error {
 	return r.RegisterAll(
 		Command{
 			Name:  "thread.agents",
@@ -50,21 +44,21 @@ func RegisterAgents(r *Registry, b AgentsBackend, s AgentsSessions, e Emitter) e
 				"type, model, mode, status, elapsed time, tool uses and tokens, then what each running one is doing and what each finished one reported. " +
 				"The header also counts the thread's own background shells (Bash run_in_background, Monitor) still running.",
 			Category: "Thread",
-			Args:     []ArgSpec{{Name: "id", Type: String, Required: true, Context: ContextSession, Description: "Thread id"}},
-			When:     hasSession,
+			Args:     []ArgSpec{{Name: "id", Type: String, Required: true, Context: ContextThread, Description: "Thread id"}},
+			When:     hasThread,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-				res, err := b.ListItems(ctx, connect.NewRequest(&v1.ListThreadItemsRequest{SessionId: a.String("id")}))
+				res, err := b.ListItems(ctx, connect.NewRequest(&v1.ListThreadItemsRequest{ThreadId: a.String("id")}))
 				if err != nil {
 					return Result{}, err
 				}
 				snap := res.Msg.GetSnapshot()
 				runs := snap.GetAgents()
-				got, err := s.Get(ctx, connect.NewRequest(&v1.GetSessionRequest{Id: a.String("id")}))
+				got, err := b.Get(ctx, connect.NewRequest(&v1.GetThreadRequest{Id: a.String("id")}))
 				if err != nil {
 					return Result{}, err
 				}
-				shells := int(got.Msg.GetSession().GetBackgroundShellsRunning())
-				return Result{Message: FormatAgents(runs, shells, time.Now()), JSON: &v1.ThreadAgentsChange{SessionId: snap.GetSessionId(), Seq: snap.GetSeq(), Agents: runs}}, nil
+				shells := int(got.Msg.GetThread().GetBackgroundShellsRunning())
+				return Result{Message: FormatAgents(runs, shells, time.Now()), JSON: &v1.ThreadAgentsChange{ThreadId: snap.GetThreadId(), Seq: snap.GetSeq(), Agents: runs}}, nil
 			},
 		},
 		Command{
@@ -74,7 +68,7 @@ func RegisterAgents(r *Registry, b AgentsBackend, s AgentsSessions, e Emitter) e
 			Category:    "View",
 			// No default chord, like view.panel.mcp (the surface has its own key while the
 			// panel has focus).
-			When: hasSession,
+			When: hasThread,
 			Run: func(context.Context, Context, Args) (Result, error) {
 				n := e.Emit(&v1.UiIntent{Intent: &v1.UiIntent_ShowView_{ShowView: &v1.UiIntent_ShowView{Name: ViewPanelAgents}}})
 				return Result{JSON: EmitResult{Delivered: n}}, nil
@@ -97,7 +91,7 @@ func agentStatusWord(s v1.ThreadAgentStatus) string {
 }
 
 // agentRunning counts running runs: all, and the thread's own background ones (as the
-// Session counts them).
+// Thread counts them).
 func agentRunning(runs []*v1.ThreadAgentRun) (all, background int) {
 	for _, r := range runs {
 		if r.GetStatus() != v1.ThreadAgentStatus_THREAD_AGENT_STATUS_RUNNING {

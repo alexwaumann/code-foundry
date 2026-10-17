@@ -16,11 +16,11 @@ import (
 
 // File format: TOML, one table per group, keys without the group prefix:
 //
-//	[sessions]
+//	[threads]
 //	default_model = "claude-opus-4-8[1m]"
 //
 //	[keybindings]
-//	"session.new" = "cmd+shift+n"
+//	"thread.new" = "cmd+shift+n"
 //
 // TOML over JSON: the file is meant to be edited by hand, and TOML has comments (the
 // rendered file documents every field and shows its default) and no trailing-comma or
@@ -43,8 +43,9 @@ func Read(path string) Settings {
 
 // decode parses a settings file into raw string-encoded values keyed by settings key.
 // Values are stringified leniently (14 and "14" both work for an int); type errors are
-// found by Field.parse. Under [keybindings], unquoted dotted keys (session.new = ...)
-// parse as nested tables and are flattened back.
+// found by Field.parse. Under [keybindings], unquoted dotted keys (thread.new = ...)
+// parse as nested tables and are flattened back. Names from before threads were renamed
+// from threads are read as the new ones (renameLegacyKeys).
 func decode(data []byte) (map[string]string, error) {
 	var doc map[string]any
 	if _, err := toml.Decode(string(data), &doc); err != nil {
@@ -59,7 +60,34 @@ func decode(data []byte) (map[string]string, error) {
 		}
 		flatten(raw, group, tbl, group == GroupKeybindings)
 	}
+	renameLegacyKeys(raw)
 	return raw, nil
+}
+
+// legacyPrefixes are key prefixes from before threads were renamed from sessions (the
+// [sessions] table, keybindings of the session.* commands) and what they are now.
+var legacyPrefixes = []struct{ old, new string }{
+	{"sessions.", GroupThreads + "."},
+	{GroupKeybindings + ".session.", GroupKeybindings + ".thread."},
+}
+
+// renameLegacyKeys rewrites raw's legacy keys to the current names, so a settings file
+// written before the rename keeps working; the next save writes the new names. A key
+// set under both names keeps the new name's value.
+func renameLegacyKeys(raw map[string]string) {
+	for key, v := range raw {
+		for _, p := range legacyPrefixes {
+			rest, ok := strings.CutPrefix(key, p.old)
+			if !ok {
+				continue
+			}
+			delete(raw, key)
+			if _, set := raw[p.new+rest]; !set {
+				raw[p.new+rest] = v
+			}
+			break
+		}
+	}
 }
 
 func flatten(raw map[string]string, prefix string, tbl map[string]any, nested bool) {
@@ -107,7 +135,7 @@ func render(accepted map[string]string) []byte {
 		fmt.Fprintf(&b, "\n[%s]\n", g.ID)
 		if g.ID == GroupKeybindings {
 			writeComment(&b, g.Description)
-			b.WriteString(`# "session.new" = "cmd+shift+n"` + "\n")
+			b.WriteString(`# "thread.new" = "cmd+shift+n"` + "\n")
 			keys := slices.Sorted(maps.Keys(accepted))
 			for _, k := range keys {
 				if isKeybindingKey(k) {

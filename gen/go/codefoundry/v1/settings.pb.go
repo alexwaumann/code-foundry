@@ -87,8 +87,8 @@ func (SettingType) EnumDescriptor() ([]byte, []int) {
 
 type SettingField struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Dotted key, "<group>.<name>", e.g. "sessions.default_model". Keybinding fields are
-	// "keybindings.<command name>", e.g. "keybindings.session.new".
+	// Dotted key, "<group>.<name>", e.g. "threads.default_model". Keybinding fields are
+	// "keybindings.<command name>", e.g. "keybindings.thread.new".
 	Key         string `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
 	Title       string `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
 	Description string `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
@@ -105,7 +105,7 @@ type SettingField struct {
 	// Free-form hint for the input (e.g. a template or an example).
 	Placeholder string `protobuf:"bytes,11,opt,name=placeholder,proto3" json:"placeholder,omitempty"`
 	// Display names for enum_values, parallel to it; empty when the values are shown as is.
-	// sessions.default_model carries the model registry's labels ("Opus 4.8").
+	// threads.default_model carries the model registry's labels ("Opus 4.8").
 	EnumLabels    []string `protobuf:"bytes,12,rep,name=enum_labels,json=enumLabels,proto3" json:"enum_labels,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

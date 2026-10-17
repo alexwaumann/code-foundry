@@ -247,7 +247,7 @@ function shellsNote(n: number): string {
 
 /** thread.agents and view.panel.agents, like the daemon's (any active thread). */
 export function agentsCommands(threads: AgentThreads, emit: (i: UiIntentInit) => number): Command[] {
-  const when = (ctx: UiContext | undefined) => Boolean(ctx?.activeSessionId);
+  const when = (ctx: UiContext | undefined) => Boolean(ctx?.activeThreadId);
   return [
     {
       cmd: {
@@ -260,15 +260,15 @@ export function agentsCommands(threads: AgentThreads, emit: (i: UiIntentInit) =>
       },
       when,
       run: (ctx, a) => {
-        const id = a.id || ctx?.activeSessionId || "";
+        const id = a.id || ctx?.activeThreadId || "";
         threads.calls.push(`agents ${id}`);
         const runs = threads.agentsOf(id);
         const shells = shellsNote(threads.shellsOf(id));
-        if (runs.length === 0) return Promise.resolve({ message: `no subagent runs in this thread${shells}`, resultJson: JSON.stringify({ sessionId: id, agents: [] }) });
+        if (runs.length === 0) return Promise.resolve({ message: `no subagent runs in this thread${shells}`, resultJson: JSON.stringify({ threadId: id, agents: [] }) });
         const c = agentCounts(runs);
         return Promise.resolve({
           message: `Agents: ${String(c.agentsRunning)} running (${String(c.backgroundAgentsRunning)} in the background) · ${String(runs.length)} this thread${shells}`,
-          resultJson: JSON.stringify({ sessionId: id, agents: runs.map((r) => ({ id: r.id, description: r.description })) }),
+          resultJson: JSON.stringify({ threadId: id, agents: runs.map((r) => ({ id: r.id, description: r.description })) }),
         });
       },
     },

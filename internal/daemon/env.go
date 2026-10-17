@@ -12,7 +12,7 @@ import (
 
 // claudeSessionVars are variables a running Claude Code session sets for its children
 // that are not CLAUDE_CODE_*: its pid, its effort level, and the SDK version of the
-// host. They describe the parent session, so they must not leak into ours either
+// host. They describe the parent thread, so they must not leak into ours either
 // (CLAUDE_EFFORT, for one, would override the effort the user picked).
 var claudeSessionVars = []string{"CLAUDECODE", "CLAUDE_PID", "CLAUDE_EFFORT", "CLAUDE_AGENT_SDK_VERSION"}
 
@@ -32,7 +32,7 @@ func inheritedClaudeVars(environ []string) []string {
 
 // scrubClaudeEnv removes inherited Claude session variables from the daemon's own
 // environment, so every terminal and claude process it starts is a fresh top-level
-// session. Observed 2026-10-08: a daemon started from inside a Claude session passed
+// thread. Observed 2026-10-08: a daemon started from inside a Claude session passed
 // CLAUDE_CODE_CHILD_SESSION to its children, which disabled transcript saving (and
 // with it session discovery and resume). Values are not logged: some are tokens.
 func scrubClaudeEnv(log *slog.Logger) []string {
@@ -46,10 +46,10 @@ func scrubClaudeEnv(log *slog.Logger) []string {
 	return vars
 }
 
-// sessionEnv is what every Claude session gets on top of the daemon's environment:
+// threadEnv is what every Claude session gets on top of the daemon's environment:
 // this daemon's loopback endpoint and bearer token. The CLI prefers them over the
-// Unix socket (client.EndpointFromEnv), which sandboxed sessions cannot connect to.
-func sessionEnv(port int, token string) []string {
+// Unix socket (client.EndpointFromEnv), which sandboxed threads cannot connect to.
+func threadEnv(port int, token string) []string {
 	return []string{
 		paths.EnvEndpoint + "=http://127.0.0.1:" + strconv.Itoa(port),
 		paths.EnvToken + "=" + token,
@@ -57,12 +57,12 @@ func sessionEnv(port int, token string) []string {
 }
 
 // scrubEndpointEnv removes an inherited endpoint, token and thread id (a daemon
-// started by hand from inside a session), so this daemon's plain terminals and action
-// runs do not point the CLI at the other daemon or at a thread of it. Sessions get this
-// daemon's own values (sessionEnv, and their own paths.EnvSession).
+// started by hand from inside a thread), so this daemon's plain terminals and action
+// runs do not point the CLI at the other daemon or at a thread of it. Threads get this
+// daemon's own values (threadEnv, and their own paths.EnvThread).
 func scrubEndpointEnv(log *slog.Logger) {
 	var vars []string
-	for _, k := range []string{paths.EnvEndpoint, paths.EnvToken, paths.EnvSession} {
+	for _, k := range []string{paths.EnvEndpoint, paths.EnvToken, paths.EnvThread, paths.EnvThreadLegacy} {
 		if _, ok := os.LookupEnv(k); ok {
 			_ = os.Unsetenv(k)
 			vars = append(vars, k)

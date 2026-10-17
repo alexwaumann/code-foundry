@@ -73,7 +73,7 @@ func (s *DaemonService) connect(ctx context.Context) (*client.Client, error) {
 }
 
 // exportDaemonBinary sets CODE_FOUNDRY_BIN to the CLI this app auto-starts (the
-// code-foundry next to it when installed), so the daemon and the sessions it spawns inherit it and
+// code-foundry next to it when installed), so the daemon and the threads it spawns inherit it and
 // can call the CLI without it being on PATH.
 func exportDaemonBinary(log *slog.Logger) {
 	if os.Getenv(EnvDaemonBinary) != "" {

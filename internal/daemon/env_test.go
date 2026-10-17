@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/alexwaumann/code-foundry/internal/paths"
 )
 
 func TestInheritedClaudeVars(t *testing.T) {
@@ -16,12 +18,12 @@ func TestInheritedClaudeVars(t *testing.T) {
 		want    []string
 	}{
 		{"none", []string{"PATH=/bin", "HOME=/h", "CLAUDE_CONFIG_DIR=/c", "ANTHROPIC_API_KEY=k"}, nil},
-		{"session vars", []string{
-			"CLAUDECODE=1", "CLAUDE_CODE_CHILD_SESSION=1", "CLAUDE_CODE_ENTRYPOINT=sdk-ts", "CLAUDE_CODE_SESSION_ID=x",
+		{"Claude session vars", []string{
+			"CLAUDECODE=1", "CLAUDE_CODE_CHILD_THREAD=1", "CLAUDE_CODE_ENTRYPOINT=sdk-ts", "CLAUDE_CODE_THREAD_ID=x",
 			"CLAUDE_PID=1", "CLAUDE_EFFORT=high", "CLAUDE_AGENT_SDK_VERSION=0.3", "PATH=/bin", "CLAUDE_CODE_MESSAGING_TOKEN=",
 		}, []string{
-			"CLAUDECODE", "CLAUDE_AGENT_SDK_VERSION", "CLAUDE_CODE_CHILD_SESSION", "CLAUDE_CODE_ENTRYPOINT",
-			"CLAUDE_CODE_MESSAGING_TOKEN", "CLAUDE_CODE_SESSION_ID", "CLAUDE_EFFORT", "CLAUDE_PID",
+			"CLAUDECODE", "CLAUDE_AGENT_SDK_VERSION", "CLAUDE_CODE_CHILD_THREAD", "CLAUDE_CODE_ENTRYPOINT",
+			"CLAUDE_CODE_MESSAGING_TOKEN", "CLAUDE_CODE_THREAD_ID", "CLAUDE_EFFORT", "CLAUDE_PID",
 		}},
 		// User configuration that merely starts with CLAUDE is kept.
 		{"config kept", []string{"CLAUDE_CONFIG_DIR=/c", "CLAUDECODEX=1", "CLAUDE_CODEX=1"}, nil},
@@ -37,12 +39,12 @@ func TestInheritedClaudeVars(t *testing.T) {
 
 func TestScrubClaudeEnv(t *testing.T) {
 	t.Setenv("CLAUDECODE", "1")
-	t.Setenv("CLAUDE_CODE_CHILD_SESSION", "1")
+	t.Setenv("CLAUDE_CODE_CHILD_THREAD", "1")
 	t.Setenv("CLAUDE_CODE_MESSAGING_TOKEN", "secret-token")
 	t.Setenv("CLAUDE_CONFIG_DIR", "/keep")
 	var buf bytes.Buffer
 	removed := scrubClaudeEnv(slog.New(slog.NewTextHandler(&buf, nil)))
-	for _, k := range []string{"CLAUDECODE", "CLAUDE_CODE_CHILD_SESSION", "CLAUDE_CODE_MESSAGING_TOKEN"} {
+	for _, k := range []string{"CLAUDECODE", "CLAUDE_CODE_CHILD_THREAD", "CLAUDE_CODE_MESSAGING_TOKEN"} {
 		if _, ok := os.LookupEnv(k); ok {
 			t.Errorf("%s still set", k)
 		}
@@ -54,7 +56,7 @@ func TestScrubClaudeEnv(t *testing.T) {
 		t.Error("CLAUDE_CONFIG_DIR was removed")
 	}
 	log := buf.String()
-	if !strings.Contains(log, "CLAUDE_CODE_CHILD_SESSION") {
+	if !strings.Contains(log, "CLAUDE_CODE_CHILD_THREAD") {
 		t.Errorf("log does not name the removed vars: %s", log)
 	}
 	if strings.Contains(log, "secret-token") {
@@ -62,21 +64,22 @@ func TestScrubClaudeEnv(t *testing.T) {
 	}
 }
 
-func TestSessionEnv(t *testing.T) {
-	got := sessionEnv(4321, "tok")
+func TestThreadEnv(t *testing.T) {
+	got := threadEnv(4321, "tok")
 	want := []string{"CODE_FOUNDRY_ENDPOINT=http://127.0.0.1:4321", "CODE_FOUNDRY_TOKEN=tok"}
 	if !slices.Equal(got, want) {
-		t.Fatalf("sessionEnv = %q, want %q", got, want)
+		t.Fatalf("threadEnv = %q, want %q", got, want)
 	}
 }
 
 func TestScrubEndpointEnv(t *testing.T) {
 	t.Setenv("CODE_FOUNDRY_ENDPOINT", "http://127.0.0.1:1")
 	t.Setenv("CODE_FOUNDRY_TOKEN", "other-daemon")
-	t.Setenv("CODE_FOUNDRY_SESSION", "s-other-daemon")
+	t.Setenv("CODE_FOUNDRY_THREAD", "s-other-daemon")
+	t.Setenv(paths.EnvThreadLegacy, "s-older-daemon")
 	var logs bytes.Buffer
 	scrubEndpointEnv(slog.New(slog.NewTextHandler(&logs, nil)))
-	for _, k := range []string{"CODE_FOUNDRY_ENDPOINT", "CODE_FOUNDRY_TOKEN", "CODE_FOUNDRY_SESSION"} {
+	for _, k := range []string{"CODE_FOUNDRY_ENDPOINT", "CODE_FOUNDRY_TOKEN", "CODE_FOUNDRY_THREAD", paths.EnvThreadLegacy} {
 		if _, ok := os.LookupEnv(k); ok {
 			t.Errorf("%s still set", k)
 		}

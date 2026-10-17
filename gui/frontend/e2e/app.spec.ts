@@ -33,7 +33,7 @@ test("selecting a thread shows its conversation; switching watches the other one
   await expect(pane).toHaveAttribute("data-session-id", "s-2");
   await expect(pane.getByTestId("thread-user").first()).toContainText("Port the grid renderer to libghostty-vt.");
   await expect(pane).not.toContainText("Refactor the sidebar tree");
-  await expect.poll(async () => (await openStreams())["ThreadService/Watch"] ?? 0).toBe(1);
+  await expect.poll(async () => (await openStreams())["ThreadService/WatchThread"] ?? 0).toBe(1);
 });
 
 test("keystrokes are written to the attached terminal in order", async ({ page }) => {
@@ -66,7 +66,7 @@ test("palette opens with cmd+k and lists only commands available in context", as
   await page.keyboard.press("Meta+k");
   const palette = page.getByTestId("palette");
   // session.new is unavailable with nothing selected, but its project picker supplies the repo.
-  await expect(palette.locator('[data-command="session.new"]')).toBeVisible();
+  await expect(palette.locator('[data-command="thread.new"]')).toBeVisible();
   // A terminal belongs to a thread or a worktree: the dashboard offers none.
   await expect(palette.locator('[data-command="terminal.new"]')).toHaveCount(0);
   await expect(palette.locator('[data-command="terminal.kill"]')).toHaveCount(0);
@@ -79,10 +79,10 @@ test("palette opens with cmd+k and lists only commands available in context", as
   await expect(page.getByTestId("bottom-terminal-host")).toHaveAttribute("data-attach-phase", "live");
   await page.keyboard.press("Meta+Shift+p");
   await expect(palette.locator('[data-command="terminal.kill"]')).toBeVisible();
-  await expect(palette.locator('[data-command="session.new"]')).toBeVisible();
+  await expect(palette.locator('[data-command="thread.new"]')).toBeVisible();
   await expect(palette.locator('[data-command="terminal.remove"]')).toHaveCount(0);
   // Keybindings are shown.
-  await expect(palette.locator('[data-command="session.new"]')).toContainText("⌘N");
+  await expect(palette.locator('[data-command="thread.new"]')).toContainText("⌘N");
 });
 
 test("invoking a command sends the current context", async ({ page }) => {
@@ -103,7 +103,7 @@ test("invoking a command sends the current context", async ({ page }) => {
   expect(last?.name).toBe("terminal.kill");
   expect(last?.context).toEqual({
     activeTerminalId: "t-s1-shell",
-    activeSessionId: "s-1",
+    activeThreadId: "s-1",
     activeRepoId: "repo-cf",
     activeWorktreePath: CF,
     activeView: "session",
@@ -119,7 +119,7 @@ test("invoking a command sends the current context", async ({ page }) => {
   await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("daemon.status");
   expect((await invocations()).at(-1)?.context).toEqual({
     activeTerminalId: "",
-    activeSessionId: "s-1",
+    activeThreadId: "s-1",
     activeRepoId: "repo-cf",
     activeWorktreePath: CF,
     activeView: "session",

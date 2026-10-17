@@ -47,7 +47,7 @@ describe("argChoices", () => {
 
 describe("optional enum prompts (session.new model/effort)", () => {
   const c = cmd({
-    name: "session.new",
+    name: "thread.new",
     args: [
       arg({ name: "worktree", type: "path", required: false }),
       arg({ name: "model", type: "enum", required: false, enumValues: ["opus", "sonnet"], defaultValue: "opus" }),

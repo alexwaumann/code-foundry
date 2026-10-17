@@ -98,7 +98,7 @@ export function isViewActionChord(chord: string): boolean {
  * project picker picks the repo. They start (palette, chord, button) even where the
  * daemon lists them as unavailable, e.g. with nothing selected.
  */
-const contextSupplied: ReadonlySet<string> = new Set(["session.new"]);
+const contextSupplied: ReadonlySet<string> = new Set(["thread.new"]);
 
 /** Whether the GUI can start this command here (see contextSupplied). */
 export function isStartable(c: CommandView): boolean {
@@ -106,7 +106,7 @@ export function isStartable(c: CommandView): boolean {
 }
 
 /** Presenters that also replace the palette's arg prompts when the command is picked there. */
-const paletteSupplied: ReadonlySet<string> = new Set(["session.new", "session.run-in", "session.snooze", "repo.clone", "repo.create", "repo.github.publish", "theme.pick"]);
+const paletteSupplied: ReadonlySet<string> = new Set(["thread.new", "thread.run-in", "thread.snooze", "repo.clone", "repo.create", "repo.github.publish", "theme.pick"]);
 
 let bindingCache: { commands: readonly CommandView[]; map: Map<string, CommandView> } | null = null;
 
@@ -175,17 +175,17 @@ export function beginRename(sessionId: string | null = getUiContext().activeSess
  * replaces the generic palette prompt. Return false to fall back to the default.
  */
 const commandPresenters: Readonly<Record<string, () => boolean>> = {
-  "session.rename": () => beginRename(),
+  "thread.rename": () => beginRename(),
   // The project picker, then the composer; the composer invokes session.new.
-  "session.new": () => {
+  "thread.new": () => {
     openNewThreadPicker();
     return true;
   },
   // "Run in…": the member picker for the active workspace thread; it invokes session.run-in.
-  "session.run-in": () => openRunInPicker(getUiContext().activeSessionId),
+  "thread.run-in": () => openRunInPicker(getUiContext().activeSessionId),
   // Snooze: the custom date dialog for the active thread (the menus offer presets), or
   // unsnooze it when it is snoozed; both invoke session.snooze.
-  "session.snooze": () => presentSnooze(getUiContext().activeSessionId),
+  "thread.snooze": () => presentSnooze(getUiContext().activeSessionId),
   // The Add Project dialog; its tabs call RepoService.Register (repo.add's CLI form with
   // a folder), stream RepoService.Clone (repo.clone's CLI form), or invoke repo.create.
   // repo.add's optional path is never prompted for. repo.clone opens it on the GitHub tab.

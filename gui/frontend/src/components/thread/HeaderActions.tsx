@@ -85,7 +85,7 @@ function WorkspaceChip({ sessionId }: { sessionId: string }) {
  */
 function ArchiveButton({ sessionId }: { sessionId: string }) {
   const archived = useSessionsStore((s) => (s.byId[sessionId]?.archivedAtMs ?? null) !== null);
-  return <CommandButton command="session.archive" icon={archived ? ArchiveRestore : Archive} tooltip={archived ? "Unarchive Thread" : "Archive Thread"} />;
+  return <CommandButton command="thread.archive" icon={archived ? ArchiveRestore : Archive} tooltip={archived ? "Unarchive Thread" : "Archive Thread"} />;
 }
 
 /**

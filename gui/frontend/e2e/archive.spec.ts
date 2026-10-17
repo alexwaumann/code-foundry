@@ -114,9 +114,9 @@ test("Archive from the row menu moves a thread to Archived and out of the main l
   await expect(page.getByTestId("archived-count")).toHaveText("2");
   await expect.poll(() => mainKeys(page)).toEqual(["s:s-2", "s:s-6", "s:s-4"]);
   await expect(page.getByTestId("confirm-dialog")).toHaveCount(0);
-  const inv = (await invocations()).filter((i) => i.name === "session.archive").at(-1);
+  const inv = (await invocations()).filter((i) => i.name === "thread.archive").at(-1);
   expect(inv?.args).toEqual({ archived: "true" });
-  expect(inv?.context?.activeSessionId).toBe("s-3");
+  expect(inv?.context?.activeThreadId).toBe("s-3");
 
   // Most recently archived first.
   await page.getByTestId("archived-header").click();
@@ -129,7 +129,7 @@ test("Archive from the row menu moves a thread to Archived and out of the main l
   await expect(page.getByTestId("archived-count")).toHaveText("1");
   await expect(row(page, "s:s-3")).toHaveAttribute("data-section", "idle");
   await expect.poll(() => mainKeys(page)).toEqual(["s:s-2", "s:s-6", "s:s-4", "s:s-3"]);
-  expect((await invocations()).filter((i) => i.name === "session.archive").at(-1)?.args).toEqual({ archived: "false" });
+  expect((await invocations()).filter((i) => i.name === "thread.archive").at(-1)?.args).toEqual({ archived: "false" });
 });
 
 test("archiving a working thread asks first (the daemon's confirmation); it then drops its side panel and bottom panel", async ({ page }) => {
@@ -169,7 +169,7 @@ test("archiving a working thread asks first (the daemon's confirmation); it then
   await expect(page.getByTestId("bottom-panel")).toHaveCount(0);
   // The header button now unarchives.
   await expect(page.getByTestId("thread-header").getByRole("button", { name: "Unarchive Thread" })).toBeVisible();
-  const confirmed = (await invocations()).filter((i) => i.name === "session.archive");
+  const confirmed = (await invocations()).filter((i) => i.name === "thread.archive");
   expect(confirmed.map((i) => i.confirmed)).toEqual([false, true]);
 
   // Archived from the CLI (another client): the same panel reset.

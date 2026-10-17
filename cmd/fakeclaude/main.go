@@ -1,4 +1,4 @@
-// Command fakeclaude is the session store tests' stand-in for `claude -p`
+// Command fakeclaude is the thread store tests' stand-in for `claude -p`
 // (internal/claudestream/fakeclaude). The tests build it themselves; it ships nowhere.
 package main
 

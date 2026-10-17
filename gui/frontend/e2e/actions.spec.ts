@@ -87,7 +87,7 @@ test("the header's Play menu lists the project's actions and runs one in the thr
   // A click runs it for the thread, always in a terminal, without a toast.
   await item(page, "Test").click();
   await expect(menu(page)).toHaveCount(0);
-  await expect.poll(async () => (await calls("action.run")).map((c) => [c.args, c.context?.activeSessionId])).toEqual([[{ action: IDS.test, terminal: "true" }, "s-1"]]);
+  await expect.poll(async () => (await calls("action.run")).map((c) => [c.args, c.context?.activeThreadId])).toEqual([[{ action: IDS.test, terminal: "true" }, "s-1"]]);
   await expect(bottom(page)).toBeVisible();
   await expect(tabs(page)).toHaveText(["code-foundry", "Test"]);
   const tab = bottom(page).locator('[data-kind="action"]');
@@ -278,7 +278,7 @@ test("an action tab: Stop keeps the tab, stopped, Rerun replaces it with a new r
   await expect(status(page)).toHaveAttribute("data-status", "running");
   const [, again] = await calls("action.run");
   expect(again?.args).toEqual({ action: IDS.dev, terminal: "true" });
-  expect(again?.context?.activeSessionId).toBe("s-1");
+  expect(again?.context?.activeThreadId).toBe("s-1");
 
   // A finished run that exits 0: the green check, the duration, Rerun.
   const build = await runFromMenu(page, "Build");

@@ -15,8 +15,8 @@ describe("helpSections", () => {
       { chord: "cmd+2", title: "Jump to thread 2" },
     ];
     const commands = [
-      cmd({ name: "session.new", title: "New Session", category: "Session", keybindings: ["cmd+n"] }),
-      cmd({ name: "session.list", title: "List Sessions", category: "Session" }),
+      cmd({ name: "thread.new", title: "New Session", category: "Session", keybindings: ["cmd+n"] }),
+      cmd({ name: "thread.list", title: "List Sessions", category: "Session" }),
       cmd({ name: "terminal.new", title: "New Terminal", category: "Terminal", keybindings: ["cmd+t"], available: false }),
       cmd({ name: "view.help", title: "Help", category: "View", keybindings: ["cmd+/"] }),
     ];
@@ -28,7 +28,7 @@ describe("helpSections", () => {
           { keys: ["⌘1–9"], label: "Jump to thread 1–9", available: true },
         ],
       },
-      { title: "Session", items: [{ keys: ["⌘N"], label: "New Session", command: "session.new", available: true }] },
+      { title: "Session", items: [{ keys: ["⌘N"], label: "New Session", command: "thread.new", available: true }] },
       { title: "Terminal", items: [{ keys: ["⌘T"], label: "New Terminal", command: "terminal.new", available: false }] },
       { title: "View", items: [{ keys: ["⌘/"], label: "Help", command: "view.help", available: true }] },
     ]);

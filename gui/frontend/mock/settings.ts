@@ -23,7 +23,7 @@ export interface MockCommandInfo {
 export const PATH = "/Users/dev/.code-foundry/settings.toml";
 
 export const groups: GroupInit[] = [
-  { id: "sessions", title: "Sessions", description: "Defaults for new Claude Code sessions." },
+  { id: "threads", title: "Threads", description: "Defaults for new threads." },
   { id: "github", title: "GitHub", description: "Your pull requests and default-branch checks, polled with gh's login." },
   { id: "repos", title: "Repositories", description: "Git fetching and where new worktrees go." },
   { id: "gitops", title: "Git operations", description: "How worktrees are handed to other apps." },
@@ -51,8 +51,8 @@ export const MODEL_VALUES: string[] = MODELS.map((m) => m.value);
 
 const staticFields: FieldInit[] = [
   {
-    key: "sessions.default_model",
-    group: "sessions",
+    key: "threads.default_model",
+    group: "threads",
     type: S.ENUM,
     title: "Default model",
     description: "Model for new threads when none is picked. Every model runs with the 1M context window.",
@@ -60,10 +60,10 @@ const staticFields: FieldInit[] = [
     enumLabels: MODELS.map((m) => m.label),
     defaultValue: "claude-opus-4-8[1m]",
   },
-  { key: "sessions.default_effort", group: "sessions", type: S.ENUM, title: "Default effort", description: "Effort level for new sessions when none is picked.", enumValues: ["", "low", "medium", "high", "xhigh", "max"], defaultValue: "high" },
+  { key: "threads.default_effort", group: "threads", type: S.ENUM, title: "Default effort", description: "Effort level for new sessions when none is picked.", enumValues: ["", "low", "medium", "high", "xhigh", "max"], defaultValue: "high" },
   {
-    key: "sessions.default_worktree",
-    group: "sessions",
+    key: "threads.default_worktree",
+    group: "threads",
     type: S.ENUM,
     title: "New threads work in",
     description: "A fresh copy keeps each thread on its own branch and folder. The project folder itself edits your files in place.",
@@ -71,10 +71,10 @@ const staticFields: FieldInit[] = [
     enumLabels: ["A fresh copy of the project", "The project folder itself"],
     defaultValue: "new",
   },
-  { key: "sessions.auto_name", group: "sessions", type: S.BOOL, title: "Name sessions automatically", description: "Name a new session from its first message with a short claude -p call.", defaultValue: "true" },
+  { key: "threads.auto_name", group: "threads", type: S.BOOL, title: "Name sessions automatically", description: "Name a new session from its first message with a short claude -p call.", defaultValue: "true" },
   {
-    key: "sessions.naming_model",
-    group: "sessions",
+    key: "threads.naming_model",
+    group: "threads",
     type: S.ENUM,
     title: "Naming model",
     description: "Model for the claude -p call that names a new session. Always runs at low effort.",
@@ -82,9 +82,9 @@ const staticFields: FieldInit[] = [
     enumLabels: MODELS.map((m) => m.label),
     defaultValue: "claude-sonnet-5[1m]",
   },
-  { key: "sessions.cache_ttl_seconds", group: "sessions", type: S.INT, title: "Prompt cache lifetime (seconds)", description: "How long the Claude API in use keeps a conversation's prompt cache after its last request.", defaultValue: "3600", min: 60n, max: 86400n },
-  { key: "sessions.close_grace_seconds", group: "sessions", type: S.INT, title: "Close grace (seconds)", description: "How long closing a session waits for Claude to exit.", defaultValue: "10", min: 1n, max: 120n, restartRequired: true },
-  { key: "sessions.scrollback_lines", group: "sessions", type: S.INT, title: "Scrollback lines", description: "Lines of history each terminal keeps.", defaultValue: "10000", min: 1000n, max: 100000n, restartRequired: true },
+  { key: "threads.cache_ttl_seconds", group: "threads", type: S.INT, title: "Prompt cache lifetime (seconds)", description: "How long the Claude API in use keeps a conversation's prompt cache after its last request.", defaultValue: "3600", min: 60n, max: 86400n },
+  { key: "threads.close_grace_seconds", group: "threads", type: S.INT, title: "Close grace (seconds)", description: "How long closing a session waits for Claude to exit.", defaultValue: "10", min: 1n, max: 120n, restartRequired: true },
+  { key: "threads.scrollback_lines", group: "threads", type: S.INT, title: "Scrollback lines", description: "Lines of history each terminal keeps.", defaultValue: "10000", min: 1000n, max: 100000n, restartRequired: true },
   { key: "github.poll_interval_seconds", group: "github", type: S.INT, title: "Poll interval (seconds)", description: "How often one request checks your pull requests, watched branches, and tracked default branches for changes.", defaultValue: "60", min: 15n, max: 3600n },
   { key: "github.dashboards_enabled", group: "github", type: S.BOOL, title: "Pull request dashboards", description: "Poll your pull requests for the Pull Requests page.", defaultValue: "true" },
   { key: "repos.fetch_interval_seconds", group: "repos", type: S.INT, title: "Fetch interval (seconds)", description: "How often each repository runs git fetch --prune. 0 turns it off.", defaultValue: "120", min: 0n, max: 86400n, restartRequired: true },

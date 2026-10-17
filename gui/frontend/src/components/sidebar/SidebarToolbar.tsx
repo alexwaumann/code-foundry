@@ -92,10 +92,10 @@ export function SidebarToolbar() {
  * muted hint on the right. Runs exactly what the palette does (the project picker).
  */
 export function SidebarNewThread() {
-  const chord = useCommandsStore((s) => s.commands.find((c) => c.name === "session.new")?.keybindings[0] ?? null);
+  const chord = useCommandsStore((s) => s.commands.find((c) => c.name === "thread.new")?.keybindings[0] ?? null);
   return (
     <CommandButton
-      command="session.new"
+      command="thread.new"
       variant="default"
       whenUnavailable="disable"
       className="mt-1.5 h-8 w-full shrink-0 justify-start gap-2 px-2 text-body-sm font-medium has-[>svg]:px-2 [--wails-draggable:no-drag]"

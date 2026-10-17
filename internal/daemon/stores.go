@@ -21,9 +21,9 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/gitops"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
-	"github.com/alexwaumann/code-foundry/internal/store/session"
 	"github.com/alexwaumann/code-foundry/internal/store/settings"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
+	"github.com/alexwaumann/code-foundry/internal/store/thread"
 	"github.com/alexwaumann/code-foundry/internal/store/update"
 	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 	"github.com/alexwaumann/code-foundry/internal/version"
@@ -53,17 +53,17 @@ type stores struct {
 	// stopShells stops the shell reaper (shells.go): exited shells and the shells of a
 	// removed worktree are removed. Stopped before terminal closes.
 	stopShells func()
-	// session layers Claude sessions on terminal and db; shut down before terminal so
-	// live sessions are recorded as disconnected while their processes still run.
-	session *session.Manager
+	// thread layers Claude sessions on terminal and db; shut down before terminal so
+	// live threads are recorded as disconnected while their processes still run.
+	thread *thread.Manager
 	// update checks for and installs new releases (disabled in dev builds).
 	update *update.Store
 	// workspace holds branch sets across repos; it creates and removes worktrees
-	// through repo and asks session which threads are live. Opened before session,
+	// through repo and asks thread which threads are live. Opened before thread,
 	// which reads workspace members at launch.
 	workspace *workspace.Manager
 	// action holds each project's actions and runs them (in a terminal, or in the
-	// background). Opened before session (whose new worktrees run on-worktree-create
+	// background). Opened before thread (whose new worktrees run on-worktree-create
 	// actions) and closed before it, killing background runs.
 	action *action.Manager
 	// stopActions stops the glue that forgets an unregistered project's actions and
@@ -75,9 +75,9 @@ type stores struct {
 }
 
 // openStores opens the database, applies migrations, and starts every store. On
-// error, whatever was started is closed again. sessionEnv is added to every Claude
-// session's environment (see sessionEnv in daemon.go).
-func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, sessionEnv []string) (_ *stores, err error) {
+// error, whatever was started is closed again. threadEnv is added to every Claude
+// process's environment (see threadEnv in daemon.go).
+func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv []string) (_ *stores, err error) {
 	s := &stores{bus: bus.New()}
 	defer func() {
 		if err != nil {
@@ -148,24 +148,24 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, sessionEnv
 		},
 	})
 	s.terminal = terminal.New(terminal.Options{
-		Bus: s.bus, Logger: log.With("store", "terminal"), MaxScrollbackLines: uint(cfg.Sessions.ScrollbackLines),
+		Bus: s.bus, Logger: log.With("store", "terminal"), MaxScrollbackLines: uint(cfg.Threads.ScrollbackLines),
 	})
-	// Workspaces open before sessions: a session reads a workspace thread's members at
-	// every spawn, and the workspace store asks sessions about their threads (and
+	// Workspaces open before threads: a thread reads a workspace thread's members at
+	// every spawn, and the workspace store asks threads about their threads (and
 	// pre-trusts worktrees) only through these closures, which run after both exist.
 	if s.workspace, err = workspace.New(ctx, workspace.Options{
 		DB: s.db, Repos: s.repo, Bus: s.bus, Log: log.With("store", "workspace"),
 		Threads: func() []workspace.Thread {
-			if s.session == nil {
+			if s.thread == nil {
 				return nil
 			}
-			return worktreeThreads(s.session.Snapshot())
+			return worktreeThreads(s.thread.Snapshot())
 		},
 		Trust: func(dir string) error {
-			if s.session == nil {
+			if s.thread == nil {
 				return nil
 			}
-			return s.session.PreTrust(dir)
+			return s.thread.PreTrust(dir)
 		},
 		WorktreePath: settingsWorktreePath(s.settings),
 	}); err != nil {
@@ -173,23 +173,23 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, sessionEnv
 	}
 	if s.action, err = action.New(ctx, action.Options{
 		DB: s.db, Repos: s.repo, Terminals: s.terminal, Bus: s.bus, Log: log.With("store", "action"),
-		Session: func(id string) (action.Owner, bool) {
-			if s.session == nil {
+		Thread: func(id string) (action.Owner, bool) {
+			if s.thread == nil {
 				return action.Owner{}, false
 			}
-			return sessionOwner(s.session.Snapshot(), id)
+			return threadOwner(s.thread.Snapshot(), id)
 		},
 	}); err != nil {
 		return nil, err
 	}
 	claude := cmp.Or(settings.ExpandedPath(cfg.Advanced.ClaudePath), "claude")
-	sessionLog := log.With("store", "session")
-	if s.session, err = session.New(ctx, session.Options{
-		DB: s.db, Terminals: s.terminal, Repos: s.repo, Workspaces: s.workspace, Bus: s.bus, Log: sessionLog,
+	threadLog := log.With("store", "thread")
+	if s.thread, err = thread.New(ctx, thread.Options{
+		DB: s.db, Terminals: s.terminal, Repos: s.repo, Workspaces: s.workspace, Bus: s.bus, Log: threadLog,
 		Claude: claude, CloseTimeout: cfg.CloseGrace(),
-		Namer:          settingsNamer(s.settings, session.ClaudeNamer(claude, "/tmp", sessionLog)),
+		Namer:          settingsNamer(s.settings, thread.ClaudeNamer(claude, "/tmp", threadLog)),
 		AttachmentsDir: p.Attachments(), WorktreePath: settingsWorktreePath(s.settings),
-		Env: sessionEnv, CacheTTL: cfg.CacheTTL(),
+		Env: threadEnv, CacheTTL: cfg.CacheTTL(),
 		// Development aids: how long a thread's process stays up at least, and how often
 		// idle threads are checked against their cache expiry (Go durations; unset or
 		// invalid: the defaults, 5m and 30s). See docs/notes/thread-lifecycle.md.
@@ -201,14 +201,14 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, sessionEnv
 	}); err != nil {
 		return nil, err
 	}
-	applyCacheTTL(s.settings, s.session)
-	// After session: the reaper's sweep asks it which threads exist.
+	applyCacheTTL(s.settings, s.thread)
+	// After thread: the reaper's sweep asks it which threads exist.
 	if s.stopShells, err = startShellReaper(ctx, shellReaperOptions{
 		Log: log.With("store", "terminal"), Terminals: s.terminal, Bus: s.bus,
 		RepoExists: func(id string) bool { _, ok := s.repo.Snapshot().Repo(id); return ok },
-		SessionExists: func(id string) bool {
-			snap := s.session.Snapshot()
-			return snap == nil || slices.ContainsFunc(snap.Sessions, func(x session.Session) bool { return x.ID == id })
+		ThreadExists: func(id string) bool {
+			snap := s.thread.Snapshot()
+			return snap == nil || slices.ContainsFunc(snap.Threads, func(x thread.Thread) bool { return x.ID == id })
 		},
 	}); err != nil {
 		return nil, err
@@ -238,28 +238,28 @@ func envDuration(log *slog.Logger, name string) time.Duration {
 	return d
 }
 
-// sessionOwner is thread id's project and worktree, the owner of its action runs.
-func sessionOwner(snap *session.Snapshot, id string) (action.Owner, bool) {
+// threadOwner is thread id's project and worktree, the owner of its action runs.
+func threadOwner(snap *thread.Snapshot, id string) (action.Owner, bool) {
 	if snap == nil {
 		return action.Owner{}, false
 	}
-	i := slices.IndexFunc(snap.Sessions, func(x session.Session) bool { return x.ID == id })
+	i := slices.IndexFunc(snap.Threads, func(x thread.Thread) bool { return x.ID == id })
 	if i < 0 {
 		return action.Owner{}, false
 	}
-	return action.Owner{SessionID: id, RepoID: snap.Sessions[i].RepoID, Worktree: snap.Sessions[i].WorktreePath}, true
+	return action.Owner{ThreadID: id, RepoID: snap.Threads[i].RepoID, Worktree: snap.Threads[i].WorktreePath}, true
 }
 
 // worktreeThreads lists the threads that own their cwd, for the cleanup rule and the
 // workspace store's removal guards: every thread but an archived one, whatever its state
 // (a stopped thread looks like any other in the GUI and a message starts it again in the
 // same worktree; a snoozed one comes back to it).
-func worktreeThreads(snap *session.Snapshot) []workspace.Thread {
+func worktreeThreads(snap *thread.Snapshot) []workspace.Thread {
 	var out []workspace.Thread
 	if snap == nil {
 		return nil
 	}
-	for _, s := range snap.Sessions {
+	for _, s := range snap.Threads {
 		if s.ArchivedAt.IsZero() {
 			out = append(out, workspace.Thread{ID: s.ID, Name: s.Name, Cwd: s.WorktreePath})
 		}
@@ -284,9 +284,9 @@ func (s *stores) close() error {
 		errs = append(errs, s.action.Close(closeCtx))
 		cancel()
 	}
-	if s.session != nil {
+	if s.thread != nil {
 		closeCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
-		errs = append(errs, s.session.Shutdown(closeCtx))
+		errs = append(errs, s.thread.Shutdown(closeCtx))
 		cancel()
 	}
 	if s.terminal != nil {

@@ -64,7 +64,7 @@ func TestActionUnary(t *testing.T) {
 		t.Errorf("Update to no icon: %v", err)
 	}
 
-	run, err := c.Run(ctx, connect.NewRequest(&v1.RunActionRequest{Action: "unit TESTS", SessionId: "s1", RepoId: "web",
+	run, err := c.Run(ctx, connect.NewRequest(&v1.RunActionRequest{Action: "unit TESTS", ThreadId: "s1", RepoId: "web",
 		Mode: v1.ActionRunMode_ACTION_RUN_MODE_TERMINAL}))
 	if err != nil {
 		t.Fatal(err)
@@ -74,7 +74,7 @@ func TestActionUnary(t *testing.T) {
 		r.GetTerminalId() == "" || r.GetTrigger() != v1.ActionRunTrigger_ACTION_RUN_TRIGGER_USER {
 		t.Fatalf("Run = %v", r)
 	}
-	if ran := fake.Ran(); len(ran) != 1 || ran[0] != (action.RunOptions{Action: "unit TESTS", SessionID: "s1", RepoID: "web", Mode: action.ModeTerminal}) {
+	if ran := fake.Ran(); len(ran) != 1 || ran[0] != (action.RunOptions{Action: "unit TESTS", ThreadID: "s1", RepoID: "web", Mode: action.ModeTerminal}) {
 		t.Errorf("Ran = %+v", ran)
 	}
 	if _, err := c.Run(ctx, connect.NewRequest(&v1.RunActionRequest{Action: "deploy", RepoId: "web"})); connect.CodeOf(err) != connect.CodeNotFound {

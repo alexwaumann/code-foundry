@@ -20,7 +20,7 @@
 // version its daemon runs (GUI and daemon have no cross-version compatibility). The
 // user applies it with `app.restart` (the GUI's "Restart Now"): Install swaps the staged
 // directory in (two renames), RequestRestart announces RestartRequested, then the daemon
-// exits, closing every session; GUI hosts relaunch once their Watch stream ends, and the
+// exits, closing every thread; GUI hosts relaunch once their Watch stream ends, and the
 // relaunched window auto-starts the installed daemon. A daemon that starts from the new
 // install is simply up to date.
 //

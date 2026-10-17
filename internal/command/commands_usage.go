@@ -203,7 +203,7 @@ func formatTokens(n int64) string {
 
 func trimZero(s string) string { return strings.TrimSuffix(s, ".0") }
 
-// formatUSD shows cents, or four decimals under a cent so small sessions are not $0.00.
+// formatUSD shows cents, or four decimals under a cent so small threads are not $0.00.
 func formatUSD(v float64) string {
 	if v > 0 && v < 0.01 {
 		return "$" + strconv.FormatFloat(v, 'f', 4, 64)
@@ -270,7 +270,7 @@ func renderUsage(heading string, rep UsageReport) string {
 
 // RegisterUsage registers usage.show, the CLI's token usage report (`code-foundry
 // usage [--thread <id>] [--json]`). The GUI's entry point is view.usage.
-func RegisterUsage(r *Registry, b SessionBackend) error {
+func RegisterUsage(r *Registry, b ThreadBackend) error {
 	return r.Register(Command{
 		Name:  "usage.show",
 		Title: "Show Token Usage",
@@ -284,11 +284,11 @@ func RegisterUsage(r *Registry, b SessionBackend) error {
 		When: func(c Context) bool { return c.ActiveView == "" },
 		Run: func(ctx context.Context, _ Context, args Args) (Result, error) {
 			if id := args.String("thread"); id != "" {
-				res, err := b.Get(ctx, connect.NewRequest(&v1.GetSessionRequest{Id: id}))
+				res, err := b.Get(ctx, connect.NewRequest(&v1.GetThreadRequest{Id: id}))
 				if err != nil {
 					return Result{}, err
 				}
-				s := res.Msg.GetSession()
+				s := res.Msg.GetThread()
 				rep := summarizeUsage(s.GetUsage())
 				rep.Thread, rep.Threads = s.GetId(), 1
 				rep.AgentRuns = usageRuns(s.GetAgentRuns())
@@ -298,18 +298,18 @@ func RegisterUsage(r *Registry, b SessionBackend) error {
 				}
 				return Result{Message: strings.TrimRight(renderUsage(heading, rep)+renderRuns(rep.AgentRuns), "\n"), JSON: rep}, nil
 			}
-			res, err := b.List(ctx, connect.NewRequest(&v1.ListSessionsRequest{}))
+			res, err := b.List(ctx, connect.NewRequest(&v1.ListThreadsRequest{}))
 			if err != nil {
 				return Result{}, err
 			}
 			var all []*v1.UsageBucket
-			for _, s := range res.Msg.GetSessions() {
+			for _, s := range res.Msg.GetThreads() {
 				all = append(all, s.GetUsage()...)
 			}
 			retired := res.Msg.GetRetiredUsage()
 			all = append(all, retired...)
 			rep := summarizeUsage(all)
-			rep.Threads, rep.Retired = len(res.Msg.GetSessions()), len(retired) > 0
+			rep.Threads, rep.Retired = len(res.Msg.GetThreads()), len(retired) > 0
 			heading := fmt.Sprintf("All threads (%d", rep.Threads)
 			if rep.Retired {
 				heading += " + removed"

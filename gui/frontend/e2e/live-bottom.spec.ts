@@ -31,7 +31,7 @@ function cli(...args: string[]): string {
 /** The thread's shells, from the daemon. */
 function shellsOf(session: string): string[] {
   const list = (JSON.parse(cli("terminal", "list", "--json")) as { terminals?: { id: string; labels?: Record<string, string> }[] }).terminals ?? [];
-  return list.filter((t) => t.labels?.kind === "shell" && t.labels.session === session).map((t) => t.id);
+  return list.filter((t) => t.labels?.kind === "shell" && t.labels.thread === session).map((t) => t.id);
 }
 
 const bottom = (page: Page) => page.getByTestId("bottom-panel");

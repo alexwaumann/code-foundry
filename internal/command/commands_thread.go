@@ -22,6 +22,19 @@ import (
 // Connect signatures. The API handler, any ThreadServiceHandler, and a
 // ThreadServiceClient satisfy it.
 type ThreadBackend interface {
+	// The lifecycle (commands_thread_lifecycle.go and the thread.pin, thread.archive,
+	// thread.snooze and thread.run-in files).
+	Create(context.Context, *connect.Request[v1.CreateThreadRequest]) (*connect.Response[v1.CreateThreadResponse], error)
+	Fork(context.Context, *connect.Request[v1.ForkThreadRequest]) (*connect.Response[v1.ForkThreadResponse], error)
+	List(context.Context, *connect.Request[v1.ListThreadsRequest]) (*connect.Response[v1.ListThreadsResponse], error)
+	Get(context.Context, *connect.Request[v1.GetThreadRequest]) (*connect.Response[v1.GetThreadResponse], error)
+	Rename(context.Context, *connect.Request[v1.RenameThreadRequest]) (*connect.Response[v1.RenameThreadResponse], error)
+	Remove(context.Context, *connect.Request[v1.RemoveThreadRequest]) (*connect.Response[v1.RemoveThreadResponse], error)
+	RunIn(context.Context, *connect.Request[v1.RunInThreadRequest]) (*connect.Response[v1.RunInThreadResponse], error)
+	Pin(context.Context, *connect.Request[v1.PinThreadRequest]) (*connect.Response[v1.PinThreadResponse], error)
+	Archive(context.Context, *connect.Request[v1.ArchiveThreadRequest]) (*connect.Response[v1.ArchiveThreadResponse], error)
+	Snooze(context.Context, *connect.Request[v1.SnoozeThreadRequest]) (*connect.Response[v1.SnoozeThreadResponse], error)
+	// The conversation.
 	ListItems(context.Context, *connect.Request[v1.ListThreadItemsRequest]) (*connect.Response[v1.ListThreadItemsResponse], error)
 	Send(context.Context, *connect.Request[v1.SendThreadMessageRequest]) (*connect.Response[v1.SendThreadMessageResponse], error)
 	Respond(context.Context, *connect.Request[v1.RespondThreadRequest]) (*connect.Response[v1.RespondThreadResponse], error)
@@ -52,7 +65,7 @@ var threadDecisions = map[string]v1.ThreadDecision{
 // RegisterThread registers thread.send, thread.respond, thread.interrupt,
 // thread.items, thread.set-model, thread.set-mode and thread.set-effort.
 func RegisterThread(r *Registry, b ThreadBackend) error {
-	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextSession, Description: "Thread id"}
+	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextThread, Description: "Thread id"}
 	return r.RegisterAll(
 		Command{
 			Name:  "thread.send",
@@ -66,10 +79,10 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 				{Name: "attachments", Type: String, Description: "Comma-separated image paths from StageAttachment"},
 				{Name: "composer-text", Type: String, Description: "The GUI composer's text with its tag tokens, kept on the message for display (the GUI sets it)"},
 			},
-			When: hasSession,
+			When: hasThread,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				res, err := b.Send(ctx, connect.NewRequest(&v1.SendThreadMessageRequest{
-					SessionId: a.String("id"), Text: a.String("text"), Attachments: splitList(a.String("attachments")),
+					ThreadId: a.String("id"), Text: a.String("text"), Attachments: splitList(a.String("attachments")),
 					ComposerText: a.String("composer-text"),
 				}))
 				if err != nil {
@@ -93,10 +106,10 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 				{Name: "message", Type: String, Description: "With deny: the reason Claude sees"},
 				{Name: "interrupt", Type: Bool, Description: "With deny: also stop the turn"},
 			},
-			When: hasSession,
+			When: hasThread,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				id := a.String("id")
-				items, err := b.ListItems(ctx, connect.NewRequest(&v1.ListThreadItemsRequest{SessionId: id}))
+				items, err := b.ListItems(ctx, connect.NewRequest(&v1.ListThreadItemsRequest{ThreadId: id}))
 				if err != nil {
 					return Result{}, err
 				}
@@ -116,7 +129,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 					return Result{}, connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf("thread %s has no pending request", id))
 				}
 				msg := &v1.RespondThreadRequest{
-					SessionId: id, RequestId: pending.GetRequestId(), Decision: threadDecisions[a.String("decision")],
+					ThreadId: id, RequestId: pending.GetRequestId(), Decision: threadDecisions[a.String("decision")],
 					Message: a.String("message"), Interrupt: a.Bool("interrupt"),
 				}
 				if pending.GetQuestion() && msg.Decision != v1.ThreadDecision_THREAD_DECISION_DENY {
@@ -140,9 +153,9 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 			// No keybinding: Escape (Claude Code's key) stopped turns by accident. The GUI
 			// interrupts from the composer's Interrupt button only.
 			Args: []ArgSpec{idArg},
-			When: hasSession,
+			When: hasThread,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-				if _, err := b.Interrupt(ctx, connect.NewRequest(&v1.InterruptThreadRequest{SessionId: a.String("id")})); err != nil {
+				if _, err := b.Interrupt(ctx, connect.NewRequest(&v1.InterruptThreadRequest{ThreadId: a.String("id")})); err != nil {
 					return Result{}, err
 				}
 				return Result{Message: "interrupted thread " + a.String("id")}, nil
@@ -157,9 +170,9 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 				idArg,
 				{Name: "full", Type: Bool, Description: "Print whole texts, tool inputs and outputs instead of one line each"},
 			},
-			When: hasSession,
+			When: hasThread,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-				res, err := b.ListItems(ctx, connect.NewRequest(&v1.ListThreadItemsRequest{SessionId: a.String("id")}))
+				res, err := b.ListItems(ctx, connect.NewRequest(&v1.ListThreadItemsRequest{ThreadId: a.String("id")}))
 				if err != nil {
 					return Result{}, err
 				}
@@ -174,16 +187,16 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 			Category:    "Thread",
 			Args: []ArgSpec{
 				idArg,
-				{Name: "model", Type: Enum, Enum: SessionModels, Required: true, Positional: true, Description: sessionModelHelp},
+				{Name: "model", Type: Enum, Enum: ThreadModels, Required: true, Positional: true, Description: threadModelHelp},
 			},
-			When: hasSession,
+			When: hasThread,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-				res, err := b.SetModel(ctx, connect.NewRequest(&v1.SetThreadModelRequest{SessionId: a.String("id"), Model: a.String("model")}))
+				res, err := b.SetModel(ctx, connect.NewRequest(&v1.SetThreadModelRequest{ThreadId: a.String("id"), Model: a.String("model")}))
 				if err != nil {
 					return Result{}, err
 				}
-				s := res.Msg.GetSession()
-				return Result{Message: "thread " + sessionLabel(s) + " uses " + model.Label(s.GetModel()), JSON: s}, nil
+				s := res.Msg.GetThread()
+				return Result{Message: "thread " + threadLabel(s) + " uses " + model.Label(s.GetModel()), JSON: s}, nil
 			},
 		},
 		Command{
@@ -193,18 +206,18 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 			Category:    "Thread",
 			Args: []ArgSpec{
 				idArg,
-				{Name: "permission", Type: Enum, Enum: SessionPermissions, Required: true, Positional: true, Description: "supervised, accept-edits, or auto"},
+				{Name: "permission", Type: Enum, Enum: ThreadPermissions, Required: true, Positional: true, Description: "supervised, accept-edits, or auto"},
 			},
-			When: hasSession,
+			When: hasThread,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				res, err := b.SetPermissionMode(ctx, connect.NewRequest(&v1.SetThreadPermissionModeRequest{
-					SessionId: a.String("id"), PermissionMode: sessionPermissionModes[a.String("permission")],
+					ThreadId: a.String("id"), PermissionMode: threadPermissionModes[a.String("permission")],
 				}))
 				if err != nil {
 					return Result{}, err
 				}
-				s := res.Msg.GetSession()
-				return Result{Message: "thread " + sessionLabel(s) + " runs " + a.String("permission"), JSON: s}, nil
+				s := res.Msg.GetThread()
+				return Result{Message: "thread " + threadLabel(s) + " runs " + a.String("permission"), JSON: s}, nil
 			},
 		},
 		Command{
@@ -215,21 +228,21 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 			Category: "Thread",
 			Args: []ArgSpec{
 				idArg,
-				{Name: "effort", Type: Enum, Enum: SessionEfforts, Required: true, Positional: true, Description: "low, medium, high, xhigh, or max"},
+				{Name: "effort", Type: Enum, Enum: ThreadEfforts, Required: true, Positional: true, Description: "low, medium, high, xhigh, or max"},
 			},
-			When: hasSession,
+			When: hasThread,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-				res, err := b.SetEffort(ctx, connect.NewRequest(&v1.SetThreadEffortRequest{SessionId: a.String("id"), Effort: a.String("effort")}))
+				res, err := b.SetEffort(ctx, connect.NewRequest(&v1.SetThreadEffortRequest{ThreadId: a.String("id"), Effort: a.String("effort")}))
 				if err != nil {
 					return Result{}, err
 				}
-				s := res.Msg.GetSession()
-				msg := "thread " + sessionLabel(s) + " restarts with effort " + s.GetEffort()
+				s := res.Msg.GetThread()
+				msg := "thread " + threadLabel(s) + " restarts with effort " + s.GetEffort()
 				switch {
 				case s.GetEffortPending() && onTurn(s):
-					msg = "thread " + sessionLabel(s) + " switches to effort " + s.GetEffort() + " after this turn"
+					msg = "thread " + threadLabel(s) + " switches to effort " + s.GetEffort() + " after this turn"
 				case notRunning(s):
-					msg = "thread " + sessionLabel(s) + " uses effort " + s.GetEffort() + " from its next message"
+					msg = "thread " + threadLabel(s) + " uses effort " + s.GetEffort() + " from its next message"
 				}
 				return Result{Message: msg, JSON: s}, nil
 			},
@@ -239,9 +252,9 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 
 // notRunning: s has no Claude process up (stopped, or on its way down); a setting
 // applies when the next message starts it.
-func notRunning(s *v1.Session) bool {
+func notRunning(s *v1.Thread) bool {
 	st := s.GetState()
-	return st == v1.SessionState_SESSION_STATE_DISCONNECTED || st == v1.SessionState_SESSION_STATE_CLOSING
+	return st == v1.ThreadState_THREAD_STATE_DISCONNECTED || st == v1.ThreadState_THREAD_STATE_CLOSING
 }
 
 // questionTexts are the questions of the question item itemID.
@@ -419,11 +432,11 @@ func FormatThreadItems(snap *v1.ThreadItemsSnapshot, full bool) string {
 // onTurn: the thread is on a turn (working, or waiting on a permission or a question
 // mid-turn), so an effort change waits for its end. "finished" or a turn's error waits
 // for nobody: the restart is immediate.
-func onTurn(s *v1.Session) bool {
+func onTurn(s *v1.Thread) bool {
 	switch s.GetStatus() {
-	case v1.SessionStatus_SESSION_STATUS_BUSY:
+	case v1.ThreadStatus_THREAD_STATUS_BUSY:
 		return true
-	case v1.SessionStatus_SESSION_STATUS_NEEDS_ATTENTION:
+	case v1.ThreadStatus_THREAD_STATUS_NEEDS_ATTENTION:
 		r := s.GetStatusReason()
 		return strings.HasPrefix(r, "permission") || strings.HasPrefix(r, "question")
 	}

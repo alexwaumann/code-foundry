@@ -4,7 +4,7 @@
  * unpriced. Seeded on s-1; POST /__mock/usage adds a bucket to any session.
  */
 import type { MessageInitShape } from "@bufbuild/protobuf";
-import type { UsageBucketSchema } from "../src/gen/codefoundry/v1/session_pb";
+import type { UsageBucketSchema } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
 
 type UsageBucketInit = MessageInitShape<typeof UsageBucketSchema>;
 

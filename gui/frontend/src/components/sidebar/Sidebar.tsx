@@ -364,7 +364,7 @@ function SidebarList({ bodyHeight }: { bodyHeight: number }) {
   );
 }
 
-/** Shown when the daemon has no SessionService (older daemon): everything else still works. */
+/** Shown when the daemon has no ThreadService (older daemon): everything else still works. */
 function SessionsUnavailable() {
   const unavailable = useSessionsStore((s) => s.availability === "unavailable");
   const error = useSessionsStore((s) => s.error);

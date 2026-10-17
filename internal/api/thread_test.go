@@ -12,14 +12,14 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/bus"
-	"github.com/alexwaumann/code-foundry/internal/store/session"
-	"github.com/alexwaumann/code-foundry/internal/store/session/sessiontest"
+	"github.com/alexwaumann/code-foundry/internal/store/thread"
+	"github.com/alexwaumann/code-foundry/internal/store/thread/threadtest"
 )
 
-func newThreadServer(t *testing.T) (*sessiontest.Fake, codefoundryv1connect.ThreadServiceClient) {
+func newThreadServer(t *testing.T) (*threadtest.Fake, codefoundryv1connect.ThreadServiceClient) {
 	t.Helper()
 	b := bus.New()
-	fake := sessiontest.New(b)
+	fake := threadtest.New(b)
 	route := NewThread(fake, b).Route()
 	mux := http.NewServeMux()
 	mux.Handle(route.Path, route.Handler)
@@ -32,22 +32,22 @@ func newThreadServer(t *testing.T) (*sessiontest.Fake, codefoundryv1connect.Thre
 
 func TestThreadWatchSendRespond(t *testing.T) {
 	fake, c := newThreadServer(t)
-	fake.Put(session.Session{ID: "s1", State: session.StateConnected})
-	fake.Put(session.Session{ID: "d1", State: session.StateDisconnected})
+	fake.Put(thread.Thread{ID: "s1", State: thread.StateConnected})
+	fake.Put(thread.Thread{ID: "d1", State: thread.StateDisconnected})
 	fake.PutItems("s1",
-		session.Item{ID: "u1", Kind: session.KindUserMessage, Text: "hi @cf-file://r1/a.go", Attachments: []string{"/att/1.png"},
+		thread.Item{ID: "u1", Kind: thread.KindUserMessage, Text: "hi @cf-file://r1/a.go", Attachments: []string{"/att/1.png"},
 			ComposerText: "hi [a.go](cf-file://r1/a.go)"},
-		session.Item{ID: "m/0", Kind: session.KindAssistantText, Text: "| a |", Streaming: true},
-		session.Item{ID: "perm-r1", Kind: session.KindPermission, Request: &session.Request{RequestID: "r1", ToolName: "Write", Description: "a.go", State: session.RequestPending}},
+		thread.Item{ID: "m/0", Kind: thread.KindAssistantText, Text: "| a |", Streaming: true},
+		thread.Item{ID: "perm-r1", Kind: thread.KindPermission, Request: &thread.Request{RequestID: "r1", ToolName: "Write", Description: "a.go", State: thread.RequestPending}},
 	)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if _, err := c.ListItems(ctx, connect.NewRequest(&v1.ListThreadItemsRequest{SessionId: "nope"})); connect.CodeOf(err) != connect.CodeNotFound {
+	if _, err := c.ListItems(ctx, connect.NewRequest(&v1.ListThreadItemsRequest{ThreadId: "nope"})); connect.CodeOf(err) != connect.CodeNotFound {
 		t.Errorf("items of an unknown thread: %v", err)
 	}
 
-	stream, err := c.Watch(ctx, connect.NewRequest(&v1.WatchThreadRequest{SessionId: "s1"}))
+	stream, err := c.WatchThread(ctx, connect.NewRequest(&v1.WatchThreadRequest{ThreadId: "s1"}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +78,7 @@ func TestThreadWatchSendRespond(t *testing.T) {
 		t.Errorf("watchers = %d", fake.Watchers("s1"))
 	}
 
-	res, err := c.Send(ctx, connect.NewRequest(&v1.SendThreadMessageRequest{SessionId: "s1", Text: "more", Attachments: []string{"/att/2.png"},
+	res, err := c.Send(ctx, connect.NewRequest(&v1.SendThreadMessageRequest{ThreadId: "s1", Text: "more", Attachments: []string{"/att/2.png"},
 		ComposerText: "![a.png](cf-attachment://0) more"}))
 	if err != nil {
 		t.Fatal(err)
@@ -90,10 +90,10 @@ func TestThreadWatchSendRespond(t *testing.T) {
 		t.Errorf("appended %v", ev)
 	}
 
-	if _, err := c.Respond(ctx, connect.NewRequest(&v1.RespondThreadRequest{SessionId: "s1", RequestId: "r1"})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+	if _, err := c.Respond(ctx, connect.NewRequest(&v1.RespondThreadRequest{ThreadId: "s1", RequestId: "r1"})); connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Errorf("respond without a decision: %v", err)
 	}
-	rr, err := c.Respond(ctx, connect.NewRequest(&v1.RespondThreadRequest{SessionId: "s1", RequestId: "r1", Decision: v1.ThreadDecision_THREAD_DECISION_ALLOW_FOR_SESSION}))
+	rr, err := c.Respond(ctx, connect.NewRequest(&v1.RespondThreadRequest{ThreadId: "s1", RequestId: "r1", Decision: v1.ThreadDecision_THREAD_DECISION_ALLOW_FOR_SESSION}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,34 +106,34 @@ func TestThreadWatchSendRespond(t *testing.T) {
 	if ev := next().GetPending(); ev == nil || len(ev.GetPending()) != 0 {
 		t.Errorf("pending %v", ev)
 	}
-	if _, err := c.Respond(ctx, connect.NewRequest(&v1.RespondThreadRequest{SessionId: "s1", RequestId: "r1", Decision: v1.ThreadDecision_THREAD_DECISION_DENY})); connect.CodeOf(err) != connect.CodeNotFound {
+	if _, err := c.Respond(ctx, connect.NewRequest(&v1.RespondThreadRequest{ThreadId: "s1", RequestId: "r1", Decision: v1.ThreadDecision_THREAD_DECISION_DENY})); connect.CodeOf(err) != connect.CodeNotFound {
 		t.Errorf("respond twice: %v", err)
 	}
-	if _, err := c.Interrupt(ctx, connect.NewRequest(&v1.InterruptThreadRequest{SessionId: "s1"})); err != nil {
+	if _, err := c.Interrupt(ctx, connect.NewRequest(&v1.InterruptThreadRequest{ThreadId: "s1"})); err != nil {
 		t.Fatal(err)
 	}
-	ms, err := c.SetModel(ctx, connect.NewRequest(&v1.SetThreadModelRequest{SessionId: "s1", Model: "sonnet"}))
-	if err != nil || ms.Msg.GetSession().GetModel() != "sonnet" {
+	ms, err := c.SetModel(ctx, connect.NewRequest(&v1.SetThreadModelRequest{ThreadId: "s1", Model: "sonnet"}))
+	if err != nil || ms.Msg.GetThread().GetModel() != "sonnet" {
 		t.Fatalf("set model %v %v", ms, err)
 	}
-	if _, err := c.SetPermissionMode(ctx, connect.NewRequest(&v1.SetThreadPermissionModeRequest{SessionId: "s1"})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+	if _, err := c.SetPermissionMode(ctx, connect.NewRequest(&v1.SetThreadPermissionModeRequest{ThreadId: "s1"})); connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Errorf("set default mode: %v", err)
 	}
-	if _, err := c.SetPermissionMode(ctx, connect.NewRequest(&v1.SetThreadPermissionModeRequest{SessionId: "s1", PermissionMode: v1.PermissionMode_PERMISSION_MODE_ACCEPT_EDITS})); err != nil {
+	if _, err := c.SetPermissionMode(ctx, connect.NewRequest(&v1.SetThreadPermissionModeRequest{ThreadId: "s1", PermissionMode: v1.PermissionMode_PERMISSION_MODE_ACCEPT_EDITS})); err != nil {
 		t.Fatal(err)
 	}
-	es, err := c.SetEffort(ctx, connect.NewRequest(&v1.SetThreadEffortRequest{SessionId: "s1", Effort: "max"}))
-	if err != nil || es.Msg.GetSession().GetEffort() != "max" {
+	es, err := c.SetEffort(ctx, connect.NewRequest(&v1.SetThreadEffortRequest{ThreadId: "s1", Effort: "max"}))
+	if err != nil || es.Msg.GetThread().GetEffort() != "max" {
 		t.Fatalf("set effort %v %v", es, err)
 	}
-	if _, err := c.SetEffort(ctx, connect.NewRequest(&v1.SetThreadEffortRequest{SessionId: "s1", Effort: "huge"})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+	if _, err := c.SetEffort(ctx, connect.NewRequest(&v1.SetThreadEffortRequest{ThreadId: "s1", Effort: "huge"})); connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Errorf("bad effort: %v", err)
 	}
 	// A message starts a stopped thread.
-	if res, err := c.Send(ctx, connect.NewRequest(&v1.SendThreadMessageRequest{SessionId: "d1", Text: "x"})); err != nil || res.Msg.GetItem().GetUserMessage().GetText() != "x" {
+	if res, err := c.Send(ctx, connect.NewRequest(&v1.SendThreadMessageRequest{ThreadId: "d1", Text: "x"})); err != nil || res.Msg.GetItem().GetUserMessage().GetText() != "x" {
 		t.Errorf("send to a stopped thread: %v, %v", res, err)
 	}
-	if s, _ := fake.Get(ctx, "d1"); s.State != session.StateConnected {
+	if s, _ := fake.Get(ctx, "d1"); s.State != thread.StateConnected {
 		t.Errorf("after the send %+v", s)
 	}
 
@@ -152,41 +152,41 @@ func TestItemToProto(t *testing.T) {
 	now := time.Unix(1700000000, 0)
 	tests := []struct {
 		name  string
-		item  session.Item
+		item  thread.Item
 		check func(*v1.ThreadItem) bool
 	}{
-		{"tool call", session.Item{Kind: session.KindToolCall, Tool: &session.ToolCall{ToolUseID: "t", Name: "Bash", InputJSON: `{"command":"ls"}`, Status: session.ToolError, Output: "no", IsError: true, ResultJSON: "{}"}},
+		{"tool call", thread.Item{Kind: thread.KindToolCall, Tool: &thread.ToolCall{ToolUseID: "t", Name: "Bash", InputJSON: `{"command":"ls"}`, Status: thread.ToolError, Output: "no", IsError: true, ResultJSON: "{}"}},
 			func(p *v1.ThreadItem) bool {
 				tc := p.GetToolCall()
 				return tc.GetStatus() == v1.ToolCallStatus_TOOL_CALL_STATUS_ERROR && tc.GetIsError() && tc.GetInputJson() == `{"command":"ls"}` && tc.GetResultJson() == "{}"
 			}},
-		{"question", session.Item{Kind: session.KindQuestion, Request: &session.Request{RequestID: "q", State: session.RequestAllowed, Answers: map[string]string{"Q": "A"}}},
+		{"question", thread.Item{Kind: thread.KindQuestion, Request: &thread.Request{RequestID: "q", State: thread.RequestAllowed, Answers: map[string]string{"Q": "A"}}},
 			func(p *v1.ThreadItem) bool {
 				return p.GetQuestion().GetAnswers()["Q"] == "A" && p.GetQuestion().GetState() == v1.ThreadRequestState_THREAD_REQUEST_STATE_ALLOWED
 			}},
-		{"auto denied", session.Item{Kind: session.KindPermission, Request: &session.Request{State: session.RequestDenied, Decision: session.DecisionAutoDenied}},
+		{"auto denied", thread.Item{Kind: thread.KindPermission, Request: &thread.Request{State: thread.RequestDenied, Decision: thread.DecisionAutoDenied}},
 			func(p *v1.ThreadItem) bool { return p.GetPermission().GetDecision() == "auto_denied" }},
-		{"turn end", session.Item{Kind: session.KindTurnEnd, Turn: &session.TurnEnd{Subtype: "success", CostUSD: 0.5, NumTurns: 2, Interrupted: true, Errors: []string{"e"}}},
+		{"turn end", thread.Item{Kind: thread.KindTurnEnd, Turn: &thread.TurnEnd{Subtype: "success", CostUSD: 0.5, NumTurns: 2, Interrupted: true, Errors: []string{"e"}}},
 			func(p *v1.ThreadItem) bool {
 				te := p.GetTurnEnd()
 				return te.GetCostUsd() == 0.5 && te.GetNumTurns() == 2 && te.GetInterrupted() && te.GetErrors()[0] == "e" &&
 					te.TurnCostUsd == nil && te.GetModel() == ""
 			}},
-		{"turn end with its own cost and model", session.Item{Kind: session.KindTurnEnd, Turn: &session.TurnEnd{CostUSD: 0.5, TurnCostUSD: new(0.2), Model: "claude-haiku-5-5"}},
+		{"turn end with its own cost and model", thread.Item{Kind: thread.KindTurnEnd, Turn: &thread.TurnEnd{CostUSD: 0.5, TurnCostUSD: new(0.2), Model: "claude-haiku-5-5"}},
 			func(p *v1.ThreadItem) bool {
 				te := p.GetTurnEnd()
 				return te.TurnCostUsd != nil && te.GetTurnCostUsd() == 0.2 && te.GetModel() == "claude-haiku-5-5"
 			}},
-		{"compaction", session.Item{Kind: session.KindCompaction, Text: "summary", Compaction: &session.Compaction{Trigger: "auto", PreTokens: 9}},
+		{"compaction", thread.Item{Kind: thread.KindCompaction, Text: "summary", Compaction: &thread.Compaction{Trigger: "auto", PreTokens: 9}},
 			func(p *v1.ThreadItem) bool {
 				return p.GetCompaction().GetSummary() == "summary" && p.GetCompaction().GetTrigger() == "auto" && p.GetCompaction().GetPreTokens() == 9
 			}},
-		{"thinking", session.Item{Kind: session.KindThinking, Text: "hm"}, func(p *v1.ThreadItem) bool { return p.GetThinking().GetText() == "hm" }},
-		{"error", session.Item{Kind: session.KindError, Text: "boom"}, func(p *v1.ThreadItem) bool { return p.GetError().GetText() == "boom" }},
-		{"command output", session.Item{Kind: session.KindCommandOutput, Text: "Compacted"}, func(p *v1.ThreadItem) bool { return p.GetCommandOutput().GetText() == "Compacted" }},
-		{"note", session.Item{Kind: session.KindNote, Text: "Forked from base"}, func(p *v1.ThreadItem) bool { return p.GetNote().GetText() == "Forked from base" }},
-		{"subagent", session.Item{Kind: session.KindAssistantText, Text: "x", ParentToolUseID: "agent"}, func(p *v1.ThreadItem) bool { return p.GetParentToolUseId() == "agent" }},
-		{"unknown kind", session.Item{Kind: "future"}, func(p *v1.ThreadItem) bool { return p.GetPayload() == nil }},
+		{"thinking", thread.Item{Kind: thread.KindThinking, Text: "hm"}, func(p *v1.ThreadItem) bool { return p.GetThinking().GetText() == "hm" }},
+		{"error", thread.Item{Kind: thread.KindError, Text: "boom"}, func(p *v1.ThreadItem) bool { return p.GetError().GetText() == "boom" }},
+		{"command output", thread.Item{Kind: thread.KindCommandOutput, Text: "Compacted"}, func(p *v1.ThreadItem) bool { return p.GetCommandOutput().GetText() == "Compacted" }},
+		{"note", thread.Item{Kind: thread.KindNote, Text: "Forked from base"}, func(p *v1.ThreadItem) bool { return p.GetNote().GetText() == "Forked from base" }},
+		{"subagent", thread.Item{Kind: thread.KindAssistantText, Text: "x", ParentToolUseID: "agent"}, func(p *v1.ThreadItem) bool { return p.GetParentToolUseId() == "agent" }},
+		{"unknown kind", thread.Item{Kind: "future"}, func(p *v1.ThreadItem) bool { return p.GetPayload() == nil }},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

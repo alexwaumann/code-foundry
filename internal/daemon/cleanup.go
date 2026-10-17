@@ -12,7 +12,7 @@ import (
 // is the git half): why something keeps the worktree at path, or "". A thread is on it
 // (its cwd is the worktree or inside it; any state, archived ones excluded by the caller), a terminal that has not exited
 // belongs to it (worktree label) or runs inside it, or it is a workspace member. Pure;
-// the daemon passes the session, terminal and workspace stores' current state.
+// the daemon passes the thread, terminal and workspace stores' current state.
 func cleanupHold(path string, threads []workspace.Thread, terminals []terminal.Terminal, workspaces *workspace.Snapshot) string {
 	for _, t := range threads {
 		if inside(t.Cwd, path) {

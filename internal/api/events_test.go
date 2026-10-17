@@ -22,11 +22,11 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/gitops/gitopstest"
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
 	"github.com/alexwaumann/code-foundry/internal/store/repo/repotest"
-	"github.com/alexwaumann/code-foundry/internal/store/session"
-	"github.com/alexwaumann/code-foundry/internal/store/session/sessiontest"
 	"github.com/alexwaumann/code-foundry/internal/store/settings/settingstest"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal/terminaltest"
+	"github.com/alexwaumann/code-foundry/internal/store/thread"
+	"github.com/alexwaumann/code-foundry/internal/store/thread/threadtest"
 	"github.com/alexwaumann/code-foundry/internal/store/update"
 	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 	"github.com/alexwaumann/code-foundry/internal/store/workspace/workspacetest"
@@ -36,7 +36,7 @@ type eventsFixture struct {
 	bus    *bus.Bus
 	repo   *repotest.Fake
 	term   *terminaltest.Fake
-	sess   *sessiontest.Fake
+	th     *threadtest.Fake
 	gh     *ghtest.Store
 	gitops *gitopstest.Fake
 	set    *settingstest.Fake
@@ -57,8 +57,8 @@ func newEventsFixture(t *testing.T) *eventsFixture {
 	// A disabled updater: its snapshot is the status and it never checks.
 	upd := update.Start(context.Background(), update.Options{Current: "dev", DisabledReason: "dev build", Bus: b, InitialDelay: time.Hour})
 	t.Cleanup(upd.Close)
-	f := &eventsFixture{bus: b, repo: repotest.New(b), term: terminaltest.New(b), sess: sessiontest.New(b), gh: ghtest.New(b), gitops: gitopstest.New(b), set: set, update: upd, ws: workspacetest.New(b), done: make(chan struct{})}
-	route := NewEvents(EventsDeps{Bus: b, Repo: f.repo, Terminal: f.term, Session: f.sess, Gh: f.gh, GitOps: f.gitops, Settings: f.set, Update: f.update, Workspace: f.ws, Done: f.done}).Route()
+	f := &eventsFixture{bus: b, repo: repotest.New(b), term: terminaltest.New(b), th: threadtest.New(b), gh: ghtest.New(b), gitops: gitopstest.New(b), set: set, update: upd, ws: workspacetest.New(b), done: make(chan struct{})}
+	route := NewEvents(EventsDeps{Bus: b, Repo: f.repo, Terminal: f.term, Thread: f.th, Gh: f.gh, GitOps: f.gitops, Settings: f.set, Update: f.update, Workspace: f.ws, Done: f.done}).Route()
 	mux := http.NewServeMux()
 	mux.Handle(route.Path, route.Handler)
 	// HTTP/2 like the repo drop test: flow-control windows bound how much the handler
@@ -126,16 +126,16 @@ func describe(ev *v1.Event) string {
 			return "terminal.updated " + u.GetId()
 		}
 		return "terminal.removed " + e.Terminal.GetRemovedId()
-	case *v1.Event_Session:
-		switch x := e.Session.GetEvent().(type) {
-		case *v1.SessionEvent_Snapshot:
-			return fmt.Sprintf("session.snapshot(%d)", len(x.Snapshot.GetSessions()))
-		case *v1.SessionEvent_Updated:
-			return "session.updated " + x.Updated.GetId() + " " + x.Updated.GetStatus().String()
-		case *v1.SessionEvent_RemovedId:
-			return "session.removed " + x.RemovedId
+	case *v1.Event_ThreadList:
+		switch x := e.ThreadList.GetEvent().(type) {
+		case *v1.ThreadListEvent_Snapshot:
+			return fmt.Sprintf("thread.snapshot(%d)", len(x.Snapshot.GetThreads()))
+		case *v1.ThreadListEvent_Updated:
+			return "thread.updated " + x.Updated.GetId() + " " + x.Updated.GetStatus().String()
+		case *v1.ThreadListEvent_RemovedId:
+			return "thread.removed " + x.RemovedId
 		default:
-			return "session.other"
+			return "thread.other"
 		}
 	case *v1.Event_Gh:
 		if p := e.Gh.GetPolled(); p != nil {
@@ -179,11 +179,11 @@ func describe(ev *v1.Event) string {
 		case *v1.ThreadEvent_PendingSnapshot:
 			return fmt.Sprintf("thread.pending_snapshot(%d)", len(th.PendingSnapshot.GetThreads()))
 		case *v1.ThreadEvent_Appended:
-			return "thread.appended " + th.Appended.GetSessionId() + " " + th.Appended.GetItem().GetId()
+			return "thread.appended " + th.Appended.GetThreadId() + " " + th.Appended.GetItem().GetId()
 		case *v1.ThreadEvent_Updated:
-			return "thread.updated " + th.Updated.GetSessionId() + " " + th.Updated.GetItem().GetId()
+			return "thread.updated " + th.Updated.GetThreadId() + " " + th.Updated.GetItem().GetId()
 		case *v1.ThreadEvent_Pending:
-			return fmt.Sprintf("thread.pending %s %d", th.Pending.GetSessionId(), len(th.Pending.GetPending()))
+			return fmt.Sprintf("thread.pending %s %d", th.Pending.GetThreadId(), len(th.Pending.GetPending()))
 		default:
 			return "thread.other"
 		}
@@ -202,10 +202,10 @@ func TestEventsSnapshotOrderThenLive(t *testing.T) {
 	defer cancel()
 	_, _ = f.repo.Register(ctx, "/code/a")
 	t1, _ := f.term.Create(ctx, terminal.Spec{Argv: []string{"zsh"}})
-	t2, _ := f.term.Create(ctx, terminal.Spec{Argv: []string{"zsh"}, Labels: map[string]string{"kind": "shell", "session": "s1"}})
-	f.sess.Put(session.Session{ID: "s1", State: session.StateConnected, Status: session.StatusIdle})
-	f.sess.Put(session.Session{ID: "s2", State: session.StateConnected, CreatedAt: time.Unix(1, 0)})
-	f.sess.PutItems("s2", session.Item{ID: "perm-r1", Kind: session.KindPermission, Request: &session.Request{RequestID: "r1", ToolName: "Write", State: session.RequestPending}})
+	t2, _ := f.term.Create(ctx, terminal.Spec{Argv: []string{"zsh"}, Labels: map[string]string{"kind": "shell", "thread": "s1"}})
+	f.th.Put(thread.Thread{ID: "s1", State: thread.StateConnected, Status: thread.StatusIdle})
+	f.th.Put(thread.Thread{ID: "s2", State: thread.StateConnected, CreatedAt: time.Unix(1, 0)})
+	f.th.PutItems("s2", thread.Item{ID: "perm-r1", Kind: thread.KindPermission, Request: &thread.Request{RequestID: "r1", ToolName: "Write", State: thread.RequestPending}})
 	f.gh.SetRepo(gh.RepoState{Slug: "o/b"})
 	f.gh.SetRepo(gh.RepoState{Slug: "o/a"})
 	f.gitops.Put(gitops.Op{ID: "op-0", Kind: gitops.KindFetch, State: gitops.StateRunning})
@@ -217,7 +217,7 @@ func TestEventsSnapshotOrderThenLive(t *testing.T) {
 		"workspace.snapshot(1)",
 		"terminal.updated " + t1.ID,
 		"terminal.updated " + t2.ID,
-		"session.snapshot(2)",
+		"thread.snapshot(2)",
 		"thread.pending_snapshot(1)",
 		"gh.viewer",
 		"gh.polled ",
@@ -257,11 +257,11 @@ func TestEventsSnapshotOrderThenLive(t *testing.T) {
 	if got := describe(s.next()); got != "terminal.removed "+t1.ID {
 		t.Fatalf("got %q, want terminal removal", got)
 	}
-	f.sess.Put(session.Session{ID: "s1", State: session.StateConnected, Status: session.StatusNeedsAttention})
-	if got := describe(s.next()); got != "session.updated s1 SESSION_STATUS_NEEDS_ATTENTION" {
-		t.Fatalf("got %q, want session update", got)
+	f.th.Put(thread.Thread{ID: "s1", State: thread.StateConnected, Status: thread.StatusNeedsAttention})
+	if got := describe(s.next()); got != "thread.updated s1 THREAD_STATUS_NEEDS_ATTENTION" {
+		t.Fatalf("got %q, want thread update", got)
 	}
-	if _, err := f.sess.Respond(ctx, "s2", "r1", session.Decision{Allow: true}); err != nil {
+	if _, err := f.th.Respond(ctx, "s2", "r1", thread.Decision{Allow: true}); err != nil {
 		t.Fatal(err)
 	}
 	// Only the pending list travels on the event stream; the item update stays on
@@ -304,8 +304,8 @@ func TestEventsSnapshotOrderThenLive(t *testing.T) {
 	if got := describe(s.next()); got != "ui.palette x" {
 		t.Fatalf("got %q, want ui.palette x", got)
 	}
-	// The labels that place session terminals survive the mapping.
-	if l := f.term.List(ctx); len(l) != 1 || l[0].Labels["session"] != "s1" {
+	// The labels that place thread terminals survive the mapping.
+	if l := f.term.List(ctx); len(l) != 1 || l[0].Labels["thread"] != "s1" {
 		t.Fatalf("list = %v", l)
 	}
 }
@@ -319,7 +319,7 @@ func TestEventsSourceFilter(t *testing.T) {
 		{"ui only", []v1.EventSource{v1.EventSource_EVENT_SOURCE_UI}, "ui.palette go"},
 		{"terminal only", []v1.EventSource{v1.EventSource_EVENT_SOURCE_TERMINAL}, "terminal.updated fake-1"},
 		{"repo and ui", []v1.EventSource{v1.EventSource_EVENT_SOURCE_UI, v1.EventSource_EVENT_SOURCE_REPO}, "repo.snapshot(0)"},
-		{"session only", []v1.EventSource{v1.EventSource_EVENT_SOURCE_SESSION}, "session.snapshot(0)"},
+		{"thread only", []v1.EventSource{v1.EventSource_EVENT_SOURCE_THREAD_LIST}, "thread.snapshot(0)"},
 		{"gh only", []v1.EventSource{v1.EventSource_EVENT_SOURCE_GH}, "gh.viewer"},
 		{"gitops only", []v1.EventSource{v1.EventSource_EVENT_SOURCE_GITOPS}, "gitops.snapshot(0)"},
 		{"settings only", []v1.EventSource{v1.EventSource_EVENT_SOURCE_SETTINGS}, "settings.snapshot(1)"},

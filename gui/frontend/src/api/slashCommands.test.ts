@@ -9,19 +9,19 @@ const deploy = { name: "deploy", description: "Ship it (project)", argumentHint:
 
 describe("slash commands on the Watch", () => {
   it("maps the snapshot's list", () => {
-    const v = toThreadEventView(create(ThreadEventSchema, { event: { case: "snapshot", value: { sessionId: "s", seq: 4n, commands: [deploy, usage] } } }));
+    const v = toThreadEventView(create(ThreadEventSchema, { event: { case: "snapshot", value: { threadId: "s", seq: 4n, commands: [deploy, usage] } } }));
     expect(v?.kind === "snapshot" && v.commands).toEqual([deploy, usage]);
   });
 
   it("maps a commands event, empty when the process ended", () => {
-    const v = toThreadEventView(create(ThreadEventSchema, { event: { case: "commands", value: { sessionId: "s", seq: 9n, commands: [usage] } } }));
+    const v = toThreadEventView(create(ThreadEventSchema, { event: { case: "commands", value: { threadId: "s", seq: 9n, commands: [usage] } } }));
     expect(v).toEqual({ kind: "commands", sessionId: "s", seq: 9, commands: [usage] });
-    const gone = toThreadEventView(create(ThreadEventSchema, { event: { case: "commands", value: { sessionId: "s", seq: 10n } } }));
+    const gone = toThreadEventView(create(ThreadEventSchema, { event: { case: "commands", value: { threadId: "s", seq: 10n } } }));
     expect(gone).toEqual({ kind: "commands", sessionId: "s", seq: 10, commands: [] });
   });
 
   it("an older daemon's snapshot has none", () => {
-    const v = toThreadEventView(create(ThreadEventSchema, { event: { case: "snapshot", value: { sessionId: "s", seq: 1n } } }));
+    const v = toThreadEventView(create(ThreadEventSchema, { event: { case: "snapshot", value: { threadId: "s", seq: 1n } } }));
     expect(v?.kind === "snapshot" && v.commands).toEqual([]);
   });
 });

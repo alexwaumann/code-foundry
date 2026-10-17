@@ -86,21 +86,21 @@ export type Terminal = Message<"codefoundry.v1.Terminal"> & {
    * creators follow this contract (internal/termlabel):
    *   kind      "shell" on a shell started by the terminal.new command; "action" on
    *             an action run in a terminal (ActionService.Run, action.run). A
-   *             session's Claude terminal has no kind. The daemon removes a "shell"
-   *             terminal as soon as it exits; an "action" terminal stays EXITED until
+   *             terminal without a kind is not a panel terminal. The daemon removes a
+   *             "shell" terminal as soon as it exits; an "action" terminal stays EXITED until
    *             it is closed (terminal.close), so its output can be read. Both are
    *             killed and removed when their thread is removed, their project is
    *             unregistered, or their worktree directory is removed.
-   *   session   the thread (session id) the terminal belongs to: on a session's Claude
-   *             terminal, and on a shell started for a thread.
+   *   thread    the thread (thread id) the terminal belongs to: on a shell or action
+   *             run started for a thread.
    *   repo      the repository id of the worktree a shell belongs to.
    *   worktree  the worktree path (symlinks resolved) the terminal belongs to: the
-   *             session's worktree on a Claude terminal; on a shell, its owner worktree
-   *             (the thread's worktree when it belongs to a thread).
+   *             owner worktree of a shell or action run (the thread's worktree when it
+   *             belongs to a thread).
    *   action    on kind "action": the action's id (ActionService).
    *   action.name  on kind "action": the action's name when the run started.
    *   action.run   on kind "action": the run's id (ActionRun.id).
-   * An action terminal carries the same session / repo / worktree owner labels as a
+   * An action terminal carries the same thread / repo / worktree owner labels as a
    * shell, so a bottom panel shows both the same way.
    * A terminal created through Create without labels belongs to nothing.
    *
@@ -637,7 +637,7 @@ export const TerminalStateSchema: GenEnum<TerminalState> = /*@__PURE__*/
 
 /**
  * TerminalService owns PTY-backed terminals. It is program-agnostic: a terminal runs any
- * argv. "This is a Claude session" is SessionService's concern (Phase 2).
+ * argv. Threads run Claude headlessly (ThreadService), never in a terminal.
  *
  * @generated from service codefoundry.v1.TerminalService
  */
@@ -729,7 +729,7 @@ export const TerminalService: GenService<{
    * Kill, waits for it to exit, and removes it. It returns once the terminal is gone
    * (Watch has sent `updated` with state EXITED, then `removed_id`). Closing an exited
    * shell or action run just removes it. Any other
-   * terminal (a thread's Claude terminal: use SessionService.Close) is refused with
+   * terminal (one created through Create without those labels) is refused with
    * FailedPrecondition; an unknown id is NotFound.
    *
    * @generated from rpc codefoundry.v1.TerminalService.Close

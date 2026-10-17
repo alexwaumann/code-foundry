@@ -5,9 +5,9 @@
 // subscriber only, and the drop is counted on both the subscription and the bus.
 //
 //	b := bus.New()
-//	sub := bus.Subscribe[SessionChanged](b, 64)
+//	sub := bus.Subscribe[ThreadChanged](b, 64)
 //	defer sub.Close()
-//	bus.Publish(b, SessionChanged{ID: "s1"})
+//	bus.Publish(b, ThreadChanged{ID: "s1"})
 //	ev := <-sub.C()
 package bus
 

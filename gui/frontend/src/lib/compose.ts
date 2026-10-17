@@ -57,7 +57,7 @@ export type ProjectWorktree = Exclude<WorktreeChoice, { kind: "members" }>;
  */
 export type WorkInMode = "new" | "current";
 
-export const WORK_IN_SETTING_KEY = "sessions.default_worktree";
+export const WORK_IN_SETTING_KEY = "threads.default_worktree";
 
 function workInMode(v: string | undefined): WorkInMode | undefined {
   return v === "new" || v === "current" ? v : undefined;

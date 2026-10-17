@@ -102,8 +102,8 @@ test("no Close or Reconnect anywhere: header, row menu, palette, chords", async 
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("Thread");
   const palette = page.getByTestId("palette");
-  await expect(palette.locator('[data-command="session.rename"]')).toBeVisible();
-  await expect(palette.locator('[data-command="session.close"], [data-command="session.reconnect"]')).toHaveCount(0);
+  await expect(palette.locator('[data-command="thread.rename"]')).toBeVisible();
+  await expect(palette.locator('[data-command="thread.close"], [data-command="thread.reconnect"]')).toHaveCount(0);
   await page.keyboard.press("Escape");
   const before = (await invocations()).length;
   await page.getByTestId("thread-composer").getByTestId("composer-input").click();
@@ -190,7 +190,7 @@ test("new thread: a worktree's + on the Projects page opens the composer with th
   await expect(page.getByTestId("composer-input")).toBeFocused();
   await page.keyboard.type("Fix the resize race");
   await page.keyboard.press("Enter");
-  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("session.new");
+  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("thread.new");
   const last = (await invocations()).at(-1);
   expect(last?.args).toEqual({ repo: "repo-cf", worktree: FIX_RESIZE, model: "claude-opus-4-8[1m]", effort: "high", permission: "auto", prompt: "Fix the resize race" });
   // The thread is the newest row, in that worktree, selected and shown.
@@ -218,8 +218,8 @@ test("rename inline: double-click commits via session.rename, cmd+r from the pro
   await page.keyboard.press("Enter");
   await expect(row(page, "s:s-3").getByTestId("session-name")).toHaveText("Resize race, take two");
   const last = (await invocations()).at(-1);
-  expect(last).toMatchObject({ name: "session.rename", args: { name: "Resize race, take two" } });
-  expect(last?.context?.activeSessionId).toBe("s-3");
+  expect(last).toMatchObject({ name: "thread.rename", args: { name: "Resize race, take two" } });
+  expect(last?.context?.activeThreadId).toBe("s-3");
 
   await row(page, "s:s-1").click();
   await expect(page.getByTestId("thread-composer").getByTestId("composer-input")).toBeFocused();
@@ -274,18 +274,18 @@ test("the whole app runs on one events stream plus one thread Watch", async ({ p
   // per-service Watch at all, only the visible thread's Watch is still open, and no
   // terminal is attached (threads have none; the bottom panel is closed).
   expect(started.get("EventService/Watch")).toBe(1);
-  for (const legacy of ["RepoService/Watch", "TerminalService/Watch", "UiService/WatchIntents", "SessionService/Watch", "GhService/Watch"]) {
+  for (const legacy of ["RepoService/Watch", "TerminalService/Watch", "UiService/WatchIntents", "ThreadService/Watch", "GhService/Watch"]) {
     expect(started.get(legacy) ?? 0, legacy).toBe(0);
   }
   await expect.poll(() => open.get("EventService/Watch")).toBe(1);
-  await expect.poll(() => open.get("ThreadService/Watch")).toBe(1);
-  expect(started.get("ThreadService/Watch")).toBeGreaterThanOrEqual(3);
+  await expect.poll(() => open.get("ThreadService/WatchThread")).toBe(1);
+  expect(started.get("ThreadService/WatchThread")).toBeGreaterThanOrEqual(3);
   expect(started.get("TerminalService/Attach") ?? 0).toBe(0);
   // Server side agrees.
-  await expect.poll(openStreams).toEqual({ "EventService/Watch": 1, "ThreadService/Watch": 1 });
+  await expect.poll(openStreams).toEqual({ "EventService/Watch": 1, "ThreadService/WatchThread": 1 });
 });
 
-test("a daemon without SessionService degrades to 'service unavailable'", async ({ page }) => {
+test("a daemon without ThreadService degrades to 'service unavailable'", async ({ page }) => {
   await mockPost("sessions-service?enabled=false");
   // No rows to wait for (openApp waits for one): the notice is what shows.
   await page.goto(appPath);

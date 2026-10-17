@@ -1,6 +1,6 @@
 // Package termlabel is the label contract on terminals: the names creators put in
 // terminal.Spec.Labels (proto Terminal.labels) and what they mean. The terminal store
-// itself treats labels as opaque; this package exists so the session store, the
+// itself treats labels as opaque; this package exists so the thread store, the
 // terminal.* commands, the action store, the daemon's shell reaper, and the GUI agree on
 // one set of names. It has no dependencies (in particular no cgo), so any package may
 // import it.
@@ -8,11 +8,11 @@
 // Two kinds of terminal carry labels, both shown in the bottom panel of their owner:
 //
 //   - A shell started by terminal.new has Kind = KindShell, Repo and Worktree for the
-//     worktree it belongs to, and Session when it belongs to a thread (Repo and
+//     worktree it belongs to, and Thread when it belongs to a thread (Repo and
 //     Worktree are then the thread's: for a thread without a project, Repo is empty
 //     and Worktree is its cwd, the home directory).
 //   - An action run in a terminal (internal/store/action) has Kind = KindAction, the
-//     same owner labels as a shell (Session, Repo, Worktree), plus Action (the action's
+//     same owner labels as a shell (Thread, Repo, Worktree), plus Action (the action's
 //     id), ActionName (its name when it started) and ActionRun (the run's id).
 //
 // Claude itself never runs in a terminal. A terminal without labels
@@ -22,8 +22,8 @@ package termlabel
 const (
 	// Kind says what started the terminal: KindShell or KindAction.
 	Kind = "kind"
-	// Session is the id of the thread (session) the terminal belongs to.
-	Session = "session"
+	// Thread is the id of the thread the terminal belongs to.
+	Thread = "thread"
 	// Repo is the id of the registered repository whose worktree the terminal belongs to.
 	Repo = "repo"
 	// Worktree is the path (symlinks resolved, as in the repo snapshot) of the worktree
@@ -39,7 +39,7 @@ const (
 )
 
 // KindShell is Kind's value on a shell started by terminal.new. The daemon removes such a
-// terminal as soon as it exits, and kills and removes it when its thread (Session) or its
+// terminal as soon as it exits, and kills and removes it when its thread (Thread) or its
 // worktree (Worktree) is removed.
 const KindShell = "shell"
 
@@ -60,19 +60,19 @@ func IsAction(labels map[string]string) bool { return labels[Kind] == KindAction
 func IsPanel(labels map[string]string) bool { return IsShell(labels) || IsAction(labels) }
 
 // Shell returns the labels of a shell owned by worktree path of repo repoID, and by
-// thread sessionID when it is not empty.
-func Shell(sessionID, repoID, worktree string) map[string]string {
+// thread threadID when it is not empty.
+func Shell(threadID, repoID, worktree string) map[string]string {
 	l := map[string]string{Kind: KindShell, Repo: repoID, Worktree: worktree}
-	if sessionID != "" {
-		l[Session] = sessionID
+	if threadID != "" {
+		l[Thread] = threadID
 	}
 	return l
 }
 
 // ActionTerminal returns the labels of run runID of action actionID (named name) in a
 // terminal owned like a shell (see Shell).
-func ActionTerminal(sessionID, repoID, worktree, actionID, name, runID string) map[string]string {
-	l := Shell(sessionID, repoID, worktree)
+func ActionTerminal(threadID, repoID, worktree, actionID, name, runID string) map[string]string {
+	l := Shell(threadID, repoID, worktree)
 	l[Kind] = KindAction
 	l[Action] = actionID
 	l[ActionName] = name

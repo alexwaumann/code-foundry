@@ -81,7 +81,7 @@ describe("openFailedRun", () => {
 
 describe("ownerOfTerminal", () => {
   it.each([
-    ["a thread's", { kind: "action", session: "s-1", repo: "r", worktree: "/w" }, { kind: "thread", sessionId: "s-1" }],
+    ["a thread's", { kind: "action", thread: "s-1", repo: "r", worktree: "/w" }, { kind: "thread", sessionId: "s-1" }],
     ["a worktree's", { kind: "action", repo: "r", worktree: "/w" }, { kind: "worktree", repoId: "r", path: "/w" }],
     ["neither", { kind: "action" }, null],
   ])("%s", (_n, labels, want) => {
@@ -103,21 +103,21 @@ describe("runs", () => {
   });
 
   it("rerunAction: runs the same action for the same owner, then closes the old tab", async () => {
-    useTerminalsStore.setState({ byId: { "t-1": { id: "t-1", labels: { kind: "action", session: "s-1", action: "a-1" } } as never }, order: ["t-1"] });
+    useTerminalsStore.setState({ byId: { "t-1": { id: "t-1", labels: { kind: "action", thread: "s-1", action: "a-1" } } as never }, order: ["t-1"] });
     await expect(rerunAction("t-1")).resolves.toBe("t-9");
     expect(runCommandForResult.mock.calls[0]?.[1]).toEqual({ action: "a-1", terminal: "true" });
     expect(closeBottomTerminal).toHaveBeenCalledWith("t-1");
   });
 
   it("rerunAction: a run that fails keeps the old tab", async () => {
-    useTerminalsStore.setState({ byId: { "t-1": { id: "t-1", labels: { kind: "action", session: "s-1", action: "a-1" } } as never }, order: ["t-1"] });
+    useTerminalsStore.setState({ byId: { "t-1": { id: "t-1", labels: { kind: "action", thread: "s-1", action: "a-1" } } as never }, order: ["t-1"] });
     runCommandForResult.mockResolvedValueOnce(null);
     await expect(rerunAction("t-1")).resolves.toBeNull();
     expect(closeBottomTerminal).not.toHaveBeenCalled();
   });
 
   it("rerunAction: a second Rerun of the same tab while one is in flight runs nothing", async () => {
-    useTerminalsStore.setState({ byId: { "t-1": { id: "t-1", labels: { kind: "action", session: "s-1", action: "a-1" } } as never }, order: ["t-1"] });
+    useTerminalsStore.setState({ byId: { "t-1": { id: "t-1", labels: { kind: "action", thread: "s-1", action: "a-1" } } as never }, order: ["t-1"] });
     const first = rerunAction("t-1");
     await expect(rerunAction("t-1")).resolves.toBeNull();
     await expect(first).resolves.toBe("t-9");

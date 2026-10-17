@@ -15,7 +15,7 @@ import (
 type Deps struct {
 	Daemon  command.DaemonInfo
 	Emitter command.Emitter
-	// Terminal backs terminal.* (terminal.new also reads Repo and Session to find a
+	// Terminal backs terminal.* (terminal.new also reads Repo and Thread to find a
 	// shell's owner). Nil registers the commands against
 	// UnimplementedTerminalServiceHandler, so they list but fail with Unimplemented.
 	Terminal command.TerminalBackend
@@ -40,8 +40,6 @@ type Deps struct {
 	// Projects backs repo.create, repo.github.publish and repo.delete (its NotGit
 	// defaults to NotGit). A nil Backend works like Terminal.
 	Projects command.ProjectDeps
-	// Session backs session.*. Nil works like Terminal.
-	Session command.SessionBackend
 	// Thread backs thread.*. Nil works like Terminal.
 	Thread command.ThreadBackend
 	// GitOps backs git.*, pr.*, worktree.open.editor, worktree.reveal and view.open.url.
@@ -49,7 +47,7 @@ type Deps struct {
 	GitOps command.GitOpsDeps
 	// Gh backs pr.revert, pr.merge, pr.review.request, pr.refresh, pr.review and
 	// pr.comment (the pull request detail panel's actions), and reads the pull request for pr.ask, pr.explain and
-	// pr.fix.findings (which also use Repo, Session, GitOps.Backend and Emitter). Nil
+	// pr.fix.findings (which also use Repo, Thread, GitOps.Backend and Emitter). Nil
 	// works like Terminal.
 	Gh command.GhBackend
 	// Settings backs settings.*, theme.* and notifications.test (the alert volume). Nil works like
@@ -63,7 +61,7 @@ type Deps struct {
 	Restart func()
 	// Workspace backs workspace.*. Nil works like Terminal.
 	Workspace command.WorkspaceBackend
-	// Action backs action.* (which also use Repo and Session to find a run's owner).
+	// Action backs action.* (which also use Repo and Thread to find a run's owner).
 	// Nil works like Terminal.
 	Action command.ActionBackend
 }
@@ -78,9 +76,6 @@ func Register(r *command.Registry, d Deps) error {
 	}
 	if d.Repo == nil {
 		d.Repo = codefoundryv1connect.UnimplementedRepoServiceHandler{}
-	}
-	if d.Session == nil {
-		d.Session = codefoundryv1connect.UnimplementedSessionServiceHandler{}
 	}
 	if d.Thread == nil {
 		d.Thread = codefoundryv1connect.UnimplementedThreadServiceHandler{}
@@ -106,29 +101,29 @@ func Register(r *command.Registry, d Deps) error {
 	return errors.Join(
 		command.RegisterDaemon(r, d.Daemon),
 		command.RegisterUI(r, d.Emitter),
-		command.RegisterTerminal(r, command.TerminalDeps{Terminal: d.Terminal, Repo: d.Repo, Session: d.Session, IsShell: d.IsShellTerminal, AwaitOutput: d.AwaitTerminalOutput, BracketedPaste: d.TerminalBracketedPaste}),
+		command.RegisterTerminal(r, command.TerminalDeps{Terminal: d.Terminal, Repo: d.Repo, Thread: d.Thread, IsShell: d.IsShellTerminal, AwaitOutput: d.AwaitTerminalOutput, BracketedPaste: d.TerminalBracketedPaste}),
 		command.RegisterRepo(r, d.Repo, d.NotGit),
 		command.RegisterRepoAdd(r, d.Repo, d.Clone),
 		command.RegisterRepoCleanup(r, command.RepoCleanupDeps{Repo: d.Repo, GitOps: d.GitOps.Backend, NotGit: d.NotGit}),
 		command.RegisterProjects(r, d.Projects),
-		command.RegisterSession(r, d.Session, d.Emitter),
+		command.RegisterThreadLifecycle(r, d.Thread, d.Emitter),
 		command.RegisterThread(r, d.Thread),
 		command.RegisterMcp(r, d.Thread, d.Emitter),
-		command.RegisterAgents(r, d.Thread, d.Session, d.Emitter),
+		command.RegisterAgents(r, d.Thread, d.Emitter),
 		command.RegisterSlash(r, d.Thread),
 		command.RegisterGitOps(r, d.GitOps),
 		command.RegisterPullRequest(r, d.Gh),
-		command.RegisterPullRequestSessions(r, command.PullRequestSessionDeps{
-			Gh: d.Gh, Repo: d.Repo, Session: d.Session, GitOps: d.GitOps.Backend, Emitter: d.Emitter,
+		command.RegisterPullRequestThreads(r, command.PullRequestThreadDeps{
+			Gh: d.Gh, Repo: d.Repo, Thread: d.Thread, GitOps: d.GitOps.Backend, Emitter: d.Emitter,
 		}),
 		command.RegisterSettings(r, d.Settings, d.Emitter, d.Reveal),
 		command.RegisterNotifications(r, d.Settings, d.Emitter),
 		command.RegisterTheme(r, d.Settings),
 		command.RegisterThemePick(r, d.Emitter),
-		command.RegisterUpdate(r, command.UpdateDeps{Update: d.Update, Session: d.Session, Restart: d.Restart, Daemon: d.Daemon}),
+		command.RegisterUpdate(r, command.UpdateDeps{Update: d.Update, Thread: d.Thread, Restart: d.Restart, Daemon: d.Daemon}),
 		command.RegisterView(r, d.Emitter),
-		command.RegisterUsage(r, d.Session),
+		command.RegisterUsage(r, d.Thread),
 		command.RegisterWorkspace(r, d.Workspace),
-		command.RegisterAction(r, command.ActionDeps{Action: d.Action, Repo: d.Repo, Session: d.Session}),
+		command.RegisterAction(r, command.ActionDeps{Action: d.Action, Repo: d.Repo, Thread: d.Thread}),
 	)
 }

@@ -11,7 +11,7 @@ const needsConfirm = vi.hoisted(() => new Error("needs confirmation"));
 vi.mock("@/api/command", async (orig) => ({
   ...(await orig<typeof import("@/api/command")>()),
   invokeCommand,
-  confirmationOf: (err: unknown) => (err === needsConfirm ? { command: "session.remove", title: "Remove Session", message: "Remove session s1?" } : null),
+  confirmationOf: (err: unknown) => (err === needsConfirm ? { command: "thread.remove", title: "Remove Session", message: "Remove session s1?" } : null),
 }));
 const { runCommand } = await import("./commands");
 
@@ -134,13 +134,13 @@ describe("runCommand confirmation", () => {
   ])("confirm=%s invokes %i time(s)", async (yes, calls) => {
     invokeCommand.mockRejectedValueOnce(needsConfirm).mockResolvedValue({ message: "", resultJson: "" });
     const ctx = { activeTerminalId: "", activeSessionId: "s1", activeRepoId: "", activeWorktreePath: "", activeView: "session", activeWorkspaceId: "" };
-    const done = runCommand("session.remove", {}, ctx);
+    const done = runCommand("thread.remove", {}, ctx);
     await vi.waitFor(() => {
       expect(useConfirmStore.getState().pending?.message).toBe("Remove session s1?");
     });
     answerConfirm(yes);
     expect(await done).toBe(yes);
     expect(invokeCommand).toHaveBeenCalledTimes(calls);
-    if (yes) expect(invokeCommand).toHaveBeenLastCalledWith("session.remove", ctx, {}, undefined, { confirmed: true });
+    if (yes) expect(invokeCommand).toHaveBeenLastCalledWith("thread.remove", ctx, {}, undefined, { confirmed: true });
   });
 });

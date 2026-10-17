@@ -122,7 +122,7 @@ function Fleet() {
         <Counts running={running} waiting={waiting} />
       </Header>
       <div className="flex flex-wrap justify-center gap-2" data-testid="welcome-actions">
-        <CommandButton command="session.new" icon={SquarePen} label="New thread" variant="default" whenUnavailable="disable" keepFocus={false} />
+        <CommandButton command="thread.new" icon={SquarePen} label="New thread" variant="default" whenUnavailable="disable" keepFocus={false} />
         <CommandButton command="ui.palette.open" icon={Command} label="Command palette" variant="outline" className="backdrop-blur-sm" keepFocus={false} />
       </div>
       <ActiveThreads />

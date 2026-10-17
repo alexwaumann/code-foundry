@@ -139,9 +139,9 @@ type Command = {
 
 /** thread.mcp, thread.mcp-reconnect and view.panel.mcp, like the daemon's (any active thread). */
 export function mcpCommands(threads: McpThreads, emit: (i: UiIntentInit) => number): Command[] {
-  const when = (ctx: UiContext | undefined) => Boolean(ctx?.activeSessionId);
+  const when = (ctx: UiContext | undefined) => Boolean(ctx?.activeThreadId);
   const id = { name: "id", type: ArgType.STRING, required: false, description: "Thread id (default: the active thread)" };
-  const sid = (ctx: UiContext | undefined, a: Record<string, string>) => a.id || ctx?.activeSessionId || "";
+  const sid = (ctx: UiContext | undefined, a: Record<string, string>) => a.id || ctx?.activeThreadId || "";
   return [
     {
       cmd: {

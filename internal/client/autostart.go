@@ -28,7 +28,7 @@ type ConnectOptions struct {
 	// Logger receives auto-start diagnostics. Defaults to slog.Default().
 	Logger *slog.Logger
 	// Endpoint, when set, is used instead of the Unix socket (the CLI sets it from
-	// EndpointFromEnv inside a session). Connect then only checks that the daemon
+	// EndpointFromEnv inside a thread). Connect then only checks that the daemon
 	// answers; it never starts one, since the endpoint names a daemon that is already
 	// running (a new one would listen on another port with another token).
 	Endpoint *Endpoint
@@ -48,7 +48,7 @@ func Connect(ctx context.Context, p paths.Paths, opts ConnectOptions) (*Client, 
 		pctx, cancel := context.WithTimeout(ctx, probeTimeout)
 		defer cancel()
 		if _, err := c.Ping(pctx); err != nil {
-			return nil, fmt.Errorf("daemon at %s (%s) is not reachable; not starting one from inside a session: %w",
+			return nil, fmt.Errorf("daemon at %s (%s) is not reachable; not starting one from inside a thread: %w",
 				ep.BaseURL, EnvEndpoint, err)
 		}
 		return c, nil
@@ -107,7 +107,7 @@ func (c *Client) alive(ctx context.Context) bool {
 	return err == nil
 }
 
-// spawnDaemon starts `bin daemon` in its own session, detached from the caller's
+// spawnDaemon starts `bin daemon` in its own thread, detached from the caller's
 // terminal, with stdio appended to the daemon log. If two clients race, the loser's
 // daemon exits on the instance lock and both end up talking to the winner.
 func spawnDaemon(p paths.Paths, bin string) error {

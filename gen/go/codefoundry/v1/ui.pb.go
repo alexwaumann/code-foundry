@@ -117,7 +117,7 @@ type UiIntent struct {
 	//	*UiIntent_FocusRepo_
 	//	*UiIntent_OpenPalette_
 	//	*UiIntent_Notify_
-	//	*UiIntent_FocusSession_
+	//	*UiIntent_FocusThread_
 	//	*UiIntent_ShowView_
 	//	*UiIntent_PlayAlertSound_
 	Intent        isUiIntent_Intent `protobuf_oneof:"intent"`
@@ -198,10 +198,10 @@ func (x *UiIntent) GetNotify() *UiIntent_Notify {
 	return nil
 }
 
-func (x *UiIntent) GetFocusSession() *UiIntent_FocusSession {
+func (x *UiIntent) GetFocusThread() *UiIntent_FocusThread {
 	if x != nil {
-		if x, ok := x.Intent.(*UiIntent_FocusSession_); ok {
-			return x.FocusSession
+		if x, ok := x.Intent.(*UiIntent_FocusThread_); ok {
+			return x.FocusThread
 		}
 	}
 	return nil
@@ -245,8 +245,8 @@ type UiIntent_Notify_ struct {
 	Notify *UiIntent_Notify `protobuf:"bytes,4,opt,name=notify,proto3,oneof"`
 }
 
-type UiIntent_FocusSession_ struct {
-	FocusSession *UiIntent_FocusSession `protobuf:"bytes,5,opt,name=focus_session,json=focusSession,proto3,oneof"`
+type UiIntent_FocusThread_ struct {
+	FocusThread *UiIntent_FocusThread `protobuf:"bytes,5,opt,name=focus_thread,json=focusThread,proto3,oneof"`
 }
 
 type UiIntent_ShowView_ struct {
@@ -265,7 +265,7 @@ func (*UiIntent_OpenPalette_) isUiIntent_Intent() {}
 
 func (*UiIntent_Notify_) isUiIntent_Intent() {}
 
-func (*UiIntent_FocusSession_) isUiIntent_Intent() {}
+func (*UiIntent_FocusThread_) isUiIntent_Intent() {}
 
 func (*UiIntent_ShowView_) isUiIntent_Intent() {}
 
@@ -453,27 +453,27 @@ func (x *UiIntent_ShowView) GetName() string {
 	return ""
 }
 
-type UiIntent_FocusSession struct {
+type UiIntent_FocusThread struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	ThreadId      string                 `protobuf:"bytes,1,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *UiIntent_FocusSession) Reset() {
-	*x = UiIntent_FocusSession{}
+func (x *UiIntent_FocusThread) Reset() {
+	*x = UiIntent_FocusThread{}
 	mi := &file_codefoundry_v1_ui_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *UiIntent_FocusSession) String() string {
+func (x *UiIntent_FocusThread) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*UiIntent_FocusSession) ProtoMessage() {}
+func (*UiIntent_FocusThread) ProtoMessage() {}
 
-func (x *UiIntent_FocusSession) ProtoReflect() protoreflect.Message {
+func (x *UiIntent_FocusThread) ProtoReflect() protoreflect.Message {
 	mi := &file_codefoundry_v1_ui_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -485,14 +485,14 @@ func (x *UiIntent_FocusSession) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use UiIntent_FocusSession.ProtoReflect.Descriptor instead.
-func (*UiIntent_FocusSession) Descriptor() ([]byte, []int) {
+// Deprecated: Use UiIntent_FocusThread.ProtoReflect.Descriptor instead.
+func (*UiIntent_FocusThread) Descriptor() ([]byte, []int) {
 	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{1, 2}
 }
 
-func (x *UiIntent_FocusSession) GetSessionId() string {
+func (x *UiIntent_FocusThread) GetThreadId() string {
 	if x != nil {
-		return x.SessionId
+		return x.ThreadId
 	}
 	return ""
 }
@@ -703,23 +703,22 @@ var File_codefoundry_v1_ui_proto protoreflect.FileDescriptor
 const file_codefoundry_v1_ui_proto_rawDesc = "" +
 	"\n" +
 	"\x17codefoundry/v1/ui.proto\x12\x0ecodefoundry.v1\"\x15\n" +
-	"\x13WatchIntentsRequest\"\xf6\a\n" +
+	"\x13WatchIntentsRequest\"\xf0\a\n" +
 	"\bUiIntent\x12O\n" +
 	"\x0efocus_terminal\x18\x01 \x01(\v2&.codefoundry.v1.UiIntent.FocusTerminalH\x00R\rfocusTerminal\x12C\n" +
 	"\n" +
 	"focus_repo\x18\x02 \x01(\v2\".codefoundry.v1.UiIntent.FocusRepoH\x00R\tfocusRepo\x12I\n" +
 	"\fopen_palette\x18\x03 \x01(\v2$.codefoundry.v1.UiIntent.OpenPaletteH\x00R\vopenPalette\x129\n" +
-	"\x06notify\x18\x04 \x01(\v2\x1f.codefoundry.v1.UiIntent.NotifyH\x00R\x06notify\x12L\n" +
-	"\rfocus_session\x18\x05 \x01(\v2%.codefoundry.v1.UiIntent.FocusSessionH\x00R\ffocusSession\x12@\n" +
+	"\x06notify\x18\x04 \x01(\v2\x1f.codefoundry.v1.UiIntent.NotifyH\x00R\x06notify\x12I\n" +
+	"\ffocus_thread\x18\x05 \x01(\v2$.codefoundry.v1.UiIntent.FocusThreadH\x00R\vfocusThread\x12@\n" +
 	"\tshow_view\x18\x06 \x01(\v2!.codefoundry.v1.UiIntent.ShowViewH\x00R\bshowView\x12S\n" +
 	"\x10play_alert_sound\x18\a \x01(\v2'.codefoundry.v1.UiIntent.PlayAlertSoundH\x00R\x0eplayAlertSound\x1a(\n" +
 	"\x0ePlayAlertSound\x12\x16\n" +
 	"\x06volume\x18\x01 \x01(\x05R\x06volume\x1a\x1e\n" +
 	"\bShowView\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x1a-\n" +
-	"\fFocusSession\x12\x1d\n" +
-	"\n" +
-	"session_id\x18\x01 \x01(\tR\tsessionId\x1a0\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x1a*\n" +
+	"\vFocusThread\x12\x1b\n" +
+	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x1a0\n" +
 	"\rFocusTerminal\x12\x1f\n" +
 	"\vterminal_id\x18\x01 \x01(\tR\n" +
 	"terminalId\x1aI\n" +
@@ -770,7 +769,7 @@ var file_codefoundry_v1_ui_proto_goTypes = []any{
 	(*EmitIntentResponse)(nil),      // 4: codefoundry.v1.EmitIntentResponse
 	(*UiIntent_PlayAlertSound)(nil), // 5: codefoundry.v1.UiIntent.PlayAlertSound
 	(*UiIntent_ShowView)(nil),       // 6: codefoundry.v1.UiIntent.ShowView
-	(*UiIntent_FocusSession)(nil),   // 7: codefoundry.v1.UiIntent.FocusSession
+	(*UiIntent_FocusThread)(nil),    // 7: codefoundry.v1.UiIntent.FocusThread
 	(*UiIntent_FocusTerminal)(nil),  // 8: codefoundry.v1.UiIntent.FocusTerminal
 	(*UiIntent_FocusRepo)(nil),      // 9: codefoundry.v1.UiIntent.FocusRepo
 	(*UiIntent_OpenPalette)(nil),    // 10: codefoundry.v1.UiIntent.OpenPalette
@@ -781,7 +780,7 @@ var file_codefoundry_v1_ui_proto_depIdxs = []int32{
 	9,  // 1: codefoundry.v1.UiIntent.focus_repo:type_name -> codefoundry.v1.UiIntent.FocusRepo
 	10, // 2: codefoundry.v1.UiIntent.open_palette:type_name -> codefoundry.v1.UiIntent.OpenPalette
 	11, // 3: codefoundry.v1.UiIntent.notify:type_name -> codefoundry.v1.UiIntent.Notify
-	7,  // 4: codefoundry.v1.UiIntent.focus_session:type_name -> codefoundry.v1.UiIntent.FocusSession
+	7,  // 4: codefoundry.v1.UiIntent.focus_thread:type_name -> codefoundry.v1.UiIntent.FocusThread
 	6,  // 5: codefoundry.v1.UiIntent.show_view:type_name -> codefoundry.v1.UiIntent.ShowView
 	5,  // 6: codefoundry.v1.UiIntent.play_alert_sound:type_name -> codefoundry.v1.UiIntent.PlayAlertSound
 	2,  // 7: codefoundry.v1.EmitIntentRequest.intent:type_name -> codefoundry.v1.UiIntent
@@ -807,7 +806,7 @@ func file_codefoundry_v1_ui_proto_init() {
 		(*UiIntent_FocusRepo_)(nil),
 		(*UiIntent_OpenPalette_)(nil),
 		(*UiIntent_Notify_)(nil),
-		(*UiIntent_FocusSession_)(nil),
+		(*UiIntent_FocusThread_)(nil),
 		(*UiIntent_ShowView_)(nil),
 		(*UiIntent_PlayAlertSound_)(nil),
 	}

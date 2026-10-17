@@ -470,7 +470,7 @@ export const UpdateStateSchema: GenEnum<UpdateState> = /*@__PURE__*/
  * (`app.update`) fetches, verifies and stages the release beside the app directory
  * without changing the install, so a window reopened meanwhile still matches its daemon
  * (GUI and daemon have no cross-version compatibility). Nothing restarts by itself,
- * because restarting the daemon closes every session. `app.restart` (the GUI's "Restart
+ * because restarting the daemon stops every thread's Claude. `app.restart` (the GUI's "Restart
  * Now") applies a download in one step: Install swaps it into the app directory, then
  * RequestRestart announces RestartRequested on Watch and the daemon exits; GUI hosts
  * relaunch once their Watch stream ends, and the relaunched window auto-starts the

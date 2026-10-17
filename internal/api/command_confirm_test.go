@@ -15,9 +15,9 @@ func TestCommandInvokeConfirm(t *testing.T) {
 	r := command.NewRegistry()
 	ran := 0
 	if err := r.Register(command.Command{
-		Name: "session.remove", Title: "Remove Session", Category: "Session",
-		Args:    []command.ArgSpec{{Name: "id", Type: command.String, Required: true, Context: command.ContextSession, Positional: true}},
-		Confirm: "Remove session {id}?",
+		Name: "thread.remove", Title: "Remove Thread", Category: "Thread",
+		Args:    []command.ArgSpec{{Name: "id", Type: command.String, Required: true, Context: command.ContextThread, Positional: true}},
+		Confirm: "Remove thread {id}?",
 		Run: func(context.Context, command.Context, command.Args) (command.Result, error) {
 			ran++
 			return command.Result{Message: "removed"}, nil
@@ -37,7 +37,7 @@ func TestCommandInvokeConfirm(t *testing.T) {
 		t.Fatalf("listed = %v, want requires_confirmation and a positional arg", c)
 	}
 
-	_, err = h.Invoke(ctx, connect.NewRequest(&v1.InvokeCommandRequest{Name: "session.remove", Args: map[string]string{"id": "s1"}}))
+	_, err = h.Invoke(ctx, connect.NewRequest(&v1.InvokeCommandRequest{Name: "thread.remove", Args: map[string]string{"id": "s1"}}))
 	var ce *connect.Error
 	if !errors.As(err, &ce) || ce.Code() != connect.CodeFailedPrecondition {
 		t.Fatalf("err = %v, want FailedPrecondition", err)
@@ -50,7 +50,7 @@ func TestCommandInvokeConfirm(t *testing.T) {
 			}
 		}
 	}
-	if got == nil || got.GetMessage() != "Remove session s1?" || got.GetCommand() != "session.remove" || got.GetTitle() != "Remove Session" {
+	if got == nil || got.GetMessage() != "Remove thread s1?" || got.GetCommand() != "thread.remove" || got.GetTitle() != "Remove Thread" {
 		t.Fatalf("detail = %v", got)
 	}
 	if ran != 0 {
@@ -58,7 +58,7 @@ func TestCommandInvokeConfirm(t *testing.T) {
 	}
 
 	res, err := h.Invoke(ctx, connect.NewRequest(&v1.InvokeCommandRequest{
-		Name: "session.remove", Args: map[string]string{"id": "s1"}, Confirmed: true,
+		Name: "thread.remove", Args: map[string]string{"id": "s1"}, Confirmed: true,
 	}))
 	if err != nil || res.Msg.GetMessage() != "removed" || ran != 1 {
 		t.Fatalf("confirmed invoke = %v, %v (ran %d)", res, err, ran)

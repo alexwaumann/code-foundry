@@ -13,9 +13,9 @@ import (
 func TestUsageShow(t *testing.T) {
 	opus := &v1.UsageBucket{Day: "2026-10-09", Model: "claude-opus-5-5", Requests: 2, Output: 100, CostUsd: 3}
 	haiku := &v1.UsageBucket{Day: "2026-10-09", Model: "claude-haiku-5-5", Requests: 1, Output: 50, CostUsd: 1}
-	b := &commandtest.Session{
-		Current:      &v1.Session{Id: "s-1", Name: "demo", Usage: []*v1.UsageBucket{opus}},
-		Others:       []*v1.Session{{Id: "s-2", Usage: []*v1.UsageBucket{haiku}}},
+	b := &commandtest.Thread{
+		Current:      &v1.Thread{Id: "s-1", Name: "demo", Usage: []*v1.UsageBucket{opus}},
+		Others:       []*v1.Thread{{Id: "s-2", Usage: []*v1.UsageBucket{haiku}}},
 		RetiredUsage: []*v1.UsageBucket{opus},
 	}
 	reg := command.NewRegistry()
@@ -51,7 +51,7 @@ func TestUsageShow(t *testing.T) {
 			}
 		})
 	}
-	if _, err := reg.Invoke(context.Background(), command.Context{ActiveView: "session"}, "usage.show", nil); err == nil {
+	if _, err := reg.Invoke(context.Background(), command.Context{ActiveView: "thread"}, "usage.show", nil); err == nil {
 		t.Error("usage.show ran from the GUI; it is the CLI's (the palette has view.usage)")
 	}
 }

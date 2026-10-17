@@ -1,5 +1,5 @@
 // Package terminaltest provides an in-memory terminal.Store for tests of code that
-// consumes terminals (API handlers, the session store). No PTYs or emulators are
+// consumes terminals (API handlers, the thread store). No PTYs or emulators are
 // involved: tests drive output, titles, and exits explicitly.
 package terminaltest
 

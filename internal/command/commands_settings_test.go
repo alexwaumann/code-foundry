@@ -18,7 +18,7 @@ import (
 func newSettingsRegistry(t *testing.T) (*command.Registry, *commandtest.Emitter, *settingstest.Fake, *[]string) {
 	t.Helper()
 	store, err := settingstest.New(context.Background(), t.TempDir(), nil, []settings.CommandInfo{
-		{Name: "session.new", Title: "New Thread", Category: "Thread", Keybindings: []string{"cmd+n"}},
+		{Name: "thread.new", Title: "New Thread", Category: "Thread", Keybindings: []string{"cmd+n"}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -48,17 +48,17 @@ func TestSettingsCommands(t *testing.T) {
 	}{
 		{name: "get one", cmd: "settings.get", args: map[string]string{"key": "appearance.font_size"}, wantMsg: "13",
 			wantJSON: `{"key":"appearance.font_size","value":"13","default":"13"}`},
-		{name: "get all", cmd: "settings.get", wantMsg: `appearance.theme = "system"`, wantJSON: `"key":"keybindings.session.new","value":"cmd+n"`},
+		{name: "get all", cmd: "settings.get", wantMsg: `appearance.theme = "system"`, wantJSON: `"key":"keybindings.thread.new","value":"cmd+n"`},
 		{name: "get unknown", cmd: "settings.get", args: map[string]string{"key": "nope.nope"}, wantErr: command.ErrInvalidArgs},
 		{name: "set", cmd: "settings.set", args: map[string]string{"key": "appearance.font_size", "value": "15"},
 			wantMsg: `appearance.font_size = "15"`},
-		{name: "set restart field notes it", cmd: "settings.set", args: map[string]string{"key": "sessions.scrollback_lines", "value": "20000"},
+		{name: "set restart field notes it", cmd: "settings.set", args: map[string]string{"key": "threads.scrollback_lines", "value": "20000"},
 			wantMsg: "(applies after a daemon restart)"},
-		{name: "set keybinding", cmd: "settings.set", args: map[string]string{"key": "keybindings.session.new", "value": "Shift+Cmd+N"},
-			wantMsg: `keybindings.session.new = "cmd+shift+n"`},
+		{name: "set keybinding", cmd: "settings.set", args: map[string]string{"key": "keybindings.thread.new", "value": "Shift+Cmd+N"},
+			wantMsg: `keybindings.thread.new = "cmd+shift+n"`},
 		{name: "set invalid value", cmd: "settings.set", args: map[string]string{"key": "appearance.font_size", "value": "200"},
 			wantCode: connect.CodeInvalidArgument},
-		{name: "set reserved chord", cmd: "settings.set", args: map[string]string{"key": "keybindings.session.new", "value": "cmd+k"},
+		{name: "set reserved chord", cmd: "settings.set", args: map[string]string{"key": "keybindings.thread.new", "value": "cmd+k"},
 			wantCode: connect.CodeInvalidArgument},
 		{name: "set needs a value", cmd: "settings.set", args: map[string]string{"key": "appearance.font_size"}, wantErr: command.ErrInvalidArgs},
 		{name: "reset", cmd: "settings.reset", args: map[string]string{"key": "appearance.theme"}, wantMsg: `appearance.theme = "system" (default)`},

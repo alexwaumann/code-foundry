@@ -56,7 +56,7 @@ type cli struct {
 	stdin       io.Reader
 	interactive func() bool
 	// getenv reads the environment (os.Getenv); nil reads nothing. It supplies the
-	// default --context-session (paths.EnvSession, set in a thread's Claude session).
+	// default --context-thread (paths.EnvThread, set in a thread's Claude session).
 	getenv func(string) string
 }
 
@@ -94,8 +94,8 @@ func connectDaemon(ctx context.Context) (*client.Client, error) {
 	return client.Connect(ctx, p, opts)
 }
 
-// connectOptions prefers the loopback endpoint a session's environment names
-// (client.EnvEndpoint, client.EnvToken) over the Unix socket. Sandboxed sessions
+// connectOptions prefers the loopback endpoint a thread's environment names
+// (client.EnvEndpoint, client.EnvToken) over the Unix socket. Sandboxed threads
 // cannot reach Unix sockets, and Connect never auto-starts a daemon for an endpoint.
 func connectOptions(getenv func(string) string) (client.ConnectOptions, error) {
 	ep, ok, err := client.EndpointFromEnv(getenv)

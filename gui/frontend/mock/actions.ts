@@ -385,7 +385,7 @@ export class MockActions {
       actionName: r.actionName,
       command: r.command,
       repoId: r.repoId,
-      sessionId: r.sessionId,
+      threadId: r.sessionId,
       worktreePath: r.worktreePath,
       mode: r.mode,
       terminalId: r.terminalId,
@@ -525,11 +525,11 @@ export class MockActions {
 
   /** ActionService.Run: an action by id, else by name in the owner's project (or repoId's). */
   run(
-    req: { action: string; sessionId?: string; worktreePath?: string; repoId?: string; mode?: ActionRunMode },
+    req: { action: string; threadId?: string; worktreePath?: string; repoId?: string; mode?: ActionRunMode },
     trigger = ActionRunTrigger.USER,
     script?: Script,
   ): RunInit {
-    const owner = this.owner(req.sessionId ?? "", req.worktreePath ?? "", req.repoId ?? "");
+    const owner = this.owner(req.threadId ?? "", req.worktreePath ?? "", req.repoId ?? "");
     const ref = req.action.trim();
     let a = this.actions.get(ref);
     if (a && a.repoId !== owner.repoId) throw new CommandError("unavailable", `action ${a.name} (${a.id}) belongs to another project`);
@@ -580,7 +580,7 @@ export class MockActions {
     this.runs.unshift(r);
     if (mode === ActionRunMode.TERMINAL) {
       const labels: Record<string, string> = { kind: "action", repo: owner.repoId, worktree: owner.worktree, action: a.id, "action.name": a.name, "action.run": r.id };
-      if (owner.sessionId) labels.session = owner.sessionId;
+      if (owner.sessionId) labels.thread = owner.sessionId;
       r.terminalId = this.host.startTerminal(["/bin/zsh", "-lc", a.command], owner.worktree, labels);
     }
     this.host.publish({ event: { case: "runUpdated", value: this.runMsg(r, false) } });
@@ -631,7 +631,7 @@ export class MockActions {
     this.host.publish({
       event: {
         case: "runFinished",
-        value: { runId: r.id, actionId: r.actionId, actionName: r.actionName, repoId: r.repoId, sessionId: r.sessionId, exitCode: code, mode: r.mode, trigger: r.trigger, terminalId: r.terminalId },
+        value: { runId: r.id, actionId: r.actionId, actionName: r.actionName, repoId: r.repoId, threadId: r.sessionId, exitCode: code, mode: r.mode, trigger: r.trigger, terminalId: r.terminalId },
       },
     });
     for (const w of r.waiters.splice(0)) w();
@@ -733,10 +733,10 @@ export class MockActions {
       if (!id) throw new CommandError("invalid", `no project "${ref}" (code-foundry repo list)`);
       return id;
     }
-    if (ctx?.activeSessionId) {
-      const s = this.host.session(ctx.activeSessionId);
-      if (!s) throw new CommandError("notfound", `thread ${ctx.activeSessionId} not found`);
-      if (!s.repoId) throw new CommandError("invalid", `thread ${ctx.activeSessionId} has no project; ${noProject}`);
+    if (ctx?.activeThreadId) {
+      const s = this.host.session(ctx.activeThreadId);
+      if (!s) throw new CommandError("notfound", `thread ${ctx.activeThreadId} not found`);
+      if (!s.repoId) throw new CommandError("invalid", `thread ${ctx.activeThreadId} has no project; ${noProject}`);
       return s.repoId;
     }
     if (ctx?.activeRepoId && repos.some((r) => r.id === ctx.activeRepoId)) return ctx.activeRepoId;
@@ -776,8 +776,8 @@ export class MockActions {
 
   /** action.list, action.add, action.edit, action.remove, action.run, action.wait, action.runs (internal/command/commands_action.go). */
   commands(): Command[] {
-    const canUse = (ctx: UiContext | undefined) => Boolean(ctx?.activeSessionId || ctx?.activeRepoId || ctx?.activeWorktreePath || !ctx?.activeView);
-    const canRun = (ctx: UiContext | undefined) => Boolean(ctx?.activeSessionId || ctx?.activeWorktreePath || !ctx?.activeView);
+    const canUse = (ctx: UiContext | undefined) => Boolean(ctx?.activeThreadId || ctx?.activeRepoId || ctx?.activeWorktreePath || !ctx?.activeView);
+    const canRun = (ctx: UiContext | undefined) => Boolean(ctx?.activeThreadId || ctx?.activeWorktreePath || !ctx?.activeView);
     const repoArg = { name: "repo", type: ArgType.STRING, required: false, description: "Project: id, name, or a path inside it (default: the thread's, the worktree's, or the working directory's)" };
     const hereArg = {
       name: "here",
@@ -893,7 +893,7 @@ export class MockActions {
           if (bg && term) throw new CommandError("invalid", "--background and --terminal exclude each other");
           const mode = bg ? ActionRunMode.BACKGROUND : term ? ActionRunMode.TERMINAL : ActionRunMode.UNSPECIFIED;
           let worktreePath = "";
-          if (!ctx?.activeSessionId) {
+          if (!ctx?.activeThreadId) {
             const path = ctx?.activeWorktreePath || args.here || "";
             const repos = this.host.repos();
             const exact = repos.some((r) => r.worktrees.includes(path));
@@ -902,7 +902,7 @@ export class MockActions {
             worktreePath = exact ? path : best;
             if (!worktreePath) throw new CommandError("invalid", "action.run needs a thread, a worktree, or to run inside a registered project");
           }
-          const run = this.run({ action: args.action ?? "", sessionId: ctx?.activeSessionId ?? "", worktreePath, mode });
+          const run = this.run({ action: args.action ?? "", threadId: ctx?.activeThreadId ?? "", worktreePath, mode });
           if (args.wait === "true") return this.waitMessage(run.id ?? "");
           const json = toJsonString(ActionRunSchema, create(ActionRunSchema, run));
           if (run.mode === ActionRunMode.TERMINAL) return { message: `started ${run.actionName ?? ""} in terminal ${run.terminalId ?? ""} (run ${run.id ?? ""})`, resultJson: json };

@@ -8,7 +8,7 @@ import type { SettingFieldView } from "@/api/settings";
 import { DEFAULT_MODEL, type Choice } from "./compose";
 
 /** The settings field whose enum is the model registry. */
-export const MODEL_SETTING_KEY = "sessions.default_model";
+export const MODEL_SETTING_KEY = "threads.default_model";
 
 /** The registry's default model alone, until the schema arrives. */
 export const FALLBACK_MODEL_CHOICES: readonly Choice[] = [{ value: DEFAULT_MODEL, label: "Opus 4.8" }];

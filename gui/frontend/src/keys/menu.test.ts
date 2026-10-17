@@ -27,7 +27,7 @@ function cmd(over: Partial<CommandView>): CommandView {
 beforeEach(() => {
   vi.clearAllMocks();
   useCommandsStore.setState({
-    commands: [cmd({ name: "ui.palette.open", title: "Open Command Palette" }), cmd({ name: "session.rename", title: "Rename Thread", available: false })],
+    commands: [cmd({ name: "ui.palette.open", title: "Open Command Palette" }), cmd({ name: "thread.rename", title: "Rename Thread", available: false })],
   });
   useSessionsStore.setState({ byId: {}, order: [] });
   useUiStore.setState({ selection: { kind: "view", name: "dashboard" } });
@@ -44,7 +44,7 @@ describe("runMenuCommand", () => {
   });
 
   it("says when the command is not available here, by its title", () => {
-    runMenuCommand("session.rename");
+    runMenuCommand("thread.rename");
     expect(toastInfo).toHaveBeenCalledWith("Rename Thread is not available here");
   });
 

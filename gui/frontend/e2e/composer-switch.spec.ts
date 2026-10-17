@@ -77,7 +77,7 @@ test("switch the project from the heading: the draft moves, Also in is swapped, 
   await expect(page.getByTestId("composer-worktree")).toHaveText("Fresh copy");
 
   await page.keyboard.press("Enter");
-  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("session.new");
+  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("thread.new");
   const args = (await invocations()).at(-1)?.args ?? {};
   expect(args).toMatchObject({ repo: "repo-gp", "new-worktree": "true", model: "claude-4.5-haiku[1m]", prompt: "Port the login form" });
   expect(args.repos).toBeUndefined();

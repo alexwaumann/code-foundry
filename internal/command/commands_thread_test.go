@@ -9,26 +9,26 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/api"
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/command"
-	"github.com/alexwaumann/code-foundry/internal/store/session"
-	"github.com/alexwaumann/code-foundry/internal/store/session/sessiontest"
+	"github.com/alexwaumann/code-foundry/internal/store/thread"
+	"github.com/alexwaumann/code-foundry/internal/store/thread/threadtest"
 )
 
-func newThreadRegistry(t *testing.T) (*command.Registry, *sessiontest.Fake) {
+func newThreadRegistry(t *testing.T) (*command.Registry, *threadtest.Fake) {
 	t.Helper()
 	b := bus.New()
-	fake := sessiontest.New(b)
+	fake := threadtest.New(b)
 	reg := command.NewRegistry()
 	if err := command.RegisterThread(reg, api.NewThread(fake, b)); err != nil {
 		t.Fatal(err)
 	}
-	fake.Put(session.Session{ID: "s1", Name: "fix", State: session.StateConnected})
+	fake.Put(thread.Thread{ID: "s1", Name: "fix", State: thread.StateConnected})
 	return reg, fake
 }
 
 // A setting on a stopped thread only goes to its row; the message says when it applies.
 func TestThreadSetEffortStopped(t *testing.T) {
 	reg, fake := newThreadRegistry(t)
-	fake.Put(session.Session{ID: "s2", Name: "idle", State: session.StateDisconnected, DisconnectReason: session.ReasonIdle})
+	fake.Put(thread.Thread{ID: "s2", Name: "idle", State: thread.StateDisconnected, DisconnectReason: thread.ReasonIdle})
 	res, err := reg.Invoke(context.Background(), command.Context{}, "thread.set-effort", map[string]string{"id": "s2", "effort": "high"})
 	if err != nil {
 		t.Fatal(err)
@@ -45,8 +45,8 @@ func TestThreadCommandsAvailability(t *testing.T) {
 		ctx  command.Context
 		want bool
 	}{
-		{"cli", command.Context{ActiveSessionID: "s1"}, true},
-		{"gui thread", command.Context{ActiveSessionID: "s1", ActiveView: "session"}, true},
+		{"cli", command.Context{ActiveThreadID: "s1"}, true},
+		{"gui thread", command.Context{ActiveThreadID: "s1", ActiveView: "thread"}, true},
 		{"no thread", command.Context{ActiveView: "projects"}, false},
 	}
 	for _, tt := range tests {
@@ -72,7 +72,7 @@ func TestThreadCommands(t *testing.T) {
 	question := `{"questions":[{"question":"Which color?","header":"Color","options":[{"label":"Red"},{"label":"Blue"}],"multiSelect":false}]}`
 	tests := []struct {
 		name      string
-		items     []session.Item
+		items     []thread.Item
 		cmd       string
 		args      map[string]string
 		wantErr   error
@@ -90,28 +90,28 @@ func TestThreadCommands(t *testing.T) {
 		},
 		{
 			name: "respond allows the oldest pending request", cmd: "thread.respond", args: map[string]string{"id": "s1"},
-			items: []session.Item{
-				{ID: "perm-r1", Kind: session.KindPermission, Request: &session.Request{RequestID: "r1", ToolName: "Write", State: session.RequestPending}},
-				{ID: "perm-r2", Kind: session.KindPermission, Request: &session.Request{RequestID: "r2", ToolName: "Bash", State: session.RequestPending}},
+			items: []thread.Item{
+				{ID: "perm-r1", Kind: thread.KindPermission, Request: &thread.Request{RequestID: "r1", ToolName: "Write", State: thread.RequestPending}},
+				{ID: "perm-r2", Kind: thread.KindPermission, Request: &thread.Request{RequestID: "r2", ToolName: "Bash", State: thread.RequestPending}},
 			},
 			wantMsg: "allowed (allow)", wantCalls: []string{"Respond s1 r1 allow"},
 		},
 		{
 			name: "respond to a named request with deny", cmd: "thread.respond", args: map[string]string{"id": "s1", "decision": "deny", "request": "r2", "message": "no"},
-			items: []session.Item{
-				{ID: "perm-r1", Kind: session.KindPermission, Request: &session.Request{RequestID: "r1", State: session.RequestPending}},
-				{ID: "perm-r2", Kind: session.KindPermission, Request: &session.Request{RequestID: "r2", State: session.RequestPending}},
+			items: []thread.Item{
+				{ID: "perm-r1", Kind: thread.KindPermission, Request: &thread.Request{RequestID: "r1", State: thread.RequestPending}},
+				{ID: "perm-r2", Kind: thread.KindPermission, Request: &thread.Request{RequestID: "r2", State: thread.RequestPending}},
 			},
 			wantMsg: "denied (deny): no", wantCalls: []string{"Respond s1 r2 deny"},
 		},
 		{
 			name: "question with a bare label", cmd: "thread.respond", args: map[string]string{"id": "s1", "answer": "Blue"},
-			items:   []session.Item{{ID: "q-r1", Kind: session.KindQuestion, Request: &session.Request{RequestID: "r1", ToolName: "AskUserQuestion", InputJSON: question, State: session.RequestPending}}},
+			items:   []thread.Item{{ID: "q-r1", Kind: thread.KindQuestion, Request: &thread.Request{RequestID: "r1", ToolName: "AskUserQuestion", InputJSON: question, State: thread.RequestPending}}},
 			wantMsg: "allowed (allow): Which color? = Blue", wantCalls: []string{"Respond s1 r1 allow"},
 		},
 		{
 			name: "question needs an answer", cmd: "thread.respond", args: map[string]string{"id": "s1"},
-			items:   []session.Item{{ID: "q-r1", Kind: session.KindQuestion, Request: &session.Request{RequestID: "r1", InputJSON: question, State: session.RequestPending}}},
+			items:   []thread.Item{{ID: "q-r1", Kind: thread.KindQuestion, Request: &thread.Request{RequestID: "r1", InputJSON: question, State: thread.RequestPending}}},
 			wantErr: command.ErrInvalidArgs,
 		},
 		{
@@ -120,16 +120,16 @@ func TestThreadCommands(t *testing.T) {
 		},
 		{
 			name: "items", cmd: "thread.items", args: map[string]string{"id": "s1"},
-			items: []session.Item{
-				{ID: "u", Kind: session.KindUserMessage, Text: "write it", Attachments: []string{"/a.png"}},
-				{ID: "t", Kind: session.KindToolCall, Tool: &session.ToolCall{Name: "Write", InputJSON: `{"file_path":"/x"}`, Status: session.ToolDone, Output: "File created\nmore"}},
-				{ID: "sub", Kind: session.KindAssistantText, Text: "from the agent", ParentToolUseID: "t"},
-				{ID: "p", Kind: session.KindPermission, Request: &session.Request{RequestID: "r9", ToolName: "Bash", Description: "ls", State: session.RequestPending}},
-				{ID: "a", Kind: session.KindAssistantText, Text: "done"},
-				{ID: "e", Kind: session.KindTurnEnd, Turn: &session.TurnEnd{Subtype: "success", DurationMS: 2500, CostUSD: 0.0123, OutputTokens: 9, InputTokens: 1}},
-				{ID: "u2", Kind: session.KindUserMessage, Text: "again"},
-				{ID: "e2", Kind: session.KindTurnEnd, Turn: &session.TurnEnd{Subtype: "success", DurationMS: 1000, CostUSD: 0.0153, TurnCostUSD: new(0.003), Model: "claude-haiku-5-5"}},
-				{ID: "n", Kind: session.KindNote, Text: "Forked from fix"},
+			items: []thread.Item{
+				{ID: "u", Kind: thread.KindUserMessage, Text: "write it", Attachments: []string{"/a.png"}},
+				{ID: "t", Kind: thread.KindToolCall, Tool: &thread.ToolCall{Name: "Write", InputJSON: `{"file_path":"/x"}`, Status: thread.ToolDone, Output: "File created\nmore"}},
+				{ID: "sub", Kind: thread.KindAssistantText, Text: "from the agent", ParentToolUseID: "t"},
+				{ID: "p", Kind: thread.KindPermission, Request: &thread.Request{RequestID: "r9", ToolName: "Bash", Description: "ls", State: thread.RequestPending}},
+				{ID: "a", Kind: thread.KindAssistantText, Text: "done"},
+				{ID: "e", Kind: thread.KindTurnEnd, Turn: &thread.TurnEnd{Subtype: "success", DurationMS: 2500, CostUSD: 0.0123, OutputTokens: 9, InputTokens: 1}},
+				{ID: "u2", Kind: thread.KindUserMessage, Text: "again"},
+				{ID: "e2", Kind: thread.KindTurnEnd, Turn: &thread.TurnEnd{Subtype: "success", DurationMS: 1000, CostUSD: 0.0153, TurnCostUSD: new(0.003), Model: "claude-haiku-5-5"}},
+				{ID: "n", Kind: thread.KindNote, Text: "Forked from fix"},
 			},
 			wantMsg: "#1 you: write it\n    [image /a.png]\n#2 tool Write [done] {\"file_path\":\"/x\"}\n    → File created …\n    #3 claude: from the agent\n" +
 				"#4 permission Bash ls: pending (request r9)\n#5 claude: done\n#6 turn end: success, 2.5s, 1 in / 9 out tokens, $0.0123 so far\n" +

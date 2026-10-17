@@ -5,7 +5,7 @@ import (
 )
 
 // EventRunCommand is emitted to the frontend by app menu items that run something in the
-// window: the data is a registry command name (session.new, view.settings, ...) or the
+// window: the data is a registry command name (thread.new, view.settings, ...) or the
 // name of a GUI view action (menuViewActions in gui/frontend/src/keys/menu.ts). The page
 // starts it exactly as the palette would, so the menu adds no user action of its own
 // (docs/notes/onboarding-1-entry-points.md).
@@ -31,8 +31,8 @@ var settingsItem = menuCommand{"Settings…", "view.settings"}
 
 // threadMenu is the Thread menu, one slice per separated group.
 var threadMenu = [][]menuCommand{
-	{{"New Thread", "session.new"}, {"Add Project…", "repo.add"}},
-	{{"Rename Thread", "session.rename"}, {"Fork Thread", "session.fork"}, {"Snooze…", "session.snooze"}, {"Archive", "session.archive"}},
+	{{"New Thread", "thread.new"}, {"Add Project…", "repo.add"}},
+	{{"Rename Thread", "thread.rename"}, {"Fork Thread", "thread.fork"}, {"Snooze…", "thread.snooze"}, {"Archive", "thread.archive"}},
 	{{"Next Needing Attention", "attention.next"}},
 }
 

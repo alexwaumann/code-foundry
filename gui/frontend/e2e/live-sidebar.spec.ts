@@ -35,7 +35,7 @@ interface LiveSession {
 }
 
 function sessionInfo(id: string): LiveSession | undefined {
-  return ((JSON.parse(cli("session", "list", "--json")) as { sessions?: LiveSession[] }).sessions ?? []).find((s) => s.id === id);
+  return ((JSON.parse(cli("thread", "list", "--json")) as { threads?: LiveSession[] }).threads ?? []).find((s) => s.id === id);
 }
 
 async function shot(page: Page, name: string): Promise<void> {
@@ -52,7 +52,7 @@ test("flat sidebar, Projects page and Run in… with real threads", async ({ pag
   const [first, second] = ws.members;
   if (!first || !second) throw new Error(`workspace ${WORKSPACE} needs two members`);
   const start = (...args: string[]) =>
-    (JSON.parse(cli("session", "new", ...args, "--model", "haiku", "--effort", "medium", "--permission", "auto", "--prompt", "say hi and stop", "--json")) as LiveSession).id;
+    (JSON.parse(cli("thread", "new", ...args, "--model", "haiku", "--effort", "medium", "--permission", "auto", "--prompt", "say hi and stop", "--json")) as LiveSession).id;
   const wsThread = start("--workspace", ws.workspace.id, "--repo", first.repoId);
   const projThread = start("--repo", second.repoId);
   try {
@@ -108,7 +108,7 @@ test("flat sidebar, Projects page and Run in… with real threads", async ({ pag
   } finally {
     for (const id of [wsThread, projThread]) {
       try {
-        cli("session", "archive", "--id", id, "--yes");
+        cli("thread", "archive", "--id", id, "--yes");
       } catch {
         // already gone
       }

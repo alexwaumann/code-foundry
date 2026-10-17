@@ -1,0 +1,265 @@
+package thread
+
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"io"
+	"os"
+	"path/filepath"
+
+	"github.com/fsnotify/fsnotify"
+)
+
+// Transcript discovery and tailing.
+//
+// Claude writes a session's transcript to <claude dir>/projects/<slug>/<session
+// id>.jsonl (slug: see projectSlug). The file only appears with the first message, so
+// it is often created well after spawn. The thread store chooses the Claude session
+// id itself (--session-id, or the id passed to --resume), so discovery waits for one
+// known file instead of guessing among the newest files in a directory shared with
+// other threads in the same worktree. /clear makes Claude switch to a new session id
+// and file; that rotation is followed through Claude's per-process record
+// sessions/<pid>.json (see pidSessionID).
+
+const (
+	tailReadChunk = 64 << 10
+	maxLineBytes  = 8 << 20 // longer lines (huge attachments) are skipped
+)
+
+// tailer follows one Claude session's transcript file. Not safe for concurrent use;
+// the runner goroutine owns it.
+type tailer struct {
+	paths ClaudePaths
+	cwd   string
+
+	id      string // Claude session id being followed
+	fromEnd bool   // skip content that existed when the file was first opened
+	path    string
+	f       *os.File
+	off     int64
+	skipped int64 // bytes fromEnd skipped when the file was opened (backfill reads them)
+	lineSplitter
+
+	w       *fsnotify.Watcher // nil if fsnotify is unavailable; polling still works
+	watched map[string]bool
+}
+
+func newTailer(paths ClaudePaths, cwd string) *tailer {
+	t := &tailer{paths: paths, cwd: cwd, watched: map[string]bool{}}
+	if w, err := fsnotify.NewWatcher(); err == nil {
+		t.w = w
+	}
+	return t
+}
+
+// events is the fsnotify channel (nil when unavailable). Any event means "poll".
+func (t *tailer) events() <-chan fsnotify.Event {
+	if t.w == nil {
+		return nil
+	}
+	return t.w.Events
+}
+
+func (t *tailer) errors() <-chan error {
+	if t.w == nil {
+		return nil
+	}
+	return t.w.Errors
+}
+
+// follow switches to Claude session id. fromEnd skips what is already in the file
+// (resume: the history is not news).
+func (t *tailer) follow(id string, fromEnd bool) {
+	if id == t.id {
+		return
+	}
+	t.closeFile()
+	t.id, t.fromEnd = id, fromEnd
+	t.path, t.off, t.skipped, t.lineSplitter = "", 0, 0, lineSplitter{}
+}
+
+func (t *tailer) closeFile() {
+	if t.f != nil {
+		_ = t.f.Close()
+		t.f = nil
+	}
+}
+
+func (t *tailer) close() {
+	t.closeFile()
+	if t.w != nil {
+		_ = t.w.Close()
+	}
+}
+
+// poll opens the transcript if it has appeared and returns complete new lines.
+// discovered is true on the call that first finds the file for the current id.
+func (t *tailer) poll() (lines [][]byte, discovered bool) {
+	if t.id == "" {
+		return nil, false
+	}
+	t.ensureWatches()
+	if t.f == nil {
+		p, ok := t.paths.transcriptPath(t.cwd, t.id)
+		if !ok {
+			return nil, false
+		}
+		f, err := os.Open(p)
+		if err != nil {
+			return nil, false
+		}
+		t.f, t.path, discovered = f, p, true
+		if t.fromEnd {
+			if fi, err := f.Stat(); err == nil {
+				t.off, t.skipped = fi.Size(), fi.Size()
+			}
+		}
+		t.watch(filepath.Dir(p))
+	}
+	if fi, err := t.f.Stat(); err == nil && fi.Size() < t.off {
+		t.off, t.lineSplitter = 0, lineSplitter{} // truncated or replaced
+	}
+	lines, err := readAppended(t.f, &t.off, &t.lineSplitter, lines)
+	if err != nil {
+		t.closeFile() // reopen on the next poll
+	}
+	return lines, discovered
+}
+
+// readAppended reads f from *off to its end, advancing *off, and appends the complete
+// lines to lines. err is a read error other than EOF.
+func readAppended(f *os.File, off *int64, sp *lineSplitter, lines [][]byte) ([][]byte, error) {
+	buf := make([]byte, tailReadChunk)
+	for {
+		n, err := f.ReadAt(buf, *off)
+		if n > 0 {
+			*off += int64(n)
+			lines = sp.split(lines, buf[:n])
+		}
+		if err != nil && !errors.Is(err, io.EOF) {
+			return lines, err
+		}
+		if err != nil || n < len(buf) {
+			return lines, nil
+		}
+	}
+}
+
+// lineSplitter cuts a byte stream into lines. Lines longer than maxLineBytes are
+// skipped (huge attachments), never buffered whole.
+type lineSplitter struct {
+	partial []byte
+	skip    bool // discarding the rest of an over-long line
+}
+
+// split appends the complete non-empty lines in data to lines, each a copy.
+func (t *lineSplitter) split(lines [][]byte, data []byte) [][]byte {
+	for len(data) > 0 {
+		i := bytes.IndexByte(data, '\n')
+		if i < 0 {
+			if !t.skip {
+				t.partial = append(t.partial, data...)
+				if len(t.partial) > maxLineBytes {
+					t.partial, t.skip = nil, true
+				}
+			}
+			return lines
+		}
+		if t.skip {
+			t.skip = false
+		} else {
+			line := append(t.partial, data[:i]...)
+			t.partial = nil
+			if len(line) > 0 {
+				lines = append(lines, line)
+			}
+		}
+		data = data[i+1:]
+	}
+	return lines
+}
+
+// ensureWatches watches the project dir, or the projects root until the project dir
+// exists, so the file's creation is noticed without waiting for the next tick.
+func (t *tailer) ensureWatches() {
+	if t.w == nil {
+		return
+	}
+	dir := t.paths.projectDir(t.cwd)
+	if t.watched[dir] {
+		return
+	}
+	if _, err := os.Stat(dir); err == nil {
+		t.watch(dir)
+		return
+	}
+	t.watch(filepath.Join(t.paths.Dir, "projects"))
+}
+
+func (t *tailer) watch(dir string) {
+	if t.w == nil || t.watched[dir] {
+		return
+	}
+	if err := t.w.Add(dir); err == nil {
+		t.watched[dir] = true
+	}
+}
+
+// pidSessionID reads the current Claude session id of process pid from Claude's
+// per-process record (sessions/<pid>.json). Empty if unavailable.
+func pidSessionID(paths ClaudePaths, pid int) string {
+	data, err := os.ReadFile(paths.pidFile(pid))
+	if err != nil {
+		return ""
+	}
+	var rec struct {
+		PID       int    `json:"pid"`
+		SessionID string `json:"sessionId"`
+	}
+	if json.Unmarshal(data, &rec) != nil || rec.PID != pid {
+		return ""
+	}
+	return rec.SessionID
+}
+
+// scanLines streams the first limit bytes of the transcript at path (all of it when
+// limit <= 0) and calls fn with each line in file order. Lines are split like the
+// tailer splits them: over-long lines are skipped, never buffered whole. A last line
+// without its newline (yet) is passed too. Reads the history the tailer skipped
+// (backfill) and does full rescans.
+func scanLines(path string, limit int64, fn func(line []byte)) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+	var r io.Reader = f
+	if limit > 0 {
+		r = io.LimitReader(f, limit)
+	}
+	var (
+		sp    lineSplitter
+		lines [][]byte
+	)
+	buf := make([]byte, tailReadChunk)
+	for {
+		n, err := r.Read(buf)
+		if n > 0 {
+			lines = sp.split(lines[:0], buf[:n])
+			for _, line := range lines {
+				fn(line)
+			}
+		}
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return err
+		}
+	}
+	if !sp.skip && len(sp.partial) > 0 {
+		fn(sp.partial)
+	}
+	return nil
+}

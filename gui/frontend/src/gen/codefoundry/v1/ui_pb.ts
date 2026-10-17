@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/ui.proto.
  */
 export const file_codefoundry_v1_ui: GenFile = /*@__PURE__*/
-  fileDesc("Chdjb2RlZm91bmRyeS92MS91aS5wcm90bxIOY29kZWZvdW5kcnkudjEiFQoTV2F0Y2hJbnRlbnRzUmVxdWVzdCLJBgoIVWlJbnRlbnQSQAoOZm9jdXNfdGVybWluYWwYASABKAsyJi5jb2RlZm91bmRyeS52MS5VaUludGVudC5Gb2N1c1Rlcm1pbmFsSAASOAoKZm9jdXNfcmVwbxgCIAEoCzIiLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50LkZvY3VzUmVwb0gAEjwKDG9wZW5fcGFsZXR0ZRgDIAEoCzIkLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50Lk9wZW5QYWxldHRlSAASMQoGbm90aWZ5GAQgASgLMh8uY29kZWZvdW5kcnkudjEuVWlJbnRlbnQuTm90aWZ5SAASPgoNZm9jdXNfc2Vzc2lvbhgFIAEoCzIlLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50LkZvY3VzU2Vzc2lvbkgAEjYKCXNob3dfdmlldxgGIAEoCzIhLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50LlNob3dWaWV3SAASQwoQcGxheV9hbGVydF9zb3VuZBgHIAEoCzInLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50LlBsYXlBbGVydFNvdW5kSAAaIAoOUGxheUFsZXJ0U291bmQSDgoGdm9sdW1lGAEgASgFGhgKCFNob3dWaWV3EgwKBG5hbWUYASABKAkaIgoMRm9jdXNTZXNzaW9uEhIKCnNlc3Npb25faWQYASABKAkaJAoNRm9jdXNUZXJtaW5hbBITCgt0ZXJtaW5hbF9pZBgBIAEoCRozCglGb2N1c1JlcG8SDwoHcmVwb19pZBgBIAEoCRIVCg13b3JrdHJlZV9wYXRoGAIgASgJGhwKC09wZW5QYWxldHRlEg0KBXF1ZXJ5GAEgASgJGq8BCgZOb3RpZnkSNAoFbGV2ZWwYASABKA4yJS5jb2RlZm91bmRyeS52MS5VaUludGVudC5Ob3RpZnkuTGV2ZWwSDQoFdGl0bGUYAiABKAkSDAoEYm9keRgDIAEoCSJSCgVMZXZlbBIVChFMRVZFTF9VTlNQRUNJRklFRBAAEg4KCkxFVkVMX0lORk8QARIRCg1MRVZFTF9XQVJOSU5HEAISDwoLTEVWRUxfRVJST1IQA0IICgZpbnRlbnQiPQoRRW1pdEludGVudFJlcXVlc3QSKAoGaW50ZW50GAEgASgLMhguY29kZWZvdW5kcnkudjEuVWlJbnRlbnQiJwoSRW1pdEludGVudFJlc3BvbnNlEhEKCWRlbGl2ZXJlZBgBIAEoDTKvAQoJVWlTZXJ2aWNlElEKDFdhdGNoSW50ZW50cxIjLmNvZGVmb3VuZHJ5LnYxLldhdGNoSW50ZW50c1JlcXVlc3QaGC5jb2RlZm91bmRyeS52MS5VaUludGVudCIAMAESTwoERW1pdBIhLmNvZGVmb3VuZHJ5LnYxLkVtaXRJbnRlbnRSZXF1ZXN0GiIuY29kZWZvdW5kcnkudjEuRW1pdEludGVudFJlc3BvbnNlIgBCvwEKEmNvbS5jb2RlZm91bmRyeS52MUIHVWlQcm90b1ABWkdnaXRodWIuY29tL2FsZXh3YXVtYW5uL2NvZGUtZm91bmRyeS9nZW4vZ28vY29kZWZvdW5kcnkvdjE7Y29kZWZvdW5kcnl2MaICA0NYWKoCDkNvZGVmb3VuZHJ5LlYxygIOQ29kZWZvdW5kcnlcVjHiAhpDb2RlZm91bmRyeVxWMVxHUEJNZXRhZGF0YeoCD0NvZGVmb3VuZHJ5OjpWMWIGcHJvdG8z");
+  fileDesc("Chdjb2RlZm91bmRyeS92MS91aS5wcm90bxIOY29kZWZvdW5kcnkudjEiFQoTV2F0Y2hJbnRlbnRzUmVxdWVzdCLFBgoIVWlJbnRlbnQSQAoOZm9jdXNfdGVybWluYWwYASABKAsyJi5jb2RlZm91bmRyeS52MS5VaUludGVudC5Gb2N1c1Rlcm1pbmFsSAASOAoKZm9jdXNfcmVwbxgCIAEoCzIiLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50LkZvY3VzUmVwb0gAEjwKDG9wZW5fcGFsZXR0ZRgDIAEoCzIkLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50Lk9wZW5QYWxldHRlSAASMQoGbm90aWZ5GAQgASgLMh8uY29kZWZvdW5kcnkudjEuVWlJbnRlbnQuTm90aWZ5SAASPAoMZm9jdXNfdGhyZWFkGAUgASgLMiQuY29kZWZvdW5kcnkudjEuVWlJbnRlbnQuRm9jdXNUaHJlYWRIABI2CglzaG93X3ZpZXcYBiABKAsyIS5jb2RlZm91bmRyeS52MS5VaUludGVudC5TaG93Vmlld0gAEkMKEHBsYXlfYWxlcnRfc291bmQYByABKAsyJy5jb2RlZm91bmRyeS52MS5VaUludGVudC5QbGF5QWxlcnRTb3VuZEgAGiAKDlBsYXlBbGVydFNvdW5kEg4KBnZvbHVtZRgBIAEoBRoYCghTaG93VmlldxIMCgRuYW1lGAEgASgJGiAKC0ZvY3VzVGhyZWFkEhEKCXRocmVhZF9pZBgBIAEoCRokCg1Gb2N1c1Rlcm1pbmFsEhMKC3Rlcm1pbmFsX2lkGAEgASgJGjMKCUZvY3VzUmVwbxIPCgdyZXBvX2lkGAEgASgJEhUKDXdvcmt0cmVlX3BhdGgYAiABKAkaHAoLT3BlblBhbGV0dGUSDQoFcXVlcnkYASABKAkarwEKBk5vdGlmeRI0CgVsZXZlbBgBIAEoDjIlLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50Lk5vdGlmeS5MZXZlbBINCgV0aXRsZRgCIAEoCRIMCgRib2R5GAMgASgJIlIKBUxldmVsEhUKEUxFVkVMX1VOU1BFQ0lGSUVEEAASDgoKTEVWRUxfSU5GTxABEhEKDUxFVkVMX1dBUk5JTkcQAhIPCgtMRVZFTF9FUlJPUhADQggKBmludGVudCI9ChFFbWl0SW50ZW50UmVxdWVzdBIoCgZpbnRlbnQYASABKAsyGC5jb2RlZm91bmRyeS52MS5VaUludGVudCInChJFbWl0SW50ZW50UmVzcG9uc2USEQoJZGVsaXZlcmVkGAEgASgNMq8BCglVaVNlcnZpY2USUQoMV2F0Y2hJbnRlbnRzEiMuY29kZWZvdW5kcnkudjEuV2F0Y2hJbnRlbnRzUmVxdWVzdBoYLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50IgAwARJPCgRFbWl0EiEuY29kZWZvdW5kcnkudjEuRW1pdEludGVudFJlcXVlc3QaIi5jb2RlZm91bmRyeS52MS5FbWl0SW50ZW50UmVzcG9uc2UiAEK/AQoSY29tLmNvZGVmb3VuZHJ5LnYxQgdVaVByb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM");
 
 /**
  * @generated from message codefoundry.v1.WatchIntentsRequest
@@ -58,10 +58,10 @@ export type UiIntent = Message<"codefoundry.v1.UiIntent"> & {
     case: "notify";
   } | {
     /**
-     * @generated from field: codefoundry.v1.UiIntent.FocusSession focus_session = 5;
+     * @generated from field: codefoundry.v1.UiIntent.FocusThread focus_thread = 5;
      */
-    value: UiIntent_FocusSession;
-    case: "focusSession";
+    value: UiIntent_FocusThread;
+    case: "focusThread";
   } | {
     /**
      * @generated from field: codefoundry.v1.UiIntent.ShowView show_view = 6;
@@ -127,20 +127,20 @@ export const UiIntent_ShowViewSchema: GenMessage<UiIntent_ShowView> = /*@__PURE_
   messageDesc(file_codefoundry_v1_ui, 1, 1);
 
 /**
- * @generated from message codefoundry.v1.UiIntent.FocusSession
+ * @generated from message codefoundry.v1.UiIntent.FocusThread
  */
-export type UiIntent_FocusSession = Message<"codefoundry.v1.UiIntent.FocusSession"> & {
+export type UiIntent_FocusThread = Message<"codefoundry.v1.UiIntent.FocusThread"> & {
   /**
-   * @generated from field: string session_id = 1;
+   * @generated from field: string thread_id = 1;
    */
-  sessionId: string;
+  threadId: string;
 };
 
 /**
- * Describes the message codefoundry.v1.UiIntent.FocusSession.
- * Use `create(UiIntent_FocusSessionSchema)` to create a new message.
+ * Describes the message codefoundry.v1.UiIntent.FocusThread.
+ * Use `create(UiIntent_FocusThreadSchema)` to create a new message.
  */
-export const UiIntent_FocusSessionSchema: GenMessage<UiIntent_FocusSession> = /*@__PURE__*/
+export const UiIntent_FocusThreadSchema: GenMessage<UiIntent_FocusThread> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_ui, 1, 2);
 
 /**

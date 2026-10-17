@@ -76,7 +76,7 @@ async function daemonItems(): Promise<{ seq: number; items: number }> {
   const res = await fetch(`http://127.0.0.1:${port}/codefoundry.v1.ThreadService/ListItems`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ sessionId: ID }),
+    body: JSON.stringify({ threadId: ID }),
   });
   const body = (await res.json()) as { snapshot?: { seq?: string; items?: unknown[] } };
   return { seq: Number(body.snapshot?.seq ?? 0), items: body.snapshot?.items?.length ?? 0 };

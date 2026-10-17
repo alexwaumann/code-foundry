@@ -46,11 +46,11 @@ type Options struct {
 	Repos RepoSource
 	// Terminals runs terminal-mode actions. Nil refuses them.
 	Terminals terminal.Store
-	// Session resolves a thread to its owner (project and worktree). Nil: runs need a
+	// Thread resolves a thread to its owner (project and worktree). Nil: runs need a
 	// worktree.
-	Session func(id string) (Owner, bool)
-	Bus     *bus.Bus     // default: a private bus
-	Log     *slog.Logger // default: slog.Default()
+	Thread func(id string) (Owner, bool)
+	Bus    *bus.Bus     // default: a private bus
+	Log    *slog.Logger // default: slog.Default()
 	// Shell is the shell that runs commands (`<Shell> -lc <command>`). Default: $SHELL,
 	// else /bin/zsh.
 	Shell string

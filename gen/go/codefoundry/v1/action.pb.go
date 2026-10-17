@@ -370,7 +370,7 @@ type ActionRun struct {
 	Command    string `protobuf:"bytes,4,opt,name=command,proto3" json:"command,omitempty"`
 	RepoId     string `protobuf:"bytes,5,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
 	// The thread the run belongs to; empty for a worktree's run.
-	SessionId string `protobuf:"bytes,6,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	ThreadId string `protobuf:"bytes,6,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
 	// Where it runs (its cwd and CODE_FOUNDRY_WORKTREE).
 	WorktreePath string        `protobuf:"bytes,7,opt,name=worktree_path,json=worktreePath,proto3" json:"worktree_path,omitempty"`
 	Mode         ActionRunMode `protobuf:"varint,8,opt,name=mode,proto3,enum=codefoundry.v1.ActionRunMode" json:"mode,omitempty"`
@@ -457,9 +457,9 @@ func (x *ActionRun) GetRepoId() string {
 	return ""
 }
 
-func (x *ActionRun) GetSessionId() string {
+func (x *ActionRun) GetThreadId() string {
 	if x != nil {
-		return x.SessionId
+		return x.ThreadId
 	}
 	return ""
 }
@@ -985,7 +985,7 @@ type RunActionRequest struct {
 	// Action id, or its name (ignoring case) within the owner's project or repo_id.
 	Action string `protobuf:"bytes,1,opt,name=action,proto3" json:"action,omitempty"`
 	// The owning thread: the run uses its project and worktree. Wins over worktree_path.
-	SessionId string `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	ThreadId string `protobuf:"bytes,2,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
 	// The owning worktree when there is no thread: a registered worktree of the action's
 	// project.
 	WorktreePath string `protobuf:"bytes,3,opt,name=worktree_path,json=worktreePath,proto3" json:"worktree_path,omitempty"`
@@ -1034,9 +1034,9 @@ func (x *RunActionRequest) GetAction() string {
 	return ""
 }
 
-func (x *RunActionRequest) GetSessionId() string {
+func (x *RunActionRequest) GetThreadId() string {
 	if x != nil {
-		return x.SessionId
+		return x.ThreadId
 	}
 	return ""
 }
@@ -1530,7 +1530,7 @@ type ActionRunFinished struct {
 	ActionId      string                 `protobuf:"bytes,2,opt,name=action_id,json=actionId,proto3" json:"action_id,omitempty"`
 	ActionName    string                 `protobuf:"bytes,3,opt,name=action_name,json=actionName,proto3" json:"action_name,omitempty"`
 	RepoId        string                 `protobuf:"bytes,4,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
-	SessionId     string                 `protobuf:"bytes,5,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	ThreadId      string                 `protobuf:"bytes,5,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
 	ExitCode      int32                  `protobuf:"varint,6,opt,name=exit_code,json=exitCode,proto3" json:"exit_code,omitempty"`
 	Mode          ActionRunMode          `protobuf:"varint,7,opt,name=mode,proto3,enum=codefoundry.v1.ActionRunMode" json:"mode,omitempty"`
 	Trigger       ActionRunTrigger       `protobuf:"varint,8,opt,name=trigger,proto3,enum=codefoundry.v1.ActionRunTrigger" json:"trigger,omitempty"`
@@ -1597,9 +1597,9 @@ func (x *ActionRunFinished) GetRepoId() string {
 	return ""
 }
 
-func (x *ActionRunFinished) GetSessionId() string {
+func (x *ActionRunFinished) GetThreadId() string {
 	if x != nil {
-		return x.SessionId
+		return x.ThreadId
 	}
 	return ""
 }
@@ -1651,16 +1651,15 @@ const file_codefoundry_v1_action_proto_rawDesc = "" +
 	"created_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
 	"updated_at\x18\n" +
-	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xee\x04\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xec\x04\n" +
 	"\tActionRun\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\taction_id\x18\x02 \x01(\tR\bactionId\x12\x1f\n" +
 	"\vaction_name\x18\x03 \x01(\tR\n" +
 	"actionName\x12\x18\n" +
 	"\acommand\x18\x04 \x01(\tR\acommand\x12\x17\n" +
-	"\arepo_id\x18\x05 \x01(\tR\x06repoId\x12\x1d\n" +
-	"\n" +
-	"session_id\x18\x06 \x01(\tR\tsessionId\x12#\n" +
+	"\arepo_id\x18\x05 \x01(\tR\x06repoId\x12\x1b\n" +
+	"\tthread_id\x18\x06 \x01(\tR\bthreadId\x12#\n" +
 	"\rworktree_path\x18\a \x01(\tR\fworktreePath\x121\n" +
 	"\x04mode\x18\b \x01(\x0e2\x1d.codefoundry.v1.ActionRunModeR\x04mode\x12\x1f\n" +
 	"\vterminal_id\x18\t \x01(\tR\n" +
@@ -1710,11 +1709,10 @@ const file_codefoundry_v1_action_proto_rawDesc = "" +
 	"\x06action\x18\x01 \x01(\v2\x16.codefoundry.v1.ActionR\x06action\"%\n" +
 	"\x13DeleteActionRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x16\n" +
-	"\x14DeleteActionResponse\"\xba\x01\n" +
+	"\x14DeleteActionResponse\"\xb8\x01\n" +
 	"\x10RunActionRequest\x12\x16\n" +
-	"\x06action\x18\x01 \x01(\tR\x06action\x12\x1d\n" +
-	"\n" +
-	"session_id\x18\x02 \x01(\tR\tsessionId\x12#\n" +
+	"\x06action\x18\x01 \x01(\tR\x06action\x12\x1b\n" +
+	"\tthread_id\x18\x02 \x01(\tR\bthreadId\x12#\n" +
 	"\rworktree_path\x18\x03 \x01(\tR\fworktreePath\x12\x17\n" +
 	"\arepo_id\x18\x04 \x01(\tR\x06repoId\x121\n" +
 	"\x04mode\x18\x05 \x01(\x0e2\x1d.codefoundry.v1.ActionRunModeR\x04mode\"@\n" +
@@ -1741,15 +1739,14 @@ const file_codefoundry_v1_action_proto_rawDesc = "" +
 	"\x05event\"q\n" +
 	"\x0eActionSnapshot\x120\n" +
 	"\aactions\x18\x01 \x03(\v2\x16.codefoundry.v1.ActionR\aactions\x12-\n" +
-	"\x04runs\x18\x02 \x03(\v2\x19.codefoundry.v1.ActionRunR\x04runs\"\xcd\x02\n" +
+	"\x04runs\x18\x02 \x03(\v2\x19.codefoundry.v1.ActionRunR\x04runs\"\xcb\x02\n" +
 	"\x11ActionRunFinished\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12\x1b\n" +
 	"\taction_id\x18\x02 \x01(\tR\bactionId\x12\x1f\n" +
 	"\vaction_name\x18\x03 \x01(\tR\n" +
 	"actionName\x12\x17\n" +
-	"\arepo_id\x18\x04 \x01(\tR\x06repoId\x12\x1d\n" +
-	"\n" +
-	"session_id\x18\x05 \x01(\tR\tsessionId\x12\x1b\n" +
+	"\arepo_id\x18\x04 \x01(\tR\x06repoId\x12\x1b\n" +
+	"\tthread_id\x18\x05 \x01(\tR\bthreadId\x12\x1b\n" +
 	"\texit_code\x18\x06 \x01(\x05R\bexitCode\x121\n" +
 	"\x04mode\x18\a \x01(\x0e2\x1d.codefoundry.v1.ActionRunModeR\x04mode\x12:\n" +
 	"\atrigger\x18\b \x01(\x0e2 .codefoundry.v1.ActionRunTriggerR\atrigger\x12\x1f\n" +

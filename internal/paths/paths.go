@@ -25,17 +25,23 @@ const EnvHome = "CODE_FOUNDRY_HOME"
 
 // The daemon sets these in every Claude session it spawns: its loopback endpoint
 // (http://127.0.0.1:<port>) and bearer token. The CLI prefers them over the Unix
-// socket (client.EndpointFromEnv); sandboxed sessions cannot connect to sockets.
+// socket (client.EndpointFromEnv); sandboxed threads cannot connect to sockets.
 const (
 	EnvEndpoint = "CODE_FOUNDRY_ENDPOINT"
 	EnvToken    = "CODE_FOUNDRY_TOKEN"
 )
 
-// EnvSession is the id of the thread a process belongs to. The daemon sets it in every
-// Claude session it spawns (and in a thread's action runs); the CLI sends it as the
-// default --context-session, so `code-foundry terminal new` or `action run` from a
+// EnvThread is the id of the thread a process belongs to. The daemon sets it in every
+// Claude process it spawns for a thread (and in a thread's action runs); the CLI sends it
+// as the default --context-thread, so `code-foundry terminal new` or `action run` from a
 // thread's agent lands in that thread's bottom panel.
-const EnvSession = "CODE_FOUNDRY_SESSION"
+const EnvThread = "CODE_FOUNDRY_THREAD"
+
+// EnvThreadLegacy is EnvThread's name before threads were renamed from sessions. The CLI
+// still reads it when EnvThread is unset, for one release, so a process started with the
+// old name keeps its default --context-thread; the daemon sets only EnvThread and scrubs
+// both. Remove it after the next stable release.
+const EnvThreadLegacy = "CODE_FOUNDRY_SESSION"
 
 // Every action run (internal/store/action) gets these: the project's main checkout and
 // the worktree the run belongs to (its cwd).
@@ -113,7 +119,7 @@ func (p Paths) Worktrees() string { return filepath.Join(p.home, "worktrees") }
 func (p Paths) Projects() string { return filepath.Join(p.home, "projects") }
 
 // Attachments is where images staged for a new thread's first prompt are kept
-// (SessionService.StageAttachment). The session store creates it on demand and
+// (ThreadService.StageAttachment). The thread store creates it on demand and
 // removes files older than a day on daemon start.
 func (p Paths) Attachments() string { return filepath.Join(p.home, "attachments") }
 

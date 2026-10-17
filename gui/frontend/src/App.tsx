@@ -47,7 +47,7 @@ function regionOf(el: EventTarget | null): FocusRegion {
 /**
  * Starts the daemon sync and global listeners; returns one stop function. Long-lived
  * connections: one EventService.Watch (all slices) plus the selected thread's
- * ThreadService.Watch (components/thread) and an Attach for the bottom panel's active
+ * ThreadService.WatchThread (components/thread) and an Attach for the bottom panel's active
  * shell, each only while visible.
  */
 function startApp(): () => void {

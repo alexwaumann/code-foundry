@@ -14,8 +14,8 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
-	"github.com/alexwaumann/code-foundry/internal/store/session"
 	"github.com/alexwaumann/code-foundry/internal/store/settings"
+	"github.com/alexwaumann/code-foundry/internal/store/thread"
 	"github.com/alexwaumann/code-foundry/internal/store/update"
 )
 
@@ -24,14 +24,14 @@ import (
 // settings page marks them "applies after a daemon restart". Everything below applies
 // live:
 //
-//   - keybinding overrides and session model/effort defaults -> command registry
+//   - keybinding overrides and thread model/effort defaults -> command registry
 //     overrides (CommandService.List reports the effective values);
 //   - log level -> the log file handler's LevelVar;
-//   - auto-naming and the naming model -> a Namer that reads both per session;
-//   - sessions.cache_ttl_seconds -> session.Manager.SetCacheTTL on every change
+//   - auto-naming and the naming model -> a Namer that reads both per thread;
+//   - threads.cache_ttl_seconds -> thread.Manager.SetCacheTTL on every change
 //     (applyCacheTTL), which republishes the threads whose cache expiry moved;
 //   - worktree directory -> repo.worktree.new's default path, and the path of the
-//     worktree a new thread creates (session.Options.WorktreePath).
+//     worktree a new thread creates (thread.Options.WorktreePath).
 //   - editor command -> gitops' Editor func (stores.go), read on every open.
 //   - github.poll_interval_seconds and github.dashboards_enabled -> the gh store's
 //     Config func (stores.go), read before every poll.
@@ -64,10 +64,10 @@ func registryOverrides(s settings.Settings) command.Overrides {
 	return command.Overrides{
 		Keybindings: settings.KeybindingOverrides(s.Keybindings),
 		ArgDefaults: map[string]map[string]string{
-			"session.new":     {"model": s.Sessions.DefaultModel, "effort": s.Sessions.DefaultEffort},
-			"pr.ask":          {"model": s.Sessions.DefaultModel, "effort": s.Sessions.DefaultEffort},
-			"pr.explain":      {"model": s.Sessions.DefaultModel, "effort": s.Sessions.DefaultEffort},
-			"pr.fix.findings": {"model": s.Sessions.DefaultModel, "effort": s.Sessions.DefaultEffort},
+			"thread.new":      {"model": s.Threads.DefaultModel, "effort": s.Threads.DefaultEffort},
+			"pr.ask":          {"model": s.Threads.DefaultModel, "effort": s.Threads.DefaultEffort},
+			"pr.explain":      {"model": s.Threads.DefaultModel, "effort": s.Threads.DefaultEffort},
+			"pr.fix.findings": {"model": s.Threads.DefaultModel, "effort": s.Threads.DefaultEffort},
 		},
 	}
 }
@@ -80,25 +80,25 @@ func logLevel(s string) slog.Level {
 	return l
 }
 
-// errAutoNameOff is what the namer returns when auto-naming is turned off; the session
-// store logs it and leaves the session unnamed.
-var errAutoNameOff = errors.New("auto-naming is turned off in settings (sessions.auto_name)")
+// errAutoNameOff is what the namer returns when auto-naming is turned off; the thread
+// store logs it and leaves the thread unnamed.
+var errAutoNameOff = errors.New("auto-naming is turned off in settings (threads.auto_name)")
 
-// settingsNamer wraps next so sessions.auto_name and sessions.naming_model apply
+// settingsNamer wraps next so threads.auto_name and threads.naming_model apply
 // without a restart: each call reads them and hands the model to next with
-// session.WithNamingModel.
-func settingsNamer(st *settings.Store, next session.Namer) session.Namer {
+// thread.WithNamingModel.
+func settingsNamer(st *settings.Store, next thread.Namer) thread.Namer {
 	return func(ctx context.Context, msg string) (string, error) {
-		s := st.Settings().Sessions
+		s := st.Settings().Threads
 		if !s.AutoName {
 			return "", errAutoNameOff
 		}
-		return next(session.WithNamingModel(ctx, s.NamingModel), msg)
+		return next(thread.WithNamingModel(ctx, s.NamingModel), msg)
 	}
 }
 
-// settingsWorktreePath applies repos.worktree_dir to the worktrees the session store
-// makes for new threads (session.Options.WorktreePath), the same way worktreeDirRepo
+// settingsWorktreePath applies repos.worktree_dir to the worktrees the thread store
+// makes for new threads (thread.Options.WorktreePath), the same way worktreeDirRepo
 // does for repo.worktree.new. "" leaves the repo store's default.
 func settingsWorktreePath(st *settings.Store) func(repo.Repo, string) string {
 	return func(r repo.Repo, branch string) string {
@@ -159,13 +159,13 @@ func settingsManagedRoots(st *settings.Store) func(string) []string {
 	}
 }
 
-// cacheTTLSetter is the session store's live cache TTL (*session.Manager).
+// cacheTTLSetter is the thread store's live cache TTL (*thread.Manager).
 type cacheTTLSetter interface{ SetCacheTTL(time.Duration) }
 
-// applyCacheTTL keeps the session store's prompt cache lifetime equal to
-// sessions.cache_ttl_seconds, now and on every settings change.
-func applyCacheTTL(st *settings.Store, sessions cacheTTLSetter) {
-	st.OnChange(func(snap *settings.Snapshot) { sessions.SetCacheTTL(snap.Settings.CacheTTL()) })
+// applyCacheTTL keeps the thread store's prompt cache lifetime equal to
+// threads.cache_ttl_seconds, now and on every settings change.
+func applyCacheTTL(st *settings.Store, threads cacheTTLSetter) {
+	st.OnChange(func(snap *settings.Snapshot) { threads.SetCacheTTL(snap.Settings.CacheTTL()) })
 }
 
 // updateChannelSetter is the updater's live channel (*update.Store).

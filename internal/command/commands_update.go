@@ -31,8 +31,8 @@ var (
 
 // UpdateDeps are the dependencies of the app.* commands and daemon.restart.
 type UpdateDeps struct {
-	Update  UpdateBackend
-	Session SessionBackend
+	Update UpdateBackend
+	Thread ThreadBackend
 	// Restart stops the daemon gracefully (Claude stops in every thread; a message
 	// starts it again) shortly after the command returns; the next client auto-starts
 	// the binary that is installed now. Nil makes daemon.restart and app.restart fail.
@@ -53,7 +53,7 @@ type AppVersion struct {
 }
 
 // DaemonRestart is daemon.restart's JSON result. ThreadsInterrupted counts the threads
-// the restart cut off (ActiveSession).
+// the restart cut off (ActiveThread).
 type DaemonRestart struct {
 	ThreadsInterrupted int `json:"threads_interrupted"`
 }
@@ -143,17 +143,17 @@ func channelSuffix(st *v1.UpdateStatus) string {
 	return " (" + st.GetChannel() + " channel)"
 }
 
-// ActiveSession reports whether a restart cuts s off, by the predicate archive and
+// ActiveThread reports whether a restart cuts s off, by the predicate archive and
 // snooze confirm with (archiveInterrupts): Claude starting or running a turn, waiting on
 // a permission request or question, background agents or shells running, or the turn
 // that reports one that just ended. An idle thread loses nothing: a message starts it
 // again.
-func ActiveSession(s *v1.Session) bool {
+func ActiveThread(s *v1.Thread) bool {
 	why, _ := archiveInterrupts(s)
 	return why != ""
 }
 
-// RestartCost is what a restart cuts off, summed over the threads (ActiveSession).
+// RestartCost is what a restart cuts off, summed over the threads (ActiveThread).
 type RestartCost struct {
 	// Threads is how many threads lose something.
 	Threads int
@@ -164,10 +164,10 @@ type RestartCost struct {
 }
 
 // RestartCostOf sums what a restart would cut off.
-func RestartCostOf(sessions []*v1.Session) RestartCost {
+func RestartCostOf(threads []*v1.Thread) RestartCost {
 	var c RestartCost
-	for _, s := range sessions {
-		if !ActiveSession(s) {
+	for _, s := range threads {
+		if !ActiveThread(s) {
 			continue
 		}
 		c.Threads++
@@ -206,14 +206,14 @@ func (c RestartCost) String() string {
 	return strings.Join(parts[:len(parts)-1], ", ") + " and " + parts[len(parts)-1]
 }
 
-// restartCost is RestartCostOf the daemon's threads; nothing when the session service
+// restartCost is RestartCostOf the daemon's threads; nothing when the thread service
 // is unavailable.
-func restartCost(ctx context.Context, s SessionBackend) RestartCost {
-	res, err := s.List(ctx, connect.NewRequest(&v1.ListSessionsRequest{}))
+func restartCost(ctx context.Context, s ThreadBackend) RestartCost {
+	res, err := s.List(ctx, connect.NewRequest(&v1.ListThreadsRequest{}))
 	if err != nil {
 		return RestartCost{}
 	}
-	return RestartCostOf(res.Msg.GetSessions())
+	return RestartCostOf(res.Msg.GetThreads())
 }
 
 // restartConfirm is app.restart's and daemon.restart's confirmation ("Restart
@@ -336,7 +336,7 @@ func RegisterUpdate(r *Registry, d UpdateDeps) error {
 		Command{
 			Name:        "app.relaunch",
 			Title:       "Relaunch App",
-			Description: "Quit and reopen the app window, picking up an installed update. Sessions keep running in the daemon.",
+			Description: "Quit and reopen the app window, picking up an installed update. Threads keep running in the daemon.",
 			Category:    "App",
 			Run: func(ctx context.Context, _ Context, _ Args) (Result, error) {
 				res, err := d.Update.Relaunch(ctx, connect.NewRequest(&v1.RelaunchAppRequest{}))
@@ -363,7 +363,7 @@ func RegisterUpdate(r *Registry, d UpdateDeps) error {
 			},
 			Confirm: restartConfirm("Restart Code Foundry", RestartCost{}),
 			DynamicConfirm: func(ctx context.Context, _ Context, _ Args) string {
-				return restartConfirm(restartWhat(updateStatus(ctx, d.Update)), restartCost(ctx, d.Session))
+				return restartConfirm(restartWhat(updateStatus(ctx, d.Update)), restartCost(ctx, d.Thread))
 			},
 			Run: func(ctx context.Context, _ Context, _ Args) (Result, error) {
 				if d.Restart == nil {
@@ -382,7 +382,7 @@ func RegisterUpdate(r *Registry, d UpdateDeps) error {
 						return Result{}, fmt.Errorf("install %s: %w", installed, err)
 					}
 				}
-				n := restartCost(ctx, d.Session)
+				n := restartCost(ctx, d.Thread)
 				// Announce before stopping, so GUIs hear it while the daemon is still up;
 				// each relaunches once its Watch stream ends.
 				res, err := d.Update.RequestRestart(ctx, connect.NewRequest(&v1.RequestRestartRequest{}))
@@ -409,7 +409,7 @@ func RegisterUpdate(r *Registry, d UpdateDeps) error {
 			Category: "Daemon",
 			Confirm:  restartConfirm("Restart the daemon", RestartCost{}),
 			DynamicConfirm: func(ctx context.Context, _ Context, _ Args) string {
-				return restartConfirm("Restart the daemon", restartCost(ctx, d.Session))
+				return restartConfirm("Restart the daemon", restartCost(ctx, d.Thread))
 			},
 			Run: func(ctx context.Context, _ Context, _ Args) (Result, error) {
 				if d.Restart == nil {
@@ -420,7 +420,7 @@ func RegisterUpdate(r *Registry, d UpdateDeps) error {
 				if updateStatus(ctx, d.Update).GetState() == v1.UpdateState_UPDATE_STATE_DOWNLOADING {
 					return Result{}, errDownloading
 				}
-				n := restartCost(ctx, d.Session)
+				n := restartCost(ctx, d.Thread)
 				d.Restart()
 				return Result{
 					Message: "restarting the daemon" + cutOff(n) + "; the next client starts the installed version",

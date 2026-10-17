@@ -16,16 +16,16 @@ func TestDecode(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "empty", in: "", want: map[string]string{}},
-		{name: "typed values", in: "[sessions]\nauto_name = false\nscrollback_lines = 5000\n[appearance]\ntheme = \"dark\"\n",
-			want: map[string]string{"sessions.auto_name": "false", "sessions.scrollback_lines": "5000", "appearance.theme": "dark"}},
+		{name: "typed values", in: "[threads]\nauto_name = false\nscrollback_lines = 5000\n[appearance]\ntheme = \"dark\"\n",
+			want: map[string]string{"threads.auto_name": "false", "threads.scrollback_lines": "5000", "appearance.theme": "dark"}},
 		{name: "lenient string int", in: "[appearance]\nfont_size = \"15\"\n", want: map[string]string{"appearance.font_size": "15"}},
 		{name: "float stays a float", in: "[appearance]\nfont_size = 13.5\n", want: map[string]string{"appearance.font_size": "13.5"}},
-		{name: "quoted keybinding keys", in: "[keybindings]\n\"session.new\" = \"cmd+shift+n\"\n",
-			want: map[string]string{"keybindings.session.new": "cmd+shift+n"}},
-		{name: "unquoted dotted keybinding keys are flattened", in: "[keybindings]\nsession.new = \"cmd+j\"\nrepo.worktree.new = \"cmd+alt+n\"\n",
-			want: map[string]string{"keybindings.session.new": "cmd+j", "keybindings.repo.worktree.new": "cmd+alt+n"}},
+		{name: "quoted keybinding keys", in: "[keybindings]\n\"thread.new\" = \"cmd+shift+n\"\n",
+			want: map[string]string{"keybindings.thread.new": "cmd+shift+n"}},
+		{name: "unquoted dotted keybinding keys are flattened", in: "[keybindings]\nthread.new = \"cmd+j\"\nrepo.worktree.new = \"cmd+alt+n\"\n",
+			want: map[string]string{"keybindings.thread.new": "cmd+j", "keybindings.repo.worktree.new": "cmd+alt+n"}},
 		{name: "top-level key", in: "theme = \"dark\"\n", want: map[string]string{"theme": "dark"}},
-		{name: "syntax error", in: "[sessions\n", wantErr: true},
+		{name: "syntax error", in: "[threads\n", wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -43,6 +43,36 @@ func TestDecode(t *testing.T) {
 	}
 }
 
+// Files written before threads were renamed from sessions: [sessions] and the session.*
+// keybindings read as [threads] and thread.*.
+func TestDecodeLegacyNames(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want map[string]string
+	}{
+		{name: "[sessions] is [threads]", in: "[sessions]\nauto_name = false\ndefault_effort = \"max\"\n",
+			want: map[string]string{"threads.auto_name": "false", "threads.default_effort": "max"}},
+		{name: "quoted session.* keybindings are thread.*", in: "[keybindings]\n\"session.new\" = \"cmd+shift+n\"\n\"session.rename\" = \"none\"\n",
+			want: map[string]string{"keybindings.thread.new": "cmd+shift+n", "keybindings.thread.rename": "none"}},
+		{name: "unquoted session.* keybindings are thread.*", in: "[keybindings]\nsession.new = \"cmd+j\"\nrepo.worktree.new = \"cmd+alt+n\"\n",
+			want: map[string]string{"keybindings.thread.new": "cmd+j", "keybindings.repo.worktree.new": "cmd+alt+n"}},
+		{name: "the new name wins when both are set", in: "[sessions]\nauto_name = false\nfont_size = 9\n[threads]\nauto_name = true\n[keybindings]\n\"session.new\" = \"cmd+1\"\n\"thread.new\" = \"cmd+2\"\n",
+			want: map[string]string{"threads.auto_name": "true", "threads.font_size": "9", "keybindings.thread.new": "cmd+2"}},
+		{name: "other groups and keybindings are left alone", in: "[appearance]\ntheme = \"dark\"\n[keybindings]\n\"sessionx.new\" = \"cmd+3\"\n\"terminal.new\" = \"cmd+t\"\n",
+			want: map[string]string{"appearance.theme": "dark", "keybindings.sessionx.new": "cmd+3", "keybindings.terminal.new": "cmd+t"}},
+		{name: "a top-level sessions key is not a table", in: "sessions = \"x\"\n", want: map[string]string{"sessions": "x"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := decode([]byte(tt.in))
+			if err != nil || !maps.Equal(got, tt.want) {
+				t.Fatalf("decode = %v, %v; want %v", got, err, tt.want)
+			}
+		})
+	}
+}
+
 func TestRenderRoundTrip(t *testing.T) {
 	accepted := map[string]string{
 		KeyAutoName:                   "false",
@@ -50,14 +80,14 @@ func TestRenderRoundTrip(t *testing.T) {
 		KeyFontSize:                   "15",
 		KeyFontFamily:                 `Weird "Font" \ Name`,
 		KeyWorktreeDir:                "~/wt/{repo}",
-		KeybindingKey("session.new"):  "cmd+shift+n",
+		KeybindingKey("thread.new"):   "cmd+shift+n",
 		KeybindingKey("terminal.new"): "none",
 	}
 	out := render(accepted)
 	text := string(out)
 	for _, want := range []string{
-		"[sessions]\n", "auto_name = false\n", "naming_model = \"claude-4.5-haiku[1m]\"\n", "font_size = 15\n", `font_family = "Weird \"Font\" \\ Name"` + "\n",
-		"# default_model = \"claude-opus-4-8[1m]\"\n", "# default_effort = \"high\"\n", "# scrollback_lines = 10000\n", `"session.new" = "cmd+shift+n"` + "\n",
+		"[threads]\n", "auto_name = false\n", "naming_model = \"claude-4.5-haiku[1m]\"\n", "font_size = 15\n", `font_family = "Weird \"Font\" \\ Name"` + "\n",
+		"# default_model = \"claude-opus-4-8[1m]\"\n", "# default_effort = \"high\"\n", "# scrollback_lines = 10000\n", `"thread.new" = "cmd+shift+n"` + "\n",
 		"Applies after a daemon restart.",
 	} {
 		if !strings.Contains(text, want) {
@@ -135,7 +165,7 @@ func TestOlderFileGetsNotificationDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := Read(path)
-	if got.Sessions.AutoName || got.Appearance.Theme != "dark" {
+	if got.Threads.AutoName || got.Appearance.Theme != "dark" {
 		t.Errorf("own values lost: %+v", got)
 	}
 	if got.Notifications != Defaults().Notifications {

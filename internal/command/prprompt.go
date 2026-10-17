@@ -14,7 +14,7 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 )
 
-// Prompts for the sessions pr.ask, pr.explain and pr.fix.findings start. Pure functions
+// Prompts for the threads pr.ask, pr.explain and pr.fix.findings start. Pure functions
 // of the pull request detail; see docs/notes/pr-thread-commands.md for the templates.
 
 const (
@@ -29,8 +29,8 @@ const (
 	// threadHead and threadTail are the comments a long review thread keeps: its first
 	// and its last two, with a "N more comments" line between them.
 	threadHead, threadTail = 1, 2
-	// MaxPRPromptBytes is the largest prompt a pull request session starts with. The
-	// session runner types the prompt into the terminal, whose input backlog is 1 MiB
+	// MaxPRPromptBytes is the largest prompt a pull request thread starts with. The
+	// thread runner types the prompt into the terminal, whose input backlog is 1 MiB
 	// (internal/store/terminal/input.go); a larger prompt would be cut silently.
 	MaxPRPromptBytes = 200 << 10
 )
@@ -53,7 +53,7 @@ func prPromptInfo(pr *v1.PullRequest) PRPromptInfo {
 	}
 }
 
-// PRCheckout is what pr.fix.findings knows about the worktree the session starts in
+// PRCheckout is what pr.fix.findings knows about the worktree the thread starts in
 // (from its last status refresh). The zero value says nothing.
 type PRCheckout struct {
 	// Behind is how many commits the upstream has that HEAD lacks.

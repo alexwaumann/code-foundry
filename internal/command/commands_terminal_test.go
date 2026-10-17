@@ -40,11 +40,11 @@ func TestTerminalNewOwner(t *testing.T) {
 		{Id: "r1", Path: app, Worktrees: []*v1.Worktree{{RepoId: "r1", Path: app}, {RepoId: "r1", Path: feat}}},
 		{Id: "r2", Path: real, Worktrees: []*v1.Worktree{{RepoId: "r2", Path: real}}},
 	}
-	thread := &v1.Session{RepoId: "r1", WorktreePath: feat}
+	thread := &v1.Thread{RepoId: "r1", WorktreePath: feat}
 	cli := command.Context{} // ActiveView is empty only from the CLI
 	gui := func(c command.Context) command.Context {
 		if c.ActiveView == "" {
-			c.ActiveView = "session"
+			c.ActiveView = "thread"
 		}
 		return c
 	}
@@ -54,8 +54,8 @@ func TestTerminalNewOwner(t *testing.T) {
 		ctx        command.Context
 		args       map[string]string
 		darwinOnly bool
-		sessionErr error
-		session    *v1.Session // the thread Get returns; default thread
+		threadErr  error
+		thread     *v1.Thread // the thread Get returns; default thread
 		wantErr    error
 		wantMsg    string // substring of the error
 		wantCwd    string
@@ -63,18 +63,18 @@ func TestTerminalNewOwner(t *testing.T) {
 		wantArgv   []string
 	}{
 		// A thread owns it.
-		{name: "thread in the GUI", ctx: gui(command.Context{ActiveSessionID: "s1", ActiveRepoID: "r1", ActiveWorktreePath: feat}),
+		{name: "thread in the GUI", ctx: gui(command.Context{ActiveThreadID: "s1", ActiveRepoID: "r1", ActiveWorktreePath: feat}),
 			wantCwd: feat, wantLabels: termlabel.Shell("s1", "r1", feat)},
-		{name: "thread without a worktree in context starts in the thread's worktree", ctx: gui(command.Context{ActiveSessionID: "s1"}),
+		{name: "thread without a worktree in context starts in the thread's worktree", ctx: gui(command.Context{ActiveThreadID: "s1"}),
 			wantCwd: feat, wantLabels: termlabel.Shell("s1", "r1", feat)},
-		{name: "thread from the CLI ignores the working directory", ctx: command.Context{ActiveSessionID: "s1"}, args: here("/cf-test/elsewhere"),
+		{name: "thread from the CLI ignores the working directory", ctx: command.Context{ActiveThreadID: "s1"}, args: here("/cf-test/elsewhere"),
 			wantCwd: feat, wantLabels: termlabel.Shell("s1", "r1", feat)},
-		{name: "thread with --cwd starts there", ctx: command.Context{ActiveSessionID: "s1"}, args: map[string]string{"cwd": app + "/docs"},
+		{name: "thread with --cwd starts there", ctx: command.Context{ActiveThreadID: "s1"}, args: map[string]string{"cwd": app + "/docs"},
 			wantCwd: app + "/docs", wantLabels: termlabel.Shell("s1", "r1", feat)},
-		{name: "thread without a project starts in its home and has no repo", ctx: gui(command.Context{ActiveSessionID: "s1", ActiveWorktreePath: "/cf-test/home"}),
-			session: &v1.Session{WorktreePath: "/cf-test/home"}, wantCwd: "/cf-test/home", wantLabels: termlabel.Shell("s1", "", "/cf-test/home")},
-		{name: "thread lookup fails", ctx: command.Context{ActiveSessionID: "s1"},
-			sessionErr: connect.NewError(connect.CodeNotFound, errors.New("no such session")), wantMsg: "no such session"},
+		{name: "thread without a project starts in its home and has no repo", ctx: gui(command.Context{ActiveThreadID: "s1", ActiveWorktreePath: "/cf-test/home"}),
+			thread: &v1.Thread{WorktreePath: "/cf-test/home"}, wantCwd: "/cf-test/home", wantLabels: termlabel.Shell("s1", "", "/cf-test/home")},
+		{name: "thread lookup fails", ctx: command.Context{ActiveThreadID: "s1"},
+			threadErr: connect.NewError(connect.CodeNotFound, errors.New("no such thread")), wantMsg: "no such thread"},
 		// Else the context's worktree.
 		{name: "worktree in the GUI", ctx: command.Context{ActiveRepoID: "r1", ActiveWorktreePath: feat, ActiveView: "projects"},
 			wantCwd: feat, wantLabels: termlabel.Shell("", "r1", feat)},
@@ -122,7 +122,7 @@ func TestTerminalNewOwner(t *testing.T) {
 			if err := command.RegisterTerminal(reg, command.TerminalDeps{
 				Terminal: term,
 				Repo:     &commandtest.Repo{Repos: repos},
-				Session:  &commandtest.Session{Current: cmp.Or(tt.session, thread), Err: tt.sessionErr},
+				Thread:   &commandtest.Thread{Current: cmp.Or(tt.thread, thread), Err: tt.threadErr},
 			}); err != nil {
 				t.Fatal(err)
 			}
@@ -214,10 +214,10 @@ func TestTerminalClose(t *testing.T) {
 		t.Errorf("terminal.close = %+v, want title Close Terminal, category Terminal, no confirmation", c)
 	}
 	// A terminal that is not a shell (TerminalService.Create without labels).
-	if c.Available(command.Context{ActiveTerminalID: "t-other", ActiveSessionID: "s1"}) {
+	if c.Available(command.Context{ActiveTerminalID: "t-other", ActiveThreadID: "s1"}) {
 		t.Error("terminal.close offered on a terminal that is not a shell")
 	}
-	if !c.Available(command.Context{ActiveTerminalID: "t-shell", ActiveSessionID: "s1"}) {
+	if !c.Available(command.Context{ActiveTerminalID: "t-shell", ActiveThreadID: "s1"}) {
 		t.Error("terminal.close not offered on a shell")
 	}
 	_, err := reg.Invoke(context.Background(), command.Context{ActiveTerminalID: "t-other"}, "terminal.close", nil)

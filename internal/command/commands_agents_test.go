@@ -15,20 +15,20 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/command/commandtest"
-	"github.com/alexwaumann/code-foundry/internal/store/session"
-	"github.com/alexwaumann/code-foundry/internal/store/session/sessiontest"
+	"github.com/alexwaumann/code-foundry/internal/store/thread"
+	"github.com/alexwaumann/code-foundry/internal/store/thread/threadtest"
 )
 
-func newAgentsRegistry(t *testing.T) (*command.Registry, *sessiontest.Fake, *commandtest.Emitter) {
+func newAgentsRegistry(t *testing.T) (*command.Registry, *threadtest.Fake, *commandtest.Emitter) {
 	t.Helper()
 	b := bus.New()
-	fake := sessiontest.New(b)
+	fake := threadtest.New(b)
 	reg := command.NewRegistry()
 	emit := &commandtest.Emitter{Delivered: 1}
-	if err := command.RegisterAgents(reg, api.NewThread(fake, b), api.NewSession(fake, b), emit); err != nil {
+	if err := command.RegisterAgents(reg, api.NewThread(fake, b), emit); err != nil {
 		t.Fatal(err)
 	}
-	fake.Put(session.Session{ID: "s1", Name: "fix", State: session.StateConnected})
+	fake.Put(thread.Thread{ID: "s1", Name: "fix", State: thread.StateConnected})
 	return reg, fake, emit
 }
 
@@ -39,8 +39,8 @@ func TestAgentsCommandsAvailability(t *testing.T) {
 		ctx  command.Context
 		want bool
 	}{
-		{"cli", command.Context{ActiveSessionID: "s1"}, true},
-		{"gui thread", command.Context{ActiveSessionID: "s1", ActiveView: "session"}, true},
+		{"cli", command.Context{ActiveThreadID: "s1"}, true},
+		{"gui thread", command.Context{ActiveThreadID: "s1", ActiveView: "thread"}, true},
 		{"no thread", command.Context{ActiveView: "projects"}, false},
 	}
 	for _, tt := range tests {
@@ -55,12 +55,12 @@ func TestAgentsCommandsAvailability(t *testing.T) {
 
 func TestThreadAgentsCommand(t *testing.T) {
 	reg, fake, _ := newAgentsRegistry(t)
-	fake.Put(session.Session{ID: "s1", Name: "fix", State: session.StateConnected, BackgroundShellsRunning: 2})
+	fake.Put(thread.Thread{ID: "s1", Name: "fix", State: thread.StateConnected, BackgroundShellsRunning: 2})
 	start := time.Now().Add(-90 * time.Second)
 	fake.PutAgents("s1",
-		session.AgentRun{ID: "a1", Description: "Slow count", AgentType: "general-purpose", Model: "haiku", Background: true, SpawnDepth: 1,
-			Status: session.AgentRunning, Activity: "Running Sleep 6 seconds", LastTool: "Bash", ToolUses: 1, TotalTokens: 14140, StartedAt: start},
-		session.AgentRun{ID: "a2", Description: "Outer agent", AgentType: "general-purpose", SpawnDepth: 1, Status: session.AgentDone,
+		thread.AgentRun{ID: "a1", Description: "Slow count", AgentType: "general-purpose", Model: "haiku", Background: true, SpawnDepth: 1,
+			Status: thread.AgentRunning, Activity: "Running Sleep 6 seconds", LastTool: "Bash", ToolUses: 1, TotalTokens: 14140, StartedAt: start},
+		thread.AgentRun{ID: "a2", Description: "Outer agent", AgentType: "general-purpose", SpawnDepth: 1, Status: thread.AgentDone,
 			Summary: "outer done\nmore", ToolUses: 2, TotalTokens: 18138, DurationMS: 5939, StartedAt: start},
 	)
 	res, err := reg.Invoke(context.Background(), command.Context{}, "thread.agents", map[string]string{"id": "s1"})
@@ -78,7 +78,7 @@ func TestThreadAgentsCommand(t *testing.T) {
 			t.Errorf("message lacks %q:\n%s", w, res.Message)
 		}
 	}
-	if j, ok := res.JSON.(*v1.ThreadAgentsChange); !ok || j.GetSessionId() != "s1" || len(j.GetAgents()) != 2 {
+	if j, ok := res.JSON.(*v1.ThreadAgentsChange); !ok || j.GetThreadId() != "s1" || len(j.GetAgents()) != 2 {
 		t.Errorf("json %+v", res.JSON)
 	}
 	_, err = reg.Invoke(context.Background(), command.Context{}, "thread.agents", map[string]string{"id": "nope"})
@@ -90,7 +90,7 @@ func TestThreadAgentsCommand(t *testing.T) {
 
 func TestViewPanelAgentsEmits(t *testing.T) {
 	reg, _, emit := newAgentsRegistry(t)
-	res, err := reg.Invoke(context.Background(), command.Context{ActiveSessionID: "s1", ActiveView: "session"}, "view.panel.agents", nil)
+	res, err := reg.Invoke(context.Background(), command.Context{ActiveThreadID: "s1", ActiveView: "thread"}, "view.panel.agents", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

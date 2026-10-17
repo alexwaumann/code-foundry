@@ -56,7 +56,7 @@ const REFUSALS: Readonly<Record<string, string>> = {
   effort: "Change the effort with the composer's effort selector (or `thread.set-effort`), not /effort.",
   fast: "Pick the model with the composer's model selector (or `thread.set-model`), not /fast.",
   mcp: "Manage MCP servers in the MCP panel (or `thread.mcp`), not /mcp.",
-  rename: "Rename the thread with Rename Thread (or `session.rename`), not /rename.",
+  rename: "Rename the thread with Rename Thread (or `thread.rename`), not /rename.",
   clear: "Start a new thread instead of clearing this one.",
 };
 const ALIASES: Readonly<Record<string, string>> = { reset: "clear", new: "clear", name: "rename" };

@@ -1,4 +1,4 @@
-// Package fakeclaude is a fake `claude -p` for the session store's tests, built as
+// Package fakeclaude is a fake `claude -p` for the thread store's tests, built as
 // cmd/fakeclaude. It is its own small binary rather than the test binary re-executing
 // itself because a race-instrumented process takes about a second to start on macOS
 // (shadow memory), and the suite starts it a few hundred times (docs/notes/

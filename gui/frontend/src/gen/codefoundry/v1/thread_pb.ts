@@ -6,8 +6,8 @@ import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobu
 import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
 import type { StreamHeartbeat } from "./heartbeat_pb";
 import { file_codefoundry_v1_heartbeat } from "./heartbeat_pb";
-import type { PermissionMode, Session } from "./session_pb";
-import { file_codefoundry_v1_session } from "./session_pb";
+import type { ArchiveThreadRequestSchema, ArchiveThreadResponseSchema, CloseThreadRequestSchema, CloseThreadResponseSchema, CreateThreadRequestSchema, CreateThreadResponseSchema, ForkThreadRequestSchema, ForkThreadResponseSchema, GetThreadRequestSchema, GetThreadResponseSchema, ListThreadsRequestSchema, ListThreadsResponseSchema, PermissionMode, PinThreadRequestSchema, PinThreadResponseSchema, ReadAttachmentRequestSchema, ReadAttachmentResponseSchema, ReconnectThreadRequestSchema, ReconnectThreadResponseSchema, RemoveThreadRequestSchema, RemoveThreadResponseSchema, RenameThreadRequestSchema, RenameThreadResponseSchema, RunInThreadRequestSchema, RunInThreadResponseSchema, SnoozeThreadRequestSchema, SnoozeThreadResponseSchema, StageAttachmentRequestSchema, StageAttachmentResponseSchema, Thread, ThreadListEventSchema, WatchThreadsRequestSchema } from "./thread_lifecycle_pb";
+import { file_codefoundry_v1_thread_lifecycle } from "./thread_lifecycle_pb";
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
 import type { Message } from "@bufbuild/protobuf";
@@ -16,7 +16,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/thread.proto.
  */
 export const file_codefoundry_v1_thread: GenFile = /*@__PURE__*/
-  fileDesc("Chtjb2RlZm91bmRyeS92MS90aHJlYWQucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIogGCgpUaHJlYWRJdGVtEgoKAmlkGAEgASgJEg8KB29yZGluYWwYAiABKAMSGgoScGFyZW50X3Rvb2xfdXNlX2lkGAMgASgJEi4KCmNyZWF0ZWRfYXQYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnVwZGF0ZWRfYXQYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhEKCXN0cmVhbWluZxgGIAEoCBI3Cgx1c2VyX21lc3NhZ2UYCiABKAsyHy5jb2RlZm91bmRyeS52MS5Vc2VyTWVzc2FnZUl0ZW1IABI7Cg5hc3Npc3RhbnRfdGV4dBgLIAEoCzIhLmNvZGVmb3VuZHJ5LnYxLkFzc2lzdGFudFRleHRJdGVtSAASMAoIdGhpbmtpbmcYDCABKAsyHC5jb2RlZm91bmRyeS52MS5UaGlua2luZ0l0ZW1IABIxCgl0b29sX2NhbGwYDSABKAsyHC5jb2RlZm91bmRyeS52MS5Ub29sQ2FsbEl0ZW1IABI3CgpwZXJtaXNzaW9uGA4gASgLMiEuY29kZWZvdW5kcnkudjEuVGhyZWFkUmVxdWVzdEl0ZW1IABI1CghxdWVzdGlvbhgPIAEoCzIhLmNvZGVmb3VuZHJ5LnYxLlRocmVhZFJlcXVlc3RJdGVtSAASLwoIdHVybl9lbmQYECABKAsyGy5jb2RlZm91bmRyeS52MS5UdXJuRW5kSXRlbUgAEioKBWVycm9yGBEgASgLMhkuY29kZWZvdW5kcnkudjEuRXJyb3JJdGVtSAASNAoKY29tcGFjdGlvbhgSIAEoCzIeLmNvZGVmb3VuZHJ5LnYxLkNvbXBhY3Rpb25JdGVtSAASOwoOY29tbWFuZF9vdXRwdXQYEyABKAsyIS5jb2RlZm91bmRyeS52MS5Db21tYW5kT3V0cHV0SXRlbUgAEigKBG5vdGUYFCABKAsyGC5jb2RlZm91bmRyeS52MS5Ob3RlSXRlbUgAQgkKB3BheWxvYWQiSwoPVXNlck1lc3NhZ2VJdGVtEgwKBHRleHQYASABKAkSEwoLYXR0YWNobWVudHMYAiADKAkSFQoNY29tcG9zZXJfdGV4dBgDIAEoCSIhChFBc3Npc3RhbnRUZXh0SXRlbRIMCgR0ZXh0GAEgASgJIhwKDFRoaW5raW5nSXRlbRIMCgR0ZXh0GAEgASgJIqwBCgxUb29sQ2FsbEl0ZW0SEwoLdG9vbF91c2VfaWQYASABKAkSDAoEbmFtZRgCIAEoCRISCgppbnB1dF9qc29uGAMgASgJEi4KBnN0YXR1cxgEIAEoDjIeLmNvZGVmb3VuZHJ5LnYxLlRvb2xDYWxsU3RhdHVzEg4KBm91dHB1dBgFIAEoCRIQCghpc19lcnJvchgGIAEoCBITCgtyZXN1bHRfanNvbhgHIAEoCSK/AwoRVGhyZWFkUmVxdWVzdEl0ZW0SEgoKcmVxdWVzdF9pZBgBIAEoCRIRCgl0b29sX25hbWUYAiABKAkSFAoMZGlzcGxheV9uYW1lGAMgASgJEg0KBXRpdGxlGAQgASgJEhMKC2Rlc2NyaXB0aW9uGAUgASgJEhMKC3Rvb2xfdXNlX2lkGAYgASgJEhAKCGFnZW50X2lkGAcgASgJEhQKDGJsb2NrZWRfcGF0aBgIIAEoCRIXCg9kZWNpc2lvbl9yZWFzb24YCSABKAkSEgoKaW5wdXRfanNvbhgKIAEoCRIYChBzdWdnZXN0aW9uc19qc29uGAsgASgJEjEKBXN0YXRlGAwgASgOMiIuY29kZWZvdW5kcnkudjEuVGhyZWFkUmVxdWVzdFN0YXRlEhAKCGRlY2lzaW9uGA0gASgJEg8KB21lc3NhZ2UYDiABKAkSPwoHYW5zd2VycxgPIAMoCzIuLmNvZGVmb3VuZHJ5LnYxLlRocmVhZFJlcXVlc3RJdGVtLkFuc3dlcnNFbnRyeRouCgxBbnN3ZXJzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASLeAgoLVHVybkVuZEl0ZW0SDwoHc3VidHlwZRgBIAEoCRIQCghpc19lcnJvchgCIAEoCBITCgtpbnRlcnJ1cHRlZBgDIAEoCBITCgtzdG9wX3JlYXNvbhgEIAEoCRIXCg90ZXJtaW5hbF9yZWFzb24YBSABKAkSEwoLZHVyYXRpb25fbXMYBiABKAMSEQoJbnVtX3R1cm5zGAcgASgFEhAKCGNvc3RfdXNkGAggASgBEhQKDGlucHV0X3Rva2VucxgJIAEoAxIVCg1vdXRwdXRfdG9rZW5zGAogASgDEhkKEWNhY2hlX3JlYWRfdG9rZW5zGAsgASgDEhoKEmNhY2hlX3dyaXRlX3Rva2VucxgMIAEoAxIOCgZlcnJvcnMYDSADKAkSGgoNdHVybl9jb3N0X3VzZBgOIAEoAUgAiAEBEg0KBW1vZGVsGA8gASgJQhAKDl90dXJuX2Nvc3RfdXNkIhkKCUVycm9ySXRlbRIMCgR0ZXh0GAEgASgJIlsKDkNvbXBhY3Rpb25JdGVtEg8KB3RyaWdnZXIYASABKAkSEgoKcHJlX3Rva2VucxgCIAEoAxITCgtwb3N0X3Rva2VucxgDIAEoAxIPCgdzdW1tYXJ5GAQgASgJIiEKEUNvbW1hbmRPdXRwdXRJdGVtEgwKBHRleHQYASABKAkiGAoITm90ZUl0ZW0SDAoEdGV4dBgBIAEoCSJxChRUaHJlYWRQZW5kaW5nUmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgJEg8KB2l0ZW1faWQYAiABKAkSEAoIcXVlc3Rpb24YAyABKAgSEQoJdG9vbF9uYW1lGAQgASgJEg8KB3N1bW1hcnkYBSABKAkipgIKE1RocmVhZEl0ZW1zU25hcHNob3QSEgoKc2Vzc2lvbl9pZBgBIAEoCRILCgNzZXEYAiABKAQSKQoFaXRlbXMYAyADKAsyGi5jb2RlZm91bmRyeS52MS5UaHJlYWRJdGVtEjUKB3BlbmRpbmcYBCADKAsyJC5jb2RlZm91bmRyeS52MS5UaHJlYWRQZW5kaW5nUmVxdWVzdBIsCgNtY3AYBSABKAsyHy5jb2RlZm91bmRyeS52MS5UaHJlYWRNY3BTdGF0dXMSLgoIY29tbWFuZHMYBiADKAsyHC5jb2RlZm91bmRyeS52MS5TbGFzaENvbW1hbmQSLgoGYWdlbnRzGAcgAygLMh4uY29kZWZvdW5kcnkudjEuVGhyZWFkQWdlbnRSdW4i2QEKD1RocmVhZEl0ZW1EZWx0YRISCgpzZXNzaW9uX2lkGAEgASgJEgsKA3NlcRgCIAEoBBIPCgdpdGVtX2lkGAMgASgJEg8KB29yZGluYWwYBCABKAMSNAoFZmllbGQYBSABKA4yJS5jb2RlZm91bmRyeS52MS5UaHJlYWRJdGVtRGVsdGEuRmllbGQSDAoEdGV4dBgGIAEoCSI/CgVGaWVsZBIVChFGSUVMRF9VTlNQRUNJRklFRBAAEg4KCkZJRUxEX1RFWFQQARIPCgtGSUVMRF9JTlBVVBACIl0KEFRocmVhZEl0ZW1DaGFuZ2USEgoKc2Vzc2lvbl9pZBgBIAEoCRILCgNzZXEYAiABKAQSKAoEaXRlbRgDIAEoCzIaLmNvZGVmb3VuZHJ5LnYxLlRocmVhZEl0ZW0iZwoNVGhyZWFkUGVuZGluZxISCgpzZXNzaW9uX2lkGAEgASgJEgsKA3NlcRgCIAEoBBI1CgdwZW5kaW5nGAMgAygLMiQuY29kZWZvdW5kcnkudjEuVGhyZWFkUGVuZGluZ1JlcXVlc3QiRwoVVGhyZWFkUGVuZGluZ1NuYXBzaG90Ei4KB3RocmVhZHMYASADKAsyHS5jb2RlZm91bmRyeS52MS5UaHJlYWRQZW5kaW5nIrwECgtUaHJlYWRFdmVudBI3CghzbmFwc2hvdBgBIAEoCzIjLmNvZGVmb3VuZHJ5LnYxLlRocmVhZEl0ZW1zU25hcHNob3RIABI0CghhcHBlbmRlZBgCIAEoCzIgLmNvZGVmb3VuZHJ5LnYxLlRocmVhZEl0ZW1DaGFuZ2VIABIzCgd1cGRhdGVkGAMgASgLMiAuY29kZWZvdW5kcnkudjEuVGhyZWFkSXRlbUNoYW5nZUgAEjAKBWRlbHRhGAQgASgLMh8uY29kZWZvdW5kcnkudjEuVGhyZWFkSXRlbURlbHRhSAASMAoHcGVuZGluZxgFIAEoCzIdLmNvZGVmb3VuZHJ5LnYxLlRocmVhZFBlbmRpbmdIABJBChBwZW5kaW5nX3NuYXBzaG90GAYgASgLMiUuY29kZWZvdW5kcnkudjEuVGhyZWFkUGVuZGluZ1NuYXBzaG90SAASLgoDbWNwGAcgASgLMh8uY29kZWZvdW5kcnkudjEuVGhyZWFkTWNwQ2hhbmdlSAASPQoIY29tbWFuZHMYCCABKAsyKS5jb2RlZm91bmRyeS52MS5UaHJlYWRTbGFzaENvbW1hbmRzQ2hhbmdlSAASNAoJaGVhcnRiZWF0GAkgASgLMh8uY29kZWZvdW5kcnkudjEuU3RyZWFtSGVhcnRiZWF0SAASNAoGYWdlbnRzGAogASgLMiIuY29kZWZvdW5kcnkudjEuVGhyZWFkQWdlbnRzQ2hhbmdlSABCBwoFZXZlbnQiaAoHTWNwVG9vbBIMCgRuYW1lGAEgASgJEhMKC2Rlc2NyaXB0aW9uGAIgASgJEhEKCXJlYWRfb25seRgDIAEoCBITCgtkZXN0cnVjdGl2ZRgEIAEoCBISCgpvcGVuX3dvcmxkGAUgASgIItkBCglNY3BTZXJ2ZXISDAoEbmFtZRgBIAEoCRIvCgZzdGF0dXMYAiABKA4yHy5jb2RlZm91bmRyeS52MS5NY3BTZXJ2ZXJTdGF0dXMSEwoLc2VydmVyX25hbWUYAyABKAkSDwoHdmVyc2lvbhgEIAEoCRINCgVlcnJvchgFIAEoCRINCgVzY29wZRgGIAEoCRIOCgZzb3VyY2UYByABKAkSEQoJdHJhbnNwb3J0GAggASgJEiYKBXRvb2xzGAkgAygLMhcuY29kZWZvdW5kcnkudjEuTWNwVG9vbCKvAQoPVGhyZWFkTWNwU3RhdHVzEi4KCmNoZWNrZWRfYXQYASABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjAKB3RyaWdnZXIYAiABKA4yHy5jb2RlZm91bmRyeS52MS5NY3BDaGVja1RyaWdnZXISDgoGc2VydmVyGAMgASgJEioKB3NlcnZlcnMYBCADKAsyGS5jb2RlZm91bmRyeS52MS5NY3BTZXJ2ZXIiYwoPVGhyZWFkTWNwQ2hhbmdlEhIKCnNlc3Npb25faWQYASABKAkSCwoDc2VxGAIgASgEEi8KBnN0YXR1cxgDIAEoCzIfLmNvZGVmb3VuZHJ5LnYxLlRocmVhZE1jcFN0YXR1cyKPBAoOVGhyZWFkQWdlbnRSdW4SCgoCaWQYASABKAkSEwoLdG9vbF91c2VfaWQYAiABKAkSEQoJcGFyZW50X2lkGAMgASgJEhMKC2Rlc2NyaXB0aW9uGAQgASgJEhIKCmFnZW50X3R5cGUYBSABKAkSDQoFbW9kZWwYBiABKAkSDgoGZWZmb3J0GAcgASgJEhIKCmJhY2tncm91bmQYCCABKAgSEwoLc3Bhd25fZGVwdGgYCSABKAUSMQoGc3RhdHVzGAogASgOMiEuY29kZWZvdW5kcnkudjEuVGhyZWFkQWdlbnRTdGF0dXMSEAoIYWN0aXZpdHkYCyABKAkSEQoJbGFzdF90b29sGAwgASgJEhQKDHRvdGFsX3Rva2VucxgNIAEoAxIRCgl0b29sX3VzZXMYDiABKAMSEwoLZHVyYXRpb25fbXMYDyABKAMSDwoHc3VtbWFyeRgQIAEoCRINCgVlcnJvchgRIAEoCRIuCgpzdGFydGVkX2F0GBIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgpyZXN1bWVkX2F0GBMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIsCghlbmRlZF9hdBgUIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASFAoMbm90ZV9pdGVtX2lkGBUgASgJImUKElRocmVhZEFnZW50c0NoYW5nZRISCgpzZXNzaW9uX2lkGAEgASgJEgsKA3NlcRgCIAEoBBIuCgZhZ2VudHMYAyADKAsyHi5jb2RlZm91bmRyeS52MS5UaHJlYWRBZ2VudFJ1biIsChZMaXN0VGhyZWFkSXRlbXNSZXF1ZXN0EhIKCnNlc3Npb25faWQYASABKAkiUAoXTGlzdFRocmVhZEl0ZW1zUmVzcG9uc2USNQoIc25hcHNob3QYASABKAsyIy5jb2RlZm91bmRyeS52MS5UaHJlYWRJdGVtc1NuYXBzaG90IigKEldhdGNoVGhyZWFkUmVxdWVzdBISCgpzZXNzaW9uX2lkGAEgASgJImgKGFNlbmRUaHJlYWRNZXNzYWdlUmVxdWVzdBISCgpzZXNzaW9uX2lkGAEgASgJEgwKBHRleHQYAiABKAkSEwoLYXR0YWNobWVudHMYAyADKAkSFQoNY29tcG9zZXJfdGV4dBgEIAEoCSJFChlTZW5kVGhyZWFkTWVzc2FnZVJlc3BvbnNlEigKBGl0ZW0YASABKAsyGi5jb2RlZm91bmRyeS52MS5UaHJlYWRJdGVtIogCChRSZXNwb25kVGhyZWFkUmVxdWVzdBISCgpzZXNzaW9uX2lkGAEgASgJEhIKCnJlcXVlc3RfaWQYAiABKAkSMAoIZGVjaXNpb24YAyABKA4yHi5jb2RlZm91bmRyeS52MS5UaHJlYWREZWNpc2lvbhJCCgdhbnN3ZXJzGAQgAygLMjEuY29kZWZvdW5kcnkudjEuUmVzcG9uZFRocmVhZFJlcXVlc3QuQW5zd2Vyc0VudHJ5Eg8KB21lc3NhZ2UYBSABKAkSEQoJaW50ZXJydXB0GAYgASgIGi4KDEFuc3dlcnNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIkEKFVJlc3BvbmRUaHJlYWRSZXNwb25zZRIoCgRpdGVtGAEgASgLMhouY29kZWZvdW5kcnkudjEuVGhyZWFkSXRlbSIsChZJbnRlcnJ1cHRUaHJlYWRSZXF1ZXN0EhIKCnNlc3Npb25faWQYASABKAkiGQoXSW50ZXJydXB0VGhyZWFkUmVzcG9uc2UiOgoVU2V0VGhyZWFkTW9kZWxSZXF1ZXN0EhIKCnNlc3Npb25faWQYASABKAkSDQoFbW9kZWwYAiABKAkiQgoWU2V0VGhyZWFkTW9kZWxSZXNwb25zZRIoCgdzZXNzaW9uGAEgASgLMhcuY29kZWZvdW5kcnkudjEuU2Vzc2lvbiJtCh5TZXRUaHJlYWRQZXJtaXNzaW9uTW9kZVJlcXVlc3QSEgoKc2Vzc2lvbl9pZBgBIAEoCRI3Cg9wZXJtaXNzaW9uX21vZGUYAiABKA4yHi5jb2RlZm91bmRyeS52MS5QZXJtaXNzaW9uTW9kZSJLCh9TZXRUaHJlYWRQZXJtaXNzaW9uTW9kZVJlc3BvbnNlEigKB3Nlc3Npb24YASABKAsyFy5jb2RlZm91bmRyeS52MS5TZXNzaW9uIjwKFlNldFRocmVhZEVmZm9ydFJlcXVlc3QSEgoKc2Vzc2lvbl9pZBgBIAEoCRIOCgZlZmZvcnQYAiABKAkiQwoXU2V0VGhyZWFkRWZmb3J0UmVzcG9uc2USKAoHc2Vzc2lvbhgBIAEoCzIXLmNvZGVmb3VuZHJ5LnYxLlNlc3Npb24iNwoQTWNwU3RhdHVzUmVxdWVzdBISCgpzZXNzaW9uX2lkGAEgASgJEg8KB3JlZnJlc2gYAiABKAgiRAoRTWNwU3RhdHVzUmVzcG9uc2USLwoGc3RhdHVzGAEgASgLMh8uY29kZWZvdW5kcnkudjEuVGhyZWFkTWNwU3RhdHVzIj4KE01jcFJlY29ubmVjdFJlcXVlc3QSEgoKc2Vzc2lvbl9pZBgBIAEoCRITCgtzZXJ2ZXJfbmFtZRgCIAEoCSJWChRNY3BSZWNvbm5lY3RSZXNwb25zZRIvCgZzdGF0dXMYASABKAsyHy5jb2RlZm91bmRyeS52MS5UaHJlYWRNY3BTdGF0dXMSDQoFZXJyb3IYAiABKAkiagoMU2xhc2hDb21tYW5kEgwKBG5hbWUYASABKAkSEwoLZGVzY3JpcHRpb24YAiABKAkSFQoNYXJndW1lbnRfaGludBgDIAEoCRIPCgdhbGlhc2VzGAQgAygJEg8KB2J1aWx0aW4YBSABKAgibAoZVGhyZWFkU2xhc2hDb21tYW5kc0NoYW5nZRISCgpzZXNzaW9uX2lkGAEgASgJEgsKA3NlcRgCIAEoBBIuCghjb21tYW5kcxgDIAMoCzIcLmNvZGVmb3VuZHJ5LnYxLlNsYXNoQ29tbWFuZCIqChRTbGFzaENvbW1hbmRzUmVxdWVzdBISCgpzZXNzaW9uX2lkGAEgASgJIkcKFVNsYXNoQ29tbWFuZHNSZXNwb25zZRIuCghjb21tYW5kcxgBIAMoCzIcLmNvZGVmb3VuZHJ5LnYxLlNsYXNoQ29tbWFuZCqHAQoOVG9vbENhbGxTdGF0dXMSIAocVE9PTF9DQUxMX1NUQVRVU19VTlNQRUNJRklFRBAAEhwKGFRPT0xfQ0FMTF9TVEFUVVNfUlVOTklORxABEhkKFVRPT0xfQ0FMTF9TVEFUVVNfRE9ORRACEhoKFlRPT0xfQ0FMTF9TVEFUVVNfRVJST1IQAyrDAQoSVGhyZWFkUmVxdWVzdFN0YXRlEiQKIFRIUkVBRF9SRVFVRVNUX1NUQVRFX1VOU1BFQ0lGSUVEEAASIAocVEhSRUFEX1JFUVVFU1RfU1RBVEVfUEVORElORxABEiAKHFRIUkVBRF9SRVFVRVNUX1NUQVRFX0FMTE9XRUQQAhIfChtUSFJFQURfUkVRVUVTVF9TVEFURV9ERU5JRUQQAxIiCh5USFJFQURfUkVRVUVTVF9TVEFURV9DQU5DRUxMRUQQBCrUAQoPTWNwU2VydmVyU3RhdHVzEiEKHU1DUF9TRVJWRVJfU1RBVFVTX1VOU1BFQ0lGSUVEEAASHwobTUNQX1NFUlZFUl9TVEFUVVNfQ09OTkVDVEVEEAESHAoYTUNQX1NFUlZFUl9TVEFUVVNfRkFJTEVEEAISIAocTUNQX1NFUlZFUl9TVEFUVVNfTkVFRFNfQVVUSBADEh0KGU1DUF9TRVJWRVJfU1RBVFVTX1BFTkRJTkcQBBIeChpNQ1BfU0VSVkVSX1NUQVRVU19ESVNBQkxFRBAFKpYBCg9NY3BDaGVja1RyaWdnZXISIQodTUNQX0NIRUNLX1RSSUdHRVJfVU5TUEVDSUZJRUQQABIgChxNQ1BfQ0hFQ0tfVFJJR0dFUl9UVVJOX1NUQVJUEAESHQoZTUNQX0NIRUNLX1RSSUdHRVJfUkVGUkVTSBACEh8KG01DUF9DSEVDS19UUklHR0VSX1JFQ09OTkVDVBADKpcBChFUaHJlYWRBZ2VudFN0YXR1cxIjCh9USFJFQURfQUdFTlRfU1RBVFVTX1VOU1BFQ0lGSUVEEAASHwobVEhSRUFEX0FHRU5UX1NUQVRVU19SVU5OSU5HEAESHAoYVEhSRUFEX0FHRU5UX1NUQVRVU19ET05FEAISHgoaVEhSRUFEX0FHRU5UX1NUQVRVU19GQUlMRUQQAyqNAQoOVGhyZWFkRGVjaXNpb24SHwobVEhSRUFEX0RFQ0lTSU9OX1VOU1BFQ0lGSUVEEAASGQoVVEhSRUFEX0RFQ0lTSU9OX0FMTE9XEAESJQohVEhSRUFEX0RFQ0lTSU9OX0FMTE9XX0ZPUl9TRVNTSU9OEAISGAoUVEhSRUFEX0RFQ0lTSU9OX0RFTlkQAzKcCAoNVGhyZWFkU2VydmljZRJeCglMaXN0SXRlbXMSJi5jb2RlZm91bmRyeS52MS5MaXN0VGhyZWFkSXRlbXNSZXF1ZXN0GicuY29kZWZvdW5kcnkudjEuTGlzdFRocmVhZEl0ZW1zUmVzcG9uc2UiABJMCgVXYXRjaBIiLmNvZGVmb3VuZHJ5LnYxLldhdGNoVGhyZWFkUmVxdWVzdBobLmNvZGVmb3VuZHJ5LnYxLlRocmVhZEV2ZW50IgAwARJdCgRTZW5kEiguY29kZWZvdW5kcnkudjEuU2VuZFRocmVhZE1lc3NhZ2VSZXF1ZXN0GikuY29kZWZvdW5kcnkudjEuU2VuZFRocmVhZE1lc3NhZ2VSZXNwb25zZSIAElgKB1Jlc3BvbmQSJC5jb2RlZm91bmRyeS52MS5SZXNwb25kVGhyZWFkUmVxdWVzdBolLmNvZGVmb3VuZHJ5LnYxLlJlc3BvbmRUaHJlYWRSZXNwb25zZSIAEl4KCUludGVycnVwdBImLmNvZGVmb3VuZHJ5LnYxLkludGVycnVwdFRocmVhZFJlcXVlc3QaJy5jb2RlZm91bmRyeS52MS5JbnRlcnJ1cHRUaHJlYWRSZXNwb25zZSIAElsKCFNldE1vZGVsEiUuY29kZWZvdW5kcnkudjEuU2V0VGhyZWFkTW9kZWxSZXF1ZXN0GiYuY29kZWZvdW5kcnkudjEuU2V0VGhyZWFkTW9kZWxSZXNwb25zZSIAEnYKEVNldFBlcm1pc3Npb25Nb2RlEi4uY29kZWZvdW5kcnkudjEuU2V0VGhyZWFkUGVybWlzc2lvbk1vZGVSZXF1ZXN0Gi8uY29kZWZvdW5kcnkudjEuU2V0VGhyZWFkUGVybWlzc2lvbk1vZGVSZXNwb25zZSIAEl4KCVNldEVmZm9ydBImLmNvZGVmb3VuZHJ5LnYxLlNldFRocmVhZEVmZm9ydFJlcXVlc3QaJy5jb2RlZm91bmRyeS52MS5TZXRUaHJlYWRFZmZvcnRSZXNwb25zZSIAElIKCU1jcFN0YXR1cxIgLmNvZGVmb3VuZHJ5LnYxLk1jcFN0YXR1c1JlcXVlc3QaIS5jb2RlZm91bmRyeS52MS5NY3BTdGF0dXNSZXNwb25zZSIAElsKDE1jcFJlY29ubmVjdBIjLmNvZGVmb3VuZHJ5LnYxLk1jcFJlY29ubmVjdFJlcXVlc3QaJC5jb2RlZm91bmRyeS52MS5NY3BSZWNvbm5lY3RSZXNwb25zZSIAEl4KDVNsYXNoQ29tbWFuZHMSJC5jb2RlZm91bmRyeS52MS5TbGFzaENvbW1hbmRzUmVxdWVzdBolLmNvZGVmb3VuZHJ5LnYxLlNsYXNoQ29tbWFuZHNSZXNwb25zZSIAQsMBChJjb20uY29kZWZvdW5kcnkudjFCC1RocmVhZFByb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM", [file_codefoundry_v1_heartbeat, file_codefoundry_v1_session, file_google_protobuf_timestamp]);
+  fileDesc("Chtjb2RlZm91bmRyeS92MS90aHJlYWQucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIogGCgpUaHJlYWRJdGVtEgoKAmlkGAEgASgJEg8KB29yZGluYWwYAiABKAMSGgoScGFyZW50X3Rvb2xfdXNlX2lkGAMgASgJEi4KCmNyZWF0ZWRfYXQYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnVwZGF0ZWRfYXQYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhEKCXN0cmVhbWluZxgGIAEoCBI3Cgx1c2VyX21lc3NhZ2UYCiABKAsyHy5jb2RlZm91bmRyeS52MS5Vc2VyTWVzc2FnZUl0ZW1IABI7Cg5hc3Npc3RhbnRfdGV4dBgLIAEoCzIhLmNvZGVmb3VuZHJ5LnYxLkFzc2lzdGFudFRleHRJdGVtSAASMAoIdGhpbmtpbmcYDCABKAsyHC5jb2RlZm91bmRyeS52MS5UaGlua2luZ0l0ZW1IABIxCgl0b29sX2NhbGwYDSABKAsyHC5jb2RlZm91bmRyeS52MS5Ub29sQ2FsbEl0ZW1IABI3CgpwZXJtaXNzaW9uGA4gASgLMiEuY29kZWZvdW5kcnkudjEuVGhyZWFkUmVxdWVzdEl0ZW1IABI1CghxdWVzdGlvbhgPIAEoCzIhLmNvZGVmb3VuZHJ5LnYxLlRocmVhZFJlcXVlc3RJdGVtSAASLwoIdHVybl9lbmQYECABKAsyGy5jb2RlZm91bmRyeS52MS5UdXJuRW5kSXRlbUgAEioKBWVycm9yGBEgASgLMhkuY29kZWZvdW5kcnkudjEuRXJyb3JJdGVtSAASNAoKY29tcGFjdGlvbhgSIAEoCzIeLmNvZGVmb3VuZHJ5LnYxLkNvbXBhY3Rpb25JdGVtSAASOwoOY29tbWFuZF9vdXRwdXQYEyABKAsyIS5jb2RlZm91bmRyeS52MS5Db21tYW5kT3V0cHV0SXRlbUgAEigKBG5vdGUYFCABKAsyGC5jb2RlZm91bmRyeS52MS5Ob3RlSXRlbUgAQgkKB3BheWxvYWQiSwoPVXNlck1lc3NhZ2VJdGVtEgwKBHRleHQYASABKAkSEwoLYXR0YWNobWVudHMYAiADKAkSFQoNY29tcG9zZXJfdGV4dBgDIAEoCSIhChFBc3Npc3RhbnRUZXh0SXRlbRIMCgR0ZXh0GAEgASgJIhwKDFRoaW5raW5nSXRlbRIMCgR0ZXh0GAEgASgJIqwBCgxUb29sQ2FsbEl0ZW0SEwoLdG9vbF91c2VfaWQYASABKAkSDAoEbmFtZRgCIAEoCRISCgppbnB1dF9qc29uGAMgASgJEi4KBnN0YXR1cxgEIAEoDjIeLmNvZGVmb3VuZHJ5LnYxLlRvb2xDYWxsU3RhdHVzEg4KBm91dHB1dBgFIAEoCRIQCghpc19lcnJvchgGIAEoCBITCgtyZXN1bHRfanNvbhgHIAEoCSK/AwoRVGhyZWFkUmVxdWVzdEl0ZW0SEgoKcmVxdWVzdF9pZBgBIAEoCRIRCgl0b29sX25hbWUYAiABKAkSFAoMZGlzcGxheV9uYW1lGAMgASgJEg0KBXRpdGxlGAQgASgJEhMKC2Rlc2NyaXB0aW9uGAUgASgJEhMKC3Rvb2xfdXNlX2lkGAYgASgJEhAKCGFnZW50X2lkGAcgASgJEhQKDGJsb2NrZWRfcGF0aBgIIAEoCRIXCg9kZWNpc2lvbl9yZWFzb24YCSABKAkSEgoKaW5wdXRfanNvbhgKIAEoCRIYChBzdWdnZXN0aW9uc19qc29uGAsgASgJEjEKBXN0YXRlGAwgASgOMiIuY29kZWZvdW5kcnkudjEuVGhyZWFkUmVxdWVzdFN0YXRlEhAKCGRlY2lzaW9uGA0gASgJEg8KB21lc3NhZ2UYDiABKAkSPwoHYW5zd2VycxgPIAMoCzIuLmNvZGVmb3VuZHJ5LnYxLlRocmVhZFJlcXVlc3RJdGVtLkFuc3dlcnNFbnRyeRouCgxBbnN3ZXJzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASLeAgoLVHVybkVuZEl0ZW0SDwoHc3VidHlwZRgBIAEoCRIQCghpc19lcnJvchgCIAEoCBITCgtpbnRlcnJ1cHRlZBgDIAEoCBITCgtzdG9wX3JlYXNvbhgEIAEoCRIXCg90ZXJtaW5hbF9yZWFzb24YBSABKAkSEwoLZHVyYXRpb25fbXMYBiABKAMSEQoJbnVtX3R1cm5zGAcgASgFEhAKCGNvc3RfdXNkGAggASgBEhQKDGlucHV0X3Rva2VucxgJIAEoAxIVCg1vdXRwdXRfdG9rZW5zGAogASgDEhkKEWNhY2hlX3JlYWRfdG9rZW5zGAsgASgDEhoKEmNhY2hlX3dyaXRlX3Rva2VucxgMIAEoAxIOCgZlcnJvcnMYDSADKAkSGgoNdHVybl9jb3N0X3VzZBgOIAEoAUgAiAEBEg0KBW1vZGVsGA8gASgJQhAKDl90dXJuX2Nvc3RfdXNkIhkKCUVycm9ySXRlbRIMCgR0ZXh0GAEgASgJIlsKDkNvbXBhY3Rpb25JdGVtEg8KB3RyaWdnZXIYASABKAkSEgoKcHJlX3Rva2VucxgCIAEoAxITCgtwb3N0X3Rva2VucxgDIAEoAxIPCgdzdW1tYXJ5GAQgASgJIiEKEUNvbW1hbmRPdXRwdXRJdGVtEgwKBHRleHQYASABKAkiGAoITm90ZUl0ZW0SDAoEdGV4dBgBIAEoCSJxChRUaHJlYWRQZW5kaW5nUmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgJEg8KB2l0ZW1faWQYAiABKAkSEAoIcXVlc3Rpb24YAyABKAgSEQoJdG9vbF9uYW1lGAQgASgJEg8KB3N1bW1hcnkYBSABKAkipQIKE1RocmVhZEl0ZW1zU25hcHNob3QSEQoJdGhyZWFkX2lkGAEgASgJEgsKA3NlcRgCIAEoBBIpCgVpdGVtcxgDIAMoCzIaLmNvZGVmb3VuZHJ5LnYxLlRocmVhZEl0ZW0SNQoHcGVuZGluZxgEIAMoCzIkLmNvZGVmb3VuZHJ5LnYxLlRocmVhZFBlbmRpbmdSZXF1ZXN0EiwKA21jcBgFIAEoCzIfLmNvZGVmb3VuZHJ5LnYxLlRocmVhZE1jcFN0YXR1cxIuCghjb21tYW5kcxgGIAMoCzIcLmNvZGVmb3VuZHJ5LnYxLlNsYXNoQ29tbWFuZBIuCgZhZ2VudHMYByADKAsyHi5jb2RlZm91bmRyeS52MS5UaHJlYWRBZ2VudFJ1biLYAQoPVGhyZWFkSXRlbURlbHRhEhEKCXRocmVhZF9pZBgBIAEoCRILCgNzZXEYAiABKAQSDwoHaXRlbV9pZBgDIAEoCRIPCgdvcmRpbmFsGAQgASgDEjQKBWZpZWxkGAUgASgOMiUuY29kZWZvdW5kcnkudjEuVGhyZWFkSXRlbURlbHRhLkZpZWxkEgwKBHRleHQYBiABKAkiPwoFRmllbGQSFQoRRklFTERfVU5TUEVDSUZJRUQQABIOCgpGSUVMRF9URVhUEAESDwoLRklFTERfSU5QVVQQAiJcChBUaHJlYWRJdGVtQ2hhbmdlEhEKCXRocmVhZF9pZBgBIAEoCRILCgNzZXEYAiABKAQSKAoEaXRlbRgDIAEoCzIaLmNvZGVmb3VuZHJ5LnYxLlRocmVhZEl0ZW0iZgoNVGhyZWFkUGVuZGluZxIRCgl0aHJlYWRfaWQYASABKAkSCwoDc2VxGAIgASgEEjUKB3BlbmRpbmcYAyADKAsyJC5jb2RlZm91bmRyeS52MS5UaHJlYWRQZW5kaW5nUmVxdWVzdCJHChVUaHJlYWRQZW5kaW5nU25hcHNob3QSLgoHdGhyZWFkcxgBIAMoCzIdLmNvZGVmb3VuZHJ5LnYxLlRocmVhZFBlbmRpbmcivAQKC1RocmVhZEV2ZW50EjcKCHNuYXBzaG90GAEgASgLMiMuY29kZWZvdW5kcnkudjEuVGhyZWFkSXRlbXNTbmFwc2hvdEgAEjQKCGFwcGVuZGVkGAIgASgLMiAuY29kZWZvdW5kcnkudjEuVGhyZWFkSXRlbUNoYW5nZUgAEjMKB3VwZGF0ZWQYAyABKAsyIC5jb2RlZm91bmRyeS52MS5UaHJlYWRJdGVtQ2hhbmdlSAASMAoFZGVsdGEYBCABKAsyHy5jb2RlZm91bmRyeS52MS5UaHJlYWRJdGVtRGVsdGFIABIwCgdwZW5kaW5nGAUgASgLMh0uY29kZWZvdW5kcnkudjEuVGhyZWFkUGVuZGluZ0gAEkEKEHBlbmRpbmdfc25hcHNob3QYBiABKAsyJS5jb2RlZm91bmRyeS52MS5UaHJlYWRQZW5kaW5nU25hcHNob3RIABIuCgNtY3AYByABKAsyHy5jb2RlZm91bmRyeS52MS5UaHJlYWRNY3BDaGFuZ2VIABI9Cghjb21tYW5kcxgIIAEoCzIpLmNvZGVmb3VuZHJ5LnYxLlRocmVhZFNsYXNoQ29tbWFuZHNDaGFuZ2VIABI0CgloZWFydGJlYXQYCSABKAsyHy5jb2RlZm91bmRyeS52MS5TdHJlYW1IZWFydGJlYXRIABI0CgZhZ2VudHMYCiABKAsyIi5jb2RlZm91bmRyeS52MS5UaHJlYWRBZ2VudHNDaGFuZ2VIAEIHCgVldmVudCJoCgdNY3BUb29sEgwKBG5hbWUYASABKAkSEwoLZGVzY3JpcHRpb24YAiABKAkSEQoJcmVhZF9vbmx5GAMgASgIEhMKC2Rlc3RydWN0aXZlGAQgASgIEhIKCm9wZW5fd29ybGQYBSABKAgi2QEKCU1jcFNlcnZlchIMCgRuYW1lGAEgASgJEi8KBnN0YXR1cxgCIAEoDjIfLmNvZGVmb3VuZHJ5LnYxLk1jcFNlcnZlclN0YXR1cxITCgtzZXJ2ZXJfbmFtZRgDIAEoCRIPCgd2ZXJzaW9uGAQgASgJEg0KBWVycm9yGAUgASgJEg0KBXNjb3BlGAYgASgJEg4KBnNvdXJjZRgHIAEoCRIRCgl0cmFuc3BvcnQYCCABKAkSJgoFdG9vbHMYCSADKAsyFy5jb2RlZm91bmRyeS52MS5NY3BUb29sIq8BCg9UaHJlYWRNY3BTdGF0dXMSLgoKY2hlY2tlZF9hdBgBIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMAoHdHJpZ2dlchgCIAEoDjIfLmNvZGVmb3VuZHJ5LnYxLk1jcENoZWNrVHJpZ2dlchIOCgZzZXJ2ZXIYAyABKAkSKgoHc2VydmVycxgEIAMoCzIZLmNvZGVmb3VuZHJ5LnYxLk1jcFNlcnZlciJiCg9UaHJlYWRNY3BDaGFuZ2USEQoJdGhyZWFkX2lkGAEgASgJEgsKA3NlcRgCIAEoBBIvCgZzdGF0dXMYAyABKAsyHy5jb2RlZm91bmRyeS52MS5UaHJlYWRNY3BTdGF0dXMijwQKDlRocmVhZEFnZW50UnVuEgoKAmlkGAEgASgJEhMKC3Rvb2xfdXNlX2lkGAIgASgJEhEKCXBhcmVudF9pZBgDIAEoCRITCgtkZXNjcmlwdGlvbhgEIAEoCRISCgphZ2VudF90eXBlGAUgASgJEg0KBW1vZGVsGAYgASgJEg4KBmVmZm9ydBgHIAEoCRISCgpiYWNrZ3JvdW5kGAggASgIEhMKC3NwYXduX2RlcHRoGAkgASgFEjEKBnN0YXR1cxgKIAEoDjIhLmNvZGVmb3VuZHJ5LnYxLlRocmVhZEFnZW50U3RhdHVzEhAKCGFjdGl2aXR5GAsgASgJEhEKCWxhc3RfdG9vbBgMIAEoCRIUCgx0b3RhbF90b2tlbnMYDSABKAMSEQoJdG9vbF91c2VzGA4gASgDEhMKC2R1cmF0aW9uX21zGA8gASgDEg8KB3N1bW1hcnkYECABKAkSDQoFZXJyb3IYESABKAkSLgoKc3RhcnRlZF9hdBgSIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKcmVzdW1lZF9hdBgTIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLAoIZW5kZWRfYXQYFCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhQKDG5vdGVfaXRlbV9pZBgVIAEoCSJkChJUaHJlYWRBZ2VudHNDaGFuZ2USEQoJdGhyZWFkX2lkGAEgASgJEgsKA3NlcRgCIAEoBBIuCgZhZ2VudHMYAyADKAsyHi5jb2RlZm91bmRyeS52MS5UaHJlYWRBZ2VudFJ1biIrChZMaXN0VGhyZWFkSXRlbXNSZXF1ZXN0EhEKCXRocmVhZF9pZBgBIAEoCSJQChdMaXN0VGhyZWFkSXRlbXNSZXNwb25zZRI1CghzbmFwc2hvdBgBIAEoCzIjLmNvZGVmb3VuZHJ5LnYxLlRocmVhZEl0ZW1zU25hcHNob3QiJwoSV2F0Y2hUaHJlYWRSZXF1ZXN0EhEKCXRocmVhZF9pZBgBIAEoCSJnChhTZW5kVGhyZWFkTWVzc2FnZVJlcXVlc3QSEQoJdGhyZWFkX2lkGAEgASgJEgwKBHRleHQYAiABKAkSEwoLYXR0YWNobWVudHMYAyADKAkSFQoNY29tcG9zZXJfdGV4dBgEIAEoCSJFChlTZW5kVGhyZWFkTWVzc2FnZVJlc3BvbnNlEigKBGl0ZW0YASABKAsyGi5jb2RlZm91bmRyeS52MS5UaHJlYWRJdGVtIocCChRSZXNwb25kVGhyZWFkUmVxdWVzdBIRCgl0aHJlYWRfaWQYASABKAkSEgoKcmVxdWVzdF9pZBgCIAEoCRIwCghkZWNpc2lvbhgDIAEoDjIeLmNvZGVmb3VuZHJ5LnYxLlRocmVhZERlY2lzaW9uEkIKB2Fuc3dlcnMYBCADKAsyMS5jb2RlZm91bmRyeS52MS5SZXNwb25kVGhyZWFkUmVxdWVzdC5BbnN3ZXJzRW50cnkSDwoHbWVzc2FnZRgFIAEoCRIRCglpbnRlcnJ1cHQYBiABKAgaLgoMQW5zd2Vyc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiQQoVUmVzcG9uZFRocmVhZFJlc3BvbnNlEigKBGl0ZW0YASABKAsyGi5jb2RlZm91bmRyeS52MS5UaHJlYWRJdGVtIisKFkludGVycnVwdFRocmVhZFJlcXVlc3QSEQoJdGhyZWFkX2lkGAEgASgJIhkKF0ludGVycnVwdFRocmVhZFJlc3BvbnNlIjkKFVNldFRocmVhZE1vZGVsUmVxdWVzdBIRCgl0aHJlYWRfaWQYASABKAkSDQoFbW9kZWwYAiABKAkiQAoWU2V0VGhyZWFkTW9kZWxSZXNwb25zZRImCgZ0aHJlYWQYASABKAsyFi5jb2RlZm91bmRyeS52MS5UaHJlYWQibAoeU2V0VGhyZWFkUGVybWlzc2lvbk1vZGVSZXF1ZXN0EhEKCXRocmVhZF9pZBgBIAEoCRI3Cg9wZXJtaXNzaW9uX21vZGUYAiABKA4yHi5jb2RlZm91bmRyeS52MS5QZXJtaXNzaW9uTW9kZSJJCh9TZXRUaHJlYWRQZXJtaXNzaW9uTW9kZVJlc3BvbnNlEiYKBnRocmVhZBgBIAEoCzIWLmNvZGVmb3VuZHJ5LnYxLlRocmVhZCI7ChZTZXRUaHJlYWRFZmZvcnRSZXF1ZXN0EhEKCXRocmVhZF9pZBgBIAEoCRIOCgZlZmZvcnQYAiABKAkiQQoXU2V0VGhyZWFkRWZmb3J0UmVzcG9uc2USJgoGdGhyZWFkGAEgASgLMhYuY29kZWZvdW5kcnkudjEuVGhyZWFkIjYKEE1jcFN0YXR1c1JlcXVlc3QSEQoJdGhyZWFkX2lkGAEgASgJEg8KB3JlZnJlc2gYAiABKAgiRAoRTWNwU3RhdHVzUmVzcG9uc2USLwoGc3RhdHVzGAEgASgLMh8uY29kZWZvdW5kcnkudjEuVGhyZWFkTWNwU3RhdHVzIj0KE01jcFJlY29ubmVjdFJlcXVlc3QSEQoJdGhyZWFkX2lkGAEgASgJEhMKC3NlcnZlcl9uYW1lGAIgASgJIlYKFE1jcFJlY29ubmVjdFJlc3BvbnNlEi8KBnN0YXR1cxgBIAEoCzIfLmNvZGVmb3VuZHJ5LnYxLlRocmVhZE1jcFN0YXR1cxINCgVlcnJvchgCIAEoCSJqCgxTbGFzaENvbW1hbmQSDAoEbmFtZRgBIAEoCRITCgtkZXNjcmlwdGlvbhgCIAEoCRIVCg1hcmd1bWVudF9oaW50GAMgASgJEg8KB2FsaWFzZXMYBCADKAkSDwoHYnVpbHRpbhgFIAEoCCJrChlUaHJlYWRTbGFzaENvbW1hbmRzQ2hhbmdlEhEKCXRocmVhZF9pZBgBIAEoCRILCgNzZXEYAiABKAQSLgoIY29tbWFuZHMYAyADKAsyHC5jb2RlZm91bmRyeS52MS5TbGFzaENvbW1hbmQiKQoUU2xhc2hDb21tYW5kc1JlcXVlc3QSEQoJdGhyZWFkX2lkGAEgASgJIkcKFVNsYXNoQ29tbWFuZHNSZXNwb25zZRIuCghjb21tYW5kcxgBIAMoCzIcLmNvZGVmb3VuZHJ5LnYxLlNsYXNoQ29tbWFuZCqHAQoOVG9vbENhbGxTdGF0dXMSIAocVE9PTF9DQUxMX1NUQVRVU19VTlNQRUNJRklFRBAAEhwKGFRPT0xfQ0FMTF9TVEFUVVNfUlVOTklORxABEhkKFVRPT0xfQ0FMTF9TVEFUVVNfRE9ORRACEhoKFlRPT0xfQ0FMTF9TVEFUVVNfRVJST1IQAyrDAQoSVGhyZWFkUmVxdWVzdFN0YXRlEiQKIFRIUkVBRF9SRVFVRVNUX1NUQVRFX1VOU1BFQ0lGSUVEEAASIAocVEhSRUFEX1JFUVVFU1RfU1RBVEVfUEVORElORxABEiAKHFRIUkVBRF9SRVFVRVNUX1NUQVRFX0FMTE9XRUQQAhIfChtUSFJFQURfUkVRVUVTVF9TVEFURV9ERU5JRUQQAxIiCh5USFJFQURfUkVRVUVTVF9TVEFURV9DQU5DRUxMRUQQBCrUAQoPTWNwU2VydmVyU3RhdHVzEiEKHU1DUF9TRVJWRVJfU1RBVFVTX1VOU1BFQ0lGSUVEEAASHwobTUNQX1NFUlZFUl9TVEFUVVNfQ09OTkVDVEVEEAESHAoYTUNQX1NFUlZFUl9TVEFUVVNfRkFJTEVEEAISIAocTUNQX1NFUlZFUl9TVEFUVVNfTkVFRFNfQVVUSBADEh0KGU1DUF9TRVJWRVJfU1RBVFVTX1BFTkRJTkcQBBIeChpNQ1BfU0VSVkVSX1NUQVRVU19ESVNBQkxFRBAFKpYBCg9NY3BDaGVja1RyaWdnZXISIQodTUNQX0NIRUNLX1RSSUdHRVJfVU5TUEVDSUZJRUQQABIgChxNQ1BfQ0hFQ0tfVFJJR0dFUl9UVVJOX1NUQVJUEAESHQoZTUNQX0NIRUNLX1RSSUdHRVJfUkVGUkVTSBACEh8KG01DUF9DSEVDS19UUklHR0VSX1JFQ09OTkVDVBADKpcBChFUaHJlYWRBZ2VudFN0YXR1cxIjCh9USFJFQURfQUdFTlRfU1RBVFVTX1VOU1BFQ0lGSUVEEAASHwobVEhSRUFEX0FHRU5UX1NUQVRVU19SVU5OSU5HEAESHAoYVEhSRUFEX0FHRU5UX1NUQVRVU19ET05FEAISHgoaVEhSRUFEX0FHRU5UX1NUQVRVU19GQUlMRUQQAyqNAQoOVGhyZWFkRGVjaXNpb24SHwobVEhSRUFEX0RFQ0lTSU9OX1VOU1BFQ0lGSUVEEAASGQoVVEhSRUFEX0RFQ0lTSU9OX0FMTE9XEAESJQohVEhSRUFEX0RFQ0lTSU9OX0FMTE9XX0ZPUl9TRVNTSU9OEAISGAoUVEhSRUFEX0RFQ0lTSU9OX0RFTlkQAzK8EgoNVGhyZWFkU2VydmljZRJVCgZDcmVhdGUSIy5jb2RlZm91bmRyeS52MS5DcmVhdGVUaHJlYWRSZXF1ZXN0GiQuY29kZWZvdW5kcnkudjEuQ3JlYXRlVGhyZWFkUmVzcG9uc2UiABJPCgRGb3JrEiEuY29kZWZvdW5kcnkudjEuRm9ya1RocmVhZFJlcXVlc3QaIi5jb2RlZm91bmRyeS52MS5Gb3JrVGhyZWFkUmVzcG9uc2UiABJRCgRMaXN0EiIuY29kZWZvdW5kcnkudjEuTGlzdFRocmVhZHNSZXF1ZXN0GiMuY29kZWZvdW5kcnkudjEuTGlzdFRocmVhZHNSZXNwb25zZSIAEkwKA0dldBIgLmNvZGVmb3VuZHJ5LnYxLkdldFRocmVhZFJlcXVlc3QaIS5jb2RlZm91bmRyeS52MS5HZXRUaHJlYWRSZXNwb25zZSIAElUKBlJlbmFtZRIjLmNvZGVmb3VuZHJ5LnYxLlJlbmFtZVRocmVhZFJlcXVlc3QaJC5jb2RlZm91bmRyeS52MS5SZW5hbWVUaHJlYWRSZXNwb25zZSIAElIKBUNsb3NlEiIuY29kZWZvdW5kcnkudjEuQ2xvc2VUaHJlYWRSZXF1ZXN0GiMuY29kZWZvdW5kcnkudjEuQ2xvc2VUaHJlYWRSZXNwb25zZSIAEl4KCVJlY29ubmVjdBImLmNvZGVmb3VuZHJ5LnYxLlJlY29ubmVjdFRocmVhZFJlcXVlc3QaJy5jb2RlZm91bmRyeS52MS5SZWNvbm5lY3RUaHJlYWRSZXNwb25zZSIAElUKBlJlbW92ZRIjLmNvZGVmb3VuZHJ5LnYxLlJlbW92ZVRocmVhZFJlcXVlc3QaJC5jb2RlZm91bmRyeS52MS5SZW1vdmVUaHJlYWRSZXNwb25zZSIAElIKBVJ1bkluEiIuY29kZWZvdW5kcnkudjEuUnVuSW5UaHJlYWRSZXF1ZXN0GiMuY29kZWZvdW5kcnkudjEuUnVuSW5UaHJlYWRSZXNwb25zZSIAEkwKA1BpbhIgLmNvZGVmb3VuZHJ5LnYxLlBpblRocmVhZFJlcXVlc3QaIS5jb2RlZm91bmRyeS52MS5QaW5UaHJlYWRSZXNwb25zZSIAElgKB0FyY2hpdmUSJC5jb2RlZm91bmRyeS52MS5BcmNoaXZlVGhyZWFkUmVxdWVzdBolLmNvZGVmb3VuZHJ5LnYxLkFyY2hpdmVUaHJlYWRSZXNwb25zZSIAElUKBlNub296ZRIjLmNvZGVmb3VuZHJ5LnYxLlNub296ZVRocmVhZFJlcXVlc3QaJC5jb2RlZm91bmRyeS52MS5Tbm9vemVUaHJlYWRSZXNwb25zZSIAElEKBVdhdGNoEiMuY29kZWZvdW5kcnkudjEuV2F0Y2hUaHJlYWRzUmVxdWVzdBofLmNvZGVmb3VuZHJ5LnYxLlRocmVhZExpc3RFdmVudCIAMAESZAoPU3RhZ2VBdHRhY2htZW50EiYuY29kZWZvdW5kcnkudjEuU3RhZ2VBdHRhY2htZW50UmVxdWVzdBonLmNvZGVmb3VuZHJ5LnYxLlN0YWdlQXR0YWNobWVudFJlc3BvbnNlIgASYQoOUmVhZEF0dGFjaG1lbnQSJS5jb2RlZm91bmRyeS52MS5SZWFkQXR0YWNobWVudFJlcXVlc3QaJi5jb2RlZm91bmRyeS52MS5SZWFkQXR0YWNobWVudFJlc3BvbnNlIgASXgoJTGlzdEl0ZW1zEiYuY29kZWZvdW5kcnkudjEuTGlzdFRocmVhZEl0ZW1zUmVxdWVzdBonLmNvZGVmb3VuZHJ5LnYxLkxpc3RUaHJlYWRJdGVtc1Jlc3BvbnNlIgASUgoLV2F0Y2hUaHJlYWQSIi5jb2RlZm91bmRyeS52MS5XYXRjaFRocmVhZFJlcXVlc3QaGy5jb2RlZm91bmRyeS52MS5UaHJlYWRFdmVudCIAMAESXQoEU2VuZBIoLmNvZGVmb3VuZHJ5LnYxLlNlbmRUaHJlYWRNZXNzYWdlUmVxdWVzdBopLmNvZGVmb3VuZHJ5LnYxLlNlbmRUaHJlYWRNZXNzYWdlUmVzcG9uc2UiABJYCgdSZXNwb25kEiQuY29kZWZvdW5kcnkudjEuUmVzcG9uZFRocmVhZFJlcXVlc3QaJS5jb2RlZm91bmRyeS52MS5SZXNwb25kVGhyZWFkUmVzcG9uc2UiABJeCglJbnRlcnJ1cHQSJi5jb2RlZm91bmRyeS52MS5JbnRlcnJ1cHRUaHJlYWRSZXF1ZXN0GicuY29kZWZvdW5kcnkudjEuSW50ZXJydXB0VGhyZWFkUmVzcG9uc2UiABJbCghTZXRNb2RlbBIlLmNvZGVmb3VuZHJ5LnYxLlNldFRocmVhZE1vZGVsUmVxdWVzdBomLmNvZGVmb3VuZHJ5LnYxLlNldFRocmVhZE1vZGVsUmVzcG9uc2UiABJ2ChFTZXRQZXJtaXNzaW9uTW9kZRIuLmNvZGVmb3VuZHJ5LnYxLlNldFRocmVhZFBlcm1pc3Npb25Nb2RlUmVxdWVzdBovLmNvZGVmb3VuZHJ5LnYxLlNldFRocmVhZFBlcm1pc3Npb25Nb2RlUmVzcG9uc2UiABJeCglTZXRFZmZvcnQSJi5jb2RlZm91bmRyeS52MS5TZXRUaHJlYWRFZmZvcnRSZXF1ZXN0GicuY29kZWZvdW5kcnkudjEuU2V0VGhyZWFkRWZmb3J0UmVzcG9uc2UiABJSCglNY3BTdGF0dXMSIC5jb2RlZm91bmRyeS52MS5NY3BTdGF0dXNSZXF1ZXN0GiEuY29kZWZvdW5kcnkudjEuTWNwU3RhdHVzUmVzcG9uc2UiABJbCgxNY3BSZWNvbm5lY3QSIy5jb2RlZm91bmRyeS52MS5NY3BSZWNvbm5lY3RSZXF1ZXN0GiQuY29kZWZvdW5kcnkudjEuTWNwUmVjb25uZWN0UmVzcG9uc2UiABJeCg1TbGFzaENvbW1hbmRzEiQuY29kZWZvdW5kcnkudjEuU2xhc2hDb21tYW5kc1JlcXVlc3QaJS5jb2RlZm91bmRyeS52MS5TbGFzaENvbW1hbmRzUmVzcG9uc2UiAELDAQoSY29tLmNvZGVmb3VuZHJ5LnYxQgtUaHJlYWRQcm90b1ABWkdnaXRodWIuY29tL2FsZXh3YXVtYW5uL2NvZGUtZm91bmRyeS9nZW4vZ28vY29kZWZvdW5kcnkvdjE7Y29kZWZvdW5kcnl2MaICA0NYWKoCDkNvZGVmb3VuZHJ5LlYxygIOQ29kZWZvdW5kcnlcVjHiAhpDb2RlZm91bmRyeVxWMVxHUEJNZXRhZGF0YeoCD0NvZGVmb3VuZHJ5OjpWMWIGcHJvdG8z", [file_codefoundry_v1_heartbeat, file_codefoundry_v1_thread_lifecycle, file_google_protobuf_timestamp]);
 
 /**
  * One entry of a rendered thread's conversation. The payload's case is the kind.
@@ -644,9 +644,9 @@ export const ThreadPendingRequestSchema: GenMessage<ThreadPendingRequest> = /*@_
  */
 export type ThreadItemsSnapshot = Message<"codefoundry.v1.ThreadItemsSnapshot"> & {
   /**
-   * @generated from field: string session_id = 1;
+   * @generated from field: string thread_id = 1;
    */
-  sessionId: string;
+  threadId: string;
 
   /**
    * The thread's event sequence number included in the snapshot.
@@ -704,9 +704,9 @@ export const ThreadItemsSnapshotSchema: GenMessage<ThreadItemsSnapshot> = /*@__P
  */
 export type ThreadItemDelta = Message<"codefoundry.v1.ThreadItemDelta"> & {
   /**
-   * @generated from field: string session_id = 1;
+   * @generated from field: string thread_id = 1;
    */
-  sessionId: string;
+  threadId: string;
 
   /**
    * @generated from field: uint64 seq = 2;
@@ -776,9 +776,9 @@ export const ThreadItemDelta_FieldSchema: GenEnum<ThreadItemDelta_Field> = /*@__
  */
 export type ThreadItemChange = Message<"codefoundry.v1.ThreadItemChange"> & {
   /**
-   * @generated from field: string session_id = 1;
+   * @generated from field: string thread_id = 1;
    */
-  sessionId: string;
+  threadId: string;
 
   /**
    * @generated from field: uint64 seq = 2;
@@ -805,9 +805,9 @@ export const ThreadItemChangeSchema: GenMessage<ThreadItemChange> = /*@__PURE__*
  */
 export type ThreadPending = Message<"codefoundry.v1.ThreadPending"> & {
   /**
-   * @generated from field: string session_id = 1;
+   * @generated from field: string thread_id = 1;
    */
-  sessionId: string;
+  threadId: string;
 
   /**
    * @generated from field: uint64 seq = 2;
@@ -856,7 +856,7 @@ export type ThreadEvent = Message<"codefoundry.v1.ThreadEvent"> & {
    */
   event: {
     /**
-     * ThreadService.Watch's first event (and a resync after drops).
+     * ThreadService.WatchThread's first event (and a resync after drops).
      *
      * @generated from field: codefoundry.v1.ThreadItemsSnapshot snapshot = 1;
      */
@@ -864,7 +864,7 @@ export type ThreadEvent = Message<"codefoundry.v1.ThreadEvent"> & {
     case: "snapshot";
   } | {
     /**
-     * Watch only: items and their streaming deltas.
+     * WatchThread only: items and their streaming deltas.
      *
      * @generated from field: codefoundry.v1.ThreadItemChange appended = 2;
      */
@@ -884,7 +884,7 @@ export type ThreadEvent = Message<"codefoundry.v1.ThreadEvent"> & {
     case: "delta";
   } | {
     /**
-     * Watch and EventService: the thread's pending requests changed.
+     * WatchThread and EventService: the thread's pending requests changed.
      *
      * @generated from field: codefoundry.v1.ThreadPending pending = 5;
      */
@@ -900,7 +900,7 @@ export type ThreadEvent = Message<"codefoundry.v1.ThreadEvent"> & {
     case: "pendingSnapshot";
   } | {
     /**
-     * Watch only: the thread's MCP servers were checked again.
+     * WatchThread only: the thread's MCP servers were checked again.
      *
      * @generated from field: codefoundry.v1.ThreadMcpChange mcp = 7;
      */
@@ -908,7 +908,7 @@ export type ThreadEvent = Message<"codefoundry.v1.ThreadEvent"> & {
     case: "mcp";
   } | {
     /**
-     * Watch only: the thread's slash commands changed (Claude's list changed).
+     * WatchThread only: the thread's slash commands changed (Claude's list changed).
      *
      * @generated from field: codefoundry.v1.ThreadSlashCommandsChange commands = 8;
      */
@@ -916,7 +916,7 @@ export type ThreadEvent = Message<"codefoundry.v1.ThreadEvent"> & {
     case: "commands";
   } | {
     /**
-     * Watch only: nothing else was sent for a while (see StreamHeartbeat). It does not
+     * WatchThread only: nothing else was sent for a while (see StreamHeartbeat). It does not
      * advance seq.
      *
      * @generated from field: codefoundry.v1.StreamHeartbeat heartbeat = 9;
@@ -925,7 +925,7 @@ export type ThreadEvent = Message<"codefoundry.v1.ThreadEvent"> & {
     case: "heartbeat";
   } | {
     /**
-     * Watch only: the thread's subagent runs changed (the whole list). A run's status,
+     * WatchThread only: the thread's subagent runs changed (the whole list). A run's status,
      * report or a new run comes at once; its progress (activity, last tool, counters) at
      * most once a second.
      *
@@ -1097,15 +1097,15 @@ export const ThreadMcpStatusSchema: GenMessage<ThreadMcpStatus> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_thread, 20);
 
 /**
- * A thread's MCP status changed (ThreadService.Watch).
+ * A thread's MCP status changed (ThreadService.WatchThread).
  *
  * @generated from message codefoundry.v1.ThreadMcpChange
  */
 export type ThreadMcpChange = Message<"codefoundry.v1.ThreadMcpChange"> & {
   /**
-   * @generated from field: string session_id = 1;
+   * @generated from field: string thread_id = 1;
    */
-  sessionId: string;
+  threadId: string;
 
   /**
    * @generated from field: uint64 seq = 2;
@@ -1131,7 +1131,7 @@ export const ThreadMcpChangeSchema: GenMessage<ThreadMcpChange> = /*@__PURE__*/
 /**
  * One subagent run of a thread (an Agent tool call, foreground or background, also one
  * spawned by another run), as the stream's task frames report it. A run woken again by
- * SendMessage goes back to RUNNING in place (resumed_at). Persisted, with Session.agent_runs.
+ * SendMessage goes back to RUNNING in place (resumed_at). Persisted, with Thread.agent_runs.
  *
  * @generated from message codefoundry.v1.ThreadAgentRun
  */
@@ -1285,15 +1285,15 @@ export const ThreadAgentRunSchema: GenMessage<ThreadAgentRun> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_thread, 22);
 
 /**
- * A thread's subagent runs changed (ThreadService.Watch).
+ * A thread's subagent runs changed (ThreadService.WatchThread).
  *
  * @generated from message codefoundry.v1.ThreadAgentsChange
  */
 export type ThreadAgentsChange = Message<"codefoundry.v1.ThreadAgentsChange"> & {
   /**
-   * @generated from field: string session_id = 1;
+   * @generated from field: string thread_id = 1;
    */
-  sessionId: string;
+  threadId: string;
 
   /**
    * @generated from field: uint64 seq = 2;
@@ -1320,9 +1320,9 @@ export const ThreadAgentsChangeSchema: GenMessage<ThreadAgentsChange> = /*@__PUR
  */
 export type ListThreadItemsRequest = Message<"codefoundry.v1.ListThreadItemsRequest"> & {
   /**
-   * @generated from field: string session_id = 1;
+   * @generated from field: string thread_id = 1;
    */
-  sessionId: string;
+  threadId: string;
 };
 
 /**
@@ -1354,9 +1354,9 @@ export const ListThreadItemsResponseSchema: GenMessage<ListThreadItemsResponse> 
  */
 export type WatchThreadRequest = Message<"codefoundry.v1.WatchThreadRequest"> & {
   /**
-   * @generated from field: string session_id = 1;
+   * @generated from field: string thread_id = 1;
    */
-  sessionId: string;
+  threadId: string;
 };
 
 /**
@@ -1371,9 +1371,9 @@ export const WatchThreadRequestSchema: GenMessage<WatchThreadRequest> = /*@__PUR
  */
 export type SendThreadMessageRequest = Message<"codefoundry.v1.SendThreadMessageRequest"> & {
   /**
-   * @generated from field: string session_id = 1;
+   * @generated from field: string thread_id = 1;
    */
-  sessionId: string;
+  threadId: string;
 
   /**
    * As typed; "@cf-file://<repo id>/<path>" tags become absolute paths for Claude.
@@ -1428,9 +1428,9 @@ export const SendThreadMessageResponseSchema: GenMessage<SendThreadMessageRespon
  */
 export type RespondThreadRequest = Message<"codefoundry.v1.RespondThreadRequest"> & {
   /**
-   * @generated from field: string session_id = 1;
+   * @generated from field: string thread_id = 1;
    */
-  sessionId: string;
+  threadId: string;
 
   /**
    * @generated from field: string request_id = 2;
@@ -1498,9 +1498,9 @@ export const RespondThreadResponseSchema: GenMessage<RespondThreadResponse> = /*
  */
 export type InterruptThreadRequest = Message<"codefoundry.v1.InterruptThreadRequest"> & {
   /**
-   * @generated from field: string session_id = 1;
+   * @generated from field: string thread_id = 1;
    */
-  sessionId: string;
+  threadId: string;
 };
 
 /**
@@ -1528,9 +1528,9 @@ export const InterruptThreadResponseSchema: GenMessage<InterruptThreadResponse> 
  */
 export type SetThreadModelRequest = Message<"codefoundry.v1.SetThreadModelRequest"> & {
   /**
-   * @generated from field: string session_id = 1;
+   * @generated from field: string thread_id = 1;
    */
-  sessionId: string;
+  threadId: string;
 
   /**
    * @generated from field: string model = 2;
@@ -1550,9 +1550,9 @@ export const SetThreadModelRequestSchema: GenMessage<SetThreadModelRequest> = /*
  */
 export type SetThreadModelResponse = Message<"codefoundry.v1.SetThreadModelResponse"> & {
   /**
-   * @generated from field: codefoundry.v1.Session session = 1;
+   * @generated from field: codefoundry.v1.Thread thread = 1;
    */
-  session?: Session | undefined;
+  thread?: Thread | undefined;
 };
 
 /**
@@ -1567,9 +1567,9 @@ export const SetThreadModelResponseSchema: GenMessage<SetThreadModelResponse> = 
  */
 export type SetThreadPermissionModeRequest = Message<"codefoundry.v1.SetThreadPermissionModeRequest"> & {
   /**
-   * @generated from field: string session_id = 1;
+   * @generated from field: string thread_id = 1;
    */
-  sessionId: string;
+  threadId: string;
 
   /**
    * @generated from field: codefoundry.v1.PermissionMode permission_mode = 2;
@@ -1589,9 +1589,9 @@ export const SetThreadPermissionModeRequestSchema: GenMessage<SetThreadPermissio
  */
 export type SetThreadPermissionModeResponse = Message<"codefoundry.v1.SetThreadPermissionModeResponse"> & {
   /**
-   * @generated from field: codefoundry.v1.Session session = 1;
+   * @generated from field: codefoundry.v1.Thread thread = 1;
    */
-  session?: Session | undefined;
+  thread?: Thread | undefined;
 };
 
 /**
@@ -1606,9 +1606,9 @@ export const SetThreadPermissionModeResponseSchema: GenMessage<SetThreadPermissi
  */
 export type SetThreadEffortRequest = Message<"codefoundry.v1.SetThreadEffortRequest"> & {
   /**
-   * @generated from field: string session_id = 1;
+   * @generated from field: string thread_id = 1;
    */
-  sessionId: string;
+  threadId: string;
 
   /**
    * low, medium, high, xhigh or max.
@@ -1632,9 +1632,9 @@ export type SetThreadEffortResponse = Message<"codefoundry.v1.SetThreadEffortRes
   /**
    * effort_pending is set when the restart waits for the running turn.
    *
-   * @generated from field: codefoundry.v1.Session session = 1;
+   * @generated from field: codefoundry.v1.Thread thread = 1;
    */
-  session?: Session | undefined;
+  thread?: Thread | undefined;
 };
 
 /**
@@ -1649,9 +1649,9 @@ export const SetThreadEffortResponseSchema: GenMessage<SetThreadEffortResponse> 
  */
 export type McpStatusRequest = Message<"codefoundry.v1.McpStatusRequest"> & {
   /**
-   * @generated from field: string session_id = 1;
+   * @generated from field: string thread_id = 1;
    */
-  sessionId: string;
+  threadId: string;
 
   /**
    * Ask Claude now instead of returning the last check.
@@ -1692,9 +1692,9 @@ export const McpStatusResponseSchema: GenMessage<McpStatusResponse> = /*@__PURE_
  */
 export type McpReconnectRequest = Message<"codefoundry.v1.McpReconnectRequest"> & {
   /**
-   * @generated from field: string session_id = 1;
+   * @generated from field: string thread_id = 1;
    */
-  sessionId: string;
+  threadId: string;
 
   /**
    * The server's name as McpServer.name has it.
@@ -1790,15 +1790,15 @@ export const SlashCommandSchema: GenMessage<SlashCommand> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_thread, 43);
 
 /**
- * A thread's slash commands changed (ThreadService.Watch).
+ * A thread's slash commands changed (ThreadService.WatchThread).
  *
  * @generated from message codefoundry.v1.ThreadSlashCommandsChange
  */
 export type ThreadSlashCommandsChange = Message<"codefoundry.v1.ThreadSlashCommandsChange"> & {
   /**
-   * @generated from field: string session_id = 1;
+   * @generated from field: string thread_id = 1;
    */
-  sessionId: string;
+  threadId: string;
 
   /**
    * @generated from field: uint64 seq = 2;
@@ -1825,9 +1825,9 @@ export const ThreadSlashCommandsChangeSchema: GenMessage<ThreadSlashCommandsChan
  */
 export type SlashCommandsRequest = Message<"codefoundry.v1.SlashCommandsRequest"> & {
   /**
-   * @generated from field: string session_id = 1;
+   * @generated from field: string thread_id = 1;
    */
-  sessionId: string;
+  threadId: string;
 };
 
 /**
@@ -2094,13 +2094,196 @@ export const ThreadDecisionSchema: GenEnum<ThreadDecision> = /*@__PURE__*/
   enumDesc(file_codefoundry_v1_thread, 5);
 
 /**
- * ThreadService drives threads: Claude Code runs headlessly (claude -p over
- * stream-json) and the conversation is recorded by the daemon as items the GUI draws.
- * See docs/notes/rendered-threads-1-daemon.md and docs/notes/rendered-only.md.
+ * ThreadService manages threads, the primary unit of the app, and drives their
+ * conversations. A thread runs Claude Code headlessly (claude -p over stream-json) and
+ * the daemon records the conversation as items the GUI draws. A connected thread owns
+ * one claude process; a disconnected thread owns none and the next message resumes it
+ * (claude --resume). The lifecycle messages (Thread, CreateThreadRequest, ...) are in
+ * thread_lifecycle.proto. See docs/notes/rendered-threads-1-daemon.md and
+ * docs/notes/rendered-only.md.
  *
  * @generated from service codefoundry.v1.ThreadService
  */
 export const ThreadService: GenService<{
+  /**
+   * Create spawns claude in a worktree and returns the thread in STARTING state.
+   *
+   * @generated from rpc codefoundry.v1.ThreadService.Create
+   */
+  create: {
+    methodKind: "unary";
+    input: typeof CreateThreadRequestSchema;
+    output: typeof CreateThreadResponseSchema;
+  },
+  /**
+   * Fork starts a new thread that continues an existing thread's conversation.
+   *
+   * @generated from rpc codefoundry.v1.ThreadService.Fork
+   */
+  fork: {
+    methodKind: "unary";
+    input: typeof ForkThreadRequestSchema;
+    output: typeof ForkThreadResponseSchema;
+  },
+  /**
+   * List returns all threads.
+   *
+   * @generated from rpc codefoundry.v1.ThreadService.List
+   */
+  list: {
+    methodKind: "unary";
+    input: typeof ListThreadsRequestSchema;
+    output: typeof ListThreadsResponseSchema;
+  },
+  /**
+   * Get returns one thread.
+   *
+   * @generated from rpc codefoundry.v1.ThreadService.Get
+   */
+  get: {
+    methodKind: "unary";
+    input: typeof GetThreadRequestSchema;
+    output: typeof GetThreadResponseSchema;
+  },
+  /**
+   * Rename sets a user-chosen name and disables auto-naming for the thread.
+   *
+   * @generated from rpc codefoundry.v1.ThreadService.Rename
+   */
+  rename: {
+    methodKind: "unary";
+    input: typeof RenameThreadRequestSchema;
+    output: typeof RenameThreadResponseSchema;
+  },
+  /**
+   * Close ends the Claude process gracefully (interrupt, stdin closed, bounded wait,
+   * then kill). The thread remains, DISCONNECTED, until Remove. No command calls it
+   * since 2026-10-15: the daemon starts a thread's process when a message is sent
+   * (Send) and stops it at the prompt cache expiry (docs/notes/thread-lifecycle.md).
+   * Kept for compatibility.
+   *
+   * @generated from rpc codefoundry.v1.ThreadService.Close
+   */
+  close: {
+    methodKind: "unary";
+    input: typeof CloseThreadRequestSchema;
+    output: typeof CloseThreadResponseSchema;
+  },
+  /**
+   * Reconnect resumes a DISCONNECTED thread in a new claude process, without a
+   * prompt. No command calls it since 2026-10-15 (a message starts a stopped thread).
+   * Kept for compatibility.
+   *
+   * @generated from rpc codefoundry.v1.ThreadService.Reconnect
+   */
+  reconnect: {
+    methodKind: "unary";
+    input: typeof ReconnectThreadRequestSchema;
+    output: typeof ReconnectThreadResponseSchema;
+  },
+  /**
+   * Remove forgets a thread. Stops its Claude first if it runs.
+   *
+   * @generated from rpc codefoundry.v1.ThreadService.Remove
+   */
+  remove: {
+    methodKind: "unary";
+    input: typeof RemoveThreadRequestSchema;
+    output: typeof RemoveThreadResponseSchema;
+  },
+  /**
+   * RunIn moves a workspace thread's cwd to another member worktree of its workspace.
+   * A live thread gets set_cwd once it is idle (pending_worktree_path shows the queued
+   * target until then) and the row's worktree_path and repo_id change when Claude
+   * accepts it. A disconnected thread's row
+   * changes at once; the next reconnect resumes there. Refused for a project thread or
+   * a target that is not a member.
+   *
+   * @generated from rpc codefoundry.v1.ThreadService.RunIn
+   */
+  runIn: {
+    methodKind: "unary";
+    input: typeof RunInThreadRequestSchema;
+    output: typeof RunInThreadResponseSchema;
+  },
+  /**
+   * Pin pins or unpins a thread. Pinned threads sit in their own section at the top of
+   * the GUI's thread list. Persisted; any state.
+   *
+   * @generated from rpc codefoundry.v1.ThreadService.Pin
+   */
+  pin: {
+    methodKind: "unary";
+    input: typeof PinThreadRequestSchema;
+    output: typeof PinThreadResponseSchema;
+  },
+  /**
+   * Archive archives or unarchives a thread. Archiving ends Claude gracefully like
+   * Close (the thread is DISCONNECTED), kills and removes the thread's shells, unpins
+   * it and records archived_at (kept when it is already archived). Unarchiving only
+   * clears archived_at: the thread stays disconnected until a Reconnect. Reconnect,
+   * Pin (pinned) and Send unarchive a thread implicitly. Persisted; any state.
+   *
+   * @generated from rpc codefoundry.v1.ThreadService.Archive
+   */
+  archive: {
+    methodKind: "unary";
+    input: typeof ArchiveThreadRequestSchema;
+    output: typeof ArchiveThreadResponseSchema;
+  },
+  /**
+   * Snooze snoozes a thread until a time, or unsnoozes it (until unset). Snoozing ends
+   * Claude gracefully like Close (the thread is DISCONNECTED), kills and removes the
+   * thread's shells, unpins and unarchives it and records snoozed_until (a re-snooze
+   * replaces it). until must be in the future (INVALID_ARGUMENT otherwise). When the
+   * time comes the daemon wakes the thread: snoozed_until is cleared and the thread,
+   * still disconnected, becomes NEEDS_ATTENTION "snooze ended" (status_changed_at = the
+   * wake time). Unsnoozing before then only clears snoozed_until. Reconnect, Pin
+   * (pinned), Send and Archive (archived) clear a snooze implicitly. Persisted.
+   *
+   * @generated from rpc codefoundry.v1.ThreadService.Snooze
+   */
+  snooze: {
+    methodKind: "unary";
+    input: typeof SnoozeThreadRequestSchema;
+    output: typeof SnoozeThreadResponseSchema;
+  },
+  /**
+   * Watch streams changes to the thread list (every thread's record, not its items).
+   * The first event is a snapshot. WatchThread streams one thread's conversation.
+   *
+   * @generated from rpc codefoundry.v1.ThreadService.Watch
+   */
+  watch: {
+    methodKind: "server_streaming";
+    input: typeof WatchThreadsRequestSchema;
+    output: typeof ThreadListEventSchema;
+  },
+  /**
+   * StageAttachment stores an image the first prompt refers to and returns its path.
+   * Create appends "Attached image: <path>" lines for CreateThreadRequest.attachments;
+   * Claude reads them with its Read tool. Only image types are accepted, with size
+   * limits; unused staged files are reaped by the daemon.
+   *
+   * @generated from rpc codefoundry.v1.ThreadService.StageAttachment
+   */
+  stageAttachment: {
+    methodKind: "unary";
+    input: typeof StageAttachmentRequestSchema;
+    output: typeof StageAttachmentResponseSchema;
+  },
+  /**
+   * ReadAttachment returns a staged attachment's bytes (a user message shows its
+   * images). Only files directly in the attachments directory;
+   * NOT_FOUND once the file was reaped.
+   *
+   * @generated from rpc codefoundry.v1.ThreadService.ReadAttachment
+   */
+  readAttachment: {
+    methodKind: "unary";
+    input: typeof ReadAttachmentRequestSchema;
+    output: typeof ReadAttachmentResponseSchema;
+  },
   /**
    * ListItems returns a thread's items (the streaming one included) and its pending
    * requests. Works while disconnected (items persist).
@@ -2113,14 +2296,14 @@ export const ThreadService: GenService<{
     output: typeof ListThreadItemsResponseSchema;
   },
   /**
-   * Watch streams one thread: a snapshot first, then appended/updated items, text
-   * deltas and pending-request changes. While a Watch is open the thread counts as
+   * WatchThread streams one thread: a snapshot first, then appended/updated items, text
+   * deltas and pending-request changes. While a WatchThread is open the thread counts as
    * looked at: a finished turn is seen at once. Apply only
    * events whose seq is greater than the snapshot's.
    *
-   * @generated from rpc codefoundry.v1.ThreadService.Watch
+   * @generated from rpc codefoundry.v1.ThreadService.WatchThread
    */
-  watch: {
+  watchThread: {
     methodKind: "server_streaming";
     input: typeof WatchThreadRequestSchema;
     output: typeof ThreadEventSchema;
@@ -2192,7 +2375,7 @@ export const ThreadService: GenService<{
   /**
    * SetEffort changes a thread's effort level. Claude has no live effort switch, so the
    * daemon restarts a running process with --resume and the new --effort: at once when
-   * the thread is idle, else once the running turn ends (Session.effort_pending says so
+   * the thread is idle, else once the running turn ends (Thread.effort_pending says so
    * meanwhile). The row records the effort for later spawns either way; a thread that is
    * not running only records it.
    *
@@ -2206,7 +2389,7 @@ export const ThreadService: GenService<{
   /**
    * McpStatus returns the thread's MCP servers as last checked. The daemon asks Claude
    * (mcp_status) at the start of every turn, again every few seconds while a server is
-   * still connecting, and after McpReconnect; Watch carries each new answer (the `mcp`
+   * still connecting, and after McpReconnect; WatchThread carries each new answer (the `mcp`
    * event). The last answer is kept while the thread is not running, also across daemon
    * restarts. refresh asks Claude now, starting a stopped thread without a prompt.
    * Without it a running thread not checked yet is asked once; status is unset when
@@ -2240,7 +2423,7 @@ export const ThreadService: GenService<{
    * the app's own controls, terminal-only, or retired; never a skill or a user, project
    * or plugin command). In Claude's order: its skills, then its built-ins, then plugin
    * skills. What Claude last reported, kept while the thread is not running (also across
-   * daemon restarts); empty when it never answered a handshake. Watch carries every change (the
+   * daemon restarts); empty when it never answered a handshake. WatchThread carries every change (the
    * `commands` event). See docs/notes/slash-commands-1-daemon.md.
    *
    * @generated from rpc codefoundry.v1.ThreadService.SlashCommands

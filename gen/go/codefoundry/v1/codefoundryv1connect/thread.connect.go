@@ -33,10 +33,43 @@ const (
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
-	// ThreadServiceListItemsProcedure is the fully-qualified name of the ThreadService's ListItems RPC.
-	ThreadServiceListItemsProcedure = "/codefoundry.v1.ThreadService/ListItems"
+	// ThreadServiceCreateProcedure is the fully-qualified name of the ThreadService's Create RPC.
+	ThreadServiceCreateProcedure = "/codefoundry.v1.ThreadService/Create"
+	// ThreadServiceForkProcedure is the fully-qualified name of the ThreadService's Fork RPC.
+	ThreadServiceForkProcedure = "/codefoundry.v1.ThreadService/Fork"
+	// ThreadServiceListProcedure is the fully-qualified name of the ThreadService's List RPC.
+	ThreadServiceListProcedure = "/codefoundry.v1.ThreadService/List"
+	// ThreadServiceGetProcedure is the fully-qualified name of the ThreadService's Get RPC.
+	ThreadServiceGetProcedure = "/codefoundry.v1.ThreadService/Get"
+	// ThreadServiceRenameProcedure is the fully-qualified name of the ThreadService's Rename RPC.
+	ThreadServiceRenameProcedure = "/codefoundry.v1.ThreadService/Rename"
+	// ThreadServiceCloseProcedure is the fully-qualified name of the ThreadService's Close RPC.
+	ThreadServiceCloseProcedure = "/codefoundry.v1.ThreadService/Close"
+	// ThreadServiceReconnectProcedure is the fully-qualified name of the ThreadService's Reconnect RPC.
+	ThreadServiceReconnectProcedure = "/codefoundry.v1.ThreadService/Reconnect"
+	// ThreadServiceRemoveProcedure is the fully-qualified name of the ThreadService's Remove RPC.
+	ThreadServiceRemoveProcedure = "/codefoundry.v1.ThreadService/Remove"
+	// ThreadServiceRunInProcedure is the fully-qualified name of the ThreadService's RunIn RPC.
+	ThreadServiceRunInProcedure = "/codefoundry.v1.ThreadService/RunIn"
+	// ThreadServicePinProcedure is the fully-qualified name of the ThreadService's Pin RPC.
+	ThreadServicePinProcedure = "/codefoundry.v1.ThreadService/Pin"
+	// ThreadServiceArchiveProcedure is the fully-qualified name of the ThreadService's Archive RPC.
+	ThreadServiceArchiveProcedure = "/codefoundry.v1.ThreadService/Archive"
+	// ThreadServiceSnoozeProcedure is the fully-qualified name of the ThreadService's Snooze RPC.
+	ThreadServiceSnoozeProcedure = "/codefoundry.v1.ThreadService/Snooze"
 	// ThreadServiceWatchProcedure is the fully-qualified name of the ThreadService's Watch RPC.
 	ThreadServiceWatchProcedure = "/codefoundry.v1.ThreadService/Watch"
+	// ThreadServiceStageAttachmentProcedure is the fully-qualified name of the ThreadService's
+	// StageAttachment RPC.
+	ThreadServiceStageAttachmentProcedure = "/codefoundry.v1.ThreadService/StageAttachment"
+	// ThreadServiceReadAttachmentProcedure is the fully-qualified name of the ThreadService's
+	// ReadAttachment RPC.
+	ThreadServiceReadAttachmentProcedure = "/codefoundry.v1.ThreadService/ReadAttachment"
+	// ThreadServiceListItemsProcedure is the fully-qualified name of the ThreadService's ListItems RPC.
+	ThreadServiceListItemsProcedure = "/codefoundry.v1.ThreadService/ListItems"
+	// ThreadServiceWatchThreadProcedure is the fully-qualified name of the ThreadService's WatchThread
+	// RPC.
+	ThreadServiceWatchThreadProcedure = "/codefoundry.v1.ThreadService/WatchThread"
 	// ThreadServiceSendProcedure is the fully-qualified name of the ThreadService's Send RPC.
 	ThreadServiceSendProcedure = "/codefoundry.v1.ThreadService/Send"
 	// ThreadServiceRespondProcedure is the fully-qualified name of the ThreadService's Respond RPC.
@@ -62,14 +95,73 @@ const (
 
 // ThreadServiceClient is a client for the codefoundry.v1.ThreadService service.
 type ThreadServiceClient interface {
+	// Create spawns claude in a worktree and returns the thread in STARTING state.
+	Create(context.Context, *connect.Request[v1.CreateThreadRequest]) (*connect.Response[v1.CreateThreadResponse], error)
+	// Fork starts a new thread that continues an existing thread's conversation.
+	Fork(context.Context, *connect.Request[v1.ForkThreadRequest]) (*connect.Response[v1.ForkThreadResponse], error)
+	// List returns all threads.
+	List(context.Context, *connect.Request[v1.ListThreadsRequest]) (*connect.Response[v1.ListThreadsResponse], error)
+	// Get returns one thread.
+	Get(context.Context, *connect.Request[v1.GetThreadRequest]) (*connect.Response[v1.GetThreadResponse], error)
+	// Rename sets a user-chosen name and disables auto-naming for the thread.
+	Rename(context.Context, *connect.Request[v1.RenameThreadRequest]) (*connect.Response[v1.RenameThreadResponse], error)
+	// Close ends the Claude process gracefully (interrupt, stdin closed, bounded wait,
+	// then kill). The thread remains, DISCONNECTED, until Remove. No command calls it
+	// since 2026-10-15: the daemon starts a thread's process when a message is sent
+	// (Send) and stops it at the prompt cache expiry (docs/notes/thread-lifecycle.md).
+	// Kept for compatibility.
+	Close(context.Context, *connect.Request[v1.CloseThreadRequest]) (*connect.Response[v1.CloseThreadResponse], error)
+	// Reconnect resumes a DISCONNECTED thread in a new claude process, without a
+	// prompt. No command calls it since 2026-10-15 (a message starts a stopped thread).
+	// Kept for compatibility.
+	Reconnect(context.Context, *connect.Request[v1.ReconnectThreadRequest]) (*connect.Response[v1.ReconnectThreadResponse], error)
+	// Remove forgets a thread. Stops its Claude first if it runs.
+	Remove(context.Context, *connect.Request[v1.RemoveThreadRequest]) (*connect.Response[v1.RemoveThreadResponse], error)
+	// RunIn moves a workspace thread's cwd to another member worktree of its workspace.
+	// A live thread gets set_cwd once it is idle (pending_worktree_path shows the queued
+	// target until then) and the row's worktree_path and repo_id change when Claude
+	// accepts it. A disconnected thread's row
+	// changes at once; the next reconnect resumes there. Refused for a project thread or
+	// a target that is not a member.
+	RunIn(context.Context, *connect.Request[v1.RunInThreadRequest]) (*connect.Response[v1.RunInThreadResponse], error)
+	// Pin pins or unpins a thread. Pinned threads sit in their own section at the top of
+	// the GUI's thread list. Persisted; any state.
+	Pin(context.Context, *connect.Request[v1.PinThreadRequest]) (*connect.Response[v1.PinThreadResponse], error)
+	// Archive archives or unarchives a thread. Archiving ends Claude gracefully like
+	// Close (the thread is DISCONNECTED), kills and removes the thread's shells, unpins
+	// it and records archived_at (kept when it is already archived). Unarchiving only
+	// clears archived_at: the thread stays disconnected until a Reconnect. Reconnect,
+	// Pin (pinned) and Send unarchive a thread implicitly. Persisted; any state.
+	Archive(context.Context, *connect.Request[v1.ArchiveThreadRequest]) (*connect.Response[v1.ArchiveThreadResponse], error)
+	// Snooze snoozes a thread until a time, or unsnoozes it (until unset). Snoozing ends
+	// Claude gracefully like Close (the thread is DISCONNECTED), kills and removes the
+	// thread's shells, unpins and unarchives it and records snoozed_until (a re-snooze
+	// replaces it). until must be in the future (INVALID_ARGUMENT otherwise). When the
+	// time comes the daemon wakes the thread: snoozed_until is cleared and the thread,
+	// still disconnected, becomes NEEDS_ATTENTION "snooze ended" (status_changed_at = the
+	// wake time). Unsnoozing before then only clears snoozed_until. Reconnect, Pin
+	// (pinned), Send and Archive (archived) clear a snooze implicitly. Persisted.
+	Snooze(context.Context, *connect.Request[v1.SnoozeThreadRequest]) (*connect.Response[v1.SnoozeThreadResponse], error)
+	// Watch streams changes to the thread list (every thread's record, not its items).
+	// The first event is a snapshot. WatchThread streams one thread's conversation.
+	Watch(context.Context, *connect.Request[v1.WatchThreadsRequest]) (*connect.ServerStreamForClient[v1.ThreadListEvent], error)
+	// StageAttachment stores an image the first prompt refers to and returns its path.
+	// Create appends "Attached image: <path>" lines for CreateThreadRequest.attachments;
+	// Claude reads them with its Read tool. Only image types are accepted, with size
+	// limits; unused staged files are reaped by the daemon.
+	StageAttachment(context.Context, *connect.Request[v1.StageAttachmentRequest]) (*connect.Response[v1.StageAttachmentResponse], error)
+	// ReadAttachment returns a staged attachment's bytes (a user message shows its
+	// images). Only files directly in the attachments directory;
+	// NOT_FOUND once the file was reaped.
+	ReadAttachment(context.Context, *connect.Request[v1.ReadAttachmentRequest]) (*connect.Response[v1.ReadAttachmentResponse], error)
 	// ListItems returns a thread's items (the streaming one included) and its pending
 	// requests. Works while disconnected (items persist).
 	ListItems(context.Context, *connect.Request[v1.ListThreadItemsRequest]) (*connect.Response[v1.ListThreadItemsResponse], error)
-	// Watch streams one thread: a snapshot first, then appended/updated items, text
-	// deltas and pending-request changes. While a Watch is open the thread counts as
+	// WatchThread streams one thread: a snapshot first, then appended/updated items, text
+	// deltas and pending-request changes. While a WatchThread is open the thread counts as
 	// looked at: a finished turn is seen at once. Apply only
 	// events whose seq is greater than the snapshot's.
-	Watch(context.Context, *connect.Request[v1.WatchThreadRequest]) (*connect.ServerStreamForClient[v1.ThreadEvent], error)
+	WatchThread(context.Context, *connect.Request[v1.WatchThreadRequest]) (*connect.ServerStreamForClient[v1.ThreadEvent], error)
 	// Send sends a user message. Allowed while a turn runs: Claude queues it or folds it
 	// in. A thread that is not running starts with the message as its first prompt: the
 	// returned item is in the timeline at once, and a start that fails is an error item
@@ -96,13 +188,13 @@ type ThreadServiceClient interface {
 	SetPermissionMode(context.Context, *connect.Request[v1.SetThreadPermissionModeRequest]) (*connect.Response[v1.SetThreadPermissionModeResponse], error)
 	// SetEffort changes a thread's effort level. Claude has no live effort switch, so the
 	// daemon restarts a running process with --resume and the new --effort: at once when
-	// the thread is idle, else once the running turn ends (Session.effort_pending says so
+	// the thread is idle, else once the running turn ends (Thread.effort_pending says so
 	// meanwhile). The row records the effort for later spawns either way; a thread that is
 	// not running only records it.
 	SetEffort(context.Context, *connect.Request[v1.SetThreadEffortRequest]) (*connect.Response[v1.SetThreadEffortResponse], error)
 	// McpStatus returns the thread's MCP servers as last checked. The daemon asks Claude
 	// (mcp_status) at the start of every turn, again every few seconds while a server is
-	// still connecting, and after McpReconnect; Watch carries each new answer (the `mcp`
+	// still connecting, and after McpReconnect; WatchThread carries each new answer (the `mcp`
 	// event). The last answer is kept while the thread is not running, also across daemon
 	// restarts. refresh asks Claude now, starting a stopped thread without a prompt.
 	// Without it a running thread not checked yet is asked once; status is unset when
@@ -120,7 +212,7 @@ type ThreadServiceClient interface {
 	// the app's own controls, terminal-only, or retired; never a skill or a user, project
 	// or plugin command). In Claude's order: its skills, then its built-ins, then plugin
 	// skills. What Claude last reported, kept while the thread is not running (also across
-	// daemon restarts); empty when it never answered a handshake. Watch carries every change (the
+	// daemon restarts); empty when it never answered a handshake. WatchThread carries every change (the
 	// `commands` event). See docs/notes/slash-commands-1-daemon.md.
 	SlashCommands(context.Context, *connect.Request[v1.SlashCommandsRequest]) (*connect.Response[v1.SlashCommandsResponse], error)
 }
@@ -136,16 +228,106 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 	baseURL = strings.TrimRight(baseURL, "/")
 	threadServiceMethods := v1.File_codefoundry_v1_thread_proto.Services().ByName("ThreadService").Methods()
 	return &threadServiceClient{
+		create: connect.NewClient[v1.CreateThreadRequest, v1.CreateThreadResponse](
+			httpClient,
+			baseURL+ThreadServiceCreateProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("Create")),
+			connect.WithClientOptions(opts...),
+		),
+		fork: connect.NewClient[v1.ForkThreadRequest, v1.ForkThreadResponse](
+			httpClient,
+			baseURL+ThreadServiceForkProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("Fork")),
+			connect.WithClientOptions(opts...),
+		),
+		list: connect.NewClient[v1.ListThreadsRequest, v1.ListThreadsResponse](
+			httpClient,
+			baseURL+ThreadServiceListProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("List")),
+			connect.WithClientOptions(opts...),
+		),
+		get: connect.NewClient[v1.GetThreadRequest, v1.GetThreadResponse](
+			httpClient,
+			baseURL+ThreadServiceGetProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("Get")),
+			connect.WithClientOptions(opts...),
+		),
+		rename: connect.NewClient[v1.RenameThreadRequest, v1.RenameThreadResponse](
+			httpClient,
+			baseURL+ThreadServiceRenameProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("Rename")),
+			connect.WithClientOptions(opts...),
+		),
+		close: connect.NewClient[v1.CloseThreadRequest, v1.CloseThreadResponse](
+			httpClient,
+			baseURL+ThreadServiceCloseProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("Close")),
+			connect.WithClientOptions(opts...),
+		),
+		reconnect: connect.NewClient[v1.ReconnectThreadRequest, v1.ReconnectThreadResponse](
+			httpClient,
+			baseURL+ThreadServiceReconnectProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("Reconnect")),
+			connect.WithClientOptions(opts...),
+		),
+		remove: connect.NewClient[v1.RemoveThreadRequest, v1.RemoveThreadResponse](
+			httpClient,
+			baseURL+ThreadServiceRemoveProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("Remove")),
+			connect.WithClientOptions(opts...),
+		),
+		runIn: connect.NewClient[v1.RunInThreadRequest, v1.RunInThreadResponse](
+			httpClient,
+			baseURL+ThreadServiceRunInProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("RunIn")),
+			connect.WithClientOptions(opts...),
+		),
+		pin: connect.NewClient[v1.PinThreadRequest, v1.PinThreadResponse](
+			httpClient,
+			baseURL+ThreadServicePinProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("Pin")),
+			connect.WithClientOptions(opts...),
+		),
+		archive: connect.NewClient[v1.ArchiveThreadRequest, v1.ArchiveThreadResponse](
+			httpClient,
+			baseURL+ThreadServiceArchiveProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("Archive")),
+			connect.WithClientOptions(opts...),
+		),
+		snooze: connect.NewClient[v1.SnoozeThreadRequest, v1.SnoozeThreadResponse](
+			httpClient,
+			baseURL+ThreadServiceSnoozeProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("Snooze")),
+			connect.WithClientOptions(opts...),
+		),
+		watch: connect.NewClient[v1.WatchThreadsRequest, v1.ThreadListEvent](
+			httpClient,
+			baseURL+ThreadServiceWatchProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("Watch")),
+			connect.WithClientOptions(opts...),
+		),
+		stageAttachment: connect.NewClient[v1.StageAttachmentRequest, v1.StageAttachmentResponse](
+			httpClient,
+			baseURL+ThreadServiceStageAttachmentProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("StageAttachment")),
+			connect.WithClientOptions(opts...),
+		),
+		readAttachment: connect.NewClient[v1.ReadAttachmentRequest, v1.ReadAttachmentResponse](
+			httpClient,
+			baseURL+ThreadServiceReadAttachmentProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("ReadAttachment")),
+			connect.WithClientOptions(opts...),
+		),
 		listItems: connect.NewClient[v1.ListThreadItemsRequest, v1.ListThreadItemsResponse](
 			httpClient,
 			baseURL+ThreadServiceListItemsProcedure,
 			connect.WithSchema(threadServiceMethods.ByName("ListItems")),
 			connect.WithClientOptions(opts...),
 		),
-		watch: connect.NewClient[v1.WatchThreadRequest, v1.ThreadEvent](
+		watchThread: connect.NewClient[v1.WatchThreadRequest, v1.ThreadEvent](
 			httpClient,
-			baseURL+ThreadServiceWatchProcedure,
-			connect.WithSchema(threadServiceMethods.ByName("Watch")),
+			baseURL+ThreadServiceWatchThreadProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("WatchThread")),
 			connect.WithClientOptions(opts...),
 		),
 		send: connect.NewClient[v1.SendThreadMessageRequest, v1.SendThreadMessageResponse](
@@ -207,8 +389,23 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 
 // threadServiceClient implements ThreadServiceClient.
 type threadServiceClient struct {
+	create            *connect.Client[v1.CreateThreadRequest, v1.CreateThreadResponse]
+	fork              *connect.Client[v1.ForkThreadRequest, v1.ForkThreadResponse]
+	list              *connect.Client[v1.ListThreadsRequest, v1.ListThreadsResponse]
+	get               *connect.Client[v1.GetThreadRequest, v1.GetThreadResponse]
+	rename            *connect.Client[v1.RenameThreadRequest, v1.RenameThreadResponse]
+	close             *connect.Client[v1.CloseThreadRequest, v1.CloseThreadResponse]
+	reconnect         *connect.Client[v1.ReconnectThreadRequest, v1.ReconnectThreadResponse]
+	remove            *connect.Client[v1.RemoveThreadRequest, v1.RemoveThreadResponse]
+	runIn             *connect.Client[v1.RunInThreadRequest, v1.RunInThreadResponse]
+	pin               *connect.Client[v1.PinThreadRequest, v1.PinThreadResponse]
+	archive           *connect.Client[v1.ArchiveThreadRequest, v1.ArchiveThreadResponse]
+	snooze            *connect.Client[v1.SnoozeThreadRequest, v1.SnoozeThreadResponse]
+	watch             *connect.Client[v1.WatchThreadsRequest, v1.ThreadListEvent]
+	stageAttachment   *connect.Client[v1.StageAttachmentRequest, v1.StageAttachmentResponse]
+	readAttachment    *connect.Client[v1.ReadAttachmentRequest, v1.ReadAttachmentResponse]
 	listItems         *connect.Client[v1.ListThreadItemsRequest, v1.ListThreadItemsResponse]
-	watch             *connect.Client[v1.WatchThreadRequest, v1.ThreadEvent]
+	watchThread       *connect.Client[v1.WatchThreadRequest, v1.ThreadEvent]
 	send              *connect.Client[v1.SendThreadMessageRequest, v1.SendThreadMessageResponse]
 	respond           *connect.Client[v1.RespondThreadRequest, v1.RespondThreadResponse]
 	interrupt         *connect.Client[v1.InterruptThreadRequest, v1.InterruptThreadResponse]
@@ -220,14 +417,89 @@ type threadServiceClient struct {
 	slashCommands     *connect.Client[v1.SlashCommandsRequest, v1.SlashCommandsResponse]
 }
 
+// Create calls codefoundry.v1.ThreadService.Create.
+func (c *threadServiceClient) Create(ctx context.Context, req *connect.Request[v1.CreateThreadRequest]) (*connect.Response[v1.CreateThreadResponse], error) {
+	return c.create.CallUnary(ctx, req)
+}
+
+// Fork calls codefoundry.v1.ThreadService.Fork.
+func (c *threadServiceClient) Fork(ctx context.Context, req *connect.Request[v1.ForkThreadRequest]) (*connect.Response[v1.ForkThreadResponse], error) {
+	return c.fork.CallUnary(ctx, req)
+}
+
+// List calls codefoundry.v1.ThreadService.List.
+func (c *threadServiceClient) List(ctx context.Context, req *connect.Request[v1.ListThreadsRequest]) (*connect.Response[v1.ListThreadsResponse], error) {
+	return c.list.CallUnary(ctx, req)
+}
+
+// Get calls codefoundry.v1.ThreadService.Get.
+func (c *threadServiceClient) Get(ctx context.Context, req *connect.Request[v1.GetThreadRequest]) (*connect.Response[v1.GetThreadResponse], error) {
+	return c.get.CallUnary(ctx, req)
+}
+
+// Rename calls codefoundry.v1.ThreadService.Rename.
+func (c *threadServiceClient) Rename(ctx context.Context, req *connect.Request[v1.RenameThreadRequest]) (*connect.Response[v1.RenameThreadResponse], error) {
+	return c.rename.CallUnary(ctx, req)
+}
+
+// Close calls codefoundry.v1.ThreadService.Close.
+func (c *threadServiceClient) Close(ctx context.Context, req *connect.Request[v1.CloseThreadRequest]) (*connect.Response[v1.CloseThreadResponse], error) {
+	return c.close.CallUnary(ctx, req)
+}
+
+// Reconnect calls codefoundry.v1.ThreadService.Reconnect.
+func (c *threadServiceClient) Reconnect(ctx context.Context, req *connect.Request[v1.ReconnectThreadRequest]) (*connect.Response[v1.ReconnectThreadResponse], error) {
+	return c.reconnect.CallUnary(ctx, req)
+}
+
+// Remove calls codefoundry.v1.ThreadService.Remove.
+func (c *threadServiceClient) Remove(ctx context.Context, req *connect.Request[v1.RemoveThreadRequest]) (*connect.Response[v1.RemoveThreadResponse], error) {
+	return c.remove.CallUnary(ctx, req)
+}
+
+// RunIn calls codefoundry.v1.ThreadService.RunIn.
+func (c *threadServiceClient) RunIn(ctx context.Context, req *connect.Request[v1.RunInThreadRequest]) (*connect.Response[v1.RunInThreadResponse], error) {
+	return c.runIn.CallUnary(ctx, req)
+}
+
+// Pin calls codefoundry.v1.ThreadService.Pin.
+func (c *threadServiceClient) Pin(ctx context.Context, req *connect.Request[v1.PinThreadRequest]) (*connect.Response[v1.PinThreadResponse], error) {
+	return c.pin.CallUnary(ctx, req)
+}
+
+// Archive calls codefoundry.v1.ThreadService.Archive.
+func (c *threadServiceClient) Archive(ctx context.Context, req *connect.Request[v1.ArchiveThreadRequest]) (*connect.Response[v1.ArchiveThreadResponse], error) {
+	return c.archive.CallUnary(ctx, req)
+}
+
+// Snooze calls codefoundry.v1.ThreadService.Snooze.
+func (c *threadServiceClient) Snooze(ctx context.Context, req *connect.Request[v1.SnoozeThreadRequest]) (*connect.Response[v1.SnoozeThreadResponse], error) {
+	return c.snooze.CallUnary(ctx, req)
+}
+
+// Watch calls codefoundry.v1.ThreadService.Watch.
+func (c *threadServiceClient) Watch(ctx context.Context, req *connect.Request[v1.WatchThreadsRequest]) (*connect.ServerStreamForClient[v1.ThreadListEvent], error) {
+	return c.watch.CallServerStream(ctx, req)
+}
+
+// StageAttachment calls codefoundry.v1.ThreadService.StageAttachment.
+func (c *threadServiceClient) StageAttachment(ctx context.Context, req *connect.Request[v1.StageAttachmentRequest]) (*connect.Response[v1.StageAttachmentResponse], error) {
+	return c.stageAttachment.CallUnary(ctx, req)
+}
+
+// ReadAttachment calls codefoundry.v1.ThreadService.ReadAttachment.
+func (c *threadServiceClient) ReadAttachment(ctx context.Context, req *connect.Request[v1.ReadAttachmentRequest]) (*connect.Response[v1.ReadAttachmentResponse], error) {
+	return c.readAttachment.CallUnary(ctx, req)
+}
+
 // ListItems calls codefoundry.v1.ThreadService.ListItems.
 func (c *threadServiceClient) ListItems(ctx context.Context, req *connect.Request[v1.ListThreadItemsRequest]) (*connect.Response[v1.ListThreadItemsResponse], error) {
 	return c.listItems.CallUnary(ctx, req)
 }
 
-// Watch calls codefoundry.v1.ThreadService.Watch.
-func (c *threadServiceClient) Watch(ctx context.Context, req *connect.Request[v1.WatchThreadRequest]) (*connect.ServerStreamForClient[v1.ThreadEvent], error) {
-	return c.watch.CallServerStream(ctx, req)
+// WatchThread calls codefoundry.v1.ThreadService.WatchThread.
+func (c *threadServiceClient) WatchThread(ctx context.Context, req *connect.Request[v1.WatchThreadRequest]) (*connect.ServerStreamForClient[v1.ThreadEvent], error) {
+	return c.watchThread.CallServerStream(ctx, req)
 }
 
 // Send calls codefoundry.v1.ThreadService.Send.
@@ -277,14 +549,73 @@ func (c *threadServiceClient) SlashCommands(ctx context.Context, req *connect.Re
 
 // ThreadServiceHandler is an implementation of the codefoundry.v1.ThreadService service.
 type ThreadServiceHandler interface {
+	// Create spawns claude in a worktree and returns the thread in STARTING state.
+	Create(context.Context, *connect.Request[v1.CreateThreadRequest]) (*connect.Response[v1.CreateThreadResponse], error)
+	// Fork starts a new thread that continues an existing thread's conversation.
+	Fork(context.Context, *connect.Request[v1.ForkThreadRequest]) (*connect.Response[v1.ForkThreadResponse], error)
+	// List returns all threads.
+	List(context.Context, *connect.Request[v1.ListThreadsRequest]) (*connect.Response[v1.ListThreadsResponse], error)
+	// Get returns one thread.
+	Get(context.Context, *connect.Request[v1.GetThreadRequest]) (*connect.Response[v1.GetThreadResponse], error)
+	// Rename sets a user-chosen name and disables auto-naming for the thread.
+	Rename(context.Context, *connect.Request[v1.RenameThreadRequest]) (*connect.Response[v1.RenameThreadResponse], error)
+	// Close ends the Claude process gracefully (interrupt, stdin closed, bounded wait,
+	// then kill). The thread remains, DISCONNECTED, until Remove. No command calls it
+	// since 2026-10-15: the daemon starts a thread's process when a message is sent
+	// (Send) and stops it at the prompt cache expiry (docs/notes/thread-lifecycle.md).
+	// Kept for compatibility.
+	Close(context.Context, *connect.Request[v1.CloseThreadRequest]) (*connect.Response[v1.CloseThreadResponse], error)
+	// Reconnect resumes a DISCONNECTED thread in a new claude process, without a
+	// prompt. No command calls it since 2026-10-15 (a message starts a stopped thread).
+	// Kept for compatibility.
+	Reconnect(context.Context, *connect.Request[v1.ReconnectThreadRequest]) (*connect.Response[v1.ReconnectThreadResponse], error)
+	// Remove forgets a thread. Stops its Claude first if it runs.
+	Remove(context.Context, *connect.Request[v1.RemoveThreadRequest]) (*connect.Response[v1.RemoveThreadResponse], error)
+	// RunIn moves a workspace thread's cwd to another member worktree of its workspace.
+	// A live thread gets set_cwd once it is idle (pending_worktree_path shows the queued
+	// target until then) and the row's worktree_path and repo_id change when Claude
+	// accepts it. A disconnected thread's row
+	// changes at once; the next reconnect resumes there. Refused for a project thread or
+	// a target that is not a member.
+	RunIn(context.Context, *connect.Request[v1.RunInThreadRequest]) (*connect.Response[v1.RunInThreadResponse], error)
+	// Pin pins or unpins a thread. Pinned threads sit in their own section at the top of
+	// the GUI's thread list. Persisted; any state.
+	Pin(context.Context, *connect.Request[v1.PinThreadRequest]) (*connect.Response[v1.PinThreadResponse], error)
+	// Archive archives or unarchives a thread. Archiving ends Claude gracefully like
+	// Close (the thread is DISCONNECTED), kills and removes the thread's shells, unpins
+	// it and records archived_at (kept when it is already archived). Unarchiving only
+	// clears archived_at: the thread stays disconnected until a Reconnect. Reconnect,
+	// Pin (pinned) and Send unarchive a thread implicitly. Persisted; any state.
+	Archive(context.Context, *connect.Request[v1.ArchiveThreadRequest]) (*connect.Response[v1.ArchiveThreadResponse], error)
+	// Snooze snoozes a thread until a time, or unsnoozes it (until unset). Snoozing ends
+	// Claude gracefully like Close (the thread is DISCONNECTED), kills and removes the
+	// thread's shells, unpins and unarchives it and records snoozed_until (a re-snooze
+	// replaces it). until must be in the future (INVALID_ARGUMENT otherwise). When the
+	// time comes the daemon wakes the thread: snoozed_until is cleared and the thread,
+	// still disconnected, becomes NEEDS_ATTENTION "snooze ended" (status_changed_at = the
+	// wake time). Unsnoozing before then only clears snoozed_until. Reconnect, Pin
+	// (pinned), Send and Archive (archived) clear a snooze implicitly. Persisted.
+	Snooze(context.Context, *connect.Request[v1.SnoozeThreadRequest]) (*connect.Response[v1.SnoozeThreadResponse], error)
+	// Watch streams changes to the thread list (every thread's record, not its items).
+	// The first event is a snapshot. WatchThread streams one thread's conversation.
+	Watch(context.Context, *connect.Request[v1.WatchThreadsRequest], *connect.ServerStream[v1.ThreadListEvent]) error
+	// StageAttachment stores an image the first prompt refers to and returns its path.
+	// Create appends "Attached image: <path>" lines for CreateThreadRequest.attachments;
+	// Claude reads them with its Read tool. Only image types are accepted, with size
+	// limits; unused staged files are reaped by the daemon.
+	StageAttachment(context.Context, *connect.Request[v1.StageAttachmentRequest]) (*connect.Response[v1.StageAttachmentResponse], error)
+	// ReadAttachment returns a staged attachment's bytes (a user message shows its
+	// images). Only files directly in the attachments directory;
+	// NOT_FOUND once the file was reaped.
+	ReadAttachment(context.Context, *connect.Request[v1.ReadAttachmentRequest]) (*connect.Response[v1.ReadAttachmentResponse], error)
 	// ListItems returns a thread's items (the streaming one included) and its pending
 	// requests. Works while disconnected (items persist).
 	ListItems(context.Context, *connect.Request[v1.ListThreadItemsRequest]) (*connect.Response[v1.ListThreadItemsResponse], error)
-	// Watch streams one thread: a snapshot first, then appended/updated items, text
-	// deltas and pending-request changes. While a Watch is open the thread counts as
+	// WatchThread streams one thread: a snapshot first, then appended/updated items, text
+	// deltas and pending-request changes. While a WatchThread is open the thread counts as
 	// looked at: a finished turn is seen at once. Apply only
 	// events whose seq is greater than the snapshot's.
-	Watch(context.Context, *connect.Request[v1.WatchThreadRequest], *connect.ServerStream[v1.ThreadEvent]) error
+	WatchThread(context.Context, *connect.Request[v1.WatchThreadRequest], *connect.ServerStream[v1.ThreadEvent]) error
 	// Send sends a user message. Allowed while a turn runs: Claude queues it or folds it
 	// in. A thread that is not running starts with the message as its first prompt: the
 	// returned item is in the timeline at once, and a start that fails is an error item
@@ -311,13 +642,13 @@ type ThreadServiceHandler interface {
 	SetPermissionMode(context.Context, *connect.Request[v1.SetThreadPermissionModeRequest]) (*connect.Response[v1.SetThreadPermissionModeResponse], error)
 	// SetEffort changes a thread's effort level. Claude has no live effort switch, so the
 	// daemon restarts a running process with --resume and the new --effort: at once when
-	// the thread is idle, else once the running turn ends (Session.effort_pending says so
+	// the thread is idle, else once the running turn ends (Thread.effort_pending says so
 	// meanwhile). The row records the effort for later spawns either way; a thread that is
 	// not running only records it.
 	SetEffort(context.Context, *connect.Request[v1.SetThreadEffortRequest]) (*connect.Response[v1.SetThreadEffortResponse], error)
 	// McpStatus returns the thread's MCP servers as last checked. The daemon asks Claude
 	// (mcp_status) at the start of every turn, again every few seconds while a server is
-	// still connecting, and after McpReconnect; Watch carries each new answer (the `mcp`
+	// still connecting, and after McpReconnect; WatchThread carries each new answer (the `mcp`
 	// event). The last answer is kept while the thread is not running, also across daemon
 	// restarts. refresh asks Claude now, starting a stopped thread without a prompt.
 	// Without it a running thread not checked yet is asked once; status is unset when
@@ -335,7 +666,7 @@ type ThreadServiceHandler interface {
 	// the app's own controls, terminal-only, or retired; never a skill or a user, project
 	// or plugin command). In Claude's order: its skills, then its built-ins, then plugin
 	// skills. What Claude last reported, kept while the thread is not running (also across
-	// daemon restarts); empty when it never answered a handshake. Watch carries every change (the
+	// daemon restarts); empty when it never answered a handshake. WatchThread carries every change (the
 	// `commands` event). See docs/notes/slash-commands-1-daemon.md.
 	SlashCommands(context.Context, *connect.Request[v1.SlashCommandsRequest]) (*connect.Response[v1.SlashCommandsResponse], error)
 }
@@ -347,16 +678,106 @@ type ThreadServiceHandler interface {
 // and JSON codecs. They also support gzip compression.
 func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
 	threadServiceMethods := v1.File_codefoundry_v1_thread_proto.Services().ByName("ThreadService").Methods()
-	threadServiceListItemsHandler := connect.NewUnaryHandler(
-		ThreadServiceListItemsProcedure,
-		svc.ListItems,
-		connect.WithSchema(threadServiceMethods.ByName("ListItems")),
+	threadServiceCreateHandler := connect.NewUnaryHandler(
+		ThreadServiceCreateProcedure,
+		svc.Create,
+		connect.WithSchema(threadServiceMethods.ByName("Create")),
+		connect.WithHandlerOptions(opts...),
+	)
+	threadServiceForkHandler := connect.NewUnaryHandler(
+		ThreadServiceForkProcedure,
+		svc.Fork,
+		connect.WithSchema(threadServiceMethods.ByName("Fork")),
+		connect.WithHandlerOptions(opts...),
+	)
+	threadServiceListHandler := connect.NewUnaryHandler(
+		ThreadServiceListProcedure,
+		svc.List,
+		connect.WithSchema(threadServiceMethods.ByName("List")),
+		connect.WithHandlerOptions(opts...),
+	)
+	threadServiceGetHandler := connect.NewUnaryHandler(
+		ThreadServiceGetProcedure,
+		svc.Get,
+		connect.WithSchema(threadServiceMethods.ByName("Get")),
+		connect.WithHandlerOptions(opts...),
+	)
+	threadServiceRenameHandler := connect.NewUnaryHandler(
+		ThreadServiceRenameProcedure,
+		svc.Rename,
+		connect.WithSchema(threadServiceMethods.ByName("Rename")),
+		connect.WithHandlerOptions(opts...),
+	)
+	threadServiceCloseHandler := connect.NewUnaryHandler(
+		ThreadServiceCloseProcedure,
+		svc.Close,
+		connect.WithSchema(threadServiceMethods.ByName("Close")),
+		connect.WithHandlerOptions(opts...),
+	)
+	threadServiceReconnectHandler := connect.NewUnaryHandler(
+		ThreadServiceReconnectProcedure,
+		svc.Reconnect,
+		connect.WithSchema(threadServiceMethods.ByName("Reconnect")),
+		connect.WithHandlerOptions(opts...),
+	)
+	threadServiceRemoveHandler := connect.NewUnaryHandler(
+		ThreadServiceRemoveProcedure,
+		svc.Remove,
+		connect.WithSchema(threadServiceMethods.ByName("Remove")),
+		connect.WithHandlerOptions(opts...),
+	)
+	threadServiceRunInHandler := connect.NewUnaryHandler(
+		ThreadServiceRunInProcedure,
+		svc.RunIn,
+		connect.WithSchema(threadServiceMethods.ByName("RunIn")),
+		connect.WithHandlerOptions(opts...),
+	)
+	threadServicePinHandler := connect.NewUnaryHandler(
+		ThreadServicePinProcedure,
+		svc.Pin,
+		connect.WithSchema(threadServiceMethods.ByName("Pin")),
+		connect.WithHandlerOptions(opts...),
+	)
+	threadServiceArchiveHandler := connect.NewUnaryHandler(
+		ThreadServiceArchiveProcedure,
+		svc.Archive,
+		connect.WithSchema(threadServiceMethods.ByName("Archive")),
+		connect.WithHandlerOptions(opts...),
+	)
+	threadServiceSnoozeHandler := connect.NewUnaryHandler(
+		ThreadServiceSnoozeProcedure,
+		svc.Snooze,
+		connect.WithSchema(threadServiceMethods.ByName("Snooze")),
 		connect.WithHandlerOptions(opts...),
 	)
 	threadServiceWatchHandler := connect.NewServerStreamHandler(
 		ThreadServiceWatchProcedure,
 		svc.Watch,
 		connect.WithSchema(threadServiceMethods.ByName("Watch")),
+		connect.WithHandlerOptions(opts...),
+	)
+	threadServiceStageAttachmentHandler := connect.NewUnaryHandler(
+		ThreadServiceStageAttachmentProcedure,
+		svc.StageAttachment,
+		connect.WithSchema(threadServiceMethods.ByName("StageAttachment")),
+		connect.WithHandlerOptions(opts...),
+	)
+	threadServiceReadAttachmentHandler := connect.NewUnaryHandler(
+		ThreadServiceReadAttachmentProcedure,
+		svc.ReadAttachment,
+		connect.WithSchema(threadServiceMethods.ByName("ReadAttachment")),
+		connect.WithHandlerOptions(opts...),
+	)
+	threadServiceListItemsHandler := connect.NewUnaryHandler(
+		ThreadServiceListItemsProcedure,
+		svc.ListItems,
+		connect.WithSchema(threadServiceMethods.ByName("ListItems")),
+		connect.WithHandlerOptions(opts...),
+	)
+	threadServiceWatchThreadHandler := connect.NewServerStreamHandler(
+		ThreadServiceWatchThreadProcedure,
+		svc.WatchThread,
+		connect.WithSchema(threadServiceMethods.ByName("WatchThread")),
 		connect.WithHandlerOptions(opts...),
 	)
 	threadServiceSendHandler := connect.NewUnaryHandler(
@@ -415,10 +836,40 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 	)
 	return "/codefoundry.v1.ThreadService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case ThreadServiceListItemsProcedure:
-			threadServiceListItemsHandler.ServeHTTP(w, r)
+		case ThreadServiceCreateProcedure:
+			threadServiceCreateHandler.ServeHTTP(w, r)
+		case ThreadServiceForkProcedure:
+			threadServiceForkHandler.ServeHTTP(w, r)
+		case ThreadServiceListProcedure:
+			threadServiceListHandler.ServeHTTP(w, r)
+		case ThreadServiceGetProcedure:
+			threadServiceGetHandler.ServeHTTP(w, r)
+		case ThreadServiceRenameProcedure:
+			threadServiceRenameHandler.ServeHTTP(w, r)
+		case ThreadServiceCloseProcedure:
+			threadServiceCloseHandler.ServeHTTP(w, r)
+		case ThreadServiceReconnectProcedure:
+			threadServiceReconnectHandler.ServeHTTP(w, r)
+		case ThreadServiceRemoveProcedure:
+			threadServiceRemoveHandler.ServeHTTP(w, r)
+		case ThreadServiceRunInProcedure:
+			threadServiceRunInHandler.ServeHTTP(w, r)
+		case ThreadServicePinProcedure:
+			threadServicePinHandler.ServeHTTP(w, r)
+		case ThreadServiceArchiveProcedure:
+			threadServiceArchiveHandler.ServeHTTP(w, r)
+		case ThreadServiceSnoozeProcedure:
+			threadServiceSnoozeHandler.ServeHTTP(w, r)
 		case ThreadServiceWatchProcedure:
 			threadServiceWatchHandler.ServeHTTP(w, r)
+		case ThreadServiceStageAttachmentProcedure:
+			threadServiceStageAttachmentHandler.ServeHTTP(w, r)
+		case ThreadServiceReadAttachmentProcedure:
+			threadServiceReadAttachmentHandler.ServeHTTP(w, r)
+		case ThreadServiceListItemsProcedure:
+			threadServiceListItemsHandler.ServeHTTP(w, r)
+		case ThreadServiceWatchThreadProcedure:
+			threadServiceWatchThreadHandler.ServeHTTP(w, r)
 		case ThreadServiceSendProcedure:
 			threadServiceSendHandler.ServeHTTP(w, r)
 		case ThreadServiceRespondProcedure:
@@ -446,12 +897,72 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 // UnimplementedThreadServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedThreadServiceHandler struct{}
 
+func (UnimplementedThreadServiceHandler) Create(context.Context, *connect.Request[v1.CreateThreadRequest]) (*connect.Response[v1.CreateThreadResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Create is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) Fork(context.Context, *connect.Request[v1.ForkThreadRequest]) (*connect.Response[v1.ForkThreadResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Fork is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) List(context.Context, *connect.Request[v1.ListThreadsRequest]) (*connect.Response[v1.ListThreadsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.List is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) Get(context.Context, *connect.Request[v1.GetThreadRequest]) (*connect.Response[v1.GetThreadResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Get is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) Rename(context.Context, *connect.Request[v1.RenameThreadRequest]) (*connect.Response[v1.RenameThreadResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Rename is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) Close(context.Context, *connect.Request[v1.CloseThreadRequest]) (*connect.Response[v1.CloseThreadResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Close is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) Reconnect(context.Context, *connect.Request[v1.ReconnectThreadRequest]) (*connect.Response[v1.ReconnectThreadResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Reconnect is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) Remove(context.Context, *connect.Request[v1.RemoveThreadRequest]) (*connect.Response[v1.RemoveThreadResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Remove is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) RunIn(context.Context, *connect.Request[v1.RunInThreadRequest]) (*connect.Response[v1.RunInThreadResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.RunIn is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) Pin(context.Context, *connect.Request[v1.PinThreadRequest]) (*connect.Response[v1.PinThreadResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Pin is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) Archive(context.Context, *connect.Request[v1.ArchiveThreadRequest]) (*connect.Response[v1.ArchiveThreadResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Archive is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) Snooze(context.Context, *connect.Request[v1.SnoozeThreadRequest]) (*connect.Response[v1.SnoozeThreadResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Snooze is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) Watch(context.Context, *connect.Request[v1.WatchThreadsRequest], *connect.ServerStream[v1.ThreadListEvent]) error {
+	return connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Watch is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) StageAttachment(context.Context, *connect.Request[v1.StageAttachmentRequest]) (*connect.Response[v1.StageAttachmentResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.StageAttachment is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) ReadAttachment(context.Context, *connect.Request[v1.ReadAttachmentRequest]) (*connect.Response[v1.ReadAttachmentResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.ReadAttachment is not implemented"))
+}
+
 func (UnimplementedThreadServiceHandler) ListItems(context.Context, *connect.Request[v1.ListThreadItemsRequest]) (*connect.Response[v1.ListThreadItemsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.ListItems is not implemented"))
 }
 
-func (UnimplementedThreadServiceHandler) Watch(context.Context, *connect.Request[v1.WatchThreadRequest], *connect.ServerStream[v1.ThreadEvent]) error {
-	return connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Watch is not implemented"))
+func (UnimplementedThreadServiceHandler) WatchThread(context.Context, *connect.Request[v1.WatchThreadRequest], *connect.ServerStream[v1.ThreadEvent]) error {
+	return connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.WatchThread is not implemented"))
 }
 
 func (UnimplementedThreadServiceHandler) Send(context.Context, *connect.Request[v1.SendThreadMessageRequest]) (*connect.Response[v1.SendThreadMessageResponse], error) {

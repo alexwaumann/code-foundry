@@ -80,7 +80,7 @@ func (r *runRec) kill(grace time.Duration, wg *sync.WaitGroup) {
 
 // Run implements Store.
 func (m *Manager) Run(ctx context.Context, o RunOptions) (Run, error) {
-	owner, err := m.owner(o.SessionID, o.Worktree, o.RepoID)
+	owner, err := m.owner(o.ThreadID, o.Worktree, o.RepoID)
 	if err != nil {
 		return Run{}, err
 	}
@@ -91,25 +91,25 @@ func (m *Manager) Run(ctx context.Context, o RunOptions) (Run, error) {
 	return m.start(ctx, a, owner, o.Mode, TriggerUser)
 }
 
-// owner resolves a run's owner: the thread sessionID, else the registered worktree at
+// owner resolves a run's owner: the thread threadID, else the registered worktree at
 // worktree (in repoID when given).
-func (m *Manager) owner(sessionID, worktree, repoID string) (Owner, error) {
+func (m *Manager) owner(threadID, worktree, repoID string) (Owner, error) {
 	switch {
-	case sessionID != "":
-		if m.opts.Session == nil {
-			return Owner{}, fmt.Errorf("%w: thread %s", ErrNotFound, sessionID)
+	case threadID != "":
+		if m.opts.Thread == nil {
+			return Owner{}, fmt.Errorf("%w: thread %s", ErrNotFound, threadID)
 		}
-		ow, ok := m.opts.Session(sessionID)
+		ow, ok := m.opts.Thread(threadID)
 		if !ok {
-			return Owner{}, fmt.Errorf("%w: thread %s", ErrNotFound, sessionID)
+			return Owner{}, fmt.Errorf("%w: thread %s", ErrNotFound, threadID)
 		}
 		if ow.RepoID == "" {
-			return Owner{}, fmt.Errorf("%w: thread %s has no project; actions belong to a project", ErrFailedPrecondition, sessionID)
+			return Owner{}, fmt.Errorf("%w: thread %s has no project; actions belong to a project", ErrFailedPrecondition, threadID)
 		}
 		if repoID != "" && repoID != ow.RepoID {
-			return Owner{}, fmt.Errorf("%w: thread %s is in project %s, not %s", ErrInvalidArgument, sessionID, ow.RepoID, repoID)
+			return Owner{}, fmt.Errorf("%w: thread %s is in project %s, not %s", ErrInvalidArgument, threadID, ow.RepoID, repoID)
 		}
-		ow.SessionID = sessionID
+		ow.ThreadID = threadID
 		return ow, nil
 	case worktree != "":
 		for _, r := range m.opts.Repos.Snapshot().Repos {
@@ -148,7 +148,7 @@ func (m *Manager) start(ctx context.Context, a Action, owner Owner, mode Mode, t
 	rec := &runRec{
 		run: Run{
 			ID: id, ActionID: a.ID, ActionName: a.Name, Command: a.Command,
-			RepoID: owner.RepoID, SessionID: owner.SessionID, Worktree: owner.Worktree,
+			RepoID: owner.RepoID, ThreadID: owner.ThreadID, Worktree: owner.Worktree,
 			Mode: mode, Trigger: trigger, State: RunRunning, StartedAt: m.opts.Now(),
 		},
 		started: make(chan struct{}),
@@ -170,7 +170,7 @@ func (m *Manager) start(ctx context.Context, a Action, owner Owner, mode Mode, t
 	case ModeTerminal:
 		t, err := m.opts.Terminals.Create(ctx, terminal.Spec{
 			Argv: []string{m.opts.Shell, "-lc", a.Command}, Cwd: owner.Worktree, Env: env,
-			Labels:   termlabel.ActionTerminal(owner.SessionID, owner.RepoID, owner.Worktree, a.ID, a.Name, id),
+			Labels:   termlabel.ActionTerminal(owner.ThreadID, owner.RepoID, owner.Worktree, a.ID, a.Name, id),
 			Observer: m.observer(rec),
 		})
 		if err != nil {
@@ -199,15 +199,15 @@ func (m *Manager) start(ctx context.Context, a Action, owner Owner, mode Mode, t
 	out := rec.public(true)
 	m.mu.Unlock()
 	m.log.Info("action run started", "run", id, "action", a.ID, "name", a.Name, "mode", mode.String(),
-		"session", owner.SessionID, "worktree", owner.Worktree, "terminal", out.TerminalID)
+		"thread", owner.ThreadID, "worktree", owner.Worktree, "terminal", out.TerminalID)
 	return out, nil
 }
 
 // runEnv is what a run gets on top of the daemon's environment.
 func runEnv(root string, o Owner) []string {
 	env := []string{paths.EnvProjectRoot + "=" + root, paths.EnvWorktree + "=" + o.Worktree}
-	if o.SessionID != "" {
-		env = append(env, paths.EnvSession+"="+o.SessionID)
+	if o.ThreadID != "" {
+		env = append(env, paths.EnvThread+"="+o.ThreadID)
 	}
 	return env
 }
@@ -284,7 +284,7 @@ func (m *Manager) finish(rec *runRec, code int) {
 	m.rebuild()
 	bus.Publish[Event](m.opts.Bus, RunUpdated{Run: rec.public(false)})
 	bus.Publish[Event](m.opts.Bus, RunFinished{
-		RunID: r.ID, ActionID: r.ActionID, ActionName: r.ActionName, RepoID: r.RepoID, SessionID: r.SessionID,
+		RunID: r.ID, ActionID: r.ActionID, ActionName: r.ActionName, RepoID: r.RepoID, ThreadID: r.ThreadID,
 		TerminalID: r.TerminalID, Mode: r.Mode, Trigger: r.Trigger, ExitCode: code,
 	})
 }
@@ -357,9 +357,9 @@ func (m *Manager) Wait(ctx context.Context, id string) (Run, error) {
 }
 
 // WorktreeCreated runs repoID's on-worktree-create actions in the background, one
-// after another in their order, for the thread sessionID whose new worktree is at
+// after another in their order, for the thread threadID whose new worktree is at
 // worktree. It returns at once; failures are logged and published as RunFinished.
-func (m *Manager) WorktreeCreated(sessionID, repoID, worktree string) {
+func (m *Manager) WorktreeCreated(threadID, repoID, worktree string) {
 	m.mu.Lock()
 	if m.closed {
 		m.mu.Unlock()
@@ -377,13 +377,13 @@ func (m *Manager) WorktreeCreated(sessionID, repoID, worktree string) {
 	}
 	m.wg.Add(1)
 	m.mu.Unlock()
-	owner := Owner{SessionID: sessionID, RepoID: repoID, Worktree: worktree}
+	owner := Owner{ThreadID: threadID, RepoID: repoID, Worktree: worktree}
 	go func() {
 		defer m.wg.Done()
 		for _, a := range acts {
 			r, err := m.start(m.ctx, a, owner, ModeBackground, TriggerWorktreeCreate)
 			if err != nil {
-				m.log.Warn("worktree-create action did not start", "action", a.ID, "name", a.Name, "session", sessionID, "err", err)
+				m.log.Warn("worktree-create action did not start", "action", a.ID, "name", a.Name, "thread", threadID, "err", err)
 				continue
 			}
 			r, err = m.Wait(m.ctx, r.ID)
@@ -391,7 +391,7 @@ func (m *Manager) WorktreeCreated(sessionID, repoID, worktree string) {
 				return // closing
 			}
 			if r.ExitCode != 0 {
-				m.log.Warn("worktree-create action failed", "action", a.ID, "name", a.Name, "session", sessionID,
+				m.log.Warn("worktree-create action failed", "action", a.ID, "name", a.Name, "thread", threadID,
 					"run", r.ID, "exit", r.ExitCode, "output", lastLines(r.Output, 5))
 			}
 		}

@@ -1,0 +1,185 @@
+package api
+
+import (
+	"context"
+	"math"
+	"testing"
+	"time"
+
+	"connectrpc.com/connect"
+
+	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
+	"github.com/alexwaumann/code-foundry/internal/store/thread"
+)
+
+func near(a, b float64) bool { return math.Abs(a-b) < 1e-9 }
+
+func TestUsageToProto(t *testing.T) {
+	opus := thread.UsageBucket{Model: "claude-opus-5-5", Day: "2026-10-09", Requests: 2,
+		Input: 1_000_000, Output: 1_000_000, CacheRead: 1_000_000, CacheWrite5m: 1_000_000, CacheWrite1h: 1_000_000}
+	haikuLong := thread.UsageBucket{Model: "claude-haiku-5-5", Tier: "long", Day: "2026-10-09", Requests: 1, Input: 1_000_000}
+	unknown := thread.UsageBucket{Model: "claude-next-1", Day: "2026-10-10", Requests: 1, Input: 5}
+	tests := []struct {
+		name     string
+		in       []thread.UsageBucket
+		cost     float64
+		unpriced bool
+	}{
+		{name: "none"},
+		{name: "priced", in: []thread.UsageBucket{opus, haikuLong}, cost: 4 + 20 + 0.2 + 5 + 8 + 0.5},
+		{name: "an unpriced bucket adds nothing and flags the thread", in: []thread.UsageBucket{opus, unknown},
+			cost: 4 + 20 + 0.2 + 5 + 8, unpriced: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out, cost, unpriced := usageToProto(tt.in)
+			if len(out) != len(tt.in) || !near(cost, tt.cost) || unpriced != tt.unpriced {
+				t.Fatalf("usageToProto = %d buckets, %v, %v; want %d, %v, %v", len(out), cost, unpriced, len(tt.in), tt.cost, tt.unpriced)
+			}
+			for i, p := range out {
+				b := tt.in[i]
+				if p.GetModel() != b.Model || p.GetTier() != b.Tier || p.GetDay() != b.Day || p.GetRequests() != b.Requests ||
+					p.GetInput() != b.Input || p.GetCacheWrite_5M() != b.CacheWrite5m || p.GetCacheWrite_1H() != b.CacheWrite1h {
+					t.Errorf("bucket %d = %v; want %+v", i, p, b)
+				}
+				if p.GetUnpriced() != (b.Model == unknown.Model) || (p.GetUnpriced() && p.GetCostUsd() != 0) {
+					t.Errorf("bucket %d priced = %v, %v", i, p.GetCostUsd(), p.GetUnpriced())
+				}
+				kinds := p.GetInputCostUsd() + p.GetOutputCostUsd() + p.GetCacheReadCostUsd() + p.GetCacheWrite_5MCostUsd() + p.GetCacheWrite_1HCostUsd()
+				if !near(kinds, p.GetCostUsd()) {
+					t.Errorf("bucket %d per-kind costs sum to %v; cost %v", i, kinds, p.GetCostUsd())
+				}
+				wantSavings := 0.0
+				if b.Model == opus.Model {
+					wantSavings = 4 - 0.2 // 1M cache-read tokens at (input - cache read) rate
+				}
+				if !near(p.GetCacheSavingsUsd(), wantSavings) {
+					t.Errorf("bucket %d cache savings = %v; want %v", i, p.GetCacheSavingsUsd(), wantSavings)
+				}
+			}
+			if tt.name == "priced" {
+				// Opus 5.5 at 1M of each kind: input 4, output 20, cache read 0.2, write 5m 5, write 1h 8.
+				o := out[0]
+				if !near(o.GetInputCostUsd(), 4) || !near(o.GetOutputCostUsd(), 20) || !near(o.GetCacheReadCostUsd(), 0.2) ||
+					!near(o.GetCacheWrite_5MCostUsd(), 5) || !near(o.GetCacheWrite_1HCostUsd(), 8) {
+					t.Errorf("opus per-kind costs = %v", o)
+				}
+			}
+		})
+	}
+}
+
+func TestThreadUsageOnTheWire(t *testing.T) {
+	fake, c := newThreadServer(t)
+	usage := []thread.UsageBucket{{Model: "claude-opus-5-5", Day: "2026-10-09", Requests: 1, Output: 1_000_000}}
+	fake.Put(thread.Thread{ID: "s-a", CreatedAt: time.Unix(1, 0), Usage: usage})
+	fake.SetRetiredUsage([]thread.UsageBucket{{Model: "claude-haiku-5-5", Day: "2026-10-08", Requests: 1, Output: 2_000_000}})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	list, err := c.List(ctx, connect.NewRequest(&v1.ListThreadsRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := list.Msg.GetThreads()[0]
+	if len(s.GetUsage()) != 1 || !near(s.GetCostUsd(), 20) || s.GetUnpriced() {
+		t.Errorf("listed thread usage = %v, cost %v, unpriced %v", s.GetUsage(), s.GetCostUsd(), s.GetUnpriced())
+	}
+	if r := list.Msg.GetRetiredUsage(); len(r) != 1 || !near(r[0].GetCostUsd(), 1) {
+		t.Errorf("listed retired = %v", r)
+	}
+
+	stream, err := c.Watch(ctx, connect.NewRequest(&v1.WatchThreadsRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !stream.Receive() || len(stream.Msg().GetSnapshot().GetRetiredUsage()) != 1 {
+		t.Fatalf("snapshot = %v (%v)", stream.Msg(), stream.Err())
+	}
+	if err := fake.Remove(ctx, "s-a"); err != nil {
+		t.Fatal(err)
+	}
+	if !stream.Receive() || stream.Msg().GetRemovedId() != "s-a" {
+		t.Fatalf("removed = %v (%v)", stream.Msg(), stream.Err())
+	}
+	if !stream.Receive() {
+		t.Fatal(stream.Err())
+	}
+	retired := stream.Msg().GetRetiredUsage().GetBuckets()
+	if len(retired) != 2 || retired[0].GetModel() != "claude-haiku-5-5" || retired[1].GetModel() != "claude-opus-5-5" {
+		t.Errorf("retired event = %v", stream.Msg())
+	}
+}
+
+func TestAgentRunsToProto(t *testing.T) {
+	started := time.Date(2026, 10, 11, 3, 0, 0, 0, time.UTC)
+	runs := []thread.AgentRun{
+		{ID: "a1", Description: "say ok", AgentType: "general-purpose", Model: "haiku", Effort: "medium", SpawnDepth: 1,
+			StartedAt: started, Usage: []thread.UsageBucket{{Model: "claude-haiku-5-5", Day: "2026-10-11", Requests: 1, Input: 1_000_000}}},
+		{ID: "a2", Background: true, Open: true, SpawnDepth: 2,
+			Usage: []thread.UsageBucket{{Model: "claude-next-1", Day: "2026-10-11", Requests: 1, Input: 5}}},
+	}
+	out := agentRunsToProto(runs)
+	if len(out) != 2 {
+		t.Fatalf("agentRunsToProto = %v", out)
+	}
+	a, b := out[0], out[1]
+	if a.GetId() != "a1" || a.GetDescription() != "say ok" || a.GetAgentType() != "general-purpose" || a.GetModel() != "haiku" ||
+		a.GetEffort() != "medium" || a.GetBackground() || a.GetStatus() != v1.AgentRunStatus_AGENT_RUN_STATUS_CLOSED ||
+		a.GetSpawnDepth() != 1 || !a.GetStartedAt().AsTime().Equal(started) || len(a.GetUsage()) != 1 || !near(a.GetCostUsd(), 0.1) || a.GetUnpriced() {
+		t.Errorf("closed run = %v", a)
+	}
+	if b.GetStatus() != v1.AgentRunStatus_AGENT_RUN_STATUS_OPEN || !b.GetBackground() || b.GetSpawnDepth() != 2 ||
+		b.GetStartedAt() != nil || !b.GetUnpriced() || b.GetCostUsd() != 0 {
+		t.Errorf("open run = %v", b)
+	}
+}
+
+func TestContextRereadUSD(t *testing.T) {
+	at := time.Date(2026, 10, 12, 9, 0, 0, 0, time.UTC)
+	hour := func(s thread.Thread) thread.Thread {
+		s.LastResultAt, s.CacheExpiresAt = at, at.Add(time.Hour)
+		return s
+	}
+	tests := []struct {
+		name string
+		s    thread.Thread
+		want float64
+	}{
+		{name: "the answering model's 1 h write rate", s: hour(thread.Thread{ContextTokens: 1_000_000, ContextModel: "claude-opus-4-8", Model: "opus"}), want: 10},
+		{name: "a 5 min TTL bills the 5 min rate", want: 6.25, s: thread.Thread{ContextTokens: 1_000_000, ContextModel: "claude-opus-4-8",
+			LastResultAt: at, CacheExpiresAt: at.Add(5 * time.Minute)}},
+		{name: "the row's model when it is a full id", s: hour(thread.Thread{ContextTokens: 1_000_000, Model: "claude-sonnet-4-6"}), want: 6},
+		{name: "an alias alone is unpriced", s: hour(thread.Thread{ContextTokens: 1_000_000, Model: "haiku"})},
+		{name: "an unknown model", s: hour(thread.Thread{ContextTokens: 1_000_000, ContextModel: "claude-next-1"})},
+		{name: "no result yet", s: thread.Thread{ContextTokens: 0, ContextModel: "claude-opus-4-8"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := contextRereadUSD(tt.s); !near(got, tt.want) {
+				t.Errorf("contextRereadUSD = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestThreadContextOnTheWire(t *testing.T) {
+	fake, c := newThreadServer(t)
+	at := time.Date(2026, 10, 12, 9, 0, 0, 0, time.UTC)
+	fake.Put(thread.Thread{ID: "s-a", CreatedAt: time.Unix(1, 0), ContextTokens: 25_700,
+		ContextModel: "claude-haiku-4-5-20251001", LastResultAt: at, CacheExpiresAt: at.Add(time.Hour)})
+	fake.Put(thread.Thread{ID: "s-b", CreatedAt: time.Unix(2, 0)}) // no result yet
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	list, err := c.List(ctx, connect.NewRequest(&v1.ListThreadsRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, fresh := list.Msg.GetThreads()[0], list.Msg.GetThreads()[1]
+	if r.GetContextTokens() != 25_700 || !r.GetCacheExpiresAt().AsTime().Equal(at.Add(time.Hour)) || !near(r.GetContextRereadUsd(), 25_700*2/1e6) {
+		t.Errorf("with a result = tokens %d, expires %v, reread %v", r.GetContextTokens(), r.GetCacheExpiresAt(), r.GetContextRereadUsd())
+	}
+	if fresh.GetContextTokens() != 0 || fresh.GetCacheExpiresAt() != nil || fresh.GetContextRereadUsd() != 0 {
+		t.Errorf("without a result = %v", fresh)
+	}
+}

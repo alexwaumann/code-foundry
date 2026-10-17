@@ -2,7 +2,7 @@
  * A running thread's slash commands (docs/notes/slash-commands-1-daemon.md) mapped to view
  * models. Generated types stay in src/api. Claude reports them at its handshake and
  * again whenever they change; the daemon drops the ones the app replaces or that mean
- * nothing over stream-json, and ThreadService.Watch carries the list (the snapshot's
+ * nothing over stream-json, and ThreadService.WatchThread carries the list (the snapshot's
  * `commands`, then `commands` events), so the composer reads it from the thread store.
  * Empty: the thread is not running (or the daemon predates the list).
  */

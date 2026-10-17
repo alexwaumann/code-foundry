@@ -63,7 +63,7 @@ type ActionServiceClient interface {
 	Update(context.Context, *connect.Request[v1.UpdateActionRequest]) (*connect.Response[v1.UpdateActionResponse], error)
 	// Delete forgets an action. Its runs keep going.
 	Delete(context.Context, *connect.Request[v1.DeleteActionRequest]) (*connect.Response[v1.DeleteActionResponse], error)
-	// Run starts an action for an owner: a thread (session_id; the run belongs to its
+	// Run starts an action for an owner: a thread (thread_id; the run belongs to its
 	// bottom panel) or a worktree (worktree_path). It returns the run as soon as it has
 	// started.
 	Run(context.Context, *connect.Request[v1.RunActionRequest]) (*connect.Response[v1.RunActionResponse], error)
@@ -203,7 +203,7 @@ type ActionServiceHandler interface {
 	Update(context.Context, *connect.Request[v1.UpdateActionRequest]) (*connect.Response[v1.UpdateActionResponse], error)
 	// Delete forgets an action. Its runs keep going.
 	Delete(context.Context, *connect.Request[v1.DeleteActionRequest]) (*connect.Response[v1.DeleteActionResponse], error)
-	// Run starts an action for an owner: a thread (session_id; the run belongs to its
+	// Run starts an action for an owner: a thread (thread_id; the run belongs to its
 	// bottom panel) or a worktree (worktree_path). It returns the run as soon as it has
 	// started.
 	Run(context.Context, *connect.Request[v1.RunActionRequest]) (*connect.Response[v1.RunActionResponse], error)

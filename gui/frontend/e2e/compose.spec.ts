@@ -115,7 +115,7 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
   await expect(created.getByTestId("session-name")).toHaveText("Add a dark mode", { timeout: 5000 });
 
   const last = (await invocations()).at(-1);
-  expect(last?.name).toBe("session.new");
+  expect(last?.name).toBe("thread.new");
   expect(last?.args).toEqual({
     repo: "repo-cf",
     "new-worktree": "true",
@@ -214,7 +214,7 @@ test("pickers are keyboard operable; Tab goes prompt → pickers → send", asyn
   await page.keyboard.press("Tab");
   await expect(page.getByTestId("composer-send")).toBeFocused();
   await page.keyboard.press("Enter");
-  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("session.new");
+  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("thread.new");
   expect((await invocations()).at(-1)?.args).toEqual({
     repo: "repo-cf",
     "new-worktree": "true",
@@ -321,8 +321,8 @@ test("an existing worktree or the current checkout shows its branch, read-only a
   await expect(page.getByTestId("composer-base")).toHaveText("From origin/main");
 });
 
-test("Work in: sessions.default_worktree = current starts in place; a pick is remembered per project", async ({ page }) => {
-  await mockPost("settings/external?sessions.default_worktree=current");
+test("Work in: threads.default_worktree = current starts in place; a pick is remembered per project", async ({ page }) => {
+  await mockPost("settings/external?threads.default_worktree=current");
   await openApp(page);
   await compose(page);
   const worktree = page.getByTestId("composer-worktree");
@@ -385,7 +385,7 @@ test("attachments: picked, rejected, removed, staged on send", async ({ page }) 
   await page.getByTestId("composer-input").fill("Match these screenshots");
   await expect(page.getByTestId("prompt-chip")).toHaveCount(0);
   await page.getByTestId("composer-input").press("Enter");
-  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("session.new");
+  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("thread.new");
   const up = await staged();
   expect(up.map((a) => [a.name, a.mimeType, a.size])).toEqual([
     ["shot.png", "image/png", PNG.length],
@@ -510,7 +510,7 @@ test("image chips: inserted at the caret, one unit for arrows and Backspace, × 
   await page.keyboard.type("please");
   await expect(chips).toHaveCount(1);
   await page.keyboard.press("Enter");
-  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("session.new");
+  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("thread.new");
   const [up] = await staged();
   const args = (await invocations()).at(-1)?.args;
   expect(args?.prompt).toBe(`Compare with the header and [Image: logo.png; ref=${up?.path ?? ""}] please`);
@@ -562,7 +562,7 @@ test("a local-only repository: local refs from main, no remote git commands", as
   await page.getByTestId("composer-input").click();
   await page.keyboard.type("Try a new shader");
   await page.keyboard.press("Enter");
-  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("session.new");
+  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("thread.new");
   expect((await invocations()).at(-1)?.args).toMatchObject({ repo: "repo-sk", "new-worktree": "true", base: "main" });
   await expect(page.locator('[data-row-kind="session"][aria-selected="true"]')).toBeVisible();
 
@@ -574,7 +574,7 @@ test("a local-only repository: local refs from main, no remote git commands", as
 });
 
 test("a daemon older than ListRefs/StageAttachment: a clear restart hint, not HTTP 404", async ({ page }) => {
-  await mockPost("missing-rpc?rpc=RepoService/ListRefs&rpc=SessionService/StageAttachment");
+  await mockPost("missing-rpc?rpc=RepoService/ListRefs&rpc=ThreadService/StageAttachment");
   await openApp(page);
   await compose(page);
   await expect(page.getByTestId("composer-base")).toHaveText("From the default branch");
@@ -708,7 +708,7 @@ test("attachment preview: from an inline chip by click or Space; Enter next to a
   // Enter with the caret right after the chip sends the thread.
   await page.keyboard.press("ArrowRight");
   await page.keyboard.press("Enter");
-  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("session.new");
+  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("thread.new");
   await expect(preview).toHaveCount(0);
 });
 

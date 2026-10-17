@@ -27,7 +27,7 @@ const (
 	EventSource_EVENT_SOURCE_UNSPECIFIED EventSource = 0
 	EventSource_EVENT_SOURCE_REPO        EventSource = 1
 	EventSource_EVENT_SOURCE_TERMINAL    EventSource = 2
-	EventSource_EVENT_SOURCE_SESSION     EventSource = 3
+	EventSource_EVENT_SOURCE_THREAD_LIST EventSource = 3
 	EventSource_EVENT_SOURCE_GH          EventSource = 4
 	EventSource_EVENT_SOURCE_UI          EventSource = 5
 	EventSource_EVENT_SOURCE_GITOPS      EventSource = 6
@@ -37,12 +37,12 @@ const (
 	// settings, before UI intents.
 	EventSource_EVENT_SOURCE_UPDATE EventSource = 10
 	// Workspaces (branch sets). Sent right after repo, before terminal: members name
-	// repositories, and sessions name workspaces.
+	// repositories, and threads name workspaces.
 	EventSource_EVENT_SOURCE_WORKSPACE EventSource = 11
 	// Rendered threads' pending requests (permission prompts and questions), for
-	// every rendered thread: a ThreadPendingSnapshot (right after session), then a
+	// every rendered thread: a ThreadPendingSnapshot (right after the thread list), then a
 	// ThreadEvent.pending per change. A thread's items come only from
-	// ThreadService.ListItems or Watch; this source never carries them.
+	// ThreadService.ListItems or WatchThread; this source never carries them.
 	EventSource_EVENT_SOURCE_THREAD EventSource = 12
 	// Actions and their runs: an ActionEvent snapshot (after update), then changes and
 	// run_finished. Runs never carry their output here.
@@ -55,7 +55,7 @@ var (
 		0:  "EVENT_SOURCE_UNSPECIFIED",
 		1:  "EVENT_SOURCE_REPO",
 		2:  "EVENT_SOURCE_TERMINAL",
-		3:  "EVENT_SOURCE_SESSION",
+		3:  "EVENT_SOURCE_THREAD_LIST",
 		4:  "EVENT_SOURCE_GH",
 		5:  "EVENT_SOURCE_UI",
 		6:  "EVENT_SOURCE_GITOPS",
@@ -69,7 +69,7 @@ var (
 		"EVENT_SOURCE_UNSPECIFIED": 0,
 		"EVENT_SOURCE_REPO":        1,
 		"EVENT_SOURCE_TERMINAL":    2,
-		"EVENT_SOURCE_SESSION":     3,
+		"EVENT_SOURCE_THREAD_LIST": 3,
 		"EVENT_SOURCE_GH":          4,
 		"EVENT_SOURCE_UI":          5,
 		"EVENT_SOURCE_GITOPS":      6,
@@ -159,7 +159,7 @@ type Event struct {
 	//
 	//	*Event_Repo
 	//	*Event_Terminal
-	//	*Event_Session
+	//	*Event_ThreadList
 	//	*Event_Gh
 	//	*Event_Ui
 	//	*Event_Gitops
@@ -229,10 +229,10 @@ func (x *Event) GetTerminal() *TerminalEvent {
 	return nil
 }
 
-func (x *Event) GetSession() *SessionEvent {
+func (x *Event) GetThreadList() *ThreadListEvent {
 	if x != nil {
-		if x, ok := x.Event.(*Event_Session); ok {
-			return x.Session
+		if x, ok := x.Event.(*Event_ThreadList); ok {
+			return x.ThreadList
 		}
 	}
 	return nil
@@ -331,8 +331,8 @@ type Event_Terminal struct {
 	Terminal *TerminalEvent `protobuf:"bytes,2,opt,name=terminal,proto3,oneof"`
 }
 
-type Event_Session struct {
-	Session *SessionEvent `protobuf:"bytes,3,opt,name=session,proto3,oneof"`
+type Event_ThreadList struct {
+	ThreadList *ThreadListEvent `protobuf:"bytes,3,opt,name=thread_list,json=threadList,proto3,oneof"`
 }
 
 type Event_Gh struct {
@@ -381,7 +381,7 @@ func (*Event_Repo) isEvent_Event() {}
 
 func (*Event_Terminal) isEvent_Event() {}
 
-func (*Event_Session) isEvent_Event() {}
+func (*Event_ThreadList) isEvent_Event() {}
 
 func (*Event_Gh) isEvent_Event() {}
 
@@ -405,13 +405,14 @@ var File_codefoundry_v1_events_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_events_proto_rawDesc = "" +
 	"\n" +
-	"\x1bcodefoundry/v1/events.proto\x12\x0ecodefoundry.v1\x1a\x1bcodefoundry/v1/action.proto\x1a\x17codefoundry/v1/gh.proto\x1a\x1bcodefoundry/v1/gitops.proto\x1a\x1ecodefoundry/v1/heartbeat.proto\x1a\x19codefoundry/v1/repo.proto\x1a\x1ccodefoundry/v1/session.proto\x1a\x1dcodefoundry/v1/settings.proto\x1a\x1dcodefoundry/v1/terminal.proto\x1a\x1bcodefoundry/v1/thread.proto\x1a\x17codefoundry/v1/ui.proto\x1a\x1bcodefoundry/v1/update.proto\x1a\x1ecodefoundry/v1/workspace.proto\"K\n" +
+	"\x1bcodefoundry/v1/events.proto\x12\x0ecodefoundry.v1\x1a\x1bcodefoundry/v1/action.proto\x1a\x17codefoundry/v1/gh.proto\x1a\x1bcodefoundry/v1/gitops.proto\x1a\x1ecodefoundry/v1/heartbeat.proto\x1a\x19codefoundry/v1/repo.proto\x1a\x1dcodefoundry/v1/settings.proto\x1a\x1dcodefoundry/v1/terminal.proto\x1a\x1bcodefoundry/v1/thread.proto\x1a%codefoundry/v1/thread_lifecycle.proto\x1a\x17codefoundry/v1/ui.proto\x1a\x1bcodefoundry/v1/update.proto\x1a\x1ecodefoundry/v1/workspace.proto\"K\n" +
 	"\x12WatchEventsRequest\x125\n" +
-	"\asources\x18\x01 \x03(\x0e2\x1b.codefoundry.v1.EventSourceR\asources\"\xa9\x05\n" +
+	"\asources\x18\x01 \x03(\x0e2\x1b.codefoundry.v1.EventSourceR\asources\"\xb3\x05\n" +
 	"\x05Event\x12/\n" +
 	"\x04repo\x18\x01 \x01(\v2\x19.codefoundry.v1.RepoEventH\x00R\x04repo\x12;\n" +
-	"\bterminal\x18\x02 \x01(\v2\x1d.codefoundry.v1.TerminalEventH\x00R\bterminal\x128\n" +
-	"\asession\x18\x03 \x01(\v2\x1c.codefoundry.v1.SessionEventH\x00R\asession\x12)\n" +
+	"\bterminal\x18\x02 \x01(\v2\x1d.codefoundry.v1.TerminalEventH\x00R\bterminal\x12B\n" +
+	"\vthread_list\x18\x03 \x01(\v2\x1f.codefoundry.v1.ThreadListEventH\x00R\n" +
+	"threadList\x12)\n" +
 	"\x02gh\x18\x04 \x01(\v2\x17.codefoundry.v1.GhEventH\x00R\x02gh\x12*\n" +
 	"\x02ui\x18\x05 \x01(\v2\x18.codefoundry.v1.UiIntentH\x00R\x02ui\x125\n" +
 	"\x06gitops\x18\x06 \x01(\v2\x1b.codefoundry.v1.GitOpsEventH\x00R\x06gitops\x12;\n" +
@@ -422,12 +423,12 @@ const file_codefoundry_v1_events_proto_rawDesc = "" +
 	"\x06thread\x18\f \x01(\v2\x1b.codefoundry.v1.ThreadEventH\x00R\x06thread\x12?\n" +
 	"\theartbeat\x18\r \x01(\v2\x1f.codefoundry.v1.StreamHeartbeatH\x00R\theartbeat\x125\n" +
 	"\x06action\x18\x0e \x01(\v2\x1b.codefoundry.v1.ActionEventH\x00R\x06actionB\a\n" +
-	"\x05event*\xbc\x02\n" +
+	"\x05event*\xc0\x02\n" +
 	"\vEventSource\x12\x1c\n" +
 	"\x18EVENT_SOURCE_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11EVENT_SOURCE_REPO\x10\x01\x12\x19\n" +
-	"\x15EVENT_SOURCE_TERMINAL\x10\x02\x12\x18\n" +
-	"\x14EVENT_SOURCE_SESSION\x10\x03\x12\x13\n" +
+	"\x15EVENT_SOURCE_TERMINAL\x10\x02\x12\x1c\n" +
+	"\x18EVENT_SOURCE_THREAD_LIST\x10\x03\x12\x13\n" +
 	"\x0fEVENT_SOURCE_GH\x10\x04\x12\x13\n" +
 	"\x0fEVENT_SOURCE_UI\x10\x05\x12\x17\n" +
 	"\x13EVENT_SOURCE_GITOPS\x10\x06\x12\x19\n" +
@@ -461,7 +462,7 @@ var file_codefoundry_v1_events_proto_goTypes = []any{
 	(*Event)(nil),              // 2: codefoundry.v1.Event
 	(*RepoEvent)(nil),          // 3: codefoundry.v1.RepoEvent
 	(*TerminalEvent)(nil),      // 4: codefoundry.v1.TerminalEvent
-	(*SessionEvent)(nil),       // 5: codefoundry.v1.SessionEvent
+	(*ThreadListEvent)(nil),    // 5: codefoundry.v1.ThreadListEvent
 	(*GhEvent)(nil),            // 6: codefoundry.v1.GhEvent
 	(*UiIntent)(nil),           // 7: codefoundry.v1.UiIntent
 	(*GitOpsEvent)(nil),        // 8: codefoundry.v1.GitOpsEvent
@@ -476,7 +477,7 @@ var file_codefoundry_v1_events_proto_depIdxs = []int32{
 	0,  // 0: codefoundry.v1.WatchEventsRequest.sources:type_name -> codefoundry.v1.EventSource
 	3,  // 1: codefoundry.v1.Event.repo:type_name -> codefoundry.v1.RepoEvent
 	4,  // 2: codefoundry.v1.Event.terminal:type_name -> codefoundry.v1.TerminalEvent
-	5,  // 3: codefoundry.v1.Event.session:type_name -> codefoundry.v1.SessionEvent
+	5,  // 3: codefoundry.v1.Event.thread_list:type_name -> codefoundry.v1.ThreadListEvent
 	6,  // 4: codefoundry.v1.Event.gh:type_name -> codefoundry.v1.GhEvent
 	7,  // 5: codefoundry.v1.Event.ui:type_name -> codefoundry.v1.UiIntent
 	8,  // 6: codefoundry.v1.Event.gitops:type_name -> codefoundry.v1.GitOpsEvent
@@ -505,17 +506,17 @@ func file_codefoundry_v1_events_proto_init() {
 	file_codefoundry_v1_gitops_proto_init()
 	file_codefoundry_v1_heartbeat_proto_init()
 	file_codefoundry_v1_repo_proto_init()
-	file_codefoundry_v1_session_proto_init()
 	file_codefoundry_v1_settings_proto_init()
 	file_codefoundry_v1_terminal_proto_init()
 	file_codefoundry_v1_thread_proto_init()
+	file_codefoundry_v1_thread_lifecycle_proto_init()
 	file_codefoundry_v1_ui_proto_init()
 	file_codefoundry_v1_update_proto_init()
 	file_codefoundry_v1_workspace_proto_init()
 	file_codefoundry_v1_events_proto_msgTypes[1].OneofWrappers = []any{
 		(*Event_Repo)(nil),
 		(*Event_Terminal)(nil),
-		(*Event_Session)(nil),
+		(*Event_ThreadList)(nil),
 		(*Event_Gh)(nil),
 		(*Event_Ui)(nil),
 		(*Event_Gitops)(nil),

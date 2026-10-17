@@ -60,7 +60,7 @@ test("composer: a /skill tag from the card starts a haiku thread that runs the s
   await expect(created).toBeVisible({ timeout: 30_000 });
   const id = ((await created.getAttribute("data-row-key")) ?? "").slice(2);
   console.log(`live-skills session ${id}`);
-  const find = () => ((JSON.parse(cli("session", "list", "--json")) as { sessions?: LiveSession[] }).sessions ?? []).find((s) => s.id === id);
+  const find = () => ((JSON.parse(cli("thread", "list", "--json")) as { threads?: LiveSession[] }).threads ?? []).find((s) => s.id === id);
   // The status reads idle before the first turn starts: wait for Claude's answer in the
   // transcript (~/.claude/projects/<slug>/<claude session id>.jsonl) instead.
   await expect.poll(() => find()?.claudeSessionId ?? "", { timeout: 30_000 }).not.toBe("");
@@ -86,5 +86,5 @@ test("composer: a /skill tag from the card starts a haiku thread that runs the s
   console.log(`answer: ${answer().slice(0, 600)}`);
   await expect.poll(() => find()?.status, { timeout: 60_000 }).toBe("SESSION_STATUS_IDLE");
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "live-skills-thread.png") });
-  cli("session", "archive", "--id", id, "--yes");
+  cli("thread", "archive", "--id", id, "--yes");
 });

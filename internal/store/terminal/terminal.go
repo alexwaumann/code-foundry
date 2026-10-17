@@ -4,7 +4,7 @@
 // of the emulator (see snapshot.go) followed by live output.
 //
 // The package is program-agnostic: it spawns argv/env/cwd. Knowing that a terminal runs
-// Claude is the session store's job.
+// Claude is the thread store's job.
 package terminal
 
 import (
@@ -56,7 +56,7 @@ type Spec struct {
 	Env []string
 	// Cols and Rows are the initial size; zero means 80x24.
 	Cols, Rows uint16
-	// Labels are opaque to this package (e.g. the session store's session id).
+	// Labels are opaque to this package (e.g. the thread store's thread id).
 	Labels map[string]string
 	// Observer, if set, sees every output chunk, title change, alt-screen change,
 	// Attach subscriber change, and the exit of this terminal. See Observer for the

@@ -1,7 +1,7 @@
 /**
  * Threads: the conversation the daemon records as items (ThreadService) mapped to view
  * models. Generated types stay in this file. Sync rules
- * (docs/notes/rendered-threads-1-daemon.md): ThreadService.Watch sends a snapshot first,
+ * (docs/notes/rendered-threads-1-daemon.md): ThreadService.WatchThread sends a snapshot first,
  * then appended / updated items, text deltas and pending-request changes, each with the
  * thread's seq. The EventService `thread` source carries only pending requests (a
  * pending_snapshot, then a pending event per change), for badges without a Watch.
@@ -285,7 +285,7 @@ export function toThreadEventView(ev: ThreadEvent): ThreadEventView | null {
     case "snapshot":
       return {
         kind: "snapshot",
-        sessionId: e.value.sessionId,
+        sessionId: e.value.threadId,
         seq: Number(e.value.seq),
         items: items(e.value.items),
         pending: e.value.pending.map(toPendingView),
@@ -296,34 +296,34 @@ export function toThreadEventView(ev: ThreadEvent): ThreadEventView | null {
     case "appended":
     case "updated": {
       const item = e.value.item ? toThreadItemView(e.value.item) : null;
-      return item && { kind: e.case, sessionId: e.value.sessionId, seq: Number(e.value.seq), item };
+      return item && { kind: e.case, sessionId: e.value.threadId, seq: Number(e.value.seq), item };
     }
     case "delta": {
       const field = e.value.field === ThreadItemDelta_Field.TEXT ? "text" : e.value.field === ThreadItemDelta_Field.INPUT ? "input" : null;
-      return field && { kind: "delta", sessionId: e.value.sessionId, seq: Number(e.value.seq), itemId: e.value.itemId, ordinal: Number(e.value.ordinal), field, text: e.value.text };
+      return field && { kind: "delta", sessionId: e.value.threadId, seq: Number(e.value.seq), itemId: e.value.itemId, ordinal: Number(e.value.ordinal), field, text: e.value.text };
     }
     case "pending":
-      return { kind: "pending", sessionId: e.value.sessionId, seq: Number(e.value.seq), pending: e.value.pending.map(toPendingView) };
+      return { kind: "pending", sessionId: e.value.threadId, seq: Number(e.value.seq), pending: e.value.pending.map(toPendingView) };
     case "mcp":
-      return { kind: "mcp", sessionId: e.value.sessionId, seq: Number(e.value.seq), status: toMcpStatusView(e.value.status) };
+      return { kind: "mcp", sessionId: e.value.threadId, seq: Number(e.value.seq), status: toMcpStatusView(e.value.status) };
     case "commands":
-      return { kind: "commands", sessionId: e.value.sessionId, seq: Number(e.value.seq), commands: toSlashCommandViews(e.value.commands) };
+      return { kind: "commands", sessionId: e.value.threadId, seq: Number(e.value.seq), commands: toSlashCommandViews(e.value.commands) };
     case "agents":
-      return { kind: "agents", sessionId: e.value.sessionId, seq: Number(e.value.seq), agents: toAgentRunViews(e.value.agents) };
+      return { kind: "agents", sessionId: e.value.threadId, seq: Number(e.value.seq), agents: toAgentRunViews(e.value.agents) };
     case "pendingSnapshot":
       return {
         kind: "pendingSnapshot",
-        threads: e.value.threads.map((t) => ({ sessionId: t.sessionId, seq: Number(t.seq), pending: t.pending.map(toPendingView) })),
+        threads: e.value.threads.map((t) => ({ sessionId: t.threadId, seq: Number(t.seq), pending: t.pending.map(toPendingView) })),
       };
     default:
       return null;
   }
 }
 
-/** Opens ThreadService.Watch for one thread and yields mapped events (a snapshot first) and HEARTBEAT for heartbeats. */
+/** Opens ThreadService.WatchThread for one thread and yields mapped events (a snapshot first) and HEARTBEAT for heartbeats. */
 export async function* watchThread(sessionId: string, signal: AbortSignal, conn: DaemonConnection = daemon): AsyncGenerator<ThreadEventView | Heartbeat> {
   const c = await conn.client(ThreadService);
-  for await (const ev of c.watch({ sessionId }, { signal })) {
+  for await (const ev of c.watchThread({ threadId: sessionId }, { signal })) {
     if (ev.event.case === "heartbeat") {
       yield HEARTBEAT;
       continue;

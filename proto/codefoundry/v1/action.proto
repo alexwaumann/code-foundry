@@ -22,7 +22,7 @@ service ActionService {
   rpc Update(UpdateActionRequest) returns (UpdateActionResponse) {}
   // Delete forgets an action. Its runs keep going.
   rpc Delete(DeleteActionRequest) returns (DeleteActionResponse) {}
-  // Run starts an action for an owner: a thread (session_id; the run belongs to its
+  // Run starts an action for an owner: a thread (thread_id; the run belongs to its
   // bottom panel) or a worktree (worktree_path). It returns the run as soon as it has
   // started.
   rpc Run(RunActionRequest) returns (RunActionResponse) {}
@@ -100,7 +100,7 @@ message ActionRun {
   string command = 4;
   string repo_id = 5;
   // The thread the run belongs to; empty for a worktree's run.
-  string session_id = 6;
+  string thread_id = 6;
   // Where it runs (its cwd and CODE_FOUNDRY_WORKTREE).
   string worktree_path = 7;
   ActionRunMode mode = 8;
@@ -172,7 +172,7 @@ message RunActionRequest {
   // Action id, or its name (ignoring case) within the owner's project or repo_id.
   string action = 1;
   // The owning thread: the run uses its project and worktree. Wins over worktree_path.
-  string session_id = 2;
+  string thread_id = 2;
   // The owning worktree when there is no thread: a registered worktree of the action's
   // project.
   string worktree_path = 3;
@@ -233,7 +233,7 @@ message ActionRunFinished {
   string action_id = 2;
   string action_name = 3;
   string repo_id = 4;
-  string session_id = 5;
+  string thread_id = 5;
   int32 exit_code = 6;
   ActionRunMode mode = 7;
   ActionRunTrigger trigger = 8;
