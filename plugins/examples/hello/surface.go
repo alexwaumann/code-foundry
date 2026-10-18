@@ -103,7 +103,7 @@ func (d *demo) overviewNodes(pin string) []ui.Node {
 	list := ui.Node{Key: "runs", List: &ui.List{GlyphStyle: ui.GlyphDot, EmptyText: "No runs", Rows: []ui.Row{
 		{Key: "run-3", Glyph: ui.StatusGlyph(ui.StatusRunning), Title: "Build #3", TitleMeta: ui.Plain("main"),
 			Line2: ui.Spans(ui.T("started "), ui.At(now.Add(-42*time.Second), ui.TimeElapsed)), Trailing: ui.Spans(ui.For(42 * time.Second)),
-			Action: ui.EventAction("open-run", "3"),
+			Action:  ui.EventAction("open-run", "3"),
 			Actions: []ui.Button{ui.EventButton("run-3-cancel", "Cancel", "cancel-run").WithIcon("square").AsIconOnly()}},
 		{Key: "run-2", Glyph: ui.StatusGlyph(ui.StatusFailed), Title: "Build #2", Pill: ui.NewPill("failed", ui.ToneError),
 			Line2: ui.Spans(ui.T("deploy failed").WithTone(ui.ToneError)), Trailing: ui.Spans(ui.For(95 * time.Second)), Action: ui.EventAction("open-run", "2")},
@@ -290,9 +290,11 @@ func newPinned(_ context.Context, h *pluginsdk.Host, open pluginsdk.SurfaceOpen)
 	}})
 }
 
-func (*pinned) Act(context.Context, pluginsdk.SurfaceAct) error { return errors.New("nothing to do here") }
-func (*pinned) Visibility(bool)                                  {}
-func (*pinned) Close()                                           {}
+func (*pinned) Act(context.Context, pluginsdk.SurfaceAct) error {
+	return errors.New("nothing to do here")
+}
+func (*pinned) Visibility(bool) {}
+func (*pinned) Close()          {}
 
 // checks lists a pull request's checks (the host's pr.checks); it is available where
 // the thread's pull request has GitHub Actions checks.
@@ -355,6 +357,8 @@ func checksView(ctx context.Context, h *pluginsdk.Host, header *ui.Header, uctx 
 	return view
 }
 
-func (checks) Act(context.Context, pluginsdk.SurfaceAct) error { return errors.New("nothing to do here") }
-func (checks) Visibility(bool)                                  {}
-func (checks) Close()                                           {}
+func (checks) Act(context.Context, pluginsdk.SurfaceAct) error {
+	return errors.New("nothing to do here")
+}
+func (checks) Visibility(bool) {}
+func (checks) Close()          {}

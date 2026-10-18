@@ -102,7 +102,9 @@ func InPluginNamespace(c *v1.Command) bool { return strings.HasPrefix(c.GetName(
 var leftOut = []string{"pr.checks"}
 
 // LeftOut reports whether the guide leaves c out: the plugin namespace and leftOut.
-func LeftOut(c *v1.Command) bool { return InPluginNamespace(c) || slices.Contains(leftOut, c.GetName()) }
+func LeftOut(c *v1.Command) bool {
+	return InPluginNamespace(c) || slices.Contains(leftOut, c.GetName())
+}
 
 // writeGuideCommands lists cmds by category (guideCategoryOrder first), each with its
 // usage and description.

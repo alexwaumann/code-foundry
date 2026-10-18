@@ -102,8 +102,8 @@ func (p *panel) Close()            { p.h.Log().Info("closed", "instance", p.inst
 type still struct{}
 
 func (still) Act(context.Context, pluginsdk.SurfaceAct) error { return nil }
-func (still) Visibility(bool)                                  {}
-func (still) Close()                                           {}
+func (still) Visibility(bool)                                 {}
+func (still) Close()                                          {}
 
 func surfacePlugin() pluginsdk.Plugin {
 	setCtx := func(v any) pluginsdk.CommandFunc {
