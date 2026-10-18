@@ -46,6 +46,8 @@ export interface PromptEditorHandle {
    * prompt after it. One undo step.
    */
   insertCite(citationId: string): void;
+  /** Focuses the prompt with the selection collapsed to its end (a clicked tag is no longer selected). */
+  focusCollapsed(): void;
 }
 
 interface PromptEditorProps {
@@ -382,6 +384,10 @@ export function PromptEditor({
           .setTextSelection(at + size)
           .scrollIntoView()
           .run();
+      },
+      focusCollapsed: () => {
+        if (editor.isDestroyed) return;
+        editor.chain().focus().setTextSelection(editor.state.selection.to).run();
       },
       insertText: (range, text) => {
         const { doc } = editor.state;

@@ -134,6 +134,8 @@ test("select → Cite → comment → chip; edit from the chip; send; the bubble
   await expect(popover(page)).toBeVisible();
   await expect(popover(page)).toHaveAttribute("data-editing", "");
   await expect(comment(page)).toHaveValue("Is it on main?\nCheck the remote.");
+  // The field has the keyboard (not the prompt, where the click left the chip selected).
+  await expect(comment(page)).toBeFocused();
   await expect(chips(page).first()).toHaveAttribute("data-editing", "");
   expect(await hasHighlight(page, "cf-cite-mark")).toBe(true);
   await shot(page, "cite-edit");
@@ -142,6 +144,11 @@ test("select → Cite → comment → chip; edit from the chip; send; the bubble
   await expect(popover(page)).toHaveCount(0);
   await expect(chips(page).first()).not.toHaveAttribute("data-editing", "");
   expect(await hasHighlight(page, "cf-cite-mark")).toBe(false);
+  // Back in the prompt, the caret after the chip: typing does not replace it.
+  await expect(page.getByTestId("thread-composer").locator('[contenteditable="true"]')).toBeFocused();
+  await page.keyboard.type("Q");
+  await expect(chips(page)).toHaveCount(1);
+  await page.keyboard.press("Backspace");
 
   // Send: Claude gets the self-contained link.
   await page.getByTestId("thread-composer").locator('[contenteditable="true"]').click();

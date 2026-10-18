@@ -15,7 +15,7 @@ const open: CiteOpen = {
 function Harness({ onSave, onCancel, initial = "" }: { onSave: () => void; onCancel: () => void; initial?: string }) {
   const [comment, setComment] = useState(initial);
   const ref = useRef<HTMLTextAreaElement>(null);
-  return <CommentForm open={open} comment={comment} setComment={setComment} fieldRef={ref} onSave={onSave} onCancel={onCancel} />;
+  return <CommentForm open={open} shown comment={comment} setComment={setComment} fieldRef={ref} onSave={onSave} onCancel={onCancel} />;
 }
 
 afterEach(() => {

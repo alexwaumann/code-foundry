@@ -2,7 +2,7 @@
  * The citation flow's shared state (docs/notes/citations.md): which composer chip's
  * comment is being edited, and the hand-offs between the pieces that do not share a
  * React tree: the thread's cite layer inserts a new citation into the composer
- * (registerCiteInsert), a composer chip or a sent chip asks the cite layer to go to the
+ * (registerCiteTarget), a composer chip or a sent chip asks the cite layer to go to the
  * quote's source (requestEdit, requestFlash), and the cite layer asks the timeline to
  * bring the quoted item's row into view (registerTimeline).
  */
@@ -39,21 +39,34 @@ export function requestFlash(threadId: string, cite: CitationBody): void {
   useCiteStore.setState({ flash: { threadId, cite, seq: ++flashSeq } });
 }
 
-const inserters = new Map<string, (citationId: string) => void>();
+/** What a composer offers the cite layer. */
+export interface CiteTarget {
+  /** Inserts a citation tag at the caret and focuses the prompt after it. */
+  insert(citationId: string): void;
+  /** Focuses the prompt with a collapsed caret (a clicked chip is no longer selected, so typing does not replace it). */
+  focus(): void;
+}
 
-/** A composer offers to insert citation tags at its caret (the thread composer, by its draft key). Returns the unregister. */
-export function registerCiteInsert(draftKey: string, insert: (citationId: string) => void): () => void {
-  inserters.set(draftKey, insert);
+const targets = new Map<string, CiteTarget>();
+
+/** A composer offers to take citations (the thread composer, by its draft key). Returns the unregister. */
+export function registerCiteTarget(draftKey: string, target: CiteTarget): () => void {
+  targets.set(draftKey, target);
   return () => {
-    if (inserters.get(draftKey) === insert) inserters.delete(draftKey);
+    if (targets.get(draftKey) === target) targets.delete(draftKey);
   };
 }
 
 /** Inserts a citation tag into a draft's composer; false when no composer of that draft is mounted. */
 export function insertCite(draftKey: string, citationId: string): boolean {
-  const insert = inserters.get(draftKey);
-  insert?.(citationId);
-  return insert !== undefined;
+  const t = targets.get(draftKey);
+  t?.insert(citationId);
+  return t !== undefined;
+}
+
+/** Back to the draft's prompt after a chip's comment was edited. */
+export function focusCiteTarget(draftKey: string): void {
+  targets.get(draftKey)?.focus();
 }
 
 /** What a thread's timeline offers the cite layer. */

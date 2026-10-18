@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { CITE_EDGE, CITE_GAP, citableItem, newCitationId, placeCite, quoteAt, type CitationBody, type CitePlacement, type CiteSide } from "@/lib/citation";
 import { zoomFactor } from "@/lib/zoom";
 import { findCitation, putCitation } from "@/stores/compose";
-import { endEdit, insertCite, useCiteStore } from "@/stores/cite";
+import { endEdit, focusCiteTarget, insertCite, useCiteStore } from "@/stores/cite";
 import { threadDraftKey } from "@/stores/threadActions";
 import { CITE_ITEM_ATTR, citeItemSelector, highlightsSupported, lineRects, offsetOf, paint, plainText, rangeOf, type CitePaint } from "./citeDom";
 import { dockTop, frame, revealQuote } from "./reveal";
@@ -77,7 +77,11 @@ export function CiteLayer({ threadId, paneRef }: { threadId: string; paneRef: Re
     placement.current = HIDDEN;
     paint("cf-cite-held", null);
     paint("cf-cite-mark", null);
-    if (was?.editId) endEdit();
+    if (was?.editId) {
+      endEdit();
+      // Back to the prompt, the caret after the chip (the click left it selected).
+      focusCiteTarget(draftKey);
+    }
   };
 
   // A mouseup that leaves a selection in one answer: the Cite button. Anything else
@@ -121,6 +125,7 @@ export function CiteLayer({ threadId, paneRef }: { threadId: string; paneRef: Re
       document.removeEventListener("mouseup", onUp);
       document.removeEventListener("selectionchange", onSelection);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- close reads refs and the thread's draft key only (both fixed for this layer).
   }, [threadId, paneRef]);
 
   // A composer chip asks to edit its comment: go to the quote, then open the popover there
@@ -302,7 +307,7 @@ export function CiteLayer({ threadId, paneRef }: { threadId: string; paneRef: Re
               Cite
             </button>
           ) : (
-            <CommentForm open={open} comment={comment} setComment={setComment} fieldRef={fieldRef} onSave={save} onCancel={close} />
+            <CommentForm open={open} shown={visible} comment={comment} setComment={setComment} fieldRef={fieldRef} onSave={save} onCancel={close} />
           )}
         </PopoverContent>
       )}
@@ -313,6 +318,7 @@ export function CiteLayer({ threadId, paneRef }: { threadId: string; paneRef: Re
 /** The comment popover's body: a growing multi-line field, then Cancel and Save at the bottom right. */
 export function CommentForm({
   open,
+  shown,
   comment,
   setComment,
   fieldRef,
@@ -320,6 +326,8 @@ export function CommentForm({
   onCancel,
 }: {
   open: CiteOpen;
+  /** Placed and visible: only then can the field take the keyboard (a hidden one cannot). */
+  shown: boolean;
   comment: string;
   setComment: (s: string) => void;
   fieldRef: RefObject<HTMLTextAreaElement | null>;
@@ -333,13 +341,13 @@ export function CommentForm({
     field.style.height = "auto";
     field.style.height = `${String(field.scrollHeight + 2)}px`;
   }, [comment, fieldRef]);
-  // Focus once mounted (the button turned into the form, or an edit opened it).
+  // Focus once shown (the button turned into the form, or an edit opened it: hidden until its first placement).
   useEffect(() => {
     const field = fieldRef.current;
-    if (!field) return;
+    if (!field || !shown) return;
     field.focus();
     field.setSelectionRange(field.value.length, field.value.length);
-  }, [fieldRef, open.editId, open.body]);
+  }, [fieldRef, shown, open.editId, open.body]);
   return (
     <form
       onSubmit={(e) => {
