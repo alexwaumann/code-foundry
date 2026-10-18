@@ -303,6 +303,12 @@ describe("thread and pull request tags", () => {
     expect(projectPrompt(`${tagToken(pr)}${tagToken(thread)}`, none)).toBe('alexwaumann/code-foundry#185[Thread "Fix resize race" (id s-0123456789ab)]');
   });
 
+  it("projection: a pull request against a word gets a space on that side, so the reference stays whole", () => {
+    expect(projectPrompt(`see${tagToken(pr)}s`, none)).toBe("see alexwaumann/code-foundry#185 s");
+    expect(projectPrompt(`(${tagToken(pr)}), ${tagToken(pr)}.`, none)).toBe("(alexwaumann/code-foundry#185), alexwaumann/code-foundry#185.");
+    expect(projectPrompt(`${tagToken(pr)}${tagToken(pr)}`, none)).toBe("alexwaumann/code-foundry#185 alexwaumann/code-foundry#185");
+  });
+
   it("neither belongs to a project: member changes keep them", () => {
     const text = `${tagToken(thread)} ${tagToken(pr)} ${tagToken({ tagKind: "file", projectId: "r1", path: "a.ts" })}`;
     expect(tagsByProject(text)).toEqual(["r1"]);

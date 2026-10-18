@@ -277,7 +277,8 @@ export function stagedPdfPages(path: string): number | null {
  * after either when anything but whitespace follows, because a slash command and the
  * daemon's file reference both end at whitespace. A thread becomes `[Thread "<label>" (id
  * <id>)]`, which the daemon completes with where to read it (internal/store/thread
- * threadrefs.go), a pull request `owner/repo#123` (what gh takes).
+ * threadrefs.go), a pull request `owner/repo#123` (what gh takes; a space between it and
+ * a word right against it).
  */
 export function projectPrompt(text: string, lookup: (id: string) => { name: string; ref: string; kind: "image" | "pdf" } | undefined): string {
   let out = "";
@@ -303,9 +304,14 @@ export function projectPrompt(text: string, lookup: (id: string) => { name: stri
       case "thread":
         out += `[Thread "${threadLabel(tag.name, tag.id)}" (id ${tag.id})]`;
         break;
-      case "pr":
-        out += `${tag.slug}#${String(tag.number)}`;
+      case "pr": {
+        // A word character against either end would read as part of the reference
+        // ("seeowner/repo#1", "owner/repo#1s"): a space keeps it whole.
+        const lead = /[\p{L}\p{N}_]$/u.test(out) ? " " : "";
+        const trail = /^[\p{L}\p{N}_]/u.test(text.slice(last)) ? " " : "";
+        out += `${lead}${tag.slug}#${String(tag.number)}${trail}`;
         break;
+      }
     }
   }
   return out + text.slice(last);
