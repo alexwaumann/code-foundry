@@ -20,10 +20,13 @@ type row struct {
 	Granted     *pluginsdk.Permissions // nil: never consented
 	ConsentedAt time.Time
 	DevPath     string
+	// Origin is the source the consent, secrets and data belong to (origin.go, migration
+	// 0033); "" when not known.
+	Origin string
 }
 
 func loadRows(ctx context.Context, db *sql.DB) (map[string]row, error) {
-	rows, err := db.QueryContext(ctx, `SELECT name, enabled, granted_json, consented_at, dev_path FROM plugins`)
+	rows, err := db.QueryContext(ctx, `SELECT name, enabled, granted_json, consented_at, dev_path, origin FROM plugins`)
 	if err != nil {
 		return nil, fmt.Errorf("plugin: load: %w", err)
 	}
@@ -34,7 +37,7 @@ func loadRows(ctx context.Context, db *sql.DB) (map[string]row, error) {
 		var enabled int
 		var granted string
 		var consented int64
-		if err := rows.Scan(&r.Name, &enabled, &granted, &consented, &r.DevPath); err != nil {
+		if err := rows.Scan(&r.Name, &enabled, &granted, &consented, &r.DevPath, &r.Origin); err != nil {
 			return nil, fmt.Errorf("plugin: load: %w", err)
 		}
 		r.Enabled = enabled != 0
@@ -72,11 +75,12 @@ func saveRow(ctx context.Context, db *sql.DB, r row, now time.Time) error {
 	if r.Enabled {
 		enabled = 1
 	}
-	if _, err := db.ExecContext(ctx, `INSERT INTO plugins (name, enabled, granted_json, consented_at, dev_path, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?)
+	if _, err := db.ExecContext(ctx, `INSERT INTO plugins (name, enabled, granted_json, consented_at, dev_path, origin, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (name) DO UPDATE SET enabled = excluded.enabled, granted_json = excluded.granted_json,
-			consented_at = excluded.consented_at, dev_path = excluded.dev_path, updated_at = excluded.updated_at`,
-		r.Name, enabled, granted, consented, r.DevPath, now.UnixMilli()); err != nil {
+			consented_at = excluded.consented_at, dev_path = excluded.dev_path, origin = excluded.origin,
+			updated_at = excluded.updated_at`,
+		r.Name, enabled, granted, consented, r.DevPath, r.Origin, now.UnixMilli()); err != nil {
 		return fmt.Errorf("plugin: save %s: %w", r.Name, err)
 	}
 	return nil

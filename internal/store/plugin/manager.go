@@ -555,6 +555,10 @@ func (m *Manager) enableLocked(ctx context.Context, name string, consent bool) (
 		g := mf.Permissions.Normalize()
 		r.Granted, r.ConsentedAt = &g, m.opts.Now().Truncate(time.Millisecond)
 	}
+	if r.Origin == "" {
+		// Consent binds to the package's source (origin.go).
+		r.Origin = m.currentOrigin(name)
+	}
 	if err := saveRow(ctx, m.opts.DB, r, m.opts.Now()); err != nil {
 		return EnableResult{}, err
 	}
@@ -641,8 +645,10 @@ func (m *Manager) Restart(ctx context.Context, name string) (Plugin, error) {
 	return m.public(name), nil
 }
 
-// Dev implements Store.
-func (m *Manager) Dev(ctx context.Context, dir string, consent, dryRun bool) (EnableResult, error) {
+// Dev implements Store. force lets the link take the name from a package of another
+// source (another folder's link, say), deleting what that one left (origin.go); the
+// consent text then says so.
+func (m *Manager) Dev(ctx context.Context, dir string, consent, dryRun, force bool) (EnableResult, error) {
 	m.opMu.Lock()
 	defer m.opMu.Unlock()
 	if m.isClosed() {
@@ -667,22 +673,38 @@ func (m *Manager) Dev(ctx context.Context, dir string, consent, dryRun bool) (En
 	if fi, err := os.Lstat(link); err == nil && fi.Mode()&fs.ModeSymlink == 0 {
 		return EnableResult{}, fmt.Errorf("%w: a plugin named %s is installed at %s; remove it first", ErrFailedPrecondition, name, link)
 	}
+	origin := originOf(KindPath, real)
+	took, err := m.checkOrigin(ctx, name, origin, force)
+	if err != nil {
+		return EnableResult{}, err
+	}
 	rows, err := loadRows(ctx, m.opts.DB)
 	if err != nil {
 		return EnableResult{}, err
 	}
 	r := rows[name]
-	needs := needsConsent(mf.Permissions, r.Granted)
+	needs := took != nil || needsConsent(mf.Permissions, r.Granted)
 	if dryRun || (needs && !consent) {
 		p := Plugin{Name: name, Dir: real, Dev: true, DevPath: real, Manifest: mf, Issues: warnings, State: StateDisabled, NeedsConsent: needs}
 		if cur, ok := m.Snapshot().Plugin(name); ok {
 			p.State, p.Enabled = cur.State, cur.Enabled
 		}
-		return EnableResult{Plugin: p, NeedsConsent: needs, Consent: ConsentText(mf)}, nil
+		text := ConsentText(mf)
+		if took != nil {
+			text += takeoverConsent(name, took)
+		}
+		return EnableResult{Plugin: p, NeedsConsent: needs, Consent: text}, nil
+	}
+	if _, err := m.claimLocked(ctx, name, origin, force); err != nil {
+		return EnableResult{}, err
 	}
 	if err := linkDir(real, link); err != nil {
 		return EnableResult{}, err
 	}
+	if rows, err = loadRows(ctx, m.opts.DB); err != nil {
+		return EnableResult{}, err
+	}
+	r = rows[name]
 	r.Name, r.DevPath = name, real
 	if err := saveRow(ctx, m.opts.DB, r, m.opts.Now()); err != nil {
 		return EnableResult{}, err

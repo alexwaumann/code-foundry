@@ -74,7 +74,7 @@ func (h *Plugin) Restart(ctx context.Context, req *connect.Request[v1.RestartPlu
 // Dev links a plugin folder and enables it.
 func (h *Plugin) Dev(ctx context.Context, req *connect.Request[v1.DevPluginRequest]) (*connect.Response[v1.DevPluginResponse], error) {
 	m := req.Msg
-	res, err := h.store.Dev(ctx, m.GetPath(), m.GetConsent(), m.GetDryRun())
+	res, err := h.store.Dev(ctx, m.GetPath(), m.GetConsent(), m.GetDryRun(), m.GetForce())
 	if err != nil {
 		return nil, pluginError(err)
 	}

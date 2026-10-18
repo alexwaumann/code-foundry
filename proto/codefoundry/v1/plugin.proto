@@ -237,6 +237,10 @@ message DevPluginRequest {
   string path = 1;
   bool consent = 2;
   bool dry_run = 3;
+  // Take the name from a plugin of another source (a link to another folder, an
+  // installed package's leftovers): its secrets, data and consent are deleted first, and
+  // enabling asks for consent again.
+  bool force = 4;
 }
 
 message DevPluginResponse {

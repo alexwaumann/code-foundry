@@ -1182,9 +1182,13 @@ func (x *RestartPluginResponse) GetPlugin() *Plugin {
 type DevPluginRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// An absolute folder with a plugin.json, under the home directory.
-	Path          string `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
-	Consent       bool   `protobuf:"varint,2,opt,name=consent,proto3" json:"consent,omitempty"`
-	DryRun        bool   `protobuf:"varint,3,opt,name=dry_run,json=dryRun,proto3" json:"dry_run,omitempty"`
+	Path    string `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
+	Consent bool   `protobuf:"varint,2,opt,name=consent,proto3" json:"consent,omitempty"`
+	DryRun  bool   `protobuf:"varint,3,opt,name=dry_run,json=dryRun,proto3" json:"dry_run,omitempty"`
+	// Take the name from a plugin of another source (a link to another folder, an
+	// installed package's leftovers): its secrets, data and consent are deleted first, and
+	// enabling asks for consent again.
+	Force         bool `protobuf:"varint,4,opt,name=force,proto3" json:"force,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1236,6 +1240,13 @@ func (x *DevPluginRequest) GetConsent() bool {
 func (x *DevPluginRequest) GetDryRun() bool {
 	if x != nil {
 		return x.DryRun
+	}
+	return false
+}
+
+func (x *DevPluginRequest) GetForce() bool {
+	if x != nil {
+		return x.Force
 	}
 	return false
 }
@@ -4512,11 +4523,12 @@ const file_codefoundry_v1_plugin_proto_rawDesc = "" +
 	"\x14RestartPluginRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\"G\n" +
 	"\x15RestartPluginResponse\x12.\n" +
-	"\x06plugin\x18\x01 \x01(\v2\x16.codefoundry.v1.PluginR\x06plugin\"Y\n" +
+	"\x06plugin\x18\x01 \x01(\v2\x16.codefoundry.v1.PluginR\x06plugin\"o\n" +
 	"\x10DevPluginRequest\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x18\n" +
 	"\aconsent\x18\x02 \x01(\bR\aconsent\x12\x17\n" +
-	"\adry_run\x18\x03 \x01(\bR\x06dryRun\"\x8b\x01\n" +
+	"\adry_run\x18\x03 \x01(\bR\x06dryRun\x12\x14\n" +
+	"\x05force\x18\x04 \x01(\bR\x05force\"\x8b\x01\n" +
 	"\x11DevPluginResponse\x12.\n" +
 	"\x06plugin\x18\x01 \x01(\v2\x16.codefoundry.v1.PluginR\x06plugin\x12#\n" +
 	"\rneeds_consent\x18\x02 \x01(\bR\fneedsConsent\x12!\n" +

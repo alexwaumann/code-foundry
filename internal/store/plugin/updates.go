@@ -32,7 +32,8 @@ func (RegistryChanged) isPluginEvent() {}
 
 // offerFor is the update a registry offers for p: a non-dev plugin whose name the merged
 // index lists with a newer version. A plugin installed from a GitHub release is only
-// matched by an entry of the same repository (another plugin may share its name).
+// matched by an entry of the same repository, one installed from a registry only by that
+// registry's entry (another plugin may share its name).
 func offerFor(p Plugin, merged registry.Merged) (UpdateOffer, bool) {
 	if p.Dev || p.Manifest.Version == "" {
 		return UpdateOffer{}, false
@@ -42,6 +43,12 @@ func offerFor(p Plugin, merged registry.Merged) (UpdateOffer, bool) {
 		return UpdateOffer{}, false
 	}
 	if p.Installed != nil && p.Installed.Kind == KindGitHub && !strings.EqualFold(p.Installed.Source, e.Repo) {
+		return UpdateOffer{}, false
+	}
+	// Nor is one from a registry by another registry's entry of the name (a registry
+	// added first, or the first one dropping it): installing that would be a takeover
+	// (origin.go), which only `plugin install --force` does.
+	if p.Installed != nil && p.Installed.Kind == KindRegistry && p.Installed.Source != e.Registry {
 		return UpdateOffer{}, false
 	}
 	return UpdateOffer{Version: e.Version, Registry: e.Registry}, true

@@ -206,8 +206,9 @@ type Store interface {
 	// Restart re-reads the manifest and starts the plugin afresh (also from failed).
 	Restart(ctx context.Context, name string) (Plugin, error)
 	// Dev links a plugin folder into the plugins dir and enables it (consent as Enable).
-	// dryRun only reads the folder's manifest and reports the consent needed.
-	Dev(ctx context.Context, dir string, consent, dryRun bool) (EnableResult, error)
+	// dryRun only reads the folder's manifest and reports the consent needed. force takes
+	// the name from a package of another source, deleting what it left (origin.go).
+	Dev(ctx context.Context, dir string, consent, dryRun, force bool) (EnableResult, error)
 	// Reload rescans the plugins dir.
 	Reload(ctx context.Context) error
 	// Logs returns the last n lines of a plugin's log (all kept when n <= 0).
