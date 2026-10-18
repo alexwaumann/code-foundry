@@ -30,9 +30,14 @@ export PKG_CONFIG_PATH := $(GHOSTTY_VT_PREFIX)/share/pkgconfig$(if $(PKG_CONFIG_
 VERSION  ?= dev
 # GitHub repository the in-app updater and install.sh download releases from.
 RELEASE_REPO ?= alexwaumann/code-foundry
-# One set of version ldflags for both binaries (the CLI here, the GUI via scripts/package.sh).
+# The commit, for builds Go cannot stamp (a git worktree's .git is a file): the plugin
+# skill pins the SDK at it. "-dirty" when the tree has changes.
+COMMIT   ?= $(shell git rev-parse HEAD 2>/dev/null)$(shell [ -n "$$(git status --porcelain 2>/dev/null)" ] && echo -dirty)
+# One set of version ldflags for both binaries (the CLI here, the GUI via scripts/package.sh;
+# Commit is the CLI's only).
 LDFLAGS  := -X github.com/alexwaumann/code-foundry/internal/version.Version=$(VERSION) \
-            -X github.com/alexwaumann/code-foundry/internal/version.ReleaseRepo=$(RELEASE_REPO)
+            -X github.com/alexwaumann/code-foundry/internal/version.ReleaseRepo=$(RELEASE_REPO) \
+            -X github.com/alexwaumann/code-foundry/internal/version.Commit=$(COMMIT)
 FRONTEND := gui/frontend
 PNPM     := pnpm --dir $(FRONTEND)
 

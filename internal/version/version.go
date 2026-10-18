@@ -9,6 +9,11 @@ import (
 // Version is set at build time with -ldflags "-X github.com/alexwaumann/code-foundry/internal/version.Version=...".
 var Version = "dev"
 
+// Commit is the commit to report when the binary has no VCS stamp: Go stamps one only
+// when the module's .git is a directory, so a build in a git worktree (where .git is a
+// file) has none. `make build` sets it with -ldflags "-X ...version.Commit=<sha>[-dirty]".
+var Commit = ""
+
 // Info describes the running build.
 type Info struct {
 	Version   string
@@ -16,9 +21,10 @@ type Info struct {
 	GoVersion string
 }
 
-// Get returns build information, filling the commit from the embedded VCS info.
+// Get returns build information, filling the commit from the embedded VCS info, else
+// from Commit.
 func Get() Info {
-	info := Info{Version: Version, GoVersion: runtime.Version()}
+	info := Info{Version: Version, Commit: Commit, GoVersion: runtime.Version()}
 	if bi, ok := debug.ReadBuildInfo(); ok {
 		dirty := false
 		for _, s := range bi.Settings {
