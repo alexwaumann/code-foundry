@@ -100,6 +100,14 @@ export function GlyphView({ glyph, style = "dot", className }: { glyph: GlyphVal
     const { icon: Icon, className: c } = statusIcon[status];
     return <Icon className={cn("size-3.5 shrink-0", c, className)} aria-label={status || undefined} data-status={status} />;
   }
+  if (status === "skipped") {
+    // A dash, not a ring: pending is the hollow ring.
+    return (
+      <span className={cn("flex size-2 shrink-0 items-center justify-center", className)} role="img" aria-label="skipped" data-status={status}>
+        <span className="h-0.5 w-2 rounded-full bg-muted-foreground/70" />
+      </span>
+    );
+  }
   return <span className={cn("size-2 shrink-0 rounded-full", statusDot[status], className)} role="img" aria-label={status || "status"} data-status={status} />;
 }
 
@@ -137,7 +145,7 @@ export function PluginButton({ button, values, onClick, submit }: { button: View
       type={submit ? "submit" : "button"}
       variant={style === "outline" ? "outline" : "ghost"}
       size={button.iconOnly ? "icon-xs" : "xs"}
-      className={cn(buttonStyle[style], style === "outline" && "bg-transparent dark:bg-transparent")}
+      className={cn(buttonStyle[style], style === "outline" && "bg-transparent dark:bg-transparent", !button.iconOnly && "max-w-full min-w-0")}
       disabled={disabled}
       aria-label={button.iconOnly ? button.label : undefined}
       aria-busy={pending || undefined}
@@ -147,11 +155,18 @@ export function PluginButton({ button, values, onClick, submit }: { button: View
       onClick={submit ? undefined : click}
     >
       {icon}
-      {!button.iconOnly && button.label}
+      {!button.iconOnly && <span className="min-w-0 truncate">{button.label}</span>}
       {external && <ExternalLink className="size-3" aria-hidden />}
     </Button>
   );
-  if (!button.iconOnly) return el;
+  // A label wider than the panel truncates; the tooltip then shows it whole.
+  if (!button.iconOnly) {
+    return (
+      <Tip label={button.label} whenTruncated>
+        {el}
+      </Tip>
+    );
+  }
   // The span carries the tooltip while the button is disabled (no pointer events).
   return (
     <Tip label={button.label}>
@@ -160,7 +175,7 @@ export function PluginButton({ button, values, onClick, submit }: { button: View
   );
 }
 
-/** A row of buttons that wraps; buttons never shrink. */
+/** A row of buttons that wraps; a button shrinks only when its label alone is wider than the row (it truncates). */
 export function ButtonBar({ buttons, align, className }: { buttons: readonly ViewButton[] | undefined; align?: "start" | "end"; className?: string }) {
   if (!buttons || buttons.length === 0) return null;
   return (

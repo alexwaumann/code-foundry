@@ -22,6 +22,8 @@ function RowView({ row, glyphStyle, dense }: { row: Row; glyphStyle: "dot" | "ic
     <div
       role={clickable ? "button" : undefined}
       tabIndex={clickable ? 0 : undefined}
+      aria-pressed={clickable ? (row.selected ?? false) : undefined}
+      aria-current={!clickable && row.selected ? "true" : undefined}
       className={cn(
         "-mx-2 flex min-w-0 gap-2 rounded-md px-2 outline-none focus-visible:ring-1 focus-visible:ring-ring",
         dense ? "h-6 items-center" : "items-start py-1.5",

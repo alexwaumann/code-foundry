@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PluginViewModel } from "@/api/plugin";
 import { demoView } from "@/test/pluginFixtures";
-import { appendToLog, appendToView, applySurfaceUpdate, draftKeyOf, emptyEntry, formsOf, LOG_MAX_LINES, reconcileResets, unknownNodes } from "./pluginSurfaces";
+import { appendToLog, appendToView, applySurfaceUpdate, draftKeyOf, emptyEntry, formHasErrors, formsOf, LOG_MAX_LINES, reconcileResets, settleSubmits, unknownNodes } from "./pluginSurfaces";
 
 const entry = emptyEntry({ plugin: "hello", surface: "demo" });
 
@@ -66,6 +66,41 @@ describe("drafts", () => {
     r = reconcileResets(drafts, r.resetTokens, "i", reset);
     expect(r.drafts).toEqual({});
     expect(r.resetTokens[dk]).toBe("1");
+  });
+
+  it("keeps a submitted form's drafts while the plugin's next view shows errors for it", () => {
+    const view = demoView("form");
+    const dk = draftKeyOf("i", "form", "settings");
+    const drafts = { [dk]: { name: "admin" } };
+    const withError: PluginViewModel = {
+      ...view,
+      nodes: view.nodes.map((n) => (n.form ? { ...n, form: { ...n.form, fields: n.form.fields.map((f) => (f.name === "name" ? { ...f, error: "admin is reserved" } : f)) } } : n)),
+    };
+    // The view the submit acted on (version 3) does not settle it.
+    let r = settleSubmits(drafts, { [dk]: 3 }, "i", withError, 3);
+    expect(r.drafts).toBe(drafts);
+    expect(r.submitted).toEqual({ [dk]: 3 });
+    // The next one has errors: the drafts stay (the user fixes what they typed), the submit is settled.
+    r = settleSubmits(drafts, { [dk]: 3 }, "i", withError, 4);
+    expect(r.drafts).toBe(drafts);
+    expect(r.submitted).toEqual({});
+    // Without errors the drafts go.
+    r = settleSubmits(drafts, { [dk]: 3 }, "i", view, 4);
+    expect(r.drafts).toEqual({});
+    // A view without the form (the plugin moved on) settles it too.
+    r = settleSubmits(drafts, { [dk]: 3 }, "i", { ...view, nodes: [] }, 4);
+    expect(r.drafts).toEqual({});
+    // Another instance's submit is not this view's business.
+    r = settleSubmits(drafts, { [dk]: 3 }, "other", view, 9);
+    expect(r.drafts).toBe(drafts);
+  });
+
+  it("finds the plugin's errors on the form, a field, a fieldset or a field in one", () => {
+    expect(formHasErrors({ fields: [] })).toBe(false);
+    expect(formHasErrors({ fields: [], error: "no" })).toBe(true);
+    expect(formHasErrors({ fields: [{ key: "a", error: "x" }] })).toBe(true);
+    expect(formHasErrors({ fields: [{ key: "fs", fieldset: { fields: [], error: "x" } }] })).toBe(true);
+    expect(formHasErrors({ fields: [{ key: "fs", fieldset: { fields: [{ key: "b", error: "x" }] } }] })).toBe(true);
   });
 
   it("lists forms at any depth", () => {
