@@ -216,7 +216,7 @@ func (m *Manager) startStopped(ctx context.Context, id string, o startOpts) (Ite
 		}
 		if l.resume == "" {
 			r.s.ClaudeSessionID = ""
-			r.namingTried = r.s.Name != ""
+			r.namingTried = r.s.namedForGood()
 		}
 		r.first = o.first
 	})

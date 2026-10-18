@@ -3,6 +3,7 @@ package thread
 import (
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -15,6 +16,56 @@ import (
 // NameProvisional set. The namer still runs and replaces it (AutoNamed, the flag
 // cleared); a rename clears the flag and is never overwritten. A new worktree's branch
 // never uses it: the slug still waits on the namer (waitSlug).
+
+// namedForGood reports whether s has a name the namer must not replace: the user's,
+// the namer's, or a fork's.
+func (s *Thread) namedForGood() bool {
+	return s.Name != "" && !s.NameProvisional
+}
+
+// nameProvisionally gives an unnamed s the provisional name of its first prompt
+// (provisionalName); nothing when the prompt leaves none. Reports whether it did.
+func (s *Thread) nameProvisionally(composer, text string) bool {
+	if s.Name != "" {
+		return false
+	}
+	if n := provisionalName(composer, text); n != "" {
+		s.Name, s.AutoNamed, s.NameProvisional = n, false, true
+		return true
+	}
+	return false
+}
+
+// applyNamerTitle names s with the namer's title unless it is named for good (a rename
+// meanwhile wins).
+func (s *Thread) applyNamerTitle(title string) {
+	if !s.namedForGood() {
+		s.Name, s.AutoNamed, s.NameProvisional = title, true, false
+	}
+}
+
+// nameFromFirstMessage gives a thread created without a prompt the provisional name of
+// the first message sent to it (Send). A thread that has a user message already, or
+// whose namer has run, keeps its name; so does one woken by the daemon (OriginWake).
+func (m *Manager) nameFromFirstMessage(id string, log *threadLog, o *outgoing) {
+	if o.origin != OriginUser || log.hasUserMessage() {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	rec, ok := m.recs[id]
+	if !ok || m.closed || rec.namingTried || !rec.s.nameProvisionally(o.composer, o.text) {
+		return
+	}
+	m.commitLocked(rec, true)
+}
+
+// hasUserMessage reports whether the log has a message from the user.
+func (t *threadLog) hasUserMessage() bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return slices.ContainsFunc(t.items, func(it Item) bool { return it.Kind == KindUserMessage })
+}
 
 // maxProvisionalName bounds a provisional name in runes, the "…" included.
 const maxProvisionalName = 48
