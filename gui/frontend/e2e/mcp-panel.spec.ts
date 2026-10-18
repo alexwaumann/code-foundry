@@ -160,7 +160,9 @@ test("a stopped thread keeps its last status; Refresh and Reconnect are enabled 
   await expect(pw).toHaveAttribute("data-status", "connected");
   expect(await threadCalls()).toContain("mcp-reconnect s-r1 playwright");
   await surface(page).getByTestId("mcp-refresh").click();
-  await expect(surface(page).getByTestId("mcp-checked")).toHaveText(/^Checked (just now|\d+s ago)$/);
+  // The mock answers without starting Claude (the daemon starts it), so the thread stays
+  // stopped and the fresh check still reads stale (docs/notes/panel-polish.md).
+  await expect(surface(page).getByTestId("mcp-checked")).toHaveText(/^Last check (just now|\d+s ago) · may be out of date$/);
   expect(await threadCalls()).toContain("mcp s-r1 refresh");
 });
 
