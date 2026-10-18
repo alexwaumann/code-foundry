@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 )
@@ -427,6 +428,36 @@ func (a ArgSpec) validate() error {
 		return errors.New("a context arg must be a string or a path")
 	case t == ArgEnum && a.Default != "" && !slices.Contains(a.Enum, a.Default):
 		return fmt.Errorf("default %q is not one of the values", a.Default)
+	case a.Default != "":
+		if err := parseArgValue(t, a.Enum, a.Default); err != nil {
+			return fmt.Errorf("default: %w", err)
+		}
+	}
+	return nil
+}
+
+// parseArgValue checks a value of an arg of type t the way the host's command registry
+// parses it (a default it cannot parse keeps every command of the plugin unregistered):
+// a bool is true or false (strconv.ParseBool), an int a whole number that fits in an
+// int, a path absolute or under ~/.
+func parseArgValue(t string, enum []string, v string) error {
+	switch t {
+	case ArgBool:
+		if _, err := strconv.ParseBool(v); err != nil {
+			return fmt.Errorf("want true or false, got %q", v)
+		}
+	case ArgInt:
+		if _, err := strconv.Atoi(v); err != nil {
+			return fmt.Errorf("want an integer, got %q", v)
+		}
+	case ArgEnum:
+		if !slices.Contains(enum, v) {
+			return fmt.Errorf("want one of %s, got %q", strings.Join(enum, ", "), v)
+		}
+	case ArgPath:
+		if v != "~" && !strings.HasPrefix(v, "~/") && !strings.HasPrefix(v, "/") {
+			return fmt.Errorf("want an absolute path or one under ~/, got %q", v)
+		}
 	}
 	return nil
 }

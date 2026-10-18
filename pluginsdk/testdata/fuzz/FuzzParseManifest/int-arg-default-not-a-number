@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("{\"name\":\"x\",\"version\":\"1.0.0\",\"protocol\":1,\"exec\":[\"a\"],\"commands\":[{\"name\":\"n\",\"title\":\"N\",\"args\":[{\"name\":\"count\",\"type\":\"int\",\"default\":\"many\"}]}]}")

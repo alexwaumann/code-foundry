@@ -38,12 +38,14 @@ const (
 const MaxQueue = 4 << 20
 
 // MaxInflight bounds the incoming requests a Conn handles at once; one more is answered
-// CodeRateLimited at once. MaxNotifications bounds the incoming notifications waiting
-// for the handler; more are dropped (OnIssue says so). A peer flooding either cannot
-// make the other side grow without bound.
+// CodeRateLimited at once, so a peer that floods requests cannot pile up goroutines.
+// MaxNotifications bounds the incoming notifications waiting for the handler, and
+// MaxNotifyQueue their bytes; one over either is dropped. Refusals and drops are
+// reported through OnIssue once per burst, then summed when the burst is over.
 const (
 	MaxInflight      = 64
 	MaxNotifications = 4096
+	MaxNotifyQueue   = 16 << 20
 )
 
 var (
@@ -52,6 +54,8 @@ var (
 	ErrClosed = errors.New("pluginsdk: connection closed")
 	// ErrQueueFull is returned when the outbound queue is full: the peer is not reading.
 	ErrQueueFull = errors.New("pluginsdk: outbound queue full")
+	// ErrTooLong is returned for a message over the line limit (ConnOptions.MaxLine).
+	ErrTooLong = errors.New("pluginsdk: message over the line limit")
 )
 
 // Error is a JSON-RPC error object. Handlers return one (or wrap one with %w) to choose
@@ -96,7 +100,7 @@ type ConnOptions struct {
 	// MaxQueue bounds the outbound queue in bytes (default MaxQueue).
 	MaxQueue int
 	// MaxInflight and MaxNotifications bound incoming work (defaults MaxInflight,
-	// MaxNotifications).
+	// MaxNotifications); MaxNotifyQueue bounds the waiting notifications' bytes.
 	MaxInflight, MaxNotifications int
 	// OnIssue is told about protocol problems: oversize or malformed lines, unknown
 	// response ids, a full queue, a panicking handler. Nil ignores them.
@@ -151,10 +155,14 @@ type Conn struct {
 	qclosed bool
 	wdone   chan struct{} // closed when the writer has drained the queue and exited
 
-	nmu     sync.Mutex
-	ncond   *sync.Cond
-	nqueue  []notification
-	nclosed bool
+	nmu      sync.Mutex
+	ncond    *sync.Cond
+	nqueue   []notification
+	nbytes   int
+	ndropped int // notifications dropped since the queue was last empty
+	nclosed  bool
+
+	refused atomic.Int32 // requests refused since in-flight requests were last under half the limit
 }
 
 // NewConn starts a Conn reading r and writing w. It runs until r ends or Close.
@@ -305,7 +313,7 @@ func (c *Conn) enqueue(m wire) error {
 		return fmt.Errorf("pluginsdk: encode message: %w", err)
 	}
 	if len(b) > c.opts.MaxLine {
-		return fmt.Errorf("pluginsdk: message of %d bytes is over the %d byte line limit", len(b), c.opts.MaxLine)
+		return fmt.Errorf("%w: %d bytes, the limit is %d", ErrTooLong, len(b), c.opts.MaxLine)
 	}
 	b = append(b, '\n')
 	c.qmu.Lock()
@@ -382,7 +390,16 @@ func (c *Conn) readLoop(r io.Reader) {
 func (c *Conn) dispatch(line []byte) {
 	var m wire
 	if err := json.Unmarshal(line, &m); err != nil {
+		var te *json.UnmarshalTypeError
+		if !errors.As(err, &te) {
+			c.issue("malformed line: %v", err)
+			return
+		}
+		// A JSON object with a field of the wrong type ("jsonrpc": 2, an error whose
+		// code is a string): Unmarshal filled in what it could, so a request still gets
+		// an answer and a call its failure instead of waiting for its timeout.
 		c.issue("malformed line: %v", err)
+		c.malformed(m, err)
 		return
 	}
 	hasID := len(m.ID) > 0 && string(m.ID) != "null"
@@ -391,11 +408,20 @@ func (c *Conn) dispatch(line []byte) {
 		select {
 		case c.inflight <- struct{}{}:
 			go func() {
-				defer func() { <-c.inflight }()
+				defer func() {
+					<-c.inflight
+					if len(c.inflight) < c.opts.MaxInflight/2 {
+						if n := c.refused.Swap(0); n > 1 {
+							c.issue("refused %d requests while %d were in flight", n, c.opts.MaxInflight)
+						}
+					}
+				}()
 				c.answer(m)
 			}()
 		default:
-			c.issue("refused %s: %d requests in flight", m.Method, c.opts.MaxInflight)
+			if c.refused.Add(1) == 1 {
+				c.issue("refused %s: %d requests in flight", m.Method, c.opts.MaxInflight)
+			}
 			out := wire{ID: m.ID, Error: &Error{Code: CodeRateLimited, Message: fmt.Sprintf("too many requests in flight (at most %d): wait for answers", c.opts.MaxInflight)}}
 			if err := c.enqueue(out); err != nil && !errors.Is(err, ErrClosed) {
 				c.issue("answer %s: %v", m.Method, err)
@@ -405,12 +431,17 @@ func (c *Conn) dispatch(line []byte) {
 		c.nmu.Lock()
 		switch {
 		case c.nclosed:
-		case len(c.nqueue) >= c.opts.MaxNotifications:
+		case len(c.nqueue) >= c.opts.MaxNotifications || c.nbytes+len(m.Params) > MaxNotifyQueue:
+			c.ndropped++
+			first, waiting := c.ndropped == 1, len(c.nqueue)
 			c.nmu.Unlock()
-			c.issue("dropped notification %s: %d waiting", m.Method, c.opts.MaxNotifications)
+			if first {
+				c.issue("dropping notifications: %d waiting to be handled (the first dropped: %s)", waiting, m.Method)
+			}
 			return
 		default:
 			c.nqueue = append(c.nqueue, notification{method: m.Method, params: m.Params})
+			c.nbytes += len(m.Params)
 			c.ncond.Signal()
 		}
 		c.nmu.Unlock()
@@ -431,6 +462,33 @@ func (c *Conn) dispatch(line []byte) {
 		}
 	default:
 		c.issue("line is neither a request, a notification nor a response")
+	}
+}
+
+// malformed handles a line Unmarshal could only partly decode (a field of the wrong
+// type): a request is answered with CodeInvalidRequest, a response fails its call.
+func (c *Conn) malformed(m wire, err error) {
+	hasID := len(m.ID) > 0 && string(m.ID) != "null"
+	switch {
+	case !hasID:
+	case m.Method != "":
+		c.reply(m, NewError(CodeInvalidRequest, "%s: invalid request: %v", m.Method, err))
+	default:
+		id, perr := strconv.ParseInt(string(m.ID), 10, 64)
+		c.mu.Lock()
+		ch, ok := c.pending[id]
+		delete(c.pending, id)
+		c.mu.Unlock()
+		if perr == nil && ok {
+			ch <- response{err: NewError(CodeInvalidRequest, "malformed response: %v", err)}
+		}
+	}
+}
+
+// reply sends an error response to request m.
+func (c *Conn) reply(m wire, e *Error) {
+	if err := c.enqueue(wire{ID: m.ID, Error: e}); err != nil && !errors.Is(err, ErrClosed) {
+		c.issue("answer %s: %v", m.Method, err)
 	}
 }
 
@@ -456,7 +514,14 @@ func (c *Conn) answer(m wire) {
 			out.Result = raw
 		}
 	}
-	if err := c.enqueue(out); err != nil && !errors.Is(err, ErrClosed) {
+	err = c.enqueue(out)
+	if errors.Is(err, ErrTooLong) && out.Result != nil {
+		// The result does not fit a line: the peer still gets an answer.
+		c.issue("answer %s: %v", m.Method, err)
+		out.Result, out.Error = nil, &Error{Code: CodeInternal, Message: fmt.Sprintf("%s: the result is over the %d byte line limit", m.Method, c.opts.MaxLine)}
+		err = c.enqueue(out)
+	}
+	if err != nil && !errors.Is(err, ErrClosed) {
 		c.issue("answer %s: %v", m.Method, err)
 	}
 	if c.opts.Answered != nil {
@@ -488,8 +553,17 @@ func (c *Conn) notifyLoop() {
 			return
 		}
 		n := c.nqueue[0]
+		c.nqueue[0] = notification{}
 		c.nqueue = c.nqueue[1:]
+		c.nbytes -= len(n.params)
+		dropped := 0
+		if len(c.nqueue) == 0 {
+			dropped, c.ndropped = c.ndropped, 0
+		}
 		c.nmu.Unlock()
+		if dropped > 0 {
+			c.issue("dropped %d notifications while the queue was full", dropped)
+		}
 		c.notifyOne(n)
 	}
 }
