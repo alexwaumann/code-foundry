@@ -48,9 +48,9 @@ function EnvSummary({ env }: { env: PluginEnvironmentView }) {
     <div className="flex min-w-0 flex-col gap-1 rounded-md border border-border px-3 py-2" data-testid="plugin-env">
       <p className="text-caption-sm">New threads in {scopeWords(env.projects, env.noProject, projectName)} get:</p>
       <ul className="flex min-w-0 flex-col gap-0.5 font-mono text-caption-sm text-foreground">
-        {env.env.map((v) => (
-          <li key={v.key} className="truncate">
-            {v.key}={v.value}
+        {env.env.map((k) => (
+          <li key={k} className="truncate">
+            {k}
           </li>
         ))}
         {env.pathPrepend.map((p) => (

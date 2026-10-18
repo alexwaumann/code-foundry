@@ -77,7 +77,7 @@ whenever a new version asks for more (the plugin is disabled until they agree).
 | `secrets` | bool | `Host.Secrets()` and form secret inputs with `store`: the plugin's own Keychain namespace. |
 | `threads` | bool | Plugin-owned Claude threads (`CreateThread`, `thread` node; `reference/host-api.md`). |
 | `terminals` | bool | Plugin-owned terminals (`CreateTerminal`, `terminal` node). |
-| `api` | bool | The daemon's endpoint and token in `CODE_FOUNDRY_ENDPOINT` / `CODE_FOUNDRY_TOKEN`: full control of Code Foundry. Avoid; the consent text warns the user. |
+| `api` | bool | The daemon's endpoint and token in `CODE_FOUNDRY_ENDPOINT` / `CODE_FOUNDRY_TOKEN`: full control of Code Foundry, other plugins included (the API cannot tell a plugin from the user). Avoid; the consent text warns the user. |
 
 ## Commands
 

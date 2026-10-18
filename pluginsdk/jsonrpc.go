@@ -37,6 +37,15 @@ const (
 // fills it, and further writes fail with ErrQueueFull instead of blocking the writer.
 const MaxQueue = 4 << 20
 
+// MaxInflight bounds the incoming requests a Conn handles at once; one more is answered
+// CodeRateLimited at once. MaxNotifications bounds the incoming notifications waiting
+// for the handler; more are dropped (OnIssue says so). A peer flooding either cannot
+// make the other side grow without bound.
+const (
+	MaxInflight      = 64
+	MaxNotifications = 4096
+)
+
 var (
 	// ErrClosed is returned by calls on a closed Conn and by calls in flight when it
 	// closes (the peer went away).
@@ -86,6 +95,9 @@ type ConnOptions struct {
 	MaxLine int
 	// MaxQueue bounds the outbound queue in bytes (default MaxQueue).
 	MaxQueue int
+	// MaxInflight and MaxNotifications bound incoming work (defaults MaxInflight,
+	// MaxNotifications).
+	MaxInflight, MaxNotifications int
 	// OnIssue is told about protocol problems: oversize or malformed lines, unknown
 	// response ids, a full queue, a panicking handler. Nil ignores them.
 	OnIssue func(msg string)
@@ -124,6 +136,8 @@ type Conn struct {
 	ctx    context.Context // cancelled when the Conn closes
 	cancel context.CancelFunc
 	nextID atomic.Int64
+	// inflight holds a token per incoming request being handled.
+	inflight chan struct{}
 
 	mu      sync.Mutex
 	pending map[int64]chan response
@@ -151,7 +165,14 @@ func NewConn(r io.Reader, w io.Writer, opts ConnOptions) *Conn {
 	if opts.MaxQueue <= 0 {
 		opts.MaxQueue = MaxQueue
 	}
-	c := &Conn{opts: opts, w: w, pending: map[int64]chan response{}, done: make(chan struct{}), wdone: make(chan struct{})}
+	if opts.MaxInflight <= 0 {
+		opts.MaxInflight = MaxInflight
+	}
+	if opts.MaxNotifications <= 0 {
+		opts.MaxNotifications = MaxNotifications
+	}
+	c := &Conn{opts: opts, w: w, pending: map[int64]chan response{}, done: make(chan struct{}), wdone: make(chan struct{}),
+		inflight: make(chan struct{}, opts.MaxInflight)}
 	c.ctx, c.cancel = context.WithCancel(context.Background())
 	c.qcond = sync.NewCond(&c.qmu)
 	c.ncond = sync.NewCond(&c.nmu)
@@ -367,10 +388,28 @@ func (c *Conn) dispatch(line []byte) {
 	hasID := len(m.ID) > 0 && string(m.ID) != "null"
 	switch {
 	case m.Method != "" && hasID:
-		go c.answer(m)
+		select {
+		case c.inflight <- struct{}{}:
+			go func() {
+				defer func() { <-c.inflight }()
+				c.answer(m)
+			}()
+		default:
+			c.issue("refused %s: %d requests in flight", m.Method, c.opts.MaxInflight)
+			out := wire{ID: m.ID, Error: &Error{Code: CodeRateLimited, Message: fmt.Sprintf("too many requests in flight (at most %d): wait for answers", c.opts.MaxInflight)}}
+			if err := c.enqueue(out); err != nil && !errors.Is(err, ErrClosed) {
+				c.issue("answer %s: %v", m.Method, err)
+			}
+		}
 	case m.Method != "":
 		c.nmu.Lock()
-		if !c.nclosed {
+		switch {
+		case c.nclosed:
+		case len(c.nqueue) >= c.opts.MaxNotifications:
+			c.nmu.Unlock()
+			c.issue("dropped notification %s: %d waiting", m.Method, c.opts.MaxNotifications)
+			return
+		default:
 			c.nqueue = append(c.nqueue, notification{method: m.Method, params: m.Params})
 			c.ncond.Signal()
 		}

@@ -551,7 +551,7 @@ func (p Permissions) Describe() []string {
 		out = append(out, "open its own terminals")
 	}
 	if p.API {
-		out = append(out, "full control of Code Foundry (it gets the daemon's endpoint and token)")
+		out = append(out, "full control of Code Foundry, including managing other plugins and deleting their secrets (it gets the daemon's endpoint and token)")
 	}
 	return out
 }

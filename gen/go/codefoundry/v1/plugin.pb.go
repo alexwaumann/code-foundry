@@ -3070,9 +3070,11 @@ func (x *PluginEnvironmentRequest) GetName() string {
 
 // PluginEnvVar is one environment variable a plugin contributes.
 type PluginEnvVar struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
-	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Key   string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	// Never filled: a plugin may push a token, so values stay in the daemon (and the
+	// threads it spawns); clients show the key (docs/notes/plugins-8-secrets-hardening.md).
+	Value         string `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }

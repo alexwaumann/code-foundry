@@ -1426,6 +1426,9 @@ export type PluginEnvVar = Message<"codefoundry.v1.PluginEnvVar"> & {
   key: string;
 
   /**
+   * Never filled: a plugin may push a token, so values stay in the daemon (and the
+   * threads it spawns); clients show the key (docs/notes/plugins-8-secrets-hardening.md).
+   *
    * @generated from field: string value = 2;
    */
   value: string;

@@ -479,6 +479,8 @@ message PluginEnvironmentRequest {
 // PluginEnvVar is one environment variable a plugin contributes.
 message PluginEnvVar {
   string key = 1;
+  // Never filled: a plugin may push a token, so values stay in the daemon (and the
+  // threads it spawns); clients show the key (docs/notes/plugins-8-secrets-hardening.md).
   string value = 2;
 }
 

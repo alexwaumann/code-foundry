@@ -202,3 +202,42 @@ func TestConnCallContextCancel(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 }
+
+// TestConnBoundsIncomingWork: requests beyond MaxInflight are answered CodeRateLimited
+// at once instead of each getting a goroutine; the held ones still complete.
+func TestConnBoundsIncomingWork(t *testing.T) {
+	release := make(chan struct{})
+	var issues sync.Map
+	server := ConnOptions{MaxInflight: 2, OnIssue: func(msg string) { issues.Store(msg, true) },
+		Handle: func(ctx context.Context, _ string, _ json.RawMessage) (any, error) {
+			select {
+			case <-release:
+			case <-ctx.Done():
+			}
+			return "done", nil
+		}}
+	client, _ := pair(t, ConnOptions{}, server)
+	ctx := ctxT(t)
+	results := make(chan error, 5)
+	for range 5 {
+		go func() { results <- client.Call(ctx, "hold", nil, nil) }()
+	}
+	// Three are refused while two hold the slots; then the two finish.
+	for range 3 {
+		if err := <-results; ErrorCode(err) != CodeRateLimited {
+			t.Fatalf("want a refusal, got %v", err)
+		}
+	}
+	close(release)
+	for range 2 {
+		if err := <-results; err != nil {
+			t.Errorf("held call: %v", err)
+		}
+	}
+	if err := client.Call(ctx, "hold", nil, nil); err != nil {
+		t.Errorf("after the slots freed: %v", err)
+	}
+	if _, ok := issues.Load("refused hold: 2 requests in flight"); !ok {
+		t.Error("no issue reported")
+	}
+}
