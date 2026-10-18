@@ -19,6 +19,7 @@ require (
 
 require (
 	github.com/adrg/xdg v0.5.3 // indirect
+	github.com/alexwaumann/code-foundry/pluginsdk v0.0.0-00010101000000-000000000000
 	github.com/coder/websocket v1.8.14 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
@@ -39,3 +40,5 @@ require (
 )
 
 tool honnef.co/go/tools/cmd/staticcheck
+
+replace github.com/alexwaumann/code-foundry/pluginsdk => ./pluginsdk
