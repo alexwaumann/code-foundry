@@ -16,7 +16,13 @@ not be sent (a refusal shows in the plugin's log).
   `plugin dev`), `h.HostVersion()`, `h.HasCapability("view.tabs")`.
 - `h.Log()` is a `*slog.Logger` writing to the plugin's log (`code-foundry plugin logs
   <name>`) and, at its level, the daemon's. Log keys, ids and counts; never a secret's
-  value. stderr lines land in the same log.
+  value. Integers print as written (`run=39128319017`). stderr lines land in the same
+  log.
+- **Running the user's tools.** The plugin's PATH is the daemon's, which may lack what
+  the user's terminal has (Homebrew, a Go or Node version manager). Run project tools
+  through the login shell, as project actions do: `exec.Command(os.Getenv("SHELL"), "-lc",
+  cmd)` (fall back to `/bin/zsh`), with `Dir` set to the worktree. `gh` and `git` are
+  usually on PATH; resolve them the same way if not.
 
 ## Invoke: run a Code Foundry command
 
@@ -46,7 +52,20 @@ Useful commands: `thread.send` (a message into a thread: `"Send failure to Claud
 `pr.checks` (a pull request's checks, `--json` shape `{repo, number, url, headSha,
 checks: [{name, workflow, status, conclusion, app, provider, url, startedAt,
 completedAt}]}`), `thread.get`, `thread.list`, `project.list`. A plugin that only needs
-GitHub can also run `gh` itself (it is on PATH with the user's login).
+GitHub can also run `gh` itself (with the user's login).
+
+**`pr.checks` and how fresh GitHub data is.** The daemon polls GitHub every
+`github.poll_interval_seconds` (60 s) while an app window is visible, at most every 5
+minutes while every window is hidden, and every 15 minutes with no app open (a CLI-only
+or isolated daemon). `gh` events are sent only when that poll sees a change, so a plugin
+cannot rely on them to follow check runs. `pr.checks` reads the cached pull request
+detail and fetches it again when it is older than about 30 s, so it is fresh when called.
+To follow runs, sweep: call `pr.checks` (or `gh`) per thread of interest about once a
+minute while something runs and every few minutes otherwise, only while someone looks or
+a flag depends on it. A thread's pull request: `pr.checks` with the thread's context
+answers -32002 "has no pull request" when there is none (a new thread's branch is linked
+by the next poll); the `threadList` payload carries only `branch` and the pull requests
+Claude linked (`linkedPullRequests`).
 
 ## SetFlag: thread attention and error (permission `threadStatus`)
 
@@ -63,9 +82,14 @@ err = h.SetFlag(ctx, pluginsdk.Flag{ThreadID: id, Level: pluginsdk.FlagNone}) //
   it when the user opens the thread (at once if it is open now: then nothing is stored).
 - At most one flag a second per thread (-32005 `CodeRateLimited`; clearing is never
   limited). An unknown thread is -32004; an archived one -32002.
+- Setting the same level and reason again is a no-op (no bell, the set time stays): to
+  ring again for a new failure, change the reason ("3 tests failed in pkg/api") or clear
+  first. `UntilSeen` stays until a viewer opens the thread (the GUI showing it); without
+  a GUI it stays.
 - Flags are persisted and outlive restarts: `h.Flags()` (in Init) lists the plugin's
-  live flags so it can clear what no longer holds. Disabling the plugin or archiving the
-  thread clears them. `code-foundry thread flags <id>` shows them.
+  live flags so it can clear what no longer holds (`plugintest.Options.Flags` tests it).
+  Disabling the plugin or archiving the thread clears them. `code-foundry thread flags
+  <id>` shows them.
 
 ## SetContext: facts for when clauses
 
@@ -167,6 +191,32 @@ pluginsdk.Plugin{
 Every source and the changes it sends (this build):
 
 {{cf.eventVariants}}
+
+**The payloads.** protojson: lowerCamel fields, enums by full name, and empty lists,
+`false`, `0` and `""` left out (an empty snapshot is `{"threadList":{"snapshot":{}}}`,
+with no `threads`). The useful fields:
+
+| Change | Fields |
+|---|---|
+| `threadList.snapshot` | `threads`: a list of threads |
+| `threadList.updated` (a thread) | `id`, `projectId`, `workspaceId`, `worktreePath` (its cwd), `branch`, `name`, `state` (`THREAD_STATE_CONNECTED`, …), `status` (`THREAD_STATUS_BUSY`, `_IDLE`, `_NEEDS_ATTENTION`, `_ERROR`), `statusReason`, `lastActivityAt`, `linkedPullRequests` (`[{slug, number, url}]`), `archivedAt` |
+| `threadList.removedId` | the removed thread's id (a string). Archiving is not removal: it arrives as `updated` with `archivedAt` set |
+| `project.snapshot` | `projects`: each with `id`, `name`, `path`, `githubSlug`, `defaultBranch`, `git`, `worktrees` |
+| `project.worktreeUpdated` (a worktree) | `projectId`, `path`, `branch`, `head`, `isMain`, `detached`, `status`: `{modified, staged, untracked, conflicted, dirty, ahead, behind, upstream, baseRef, baseAhead, baseBehind, operation, error, refreshedAt}` |
+| `project.worktreeRemoved` | `{projectId, path}` |
+| `project.projectUpdated` / `projectRemovedId` | a whole project (with its worktrees) / an id |
+| `gh.branchPullRequestsUpdated` | `{repoSlug, headRef, fetchedAt}`: a watched branch's pull requests changed |
+| `gh.pullRequestDetailUpdated` | `{repoSlug, number}`: re-read with `pr.checks` |
+| `gitops.queued` / `started` / `finished` | a git operation on a worktree (fetch, pull, push, …) |
+
+**No per-file events.** `project.worktreeUpdated` is sent when a worktree's status
+*summary* changes: the counts above, `dirty`, `head`, `branch`, `operation`. Editing a file
+that is already modified changes none of them and sends nothing. `worktreeDetailUpdated`
+is sent only for worktrees whose detail someone asked for in the last 10 minutes (the
+app's worktree panel), so a plugin cannot rely on it. A plugin that must see every edit
+(a test watcher) uses `worktreeUpdated` as a hint and polls the worktree it watches
+itself (`git status --porcelain` plus file mtimes, every second or two), only while a
+viewer or a flag needs it.
 
 ## Secrets (permission `secrets`)
 

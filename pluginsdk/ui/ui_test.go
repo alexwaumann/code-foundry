@@ -251,3 +251,14 @@ func TestButtonWithData(t *testing.T) {
 		t.Errorf("WithData invented an action: %+v", e.Action)
 	}
 }
+
+func TestIconsSorted(t *testing.T) {
+	for i, n := range Icons {
+		if !iconPattern.MatchString(n) || (i > 0 && Icons[i-1] >= n) {
+			t.Errorf("Icons[%d] = %q: kebab case, sorted, once", i, n)
+		}
+	}
+	if !KnownIcon("workflow") || KnownIcon("no-such-icon") {
+		t.Error("KnownIcon")
+	}
+}

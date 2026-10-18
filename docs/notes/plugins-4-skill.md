@@ -174,6 +174,69 @@ appends with no duplicate lines, `make dist`). Its stumbles, fixed:
   plugin. Go 1.24 or newer. How plugin errors print (`… (unknown)`), that `plugin act`
   prints only the version, and that `plugin surface --json` nests the view as a string.
 
+## Fix-up pass: feedback from the two real plugins
+
+The GitHub Actions tracker (`alexwaumann/code-foundry-plugin-gh-actions`) and the test
+watcher (`alexwaumann/code-foundry-plugin-test-watcher`) were built from the skill alone
+and shipped (v0.1.0 releases, registry PRs #1 and #2). Their `SKILL-FEEDBACK.md` files had
+41 items; every one is addressed:
+
+* **SDK / plugintest**: `plugintest.Host.OpenSurfaceWith(ctx, SurfaceOpen)` (Facts);
+  `Options.Flags` (Init's `h.Flags()`); `WaitFor` also re-checks every 20 ms (conditions
+  on the plugin's own state) and fails with the plugin's last log lines (a refused view
+  shows there); `LogParams` decodes attr numbers as `json.Number`, so an integer prints as
+  written (`run=39128319017`, was `3.9128319017e+10`; the host decodes through the SDK
+  type); `ui.Icons` / `ui.KnownIcon`, the GUI's allowlist (PR 5's
+  `components/plugin/icons.ts`; `TestIconsMatchTheGUI` compares the two once that file is
+  in the tree); the package doc no longer points at the host's design docs.
+* **Skill files are 0644 in 0755 directories** inside the private `.claude` (0700), so a
+  copied example has ordinary modes.
+* **Example**: `.gitignore` covers the binary `go build` names after the module;
+  `release.yml` on `actions/checkout@v5`, `actions/setup-go@v6`, `ubuntu-24.04`, release
+  notes without the not-yet-existing `plugin install`; a `ci.yml` (vet, `test -race` on
+  pushes to main and pull requests); `make registry-entry` runs
+  `scripts/registry-entry.go` (build-ignored; plugin.json + the release's `SHA256SUMS` →
+  `dist/<name>.json` with all eight permission keys and both artifact URLs and hashes).
+  Checked against the real gh-actions v0.1.0 release: the entry passes the registry's
+  `validate.py` and equals PR #2's up to command order. `TestRegistryEntryScript` covers it.
+* **Skill text**: project events (`worktreeUpdated` only on status-summary changes, no
+  per-file events, poll for edits, `worktreeDetailUpdated` only for worktrees someone
+  asked about), payload field tables (thread, worktree, `worktreeRemoved`, archive as
+  `updated`, omitted empty fields), GitHub poll cadence (60 s with a visible window, 5 min
+  hidden, 15 min without a GUI) and `pr.checks`' ~30 s cache, sweeping guidance, threads ↔
+  pull requests via `pr.checks` (-32002), `pr` instances shared by every thread on the
+  pull request (command buttons for thread-specific actions; pass ids, not text, in
+  command args), `plugin act` events only (command buttons via the command), `plugin
+  surface` returning at the first view and `--thread` vs `--context-thread`, "not known
+  yet" on first use, paths under home for `plugin dev` / `project add` / unpacked
+  tarballs, log node reset (a key per run, or a seed line) and order (appends before the
+  final view), `$SHELL -lc` for the user's tools, `confirm` placeholders (`(none)` for an
+  absent arg), SetFlag same-reason no-op and until-seen without a GUI, tab keys `tab-…` in
+  every example and `v.Tabs = tabs`, the icon list, the destructive rule (remote or
+  side-effecting runs confirm; local re-runnable work does not), context args of command
+  buttons default from the panel, copying into an existing clone, keeping `go mod init`'s
+  `go` line, `pluginpack` (PR 7) as the alternative packer, and the two plugin
+  repositories cited as larger examples.
+
+## For PR 6/8 (host behaviour, not changed in this PR)
+
+* `surface/act` carries no viewer context: a shared (`pr`, `project`, `global`) instance
+  cannot tell which thread the click came from. The skill recommends command buttons.
+* `plugin list` shows an async clause that is not known yet as `off`; `runs(unknown)` would
+  say why. `plugin surface --settle <dur>` (wait until no new view for a while) would save
+  the re-run after a "Loading" view.
+* `gh` events fire only when the poll sees a change and the poll slows to 15 min without a
+  GUI; per-pull-request check events (see the gh granular events plan) would let plugins
+  drop their sweeps. The `threadList` payload has no branch pull request (`thread.pr.*`
+  facts exist; the payload could carry `prRepo` / `prNumber`).
+* No per-file worktree events; a test watcher polls.
+* A plugin's command error reaches the CLI as Connect `Unknown` ("… (unknown)").
+* `plugin act` could print the resulting view, and could press a command button by running
+  its command with the panel context.
+* No event tells a plugin that the user deleted one of its secrets or changed consent.
+* Command args in views have no limit of their own (only the view's 256 KB).
+* Install from a registry (`plugin install`) is PR 7.
+
 ## Not fixed here (for the SDK or the host)
 
 * A plugin's own command error reaches the CLI as Connect `Unknown` ("… (unknown)"); a

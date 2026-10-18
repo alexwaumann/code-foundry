@@ -1,6 +1,10 @@
 package pluginsdk
 
-import "testing"
+import (
+	"encoding/json"
+	"fmt"
+	"testing"
+)
 
 func TestSurfaceActStored(t *testing.T) {
 	for _, tt := range []struct {
@@ -18,5 +22,18 @@ func TestSurfaceActStored(t *testing.T) {
 		if got != tt.want || ok != tt.ok {
 			t.Errorf("%s: %+v, %v", tt.name, got, ok)
 		}
+	}
+}
+
+func TestLogParamsKeepsIntegers(t *testing.T) {
+	var p LogParams
+	if err := json.Unmarshal([]byte(`{"level":"info","msg":"flagged","attrs":{"run":39128319017,"ratio":0.5,"name":"ci"}}`), &p); err != nil {
+		t.Fatal(err)
+	}
+	if got := fmt.Sprint(p.Attrs["run"], " ", p.Attrs["ratio"], " ", p.Attrs["name"]); got != "39128319017 0.5 ci" {
+		t.Errorf("attrs print as %q", got)
+	}
+	if p.Level != "info" || p.Msg != "flagged" {
+		t.Errorf("%+v", p)
 	}
 }

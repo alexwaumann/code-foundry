@@ -45,6 +45,7 @@ func placeholders(src Sources) map[string]string {
 		"eventSources":  codeList(pluginsdk.EventSources),
 		"limits":        viewLimits(),
 		"eventVariants": eventVariants(),
+		"icons":         codeList(ui.Icons),
 	}
 }
 
@@ -225,7 +226,9 @@ Not in the registry, built into the CLI:
 
 Reading the output: an error your plugin returned prints as `+"`code-foundry: plugin.<name>.<command>: <message> (unknown)`"+`
 (exit 1; "unknown" is the transport's code for a plugin's own error). `+"`plugin act`"+` prints only the view version
-it acted on: run `+"`plugin surface`"+` again to see the result. `+"`plugin surface --json`"+` carries the view as a JSON
+it acted on: run `+"`plugin surface`"+` again to see the result. `+"`plugin act`"+` sends events only; a command
+button is run by the host, so exercise it with `+"`code-foundry plugin <name> <command>`"+`. `+"`plugin surface`"+` returns at
+the first view (a surface that loads shows "Loading"): run it again a moment later. `+"`plugin surface --json`"+` carries the view as a JSON
 string in `+"`view.viewJson`"+` (decode it twice, or use the text output).
 `)
 	var verbs, helpers []*v1.Command

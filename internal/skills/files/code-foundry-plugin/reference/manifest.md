@@ -93,7 +93,7 @@ Each becomes `plugin.<name>.<command>`: a palette entry under the display name, 
 | `title` | Required, up to 80 characters, Title Case ("Rerun Failed Jobs"). The palette entry. |
 | `description` | One or two sentences; the CLI's help and the palette's detail. |
 | `when` | A clause (below) deciding where the command is available; elsewhere it is unavailable, and running it says why. Default: always. |
-| `confirm` | Makes it ask first: the host shows this text (with `{arg}` placeholders filled) and runs it only on yes; the CLI needs `--yes`. The plugin never confirms for the user. |
+| `confirm` | Makes it ask first: the host shows this text and runs it only on yes; the CLI needs `--yes`. The plugin never confirms for the user. `{arg}` placeholders take the arg's value after defaults (a bool `true`/`false`); an arg neither given nor defaulted shows `(none)`. The text is rendered before the plugin runs, so it cannot name what the plugin would pick ("the newest run"): word it to read well with `(none)`, or leave the placeholder out. |
 | `timeoutSeconds` | How long one run may take: default 30, at most 600. |
 | `args` | Below. |
 
@@ -108,7 +108,7 @@ Args (`pluginsdk.ArgSpec`); values reach the handler as strings in `req.Args`
 | `default` | A default value (in `enum` for an enum). Not with `required`. |
 | `required` | The command refuses to run without it. |
 | `positional` | Also takes a bare word on the CLI, in declaration order: `plugin gh-actions cancel 123`. One word each: quote text with spaces (`plugin notes add "buy milk"`). |
-| `context` | `thread`, `project`, `worktree` or `terminal` (string and path args only): defaults to the caller's active one (the GUI's selection, `--context-thread` on the CLI, or `$CODE_FOUNDRY_THREAD` in a thread). A thread or terminal id given as a unique suffix (`c820`) is resolved to the full id, also in `req.Context`. |
+| `context` | `thread`, `project`, `worktree` or `terminal` (string and path args only): defaults to the caller's active one (the GUI's selection, `--context-thread` on the CLI, or `$CODE_FOUNDRY_THREAD` in a thread). A thread or terminal id given as a unique suffix (`c820`) is resolved to the full id, also in `req.Context`. A view's command button fills it from the panel's context, so its `args` can leave it out. |
 | `description` | The flag's help. |
 
 The command also gets the caller's context in `req.Context` (`ThreadID`, `ProjectID`,
@@ -132,7 +132,7 @@ minute after the last viewer left.
 |---|---|
 | `id` | Required, kebab case, unique. |
 | `title` | Required, up to 80 characters: the tab's title and `Show <title>` in the palette. |
-| `icon` | A lucide icon name in kebab case (`workflow`, `key-round`, `git-pull-request`, `rocket`, `bug`, `database`, `server`, `shield-check`, `sparkles`, …); the GUI knows a curated set and draws a generic icon for others. |
+| `icon` | A lucide icon name from the list below; any other name draws a plain circle. |
 | `scope` | What one instance is for (below). Default `thread`. |
 | `placement` | `["panel"]` (default): the side panel. `settings` is accepted and reserved for a later version. |
 | `when` | A clause; the surface is offered only where it holds (and its scope's context exists). |
@@ -140,16 +140,36 @@ minute after the last viewer left.
 | Scope | One instance per | Context the plugin gets (`SurfaceOpen.Context`) | Debug it with |
 |---|---|---|---|
 | `global` | Code Foundry | nothing | `plugin surface <name> <id>` |
-| `thread` | thread | the thread, its project, worktree, workspace | `--context-thread <id>` (default: yours) |
+| `thread` | thread | the thread, its project, worktree, workspace | `--thread <id>` (default: yours) |
 | `project` | project | the project | `--project <id>` |
 | `worktree` | worktree | the worktree | `--context-worktree <path>` |
-| `pr` | pull request (`owner/repo#n`) | the opening thread's context, and `Facts["pr"] = {"repo","number","url"}` | `--context-thread <id>` of a thread with a pull request |
+| `pr` | pull request (`owner/repo#n`) | the opening thread's context, and `Facts["pr"] = {"repo","number","url"}` | `--thread <id>` of a thread with a pull request |
+
+`plugin surface` and `plugin act` take `--thread <id>` (a unique suffix works) or
+`--project <id>`; the global `--context-thread` works too.
+
+**One instance, many viewers.** A `pr` instance serves every thread on that pull request,
+but its `SurfaceOpen.Context` is the first opener's thread, and a `surface/act` carries no
+viewer context (the same holds for a `project` or `global` surface shown beside different
+threads). So an event that acts on "this
+thread" (send a failure to Claude) would reach the first opener's thread. Make anything
+thread-specific a **command button** instead: the host runs it with the viewing panel's
+context, so the command's `context: thread` arg is the thread the user is looking at.
+Command args travel inside the view (its 256 KB budget; an event's `data` is capped at
+1 KB): pass an id the command can look up (a run id, a job id), not the text itself.
 
 The instance id is `<plugin>/<surface>/<scope id>` (`gh-actions/runs/pr:octo/app#12`,
 `minimal/status/thread:s-1f2e3d4c5b6a`). `SurfaceOpen.Facts` also carries the value of
 every fact the surface's `when` clause reads. Each surface gets a command
 `plugin.<name>.show.<id>` (`code-foundry plugin <name> show <id>`) that opens it in the
 GUI; it is available exactly where the surface is.
+
+## Icons
+
+The GUI draws these lucide icons (header and surface icons, glyphs, buttons, notices;
+`ui.Icons` in the SDK, `ui.KnownIcon(name)`); any other name draws a plain circle:
+
+{{cf.icons}}
 
 ## When clauses
 
@@ -167,9 +187,12 @@ fact    := segment ("." segment)*        segment := [A-Za-z_][A-Za-z0-9_-]*
   `project.slug =~ /^acme\//`. Comparisons do not chain.
 - `x in y`: any element of x equals any element of y (a scalar is a one-element list):
   `"github-actions" in pr.checks.provider`, `project.slug in ["acme/api", "acme/web"]`.
-- Facts about pull request checks are fetched lazily: until they arrive the clause is
-  "not known yet" (unavailable, says so); `unknown && false` is false, `unknown || true`
-  is true.
+- Facts about pull request checks are fetched lazily, the first time a clause reads them
+  for a thread: until they arrive the clause is "not known yet" (unavailable: `plugin
+  surface` fails with `not known yet (…waits on a pull request's checks)`, `plugin list`
+  shows `off`); retry a few seconds later. A new thread's branch is matched to its pull
+  request by the next GitHub poll (up to a minute with the app open). `unknown && false`
+  is false, `unknown || true` is true.
 - A clause that does not parse is a plugin issue (NOTE column) and its command or surface
   is never available.
 

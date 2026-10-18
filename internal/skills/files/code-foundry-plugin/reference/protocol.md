@@ -29,7 +29,9 @@ and result type is a Go type there (`go doc github.com/alexwaumann/code-foundry/
   permission also `CODE_FOUNDRY_ENDPOINT` and `CODE_FOUNDRY_TOKEN`. Never a thread id: the
   thread comes with each call's context.
 - A tool the plugin runs (`gh`, `git`) is found on that PATH; it inherits the user's `gh`
-  login through HOME.
+  login through HOME. That PATH is the daemon's: when the app started the daemon it may
+  lack Homebrew or a language version manager, so run the user's project tools (`go test`,
+  `npm test`) through their login shell, `$SHELL -lc "<command>"`, as project actions do.
 
 ## Lifecycle
 
@@ -72,7 +74,9 @@ listed and fail with the reason; its surfaces say so.
 
 After `surface/open` the plugin sends the instance's view with `view/update` within 10 s
 (else the host shows "not responding"); a view sent before it answers the open counts, so
-render inside the factory. An error from the factory or from `Act` is shown to the user
+render inside the factory. A surface that fetches renders a "Loading" view there (a
+`progress` node) and the data from a goroutine; viewers, and `plugin surface`, see the
+first view first. An error from the factory or from `Act` is shown to the user
 (the CLI's `plugin act` prints it and exits 1).
 
 ## Plugin → host
