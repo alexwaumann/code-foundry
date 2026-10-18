@@ -61,7 +61,9 @@ describe("a tool waiting for permission", () => {
   it("an Edit shows its diff, so the user sees what they allow", () => {
     const c = show(editWaiting("Edit", { file_path: "/w/a.go", old_string: "x := 1", new_string: "x := 2" }));
     expect(c.querySelector('[data-waiting="true"]')?.textContent).toContain("waiting for you");
-    expect(c.querySelector('[data-testid="thread-diff"]')?.textContent).toContain("x := 2");
+    // The diff itself renders in the library's shadow root (e2e/thread.spec.ts reads it).
+    expect(c.querySelector('[data-testid="thread-diff"]')?.textContent).toContain("a.go");
+    expect(c.querySelector('[data-testid="thread-diff"] diffs-container')).not.toBeNull();
   });
 
   it("a Bash call does not expand (the docked prompt shows the command)", () => {

@@ -3,7 +3,6 @@ import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronRight, MessageCircleQ
 import type { ThreadPendingView, ThreadRequestView } from "@/api/thread";
 import { Kbd } from "@/components/ui/kbd";
 import { Tip } from "@/components/ui/tooltip";
-import { diffStats } from "@/lib/diff";
 import { shellTokens } from "@/lib/highlight";
 import {
   answerOf,
@@ -24,13 +23,13 @@ import {
   type PromptShape,
   type QuestionPick,
 } from "@/lib/threadRequest";
-import { parseObject, relPath, str, toolHunks, type Json } from "@/lib/toolSummary";
+import { diffStats, parseObject, relPath, str, toolDiff, toolDiffFiles, type Json } from "@/lib/toolSummary";
 import { useThreadsStore } from "@/stores/threads";
 import { useAgentInputOf, useThreadItem } from "@/stores/thread";
 import { respondThread } from "@/stores/threadActions";
 import { TokenSpans } from "./Code";
 import { useThreadCtx } from "./context";
-import { DiffView } from "./DiffView";
+import { ToolDiffView } from "./ToolDiffView";
 
 /**
  * The docked prompts (rendered threads PR 3, docs/notes/rendered-threads-3-interaction.md):
@@ -119,11 +118,11 @@ function ButtonKey({ k }: { k: string }) {
 /** An Edit/Write waiting for permission: its +/− summary, and the diff on demand. */
 function PromptDiff({ r }: { r: ThreadRequestView }) {
   const { cwd } = useThreadCtx();
-  const hunks = useMemo(() => toolHunks({ name: r.toolName, inputJson: r.inputJson, resultJson: "" }), [r.toolName, r.inputJson]);
+  const diff = useMemo(() => toolDiff({ name: r.toolName, inputJson: r.inputJson, resultJson: "" }), [r.toolName, r.inputJson]);
+  const stats = useMemo(() => (diff ? diffStats(toolDiffFiles(diff)) : null), [diff]);
   const [open, setOpen] = useState(false);
-  if (hunks.length === 0) return null;
-  const { added, removed } = diffStats(hunks);
-  const input = parseObject(r.inputJson);
+  if (!diff || !stats) return null;
+  const { added, removed } = stats;
   const Chevron = open ? ChevronDown : ChevronRight;
   return (
     <div className="pdiff" data-testid="thread-permission-diff">
@@ -135,7 +134,7 @@ function PromptDiff({ r }: { r: ThreadRequestView }) {
       </button>
       {open && (
         <div className="pdiff-body">
-          <DiffView path={str(input, "file_path") || str(input, "notebook_path")} hunks={hunks} cwd={cwd} />
+          <ToolDiffView diff={diff} cwd={cwd} />
         </div>
       )}
     </div>

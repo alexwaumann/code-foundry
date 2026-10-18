@@ -473,64 +473,29 @@ html[data-thread-width="full"] .cf-thread {
 .cf-thread .diff .dh .dir {
   color: var(--muted-foreground);
 }
-.cf-thread .diff .hunk {
-  color: var(--muted-foreground);
-  background: color-mix(in oklab, var(--t-sky) 7%, transparent);
-  padding: 0 10px;
-}
+/* A Read row's lines (ToolDetail ReadDetail, lowlight): line number, then the text. */
 .cf-thread .diff .l {
   display: grid;
-  grid-template-columns: 38px 38px 18px 1fr;
   white-space: pre-wrap;
   word-break: break-word;
   tab-size: 4;
   color: var(--syn-fg);
 }
-.cf-thread .diff .l .o,
-.cf-thread .diff .l .n {
+.cf-thread .diff .l .o {
   text-align: right;
   padding-right: 8px;
   color: var(--muted-foreground);
   opacity: 0.6;
   user-select: none;
 }
-.cf-thread .diff .l .g {
-  color: var(--muted-foreground);
-  user-select: none;
-  text-align: center;
+/* An edit's diff (ToolDiffView on components/code): a MultiEdit's edits one under another;
+   a long diff scrolls in a bounded box (the library lays out only the visible lines). */
+.cf-thread .diff .cf-code-view + .cf-code-view {
+  border-top: 1px solid var(--border);
 }
-.cf-thread .diff .l.la {
-  background: color-mix(in oklab, var(--t-emerald-500) 11%, transparent);
-}
-.cf-thread .diff .l.la .g {
-  color: var(--t-emerald);
-}
-.cf-thread .diff .l.la :is(.o, .n) {
-  background: color-mix(in oklab, var(--t-emerald-500) 9%, transparent);
-}
-.cf-thread .diff .l.lr {
-  background: color-mix(in oklab, var(--t-red-500) 11%, transparent);
-}
-.cf-thread .diff .l.lr .g {
-  color: var(--t-red);
-}
-.cf-thread .diff .l.lr :is(.o, .n) {
-  background: color-mix(in oklab, var(--t-red-500) 9%, transparent);
-}
-.cf-thread .diff .l ins {
-  text-decoration: none;
-  background: color-mix(in oklab, var(--t-emerald-500) 26%, transparent);
-  border-radius: 2px;
-}
-.cf-thread .diff .l del {
-  text-decoration: none;
-  background: color-mix(in oklab, var(--t-red-500) 26%, transparent);
-  border-radius: 2px;
-}
-.cf-thread .diff .more {
-  padding: 2px 10px;
-  color: var(--muted-foreground);
-  font-family: inherit;
+.cf-thread .diff .diff-scroll {
+  max-height: 480px;
+  overflow: auto;
 }
 
 /* ---------- user messages, turns ---------- */

@@ -139,26 +139,3 @@ export function shellTokens(command: string): Token[] {
   }
   return out;
 }
-
-/** A token that may fall inside a diff line's changed span. */
-export interface MarkedToken extends Token {
-  marked: boolean;
-}
-
-/** Splits a line's tokens at a changed span [start, end) (lib/diff mark); everything unmarked without one. */
-export function markTokens(tokens: readonly Token[], mark: readonly [number, number] | undefined): MarkedToken[] {
-  if (!mark || mark[0] >= mark[1]) return tokens.map((t) => ({ ...t, marked: false }));
-  const out: MarkedToken[] = [];
-  let pos = 0;
-  for (const t of tokens) {
-    const end = pos + t.text.length;
-    const cuts = [pos, Math.min(Math.max(mark[0], pos), end), Math.min(Math.max(mark[1], pos), end), end];
-    for (let i = 0; i < 3; i++) {
-      const a = cuts[i] ?? pos;
-      const b = cuts[i + 1] ?? end;
-      if (b > a) out.push({ text: t.text.slice(a - pos, b - pos), cls: t.cls, marked: i === 1 });
-    }
-    pos = end;
-  }
-  return out;
-}

@@ -2,26 +2,17 @@ import { memo, useMemo, type ReactNode } from "react";
 import { ImageIcon } from "lucide-react";
 import { Markdown, type MarkdownExtras } from "@/components/pr/Markdown";
 import { Tip } from "@/components/ui/tooltip";
-import { grammarFor, highlightLines, type MarkedToken, type Token } from "@/lib/highlight";
+import { grammarFor, highlightLines, type Token } from "@/lib/highlight";
 import { useAttachmentUrl } from "@/stores/attachments";
 import { CodeActions } from "./CodeActions";
 
-/** One line's tokens as spans (marked tokens wrapped in `mark`: ins or del). */
-export function TokenSpans({ tokens, mark }: { tokens: readonly (Token | MarkedToken)[]; mark?: "ins" | "del" }): ReactNode {
-  return tokens.map((t, i) => {
-    const span = t.cls ? (
-      <span key={i} className={t.cls}>
-        {t.text}
-      </span>
-    ) : (
-      t.text
-    );
-    if (mark && "marked" in t && t.marked) {
-      const Tag = mark;
-      return <Tag key={i}>{span}</Tag>;
-    }
-    return typeof span === "string" ? <span key={i}>{span}</span> : span;
-  });
+/** One line's tokens as spans. */
+export function TokenSpans({ tokens }: { tokens: readonly Token[] }): ReactNode {
+  return tokens.map((t, i) => (
+    <span key={i} className={t.cls || undefined}>
+      {t.text}
+    </span>
+  ));
 }
 
 /**
