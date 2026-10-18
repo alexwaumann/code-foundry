@@ -283,6 +283,11 @@ Services (v1):
   and speaks newline-delimited JSON-RPC 2.0 with over stdio; their manifest commands are
   `plugin.<name>.<command>` (`docs/notes/plugins-1-core.md`; design in
   `docs/sketches/plugins/`).
+  WatchSurface, GetSurface and Act serve plugin surfaces: views (the `pluginsdk/ui`
+  JSON the daemon validates) per instance `<plugin>/<surface>/<scope>`, opened on the
+  first watcher; each surface's `plugin.<name>.show.<surface>` command carries its
+  availability (a when clause over host facts) in CommandService.List
+  (`docs/notes/plugins-2-surfaces.md`).
 * `HealthService` — Ping, Version.
 
 Rules:
