@@ -78,6 +78,10 @@ func labelList(s *v1.Thread) string {
 // "removed".
 func threadDetail(s *v1.Thread, names map[string]string) string {
 	lines := []string{"thread " + threadLabel(s), "status: " + waitStatus(s), "worktree: " + s.GetWorktreePath()}
+	if s.GetBranch() != "" {
+		// The branch the worktree was made for (what a recreation checks out again).
+		lines = append(lines, "branch: "+s.GetBranch())
+	}
 	if s.GetCreatedBy() != "" {
 		name, exists := creatorName(s, names)
 		ref := s.GetCreatedBy()
