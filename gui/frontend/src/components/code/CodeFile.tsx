@@ -3,6 +3,7 @@ import { File, type FileOptions } from "@pierre/diffs/react";
 import { useCodeTheme } from "@/lib/codeTheme";
 import { cn } from "@/lib/utils";
 import { useCodeViewStore } from "@/stores/codeView";
+import { useCodeHost } from "./useCodeHost";
 import "./code.css";
 
 export interface CodeFileProps {
@@ -30,5 +31,10 @@ export const CodeFile = memo(function CodeFile({ name, contents, wrap, lineNumbe
     (): FileOptions<undefined, undefined> => ({ theme, themeType, disableFileHeader: true, disableLineNumbers: !lineNumbers, overflow }),
     [theme, themeType, lineNumbers, overflow],
   );
-  return <File file={file} options={options} className={cn("cf-code-view", className)} />;
+  const host = useCodeHost();
+  return (
+    <div ref={host} className={cn("cf-code-view", className)}>
+      <File file={file} options={options} />
+    </div>
+  );
 });

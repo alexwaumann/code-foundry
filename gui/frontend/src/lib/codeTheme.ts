@@ -28,7 +28,7 @@ type Syn = "--syn-fg" | "--syn-kw" | "--syn-fn" | "--syn-type" | "--syn-str" | "
 const SCOPES: readonly (readonly [Syn, readonly string[], string?])[] = [
   ["--syn-fg", ["variable", "punctuation", "meta.embedded", "keyword.operator", "variable.parameter", "support.variable"]],
   ["--syn-com", ["comment", "punctuation.definition.comment", "string.comment"], "italic"],
-  ["--syn-kw", ["keyword", "storage", "storage.type", "storage.modifier", "keyword.control", "markup.heading", "entity.name.section"]],
+  ["--syn-kw", ["keyword", "storage", "storage.type", "storage.modifier", "keyword.control", "keyword.operator.expression", "keyword.operator.new", "markup.heading", "entity.name.section"]],
   ["--syn-fn", ["entity.name.function", "support.function", "meta.function-call.generic", "entity.other.attribute-name", "markup.bold"]],
   ["--syn-type", ["entity.name.type", "entity.name.class", "entity.name.tag", "support.type", "support.class", "entity.other.inherited-class"]],
   ["--syn-str", ["string", "punctuation.definition.string", "string.regexp", "markup.raw", "markup.inline.raw", "markup.inserted"]],

@@ -158,6 +158,10 @@ export function structuredPatchText(path: string, hunks: readonly StructuredPatc
   return `${out.join("\n")}\n`;
 }
 
+function endLine(s: string): string {
+  return s === "" || s.endsWith("\n") ? s : `${s}\n`;
+}
+
 /** The language name for a notebook cell (its result's language when Claude sent one). */
 function cellName(input: Json, result: Json): string {
   if (str(input, "cell_type") === "markdown") return "cell.md";
@@ -174,7 +178,10 @@ export function toolDiff(t: Pick<ToolCallView, "name" | "inputJson" | "resultJso
   const patch = result.structuredPatch;
   if (Array.isArray(patch) && patch.length > 0) return { kind: "patch", path, patch: structuredPatchText(path || "file", patch as StructuredPatchHunk[]) };
   const contents = (pairs: ContentPair[], numbered: boolean, n = name): ToolDiff | null => {
-    const changed = pairs.filter((p) => p.oldText !== p.newText && (p.oldText !== null || p.newText !== ""));
+    const changed = pairs
+      // A snippet (unnumbered) has no end of file: end its lines so none reads "No newline at end of file".
+      .map((p) => (numbered ? p : { oldText: p.oldText === null ? null : endLine(p.oldText), newText: endLine(p.newText) }))
+      .filter((p) => p.oldText !== p.newText && (p.oldText !== null || p.newText !== ""));
     return changed.length > 0 ? { kind: "contents", path, name: n, pairs: changed, numbered } : null;
   };
   switch (t.name) {

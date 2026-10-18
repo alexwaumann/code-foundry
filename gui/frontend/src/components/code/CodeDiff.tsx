@@ -3,6 +3,7 @@ import { MultiFileDiff, PatchDiff, Virtualizer, type FileDiffOptions } from "@pi
 import { useCodeTheme } from "@/lib/codeTheme";
 import { cn } from "@/lib/utils";
 import { useCodeViewStore, type DiffStyle } from "@/stores/codeView";
+import { useCodeHost } from "./useCodeHost";
 import "./code.css";
 
 /** One side of a diff: a file name (its extension picks the language) and its text. */
@@ -48,16 +49,16 @@ function useDiffOptions({ diffStyle, wrap, lineNumbers = true }: Pick<CodeDiffPr
   );
 }
 
-function PatchView({ patch, options, className }: { patch: string; options: Options; className: string }) {
-  return <PatchDiff patch={patch} options={options} className={className} />;
+function PatchView({ patch, options }: { patch: string; options: Options }) {
+  return <PatchDiff patch={patch} options={options} />;
 }
 
-function FilesView({ oldFile, newFile, options, className }: { oldFile: CodeSide | null; newFile: CodeSide; options: Options; className: string }) {
+function FilesView({ oldFile, newFile, options }: { oldFile: CodeSide | null; newFile: CodeSide; options: Options }) {
   const oldName = oldFile?.name;
   const oldContents = oldFile?.contents;
   const old = useMemo(() => (oldName === undefined || oldContents === undefined ? null : { name: oldName, contents: oldContents }), [oldName, oldContents]);
   const neu = useMemo(() => ({ name: newFile.name, contents: newFile.contents }), [newFile.name, newFile.contents]);
-  return old ? <MultiFileDiff oldFile={old} newFile={neu} options={options} className={className} /> : <MultiFileDiff oldFile={null} newFile={neu} options={options} className={className} />;
+  return old ? <MultiFileDiff oldFile={old} newFile={neu} options={options} /> : <MultiFileDiff oldFile={null} newFile={neu} options={options} />;
 }
 
 /**
@@ -67,8 +68,12 @@ function FilesView({ oldFile, newFile, options, className }: { oldFile: CodeSide
  */
 export const CodeDiff = memo(function CodeDiff(props: CodeDiffProps) {
   const options = useDiffOptions(props);
-  const className = cn("cf-code-view", props.className);
-  return "patch" in props ? <PatchView patch={props.patch} options={options} className={className} /> : <FilesView oldFile={props.oldFile} newFile={props.newFile} options={options} className={className} />;
+  const host = useCodeHost();
+  return (
+    <div ref={host} className={cn("cf-code-view", props.className)}>
+      {"patch" in props ? <PatchView patch={props.patch} options={options} /> : <FilesView oldFile={props.oldFile} newFile={props.newFile} options={options} />}
+    </div>
+  );
 });
 
 /**

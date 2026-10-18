@@ -87,7 +87,7 @@ describe("toolDiff", () => {
     expect(f?.hunks[0]?.additionStart).toBe(40);
     expect(stats(d)).toEqual({ added: 1, removed: 1 });
     // Without it (no result yet: waiting for permission) the position is unknown: no line numbers.
-    expect(toolDiff({ ...t, resultJson: "" })).toEqual({ kind: "contents", path: "/w/a.go", name: "a.go", pairs: [{ oldText: "x", newText: "y" }], numbered: false });
+    expect(toolDiff({ ...t, resultJson: "" })).toEqual({ kind: "contents", path: "/w/a.go", name: "a.go", pairs: [{ oldText: "x\n", newText: "y\n" }], numbered: false });
   });
   it("Write: a new file is all added and numbered; an update that changed nothing has no diff", () => {
     const w = call("Write", { file_path: "/w/a", content: "x\ny" });
@@ -106,7 +106,7 @@ describe("toolDiff", () => {
     expect(stats(d)).toEqual({ added: 3, removed: 2 });
   });
   it("NotebookEdit shows the new cell source as added; a deleted cell has no diff", () => {
-    expect(toolDiff(call("NotebookEdit", { notebook_path: "/w/n.ipynb", new_source: "print(1)", cell_type: "code" }))).toMatchObject({ name: "cell.py", pairs: [{ oldText: null, newText: "print(1)" }], numbered: false });
+    expect(toolDiff(call("NotebookEdit", { notebook_path: "/w/n.ipynb", new_source: "print(1)", cell_type: "code" }))).toMatchObject({ name: "cell.py", pairs: [{ oldText: null, newText: "print(1)\n" }], numbered: false });
     expect(toolDiff(call("NotebookEdit", { notebook_path: "/w/n.ipynb", new_source: "# Hi", cell_type: "markdown" }))).toMatchObject({ name: "cell.md" });
     expect(toolDiff(call("NotebookEdit", { notebook_path: "/w/n.ipynb", new_source: "", edit_mode: "delete" }))).toBeNull();
   });
