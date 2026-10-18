@@ -62,7 +62,7 @@ func TestGuide(t *testing.T) {
 		// Confirmation, children, project refs, and --all composing.
 		"Commands shown with `--yes` may ask for confirmation", "- `thread.remove [--id] --yes` ",
 		"thread list --created-by $CODE_FOUNDRY_THREAD`", "`--created-by user`",
-		"`thread list --created-by $CODE_FOUNDRY_THREAD --json` carries each thread's", "`reportData`",
+		"`thread list --created-by $CODE_FOUNDRY_THREAD --json` has each one's", "`reportData`",
 		"`--project` takes a project id or name; `code-foundry project list` prints them",
 		"`--all` includes them; the other filters still apply",
 	} {
