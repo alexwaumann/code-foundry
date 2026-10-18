@@ -22,12 +22,12 @@ const MODE_OPTIONS: { value: ChartMode; label: string }[] = [
 ];
 
 /**
- * Every thread's usage array, then the retired ledger last: one subscription, compared
- * element by element, so only a usage change (or a thread update that brings a new
- * array) re-folds.
+ * Every thread's usage array (plugins' own threads too: they cost like any), then the
+ * retired ledger last: one subscription, compared element by element, so only a usage
+ * change (or a thread update that brings a new array) re-folds.
  */
 function useAllUsage(): readonly (readonly UsageBucketView[])[] {
-  return useThreadsStore(useShallow((s) => [...s.order.map((id) => s.byId[id]?.usage ?? NONE), s.retiredUsage]));
+  return useThreadsStore(useShallow((s) => [...[...s.order, ...(s.owned ?? [])].map((id) => s.byId[id]?.usage ?? NONE), s.retiredUsage]));
 }
 
 function plural(n: number, one: string, many: string): string {

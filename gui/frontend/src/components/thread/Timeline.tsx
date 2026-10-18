@@ -59,9 +59,9 @@ function useRows(threadId: string, working: boolean): TimelineRow[] {
  * Away from the bottom, a "Jump to bottom" chip floats above the composer; it scrolls
  * down and pins the list again.
  */
-export function Timeline({ threadId, working, bottomInset }: { threadId: string; working: boolean; bottomInset: number }) {
+export function Timeline({ threadId, working, bottomInset, inset }: { threadId: string; working: boolean; bottomInset: number; inset?: number }) {
   const rows = useRows(threadId, working);
-  return <TimelineList threadId={threadId} rows={rows} bottomInset={bottomInset} renderRow={renderTimelineRow} turns />;
+  return <TimelineList threadId={threadId} rows={rows} bottomInset={bottomInset} renderRow={renderTimelineRow} turns inset={inset} />;
 }
 
 function renderTimelineRow(row: TimelineRow) {
@@ -87,6 +87,7 @@ export function TimelineList<R extends ListRow>({
   renderRow,
   estimateRow = estimate,
   turns = false,
+  inset = 40,
 }: {
   threadId: string;
   rows: readonly R[];
@@ -94,6 +95,8 @@ export function TimelineList<R extends ListRow>({
   renderRow: (row: R) => ReactNode;
   estimateRow?: (row: R | undefined) => number;
   turns?: boolean;
+  /** The rows' left and right inset in px (40 in the content pane, less in a narrow side panel). */
+  inset?: number | undefined;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
@@ -263,7 +266,7 @@ export function TimelineList<R extends ListRow>({
                 data-row-type={row.type}
                 data-turn-end={turnEnd || undefined}
                 ref={v.measureElement}
-                style={{ position: "absolute", top: 0, left: 40, right: 40, transform: `translateY(${String(vi.start)}px)` }}
+                style={{ position: "absolute", top: 0, left: inset, right: inset, transform: `translateY(${String(vi.start)}px)` }}
               >
                 {renderRow(row)}
               </div>

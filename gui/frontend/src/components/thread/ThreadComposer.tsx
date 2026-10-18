@@ -135,7 +135,21 @@ function SnoozeNote({ threadId }: { threadId: string }) {
  * turns by accident); only the Interrupt button does. An effort change restarts Claude,
  * after the turn when one runs. The draft is the compose store's `thread:<id>`.
  */
-export function ThreadComposer({ threadId, pending, busy }: { threadId: string; pending: readonly ThreadPendingView[]; busy: boolean }) {
+export function ThreadComposer({
+  threadId,
+  pending,
+  busy,
+  placeholder,
+  focusRequests = true,
+}: {
+  threadId: string;
+  pending: readonly ThreadPendingView[];
+  busy: boolean;
+  /** The empty prompt's text (default "Send a follow-up…"). */
+  placeholder?: string | undefined;
+  /** Whether focus requests for the content pane land here: the content pane's composer only, not a plugin's thread node's. */
+  focusRequests?: boolean;
+}) {
   const draftKey = threadDraftKey(threadId);
   const text = useDraft(draftKey, "text");
   const hasAttachments = useDraft(draftKey, "attachments").length > 0;
@@ -194,6 +208,7 @@ export function ThreadComposer({ threadId, pending, busy }: { threadId: string; 
   }, []);
   const inRoot = (el: Element | null): boolean => el !== null && rootRef.current?.contains(el) === true;
   useEffect(() => {
+    if (!focusRequests) return;
     if (handledPromptSeq === focusSeq && seenContent.current === contentFocusSeq) return;
     const key = `${String(focusSeq)}:${String(contentFocusSeq)}`;
     if (request.current?.key !== key) request.current = { key, before: document.activeElement };
@@ -229,7 +244,7 @@ export function ThreadComposer({ threadId, pending, busy }: { threadId: string; 
     return () => {
       cancelAnimationFrame(raf);
     };
-  }, [focusSeq, contentFocusSeq, threadId]);
+  }, [focusSeq, contentFocusSeq, threadId, focusRequests]);
 
   // The editor turns read-only while a send is in flight. Chromium drops its focus then;
   // WebKit keeps the element focused but no longer edits in it, and the editor's focus()
@@ -311,7 +326,7 @@ export function ThreadComposer({ threadId, pending, busy }: { threadId: string; 
               draftKey={draftKey}
               value={text}
               disabled={sending}
-              placeholder={busy ? "Send a follow-up… Claude picks it up mid-turn" : "Send a follow-up…"}
+              placeholder={busy ? `${placeholder ?? "Send a follow-up…"} Claude picks it up mid-turn` : (placeholder ?? "Send a follow-up…")}
               onChange={(t) => {
                 updateDraft(draftKey, { text: t, error: null });
               }}

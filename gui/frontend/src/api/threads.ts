@@ -173,6 +173,13 @@ export interface ThreadView {
    * shows the top flag (lib/statusLine). docs/notes/plugins-3-events-flags-env.md.
    */
   flags: ThreadFlagView[];
+  /**
+   * Who owns the thread when the user does not: "plugin:<name>" for a plugin's own thread
+   * (docs/notes/plugins-6-thread-terminal.md). Owned threads are hidden: the threads store
+   * keeps them out of `order` (the sidebar, attention, the dock, lineage), and a plugin's
+   * thread node shows them. Absent or "" for the user's.
+   */
+  owner?: string;
 }
 
 /** A plugin's flag on a thread. */
@@ -366,6 +373,7 @@ export function toThreadView(s: Thread): ThreadView {
     report: toThreadReportView(s),
     budgetUsd: s.budgetUsd,
     flags: s.flags.flatMap(toThreadFlagView),
+    ...(s.owner ? { owner: s.owner } : {}),
   };
 }
 
