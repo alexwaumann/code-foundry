@@ -629,7 +629,13 @@ type Thread struct {
 	// top flag's reason on the row. Cleared by the plugin, when the plugin is disabled or
 	// removed, when the thread is archived, and for until_seen flags when the thread is
 	// opened. Persisted. Sorted by level (error first), then newest first.
-	Flags         []*ThreadFlag `protobuf:"bytes,53,rep,name=flags,proto3" json:"flags,omitempty"`
+	Flags []*ThreadFlag `protobuf:"bytes,53,rep,name=flags,proto3" json:"flags,omitempty"`
+	// Who owns the thread when the user does not: "plugin:<name>" for a plugin's thread
+	// (thread/create; docs/notes/plugins-6-thread-terminal.md). Owned threads are hidden:
+	// not in the sidebar, attention counts, dock alerts, the Threads panel or lineage, and
+	// left out of a filtered List unless filter.all or filter.owner asks for them. Their
+	// usage still counts. Set once at Create. Empty for the user's threads.
+	Owner         string `protobuf:"bytes,54,opt,name=owner,proto3" json:"owner,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1019,6 +1025,13 @@ func (x *Thread) GetFlags() []*ThreadFlag {
 		return x.Flags
 	}
 	return nil
+}
+
+func (x *Thread) GetOwner() string {
+	if x != nil {
+		return x.Owner
+	}
+	return ""
 }
 
 // ThreadFlag is one plugin's flag on a thread (Thread.flags).
@@ -2371,7 +2384,10 @@ type ThreadFilter struct {
 	// Only threads carrying every one of these labels.
 	Labels []string `protobuf:"bytes,8,rep,name=labels,proto3" json:"labels,omitempty"`
 	// At most this many threads (the most recently active); 0: no limit.
-	Limit         int32 `protobuf:"varint,9,opt,name=limit,proto3" json:"limit,omitempty"`
+	Limit int32 `protobuf:"varint,9,opt,name=limit,proto3" json:"limit,omitempty"`
+	// Only threads with this owner ("plugin:hello"), or with "plugin:" any plugin's.
+	// Without it (and without all) owned threads are left out.
+	Owner         string `protobuf:"bytes,10,opt,name=owner,proto3" json:"owner,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2467,6 +2483,13 @@ func (x *ThreadFilter) GetLimit() int32 {
 		return x.Limit
 	}
 	return 0
+}
+
+func (x *ThreadFilter) GetOwner() string {
+	if x != nil {
+		return x.Owner
+	}
+	return ""
 }
 
 type ListThreadsResponse struct {
@@ -4061,7 +4084,7 @@ var File_codefoundry_v1_thread_lifecycle_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\n" +
-	"%codefoundry/v1/thread_lifecycle.proto\x12\x0ecodefoundry.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xcc\x11\n" +
+	"%codefoundry/v1/thread_lifecycle.proto\x12\x0ecodefoundry.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xe2\x11\n" +
 	"\x06Thread\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12*\n" +
 	"\x11claude_session_id\x18\x02 \x01(\tR\x0fclaudeSessionId\x12\x1d\n" +
@@ -4123,7 +4146,8 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\treport_at\x182 \x01(\v2\x1a.google.protobuf.TimestampR\breportAt\x12\x1d\n" +
 	"\n" +
 	"budget_usd\x183 \x01(\x01R\tbudgetUsd\x120\n" +
-	"\x05flags\x185 \x03(\v2\x1a.codefoundry.v1.ThreadFlagR\x05flagsJ\x04\b\t\x10\n" +
+	"\x05flags\x185 \x03(\v2\x1a.codefoundry.v1.ThreadFlagR\x05flags\x12\x14\n" +
+	"\x05owner\x186 \x01(\tR\x05ownerJ\x04\b\t\x10\n" +
 	"J\x04\b\x1f\x10 R\vterminal_idR\x06render\"\xf5\x01\n" +
 	"\n" +
 	"ThreadFlag\x12\x16\n" +
@@ -4239,7 +4263,7 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\x12ForkThreadResponse\x12.\n" +
 	"\x06thread\x18\x01 \x01(\v2\x16.codefoundry.v1.ThreadR\x06thread\"J\n" +
 	"\x12ListThreadsRequest\x124\n" +
-	"\x06filter\x18\x01 \x01(\v2\x1c.codefoundry.v1.ThreadFilterR\x06filter\"\xb9\x02\n" +
+	"\x06filter\x18\x01 \x01(\v2\x1c.codefoundry.v1.ThreadFilterR\x06filter\"\xcf\x02\n" +
 	"\fThreadFilter\x12\x10\n" +
 	"\x03all\x18\x01 \x01(\bR\x03all\x12)\n" +
 	"\x10include_archived\x18\x02 \x01(\bR\x0fincludeArchived\x124\n" +
@@ -4250,7 +4274,9 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\n" +
 	"created_by\x18\a \x01(\tR\tcreatedBy\x12\x16\n" +
 	"\x06labels\x18\b \x03(\tR\x06labels\x12\x14\n" +
-	"\x05limit\x18\t \x01(\x05R\x05limit\"\x89\x01\n" +
+	"\x05limit\x18\t \x01(\x05R\x05limit\x12\x14\n" +
+	"\x05owner\x18\n" +
+	" \x01(\tR\x05owner\"\x89\x01\n" +
 	"\x13ListThreadsResponse\x120\n" +
 	"\athreads\x18\x01 \x03(\v2\x16.codefoundry.v1.ThreadR\athreads\x12@\n" +
 	"\rretired_usage\x18\x02 \x03(\v2\x1b.codefoundry.v1.UsageBucketR\fretiredUsage\"\"\n" +

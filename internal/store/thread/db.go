@@ -9,7 +9,7 @@ import (
 )
 
 // Persistence for the threads table (migrations 0003, 0006, 0008, 0009, 0011, 0014,
-// 0015, 0016, 0017, 0018, 0023 and 0027) and thread_pull_requests (0010); thread_usage and usage_retired
+// 0015, 0016, 0017, 0018, 0023, 0027 and 0031) and thread_pull_requests (0010); thread_usage and usage_retired
 // (0012) are in usage_db.go, which also deletes threads (retireThread). No process
 // survives a daemon restart. Status, its reason and StatusChangedAt are (0011): a disconnected
 // thread keeps the status it ended with.
@@ -36,9 +36,9 @@ func saveThread(ctx context.Context, db *sql.DB, s Thread) error {
 			status, status_reason, status_changed_at,
 			context_tokens, context_model, last_result_at, archived_at, snoozed_until,
 			created_by, created_by_name, brief, labels,
-			report_status, report_summary, report_data, report_at, budget_usd, budget_hit_usd, branch)
+			report_status, report_summary, report_data, report_at, budget_usd, budget_hit_usd, branch, owner)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-			?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (id) DO UPDATE SET
 			claude_session_id = excluded.claude_session_id,
 			project_id = excluded.project_id,
@@ -76,14 +76,15 @@ func saveThread(ctx context.Context, db *sql.DB, s Thread) error {
 			report_at = excluded.report_at,
 			budget_usd = excluded.budget_usd,
 			budget_hit_usd = excluded.budget_hit_usd,
-			branch = excluded.branch`,
+			branch = excluded.branch,
+			owner = excluded.owner`,
 		s.ID, s.ClaudeSessionID, s.ProjectID, s.WorktreePath, s.Name, s.AutoNamed, s.Model, s.Effort,
 		millis(s.CreatedAt), millis(s.LastActivityAt), s.ParentID, int(s.State), s.DisconnectReason, s.ExitCode, s.LastError,
 		int(s.PermissionMode), s.BaseRef, s.CreatedWorktree, s.WorkspaceID, s.Pinned,
 		int(s.Status), s.StatusReason, millis(s.StatusChangedAt),
 		s.ContextTokens, s.ContextModel, millis(s.LastResultAt), millis(s.ArchivedAt), millis(s.SnoozedUntil),
 		s.CreatedBy, s.CreatedByName, s.Brief, labelsJSON(s.Labels),
-		int(s.Report.Status), s.Report.Summary, s.Report.Data, millis(s.Report.At), s.BudgetUSD, s.BudgetHitUSD, s.Branch)
+		int(s.Report.Status), s.Report.Summary, s.Report.Data, millis(s.Report.At), s.BudgetUSD, s.BudgetHitUSD, s.Branch, s.Owner)
 	if err != nil {
 		return fmt.Errorf("thread: save %s: %w", s.ID, err)
 	}
@@ -97,7 +98,7 @@ func loadThreads(ctx context.Context, db *sql.DB) ([]Thread, error) {
 			status, status_reason, status_changed_at,
 			context_tokens, context_model, last_result_at, archived_at, snoozed_until,
 			created_by, created_by_name, brief, labels,
-			report_status, report_summary, report_data, report_at, budget_usd, budget_hit_usd, branch
+			report_status, report_summary, report_data, report_at, budget_usd, budget_hit_usd, branch, owner
 		FROM threads ORDER BY created_at, id`)
 	if err != nil {
 		return nil, fmt.Errorf("thread: load: %w", err)
@@ -115,7 +116,7 @@ func loadThreads(ctx context.Context, db *sql.DB) ([]Thread, error) {
 			&status, &s.StatusReason, &statusAt,
 			&s.ContextTokens, &s.ContextModel, &lastResult, &archived, &snoozed,
 			&s.CreatedBy, &s.CreatedByName, &s.Brief, &labels,
-			&reportStatus, &s.Report.Summary, &s.Report.Data, &reportAt, &s.BudgetUSD, &s.BudgetHitUSD, &s.Branch); err != nil {
+			&reportStatus, &s.Report.Summary, &s.Report.Data, &reportAt, &s.BudgetUSD, &s.BudgetHitUSD, &s.Branch, &s.Owner); err != nil {
 			return nil, fmt.Errorf("thread: load: %w", err)
 		}
 		s.CreatedAt, s.LastActivityAt, s.State = fromMillis(created), fromMillis(active), State(state)
