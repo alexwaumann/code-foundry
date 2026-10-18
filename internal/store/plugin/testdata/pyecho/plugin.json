@@ -1,0 +1,13 @@
+{
+  "name": "pyecho",
+  "displayName": "Python echo",
+  "version": "0.1.0",
+  "description": "A python3 plugin with no SDK: proves the protocol is language agnostic.",
+  "protocol": 1,
+  "exec": ["python3", "plugin.py"],
+  "permissions": { "commands": ["thread.send"] },
+  "commands": [
+    { "name": "echo", "title": "Echo", "args": [{ "name": "text", "positional": true }] },
+    { "name": "send", "title": "Send Through the Host", "args": [{ "name": "text", "required": true }] }
+  ]
+}

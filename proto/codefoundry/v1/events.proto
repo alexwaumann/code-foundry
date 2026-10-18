@@ -6,6 +6,7 @@ import "codefoundry/v1/action.proto";
 import "codefoundry/v1/gh.proto";
 import "codefoundry/v1/gitops.proto";
 import "codefoundry/v1/heartbeat.proto";
+import "codefoundry/v1/plugin.proto";
 import "codefoundry/v1/project.proto";
 import "codefoundry/v1/settings.proto";
 import "codefoundry/v1/terminal.proto";
@@ -21,7 +22,7 @@ import "codefoundry/v1/workspace.proto";
 // Watch RPCs remain for the CLI and tests.
 service EventService {
   // Watch streams all events. Each store's snapshot event is sent first, in the order
-  // project, workspace, terminal, thread list, thread, gh, gitops, settings, update, action, so a
+  // project, workspace, terminal, thread list, thread, gh, gitops, settings, update, action, plugin, so a
   // client can replace its state wholesale on connect.
   rpc Watch(WatchEventsRequest) returns (stream Event) {}
   // SetClientState updates what a GUI client's open Watch stream reported about itself
@@ -97,6 +98,8 @@ enum EventSource {
   // Actions and their runs: an ActionEvent snapshot (after update), then changes and
   // run_finished. Runs never carry their output here.
   EVENT_SOURCE_ACTION = 13;
+  // Plugins: a PluginEvent snapshot (after action), then updated / removed_name.
+  EVENT_SOURCE_PLUGIN = 14;
 }
 
 message Event {
@@ -119,6 +122,8 @@ message Event {
     // Actions: a snapshot, then updated / removed_id / run_updated / run_removed_id /
     // run_finished.
     ActionEvent action = 14;
+    // Plugins: a snapshot, then updated / removed_name.
+    PluginEvent plugin = 15;
   }
   // Position of a live event in the daemon's one event sequence: 1, 2, 3, ... per
   // daemon lifetime, shared by every client and source (the same event has the same

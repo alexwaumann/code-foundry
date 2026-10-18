@@ -249,6 +249,15 @@ func (cl *cli) runRegistry(ctx context.Context, args []string) error {
 	if code := res.GetExitCode(); code != 0 {
 		return exitCodeError(code)
 	}
+	if f, ok := cliFollowers[cmd.GetName()]; ok && !*asJSON && cl.wantsFollow(f, flags) {
+		if name, lines, ok := f.target(vals, res); ok {
+			c, err := cl.connect(ctx)
+			if err != nil {
+				return err
+			}
+			return cl.followPluginLog(ctx, c, name, lines)
+		}
+	}
 	return nil
 }
 
