@@ -131,7 +131,7 @@ function Notice({ children, url, testId }: { children: ReactNode; url: string; t
 /** One file of the list: status letter, path (directory muted, truncating from its start), + and −. */
 function FileRowButton({ f, onPick }: { f: PrDiffFile; onPick: (id: string) => void }) {
   return (
-    <Tip label={f.prevPath ? `${f.prevPath} → ${f.path}` : f.path} align="start">
+    <Tip label={f.prevPath ? `${f.prevPath} → ${f.path}` : f.path} whenTruncated={!f.prevPath} align="start">
       <button
         type="button"
         className="grid h-full w-full grid-cols-[1.25rem_minmax(0,1fr)_5ch_5ch] items-center gap-x-2 rounded-sm px-1.5 text-left text-body-sm font-mono outline-none hover:bg-accent/50 focus-visible:ring-1 focus-visible:ring-ring"
