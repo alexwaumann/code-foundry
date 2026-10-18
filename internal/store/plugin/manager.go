@@ -22,6 +22,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/fsx"
+	"github.com/alexwaumann/code-foundry/internal/store/plugin/registry"
 	"github.com/alexwaumann/code-foundry/pluginsdk"
 )
 
@@ -99,6 +100,10 @@ type Options struct {
 	// Surface timing; zero values take DefaultSurfaceGrace, DefaultFirstViewTimeout and
 	// DefaultCoalesce.
 	SurfaceGrace, FirstViewTimeout, CoalesceInterval time.Duration
+
+	// Registry reads the plugin registries for install, update and browse (install.go,
+	// updates.go); nil refuses installing from a registry or a release.
+	Registry *registry.Client
 }
 
 func (o *Options) defaults() {
@@ -170,6 +175,10 @@ type Manager struct {
 
 	// env is the plugins' session environments (environment.go).
 	env envState
+
+	// inst is where packages came from and the registries' last index (install.go,
+	// updates.go).
+	inst installState
 }
 
 var _ Store = (*Manager)(nil)
@@ -228,6 +237,7 @@ func (m *Manager) Start(ctx context.Context) error {
 	if err := m.loadEnvironments(ctx); err != nil {
 		m.log.Warn("plugin: saved session environments", "err", err)
 	}
+	m.loadInstalls(ctx)
 	if err := m.Reload(ctx); err != nil {
 		return err
 	}
@@ -282,6 +292,7 @@ func (m *Manager) publicLocked(e *entry) Plugin {
 	if e.loadErr != "" {
 		p.LastError = e.loadErr
 	}
+	m.installInfo(&p)
 	return p
 }
 
