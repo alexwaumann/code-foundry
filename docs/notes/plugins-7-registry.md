@@ -1,9 +1,9 @@
 # Plugins 7: registries, install, update, uninstall (2026-10-18)
 
 The seventh PR of the plugin stack (`docs/sketches/plugins/DECISIONS.md`, "Registry" and
-build order row 7), phase 1: the daemon and the CLI. Settings → Plugins → Browse (the GUI)
-comes in phase 2, on top of PR 5's Installed section and PR 6. Built on
-`cf/plugins-3-events-flags-env`; it will be rebased onto PR 6.
+build order row 7). Phase 1: the daemon and the CLI. Phase 2 (below, "GUI"): Settings →
+Plugins → Browse on PR 5's page. Based on `cf/plugins-5-gui`; the orchestrator rebases it
+onto PR 6.
 
 ## What is here
 
@@ -12,7 +12,7 @@ comes in phase 2, on top of PR 5's Installed section and PR 6. Built on
 | Registry client: index parse + validation, locations, cache + merge, gh / HTTPS fetch, release resolution, checksums, safe extraction | `internal/store/plugin/registry/` (fake gh in `registrytest`) |
 | Install / uninstall / dev links, install records, progress events | `internal/store/plugin/install.go`, `install_db.go`, migration `0031_plugin_installs.sql` |
 | Update offers, `CheckUpdates`, `Update`, `Browse`, `SetRegistries`, `RegistryChanged` | `internal/store/plugin/updates.go` |
-| Setting `plugins.registries` | `internal/store/settings/schema.go` (Advanced › Plugins), `Settings.Plugins.Registries` |
+| Setting `plugins.registries` | `internal/store/settings/schema.go` (Plugins › Registries), `Settings.Plugins.Registries` |
 | Daemon glue: the client (gh path, cache dir), the setting, the update-check hook | `internal/daemon/plugin_registry.go` |
 | `PluginService.Browse/RefreshRegistries/Install/Update/Uninstall`, `Plugin.install/update_*`, `PluginEvent.install_progress/registry_epoch` | `proto/codefoundry/v1/plugin.proto` (appended), `internal/api/plugin_registry.go` |
 | `plugin browse`, `plugin install`, `plugin update`, `plugin uninstall` | `internal/command/commands_plugin_registry.go` |
@@ -102,8 +102,9 @@ Without `--purge` the consent stays: reinstalling and `--enable` does not ask ag
   `https://github.com/<owner>/<repo>` (or the `owner/repo` shorthand) is read with gh;
   any other https URL is the index itself (`/index.json` appended unless it ends in
   `.json`); plain http only to localhost/loopback (the index names the hashes, so it must
-  not be open to tampering). Shown under Advanced › Plugins for now; phase 2 may move it
-  next to Browse.
+  not be open to tampering). It lives on a schema page `plugins` (section Registries),
+  which the GUI draws with its own component (below), so it shows under Browse and
+  settings search finds it.
 * **Reading a GitHub registry**: `gh api -H "Accept: application/vnd.github.raw+json"
   repos/<owner>/<repo>/contents/index.json` (raw content, no base64; the default branch).
   gh's executable is `advanced.gh_path`, else PATH and Homebrew (`gh.LookPath`), with the
@@ -142,6 +143,96 @@ Without `--purge` the consent stays: reinstalling and `--enable` does not ask ag
   `-repo -entry` writes the registry entry (`plugins/<name>.json`) with release URLs
   (`-url-base` for other hosting). Its output passes the registry's `scripts/validate.py`.
 
+## GUI (phase 2)
+
+| Piece | Where |
+|---|---|
+| View models: Browse, entries, registries, install progress, the install record and update offer on `PluginView`, `installOutcome` (plugin.install's result JSON) | `gui/frontend/src/api/plugin.ts` (the "Registries" part) |
+| Browse, progress per plugin, busy state, install / update / uninstall actions; `install_progress` and `registry_epoch` are routed here from `stores/plugins.ts` `onPluginEvent` | `src/stores/pluginRegistry.ts` |
+| Browse section (in PR 5's `SectionCard id="browse"` seam) | `components/plugin/settings/BrowseSection.tsx`, helpers in `registry.ts` |
+| Update / Uninstall on Installed rows, "from <source>", "<v> is available." | `components/plugin/settings/PluginsPage.tsx` |
+| Uninstall dialog with the purge checkbox | `components/plugin/settings/UninstallDialog.tsx` |
+| The page's settings section (plugins.registries) | `PluginsPage` renders `pageSections(schema, page)`; `SettingsPage` lets a GUI page share a schema page's id |
+| Mock: default registry with gh-actions and test-watcher 0.1.0 (descriptions from the registry's PRs #1/#2), test-watcher 0.0.9 installed and running, install steps 250 ms apart, `POST /__mock/plugin/registry?error=…` | `mock/pluginRegistry.ts`, hooks in `mock/plugins.ts`, `mock/server.ts`, `mock/settings.ts` |
+| Tests | `src/api/pluginRegistry.test.ts`, `src/stores/pluginRegistry.test.ts`, `components/plugin/settings/registry.test.ts`, `e2e/plugin-registry.spec.ts`; `e2e/plugins.spec.ts` now counts four installed plugins |
+
+What it does:
+
+* **Browse** reads `PluginService.Browse` when the page opens (the daemon's 1 h cache) and
+  again on Refresh (`refresh: true`) and whenever a `registry_epoch` arrives. A row: display
+  name, version, a pill (none when not installed, "Installed" emerald, "Update from X"
+  amber, "Dev X", "No build for this Mac"), description, the permissions in the consent
+  dialog's words ("May …"), `repo · from <registry>`, and Install (amber outline) or
+  "Update to X" (amber outline). Under the rows, each registry: its URL, "N plugins ·
+  read 5 min ago", a failure in words (404 or no access through gh, gh not logged in or
+  missing, offline; else the daemon's text) with "Showing what it listed last time." when
+  the cache stands in. No entries: "No plugins listed yet." above the registry rows.
+* **Install** runs `plugin.install <name>` through `runCommandForResult` (quiet; a failure
+  is toasted and stays under the row in red). The row shows the daemon's
+  `install_progress` steps inline ("Finding it…", "Downloading… 1.5 MB", "Checking the
+  SHA-256…", "Unpacking…", "Installing…"). When the plugin comes back disabled it runs
+  `plugin.enable`, so PR 5's consent dialog asks before anything runs.
+* **Update** (Browse row or Installed row, amber outline when offered) runs
+  `plugin.update <name>`.
+* **Uninstall** (Installed rows, muted) opens a dialog with "Also delete its data, its
+  secrets in the Keychain, its logs and the consent given" (= `--purge`); its Uninstall
+  is destructive-outlined. The daemon's confirm for that call is answered by a presenter
+  registered for `plugin.uninstall` (the user just confirmed), so it is not asked twice;
+  from the palette the generic confirm shows the daemon's text.
+* **Registries**: the `plugins.registries` field under Browse (a text field; the settings
+  schema has no list type, so the description says "separate several with commas").
+
+Screenshots (live isolated daemon, WebKit, dark and light, as PR 5): branch
+`cf/plugins-7-shots`, `docs/notes/plugins-7-registry/*.png`: `browse-page-*` (the page
+with gh-actions and test-watcher installed and hello listed by the loopback registry; the
+real default registry empty), `install-progress-*` (downloading from a throttled
+server), `install-consent-*`, `installed-after-install-*`, `installed-update-*` and
+`browse-update-*` (hello 0.1.0 installed, 0.1.1 listed), `registries-setting-*`.
+
+## The real plugins from their GitHub releases (2026-10-18, isolated `/tmp/cfp7`)
+
+Both release `SHA256SUMS` (the skill's `make dist`), which `ResolveRelease` reads (with
+`checksums.txt` and `sha256sums.txt`); the recorded hashes match the registry entries in
+the registry's pull requests #1 and #2.
+
+```
+$ code-foundry plugin install alexwaumann/code-foundry-plugin-gh-actions
+installed gh-actions 0.1.0 from alexwaumann/code-foundry-plugin-gh-actions
+disabled until you enable it: code-foundry plugin enable gh-actions (lists its permissions)
+$ code-foundry plugin install alexwaumann/code-foundry-plugin-test-watcher@v0.1.0 --enable --yes
+installed test-watcher 0.1.0 from alexwaumann/code-foundry-plugin-test-watcher
+enabled test-watcher 0.1.0 (starting)
+commands: code-foundry plugin test-watcher run, code-foundry plugin test-watcher stop, code-foundry plugin test-watcher set-command, code-foundry plugin test-watcher toggle-watch
+$ code-foundry plugin enable gh-actions --yes
+enabled gh-actions 0.1.0 (starting)
+commands: code-foundry plugin gh-actions rerun-failed, code-foundry plugin gh-actions rerun, code-foundry plugin gh-actions cancel, code-foundry plugin gh-actions open
+$ code-foundry plugin list
+NAME          VERSION  STATE    PERMISSIONS                                                                    COMMANDS  SURFACES    NOTE
+gh-actions    0.1.0    running  commands(thread.send,view.open.url,pr.checks) events(gh,threads) threadStatus  4         runs(off)   
+test-watcher  0.1.0    running  commands(thread.send) events(project,threads) threadStatus                     4         tests(off)  
+$ code-foundry plugin logs gh-actions --lines 20
+08:28:21.844 host       installed 0.1.0 from alexwaumann/code-foundry-plugin-gh-actions
+08:28:23.578 host       enabled with consent to: run Code Foundry commands: pr.checks, thread.send, view.open.url; read events: gh, threads; raise threads to needs-attention or error
+08:28:23.580 host       starting gh-actions 0.1.0 (pid 32442)
+08:28:23.669 host       running
+08:28:23.669 log info   gh-actions is up dev=false host=dev
+08:28:23.669 host       subscribed sub-1 to threads, gh
+log file: /tmp/cfp7/logs/plugins/gh-actions.log
+$ code-foundry plugin logs test-watcher --lines 20
+08:28:23.557 host       installed 0.1.0 from alexwaumann/code-foundry-plugin-test-watcher
+08:28:23.558 host       enabled with consent to: run Code Foundry commands: thread.send; read events: project, threads; raise threads to needs-attention or error
+08:28:23.560 host       starting test-watcher 0.1.0 (pid 32437)
+08:28:23.663 host       running
+08:28:23.663 host       subscribed sub-1 to threads, project
+08:28:23.663 log info   test-watcher is up dev=false followed=0 host=dev
+log file: /tmp/cfp7/logs/plugins/test-watcher.log
+gh-actions|github|alexwaumann/code-foundry-plugin-gh-actions|0.1.0|7ad70901f01b7efe
+test-watcher|github|alexwaumann/code-foundry-plugin-test-watcher|0.1.0|447deb231b78f729
+```
+
+gh-actions shows its surface only for a thread whose pull request has GitHub Actions
+checks; `runs(off)` is that, the plugin is running and its log is clean.
+
 ## pluginpack (for plugin repositories' release workflows)
 
 ```
@@ -167,7 +258,9 @@ It prints `<sha256>  <file>` per tarball. A bare `DIR` is `darwin/<this arch>`;
   version: `--refresh` (or `plugin browse --refresh` first).
 * `make gen` regenerates `gui/frontend/src/gen/.../plugin_pb.ts` too (committed generated
   code; no GUI source changed in this phase).
-* Migration 0030 may need renumbering when rebasing onto PR 6 if it adds one.
+* The installs migration was written as 0030 and is 0031 since the stack was rebased onto
+  main (2026-10-18), whose `0028_thread_name_provisional.sql` pushed the stack's numbers up
+  by one: 0029 plugins, 0030 flags/env, 0031 installs, 0032 thread owner (PR 6's).
 
 ## End to end (2026-10-18, isolated `CODE_FOUNDRY_HOME=/tmp/cfp7`, dev build)
 
@@ -354,9 +447,9 @@ extracting, installing, done) interleaved with `updated hello` as it stopped and
 
 ## Open
 
-* Phase 2: Settings → Plugins → Browse (entries with permissions, install / update
-  buttons, progress from `install_progress`, registry errors; the GUI mock's settings
-  fixture needs `plugins.registries`).
+* Browse has no search or filter (registries are small today), and no per-entry "show
+  the manifest" before install; the permissions come from the entry.
+* An install failure stays under its row until the next try or a reload of the page.
 * Direct (GitHub release) installs not listed in any registry get no update offers; only
   the merged index is compared. `plugin install owner/repo` again installs the latest.
 * No signing (DECISIONS: trust = registry owner + hash + consent).
