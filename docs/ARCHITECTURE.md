@@ -109,7 +109,8 @@ gui/
   build/                   Wails build assets; darwin Taskfile builds the bare GUI executable
 scripts/                   install.sh (embedded in the binary), package.sh, release.sh,
                            next-version.sh, ghostty-vt.sh
-docs/                      this file, PLAN.md, ADRs under docs/adr/
+docs/                      this file, PLAN.md, ADRs under docs/adr/, GETTING-STARTED.md (embedded by
+                           embed.go, package docs, for the help skill)
 ```
 
 Module path: `github.com/alexwaumann/code-foundry`.
