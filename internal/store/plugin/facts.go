@@ -34,6 +34,8 @@ type ThreadFacts struct {
 	ID, State, Status      string
 	ProjectID, WorkspaceID string
 	WorktreePath, Branch   string
+	// Archived: the thread is archived (an open surface for it closes, context_gone).
+	Archived bool
 	// PullRequests are the thread's pull requests, the one to show first: its branch's
 	// (an open one first), then the ones Claude linked, newest first; distinct.
 	PullRequests []PullRequestRef

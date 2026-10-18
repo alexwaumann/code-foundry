@@ -28,7 +28,8 @@ const (
 	// hidden instance may stop polling.
 	MethodSurfaceVisibility = "surface/visibility"
 	// MethodSurfaceClose (notification): SurfaceClose, after the instance had no viewer
-	// for the host's grace (60 s), or when the plugin is being stopped.
+	// for the host's grace (10 minutes), at once when its thread or project went away or
+	// its when clause stopped holding (SurfaceClose.Reason says which).
 	MethodSurfaceClose = "surface/close"
 	// MethodSurfaceAct (request, 10 s): SurfaceAct → {}. An error's message is shown to
 	// the user.
@@ -359,12 +360,35 @@ type SurfaceVisibility struct {
 	Visible  bool   `json:"visible"`
 }
 
-// SurfaceClose is surface/close's params. Reason is "idle" (no viewer for the grace),
-// "shutdown" (the plugin is being stopped) or "gone" (the plugin's surface went away).
+// SurfaceClose is surface/close's params.
 type SurfaceClose struct {
-	Instance string `json:"instance"`
-	Reason   string `json:"reason,omitempty"`
+	Instance string      `json:"instance"`
+	Reason   CloseReason `json:"reason,omitempty"`
 }
+
+// CloseReason says why a surface instance closed (Surface.Close). A plugin's state for
+// an instance (the selected run, a tab's scroll) goes with it: keep what must outlive a
+// close in the plugin (by thread, project or pull request) and restore it on the next
+// surface/open.
+type CloseReason string
+
+// Close reasons. The host sends the first three; the SDK closes with the last two.
+const (
+	// CloseIdle: no viewer for the host's grace (10 minutes).
+	CloseIdle CloseReason = "idle"
+	// CloseContextGone: the instance's thread was archived or removed, or its project
+	// removed. It will not come back.
+	CloseContextGone CloseReason = "context_gone"
+	// CloseUnavailable: its when clause stopped holding while it was open (the pull
+	// request's checks went away, a context fact changed). It opens afresh when the
+	// clause holds again and someone looks.
+	CloseUnavailable CloseReason = "unavailable"
+	// CloseShutdown: the plugin is stopping (Serve is returning).
+	CloseShutdown CloseReason = "shutdown"
+	// CloseReopened: the host opened the same instance again (after a restart of the
+	// host's side); the new Surface replaces this one.
+	CloseReopened CloseReason = "reopened"
+)
 
 // SurfaceAct kinds.
 const (

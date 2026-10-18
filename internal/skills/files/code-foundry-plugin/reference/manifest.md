@@ -130,8 +130,12 @@ restart <name>`".
 
 A surface is a view the host renders from the plugin's view model
 (`reference/primitives.md`). One **instance** exists per scope value; the host opens it
-when someone first looks (`surface/open` → `Plugin.Surfaces[<id>]`) and closes it a
-minute after the last viewer left.
+when someone first looks (`surface/open` → `Plugin.Surfaces[<id>]`) and closes it
+(`Surface.Close(reason)`) 10 minutes after the last viewer left (`idle`), or at once when
+its thread is archived or removed or its project removed (`context_gone`) or its `when`
+stops holding (`unavailable`; it opens afresh when the clause holds again). What a
+Surface holds goes with it: keep state the user would miss (the selected run, a filter)
+in the plugin, keyed by thread, project or pull request, and restore it on the next open.
 
 | Field | Rules |
 |---|---|

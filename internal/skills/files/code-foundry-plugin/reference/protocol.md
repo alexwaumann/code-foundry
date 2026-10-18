@@ -68,7 +68,7 @@ listed and fail with the reason; its surfaces say so.
 | `command/invoke` | request (the command's `timeoutSeconds`) | `CommandRequest{command, args, context}` → `CommandResult{message, json, exitCode}` | `Plugin.Commands[command]` |
 | `surface/open` | request (5 s) | `SurfaceOpen{instance, surface, context, facts}` → `{}` | `Plugin.Surfaces[surface]` |
 | `surface/visibility` | notification | `{instance, visible}`: viewers went from none to some (also right after open) or back | `Surface.Visibility` |
-| `surface/close` | notification | `{instance, reason}`: `idle` (no viewer for 60 s), `shutdown` | `Surface.Close` |
+| `surface/close` | notification | `{instance, reason}`: `idle` (no viewer for 10 minutes), `context_gone` (thread archived or removed, project removed), `unavailable` (the `when` stopped holding) | `Surface.Close(reason)`; the SDK adds `shutdown` and `reopened` |
 | `surface/act` | request (10 s) | `SurfaceAct{instance, context, version, kind, action, key, data, field, value, values}` → `{}` | `Surface.Act` |
 | `events/event` | notification | `Event{subscription, snapshot, event}` | `Plugin.OnEvent` |
 

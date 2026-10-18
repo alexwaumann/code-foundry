@@ -63,8 +63,8 @@ chip `deploy` and a button `deploy` collide, so prefix by role (`stage-deploy`,
   a viewer never sees the verdict above a log that is still filling.
 - Acts name a view version: the elements of the last 4 versions still act, so a click on
   a view that was just replaced still arrives (with its old `version`).
-- After `Surface.Close` the instance is gone: `UpdateView` to it fails with -32004. Stop
-  the instance's goroutines in `Close`.
+- After `Surface.Close(reason)` the instance is gone: `UpdateView` to it fails with
+  -32004. Stop the instance's goroutines in `Close`; persist what should survive it.
 
 ## Limits
 

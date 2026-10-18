@@ -180,9 +180,15 @@ func (h *Host) Visibility(instance string, visible bool) error {
 	return h.conn.Notify(pluginsdk.MethodSurfaceVisibility, pluginsdk.SurfaceVisibility{Instance: instance, Visible: visible})
 }
 
-// CloseSurface sends surface/close.
+// CloseSurface sends surface/close with reason idle (no viewer for the grace).
 func (h *Host) CloseSurface(instance string) error {
-	return h.conn.Notify(pluginsdk.MethodSurfaceClose, pluginsdk.SurfaceClose{Instance: instance, Reason: "idle"})
+	return h.CloseSurfaceFor(instance, pluginsdk.CloseIdle)
+}
+
+// CloseSurfaceFor sends surface/close with a reason: pluginsdk.CloseContextGone (the
+// thread was archived), pluginsdk.CloseUnavailable (the when clause stopped holding), ….
+func (h *Host) CloseSurfaceFor(instance string, reason pluginsdk.CloseReason) error {
+	return h.conn.Notify(pluginsdk.MethodSurfaceClose, pluginsdk.SurfaceClose{Instance: instance, Reason: reason})
 }
 
 // Ping pings the plugin.

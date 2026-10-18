@@ -25,8 +25,10 @@ type Surface interface {
 	Act(ctx context.Context, act SurfaceAct) error
 	// Visibility reports whether anyone is looking; a hidden surface may stop polling.
 	Visibility(visible bool)
-	// Close ends the instance.
-	Close()
+	// Close ends the instance, saying why (CloseIdle, CloseContextGone,
+	// CloseUnavailable, CloseShutdown, CloseReopened; another host may send another).
+	// Stop its pollers; state that must outlive it belongs to the plugin, not the Surface.
+	Close(reason CloseReason)
 }
 
 // Plugin is what a plugin implements. Every field is optional.
@@ -201,16 +203,17 @@ func (s *server) notify(ctx context.Context, method string, params json.RawMessa
 			}
 		}
 	case MethodSurfaceClose:
-		var p struct {
-			Instance string `json:"instance"`
-		}
+		var p SurfaceClose
 		if json.Unmarshal(params, &p) == nil {
 			s.smu.Lock()
 			sf, ok := s.surfaces[p.Instance]
 			delete(s.surfaces, p.Instance)
 			s.smu.Unlock()
 			if ok {
-				sf.Close()
+				if p.Reason == "" {
+					p.Reason = CloseIdle
+				}
+				sf.Close(p.Reason)
 			}
 		}
 	}
@@ -234,7 +237,7 @@ func (s *server) openSurface(ctx context.Context, params json.RawMessage) (any, 
 	s.surfaces[open.Instance] = sf
 	s.smu.Unlock()
 	if old != nil {
-		old.Close()
+		old.Close(CloseReopened)
 	}
 	return struct{}{}, nil
 }
@@ -252,6 +255,6 @@ func (s *server) closeSurfaces() {
 	s.surfaces = map[string]Surface{}
 	s.smu.Unlock()
 	for _, sf := range all {
-		sf.Close()
+		sf.Close(CloseShutdown)
 	}
 }

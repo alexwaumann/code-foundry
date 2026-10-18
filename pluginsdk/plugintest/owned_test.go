@@ -16,8 +16,8 @@ func (s actSurface) Act(_ context.Context, a pluginsdk.SurfaceAct) error {
 	s.got <- a.Context
 	return nil
 }
-func (actSurface) Visibility(bool) {}
-func (actSurface) Close()          {}
+func (actSurface) Visibility(bool)             {}
+func (actSurface) Close(pluginsdk.CloseReason) {}
 
 // The fake host keeps the plugin's threads and terminals, refuses ids that are not the
 // plugin's and calls without the permission, and an act carries the panel's context.

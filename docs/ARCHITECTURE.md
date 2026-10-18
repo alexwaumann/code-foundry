@@ -672,8 +672,10 @@ built: `docs/notes/plugins-1-core.md` through `plugins-6-thread-terminal.md`.
   (thread, project, workspace, the thread's pull request and its checks, fetched
   lazily) and the plugins' own `context/set` facts.
 * **Surfaces.** An instance per scope value (`<plugin>/<surface>/<global | thread:id |
-  project:id | worktree:path | pr:owner/repo#n>`), opened on the first watcher, closed a
-  minute after the last. Views are the `pluginsdk/ui` JSON, validated by the daemon
+  project:id | worktree:path | pr:owner/repo#n>`), opened on the first watcher, closed
+  10 minutes after the last (`idle`), or at once when its thread or project goes
+  (`context_gone`, on the daemon's thread and project events) or its `when` stops
+  holding (`unavailable`). Views are the `pluginsdk/ui` JSON, validated by the daemon
   (schema, limits, keys, URLs, the commands a view may run, secrets), re-encoded,
   versioned and coalesced per watcher; log nodes take appends. `PluginService.WatchSurface`,
   `GetSurface` and `Act` serve them; an act names an element of a recent version and the

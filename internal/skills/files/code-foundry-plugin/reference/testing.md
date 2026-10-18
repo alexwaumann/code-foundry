@@ -36,7 +36,7 @@ Drive it like the host:
 | `h.OpenSurface(ctx, instance, "status", uctx)` | `surface/open` + `visibility true` |
 | `h.OpenSurfaceWith(ctx, pluginsdk.SurfaceOpen{Instance, Surface, Context, Facts})` | the same with facts: a `pr` surface's `Facts["pr"]` (`json.RawMessage(`{"repo":"octo/app","number":12,"url":"…"}`)`) and the facts its `when` reads |
 | `h.Act(ctx, pluginsdk.SurfaceAct{Instance, Kind, Action, Key, Data, Value, Values})` | `surface/act` (Version 0 = the latest) |
-| `h.Visibility(instance, false)`, `h.CloseSurface(instance)` | visibility and close notifications |
+| `h.Visibility(instance, false)`, `h.CloseSurface(instance)`, `h.CloseSurfaceFor(instance, pluginsdk.CloseContextGone)` | visibility and close notifications (`CloseSurface` says `idle`) |
 | `h.Event(pluginsdk.Event{Subscription: "sub-1", Event: json.RawMessage(...)})` | an `events/event` |
 | `h.Ping(ctx)`, `h.Shutdown(ctx)` | ping; shutdown and what `Serve` returned |
 | `h.SetSecret(key, value)` | a secret as if the user had stored it (a form with `store`) |
