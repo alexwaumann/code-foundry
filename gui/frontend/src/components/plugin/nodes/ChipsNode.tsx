@@ -10,7 +10,8 @@ import { statusIcon, statusTone } from "../tones";
 function ChipView({ chip, focusable }: { chip: Chip; focusable: boolean }) {
   const run = useRunAction();
   const { inert } = useViewCtx();
-  const { icon: Icon, className: iconClass } = statusIcon[chip.status ?? ""];
+  // A chip without a status has no glyph (the empty status would draw as pending).
+  const glyph = chip.status ? statusIcon[chip.status] : null;
   const tone = statusTone(chip.status);
   const clickable = chip.action !== undefined && !inert;
   return (
@@ -18,6 +19,7 @@ function ChipView({ chip, focusable }: { chip: Chip; focusable: boolean }) {
       type="button"
       tabIndex={focusable ? 0 : -1}
       aria-disabled={!clickable || undefined}
+      aria-pressed={chip.selected ?? false}
       className={cn(
         "flex h-6 min-w-0 shrink-0 items-center gap-1.5 rounded-md border px-2 text-body-sm outline-none focus-visible:ring-1 focus-visible:ring-ring",
         tone === "error" ? "border-destructive/35 text-destructive" : tone === "attention" ? "border-warning/35 text-warning" : "border-border",
@@ -32,7 +34,7 @@ function ChipView({ chip, focusable }: { chip: Chip; focusable: boolean }) {
         if (clickable) run(chip.key, chip.action);
       }}
     >
-      <Icon className={cn("size-3.5 shrink-0", iconClass)} aria-hidden />
+      {glyph && <glyph.icon className={cn("size-3.5 shrink-0", glyph.className)} aria-hidden />}
       <span className="truncate">{chip.label}</span>
       {chip.meta !== undefined && <InlineView value={chip.meta} className="shrink-0 text-caption-sm tabular-nums" />}
     </button>

@@ -1,8 +1,10 @@
 import { useState, type SyntheticEvent, type KeyboardEvent, type ReactNode } from "react";
 import type { Field, FieldValue, FormNodeData, SelectOption } from "@/api/plugin";
+import { ChevronDown } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -62,6 +64,7 @@ function InputControl({ f, api, id, invalid }: { f: Field; api: FieldApi; id: st
       maxLength={input.maxLength || undefined}
       disabled={f.disabled || locked}
       aria-invalid={invalid || undefined}
+      aria-required={f.required || undefined}
       autoComplete={secret ? "new-password" : "off"}
       spellCheck={false}
       className={cn("h-7 text-body-sm", input.mono && "font-mono")}
@@ -102,10 +105,13 @@ function SelectControl({ f, api, id, invalid }: { f: Field; api: FieldApi; id: s
   const v = fieldValue(f, api.drafts);
   const disabled = (f.disabled ?? false) || locked;
   const multiple = sel.multiple ?? false;
+  if (multiple && sel.style !== "list") {
+    return <MultiDropdown f={f} api={api} id={id} invalid={invalid} options={options} disabled={disabled} />;
+  }
   if (multiple) {
     const chosen = new Set(Array.isArray(v) ? v : []);
     return (
-      <div className="flex min-w-0 flex-col gap-1.5" role="group" aria-labelledby={`${id}-label`} data-testid="plugin-select" data-name={f.name} data-style="checks">
+      <div className="flex min-w-0 flex-col gap-1.5" role="group" aria-labelledby={`${id}-label`} aria-required={f.required || undefined} data-testid="plugin-select" data-name={f.name} data-style="checks">
         {options.map((o) => (
           <label key={o.key} className="flex min-w-0 cursor-default items-start">
             {optionLabel(
@@ -134,6 +140,7 @@ function SelectControl({ f, api, id, invalid }: { f: Field; api: FieldApi; id: s
         value={current}
         disabled={disabled}
         aria-labelledby={`${id}-label`}
+        aria-required={f.required || undefined}
         className="gap-1.5"
         onValueChange={(next) => {
           api.change(f, next, true);
@@ -151,14 +158,24 @@ function SelectControl({ f, api, id, invalid }: { f: Field; api: FieldApi; id: s
     );
   }
   return (
+    // Always controlled: "" shows the placeholder (a reset or the plugin's empty value clears it).
     <Select
-      value={current || undefined}
+      value={current}
       disabled={disabled}
       onValueChange={(next) => {
         api.change(f, next, true);
       }}
     >
-      <SelectTrigger id={id} size="sm" className="w-full text-body-sm" aria-invalid={invalid || undefined} data-testid="plugin-select" data-name={f.name} data-style="dropdown">
+      <SelectTrigger
+        id={id}
+        size="sm"
+        className="w-full text-body-sm"
+        aria-invalid={invalid || undefined}
+        aria-required={f.required || undefined}
+        data-testid="plugin-select"
+        data-name={f.name}
+        data-style="dropdown"
+      >
         <SelectValue placeholder={sel.placeholder || "Choose…"} />
       </SelectTrigger>
       <SelectContent>
@@ -169,6 +186,74 @@ function SelectControl({ f, api, id, invalid }: { f: Field; api: FieldApi; id: s
         ))}
       </SelectContent>
     </Select>
+  );
+}
+
+/**
+ * A multiple select in the dropdown style: a trigger like the single dropdown's (the
+ * placeholder while nothing is chosen, else the chosen labels) over a popover checklist.
+ * Each check is a change at once, like the list style's.
+ */
+function MultiDropdown({ f, api, id, invalid, options, disabled }: { f: Field; api: FieldApi; id: string; invalid: boolean; options: readonly SelectOption[]; disabled: boolean }) {
+  const v = fieldValue(f, api.drafts);
+  const chosen = new Set(Array.isArray(v) ? v : []);
+  const labels = options.filter((o) => chosen.has(o.value)).map((o) => o.label);
+  const summary = labels.join(", ");
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          id={id}
+          disabled={disabled}
+          aria-invalid={invalid || undefined}
+          aria-required={f.required || undefined}
+          className={cn(
+            "flex h-7 w-full min-w-0 items-center justify-between gap-2 rounded-md border border-input bg-transparent px-2.5 py-1 text-body-sm whitespace-nowrap shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:bg-input/30 dark:hover:bg-input/50 dark:aria-invalid:ring-destructive/40",
+            labels.length === 0 && "text-muted-foreground",
+          )}
+          data-testid="plugin-select"
+          data-name={f.name}
+          data-style="multi-dropdown"
+        >
+          <span className="min-w-0 truncate">{labels.length === 0 ? f.select?.placeholder || "Choose…" : summary}</span>
+          <span className="flex shrink-0 items-center gap-1.5">
+            {labels.length > 1 && <span className="text-caption-sm tabular-nums">{labels.length}</span>}
+            <ChevronDown className="size-4 text-muted-foreground opacity-50" aria-hidden />
+          </span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[calc(var(--radix-popover-trigger-width)/var(--cf-zoom))] p-1" data-testid="plugin-select-options">
+        <div role="group" aria-label={f.label || f.name} className="flex max-h-64 flex-col overflow-y-auto">
+          {options.map((o) => (
+            <label key={o.key} className={cn("flex min-w-0 cursor-default items-center rounded-sm px-2 py-1.5 hover:bg-accent dark:hover:bg-accent/50", o.disabled && "pointer-events-none")}>
+              {optionLabel(
+                o,
+                false,
+                <Checkbox
+                  checked={chosen.has(o.value)}
+                  disabled={o.disabled}
+                  onCheckedChange={(on) => {
+                    const next = options.map((x) => x.value).filter((x) => (x === o.value ? on === true : chosen.has(x)));
+                    api.change(f, next, true);
+                  }}
+                  data-value={o.value}
+                />,
+              )}
+            </label>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/** The label's mark for a required field, from the first paint (the host checks it on blur and submit). */
+function RequiredMark() {
+  return (
+    <span className="text-muted-foreground" aria-hidden data-testid="plugin-required">
+      *
+    </span>
   );
 }
 
@@ -221,8 +306,9 @@ function FieldView({ f, api }: { f: Field; api: FieldApi }) {
   return (
     <div className="flex min-w-0 flex-col gap-1.5" data-testid="plugin-field" data-name={name}>
       {f.label && (
-        <Label id={`${id}-label`} htmlFor={id} className="text-body-sm font-medium">
+        <Label id={`${id}-label`} htmlFor={id} className="gap-1 text-body-sm font-medium">
           {f.label}
+          {f.required && <RequiredMark />}
         </Label>
       )}
       {f.input ? <InputControl f={f} api={api} id={id} invalid={invalid} /> : f.select ? <SelectControl f={f} api={api} id={id} invalid={invalid} /> : null}
@@ -233,8 +319,9 @@ function FieldView({ f, api }: { f: Field; api: FieldApi }) {
 
 /**
  * The one way values travel to the plugin (PRIMITIVES.md §A "form"). Values are host
- * drafts per instance, view tab and form until a submit the plugin takes (a new
- * resetToken drops them too); a pristine field shows the plugin's value. The host checks
+ * drafts per instance, view tab and form until a submit the plugin takes is followed by a
+ * view without errors for the form (a new resetToken drops them too); a pristine field
+ * shows the plugin's value. Required fields carry a muted asterisk from the start. The host checks
  * required, max length and pattern on blur and on submit; the plugin's own errors come back
  * in its next view. From submit until the plugin answers (and while `busy`) the whole
  * form is disabled and the submit spins. Enter in a text field submits; Escape reverts it.
@@ -256,7 +343,7 @@ export function FormNode({ node, data }: NodeProps<"form">) {
     setHostErrors(errors);
     if (Object.keys(errors).length > 0) return;
     if (submit.action.event) {
-      await actOnElement(watchKey, submit.key, { values: formValues(form, now, true), clearDraftsOf: draftKey });
+      await actOnElement(watchKey, submit.key, { values: formValues(form, now, true), submitOf: draftKey });
     } else if (submit.action.command) {
       // A form with a secret never submits through a command (the daemon refuses the view).
       const args: Record<string, string> = { ...submit.action.command.args };

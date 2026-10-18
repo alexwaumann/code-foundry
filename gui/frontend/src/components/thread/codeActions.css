@@ -2,19 +2,21 @@
  * A thread's code block buttons (CodeActions.tsx): Copy, and Run in terminal on shell
  * blocks in Claude's replies, at the block's top right. Hidden until the block is hovered
  * or a button has the keyboard (they stay in the tab order). Kept apart from thread.css.
+ * A plugin's markdown node (.cf-plugin-md, components/plugin/nodes/MarkdownNode.tsx) uses
+ * the same code blocks outside any .cf-thread.
  */
-.cf-thread .cf-code {
+:is(.cf-thread, .cf-plugin-md) .cf-code {
   position: relative;
 }
 /* The wrapper takes the block's place in the markdown flow (.cf-markdown's first/last
    child margins apply to it); the pre inside has none of its own. */
-.cf-thread .cf-markdown :where(.cf-code) {
+:is(.cf-thread, .cf-plugin-md) .cf-markdown :where(.cf-code) {
   margin: 0.5em 0;
 }
-.cf-thread .cf-markdown .cf-code > pre {
+:is(.cf-thread, .cf-plugin-md) .cf-markdown .cf-code > pre {
   margin: 0;
 }
-.cf-thread .cf-code-actions {
+:is(.cf-thread, .cf-plugin-md) .cf-code-actions {
   position: absolute;
   top: 5px;
   right: 5px;
@@ -25,13 +27,13 @@
   user-select: none;
   -webkit-user-select: none;
 }
-.cf-thread .cf-code:hover > .cf-code-actions,
-.cf-thread .term:hover > .cf-code > .cf-code-actions,
-.cf-thread .cf-code-actions:focus-within,
-.cf-thread .cf-code-actions:has([data-copied]) {
+:is(.cf-thread, .cf-plugin-md) .cf-code:hover > .cf-code-actions,
+:is(.cf-thread, .cf-plugin-md) .term:hover > .cf-code > .cf-code-actions,
+:is(.cf-thread, .cf-plugin-md) .cf-code-actions:focus-within,
+:is(.cf-thread, .cf-plugin-md) .cf-code-actions:has([data-copied]) {
   opacity: 1;
 }
-.cf-thread .cf-code-btn {
+:is(.cf-thread, .cf-plugin-md) .cf-code-btn {
   height: 22px;
   min-width: 22px;
   padding: 0 4px;
@@ -48,35 +50,35 @@
   line-height: 1;
   cursor: pointer;
 }
-.cf-thread .cf-code-btn:hover {
+:is(.cf-thread, .cf-plugin-md) .cf-code-btn:hover {
   color: var(--foreground);
   background: color-mix(in oklab, var(--foreground) 7%, var(--background));
 }
-.cf-thread .cf-code-btn:focus-visible {
+:is(.cf-thread, .cf-plugin-md) .cf-code-btn:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 1px;
 }
-.cf-thread .cf-code-btn svg {
+:is(.cf-thread, .cf-plugin-md) .cf-code-btn svg {
   width: 12px;
   height: 12px;
 }
-.cf-thread .cf-code-btn[data-copied] {
+:is(.cf-thread, .cf-plugin-md) .cf-code-btn[data-copied] {
   color: var(--t-emerald);
 }
 /* A Bash row's command line: room on the right for its Copy button. */
-.cf-thread .term .cmd.cf-code {
+:is(.cf-thread, .cf-plugin-md) .term .cmd.cf-code {
   padding-right: 40px;
 }
-.cf-thread .term .cmd.cf-code > .cf-code-actions {
+:is(.cf-thread, .cf-plugin-md) .term .cmd.cf-code > .cf-code-actions {
   top: 6px;
   right: 6px;
 }
 
 /* The streaming caret (thread.css) inside a wrapped block's code, not after the wrapper. */
-.cf-thread .cf-streaming > div.cf-code:last-child::after {
+:is(.cf-thread, .cf-plugin-md) .cf-streaming > div.cf-code:last-child::after {
   content: none;
 }
-.cf-thread .cf-streaming > .cf-code:last-child > pre > code::after {
+:is(.cf-thread, .cf-plugin-md) .cf-streaming > .cf-code:last-child > pre > code::after {
   content: "";
   display: inline-block;
   width: 7px;

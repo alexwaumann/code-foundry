@@ -33,15 +33,18 @@ export const toneBorder: Record<Tone, string> = {
   ok: "border-border",
 };
 
-/** A status as a dot (rows): emerald, red, amber, muted; running and the rest are drawn otherwise (dotFor). */
+/**
+ * A status as a dot (rows): emerald, red, amber, muted; pending a hollow ring. Running (a
+ * spinner) and skipped (a dash, so it never reads as pending) are drawn by GlyphView.
+ */
 export const statusDot: Record<Status, string> = {
   "": "bg-muted-foreground/40",
   ok: "bg-success",
   failed: "bg-destructive",
   attention: "bg-warning",
   running: "",
-  pending: "border-[1.5px] border-muted-foreground/50",
-  skipped: "border-[1.5px] border-muted-foreground/50",
+  pending: "border-[1.5px] border-muted-foreground/60",
+  skipped: "",
   off: "bg-muted-foreground/40",
 };
 

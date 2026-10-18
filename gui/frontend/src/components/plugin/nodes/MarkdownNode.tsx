@@ -1,6 +1,7 @@
 import { CodeBlock } from "@/components/thread/Code";
 import { Markdown, type MarkdownExtras } from "@/components/pr/Markdown";
 import type { NodeProps } from "../registry";
+import "@/components/thread/codeActions.css";
 
 /** The thread's markdown, minus path chips and attachments: HTML as text, code blocks with Copy, links through the host. */
 const extras: MarkdownExtras = {
@@ -15,7 +16,7 @@ const extras: MarkdownExtras = {
 
 export function MarkdownNode({ data }: NodeProps<"markdown">) {
   return (
-    <div className="min-w-0 text-body-sm select-text" data-testid="plugin-markdown">
+    <div className="cf-plugin-md min-w-0 text-body-sm select-text" data-testid="plugin-markdown">
       <Markdown extras={extras}>{data.source}</Markdown>
     </div>
   );

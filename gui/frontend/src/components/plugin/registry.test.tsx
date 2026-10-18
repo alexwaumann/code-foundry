@@ -61,7 +61,8 @@ describe("node renderer registry", () => {
     expect(screen.getAllByTestId("plugin-select").map((s) => [s.getAttribute("data-name"), s.getAttribute("data-style")])).toEqual([
       ["project", "dropdown"],
       ["env", "radios"],
-      ["tags", "checks"],
+      // Multiple without a style is the dropdown's (pluginsdk/ui SelectDropdown is the default).
+      ["tags", "multi-dropdown"],
     ]);
     expect(screen.getByTestId("plugin-fieldset").querySelectorAll('[data-testid="plugin-toggle"]')).toHaveLength(2);
   });
