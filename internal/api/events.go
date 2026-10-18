@@ -18,6 +18,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/action"
 	"github.com/alexwaumann/code-foundry/internal/store/gh"
 	"github.com/alexwaumann/code-foundry/internal/store/gitops"
+	"github.com/alexwaumann/code-foundry/internal/store/plugin"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/settings"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
@@ -44,6 +45,8 @@ type EventsDeps struct {
 	Workspace workspace.Store
 	// Action is the action store (per-project commands and their runs).
 	Action action.Store
+	// Plugin is the plugin store.
+	Plugin plugin.Store
 	// Done ends every stream when closed (daemon shutdown). May be nil.
 	Done <-chan struct{}
 	// Epoch is Event.epoch, the daemon instance; empty draws a random one (NewEvents).
@@ -130,7 +133,7 @@ type eventResumer interface{ resume(ctx context.Context) }
 
 // sources lists the stream's sources in the order their snapshots are sent (see
 // events.proto: project, workspace, terminal, thread, thread, gh, gitops, settings, update,
-// action),
+// action, plugin),
 // followed by UI intents.
 func (h *Events) sources() []eventSource {
 	d := h.deps
@@ -161,6 +164,9 @@ func (h *Events) sources() []eventSource {
 	}
 	if d.Action != nil {
 		out = append(out, actionSource{store: d.Action, bus: d.Bus}) // api/action_events.go
+	}
+	if d.Plugin != nil {
+		out = append(out, pluginSource{store: d.Plugin, bus: d.Bus}) // api/plugin_events.go
 	}
 	out = append(out, uiSource{bus: d.Bus})
 	return out

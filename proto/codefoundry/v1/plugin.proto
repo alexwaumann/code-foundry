@@ -1,0 +1,250 @@
+syntax = "proto3";
+
+package codefoundry.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// PluginService manages plugins: separate executables under ~/.code-foundry/plugins/<name>
+// (a plugin.json manifest beside them) that the daemon runs and speaks newline-delimited
+// JSON-RPC 2.0 with over stdio (the Go SDK is the pluginsdk module). A plugin found on
+// disk is disabled until the user enables it and consents to the permissions its manifest
+// lists; it needs consent again when an update asks for more. Each enabled plugin's
+// manifest commands are registry commands named plugin.<name>.<command>. See
+// docs/notes/plugins-1-core.md and docs/sketches/plugins/.
+service PluginService {
+  // List returns every plugin found, by name.
+  rpc List(ListPluginsRequest) returns (ListPluginsResponse) {}
+  // Enable turns a plugin on. Without consent, when the user has not consented to the
+  // manifest's permissions (never, or they grew), nothing changes and the response
+  // carries needs_consent and the text to consent to; call again with consent.
+  rpc Enable(EnablePluginRequest) returns (EnablePluginResponse) {}
+  // Disable stops a plugin and removes its commands. Its secrets and consent are kept.
+  rpc Disable(DisablePluginRequest) returns (DisablePluginResponse) {}
+  // Restart re-reads the manifest and starts the plugin afresh, also from failed.
+  rpc Restart(RestartPluginRequest) returns (RestartPluginResponse) {}
+  // Dev links a plugin folder (under the home directory) into the plugins directory as
+  // <name> and enables it, with consent as Enable. Dev plugins back off at most 2 s and
+  // never fail for crashing. dry_run only reads the folder's manifest.
+  rpc Dev(DevPluginRequest) returns (DevPluginResponse) {}
+  // Reload rescans the plugins directory.
+  rpc Reload(ReloadPluginsRequest) returns (ReloadPluginsResponse) {}
+  // Logs returns the tail of a plugin's log (stderr, its log notifications and the
+  // daemon's own lines about it) and the log file's path.
+  rpc Logs(PluginLogsRequest) returns (PluginLogsResponse) {}
+  // FollowLogs sends the tail, then every new line until the client goes away.
+  rpc FollowLogs(FollowPluginLogsRequest) returns (stream PluginLogLine) {}
+  // ListSecrets returns the names of a plugin's stored secrets (never their values).
+  rpc ListSecrets(ListPluginSecretsRequest) returns (ListPluginSecretsResponse) {}
+  // DeleteSecret removes one of a plugin's secrets from the Keychain.
+  rpc DeleteSecret(DeletePluginSecretRequest) returns (DeletePluginSecretResponse) {}
+  // Watch sends a snapshot, then every change. A client that falls behind gets a new
+  // snapshot.
+  rpc Watch(WatchPluginsRequest) returns (stream PluginEvent) {}
+}
+
+enum PluginState {
+  PLUGIN_STATE_UNSPECIFIED = 0;
+  // Found, not enabled (new, disabled by the user, or its permissions grew).
+  PLUGIN_STATE_DISABLED = 1;
+  // Spawned, initialize in flight.
+  PLUGIN_STATE_STARTING = 2;
+  PLUGIN_STATE_RUNNING = 3;
+  // Exited or hung; waiting for next_restart_at.
+  PLUGIN_STATE_CRASHED = 4;
+  PLUGIN_STATE_STOPPING = 5;
+  // The daemon is shutting down.
+  PLUGIN_STATE_STOPPED = 6;
+  // A bad manifest, an unsupported protocol, a missing executable, or too many crashes.
+  // Restart leaves it.
+  PLUGIN_STATE_FAILED = 7;
+}
+
+// PluginPermissions mirrors plugin.json's permissions (the plugin registry's entry schema).
+message PluginPermissions {
+  // Command globs the plugin may run through the host ("thread.send", "view.open.*").
+  repeated string commands = 1;
+  // Event sources it may subscribe to.
+  repeated string events = 2;
+  bool thread_status = 3;
+  bool session_env = 4;
+  bool secrets = 5;
+  bool threads = 6;
+  bool terminals = 7;
+  // Full control: the daemon's endpoint and token in its environment.
+  bool api = 8;
+}
+
+// PluginCommand is one manifest command, registered as name.
+message PluginCommand {
+  // The registry name, plugin.<plugin>.<command>.
+  string name = 1;
+  string title = 2;
+  string description = 3;
+}
+
+// PluginSurface is one manifest surface (rendered from protocol PR 2 on).
+message PluginSurface {
+  string id = 1;
+  string title = 2;
+  string icon = 3;
+  string scope = 4;
+  repeated string placements = 5;
+}
+
+message Plugin {
+  string name = 1;
+  string display_name = 2;
+  string version = 3;
+  string description = 4;
+  PluginState state = 5;
+  bool enabled = 6;
+  // Why the daemon turned an enabled plugin off ("its permissions changed: …").
+  string disabled_reason = 7;
+  // Linked with `plugin dev`; dev_path is the linked folder.
+  bool dev = 8;
+  string dev_path = 9;
+  // The package directory.
+  string dir = 10;
+  // The last crash or failure, or the manifest's problem.
+  string last_error = 11;
+  // Manifest warnings (unknown fields) and registration problems.
+  repeated string issues = 12;
+  // What the manifest asks for.
+  PluginPermissions permissions = 13;
+  // What the user consented to; unset when never.
+  PluginPermissions granted = 14;
+  google.protobuf.Timestamp consented_at = 15;
+  // Enabling asks for consent first (never consented, or the manifest asks for more).
+  bool needs_consent = 16;
+  // The text the user consents to.
+  string consent_text = 17;
+  int32 pid = 18;
+  google.protobuf.Timestamp started_at = 19;
+  google.protobuf.Timestamp next_restart_at = 20;
+  // Crashes since it was last enabled or restarted.
+  int32 restarts = 21;
+  int32 protocol = 22;
+  repeated string capabilities = 23;
+  repeated PluginCommand commands = 24;
+  repeated PluginSurface surfaces = 25;
+  string log_path = 26;
+}
+
+message ListPluginsRequest {}
+
+message ListPluginsResponse {
+  repeated Plugin plugins = 1;
+}
+
+message EnablePluginRequest {
+  string name = 1;
+  // The user consents to the permissions in the plugin's consent_text.
+  bool consent = 2;
+}
+
+message EnablePluginResponse {
+  Plugin plugin = 1;
+  // Nothing was enabled: show consent_text and call again with consent.
+  bool needs_consent = 2;
+  string consent_text = 3;
+}
+
+message DisablePluginRequest {
+  string name = 1;
+}
+
+message DisablePluginResponse {
+  Plugin plugin = 1;
+}
+
+message RestartPluginRequest {
+  string name = 1;
+}
+
+message RestartPluginResponse {
+  Plugin plugin = 1;
+}
+
+message DevPluginRequest {
+  // An absolute folder with a plugin.json, under the home directory.
+  string path = 1;
+  bool consent = 2;
+  bool dry_run = 3;
+}
+
+message DevPluginResponse {
+  Plugin plugin = 1;
+  bool needs_consent = 2;
+  string consent_text = 3;
+}
+
+message ReloadPluginsRequest {}
+
+message ReloadPluginsResponse {}
+
+message PluginLogsRequest {
+  string name = 1;
+  // How many lines (0: all kept in memory, the last 1000).
+  int32 lines = 2;
+}
+
+message PluginLogLine {
+  // Grows by one per line of this plugin's log in this daemon's lifetime; a gap means a
+  // follower missed lines.
+  uint64 seq = 1;
+  google.protobuf.Timestamp time = 2;
+  // "stderr", "log" (the plugin's log notifications) or "host" (the daemon's lines).
+  string source = 3;
+  // A log notification's level (debug, info, warn, error).
+  string level = 4;
+  string text = 5;
+}
+
+message PluginLogsResponse {
+  repeated PluginLogLine lines = 1;
+  // logs/plugins/<name>.log (1 MiB, then <name>.log.1).
+  string path = 2;
+}
+
+message FollowPluginLogsRequest {
+  string name = 1;
+  // How many earlier lines to send first.
+  int32 lines = 2;
+}
+
+message PluginSecret {
+  string key = 1;
+  google.protobuf.Timestamp updated_at = 2;
+}
+
+message ListPluginSecretsRequest {
+  string name = 1;
+}
+
+message ListPluginSecretsResponse {
+  repeated PluginSecret secrets = 1;
+}
+
+message DeletePluginSecretRequest {
+  string name = 1;
+  string key = 2;
+}
+
+message DeletePluginSecretResponse {}
+
+message WatchPluginsRequest {}
+
+message PluginEvent {
+  oneof event {
+    // Every plugin.
+    PluginSnapshot snapshot = 1;
+    // A plugin's full state after a change.
+    Plugin updated = 2;
+    // A plugin's package is gone.
+    string removed_name = 3;
+  }
+}
+
+message PluginSnapshot {
+  repeated Plugin plugins = 1;
+}
