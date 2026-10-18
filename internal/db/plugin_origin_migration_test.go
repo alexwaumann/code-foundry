@@ -8,7 +8,7 @@ import (
 )
 
 // Migration 0033 adds plugins.origin: a dev link's folder, else the install record's
-// source (a GitHub repository in lower case), else '' (a package put in by hand).
+// source (a GitHub repository in lower case), else empty (a package put in by hand).
 func TestPluginOriginMigrationBackfill(t *testing.T) {
 	ctx := context.Background()
 	all, err := LoadMigrations(Migrations())
