@@ -118,8 +118,13 @@ arg resolves id suffixes: a command that reads `req.Context.ThreadID` without de
 command acts on a thread. A result's
 `Message` is what the CLI prints and the GUI toasts; `JSON` is `--json`'s output;
 `ExitCode` the CLI's exit status. Return an error to fail: its message is the CLI's
-error (exit 1) and the GUI's error toast; `pluginsdk.NewError(pluginsdk.CodeInvalidParams, ...)`
-makes it a usage error (exit 2).
+error, printed as it is (`code-foundry plugin.<name>.<command>: <message>`, exit 1), and
+the GUI's error toast. `pluginsdk.NewError(pluginsdk.CodeInvalidParams, ...)` marks it a
+bad argument (Connect `InvalidArgument` for API callers, `FailedPrecondition` for any
+other error); the CLI still exits 1. Exit 2 is only for the CLI's own usage errors (an
+unknown flag, a missing required arg). While the plugin is not running its commands fail
+the same way, with what to do: "plugin <name> is failed (…); run `code-foundry plugin
+restart <name>`".
 
 ## Surfaces
 

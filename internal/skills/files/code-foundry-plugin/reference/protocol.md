@@ -108,7 +108,7 @@ serve answers -32601.
 |---|---|---|
 | -32700, -32600 | `CodeParseError`, `CodeInvalidRequest` | malformed line or message |
 | -32601 | `CodeMethodNotFound` | unknown method, or one this host does not serve |
-| -32602 | `CodeInvalidParams` | bad params; a refused view (the message names each problem); from a command: a usage error (CLI exit 2) |
+| -32602 | `CodeInvalidParams` | bad params; a refused view (the message names each problem); from a command: a bad argument (Connect `InvalidArgument`; the CLI prints it and exits 1) |
 | -32603 | `CodeInternal` | any other error, a panic |
 | -32001 | `CodePermissionDenied` | the grant does not cover the call |
 | -32002 | `CodeUnavailable` | not available in that context (the message says why), an archived thread |

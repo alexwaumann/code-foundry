@@ -1,12 +1,14 @@
 package plugin
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/pluginsdk"
 )
 
@@ -112,5 +114,33 @@ func TestShortDuration(t *testing.T) {
 		if got := shortDuration(d); got != want {
 			t.Errorf("shortDuration(%s) = %q, want %q", d, got, want)
 		}
+	}
+}
+
+func TestCommandDown(t *testing.T) {
+	now := time.Date(2026, 10, 18, 12, 0, 0, 0, time.UTC)
+	m := &Manager{opts: Options{Now: func() time.Time { return now }}}
+	tests := []struct {
+		e    entry
+		want string
+	}{
+		{entry{name: "x", state: StateStarting}, "plugin x is starting; try again in a moment"},
+		{entry{name: "x", state: StateCrashed, lastError: "exited with status 1", nextRestartAt: now.Add(3 * time.Second)},
+			"plugin x is crashed (exited with status 1); it retries in 3s, or run `code-foundry plugin restart x`"},
+		{entry{name: "x", state: StateFailed, lastError: "crashed 5 times in 10m"},
+			"plugin x is failed (crashed 5 times in 10m); run `code-foundry plugin restart x`"},
+		{entry{name: "x", state: StateDisabled}, "plugin x is disabled; run `code-foundry plugin enable x`"},
+		{entry{name: "x", state: StateStopping}, "plugin x is stopping; run `code-foundry plugin restart x`"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.e.state.String(), func(t *testing.T) {
+			if got := m.commandDownLocked(&tt.e); got != tt.want {
+				t.Errorf("got %q\nwant %q", got, tt.want)
+			}
+			err := command.Failed(pluginDown(tt.want))
+			if !errors.Is(err, command.ErrUnavailable) || err.Error() != tt.want {
+				t.Errorf("pluginDown: %v", err)
+			}
+		})
 	}
 }

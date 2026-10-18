@@ -250,7 +250,7 @@ func TestEnableConsentCommandsAndHost(t *testing.T) {
 	if err != nil || len(list) != 1 || list[0].Key != "word" {
 		t.Errorf("secrets list %+v, %v", list, err)
 	}
-	if _, err := e.invoke("plugin.hello.fail", nil, command.Context{}); err == nil || err.Error() != "it broke" {
+	if _, err := e.invoke("plugin.hello.fail", nil, command.Context{}); err == nil || err.Error() != "it broke" || !command.IsFailed(err) {
 		t.Errorf("fail: %v", err)
 	}
 	if _, err := e.invoke("plugin.hello.slow", nil, command.Context{}); err == nil || !strings.Contains(err.Error(), "did not answer slow within 1s") {
@@ -348,8 +348,8 @@ func TestCrashBackoffFailedRestart(t *testing.T) {
 		t.Errorf("backoff too long: %s", d)
 	}
 	// Commands stay registered while it is down and say why.
-	if _, err := e.invoke("plugin.hello.greet", nil, command.Context{}); !errors.Is(err, command.ErrUnavailable) ||
-		!strings.Contains(err.Error(), "plugin restart hello") {
+	if _, err := e.invoke("plugin.hello.greet", nil, command.Context{}); !errors.Is(err, command.ErrUnavailable) || !command.IsFailed(err) ||
+		!strings.HasPrefix(err.Error(), "plugin hello is failed (crashed 3 times") || !strings.HasSuffix(err.Error(), "; run `code-foundry plugin restart hello`") {
 		t.Fatalf("greet while failed: %v", err)
 	}
 

@@ -112,3 +112,12 @@ message ConfirmationRequired {
   // Command title, for the dialog's confirm button.
   string title = 3;
 }
+
+// CommandFailed is the error detail of an Invoke whose command could not do what it was
+// asked on its own terms, not because the caller got it wrong: a plugin's command
+// answered with an error, or its plugin is not running. The code still says what kind
+// of failure it is (InvalidArgument, FailedPrecondition); clients show the message as it
+// is, and the CLI exits 1 (not 2, its usage status) without pointing at help.
+message CommandFailed {
+  string command = 1;
+}

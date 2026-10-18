@@ -691,6 +691,55 @@ func (x *ConfirmationRequired) GetTitle() string {
 	return ""
 }
 
+// CommandFailed is the error detail of an Invoke whose command could not do what it was
+// asked on its own terms, not because the caller got it wrong: a plugin's command
+// answered with an error, or its plugin is not running. The code still says what kind
+// of failure it is (InvalidArgument, FailedPrecondition); clients show the message as it
+// is, and the CLI exits 1 (not 2, its usage status) without pointing at help.
+type CommandFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Command       string                 `protobuf:"bytes,1,opt,name=command,proto3" json:"command,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CommandFailed) Reset() {
+	*x = CommandFailed{}
+	mi := &file_codefoundry_v1_command_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CommandFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CommandFailed) ProtoMessage() {}
+
+func (x *CommandFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_command_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CommandFailed.ProtoReflect.Descriptor instead.
+func (*CommandFailed) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_command_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *CommandFailed) GetCommand() string {
+	if x != nil {
+		return x.Command
+	}
+	return ""
+}
+
 var File_codefoundry_v1_command_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_command_proto_rawDesc = "" +
@@ -749,7 +798,9 @@ const file_codefoundry_v1_command_proto_rawDesc = "" +
 	"\x14ConfirmationRequired\x12\x18\n" +
 	"\acommand\x18\x01 \x01(\tR\acommand\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12\x14\n" +
-	"\x05title\x18\x03 \x01(\tR\x05title*\x83\x01\n" +
+	"\x05title\x18\x03 \x01(\tR\x05title\")\n" +
+	"\rCommandFailed\x12\x18\n" +
+	"\acommand\x18\x01 \x01(\tR\acommand*\x83\x01\n" +
 	"\aArgType\x12\x18\n" +
 	"\x14ARG_TYPE_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fARG_TYPE_STRING\x10\x01\x12\x11\n" +
@@ -775,7 +826,7 @@ func file_codefoundry_v1_command_proto_rawDescGZIP() []byte {
 }
 
 var file_codefoundry_v1_command_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_codefoundry_v1_command_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_codefoundry_v1_command_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_codefoundry_v1_command_proto_goTypes = []any{
 	(ArgType)(0),                  // 0: codefoundry.v1.ArgType
 	(*UiContext)(nil),             // 1: codefoundry.v1.UiContext
@@ -786,24 +837,25 @@ var file_codefoundry_v1_command_proto_goTypes = []any{
 	(*InvokeCommandRequest)(nil),  // 6: codefoundry.v1.InvokeCommandRequest
 	(*InvokeCommandResponse)(nil), // 7: codefoundry.v1.InvokeCommandResponse
 	(*ConfirmationRequired)(nil),  // 8: codefoundry.v1.ConfirmationRequired
-	nil,                           // 9: codefoundry.v1.InvokeCommandRequest.ArgsEntry
+	(*CommandFailed)(nil),         // 9: codefoundry.v1.CommandFailed
+	nil,                           // 10: codefoundry.v1.InvokeCommandRequest.ArgsEntry
 }
 var file_codefoundry_v1_command_proto_depIdxs = []int32{
-	0, // 0: codefoundry.v1.ArgSpec.type:type_name -> codefoundry.v1.ArgType
-	2, // 1: codefoundry.v1.Command.args:type_name -> codefoundry.v1.ArgSpec
-	1, // 2: codefoundry.v1.ListCommandsRequest.context:type_name -> codefoundry.v1.UiContext
-	3, // 3: codefoundry.v1.ListCommandsResponse.commands:type_name -> codefoundry.v1.Command
-	1, // 4: codefoundry.v1.InvokeCommandRequest.context:type_name -> codefoundry.v1.UiContext
-	9, // 5: codefoundry.v1.InvokeCommandRequest.args:type_name -> codefoundry.v1.InvokeCommandRequest.ArgsEntry
-	4, // 6: codefoundry.v1.CommandService.List:input_type -> codefoundry.v1.ListCommandsRequest
-	6, // 7: codefoundry.v1.CommandService.Invoke:input_type -> codefoundry.v1.InvokeCommandRequest
-	5, // 8: codefoundry.v1.CommandService.List:output_type -> codefoundry.v1.ListCommandsResponse
-	7, // 9: codefoundry.v1.CommandService.Invoke:output_type -> codefoundry.v1.InvokeCommandResponse
-	8, // [8:10] is the sub-list for method output_type
-	6, // [6:8] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	0,  // 0: codefoundry.v1.ArgSpec.type:type_name -> codefoundry.v1.ArgType
+	2,  // 1: codefoundry.v1.Command.args:type_name -> codefoundry.v1.ArgSpec
+	1,  // 2: codefoundry.v1.ListCommandsRequest.context:type_name -> codefoundry.v1.UiContext
+	3,  // 3: codefoundry.v1.ListCommandsResponse.commands:type_name -> codefoundry.v1.Command
+	1,  // 4: codefoundry.v1.InvokeCommandRequest.context:type_name -> codefoundry.v1.UiContext
+	10, // 5: codefoundry.v1.InvokeCommandRequest.args:type_name -> codefoundry.v1.InvokeCommandRequest.ArgsEntry
+	4,  // 6: codefoundry.v1.CommandService.List:input_type -> codefoundry.v1.ListCommandsRequest
+	6,  // 7: codefoundry.v1.CommandService.Invoke:input_type -> codefoundry.v1.InvokeCommandRequest
+	5,  // 8: codefoundry.v1.CommandService.List:output_type -> codefoundry.v1.ListCommandsResponse
+	7,  // 9: codefoundry.v1.CommandService.Invoke:output_type -> codefoundry.v1.InvokeCommandResponse
+	8,  // [8:10] is the sub-list for method output_type
+	6,  // [6:8] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_command_proto_init() }
@@ -817,7 +869,7 @@ func file_codefoundry_v1_command_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_command_proto_rawDesc), len(file_codefoundry_v1_command_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   9,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
