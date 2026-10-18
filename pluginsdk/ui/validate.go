@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"reflect"
 	"regexp"
 	"slices"
 	"strings"
@@ -49,6 +50,8 @@ const (
 	// MaxActValues bounds an action's form values as the host gets them (encoded JSON):
 	// a bigger submit is refused before it reaches the plugin.
 	MaxActValues = 64 << 10
+	// MaxProblems is how many problems Validate names; the rest are counted.
+	MaxProblems = 50
 )
 
 // KeyPattern is the shape of every key. Keys share one namespace across the view.
@@ -60,6 +63,9 @@ var iconPattern = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 // problem, each with its path ("nodes[2].form.fields[0]: …").
 func (v View) Validate() error {
 	c := &checker{keys: map[string]string{}}
+	if rv := reflect.ValueOf(v); !validUTF8(rv) {
+		c.utf8("", rv)
+	}
 	if v.Header != nil {
 		c.header("header", v.Header)
 	}
@@ -82,19 +88,28 @@ func (v View) Validate() error {
 	} else {
 		c.bad("view", "does not encode: %v", err)
 	}
+	if more := c.problems - len(c.errs); more > 0 {
+		c.errs = append(c.errs, fmt.Errorf("view: %d more problems", more))
+	}
 	return errors.Join(c.errs...)
 }
 
 type checker struct {
 	errs     []error
+	problems int
 	keys     map[string]string // key → path of its first use
 	elements int
 	logs     int
 	logBytes int
 }
 
+// bad records a problem; past MaxProblems it only counts it (a view of thousands of bad
+// nodes would otherwise cost megabytes of messages).
 func (c *checker) bad(path, format string, a ...any) {
-	c.errs = append(c.errs, fmt.Errorf("%s: %s", path, fmt.Sprintf(format, a...)))
+	c.problems++
+	if len(c.errs) < MaxProblems {
+		c.errs = append(c.errs, fmt.Errorf("%s: %s", path, fmt.Sprintf(format, a...)))
+	}
 }
 
 func (c *checker) key(path, k string) {
@@ -111,9 +126,6 @@ func (c *checker) key(path, k string) {
 }
 
 func (c *checker) str(path, s string, max int) {
-	if !utf8.ValidString(s) {
-		c.bad(path, "not valid UTF-8")
-	}
 	if n := utf8.RuneCountInString(s); n > max {
 		c.bad(path, "%d characters, at most %d", n, max)
 	}
@@ -202,9 +214,6 @@ func (c *checker) inline(path string, in *Inline, max int) {
 		}
 		if kinds > 1 {
 			c.bad(sp, "a span is text, a time or a duration, not several")
-		}
-		if !utf8.ValidString(s.Text) {
-			c.bad(sp+".text", "not valid UTF-8")
 		}
 		n += utf8.RuneCountInString(s.Text)
 		c.tone(sp+".tone", s.Tone)
@@ -620,4 +629,79 @@ func (c *checker) field(path string, f Field, inFieldset bool) bool {
 		}
 	}
 	return false
+}
+
+// validUTF8 reports whether every string in v is valid UTF-8 (utf8 then names the ones
+// that are not; most views have none, and paths cost).
+func validUTF8(v reflect.Value) bool {
+	switch v.Kind() {
+	case reflect.Pointer, reflect.Interface:
+		return v.IsNil() || validUTF8(v.Elem())
+	case reflect.Struct:
+		for i := range v.NumField() {
+			if v.Type().Field(i).IsExported() && !validUTF8(v.Field(i)) {
+				return false
+			}
+		}
+	case reflect.Slice, reflect.Array:
+		for i := range v.Len() {
+			if !validUTF8(v.Index(i)) {
+				return false
+			}
+		}
+	case reflect.Map:
+		iter := v.MapRange()
+		for iter.Next() {
+			if !validUTF8(iter.Key()) || !validUTF8(iter.Value()) {
+				return false
+			}
+		}
+	case reflect.String:
+		return utf8.ValidString(v.String())
+	}
+	return true
+}
+
+// utf8 reports every string in v that is not valid UTF-8 (struct fields by their JSON
+// names, slice elements, map keys and values). JSON replaces each invalid byte with
+// U+FFFD, so the host would check (and show) other text, of another size, than the
+// plugin did: a log or event data under its byte limit here could be over it there.
+func (c *checker) utf8(path string, v reflect.Value) {
+	switch v.Kind() {
+	case reflect.Pointer, reflect.Interface:
+		if !v.IsNil() {
+			c.utf8(path, v.Elem())
+		}
+	case reflect.Struct:
+		t := v.Type()
+		for i := range t.NumField() {
+			f := t.Field(i)
+			if !f.IsExported() {
+				continue
+			}
+			name, _, _ := strings.Cut(f.Tag.Get("json"), ",")
+			if name == "" {
+				name = strings.ToLower(f.Name)
+			}
+			if path != "" {
+				name = path + "." + name
+			}
+			c.utf8(name, v.Field(i))
+		}
+	case reflect.Slice, reflect.Array:
+		for i := range v.Len() {
+			c.utf8(fmt.Sprintf("%s[%d]", path, i), v.Index(i))
+		}
+	case reflect.Map:
+		iter := v.MapRange()
+		for iter.Next() {
+			k := fmt.Sprint(iter.Key().Interface())
+			c.utf8(path+" key", iter.Key())
+			c.utf8(path+"."+k, iter.Value())
+		}
+	case reflect.String:
+		if !utf8.ValidString(v.String()) {
+			c.bad(path, "not valid UTF-8")
+		}
+	}
 }
