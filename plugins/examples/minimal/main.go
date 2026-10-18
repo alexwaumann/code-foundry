@@ -53,7 +53,8 @@ func hello(_ context.Context, h *pluginsdk.Host, req pluginsdk.CommandRequest) (
 }
 
 // status is one open instance of the status surface: the tab of one thread. The host
-// opens it when someone first looks and closes it a minute after the last one left.
+// opens it when someone first looks and closes it 10 minutes after the last one left
+// (at once when the thread is archived or removed).
 type status struct {
 	h      *pluginsdk.Host
 	open   pluginsdk.SurfaceOpen
