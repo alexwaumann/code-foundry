@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"runtime"
 	"slices"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -135,5 +137,31 @@ func TestOwnedLimitsUnderConcurrency(t *testing.T) {
 	argv, _ := json.Marshal(map[string]any{"argv": append([]string{"sh"}, make([]string, maxTerminalArgv)...)})
 	if _, err := a.terminalCreate(context.Background(), argv); pluginsdk.ErrorCode(err) != pluginsdk.CodeInvalidParams {
 		t.Errorf("an argv of %d empty strings: %v", maxTerminalArgv, err)
+	}
+}
+
+// plugin.json is read only as a bounded regular file: a FIFO blocked discovery (and the
+// store with it), a huge file filled memory.
+func TestReadManifestRefusesFIFOsAndHugeFiles(t *testing.T) {
+	fifo := t.TempDir()
+	if err := syscall.Mkfifo(filepath.Join(fifo, pluginsdk.ManifestFile), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() { _, _, err := readManifest(fifo); done <- err }()
+	select {
+	case err := <-done:
+		if err == nil || !strings.Contains(err.Error(), "not a regular file") {
+			t.Errorf("fifo: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("reading a FIFO plugin.json blocked")
+	}
+	huge := t.TempDir()
+	if err := os.WriteFile(filepath.Join(huge, pluginsdk.ManifestFile), make([]byte, maxManifestBytes+1), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := readManifest(huge); err == nil || !strings.Contains(err.Error(), "over") {
+		t.Errorf("huge: %v", err)
 	}
 }
