@@ -22,9 +22,14 @@ from the prompt at creation, and the namer replaces it.
   period after an abbreviation (`e.g.`, `i.e.`, `etc.`, `vs.`) or ending a one-word
   sentence ("Hi.") does not end it; a version ("v1.2.") does. A trailing `.`, `:`, `;`, `,`
   goes; `?` and `!` stay. Longer than 48 runes: cut at the last space that fits 47, trailing
-  punctuation trimmed, then "…" (48 including it); a first word longer than that is cut
-  mid-word. Nothing left (an image-only prompt): no name, and the id placeholder shows as
-  before.
+  punctuation trimmed, then "…" (48 including it). When that space would keep fewer than
+  23 runes (half the room) the cut is mid-word instead: a first word longer than the
+  limit, but also one short word and then a URL or a path ("Review https://github.com/…"
+  was "Review…") and CJK text with an early space. A mid-word cut backs off to the start
+  of the character there (`clusterStart`): combining marks, emoji modifiers, variation
+  selectors, tags and ZWJ sequences stay with their base, a flag's regional-indicator pair
+  stays whole (an approximation of grapheme clusters, no dependency). Nothing left (an
+  image-only prompt): no name, and the id placeholder shows as before.
 - **Persisted flag.** Migration 0028 adds `threads.name_provisional` (default 0: existing
   names stay real). `Thread.NameProvisional`, `codefoundry.v1.Thread.name_provisional`
   (53), `ThreadView.nameProvisional`. A provisional name has `AutoNamed` false: that flag
@@ -49,7 +54,11 @@ from the prompt at creation, and the namer replaces it.
 - **GUI.** Muted and italic (`text-muted-foreground italic`) on the sidebar row name
   (both the two-line row and the archived/snoozed single line) and the header title,
   `data-provisional` on the row's name. No icon, no tooltip. The unnamed id keeps its
-  muted, upright look.
+  muted, upright look. The sidebar's inline rename field commits only an edit of the name
+  it opened with: opened on a provisional name, then the namer's title lands, then a blur
+  or Enter with the text untouched would otherwise rename the thread to the stale
+  provisional text for good (before, an unnamed thread opened an empty field, which never
+  commits).
 - **CLI.** Text output just shows the name; `--json` (protojson) carries
   `"nameProvisional": true` and leaves it out otherwise.
 
@@ -70,13 +79,14 @@ from the prompt at creation, and the namer replaces it.
 
 - `make check` green.
 - Table tests: `TestProvisionalName` (tokens, projected forms, whitespace, multi-line,
-  sentences, abbreviations, markers, long words, unicode, CJK, image-only),
+  sentences, abbreviations, markers, long words, a URL after a short word, the half-room
+  boundary, unicode, CJK, combining marks, skin tones, ZWJ sequences, flags, image-only),
   `TestProvisionalNameRules` (namer replaces, rename before the namer wins, explicit
   name, image-only, failed namer survives a restart with the namer still to run, first
   message to a prompt-less thread), `TestForkOfProvisionalName`,
   `TestThreadNameProvisionalMigrationDefault`, `TestThreadToProtoNameProvisional`, the
   new-worktree table (a failed namer: provisional name, branch `cf/<id>`), sidebar and
-  header component tests.
+  header component tests, the rename field (the title landing while it is open is kept).
 - Daemon + CLI against an isolated home with a scratch project under `$HOME`, Haiku 5.5
   at medium effort (this machine has no 1M-context credits, so a test-only wrapper set
   as `advanced.claude_path` dropped the `[1m]` suffix and could slow the naming call to
