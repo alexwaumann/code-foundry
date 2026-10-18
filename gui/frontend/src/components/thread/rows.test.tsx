@@ -245,7 +245,8 @@ function turnEndItem(over: Partial<Extract<ThreadItemView, { kind: "turnEnd" }>>
 const interrupted = { subtype: "error_during_execution", isError: true, interrupted: true };
 
 describe("a message sent mid-turn (a steer)", () => {
-  const at = new Date(2026, 9, 17, 14, 12).getTime();
+  // Today at 14:12: the caption shows a bare time only for today's messages.
+  const at = new Date(new Date().setHours(14, 12, 0, 0)).getTime();
   const steered: ThreadItemView[] = [
     { ...base, id: "u", ordinal: 1, kind: "user", text: "run it", attachments: [], composerText: "" },
     { ...base, id: "t1", ordinal: 2, kind: "tool", toolUseId: "t1", name: "Bash", inputJson: '{"command":"sleep 1"}', status: "done", output: "", isError: false, resultJson: "" },
