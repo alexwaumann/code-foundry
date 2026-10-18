@@ -384,6 +384,37 @@ describe("path chips", () => {
     expect(openFileInPanel).toHaveBeenCalledTimes(1);
   });
 
+  it("paths with spaces are chips in a code span, in quotes and on a line of their own", () => {
+    const text = [
+      "`docs/my report.pdf`: one page. The shot is \"shots/screen shot.png\".",
+      "",
+      "/w/shots/plain shot.png",
+      "",
+      "The rest is in src/components/ui like Button.tsx.",
+    ].join("\n");
+    const c = show([user, { ...base, id: "a", ordinal: 2, kind: "text", text }], { working: true });
+    const chips = [...c.querySelectorAll<HTMLElement>('[data-testid="path-chip"]')];
+    expect(chips.map((el) => el.dataset.path)).toEqual(["docs/my report.pdf", "shots/screen shot.png", "/w/shots/plain shot.png", "src/components/ui", "Button.tsx"]);
+    fireEvent.click(chips[0] as HTMLElement);
+    expect(openFileInPanel).toHaveBeenCalledWith("current", { project: "", base: "/w", path: "/w/docs/my report.pdf" });
+  });
+
+  it.each<[string, string, string, string]>([
+    ["an image", "/w/shots/screen shot.png", "screen shot.png shots", "/w/shots/screen shot.png"],
+    ["a PDF", "/w/docs/my report.pdf", "my report.pdf docs", "/w/docs/my report.pdf"],
+    ["a folder with a space", "/Users/a/My Files/notes.md", "notes.md /Users/a/My Files", "/Users/a/My Files/notes.md"],
+  ])("a Read row of %s whose path has spaces is a chip", (_name, filePath, label, opened) => {
+    const c = show(
+      [user, { ...base, id: "r", ordinal: 2, kind: "tool", toolUseId: "r", name: "Read", inputJson: JSON.stringify({ file_path: filePath }), status: "done", output: "", isError: false, resultJson: "" }],
+      { working: true },
+    );
+    const chip = c.querySelector<HTMLElement>('[data-testid="tool-path-chip"]');
+    expect(chip?.dataset.path).toBe(filePath);
+    expect(chip?.textContent).toBe(label);
+    fireEvent.click(chip as HTMLElement);
+    expect(openFileInPanel).toHaveBeenCalledWith("current", { project: "", base: "/w", path: opened });
+  });
+
   it("a Read row opens at its offset", () => {
     const c = show(
       [

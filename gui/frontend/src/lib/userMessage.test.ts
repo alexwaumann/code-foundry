@@ -53,6 +53,17 @@ describe("parseUserMessage", () => {
     expect([...inlineAttachmentPaths(pieces)]).toEqual(["/att/b.png"]);
   });
 
+  it.each<[string, string, string, "image" | "pdf"]>([
+    ["an image", "drop me here.png", "/att/9d08.png", "image"],
+    ["a PDF", "my report (1).pdf", "/att/0a1b-2p.pdf", "pdf"],
+    ["a macOS screenshot (U+202F before AM)", "Screenshot 2026-10-18 at 10.42.13\u202fAM.png", "/att/c3.png", "image"],
+  ])("%s chip whose name has spaces keeps its name and staged path", (_name, name, staged, kind) => {
+    const sent = sentComposerText(`Look at ${image("d1", name)} please`, (id) => (id === "d1" ? 0 : undefined));
+    const pieces = parseUserMessage("(projected)", sent, [staged]);
+    expect(pieces).toEqual([{ kind: "text", text: "Look at " }, { kind, name, path: staged }, { kind: "text", text: " please" }]);
+    expect([...inlineAttachmentPaths(pieces)]).toEqual([staged]);
+  });
+
   it("a chip whose staged file is a PDF (Claude got [PDF: …]) is a pdf piece", () => {
     const composer = `Summarize ${image("0", "spec.pdf")} next to ${image("1", "shot.png")} and ${image("x", "gone.pdf")}`;
     const sent = sentComposerText(composer.replace("](cf-attachment://0)", "](cf-attachment://p1)"), (id) => (id === "p1" ? 0 : undefined));
