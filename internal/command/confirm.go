@@ -1,6 +1,7 @@
 package command
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"regexp"
@@ -81,4 +82,14 @@ type invokeOptions struct {
 // Confirmed marks the call as confirmed by the user, so commands with Confirm run.
 func Confirmed(yes bool) InvokeOption {
 	return func(o *invokeOptions) { o.confirmed = yes }
+}
+
+type confirmedKey struct{}
+
+// ConfirmedIn reports whether the Invoke that runs a command was confirmed by the user
+// (Confirmed(true)), for a command that runs another for the user and passes the
+// confirmation on (plugin.act pressing a view's command button).
+func ConfirmedIn(ctx context.Context) bool {
+	yes, _ := ctx.Value(confirmedKey{}).(bool)
+	return yes
 }

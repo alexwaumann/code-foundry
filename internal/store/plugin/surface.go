@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"sync"
@@ -143,6 +144,8 @@ type SurfaceElement struct {
 	Action string
 	Label  string
 	Form   string
+	// Args are a command element's args as the view sets them.
+	Args map[string]string
 }
 
 // ActRequest is an action on an instance's view element.
@@ -844,7 +847,11 @@ func (m *Manager) SurfaceElements(key string, version uint64) []SurfaceElement {
 	out := make([]SurfaceElement, 0, len(idx.order))
 	for _, k := range idx.order {
 		el := idx.elements[k]
-		out = append(out, SurfaceElement{Key: el.key, Kind: el.kind, Action: el.actionName(), Label: el.label, Form: el.form})
+		se := SurfaceElement{Key: el.key, Kind: el.kind, Action: el.actionName(), Label: el.label, Form: el.form}
+		if el.action != nil && el.action.Command != nil && len(el.action.Command.Args) > 0 {
+			se.Args = maps.Clone(el.action.Command.Args)
+		}
+		out = append(out, se)
 	}
 	return out
 }

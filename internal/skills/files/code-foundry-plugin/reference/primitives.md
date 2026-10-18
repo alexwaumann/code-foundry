@@ -98,7 +98,8 @@ the panel's context, so `args` can leave them out (at most 16 args, 4 KiB togeth
 per value: pass ids, not text), and it runs with the viewer's panel,
 which matters for shared instances (`reference/manifest.md`, "One instance, many
 viewers"). `openUrl` and `copy` are done by the host and never reach the plugin, and
-neither does a command button: `plugin act` cannot press one; run the command instead.
+neither does a command button: `plugin act --key <button>` presses one as the GUI does
+(the command runs with the panel's context; `--yes` for one that asks first).
 
 ## Header and tabs
 

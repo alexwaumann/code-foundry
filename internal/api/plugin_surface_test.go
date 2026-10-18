@@ -155,6 +155,40 @@ func TestGetSurfaceAndAct(t *testing.T) {
 	}
 }
 
+// settle_ms waits for the views after the first until none has come for that long.
+func TestGetSurfaceSettles(t *testing.T) {
+	_, surfaces, c := newSurfaceServer(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	surfaces.Available["hello/main"] = true
+	surfaces.Elements = []plugin.SurfaceElement{{Key: "rerun", Kind: "command", Action: "plugin.hello.rerun", Label: "Rerun", Args: map[string]string{"run": "7"}}}
+	key := "hello/main/thread:s-1"
+	go func() {
+		for surfaces.Watches() == 0 {
+			time.Sleep(5 * time.Millisecond)
+		}
+		surfaces.Push(plugin.SurfaceUpdate{State: &plugin.SurfaceState{Instance: key, Phase: plugin.PhaseLive}})
+		for v := uint64(1); v <= 3; v++ { // "Loading", then two more 100 ms apart
+			surfaces.Push(plugin.SurfaceUpdate{View: &plugin.SurfaceView{Instance: key, Version: v, JSON: []byte(`{"nodes":[]}`)}})
+			time.Sleep(100 * time.Millisecond)
+		}
+	}()
+	start := time.Now()
+	res, err := c.GetSurface(ctx, connect.NewRequest(&v1.GetSurfaceRequest{Ref: helloRef, SettleMs: 400}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := res.Msg.GetView().GetVersion(); got != 3 {
+		t.Errorf("settled on version %d, want 3", got)
+	}
+	if d := time.Since(start); d < 600*time.Millisecond {
+		t.Errorf("returned after %s: did not wait for quiet", d)
+	}
+	if els := res.Msg.GetElements(); len(els) != 1 || els[0].GetArgs()["run"] != "7" {
+		t.Errorf("elements %v", els)
+	}
+}
+
 func TestSurfacesUnimplemented(t *testing.T) {
 	_, c := newPluginServer(t)
 	_, err := c.Act(context.Background(), connect.NewRequest(&v1.SurfaceActRequest{}))

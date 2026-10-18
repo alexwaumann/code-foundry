@@ -157,18 +157,24 @@ any scratch project you `code-foundry project add` to test against, must be unde
 home directory; so must an unpacked release tarball you try):
 
 - `code-foundry plugin <name> <command> [args] --thread <id>`: a command, as its view
-  button would run it. This is how to exercise a command button.
+  button would run it.
 - `code-foundry plugin surface <name> <surface> --thread <id>` opens the surface for that
   thread as the panel would and prints the view the host accepted and the elements an
-  act can name. It returns at the first view: a surface that renders "Loading" first
-  shows that; run it again a moment later (the instance stays open a minute), or watch:
+  act can name (a command button with its args). It returns at the first view: a surface
+  that renders "Loading" first shows that; add `--settle 2s` to wait until no new view
+  has come for 2 s (at most 30 s), or watch:
   `code-foundry plugin surface <name> <surface> --thread <id> --watch > /tmp/view.txt &
-  pid=$!; sleep 5; kill $pid`. `--thread` (and `--project`) take a unique suffix; the
-  global `--context-thread` works too.
-- `code-foundry plugin act <name> <surface> <event> --thread <id>` sends an event: the
+  pid=$!; sleep 5; kill $pid`. The instance stays open 10 minutes after the last look.
+  `--thread` (and `--project`) take a unique suffix; the global `--context-thread` works
+  too.
+- `code-foundry plugin act <name> <surface> <event> --thread <id>` acts as a click: the
   event name positionally or `--key <element key>`, `tab --key <tab key>` for a tab,
-  `--value` for a field's change, `--values '{"field": "…"}'` for a submit. It reaches
-  events only: a command button answers "the host runs it, not the plugin".
+  `--value` for a field's change, `--values '{"field": "…"}'` for a submit. An event goes
+  to the plugin; a command button (`--key <button>`, or its command name positionally)
+  runs its command with the panel's context, as the GUI does (a form's values become its
+  args; a command that asks first needs `--yes`), and prints the command's result. Then
+  it prints the view once no new one has come for `--settle` (default 500ms), so there
+  is no need for a `plugin surface` after it; `--quiet` prints only what happened.
 - A `pr` surface's `when` usually reads `pr.checks.*`: the first try for a thread fails
   with "not known yet" while the checks are fetched; retry after a few seconds.
 - `code-foundry thread new --no-project --name test --created-by=` makes a thread to
