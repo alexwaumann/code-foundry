@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync/atomic"
 	"time"
 
 	"github.com/alexwaumann/code-foundry/pluginsdk"
@@ -68,7 +69,12 @@ func okPlugin() pluginsdk.Plugin {
 			return res, nil
 		}
 	}
+	var changed atomic.Value // the last secret/changed, "key deleted=true"
+	changed.Store("")
 	return pluginsdk.Plugin{
+		OnSecretChanged: func(_ context.Context, _ *pluginsdk.Host, c pluginsdk.SecretChanged) {
+			changed.Store(fmt.Sprintf("%s deleted=%v", c.Key, c.Deleted))
+		},
 		Init: func(_ context.Context, h *pluginsdk.Host) error {
 			h.Log().Info("started", "data", h.DataDir() != "")
 			fmt.Println("stray stdout line") // must land in the log, not the protocol
@@ -128,6 +134,9 @@ func okPlugin() pluginsdk.Plugin {
 			"slow": func(ctx context.Context, _ *pluginsdk.Host, _ pluginsdk.CommandRequest) (pluginsdk.CommandResult, error) {
 				<-ctx.Done()
 				return msg("late")
+			},
+			"changed": func(context.Context, *pluginsdk.Host, pluginsdk.CommandRequest) (pluginsdk.CommandResult, error) {
+				return msg(changed.Load().(string))
 			},
 			"fail": func(context.Context, *pluginsdk.Host, pluginsdk.CommandRequest) (pluginsdk.CommandResult, error) {
 				return pluginsdk.CommandResult{}, errors.New("it broke")

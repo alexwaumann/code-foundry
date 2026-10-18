@@ -43,6 +43,9 @@ type Plugin struct {
 	Surfaces map[string]SurfaceFactory
 	// OnEvent receives subscribed events in order.
 	OnEvent func(ctx context.Context, h *Host, ev Event)
+	// OnSecretChanged learns that the user deleted one of its secrets (`plugin secrets
+	// delete`, Settings): drop what was read from it and ask again (a form, a notice).
+	OnSecretChanged func(ctx context.Context, h *Host, c SecretChanged)
 	// Shutdown runs when the host asks the plugin to stop (it has about 2 seconds).
 	Shutdown func(ctx context.Context, h *Host)
 	// Capabilities the plugin announces in addition to the SDK's own.
@@ -191,6 +194,11 @@ func (s *server) notify(ctx context.Context, method string, params json.RawMessa
 		var ev Event
 		if json.Unmarshal(params, &ev) == nil {
 			s.p.OnEvent(ctx, s.h, ev)
+		}
+	case MethodSecretChanged:
+		var c SecretChanged
+		if s.p.OnSecretChanged != nil && json.Unmarshal(params, &c) == nil {
+			s.p.OnSecretChanged(ctx, s.h, c)
 		}
 	case MethodSurfaceVisibility:
 		var p struct {

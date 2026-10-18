@@ -113,3 +113,24 @@ func TestCloseReasons(t *testing.T) {
 		}
 	}
 }
+
+// A secret the user deletes reaches the plugin as secret/changed.
+func TestDeleteSecretNotifies(t *testing.T) {
+	got := make(chan pluginsdk.SecretChanged, 1)
+	p := pluginsdk.Plugin{OnSecretChanged: func(_ context.Context, _ *pluginsdk.Host, c pluginsdk.SecretChanged) { got <- c }}
+	h := plugintest.Start(t, p, plugintest.Options{Granted: pluginsdk.Permissions{Secrets: true}, Secrets: map[string]string{"token": "t0k"}})
+	if err := h.DeleteSecret("token"); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case c := <-got:
+		if c != (pluginsdk.SecretChanged{Key: "token", Deleted: true}) {
+			t.Errorf("got %+v", c)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("no secret/changed")
+	}
+	if _, ok := h.Secret("token"); ok {
+		t.Error("still stored")
+	}
+}

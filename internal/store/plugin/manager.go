@@ -807,7 +807,16 @@ func (m *Manager) DeleteSecret(ctx context.Context, name, key string) error {
 	if e, ok := m.entry(name); ok {
 		e.logs.add("host", "", "secret deleted by the user: "+key)
 	}
+	m.secretDeleted(name, key)
 	return nil
+}
+
+// secretDeleted tells a running plugin the user deleted one of its secrets
+// (secret/changed); a plugin that is not running reads the list when it starts.
+func (m *Manager) secretDeleted(name, key string) {
+	if conn := m.conn(name); conn != nil {
+		_ = conn.Notify(pluginsdk.MethodSecretChanged, pluginsdk.SecretChanged{Key: key, Deleted: true})
+	}
 }
 
 // Close stops every plugin (shutdown, then SIGTERM, then SIGKILL) and waits.

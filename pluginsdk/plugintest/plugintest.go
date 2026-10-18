@@ -287,6 +287,16 @@ func (h *Host) SetSecret(key, value string) {
 	})
 }
 
+// DeleteSecret deletes a secret as the user would (`plugin secrets delete`, Settings)
+// and sends the plugin secret/changed {key, deleted: true} (Plugin.OnSecretChanged).
+func (h *Host) DeleteSecret(key string) error {
+	h.record(func() {
+		delete(h.values, key)
+		delete(h.secrets, key)
+	})
+	return h.conn.Notify(pluginsdk.MethodSecretChanged, pluginsdk.SecretChanged{Key: key, Deleted: true})
+}
+
 // Flags returns the thread/setFlag calls.
 func (h *Host) Flags() []pluginsdk.Flag {
 	h.mu.Lock()

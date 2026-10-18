@@ -246,9 +246,17 @@ list, err := h.Secrets().List(ctx) // names and set times, never values
 - The usual way in is a form secret input with `store` (`reference/primitives.md`): the
   user types it, the host stores it, the plugin only reads it. A plugin that needs a
   secret it does not have shows a notice with a form, not an error.
-- The user sees and deletes them with `code-foundry plugin secrets list|delete <name>`;
-  the plugin is not told, so read a secret when you need it (and handle "not found")
-  rather than caching that it exists. Disabling the plugin keeps them.
+- The user sees and deletes them with `code-foundry plugin secrets list|delete <name>`
+  (and in Settings). Disabling the plugin keeps them; `uninstall --purge` deletes them.
+
+When the user deletes one, a running plugin gets `secret/changed` `{key, deleted: true}`
+(`Plugin.OnSecretChanged`; not for its own `Delete`): drop what it read from it (a client,
+a cached token) and bring back the form or notice that asks for it. A plugin that was
+not running learns nothing, so still read a secret when you need it and handle "not
+found" rather than caching that it exists. Consent never changes under a running plugin:
+when an update asks for more the host stops it until the user consents again, and every
+start hands over what was granted (`h.Granted()`). Test it with plugintest's
+`h.DeleteSecret(key)`.
 
 ## Toasts
 

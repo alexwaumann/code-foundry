@@ -103,6 +103,7 @@ func testManifest(name string) pluginsdk.Manifest {
 			{Name: "forget", Title: "Forget", Args: []pluginsdk.ArgSpec{{Name: "key"}}},
 			{Name: "slow", Title: "Slow", TimeoutSeconds: 1},
 			{Name: "fail", Title: "Fail"},
+			{Name: "changed", Title: "Changed"},
 		},
 	}
 }
@@ -250,6 +251,14 @@ func TestEnableConsentCommandsAndHost(t *testing.T) {
 	if err != nil || len(list) != 1 || list[0].Key != "word" {
 		t.Errorf("secrets list %+v, %v", list, err)
 	}
+	// The user deleting a secret tells the plugin (secret/changed).
+	if err := m.DeleteSecret(context.Background(), "hello", "word"); err != nil {
+		t.Fatal(err)
+	}
+	e.eventually("secret/changed", func() bool {
+		r, err := e.invoke("plugin.hello.changed", nil, command.Context{})
+		return err == nil && r.Message == "word deleted=true"
+	})
 	if _, err := e.invoke("plugin.hello.fail", nil, command.Context{}); err == nil || err.Error() != "it broke" || !command.IsFailed(err) {
 		t.Errorf("fail: %v", err)
 	}

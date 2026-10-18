@@ -71,6 +71,7 @@ listed and fail with the reason; its surfaces say so.
 | `surface/close` | notification | `{instance, reason}`: `idle` (no viewer for 10 minutes), `context_gone` (thread archived or removed, project removed), `unavailable` (the `when` stopped holding) | `Surface.Close(reason)`; the SDK adds `shutdown` and `reopened` |
 | `surface/act` | request (10 s) | `SurfaceAct{instance, context, version, kind, action, key, data, field, value, values}` → `{}` | `Surface.Act` |
 | `events/event` | notification | `Event{subscription, snapshot, event}` | `Plugin.OnEvent` |
+| `secret/changed` | notification | `{key, deleted: true}`: the user deleted one of its secrets | `Plugin.OnSecretChanged` |
 
 After `surface/open` the plugin sends the instance's view with `view/update` within 10 s
 (else the host shows "not responding"); a view sent before it answers the open counts, so

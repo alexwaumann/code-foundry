@@ -190,6 +190,7 @@ func (m *Manager) purgeSecretsAndData(ctx context.Context, name string) ([]strin
 		if _, err := dropSecret(ctx, m.opts.DB, name, s.Key); err != nil {
 			return purged, err
 		}
+		m.secretDeleted(name, s.Key) // (the callers stopped it first: nothing to tell)
 	}
 	if len(secrets) > 0 {
 		purged = append(purged, fmt.Sprintf("%d secret(s) from the Keychain", len(secrets)))

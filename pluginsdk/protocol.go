@@ -36,7 +36,17 @@ const (
 	MethodSurfaceAct = "surface/act"
 	// MethodEventsEvent (notification): Event, one subscribed event (Plugin.OnEvent).
 	MethodEventsEvent = "events/event"
+	// MethodSecretChanged (notification): SecretChanged, when the user deleted one of the
+	// plugin's secrets (`plugin secrets delete`, Settings) (Plugin.OnSecretChanged). Not
+	// sent for the plugin's own secret/delete.
+	MethodSecretChanged = "secret/changed"
 )
+
+// SecretChanged is secret/changed's params: which secret, and that it is gone.
+type SecretChanged struct {
+	Key     string `json:"key"`
+	Deleted bool   `json:"deleted"`
+}
 
 // Plugin → host methods.
 const (
