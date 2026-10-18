@@ -1,3 +1,3 @@
 module github.com/alexwaumann/code-foundry/pluginsdk
 
-go 1.26.0
+go 1.24.0
