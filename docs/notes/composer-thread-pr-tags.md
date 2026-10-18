@@ -90,6 +90,41 @@ Status: branch `cf/composer-thread-pr-tags`. Two tag kinds next to the skill (`/
   that spec archives it in `beforeEach`; the outdated-SearchFiles case now expects the
   threads-only card.
 
+## Live check (scratch daemon, 2026-10-18)
+
+`make build gui-build`; `CODE_FOUNDRY_HOME=/tmp/cf-tags-home bin/code-foundry daemon --dev`,
+the GUI as an isolated copy on it; a shallow clone of this repository at
+`~/cf-tags-scratch/code-foundry` registered as a project (so the gh store polls
+`alexwaumann/code-foundry`); `threads.default_model` Haiku 5.5, effort medium. Two
+threads from the CLI: "Pick a codename" (Haiku 5.5, replied `CODENAME-AMBER-7731`) and
+"Draft release notes" (no prompt, so no transcript).
+
+* New-thread composer: `@pick` listed "Pick a codename · code-foundry · Finished" under
+  Threads above the matching files; `#18` listed the real #187, #188, #189, #186, #185
+  with their titles. Chips and tooltips as designed (merged PRs in violet).
+* Sent: `Quote the reply in [Pick a codename] and give the title of [#187] using gh. Two
+  lines only.` Claude's first user message in its transcript:
+  `… [Thread "Pick a codename" (id s-bf8cb948c8ab); transcript: /Users/alex/.claude/projects/-Users-alex-cf-tags-scratch-code-foundry/e7b9a8ca-….jsonl]
+  and give the title of alexwaumann/code-foundry#187 using gh …`. It Read that jsonl and
+  ran `gh pr view 187 --repo alexwaumann/code-foundry`; answer: `CODENAME-AMBER-7731` /
+  `feat(thread): provisional thread names from the first prompt`. The bubble drew both chips.
+* Follow-up in that thread's composer (it left itself out of the Threads group) tagging
+  "Draft release notes": Claude got `[Thread "Draft release notes" (id s-6ff1ef00dde8);
+  inspect with: code-foundry thread read s-6ff1ef00dde8]`. (It could not run the CLI in
+  this scratch setup: no `code-foundry` on its PATH.)
+* Daemon log: one WARN, auto-naming failing on the account's 1M-context credit limit
+  (unrelated). Light and dark screenshots in the PR.
+
 ## Verified
 
-See the PR body for the end-to-end run against a real daemon.
+* `make check` green: gofmt, vet, staticcheck, `go test -race ./...`, typecheck, lint,
+  vitest. Go: `TestRewriteThreadRefs` (table: transcript, no transcript, current name
+  cleaned, blank name, unknown id, two lines, shapes left alone, idempotent),
+  `TestSendRewritesThreadRefs`, `TestCreateRewritesThreadRefs`. Vitest: tokens,
+  projection, malformed tokens and member changes (`lib/prompt.test.ts`), the `#` trigger
+  table (`lib/completion.test.ts`), candidates (`lib/tagCandidates.test.ts`: archived,
+  snoozed and the current thread left out, caps, ranking, the pool), bubble pieces
+  (`lib/userMessage.test.ts`), node attrs, the quiet card (`useCompletion.test.tsx`).
+* `make gui-e2e`: 913 passed, 1 failed (`thread.spec.ts` "scrolled up when the turn ends",
+  light, WebKit), which passes alone 3/3; composer-threads and composer-prs pass 2× in both
+  browsers.
