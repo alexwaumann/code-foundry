@@ -156,3 +156,8 @@ clicks and drags.
   source (flash); no button in a bubble, across into a bubble, a click elsewhere hides
   it; Escape, a click outside, an empty comment, Backspace and undo; a folded turn
   unfolds for its chip; a link to an item the thread lacks: "No longer in this thread".
+* `make gui-e2e` (full suite, run while the GUI build and the live check loaded the
+  machine): 921 passed, 46 skipped, 9 failed, none of them in the composer or the
+  timeline (`projects.spec.ts:349`, `settings.spec.ts:293` and `:507`,
+  `threads.spec.ts:242`, `usage-page.spec.ts:36`, `worktree-panel.spec.ts:112`; two of
+  them the `test-results` clobber above). Re-run alone in both browsers: 12/12 passed.
