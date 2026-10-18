@@ -111,8 +111,31 @@ func TestSpawnExtras(t *testing.T) {
 	}
 	e.m.SetSpawnExtras(rec.fn)
 	h2 := e.connected(CreateOptions{NoProject: true})
-	if in := rec.last(); !in.NoProject || in.ThreadID != h2.ID {
+	if in := rec.last(); !in.NoProject || in.ThreadID != h2.ID || in.Owner != "" {
 		t.Errorf("no-project SpawnInfo = %+v", in)
+	}
+
+	// An owned thread's own env and dirs come after the extras' (its env wins), every
+	// spawn; the extras learn its owner.
+	own := t.TempDir()
+	rec.set(SpawnExtras{Env: []string{"CF_HELLO=1"}, AddDirs: []string{plug}})
+	o := e.connected(CreateOptions{NoProject: true, Owner: "plugin:hello", Env: []string{"CF_HELLO=thread", "CF_HELLO_THREAD=1"}, AddDirs: []string{own, plug}})
+	spec = e.spec(o.ID)
+	if got, want := addDirs(spec.Argv), []string{skills, plug, own, att}; !slices.Equal(got, want) {
+		t.Errorf("owned --add-dir = %q, want %q", got, want)
+	}
+	if v, _ := envValue(spec.Env, "CF_HELLO"); v != "thread" {
+		t.Errorf("owned env CF_HELLO = %q, want the thread's", v)
+	}
+	if v, _ := envValue(spec.Env, "CF_HELLO_THREAD"); v != "1" {
+		t.Errorf("owned env CF_HELLO_THREAD = %q", v)
+	}
+	if in := rec.last(); in.Owner != "plugin:hello" || in.ThreadID != o.ID {
+		t.Errorf("owned SpawnInfo = %+v", in)
+	}
+	e.restart()
+	if got, _ := e.m.Get(e.ctx(), o.ID); !slices.Equal(got.SpawnEnv, []string{"CF_HELLO=thread", "CF_HELLO_THREAD=1"}) || !slices.Equal(got.SpawnAddDirs, []string{own, plug}) {
+		t.Errorf("after restart: env %q dirs %q", got.SpawnEnv, got.SpawnAddDirs)
 	}
 }
 
