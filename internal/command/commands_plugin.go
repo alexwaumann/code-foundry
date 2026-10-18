@@ -297,6 +297,8 @@ func formatPlugins(ps []*v1.Plugin) string {
 			note = "new: code-foundry plugin enable " + p.GetName()
 		case p.GetState() == v1.PluginState_PLUGIN_STATE_CRASHED && p.GetNextRestartAt() != nil:
 			note = fmt.Sprintf("%s (restart %d)", note, p.GetRestarts())
+		case p.GetUpdateAvailable() && note == "":
+			note = p.GetUpdateVersion() + " available: code-foundry plugin update " + p.GetName()
 		}
 		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%d\t%s\t%s\n", p.GetName(), p.GetVersion(), state,
 			permissionSummary(p.GetPermissions()), len(p.GetCommands()), surfaceSummary(p.GetSurfaces()), note)

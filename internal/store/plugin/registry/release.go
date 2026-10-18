@@ -49,7 +49,7 @@ func (f Fetcher) ResolveRelease(ctx context.Context, repo, tag, platform, tmpDir
 	args = append(args, "-R", repo, "--json", "tagName,assets")
 	out, err := f.Gh.Run(ctx, args...)
 	if errors.Is(err, ErrNotFound) {
-		what := "a release"
+		what := "published release"
 		if tag != "" {
 			what = "release " + tag
 		}
