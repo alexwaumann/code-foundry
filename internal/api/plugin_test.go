@@ -135,3 +135,29 @@ func TestPluginWatch(t *testing.T) {
 		t.Fatalf("update = %v, %v", stream.Msg(), stream.Err())
 	}
 }
+
+func TestPluginListDirs(t *testing.T) {
+	b := bus.New()
+	fake := plugintest.New(b)
+	for _, tc := range []struct {
+		name          string
+		h             *Plugin
+		plugins, data string
+	}{
+		{"unset", NewPlugin(fake, b), "", ""},
+		{"set", NewPlugin(fake, b).WithDirs("/home/u/.cf/plugins", "/home/u/.cf/plugin-data"), "/home/u/.cf/plugins", "/home/u/.cf/plugin-data"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			res, err := tc.h.List(context.Background(), connect.NewRequest(&v1.ListPluginsRequest{}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := res.Msg.GetPluginsDir(); got != tc.plugins {
+				t.Errorf("plugins_dir = %q, want %q", got, tc.plugins)
+			}
+			if got := res.Msg.GetDataDir(); got != tc.data {
+				t.Errorf("data_dir = %q, want %q", got, tc.data)
+			}
+		})
+	}
+}

@@ -21,6 +21,8 @@ type Plugin struct {
 	bus      *bus.Bus
 	surfaces plugin.Surfaces // nil: WatchSurface, GetSurface and Act are unimplemented
 	beat     time.Duration   // WatchSurface's heartbeat interval; zero is HeartbeatInterval
+	// The plugins dir and the parent of the data dirs, as List reports them (WithDirs).
+	pluginsDir, dataDir string
 }
 
 var _ codefoundryv1connect.PluginServiceHandler = (*Plugin)(nil)
@@ -28,6 +30,13 @@ var _ codefoundryv1connect.PluginServiceHandler = (*Plugin)(nil)
 // NewPlugin returns a PluginService handler. b must be the bus the store publishes
 // plugin.Event on.
 func NewPlugin(store plugin.Store, b *bus.Bus) *Plugin { return &Plugin{store: store, bus: b} }
+
+// WithDirs sets the directories List reports: the packages' (paths.Plugins) and the parent
+// of each plugin's data dir (paths.PluginData), so the GUI names the real ones.
+func (h *Plugin) WithDirs(plugins, data string) *Plugin {
+	h.pluginsDir, h.dataDir = plugins, data
+	return h
+}
 
 // Route mounts the service.
 func (h *Plugin) Route(opts ...connect.HandlerOption) Route {
@@ -39,7 +48,7 @@ func (h *Plugin) Route(opts ...connect.HandlerOption) Route {
 func (h *Plugin) List(_ context.Context, req *connect.Request[v1.ListPluginsRequest]) (*connect.Response[v1.ListPluginsResponse], error) {
 	out := pluginsToProto(h.store.Snapshot().Plugins)
 	h.fillAvailability(out, contextFromProto(req.Msg.GetContext()))
-	return connect.NewResponse(&v1.ListPluginsResponse{Plugins: out}), nil
+	return connect.NewResponse(&v1.ListPluginsResponse{Plugins: out, PluginsDir: h.pluginsDir, DataDir: h.dataDir}), nil
 }
 
 // Enable turns a plugin on, or reports the consent it needs.

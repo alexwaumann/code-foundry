@@ -856,8 +856,12 @@ func (x *ListPluginsRequest) GetContext() *UiContext {
 }
 
 type ListPluginsResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Plugins       []*Plugin              `protobuf:"bytes,1,rep,name=plugins,proto3" json:"plugins,omitempty"`
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Plugins []*Plugin              `protobuf:"bytes,1,rep,name=plugins,proto3" json:"plugins,omitempty"`
+	// Where the packages are (paths.Plugins: <home>/plugins) and the parent of each plugin's
+	// data dir (paths.PluginData: <data_dir>/<name>), for words that name them.
+	PluginsDir    string `protobuf:"bytes,2,opt,name=plugins_dir,json=pluginsDir,proto3" json:"plugins_dir,omitempty"`
+	DataDir       string `protobuf:"bytes,3,opt,name=data_dir,json=dataDir,proto3" json:"data_dir,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -897,6 +901,20 @@ func (x *ListPluginsResponse) GetPlugins() []*Plugin {
 		return x.Plugins
 	}
 	return nil
+}
+
+func (x *ListPluginsResponse) GetPluginsDir() string {
+	if x != nil {
+		return x.PluginsDir
+	}
+	return ""
+}
+
+func (x *ListPluginsResponse) GetDataDir() string {
+	if x != nil {
+		return x.DataDir
+	}
+	return ""
 }
 
 type EnablePluginRequest struct {
@@ -4539,9 +4557,12 @@ const file_codefoundry_v1_plugin_proto_rawDesc = "" +
 	"\x0eupdate_version\x18\x1d \x01(\tR\rupdateVersion\x12'\n" +
 	"\x0fupdate_registry\x18\x1e \x01(\tR\x0eupdateRegistry\"I\n" +
 	"\x12ListPluginsRequest\x123\n" +
-	"\acontext\x18\x01 \x01(\v2\x19.codefoundry.v1.UiContextR\acontext\"G\n" +
+	"\acontext\x18\x01 \x01(\v2\x19.codefoundry.v1.UiContextR\acontext\"\x83\x01\n" +
 	"\x13ListPluginsResponse\x120\n" +
-	"\aplugins\x18\x01 \x03(\v2\x16.codefoundry.v1.PluginR\aplugins\"C\n" +
+	"\aplugins\x18\x01 \x03(\v2\x16.codefoundry.v1.PluginR\aplugins\x12\x1f\n" +
+	"\vplugins_dir\x18\x02 \x01(\tR\n" +
+	"pluginsDir\x12\x19\n" +
+	"\bdata_dir\x18\x03 \x01(\tR\adataDir\"C\n" +
 	"\x13EnablePluginRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
 	"\aconsent\x18\x02 \x01(\bR\aconsent\"\x8e\x01\n" +
