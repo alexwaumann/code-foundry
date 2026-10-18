@@ -1,9 +1,9 @@
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { AgentRunView } from "@/api/agents";
 import type { ThreadItemView } from "@/api/thread";
 import { buildRows, buildTurns, decodeTimelineKey, timelineKey } from "@/lib/threadTimeline";
-import { structOf, useThreadStore } from "@/stores/thread";
+import { setRowExpanded, structOf, useThreadStore } from "@/stores/thread";
 import { ThreadContext } from "./context";
 import { TimelineRowView } from "./rows";
 
@@ -44,7 +44,7 @@ function run(id: string, o: Partial<AgentRunView> = {}): AgentRunView {
   };
 }
 
-const agentCall = (id: string, o: Partial<Extract<ThreadItemView, { kind: "tool" }>> = {}): ThreadItemView => ({
+const agentCall = (id: string, o: Partial<Extract<ThreadItemView, { kind: "tool" }>> = {}): Extract<ThreadItemView, { kind: "tool" }> => ({
   ...base,
   id,
   ordinal: 2,
@@ -86,8 +86,25 @@ describe("Agent rows", () => {
     expect(q(el, "thread-agent-activity")?.className).toBe("act");
     expect(q(el, "thread-agent-elapsed")?.textContent).toMatch(/^4m 1\ds$/);
     expect(el.querySelector('[aria-label="Running"]')).not.toBeNull();
-    expect(q(el, "thread-tool")?.getAttribute("aria-expanded")).toBe("false");
+    // One line: nothing to open while it runs.
+    expect(q(el, "thread-tool")?.tagName).toBe("DIV");
+    expect(q(el, "thread-tool")?.hasAttribute("aria-expanded")).toBe(false);
     expect(q(el, "thread-agent-failed")).toBeNull();
+  });
+
+  it("the meta's order: chip, activity, elapsed, spinner (the activity fills the line between)", () => {
+    const el = show([user, agentCall("t1")], [run("a1", { toolUseId: "t1", background: true, activity: "Reading internal/store/thread/agents.go" })]);
+    const meta = q(el, "thread-tool")?.querySelector(".meta");
+    expect([...(meta?.children ?? [])].map((c) => c.getAttribute("data-testid") ?? c.getAttribute("aria-label"))).toEqual(["thread-agent-bg", "thread-agent-activity", "thread-agent-elapsed", "Running"]);
+  });
+
+  it.each([
+    { name: "a foreground run", o: {} },
+    { name: "a background run", o: { background: true } },
+    { name: "a nested run (spawned by another run)", o: { spawnDepth: 2, parentId: "a0" } },
+  ])("$name shows its activity while it runs", ({ o }) => {
+    const el = show([user, agentCall("t1")], [run("a1", { toolUseId: "t1", activity: "Running go vet", ...o })]);
+    expect(q(el, "thread-agent-activity")?.textContent).toBe("Running go vet");
   });
 
   it("the spinner stays while the run runs even if the call's item says done", () => {
@@ -95,10 +112,46 @@ describe("Agent rows", () => {
     expect(el.querySelector('[aria-label="Running"]')).not.toBeNull();
   });
 
-  it("a running foreground run opens to show its work", () => {
-    const el = show([user, agentCall("t1")], [run("a1", { toolUseId: "t1" })]);
-    expect(q(el, "thread-agent-bg")).toBeNull();
-    expect(q(el, "thread-tool")?.getAttribute("aria-expanded")).toBe("true");
+  // The run's own items (parent_tool_use_id = the call): they belong to the subagent view,
+  // never under the row in the thread.
+  const work: ThreadItemView[] = [
+    { ...agentCall("b1"), ordinal: 3, parentToolUseId: "t1", name: "Bash", inputJson: JSON.stringify({ command: "go vet ./..." }) },
+    { ...base, id: "x1", ordinal: 4, parentToolUseId: "t1", kind: "text", text: "Vet is clean." },
+  ];
+  const REPORT = JSON.stringify({ content: [{ type: "text", text: "All checks pass." }] });
+
+  it.each([
+    { name: "a running foreground run", call: {}, r: {}, opens: false },
+    { name: "a running background run", call: {}, r: { background: true }, opens: false },
+    { name: "a running nested run", call: {}, r: { spawnDepth: 2, parentId: "a0" }, opens: false },
+    { name: "a call done while its run runs on", call: { status: "done" as const, resultJson: REPORT }, r: { background: true }, opens: false },
+    { name: "a done run with a report", call: { status: "done" as const, resultJson: REPORT }, r: { status: "done" as const, endedAtMs: NOW }, opens: true },
+    { name: "a done run without one", call: { status: "done" as const }, r: { status: "done" as const, endedAtMs: NOW }, opens: false },
+    { name: "an older daemon's running call", call: {}, r: null, opens: false },
+    { name: "an older daemon's done call", call: { status: "done" as const, resultJson: REPORT }, r: null, opens: true },
+  ])("$name: one line, never open by itself, never its nested rows (opens: $opens)", ({ call, r, opens }) => {
+    const el = show([user, agentCall("t1", call), ...work], r ? [run("a1", { toolUseId: "t1", ...r })] : []);
+    const row = q(el, "thread-tool") as HTMLElement;
+    expect(row.tagName).toBe(opens ? "BUTTON" : "DIV");
+    expect(row.querySelector(".chev") !== null).toBe(opens);
+    if (opens) {
+      expect(row.getAttribute("aria-expanded")).toBe("false");
+      fireEvent.click(row);
+      expect(row.getAttribute("aria-expanded")).toBe("true");
+      expect(q(el, "thread-agent-report")?.textContent).toBe("All checks pass.");
+    }
+    if (!opens) expect(q(el, "thread-agent-report")).toBeNull();
+    // Only the Agent call itself: none of the run's rows, open or not.
+    expect([...el.querySelectorAll("[data-tool]")].map((e) => e.getAttribute("data-tool"))).toEqual(["Agent"]);
+    expect(el.textContent).not.toContain("Vet is clean.");
+  });
+
+  it("a row the reader had opened shows no nested rows while its run runs", () => {
+    setRowExpanded("s", "t1", true);
+    const el = show([user, agentCall("t1"), ...work], [run("a1", { toolUseId: "t1" })]);
+    expect(q(el, "thread-tool")?.tagName).toBe("DIV");
+    expect(el.querySelectorAll("[data-tool]")).toHaveLength(1);
+    expect(q(el, "thread-agent-report")).toBeNull();
   });
 
   it("a failed background run: background and failed chips, its duration, no spinner", () => {

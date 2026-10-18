@@ -93,20 +93,30 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("Open on Agent rows", () => {
-  it("a thread's own run has Open (beside the row, which still folds); a nested one has none", () => {
-    // a1 is the thread's own (expanded: a running foreground run), n1 its nested run.
+  it("a thread's own run has Open beside its one-line row; its nested run gets no row in the thread", () => {
+    // a1 is the thread's own (a running foreground run), n1 its nested run.
     const el = showTimeline([user, call("toolu_a1"), call("toolu_n1", "toolu_a1")], [run("a1", { background: false }), run("n1", { parentId: "a1", spawnDepth: 2, background: false })]);
     const opens = screen.getAllByTestId("thread-agent-open");
     expect(opens.map((b) => b.getAttribute("data-run"))).toEqual(["a1"]);
     expect(opens[0]?.textContent).toBe("Open");
     expect(opens[0]?.getAttribute("aria-label")).toBe("Open run a1");
-    // Not inside the row's own button: the row still toggles.
+    // Beside the row, not inside it; while the run works the row itself has nothing to open.
     const host = opens[0]?.closest(".agent-host");
-    expect(host?.querySelector(":scope > button.row")).not.toBeNull();
-    expect(opens[0]?.closest("button.row")).toBeNull();
+    expect(host?.querySelector(':scope > div.row[data-testid="thread-tool"]')).not.toBeNull();
+    expect(opens[0]?.closest(".row")).toBeNull();
     fireEvent.click(opens[0] as HTMLElement);
     expect(openAgentRun).toHaveBeenCalledWith("s", "a1");
     expect(el.querySelectorAll(".agent-host")).toHaveLength(1);
+    expect(el.querySelectorAll("[data-tool]")).toHaveLength(1);
+  });
+
+  it("an ended run's Open sits beside the row, which still opens to its report", () => {
+    const done = { ...call("toolu_a1"), status: "done", output: "Report." } as ThreadItemView;
+    showTimeline([user, done], [run("a1", { status: "done", endedAtMs: NOW })]);
+    const open = screen.getByTestId("thread-agent-open");
+    const row = open.closest(".agent-host")?.querySelector(":scope > button.row");
+    expect(row).not.toBeNull();
+    expect(open.closest("button.row")).toBeNull();
   });
 
   it("nothing to open without a known run, or where thread.agent.open is not listed", () => {

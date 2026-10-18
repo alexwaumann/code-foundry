@@ -37,7 +37,7 @@ import { formatAgo } from "@/lib/thread";
 import { questionsOf } from "@/lib/threadRequest";
 import { wakeLine, type WakeTone } from "@/lib/wake";
 import { groupLabel, turnCostLabel, type TimelineRow, type WorkNode } from "@/lib/threadTimeline";
-import { formatDuration, parseObject, splitPath, str, toolFileTarget, toolSummary, type Tense } from "@/lib/toolSummary";
+import { agentReport, formatDuration, parseObject, splitPath, str, toolFileTarget, toolSummary, type Tense } from "@/lib/toolSummary";
 import { useAgentRunOfCall, useAgentRunOfNote } from "@/stores/agents";
 import { useNoteCreator } from "@/stores/lineage";
 import { useModelChoices } from "@/stores/settings";
@@ -208,8 +208,10 @@ function AgentMeta({ run, itemRunning, fallback }: { run: AgentRunView; itemRunn
 }
 
 /**
- * A tool call: its row, and when open its detail (a subagent: its nested rows and report).
- * Open by default: a running subagent, and a file edit waiting for permission.
+ * A tool call: its row, and when open its detail. Open by default: a file edit waiting for
+ * permission. An Agent call stays one line: it never opens by itself, and while its run
+ * works it has nothing to open (the run's work is in the subagent view, Open ›, and the
+ * Agents tab, never under the row); once ended it opens to the report the run handed back.
  */
 const ToolRow = memo(function ToolRow({ node }: { node: Extract<WorkNode, { type: "tool" }> }) {
   const { threadId, cwd } = useThreadCtx();
@@ -222,14 +224,14 @@ const ToolRow = memo(function ToolRow({ node }: { node: Extract<WorkNode, { type
   const run = useAgentRunOfCall(threadId, agent ? node.id : "");
   const request = perm?.kind === "permission" ? perm.request : null;
   const waiting = request?.state === "pending";
-  // A running foreground subagent opens to show its work; a background one stays a line
-  // (its progress is the activity on the row, the strip and the Agents tab), and so does a
-  // nested run (spawned by another run): the stream never carries its work.
-  const [open, toggle] = useToggle(node.key, (agent && t?.status === "running" && !run?.background && (run?.spawnDepth ?? 1) <= 1) || (waiting && EDIT_TOOLS.has(node.name)));
+  const [open, toggle] = useToggle(node.key, waiting && EDIT_TOOLS.has(node.name));
   if (!t) return null;
   const tense: Tense = waiting ? "pending" : t.status === "running" ? "running" : "done";
   const s = toolSummary(t, { tense, durationMs: durationOf(t), cwd });
   const denied = request?.state === "denied";
+  // An Agent call's only detail is its report, once the call and its run have ended.
+  const report = agent && !waiting && t.status !== "running" && run?.status !== "running" ? agentReport(t) : "";
+  const expandable = agent ? report !== "" : !waiting || EDIT_TOOLS.has(t.name);
   const meta = waiting ? (
     <span className="t-amber" data-testid="thread-waiting">
       waiting for you
@@ -259,21 +261,16 @@ const ToolRow = memo(function ToolRow({ node }: { node: Extract<WorkNode, { type
         icon={toolIcon(t.name)}
         label={<ToolLabel t={t} tense={tense} cwd={cwd} />}
         meta={meta}
-        expanded={waiting && !EDIT_TOOLS.has(t.name) ? undefined : open}
+        expanded={expandable ? open : undefined}
         onToggle={toggle}
         testId="thread-tool"
         data={{ "data-waiting": waiting ? "true" : undefined }}
       />
       {openable && <AgentOpen threadId={threadId} runId={run.id} name={agentName(run)} />}
       {open &&
-        (!waiting || EDIT_TOOLS.has(t.name)) &&
+        expandable &&
         (agent ? (
-          <div className="children">
-            {node.children.map((c) => (
-              <WorkNodeView key={c.key} node={c} nested />
-            ))}
-            {t.status !== "running" && <AgentReport t={t} />}
-          </div>
+          <AgentReport text={report} />
         ) : (
           <div className="detail">
             {request && request.state !== "allowed" && request.message && <p className="mb-1 text-caption">{request.message}</p>}
@@ -372,7 +369,7 @@ function CopyAnswer({ answer }: { answer: string }) {
   );
 }
 
-const TextRow = memo(function TextRow({ id, final, answer, nested }: { id: string; final: boolean; answer?: string; nested?: boolean }) {
+const TextRow = memo(function TextRow({ id, final, answer }: { id: string; final: boolean; answer?: string }) {
   const { threadId } = useThreadCtx();
   const it = useThreadItem(threadId, id);
   const text = it?.kind === "text" ? it.text : "";
@@ -385,13 +382,6 @@ const TextRow = memo(function TextRow({ id, final, answer, nested }: { id: strin
       <ThreadMarkdown className={it.streaming ? "cf-streaming" : undefined}>{it.text}</ThreadMarkdown>
     </CodeRunContext.Provider>
   );
-  if (nested) {
-    return (
-      <div className="subresult selectable" data-testid="thread-text">
-        {md}
-      </div>
-    );
-  }
   return (
     <div className={final ? "a-md final selectable" : "a-md selectable"} data-testid="thread-text" data-final={final || undefined} data-streaming={it.streaming || undefined}>
       {md}
@@ -636,8 +626,8 @@ function AgentNoteRow({ note, atMs, threadId, run }: { note: ReturnType<typeof p
   );
 }
 
-/** A row of a turn's work log, top level or nested under a subagent. */
-export function WorkNodeView({ node, nested }: { node: WorkNode; nested?: boolean }) {
+/** A row of a turn's work log. */
+export function WorkNodeView({ node }: { node: WorkNode }) {
   switch (node.type) {
     case "tool":
       return <ToolRow node={node} />;
@@ -646,7 +636,7 @@ export function WorkNodeView({ node, nested }: { node: WorkNode; nested?: boolea
     case "thinking":
       return <ThinkingRow node={node} />;
     case "text":
-      return <TextRow id={node.id} final={node.final} answer={nested ? undefined : node.answer} nested={nested} />;
+      return <TextRow id={node.id} final={node.final} answer={node.answer} />;
     case "question":
       return <QuestionRow id={node.id} />;
     case "permission":
