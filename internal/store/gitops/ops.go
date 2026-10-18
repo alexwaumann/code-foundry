@@ -1,6 +1,7 @@
 package gitops
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -293,9 +294,14 @@ func (m *Manager) OpenPR(ctx context.Context, worktreePath string) (Op, error) {
 	})
 }
 
-// OpenEditor implements Store.
-func (m *Manager) OpenEditor(ctx context.Context, worktreePath string) (Op, error) {
-	t, err := m.resolve(worktreePath)
+// OpenEditor implements Store: the worktree, or o.File (at o.Line where the editor
+// takes one; editorArgs), in the configured editor.
+func (m *Manager) OpenEditor(ctx context.Context, o OpenOptions) (Op, error) {
+	t, err := m.resolve(o.WorktreePath)
+	if err != nil {
+		return Op{}, err
+	}
+	file, err := m.resolveFile(t, o.File)
 	if err != nil {
 		return Op{}, err
 	}
@@ -303,11 +309,19 @@ func (m *Manager) OpenEditor(ctx context.Context, worktreePath string) (Op, erro
 	if m.opts.editorEnv != nil {
 		env = *m.opts.editorEnv
 	}
-	argv, err := resolveEditor(m.opts.Editor(), t.path, env)
+	argv, err := resolveEditor(m.opts.Editor(), PathPlaceholder, env)
 	if errors.Is(err, ErrInvalidArgument) {
 		return Op{}, err
 	}
-	return m.submit(ctx, KindOpenEditor, "Open "+filepath.Base(t.path)+" in editor", t, false, func(ctx context.Context, x *run) (string, string, error) {
+	what := filepath.Base(t.path)
+	switch {
+	case err != nil: // no editor: the op fails with the reason
+	case file != "":
+		argv, what = editorArgs(argv, file, o.Line), filepath.Base(file)
+	default:
+		argv = withPath(argv, t.path)
+	}
+	return m.submit(ctx, KindOpenEditor, "Open "+what+" in editor", t, false, func(ctx context.Context, x *run) (string, string, error) {
 		if err != nil {
 			x.note("%v", err)
 			return "", "", &opError{summary: err.Error()}
@@ -315,7 +329,7 @@ func (m *Manager) OpenEditor(ctx context.Context, worktreePath string) (Op, erro
 		if _, err := x.exec(ctx, Cmd{Name: argv[0], Args: argv[1:]}); err != nil {
 			return "", "", err
 		}
-		return "opened " + filepath.Base(t.path) + " in " + editorName(argv), "", nil
+		return "opened " + what + " in " + editorName(argv), "", nil
 	})
 }
 
@@ -327,17 +341,22 @@ func editorName(argv []string) string {
 	return filepath.Base(argv[0])
 }
 
-// Reveal implements Store: `open -R <path>` selects the worktree in Finder.
-func (m *Manager) Reveal(ctx context.Context, worktreePath string) (Op, error) {
-	t, err := m.resolve(worktreePath)
+// Reveal implements Store: `open -R <path>` selects the worktree, or o.File, in Finder.
+func (m *Manager) Reveal(ctx context.Context, o OpenOptions) (Op, error) {
+	t, err := m.resolve(o.WorktreePath)
 	if err != nil {
 		return Op{}, err
 	}
-	return m.submit(ctx, KindReveal, "Reveal "+filepath.Base(t.path)+" in Finder", t, false, func(ctx context.Context, x *run) (string, string, error) {
-		if _, err := x.exec(ctx, Cmd{Name: m.opts.Open, Args: []string{"-R", t.path}}); err != nil {
+	file, err := m.resolveFile(t, o.File)
+	if err != nil {
+		return Op{}, err
+	}
+	p := cmp.Or(file, t.path)
+	return m.submit(ctx, KindReveal, "Reveal "+filepath.Base(p)+" in Finder", t, false, func(ctx context.Context, x *run) (string, string, error) {
+		if _, err := x.exec(ctx, Cmd{Name: m.opts.Open, Args: []string{"-R", p}}); err != nil {
 			return "", "", err
 		}
-		return "revealed " + t.path + " in Finder", "", nil
+		return "revealed " + p + " in Finder", "", nil
 	})
 }
 

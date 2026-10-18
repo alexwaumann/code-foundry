@@ -90,6 +90,20 @@ service GhService {
   // viewer (an issue comment, not a review). The body is trimmed, required, and at most
   // 65536 bytes. Errors and the event as for SubmitPullRequestReview.
   rpc AddPullRequestComment(AddPullRequestCommentRequest) returns (AddPullRequestCommentResponse) {}
+  // GetPullRequestDiff returns a pull request's unified diff as GitHub renders it
+  // (REST pulls/{n} with Accept: application/vnd.github.v3.diff; the base side is the
+  // merge base, and a cross-repository pull request works the same). Cached in memory
+  // per pull request and head commit: a call whose cached head matches the pull
+  // request's cached head (GetPullRequestDetail's) is served without a request; refresh
+  // always fetches. At most 4 MiB (truncated says when the rest was dropped). GitHub
+  // refuses diffs over 20,000 lines or 1 MB of patch (FAILED_PRECONDITION with its
+  // message).
+  rpc GetPullRequestDiff(GetPullRequestDiffRequest) returns (GetPullRequestDiffResponse) {}
+  // GetPullRequestFile returns one file at a commit (REST contents/{path}?ref= with
+  // Accept: application/vnd.github.raw+json), at most 1 MiB. A missing path (or a
+  // directory) is not_found, not an error. Cached in memory by (repository, commit,
+  // path); a commit's file never changes.
+  rpc GetPullRequestFile(GetPullRequestFileRequest) returns (GetPullRequestFileResponse) {}
 }
 
 // GitHub's pull request state.
@@ -241,6 +255,10 @@ message PullRequest {
   // Only the poll's fingerprint is known so far (the detail fetch is pending or
   // failed): title and the detail fields are empty. The next poll retries.
   bool partial = 27;
+  // The base branch's head commit as GitHub last computed the pull request (the old
+  // side of its diff is the merge base of this and head_sha). Empty in a cache written
+  // before it was fetched, until the next detail fetch.
+  string base_sha = 28;
 }
 
 message PullRequestReview {
@@ -788,4 +806,46 @@ message AddPullRequestCommentResponse {
   string id = 1;
   string url = 2;
   google.protobuf.Timestamp created_at = 3;
+}
+
+// ---- Pull request diff and files (GetPullRequestDiff, GetPullRequestFile) ---------
+
+message GetPullRequestDiffRequest {
+  string repo_slug = 1;
+  int32 number = 2;
+  // Fetch from GitHub even when a diff for the cached head commit is cached.
+  bool refresh = 3;
+}
+
+message GetPullRequestDiffResponse {
+  // Unified diff text ("diff --git a/... b/..." per file), possibly cut at a line
+  // boundary when truncated.
+  string diff = 1;
+  // The head and base commits the diff was computed for (from the cached pull
+  // request at fetch time; empty when it was not cached yet).
+  string head_sha = 2;
+  string base_sha = 3;
+  // The diff was over 4 MiB; diff holds its first whole lines.
+  bool truncated = 4;
+  google.protobuf.Timestamp fetched_at = 5;
+}
+
+message GetPullRequestFileRequest {
+  // The repository to read from: the pull request's, or for the head side of a
+  // cross-repository pull request its head_repo_slug.
+  string repo_slug = 1;
+  // A full commit SHA (head_sha, base_sha, or a merge base).
+  string ref = 2;
+  // Repository-relative path with forward slashes.
+  string path = 3;
+}
+
+message GetPullRequestFileResponse {
+  bytes contents = 1;
+  // The file is over 1 MiB; contents holds its first MiB.
+  bool truncated = 2;
+  // NUL in the first 8 KiB.
+  bool binary = 3;
+  // No file at path in ref (or path is a directory or a submodule).
+  bool not_found = 4;
 }

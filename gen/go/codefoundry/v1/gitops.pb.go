@@ -817,8 +817,14 @@ func (x *OpenPullRequestResponse) GetOp() *GitOp {
 }
 
 type OpenEditorRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	WorktreePath  string                 `protobuf:"bytes,1,opt,name=worktree_path,json=worktreePath,proto3" json:"worktree_path,omitempty"`
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	WorktreePath string                 `protobuf:"bytes,1,opt,name=worktree_path,json=worktreePath,proto3" json:"worktree_path,omitempty"`
+	// Optional file to open instead of the folder: absolute, or relative to
+	// worktree_path. Must be under the home directory.
+	File string `protobuf:"bytes,2,opt,name=file,proto3" json:"file,omitempty"`
+	// 1-based line to open file at; 0 for none. VS Code, Cursor and Windsurf get
+	// `-g file:line`, Zed and Sublime Text `file:line`; other editors only the file.
+	Line          uint32 `protobuf:"varint,3,opt,name=line,proto3" json:"line,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -858,6 +864,20 @@ func (x *OpenEditorRequest) GetWorktreePath() string {
 		return x.WorktreePath
 	}
 	return ""
+}
+
+func (x *OpenEditorRequest) GetFile() string {
+	if x != nil {
+		return x.File
+	}
+	return ""
+}
+
+func (x *OpenEditorRequest) GetLine() uint32 {
+	if x != nil {
+		return x.Line
+	}
+	return 0
 }
 
 type OpenEditorResponse struct {
@@ -905,8 +925,11 @@ func (x *OpenEditorResponse) GetOp() *GitOp {
 }
 
 type RevealRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	WorktreePath  string                 `protobuf:"bytes,1,opt,name=worktree_path,json=worktreePath,proto3" json:"worktree_path,omitempty"`
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	WorktreePath string                 `protobuf:"bytes,1,opt,name=worktree_path,json=worktreePath,proto3" json:"worktree_path,omitempty"`
+	// Optional file to reveal instead of the folder: absolute, or relative to
+	// worktree_path. Must be under the home directory.
+	File          string `protobuf:"bytes,2,opt,name=file,proto3" json:"file,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -944,6 +967,13 @@ func (*RevealRequest) Descriptor() ([]byte, []int) {
 func (x *RevealRequest) GetWorktreePath() string {
 	if x != nil {
 		return x.WorktreePath
+	}
+	return ""
+}
+
+func (x *RevealRequest) GetFile() string {
+	if x != nil {
+		return x.File
 	}
 	return ""
 }
@@ -1413,13 +1443,16 @@ const file_codefoundry_v1_gitops_proto_rawDesc = "" +
 	"\x16OpenPullRequestRequest\x12#\n" +
 	"\rworktree_path\x18\x01 \x01(\tR\fworktreePath\"@\n" +
 	"\x17OpenPullRequestResponse\x12%\n" +
-	"\x02op\x18\x01 \x01(\v2\x15.codefoundry.v1.GitOpR\x02op\"8\n" +
+	"\x02op\x18\x01 \x01(\v2\x15.codefoundry.v1.GitOpR\x02op\"`\n" +
 	"\x11OpenEditorRequest\x12#\n" +
-	"\rworktree_path\x18\x01 \x01(\tR\fworktreePath\";\n" +
+	"\rworktree_path\x18\x01 \x01(\tR\fworktreePath\x12\x12\n" +
+	"\x04file\x18\x02 \x01(\tR\x04file\x12\x12\n" +
+	"\x04line\x18\x03 \x01(\rR\x04line\";\n" +
 	"\x12OpenEditorResponse\x12%\n" +
-	"\x02op\x18\x01 \x01(\v2\x15.codefoundry.v1.GitOpR\x02op\"4\n" +
+	"\x02op\x18\x01 \x01(\v2\x15.codefoundry.v1.GitOpR\x02op\"H\n" +
 	"\rRevealRequest\x12#\n" +
-	"\rworktree_path\x18\x01 \x01(\tR\fworktreePath\"7\n" +
+	"\rworktree_path\x18\x01 \x01(\tR\fworktreePath\x12\x12\n" +
+	"\x04file\x18\x02 \x01(\tR\x04file\"7\n" +
 	"\x0eRevealResponse\x12%\n" +
 	"\x02op\x18\x01 \x01(\v2\x15.codefoundry.v1.GitOpR\x02op\"\"\n" +
 	"\x0eOpenUrlRequest\x12\x10\n" +

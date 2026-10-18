@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/filesystem.proto.
  */
 export const file_codefoundry_v1_filesystem: GenFile = /*@__PURE__*/
-  fileDesc("Ch9jb2RlZm91bmRyeS92MS9maWxlc3lzdGVtLnByb3RvEg5jb2RlZm91bmRyeS52MSIoChZMaXN0RGlyZWN0b3JpZXNSZXF1ZXN0Eg4KBnByZWZpeBgBIAEoCSJQCg5EaXJlY3RvcnlFbnRyeRIMCgRwYXRoGAEgASgJEgwKBG5hbWUYAiABKAkSDgoGaXNfZ2l0GAMgASgIEhIKCnJlZ2lzdGVyZWQYBCABKAgicQoXTGlzdERpcmVjdG9yaWVzUmVzcG9uc2USLwoHZW50cmllcxgBIAMoCzIeLmNvZGVmb3VuZHJ5LnYxLkRpcmVjdG9yeUVudHJ5EhIKCmNvbXBsZXRpb24YAiABKAkSEQoJdHJ1bmNhdGVkGAMgASgIIi8KC1NraWxsU291cmNlEhIKCnByb2plY3RfaWQYASABKAkSDAoEcGF0aBgCIAEoCSJXChFMaXN0U2tpbGxzUmVxdWVzdBIsCgdzb3VyY2VzGAEgAygLMhsuY29kZWZvdW5kcnkudjEuU2tpbGxTb3VyY2USFAoMaW5jbHVkZV91c2VyGAIgASgIIncKBVNraWxsEgwKBG5hbWUYASABKAkSEwoLZGVzY3JpcHRpb24YAiABKAkSKQoFc2NvcGUYAyABKA4yGi5jb2RlZm91bmRyeS52MS5Ta2lsbFNjb3BlEhIKCnByb2plY3RfaWQYBCABKAkSDAoEcGF0aBgFIAEoCSI7ChJMaXN0U2tpbGxzUmVzcG9uc2USJQoGc2tpbGxzGAEgAygLMhUuY29kZWZvdW5kcnkudjEuU2tpbGwiVAoSU2VhcmNoRmlsZXNSZXF1ZXN0EhIKCnByb2plY3RfaWQYASABKAkSDAoEcGF0aBgCIAEoCRINCgVxdWVyeRgDIAEoCRINCgVsaW1pdBgEIAEoBSIpCglGaWxlTWF0Y2gSDAoEcGF0aBgBIAEoCRIOCgZpc19kaXIYAiABKAgiVAoTU2VhcmNoRmlsZXNSZXNwb25zZRIqCgdtYXRjaGVzGAEgAygLMhkuY29kZWZvdW5kcnkudjEuRmlsZU1hdGNoEhEKCXRydW5jYXRlZBgCIAEoCCpYCgpTa2lsbFNjb3BlEhsKF1NLSUxMX1NDT1BFX1VOU1BFQ0lGSUVEEAASFAoQU0tJTExfU0NPUEVfVVNFUhABEhcKE1NLSUxMX1NDT1BFX1BST0pFQ1QQAjKqAgoRRmlsZXN5c3RlbVNlcnZpY2USZAoPTGlzdERpcmVjdG9yaWVzEiYuY29kZWZvdW5kcnkudjEuTGlzdERpcmVjdG9yaWVzUmVxdWVzdBonLmNvZGVmb3VuZHJ5LnYxLkxpc3REaXJlY3Rvcmllc1Jlc3BvbnNlIgASVQoKTGlzdFNraWxscxIhLmNvZGVmb3VuZHJ5LnYxLkxpc3RTa2lsbHNSZXF1ZXN0GiIuY29kZWZvdW5kcnkudjEuTGlzdFNraWxsc1Jlc3BvbnNlIgASWAoLU2VhcmNoRmlsZXMSIi5jb2RlZm91bmRyeS52MS5TZWFyY2hGaWxlc1JlcXVlc3QaIy5jb2RlZm91bmRyeS52MS5TZWFyY2hGaWxlc1Jlc3BvbnNlIgBCxwEKEmNvbS5jb2RlZm91bmRyeS52MUIPRmlsZXN5c3RlbVByb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM");
+  fileDesc("Ch9jb2RlZm91bmRyeS92MS9maWxlc3lzdGVtLnByb3RvEg5jb2RlZm91bmRyeS52MSIoChZMaXN0RGlyZWN0b3JpZXNSZXF1ZXN0Eg4KBnByZWZpeBgBIAEoCSJQCg5EaXJlY3RvcnlFbnRyeRIMCgRwYXRoGAEgASgJEgwKBG5hbWUYAiABKAkSDgoGaXNfZ2l0GAMgASgIEhIKCnJlZ2lzdGVyZWQYBCABKAgicQoXTGlzdERpcmVjdG9yaWVzUmVzcG9uc2USLwoHZW50cmllcxgBIAMoCzIeLmNvZGVmb3VuZHJ5LnYxLkRpcmVjdG9yeUVudHJ5EhIKCmNvbXBsZXRpb24YAiABKAkSEQoJdHJ1bmNhdGVkGAMgASgIIi8KC1NraWxsU291cmNlEhIKCnByb2plY3RfaWQYASABKAkSDAoEcGF0aBgCIAEoCSJXChFMaXN0U2tpbGxzUmVxdWVzdBIsCgdzb3VyY2VzGAEgAygLMhsuY29kZWZvdW5kcnkudjEuU2tpbGxTb3VyY2USFAoMaW5jbHVkZV91c2VyGAIgASgIIncKBVNraWxsEgwKBG5hbWUYASABKAkSEwoLZGVzY3JpcHRpb24YAiABKAkSKQoFc2NvcGUYAyABKA4yGi5jb2RlZm91bmRyeS52MS5Ta2lsbFNjb3BlEhIKCnByb2plY3RfaWQYBCABKAkSDAoEcGF0aBgFIAEoCSI7ChJMaXN0U2tpbGxzUmVzcG9uc2USJQoGc2tpbGxzGAEgAygLMhUuY29kZWZvdW5kcnkudjEuU2tpbGwiVAoSU2VhcmNoRmlsZXNSZXF1ZXN0EhIKCnByb2plY3RfaWQYASABKAkSDAoEcGF0aBgCIAEoCRINCgVxdWVyeRgDIAEoCRINCgVsaW1pdBgEIAEoBSIpCglGaWxlTWF0Y2gSDAoEcGF0aBgBIAEoCRIOCgZpc19kaXIYAiABKAgiVAoTU2VhcmNoRmlsZXNSZXNwb25zZRIqCgdtYXRjaGVzGAEgAygLMhkuY29kZWZvdW5kcnkudjEuRmlsZU1hdGNoEhEKCXRydW5jYXRlZBgCIAEoCCJECg9SZWFkRmlsZVJlcXVlc3QSEAoIYmFzZV9kaXIYASABKAkSDAoEcGF0aBgCIAEoCRIRCgltYXhfYnl0ZXMYAyABKAMitwEKEFJlYWRGaWxlUmVzcG9uc2USEAoIY29udGVudHMYASABKAwSDAoEc2l6ZRgCIAEoAxIRCgl0cnVuY2F0ZWQYAyABKAgSDgoGYmluYXJ5GAQgASgIEhEKCW1pbWVfdHlwZRgFIAEoCRITCgttb2RpZmllZF9hdBgGIAEoAxIVCg1yZXNvbHZlZF9wYXRoGAcgASgJEhEKCW5vdF9mb3VuZBgIIAEoCBIOCgZpc19kaXIYCSABKAgqWAoKU2tpbGxTY29wZRIbChdTS0lMTF9TQ09QRV9VTlNQRUNJRklFRBAAEhQKEFNLSUxMX1NDT1BFX1VTRVIQARIXChNTS0lMTF9TQ09QRV9QUk9KRUNUEAIy+wIKEUZpbGVzeXN0ZW1TZXJ2aWNlEmQKD0xpc3REaXJlY3RvcmllcxImLmNvZGVmb3VuZHJ5LnYxLkxpc3REaXJlY3Rvcmllc1JlcXVlc3QaJy5jb2RlZm91bmRyeS52MS5MaXN0RGlyZWN0b3JpZXNSZXNwb25zZSIAElUKCkxpc3RTa2lsbHMSIS5jb2RlZm91bmRyeS52MS5MaXN0U2tpbGxzUmVxdWVzdBoiLmNvZGVmb3VuZHJ5LnYxLkxpc3RTa2lsbHNSZXNwb25zZSIAElgKC1NlYXJjaEZpbGVzEiIuY29kZWZvdW5kcnkudjEuU2VhcmNoRmlsZXNSZXF1ZXN0GiMuY29kZWZvdW5kcnkudjEuU2VhcmNoRmlsZXNSZXNwb25zZSIAEk8KCFJlYWRGaWxlEh8uY29kZWZvdW5kcnkudjEuUmVhZEZpbGVSZXF1ZXN0GiAuY29kZWZvdW5kcnkudjEuUmVhZEZpbGVSZXNwb25zZSIAQscBChJjb20uY29kZWZvdW5kcnkudjFCD0ZpbGVzeXN0ZW1Qcm90b1ABWkdnaXRodWIuY29tL2FsZXh3YXVtYW5uL2NvZGUtZm91bmRyeS9nZW4vZ28vY29kZWZvdW5kcnkvdjE7Y29kZWZvdW5kcnl2MaICA0NYWKoCDkNvZGVmb3VuZHJ5LlYxygIOQ29kZWZvdW5kcnlcVjHiAhpDb2RlZm91bmRyeVxWMVxHUEJNZXRhZGF0YeoCD0NvZGVmb3VuZHJ5OjpWMWIGcHJvdG8z");
 
 /**
  * @generated from message codefoundry.v1.ListDirectoriesRequest
@@ -314,6 +314,117 @@ export const SearchFilesResponseSchema: GenMessage<SearchFilesResponse> = /*@__P
   messageDesc(file_codefoundry_v1_filesystem, 9);
 
 /**
+ * @generated from message codefoundry.v1.ReadFileRequest
+ */
+export type ReadFileRequest = Message<"codefoundry.v1.ReadFileRequest"> & {
+  /**
+   * Absolute directory a relative path is resolved against. Ignored for an absolute
+   * path.
+   *
+   * @generated from field: string base_dir = 1;
+   */
+  baseDir: string;
+
+  /**
+   * Absolute, "~/"-prefixed, or relative to base_dir.
+   *
+   * @generated from field: string path = 2;
+   */
+  path: string;
+
+  /**
+   * Maximum bytes of contents. Zero means 1 MiB, which is also the limit.
+   *
+   * @generated from field: int64 max_bytes = 3;
+   */
+  maxBytes: bigint;
+};
+
+/**
+ * Describes the message codefoundry.v1.ReadFileRequest.
+ * Use `create(ReadFileRequestSchema)` to create a new message.
+ */
+export const ReadFileRequestSchema: GenMessage<ReadFileRequest> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_filesystem, 10);
+
+/**
+ * @generated from message codefoundry.v1.ReadFileResponse
+ */
+export type ReadFileResponse = Message<"codefoundry.v1.ReadFileResponse"> & {
+  /**
+   * The first max_bytes of the file.
+   *
+   * @generated from field: bytes contents = 1;
+   */
+  contents: Uint8Array;
+
+  /**
+   * The file's full size in bytes.
+   *
+   * @generated from field: int64 size = 2;
+   */
+  size: bigint;
+
+  /**
+   * size > len(contents).
+   *
+   * @generated from field: bool truncated = 3;
+   */
+  truncated: boolean;
+
+  /**
+   * NUL in the first 8 KiB, or a MIME type that is not text (images, PDFs, archives).
+   * Contents are returned anyway (the viewer shows images inline).
+   *
+   * @generated from field: bool binary = 4;
+   */
+  binary: boolean;
+
+  /**
+   * From the extension, else sniffed from the contents ("text/markdown",
+   * "image/png", "text/plain; charset=utf-8", "application/octet-stream").
+   *
+   * @generated from field: string mime_type = 5;
+   */
+  mimeType: string;
+
+  /**
+   * Modification time, unix milliseconds.
+   *
+   * @generated from field: int64 modified_at = 6;
+   */
+  modifiedAt: bigint;
+
+  /**
+   * Absolute, cleaned path as asked for (before following symlinks).
+   *
+   * @generated from field: string resolved_path = 7;
+   */
+  resolvedPath: string;
+
+  /**
+   * Nothing exists at resolved_path; the other fields are empty.
+   *
+   * @generated from field: bool not_found = 8;
+   */
+  notFound: boolean;
+
+  /**
+   * resolved_path is a directory; only size and modified_at are set.
+   *
+   * @generated from field: bool is_dir = 9;
+   */
+  isDir: boolean;
+};
+
+/**
+ * Describes the message codefoundry.v1.ReadFileResponse.
+ * Use `create(ReadFileResponseSchema)` to create a new message.
+ */
+export const ReadFileResponseSchema: GenMessage<ReadFileResponse> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_filesystem, 11);
+
+/**
  * @generated from enum codefoundry.v1.SkillScope
  */
 export enum SkillScope {
@@ -397,6 +508,21 @@ export const FilesystemService: GenService<{
     methodKind: "unary";
     input: typeof SearchFilesRequestSchema;
     output: typeof SearchFilesResponseSchema;
+  },
+  /**
+   * ReadFile reads one file for the file viewer. path is absolute, or relative to
+   * base_dir (a thread's worktree, or the home directory); "~/" is the home
+   * directory. Symlinks are followed, and the file they lead to must be under the
+   * home directory too: InvalidArgument otherwise (also for a relative path without
+   * an absolute base_dir). A missing path is not_found and a directory is_dir, not
+   * errors. Contents are at most max_bytes (default and limit 1 MiB).
+   *
+   * @generated from rpc codefoundry.v1.FilesystemService.ReadFile
+   */
+  readFile: {
+    methodKind: "unary";
+    input: typeof ReadFileRequestSchema;
+    output: typeof ReadFileResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_codefoundry_v1_filesystem, 0);

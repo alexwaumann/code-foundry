@@ -74,9 +74,10 @@ type GitOpsServiceClient interface {
 	CreatePullRequest(context.Context, *connect.Request[v1.CreatePullRequestRequest]) (*connect.Response[v1.CreatePullRequestResponse], error)
 	// OpenPullRequest opens the current branch's pull request in the default browser.
 	OpenPullRequest(context.Context, *connect.Request[v1.OpenPullRequestRequest]) (*connect.Response[v1.OpenPullRequestResponse], error)
-	// OpenEditor opens the worktree in the configured editor.
+	// OpenEditor opens the worktree in the configured editor, or with file one file of
+	// it (at line, for editors that take one).
 	OpenEditor(context.Context, *connect.Request[v1.OpenEditorRequest]) (*connect.Response[v1.OpenEditorResponse], error)
-	// Reveal shows the worktree in Finder (`open -R`).
+	// Reveal shows the worktree (or file in it) in Finder (`open -R`).
 	Reveal(context.Context, *connect.Request[v1.RevealRequest]) (*connect.Response[v1.RevealResponse], error)
 	// OpenUrl opens an http(s) URL in the default browser.
 	OpenUrl(context.Context, *connect.Request[v1.OpenUrlRequest]) (*connect.Response[v1.OpenUrlResponse], error)
@@ -240,9 +241,10 @@ type GitOpsServiceHandler interface {
 	CreatePullRequest(context.Context, *connect.Request[v1.CreatePullRequestRequest]) (*connect.Response[v1.CreatePullRequestResponse], error)
 	// OpenPullRequest opens the current branch's pull request in the default browser.
 	OpenPullRequest(context.Context, *connect.Request[v1.OpenPullRequestRequest]) (*connect.Response[v1.OpenPullRequestResponse], error)
-	// OpenEditor opens the worktree in the configured editor.
+	// OpenEditor opens the worktree in the configured editor, or with file one file of
+	// it (at line, for editors that take one).
 	OpenEditor(context.Context, *connect.Request[v1.OpenEditorRequest]) (*connect.Response[v1.OpenEditorResponse], error)
-	// Reveal shows the worktree in Finder (`open -R`).
+	// Reveal shows the worktree (or file in it) in Finder (`open -R`).
 	Reveal(context.Context, *connect.Request[v1.RevealRequest]) (*connect.Response[v1.RevealResponse], error)
 	// OpenUrl opens an http(s) URL in the default browser.
 	OpenUrl(context.Context, *connect.Request[v1.OpenUrlRequest]) (*connect.Response[v1.OpenUrlResponse], error)

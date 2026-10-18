@@ -125,7 +125,8 @@ func TestDecodeFullPullRequestMerged(t *testing.T) {
 		t.Fatal(err)
 	}
 	pr := d.PullRequest
-	if pr.State != PullRequestMerged || pr.ID != "PR_kwDOVAtW7M8AAAABHeFTDg" || pr.Number != 1 || pr.MergedAt.IsZero() {
+	if pr.State != PullRequestMerged || pr.ID != "PR_kwDOVAtW7M8AAAABHeFTDg" || pr.Number != 1 || pr.MergedAt.IsZero() ||
+		pr.BaseSHA != "a0a498be5609f463418f939f9d333c898770393b" {
 		t.Errorf("summary = %+v", pr)
 	}
 	if d.MergeCommitSHA != "1ef770ad823852e60967de188fbbd02663e33409" || d.MergedBy != "alexwaumann" || d.ClosedAt.IsZero() {

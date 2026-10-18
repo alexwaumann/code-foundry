@@ -93,6 +93,7 @@ fragment PullRequestSummary on PullRequest {
   headRefName
   headRefOid
   baseRefName
+  baseRefOid
   isCrossRepository
   additions
   deletions

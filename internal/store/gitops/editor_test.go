@@ -88,3 +88,32 @@ func TestSplitWords(t *testing.T) {
 		}
 	}
 }
+
+func TestEditorArgs(t *testing.T) {
+	const f = "/w/a.go"
+	tests := []struct {
+		name     string
+		template []string
+		line     int
+		want     []string
+	}{
+		{"code at line", []string{"/opt/bin/code", PathPlaceholder}, 12, []string{"/opt/bin/code", "-g", f + ":12"}},
+		{"cursor with flags", []string{"cursor", "-r", PathPlaceholder}, 3, []string{"cursor", "-r", "-g", f + ":3"}},
+		{"windsurf no line", []string{"windsurf", PathPlaceholder}, 0, []string{"windsurf", f}},
+		{"zed", []string{"/usr/local/bin/zed", PathPlaceholder}, 5, []string{"/usr/local/bin/zed", f + ":5"}},
+		{"subl", []string{"subl", PathPlaceholder}, 5, []string{"subl", f + ":5"}},
+		{"open -a", []string{"/usr/bin/open", "-a", "Visual Studio Code", PathPlaceholder}, 5, []string{"/usr/bin/open", "-a", "Visual Studio Code", f}},
+		{"unknown editor", []string{"idea", PathPlaceholder}, 5, []string{"idea", f}},
+		{"placeholder inside an arg", []string{"code", "--file=" + PathPlaceholder}, 2, []string{"code", "--file=" + f + ":2"}},
+	}
+	for _, tt := range tests {
+		if got := editorArgs(tt.template, f, tt.line); !slices.Equal(got, tt.want) {
+			t.Errorf("%s: got %q, want %q", tt.name, got, tt.want)
+		}
+	}
+	// resolveEditor with the placeholder as the path is the template editorArgs fills.
+	got, err := resolveEditor("code -n", PathPlaceholder, fakeEditorEnv(nil, []string{"code"}, nil))
+	if err != nil || !slices.Equal(editorArgs(got, f, 4), []string{"/bin/code", "-n", "-g", f + ":4"}) {
+		t.Errorf("configured template = %q, %v", got, err)
+	}
+}

@@ -186,6 +186,7 @@ describe("gh mapping", () => {
       isCrossRepository: true,
       partial: true,
       headSha: "abc123",
+      baseSha: "def456",
     });
     const v = toPullRequestView(p);
     expect(v).toMatchObject({
@@ -206,8 +207,9 @@ describe("gh mapping", () => {
       isCrossRepository: true,
       partial: true,
       headSha: "abc123",
+      baseSha: "def456",
     });
-    expect(toPullRequestView(create(PullRequestSchema, {}))).toMatchObject({ mergeable: null, mergeState: "", partial: false, headSha: "" });
+    expect(toPullRequestView(create(PullRequestSchema, {}))).toMatchObject({ mergeable: null, mergeState: "", partial: false, headSha: "", baseSha: "" });
   });
 
   it("maps a pull request detail", () => {

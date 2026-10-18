@@ -445,19 +445,18 @@ func computeHeadPart(key headKey, run func(...string) ([]byte, error)) (*headPar
 	if key.baseSHA == "" {
 		return hp, nil
 	}
-	out, err := run("merge-base", key.head, key.baseSHA)
-	switch {
-	case err == nil:
-		hp.mergeBase = string(trimNL(out))
-	case isExit(err, 1):
-		// No merge base (unrelated histories, or beyond a shallow boundary): compare
-		// only uncommitted changes, like having no base. Exit 1 is git's answer, so it
-		// is cached; any other failure is an error and is not.
-		return hp, nil
-	default:
+	var err error
+	if hp.mergeBase, err = runMergeBase(key, run); err != nil {
 		return nil, err
 	}
-	if out, err = run(gitDiff("--name-status", hp.mergeBase, key.head)...); err != nil {
+	if hp.mergeBase == "" {
+		// No merge base: compare only uncommitted changes, like having no base. It is
+		// git's answer (exit 1), so it is cached; any other failure is an error and is
+		// not.
+		return hp, nil
+	}
+	out, err := run(gitDiff("--name-status", hp.mergeBase, key.head)...)
+	if err != nil {
 		return nil, err
 	}
 	hp.committed = parseNameStatusZ(out)

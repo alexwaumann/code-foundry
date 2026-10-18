@@ -166,3 +166,23 @@ func (h *Filesystem) checkout(projectID, path string) (dir string, git bool, err
 	}
 	return real, git, nil
 }
+
+// ReadFile reads one file under home for the file viewer.
+func (h *Filesystem) ReadFile(_ context.Context, req *connect.Request[v1.ReadFileRequest]) (*connect.Response[v1.ReadFileResponse], error) {
+	m := req.Msg
+	f, err := fsx.ReadFile(h.root, m.GetBaseDir(), m.GetPath(), m.GetMaxBytes())
+	if err != nil {
+		if errors.Is(err, fsx.ErrInvalidArgument) {
+			return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		}
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	out := &v1.ReadFileResponse{
+		Contents: f.Contents, Size: f.Size, Truncated: f.Truncated, Binary: f.Binary, MimeType: f.MIMEType,
+		ResolvedPath: f.Path, NotFound: f.NotFound, IsDir: f.IsDir,
+	}
+	if !f.ModifiedAt.IsZero() {
+		out.ModifiedAt = f.ModifiedAt.UnixMilli()
+	}
+	return connect.NewResponse(out), nil
+}

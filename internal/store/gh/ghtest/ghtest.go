@@ -23,9 +23,11 @@ type Store struct {
 	branch  map[string]gh.BranchPullRequests
 	err     error
 	calls   []string
-	detail  detailState       // detail.go
-	cards   []gh.Repository   // search.go
-	owners  []gh.PublishOwner // owners.go
+	detail  detailState                   // detail.go
+	cards   []gh.Repository               // search.go
+	owners  []gh.PublishOwner             // owners.go
+	diffs   map[string]gh.PullRequestDiff // files.go
+	files   map[string]gh.PullRequestFile // files.go
 }
 
 var _ gh.Service = (*Store)(nil)

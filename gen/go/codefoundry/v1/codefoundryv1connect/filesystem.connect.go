@@ -42,6 +42,9 @@ const (
 	// FilesystemServiceSearchFilesProcedure is the fully-qualified name of the FilesystemService's
 	// SearchFiles RPC.
 	FilesystemServiceSearchFilesProcedure = "/codefoundry.v1.FilesystemService/SearchFiles"
+	// FilesystemServiceReadFileProcedure is the fully-qualified name of the FilesystemService's
+	// ReadFile RPC.
+	FilesystemServiceReadFileProcedure = "/codefoundry.v1.FilesystemService/ReadFile"
 )
 
 // FilesystemServiceClient is a client for the codefoundry.v1.FilesystemService service.
@@ -69,6 +72,13 @@ type FilesystemServiceClient interface {
 	// the shallowest entries. An unknown project is NotFound; a path outside the home
 	// directory is InvalidArgument.
 	SearchFiles(context.Context, *connect.Request[v1.SearchFilesRequest]) (*connect.Response[v1.SearchFilesResponse], error)
+	// ReadFile reads one file for the file viewer. path is absolute, or relative to
+	// base_dir (a thread's worktree, or the home directory); "~/" is the home
+	// directory. Symlinks are followed, and the file they lead to must be under the
+	// home directory too: InvalidArgument otherwise (also for a relative path without
+	// an absolute base_dir). A missing path is not_found and a directory is_dir, not
+	// errors. Contents are at most max_bytes (default and limit 1 MiB).
+	ReadFile(context.Context, *connect.Request[v1.ReadFileRequest]) (*connect.Response[v1.ReadFileResponse], error)
 }
 
 // NewFilesystemServiceClient constructs a client for the codefoundry.v1.FilesystemService service.
@@ -100,6 +110,12 @@ func NewFilesystemServiceClient(httpClient connect.HTTPClient, baseURL string, o
 			connect.WithSchema(filesystemServiceMethods.ByName("SearchFiles")),
 			connect.WithClientOptions(opts...),
 		),
+		readFile: connect.NewClient[v1.ReadFileRequest, v1.ReadFileResponse](
+			httpClient,
+			baseURL+FilesystemServiceReadFileProcedure,
+			connect.WithSchema(filesystemServiceMethods.ByName("ReadFile")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -108,6 +124,7 @@ type filesystemServiceClient struct {
 	listDirectories *connect.Client[v1.ListDirectoriesRequest, v1.ListDirectoriesResponse]
 	listSkills      *connect.Client[v1.ListSkillsRequest, v1.ListSkillsResponse]
 	searchFiles     *connect.Client[v1.SearchFilesRequest, v1.SearchFilesResponse]
+	readFile        *connect.Client[v1.ReadFileRequest, v1.ReadFileResponse]
 }
 
 // ListDirectories calls codefoundry.v1.FilesystemService.ListDirectories.
@@ -123,6 +140,11 @@ func (c *filesystemServiceClient) ListSkills(ctx context.Context, req *connect.R
 // SearchFiles calls codefoundry.v1.FilesystemService.SearchFiles.
 func (c *filesystemServiceClient) SearchFiles(ctx context.Context, req *connect.Request[v1.SearchFilesRequest]) (*connect.Response[v1.SearchFilesResponse], error) {
 	return c.searchFiles.CallUnary(ctx, req)
+}
+
+// ReadFile calls codefoundry.v1.FilesystemService.ReadFile.
+func (c *filesystemServiceClient) ReadFile(ctx context.Context, req *connect.Request[v1.ReadFileRequest]) (*connect.Response[v1.ReadFileResponse], error) {
+	return c.readFile.CallUnary(ctx, req)
 }
 
 // FilesystemServiceHandler is an implementation of the codefoundry.v1.FilesystemService service.
@@ -150,6 +172,13 @@ type FilesystemServiceHandler interface {
 	// the shallowest entries. An unknown project is NotFound; a path outside the home
 	// directory is InvalidArgument.
 	SearchFiles(context.Context, *connect.Request[v1.SearchFilesRequest]) (*connect.Response[v1.SearchFilesResponse], error)
+	// ReadFile reads one file for the file viewer. path is absolute, or relative to
+	// base_dir (a thread's worktree, or the home directory); "~/" is the home
+	// directory. Symlinks are followed, and the file they lead to must be under the
+	// home directory too: InvalidArgument otherwise (also for a relative path without
+	// an absolute base_dir). A missing path is not_found and a directory is_dir, not
+	// errors. Contents are at most max_bytes (default and limit 1 MiB).
+	ReadFile(context.Context, *connect.Request[v1.ReadFileRequest]) (*connect.Response[v1.ReadFileResponse], error)
 }
 
 // NewFilesystemServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -177,6 +206,12 @@ func NewFilesystemServiceHandler(svc FilesystemServiceHandler, opts ...connect.H
 		connect.WithSchema(filesystemServiceMethods.ByName("SearchFiles")),
 		connect.WithHandlerOptions(opts...),
 	)
+	filesystemServiceReadFileHandler := connect.NewUnaryHandler(
+		FilesystemServiceReadFileProcedure,
+		svc.ReadFile,
+		connect.WithSchema(filesystemServiceMethods.ByName("ReadFile")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/codefoundry.v1.FilesystemService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case FilesystemServiceListDirectoriesProcedure:
@@ -185,6 +220,8 @@ func NewFilesystemServiceHandler(svc FilesystemServiceHandler, opts ...connect.H
 			filesystemServiceListSkillsHandler.ServeHTTP(w, r)
 		case FilesystemServiceSearchFilesProcedure:
 			filesystemServiceSearchFilesHandler.ServeHTTP(w, r)
+		case FilesystemServiceReadFileProcedure:
+			filesystemServiceReadFileHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -204,4 +241,8 @@ func (UnimplementedFilesystemServiceHandler) ListSkills(context.Context, *connec
 
 func (UnimplementedFilesystemServiceHandler) SearchFiles(context.Context, *connect.Request[v1.SearchFilesRequest]) (*connect.Response[v1.SearchFilesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.FilesystemService.SearchFiles is not implemented"))
+}
+
+func (UnimplementedFilesystemServiceHandler) ReadFile(context.Context, *connect.Request[v1.ReadFileRequest]) (*connect.Response[v1.ReadFileResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.FilesystemService.ReadFile is not implemented"))
 }

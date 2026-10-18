@@ -72,6 +72,8 @@ export interface PullRequestView {
   /** The head commit (full SHA); "" if unknown. The merge button sends it as pr.merge's head-sha. */
   headSha: string;
   baseRef: string;
+  /** The base branch's head commit (full SHA) when GitHub last computed the PR; "" if unknown. */
+  baseSha: string;
   review: ReviewView;
   checks: CheckRollupView;
   createdAtMs: number | null;
@@ -367,6 +369,7 @@ export function toPullRequestView(p: PullRequest): PullRequestView {
     headRef: p.headRef,
     headSha: p.headSha,
     baseRef: p.baseRef,
+    baseSha: p.baseSha,
     review: reviews[p.reviewDecision],
     checks: toRollupView(p.checks),
     createdAtMs: ms(p.createdAt),

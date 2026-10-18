@@ -124,14 +124,26 @@ func (f *Fake) OpenPR(_ context.Context, path string) (gitops.Op, error) {
 	return f.do(gitops.KindPROpen, path, "OpenPR "+path)
 }
 
-// OpenEditor implements gitops.Store.
-func (f *Fake) OpenEditor(_ context.Context, path string) (gitops.Op, error) {
-	return f.do(gitops.KindOpenEditor, path, "OpenEditor "+path)
+// OpenEditor implements gitops.Store. It records "OpenEditor <worktree>", plus
+// " <file>:<line>" with a file.
+func (f *Fake) OpenEditor(_ context.Context, o gitops.OpenOptions) (gitops.Op, error) {
+	return f.do(gitops.KindOpenEditor, o.WorktreePath, "OpenEditor "+o.WorktreePath+fileSuffix(o, true))
 }
 
-// Reveal implements gitops.Store.
-func (f *Fake) Reveal(_ context.Context, path string) (gitops.Op, error) {
-	return f.do(gitops.KindReveal, path, "Reveal "+path)
+// Reveal implements gitops.Store. It records "Reveal <worktree>", plus " <file>" with
+// a file.
+func (f *Fake) Reveal(_ context.Context, o gitops.OpenOptions) (gitops.Op, error) {
+	return f.do(gitops.KindReveal, o.WorktreePath, "Reveal "+o.WorktreePath+fileSuffix(o, false))
+}
+
+func fileSuffix(o gitops.OpenOptions, line bool) string {
+	switch {
+	case o.File == "":
+		return ""
+	case line:
+		return fmt.Sprintf(" %s:%d", o.File, o.Line)
+	}
+	return " " + o.File
 }
 
 // OpenURL implements gitops.Store.

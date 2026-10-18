@@ -143,7 +143,7 @@ func (r *HTTPRunner) GraphQL(ctx context.Context, query string, vars map[string]
 	if err != nil {
 		return nil, fmt.Errorf("github graphql: encode request: %w", err)
 	}
-	res, err := r.do(ctx, http.MethodPost, r.opts.BaseURL+"/graphql", body)
+	res, err := r.do(ctx, http.MethodPost, r.opts.BaseURL+"/graphql", body, sendOpts{})
 	if err != nil {
 		return nil, err
 	}
@@ -152,6 +152,18 @@ func (r *HTTPRunner) GraphQL(ctx context.Context, query string, vars map[string]
 
 // REST implements RESTRunner: GET <BaseURL>/<path>?<params>.
 func (r *HTTPRunner) REST(ctx context.Context, path string, params map[string]string) (json.RawMessage, error) {
+	res, err := r.do(ctx, http.MethodGet, r.restURL(path, params), nil, sendOpts{})
+	if err != nil {
+		return nil, err
+	}
+	if !res.ok() {
+		return nil, classifyHTTP(res)
+	}
+	return res.body, nil
+}
+
+// restURL is <BaseURL>/<path>?<params>.
+func (r *HTTPRunner) restURL(path string, params map[string]string) string {
 	u := r.opts.BaseURL + "/" + strings.TrimPrefix(path, "/")
 	if len(params) > 0 {
 		q := url.Values{}
@@ -160,14 +172,7 @@ func (r *HTTPRunner) REST(ctx context.Context, path string, params map[string]st
 		}
 		u += "?" + q.Encode()
 	}
-	res, err := r.do(ctx, http.MethodGet, u, nil)
-	if err != nil {
-		return nil, err
-	}
-	if !res.ok() {
-		return nil, classifyHTTP(res)
-	}
-	return res.body, nil
+	return u
 }
 
 // AuthStatus implements Runner. It resolves the token afresh and validates it with
@@ -181,7 +186,7 @@ func (r *HTTPRunner) AuthStatus(ctx context.Context) (AuthStatus, error) {
 		}
 		return AuthStatus{}, err
 	}
-	res, err := r.send(ctx, http.MethodGet, r.opts.BaseURL+"/user", nil, tok)
+	res, err := r.send(ctx, http.MethodGet, r.opts.BaseURL+"/user", nil, tok, sendOpts{})
 	if err != nil {
 		return AuthStatus{}, err
 	}
@@ -203,12 +208,12 @@ func (r *HTTPRunner) AuthStatus(ctx context.Context) (AuthStatus, error) {
 // do sends a request with the cached token. On 401 it resolves the token again and,
 // when gh now has a different one, retries once. A token that cannot be resolved is
 // ErrNotAuthenticated.
-func (r *HTTPRunner) do(ctx context.Context, method, u string, body []byte) (httpResult, error) {
+func (r *HTTPRunner) do(ctx context.Context, method, u string, body []byte, o sendOpts) (httpResult, error) {
 	tok, err := r.resolveToken(ctx, false)
 	if err != nil {
 		return httpResult{}, notAuthenticated(err)
 	}
-	res, err := r.send(ctx, method, u, body, tok)
+	res, err := r.send(ctx, method, u, body, tok, o)
 	if err != nil || res.status != http.StatusUnauthorized {
 		return res, err
 	}
@@ -221,7 +226,7 @@ func (r *HTTPRunner) do(ctx context.Context, method, u string, body []byte) (htt
 		return res, nil
 	}
 	r.opts.Log.Info("github rejected the token; retrying with the one gh has now")
-	return r.send(ctx, method, u, body, fresh)
+	return r.send(ctx, method, u, body, fresh, o)
 }
 
 func notAuthenticated(err error) error {
@@ -257,13 +262,24 @@ type httpResult struct {
 	status int
 	header http.Header
 	body   []byte
+	// truncated: the body was longer than sendOpts.limit, and body holds the first
+	// limit bytes.
+	truncated bool
+}
+
+// sendOpts varies a request from the JSON default.
+type sendOpts struct {
+	// accept is the Accept header; application/vnd.github+json when empty.
+	accept string
+	// limit caps the body read (maxBody when zero); a longer body sets truncated.
+	limit int64
 }
 
 func (h httpResult) ok() bool { return h.status >= 200 && h.status < 300 }
 
 // send performs one request within Timeout. Transport failures are ErrNetwork, except
 // cancellation of ctx itself, which is returned as is.
-func (r *HTTPRunner) send(ctx context.Context, method, u string, body []byte, tok string) (httpResult, error) {
+func (r *HTTPRunner) send(ctx context.Context, method, u string, body []byte, tok string, o sendOpts) (httpResult, error) {
 	cctx, cancel := context.WithTimeout(ctx, r.opts.Timeout)
 	defer cancel()
 	var reused bool
@@ -280,16 +296,17 @@ func (r *HTTPRunner) send(ctx context.Context, method, u string, body []byte, to
 	}
 	req.Header.Set("Authorization", "Bearer "+tok)
 	req.Header.Set("User-Agent", r.opts.UserAgent)
-	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("Accept", cmp.Or(o.accept, "application/vnd.github+json"))
 	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
 	start := r.opts.Now()
 	resp, err := r.opts.Client.Do(req)
+	limit := cmp.Or(o.limit, maxBody)
 	var b []byte
 	if err == nil {
-		b, err = io.ReadAll(io.LimitReader(resp.Body, maxBody))
+		b, err = io.ReadAll(io.LimitReader(resp.Body, limit+1)) // one more byte tells a longer body
 		resp.Body.Close()
 	}
 	if err != nil {
@@ -303,7 +320,11 @@ func (r *HTTPRunner) send(ctx context.Context, method, u string, body []byte, to
 		"dur", r.opts.Now().Sub(start).Round(time.Millisecond).String(), "reused_conn", reused,
 		"proto", resp.Proto, "bytes", len(b),
 		"rl_resource", h.Get("X-Ratelimit-Resource"), "rl_remaining", h.Get("X-Ratelimit-Remaining"))
-	return httpResult{status: resp.StatusCode, header: h, body: b}, nil
+	res := httpResult{status: resp.StatusCode, header: h, body: b}
+	if int64(len(b)) > limit {
+		res.body, res.truncated = b[:limit], true
+	}
+	return res, nil
 }
 
 // parseGraphQLResponse turns a /graphql response into data or a classified error. A

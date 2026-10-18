@@ -77,6 +77,12 @@ type Service interface {
 	// AddPullRequestComment posts a comment on a pull request's conversation as the
 	// viewer. Errors as for SubmitPullRequestReview.
 	AddPullRequestComment(ctx context.Context, slug string, number int, body string) (PostedComment, error)
+	// PullRequestDiff returns a pull request's unified diff, at most PullRequestDiffMax,
+	// cached per pull request and head commit (pr_files.go).
+	PullRequestDiff(ctx context.Context, slug string, number int, refresh bool) (PullRequestDiff, error)
+	// PullRequestFile returns one file at a full commit SHA, at most
+	// PullRequestFileMax; a missing path is NotFound, not an error (pr_files.go).
+	PullRequestFile(ctx context.Context, slug, ref, path string) (PullRequestFile, error)
 }
 
 // Errors returned by the store and the runner. Match with errors.Is.
@@ -206,13 +212,16 @@ type CheckRollup struct {
 // rollup. Polled pull requests carry every field; GetPullRequest fills the same set.
 type PullRequest struct {
 	// ID is GitHub's node id (the poll's key).
-	ID                string           `json:"id,omitempty"`
-	Number            int              `json:"number"`
-	Title             string           `json:"title"`
-	Author            string           `json:"author,omitempty"`
-	HeadRef           string           `json:"headRef"`
-	HeadSHA           string           `json:"headSha"`
-	BaseRef           string           `json:"baseRef"`
+	ID      string `json:"id,omitempty"`
+	Number  int    `json:"number"`
+	Title   string `json:"title"`
+	Author  string `json:"author,omitempty"`
+	HeadRef string `json:"headRef"`
+	HeadSHA string `json:"headSha"`
+	BaseRef string `json:"baseRef"`
+	// BaseSHA is the base branch's head commit when GitHub last computed the pull
+	// request; empty in a cache written before it was fetched.
+	BaseSHA           string           `json:"baseSha,omitempty"`
 	Draft             bool             `json:"draft,omitempty"`
 	ReviewDecision    ReviewDecision   `json:"reviewDecision,omitempty"`
 	Mergeable         Mergeable        `json:"mergeable,omitempty"`

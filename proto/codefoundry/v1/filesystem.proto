@@ -31,6 +31,14 @@ service FilesystemService {
   // the shallowest entries. An unknown project is NotFound; a path outside the home
   // directory is InvalidArgument.
   rpc SearchFiles(SearchFilesRequest) returns (SearchFilesResponse) {}
+
+  // ReadFile reads one file for the file viewer. path is absolute, or relative to
+  // base_dir (a thread's worktree, or the home directory); "~/" is the home
+  // directory. Symlinks are followed, and the file they lead to must be under the
+  // home directory too: InvalidArgument otherwise (also for a relative path without
+  // an absolute base_dir). A missing path is not_found and a directory is_dir, not
+  // errors. Contents are at most max_bytes (default and limit 1 MiB).
+  rpc ReadFile(ReadFileRequest) returns (ReadFileResponse) {}
 }
 
 message ListDirectoriesRequest {
@@ -123,4 +131,37 @@ message SearchFilesResponse {
   repeated FileMatch matches = 1;
   // More entries matched than were returned.
   bool truncated = 2;
+}
+
+message ReadFileRequest {
+  // Absolute directory a relative path is resolved against. Ignored for an absolute
+  // path.
+  string base_dir = 1;
+  // Absolute, "~/"-prefixed, or relative to base_dir.
+  string path = 2;
+  // Maximum bytes of contents. Zero means 1 MiB, which is also the limit.
+  int64 max_bytes = 3;
+}
+
+message ReadFileResponse {
+  // The first max_bytes of the file.
+  bytes contents = 1;
+  // The file's full size in bytes.
+  int64 size = 2;
+  // size > len(contents).
+  bool truncated = 3;
+  // NUL in the first 8 KiB, or a MIME type that is not text (images, PDFs, archives).
+  // Contents are returned anyway (the viewer shows images inline).
+  bool binary = 4;
+  // From the extension, else sniffed from the contents ("text/markdown",
+  // "image/png", "text/plain; charset=utf-8", "application/octet-stream").
+  string mime_type = 5;
+  // Modification time, unix milliseconds.
+  int64 modified_at = 6;
+  // Absolute, cleaned path as asked for (before following symlinks).
+  string resolved_path = 7;
+  // Nothing exists at resolved_path; the other fields are empty.
+  bool not_found = 8;
+  // resolved_path is a directory; only size and modified_at are set.
+  bool is_dir = 9;
 }
