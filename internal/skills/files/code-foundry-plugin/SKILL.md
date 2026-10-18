@@ -10,8 +10,7 @@ stdout (newline-delimited JSON-RPC 2.0). Its `plugin.json` declares everything u
 **commands** (`code-foundry plugin <name> <command>`, also in the app's command palette),
 **surfaces** (side-panel tabs the app draws from a JSON view model the plugin sends; no
 HTML) and **permissions** the user consents to before it runs (running host commands,
-reading events, flagging threads, adding env to new Claude threads, Keychain secrets, its
-own Claude threads and terminals).
+reading events, flagging threads, env for new threads, secrets, own threads and terminals).
 Write plugins in Go with the SDK `github.com/alexwaumann/code-foundry/pluginsdk`
 (standard library only; `pluginsdk/ui` builds views, `pluginsdk/plugintest` is a fake host
 for tests). This Code Foundry is {{cf.version}}.
