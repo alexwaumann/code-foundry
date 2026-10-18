@@ -106,3 +106,11 @@ func TestManagementVerb(t *testing.T) {
 		}
 	}
 }
+
+func TestShortDuration(t *testing.T) {
+	for d, want := range map[time.Duration]string{10 * time.Minute: "10m", time.Hour: "1h", 90 * time.Second: "1m30s", 2 * time.Second: "2s"} {
+		if got := shortDuration(d); got != want {
+			t.Errorf("shortDuration(%s) = %q, want %q", d, got, want)
+		}
+	}
+}

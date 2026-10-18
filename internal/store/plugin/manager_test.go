@@ -330,7 +330,7 @@ func TestCrashBackoffFailedRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	p := e.waitState("hello", plugin.StateFailed)
-	if p.Restarts != 3 || !strings.Contains(p.LastError, "crashed 3 times") || !strings.Contains(p.LastError, "boom: no config") {
+	if p.Restarts != 3 || !strings.Contains(p.LastError, "crashed 3 times in 10m, last: exited with status 3: boom") || !strings.Contains(p.LastError, "boom: no config") {
 		t.Fatalf("failed: restarts=%d err=%q", p.Restarts, p.LastError)
 	}
 	for len(sub.C()) > 0 {
