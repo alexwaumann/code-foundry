@@ -34,7 +34,7 @@ func view(t *testing.T, h *plugintest.Host) ui.View {
 func TestDemoSurface(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	h := plugintest.Start(t, plugin(), plugintest.Options{Name: "hello", Granted: pluginsdk.Permissions{Secrets: true}})
+	h := plugintest.Start(t, plugin(), plugintest.Options{Name: "hello", Granted: pluginsdk.Permissions{Secrets: true, Events: []string{"threads"}, ThreadStatus: true, SessionEnv: true}})
 	if err := h.OpenSurface(ctx, inst, "demo", pluginsdk.UiContext{ThreadID: "s-1"}); err != nil {
 		t.Fatal(err)
 	}
