@@ -36,16 +36,26 @@ func (f pluginFlags) SetFlag(ctx context.Context, id string, s plugin.FlagSpec) 
 	_, changed, err := f.threads.SetFlag(ctx, id, thread.Flag{
 		Source: s.Plugin, SourceName: s.DisplayName, Level: level, Reason: s.Reason, UntilSeen: s.UntilSeen,
 	})
-	switch {
-	case errors.Is(err, thread.ErrNotFound):
-		return false, fmt.Errorf("%w: %v", plugin.ErrNotFound, err)
-	case errors.Is(err, thread.ErrInvalidArgument):
-		return false, fmt.Errorf("%w: %v", plugin.ErrInvalidArgument, err)
-	case errors.Is(err, thread.ErrFailedPrecondition):
-		return false, fmt.Errorf("%w: %v", plugin.ErrFailedPrecondition, err)
+	for from, to := range flagErrors {
+		if errors.Is(err, from) {
+			return false, kindError{kind: to, err: err}
+		}
 	}
 	return changed, err
 }
+
+// flagErrors map the thread store's errors to the plugin store's.
+var flagErrors = map[error]error{
+	thread.ErrNotFound:           plugin.ErrNotFound,
+	thread.ErrInvalidArgument:    plugin.ErrInvalidArgument,
+	thread.ErrFailedPrecondition: plugin.ErrFailedPrecondition,
+}
+
+// kindError reads as err and matches kind (errors.Is) as well as err's own chain.
+type kindError struct{ kind, err error }
+
+func (e kindError) Error() string   { return e.err.Error() }
+func (e kindError) Unwrap() []error { return []error{e.kind, e.err} }
 
 func (f pluginFlags) ClearPlugin(ctx context.Context, name string) (int, error) {
 	return f.threads.ClearFlagSource(ctx, name)
