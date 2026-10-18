@@ -3,9 +3,11 @@
 The last step of the plugin stack (`docs/sketches/plugins/DECISIONS.md`: "The series ends
 with both plugins installed from the registry into a real daemon + GUI run and screenshots
 of them working"). Both real plugins, `gh-actions` and `test-watcher`, installed from the
-real default registry (`alexwaumann/code-foundry-plugins`, both at 0.1.0) into a dev build
-of `cf/plugins-7-registry` with an isolated home, driven from the CLI and from the GUI.
-Every step passed; two small fixes landed on this branch (below).
+real registry (`alexwaumann/code-foundry-plugins`, both at 0.1.0; the default registry
+when this ran) into a dev build of `cf/plugins-7-registry` with an isolated home, driven
+from the CLI and from the GUI. Every step passed; two small fixes landed on this branch
+(below). Since the rebase onto main (2026-10-18) `plugins.registries` defaults to empty,
+so a run sets it first (the second line of `plugin browse` below).
 
 ## Run the stack locally
 
@@ -16,6 +18,8 @@ mkdir -p ~/.cf-integ                                        # an isolated home, 
 # a wrapper so no CLI call ever reaches the real home (a CLI call auto-starts a daemon):
 printf '#!/bin/zsh\nexport CODE_FOUNDRY_HOME=$HOME/.cf-integ\nexec %s/bin/code-foundry "$@"\n' "$PWD" > /tmp/cf && chmod +x /tmp/cf
 env -u CLAUDECODE -u CLAUDE_CODE_ENTRYPOINT CODE_FOUNDRY_HOME=$HOME/.cf-integ ./bin/code-foundry daemon --dev &
+/tmp/cf plugin browse                                       # "no plugin registry is configured": none by default
+/tmp/cf settings set plugins.registries https://github.com/alexwaumann/code-foundry-plugins
 /tmp/cf plugin browse                                       # the real registry: gh-actions, test-watcher
 /tmp/cf plugin install gh-actions && /tmp/cf plugin install test-watcher
 /tmp/cf plugin enable gh-actions --yes && /tmp/cf plugin enable test-watcher --yes
@@ -48,6 +52,9 @@ code-foundry-help  code-foundry-orchestrate  code-foundry-plugin
 ```
 
 ### 2. Install from the real registry
+
+(Recorded while that registry was the default; today `code-foundry settings set
+plugins.registries https://github.com/alexwaumann/code-foundry-plugins` comes first.)
 
 ```
 $ code-foundry plugin browse

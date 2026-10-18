@@ -30,6 +30,7 @@ func TestPluginRegistryCommands(t *testing.T) {
 		cmd       string
 		args      map[string]string
 		confirmed bool
+		browse    *v1.BrowsePluginsResponse // instead of the two-registry browse
 		install   *v1.InstallPluginResponse
 		update    *v1.UpdatePluginsResponse
 		wantErr   string // a ConfirmError's message prefix, or a substring of the error
@@ -38,6 +39,11 @@ func TestPluginRegistryCommands(t *testing.T) {
 	}{
 		{name: "browse", cmd: "plugin.browse", args: map[string]string{"refresh": "true"}, want: &v1.BrowsePluginsRequest{Refresh: true},
 			wantMsg: []string{"NAME   VERSION                        INSTALLED       PERMISSIONS  DESCRIPTION\nhello  0.1.1                          0.1.0 (update)  secrets      Greets.\njobs   1.0.0 (no darwin/arm64 build)  -               -\n", "registry https://github.com/o/reg: 2 plugin(s), fetched", "(cached)", "  error: HTTP 502", "  issue: plugins[0]: bad"}},
+		{name: "browse with no registry configured", cmd: "plugin.browse", browse: &v1.BrowsePluginsResponse{Platform: "darwin/arm64"},
+			wantMsg: []string{"no plugin registry is configured; add one with: code-foundry settings set plugins.registries https://github.com/<owner>/<repo>"}},
+		{name: "browse an empty registry", cmd: "plugin.browse",
+			browse:  &v1.BrowsePluginsResponse{Platform: "darwin/arm64", Registries: []*v1.PluginRegistry{{Url: "https://github.com/o/reg"}}},
+			wantMsg: []string{"no plugins in the registries\nregistry https://github.com/o/reg: 0 plugin(s)"}},
 		{name: "install", cmd: "plugin.install", args: map[string]string{"ref": "hello"}, want: &v1.InstallPluginRequest{Ref: "hello"},
 			install: &v1.InstallPluginResponse{Plugin: hello, Kind: "registry", Source: "https://github.com/o/reg", Version: "0.1.0", Changed: true, Warnings: []string{"unverified"}},
 			wantMsg: []string{"installed hello 0.1.0 from https://github.com/o/reg\nwarning: unverified\ndisabled until you enable it: code-foundry plugin enable hello"}},
@@ -70,7 +76,11 @@ func TestPluginRegistryCommands(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b := &commandtest.PluginRegistry{BrowseRes: browse, InstallRes: tt.install, UpdateRes: tt.update}
+			br := browse
+			if tt.browse != nil {
+				br = tt.browse
+			}
+			b := &commandtest.PluginRegistry{BrowseRes: br, InstallRes: tt.install, UpdateRes: tt.update}
 			reg := command.NewRegistry()
 			if err := command.RegisterPluginRegistry(reg, b); err != nil {
 				t.Fatal(err)

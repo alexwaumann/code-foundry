@@ -230,7 +230,14 @@ func formatUpdates(ups []*v1.PluginUpdate, check bool) string {
 	return strings.Join(lines, "\n")
 }
 
+// noRegistryMessage is plugin.browse's answer when plugins.registries lists none (its
+// default): nothing to browse, and how to add one.
+const noRegistryMessage = "no plugin registry is configured; add one with: code-foundry settings set plugins.registries https://github.com/<owner>/<repo>"
+
 func formatBrowse(r *v1.BrowsePluginsResponse) string {
+	if len(r.GetRegistries()) == 0 && len(r.GetEntries()) == 0 {
+		return noRegistryMessage
+	}
 	var sb strings.Builder
 	if len(r.GetEntries()) == 0 {
 		sb.WriteString("no plugins in the registries\n")
@@ -281,9 +288,6 @@ func formatBrowse(r *v1.BrowsePluginsResponse) string {
 			line += "\n  issue: " + is
 		}
 		sb.WriteString(line + "\n")
-	}
-	if len(r.GetRegistries()) == 0 {
-		sb.WriteString("no registries: settings plugins.registries\n")
 	}
 	return strings.TrimRight(sb.String(), "\n")
 }

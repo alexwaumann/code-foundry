@@ -7,6 +7,7 @@
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { SettingType, type SettingFieldSchema, type SettingGroupSchema, type SettingsSnapshotSchema } from "../src/gen/codefoundry/v1/settings_pb";
 import { DEFAULT_DARK, DEFAULT_LIGHT, themesFor } from "../src/themes";
+import { FIXTURE_REGISTRY } from "./pluginRegistry";
 
 type FieldInit = MessageInitShape<typeof SettingFieldSchema> & { key: string; type: SettingType; defaultValue: string; group: string; page: string; section: string };
 type GroupInit = MessageInitShape<typeof SettingGroupSchema>;
@@ -199,7 +200,7 @@ const staticFields: FieldInit[] = [
   { key: "gitops.editor_command", group: "gitops", page: "source", section: "projects", type: S.STRING, title: "Editor command", description: "Opens a worktree (Open in Editor), e.g. \"code\" or \"open -a Zed\"; {path} is the worktree path, else the path is appended. Empty detects an editor.", defaultValue: "", placeholder: "auto-detect" },
   { key: "advanced.claude_path", group: "advanced", page: "advanced", section: "executables", type: S.PATH, title: "claude executable", description: "Absolute path to claude. Empty finds it on PATH.", defaultValue: "", placeholder: "claude (from PATH)", restartRequired: true },
   { key: "advanced.gh_path", group: "advanced", page: "advanced", section: "executables", type: S.PATH, title: "gh executable", description: "Absolute path to gh. Empty finds it on PATH or in Homebrew's locations.", defaultValue: "", placeholder: "gh (from PATH)", restartRequired: true },
-  { key: "plugins.registries", group: "plugins", page: "plugins", section: "registries", type: S.STRING, title: "Plugin registries", description: 'Where Browse and plugin install find plugins, in order: the first registry listing a name wins. A GitHub repository (https://github.com/<owner>/<repo>, read with your gh login, so private ones work) or an https URL of an index.json. Separate several with commas; "none" lists none.', defaultValue: "https://github.com/alexwaumann/code-foundry-plugins", placeholder: "https://github.com/alexwaumann/code-foundry-plugins" },
+  { key: "plugins.registries", group: "plugins", page: "plugins", section: "registries", type: S.STRING, title: "Plugin registries", description: 'Where Browse and plugin install find plugins, in order: the first registry listing a name wins. A GitHub repository (https://github.com/<owner>/<repo>, read with your gh login, so private ones work) or an https URL of an index.json. Separate several with commas. Empty (the default) configures none: Browse lists nothing and install takes only a release or a folder.', defaultValue: "", placeholder: "https://github.com/<owner>/<repo>" },
   { key: "advanced.log_level", group: "advanced", page: "advanced", section: "logging", type: S.ENUM, title: "Log level", description: "Minimum level written to the daemon's log file (logs/daemon.log).", enumValues: ["debug", "info", "warn", "error"], enumLabels: ["Debug", "Info", "Warn", "Error"], defaultValue: "info" },
 ];
 
@@ -231,9 +232,17 @@ export class SettingsValidation extends Error {
   }
 }
 
+/**
+ * The "file" the mock starts from: the fixture registry configured explicitly
+ * (plugins.registries is empty by default), so Browse has something to list.
+ */
+function initialRaw(): Record<string, string> {
+  return { "plugins.registries": FIXTURE_REGISTRY };
+}
+
 export class MockSettings {
   /** Values as written in the "file", by key. */
-  raw: Record<string, string> = {};
+  raw: Record<string, string> = initialRaw();
   revision = 1;
   loadError = "";
   private readonly startup: Record<string, string>;
@@ -246,7 +255,7 @@ export class MockSettings {
   }
 
   reset(): void {
-    this.raw = {};
+    this.raw = initialRaw();
     this.loadError = "";
     this.revision = 1;
   }
@@ -271,6 +280,11 @@ export class MockSettings {
   pages(): PageInit[] {
     const cats = [...new Set(this.bindable().map((c) => c.category))];
     return staticPages.map((p) => (p.id === "keybindings" ? { ...p, sections: cats.map((c) => ({ id: categorySection(c), title: c })) } : p));
+  }
+
+  /** One static field's effective value, without the keybinding fields (which need the commands). */
+  value(key: string): string {
+    return this.raw[key] ?? staticFields.find((f) => f.key === key)?.defaultValue ?? "";
   }
 
   /** Effective values (defaults included). */

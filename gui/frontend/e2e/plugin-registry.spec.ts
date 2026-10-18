@@ -2,9 +2,10 @@ import { expect, test, type Page } from "@playwright/test";
 import { invocations, mockPost, openApp, resetMock, row } from "./fixtures";
 
 /**
- * Settings → Plugins → Browse (docs/notes/plugins-7-registry.md) against the mock's default
- * registry (mock/pluginRegistry.ts): gh-actions 0.1.0 not installed, test-watcher 0.1.0
- * listed while 0.0.9 is installed and running.
+ * Settings → Plugins → Browse (docs/notes/plugins-7-registry.md) against the mock's fixture
+ * registry (mock/pluginRegistry.ts), which the mock's settings configure explicitly
+ * (plugins.registries is empty by default): gh-actions 0.1.0 not installed, test-watcher
+ * 0.1.0 listed while 0.0.9 is installed and running.
  */
 
 async function openPlugins(page: Page): Promise<void> {
@@ -43,6 +44,27 @@ test("Browse lists the registry's plugins with what they ask for, the registry b
   await mockPost(`plugin/registry?error=${encodeURIComponent("not found: no index.json in o/r (or no access with your gh login)")}`);
   await page.getByTestId("registry-refresh").click();
   await expect(page.locator('[data-testid="registry-status"][data-error="true"]')).toContainText("Not found, or your gh login cannot read it.");
+});
+
+test("with no registry configured (the default) Browse says so and points at the setting; adding one lists its plugins", async ({ page }) => {
+  // The setting back to its default: no registry.
+  await mockPost("settings/external?plugins.registries=");
+  await openPlugins(page);
+  await expect(page.getByTestId("registry-none")).toHaveText(
+    "No registry is configured, so there is nothing to browse. Add one in Plugin registries below.",
+  );
+  await expect(page.getByTestId("registry-entry")).toHaveCount(0);
+  await expect(page.getByTestId("registry-status")).toHaveCount(0);
+  await expect(page.getByTestId("registry-empty")).toHaveCount(0);
+
+  // Adding the registry in the field below re-reads Browse.
+  const field = page.locator('[data-setting="plugins.registries"]').getByRole("textbox");
+  await expect(field).toHaveValue("");
+  await field.fill("https://github.com/alexwaumann/code-foundry-plugins");
+  await field.press("Enter");
+  await expect(page.getByTestId("registry-entry")).toHaveCount(2);
+  await expect(page.getByTestId("registry-none")).toHaveCount(0);
+  await expect(page.getByTestId("registry-status")).toContainText("alexwaumann/code-foundry-plugins");
 });
 
 test("Install shows the download's progress, then asks for consent; enabling runs it", async ({ page }) => {

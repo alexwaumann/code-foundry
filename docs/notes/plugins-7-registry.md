@@ -97,14 +97,25 @@ Without `--purge` the consent stays: reinstalling and `--enable` does not ask ag
 
 * **`plugins.registries` is a String setting** of comma-separated URLs (the settings
   schema has no list type and the GUI renders String as a text field). A TOML array in
-  the file reads as the same comma list (`stringify` joins `[]any`). `"none"` is the empty
-  list (an empty value is the default). Every entry is validated (`registry.ParseList`):
+  the file reads as the same comma list (`stringify` joins `[]any`). Every entry is validated (`registry.ParseList`):
   `https://github.com/<owner>/<repo>` (or the `owner/repo` shorthand) is read with gh;
   any other https URL is the index itself (`/index.json` appended unless it ends in
   `.json`); plain http only to localhost/loopback (the index names the hashes, so it must
   not be open to tampering). It lives on a schema page `plugins` (section Registries),
   which the GUI draws with its own component (below), so it shows under Browse and
   settings search finds it.
+* **No registry by default.** `plugins.registries` defaults to empty (changed on the
+  2026-10-18 rebase onto main; it was `https://github.com/alexwaumann/code-foundry-plugins`,
+  which the transcripts below still show). Code Foundry ships pointing at no one's
+  registry: you add the one you trust. With none, Browse says "No registry is configured,
+  so there is nothing to browse. Add one in Plugin registries below." (no registry rows);
+  `plugin browse` prints `no plugin registry is configured; add one with: code-foundry
+  settings set plugins.registries https://github.com/<owner>/<repo>` and exits 0; `plugin
+  install <name>` fails NotFound saying no registry is configured (a release and a folder
+  still install). `"none"` still reads as the empty list. The merged index's fingerprint
+  includes the registry URLs, so changing the set publishes `registry_epoch` and an open
+  Browse re-reads at once (adding the first registry used to leave it saying "none" until
+  Refresh, as nothing was fetched yet).
 * **Reading a GitHub registry**: `gh api -H "Accept: application/vnd.github.raw+json"
   repos/<owner>/<repo>/contents/index.json` (raw content, no base64; the default branch).
   gh's executable is `advanced.gh_path`, else PATH and Homebrew (`gh.LookPath`), with the
@@ -153,8 +164,8 @@ Without `--purge` the consent stays: reinstalling and `--enable` does not ask ag
 | Update / Uninstall on Installed rows, "from <source>", "<v> is available." | `components/plugin/settings/PluginsPage.tsx` |
 | Uninstall dialog with the purge checkbox | `components/plugin/settings/UninstallDialog.tsx` |
 | The page's settings section (plugins.registries) | `PluginsPage` renders `pageSections(schema, page)`; `SettingsPage` lets a GUI page share a schema page's id |
-| Mock: default registry with gh-actions and test-watcher 0.1.0 (descriptions from the registry's PRs #1/#2), test-watcher 0.0.9 installed and running, install steps 250 ms apart, `POST /__mock/plugin/registry?error=…` | `mock/pluginRegistry.ts`, hooks in `mock/plugins.ts`, `mock/server.ts`, `mock/settings.ts` |
-| Tests | `src/api/pluginRegistry.test.ts`, `src/stores/pluginRegistry.test.ts`, `components/plugin/settings/registry.test.ts`, `e2e/plugin-registry.spec.ts`; `e2e/plugins.spec.ts` now counts four installed plugins |
+| Mock: a fixture registry (configured explicitly in the mock's settings, `initialRaw`; the field's default is empty as in the daemon, and clearing it re-reads Browse through `registry_epoch`) with gh-actions and test-watcher 0.1.0 (descriptions from the registry's PRs #1/#2), test-watcher 0.0.9 installed and running, install steps 250 ms apart, `POST /__mock/plugin/registry?error=…` | `mock/pluginRegistry.ts`, hooks in `mock/plugins.ts`, `mock/server.ts`, `mock/settings.ts` |
+| Tests | `src/api/pluginRegistry.test.ts`, `src/stores/pluginRegistry.test.ts`, `components/plugin/settings/registry.test.ts`, `e2e/plugin-registry.spec.ts` (with no registry configured, and adding one from the field); `e2e/plugins.spec.ts` now counts four installed plugins |
 
 What it does:
 
@@ -166,7 +177,9 @@ What it does:
   "Update to X" (amber outline). Under the rows, each registry: its URL, "N plugins ·
   read 5 min ago", a failure in words (404 or no access through gh, gh not logged in or
   missing, offline; else the daemon's text) with "Showing what it listed last time." when
-  the cache stands in. No entries: "No plugins listed yet." above the registry rows.
+  the cache stands in. No entries: "No plugins listed yet." above the registry rows; no
+  registry configured (the default): "No registry is configured, so there is nothing to
+  browse. Add one in Plugin registries below." and no registry rows.
 * **Install** runs `plugin.install <name>` through `runCommandForResult` (quiet; a failure
   is toasted and stays under the row in red). The row shows the daemon's
   `install_progress` steps inline ("Finding it…", "Downloading… 1.5 MB", "Checking the
@@ -185,7 +198,7 @@ What it does:
 Screenshots (live isolated daemon, WebKit, dark and light, as PR 5): branch
 `cf/plugins-7-shots`, `docs/notes/plugins-7-registry/*.png`: `browse-page-*` (the page
 with gh-actions and test-watcher installed and hello listed by the loopback registry; the
-real default registry empty), `install-progress-*` (downloading from a throttled
+real registry, then the default, empty), `install-progress-*` (downloading from a throttled
 server), `install-consent-*`, `installed-after-install-*`, `installed-update-*` and
 `browse-update-*` (hello 0.1.0 installed, 0.1.1 listed), `registries-setting-*`.
 
@@ -288,8 +301,10 @@ $ CODE_FOUNDRY_HOME=/tmp/cfp7 CODE_FOUNDRY_UPDATE_DELAY=1h ./bin/code-foundry da
 The session (`code-foundry` with `CODE_FOUNDRY_HOME=/tmp/cfp7`; between parts the index
 was rewritten and the daemon restarted as the comments say). `plugin hello remember`
 wrote to the real login Keychain; the purge removed it (`security find-generic-password
--s code-foundry-plugin -a hello/word` finds nothing afterwards). The default registry
-(`alexwaumann/code-foundry-plugins`, empty) is read through gh and cached.
+-s code-foundry-plugin -a hello/word` finds nothing afterwards). The default registry at
+the time (`alexwaumann/code-foundry-plugins`, empty) is read through gh and cached; the
+default is empty now (Decisions), so `settings reset plugins.registries` would print `""`
+and `plugin browse` the no-registry line.
 
 ```
 $ code-foundry daemon status

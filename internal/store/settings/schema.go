@@ -427,8 +427,8 @@ var staticFields = []Field{
 	// Plugins › Registries.
 	{
 		Key: KeyPluginRegistries, Group: GroupPlugins, Page: PagePlugins, Section: "registries", Type: String, Title: "Plugin registries",
-		Description: "Where Browse and plugin install find plugins, in order: the first registry listing a name wins. A GitHub repository (https://github.com/<owner>/<repo>, read with your gh login, so private ones work) or an https URL of an index.json. Separate several with commas; \"none\" lists none.",
-		Default:     registry.DefaultRegistry, Placeholder: registry.DefaultRegistry,
+		Description: "Where Browse and plugin install find plugins, in order: the first registry listing a name wins. A GitHub repository (https://github.com/<owner>/<repo>, read with your gh login, so private ones work) or an https URL of an index.json. Separate several with commas. Empty (the default) configures none: Browse lists nothing and install takes only a release or a folder.",
+		Default:     "", Placeholder: "https://github.com/<owner>/<repo>",
 		check: checkRegistries,
 		bind:  func(s *Settings) any { return &s.Plugins.Registries },
 	},

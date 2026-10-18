@@ -40,9 +40,6 @@ const IndexFile = "index.json"
 // it goes (unknown fields are ignored), with an issue.
 const SchemaVersion = 1
 
-// DefaultRegistry is the plugins.registries default.
-const DefaultRegistry = "https://github.com/alexwaumann/code-foundry-plugins"
-
 // Index is one registry's index.json.
 type Index struct {
 	Schema      int     `json:"schema"`

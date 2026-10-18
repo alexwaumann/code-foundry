@@ -506,10 +506,10 @@ func TestPluginRegistriesField(t *testing.T) {
 	tests := []struct {
 		raw, want, issue string
 	}{
-		{raw: "", want: "https://github.com/alexwaumann/code-foundry-plugins"},
+		{raw: "", want: ""},
 		{raw: "o/a, https://x.example/index.json", want: "o/a, https://x.example/index.json"},
 		{raw: "none", want: "none"},
-		{raw: "o/a, http://x.example/index.json", want: "https://github.com/alexwaumann/code-foundry-plugins", issue: "plain http only for localhost"},
+		{raw: "o/a, http://x.example/index.json", want: "", issue: "plain http only for localhost"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.raw, func(t *testing.T) {

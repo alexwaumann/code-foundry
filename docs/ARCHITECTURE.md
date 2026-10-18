@@ -713,7 +713,8 @@ built: `docs/notes/plugins-1-core.md` through `plugins-6-thread-terminal.md`.
   sources, host facts and view limits are filled in from the code.
 * **Registry** (PR 7): `alexwaumann/code-foundry-plugins` serves `index.json` built from
   `plugins/<name>.json` entries (release tarball URLs per macOS architecture with
-  SHA-256, permissions equal to the manifest's), validated by its CI.
+  SHA-256, permissions equal to the manifest's), validated by its CI. No registry is
+  configured by default: `plugins.registries` is empty until the user adds one.
 
 ## 11. Conventions
 

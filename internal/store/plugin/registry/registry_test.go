@@ -447,3 +447,27 @@ func TestFindChecksum(t *testing.T) {
 		}
 	}
 }
+
+func TestFingerprint(t *testing.T) {
+	none := registry.Merged{}
+	reg := registry.Merged{Registries: []registry.Status{{URL: "https://github.com/o/reg"}}}
+	listed := registry.Merged{Registries: reg.Registries, Entries: []registry.Entry{{Name: "hello", Version: "0.1.0", Registry: "https://github.com/o/reg"}}}
+	bumped := registry.Merged{Registries: reg.Registries, Entries: []registry.Entry{{Name: "hello", Version: "0.2.0", Registry: "https://github.com/o/reg"}}}
+	tests := []struct {
+		name string
+		a, b registry.Merged
+		same bool
+	}{
+		{name: "unchanged", a: listed, b: listed, same: true},
+		{name: "first registry configured, nothing fetched yet", a: none, b: reg},
+		{name: "an entry listed", a: reg, b: listed},
+		{name: "an entry bumped", a: listed, b: bumped},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if same := tt.a.Fingerprint() == tt.b.Fingerprint(); same != tt.same {
+				t.Errorf("same = %v, want %v", same, tt.same)
+			}
+		})
+	}
+}

@@ -73,16 +73,10 @@ function EntryRow({ name, className }: { name: string; className?: string | unde
   );
 }
 
-/** A registry that failed, or has nothing to list yet. */
+/** Each configured registry: when it was read, and a failure in words. */
 function RegistryNotices() {
   const registries = usePluginRegistryStore((s) => s.browse?.registries);
-  if (!registries) return null;
-  if (registries.length === 0)
-    return (
-      <p className="border-t border-border px-4 py-3 text-caption" data-testid="registry-none">
-        No registries: add one below.
-      </p>
-    );
+  if (!registries || registries.length === 0) return null;
   return (
     <>
       {registries.map((r) => (
@@ -120,6 +114,8 @@ function RegistryNotices() {
 export function BrowseSection() {
   const names = usePluginRegistryStore(useShallow((s) => s.browse?.entries.map((e) => e.name) ?? []));
   const loaded = usePluginRegistryStore((s) => s.browse !== null);
+  // plugins.registries is empty by default: nothing to browse until one is added below.
+  const noRegistry = usePluginRegistryStore((s) => s.browse?.registries.length === 0);
   const loading = usePluginRegistryStore((s) => s.loading);
   const error = usePluginRegistryStore((s) => s.error);
   useEffect(() => {
@@ -142,7 +138,12 @@ export function BrowseSection() {
       {names.map((n) => (
         <EntryRow key={n} name={n} className="border-t border-border" />
       ))}
-      {loaded && names.length === 0 && !error && (
+      {loaded && names.length === 0 && !error && noRegistry && (
+        <p className="border-t border-border px-4 py-3 text-caption" data-testid="registry-none">
+          No registry is configured, so there is nothing to browse. Add one in Plugin registries below.
+        </p>
+      )}
+      {loaded && names.length === 0 && !error && !noRegistry && (
         <p className="border-t border-border px-4 py-3 text-caption" data-testid="registry-empty">
           No plugins listed yet.
         </p>

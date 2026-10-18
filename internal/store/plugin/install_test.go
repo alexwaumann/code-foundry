@@ -318,6 +318,12 @@ func TestInstallRefusals(t *testing.T) {
 			}
 		})
 	}
+	// No registry configured (the setting's default): a name has nowhere to be looked up.
+	m.SetRegistries(nil)
+	_, err := m.Install(ctx, plugin.InstallRequest{Ref: "greedy"})
+	if !errors.Is(err, plugin.ErrNotFound) || !strings.Contains(err.Error(), `no plugin registry is configured to look up "greedy"`) {
+		t.Fatalf("no registry: err = %v", err)
+	}
 }
 
 func TestInstallFromGitHubRelease(t *testing.T) {

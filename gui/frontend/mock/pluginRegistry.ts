@@ -1,9 +1,12 @@
 /**
- * The plugin registries in the mock daemon (docs/notes/plugins-7-registry.md): the default
- * registry listing gh-actions and test-watcher 0.1.0 (their entries in
+ * The plugin registries in the mock daemon (docs/notes/plugins-7-registry.md): the
+ * fixture registry listing gh-actions and test-watcher 0.1.0 (their entries in
  * github.com/alexwaumann/code-foundry-plugins pull requests #1 and #2), PluginService.Browse,
- * and plugin.browse / install / update / uninstall. An install reports its steps as
- * install_progress events a few hundred milliseconds apart, like a real download.
+ * and plugin.browse / install / update / uninstall. plugins.registries is empty by
+ * default, as in the daemon; the mock's settings configure the fixture registry
+ * explicitly (mock/settings.ts), and clearing the setting shows Browse with no registry.
+ * An install reports its steps as install_progress events a few hundred milliseconds
+ * apart, like a real download.
  */
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
@@ -15,7 +18,14 @@ import type { PluginCommand, PluginEventInit } from "./plugins";
 type EntryInit = MessageInitShape<typeof PluginIndexEntrySchema>;
 type BrowseInit = MessageInitShape<typeof BrowsePluginsResponseSchema>;
 
-export const DEFAULT_REGISTRY = "https://github.com/alexwaumann/code-foundry-plugins";
+/** The registry the fixture lists, configured in the mock's settings (not a default). */
+export const FIXTURE_REGISTRY = "https://github.com/alexwaumann/code-foundry-plugins";
+
+/** The plugins.registries value as the daemon reads it: URLs separated by commas or spaces. */
+export function parseRegistries(v: string): string[] {
+  if (v.trim().toLowerCase() === "none") return [];
+  return [...new Set(v.split(/[\s,]+/).filter(Boolean).map((u) => u.replace(/\/+$/, "")))];
+}
 
 interface Perms {
   commands: string[];
@@ -40,6 +50,8 @@ interface Entry extends InstallSpec {
 }
 
 export interface RegistryDeps {
+  /** The plugins.registries setting's value. */
+  registries: () => string;
   installed: (name: string) => { version: string; dev: boolean } | null;
   install: (spec: InstallSpec) => void;
   uninstall: (name: string) => void;
@@ -55,7 +67,7 @@ function seedEntries(): Entry[] {
       description: "GitHub Actions runs, jobs and failed-step logs for the selected thread's pull request: rerun, cancel, send a failure to Claude, and a thread flag when a run fails.",
       repo: "alexwaumann/code-foundry-plugin-gh-actions",
       permissions: { commands: ["pr.checks", "thread.send", "view.open.url"], events: ["gh", "threads"], threadStatus: true, sessionEnv: false, secrets: false },
-      registry: DEFAULT_REGISTRY,
+      registry: FIXTURE_REGISTRY,
     },
     {
       name: "test-watcher",
@@ -64,7 +76,7 @@ function seedEntries(): Entry[] {
       description: "Runs the project's tests in a thread's worktree whenever files change, shows failures and output in the side panel, flags the thread while tests fail, and sends failures to Claude.",
       repo: "alexwaumann/code-foundry-plugin-test-watcher",
       permissions: { commands: ["thread.send"], events: ["project", "threads"], threadStatus: true, sessionEnv: false, secrets: false },
-      registry: DEFAULT_REGISTRY,
+      registry: FIXTURE_REGISTRY,
     },
   ];
 }
@@ -99,31 +111,57 @@ export class MockRegistry {
   private fetchedAt = new Date(Date.now() - 12 * 60_000);
   /** A failure Browse reports for the registry (POST /__mock/plugin/registry?error=…). */
   error = "";
+  /** RegistryChanged's epoch and the registries it was last published for. */
+  private epoch = 0;
+  private seen = "";
 
   constructor(private readonly deps: RegistryDeps) {}
 
   reset(): void {
     this.entries = seedEntries();
     this.error = "";
+    this.seen = this.configured().join(" ");
     this.fetchedAt = new Date(Date.now() - 12 * 60_000);
   }
 
+  /** Settings changed: like the daemon, a new set of registries makes clients showing Browse read it again. */
+  settingsChanged(): void {
+    const now = this.configured().join(" ");
+    if (now === this.seen) return;
+    this.seen = now;
+    this.epoch++;
+    this.deps.publish({ event: { case: "registryEpoch", value: BigInt(this.epoch) } });
+  }
+
+  /** The configured registries (none by default). */
+  private configured(): string[] {
+    return parseRegistries(this.deps.registries());
+  }
+
+  /** What the configured registries list: the fixture's entries when it is one of them. */
+  private listed(): Entry[] {
+    return this.configured().includes(FIXTURE_REGISTRY) ? this.entries : [];
+  }
+
   private entry(name: string): Entry {
-    const e = this.entries.find((x) => x.name === name);
-    if (!e) throw new CommandError("notfound", `no plugin "${name}" in the registries (${DEFAULT_REGISTRY})`);
+    const regs = this.configured();
+    if (regs.length === 0)
+      throw new CommandError("notfound", `no plugin registry is configured to look up "${name}" in (settings plugins.registries); a release installs as <owner>/<repo>, a folder by its path`);
+    const e = this.listed().find((x) => x.name === name);
+    if (!e) throw new CommandError("notfound", `no plugin "${name}" in the registries (${regs.join(", ")})`);
     return e;
   }
 
   /** The update fields of a Plugin message. */
   offer(name: string, version: string, dev: boolean): { updateAvailable?: boolean; updateVersion?: string; updateRegistry?: string } {
-    const e = this.entries.find((x) => x.name === name);
+    const e = this.listed().find((x) => x.name === name);
     if (!e || dev || !newer(e.version, version)) return {};
     return { updateAvailable: true, updateVersion: e.version, updateRegistry: e.registry };
   }
 
   browse(refresh: boolean): BrowseInit {
     if (refresh) this.fetchedAt = new Date();
-    const entries: EntryInit[] = this.entries.map((e) => {
+    const entries: EntryInit[] = this.listed().map((e) => {
       const inst = this.deps.installed(e.name);
       return {
         name: e.name,
@@ -147,7 +185,11 @@ export class MockRegistry {
     return {
       entries,
       platform: "darwin/arm64",
-      registries: [{ url: DEFAULT_REGISTRY, fetchedAt: timestampFromDate(this.fetchedAt), cached: !refresh, error: this.error, plugins: this.entries.length, issues: [] }],
+      registries: this.configured().map((url) =>
+        url === FIXTURE_REGISTRY
+          ? { url, fetchedAt: timestampFromDate(this.fetchedAt), cached: !refresh, error: this.error, plugins: this.entries.length, issues: [] }
+          : { url, fetchedAt: timestampFromDate(this.fetchedAt), cached: !refresh, error: "", plugins: 0, issues: [] },
+      ),
     };
   }
 
@@ -183,7 +225,11 @@ export class MockRegistry {
       {
         cmd: { name: "plugin.browse", title: "Browse Plugins", category: "Plugin", description: "List the plugins the registries offer.", keybindings: [], args: [refresh] },
         when: always,
-        run: (_c: UiContext | undefined, a) => this.browse(a.refresh === "true").entries?.map((e) => `${e.name ?? ""} ${e.version ?? ""}`).join("\n") ?? "",
+        run: (_c: UiContext | undefined, a) => {
+          const b = this.browse(a.refresh === "true");
+          if (b.registries?.length === 0) return "no plugin registry is configured; add one with: code-foundry settings set plugins.registries https://github.com/<owner>/<repo>";
+          return b.entries?.map((e) => `${e.name ?? ""} ${e.version ?? ""}`).join("\n") ?? "";
+        },
       },
       {
         cmd: {
@@ -238,10 +284,10 @@ export class MockRegistry {
         },
         when: always,
         run: async (_c, a) => {
-          const names = a.name ? [a.name] : this.entries.map((e) => e.name);
+          const names = a.name ? [a.name] : this.listed().map((e) => e.name);
           const lines: string[] = [];
           for (const n of names) {
-            const e = this.entries.find((x) => x.name === n);
+            const e = this.listed().find((x) => x.name === n);
             const had = this.deps.installed(n);
             if (!e || !had || had.dev || !newer(e.version, had.version)) continue;
             if (a.check === "true") {

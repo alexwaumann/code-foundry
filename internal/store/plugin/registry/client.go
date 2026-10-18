@@ -64,11 +64,16 @@ func (m Merged) Entry(name string) (Entry, bool) {
 	return m.Entries[i], true
 }
 
-// Fingerprint changes whenever an entry is added, removed, bumped or moves registry.
+// Fingerprint changes whenever an entry is added, removed, bumped or moves registry, and
+// when the configured registries change (adding the first one to the empty default must
+// re-read Browse even before its index is fetched).
 func (m Merged) Fingerprint() string {
 	h := sha256.New()
 	for _, e := range m.Entries {
 		_, _ = fmt.Fprintf(h, "%s\x00%s\x00%s\x00", e.Name, e.Version, e.Registry)
+	}
+	for _, r := range m.Registries {
+		_, _ = fmt.Fprintf(h, "registry\x00%s\x00", r.URL)
 	}
 	return hex.EncodeToString(h.Sum(nil))
 }

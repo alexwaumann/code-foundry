@@ -302,6 +302,9 @@ func (m *Manager) resolve(ctx context.Context, ref parsedRef, refresh bool) (pla
 		e, ok = merged.Entry(ref.target)
 	}
 	m.setMerged(merged)
+	if !ok && len(merged.Registries) == 0 {
+		return plan{}, fmt.Errorf("%w: no plugin registry is configured to look up %q in (settings plugins.registries); a release installs as <owner>/<repo>, a folder by its path", ErrNotFound, ref.target)
+	}
 	if !ok {
 		msg := fmt.Sprintf("no plugin %q in the registries (%s)", ref.target, strings.Join(registryURLs(merged), ", "))
 		if err := merged.Err(); err != nil {
@@ -343,9 +346,6 @@ func registryURLs(m registry.Merged) []string {
 	out := make([]string, len(m.Registries))
 	for i, r := range m.Registries {
 		out[i] = r.URL
-	}
-	if len(out) == 0 {
-		return []string{"none configured: settings plugins.registries"}
 	}
 	return out
 }

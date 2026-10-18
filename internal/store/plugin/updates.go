@@ -24,8 +24,8 @@ type UpdateOffer struct {
 }
 
 // RegistryChanged is published when the merged index changes (an entry added, removed,
-// bumped, or moved to another registry): clients showing Browse read it again. Epoch
-// grows by one per change in this daemon's lifetime.
+// bumped, or moved to another registry) or the configured registries do: clients
+// showing Browse read it again. Epoch grows by one per change in this daemon's lifetime.
 type RegistryChanged struct{ Epoch uint64 }
 
 func (RegistryChanged) isPluginEvent() {}

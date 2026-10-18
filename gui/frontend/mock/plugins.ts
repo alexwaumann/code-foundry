@@ -454,7 +454,7 @@ function seedPlugins(): MockPlugin[] {
       ],
     },
     {
-      // Installed from the default registry, which now lists 0.1.0 (mock/pluginRegistry.ts).
+      // Installed from the fixture registry, which now lists 0.1.0 (mock/pluginRegistry.ts).
       name: "test-watcher",
       displayName: "Test Watcher",
       version: "0.0.9",
@@ -500,6 +500,8 @@ export interface PluginDeps {
   threadExists: (id: string) => boolean;
   /** thread.send (the demo's Send hello to its own thread, Ask the main thread through host/invoke). */
   sendToThread: (id: string, text: string) => void;
+  /** The plugins.registries setting's value (mock/settings.ts). */
+  registries: () => string;
 }
 
 export class MockPlugins {
@@ -512,6 +514,7 @@ export class MockPlugins {
   acts: string[] = [];
   /** The registries, Browse and plugin.install / update / uninstall (mock/pluginRegistry.ts). */
   readonly registry: MockRegistry = new MockRegistry({
+    registries: () => this.deps.registries(),
     installed: (name) => {
       const p = this.plugins.get(name);
       return p ? { version: p.version, dev: p.dev, installed: true } : null;
