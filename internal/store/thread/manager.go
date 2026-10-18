@@ -292,7 +292,7 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 			}
 		}
 		s.CacheExpiresAt = cacheExpiry(s.LastResultAt, opts.CacheTTL)
-		m.recs[s.ID] = &record{s: s, namingTried: s.Name != ""}
+		m.recs[s.ID] = &record{s: s, namingTried: s.namedForGood()}
 	}
 	// Wake subscriptions, armed with the threads as loaded (subscriptions.go).
 	if m.subs, err = loadSubscriptionState(ctx, opts.DB, opts.Log, m.recs); err != nil {
@@ -524,6 +524,10 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 			return Thread{}, err
 		}
 	}
+	if s.Name == "" {
+		// Until the namer answers (provisional.go); namingTried stays false so it runs.
+		s.nameProvisionally(o.ComposerPrompt, o.InitialPrompt)
+	}
 	// The worktrees exist now: point file references at them (see filerefs.go).
 	prompt, dropped := rewriteFileRefs(prompt, func(projectID string) (string, bool) {
 		if i := slices.IndexFunc(members, func(mem workspace.Member) bool { return mem.ProjectID == projectID }); i >= 0 {
@@ -630,6 +634,7 @@ func (m *Manager) Fork(ctx context.Context, id, name string) (Thread, error) {
 	}
 	autoNamed := false
 	if name == "" && parent.Name != "" {
+		// A parent's provisional name is the fork's for good: no namer runs for a fork.
 		name, autoNamed = forkName(parent.Name), parent.AutoNamed
 	}
 	now := m.opts.Now()
@@ -801,7 +806,7 @@ func (m *Manager) Rename(_ context.Context, id, name string) (Thread, error) {
 	if err != nil {
 		return Thread{}, err
 	}
-	rec.s.Name, rec.s.AutoNamed, rec.namingTried = name, false, true
+	rec.s.Name, rec.s.AutoNamed, rec.s.NameProvisional, rec.namingTried = name, false, false, true
 	m.commitLocked(rec, true)
 	return rec.s, nil
 }
@@ -927,7 +932,7 @@ func (m *Manager) detach(r *runner, fn func(*Thread)) {
 func (m *Manager) startNaming(id, msg string) {
 	m.mu.Lock()
 	rec, ok := m.recs[id]
-	if !ok || rec.namingTried || rec.s.Name != "" || m.closed {
+	if !ok || rec.namingTried || rec.s.namedForGood() || m.closed {
 		m.mu.Unlock()
 		return
 	}
@@ -944,12 +949,15 @@ func (m *Manager) startNaming(id, msg string) {
 			m.log.Warn("auto-naming failed", "thread", id, "err", err)
 			return
 		}
-		if _, ok := m.update(id, true, func(rec *record) {
-			if rec.s.Name == "" {
-				rec.s.Name, rec.s.AutoNamed = name, true
-			}
-		}); ok {
-			m.log.Info("thread auto-named", "thread", id, "name", name, "took", time.Since(start).Round(time.Millisecond).String())
+		applied := false
+		if _, ok := m.update(id, true, func(rec *record) { applied = rec.s.applyNamerTitle(name) }); !ok {
+			return // removed meanwhile
+		}
+		took := time.Since(start).Round(time.Millisecond).String()
+		if applied {
+			m.log.Info("thread auto-named", "thread", id, "name", name, "took", took)
+		} else {
+			m.log.Info("naming answer ignored: the thread was named meanwhile", "thread", id, "name", name, "took", took)
 		}
 	}()
 }

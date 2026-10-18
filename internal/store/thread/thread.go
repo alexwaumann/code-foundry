@@ -123,6 +123,9 @@ type Thread struct {
 	WorktreePath    string // the cwd
 	Name            string
 	AutoNamed       bool
+	// NameProvisional: Name was derived from the first prompt (provisional.go) and the
+	// namer still replaces it; a rename or the namer's title clears it. Persisted.
+	NameProvisional bool
 	Model           string
 	Effort          string
 	State           State

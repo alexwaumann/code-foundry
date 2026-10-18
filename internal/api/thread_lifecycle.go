@@ -232,6 +232,7 @@ func threadToProto(s thread.Thread) *v1.Thread {
 		WorktreePath:        s.WorktreePath,
 		Name:                s.Name,
 		AutoNamed:           s.AutoNamed,
+		NameProvisional:     s.NameProvisional,
 		Model:               s.Model,
 		Effort:              s.Effort,
 		State:               v1.ThreadState(s.State),

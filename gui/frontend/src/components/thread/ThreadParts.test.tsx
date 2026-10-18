@@ -53,6 +53,21 @@ describe("ThreadTitle", () => {
     expect(startCommandNamed).toHaveBeenCalledWith("thread.rename");
   });
 
+  it("a provisional name is muted and italic until the naming model's title lands", () => {
+    useThreadsStore.setState({ byId: { "s-1": thread({ name: "fix the stale pr badge", nameProvisional: true }) }, order: ["s-1"] });
+    render(<ThreadTitle id="s-1" />);
+    expect(title().textContent).toBe("fix the stale pr badge");
+    expect(title().className).toContain("italic");
+    expect(title().className).toContain("text-muted-foreground");
+    expect(title().className).not.toContain("text-foreground ");
+    act(() => {
+      useThreadsStore.setState({ byId: { "s-1": thread({ name: "Fix the stale PR badge", nameProvisional: false }) } });
+    });
+    expect(title().textContent).toBe("Fix the stale PR badge");
+    expect(title().className).not.toContain("italic");
+    expect(title().className).toContain("text-foreground");
+  });
+
   it("shows no status, badge text, model or path", () => {
     render(<ThreadTitle id="s-1" />);
     const text = document.body.textContent;

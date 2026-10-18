@@ -80,6 +80,11 @@ message Thread {
   // unless the user named or renamed it.
   string name = 5;
   bool auto_named = 6;
+  // name is provisional: the daemon derived it from the first prompt (its first line or
+  // sentence, at most 48 characters) while the naming model works; the model's title
+  // replaces it and clears this. A rename clears it too and is never replaced. False
+  // with an empty name (a prompt of only an image). Persisted.
+  bool name_provisional = 53;
   // Model and effort as passed to claude (e.g. "opus", "high"). Empty means claude's default.
   string model = 7;
   string effort = 8;

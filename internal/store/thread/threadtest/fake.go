@@ -285,13 +285,13 @@ func (f *Fake) Get(_ context.Context, id string) (thread.Thread, error) {
 	return f.get(id)
 }
 
-// Rename sets the name and clears AutoNamed.
+// Rename sets the name and clears AutoNamed and NameProvisional.
 func (f *Fake) Rename(_ context.Context, id, name string) (thread.Thread, error) {
 	return f.mutate("Rename "+id+" "+name, id, func(s *thread.Thread) error {
 		if strings.TrimSpace(name) == "" {
 			return fmt.Errorf("%w: name is empty", thread.ErrInvalidArgument)
 		}
-		s.Name, s.AutoNamed = strings.TrimSpace(name), false
+		s.Name, s.AutoNamed, s.NameProvisional = strings.TrimSpace(name), false, false
 		return nil
 	})
 }

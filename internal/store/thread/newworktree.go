@@ -23,7 +23,8 @@ import (
 // slugify) the thread id. Only the branch waits for the namer, bounded by
 // Options.SlugTimeout. The namer is called once per thread: a title that arrives in
 // time names the branch and the thread; one that arrives later only names the
-// thread then (the branch stays cf/<id>; the row keeps its placeholder until then).
+// thread then (the branch stays cf/<id>; the row keeps its provisional name, else its
+// placeholder, until then). The provisional name never names the branch.
 
 // branchPrefix namespaces branches the app creates.
 const branchPrefix = "cf/"
@@ -200,12 +201,14 @@ func (m *Manager) applyLateName(id string, ch <-chan namingResult) {
 			m.log.Warn("auto-naming failed", "thread", id, "err", res.err)
 			return
 		}
-		if _, ok := m.update(id, true, func(rec *record) {
-			if rec.s.Name == "" {
-				rec.s.Name, rec.s.AutoNamed = res.name, true
-			}
-		}); ok {
+		applied := false
+		if _, ok := m.update(id, true, func(rec *record) { applied = rec.s.applyNamerTitle(res.name) }); !ok {
+			return // removed meanwhile
+		}
+		if applied {
 			m.log.Info("thread auto-named after its worktree was created", "thread", id, "name", res.name)
+		} else {
+			m.log.Info("naming answer ignored: the thread was named meanwhile", "thread", id, "name", res.name)
 		}
 	}()
 }

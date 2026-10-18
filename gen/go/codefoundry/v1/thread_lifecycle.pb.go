@@ -412,6 +412,11 @@ type Thread struct {
 	// unless the user named or renamed it.
 	Name      string `protobuf:"bytes,5,opt,name=name,proto3" json:"name,omitempty"`
 	AutoNamed bool   `protobuf:"varint,6,opt,name=auto_named,json=autoNamed,proto3" json:"auto_named,omitempty"`
+	// name is provisional: the daemon derived it from the first prompt (its first line or
+	// sentence, at most 48 characters) while the naming model works; the model's title
+	// replaces it and clears this. A rename clears it too and is never replaced. False
+	// with an empty name (a prompt of only an image). Persisted.
+	NameProvisional bool `protobuf:"varint,53,opt,name=name_provisional,json=nameProvisional,proto3" json:"name_provisional,omitempty"`
 	// Model and effort as passed to claude (e.g. "opus", "high"). Empty means claude's default.
 	Model          string                 `protobuf:"bytes,7,opt,name=model,proto3" json:"model,omitempty"`
 	Effort         string                 `protobuf:"bytes,8,opt,name=effort,proto3" json:"effort,omitempty"`
@@ -643,6 +648,13 @@ func (x *Thread) GetName() string {
 func (x *Thread) GetAutoNamed() bool {
 	if x != nil {
 		return x.AutoNamed
+	}
+	return false
+}
+
+func (x *Thread) GetNameProvisional() bool {
+	if x != nil {
+		return x.NameProvisional
 	}
 	return false
 }
@@ -3904,7 +3916,7 @@ var File_codefoundry_v1_thread_lifecycle_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\n" +
-	"%codefoundry/v1/thread_lifecycle.proto\x12\x0ecodefoundry.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x9a\x11\n" +
+	"%codefoundry/v1/thread_lifecycle.proto\x12\x0ecodefoundry.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xc5\x11\n" +
 	"\x06Thread\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12*\n" +
 	"\x11claude_session_id\x18\x02 \x01(\tR\x0fclaudeSessionId\x12\x1d\n" +
@@ -3913,7 +3925,8 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\rworktree_path\x18\x04 \x01(\tR\fworktreePath\x12\x12\n" +
 	"\x04name\x18\x05 \x01(\tR\x04name\x12\x1d\n" +
 	"\n" +
-	"auto_named\x18\x06 \x01(\bR\tautoNamed\x12\x14\n" +
+	"auto_named\x18\x06 \x01(\bR\tautoNamed\x12)\n" +
+	"\x10name_provisional\x185 \x01(\bR\x0fnameProvisional\x12\x14\n" +
 	"\x05model\x18\a \x01(\tR\x05model\x12\x16\n" +
 	"\x06effort\x18\b \x01(\tR\x06effort\x121\n" +
 	"\x05state\x18\n" +

@@ -1,6 +1,9 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ThreadView } from "@/api/threads";
+
+const renameThread = vi.hoisted(() => vi.fn<(id: string, name: string) => Promise<boolean>>(() => Promise.resolve(true)));
+vi.mock("@/stores/threadActions", async (orig) => ({ ...(await orig<typeof import("@/stores/threadActions")>()), renameThread }));
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
@@ -77,6 +80,46 @@ describe("SidebarRow running agents", () => {
     const el = screen.getByTestId("row-agents");
     expect(el.className).toContain("text-info");
     expect(el.querySelector("svg")).not.toBeNull();
+  });
+});
+
+describe("SidebarRow provisional name", () => {
+  it.each([
+    ["provisional: the name, muted and italic", { name: "fix the login redirect", nameProvisional: true }, "fix the login redirect", true, true],
+    ["the naming model's title: plain", { name: "Fix the login redirect", nameProvisional: false }, "Fix the login redirect", false, false],
+    ["unnamed: the id, muted, not italic", { name: "", nameProvisional: false }, "s-1", true, false],
+  ])("%s", (_name, o, text, muted, italic) => {
+    renderRow(o);
+    const el = screen.getByTestId("thread-name");
+    expect(el.textContent).toBe(text);
+    expect(el.className.includes("text-muted-foreground")).toBe(muted);
+    expect(el.className.includes("italic")).toBe(italic);
+    expect(el.getAttribute("data-provisional")).toBe(italic ? "true" : null);
+  });
+});
+
+describe("SidebarRow rename field", () => {
+  function openRename(o: Partial<ThreadView>): HTMLInputElement {
+    renameThread.mockClear();
+    useUiStore.setState({ renamingThreadId: "s-1" });
+    renderRow(o);
+    return screen.getByTestId<HTMLInputElement>("rename-input");
+  }
+
+  it("the naming model's title landing while it is open: an untouched commit keeps the title", () => {
+    const input = openRename({ name: "fix the login redirect", nameProvisional: true });
+    act(() => {
+      useThreadsStore.setState({ byId: { "s-1": thread({ name: "Fix login redirect loop", nameProvisional: false }) } });
+    });
+    fireEvent.blur(input);
+    expect(renameThread).not.toHaveBeenCalled();
+  });
+
+  it("an edit commits", () => {
+    const input = openRename({ name: "fix the login redirect", nameProvisional: true });
+    fireEvent.change(input, { target: { value: "Login loop" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(renameThread).toHaveBeenCalledWith("s-1", "Login loop");
   });
 });
 

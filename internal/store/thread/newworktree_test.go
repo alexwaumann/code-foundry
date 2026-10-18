@@ -65,8 +65,10 @@ func TestCreateNewWorktree(t *testing.T) {
 		namer      func(n int, msg string) (string, error) // n counts calls from 1
 		wantBranch string                                  // "<id>" stands for cf/<thread id>
 		wantName   string
-		wantCalls  int
-		wantBase   string
+		// wantProvisional: the name is the prompt's provisional one (the namer failed).
+		wantProvisional bool
+		wantCalls       int
+		wantBase        string
 	}{
 		{name: "title in time names the thread, its slug the branch", o: CreateOptions{ProjectID: "r1", InitialPrompt: "fix the login bug"},
 			namer: func(int, string) (string, error) { return "Fix the login bug", nil }, wantBranch: "cf/fix-the-login-bug",
@@ -88,8 +90,9 @@ func TestCreateNewWorktree(t *testing.T) {
 			taken: []string{"refs/heads/cf/do-x", "refs/remotes/origin/cf/do-x-2"},
 			namer: func(int, string) (string, error) { return "Do x", nil }, wantBranch: "cf/do-x-3", wantName: "Do x", wantCalls: 1,
 			wantBase: "origin/main"},
-		{name: "namer error uses the id", o: CreateOptions{ProjectID: "r1", InitialPrompt: "x"},
+		{name: "namer error uses the id, never the provisional name", o: CreateOptions{ProjectID: "r1", InitialPrompt: "fix the login bug"},
 			namer: func(int, string) (string, error) { return "", errors.New("exit status 1") }, wantBranch: "<id>", wantCalls: 1,
+			wantName: "fix the login bug", wantProvisional: true,
 			wantBase: "origin/main"},
 		{name: "rate limit is retried once", o: CreateOptions{ProjectID: "r1", InitialPrompt: "x"},
 			namer: func(n int, _ string) (string, error) {
@@ -100,6 +103,7 @@ func TestCreateNewWorktree(t *testing.T) {
 			}, wantBranch: "cf/after-retry", wantName: "After retry", wantCalls: 2, wantBase: "origin/main"},
 		{name: "second rate limit gives up", o: CreateOptions{ProjectID: "r1", InitialPrompt: "x"},
 			namer: func(int, string) (string, error) { return "", errors.New("Rate limit reached") }, wantBranch: "<id>",
+			wantName: "x", wantProvisional: true,
 			wantCalls: 2, wantBase: "origin/main"},
 		{name: "explicit name is the slug without the namer", o: CreateOptions{ProjectID: "r1", Name: "My Big Feature!", InitialPrompt: "x"},
 			wantBranch: "cf/my-big-feature", wantName: "My Big Feature!", wantCalls: 0, wantBase: "origin/main"},
@@ -138,7 +142,8 @@ func TestCreateNewWorktree(t *testing.T) {
 			}
 			wantPath := rr.WorktreeRoot + "/_local/repo/" + strings.ReplaceAll(branch, "/", "-")
 			if !s.CreatedWorktree || s.WorktreePath != wantPath || s.ProjectID != "r1" || s.BaseRef != tt.wantBase ||
-				s.Name != tt.wantName || s.AutoNamed != (tt.wantName != "" && tt.o.Name == "") {
+				s.Name != tt.wantName || s.AutoNamed != (tt.wantName != "" && tt.o.Name == "" && !tt.wantProvisional) ||
+				s.NameProvisional != tt.wantProvisional {
 				t.Errorf("thread = %+v", s)
 			}
 			spec := e.spec(s.ID)
@@ -190,16 +195,17 @@ func TestCreateNewWorktreeSlugTimeoutNamesLater(t *testing.T) {
 	if got := rr.created(); len(got) != 1 || got[0].Branch != "cf/"+s.ID {
 		t.Fatalf("CreateWorktree calls = %+v", got)
 	}
-	if s.Name != "" || s.State != StateStarting {
+	// The provisional name shows meanwhile; the branch never takes it.
+	if s.Name != "x" || !s.NameProvisional || s.AutoNamed || s.State != StateStarting {
 		t.Fatalf("thread = %+v", s)
 	}
 	close(release)
 	got := e.waitFor(s.ID, "named", func(s Thread) bool { return s.Name == "Slow name" })
-	if !got.AutoNamed {
+	if !got.AutoNamed || got.NameProvisional {
 		t.Errorf("thread = %+v", got)
 	}
 	rows, _ := loadThreads(context.Background(), e.m.opts.DB)
-	if len(rows) != 1 || rows[0].Name != "Slow name" || !rows[0].CreatedWorktree || rows[0].BaseRef != "origin/main" {
+	if len(rows) != 1 || rows[0].Name != "Slow name" || rows[0].NameProvisional || !rows[0].CreatedWorktree || rows[0].BaseRef != "origin/main" {
 		t.Errorf("rows = %+v", rows)
 	}
 }
@@ -220,7 +226,7 @@ func TestCreateNewWorktreeSlugTimeoutKeepsRename(t *testing.T) {
 	}
 	close(release)
 	time.Sleep(100 * time.Millisecond)
-	if got, _ := e.m.Get(e.ctx(), s.ID); got.Name != "mine" || got.AutoNamed {
+	if got, _ := e.m.Get(e.ctx(), s.ID); got.Name != "mine" || got.AutoNamed || got.NameProvisional {
 		t.Errorf("late name overwrote the rename: %+v", got)
 	}
 }
