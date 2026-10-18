@@ -17,6 +17,8 @@ type Surfaces struct {
 	// missing is unavailable with Why.
 	Available map[string]bool
 	Why       string
+	// Unknown marks "<plugin>/<surface>" unavailable for now (a fact not known yet).
+	Unknown map[string]bool
 	// Elements is what SurfaceElements returns.
 	Elements []plugin.SurfaceElement
 	// ActErr, when set, is Act's error.
@@ -32,13 +34,13 @@ var _ plugin.Surfaces = (*Surfaces)(nil)
 func NewSurfaces() *Surfaces { return &Surfaces{Available: map[string]bool{}} }
 
 // SurfaceAvailable implements plugin.Surfaces.
-func (s *Surfaces) SurfaceAvailable(p, surface string, _ command.Context) (bool, string) {
+func (s *Surfaces) SurfaceAvailable(p, surface string, _ command.Context) plugin.Availability {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.Available[p+"/"+surface] {
-		return true, ""
+		return plugin.Availability{Available: true}
 	}
-	return false, s.Why
+	return plugin.Availability{Unknown: s.Unknown[p+"/"+surface], Reason: s.Why}
 }
 
 // WatchSurface implements plugin.Surfaces: the instance key is

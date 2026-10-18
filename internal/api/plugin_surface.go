@@ -26,7 +26,8 @@ func (h *Plugin) fillAvailability(ps []*v1.Plugin, uctx command.Context) {
 				s.UnavailableReason = "plugin " + p.GetName() + " is disabled"
 				continue
 			}
-			s.Available, s.UnavailableReason = h.surfaces.SurfaceAvailable(p.GetName(), s.GetId(), uctx)
+			a := h.surfaces.SurfaceAvailable(p.GetName(), s.GetId(), uctx)
+			s.Available, s.Unknown, s.UnavailableReason = a.Available, a.Unknown, a.Reason
 		}
 	}
 }

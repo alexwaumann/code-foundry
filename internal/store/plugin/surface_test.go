@@ -594,9 +594,8 @@ func TestShowCommandsAndContextFacts(t *testing.T) {
 		t.Error("the fact leaked to s-2, or the command did not follow")
 	}
 	waitEvent(t, sub, func(ev plugin.Event) bool { _, ok := ev.(plugin.AvailabilityChanged); return ok })
-	ok, why := e.m.SurfaceAvailable("surf", "gated", s2)
-	if ok || !strings.Contains(why, "surf.on") {
-		t.Errorf("s-2: %v %q", ok, why)
+	if a := e.m.SurfaceAvailable("surf", "gated", s2); a.Available || a.Unknown || !strings.Contains(a.Reason, "surf.on") {
+		t.Errorf("s-2: %+v", a)
 	}
 	if _, err := e.invoke("plugin.surf.off", nil, s1); err != nil {
 		t.Fatal(err)
@@ -639,8 +638,11 @@ func TestAsyncChecksFact(t *testing.T) {
 	if why := show.WhyUnavailable(s1); !strings.Contains(why, "not known yet") {
 		t.Errorf("why %q", why)
 	}
-	if ok, why := e.m.SurfaceAvailable("surf", "checks", command.Context{ActiveThreadID: "s-2"}); ok || !strings.Contains(why, "no pull request") {
-		t.Errorf("s-2 (no pull request): %v %q", ok, why)
+	if a := e.m.SurfaceAvailable("surf", "checks", s1); a.Available || !a.Unknown {
+		t.Errorf("s-1 before the checks: %+v, want unknown", a)
+	}
+	if a := e.m.SurfaceAvailable("surf", "checks", command.Context{ActiveThreadID: "s-2"}); a.Available || a.Unknown || !strings.Contains(a.Reason, "no pull request") {
+		t.Errorf("s-2 (no pull request): %+v", a)
 	}
 	e.facts.mu.Lock()
 	e.facts.checks = []plugin.CheckRun{{Name: "test", App: "github-actions", URL: "https://github.com/o/r/actions/runs/1/job/2"}, {Name: "jenkins", URL: "https://ci.example/1"}}

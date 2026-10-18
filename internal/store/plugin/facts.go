@@ -260,10 +260,11 @@ func (e *factEnv) checks(field func(CheckRun) string) value {
 }
 
 // availability is a predicate's verdict for a context, with the reason when it is not
-// available.
+// available; unknown when it reads a fact that is not known yet (unavailable for now).
 type availability struct {
-	ok     bool
-	reason string
+	ok      bool
+	unknown bool
+	reason  string
 }
 
 // evalPredicate evaluates p (nil: true) in uctx. An unknown result is unavailable
@@ -277,7 +278,7 @@ func (m *Manager) evalPredicate(p *Predicate, uctx command.Context) availability
 	case triTrue:
 		return availability{ok: true}
 	case triUnknown:
-		return availability{reason: "not known yet (" + p.src + " waits on a pull request's checks)"}
+		return availability{unknown: true, reason: "not known yet (" + p.src + " waits on a pull request's checks)"}
 	}
 	return availability{reason: "its condition does not hold here: " + p.src}
 }

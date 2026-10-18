@@ -165,8 +165,9 @@ type ActRequest struct {
 // Surfaces is the surface half of the plugin store (the API's WatchSurface, GetSurface
 // and Act). *Manager implements it.
 type Surfaces interface {
-	// SurfaceAvailable reports whether a surface is available in uctx, and why not.
-	SurfaceAvailable(plugin, surface string, uctx command.Context) (bool, string)
+	// SurfaceAvailable reports whether a surface is available in uctx, why not, and
+	// whether that is only for now (its when clause waits on a fact not known yet).
+	SurfaceAvailable(plugin, surface string, uctx command.Context) Availability
 	// WatchSurface opens (or joins) the instance ref names and streams its updates until
 	// ctx ends; it returns the instance key. The channel closes when ctx ends.
 	WatchSurface(ctx context.Context, ref SurfaceRef) (string, <-chan SurfaceUpdate, error)
@@ -472,21 +473,31 @@ func (m *Manager) surfaceAvailability(spec pluginsdk.SurfaceSpec, uctx command.C
 	return m.evalPredicate(p, uctx)
 }
 
+// Availability is a surface's availability in a context.
+type Availability struct {
+	Available bool
+	// Unknown: not available for now, because its when clause reads a fact that is not
+	// known yet (a pull request's checks while they are fetched).
+	Unknown bool
+	// Reason says why it is not available.
+	Reason string
+}
+
 // SurfaceAvailable implements Surfaces.
-func (m *Manager) SurfaceAvailable(plugin, surface string, uctx command.Context) (bool, string) {
+func (m *Manager) SurfaceAvailable(plugin, surface string, uctx command.Context) Availability {
 	p, ok := m.Snapshot().Plugin(plugin)
 	if !ok {
-		return false, "plugin " + plugin + " is not installed"
+		return Availability{Reason: "plugin " + plugin + " is not installed"}
 	}
 	spec, ok := surfaceSpec(p, surface)
 	if !ok {
-		return false, fmt.Sprintf("plugin %s has no surface %q", plugin, surface)
+		return Availability{Reason: fmt.Sprintf("plugin %s has no surface %q", plugin, surface)}
 	}
 	if !p.Enabled {
-		return false, "plugin " + plugin + " is disabled"
+		return Availability{Reason: "plugin " + plugin + " is disabled"}
 	}
 	a := m.surfaceAvailability(spec, uctx)
-	return a.ok, a.reason
+	return Availability{Available: a.ok, Unknown: a.unknown, Reason: a.reason}
 }
 
 // resolve finds (or makes) the instance ref names.

@@ -52,6 +52,11 @@ func TestPluginListSurfaceAvailability(t *testing.T) {
 		s.GetKind() != "plugin.hello.main" || s.GetScope() != "thread" {
 		t.Errorf("surface %v", s)
 	}
+	surfaces.Unknown = map[string]bool{"hello/main": true}
+	list, _ = c.List(context.Background(), connect.NewRequest(&v1.ListPluginsRequest{}))
+	if s := list.Msg.GetPlugins()[0].GetSurfaces()[0]; s.GetAvailable() || !s.GetUnknown() {
+		t.Errorf("a clause not known yet: %v", s)
+	}
 	surfaces.Available["hello/main"] = true
 	list, _ = c.List(context.Background(), connect.NewRequest(&v1.ListPluginsRequest{Context: &v1.UiContext{ActiveThreadId: "s-1"}}))
 	if s := list.Msg.GetPlugins()[0].GetSurfaces()[0]; !s.GetAvailable() {
