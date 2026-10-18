@@ -104,21 +104,22 @@ func (r *Registry) resolveIDs(ctx context.Context, specs []ArgSpec, args Args, e
 // when an entry is a suffix): the full ids joined by commas, blanks and repeats dropped.
 // One entry that does not resolve fails them all, so a typo acts on none.
 func (r *Registry) resolveIDList(ctx context.Context, s ArgSpec, v string) (string, error) {
-	var ids []string
-	listed := false
-	var out []string
+	list := r.idLister(s.ID)
+	var (
+		ids    []string
+		listed bool
+		out    []string
+	)
 	for _, ref := range splitList(v) {
-		if needsResolve(s.ID, ref) && !listed {
-			if list := r.idLister(s.ID); list != nil {
+		full := ref
+		if list != nil && needsResolve(s.ID, ref) {
+			if !listed {
 				var err error
 				if ids, err = list(ctx); err != nil {
 					return "", err
 				}
+				listed = true
 			}
-			listed = true
-		}
-		full := ref
-		if listed && ids != nil {
 			var err error
 			if full, err = ResolveID(s.ID, s.Name, ref, ids); err != nil {
 				return "", err
