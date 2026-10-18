@@ -28,6 +28,10 @@ function plugin(name: string, surfaces: string[] = []): PluginView {
     commands: [],
     surfaces: surfaces.map((id) => ({ id, title: id, icon: "", scope: "thread", when: "", showCommand: `plugin.${name}.show.${id}`, kind: `plugin.${name}.${id}` })),
     logPath: "",
+    install: null,
+    updateAvailable: false,
+    updateVersion: "",
+    updateRegistry: "",
   };
 }
 

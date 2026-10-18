@@ -126,6 +126,9 @@ const (
 	PageSource        = "source"
 	PageKeybindings   = "keybindings"
 	PageAdvanced      = "advanced"
+	// PagePlugins is drawn by the GUI (Settings → Plugins: installed plugins and Browse)
+	// around its one section of fields.
+	PagePlugins = "plugins"
 )
 
 // Pages in display order. The keybindings page's sections are the command categories
@@ -154,8 +157,9 @@ var Pages = []Page{
 	{ID: PageAdvanced, Title: "Advanced", Sections: []Section{
 		{ID: "executables", Title: "Executables"},
 		{ID: "logging", Title: "Logging"},
-		{ID: "plugins", Title: "Plugins"},
 	}},
+	{ID: PagePlugins, Title: "Plugins", Description: "Separate programs that add commands, panel surfaces, thread flags and environment to Code Foundry.",
+		Sections: []Section{{ID: "registries", Title: "Registries", Description: "Where Browse finds plugins to install."}}},
 }
 
 // Groups are the file's tables, in file order. The settings page follows Pages.
@@ -420,9 +424,9 @@ var staticFields = []Field{
 		Enum:        []string{"debug", "info", "warn", "error"}, EnumLabels: []string{"Debug", "Info", "Warn", "Error"}, Default: "info",
 		bind: func(s *Settings) any { return &s.Advanced.LogLevel },
 	},
-	// Advanced › Plugins.
+	// Plugins › Registries.
 	{
-		Key: KeyPluginRegistries, Group: GroupPlugins, Page: PageAdvanced, Section: "plugins", Type: String, Title: "Plugin registries",
+		Key: KeyPluginRegistries, Group: GroupPlugins, Page: PagePlugins, Section: "registries", Type: String, Title: "Plugin registries",
 		Description: "Where Browse and plugin install find plugins, in order: the first registry listing a name wins. A GitHub repository (https://github.com/<owner>/<repo>, read with your gh login, so private ones work) or an https URL of an index.json. Separate several with commas; \"none\" lists none.",
 		Default:     registry.DefaultRegistry, Placeholder: registry.DefaultRegistry,
 		check: checkRegistries,

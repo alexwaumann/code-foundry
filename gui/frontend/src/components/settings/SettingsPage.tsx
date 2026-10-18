@@ -142,7 +142,8 @@ export function SettingsPage() {
   const words = useMemo(() => queryWords(query), [query]);
   const searching = words.length > 0;
   const result = useMemo(() => (schema && searching ? searchSettings(schema, words) : null), [schema, searching, words]);
-  const pages = useMemo(() => (schema ? [...schema.pages, ...guiPages.map((g) => g.page)] : []), [schema]);
+  // A GUI page may also be a schema page (Plugins: its settings section): the schema's wins, drawn by the GUI's component.
+  const pages = useMemo(() => (schema ? [...schema.pages, ...guiPages.map((g) => g.page).filter((g) => !schema.pages.some((p) => p.id === g.id))] : []), [schema]);
   const page = pages.find((p) => p.id === pageId) ?? pages[0];
 
   // A new page (or the search's results) starts at the top.
