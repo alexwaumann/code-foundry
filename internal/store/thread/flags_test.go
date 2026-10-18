@@ -25,9 +25,8 @@ func flagSummary(fs []Flag) []string {
 // persistence across a daemon restart.
 func TestFlagLifecycle(t *testing.T) {
 	type step struct {
-		do      func(e *env, id string) error
-		want    []string
-		changed *bool
+		do   func(e *env, id string) error
+		want []string
 	}
 	set := func(source string, level FlagLevel, reason string, untilSeen bool, changed *bool) func(e *env, id string) error {
 		return func(e *env, id string) error {
