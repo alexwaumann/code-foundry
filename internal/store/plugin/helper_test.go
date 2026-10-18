@@ -38,6 +38,12 @@ func helper(mode string) int {
 			return 1
 		}
 		return 0
+	case "owned":
+		if err := pluginsdk.Serve(ownedPlugin()); err != nil {
+			fmt.Fprintln(os.Stderr, "serve:", err)
+			return 1
+		}
+		return 0
 	case "ok":
 		if err := pluginsdk.Serve(okPlugin()); err != nil {
 			fmt.Fprintln(os.Stderr, "serve:", err)
