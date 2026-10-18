@@ -32,10 +32,15 @@ interface RowProps {
   onActivate: (row: Row, how: "click") => void;
 }
 
-/** Inline name editor; Enter or blur commits via thread.rename, Escape cancels. */
+/**
+ * Inline name editor; Enter or blur commits via thread.rename, Escape cancels. It commits
+ * only an edit of the name it opened with: a name that changed meanwhile (the naming
+ * model's title replacing a provisional name) is not overwritten by the untouched text.
+ */
 function RenameField({ id, name }: { id: string; name: string }) {
   const ref = useRef<HTMLInputElement>(null);
   const done = useRef(false);
+  const opened = useRef(name);
   const returnTo = useRef<Element | null>(null);
   useEffect(() => {
     returnTo.current = document.activeElement;
@@ -46,7 +51,7 @@ function RenameField({ id, name }: { id: string; name: string }) {
     done.current = true;
     const value = ref.current?.value.trim() ?? "";
     useUiStore.getState().setRenaming(null);
-    if (commit && value && value !== name) void renameThread(id, value);
+    if (commit && value && value !== opened.current && value !== name) void renameThread(id, value);
     if (returnTo.current instanceof HTMLElement && returnTo.current.isConnected) returnTo.current.focus();
     else useUiStore.getState().focusSidebar();
   };
