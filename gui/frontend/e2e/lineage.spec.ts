@@ -7,8 +7,10 @@ import { emit, expectTooltip, mockPost, mockUrl, openApp, resetMock, row } from 
  * POST /__mock/lineage (World.addLineage): "Fix login redirect" (s-l-parent, working)
  * created "Add retry to login redirect" (s-l-child, finished, its log opening with the
  * daemon's "Created by" note) and six siblings of it, one archived; s-l-child created
- * "Write retry backoff tests" (s-l-grand). Set SHOTS=<dir> to save screenshots (WebKit,
- * dark and light).
+ * "Write retry backoff tests" (s-l-grand), which recorded its creator as "Add retry to
+ * login redirect (old)": the creator is resolved by its id and shown under its current
+ * name (docs/notes/lineage-by-id.md), the recorded one only once it is removed. Set
+ * SHOTS=<dir> to save screenshots (WebKit, dark and light).
  */
 
 const P = "s-l-parent";
@@ -122,20 +124,39 @@ test("timeline: a wake message is a collapsed Woken by note that expands to its 
   await expect(header(page).getByTestId("thread-title")).toHaveText("Add retry to login redirect");
 });
 
-test("header: a removed creator leaves an inert chip saying so; an archived one still opens", async ({ page }) => {
+test("a renamed creator: the chip, the tooltip and the note show its current name; the note links by id", async ({ page }) => {
+  await openApp(page);
+  // s-l-grand recorded "Add retry to login redirect (old)"; its creator is named "Add retry to login redirect".
+  const tip = page.locator('[data-testid="thread-tooltip"]:not([data-state="closed"])');
+  await row(page, "s:s-l-grand").hover();
+  await expect(tip).toHaveAttribute("data-thread-id", "s-l-grand");
+  await expect(tip.getByTestId("tip-created-by")).toHaveText("Created by Add retry to login redirect");
+  await open(page, "s-l-grand");
+  await expect(chip(page)).toHaveText("from Add retry to login redirect");
+  const note = page.getByTestId("thread-created-by-note");
+  const link = note.getByTestId("thread-created-by-note-link");
+  await expect(link).toHaveText("Add retry to login redirect");
+  await expect(link).toHaveAttribute("data-thread", C);
+  await expect(note.getByTestId("thread-created-by-note-brief")).toHaveText(/^brief: Write table tests for the retry backoff schedule/);
+  await link.click();
+  await expect(header(page).getByTestId("thread-title")).toHaveText("Add retry to login redirect");
+});
+
+test("header: a removed creator leaves an inert chip saying so, with the recorded name; an archived one still opens", async ({ page }) => {
   await openApp(page);
   await open(page, "s-l-grand");
   await expect(chip(page)).toHaveText("from Add retry to login redirect");
   await expect(chip(page)).not.toHaveAttribute("data-removed", "true");
   await removeThread(C);
+  // Gone from the list: the name the thread recorded when it was created.
   await expect(chip(page)).toHaveAttribute("data-removed", "true");
-  await expect(chip(page)).toHaveText("from Add retry to login redirect");
+  await expect(chip(page)).toHaveText("from Add retry to login redirect (old)");
   await expect(chip(page)).toHaveCSS("cursor", "default");
   await expectTooltip(page, chip(page), "Thread removed");
   await chip(page).click();
   await expect(page.getByTestId("panel-body")).toHaveCount(0);
   await expect(page.getByTestId("thread-created-by-note-link")).toHaveCount(0);
-  await expect(page.getByTestId("thread-created-by-note-name")).toHaveText("Add retry to login redirect");
+  await expect(page.getByTestId("thread-created-by-note-name")).toHaveText("Add retry to login redirect (old)");
 });
 
 test("Threads tab on an agent's thread: creator, this thread, five siblings then +1 more, its child; rows open threads", async ({ page }) => {

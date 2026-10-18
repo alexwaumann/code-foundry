@@ -113,6 +113,10 @@ type Item struct {
 	// Text: user_message (as typed), assistant_text, thinking, error, compaction (the
 	// summary), command_output, note.
 	Text string
+	// NoteCreatedBy: a note's creator thread id when it is the "Created by" note that
+	// starts a thread another thread made (Text keeps the creator's name at creation);
+	// empty for every other note. A fork's copy keeps it.
+	NoteCreatedBy string
 	// Attachments: user_message's staged image and PDF paths.
 	Attachments []string
 	// ComposerText: user_message's composer text with its tag tokens, when the GUI

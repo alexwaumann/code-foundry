@@ -1606,8 +1606,14 @@ func (x *CommandOutputItem) GetText() string {
 // rather than anything Claude said or did. A fork's items start with a copy of its
 // parent's, ended by the note "Forked from <parent's name at fork time>".
 type NoteItem struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Text          string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Text  string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
+	// The creator thread's id when this is the "Created by <name> · brief: <brief>" note
+	// the daemon writes at the top of a thread another thread's agent made (a fork's copy
+	// of it keeps it); empty for every other note. The GUI resolves it against the thread
+	// list for the creator's current name; the text keeps the name at creation, the
+	// fallback for a removed creator.
+	CreatedBy     string `protobuf:"bytes,2,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1645,6 +1651,13 @@ func (*NoteItem) Descriptor() ([]byte, []int) {
 func (x *NoteItem) GetText() string {
 	if x != nil {
 		return x.Text
+	}
+	return ""
+}
+
+func (x *NoteItem) GetCreatedBy() string {
+	if x != nil {
+		return x.CreatedBy
 	}
 	return ""
 }
@@ -4377,9 +4390,11 @@ const file_codefoundry_v1_thread_proto_rawDesc = "" +
 	"postTokens\x12\x18\n" +
 	"\asummary\x18\x04 \x01(\tR\asummary\"'\n" +
 	"\x11CommandOutputItem\x12\x12\n" +
-	"\x04text\x18\x01 \x01(\tR\x04text\"\x1e\n" +
+	"\x04text\x18\x01 \x01(\tR\x04text\"=\n" +
 	"\bNoteItem\x12\x12\n" +
-	"\x04text\x18\x01 \x01(\tR\x04text\"\xa1\x01\n" +
+	"\x04text\x18\x01 \x01(\tR\x04text\x12\x1d\n" +
+	"\n" +
+	"created_by\x18\x02 \x01(\tR\tcreatedBy\"\xa1\x01\n" +
 	"\x14ThreadPendingRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x17\n" +

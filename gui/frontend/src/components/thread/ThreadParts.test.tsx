@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CommandView } from "@/api/command";
 import type { ThreadView } from "@/api/threads";
@@ -131,6 +131,17 @@ describe("ThreadTitle created-by chip", () => {
     expect([...container.children].map((e) => e.getAttribute("data-testid"))).toEqual(["thread-title", "thread-created-by", "thread-location"]);
     fireEvent.click(c);
     expect(startCommandNamed).toHaveBeenCalledWith("view.panel.threads");
+  });
+
+  it("shows a renamed creator's current name, and follows a later rename", () => {
+    useCommandsStore.setState({ commands: [cmd("thread.rename"), cmd("view.panel.threads")] });
+    useThreadsStore.setState({ byId: { "s-1": thread(child), "s-p": thread({ id: "s-p", name: "Login redirect" }) }, order: ["s-p", "s-1"] });
+    render(<ThreadTitle id="s-1" />);
+    expect(chip()?.textContent).toBe("from Login redirect");
+    act(() => {
+      useThreadsStore.setState((s) => ({ byId: { ...s.byId, "s-p": { ...s.byId["s-p"], name: "Login redirect, v2" } as ThreadView } }));
+    });
+    expect(chip()?.textContent).toBe("from Login redirect, v2");
   });
 
   it("is inert and muted once the creator was removed, keeping its recorded name", () => {

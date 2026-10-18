@@ -3,7 +3,8 @@
  * thread (`createdBy`, docs/notes/agents-2-metadata.md), its siblings (the creator's other
  * threads) and its children (threads created from it). Pure, over the thread list; the
  * narrow selectors live in stores/lineage.ts. Order is always spawn order: the list's
- * `order` (creation time, then id).
+ * `order` (creation time, then id). A creator is resolved by its id and shown under its
+ * current name (docs/notes/lineage-by-id.md).
  */
 import type { ThreadView } from "@/api/threads";
 import { statusLine, type StatusTone } from "./statusLine";
@@ -17,23 +18,33 @@ export interface LineageData {
 /** The Threads panel shows this many siblings, then a "+N more" row that expands. */
 export const SIBLINGS_CAP = 5;
 
-/** The id of the note the daemon writes at the top of a thread an agent created. */
-export const CREATED_BY_NOTE_ID = "note-created-by";
-
-/** Who created a thread: the creator's id and its name at creation, and whether it still exists. */
+/**
+ * Who created a thread, resolved by the creator's id (docs/notes/lineage-by-id.md): its id,
+ * its name, and whether it still exists.
+ */
 export interface Creator {
   id: string;
-  /** The creator's name when the thread was created (createdByName), else its id. */
+  /**
+   * The creator's current name (its id while unnamed) when it is in the thread list; once
+   * it is removed, the name it had when the thread was created (createdByName), else its id.
+   */
   name: string;
   /** In the thread list; an archived creator counts, a removed one does not. */
   exists: boolean;
+}
+
+/** The creator `id` as a Creator: its current name while it exists, else `recorded` (else the id). */
+function resolveCreator(data: LineageData, id: string, recorded: string): Creator {
+  const c = data.byId[id];
+  if (c) return { id, name: c.name || id, exists: true };
+  return { id, name: recorded || id, exists: false };
 }
 
 /** The thread's creator; null when the user made it (or the thread is unknown). */
 export function creatorOf(data: LineageData, id: string): Creator | null {
   const t = data.byId[id];
   if (!t?.createdBy) return null;
-  return { id: t.createdBy, name: t.createdByName || t.createdBy, exists: t.createdBy in data.byId };
+  return resolveCreator(data, t.createdBy, t.createdByName);
 }
 
 /** Other threads with the same creator, in spawn order; none for a thread the user made. */
@@ -145,8 +156,9 @@ export function lineageStatus(t: ThreadView | undefined): LineageStatus {
   }
 }
 
-/** The daemon's "Created by <name> · brief: <brief>" note, split. */
+/** The daemon's "Created by <name> · brief: <brief>" note's text, split. */
 export interface CreatedByNote {
+  /** The creator's name when the thread was created: the fallback for a removed creator. */
   name: string;
   /** "" when the note has no brief part. */
   brief: string;
@@ -156,33 +168,21 @@ const NOTE_HEAD = "Created by ";
 const BRIEF_SEP = " · brief: ";
 
 /**
- * Parses the daemon's created-by note (internal/store/thread startNote). `name`, the
- * creator's name as the thread records it, says where a name containing " · brief: " ends;
- * without it the first separator does. Null for any other note.
+ * Splits a created-by note's text (internal/store/thread createdByNoteText) at the first
+ * " · brief: ". The note is told by its item's `createdBy`, not by its text or id, so a
+ * fork's copy reads the same; a name containing the separator splits early, which only
+ * shows for a removed creator (an existing one shows its current name).
  */
-export function parseCreatedByNote(text: string, name = ""): CreatedByNote | null {
-  if (!text.startsWith(NOTE_HEAD)) return null;
-  const rest = text.slice(NOTE_HEAD.length);
-  if (name && (rest === name || rest.startsWith(name + BRIEF_SEP))) return { name, brief: rest.slice(name.length + BRIEF_SEP.length) };
+export function parseCreatedByNote(text: string): CreatedByNote {
+  const rest = text.startsWith(NOTE_HEAD) ? text.slice(NOTE_HEAD.length) : text;
   const i = rest.indexOf(BRIEF_SEP);
-  const out = i < 0 ? { name: rest, brief: "" } : { name: rest.slice(0, i), brief: rest.slice(i + BRIEF_SEP.length) };
-  return out.name ? out : null;
+  return i < 0 ? { name: rest, brief: "" } : { name: rest.slice(0, i), brief: rest.slice(i + BRIEF_SEP.length) };
 }
 
 /**
- * The thread a created-by note names, for its link: in the thread whose own note it is
- * (`note-created-by` and the thread records that creator under that name), the recorded
- * creator id; otherwise (a fork's copied note) the one thread with that name. "" when it
- * cannot be told (none, or several with the name), and when that thread is gone.
+ * The creator a created-by note names, by the note's `createdBy` id: linked (exists) and
+ * with its current name while it is in the thread list, else the note's recorded name.
  */
-export function noteCreatorId(data: LineageData, threadId: string, noteId: string, name: string): string {
-  const t = data.byId[threadId];
-  if (noteId === CREATED_BY_NOTE_ID && t?.createdBy && (t.createdByName || t.createdBy) === name) return t.createdBy in data.byId ? t.createdBy : "";
-  let found = "";
-  for (const x of data.order) {
-    if (data.byId[x]?.name !== name) continue;
-    if (found) return "";
-    found = x;
-  }
-  return found;
+export function noteCreator(data: LineageData, createdBy: string, recorded: string): Creator {
+  return resolveCreator(data, createdBy, recorded);
 }

@@ -322,7 +322,7 @@ func itemToProto(it thread.Item) *v1.ThreadItem {
 	case thread.KindCommandOutput:
 		p.Payload = &v1.ThreadItem_CommandOutput{CommandOutput: &v1.CommandOutputItem{Text: it.Text}}
 	case thread.KindNote:
-		p.Payload = &v1.ThreadItem_Note{Note: &v1.NoteItem{Text: it.Text}}
+		p.Payload = &v1.ThreadItem_Note{Note: &v1.NoteItem{Text: it.Text, CreatedBy: it.NoteCreatedBy}}
 	}
 	return p
 }

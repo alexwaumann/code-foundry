@@ -58,10 +58,14 @@ Decided while building (not in the brief; flagged for review):
   and links only a unique match. A removed creator or an ambiguous name is muted text, no
   link (the sketch's "gone" style). The note item carries no creator id (`NoteItem` is text
   only), so nothing else was possible without a proto change.
+  *Reversed 2026-10-18: the note carries its creator's id and links by it
+  (`lineage-by-id.md`).*
 * **The recorded name is shown, not the creator's current name**, everywhere (chip,
   tooltip, subline, note): `createdByName` is kept verbatim by the daemon, and the note
   text has it too, so all four agree. The creator's own row in the panel shows its current
   name.
+  *Reversed 2026-10-18: everything shows the creator's current name, the recorded one only
+  for a removed creator (`lineage-by-id.md`).*
 * **Tooltip with a removed creator**: "Created by <recorded name> (removed)", the name
   muted. The sketch had "Created by a removed thread"; the brief asked for the name. The
   panel's subline does use "Created by a removed thread" (as the sketch), and its Created

@@ -3,11 +3,10 @@ import type { ThreadView } from "@/api/threads";
 import {
   capIds,
   childIds,
-  CREATED_BY_NOTE_ID,
   creatorOf,
   lineageStatus,
   lineageTail,
-  noteCreatorId,
+  noteCreator,
   parseCreatedByNote,
   projectCount,
   relatedCount,
@@ -54,12 +53,18 @@ const D = data([
   kid("a1", "a"),
   kid("orphan", "gone", { createdByName: "Removed one" }),
   kid("orphan2", "gone", { createdByName: "Removed one" }),
+  t("r", { name: "Renamed parent" }),
+  kid("r1", "r", { createdByName: "Old parent" }),
+  t("anon", { name: "" }),
+  kid("anon1", "anon", { createdByName: "Named once" }),
 ]);
 
 describe("creatorOf", () => {
   it.each([
     ["the user's thread", "p", null],
     ["an agent's thread", "a", { id: "p", name: "name p", exists: true }],
+    ["a renamed creator: its current name, not the recorded one", "r1", { id: "r", name: "Renamed parent", exists: true }],
+    ["an unnamed creator: its id, not the recorded name", "anon1", { id: "anon", name: "anon", exists: true }],
     ["a removed creator keeps its recorded name", "orphan", { id: "gone", name: "Removed one", exists: false }],
     ["an unknown thread", "zz", null],
   ])("%s", (_n, id, want) => {
@@ -150,30 +155,25 @@ describe("lineageStatus", () => {
 
 describe("parseCreatedByNote", () => {
   it.each([
-    ["with a brief", "Created by Fix login · brief: Add retry, keep it small", "", { name: "Fix login", brief: "Add retry, keep it small" }],
-    ["without a brief", "Created by Fix login", "", { name: "Fix login", brief: "" }],
-    ["a brief with the separator", "Created by A · brief: x · brief: y", "", { name: "A", brief: "x · brief: y" }],
-    ["the recorded name says where it ends", "Created by A · brief: B · brief: c", "A · brief: B", { name: "A · brief: B", brief: "c" }],
-    ["the recorded name alone", "Created by A · brief: B", "A · brief: B", { name: "A · brief: B", brief: "" }],
-    ["a recorded name that does not match", "Created by X · brief: y", "Other", { name: "X", brief: "y" }],
-    ["a fork note", "Forked from Fix login", "", null],
-    ["a budget note", "Budget of $5.00 reached; Claude was interrupted.", "", null],
-    ["no name", "Created by ", "", null],
-  ])("%s", (_n, text, name, want) => {
-    expect(parseCreatedByNote(text, name)).toEqual(want);
+    ["with a brief", "Created by Fix login · brief: Add retry, keep it small", { name: "Fix login", brief: "Add retry, keep it small" }],
+    ["without a brief", "Created by Fix login", { name: "Fix login", brief: "" }],
+    ["a brief with the separator", "Created by A · brief: x · brief: y", { name: "A", brief: "x · brief: y" }],
+    ["a name with the separator splits at the first", "Created by A · brief: B · brief: c", { name: "A", brief: "B · brief: c" }],
+    ["no name", "Created by ", { name: "", brief: "" }],
+  ])("%s", (_n, text, want) => {
+    expect(parseCreatedByNote(text)).toEqual(want);
   });
 });
 
-describe("noteCreatorId", () => {
-  const N = data([t("p", { name: "Fix login" }), kid("a", "p", { createdByName: "Fix login" }), t("fork", { name: "Fork of a" }), t("twin1", { name: "Twin" }), t("twin2", { name: "Twin" }), kid("o", "gone", { createdByName: "Fix login" })]);
+describe("noteCreator", () => {
+  const N = data([t("p", { name: "Fix login, renamed" }), t("twin", { name: "Fix login" }), t("anon", { name: "" }), t("fork", { name: "Fork of a" })]);
   it.each([
-    ["the thread's own note: its recorded creator", "a", CREATED_BY_NOTE_ID, "Fix login", "p"],
-    ["the own note of a removed creator: no link, even with a namesake", "o", CREATED_BY_NOTE_ID, "Fix login", ""],
-    ["a fork's copied note: the one thread with that name", "fork", CREATED_BY_NOTE_ID, "Fix login", "p"],
-    ["another note id: by name", "a", "a-i3", "Fix login", "p"],
-    ["an ambiguous name", "fork", CREATED_BY_NOTE_ID, "Twin", ""],
-    ["no such name", "fork", CREATED_BY_NOTE_ID, "Nobody", ""],
-  ])("%s", (_n, threadId, noteId, name, want) => {
-    expect(noteCreatorId(N, threadId, noteId, name)).toBe(want);
+    ["an existing creator: its current name, linked", "p", "Fix login", { id: "p", name: "Fix login, renamed", exists: true }],
+    ["by id, never by name: a namesake does not matter", "p", "Fix login", { id: "p", name: "Fix login, renamed", exists: true }],
+    ["an unnamed creator: its id", "anon", "Named once", { id: "anon", name: "anon", exists: true }],
+    ["a removed creator: the recorded name, no link", "gone", "Fix login", { id: "gone", name: "Fix login", exists: false }],
+    ["a removed creator without a recorded name: its id", "gone", "", { id: "gone", name: "gone", exists: false }],
+  ])("%s", (_n, createdBy, recorded, want) => {
+    expect(noteCreator(N, createdBy, recorded)).toEqual(want);
   });
 });

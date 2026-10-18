@@ -296,12 +296,14 @@ func (m *Manager) SetBudget(_ context.Context, id string, usd float64) (Thread, 
 	return rec.s, nil
 }
 
-// startNote appends a note to a new thread's log before its first spawn and returns it;
-// the caller saves the row once spawn wrote the thread's (thread_items references it).
-func (m *Manager) startNote(ctx context.Context, id, noteID, text string) (Item, error) {
+// startNote appends a note (its ID, Text and NoteCreatedBy) to a new thread's log before
+// its first spawn and returns it; the caller saves the row once spawn wrote the thread's
+// (thread_items references it).
+func (m *Manager) startNote(ctx context.Context, id string, note Item) (Item, error) {
 	log, err := m.thread(ctx, id)
 	if err != nil {
 		return Item{}, fmt.Errorf("thread: create %s: %w", id, err)
 	}
-	return log.append(Item{ID: noteID, Kind: KindNote, Text: text}), nil
+	note.Kind = KindNote
+	return log.append(note), nil
 }

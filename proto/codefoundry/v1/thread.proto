@@ -365,6 +365,12 @@ message CommandOutputItem {
 // parent's, ended by the note "Forked from <parent's name at fork time>".
 message NoteItem {
   string text = 1;
+  // The creator thread's id when this is the "Created by <name> · brief: <brief>" note
+  // the daemon writes at the top of a thread another thread's agent made (a fork's copy
+  // of it keeps it); empty for every other note. The GUI resolves it against the thread
+  // list for the creator's current name; the text keeps the name at creation, the
+  // fallback for a removed creator.
+  string created_by = 2;
 }
 
 // A request waiting on the user.

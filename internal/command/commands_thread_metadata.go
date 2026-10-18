@@ -74,10 +74,17 @@ func labelList(s *v1.Thread) string {
 }
 
 // threadDetail is thread.get's text: one "key: value" line per fact the thread has.
-func threadDetail(s *v1.Thread) string {
+// names resolves the creator (threadNames): its current name, or the recorded one and
+// "removed".
+func threadDetail(s *v1.Thread, names map[string]string) string {
 	lines := []string{"thread " + threadLabel(s), "status: " + waitStatus(s), "worktree: " + s.GetWorktreePath()}
 	if s.GetCreatedBy() != "" {
-		lines = append(lines, "created by: "+s.GetCreatedByName()+" ("+s.GetCreatedBy()+")")
+		name, exists := creatorName(s, names)
+		ref := s.GetCreatedBy()
+		if !exists {
+			ref += ", removed"
+		}
+		lines = append(lines, "created by: "+name+" ("+ref+")")
 	}
 	if s.GetParentId() != "" {
 		lines = append(lines, "forked from: "+s.GetParentId())
@@ -128,7 +135,11 @@ func threadGet(b ThreadBackend, idArg ArgSpec) Command {
 				return Result{}, err
 			}
 			s := res.Msg.GetThread()
-			return Result{Message: threadDetail(s), JSON: s}, nil
+			names, err := threadNames(ctx, b, []*v1.Thread{s})
+			if err != nil {
+				return Result{}, err
+			}
+			return Result{Message: threadDetail(s, names), JSON: s}, nil
 		},
 	}
 }

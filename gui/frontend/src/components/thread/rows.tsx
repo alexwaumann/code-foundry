@@ -31,7 +31,7 @@ import { Tip } from "@/components/ui/tooltip";
 import { agentElapsedMs, agentName, fmtElapsed, parseAgentNote } from "@/lib/agents";
 import { copyText } from "@/lib/clipboard";
 import { useNow } from "@/lib/clock";
-import { CREATED_BY_NOTE_ID, parseCreatedByNote } from "@/lib/lineage";
+import { parseCreatedByNote } from "@/lib/lineage";
 import { canonicalModelName } from "@/lib/models";
 import { formatAgo } from "@/lib/thread";
 import { questionsOf } from "@/lib/threadRequest";
@@ -39,7 +39,7 @@ import { wakeLine, type WakeTone } from "@/lib/wake";
 import { groupLabel, turnCostLabel, type TimelineRow, type WorkNode } from "@/lib/threadTimeline";
 import { formatDuration, parseObject, splitPath, str, toolFileTarget, toolSummary, type Tense } from "@/lib/toolSummary";
 import { useAgentRunOfCall, useAgentRunOfNote } from "@/stores/agents";
-import { useNoteCreatorId } from "@/stores/lineage";
+import { useNoteCreator } from "@/stores/lineage";
 import { useModelChoices } from "@/stores/settings";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
@@ -539,7 +539,7 @@ const SystemNoteRow = memo(function SystemNoteRow({ id }: { id: string }) {
   if (it?.kind !== "note") return null;
   const note = parseAgentNote(it.text, run?.description ?? "");
   if (note) return <AgentNoteRow note={note} atMs={it.createdAtMs} threadId={threadId} run={run && run.spawnDepth <= 1 ? run : undefined} />;
-  if (parseCreatedByNote(it.text)) return <CreatedByNoteRow threadId={threadId} id={id} text={it.text} atMs={it.createdAtMs} />;
+  if (it.createdBy !== "") return <CreatedByNoteRow createdBy={it.createdBy} text={it.text} atMs={it.createdAtMs} />;
   return (
     <div className="sysnote" role="separator" aria-label={it.text} data-testid="thread-note">
       <span className="selectable">{it.text}</span>
@@ -549,35 +549,34 @@ const SystemNoteRow = memo(function SystemNoteRow({ id }: { id: string }) {
 
 /**
  * The daemon's note at the top of a thread an agent created
- * (docs/notes/agents-3-lineage-gui.md): "↳ Created by <creator> · brief: <brief>" on the
- * lineage note's faint line, the creator's name a link that opens it (as a sidebar click
- * does), the age on the right. The creator is the thread's recorded one for its own note,
- * else (a fork's copied note) the one thread with that name; a creator that cannot be
- * found (removed, or the name is ambiguous) is muted text.
+ * (docs/notes/agents-3-lineage-gui.md, docs/notes/lineage-by-id.md): "↳ Created by
+ * <creator> · brief: <brief>" on the lineage note's faint line, the age on the right. The
+ * creator is the note's `createdBy` id (a fork's copied note carries it too): while it
+ * exists, its current name is a link that opens it (as a sidebar click does); once
+ * removed, the name the note recorded, muted.
  */
-function CreatedByNoteRow({ threadId, id, text, atMs }: { threadId: string; id: string; text: string; atMs: number | null }) {
-  const recorded = useThreadsStore((s) => (id === CREATED_BY_NOTE_ID ? (s.byId[threadId]?.createdByName ?? "") : ""));
-  const note = parseCreatedByNote(text, recorded) ?? { name: "", brief: "" };
-  const creatorId = useNoteCreatorId(threadId, id, note.name);
+function CreatedByNoteRow({ createdBy, text, atMs }: { createdBy: string; text: string; atMs: number | null }) {
+  const note = useMemo(() => parseCreatedByNote(text), [text]);
+  const creator = useNoteCreator(createdBy, note.name);
   return (
     <LineageNote icon={<CornerDownRight aria-hidden />} atMs={atMs} testId="thread-created-by-note">
       <span className="lead">Created by</span>
-      {creatorId ? (
+      {creator.exists ? (
         <button
           type="button"
           className="nm"
           data-testid="thread-created-by-note-link"
-          data-thread={creatorId}
+          data-thread={creator.id}
           onClick={(e) => {
             e.stopPropagation();
-            useUiStore.getState().select({ kind: "thread", id: creatorId }, { focusPrompt: true });
+            useUiStore.getState().select({ kind: "thread", id: creator.id }, { focusPrompt: true });
           }}
         >
-          {note.name}
+          {creator.name}
         </button>
       ) : (
         <span className="nm gone" data-testid="thread-created-by-note-name">
-          {note.name}
+          {creator.name}
         </span>
       )}
       {note.brief && (

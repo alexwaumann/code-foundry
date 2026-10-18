@@ -12,6 +12,7 @@ func TestForkItems(t *testing.T) {
 	at := time.Date(2026, 10, 13, 9, 0, 0, 0, time.UTC)
 	now := at.Add(time.Hour)
 	note := Item{ID: "note-fork-p", Kind: KindNote, Text: "Forked from base", CreatedAt: now, UpdatedAt: now}
+	createdBy := Item{ID: createdByNoteID, Ordinal: 1, Kind: KindNote, Text: "Created by Parent", NoteCreatedBy: "s-parent", CreatedAt: at, UpdatedAt: at}
 	user := Item{ID: "u", Ordinal: 3, Kind: KindUserMessage, Text: "hi", CreatedAt: at, UpdatedAt: at}
 	text := Item{ID: "m/0", Ordinal: 4, Kind: KindAssistantText, Text: "hello", CreatedAt: at, UpdatedAt: at}
 	end := Item{ID: "turn-1", Ordinal: 5, Kind: KindTurnEnd, Turn: &TurnEnd{Subtype: "success", CostUSD: 0.5, TurnCostUSD: new(0.5)}, CreatedAt: at, UpdatedAt: at}
@@ -34,6 +35,7 @@ func TestForkItems(t *testing.T) {
 		{"a finished turn is copied as is, renumbered, times kept", []Item{user, text, end},
 			[]Item{renumbered(user, 1), renumbered(text, 2), renumbered(end, 3), noteAt(4)}},
 		{"subagent items keep their parent", []Item{sub}, []Item{renumbered(sub, 1), noteAt(2)}},
+		{"a created-by note keeps its creator", []Item{createdBy, user}, []Item{renumbered(createdBy, 1), renumbered(user, 2), noteAt(3)}},
 		{"running tools end as errors", []Item{running, ranOut}, []Item{
 			func() Item {
 				it := renumbered(running, 1)

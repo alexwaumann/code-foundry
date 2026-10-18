@@ -104,7 +104,7 @@ describe("a system note", () => {
         cacheWriteTokens: 0,
         errors: [],
       },
-      { ...base, id: "note-fork-p", ordinal: 5, kind: "note", text: "Forked from fix-badge" },
+      { ...base, id: "note-fork-p", ordinal: 5, kind: "note", text: "Forked from fix-badge", createdBy: "" },
     ]);
     const note = c.querySelector('[data-testid="thread-note"]');
     expect(note?.getAttribute("role")).toBe("separator");
