@@ -14,9 +14,12 @@ export function fadeMask(start: boolean, end: boolean): string | undefined {
   return `linear-gradient(to right, ${a}, ${b})`;
 }
 
-/** The scrollLeft that brings an item (its left edge and width inside the scroller) fully into view, moving as little as it can. */
-export function scrollLeftToShow(scrollLeft: number, clientWidth: number, itemLeft: number, itemWidth: number): number {
-  if (itemLeft < scrollLeft) return Math.max(0, itemLeft);
-  if (itemLeft + itemWidth > scrollLeft + clientWidth) return itemLeft + itemWidth - clientWidth;
+/**
+ * The scrollLeft that brings an item (its left edge and width inside the scroller's
+ * content) fully into view clear of the edge fade (`margin`), moving as little as it can.
+ */
+export function scrollLeftToShow(scrollLeft: number, clientWidth: number, itemLeft: number, itemWidth: number, margin = 24): number {
+  if (itemLeft - margin < scrollLeft) return Math.max(0, itemLeft - margin);
+  if (itemLeft + itemWidth + margin > scrollLeft + clientWidth) return itemLeft + itemWidth + margin - clientWidth;
   return scrollLeft;
 }
