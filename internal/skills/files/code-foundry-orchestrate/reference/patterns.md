@@ -1,7 +1,8 @@
 # Orchestration patterns
 
 Worked examples for the code-foundry-orchestrate skill. Ids and paths are examples;
-use the ones the commands print. Every command runs in your Bash tool.
+use the ones the commands print (`code-foundry project list` prints the project ids).
+Every command runs in your Bash tool.
 
 ## 1. One child, and wait for it
 
@@ -9,8 +10,8 @@ Start with cleanup, then one thread in a new worktree. Without `--notify`, since
 wait in this turn.
 
 ```
-code-foundry project worktree cleanup api --yes
-code-foundry thread new --project api --new-worktree \
+code-foundry project worktree cleanup 4e1f0a7b9c2d --yes
+code-foundry thread new --project 4e1f0a7b9c2d --new-worktree \
   --name "Fix the login redirect" \
   --brief "After login users land on / instead of the page they asked for" \
   --labels bug,auth --request-id fix-login-redirect \
@@ -38,14 +39,14 @@ task (a retry after an error then returns the thread made the first time), `--no
 on each, then end your turn.
 
 ```
-code-foundry project worktree cleanup web --yes
-code-foundry thread new --project web --new-worktree --name "Bump the router" \
+code-foundry project worktree cleanup 8c3d5e7f9a1b --yes
+code-foundry thread new --project 8c3d5e7f9a1b --new-worktree --name "Bump the router" \
   --brief "react-router 7 to 7.4" --labels deps,batch-1018 --notify \
   --request-id batch-1018-router --budget 5 --prompt "..."
-code-foundry thread new --project web --new-worktree --name "Fix the lint warnings" \
+code-foundry thread new --project 8c3d5e7f9a1b --new-worktree --name "Fix the lint warnings" \
   --brief "The 23 warnings eslint prints on main" --labels lint,batch-1018 --notify \
   --request-id batch-1018-lint --budget 5 --prompt "..."
-code-foundry thread new --project web --new-worktree --name "Fix the docs typos" \
+code-foundry thread new --project 8c3d5e7f9a1b --new-worktree --name "Fix the docs typos" \
   --brief "Typos the user listed in docs/" --labels docs,batch-1018 --notify \
   --request-id batch-1018-docs --budget 5 --prompt "..."
 ```
@@ -86,7 +87,7 @@ it merged, clean up:
 
 ```
 code-foundry thread archive --ids 5e6f --yes
-code-foundry project worktree cleanup web --yes
+code-foundry project worktree cleanup 8c3d5e7f9a1b --yes
 ```
 
 Notes:

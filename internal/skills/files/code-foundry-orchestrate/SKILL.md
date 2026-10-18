@@ -23,12 +23,12 @@ sees every thread in the app's sidebar. You create and drive other threads with 
 ## The loop
 
 1. **Clean up first.** At the start of any new orchestration, run
-   `code-foundry project worktree cleanup <project> --yes` (see Cleanup).
-2. **Create** one thread per unit of work. `code-foundry project list` names the
-   projects.
+   `code-foundry project worktree cleanup <project id> --yes` (see Cleanup).
+2. **Create** one thread per unit of work. `code-foundry project list` prints each
+   project's name and id; pass the id.
 
    ```
-   code-foundry thread new --project <project> --new-worktree \
+   code-foundry thread new --project <project id> --new-worktree \
      --name "Fix the login redirect" --brief "What and why, at most 500 characters" \
      --labels bug,auth --notify --request-id fix-login-redirect \
      --prompt "The whole task: goal, constraints, how to verify, open a PR, then report."
@@ -44,7 +44,9 @@ sees every thread in the app's sidebar. You create and drive other threads with 
    - End your turn. `--notify` sends you a `[code-foundry wake]` message each time the
      child settles; best for long work or several children.
 
-   A wait that times out exits 1; the thread is still working, wait again.
+   `needs attention (finished)` is a turn that ended normally (nobody has looked at it
+   yet); another reason is a question, a permission or a budget stop. A wait that times
+   out exits 1; the thread is still working, wait again.
 4. **Collect.** `code-foundry thread reports --created-by $CODE_FOUNDRY_THREAD` prints one
    line per child (`-`: no report yet; `--json` for the data). `code-foundry thread read <id>`
    prints its last 20 items (`--since <nextSince>` reads on). A child that needs attention
@@ -56,7 +58,7 @@ sees every thread in the app's sidebar. You create and drive other threads with 
 
 ## Cleanup
 
-`code-foundry project worktree cleanup <project> --yes` is safe to run any time: it
+`code-foundry project worktree cleanup <project id> --yes` is safe to run any time: it
 fetches, then removes only worktrees Code Foundry made whose work is merged into
 origin/<default> and that have no uncommitted changes and no thread (archived ones do
 not count), terminal or workspace on them. It never deletes branches. Run it when the
