@@ -20,6 +20,8 @@ package ui
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"strconv"
 	"time"
 )
 
@@ -476,18 +478,111 @@ type Fieldset struct {
 	Fields []Field `json:"fields"`
 }
 
-// Thread renders a plugin-owned Claude thread (permission threads) with the host's
-// thread view and composer.
+// Thread renders a plugin-owned Claude thread (permission threads; Host.CreateThread)
+// with the host's rendered thread view and its composer. A thread that is gone (removed,
+// or not the plugin's) shows a muted empty state.
 type Thread struct {
-	ThreadID    string `json:"threadId"`
-	ReadOnly    bool   `json:"readOnly,omitempty"` // no composer
+	ThreadID string `json:"threadId"`
+	// ReadOnly leaves the composer out: the plugin alone sends (Host.SendThread).
+	ReadOnly bool `json:"readOnly,omitempty"`
+	// Placeholder is the composer's empty text ("Ask the assistant…").
 	Placeholder string `json:"placeholder,omitempty"`
+	// Height: HeightAuto (the zero value: about 420 px), HeightFill (the rest of the
+	// panel's height, at least 240 px) or HeightPx(n).
+	Height Height `json:"height,omitzero"`
 }
 
-// Terminal renders a plugin-owned terminal (permission terminals), with an "Open in
-// bottom panel" action.
+// Terminal renders a plugin-owned terminal (permission terminals; Host.CreateTerminal)
+// with the host's terminal view and an "Open in bottom panel" button, which shows it as a
+// tab of the bottom panel of what the user is looking at. A terminal that is gone shows a
+// muted empty state.
 type Terminal struct {
 	TerminalID string `json:"terminalId"`
-	Rows       int    `json:"rows,omitempty"` // 4..60, 0 = 16
-	Title      string `json:"title,omitempty"`
+	// Rows is the height in text rows (4..60, 0 = 16) when Height is HeightAuto.
+	Rows  int    `json:"rows,omitempty"`
+	Title string `json:"title,omitempty"`
+	// Height: HeightAuto (the zero value: Rows), HeightFill or HeightPx(n).
+	Height Height `json:"height,omitzero"`
+	// Actions are up to 2 more buttons beside "Open in bottom panel" (Restart, Stop).
+	Actions []Button `json:"actions,omitempty"`
+}
+
+// Height is a thread or terminal node's height: HeightAuto (the zero value), HeightFill or
+// HeightPx(n). It travels as "auto", "fill" or a number of pixels.
+type Height struct {
+	mode string // "", "auto", "fill", "px"
+	px   int
+}
+
+// Heights.
+var (
+	// HeightAuto is the host's default height for the node.
+	HeightAuto = Height{mode: "auto"}
+	// HeightFill takes the rest of the panel's height (at least 240 px).
+	HeightFill = Height{mode: "fill"}
+)
+
+// HeightPx is a fixed height in CSS pixels (MinHeightPx..MaxHeightPx).
+func HeightPx(n int) Height { return Height{mode: "px", px: n} }
+
+// Pixel bounds of HeightPx.
+const (
+	MinHeightPx = 120
+	MaxHeightPx = 1600
+)
+
+// IsZero reports whether h is unset (the host's default, like HeightAuto).
+func (h Height) IsZero() bool { return h.mode == "" }
+
+// Fill reports whether h is HeightFill.
+func (h Height) Fill() bool { return h.mode == "fill" }
+
+// Px is a HeightPx height's pixels, 0 for any other.
+func (h Height) Px() int {
+	if h.mode == "px" {
+		return h.px
+	}
+	return 0
+}
+
+// String is "auto", "fill" or the pixels.
+func (h Height) String() string {
+	switch h.mode {
+	case "fill":
+		return "fill"
+	case "px":
+		return strconv.Itoa(h.px)
+	default:
+		return "auto"
+	}
+}
+
+// MarshalJSON encodes "auto", "fill" or a number.
+func (h Height) MarshalJSON() ([]byte, error) {
+	if h.mode == "px" {
+		return []byte(strconv.Itoa(h.px)), nil
+	}
+	return json.Marshal(h.String())
+}
+
+// UnmarshalJSON accepts "auto", "fill" or a whole number of pixels.
+func (h *Height) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err == nil {
+		switch s {
+		case "auto", "":
+			*h = HeightAuto
+		case "fill":
+			*h = HeightFill
+		default:
+			return fmt.Errorf("height %q: want \"auto\", \"fill\" or a number of pixels", s)
+		}
+		return nil
+	}
+	var n float64
+	if err := json.Unmarshal(b, &n); err != nil || n != float64(int(n)) {
+		return fmt.Errorf("height %s: want \"auto\", \"fill\" or a whole number of pixels", b)
+	}
+	*h = HeightPx(int(n))
+	return nil
 }

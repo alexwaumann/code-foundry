@@ -176,6 +176,61 @@ func (h *Host) appendLog(p ViewAppendParams) error {
 	return h.conn.Call(ctx, MethodViewAppend, p, nil)
 }
 
+// CreateThread makes a Claude thread the plugin owns (permission threads) and returns
+// its id: hidden from the user's thread list, rendered by ui.Thread nodes, archived when
+// the plugin is disabled or uninstalled. It runs like any thread: a message starts its
+// Claude, which stops again once its prompt cache expires, and its cost counts.
+func (h *Host) CreateThread(ctx context.Context, p ThreadCreateParams) (string, error) {
+	var res ThreadCreateResult
+	err := h.conn.Call(ctx, MethodThreadCreate, p, &res)
+	return res.ThreadID, err
+}
+
+// SendThread sends a message to one of the plugin's threads (starting its Claude when
+// it is stopped). To write to the user's own thread instead, Invoke thread.send with
+// its id (permissions.commands).
+func (h *Host) SendThread(ctx context.Context, threadID, text string) error {
+	return h.conn.Call(ctx, MethodThreadSend, ThreadSendParams{ThreadID: threadID, Text: text}, nil)
+}
+
+// ArchiveThread archives one of the plugin's threads (its Claude stops). A later
+// SendThread brings it back.
+func (h *Host) ArchiveThread(ctx context.Context, threadID string) error {
+	return h.conn.Call(ctx, MethodThreadArchive, ThreadRef{ThreadID: threadID}, nil)
+}
+
+// Threads lists the plugin's threads, archived ones included, oldest first.
+func (h *Host) Threads(ctx context.Context) ([]PluginThread, error) {
+	var res ThreadListResult
+	if err := h.conn.Call(ctx, MethodThreadList, struct{}{}, &res); err != nil {
+		return nil, err
+	}
+	return res.Threads, nil
+}
+
+// CreateTerminal starts a terminal the plugin owns (permission terminals) and returns
+// its id, for a ui.Terminal node. It is closed when the plugin is disabled or
+// uninstalled and does not outlive the daemon.
+func (h *Host) CreateTerminal(ctx context.Context, p TerminalCreateParams) (string, error) {
+	var res TerminalCreateResult
+	err := h.conn.Call(ctx, MethodTerminalCreate, p, &res)
+	return res.TerminalID, err
+}
+
+// CloseTerminal kills one of the plugin's terminals and forgets it.
+func (h *Host) CloseTerminal(ctx context.Context, terminalID string) error {
+	return h.conn.Call(ctx, MethodTerminalClose, TerminalRef{TerminalID: terminalID}, nil)
+}
+
+// Terminals lists the plugin's terminals.
+func (h *Host) Terminals(ctx context.Context) ([]PluginTerminal, error) {
+	var res TerminalListResult
+	if err := h.conn.Call(ctx, MethodTerminalList, struct{}{}, &res); err != nil {
+		return nil, err
+	}
+	return res.Terminals, nil
+}
+
 // Secrets is the plugin's namespace in the host's secret store (the user's Keychain).
 // Values travel host → plugin only; the host never logs or shows them.
 func (h *Host) Secrets() Secrets { return Secrets{h: h} }

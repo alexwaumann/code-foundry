@@ -194,6 +194,16 @@ func TestValidateRejects(t *testing.T) {
 			v.Nodes[0].Text.Content = Spans(Span{Text: "x", Duration: &Duration{Ms: 1}})
 		}, "not several"},
 		{"thread without id", func(v *View) { v.Nodes = append(v.Nodes, NewThread("th", "")) }, "threadId: required"},
+		{"thread too short", func(v *View) {
+			n := NewThread("th", "s-1")
+			n.Thread.Height = HeightPx(40)
+			v.Nodes = append(v.Nodes, n)
+		}, "40 px is outside"},
+		{"terminal too many buttons", func(v *View) {
+			n := NewTerminal("term", "t-1")
+			n.Terminal.Actions = []Button{EventButton("b1", "1", "a"), EventButton("b2", "2", "b"), EventButton("b3", "3", "c")}
+			v.Nodes = append(v.Nodes, n)
+		}, "at most 2"},
 		{"too many elements", func(v *View) {
 			for i := range MaxElements {
 				v.Nodes = append(v.Nodes, NewChips("c"+itoa(i)))
@@ -260,5 +270,43 @@ func TestIconsSorted(t *testing.T) {
 	}
 	if !KnownIcon("workflow") || KnownIcon("no-such-icon") {
 		t.Error("KnownIcon")
+	}
+}
+
+func TestHeightJSON(t *testing.T) {
+	tests := []struct {
+		h    Height
+		json string
+	}{
+		{HeightAuto, `"auto"`},
+		{HeightFill, `"fill"`},
+		{HeightPx(360), `360`},
+	}
+	for _, tt := range tests {
+		b, err := json.Marshal(tt.h)
+		if err != nil || string(b) != tt.json {
+			t.Errorf("Marshal(%v) = %s, %v; want %s", tt.h, b, err, tt.json)
+		}
+		var back Height
+		if err := json.Unmarshal(b, &back); err != nil || back != tt.h {
+			t.Errorf("Unmarshal(%s) = %v, %v", b, back, err)
+		}
+	}
+	// Unset is left out of a node; a bad value is refused.
+	b, _ := json.Marshal(Thread{ThreadID: "s-1"})
+	if strings.Contains(string(b), "height") {
+		t.Errorf("unset height encoded: %s", b)
+	}
+	var h Height
+	for _, bad := range []string{`"tall"`, `1.5`, `true`} {
+		if err := json.Unmarshal([]byte(bad), &h); err == nil {
+			t.Errorf("Unmarshal(%s) accepted", bad)
+		}
+	}
+	n := NewTerminal("term", "t-1")
+	n.Terminal.Height = HeightFill
+	n.Terminal.Actions = []Button{EventButton("restart", "Restart", "restart")}
+	if err := (View{Nodes: []Node{n}}).Validate(); err != nil {
+		t.Fatalf("Validate: %v", err)
 	}
 }
