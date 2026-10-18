@@ -380,7 +380,10 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   (`docs/notes/rendered-threads-cold-cache.md`).
 * Auto-naming via an independent `claude -p` call producing a short natural title
   ("Fix the login redirect"); a new worktree's branch is `cf/` + the title's slug
-  (`docs/notes/natural-thread-names.md`). Once a thread whose worktree Create made has
+  (`docs/notes/natural-thread-names.md`). Until it answers, a thread with a first prompt
+  has a provisional name, the prompt's first line or sentence cut to 48 characters
+  (`name_provisional`, `provisional.go`); the title replaces it, a rename clears it, the
+  branch never uses it (`docs/notes/provisional-names.md`). Once a thread whose worktree Create made has
   started, `Options.WorktreeCreated` hands the worktree to the daemon, which runs the
   project's on-worktree-create actions in the background (the thread store does not
   know about actions; `docs/notes/actions-1-daemon.md`).
