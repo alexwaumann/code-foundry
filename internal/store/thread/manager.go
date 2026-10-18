@@ -57,6 +57,11 @@ type Options struct {
 	// AttachmentMaxAge, then again every AttachmentReapInterval until Shutdown;
 	// every claude gets --add-dir for it so Read of an attachment does not ask.
 	AttachmentsDir string
+	// SkillsDir is the directory with the skills the daemon ships to threads in its
+	// .claude/skills (internal/skills writes it): every claude gets it as its first
+	// --add-dir, which loads them. Empty: none. New creates it, so claude never refuses
+	// a missing --add-dir.
+	SkillsDir string
 	// AttachmentMaxAge is how long a staged attachment is kept. Default
 	// AttachmentMaxAge (the package constant).
 	AttachmentMaxAge time.Duration
@@ -311,6 +316,13 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 		defer idleTicker.Stop()
 		m.stopIdleLoop(idleTicker.C)
 	}()
+	if opts.SkillsDir != "" {
+		// Exists for claude --add-dir (claudeCommand) even if the daemon cannot write
+		// the skills.
+		if err := os.MkdirAll(opts.SkillsDir, 0o700); err != nil {
+			m.log.Warn("create skills dir", "dir", opts.SkillsDir, "err", err)
+		}
+	}
 	if opts.AttachmentsDir != "" {
 		// Exists for claude --add-dir (see spawn) before anything is staged.
 		if err := os.MkdirAll(opts.AttachmentsDir, 0o700); err != nil {
@@ -718,17 +730,22 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 }
 
 // claudeCommand is the argv and environment of a claude spawn for s: its model,
-// effort and permission mode, the attachments dir and workspace members as --add-dir,
-// the system prompt line (ThreadPrompt, and the workspace's) and the workspace env. The prompt is never in argv (it is the first user
-// message). g is what the conversation's allow-for-thread answers granted (an effort
-// restart's; a fresh spawn starts without).
+// effort and permission mode, --add-dir for the skills dir, the attachments dir, the
+// workspace members and the granted dirs (in that order, every spawn), the system
+// prompt line (ThreadPrompt, and the workspace's) and the workspace env. The prompt is
+// never in argv (it is the first user message). g is what the conversation's
+// allow-for-thread answers granted (an effort restart's; a fresh spawn starts without).
 func (m *Manager) claudeCommand(s Thread, l launch, g grants) (argv, env []string) {
 	sa := spawnArgs{model: s.Model, effort: s.Effort, perm: s.PermissionMode,
 		allowedTools: g.allow, disallowedTools: g.deny, appendSystemPrompt: systemPrompt("")}
+	if m.opts.SkillsDir != "" {
+		// First, so the skills load whatever else is added (docs/notes/agent-skills.md).
+		sa.addDirs = append(sa.addDirs, m.opts.SkillsDir)
+	}
 	if m.opts.AttachmentsDir != "" {
 		// Every spawn (not only the first prompt's): a resumed or forked conversation
 		// may read its images again.
-		sa.addDirs = []string{m.opts.AttachmentsDir}
+		sa.addDirs = append(sa.addDirs, m.opts.AttachmentsDir)
 	}
 	env = append(slices.Clip(m.opts.Env), paths.EnvThread+"="+s.ID)
 	if s.WorkspaceID != "" {
