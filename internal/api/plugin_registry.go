@@ -175,4 +175,3 @@ func registryEventToProto(ev plugin.Event) *v1.PluginEvent {
 	}
 	return nil
 }
-
