@@ -101,7 +101,7 @@ test("Uninstall confirms once in its own dialog, with purge as a choice", async 
   await installed(page, "test-watcher").getByTestId("plugin-uninstall").click();
   const dialog = page.getByTestId("uninstall-dialog");
   await expect(dialog).toContainText("Uninstall Test Watcher?");
-  await expect(dialog).toContainText("Its data, secrets and the consent you gave stay for a reinstall.");
+  await expect(dialog).toContainText("Its data (~/.code-foundry/plugin-data/test-watcher), secrets and the consent you gave stay for a reinstall.");
   await dialog.getByTestId("uninstall-purge").click();
   await dialog.getByTestId("uninstall-confirm").click();
   await expect(installed(page, "test-watcher")).toHaveCount(0);

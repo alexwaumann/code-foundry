@@ -47,6 +47,12 @@ plus one small proto addition. Siblings off the same commit: plugins 8 (secrets)
   registries from `plugins.registries` ("" or "none" lists none; the default registry lists
   the two plugins; any other URL answers empty) and bumps the registry epoch when it
   changes, so either default renders the right state.
+* **Rebased onto the empty default (2026-10-18).** PR 7 now defaults `plugins.registries`
+  to empty and built the same mock plumbing (`MockRegistry.settingsChanged`, `listed`, a
+  `registries` dep, the fixture registry set explicitly in the mock's settings, and
+  `MockSettings.value` so the registry never reads the keybinding fields). The rebase kept
+  PR 7's mock and added this PR's `installError`; Browse's empty state is this PR's (the
+  link), so `e2e/plugin-registry.spec.ts`'s no-registry test expects its words.
 
 ## Skipped (noted, not built)
 
@@ -63,6 +69,10 @@ plus one small proto addition. Siblings off the same commit: plugins 8 (secrets)
   `settings/state.ts`, `stores/flagSurface.ts`), not next to the components.
 * A `useSyncExternalStore` snapshot must be stable: `useFlagSurfaceKind` returns the kind
   string, not the manifest (`allSurfaces` builds new objects).
+* `e2e/plugin-registry.spec.ts`'s uninstall test now expects the data folder in the
+  dialog's words. `make gui-e2e` (36 min under load from sibling agents): 941 passed; the
+  only other failure, `workspaces.spec.ts` "pick a project, add Also in" on Chromium
+  (composer heading not found in 5 s), passed on WebKit and on a rerun: load, not this change.
 * The mock's `MockSettings.values()` lists command keybinding fields, which reads the
   plugins: `MockRegistry` must not read the setting while `MockPlugins` is being built.
 
