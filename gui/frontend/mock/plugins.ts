@@ -91,13 +91,17 @@ interface MockPlugin {
   restarts: number;
   pid: number;
   startedAt: Date;
-  permissions: { commands: string[]; events: string[]; threadStatus: boolean; sessionEnv: boolean; secrets: boolean };
+  permissions: { commands: string[]; events: string[]; threadStatus: boolean; sessionEnv: boolean; secrets: boolean; threads?: boolean; terminals?: boolean };
   commands: { name: string; title: string; description: string }[];
   surfaces: SurfaceDef[];
 }
 
+/** The hello plugin's own thread and terminal in the default world (mock/world.ts seeds them; the demo's Assistant and Shell tabs show them). */
+export const HELLO_THREAD = "s-hello-assistant";
+export const HELLO_TERMINAL = "t-hello-clock";
+
 /** The views were captured at this moment; their times shift by (now - this). */
-const CAPTURED_AT = Date.parse("2026-10-18T06:11:51.230-05:00");
+const CAPTURED_AT = Date.parse("2026-10-18T09:02:16.311-05:00");
 
 function fixture(name: string): Record<string, unknown> {
   const url = new URL(`../../../internal/store/plugin/testdata/hello-demo/${name}.json`, import.meta.url);
@@ -215,6 +219,7 @@ class DemoInstance {
     readonly key: string,
     readonly threadId: string,
     private readonly onPin: (threadId: string, pinned: boolean) => void,
+    private readonly send: (threadId: string, text: string) => void = () => undefined,
   ) {}
 
   state(pluginState: PluginState): SurfaceUpdateInit {
@@ -253,6 +258,14 @@ class DemoInstance {
         const token = form.fields.find((f) => f.key === "f-token");
         if (token?.input && this.tokenStored) token.input.hasValue = true;
       });
+    } else if (this.tab === "assistant") {
+      patchNode(nodes, "assistant-thread", (n) => {
+        (n.thread as { threadId: string }).threadId = HELLO_THREAD;
+      });
+    } else if (this.tab === "shell") {
+      patchNode(nodes, "clock", (n) => {
+        (n.terminal as { terminalId: string }).terminalId = HELLO_TERMINAL;
+      });
     } else {
       patchNode(nodes, "log-state", (n) => {
         n.text = { content: this.running ? `Building ${String(this.build)}…` : this.build > 0 ? `Build ${String(this.build)} finished.` : "Idle. Start a build to stream its log." };
@@ -274,8 +287,19 @@ class DemoInstance {
   }
 
   /** The plugin's surface/act. Throws the plugin's refusal as Aborted, like the daemon. */
-  act(el: Element, values: Record<string, unknown>, toast: (text: string) => void): void {
+  act(el: Element, values: Record<string, unknown>, toast: (text: string) => void, viewer = ""): void {
     switch (`${el.kind}:${el.event}`) {
+      case "click:send-hello":
+        this.send(HELLO_THREAD, "say hello in one line");
+        toast("sent to the assistant");
+        return;
+      case "click:ask-main":
+        // The act's context: the thread the acting panel shows.
+        this.send(viewer || this.threadId, "The hello plugin says hi from its Assistant tab. Answer in one short line.");
+        toast("sent to the thread");
+        return;
+      case "click:restart-shell":
+        break;
       case "tab:tab":
         this.tab = el.key;
         break;
@@ -406,7 +430,7 @@ function seedPlugins(): MockPlugin[] {
       name: "hello",
       displayName: "Hello",
       version: "0.1.0",
-      description: "The example plugin: greets, sends a message to a thread through the host, keeps a word in the Keychain, follows the thread list, flags threads and gives new threads CF_HELLO=1.",
+      description: "The example plugin: greets, sends a message to a thread through the host, keeps a word in the Keychain, follows the thread list, flags threads, gives new threads CF_HELLO=1, and runs a Claude thread and a terminal of its own.",
       state: PluginState.RUNNING,
       enabled: true,
       dev: true,
@@ -417,7 +441,7 @@ function seedPlugins(): MockPlugin[] {
       restarts: 0,
       pid: 48213,
       startedAt: started,
-      permissions: { commands: ["thread.send", "pr.checks"], events: ["threads"], threadStatus: true, sessionEnv: true, secrets: true },
+      permissions: { commands: ["thread.send", "pr.checks"], events: ["threads"], threadStatus: true, sessionEnv: true, secrets: true, threads: true, terminals: true },
       commands: HELLO_COMMANDS,
       surfaces: [
         { id: "demo", title: "Hello Demo", icon: "sparkles", scope: "thread" },
@@ -449,6 +473,8 @@ export interface PluginDeps {
   publish: (ev: PluginEventInit) => void;
   emit: (i: UiIntentInit) => number;
   threadExists: (id: string) => boolean;
+  /** thread.send (the demo's Send hello to its own thread, Ask the main thread through host/invoke). */
+  sendToThread: (id: string, text: string) => void;
 }
 
 export class MockPlugins {
@@ -621,11 +647,18 @@ export class MockPlugins {
     const key = `${p.name}/${s.id}/${thread ? `thread:${thread}` : "global"}`;
     let inst = this.instances.get(key);
     if (!inst) {
-      inst = new DemoInstance(key, thread, (id, on) => {
-        if (on) this.pinned.add(id);
-        else this.pinned.delete(id);
-        this.bumpEpoch();
-      });
+      inst = new DemoInstance(
+        key,
+        thread,
+        (id, on) => {
+          if (on) this.pinned.add(id);
+          else this.pinned.delete(id);
+          this.bumpEpoch();
+        },
+        (id, text) => {
+          this.deps.sendToThread(id, text);
+        },
+      );
       this.instances.set(key, inst);
       const created = inst;
       if (p.name === "hello" && s.id === "demo") setTimeout(() => {
@@ -663,9 +696,10 @@ export class MockPlugins {
     if (!el) throw new ConnectError(`no acting element "${req.key}" in the view`, Code.InvalidArgument);
     if (el.kind === "host") throw new ConnectError(`${req.key} is a host action: the host runs it, not the plugin`, Code.InvalidArgument);
     const values = (req.values ?? {}) as Record<string, unknown>;
-    this.acts.push(`${req.instance} ${req.key} ${JSON.stringify(values)}${req.value !== undefined ? ` value=${req.value}` : ""}`);
+    const viewer = req.context?.activeThreadId ?? "";
+    this.acts.push(`${req.instance} ${req.key} ${JSON.stringify(values)}${req.value !== undefined ? ` value=${req.value}` : ""}${viewer ? ` viewer=${viewer}` : ""}`);
     const version = req.version || BigInt(inst.version);
-    inst.act(el, values, (text) => inst.hub.publish({ update: { case: "toast", value: { instance: inst.key, level: "info", text } } }));
+    inst.act(el, values, (text) => inst.hub.publish({ update: { case: "toast", value: { instance: inst.key, level: "info", text } } }), viewer);
     return version;
   }
 

@@ -1,16 +1,19 @@
 /**
  * The hello demo's captured views (internal/store/plugin/testdata/hello-demo, written by
- * PR 2's end to end): every node kind, tabs, a fieldset, an options source, both log forms.
+ * PR 6's end to end): every node kind, tabs, a fieldset, an options source, both log forms,
+ * the plugin's own thread (assistant) and terminal (shell).
  * Imported from the repository so the GUI's tests and the daemon's tests share them.
  */
 import { parseView, type PluginViewModel } from "@/api/plugin";
+import assistant from "../../../../internal/store/plugin/testdata/hello-demo/assistant.json?raw";
 import form from "../../../../internal/store/plugin/testdata/hello-demo/form.json?raw";
 import log from "../../../../internal/store/plugin/testdata/hello-demo/log.json?raw";
 import overview from "../../../../internal/store/plugin/testdata/hello-demo/overview.json?raw";
+import shell from "../../../../internal/store/plugin/testdata/hello-demo/shell.json?raw";
 
-export type DemoTab = "overview" | "form" | "log";
+export type DemoTab = "overview" | "form" | "log" | "assistant" | "shell";
 
-const json: Record<DemoTab, string> = { overview, form, log };
+const json: Record<DemoTab, string> = { overview, form, log, assistant, shell };
 
 export function demoJson(tab: DemoTab): string {
   return json[tab];

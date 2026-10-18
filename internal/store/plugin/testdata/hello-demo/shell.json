@@ -1,0 +1,110 @@
+{
+  "header": {
+    "icon": "sparkles",
+    "title": "Hello demo",
+    "trailing": {
+      "spans": [
+        {
+          "text": "0 clicks",
+          "tone": "muted"
+        }
+      ]
+    },
+    "pill": {
+      "label": "demo",
+      "tone": "ok"
+    },
+    "subline": {
+      "spans": [
+        {
+          "text": "opened "
+        },
+        {
+          "time": {
+            "at": "2026-10-18T09:02:16.311761-05:00",
+            "style": "relative"
+          }
+        },
+        {
+          "text": " · thread "
+        },
+        {
+          "text": "s-f20aac336477",
+          "mono": true
+        }
+      ]
+    },
+    "actions": [
+      {
+        "key": "hdr-refresh",
+        "label": "Refresh",
+        "icon": "refresh-cw",
+        "action": {
+          "event": "refresh"
+        },
+        "iconOnly": true
+      },
+      {
+        "key": "hdr-docs",
+        "label": "Open the plugin docs",
+        "icon": "external-link",
+        "action": {
+          "openUrl": "https://github.com/alexwaumann/code-foundry"
+        },
+        "iconOnly": true
+      }
+    ],
+    "tabTitle": "Hello"
+  },
+  "tabs": {
+    "items": [
+      {
+        "key": "overview",
+        "label": "Overview"
+      },
+      {
+        "key": "form",
+        "label": "Form"
+      },
+      {
+        "key": "log",
+        "label": "Log"
+      },
+      {
+        "key": "assistant",
+        "label": "Assistant"
+      },
+      {
+        "key": "shell",
+        "label": "Shell"
+      }
+    ],
+    "active": "shell"
+  },
+  "nodes": [
+    {
+      "key": "shell-intro",
+      "text": {
+        "content": "A terminal the plugin owns, printing the date every two seconds. Open it in the bottom panel to keep it in view while you work."
+      }
+    },
+    {
+      "key": "clock",
+      "terminal": {
+        "terminalId": "t-a358ef7dc8a0",
+        "title": "Clock",
+        "height": 320,
+        "actions": [
+          {
+            "key": "restart-shell",
+            "label": "Restart",
+            "icon": "rotate-ccw",
+            "action": {
+              "event": "restart-shell"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
