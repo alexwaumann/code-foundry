@@ -139,7 +139,7 @@ for _, issue := range res.Issues { h.Log().Warn("environment", "issue", issue) }
 - What breaks a rule is dropped with an issue in `res.Issues`; the rest applies
   (`res.Applied`). Plugins apply in name order: a variable an earlier plugin sets is
   dropped from a later one, with an issue. `code-foundry plugin env <name>` shows the
-  result.
+  result (variable names, never their values).
 - A new thread waits up to 2 s for a plugin with this permission that is still starting,
   so push early in Init.
 
@@ -265,9 +265,12 @@ start hands over what was granted (`h.Granted()`). Test it with plugintest's
 
 ## Toasts
 
-`h.Toast(pluginsdk.ToastInfo, "Rerun started")` shows a short message in the app
-(`ToastAttention`, `ToastError` for the other tones); `h.ToastIn(instance, level, text)`
-shows it in that surface's panel. Up to 200 characters, at most one a second per plugin
+`h.Toast(pluginsdk.ToastInfo, "Rerun started")` shows a short message in the app's
+toaster (bottom right) with the plugin's display name as its title (`ToastAttention`,
+`ToastError` for the other levels, which differ by icon, not colour).
+`h.ToastIn(instance, level, text)` shows it in the same toaster, without the name, only
+to whoever has that instance on screen: not inside the panel. For a message that should
+stay with the panel, render a `notice` node. Up to 200 characters, at most one a second per plugin
 (more are dropped). A command's `Message` is toasted anyway when it runs from the GUI: do
 not toast it twice.
 
@@ -279,6 +282,10 @@ not toast it twice.
 ## Threads and terminals of its own (permissions `threads`, `terminals`)
 
 ```go
+// A skill for the thread: Claude Code loads <add-dir>/.claude/skills/<skill>/SKILL.md.
+skillDir := filepath.Join(h.DataDir(), "claude")
+_ = os.MkdirAll(filepath.Join(skillDir, ".claude", "skills", "deploy-helper"), 0o755)
+_ = os.WriteFile(filepath.Join(skillDir, ".claude", "skills", "deploy-helper", "SKILL.md"), skillMD, 0o644)
 id, err := h.CreateThread(ctx, pluginsdk.ThreadCreateParams{Title: "Deploy helper",
 	AddDirs: []string{skillDir}, Env: map[string]string{"DEPLOYBOT_URL": url}})
 err = h.SendThread(ctx, id, "Summarize the last failed deploy in one line.")
@@ -291,10 +298,15 @@ shown by a `thread` node. `Cwd` defaults to the plugin's data dir (with `Project
 project's main worktree; a `cwd` must be under home); `Env` and `AddDirs` follow the
 session environment's rules, but a bad one refuses the call, and they replace the
 plugin's own session environment for this thread; `Model` and `Effort` default to the
-user's settings; `Prompt` is an optional first message. It runs like any thread: a
+user's settings (`Model` a model id, `Effort` `low` … `max`: the values `code-foundry help
+thread.new` lists for `--model` and `--effort`); `Prompt` is an optional first message.
+An `AddDirs` entry (here or in `SetEnvironment`) is a directory Claude Code may read and
+loads skills from: a skill is `<dir>/.claude/skills/<skill>/SKILL.md` (with `name` and
+`description` front matter), as above; `<dir>` itself is passed. It runs like any thread: a
 message starts its Claude, which stops at cache expiry, and it costs what it costs (the
 Usage page counts it). `SendThread` and `ArchiveThread` reach only the plugin's own
-threads (-32004 otherwise; a send unarchives); `Threads` lists them. To write to the
+threads (-32004 otherwise; a send unarchives; an archived thread's node still renders,
+so drop it from the view); `Threads` lists them. To write to the
 user's thread, `Invoke` `thread.send` with the id from `act.Context`. `CreateTerminal`
 starts a terminal the plugin owns (cwd the data dir unless given, under home; env checked
 like a thread's; `$SHELL -lc` for the user's tools), shown by a `terminal` node and, on
