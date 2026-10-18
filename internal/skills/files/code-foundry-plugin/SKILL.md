@@ -18,9 +18,10 @@ for tests). This Code Foundry is {{cf.version}}.
 ## The loop
 
 1. **Scaffold** from the example: a complete plugin with one command, one surface, tests,
-   a Makefile and a release workflow. The folder must be under your home directory.
+   a Makefile and a release workflow. Use a new folder under the home directory (where
+   the user keeps code; ask if unsure), named after the repository it will become:
    ```
-   mkdir -p ~/code/code-foundry-plugin-<name> && cd ~/code/code-foundry-plugin-<name>
+   mkdir -p <dir>/code-foundry-plugin-<name> && cd <dir>/code-foundry-plugin-<name>
    cp -R {{cf.example}}/. .
    ```
    Then replace `minimal` (and `Minimal`) with your plugin's name everywhere:
@@ -35,8 +36,8 @@ for tests). This Code Foundry is {{cf.version}}.
    go get github.com/alexwaumann/code-foundry/pluginsdk@{{cf.sdkPin}}
    go mod tidy
    ```
-   The pin is the SDK of this Code Foundry build. If `go get` cannot find it (a local
-   build not on GitHub), use `@main`. `go doc github.com/alexwaumann/code-foundry/pluginsdk`
+   The pin is the SDK of this Code Foundry build (the first fetch can take a minute). If
+   `go get` cannot find it (a local build not on GitHub), use `@main`. `go doc github.com/alexwaumann/code-foundry/pluginsdk`
    (also `.../pluginsdk/ui`, `.../pluginsdk/plugintest`) documents every type and method.
 4. **Serve**: in `main.go`, `pluginsdk.Serve(pluginsdk.Plugin{...})` with a handler for
    every manifest command (`Commands`, by name) and surface (`Surfaces`, by id), plus

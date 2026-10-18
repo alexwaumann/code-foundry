@@ -90,8 +90,7 @@ func viewLimits() string {
 func fill(p string, b []byte, values map[string]string) ([]byte, error) {
 	var err error
 	out := placeholder.ReplaceAllFunc(b, func(m []byte) []byte {
-		name := string(placeholder.FindSubmatch(m)[1])
-		v, ok := values[name]
+		v, ok := values[string(placeholder.FindSubmatch(m)[1])]
 		if !ok {
 			err = fmt.Errorf("skills: %s: unknown placeholder %s", p, m)
 		}
