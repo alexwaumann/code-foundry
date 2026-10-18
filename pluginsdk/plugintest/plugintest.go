@@ -37,6 +37,11 @@ type Options struct {
 	Invoke func(ctx context.Context, p pluginsdk.InvokeParams) (pluginsdk.CommandResult, error)
 	// Capabilities are the host capabilities announced in initialize.
 	Capabilities []string
+	// Secrets are stored before the plugin starts (so Init can read them).
+	Secrets map[string]string
+	// NoInitWait makes Start return right after the handshake instead of waiting (up to
+	// 5 s) for Plugin.Init to return; for a plugin whose Init blocks.
+	NoInitWait bool
 }
 
 // Host is the fake host.
@@ -63,8 +68,9 @@ type Host struct {
 	closeOnce   sync.Once
 }
 
-// Start serves p against a new fake host and completes the handshake. The plugin is
-// shut down when the test ends.
+// Start serves p against a new fake host, completes the handshake and waits for
+// p.Init to return (Options.NoInitWait: not), so what Init sets up is in place. The
+// plugin is shut down when the test ends.
 func Start(t testing.TB, p pluginsdk.Plugin, opts Options) *Host {
 	t.Helper()
 	if opts.Name == "" {
@@ -75,6 +81,20 @@ func Start(t testing.TB, p pluginsdk.Plugin, opts Options) *Host {
 	}
 	h := &Host{t: t, opts: opts, done: make(chan error, 1), changed: make(chan struct{}),
 		secrets: map[string]pluginsdk.SecretInfo{}, values: map[string]string{}, views: map[string]json.RawMessage{}, versions: map[string]uint64{}}
+	for k, v := range opts.Secrets {
+		h.values[k] = v
+		h.secrets[k] = pluginsdk.SecretInfo{Key: k, UpdatedAt: time.Now()}
+	}
+	initDone := make(chan error, 1)
+	if init := p.Init; init != nil && !opts.NoInitWait {
+		p.Init = func(ctx context.Context, ph *pluginsdk.Host) error {
+			err := init(ctx, ph)
+			initDone <- err
+			return err
+		}
+	} else {
+		initDone <- nil
+	}
 	toPluginR, toPluginW := io.Pipe()
 	toHostR, toHostW := io.Pipe()
 	go func() {
@@ -104,8 +124,19 @@ func Start(t testing.TB, p pluginsdk.Plugin, opts Options) *Host {
 	if err := h.conn.Notify(pluginsdk.MethodInitialized, struct{}{}); err != nil {
 		t.Fatalf("plugintest: initialized: %v", err)
 	}
+	select {
+	case err := <-initDone:
+		if err != nil {
+			t.Logf("plugintest: Init failed (Serve ends): %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Logf("plugintest: Init has not returned after 5s; going on (Options.NoInitWait skips the wait)")
+	}
 	return h
 }
+
+// DataDir is the plugin's data directory (Options.DataDir, else a temporary one).
+func (h *Host) DataDir() string { return h.opts.DataDir }
 
 // Command invokes one of the plugin's commands (command/invoke).
 func (h *Host) Command(ctx context.Context, name string, args map[string]string, uctx pluginsdk.UiContext) (pluginsdk.CommandResult, error) {

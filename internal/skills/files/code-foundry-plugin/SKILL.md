@@ -30,7 +30,7 @@ for tests). This Code Foundry is {{cf.version}}.
    (`plugin.<name>.<command>`), the executable (`bin/<name>`) and the release tarballs.
 2. **Manifest**: edit `plugin.json` (`reference/manifest.md`): commands and their args,
    surfaces with a scope and a `when` clause, and the fewest permissions that work.
-3. **Module**:
+3. **Module** (Go 1.24 or newer):
    ```
    go mod init github.com/<owner>/code-foundry-plugin-<name>
    go get github.com/alexwaumann/code-foundry/pluginsdk@{{cf.sdkPin}}

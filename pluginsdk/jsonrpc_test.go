@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 	"sync"
@@ -44,6 +45,8 @@ func TestConnCall(t *testing.T) {
 			return nil, NewError(CodePermissionDenied, "no")
 		case "boom":
 			return nil, errors.New("plain error")
+		case "wrapped":
+			return nil, fmt.Errorf("sending the log: %w", NewError(CodePermissionDenied, "permission denied: command thread.send"))
 		case "panic":
 			panic("oops")
 		}
@@ -59,16 +62,18 @@ func TestConnCall(t *testing.T) {
 	tests := []struct {
 		method string
 		code   int
+		msg    string
 	}{
-		{"denied", CodePermissionDenied},
-		{"boom", CodeInternal},
-		{"panic", CodeInternal},
-		{"nope", CodeMethodNotFound},
+		{"denied", CodePermissionDenied, "no"},
+		{"boom", CodeInternal, "plain error"},
+		{"wrapped", CodePermissionDenied, "sending the log: permission denied: command thread.send"},
+		{"panic", CodeInternal, "panic: internal error"},
+		{"nope", CodeMethodNotFound, "unknown nope"},
 	}
 	for _, tt := range tests {
 		err := client.Call(ctx, tt.method, nil, nil)
-		if got := ErrorCode(err); got != tt.code {
-			t.Errorf("%s: code %d (%v), want %d", tt.method, got, err, tt.code)
+		if got := ErrorCode(err); got != tt.code || err.Error() != tt.msg {
+			t.Errorf("%s: code %d (%q), want %d (%q)", tt.method, got, err, tt.code, tt.msg)
 		}
 	}
 }
