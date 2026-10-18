@@ -69,6 +69,7 @@ func (m *Manager) Send(ctx context.Context, id string, msg Message) (Item, error
 	if len(dropped) > 0 {
 		m.log.Warn("file references outside the thread's projects; passing their relative paths", "thread", id, "refs", dropped)
 	}
+	prompt = m.rewriteThreadRefsLogged(id, prompt)
 	o := &outgoing{text: strings.TrimSpace(msg.Text), composer: strings.TrimSpace(msg.ComposerText), attachments: attachments, prompt: prompt,
 		origin: msg.Origin, wakeTitle: msg.WakeTitle, wakeJSON: msg.WakeJSON}
 	m.nameFromFirstMessage(id, log, o)
