@@ -57,7 +57,7 @@ function LocalImage({ src, alt }: { src: string; alt: string }) {
   );
 }
 
-/** The thread's markdown renderers (stable: Markdown memoizes on it). HTML is shown as text, like Claude Code's own UI. */
+/** The thread's markdown renderers (stable: Markdown memoizes on it). HTML is shown as text, like Claude Code's own UI, but for matched pairs of a few inline tags such as <small> (lib/inlineHtml). */
 const threadExtras: MarkdownExtras = {
   html: false,
   code: (lang, code) => <CodeBlock lang={lang} code={code} />,

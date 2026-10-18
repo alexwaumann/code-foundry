@@ -4,6 +4,7 @@ import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema, type Options as SanitizeSchema } from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import { Tip } from "@/components/ui/tooltip";
+import { INLINE_HTML_TAGS, rehypeInlineHtml } from "@/lib/inlineHtml";
 import { CHIP_PROP, matchPath, rehypePathChips, type PathMatch } from "@/lib/pathChips";
 import { cn } from "@/lib/utils";
 import { openUrl } from "@/stores/gh";
@@ -46,38 +47,30 @@ const baseComponents: Components = {
  * and struck text). Everything else, script and style included, is dropped. Attributes and URL schemes follow GitHub's own schema
  * (rehype-sanitize's defaultSchema), except that images load only over https.
  */
+/** What markdown and GFM produce themselves. */
+const markdownTags = [
+  "a", "blockquote", "br", "code", "del", "em", "h1", "h2", "h3", "h4", "h5", "h6", "hr", "img", "input", "li", "ol", "p", "pre",
+  "section", "strong", "table", "tbody", "td", "th", "thead", "tr", "ul",
+];
+
 const markdownSchema: SanitizeSchema = {
   ...defaultSchema,
-  tagNames: [
-    "a", "blockquote", "br", "code", "del", "em", "h1", "h2", "h3", "h4", "h5", "h6", "hr", "img", "input", "li", "ol", "p", "pre",
-    "section", "strong", "table", "tbody", "td", "th", "thead", "tr", "ul",
-    "details", "summary", "sub", "sup", "kbd", "small", "mark", "ins", "s",
-  ],
+  tagNames: [...markdownTags, "details", "summary", "sub", "sup", "kbd", "small", "mark", "ins", "s", "u"],
   protocols: { ...defaultSchema.protocols, src: ["https"] },
 };
+
+/** Without raw HTML (a thread): markdown's own elements and the inline tags lib/inlineHtml builds, nothing else. */
+const inlineSchema: SanitizeSchema = { ...markdownSchema, tagNames: [...new Set([...markdownTags, ...INLINE_HTML_TAGS])] };
 
 const remarkPlugins = [remarkGfm];
 type RehypePlugins = NonNullable<Parameters<typeof ReactMarkdown>[0]["rehypePlugins"]>;
 const rehypePlugins = [rehypeRaw, [rehypeSanitize, markdownSchema]] as RehypePlugins;
-interface HastLike {
-  type: string;
-  value?: string;
-  children?: HastLike[];
-}
-
-/** Turns raw HTML nodes into text (sanitize would drop them, and their words with them). */
-function rehypeRawAsText() {
-  const walk = (n: HastLike) => {
-    for (const c of n.children ?? []) {
-      if (c.type === "raw") c.type = "text";
-      else walk(c);
-    }
-  };
-  return walk;
-}
-
-/** Without raw HTML: any HTML in the source shows as text. Still sanitized. */
-const rehypePluginsNoHtml = [rehypeRawAsText, [rehypeSanitize, markdownSchema]] as RehypePlugins;
+/**
+ * Without raw HTML: HTML in the source shows as text, except matched pairs of a few inline
+ * tags (small, mark, sub, sup, kbd, ins, s, del, u) and br, which render
+ * (lib/inlineHtml). Never stripped silently. Still sanitized.
+ */
+const rehypePluginsNoHtml = [rehypeInlineHtml, [rehypeSanitize, inlineSchema]] as RehypePlugins;
 
 /** Optional renderers a surface adds (a thread: highlighted code, attachment images). */
 export interface MarkdownExtras {
@@ -88,8 +81,9 @@ export interface MarkdownExtras {
   /** A table, given its rows (thead, tbody) to put in a <table>: lets a surface wrap it. */
   table?: (rows: ReactNode) => ReactNode;
   /**
-   * false: HTML in the source is text, not markup (Claude's answers: "Result<T, E>" must
-   * not vanish as an unknown tag). Default true (GitHub bodies use HTML).
+   * false: HTML in the source is text, not markup (Claude's answers: "Result<T, E>" or
+   * "<pasted_content>" must not vanish as an unknown tag), but for matched pairs of a few
+   * inline tags such as `<small>` (lib/inlineHtml). Default true (GitHub bodies use HTML).
    */
   html?: boolean;
   /**
