@@ -8,6 +8,7 @@ import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 import type { PluginEventView, PluginSurfaceView, PluginView } from "@/api/plugin";
 import { refreshCommands } from "./commands";
+import { onInstallProgress, onRegistryEpoch } from "./pluginRegistry";
 
 export interface PluginsState {
   byName: Readonly<Record<string, PluginView>>;
@@ -43,6 +44,9 @@ export function applyPluginEvent(s: PluginsState, ev: PluginEventView): PluginsS
     }
     case "availability":
       return ev.epoch === s.epoch ? s : { ...s, epoch: ev.epoch };
+    case "install-progress":
+    case "registry":
+      return s; // stores/pluginRegistry.ts
   }
 }
 
@@ -50,6 +54,14 @@ let relist: ReturnType<typeof setTimeout> | undefined;
 
 /** Applies a plugin event and re-lists commands soon after (a burst re-lists once). */
 export function onPluginEvent(ev: PluginEventView): void {
+  if (ev.kind === "install-progress") {
+    onInstallProgress(ev.progress);
+    return;
+  }
+  if (ev.kind === "registry") {
+    onRegistryEpoch(ev.epoch);
+    return;
+  }
   usePluginsStore.setState((s) => applyPluginEvent(s, ev));
   clearTimeout(relist);
   relist = setTimeout(() => void refreshCommands(), 50);

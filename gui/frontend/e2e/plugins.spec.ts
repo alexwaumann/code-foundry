@@ -157,19 +157,19 @@ test("Settings → Plugins lists them; enabling one asks for consent with its pe
   await page.keyboard.press("Meta+,");
   await page.getByTestId("settings-nav-plugins").click();
   const rows = page.getByTestId("plugin-row-settings");
-  await expect(rows).toHaveCount(3);
-  await expect(rows.locator('[data-testid="plugin-pill"]')).toHaveText(["Disabled", "Crashed", "Running"]);
-  const hello = page.locator('[data-plugin="hello"]');
+  await expect(rows).toHaveCount(4);
+  await expect(rows.locator('[data-testid="plugin-pill"]')).toHaveText(["Disabled", "Crashed", "Running", "Running"]);
+  const hello = rows.and(page.locator('[data-plugin="hello"]'));
   await expect(hello.getByTestId("plugin-process")).toHaveText("pid 48213");
   await expect(hello.getByTestId("plugin-env")).toContainText("CF_HELLO=1");
   await expect(hello.getByTestId("plugin-env")).toContainText("running threads keep what they spawned with");
-  await expect(page.locator('[data-plugin="crasher"]').getByTestId("plugin-last-error")).toHaveText("exited with status 1: crasher: cannot read config");
+  await expect(rows.and(page.locator('[data-plugin="crasher"]')).getByTestId("plugin-last-error")).toHaveText("exited with status 1: crasher: cannot read config");
 
   await hello.getByTestId("plugin-logs-open").click();
   await expect(page.getByTestId("plugin-logs")).toContainText("hello is up");
   await page.keyboard.press("Escape");
 
-  const acme = page.locator('[data-plugin="acme-data"]');
+  const acme = rows.and(page.locator('[data-plugin="acme-data"]'));
   await acme.getByTestId("plugin-enable").click();
   const consent = page.getByTestId("consent-dialog");
   await expect(consent.getByTestId("consent-title")).toHaveText("Enable Acme Data 1.2.0?");
