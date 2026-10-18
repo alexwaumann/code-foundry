@@ -4,7 +4,7 @@
  * Pure, over the thread view; the row renders it (components/sidebar/SidebarRow.tsx).
  */
 import type { ThreadView } from "@/api/threads";
-import { formatAgo, threadBadge, statusKind, statusNote } from "./thread";
+import { formatAgo, threadBadge, statusKind, statusNote, topFlag } from "./thread";
 
 /**
  * - "place": just "project @ branch" (idle, unknown; whether Claude's process runs never shows)
@@ -15,8 +15,22 @@ import { formatAgo, threadBadge, statusKind, statusNote } from "./thread";
  * - "error": "Error · <code or reason>" (red): Claude reported an error, or an error status other than interrupted
  * - "interrupted": "Interrupted while working · <ago>" (red): the process ended mid-turn
  * - "snoozeEnded": "Snooze ended · <ago>" (amber): the daemon woke a snoozed thread
+ * - "flagAttention": "<plugin>: <reason>" (amber), "flagError": the same in red: a plugin's
+ *   flag (docs/notes/plugins-3-events-flags-env.md). Claude's own prompts and errors win
+ *   over a flag; a flag wins over a finished turn and over working.
  */
-export type StatusLineKind = "place" | "working" | "input" | "question" | "plan" | "finished" | "error" | "interrupted" | "snoozeEnded";
+export type StatusLineKind =
+  | "place"
+  | "working"
+  | "input"
+  | "question"
+  | "plan"
+  | "finished"
+  | "error"
+  | "interrupted"
+  | "snoozeEnded"
+  | "flagAttention"
+  | "flagError";
 
 export type StatusTone = "muted" | "sky" | "amber" | "emerald" | "red";
 
@@ -38,6 +52,8 @@ export const statusTones: Readonly<Record<StatusLineKind, StatusTone>> = {
   error: "red",
   interrupted: "red",
   snoozeEnded: "amber",
+  flagAttention: "amber",
+  flagError: "red",
 };
 
 /** Whether "project @ branch" follows the status text (or stands alone, for "place"). */
@@ -47,18 +63,22 @@ export function showsPlace(kind: StatusLineKind): boolean {
 
 const PLACE: StatusLine = { kind: "place", detail: "", at: null };
 
-export function statusLine(s: Pick<ThreadView, "state" | "status" | "statusReason" | "statusChangedAtMs"> | undefined): StatusLine {
+export function statusLine(
+  s: (Pick<ThreadView, "state" | "status" | "statusReason" | "statusChangedAtMs"> & Partial<Pick<ThreadView, "flags">>) | undefined,
+): StatusLine {
   if (!s) return PLACE;
+  const flag = topFlag(s);
   const badge = threadBadge(s);
-  switch (badge) {
-    case "busy":
-      return { kind: "working", detail: "", at: null };
-    case "attention":
-    case "error":
-      break;
-    default:
-      return PLACE;
+  if (badge === "attention" || badge === "error") {
+    const line = streamLine(s);
+    if (line.kind !== "finished" || !flag) return line;
   }
+  if (flag) return { kind: flag.level === "error" ? "flagError" : "flagAttention", detail: `${flag.pluginName}: ${flag.reason}`, at: null };
+  return badge === "busy" ? { kind: "working", detail: "", at: null } : PLACE;
+}
+
+/** The line for a thread Claude left needing attention or in error (threadBadge). */
+function streamLine(s: Pick<ThreadView, "status" | "statusReason" | "statusChangedAtMs">): StatusLine {
   const kind = statusKind(s);
   switch (kind) {
     case "done":
@@ -88,11 +108,14 @@ const words: Readonly<Record<StatusLineKind, string>> = {
   error: "Error",
   interrupted: "Interrupted while working",
   snoozeEnded: "Snooze ended",
+  flagAttention: "",
+  flagError: "",
 };
 
 /** The status text before the place: "" for "place". `now` only matters when `at` is set. */
 export function statusText(l: StatusLine, now: number): string {
   const word = words[l.kind];
+  if (word === "") return l.detail;
   if (l.at !== null) return l.kind === "finished" ? `${word} ${formatAgo(l.at, now)}` : `${word} · ${formatAgo(l.at, now)}`;
   return l.detail ? `${word} · ${l.detail}` : word;
 }

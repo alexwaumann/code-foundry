@@ -1,4 +1,4 @@
-import type { ThreadView } from "@/api/threads";
+import type { ThreadFlagView, ThreadView } from "@/api/threads";
 
 /**
  * The one badge a thread row shows. It never tells whether Claude's process runs (the
@@ -116,13 +116,24 @@ export function attentionTier(s: Pick<ThreadView, "status" | "statusReason">): A
 
 /**
  * The sidebar group an unpinned thread sorts in (lib/tree.ts buildRows): "prompt" (waits on
- * the user, attentionTier), "error" (error / interrupted), "done" (an unseen finished turn),
- * "working" (busy, or Claude starting), "idle" (everything else). The same reading as
+ * the user, attentionTier, or a plugin's attention flag), "error" (error / interrupted, or a
+ * plugin's error flag), "done" (an unseen finished turn), "working" (busy, or Claude
+ * starting), "idle" (everything else). The same reading as
  * threadBadge: attention and error win, so a thread waiting on the user never hides in the
  * collapsible Working section (keys/bindings.ts jumpToAttention); a stopped or stopping
  * busy thread is idle.
  */
 export type ThreadGroup = "prompt" | "error" | "done" | "idle" | "working";
+
+/**
+ * The flag line 2 shows (docs/notes/plugins-3-events-flags-env.md): the first error flag,
+ * else the first attention flag (the daemon sends them errors first, then newest first);
+ * null without flags.
+ */
+export function topFlag(s: Partial<Pick<ThreadView, "flags">>): ThreadFlagView | null {
+  const flags = s.flags ?? [];
+  return flags.find((f) => f.level === "error") ?? flags[0] ?? null;
+}
 
 export function isThreadGroup(v: string): v is ThreadGroup {
   return v === "prompt" || v === "error" || v === "done" || v === "idle" || v === "working";
@@ -149,10 +160,15 @@ export function restartCutsOff(
   return s.backgroundWakePending ? "reporting" : null;
 }
 
-export function threadGroup(s: Pick<ThreadView, "state" | "status" | "statusReason">): ThreadGroup {
+export function threadGroup(s: Pick<ThreadView, "state" | "status" | "statusReason"> & Partial<Pick<ThreadView, "flags">>): ThreadGroup {
   const tier = attentionTier(s);
-  if (tier !== "") return tier;
+  if (tier === "prompt") return tier;
   if (s.status === "error") return "error";
+  // A plugin's flag: errors sort with errors, attention with prompts, above a finished
+  // turn and out of Working.
+  const flag = topFlag(s);
+  if (flag) return flag.level === "error" ? "error" : "prompt";
+  if (tier === "done") return tier;
   return threadBadge(s) === "busy" ? "working" : "idle";
 }
 

@@ -8,7 +8,7 @@ import { Code, ConnectError } from "@connectrpc/connect";
 import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
 import { EventSource, type EventSchema } from "../src/gen/codefoundry/v1/events_pb";
 import type { ProjectEventSchema, ProjectSchema, WorktreeSchema } from "../src/gen/codefoundry/v1/project_pb";
-import { PermissionMode, ThreadState, ThreadStatus, type ThreadListEventSchema, type ThreadSchema } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
+import { PermissionMode, ThreadFlagLevel, ThreadState, ThreadStatus, type ThreadListEventSchema, type ThreadSchema } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
 import { TerminalState, type AttachEventSchema, type TerminalEventSchema, type TerminalSchema } from "../src/gen/codefoundry/v1/terminal_pb";
 import { UiIntent_Notify_Level, UiIntentSchema } from "../src/gen/codefoundry/v1/ui_pb";
 import type { WorkspaceEventSchema, WorkspaceSchema } from "../src/gen/codefoundry/v1/workspace_pb";
@@ -130,6 +130,21 @@ interface MockThread {
    * starting and busy threads sit in the Working section.
    */
   held: boolean;
+  /**
+   * Plugins' flags (Thread.flags; POST /__mock/thread/flag), one per plugin, errors first then
+   * newest. Archiving clears them; opening the thread clears until-seen ones.
+   */
+  flags: MockFlag[];
+}
+
+/** A plugin's flag on a thread (docs/notes/plugins-3-events-flags-env.md). */
+export interface MockFlag {
+  plugin: string;
+  pluginDisplayName: string;
+  level: ThreadFlagLevel;
+  reason: string;
+  setAt: Date;
+  untilSeen: boolean;
 }
 
 interface ArgDef {
@@ -560,6 +575,9 @@ export class World {
         this.setStatus(s, status, reason);
         s.lastActivityAt = new Date();
         this.publishThread(s);
+      },
+      seenFlags: (id) => {
+        this.seenFlags(id);
       },
       setModel: (id, model) => {
         const s = this.thread(id);
@@ -1132,6 +1150,7 @@ export class World {
       nameIn: 0,
       pendingName: "",
       held: false,
+      flags: [],
       ...o,
       state,
     };
@@ -1169,6 +1188,7 @@ export class World {
       workspaceId: s.workspaceId,
       pendingWorktreePath: s.pendingWorktreePath,
       pinned: s.pinned,
+      flags: s.flags.map((f) => ({ ...f, setAt: timestampFromDate(f.setAt) })),
       ...(s.archivedAt ? { archivedAt: timestampFromDate(s.archivedAt) } : {}),
       ...(s.snoozedUntil ? { snoozedUntil: timestampFromDate(s.snoozedUntil) } : {}),
       effortPending: s.effortPending,
@@ -1255,6 +1275,30 @@ export class World {
   /** Test control: the clock stops (or, held false, resumes) changing this thread (MockThread.held); controls and input always do. */
   holdThread(id: string, held = true): void {
     this.thread(id).held = held;
+  }
+
+  /**
+   * A plugin raises (or with level none clears) its flag on a thread, like the daemon's
+   * thread/setFlag: one per plugin, errors first then newest; an archived thread refuses.
+   */
+  setFlag(id: string, f: Omit<MockFlag, "setAt" | "level"> & { level: ThreadFlagLevel | null }): void {
+    const s = this.thread(id);
+    const rest = s.flags.filter((x) => x.plugin !== f.plugin);
+    if (f.level === null) {
+      s.flags = rest;
+    } else {
+      if (s.archivedAt) throw new CommandError("unavailable", "thread is archived");
+      s.flags = [...rest, { ...f, level: f.level, setAt: new Date() }].sort((a, b) => b.level - a.level || b.setAt.getTime() - a.setAt.getTime());
+    }
+    this.publishThread(s);
+  }
+
+  /** The user opened the thread: its until-seen flags go (the daemon's WatchItems). */
+  seenFlags(id: string): void {
+    const s = this.threads.get(id);
+    if (!s || !s.flags.some((f) => f.untilSeen)) return;
+    s.flags = s.flags.filter((f) => !f.untilSeen);
+    this.publishThread(s);
   }
 
   setThreadStatus(id: string, status: ThreadStatus, reason?: string): void {
@@ -1392,6 +1436,7 @@ export class World {
     s.pinned = false;
     s.archivedAt ??= new Date();
     s.snoozedUntil = null;
+    s.flags = [];
     this.publishThread(s);
     return `archived thread ${label}`;
   }
