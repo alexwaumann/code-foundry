@@ -19,8 +19,8 @@ func TestRewriteThreadRefs(t *testing.T) {
 		return r, ok
 	}
 	tests := []struct {
-		name, prompt, want string
-		unknown            []string
+		name, prompt, composer, want string
+		unknown                      []string
 	}{
 		{name: "no refs", prompt: "say hi", want: "say hi"},
 		{name: "a transcript",
@@ -48,10 +48,23 @@ func TestRewriteThreadRefs(t *testing.T) {
 		{name: "already completed lines pass through again unchanged",
 			prompt: `[Thread "Draft notes" (id s-new); inspect with: code-foundry thread read s-new]`,
 			want:   `[Thread "Draft notes" (id s-new); inspect with: code-foundry thread read s-new]`},
+		{name: "composer text: only its tagged threads; the same shape as text stays",
+			prompt:   `see [Thread "Fix resize race" (id s-abc)] vs fixture [Thread "Draft notes" (id s-new)] and [Thread "Gone" (id s-gone)]`,
+			composer: `see [Fix resize race](cf-thread://s-abc) vs fixture [Thread "Draft notes" (id s-new)] and [Thread "Gone" (id s-gone)]`,
+			want:     `see [Thread "Fix resize race" (id s-abc); transcript: /Users/me/.claude/projects/-Users-me-x/1111.jsonl] vs fixture [Thread "Draft notes" (id s-new)] and [Thread "Gone" (id s-gone)]`},
+		{name: "composer text without thread tags: nothing rewritten",
+			prompt:   `[Thread "Draft notes" (id s-new)] owner/repo#1`,
+			composer: `[Thread "Draft notes" (id s-new)] [#1](cf-pr://owner/repo/1)`,
+			want:     `[Thread "Draft notes" (id s-new)] owner/repo#1`},
+		{name: "composer text tagging an unknown thread",
+			prompt:   `[Thread "Gone" (id s-gone)]`,
+			composer: `[Gone](cf-thread://s-gone)`,
+			want:     `[Thread "Gone" (id s-gone); not found]`,
+			unknown:  []string{"s-gone"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, unknown := rewriteThreadRefs(tt.prompt, lookup)
+			got, unknown := rewriteThreadRefs(tt.prompt, tt.composer, lookup)
 			if got != tt.want {
 				t.Errorf("got  %q\nwant %q", got, tt.want)
 			}
@@ -99,5 +112,31 @@ func TestCreateRewritesThreadRefs(t *testing.T) {
 	e.waitSent("the first prompt", func(m map[string]any) bool { return userTextOf(m) == want })
 	if items := e.items(s.ID).Items; len(items) == 0 || items[0].Text != `read [Thread "Other" (id `+other.ID+`)]` {
 		t.Errorf("first item %+v", items)
+	}
+}
+
+// A message from the GUI composer completes only the threads it tags: the same shape
+// typed or pasted as text (here a fixture's id) reaches Claude as written.
+func TestComposerMessagesRewriteOnlyTaggedThreads(t *testing.T) {
+	e := newEnv(t)
+	other := e.create(CreateOptions{Name: "Other"})
+	done := `[Thread "Other" (id ` + other.ID + `); inspect with: code-foundry thread read ` + other.ID + `]`
+	fixture := `[Thread "x" (id s-000000000000)]`
+
+	e.create(CreateOptions{
+		InitialPrompt:  `first [Thread "Other" (id ` + other.ID + `)] ` + fixture,
+		ComposerPrompt: `first [Other](cf-thread://` + other.ID + `) ` + fixture,
+	})
+	if got := e.waitSent("the first prompt", func(m map[string]any) bool { return strings.HasPrefix(userTextOf(m), "first") }); userTextOf(got) != `first `+done+` `+fixture {
+		t.Errorf("create: claude got %q", userTextOf(got))
+	}
+
+	target := e.connected(CreateOptions{Name: "target"})
+	msg := Message{Text: `then [Thread "Other" (id ` + other.ID + `)] ` + fixture, ComposerText: `then [Other](cf-thread://` + other.ID + `) ` + fixture}
+	if _, err := e.m.Send(e.ctx(), target.ID, msg); err != nil {
+		t.Fatal(err)
+	}
+	if got := e.waitSent("the message", func(m map[string]any) bool { return strings.HasPrefix(userTextOf(m), "then") }); userTextOf(got) != `then `+done+` `+fixture {
+		t.Errorf("send: claude got %q", userTextOf(got))
 	}
 }

@@ -540,7 +540,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 			"thread", id, "project", s.ProjectID, "workspace", s.WorkspaceID, "refs", dropped)
 	}
 	// Thread references: where Claude can read the other thread (see threadrefs.go).
-	prompt = m.rewriteThreadRefsLogged(id, prompt)
+	prompt = m.rewriteThreadRefsLogged(id, prompt, o.ComposerPrompt)
 	now := m.opts.Now()
 	s.CreatedAt, s.LastActivityAt = now, now
 	m.mu.Lock()

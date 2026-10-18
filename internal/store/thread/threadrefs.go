@@ -22,7 +22,28 @@ import (
 //
 // An id the daemon does not know keeps the name as written and says so ("; not found").
 // Anything else in brackets is left alone, so prose that happens to look similar but is
-// not exactly this shape passes through.
+// not exactly this shape passes through. A message from the GUI composer (its composer
+// text is set) has only the lines of its own thread tags rewritten: the same shape typed
+// or pasted as text (a test fixture, an earlier message copied from `thread read`) is
+// the user's and reaches Claude as written. A message without composer text (the CLI, an
+// agent's `thread send`) has every such line rewritten.
+
+// composerThreadTag matches a thread tag in the GUI composer's text (gui lib/prompt.ts):
+// "[label](cf-thread://<id>)"; 1 the id.
+var composerThreadTag = regexp.MustCompile(`\[[^\[\]\n]*\]\(cf-thread://([A-Za-z0-9_-]{1,64})\)`)
+
+// taggedThreadIDs is the set of thread ids composer tags; nil without composer text
+// (every reference counts).
+func taggedThreadIDs(composer string) map[string]bool {
+	if strings.TrimSpace(composer) == "" {
+		return nil
+	}
+	ids := map[string]bool{}
+	for _, m := range composerThreadTag.FindAllStringSubmatch(composer, -1) {
+		ids[m[1]] = true
+	}
+	return ids
+}
 
 // threadRefPattern matches the GUI's projection of a thread tag: a name without quotes,
 // brackets or line breaks (the GUI cleans it), and a thread id.
@@ -49,16 +70,20 @@ func cleanRefName(s string) string {
 }
 
 // rewriteThreadRefs completes every thread reference in prompt (see above) with what
-// lookup returns for its id. It also returns the ids lookup did not know, for the caller
-// to log.
-func rewriteThreadRefs(prompt string, lookup func(id string) (threadRef, bool)) (string, []string) {
+// lookup returns for its id; with composer text, only those of the threads it tags. It
+// also returns the ids lookup did not know, for the caller to log.
+func rewriteThreadRefs(prompt, composer string, lookup func(id string) (threadRef, bool)) (string, []string) {
 	if !strings.Contains(prompt, `[Thread "`) {
 		return prompt, nil
 	}
+	tagged := taggedThreadIDs(composer)
 	var unknown []string
 	out := threadRefPattern.ReplaceAllStringFunc(prompt, func(m string) string {
 		sub := threadRefPattern.FindStringSubmatch(m)
 		name, id := sub[1], sub[2]
+		if tagged != nil && !tagged[id] {
+			return m
+		}
 		ref, ok := lookup(id)
 		if !ok {
 			unknown = append(unknown, id)
@@ -93,8 +118,8 @@ func (m *Manager) threadRefs(id string) (threadRef, bool) {
 }
 
 // rewriteThreadRefsLogged is rewriteThreadRefs over the snapshot, logging unknown ids.
-func (m *Manager) rewriteThreadRefsLogged(threadID, prompt string) string {
-	out, unknown := rewriteThreadRefs(prompt, m.threadRefs)
+func (m *Manager) rewriteThreadRefsLogged(threadID, prompt, composer string) string {
+	out, unknown := rewriteThreadRefs(prompt, composer, m.threadRefs)
 	if len(unknown) > 0 {
 		m.log.Warn("thread references to unknown threads", "thread", threadID, "ids", unknown)
 	}
