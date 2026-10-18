@@ -5,6 +5,13 @@ export interface TerminalsData {
   byId: Readonly<Record<string, TerminalView>>;
   /** Display order: the daemon's list order, new terminals appended. */
   order: readonly string[];
+  /**
+   * Plugins' terminals the user opened in a bottom panel ("Open in bottom panel" on a
+   * terminal node), by terminal id: the panel key whose strip shows it as a tab
+   * (stores/bottomPanel.ts bottomTabIds). Window-local; a terminal that goes takes its tab
+   * with it. docs/notes/plugins-6-thread-terminal.md.
+   */
+  shownIn?: Readonly<Record<string, string>>;
 }
 
 interface TerminalsState extends TerminalsData {

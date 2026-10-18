@@ -3,9 +3,17 @@ import type { AgentRunView, ThreadFlagView, ThreadListEventView, ThreadView, Usa
 import { threadBadge } from "@/lib/thread";
 
 export interface ThreadsData {
+  /** Every thread, owned ones (a plugin's) included. */
   byId: Readonly<Record<string, ThreadView>>;
-  /** Display order: creation time, then id. */
+  /**
+   * The user's threads in display order: creation time, then id. Owned threads (a
+   * plugin's; ThreadView.owner) are left out, so nothing that lists the user's threads
+   * (the sidebar, attention counts and the dock, the Threads panel, lineage, pickers)
+   * shows them: their plugin's thread node does (docs/notes/plugins-6-thread-terminal.md).
+   */
   order: readonly string[];
+  /** The owned threads, in the same order; absent when there are none. */
+  owned?: readonly string[];
 }
 
 /**
@@ -94,14 +102,32 @@ function sameLinks(a: ThreadView["linkedPullRequests"], b: ThreadView["linkedPul
   return a === b || (a.length === b.length && a.every((l, i) => l.url === b[i]?.url));
 }
 
-function sortedOrder(byId: Readonly<Record<string, ThreadView>>): string[] {
+/** Whether a thread is someone else's than the user's (a plugin's). */
+export function isOwned(s: Pick<ThreadView, "owner"> | undefined): boolean {
+  return (s?.owner ?? "") !== "";
+}
+
+function sortedOrder(byId: Readonly<Record<string, ThreadView>>, owned = false): string[] {
   return Object.values(byId)
+    .filter((s) => isOwned(s) === owned)
     .sort((a, b) => (a.createdAtMs ?? 0) - (b.createdAtMs ?? 0) || a.id.localeCompare(b.id))
     .map((s) => s.id);
 }
 
 function sameOrder(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((id, i) => id === b[i]);
+}
+
+const NO_OWNED: readonly string[] = [];
+
+/**
+ * The data with the owned list for byId, keeping prev's when unchanged. Always set (the
+ * stores merge a result into their state, so an absent list would keep a stale one).
+ */
+function withOwned(data: ThreadsData, prev: ThreadsData): ThreadsData {
+  const owned = sortedOrder(data.byId, true);
+  if (owned.length === 0) return { ...data, owned: NO_OWNED };
+  return { ...data, owned: prev.owned && sameOrder(prev.owned, owned) ? prev.owned : owned };
 }
 
 /** Replaces the whole set (List result or snapshot), keeping identity for unchanged threads. */
@@ -112,8 +138,9 @@ export function replaceThreads(prev: ThreadsData, list: readonly ThreadView[]): 
     byId[s.id] = old && sameThread(old, s) ? old : s;
   }
   const order = sortedOrder(byId);
-  const unchanged = sameOrder(order, prev.order) && order.every((id) => byId[id] === prev.byId[id]);
-  return unchanged ? prev : { byId, order };
+  const unchanged =
+    Object.keys(byId).length === Object.keys(prev.byId).length && sameOrder(order, prev.order) && Object.keys(byId).every((id) => byId[id] === prev.byId[id]);
+  return unchanged ? prev : withOwned({ byId, order }, prev);
 }
 
 export function applyThreadListEvent(prev: ThreadsData, ev: ThreadListEventView): ThreadsData {
@@ -125,13 +152,16 @@ export function applyThreadListEvent(prev: ThreadsData, ev: ThreadListEventView)
       const old = prev.byId[s.id];
       if (old && sameThread(old, s)) return prev;
       const byId = { ...prev.byId, [s.id]: s };
+      if (isOwned(s) || isOwned(old)) return withOwned({ byId, order: sortedOrder(byId) }, prev);
       const order = old && old.createdAtMs === s.createdAtMs ? prev.order : sortedOrder(byId);
-      return { byId, order };
+      return { byId, order, owned: prev.owned ?? NO_OWNED };
     }
     case "removed": {
       if (!(ev.id in prev.byId)) return prev;
       const { [ev.id]: _removed, ...byId } = prev.byId;
-      return { byId, order: prev.order.filter((id) => id !== ev.id) };
+      const order = prev.order.filter((id) => id !== ev.id);
+      const owned = prev.owned?.filter((id) => id !== ev.id) ?? NO_OWNED;
+      return { byId, order, owned: owned.length > 0 ? owned : NO_OWNED };
     }
     case "retiredUsage":
       return prev; // no thread changed: see applyRetiredUsage

@@ -41,6 +41,7 @@ import {
 import { invokeConfirmed, refreshCommands, runCommandForResult, useCommandsStore } from "./commands";
 import { getUiContext, projectsShellPlace, worktreeContext } from "./context";
 import { expandPanel, getPanel } from "./panel";
+import { hidePluginTerminalTab } from "./pluginTerminals";
 import { useTerminalsStore, type TerminalsData } from "./terminals";
 import { useUiStore } from "./ui";
 import { bottomCanShow, toggleBottomCommand, useViewsStore, visibleBottomKey } from "./views";
@@ -257,11 +258,13 @@ export function newWorktreeTerminal(projectId: string, path: string): Promise<bo
 
 /**
  * Closes a tab: terminal.close with --id for that terminal, no confirmation (it only
- * closes shells). Its tab goes when the daemon removes the terminal. A shell that is
+ * closes shells); a plugin's terminal's tab leaves the strip and the terminal runs on. Its tab goes when the daemon removes the terminal. A shell that is
  * already gone (reaped meanwhile: NotFound, or unavailable because the daemon no longer
  * knows it) is not an error.
  */
 export async function closeBottomTerminal(id: string): Promise<void> {
+  // A plugin's terminal is the plugin's to close: its tab only leaves the strip.
+  if (hidePluginTerminalTab(id)) return;
   const ctx: UiContextView = { ...getUiContext(), activeTerminalId: id };
   try {
     await invokeConfirmed("terminal.close", { id }, ctx);

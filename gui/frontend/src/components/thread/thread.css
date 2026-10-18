@@ -1336,3 +1336,15 @@ html[data-thread-width="full"] .cf-thread {
 .cf-thread .subreport > .text-overline {
   margin-bottom: 4px;
 }
+
+/* ---------- inline: a thread inside a plugin's side-panel view (InlineThread) ---------- */
+.cf-thread-inline {
+  --thread-col: none;
+  --thread-dock: none;
+}
+.cf-thread-inline .col {
+  padding: 0 12px;
+}
+.cf-thread-inline .dock {
+  padding: 16px 8px 8px;
+}

@@ -1,13 +1,13 @@
 import { Loader2 } from "lucide-react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Backdrop } from "@/components/backdrop/Backdrop";
 import { ThreadTitle } from "@/components/thread/ThreadParts";
 import { DragBand } from "@/components/window/DragBand";
 import { PaneHeader } from "@/components/window/PaneHeader";
-import { useLinger } from "@/lib/linger";
 import { useThreadsStore } from "@/stores/threads";
-import { forgetTurnView, startThreadWatch, useOpenRequests, useThreadEmpty, useThreadLoaded, useThreadPending, useThreadStore } from "@/stores/thread";
+import { forgetTurnView, startThreadWatch } from "@/stores/thread";
 import { useShownRun } from "@/stores/subagentView";
+import { useElementHeight, useThreadActivity } from "./activity";
 import { AgentsStrip } from "./AgentsStrip";
 import { CiteLayer } from "./cite/CiteLayer";
 import { SubagentPane } from "./SubagentPane";
@@ -16,25 +16,6 @@ import { HeaderActions } from "./HeaderActions";
 import { Timeline } from "./Timeline";
 import { ThreadComposer } from "./ThreadComposer";
 import "./thread.css";
-
-/** The floating composer's height, for the timeline's bottom inset. */
-function useHeight(ref: React.RefObject<HTMLElement | null>): number {
-  const [h, setH] = useState(0);
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const measure = () => {
-      setH(el.offsetHeight);
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => {
-      ro.disconnect();
-    };
-  }, [ref]);
-  return h;
-}
 
 /**
  * What the content pane shows for a thread id the threads store does not have: a removed
@@ -87,29 +68,9 @@ function WatchedThread({ threadId }: { threadId: string }) {
 
 function ThreadBody({ threadId }: { threadId: string }) {
   const cwd = useThreadsStore((s) => s.byId[threadId]?.worktreePath ?? "");
-  const state = useThreadsStore((s) => s.byId[threadId]?.state ?? "unknown");
-  const status = useThreadsStore((s) => s.byId[threadId]?.status ?? "unknown");
-  const pendingList = useThreadPending(threadId);
-  const loaded = useThreadLoaded(threadId);
-  const empty = useThreadEmpty(threadId);
-  const watchError = useThreadStore((s) => (s.watch?.threadId === threadId && s.watch.status === "retrying" ? s.watch.error : null));
-  const catchingUp = useThreadStore((s) => s.watch?.threadId === threadId && s.watch.status === "retrying");
-  // The prompts to dock: pending requests minus the ones just answered (their answer is on its way).
-  const open = useOpenRequests(threadId);
-  const waiting = pendingList.length > 0;
-  // Internal only: a process on its way out or gone makes a busy status (an older
-  // daemon's) mean nothing. Nothing on screen says whether it runs.
-  const running = state !== "disconnected" && state !== "closing";
-  // Claude is on a turn: busy, or waiting on the user mid-turn.
-  const busy = running && (status === "busy" || waiting);
-  // Working: busy, or Claude starting for a message just sent, which looks the same.
-  const working = running && (status === "busy" || state === "starting") && open.length === 0;
-  // The timeline's live turn header outlasts a stop by a moment (not a docked request):
-  // the status can turn idle before the turn_end arrives on the Watch, and the header then
-  // turns into the finished one in place instead of vanishing and coming back.
-  const timelineWorking = useLinger(working, open.length === 0 ? 2000 : 0);
+  const { loaded, empty, catchingUp, watchError, open, busy, working, timelineWorking } = useThreadActivity(threadId);
   const dockRef = useRef<HTMLDivElement>(null);
-  const dockHeight = useHeight(dockRef);
+  const dockHeight = useElementHeight(dockRef);
   const bodyRef = useRef<HTMLDivElement>(null);
   const ctx = useMemo(() => ({ threadId, cwd }), [threadId, cwd]);
   return (
