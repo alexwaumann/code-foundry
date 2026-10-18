@@ -37,3 +37,22 @@ func (f *Fake) WorktreeDetail(_ context.Context, projectID, path string) (projec
 	}
 	return project.WorktreeDetail{ProjectID: projectID, Path: path}, nil
 }
+
+// SetFileDiff sets what WorktreeFileDiff returns for a known worktree.
+func (f *Fake) SetFileDiff(d project.WorktreeFileDiff) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.fileDiff = d
+}
+
+// WorktreeFileDiff implements project.Store: the SetFileDiff value for any file of a
+// known worktree.
+func (f *Fake) WorktreeFileDiff(_ context.Context, req project.FileDiffRequest) (project.WorktreeFileDiff, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.Calls = append(f.Calls, fmt.Sprintf("WorktreeFileDiff %s %s %s %d", req.ProjectID, req.Path, req.File, req.Scope))
+	if _, ok := f.snap.Worktree(req.ProjectID, req.Path); !ok {
+		return project.WorktreeFileDiff{}, fmt.Errorf("%w: worktree %q in project %q", project.ErrNotFound, req.Path, req.ProjectID)
+	}
+	return f.fileDiff, nil
+}

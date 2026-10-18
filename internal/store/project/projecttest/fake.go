@@ -29,6 +29,8 @@ type Fake struct {
 	snap     *project.Snapshot
 	// details backs WorktreeDetail (detail.go); nil until SetDetail.
 	details map[string]project.WorktreeDetail
+	// fileDiff is what WorktreeFileDiff returns (SetFileDiff).
+	fileDiff project.WorktreeFileDiff
 	// refs backs ListRefs; nil until SetRefs.
 	refs map[string]project.Refs
 	// live is the last SetLiveWorktrees (activity.go).

@@ -238,6 +238,10 @@ type Store interface {
 	// WorktreeDetail returns the files changed and commits on a worktree against its
 	// base (detail.go), computing them if needed.
 	WorktreeDetail(ctx context.Context, projectID, path string) (WorktreeDetail, error)
+	// WorktreeFileDiff returns both sides of one file of a worktree against the
+	// detail's base (filediff.go), read now. ErrInvalidArgument for a file path that
+	// leaves the worktree, ErrFailedPrecondition for a project without git.
+	WorktreeFileDiff(ctx context.Context, req FileDiffRequest) (WorktreeFileDiff, error)
 	// InitGit makes a project without git a git repository (`git init -b <default>`
 	// and an empty "chore: initial commit") and refreshes it, returning the git project.
 	// ErrFailedPrecondition when it already is one.

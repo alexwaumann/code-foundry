@@ -38,6 +38,15 @@ service ProjectService {
   // worktree has been asked about in the last 10 minutes, every status refresh of it
   // recomputes the detail and announces changes as worktree_detail_updated.
   rpc GetWorktreeDetail(GetWorktreeDetailRequest) returns (GetWorktreeDetailResponse) {}
+  // GetWorktreeFileDiff returns both sides of one file of a worktree for a diff view,
+  // against the same base and merge base GetWorktreeDetail uses. WORKING: the merge
+  // base's version against the file on disk (untracked files included); a worktree
+  // without a base compares with HEAD (the empty tree on an unborn branch), as the
+  // detail's file list does. BRANCH: the merge base's version against HEAD's; without
+  // a base, error says so. Each side is at most 1 MiB. Computed on every call (not
+  // cached); NotFound for an unknown worktree, InvalidArgument for a file path that
+  // leaves the worktree, FailedPrecondition for a project without git.
+  rpc GetWorktreeFileDiff(GetWorktreeFileDiffRequest) returns (GetWorktreeFileDiffResponse) {}
   // ListRefs returns the refs a worktree can be based on: local branches and
   // remote-tracking branches (origin/<name>), plus the default base.
   rpc ListRefs(ListRefsRequest) returns (ListRefsResponse) {}
@@ -300,6 +309,59 @@ message GetWorktreeDetailRequest {
 
 message GetWorktreeDetailResponse {
   WorktreeDetail detail = 1;
+}
+
+// What GetWorktreeFileDiff compares.
+enum DiffScope {
+  DIFF_SCOPE_UNSPECIFIED = 0;
+  // The merge base against the working tree (the worktree panel's file list).
+  DIFF_SCOPE_WORKING = 1;
+  // The merge base against HEAD (what is committed on the branch).
+  DIFF_SCOPE_BRANCH = 2;
+}
+
+message GetWorktreeFileDiffRequest {
+  string project_id = 1;
+  // The worktree, as GetWorktreeDetail takes it.
+  string path = 2;
+  // Worktree-relative path (forward slashes) of the new side.
+  string file = 3;
+  // Worktree-relative path of the old side, for a rename or copy (FileChange.old_path).
+  // Empty: file.
+  string old_path = 4;
+  // UNSPECIFIED is WORKING.
+  DiffScope scope = 5;
+}
+
+// One side of a file diff.
+message FileVersion {
+  // The file exists on this side (a deleted file's new side and an added file's old
+  // side are absent; so is a directory or submodule at the path).
+  bool present = 1;
+  // At most 1 MiB.
+  bytes contents = 2;
+  // The file is larger than 1 MiB; contents holds its first MiB (none at all past
+  // 32 MiB in git).
+  bool truncated = 3;
+  // NUL in the first 8000 bytes.
+  bool binary = 4;
+}
+
+message GetWorktreeFileDiffResponse {
+  FileVersion old = 1;
+  FileVersion new = 2;
+  // As in WorktreeDetail. Empty base_ref and merge_base: no base (WORKING then
+  // compared with HEAD).
+  string base_ref = 3;
+  string merge_base = 4;
+  string head = 5;
+  // One letter, from the two sides: A (only new), D (only old), M (both, contents
+  // differ; or either side truncated), R (both, old_path differs from file, contents
+  // equal or not), "" (both equal, or neither present).
+  string status = 6;
+  // Non-empty when the scope cannot be compared: BRANCH on a worktree without a base
+  // or without a merge base. The sides are then empty.
+  string error = 7;
 }
 
 // A worktree compared with its base.
