@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package codefoundry.v1;
 
+import "codefoundry/v1/command.proto";
+
 // UiService lets the daemon (and the CLI through it) steer a running GUI.
 service UiService {
   // WatchIntents is held open by the GUI. Intents are fan-out: every watcher gets each.
@@ -22,6 +24,19 @@ message UiIntent {
     ShowView show_view = 6;
     PlayAlertSound play_alert_sound = 7;
     ShowAgentRun show_agent_run = 8;
+    InvokeCommand invoke_command = 9;
+  }
+
+  // InvokeCommand asks the GUI to run a command through its normal flow (runCommand):
+  // a command that asks first shows the daemon's own confirm dialog, and the user
+  // decides. A plugin's host/invoke with confirm "ask" sends it (caller
+  // "plugin:<name>"); the plugin learns the outcome from events.
+  message InvokeCommand {
+    string name = 1;
+    map<string, string> args = 2;
+    UiContext context = 3;
+    // Who asked ("plugin:hello"), for the dialog.
+    string caller = 4;
   }
 
   // ShowAgentRun selects a thread and shows one of its own subagent runs (spawn depth 1)

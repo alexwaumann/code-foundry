@@ -17,8 +17,10 @@ import (
 
 // Plugin implements codefoundryv1connect.PluginServiceHandler over a plugin.Store.
 type Plugin struct {
-	store plugin.Store
-	bus   *bus.Bus
+	store    plugin.Store
+	bus      *bus.Bus
+	surfaces plugin.Surfaces // nil: WatchSurface, GetSurface and Act are unimplemented
+	beat     time.Duration   // WatchSurface's heartbeat interval; zero is HeartbeatInterval
 }
 
 var _ codefoundryv1connect.PluginServiceHandler = (*Plugin)(nil)
@@ -33,9 +35,11 @@ func (h *Plugin) Route(opts ...connect.HandlerOption) Route {
 	return Route{Path: path, Handler: handler}
 }
 
-// List returns every plugin.
-func (h *Plugin) List(context.Context, *connect.Request[v1.ListPluginsRequest]) (*connect.Response[v1.ListPluginsResponse], error) {
-	return connect.NewResponse(&v1.ListPluginsResponse{Plugins: pluginsToProto(h.store.Snapshot().Plugins)}), nil
+// List returns every plugin, with each surface's availability in the request's context.
+func (h *Plugin) List(_ context.Context, req *connect.Request[v1.ListPluginsRequest]) (*connect.Response[v1.ListPluginsResponse], error) {
+	out := pluginsToProto(h.store.Snapshot().Plugins)
+	h.fillAvailability(out, contextFromProto(req.Msg.GetContext()))
+	return connect.NewResponse(&v1.ListPluginsResponse{Plugins: out}), nil
 }
 
 // Enable turns a plugin on, or reports the consent it needs.
@@ -181,6 +185,8 @@ func pluginEventToProto(ev plugin.Event) *v1.PluginEvent {
 		return &v1.PluginEvent{Event: &v1.PluginEvent_Updated{Updated: pluginToProto(e.Plugin)}}
 	case plugin.Removed:
 		return &v1.PluginEvent{Event: &v1.PluginEvent_RemovedName{RemovedName: e.Name}}
+	case plugin.AvailabilityChanged:
+		return &v1.PluginEvent{Event: &v1.PluginEvent_AvailabilityEpoch{AvailabilityEpoch: e.Epoch}}
 	}
 	return nil
 }
@@ -238,7 +244,15 @@ func pluginToProto(p plugin.Plugin) *v1.Plugin {
 		out.Commands = append(out.Commands, &v1.PluginCommand{Name: plugin.Prefix(p.Name) + c.Name, Title: c.Title, Description: c.Description})
 	}
 	for _, s := range mf.Surfaces {
-		out.Surfaces = append(out.Surfaces, &v1.PluginSurface{Id: s.ID, Title: s.Title, Icon: s.Icon, Scope: s.Scope, Placements: s.Placement})
+		scope, placements := s.Scope, s.Placement
+		if scope == "" {
+			scope = pluginsdk.ScopeThread
+		}
+		if len(placements) == 0 {
+			placements = []string{pluginsdk.PlacementPanel}
+		}
+		out.Surfaces = append(out.Surfaces, &v1.PluginSurface{Id: s.ID, Title: s.Title, Icon: s.Icon, Scope: scope, Placements: placements,
+			When: s.When, ShowCommand: plugin.ShowCommand(p.Name, s.ID), Kind: plugin.SurfaceKind(p.Name, s.ID)})
 	}
 	return out
 }

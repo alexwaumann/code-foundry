@@ -53,6 +53,8 @@ type Host struct {
 	toasts      []pluginsdk.ToastParams
 	contexts    []pluginsdk.ContextParams
 	views       map[string]json.RawMessage
+	versions    map[string]uint64
+	appends     []pluginsdk.ViewAppendParams
 	envs        []pluginsdk.Environment
 	subs        [][]string
 	closeOnce   sync.Once
@@ -69,7 +71,7 @@ func Start(t testing.TB, p pluginsdk.Plugin, opts Options) *Host {
 		opts.DataDir = t.TempDir()
 	}
 	h := &Host{t: t, opts: opts, done: make(chan error, 1), changed: make(chan struct{}),
-		secrets: map[string]pluginsdk.SecretInfo{}, values: map[string]string{}, views: map[string]json.RawMessage{}}
+		secrets: map[string]pluginsdk.SecretInfo{}, values: map[string]string{}, views: map[string]json.RawMessage{}, versions: map[string]uint64{}}
 	toPluginR, toPluginW := io.Pipe()
 	toHostR, toHostW := io.Pipe()
 	go func() {
@@ -107,6 +109,33 @@ func (h *Host) Command(ctx context.Context, name string, args map[string]string,
 	var res pluginsdk.CommandResult
 	err := h.conn.Call(ctx, pluginsdk.MethodCommandInvoke, pluginsdk.CommandRequest{Command: name, Args: args, Context: uctx}, &res)
 	return res, err
+}
+
+// OpenSurface opens a surface instance (surface/open) and tells the plugin it is
+// visible, as the host does for its first viewer. The plugin's views arrive in View.
+func (h *Host) OpenSurface(ctx context.Context, instance, surface string, uctx pluginsdk.UiContext) error {
+	if err := h.conn.Call(ctx, pluginsdk.MethodSurfaceOpen, pluginsdk.SurfaceOpen{Instance: instance, Surface: surface, Context: uctx}, nil); err != nil {
+		return err
+	}
+	return h.conn.Notify(pluginsdk.MethodSurfaceVisibility, pluginsdk.SurfaceVisibility{Instance: instance, Visible: true})
+}
+
+// Act sends surface/act. A zero act.Version is the instance's latest.
+func (h *Host) Act(ctx context.Context, act pluginsdk.SurfaceAct) error {
+	if act.Version == 0 {
+		act.Version = h.Version(act.Instance)
+	}
+	return h.conn.Call(ctx, pluginsdk.MethodSurfaceAct, act, nil)
+}
+
+// Visibility sends surface/visibility.
+func (h *Host) Visibility(instance string, visible bool) error {
+	return h.conn.Notify(pluginsdk.MethodSurfaceVisibility, pluginsdk.SurfaceVisibility{Instance: instance, Visible: visible})
+}
+
+// CloseSurface sends surface/close.
+func (h *Host) CloseSurface(instance string) error {
+	return h.conn.Notify(pluginsdk.MethodSurfaceClose, pluginsdk.SurfaceClose{Instance: instance, Reason: "idle"})
 }
 
 // Ping pings the plugin.
@@ -225,6 +254,20 @@ func (h *Host) View(instance string) (json.RawMessage, bool) {
 	return v, ok
 }
 
+// Version returns how many views an instance has had (its latest version).
+func (h *Host) Version(instance string) uint64 {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.versions[instance]
+}
+
+// Appends returns the view/append calls.
+func (h *Host) Appends() []pluginsdk.ViewAppendParams {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return slices.Clone(h.appends)
+}
+
 // Environments returns the session/setEnvironment calls.
 func (h *Host) Environments() []pluginsdk.Environment {
 	h.mu.Lock()
@@ -310,6 +353,25 @@ func (h *Host) handle(ctx context.Context, method string, params json.RawMessage
 		return pluginsdk.SubscribeResult{Subscription: id}, nil
 	case pluginsdk.MethodEventsUnsubscribe:
 		return struct{}{}, nil
+	case pluginsdk.MethodViewUpdate:
+		p, err := decode[pluginsdk.ViewUpdateParams](params)
+		if err != nil {
+			return nil, err
+		}
+		var v uint64
+		h.record(func() {
+			h.views[p.Instance] = p.View
+			h.versions[p.Instance]++
+			v = h.versions[p.Instance]
+		})
+		return pluginsdk.ViewUpdateResult{Version: v}, nil
+	case pluginsdk.MethodViewAppend:
+		p, err := decode[pluginsdk.ViewAppendParams](params)
+		if err != nil {
+			return nil, err
+		}
+		h.record(func() { h.appends = append(h.appends, p) })
+		return pluginsdk.ViewUpdateResult{Version: h.Version(p.Instance)}, nil
 	}
 	return nil, pluginsdk.NewError(pluginsdk.CodeMethodNotFound, "method %q not supported by plugintest", method)
 }
@@ -379,7 +441,10 @@ func (h *Host) notify(_ context.Context, method string, params json.RawMessage) 
 		}
 	case pluginsdk.MethodViewUpdate:
 		if p, err := decode[pluginsdk.ViewUpdateParams](params); err == nil {
-			h.record(func() { h.views[p.Instance] = p.View })
+			h.record(func() {
+				h.views[p.Instance] = p.View
+				h.versions[p.Instance]++
+			})
 		}
 	}
 }

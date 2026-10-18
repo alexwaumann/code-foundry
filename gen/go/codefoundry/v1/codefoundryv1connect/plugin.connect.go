@@ -58,6 +58,14 @@ const (
 	PluginServiceDeleteSecretProcedure = "/codefoundry.v1.PluginService/DeleteSecret"
 	// PluginServiceWatchProcedure is the fully-qualified name of the PluginService's Watch RPC.
 	PluginServiceWatchProcedure = "/codefoundry.v1.PluginService/Watch"
+	// PluginServiceWatchSurfaceProcedure is the fully-qualified name of the PluginService's
+	// WatchSurface RPC.
+	PluginServiceWatchSurfaceProcedure = "/codefoundry.v1.PluginService/WatchSurface"
+	// PluginServiceGetSurfaceProcedure is the fully-qualified name of the PluginService's GetSurface
+	// RPC.
+	PluginServiceGetSurfaceProcedure = "/codefoundry.v1.PluginService/GetSurface"
+	// PluginServiceActProcedure is the fully-qualified name of the PluginService's Act RPC.
+	PluginServiceActProcedure = "/codefoundry.v1.PluginService/Act"
 )
 
 // PluginServiceClient is a client for the codefoundry.v1.PluginService service.
@@ -90,6 +98,22 @@ type PluginServiceClient interface {
 	// Watch sends a snapshot, then every change. A client that falls behind gets a new
 	// snapshot.
 	Watch(context.Context, *connect.Request[v1.WatchPluginsRequest]) (*connect.ServerStreamForClient[v1.PluginEvent], error)
+	// WatchSurface holds one surface instance open (docs/notes/plugins-2-surfaces.md): the
+	// first watcher opens it in the plugin (surface/open), the last one leaving hides it
+	// and, after a grace, closes it. It sends the instance's state first, then its current
+	// view (a cached one paints at once), then every new view (coalesced to at most one
+	// per 100 ms), log appends, toasts, and heartbeats while quiet. A surface that is not
+	// available in the context fails with FailedPrecondition.
+	WatchSurface(context.Context, *connect.Request[v1.WatchSurfaceRequest]) (*connect.ServerStreamForClient[v1.SurfaceUpdate], error)
+	// GetSurface opens an instance like WatchSurface, waits up to wait_ms for a view, and
+	// returns it with the actions it offers (the CLI's plugin surface; agents drive
+	// surfaces with it and Act). The instance stays open for the grace afterwards.
+	GetSurface(context.Context, *connect.Request[v1.GetSurfaceRequest]) (*connect.Response[v1.GetSurfaceResponse], error)
+	// Act forwards a user action on a view element (a click, a form submit, a field
+	// change, a tab switch) to the plugin as surface/act and returns once the plugin has
+	// answered; its error is the plugin's message (the GUI toasts it). Command, open-url
+	// and copy actions are the host's and never reach Act.
+	Act(context.Context, *connect.Request[v1.SurfaceActRequest]) (*connect.Response[v1.SurfaceActResponse], error)
 }
 
 // NewPluginServiceClient constructs a client for the codefoundry.v1.PluginService service. By
@@ -169,6 +193,24 @@ func NewPluginServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(pluginServiceMethods.ByName("Watch")),
 			connect.WithClientOptions(opts...),
 		),
+		watchSurface: connect.NewClient[v1.WatchSurfaceRequest, v1.SurfaceUpdate](
+			httpClient,
+			baseURL+PluginServiceWatchSurfaceProcedure,
+			connect.WithSchema(pluginServiceMethods.ByName("WatchSurface")),
+			connect.WithClientOptions(opts...),
+		),
+		getSurface: connect.NewClient[v1.GetSurfaceRequest, v1.GetSurfaceResponse](
+			httpClient,
+			baseURL+PluginServiceGetSurfaceProcedure,
+			connect.WithSchema(pluginServiceMethods.ByName("GetSurface")),
+			connect.WithClientOptions(opts...),
+		),
+		act: connect.NewClient[v1.SurfaceActRequest, v1.SurfaceActResponse](
+			httpClient,
+			baseURL+PluginServiceActProcedure,
+			connect.WithSchema(pluginServiceMethods.ByName("Act")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -185,6 +227,9 @@ type pluginServiceClient struct {
 	listSecrets  *connect.Client[v1.ListPluginSecretsRequest, v1.ListPluginSecretsResponse]
 	deleteSecret *connect.Client[v1.DeletePluginSecretRequest, v1.DeletePluginSecretResponse]
 	watch        *connect.Client[v1.WatchPluginsRequest, v1.PluginEvent]
+	watchSurface *connect.Client[v1.WatchSurfaceRequest, v1.SurfaceUpdate]
+	getSurface   *connect.Client[v1.GetSurfaceRequest, v1.GetSurfaceResponse]
+	act          *connect.Client[v1.SurfaceActRequest, v1.SurfaceActResponse]
 }
 
 // List calls codefoundry.v1.PluginService.List.
@@ -242,6 +287,21 @@ func (c *pluginServiceClient) Watch(ctx context.Context, req *connect.Request[v1
 	return c.watch.CallServerStream(ctx, req)
 }
 
+// WatchSurface calls codefoundry.v1.PluginService.WatchSurface.
+func (c *pluginServiceClient) WatchSurface(ctx context.Context, req *connect.Request[v1.WatchSurfaceRequest]) (*connect.ServerStreamForClient[v1.SurfaceUpdate], error) {
+	return c.watchSurface.CallServerStream(ctx, req)
+}
+
+// GetSurface calls codefoundry.v1.PluginService.GetSurface.
+func (c *pluginServiceClient) GetSurface(ctx context.Context, req *connect.Request[v1.GetSurfaceRequest]) (*connect.Response[v1.GetSurfaceResponse], error) {
+	return c.getSurface.CallUnary(ctx, req)
+}
+
+// Act calls codefoundry.v1.PluginService.Act.
+func (c *pluginServiceClient) Act(ctx context.Context, req *connect.Request[v1.SurfaceActRequest]) (*connect.Response[v1.SurfaceActResponse], error) {
+	return c.act.CallUnary(ctx, req)
+}
+
 // PluginServiceHandler is an implementation of the codefoundry.v1.PluginService service.
 type PluginServiceHandler interface {
 	// List returns every plugin found, by name.
@@ -272,6 +332,22 @@ type PluginServiceHandler interface {
 	// Watch sends a snapshot, then every change. A client that falls behind gets a new
 	// snapshot.
 	Watch(context.Context, *connect.Request[v1.WatchPluginsRequest], *connect.ServerStream[v1.PluginEvent]) error
+	// WatchSurface holds one surface instance open (docs/notes/plugins-2-surfaces.md): the
+	// first watcher opens it in the plugin (surface/open), the last one leaving hides it
+	// and, after a grace, closes it. It sends the instance's state first, then its current
+	// view (a cached one paints at once), then every new view (coalesced to at most one
+	// per 100 ms), log appends, toasts, and heartbeats while quiet. A surface that is not
+	// available in the context fails with FailedPrecondition.
+	WatchSurface(context.Context, *connect.Request[v1.WatchSurfaceRequest], *connect.ServerStream[v1.SurfaceUpdate]) error
+	// GetSurface opens an instance like WatchSurface, waits up to wait_ms for a view, and
+	// returns it with the actions it offers (the CLI's plugin surface; agents drive
+	// surfaces with it and Act). The instance stays open for the grace afterwards.
+	GetSurface(context.Context, *connect.Request[v1.GetSurfaceRequest]) (*connect.Response[v1.GetSurfaceResponse], error)
+	// Act forwards a user action on a view element (a click, a form submit, a field
+	// change, a tab switch) to the plugin as surface/act and returns once the plugin has
+	// answered; its error is the plugin's message (the GUI toasts it). Command, open-url
+	// and copy actions are the host's and never reach Act.
+	Act(context.Context, *connect.Request[v1.SurfaceActRequest]) (*connect.Response[v1.SurfaceActResponse], error)
 }
 
 // NewPluginServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -347,6 +423,24 @@ func NewPluginServiceHandler(svc PluginServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(pluginServiceMethods.ByName("Watch")),
 		connect.WithHandlerOptions(opts...),
 	)
+	pluginServiceWatchSurfaceHandler := connect.NewServerStreamHandler(
+		PluginServiceWatchSurfaceProcedure,
+		svc.WatchSurface,
+		connect.WithSchema(pluginServiceMethods.ByName("WatchSurface")),
+		connect.WithHandlerOptions(opts...),
+	)
+	pluginServiceGetSurfaceHandler := connect.NewUnaryHandler(
+		PluginServiceGetSurfaceProcedure,
+		svc.GetSurface,
+		connect.WithSchema(pluginServiceMethods.ByName("GetSurface")),
+		connect.WithHandlerOptions(opts...),
+	)
+	pluginServiceActHandler := connect.NewUnaryHandler(
+		PluginServiceActProcedure,
+		svc.Act,
+		connect.WithSchema(pluginServiceMethods.ByName("Act")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/codefoundry.v1.PluginService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case PluginServiceListProcedure:
@@ -371,6 +465,12 @@ func NewPluginServiceHandler(svc PluginServiceHandler, opts ...connect.HandlerOp
 			pluginServiceDeleteSecretHandler.ServeHTTP(w, r)
 		case PluginServiceWatchProcedure:
 			pluginServiceWatchHandler.ServeHTTP(w, r)
+		case PluginServiceWatchSurfaceProcedure:
+			pluginServiceWatchSurfaceHandler.ServeHTTP(w, r)
+		case PluginServiceGetSurfaceProcedure:
+			pluginServiceGetSurfaceHandler.ServeHTTP(w, r)
+		case PluginServiceActProcedure:
+			pluginServiceActHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -422,4 +522,16 @@ func (UnimplementedPluginServiceHandler) DeleteSecret(context.Context, *connect.
 
 func (UnimplementedPluginServiceHandler) Watch(context.Context, *connect.Request[v1.WatchPluginsRequest], *connect.ServerStream[v1.PluginEvent]) error {
 	return connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.PluginService.Watch is not implemented"))
+}
+
+func (UnimplementedPluginServiceHandler) WatchSurface(context.Context, *connect.Request[v1.WatchSurfaceRequest], *connect.ServerStream[v1.SurfaceUpdate]) error {
+	return connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.PluginService.WatchSurface is not implemented"))
+}
+
+func (UnimplementedPluginServiceHandler) GetSurface(context.Context, *connect.Request[v1.GetSurfaceRequest]) (*connect.Response[v1.GetSurfaceResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.PluginService.GetSurface is not implemented"))
+}
+
+func (UnimplementedPluginServiceHandler) Act(context.Context, *connect.Request[v1.SurfaceActRequest]) (*connect.Response[v1.SurfaceActResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.PluginService.Act is not implemented"))
 }

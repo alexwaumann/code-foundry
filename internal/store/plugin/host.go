@@ -190,6 +190,9 @@ func (a *actor) hostInvoke(ctx context.Context, params json.RawMessage) (any, er
 	a.hostLog("host/invoke %s", p.Command)
 	res, err := a.m.opts.Commands.Invoke(ctx, uctx, p.Command, p.Args)
 	if err != nil {
+		if asked, ok := a.askUser(err, p); ok {
+			return asked, nil
+		}
 		return nil, invokeError(err)
 	}
 	out := pluginsdk.CommandResult{Message: res.Message, ExitCode: res.ExitCode}

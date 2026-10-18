@@ -145,6 +145,7 @@ func Run(ctx context.Context, opts Options) error {
 	workspaceAPI := api.NewWorkspace(st.workspace, events)
 	actionAPI := api.NewAction(st.action, events)
 	commands := command.NewRegistry()
+	facts := pluginFacts{thread: st.thread, project: st.project, gh: st.gh}
 	// Plugins start once every command is registered (below), so a starting plugin's
 	// host/invoke finds them; they stop before the stores close (defers run in reverse),
 	// so a last host/invoke still has a registry and stores behind it.
@@ -152,12 +153,13 @@ func Run(ctx context.Context, opts Options) error {
 		Dir: p.Plugins(), DataDir: p.PluginData(), LogDir: p.PluginLogs(),
 		DB: st.db, Commands: commands, Bus: events, Log: log.With("component", "plugins"),
 		Home: st.home, HostVersion: opts.Version.Version, APIEnv: threadEnv(port, token),
+		Facts: facts, Emitter: command.BusEmitter{Bus: events},
 	})
 	if err != nil {
 		return err
 	}
 	defer func() { _ = plugins.Close() }()
-	pluginAPI := api.NewPlugin(plugins, events)
+	pluginAPI := api.NewPlugin(plugins, events).WithSurfaces(plugins)
 	if err := all.Register(commands, all.Deps{
 		Daemon: command.DaemonInfo{
 			PID: os.Getpid(), Version: opts.Version, Started: started, Home: p.Home(), Socket: p.Socket(),
@@ -195,12 +197,14 @@ func Run(ctx context.Context, opts Options) error {
 			GitHubSlug: func(c command.Context) string { return st.gitops.GitHubSlug(c.ActiveProjectID, c.ActiveWorktreePath) },
 			LocalOnly:  func(c command.Context) bool { return st.gitops.LocalOnly(c.ActiveProjectID, c.ActiveWorktreePath) },
 		},
-		Gh:        ghAPI,
-		Settings:  settingsAPI,
-		Update:    updateAPI,
-		Workspace: workspaceAPI,
-		Action:    actionAPI,
-		Plugin:    pluginAPI,
+		Gh:                ghAPI,
+		Settings:          settingsAPI,
+		Update:            updateAPI,
+		Workspace:         workspaceAPI,
+		Action:            actionAPI,
+		Plugin:            pluginAPI,
+		PluginSurface:     pluginAPI,
+		PullRequestChecks: command.PullRequestChecksDeps{Gh: ghAPI, ThreadPullRequest: facts.threadPullRequest},
 		Restart: func() {
 			// Let the command's response reach the caller first.
 			time.AfterFunc(restartDelay, func() { restart(errRestartRequested) })
