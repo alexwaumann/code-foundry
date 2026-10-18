@@ -39,6 +39,8 @@ export interface ThreadView {
   worktreePath: string;
   name: string;
   autoNamed: boolean;
+  /** name is provisional: the daemon took it from the first prompt; the naming model's title replaces it. Shown muted and italic. */
+  nameProvisional: boolean;
   model: string;
   effort: string;
   state: ThreadStateView;
@@ -297,6 +299,7 @@ export function toThreadView(s: Thread): ThreadView {
     worktreePath: s.worktreePath,
     name: s.name,
     autoNamed: s.autoNamed,
+    nameProvisional: s.nameProvisional,
     model: s.model,
     effort: s.effort,
     state: stateMap[s.state],

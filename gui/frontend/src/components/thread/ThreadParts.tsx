@@ -4,6 +4,7 @@ import { CommandButton } from "@/components/command/CommandButton";
 import { NoGitBadge } from "@/components/projects/NoGitBadge";
 import { Tip } from "@/components/ui/tooltip";
 import { threadRowModel, type WorkspaceLookup } from "@/lib/threadRow";
+import { cn } from "@/lib/utils";
 import { useCreator } from "@/stores/lineage";
 import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
@@ -18,12 +19,14 @@ const NO_WORKSPACES: WorkspaceLookup = { byId: {} };
  */
 function ThreadName({ id }: { id: string }) {
   const name = useThreadsStore((s) => s.byId[id]?.name || id);
+  // The daemon's cut of the first prompt until the naming model's title lands: muted and italic, as in the sidebar.
+  const provisional = useThreadsStore((s) => s.byId[id]?.nameProvisional ?? false);
   return (
     <CommandButton
       command="thread.rename"
       whenUnavailable="plain"
       size="xs"
-      className="-ml-1.5 flex h-6 min-w-0 shrink items-center rounded-md px-1.5 text-label text-foreground"
+      className={cn("-ml-1.5 flex h-6 min-w-0 shrink items-center rounded-md px-1.5 text-label text-foreground", provisional && "text-muted-foreground italic")}
       data-testid="thread-title"
     >
       <span className="truncate">{name}</span>

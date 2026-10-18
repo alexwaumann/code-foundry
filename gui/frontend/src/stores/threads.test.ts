@@ -19,6 +19,7 @@ function thread(id: string, over: Partial<ThreadView> = {}): ThreadView {
     worktreePath: "/src/app",
     name: id,
     autoNamed: true,
+    nameProvisional: false,
     model: "opus",
     effort: "high",
     state: "connected",

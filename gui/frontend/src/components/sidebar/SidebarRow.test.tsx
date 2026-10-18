@@ -80,6 +80,21 @@ describe("SidebarRow running agents", () => {
   });
 });
 
+describe("SidebarRow provisional name", () => {
+  it.each([
+    ["provisional: the name, muted and italic", { name: "fix the login redirect", nameProvisional: true }, "fix the login redirect", true, true],
+    ["the naming model's title: plain", { name: "Fix the login redirect", nameProvisional: false }, "Fix the login redirect", false, false],
+    ["unnamed: the id, muted, not italic", { name: "", nameProvisional: false }, "s-1", true, false],
+  ])("%s", (_name, o, text, muted, italic) => {
+    renderRow(o);
+    const el = screen.getByTestId("thread-name");
+    expect(el.textContent).toBe(text);
+    expect(el.className.includes("text-muted-foreground")).toBe(muted);
+    expect(el.className.includes("italic")).toBe(italic);
+    expect(el.getAttribute("data-provisional")).toBe(italic ? "true" : null);
+  });
+});
+
 describe("SidebarRow archived", () => {
   function renderArchived(o: Partial<ThreadView>): HTMLElement {
     useThreadsStore.setState({ byId: { "s-1": thread({ state: "disconnected", status: "attention", statusReason: "finished", ...o }) }, order: ["s-1"] });

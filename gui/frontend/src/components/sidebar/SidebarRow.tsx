@@ -241,9 +241,19 @@ function MadeByThreadGlyph({ id }: { id: string }) {
   return <CornerDownRight className="-mr-px size-3 shrink-0 text-muted-foreground opacity-85" aria-label="Created by a thread" data-testid="row-created-by" />;
 }
 
+/**
+ * The name's look: the id stands in, muted, while there is no name; a provisional name
+ * (the daemon's cut of the first prompt, until the naming model's title lands) is muted
+ * and italic.
+ */
+function nameClass(name: string, provisional: boolean): string {
+  return cn("truncate", (!name || provisional) && "text-muted-foreground", provisional && "italic");
+}
+
 function ThreadLabel({ id }: { id: string }) {
   // Unnamed until the daemon names it from the first prompt: the id stands in.
   const name = useThreadsStore((s) => s.byId[id]?.name ?? "");
+  const provisional = useThreadsStore((s) => s.byId[id]?.nameProvisional ?? false);
   const pinned = useThreadsStore((s) => s.byId[id]?.pinned ?? false);
   const renaming = useUiStore((s) => s.renamingThreadId === id);
   return (
@@ -255,7 +265,7 @@ function ThreadLabel({ id }: { id: string }) {
         ) : (
           <>
             <MadeByThreadGlyph id={id} />
-            <span className={cn("truncate", !name && "text-muted-foreground")} data-testid="thread-name">
+            <span className={nameClass(name, provisional)} data-testid="thread-name" data-provisional={provisional || undefined}>
               {name || id}
             </span>
             <span className="ml-auto flex min-w-0 shrink-0 items-center gap-1 pl-1">
@@ -509,6 +519,7 @@ function SnoozeLeft({ id }: { id: string }) {
  */
 function SingleLineLabel({ id, section }: { id: string; section: "archived" | "snoozed" }) {
   const name = useThreadsStore((s) => s.byId[id]?.name ?? "");
+  const provisional = useThreadsStore((s) => s.byId[id]?.nameProvisional ?? false);
   const renaming = useUiStore((s) => s.renamingThreadId === id);
   return (
     <span className="flex min-w-0 flex-1 items-center gap-1.5" data-testid="thread-body" data-archived={section === "archived" || undefined} data-snoozed={section === "snoozed" || undefined}>
@@ -517,7 +528,7 @@ function SingleLineLabel({ id, section }: { id: string; section: "archived" | "s
       ) : (
         <>
           <MadeByThreadGlyph id={id} />
-          <span className={cn("truncate", !name && "text-muted-foreground")} data-testid="thread-name">
+          <span className={nameClass(name, provisional)} data-testid="thread-name" data-provisional={provisional || undefined}>
             {name || id}
           </span>
           {section === "archived" ? <ArchivedAge id={id} /> : <SnoozeLeft id={id} />}
