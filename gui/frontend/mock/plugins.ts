@@ -16,7 +16,8 @@
  * Controls (mock/server.ts): POST /__mock/plugin/state?name=hello&state=crashed|running|failed
  * (the plugin goes down or comes back; its open surfaces follow), POST /__mock/plugin/toast?text=…
  * (a view/toast without an instance: a Notify intent), POST /__mock/plugin/invoke?command=…
- * (a host/invoke with confirm "ask": an InvokeCommand intent), GET /__mock/plugin/acts.
+ * (a host/invoke with confirm "ask": an InvokeCommand intent), POST /__mock/plugin/demotab?tab=…
+ * (the demo shows a tab, "stress" included: two threads and a terminal), GET /__mock/plugin/acts.
  */
 import { readFileSync } from "node:fs";
 import type { MessageInitShape } from "@bufbuild/protobuf";
@@ -236,7 +237,18 @@ class DemoInstance {
 
   render(): void {
     const shift = this.openedAt - CAPTURED_AT;
-    const v = shiftTimes(fixture(this.tab), shift) as Record<string, unknown>;
+    // "stress" (POST /__mock/plugin/demotab?tab=stress; not in the captured views): two
+    // thread nodes and a terminal in one view, more live streams than the GUI's budget.
+    const v = shiftTimes(fixture(this.tab === "stress" ? "assistant" : this.tab), shift) as Record<string, unknown>;
+    if (this.tab === "stress") {
+      (v.tabs as { items: { key: string; label: string }[] }).items.push({ key: "stress", label: "Stress" });
+      v.nodes = [
+        { key: "stress-a", thread: { threadId: HELLO_THREAD, height: 200 } },
+        { key: "stress-b", thread: { threadId: "s-1", readOnly: true, height: 200 } },
+        { key: "stress-t", terminal: { terminalId: HELLO_TERMINAL, title: "Clock", rows: 6 } },
+        { key: "stress-bar", actions: { buttons: [{ key: "click", label: "Click", action: { event: "click" } }] } },
+      ];
+    }
     const header = v.header as Record<string, unknown>;
     header.trailing = { spans: [{ text: `${String(this.clicks)} ${this.clicks === 1 ? "click" : "clicks"}`, tone: "muted" }] };
     const subline = header.subline as { spans: { text?: string; mono?: boolean }[] };
@@ -649,6 +661,15 @@ export class MockPlugins {
     if (s.scope === "thread" && !(ctx?.activeThreadId && this.deps.threadExists(ctx.activeThreadId))) return false;
     if (p.name === "hello" && s.id === "pinned") return this.pinned.has(ctx?.activeThreadId ?? "");
     return s.when ? s.when(ctx) : true;
+  }
+
+  /** Every open hello demo instance switches to `tab` (POST /__mock/plugin/demotab), as if the plugin did. */
+  demoTab(tab: string): void {
+    for (const inst of this.instances.values()) {
+      if (!inst.key.startsWith("hello/demo/")) continue;
+      inst.tab = tab;
+      inst.render();
+    }
   }
 
   /** The plugin goes down or comes back (POST /__mock/plugin/state); open instances follow. */

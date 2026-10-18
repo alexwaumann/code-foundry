@@ -18,6 +18,7 @@ import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 import { invalidateOnTransportError } from "@/api/endpoint";
 import { runStream, type StreamStatus } from "@/api/stream";
+import { resettleStreamSlots, type StreamPriority } from "@/api/streamSlots";
 import type { AgentRunView } from "@/api/agents";
 import type { McpStatusView } from "@/api/mcp";
 import { shareCommands, type SlashCommandView } from "@/api/slashCommands";
@@ -277,8 +278,8 @@ function keepRecent(threadId: string): void {
   if (drop.size > 0) pruneThreadLogs((id) => !drop.has(id));
 }
 
-/** The open Watches by thread: how many views hold each, and how to end it. */
-const openWatches = new Map<string, { holders: number; stop: () => void }>();
+/** The open Watches by thread: how many views hold each (and how many of them are core), and how to end it. */
+const openWatches = new Map<string, { holders: number; core: number; stop: () => void }>();
 
 /** How many Watches are open (one per thread on screen). */
 export function openThreadWatches(): number {
@@ -289,24 +290,37 @@ export function openThreadWatches(): number {
  * Holds the Watch of a thread a view shows, opening it for the first holder and keeping
  * it open (reconnecting with backoff) until the last one calls the returned function: one
  * stream per thread, however many views show it. Calling the release twice is harmless.
+ * `priority` is the holder's stream priority (api/streamSlots.ts): a plugin's thread node
+ * holds "inline"; the Watch is core while any core holder (the content pane) holds it.
  */
-export function startThreadWatch(threadId: string): () => void {
+export function startThreadWatch(threadId: string, priority: StreamPriority = "core"): () => void {
+  const core = priority === "core" ? 1 : 0;
   const held = openWatches.get(threadId);
-  if (held) held.holders++;
-  else openWatches.set(threadId, { holders: 1, stop: openThreadWatch(threadId) });
+  if (held) {
+    held.holders++;
+    held.core += core;
+    // A core holder may lift a waiting inline Watch ahead of the queue.
+    if (core) resettleStreamSlots();
+  } else {
+    const w: { holders: number; core: number; stop: () => void } = { holders: 1, core, stop: () => undefined };
+    openWatches.set(threadId, w);
+    w.stop = openThreadWatch(threadId, () => (w.core > 0 ? "core" : "inline"));
+  }
   let released = false;
   return () => {
     if (released) return;
     released = true;
     const w = openWatches.get(threadId);
-    if (!w || --w.holders > 0) return;
+    if (!w) return;
+    w.core -= core;
+    if (--w.holders > 0) return;
     openWatches.delete(threadId);
     w.stop();
   };
 }
 
 /** Opens one thread's Watch; the returned function ends it. */
-function openThreadWatch(threadId: string): () => void {
+function openThreadWatch(threadId: string, priority: () => StreamPriority): () => void {
   keepRecent(threadId);
   let queue: ThreadEventView[] = [];
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -323,6 +337,7 @@ function openThreadWatch(threadId: string): () => void {
   };
   const stop = runStream<ThreadEventView>({
     open: (signal) => watchThread(threadId, signal),
+    slot: { label: `thread:${threadId}`, priority },
     // WKWebView can hold the tail of the stream after the window was hidden, minimized or
     // covered (docs/notes/thread-render-stall.md): a fresh Watch's snapshot catches up at
     // once on return, as leaving and reopening the thread does.
