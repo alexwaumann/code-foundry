@@ -22,6 +22,9 @@ type SpawnInfo struct {
 	WorkspaceID      string
 	MemberProjectIDs []string
 	NoProject        bool
+	// Owner is the thread's owner ("plugin:<name>"; Thread.Owner): that plugin's session
+	// environment is left out, since the thread brings its own (Thread.SpawnEnv).
+	Owner string
 	// Wait allows a short wait for a contributor still starting (spawn: true; the effort
 	// restart runs on the runner goroutine and passes false: it must never block).
 	Wait bool
@@ -54,7 +57,7 @@ func (m *Manager) SetSpawnExtras(fn SpawnExtrasFunc) {
 func spawnInfoOf(s Thread, members []string, wait bool) SpawnInfo {
 	return SpawnInfo{
 		ThreadID: s.ID, ProjectID: s.ProjectID, WorkspaceID: s.WorkspaceID, MemberProjectIDs: members,
-		NoProject: s.ProjectID == "" && s.WorkspaceID == "", Wait: wait,
+		NoProject: s.ProjectID == "" && s.WorkspaceID == "", Wait: wait, Owner: s.Owner,
 	}
 }
 

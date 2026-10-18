@@ -483,7 +483,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 	s := Thread{
 		ID: id, Name: name, Model: o.Model, Effort: o.Effort, PermissionMode: o.PermissionMode, State: StateStarting,
 		CreatedBy: creatorID, CreatedByName: creatorName, Brief: brief, Labels: labels, BudgetUSD: o.BudgetUSD,
-		Owner: owner,
+		Owner: owner, SpawnEnv: slices.Clone(o.Env), SpawnAddDirs: slices.Clone(o.AddDirs),
 	}
 	namingTried := name != ""
 	var late <-chan namingResult
@@ -804,6 +804,11 @@ func (m *Manager) claudeCommand(ctx context.Context, s Thread, l launch, g grant
 	}
 	x := m.extras(ctx, spawnInfoOf(s, members, wait))
 	sa.addDirs = append(sa.addDirs, x.AddDirs...)
+	for _, d := range s.SpawnAddDirs { // the thread's own, after the plugins' (owner.go)
+		if !slices.Contains(sa.addDirs, d) && isDir(d) {
+			sa.addDirs = append(sa.addDirs, d)
+		}
+	}
 	if m.opts.AttachmentsDir != "" {
 		// Every spawn (not only the first prompt's): a resumed or forked conversation
 		// may read its images again.
@@ -812,6 +817,7 @@ func (m *Manager) claudeCommand(ctx context.Context, s Thread, l launch, g grant
 	sa.addDirs = append(sa.addDirs, wl.addDirs...)
 	sa.addDirs = append(sa.addDirs, g.dirs...)
 	env = append(slices.Clip(env), x.Env...)
+	env = append(env, s.SpawnEnv...)
 	if p := prependPath(env, x.PathPrepend, os.Getenv("PATH")); p != "" {
 		env = append(env, p)
 	}

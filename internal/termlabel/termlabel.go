@@ -15,6 +15,12 @@
 //     same owner labels as a shell (Thread, Project, Worktree), plus Action (the action's
 //     id), ActionName (its name when it started) and ActionRun (the run's id).
 //
+// A plugin's terminal (terminal/create; docs/notes/plugins-6-thread-terminal.md) has Kind
+// = KindPlugin, Plugin = the plugin's name and Title = the title it gave. It belongs to
+// the plugin, not to a thread or worktree: the plugin's surfaces show it, and the bottom
+// panel shows it only when the user opens it there. It is closed when the plugin is
+// disabled or uninstalled; terminal.close and the shell reaper leave it alone.
+//
 // Claude itself never runs in a terminal. A terminal without labels
 // (TerminalService.Create called directly) belongs to nothing.
 package termlabel
@@ -36,6 +42,10 @@ const (
 	// ActionRun is the id of the run (ActionService's ActionRun) a KindAction terminal
 	// belongs to.
 	ActionRun = "action.run"
+	// Plugin is the name of the plugin a KindPlugin terminal belongs to; Title is the
+	// title it gave the terminal (a tab title).
+	Plugin = "plugin"
+	Title  = "title"
 )
 
 // KindShell is Kind's value on a shell started by terminal.new. The daemon removes such a
@@ -47,6 +57,17 @@ const KindShell = "shell"
 // when it exits (EXITED, so the user can read the output; the GUI closes it), but it is
 // killed and removed with its thread, worktree or project exactly like a shell.
 const KindAction = "action"
+
+// KindPlugin is Kind's value on a plugin's terminal.
+const KindPlugin = "plugin"
+
+// IsPlugin reports whether labels mark a plugin's terminal.
+func IsPlugin(labels map[string]string) bool { return labels[Kind] == KindPlugin }
+
+// PluginTerminal returns the labels of a terminal plugin name owns, titled title.
+func PluginTerminal(name, title string) map[string]string {
+	return map[string]string{Kind: KindPlugin, Plugin: name, Title: title}
+}
 
 // IsShell reports whether labels mark a shell started by terminal.new.
 func IsShell(labels map[string]string) bool { return labels[Kind] == KindShell }

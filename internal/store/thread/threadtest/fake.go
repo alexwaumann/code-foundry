@@ -187,6 +187,7 @@ func (f *Fake) Create(_ context.Context, o thread.CreateOptions) (thread.Thread,
 		call += " owner=" + o.Owner
 		s.Owner = o.Owner
 	}
+	s.SpawnEnv, s.SpawnAddDirs = slices.Clone(o.Env), slices.Clone(o.AddDirs)
 	if o.InitialPrompt != "" {
 		call += " prompt=" + o.InitialPrompt
 	}
