@@ -47,11 +47,14 @@ func TestSettingsCommands(t *testing.T) {
 		wantCode connect.Code
 	}{
 		{name: "get one", cmd: "settings.get", args: map[string]string{"key": "appearance.font_size"}, wantMsg: "13",
-			wantJSON: `{"key":"appearance.font_size","value":"13","default":"13"}`},
-		{name: "get all", cmd: "settings.get", wantMsg: `appearance.theme = "system"`, wantJSON: `"key":"keybindings.thread.new","value":"cmd+n"`},
+			wantJSON: `{"key":"appearance.font_size","value":"13","default":"13","title":"Font size","description":"Size of terminal text, before zoom.","type":"int"}`},
+		{name: "get all", cmd: "settings.get", wantMsg: `appearance.theme = "system"`,
+			wantJSON: `{"key":"keybindings.thread.new","value":"cmd+n","default":"cmd+n","title":"New Thread","description":"","type":"keybinding"}`},
+		{name: "get all: an enum", cmd: "settings.get",
+			wantJSON: `{"key":"appearance.theme","value":"system","default":"system","title":"Scheme","description":"Dark or light. System follows the macOS appearance.","type":"enum"}`},
 		{name: "get unknown", cmd: "settings.get", args: map[string]string{"key": "nope.nope"}, wantErr: command.ErrInvalidArgs},
 		{name: "set", cmd: "settings.set", args: map[string]string{"key": "appearance.font_size", "value": "15"},
-			wantMsg: `appearance.font_size = "15"`},
+			wantMsg: `appearance.font_size = "15"`, wantJSON: `"value":"15","default":"13","title":"Font size"`},
 		{name: "set restart field notes it", cmd: "settings.set", args: map[string]string{"key": "threads.scrollback_lines", "value": "20000"},
 			wantMsg: "(applies after a daemon restart)"},
 		{name: "set keybinding", cmd: "settings.set", args: map[string]string{"key": "keybindings.thread.new", "value": "Shift+Cmd+N"},

@@ -38,11 +38,26 @@ func RevealInFinder(ctx context.Context, path string) error {
 	return nil
 }
 
-// SettingValue is one entry of settings.get's JSON result.
+// SettingValue is one entry of settings.get's JSON result (and settings.set's and
+// settings.reset's): the value with what the schema says about the setting, so an
+// agent can explain it without reading the settings page.
 type SettingValue struct {
-	Key     string `json:"key"`
-	Value   string `json:"value"`
-	Default string `json:"default"`
+	Key         string `json:"key"`
+	Value       string `json:"value"`
+	Default     string `json:"default"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	// Type is the SettingType's lower-case name: string, int, bool, enum, path or
+	// keybinding.
+	Type string `json:"type"`
+}
+
+// settingValue is f's SettingValue with value v.
+func settingValue(f *v1.SettingField, v string) SettingValue {
+	return SettingValue{
+		Key: f.GetKey(), Value: v, Default: f.GetDefaultValue(), Title: f.GetTitle(), Description: f.GetDescription(),
+		Type: strings.ToLower(strings.TrimPrefix(f.GetType().String(), "SETTING_TYPE_")),
+	}
 }
 
 // Views the GUI knows how to show (UiIntent.ShowView.name).
@@ -106,13 +121,13 @@ func RegisterSettings(r *Registry, b SettingsBackend, e Emitter, reveal RevealFu
 				vals := res.Msg.GetSettings().GetValues()
 				if f != nil {
 					v := vals[key]
-					return Result{Message: v, JSON: SettingValue{Key: key, Value: v, Default: f.GetDefaultValue()}}, nil
+					return Result{Message: v, JSON: settingValue(f, v)}, nil
 				}
 				var sb strings.Builder
 				out := make([]SettingValue, 0, len(fields))
 				for _, f := range fields {
 					v := vals[f.GetKey()]
-					out = append(out, SettingValue{Key: f.GetKey(), Value: v, Default: f.GetDefaultValue()})
+					out = append(out, settingValue(f, v))
 					fmt.Fprintf(&sb, "%s = %q\n", f.GetKey(), v)
 				}
 				return Result{Message: strings.TrimRight(sb.String(), "\n"), JSON: out}, nil
@@ -137,7 +152,7 @@ func RegisterSettings(r *Registry, b SettingsBackend, e Emitter, reveal RevealFu
 					return Result{}, err
 				}
 				v := res.Msg.GetSettings().GetValues()[key]
-				return Result{Message: fmt.Sprintf("%s = %q%s", key, v, restartNote(f)), JSON: SettingValue{Key: key, Value: v, Default: f.GetDefaultValue()}}, nil
+				return Result{Message: fmt.Sprintf("%s = %q%s", key, v, restartNote(f)), JSON: settingValue(f, v)}, nil
 			},
 		},
 		Command{
@@ -158,7 +173,7 @@ func RegisterSettings(r *Registry, b SettingsBackend, e Emitter, reveal RevealFu
 					return Result{}, err
 				}
 				v := res.Msg.GetSettings().GetValues()[key]
-				return Result{Message: fmt.Sprintf("%s = %q (default)%s", key, v, restartNote(f)), JSON: SettingValue{Key: key, Value: v, Default: f.GetDefaultValue()}}, nil
+				return Result{Message: fmt.Sprintf("%s = %q (default)%s", key, v, restartNote(f)), JSON: settingValue(f, v)}, nil
 			},
 		},
 		Command{
