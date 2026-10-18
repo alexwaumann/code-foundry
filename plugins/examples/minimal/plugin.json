@@ -1,0 +1,18 @@
+{
+  "name": "minimal",
+  "displayName": "Minimal",
+  "version": "0.1.0",
+  "description": "The smallest complete Code Foundry plugin: one command and one side-panel surface per thread.",
+  "protocol": 1,
+  "exec": ["bin/minimal"],
+  "permissions": {},
+  "commands": [
+    {
+      "name": "hello",
+      "title": "Say Hello",
+      "description": "Answer with a greeting.",
+      "args": [{ "name": "name", "positional": true, "default": "world", "description": "Who to greet" }]
+    }
+  ],
+  "surfaces": [{ "id": "status", "title": "Minimal", "icon": "sparkles", "scope": "thread" }]
+}
