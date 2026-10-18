@@ -58,8 +58,9 @@ with one change: a multi-line comment field with Cancel and Save at the bottom r
   the prompt; the body (quote, comment, source thread and item, offsets, prefix, suffix)
   in `Draft.citations`, kept in memory like attachments, never pruned while the draft
   lives (undo brings a deleted chip back with its body), gone with the draft. Label: the
-  first 4 words of the quote cut at 24 characters, an ellipsis when anything was cut
-  (`The fingerprint then mat…`). Tooltip: the quote, then the comment muted. Not
+  first 4 words of the quote, at most 24 characters: cut at the last word boundary within
+  them when that keeps at least 12, else mid-word; an ellipsis when anything was cut
+  (`The fingerprint then…`; review: the first cut was mid-word, `The fingerprint then mat…`). Tooltip: the quote, then the comment muted. Not
   project-scoped (member changes keep it). A token whose body no draft has (copied from a
   composer that has sent it) is dashed and left out of the message; a token copied to
   another composer while its draft lives finds its body there (`findCitation`).
@@ -122,7 +123,7 @@ clicks and drags.
 * Dragging over "The fingerprint then matches the old value" showed Cite 6px under the
   line, centred where the pointer let go. Cite turned into the popover in place, the
   selection painted while the field had the keyboard; a two-line comment, Enter: the chip
-  `The fingerprint then mat…` at the caret. A second citation of the bold lead-in
+  `The fingerprint then mat…` at the caret (now `The fingerprint then…`). A second citation of the bold lead-in
   "Fingerprint the full state:" with no comment.
 * A click on the first chip: the quote amber and underlined, the chip ringed, the comment
   prefilled and focused; Escape returned to the prompt.

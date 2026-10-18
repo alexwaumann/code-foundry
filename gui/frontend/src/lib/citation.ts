@@ -27,8 +27,10 @@ export const CITE_LABEL = "Assistant quote";
 export const CITE_CONTEXT = 32;
 /** The chip label: at most this many words of the quote … */
 export const CITE_LABEL_WORDS = 4;
-/** … and at most this many characters. */
+/** … and at most this many characters, … */
 export const CITE_LABEL_CHARS = 24;
+/** … cut at the last word boundary within them when that keeps at least this many (else mid-word). */
+export const CITE_LABEL_MIN_CHARS = 12;
 
 /** Where a citation came from and what it says (everything the sent link carries). */
 export interface CitationBody {
@@ -66,9 +68,10 @@ export function citeToken(id: string): string {
 }
 
 /**
- * The chip's label: the first CITE_LABEL_WORDS words of the quote, cut at
- * CITE_LABEL_CHARS characters, with an ellipsis when anything was cut. "Quote" for an
- * empty one.
+ * The chip's label: the first CITE_LABEL_WORDS words of the quote, at most
+ * CITE_LABEL_CHARS characters (cut at the last word boundary within them when that keeps
+ * at least CITE_LABEL_MIN_CHARS, else mid-word), with an ellipsis when anything was cut.
+ * "Quote" for an empty one.
  */
 export function citeLabel(quote: string): string {
   const words = quote.trim().split(/\s+/).filter(Boolean);
@@ -76,7 +79,9 @@ export function citeLabel(quote: string): string {
   let chars = Array.from(words.slice(0, CITE_LABEL_WORDS).join(" "));
   let cut = words.length > CITE_LABEL_WORDS;
   if (chars.length > CITE_LABEL_CHARS) {
-    chars = chars.slice(0, CITE_LABEL_CHARS);
+    // A space right after the limit is a boundary too: the word before it fits whole.
+    const space = chars.slice(0, CITE_LABEL_CHARS + 1).lastIndexOf(" ");
+    chars = chars.slice(0, space >= CITE_LABEL_MIN_CHARS ? space : CITE_LABEL_CHARS);
     cut = true;
   }
   const label = chars.join("").trimEnd();
