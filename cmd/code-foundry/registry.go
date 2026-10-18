@@ -5,7 +5,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"path/filepath"
 	"strings"
 	"text/tabwriter"
@@ -167,7 +166,7 @@ func (cl *cli) runRegistry(ctx context.Context, args []string) error {
 		return err
 	}
 	fs := cl.newFlagSet(cmd.GetName())
-	fs.Usage = func() { printCommandHelp(cl.stderr, cmd) }
+	fs.Usage = func() { guide.WriteHelp(cl.stderr, cmd, true) }
 	flags := make([]*argFlag, len(cmd.GetArgs()))
 	for i, a := range cmd.GetArgs() {
 		flags[i] = &argFlag{spec: a}
@@ -331,39 +330,6 @@ func (cl *cli) commandHelp(ctx context.Context, words []string) error {
 		fmt.Fprintf(cl.stderr, "code-foundry help: unexpected arguments %v\n", rest)
 		return errUsage
 	}
-	printCommandHelp(cl.stdout, cmd)
+	guide.WriteHelp(cl.stdout, cmd, true)
 	return nil
-}
-
-func printCommandHelp(w io.Writer, cmd *v1.Command) {
-	name := cmd.GetName()
-	fmt.Fprintf(w, "%s - %s\n", name, cmd.GetTitle())
-	if d := cmd.GetDescription(); d != "" {
-		fmt.Fprintf(w, "\n%s\n", d)
-	}
-	pos := positionalUsage(cmd)
-	fmt.Fprintf(w, "\nUsage:\n  code-foundry %s%s [flags]\n  code-foundry %s%s [flags]\n",
-		name, pos, strings.ReplaceAll(name, ".", " "), pos)
-
-	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	if len(cmd.GetArgs()) > 0 {
-		fmt.Fprintln(tw, "\nFlags:")
-		for _, a := range cmd.GetArgs() {
-			fmt.Fprintf(tw, "  --%s %s\t%s\n", a.GetName(), guide.ArgPlaceholder(a), guide.ArgDetail(a))
-		}
-	}
-	fmt.Fprintln(tw, "\nCommon flags:")
-	fmt.Fprintln(tw, "  --json\tprint the structured result as JSON")
-	if cmd.GetRequiresConfirmation() {
-		fmt.Fprintln(tw, "  --yes\tdo not ask for confirmation (required without a terminal)")
-	}
-	fmt.Fprintln(tw, "  --context-terminal id\tactive terminal, for availability and defaults")
-	fmt.Fprintln(tw, "  --context-thread id\tactive thread (default $"+paths.EnvThread+", set in a thread's Claude process)")
-	fmt.Fprintln(tw, "  --context-project id\tactive project")
-	fmt.Fprintln(tw, "  --context-worktree path\tactive worktree")
-	fmt.Fprintln(tw, "  --context-workspace id\tactive workspace")
-	_ = tw.Flush()
-	if kb := cmd.GetKeybindings(); len(kb) > 0 {
-		fmt.Fprintf(w, "\nKeybindings: %s\n", strings.Join(kb, ", "))
-	}
 }
