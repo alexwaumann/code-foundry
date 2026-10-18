@@ -57,6 +57,10 @@ const (
 // KeyPattern is the shape of every key. Keys share one namespace across the view.
 var KeyPattern = regexp.MustCompile(`^[A-Za-z0-9._:-]{1,64}$`)
 
+// StorePattern is the shape of a secret input's store: a key the host's secret store
+// takes (a key without ":").
+var StorePattern = regexp.MustCompile(`^[A-Za-z0-9._-]{1,64}$`)
+
 var iconPattern = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 
 // Validate checks v against the schema's rules and limits. The error joins one error per
@@ -95,12 +99,13 @@ func (v View) Validate() error {
 }
 
 type checker struct {
-	errs     []error
-	problems int
-	keys     map[string]string // key → path of its first use
-	elements int
-	logs     int
-	logBytes int
+	errs      []error
+	problems  int
+	formNames map[string]string // the current form's field names → path
+	keys      map[string]string // key → path of its first use
+	elements  int
+	logs      int
+	logBytes  int
 }
 
 // bad records a problem; past MaxProblems it only counts it (a view of thousands of bad
@@ -508,6 +513,7 @@ func (c *checker) log(path string, l *Log) {
 }
 
 func (c *checker) form(path string, f *Form) {
+	c.formNames = map[string]string{}
 	secret := false
 	for i, fl := range f.Fields {
 		if c.field(fmt.Sprintf("%s.fields[%d]", path, i), fl, false) {
@@ -567,6 +573,13 @@ func (c *checker) field(path string, f Field, inFieldset bool) bool {
 		return secret
 	}
 	c.required(path+".name", f.Name)
+	if first, dup := c.formNames[f.Name]; dup && f.Name != "" {
+		// The values are keyed by name: one field's value (or a secret's store) would
+		// silently stand for the other's.
+		c.bad(path+".name", "%q is already the name of %s in this form", f.Name, first)
+	} else {
+		c.formNames[f.Name] = path
+	}
 	switch {
 	case f.Input != nil:
 		in := f.Input
@@ -588,8 +601,8 @@ func (c *checker) field(path string, f Field, inFieldset bool) bool {
 			if in.Value != "" {
 				c.bad(p+".value", "a secret input never carries its value")
 			}
-			if in.Store != "" && !KeyPattern.MatchString(in.Store) {
-				c.bad(p+".store", "%q must match %s", in.Store, KeyPattern)
+			if in.Store != "" && !StorePattern.MatchString(in.Store) {
+				c.bad(p+".store", "%q must match %s", in.Store, StorePattern)
 			}
 			if f.Change != nil {
 				c.bad(path+".change", "a secret input sends no change events")
