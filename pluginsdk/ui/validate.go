@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"regexp"
 	"slices"
 	"strings"
@@ -40,6 +41,14 @@ const (
 	// panel").
 	MaxTerminalButtons = 2
 	MaxBarButtons      = 6
+	// A command action's args: how many, their names and values together (bytes), and
+	// one value (bytes). Pass ids in args, not text: the command looks the rest up.
+	MaxCommandArgs      = 16
+	MaxCommandArgsBytes = 4 << 10
+	MaxCommandArgValue  = 2 << 10
+	// MaxActValues bounds an action's form values as the host gets them (encoded JSON):
+	// a bigger submit is refused before it reaches the plugin.
+	MaxActValues = 64 << 10
 )
 
 // KeyPattern is the shape of every key. Keys share one namespace across the view.
@@ -220,6 +229,7 @@ func (c *checker) action(path string, a *Action) {
 	if a.Command != nil {
 		kinds++
 		c.required(path+".command.name", a.Command.Name)
+		c.commandArgs(path+".command.args", a.Command.Args)
 	}
 	if a.OpenURL != "" {
 		kinds++
@@ -239,6 +249,25 @@ func (c *checker) action(path string, a *Action) {
 	}
 	if len(a.Data) > MaxEventData {
 		c.bad(path+".data", "%d bytes, at most %d", len(a.Data), MaxEventData)
+	}
+}
+
+// commandArgs checks a command action's args against MaxCommandArgs,
+// MaxCommandArgsBytes and MaxCommandArgValue.
+func (c *checker) commandArgs(path string, args map[string]string) {
+	if len(args) > MaxCommandArgs {
+		c.bad(path, "%d args, at most %d", len(args), MaxCommandArgs)
+	}
+	total := 0
+	for _, k := range slices.Sorted(maps.Keys(args)) {
+		v := args[k]
+		total += len(k) + len(v)
+		if len(v) > MaxCommandArgValue {
+			c.bad(path+"."+k, "%d bytes, at most %d", len(v), MaxCommandArgValue)
+		}
+	}
+	if total > MaxCommandArgsBytes {
+		c.bad(path, "%d bytes of names and values, at most %d (pass ids, not text)", total, MaxCommandArgsBytes)
 	}
 }
 

@@ -413,6 +413,8 @@ func TestSurfaceActs(t *testing.T) {
 		{"wrong action", plugin.ActRequest{Key: "inc", Action: "save"}, plugin.ErrInvalidArgument, `not "save"`},
 		{"plugin error", plugin.ActRequest{Key: "fail"}, plugin.ErrPluginRefused, "it broke"},
 		{"old version", plugin.ActRequest{Key: "inc", Version: 999}, plugin.ErrFailedPrecondition, "is gone"},
+		{"values too big", plugin.ActRequest{Action: "save", Values: map[string]any{"name": strings.Repeat("x", ui.MaxActValues)}},
+			plugin.ErrInvalidArgument, "values are over 65536 bytes"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

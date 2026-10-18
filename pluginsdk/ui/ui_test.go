@@ -133,6 +133,21 @@ func TestValidateRejects(t *testing.T) {
 		{"event data too big", func(v *View) {
 			v.Nodes = append(v.Nodes, NewActions("a", Button{Key: "b", Label: "B", Action: EventAction("e", strings.Repeat("x", MaxEventData+1))}))
 		}, "bytes, at most"},
+		{"too many command args", func(v *View) {
+			args := map[string]string{}
+			for i := range MaxCommandArgs + 1 {
+				args["a"+itoa(i)] = "x"
+			}
+			v.Nodes = append(v.Nodes, NewActions("a", CommandButton("b", "B", "plugin.x.go", args)))
+		}, "17 args, at most 16"},
+		{"command arg value too big", func(v *View) {
+			args := map[string]string{"text": strings.Repeat("x", MaxCommandArgValue+1)}
+			v.Nodes = append(v.Nodes, NewActions("a", CommandButton("b", "B", "plugin.x.go", args)))
+		}, "command.args.text: 2049 bytes, at most 2048"},
+		{"command args too big together", func(v *View) {
+			args := map[string]string{"a": strings.Repeat("x", 1500), "b": strings.Repeat("x", 1500), "c": strings.Repeat("x", 1500)}
+			v.Nodes = append(v.Nodes, NewActions("a", CommandButton("b", "B", "plugin.x.go", args)))
+		}, "4503 bytes of names and values, at most 4096"},
 		{"javascript url", func(v *View) { v.Nodes = append(v.Nodes, NewActions("a", URLButton("b", "B", "javascript:alert(1)"))) }, "not an http"},
 		{"too many header buttons", func(v *View) {
 			v.Header = &Header{Actions: []Button{EventButton("a", "A", "a"), EventButton("b", "B", "b"), EventButton("c", "C", "c")}}
@@ -219,6 +234,21 @@ func TestValidateRejects(t *testing.T) {
 				t.Fatalf("err = %v, want %q", err, tt.want)
 			}
 		})
+	}
+}
+
+func TestCommandArgsAtTheLimits(t *testing.T) {
+	args := map[string]string{}
+	for i := range MaxCommandArgs {
+		args["a"+itoa(i)] = strings.Repeat("x", MaxCommandArgsBytes/MaxCommandArgs-len("a"+itoa(i)))
+	}
+	v := NewView(nil, NewActions("a", CommandButton("b", "B", "plugin.x.go", args)))
+	if err := v.Validate(); err != nil {
+		t.Fatalf("16 args, 4 KiB together: %v", err)
+	}
+	one := NewView(nil, NewActions("a", CommandButton("b", "B", "plugin.x.go", map[string]string{"t": strings.Repeat("x", MaxCommandArgValue)})))
+	if err := one.Validate(); err != nil {
+		t.Fatalf("one 2 KiB value: %v", err)
 	}
 }
 

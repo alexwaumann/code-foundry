@@ -119,6 +119,8 @@ func viewLimits() string {
 		{"Notice detail / event data / copy text (bytes)", n(ui.MaxNoticeDetail, ui.MaxEventData, ui.MaxCopy)},
 		{"Select options", n(ui.MaxOptions)},
 		{"Buttons in a header / row / notice / section / empty state / actions bar", n(ui.MaxHeaderButtons, ui.MaxRowButtons, ui.MaxNoticeButtons, ui.MaxSectionButton, ui.MaxEmptyButtons, ui.MaxBarButtons)},
+		{"A command action's args: count / names and values together (bytes) / one value (bytes)", n(ui.MaxCommandArgs, ui.MaxCommandArgsBytes, ui.MaxCommandArgValue)},
+		{"An action's form values as the host gets them (bytes, encoded)", n(ui.MaxActValues)},
 	}
 	var b strings.Builder
 	b.WriteString("| Limit | Value |\n|---|---|")

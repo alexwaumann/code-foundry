@@ -94,7 +94,8 @@ name, `act.Data` its data, at most 1 KB). A `command` runs a command with the pa
 context through the host, with its confirm dialog: the plugin's own
 (`plugin.<name>.<command>`) or a host command its `permissions.commands` allow (the view
 is refused otherwise); its `context: thread` (and project, worktree) args default from
-the panel's context, so `args` can leave them out, and it runs with the viewer's panel,
+the panel's context, so `args` can leave them out (at most 16 args, 4 KiB together, 2 KiB
+per value: pass ids, not text), and it runs with the viewer's panel,
 which matters for shared instances (`reference/manifest.md`, "One instance, many
 viewers"). `openUrl` and `copy` are done by the host and never reach the plugin, and
 neither does a command button: `plugin act` cannot press one; run the command instead.

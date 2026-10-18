@@ -421,6 +421,11 @@ func (m *Manager) Act(ctx context.Context, req ActRequest) (uint64, error) {
 	if req.Value != nil && el.kind != pluginsdk.ActTab {
 		act.Value = *req.Value
 	}
+	if len(req.Values) > 0 {
+		if b, err := json.Marshal(req.Values); err != nil || len(b) > ui.MaxActValues {
+			return 0, fmt.Errorf("%w: the action's values are over %d bytes", ErrInvalidArgument, ui.MaxActValues)
+		}
+	}
 	vals, stores, err := idx.values(el, req.Values)
 	if err != nil {
 		return 0, err
