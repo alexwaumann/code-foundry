@@ -1,0 +1,14 @@
+/*
+ * Metrics for @pierre/diffs (components/code). The library renders in a shadow root under
+ * <diffs-container>; these custom properties inherit into it. Font and size match the
+ * thread's own code (thread.css .diff, .cf-code: the bundled JetBrains Mono at 12/19), so a
+ * thread row keeps its size; colours come from the theme bridge (lib/codeTheme.ts).
+ */
+.cf-code-view {
+  display: block;
+  --diffs-font-family: "JetBrainsMono Nerd Font Mono", "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
+  --diffs-header-font-family: inherit;
+  --diffs-font-size: 12px;
+  --diffs-line-height: 19px;
+  --diffs-tab-size: 4;
+}

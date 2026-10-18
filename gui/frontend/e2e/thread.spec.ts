@@ -123,10 +123,11 @@ for (const scheme of ["dark", "light"] as const) {
       await expect(edit).toContainText("+6");
       await edit.getByTestId("thread-tool").click();
       const diff = edit.getByTestId("thread-diff");
-      await expect(diff).toContainText("@@ -18,9 +18,14 @@");
-      await expect(diff.locator('[data-kind="add"]')).toHaveCount(6);
-      await expect(diff.locator('[data-kind="del"]')).toHaveCount(1);
-      await expect(diff.locator(".hljs-keyword").first()).toBeVisible();
+      // @pierre/diffs renders in an open shadow root; Playwright's CSS locators pierce it.
+      const code = diff.locator("[data-code]");
+      await expect(code.locator('[data-line][data-line-type="change-addition"]')).toHaveCount(6);
+      await expect(code.locator('[data-line][data-line-type="change-deletion"]')).toHaveCount(1);
+      await expect(code).toContainText("HeadRefOid");
 
       // The subagent: nested rows and its report.
       const agent = await reveal(page, pane(page).locator('[data-tool="Agent"]'));

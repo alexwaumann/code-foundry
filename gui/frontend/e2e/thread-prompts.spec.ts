@@ -193,7 +193,7 @@ test("parallel requests stack oldest first; each is answerable; an Edit shows it
   const diff = edit.getByTestId("thread-permission-diff");
   await expect(diff).toContainText("+1");
   await diff.getByRole("button", { name: /Show the change/ }).click();
-  await expect(diff.getByTestId("thread-diff").locator('[data-kind="add"]')).toContainText("!force");
+  await expect(diff.getByTestId("thread-diff").locator('[data-code] [data-line][data-line-type="change-addition"]')).toContainText("!force");
 
   // The newer one first, by click: the older stays.
   await push.getByTestId("thread-permission-allow").click();

@@ -6,7 +6,7 @@
  * runs, "Ran" once done. Pure; inputs are parsed tolerantly (a streaming input is partial JSON).
  */
 import type { ToolCallView } from "@/api/thread";
-import { addedHunks, diffStats, editHunks, patchHunks, type DiffHunk, type StructuredPatchHunk } from "./diff";
+import { parseDiffFromFile, parsePatchFiles, type FileDiffMetadata } from "@pierre/diffs";
 
 export type Json = Record<string, unknown>;
 
@@ -120,27 +120,146 @@ export function firstLine(s: string): string {
   return s.includes("\n") ? `${line} …` : line;
 }
 
-/** The diff an Edit, MultiEdit or Write shows: the result's structuredPatch first, else built from the input. */
-export function toolHunks(t: Pick<ToolCallView, "name" | "inputJson" | "resultJson">): DiffHunk[] {
+/** One hunk of Claude's structuredPatch (the `diff` package's format). */
+export interface StructuredPatchHunk {
+  oldStart: number;
+  oldLines: number;
+  newStart: number;
+  newLines: number;
+  /** " ctx", "-del", "+add", "\\ No newline at end of file". */
+  lines: readonly string[];
+}
+
+/** One old → new pair of an input-built diff; `oldText` null for a file (or cell) that is all new. */
+export interface ContentPair {
+  oldText: string | null;
+  newText: string;
+}
+
+/**
+ * What an Edit, MultiEdit, Write or NotebookEdit row's diff renders from
+ * (components/code/CodeDiff): Claude's structuredPatch as a unified patch (real line
+ * numbers), or old/new contents from the input. `numbered` is false for snippets whose
+ * place in the file is unknown (an Edit's old_string / new_string, a notebook cell), so
+ * their line numbers are not shown. `name` is the file name the language comes from.
+ */
+export type ToolDiff =
+  | { kind: "patch"; path: string; patch: string }
+  | { kind: "contents"; path: string; name: string; pairs: readonly ContentPair[]; numbered: boolean };
+
+/** Claude's structuredPatch as a git-style unified patch for one file. */
+export function structuredPatchText(path: string, hunks: readonly StructuredPatchHunk[]): string {
+  const p = path.replace(/^\/+/, "");
+  const out = [`diff --git a/${p} b/${p}`, `--- a/${p}`, `+++ b/${p}`];
+  for (const h of hunks) {
+    out.push(`@@ -${String(h.oldStart)},${String(h.oldLines)} +${String(h.newStart)},${String(h.newLines)} @@`);
+    out.push(...h.lines);
+  }
+  return `${out.join("\n")}\n`;
+}
+
+function endLine(s: string): string {
+  return s === "" || s.endsWith("\n") ? s : `${s}\n`;
+}
+
+/** The language name for a notebook cell (its result's language when Claude sent one). */
+function cellName(input: Json, result: Json): string {
+  if (str(input, "cell_type") === "markdown") return "cell.md";
+  const lang = str(result, "language").toLowerCase();
+  return lang === "" || lang === "python" ? "cell.py" : `cell.${lang}`;
+}
+
+/** The diff a file-changing tool shows: the result's structuredPatch first, else built from the input; null when there is none. */
+export function toolDiff(t: Pick<ToolCallView, "name" | "inputJson" | "resultJson">): ToolDiff | null {
   const input = parseObject(t.inputJson);
   const result = parseObject(t.resultJson);
+  const path = str(input, "file_path") || str(input, "notebook_path");
+  const name = path.slice(path.lastIndexOf("/") + 1) || "file";
   const patch = result.structuredPatch;
-  if (Array.isArray(patch) && patch.length > 0) return patchHunks(patch as StructuredPatchHunk[]);
+  if (Array.isArray(patch) && patch.length > 0) return { kind: "patch", path, patch: structuredPatchText(path || "file", patch as StructuredPatchHunk[]) };
+  const contents = (pairs: ContentPair[], numbered: boolean, n = name): ToolDiff | null => {
+    const changed = pairs
+      // A snippet (unnumbered) has no end of file: end its lines so none reads "No newline at end of file".
+      .map((p) => (numbered ? p : { oldText: p.oldText === null ? null : endLine(p.oldText), newText: endLine(p.newText) }))
+      .filter((p) => p.oldText !== p.newText && (p.oldText !== null || p.newText !== ""));
+    return changed.length > 0 ? { kind: "contents", path, name: n, pairs: changed, numbered } : null;
+  };
   switch (t.name) {
     case "Edit":
-      return editHunks(str(input, "old_string"), str(input, "new_string"));
+      return contents([{ oldText: str(input, "old_string"), newText: str(input, "new_string") }], false);
     case "MultiEdit": {
       const edits = Array.isArray(input.edits) ? (input.edits as Json[]) : [];
-      return edits.flatMap((e) => editHunks(str(e, "old_string"), str(e, "new_string")));
+      return contents(
+        edits.map((e) => ({ oldText: str(e, "old_string"), newText: str(e, "new_string") })),
+        false,
+      );
     }
     case "Write":
       // An update that changed nothing has an empty patch: no diff. Otherwise (a new file,
       // or no result yet) the content shows as added.
-      if (str(result, "type") === "update") return [];
-      return addedHunks(str(input, "content"));
+      if (str(result, "type") === "update") return null;
+      return contents([{ oldText: null, newText: str(input, "content") }], true);
+    case "NotebookEdit":
+      // The cell's old source is not in the input: a replaced or inserted cell shows as added.
+      if (str(input, "edit_mode") === "delete") return null;
+      return contents([{ oldText: null, newText: str(input, "new_source") }], false, cellName(input, result));
     default:
-      return [];
+      return null;
   }
+}
+
+/** The library's diff metadata for each part of a tool diff (one per pair; one for a patch). */
+export function toolDiffFiles(d: ToolDiff): FileDiffMetadata[] {
+  if (d.kind === "patch") return parsePatchFiles(d.patch).flatMap((p) => p.files);
+  return d.pairs.map((p) => parseDiffFromFile(p.oldText === null ? null : { name: d.name, contents: p.oldText }, { name: d.name, contents: p.newText }));
+}
+
+/** Added and removed line counts. */
+export function diffStats(files: readonly FileDiffMetadata[]): { added: number; removed: number } {
+  let added = 0;
+  let removed = 0;
+  for (const f of files) {
+    for (const h of f.hunks) {
+      added += h.additionLines;
+      removed += h.deletionLines;
+    }
+  }
+  return { added, removed };
+}
+
+const statsCache = new WeakMap<object, { added: number; removed: number }>();
+
+/** A tool call's diff stats, computed once per call object (rows render it twice per update). */
+export function toolDiffStats(t: Pick<ToolCallView, "name" | "inputJson" | "resultJson">): { added: number; removed: number } {
+  let s = statsCache.get(t);
+  if (!s) {
+    const d = toolDiff(t);
+    s = d ? diffStats(toolDiffFiles(d)) : { added: 0, removed: 0 };
+    statsCache.set(t, s);
+  }
+  return s;
+}
+
+const chomp = (l: string | undefined) => (l ?? "").replace(/\r?\n$/, "");
+
+/** A tool diff as unified text, for Copy: the patch itself, or each pair's hunks ("@@" alone when unnumbered). */
+export function diffText(d: ToolDiff, files: readonly FileDiffMetadata[]): string {
+  if (d.kind === "patch") return d.patch;
+  const out: string[] = [];
+  for (const f of files) {
+    for (const h of f.hunks) {
+      out.push(d.numbered ? `@@ -${String(h.deletionStart)},${String(h.deletionCount)} +${String(h.additionStart)},${String(h.additionCount)} @@` : "@@");
+      for (const c of h.hunkContent) {
+        if (c.type === "context") {
+          for (let i = 0; i < c.lines; i++) out.push(` ${chomp(f.additionLines[c.additionLineIndex + i])}`);
+        } else {
+          for (let i = 0; i < c.deletions; i++) out.push(`-${chomp(f.deletionLines[c.deletionLineIndex + i])}`);
+          for (let i = 0; i < c.additions; i++) out.push(`+${chomp(f.additionLines[c.additionLineIndex + i])}`);
+        }
+      }
+    }
+  }
+  return out.join("\n");
 }
 
 function plural(n: number, one: string, many = `${one}s`): string {
@@ -190,7 +309,7 @@ export function toolSummary(t: ToolCallView, opts: { tense: Tense; durationMs?: 
       s.target = base;
       s.detail = dir;
       if (t.name === "Write" && done && str(result, "type") === "create") s.verb = "Created";
-      const stats = diffStats(toolHunks(t));
+      const stats = toolDiffStats(t);
       s.added = stats.added;
       s.removed = stats.removed;
       // The diff shows one occurrence; say it applied to every one.

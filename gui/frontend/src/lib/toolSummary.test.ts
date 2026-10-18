@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ToolCallView } from "@/api/thread";
-import { exitCode, formatDuration, parseObject, splitPath, toolHunks, toolSummary, type Tense } from "./toolSummary";
+import { diffStats, diffText, exitCode, formatDuration, parseObject, splitPath, structuredPatchText, toolDiff, toolDiffFiles, toolSummary, type Tense, type ToolDiff } from "./toolSummary";
 
 function call(name: string, input: object, over: Partial<ToolCallView> = {}): ToolCallView {
   return { toolUseId: "t", name, inputJson: JSON.stringify(input), status: "done", output: "", isError: false, resultJson: "", ...over };
@@ -75,28 +75,49 @@ describe("toolSummary", () => {
   });
 });
 
-describe("toolHunks", () => {
-  it("prefers the result's structuredPatch", () => {
-    const t = call("Edit", { old_string: "x", new_string: "y" }, { resultJson: JSON.stringify({ structuredPatch: [{ oldStart: 40, oldLines: 1, newStart: 40, newLines: 1, lines: ["-x", "+y"] }] }) });
-    expect(toolHunks(t)[0]?.oldStart).toBe(40);
+const stats = (d: ToolDiff | null) => (d ? diffStats(toolDiffFiles(d)) : null);
+
+describe("toolDiff", () => {
+  it("prefers the result's structuredPatch, as a git-style patch with real line numbers", () => {
+    const t = call("Edit", { file_path: "/w/a.go", old_string: "x", new_string: "y" }, { resultJson: JSON.stringify({ structuredPatch: [{ oldStart: 40, oldLines: 2, newStart: 40, newLines: 2, lines: [" a", "-x", "+y"] }] }) });
+    const d = toolDiff(t);
+    expect(d).toEqual({ kind: "patch", path: "/w/a.go", patch: "diff --git a/w/a.go b/w/a.go\n--- a/w/a.go\n+++ b/w/a.go\n@@ -40,2 +40,2 @@\n a\n-x\n+y\n" });
+    const [f] = d ? toolDiffFiles(d) : [];
+    expect(f?.name).toBe("w/a.go");
+    expect(f?.hunks[0]?.additionStart).toBe(40);
+    expect(stats(d)).toEqual({ added: 1, removed: 1 });
     // Without it (no result yet: waiting for permission) the position is unknown: no line numbers.
-    const [h] = toolHunks({ ...t, resultJson: "" });
-    expect(h?.unnumbered).toBe(true);
-    expect(h?.lines.map((l) => [l.oldNo, l.newNo])).toEqual([
-      [null, null],
-      [null, null],
-    ]);
+    expect(toolDiff({ ...t, resultJson: "" })).toEqual({ kind: "contents", path: "/w/a.go", name: "a.go", pairs: [{ oldText: "x\n", newText: "y\n" }], numbered: false });
   });
-  it("Write: a new file is all added; an update that changed nothing has no diff", () => {
+  it("Write: a new file is all added and numbered; an update that changed nothing has no diff", () => {
     const w = call("Write", { file_path: "/w/a", content: "x\ny" });
-    expect(toolHunks(w)[0]?.lines.map((l) => l.kind)).toEqual(["add", "add"]);
-    expect(toolHunks({ ...w, resultJson: JSON.stringify({ type: "update", structuredPatch: [] }) })).toEqual([]);
+    expect(toolDiff(w)).toMatchObject({ kind: "contents", pairs: [{ oldText: null, newText: "x\ny" }], numbered: true });
+    expect(stats(toolDiff(w))).toEqual({ added: 2, removed: 0 });
+    expect(toolDiff({ ...w, resultJson: JSON.stringify({ type: "update", structuredPatch: [] }) })).toBeNull();
   });
-  it("an Edit with an empty old_string adds its text; replace_all says every occurrence", () => {
-    expect(toolHunks(call("Edit", { old_string: "", new_string: "a\nb" }))[0]?.lines.map((l) => l.kind)).toEqual(["add", "add"]);
+  it("an Edit with an empty old_string adds its text; one that changes nothing has no diff; replace_all says every occurrence", () => {
+    expect(stats(toolDiff(call("Edit", { old_string: "", new_string: "a\nb" })))).toEqual({ added: 2, removed: 0 });
+    expect(toolDiff(call("Edit", { old_string: "a", new_string: "a" }))).toBeNull();
     expect(sum(call("Edit", { file_path: "/w/repo/a.go", old_string: "x", new_string: "y", replace_all: true }))).toMatchObject({ added: 1, removed: 1, meta: "every occurrence" });
   });
-  it("MultiEdit concatenates its edits' hunks", () => {
-    expect(toolHunks(call("MultiEdit", { edits: [{ old_string: "a", new_string: "b" }, { old_string: "c", new_string: "d" }] }))).toHaveLength(2);
+  it("MultiEdit keeps one pair per edit", () => {
+    const d = toolDiff(call("MultiEdit", { file_path: "/w/a.ts", edits: [{ old_string: "a", new_string: "b" }, { old_string: "c", new_string: "d\ne" }] }));
+    expect(d?.kind === "contents" && d.pairs).toHaveLength(2);
+    expect(stats(d)).toEqual({ added: 3, removed: 2 });
+  });
+  it("NotebookEdit shows the new cell source as added; a deleted cell has no diff", () => {
+    expect(toolDiff(call("NotebookEdit", { notebook_path: "/w/n.ipynb", new_source: "print(1)", cell_type: "code" }))).toMatchObject({ name: "cell.py", pairs: [{ oldText: null, newText: "print(1)\n" }], numbered: false });
+    expect(toolDiff(call("NotebookEdit", { notebook_path: "/w/n.ipynb", new_source: "# Hi", cell_type: "markdown" }))).toMatchObject({ name: "cell.md" });
+    expect(toolDiff(call("NotebookEdit", { notebook_path: "/w/n.ipynb", new_source: "", edit_mode: "delete" }))).toBeNull();
+  });
+});
+
+describe("diffText", () => {
+  it("is the patch itself for a patch, else each pair's hunks without line numbers", () => {
+    const patch = structuredPatchText("/w/a.go", [{ oldStart: 1, oldLines: 1, newStart: 1, newLines: 1, lines: ["-x", "+y"] }]);
+    const p: ToolDiff = { kind: "patch", path: "/w/a.go", patch };
+    expect(diffText(p, toolDiffFiles(p))).toBe(patch);
+    const c: ToolDiff = { kind: "contents", path: "/w/a.go", name: "a.go", pairs: [{ oldText: "a\nb\n", newText: "a\nB\n" }], numbered: false };
+    expect(diffText(c, toolDiffFiles(c))).toBe("@@\n a\n-b\n+B");
   });
 });

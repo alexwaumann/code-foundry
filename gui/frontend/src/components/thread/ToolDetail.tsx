@@ -1,11 +1,11 @@
-import { memo, type ReactNode } from "react";
+import { memo, useMemo, type ReactNode } from "react";
 import { Check, Circle, CircleDot } from "lucide-react";
 import type { ToolCallView } from "@/api/thread";
 import { grammarForPath, highlightLines, shellTokens } from "@/lib/highlight";
-import { agentReport, obj, parseObject, relPath, str, toolHunks, type Json } from "@/lib/toolSummary";
+import { agentReport, obj, parseObject, relPath, str, toolDiff, type Json } from "@/lib/toolSummary";
 import { ThreadMarkdown, TokenSpans } from "./Code";
 import { CopyButton } from "./CodeActions";
-import { DiffView } from "./DiffView";
+import { ToolDiffView } from "./ToolDiffView";
 
 /** Lines of tool output shown before the rest is cut (the block scrolls within its max height). */
 const OUTPUT_LINES = 400;
@@ -160,6 +160,13 @@ function Output({ text, label }: { text: string; label?: string }) {
   );
 }
 
+/** A file change (Edit, MultiEdit, Write, NotebookEdit) as a diff; its output when there is none. */
+function EditDetail({ t, cwd }: { t: ToolCallView; cwd: string }) {
+  const diff = useMemo(() => toolDiff(t), [t]);
+  if (!diff) return <Output text={t.output} />;
+  return <ToolDiffView diff={diff} cwd={cwd} />;
+}
+
 /** The subagent's final report under its nested rows. */
 export function AgentReport({ t }: { t: ToolCallView }) {
   const text = agentReport(t);
@@ -179,12 +186,8 @@ export const ToolDetail = memo(function ToolDetail({ t, cwd }: { t: ToolCallView
     case "Edit":
     case "MultiEdit":
     case "Write":
-    case "NotebookEdit": {
-      const hunks = toolHunks(t);
-      const input = parseObject(t.inputJson);
-      if (hunks.length === 0) return <Output text={t.output} />;
-      return <DiffView path={str(input, "file_path") || str(input, "notebook_path")} hunks={hunks} cwd={cwd} />;
-    }
+    case "NotebookEdit":
+      return <EditDetail t={t} cwd={cwd} />;
     case "Read":
       return <ReadDetail t={t} cwd={cwd} />;
     case "Grep":
