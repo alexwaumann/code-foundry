@@ -106,7 +106,7 @@ neither does a command button: `plugin act --key <button>` presses one as the GU
 ```json
 {"header": {"icon": "workflow", "title": "Checks of octo/app#12", "tabTitle": "Checks",
             "pill": {"label": "2 failing", "tone": "error"},
-            "subline": {"spans": [{"text": "updated "}, {"time": {"at": "2026-10-18T09:00:00Z"}}]},
+            "subline": {"spans": [{"text": "updated "}, {"time": {"at": "2026-10-18T09:00:00Z"}}]}, "sublineIcon": "clock",
             "trailing": "main",
             "actions": [{"key": "refresh", "label": "Refresh", "icon": "refresh-cw", "iconOnly": true, "action": {"event": "refresh"}}]},
  "tabs": {"items": [{"key": "tab-runs", "label": "Runs"}, {"key": "tab-log", "label": "Log", "badge": {"label": "live", "tone": "attention"}}],
@@ -117,7 +117,7 @@ neither does a command button: `plugin act --key <button>` presses one as the GU
 ```go
 h := &ui.Header{Icon: "workflow", Title: "Checks of octo/app#12", TabTitle: "Checks",
 	Pill: ui.NewPill("2 failing", ui.ToneError), Trailing: ui.Plain("main"),
-	Subline: ui.Spans(ui.T("updated "), ui.At(fetched, ui.TimeRelative)),
+	Subline: ui.Spans(ui.T("updated "), ui.At(fetched, ui.TimeRelative)), SublineIcon: "clock",
 	Actions: []ui.Button{ui.EventButton("refresh", "Refresh", "refresh").WithIcon("refresh-cw").AsIconOnly()}}
 tabs := ui.NewTabs("tab-runs", ui.NewTab("tab-runs", "Runs"), ui.Tab{Key: "tab-log", Label: "Log", Badge: ui.NewPill("live", ui.ToneAttention)})
 v := ui.View{Header: h, Tabs: tabs, Nodes: runsNodes} // NewTabs returns *ui.Tabs
@@ -125,12 +125,16 @@ v := ui.View{Header: h, Tabs: tabs, Nodes: runsNodes} // NewTabs returns *ui.Tab
 
 The header stays pinned above the scrolling body. Empty `icon` and `title` use the
 manifest's; `tabTitle` (40 characters) renames the panel tab; up to 2 header buttons, drawn
-icon-only (give them an icon). **Tabs** switch views inside one surface: the host draws the strip, sends a
+icon-only (give them an icon) at the end of the sub-line. The title is one line; the
+sub-line (with `sublineIcon`, a neutral icon from the list, before it) wraps to two lines
+(about 50 characters each at 400 px, 30 at 280 px) and is cut after that, never revealed:
+a sentence of guidance goes in a `text` node. **Tabs** switch views inside one surface: the host draws the strip, sends a
 `tab` act (`act.Kind == "tab"`, `act.Key` the tab's key) when the user switches, and
 keeps form drafts per tab. The plugin answers with the view of the new active tab:
 `nodes` are always the active tab's. Tab keys share the view's one key namespace: a tab
 `runs` and a list `runs` collide (`nodes[1].key: "runs" is already used by
-tabs.items[0]`), so prefix tabs `tab-…`.
+tabs.items[0]`), so prefix tabs `tab-…`. Past 8 tabs, group: collapsible sections inside a
+tab, or a second surface for a second subject.
 
 ## Nodes
 
@@ -207,7 +211,9 @@ ui.Node{Key: "run-list", List: &ui.List{EmptyText: "No runs yet", Rows: []ui.Row
 ```
 
 A row: glyph, title (required), `titleMeta`, pill, `line2`, `trailing`, up to 3 buttons,
-an `action` for the whole row, `selected`. `glyphStyle`: `dot` (default) or `icon`;
+an `action` for the whole row, `selected`. Icon-only buttons sit at the end of the first
+line beside `trailing`; labelled ones go on a line of their own under the row (a cancel
+or open is icon-only, a "Send to Claude" labelled). `glyphStyle`: `dot` (default) or `icon`;
 `dense` draws 24 px single-line rows: `line2` and labelled buttons are **not shown**
 (icon-only buttons and `trailing` are), so leave it off when line 2 carries something
 the user needs. `emptyText` shows when there are no rows.
@@ -321,19 +327,25 @@ The whole body when there is nothing yet; up to 2 buttons.
 ```json
 {"key": "older", "section": {"title": "Earlier runs", "meta": "last 24 h", "pill": {"label": "3"},
   "collapsible": true, "collapsed": true, "card": false, "stale": false,
+  "actions": [{"key": "older-clear", "label": "Clear", "icon": "trash-2", "iconOnly": true, "action": {"event": "clear"}}],
   "children": [{"key": "older-list", "list": {"rows": []}}]}}
+{"key": "deploy", "section": {"title": "Deploy", "card": true, "tone": "error", "children": [...]}}
 ```
 
 ```go
 ui.Node{Key: "older", Section: &ui.Section{Title: "Earlier runs", Meta: ui.Plain("last 24 h"), Pill: ui.NewPill("3", ui.ToneNeutral),
-	Collapsible: true, Collapsed: true, Children: []ui.Node{olderList}}}
+	Collapsible: true, Collapsed: true, Children: []ui.Node{olderList},
+	Actions: []ui.Button{ui.EventButton("older-clear", "Clear", "clear").WithIcon("trash-2").AsIconOnly()}}}
+ui.Node{Key: "deploy", Section: &ui.Section{Title: "Deploy", Card: true, Tone: ui.ToneError, Children: deployNodes}}
 // or: ui.NewSection("older", "Earlier runs", children...)
 ```
 
-Groups nodes under a title (60 characters): `card` draws a box (`tone` `attention` or
-`error` colours its border), `collapsible` + `collapsed` (initial; the user's toggle
-wins), `stale` dims last-known data while the backend is unreachable, up to 2 buttons.
-Sections nest two deep: section > section > node.
+Groups nodes under a title (60 characters, one line: with meta, pill and buttons beside
+it, it is cut early, so keep it to a few words): `card` draws a box, `tone` `attention`
+or `error` colours the title (and a card's border), `collapsible` + `collapsed` (initial;
+the user's toggle wins), `stale` dims last-known data while the backend is unreachable.
+Up to 2 buttons sit at the end of the title row, after the pill. Sections nest two deep:
+section > section > node.
 
 ### form
 
@@ -386,24 +398,32 @@ plugin's validation message), `required`, `disabled`, and exactly one control:
   again (and answers with a field `error` or an error).
 - `select`: `options` (up to 200, each `key`, `value`, `label`, `description` in list
   style, `disabled`), `value` (a list: one value unless `multiple`), `multiple`, `style`
-  `dropdown` (default) or `list` (radio or checkbox rows with descriptions),
-  `placeholder`. `optionsSource: "projects"` or `"threads"` makes the host fill the
+  `dropdown` (default; with `multiple`, a menu of checkboxes) or `list` (radio or
+  checkbox rows with descriptions), `placeholder`. `optionsSource: "projects"` or `"threads"` makes the host fill the
   options (values are ids) and keep them current; `options` must then be empty.
 - `toggle`: a switch, `value` true or false.
 - `fieldset`: a label, `hint` and `error` over a group of fields (a checkbox group, a
   pair of related inputs). Fieldsets do not nest.
 
-A field with `change: {"event": "…"}` sends a `change` act as the user edits it
-(`act.Field` its name, `act.Value` the new value), for dependent fields; never for a
+A field with `change: {"event": "…"}` sends a `change` act when the user commits an edit
+(a text field on leaving it, a select or toggle on each pick; never per keystroke):
+`act.Field` its name, `act.Value` the new value, for dependent fields; never for a
 secret. The **submit** button sends a `submit` act with every field's value in
 `act.Values` by name: strings, booleans for toggles, string lists for multiple selects.
 It may run a command instead (the fields fill its args by name) unless the form has a
-secret field. `secondary` buttons act like any button. `error` shows under the form,
-`busy` disables it while the plugin works.
+secret field. `secondary` buttons act like any button. `error` shows under the form.
+From submit until Act returns, the host disables the form and spins the submit itself;
+for work that outlives the act, render the form with `busy` (every field and button
+disabled) and the submit button with `busy` (its spinner), and drop both when it ends.
 
 **Drafts.** The host keeps what the user typed (per instance and tab) across new views,
-so re-rendering does not wipe a half-filled form. Change `resetToken` to drop the drafts
-and show the view's values (after a successful save, a reset).
+so re-rendering does not wipe a half-filled form. A submit the plugin takes drops the
+form's drafts (the fields show the next view's values); a refused one keeps them: Act
+returned an error (toasted), or the view after it has a field `error` or the form's
+`error`. So answer bad values with field errors and the user's text stays under them.
+Change `resetToken` to drop the drafts and show the view's values (a reset). The plugin
+cannot read drafts: to follow what the user enters before submit, give the field a
+`change` event.
 
 **Secrets.** A secret input never carries a value. With `store: "<key>"` (permission
 `secrets`) the host writes the submitted value into the plugin's Keychain namespace
@@ -434,7 +454,11 @@ terminal (`h.CreateTerminal`, permission `terminals`) with the host's terminal v
 default: about 420 px for a thread, `rows` text rows (4..60, default 16) for a terminal),
 `"fill"` (the rest of the panel, at least 240 px) or pixels (120..1600). A view naming
 another owner's thread or terminal is refused; one that is gone (removed, closed) shows a
-muted empty state. Check `h.HasCapability("view.node.thread")` (`view.node.terminal`)
+muted empty state; an archived thread still renders, composer included, with no archived
+cue (`SendThread` unarchives it), so drop its node when you archive it. Each of these nodes is a
+live stream from the GUI to the daemon: the GUI attaches one only while it is on screen
+and at most two per view, so show one (two at most) at a time and switch with tabs or
+chips rather than stacking them. Check `h.HasCapability("view.node.thread")` (`view.node.terminal`)
 before relying on them; `reference/host-api.md` has the calls that make them.
 
 ## Acts
@@ -450,7 +474,9 @@ before relying on them; `reference/host-api.md` has the calls that make them.
 
 `act.Context` is what the panel the user acted in shows (`ThreadID`, `ProjectID`, …): a
 shared instance (scope `pr`, `project`, `global`) learns from it which thread a click came
-from (capability `act.context`; empty from an older host). `Version` is the view version
+from (capability `act.context`; empty from an older host). What the panel lacks is empty:
+beside a page with no thread (Projects, Usage) `ThreadID` is "", so a thread action
+there checks for it and answers with an error ("open a thread first"). `Version` is the view version
 acted on. The host takes the kind, event, data and form
 from its own copy of that version, so a client cannot forge them; the plugin still
 validates `Values`. Return an error to refuse (its message is shown to the user); render
