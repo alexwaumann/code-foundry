@@ -78,8 +78,8 @@ type CommandSpec struct {
 	Name        string `json:"name"`
 	Title       string `json:"title"`
 	Description string `json:"description,omitempty"`
-	// When is an availability predicate over host facts (evaluated by the host from
-	// protocol PR 2 on; until then a command is always available).
+	// When is an availability predicate over host facts, evaluated by the host: where it
+	// does not hold the command is listed as unavailable (and says why when run).
 	When string `json:"when,omitempty"`
 	// Confirm makes the command destructive: the host asks the user with this text first
 	// ({arg} placeholders allowed). A plugin can never confirm on the user's behalf.

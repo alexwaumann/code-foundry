@@ -11,6 +11,8 @@ import (
 	"slices"
 	"strings"
 
+	"google.golang.org/protobuf/reflect/protoreflect"
+
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/guide"
 	"github.com/alexwaumann/code-foundry/plugins"
@@ -42,7 +44,46 @@ func placeholders(src Sources) map[string]string {
 		"reservedArgs":  codeList(pluginsdk.ReservedArgNames),
 		"eventSources":  codeList(pluginsdk.EventSources),
 		"limits":        viewLimits(),
+		"eventVariants": eventVariants(),
 	}
+}
+
+// eventFields are the codefoundry.v1.Event fields of the manifest's event sources
+// (pluginsdk.EventSources), where the name differs.
+var eventFields = map[string]string{"threads": "thread_list"}
+
+// eventStreamOnly are the changes of a source the event stream carries, where the
+// message has more (the thread source's items and deltas are WatchThread's only).
+var eventStreamOnly = map[string][]string{"thread": {"pending_snapshot", "pending"}}
+
+// eventsCLISources are `code-foundry events --source` names, where they differ.
+var eventsCLISources = map[string]string{"threads": "thread-list"}
+
+// eventVariants is a table of each event source's JSON key and the changes it carries
+// (its message's oneof), read from the generated protobuf descriptors.
+func eventVariants() string {
+	fields := (&v1.Event{}).ProtoReflect().Descriptor().Fields()
+	var b strings.Builder
+	b.WriteString("| Source (manifest) | `--source` | JSON key | Changes (the key inside) |\n|---|---|---|---|")
+	for _, src := range pluginsdk.EventSources {
+		name := cmp.Or(eventFields[src], src)
+		f := fields.ByName(protoreflect.Name(name))
+		if f == nil || f.Message() == nil {
+			continue
+		}
+		var kinds []string
+		oneof := f.Message().Oneofs()
+		if oneof.Len() > 0 {
+			of := oneof.Get(0).Fields()
+			for i := range of.Len() {
+				if only := eventStreamOnly[src]; only == nil || slices.Contains(only, string(of.Get(i).Name())) {
+					kinds = append(kinds, "`"+of.Get(i).JSONName()+"`")
+				}
+			}
+		}
+		fmt.Fprintf(&b, "\n| `%s` | `%s` | `%s` | %s |", src, cmp.Or(eventsCLISources[src], src), f.JSONName(), strings.Join(kinds, ", "))
+	}
+	return b.String()
 }
 
 // codeList is "`a`, `b`, `c`".
@@ -162,8 +203,9 @@ func pluginCLIReference(w io.Writer, src Sources) {
 Every command below is the text `+"`code-foundry help <command>`"+` prints. Run one by its dotted name or
 with spaces (`+"`code-foundry plugin.dev ...` = `code-foundry plugin dev ...`"+`); `+"`<arg>`"+` is positional and
 every arg is also a `+"`--flag`"+`. A plugin's own commands are `+"`code-foundry plugin <name> <command>`"+`
-(`+"`plugin.<name>.<command>`"+`), and each surface adds `+"`plugin <name> show <surface>`"+`, which opens it in
-the GUI.
+(`+"`plugin.<name>.<command>`"+`; a dotted command name takes spaces too), and each surface adds
+`+"`plugin <name> show <surface>`"+`, which opens it in the GUI (without a GUI it does nothing; use
+`+"`plugin surface`"+`).
 
 Every command also takes these flags:
 
@@ -176,7 +218,8 @@ Not in the registry, built into the CLI:
 
 - `+"`code-foundry events --json --source <source>`"+` prints the daemon's events as JSON lines, the same JSON a
   plugin's OnEvent gets in `+"`Event.Event`"+`. The CLI's source names: `+"`thread-list`"+` (manifest `+"`threads`"+`),
-  `+"`thread`, `project`, `workspace`, `gh`, `gitops`, `settings`, `update`, `action`, `plugin`"+`.
+  `+"`thread`, `project`, `workspace`, `gh`, `gitops`, `settings`, `update`, `action`, `plugin`"+`. It streams
+  until killed: `+"`code-foundry events --json --source thread-list > /tmp/events.json & pid=$!; sleep 5; kill $pid`"+`.
 - `+"`code-foundry commands --context-thread <id>`"+` lists every command with whether it is available there: your
   plugin's commands and `+"`show`"+` commands follow their `+"`when`"+` clauses.
 `)

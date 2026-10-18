@@ -20,6 +20,12 @@ var argTypes = map[string]command.ArgType{
 	pluginsdk.ArgInt: command.Int, pluginsdk.ArgEnum: command.Enum, pluginsdk.ArgPath: command.Path,
 }
 
+// argIDs are the id kinds of context args: a thread or terminal arg given as a unique
+// suffix (or a --context-thread suffix it defaults to) reaches the plugin as the full id.
+var argIDs = map[string]command.IDKind{
+	pluginsdk.ArgContextThread: command.ThreadID, pluginsdk.ArgContextTerminal: command.TerminalID,
+}
+
 var argContexts = map[string]command.ContextField{
 	"": command.NoContext, pluginsdk.ArgContextThread: command.ContextThread, pluginsdk.ArgContextProject: command.ContextProject,
 	pluginsdk.ArgContextWorktree: command.ContextWorktree, pluginsdk.ArgContextTerminal: command.ContextTerminal,
@@ -36,6 +42,9 @@ func (m *Manager) commandsFor(name string, mf pluginsdk.Manifest) []command.Comm
 			args[i] = command.ArgSpec{
 				Name: a.Name, Type: argTypes[a.Type], Required: a.Required, Description: a.Description,
 				Enum: a.Enum, Default: a.Default, Positional: a.Positional, Context: argContexts[a.Context],
+			}
+			if args[i].Type == command.String {
+				args[i].ID = argIDs[a.Context]
 			}
 		}
 		when, why := m.commandWhen(spec.When)

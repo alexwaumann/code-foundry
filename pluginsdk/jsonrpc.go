@@ -13,7 +13,7 @@ import (
 	"sync/atomic"
 )
 
-// JSON-RPC error codes: the standard ones, then the protocol's own (ARCHITECTURE.md §B.3).
+// JSON-RPC error codes: the standard ones, then the protocol's own.
 const (
 	CodeParseError     = -32700
 	CodeInvalidRequest = -32600

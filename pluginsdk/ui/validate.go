@@ -10,7 +10,7 @@ import (
 	"unicode/utf8"
 )
 
-// Limits every view must respect (PRIMITIVES.md §B "Limits"). The host refuses a view
+// Limits every view must respect. The host refuses a view
 // that breaks one and keeps the previous one.
 const (
 	MaxElements      = 400       // nodes, rows, chips, pairs, fields, options, buttons, tabs

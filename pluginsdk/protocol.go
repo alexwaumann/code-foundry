@@ -32,7 +32,7 @@ const (
 	// MethodSurfaceAct (request, 10 s): SurfaceAct → {}. An error's message is shown to
 	// the user.
 	MethodSurfaceAct = "surface/act"
-	// MethodEventsEvent (notification) carries one subscribed event (protocol PR 3).
+	// MethodEventsEvent (notification): Event, one subscribed event (Plugin.OnEvent).
 	MethodEventsEvent = "events/event"
 )
 
@@ -49,8 +49,9 @@ const (
 	MethodSecretSet    = "secret/set"
 	MethodSecretDelete = "secret/delete"
 	MethodSecretList   = "secret/list"
-	// The rest arrive with later protocol PRs; until a host supports one it answers
-	// CodeMethodNotFound.
+	// A method a host does not support (yet) answers CodeMethodNotFound; the host's
+	// initialize capabilities say what it supports. thread/create, thread/send,
+	// terminal/create and terminal/close are not served yet.
 	//
 	// MethodViewUpdate (request): ViewUpdateParams → ViewUpdateResult. The whole view
 	// of an open instance; the host validates it (an invalid view is refused with
@@ -66,15 +67,20 @@ const (
 	// MethodContextSet (notification): ContextParams, a predicate fact
 	// <plugin>.<key> (global, or for one thread or project) the host's when clauses
 	// read. A null value removes it. Facts last until the plugin process ends.
-	MethodContextSet        = "context/set"
-	MethodThreadSetFlag     = "thread/setFlag"
+	MethodContextSet = "context/set"
+	// MethodThreadSetFlag (request): Flag → FlagResult (Host.SetFlag).
+	MethodThreadSetFlag = "thread/setFlag"
+	// MethodEventsSubscribe (request): SubscribeParams → SubscribeResult; the events
+	// arrive as events/event. MethodEventsUnsubscribe ends one.
 	MethodEventsSubscribe   = "events/subscribe"
 	MethodEventsUnsubscribe = "events/unsubscribe"
-	MethodSetEnvironment    = "session/setEnvironment"
-	MethodThreadCreate      = "thread/create"
-	MethodThreadSend        = "thread/send"
-	MethodTerminalCreate    = "terminal/create"
-	MethodTerminalClose     = "terminal/close"
+	// MethodSetEnvironment (request): Environment → EnvironmentResult
+	// (Host.SetEnvironment).
+	MethodSetEnvironment = "session/setEnvironment"
+	MethodThreadCreate   = "thread/create"
+	MethodThreadSend     = "thread/send"
+	MethodTerminalCreate = "terminal/create"
+	MethodTerminalClose  = "terminal/close"
 )
 
 // Environment variables the host sets in a plugin's process.

@@ -78,6 +78,17 @@ func (b Button) WithIcon(icon string) Button { b.Icon = icon; return b }
 // WithStyle returns b with a style.
 func (b Button) WithStyle(s ButtonStyle) Button { b.Style = s; return b }
 
+// WithData returns b with data for its event (at most 1 KB; act.Data in Surface.Act),
+// such as the id of the row the button is on.
+func (b Button) WithData(data string) Button {
+	if b.Action != nil {
+		a := *b.Action
+		a.Data = data
+		b.Action = &a
+	}
+	return b
+}
+
 // AsIconOnly returns b drawn as its icon (the label becomes its tooltip).
 func (b Button) AsIconOnly() Button { b.IconOnly = true; return b }
 

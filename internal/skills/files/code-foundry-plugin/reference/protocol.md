@@ -24,7 +24,8 @@ and result type is a Go type there (`go doc github.com/alexwaumann/code-foundry/
   environment: `PATH`, `HOME`, `USER`, `LOGNAME`, `SHELL`, `TMPDIR`, `LANG`, `LC_*`, `TZ`,
   `SSH_AUTH_SOCK`, plus `CODE_FOUNDRY_PLUGIN` (its name), `CODE_FOUNDRY_PLUGIN_DIR` (the
   package folder) and `CODE_FOUNDRY_PLUGIN_DATA` (its own state folder,
-  `~/.code-foundry/plugin-data/<name>`, 0700, kept across updates). With the `api`
+  `<Code Foundry home>/plugin-data/<name>`, usually `~/.code-foundry/plugin-data/<name>`,
+  0700, kept across updates; `h.DataDir()`). With the `api`
   permission also `CODE_FOUNDRY_ENDPOINT` and `CODE_FOUNDRY_TOKEN`. Never a thread id: the
   thread comes with each call's context.
 - A tool the plugin runs (`gh`, `git`) is found on that PATH; it inherits the user's `gh`

@@ -6,7 +6,10 @@
 //	res, err := h.Command(ctx, "greet", map[string]string{"name": "Ada"}, pluginsdk.UiContext{})
 //
 // Permissions are enforced like the real host: host/invoke needs a matching
-// permissions.commands glob and secret/* needs permissions.secrets.
+// permissions.commands glob, secret/* needs permissions.secrets, thread/setFlag
+// threadStatus, session/setEnvironment sessionEnv, and events/subscribe each source in
+// permissions.events. It does not evaluate when clauses, check views beyond what the
+// plugin's own Validate did, or store secrets from forms (SetSecret does).
 package plugintest
 
 import (

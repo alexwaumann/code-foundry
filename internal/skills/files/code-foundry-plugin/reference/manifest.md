@@ -82,15 +82,17 @@ whenever a new version asks for more (the plugin is disabled until they agree).
 ## Commands
 
 Each becomes `plugin.<name>.<command>`: a palette entry under the display name, and
-`code-foundry plugin <name> <command>` on the CLI. The plugin handles it in
-`Plugin.Commands[<command>]`.
+`code-foundry plugin <name> <command>` on the CLI, a dotted name with spaces
+(`run.rerun-failed` is `code-foundry plugin ci run rerun-failed`; the dotted form
+`plugin.ci.run.rerun-failed` works too). The plugin handles it in
+`Plugin.Commands["run.rerun-failed"]`.
 
 | Field | Rules |
 |---|---|
 | `name` | Required. Dotted kebab-case segments: `greet`, `run.rerun-failed`. `show` and `show.*` are reserved (each surface gets `plugin.<name>.show.<surface>`). |
 | `title` | Required, up to 80 characters, Title Case ("Rerun Failed Jobs"). The palette entry. |
 | `description` | One or two sentences; the CLI's help and the palette's detail. |
-| `when` | A clause (below) deciding where the command is available; elsewhere it is listed as unavailable with the reason. Default: always. |
+| `when` | A clause (below) deciding where the command is available; elsewhere it is unavailable, and running it says why. Default: always. |
 | `confirm` | Makes it ask first: the host shows this text (with `{arg}` placeholders filled) and runs it only on yes; the CLI needs `--yes`. The plugin never confirms for the user. |
 | `timeoutSeconds` | How long one run may take: default 30, at most 600. |
 | `args` | Below. |
@@ -105,12 +107,15 @@ Args (`pluginsdk.ArgSpec`); values reach the handler as strings in `req.Args`
 | `enum` | The values of an `enum` arg (required for one, refused for others). |
 | `default` | A default value (in `enum` for an enum). Not with `required`. |
 | `required` | The command refuses to run without it. |
-| `positional` | Also takes a bare word on the CLI, in declaration order: `plugin gh-actions cancel 123`. |
-| `context` | `thread`, `project`, `worktree` or `terminal` (string and path args only): defaults to the caller's active one (the GUI's selection, `--context-thread` on the CLI, or `$CODE_FOUNDRY_THREAD` in a thread). |
+| `positional` | Also takes a bare word on the CLI, in declaration order: `plugin gh-actions cancel 123`. One word each: quote text with spaces (`plugin notes add "buy milk"`). |
+| `context` | `thread`, `project`, `worktree` or `terminal` (string and path args only): defaults to the caller's active one (the GUI's selection, `--context-thread` on the CLI, or `$CODE_FOUNDRY_THREAD` in a thread). A thread or terminal id given as a unique suffix (`c820`) is resolved to the full id, also in `req.Context`. |
 | `description` | The flag's help. |
 
 The command also gets the caller's context in `req.Context` (`ThreadID`, `ProjectID`,
-`WorktreePath`, `TerminalID`, `WorkspaceID`, `View`), whatever its args. A result's
+`WorktreePath`, `TerminalID`, `WorkspaceID`, `View`), whatever its args. Only a context
+arg resolves id suffixes: a command that reads `req.Context.ThreadID` without declaring a
+`context: thread` arg gets `--context-thread` exactly as typed, so declare the arg when a
+command acts on a thread. A result's
 `Message` is what the CLI prints and the GUI toasts; `JSON` is `--json`'s output;
 `ExitCode` the CLI's exit status. Return an error to fail: its message is the CLI's
 error (exit 1) and the GUI's error toast; `pluginsdk.NewError(pluginsdk.CodeInvalidParams, ...)`
@@ -186,4 +191,6 @@ Examples: `thread.hasPr`, `project.slug == "acme/api"`, `!thread || thread.statu
 && pr.checks.url =~ /jenkins\.acme\.com/`.
 
 Check availability from the CLI: `code-foundry commands --context-thread <id>` (the
-AVAILABLE column) and `code-foundry plugin list --context-thread <id>` (`runs(on)`).
+AVAILABLE column: yes or no), `code-foundry plugin list --context-thread <id>`
+(`runs(on)`), and running the command, which says why it is unavailable ("its condition
+does not hold here: …", "not known yet …").

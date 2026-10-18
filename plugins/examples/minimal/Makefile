@@ -20,7 +20,7 @@ test:
 dist:
 	rm -rf dist && mkdir -p dist
 	for arch in arm64 amd64; do \
-		pkg=dist/pkg-$$arch && mkdir -p $$pkg/bin && cp plugin.json $$pkg/ && \
+		pkg=dist/pkg-$$arch && mkdir -p $$pkg/bin && cp plugin.json $$pkg/ && chmod 0644 $$pkg/plugin.json && \
 		GOOS=darwin GOARCH=$$arch CGO_ENABLED=0 go build -trimpath -ldflags=-s -o $$pkg/bin/$(NAME) . && \
 		COPYFILE_DISABLE=1 tar -C $$pkg -czf dist/$(NAME)-$(VERSION)-darwin-$$arch.tar.gz plugin.json bin/$(NAME) && \
 		rm -rf $$pkg || exit 1; \

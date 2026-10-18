@@ -78,7 +78,7 @@ place are refused, with a path to the problem (`nodes[2].list.rows[0].title: req
 | pill | `{"label": "failed", "tone": "error"}` | `ui.NewPill("failed", ui.ToneError)` | one or two words |
 | glyph | `{"status": "running"}` or `{"icon": "package", "tone": "muted"}` | `ui.StatusGlyph(s)`, `ui.IconGlyph(name, tone)` | a status or a lucide icon, not both |
 | action | exactly one of `{"event": "rerun", "data": "job-7"}`, `{"command": {"name", "args"}}`, `{"openUrl": "https://…"}`, `{"copy": "text"}` | `ui.EventAction(event, data)`, `ui.CommandAction(name, args)`, `ui.URLAction(url)`, `ui.CopyAction(text)` | below |
-| button | `{"key", "label", "icon", "style", "action", "disabled", "busy", "iconOnly"}` | `ui.EventButton(key, label, event)`, `ui.CommandButton(key, label, command, args)`, `ui.URLButton`, `ui.CopyButton`, then `.WithStyle(…)`, `.WithIcon("refresh-cw")`, `.AsIconOnly()` | `label` always (the tooltip of an icon-only button); styles `muted` (default), `outline`, `attention`, `destructive`, `link`; `busy` shows a spinner for work that outlives the click |
+| button | `{"key", "label", "icon", "style", "action", "disabled", "busy", "iconOnly"}` | `ui.EventButton(key, label, event)`, `ui.CommandButton(key, label, command, args)`, `ui.URLButton`, `ui.CopyButton`, then `.WithStyle(…)`, `.WithIcon("refresh-cw")`, `.AsIconOnly()`, `.WithData(id)` (an event's data) | `label` always (the tooltip of an icon-only button); styles `muted` (default), `outline`, `attention`, `destructive`, `link`; `busy` shows a spinner for work that outlives the click |
 
 **Actions.** An `event` reaches the plugin as a `surface/act` (`act.Action` is the event
 name, `act.Data` its data, at most 1 KB). A `command` runs a command with the panel's
@@ -172,7 +172,8 @@ Facts about one thing: a label (40 characters) and a value or a pill.
    "trailing": {"spans": [{"duration": {"ms": 42000}}]},
    "action": {"event": "open-run", "data": "7"},
    "actions": [{"key": "run-7-cancel", "label": "Cancel", "icon": "square", "iconOnly": true, "style": "destructive", "action": {"command": {"name": "plugin.ci.cancel", "args": {"run": "7"}}}}]},
-  {"key": "run-6", "glyph": {"status": "failed"}, "title": "CI", "pill": {"label": "failed", "tone": "error"}, "selected": true}]}}
+  {"key": "run-6", "glyph": {"status": "failed"}, "title": "CI", "pill": {"label": "failed", "tone": "error"}, "selected": true,
+   "actions": [{"key": "run-6-hide", "label": "Hide", "action": {"event": "hide", "data": "6"}}]}]}}
 ```
 
 ```go
@@ -183,7 +184,8 @@ ui.Node{Key: "runs", List: &ui.List{EmptyText: "No runs yet", Rows: []ui.Row{
 		Action:   ui.EventAction("open-run", "7"),
 		Actions: []ui.Button{ui.CommandButton("run-7-cancel", "Cancel", "plugin.ci.cancel", map[string]string{"run": "7"}).
 			WithIcon("square").AsIconOnly().WithStyle(ui.ButtonDestructive)}},
-	{Key: "run-6", Glyph: ui.StatusGlyph(ui.StatusFailed), Title: "CI", Pill: ui.NewPill("failed", ui.ToneError), Selected: true},
+	{Key: "run-6", Glyph: ui.StatusGlyph(ui.StatusFailed), Title: "CI", Pill: ui.NewPill("failed", ui.ToneError), Selected: true,
+		Actions: []ui.Button{ui.EventButton("run-6-hide", "Hide", "hide").WithData("6")}}, // act.Data == "6"
 }}}
 ```
 
@@ -416,7 +418,7 @@ relying on them.
 | `click` | a button, row or chip with an event | `Action` (event name), `Key` (element key), `Data` |
 | `submit` | a form's submit with an event | `Action`, `Key`, `Data`, `Values` (the form's fields by name) |
 | `change` | a field with a change event was edited | `Action`, `Key`, `Field`, `Value`, `Values` |
-| `tab` | the user switched tabs | `Action` is `"tab"`, `Key` and `Value` the new tab's key |
+| `tab` | the user switched tabs | `Action` is `"tab"`, `Key` the new tab's key (`Value` too, as `any`: use `Key`) |
 
 `Version` is the view version acted on. The host takes the kind, event, data and form
 from its own copy of that version, so a client cannot forge them; the plugin still
