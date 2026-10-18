@@ -20,6 +20,30 @@ const (
 	MaxEntries       = 10000
 )
 
+// maxDecompressed bounds the bytes read out of the gzip stream: the files plus room for
+// headers. Without it, metadata the entry limits do not see (any number of PAX or GNU
+// long-name headers before one entry, each up to 1 MiB) would decompress without end: a
+// small download could keep the daemon inflating for minutes. A variable for tests.
+var maxDecompressed int64 = MaxUnpackedBytes + 64<<20
+
+// capReader fails once more than max bytes were read.
+type capReader struct {
+	r      io.Reader
+	n, max int64
+}
+
+func (c *capReader) Read(p []byte) (int, error) {
+	if c.n >= c.max {
+		return 0, fmt.Errorf("more than %d bytes decompressed", c.max)
+	}
+	if int64(len(p)) > c.max-c.n {
+		p = p[:c.max-c.n]
+	}
+	n, err := c.r.Read(p)
+	c.n += int64(n)
+	return n, err
+}
+
 // ErrHashMismatch: a download's SHA-256 is not the one the index or checksums name.
 var ErrHashMismatch = errors.New("sha256 mismatch")
 
@@ -53,7 +77,8 @@ func Verify(file, want string) error {
 // the package directory's contents at its root (plugin.json, bin/…), optionally under
 // "./". Only directories and regular files are allowed, nothing outside dir (no absolute
 // names, no ".."), no links or devices; modes keep their executable bits and lose
-// everything but 0755. Limits: MaxEntries entries, MaxUnpackedBytes in all.
+// everything but 0755. Limits: MaxEntries entries, MaxUnpackedBytes in all, and a
+// little more than that decompressed.
 func Extract(tarball, dir string) error {
 	f, err := os.Open(tarball)
 	if err != nil {
@@ -65,7 +90,7 @@ func Extract(tarball, dir string) error {
 		return fmt.Errorf("extract: not a gzip file: %w", err)
 	}
 	defer func() { _ = gz.Close() }()
-	tr := tar.NewReader(gz)
+	tr := tar.NewReader(&capReader{r: gz, max: maxDecompressed})
 	var total int64
 	seen := map[string]bool{}
 	for n := 0; ; n++ {

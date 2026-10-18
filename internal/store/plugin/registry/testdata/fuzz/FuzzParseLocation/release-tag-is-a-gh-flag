@@ -1,0 +1,2 @@
+go test fuzz v1
+string("https://github.com/o/r/releases/download/--dir=%2Ftmp/-y")

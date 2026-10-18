@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("{\"schema\":1,\"plugins\":[{\"name\":\"x\",\"version\":\"1.0.0\",\"artifacts\":{\"darwin/arm64\":{\"url\":\"https://github.com/o/r/releases/download/--clobber/-O\",\"sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"}}}]}")
