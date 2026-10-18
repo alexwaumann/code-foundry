@@ -2,7 +2,7 @@ import { memo, useMemo, type ReactNode } from "react";
 import { Check, Circle, CircleDot } from "lucide-react";
 import type { ToolCallView } from "@/api/thread";
 import { grammarForPath, highlightLines, shellTokens } from "@/lib/highlight";
-import { agentReport, obj, parseObject, relPath, str, toolDiff, type Json } from "@/lib/toolSummary";
+import { obj, parseObject, relPath, str, toolDiff, type Json } from "@/lib/toolSummary";
 import { ThreadMarkdown, TokenSpans } from "./Code";
 import { CopyButton } from "./CodeActions";
 import { ToolDiffView } from "./ToolDiffView";
@@ -167,12 +167,11 @@ function EditDetail({ t, cwd }: { t: ToolCallView; cwd: string }) {
   return <ToolDiffView diff={diff} cwd={cwd} />;
 }
 
-/** The subagent's final report under its nested rows. */
-export function AgentReport({ t }: { t: ToolCallView }) {
-  const text = agentReport(t);
+/** An ended Agent call's detail: the report its subagent handed back (lib/toolSummary `agentReport`). */
+export function AgentReport({ text }: { text: string }) {
   if (!text) return null;
   return (
-    <div className="subresult selectable">
+    <div className="subresult selectable" data-testid="thread-agent-report">
       <ThreadMarkdown>{text}</ThreadMarkdown>
     </div>
   );

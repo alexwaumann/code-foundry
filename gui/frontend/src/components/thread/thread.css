@@ -348,13 +348,27 @@ html[data-thread-width="full"] .cf-thread {
   color: var(--muted-foreground);
   font-weight: 400;
 }
-/* A running subagent's activity on its Agent row, after a "·". */
+/* A running subagent's row is one line: the label at its own width, then the activity
+   after a "·" filling what is left (ellipsised), then the elapsed time and the spinner at
+   the right. When the line is too narrow the label and the activity both give way. */
+.cf-thread .row:has(> .meta > .act) > .lbl {
+  flex: 0 1 auto;
+}
+.cf-thread .row > .meta:has(> .act) {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+.cf-thread .row > .meta:has(> .act) > :not(.act) {
+  flex: none;
+  white-space: nowrap;
+}
 .cf-thread .row .act {
+  flex: 1 1 auto;
   font-size: 12px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 260px;
   min-width: 0;
 }
 .cf-thread .row .act::before {
@@ -381,11 +395,6 @@ html[data-thread-width="full"] .cf-thread {
 }
 .cf-thread .members {
   margin-left: 28px;
-}
-.cf-thread .children {
-  margin: 0 0 4px 12px;
-  padding-left: 16px;
-  border-left: 1px solid color-mix(in oklab, var(--foreground) 14%, transparent);
 }
 .cf-thread .matches {
   font-family: var(--t-mono);

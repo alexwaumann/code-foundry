@@ -129,14 +129,16 @@ for (const scheme of ["dark", "light"] as const) {
       await expect(code.locator('[data-line][data-line-type="change-deletion"]')).toHaveCount(1);
       await expect(code).toContainText("HeadRefOid");
 
-      // The subagent: nested rows and its report.
+      // The subagent: one line; open, only its report (its own rows stay out of the thread).
       const agent = await reveal(page, pane(page).locator('[data-tool="Agent"]'));
       await expect(agent).toContainText("Review the fingerprint change");
       await expect(agent).toContainText("4 tools · 41s");
+      await expect(agent.getByTestId("thread-tool").first()).toHaveAttribute("aria-expanded", "false");
       await agent.getByTestId("thread-tool").first().click();
-      await expect(agent.locator(".children")).toContainText("Read 2 files, searched code once");
-      await expect(agent.locator(".children")).toContainText("go vet ./internal/store/pr/...");
-      await expect(agent.locator(".subresult")).toContainText("Looks right.");
+      await expect(agent.getByTestId("thread-agent-report")).toContainText("Looks right.");
+      await expect(agent.locator("[data-tool]")).toHaveCount(0);
+      await expect(agent).not.toContainText("Read 2 files, searched code once");
+      await expect(agent).not.toContainText("go vet ./internal/store/pr/...");
 
       // The final answer's markdown: GFM table, highlighted Go in the bundled mono.
       const answer = await reveal(page, pane(page).locator('[data-testid="thread-text"][data-final]'));
