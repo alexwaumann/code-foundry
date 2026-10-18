@@ -6,6 +6,7 @@ import { contextKey, getListOptions, getListThreads, getUiContext } from "@/stor
 import { openAddProject } from "@/stores/addProject";
 import { openNewThreadPicker } from "@/stores/compose";
 import { openPublishDialog } from "@/stores/publish";
+import { allSurfaces } from "@/stores/plugins";
 import { presentSnooze } from "@/stores/snoozeDialog";
 import { leaveSubagent } from "@/stores/subagentView";
 import { attentionIds, useThreadsStore } from "@/stores/threads";
@@ -303,9 +304,19 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
   },
 };
 
+/**
+ * A plugin surface's show command (plugin.<plugin>.show.<surface>), window-local like
+ * view.panel.*: this window's panel for its selection opens the surface's tab (a page over
+ * the content area closes). The CLI's runs on the daemon and reaches windows as a ShowView.
+ */
+function presentPluginShow(name: string): boolean {
+  const m = allSurfaces().find((s) => s.showCommand === name);
+  return m ? showView(`panel.${m.kind}`) : false;
+}
+
 /** Runs the command's presenter, if it has one; false means "invoke it normally". */
 export function presentCommand(name: string): boolean {
-  return commandPresenters[name]?.() ?? false;
+  return commandPresenters[name]?.() ?? presentPluginShow(name);
 }
 
 /** Picked in the palette: runs its presenter instead of the arg prompts, if it has that kind. */

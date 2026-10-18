@@ -1,4 +1,5 @@
 import { UiIntent_Notify_Level, type UiIntent } from "@/gen/codefoundry/v1/ui_pb";
+import type { UiContextView } from "./command";
 
 export type NotifyLevel = "info" | "warning" | "error";
 
@@ -11,7 +12,12 @@ export type UiIntentView =
   | { kind: "showView"; name: string }
   | { kind: "playAlertSound"; volume: number }
   /** thread.agent.open: select the thread and show one of its own subagent runs read-only. */
-  | { kind: "showAgentRun"; threadId: string; runId: string };
+  | { kind: "showAgentRun"; threadId: string; runId: string }
+  /**
+   * A plugin's host/invoke with confirm "ask": run the command through runCommand, so the
+   * daemon's own confirm dialog asks the user. `caller` is who asked ("plugin:hello").
+   */
+  | { kind: "invokeCommand"; name: string; args: Record<string, string>; context: UiContextView | null; caller: string };
 
 const levelMap: Record<UiIntent_Notify_Level, NotifyLevel> = {
   [UiIntent_Notify_Level.UNSPECIFIED]: "info",
@@ -39,6 +45,25 @@ export function toUiIntentView(i: UiIntent): UiIntentView | null {
       return { kind: "playAlertSound", volume: e.value.volume };
     case "showAgentRun":
       return { kind: "showAgentRun", threadId: e.value.threadId, runId: e.value.runId };
+    case "invokeCommand": {
+      const c = e.value.context;
+      return {
+        kind: "invokeCommand",
+        name: e.value.name,
+        args: { ...e.value.args },
+        context: c
+          ? {
+              activeTerminalId: c.activeTerminalId,
+              activeThreadId: c.activeThreadId,
+              activeProjectId: c.activeProjectId,
+              activeWorktreePath: c.activeWorktreePath,
+              activeView: c.activeView,
+              activeWorkspaceId: c.activeWorkspaceId,
+            }
+          : null,
+        caller: e.value.caller,
+      };
+    }
     default:
       return null;
   }

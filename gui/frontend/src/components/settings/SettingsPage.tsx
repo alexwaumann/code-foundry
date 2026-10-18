@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { runCommand } from "@/stores/commands";
 import { loadSettingsSchema, useSettingsStore } from "@/stores/settings";
 import { closeSettings, setSettingsPage, useViewsStore } from "@/stores/views";
+import { guiPages } from "./guiPages";
 import { KeybindingsPage } from "./KeybindingsPage";
 import { pageSections, queryWords, searchSettings, type SearchResult } from "./model";
 import { PageHead } from "./PageHead";
@@ -25,11 +26,13 @@ const pageIcons: Readonly<Partial<Record<string, LucideIcon>>> = {
   source: GitBranch,
   keybindings: Keyboard,
   advanced: Wrench,
+  ...Object.fromEntries(guiPages.map((g) => [g.page.id, g.icon])),
 };
 
 /** Pages drawn by a component of their own, by id; the rest are section cards of fields. */
 const customPages: Readonly<Partial<Record<string, (p: { schema: SettingsSchemaView; page: SettingPageView }) => React.JSX.Element>>> = {
   keybindings: KeybindingsPage,
+  ...Object.fromEntries(guiPages.map((g) => [g.page.id, g.component])),
 };
 
 function Banners() {
@@ -139,7 +142,8 @@ export function SettingsPage() {
   const words = useMemo(() => queryWords(query), [query]);
   const searching = words.length > 0;
   const result = useMemo(() => (schema && searching ? searchSettings(schema, words) : null), [schema, searching, words]);
-  const page = schema?.pages.find((p) => p.id === pageId) ?? schema?.pages[0];
+  const pages = useMemo(() => (schema ? [...schema.pages, ...guiPages.map((g) => g.page)] : []), [schema]);
+  const page = pages.find((p) => p.id === pageId) ?? pages[0];
 
   // A new page (or the search's results) starts at the top.
   useEffect(() => {
@@ -190,7 +194,7 @@ export function SettingsPage() {
         </Button>
       </PaneHeader>
       <div className="flex min-h-0 flex-1">
-        <SettingsNav pages={schema?.pages ?? []} current={searching ? null : (page?.id ?? null)} counts={result?.counts ?? null} onPick={pick} />
+        <SettingsNav pages={pages} current={searching ? null : (page?.id ?? null)} counts={result?.counts ?? null} onPick={pick} />
         <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-6 pt-5 pb-6">
           <div className="mx-auto max-w-3xl" data-testid="settings-body" data-page={searching ? undefined : page?.id}>
             <Banners />

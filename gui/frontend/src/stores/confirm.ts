@@ -11,6 +11,32 @@ export interface ConfirmRequest {
   confirmLabel: string;
   /** Centered in the window instead of near the top (questions about the content under it). */
   centered?: boolean;
+  /** The command being confirmed and its args, when a command asks (runCommand). */
+  command?: string;
+  args?: Readonly<Record<string, string>>;
+  /** Who asked to run it, when not the user ("Hello", a plugin's InvokeCommand). */
+  caller?: string;
+}
+
+/** Asks for a command's confirmation in a dialog of its own (resolves the user's answer). */
+export type ConfirmPresenter = (req: ConfirmRequest) => Promise<boolean>;
+
+const presenters = new Map<string, ConfirmPresenter>();
+
+/**
+ * Lets a command confirm in its own dialog instead of the generic one (the plugin
+ * consent dialog for plugin.enable and plugin.dev). Returns the unregister function.
+ */
+export function registerConfirmPresenter(command: string, p: ConfirmPresenter): () => void {
+  presenters.set(command, p);
+  return () => {
+    if (presenters.get(command) === p) presenters.delete(command);
+  };
+}
+
+/** A command's own confirm presenter, if one is registered. */
+export function confirmPresenter(command: string): ConfirmPresenter | undefined {
+  return presenters.get(command);
 }
 
 interface ConfirmState {

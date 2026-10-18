@@ -7,6 +7,7 @@ import { ActionRunDialog } from "@/components/actions/ActionRunDialog";
 import { PublishDialog } from "@/components/publish/PublishDialog";
 import { SnoozeDialog } from "@/components/snooze/SnoozeDialog";
 import { ConfirmDialog } from "@/components/confirm/ConfirmDialog";
+import { ConsentDialog } from "@/components/plugin/ConsentDialog";
 import { StartPage } from "@/components/start/StartPage";
 import { HelpOverlay } from "@/components/help/HelpOverlay";
 import { SettingsPage } from "@/components/settings/SettingsPage";
@@ -209,6 +210,7 @@ export function App() {
         <CommandPalette />
         <HelpOverlay />
         <ConfirmDialog />
+        <ConsentDialog />
         <UpdateDialog />
         <AddProjectDialog />
         <PublishDialog />

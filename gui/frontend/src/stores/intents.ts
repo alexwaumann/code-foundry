@@ -2,6 +2,9 @@ import { toast } from "sonner";
 import { playAlertSound } from "@/api/app";
 import type { UiIntentView } from "@/api/ui";
 import { clearRevealOnArrival, revealShell } from "./bottomActions";
+import { runCommandForResult } from "./commands";
+import { getUiContext } from "./context";
+import { usePluginsStore } from "./plugins";
 import { PENDING_FOCUS_MS } from "./bottomPanel";
 import { showAgentRun } from "./subagentView";
 import { useTerminalsStore } from "./terminals";
@@ -52,6 +55,13 @@ function focusTerminal(id: string): void {
   }, PENDING_FOCUS_MS);
 }
 
+/** Who asked, in words: a plugin's display name ("plugin:hello" → "Hello"), else as given. */
+function callerName(caller: string): string {
+  const m = /^plugin:(.+)$/.exec(caller);
+  if (!m?.[1]) return caller;
+  return usePluginsStore.getState().byName[m[1]]?.displayName ?? m[1];
+}
+
 /** Applies one UI intent (delivered on the shared events stream) to the GUI. */
 export function applyIntent(intent: UiIntentView): void {
   const ui = useUiStore.getState();
@@ -85,6 +95,10 @@ export function applyIntent(intent: UiIntentView): void {
     case "playAlertSound":
       // notifications.test: a preview, whatever the focus, cooldown and sound toggle.
       void playAlertSound(intent.volume);
+      break;
+    case "invokeCommand":
+      // A plugin asked (host/invoke, confirm "ask"): the normal flow, the daemon's confirm text included.
+      void runCommandForResult(intent.name, intent.args, { ctx: intent.context ?? getUiContext(), caller: callerName(intent.caller) });
       break;
     case "showAgentRun":
       // thread.agent.open: the thread selected, one of its runs shown read-only.
