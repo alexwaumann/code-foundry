@@ -139,12 +139,20 @@ describe("splitProse", () => {
     ],
     ["the rest of a line after a label (a text node after <strong>)", " /Users/a/my report.pdf.", [" ", chip("/Users/a/my report.pdf"), "."]],
     ["a bracketed line", "(docs/my report.pdf)", ["(", chip("docs/my report.pdf"), ")"]],
-    ["a bare spaced path in a sentence: no chip, no wrong pieces", "I saved it to /Users/a/docs/my report.pdf for you.", null],
-    ["a bare relative one", "Open docs/my report.pdf now", null],
-    ["a bare one beside a plain path", "Read docs/my report.pdf and src/a.ts.", ["Read docs/my report.pdf and ", chip("src/a.ts"), "."]],
-    ["a sentence that reads like a spaced path loses its chips rather than gaining wrong ones", "Run /usr/bin/python3 on main.py today", null],
+    // A two-segment folder is no prose chip (the word rules), so these keep the one chip they had.
+    ["a folder then a file in a sentence keeps its chips", "the files in src/components like Button.tsx", ["the files in src/components like ", chip("Button.tsx")]],
+    ["a folder then a file to add keeps its chips", "in internal/store add thread.go", ["in internal/store add ", chip("thread.go")]],
+    ["a deeper folder then a file keeps both chips", "the files in src/components/ui like Button.tsx", ["the files in ", chip("src/components/ui"), " like ", chip("Button.tsx")]],
+    ["a deeper folder then a file to add keeps both chips", "in internal/store/thread add stream.go", ["in ", chip("internal/store/thread"), " add ", chip("stream.go")]],
+    ["a program then a file keeps both chips", "Run /usr/bin/python3 on main.py today", ["Run ", chip("/usr/bin/python3"), " on ", chip("main.py"), " today"]],
+    [
+      "a bare spaced path in a sentence is left to the word pass (its pieces, as before)",
+      "I saved it to /Users/a/docs/my report.pdf for you.",
+      ["I saved it to ", chip("/Users/a/docs/my"), " ", chip("report.pdf"), " for you."],
+    ],
+    ["a bare relative one: the word pass finds only the name", "Open docs/my report.pdf now", ["Open docs/my ", chip("report.pdf"), " now"]],
     ["quotes around words, not a path", 'He said "hello there" about src/a.ts', ['He said "hello there" about ', chip("src/a.ts")]],
-    ["apostrophes are not quotes", "Alex's notes and Sam's docs/my report.pdf", null],
+    ["apostrophes are not quotes", "Alex's notes and Sam's docs/my report.pdf", ["Alex's notes and Sam's docs/my ", chip("report.pdf")]],
     ["a run stops at a line break", "/usr/bin/env node\nnpm run build.md", [chip("/usr/bin/env"), " node\nnpm run ", chip("build.md")]],
   ])("%s", (_name, text, want) => {
     expect(splitProse(text)).toEqual(want);

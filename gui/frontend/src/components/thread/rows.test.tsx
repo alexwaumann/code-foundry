@@ -384,20 +384,19 @@ describe("path chips", () => {
     expect(openFileInPanel).toHaveBeenCalledTimes(1);
   });
 
-  it("paths with spaces are chips in a code span, in quotes and on a line of their own; a bare one in a sentence is not, nor its pieces", () => {
+  it("paths with spaces are chips in a code span, in quotes and on a line of their own", () => {
     const text = [
       "`docs/my report.pdf`: one page. The shot is \"shots/screen shot.png\".",
       "",
       "/w/shots/plain shot.png",
       "",
-      "I saved it to /w/out/final report.pdf for you.",
+      "The rest is in src/components/ui like Button.tsx.",
     ].join("\n");
     const c = show([user, { ...base, id: "a", ordinal: 2, kind: "text", text }], { working: true });
     const chips = [...c.querySelectorAll<HTMLElement>('[data-testid="path-chip"]')];
-    expect(chips.map((el) => el.dataset.path)).toEqual(["docs/my report.pdf", "shots/screen shot.png", "/w/shots/plain shot.png"]);
+    expect(chips.map((el) => el.dataset.path)).toEqual(["docs/my report.pdf", "shots/screen shot.png", "/w/shots/plain shot.png", "src/components/ui", "Button.tsx"]);
     fireEvent.click(chips[0] as HTMLElement);
     expect(openFileInPanel).toHaveBeenCalledWith("current", { project: "", base: "/w", path: "/w/docs/my report.pdf" });
-    expect(c.textContent).toContain("I saved it to /w/out/final report.pdf for you.");
   });
 
   it.each<[string, string, string, string]>([

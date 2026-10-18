@@ -16,8 +16,9 @@
  * too), or as a prose line that is nothing but the path (Claude's "one per line" lists);
  * it then has to pass more rules (spacedPathOk: a file with a known extension, no words
  * that read as a command). A bare one inside a sentence ("saved to /a/my report.pdf now")
- * is not chipped, and neither are its pieces: `/a/my` and `report.pdf` would open the
- * wrong files. A token is rejected when it:
+ * is left to the word pass, which may chip its pieces (`/a/my`, `report.pdf`): telling it
+ * from "the files in src/components like Button.tsx" is not safe, and that sentence's two
+ * chips matter more. A token is rejected when it:
  *
  * - has `://` (a URL) or starts with a domain-looking segment (`github.com/a/b`);
  * - starts with `-` (a flag), `@` (a scoped package, a decorator) or `$`;
@@ -188,11 +189,11 @@ const TRAIL = /[.,;:!?)\]}"'”’»]+$/;
 /** A run of a text node: plain text, or a path chip. */
 export type ProsePiece = string | PathMatch;
 
-/** A stretch of a text node already decided: a chip, or (null) text no word in it may chip. */
+/** A stretch of a text node that is one chip. */
 interface Span {
   start: number;
   end: number;
-  hit: PathMatch | null;
+  hit: PathMatch;
 }
 
 /** Quote pairs a spaced prose path may sit between (the quotes stay text). */
@@ -216,13 +217,13 @@ function quotedSpans(text: string): Span[] {
 const RUN_WORDS = 6;
 
 /**
- * Bare spaced paths in [from, to): a word with a slash and the words after it (single
- * spaces apart) up to the first that ends in a known extension, when together they pass
- * as a spaced path. Alone on its line (leading `([{"'`, trailing punctuation aside) the
- * run is a chip; inside a sentence it is only kept from the word pass, whose pieces of it
- * would be wrong.
+ * Spaced paths alone on their line in [from, to): a word with a slash and the words after
+ * it (single spaces apart) up to the first that ends in a known extension, when together
+ * they pass as a spaced path and nothing else is on the line (leading `([{"'` and trailing
+ * punctuation aside). Inside a sentence such a run is left to the word pass: "the files in
+ * src/components like Button.tsx" reads the same and keeps its two chips.
  */
-function runSpans(text: string, from: number, to: number): Span[] {
+function lineSpans(text: string, from: number, to: number): Span[] {
   const out: Span[] = [];
   const words = [...text.slice(from, to).matchAll(/\S+/g)].map((w) => ({ start: from + w.index, end: from + w.index + w[0].length }));
   for (let i = 0; i < words.length; i++) {
@@ -245,8 +246,10 @@ function runSpans(text: string, from: number, to: number): Span[] {
         const nl = text.indexOf("\n", end);
         const lineEnd = nl < 0 ? text.length : nl;
         const alone = /^\s*[([{"'“‘«]*$/.test(text.slice(lineStart, start)) && /^[.,;:!?)\]}"'”’»]*\s*$/.test(text.slice(end, lineEnd));
-        out.push(alone ? { start, end, hit } : { start: first.start, end: w.end, hit: null });
-        i = j;
+        if (alone) {
+          out.push({ start, end, hit });
+          i = j;
+        }
       }
       break;
     }
@@ -283,17 +286,17 @@ function gaps(spans: readonly Span[], from: number, to: number, fn: (a: number, 
 /**
  * A prose text split into text and path chips, or null when it has none (the common case:
  * callers keep the original node). Whitespace, quotes and stripped punctuation stay in the
- * text runs. Quoted spaced paths go first, then bare spaced runs, then single words.
+ * text runs. Quoted spaced paths go first, then spaced paths alone on a line, then single
+ * words.
  */
 export function splitProse(text: string): ProsePiece[] | null {
   // Cheap guard: every chip has a slash or a dot.
   if (!text.includes("/") && !text.includes(".")) return null;
   const quoted = quotedSpans(text);
-  const decided: Span[] = [...quoted];
-  gaps(quoted, 0, text.length, (a, b) => decided.push(...runSpans(text, a, b)));
-  decided.sort((x, y) => x.start - y.start);
-  const spans: Span[] = decided.filter((s) => s.hit);
-  gaps(decided, 0, text.length, (a, b) => {
+  const spans: Span[] = [...quoted];
+  gaps(quoted, 0, text.length, (a, b) => spans.push(...lineSpans(text, a, b)));
+  spans.sort((x, y) => x.start - y.start);
+  gaps([...spans], 0, text.length, (a, b) => {
     wordChips(text, a, b, spans);
   });
   if (spans.length === 0) return null;
@@ -301,7 +304,6 @@ export function splitProse(text: string): ProsePiece[] | null {
   const out: ProsePiece[] = [];
   let last = 0;
   for (const s of spans) {
-    if (!s.hit) continue;
     if (s.start > last) out.push(text.slice(last, s.start));
     out.push(s.hit);
     last = s.end;
