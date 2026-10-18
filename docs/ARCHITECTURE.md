@@ -341,7 +341,10 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   start is an error item and status error); every 30 s the store stops threads idle at
   their prompt past their prompt cache expiry (nothing pending, unfinished, queued or
   running in the background; up at least 5 minutes), disconnect reason "idle"
-  (`docs/notes/thread-lifecycle.md`).
+  (`docs/notes/thread-lifecycle.md`). A start of a thread whose worktree the app made and
+  a cleanup removed makes it again first, on the branch the row records, at the same
+  path, so `--resume` finds the transcript; workspace threads and user checkouts keep the
+  refusal (`recreate.go`, `docs/notes/recreate-worktree.md`).
 * **The runner** (`runner.go`, `stream.go`): `internal/claudestream` speaks the control
   protocol (initialize handshake, `can_use_tool` routed to the store, interrupt,
   set_model, set_permission_mode, set_cwd for RunIn). The stream is projected into

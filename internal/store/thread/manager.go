@@ -66,6 +66,14 @@ type Options struct {
 	// RefExists reports whether ref exists in the repository at dir; Create uses it
 	// to keep new worktree branches unique. Default: git rev-parse --verify.
 	RefExists func(ctx context.Context, dir, ref string) bool
+	// FetchBranch fetches origin's branch in the repository at dir and reports whether
+	// origin has it; a thread whose cleaned-up worktree is recreated looks there before
+	// making the branch again from its base (recreate.go). Default: git fetch.
+	FetchBranch func(ctx context.Context, dir, branch string) bool
+	// WorktreeRoot is the directory the app makes worktrees in (paths.Worktrees, the
+	// project store's Options.WorktreeRoot). Only a missing cwd under it is recreated
+	// when its thread starts (recreate.go); empty recreates none.
+	WorktreeRoot string
 	// Env entries ("KEY=VALUE") are added to every claude process's environment
 	// (Create, Reconnect, Fork). The daemon passes its loopback endpoint and token so
 	// the CLI inside a thread reaches it without the Unix socket. Every process also
@@ -163,6 +171,9 @@ func (o Options) withDefaults() (Options, error) {
 	}
 	if o.RefExists == nil {
 		o.RefExists = gitRefExists
+	}
+	if o.FetchBranch == nil {
+		o.FetchBranch = gitFetchBranch
 	}
 	def := func(d *time.Duration, v time.Duration) {
 		if *d <= 0 {
@@ -293,6 +304,8 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 			m.log.Warn("close the open turn of a thread the daemon lost", "thread", id, "err", err)
 		}
 	}
+	// Rows from before threads.branch get theirs from the project store (recreate.go).
+	m.startBackfill()
 	// Snoozes that ended while the daemon was stopped wake now, then the clock is
 	// checked on every tick (snooze.go).
 	m.wakeSnoozed()
