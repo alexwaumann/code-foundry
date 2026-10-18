@@ -129,6 +129,18 @@ func (p Paths) Attachments() string { return filepath.Join(p.home, "attachments"
 // removed.
 func (p Paths) Claude() string { return filepath.Join(p.home, "claude") }
 
+// Plugins is where plugin packages live: <Plugins>/<name>/plugin.json, a directory or,
+// for `plugin dev`, a symlink to the author's folder (internal/store/plugin).
+func (p Paths) Plugins() string { return filepath.Join(p.home, "plugins") }
+
+// PluginData is a plugin's own state directory (0700), outside its package so an update
+// never wipes it: <PluginData>/<name>.
+func (p Paths) PluginData() string { return filepath.Join(p.home, "plugin-data") }
+
+// PluginLogs is where each plugin's log goes: <PluginLogs>/<name>.log (stderr and its
+// log notifications, 1 MiB, one rotation).
+func (p Paths) PluginLogs() string { return filepath.Join(p.Logs(), "plugins") }
+
 // WindowBackground is the GUI host's own state: the window colour of each scheme, so the
 // window opens in the last theme's colour before the page (and the daemon's settings)
 // load (gui/windowbg.go). Not under App(): an update replaces that directory.
