@@ -492,9 +492,12 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
 * State discipline: sliced Zustand stores, one per daemon service. Streams update slices;
   components subscribe to the narrowest selector. Lists are virtualized. No global
   re-render on daemon events.
-* Connection budget: the GUI holds exactly one `EventService.Watch` stream plus at most
-  two long-lived streams: the content pane's `ThreadService.Watch` and the bottom
-  panel's active shell `TerminalService.Attach`, each only while it is visible. Everything else is unary, except a
+* Connection budget: the GUI holds exactly one `EventService.Watch` stream plus one
+  `ThreadService.Watch` per visible thread view (the content pane's thread, a plugin's
+  thread node; one stream when both show the same thread) and one `TerminalService.Attach`
+  per visible terminal view (the bottom panel's active shell, a plugin's terminal node),
+  each only while it is visible: usually two, three or four with a plugin's thread or
+  terminal on screen. Everything else is unary, except a
   `ProjectService.Clone` stream while the Add Project dialog clones a repository. This keeps
   the browser's six HTTP/1.1 connections per origin mostly free.
 * Stream liveness: the daemon sends a `StreamHeartbeat` on each of those three streams
@@ -524,8 +527,10 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   has Run in terminal, a new shell in the thread's bottom panel through `terminal.new
   --run` (the daemon types the line once the shell has printed its prompt;
   `docs/notes/code-block-actions.md`).
-* Only the visible thread is watched and only the visible shell is attached. Switching
-  threads (or bottom panel tabs) ends the old stream and opens the new one. Background
+* Only visible views are watched or attached: one Watch per thread on screen
+  (`stores/thread.ts` `startThreadWatch` counts its holders), one Attach per terminal
+  view (a plugin terminal shown in the bottom panel is not attached in its node too).
+  Switching threads (or bottom panel tabs) ends the old stream and opens the new one. Background
   threads cost nothing in the frontend. Watching is also how the daemon knows a thread
   is being looked at: while a thread has a Watch subscriber, finished turns count as
   seen (`docs/notes/phase2-integration.md` describes the same rule for the old Attach).
@@ -626,9 +631,9 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
 
 Plugins extend the app without changing it: separate executables, written by users and
 mostly by agents, that the daemon runs and that contribute commands, side-panel
-surfaces, thread flags and a share of every new thread's environment. Design:
-`docs/sketches/plugins/` (`DECISIONS.md` wins); what was built: `docs/notes/plugins-1-core.md`
-through `plugins-4-skill.md`.
+surfaces, thread flags, a share of every new thread's environment, and Claude threads and
+terminals of their own. Design: `docs/sketches/plugins/` (`DECISIONS.md` wins); what was
+built: `docs/notes/plugins-1-core.md` through `plugins-6-thread-terminal.md`.
 
 * **Package.** A folder `$CONFIG/plugins/<name>` with a `plugin.json` (name, version,
   protocol, `exec`, permissions, commands, surfaces) and the executable. `plugin dev`
@@ -650,8 +655,9 @@ through `plugins-4-skill.md`.
   `command/invoke`, `surface/open|visibility|close|act`, `events/event`. Plugin → host:
   `log`, `host/invoke` (the manifest's command globs; never a confirm on the user's
   behalf; `confirm: ask` hands it to the GUI), `secret/*`, `view/update|append|toast`,
-  `context/set`, `thread/setFlag`, `events/subscribe`, `session/setEnvironment`;
-  `thread/*` and `terminal/*` are PR 6.
+  `context/set`, `thread/setFlag`, `events/subscribe`, `session/setEnvironment`,
+  `thread/create|send|archive|list`, `terminal/create|close|list`. A `surface/act`
+  carries the acting panel's context.
 * **Commands.** Manifest commands are `plugin.<name>.<command>` in the one registry
   (`Registry.ReplacePrefix` on enable and restart), so the palette, CLI and agents get
   them; each surface adds `plugin.<name>.show.<surface>`, whose availability is the
@@ -672,6 +678,15 @@ through `plugins-4-skill.md`.
   flag on a thread (an overlay in the thread store; never the stream's status).
   `session/setEnvironment` contributes env, PATH entries and `--add-dir`s to new threads
   through the thread store's spawn extras (§6).
+* **Own threads and terminals** (permissions `threads`, `terminals`;
+  `docs/notes/plugins-6-thread-terminal.md`). A plugin's thread is an ordinary thread
+  owned by `plugin:<name>` (`threads.owner`) with a cwd and env/add-dirs of its own
+  (checked like a session environment, applied on every spawn in place of the plugin's
+  session environment): hidden from filtered lists (`thread list --plugin`), the sidebar,
+  attention and the dock, still running, stopping and costing like any. Its terminal is
+  labelled `kind=plugin` (`internal/termlabel`). Both are rendered by `thread` and
+  `terminal` view nodes; disabling or removing the plugin archives the threads and closes
+  the terminals.
 * **SDK** (`pluginsdk/`, a nested module, stdlib only, Go 1.24, `replace`d into the
   main module): manifest types and validation, the JSON-RPC `Conn`, `Serve` and `Host`;
   `pluginsdk/ui` (typed nodes, builders, `Validate` with the host's rules);
