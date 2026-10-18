@@ -1,4 +1,4 @@
-import { useContext, type ReactNode } from "react";
+import { useContext, useState, type ReactNode } from "react";
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { citeLabel } from "@/lib/citation";
@@ -150,8 +150,10 @@ function CiteTag({ id, selected }: { id: string; selected: boolean }) {
   const c = useCitation(draftKey, id);
   const editing = useEditingCitation(draftKey, id);
   const label = c ? citeLabel(c.text) : "Quote";
+  // Controlled throughout (switching between controlled and not warns): shut while editing.
+  const [hover, setHover] = useState(false);
   return (
-    <Tooltip disableHoverableContent open={editing ? false : undefined}>
+    <Tooltip disableHoverableContent open={hover && !editing} onOpenChange={setHover}>
       <TooltipTrigger asChild>
         <NodeViewWrapper
           as="span"
