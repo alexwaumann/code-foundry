@@ -343,7 +343,7 @@ func TestSurfaceLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	e.waitLog("act viewer=s-viewer")
-	v2 = w.view("after the second inc", contains("count 2"))
+	w.view("after the second inc", contains("count 2"))
 	// A second watcher gets the current view at once.
 	w2 := e.watch("panel", s1)
 	w2.view("second watcher", contains("count 2"))
