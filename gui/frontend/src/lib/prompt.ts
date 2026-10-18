@@ -10,17 +10,23 @@
  *   thread [Fix resize race](cf-thread://s-0123456789ab)
  *          another thread, by its Code Foundry id; the label is its name when it was inserted
  *   pr     [#123](cf-pr://owner/repo/123)  a GitHub pull request
+ *   cite   [Assistant quote](cf-cite://c0123456789ab)
+ *          text quoted from one of Claude's answers, by the id of its body in the draft
+ *          (lib/citation.ts; docs/notes/citations.md)
  *
  * The editor (components/compose/PromptEditor.tsx) parses the string into its document
  * and serializes it back on every edit; on send, projectPrompt turns each token into what
  * Claude gets: `[Image: <name>; ref=<staged path>]` (`[PDF: …]` for a PDF), `/<skill>`, `@cf-file://…` (the
  * daemon resolves that to the thread's worktree; docs/notes/composer-tags-1-daemon.md),
  * `[Thread "<name>" (id <id>)]` (the daemon adds where to read that thread, its
- * transcript; docs/notes/composer-thread-pr-tags.md) or `owner/repo#123`. Skill, file and
+ * transcript; docs/notes/composer-thread-pr-tags.md), `owner/repo#123`, or a citation's
+ * self-contained `[Assistant quote](cf-cite://v1/…)` link. Skill, file and
  * pull request labels are derived from the URL, never read back from the token; a
  * thread's label is the one thing a token carries (the name when it was inserted). Pure
  * functions only.
  */
+
+import { CITE_LABEL, citeLink, citeToken, type CitationBody } from "./citation";
 
 export const ATTACHMENT_SCHEME = "cf-attachment://";
 export const SKILL_SCHEME = "cf-skill://";
@@ -40,17 +46,20 @@ export type PromptTag =
   /** id: the Code Foundry thread id; name: its name when the tag was inserted. */
   | { tagKind: "thread"; id: string; name: string }
   /** slug: "owner/repo" (lower case, as the daemon's gh store keeps it). */
-  | { tagKind: "pr"; slug: string; number: number };
+  | { tagKind: "pr"; slug: string; number: number }
+  /** id: the citation's id in the draft (Draft.citations holds its body). */
+  | { tagKind: "cite"; id: string };
 
 export type TagKind = PromptTag["tagKind"];
 
 export type PromptPiece = { kind: "text"; text: string } | ({ kind: "tag" } & PromptTag);
 
 // Groups: 1 image label, 2 attachment id | 3 label, 4 skill|file, 5 project slot, 6 the rest
-// | 7 thread label, 8 thread id | 9 owner, 10 repo, 11 pull request number.
+// | 7 thread label, 8 thread id | 9 owner, 10 repo, 11 pull request number | 12 citation id.
 // Labels exclude "[" (tokens never have one), so an unclosed "[" typed before a tag stays text.
+// A citation id has no "/": a sent citation link (cf-cite://v1/…) is not a draft token.
 const TOKEN =
-  /!\[([^[\]\n]*)\]\(cf-attachment:\/\/([A-Za-z0-9_-]+)\)|\[([^[\]\n]*)\]\(cf-(skill|file):\/\/([A-Za-z0-9_.~-]+)\/([^\s()]+)\)|\[([^[\]\n]*)\]\(cf-thread:\/\/([A-Za-z0-9_-]{1,64})\)|\[[^[\]\n]*\]\(cf-pr:\/\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\/([1-9][0-9]{0,9})\)/g;
+  /!\[([^[\]\n]*)\]\(cf-attachment:\/\/([A-Za-z0-9_-]+)\)|\[([^[\]\n]*)\]\(cf-(skill|file):\/\/([A-Za-z0-9_.~-]+)\/([^\s()]+)\)|\[([^[\]\n]*)\]\(cf-thread:\/\/([A-Za-z0-9_-]{1,64})\)|\[[^[\]\n]*\]\(cf-pr:\/\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\/([1-9][0-9]{0,9})\)|\[[^[\]\n]*\]\(cf-cite:\/\/([A-Za-z0-9_-]{1,64})\)/g;
 
 /** A thread name safe inside its token and its projection's quotes: no brackets, quotes or newlines; the id when blank. */
 export function threadLabel(name: string, id: string): string {
@@ -96,6 +105,8 @@ export function tagLabel(tag: PromptTag): string {
       return threadLabel(tag.name, tag.id);
     case "pr":
       return `#${String(tag.number)}`;
+    case "cite":
+      return CITE_LABEL;
   }
 }
 
@@ -117,6 +128,8 @@ export function tagToken(tag: PromptTag): string {
       return `[${tagLabel(tag)}](${THREAD_SCHEME}${tag.id})`;
     case "pr":
       return `[${tagLabel(tag)}](${PR_SCHEME}${tag.slug}/${String(tag.number)})`;
+    case "cite":
+      return citeToken(tag.id);
   }
 }
 
@@ -130,6 +143,7 @@ function matchTag(m: RegExpExecArray): PromptTag | null {
   if (m[2] !== undefined) return { tagKind: "image", id: m[2], name: m[1] ?? "" };
   if (m[8] !== undefined) return { tagKind: "thread", id: m[8], name: m[7] ?? "" };
   if (m[11] !== undefined) return { tagKind: "pr", slug: `${m[9] ?? ""}/${m[10] ?? ""}`.toLowerCase(), number: Number(m[11]) };
+  if (m[12] !== undefined) return { tagKind: "cite", id: m[12] };
   const slot = m[5] ?? "";
   const rest = decode(m[6] ?? "");
   if (rest === null || rest === "") return null;
@@ -222,7 +236,7 @@ export function removeReferences(text: string, id: string): string {
 
 /**
  * The project a tag belongs to: a project skill's or a file's project; "" for images, user
- * skills, threads and pull requests (those name the same thing from any checkout).
+ * skills, threads, pull requests and citations (those name the same thing from any checkout).
  */
 export function tagProject(tag: PromptTag): string {
   return tag.tagKind === "skill" || tag.tagKind === "file" ? tag.projectId : "";
@@ -278,9 +292,14 @@ export function stagedPdfPages(path: string): number | null {
  * daemon's file reference both end at whitespace. A thread becomes `[Thread "<label>" (id
  * <id>)]`, which the daemon completes with where to read it (internal/store/thread
  * threadrefs.go), a pull request `owner/repo#123` (what gh takes; a space between it and
- * a word right against it).
+ * a word right against it), a citation its self-contained link (lib/citation.ts
+ * citeLink; nothing when `cite` does not know it).
  */
-export function projectPrompt(text: string, lookup: (id: string) => { name: string; ref: string; kind: "image" | "pdf" } | undefined): string {
+export function projectPrompt(
+  text: string,
+  lookup: (id: string) => { name: string; ref: string; kind: "image" | "pdf" } | undefined,
+  cite: (id: string) => CitationBody | undefined = () => undefined,
+): string {
   let out = "";
   let last = 0;
   for (const { m, tag } of tokens(text)) {
@@ -310,6 +329,11 @@ export function projectPrompt(text: string, lookup: (id: string) => { name: stri
         const lead = /[\p{L}\p{N}_]$/u.test(out) ? " " : "";
         const trail = /^[\p{L}\p{N}_]/u.test(text.slice(last)) ? " " : "";
         out += `${lead}${tag.slug}#${String(tag.number)}${trail}`;
+        break;
+      }
+      case "cite": {
+        const c = cite(tag.id);
+        if (c) out += citeLink(c);
         break;
       }
     }

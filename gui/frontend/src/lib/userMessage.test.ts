@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { tagToken } from "./prompt";
+import { citeLink, parseCiteLink } from "./citation";
+import { projectPrompt, tagToken } from "./prompt";
 import { inlineAttachmentPaths, parseUserMessage, sentComposerText } from "./userMessage";
 
 const image = (id: string, name: string) => tagToken({ tagKind: "image", id, name });
@@ -91,5 +92,47 @@ describe("parseUserMessage", () => {
       { kind: "pdf", name: "gone.pdf", path: "" },
     ]);
     expect([...inlineAttachmentPaths(pieces)]).toEqual(["/att/0a.pdf", "/att/1b.png"]);
+  });
+});
+
+describe("citations", () => {
+  const C = tagToken({ tagKind: "cite", id: "c1" });
+  const body = { threadId: "s-1", itemId: "s-1-i9", text: "the branch is pushed", comment: "Is it on main?", start: 23, end: 43, prefix: "pass and ", suffix: ": PR #63" };
+  const cite = (id: string) => (id === "c1" ? body : undefined);
+
+  it("sentComposerText replaces the token with the link (dropped without a body)", () => {
+    expect(sentComposerText(`${C} ok ${image("a1", "x.png")}`, () => 0, cite)).toBe(`${citeLink(body)} ok ${image("0", "x.png")}`);
+    expect(sentComposerText(`${C} ok`, () => 0)).toBe(" ok");
+  });
+
+  it("round trip: projected and parsed back into the same citation, from either text", () => {
+    const draft = `${C} is that right? ${file("r1", "a.go")}`;
+    const text = projectPrompt(draft, () => undefined, cite);
+    const composer = sentComposerText(draft, () => undefined, cite);
+    const want = [
+      { kind: "cite", cite: body },
+      { kind: "text", text: " is that right? " },
+    ];
+    expect(parseUserMessage(text, composer, []).slice(0, 2)).toEqual(want);
+    // Without composer text (it equalled the projection, or the CLI sent the link): the link alone still makes the chip.
+    expect(parseUserMessage(`${citeLink(body)} is that right?`, "", [])).toEqual([
+      { kind: "cite", cite: body },
+      { kind: "text", text: " is that right?" },
+    ]);
+    expect(parseCiteLink(citeLink(body))).toEqual(body);
+  });
+
+  it("a link next to a tag and across lines", () => {
+    const composer = `${skill("tdd")} ${citeLink(body)}\nnext`;
+    expect(parseUserMessage("ignored", composer, [])).toEqual([
+      { kind: "skill", name: "tdd" },
+      { kind: "text", text: " " },
+      { kind: "cite", cite: body },
+      { kind: "text", text: "\nnext" },
+    ]);
+  });
+
+  it("a draft token stored as is (no body) shows nothing", () => {
+    expect(parseUserMessage("x", `a ${C} b`, [])).toEqual([{ kind: "text", text: "a  b" }]);
   });
 });

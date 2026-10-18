@@ -318,3 +318,34 @@ describe("thread and pull request tags", () => {
     expect(proseOf(text)).toBe(text);
   });
 });
+
+describe("citation tags", () => {
+  const C = "[Assistant quote](cf-cite://c0123456789ab)";
+  const body = { threadId: "s-1", itemId: "s-1-i9", text: "the branch is pushed", comment: "", start: 23, end: 43, prefix: "pass and ", suffix: ": PR #63" };
+
+  it("parses and serializes the draft token", () => {
+    const lines = parsePrompt(`see ${C} ok`);
+    expect(lines).toEqual([[{ kind: "text", text: "see " }, { kind: "tag", tagKind: "cite", id: "c0123456789ab" }, { kind: "text", text: " ok" }]]);
+    expect(serializePrompt(lines)).toBe(`see ${C} ok`);
+    expect(tagToken({ tagKind: "cite", id: "c0123456789ab" })).toBe(C);
+    expect(tagLabel({ tagKind: "cite", id: "x" })).toBe("Assistant quote");
+  });
+
+  it("a sent link, a bad id or an unclosed bracket before it are not draft tokens", () => {
+    const sent = "[Assistant quote](cf-cite://v1/s-1/i1?text=a&start=0&end=1)";
+    expect(parseLine(sent)).toEqual([{ kind: "text", text: sent }]);
+    expect(parseLine("[Assistant quote](cf-cite://a/b)")).toEqual([{ kind: "text", text: "[Assistant quote](cf-cite://a/b)" }]);
+    expect(parseLine(`[x ${C}`)).toEqual([{ kind: "text", text: "[x " }, { kind: "tag", tagKind: "cite", id: "c0123456789ab" }]);
+  });
+
+  it("projects to the self-contained link; dropped when the draft has no body for it", () => {
+    const out = projectPrompt(`${C} is that right?`, () => undefined, (id) => (id === "c0123456789ab" ? body : undefined));
+    expect(out).toBe("[Assistant quote](cf-cite://v1/s-1/s-1-i9?text=the%20branch%20is%20pushed&start=23&end=43&prefix=pass%20and%20&suffix=%3A%20PR%20%2363) is that right?");
+    expect(projectPrompt(`${C} is that right?`, () => undefined)).toBe(" is that right?");
+  });
+
+  it("is not project-scoped: member changes keep it", () => {
+    expect(tagsByProject(`${C} x`)).toEqual([]);
+    expect(retainProjectTags(`${C} x`, [])).toBe(`${C} x`);
+  });
+});
