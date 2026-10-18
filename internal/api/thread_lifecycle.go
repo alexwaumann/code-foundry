@@ -285,7 +285,8 @@ func threadToProto(s thread.Thread) *v1.Thread {
 	if r := s.Retry; r != nil {
 		p.Retry = &v1.ApiRetry{Attempt: int32(r.Attempt), MaxRetries: int32(r.MaxRetries), RetryAt: timestamppb.New(r.RetryAt), ErrorStatus: int32(r.Status), Error: r.Error}
 	}
-	metadataToProto(s, p) // thread_metadata.go
+	metadataToProto(s, p)           // thread_metadata.go
+	p.Flags = flagsToProto(s.Flags) // thread_flags.go
 	return p
 }
 

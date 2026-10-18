@@ -4284,6 +4284,112 @@ func (x *SlashCommandsResponse) GetCommands() []*SlashCommand {
 	return nil
 }
 
+type ClearThreadFlagsRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// The plugin whose flag to clear; empty clears every flag.
+	Plugin        string `protobuf:"bytes,2,opt,name=plugin,proto3" json:"plugin,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ClearThreadFlagsRequest) Reset() {
+	*x = ClearThreadFlagsRequest{}
+	mi := &file_codefoundry_v1_thread_proto_msgTypes[49]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ClearThreadFlagsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ClearThreadFlagsRequest) ProtoMessage() {}
+
+func (x *ClearThreadFlagsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_thread_proto_msgTypes[49]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ClearThreadFlagsRequest.ProtoReflect.Descriptor instead.
+func (*ClearThreadFlagsRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_thread_proto_rawDescGZIP(), []int{49}
+}
+
+func (x *ClearThreadFlagsRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ClearThreadFlagsRequest) GetPlugin() string {
+	if x != nil {
+		return x.Plugin
+	}
+	return ""
+}
+
+type ClearThreadFlagsResponse struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Thread *Thread                `protobuf:"bytes,1,opt,name=thread,proto3" json:"thread,omitempty"`
+	// How many flags were removed.
+	Cleared       int32 `protobuf:"varint,2,opt,name=cleared,proto3" json:"cleared,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ClearThreadFlagsResponse) Reset() {
+	*x = ClearThreadFlagsResponse{}
+	mi := &file_codefoundry_v1_thread_proto_msgTypes[50]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ClearThreadFlagsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ClearThreadFlagsResponse) ProtoMessage() {}
+
+func (x *ClearThreadFlagsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_thread_proto_msgTypes[50]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ClearThreadFlagsResponse.ProtoReflect.Descriptor instead.
+func (*ClearThreadFlagsResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_thread_proto_rawDescGZIP(), []int{50}
+}
+
+func (x *ClearThreadFlagsResponse) GetThread() *Thread {
+	if x != nil {
+		return x.Thread
+	}
+	return nil
+}
+
+func (x *ClearThreadFlagsResponse) GetCleared() int32 {
+	if x != nil {
+		return x.Cleared
+	}
+	return 0
+}
+
 var File_codefoundry_v1_thread_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_thread_proto_rawDesc = "" +
@@ -4589,7 +4695,13 @@ const file_codefoundry_v1_thread_proto_rawDesc = "" +
 	"\x14SlashCommandsRequest\x12\x1b\n" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\"Q\n" +
 	"\x15SlashCommandsResponse\x128\n" +
-	"\bcommands\x18\x01 \x03(\v2\x1c.codefoundry.v1.SlashCommandR\bcommands*a\n" +
+	"\bcommands\x18\x01 \x03(\v2\x1c.codefoundry.v1.SlashCommandR\bcommands\"A\n" +
+	"\x17ClearThreadFlagsRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
+	"\x06plugin\x18\x02 \x01(\tR\x06plugin\"d\n" +
+	"\x18ClearThreadFlagsResponse\x12.\n" +
+	"\x06thread\x18\x01 \x01(\v2\x16.codefoundry.v1.ThreadR\x06thread\x12\x18\n" +
+	"\acleared\x18\x02 \x01(\x05R\acleared*a\n" +
 	"\rMessageOrigin\x12\x1e\n" +
 	"\x1aMESSAGE_ORIGIN_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13MESSAGE_ORIGIN_USER\x10\x01\x12\x17\n" +
@@ -4633,7 +4745,7 @@ const file_codefoundry_v1_thread_proto_rawDesc = "" +
 	"\x1bTHREAD_DECISION_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15THREAD_DECISION_ALLOW\x10\x01\x12%\n" +
 	"!THREAD_DECISION_ALLOW_FOR_SESSION\x10\x02\x12\x18\n" +
-	"\x14THREAD_DECISION_DENY\x10\x032\xd6\x17\n" +
+	"\x14THREAD_DECISION_DENY\x10\x032\xb9\x18\n" +
 	"\rThreadService\x12U\n" +
 	"\x06Create\x12#.codefoundry.v1.CreateThreadRequest\x1a$.codefoundry.v1.CreateThreadResponse\"\x00\x12O\n" +
 	"\x04Fork\x12!.codefoundry.v1.ForkThreadRequest\x1a\".codefoundry.v1.ForkThreadResponse\"\x00\x12Q\n" +
@@ -4650,7 +4762,9 @@ const file_codefoundry_v1_thread_proto_rawDesc = "" +
 	"\x06Snooze\x12#.codefoundry.v1.SnoozeThreadRequest\x1a$.codefoundry.v1.SnoozeThreadResponse\"\x00\x12R\n" +
 	"\x05Label\x12\".codefoundry.v1.LabelThreadRequest\x1a#.codefoundry.v1.LabelThreadResponse\"\x00\x12U\n" +
 	"\x06Report\x12#.codefoundry.v1.ReportThreadRequest\x1a$.codefoundry.v1.ReportThreadResponse\"\x00\x12^\n" +
-	"\tSetBudget\x12&.codefoundry.v1.SetThreadBudgetRequest\x1a'.codefoundry.v1.SetThreadBudgetResponse\"\x00\x12^\n" +
+	"\tSetBudget\x12&.codefoundry.v1.SetThreadBudgetRequest\x1a'.codefoundry.v1.SetThreadBudgetResponse\"\x00\x12a\n" +
+	"\n" +
+	"ClearFlags\x12'.codefoundry.v1.ClearThreadFlagsRequest\x1a(.codefoundry.v1.ClearThreadFlagsResponse\"\x00\x12^\n" +
 	"\tSubscribe\x12&.codefoundry.v1.SubscribeThreadRequest\x1a'.codefoundry.v1.SubscribeThreadResponse\"\x00\x12d\n" +
 	"\vUnsubscribe\x12(.codefoundry.v1.UnsubscribeThreadRequest\x1a).codefoundry.v1.UnsubscribeThreadResponse\"\x00\x12v\n" +
 	"\x11ListSubscriptions\x12..codefoundry.v1.ListThreadSubscriptionsRequest\x1a/.codefoundry.v1.ListThreadSubscriptionsResponse\"\x00\x12Q\n" +
@@ -4683,7 +4797,7 @@ func file_codefoundry_v1_thread_proto_rawDescGZIP() []byte {
 }
 
 var file_codefoundry_v1_thread_proto_enumTypes = make([]protoimpl.EnumInfo, 9)
-var file_codefoundry_v1_thread_proto_msgTypes = make([]protoimpl.MessageInfo, 51)
+var file_codefoundry_v1_thread_proto_msgTypes = make([]protoimpl.MessageInfo, 53)
 var file_codefoundry_v1_thread_proto_goTypes = []any{
 	(MessageOrigin)(0),                      // 0: codefoundry.v1.MessageOrigin
 	(ToolCallStatus)(0),                     // 1: codefoundry.v1.ToolCallStatus
@@ -4743,60 +4857,62 @@ var file_codefoundry_v1_thread_proto_goTypes = []any{
 	(*ThreadSlashCommandsChange)(nil),       // 55: codefoundry.v1.ThreadSlashCommandsChange
 	(*SlashCommandsRequest)(nil),            // 56: codefoundry.v1.SlashCommandsRequest
 	(*SlashCommandsResponse)(nil),           // 57: codefoundry.v1.SlashCommandsResponse
-	nil,                                     // 58: codefoundry.v1.ThreadRequestItem.AnswersEntry
-	nil,                                     // 59: codefoundry.v1.RespondThreadRequest.AnswersEntry
-	(*timestamppb.Timestamp)(nil),           // 60: google.protobuf.Timestamp
-	(*StreamHeartbeat)(nil),                 // 61: codefoundry.v1.StreamHeartbeat
-	(*Thread)(nil),                          // 62: codefoundry.v1.Thread
-	(PermissionMode)(0),                     // 63: codefoundry.v1.PermissionMode
-	(*CreateThreadRequest)(nil),             // 64: codefoundry.v1.CreateThreadRequest
-	(*ForkThreadRequest)(nil),               // 65: codefoundry.v1.ForkThreadRequest
-	(*ListThreadsRequest)(nil),              // 66: codefoundry.v1.ListThreadsRequest
-	(*GetThreadRequest)(nil),                // 67: codefoundry.v1.GetThreadRequest
-	(*WaitThreadRequest)(nil),               // 68: codefoundry.v1.WaitThreadRequest
-	(*RenameThreadRequest)(nil),             // 69: codefoundry.v1.RenameThreadRequest
-	(*CloseThreadRequest)(nil),              // 70: codefoundry.v1.CloseThreadRequest
-	(*ReconnectThreadRequest)(nil),          // 71: codefoundry.v1.ReconnectThreadRequest
-	(*RemoveThreadRequest)(nil),             // 72: codefoundry.v1.RemoveThreadRequest
-	(*RunInThreadRequest)(nil),              // 73: codefoundry.v1.RunInThreadRequest
-	(*PinThreadRequest)(nil),                // 74: codefoundry.v1.PinThreadRequest
-	(*ArchiveThreadRequest)(nil),            // 75: codefoundry.v1.ArchiveThreadRequest
-	(*SnoozeThreadRequest)(nil),             // 76: codefoundry.v1.SnoozeThreadRequest
-	(*LabelThreadRequest)(nil),              // 77: codefoundry.v1.LabelThreadRequest
-	(*ReportThreadRequest)(nil),             // 78: codefoundry.v1.ReportThreadRequest
-	(*SetThreadBudgetRequest)(nil),          // 79: codefoundry.v1.SetThreadBudgetRequest
-	(*SubscribeThreadRequest)(nil),          // 80: codefoundry.v1.SubscribeThreadRequest
-	(*UnsubscribeThreadRequest)(nil),        // 81: codefoundry.v1.UnsubscribeThreadRequest
-	(*ListThreadSubscriptionsRequest)(nil),  // 82: codefoundry.v1.ListThreadSubscriptionsRequest
-	(*WatchThreadsRequest)(nil),             // 83: codefoundry.v1.WatchThreadsRequest
-	(*StageAttachmentRequest)(nil),          // 84: codefoundry.v1.StageAttachmentRequest
-	(*ReadAttachmentRequest)(nil),           // 85: codefoundry.v1.ReadAttachmentRequest
-	(*CreateThreadResponse)(nil),            // 86: codefoundry.v1.CreateThreadResponse
-	(*ForkThreadResponse)(nil),              // 87: codefoundry.v1.ForkThreadResponse
-	(*ListThreadsResponse)(nil),             // 88: codefoundry.v1.ListThreadsResponse
-	(*GetThreadResponse)(nil),               // 89: codefoundry.v1.GetThreadResponse
-	(*WaitThreadResponse)(nil),              // 90: codefoundry.v1.WaitThreadResponse
-	(*RenameThreadResponse)(nil),            // 91: codefoundry.v1.RenameThreadResponse
-	(*CloseThreadResponse)(nil),             // 92: codefoundry.v1.CloseThreadResponse
-	(*ReconnectThreadResponse)(nil),         // 93: codefoundry.v1.ReconnectThreadResponse
-	(*RemoveThreadResponse)(nil),            // 94: codefoundry.v1.RemoveThreadResponse
-	(*RunInThreadResponse)(nil),             // 95: codefoundry.v1.RunInThreadResponse
-	(*PinThreadResponse)(nil),               // 96: codefoundry.v1.PinThreadResponse
-	(*ArchiveThreadResponse)(nil),           // 97: codefoundry.v1.ArchiveThreadResponse
-	(*SnoozeThreadResponse)(nil),            // 98: codefoundry.v1.SnoozeThreadResponse
-	(*LabelThreadResponse)(nil),             // 99: codefoundry.v1.LabelThreadResponse
-	(*ReportThreadResponse)(nil),            // 100: codefoundry.v1.ReportThreadResponse
-	(*SetThreadBudgetResponse)(nil),         // 101: codefoundry.v1.SetThreadBudgetResponse
-	(*SubscribeThreadResponse)(nil),         // 102: codefoundry.v1.SubscribeThreadResponse
-	(*UnsubscribeThreadResponse)(nil),       // 103: codefoundry.v1.UnsubscribeThreadResponse
-	(*ListThreadSubscriptionsResponse)(nil), // 104: codefoundry.v1.ListThreadSubscriptionsResponse
-	(*ThreadListEvent)(nil),                 // 105: codefoundry.v1.ThreadListEvent
-	(*StageAttachmentResponse)(nil),         // 106: codefoundry.v1.StageAttachmentResponse
-	(*ReadAttachmentResponse)(nil),          // 107: codefoundry.v1.ReadAttachmentResponse
+	(*ClearThreadFlagsRequest)(nil),         // 58: codefoundry.v1.ClearThreadFlagsRequest
+	(*ClearThreadFlagsResponse)(nil),        // 59: codefoundry.v1.ClearThreadFlagsResponse
+	nil,                                     // 60: codefoundry.v1.ThreadRequestItem.AnswersEntry
+	nil,                                     // 61: codefoundry.v1.RespondThreadRequest.AnswersEntry
+	(*timestamppb.Timestamp)(nil),           // 62: google.protobuf.Timestamp
+	(*StreamHeartbeat)(nil),                 // 63: codefoundry.v1.StreamHeartbeat
+	(*Thread)(nil),                          // 64: codefoundry.v1.Thread
+	(PermissionMode)(0),                     // 65: codefoundry.v1.PermissionMode
+	(*CreateThreadRequest)(nil),             // 66: codefoundry.v1.CreateThreadRequest
+	(*ForkThreadRequest)(nil),               // 67: codefoundry.v1.ForkThreadRequest
+	(*ListThreadsRequest)(nil),              // 68: codefoundry.v1.ListThreadsRequest
+	(*GetThreadRequest)(nil),                // 69: codefoundry.v1.GetThreadRequest
+	(*WaitThreadRequest)(nil),               // 70: codefoundry.v1.WaitThreadRequest
+	(*RenameThreadRequest)(nil),             // 71: codefoundry.v1.RenameThreadRequest
+	(*CloseThreadRequest)(nil),              // 72: codefoundry.v1.CloseThreadRequest
+	(*ReconnectThreadRequest)(nil),          // 73: codefoundry.v1.ReconnectThreadRequest
+	(*RemoveThreadRequest)(nil),             // 74: codefoundry.v1.RemoveThreadRequest
+	(*RunInThreadRequest)(nil),              // 75: codefoundry.v1.RunInThreadRequest
+	(*PinThreadRequest)(nil),                // 76: codefoundry.v1.PinThreadRequest
+	(*ArchiveThreadRequest)(nil),            // 77: codefoundry.v1.ArchiveThreadRequest
+	(*SnoozeThreadRequest)(nil),             // 78: codefoundry.v1.SnoozeThreadRequest
+	(*LabelThreadRequest)(nil),              // 79: codefoundry.v1.LabelThreadRequest
+	(*ReportThreadRequest)(nil),             // 80: codefoundry.v1.ReportThreadRequest
+	(*SetThreadBudgetRequest)(nil),          // 81: codefoundry.v1.SetThreadBudgetRequest
+	(*SubscribeThreadRequest)(nil),          // 82: codefoundry.v1.SubscribeThreadRequest
+	(*UnsubscribeThreadRequest)(nil),        // 83: codefoundry.v1.UnsubscribeThreadRequest
+	(*ListThreadSubscriptionsRequest)(nil),  // 84: codefoundry.v1.ListThreadSubscriptionsRequest
+	(*WatchThreadsRequest)(nil),             // 85: codefoundry.v1.WatchThreadsRequest
+	(*StageAttachmentRequest)(nil),          // 86: codefoundry.v1.StageAttachmentRequest
+	(*ReadAttachmentRequest)(nil),           // 87: codefoundry.v1.ReadAttachmentRequest
+	(*CreateThreadResponse)(nil),            // 88: codefoundry.v1.CreateThreadResponse
+	(*ForkThreadResponse)(nil),              // 89: codefoundry.v1.ForkThreadResponse
+	(*ListThreadsResponse)(nil),             // 90: codefoundry.v1.ListThreadsResponse
+	(*GetThreadResponse)(nil),               // 91: codefoundry.v1.GetThreadResponse
+	(*WaitThreadResponse)(nil),              // 92: codefoundry.v1.WaitThreadResponse
+	(*RenameThreadResponse)(nil),            // 93: codefoundry.v1.RenameThreadResponse
+	(*CloseThreadResponse)(nil),             // 94: codefoundry.v1.CloseThreadResponse
+	(*ReconnectThreadResponse)(nil),         // 95: codefoundry.v1.ReconnectThreadResponse
+	(*RemoveThreadResponse)(nil),            // 96: codefoundry.v1.RemoveThreadResponse
+	(*RunInThreadResponse)(nil),             // 97: codefoundry.v1.RunInThreadResponse
+	(*PinThreadResponse)(nil),               // 98: codefoundry.v1.PinThreadResponse
+	(*ArchiveThreadResponse)(nil),           // 99: codefoundry.v1.ArchiveThreadResponse
+	(*SnoozeThreadResponse)(nil),            // 100: codefoundry.v1.SnoozeThreadResponse
+	(*LabelThreadResponse)(nil),             // 101: codefoundry.v1.LabelThreadResponse
+	(*ReportThreadResponse)(nil),            // 102: codefoundry.v1.ReportThreadResponse
+	(*SetThreadBudgetResponse)(nil),         // 103: codefoundry.v1.SetThreadBudgetResponse
+	(*SubscribeThreadResponse)(nil),         // 104: codefoundry.v1.SubscribeThreadResponse
+	(*UnsubscribeThreadResponse)(nil),       // 105: codefoundry.v1.UnsubscribeThreadResponse
+	(*ListThreadSubscriptionsResponse)(nil), // 106: codefoundry.v1.ListThreadSubscriptionsResponse
+	(*ThreadListEvent)(nil),                 // 107: codefoundry.v1.ThreadListEvent
+	(*StageAttachmentResponse)(nil),         // 108: codefoundry.v1.StageAttachmentResponse
+	(*ReadAttachmentResponse)(nil),          // 109: codefoundry.v1.ReadAttachmentResponse
 }
 var file_codefoundry_v1_thread_proto_depIdxs = []int32{
-	60,  // 0: codefoundry.v1.ThreadItem.created_at:type_name -> google.protobuf.Timestamp
-	60,  // 1: codefoundry.v1.ThreadItem.updated_at:type_name -> google.protobuf.Timestamp
+	62,  // 0: codefoundry.v1.ThreadItem.created_at:type_name -> google.protobuf.Timestamp
+	62,  // 1: codefoundry.v1.ThreadItem.updated_at:type_name -> google.protobuf.Timestamp
 	10,  // 2: codefoundry.v1.ThreadItem.user_message:type_name -> codefoundry.v1.UserMessageItem
 	11,  // 3: codefoundry.v1.ThreadItem.assistant_text:type_name -> codefoundry.v1.AssistantTextItem
 	12,  // 4: codefoundry.v1.ThreadItem.thinking:type_name -> codefoundry.v1.ThinkingItem
@@ -4811,7 +4927,7 @@ var file_codefoundry_v1_thread_proto_depIdxs = []int32{
 	0,   // 13: codefoundry.v1.UserMessageItem.origin:type_name -> codefoundry.v1.MessageOrigin
 	1,   // 14: codefoundry.v1.ToolCallItem.status:type_name -> codefoundry.v1.ToolCallStatus
 	2,   // 15: codefoundry.v1.ThreadRequestItem.state:type_name -> codefoundry.v1.ThreadRequestState
-	58,  // 16: codefoundry.v1.ThreadRequestItem.answers:type_name -> codefoundry.v1.ThreadRequestItem.AnswersEntry
+	60,  // 16: codefoundry.v1.ThreadRequestItem.answers:type_name -> codefoundry.v1.ThreadRequestItem.AnswersEntry
 	9,   // 17: codefoundry.v1.ThreadItemsSnapshot.items:type_name -> codefoundry.v1.ThreadItem
 	20,  // 18: codefoundry.v1.ThreadItemsSnapshot.pending:type_name -> codefoundry.v1.ThreadPendingRequest
 	29,  // 19: codefoundry.v1.ThreadItemsSnapshot.mcp:type_name -> codefoundry.v1.ThreadMcpStatus
@@ -4829,18 +4945,18 @@ var file_codefoundry_v1_thread_proto_depIdxs = []int32{
 	25,  // 31: codefoundry.v1.ThreadEvent.pending_snapshot:type_name -> codefoundry.v1.ThreadPendingSnapshot
 	30,  // 32: codefoundry.v1.ThreadEvent.mcp:type_name -> codefoundry.v1.ThreadMcpChange
 	55,  // 33: codefoundry.v1.ThreadEvent.commands:type_name -> codefoundry.v1.ThreadSlashCommandsChange
-	61,  // 34: codefoundry.v1.ThreadEvent.heartbeat:type_name -> codefoundry.v1.StreamHeartbeat
+	63,  // 34: codefoundry.v1.ThreadEvent.heartbeat:type_name -> codefoundry.v1.StreamHeartbeat
 	32,  // 35: codefoundry.v1.ThreadEvent.agents:type_name -> codefoundry.v1.ThreadAgentsChange
 	3,   // 36: codefoundry.v1.McpServer.status:type_name -> codefoundry.v1.McpServerStatus
 	27,  // 37: codefoundry.v1.McpServer.tools:type_name -> codefoundry.v1.McpTool
-	60,  // 38: codefoundry.v1.ThreadMcpStatus.checked_at:type_name -> google.protobuf.Timestamp
+	62,  // 38: codefoundry.v1.ThreadMcpStatus.checked_at:type_name -> google.protobuf.Timestamp
 	4,   // 39: codefoundry.v1.ThreadMcpStatus.trigger:type_name -> codefoundry.v1.McpCheckTrigger
 	28,  // 40: codefoundry.v1.ThreadMcpStatus.servers:type_name -> codefoundry.v1.McpServer
 	29,  // 41: codefoundry.v1.ThreadMcpChange.status:type_name -> codefoundry.v1.ThreadMcpStatus
 	5,   // 42: codefoundry.v1.ThreadAgentRun.status:type_name -> codefoundry.v1.ThreadAgentStatus
-	60,  // 43: codefoundry.v1.ThreadAgentRun.started_at:type_name -> google.protobuf.Timestamp
-	60,  // 44: codefoundry.v1.ThreadAgentRun.resumed_at:type_name -> google.protobuf.Timestamp
-	60,  // 45: codefoundry.v1.ThreadAgentRun.ended_at:type_name -> google.protobuf.Timestamp
+	62,  // 43: codefoundry.v1.ThreadAgentRun.started_at:type_name -> google.protobuf.Timestamp
+	62,  // 44: codefoundry.v1.ThreadAgentRun.resumed_at:type_name -> google.protobuf.Timestamp
+	62,  // 45: codefoundry.v1.ThreadAgentRun.ended_at:type_name -> google.protobuf.Timestamp
 	31,  // 46: codefoundry.v1.ThreadAgentsChange.agents:type_name -> codefoundry.v1.ThreadAgentRun
 	35,  // 47: codefoundry.v1.ListThreadItemsRequest.query:type_name -> codefoundry.v1.ThreadItemsQuery
 	21,  // 48: codefoundry.v1.ListThreadItemsResponse.snapshot:type_name -> codefoundry.v1.ThreadItemsSnapshot
@@ -4849,87 +4965,90 @@ var file_codefoundry_v1_thread_proto_depIdxs = []int32{
 	9,   // 51: codefoundry.v1.ThreadItemsPage.items:type_name -> codefoundry.v1.ThreadItem
 	9,   // 52: codefoundry.v1.SendThreadMessageResponse.item:type_name -> codefoundry.v1.ThreadItem
 	7,   // 53: codefoundry.v1.RespondThreadRequest.decision:type_name -> codefoundry.v1.ThreadDecision
-	59,  // 54: codefoundry.v1.RespondThreadRequest.answers:type_name -> codefoundry.v1.RespondThreadRequest.AnswersEntry
+	61,  // 54: codefoundry.v1.RespondThreadRequest.answers:type_name -> codefoundry.v1.RespondThreadRequest.AnswersEntry
 	9,   // 55: codefoundry.v1.RespondThreadResponse.item:type_name -> codefoundry.v1.ThreadItem
-	62,  // 56: codefoundry.v1.SetThreadModelResponse.thread:type_name -> codefoundry.v1.Thread
-	63,  // 57: codefoundry.v1.SetThreadPermissionModeRequest.permission_mode:type_name -> codefoundry.v1.PermissionMode
-	62,  // 58: codefoundry.v1.SetThreadPermissionModeResponse.thread:type_name -> codefoundry.v1.Thread
-	62,  // 59: codefoundry.v1.SetThreadEffortResponse.thread:type_name -> codefoundry.v1.Thread
+	64,  // 56: codefoundry.v1.SetThreadModelResponse.thread:type_name -> codefoundry.v1.Thread
+	65,  // 57: codefoundry.v1.SetThreadPermissionModeRequest.permission_mode:type_name -> codefoundry.v1.PermissionMode
+	64,  // 58: codefoundry.v1.SetThreadPermissionModeResponse.thread:type_name -> codefoundry.v1.Thread
+	64,  // 59: codefoundry.v1.SetThreadEffortResponse.thread:type_name -> codefoundry.v1.Thread
 	29,  // 60: codefoundry.v1.McpStatusResponse.status:type_name -> codefoundry.v1.ThreadMcpStatus
 	29,  // 61: codefoundry.v1.McpReconnectResponse.status:type_name -> codefoundry.v1.ThreadMcpStatus
 	54,  // 62: codefoundry.v1.ThreadSlashCommandsChange.commands:type_name -> codefoundry.v1.SlashCommand
 	54,  // 63: codefoundry.v1.SlashCommandsResponse.commands:type_name -> codefoundry.v1.SlashCommand
-	64,  // 64: codefoundry.v1.ThreadService.Create:input_type -> codefoundry.v1.CreateThreadRequest
-	65,  // 65: codefoundry.v1.ThreadService.Fork:input_type -> codefoundry.v1.ForkThreadRequest
-	66,  // 66: codefoundry.v1.ThreadService.List:input_type -> codefoundry.v1.ListThreadsRequest
-	67,  // 67: codefoundry.v1.ThreadService.Get:input_type -> codefoundry.v1.GetThreadRequest
-	68,  // 68: codefoundry.v1.ThreadService.Wait:input_type -> codefoundry.v1.WaitThreadRequest
-	69,  // 69: codefoundry.v1.ThreadService.Rename:input_type -> codefoundry.v1.RenameThreadRequest
-	70,  // 70: codefoundry.v1.ThreadService.Close:input_type -> codefoundry.v1.CloseThreadRequest
-	71,  // 71: codefoundry.v1.ThreadService.Reconnect:input_type -> codefoundry.v1.ReconnectThreadRequest
-	72,  // 72: codefoundry.v1.ThreadService.Remove:input_type -> codefoundry.v1.RemoveThreadRequest
-	73,  // 73: codefoundry.v1.ThreadService.RunIn:input_type -> codefoundry.v1.RunInThreadRequest
-	74,  // 74: codefoundry.v1.ThreadService.Pin:input_type -> codefoundry.v1.PinThreadRequest
-	75,  // 75: codefoundry.v1.ThreadService.Archive:input_type -> codefoundry.v1.ArchiveThreadRequest
-	76,  // 76: codefoundry.v1.ThreadService.Snooze:input_type -> codefoundry.v1.SnoozeThreadRequest
-	77,  // 77: codefoundry.v1.ThreadService.Label:input_type -> codefoundry.v1.LabelThreadRequest
-	78,  // 78: codefoundry.v1.ThreadService.Report:input_type -> codefoundry.v1.ReportThreadRequest
-	79,  // 79: codefoundry.v1.ThreadService.SetBudget:input_type -> codefoundry.v1.SetThreadBudgetRequest
-	80,  // 80: codefoundry.v1.ThreadService.Subscribe:input_type -> codefoundry.v1.SubscribeThreadRequest
-	81,  // 81: codefoundry.v1.ThreadService.Unsubscribe:input_type -> codefoundry.v1.UnsubscribeThreadRequest
-	82,  // 82: codefoundry.v1.ThreadService.ListSubscriptions:input_type -> codefoundry.v1.ListThreadSubscriptionsRequest
-	83,  // 83: codefoundry.v1.ThreadService.Watch:input_type -> codefoundry.v1.WatchThreadsRequest
-	84,  // 84: codefoundry.v1.ThreadService.StageAttachment:input_type -> codefoundry.v1.StageAttachmentRequest
-	85,  // 85: codefoundry.v1.ThreadService.ReadAttachment:input_type -> codefoundry.v1.ReadAttachmentRequest
-	33,  // 86: codefoundry.v1.ThreadService.ListItems:input_type -> codefoundry.v1.ListThreadItemsRequest
-	37,  // 87: codefoundry.v1.ThreadService.WatchThread:input_type -> codefoundry.v1.WatchThreadRequest
-	38,  // 88: codefoundry.v1.ThreadService.Send:input_type -> codefoundry.v1.SendThreadMessageRequest
-	40,  // 89: codefoundry.v1.ThreadService.Respond:input_type -> codefoundry.v1.RespondThreadRequest
-	42,  // 90: codefoundry.v1.ThreadService.Interrupt:input_type -> codefoundry.v1.InterruptThreadRequest
-	44,  // 91: codefoundry.v1.ThreadService.SetModel:input_type -> codefoundry.v1.SetThreadModelRequest
-	46,  // 92: codefoundry.v1.ThreadService.SetPermissionMode:input_type -> codefoundry.v1.SetThreadPermissionModeRequest
-	48,  // 93: codefoundry.v1.ThreadService.SetEffort:input_type -> codefoundry.v1.SetThreadEffortRequest
-	50,  // 94: codefoundry.v1.ThreadService.McpStatus:input_type -> codefoundry.v1.McpStatusRequest
-	52,  // 95: codefoundry.v1.ThreadService.McpReconnect:input_type -> codefoundry.v1.McpReconnectRequest
-	56,  // 96: codefoundry.v1.ThreadService.SlashCommands:input_type -> codefoundry.v1.SlashCommandsRequest
-	86,  // 97: codefoundry.v1.ThreadService.Create:output_type -> codefoundry.v1.CreateThreadResponse
-	87,  // 98: codefoundry.v1.ThreadService.Fork:output_type -> codefoundry.v1.ForkThreadResponse
-	88,  // 99: codefoundry.v1.ThreadService.List:output_type -> codefoundry.v1.ListThreadsResponse
-	89,  // 100: codefoundry.v1.ThreadService.Get:output_type -> codefoundry.v1.GetThreadResponse
-	90,  // 101: codefoundry.v1.ThreadService.Wait:output_type -> codefoundry.v1.WaitThreadResponse
-	91,  // 102: codefoundry.v1.ThreadService.Rename:output_type -> codefoundry.v1.RenameThreadResponse
-	92,  // 103: codefoundry.v1.ThreadService.Close:output_type -> codefoundry.v1.CloseThreadResponse
-	93,  // 104: codefoundry.v1.ThreadService.Reconnect:output_type -> codefoundry.v1.ReconnectThreadResponse
-	94,  // 105: codefoundry.v1.ThreadService.Remove:output_type -> codefoundry.v1.RemoveThreadResponse
-	95,  // 106: codefoundry.v1.ThreadService.RunIn:output_type -> codefoundry.v1.RunInThreadResponse
-	96,  // 107: codefoundry.v1.ThreadService.Pin:output_type -> codefoundry.v1.PinThreadResponse
-	97,  // 108: codefoundry.v1.ThreadService.Archive:output_type -> codefoundry.v1.ArchiveThreadResponse
-	98,  // 109: codefoundry.v1.ThreadService.Snooze:output_type -> codefoundry.v1.SnoozeThreadResponse
-	99,  // 110: codefoundry.v1.ThreadService.Label:output_type -> codefoundry.v1.LabelThreadResponse
-	100, // 111: codefoundry.v1.ThreadService.Report:output_type -> codefoundry.v1.ReportThreadResponse
-	101, // 112: codefoundry.v1.ThreadService.SetBudget:output_type -> codefoundry.v1.SetThreadBudgetResponse
-	102, // 113: codefoundry.v1.ThreadService.Subscribe:output_type -> codefoundry.v1.SubscribeThreadResponse
-	103, // 114: codefoundry.v1.ThreadService.Unsubscribe:output_type -> codefoundry.v1.UnsubscribeThreadResponse
-	104, // 115: codefoundry.v1.ThreadService.ListSubscriptions:output_type -> codefoundry.v1.ListThreadSubscriptionsResponse
-	105, // 116: codefoundry.v1.ThreadService.Watch:output_type -> codefoundry.v1.ThreadListEvent
-	106, // 117: codefoundry.v1.ThreadService.StageAttachment:output_type -> codefoundry.v1.StageAttachmentResponse
-	107, // 118: codefoundry.v1.ThreadService.ReadAttachment:output_type -> codefoundry.v1.ReadAttachmentResponse
-	34,  // 119: codefoundry.v1.ThreadService.ListItems:output_type -> codefoundry.v1.ListThreadItemsResponse
-	26,  // 120: codefoundry.v1.ThreadService.WatchThread:output_type -> codefoundry.v1.ThreadEvent
-	39,  // 121: codefoundry.v1.ThreadService.Send:output_type -> codefoundry.v1.SendThreadMessageResponse
-	41,  // 122: codefoundry.v1.ThreadService.Respond:output_type -> codefoundry.v1.RespondThreadResponse
-	43,  // 123: codefoundry.v1.ThreadService.Interrupt:output_type -> codefoundry.v1.InterruptThreadResponse
-	45,  // 124: codefoundry.v1.ThreadService.SetModel:output_type -> codefoundry.v1.SetThreadModelResponse
-	47,  // 125: codefoundry.v1.ThreadService.SetPermissionMode:output_type -> codefoundry.v1.SetThreadPermissionModeResponse
-	49,  // 126: codefoundry.v1.ThreadService.SetEffort:output_type -> codefoundry.v1.SetThreadEffortResponse
-	51,  // 127: codefoundry.v1.ThreadService.McpStatus:output_type -> codefoundry.v1.McpStatusResponse
-	53,  // 128: codefoundry.v1.ThreadService.McpReconnect:output_type -> codefoundry.v1.McpReconnectResponse
-	57,  // 129: codefoundry.v1.ThreadService.SlashCommands:output_type -> codefoundry.v1.SlashCommandsResponse
-	97,  // [97:130] is the sub-list for method output_type
-	64,  // [64:97] is the sub-list for method input_type
-	64,  // [64:64] is the sub-list for extension type_name
-	64,  // [64:64] is the sub-list for extension extendee
-	0,   // [0:64] is the sub-list for field type_name
+	64,  // 64: codefoundry.v1.ClearThreadFlagsResponse.thread:type_name -> codefoundry.v1.Thread
+	66,  // 65: codefoundry.v1.ThreadService.Create:input_type -> codefoundry.v1.CreateThreadRequest
+	67,  // 66: codefoundry.v1.ThreadService.Fork:input_type -> codefoundry.v1.ForkThreadRequest
+	68,  // 67: codefoundry.v1.ThreadService.List:input_type -> codefoundry.v1.ListThreadsRequest
+	69,  // 68: codefoundry.v1.ThreadService.Get:input_type -> codefoundry.v1.GetThreadRequest
+	70,  // 69: codefoundry.v1.ThreadService.Wait:input_type -> codefoundry.v1.WaitThreadRequest
+	71,  // 70: codefoundry.v1.ThreadService.Rename:input_type -> codefoundry.v1.RenameThreadRequest
+	72,  // 71: codefoundry.v1.ThreadService.Close:input_type -> codefoundry.v1.CloseThreadRequest
+	73,  // 72: codefoundry.v1.ThreadService.Reconnect:input_type -> codefoundry.v1.ReconnectThreadRequest
+	74,  // 73: codefoundry.v1.ThreadService.Remove:input_type -> codefoundry.v1.RemoveThreadRequest
+	75,  // 74: codefoundry.v1.ThreadService.RunIn:input_type -> codefoundry.v1.RunInThreadRequest
+	76,  // 75: codefoundry.v1.ThreadService.Pin:input_type -> codefoundry.v1.PinThreadRequest
+	77,  // 76: codefoundry.v1.ThreadService.Archive:input_type -> codefoundry.v1.ArchiveThreadRequest
+	78,  // 77: codefoundry.v1.ThreadService.Snooze:input_type -> codefoundry.v1.SnoozeThreadRequest
+	79,  // 78: codefoundry.v1.ThreadService.Label:input_type -> codefoundry.v1.LabelThreadRequest
+	80,  // 79: codefoundry.v1.ThreadService.Report:input_type -> codefoundry.v1.ReportThreadRequest
+	81,  // 80: codefoundry.v1.ThreadService.SetBudget:input_type -> codefoundry.v1.SetThreadBudgetRequest
+	58,  // 81: codefoundry.v1.ThreadService.ClearFlags:input_type -> codefoundry.v1.ClearThreadFlagsRequest
+	82,  // 82: codefoundry.v1.ThreadService.Subscribe:input_type -> codefoundry.v1.SubscribeThreadRequest
+	83,  // 83: codefoundry.v1.ThreadService.Unsubscribe:input_type -> codefoundry.v1.UnsubscribeThreadRequest
+	84,  // 84: codefoundry.v1.ThreadService.ListSubscriptions:input_type -> codefoundry.v1.ListThreadSubscriptionsRequest
+	85,  // 85: codefoundry.v1.ThreadService.Watch:input_type -> codefoundry.v1.WatchThreadsRequest
+	86,  // 86: codefoundry.v1.ThreadService.StageAttachment:input_type -> codefoundry.v1.StageAttachmentRequest
+	87,  // 87: codefoundry.v1.ThreadService.ReadAttachment:input_type -> codefoundry.v1.ReadAttachmentRequest
+	33,  // 88: codefoundry.v1.ThreadService.ListItems:input_type -> codefoundry.v1.ListThreadItemsRequest
+	37,  // 89: codefoundry.v1.ThreadService.WatchThread:input_type -> codefoundry.v1.WatchThreadRequest
+	38,  // 90: codefoundry.v1.ThreadService.Send:input_type -> codefoundry.v1.SendThreadMessageRequest
+	40,  // 91: codefoundry.v1.ThreadService.Respond:input_type -> codefoundry.v1.RespondThreadRequest
+	42,  // 92: codefoundry.v1.ThreadService.Interrupt:input_type -> codefoundry.v1.InterruptThreadRequest
+	44,  // 93: codefoundry.v1.ThreadService.SetModel:input_type -> codefoundry.v1.SetThreadModelRequest
+	46,  // 94: codefoundry.v1.ThreadService.SetPermissionMode:input_type -> codefoundry.v1.SetThreadPermissionModeRequest
+	48,  // 95: codefoundry.v1.ThreadService.SetEffort:input_type -> codefoundry.v1.SetThreadEffortRequest
+	50,  // 96: codefoundry.v1.ThreadService.McpStatus:input_type -> codefoundry.v1.McpStatusRequest
+	52,  // 97: codefoundry.v1.ThreadService.McpReconnect:input_type -> codefoundry.v1.McpReconnectRequest
+	56,  // 98: codefoundry.v1.ThreadService.SlashCommands:input_type -> codefoundry.v1.SlashCommandsRequest
+	88,  // 99: codefoundry.v1.ThreadService.Create:output_type -> codefoundry.v1.CreateThreadResponse
+	89,  // 100: codefoundry.v1.ThreadService.Fork:output_type -> codefoundry.v1.ForkThreadResponse
+	90,  // 101: codefoundry.v1.ThreadService.List:output_type -> codefoundry.v1.ListThreadsResponse
+	91,  // 102: codefoundry.v1.ThreadService.Get:output_type -> codefoundry.v1.GetThreadResponse
+	92,  // 103: codefoundry.v1.ThreadService.Wait:output_type -> codefoundry.v1.WaitThreadResponse
+	93,  // 104: codefoundry.v1.ThreadService.Rename:output_type -> codefoundry.v1.RenameThreadResponse
+	94,  // 105: codefoundry.v1.ThreadService.Close:output_type -> codefoundry.v1.CloseThreadResponse
+	95,  // 106: codefoundry.v1.ThreadService.Reconnect:output_type -> codefoundry.v1.ReconnectThreadResponse
+	96,  // 107: codefoundry.v1.ThreadService.Remove:output_type -> codefoundry.v1.RemoveThreadResponse
+	97,  // 108: codefoundry.v1.ThreadService.RunIn:output_type -> codefoundry.v1.RunInThreadResponse
+	98,  // 109: codefoundry.v1.ThreadService.Pin:output_type -> codefoundry.v1.PinThreadResponse
+	99,  // 110: codefoundry.v1.ThreadService.Archive:output_type -> codefoundry.v1.ArchiveThreadResponse
+	100, // 111: codefoundry.v1.ThreadService.Snooze:output_type -> codefoundry.v1.SnoozeThreadResponse
+	101, // 112: codefoundry.v1.ThreadService.Label:output_type -> codefoundry.v1.LabelThreadResponse
+	102, // 113: codefoundry.v1.ThreadService.Report:output_type -> codefoundry.v1.ReportThreadResponse
+	103, // 114: codefoundry.v1.ThreadService.SetBudget:output_type -> codefoundry.v1.SetThreadBudgetResponse
+	59,  // 115: codefoundry.v1.ThreadService.ClearFlags:output_type -> codefoundry.v1.ClearThreadFlagsResponse
+	104, // 116: codefoundry.v1.ThreadService.Subscribe:output_type -> codefoundry.v1.SubscribeThreadResponse
+	105, // 117: codefoundry.v1.ThreadService.Unsubscribe:output_type -> codefoundry.v1.UnsubscribeThreadResponse
+	106, // 118: codefoundry.v1.ThreadService.ListSubscriptions:output_type -> codefoundry.v1.ListThreadSubscriptionsResponse
+	107, // 119: codefoundry.v1.ThreadService.Watch:output_type -> codefoundry.v1.ThreadListEvent
+	108, // 120: codefoundry.v1.ThreadService.StageAttachment:output_type -> codefoundry.v1.StageAttachmentResponse
+	109, // 121: codefoundry.v1.ThreadService.ReadAttachment:output_type -> codefoundry.v1.ReadAttachmentResponse
+	34,  // 122: codefoundry.v1.ThreadService.ListItems:output_type -> codefoundry.v1.ListThreadItemsResponse
+	26,  // 123: codefoundry.v1.ThreadService.WatchThread:output_type -> codefoundry.v1.ThreadEvent
+	39,  // 124: codefoundry.v1.ThreadService.Send:output_type -> codefoundry.v1.SendThreadMessageResponse
+	41,  // 125: codefoundry.v1.ThreadService.Respond:output_type -> codefoundry.v1.RespondThreadResponse
+	43,  // 126: codefoundry.v1.ThreadService.Interrupt:output_type -> codefoundry.v1.InterruptThreadResponse
+	45,  // 127: codefoundry.v1.ThreadService.SetModel:output_type -> codefoundry.v1.SetThreadModelResponse
+	47,  // 128: codefoundry.v1.ThreadService.SetPermissionMode:output_type -> codefoundry.v1.SetThreadPermissionModeResponse
+	49,  // 129: codefoundry.v1.ThreadService.SetEffort:output_type -> codefoundry.v1.SetThreadEffortResponse
+	51,  // 130: codefoundry.v1.ThreadService.McpStatus:output_type -> codefoundry.v1.McpStatusResponse
+	53,  // 131: codefoundry.v1.ThreadService.McpReconnect:output_type -> codefoundry.v1.McpReconnectResponse
+	57,  // 132: codefoundry.v1.ThreadService.SlashCommands:output_type -> codefoundry.v1.SlashCommandsResponse
+	99,  // [99:133] is the sub-list for method output_type
+	65,  // [65:99] is the sub-list for method input_type
+	65,  // [65:65] is the sub-list for extension type_name
+	65,  // [65:65] is the sub-list for extension extendee
+	0,   // [0:65] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_thread_proto_init() }
@@ -4972,7 +5091,7 @@ func file_codefoundry_v1_thread_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_thread_proto_rawDesc), len(file_codefoundry_v1_thread_proto_rawDesc)),
 			NumEnums:      9,
-			NumMessages:   51,
+			NumMessages:   53,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

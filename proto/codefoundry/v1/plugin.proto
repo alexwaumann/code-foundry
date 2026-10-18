@@ -59,6 +59,10 @@ service PluginService {
   // answered; its error is the plugin's message (the GUI toasts it). Command, open-url
   // and copy actions are the host's and never reach Act.
   rpc Act(SurfaceActRequest) returns (SurfaceActResponse) {}
+  // Environment returns what plugins contribute to new Claude threads
+  // (session/setEnvironment): one plugin's, or every one with a contribution when name is
+  // empty, as applied (validated, conflicts resolved in name order) with the issues found.
+  rpc Environment(PluginEnvironmentRequest) returns (PluginEnvironmentResponse) {}
 }
 
 enum PluginState {
@@ -423,4 +427,39 @@ message SurfaceActRequest {
 message SurfaceActResponse {
   // The version acted on.
   uint64 version = 1;
+}
+
+message PluginEnvironmentRequest {
+  // A plugin's name; empty for every plugin with a contribution.
+  string name = 1;
+}
+
+// PluginEnvVar is one environment variable a plugin contributes.
+message PluginEnvVar {
+  string key = 1;
+  string value = 2;
+}
+
+// PluginEnvironment is one plugin's contribution to new Claude threads, as applied.
+message PluginEnvironment {
+  string plugin = 1;
+  // Sorted by key; keys refused or lost to an earlier plugin are left out (see issues).
+  repeated PluginEnvVar env = 2;
+  // Directories prepended to PATH, in order.
+  repeated string path_prepend = 3;
+  // --add-dir directories, after the daemon's skills dir.
+  repeated string add_dirs = 4;
+  // Which threads get it: empty projects means every project; no_project adds threads
+  // without a project.
+  repeated string projects = 5;
+  bool no_project = 6;
+  // What was refused or dropped, in words.
+  repeated string issues = 7;
+  // When the plugin last pushed it.
+  google.protobuf.Timestamp updated_at = 8;
+}
+
+message PluginEnvironmentResponse {
+  // By plugin name.
+  repeated PluginEnvironment environments = 1;
 }

@@ -55,6 +55,8 @@ type wsLaunch struct {
 	missing []string // other members' worktrees that do not exist (claude refuses them)
 	env     []string
 	prompt  string
+	// projects are every member's project, the cwd's included, in member order.
+	projects []string
 }
 
 // workspaceLaunch reads workspace id's current members from snap for a thread running
@@ -66,6 +68,7 @@ func workspaceLaunch(snap *workspace.Snapshot, id, cwd string, exists func(strin
 		return l, false
 	}
 	for _, mem := range w.Members {
+		l.projects = append(l.projects, mem.ProjectID)
 		switch {
 		case samePath(mem.WorktreePath, cwd):
 		case exists(mem.WorktreePath):

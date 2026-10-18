@@ -154,12 +154,18 @@ func Run(ctx context.Context, opts Options) error {
 		DB: st.db, Commands: commands, Bus: events, Log: log.With("component", "plugins"),
 		Home: st.home, HostVersion: opts.Version.Version, APIEnv: threadEnv(port, token),
 		Facts: facts, Emitter: command.BusEmitter{Bus: events},
+		Flags: pluginFlags{threads: st.thread},
 	})
 	if err != nil {
 		return err
 	}
 	defer func() { _ = plugins.Close() }()
 	pluginAPI := api.NewPlugin(plugins, events).WithSurfaces(plugins)
+	// Every claude spawn gets the plugins' session environments (plugin_hooks.go).
+	st.thread.SetSpawnExtras(pluginSpawnExtras(plugins))
+	eventsAPI := api.NewEvents(api.EventsDeps{Bus: events, Project: st.project, Terminal: st.terminal, Thread: st.thread, Gh: st.gh, GitOps: st.gitops, Settings: st.settings, Update: st.update, Workspace: st.workspace, Action: st.action, Plugin: plugins, Done: ctx.Done(), Clients: clients})
+	// Plugins subscribe to the same events (events/subscribe).
+	plugins.SetEvents(api.NewPluginFeed(eventsAPI, log.With("component", "plugins")))
 	if err := all.Register(commands, all.Deps{
 		Daemon: command.DaemonInfo{
 			PID: os.Getpid(), Version: opts.Version, Started: started, Home: p.Home(), Socket: p.Socket(),
@@ -233,7 +239,7 @@ func Run(ctx context.Context, opts Options) error {
 		actionAPI.Route(),
 		pluginAPI.Route(),
 		api.NewFilesystem(st.home, st.project).Route(),
-		api.NewEvents(api.EventsDeps{Bus: events, Project: st.project, Terminal: st.terminal, Thread: st.thread, Gh: st.gh, GitOps: st.gitops, Settings: st.settings, Update: st.update, Workspace: st.workspace, Action: st.action, Plugin: plugins, Done: ctx.Done(), Clients: clients}).Route(),
+		eventsAPI.Route(),
 	}
 	mux := http.NewServeMux()
 	for _, r := range routes {

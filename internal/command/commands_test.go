@@ -62,7 +62,7 @@ func TestAllRegistersEveryDomain(t *testing.T) {
 		"project.add", "project.clone", "project.create", "project.github.publish", "project.delete",
 		"thread.new", "thread.list", "thread.reports", "thread.focus",
 		"thread.rename", "thread.fork", "thread.remove", "thread.run-in", "thread.pin", "thread.archive", "thread.snooze",
-		"thread.get", "thread.label", "thread.report", "thread.budget",
+		"thread.get", "thread.label", "thread.report", "thread.budget", "thread.flags", "thread.flag.clear",
 		"thread.send", "thread.respond", "thread.interrupt", "thread.items", "thread.read", "thread.set-model", "thread.set-mode", "thread.set-effort", "thread.wait",
 		"thread.subscribe", "thread.unsubscribe", "thread.subscriptions",
 		"thread.mcp", "thread.mcp-reconnect", "view.panel.mcp", "thread.commands", "thread.agents", "view.panel.agents", "thread.agent.open", "thread.agent.up",
@@ -76,7 +76,7 @@ func TestAllRegistersEveryDomain(t *testing.T) {
 		"workspace.new", "workspace.list", "workspace.members", "workspace.add-project", "workspace.remove-project", "workspace.remove",
 		"action.list", "action.add", "action.edit", "action.remove", "action.run", "action.wait", "action.runs",
 		"plugin.list", "plugin.enable", "plugin.disable", "plugin.restart", "plugin.reload", "plugin.logs", "plugin.dev",
-		"plugin.secrets.list", "plugin.secrets.delete", "plugin.surface", "plugin.act", "pr.checks",
+		"plugin.secrets.list", "plugin.secrets.delete", "plugin.env", "plugin.surface", "plugin.act", "pr.checks",
 	}
 	for _, n := range want {
 		if _, ok := f.reg.Get(n); !ok {

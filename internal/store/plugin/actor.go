@@ -40,6 +40,14 @@ type actor struct {
 	ignored map[string]bool // later-protocol notifications already logged this run
 	echo    rateLimiter
 
+	// flagRate limits thread/setFlag per thread (flags.go).
+	flagRate flagLimiter
+	// events is the run's subscriptions (events.go); nil until the first subscribe.
+	events *eventPump
+	// envReady closes when the run first pushes its session environment, settles
+	// without one, or ends (environment.go): a spawn waits for it.
+	envReady chan struct{}
+
 	crashes []time.Time // only run's goroutine touches it
 }
 
@@ -196,8 +204,10 @@ func (a *actor) once(info spawnInfo) (err error) {
 	if err := os.MkdirAll(dataDir, 0o700); err != nil {
 		return fmt.Errorf("data dir: %w", err)
 	}
+	envReady := make(chan struct{})
+	defer closeOnce(envReady)
 	a.mu.Lock()
-	a.perms, a.logs, a.ignored = mf.Permissions, info.logs, map[string]bool{}
+	a.perms, a.logs, a.ignored, a.envReady = mf.Permissions, info.logs, map[string]bool{}, envReady
 	a.mu.Unlock()
 	a.m.update(a.name, a, func(e *entry) { e.state = StateStarting })
 
@@ -225,6 +235,7 @@ func (a *actor) once(info spawnInfo) (err error) {
 	a.conn = conn
 	a.mu.Unlock()
 	defer func() {
+		a.closeEvents()
 		a.mu.Lock()
 		a.conn = nil
 		a.mu.Unlock()
@@ -245,6 +256,7 @@ func (a *actor) once(info spawnInfo) (err error) {
 		Protocol: pluginsdk.ProtocolVersion,
 		Host:     pluginsdk.HostInfo{Version: o.HostVersion, Capabilities: hostCapabilities},
 		Plugin:   pluginsdk.PluginInfo{Name: a.name, Dir: info.dir, DataDir: dataDir, Granted: info.granted, Dev: info.dev},
+		Flags:    a.m.liveFlags(a.name),
 	}, &res)
 	cancel()
 	if err != nil {
@@ -266,6 +278,9 @@ func (a *actor) once(info spawnInfo) (err error) {
 		e.state, e.startedAt, e.protocol, e.caps, e.nextRestartAt = StateRunning, now, res.Protocol, res.Capabilities, time.Time{}
 	})
 	info.logs.add("host", "", "running")
+	// Its Init (which pushes its session environment) runs now; a spawn waits a moment.
+	settle := time.AfterFunc(envSettle, func() { closeOnce(envReady) })
+	defer settle.Stop()
 
 	ping := time.NewTicker(o.PingInterval)
 	defer ping.Stop()

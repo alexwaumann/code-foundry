@@ -66,6 +66,9 @@ const (
 	PluginServiceGetSurfaceProcedure = "/codefoundry.v1.PluginService/GetSurface"
 	// PluginServiceActProcedure is the fully-qualified name of the PluginService's Act RPC.
 	PluginServiceActProcedure = "/codefoundry.v1.PluginService/Act"
+	// PluginServiceEnvironmentProcedure is the fully-qualified name of the PluginService's Environment
+	// RPC.
+	PluginServiceEnvironmentProcedure = "/codefoundry.v1.PluginService/Environment"
 )
 
 // PluginServiceClient is a client for the codefoundry.v1.PluginService service.
@@ -114,6 +117,10 @@ type PluginServiceClient interface {
 	// answered; its error is the plugin's message (the GUI toasts it). Command, open-url
 	// and copy actions are the host's and never reach Act.
 	Act(context.Context, *connect.Request[v1.SurfaceActRequest]) (*connect.Response[v1.SurfaceActResponse], error)
+	// Environment returns what plugins contribute to new Claude threads
+	// (session/setEnvironment): one plugin's, or every one with a contribution when name is
+	// empty, as applied (validated, conflicts resolved in name order) with the issues found.
+	Environment(context.Context, *connect.Request[v1.PluginEnvironmentRequest]) (*connect.Response[v1.PluginEnvironmentResponse], error)
 }
 
 // NewPluginServiceClient constructs a client for the codefoundry.v1.PluginService service. By
@@ -211,6 +218,12 @@ func NewPluginServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(pluginServiceMethods.ByName("Act")),
 			connect.WithClientOptions(opts...),
 		),
+		environment: connect.NewClient[v1.PluginEnvironmentRequest, v1.PluginEnvironmentResponse](
+			httpClient,
+			baseURL+PluginServiceEnvironmentProcedure,
+			connect.WithSchema(pluginServiceMethods.ByName("Environment")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -230,6 +243,7 @@ type pluginServiceClient struct {
 	watchSurface *connect.Client[v1.WatchSurfaceRequest, v1.SurfaceUpdate]
 	getSurface   *connect.Client[v1.GetSurfaceRequest, v1.GetSurfaceResponse]
 	act          *connect.Client[v1.SurfaceActRequest, v1.SurfaceActResponse]
+	environment  *connect.Client[v1.PluginEnvironmentRequest, v1.PluginEnvironmentResponse]
 }
 
 // List calls codefoundry.v1.PluginService.List.
@@ -302,6 +316,11 @@ func (c *pluginServiceClient) Act(ctx context.Context, req *connect.Request[v1.S
 	return c.act.CallUnary(ctx, req)
 }
 
+// Environment calls codefoundry.v1.PluginService.Environment.
+func (c *pluginServiceClient) Environment(ctx context.Context, req *connect.Request[v1.PluginEnvironmentRequest]) (*connect.Response[v1.PluginEnvironmentResponse], error) {
+	return c.environment.CallUnary(ctx, req)
+}
+
 // PluginServiceHandler is an implementation of the codefoundry.v1.PluginService service.
 type PluginServiceHandler interface {
 	// List returns every plugin found, by name.
@@ -348,6 +367,10 @@ type PluginServiceHandler interface {
 	// answered; its error is the plugin's message (the GUI toasts it). Command, open-url
 	// and copy actions are the host's and never reach Act.
 	Act(context.Context, *connect.Request[v1.SurfaceActRequest]) (*connect.Response[v1.SurfaceActResponse], error)
+	// Environment returns what plugins contribute to new Claude threads
+	// (session/setEnvironment): one plugin's, or every one with a contribution when name is
+	// empty, as applied (validated, conflicts resolved in name order) with the issues found.
+	Environment(context.Context, *connect.Request[v1.PluginEnvironmentRequest]) (*connect.Response[v1.PluginEnvironmentResponse], error)
 }
 
 // NewPluginServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -441,6 +464,12 @@ func NewPluginServiceHandler(svc PluginServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(pluginServiceMethods.ByName("Act")),
 		connect.WithHandlerOptions(opts...),
 	)
+	pluginServiceEnvironmentHandler := connect.NewUnaryHandler(
+		PluginServiceEnvironmentProcedure,
+		svc.Environment,
+		connect.WithSchema(pluginServiceMethods.ByName("Environment")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/codefoundry.v1.PluginService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case PluginServiceListProcedure:
@@ -471,6 +500,8 @@ func NewPluginServiceHandler(svc PluginServiceHandler, opts ...connect.HandlerOp
 			pluginServiceGetSurfaceHandler.ServeHTTP(w, r)
 		case PluginServiceActProcedure:
 			pluginServiceActHandler.ServeHTTP(w, r)
+		case PluginServiceEnvironmentProcedure:
+			pluginServiceEnvironmentHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -534,4 +565,8 @@ func (UnimplementedPluginServiceHandler) GetSurface(context.Context, *connect.Re
 
 func (UnimplementedPluginServiceHandler) Act(context.Context, *connect.Request[v1.SurfaceActRequest]) (*connect.Response[v1.SurfaceActResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.PluginService.Act is not implemented"))
+}
+
+func (UnimplementedPluginServiceHandler) Environment(context.Context, *connect.Request[v1.PluginEnvironmentRequest]) (*connect.Response[v1.PluginEnvironmentResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.PluginService.Environment is not implemented"))
 }

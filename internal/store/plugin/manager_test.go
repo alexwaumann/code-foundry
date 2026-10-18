@@ -226,7 +226,7 @@ func TestEnableConsentCommandsAndHost(t *testing.T) {
 	tests := []struct{ cmd, want string }{
 		{"plugin.hello.archive", fmt.Sprintf("code %d: thread.archive asks the user first: Archive it?", pluginsdk.CodeConfirmationRequired)},
 		{"plugin.hello.manage", fmt.Sprintf("code %d: permission denied: plugins cannot run plugin.enable", pluginsdk.CodePermissionDenied)},
-		{"plugin.hello.flag", fmt.Sprintf("code %d: thread/setFlag is not supported yet by this Code Foundry", pluginsdk.CodeMethodNotFound)},
+		{"plugin.hello.flag", fmt.Sprintf("code %d: permission denied: thread/setFlag needs \"threadStatus\": true in plugin.json's permissions", pluginsdk.CodePermissionDenied)},
 		{"plugin.hello.remember", "remembered"},
 		{"plugin.hello.recall", "s3cret"},
 		{"plugin.hello.env", "hello  "}, // no token without the api permission, no parent env
