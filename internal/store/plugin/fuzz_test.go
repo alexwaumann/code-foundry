@@ -84,6 +84,9 @@ func checkView(t *testing.T, raw []byte) {
 		}
 		return
 	}
+	if path := nullList(canon); path != "" {
+		t.Fatalf("the canonical form has null for the list %s:\n%s", path, canon)
+	}
 	v2, canon2, errs2 := validateView(canon, "p", fuzzPerms)
 	if len(errs2) > 0 {
 		t.Fatalf("the canonical form of an accepted view is refused: %q\n%s", errs2, canon)
@@ -121,6 +124,39 @@ func checkView(t *testing.T, raw []byte) {
 	_ = in.pull(w)
 }
 
+// requiredLists are the view model's lists without omitempty: viewers expect arrays.
+var requiredLists = []string{"nodes", "items", "rows", "chips", "buttons", "children", "fields"}
+
+// nullList returns the path of a required list that is null in the view's JSON.
+func nullList(view []byte) string {
+	var tree any
+	if json.Unmarshal(view, &tree) != nil {
+		return ""
+	}
+	var walk func(path string, v any) string
+	walk = func(path string, v any) string {
+		switch x := v.(type) {
+		case map[string]any:
+			for k, c := range x {
+				if c == nil && slices.Contains(requiredLists, k) {
+					return path + "." + k
+				}
+				if p := walk(path+"."+k, c); p != "" {
+					return p
+				}
+			}
+		case []any:
+			for i, c := range x {
+				if p := walk(fmt.Sprintf("%s[%d]", path, i), c); p != "" {
+					return p
+				}
+			}
+		}
+		return ""
+	}
+	return walk("", tree)
+}
+
 func newFuzzInstance() *instance {
 	return &instance{key: "p/s/x", plugin: "p", surfaceID: "s", watchers: map[*watcher]struct{}{}, index: map[uint64]*actionIndex{}}
 }
@@ -131,6 +167,7 @@ func FuzzValidateView(f *testing.F) {
 	}
 	f.Add([]byte(`{"nodes":[{"key":"a","log":{"text":"x"}}],"nodes":null}`))
 	f.Add([]byte(`  {"Nodes":[{"KEY":"a","TEXT":{"content":"x"}}]}`))
+	f.Add([]byte(`{}`))
 	f.Fuzz(func(t *testing.T, raw []byte) {
 		checkView(t, raw)
 	})
