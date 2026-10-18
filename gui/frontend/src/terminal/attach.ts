@@ -1,5 +1,6 @@
 import type { AttachEventView } from "@/api/terminal";
 import { errorMessage, runStream, type Heartbeat, type StreamStatus } from "@/api/stream";
+import type { StreamPriority } from "@/api/streamSlots";
 import type { Disposable, TerminalRenderer } from "./renderer";
 
 export type AttachPhase = "idle" | "connecting" | "live" | "reconnecting" | "exited" | "error";
@@ -17,6 +18,8 @@ export interface AttachDeps {
   write: (id: string, data: Uint8Array) => Promise<void>;
   resize: (id: string, cols: number, rows: number) => Promise<void>;
   onStreamError?: (err: unknown) => void;
+  /** The Attach stream's priority (api/streamSlots.ts): "inline" for a plugin's terminal node. Default core. */
+  priority?: StreamPriority;
 }
 
 function concat(chunks: readonly Uint8Array[]): Uint8Array {
@@ -34,8 +37,9 @@ function concat(chunks: readonly Uint8Array[]): Uint8Array {
  * Owns the attach lifecycle for one renderer. At most one terminal is attached at a
  * time: attach(id) aborts the previous stream before opening the next.
  *
- *   Snapshot -> reset(), size to the snapshot, write(data), then fit (which may Resize)
- *   Output   -> write
+ *   Snapshot -> reset(), size to the snapshot, write(data); once xterm has parsed it,
+ *               fit (which may Resize) and apply what arrived meanwhile
+ *   Output   -> write (held while a snapshot is being parsed)
  *   Resized  -> resize (no Resize RPC back)
  *   Exited   -> phase "exited"; no reconnect after the stream ends
  *
@@ -51,6 +55,14 @@ export class AttachController {
   private flushing = false;
   private resizeTimer: ReturnType<typeof setTimeout> | undefined;
   private generation = 0;
+  /**
+   * Events that arrived while a snapshot was still being parsed (null: none is). xterm
+   * parses a large write over later frames while resize() applies at once, so output or
+   * a resize applied before the snapshot lands would draw at the wrong size and the
+   * replay would interleave with live output.
+   */
+  private held: AttachEventView[] | null = null;
+  private snapshots = 0;
 
   constructor(
     private readonly renderer: TerminalRenderer,
@@ -85,6 +97,7 @@ export class AttachController {
     this.setState({ terminalId: id, phase: "connecting", exitCode: null, error: null });
     this.stopStream = runStream<AttachEventView>({
       open: (signal) => this.deps.attach(id, signal),
+      slot: { label: `terminal:${id}`, priority: this.deps.priority ?? "core" },
       onEvent: (ev) => {
         if (gen === this.generation) this.handle(ev);
       },
@@ -106,20 +119,27 @@ export class AttachController {
     this.stopStream = null;
     clearTimeout(this.resizeTimer);
     this.pending = [];
+    this.held = null;
+    this.snapshots++;
     if (this.state.terminalId !== null) this.setState({ terminalId: null, phase: "idle", exitCode: null, error: null });
   }
 
   private handle(ev: AttachEventView): void {
+    if (this.held && ev.kind !== "snapshot") {
+      this.held.push(ev);
+      return;
+    }
     switch (ev.kind) {
       case "snapshot": {
+        // A new snapshot (a reconnect) replaces whatever the previous one was holding.
+        const seq = ++this.snapshots;
+        this.held = [];
         this.renderer.reset();
         if (ev.cols > 0 && ev.rows > 0) this.renderer.resize(ev.cols, ev.rows);
-        this.renderer.write(ev.data);
-        // The container decides the size; tell the daemon if it differs from the PTY's.
-        this.renderer.fit();
-        const { cols, rows } = this.renderer.size;
-        if (cols !== ev.cols || rows !== ev.rows) this.scheduleResize(cols, rows, 0);
-        if (this.state.phase !== "exited") this.setState({ phase: "live", error: null });
+        this.renderer.write(ev.data, () => {
+          if (seq !== this.snapshots) return;
+          this.snapshotParsed(ev.cols, ev.rows);
+        });
         break;
       }
       case "output":
@@ -135,6 +155,18 @@ export class AttachController {
         this.setState({ phase: "exited", exitCode: ev.exitCode });
         break;
     }
+  }
+
+  /** The snapshot is on the grid: fit it to the container, then apply what arrived meanwhile. */
+  private snapshotParsed(snapCols: number, snapRows: number): void {
+    const held = this.held ?? [];
+    this.held = null;
+    // The container decides the size; tell the daemon if it differs from the PTY's.
+    this.renderer.fit();
+    const { cols, rows } = this.renderer.size;
+    if (cols !== snapCols || rows !== snapRows) this.scheduleResize(cols, rows, 0);
+    if (this.state.phase !== "exited") this.setState({ phase: "live", error: null });
+    for (const ev of held) this.handle(ev);
   }
 
   private input(data: Uint8Array): void {
