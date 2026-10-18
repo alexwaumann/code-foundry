@@ -2,6 +2,9 @@ syntax = "proto3";
 
 package codefoundry.v1;
 
+import "codefoundry/v1/command.proto";
+import "codefoundry/v1/heartbeat.proto";
+import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 
 // PluginService manages plugins: separate executables under ~/.code-foundry/plugins/<name>
@@ -40,6 +43,22 @@ service PluginService {
   // Watch sends a snapshot, then every change. A client that falls behind gets a new
   // snapshot.
   rpc Watch(WatchPluginsRequest) returns (stream PluginEvent) {}
+  // WatchSurface holds one surface instance open (docs/notes/plugins-2-surfaces.md): the
+  // first watcher opens it in the plugin (surface/open), the last one leaving hides it
+  // and, after a grace, closes it. It sends the instance's state first, then its current
+  // view (a cached one paints at once), then every new view (coalesced to at most one
+  // per 100 ms), log appends, toasts, and heartbeats while quiet. A surface that is not
+  // available in the context fails with FailedPrecondition.
+  rpc WatchSurface(WatchSurfaceRequest) returns (stream SurfaceUpdate) {}
+  // GetSurface opens an instance like WatchSurface, waits up to wait_ms for a view, and
+  // returns it with the actions it offers (the CLI's plugin surface; agents drive
+  // surfaces with it and Act). The instance stays open for the grace afterwards.
+  rpc GetSurface(GetSurfaceRequest) returns (GetSurfaceResponse) {}
+  // Act forwards a user action on a view element (a click, a form submit, a field
+  // change, a tab switch) to the plugin as surface/act and returns once the plugin has
+  // answered; its error is the plugin's message (the GUI toasts it). Command, open-url
+  // and copy actions are the host's and never reach Act.
+  rpc Act(SurfaceActRequest) returns (SurfaceActResponse) {}
 }
 
 enum PluginState {
@@ -82,13 +101,25 @@ message PluginCommand {
   string description = 3;
 }
 
-// PluginSurface is one manifest surface (rendered from protocol PR 2 on).
+// PluginSurface is one manifest surface.
 message PluginSurface {
   string id = 1;
   string title = 2;
   string icon = 3;
+  // global, thread, project, worktree or pr: what one instance is for.
   string scope = 4;
   repeated string placements = 5;
+  // The manifest's when clause ("" = always, within its scope).
+  string when = 6;
+  // The command that shows it, plugin.<plugin>.show.<id>; its availability is the
+  // surface's (CommandService.List carries it to the GUI).
+  string show_command = 7;
+  // The GUI's surface kind and ShowView name stem: plugin.<plugin>.<id>.
+  string kind = 8;
+  // Whether it is available in ListPluginsRequest.context (false without a context
+  // when its scope needs one), and why not.
+  bool available = 9;
+  string unavailable_reason = 10;
 }
 
 message Plugin {
@@ -130,7 +161,10 @@ message Plugin {
   string log_path = 26;
 }
 
-message ListPluginsRequest {}
+message ListPluginsRequest {
+  // Fills each surface's available and unavailable_reason for this context.
+  UiContext context = 1;
+}
 
 message ListPluginsResponse {
   repeated Plugin plugins = 1;
@@ -242,9 +276,151 @@ message PluginEvent {
     Plugin updated = 2;
     // A plugin's package is gone.
     string removed_name = 3;
+    // Availability may have changed without a plugin changing (an async fact such as a
+    // pull request's checks resolved, or a plugin set a context key): re-list commands.
+    // Grows by one per change in this daemon's lifetime.
+    uint64 availability_epoch = 4;
   }
 }
 
 message PluginSnapshot {
   repeated Plugin plugins = 1;
+}
+
+// SurfaceRef names a surface instance by plugin, surface and the context its scope reads
+// (a thread scope the thread, a project scope the project, …). The daemon derives the
+// instance key from them: <plugin>/<surface>/<scope id>, where the scope id is
+// "global", "thread:<id>", "project:<id>", "worktree:<path>" or "pr:<owner>/<repo>#<n>".
+message SurfaceRef {
+  string plugin = 1;
+  string surface = 2;
+  UiContext context = 3;
+  // Instead of the three above: the key of an instance the daemon already has (one
+  // opened before, e.g. by GetSurface), as GetSurfaceResponse.state.instance names it.
+  string instance = 4;
+}
+
+enum SurfacePhase {
+  SURFACE_PHASE_UNSPECIFIED = 0;
+  // surface/open sent; no view yet.
+  SURFACE_PHASE_OPENING = 1;
+  // The plugin has sent a view.
+  SURFACE_PHASE_LIVE = 2;
+  // No view 10 s after opening, or the plugin did not answer surface/open.
+  SURFACE_PHASE_NOT_RESPONDING = 3;
+  // The plugin is not running (plugin_state says how); the last view, if any, is stale.
+  SURFACE_PHASE_PLUGIN_DOWN = 4;
+  // The plugin refused to open it (message is its error).
+  SURFACE_PHASE_FAILED = 5;
+}
+
+// SurfaceState is the instance's host-side state.
+message SurfaceState {
+  string instance = 1;
+  SurfacePhase phase = 2;
+  // In words, for the GUI's notice ("Hello is restarting (next try in 2s)").
+  string message = 3;
+  PluginState plugin_state = 4;
+}
+
+// SurfaceView is one version of an instance's view: the view model's JSON as the daemon
+// validated and re-encoded it (pluginsdk/ui's schema; log nodes carry everything
+// appended since), never the plugin's bytes as sent.
+message SurfaceView {
+  string instance = 1;
+  // Grows with every accepted view of the instance; Act names the one acted on.
+  uint64 version = 2;
+  string view_json = 3;
+  // The daemon made this view: the plugin's view was invalid (a notice says why, above
+  // the last valid view in dev mode).
+  bool host_rendered = 4;
+}
+
+message SurfaceLogLine {
+  string text = 1;
+  string tone = 2;
+}
+
+// SurfaceLogAppend extends one log node of the current version (view/append).
+message SurfaceLogAppend {
+  string instance = 1;
+  uint64 version = 2;
+  // The log node's key.
+  string key = 3;
+  // For a text log: appended as is.
+  string text = 4;
+  // For a lines log: appended lines.
+  repeated SurfaceLogLine lines = 5;
+}
+
+message SurfaceToast {
+  string instance = 1;
+  // info, attention or error.
+  string level = 2;
+  string text = 3;
+}
+
+message SurfaceUpdate {
+  oneof update {
+    SurfaceState state = 1;
+    SurfaceView view = 2;
+    SurfaceLogAppend append = 3;
+    SurfaceToast toast = 4;
+    StreamHeartbeat heartbeat = 5;
+  }
+}
+
+message WatchSurfaceRequest {
+  SurfaceRef ref = 1;
+}
+
+message GetSurfaceRequest {
+  SurfaceRef ref = 1;
+  // How long to wait for the first view (0: 10 s).
+  int32 wait_ms = 2;
+}
+
+// SurfaceElement is one element of a view that acts: a button, row, chip, tab, form
+// submit or field with a change event.
+message SurfaceElement {
+  string key = 1;
+  // click, submit, change or tab: sent to the plugin with Act; command, open_url or copy:
+  // handled by the host (the GUI), never by Act.
+  string kind = 2;
+  // The event name (an event action), the command name, the URL; "tab" for a tab.
+  string action = 3;
+  // The button's or tab's label, the row's title.
+  string label = 4;
+  // The enclosing form's key, if any.
+  string form = 5;
+}
+
+message GetSurfaceResponse {
+  SurfaceState state = 1;
+  // Unset when no view arrived in time.
+  SurfaceView view = 2;
+  repeated SurfaceElement elements = 3;
+}
+
+message SurfaceActRequest {
+  // The instance key; or ref.
+  string instance = 1;
+  SurfaceRef ref = 2;
+  // The view version the user acted on (0: the current one).
+  uint64 version = 3;
+  // The element's key; may be omitted when action names exactly one element.
+  string key = 4;
+  // The element's event name ("tab" for a tab); checked against the view when given.
+  string action = 5;
+  // A change's new value or a tab's key.
+  optional string value = 6;
+  // The form's values by field name: strings, booleans (toggles), string lists
+  // (multiple selects). A secret input with store is written to the Keychain and the
+  // plugin gets {key, stored: true} instead.
+  google.protobuf.Struct values = 7;
+}
+
+message SurfaceActResponse {
+  // The version acted on.
+  uint64 version = 1;
 }

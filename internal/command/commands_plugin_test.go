@@ -40,7 +40,7 @@ func TestPluginCommands(t *testing.T) {
 		wantMsg   string // substring
 		want      proto.Message
 	}{
-		{name: "list", cmd: "plugin.list", wantMsg: "hello  0.1.0    disabled  commands(thread.send) secrets  1         new: code-foundry plugin enable hello"},
+		{name: "list", cmd: "plugin.list", wantMsg: "hello  0.1.0    disabled  commands(thread.send) secrets  1         -         new: code-foundry plugin enable hello"},
 		{name: "enable asks for consent", cmd: "plugin.enable", args: map[string]string{"name": "hello"},
 			wantErr: "Enable Hello 0.1.0? It runs bin/hello as you and may:\n  - keep secrets"},
 		{name: "enable with consent", cmd: "plugin.enable", args: map[string]string{"name": "hello"}, confirmed: true,

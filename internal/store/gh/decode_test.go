@@ -1,6 +1,7 @@
 package gh
 
 import (
+	"encoding/json"
 	"errors"
 	"testing"
 )
@@ -156,6 +157,29 @@ func TestMapContext(t *testing.T) {
 			got, ok := mapContext(&tt.in)
 			if ok != tt.ok || got != tt.want {
 				t.Errorf("mapContext = %+v, %v; want %+v, %v", got, ok, tt.want, tt.ok)
+			}
+		})
+	}
+}
+
+func TestMapContextApp(t *testing.T) {
+	tests := []struct {
+		name, node, want string
+	}{
+		{"actions", `{"__typename":"CheckRun","name":"test","status":"COMPLETED","checkSuite":{"app":{"slug":"github-actions"},"workflowRun":{"workflow":{"name":"CI"}}}}`, "github-actions"},
+		{"other app", `{"__typename":"CheckRun","name":"lint","status":"COMPLETED","checkSuite":{"app":{"slug":"buildkite"}}}`, "buildkite"},
+		{"no suite", `{"__typename":"CheckRun","name":"x","status":"QUEUED"}`, ""},
+		{"status", `{"__typename":"StatusContext","context":"jenkins","state":"SUCCESS"}`, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var n contextNodeJSON
+			if err := json.Unmarshal([]byte(tt.node), &n); err != nil {
+				t.Fatal(err)
+			}
+			run, ok := mapContext(&n)
+			if !ok || run.App != tt.want {
+				t.Errorf("run = %+v, want app %q", run, tt.want)
 			}
 		})
 	}

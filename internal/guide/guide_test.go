@@ -38,7 +38,7 @@ func TestGuide(t *testing.T) {
 	Write(&buf, cmds, "s-7754a478e649")
 	guide := buf.String()
 	for _, c := range cmds {
-		if InPluginNamespace(c) {
+		if LeftOut(c) {
 			if strings.Contains(guide, "`"+c.GetName()) {
 				t.Errorf("the guide lists plugin command %s", c.GetName())
 			}
@@ -95,7 +95,7 @@ func TestGuide(t *testing.T) {
 	// Every command that asks for confirmation shows --yes, in the detailed and the
 	// one-line forms alike; no other command does.
 	for _, c := range cmds {
-		if InPluginNamespace(c) {
+		if LeftOut(c) {
 			continue
 		}
 		u := Usage(c)

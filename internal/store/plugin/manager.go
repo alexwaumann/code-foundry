@@ -81,6 +81,15 @@ type Options struct {
 	CrashLimit                                                         int
 	LogMaxBytes                                                        int64
 	LogTail                                                            int
+
+	// Facts answers the predicates' host facts (threads, projects, pull request
+	// checks); nil knows only the context's ids. Emitter sends UI intents (show
+	// commands, host/invoke with confirm "ask", toasts); nil sends none.
+	Facts   FactSource
+	Emitter command.Emitter
+	// Surface timing; zero values take DefaultSurfaceGrace, DefaultFirstViewTimeout and
+	// DefaultCoalesce.
+	SurfaceGrace, FirstViewTimeout, CoalesceInterval time.Duration
 }
 
 func (o *Options) defaults() {
@@ -99,6 +108,9 @@ func (o *Options) defaults() {
 	d(&o.DevBackoffMax, DefaultDevBackoffMax)
 	d(&o.CrashWindow, DefaultCrashWindow)
 	d(&o.StableAfter, DefaultStableAfter)
+	d(&o.SurfaceGrace, DefaultSurfaceGrace)
+	d(&o.FirstViewTimeout, DefaultFirstViewTimeout)
+	d(&o.CoalesceInterval, DefaultCoalesce)
 	if o.CrashLimit <= 0 {
 		o.CrashLimit = DefaultCrashLimit
 	}
@@ -139,6 +151,13 @@ type Manager struct {
 	entries map[string]*entry
 	closed  bool
 	snap    atomic.Pointer[Snapshot]
+
+	// Surfaces and availability (surface.go, facts.go, show.go).
+	surf     *surfaceHub
+	preds    predicates
+	ctxFacts contextFacts
+	checks   checksCache
+	avail    availabilityNotifier
 }
 
 var _ Store = (*Manager)(nil)
@@ -183,7 +202,10 @@ func New(opts Options) (*Manager, error) {
 		}
 	}
 	m := &Manager{opts: opts, log: opts.Log, entries: map[string]*entry{}}
+	m.avail.interval = availabilityInterval
+	m.surf = newSurfaceHub(m)
 	m.rebuildLocked()
+	go m.surf.run()
 	return m, nil
 }
 
@@ -235,6 +257,8 @@ func (m *Manager) publicLocked(e *entry) Plugin {
 	if e.regErr != "" {
 		p.Issues = append(p.Issues, e.regErr)
 	}
+	p.Issues = append(p.Issues, m.predicateIssues(e.manifest)...)
+	p.Issues = append(p.Issues, m.surf.issuesOf(e.name)...)
 	if e.loadErr != "" {
 		p.LastError = e.loadErr
 	}
@@ -742,6 +766,7 @@ func (m *Manager) Close() error {
 		wg.Go(func() { m.stopActor(e, StateStopped) })
 	}
 	wg.Wait()
+	m.surf.close()
 	for _, e := range es {
 		e.logs.close()
 	}

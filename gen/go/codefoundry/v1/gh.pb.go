@@ -1275,9 +1275,11 @@ type CheckRun struct {
 	// Details page (Actions job log, external CI page, or status target URL).
 	Url string `protobuf:"bytes,5,opt,name=url,proto3" json:"url,omitempty"`
 	// Status description for commit statuses; empty for check runs.
-	Description   string                 `protobuf:"bytes,6,opt,name=description,proto3" json:"description,omitempty"`
-	StartedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
-	CompletedAt   *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=completed_at,json=completedAt,proto3" json:"completed_at,omitempty"`
+	Description string                 `protobuf:"bytes,6,opt,name=description,proto3" json:"description,omitempty"`
+	StartedAt   *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
+	CompletedAt *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=completed_at,json=completedAt,proto3" json:"completed_at,omitempty"`
+	// The GitHub App that made a check run ("github-actions"); empty for commit statuses.
+	App           string `protobuf:"bytes,9,opt,name=app,proto3" json:"app,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1366,6 +1368,13 @@ func (x *CheckRun) GetCompletedAt() *timestamppb.Timestamp {
 		return x.CompletedAt
 	}
 	return nil
+}
+
+func (x *CheckRun) GetApp() string {
+	if x != nil {
+		return x.App
+	}
+	return ""
 }
 
 type GetViewerRequest struct {
@@ -5151,7 +5160,7 @@ const file_codefoundry_v1_gh_proto_rawDesc = "" +
 	"\x11PullRequestReview\x12\x16\n" +
 	"\x06author\x18\x01 \x01(\tR\x06author\x12<\n" +
 	"\x05state\x18\x02 \x01(\x0e2&.codefoundry.v1.PullRequestReviewStateR\x05state\x12=\n" +
-	"\fsubmitted_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\vsubmittedAt\"\xde\x02\n" +
+	"\fsubmitted_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\vsubmittedAt\"\xf0\x02\n" +
 	"\bCheckRun\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1a\n" +
 	"\bworkflow\x18\x02 \x01(\tR\bworkflow\x123\n" +
@@ -5163,7 +5172,8 @@ const file_codefoundry_v1_gh_proto_rawDesc = "" +
 	"\vdescription\x18\x06 \x01(\tR\vdescription\x129\n" +
 	"\n" +
 	"started_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tstartedAt\x12=\n" +
-	"\fcompleted_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\vcompletedAt\"\x12\n" +
+	"\fcompleted_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\vcompletedAt\x12\x10\n" +
+	"\x03app\x18\t \x01(\tR\x03app\"\x12\n" +
 	"\x10GetViewerRequest\"\xc5\x01\n" +
 	"\x11GetViewerResponse\x120\n" +
 	"\x06viewer\x18\x01 \x01(\v2\x18.codefoundry.v1.GhViewerR\x06viewer\x12$\n" +

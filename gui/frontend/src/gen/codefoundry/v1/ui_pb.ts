@@ -4,13 +4,15 @@
 
 import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import type { UiContext } from "./command_pb";
+import { file_codefoundry_v1_command } from "./command_pb";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file codefoundry/v1/ui.proto.
  */
 export const file_codefoundry_v1_ui: GenFile = /*@__PURE__*/
-  fileDesc("Chdjb2RlZm91bmRyeS92MS91aS5wcm90bxIOY29kZWZvdW5kcnkudjEiFQoTV2F0Y2hJbnRlbnRzUmVxdWVzdCLFBwoIVWlJbnRlbnQSQAoOZm9jdXNfdGVybWluYWwYASABKAsyJi5jb2RlZm91bmRyeS52MS5VaUludGVudC5Gb2N1c1Rlcm1pbmFsSAASPgoNZm9jdXNfcHJvamVjdBgCIAEoCzIlLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50LkZvY3VzUHJvamVjdEgAEjwKDG9wZW5fcGFsZXR0ZRgDIAEoCzIkLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50Lk9wZW5QYWxldHRlSAASMQoGbm90aWZ5GAQgASgLMh8uY29kZWZvdW5kcnkudjEuVWlJbnRlbnQuTm90aWZ5SAASPAoMZm9jdXNfdGhyZWFkGAUgASgLMiQuY29kZWZvdW5kcnkudjEuVWlJbnRlbnQuRm9jdXNUaHJlYWRIABI2CglzaG93X3ZpZXcYBiABKAsyIS5jb2RlZm91bmRyeS52MS5VaUludGVudC5TaG93Vmlld0gAEkMKEHBsYXlfYWxlcnRfc291bmQYByABKAsyJy5jb2RlZm91bmRyeS52MS5VaUludGVudC5QbGF5QWxlcnRTb3VuZEgAEj8KDnNob3dfYWdlbnRfcnVuGAggASgLMiUuY29kZWZvdW5kcnkudjEuVWlJbnRlbnQuU2hvd0FnZW50UnVuSAAaMQoMU2hvd0FnZW50UnVuEhEKCXRocmVhZF9pZBgBIAEoCRIOCgZydW5faWQYAiABKAkaIAoOUGxheUFsZXJ0U291bmQSDgoGdm9sdW1lGAEgASgFGhgKCFNob3dWaWV3EgwKBG5hbWUYASABKAkaIAoLRm9jdXNUaHJlYWQSEQoJdGhyZWFkX2lkGAEgASgJGiQKDUZvY3VzVGVybWluYWwSEwoLdGVybWluYWxfaWQYASABKAkaOQoMRm9jdXNQcm9qZWN0EhIKCnByb2plY3RfaWQYASABKAkSFQoNd29ya3RyZWVfcGF0aBgCIAEoCRocCgtPcGVuUGFsZXR0ZRINCgVxdWVyeRgBIAEoCRqvAQoGTm90aWZ5EjQKBWxldmVsGAEgASgOMiUuY29kZWZvdW5kcnkudjEuVWlJbnRlbnQuTm90aWZ5LkxldmVsEg0KBXRpdGxlGAIgASgJEgwKBGJvZHkYAyABKAkiUgoFTGV2ZWwSFQoRTEVWRUxfVU5TUEVDSUZJRUQQABIOCgpMRVZFTF9JTkZPEAESEQoNTEVWRUxfV0FSTklORxACEg8KC0xFVkVMX0VSUk9SEANCCAoGaW50ZW50Ij0KEUVtaXRJbnRlbnRSZXF1ZXN0EigKBmludGVudBgBIAEoCzIYLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50IicKEkVtaXRJbnRlbnRSZXNwb25zZRIRCglkZWxpdmVyZWQYASABKA0yrwEKCVVpU2VydmljZRJRCgxXYXRjaEludGVudHMSIy5jb2RlZm91bmRyeS52MS5XYXRjaEludGVudHNSZXF1ZXN0GhguY29kZWZvdW5kcnkudjEuVWlJbnRlbnQiADABEk8KBEVtaXQSIS5jb2RlZm91bmRyeS52MS5FbWl0SW50ZW50UmVxdWVzdBoiLmNvZGVmb3VuZHJ5LnYxLkVtaXRJbnRlbnRSZXNwb25zZSIAQr8BChJjb20uY29kZWZvdW5kcnkudjFCB1VpUHJvdG9QAVpHZ2l0aHViLmNvbS9hbGV4d2F1bWFubi9jb2RlLWZvdW5kcnkvZ2VuL2dvL2NvZGVmb3VuZHJ5L3YxO2NvZGVmb3VuZHJ5djGiAgNDWFiqAg5Db2RlZm91bmRyeS5WMcoCDkNvZGVmb3VuZHJ5XFYx4gIaQ29kZWZvdW5kcnlcVjFcR1BCTWV0YWRhdGHqAg9Db2RlZm91bmRyeTo6VjFiBnByb3RvMw");
+  fileDesc("Chdjb2RlZm91bmRyeS92MS91aS5wcm90bxIOY29kZWZvdW5kcnkudjEiFQoTV2F0Y2hJbnRlbnRzUmVxdWVzdCLQCQoIVWlJbnRlbnQSQAoOZm9jdXNfdGVybWluYWwYASABKAsyJi5jb2RlZm91bmRyeS52MS5VaUludGVudC5Gb2N1c1Rlcm1pbmFsSAASPgoNZm9jdXNfcHJvamVjdBgCIAEoCzIlLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50LkZvY3VzUHJvamVjdEgAEjwKDG9wZW5fcGFsZXR0ZRgDIAEoCzIkLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50Lk9wZW5QYWxldHRlSAASMQoGbm90aWZ5GAQgASgLMh8uY29kZWZvdW5kcnkudjEuVWlJbnRlbnQuTm90aWZ5SAASPAoMZm9jdXNfdGhyZWFkGAUgASgLMiQuY29kZWZvdW5kcnkudjEuVWlJbnRlbnQuRm9jdXNUaHJlYWRIABI2CglzaG93X3ZpZXcYBiABKAsyIS5jb2RlZm91bmRyeS52MS5VaUludGVudC5TaG93Vmlld0gAEkMKEHBsYXlfYWxlcnRfc291bmQYByABKAsyJy5jb2RlZm91bmRyeS52MS5VaUludGVudC5QbGF5QWxlcnRTb3VuZEgAEj8KDnNob3dfYWdlbnRfcnVuGAggASgLMiUuY29kZWZvdW5kcnkudjEuVWlJbnRlbnQuU2hvd0FnZW50UnVuSAASQAoOaW52b2tlX2NvbW1hbmQYCSABKAsyJi5jb2RlZm91bmRyeS52MS5VaUludGVudC5JbnZva2VDb21tYW5kSAAaxgEKDUludm9rZUNvbW1hbmQSDAoEbmFtZRgBIAEoCRI+CgRhcmdzGAIgAygLMjAuY29kZWZvdW5kcnkudjEuVWlJbnRlbnQuSW52b2tlQ29tbWFuZC5BcmdzRW50cnkSKgoHY29udGV4dBgDIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLlVpQ29udGV4dBIOCgZjYWxsZXIYBCABKAkaKwoJQXJnc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEaMQoMU2hvd0FnZW50UnVuEhEKCXRocmVhZF9pZBgBIAEoCRIOCgZydW5faWQYAiABKAkaIAoOUGxheUFsZXJ0U291bmQSDgoGdm9sdW1lGAEgASgFGhgKCFNob3dWaWV3EgwKBG5hbWUYASABKAkaIAoLRm9jdXNUaHJlYWQSEQoJdGhyZWFkX2lkGAEgASgJGiQKDUZvY3VzVGVybWluYWwSEwoLdGVybWluYWxfaWQYASABKAkaOQoMRm9jdXNQcm9qZWN0EhIKCnByb2plY3RfaWQYASABKAkSFQoNd29ya3RyZWVfcGF0aBgCIAEoCRocCgtPcGVuUGFsZXR0ZRINCgVxdWVyeRgBIAEoCRqvAQoGTm90aWZ5EjQKBWxldmVsGAEgASgOMiUuY29kZWZvdW5kcnkudjEuVWlJbnRlbnQuTm90aWZ5LkxldmVsEg0KBXRpdGxlGAIgASgJEgwKBGJvZHkYAyABKAkiUgoFTGV2ZWwSFQoRTEVWRUxfVU5TUEVDSUZJRUQQABIOCgpMRVZFTF9JTkZPEAESEQoNTEVWRUxfV0FSTklORxACEg8KC0xFVkVMX0VSUk9SEANCCAoGaW50ZW50Ij0KEUVtaXRJbnRlbnRSZXF1ZXN0EigKBmludGVudBgBIAEoCzIYLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50IicKEkVtaXRJbnRlbnRSZXNwb25zZRIRCglkZWxpdmVyZWQYASABKA0yrwEKCVVpU2VydmljZRJRCgxXYXRjaEludGVudHMSIy5jb2RlZm91bmRyeS52MS5XYXRjaEludGVudHNSZXF1ZXN0GhguY29kZWZvdW5kcnkudjEuVWlJbnRlbnQiADABEk8KBEVtaXQSIS5jb2RlZm91bmRyeS52MS5FbWl0SW50ZW50UmVxdWVzdBoiLmNvZGVmb3VuZHJ5LnYxLkVtaXRJbnRlbnRSZXNwb25zZSIAQr8BChJjb20uY29kZWZvdW5kcnkudjFCB1VpUHJvdG9QAVpHZ2l0aHViLmNvbS9hbGV4d2F1bWFubi9jb2RlLWZvdW5kcnkvZ2VuL2dvL2NvZGVmb3VuZHJ5L3YxO2NvZGVmb3VuZHJ5djGiAgNDWFiqAg5Db2RlZm91bmRyeS5WMcoCDkNvZGVmb3VuZHJ5XFYx4gIaQ29kZWZvdW5kcnlcVjFcR1BCTWV0YWRhdGHqAg9Db2RlZm91bmRyeTo6VjFiBnByb3RvMw", [file_codefoundry_v1_command]);
 
 /**
  * @generated from message codefoundry.v1.WatchIntentsRequest
@@ -80,6 +82,12 @@ export type UiIntent = Message<"codefoundry.v1.UiIntent"> & {
      */
     value: UiIntent_ShowAgentRun;
     case: "showAgentRun";
+  } | {
+    /**
+     * @generated from field: codefoundry.v1.UiIntent.InvokeCommand invoke_command = 9;
+     */
+    value: UiIntent_InvokeCommand;
+    case: "invokeCommand";
   } | { case: undefined; value?: undefined };
 };
 
@@ -89,6 +97,45 @@ export type UiIntent = Message<"codefoundry.v1.UiIntent"> & {
  */
 export const UiIntentSchema: GenMessage<UiIntent> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_ui, 1);
+
+/**
+ * InvokeCommand asks the GUI to run a command through its normal flow (runCommand):
+ * a command that asks first shows the daemon's own confirm dialog, and the user
+ * decides. A plugin's host/invoke with confirm "ask" sends it (caller
+ * "plugin:<name>"); the plugin learns the outcome from events.
+ *
+ * @generated from message codefoundry.v1.UiIntent.InvokeCommand
+ */
+export type UiIntent_InvokeCommand = Message<"codefoundry.v1.UiIntent.InvokeCommand"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: map<string, string> args = 2;
+   */
+  args: { [key: string]: string };
+
+  /**
+   * @generated from field: codefoundry.v1.UiContext context = 3;
+   */
+  context?: UiContext | undefined;
+
+  /**
+   * Who asked ("plugin:hello"), for the dialog.
+   *
+   * @generated from field: string caller = 4;
+   */
+  caller: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.UiIntent.InvokeCommand.
+ * Use `create(UiIntent_InvokeCommandSchema)` to create a new message.
+ */
+export const UiIntent_InvokeCommandSchema: GenMessage<UiIntent_InvokeCommand> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_ui, 1, 0);
 
 /**
  * ShowAgentRun selects a thread and shows one of its own subagent runs (spawn depth 1)
@@ -117,7 +164,7 @@ export type UiIntent_ShowAgentRun = Message<"codefoundry.v1.UiIntent.ShowAgentRu
  * Use `create(UiIntent_ShowAgentRunSchema)` to create a new message.
  */
 export const UiIntent_ShowAgentRunSchema: GenMessage<UiIntent_ShowAgentRun> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ui, 1, 0);
+  messageDesc(file_codefoundry_v1_ui, 1, 1);
 
 /**
  * PlayAlertSound plays the attention alert sound once (notifications.test, a preview:
@@ -139,7 +186,7 @@ export type UiIntent_PlayAlertSound = Message<"codefoundry.v1.UiIntent.PlayAlert
  * Use `create(UiIntent_PlayAlertSoundSchema)` to create a new message.
  */
 export const UiIntent_PlayAlertSoundSchema: GenMessage<UiIntent_PlayAlertSound> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ui, 1, 1);
+  messageDesc(file_codefoundry_v1_ui, 1, 2);
 
 /**
  * ShowView opens a named GUI view: "help", "settings", "pullrequests".
@@ -159,7 +206,7 @@ export type UiIntent_ShowView = Message<"codefoundry.v1.UiIntent.ShowView"> & {
  * Use `create(UiIntent_ShowViewSchema)` to create a new message.
  */
 export const UiIntent_ShowViewSchema: GenMessage<UiIntent_ShowView> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ui, 1, 2);
+  messageDesc(file_codefoundry_v1_ui, 1, 3);
 
 /**
  * @generated from message codefoundry.v1.UiIntent.FocusThread
@@ -176,7 +223,7 @@ export type UiIntent_FocusThread = Message<"codefoundry.v1.UiIntent.FocusThread"
  * Use `create(UiIntent_FocusThreadSchema)` to create a new message.
  */
 export const UiIntent_FocusThreadSchema: GenMessage<UiIntent_FocusThread> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ui, 1, 3);
+  messageDesc(file_codefoundry_v1_ui, 1, 4);
 
 /**
  * @generated from message codefoundry.v1.UiIntent.FocusTerminal
@@ -193,7 +240,7 @@ export type UiIntent_FocusTerminal = Message<"codefoundry.v1.UiIntent.FocusTermi
  * Use `create(UiIntent_FocusTerminalSchema)` to create a new message.
  */
 export const UiIntent_FocusTerminalSchema: GenMessage<UiIntent_FocusTerminal> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ui, 1, 4);
+  messageDesc(file_codefoundry_v1_ui, 1, 5);
 
 /**
  * @generated from message codefoundry.v1.UiIntent.FocusProject
@@ -215,7 +262,7 @@ export type UiIntent_FocusProject = Message<"codefoundry.v1.UiIntent.FocusProjec
  * Use `create(UiIntent_FocusProjectSchema)` to create a new message.
  */
 export const UiIntent_FocusProjectSchema: GenMessage<UiIntent_FocusProject> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ui, 1, 5);
+  messageDesc(file_codefoundry_v1_ui, 1, 6);
 
 /**
  * @generated from message codefoundry.v1.UiIntent.OpenPalette
@@ -234,7 +281,7 @@ export type UiIntent_OpenPalette = Message<"codefoundry.v1.UiIntent.OpenPalette"
  * Use `create(UiIntent_OpenPaletteSchema)` to create a new message.
  */
 export const UiIntent_OpenPaletteSchema: GenMessage<UiIntent_OpenPalette> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ui, 1, 6);
+  messageDesc(file_codefoundry_v1_ui, 1, 7);
 
 /**
  * @generated from message codefoundry.v1.UiIntent.Notify
@@ -261,7 +308,7 @@ export type UiIntent_Notify = Message<"codefoundry.v1.UiIntent.Notify"> & {
  * Use `create(UiIntent_NotifySchema)` to create a new message.
  */
 export const UiIntent_NotifySchema: GenMessage<UiIntent_Notify> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ui, 1, 7);
+  messageDesc(file_codefoundry_v1_ui, 1, 8);
 
 /**
  * @generated from enum codefoundry.v1.UiIntent.Notify.Level
@@ -292,7 +339,7 @@ export enum UiIntent_Notify_Level {
  * Describes the enum codefoundry.v1.UiIntent.Notify.Level.
  */
 export const UiIntent_Notify_LevelSchema: GenEnum<UiIntent_Notify_Level> = /*@__PURE__*/
-  enumDesc(file_codefoundry_v1_ui, 1, 7, 0);
+  enumDesc(file_codefoundry_v1_ui, 1, 8, 0);
 
 /**
  * @generated from message codefoundry.v1.EmitIntentRequest

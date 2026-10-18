@@ -271,6 +271,9 @@ type CheckRun struct {
 	Description string          `json:"description,omitempty"`
 	StartedAt   time.Time       `json:"startedAt,omitzero"`
 	CompletedAt time.Time       `json:"completedAt,omitzero"`
+	// App is the slug of the GitHub App that made a check run ("github-actions");
+	// empty for a commit status, and in caches written before it was fetched.
+	App string `json:"app,omitempty"`
 }
 
 // ViewerState is the viewer plus fetch status.

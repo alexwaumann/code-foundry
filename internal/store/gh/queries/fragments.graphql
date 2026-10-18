@@ -43,7 +43,7 @@ fragment CheckContexts on StatusCheckRollupContextConnection {
       detailsUrl
       startedAt
       completedAt
-      checkSuite { workflowRun { workflow { name } } }
+      checkSuite { app { slug } workflowRun { workflow { name } } }
     }
     ... on StatusContext {
       context

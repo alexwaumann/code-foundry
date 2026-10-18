@@ -57,11 +57,12 @@ func RegisterPlugin(r *Registry, b PluginBackend) error {
 			Name:  "plugin.list",
 			Title: "List Plugins",
 			Description: "List the plugins in ~/.code-foundry/plugins: version, state (disabled, starting, running, crashed, " +
-				"failed), whether enabling needs consent, and their commands.",
+				"failed), whether enabling needs consent, their commands, and their surfaces with whether each is " +
+				"available in the context (--context-thread, --context-project).",
 			Category:     "Plugin",
 			NoKeybinding: true,
-			Run: func(ctx context.Context, _ Context, _ Args) (Result, error) {
-				res, err := b.List(ctx, connect.NewRequest(&v1.ListPluginsRequest{}))
+			Run: func(ctx context.Context, uctx Context, _ Args) (Result, error) {
+				res, err := b.List(ctx, connect.NewRequest(&v1.ListPluginsRequest{Context: UiContextToProto(uctx)}))
 				if err != nil {
 					return Result{}, err
 				}
@@ -276,7 +277,7 @@ func formatPlugins(ps []*v1.Plugin) string {
 	}
 	var sb strings.Builder
 	tw := tabwriter.NewWriter(&sb, 0, 4, 2, ' ', 0)
-	_, _ = fmt.Fprintln(tw, "NAME\tVERSION\tSTATE\tPERMISSIONS\tCOMMANDS\tNOTE")
+	_, _ = fmt.Fprintln(tw, "NAME\tVERSION\tSTATE\tPERMISSIONS\tCOMMANDS\tSURFACES\tNOTE")
 	for _, p := range ps {
 		state := pluginState(p.GetState())
 		if p.GetDev() {
@@ -294,11 +295,28 @@ func formatPlugins(ps []*v1.Plugin) string {
 		case p.GetState() == v1.PluginState_PLUGIN_STATE_CRASHED && p.GetNextRestartAt() != nil:
 			note = fmt.Sprintf("%s (restart %d)", note, p.GetRestarts())
 		}
-		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%d\t%s\n", p.GetName(), p.GetVersion(), state,
-			permissionSummary(p.GetPermissions()), len(p.GetCommands()), note)
+		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%d\t%s\t%s\n", p.GetName(), p.GetVersion(), state,
+			permissionSummary(p.GetPermissions()), len(p.GetCommands()), surfaceSummary(p.GetSurfaces()), note)
 	}
 	_ = tw.Flush()
 	return strings.TrimRight(sb.String(), "\n")
+}
+
+// surfaceSummary lists surfaces with their availability in the listed context:
+// "demo(on) checks(off)".
+func surfaceSummary(ss []*v1.PluginSurface) string {
+	if len(ss) == 0 {
+		return "-"
+	}
+	out := make([]string, len(ss))
+	for i, s := range ss {
+		on := "off"
+		if s.GetAvailable() {
+			on = "on"
+		}
+		out[i] = s.GetId() + "(" + on + ")"
+	}
+	return strings.Join(out, " ")
 }
 
 // FormatPluginLogLine is one log line as the CLI prints it.

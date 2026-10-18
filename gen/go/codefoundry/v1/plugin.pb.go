@@ -9,6 +9,7 @@ package codefoundryv1
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	structpb "google.golang.org/protobuf/types/known/structpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
@@ -90,6 +91,69 @@ func (x PluginState) Number() protoreflect.EnumNumber {
 // Deprecated: Use PluginState.Descriptor instead.
 func (PluginState) EnumDescriptor() ([]byte, []int) {
 	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{0}
+}
+
+type SurfacePhase int32
+
+const (
+	SurfacePhase_SURFACE_PHASE_UNSPECIFIED SurfacePhase = 0
+	// surface/open sent; no view yet.
+	SurfacePhase_SURFACE_PHASE_OPENING SurfacePhase = 1
+	// The plugin has sent a view.
+	SurfacePhase_SURFACE_PHASE_LIVE SurfacePhase = 2
+	// No view 10 s after opening, or the plugin did not answer surface/open.
+	SurfacePhase_SURFACE_PHASE_NOT_RESPONDING SurfacePhase = 3
+	// The plugin is not running (plugin_state says how); the last view, if any, is stale.
+	SurfacePhase_SURFACE_PHASE_PLUGIN_DOWN SurfacePhase = 4
+	// The plugin refused to open it (message is its error).
+	SurfacePhase_SURFACE_PHASE_FAILED SurfacePhase = 5
+)
+
+// Enum value maps for SurfacePhase.
+var (
+	SurfacePhase_name = map[int32]string{
+		0: "SURFACE_PHASE_UNSPECIFIED",
+		1: "SURFACE_PHASE_OPENING",
+		2: "SURFACE_PHASE_LIVE",
+		3: "SURFACE_PHASE_NOT_RESPONDING",
+		4: "SURFACE_PHASE_PLUGIN_DOWN",
+		5: "SURFACE_PHASE_FAILED",
+	}
+	SurfacePhase_value = map[string]int32{
+		"SURFACE_PHASE_UNSPECIFIED":    0,
+		"SURFACE_PHASE_OPENING":        1,
+		"SURFACE_PHASE_LIVE":           2,
+		"SURFACE_PHASE_NOT_RESPONDING": 3,
+		"SURFACE_PHASE_PLUGIN_DOWN":    4,
+		"SURFACE_PHASE_FAILED":         5,
+	}
+)
+
+func (x SurfacePhase) Enum() *SurfacePhase {
+	p := new(SurfacePhase)
+	*p = x
+	return p
+}
+
+func (x SurfacePhase) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (SurfacePhase) Descriptor() protoreflect.EnumDescriptor {
+	return file_codefoundry_v1_plugin_proto_enumTypes[1].Descriptor()
+}
+
+func (SurfacePhase) Type() protoreflect.EnumType {
+	return &file_codefoundry_v1_plugin_proto_enumTypes[1]
+}
+
+func (x SurfacePhase) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use SurfacePhase.Descriptor instead.
+func (SurfacePhase) EnumDescriptor() ([]byte, []int) {
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{1}
 }
 
 // PluginPermissions mirrors plugin.json's permissions (the plugin registry's entry schema).
@@ -258,16 +322,28 @@ func (x *PluginCommand) GetDescription() string {
 	return ""
 }
 
-// PluginSurface is one manifest surface (rendered from protocol PR 2 on).
+// PluginSurface is one manifest surface.
 type PluginSurface struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Title         string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
-	Icon          string                 `protobuf:"bytes,3,opt,name=icon,proto3" json:"icon,omitempty"`
-	Scope         string                 `protobuf:"bytes,4,opt,name=scope,proto3" json:"scope,omitempty"`
-	Placements    []string               `protobuf:"bytes,5,rep,name=placements,proto3" json:"placements,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Title string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	Icon  string                 `protobuf:"bytes,3,opt,name=icon,proto3" json:"icon,omitempty"`
+	// global, thread, project, worktree or pr: what one instance is for.
+	Scope      string   `protobuf:"bytes,4,opt,name=scope,proto3" json:"scope,omitempty"`
+	Placements []string `protobuf:"bytes,5,rep,name=placements,proto3" json:"placements,omitempty"`
+	// The manifest's when clause ("" = always, within its scope).
+	When string `protobuf:"bytes,6,opt,name=when,proto3" json:"when,omitempty"`
+	// The command that shows it, plugin.<plugin>.show.<id>; its availability is the
+	// surface's (CommandService.List carries it to the GUI).
+	ShowCommand string `protobuf:"bytes,7,opt,name=show_command,json=showCommand,proto3" json:"show_command,omitempty"`
+	// The GUI's surface kind and ShowView name stem: plugin.<plugin>.<id>.
+	Kind string `protobuf:"bytes,8,opt,name=kind,proto3" json:"kind,omitempty"`
+	// Whether it is available in ListPluginsRequest.context (false without a context
+	// when its scope needs one), and why not.
+	Available         bool   `protobuf:"varint,9,opt,name=available,proto3" json:"available,omitempty"`
+	UnavailableReason string `protobuf:"bytes,10,opt,name=unavailable_reason,json=unavailableReason,proto3" json:"unavailable_reason,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *PluginSurface) Reset() {
@@ -333,6 +409,41 @@ func (x *PluginSurface) GetPlacements() []string {
 		return x.Placements
 	}
 	return nil
+}
+
+func (x *PluginSurface) GetWhen() string {
+	if x != nil {
+		return x.When
+	}
+	return ""
+}
+
+func (x *PluginSurface) GetShowCommand() string {
+	if x != nil {
+		return x.ShowCommand
+	}
+	return ""
+}
+
+func (x *PluginSurface) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *PluginSurface) GetAvailable() bool {
+	if x != nil {
+		return x.Available
+	}
+	return false
+}
+
+func (x *PluginSurface) GetUnavailableReason() string {
+	if x != nil {
+		return x.UnavailableReason
+	}
+	return ""
 }
 
 type Plugin struct {
@@ -590,7 +701,9 @@ func (x *Plugin) GetLogPath() string {
 }
 
 type ListPluginsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Fills each surface's available and unavailable_reason for this context.
+	Context       *UiContext `protobuf:"bytes,1,opt,name=context,proto3" json:"context,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -623,6 +736,13 @@ func (x *ListPluginsRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use ListPluginsRequest.ProtoReflect.Descriptor instead.
 func (*ListPluginsRequest) Descriptor() ([]byte, []int) {
 	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *ListPluginsRequest) GetContext() *UiContext {
+	if x != nil {
+		return x.Context
+	}
+	return nil
 }
 
 type ListPluginsResponse struct {
@@ -1662,6 +1782,7 @@ type PluginEvent struct {
 	//	*PluginEvent_Snapshot
 	//	*PluginEvent_Updated
 	//	*PluginEvent_RemovedName
+	//	*PluginEvent_AvailabilityEpoch
 	Event         isPluginEvent_Event `protobuf_oneof:"event"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1731,6 +1852,15 @@ func (x *PluginEvent) GetRemovedName() string {
 	return ""
 }
 
+func (x *PluginEvent) GetAvailabilityEpoch() uint64 {
+	if x != nil {
+		if x, ok := x.Event.(*PluginEvent_AvailabilityEpoch); ok {
+			return x.AvailabilityEpoch
+		}
+	}
+	return 0
+}
+
 type isPluginEvent_Event interface {
 	isPluginEvent_Event()
 }
@@ -1750,11 +1880,20 @@ type PluginEvent_RemovedName struct {
 	RemovedName string `protobuf:"bytes,3,opt,name=removed_name,json=removedName,proto3,oneof"`
 }
 
+type PluginEvent_AvailabilityEpoch struct {
+	// Availability may have changed without a plugin changing (an async fact such as a
+	// pull request's checks resolved, or a plugin set a context key): re-list commands.
+	// Grows by one per change in this daemon's lifetime.
+	AvailabilityEpoch uint64 `protobuf:"varint,4,opt,name=availability_epoch,json=availabilityEpoch,proto3,oneof"`
+}
+
 func (*PluginEvent_Snapshot) isPluginEvent_Event() {}
 
 func (*PluginEvent_Updated) isPluginEvent_Event() {}
 
 func (*PluginEvent_RemovedName) isPluginEvent_Event() {}
+
+func (*PluginEvent_AvailabilityEpoch) isPluginEvent_Event() {}
 
 type PluginSnapshot struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -1800,11 +1939,938 @@ func (x *PluginSnapshot) GetPlugins() []*Plugin {
 	return nil
 }
 
+// SurfaceRef names a surface instance by plugin, surface and the context its scope reads
+// (a thread scope the thread, a project scope the project, …). The daemon derives the
+// instance key from them: <plugin>/<surface>/<scope id>, where the scope id is
+// "global", "thread:<id>", "project:<id>", "worktree:<path>" or "pr:<owner>/<repo>#<n>".
+type SurfaceRef struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Plugin  string                 `protobuf:"bytes,1,opt,name=plugin,proto3" json:"plugin,omitempty"`
+	Surface string                 `protobuf:"bytes,2,opt,name=surface,proto3" json:"surface,omitempty"`
+	Context *UiContext             `protobuf:"bytes,3,opt,name=context,proto3" json:"context,omitempty"`
+	// Instead of the three above: the key of an instance the daemon already has (one
+	// opened before, e.g. by GetSurface), as GetSurfaceResponse.state.instance names it.
+	Instance      string `protobuf:"bytes,4,opt,name=instance,proto3" json:"instance,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SurfaceRef) Reset() {
+	*x = SurfaceRef{}
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SurfaceRef) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SurfaceRef) ProtoMessage() {}
+
+func (x *SurfaceRef) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SurfaceRef.ProtoReflect.Descriptor instead.
+func (*SurfaceRef) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *SurfaceRef) GetPlugin() string {
+	if x != nil {
+		return x.Plugin
+	}
+	return ""
+}
+
+func (x *SurfaceRef) GetSurface() string {
+	if x != nil {
+		return x.Surface
+	}
+	return ""
+}
+
+func (x *SurfaceRef) GetContext() *UiContext {
+	if x != nil {
+		return x.Context
+	}
+	return nil
+}
+
+func (x *SurfaceRef) GetInstance() string {
+	if x != nil {
+		return x.Instance
+	}
+	return ""
+}
+
+// SurfaceState is the instance's host-side state.
+type SurfaceState struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Instance string                 `protobuf:"bytes,1,opt,name=instance,proto3" json:"instance,omitempty"`
+	Phase    SurfacePhase           `protobuf:"varint,2,opt,name=phase,proto3,enum=codefoundry.v1.SurfacePhase" json:"phase,omitempty"`
+	// In words, for the GUI's notice ("Hello is restarting (next try in 2s)").
+	Message       string      `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
+	PluginState   PluginState `protobuf:"varint,4,opt,name=plugin_state,json=pluginState,proto3,enum=codefoundry.v1.PluginState" json:"plugin_state,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SurfaceState) Reset() {
+	*x = SurfaceState{}
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SurfaceState) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SurfaceState) ProtoMessage() {}
+
+func (x *SurfaceState) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SurfaceState.ProtoReflect.Descriptor instead.
+func (*SurfaceState) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *SurfaceState) GetInstance() string {
+	if x != nil {
+		return x.Instance
+	}
+	return ""
+}
+
+func (x *SurfaceState) GetPhase() SurfacePhase {
+	if x != nil {
+		return x.Phase
+	}
+	return SurfacePhase_SURFACE_PHASE_UNSPECIFIED
+}
+
+func (x *SurfaceState) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *SurfaceState) GetPluginState() PluginState {
+	if x != nil {
+		return x.PluginState
+	}
+	return PluginState_PLUGIN_STATE_UNSPECIFIED
+}
+
+// SurfaceView is one version of an instance's view: the view model's JSON as the daemon
+// validated and re-encoded it (pluginsdk/ui's schema; log nodes carry everything
+// appended since), never the plugin's bytes as sent.
+type SurfaceView struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Instance string                 `protobuf:"bytes,1,opt,name=instance,proto3" json:"instance,omitempty"`
+	// Grows with every accepted view of the instance; Act names the one acted on.
+	Version  uint64 `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"`
+	ViewJson string `protobuf:"bytes,3,opt,name=view_json,json=viewJson,proto3" json:"view_json,omitempty"`
+	// The daemon made this view: the plugin's view was invalid (a notice says why, above
+	// the last valid view in dev mode).
+	HostRendered  bool `protobuf:"varint,4,opt,name=host_rendered,json=hostRendered,proto3" json:"host_rendered,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SurfaceView) Reset() {
+	*x = SurfaceView{}
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SurfaceView) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SurfaceView) ProtoMessage() {}
+
+func (x *SurfaceView) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SurfaceView.ProtoReflect.Descriptor instead.
+func (*SurfaceView) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *SurfaceView) GetInstance() string {
+	if x != nil {
+		return x.Instance
+	}
+	return ""
+}
+
+func (x *SurfaceView) GetVersion() uint64 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+func (x *SurfaceView) GetViewJson() string {
+	if x != nil {
+		return x.ViewJson
+	}
+	return ""
+}
+
+func (x *SurfaceView) GetHostRendered() bool {
+	if x != nil {
+		return x.HostRendered
+	}
+	return false
+}
+
+type SurfaceLogLine struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Text          string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
+	Tone          string                 `protobuf:"bytes,2,opt,name=tone,proto3" json:"tone,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SurfaceLogLine) Reset() {
+	*x = SurfaceLogLine{}
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SurfaceLogLine) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SurfaceLogLine) ProtoMessage() {}
+
+func (x *SurfaceLogLine) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SurfaceLogLine.ProtoReflect.Descriptor instead.
+func (*SurfaceLogLine) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *SurfaceLogLine) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+func (x *SurfaceLogLine) GetTone() string {
+	if x != nil {
+		return x.Tone
+	}
+	return ""
+}
+
+// SurfaceLogAppend extends one log node of the current version (view/append).
+type SurfaceLogAppend struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Instance string                 `protobuf:"bytes,1,opt,name=instance,proto3" json:"instance,omitempty"`
+	Version  uint64                 `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"`
+	// The log node's key.
+	Key string `protobuf:"bytes,3,opt,name=key,proto3" json:"key,omitempty"`
+	// For a text log: appended as is.
+	Text string `protobuf:"bytes,4,opt,name=text,proto3" json:"text,omitempty"`
+	// For a lines log: appended lines.
+	Lines         []*SurfaceLogLine `protobuf:"bytes,5,rep,name=lines,proto3" json:"lines,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SurfaceLogAppend) Reset() {
+	*x = SurfaceLogAppend{}
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SurfaceLogAppend) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SurfaceLogAppend) ProtoMessage() {}
+
+func (x *SurfaceLogAppend) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SurfaceLogAppend.ProtoReflect.Descriptor instead.
+func (*SurfaceLogAppend) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *SurfaceLogAppend) GetInstance() string {
+	if x != nil {
+		return x.Instance
+	}
+	return ""
+}
+
+func (x *SurfaceLogAppend) GetVersion() uint64 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+func (x *SurfaceLogAppend) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *SurfaceLogAppend) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+func (x *SurfaceLogAppend) GetLines() []*SurfaceLogLine {
+	if x != nil {
+		return x.Lines
+	}
+	return nil
+}
+
+type SurfaceToast struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Instance string                 `protobuf:"bytes,1,opt,name=instance,proto3" json:"instance,omitempty"`
+	// info, attention or error.
+	Level         string `protobuf:"bytes,2,opt,name=level,proto3" json:"level,omitempty"`
+	Text          string `protobuf:"bytes,3,opt,name=text,proto3" json:"text,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SurfaceToast) Reset() {
+	*x = SurfaceToast{}
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SurfaceToast) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SurfaceToast) ProtoMessage() {}
+
+func (x *SurfaceToast) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SurfaceToast.ProtoReflect.Descriptor instead.
+func (*SurfaceToast) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *SurfaceToast) GetInstance() string {
+	if x != nil {
+		return x.Instance
+	}
+	return ""
+}
+
+func (x *SurfaceToast) GetLevel() string {
+	if x != nil {
+		return x.Level
+	}
+	return ""
+}
+
+func (x *SurfaceToast) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+type SurfaceUpdate struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Update:
+	//
+	//	*SurfaceUpdate_State
+	//	*SurfaceUpdate_View
+	//	*SurfaceUpdate_Append
+	//	*SurfaceUpdate_Toast
+	//	*SurfaceUpdate_Heartbeat
+	Update        isSurfaceUpdate_Update `protobuf_oneof:"update"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SurfaceUpdate) Reset() {
+	*x = SurfaceUpdate{}
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SurfaceUpdate) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SurfaceUpdate) ProtoMessage() {}
+
+func (x *SurfaceUpdate) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SurfaceUpdate.ProtoReflect.Descriptor instead.
+func (*SurfaceUpdate) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *SurfaceUpdate) GetUpdate() isSurfaceUpdate_Update {
+	if x != nil {
+		return x.Update
+	}
+	return nil
+}
+
+func (x *SurfaceUpdate) GetState() *SurfaceState {
+	if x != nil {
+		if x, ok := x.Update.(*SurfaceUpdate_State); ok {
+			return x.State
+		}
+	}
+	return nil
+}
+
+func (x *SurfaceUpdate) GetView() *SurfaceView {
+	if x != nil {
+		if x, ok := x.Update.(*SurfaceUpdate_View); ok {
+			return x.View
+		}
+	}
+	return nil
+}
+
+func (x *SurfaceUpdate) GetAppend() *SurfaceLogAppend {
+	if x != nil {
+		if x, ok := x.Update.(*SurfaceUpdate_Append); ok {
+			return x.Append
+		}
+	}
+	return nil
+}
+
+func (x *SurfaceUpdate) GetToast() *SurfaceToast {
+	if x != nil {
+		if x, ok := x.Update.(*SurfaceUpdate_Toast); ok {
+			return x.Toast
+		}
+	}
+	return nil
+}
+
+func (x *SurfaceUpdate) GetHeartbeat() *StreamHeartbeat {
+	if x != nil {
+		if x, ok := x.Update.(*SurfaceUpdate_Heartbeat); ok {
+			return x.Heartbeat
+		}
+	}
+	return nil
+}
+
+type isSurfaceUpdate_Update interface {
+	isSurfaceUpdate_Update()
+}
+
+type SurfaceUpdate_State struct {
+	State *SurfaceState `protobuf:"bytes,1,opt,name=state,proto3,oneof"`
+}
+
+type SurfaceUpdate_View struct {
+	View *SurfaceView `protobuf:"bytes,2,opt,name=view,proto3,oneof"`
+}
+
+type SurfaceUpdate_Append struct {
+	Append *SurfaceLogAppend `protobuf:"bytes,3,opt,name=append,proto3,oneof"`
+}
+
+type SurfaceUpdate_Toast struct {
+	Toast *SurfaceToast `protobuf:"bytes,4,opt,name=toast,proto3,oneof"`
+}
+
+type SurfaceUpdate_Heartbeat struct {
+	Heartbeat *StreamHeartbeat `protobuf:"bytes,5,opt,name=heartbeat,proto3,oneof"`
+}
+
+func (*SurfaceUpdate_State) isSurfaceUpdate_Update() {}
+
+func (*SurfaceUpdate_View) isSurfaceUpdate_Update() {}
+
+func (*SurfaceUpdate_Append) isSurfaceUpdate_Update() {}
+
+func (*SurfaceUpdate_Toast) isSurfaceUpdate_Update() {}
+
+func (*SurfaceUpdate_Heartbeat) isSurfaceUpdate_Update() {}
+
+type WatchSurfaceRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Ref           *SurfaceRef            `protobuf:"bytes,1,opt,name=ref,proto3" json:"ref,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WatchSurfaceRequest) Reset() {
+	*x = WatchSurfaceRequest{}
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WatchSurfaceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WatchSurfaceRequest) ProtoMessage() {}
+
+func (x *WatchSurfaceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WatchSurfaceRequest.ProtoReflect.Descriptor instead.
+func (*WatchSurfaceRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *WatchSurfaceRequest) GetRef() *SurfaceRef {
+	if x != nil {
+		return x.Ref
+	}
+	return nil
+}
+
+type GetSurfaceRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Ref   *SurfaceRef            `protobuf:"bytes,1,opt,name=ref,proto3" json:"ref,omitempty"`
+	// How long to wait for the first view (0: 10 s).
+	WaitMs        int32 `protobuf:"varint,2,opt,name=wait_ms,json=waitMs,proto3" json:"wait_ms,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSurfaceRequest) Reset() {
+	*x = GetSurfaceRequest{}
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSurfaceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSurfaceRequest) ProtoMessage() {}
+
+func (x *GetSurfaceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSurfaceRequest.ProtoReflect.Descriptor instead.
+func (*GetSurfaceRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *GetSurfaceRequest) GetRef() *SurfaceRef {
+	if x != nil {
+		return x.Ref
+	}
+	return nil
+}
+
+func (x *GetSurfaceRequest) GetWaitMs() int32 {
+	if x != nil {
+		return x.WaitMs
+	}
+	return 0
+}
+
+// SurfaceElement is one element of a view that acts: a button, row, chip, tab, form
+// submit or field with a change event.
+type SurfaceElement struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Key   string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	// click, submit, change or tab: sent to the plugin with Act; command, open_url or copy:
+	// handled by the host (the GUI), never by Act.
+	Kind string `protobuf:"bytes,2,opt,name=kind,proto3" json:"kind,omitempty"`
+	// The event name (an event action), the command name, the URL; "tab" for a tab.
+	Action string `protobuf:"bytes,3,opt,name=action,proto3" json:"action,omitempty"`
+	// The button's or tab's label, the row's title.
+	Label string `protobuf:"bytes,4,opt,name=label,proto3" json:"label,omitempty"`
+	// The enclosing form's key, if any.
+	Form          string `protobuf:"bytes,5,opt,name=form,proto3" json:"form,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SurfaceElement) Reset() {
+	*x = SurfaceElement{}
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SurfaceElement) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SurfaceElement) ProtoMessage() {}
+
+func (x *SurfaceElement) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SurfaceElement.ProtoReflect.Descriptor instead.
+func (*SurfaceElement) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *SurfaceElement) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *SurfaceElement) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *SurfaceElement) GetAction() string {
+	if x != nil {
+		return x.Action
+	}
+	return ""
+}
+
+func (x *SurfaceElement) GetLabel() string {
+	if x != nil {
+		return x.Label
+	}
+	return ""
+}
+
+func (x *SurfaceElement) GetForm() string {
+	if x != nil {
+		return x.Form
+	}
+	return ""
+}
+
+type GetSurfaceResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	State *SurfaceState          `protobuf:"bytes,1,opt,name=state,proto3" json:"state,omitempty"`
+	// Unset when no view arrived in time.
+	View          *SurfaceView      `protobuf:"bytes,2,opt,name=view,proto3" json:"view,omitempty"`
+	Elements      []*SurfaceElement `protobuf:"bytes,3,rep,name=elements,proto3" json:"elements,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSurfaceResponse) Reset() {
+	*x = GetSurfaceResponse{}
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSurfaceResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSurfaceResponse) ProtoMessage() {}
+
+func (x *GetSurfaceResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSurfaceResponse.ProtoReflect.Descriptor instead.
+func (*GetSurfaceResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *GetSurfaceResponse) GetState() *SurfaceState {
+	if x != nil {
+		return x.State
+	}
+	return nil
+}
+
+func (x *GetSurfaceResponse) GetView() *SurfaceView {
+	if x != nil {
+		return x.View
+	}
+	return nil
+}
+
+func (x *GetSurfaceResponse) GetElements() []*SurfaceElement {
+	if x != nil {
+		return x.Elements
+	}
+	return nil
+}
+
+type SurfaceActRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The instance key; or ref.
+	Instance string      `protobuf:"bytes,1,opt,name=instance,proto3" json:"instance,omitempty"`
+	Ref      *SurfaceRef `protobuf:"bytes,2,opt,name=ref,proto3" json:"ref,omitempty"`
+	// The view version the user acted on (0: the current one).
+	Version uint64 `protobuf:"varint,3,opt,name=version,proto3" json:"version,omitempty"`
+	// The element's key; may be omitted when action names exactly one element.
+	Key string `protobuf:"bytes,4,opt,name=key,proto3" json:"key,omitempty"`
+	// The element's event name ("tab" for a tab); checked against the view when given.
+	Action string `protobuf:"bytes,5,opt,name=action,proto3" json:"action,omitempty"`
+	// A change's new value or a tab's key.
+	Value *string `protobuf:"bytes,6,opt,name=value,proto3,oneof" json:"value,omitempty"`
+	// The form's values by field name: strings, booleans (toggles), string lists
+	// (multiple selects). A secret input with store is written to the Keychain and the
+	// plugin gets {key, stored: true} instead.
+	Values        *structpb.Struct `protobuf:"bytes,7,opt,name=values,proto3" json:"values,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SurfaceActRequest) Reset() {
+	*x = SurfaceActRequest{}
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SurfaceActRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SurfaceActRequest) ProtoMessage() {}
+
+func (x *SurfaceActRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SurfaceActRequest.ProtoReflect.Descriptor instead.
+func (*SurfaceActRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *SurfaceActRequest) GetInstance() string {
+	if x != nil {
+		return x.Instance
+	}
+	return ""
+}
+
+func (x *SurfaceActRequest) GetRef() *SurfaceRef {
+	if x != nil {
+		return x.Ref
+	}
+	return nil
+}
+
+func (x *SurfaceActRequest) GetVersion() uint64 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+func (x *SurfaceActRequest) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *SurfaceActRequest) GetAction() string {
+	if x != nil {
+		return x.Action
+	}
+	return ""
+}
+
+func (x *SurfaceActRequest) GetValue() string {
+	if x != nil && x.Value != nil {
+		return *x.Value
+	}
+	return ""
+}
+
+func (x *SurfaceActRequest) GetValues() *structpb.Struct {
+	if x != nil {
+		return x.Values
+	}
+	return nil
+}
+
+type SurfaceActResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The version acted on.
+	Version       uint64 `protobuf:"varint,1,opt,name=version,proto3" json:"version,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SurfaceActResponse) Reset() {
+	*x = SurfaceActResponse{}
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SurfaceActResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SurfaceActResponse) ProtoMessage() {}
+
+func (x *SurfaceActResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SurfaceActResponse.ProtoReflect.Descriptor instead.
+func (*SurfaceActResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *SurfaceActResponse) GetVersion() uint64 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
 var File_codefoundry_v1_plugin_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_plugin_proto_rawDesc = "" +
 	"\n" +
-	"\x1bcodefoundry/v1/plugin.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xf1\x01\n" +
+	"\x1bcodefoundry/v1/plugin.proto\x12\x0ecodefoundry.v1\x1a\x1ccodefoundry/v1/command.proto\x1a\x1ecodefoundry/v1/heartbeat.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xf1\x01\n" +
 	"\x11PluginPermissions\x12\x1a\n" +
 	"\bcommands\x18\x01 \x03(\tR\bcommands\x12\x16\n" +
 	"\x06events\x18\x02 \x03(\tR\x06events\x12#\n" +
@@ -1818,7 +2884,7 @@ const file_codefoundry_v1_plugin_proto_rawDesc = "" +
 	"\rPluginCommand\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +
-	"\vdescription\x18\x03 \x01(\tR\vdescription\"\x7f\n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\"\x97\x02\n" +
 	"\rPluginSurface\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x12\n" +
@@ -1826,7 +2892,13 @@ const file_codefoundry_v1_plugin_proto_rawDesc = "" +
 	"\x05scope\x18\x04 \x01(\tR\x05scope\x12\x1e\n" +
 	"\n" +
 	"placements\x18\x05 \x03(\tR\n" +
-	"placements\"\xee\a\n" +
+	"placements\x12\x12\n" +
+	"\x04when\x18\x06 \x01(\tR\x04when\x12!\n" +
+	"\fshow_command\x18\a \x01(\tR\vshowCommand\x12\x12\n" +
+	"\x04kind\x18\b \x01(\tR\x04kind\x12\x1c\n" +
+	"\tavailable\x18\t \x01(\bR\tavailable\x12-\n" +
+	"\x12unavailable_reason\x18\n" +
+	" \x01(\tR\x11unavailableReason\"\xee\a\n" +
 	"\x06Plugin\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12!\n" +
 	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12\x18\n" +
@@ -1856,8 +2928,9 @@ const file_codefoundry_v1_plugin_proto_rawDesc = "" +
 	"\fcapabilities\x18\x17 \x03(\tR\fcapabilities\x129\n" +
 	"\bcommands\x18\x18 \x03(\v2\x1d.codefoundry.v1.PluginCommandR\bcommands\x129\n" +
 	"\bsurfaces\x18\x19 \x03(\v2\x1d.codefoundry.v1.PluginSurfaceR\bsurfaces\x12\x19\n" +
-	"\blog_path\x18\x1a \x01(\tR\alogPath\"\x14\n" +
-	"\x12ListPluginsRequest\"G\n" +
+	"\blog_path\x18\x1a \x01(\tR\alogPath\"I\n" +
+	"\x12ListPluginsRequest\x123\n" +
+	"\acontext\x18\x01 \x01(\v2\x19.codefoundry.v1.UiContextR\acontext\"G\n" +
 	"\x13ListPluginsResponse\x120\n" +
 	"\aplugins\x18\x01 \x03(\v2\x16.codefoundry.v1.PluginR\aplugins\"C\n" +
 	"\x13EnablePluginRequest\x12\x12\n" +
@@ -1912,14 +2985,77 @@ const file_codefoundry_v1_plugin_proto_rawDesc = "" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x10\n" +
 	"\x03key\x18\x02 \x01(\tR\x03key\"\x1c\n" +
 	"\x1aDeletePluginSecretResponse\"\x15\n" +
-	"\x13WatchPluginsRequest\"\xad\x01\n" +
+	"\x13WatchPluginsRequest\"\xde\x01\n" +
 	"\vPluginEvent\x12<\n" +
 	"\bsnapshot\x18\x01 \x01(\v2\x1e.codefoundry.v1.PluginSnapshotH\x00R\bsnapshot\x122\n" +
 	"\aupdated\x18\x02 \x01(\v2\x16.codefoundry.v1.PluginH\x00R\aupdated\x12#\n" +
-	"\fremoved_name\x18\x03 \x01(\tH\x00R\vremovedNameB\a\n" +
+	"\fremoved_name\x18\x03 \x01(\tH\x00R\vremovedName\x12/\n" +
+	"\x12availability_epoch\x18\x04 \x01(\x04H\x00R\x11availabilityEpochB\a\n" +
 	"\x05event\"B\n" +
 	"\x0ePluginSnapshot\x120\n" +
-	"\aplugins\x18\x01 \x03(\v2\x16.codefoundry.v1.PluginR\aplugins*\xe3\x01\n" +
+	"\aplugins\x18\x01 \x03(\v2\x16.codefoundry.v1.PluginR\aplugins\"\x8f\x01\n" +
+	"\n" +
+	"SurfaceRef\x12\x16\n" +
+	"\x06plugin\x18\x01 \x01(\tR\x06plugin\x12\x18\n" +
+	"\asurface\x18\x02 \x01(\tR\asurface\x123\n" +
+	"\acontext\x18\x03 \x01(\v2\x19.codefoundry.v1.UiContextR\acontext\x12\x1a\n" +
+	"\binstance\x18\x04 \x01(\tR\binstance\"\xb8\x01\n" +
+	"\fSurfaceState\x12\x1a\n" +
+	"\binstance\x18\x01 \x01(\tR\binstance\x122\n" +
+	"\x05phase\x18\x02 \x01(\x0e2\x1c.codefoundry.v1.SurfacePhaseR\x05phase\x12\x18\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\x12>\n" +
+	"\fplugin_state\x18\x04 \x01(\x0e2\x1b.codefoundry.v1.PluginStateR\vpluginState\"\x85\x01\n" +
+	"\vSurfaceView\x12\x1a\n" +
+	"\binstance\x18\x01 \x01(\tR\binstance\x12\x18\n" +
+	"\aversion\x18\x02 \x01(\x04R\aversion\x12\x1b\n" +
+	"\tview_json\x18\x03 \x01(\tR\bviewJson\x12#\n" +
+	"\rhost_rendered\x18\x04 \x01(\bR\fhostRendered\"8\n" +
+	"\x0eSurfaceLogLine\x12\x12\n" +
+	"\x04text\x18\x01 \x01(\tR\x04text\x12\x12\n" +
+	"\x04tone\x18\x02 \x01(\tR\x04tone\"\xa4\x01\n" +
+	"\x10SurfaceLogAppend\x12\x1a\n" +
+	"\binstance\x18\x01 \x01(\tR\binstance\x12\x18\n" +
+	"\aversion\x18\x02 \x01(\x04R\aversion\x12\x10\n" +
+	"\x03key\x18\x03 \x01(\tR\x03key\x12\x12\n" +
+	"\x04text\x18\x04 \x01(\tR\x04text\x124\n" +
+	"\x05lines\x18\x05 \x03(\v2\x1e.codefoundry.v1.SurfaceLogLineR\x05lines\"T\n" +
+	"\fSurfaceToast\x12\x1a\n" +
+	"\binstance\x18\x01 \x01(\tR\binstance\x12\x14\n" +
+	"\x05level\x18\x02 \x01(\tR\x05level\x12\x12\n" +
+	"\x04text\x18\x03 \x01(\tR\x04text\"\xb5\x02\n" +
+	"\rSurfaceUpdate\x124\n" +
+	"\x05state\x18\x01 \x01(\v2\x1c.codefoundry.v1.SurfaceStateH\x00R\x05state\x121\n" +
+	"\x04view\x18\x02 \x01(\v2\x1b.codefoundry.v1.SurfaceViewH\x00R\x04view\x12:\n" +
+	"\x06append\x18\x03 \x01(\v2 .codefoundry.v1.SurfaceLogAppendH\x00R\x06append\x124\n" +
+	"\x05toast\x18\x04 \x01(\v2\x1c.codefoundry.v1.SurfaceToastH\x00R\x05toast\x12?\n" +
+	"\theartbeat\x18\x05 \x01(\v2\x1f.codefoundry.v1.StreamHeartbeatH\x00R\theartbeatB\b\n" +
+	"\x06update\"C\n" +
+	"\x13WatchSurfaceRequest\x12,\n" +
+	"\x03ref\x18\x01 \x01(\v2\x1a.codefoundry.v1.SurfaceRefR\x03ref\"Z\n" +
+	"\x11GetSurfaceRequest\x12,\n" +
+	"\x03ref\x18\x01 \x01(\v2\x1a.codefoundry.v1.SurfaceRefR\x03ref\x12\x17\n" +
+	"\await_ms\x18\x02 \x01(\x05R\x06waitMs\"x\n" +
+	"\x0eSurfaceElement\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x12\n" +
+	"\x04kind\x18\x02 \x01(\tR\x04kind\x12\x16\n" +
+	"\x06action\x18\x03 \x01(\tR\x06action\x12\x14\n" +
+	"\x05label\x18\x04 \x01(\tR\x05label\x12\x12\n" +
+	"\x04form\x18\x05 \x01(\tR\x04form\"\xb5\x01\n" +
+	"\x12GetSurfaceResponse\x122\n" +
+	"\x05state\x18\x01 \x01(\v2\x1c.codefoundry.v1.SurfaceStateR\x05state\x12/\n" +
+	"\x04view\x18\x02 \x01(\v2\x1b.codefoundry.v1.SurfaceViewR\x04view\x12:\n" +
+	"\belements\x18\x03 \x03(\v2\x1e.codefoundry.v1.SurfaceElementR\belements\"\xf7\x01\n" +
+	"\x11SurfaceActRequest\x12\x1a\n" +
+	"\binstance\x18\x01 \x01(\tR\binstance\x12,\n" +
+	"\x03ref\x18\x02 \x01(\v2\x1a.codefoundry.v1.SurfaceRefR\x03ref\x12\x18\n" +
+	"\aversion\x18\x03 \x01(\x04R\aversion\x12\x10\n" +
+	"\x03key\x18\x04 \x01(\tR\x03key\x12\x16\n" +
+	"\x06action\x18\x05 \x01(\tR\x06action\x12\x19\n" +
+	"\x05value\x18\x06 \x01(\tH\x00R\x05value\x88\x01\x01\x12/\n" +
+	"\x06values\x18\a \x01(\v2\x17.google.protobuf.StructR\x06valuesB\b\n" +
+	"\x06_value\".\n" +
+	"\x12SurfaceActResponse\x12\x18\n" +
+	"\aversion\x18\x01 \x01(\x04R\aversion*\xe3\x01\n" +
 	"\vPluginState\x12\x1c\n" +
 	"\x18PLUGIN_STATE_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15PLUGIN_STATE_DISABLED\x10\x01\x12\x19\n" +
@@ -1928,7 +3064,14 @@ const file_codefoundry_v1_plugin_proto_rawDesc = "" +
 	"\x14PLUGIN_STATE_CRASHED\x10\x04\x12\x19\n" +
 	"\x15PLUGIN_STATE_STOPPING\x10\x05\x12\x18\n" +
 	"\x14PLUGIN_STATE_STOPPED\x10\x06\x12\x17\n" +
-	"\x13PLUGIN_STATE_FAILED\x10\a2\xdd\a\n" +
+	"\x13PLUGIN_STATE_FAILED\x10\a*\xbb\x01\n" +
+	"\fSurfacePhase\x12\x1d\n" +
+	"\x19SURFACE_PHASE_UNSPECIFIED\x10\x00\x12\x19\n" +
+	"\x15SURFACE_PHASE_OPENING\x10\x01\x12\x16\n" +
+	"\x12SURFACE_PHASE_LIVE\x10\x02\x12 \n" +
+	"\x1cSURFACE_PHASE_NOT_RESPONDING\x10\x03\x12\x1d\n" +
+	"\x19SURFACE_PHASE_PLUGIN_DOWN\x10\x04\x12\x18\n" +
+	"\x14SURFACE_PHASE_FAILED\x10\x052\xdc\t\n" +
 	"\rPluginService\x12Q\n" +
 	"\x04List\x12\".codefoundry.v1.ListPluginsRequest\x1a#.codefoundry.v1.ListPluginsResponse\"\x00\x12U\n" +
 	"\x06Enable\x12#.codefoundry.v1.EnablePluginRequest\x1a$.codefoundry.v1.EnablePluginResponse\"\x00\x12X\n" +
@@ -1941,7 +3084,11 @@ const file_codefoundry_v1_plugin_proto_rawDesc = "" +
 	"FollowLogs\x12'.codefoundry.v1.FollowPluginLogsRequest\x1a\x1d.codefoundry.v1.PluginLogLine\"\x000\x01\x12d\n" +
 	"\vListSecrets\x12(.codefoundry.v1.ListPluginSecretsRequest\x1a).codefoundry.v1.ListPluginSecretsResponse\"\x00\x12g\n" +
 	"\fDeleteSecret\x12).codefoundry.v1.DeletePluginSecretRequest\x1a*.codefoundry.v1.DeletePluginSecretResponse\"\x00\x12M\n" +
-	"\x05Watch\x12#.codefoundry.v1.WatchPluginsRequest\x1a\x1b.codefoundry.v1.PluginEvent\"\x000\x01B\xc3\x01\n" +
+	"\x05Watch\x12#.codefoundry.v1.WatchPluginsRequest\x1a\x1b.codefoundry.v1.PluginEvent\"\x000\x01\x12V\n" +
+	"\fWatchSurface\x12#.codefoundry.v1.WatchSurfaceRequest\x1a\x1d.codefoundry.v1.SurfaceUpdate\"\x000\x01\x12U\n" +
+	"\n" +
+	"GetSurface\x12!.codefoundry.v1.GetSurfaceRequest\x1a\".codefoundry.v1.GetSurfaceResponse\"\x00\x12N\n" +
+	"\x03Act\x12!.codefoundry.v1.SurfaceActRequest\x1a\".codefoundry.v1.SurfaceActResponse\"\x00B\xc3\x01\n" +
 	"\x12com.codefoundry.v1B\vPluginProtoP\x01ZGgithub.com/alexwaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
 
 var (
@@ -1956,88 +3103,128 @@ func file_codefoundry_v1_plugin_proto_rawDescGZIP() []byte {
 	return file_codefoundry_v1_plugin_proto_rawDescData
 }
 
-var file_codefoundry_v1_plugin_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_codefoundry_v1_plugin_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
+var file_codefoundry_v1_plugin_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_codefoundry_v1_plugin_proto_msgTypes = make([]protoimpl.MessageInfo, 41)
 var file_codefoundry_v1_plugin_proto_goTypes = []any{
 	(PluginState)(0),                   // 0: codefoundry.v1.PluginState
-	(*PluginPermissions)(nil),          // 1: codefoundry.v1.PluginPermissions
-	(*PluginCommand)(nil),              // 2: codefoundry.v1.PluginCommand
-	(*PluginSurface)(nil),              // 3: codefoundry.v1.PluginSurface
-	(*Plugin)(nil),                     // 4: codefoundry.v1.Plugin
-	(*ListPluginsRequest)(nil),         // 5: codefoundry.v1.ListPluginsRequest
-	(*ListPluginsResponse)(nil),        // 6: codefoundry.v1.ListPluginsResponse
-	(*EnablePluginRequest)(nil),        // 7: codefoundry.v1.EnablePluginRequest
-	(*EnablePluginResponse)(nil),       // 8: codefoundry.v1.EnablePluginResponse
-	(*DisablePluginRequest)(nil),       // 9: codefoundry.v1.DisablePluginRequest
-	(*DisablePluginResponse)(nil),      // 10: codefoundry.v1.DisablePluginResponse
-	(*RestartPluginRequest)(nil),       // 11: codefoundry.v1.RestartPluginRequest
-	(*RestartPluginResponse)(nil),      // 12: codefoundry.v1.RestartPluginResponse
-	(*DevPluginRequest)(nil),           // 13: codefoundry.v1.DevPluginRequest
-	(*DevPluginResponse)(nil),          // 14: codefoundry.v1.DevPluginResponse
-	(*ReloadPluginsRequest)(nil),       // 15: codefoundry.v1.ReloadPluginsRequest
-	(*ReloadPluginsResponse)(nil),      // 16: codefoundry.v1.ReloadPluginsResponse
-	(*PluginLogsRequest)(nil),          // 17: codefoundry.v1.PluginLogsRequest
-	(*PluginLogLine)(nil),              // 18: codefoundry.v1.PluginLogLine
-	(*PluginLogsResponse)(nil),         // 19: codefoundry.v1.PluginLogsResponse
-	(*FollowPluginLogsRequest)(nil),    // 20: codefoundry.v1.FollowPluginLogsRequest
-	(*PluginSecret)(nil),               // 21: codefoundry.v1.PluginSecret
-	(*ListPluginSecretsRequest)(nil),   // 22: codefoundry.v1.ListPluginSecretsRequest
-	(*ListPluginSecretsResponse)(nil),  // 23: codefoundry.v1.ListPluginSecretsResponse
-	(*DeletePluginSecretRequest)(nil),  // 24: codefoundry.v1.DeletePluginSecretRequest
-	(*DeletePluginSecretResponse)(nil), // 25: codefoundry.v1.DeletePluginSecretResponse
-	(*WatchPluginsRequest)(nil),        // 26: codefoundry.v1.WatchPluginsRequest
-	(*PluginEvent)(nil),                // 27: codefoundry.v1.PluginEvent
-	(*PluginSnapshot)(nil),             // 28: codefoundry.v1.PluginSnapshot
-	(*timestamppb.Timestamp)(nil),      // 29: google.protobuf.Timestamp
+	(SurfacePhase)(0),                  // 1: codefoundry.v1.SurfacePhase
+	(*PluginPermissions)(nil),          // 2: codefoundry.v1.PluginPermissions
+	(*PluginCommand)(nil),              // 3: codefoundry.v1.PluginCommand
+	(*PluginSurface)(nil),              // 4: codefoundry.v1.PluginSurface
+	(*Plugin)(nil),                     // 5: codefoundry.v1.Plugin
+	(*ListPluginsRequest)(nil),         // 6: codefoundry.v1.ListPluginsRequest
+	(*ListPluginsResponse)(nil),        // 7: codefoundry.v1.ListPluginsResponse
+	(*EnablePluginRequest)(nil),        // 8: codefoundry.v1.EnablePluginRequest
+	(*EnablePluginResponse)(nil),       // 9: codefoundry.v1.EnablePluginResponse
+	(*DisablePluginRequest)(nil),       // 10: codefoundry.v1.DisablePluginRequest
+	(*DisablePluginResponse)(nil),      // 11: codefoundry.v1.DisablePluginResponse
+	(*RestartPluginRequest)(nil),       // 12: codefoundry.v1.RestartPluginRequest
+	(*RestartPluginResponse)(nil),      // 13: codefoundry.v1.RestartPluginResponse
+	(*DevPluginRequest)(nil),           // 14: codefoundry.v1.DevPluginRequest
+	(*DevPluginResponse)(nil),          // 15: codefoundry.v1.DevPluginResponse
+	(*ReloadPluginsRequest)(nil),       // 16: codefoundry.v1.ReloadPluginsRequest
+	(*ReloadPluginsResponse)(nil),      // 17: codefoundry.v1.ReloadPluginsResponse
+	(*PluginLogsRequest)(nil),          // 18: codefoundry.v1.PluginLogsRequest
+	(*PluginLogLine)(nil),              // 19: codefoundry.v1.PluginLogLine
+	(*PluginLogsResponse)(nil),         // 20: codefoundry.v1.PluginLogsResponse
+	(*FollowPluginLogsRequest)(nil),    // 21: codefoundry.v1.FollowPluginLogsRequest
+	(*PluginSecret)(nil),               // 22: codefoundry.v1.PluginSecret
+	(*ListPluginSecretsRequest)(nil),   // 23: codefoundry.v1.ListPluginSecretsRequest
+	(*ListPluginSecretsResponse)(nil),  // 24: codefoundry.v1.ListPluginSecretsResponse
+	(*DeletePluginSecretRequest)(nil),  // 25: codefoundry.v1.DeletePluginSecretRequest
+	(*DeletePluginSecretResponse)(nil), // 26: codefoundry.v1.DeletePluginSecretResponse
+	(*WatchPluginsRequest)(nil),        // 27: codefoundry.v1.WatchPluginsRequest
+	(*PluginEvent)(nil),                // 28: codefoundry.v1.PluginEvent
+	(*PluginSnapshot)(nil),             // 29: codefoundry.v1.PluginSnapshot
+	(*SurfaceRef)(nil),                 // 30: codefoundry.v1.SurfaceRef
+	(*SurfaceState)(nil),               // 31: codefoundry.v1.SurfaceState
+	(*SurfaceView)(nil),                // 32: codefoundry.v1.SurfaceView
+	(*SurfaceLogLine)(nil),             // 33: codefoundry.v1.SurfaceLogLine
+	(*SurfaceLogAppend)(nil),           // 34: codefoundry.v1.SurfaceLogAppend
+	(*SurfaceToast)(nil),               // 35: codefoundry.v1.SurfaceToast
+	(*SurfaceUpdate)(nil),              // 36: codefoundry.v1.SurfaceUpdate
+	(*WatchSurfaceRequest)(nil),        // 37: codefoundry.v1.WatchSurfaceRequest
+	(*GetSurfaceRequest)(nil),          // 38: codefoundry.v1.GetSurfaceRequest
+	(*SurfaceElement)(nil),             // 39: codefoundry.v1.SurfaceElement
+	(*GetSurfaceResponse)(nil),         // 40: codefoundry.v1.GetSurfaceResponse
+	(*SurfaceActRequest)(nil),          // 41: codefoundry.v1.SurfaceActRequest
+	(*SurfaceActResponse)(nil),         // 42: codefoundry.v1.SurfaceActResponse
+	(*timestamppb.Timestamp)(nil),      // 43: google.protobuf.Timestamp
+	(*UiContext)(nil),                  // 44: codefoundry.v1.UiContext
+	(*StreamHeartbeat)(nil),            // 45: codefoundry.v1.StreamHeartbeat
+	(*structpb.Struct)(nil),            // 46: google.protobuf.Struct
 }
 var file_codefoundry_v1_plugin_proto_depIdxs = []int32{
 	0,  // 0: codefoundry.v1.Plugin.state:type_name -> codefoundry.v1.PluginState
-	1,  // 1: codefoundry.v1.Plugin.permissions:type_name -> codefoundry.v1.PluginPermissions
-	1,  // 2: codefoundry.v1.Plugin.granted:type_name -> codefoundry.v1.PluginPermissions
-	29, // 3: codefoundry.v1.Plugin.consented_at:type_name -> google.protobuf.Timestamp
-	29, // 4: codefoundry.v1.Plugin.started_at:type_name -> google.protobuf.Timestamp
-	29, // 5: codefoundry.v1.Plugin.next_restart_at:type_name -> google.protobuf.Timestamp
-	2,  // 6: codefoundry.v1.Plugin.commands:type_name -> codefoundry.v1.PluginCommand
-	3,  // 7: codefoundry.v1.Plugin.surfaces:type_name -> codefoundry.v1.PluginSurface
-	4,  // 8: codefoundry.v1.ListPluginsResponse.plugins:type_name -> codefoundry.v1.Plugin
-	4,  // 9: codefoundry.v1.EnablePluginResponse.plugin:type_name -> codefoundry.v1.Plugin
-	4,  // 10: codefoundry.v1.DisablePluginResponse.plugin:type_name -> codefoundry.v1.Plugin
-	4,  // 11: codefoundry.v1.RestartPluginResponse.plugin:type_name -> codefoundry.v1.Plugin
-	4,  // 12: codefoundry.v1.DevPluginResponse.plugin:type_name -> codefoundry.v1.Plugin
-	29, // 13: codefoundry.v1.PluginLogLine.time:type_name -> google.protobuf.Timestamp
-	18, // 14: codefoundry.v1.PluginLogsResponse.lines:type_name -> codefoundry.v1.PluginLogLine
-	29, // 15: codefoundry.v1.PluginSecret.updated_at:type_name -> google.protobuf.Timestamp
-	21, // 16: codefoundry.v1.ListPluginSecretsResponse.secrets:type_name -> codefoundry.v1.PluginSecret
-	28, // 17: codefoundry.v1.PluginEvent.snapshot:type_name -> codefoundry.v1.PluginSnapshot
-	4,  // 18: codefoundry.v1.PluginEvent.updated:type_name -> codefoundry.v1.Plugin
-	4,  // 19: codefoundry.v1.PluginSnapshot.plugins:type_name -> codefoundry.v1.Plugin
-	5,  // 20: codefoundry.v1.PluginService.List:input_type -> codefoundry.v1.ListPluginsRequest
-	7,  // 21: codefoundry.v1.PluginService.Enable:input_type -> codefoundry.v1.EnablePluginRequest
-	9,  // 22: codefoundry.v1.PluginService.Disable:input_type -> codefoundry.v1.DisablePluginRequest
-	11, // 23: codefoundry.v1.PluginService.Restart:input_type -> codefoundry.v1.RestartPluginRequest
-	13, // 24: codefoundry.v1.PluginService.Dev:input_type -> codefoundry.v1.DevPluginRequest
-	15, // 25: codefoundry.v1.PluginService.Reload:input_type -> codefoundry.v1.ReloadPluginsRequest
-	17, // 26: codefoundry.v1.PluginService.Logs:input_type -> codefoundry.v1.PluginLogsRequest
-	20, // 27: codefoundry.v1.PluginService.FollowLogs:input_type -> codefoundry.v1.FollowPluginLogsRequest
-	22, // 28: codefoundry.v1.PluginService.ListSecrets:input_type -> codefoundry.v1.ListPluginSecretsRequest
-	24, // 29: codefoundry.v1.PluginService.DeleteSecret:input_type -> codefoundry.v1.DeletePluginSecretRequest
-	26, // 30: codefoundry.v1.PluginService.Watch:input_type -> codefoundry.v1.WatchPluginsRequest
-	6,  // 31: codefoundry.v1.PluginService.List:output_type -> codefoundry.v1.ListPluginsResponse
-	8,  // 32: codefoundry.v1.PluginService.Enable:output_type -> codefoundry.v1.EnablePluginResponse
-	10, // 33: codefoundry.v1.PluginService.Disable:output_type -> codefoundry.v1.DisablePluginResponse
-	12, // 34: codefoundry.v1.PluginService.Restart:output_type -> codefoundry.v1.RestartPluginResponse
-	14, // 35: codefoundry.v1.PluginService.Dev:output_type -> codefoundry.v1.DevPluginResponse
-	16, // 36: codefoundry.v1.PluginService.Reload:output_type -> codefoundry.v1.ReloadPluginsResponse
-	19, // 37: codefoundry.v1.PluginService.Logs:output_type -> codefoundry.v1.PluginLogsResponse
-	18, // 38: codefoundry.v1.PluginService.FollowLogs:output_type -> codefoundry.v1.PluginLogLine
-	23, // 39: codefoundry.v1.PluginService.ListSecrets:output_type -> codefoundry.v1.ListPluginSecretsResponse
-	25, // 40: codefoundry.v1.PluginService.DeleteSecret:output_type -> codefoundry.v1.DeletePluginSecretResponse
-	27, // 41: codefoundry.v1.PluginService.Watch:output_type -> codefoundry.v1.PluginEvent
-	31, // [31:42] is the sub-list for method output_type
-	20, // [20:31] is the sub-list for method input_type
-	20, // [20:20] is the sub-list for extension type_name
-	20, // [20:20] is the sub-list for extension extendee
-	0,  // [0:20] is the sub-list for field type_name
+	2,  // 1: codefoundry.v1.Plugin.permissions:type_name -> codefoundry.v1.PluginPermissions
+	2,  // 2: codefoundry.v1.Plugin.granted:type_name -> codefoundry.v1.PluginPermissions
+	43, // 3: codefoundry.v1.Plugin.consented_at:type_name -> google.protobuf.Timestamp
+	43, // 4: codefoundry.v1.Plugin.started_at:type_name -> google.protobuf.Timestamp
+	43, // 5: codefoundry.v1.Plugin.next_restart_at:type_name -> google.protobuf.Timestamp
+	3,  // 6: codefoundry.v1.Plugin.commands:type_name -> codefoundry.v1.PluginCommand
+	4,  // 7: codefoundry.v1.Plugin.surfaces:type_name -> codefoundry.v1.PluginSurface
+	44, // 8: codefoundry.v1.ListPluginsRequest.context:type_name -> codefoundry.v1.UiContext
+	5,  // 9: codefoundry.v1.ListPluginsResponse.plugins:type_name -> codefoundry.v1.Plugin
+	5,  // 10: codefoundry.v1.EnablePluginResponse.plugin:type_name -> codefoundry.v1.Plugin
+	5,  // 11: codefoundry.v1.DisablePluginResponse.plugin:type_name -> codefoundry.v1.Plugin
+	5,  // 12: codefoundry.v1.RestartPluginResponse.plugin:type_name -> codefoundry.v1.Plugin
+	5,  // 13: codefoundry.v1.DevPluginResponse.plugin:type_name -> codefoundry.v1.Plugin
+	43, // 14: codefoundry.v1.PluginLogLine.time:type_name -> google.protobuf.Timestamp
+	19, // 15: codefoundry.v1.PluginLogsResponse.lines:type_name -> codefoundry.v1.PluginLogLine
+	43, // 16: codefoundry.v1.PluginSecret.updated_at:type_name -> google.protobuf.Timestamp
+	22, // 17: codefoundry.v1.ListPluginSecretsResponse.secrets:type_name -> codefoundry.v1.PluginSecret
+	29, // 18: codefoundry.v1.PluginEvent.snapshot:type_name -> codefoundry.v1.PluginSnapshot
+	5,  // 19: codefoundry.v1.PluginEvent.updated:type_name -> codefoundry.v1.Plugin
+	5,  // 20: codefoundry.v1.PluginSnapshot.plugins:type_name -> codefoundry.v1.Plugin
+	44, // 21: codefoundry.v1.SurfaceRef.context:type_name -> codefoundry.v1.UiContext
+	1,  // 22: codefoundry.v1.SurfaceState.phase:type_name -> codefoundry.v1.SurfacePhase
+	0,  // 23: codefoundry.v1.SurfaceState.plugin_state:type_name -> codefoundry.v1.PluginState
+	33, // 24: codefoundry.v1.SurfaceLogAppend.lines:type_name -> codefoundry.v1.SurfaceLogLine
+	31, // 25: codefoundry.v1.SurfaceUpdate.state:type_name -> codefoundry.v1.SurfaceState
+	32, // 26: codefoundry.v1.SurfaceUpdate.view:type_name -> codefoundry.v1.SurfaceView
+	34, // 27: codefoundry.v1.SurfaceUpdate.append:type_name -> codefoundry.v1.SurfaceLogAppend
+	35, // 28: codefoundry.v1.SurfaceUpdate.toast:type_name -> codefoundry.v1.SurfaceToast
+	45, // 29: codefoundry.v1.SurfaceUpdate.heartbeat:type_name -> codefoundry.v1.StreamHeartbeat
+	30, // 30: codefoundry.v1.WatchSurfaceRequest.ref:type_name -> codefoundry.v1.SurfaceRef
+	30, // 31: codefoundry.v1.GetSurfaceRequest.ref:type_name -> codefoundry.v1.SurfaceRef
+	31, // 32: codefoundry.v1.GetSurfaceResponse.state:type_name -> codefoundry.v1.SurfaceState
+	32, // 33: codefoundry.v1.GetSurfaceResponse.view:type_name -> codefoundry.v1.SurfaceView
+	39, // 34: codefoundry.v1.GetSurfaceResponse.elements:type_name -> codefoundry.v1.SurfaceElement
+	30, // 35: codefoundry.v1.SurfaceActRequest.ref:type_name -> codefoundry.v1.SurfaceRef
+	46, // 36: codefoundry.v1.SurfaceActRequest.values:type_name -> google.protobuf.Struct
+	6,  // 37: codefoundry.v1.PluginService.List:input_type -> codefoundry.v1.ListPluginsRequest
+	8,  // 38: codefoundry.v1.PluginService.Enable:input_type -> codefoundry.v1.EnablePluginRequest
+	10, // 39: codefoundry.v1.PluginService.Disable:input_type -> codefoundry.v1.DisablePluginRequest
+	12, // 40: codefoundry.v1.PluginService.Restart:input_type -> codefoundry.v1.RestartPluginRequest
+	14, // 41: codefoundry.v1.PluginService.Dev:input_type -> codefoundry.v1.DevPluginRequest
+	16, // 42: codefoundry.v1.PluginService.Reload:input_type -> codefoundry.v1.ReloadPluginsRequest
+	18, // 43: codefoundry.v1.PluginService.Logs:input_type -> codefoundry.v1.PluginLogsRequest
+	21, // 44: codefoundry.v1.PluginService.FollowLogs:input_type -> codefoundry.v1.FollowPluginLogsRequest
+	23, // 45: codefoundry.v1.PluginService.ListSecrets:input_type -> codefoundry.v1.ListPluginSecretsRequest
+	25, // 46: codefoundry.v1.PluginService.DeleteSecret:input_type -> codefoundry.v1.DeletePluginSecretRequest
+	27, // 47: codefoundry.v1.PluginService.Watch:input_type -> codefoundry.v1.WatchPluginsRequest
+	37, // 48: codefoundry.v1.PluginService.WatchSurface:input_type -> codefoundry.v1.WatchSurfaceRequest
+	38, // 49: codefoundry.v1.PluginService.GetSurface:input_type -> codefoundry.v1.GetSurfaceRequest
+	41, // 50: codefoundry.v1.PluginService.Act:input_type -> codefoundry.v1.SurfaceActRequest
+	7,  // 51: codefoundry.v1.PluginService.List:output_type -> codefoundry.v1.ListPluginsResponse
+	9,  // 52: codefoundry.v1.PluginService.Enable:output_type -> codefoundry.v1.EnablePluginResponse
+	11, // 53: codefoundry.v1.PluginService.Disable:output_type -> codefoundry.v1.DisablePluginResponse
+	13, // 54: codefoundry.v1.PluginService.Restart:output_type -> codefoundry.v1.RestartPluginResponse
+	15, // 55: codefoundry.v1.PluginService.Dev:output_type -> codefoundry.v1.DevPluginResponse
+	17, // 56: codefoundry.v1.PluginService.Reload:output_type -> codefoundry.v1.ReloadPluginsResponse
+	20, // 57: codefoundry.v1.PluginService.Logs:output_type -> codefoundry.v1.PluginLogsResponse
+	19, // 58: codefoundry.v1.PluginService.FollowLogs:output_type -> codefoundry.v1.PluginLogLine
+	24, // 59: codefoundry.v1.PluginService.ListSecrets:output_type -> codefoundry.v1.ListPluginSecretsResponse
+	26, // 60: codefoundry.v1.PluginService.DeleteSecret:output_type -> codefoundry.v1.DeletePluginSecretResponse
+	28, // 61: codefoundry.v1.PluginService.Watch:output_type -> codefoundry.v1.PluginEvent
+	36, // 62: codefoundry.v1.PluginService.WatchSurface:output_type -> codefoundry.v1.SurfaceUpdate
+	40, // 63: codefoundry.v1.PluginService.GetSurface:output_type -> codefoundry.v1.GetSurfaceResponse
+	42, // 64: codefoundry.v1.PluginService.Act:output_type -> codefoundry.v1.SurfaceActResponse
+	51, // [51:65] is the sub-list for method output_type
+	37, // [37:51] is the sub-list for method input_type
+	37, // [37:37] is the sub-list for extension type_name
+	37, // [37:37] is the sub-list for extension extendee
+	0,  // [0:37] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_plugin_proto_init() }
@@ -2045,18 +3232,29 @@ func file_codefoundry_v1_plugin_proto_init() {
 	if File_codefoundry_v1_plugin_proto != nil {
 		return
 	}
+	file_codefoundry_v1_command_proto_init()
+	file_codefoundry_v1_heartbeat_proto_init()
 	file_codefoundry_v1_plugin_proto_msgTypes[26].OneofWrappers = []any{
 		(*PluginEvent_Snapshot)(nil),
 		(*PluginEvent_Updated)(nil),
 		(*PluginEvent_RemovedName)(nil),
+		(*PluginEvent_AvailabilityEpoch)(nil),
 	}
+	file_codefoundry_v1_plugin_proto_msgTypes[34].OneofWrappers = []any{
+		(*SurfaceUpdate_State)(nil),
+		(*SurfaceUpdate_View)(nil),
+		(*SurfaceUpdate_Append)(nil),
+		(*SurfaceUpdate_Toast)(nil),
+		(*SurfaceUpdate_Heartbeat)(nil),
+	}
+	file_codefoundry_v1_plugin_proto_msgTypes[39].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_plugin_proto_rawDesc), len(file_codefoundry_v1_plugin_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   28,
+			NumEnums:      2,
+			NumMessages:   41,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

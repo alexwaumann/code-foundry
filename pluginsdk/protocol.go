@@ -18,12 +18,20 @@ const (
 	// MethodShutdown (request, 2 s): {} → {}. The plugin then exits; the host closes
 	// stdin and signals the process group if it does not.
 	MethodShutdown = "shutdown"
-	// MethodSurfaceOpen, MethodSurfaceVisibility, MethodSurfaceClose and MethodSurfaceAct
-	// drive surface instances (protocol PR 2).
-	MethodSurfaceOpen       = "surface/open"
+	// MethodSurfaceOpen (request, 5 s): SurfaceOpen → {}. The first viewer of an
+	// instance opens it; the plugin then sends its view with view/update (within 10 s,
+	// or the host shows "not responding"). A view/update sent before the answer counts.
+	MethodSurfaceOpen = "surface/open"
+	// MethodSurfaceVisibility (notification): SurfaceVisibility, when the instance's
+	// viewers go from none to some (true, also right after open) and back (false). A
+	// hidden instance may stop polling.
 	MethodSurfaceVisibility = "surface/visibility"
-	MethodSurfaceClose      = "surface/close"
-	MethodSurfaceAct        = "surface/act"
+	// MethodSurfaceClose (notification): SurfaceClose, after the instance had no viewer
+	// for the host's grace (60 s), or when the plugin is being stopped.
+	MethodSurfaceClose = "surface/close"
+	// MethodSurfaceAct (request, 10 s): SurfaceAct → {}. An error's message is shown to
+	// the user.
+	MethodSurfaceAct = "surface/act"
 	// MethodEventsEvent (notification) carries one subscribed event (protocol PR 3).
 	MethodEventsEvent = "events/event"
 )
@@ -43,8 +51,21 @@ const (
 	MethodSecretList   = "secret/list"
 	// The rest arrive with later protocol PRs; until a host supports one it answers
 	// CodeMethodNotFound.
-	MethodViewUpdate        = "view/update"
-	MethodViewToast         = "view/toast"
+	//
+	// MethodViewUpdate (request): ViewUpdateParams → ViewUpdateResult. The whole view
+	// of an open instance; the host validates it (an invalid view is refused with
+	// CodeInvalidParams naming each problem, and the previous view stays), numbers it,
+	// and coalesces bursts. Sent as a notification it works too, but a refusal then
+	// only reaches the plugin's log.
+	MethodViewUpdate = "view/update"
+	// MethodViewAppend (request or notification): ViewAppendParams → ViewUpdateResult.
+	// Extends one log node of the instance's current view without re-sending it.
+	MethodViewAppend = "view/append"
+	// MethodViewToast (notification): ToastParams, at most one a second.
+	MethodViewToast = "view/toast"
+	// MethodContextSet (notification): ContextParams, a predicate fact
+	// <plugin>.<key> (global, or for one thread or project) the host's when clauses
+	// read. A null value removes it. Facts last until the plugin process ends.
 	MethodContextSet        = "context/set"
 	MethodThreadSetFlag     = "thread/setFlag"
 	MethodEventsSubscribe   = "events/subscribe"
@@ -137,10 +158,26 @@ type InvokeParams struct {
 	Command string            `json:"command"`
 	Args    map[string]string `json:"args,omitempty"`
 	Context UiContext         `json:"context"`
-	// Confirm is "never" (default: a command that asks the user first fails with
-	// CodeConfirmationRequired) or "ask" (the host asks the user in the GUI; protocol
-	// PR 2).
+	// Confirm is ConfirmNever (default: a command that asks the user first fails with
+	// CodeConfirmationRequired) or ConfirmAsk: the host hands it to the GUI, which runs
+	// it through its own confirm dialog, and answers at once with AskedResult as JSON
+	// (still CodeConfirmationRequired when no GUI is connected). The plugin learns the
+	// outcome from events.
 	Confirm string `json:"confirm,omitempty"`
+}
+
+// InvokeParams.Confirm values.
+const (
+	ConfirmNever = "never"
+	ConfirmAsk   = "ask"
+)
+
+// AskedResult is the JSON of host/invoke's result when a command was handed to the
+// user (Confirm "ask").
+type AskedResult struct {
+	// Asked: the GUI shows the command's confirm dialog; Delivered counts the windows.
+	Asked     bool `json:"asked"`
+	Delivered int  `json:"delivered"`
 }
 
 // LogParams is the log notification's params.
@@ -265,21 +302,80 @@ type SurfaceOpen struct {
 	Facts    map[string]json.RawMessage `json:"facts,omitempty"`
 }
 
+// SurfaceVisibility is surface/visibility's params.
+type SurfaceVisibility struct {
+	Instance string `json:"instance"`
+	Visible  bool   `json:"visible"`
+}
+
+// SurfaceClose is surface/close's params. Reason is "idle" (no viewer for the grace),
+// "shutdown" (the plugin is being stopped) or "gone" (the plugin's surface went away).
+type SurfaceClose struct {
+	Instance string `json:"instance"`
+	Reason   string `json:"reason,omitempty"`
+}
+
+// SurfaceAct kinds.
+const (
+	ActClick  = "click"  // a button, row or chip with an event action
+	ActSubmit = "submit" // a form's submit button
+	ActChange = "change" // a field with a change event was edited
+	ActTab    = "tab"    // the user switched tabs; Key and Value are the new tab's key
+)
+
 // SurfaceAct is surface/act's params: the user acted on a view element.
 type SurfaceAct struct {
 	Instance string `json:"instance"`
-	Version  uint64 `json:"version"`
-	// Kind is "click", "submit", "change" or "tab".
-	Kind   string         `json:"kind"`
-	Action string         `json:"action"`
-	Key    string         `json:"key,omitempty"`
-	Data   string         `json:"data,omitempty"`
-	Field  string         `json:"field,omitempty"`
+	// Version is the view version the user acted on (it may be older than the latest).
+	Version uint64 `json:"version"`
+	// Kind is ActClick, ActSubmit, ActChange or ActTab.
+	Kind string `json:"kind"`
+	// Action is the element's event name ("tab" for a tab).
+	Action string `json:"action"`
+	// Key is the element's key; Data the event's data, as the view declared it.
+	Key  string `json:"key,omitempty"`
+	Data string `json:"data,omitempty"`
+	// Field is the name of the field a change is about.
+	Field string `json:"field,omitempty"`
+	// Value is a change's new value or a tab's key.
+	Value any `json:"value,omitempty"`
+	// Values are the enclosing form's fields by name (strings, booleans, string lists);
+	// a secret input with store arrives as StoredSecret, and a secret never arrives in a
+	// change.
 	Values map[string]any `json:"values,omitempty"`
+}
+
+// StoredSecret replaces a secret input's value in SurfaceAct.Values when the input has
+// a store key: the host wrote the value to the plugin's secrets (Secrets().Get(Key)).
+type StoredSecret struct {
+	Key    string `json:"key"`
+	Stored bool   `json:"stored"`
 }
 
 // ViewUpdateParams is view/update's params.
 type ViewUpdateParams struct {
 	Instance string          `json:"instance"`
 	View     json.RawMessage `json:"view"`
+}
+
+// ViewUpdateResult answers view/update and view/append: the instance's view version.
+type ViewUpdateResult struct {
+	Version uint64 `json:"version"`
+}
+
+// AppendLine is one toned line of a view/append to a lines log.
+type AppendLine struct {
+	Text string `json:"text"`
+	Tone string `json:"tone,omitempty"`
+}
+
+// ViewAppendParams is view/append's params: Text extends a text log, Lines a lines
+// log (each at most 64 KB per append). The host keeps the last 2,000 lines or 256 KB
+// of each log node; a view that sets the node's text or lines replaces the buffer, one
+// that leaves both empty keeps it.
+type ViewAppendParams struct {
+	Instance string       `json:"instance"`
+	Key      string       `json:"key"`
+	Text     string       `json:"text,omitempty"`
+	Lines    []AppendLine `json:"lines,omitempty"`
 }

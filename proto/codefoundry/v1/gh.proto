@@ -280,6 +280,8 @@ message CheckRun {
   string description = 6;
   google.protobuf.Timestamp started_at = 7;
   google.protobuf.Timestamp completed_at = 8;
+  // The GitHub App that made a check run ("github-actions"); empty for commit statuses.
+  string app = 9;
 }
 
 message GetViewerRequest {}

@@ -271,6 +271,7 @@ func checkRunsToProto(runs []gh.CheckRun) []*v1.CheckRun {
 		out = append(out, &v1.CheckRun{
 			Name:        r.Name,
 			Workflow:    r.Workflow,
+			App:         r.App,
 			Status:      enumOf[v1.CheckStatus](v1.CheckStatus_value, "CHECK_STATUS_", string(r.Status)),
 			Conclusion:  enumOf[v1.CheckConclusion](v1.CheckConclusion_value, "CHECK_CONCLUSION_", string(r.Conclusion)),
 			Url:         r.URL,

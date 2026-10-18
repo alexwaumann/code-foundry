@@ -4,15 +4,19 @@
 
 import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import type { UiContext } from "./command_pb";
+import { file_codefoundry_v1_command } from "./command_pb";
+import type { StreamHeartbeat } from "./heartbeat_pb";
+import { file_codefoundry_v1_heartbeat } from "./heartbeat_pb";
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
-import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
-import type { Message } from "@bufbuild/protobuf";
+import { file_google_protobuf_struct, file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
+import type { JsonObject, Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file codefoundry/v1/plugin.proto.
  */
 export const file_codefoundry_v1_plugin: GenFile = /*@__PURE__*/
-  fileDesc("Chtjb2RlZm91bmRyeS92MS9wbHVnaW4ucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIqMBChFQbHVnaW5QZXJtaXNzaW9ucxIQCghjb21tYW5kcxgBIAMoCRIOCgZldmVudHMYAiADKAkSFQoNdGhyZWFkX3N0YXR1cxgDIAEoCBITCgtzZXNzaW9uX2VudhgEIAEoCBIPCgdzZWNyZXRzGAUgASgIEg8KB3RocmVhZHMYBiABKAgSEQoJdGVybWluYWxzGAcgASgIEgsKA2FwaRgIIAEoCCJBCg1QbHVnaW5Db21tYW5kEgwKBG5hbWUYASABKAkSDQoFdGl0bGUYAiABKAkSEwoLZGVzY3JpcHRpb24YAyABKAkiWwoNUGx1Z2luU3VyZmFjZRIKCgJpZBgBIAEoCRINCgV0aXRsZRgCIAEoCRIMCgRpY29uGAMgASgJEg0KBXNjb3BlGAQgASgJEhIKCnBsYWNlbWVudHMYBSADKAki4wUKBlBsdWdpbhIMCgRuYW1lGAEgASgJEhQKDGRpc3BsYXlfbmFtZRgCIAEoCRIPCgd2ZXJzaW9uGAMgASgJEhMKC2Rlc2NyaXB0aW9uGAQgASgJEioKBXN0YXRlGAUgASgOMhsuY29kZWZvdW5kcnkudjEuUGx1Z2luU3RhdGUSDwoHZW5hYmxlZBgGIAEoCBIXCg9kaXNhYmxlZF9yZWFzb24YByABKAkSCwoDZGV2GAggASgIEhAKCGRldl9wYXRoGAkgASgJEgsKA2RpchgKIAEoCRISCgpsYXN0X2Vycm9yGAsgASgJEg4KBmlzc3VlcxgMIAMoCRI2CgtwZXJtaXNzaW9ucxgNIAEoCzIhLmNvZGVmb3VuZHJ5LnYxLlBsdWdpblBlcm1pc3Npb25zEjIKB2dyYW50ZWQYDiABKAsyIS5jb2RlZm91bmRyeS52MS5QbHVnaW5QZXJtaXNzaW9ucxIwCgxjb25zZW50ZWRfYXQYDyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhUKDW5lZWRzX2NvbnNlbnQYECABKAgSFAoMY29uc2VudF90ZXh0GBEgASgJEgsKA3BpZBgSIAEoBRIuCgpzdGFydGVkX2F0GBMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIzCg9uZXh0X3Jlc3RhcnRfYXQYFCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhAKCHJlc3RhcnRzGBUgASgFEhAKCHByb3RvY29sGBYgASgFEhQKDGNhcGFiaWxpdGllcxgXIAMoCRIvCghjb21tYW5kcxgYIAMoCzIdLmNvZGVmb3VuZHJ5LnYxLlBsdWdpbkNvbW1hbmQSLwoIc3VyZmFjZXMYGSADKAsyHS5jb2RlZm91bmRyeS52MS5QbHVnaW5TdXJmYWNlEhAKCGxvZ19wYXRoGBogASgJIhQKEkxpc3RQbHVnaW5zUmVxdWVzdCI+ChNMaXN0UGx1Z2luc1Jlc3BvbnNlEicKB3BsdWdpbnMYASADKAsyFi5jb2RlZm91bmRyeS52MS5QbHVnaW4iNAoTRW5hYmxlUGx1Z2luUmVxdWVzdBIMCgRuYW1lGAEgASgJEg8KB2NvbnNlbnQYAiABKAgiawoURW5hYmxlUGx1Z2luUmVzcG9uc2USJgoGcGx1Z2luGAEgASgLMhYuY29kZWZvdW5kcnkudjEuUGx1Z2luEhUKDW5lZWRzX2NvbnNlbnQYAiABKAgSFAoMY29uc2VudF90ZXh0GAMgASgJIiQKFERpc2FibGVQbHVnaW5SZXF1ZXN0EgwKBG5hbWUYASABKAkiPwoVRGlzYWJsZVBsdWdpblJlc3BvbnNlEiYKBnBsdWdpbhgBIAEoCzIWLmNvZGVmb3VuZHJ5LnYxLlBsdWdpbiIkChRSZXN0YXJ0UGx1Z2luUmVxdWVzdBIMCgRuYW1lGAEgASgJIj8KFVJlc3RhcnRQbHVnaW5SZXNwb25zZRImCgZwbHVnaW4YASABKAsyFi5jb2RlZm91bmRyeS52MS5QbHVnaW4iQgoQRGV2UGx1Z2luUmVxdWVzdBIMCgRwYXRoGAEgASgJEg8KB2NvbnNlbnQYAiABKAgSDwoHZHJ5X3J1bhgDIAEoCCJoChFEZXZQbHVnaW5SZXNwb25zZRImCgZwbHVnaW4YASABKAsyFi5jb2RlZm91bmRyeS52MS5QbHVnaW4SFQoNbmVlZHNfY29uc2VudBgCIAEoCBIUCgxjb25zZW50X3RleHQYAyABKAkiFgoUUmVsb2FkUGx1Z2luc1JlcXVlc3QiFwoVUmVsb2FkUGx1Z2luc1Jlc3BvbnNlIjAKEVBsdWdpbkxvZ3NSZXF1ZXN0EgwKBG5hbWUYASABKAkSDQoFbGluZXMYAiABKAUicwoNUGx1Z2luTG9nTGluZRILCgNzZXEYASABKAQSKAoEdGltZRgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASDgoGc291cmNlGAMgASgJEg0KBWxldmVsGAQgASgJEgwKBHRleHQYBSABKAkiUAoSUGx1Z2luTG9nc1Jlc3BvbnNlEiwKBWxpbmVzGAEgAygLMh0uY29kZWZvdW5kcnkudjEuUGx1Z2luTG9nTGluZRIMCgRwYXRoGAIgASgJIjYKF0ZvbGxvd1BsdWdpbkxvZ3NSZXF1ZXN0EgwKBG5hbWUYASABKAkSDQoFbGluZXMYAiABKAUiSwoMUGx1Z2luU2VjcmV0EgsKA2tleRgBIAEoCRIuCgp1cGRhdGVkX2F0GAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCIoChhMaXN0UGx1Z2luU2VjcmV0c1JlcXVlc3QSDAoEbmFtZRgBIAEoCSJKChlMaXN0UGx1Z2luU2VjcmV0c1Jlc3BvbnNlEi0KB3NlY3JldHMYASADKAsyHC5jb2RlZm91bmRyeS52MS5QbHVnaW5TZWNyZXQiNgoZRGVsZXRlUGx1Z2luU2VjcmV0UmVxdWVzdBIMCgRuYW1lGAEgASgJEgsKA2tleRgCIAEoCSIcChpEZWxldGVQbHVnaW5TZWNyZXRSZXNwb25zZSIVChNXYXRjaFBsdWdpbnNSZXF1ZXN0Io0BCgtQbHVnaW5FdmVudBIyCghzbmFwc2hvdBgBIAEoCzIeLmNvZGVmb3VuZHJ5LnYxLlBsdWdpblNuYXBzaG90SAASKQoHdXBkYXRlZBgCIAEoCzIWLmNvZGVmb3VuZHJ5LnYxLlBsdWdpbkgAEhYKDHJlbW92ZWRfbmFtZRgDIAEoCUgAQgcKBWV2ZW50IjkKDlBsdWdpblNuYXBzaG90EicKB3BsdWdpbnMYASADKAsyFi5jb2RlZm91bmRyeS52MS5QbHVnaW4q4wEKC1BsdWdpblN0YXRlEhwKGFBMVUdJTl9TVEFURV9VTlNQRUNJRklFRBAAEhkKFVBMVUdJTl9TVEFURV9ESVNBQkxFRBABEhkKFVBMVUdJTl9TVEFURV9TVEFSVElORxACEhgKFFBMVUdJTl9TVEFURV9SVU5OSU5HEAMSGAoUUExVR0lOX1NUQVRFX0NSQVNIRUQQBBIZChVQTFVHSU5fU1RBVEVfU1RPUFBJTkcQBRIYChRQTFVHSU5fU1RBVEVfU1RPUFBFRBAGEhcKE1BMVUdJTl9TVEFURV9GQUlMRUQQBzLdBwoNUGx1Z2luU2VydmljZRJRCgRMaXN0EiIuY29kZWZvdW5kcnkudjEuTGlzdFBsdWdpbnNSZXF1ZXN0GiMuY29kZWZvdW5kcnkudjEuTGlzdFBsdWdpbnNSZXNwb25zZSIAElUKBkVuYWJsZRIjLmNvZGVmb3VuZHJ5LnYxLkVuYWJsZVBsdWdpblJlcXVlc3QaJC5jb2RlZm91bmRyeS52MS5FbmFibGVQbHVnaW5SZXNwb25zZSIAElgKB0Rpc2FibGUSJC5jb2RlZm91bmRyeS52MS5EaXNhYmxlUGx1Z2luUmVxdWVzdBolLmNvZGVmb3VuZHJ5LnYxLkRpc2FibGVQbHVnaW5SZXNwb25zZSIAElgKB1Jlc3RhcnQSJC5jb2RlZm91bmRyeS52MS5SZXN0YXJ0UGx1Z2luUmVxdWVzdBolLmNvZGVmb3VuZHJ5LnYxLlJlc3RhcnRQbHVnaW5SZXNwb25zZSIAEkwKA0RldhIgLmNvZGVmb3VuZHJ5LnYxLkRldlBsdWdpblJlcXVlc3QaIS5jb2RlZm91bmRyeS52MS5EZXZQbHVnaW5SZXNwb25zZSIAElcKBlJlbG9hZBIkLmNvZGVmb3VuZHJ5LnYxLlJlbG9hZFBsdWdpbnNSZXF1ZXN0GiUuY29kZWZvdW5kcnkudjEuUmVsb2FkUGx1Z2luc1Jlc3BvbnNlIgASTwoETG9ncxIhLmNvZGVmb3VuZHJ5LnYxLlBsdWdpbkxvZ3NSZXF1ZXN0GiIuY29kZWZvdW5kcnkudjEuUGx1Z2luTG9nc1Jlc3BvbnNlIgASWAoKRm9sbG93TG9ncxInLmNvZGVmb3VuZHJ5LnYxLkZvbGxvd1BsdWdpbkxvZ3NSZXF1ZXN0Gh0uY29kZWZvdW5kcnkudjEuUGx1Z2luTG9nTGluZSIAMAESZAoLTGlzdFNlY3JldHMSKC5jb2RlZm91bmRyeS52MS5MaXN0UGx1Z2luU2VjcmV0c1JlcXVlc3QaKS5jb2RlZm91bmRyeS52MS5MaXN0UGx1Z2luU2VjcmV0c1Jlc3BvbnNlIgASZwoMRGVsZXRlU2VjcmV0EikuY29kZWZvdW5kcnkudjEuRGVsZXRlUGx1Z2luU2VjcmV0UmVxdWVzdBoqLmNvZGVmb3VuZHJ5LnYxLkRlbGV0ZVBsdWdpblNlY3JldFJlc3BvbnNlIgASTQoFV2F0Y2gSIy5jb2RlZm91bmRyeS52MS5XYXRjaFBsdWdpbnNSZXF1ZXN0GhsuY29kZWZvdW5kcnkudjEuUGx1Z2luRXZlbnQiADABQsMBChJjb20uY29kZWZvdW5kcnkudjFCC1BsdWdpblByb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM", [file_google_protobuf_timestamp]);
+  fileDesc("Chtjb2RlZm91bmRyeS92MS9wbHVnaW4ucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIqMBChFQbHVnaW5QZXJtaXNzaW9ucxIQCghjb21tYW5kcxgBIAMoCRIOCgZldmVudHMYAiADKAkSFQoNdGhyZWFkX3N0YXR1cxgDIAEoCBITCgtzZXNzaW9uX2VudhgEIAEoCBIPCgdzZWNyZXRzGAUgASgIEg8KB3RocmVhZHMYBiABKAgSEQoJdGVybWluYWxzGAcgASgIEgsKA2FwaRgIIAEoCCJBCg1QbHVnaW5Db21tYW5kEgwKBG5hbWUYASABKAkSDQoFdGl0bGUYAiABKAkSEwoLZGVzY3JpcHRpb24YAyABKAkivAEKDVBsdWdpblN1cmZhY2USCgoCaWQYASABKAkSDQoFdGl0bGUYAiABKAkSDAoEaWNvbhgDIAEoCRINCgVzY29wZRgEIAEoCRISCgpwbGFjZW1lbnRzGAUgAygJEgwKBHdoZW4YBiABKAkSFAoMc2hvd19jb21tYW5kGAcgASgJEgwKBGtpbmQYCCABKAkSEQoJYXZhaWxhYmxlGAkgASgIEhoKEnVuYXZhaWxhYmxlX3JlYXNvbhgKIAEoCSLjBQoGUGx1Z2luEgwKBG5hbWUYASABKAkSFAoMZGlzcGxheV9uYW1lGAIgASgJEg8KB3ZlcnNpb24YAyABKAkSEwoLZGVzY3JpcHRpb24YBCABKAkSKgoFc3RhdGUYBSABKA4yGy5jb2RlZm91bmRyeS52MS5QbHVnaW5TdGF0ZRIPCgdlbmFibGVkGAYgASgIEhcKD2Rpc2FibGVkX3JlYXNvbhgHIAEoCRILCgNkZXYYCCABKAgSEAoIZGV2X3BhdGgYCSABKAkSCwoDZGlyGAogASgJEhIKCmxhc3RfZXJyb3IYCyABKAkSDgoGaXNzdWVzGAwgAygJEjYKC3Blcm1pc3Npb25zGA0gASgLMiEuY29kZWZvdW5kcnkudjEuUGx1Z2luUGVybWlzc2lvbnMSMgoHZ3JhbnRlZBgOIAEoCzIhLmNvZGVmb3VuZHJ5LnYxLlBsdWdpblBlcm1pc3Npb25zEjAKDGNvbnNlbnRlZF9hdBgPIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASFQoNbmVlZHNfY29uc2VudBgQIAEoCBIUCgxjb25zZW50X3RleHQYESABKAkSCwoDcGlkGBIgASgFEi4KCnN0YXJ0ZWRfYXQYEyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjMKD25leHRfcmVzdGFydF9hdBgUIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEAoIcmVzdGFydHMYFSABKAUSEAoIcHJvdG9jb2wYFiABKAUSFAoMY2FwYWJpbGl0aWVzGBcgAygJEi8KCGNvbW1hbmRzGBggAygLMh0uY29kZWZvdW5kcnkudjEuUGx1Z2luQ29tbWFuZBIvCghzdXJmYWNlcxgZIAMoCzIdLmNvZGVmb3VuZHJ5LnYxLlBsdWdpblN1cmZhY2USEAoIbG9nX3BhdGgYGiABKAkiQAoSTGlzdFBsdWdpbnNSZXF1ZXN0EioKB2NvbnRleHQYASABKAsyGS5jb2RlZm91bmRyeS52MS5VaUNvbnRleHQiPgoTTGlzdFBsdWdpbnNSZXNwb25zZRInCgdwbHVnaW5zGAEgAygLMhYuY29kZWZvdW5kcnkudjEuUGx1Z2luIjQKE0VuYWJsZVBsdWdpblJlcXVlc3QSDAoEbmFtZRgBIAEoCRIPCgdjb25zZW50GAIgASgIImsKFEVuYWJsZVBsdWdpblJlc3BvbnNlEiYKBnBsdWdpbhgBIAEoCzIWLmNvZGVmb3VuZHJ5LnYxLlBsdWdpbhIVCg1uZWVkc19jb25zZW50GAIgASgIEhQKDGNvbnNlbnRfdGV4dBgDIAEoCSIkChREaXNhYmxlUGx1Z2luUmVxdWVzdBIMCgRuYW1lGAEgASgJIj8KFURpc2FibGVQbHVnaW5SZXNwb25zZRImCgZwbHVnaW4YASABKAsyFi5jb2RlZm91bmRyeS52MS5QbHVnaW4iJAoUUmVzdGFydFBsdWdpblJlcXVlc3QSDAoEbmFtZRgBIAEoCSI/ChVSZXN0YXJ0UGx1Z2luUmVzcG9uc2USJgoGcGx1Z2luGAEgASgLMhYuY29kZWZvdW5kcnkudjEuUGx1Z2luIkIKEERldlBsdWdpblJlcXVlc3QSDAoEcGF0aBgBIAEoCRIPCgdjb25zZW50GAIgASgIEg8KB2RyeV9ydW4YAyABKAgiaAoRRGV2UGx1Z2luUmVzcG9uc2USJgoGcGx1Z2luGAEgASgLMhYuY29kZWZvdW5kcnkudjEuUGx1Z2luEhUKDW5lZWRzX2NvbnNlbnQYAiABKAgSFAoMY29uc2VudF90ZXh0GAMgASgJIhYKFFJlbG9hZFBsdWdpbnNSZXF1ZXN0IhcKFVJlbG9hZFBsdWdpbnNSZXNwb25zZSIwChFQbHVnaW5Mb2dzUmVxdWVzdBIMCgRuYW1lGAEgASgJEg0KBWxpbmVzGAIgASgFInMKDVBsdWdpbkxvZ0xpbmUSCwoDc2VxGAEgASgEEigKBHRpbWUYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEg4KBnNvdXJjZRgDIAEoCRINCgVsZXZlbBgEIAEoCRIMCgR0ZXh0GAUgASgJIlAKElBsdWdpbkxvZ3NSZXNwb25zZRIsCgVsaW5lcxgBIAMoCzIdLmNvZGVmb3VuZHJ5LnYxLlBsdWdpbkxvZ0xpbmUSDAoEcGF0aBgCIAEoCSI2ChdGb2xsb3dQbHVnaW5Mb2dzUmVxdWVzdBIMCgRuYW1lGAEgASgJEg0KBWxpbmVzGAIgASgFIksKDFBsdWdpblNlY3JldBILCgNrZXkYASABKAkSLgoKdXBkYXRlZF9hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiKAoYTGlzdFBsdWdpblNlY3JldHNSZXF1ZXN0EgwKBG5hbWUYASABKAkiSgoZTGlzdFBsdWdpblNlY3JldHNSZXNwb25zZRItCgdzZWNyZXRzGAEgAygLMhwuY29kZWZvdW5kcnkudjEuUGx1Z2luU2VjcmV0IjYKGURlbGV0ZVBsdWdpblNlY3JldFJlcXVlc3QSDAoEbmFtZRgBIAEoCRILCgNrZXkYAiABKAkiHAoaRGVsZXRlUGx1Z2luU2VjcmV0UmVzcG9uc2UiFQoTV2F0Y2hQbHVnaW5zUmVxdWVzdCKrAQoLUGx1Z2luRXZlbnQSMgoIc25hcHNob3QYASABKAsyHi5jb2RlZm91bmRyeS52MS5QbHVnaW5TbmFwc2hvdEgAEikKB3VwZGF0ZWQYAiABKAsyFi5jb2RlZm91bmRyeS52MS5QbHVnaW5IABIWCgxyZW1vdmVkX25hbWUYAyABKAlIABIcChJhdmFpbGFiaWxpdHlfZXBvY2gYBCABKARIAEIHCgVldmVudCI5Cg5QbHVnaW5TbmFwc2hvdBInCgdwbHVnaW5zGAEgAygLMhYuY29kZWZvdW5kcnkudjEuUGx1Z2luImsKClN1cmZhY2VSZWYSDgoGcGx1Z2luGAEgASgJEg8KB3N1cmZhY2UYAiABKAkSKgoHY29udGV4dBgDIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLlVpQ29udGV4dBIQCghpbnN0YW5jZRgEIAEoCSKRAQoMU3VyZmFjZVN0YXRlEhAKCGluc3RhbmNlGAEgASgJEisKBXBoYXNlGAIgASgOMhwuY29kZWZvdW5kcnkudjEuU3VyZmFjZVBoYXNlEg8KB21lc3NhZ2UYAyABKAkSMQoMcGx1Z2luX3N0YXRlGAQgASgOMhsuY29kZWZvdW5kcnkudjEuUGx1Z2luU3RhdGUiWgoLU3VyZmFjZVZpZXcSEAoIaW5zdGFuY2UYASABKAkSDwoHdmVyc2lvbhgCIAEoBBIRCgl2aWV3X2pzb24YAyABKAkSFQoNaG9zdF9yZW5kZXJlZBgEIAEoCCIsCg5TdXJmYWNlTG9nTGluZRIMCgR0ZXh0GAEgASgJEgwKBHRvbmUYAiABKAkifwoQU3VyZmFjZUxvZ0FwcGVuZBIQCghpbnN0YW5jZRgBIAEoCRIPCgd2ZXJzaW9uGAIgASgEEgsKA2tleRgDIAEoCRIMCgR0ZXh0GAQgASgJEi0KBWxpbmVzGAUgAygLMh4uY29kZWZvdW5kcnkudjEuU3VyZmFjZUxvZ0xpbmUiPQoMU3VyZmFjZVRvYXN0EhAKCGluc3RhbmNlGAEgASgJEg0KBWxldmVsGAIgASgJEgwKBHRleHQYAyABKAkijgIKDVN1cmZhY2VVcGRhdGUSLQoFc3RhdGUYASABKAsyHC5jb2RlZm91bmRyeS52MS5TdXJmYWNlU3RhdGVIABIrCgR2aWV3GAIgASgLMhsuY29kZWZvdW5kcnkudjEuU3VyZmFjZVZpZXdIABIyCgZhcHBlbmQYAyABKAsyIC5jb2RlZm91bmRyeS52MS5TdXJmYWNlTG9nQXBwZW5kSAASLQoFdG9hc3QYBCABKAsyHC5jb2RlZm91bmRyeS52MS5TdXJmYWNlVG9hc3RIABI0CgloZWFydGJlYXQYBSABKAsyHy5jb2RlZm91bmRyeS52MS5TdHJlYW1IZWFydGJlYXRIAEIICgZ1cGRhdGUiPgoTV2F0Y2hTdXJmYWNlUmVxdWVzdBInCgNyZWYYASABKAsyGi5jb2RlZm91bmRyeS52MS5TdXJmYWNlUmVmIk0KEUdldFN1cmZhY2VSZXF1ZXN0EicKA3JlZhgBIAEoCzIaLmNvZGVmb3VuZHJ5LnYxLlN1cmZhY2VSZWYSDwoHd2FpdF9tcxgCIAEoBSJYCg5TdXJmYWNlRWxlbWVudBILCgNrZXkYASABKAkSDAoEa2luZBgCIAEoCRIOCgZhY3Rpb24YAyABKAkSDQoFbGFiZWwYBCABKAkSDAoEZm9ybRgFIAEoCSKeAQoSR2V0U3VyZmFjZVJlc3BvbnNlEisKBXN0YXRlGAEgASgLMhwuY29kZWZvdW5kcnkudjEuU3VyZmFjZVN0YXRlEikKBHZpZXcYAiABKAsyGy5jb2RlZm91bmRyeS52MS5TdXJmYWNlVmlldxIwCghlbGVtZW50cxgDIAMoCzIeLmNvZGVmb3VuZHJ5LnYxLlN1cmZhY2VFbGVtZW50IsMBChFTdXJmYWNlQWN0UmVxdWVzdBIQCghpbnN0YW5jZRgBIAEoCRInCgNyZWYYAiABKAsyGi5jb2RlZm91bmRyeS52MS5TdXJmYWNlUmVmEg8KB3ZlcnNpb24YAyABKAQSCwoDa2V5GAQgASgJEg4KBmFjdGlvbhgFIAEoCRISCgV2YWx1ZRgGIAEoCUgAiAEBEicKBnZhbHVlcxgHIAEoCzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3RCCAoGX3ZhbHVlIiUKElN1cmZhY2VBY3RSZXNwb25zZRIPCgd2ZXJzaW9uGAEgASgEKuMBCgtQbHVnaW5TdGF0ZRIcChhQTFVHSU5fU1RBVEVfVU5TUEVDSUZJRUQQABIZChVQTFVHSU5fU1RBVEVfRElTQUJMRUQQARIZChVQTFVHSU5fU1RBVEVfU1RBUlRJTkcQAhIYChRQTFVHSU5fU1RBVEVfUlVOTklORxADEhgKFFBMVUdJTl9TVEFURV9DUkFTSEVEEAQSGQoVUExVR0lOX1NUQVRFX1NUT1BQSU5HEAUSGAoUUExVR0lOX1NUQVRFX1NUT1BQRUQQBhIXChNQTFVHSU5fU1RBVEVfRkFJTEVEEAcquwEKDFN1cmZhY2VQaGFzZRIdChlTVVJGQUNFX1BIQVNFX1VOU1BFQ0lGSUVEEAASGQoVU1VSRkFDRV9QSEFTRV9PUEVOSU5HEAESFgoSU1VSRkFDRV9QSEFTRV9MSVZFEAISIAocU1VSRkFDRV9QSEFTRV9OT1RfUkVTUE9ORElORxADEh0KGVNVUkZBQ0VfUEhBU0VfUExVR0lOX0RPV04QBBIYChRTVVJGQUNFX1BIQVNFX0ZBSUxFRBAFMtwJCg1QbHVnaW5TZXJ2aWNlElEKBExpc3QSIi5jb2RlZm91bmRyeS52MS5MaXN0UGx1Z2luc1JlcXVlc3QaIy5jb2RlZm91bmRyeS52MS5MaXN0UGx1Z2luc1Jlc3BvbnNlIgASVQoGRW5hYmxlEiMuY29kZWZvdW5kcnkudjEuRW5hYmxlUGx1Z2luUmVxdWVzdBokLmNvZGVmb3VuZHJ5LnYxLkVuYWJsZVBsdWdpblJlc3BvbnNlIgASWAoHRGlzYWJsZRIkLmNvZGVmb3VuZHJ5LnYxLkRpc2FibGVQbHVnaW5SZXF1ZXN0GiUuY29kZWZvdW5kcnkudjEuRGlzYWJsZVBsdWdpblJlc3BvbnNlIgASWAoHUmVzdGFydBIkLmNvZGVmb3VuZHJ5LnYxLlJlc3RhcnRQbHVnaW5SZXF1ZXN0GiUuY29kZWZvdW5kcnkudjEuUmVzdGFydFBsdWdpblJlc3BvbnNlIgASTAoDRGV2EiAuY29kZWZvdW5kcnkudjEuRGV2UGx1Z2luUmVxdWVzdBohLmNvZGVmb3VuZHJ5LnYxLkRldlBsdWdpblJlc3BvbnNlIgASVwoGUmVsb2FkEiQuY29kZWZvdW5kcnkudjEuUmVsb2FkUGx1Z2luc1JlcXVlc3QaJS5jb2RlZm91bmRyeS52MS5SZWxvYWRQbHVnaW5zUmVzcG9uc2UiABJPCgRMb2dzEiEuY29kZWZvdW5kcnkudjEuUGx1Z2luTG9nc1JlcXVlc3QaIi5jb2RlZm91bmRyeS52MS5QbHVnaW5Mb2dzUmVzcG9uc2UiABJYCgpGb2xsb3dMb2dzEicuY29kZWZvdW5kcnkudjEuRm9sbG93UGx1Z2luTG9nc1JlcXVlc3QaHS5jb2RlZm91bmRyeS52MS5QbHVnaW5Mb2dMaW5lIgAwARJkCgtMaXN0U2VjcmV0cxIoLmNvZGVmb3VuZHJ5LnYxLkxpc3RQbHVnaW5TZWNyZXRzUmVxdWVzdBopLmNvZGVmb3VuZHJ5LnYxLkxpc3RQbHVnaW5TZWNyZXRzUmVzcG9uc2UiABJnCgxEZWxldGVTZWNyZXQSKS5jb2RlZm91bmRyeS52MS5EZWxldGVQbHVnaW5TZWNyZXRSZXF1ZXN0GiouY29kZWZvdW5kcnkudjEuRGVsZXRlUGx1Z2luU2VjcmV0UmVzcG9uc2UiABJNCgVXYXRjaBIjLmNvZGVmb3VuZHJ5LnYxLldhdGNoUGx1Z2luc1JlcXVlc3QaGy5jb2RlZm91bmRyeS52MS5QbHVnaW5FdmVudCIAMAESVgoMV2F0Y2hTdXJmYWNlEiMuY29kZWZvdW5kcnkudjEuV2F0Y2hTdXJmYWNlUmVxdWVzdBodLmNvZGVmb3VuZHJ5LnYxLlN1cmZhY2VVcGRhdGUiADABElUKCkdldFN1cmZhY2USIS5jb2RlZm91bmRyeS52MS5HZXRTdXJmYWNlUmVxdWVzdBoiLmNvZGVmb3VuZHJ5LnYxLkdldFN1cmZhY2VSZXNwb25zZSIAEk4KA0FjdBIhLmNvZGVmb3VuZHJ5LnYxLlN1cmZhY2VBY3RSZXF1ZXN0GiIuY29kZWZvdW5kcnkudjEuU3VyZmFjZUFjdFJlc3BvbnNlIgBCwwEKEmNvbS5jb2RlZm91bmRyeS52MUILUGx1Z2luUHJvdG9QAVpHZ2l0aHViLmNvbS9hbGV4d2F1bWFubi9jb2RlLWZvdW5kcnkvZ2VuL2dvL2NvZGVmb3VuZHJ5L3YxO2NvZGVmb3VuZHJ5djGiAgNDWFiqAg5Db2RlZm91bmRyeS5WMcoCDkNvZGVmb3VuZHJ5XFYx4gIaQ29kZWZvdW5kcnlcVjFcR1BCTWV0YWRhdGHqAg9Db2RlZm91bmRyeTo6VjFiBnByb3RvMw", [file_codefoundry_v1_command, file_codefoundry_v1_heartbeat, file_google_protobuf_struct, file_google_protobuf_timestamp]);
 
 /**
  * PluginPermissions mirrors plugin.json's permissions (the plugin registry's entry schema).
@@ -106,7 +110,7 @@ export const PluginCommandSchema: GenMessage<PluginCommand> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_plugin, 1);
 
 /**
- * PluginSurface is one manifest surface (rendered from protocol PR 2 on).
+ * PluginSurface is one manifest surface.
  *
  * @generated from message codefoundry.v1.PluginSurface
  */
@@ -127,6 +131,8 @@ export type PluginSurface = Message<"codefoundry.v1.PluginSurface"> & {
   icon: string;
 
   /**
+   * global, thread, project, worktree or pr: what one instance is for.
+   *
    * @generated from field: string scope = 4;
    */
   scope: string;
@@ -135,6 +141,41 @@ export type PluginSurface = Message<"codefoundry.v1.PluginSurface"> & {
    * @generated from field: repeated string placements = 5;
    */
   placements: string[];
+
+  /**
+   * The manifest's when clause ("" = always, within its scope).
+   *
+   * @generated from field: string when = 6;
+   */
+  when: string;
+
+  /**
+   * The command that shows it, plugin.<plugin>.show.<id>; its availability is the
+   * surface's (CommandService.List carries it to the GUI).
+   *
+   * @generated from field: string show_command = 7;
+   */
+  showCommand: string;
+
+  /**
+   * The GUI's surface kind and ShowView name stem: plugin.<plugin>.<id>.
+   *
+   * @generated from field: string kind = 8;
+   */
+  kind: string;
+
+  /**
+   * Whether it is available in ListPluginsRequest.context (false without a context
+   * when its scope needs one), and why not.
+   *
+   * @generated from field: bool available = 9;
+   */
+  available: boolean;
+
+  /**
+   * @generated from field: string unavailable_reason = 10;
+   */
+  unavailableReason: string;
 };
 
 /**
@@ -310,6 +351,12 @@ export const PluginSchema: GenMessage<Plugin> = /*@__PURE__*/
  * @generated from message codefoundry.v1.ListPluginsRequest
  */
 export type ListPluginsRequest = Message<"codefoundry.v1.ListPluginsRequest"> & {
+  /**
+   * Fills each surface's available and unavailable_reason for this context.
+   *
+   * @generated from field: codefoundry.v1.UiContext context = 1;
+   */
+  context?: UiContext | undefined;
 };
 
 /**
@@ -790,6 +837,16 @@ export type PluginEvent = Message<"codefoundry.v1.PluginEvent"> & {
      */
     value: string;
     case: "removedName";
+  } | {
+    /**
+     * Availability may have changed without a plugin changing (an async fact such as a
+     * pull request's checks resolved, or a plugin set a context key): re-list commands.
+     * Grows by one per change in this daemon's lifetime.
+     *
+     * @generated from field: uint64 availability_epoch = 4;
+     */
+    value: bigint;
+    case: "availabilityEpoch";
   } | { case: undefined; value?: undefined };
 };
 
@@ -816,6 +873,465 @@ export type PluginSnapshot = Message<"codefoundry.v1.PluginSnapshot"> & {
  */
 export const PluginSnapshotSchema: GenMessage<PluginSnapshot> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_plugin, 27);
+
+/**
+ * SurfaceRef names a surface instance by plugin, surface and the context its scope reads
+ * (a thread scope the thread, a project scope the project, …). The daemon derives the
+ * instance key from them: <plugin>/<surface>/<scope id>, where the scope id is
+ * "global", "thread:<id>", "project:<id>", "worktree:<path>" or "pr:<owner>/<repo>#<n>".
+ *
+ * @generated from message codefoundry.v1.SurfaceRef
+ */
+export type SurfaceRef = Message<"codefoundry.v1.SurfaceRef"> & {
+  /**
+   * @generated from field: string plugin = 1;
+   */
+  plugin: string;
+
+  /**
+   * @generated from field: string surface = 2;
+   */
+  surface: string;
+
+  /**
+   * @generated from field: codefoundry.v1.UiContext context = 3;
+   */
+  context?: UiContext | undefined;
+
+  /**
+   * Instead of the three above: the key of an instance the daemon already has (one
+   * opened before, e.g. by GetSurface), as GetSurfaceResponse.state.instance names it.
+   *
+   * @generated from field: string instance = 4;
+   */
+  instance: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.SurfaceRef.
+ * Use `create(SurfaceRefSchema)` to create a new message.
+ */
+export const SurfaceRefSchema: GenMessage<SurfaceRef> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_plugin, 28);
+
+/**
+ * SurfaceState is the instance's host-side state.
+ *
+ * @generated from message codefoundry.v1.SurfaceState
+ */
+export type SurfaceState = Message<"codefoundry.v1.SurfaceState"> & {
+  /**
+   * @generated from field: string instance = 1;
+   */
+  instance: string;
+
+  /**
+   * @generated from field: codefoundry.v1.SurfacePhase phase = 2;
+   */
+  phase: SurfacePhase;
+
+  /**
+   * In words, for the GUI's notice ("Hello is restarting (next try in 2s)").
+   *
+   * @generated from field: string message = 3;
+   */
+  message: string;
+
+  /**
+   * @generated from field: codefoundry.v1.PluginState plugin_state = 4;
+   */
+  pluginState: PluginState;
+};
+
+/**
+ * Describes the message codefoundry.v1.SurfaceState.
+ * Use `create(SurfaceStateSchema)` to create a new message.
+ */
+export const SurfaceStateSchema: GenMessage<SurfaceState> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_plugin, 29);
+
+/**
+ * SurfaceView is one version of an instance's view: the view model's JSON as the daemon
+ * validated and re-encoded it (pluginsdk/ui's schema; log nodes carry everything
+ * appended since), never the plugin's bytes as sent.
+ *
+ * @generated from message codefoundry.v1.SurfaceView
+ */
+export type SurfaceView = Message<"codefoundry.v1.SurfaceView"> & {
+  /**
+   * @generated from field: string instance = 1;
+   */
+  instance: string;
+
+  /**
+   * Grows with every accepted view of the instance; Act names the one acted on.
+   *
+   * @generated from field: uint64 version = 2;
+   */
+  version: bigint;
+
+  /**
+   * @generated from field: string view_json = 3;
+   */
+  viewJson: string;
+
+  /**
+   * The daemon made this view: the plugin's view was invalid (a notice says why, above
+   * the last valid view in dev mode).
+   *
+   * @generated from field: bool host_rendered = 4;
+   */
+  hostRendered: boolean;
+};
+
+/**
+ * Describes the message codefoundry.v1.SurfaceView.
+ * Use `create(SurfaceViewSchema)` to create a new message.
+ */
+export const SurfaceViewSchema: GenMessage<SurfaceView> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_plugin, 30);
+
+/**
+ * @generated from message codefoundry.v1.SurfaceLogLine
+ */
+export type SurfaceLogLine = Message<"codefoundry.v1.SurfaceLogLine"> & {
+  /**
+   * @generated from field: string text = 1;
+   */
+  text: string;
+
+  /**
+   * @generated from field: string tone = 2;
+   */
+  tone: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.SurfaceLogLine.
+ * Use `create(SurfaceLogLineSchema)` to create a new message.
+ */
+export const SurfaceLogLineSchema: GenMessage<SurfaceLogLine> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_plugin, 31);
+
+/**
+ * SurfaceLogAppend extends one log node of the current version (view/append).
+ *
+ * @generated from message codefoundry.v1.SurfaceLogAppend
+ */
+export type SurfaceLogAppend = Message<"codefoundry.v1.SurfaceLogAppend"> & {
+  /**
+   * @generated from field: string instance = 1;
+   */
+  instance: string;
+
+  /**
+   * @generated from field: uint64 version = 2;
+   */
+  version: bigint;
+
+  /**
+   * The log node's key.
+   *
+   * @generated from field: string key = 3;
+   */
+  key: string;
+
+  /**
+   * For a text log: appended as is.
+   *
+   * @generated from field: string text = 4;
+   */
+  text: string;
+
+  /**
+   * For a lines log: appended lines.
+   *
+   * @generated from field: repeated codefoundry.v1.SurfaceLogLine lines = 5;
+   */
+  lines: SurfaceLogLine[];
+};
+
+/**
+ * Describes the message codefoundry.v1.SurfaceLogAppend.
+ * Use `create(SurfaceLogAppendSchema)` to create a new message.
+ */
+export const SurfaceLogAppendSchema: GenMessage<SurfaceLogAppend> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_plugin, 32);
+
+/**
+ * @generated from message codefoundry.v1.SurfaceToast
+ */
+export type SurfaceToast = Message<"codefoundry.v1.SurfaceToast"> & {
+  /**
+   * @generated from field: string instance = 1;
+   */
+  instance: string;
+
+  /**
+   * info, attention or error.
+   *
+   * @generated from field: string level = 2;
+   */
+  level: string;
+
+  /**
+   * @generated from field: string text = 3;
+   */
+  text: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.SurfaceToast.
+ * Use `create(SurfaceToastSchema)` to create a new message.
+ */
+export const SurfaceToastSchema: GenMessage<SurfaceToast> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_plugin, 33);
+
+/**
+ * @generated from message codefoundry.v1.SurfaceUpdate
+ */
+export type SurfaceUpdate = Message<"codefoundry.v1.SurfaceUpdate"> & {
+  /**
+   * @generated from oneof codefoundry.v1.SurfaceUpdate.update
+   */
+  update: {
+    /**
+     * @generated from field: codefoundry.v1.SurfaceState state = 1;
+     */
+    value: SurfaceState;
+    case: "state";
+  } | {
+    /**
+     * @generated from field: codefoundry.v1.SurfaceView view = 2;
+     */
+    value: SurfaceView;
+    case: "view";
+  } | {
+    /**
+     * @generated from field: codefoundry.v1.SurfaceLogAppend append = 3;
+     */
+    value: SurfaceLogAppend;
+    case: "append";
+  } | {
+    /**
+     * @generated from field: codefoundry.v1.SurfaceToast toast = 4;
+     */
+    value: SurfaceToast;
+    case: "toast";
+  } | {
+    /**
+     * @generated from field: codefoundry.v1.StreamHeartbeat heartbeat = 5;
+     */
+    value: StreamHeartbeat;
+    case: "heartbeat";
+  } | { case: undefined; value?: undefined };
+};
+
+/**
+ * Describes the message codefoundry.v1.SurfaceUpdate.
+ * Use `create(SurfaceUpdateSchema)` to create a new message.
+ */
+export const SurfaceUpdateSchema: GenMessage<SurfaceUpdate> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_plugin, 34);
+
+/**
+ * @generated from message codefoundry.v1.WatchSurfaceRequest
+ */
+export type WatchSurfaceRequest = Message<"codefoundry.v1.WatchSurfaceRequest"> & {
+  /**
+   * @generated from field: codefoundry.v1.SurfaceRef ref = 1;
+   */
+  ref?: SurfaceRef | undefined;
+};
+
+/**
+ * Describes the message codefoundry.v1.WatchSurfaceRequest.
+ * Use `create(WatchSurfaceRequestSchema)` to create a new message.
+ */
+export const WatchSurfaceRequestSchema: GenMessage<WatchSurfaceRequest> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_plugin, 35);
+
+/**
+ * @generated from message codefoundry.v1.GetSurfaceRequest
+ */
+export type GetSurfaceRequest = Message<"codefoundry.v1.GetSurfaceRequest"> & {
+  /**
+   * @generated from field: codefoundry.v1.SurfaceRef ref = 1;
+   */
+  ref?: SurfaceRef | undefined;
+
+  /**
+   * How long to wait for the first view (0: 10 s).
+   *
+   * @generated from field: int32 wait_ms = 2;
+   */
+  waitMs: number;
+};
+
+/**
+ * Describes the message codefoundry.v1.GetSurfaceRequest.
+ * Use `create(GetSurfaceRequestSchema)` to create a new message.
+ */
+export const GetSurfaceRequestSchema: GenMessage<GetSurfaceRequest> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_plugin, 36);
+
+/**
+ * SurfaceElement is one element of a view that acts: a button, row, chip, tab, form
+ * submit or field with a change event.
+ *
+ * @generated from message codefoundry.v1.SurfaceElement
+ */
+export type SurfaceElement = Message<"codefoundry.v1.SurfaceElement"> & {
+  /**
+   * @generated from field: string key = 1;
+   */
+  key: string;
+
+  /**
+   * click, submit, change or tab: sent to the plugin with Act; command, open_url or copy:
+   * handled by the host (the GUI), never by Act.
+   *
+   * @generated from field: string kind = 2;
+   */
+  kind: string;
+
+  /**
+   * The event name (an event action), the command name, the URL; "tab" for a tab.
+   *
+   * @generated from field: string action = 3;
+   */
+  action: string;
+
+  /**
+   * The button's or tab's label, the row's title.
+   *
+   * @generated from field: string label = 4;
+   */
+  label: string;
+
+  /**
+   * The enclosing form's key, if any.
+   *
+   * @generated from field: string form = 5;
+   */
+  form: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.SurfaceElement.
+ * Use `create(SurfaceElementSchema)` to create a new message.
+ */
+export const SurfaceElementSchema: GenMessage<SurfaceElement> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_plugin, 37);
+
+/**
+ * @generated from message codefoundry.v1.GetSurfaceResponse
+ */
+export type GetSurfaceResponse = Message<"codefoundry.v1.GetSurfaceResponse"> & {
+  /**
+   * @generated from field: codefoundry.v1.SurfaceState state = 1;
+   */
+  state?: SurfaceState | undefined;
+
+  /**
+   * Unset when no view arrived in time.
+   *
+   * @generated from field: codefoundry.v1.SurfaceView view = 2;
+   */
+  view?: SurfaceView | undefined;
+
+  /**
+   * @generated from field: repeated codefoundry.v1.SurfaceElement elements = 3;
+   */
+  elements: SurfaceElement[];
+};
+
+/**
+ * Describes the message codefoundry.v1.GetSurfaceResponse.
+ * Use `create(GetSurfaceResponseSchema)` to create a new message.
+ */
+export const GetSurfaceResponseSchema: GenMessage<GetSurfaceResponse> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_plugin, 38);
+
+/**
+ * @generated from message codefoundry.v1.SurfaceActRequest
+ */
+export type SurfaceActRequest = Message<"codefoundry.v1.SurfaceActRequest"> & {
+  /**
+   * The instance key; or ref.
+   *
+   * @generated from field: string instance = 1;
+   */
+  instance: string;
+
+  /**
+   * @generated from field: codefoundry.v1.SurfaceRef ref = 2;
+   */
+  ref?: SurfaceRef | undefined;
+
+  /**
+   * The view version the user acted on (0: the current one).
+   *
+   * @generated from field: uint64 version = 3;
+   */
+  version: bigint;
+
+  /**
+   * The element's key; may be omitted when action names exactly one element.
+   *
+   * @generated from field: string key = 4;
+   */
+  key: string;
+
+  /**
+   * The element's event name ("tab" for a tab); checked against the view when given.
+   *
+   * @generated from field: string action = 5;
+   */
+  action: string;
+
+  /**
+   * A change's new value or a tab's key.
+   *
+   * @generated from field: optional string value = 6;
+   */
+  value?: string | undefined;
+
+  /**
+   * The form's values by field name: strings, booleans (toggles), string lists
+   * (multiple selects). A secret input with store is written to the Keychain and the
+   * plugin gets {key, stored: true} instead.
+   *
+   * @generated from field: google.protobuf.Struct values = 7;
+   */
+  values?: JsonObject | undefined;
+};
+
+/**
+ * Describes the message codefoundry.v1.SurfaceActRequest.
+ * Use `create(SurfaceActRequestSchema)` to create a new message.
+ */
+export const SurfaceActRequestSchema: GenMessage<SurfaceActRequest> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_plugin, 39);
+
+/**
+ * @generated from message codefoundry.v1.SurfaceActResponse
+ */
+export type SurfaceActResponse = Message<"codefoundry.v1.SurfaceActResponse"> & {
+  /**
+   * The version acted on.
+   *
+   * @generated from field: uint64 version = 1;
+   */
+  version: bigint;
+};
+
+/**
+ * Describes the message codefoundry.v1.SurfaceActResponse.
+ * Use `create(SurfaceActResponseSchema)` to create a new message.
+ */
+export const SurfaceActResponseSchema: GenMessage<SurfaceActResponse> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_plugin, 40);
 
 /**
  * @generated from enum codefoundry.v1.PluginState
@@ -878,6 +1394,57 @@ export enum PluginState {
  */
 export const PluginStateSchema: GenEnum<PluginState> = /*@__PURE__*/
   enumDesc(file_codefoundry_v1_plugin, 0);
+
+/**
+ * @generated from enum codefoundry.v1.SurfacePhase
+ */
+export enum SurfacePhase {
+  /**
+   * @generated from enum value: SURFACE_PHASE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * surface/open sent; no view yet.
+   *
+   * @generated from enum value: SURFACE_PHASE_OPENING = 1;
+   */
+  OPENING = 1,
+
+  /**
+   * The plugin has sent a view.
+   *
+   * @generated from enum value: SURFACE_PHASE_LIVE = 2;
+   */
+  LIVE = 2,
+
+  /**
+   * No view 10 s after opening, or the plugin did not answer surface/open.
+   *
+   * @generated from enum value: SURFACE_PHASE_NOT_RESPONDING = 3;
+   */
+  NOT_RESPONDING = 3,
+
+  /**
+   * The plugin is not running (plugin_state says how); the last view, if any, is stale.
+   *
+   * @generated from enum value: SURFACE_PHASE_PLUGIN_DOWN = 4;
+   */
+  PLUGIN_DOWN = 4,
+
+  /**
+   * The plugin refused to open it (message is its error).
+   *
+   * @generated from enum value: SURFACE_PHASE_FAILED = 5;
+   */
+  FAILED = 5,
+}
+
+/**
+ * Describes the enum codefoundry.v1.SurfacePhase.
+ */
+export const SurfacePhaseSchema: GenEnum<SurfacePhase> = /*@__PURE__*/
+  enumDesc(file_codefoundry_v1_plugin, 1);
 
 /**
  * PluginService manages plugins: separate executables under ~/.code-foundry/plugins/<name>
@@ -1006,6 +1573,46 @@ export const PluginService: GenService<{
     methodKind: "server_streaming";
     input: typeof WatchPluginsRequestSchema;
     output: typeof PluginEventSchema;
+  },
+  /**
+   * WatchSurface holds one surface instance open (docs/notes/plugins-2-surfaces.md): the
+   * first watcher opens it in the plugin (surface/open), the last one leaving hides it
+   * and, after a grace, closes it. It sends the instance's state first, then its current
+   * view (a cached one paints at once), then every new view (coalesced to at most one
+   * per 100 ms), log appends, toasts, and heartbeats while quiet. A surface that is not
+   * available in the context fails with FailedPrecondition.
+   *
+   * @generated from rpc codefoundry.v1.PluginService.WatchSurface
+   */
+  watchSurface: {
+    methodKind: "server_streaming";
+    input: typeof WatchSurfaceRequestSchema;
+    output: typeof SurfaceUpdateSchema;
+  },
+  /**
+   * GetSurface opens an instance like WatchSurface, waits up to wait_ms for a view, and
+   * returns it with the actions it offers (the CLI's plugin surface; agents drive
+   * surfaces with it and Act). The instance stays open for the grace afterwards.
+   *
+   * @generated from rpc codefoundry.v1.PluginService.GetSurface
+   */
+  getSurface: {
+    methodKind: "unary";
+    input: typeof GetSurfaceRequestSchema;
+    output: typeof GetSurfaceResponseSchema;
+  },
+  /**
+   * Act forwards a user action on a view element (a click, a form submit, a field
+   * change, a tab switch) to the plugin as surface/act and returns once the plugin has
+   * answered; its error is the plugin's message (the GUI toasts it). Command, open-url
+   * and copy actions are the host's and never reach Act.
+   *
+   * @generated from rpc codefoundry.v1.PluginService.Act
+   */
+  act: {
+    methodKind: "unary";
+    input: typeof SurfaceActRequestSchema;
+    output: typeof SurfaceActResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_codefoundry_v1_plugin, 0);
