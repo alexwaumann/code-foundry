@@ -510,10 +510,9 @@ Every gap in `docs/notes/plugins-integration.md`'s "Known gaps" that is now fixe
    and the constant, tag, release workflow; then the registry PR bumping the three index
    entries. Then install 0.1.2 from the registry into a release build once (the same
    steps 1–4) before announcing.
-4. **Decide the default registry.** DECISIONS says `plugins.registries` defaults to
-   `alexwaumann/code-foundry-plugins`; since the rebase onto main it defaults to empty, so
-   a user sees "No registry configured" until they set it. Either keep empty and say so in
-   the release notes (with the `settings set` line), or restore the default.
+4. **Default registry: decided, empty.** Alex chose an empty `plugins.registries` by
+   default (DECISIONS.md records it); the release notes must carry the `settings set` line
+   for `https://github.com/alexwaumann/code-foundry-plugins`.
 5. **Release notes / docs**: what plugins are, the consent model, the registry setting,
    `plugin install showcase` as the tour, that secrets live in the login Keychain readable
    by any process of the user (until signing), and that plugins run as the user.
