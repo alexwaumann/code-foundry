@@ -39,13 +39,17 @@ whitespace, so a spaced path was never a candidate whole, and its pieces could e
   and a stop inside the closing quote left out; a prose line that is nothing but the path
   (leading `([{"'` and trailing punctuation aside), which is how Claude lists paths when
   told not to use markdown.
-- **Bare in a sentence**: a run of up to six words, single spaces apart, from a word with
-  a slash to the first word with a known extension, that passes as a spaced path, is kept
-  from the word pass: no chip and no wrong pieces. Cost: a sentence that reads like one
-  (`Run /usr/bin/python3 on main.py`) loses the two chips it had. Accepted: a missing chip
-  is quiet, a chip that opens "File not found" is not, and the shape is rare.
-- `splitProse` now decides spans in three passes (quoted, runs, words) instead of one word
-  loop; the rehype plugin and the renderer's re-match (`data-cf-path`) are unchanged
+- **Bare in a sentence**: left to the word pass, exactly as before. The first version of
+  this PR masked such runs (up to six words from a word with a slash to the first word
+  with a known extension that pass as a spaced path), so `/a/docs/my report.pdf` lost its
+  wrong pieces; review caught that the same shape is everyday prose ("in
+  internal/store/thread add stream.go", "Run /usr/bin/python3 on main.py") whose chips it
+  took. The wrong pieces of a bare spaced path in a sentence are the lesser cost, and
+  Claude writes those in backticks anyway. Note "the files in src/components like
+  Button.tsx" has one chip (`Button.tsx`), before and after: a two-segment folder is not a
+  prose chip.
+- `splitProse` now decides spans in three passes (quoted, alone on a line, words) instead
+  of one word loop; the rehype plugin and the renderer's re-match (`data-cf-path`) are unchanged
   because `matchPath` itself accepts the spaced token.
 
 ## Shift-left (projection quoting): not done
@@ -72,10 +76,12 @@ spaced chip names round-trip through `sentComposerText` / `parseUserMessage`.
 
 - `pathChips.test.ts`: spaced chips (code, prose, `:line`, parentheses, U+202F, `./`, `../`)
   and 16 spaced non-chips; `splitProse` table for quotes (straight, curly, single, stop
-  inside), lines of their own, a label line, bracketed, bare in a sentence (absolute,
-  relative, beside a plain path), the accepted loss, quoted words, apostrophes, a run
-  stopping at a line break; rehype marks a quoted spaced path whole.
-- `rows.test.tsx`: an answer with a backticked, a quoted, a line-only and an in-sentence
-  spaced path (three chips, the last stays text, click resolves against the checkout);
+  inside), lines of their own, a label line, bracketed, bare in a sentence (left to the
+  word pass: pieces as before), folder-then-file sentences keeping their chips
+  (`src/components like Button.tsx`, `internal/store add thread.go`, three-segment variants
+  with two chips, `/usr/bin/python3 on main.py`), quoted words, apostrophes, a run stopping
+  at a line break; rehype marks a quoted spaced path whole.
+- `rows.test.tsx`: an answer with a backticked, a quoted and a line-only spaced path and a
+  folder-then-file sentence (five chips, click resolves against the checkout);
   Read rows of an image, a PDF and a spaced folder are chips that open the path.
 - `userMessage.test.ts`: image, PDF and U+202F-named chips keep name and staged path.
