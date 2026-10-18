@@ -954,7 +954,24 @@ func (m *Manager) startNaming(id, msg string) {
 	}()
 }
 
-// resolveWorktree maps (project id, path) to a registered project's worktree.
+// projectByRef finds a registered project by id, by name (when exactly one has it), or
+// by an absolute path inside one of its worktrees, as thread.list's filter does
+// (workspace.ResolveProject): the CLI guide promises "a project id or name" wherever a
+// command takes a project. A ref that names nothing is NotFound.
+func (m *Manager) projectByRef(snap *project.Snapshot, ref string) (project.Project, error) {
+	r, err := workspace.ResolveProject(snap, ref)
+	switch {
+	case err == nil:
+		return r, nil
+	case errors.Is(err, workspace.ErrInvalidArgument):
+		return project.Project{}, fmt.Errorf("%w: project %q: %v", ErrInvalidArgument, ref, err)
+	default:
+		return project.Project{}, fmt.Errorf("%w: project %s", ErrNotFound, ref)
+	}
+}
+
+// resolveWorktree maps (project id, name or path; worktree path) to a registered
+// project's worktree.
 func (m *Manager) resolveWorktree(projectID, path string) (string, string, error) {
 	if path != "" {
 		if !filepath.IsAbs(path) {
@@ -974,9 +991,9 @@ func (m *Manager) resolveWorktree(projectID, path string) (string, string, error
 	snap := m.opts.Projects.Snapshot()
 	var projects []project.Project
 	if projectID != "" {
-		r, ok := snap.Project(projectID)
-		if !ok {
-			return "", "", fmt.Errorf("%w: project %s", ErrNotFound, projectID)
+		r, err := m.projectByRef(snap, projectID)
+		if err != nil {
+			return "", "", err
 		}
 		if path == "" {
 			if len(r.Worktrees) > 0 {
