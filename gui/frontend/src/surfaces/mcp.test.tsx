@@ -19,7 +19,7 @@ const { useUiStore } = await import("@/stores/ui");
 const { mcpPanelCommand, showView, useViewsStore } = await import("@/stores/views");
 
 const thread = (id: string, state = "connected") =>
-  ({ id, name: `thread ${id}`, projectId: "web", worktreePath: "/src/web", workspaceId: "", pendingWorktreePath: "", state, status: "idle", linkedPullRequests: [], usage: [] }) as unknown as ThreadView;
+  ({ id, name: `thread ${id}`, projectId: "web", worktreePath: "/src/web", workspaceId: "", pendingWorktreePath: "", state, status: "idle", linkedPullRequests: [], usage: [], agentRuns: [] }) as unknown as ThreadView;
 
 function server(name: string, o: Partial<McpServerView> = {}): McpServerView {
   return { name, status: "connected", serverName: "", version: "", error: "", scope: "user", source: "user", transport: "stdio", tools: [], ...o };
@@ -207,5 +207,84 @@ describe("MCP surface", () => {
     expect(commands.run).toHaveBeenCalledWith("thread.mcp-reconnect", { id: "s-off", server: "linear" }, expect.objectContaining({ quiet: true }));
     fireEvent.click(screen.getByTestId("mcp-refresh"));
     expect(commands.run).toHaveBeenCalledWith("thread.mcp", { id: "s-off", refresh: "true" }, expect.objectContaining({ quiet: true }));
+  });
+});
+
+describe("MCP surface staleness", () => {
+  const header = () => screen.getByTestId("mcp-header");
+  const pills = () => cards().map((c) => within(c, "mcp-pill") as HTMLElement);
+  function open(id: string): void {
+    useUiStore.setState({ selection: { kind: "thread", id } });
+    act(() => {
+      showView("panel.mcp");
+    });
+    render(<SidePanel />);
+  }
+  function expectStale(on: boolean): void {
+    expect(header().getAttribute("data-stale")).toBe(on ? "true" : null);
+    expect(screen.getByTestId("mcp-checked-line").className.includes("text-warning")).toBe(on);
+    for (const p of pills()) {
+      expect(p.getAttribute("data-stale")).toBe(on ? "true" : null);
+      expect(p.className.includes("border-dashed")).toBe(on);
+    }
+    // Stale, Refresh is the labelled primary button; else the quiet icon button.
+    const refresh = screen.getByTestId("mcp-refresh");
+    expect(refresh.hasAttribute("data-cta")).toBe(on);
+    expect(refresh.className.includes("bg-primary")).toBe(on);
+    expect(refresh.textContent).toBe(on ? "Refresh" : "");
+  }
+
+  it.each<[string, string, number, boolean, string]>([
+    ["running, checked 12s ago: current", "s-r", 12_000, false, "Checked 12s ago, at the start of the last turn"],
+    ["running, checked 12 min ago: stale", "s-r", 12 * 60_000, true, "Last check 12 min ago · may be out of date"],
+    ["Claude not running, checked 12s ago: stale", "s-off", 12_000, true, "Last check 12s ago · may be out of date"],
+  ])("%s", (_name, id, ago, stale, line) => {
+    setMcp(id, { ...STATUS, checkedAtMs: Date.now() - ago });
+    open(id);
+    expect(screen.getByTestId("mcp-checked").textContent).toBe(line);
+    expectStale(stale);
+  });
+
+  it("goes stale on its own once the check turns 10 min old, and when Claude stops", () => {
+    vi.useFakeTimers();
+    try {
+      setMcp("s-r", { ...STATUS, checkedAtMs: Date.now() - 9 * 60_000 - 50_000 });
+      open("s-r");
+      expectStale(false);
+      act(() => {
+        vi.advanceTimersByTime(15_000);
+      });
+      expectStale(true);
+      expect(screen.getByTestId("mcp-checked").textContent).toBe("Last check 10 min ago · may be out of date");
+      // A fresh check: current again; then Claude stops: stale at once.
+      act(() => {
+        setMcp("s-r", { ...STATUS, checkedAtMs: Date.now() });
+      });
+      expectStale(false);
+      act(() => {
+        useThreadsStore.setState((s) => ({ byId: { ...s.byId, "s-r": thread("s-r", "disconnected") } }));
+      });
+      expectStale(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("not stale while a refresh is in flight: the icon button spins", async () => {
+    let finish: (v: unknown) => void = () => undefined;
+    commands.run.mockReturnValue(new Promise((r) => (finish = r)));
+    setMcp("s-off", STATUS);
+    open("s-off");
+    expectStale(true);
+    fireEvent.click(screen.getByTestId("mcp-refresh"));
+    expectStale(false);
+    expect(screen.getByTestId<HTMLButtonElement>("mcp-refresh").disabled).toBe(true);
+    expect(screen.getByTestId("mcp-refresh").querySelector(".animate-spin")).not.toBeNull();
+    await act(async () => {
+      finish({ message: "", resultJson: "{}" });
+      await Promise.resolve();
+    });
+    // The answer did not bring a new check (the mock store keeps the old one): stale again.
+    expectStale(true);
   });
 });

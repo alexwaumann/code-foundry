@@ -16,9 +16,11 @@ function thread(sel: Selection): string | null {
  * each in spawn order with nested runs under their parent: status, type · model · effort ·
  * mode, the live activity or the report or the error, elapsed time, tool uses and tokens
  * (docs/sketches/agents-panel variant L1, docs/notes/agents-2-gui.md). Enabled for a
- * thread, hidden otherwise. One tab per panel, no params: the body follows the
- * selection's thread, like MCP. Opened by A in the panel, by view.panel.agents and by the
- * strip above the composer (stores/agentsPanel.ts).
+ * thread with runs (the thread list's agentRuns), hidden otherwise, so the empty list
+ * offers it only when there is something to show (docs/notes/panel-polish.md); an open tab
+ * stays. One tab per panel, no params: the body follows the selection's thread, like MCP.
+ * Opened by A in the panel, by view.panel.agents and by the strip above the composer
+ * (stores/agentsPanel.ts).
  */
 export const agentsSurface: SurfaceSpec = {
   kind: AGENTS_KIND,
@@ -26,6 +28,7 @@ export const agentsSurface: SurfaceSpec = {
   icon: Bot,
   hotkey: "a",
   available: (ctx) => (thread(ctx.selection) ? "enabled" : "hidden"),
+  // The runs are the thread list's (agentRuns): a new first run lists the surface at once.
   watches: [useThreadsStore, useProjectsStore],
   render: () => createElement(AgentsSurface),
   openDefault: (ctx) => (thread(ctx.selection) ? agentsTab() : null),

@@ -43,7 +43,7 @@ const FABLE = bucket("claude-fable-5-1", { requests: 122, input: 3100, output: 2
 const OLD = bucket("claude-opus-5", { requests: 14, cacheRead: 28_400_000, unpriced: true });
 
 const thread = (id: string, usage: UsageBucketView[]) =>
-  ({ id, name: `thread ${id}`, projectId: "web", worktreePath: "/src/web", workspaceId: "", pendingWorktreePath: "", terminalId: "", state: "connected", status: "idle", linkedPullRequests: [], usage, costUsd: 0, unpriced: false }) as unknown as ThreadView;
+  ({ id, name: `thread ${id}`, projectId: "web", worktreePath: "/src/web", workspaceId: "", pendingWorktreePath: "", terminalId: "", state: "connected", status: "idle", linkedPullRequests: [], agentRuns: [], usage, costUsd: 0, unpriced: false }) as unknown as ThreadView;
 
 function select(id: string): void {
   useUiStore.setState({ selection: { kind: "thread", id } });

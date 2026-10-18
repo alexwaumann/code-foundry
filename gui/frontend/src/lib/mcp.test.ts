@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { McpServerView, McpStatusView } from "@/api/mcp";
-import { canReconnect, checkedAgo, checkedLine, connectedSummary, metaParts, needsAttention, sameServer, shareMcp, toolCount, toolHints, transportLabel } from "./mcp";
+import { canReconnect, checkedAgo, checkedLine, claudeRunning, connectedSummary, MCP_STALE_AFTER_MS, mcpStale, metaParts, needsAttention, sameServer, shareMcp, staleLine, toolCount, toolHints, transportLabel, type McpStaleInput } from "./mcp";
 
 const NOW = 1_800_000_000_000;
 
@@ -40,6 +40,43 @@ describe("checkedLine", () => {
     ["unknown trigger", { checkedAtMs: NOW - 7000, trigger: "unknown" }, "Checked 7s ago"],
   ])("%s", (_name, o, want) => {
     expect(checkedLine(status([], o), NOW)).toBe(want);
+  });
+});
+
+describe("stale state", () => {
+  const MIN = 60_000;
+  it.each<[string, McpStaleInput, boolean]>([
+    ["running, checked just now", { checkedAtMs: NOW - 2000, running: true, refreshing: false }, false],
+    ["running, 9 min 59 s", { checkedAtMs: NOW - 10 * MIN + 1000, running: true, refreshing: false }, false],
+    ["running, 10 min exactly", { checkedAtMs: NOW - MCP_STALE_AFTER_MS, running: true, refreshing: false }, true],
+    ["running, 12 min", { checkedAtMs: NOW - 12 * MIN, running: true, refreshing: false }, true],
+    ["running, unknown time", { checkedAtMs: null, running: true, refreshing: false }, false],
+    ["not running, checked just now", { checkedAtMs: NOW - 2000, running: false, refreshing: false }, true],
+    ["not running, unknown time", { checkedAtMs: null, running: false, refreshing: false }, true],
+    ["not running, refreshing", { checkedAtMs: NOW - 2000, running: false, refreshing: true }, false],
+    ["old, refreshing", { checkedAtMs: NOW - 12 * MIN, running: true, refreshing: true }, false],
+  ])("%s", (_name, s, want) => {
+    expect(mcpStale(s, NOW)).toBe(want);
+  });
+
+  it.each<[string, string | undefined, boolean]>([
+    ["connected", "connected", true],
+    ["starting", "starting", true],
+    ["closing", "closing", false],
+    ["disconnected", "disconnected", false],
+    ["unknown", "unknown", false],
+    ["no thread", undefined, false],
+  ])("claudeRunning: %s", (_name, state, want) => {
+    expect(claudeRunning(state)).toBe(want);
+  });
+
+  it.each<[string, number | null, string]>([
+    ["12 min", NOW - 12 * MIN, "Last check 12 min ago · may be out of date"],
+    ["just now (Claude stopped)", NOW - 1000, "Last check just now · may be out of date"],
+    ["2 h", NOW - 2 * 60 * MIN, "Last check 2 h ago · may be out of date"],
+    ["unknown time", null, "May be out of date"],
+  ])("staleLine: %s", (_name, ms, want) => {
+    expect(staleLine(ms, NOW)).toBe(want);
   });
 });
 

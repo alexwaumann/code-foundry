@@ -11,9 +11,12 @@ import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 import { getMcpStatus, type McpServerView, type McpStatusView } from "@/api/mcp";
 import { errorMessage } from "@/api/stream";
+import { useNowSelect } from "@/lib/clock";
+import { claudeRunning, mcpStale } from "@/lib/mcp";
 import { runCommandForResult } from "./commands";
 import { threadContext } from "./threadActions";
 import { useThreadStore } from "./thread";
+import { useThreadsStore } from "./threads";
 
 export const MCP_COMMANDS = { status: "thread.mcp", reconnect: "thread.mcp-reconnect" } as const;
 
@@ -60,6 +63,22 @@ export function useMcpReconnecting(threadId: string, name: string): boolean {
 
 export function useMcpRefreshing(threadId: string): boolean {
   return useMcpStore((s) => s.refreshing[threadId] === true);
+}
+
+/** How often the stale state re-reads the clock: it flips at most this late after the check turns 10 min old. */
+const STALE_TICK_MS = 5000;
+
+/**
+ * Whether the thread's MCP status may be out of date (lib/mcp mcpStale: Claude not
+ * running, or the check 10 min old; never while a refresh runs). False without a status
+ * (the empty state speaks then). Re-renders only when the answer flips, the clock included.
+ */
+export function useMcpStale(threadId: string): boolean {
+  const has = useThreadStore((s) => (s.logs[threadId]?.mcp ?? null) !== null);
+  const checkedAtMs = useThreadStore((s) => s.logs[threadId]?.mcp?.checkedAtMs ?? null);
+  const running = useThreadsStore((s) => claudeRunning(s.byId[threadId]?.state));
+  const refreshing = useMcpRefreshing(threadId);
+  return useNowSelect(STALE_TICK_MS, (now) => has && mcpStale({ checkedAtMs, running, refreshing }, now));
 }
 
 function setReconnecting(threadId: string, name: string, on: boolean): void {

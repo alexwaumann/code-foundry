@@ -192,7 +192,7 @@ test("Threads tab on an agent's thread: creator, this thread, five siblings then
   await expect(row(page, "s:s-l-cookie")).toHaveAttribute("aria-selected", "true");
 });
 
-test("Threads tab on the creator and on a thread with no lineage; H and the palette open it", async ({ page }) => {
+test("Threads tab on the creator, H opens it; a thread with no lineage does not list it and the palette toasts (docs/notes/panel-polish.md)", async ({ page }) => {
   await openApp(page);
   await open(page, P);
   // H in the panel's surface list.
@@ -206,14 +206,19 @@ test("Threads tab on the creator and on a thread with no lineage; H and the pale
   await expect(section(page, "siblings")).toHaveCount(0);
   expect(await sectionIds(page, "children")).toEqual([C, "s-l-e2e", "s-l-cookie", "s-l-allow", "s-l-spike", "s-l-logs", "s-l-metrics"]);
 
+  // A thread with nothing related: hidden from the list, H does nothing, the palette's command toasts.
   await open(page, "s-3");
+  await page.keyboard.press("Meta+Shift+e");
+  await expect(page.getByTestId("panel-empty")).toBeVisible();
+  await expect(page.getByTestId("panel-empty").locator('[data-surface="threads"]')).toHaveCount(0);
+  await page.keyboard.press("h");
+  await expect(page.getByTestId("panel-body")).toHaveCount(0);
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("Related Threads");
   const palette = page.getByTestId("palette");
   await palette.locator('[data-command="view.panel.threads"]').click();
-  await expectThreadsTab(page, "s-3");
-  await expect(surface(page).getByTestId("threads-empty")).toContainText("Created by you. No threads created from here.");
-  await expect(surface(page).getByTestId("threads-count")).toHaveCount(0);
+  await expect(page.getByText("No related threads")).toBeVisible();
+  await expect(page.getByTestId("panel-body")).toHaveCount(0);
 });
 
 /** SHOTS=<dir>: the notes' screenshots, WebKit, 1440x900, dark and light. */

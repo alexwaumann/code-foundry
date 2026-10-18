@@ -15,7 +15,9 @@ function thread(sel: Selection): string | null {
  * Threads: the selected thread's lineage, derived from the thread list (no RPC): the
  * thread whose agent created it, the thread itself, its siblings and the threads created
  * from it, each with status, place, age and brief (/tmp/cf-lineage-sketch variant C,
- * docs/notes/agents-3-lineage-gui.md). Enabled for a thread, hidden otherwise. One tab per
+ * docs/notes/agents-3-lineage-gui.md). Enabled for a thread with lineage (a creator,
+ * siblings or children: lib/lineage hasLineage), hidden otherwise
+ * (docs/notes/panel-polish.md); an open tab stays. One tab per
  * panel, no params: the body follows the selection's thread, like Agents. Opened by H in
  * the panel, by view.panel.threads and by the header's "from …" chip
  * (stores/threadsPanel.ts).
@@ -26,6 +28,7 @@ export const threadsSurface: SurfaceSpec = {
   icon: Network,
   hotkey: "h",
   available: (ctx) => (thread(ctx.selection) ? "enabled" : "hidden"),
+  // Lineage is the thread list's (createdBy): a new child lists the surface at once.
   watches: [useThreadsStore, useProjectsStore],
   render: () => createElement(ThreadsSurface),
   openDefault: (ctx) => (thread(ctx.selection) ? threadsTab() : null),

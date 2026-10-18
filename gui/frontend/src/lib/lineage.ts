@@ -60,6 +60,14 @@ export function childIds(data: LineageData, id: string): string[] {
   return data.order.filter((x) => x !== id && data.byId[x]?.createdBy === id);
 }
 
+/**
+ * Whether the thread has any lineage to show: a creator (removed ones count: the panel
+ * keeps their row), siblings or children. The Threads surface is listed only then.
+ */
+export function hasLineage(data: LineageData, id: string): boolean {
+  return creatorOf(data, id) !== null || siblingIds(data, id).length > 0 || childIds(data, id).length > 0;
+}
+
 /** The first `cap` ids while collapsed, and how many the "+N more" row hides. */
 export function capIds(ids: readonly string[], expanded: boolean, cap = SIBLINGS_CAP): { shown: readonly string[]; more: number } {
   if (expanded || ids.length <= cap) return { shown: ids, more: 0 };

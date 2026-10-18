@@ -82,6 +82,40 @@ export function checkedLine(s: Pick<McpStatusView, "checkedAtMs" | "trigger" | "
   }
 }
 
+/** A check older than this may be out of date even while Claude runs (a server can drop between turns). */
+export const MCP_STALE_AFTER_MS = 10 * 60_000;
+
+/** What the stale state reads: the last check's time, whether Claude runs for the thread, a refresh in flight. */
+export interface McpStaleInput {
+  checkedAtMs: number | null;
+  /** The thread's state is connected or starting (claudeRunning). */
+  running: boolean;
+  refreshing: boolean;
+}
+
+/** Claude runs for the thread (or is starting): only then does it check its servers, every turn. */
+export function claudeRunning(state: string | undefined): boolean {
+  return state === "connected" || state === "starting";
+}
+
+/**
+ * Whether the shown status may be out of date (docs/notes/panel-polish.md): Claude is not
+ * running for the thread (nothing checks until a refresh or the next turn starts it), or
+ * the last check is MCP_STALE_AFTER_MS old or more. Never while a refresh is in flight:
+ * its answer is on its way. An unknown check time is stale only when Claude is not running.
+ */
+export function mcpStale(s: McpStaleInput, now: number): boolean {
+  if (s.refreshing) return false;
+  if (!s.running) return true;
+  return s.checkedAtMs !== null && now - s.checkedAtMs >= MCP_STALE_AFTER_MS;
+}
+
+/** The stale header's line: "Last check 12 min ago · may be out of date". */
+export function staleLine(checkedAtMs: number | null, now: number): string {
+  const ago = checkedAgo(checkedAtMs, now);
+  return ago ? `Last check ${ago} · may be out of date` : "May be out of date";
+}
+
 /** The tool's hint icons, left to right, with their tooltips. */
 export type ToolHint = "read-only" | "writes" | "destructive" | "open-world";
 

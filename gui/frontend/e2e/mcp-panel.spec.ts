@@ -160,8 +160,56 @@ test("a stopped thread keeps its last status; Refresh and Reconnect are enabled 
   await expect(pw).toHaveAttribute("data-status", "connected");
   expect(await threadCalls()).toContain("mcp-reconnect s-r1 playwright");
   await surface(page).getByTestId("mcp-refresh").click();
-  await expect(surface(page).getByTestId("mcp-checked")).toHaveText(/^Checked (just now|\d+s ago)$/);
+  // The mock answers without starting Claude (the daemon starts it), so the thread stays
+  // stopped and the fresh check still reads stale (docs/notes/panel-polish.md).
+  await expect(surface(page).getByTestId("mcp-checked")).toHaveText(/^Last check (just now|\d+s ago) · may be out of date$/);
   expect(await threadCalls()).toContain("mcp s-r1 refresh");
+});
+
+/** The stale state (docs/notes/panel-polish.md): amber header line, muted dashed pills, Refresh as the primary button. */
+async function expectStale(page: Page, on: boolean): Promise<void> {
+  const header = surface(page).getByTestId("mcp-header");
+  if (on) await expect(header).toHaveAttribute("data-stale", "true");
+  else await expect(header).not.toHaveAttribute("data-stale");
+  const line = surface(page).getByTestId("mcp-checked-line");
+  if (on) await expect(line).toHaveClass(/text-warning/);
+  else await expect(line).not.toHaveClass(/text-warning/);
+  const dashed = await surface(page)
+    .getByTestId("mcp-pill")
+    .evaluateAll((els) => els.map((e) => getComputedStyle(e).borderStyle === "dashed" && getComputedStyle(e).borderTopWidth !== "0px"));
+  expect(dashed).toEqual(Array.from({ length: 6 }, () => on));
+  const refresh = surface(page).getByTestId("mcp-refresh");
+  if (on) {
+    await expect(refresh).toHaveAttribute("data-cta", "");
+    await expect(refresh).toHaveText("Refresh");
+  } else {
+    await expect(refresh).not.toHaveAttribute("data-cta");
+    await expect(refresh).toHaveText("");
+  }
+}
+
+test("a check 10 min old goes stale: amber line, dashed pills, Refresh as the call to action; a refresh clears it", async ({ page }) => {
+  await openThread(page);
+  expect(await emit({ showView: { name: "panel.mcp" } })).toBeGreaterThan(0);
+  await expectMcpTab(page);
+  await expectStale(page, false);
+  await mockPost("thread/mcp-age?id=s-r1&ago=720");
+  await expect(surface(page).getByTestId("mcp-checked")).toHaveText("Last check 12 min ago · may be out of date");
+  await expectStale(page, true);
+  await surface(page).getByTestId("mcp-refresh").click();
+  await expect(surface(page).getByTestId("mcp-checked")).toHaveText(/^Checked (just now|\d+s ago)$/);
+  await expectStale(page, false);
+  expect(await threadCalls()).toContain("mcp s-r1 refresh");
+});
+
+test("a stopped thread's status is stale at once, however recent the check", async ({ page }) => {
+  await mockPost("thread?state=stopped");
+  await openApp(page);
+  await row(page, "s:s-r1").click();
+  expect(await emit({ showView: { name: "panel.mcp" } })).toBeGreaterThan(0);
+  await expectMcpTab(page);
+  await expect(surface(page).getByTestId("mcp-checked")).toHaveText(/^Last check (just now|\d+s ago) · may be out of date$/);
+  await expectStale(page, true);
 });
 
 test("a thread Claude never reported for says so without mentioning running; Refresh checks", async ({ page }) => {
@@ -254,5 +302,10 @@ for (const scheme of ["dark", "light"] as const) {
     await page.mouse.move(0, 0);
     await page.screenshot({ path: `${String(shots)}/mcp-${scheme}.png` });
     await panel(page).screenshot({ path: `${String(shots)}/mcp-${scheme}-panel.png` });
+    // The stale state (docs/notes/panel-polish.md).
+    await mockPost("thread/mcp-age?id=s-r1&ago=720");
+    await expectStale(page, true);
+    await page.mouse.move(0, 0);
+    await panel(page).screenshot({ path: `${String(shots)}/mcp-stale-${scheme}-panel.png` });
   });
 }

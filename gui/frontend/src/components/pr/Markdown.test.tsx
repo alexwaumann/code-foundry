@@ -56,6 +56,71 @@ describe("Markdown", () => {
     expect(c.querySelector("kbd")?.textContent).toBe("⌘K");
   });
 
+  it("keeps small, mark, ins and s (GitHub bodies' fine print, highlights, edits)", () => {
+    const c = md("Done <small>(after the rebase)</small> <mark>breaking</mark> <ins>added</ins> <s>removed</s>");
+    expect(c.querySelector("small")?.textContent).toBe("(after the rebase)");
+    expect(c.querySelector("mark")?.textContent).toBe("breaking");
+    expect(c.querySelector("ins")?.textContent).toBe("added");
+    expect(c.querySelector("s")?.textContent).toBe("removed");
+  });
+
+});
+
+/** A thread's answers (html: false): only matched pairs of the inline allowlist render; every other tag stays literal. */
+describe("Markdown without raw HTML (a thread)", () => {
+  const thread = (body: string) => render(<Markdown extras={{ html: false }}>{body}</Markdown>).container;
+  /** The rendered HTML inside the wrapper, for exact comparisons. */
+  const inner = (body: string) => (thread(body).firstElementChild as HTMLElement).innerHTML;
+
+  it.each(["small", "mark", "sub", "sup", "kbd", "ins", "s", "del", "u"])("<%s> renders", (tag) => {
+    expect(inner(`x <${tag}>tiny</${tag}> y`)).toBe(`<p>x <${tag}>tiny</${tag}> y</p>`);
+  });
+
+  it.each<[string, string, string]>([
+    ["br", "one<br>two<br/>three", "<p>one<br>two<br>three</p>"],
+    ["upper case", "x <SMALL>tiny</SMALL> y", "<p>x <small>tiny</small> y</p>"],
+    ["nested", "<small>a <mark>b</mark> c</small>", "<p><small>a <mark>b</mark> c</small></p>"],
+    ["markdown inside", "<small>see **this**</small>", "<p><small>see <strong>this</strong></small></p>"],
+    ["in a list item", "- <small>fine</small> print", "<ul>\n<li><small>fine</small> print</li>\n</ul>"],
+  ])("%s", (_name, body, want) => {
+    expect(inner(body)).toBe(want);
+  });
+
+  it.each<[string, string, string]>([
+    ["an unknown tag", "Paste: <pasted_content>hi</pasted_content> done", "Paste: <pasted_content>hi</pasted_content> done"],
+    ["a file tag", "<file>a.go</file>", "<file>a.go</file>"],
+    ["a generic", "Result<T, E> and Vec<u8>", "Result<T, E> and Vec<u8>"],
+    ["an allowlisted tag with attributes", '<small class="x">a</small>', '<small class="x">a</small>'],
+    ["a script tag", "<script>alert(1)</script>", "<script>alert(1)</script>"],
+    ["a self-closed pair tag", "a <small/> b", "a <small/> b"],
+    ["a stray closing tag", "a </small> b", "a </small> b"],
+    ["in a code span", "`<small>x</small>`", "<small>x</small>"],
+    ["in a code block", "```\n<small>x</small>\n```", "<small>x</small>\n"],
+    ["an HTML block (tag alone on its line)", "<small>\nfine print\n</small>", "<small>\nfine print\n</small>"],
+  ])("%s stays literal", (_name, body, want) => {
+    const c = thread(body);
+    expect(c.textContent).toBe(want);
+    expect(c.querySelector("small, script, pasted_content, file")).toBeNull();
+  });
+
+  it("an unclosed allowlisted tag stays literal and swallows nothing after it", () => {
+    const c = thread("Before <small>never closed and **bold**\n\nNext paragraph <mark>x</mark>");
+    expect(c.querySelector("small")).toBeNull();
+    const [p1, p2] = [...c.querySelectorAll("p")];
+    expect(p1?.innerHTML).toBe("Before &lt;small&gt;never closed and <strong>bold</strong>");
+    expect(p2?.innerHTML).toBe("Next paragraph <mark>x</mark>");
+  });
+
+  it("a pair split across paragraphs does not match: both tags stay literal", () => {
+    const c = thread("<small>one\n\ntwo</small>");
+    expect(c.querySelector("small")).toBeNull();
+    expect(c.textContent).toBe("<small>one\ntwo</small>");
+  });
+
+  it("an inner unclosed tag stays literal inside the outer pair", () => {
+    expect(inner("<small>a <mark>b</small> c")).toBe("<p><small>a &lt;mark&gt;b</small> c</p>");
+  });
+
   it("still renders GFM task lists and tables", () => {
     const c = md("- [x] done\n- [ ] todo\n\n| a | b |\n|---|---|\n| 1 | 2 |");
     expect(c.querySelectorAll('input[type="checkbox"]')).toHaveLength(2);

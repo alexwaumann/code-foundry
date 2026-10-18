@@ -22,7 +22,7 @@ const WEB_FEAT = "/wt/web/cf-feat";
 const status = { upstream: "", ahead: 0, behind: 0, staged: 0, modified: 0, untracked: 0, dirty: false, refreshedAtMs: null };
 const wt = (projectId: string, path: string, branch: string, isMain = false): WorktreeView => ({ projectId, path, branch, head: "abc", detached: false, isMain, status });
 const project = (id: string, extra: WorktreeView[] = []): ProjectView => ({ id, path: `/src/${id}`, name: id, defaultBranch: "main", githubSlug: "", remotes: [], git: true, worktrees: [wt(id, `/src/${id}`, "main", true), ...extra] });
-const thread = (id: string, o: Partial<ThreadView>) => ({ id, projectId: "web", worktreePath: WEB_MAIN, workspaceId: "", pendingWorktreePath: "", terminalId: "", state: "connected", linkedPullRequests: [], ...o }) as ThreadView;
+const thread = (id: string, o: Partial<ThreadView>) => ({ id, projectId: "web", worktreePath: WEB_MAIN, workspaceId: "", pendingWorktreePath: "", terminalId: "", state: "connected", linkedPullRequests: [], agentRuns: [], ...o }) as unknown as ThreadView;
 
 function select(id: string): void {
   useUiStore.setState({ selection: { kind: "thread", id } });

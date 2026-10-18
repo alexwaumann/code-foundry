@@ -566,6 +566,24 @@
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 0.85em;
 }
+/* <small> is caption text (a body's fine print, a footnote under a table); <mark> is
+   tinted with the highlight token, the text keeps its colour; <ins> and <s> keep the
+   browser's underline and strike. */
+.cf-markdown small {
+  @apply text-caption;
+}
+.cf-markdown mark {
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--highlight) 22%, transparent);
+  padding: 0 0.15em;
+  color: inherit;
+}
+.cf-markdown ins {
+  text-decoration-line: underline;
+}
+.cf-markdown s {
+  text-decoration-line: line-through;
+}
 .dark .cf-markdown:not(:where(.light *)) :where(pre, :not(pre) > code) {
   background: oklch(1 0 0 / 5%);
 }

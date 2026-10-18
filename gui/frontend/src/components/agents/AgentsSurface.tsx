@@ -149,7 +149,7 @@ function AgentRow({ threadId, id }: { threadId: string; id: string }) {
         </div>
       ) : run.status === "failed" ? (
         run.error && (
-          <Tip label={run.error} whenTruncated>
+          <Tip label={run.error} whenTruncated maxLines={5}>
             <div className="ml-5 line-clamp-2 text-body-sm break-words text-destructive" data-testid="agent-error">
               {run.error}
             </div>
@@ -157,7 +157,7 @@ function AgentRow({ threadId, id }: { threadId: string; id: string }) {
         )
       ) : (
         run.summary && (
-          <Tip label={run.summary} whenTruncated>
+          <Tip label={run.summary} whenTruncated maxLines={5}>
             <div className="ml-5 line-clamp-2 text-caption break-words" data-testid="agent-summary">
               {run.summary}
             </div>
