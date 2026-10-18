@@ -35,7 +35,7 @@ func (r *HTTPRunner) RESTWrite(ctx context.Context, method, path string, body an
 			return nil, fmt.Errorf("github: encode request: %w", err)
 		}
 	}
-	res, err := r.do(ctx, method, r.opts.BaseURL+"/"+strings.TrimPrefix(path, "/"), b)
+	res, err := r.do(ctx, method, r.opts.BaseURL+"/"+strings.TrimPrefix(path, "/"), b, sendOpts{})
 	if err != nil {
 		return nil, err
 	}

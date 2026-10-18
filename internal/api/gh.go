@@ -223,6 +223,7 @@ func pullRequestToProto(slug string, p *gh.PullRequest) *v1.PullRequest {
 		HeadRef:           p.HeadRef,
 		HeadSha:           p.HeadSHA,
 		BaseRef:           p.BaseRef,
+		BaseSha:           p.BaseSHA,
 		Draft:             p.Draft,
 		ReviewDecision:    enumOf[v1.ReviewDecision](v1.ReviewDecision_value, "REVIEW_DECISION_", string(p.ReviewDecision)),
 		Mergeable:         enumOf[v1.Mergeable](v1.Mergeable_value, "MERGEABLE_", string(p.Mergeable)),

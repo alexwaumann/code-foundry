@@ -100,6 +100,7 @@ type pullRequestJSON struct {
 	HeadRefName       string             `json:"headRefName"`
 	HeadRefOid        string             `json:"headRefOid"`
 	BaseRefName       string             `json:"baseRefName"`
+	BaseRefOid        string             `json:"baseRefOid"`
 	IsCrossRepository bool               `json:"isCrossRepository"`
 	Additions         int                `json:"additions"`
 	Deletions         int                `json:"deletions"`
@@ -216,6 +217,7 @@ func mapPullRequest(p *pullRequestJSON) PullRequest {
 		HeadRef:           p.HeadRefName,
 		HeadSHA:           p.HeadRefOid,
 		BaseRef:           p.BaseRefName,
+		BaseSHA:           p.BaseRefOid,
 		Draft:             p.IsDraft,
 		ReviewDecision:    ReviewDecision(p.ReviewDecision),
 		Mergeable:         Mergeable(p.Mergeable),

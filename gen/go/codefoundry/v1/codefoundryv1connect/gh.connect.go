@@ -77,6 +77,12 @@ const (
 	// GhServiceAddPullRequestCommentProcedure is the fully-qualified name of the GhService's
 	// AddPullRequestComment RPC.
 	GhServiceAddPullRequestCommentProcedure = "/codefoundry.v1.GhService/AddPullRequestComment"
+	// GhServiceGetPullRequestDiffProcedure is the fully-qualified name of the GhService's
+	// GetPullRequestDiff RPC.
+	GhServiceGetPullRequestDiffProcedure = "/codefoundry.v1.GhService/GetPullRequestDiff"
+	// GhServiceGetPullRequestFileProcedure is the fully-qualified name of the GhService's
+	// GetPullRequestFile RPC.
+	GhServiceGetPullRequestFileProcedure = "/codefoundry.v1.GhService/GetPullRequestFile"
 )
 
 // GhServiceClient is a client for the codefoundry.v1.GhService service.
@@ -155,6 +161,20 @@ type GhServiceClient interface {
 	// viewer (an issue comment, not a review). The body is trimmed, required, and at most
 	// 65536 bytes. Errors and the event as for SubmitPullRequestReview.
 	AddPullRequestComment(context.Context, *connect.Request[v1.AddPullRequestCommentRequest]) (*connect.Response[v1.AddPullRequestCommentResponse], error)
+	// GetPullRequestDiff returns a pull request's unified diff as GitHub renders it
+	// (REST pulls/{n} with Accept: application/vnd.github.v3.diff; the base side is the
+	// merge base, and a cross-repository pull request works the same). Cached in memory
+	// per pull request and head commit: a call whose cached head matches the pull
+	// request's cached head (GetPullRequestDetail's) is served without a request; refresh
+	// always fetches. At most 4 MiB (truncated says when the rest was dropped). GitHub
+	// refuses diffs over 20,000 lines or 1 MB of patch (FAILED_PRECONDITION with its
+	// message).
+	GetPullRequestDiff(context.Context, *connect.Request[v1.GetPullRequestDiffRequest]) (*connect.Response[v1.GetPullRequestDiffResponse], error)
+	// GetPullRequestFile returns one file at a commit (REST contents/{path}?ref= with
+	// Accept: application/vnd.github.raw+json), at most 1 MiB. A missing path (or a
+	// directory) is not_found, not an error. Cached in memory by (repository, commit,
+	// path); a commit's file never changes.
+	GetPullRequestFile(context.Context, *connect.Request[v1.GetPullRequestFileRequest]) (*connect.Response[v1.GetPullRequestFileResponse], error)
 }
 
 // NewGhServiceClient constructs a client for the codefoundry.v1.GhService service. By default, it
@@ -270,6 +290,18 @@ func NewGhServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...c
 			connect.WithSchema(ghServiceMethods.ByName("AddPullRequestComment")),
 			connect.WithClientOptions(opts...),
 		),
+		getPullRequestDiff: connect.NewClient[v1.GetPullRequestDiffRequest, v1.GetPullRequestDiffResponse](
+			httpClient,
+			baseURL+GhServiceGetPullRequestDiffProcedure,
+			connect.WithSchema(ghServiceMethods.ByName("GetPullRequestDiff")),
+			connect.WithClientOptions(opts...),
+		),
+		getPullRequestFile: connect.NewClient[v1.GetPullRequestFileRequest, v1.GetPullRequestFileResponse](
+			httpClient,
+			baseURL+GhServiceGetPullRequestFileProcedure,
+			connect.WithSchema(ghServiceMethods.ByName("GetPullRequestFile")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -292,6 +324,8 @@ type ghServiceClient struct {
 	mergePullRequest        *connect.Client[v1.MergePullRequestRequest, v1.MergePullRequestResponse]
 	submitPullRequestReview *connect.Client[v1.SubmitPullRequestReviewRequest, v1.SubmitPullRequestReviewResponse]
 	addPullRequestComment   *connect.Client[v1.AddPullRequestCommentRequest, v1.AddPullRequestCommentResponse]
+	getPullRequestDiff      *connect.Client[v1.GetPullRequestDiffRequest, v1.GetPullRequestDiffResponse]
+	getPullRequestFile      *connect.Client[v1.GetPullRequestFileRequest, v1.GetPullRequestFileResponse]
 }
 
 // GetViewer calls codefoundry.v1.GhService.GetViewer.
@@ -379,6 +413,16 @@ func (c *ghServiceClient) AddPullRequestComment(ctx context.Context, req *connec
 	return c.addPullRequestComment.CallUnary(ctx, req)
 }
 
+// GetPullRequestDiff calls codefoundry.v1.GhService.GetPullRequestDiff.
+func (c *ghServiceClient) GetPullRequestDiff(ctx context.Context, req *connect.Request[v1.GetPullRequestDiffRequest]) (*connect.Response[v1.GetPullRequestDiffResponse], error) {
+	return c.getPullRequestDiff.CallUnary(ctx, req)
+}
+
+// GetPullRequestFile calls codefoundry.v1.GhService.GetPullRequestFile.
+func (c *ghServiceClient) GetPullRequestFile(ctx context.Context, req *connect.Request[v1.GetPullRequestFileRequest]) (*connect.Response[v1.GetPullRequestFileResponse], error) {
+	return c.getPullRequestFile.CallUnary(ctx, req)
+}
+
 // GhServiceHandler is an implementation of the codefoundry.v1.GhService service.
 type GhServiceHandler interface {
 	// GetViewer returns the authenticated GitHub user.
@@ -455,6 +499,20 @@ type GhServiceHandler interface {
 	// viewer (an issue comment, not a review). The body is trimmed, required, and at most
 	// 65536 bytes. Errors and the event as for SubmitPullRequestReview.
 	AddPullRequestComment(context.Context, *connect.Request[v1.AddPullRequestCommentRequest]) (*connect.Response[v1.AddPullRequestCommentResponse], error)
+	// GetPullRequestDiff returns a pull request's unified diff as GitHub renders it
+	// (REST pulls/{n} with Accept: application/vnd.github.v3.diff; the base side is the
+	// merge base, and a cross-repository pull request works the same). Cached in memory
+	// per pull request and head commit: a call whose cached head matches the pull
+	// request's cached head (GetPullRequestDetail's) is served without a request; refresh
+	// always fetches. At most 4 MiB (truncated says when the rest was dropped). GitHub
+	// refuses diffs over 20,000 lines or 1 MB of patch (FAILED_PRECONDITION with its
+	// message).
+	GetPullRequestDiff(context.Context, *connect.Request[v1.GetPullRequestDiffRequest]) (*connect.Response[v1.GetPullRequestDiffResponse], error)
+	// GetPullRequestFile returns one file at a commit (REST contents/{path}?ref= with
+	// Accept: application/vnd.github.raw+json), at most 1 MiB. A missing path (or a
+	// directory) is not_found, not an error. Cached in memory by (repository, commit,
+	// path); a commit's file never changes.
+	GetPullRequestFile(context.Context, *connect.Request[v1.GetPullRequestFileRequest]) (*connect.Response[v1.GetPullRequestFileResponse], error)
 }
 
 // NewGhServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -566,6 +624,18 @@ func NewGhServiceHandler(svc GhServiceHandler, opts ...connect.HandlerOption) (s
 		connect.WithSchema(ghServiceMethods.ByName("AddPullRequestComment")),
 		connect.WithHandlerOptions(opts...),
 	)
+	ghServiceGetPullRequestDiffHandler := connect.NewUnaryHandler(
+		GhServiceGetPullRequestDiffProcedure,
+		svc.GetPullRequestDiff,
+		connect.WithSchema(ghServiceMethods.ByName("GetPullRequestDiff")),
+		connect.WithHandlerOptions(opts...),
+	)
+	ghServiceGetPullRequestFileHandler := connect.NewUnaryHandler(
+		GhServiceGetPullRequestFileProcedure,
+		svc.GetPullRequestFile,
+		connect.WithSchema(ghServiceMethods.ByName("GetPullRequestFile")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/codefoundry.v1.GhService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case GhServiceGetViewerProcedure:
@@ -602,6 +672,10 @@ func NewGhServiceHandler(svc GhServiceHandler, opts ...connect.HandlerOption) (s
 			ghServiceSubmitPullRequestReviewHandler.ServeHTTP(w, r)
 		case GhServiceAddPullRequestCommentProcedure:
 			ghServiceAddPullRequestCommentHandler.ServeHTTP(w, r)
+		case GhServiceGetPullRequestDiffProcedure:
+			ghServiceGetPullRequestDiffHandler.ServeHTTP(w, r)
+		case GhServiceGetPullRequestFileProcedure:
+			ghServiceGetPullRequestFileHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -677,4 +751,12 @@ func (UnimplementedGhServiceHandler) SubmitPullRequestReview(context.Context, *c
 
 func (UnimplementedGhServiceHandler) AddPullRequestComment(context.Context, *connect.Request[v1.AddPullRequestCommentRequest]) (*connect.Response[v1.AddPullRequestCommentResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.GhService.AddPullRequestComment is not implemented"))
+}
+
+func (UnimplementedGhServiceHandler) GetPullRequestDiff(context.Context, *connect.Request[v1.GetPullRequestDiffRequest]) (*connect.Response[v1.GetPullRequestDiffResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.GhService.GetPullRequestDiff is not implemented"))
+}
+
+func (UnimplementedGhServiceHandler) GetPullRequestFile(context.Context, *connect.Request[v1.GetPullRequestFileRequest]) (*connect.Response[v1.GetPullRequestFileResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.GhService.GetPullRequestFile is not implemented"))
 }

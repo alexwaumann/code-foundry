@@ -327,7 +327,7 @@ func prJSON(p *PullRequest) map[string]any {
 		"url":   cmpString(p.URL, fmt.Sprintf("https://github.com/%s/pull/%d", p.Repo, p.Number)),
 		"state": string(p.State), "isDraft": p.Draft, "createdAt": ts(p.CreatedAt), "updatedAt": ts(p.UpdatedAt),
 		"mergedAt": ts(p.MergedAt), "author": map[string]any{"login": p.Author}, "repository": map[string]any{"nameWithOwner": p.Repo},
-		"headRefName": p.HeadRef, "headRefOid": p.HeadSHA, "baseRefName": p.BaseRef, "isCrossRepository": p.IsCrossRepository,
+		"headRefName": p.HeadRef, "headRefOid": p.HeadSHA, "baseRefName": p.BaseRef, "baseRefOid": p.BaseSHA, "isCrossRepository": p.IsCrossRepository,
 		"additions": p.Additions, "deletions": p.Deletions, "changedFiles": p.ChangedFiles,
 		"statusCheckRollup": rollupOrNil(p.Checks),
 		"headRepository":    map[string]any{"nameWithOwner": cmpString(p.HeadRepoSlug, p.Repo)},

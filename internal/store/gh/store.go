@@ -143,6 +143,7 @@ type Store struct {
 	branches branchStates // per-branch results (activity.go)
 	full     fullCache    // pull request detail panel cache (pr_detail.go)
 	owners   ownersCache  // publish owners (owners.go)
+	prFiles  prFilesCache // pull request diffs and files (pr_files.go)
 
 	// Worker goroutine only.
 	lastEnd     time.Time      // when the previous request finished
