@@ -1,17 +1,18 @@
 import { useEffect } from "react";
-import { ArrowUpCircle, Download, Loader2, RefreshCw, TriangleAlert } from "lucide-react";
+import { ArrowUpCircle, Download, Loader2, RefreshCw, TriangleAlert, X } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
+import { focusSetting } from "@/components/settings/focus";
 import { SectionCard } from "@/components/settings/SectionCard";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { installPlugin, loadBrowse, updatePlugin, usePluginRegistryStore } from "@/stores/pluginRegistry";
+import { dismissInstallFailure, installPlugin, loadBrowse, updatePlugin, usePluginRegistryStore } from "@/stores/pluginRegistry";
 import { PillView } from "../parts";
-import { entryPill, progressWords, registryErrorWords, registryLine, shortSource } from "./registry";
+import { emptyBrowse, entryPill, progressWords, REGISTRIES_SETTING, registryErrorWords, registryLine, shortSource } from "./registry";
 
 /** The amber-outlined main action of a row (no filled buttons). */
 export const mainAction = "bg-transparent dark:bg-transparent border-warning/40 text-warning hover:bg-warning/10 hover:text-warning dark:border-warning/40";
 
-/** An install in progress, or the last one's failure, under a row. */
+/** An install in progress, or the last one's failure (the daemon's words, with a dismiss ×), under a row. */
 function Progress({ name }: { name: string }) {
   const p = usePluginRegistryStore((s) => s.progress[name]);
   if (!p) return null;
@@ -20,6 +21,20 @@ function Progress({ name }: { name: string }) {
     <p className={cn("flex min-w-0 items-center gap-1.5 text-caption-sm", failed ? "break-words text-destructive" : "text-muted-foreground")} data-testid="registry-progress" data-phase={p.phase} role={failed ? "alert" : "status"}>
       {!failed && <Loader2 className="size-3 shrink-0 animate-spin" aria-hidden />}
       <span className="min-w-0">{progressWords(p)}</span>
+      {failed && (
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          className="ml-auto shrink-0 self-start text-muted-foreground hover:text-foreground"
+          aria-label="Dismiss"
+          onClick={() => {
+            dismissInstallFailure(name);
+          }}
+          data-testid="registry-progress-dismiss"
+        >
+          <X aria-hidden />
+        </Button>
+      )}
     </p>
   );
 }
@@ -114,10 +129,9 @@ function RegistryNotices() {
 export function BrowseSection() {
   const names = usePluginRegistryStore(useShallow((s) => s.browse?.entries.map((e) => e.name) ?? []));
   const loaded = usePluginRegistryStore((s) => s.browse !== null);
-  // plugins.registries is empty by default: nothing to browse until one is added below.
-  const noRegistry = usePluginRegistryStore((s) => s.browse?.registries.length === 0);
   const loading = usePluginRegistryStore((s) => s.loading);
   const error = usePluginRegistryStore((s) => s.error);
+  const empty = usePluginRegistryStore((s) => emptyBrowse(s.browse, s.error));
   useEffect(() => {
     void loadBrowse();
   }, []);
@@ -138,12 +152,22 @@ export function BrowseSection() {
       {names.map((n) => (
         <EntryRow key={n} name={n} className="border-t border-border" />
       ))}
-      {loaded && names.length === 0 && !error && noRegistry && (
+      {empty === "no-registry" && (
         <p className="border-t border-border px-4 py-3 text-caption" data-testid="registry-none">
-          No registry is configured, so there is nothing to browse. Add one in Plugin registries below.
+          No registry configured.{" "}
+          <button
+            type="button"
+            className="text-link hover:underline"
+            onClick={() => {
+              focusSetting(REGISTRIES_SETTING);
+            }}
+            data-testid="registry-none-link"
+          >
+            Add one in Registries
+          </button>
         </p>
       )}
-      {loaded && names.length === 0 && !error && !noRegistry && (
+      {empty === "none-listed" && (
         <p className="border-t border-border px-4 py-3 text-caption" data-testid="registry-empty">
           No plugins listed yet.
         </p>

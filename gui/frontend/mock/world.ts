@@ -1331,6 +1331,17 @@ export class World {
     this.publishThread(s);
   }
 
+  /** ThreadService.ClearFlags: one plugin's flag, or every one with plugin empty; NOT_FOUND when there is none to clear. */
+  clearFlags(id: string, plugin: string): number {
+    const s = this.thread(id);
+    const keep = s.flags.filter((f) => plugin !== "" && f.plugin !== plugin);
+    const n = s.flags.length - keep.length;
+    if (n === 0) throw new CommandError("notfound", `thread ${id} has no ${plugin ? `${plugin} ` : ""}flags`);
+    s.flags = keep;
+    this.publishThread(s);
+    return n;
+  }
+
   /** The user opened the thread: its until-seen flags go (the daemon's WatchItems). */
   seenFlags(id: string): void {
     const s = this.threads.get(id);
@@ -2536,6 +2547,25 @@ export class World {
         run: (_ctx, args) => {
           this.removeWorkspace(args.workspace ?? "", args.force === "true");
           return `removed workspace ${args.workspace ?? ""}`;
+        },
+      },
+      {
+        cmd: {
+          name: "thread.flag.clear",
+          title: "Clear Thread Flags",
+          category: "Thread",
+          description: "Remove the flags plugins raised on a thread: one plugin's with --plugin, else every one.",
+          keybindings: [],
+          args: [
+            { name: "id", type: ArgType.STRING, required: false, description: "Thread id (default: the active thread)" },
+            { name: "plugin", type: ArgType.STRING, required: false, description: "Only this plugin's flag" },
+          ],
+        },
+        when: (ctx) => activeThread(ctx) !== undefined,
+        run: (ctx, args) => {
+          const id = args.id || (ctx?.activeThreadId ?? "");
+          const n = this.clearFlags(id, args.plugin ?? "");
+          return `cleared ${String(n)} ${n === 1 ? "flag" : "flags"} on thread ${id}`;
         },
       },
       {

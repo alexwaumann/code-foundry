@@ -17,7 +17,7 @@ const hello = {
 const show = (available: boolean): CommandView => ({ name: "plugin.hello.show.demo", title: "Show Hello Demo", description: "", category: "Hello", args: [], keybindings: [], available });
 
 beforeEach(() => {
-  usePluginsStore.setState(applyPluginEvent({ byName: {}, order: [], loaded: false, epoch: 0 }, { kind: "snapshot", plugins: [hello] }));
+  usePluginsStore.setState(applyPluginEvent({ byName: {}, order: [], loaded: false, epoch: 0, dirs: null }, { kind: "snapshot", plugins: [hello] }));
   useUiStore.setState({ selection: { kind: "none" } });
 });
 
