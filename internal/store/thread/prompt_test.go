@@ -12,7 +12,7 @@ func TestSystemPrompt(t *testing.T) {
 	if got := systemPrompt(""); got != ThreadPrompt {
 		t.Errorf("project thread: %q", got)
 	}
-	for _, want := range []string{"code-foundry-orchestrate", "code-foundry-help", "delegate work to other threads"} {
+	for _, want := range []string{"code-foundry-orchestrate", "code-foundry-help", "code-foundry-plugin", "delegate work to other threads", "build plugins"} {
 		if !strings.Contains(ThreadPrompt, want) {
 			t.Errorf("ThreadPrompt does not name %q: %q", want, ThreadPrompt)
 		}

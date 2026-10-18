@@ -1,11 +1,13 @@
 // Package skills renders and installs the Claude Code skills the daemon ships to every
-// thread: code-foundry-orchestrate (delegating work to other threads) and
-// code-foundry-help (how-to questions about the app). Their SKILL.md files and the
-// worked examples are static (files/, embedded); their command and settings references
-// are rendered from the daemon's own registry and settings schema at every start
-// (internal/guide), so they never drift from the build that serves them. Nothing in a
-// skill runs a shell command when it loads (managed settings may forbid it): whatever
-// is dynamic is rendered here. See docs/notes/agent-skills.md.
+// thread: code-foundry-orchestrate (delegating work to other threads),
+// code-foundry-help (how-to questions about the app) and code-foundry-plugin (building
+// plugins). Their SKILL.md files and the worked examples are static (files/, embedded);
+// their command and settings references are rendered from the daemon's own registry and
+// settings schema at every start (internal/guide), so they never drift from the build
+// that serves them. Nothing in a skill runs a shell command when it loads (managed
+// settings may forbid it): whatever is dynamic is rendered here, including the
+// {{cf.<name>}} placeholders of static files (plugin.go). See
+// docs/notes/agent-skills.md and docs/notes/plugins-4-skill.md.
 package skills
 
 import (
@@ -42,6 +44,14 @@ type Sources struct {
 	// SettingGroups and Settings are SettingsService.GetSchema's groups and fields.
 	SettingGroups []*v1.SettingGroup
 	Settings      []*v1.SettingField
+	// Commit is the commit the daemon was built from (version.Info.Commit, maybe with
+	// "-dirty"): the plugin SDK version the plugin skill pins.
+	Commit string
+	// SkillsDir is where Install puts the skills (<dir>/.claude/skills), for paths the
+	// skills name; empty when unknown.
+	SkillsDir string
+	// Facts are the host facts plugins' when clauses read (plugin.HostFactNames).
+	Facts []string
 }
 
 // Files maps a path relative to the skills directory ("code-foundry-help/SKILL.md",
@@ -65,12 +75,17 @@ var references = []reference{
 		[]guide.Category{{Name: "Project"}, {Name: "Settings", Detailed: true}, {Name: "Thread"}, {Name: "Pull Request"}, {Name: "Action"}})},
 	{Help + "/reference/settings.md", settingsReference},
 	{Help + "/reference/getting-started.md", func(w io.Writer, _ Sources) { _, _ = w.Write(docs.GettingStarted) }},
+	{Plugin + "/reference/cli.md", pluginCLIReference},
+	{Plugin + "/reference/host-commands.md", hostCommandsReference},
 }
 
-// Render returns every file of every skill: the static ones and the references
-// rendered from src.
+func init() { references = append(references, exampleReferences()...) }
+
+// Render returns every file of every skill: the static ones, with their placeholders
+// filled from src, and the references rendered from src.
 func Render(src Sources) (Files, error) {
 	out := Files{}
+	values := placeholders(src)
 	err := fs.WalkDir(static, staticRoot, func(p string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return err
@@ -79,7 +94,10 @@ func Render(src Sources) (Files, error) {
 		if err != nil {
 			return fmt.Errorf("read embedded %s: %w", p, err)
 		}
-		out[p[len(staticRoot)+1:]] = b
+		rel := p[len(staticRoot)+1:]
+		if out[rel], err = fill(rel, b, values); err != nil {
+			return err
+		}
 		return nil
 	})
 	if err != nil {

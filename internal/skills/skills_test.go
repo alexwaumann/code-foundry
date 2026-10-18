@@ -17,6 +17,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/command/all"
 	"github.com/alexwaumann/code-foundry/internal/command/commandtest"
 	"github.com/alexwaumann/code-foundry/internal/skills"
+	"github.com/alexwaumann/code-foundry/internal/store/plugin"
 	"github.com/alexwaumann/code-foundry/internal/store/settings"
 	"github.com/alexwaumann/code-foundry/internal/store/settings/settingstest"
 )
@@ -49,7 +50,9 @@ func realSources(t *testing.T) skills.Sources {
 		t.Fatal(err)
 	}
 	return skills.Sources{Version: "v9.9.9", Commands: listed.Msg.GetCommands(),
-		SettingGroups: schema.Msg.GetGroups(), Settings: schema.Msg.GetFields()}
+		SettingGroups: schema.Msg.GetGroups(), Settings: schema.Msg.GetFields(),
+		Commit: "0123456789abcdef0123456789abcdef01234567", SkillsDir: "/Users/ada/.code-foundry/claude/.claude/skills",
+		Facts: plugin.HostFactNames()}
 }
 
 // frontmatter is a SKILL.md's YAML frontmatter lines, key → value.
@@ -91,6 +94,7 @@ func TestRender(t *testing.T) {
 		"code-foundry-help/SKILL.md", "code-foundry-help/reference/getting-started.md",
 		"code-foundry-help/reference/settings.md", "code-foundry-help/reference/commands.md",
 	}
+	want = append(want, pluginSkillFiles...)
 	if len(files) != len(want) {
 		t.Errorf("files = %q, want %q", paths, want)
 	}
@@ -108,9 +112,11 @@ func TestRender(t *testing.T) {
 	// Frontmatter: names, short descriptions, invocation.
 	for _, tt := range []struct {
 		skill, userInvocable string
+		maxDesc              int
 	}{
-		{skills.Orchestrate, "false"}, // model only: not in the slash menu
-		{skills.Help, ""},             // both: no invocation keys
+		{skills.Orchestrate, "false", 400}, // model only: not in the slash menu
+		{skills.Help, "", 400},             // both: no invocation keys
+		{skills.Plugin, "", 600},           // both; names the words that should trigger it
 	} {
 		p := tt.skill + "/SKILL.md"
 		fm := frontmatter(t, p, files[p])
@@ -118,8 +124,8 @@ func TestRender(t *testing.T) {
 			t.Errorf("%s: name %q", p, fm["name"])
 		}
 		desc := strings.Trim(fm["description"], `"`)
-		if desc == "" || len(desc) >= 400 || strings.Contains(desc, `"`) {
-			t.Errorf("%s: description of %d characters (want 1..399, no inner quotes)", p, len(desc))
+		if desc == "" || len(desc) >= tt.maxDesc || strings.Contains(desc, `"`) {
+			t.Errorf("%s: description of %d characters (want 1..%d, no inner quotes)", p, len(desc), tt.maxDesc-1)
 		}
 		if fm["user-invocable"] != tt.userInvocable {
 			t.Errorf("%s: user-invocable %q, want %q", p, fm["user-invocable"], tt.userInvocable)
@@ -208,7 +214,7 @@ func TestRender(t *testing.T) {
 	}
 
 	// The skills reference their files by the paths they are installed at.
-	for _, skill := range []string{skills.Orchestrate, skills.Help} {
+	for _, skill := range []string{skills.Orchestrate, skills.Help, skills.Plugin} {
 		body := string(files[skill+"/SKILL.md"])
 		for _, ref := range regexp.MustCompile("`(reference/[a-z-]+\\.md)`").FindAllStringSubmatch(body, -1) {
 			if _, ok := files[skill+"/"+ref[1]]; !ok {
