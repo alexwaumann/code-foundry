@@ -50,6 +50,10 @@ func (m *Manager) Archive(ctx context.Context, id string, archived bool) (Thread
 		rec.s.ArchivedAt = m.opts.Now()
 	}
 	rec.s.Pinned = false
+	// The user is done with it: plugins' flags go too (flags.go).
+	if _, err := m.dropFlagsLocked(ctx, rec, func(Flag) bool { return true }); err != nil {
+		m.log.Warn("clear the flags of an archived thread", "thread", id, "err", err)
+	}
 	m.commitLocked(rec, true)
 	m.log.Info("archived thread", "thread", id)
 	return rec.s, nil

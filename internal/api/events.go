@@ -185,9 +185,46 @@ func selectSources(all []eventSource, want []v1.EventSource) []eventSource {
 // away or the daemon stops. When the client missed events of a source (its queue was
 // full, or the hub's own subscription dropped some), that source's snapshot is sent
 // again and its queued events the snapshot already covers are skipped; other sources
-// are unaffected.
+// are unaffected. Plugins' subscriptions run the same loop (Feed, plugin_feed.go).
 func (h *Events) Watch(ctx context.Context, req *connect.Request[v1.WatchEventsRequest], stream *connect.ServerStream[v1.Event]) error {
-	srcs := selectSources(h.sources(), req.Msg.GetSources())
+	since := req.Msg.GetSinceSeq()
+	if e := req.Msg.GetSinceEpoch(); e != "" && e != h.deps.Epoch {
+		since = 0 // another daemon's seq: start over with the snapshots
+	}
+	// Quiet sources (gh polling off, no thread busy) get a heartbeat every
+	// HeartbeatInterval (see heartbeat.proto).
+	beat := newHeartbeat(h.beat)
+	defer beat.Stop()
+	return h.stream(ctx, selectSources(h.sources(), req.Msg.GetSources()), since, streamOut{
+		// Before the first send: a GUI that sees an event knows SetClientState will find it.
+		joined: func() func() { return h.joinClient(req.Msg) },
+		send: func(_ v1.EventSource, ev *v1.Event, _ bool) error {
+			beat.Reset()
+			return stream.Send(ev)
+		},
+		beat:  beat.C(),
+		flush: true,
+	})
+}
+
+// streamOut is where stream sends: Watch's client, or a plugin's subscription.
+type streamOut struct {
+	// joined runs once the stream has joined the hub, before anything is sent; what it
+	// returns runs when the stream ends. Nil: nothing.
+	joined func() func()
+	// send delivers one event of source kind (unspecified for a heartbeat); snapshot
+	// marks the events of a source's snapshot. A nil event (with flush) only flushes the
+	// response headers.
+	send func(kind v1.EventSource, ev *v1.Event, snapshot bool) error
+	// beat, when set, asks for a heartbeat event.
+	beat <-chan time.Time
+	// flush sends a nil event when the first snapshots were empty.
+	flush bool
+}
+
+// stream is Watch's loop over srcs (see Watch), sending to out until ctx ends or the
+// daemon stops.
+func (h *Events) stream(ctx context.Context, srcs []eventSource, since uint64, out streamOut) error {
 	byKind := make(map[v1.EventSource]eventSource, len(srcs))
 	var mask kindMask
 	for _, s := range srcs {
@@ -195,39 +232,28 @@ func (h *Events) Watch(ctx context.Context, req *connect.Request[v1.WatchEventsR
 		mask |= kindBit(s.kind())
 	}
 	hub := h.eventHub()
-	since := req.Msg.GetSinceSeq()
-	if e := req.Msg.GetSinceEpoch(); e != "" && e != h.deps.Epoch {
-		since = 0 // another daemon's seq: start over with the snapshots
-	}
 	c, replay, resumed := hub.join(mask, since)
 	defer hub.leave(c)
-	// Before the first send: a GUI that sees an event knows SetClientState will find it.
-	defer h.joinClient(req.Msg)()
-
-	// Quiet sources (gh polling off, no thread busy) get a heartbeat every
-	// HeartbeatInterval (see heartbeat.proto).
-	beat := newHeartbeat(h.beat)
-	defer beat.Stop()
-	send := func(ev *v1.Event) error {
-		beat.Reset()
-		return stream.Send(ev)
+	if out.joined != nil {
+		defer out.joined()()
 	}
+
 	// Snapshots and heartbeats are this stream's own: stamp them (the hub stamped the
 	// live events it shares).
-	sendOwn := func(ev *v1.Event) error {
+	sendOwn := func(kind v1.EventSource, ev *v1.Event, snapshot bool) error {
 		ev.Epoch = h.deps.Epoch
-		return send(ev)
+		return out.send(kind, ev, snapshot)
 	}
 	deliver := func(e hubEvent) error {
 		if o, ok := byKind[e.kind].(eventObserver); ok {
 			o.observe(e.ev)
 		}
-		return send(e.ev)
+		return out.send(e.kind, e.ev, false)
 	}
 	sendSnapshot := func(s eventSource) (int, error) {
 		evs := s.snapshot(ctx)
 		for _, ev := range evs {
-			if err := sendOwn(ev); err != nil {
+			if err := sendOwn(s.kind(), ev, true); err != nil {
 				return 0, err
 			}
 		}
@@ -257,8 +283,8 @@ func (h *Events) Watch(ctx context.Context, req *connect.Request[v1.WatchEventsR
 	}
 	// Flush response headers now if nothing was sent: clients block until they arrive,
 	// and the first live event may be a long way off.
-	if sent == 0 {
-		if err := send(nil); err != nil {
+	if sent == 0 && out.flush {
+		if err := out.send(v1.EventSource_EVENT_SOURCE_UNSPECIFIED, nil, false); err != nil {
 			return err
 		}
 	}
@@ -289,8 +315,8 @@ func (h *Events) Watch(ctx context.Context, req *connect.Request[v1.WatchEventsR
 			return nil
 		case <-h.deps.Done:
 			return nil
-		case <-beat.C():
-			if err := sendOwn(&v1.Event{Event: &v1.Event_Heartbeat{Heartbeat: &v1.StreamHeartbeat{}}}); err != nil {
+		case <-out.beat:
+			if err := sendOwn(v1.EventSource_EVENT_SOURCE_UNSPECIFIED, &v1.Event{Event: &v1.Event_Heartbeat{Heartbeat: &v1.StreamHeartbeat{}}}, false); err != nil {
 				return err
 			}
 		case <-c.poke:

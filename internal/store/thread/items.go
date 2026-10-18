@@ -676,7 +676,12 @@ func (m *Manager) addViewer(id string, d int) {
 	if m.viewers[id] <= 0 {
 		delete(m.viewers, id)
 	}
-	if rec, ok := m.recs[id]; ok && rec.run != nil {
+	rec, ok := m.recs[id]
+	if ok && d > 0 && m.seenFlagsLocked(rec) {
+		// The user opened the thread: its until-seen flags are seen (flags.go).
+		m.commitLocked(rec, false)
+	}
+	if ok && rec.run != nil {
 		rec.run.viewersChanged()
 	}
 }
