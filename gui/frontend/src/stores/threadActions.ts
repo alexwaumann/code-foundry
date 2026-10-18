@@ -19,7 +19,7 @@ import type { PermissionDecision } from "@/lib/threadRequest";
 import { projectPrompt } from "@/lib/prompt";
 import { sentComposerText } from "@/lib/userMessage";
 import { invokeConfirmed, refreshCommands, runCommand, runCommandForResult, useCommandsStore } from "./commands";
-import { clearDraft, findCitation, getDraft, isDraftEmpty, updateDraft } from "./compose";
+import { clearDraft, findCitation, getDraft, isDraftEmpty, NOTHING_TO_SEND, updateDraft } from "./compose";
 import { getUiContext } from "./context";
 import { setAnswering } from "./thread";
 
@@ -136,6 +136,7 @@ export async function sendThreadDraft(threadId: string): Promise<boolean> {
     ).trim();
     const sent = cur.attachments.filter((a) => a.stagedPath !== null);
     const attachments = sent.map((a) => a.stagedPath ?? "");
+    if (!text && attachments.length === 0) throw new Error(NOTHING_TO_SEND);
     const args: Record<string, string> = { id: threadId, text };
     if (attachments.length > 0) args.attachments = attachments.join(",");
     // The composer's own text, so the message's bubble draws the same tags (only when it

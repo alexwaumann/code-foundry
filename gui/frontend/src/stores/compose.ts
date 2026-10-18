@@ -331,6 +331,13 @@ export function findCitation(key: string, id: string): Citation | undefined {
   return drafts[key]?.citations[id] ?? Object.values(drafts).find((d) => id in d.citations)?.citations[id];
 }
 
+/**
+ * The error for a draft that projects to nothing: its only content is a citation chip
+ * whose body no draft has (pasted from a composer that has sent it), which the projection
+ * leaves out. Sending it would be an empty message (or a thread with no prompt).
+ */
+export const NOTHING_TO_SEND = "Nothing to send: the quote is no longer in any draft.";
+
 /** A citation of a draft (narrow selector; findCitation's fallback included). */
 export function useCitation(key: string, id: string): Citation | undefined {
   return useComposeStore((s) => s.drafts[key]?.citations[id] ?? Object.values(s.drafts).find((d) => id in d.citations)?.citations[id]);
@@ -607,6 +614,7 @@ export async function sendDraft(target: ComposeTarget, defaults: { model: string
       cite,
     );
     const sent = cur.attachments.filter((a) => a.stagedPath !== null);
+    if (!text.trim() && sent.length === 0) throw new Error(NOTHING_TO_SEND);
     const args = threadArgs(
       place,
       {
