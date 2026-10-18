@@ -145,6 +145,7 @@ function PullRequestRow({ pr }: { pr: PullRequestView }) {
  * (blank at zero) so they line up down the list. The directory is muted and truncates
  * from its start (rtl box; the LRMs keep its slashes in place) so the name stays visible.
  * A click (or Enter, Space) opens the file's Diff tab in the panel (OverviewBody's items).
+ * The tooltip is the full path while the row cuts it short, and a rename's source always.
  */
 function FileLine({ row }: { row: FileRow }) {
   return (
@@ -152,6 +153,8 @@ function FileLine({ row }: { row: FileRow }) {
       navKey={row.key}
       activateOnClick
       tip={row.oldPath ? `${row.oldPath} → ${row.path}` : row.path}
+      // A rename's source is not on the row; a plain path only hides when it is cut short.
+      tipWhenTruncated={!row.oldPath}
       className="grid h-full grid-cols-[1.25rem_minmax(0,1fr)_5ch_5ch] items-center gap-x-2 px-1.5 text-body-sm font-mono"
     >
       <span className={cn("text-center", statusColor[row.status] ?? "text-muted-foreground")} data-status={row.status}>

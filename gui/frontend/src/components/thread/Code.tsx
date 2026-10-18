@@ -5,6 +5,7 @@ import { Tip } from "@/components/ui/tooltip";
 import { grammarFor, highlightLines, type Token } from "@/lib/highlight";
 import { useAttachmentUrl } from "@/stores/attachments";
 import { CodeActions } from "./CodeActions";
+import { PathChip } from "./PathChip";
 
 /** One line's tokens as spans. */
 export function TokenSpans({ tokens }: { tokens: readonly Token[] }): ReactNode {
@@ -60,6 +61,8 @@ function LocalImage({ src, alt }: { src: string; alt: string }) {
 const threadExtras: MarkdownExtras = {
   html: false,
   code: (lang, code) => <CodeBlock lang={lang} code={code} />,
+  // File paths open the File tab, relative ones against the thread's checkout (PathChip).
+  pathChip: (m) => <PathChip match={m} />,
   image: (src, alt) => <LocalImage src={src} alt={alt} />,
   // The frame (rounded, scrolling sideways when too wide) is the wrapper's: thread.css.
   table: (rows) => (
@@ -69,7 +72,7 @@ const threadExtras: MarkdownExtras = {
   ),
 };
 
-/** Markdown as the thread shows it: the PR surface's renderer with highlighted code and attachment images. */
+/** Markdown as the thread shows it: the PR surface's renderer with highlighted code, attachment images and path chips. */
 export function ThreadMarkdown({ children, className }: { children: string; className?: string }) {
   return (
     <Markdown className={className} extras={threadExtras}>

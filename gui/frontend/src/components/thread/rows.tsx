@@ -37,7 +37,7 @@ import { formatAgo } from "@/lib/thread";
 import { questionsOf } from "@/lib/threadRequest";
 import { wakeLine, type WakeTone } from "@/lib/wake";
 import { groupLabel, turnCostLabel, type TimelineRow, type WorkNode } from "@/lib/threadTimeline";
-import { formatDuration, parseObject, splitPath, str, toolSummary, type Tense } from "@/lib/toolSummary";
+import { formatDuration, parseObject, splitPath, str, toolFileTarget, toolSummary, type Tense } from "@/lib/toolSummary";
 import { useAgentRunOfCall, useAgentRunOfNote } from "@/stores/agents";
 import { useNoteCreatorId } from "@/stores/lineage";
 import { useModelChoices } from "@/stores/settings";
@@ -48,6 +48,7 @@ import { ThreadMarkdown } from "./Code";
 import { CodeRunContext } from "./codeContext";
 import { KeepRowContext, useThreadCtx } from "./context";
 import { LineageNote } from "./LineageNote";
+import { ToolPathChip } from "./PathChip";
 import { AgentReport, ToolDetail } from "./ToolDetail";
 import { UserBubble } from "./UserBubble";
 
@@ -134,18 +135,29 @@ function durationOf(it: { createdAtMs: number | null; updatedAtMs: number | null
   return it.createdAtMs !== null && it.updatedAtMs !== null ? it.updatedAtMs - it.createdAtMs : undefined;
 }
 
-/** A tool call's label: verb, then the target (bold, or mono for commands and patterns), then muted detail. */
+/**
+ * A tool call's label: verb, then the target (bold, or mono for commands and patterns), then
+ * muted detail. A file tool's target and directory are one path chip opening the file (at a
+ * Read's offset, an edit's first changed line); the verb and the rest still toggle the row.
+ */
 function ToolLabel({ t, tense, cwd }: { t: ToolCallView; tense: Tense; cwd: string }) {
   const s = toolSummary(t, { tense, cwd });
+  const file = s.target ? toolFileTarget(t) : null;
+  const target =
+    s.target && (s.targetStyle === "mono" ? <span className="mono cmd">{s.target}</span> : s.targetStyle === "bold" ? <b>{s.target}</b> : <span>{s.target}</span>);
+  const detail = s.detail && <span className={s.detailMono ? "mono text-muted-foreground" : "text-muted-foreground"}>{s.detail}</span>;
   return (
     <>
       {s.verb}{" "}
-      {s.target &&
-        (s.targetStyle === "mono" ? <span className="mono cmd">{s.target}</span> : s.targetStyle === "bold" ? <b>{s.target}</b> : <span>{s.target}</span>)}
-      {s.detail && (
+      {file ? (
+        <ToolPathChip path={file.path} line={file.line}>
+          {target}
+          {detail && <> {detail}</>}
+        </ToolPathChip>
+      ) : (
         <>
-          {" "}
-          <span className={s.detailMono ? "mono text-muted-foreground" : "text-muted-foreground"}>{s.detail}</span>
+          {target}
+          {detail && <> {detail}</>}
         </>
       )}
     </>

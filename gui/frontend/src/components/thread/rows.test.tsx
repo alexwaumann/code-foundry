@@ -6,8 +6,12 @@ import { structOf, useThreadStore } from "@/stores/thread";
 import { ThreadContext } from "./context";
 import { TimelineRowView } from "./rows";
 
+const { openFileInPanel } = vi.hoisted(() => ({ openFileInPanel: vi.fn<(target: string, file: object) => boolean>(() => true) }));
+vi.mock("@/stores/filePanel", () => ({ openFileInPanel }));
+
 afterEach(() => {
   cleanup();
+  openFileInPanel.mockClear();
   vi.useRealTimers();
   useThreadStore.setState({ logs: {}, expanded: {}, folds: {} });
 });
@@ -327,5 +331,68 @@ describe("a finished turn with nothing to fold", () => {
     vi.setSystemTime(1 + 3_400);
     const c = show([hi], { working: true });
     expect(c.querySelector('[data-testid="thread-working"]')?.textContent).toBe("Working·3s");
+  });
+});
+
+describe("path chips", () => {
+  const user: ThreadItemView = { ...base, id: "u", ordinal: 1, kind: "user", text: "go", attachments: [], composerText: "" };
+
+  it("an answer's paths are chips that open the File tab, relative ones against the checkout", () => {
+    const c = show([user, { ...base, id: "a", ordinal: 2, kind: "text", text: "The bug is in `src/a.ts:12`; see also docs/notes/x.md and `react-markdown`.\n\n```\nsrc/b.ts\n```" }], { working: true });
+    const chips = [...c.querySelectorAll<HTMLElement>('[data-testid="path-chip"]')];
+    expect(chips.map((el) => el.dataset.path)).toEqual(["src/a.ts", "docs/notes/x.md"]);
+    expect(chips[0]?.getAttribute("role")).toBe("button");
+    expect(chips[0]?.textContent).toBe("src/a.ts:12");
+    fireEvent.click(chips[0] as HTMLElement);
+    expect(openFileInPanel).toHaveBeenCalledWith("current", { project: "", base: "/w", path: "/w/src/a.ts", line: 12 });
+    fireEvent.keyDown(chips[1] as HTMLElement, { key: "Enter" });
+    expect(openFileInPanel).toHaveBeenLastCalledWith("current", { project: "", base: "/w", path: "/w/docs/notes/x.md" });
+    // Not in fenced code, and a package name stays code.
+    expect(c.querySelector("pre")?.textContent).toContain("src/b.ts");
+    expect([...c.querySelectorAll("code")].map((el) => el.textContent)).toContain("react-markdown");
+  });
+
+  it("an Edit row's path opens the file at its first change; the rest of the row still toggles", () => {
+    const patch = [{ oldStart: 40, oldLines: 3, newStart: 40, newLines: 3, lines: [" a", " b", "-c", "+C", " d"] }];
+    const c = show(
+      [
+        user,
+        {
+          ...base,
+          id: "e",
+          ordinal: 2,
+          kind: "tool",
+          toolUseId: "e",
+          name: "Edit",
+          inputJson: JSON.stringify({ file_path: "/w/src/app.ts", old_string: "c", new_string: "C" }),
+          status: "done",
+          output: "",
+          isError: false,
+          resultJson: JSON.stringify({ structuredPatch: patch }),
+        },
+      ],
+      { working: true },
+    );
+    const row = c.querySelector<HTMLElement>('[data-testid="thread-tool"]');
+    const chip = row?.querySelector<HTMLElement>('[data-testid="tool-path-chip"]');
+    expect(chip?.textContent).toBe("app.ts src");
+    fireEvent.click(chip as HTMLElement);
+    expect(openFileInPanel).toHaveBeenCalledWith("current", { project: "", base: "/w", path: "/w/src/app.ts", line: 42 });
+    expect(row?.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(row as HTMLElement);
+    expect(row?.getAttribute("aria-expanded")).toBe("true");
+    expect(openFileInPanel).toHaveBeenCalledTimes(1);
+  });
+
+  it("a Read row opens at its offset", () => {
+    const c = show(
+      [
+        user,
+        { ...base, id: "r", ordinal: 2, kind: "tool", toolUseId: "r", name: "Read", inputJson: JSON.stringify({ file_path: "/elsewhere/notes.md", offset: 30 }), status: "done", output: "", isError: false, resultJson: "" },
+      ],
+      { working: true },
+    );
+    fireEvent.keyDown(c.querySelector('[data-testid="tool-path-chip"]') as HTMLElement, { key: " " });
+    expect(openFileInPanel).toHaveBeenCalledWith("current", { project: "", base: "/w", path: "/elsewhere/notes.md", line: 30 });
   });
 });

@@ -853,7 +853,7 @@ export class MockThreadLogs {
     it({ case: "userMessage", value: { text: "Looks good. Run the full suite, then push the branch.", attachments: [] } }, { at: ago(4) });
     tool("Bash", { command: "go test ./..." }, { output: "ok  \tgithub.com/alexwaumann/code-foundry/...\t(412 tests)", resultJson: JSON.stringify({ stdout: "ok  \t…/internal/store/pr\t0.41s\nok  \t…/internal/api\t3.2s\n(412 tests passed)", stderr: "" }) }, { at: ago(3, 12), until: ago(3, 50) });
     if (state === "idle") {
-      text("All 412 tests pass and the branch is pushed: PR #63 picked up the fix.", { at: ago(2) });
+      text("All 412 tests pass and the branch is pushed: PR #63 picked up the fix. The notes are in README.md, and the poller starts at `src/app.ts:12`.", { at: ago(2) });
       // Turn 1 has no turn_cost_usd or model (an older daemon, or a cost the daemon could not
       // tell); turn 2 ran in a new process that started its totals afresh (the difference of
       // the totals would say $0.38).

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ToolCallView } from "@/api/thread";
-import { diffStats, diffText, exitCode, formatDuration, parseObject, splitPath, structuredPatchText, toolDiff, toolDiffFiles, toolSummary, type Tense, type ToolDiff } from "./toolSummary";
+import { diffStats, diffText, exitCode, formatDuration, parseObject, splitPath, firstPatchLine, structuredPatchText, toolDiff, toolDiffFiles, toolFileTarget, toolSummary, type Tense, type ToolDiff } from "./toolSummary";
 
 function call(name: string, input: object, over: Partial<ToolCallView> = {}): ToolCallView {
   return { toolUseId: "t", name, inputJson: JSON.stringify(input), status: "done", output: "", isError: false, resultJson: "", ...over };
@@ -119,5 +119,27 @@ describe("diffText", () => {
     expect(diffText(p, toolDiffFiles(p))).toBe(patch);
     const c: ToolDiff = { kind: "contents", path: "/w/a.go", name: "a.go", pairs: [{ oldText: "a\nb\n", newText: "a\nB\n" }], numbered: false };
     expect(diffText(c, toolDiffFiles(c))).toBe("@@\n a\n-b\n+B");
+  });
+});
+
+describe("toolFileTarget", () => {
+  const patch = (lines: string[], newStart = 10) => JSON.stringify({ structuredPatch: [{ oldStart: newStart, oldLines: 0, newStart, newLines: 0, lines }] });
+  it.each<[string, ToolCallView, { path: string; line?: number } | null]>([
+    ["a Read at its offset", call("Read", { file_path: "/w/a.ts", offset: 30, limit: 10 }), { path: "/w/a.ts", line: 30 }],
+    ["a Read from the top", call("Read", { file_path: "/w/a.ts" }), { path: "/w/a.ts" }],
+    ["an Edit at its first added line", call("Edit", { file_path: "/w/a.ts" }, { resultJson: patch([" x", " y", "+z"]) }), { path: "/w/a.ts", line: 12 }],
+    ["an Edit at its first removal", call("Edit", { file_path: "/w/a.ts" }, { resultJson: patch([" x", "-y", "+z"]) }), { path: "/w/a.ts", line: 11 }],
+    ["an Edit still waiting (no result)", call("Edit", { file_path: "/w/a.ts" }, { status: "running" }), { path: "/w/a.ts" }],
+    ["a new file's Write", call("Write", { file_path: "/w/n.go" }, { resultJson: patch(["+package n"], 0) }), { path: "/w/n.go", line: 1 }],
+    ["a NotebookEdit", call("NotebookEdit", { notebook_path: "/w/n.ipynb" }), { path: "/w/n.ipynb" }],
+    ["a Bash call", call("Bash", { command: "ls" }), null],
+    ["a Read without a path", call("Read", {}), null],
+  ])("%s", (_, t, want) => {
+    expect(toolFileTarget(t)).toEqual(want);
+  });
+
+  it("firstPatchLine skips hunks without a change", () => {
+    expect(firstPatchLine([])).toBeNull();
+    expect(firstPatchLine([{ oldStart: 1, oldLines: 1, newStart: 1, newLines: 1, lines: [" a"] }, { oldStart: 9, oldLines: 1, newStart: 9, newLines: 1, lines: ["+b"] }])).toBe(9);
   });
 });

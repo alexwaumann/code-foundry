@@ -392,3 +392,36 @@ export function agentReport(t: Pick<ToolCallView, "resultJson" | "output">): str
   return t.output.replace(/^\[Subagent hand-back\][^\n]*\n+/, "").trim();
 }
 
+
+const FILE_TOOLS: ReadonlySet<string> = new Set(["Read", "Edit", "MultiEdit", "Write", "NotebookEdit"]);
+
+/** The new file's line of a structuredPatch's first added or removed line (where a deletion was, for a removal); null without one. */
+export function firstPatchLine(hunks: readonly StructuredPatchHunk[]): number | null {
+  for (const h of hunks) {
+    let line = h.newStart;
+    for (const l of h.lines) {
+      if (l.startsWith("+") || l.startsWith("-")) return Math.max(1, line);
+      if (l.startsWith(" ")) line++;
+    }
+  }
+  return null;
+}
+
+/**
+ * The file a Read, Edit, MultiEdit, Write or NotebookEdit call is about, for its row's path
+ * chip: the path as Claude sent it, and the line to open at (a Read's offset, an edit's
+ * first changed line from the result's structuredPatch). Null for any other tool or no path.
+ */
+export function toolFileTarget(t: Pick<ToolCallView, "name" | "inputJson" | "resultJson">): { path: string; line?: number } | null {
+  if (!FILE_TOOLS.has(t.name)) return null;
+  const input = parseObject(t.inputJson);
+  const path = str(input, "file_path") || str(input, "notebook_path");
+  if (!path) return null;
+  if (t.name === "Read") {
+    const offset = num(input, "offset");
+    return offset !== null && offset > 1 ? { path, line: Math.floor(offset) } : { path };
+  }
+  const patch = parseObject(t.resultJson).structuredPatch;
+  const line = Array.isArray(patch) ? firstPatchLine(patch as StructuredPatchHunk[]) : null;
+  return line !== null ? { path, line } : { path };
+}

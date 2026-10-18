@@ -4,6 +4,7 @@ import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema, type Options as SanitizeSchema } from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import { Tip } from "@/components/ui/tooltip";
+import { CHIP_PROP, matchPath, rehypePathChips, type PathMatch } from "@/lib/pathChips";
 import { cn } from "@/lib/utils";
 import { openUrl } from "@/stores/gh";
 import { resolveLink } from "./model";
@@ -91,10 +92,15 @@ export interface MarkdownExtras {
    * not vanish as an unknown tag). Default true (GitHub bodies use HTML).
    */
   html?: boolean;
+  /**
+   * A file path (lib/pathChips): an inline code span that is one, and paths in prose (a
+   * rehype pass over the text). Not in fenced code or links. Without it, paths stay text.
+   */
+  pathChip?: (m: PathMatch) => ReactNode;
 }
 
 function withExtras(extras: MarkdownExtras): Components {
-  const { code, image, table } = extras;
+  const { code, image, table, pathChip } = extras;
   return {
     ...baseComponents,
     ...(code && {
@@ -112,7 +118,26 @@ function withExtras(extras: MarkdownExtras): Components {
       img: ({ src, alt }) => (typeof src !== "string" ? null : /^https:\/\//.test(src) ? <img src={src} alt={alt ?? ""} loading="lazy" referrerPolicy="no-referrer" /> : image(src, alt ?? "")),
     }),
     ...(table && { table: ({ children }) => <>{table(children)}</> }),
+    ...(pathChip && {
+      code: ({ className, children }) => {
+        // Inline code only: a fenced block's text has a language class or ends in a newline
+        // (and a surface with `code` never renders its <code> here at all).
+        const m = typeof children === "string" && !className && !children.includes("\n") ? matchPath(children.trim(), "code") : null;
+        return m ? <>{pathChip(m)}</> : <code className={className}>{children}</code>;
+      },
+      span: ({ node, children, ...props }) => {
+        const token = node?.properties[CHIP_PROP];
+        const m = typeof token === "string" ? matchPath(token, "prose") : null;
+        return m ? <>{pathChip(m)}</> : <span {...props}>{children}</span>;
+      },
+    }),
   };
+}
+
+/** The rehype plugins for a set of extras: raw HTML or not, then the prose path pass. */
+function rehypeFor(extras: MarkdownExtras | undefined): RehypePlugins {
+  const base = extras?.html === false ? rehypePluginsNoHtml : rehypePlugins;
+  return extras?.pathChip ? [...base, rehypePathChips] : base;
 }
 
 /**
@@ -124,9 +149,10 @@ function withExtras(extras: MarkdownExtras): Components {
  */
 export const Markdown = memo(function Markdown({ children, className, extras }: { children: string; className?: string; extras?: MarkdownExtras }) {
   const components = useMemo(() => (extras ? withExtras(extras) : baseComponents), [extras]);
+  const rehype = useMemo(() => rehypeFor(extras), [extras]);
   return (
     <div className={cn("cf-markdown", className)}>
-      <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={extras?.html === false ? rehypePluginsNoHtml : rehypePlugins} components={components}>
+      <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehype} components={components}>
         {children}
       </ReactMarkdown>
     </div>
