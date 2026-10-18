@@ -20,7 +20,9 @@ describe("view tab overflow", () => {
 
   it("scrolls as little as it can to show the active tab", () => {
     expect(scrollLeftToShow(0, 200, 50, 40)).toBe(0);
-    expect(scrollLeftToShow(0, 200, 250, 40)).toBe(90);
-    expect(scrollLeftToShow(150, 200, 20, 40)).toBe(20);
+    expect(scrollLeftToShow(0, 200, 250, 40)).toBe(114);
+    expect(scrollLeftToShow(150, 200, 60, 40)).toBe(36);
+    // The first tab (inside the strip's 2 px padding) scrolls all the way back.
+    expect(scrollLeftToShow(80, 200, 2, 40)).toBe(0);
   });
 });

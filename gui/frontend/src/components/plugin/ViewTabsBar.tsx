@@ -45,7 +45,8 @@ export function ViewTabsBar({ tabs }: { tabs: ViewTabs }) {
     const box = ref.current;
     const el = box?.querySelector<HTMLElement>(`[data-key="${CSS.escape(active)}"]`);
     if (!box || !el) return;
-    const left = scrollLeftToShow(box.scrollLeft, box.clientWidth, el.offsetLeft - box.offsetLeft, el.offsetWidth);
+    // The tablist is the tabs' offsetParent (relative): offsetLeft is in its content, unzoomed.
+    const left = scrollLeftToShow(box.scrollLeft, box.clientWidth, el.offsetLeft, el.offsetWidth);
     if (left !== box.scrollLeft) box.scrollLeft = left;
   }, [active]);
 
@@ -66,7 +67,7 @@ export function ViewTabsBar({ tabs }: { tabs: ViewTabs }) {
         ref={ref}
         role="tablist"
         aria-label="Views"
-        className="flex min-w-0 items-center gap-0.5 overflow-x-auto rounded-lg bg-muted/60 p-0.5 [scrollbar-width:none] dark:bg-muted/40 [&::-webkit-scrollbar]:hidden"
+        className="relative flex min-w-0 items-center gap-0.5 overflow-x-auto rounded-lg bg-muted/60 p-0.5 [scrollbar-width:none] dark:bg-muted/40 [&::-webkit-scrollbar]:hidden"
         style={{ maskImage: fadeMask(edges.start, edges.end), WebkitMaskImage: fadeMask(edges.start, edges.end) }}
         onScroll={measure}
       >
