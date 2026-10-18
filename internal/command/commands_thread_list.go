@@ -59,7 +59,7 @@ func RegisterThreadList(r *Registry, d ThreadListDeps) error {
 			{Name: "state", Type: Enum, Enum: ThreadListStates, Description: "Only threads whose Claude process is starting, connected, closing, or disconnected"},
 			{Name: "project", Type: String, Description: "Only threads in this project: its id, name, or an absolute path inside it"},
 			{Name: "workspace", Type: String, Description: "Only threads of this workspace: its id or name"},
-			{Name: "created-by", Type: String, Description: "Only threads this thread created (its id, or a unique suffix of 4+ characters), or user for threads no thread created"},
+			{Name: "created-by", Type: String, Description: "Only threads created by this thread (id or suffix); user: by the user"},
 			{Name: "label", Type: String, Description: "Comma-separated labels: only threads carrying all of them"},
 			{Name: "limit", Type: Int, Default: threadListDefaultLimit, Description: "At most this many threads, the most recently active (0: no limit)"},
 		},

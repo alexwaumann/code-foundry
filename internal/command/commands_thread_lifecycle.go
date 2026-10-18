@@ -120,7 +120,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				{Name: "budget", Type: String, Description: "Spending limit in USD at Claude API rates, e.g. 5.00: Claude is interrupted when the thread's cost reaches it"},
 				{Name: "notify", Type: Bool, Description: "With created-by: wake the creator with a message each time the new thread settles (a repeat thread.subscribe)"},
 				{Name: "request-id", Type: String, Description: "An idempotency key (at most 128 characters): repeating thread.new with a key its creator used " +
-					"in the last 24 hours prints the thread made then and starts nothing; use one per task so a retry after a timeout makes no duplicate"},
+					"in the last 24 hours prints the thread made then and starts nothing"},
 			},
 			When: canStartThread,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
@@ -240,11 +240,24 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 			Title:       "Remove Thread",
 			Description: "Forget a thread, stopping Claude first if it runs.",
 			Category:    "Thread",
-			Args:        []ArgSpec{idArg},
-			When:        hasThread,
+			Args:        []ArgSpec{optionalID(idArg), threadIDsArg},
+			When:        hasThreadOrCLI,
 			Confirm:     "Remove thread {id}? Claude stops if it runs, and the thread is forgotten.",
+			// Without a thread Run says what is missing; with ids the message counts them.
+			ConfirmIf: func(_ context.Context, _ Context, a Args) bool {
+				_, err := targetThreads(a)
+				return err == nil
+			},
+			DynamicConfirm: func(_ context.Context, _ Context, a Args) string { return removeConfirm(a) },
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-				id := a.String("id")
+				ids, err := targetThreads(a)
+				if err != nil {
+					return Result{}, err
+				}
+				if a.Has("ids") {
+					return removeThreads(ctx, b, ids), nil
+				}
+				id := ids[0]
 				if _, err := b.Remove(ctx, connect.NewRequest(&v1.RemoveThreadRequest{Id: id})); err != nil {
 					return Result{}, err
 				}

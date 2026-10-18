@@ -92,7 +92,9 @@ func TestThreadArchive(t *testing.T) {
 		{name: "re-archiving an archived thread", args: map[string]string{"id": "s5", "archived": "true"},
 			current: &v1.Thread{Name: "drv", State: v1.ThreadState_THREAD_STATE_DISCONNECTED, ArchivedAt: archivedAt},
 			wantMsg: "archived thread drv (s5)", wantReqs: []proto.Message{get, archive}},
-		{name: "unavailable without a thread", wantErr: command.ErrUnavailable},
+		{name: "unavailable in the GUI without a thread", ctx: command.Context{ActiveView: "dashboard"}, wantErr: command.ErrUnavailable},
+		// The CLI may name its threads with ids alone, so Run says what is missing.
+		{name: "the CLI without a thread names what is missing", wantErr: command.ErrInvalidArgs},
 		{name: "an unknown thread fails in Run, not with a confirmation", args: map[string]string{"id": "s5", "archived": "true"},
 			backendErr: connect.NewError(connect.CodeNotFound, errors.New("nope")), wantCode: connect.CodeNotFound},
 	}

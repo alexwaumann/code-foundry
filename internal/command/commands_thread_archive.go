@@ -15,20 +15,21 @@ import (
 // while Claude is working or waiting on the user's answer, since it ends that turn, or
 // while the thread's background agents or shells run, since they stop with it; idle,
 // finished, errored and stopped threads archive at once, and unarchiving never asks.
+// With ids it acts on several threads (commands_thread_bulk.go).
 // See docs/notes/archive-threads-1-daemon.md and docs/notes/thread-lifecycle.md.
 func threadArchive(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
 		Name:  "thread.archive",
 		Title: "Archive or Unarchive Thread",
-		Description: "Archive a thread: Claude is closed, its terminals are removed and it is unpinned and listed apart. " +
-			"Unarchive puts it back in the thread list. Without archived, toggles. " +
-			"Pinning or sending a message unarchives a thread too.",
+		Description: "Archive a thread: Claude is closed, its terminals removed, and it is unpinned and listed apart. " +
+			"Without archived, toggles. Pinning or sending a message unarchives it too.",
 		Category: "Thread",
 		Args: []ArgSpec{
-			idArg,
-			{Name: "archived", Type: Bool, Description: "Archive (true) or unarchive (false); default: the opposite of now"},
+			optionalID(idArg),
+			threadIDsArg,
+			{Name: "archived", Type: Bool, Description: "Archive (true) or unarchive (false); default: the opposite of now (with ids: archive)"},
 		},
-		When:    hasThread,
+		When:    hasThreadOrCLI,
 		Confirm: "Archive thread {id}? Claude is still working; archiving ends the turn.",
 		ConfirmIf: func(ctx context.Context, _ Context, a Args) bool {
 			return archiveConfirm(ctx, b, a) != ""
@@ -37,7 +38,14 @@ func threadArchive(b ThreadBackend, idArg ArgSpec) Command {
 			return archiveConfirm(ctx, b, a)
 		},
 		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-			id := a.String("id")
+			ids, err := targetThreads(a)
+			if err != nil {
+				return Result{}, err
+			}
+			if a.Has("ids") {
+				return archiveThreads(ctx, b, ids, a), nil
+			}
+			id := ids[0]
 			archived := a.Bool("archived")
 			if !a.Has("archived") {
 				cur, err := b.Get(ctx, connect.NewRequest(&v1.GetThreadRequest{Id: id}))
@@ -62,9 +70,16 @@ func threadArchive(b ThreadBackend, idArg ArgSpec) Command {
 
 // archiveConfirm is thread.archive's confirmation for this call, or "" when it needs
 // none: unarchiving, or archiving a thread that is not mid-turn (archiveInterrupts).
-// An unknown thread needs none either: Run reports it.
+// An unknown thread needs none either: Run reports it. Given ids, archiveManyConfirm.
 func archiveConfirm(ctx context.Context, b ThreadBackend, a Args) string {
-	res, err := b.Get(ctx, connect.NewRequest(&v1.GetThreadRequest{Id: a.String("id")}))
+	ids, err := targetThreads(a)
+	if err != nil {
+		return ""
+	}
+	if a.Has("ids") {
+		return archiveManyConfirm(ctx, b, ids, a)
+	}
+	res, err := b.Get(ctx, connect.NewRequest(&v1.GetThreadRequest{Id: ids[0]}))
 	if err != nil {
 		return ""
 	}
@@ -80,11 +95,7 @@ func archiveConfirm(ctx context.Context, b ThreadBackend, a Args) string {
 	if why == "" {
 		return ""
 	}
-	name := s.GetName()
-	if name == "" {
-		name = s.GetId()
-	}
-	return "Archive thread " + name + "? " + why + "; archiving " + ends + "."
+	return "Archive thread " + threadNameOrID(s) + "? " + why + "; archiving " + ends + "."
 }
 
 // archiveInterrupts says what archiving (or snoozing) s would cut off, and what doing
