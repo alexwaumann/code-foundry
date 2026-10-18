@@ -2,13 +2,16 @@
 
 Every handler gets `h *pluginsdk.Host`. Each method is one protocol call; the host checks
 it against what the user granted (the manifest's `permissions`) and answers
--32001 `CodePermissionDenied` otherwise. Calls take a context: pass the handler's `ctx`
-(it ends when the call it serves ends) or your own with a timeout.
+-32001 `CodePermissionDenied` otherwise. Requests take a context: pass the handler's `ctx`
+(it ends when the call it serves ends) or your own with a timeout. `SetContext`, `Toast`
+and `ToastIn` are notifications: no context, and their error only says the message could
+not be sent (a refusal shows in the plugin's log).
 
 ## Identity and logging
 
 - `h.Name()`, `h.Dir()` (package folder, also the working directory), `h.DataDir()` (own
-  state folder, 0700, kept across updates: caches, settings that are not secret),
+  state folder, 0700, kept across updates: caches, settings that are not secret; always
+  use it rather than building the path, which follows the Code Foundry home),
   `h.Granted()` (the permissions the user consented to), `h.Dev()` (running under
   `plugin dev`), `h.HostVersion()`, `h.HasCapability("view.tabs")`.
 - `h.Log()` is a `*slog.Logger` writing to the plugin's log (`code-foundry plugin logs
@@ -135,15 +138,23 @@ pluginsdk.Plugin{
   `gitops` (git operations per worktree), `settings`, `update`, `action` (project
   actions and their runs), `plugin`.
 - `ev.Event` is the event as JSON, exactly what `code-foundry events --json --source
-  <source>` prints for the same source (there `threads` is `thread-list`): one object
-  keyed by the source with one change inside, plus `seq` and `epoch`:
+  <source>` prints for the same source: one object keyed by the source with one change
+  inside, plus `seq` and `epoch` (enums are their full names, `THREAD_STATUS_IDLE`):
   ```json
   {"threadList":{"updated":{"id":"s-1f2e3d4c5b6a","name":"Fix the login redirect","status":"THREAD_STATUS_IDLE", …}},"seq":"42","epoch":"c85aff6ef6fc"}
-  {"gh":{"branchPullRequestsUpdated":{…}},"seq":"43","epoch":"c85aff6ef6fc"}
+  {"threadList":{"removedId":"s-1e06a2c44e99"},"seq":"43","epoch":"c85aff6ef6fc"}
   {"gitops":{"finished":{…}},"seq":"44","epoch":"c85aff6ef6fc"}
   ```
-  Run that command (and `code-foundry thread get <id> --json` for a thread's fields) to
-  see real payloads before decoding them; decode only the fields you need.
+  `updated` carries the whole object after the change, `removedId` (or `removedName`)
+  the id of what went; `snapshot` replaces everything. The table below lists every
+  change. See real payloads before decoding them: `events` streams until killed, so
+  capture a few seconds of it (macOS has no `timeout`), doing whatever should produce the
+  events meanwhile:
+  ```
+  code-foundry events --json --source thread-list > /tmp/events.json & pid=$!; sleep 5; kill $pid
+  ```
+  `code-foundry thread get <id> --json` shows a thread's fields. Decode only what you
+  need.
 - Each source starts with its snapshot (`ev.Snapshot` true; `{"threadList":{"snapshot":{"threads":[…]}}}`),
   then live events in order. Events may reach OnEvent before Subscribe returns.
 - OnEvent runs on the notification goroutine: keep it short (hand work to a goroutine).
@@ -151,6 +162,10 @@ pluginsdk.Plugin{
   then gets that source's snapshot again: treat a snapshot as "replace what you know".
 - Subscriptions end with the process: subscribe in Init. At most 16 at once;
   `h.Unsubscribe(ctx, id)` ends one.
+
+Every source and the changes it sends (this build):
+
+{{cf.eventVariants}}
 
 ## Secrets (permission `secrets`)
 

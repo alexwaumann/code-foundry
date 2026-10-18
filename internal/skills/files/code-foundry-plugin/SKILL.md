@@ -51,7 +51,8 @@ for tests). This Code Foundry is {{cf.version}}.
 6. **Read its log**: `code-foundry plugin logs <name> --lines 50` (its stderr, `h.Log()`,
    and the host's lines: starts, exits, refused calls, rejected views). Never `--follow`
    from your Bash tool: it does not return.
-7. **Drive it without the GUI**: `code-foundry plugin <name> <command> [args]`;
+7. **Drive it without the GUI**: `code-foundry plugin <name> <command> [args]` (a dotted
+   command name takes spaces: `plugin notes note add "text"`);
    `code-foundry plugin surface <name> <surface>` prints the surface's view JSON and the
    elements that act; `code-foundry plugin act <name> <surface> <event> [--values '{...}']`
    clicks or submits one. A thread scoped surface uses your own thread
@@ -82,8 +83,10 @@ Ask the user before steps 9 and 10: they publish under the user's name.
   CLI and agents get it too); the view's button runs it (`ui.CommandButton`). Events
   (`ui.EventButton`) are for what only makes sense in the view: tabs, form submits,
   selecting a row.
-- Destructive actions are commands with `confirm` text; the host asks the user. Give
-  their buttons the `destructive` style.
+- What cannot be undone or reaches outside the plugin (cancel a run, delete a stored
+  item the user cares about, sign out) is a command with `confirm` text: the host asks.
+  Give its button the `destructive` style. Small reversible edits inside the view (hide a
+  row, remove a draft) can be plain events.
 - **Secrets** never appear in a view, a log line, a command arg or argv. Collect one with
   a form's secret input with `store`: the host keeps it in the Keychain and the plugin
   reads it with `h.Secrets().Get`. A view shows only that it is set (`hasValue`).
@@ -102,7 +105,6 @@ Ask the user before steps 9 and 10: they publish under the user's name.
   notifications arrive in order on one goroutine, so `OnEvent` must return quickly.
 - A newer manifest that asks for more permissions disables the plugin until the user
   consents again (`plugin dev ... --yes` or `plugin enable <name> --yes`).
-- `code-foundry plugin disable <name>` stops a dev plugin and removes its commands.
 
 ## References (next to this file)
 

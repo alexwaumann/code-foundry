@@ -66,6 +66,12 @@ func TestRenderPluginSkill(t *testing.T) {
 			t.Errorf("manifest.md lacks %q", want)
 		}
 	}
+	hostAPI := string(files[skills.Plugin+"/reference/host-api.md"])
+	for _, want := range []string{"| `threads` | `thread-list` | `threadList` | `snapshot`, `updated`, `removedId`", "| `thread` | `thread` | `thread` | `pending`, `pendingSnapshot` |"} {
+		if !strings.Contains(hostAPI, want) {
+			t.Errorf("host-api.md lacks %q", want)
+		}
+	}
 	if prim := string(files[skills.Plugin+"/reference/primitives.md"]); !strings.Contains(prim, "| Elements in a view (nodes, rows, chips, pairs, fields, options, buttons, tabs) | 400 |") {
 		t.Error("primitives.md lacks the limits table")
 	}

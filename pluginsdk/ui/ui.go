@@ -1,8 +1,10 @@
 // Package ui is the typed view model of plugin surfaces: Go structs for every v1 node
-// and value type of the surface schema (docs/sketches/plugins/PRIMITIVES.md §B with the
-// 2026-10-18 additions in DECISIONS.md: tabs, thread, terminal, fieldset, select option
-// sources, the duration span, and a secret input's store), builders, and Validate, which
-// checks a view against the schema's rules and limits before it leaves the plugin.
+// and value type of the surface schema (header, tabs, text, markdown, pairs, list,
+// chips, log, actions, progress, notice, empty, section, form with fieldsets and option
+// sources, thread, terminal; inline spans with times and durations), builders, and
+// Validate, which checks a view against the host's rules and limits before it leaves
+// the plugin. The code-foundry-plugin skill's reference/primitives.md shows every node
+// as JSON and Go.
 //
 // The view travels as JSON. Field names are lowerCamel; enums are short lowercase
 // strings ("error", "running"); an Inline whose only content is plain text encodes as a
