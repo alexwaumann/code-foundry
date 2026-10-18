@@ -295,6 +295,9 @@ message SurfaceRef {
   string plugin = 1;
   string surface = 2;
   UiContext context = 3;
+  // Instead of the three above: the key of an instance the daemon already has (one
+  // opened before, e.g. by GetSurface), as GetSurfaceResponse.state.instance names it.
+  string instance = 4;
 }
 
 enum SurfacePhase {

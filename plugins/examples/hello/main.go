@@ -1,7 +1,9 @@
 // Command hello is the example Code Foundry plugin (plugin.json beside it). It shows
 // the SDK end to end: commands with args and context, a host command run on the
 // user's behalf (thread.send through host/invoke, allowed by the manifest's
-// permissions.commands), the secrets API, and logging.
+// permissions.commands), the secrets API, logging, and surfaces (surface.go): a demo of
+// every view node kind, one a context fact makes available, and one gated on a pull
+// request's GitHub Actions checks.
 //
 // Build it with `make plugins`, then link it for development:
 //
@@ -10,6 +12,8 @@
 //	code-foundry plugin hello send "hi" --context-thread <thread id>
 //	code-foundry plugin hello remember swordfish && code-foundry plugin hello recall
 //	code-foundry plugin logs hello
+//	code-foundry plugin surface hello demo --context-thread <thread id>
+//	code-foundry plugin act hello demo click --context-thread <thread id>
 package main
 
 import (
@@ -44,6 +48,12 @@ func plugin() pluginsdk.Plugin {
 			"remember": remember,
 			"recall":   recall,
 			"forget":   forget,
+			"unpin":    unpin,
+		},
+		Surfaces: map[string]pluginsdk.SurfaceFactory{
+			"demo":   newDemo,
+			"pinned": newPinned,
+			"checks": newChecks,
 		},
 		Shutdown: func(_ context.Context, h *pluginsdk.Host) {
 			h.Log().Info("hello is stopping")
@@ -92,6 +102,18 @@ func recall(ctx context.Context, h *pluginsdk.Host, _ pluginsdk.CommandRequest) 
 		return pluginsdk.CommandResult{Message: "nothing remembered yet (code-foundry plugin hello remember <word>)"}, nil
 	}
 	return pluginsdk.CommandResult{Message: "the word is " + word}, nil
+}
+
+// unpin withdraws the pinned surface from a thread (the hello.pinned context fact).
+func unpin(_ context.Context, h *pluginsdk.Host, req pluginsdk.CommandRequest) (pluginsdk.CommandResult, error) {
+	id := req.Arg("thread")
+	if id == "" {
+		id = req.Context.ThreadID
+	}
+	if err := h.SetContext(pluginsdk.ContextParams{Key: "pinned", Value: nil, ThreadID: id}); err != nil {
+		return pluginsdk.CommandResult{}, err
+	}
+	return pluginsdk.CommandResult{Message: "unpinned from " + id}, nil
 }
 
 func forget(ctx context.Context, h *pluginsdk.Host, _ pluginsdk.CommandRequest) (pluginsdk.CommandResult, error) {

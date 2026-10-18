@@ -32,7 +32,7 @@ func (h *Plugin) fillAvailability(ps []*v1.Plugin, uctx command.Context) {
 }
 
 func surfaceRefFromProto(r *v1.SurfaceRef) plugin.SurfaceRef {
-	return plugin.SurfaceRef{Plugin: r.GetPlugin(), Surface: r.GetSurface(), Context: contextFromProto(r.GetContext())}
+	return plugin.SurfaceRef{Plugin: r.GetPlugin(), Surface: r.GetSurface(), Context: contextFromProto(r.GetContext()), Instance: r.GetInstance()}
 }
 
 var surfacePhases = map[plugin.SurfacePhase]v1.SurfacePhase{

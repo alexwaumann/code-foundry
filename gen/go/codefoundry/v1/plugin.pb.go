@@ -1944,10 +1944,13 @@ func (x *PluginSnapshot) GetPlugins() []*Plugin {
 // instance key from them: <plugin>/<surface>/<scope id>, where the scope id is
 // "global", "thread:<id>", "project:<id>", "worktree:<path>" or "pr:<owner>/<repo>#<n>".
 type SurfaceRef struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Plugin        string                 `protobuf:"bytes,1,opt,name=plugin,proto3" json:"plugin,omitempty"`
-	Surface       string                 `protobuf:"bytes,2,opt,name=surface,proto3" json:"surface,omitempty"`
-	Context       *UiContext             `protobuf:"bytes,3,opt,name=context,proto3" json:"context,omitempty"`
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Plugin  string                 `protobuf:"bytes,1,opt,name=plugin,proto3" json:"plugin,omitempty"`
+	Surface string                 `protobuf:"bytes,2,opt,name=surface,proto3" json:"surface,omitempty"`
+	Context *UiContext             `protobuf:"bytes,3,opt,name=context,proto3" json:"context,omitempty"`
+	// Instead of the three above: the key of an instance the daemon already has (one
+	// opened before, e.g. by GetSurface), as GetSurfaceResponse.state.instance names it.
+	Instance      string `protobuf:"bytes,4,opt,name=instance,proto3" json:"instance,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2001,6 +2004,13 @@ func (x *SurfaceRef) GetContext() *UiContext {
 		return x.Context
 	}
 	return nil
+}
+
+func (x *SurfaceRef) GetInstance() string {
+	if x != nil {
+		return x.Instance
+	}
+	return ""
 }
 
 // SurfaceState is the instance's host-side state.
@@ -2983,12 +2993,13 @@ const file_codefoundry_v1_plugin_proto_rawDesc = "" +
 	"\x12availability_epoch\x18\x04 \x01(\x04H\x00R\x11availabilityEpochB\a\n" +
 	"\x05event\"B\n" +
 	"\x0ePluginSnapshot\x120\n" +
-	"\aplugins\x18\x01 \x03(\v2\x16.codefoundry.v1.PluginR\aplugins\"s\n" +
+	"\aplugins\x18\x01 \x03(\v2\x16.codefoundry.v1.PluginR\aplugins\"\x8f\x01\n" +
 	"\n" +
 	"SurfaceRef\x12\x16\n" +
 	"\x06plugin\x18\x01 \x01(\tR\x06plugin\x12\x18\n" +
 	"\asurface\x18\x02 \x01(\tR\asurface\x123\n" +
-	"\acontext\x18\x03 \x01(\v2\x19.codefoundry.v1.UiContextR\acontext\"\xb8\x01\n" +
+	"\acontext\x18\x03 \x01(\v2\x19.codefoundry.v1.UiContextR\acontext\x12\x1a\n" +
+	"\binstance\x18\x04 \x01(\tR\binstance\"\xb8\x01\n" +
 	"\fSurfaceState\x12\x1a\n" +
 	"\binstance\x18\x01 \x01(\tR\binstance\x122\n" +
 	"\x05phase\x18\x02 \x01(\x0e2\x1c.codefoundry.v1.SurfacePhaseR\x05phase\x12\x18\n" +

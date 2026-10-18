@@ -255,6 +255,9 @@ func (cl *cli) runRegistry(ctx context.Context, args []string) error {
 			if err != nil {
 				return err
 			}
+			if f.follow != nil {
+				return f.follow(ctx, cl, c, res)
+			}
 			return cl.followPluginLog(ctx, c, name, lines)
 		}
 	}

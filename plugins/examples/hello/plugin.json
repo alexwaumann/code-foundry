@@ -6,7 +6,7 @@
   "protocol": 1,
   "exec": ["bin/hello"],
   "permissions": {
-    "commands": ["thread.send"],
+    "commands": ["thread.send", "pr.checks"],
     "secrets": true
   },
   "commands": [
@@ -41,6 +41,24 @@
       "title": "Forget the Word",
       "description": "Remove the remembered word from the Keychain.",
       "confirm": "Forget the remembered word?"
+    },
+    {
+      "name": "unpin",
+      "title": "Unpin Hello",
+      "description": "Withdraw the pinned surface from a thread (the demo's Pin button adds it).",
+      "when": "hello.pinned",
+      "args": [{ "name": "thread", "context": "thread", "description": "The thread (default: the active one)" }]
+    }
+  ],
+  "surfaces": [
+    { "id": "demo", "title": "Hello Demo", "icon": "sparkles", "scope": "thread" },
+    { "id": "pinned", "title": "Hello Pinned", "icon": "pin", "scope": "thread", "when": "hello.pinned" },
+    {
+      "id": "checks",
+      "title": "Actions Checks",
+      "icon": "workflow",
+      "scope": "pr",
+      "when": "\"github-actions\" in pr.checks.provider"
     }
   ]
 }
