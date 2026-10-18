@@ -486,6 +486,8 @@ function routes(router: ConnectRouter): void {
     restart: (req) => guard(() => (void world.invoke("plugin.restart", undefined, { name: req.name }), { plugin: world.plugins.list().find((x) => x.name === req.name) })),
     logs: (req) => guard(() => world.plugins.logs(req.name)),
     environment: () => ({ environments: world.plugins.environment() }),
+    browse: (req) => world.plugins.registry.browse(req.refresh),
+    refreshRegistries: () => ({ registries: world.plugins.registry.browse(true).registries }),
     listSecrets: () => ({ secrets: [] }),
     deleteSecret: () => ({}),
     reload: () => ({}),
@@ -737,7 +739,7 @@ function threadControl(res: ServerResponse, action: string, q: URLSearchParams):
 /**
  * Plugin controls: POST /__mock/plugin/state?name=hello&state=crashed|running|failed,
  * POST /__mock/plugin/toast?name=hello&text=…, POST /__mock/plugin/invoke?name=hello&command=plugin.hello.forget[&thread=s-1],
- * GET /__mock/plugin/acts.
+ * POST /__mock/plugin/registry?error=… (the default registry's Browse error; empty clears it), GET /__mock/plugin/acts.
  */
 function pluginControl(res: ServerResponse, what: string, q: URLSearchParams): void {
   try {
@@ -759,6 +761,10 @@ function pluginControl(res: ServerResponse, what: string, q: URLSearchParams): v
         json(res, 200, { delivered: world.plugins.invokeAsk(name, q.get("command") ?? "", ctx, {}) });
         return;
       }
+      case "POST registry":
+        world.plugins.registry.error = q.get("error") ?? "";
+        json(res, 200, { ok: true });
+        return;
       case "GET acts":
         json(res, 200, world.plugins.acts);
         return;
