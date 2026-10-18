@@ -65,9 +65,15 @@ export interface PluginSurfacesState {
   collapsed: Readonly<Record<string, Readonly<Record<string, boolean>>>>;
   /** Elements whose act or command is in flight, by watch key then element key. */
   pending: Readonly<Record<string, Readonly<Record<string, true>>>>;
+  /**
+   * Forms whose submit the plugin took, by draftKey: the view version it acted on. The
+   * first newer view decides: drafts go when it shows the form without errors (or not at
+   * all), and stay (the user's values beside the plugin's errors) when it has some.
+   */
+  submitted: Readonly<Record<string, number>>;
 }
 
-export const usePluginSurfacesStore = create<PluginSurfacesState>()(() => ({ watches: {}, drafts: {}, resetTokens: {}, collapsed: {}, pending: {} }));
+export const usePluginSurfacesStore = create<PluginSurfacesState>()(() => ({ watches: {}, drafts: {}, resetTokens: {}, collapsed: {}, pending: {}, submitted: {} }));
 
 /** A tab's watch key: its panel's key and its id. */
 export function watchKeyOf(panelKey: string, tabId: string): string {
@@ -195,6 +201,42 @@ export function reconcileResets(
   return { drafts: d, resetTokens: t };
 }
 
+/** Whether a form carries the plugin's errors: the form's own, a field's or a fieldset's. */
+export function formHasErrors(form: FormNodeData): boolean {
+  if (form.error) return true;
+  return form.fields.some((f) => Boolean(f.error) || Boolean(f.fieldset?.error) || (f.fieldset?.fields.some((c) => Boolean(c.error)) ?? false));
+}
+
+/**
+ * Drafts after a view newer than a submit the plugin took: a form the view shows without
+ * errors (or no longer shows) loses its drafts; one with errors keeps them. Either way
+ * the submit is settled. Returns the same objects when nothing changed.
+ */
+export function settleSubmits(
+  drafts: PluginSurfacesState["drafts"],
+  submitted: PluginSurfacesState["submitted"],
+  instance: string,
+  view: PluginViewModel,
+  version: number,
+): Pick<PluginSurfacesState, "drafts" | "submitted"> {
+  const due = Object.entries(submitted).filter(([dk, v]) => version > v && dk.startsWith(`${instance}\u0000`));
+  if (due.length === 0) return { drafts, submitted };
+  const tab = view.tabs?.active ?? "";
+  const forms = new Map(formsOf(view.nodes).map(({ key, form }) => [draftKeyOf(instance, tab, key), form]));
+  let d = drafts;
+  const settled = new Set(due.map(([dk]) => dk));
+  const sub = Object.fromEntries(Object.entries(submitted).filter(([dk]) => !settled.has(dk)));
+  for (const dk of settled) {
+    const form = forms.get(dk);
+    if (form && formHasErrors(form)) continue;
+    if (dk in d) {
+      const { [dk]: _dropped, ...rest } = d;
+      d = rest;
+    }
+  }
+  return { drafts: d, submitted: sub };
+}
+
 /** Whether any node of the view is of a kind this GUI does not know (shown as a notice). */
 export function unknownNodes(nodes: readonly ViewNode[]): string[] {
   return nodes.flatMap((n) => (nodeKind(n) === null ? [n.key] : n.section ? unknownNodes(n.section.children) : []));
@@ -226,7 +268,9 @@ function onUpdate(watchKey: string, u: SurfaceUpdateView): void {
     if (next === e) return s;
     const watches = { ...s.watches, [watchKey]: next };
     if (u.kind !== "view" || !next.view) return { watches };
-    return { watches, ...reconcileResets(s.drafts, s.resetTokens, next.instance, next.view) };
+    const reset = reconcileResets(s.drafts, s.resetTokens, next.instance, next.view);
+    const settled = settleSubmits(reset.drafts, s.submitted, next.instance, next.view, next.version);
+    return { watches, resetTokens: reset.resetTokens, ...settled };
   });
 }
 
@@ -239,6 +283,7 @@ export function startSurfaceWatch(watchKey: string, ref: SurfaceRefView): () => 
   usePluginSurfacesStore.setState((s) => ({ watches: { ...s.watches, [watchKey]: { ...(s.watches[watchKey] ?? emptyEntry(ref)), context: ref.context } } }));
   const stop = runStream<SurfaceUpdateView>({
     open: (signal) => watchSurface(ref, signal),
+    slot: { label: `surface:${ref.plugin}.${ref.surface}`, priority: "core" },
     onEvent: (u) => {
       onUpdate(watchKey, u);
     },
@@ -276,8 +321,11 @@ export function usePending(watchKey: string, key: string): boolean {
 export interface ActOptions {
   value?: string;
   values?: Readonly<Record<string, FieldValue>>;
-  /** Drops this form's drafts once the plugin has taken the act (a submit). */
-  clearDraftsOf?: string;
+  /**
+   * The submitted form's draftKey: once the plugin takes the act, its drafts go with the
+   * first newer view that shows the form without errors (settleSubmits).
+   */
+  submitOf?: string;
 }
 
 /**
@@ -297,7 +345,7 @@ export async function actOnElement(watchKey: string, key: string, opts: ActOptio
       ...(opts.values ? { values: opts.values } : {}),
       ...(e.context ? { context: e.context } : {}),
     });
-    if (opts.clearDraftsOf) clearDrafts(opts.clearDraftsOf);
+    if (opts.submitOf) markSubmitted(watchKey, opts.submitOf, e.version);
     return true;
   } catch (err) {
     invalidateOnTransportError(err);
@@ -339,6 +387,16 @@ export function revertDraft(draftKey: string, name: string): void {
     if (!cur || !(name in cur)) return s;
     const { [name]: _gone, ...rest } = cur;
     return { drafts: { ...s.drafts, [draftKey]: rest } };
+  });
+}
+
+/** Records a submit the plugin took; settles it at once when a newer view is already here. */
+function markSubmitted(watchKey: string, draftKey: string, version: number): void {
+  usePluginSurfacesStore.setState((s) => {
+    const submitted = { ...s.submitted, [draftKey]: version };
+    const e = s.watches[watchKey];
+    if (!e?.view || e.version <= version) return { submitted };
+    return settleSubmits(s.drafts, submitted, e.instance, e.view, e.version);
   });
 }
 

@@ -236,3 +236,44 @@ func TestNoUpdateFromAnotherRegistry(t *testing.T) {
 		t.Fatalf("version = %s", p.Manifest.Version)
 	}
 }
+
+// TestDevOverAnInstalledPackage: plugin dev of a folder whose plugin has the name of a
+// registry install is refused without --force (the package stays, with its secret);
+// with it the package goes, the link takes its place, and the link starts empty.
+func TestDevOverAnInstalledPackage(t *testing.T) {
+	g := newRegRig(t)
+	ctx := context.Background()
+	g.publish(g.build("hello", "0.1.0", basePerms), basePerms)
+	m := g.start()
+	g.enabledWithSecret(ctx, m)
+	src := g.install(t.TempDir(), "hello", "ok", testManifest("hello"))
+	real, _ := filepath.EvalSymlinks(src)
+	link := filepath.Join(g.opts.Dir, "hello")
+
+	if _, err := m.Dev(ctx, src, true, false, false); !errors.Is(err, plugin.ErrFailedPrecondition) ||
+		!strings.Contains(err.Error(), "--force replaces it with a link to "+real) {
+		t.Fatalf("dev over a package without --force: %v", err)
+	}
+	if fi, err := os.Lstat(link); err != nil || fi.Mode()&os.ModeSymlink != 0 {
+		t.Fatalf("the package was touched: %v", err)
+	}
+	g.assertSecretKept(ctx, m)
+	res, err := m.Dev(ctx, src, false, true, true)
+	if err != nil || !res.NeedsConsent || !strings.Contains(res.Consent, "It replaces the plugin hello from the registry") {
+		t.Fatalf("forced dry run = %+v, %v", res, err)
+	}
+	g.assertSecretKept(ctx, m)
+	if _, err := m.Dev(ctx, src, true, false, true); err != nil {
+		t.Fatal(err)
+	}
+	if p := g.waitState("hello", plugin.StateRunning); p.DevPath != real {
+		t.Fatalf("linked to %s", p.DevPath)
+	}
+	if target, err := os.Readlink(link); err != nil || target != real {
+		t.Fatalf("link %q, %v", target, err)
+	}
+	g.assertPurged(ctx, m)
+	if r, _ := g.invoke("plugin.hello.recall", nil, command.Context{}); r.Message != "nothing" {
+		t.Errorf("recall after the takeover = %q", r.Message)
+	}
+}

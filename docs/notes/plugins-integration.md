@@ -11,34 +11,49 @@ so a run sets it first (the second line of `plugin browse` below).
 
 ## Run the stack locally
 
-```
-git fetch origin && git checkout cf/plugins-7-registry      # the top of the stack
-make build && make gui-build                                # bin/code-foundry, gui/bin/Code Foundry
-mkdir -p ~/.cf-integ                                        # an isolated home, under ~ (see below)
-# a wrapper so no CLI call ever reaches the real home (a CLI call auto-starts a daemon):
-printf '#!/bin/zsh\nexport CODE_FOUNDRY_HOME=$HOME/.cf-integ\nexec %s/bin/code-foundry "$@"\n' "$PWD" > /tmp/cf && chmod +x /tmp/cf
-env -u CLAUDECODE -u CLAUDE_CODE_ENTRYPOINT CODE_FOUNDRY_HOME=$HOME/.cf-integ ./bin/code-foundry daemon --dev &
-/tmp/cf plugin browse                                       # "no plugin registry is configured": none by default
-/tmp/cf settings set plugins.registries https://github.com/alexwaumann/code-foundry-plugins
-/tmp/cf plugin browse                                       # the real registry: gh-actions, test-watcher
-/tmp/cf plugin install gh-actions && /tmp/cf plugin install test-watcher
-/tmp/cf plugin enable gh-actions --yes && /tmp/cf plugin enable test-watcher --yes
-/tmp/cf plugin list
-```
-
-(Started from a Claude Code session, unset every `CLAUDE*` variable, not only the two
-shown.) The home must be under `~`: `project add` refuses other paths, and a plugin's data
-dir must be under home to be a thread's cwd or add-dir (PR 6). The GUI the same way PRs
-5 to 7 shot it: the frontend in Playwright WebKit against that daemon, not the Wails
-window (an isolated Wails copy shares the installed app's WebKit localStorage):
+Updated for the top of the chain (#205, `cf/plugins-12-renderer-defects`; the release
+readiness run, `docs/notes/plugins-release-readiness.md`, used exactly this). The registry
+lists three plugins now (gh-actions, test-watcher, showcase, all 0.1.1).
 
 ```
-cd gui/frontend && pnpm exec vite --port 9461 --strictPort --host 127.0.0.1 &
-# open http://127.0.0.1:9461/?daemon=http%3A%2F%2F127.0.0.1%3A<~/.cf-integ/daemon.port>&token=<~/.cf-integ/daemon.token>
+git fetch origin && git checkout cf/plugins-12-renderer-defects   # the top of the chain
+make build && make gui-build                                      # bin/code-foundry, gui/bin/Code Foundry
+mkdir -p ~/.cf-final                                              # an isolated home, under ~ (see below)
+# a wrapper so no CLI call ever reaches the real home (a CLI call auto-starts a daemon),
+# with every CLAUDE* variable unset (started from a Claude Code session):
+cat > /tmp/cff <<'SH'
+#!/bin/zsh
+for v in ${(k)parameters[(I)CLAUDE*]}; do unset $v; done
+export CODE_FOUNDRY_HOME=$HOME/.cf-final
+exec <this worktree>/bin/code-foundry "$@"
+SH
+chmod +x /tmp/cff
+/tmp/cff daemon --dev &
+/tmp/cff plugin browse                                            # "no plugin registry is configured": none by default
+/tmp/cff settings set plugins.registries https://github.com/alexwaumann/code-foundry-plugins
+/tmp/cff plugin browse                                            # gh-actions, showcase, test-watcher
+for p in gh-actions test-watcher showcase; do /tmp/cff plugin install $p && /tmp/cff plugin enable $p --yes; done
+/tmp/cff plugin list
+```
+
+The daemon has no stop verb: `kill <pid>` (`daemon status` prints it). The home must be
+under `~`: `project add` refuses other paths, and a plugin's data dir must be under home to
+be a thread's cwd or add-dir (PR 6). Secrets from an isolated home go to the login Keychain
+under `code-foundry-plugin-<hash of the home>` (PR 8): delete them (`plugin secrets delete`)
+before removing the home. The GUI: the frontend in Playwright WebKit against that daemon,
+not the Wails window (an isolated Wails copy shares the installed app's WebKit
+localStorage); a production build ignores `?daemon=`, so use Vite's dev server:
+
+```
+cd gui/frontend && pnpm exec vite --port 9481 --strictPort --host 127.0.0.1 &
+# open http://127.0.0.1:9481/?daemon=http%3A%2F%2F127.0.0.1%3A<~/.cf-final/daemon.port>&token=<~/.cf-final/daemon.token>
 ```
 
 To use the built app instead (it shares that WebKit storage, so put panel state back
-afterwards): `CODE_FOUNDRY_HOME=~/.cf-integ CODE_FOUNDRY_BIN=$PWD/bin/code-foundry "gui/bin/Code Foundry"`.
+afterwards): `CODE_FOUNDRY_HOME=~/.cf-final CODE_FOUNDRY_BIN=$PWD/bin/code-foundry "gui/bin/Code Foundry"`.
+
+The transcript below is the first run (2026-10-18, `cf/plugins-7-registry`, two plugins at
+0.1.0, home `~/.cf-integ`); the release readiness note has the run on the top.
 
 ## Transcript (`code-foundry` = the branch binary with `CODE_FOUNDRY_HOME=~/.cf-integ`)
 
@@ -302,6 +317,9 @@ dev` loop.
   `terminal` node now that PR 6 renders them (its README says so).
 
 ## Merge order
+
+**Superseded**: the chain is now 13 PRs and merges bottom-up; see
+`docs/notes/plugins-release-readiness.md` (a). What follows is the plan at the time.
 
 Stacked, each PR based on the one before; it merges as one, top-down:
 

@@ -11,8 +11,13 @@ class FakeRenderer implements TerminalRenderer {
   private dataCbs = new Set<(d: Uint8Array) => void>();
   private resizeCbs = new Set<(s: TermSize) => void>();
   mount(): void {}
-  write(data: Uint8Array): void {
+  /** When set, a write's `parsed` callback waits here until the test calls it (xterm's async parse). */
+  deferParse: (() => void)[] | null = null;
+  write(data: Uint8Array, parsed?: () => void): void {
     this.calls.push(`write:${new TextDecoder().decode(data)}`);
+    if (!parsed) return;
+    if (this.deferParse) this.deferParse.push(parsed);
+    else parsed();
   }
   reset(): void {
     this.calls.push("reset");
@@ -132,6 +137,40 @@ describe("AttachController", () => {
     expect(ctl.current.phase).toBe("live");
     await vi.advanceTimersByTimeAsync(0);
     expect(resizes).toEqual([["t1", 100, 30]]);
+  });
+
+  it("holds output and resizes that arrive while the snapshot is parsed, then applies them in order", async () => {
+    r.deferParse = [];
+    ctl.attach("t1");
+    await flush();
+    s.push("t1", { kind: "snapshot", data: enc("replay"), cols: 80, rows: 10, altScreen: false });
+    s.push("t1", { kind: "output", data: enc("live1") });
+    s.push("t1", { kind: "resized", cols: 90, rows: 12 });
+    s.push("t1", { kind: "output", data: enc("live2") });
+    for (let i = 0; i < 4; i++) await flush();
+    // Nothing after the snapshot touches the grid (no fit, no resize, no output) until it is parsed.
+    expect(r.calls).toEqual(["reset", "reset", "resize:80x10", "write:replay"]);
+    expect(ctl.current.phase).toBe("connecting");
+    r.deferParse.shift()?.();
+    expect(r.calls).toEqual(["reset", "reset", "resize:80x10", "write:replay", "fit:100x30", "write:live1", "resize:90x12", "write:live2"]);
+    expect(ctl.current.phase).toBe("live");
+  });
+
+  it("drops what a snapshot held when a newer snapshot replaces it", async () => {
+    r.deferParse = [];
+    ctl.attach("t1");
+    await flush();
+    s.push("t1", { kind: "snapshot", data: enc("old"), cols: 100, rows: 30, altScreen: false });
+    s.push("t1", { kind: "output", data: enc("stale") });
+    s.push("t1", { kind: "snapshot", data: enc("new"), cols: 100, rows: 30, altScreen: false });
+    s.push("t1", { kind: "output", data: enc("fresh") });
+    for (let i = 0; i < 4; i++) await flush();
+    const [first, second] = r.deferParse;
+    first?.();
+    expect(r.calls).not.toContain("write:fresh");
+    second?.();
+    expect(r.calls).not.toContain("write:stale");
+    expect(r.calls.at(-1)).toBe("write:fresh");
   });
 
   it("writes output, applies Resized without echoing a Resize, and shows exit", async () => {

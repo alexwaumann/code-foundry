@@ -2,6 +2,7 @@ import { Code, ConnectError } from "@connectrpc/connect";
 import { ProjectService, RepositoryVisibility, type GitHubRepository } from "@/gen/codefoundry/v1/project_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
 import { orOutdatedDaemon } from "./errors";
+import { claimStreamSlot } from "./streamSlots";
 import { toProjectView, type ProjectView } from "./project";
 
 /**
@@ -110,7 +111,10 @@ export async function cloneRepo(
   signal?: AbortSignal,
 ): Promise<ProjectView> {
   const c = await conn.client(ProjectService);
+  // A clone is a server stream: it holds one of the origin's connections (api/streamSlots.ts).
+  const slot = claimStreamSlot("clone", "core");
   try {
+    if (!slot.granted()) await slot.ready;
     let project: ProjectView | null = null;
     for await (const ev of c.clone({ owner, name }, { signal })) {
       if (ev.event.case === "progress") onProgress({ line: ev.event.value.line, transient: ev.event.value.transient });
@@ -120,6 +124,8 @@ export async function cloneRepo(
     return project;
   } catch (err) {
     throw orOutdatedDaemon(err);
+  } finally {
+    slot.release();
   }
 }
 

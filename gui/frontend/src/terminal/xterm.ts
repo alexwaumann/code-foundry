@@ -202,8 +202,8 @@ export class XtermRenderer implements TerminalRenderer {
     this.opts.onRendererChange?.(kind);
   }
 
-  write(data: Uint8Array): void {
-    this.term.write(data);
+  write(data: Uint8Array, parsed?: () => void): void {
+    this.term.write(data, parsed);
   }
 
   reset(): void {

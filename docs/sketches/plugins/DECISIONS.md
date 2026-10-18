@@ -134,7 +134,7 @@ merges; until then plugin repos pin a commit.
 A registry is a git repository (or any URL) serving `index.json`: for each plugin, name,
 display name, description, permissions summary, latest version, per-platform download
 URL (`darwin/arm64`, `darwin/amd64`) and sha256, and the source repo. Settings gain
-`plugins.registries` (list; default `https://github.com/alexwaumann/code-foundry-plugins`).
+`plugins.registries` (list; **empty by default**, Alex 2026-10-18: a user adds `https://github.com/alexwaumann/code-foundry-plugins` or a workplace registry themselves).
 `gh` auth covers private registries, so a workplace can point at an internal repo with
 no new auth. A GitHub Action in the registry repo validates PRs that add or bump a plugin
 (manifest present in the release tarball, hash matches, permissions listed).

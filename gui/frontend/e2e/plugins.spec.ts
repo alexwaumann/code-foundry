@@ -83,6 +83,8 @@ test("the form checks on the host, submits its values to the plugin, and keeps d
   await tab(page, "form").click();
   const form = surface(page).getByTestId("plugin-form");
   await expect(form).toBeVisible();
+  // Required fields are marked before the user gets there.
+  await expect(form.locator('[data-testid="plugin-field"][data-name="name"] [data-testid="plugin-required"]')).toBeVisible();
   // Required: the host refuses before the plugin hears of it.
   await form.locator('[data-testid="plugin-button"][data-key="f-save"]').click();
   await expect(form.locator('[data-name="name"] [data-testid="plugin-field-error"]')).toHaveText("Required");
@@ -97,7 +99,12 @@ test("the form checks on the host, submits its values to the plugin, and keeps d
   await tab(page, "form").click();
   await expect(name).toHaveValue("Ada");
   await form.locator('[data-testid="plugin-input"][data-name="token"]').fill("tok-123");
-  await form.locator('[data-testid="plugin-select"][data-name="tags"] [data-value="b"]').click();
+  // Multiple without a style: a dropdown over a checklist.
+  await form.locator('[data-testid="plugin-select"][data-name="tags"]').click();
+  await page.getByTestId("plugin-select-options").locator('[data-value="b"]').click();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("plugin-select-options")).toHaveCount(0);
+  await expect(form.locator('[data-testid="plugin-select"][data-name="tags"]')).toContainText("Alpha, Beta");
   await form.locator('[data-testid="plugin-toggle"][data-name="notifyDone"]').click();
   await form.locator('[data-testid="plugin-button"][data-key="f-save"]').click();
   await expect(surface(page).getByTestId("plugin-text").first()).toContainText('Saved: {"name":"Ada"');
