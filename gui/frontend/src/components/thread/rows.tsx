@@ -382,8 +382,16 @@ const TextRow = memo(function TextRow({ id, final, answer }: { id: string; final
       <ThreadMarkdown className={it.streaming ? "cf-streaming" : undefined}>{it.text}</ThreadMarkdown>
     </CodeRunContext.Provider>
   );
+  // The thread's own answers can be cited (components/thread/cite); a subagent's text cannot.
+  const citable = it.parentToolUseId === "";
   return (
-    <div className={final ? "a-md final selectable" : "a-md selectable"} data-testid="thread-text" data-final={final || undefined} data-streaming={it.streaming || undefined}>
+    <div
+      className={final ? "a-md final selectable" : "a-md selectable"}
+      data-testid="thread-text"
+      data-final={final || undefined}
+      data-streaming={it.streaming || undefined}
+      data-cite-item={citable ? it.id : undefined}
+    >
       {md}
       {answer && <CopyAnswer answer={answer} />}
     </div>

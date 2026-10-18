@@ -9,6 +9,7 @@ import { useThreadsStore } from "@/stores/threads";
 import { forgetTurnView, startThreadWatch, useOpenRequests, useThreadEmpty, useThreadLoaded, useThreadPending, useThreadStore } from "@/stores/thread";
 import { useShownRun } from "@/stores/subagentView";
 import { AgentsStrip } from "./AgentsStrip";
+import { CiteLayer } from "./cite/CiteLayer";
 import { SubagentPane } from "./SubagentPane";
 import { ThreadContext } from "./context";
 import { HeaderActions } from "./HeaderActions";
@@ -109,6 +110,7 @@ function ThreadBody({ threadId }: { threadId: string }) {
   const timelineWorking = useLinger(working, open.length === 0 ? 2000 : 0);
   const dockRef = useRef<HTMLDivElement>(null);
   const dockHeight = useHeight(dockRef);
+  const bodyRef = useRef<HTMLDivElement>(null);
   const ctx = useMemo(() => ({ threadId, cwd }), [threadId, cwd]);
   return (
     <ThreadContext.Provider value={ctx}>
@@ -119,7 +121,7 @@ function ThreadBody({ threadId }: { threadId: string }) {
             <HeaderActions threadId={threadId} />
           </span>
         </PaneHeader>
-        <div className="relative flex min-h-0 flex-1 flex-col">
+        <div className="relative flex min-h-0 flex-1 flex-col" ref={bodyRef}>
           {/* The log on screen may be behind while the Watch stream retries (a dropped or silent stream). */}
           {loaded && catchingUp && (
             <div
@@ -142,6 +144,7 @@ function ThreadBody({ threadId }: { threadId: string }) {
             <AgentsStrip threadId={threadId} />
             <ThreadComposer key={threadId} threadId={threadId} pending={open} busy={busy} />
           </div>
+          <CiteLayer key={`cite:${threadId}`} threadId={threadId} paneRef={bodyRef} />
         </div>
       </section>
     </ThreadContext.Provider>
