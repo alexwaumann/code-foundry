@@ -40,6 +40,8 @@ interface Entry extends InstallSpec {
 }
 
 export interface RegistryDeps {
+  /** The plugins.registries setting's value (comma-separated URLs; "" or "none" lists none). */
+  registries: () => string;
   installed: (name: string) => { version: string; dev: boolean } | null;
   install: (spec: InstallSpec) => void;
   uninstall: (name: string) => void;
@@ -99,17 +101,47 @@ export class MockRegistry {
   private fetchedAt = new Date(Date.now() - 12 * 60_000);
   /** A failure Browse reports for the registry (POST /__mock/plugin/registry?error=…). */
   error = "";
+  /** A failure every install reports after its first step, until cleared (POST /__mock/plugin/registry?installError=…). */
+  installError = "";
+  private epoch = 0;
+  private lastRegistries = "";
 
   constructor(private readonly deps: RegistryDeps) {}
 
   reset(): void {
     this.entries = seedEntries();
     this.error = "";
+    this.installError = "";
     this.fetchedAt = new Date(Date.now() - 12 * 60_000);
+    this.lastRegistries = this.deps.registries();
+  }
+
+  /** The configured registry URLs, like registry.ParseList: none for "" or "none". */
+  private urls(): string[] {
+    const v = this.deps.registries().trim();
+    if (v === "" || v === "none") return [];
+    return v
+      .split(",")
+      .map((x) => x.trim())
+      .filter(Boolean);
+  }
+
+  /** The entries the configured registries list (only the default registry lists any). */
+  private listed(): Entry[] {
+    const urls = this.urls();
+    return this.entries.filter((e) => urls.includes(e.registry));
+  }
+
+  /** The settings changed: a new plugins.registries value moves the registry epoch, so Browse reads again (the daemon's SetRegistries). */
+  settingsChanged(): void {
+    const v = this.deps.registries();
+    if (v === this.lastRegistries) return;
+    this.lastRegistries = v;
+    this.deps.publish({ event: { case: "registryEpoch", value: BigInt(++this.epoch) } });
   }
 
   private entry(name: string): Entry {
-    const e = this.entries.find((x) => x.name === name);
+    const e = this.listed().find((x) => x.name === name);
     if (!e) throw new CommandError("notfound", `no plugin "${name}" in the registries (${DEFAULT_REGISTRY})`);
     return e;
   }
@@ -123,7 +155,7 @@ export class MockRegistry {
 
   browse(refresh: boolean): BrowseInit {
     if (refresh) this.fetchedAt = new Date();
-    const entries: EntryInit[] = this.entries.map((e) => {
+    const entries: EntryInit[] = this.listed().map((e) => {
       const inst = this.deps.installed(e.name);
       return {
         name: e.name,
@@ -147,7 +179,12 @@ export class MockRegistry {
     return {
       entries,
       platform: "darwin/arm64",
-      registries: [{ url: DEFAULT_REGISTRY, fetchedAt: timestampFromDate(this.fetchedAt), cached: !refresh, error: this.error, plugins: this.entries.length, issues: [] }],
+      registries: this.urls().map((url) =>
+        url === DEFAULT_REGISTRY
+          ? { url, fetchedAt: timestampFromDate(this.fetchedAt), cached: !refresh, error: this.error, plugins: entries.length, issues: [] }
+          : // Another registry answers with an empty index.
+            { url, fetchedAt: timestampFromDate(this.fetchedAt), cached: !refresh, error: "", plugins: 0, issues: [] },
+      ),
     };
   }
 
@@ -161,6 +198,7 @@ export class MockRegistry {
     const url = `https://github.com/${e.repo}/releases/download/v${e.version}/${e.name}-${e.version}-darwin-arm64.tar.gz`;
     this.progress(ref, e, PluginInstallPhase.RESOLVING, `resolving ${ref}`);
     await wait();
+    if (this.installError) throw new CommandError("unavailable", this.installError);
     this.progress(ref, e, PluginInstallPhase.DOWNLOADING, `downloading ${url}`);
     await wait();
     this.progress(ref, e, PluginInstallPhase.DOWNLOADING, `downloading ${url}`, 2_621_440);

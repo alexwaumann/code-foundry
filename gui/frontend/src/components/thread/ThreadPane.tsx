@@ -9,6 +9,7 @@ import { forgetTurnView, startThreadWatch } from "@/stores/thread";
 import { useShownRun } from "@/stores/subagentView";
 import { useElementHeight, useThreadActivity } from "./activity";
 import { AgentsStrip } from "./AgentsStrip";
+import { FlagChip } from "./FlagChip";
 import { SubagentPane } from "./SubagentPane";
 import { ThreadContext } from "./context";
 import { HeaderActions } from "./HeaderActions";
@@ -76,6 +77,7 @@ function ThreadBody({ threadId }: { threadId: string }) {
       <section className="cf-thread flex min-h-0 min-w-0 flex-1 flex-col outline-none" tabIndex={-1} aria-label="Thread" data-thread-id={threadId} data-testid="thread-pane" data-region="content">
         <PaneHeader className="gap-2 px-3" data-testid="thread-header">
           <ThreadTitle id={threadId} />
+          <FlagChip id={threadId} />
           <span className="ml-auto flex shrink-0 items-center gap-2 pl-2 text-muted-foreground tabular-nums">
             <HeaderActions threadId={threadId} />
           </span>

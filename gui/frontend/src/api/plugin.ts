@@ -26,6 +26,7 @@ import {
   type PluginEvent,
   type PluginLogLine,
   type PluginPermissions,
+  type PluginSecret,
   type SurfaceUpdate,
 } from "@/gen/codefoundry/v1/plugin_pb";
 import { toUiContext, type UiContextView } from "./command";
@@ -586,6 +587,36 @@ export interface PluginLogLineView {
 
 function toLogLine(l: PluginLogLine): PluginLogLineView {
   return { seq: Number(l.seq), timeMs: l.time ? timestampMs(l.time) : null, source: l.source, level: l.level, text: l.text };
+}
+
+/** Where the daemon keeps plugins: the packages, and the parent of each plugin's data dir (<dataDir>/<name>). */
+export interface PluginDirsView {
+  pluginsDir: string;
+  dataDir: string;
+}
+
+/** The daemon's plugin directories (PluginService.List; "" from a daemon that does not say). */
+export async function pluginDirs(signal?: AbortSignal, conn: DaemonConnection = daemon): Promise<PluginDirsView> {
+  const c = await conn.client(PluginService);
+  const res = await c.list({}, { signal });
+  return { pluginsDir: res.pluginsDir, dataDir: res.dataDir };
+}
+
+/** A secret a plugin keeps in the Keychain: its name and when it was set; never its value. */
+export interface PluginSecretView {
+  key: string;
+  updatedAtMs: number | null;
+}
+
+export function toSecretView(s: PluginSecret): PluginSecretView {
+  return { key: s.key, updatedAtMs: s.updatedAt ? timestampMs(s.updatedAt) : null };
+}
+
+/** A plugin's secrets, names only (PluginService.ListSecrets), sorted by name. */
+export async function listPluginSecrets(name: string, signal?: AbortSignal, conn: DaemonConnection = daemon): Promise<PluginSecretView[]> {
+  const c = await conn.client(PluginService);
+  const res = await c.listSecrets({ name }, { signal });
+  return res.secrets.map(toSecretView).sort((a, b) => a.key.localeCompare(b.key));
 }
 
 /** The tail of a plugin's log and the log file's path. */

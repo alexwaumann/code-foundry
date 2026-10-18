@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { entryPill, progressWords, registryErrorWords, registryLine, shortSource, sizeWords } from "./registry";
+import { emptyBrowse, entryPill, progressWords, registryErrorWords, registryLine, shortSource, sizeWords } from "./registry";
 
 describe("registry words", () => {
   it("says each install step", () => {
@@ -30,5 +30,18 @@ describe("registry words", () => {
     expect(registryErrorWords("gh: executable not found on $PATH")).toContain("gh is not installed");
     expect(registryErrorWords("dial tcp: lookup x: no such host")).toBe("Could not reach it (offline?).");
     expect(registryErrorWords("weird")).toBe("weird");
+  });
+});
+
+describe("emptyBrowse", () => {
+  const reg = { url: "https://github.com/o/r" };
+  it.each([
+    ["not read yet", null, "", null],
+    ["Browse failed", { entries: [], registries: [] }, "unavailable", null],
+    ["entries listed", { entries: [{}], registries: [reg] }, "", null],
+    ["no registry configured", { entries: [], registries: [] }, "", "no-registry"],
+    ["a registry answered with none", { entries: [], registries: [reg] }, "", "none-listed"],
+  ])("%s", (_name, b, error, want) => {
+    expect(emptyBrowse(b, error)).toBe(want);
   });
 });

@@ -11,14 +11,16 @@ import { cn } from "@/lib/utils";
 import { startCommandNamed } from "@/keys/bindings";
 import { runCommand, useCommandsStore } from "@/stores/commands";
 import { updatePlugin, usePluginRegistryStore } from "@/stores/pluginRegistry";
-import { usePlugin, usePluginNames, usePluginsStore } from "@/stores/plugins";
+import { loadPluginDirs, usePlugin, usePluginNames, usePluginsStore } from "@/stores/plugins";
 import { useProjectsStore } from "@/stores/projects";
 import { useUiStore } from "@/stores/ui";
 import { PillView, PluginIcon } from "../parts";
 import { BrowseSection, mainAction } from "./BrowseSection";
+import { pluginsDirWords } from "./dirs";
 import { LogsDialog } from "./LogsDialog";
+import { SecretsList, SecretsToggle } from "./SecretsSection";
 import { UninstallDialog } from "./UninstallDialog";
-import { processLine, scopeWords, statePill } from "./state";
+import { keepsSecrets, processLine, scopeWords, statePill } from "./state";
 
 /** Every plugin's contribution to new threads, re-read when a plugin changes. */
 function useEnvironments(): Readonly<Record<string, PluginEnvironmentView>> {
@@ -127,7 +129,9 @@ function PluginRow({
 }) {
   const p = usePlugin(name);
   const busy = usePluginRegistryStore((s) => s.busy[name]);
+  const [secretsOpen, setSecretsOpen] = useState(false);
   if (!p) return null;
+  const secrets = keepsSecrets(p);
   const pill = statePill(p);
   const proc = processLine(p);
   const update = p.updateAvailable && !p.dev;
@@ -176,6 +180,7 @@ function PluginRow({
       <div className="flex min-w-0 flex-col gap-2 pl-7">
         <SurfaceButtons p={p} />
         {env && p.enabled && <EnvSummary env={env} />}
+        {secrets && secretsOpen && <SecretsList name={p.name} />}
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           {update && (
             <Button variant="outline" size="xs" className={mainAction} disabled={busy !== undefined} onClick={() => void updatePlugin(p.name)} data-testid="plugin-update">
@@ -218,6 +223,14 @@ function PluginRow({
             <Logs aria-hidden />
             Logs
           </Button>
+          {secrets && (
+            <SecretsToggle
+              open={secretsOpen}
+              onToggle={() => {
+                setSecretsOpen((o) => !o);
+              }}
+            />
+          )}
           <Button
             variant="ghost"
             size="xs"
@@ -252,6 +265,10 @@ export function PluginsPage({ schema, page }: { schema: SettingsSchemaView; page
   const [logsOf, setLogsOf] = useState<string | null>(null);
   const [uninstallOf, setUninstallOf] = useState<string | null>(null);
   const logsTitle = usePluginsStore((s) => (logsOf ? (s.byName[logsOf]?.displayName ?? logsOf) : ""));
+  const dir = usePluginsStore((s) => pluginsDirWords(s.dirs));
+  useEffect(() => {
+    void loadPluginDirs();
+  }, []);
   return (
     <>
       <PageHead
@@ -265,12 +282,12 @@ export function PluginsPage({ schema, page }: { schema: SettingsSchemaView; page
           </Button>
         }
       />
-      <SectionCard id="installed" heading="Installed" description="Plugins in ~/.code-foundry/plugins. A new one stays off until you enable it and allow what it asks for.">
+      <SectionCard id="installed" heading="Installed" description={`Plugins in ${dir}. A new one stays off until you enable it and allow what it asks for.`}>
         {!loaded ? (
           <p className="px-4 py-3 text-caption">Loading…</p>
         ) : names.length === 0 ? (
           <p className="px-4 py-3 text-caption" data-testid="plugins-none">
-            No plugins yet. Add a dev plugin from a folder, or put one in ~/.code-foundry/plugins.
+            No plugins yet. Add a dev plugin from a folder, or put one in {dir}.
           </p>
         ) : (
           names.map((n, i) => <PluginRow key={n} name={n} env={envs[n]} className={i > 0 ? "border-t border-border" : undefined} onLogs={setLogsOf} onUninstall={setUninstallOf} />)

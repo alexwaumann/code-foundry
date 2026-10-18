@@ -29,3 +29,8 @@ export function scopeWords(projects: readonly string[], noProject: boolean, proj
   const base = projects.length === 0 ? "every project" : projects.map(projectName).join(", ");
   return noProject ? `${base} and threads without a project` : base;
 }
+
+/** Whether a plugin may keep secrets (asks for, or was granted, the permission): its row offers the list. */
+export function keepsSecrets(p: Pick<PluginView, "permissions" | "granted">): boolean {
+  return p.permissions.secrets || (p.granted?.secrets ?? false);
+}

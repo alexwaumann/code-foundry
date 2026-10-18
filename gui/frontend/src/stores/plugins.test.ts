@@ -35,7 +35,7 @@ function plugin(name: string, surfaces: string[] = []): PluginView {
   };
 }
 
-const empty: PluginsState = { byName: {}, order: [], loaded: false, epoch: 0 };
+const empty: PluginsState = { byName: {}, order: [], loaded: false, epoch: 0, dirs: null };
 
 describe("applyPluginEvent", () => {
   it("replaces everything on a snapshot, sorted by name", () => {

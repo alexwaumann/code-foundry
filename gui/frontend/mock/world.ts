@@ -634,6 +634,8 @@ export class World {
       this.events.publish({ source: EventSource.SETTINGS, event: { event: { case: "settings", value: { event: { case: "snapshot", value: snap } } } } });
       // Like the daemon: a new cache TTL moves every expiry, so those threads are republished.
       for (const s of this.threads.values()) if (s.lastResultAt) this.publishThread(s);
+      // And new plugin registries are read again (Browse follows the registry epoch).
+      this.plugins.registry.settingsChanged();
     },
   );
   /** Actions and their runs (mock/actions.ts); terminal runs are kind=action terminals here. */
@@ -663,6 +665,7 @@ export class World {
       if (!this.threads.has(id)) throw new CommandError("notfound", `no thread ${id}`);
       this.logs.send(id, text, []);
     },
+    registries: () => this.settings.values()["plugins.registries"] ?? "",
   });
   readonly update = new MockUpdater(
     (v) => this.events.publish({ source: EventSource.UPDATE, event: { event: { case: "update", value: v } } }),
@@ -1325,6 +1328,17 @@ export class World {
       s.flags = [...rest, { ...f, level: f.level, setAt: new Date() }].sort((a, b) => b.level - a.level || b.setAt.getTime() - a.setAt.getTime());
     }
     this.publishThread(s);
+  }
+
+  /** ThreadService.ClearFlags: one plugin's flag, or every one with plugin empty; NOT_FOUND when there is none to clear. */
+  clearFlags(id: string, plugin: string): number {
+    const s = this.thread(id);
+    const keep = s.flags.filter((f) => plugin !== "" && f.plugin !== plugin);
+    const n = s.flags.length - keep.length;
+    if (n === 0) throw new CommandError("notfound", `thread ${id} has no ${plugin ? `${plugin} ` : ""}flags`);
+    s.flags = keep;
+    this.publishThread(s);
+    return n;
   }
 
   /** The user opened the thread: its until-seen flags go (the daemon's WatchItems). */
@@ -2532,6 +2546,25 @@ export class World {
         run: (_ctx, args) => {
           this.removeWorkspace(args.workspace ?? "", args.force === "true");
           return `removed workspace ${args.workspace ?? ""}`;
+        },
+      },
+      {
+        cmd: {
+          name: "thread.flag.clear",
+          title: "Clear Thread Flags",
+          category: "Thread",
+          description: "Remove the flags plugins raised on a thread: one plugin's with --plugin, else every one.",
+          keybindings: [],
+          args: [
+            { name: "id", type: ArgType.STRING, required: false, description: "Thread id (default: the active thread)" },
+            { name: "plugin", type: ArgType.STRING, required: false, description: "Only this plugin's flag" },
+          ],
+        },
+        when: (ctx) => activeThread(ctx) !== undefined,
+        run: (ctx, args) => {
+          const id = args.id || (ctx?.activeThreadId ?? "");
+          const n = this.clearFlags(id, args.plugin ?? "");
+          return `cleared ${String(n)} ${n === 1 ? "flag" : "flags"} on thread ${id}`;
         },
       },
       {

@@ -5,7 +5,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { uninstallPlugin } from "@/stores/pluginRegistry";
-import { usePlugin } from "@/stores/plugins";
+import { usePlugin, usePluginsStore } from "@/stores/plugins";
+import { pluginDataDirWords, pluginsDirWords } from "./dirs";
 
 /**
  * Asks before uninstalling a plugin, with the choice to delete what it keeps too (plugin
@@ -16,6 +17,9 @@ export function UninstallDialog({ name, onClose }: { name: string; onClose: () =
   const p = usePlugin(name);
   const [purge, setPurge] = useState(false);
   const displayName = p?.displayName ?? name;
+  const dir = usePluginsStore((s) => pluginsDirWords(s.dirs));
+  const dataDir = usePluginsStore((s) => pluginDataDirWords(s.dirs, name));
+  const its = dataDir ? `Its data (${dataDir}), secrets` : "Its data, secrets";
   return (
     <Dialog
       open
@@ -29,10 +33,8 @@ export function UninstallDialog({ name, onClose }: { name: string; onClose: () =
           <div className="min-w-0 flex-1 space-y-3">
             <DialogTitle>Uninstall {displayName}?</DialogTitle>
             <DialogDescription className="break-words">
-              {p?.dev
-                ? "It stops and its link goes from ~/.code-foundry/plugins; your folder stays."
-                : "It stops and its package goes from ~/.code-foundry/plugins."}{" "}
-              {purge ? "" : "Its data, secrets and the consent you gave stay for a reinstall."}
+              {p?.dev ? `It stops and its link goes from ${dir}; your folder stays.` : `It stops and its package goes from ${dir}.`}{" "}
+              {purge ? "" : `${its} and the consent you gave stay for a reinstall.`}
             </DialogDescription>
             <Label className="items-start gap-2 text-body-sm font-normal">
               <Checkbox

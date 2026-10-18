@@ -6,7 +6,7 @@
  */
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
-import type { PluginEventView, PluginSurfaceView, PluginView } from "@/api/plugin";
+import { pluginDirs, type PluginDirsView, type PluginEventView, type PluginSurfaceView, type PluginView } from "@/api/plugin";
 import { refreshCommands } from "./commands";
 import { onInstallProgress, onRegistryEpoch } from "./pluginRegistry";
 
@@ -17,9 +17,22 @@ export interface PluginsState {
   loaded: boolean;
   /** The last availability epoch heard (PluginEvent.availability_epoch). */
   epoch: number;
+  /** The daemon's plugin directories (loadPluginDirs); null until read. */
+  dirs: PluginDirsView | null;
 }
 
-export const usePluginsStore = create<PluginsState>()(() => ({ byName: {}, order: [], loaded: false, epoch: 0 }));
+export const usePluginsStore = create<PluginsState>()(() => ({ byName: {}, order: [], loaded: false, epoch: 0, dirs: null }));
+
+/** Reads the daemon's plugin directories once per daemon home (Settings → Plugins names them). */
+export async function loadPluginDirs(): Promise<void> {
+  try {
+    const dirs = await pluginDirs();
+    const old = usePluginsStore.getState().dirs;
+    if (old?.pluginsDir !== dirs.pluginsDir || old.dataDir !== dirs.dataDir) usePluginsStore.setState({ dirs });
+  } catch {
+    // The words fall back to "the plugins folder" (components/plugin/settings/dirs.ts).
+  }
+}
 
 function sorted(byName: Readonly<Record<string, PluginView>>): string[] {
   return Object.keys(byName).sort();
