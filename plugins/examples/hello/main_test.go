@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -47,7 +49,7 @@ func TestCommands(t *testing.T) {
 	defer cancel()
 	h := plugintest.Start(t, plugin(), plugintest.Options{
 		Name:    "hello",
-		Granted: pluginsdk.Permissions{Commands: []string{"thread.send"}, Secrets: true},
+		Granted: pluginsdk.Permissions{Commands: []string{"thread.send"}, Secrets: true, Events: []string{"threads"}, ThreadStatus: true, SessionEnv: true},
 		Invoke: func(_ context.Context, p pluginsdk.InvokeParams) (pluginsdk.CommandResult, error) {
 			return pluginsdk.CommandResult{Message: "to " + p.Context.ThreadID + ": " + p.Args["text"]}, nil
 		},
@@ -84,6 +86,38 @@ func TestCommands(t *testing.T) {
 		if strings.Contains(fmt.Sprint(l.Msg, l.Attrs), "swordfish") {
 			t.Errorf("the secret was logged: %+v", l)
 		}
+	}
+	// Init pushed CF_HELLO=1 and subscribed to the thread list.
+	if envs := h.Environments(); len(envs) != 1 || envs[0].Env["CF_HELLO"] != "1" || envs[0].Scope == nil || !envs[0].Scope.NoProject {
+		t.Errorf("environments = %+v", envs)
+	}
+	if subs := h.Subscriptions(); len(subs) != 1 || len(subs[0]) != 1 || subs[0][0] != "threads" {
+		t.Errorf("subscriptions = %v", subs)
+	}
+	for _, ev := range []string{`{"threadList":{"snapshot":{}}}`, `{"threadList":{"updated":{"id":"s-1"}},"seq":"4"}`} {
+		if err := h.Event(pluginsdk.Event{Subscription: "sub-1", Event: json.RawMessage(ev)}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	h.WaitFor(5*time.Second, func(h *plugintest.Host) bool {
+		res, err := h.Command(ctx, "events", nil, pluginsdk.UiContext{})
+		return err == nil && res.Message == "2 thread list events"
+	})
+	if !slices.ContainsFunc(h.Logs(), func(l pluginsdk.LogParams) bool { return l.Msg == "event" && l.Attrs["kind"] == "threadList.updated" }) {
+		t.Errorf("no event logged: %+v", h.Logs())
+	}
+	// flag raises and clears hello's flag on the thread.
+	if res, err := h.Command(ctx, "flag", map[string]string{"level": "attention", "reason": "look"}, pluginsdk.UiContext{ThreadID: "t-1"}); err != nil || res.Message != "attention flag on t-1: look" {
+		t.Errorf("flag = %+v, %v", res, err)
+	}
+	if res, err := h.Command(ctx, "flag", map[string]string{"level": "none"}, pluginsdk.UiContext{ThreadID: "t-1"}); err != nil || res.Message != "cleared the flag on t-1" {
+		t.Errorf("flag none = %+v, %v", res, err)
+	}
+	if f := h.Flags(); len(f) != 2 || f[0].ThreadID != "t-1" || f[0].Level != "attention" || f[1].Level != "none" {
+		t.Errorf("flags = %+v", f)
+	}
+	if _, err := h.Command(ctx, "flag", nil, pluginsdk.UiContext{}); err == nil || !strings.Contains(err.Error(), "no thread") {
+		t.Errorf("flag without a thread: %v", err)
 	}
 	if err := h.Shutdown(ctx); err != nil {
 		t.Fatal(err)
