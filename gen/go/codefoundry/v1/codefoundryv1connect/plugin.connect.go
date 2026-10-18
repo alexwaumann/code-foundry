@@ -69,6 +69,17 @@ const (
 	// PluginServiceEnvironmentProcedure is the fully-qualified name of the PluginService's Environment
 	// RPC.
 	PluginServiceEnvironmentProcedure = "/codefoundry.v1.PluginService/Environment"
+	// PluginServiceBrowseProcedure is the fully-qualified name of the PluginService's Browse RPC.
+	PluginServiceBrowseProcedure = "/codefoundry.v1.PluginService/Browse"
+	// PluginServiceRefreshRegistriesProcedure is the fully-qualified name of the PluginService's
+	// RefreshRegistries RPC.
+	PluginServiceRefreshRegistriesProcedure = "/codefoundry.v1.PluginService/RefreshRegistries"
+	// PluginServiceInstallProcedure is the fully-qualified name of the PluginService's Install RPC.
+	PluginServiceInstallProcedure = "/codefoundry.v1.PluginService/Install"
+	// PluginServiceUpdateProcedure is the fully-qualified name of the PluginService's Update RPC.
+	PluginServiceUpdateProcedure = "/codefoundry.v1.PluginService/Update"
+	// PluginServiceUninstallProcedure is the fully-qualified name of the PluginService's Uninstall RPC.
+	PluginServiceUninstallProcedure = "/codefoundry.v1.PluginService/Uninstall"
 )
 
 // PluginServiceClient is a client for the codefoundry.v1.PluginService service.
@@ -121,6 +132,27 @@ type PluginServiceClient interface {
 	// (session/setEnvironment): one plugin's, or every one with a contribution when name is
 	// empty, as applied (validated, conflicts resolved in name order) with the issues found.
 	Environment(context.Context, *connect.Request[v1.PluginEnvironmentRequest]) (*connect.Response[v1.PluginEnvironmentResponse], error)
+	// Browse lists the plugins of every registry in the plugins.registries setting, merged
+	// by name (the first registry listing a name wins), each with what is installed of it,
+	// and every registry's state. Indexes come from the cache (1 h) unless refresh.
+	// docs/notes/plugins-7-registry.md.
+	Browse(context.Context, *connect.Request[v1.BrowsePluginsRequest]) (*connect.Response[v1.BrowsePluginsResponse], error)
+	// RefreshRegistries reads every registry again and returns their state.
+	RefreshRegistries(context.Context, *connect.Request[v1.RefreshPluginRegistriesRequest]) (*connect.Response[v1.RefreshPluginRegistriesResponse], error)
+	// Install installs a plugin from a registry, a GitHub release or a folder (see
+	// InstallPluginRequest.ref): it downloads this platform's tarball, checks its SHA-256,
+	// validates the package and swaps it in for plugins/<name> (the data dir stays). A new
+	// plugin stays disabled until enabled with consent; an enabled one restarts on the new
+	// package and stays enabled unless it asks for more permissions. Each step goes out as
+	// PluginEvent.install_progress.
+	Install(context.Context, *connect.Request[v1.InstallPluginRequest]) (*connect.Response[v1.InstallPluginResponse], error)
+	// Update installs the newer versions the registries list, of one plugin or of every
+	// plugin with one; check only lists them. Nothing is ever updated unasked.
+	Update(context.Context, *connect.Request[v1.UpdatePluginsRequest]) (*connect.Response[v1.UpdatePluginsResponse], error)
+	// Uninstall disables a plugin, stops it and removes its package (a dev link only, never
+	// the folder it points at). purge also deletes its data dir, secrets, logs and the
+	// consent given.
+	Uninstall(context.Context, *connect.Request[v1.UninstallPluginRequest]) (*connect.Response[v1.UninstallPluginResponse], error)
 }
 
 // NewPluginServiceClient constructs a client for the codefoundry.v1.PluginService service. By
@@ -224,26 +256,61 @@ func NewPluginServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(pluginServiceMethods.ByName("Environment")),
 			connect.WithClientOptions(opts...),
 		),
+		browse: connect.NewClient[v1.BrowsePluginsRequest, v1.BrowsePluginsResponse](
+			httpClient,
+			baseURL+PluginServiceBrowseProcedure,
+			connect.WithSchema(pluginServiceMethods.ByName("Browse")),
+			connect.WithClientOptions(opts...),
+		),
+		refreshRegistries: connect.NewClient[v1.RefreshPluginRegistriesRequest, v1.RefreshPluginRegistriesResponse](
+			httpClient,
+			baseURL+PluginServiceRefreshRegistriesProcedure,
+			connect.WithSchema(pluginServiceMethods.ByName("RefreshRegistries")),
+			connect.WithClientOptions(opts...),
+		),
+		install: connect.NewClient[v1.InstallPluginRequest, v1.InstallPluginResponse](
+			httpClient,
+			baseURL+PluginServiceInstallProcedure,
+			connect.WithSchema(pluginServiceMethods.ByName("Install")),
+			connect.WithClientOptions(opts...),
+		),
+		update: connect.NewClient[v1.UpdatePluginsRequest, v1.UpdatePluginsResponse](
+			httpClient,
+			baseURL+PluginServiceUpdateProcedure,
+			connect.WithSchema(pluginServiceMethods.ByName("Update")),
+			connect.WithClientOptions(opts...),
+		),
+		uninstall: connect.NewClient[v1.UninstallPluginRequest, v1.UninstallPluginResponse](
+			httpClient,
+			baseURL+PluginServiceUninstallProcedure,
+			connect.WithSchema(pluginServiceMethods.ByName("Uninstall")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // pluginServiceClient implements PluginServiceClient.
 type pluginServiceClient struct {
-	list         *connect.Client[v1.ListPluginsRequest, v1.ListPluginsResponse]
-	enable       *connect.Client[v1.EnablePluginRequest, v1.EnablePluginResponse]
-	disable      *connect.Client[v1.DisablePluginRequest, v1.DisablePluginResponse]
-	restart      *connect.Client[v1.RestartPluginRequest, v1.RestartPluginResponse]
-	dev          *connect.Client[v1.DevPluginRequest, v1.DevPluginResponse]
-	reload       *connect.Client[v1.ReloadPluginsRequest, v1.ReloadPluginsResponse]
-	logs         *connect.Client[v1.PluginLogsRequest, v1.PluginLogsResponse]
-	followLogs   *connect.Client[v1.FollowPluginLogsRequest, v1.PluginLogLine]
-	listSecrets  *connect.Client[v1.ListPluginSecretsRequest, v1.ListPluginSecretsResponse]
-	deleteSecret *connect.Client[v1.DeletePluginSecretRequest, v1.DeletePluginSecretResponse]
-	watch        *connect.Client[v1.WatchPluginsRequest, v1.PluginEvent]
-	watchSurface *connect.Client[v1.WatchSurfaceRequest, v1.SurfaceUpdate]
-	getSurface   *connect.Client[v1.GetSurfaceRequest, v1.GetSurfaceResponse]
-	act          *connect.Client[v1.SurfaceActRequest, v1.SurfaceActResponse]
-	environment  *connect.Client[v1.PluginEnvironmentRequest, v1.PluginEnvironmentResponse]
+	list              *connect.Client[v1.ListPluginsRequest, v1.ListPluginsResponse]
+	enable            *connect.Client[v1.EnablePluginRequest, v1.EnablePluginResponse]
+	disable           *connect.Client[v1.DisablePluginRequest, v1.DisablePluginResponse]
+	restart           *connect.Client[v1.RestartPluginRequest, v1.RestartPluginResponse]
+	dev               *connect.Client[v1.DevPluginRequest, v1.DevPluginResponse]
+	reload            *connect.Client[v1.ReloadPluginsRequest, v1.ReloadPluginsResponse]
+	logs              *connect.Client[v1.PluginLogsRequest, v1.PluginLogsResponse]
+	followLogs        *connect.Client[v1.FollowPluginLogsRequest, v1.PluginLogLine]
+	listSecrets       *connect.Client[v1.ListPluginSecretsRequest, v1.ListPluginSecretsResponse]
+	deleteSecret      *connect.Client[v1.DeletePluginSecretRequest, v1.DeletePluginSecretResponse]
+	watch             *connect.Client[v1.WatchPluginsRequest, v1.PluginEvent]
+	watchSurface      *connect.Client[v1.WatchSurfaceRequest, v1.SurfaceUpdate]
+	getSurface        *connect.Client[v1.GetSurfaceRequest, v1.GetSurfaceResponse]
+	act               *connect.Client[v1.SurfaceActRequest, v1.SurfaceActResponse]
+	environment       *connect.Client[v1.PluginEnvironmentRequest, v1.PluginEnvironmentResponse]
+	browse            *connect.Client[v1.BrowsePluginsRequest, v1.BrowsePluginsResponse]
+	refreshRegistries *connect.Client[v1.RefreshPluginRegistriesRequest, v1.RefreshPluginRegistriesResponse]
+	install           *connect.Client[v1.InstallPluginRequest, v1.InstallPluginResponse]
+	update            *connect.Client[v1.UpdatePluginsRequest, v1.UpdatePluginsResponse]
+	uninstall         *connect.Client[v1.UninstallPluginRequest, v1.UninstallPluginResponse]
 }
 
 // List calls codefoundry.v1.PluginService.List.
@@ -321,6 +388,31 @@ func (c *pluginServiceClient) Environment(ctx context.Context, req *connect.Requ
 	return c.environment.CallUnary(ctx, req)
 }
 
+// Browse calls codefoundry.v1.PluginService.Browse.
+func (c *pluginServiceClient) Browse(ctx context.Context, req *connect.Request[v1.BrowsePluginsRequest]) (*connect.Response[v1.BrowsePluginsResponse], error) {
+	return c.browse.CallUnary(ctx, req)
+}
+
+// RefreshRegistries calls codefoundry.v1.PluginService.RefreshRegistries.
+func (c *pluginServiceClient) RefreshRegistries(ctx context.Context, req *connect.Request[v1.RefreshPluginRegistriesRequest]) (*connect.Response[v1.RefreshPluginRegistriesResponse], error) {
+	return c.refreshRegistries.CallUnary(ctx, req)
+}
+
+// Install calls codefoundry.v1.PluginService.Install.
+func (c *pluginServiceClient) Install(ctx context.Context, req *connect.Request[v1.InstallPluginRequest]) (*connect.Response[v1.InstallPluginResponse], error) {
+	return c.install.CallUnary(ctx, req)
+}
+
+// Update calls codefoundry.v1.PluginService.Update.
+func (c *pluginServiceClient) Update(ctx context.Context, req *connect.Request[v1.UpdatePluginsRequest]) (*connect.Response[v1.UpdatePluginsResponse], error) {
+	return c.update.CallUnary(ctx, req)
+}
+
+// Uninstall calls codefoundry.v1.PluginService.Uninstall.
+func (c *pluginServiceClient) Uninstall(ctx context.Context, req *connect.Request[v1.UninstallPluginRequest]) (*connect.Response[v1.UninstallPluginResponse], error) {
+	return c.uninstall.CallUnary(ctx, req)
+}
+
 // PluginServiceHandler is an implementation of the codefoundry.v1.PluginService service.
 type PluginServiceHandler interface {
 	// List returns every plugin found, by name.
@@ -371,6 +463,27 @@ type PluginServiceHandler interface {
 	// (session/setEnvironment): one plugin's, or every one with a contribution when name is
 	// empty, as applied (validated, conflicts resolved in name order) with the issues found.
 	Environment(context.Context, *connect.Request[v1.PluginEnvironmentRequest]) (*connect.Response[v1.PluginEnvironmentResponse], error)
+	// Browse lists the plugins of every registry in the plugins.registries setting, merged
+	// by name (the first registry listing a name wins), each with what is installed of it,
+	// and every registry's state. Indexes come from the cache (1 h) unless refresh.
+	// docs/notes/plugins-7-registry.md.
+	Browse(context.Context, *connect.Request[v1.BrowsePluginsRequest]) (*connect.Response[v1.BrowsePluginsResponse], error)
+	// RefreshRegistries reads every registry again and returns their state.
+	RefreshRegistries(context.Context, *connect.Request[v1.RefreshPluginRegistriesRequest]) (*connect.Response[v1.RefreshPluginRegistriesResponse], error)
+	// Install installs a plugin from a registry, a GitHub release or a folder (see
+	// InstallPluginRequest.ref): it downloads this platform's tarball, checks its SHA-256,
+	// validates the package and swaps it in for plugins/<name> (the data dir stays). A new
+	// plugin stays disabled until enabled with consent; an enabled one restarts on the new
+	// package and stays enabled unless it asks for more permissions. Each step goes out as
+	// PluginEvent.install_progress.
+	Install(context.Context, *connect.Request[v1.InstallPluginRequest]) (*connect.Response[v1.InstallPluginResponse], error)
+	// Update installs the newer versions the registries list, of one plugin or of every
+	// plugin with one; check only lists them. Nothing is ever updated unasked.
+	Update(context.Context, *connect.Request[v1.UpdatePluginsRequest]) (*connect.Response[v1.UpdatePluginsResponse], error)
+	// Uninstall disables a plugin, stops it and removes its package (a dev link only, never
+	// the folder it points at). purge also deletes its data dir, secrets, logs and the
+	// consent given.
+	Uninstall(context.Context, *connect.Request[v1.UninstallPluginRequest]) (*connect.Response[v1.UninstallPluginResponse], error)
 }
 
 // NewPluginServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -470,6 +583,36 @@ func NewPluginServiceHandler(svc PluginServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(pluginServiceMethods.ByName("Environment")),
 		connect.WithHandlerOptions(opts...),
 	)
+	pluginServiceBrowseHandler := connect.NewUnaryHandler(
+		PluginServiceBrowseProcedure,
+		svc.Browse,
+		connect.WithSchema(pluginServiceMethods.ByName("Browse")),
+		connect.WithHandlerOptions(opts...),
+	)
+	pluginServiceRefreshRegistriesHandler := connect.NewUnaryHandler(
+		PluginServiceRefreshRegistriesProcedure,
+		svc.RefreshRegistries,
+		connect.WithSchema(pluginServiceMethods.ByName("RefreshRegistries")),
+		connect.WithHandlerOptions(opts...),
+	)
+	pluginServiceInstallHandler := connect.NewUnaryHandler(
+		PluginServiceInstallProcedure,
+		svc.Install,
+		connect.WithSchema(pluginServiceMethods.ByName("Install")),
+		connect.WithHandlerOptions(opts...),
+	)
+	pluginServiceUpdateHandler := connect.NewUnaryHandler(
+		PluginServiceUpdateProcedure,
+		svc.Update,
+		connect.WithSchema(pluginServiceMethods.ByName("Update")),
+		connect.WithHandlerOptions(opts...),
+	)
+	pluginServiceUninstallHandler := connect.NewUnaryHandler(
+		PluginServiceUninstallProcedure,
+		svc.Uninstall,
+		connect.WithSchema(pluginServiceMethods.ByName("Uninstall")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/codefoundry.v1.PluginService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case PluginServiceListProcedure:
@@ -502,6 +645,16 @@ func NewPluginServiceHandler(svc PluginServiceHandler, opts ...connect.HandlerOp
 			pluginServiceActHandler.ServeHTTP(w, r)
 		case PluginServiceEnvironmentProcedure:
 			pluginServiceEnvironmentHandler.ServeHTTP(w, r)
+		case PluginServiceBrowseProcedure:
+			pluginServiceBrowseHandler.ServeHTTP(w, r)
+		case PluginServiceRefreshRegistriesProcedure:
+			pluginServiceRefreshRegistriesHandler.ServeHTTP(w, r)
+		case PluginServiceInstallProcedure:
+			pluginServiceInstallHandler.ServeHTTP(w, r)
+		case PluginServiceUpdateProcedure:
+			pluginServiceUpdateHandler.ServeHTTP(w, r)
+		case PluginServiceUninstallProcedure:
+			pluginServiceUninstallHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -569,4 +722,24 @@ func (UnimplementedPluginServiceHandler) Act(context.Context, *connect.Request[v
 
 func (UnimplementedPluginServiceHandler) Environment(context.Context, *connect.Request[v1.PluginEnvironmentRequest]) (*connect.Response[v1.PluginEnvironmentResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.PluginService.Environment is not implemented"))
+}
+
+func (UnimplementedPluginServiceHandler) Browse(context.Context, *connect.Request[v1.BrowsePluginsRequest]) (*connect.Response[v1.BrowsePluginsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.PluginService.Browse is not implemented"))
+}
+
+func (UnimplementedPluginServiceHandler) RefreshRegistries(context.Context, *connect.Request[v1.RefreshPluginRegistriesRequest]) (*connect.Response[v1.RefreshPluginRegistriesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.PluginService.RefreshRegistries is not implemented"))
+}
+
+func (UnimplementedPluginServiceHandler) Install(context.Context, *connect.Request[v1.InstallPluginRequest]) (*connect.Response[v1.InstallPluginResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.PluginService.Install is not implemented"))
+}
+
+func (UnimplementedPluginServiceHandler) Update(context.Context, *connect.Request[v1.UpdatePluginsRequest]) (*connect.Response[v1.UpdatePluginsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.PluginService.Update is not implemented"))
+}
+
+func (UnimplementedPluginServiceHandler) Uninstall(context.Context, *connect.Request[v1.UninstallPluginRequest]) (*connect.Response[v1.UninstallPluginResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.PluginService.Uninstall is not implemented"))
 }

@@ -36,6 +36,7 @@ type Settings struct {
 	// KeybindingNone.
 	Keybindings map[string]string
 	Update      Update
+	Plugins     Plugins
 	Advanced    Advanced
 }
 
@@ -101,6 +102,13 @@ const (
 	ChannelStable = "stable"
 	ChannelTip    = "tip"
 )
+
+// Plugins configures where plugins are installed from.
+type Plugins struct {
+	// Registries is the plugins.registries value: registry URLs separated by commas
+	// (registry.ParseList reads it).
+	Registries string
+}
 
 // Advanced holds executable overrides and logging.
 type Advanced struct {

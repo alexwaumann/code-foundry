@@ -156,6 +156,7 @@ func Run(ctx context.Context, opts Options) error {
 		Facts: facts, Emitter: command.BusEmitter{Bus: events},
 		Flags:   pluginFlags{threads: st.thread},
 		Threads: pluginThreads{threads: st.thread, settings: st.settings}, Terminals: pluginTerminals{terminals: st.terminal},
+		Registry: pluginRegistryClient(p, st.settings.Settings(), log.With("component", "plugin-registry")),
 	})
 	if err != nil {
 		return err
@@ -211,6 +212,7 @@ func Run(ctx context.Context, opts Options) error {
 		Action:            actionAPI,
 		Plugin:            pluginAPI,
 		PluginSurface:     pluginAPI,
+		PluginRegistry:    pluginAPI,
 		PullRequestChecks: command.PullRequestChecksDeps{Gh: ghAPI, ThreadPullRequest: facts.threadPullRequest},
 		Restart: func() {
 			// Let the command's response reach the caller first.
@@ -223,6 +225,8 @@ func Run(ctx context.Context, opts Options) error {
 	if err := plugins.Start(ctx); err != nil {
 		log.Error("plugins did not start", "err", err)
 	}
+	applyPluginRegistries(st.settings, plugins)
+	defer startPluginUpdateChecks(ctx, log.With("component", "plugins"), events, st.update, plugins)()
 	commandAPI := api.NewCommand(commands)
 	installSkills(ctx, log.With("component", "skills"), p.Claude(), opts.Version, commandAPI, settingsAPI, st.settings)
 	routes := []api.Route{

@@ -137,6 +137,13 @@ func stringify(v any) string {
 		return strconv.FormatBool(v)
 	case float64:
 		return strconv.FormatFloat(v, 'f', -1, 64)
+	case []any:
+		// A list (plugins.registries = ["a", "b"]) reads as "a, b".
+		parts := make([]string, len(v))
+		for i, x := range v {
+			parts[i] = stringify(x)
+		}
+		return strings.Join(parts, ", ")
 	default:
 		return fmt.Sprint(v)
 	}
