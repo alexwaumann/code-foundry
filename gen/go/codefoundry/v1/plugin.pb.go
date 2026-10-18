@@ -2737,7 +2737,11 @@ type SurfaceActRequest struct {
 	// The form's values by field name: strings, booleans (toggles), string lists
 	// (multiple selects). A secret input with store is written to the Keychain and the
 	// plugin gets {key, stored: true} instead.
-	Values        *structpb.Struct `protobuf:"bytes,7,opt,name=values,proto3" json:"values,omitempty"`
+	Values *structpb.Struct `protobuf:"bytes,7,opt,name=values,proto3" json:"values,omitempty"`
+	// What the panel the user acted in shows (its thread, project, …): the plugin gets it
+	// as surface/act's context, so a shared instance (scope pr, project, global) knows
+	// which thread a click came from. Unset: ref's context when ref is given, else none.
+	Context       *UiContext `protobuf:"bytes,8,opt,name=context,proto3" json:"context,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2817,6 +2821,13 @@ func (x *SurfaceActRequest) GetValue() string {
 func (x *SurfaceActRequest) GetValues() *structpb.Struct {
 	if x != nil {
 		return x.Values
+	}
+	return nil
+}
+
+func (x *SurfaceActRequest) GetContext() *UiContext {
+	if x != nil {
+		return x.Context
 	}
 	return nil
 }
@@ -3295,7 +3306,7 @@ const file_codefoundry_v1_plugin_proto_rawDesc = "" +
 	"\x12GetSurfaceResponse\x122\n" +
 	"\x05state\x18\x01 \x01(\v2\x1c.codefoundry.v1.SurfaceStateR\x05state\x12/\n" +
 	"\x04view\x18\x02 \x01(\v2\x1b.codefoundry.v1.SurfaceViewR\x04view\x12:\n" +
-	"\belements\x18\x03 \x03(\v2\x1e.codefoundry.v1.SurfaceElementR\belements\"\xf7\x01\n" +
+	"\belements\x18\x03 \x03(\v2\x1e.codefoundry.v1.SurfaceElementR\belements\"\xac\x02\n" +
 	"\x11SurfaceActRequest\x12\x1a\n" +
 	"\binstance\x18\x01 \x01(\tR\binstance\x12,\n" +
 	"\x03ref\x18\x02 \x01(\v2\x1a.codefoundry.v1.SurfaceRefR\x03ref\x12\x18\n" +
@@ -3303,7 +3314,8 @@ const file_codefoundry_v1_plugin_proto_rawDesc = "" +
 	"\x03key\x18\x04 \x01(\tR\x03key\x12\x16\n" +
 	"\x06action\x18\x05 \x01(\tR\x06action\x12\x19\n" +
 	"\x05value\x18\x06 \x01(\tH\x00R\x05value\x88\x01\x01\x12/\n" +
-	"\x06values\x18\a \x01(\v2\x17.google.protobuf.StructR\x06valuesB\b\n" +
+	"\x06values\x18\a \x01(\v2\x17.google.protobuf.StructR\x06values\x123\n" +
+	"\acontext\x18\b \x01(\v2\x19.codefoundry.v1.UiContextR\acontextB\b\n" +
 	"\x06_value\".\n" +
 	"\x12SurfaceActResponse\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\x04R\aversion\".\n" +
@@ -3467,44 +3479,45 @@ var file_codefoundry_v1_plugin_proto_depIdxs = []int32{
 	39, // 34: codefoundry.v1.GetSurfaceResponse.elements:type_name -> codefoundry.v1.SurfaceElement
 	30, // 35: codefoundry.v1.SurfaceActRequest.ref:type_name -> codefoundry.v1.SurfaceRef
 	50, // 36: codefoundry.v1.SurfaceActRequest.values:type_name -> google.protobuf.Struct
-	44, // 37: codefoundry.v1.PluginEnvironment.env:type_name -> codefoundry.v1.PluginEnvVar
-	47, // 38: codefoundry.v1.PluginEnvironment.updated_at:type_name -> google.protobuf.Timestamp
-	45, // 39: codefoundry.v1.PluginEnvironmentResponse.environments:type_name -> codefoundry.v1.PluginEnvironment
-	6,  // 40: codefoundry.v1.PluginService.List:input_type -> codefoundry.v1.ListPluginsRequest
-	8,  // 41: codefoundry.v1.PluginService.Enable:input_type -> codefoundry.v1.EnablePluginRequest
-	10, // 42: codefoundry.v1.PluginService.Disable:input_type -> codefoundry.v1.DisablePluginRequest
-	12, // 43: codefoundry.v1.PluginService.Restart:input_type -> codefoundry.v1.RestartPluginRequest
-	14, // 44: codefoundry.v1.PluginService.Dev:input_type -> codefoundry.v1.DevPluginRequest
-	16, // 45: codefoundry.v1.PluginService.Reload:input_type -> codefoundry.v1.ReloadPluginsRequest
-	18, // 46: codefoundry.v1.PluginService.Logs:input_type -> codefoundry.v1.PluginLogsRequest
-	21, // 47: codefoundry.v1.PluginService.FollowLogs:input_type -> codefoundry.v1.FollowPluginLogsRequest
-	23, // 48: codefoundry.v1.PluginService.ListSecrets:input_type -> codefoundry.v1.ListPluginSecretsRequest
-	25, // 49: codefoundry.v1.PluginService.DeleteSecret:input_type -> codefoundry.v1.DeletePluginSecretRequest
-	27, // 50: codefoundry.v1.PluginService.Watch:input_type -> codefoundry.v1.WatchPluginsRequest
-	37, // 51: codefoundry.v1.PluginService.WatchSurface:input_type -> codefoundry.v1.WatchSurfaceRequest
-	38, // 52: codefoundry.v1.PluginService.GetSurface:input_type -> codefoundry.v1.GetSurfaceRequest
-	41, // 53: codefoundry.v1.PluginService.Act:input_type -> codefoundry.v1.SurfaceActRequest
-	43, // 54: codefoundry.v1.PluginService.Environment:input_type -> codefoundry.v1.PluginEnvironmentRequest
-	7,  // 55: codefoundry.v1.PluginService.List:output_type -> codefoundry.v1.ListPluginsResponse
-	9,  // 56: codefoundry.v1.PluginService.Enable:output_type -> codefoundry.v1.EnablePluginResponse
-	11, // 57: codefoundry.v1.PluginService.Disable:output_type -> codefoundry.v1.DisablePluginResponse
-	13, // 58: codefoundry.v1.PluginService.Restart:output_type -> codefoundry.v1.RestartPluginResponse
-	15, // 59: codefoundry.v1.PluginService.Dev:output_type -> codefoundry.v1.DevPluginResponse
-	17, // 60: codefoundry.v1.PluginService.Reload:output_type -> codefoundry.v1.ReloadPluginsResponse
-	20, // 61: codefoundry.v1.PluginService.Logs:output_type -> codefoundry.v1.PluginLogsResponse
-	19, // 62: codefoundry.v1.PluginService.FollowLogs:output_type -> codefoundry.v1.PluginLogLine
-	24, // 63: codefoundry.v1.PluginService.ListSecrets:output_type -> codefoundry.v1.ListPluginSecretsResponse
-	26, // 64: codefoundry.v1.PluginService.DeleteSecret:output_type -> codefoundry.v1.DeletePluginSecretResponse
-	28, // 65: codefoundry.v1.PluginService.Watch:output_type -> codefoundry.v1.PluginEvent
-	36, // 66: codefoundry.v1.PluginService.WatchSurface:output_type -> codefoundry.v1.SurfaceUpdate
-	40, // 67: codefoundry.v1.PluginService.GetSurface:output_type -> codefoundry.v1.GetSurfaceResponse
-	42, // 68: codefoundry.v1.PluginService.Act:output_type -> codefoundry.v1.SurfaceActResponse
-	46, // 69: codefoundry.v1.PluginService.Environment:output_type -> codefoundry.v1.PluginEnvironmentResponse
-	55, // [55:70] is the sub-list for method output_type
-	40, // [40:55] is the sub-list for method input_type
-	40, // [40:40] is the sub-list for extension type_name
-	40, // [40:40] is the sub-list for extension extendee
-	0,  // [0:40] is the sub-list for field type_name
+	48, // 37: codefoundry.v1.SurfaceActRequest.context:type_name -> codefoundry.v1.UiContext
+	44, // 38: codefoundry.v1.PluginEnvironment.env:type_name -> codefoundry.v1.PluginEnvVar
+	47, // 39: codefoundry.v1.PluginEnvironment.updated_at:type_name -> google.protobuf.Timestamp
+	45, // 40: codefoundry.v1.PluginEnvironmentResponse.environments:type_name -> codefoundry.v1.PluginEnvironment
+	6,  // 41: codefoundry.v1.PluginService.List:input_type -> codefoundry.v1.ListPluginsRequest
+	8,  // 42: codefoundry.v1.PluginService.Enable:input_type -> codefoundry.v1.EnablePluginRequest
+	10, // 43: codefoundry.v1.PluginService.Disable:input_type -> codefoundry.v1.DisablePluginRequest
+	12, // 44: codefoundry.v1.PluginService.Restart:input_type -> codefoundry.v1.RestartPluginRequest
+	14, // 45: codefoundry.v1.PluginService.Dev:input_type -> codefoundry.v1.DevPluginRequest
+	16, // 46: codefoundry.v1.PluginService.Reload:input_type -> codefoundry.v1.ReloadPluginsRequest
+	18, // 47: codefoundry.v1.PluginService.Logs:input_type -> codefoundry.v1.PluginLogsRequest
+	21, // 48: codefoundry.v1.PluginService.FollowLogs:input_type -> codefoundry.v1.FollowPluginLogsRequest
+	23, // 49: codefoundry.v1.PluginService.ListSecrets:input_type -> codefoundry.v1.ListPluginSecretsRequest
+	25, // 50: codefoundry.v1.PluginService.DeleteSecret:input_type -> codefoundry.v1.DeletePluginSecretRequest
+	27, // 51: codefoundry.v1.PluginService.Watch:input_type -> codefoundry.v1.WatchPluginsRequest
+	37, // 52: codefoundry.v1.PluginService.WatchSurface:input_type -> codefoundry.v1.WatchSurfaceRequest
+	38, // 53: codefoundry.v1.PluginService.GetSurface:input_type -> codefoundry.v1.GetSurfaceRequest
+	41, // 54: codefoundry.v1.PluginService.Act:input_type -> codefoundry.v1.SurfaceActRequest
+	43, // 55: codefoundry.v1.PluginService.Environment:input_type -> codefoundry.v1.PluginEnvironmentRequest
+	7,  // 56: codefoundry.v1.PluginService.List:output_type -> codefoundry.v1.ListPluginsResponse
+	9,  // 57: codefoundry.v1.PluginService.Enable:output_type -> codefoundry.v1.EnablePluginResponse
+	11, // 58: codefoundry.v1.PluginService.Disable:output_type -> codefoundry.v1.DisablePluginResponse
+	13, // 59: codefoundry.v1.PluginService.Restart:output_type -> codefoundry.v1.RestartPluginResponse
+	15, // 60: codefoundry.v1.PluginService.Dev:output_type -> codefoundry.v1.DevPluginResponse
+	17, // 61: codefoundry.v1.PluginService.Reload:output_type -> codefoundry.v1.ReloadPluginsResponse
+	20, // 62: codefoundry.v1.PluginService.Logs:output_type -> codefoundry.v1.PluginLogsResponse
+	19, // 63: codefoundry.v1.PluginService.FollowLogs:output_type -> codefoundry.v1.PluginLogLine
+	24, // 64: codefoundry.v1.PluginService.ListSecrets:output_type -> codefoundry.v1.ListPluginSecretsResponse
+	26, // 65: codefoundry.v1.PluginService.DeleteSecret:output_type -> codefoundry.v1.DeletePluginSecretResponse
+	28, // 66: codefoundry.v1.PluginService.Watch:output_type -> codefoundry.v1.PluginEvent
+	36, // 67: codefoundry.v1.PluginService.WatchSurface:output_type -> codefoundry.v1.SurfaceUpdate
+	40, // 68: codefoundry.v1.PluginService.GetSurface:output_type -> codefoundry.v1.GetSurfaceResponse
+	42, // 69: codefoundry.v1.PluginService.Act:output_type -> codefoundry.v1.SurfaceActResponse
+	46, // 70: codefoundry.v1.PluginService.Environment:output_type -> codefoundry.v1.PluginEnvironmentResponse
+	56, // [56:71] is the sub-list for method output_type
+	41, // [41:56] is the sub-list for method input_type
+	41, // [41:41] is the sub-list for extension type_name
+	41, // [41:41] is the sub-list for extension extendee
+	0,  // [0:41] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_plugin_proto_init() }

@@ -468,6 +468,10 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 	if err := m.checkNotify(o.Notify, creatorID); err != nil {
 		return Thread{}, err
 	}
+	owner, err := checkOwner(o)
+	if err != nil {
+		return Thread{}, err
+	}
 	id, err := newThreadID()
 	if err != nil {
 		return Thread{}, err
@@ -479,6 +483,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 	s := Thread{
 		ID: id, Name: name, Model: o.Model, Effort: o.Effort, PermissionMode: o.PermissionMode, State: StateStarting,
 		CreatedBy: creatorID, CreatedByName: creatorName, Brief: brief, Labels: labels, BudgetUSD: o.BudgetUSD,
+		Owner: owner,
 	}
 	namingTried := name != ""
 	var late <-chan namingResult
@@ -486,14 +491,19 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 	if (o.NewWorkspace != nil && (o.NewWorktree != nil || o.WorkspaceID != "")) || (o.NewWorktree != nil && o.WorkspaceID != "") {
 		return Thread{}, fmt.Errorf("%w: new workspace, new worktree and workspace are exclusive", ErrInvalidArgument)
 	}
+	if o.Cwd != "" && !o.NoProject {
+		return Thread{}, fmt.Errorf("%w: cwd is for a thread without a project (a project's thread runs in its worktree)", ErrInvalidArgument)
+	}
 	if o.NoProject && (o.ProjectID != "" || o.WorktreePath != "" || o.NewWorktree != nil || o.WorkspaceID != "" || o.NewWorkspace != nil) {
 		return Thread{}, fmt.Errorf("%w: no_project excludes a project, worktree, new worktree, workspace and new workspace", ErrInvalidArgument)
 	}
 	switch {
 	case o.NoProject:
 		// No owner: ProjectID and WorkspaceID stay empty and claude starts in the home
-		// directory, trusted like any cwd (spawn).
-		s.WorktreePath = m.opts.Home
+		// directory (or Cwd inside it), trusted like any cwd (spawn).
+		if s.WorktreePath, err = m.noProjectCwd(o.Cwd); err != nil {
+			return Thread{}, err
+		}
 	case o.NewWorkspace != nil:
 		cw, err := m.newWorkspace(ctx, id, name, o)
 		if err != nil {
