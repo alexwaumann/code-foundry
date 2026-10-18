@@ -59,10 +59,19 @@ func TestDaemonInstallsSkills(t *testing.T) {
 	for _, f := range []string{
 		"code-foundry-orchestrate/SKILL.md", "code-foundry-orchestrate/reference/commands.md",
 		"code-foundry-help/SKILL.md", "code-foundry-help/reference/settings.md",
+		"code-foundry-plugin/SKILL.md", "code-foundry-plugin/reference/cli.md", "code-foundry-plugin/example/main.go",
 	} {
 		b, err := os.ReadFile(filepath.Join(skills, f))
 		if err != nil || len(b) == 0 {
 			t.Errorf("%s: %d bytes, %v", f, len(b), err)
+		}
+	}
+	// The plugin skill copies the example from where it is installed; a test build has
+	// no commit, so it pins the SDK at main.
+	plug, _ := os.ReadFile(filepath.Join(skills, "code-foundry-plugin/SKILL.md"))
+	for _, want := range []string{"cp -R " + filepath.Join(skills, "code-foundry-plugin/example") + "/. .", "pluginsdk@main"} {
+		if !strings.Contains(string(plug), want) {
+			t.Errorf("code-foundry-plugin/SKILL.md lacks %q", want)
 		}
 	}
 	if _, err := os.Stat(stale); !os.IsNotExist(err) {
