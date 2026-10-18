@@ -1,0 +1,190 @@
+/* Plugin surface primitives. Tokens: ../rendered-thread/style.css; panel chrome, .pill,
+   .dot, .ib: ../mcp-panel/style.css. Nothing here adds a colour: only tokens and
+   color-mix of tokens, the way McpSurface tints its cards. Class prefix p- avoids the
+   thread sketch's .row/.chip/.chev. */
+
+/* ---------- frame ---------- */
+.p-body{container-type:inline-size}
+.p-view{display:flex;flex-direction:column;flex:1;min-height:0}
+.p-content{flex:1;min-height:0;overflow:auto;padding:12px 16px 16px;display:flex;flex-direction:column;gap:12px}
+html.tall,html.tall body{height:auto;overflow:visible}
+html.tall .app{height:auto;min-height:100vh;align-items:flex-start}
+html.tall .panel{align-self:flex-start}
+html.tall .p-content,html.tall .body{overflow:visible}
+@container (max-width:340px){
+  /* The title keeps its room; a pill that does not fit drops to a line of its own (still right-aligned). */
+  .p-hdr h2{flex-wrap:wrap;row-gap:4px}
+}
+
+/* ---------- header (McpSurface's: px-4 pt-2 pb-2.5, title 14/600, sub 12 muted) ---------- */
+.p-hdr{flex:none;display:flex;flex-direction:column;gap:3px;padding:8px 16px 10px;border-bottom:1px solid var(--pane-border)}
+.p-hdr h2{margin:0;display:flex;align-items:center;gap:6px;font-size:14px;font-weight:600;min-width:0}
+.p-hdr h2>svg{width:16px;height:16px;color:var(--muted-fg)}
+.p-hdr .p-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.p-hdr .p-pill{margin-left:auto;flex:none}
+.p-sub{display:flex;align-items:center;flex-wrap:wrap;column-gap:6px;row-gap:2px;min-height:24px;font-size:12px;color:var(--muted-fg)}
+.p-sep{opacity:.5}
+.p-sp{flex:1}
+.p-pill{display:inline-flex;align-items:center;gap:4px}
+.p-pill svg{width:10px;height:10px}
+
+/* ---------- inline ---------- */
+.p-text{margin:0;font-size:13px;line-height:1.5}
+.p-sub .p-text,.p-nb .p-text{font-size:inherit;line-height:inherit}
+.p-text.mono{font-size:11.5px}
+.t-muted{color:var(--muted-fg)}.p-text.t-muted{font-size:12px}
+.t-attention{color:var(--amber)}.t-error{color:var(--red)}
+.p-link{display:inline-flex;align-items:center;gap:4px;color:var(--muted-fg);text-decoration:none;white-space:nowrap;font-size:12px}
+.p-link svg{width:12px;height:12px}
+.p-link:hover{color:var(--fg)}
+.p-form .p-link{align-self:flex-start}
+.p-time{white-space:nowrap}
+.p-md{font-size:13px;color:var(--fg)}
+.p-md p{margin:0 0 .5em}
+.p-spinner{display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:12px;color:var(--muted-fg);min-height:20px}
+.p-spinner svg{width:13px;height:13px}
+
+/* ---------- buttons: McpSurface's h-6 text-xs; all variants quiet except default ---------- */
+.p-btn{height:24px;padding:0 8px;border-radius:6px;border:1px solid transparent;font-size:12px;font-weight:500;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;color:var(--muted-fg);background:none;flex:none}
+.p-btn svg{width:13px;height:13px}
+.p-btn:hover{background:var(--hover);color:var(--fg)}
+.p-btn.v-default{border-color:var(--border);color:var(--fg)}
+.p-btn.v-attention{border-color:color-mix(in oklab,var(--amber-500) 40%,transparent);color:var(--amber)}
+.p-btn.v-destructive:hover{color:var(--red)}
+.p-btn[disabled]{opacity:.7}
+.p-actions{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.p-ib{flex:none}
+
+/* ---------- key-value fields ---------- */
+.p-fields{margin:0;display:grid;grid-template-columns:minmax(0,max-content) minmax(0,1fr);column-gap:14px;row-gap:5px;font-size:12px;line-height:18px}
+.p-fields dt{color:var(--muted-fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
+.p-fields dt.mono{font-size:11.5px}
+.p-fields dd{margin:0;display:flex;align-items:flex-start;gap:4px;min-width:0}
+.p-fields dd>span:first-child{min-width:0;overflow-wrap:anywhere}
+.p-fields dd .mono{font-size:11.5px}
+.p-fields dd .p-ib{width:18px;height:18px}
+.p-fields dd .p-ib svg{width:12px;height:12px}
+.p-secretval{letter-spacing:.05em;color:var(--muted-fg)}
+
+/* ---------- stage chips: text-only, a status dot, wrap ---------- */
+.p-chips{display:flex;flex-wrap:wrap;gap:6px}
+.p-chip{height:24px;display:inline-flex;align-items:center;gap:6px;padding:0 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;white-space:nowrap}
+.p-chip .dot{width:7px;height:7px}
+.p-chip svg.p-lead{width:12px;height:12px;color:var(--muted-fg)}
+.p-chip .p-cm{color:var(--muted-fg);font-size:11.5px}
+.p-chip.s-pending,.p-chip.s-skipped{color:var(--muted-fg)}
+.p-chip.s-error{border-color:color-mix(in oklab,var(--red-500) 35%,transparent);color:var(--red)}
+.p-chip.s-attention{border-color:color-mix(in oklab,var(--amber-500) 35%,transparent);color:var(--amber)}
+.p-chip.s-running{border-color:color-mix(in oklab,var(--fg) 25%,transparent)}
+
+/* ---------- list rows: 8px from the pane (the content's 16px minus the row's 8px) ---------- */
+.p-list{list-style:none;margin:0 -8px;padding:0;display:flex;flex-direction:column}
+.p-row{display:flex;align-items:center;gap:8px;min-height:28px;padding:3px 8px;border-radius:7px;font-size:13px}
+.p-row.click:hover{background:var(--hover)}
+.p-row .dot{width:8px;height:8px}
+.p-row>svg.p-lead{width:13px;height:13px;color:var(--muted-fg);margin:0 -2.5px}
+.p-row .p-rt{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.p-row .p-rm{color:var(--muted-fg);font-size:12px;white-space:nowrap;flex:none}
+.p-row .p-rtr{display:flex;gap:2px;flex:none}
+.p-row.s-pending .p-rt{color:var(--muted-fg)}
+.p-skip{color:var(--muted-fg)}
+
+/* ---------- log block: the thread's bash block (.term) ---------- */
+.p-log{border:1px solid var(--border);border-radius:8px;overflow:hidden;background:oklch(0 0 0/1.5%)}
+.dark .p-log{background:oklch(1 0 0/2.5%)}
+.p-loghead{display:flex;align-items:center;gap:8px;height:30px;padding:0 4px 0 10px;border-bottom:1px solid var(--border);font-size:12px}
+.p-logt{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.p-logm{display:inline-flex;align-items:center;gap:5px;color:var(--muted-fg);white-space:nowrap}
+.p-live{width:6px;height:6px;border-radius:50%;background:var(--muted-fg);animation:blink 1.4s steps(1) infinite}
+.p-logbody{font-family:var(--font-mono);font-size:11.5px;line-height:17px;padding:7px 10px 8px;color:var(--muted-fg);white-space:pre-wrap;overflow-wrap:anywhere;max-height:220px;overflow:auto}
+.p-logbody,.p-code .mono{font-variant-ligatures:none}
+.p-logbody>div{padding-left:2ch;text-indent:-2ch}
+.p-logbody .t-error{color:var(--red)}
+.p-logbody .t-attention{color:var(--amber)}
+
+/* ---------- section ---------- */
+.p-section{display:flex;flex-direction:column;gap:8px}
+.p-sechead{display:flex;align-items:center;gap:6px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-fg);min-height:20px}
+.p-sechead .p-cnt{letter-spacing:0;font-weight:400}
+.p-sechead .p-chev{width:13px;height:13px;margin-left:-1px}
+.p-sechead.click{margin:0 -8px;padding:0 8px;border-radius:6px;height:26px}
+.p-sechead.click:hover{background:var(--hover)}
+.p-secbody{display:flex;flex-direction:column;gap:8px}
+.p-content>.p-section{margin-top:4px}
+.p-section.stale .p-secbody{opacity:.55}
+
+/* ---------- notice: tinted border like MCP's attention cards, no fill ---------- */
+.p-notice{border:1px solid var(--border);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.p-notice.tone-attention{border-color:color-mix(in oklab,var(--amber-500) 35%,transparent)}
+.p-notice.tone-error{border-color:color-mix(in oklab,var(--red-500) 35%,transparent)}
+.p-nt{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600}
+.p-nt svg{width:14px;height:14px;color:var(--muted-fg)}
+.tone-attention .p-nt svg{color:var(--amber)}
+.tone-error .p-nt svg{color:var(--red)}
+.p-nb{display:flex;flex-direction:column;gap:3px;font-size:12px;line-height:17px;color:var(--muted-fg)}
+.tone-error .p-nb .mono{color:var(--red)}
+.p-notice .p-actions{margin-top:2px}
+
+/* ---------- empty state ---------- */
+.p-empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;padding:18px 8px 8px}
+.p-empty>svg{width:20px;height:20px;color:var(--muted-fg);margin-bottom:4px}
+.p-et{font-size:13px;font-weight:500}
+.p-ex{font-size:12px;line-height:17px;color:var(--muted-fg);max-width:260px}
+.p-empty .p-actions{margin:6px 0 0;justify-content:center}
+
+.p-divider{border:0;border-top:1px solid var(--border);margin:0}
+
+/* ---------- progress ---------- */
+.p-progress{display:flex;flex-direction:column;gap:6px}
+.p-pl{display:flex;align-items:baseline;gap:8px;font-size:13px}
+.p-pl span:first-child{flex:1;min-width:0}
+.p-pm{font-size:12px;color:var(--muted-fg);white-space:nowrap}
+.p-bar{height:4px;border-radius:2px;background:var(--muted);overflow:hidden}
+.p-bar i{display:block;height:100%;border-radius:2px;background:var(--muted-fg)}
+.p-bar.ind i{width:30%;animation:pslide 1.2s ease-in-out infinite}
+@keyframes pslide{from{transform:translateX(-100%)}to{transform:translateX(340%)}}
+
+/* ---------- code (device code) ---------- */
+.p-code{display:flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:8px;padding:10px 6px 10px 14px}
+.p-code .mono{flex:1;font-size:20px;line-height:26px;letter-spacing:.14em;font-weight:700;white-space:nowrap}
+
+/* ---------- form controls (shadcn input: h-7 here, border-input, rounded-md) ---------- */
+.p-form{display:flex;flex-direction:column;gap:12px}
+.p-form .p-actions{margin-top:2px}
+.p-field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.p-fl{font-size:12px;font-weight:500}
+.p-in{height:28px;display:flex;align-items:center;gap:6px;padding:0 4px 0 9px;border:1px solid var(--input);border-radius:6px;font-size:13px;min-width:0;white-space:nowrap;overflow:hidden}
+.dark .p-in{background:oklch(1 0 0/4.5%)}
+.p-in.bad{border-color:color-mix(in oklab,var(--red-500) 60%,transparent)}
+.p-in svg{width:14px;height:14px;color:var(--muted-fg);flex:none}
+.p-select{padding-right:8px}
+.p-ph{color:var(--muted-fg)}
+.p-dots{letter-spacing:.08em}
+.p-inbtn{width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;border-radius:4px}
+.p-fh{font-size:11.5px;line-height:16px;color:var(--muted-fg)}
+.p-fe{font-size:11.5px;line-height:16px;color:var(--red)}
+.p-check{display:flex;align-items:center;gap:8px;font-size:13px;min-height:22px}
+.p-box{width:15px;height:15px;flex:none;border:1px solid var(--input);border-radius:4px;display:inline-flex;align-items:center;justify-content:center}
+.dark .p-box{background:oklch(1 0 0/4.5%)}
+.p-box.on{background:var(--primary);border-color:var(--primary);color:var(--primary-fg)}
+.p-box svg{width:11px;height:11px;stroke-width:3}
+.p-section .p-check+.p-check{margin-top:-4px}
+
+/* ---------- "Open a surface" (SidePanel EmptyState) ---------- */
+.p-surfaces{flex:1;display:flex;align-items:center;justify-content:center;padding:24px}
+.p-surfaces .w{width:100%;max-width:256px}
+.p-surfaces h2{margin:0 0 12px;text-align:center;font-size:14px;font-weight:500}
+.p-surfaces ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.p-srow{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:6px;font-size:14px}
+.p-srow:hover{background:var(--accent)}
+.p-srow>svg{width:16px;height:16px;color:var(--muted-fg)}
+.p-srow .p-st{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.p-srow kbd{border:1px solid var(--border);background:color-mix(in oklab,var(--muted) 60%,transparent);border-radius:4px;padding:2px 6px;font-family:var(--font-ui);font-size:11px;color:var(--muted-fg)}
+.p-srow.off{opacity:.45}
+.p-from{display:inline-flex;color:var(--muted-fg);padding:0 4px}
+.p-from svg{width:13px;height:13px}
+.p-sdiv{height:1px;background:var(--border);margin:6px 8px}
+
+/* ---------- ?outline: label every node with its primitive ---------- */
+html.outline [data-node]{outline:1px dashed color-mix(in oklab,var(--sky) 55%,transparent);outline-offset:1px;position:relative}
+html.outline [data-node]:not(time,a,span,button)::before{content:attr(data-node);position:absolute;top:-7px;right:2px;z-index:2;font:500 9px/12px var(--font-mono);padding:0 3px;border-radius:3px;background:var(--pane);color:var(--sky)}
