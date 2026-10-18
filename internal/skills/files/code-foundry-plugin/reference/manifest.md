@@ -58,7 +58,7 @@ show in `code-foundry plugin list`'s NOTE column.
 | `description` | Up to 300 characters; shown in the consent dialog and the registry. |
 | `protocol` | Required: `1`. |
 | `exec` | Required: the argv the host starts. `exec[0]` with a slash is relative to the package folder and must stay inside it (`bin/gh-actions`, `./run.sh`); a bare word (`python3`, `node`) is looked up on PATH. Use `bin/<name>`: the example's Makefile builds it there. |
-| `permissions` | What the plugin may do through the host (below). `{}` asks for nothing: no consent prompt. |
+| `permissions` | What the plugin may do through the host (below). `{}` asks for nothing; the user still consents once to running the plugin at all. |
 | `commands` | Up to 100 (below). |
 | `surfaces` | Up to 20 (below). |
 

@@ -45,8 +45,8 @@ for tests). This Code Foundry is {{cf.version}}.
    `reference/host-api.md`, `reference/primitives.md`). Build with `make build`, not
    `go build ./...`.
 5. **Run it** in the daemon: `make build && code-foundry plugin dev "$PWD" --follow=false`
-   links the folder as a dev plugin and enables it. If the manifest asks for permissions
-   it prints the consent text and exits 2: tell the user what the plugin may do and
+   links the folder as a dev plugin and enables it. The first time (and when permissions
+   grow) it prints the consent text and exits 2: tell the user what the plugin may do and
    re-run with `--yes` once they agree. `code-foundry plugin list` must say
    `running (dev)`; a NOTE column names manifest problems.
 6. **Read its log**: `code-foundry plugin logs <name> --lines 50` (its stderr, `h.Log()`,
