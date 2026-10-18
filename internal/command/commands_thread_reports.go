@@ -1,0 +1,209 @@
+package command
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"slices"
+	"strings"
+	"text/tabwriter"
+	"time"
+
+	"connectrpc.com/connect"
+
+	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
+)
+
+// thread.reports (docs/notes/agent-cli-feedback-2.md): the reports of many threads in
+// one call, for an agent that created them and would otherwise read each with
+// thread.get or harvest its wake messages. It reads ThreadService.List with a
+// ThreadFilter like thread.list; the report status is filtered here, since the filter
+// has no field for it. --json is a compact array of ThreadReport, not whole threads.
+
+// ThreadReportsStatuses are thread.reports' status values: a report status
+// (ThreadReportStatuses), or none for threads without a report.
+var ThreadReportsStatuses = append(slices.Clone(ThreadReportStatuses), "none")
+
+// ThreadReport is one thread in thread.reports' --json answer.
+type ThreadReport struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	// Status is the thread's status as thread.list's --status names it: busy, idle,
+	// attention or error.
+	Status string `json:"status"`
+	// ReportStatus is done, blocked, failed or progress; none without a report.
+	ReportStatus  string `json:"reportStatus"`
+	ReportSummary string `json:"reportSummary,omitempty"`
+	// ReportData is the report's JSON object as it is (the daemon validates it); a
+	// string should it not parse.
+	ReportData json.RawMessage `json:"reportData,omitempty"`
+	ReportAt   *time.Time      `json:"reportAt,omitempty"`
+	// CreatedBy is the creator's id; "" for a thread the user started.
+	CreatedBy string   `json:"createdBy"`
+	Labels    []string `json:"labels"`
+}
+
+// RegisterThreadReports registers thread.reports.
+func RegisterThreadReports(r *Registry, b ThreadBackend) error {
+	return r.Register(Command{
+		Name:  "thread.reports",
+		Title: "Show Thread Reports",
+		Description: "The reports of threads, for the thread that created them: one line each " +
+			"(`-`: no report yet; `(data)`: it has JSON data, see full). --json: one object each, reportData parsed.",
+		Category:     "Thread",
+		NoKeybinding: true,
+		Args: []ArgSpec{
+			{Name: "created-by", Type: String, Description: "Only threads created by this thread (id or suffix); user: by the user"},
+			{Name: "label", Type: String, Description: "Comma-separated labels, all required"},
+			{Name: "status", Type: Enum, Enum: ThreadReportsStatuses, Description: "Only threads with this report; none: not reported"},
+			{Name: "archived", Type: Bool, Description: "Include archived threads"},
+			{Name: "all", Type: Bool, Description: "The same as archived"},
+			{Name: "full", Type: Bool, Description: "Print each report's JSON data"},
+			{Name: "limit", Type: Int, Description: "At most this many, most recently active first (0: all)"},
+		},
+		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
+			limit := a.Int("limit")
+			if limit < 0 {
+				return Result{}, InvalidArg("limit", "limit must be 0 (no limit) or more, not %d", limit)
+			}
+			by, err := resolveCreatedBy(ctx, b, a.String("created-by"))
+			if err != nil {
+				return Result{}, err
+			}
+			// all here only adds the archived threads: ThreadFilter.all would also drop
+			// created-by and labels, which this command is for.
+			f := &v1.ThreadFilter{IncludeArchived: a.Bool("archived") || a.Bool("all"), CreatedBy: by, Labels: splitList(a.String("label"))}
+			res, err := b.List(ctx, connect.NewRequest(&v1.ListThreadsRequest{Filter: f}))
+			if err != nil {
+				return Result{}, err
+			}
+			threads := filterReports(res.Msg.GetThreads(), a.String("status"), limit)
+			out := make([]ThreadReport, len(threads))
+			for i, s := range threads {
+				out[i] = threadReport(s)
+			}
+			return Result{Message: formatThreadReports(out, f, a.Bool("full")), JSON: out}, nil
+		},
+	})
+}
+
+// resolveCreatedBy is a created-by filter as ThreadFilter takes it: "" and "user" as
+// they are, else the full id of the thread it names (an id or a unique suffix).
+func resolveCreatedBy(ctx context.Context, b ThreadBackend, by string) (string, error) {
+	by = strings.TrimSpace(by)
+	if by == "" || by == "user" {
+		return by, nil
+	}
+	ids, err := threadIDs(b)(ctx)
+	if err != nil {
+		return "", err
+	}
+	return ResolveID(ThreadID, "created-by", by, ids)
+}
+
+// filterReports keeps the threads whose report status is status ("" any, "none" no
+// report), at most limit of them (0: all).
+func filterReports(threads []*v1.Thread, status string, limit int) []*v1.Thread {
+	var out []*v1.Thread
+	for _, s := range threads {
+		if status != "" && reportWord(s) != status {
+			continue
+		}
+		out = append(out, s)
+		if limit > 0 && len(out) == limit {
+			break
+		}
+	}
+	return out
+}
+
+// reportWord is s's report status as thread.reports' status names it; "none" without
+// a report.
+func reportWord(s *v1.Thread) string {
+	if w := reportStatusName(s.GetReportStatus()); w != "" {
+		return w
+	}
+	return "none"
+}
+
+// threadReport is s for thread.reports' --json.
+func threadReport(s *v1.Thread) ThreadReport {
+	r := ThreadReport{
+		ID: s.GetId(), Name: s.GetName(), Status: threadStatusName(s.GetStatus()), ReportStatus: reportWord(s),
+		ReportSummary: s.GetReportSummary(), CreatedBy: s.GetCreatedBy(), Labels: slices.Clone(s.GetLabels()),
+	}
+	if r.Labels == nil {
+		r.Labels = []string{}
+	}
+	if d := s.GetReportData(); d != "" {
+		if json.Valid([]byte(d)) {
+			r.ReportData = json.RawMessage(d)
+		} else {
+			r.ReportData, _ = json.Marshal(d) // a string always marshals
+		}
+	}
+	if at := s.GetReportAt(); at != nil {
+		t := at.AsTime().UTC()
+		r.ReportAt = &t
+	}
+	return r
+}
+
+// threadStatusName is a thread status as thread.list's --status names it, without the
+// reason threadStatusWord adds.
+func threadStatusName(st v1.ThreadStatus) string {
+	for name, v := range threadListStatuses {
+		if v == st {
+			return name
+		}
+	}
+	return "unknown"
+}
+
+// formatThreadReports is thread.reports' text: one aligned line per thread, each with
+// its JSON data indented under it when full is set (else a "(data)" marker), or why
+// the list is empty.
+func formatThreadReports(reports []ThreadReport, f *v1.ThreadFilter, full bool) string {
+	if len(reports) == 0 {
+		if !f.GetIncludeArchived() {
+			return "no threads (archived threads are left out; --archived includes them)"
+		}
+		return "no threads"
+	}
+	var sb strings.Builder
+	tw := tabwriter.NewWriter(&sb, 0, 4, 2, ' ', 0)
+	for _, r := range reports {
+		st := r.ReportStatus
+		if st == "none" {
+			st = "-"
+		}
+		name := r.Name
+		if name == "" {
+			name = "(unnamed)"
+		}
+		summary := oneLineText(r.ReportSummary)
+		if len(r.ReportData) > 0 && !full {
+			summary = strings.TrimSpace(summary + " (data)")
+		}
+		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", r.ID, st, name, summary)
+	}
+	_ = tw.Flush()
+	// The data goes in after the alignment: a line without cells would end tabwriter's
+	// column block and misalign the rows after it.
+	lines := strings.Split(strings.TrimRight(sb.String(), "\n"), "\n")
+	var out []string
+	for i, line := range lines {
+		out = append(out, strings.TrimRight(line, " "))
+		if full && len(reports[i].ReportData) > 0 {
+			var buf bytes.Buffer
+			if json.Indent(&buf, reports[i].ReportData, "    ", "  ") == nil {
+				out = append(out, "    "+buf.String())
+			}
+		}
+	}
+	return strings.Join(out, "\n")
+}
+
+// oneLineText joins a text's lines with spaces.
+func oneLineText(s string) string { return strings.Join(strings.Fields(s), " ") }

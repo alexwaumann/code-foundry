@@ -108,6 +108,7 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterNewProjects(r, d.NewProjects),
 		command.RegisterThreadLifecycle(r, d.Thread, d.Emitter),
 		command.RegisterThreadList(r, command.ThreadListDeps{Thread: d.Thread, Project: d.Project}),
+		command.RegisterThreadReports(r, d.Thread),
 		command.RegisterThread(r, d.Thread),
 		command.RegisterMcp(r, d.Thread, d.Emitter),
 		command.RegisterAgents(r, d.Thread, d.Emitter),

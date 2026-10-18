@@ -73,17 +73,11 @@ func RegisterThreadList(r *Registry, d ThreadListDeps) error {
 				Project: strings.TrimSpace(a.String("project")), Workspace: strings.TrimSpace(a.String("workspace")),
 				Labels: splitList(a.String("label")), Limit: int32(a.Int("limit")),
 			}
-			if by := strings.TrimSpace(a.String("created-by")); by != "" && by != "user" {
-				ids, err := threadIDs(d.Thread)(ctx)
-				if err != nil {
-					return Result{}, err
-				}
-				if f.CreatedBy, err = ResolveID(ThreadID, "created-by", by, ids); err != nil {
-					return Result{}, err
-				}
-			} else {
-				f.CreatedBy = by
+			by, err := resolveCreatedBy(ctx, d.Thread, a.String("created-by"))
+			if err != nil {
+				return Result{}, err
 			}
+			f.CreatedBy = by
 			res, err := d.Thread.List(ctx, connect.NewRequest(&v1.ListThreadsRequest{Filter: f}))
 			if err != nil {
 				return Result{}, err
