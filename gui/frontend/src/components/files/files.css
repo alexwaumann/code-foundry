@@ -1,0 +1,35 @@
+/*
+ * The File tab (docs/notes/file-viewer-3-tabs.md). Rendered markdown reads as a document:
+ * the thread's markdown (thread.css under .cf-thread) at body size, headings on the type
+ * roles. Images sit on a checker so transparency shows.
+ */
+@reference "../../index.css";
+
+.cf-file-md .cf-markdown {
+  @apply text-body;
+}
+.cf-file-md .cf-markdown h1 {
+  @apply text-title;
+  margin-top: 1.2em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--border);
+}
+.cf-file-md .cf-markdown h2 {
+  @apply text-heading;
+  margin-top: 1.4em;
+  padding-bottom: 0.25em;
+  border-bottom: 1px solid var(--border);
+}
+.cf-file-md .cf-markdown :where(h3, h4, h5, h6) {
+  @apply text-subheading;
+}
+.cf-file-md .cf-markdown img {
+  max-width: 100%;
+}
+
+.cf-checker {
+  --checker: color-mix(in oklab, var(--foreground) 7%, transparent);
+  background-color: var(--pane);
+  background-image: conic-gradient(var(--checker) 25%, transparent 0 50%, var(--checker) 0 75%, transparent 0);
+  background-size: 16px 16px;
+}

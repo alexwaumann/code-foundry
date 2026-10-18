@@ -279,8 +279,6 @@ test.describe("the overview", () => {
     await expect.poll(opened).toEqual(["https://github.com/alexwaumann/code-foundry/pull/142"]);
     await list.press("ArrowDown");
     await expect(fileRow(page, "gui/frontend/src/components/sidebar/Sidebar.tsx")).toHaveAttribute("aria-selected", "true");
-    // Files have no action yet: Enter does nothing.
-    await list.press("Enter");
     await list.press("End");
     await expect(commitsRow(page)).toHaveAttribute("aria-selected", "true");
     await list.press("ArrowRight");
@@ -301,6 +299,16 @@ test.describe("the overview", () => {
     await list.press("Enter");
     await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "pullrequest");
     await expect(tabs(page)).toHaveCount(2);
+    // Enter (or Space) on a file opens its Diff tab: committed only, so on the branch (file-tabs.spec.ts).
+    await tabs(page).first().click();
+    await list.focus();
+    await list.press("ArrowDown");
+    await list.press("ArrowDown");
+    await expect(fileRow(page, "gui/frontend/src/components/sidebar/Sidebar.tsx")).toHaveAttribute("aria-selected", "true");
+    await list.press("Space");
+    await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "diff");
+    await expect(page.getByTestId("diff-tab")).toHaveAttribute("data-scope", "branch");
+    await expect(tabs(page)).toHaveCount(3);
   });
 
   test("a rebase stopped on conflicts: the strip, the unmerged card, conflicts first; it clears when the rebase ends", async ({ page }) => {

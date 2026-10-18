@@ -1,5 +1,5 @@
 import { memo, useMemo } from "react";
-import { File, type FileOptions } from "@pierre/diffs/react";
+import { File, type FileOptions, type SelectedLineRange } from "@pierre/diffs/react";
 import { useCodeTheme } from "@/lib/codeTheme";
 import { cn } from "@/lib/utils";
 import { useCodeViewStore } from "@/stores/codeView";
@@ -14,6 +14,8 @@ export interface CodeFileProps {
   wrap?: boolean;
   /** Line numbers in the gutter (on by default). */
   lineNumbers?: boolean;
+  /** Lines to mark as selected (a File tab's line). Given, even as null, the selection is controlled: clicks do not change it. */
+  selectedLines?: SelectedLineRange | null;
   className?: string;
 }
 
@@ -22,7 +24,7 @@ export interface CodeFileProps {
  * no file header (callers draw their own outside it), line numbers on, wrap from the
  * codeView store. Read-only.
  */
-export const CodeFile = memo(function CodeFile({ name, contents, wrap, lineNumbers = true, className }: CodeFileProps) {
+export const CodeFile = memo(function CodeFile({ name, contents, wrap, lineNumbers = true, selectedLines, className }: CodeFileProps) {
   const { theme, themeType } = useCodeTheme();
   const storeWrap = useCodeViewStore((s) => s.wrap);
   const overflow = (wrap ?? storeWrap) ? "wrap" : "scroll";
@@ -34,7 +36,7 @@ export const CodeFile = memo(function CodeFile({ name, contents, wrap, lineNumbe
   const host = useCodeHost();
   return (
     <div ref={host} className={cn("cf-code-view", className)}>
-      <File file={file} options={options} />
+      {selectedLines === undefined ? <File file={file} options={options} /> : <File file={file} options={options} selectedLines={selectedLines} />}
     </div>
   );
 });

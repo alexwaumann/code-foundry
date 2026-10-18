@@ -48,10 +48,15 @@ describe("panelKeyAction", () => {
 
   it("an enabled surface's hotkey opens its default tab", () => {
     const spy = vi.spyOn(filesSurface, "available").mockReturnValue("enabled");
-    expect(panelKeyAction("f", { ...emptyEntry, open: true }, ctx)).toEqual({ kind: "open", tab: files });
-    // While picking too: the letter picks from the list.
-    expect(panelKeyAction("f", picking, ctx)).toEqual({ kind: "open", tab: files });
-    spy.mockRestore();
+    const def = vi.spyOn(filesSurface, "openDefault").mockReturnValue(files);
+    try {
+      expect(panelKeyAction("f", { ...emptyEntry, open: true }, ctx)).toEqual({ kind: "open", tab: files });
+      // While picking too: the letter picks from the list.
+      expect(panelKeyAction("f", picking, ctx)).toEqual({ kind: "open", tab: files });
+    } finally {
+      spy.mockRestore();
+      def.mockRestore();
+    }
   });
 });
 

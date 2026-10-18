@@ -85,6 +85,10 @@
  *                                                 none; reset restores DEFAULT_FILES)
  *   GET  /__mock/files/calls                      ("skills <project,…|-> <includeUser>", "search <project> <query>")
  *   POST /__mock/files/search?delay=700&fail=1    (SearchFiles answers after 700ms; fail=1: Internal; reset: at once)
+ *   FilesystemService.ReadFile, ProjectService.GetWorktreeFileDiff: mock/files.ts (code-foundry's README.md,
+ *        src/app.ts, docs/preview.html, docs/logo.png, bin/tool, docs/, big.log; every detail's changed files)
+ *   POST /__mock/fs/write?path=…&text=…           (a file's contents on disk; reset restores the fixtures)
+ *   GET  /__mock/fs/calls                         ("read <path>", "diff <worktree> <file> <working|branch>")
  *   thread.new with a prompt containing FAIL fails (after the worktree delay, if any).
  *   POST /__mock/gitops?fail=git.push&delay=800   (next git.push fails; ops take 800ms)
  *   GET  /__mock/gitops
@@ -147,6 +151,7 @@ import { UiService } from "../src/gen/codefoundry/v1/ui_pb";
 import { UpdateService, UpdateState } from "../src/gen/codefoundry/v1/update_pb";
 import { groups as settingsGroups, SettingsValidation } from "./settings";
 import { updateStateNames, type UpdateEventInit } from "./update";
+import { MockFiles } from "./files";
 import { completionCalls, listDirectories, listSkills, resetCompletion, searchFilesSlow, searchMode, setMockFiles } from "./filesystem";
 import { cloneRepo, githubCalls, lookupGitHub, resetClones, searchGitHub } from "./clone";
 import { createProject, deleteProject, listPublishOwners, projectCalls, publishProject, resetProjects, visibilityFlag } from "./create";
@@ -164,6 +169,12 @@ type AttachEventInit = MessageInitShape<typeof AttachEventSchema>;
 const port = Number(process.env.MOCK_PORT ?? 7788);
 const token = process.env.MOCK_TOKEN ?? "dev-mock-token";
 const world = new World();
+/** Files on disk and worktree file diffs, over the worktree details' changed files. */
+const mockFiles = new MockFiles((path) => {
+  const d = world.gh.details.get(path);
+  if (!d) return undefined;
+  return { projectId: d.projectId ?? "", baseRef: d.baseRef, files: (d.files ?? []).map((f) => ({ path: f.path ?? "", status: f.status ?? "", oldPath: f.oldPath, binary: f.binary, uncommitted: f.uncommitted })) };
+});
 
 /** MOCK_SCENARIO=status-kinds: the status-kinds threads (World.addStatusKinds) in the world from the start and after every reset. */
 function seedScenario(): void {
@@ -300,6 +311,7 @@ function routes(router: ConnectRouter): void {
       if (!detail) throw new ConnectError(`worktree ${req.path} not found`, Code.NotFound);
       return { detail };
     },
+    getWorktreeFileDiff: (req) => mockFiles.fileDiff(req.path, req.file, req.oldPath, req.scope),
     watch: (_req, ctx) => tracked("ProjectService/Watch", world.projectEvents.subscribe(ctx.signal)),
   });
 
@@ -310,6 +322,7 @@ function routes(router: ConnectRouter): void {
     },
     listSkills: (req) => ({ skills: listSkills(world.projects, req.sources, req.includeUser) }),
     searchFiles: (req) => searchFilesSlow(world.projects, req.projectId, req.path, req.query, req.limit),
+    readFile: (req) => mockFiles.readFile(req.baseDir, req.path, req.maxBytes),
   });
 
   router.service(GhService, {
@@ -996,6 +1009,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       resetClones();
       resetProjects();
       resetCompletion();
+      mockFiles.reset();
       json(res, 200, { ok: true });
       break;
     case "POST /__mock/files": {
@@ -1015,6 +1029,13 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "GET /__mock/files/calls":
       json(res, 200, completionCalls);
+      break;
+    case "POST /__mock/fs/write":
+      mockFiles.write(q.get("path") ?? "", q.get("text") ?? "");
+      json(res, 200, { ok: true });
+      break;
+    case "GET /__mock/fs/calls":
+      json(res, 200, mockFiles.calls);
       break;
     default:
       json(res, 404, { error: "unknown control endpoint" });

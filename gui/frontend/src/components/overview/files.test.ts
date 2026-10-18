@@ -40,9 +40,9 @@ describe("buildFileRows", () => {
     expect(rows.map((r) => `${r.status} ${r.path}${r.conflict ? " !" : ""}`)).toEqual(["U x/u1.go !", "U u2.go !", "M a.ts", "M b.ts"]);
   });
 
-  it("keeps counts, binary and a rename's source", () => {
-    const [r] = buildFileRows([f("docs/new.md", { status: "R", oldPath: "docs/old.md", added: 4, deleted: 1, binary: true })]);
-    expect(r).toMatchObject({ added: 4, deleted: 1, binary: true, oldPath: "docs/old.md", conflict: false });
+  it("keeps counts, binary, uncommitted and a rename's source", () => {
+    const [r] = buildFileRows([f("docs/new.md", { status: "R", oldPath: "docs/old.md", added: 4, deleted: 1, binary: true, uncommitted: true })]);
+    expect(r).toMatchObject({ added: 4, deleted: 1, binary: true, oldPath: "docs/old.md", conflict: false, uncommitted: true });
   });
 });
 

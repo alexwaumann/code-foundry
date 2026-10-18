@@ -43,6 +43,7 @@ const ALLOW: { file: string; match: string; why: string }[] = [
   { file: "/src/components/ui/dialog.tsx", match: "bg-black/40", why: "the dialog scrim dims whatever is under it, black in every theme" },
   { file: "/src/components/compose/AttachmentLightbox.tsx", match: 'overlayClassName="bg-black/80"', why: "the attachment lightbox scrim (composers and thread)" },
   { file: "/src/components/compose/Composer.tsx", match: "rounded-full bg-black/70 text-white", why: "the remove button sits on an image thumbnail, not on a theme surface" },
+  { file: "/src/components/files/HtmlPreview.tsx", match: "flex-1 border-0 bg-white", why: "an HTML file renders on a browser's white canvas, not the theme's pane" },
 ];
 
 /** Literal colours kept in component stylesheets. `match` must appear in the line. */

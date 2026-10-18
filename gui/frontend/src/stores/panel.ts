@@ -97,13 +97,22 @@ export function isPicking(e: PanelEntry): boolean {
   return e.tabs.length > 0 && e.activeTabId === null;
 }
 
+/** Same keys and values. */
+function sameParams(a: Readonly<Record<string, string>>, b: Readonly<Record<string, string>>): boolean {
+  const ka = Object.keys(a);
+  return ka.length === Object.keys(b).length && ka.every((k) => a[k] === b[k]);
+}
+
 /**
  * Opens the panel with the tab active. An existing tab with the same id is reused (its
- * title refreshed). Ends picking: this is what picking a surface from the list does.
+ * title and params refreshed: a tab whose id leaves out some params, like a File tab's
+ * line, takes the new ones). Ends picking: this is what picking a surface from the list does.
  */
 export function openTab(e: PanelEntry, tab: Tab): PanelEntry {
   const i = e.tabs.findIndex((t) => t.id === tab.id);
-  const tabs = i < 0 ? [...e.tabs, tab] : e.tabs[i]?.title === tab.title ? e.tabs : e.tabs.map((t, j) => (j === i ? { ...t, title: tab.title } : t));
+  const old = i < 0 ? undefined : e.tabs[i];
+  const same = old !== undefined && old.title === tab.title && sameParams(old.params, tab.params);
+  const tabs = i < 0 ? [...e.tabs, tab] : same ? e.tabs : e.tabs.map((t, j) => (j === i ? { ...t, title: tab.title, params: tab.params } : t));
   return { ...dropPickFrom(e), open: true, tabs, activeTabId: tab.id };
 }
 

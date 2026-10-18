@@ -3,7 +3,7 @@ import { createContext, useCallback, useContext, useMemo, useState } from "react
 /**
  * Keyboard cursor over a page's rows (the Pull Requests page, the worktree overview).
  * The page lists every navigable row in display order; rows render through NavRow.
- * ↑/↓ (or k/j), Home/End move; Enter activates (cmd+Enter: the secondary action); →/←
+ * ↑/↓ (or k/j), Home/End move; Enter or Space activates (cmd+Enter: the secondary action); →/←
  * expand or collapse. The page's
  * container holds focus and points at the cursor row with aria-activedescendant.
  */
@@ -71,6 +71,7 @@ export function useNav(items: readonly NavItem[]) {
         move(items.length - 1);
         break;
       case "Enter":
+      case " ":
         if (item?.activate) item.activate();
         else if (item?.toggle) item.toggle(true);
         break;
