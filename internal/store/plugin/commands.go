@@ -25,9 +25,9 @@ var argContexts = map[string]command.ContextField{
 	pluginsdk.ArgContextWorktree: command.ContextWorktree, pluginsdk.ArgContextTerminal: command.ContextTerminal,
 }
 
-// commandsFor maps a manifest's commands onto registry commands. Their `when` is not
-// evaluated yet (protocol PR 2): they are available whenever the plugin is enabled,
-// and say why when it is down.
+// commandsFor maps a manifest's commands onto registry commands, plus a show command per
+// surface (show.go). A command's when clause is its When; it is available whatever the
+// plugin's state and says why when the plugin is down.
 func (m *Manager) commandsFor(name string, mf pluginsdk.Manifest) []command.Command {
 	out := make([]command.Command, 0, len(mf.Commands))
 	for _, spec := range mf.Commands {
@@ -38,19 +38,22 @@ func (m *Manager) commandsFor(name string, mf pluginsdk.Manifest) []command.Comm
 				Enum: a.Enum, Default: a.Default, Positional: a.Positional, Context: argContexts[a.Context],
 			}
 		}
+		when, why := m.commandWhen(spec.When)
 		out = append(out, command.Command{
-			Name:        Prefix(name) + spec.Name,
-			Title:       spec.Title,
-			Description: spec.Description,
-			Category:    mf.DisplayNameOr(),
-			Args:        args,
-			Confirm:     spec.Confirm,
+			When:           when,
+			WhyUnavailable: why,
+			Name:           Prefix(name) + spec.Name,
+			Title:          spec.Title,
+			Description:    spec.Description,
+			Category:       mf.DisplayNameOr(),
+			Args:           args,
+			Confirm:        spec.Confirm,
 			Run: func(ctx context.Context, uctx command.Context, a command.Args) (command.Result, error) {
 				return m.runCommand(ctx, name, spec, uctx, a)
 			},
 		})
 	}
-	return out
+	return append(out, m.showCommands(name, mf)...)
 }
 
 // register puts e's commands in the registry. opMu held.

@@ -67,6 +67,10 @@ type Deps struct {
 	// Plugin backs plugin.* (the management verbs; a plugin's own commands come from the
 	// plugin store). Nil works like Terminal.
 	Plugin command.PluginBackend
+	// PluginSurface backs plugin.surface and plugin.act. Nil works like Terminal.
+	PluginSurface command.PluginSurfaceBackend
+	// PullRequestChecks backs pr.checks (a nil Gh works like Terminal).
+	PullRequestChecks command.PullRequestChecksDeps
 }
 
 // Register registers every domain's commands into r.
@@ -94,6 +98,9 @@ func Register(r *command.Registry, d Deps) error {
 	}
 	if d.Plugin == nil {
 		d.Plugin = codefoundryv1connect.UnimplementedPluginServiceHandler{}
+	}
+	if d.PluginSurface == nil {
+		d.PluginSurface = codefoundryv1connect.UnimplementedPluginServiceHandler{}
 	}
 	if d.Update == nil {
 		d.Update = codefoundryv1connect.UnimplementedUpdateServiceHandler{}
@@ -134,5 +141,7 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterWorkspace(r, d.Workspace),
 		command.RegisterAction(r, command.ActionDeps{Action: d.Action, Project: d.Project, Thread: d.Thread}),
 		command.RegisterPlugin(r, d.Plugin),
+		command.RegisterPluginSurface(r, d.PluginSurface),
+		command.RegisterPullRequestChecks(r, d.PullRequestChecks),
 	)
 }

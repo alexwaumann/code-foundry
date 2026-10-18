@@ -38,6 +38,9 @@ type contextNodeJSON struct {
 	StartedAt   time.Time `json:"startedAt"`
 	CompletedAt time.Time `json:"completedAt"`
 	CheckSuite  *struct {
+		App *struct {
+			Slug string `json:"slug"`
+		} `json:"app"`
 		WorkflowRun *struct {
 			Workflow struct {
 				Name string `json:"name"`
@@ -348,6 +351,9 @@ func mapContext(n *contextNodeJSON) (CheckRun, bool) {
 		}
 		if n.CheckSuite != nil && n.CheckSuite.WorkflowRun != nil {
 			run.Workflow = n.CheckSuite.WorkflowRun.Workflow.Name
+		}
+		if n.CheckSuite != nil && n.CheckSuite.App != nil {
+			run.App = n.CheckSuite.App.Slug
 		}
 		return run, true
 	case "StatusContext":

@@ -180,3 +180,19 @@ func TestPermissionsWithin(t *testing.T) {
 		t.Errorf("Describe = %q", granted.Describe())
 	}
 }
+
+func TestCheckProvider(t *testing.T) {
+	tests := []struct{ app, url, want string }{
+		{"github-actions", "", "github-actions"},
+		{"buildkite", "https://github.com/o/r/actions/runs/1", "buildkite"},
+		{"", "https://github.com/o/r/actions/runs/1/job/2", "github-actions"},
+		{"", "https://jenkins.example.com/job/x/1/", "status"},
+		{"", "https://github.com/o/r/pull/1", "status"},
+		{"", "", "status"},
+	}
+	for _, tt := range tests {
+		if got := CheckProvider(tt.app, tt.url); got != tt.want {
+			t.Errorf("CheckProvider(%q, %q) = %q, want %q", tt.app, tt.url, got, tt.want)
+		}
+	}
+}

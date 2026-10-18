@@ -8,6 +8,7 @@ import (
 	"os"
 	"slices"
 	"sync"
+	"time"
 )
 
 // Host is the plugin's handle on Code Foundry. Every method is one protocol call over
@@ -75,12 +76,25 @@ func (h *Host) Invoke(ctx context.Context, command string, args map[string]strin
 	return res, err
 }
 
+// InvokeAsk runs a command that may ask the user first (Confirm): instead of failing
+// with CodeConfirmationRequired, the host hands it to the GUI, which shows the
+// command's own confirm dialog. The result's JSON is then an AskedResult; the plugin
+// learns what the user chose from events. Without a GUI connected it fails like
+// Invoke.
+func (h *Host) InvokeAsk(ctx context.Context, command string, args map[string]string, uctx UiContext) (CommandResult, error) {
+	var res CommandResult
+	err := h.conn.Call(ctx, MethodHostInvoke, InvokeParams{Command: command, Args: args, Context: uctx, Confirm: ConfirmAsk}, &res)
+	return res, err
+}
+
 // SetFlag raises or clears the plugin's flag on a thread (permission threadStatus).
 func (h *Host) SetFlag(ctx context.Context, f Flag) error {
 	return h.conn.Call(ctx, MethodThreadSetFlag, f, nil)
 }
 
-// SetContext sets a predicate key ("<plugin>.<key>") the host's when-clauses read.
+// SetContext sets a predicate fact the host's when clauses read as <plugin>.<key>
+// (p.Key without the plugin's name), globally or, with ThreadID or ProjectID, for one
+// thread or project. A nil Value removes it. Facts last until the plugin exits.
 func (h *Host) SetContext(p ContextParams) error {
 	return h.conn.Notify(MethodContextSet, p)
 }
@@ -111,8 +125,19 @@ func (h *Host) Toast(level, text string) error {
 	return h.conn.Notify(MethodViewToast, ToastParams{Level: level, Text: text})
 }
 
+// ToastIn shows a short message in the GUI for one surface instance (in its panel).
+func (h *Host) ToastIn(instance, level, text string) error {
+	return h.conn.Notify(MethodViewToast, ToastParams{Instance: instance, Level: level, Text: text})
+}
+
+// viewTimeout bounds one view/update or view/append round trip.
+const viewTimeout = 10 * time.Second
+
 // UpdateView replaces a surface instance's view. view is a ui.View (or any value
-// encoding to the view model's JSON).
+// encoding to the view model's JSON); a value with a Validate method is checked first.
+// It waits for the host's answer, so calls from one goroutine arrive in order, and
+// returns the host's refusal (CodeInvalidParams naming each problem) when the view
+// breaks the schema or its limits.
 func (h *Host) UpdateView(instance string, view any) error {
 	if v, ok := view.(interface{ Validate() error }); ok {
 		if err := v.Validate(); err != nil {
@@ -123,7 +148,26 @@ func (h *Host) UpdateView(instance string, view any) error {
 	if err != nil {
 		return fmt.Errorf("pluginsdk: encode view: %w", err)
 	}
-	return h.conn.Notify(MethodViewUpdate, ViewUpdateParams{Instance: instance, View: raw})
+	ctx, cancel := context.WithTimeout(context.Background(), viewTimeout)
+	defer cancel()
+	return h.conn.Call(ctx, MethodViewUpdate, ViewUpdateParams{Instance: instance, View: raw}, nil)
+}
+
+// AppendLog extends the text of the log node key in the instance's current view (a
+// running build's output) without re-sending the view.
+func (h *Host) AppendLog(instance, key, text string) error {
+	return h.appendLog(ViewAppendParams{Instance: instance, Key: key, Text: text})
+}
+
+// AppendLogLines extends a log node that shows toned lines.
+func (h *Host) AppendLogLines(instance, key string, lines ...AppendLine) error {
+	return h.appendLog(ViewAppendParams{Instance: instance, Key: key, Lines: lines})
+}
+
+func (h *Host) appendLog(p ViewAppendParams) error {
+	ctx, cancel := context.WithTimeout(context.Background(), viewTimeout)
+	defer cancel()
+	return h.conn.Call(ctx, MethodViewAppend, p, nil)
 }
 
 // Secrets is the plugin's namespace in the host's secret store (the user's Keychain).
