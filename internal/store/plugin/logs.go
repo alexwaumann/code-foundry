@@ -44,8 +44,11 @@ func newLogBuffer(path string, maxBytes int64, tailCap int, now func() time.Time
 func (b *logBuffer) add(source, level, text string) {
 	text = strings.TrimRight(text, "\r\n")
 	if len(text) > maxLogLine {
-		text = text[:maxLogLine] + "…"
+		text = truncateUTF8(text, maxLogLine) + "…"
 	}
+	// Stderr is bytes: the API's protobuf strings refuse invalid UTF-8 (one binary line
+	// would fail every read of the log).
+	text = strings.ToValidUTF8(text, "\uFFFD")
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.seq++

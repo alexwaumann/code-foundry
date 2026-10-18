@@ -475,6 +475,9 @@ const (
 	maxContextFacts = 1000
 	maxFactString   = 1024
 	maxFactList     = 100
+	// maxFactScopeID bounds a fact's thread or project id (ids are short; a fact keyed
+	// by megabytes of id would hold them).
+	maxFactScopeID = 256
 )
 
 var contextKeyPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_-]*(\.[A-Za-z_][A-Za-z0-9_-]*)*$`)
@@ -513,6 +516,9 @@ func (c *contextFacts) set(conn *pluginsdk.Conn, plugin, scope, key string, v va
 			return false, nil
 		}
 		delete(vals, key)
+		if len(vals) == 0 {
+			delete(pf.scope, scope) // else set-then-clear over many thread ids grows the map
+		}
 		pf.n--
 		return true, nil
 	}
@@ -608,6 +614,10 @@ func (a *actor) contextSet(params json.RawMessage) {
 	}
 	if p.ThreadID != "" && p.ProjectID != "" {
 		a.hostLog("refused context/set %s: a fact is for a thread or a project, not both", key)
+		return
+	}
+	if len(p.ThreadID) > maxFactScopeID || len(p.ProjectID) > maxFactScopeID {
+		a.hostLog("refused context/set %s: a thread or project id is at most %d bytes", key, maxFactScopeID)
 		return
 	}
 	var raw any

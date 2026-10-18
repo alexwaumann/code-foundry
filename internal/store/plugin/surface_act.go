@@ -430,15 +430,14 @@ func (m *Manager) Act(ctx context.Context, req ActRequest) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
+	secrets := map[string]string{}
 	for name, store := range stores {
 		s, _ := vals[name].(string)
 		if s == "" {
 			delete(vals, name)
 			continue
 		}
-		if err := m.storeSecret(ctx, in.plugin, store, s); err != nil {
-			return 0, err
-		}
+		secrets[store] = s
 		vals[name] = pluginsdk.StoredSecret{Key: store, Stored: true}
 	}
 	if len(vals) > 0 {
@@ -446,6 +445,12 @@ func (m *Manager) Act(ctx context.Context, req ActRequest) (uint64, error) {
 	}
 	if b, err := json.Marshal(act); err != nil || len(b) > maxActPayload {
 		return 0, fmt.Errorf("%w: the action's payload is over %d bytes", ErrInvalidArgument, maxActPayload)
+	}
+	// Stored only once the act is known to go out.
+	for store, s := range secrets {
+		if err := m.storeSecret(ctx, in.plugin, store, s); err != nil {
+			return 0, err
+		}
 	}
 	m.surfLog(in.plugin, "%s %s on %s (version %d)", act.Kind, act.Key, key, ver)
 	cctx, cancel := context.WithTimeout(ctx, surfaceActTimeout)

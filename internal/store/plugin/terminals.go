@@ -82,7 +82,7 @@ func (a *actor) terminalCreate(ctx context.Context, params json.RawMessage) (any
 	}
 	size := 0
 	for _, s := range p.Argv {
-		size += len(s)
+		size += len(s) + 1 // its NUL in exec's argv: a million empty args are not free
 		if strings.ContainsRune(s, 0) {
 			return nil, pluginsdk.NewError(pluginsdk.CodeInvalidParams, "%s: argv has a NUL byte", method)
 		}
@@ -112,6 +112,8 @@ func (a *actor) terminalCreate(ctx context.Context, params json.RawMessage) (any
 	if err != nil {
 		return nil, err
 	}
+	a.ownedMu.Lock() // count and create under one lock (threads.go)
+	defer a.ownedMu.Unlock()
 	if n := len(terms.Owned(a.name)); n >= maxPluginTerminals {
 		return nil, pluginsdk.NewError(pluginsdk.CodeRateLimited, "%s: at most %d terminals (close one first)", method, maxPluginTerminals)
 	}

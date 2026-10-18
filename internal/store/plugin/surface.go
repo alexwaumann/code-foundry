@@ -53,12 +53,15 @@ const (
 	logKeepBytes = 256 << 10
 	// appendRing appends are kept for watchers catching up; one further behind gets
 	// the whole view.
-	appendRing    = 512
-	toastRing     = 16
-	keptVersions  = 4
-	maxClosed     = 64
-	maxActPayload = 64 << 10
-	maxToastText  = 200
+	appendRing = 512
+	// maxAppendBytes bounds the ring by size too (appendCost): appends of many empty
+	// lines, each under the per-append limit, would otherwise hold a gigabyte.
+	maxAppendBytes = 4 << 20
+	toastRing      = 16
+	keptVersions   = 4
+	maxClosed      = 64
+	maxActPayload  = 64 << 10
+	maxToastText   = 200
 )
 
 // SurfacePhase is an instance's host-side state.
@@ -362,12 +365,13 @@ type instance struct {
 	renderedSeq  uint64
 	index        map[uint64]*actionIndex
 
-	appendSeq uint64
-	appends   []appendRec
-	state     SurfaceState
-	stateSeq  uint64
-	toastSeq  uint64
-	toasts    []toastRec
+	appendSeq   uint64
+	appends     []appendRec
+	appendBytes int // the appends' appendCost
+	state       SurfaceState
+	stateSeq    uint64
+	toastSeq    uint64
+	toasts      []toastRec
 
 	winStart  time.Time
 	winCount  int
@@ -381,6 +385,16 @@ type appendRec struct {
 	key     string
 	text    string
 	lines   []pluginsdk.AppendLine
+	cost    int
+}
+
+// appendCost is about what an append holds in memory.
+func appendCost(text string, lines []pluginsdk.AppendLine) int {
+	n := 64 + len(text)
+	for _, l := range lines {
+		n += 32 + len(l.Text) + len(l.Tone)
+	}
+	return n
 }
 
 type toastRec struct {
@@ -1102,10 +1116,15 @@ func (in *instance) appendLog(p pluginsdk.ViewAppendParams) (uint64, error) {
 	}
 	b.append(p.Text, p.Lines)
 	in.appendSeq++
-	in.appends = append(in.appends, appendRec{seq: in.appendSeq, version: in.version, key: p.Key, text: p.Text, lines: slices.Clone(p.Lines)})
-	if len(in.appends) > appendRing {
-		in.appends = slices.Delete(in.appends, 0, len(in.appends)-appendRing)
+	rec := appendRec{seq: in.appendSeq, version: in.version, key: p.Key, text: p.Text, lines: slices.Clone(p.Lines), cost: appendCost(p.Text, p.Lines)}
+	in.appends = append(in.appends, rec)
+	in.appendBytes += rec.cost
+	drop := 0
+	for drop < len(in.appends)-1 && (len(in.appends)-drop > appendRing || in.appendBytes > maxAppendBytes) {
+		in.appendBytes -= in.appends[drop].cost
+		drop++
 	}
+	in.appends = slices.Delete(in.appends, 0, drop)
 	in.wakeLocked()
 	return in.version, nil
 }

@@ -37,6 +37,9 @@ const (
 	maxEnvKeys      = 64
 	maxEnvDirs      = 16
 	maxScopeEntries = 256
+	// maxEnvIssues bounds the issues one push reports (the rest are counted): they are
+	// logged one a line and sent back in the answer.
+	maxEnvIssues = 32
 	// envSettle is how long after initialized a starting plugin counts as having had
 	// its chance to push (its Init runs then).
 	envSettle = 500 * time.Millisecond
@@ -205,6 +208,9 @@ func validateEnvironment(name string, in pluginsdk.Environment, home string) (En
 			}
 		}
 		out.NoProject = in.Scope.NoProject
+	}
+	if len(issues) > maxEnvIssues {
+		issues = append(issues[:maxEnvIssues:maxEnvIssues], fmt.Sprintf("… and %d more issues", len(issues)-maxEnvIssues))
 	}
 	return out, issues
 }
