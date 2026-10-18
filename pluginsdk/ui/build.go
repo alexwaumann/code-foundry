@@ -1,0 +1,195 @@
+package ui
+
+import "time"
+
+// Plain returns an Inline of plain text.
+func Plain(s string) *Inline { return &Inline{Text: s} }
+
+// Spans returns an Inline of spans.
+func Spans(spans ...Span) *Inline { return &Inline{Spans: spans} }
+
+// T returns a text span.
+func T(s string) Span { return Span{Text: s} }
+
+// At returns a ticking time span.
+func At(t time.Time, style TimeStyle) Span { return Span{Time: &Time{At: t, Style: style}} }
+
+// For returns a duration span ("1m 40s").
+func For(d time.Duration) Span { return Span{Duration: &Duration{Ms: d.Milliseconds()}} }
+
+// WithTone returns s with a tone.
+func (s Span) WithTone(t Tone) Span { s.Tone = t; return s }
+
+// AsMono returns s in the monospace font.
+func (s Span) AsMono() Span { s.Mono = true; return s }
+
+// AsStrong returns s emphasised.
+func (s Span) AsStrong() Span { s.Strong = true; return s }
+
+// Link returns s as a link to url (http or https).
+func (s Span) Link(url string) Span { s.URL = url; return s }
+
+// NewPill returns a pill.
+func NewPill(label string, tone Tone) *Pill { return &Pill{Label: label, Tone: tone} }
+
+// StatusGlyph returns a status glyph.
+func StatusGlyph(s Status) *Glyph { return &Glyph{Status: s} }
+
+// IconGlyph returns an icon glyph.
+func IconGlyph(icon string, tone Tone) *Glyph { return &Glyph{Icon: icon, Tone: tone} }
+
+// EventAction sends event (with data) to the plugin.
+func EventAction(event, data string) *Action { return &Action{Event: event, Data: data} }
+
+// CommandAction runs a command.
+func CommandAction(name string, args map[string]string) *Action {
+	return &Action{Command: &Command{Name: name, Args: args}}
+}
+
+// URLAction opens url.
+func URLAction(url string) *Action { return &Action{OpenURL: url} }
+
+// CopyAction copies text.
+func CopyAction(text string) *Action { return &Action{Copy: text} }
+
+// EventButton returns a button sending event to the plugin.
+func EventButton(key, label, event string) Button {
+	return Button{Key: key, Label: label, Action: EventAction(event, "")}
+}
+
+// CommandButton returns a button running a command.
+func CommandButton(key, label, name string, args map[string]string) Button {
+	return Button{Key: key, Label: label, Action: CommandAction(name, args)}
+}
+
+// URLButton returns a button opening url.
+func URLButton(key, label, url string) Button {
+	return Button{Key: key, Label: label, Action: URLAction(url)}
+}
+
+// CopyButton returns a button copying text.
+func CopyButton(key, label, text string) Button {
+	return Button{Key: key, Label: label, Action: CopyAction(text)}
+}
+
+// WithIcon returns b with a lucide icon.
+func (b Button) WithIcon(icon string) Button { b.Icon = icon; return b }
+
+// WithStyle returns b with a style.
+func (b Button) WithStyle(s ButtonStyle) Button { b.Style = s; return b }
+
+// AsIconOnly returns b drawn as its icon (the label becomes its tooltip).
+func (b Button) AsIconOnly() Button { b.IconOnly = true; return b }
+
+// NewView returns a view.
+func NewView(header *Header, nodes ...Node) View { return View{Header: header, Nodes: nodes} }
+
+// NewHeader returns a header with a title.
+func NewHeader(title string) *Header { return &Header{Title: title} }
+
+// NewTabs returns tabs with active selected.
+func NewTabs(active string, tabs ...Tab) *Tabs { return &Tabs{Items: tabs, Active: active} }
+
+// NewTab returns a tab.
+func NewTab(key, label string) Tab { return Tab{Key: key, Label: label} }
+
+// NewText returns a text node.
+func NewText(key string, content *Inline) Node { return Node{Key: key, Text: &Text{Content: content}} }
+
+// NewMarkdown returns a markdown node.
+func NewMarkdown(key, source string) Node { return Node{Key: key, Markdown: &Markdown{Source: source}} }
+
+// NewPairs returns a pairs node.
+func NewPairs(key string, items ...Pair) Node { return Node{Key: key, Pairs: &Pairs{Items: items}} }
+
+// NewPair returns one pair.
+func NewPair(key, label string, value *Inline) Pair {
+	return Pair{Key: key, Label: label, Value: value}
+}
+
+// NewList returns a list node.
+func NewList(key string, rows ...Row) Node { return Node{Key: key, List: &List{Rows: rows}} }
+
+// NewRow returns a list row.
+func NewRow(key, title string) Row { return Row{Key: key, Title: title} }
+
+// NewChips returns a chips node.
+func NewChips(key string, chips ...Chip) Node { return Node{Key: key, Chips: &Chips{Chips: chips}} }
+
+// NewChip returns a chip.
+func NewChip(key, label string, status Status) Chip {
+	return Chip{Key: key, Label: label, Status: status}
+}
+
+// NewLog returns a log node.
+func NewLog(key, text string) Node { return Node{Key: key, Log: &Log{Text: text}} }
+
+// NewActions returns an actions bar.
+func NewActions(key string, buttons ...Button) Node {
+	return Node{Key: key, Actions: &Actions{Buttons: buttons}}
+}
+
+// NewProgress returns a progress node; a nil value is indeterminate.
+func NewProgress(key, label string, value *float64) Node {
+	return Node{Key: key, Progress: &Progress{Label: label, Value: value}}
+}
+
+// Fraction returns a pointer for Progress.Value.
+func Fraction(v float64) *float64 { return &v }
+
+// NewNotice returns a notice.
+func NewNotice(key string, tone Tone, title string, body *Inline) Node {
+	return Node{Key: key, Notice: &Notice{Tone: tone, Title: title, Body: body}}
+}
+
+// NewEmpty returns an empty state.
+func NewEmpty(key, title string, body *Inline) Node {
+	return Node{Key: key, Empty: &Empty{Title: title, Body: body}}
+}
+
+// NewSection returns a section.
+func NewSection(key, title string, children ...Node) Node {
+	return Node{Key: key, Section: &Section{Title: title, Children: children}}
+}
+
+// NewForm returns a form submitting through submit.
+func NewForm(key string, submit *Button, fields ...Field) Node {
+	return Node{Key: key, Form: &Form{Fields: fields, Submit: submit}}
+}
+
+// TextField returns a text input field.
+func TextField(key, name, label string) Field {
+	return Field{Key: key, Name: name, Label: label, Input: &Input{}}
+}
+
+// SecretField returns a secret input field; store, when set, has the host keep the
+// submitted value in the plugin's secrets under that key.
+func SecretField(key, name, label, store string) Field {
+	return Field{Key: key, Name: name, Label: label, Input: &Input{Kind: InputSecret, Store: store}}
+}
+
+// SelectField returns a select field.
+func SelectField(key, name, label string, options ...Option) Field {
+	return Field{Key: key, Name: name, Label: label, Select: &Select{Options: options}}
+}
+
+// ToggleField returns a switch field.
+func ToggleField(key, name, label string, value bool) Field {
+	return Field{Key: key, Name: name, Label: label, Toggle: &Toggle{Value: value}}
+}
+
+// NewFieldset returns a fieldset grouping fields.
+func NewFieldset(key, label string, fields ...Field) Field {
+	return Field{Key: key, Fieldset: &Fieldset{Label: label, Fields: fields}}
+}
+
+// Opt returns a select option.
+func Opt(key, value, label string) Option { return Option{Key: key, Value: value, Label: label} }
+
+// NewThread returns a node rendering a plugin-owned thread.
+func NewThread(key, threadID string) Node { return Node{Key: key, Thread: &Thread{ThreadID: threadID}} }
+
+// NewTerminal returns a node rendering a plugin-owned terminal.
+func NewTerminal(key, terminalID string) Node {
+	return Node{Key: key, Terminal: &Terminal{TerminalID: terminalID}}
+}
