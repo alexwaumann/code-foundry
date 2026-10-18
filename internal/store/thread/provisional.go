@@ -196,7 +196,10 @@ func abbreviation(word string) bool {
 }
 
 // truncateName cuts s to maxProvisionalName runes at the last word boundary that fits,
-// with "…"; a first word longer than that is cut mid-word.
+// with "…". When that boundary would keep less than half the room (a first word longer
+// than all of it, or a short word and then a URL or a path: "Review https://…" would be
+// "Review…"; CJK text has few spaces) it cuts mid-word instead, never inside a
+// character's combining marks or an emoji sequence (clusterStart).
 func truncateName(s string) string {
 	if utf8.RuneCountInString(s) <= maxProvisionalName {
 		return s
@@ -210,17 +213,61 @@ func truncateName(s string) string {
 		}
 		n++
 	}
+	midWord := s[:clusterStart(s, end)]
 	cut := s[:end]
 	if s[end] != ' ' {
-		if sp := strings.LastIndexByte(cut, ' '); sp > 0 {
+		if sp := strings.LastIndexByte(cut, ' '); sp > 0 && utf8.RuneCountInString(cut[:sp]) >= limit/2 {
 			cut = cut[:sp]
+		} else {
+			cut = midWord
 		}
 	}
 	cut = strings.TrimRightFunc(cut, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsPunct(r) && r != ')' && r != '"' })
 	if cut == "" {
-		cut = s[:end]
+		cut = midWord
 	}
 	return cut + provisionalEllipsis
+}
+
+// clusterStart moves a cut at byte offset end of s back to the start of the
+// user-perceived character there, so a cut keeps "é" spelled e + U+0301 whole, and an
+// emoji with its skin tone, variation selector, tags or ZWJ sequence, and a flag's pair
+// of regional indicators. An approximation of grapheme clusters (UAX #29) for those
+// cases; end itself when nothing before it would be left.
+func clusterStart(s string, end int) int {
+	extends := func(r rune) bool {
+		return unicode.In(r, unicode.Mn, unicode.Me, unicode.Mc) || r == '‍' ||
+			r >= '︀' && r <= '️' || r >= 0x1f3fb && r <= 0x1f3ff || r >= 0xe0020 && r <= 0xe007f
+	}
+	regional := func(r rune) bool { return r >= 0x1f1e6 && r <= 0x1f1ff }
+	i := end
+	for i > 0 {
+		next, _ := utf8.DecodeRuneInString(s[i:])
+		prev, size := utf8.DecodeLastRuneInString(s[:i])
+		if extends(next) || prev == '‍' {
+			i -= size
+			continue
+		}
+		if regional(next) {
+			// A flag is a pair: the cut splits one when an odd run of indicators ends here.
+			k, j := 0, i
+			for j > 0 {
+				r, sz := utf8.DecodeLastRuneInString(s[:j])
+				if !regional(r) {
+					break
+				}
+				k, j = k+1, j-sz
+			}
+			if k%2 == 1 {
+				i -= size
+			}
+		}
+		break
+	}
+	if i == 0 {
+		return end
+	}
+	return i
 }
 
 // refLabel is what a projected file reference shows: its base name, a directory's with
