@@ -1,13 +1,13 @@
 import { createContext } from "react";
 import type { PromptTag } from "@/lib/prompt";
 
-/** The editor node name of an inline tag (an image chip, a skill, a file, a thread, a pull request). */
+/** The editor node name of an inline tag (an image chip, a skill, a file, a thread, a pull request, a citation). */
 export const TAG_NODE = "promptTag";
 
 /** The node's attributes: kind and every kind's fields (unused ones stay ""). */
 export interface TagAttrs {
   kind: PromptTag["tagKind"];
-  /** image: the attachment id; thread: the thread id. */
+  /** image: the attachment id; thread: the thread id; cite: the citation id. */
   id: string;
   /** image: the file name; skill: the skill name; thread: its name when inserted. */
   name: string;
@@ -46,6 +46,8 @@ export function tagAttrs(tag: PromptTag): TagAttrs {
       return { ...TAG_ATTR_DEFAULTS, kind: "thread", id: tag.id, name: tag.name };
     case "pr":
       return { ...TAG_ATTR_DEFAULTS, kind: "pr", slug: tag.slug, number: String(tag.number) };
+    case "cite":
+      return { ...TAG_ATTR_DEFAULTS, kind: "cite", id: tag.id };
   }
 }
 
@@ -64,6 +66,8 @@ export function tagOf(attrs: Record<string, unknown>): PromptTag {
       return { tagKind: "thread", id: s("id"), name: s("name") };
     case "pr":
       return { tagKind: "pr", slug: s("slug"), number: Number(s("number")) };
+    case "cite":
+      return { tagKind: "cite", id: s("id") };
     default:
       return { tagKind: "image", id: s("id"), name: s("name") };
   }

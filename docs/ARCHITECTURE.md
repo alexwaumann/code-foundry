@@ -488,7 +488,11 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   Every fenced code block and Bash command has Copy; a shell block in Claude's reply also
   has Run in terminal, a new shell in the thread's bottom panel through `terminal.new
   --run` (the daemon types the line once the shell has printed its prompt;
-  `docs/notes/code-block-actions.md`).
+  `docs/notes/code-block-actions.md`). Text selected in one of Claude's answers can be
+  cited into the composer with a comment: an amber `cf-cite://` chip whose body the draft
+  keeps, sent as a self-contained `[Assistant quote](cf-cite://v1/…)` link the bubble
+  reads back, painted over the answer with the CSS Custom Highlight API; GUI only, no
+  command (`components/thread/cite`, `docs/notes/citations.md`).
 * Only the visible thread is watched and only the visible shell is attached. Switching
   threads (or bottom panel tabs) ends the old stream and opens the new one. Background
   threads cost nothing in the frontend. Watching is also how the daemon knows a thread

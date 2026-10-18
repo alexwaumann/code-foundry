@@ -9,6 +9,9 @@
  * chips, skills, files); the attachments are the images and PDFs themselves (the tiles).
  * A chip refers to an attachment by id; removing a chip from the text keeps the
  * attachment. Skill and file tags of a project go when the project leaves the draft.
+ * A citation tag (text quoted from one of Claude's answers, docs/notes/citations.md)
+ * refers to its body in `citations` by id, the way a chip refers to its attachment: kept
+ * when the tag is deleted (undo brings it back), gone with the draft.
  *
  * A PDF's page count and first-page thumbnail come from pdf.js (lib/pdf.ts, loaded on
  * the first PDF) a moment after it is added; the inline cap and the "reads it page by
@@ -50,6 +53,7 @@ import { pdfSummary } from "@/lib/pdf";
 import { NO_PROJECT } from "@/lib/threadRow";
 import { sentComposerText } from "@/lib/userMessage";
 import { projectPrompt, removeReferences, removeProjectTags, projectTagCount, tagsByProject } from "@/lib/prompt";
+import type { Citation } from "@/lib/citation";
 import { invokeConfirmed, refreshCommands } from "./commands";
 import { requestConfirm, type ConfirmRequest } from "./confirm";
 import { getUiContext } from "./context";
@@ -113,6 +117,8 @@ export interface Draft {
   error: string | null;
   /** Attachments that were rejected (type, size, count, inline cap), and PDFs Claude reads page by page; " · " between. */
   notice: string | null;
+  /** Citation bodies by id (the text's `cf-cite://<id>` tokens name them). */
+  citations: Readonly<Record<string, Citation>>;
 }
 
 export interface RefsState {
@@ -154,6 +160,7 @@ export const emptyDraft: Draft = {
   phase: "idle",
   error: null,
   notice: null,
+  citations: {},
 };
 
 /** A workspace draft starts in the workspace's own worktrees. */
@@ -310,6 +317,30 @@ export function openPreview(key: string, id: string, returnFocus: HTMLElement | 
 
 export function closePreview(): void {
   useComposeStore.setState((s) => (s.preview?.open ? { preview: { ...s.preview, open: false } } : s));
+}
+
+/** Keeps a citation's body in a draft (new, or an edited comment). */
+export function putCitation(key: string, c: Citation): void {
+  const d = getDraft(key);
+  updateDraft(key, { citations: { ...d.citations, [c.id]: c } });
+}
+
+/** A citation's body: the draft's own, else any draft's (a token copied between composers). */
+export function findCitation(key: string, id: string): Citation | undefined {
+  const drafts = useComposeStore.getState().drafts;
+  return drafts[key]?.citations[id] ?? Object.values(drafts).find((d) => id in d.citations)?.citations[id];
+}
+
+/**
+ * The error for a draft that projects to nothing: its only content is a citation chip
+ * whose body no draft has (pasted from a composer that has sent it), which the projection
+ * leaves out. Sending it would be an empty message (or a thread with no prompt).
+ */
+export const NOTHING_TO_SEND = "Nothing to send: the quote is no longer in any draft.";
+
+/** A citation of a draft (narrow selector; findCitation's fallback included). */
+export function useCitation(key: string, id: string): Citation | undefined {
+  return useComposeStore((s) => s.drafts[key]?.citations[id] ?? Object.values(s.drafts).find((d) => id in d.citations)?.citations[id]);
 }
 
 export function clearDraft(key: string): void {
@@ -573,16 +604,22 @@ export async function sendDraft(target: ComposeTarget, defaults: { model: string
     const place = draftPlace(target, cur);
     if (!place) throw new Error("This workspace no longer exists.");
     const staged = new Map(cur.attachments.map((a) => [a.id, a]));
-    const text = projectPrompt(cur.text, (id) => {
-      const a = staged.get(id);
-      return a?.stagedPath ? { name: a.file.name, ref: a.stagedPath, kind: a.kind } : undefined;
-    });
+    const cite = (id: string) => findCitation(key, id);
+    const text = projectPrompt(
+      cur.text,
+      (id) => {
+        const a = staged.get(id);
+        return a?.stagedPath ? { name: a.file.name, ref: a.stagedPath, kind: a.kind } : undefined;
+      },
+      cite,
+    );
     const sent = cur.attachments.filter((a) => a.stagedPath !== null);
+    if (!text.trim() && sent.length === 0) throw new Error(NOTHING_TO_SEND);
     const args = threadArgs(
       place,
       {
         text,
-        composerText: sentComposerText(cur.text, (id) => sent.findIndex((a) => a.id === id)),
+        composerText: sentComposerText(cur.text, (id) => sent.findIndex((a) => a.id === id), cite),
         model: cur.model ?? defaults.model,
         effort: cur.effort ?? defaults.effort,
         permission: cur.permission,

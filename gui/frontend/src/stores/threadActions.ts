@@ -19,7 +19,7 @@ import type { PermissionDecision } from "@/lib/threadRequest";
 import { projectPrompt } from "@/lib/prompt";
 import { sentComposerText } from "@/lib/userMessage";
 import { invokeConfirmed, refreshCommands, runCommand, runCommandForResult, useCommandsStore } from "./commands";
-import { clearDraft, getDraft, isDraftEmpty, updateDraft } from "./compose";
+import { clearDraft, findCitation, getDraft, isDraftEmpty, NOTHING_TO_SEND, updateDraft } from "./compose";
 import { getUiContext } from "./context";
 import { setAnswering } from "./thread";
 
@@ -104,7 +104,7 @@ export function threadDraftKey(threadId: string): string {
  * Sends the thread's draft: stages its attachments, projects the prompt exactly like the
  * new-thread composer (attachment chips become `[Image: <name>; ref=<path>]` or
  * `[PDF: <name>; ref=<path>]`, skills `/name`,
- * files `@cf-file://…`, which the daemon resolves and stores as sent), then thread.send
+ * citations their `cf-cite://v1/…` link, files `@cf-file://…`, which the daemon resolves and stores as sent), then thread.send
  * with the staged paths and the composer's text (lib/userMessage sentComposerText) that
  * the message's bubble draws its tags from. On success the draft is cleared; on failure it stays with the
  * error. Allowed while Claude works: Claude picks the message up mid-turn (a steer), and
@@ -125,17 +125,23 @@ export async function sendThreadDraft(threadId: string): Promise<boolean> {
     updateDraft(key, { phase: "starting" });
     const cur = getDraft(key);
     const staged = new Map(cur.attachments.map((a) => [a.id, a]));
-    const text = projectPrompt(cur.text, (id) => {
-      const a = staged.get(id);
-      return a?.stagedPath ? { name: a.file.name, ref: a.stagedPath, kind: a.kind } : undefined;
-    }).trim();
+    const cite = (id: string) => findCitation(key, id);
+    const text = projectPrompt(
+      cur.text,
+      (id) => {
+        const a = staged.get(id);
+        return a?.stagedPath ? { name: a.file.name, ref: a.stagedPath, kind: a.kind } : undefined;
+      },
+      cite,
+    ).trim();
     const sent = cur.attachments.filter((a) => a.stagedPath !== null);
     const attachments = sent.map((a) => a.stagedPath ?? "");
+    if (!text && attachments.length === 0) throw new Error(NOTHING_TO_SEND);
     const args: Record<string, string> = { id: threadId, text };
     if (attachments.length > 0) args.attachments = attachments.join(",");
     // The composer's own text, so the message's bubble draws the same tags (only when it
     // has any: without tags it is the text itself).
-    const composer = sentComposerText(cur.text, (id) => sent.findIndex((a) => a.id === id)).trim();
+    const composer = sentComposerText(cur.text, (id) => sent.findIndex((a) => a.id === id), cite).trim();
     if (composer && composer !== text) args["composer-text"] = composer;
     const res = await invokeConfirmed(THREAD_COMMANDS.send, args, threadContext(threadId));
     if (!res) {

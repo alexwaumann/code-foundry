@@ -11,6 +11,7 @@ import { inlineAttachmentPaths, parseUserMessage } from "@/lib/userMessage";
 import { cn } from "@/lib/utils";
 import { type PdfSummary, useAttachment, usePdfSummary } from "@/stores/attachments";
 import { useProjectsStore } from "@/stores/projects";
+import { CiteChip } from "./cite/CiteChip";
 
 /** The image chip's accent: green, the success token. */
 const IMAGE_ACCENT = "[--chip-accent:var(--success)]";
@@ -170,7 +171,7 @@ function timeOf(ms: number | null): string {
 
 /**
  * A user message: a right-aligned bubble with the composer's tags (from the composer text
- * the item carries, lib/userMessage), attachments (images and PDFs) the text does not
+ * the item carries, lib/userMessage) and citations (cite/CiteChip), attachments (images and PDFs) the text does not
  * refer to as tiles above it, and the time under it. `steer`: a message sent while the
  * turn ran (lib/threadTimeline): a smaller bubble inside the turn, "sent mid-turn · 14:12"
  * under it.
@@ -228,6 +229,8 @@ export const UserBubble = memo(function UserBubble({
                 return <ThreadChip key={i} id={p.id} name={p.name} />;
               case "pr":
                 return <PrChip key={i} slug={p.slug} number={p.number} />;
+              case "cite":
+                return <CiteChip key={i} cite={p.cite} />;
               case "image":
               case "pdf":
                 return <AttachmentChip key={i} name={p.name} path={p.path} pdf={p.kind === "pdf"} />;

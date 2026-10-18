@@ -1,8 +1,9 @@
-import { type ReactNode, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ArrowDown } from "lucide-react";
 import { buildRows, buildTurns, decodeTimelineKey, type TimelineRow } from "@/lib/threadTimeline";
 import { deferTurnFolds, foldDeferredTurns, useDeferredTurns, useTimelineKeys, useTurnFolds, watchTurnEnds } from "@/stores/thread";
+import { registerTimeline } from "@/stores/cite";
 import { KeepRowContext } from "./context";
 import { TimelineRowView } from "./rows";
 
@@ -135,6 +136,34 @@ export function TimelineList<R extends ListRow>({
     if (!el) return;
     el.scrollTop = el.scrollHeight;
   }, []);
+
+  // The cite layer brings a quoted item's row into view (stores/cite.ts): the thread's
+  // own timeline only (its rows are the turns).
+  const rowsRef = useRef(rows);
+  useLayoutEffect(() => {
+    rowsRef.current = rows;
+  });
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!turns || !el) return;
+    return registerTimeline(threadId, {
+      scroller: el,
+      showRow: (key) => {
+        const i = rowsRef.current.findIndex((r) => r.key === key);
+        if (i < 0) return false;
+        const node = el.querySelector(`[data-index="${String(i)}"]`);
+        const box = el.getBoundingClientRect();
+        const at = node?.getBoundingClientRect();
+        if (at && at.top >= box.top && at.bottom <= box.bottom) return true;
+        pinned.current = false;
+        v.scrollToIndex(i, { align: "center" });
+        return true;
+      },
+      unpin: () => {
+        pinned.current = false;
+      },
+    });
+  }, [threadId, turns, v]);
 
   // Follow the bottom while pinned: whenever the content's height changes (rows measured,
   // text streaming in, the composer growing), or the list's own (the bottom panel opening

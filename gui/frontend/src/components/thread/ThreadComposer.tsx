@@ -26,6 +26,7 @@ import { loadSkills } from "@/stores/skills";
 import { useSlashCommands } from "@/stores/thread";
 import { interruptThread, sendThreadDraft, snoozeThread, setThreadEffort, setThreadModel, setThreadPermission, threadDraftKey } from "@/stores/threadActions";
 import { useUiStore } from "@/stores/ui";
+import { registerCiteTarget } from "@/stores/cite";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { ColdCacheNote } from "./ColdCacheNote";
 import { RetryNote } from "./RetryNote";
@@ -176,6 +177,20 @@ export function ThreadComposer({ threadId, pending, busy }: { threadId: string; 
   useEffect(() => {
     void loadSkills(sources.skills);
   }, [sources.skills]);
+
+  // The thread's cite layer inserts citations at the prompt's caret (docs/notes/citations.md).
+  useEffect(
+    () =>
+      registerCiteTarget(draftKey, {
+        insert: (id) => {
+          editorRef.current?.insertCite(id);
+        },
+        focus: () => {
+          editorRef.current?.focusCollapsed();
+        },
+      }),
+    [draftKey],
+  );
 
   // Focus requests land in the prompt: a thread selected to be typed in (ui
   // promptFocusSeq), the content pane asked for (the side panel hid, ui contentFocusSeq).
