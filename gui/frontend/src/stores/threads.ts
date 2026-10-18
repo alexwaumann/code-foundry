@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { AgentRunView, ThreadListEventView, ThreadView, UsageBucketView } from "@/api/threads";
+import type { AgentRunView, ThreadFlagView, ThreadListEventView, ThreadView, UsageBucketView } from "@/api/threads";
 import { threadBadge } from "@/lib/thread";
 
 export interface ThreadsData {
@@ -48,10 +48,17 @@ export function sameThread(a: ThreadView, b: ThreadView): boolean {
         return a[k] === b[k] || (a[k].length === b[k].length && a[k].every((l, i) => l === b[k][i]));
       case "report":
         return sameReport(a[k], b[k]);
+      case "flags":
+        return sameFlags(a[k], b[k]);
       default:
         return a[k] === b[k];
     }
   });
+}
+
+/** Field-by-field equality of flags (every Updated event carries new objects). */
+export function sameFlags(a: readonly ThreadFlagView[], b: readonly ThreadFlagView[]): boolean {
+  return a === b || (a.length === b.length && a.every((x, i) => (Object.keys(x) as (keyof ThreadFlagView)[]).every((k) => x[k] === b[i]?.[k])));
 }
 
 /** Field-by-field equality of reports (every Updated event carries a new object). */
@@ -141,12 +148,15 @@ export const useThreadsStore = create<ThreadsState>()(() => ({
 }));
 
 /**
- * The thread needs the user: needs-attention, in any state. The daemon persists status, so
- * a thread whose process stopped (or outlived a daemon restart) while asking a question or
- * waiting on a permission prompt still counts. "error" (interrupted) does not.
+ * The thread needs the user: needs-attention, in any state, or a plugin's flag on it
+ * (attention or error: a plugin raising one asks for the user like a prompt, so the bell,
+ * the badge and the dock alert follow; docs/notes/plugins-3-events-flags-env.md). The
+ * daemon persists status, so a thread whose process stopped (or outlived a daemon restart)
+ * while asking a question or waiting on a permission prompt still counts. "error"
+ * (interrupted) does not.
  */
-export function isAttention(s: Pick<ThreadView, "status" | "state">): boolean {
-  return s.status === "attention";
+export function isAttention(s: Pick<ThreadView, "status" | "state"> & Partial<Pick<ThreadView, "flags">>): boolean {
+  return s.status === "attention" || (s.flags?.length ?? 0) > 0;
 }
 
 /**
@@ -167,7 +177,7 @@ export function attentionIds(data: ThreadsData): string[] {
  * The thread is working: the "busy" badge (busy, or Claude starting; threadBadge), never
  * a thread that needs attention.
  */
-export function isRunning(s: Pick<ThreadView, "status" | "state">): boolean {
+export function isRunning(s: Pick<ThreadView, "status" | "state"> & Partial<Pick<ThreadView, "flags">>): boolean {
   return !isAttention(s) && threadBadge(s) === "busy";
 }
 

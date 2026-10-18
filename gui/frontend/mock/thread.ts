@@ -87,6 +87,8 @@ export interface ThreadWorld {
    */
   start(id: string, ready: () => void): void;
   setStatus(id: string, status: ThreadStatus, reason: string): void;
+  /** The user opened the thread: its plugins' until-seen flags go. */
+  seenFlags(id: string): void;
   setModel(id: string, model: string): void;
   setPermission(id: string, permission: string): void;
   setEffort(id: string, effort: string, pending: boolean): void;
@@ -483,6 +485,7 @@ export class MockThreadLogs {
     const l = this.log(id);
     l.watchers++;
     this.seen(id);
+    this.world.seenFlags(id);
     try {
       const live = this.hub.subscribe(signal);
       yield this.snapshot(id);
