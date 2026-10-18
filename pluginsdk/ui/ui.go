@@ -305,8 +305,10 @@ type Pair struct {
 type List struct {
 	Rows       []Row      `json:"rows"`
 	GlyphStyle GlyphStyle `json:"glyphStyle,omitempty"`
-	Dense      bool       `json:"dense,omitempty"`
-	EmptyText  string     `json:"emptyText,omitempty"`
+	// Dense draws 24 px single-line rows: a row's line2 and its labelled buttons are
+	// not shown (icon-only buttons and trailing are). For steps, env vars, short names.
+	Dense     bool   `json:"dense,omitempty"`
+	EmptyText string `json:"emptyText,omitempty"`
 }
 
 // Row is one list row.
