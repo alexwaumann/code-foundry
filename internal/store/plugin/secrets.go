@@ -3,12 +3,16 @@ package plugin
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/alexwaumann/code-foundry/internal/store/plugin/registry"
 )
 
 // SecretStore keeps plugin secrets. Values are never logged; keys may be.
@@ -21,12 +25,41 @@ type SecretStore interface {
 	Delete(ctx context.Context, plugin, key string) error
 }
 
-// KeychainService is the Keychain service every plugin secret is stored under; the
-// account is "<plugin>/<key>".
+// KeychainService is the Keychain service every plugin secret of the default config home
+// is stored under (KeychainServiceFor names another home's); the account is
+// "<plugin>/<key>" (keychainAccount).
 const KeychainService = "code-foundry-plugin"
+
+// KeychainServiceFor is the Keychain service of the config home home: KeychainService
+// for the default home (~/.code-foundry), and KeychainService plus a hash of the path for
+// any other (CODE_FOUNDRY_HOME), so a test home's plugin never reads or overwrites the
+// real home's secrets of a plugin with the same name.
+func KeychainServiceFor(home, defaultHome string) string {
+	home, defaultHome = filepath.Clean(home), filepath.Clean(defaultHome)
+	if home == defaultHome {
+		return KeychainService
+	}
+	sum := sha256.Sum256([]byte(home))
+	return KeychainService + "-" + hex.EncodeToString(sum[:6])
+}
 
 // secretKeyPattern is the shape of a secret's key.
 var secretKeyPattern = regexp.MustCompile(`^[A-Za-z0-9._-]{1,128}$`)
+
+// keychainAccount is the Keychain account of plugin's key: "<plugin>/<key>". A plugin
+// name ([a-z0-9][a-z0-9-]*) and a key ([A-Za-z0-9._-]+) never hold a "/", so the account
+// names exactly one (plugin, key) pair; anything else is refused here, at the last step
+// before the security CLI, whatever the caller checked (the account is also part of the
+// command line Set writes to `security -i`, where a space or a newline would be syntax).
+func keychainAccount(plugin, key string) (string, error) {
+	if !registry.ValidName(plugin) {
+		return "", fmt.Errorf("keychain: %q is not a plugin name", plugin)
+	}
+	if !secretKeyPattern.MatchString(key) {
+		return "", fmt.Errorf("keychain: %q is not a secret key", key)
+	}
+	return plugin + "/" + key, nil
+}
 
 // MaxSecretBytes bounds one secret value.
 const MaxSecretBytes = 16 << 10
@@ -58,6 +91,9 @@ func (k Keychain) service() string {
 	return KeychainService
 }
 
+// servicePattern bounds Service to what `security -i` reads as one word.
+var servicePattern = regexp.MustCompile(`^[A-Za-z0-9._-]{1,128}$`)
+
 // errItemNotFound is security's exit status for a missing item.
 const errItemNotFound = 44
 
@@ -78,7 +114,11 @@ func (k Keychain) run(ctx context.Context, stdin string, args ...string) (stdout
 
 // Get implements SecretStore.
 func (k Keychain) Get(ctx context.Context, plugin, key string) (string, bool, error) {
-	_, stderr, code, err := k.run(ctx, "", "find-generic-password", "-s", k.service(), "-a", plugin+"/"+key, "-g")
+	acct, err := keychainAccount(plugin, key)
+	if err != nil {
+		return "", false, err
+	}
+	_, stderr, code, err := k.run(ctx, "", "find-generic-password", "-s", k.service(), "-a", acct, "-g")
 	switch {
 	case err != nil:
 		return "", false, fmt.Errorf("keychain: %w", err)
@@ -120,7 +160,16 @@ func parsePasswordLine(out string) (string, bool) {
 
 // Set implements SecretStore.
 func (k Keychain) Set(ctx context.Context, plugin, key, value string) error {
-	cmdline := fmt.Sprintf("add-generic-password -U -s %s -a %s/%s -X %s\n", k.service(), plugin, key, hex.EncodeToString([]byte(value)))
+	acct, err := keychainAccount(plugin, key)
+	if err != nil {
+		return err
+	}
+	if !servicePattern.MatchString(k.service()) {
+		return fmt.Errorf("keychain: %q is not a service name", k.service())
+	}
+	// No -A and no -T: the item trusts only its creator, /usr/bin/security (the note
+	// plugins-8-secrets-hardening.md says what that does and does not protect).
+	cmdline := fmt.Sprintf("add-generic-password -U -s %s -a %s -X %s\n", k.service(), acct, hex.EncodeToString([]byte(value)))
 	_, stderr, code, err := k.run(ctx, cmdline, "-i")
 	switch {
 	case err != nil:
@@ -133,7 +182,11 @@ func (k Keychain) Set(ctx context.Context, plugin, key, value string) error {
 
 // Delete implements SecretStore.
 func (k Keychain) Delete(ctx context.Context, plugin, key string) error {
-	_, stderr, code, err := k.run(ctx, "", "delete-generic-password", "-s", k.service(), "-a", plugin+"/"+key)
+	acct, err := keychainAccount(plugin, key)
+	if err != nil {
+		return err
+	}
+	_, stderr, code, err := k.run(ctx, "", "delete-generic-password", "-s", k.service(), "-a", acct)
 	switch {
 	case err != nil:
 		return fmt.Errorf("keychain: %w", err)

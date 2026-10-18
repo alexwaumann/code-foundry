@@ -49,12 +49,34 @@ var (
 	envKeyPattern       = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 )
 
-// reservedEnvKey reports whether key is the daemon's or Claude's.
+// reservedEnvKey reports whether key is the daemon's or Claude's, in any case (macOS
+// variables are case-sensitive, but a shell or tool may not be: "path" is zsh's PATH).
 func reservedEnvKey(key string) bool {
+	key = strings.ToUpper(key)
 	if slices.Contains(reservedEnv, key) {
 		return true
 	}
 	return slices.ContainsFunc(reservedEnvPrefixes, func(p string) bool { return strings.HasPrefix(key, p) })
+}
+
+// withinHome reports whether the clean absolute path p is inside home, also once
+// symlinks are resolved: a link under home that points outside it is outside. A path
+// that does not exist (yet) is judged as written.
+func withinHome(home, p string) bool {
+	if home == "" {
+		return true
+	}
+	if !fsx.Within(home, p) {
+		return false
+	}
+	real, err := filepath.EvalSymlinks(p)
+	if err != nil {
+		return true
+	}
+	if rh, err := filepath.EvalSymlinks(home); err == nil {
+		home = rh
+	}
+	return fsx.Within(home, real)
 }
 
 // Environment is one plugin's contribution as applied: what was refused or lost to an
@@ -152,7 +174,7 @@ func validateEnvironment(name string, in pluginsdk.Environment, home string) (En
 				continue
 			}
 			p = filepath.Clean(p)
-			if home != "" && !fsx.Within(home, p) {
+			if !withinHome(home, p) {
 				issues = append(issues, fmt.Sprintf("%s %s is outside your home directory", what, p))
 				continue
 			}

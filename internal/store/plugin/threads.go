@@ -14,7 +14,6 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/alexwaumann/code-foundry/internal/fsx"
 	"github.com/alexwaumann/code-foundry/pluginsdk"
 	"github.com/alexwaumann/code-foundry/pluginsdk/ui"
 )
@@ -128,7 +127,7 @@ func (a *actor) ownedCwd(method, cwd, def string) (string, error) {
 	switch {
 	case !filepath.IsAbs(p):
 		return "", pluginsdk.NewError(pluginsdk.CodeInvalidParams, "%s: cwd %q is not an absolute path", method, cwd)
-	case a.m.opts.Home != "" && !fsx.Within(a.m.opts.Home, filepath.Clean(p)):
+	case !withinHome(a.m.opts.Home, filepath.Clean(p)):
 		return "", pluginsdk.NewError(pluginsdk.CodeInvalidParams, "%s: cwd %s is outside your home directory", method, p)
 	}
 	if fi, err := os.Stat(p); err != nil || !fi.IsDir() {

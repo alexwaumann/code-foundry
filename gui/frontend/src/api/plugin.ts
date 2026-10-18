@@ -598,7 +598,8 @@ export async function pluginLogs(name: string, lines = 200, signal?: AbortSignal
 /** What one plugin adds to new Claude threads, as applied. */
 export interface PluginEnvironmentView {
   plugin: string;
-  env: { key: string; value: string }[];
+  /** The variables' names: the daemon never sends a value (a plugin may push a secret). */
+  env: string[];
   pathPrepend: string[];
   addDirs: string[];
   /** Empty: every project. */
@@ -611,7 +612,7 @@ export interface PluginEnvironmentView {
 function toEnvironment(e: PluginEnvironment): PluginEnvironmentView {
   return {
     plugin: e.plugin,
-    env: e.env.map((v) => ({ key: v.key, value: v.value })),
+    env: e.env.map((v) => v.key),
     pathPrepend: [...e.pathPrepend],
     addDirs: [...e.addDirs],
     projects: [...e.projects],

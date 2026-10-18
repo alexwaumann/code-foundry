@@ -99,6 +99,8 @@ func testManifest(name string) pluginsdk.Manifest {
 			{Name: "flag", Title: "Flag"},
 			{Name: "remember", Title: "Remember", Args: []pluginsdk.ArgSpec{{Name: "word", Required: true}}},
 			{Name: "recall", Title: "Recall"},
+			{Name: "peek", Title: "Peek", Args: []pluginsdk.ArgSpec{{Name: "key"}}},
+			{Name: "forget", Title: "Forget", Args: []pluginsdk.ArgSpec{{Name: "key"}}},
 			{Name: "slow", Title: "Slow", TimeoutSeconds: 1},
 			{Name: "fail", Title: "Fail"},
 		},
@@ -502,14 +504,14 @@ func TestDevLinkEnableAndRemove(t *testing.T) {
 	src := e.install(filepath.Join(e.root, "src"), "hello", "crash", testManifest("hello"))
 	m := e.start()
 
-	res, err := m.Dev(context.Background(), src, false, true)
+	res, err := m.Dev(context.Background(), src, false, true, false)
 	if err != nil || !res.NeedsConsent || res.Plugin.Name != "hello" {
 		t.Fatalf("dry run: %+v %v", res, err)
 	}
 	if _, err := os.Lstat(filepath.Join(e.opts.Dir, "hello")); !os.IsNotExist(err) {
 		t.Fatal("dry run linked")
 	}
-	if _, err := m.Dev(context.Background(), src, true, false); err != nil {
+	if _, err := m.Dev(context.Background(), src, true, false, false); err != nil {
 		t.Fatal(err)
 	}
 	// A dev plugin never fails for crashing (CrashLimit 1 would fail it otherwise).
@@ -520,7 +522,7 @@ func TestDevLinkEnableAndRemove(t *testing.T) {
 	e.setMode(src, "ok")
 	e.waitState("hello", plugin.StateRunning)
 
-	if _, err := m.Dev(context.Background(), "relative/dir", true, false); !errors.Is(err, plugin.ErrInvalidArgument) {
+	if _, err := m.Dev(context.Background(), "relative/dir", true, false, false); !errors.Is(err, plugin.ErrInvalidArgument) {
 		t.Errorf("relative: %v", err)
 	}
 	// Removing the link removes the plugin on reload.
@@ -543,7 +545,7 @@ func TestDevOutsideHome(t *testing.T) {
 	e.opts.Home = filepath.Join(e.root, "home")
 	src := e.install(filepath.Join(e.root, "elsewhere"), "hello", "ok", testManifest("hello"))
 	m := e.start()
-	if _, err := m.Dev(context.Background(), src, true, false); !errors.Is(err, plugin.ErrInvalidArgument) || !strings.Contains(err.Error(), "outside your home") {
+	if _, err := m.Dev(context.Background(), src, true, false, false); !errors.Is(err, plugin.ErrInvalidArgument) || !strings.Contains(err.Error(), "outside your home") {
 		t.Fatalf("err %v", err)
 	}
 }

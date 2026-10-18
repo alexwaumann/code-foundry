@@ -31,8 +31,9 @@ func pluginEnvironmentToProto(e plugin.Environment) *v1.PluginEnvironment {
 		Plugin: e.Plugin, PathPrepend: e.PathPrepend, AddDirs: e.AddDirs, Projects: e.Projects,
 		NoProject: e.NoProject, Issues: e.Issues,
 	}
+	// Keys only: a value may be a secret the plugin read from the Keychain.
 	for _, k := range slices.Sorted(maps.Keys(e.Env)) {
-		p.Env = append(p.Env, &v1.PluginEnvVar{Key: k, Value: e.Env[k]})
+		p.Env = append(p.Env, &v1.PluginEnvVar{Key: k})
 	}
 	if !e.UpdatedAt.IsZero() {
 		p.UpdatedAt = timestamppb.New(e.UpdatedAt)

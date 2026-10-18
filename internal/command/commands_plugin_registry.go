@@ -62,7 +62,8 @@ func RegisterPluginRegistry(r *Registry, b PluginRegistryBackend) error {
 			Args: []ArgSpec{
 				{Name: "ref", Type: String, Required: true, Positional: true, Description: "name[@version], owner/repo[@vX.Y.Z], or /absolute/folder"},
 				{Name: "enable", Type: Bool, Description: "Enable it afterwards, consenting to its permissions (asks; --yes confirms)"},
-				{Name: "force", Type: Bool, Description: "Replace a dev link, or reinstall the version already installed"},
+				{Name: "force", Type: Bool, Description: "Replace a dev link, reinstall the version already installed, or take the name " +
+					"from a plugin of another source (deleting its secrets, data and consent; enabling asks again)"},
 				refreshArg,
 			},
 			Confirm:   "Install {ref} and enable it?",

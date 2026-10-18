@@ -289,6 +289,18 @@ func TestExtract(t *testing.T) {
 		{name: "symlink", entries: []tar.Header{{Name: "bin/x", Typeflag: tar.TypeSymlink, Linkname: "/bin/sh"}}, wantErr: "links and devices are not allowed"},
 		{name: "hard link", entries: []tar.Header{reg("a", 0o644), {Name: "b", Typeflag: tar.TypeLink, Linkname: "a"}}, wantErr: "links and devices"},
 		{name: "duplicate", entries: []tar.Header{reg("a", 0o644), reg("./a", 0o644)}, wantErr: "appears twice"},
+		{name: "backslash", entries: []tar.Header{reg(`..\evil`, 0o644)}, wantErr: "backslash"},
+		{name: "fifo", entries: []tar.Header{{Name: "p", Typeflag: tar.TypeFifo}}, wantErr: "links and devices"},
+		{name: "char device", entries: []tar.Header{{Name: "d", Typeflag: tar.TypeChar, Devmajor: 1}}, wantErr: "links and devices"},
+		{name: "setuid and sticky bits dropped", entries: []tar.Header{{Name: "bin/", Typeflag: tar.TypeDir, Mode: 0o1777}, reg("bin/x", 0o6777)},
+			check: func(t *testing.T, dir string) {
+				for name, want := range map[string]os.FileMode{"bin": os.ModeDir | 0o755, "bin/x": 0o755} {
+					fi, err := os.Stat(filepath.Join(dir, name))
+					if err != nil || fi.Mode() != want {
+						t.Errorf("%s mode = %v, %v; want %v", name, fi.Mode(), err, want)
+					}
+				}
+			}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

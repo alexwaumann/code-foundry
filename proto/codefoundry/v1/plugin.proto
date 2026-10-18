@@ -237,6 +237,10 @@ message DevPluginRequest {
   string path = 1;
   bool consent = 2;
   bool dry_run = 3;
+  // Take the name from a plugin of another source (a link to another folder, an
+  // installed package's leftovers): its secrets, data and consent are deleted first, and
+  // enabling asks for consent again.
+  bool force = 4;
 }
 
 message DevPluginResponse {
@@ -475,6 +479,8 @@ message PluginEnvironmentRequest {
 // PluginEnvVar is one environment variable a plugin contributes.
 message PluginEnvVar {
   string key = 1;
+  // Never filled: a plugin may push a token, so values stay in the daemon (and the
+  // threads it spawns); clients show the key (docs/notes/plugins-8-secrets-hardening.md).
   string value = 2;
 }
 

@@ -239,6 +239,16 @@ func (a *actor) secretGet(ctx context.Context, params json.RawMessage) (any, err
 	if err := checkSecretKey(p.Key); err != nil {
 		return nil, err
 	}
+	// Only a key this home recorded for this plugin is read: a Keychain item left by an
+	// earlier package of the name (whose secrets were purged from the database, or a
+	// database reset) stays out of reach.
+	recorded, err := hasSecret(ctx, a.m.opts.DB, a.name, p.Key)
+	if err != nil {
+		return nil, pluginsdk.NewError(pluginsdk.CodeInternal, "%v", err)
+	}
+	if !recorded {
+		return pluginsdk.SecretGetResult{}, nil
+	}
 	v, ok, err := a.m.opts.Secrets.Get(ctx, a.name, p.Key)
 	if err != nil {
 		return nil, pluginsdk.NewError(pluginsdk.CodeInternal, "%v", err)

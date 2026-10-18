@@ -143,7 +143,7 @@ func (f *Fake) Restart(_ context.Context, name string) (plugin.Plugin, error) {
 }
 
 // Dev implements plugin.Store: dir's last element is the plugin's name.
-func (f *Fake) Dev(ctx context.Context, dir string, consent, dryRun bool) (plugin.EnableResult, error) {
+func (f *Fake) Dev(ctx context.Context, dir string, consent, dryRun, _ bool) (plugin.EnableResult, error) {
 	f.mu.Lock()
 	f.calls = append(f.calls, fmt.Sprintf("dev %s consent=%v dry=%v", dir, consent, dryRun))
 	f.mu.Unlock()

@@ -114,7 +114,7 @@ func TestPluginEnvironmentAPI(t *testing.T) {
 		t.Fatal(err)
 	}
 	e := res.Msg.GetEnvironments()
-	if len(e) != 1 || len(e[0].GetEnv()) != 2 || e[0].GetEnv()[0].GetKey() != "A" || e[0].GetEnv()[1].GetValue() != "2" ||
+	if len(e) != 1 || len(e[0].GetEnv()) != 2 || e[0].GetEnv()[0].GetKey() != "A" || e[0].GetEnv()[1].GetKey() != "B" || e[0].GetEnv()[1].GetValue() != "" ||
 		e[0].GetPathPrepend()[0] != "/h/bin" || e[0].GetAddDirs()[0] != "/h/data" || e[0].GetProjects()[0] != "p1" || !e[0].GetNoProject() ||
 		e[0].GetIssues()[0] != "env PATH is reserved" || !e[0].GetUpdatedAt().AsTime().Equal(at) {
 		t.Fatalf("Environment = %v", e)

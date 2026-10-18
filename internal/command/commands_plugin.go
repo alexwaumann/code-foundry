@@ -167,22 +167,24 @@ func RegisterPlugin(r *Registry, b PluginBackend) error {
 			Category: "Plugin",
 			Args: []ArgSpec{
 				{Name: "path", Type: Path, Required: true, Positional: true, Description: "The plugin's folder"},
+				{Name: "force", Type: Bool, Description: "Take the name from a plugin of another source (a link to another folder, " +
+					"an installed package's leftovers), deleting its secrets, data and consent"},
 				followArg,
 			},
 			Confirm: "Link {path} as a dev plugin and enable it?",
 			ConfirmIf: func(ctx context.Context, _ Context, a Args) bool {
-				res, err := b.Dev(ctx, connect.NewRequest(&v1.DevPluginRequest{Path: a.Path("path"), DryRun: true}))
+				res, err := b.Dev(ctx, connect.NewRequest(&v1.DevPluginRequest{Path: a.Path("path"), DryRun: true, Force: a.Bool("force")}))
 				return err == nil && res.Msg.GetNeedsConsent()
 			},
 			DynamicConfirm: func(ctx context.Context, _ Context, a Args) string {
-				res, err := b.Dev(ctx, connect.NewRequest(&v1.DevPluginRequest{Path: a.Path("path"), DryRun: true}))
+				res, err := b.Dev(ctx, connect.NewRequest(&v1.DevPluginRequest{Path: a.Path("path"), DryRun: true, Force: a.Bool("force")}))
 				if err != nil {
 					return ""
 				}
 				return res.Msg.GetConsentText()
 			},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-				res, err := b.Dev(ctx, connect.NewRequest(&v1.DevPluginRequest{Path: a.Path("path"), Consent: true}))
+				res, err := b.Dev(ctx, connect.NewRequest(&v1.DevPluginRequest{Path: a.Path("path"), Consent: true, Force: a.Bool("force")}))
 				if err != nil {
 					return Result{}, err
 				}

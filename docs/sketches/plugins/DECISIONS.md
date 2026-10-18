@@ -56,6 +56,11 @@ only) to the plugin, each scoped to its own namespace. Rules:
 * The host never renders a secret back. A view may show "set" and when, nothing else.
 * `plugin secrets list <plugin>` and `plugin secrets delete <plugin> <key>` CLI verbs for
   the user; disabling keeps secrets, `uninstall --purge` deletes them.
+* Hardening (PR 8, `docs/notes/plugins-8-secrets-hardening.md`): secrets, consent and the
+  data dir belong to the plugin's install source, not just its name (another source's
+  package takes the name only with `--force`, which deletes them); a non-default
+  `CODE_FOUNDRY_HOME` uses its own Keychain service; reads need the key recorded in this
+  home's database. Isolation between plugins, not a sandbox: a plugin runs as the user.
 
 ### New primitives (all v1)
 

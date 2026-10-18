@@ -398,6 +398,12 @@ func (m *Manager) Install(ctx context.Context, req InstallRequest) (InstallResul
 
 func (m *Manager) install(ctx context.Context, req InstallRequest, p plan) (InstallResult, error) {
 	res := InstallResult{Kind: p.kind, Source: p.source, Version: p.version, Warnings: p.warnings}
+	origin := originOf(p.kind, p.source)
+	// Before downloading: a package from another source does not inherit the name's
+	// consent, secrets and data without --force (origin.go). claimLocked checks again.
+	if _, err := m.checkOrigin(ctx, p.name, origin, req.Force); err != nil {
+		return InstallResult{}, err
+	}
 	link := filepath.Join(m.opts.Dir, p.name)
 	fi, lerr := os.Lstat(link)
 	isLink := lerr == nil && fi.Mode()&fs.ModeSymlink != 0
@@ -464,6 +470,13 @@ func (m *Manager) install(ctx context.Context, req InstallRequest, p plan) (Inst
 	if m.isClosed() {
 		return InstallResult{}, ErrClosed
 	}
+	took, err := m.claimLocked(ctx, p.name, origin, req.Force)
+	if err != nil {
+		return InstallResult{}, err
+	}
+	if took != nil {
+		res.Warnings = append(res.Warnings, fmt.Sprintf("replaced plugin %s from %s: deleted %s", p.name, originWords(took.from), andList(took.what)))
+	}
 	if err := swapPackage(pkg, link, filepath.Join(work, "old")); err != nil {
 		return InstallResult{}, err
 	}
@@ -501,6 +514,11 @@ func (m *Manager) install(ctx context.Context, req InstallRequest, p plan) (Inst
 		}
 	}
 	res.Changed = true
+	if took != nil {
+		// A takeover is never enabled on the install's consent: enabling shows the
+		// permissions again.
+		req.Consent = false
+	}
 	return m.finishLocked(ctx, req, res, p.name)
 }
 
@@ -605,13 +623,21 @@ func (m *Manager) installLink(ctx context.Context, dir string, req InstallReques
 	name := mf.Name
 	link := filepath.Join(m.opts.Dir, name)
 	res := InstallResult{Kind: KindPath, Source: real, Version: mf.Version, Warnings: warnings, Changed: true}
+	if fi, err := os.Lstat(link); err == nil && fi.Mode()&fs.ModeSymlink == 0 && !req.Force {
+		return InstallResult{}, fmt.Errorf("%w: plugin %s is installed at %s; --force replaces it with a link to %s", ErrFailedPrecondition, name, link, real)
+	}
+	took, err := m.claimLocked(ctx, name, originOf(KindPath, real), req.Force)
+	if err != nil {
+		return InstallResult{}, err
+	}
+	if took != nil {
+		res.Warnings = append(res.Warnings, fmt.Sprintf("replaced plugin %s from %s: deleted %s", name, originWords(took.from), andList(took.what)))
+		req.Consent = false
+	}
 	if cur, ok := m.Snapshot().Plugin(name); ok {
 		res.Previous = cur.Manifest.Version
 	}
 	if fi, err := os.Lstat(link); err == nil && fi.Mode()&fs.ModeSymlink == 0 {
-		if !req.Force {
-			return InstallResult{}, fmt.Errorf("%w: plugin %s is installed at %s; --force replaces it with a link to %s", ErrFailedPrecondition, name, link, real)
-		}
 		staging, err := m.stagingRoot()
 		if err != nil {
 			return InstallResult{}, err
@@ -733,22 +759,10 @@ func (m *Manager) Uninstall(ctx context.Context, name string, purge bool) (Unins
 	if !purge {
 		return res, nil
 	}
-	for _, s := range secrets {
-		if err := m.opts.Secrets.Delete(ctx, name, s.Key); err != nil {
-			return res, fmt.Errorf("plugin: purge secret %s: %w", s.Key, err)
-		}
-		if _, err := dropSecret(ctx, m.opts.DB, name, s.Key); err != nil {
-			return res, err
-		}
-	}
-	if len(secrets) > 0 {
-		res.Purged = append(res.Purged, fmt.Sprintf("%d secret(s) from the Keychain", len(secrets)))
-	}
-	if dataErr == nil {
-		if err := os.RemoveAll(dataDir); err != nil {
-			return res, fmt.Errorf("plugin: purge %s: %w", dataDir, err)
-		}
-		res.Purged = append(res.Purged, "its data in "+dataDir)
+	purged, err := m.purgeSecretsAndData(ctx, name)
+	res.Purged = append(res.Purged, purged...)
+	if err != nil {
+		return res, err
 	}
 	for _, f := range []string{name + ".log", name + ".log.1"} {
 		_ = os.Remove(filepath.Join(m.opts.LogDir, f))

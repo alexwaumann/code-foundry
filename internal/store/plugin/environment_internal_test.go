@@ -17,6 +17,11 @@ func TestValidateEnvironment(t *testing.T) {
 		t.Fatal(err)
 	}
 	outside := t.TempDir()
+	// A link under home to a directory outside it is outside.
+	escape := filepath.Join(home, "escape")
+	if err := os.Symlink(outside, escape); err != nil {
+		t.Fatal(err)
+	}
 	tests := []struct {
 		name       string
 		in         pluginsdk.Environment
@@ -34,6 +39,13 @@ func TestValidateEnvironment(t *testing.T) {
 			wantIssues: []string{"env CLAUDECODE is reserved", "env CLAUDE_CODE_USE_BEDROCK is reserved", "env CLAUDE_CONFIG_DIR is reserved",
 				"env CLAUDE_EFFORT is reserved", "env CODE_FOUNDRY_TOKEN is reserved", "env HOME is reserved", "env PATH is reserved",
 				"env SHELL is reserved", "env TMPDIR is reserved", "env USER is reserved"}},
+		{name: "reserved keys in any case", in: pluginsdk.Environment{Env: map[string]string{
+			"path": "/x", "Path": "/x", "home": "/x", "code_foundry_token": "x", "Claude_Code_X": "1", "PATH_EXTRA": "ok"}},
+			wantEnv: []string{"PATH_EXTRA=ok"},
+			wantIssues: []string{"env Claude_Code_X is reserved", "env Path is reserved", "env code_foundry_token is reserved",
+				"env home is reserved", "env path is reserved"}},
+		{name: "a link out of home", in: pluginsdk.Environment{PathPrepend: []string{escape}, AddDirs: []string{escape}},
+			wantIssues: []string{"pathPrepend " + escape + " is outside your home directory", "addDirs " + escape + " is outside your home directory"}},
 		{name: "bad names and values", in: pluginsdk.Environment{Env: map[string]string{
 			"1X": "a", "A-B": "a", "BIG": strings.Repeat("x", MaxEnvValue+1), "NUL": "a\x00b", "MAX": strings.Repeat("x", MaxEnvValue)}},
 			wantEnv:    []string{"MAX=" + strings.Repeat("x", MaxEnvValue)},

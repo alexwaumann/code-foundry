@@ -692,7 +692,7 @@ export class MockPlugins {
   environment(): EnvironmentInit[] {
     const hello = this.plugins.get("hello");
     if (!hello?.enabled) return [];
-    return [{ plugin: "hello", env: [{ key: "CF_HELLO", value: "1" }], pathPrepend: [], addDirs: [], projects: [], noProject: true, issues: [], updatedAt: timestampFromDate(hello.startedAt) }];
+    return [{ plugin: "hello", env: [{ key: "CF_HELLO" }], pathPrepend: [], addDirs: [], projects: [], noProject: true, issues: [], updatedAt: timestampFromDate(hello.startedAt) }];
   }
 
   logs(name: string): { lines: { seq: bigint; time: ReturnType<typeof timestampFromDate>; source: string; level: string; text: string }[]; path: string } {

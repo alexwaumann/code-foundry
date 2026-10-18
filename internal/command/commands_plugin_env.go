@@ -2,7 +2,6 @@ package command
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"connectrpc.com/connect"
@@ -22,8 +21,9 @@ func pluginEnvCmd(b PluginBackend) Command {
 	return Command{
 		Name:  "plugin.env",
 		Title: "Show Plugin Session Environment",
-		Description: "Print what plugins add to new Claude threads: environment variables, PATH entries and --add-dir " +
-			"directories, which projects get them, and what was refused or lost to another plugin. One plugin's with a name.",
+		Description: "Print what plugins add to new Claude threads: environment variables (names only: a value may be a " +
+			"secret), PATH entries and --add-dir directories, which projects get them, and what was refused or lost to " +
+			"another plugin. One plugin's with a name.",
 		Category:     "Plugin",
 		NoKeybinding: true,
 		Args:         []ArgSpec{{Name: "name", Type: String, Positional: true, Description: "Plugin name (default: every plugin)"}},
@@ -56,7 +56,7 @@ func formatPluginEnvs(name string, envs []*v1.PluginEnvironment) string {
 		}
 		lines = append(lines, "  scope: "+scope)
 		for _, kv := range e.GetEnv() {
-			lines = append(lines, fmt.Sprintf("  env %s=%s", kv.GetKey(), kv.GetValue()))
+			lines = append(lines, "  env "+kv.GetKey()) // the daemon never sends the value
 		}
 		for _, p := range e.GetPathPrepend() {
 			lines = append(lines, "  PATH += "+p)
