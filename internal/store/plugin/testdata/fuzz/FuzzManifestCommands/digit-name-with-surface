@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("{\"name\":\"1password\",\"version\":\"1.0.0\",\"protocol\":1,\"exec\":[\"bin/x\"],\"surfaces\":[{\"id\":\"main\",\"title\":\"Main\"}]}")

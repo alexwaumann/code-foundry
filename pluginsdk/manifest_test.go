@@ -29,9 +29,10 @@ func TestManifestValidate(t *testing.T) {
 		want   string // substring of the error; "" means valid
 	}{
 		{name: "valid", mutate: func(*Manifest) {}},
-		{name: "name with digits first", mutate: func(m *Manifest) { m.Name = "1password"; m.Commands = nil }},
+		{name: "name with digits first", mutate: func(m *Manifest) { m.Name = "1password"; m.Commands, m.Surfaces = nil, nil }},
+		{name: "name with digits first and a surface", mutate: func(m *Manifest) { m.Name = "1password"; m.Commands = nil }, want: "cannot carry commands or surfaces"},
 		{name: "name with digits first and commands", mutate: func(m *Manifest) { m.Name = "1password" }, want: "cannot carry commands"},
-		{name: "name trailing hyphen without commands", mutate: func(m *Manifest) { m.Name = "x-"; m.Commands = nil }},
+		{name: "name trailing hyphen without commands", mutate: func(m *Manifest) { m.Name = "x-"; m.Commands, m.Surfaces = nil, nil }},
 		{name: "name uppercase", mutate: func(m *Manifest) { m.Name = "Hello" }, want: "name: "},
 		{name: "name too long", mutate: func(m *Manifest) { m.Name = strings.Repeat("a", 65) }, want: "name: "},
 		{name: "name reserved", mutate: func(m *Manifest) { m.Name = "logs" }, want: "reserved"},

@@ -70,7 +70,7 @@ func (m *Manager) register(e *entry) {
 	m.mu.Lock()
 	name, mf := e.name, e.manifest
 	m.mu.Unlock()
-	err := m.opts.Commands.ReplacePrefix(Prefix(name), m.commandsFor(name, mf))
+	err := m.replaceCommands(m.opts.Commands, name, m.commandsFor(name, mf))
 	m.update(name, nil, func(e *entry) {
 		e.regErr = ""
 		if err != nil {
@@ -82,9 +82,19 @@ func (m *Manager) register(e *entry) {
 	}
 }
 
+// replaceCommands sets the plugin's commands in the registry. A name that is not a
+// command segment ("1password") has none, so there is nothing to replace: the registry
+// would refuse its prefix (pluginsdk's Validate refuses commands and surfaces for it).
+func (m *Manager) replaceCommands(reg CommandHost, name string, cmds []command.Command) error {
+	if len(cmds) == 0 && !command.NamePattern.MatchString(Prefix(name)+"x") {
+		return nil
+	}
+	return reg.ReplacePrefix(Prefix(name), cmds)
+}
+
 // unregister removes a plugin's commands. opMu held.
 func (m *Manager) unregister(name string) {
-	if err := m.opts.Commands.ReplacePrefix(Prefix(name), nil); err != nil {
+	if err := m.replaceCommands(m.opts.Commands, name, nil); err != nil {
 		m.log.Warn("plugin commands not removed", "plugin", name, "err", err)
 	}
 }

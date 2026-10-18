@@ -532,7 +532,7 @@ func FuzzManifestCommands(f *testing.F) {
 		}
 		m := &Manager{}
 		reg := command.NewRegistry()
-		if err := reg.ReplacePrefix(Prefix(mf.Name), m.commandsFor(mf.Name, mf)); err != nil {
+		if err := m.replaceCommands(reg, mf.Name, m.commandsFor(mf.Name, mf)); err != nil {
 			t.Fatalf("a valid manifest's commands do not register: %v", err)
 		}
 	})
