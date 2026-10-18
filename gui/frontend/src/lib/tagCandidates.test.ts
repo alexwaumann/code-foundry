@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PullRequestView } from "@/api/gh";
-import { PR_ROWS, prCandidates, prItems, prPool, prScore, THREAD_ROWS, threadCandidates, threadItems, threadScore, type ThreadCandidate } from "./tagCandidates";
+import { PR_ROWS, prCandidates, prEnterPicks, prItems, prPool, prScore, THREAD_ROWS, threadCandidates, threadItems, threadScore, type ThreadCandidate } from "./tagCandidates";
 
 const thread = (id: string, name: string, o: Partial<ThreadCandidate> = {}): ThreadCandidate => ({
   id,
@@ -143,5 +143,21 @@ describe("prItems", () => {
 
   it("a number query emphasizes nothing; several repositories show theirs as the hint", () => {
     expect(prItems([pr("o/r", 7, "x")], "7", true)).toEqual([{ key: "o/r#7", label: "#7", hint: "o/r", detail: "x", tag: { tagKind: "pr", slug: "o/r", number: 7 } }]);
+  });
+});
+
+describe("prEnterPicks", () => {
+  const row = (number: number) => ({ key: "k", label: `#${String(number)}`, detail: "", tag: { tagKind: "pr" as const, slug: "o/r", number } });
+  it.each([
+    ["the exact number", 187, "187", true],
+    ["a prefix of the number", 187, "18", false],
+    ["a title query", 187, "fix", false],
+    ["digits then letters", 187, "187a", false],
+    ["a zero-led number", 187, "0187", false],
+  ] as const)("%s", (_name, number, query, want) => {
+    expect(prEnterPicks(row(number), query)).toBe(want);
+  });
+  it("only pull request rows", () => {
+    expect(prEnterPicks({ key: "k", label: "x", detail: "", tag: { tagKind: "thread", id: "s-1", name: "187" } }, "187")).toBe(false);
   });
 });

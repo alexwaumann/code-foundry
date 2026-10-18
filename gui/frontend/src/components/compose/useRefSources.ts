@@ -2,7 +2,7 @@ import { useEffect, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import type { PullRequestView } from "@/api/gh";
 import type { CompletionGroup } from "@/lib/completion";
-import { prCandidates, prItems, prPool, threadCandidates, threadItems, type ThreadRow } from "@/lib/tagCandidates";
+import { prCandidates, prEnterPicks, prItems, prPool, threadCandidates, threadItems, type ThreadRow } from "@/lib/tagCandidates";
 import { statusLine, statusText } from "@/lib/statusLine";
 import { NO_PROJECT } from "@/lib/threadRow";
 import { branchPullRequestsResource, dashboardResource } from "@/stores/gh";
@@ -127,7 +127,8 @@ export function usePrPool(slugs: readonly string[], watch: boolean): readonly Pu
  * `#`: the draft's repositories' pull requests the daemon polls (usePrPool), matched by
  * number or title, at most five. A query nothing matches shows no card at all (quiet), so
  * "#1 priority" or an issue number stays text and Enter still sends; only a pick makes
- * a tag. No card either until the pool has loaded.
+ * a tag, and Enter picks only on intent (arrow keys, or the exact number: prEnterPicks), so
+ * "fixes #18" + Enter sends as typed while #187 is listed. No card until the pool has loaded.
  */
 export function usePrSource(trigger: EditorTrigger | null, slugs: readonly string[]): CompletionSource {
   const query = trigger?.char === "#" ? trigger.query : null;
@@ -137,5 +138,5 @@ export function usePrSource(trigger: EditorTrigger | null, slugs: readonly strin
     const items = prItems(prCandidates(pool, query), query, slugs.length > 1);
     return items.length > 0 ? [{ key: "prs", heading: null, items }] : [];
   }, [pool, query, slugs]);
-  return { char: "#", label: "Pull requests", available: pool.length > 0, groups, query, searching: false, emptyText: "", quietEmpty: true };
+  return { char: "#", label: "Pull requests", available: pool.length > 0, groups, query, searching: false, emptyText: "", quietEmpty: true, enterPicks: prEnterPicks };
 }

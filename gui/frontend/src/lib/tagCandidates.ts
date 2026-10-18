@@ -151,3 +151,12 @@ export function prItems(prs: readonly PullRequestView[], query: string, multiRep
     };
   });
 }
+
+/**
+ * Whether Enter on the `#` card picks this row without the arrow keys: only when the
+ * typed number is its pull request's (typing #187 picks #187; typing #18 with #187 listed
+ * sends as typed).
+ */
+export function prEnterPicks(item: CompletionItem, query: string): boolean {
+  return typeof item.tag !== "string" && item.tag.tagKind === "pr" && /^[1-9]\d*$/.test(query) && item.tag.number === Number(query);
+}

@@ -5,7 +5,8 @@ import { invocations, mockPost, openApp, openTooltip, resetMock, row } from "./f
 // draft's repositories' pull requests the daemon polls (the mock's dashboards for
 // alexwaumann/code-foundry: #142 and #145 authored, #139 awaiting review, #133 reviewed,
 // #138 and #136 merged), by number or title, at most five. Only a pick makes a tag: a
-// number nothing has stays text and Enter sends. Set SHOTS=<dir> for screenshots.
+// number nothing has stays text and Enter sends; Enter picks only the exact number or a
+// row the arrow keys moved to (Tab and a click always pick). Set SHOTS=<dir> for screenshots.
 
 test.beforeEach(async () => {
   await resetMock();
@@ -34,7 +35,7 @@ const newThreads = async () => (await invocations()).filter((i) => i.name === "t
 
 const PR139 = "[#139](cf-pr://alexwaumann/code-foundry/139)";
 
-test("#13: open pull requests first, then merged; Enter inserts the tag; the send projects owner/repo#N", async ({ page }) => {
+test("#13: open pull requests first, then merged; #139 + Enter inserts the tag; the send projects owner/repo#N", async ({ page }) => {
   await openApp(page);
   await compose(page);
   await page.keyboard.type("review #13");
@@ -43,6 +44,8 @@ test("#13: open pull requests first, then merged; Enter inserts the tag; the sen
   await expect(card(page).getByRole("listbox")).toHaveAttribute("aria-label", "Pull requests");
   await shot(page, "pr-card");
 
+  await page.keyboard.type("9");
+  await expect(labels(page)).toHaveText(["#139"]);
   await page.keyboard.press("Enter");
   await expect(card(page)).toHaveCount(0);
   await expect(value(page)).toHaveAttribute("data-value", `review ${PR139} `);
@@ -60,6 +63,34 @@ test("#13: open pull requests first, then merged; Enter inserts the tag; the sen
   const args = (await invocations()).at(-1)?.args;
   expect(args?.prompt).toBe("review alexwaumann/code-foundry#139 and say what is left");
   expect(args?.["composer-prompt"]).toBe(`review ${PR139} and say what is left`);
+});
+
+test("#13 + Enter sends as typed while #139 is listed", async ({ page }) => {
+  await openApp(page);
+  await compose(page);
+  await page.keyboard.type("fixes #13");
+  await expect(labels(page)).toHaveText(["#139", "#133", "#138", "#136"]);
+  await page.keyboard.press("Enter");
+  await expect.poll(newThreads).toBe(1);
+  const args = (await invocations()).at(-1)?.args;
+  expect(args?.prompt).toBe("fixes #13");
+  expect(args?.["composer-prompt"] ?? "fixes #13").toBe("fixes #13");
+});
+
+test("arrow down + Enter inserts the highlighted pull request; Tab inserts the first", async ({ page }) => {
+  await openApp(page);
+  await compose(page);
+  await page.keyboard.type("#13");
+  await expect(labels(page)).toHaveText(["#139", "#133", "#138", "#136"]);
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect(card(page)).toHaveCount(0);
+  await expect(value(page)).toHaveAttribute("data-value", "[#133](cf-pr://alexwaumann/code-foundry/133) ");
+  await page.keyboard.type("#13");
+  await expect(labels(page)).toHaveText(["#139", "#133", "#138", "#136"]);
+  await page.keyboard.press("Tab");
+  await expect(value(page)).toHaveAttribute("data-value", `[#133](cf-pr://alexwaumann/code-foundry/133) ${PR139} `);
+  await expect.poll(newThreads).toBe(0);
 });
 
 test("no false positives: an unknown number, a heading, C# and a bare # stay text; Enter sends", async ({ page }) => {

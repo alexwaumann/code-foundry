@@ -11,6 +11,7 @@ import {
   type CardMemo,
   type CardShow,
   type CompletionGroup,
+  type CompletionItem,
   type TriggerChar,
 } from "@/lib/completion";
 import { cancelFiles, requestFiles, useFilesEntry } from "@/stores/files";
@@ -41,6 +42,13 @@ export interface CompletionSource {
    * not a pull request stays text, and Enter sends).
    */
   quietEmpty?: boolean;
+  /**
+   * When set, Enter picks a row only on intent: after the arrow keys moved the highlight,
+   * or for a row this accepts for the query (the `#` card: the typed number is that pull
+   * request's). Otherwise Enter closes the card and does what it does without one (sends),
+   * so "fixes #18" + Enter sends as typed while #187 is listed. Tab and a click always pick.
+   */
+  enterPicks?: (item: CompletionItem, query: string) => boolean;
 }
 
 /**
@@ -142,9 +150,11 @@ interface CardState {
   memo: CardMemo | null;
   show: CardShow;
   selected: number;
+  /** The arrow keys moved the highlight (an `enterPicks` source's intent to pick). */
+  moved: boolean;
 }
 
-const CLOSED: CardState = { key: "", memo: null, show: "none", selected: 0 };
+const CLOSED: CardState = { key: "", memo: null, show: "none", selected: 0, moved: false };
 
 /**
  * The completion card of a prompt editor: which trigger is at the caret (reported by the
@@ -158,7 +168,7 @@ const CLOSED: CardState = { key: "", memo: null, show: "none", selected: 0 };
  * query were typed); a trigger nothing has answered yet waits with the card closed and
  * Enter does nothing (it would send the half-typed reference) until Escape dismisses the
  * trigger. A slow answer shows
- * "Searching…".
+ * "Searching…". A source with `enterPicks` (the `#` card) takes Enter only on intent.
  */
 export function useCompletion(
   trigger: EditorTrigger | null,
@@ -178,7 +188,7 @@ export function useCompletion(
   if (state.key !== key) {
     // Derived from the trigger and the rows: recomputed during render when they change.
     const r = answered ? nextCard(state.memo, answered, items.length) : { show: "none" as const, memo: null };
-    cur = { key, memo: r.memo, show: r.show, selected: 0 };
+    cur = { key, memo: r.memo, show: r.show, selected: 0, moved: false };
     setState(cur);
   }
   const dismissed = live !== null && cur.memo?.at === live.at && cur.memo.dismissed;
@@ -187,9 +197,10 @@ export function useCompletion(
   const waiting = live !== null && answered === null && !dismissed;
 
   // The editor calls onKey from its own handlers: it reads the latest render through this.
-  const latest = useRef({ show, waiting, cur, items, trigger, live });
+  const enterPicks = source.enterPicks;
+  const latest = useRef({ show, waiting, cur, items, trigger, live, enterPicks });
   useLayoutEffect(() => {
-    latest.current = { show, waiting, cur, items, trigger, live };
+    latest.current = { show, waiting, cur, items, trigger, live, enterPicks };
   });
 
   const insert = (index: number) => {
@@ -206,7 +217,7 @@ export function useCompletion(
   };
 
   const onKey = (k: CompletionKey): boolean => {
-    const { show: sh, waiting: w, cur: c, items: rows, live: l } = latest.current;
+    const { show: sh, waiting: w, cur: c, items: rows, live: l, enterPicks: picks } = latest.current;
     if (sh === "none" && w && k === "enter") return true;
     // Escape before the first answer dismisses the trigger too (the card must not open
     // when the answer lands, and Enter sends again).
@@ -218,7 +229,17 @@ export function useCompletion(
     if (sh !== "list") return false;
     if (k === "up" || k === "down") {
       const n = rows.length;
-      setState((s) => ({ ...s, selected: (s.selected + (k === "down" ? 1 : n - 1)) % n }));
+      setState((s) => ({ ...s, selected: (s.selected + (k === "down" ? 1 : n - 1)) % n, moved: true }));
+      return true;
+    }
+    if (k === "enter" && picks && !c.moved) {
+      // No intent to pick: the row the query names, else close and let Enter send.
+      const i = rows.findIndex((item) => picks(item, l.query));
+      if (i < 0) {
+        setState((s) => ({ ...s, memo: dismissCard(l), show: "none" }));
+        return false;
+      }
+      insert(i);
       return true;
     }
     insert(c.selected);
