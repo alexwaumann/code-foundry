@@ -15,8 +15,11 @@ export interface TermSize {
 export interface TerminalRenderer {
   /** Attaches to a container. Call once. */
   mount(el: HTMLElement): void;
-  /** Feeds program output. */
-  write(data: Uint8Array): void;
+  /**
+   * Feeds program output. Parsing may happen later (xterm parses in chunks on later
+   * frames); `parsed` runs once this data has been applied to the grid.
+   */
+  write(data: Uint8Array, parsed?: () => void): void;
   /** Full reset (RIS) plus cleared scrollback; used before a snapshot. */
   reset(): void;
   /**
