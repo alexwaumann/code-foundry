@@ -13,6 +13,7 @@ import { expandPanel, getPanel, startPanelPicking, togglePanel } from "./panel";
 import { useUiStore, viewNames, type FocusRegion } from "./ui";
 import { openAgentsSurface } from "./agentsPanel";
 import { openMcpSurface } from "./mcpPanel";
+import { leaveSubagent } from "./subagentView";
 import { openThreadsSurface } from "./threadsPanel";
 import { openUsageSurface } from "./usagePanel";
 import { openWorkspaceSurface } from "./workspacePanel";
@@ -148,6 +149,10 @@ export function showView(name: string): boolean {
     case "bottom.toggle":
       // view.bottom.toggle: the current selection's bottom terminal panel.
       toggleBottomCommand();
+      return true;
+    case "agent.up":
+      // thread.agent.up from the CLI: out of the subagent view, back to its thread.
+      leaveSubagent();
       return true;
     default:
       // Top-level pages (the Pull Requests page) are selections. Closing settings and

@@ -1,5 +1,5 @@
 import { Fragment, type CSSProperties, type ReactNode } from "react";
-import { Bot, Clock, LoaderCircle, Wrench, Zap } from "lucide-react";
+import { Bot, ChevronRight, Clock, LoaderCircle, Wrench, Zap } from "lucide-react";
 import type { AgentRunView, AgentStatusView } from "@/api/agents";
 import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
@@ -7,6 +7,8 @@ import { agentElapsedMs, agentMeta, agentName, agentStatusText, agentsSubline, f
 import { fmtTok } from "@/lib/usage";
 import { cn } from "@/lib/utils";
 import { useAgentCounts, useAgentLevel, useAgentRowIds, useAgentRun } from "@/stores/agents";
+import { openAgentRun, useCanOpenAgents } from "@/stores/subagentActions";
+import { useIsViewing } from "@/stores/subagentView";
 import { useThreadsStore } from "@/stores/threads";
 import { useThreadStore } from "@/stores/thread";
 import { useUiStore } from "@/stores/ui";
@@ -83,26 +85,29 @@ function Stat({ icon: Icon, label, children, testId }: { icon: typeof Clock; lab
   );
 }
 
-/** One run (L1): status and name, its meta line, what it does or did, and its stats. */
+/**
+ * One run (L1): status and name, its meta line, what it does or did, and its stats. The
+ * thread's own runs (spawn depth 1) are buttons that open the run in the read-only
+ * subagent view (thread.agent.open), with a chevron after the status; the one on screen
+ * has a sky bar, a sky tint and a "viewing" tag. Nested runs have nothing to open.
+ */
 function AgentRow({ threadId, id }: { threadId: string; id: string }) {
   const run = useAgentRun(threadId, id);
   const level = useAgentLevel(threadId, id);
+  const viewing = useIsViewing(threadId, id);
+  const can = useCanOpenAgents();
   if (!run) return null;
   const name = agentName(run);
   const running = run.status === "running";
   const meta = agentMeta(run);
+  const openable = can && run.spawnDepth <= 1;
   // Nested runs are indented 20px per level, with a connector from their parent's column.
   const style = level > 0 ? ({ paddingLeft: 16 + 20 * level, "--nest-x": `${String(1 + 20 * level)}px` } as CSSProperties) : undefined;
-  return (
-    <li
-      className={cn("relative flex min-w-0 flex-col gap-[3px] border-b border-pane-border px-4 pt-[9px] pb-2.5 @max-[340px]:px-3", level > 0 && "cf-agents-nest")}
-      style={style}
-      data-testid="agent-row"
-      data-agent={run.id}
-      data-status={run.status}
-      data-level={level}
-      data-background={run.background || undefined}
-    >
+  const common = cn("relative flex w-full min-w-0 flex-col gap-[3px] border-b border-pane-border px-4 pt-[9px] pb-2.5 text-left @max-[340px]:px-3", level > 0 && "cf-agents-nest");
+  const data = { "data-testid": "agent-row", "data-agent": run.id, "data-status": run.status, "data-level": level, "data-background": run.background || undefined, "data-viewing": viewing || undefined };
+  const body = (
+    <>
+      {viewing && <span className="absolute -top-px -bottom-px left-0 w-0.5 bg-info" aria-hidden />}
       <div className="flex min-w-0 items-center gap-2 text-body-sm">
         {running ? (
           <LoaderCircle className="size-3 shrink-0 animate-spin text-info" aria-label="Running" />
@@ -114,9 +119,15 @@ function AgentRow({ threadId, id }: { threadId: string; id: string }) {
             {name}
           </span>
         </Tip>
+        {viewing && (
+          <span className="shrink-0 rounded-sm border border-info/50 px-1 text-caption-sm text-info" data-testid="agent-viewing">
+            viewing
+          </span>
+        )}
         <span className={cn("shrink-0 text-caption-sm tabular-nums", STATUS_TONE[run.status])} data-testid="agent-status">
           {running || run.endedAtMs === null ? agentStatusText(run, 0) : <EndedStatus run={run} />}
         </span>
+        {openable && <ChevronRight className="-mr-1 size-3.5 shrink-0 text-muted-foreground" aria-hidden data-testid="agent-open-chevron" />}
       </div>
       <div className="min-w-0 truncate pl-5 text-caption" data-testid="agent-meta">
         {meta.map((p, i) => (
@@ -164,6 +175,29 @@ function AgentRow({ threadId, id }: { threadId: string; id: string }) {
           {fmtTok(run.totalTokens)}
         </Stat>
       </div>
+    </>
+  );
+  const tint = viewing && "bg-info/7 dark:bg-info/10";
+  if (!openable)
+    return (
+      <li className={cn(common, tint)} style={style} {...data}>
+        {body}
+      </li>
+    );
+  return (
+    <li className="flex min-w-0">
+      <button
+        type="button"
+        className={cn(common, "cursor-default outline-none hover:bg-accent/50 focus-visible:bg-accent/50", tint)}
+        style={style}
+        aria-current={viewing || undefined}
+        onClick={() => {
+          void openAgentRun(threadId, run.id);
+        }}
+        {...data}
+      >
+        {body}
+      </button>
     </li>
   );
 }
@@ -180,7 +214,8 @@ function Message({ testId, children }: { testId: string; children: string }) {
  * The side panel's Agents surface (docs/sketches/agents-panel variant L1,
  * docs/notes/agents-2-gui.md): the selected thread's subagent runs as one flat list in
  * spawn order (status never reorders it; nested runs under their parent), separators from
- * border to border, under a header with the counts. Rows are not clickable (v1).
+ * border to border, under a header with the counts. The thread's own runs open in the
+ * read-only subagent view (AgentRow).
  */
 export function AgentsSurface() {
   const threadId = useThreadId();

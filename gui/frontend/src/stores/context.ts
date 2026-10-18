@@ -5,6 +5,7 @@ import { placeThread, type ListOptions, type ListThread, type TreeProject, type 
 import { PROJECT_LABEL, WORKTREE_LABEL } from "@/lib/termlabel";
 import { focusedBottomShell, ownerKeyOf, PROJECTS_KEY, useBottomStore } from "./bottomPanel";
 import { useProjectsStore, type ProjectsData } from "./projects";
+import { getViewing, SUBAGENT_VIEW } from "./subagentView";
 import { useThreadsStore, type ThreadsData } from "./threads";
 import { isThreadGroup, threadGroup } from "@/lib/thread";
 import { isNoProject } from "@/lib/threadRow";
@@ -88,7 +89,9 @@ function deriveSelectionContext(sel: Selection, projects: ProjectsData, threads:
         activeThreadId: sel.id,
         activeProjectId: place?.projectId ?? s?.projectId ?? "",
         activeWorktreePath: place?.path ?? (home ? "" : (s?.worktreePath ?? "")),
-        activeView: "thread",
+        // Showing one of its subagents (stores/subagentView.ts): thread.agent.up and its
+        // Escape are offered there only.
+        activeView: getViewing()?.threadId === sel.id ? SUBAGENT_VIEW : "thread",
         activeWorkspaceId: s?.workspaceId ?? "",
       };
     }

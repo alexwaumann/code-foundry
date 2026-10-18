@@ -21,6 +21,17 @@ message UiIntent {
     FocusThread focus_thread = 5;
     ShowView show_view = 6;
     PlayAlertSound play_alert_sound = 7;
+    ShowAgentRun show_agent_run = 8;
+  }
+
+  // ShowAgentRun selects a thread and shows one of its own subagent runs (spawn depth 1)
+  // read-only in the content pane, its prompt, work and report (thread.agent.open). The
+  // thread stays the selection. A run the window does not know (or a deeper one) leaves
+  // the thread showing.
+  message ShowAgentRun {
+    string thread_id = 1;
+    // The run's id (ThreadAgentRun.id, Claude's agent id).
+    string run_id = 2;
   }
 
   // PlayAlertSound plays the attention alert sound once (notifications.test, a preview:

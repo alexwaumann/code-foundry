@@ -8,7 +8,7 @@
  */
 import { useShallow } from "zustand/react/shallow";
 import type { AgentRunView } from "@/api/agents";
-import { agentCounts, agentRows, stripPart, stripRuns } from "@/lib/agents";
+import { agentCounts, agentRows, stripRuns } from "@/lib/agents";
 import { useThreadStore } from "./thread";
 
 const NO_IDS: readonly string[] = [];
@@ -46,7 +46,7 @@ export function useAgentCounts(threadId: string): { running: number; total: numb
   return useThreadStore(useShallow((s) => (s.logs[threadId] ? agentCounts(s.logs[threadId].agents) : null)));
 }
 
-/** The strip's "name · activity" parts for the running background runs. */
-export function useStripParts(threadId: string): readonly string[] {
-  return useThreadStore(useShallow((s) => (s.logs[threadId] ? stripRuns(s.logs[threadId].agents).map(stripPart) : NO_IDS)));
+/** The running background runs the strip names (lib/agents stripRuns), by id: shallow, so a progress update re-renders only that run's part. */
+export function useStripRunIds(threadId: string): readonly string[] {
+  return useThreadStore(useShallow((s) => (s.logs[threadId] ? stripRuns(s.logs[threadId].agents).map((r) => r.id) : NO_IDS)));
 }

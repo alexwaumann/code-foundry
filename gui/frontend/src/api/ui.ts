@@ -9,7 +9,9 @@ export type UiIntentView =
   | { kind: "openPalette"; query: string }
   | { kind: "notify"; level: NotifyLevel; title: string; body: string }
   | { kind: "showView"; name: string }
-  | { kind: "playAlertSound"; volume: number };
+  | { kind: "playAlertSound"; volume: number }
+  /** thread.agent.open: select the thread and show one of its own subagent runs read-only. */
+  | { kind: "showAgentRun"; threadId: string; runId: string };
 
 const levelMap: Record<UiIntent_Notify_Level, NotifyLevel> = {
   [UiIntent_Notify_Level.UNSPECIFIED]: "info",
@@ -35,6 +37,8 @@ export function toUiIntentView(i: UiIntent): UiIntentView | null {
       return { kind: "showView", name: e.value.name };
     case "playAlertSound":
       return { kind: "playAlertSound", volume: e.value.volume };
+    case "showAgentRun":
+      return { kind: "showAgentRun", threadId: e.value.threadId, runId: e.value.runId };
     default:
       return null;
   }

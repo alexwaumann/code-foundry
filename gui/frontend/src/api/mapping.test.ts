@@ -162,6 +162,7 @@ describe("ui intent mapping", () => {
     ],
     [{ case: "notify" as const, value: { title: "x" } }, { kind: "notify", level: "info", title: "x", body: "" }],
     [{ case: "playAlertSound" as const, value: { volume: 15 } }, { kind: "playAlertSound", volume: 15 }],
+    [{ case: "showAgentRun" as const, value: { threadId: "s1", runId: "a1" } }, { kind: "showAgentRun", threadId: "s1", runId: "a1" }],
   ])("maps %#", (intent, want) => {
     expect(toUiIntentView(create(UiIntentSchema, { intent }))).toEqual(want);
   });

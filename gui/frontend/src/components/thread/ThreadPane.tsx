@@ -7,7 +7,9 @@ import { PaneHeader } from "@/components/window/PaneHeader";
 import { useLinger } from "@/lib/linger";
 import { useThreadsStore } from "@/stores/threads";
 import { startThreadWatch, useOpenRequests, useThreadEmpty, useThreadLoaded, useThreadPending, useThreadStore } from "@/stores/thread";
+import { useShownRun } from "@/stores/subagentView";
 import { AgentsStrip } from "./AgentsStrip";
+import { SubagentPane } from "./SubagentPane";
 import { ThreadContext } from "./context";
 import { HeaderActions } from "./HeaderActions";
 import { Timeline } from "./Timeline";
@@ -60,11 +62,21 @@ function ThreadMissing() {
  */
 export function ThreadPane({ threadId }: { threadId: string }) {
   const exists = useThreadsStore((s) => threadId in s.byId);
-  return exists ? <ThreadBody threadId={threadId} /> : <ThreadMissing />;
+  return exists ? <WatchedThread threadId={threadId} /> : <ThreadMissing />;
+}
+
+/**
+ * The thread's Watch, held while it is selected, and what it shows: the conversation, or
+ * one of its subagent runs read-only (SubagentPane, stores/subagentView.ts), which reads
+ * the same log. Going into a run and back keeps the one stream.
+ */
+function WatchedThread({ threadId }: { threadId: string }) {
+  useEffect(() => startThreadWatch(threadId), [threadId]);
+  const runId = useShownRun(threadId);
+  return runId ? <SubagentPane key={runId} threadId={threadId} runId={runId} /> : <ThreadBody threadId={threadId} />;
 }
 
 function ThreadBody({ threadId }: { threadId: string }) {
-  useEffect(() => startThreadWatch(threadId), [threadId]);
   const cwd = useThreadsStore((s) => s.byId[threadId]?.worktreePath ?? "");
   const state = useThreadsStore((s) => s.byId[threadId]?.state ?? "unknown");
   const status = useThreadsStore((s) => s.byId[threadId]?.status ?? "unknown");

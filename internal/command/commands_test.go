@@ -65,7 +65,7 @@ func TestAllRegistersEveryDomain(t *testing.T) {
 		"thread.get", "thread.label", "thread.report", "thread.budget",
 		"thread.send", "thread.respond", "thread.interrupt", "thread.items", "thread.read", "thread.set-model", "thread.set-mode", "thread.set-effort", "thread.wait",
 		"thread.subscribe", "thread.unsubscribe", "thread.subscriptions",
-		"thread.mcp", "thread.mcp-reconnect", "view.panel.mcp", "thread.commands", "thread.agents", "view.panel.agents",
+		"thread.mcp", "thread.mcp-reconnect", "view.panel.mcp", "thread.commands", "thread.agents", "view.panel.agents", "thread.agent.open", "thread.agent.up",
 		"git.fetch", "git.pull", "git.push", "pr.create", "pr.open",
 		"pr.revert", "pr.merge", "pr.review.request", "pr.refresh", "pr.review", "pr.comment", "pr.ask", "pr.explain", "pr.fix.findings",
 		"worktree.open.editor", "worktree.reveal", "view.open.url",

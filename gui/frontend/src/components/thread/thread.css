@@ -1234,3 +1234,96 @@ html[data-thread-width="full"] .cf-thread {
   background: currentColor;
   display: block;
 }
+
+/* ---------- the read-only subagent view (SubagentPane.tsx) and its entry points ---------- */
+/* "Open ›" on a thread's own Agent row (AgentOpen.tsx): over the row's right end while
+   the row is hovered (the row makes room for it) or the button has the keyboard, like the
+   answer's copy button. The row stays the fold toggle. */
+.cf-thread .agent-host {
+  position: relative;
+}
+.cf-thread .agent-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 20px;
+  padding: 0 4px 0 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--pane);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--foreground);
+  white-space: nowrap;
+  flex: none;
+  visibility: hidden;
+}
+.cf-thread .agent-host > .agent-open {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+}
+.cf-thread .agent-open svg {
+  width: 12px;
+  height: 12px;
+  opacity: 0.7;
+}
+.cf-thread .agent-open:hover {
+  background: var(--accent);
+}
+.cf-thread .agent-open:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--ring) 60%, transparent);
+  outline-offset: -2px;
+}
+.cf-thread .agent-host:has(> .row:hover) > .agent-open,
+.cf-thread .agentnote:hover > .agent-open,
+.cf-thread .agent-open:hover,
+.cf-thread .agent-open:focus-visible {
+  visibility: visible;
+}
+.cf-thread .agent-host:has(> .row:hover, > .agent-open:hover, > .agent-open:focus-visible) > .row {
+  padding-right: 62px;
+}
+.cf-thread .agent-host:has(> .row:hover, > .agent-open:hover, > .agent-open:focus-visible) > .row .chev {
+  display: none;
+}
+/* The lineage note's "← Back to <parent>" at its right. */
+.cf-thread .lnote .back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  flex: none;
+  max-width: 40%;
+  min-width: 0;
+  color: var(--foreground);
+  font-weight: 500;
+  white-space: nowrap;
+  border-radius: 4px;
+  padding: 0 4px;
+}
+.cf-thread .lnote .back:hover {
+  background: var(--t-hover);
+}
+.cf-thread .lnote .back svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
+}
+/* The run's footer: a turn header's line under a hairline. */
+.cf-thread .thead.subfoot {
+  height: auto;
+  min-height: 26px;
+  margin: 10px 0 2px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+/* A finished run's report as it handed it back: a left-bordered block under an overline. */
+.cf-thread .subreport {
+  margin: 12px 0 4px 4px;
+  padding: 2px 0 2px 12px;
+  border-left: 2px solid color-mix(in oklab, var(--t-emerald) 55%, transparent);
+}
+.cf-thread .subreport > .text-overline {
+  margin-bottom: 4px;
+}

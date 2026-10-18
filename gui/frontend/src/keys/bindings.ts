@@ -7,6 +7,7 @@ import { openAddProject } from "@/stores/addProject";
 import { openNewThreadPicker } from "@/stores/compose";
 import { openPublishDialog } from "@/stores/publish";
 import { presentSnooze } from "@/stores/snoozeDialog";
+import { leaveSubagent } from "@/stores/subagentView";
 import { attentionIds, useThreadsStore } from "@/stores/threads";
 import { zoomUi } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
@@ -103,6 +104,18 @@ const contextSupplied: ReadonlySet<string> = new Set(["thread.new"]);
 /** Whether the GUI can start this command here (see contextSupplied). */
 export function isStartable(c: CommandView): boolean {
   return c.available || contextSupplied.has(c.name);
+}
+
+/**
+ * Commands the palette does not list: thread.agent.open takes a run id the palette cannot
+ * pick (the GUI opens runs from their Agent rows, the strip and the Agents tab; the CLI
+ * passes the id).
+ */
+const paletteHidden: ReadonlySet<string> = new Set(["thread.agent.open"]);
+
+/** Whether the palette lists this command: startable here, and not one it cannot prompt for (paletteHidden). */
+export function inPalette(c: CommandView): boolean {
+  return isStartable(c) && !paletteHidden.has(c.name);
 }
 
 /** Presenters that also replace the palette's arg prompts when the command is picked there. */
@@ -249,6 +262,12 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
   // And for the Worktree surface: this window's thread's own worktree in its panel.
   "view.panel.worktree": () => {
     worktreePanelCommand();
+    return true;
+  },
+  // Window-local like view.panel.toggle: this window leaves its subagent view (Escape, the
+  // view's back buttons, the palette). The CLI's reaches every window through ShowView.
+  "thread.agent.up": () => {
+    leaveSubagent();
     return true;
   },
   // And for the bottom terminal panel: this window's panel for its selection. Opening an
