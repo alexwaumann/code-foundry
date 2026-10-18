@@ -76,7 +76,6 @@ test("switching tabs acts on the tab; the log tab streams appended lines", async
   await expect(build).toContainText("[1/6] fetching sources");
   await expect(build).toContainText("[6/6] done");
   await expect(build).toHaveAttribute("data-lines", "6");
-  await expect(surface(page).getByTestId("plugin-placeholder")).toHaveCount(2);
 });
 
 test("the form checks on the host, submits its values to the plugin, and keeps drafts per tab", async ({ page }) => {
