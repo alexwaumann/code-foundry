@@ -564,6 +564,16 @@ export class PrDetailWorld {
     return d;
   }
 
+  /** The pull request's head and base commits as its detail has them (mock/prDiff.ts); null when it has no detail. */
+  shas(slug: string, number: number): { head: string; base: string } | null {
+    try {
+      const pr = this.detailOf(slug, number).pullRequest;
+      return { head: pr?.headSha ?? "", base: pr?.baseSha ?? "" };
+    } catch {
+      return null;
+    }
+  }
+
   get(slug: string, number: number, refresh: boolean): DetailInit {
     this.h.count("GetPullRequestDetail");
     const d = this.detailOf(slug, number);
@@ -998,6 +1008,16 @@ export class PrDetailWorld {
     if (!d) return false;
     const id = `IC_mock_${String((d.comments ?? []).length + 1)}`;
     d.comments = [...(d.comments ?? []), { id, kind: PullRequestCommentKind.ISSUE_COMMENT, author: "teammate-kim", authorAvatarUrl: avatar("teammate-kim"), body, createdAt: timestampFromDate(new Date()), url: `https://github.com/${slug}/pull/${String(number)}#${id}` }];
+    d.fetchedAt = timestampFromDate(new Date());
+    this.h.publishGh({ event: { case: "pullRequestDetailUpdated", value: { repoSlug: slug.toLowerCase(), number } } });
+    return true;
+  }
+
+  /** A poll saw a push: the head moves to sha (the Code tab reads its diff again), announced like a comment. */
+  push(slug: string, number: number, sha: string): boolean {
+    const d = this.details.get(key(slug, number));
+    if (!d?.pullRequest) return false;
+    d.pullRequest.headSha = sha;
     d.fetchedAt = timestampFromDate(new Date());
     this.h.publishGh({ event: { case: "pullRequestDetailUpdated", value: { repoSlug: slug.toLowerCase(), number } } });
     return true;

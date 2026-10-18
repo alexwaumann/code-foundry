@@ -192,7 +192,7 @@ test("Timeline lists the end state, commits, comments and reviews; inner tabs st
   await tabs(page).first().click();
   await expect(page.getByTestId("pr-tab-timeline")).toHaveAttribute("aria-selected", "true");
   await expect(page.getByTestId("pr-timeline")).toHaveAttribute("data-order", "oldest");
-  await expect(page.getByTestId("pr-tab-code")).toBeDisabled();
+  await expect(page.getByTestId("pr-tab-code")).toBeEnabled();
 });
 
 async function ghCalls(): Promise<Record<string, number>> {

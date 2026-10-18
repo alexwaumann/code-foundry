@@ -93,6 +93,8 @@ export interface PullRequestView {
   /** Pending review requests: logins and "org/team". */
   reviewRequests: string[];
   isCrossRepository: boolean;
+  /** "owner/name" of the head repository (open pull requests only); "" when unknown or the fork was deleted. */
+  headRepoSlug: string;
   /** Only the poll's fingerprint is known yet (title and details empty). */
   partial: boolean;
 }
@@ -385,6 +387,7 @@ export function toPullRequestView(p: PullRequest): PullRequestView {
     latestReviews: p.latestReviews.map((r) => ({ author: r.author, state: enumName(PullRequestReviewState, r.state), submittedAtMs: ms(r.submittedAt) })),
     reviewRequests: p.reviewRequests,
     isCrossRepository: p.isCrossRepository,
+    headRepoSlug: p.headRepoSlug,
     partial: p.partial,
   };
 }

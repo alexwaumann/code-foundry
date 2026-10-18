@@ -117,6 +117,10 @@
  *        with failing checks on no dashboard, #139 awaiting the viewer's review); its commands
  *        are pr.merge, pr.revert, pr.review.request, pr.review, pr.comment and pr.refresh
  *        ("SubmitPullRequestReview" and "AddPullRequestComment" count in /__mock/gh/calls)
+ *   POST /__mock/gh/pr-push?repo=o/r&number=145&sha=<40 hex>   (the detail's head moves;
+ *        pull_request_detail_updated). The Code tab's diff and files: mock/prDiff.ts (one
+ *        three-file diff for every pull request, #140's refused as too large; counts
+ *        "GetPullRequestDiff", "GetPullRequestDiff refresh", "GetPullRequestFile <path>")
  *   ActionService, the action event source and action.*: mock/actions.ts (repo-cf's six seeded
  *        actions, a-dev000000000 … a-debug0000000; every other project has none). A terminal run
  *        is a kind=action terminal that plays its script and stays EXITED; reset restores the seeds.
@@ -342,6 +346,8 @@ function routes(router: ConnectRouter): void {
     mergePullRequest: (req) => prDetailCall(() => world.gh.prDetails.merge(req.repoSlug, req.number, req.method, req.deleteBranch, req.expectedHeadSha)),
     submitPullRequestReview: (req) => prDetailCall(() => world.gh.prDetails.submitReview(req.repoSlug, req.number, req.event, req.body)),
     addPullRequestComment: (req) => prDetailCall(() => world.gh.prDetails.postComment(req.repoSlug, req.number, req.body)),
+    getPullRequestDiff: (req) => world.gh.prDiffs.diff(req.repoSlug, req.number, req.refresh),
+    getPullRequestFile: (req) => world.gh.prDiffs.file(req.repoSlug, req.ref, req.path),
   });
 
   router.service(CommandService, {
@@ -971,6 +977,12 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     case "POST /__mock/gh/pr-comment": {
       // A poll saw a new comment on a pull request with a detail: pull_request_detail_updated.
       const ok = world.gh.prDetails.addComment(q.get("repo") ?? "alexwaumann/code-foundry", Number(q.get("number") ?? "145"), q.get("body") ?? "New comment");
+      json(res, ok ? 200 : 404, { ok });
+      break;
+    }
+    case "POST /__mock/gh/pr-push": {
+      // A poll saw a push to a pull request with a detail: its head moves (mock/prDiff.ts).
+      const ok = world.gh.prDetails.push(q.get("repo") ?? "alexwaumann/code-foundry", Number(q.get("number") ?? "145"), q.get("sha") ?? "b0b0".padEnd(40, "0"));
       json(res, ok ? 200 : 404, { ok });
       break;
     }

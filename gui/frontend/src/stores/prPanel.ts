@@ -17,10 +17,10 @@ import { openUrl, pullRequestDetailResource, pullRequestKey } from "./gh";
 import { openSurface, usePanelStore, type PanelState, type PanelTarget } from "./panel";
 import { createResource, type Resource } from "./resource";
 
-export type PrInnerTab = "summary" | "timeline";
+export type PrInnerTab = "summary" | "timeline" | "code";
 export type SortOrder = "newest" | "oldest";
-/** Collapsible sections of the summary. */
-export type PrSection = "description" | "checks" | "comments";
+/** Collapsible sections: the summary's, and the Code tab's file list. */
+export type PrSection = "description" | "checks" | "comments" | "files";
 
 export interface PrTabState {
   inner: PrInnerTab;
@@ -33,7 +33,7 @@ export interface PrTabState {
 export const defaultPrTabState: PrTabState = { inner: "summary", commentOrder: "newest", timelineOrder: "newest", open: {} };
 
 /** Sections shown unfolded until the user folds them. */
-export const sectionOpenByDefault: Record<PrSection, boolean> = { description: true, checks: true, comments: true };
+export const sectionOpenByDefault: Record<PrSection, boolean> = { description: true, checks: true, comments: true, files: true };
 
 interface PrPanelState {
   /** By prTabKey(panelKey, tabId). */
