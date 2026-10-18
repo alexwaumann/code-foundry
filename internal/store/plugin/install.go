@@ -354,7 +354,7 @@ func registryURLs(m registry.Merged) []string {
 func registryError(err error) error {
 	switch {
 	case errors.Is(err, registry.ErrNotFound):
-		return fmt.Errorf("%w: %v", ErrNotFound, err)
+		return fmt.Errorf("%w: %s", ErrNotFound, strings.TrimPrefix(err.Error(), registry.ErrNotFound.Error()+": "))
 	case errors.Is(err, registry.ErrHashMismatch):
 		return fmt.Errorf("%w: %v", ErrFailedPrecondition, err)
 	}
