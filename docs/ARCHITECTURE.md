@@ -504,8 +504,9 @@ from the pull request (docs/notes/pr-thread-commands.md).
   bodies come from the surface registry (`src/surfaces`, `docs/notes/side-panel.md`):
   File and Diff (one file read from disk as code, rendered markdown or sandboxed HTML, or
   an image; one changed file of a worktree against its base, working tree or branch;
-  opened from the worktree overview's Changes rows and the Diff tab's Open file, one tab
-  per file; `docs/notes/file-viewer-3-tabs.md`), Pull request, whose menu starts threads about the pull
+  opened from the worktree overview's Changes rows, the Diff tab's Open file, and path
+  chips in Claude's markdown and file tool rows (`docs/notes/file-viewer-4-chips.md`), one
+  tab per file; `docs/notes/file-viewer-3-tabs.md`), Pull request, whose menu starts threads about the pull
   request through `pr.ask`, `pr.explain` and `pr.fix.findings`, Workspace (a workspace
   thread's members with their git, PR and CI state, add/remove, Run in; opened by W,
   `view.panel.workspace`, the sidebar's workspace badge, the thread header and the

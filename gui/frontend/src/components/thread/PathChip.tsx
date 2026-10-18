@@ -90,7 +90,7 @@ export function ToolPathChip({ path, line, children }: { path: string; line?: nu
       aria-label={`Open ${fileName(path)}`}
       className={cn(
         TAG_ACCENT.file,
-        "-mx-1 cursor-pointer rounded-sm border border-transparent px-1 hover:border-[color-mix(in_oklab,var(--chip-accent)_48%,var(--color-border))] hover:bg-[color-mix(in_oklab,var(--chip-accent)_17%,transparent)] focus-visible:outline-2 focus-visible:outline-ring/60",
+        "-mx-0.5 cursor-pointer rounded-sm border border-transparent px-1 hover:border-[color-mix(in_oklab,var(--chip-accent)_48%,var(--color-border))] hover:bg-[color-mix(in_oklab,var(--chip-accent)_17%,transparent)] focus-visible:outline-2 focus-visible:outline-ring/60",
       )}
       data-testid="tool-path-chip"
       data-path={path}
