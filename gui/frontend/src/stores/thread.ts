@@ -1,7 +1,10 @@
 /**
- * Threads' items (docs/notes/rendered-threads-2-gui.md). Only the visible
- * thread holds a ThreadService.WatchThread (the content pane's slot in the
- * connection budget, ARCHITECTURE §8, and it is what marks its turns seen). The Watch
+ * Threads' items (docs/notes/rendered-threads-2-gui.md). One ThreadService.WatchThread per
+ * visible thread view (the content pane's thread, and a plugin's thread node:
+ * docs/notes/plugins-6-thread-terminal.md): a view of another thread opens its own, the
+ * same thread shown twice shares one (startThreadWatch counts its holders). Each is a slot
+ * in the connection budget (ARCHITECTURE §8), and it is what marks the thread's turns
+ * seen. The Watch
  * sends a snapshot, then events with the thread's seq: an event whose seq is not above the
  * log's is dropped, and a later snapshot (a resync after drops, or a reconnect) replaces
  * the log. Items keep their identity while unchanged (structural equality), so a row only
@@ -49,8 +52,8 @@ export interface ThreadState {
   logs: Readonly<Record<string, ThreadLog>>;
   /** Pending requests per thread from the EventService thread source (badges without a Watch). */
   pending: Readonly<Record<string, ThreadPendingListView>>;
-  /** The visible thread's Watch. */
-  watch: { threadId: string; status: StreamStatus; error: string | null } | null;
+  /** The open Watches, by thread (one per thread however many views show it). */
+  watches: Readonly<Record<string, ThreadWatchState>>;
   /** Turns the user folded (true) or unfolded (false), by thread and turn key; absent: the default. */
   folds: Readonly<Record<string, Readonly<Record<string, boolean>>>>;
   /** Rows the user expanded (true) or collapsed (false), by thread and row key; absent: the row's default. */
@@ -68,7 +71,13 @@ export interface ThreadState {
   answering: Readonly<Record<string, Readonly<Record<string, true>>>>;
 }
 
-export const useThreadStore = create<ThreadState>()(() => ({ logs: {}, pending: {}, watch: null, folds: {}, expanded: {}, deferred: {}, answering: {} }));
+/** One thread's Watch: its stream's status, and the error it is retrying after. */
+export interface ThreadWatchState {
+  status: StreamStatus;
+  error: string | null;
+}
+
+export const useThreadStore = create<ThreadState>()(() => ({ logs: {}, pending: {}, watches: {}, folds: {}, expanded: {}, deferred: {}, answering: {} }));
 
 function sameArray<T>(a: readonly T[], b: readonly T[], eq: (x: T, y: T) => boolean = Object.is): boolean {
   return a === b || (a.length === b.length && a.every((x, i) => eq(x, b[i] as T)));
@@ -263,16 +272,41 @@ let recentlyWatched: string[] = [];
 
 function keepRecent(threadId: string): void {
   recentlyWatched = [threadId, ...recentlyWatched.filter((id) => id !== threadId)];
-  const drop = new Set(recentlyWatched.slice(KEPT_LOGS));
-  recentlyWatched = recentlyWatched.slice(0, KEPT_LOGS);
+  const drop = new Set(recentlyWatched.slice(KEPT_LOGS).filter((id) => !openWatches.has(id)));
+  recentlyWatched = recentlyWatched.filter((id) => !drop.has(id));
   if (drop.size > 0) pruneThreadLogs((id) => !drop.has(id));
 }
 
+/** The open Watches by thread: how many views hold each, and how to end it. */
+const openWatches = new Map<string, { holders: number; stop: () => void }>();
+
+/** How many Watches are open (one per thread on screen). */
+export function openThreadWatches(): number {
+  return openWatches.size;
+}
+
 /**
- * Opens the Watch for a thread (the visible thread; one at a time) and keeps it
- * open, reconnecting with backoff, until the returned function is called.
+ * Holds the Watch of a thread a view shows, opening it for the first holder and keeping
+ * it open (reconnecting with backoff) until the last one calls the returned function: one
+ * stream per thread, however many views show it. Calling the release twice is harmless.
  */
 export function startThreadWatch(threadId: string): () => void {
+  const held = openWatches.get(threadId);
+  if (held) held.holders++;
+  else openWatches.set(threadId, { holders: 1, stop: openThreadWatch(threadId) });
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    const w = openWatches.get(threadId);
+    if (!w || --w.holders > 0) return;
+    openWatches.delete(threadId);
+    w.stop();
+  };
+}
+
+/** Opens one thread's Watch; the returned function ends it. */
+function openThreadWatch(threadId: string): () => void {
   keepRecent(threadId);
   let queue: ThreadEventView[] = [];
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -282,8 +316,10 @@ export function startThreadWatch(threadId: string): () => void {
     queue = [];
     applyWatchBatch(threadId, batch);
   };
+  let open = true;
   const setStatus = (status: StreamStatus, error: string | null) => {
-    useThreadStore.setState((s) => (s.watch?.threadId === threadId || status === "connecting" ? { watch: { threadId, status, error } } : s));
+    if (!open) return;
+    useThreadStore.setState((s) => ({ watches: { ...s.watches, [threadId]: { status, error } } }));
   };
   const stop = runStream<ThreadEventView>({
     open: (signal) => watchThread(threadId, signal),
@@ -301,11 +337,23 @@ export function startThreadWatch(threadId: string): () => void {
     onError: invalidateOnTransportError,
   });
   return () => {
+    open = false;
     stop();
     clearTimeout(timer);
     flush();
-    useThreadStore.setState((s) => (s.watch?.threadId === threadId ? { watch: null } : s));
+    useThreadStore.setState((s) => {
+      if (!(threadId in s.watches)) return s;
+      const { [threadId]: _gone, ...watches } = s.watches;
+      return { watches };
+    });
   };
+}
+
+/** A thread's Watch status ("idle" when none is open) and the error it retries after. */
+export function useThreadWatch(threadId: string): { status: StreamStatus | "idle"; error: string | null } {
+  const status = useThreadStore((s) => s.watches[threadId]?.status ?? "idle");
+  const error = useThreadStore((s) => s.watches[threadId]?.error ?? null);
+  return { status, error };
 }
 
 /** Forgets the logs of threads that are gone (threads removed). */

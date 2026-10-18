@@ -27,7 +27,7 @@ import { ENTER_ALT, prompt, RESET, topFrame } from "./screens";
 import { CommandError } from "./errors";
 import { agentCounts, agentsCommands, listRuns } from "./agents";
 import { mcpCommands } from "./mcp";
-import { MockPlugins } from "./plugins";
+import { HELLO_TERMINAL, HELLO_THREAD, MockPlugins } from "./plugins";
 import { MockActions } from "./actions";
 import { CRASH_STDERR, MockThreadLogs, type SeedHistory, type ThreadState as ScriptedThreadState } from "./thread";
 import { contextFields, recordResult, type MockContext } from "./context";
@@ -136,6 +136,8 @@ interface MockThread {
    * newest. Archiving clears them; opening the thread clears until-seen ones.
    */
   flags: MockFlag[];
+  /** "plugin:<name>" for a plugin's own thread (hidden from the user's lists); "" for the user's. */
+  owner: string;
 }
 
 /** A plugin's flag on a thread (docs/notes/plugins-3-events-flags-env.md). */
@@ -171,7 +173,8 @@ interface CmdDef {
 }
 export type UiIntentInit = MessageInitShape<typeof UiIntentSchema>;
 
-type Kind = "top" | "shell" | "action";
+/** clock: a plugin's terminal printing the date every two seconds (the hello demo's Shell tab). */
+type Kind = "top" | "shell" | "action" | "clock";
 
 // The terminal label contract (internal/termlabel, proto Terminal.labels).
 const LABEL_KIND = "kind";
@@ -499,7 +502,21 @@ function firstMessageOf(args: Record<string, string>): MockThread["firstMessage"
  * names it), s-3 finished before it exited, s-4 crashed mid-turn, s-6 finished before its
  * close. s-5 is still starting: nothing yet.
  */
+/** A `date` line like the clock terminal's. */
+function clockLine(d: Date): string {
+  return d.toString().replace(/ GMT.*$/, "");
+}
+
 const SEEDS: Readonly<Record<string, SeedHistory | undefined>> = {
+  [HELLO_THREAD]: {
+    prompt: "say hello in one line",
+    intro: "Checking the environment the plugin gave me.",
+    command: "printenv CF_HELLO_THREAD",
+    output: "1",
+    reply: "Hello from the hello plugin, running in its data directory.",
+    minutesAgo: 2,
+    end: "done",
+  },
   "s-1": {
     prompt: "Refactor the sidebar tree into a virtualized list.",
     intro: "I'll start by reading the current sidebar and the tree builder.",
@@ -642,6 +659,10 @@ export class World {
     publish: (v) => this.events.publish({ source: EventSource.PLUGIN, event: { event: { case: "plugin", value: v } } }),
     emit: (i) => this.emit(i),
     threadExists: (id) => this.threads.has(id),
+    sendToThread: (id, text) => {
+      if (!this.threads.has(id)) throw new CommandError("notfound", `no thread ${id}`);
+      this.logs.send(id, text, []);
+    },
   });
   readonly update = new MockUpdater(
     (v) => this.events.publish({ source: EventSource.UPDATE, event: { event: { case: "update", value: v } } }),
@@ -732,6 +753,10 @@ export class World {
     const later = (min: number) => new Date(Date.now() + min * 60_000);
     this.addThread({ id: "s-8", projectId: "repo-cf", worktreePath: CF, name: "Refactor the gh poller", model: "claude-sonnet-5[1m]", effort: "", state: ThreadState.DISCONNECTED, disconnectReason: "closed", status: ThreadStatus.NEEDS_ATTENTION, statusReason: "finished", statusChangedAt: ago(30), createdAt: ago(500), lastActivityAt: ago(30), snoozedUntil: later(150) });
     this.addThread({ id: "s-9", projectId: "repo-gp", worktreePath: GP, name: "Bump wails to v3.1", model: "claude-opus-4-8[1m]", effort: "medium", state: ThreadState.DISCONNECTED, disconnectReason: "closed", createdAt: ago(450), lastActivityAt: ago(20), snoozedUntil: later(4 * 24 * 60 + 60) });
+    // The hello plugin's own assistant thread and clock terminal (its demo's Assistant and
+    // Shell tabs; docs/notes/plugins-6-thread-terminal.md): hidden from the user's lists.
+    this.addThread({ id: HELLO_THREAD, projectId: "", worktreePath: `${HOME}/.code-foundry/plugin-data/hello`, name: "Hello assistant", model: "claude-haiku-5-5[1m]", effort: "low", state: ThreadState.DISCONNECTED, disconnectReason: "idle", status: ThreadStatus.NEEDS_ATTENTION, statusReason: "finished", statusChangedAt: ago(2), createdAt: ago(3), lastActivityAt: ago(2), owner: "plugin:hello", usage: sampleUsage() });
+    this.addTerm({ id: HELLO_TERMINAL, argv: ["sh", "-c", "while true; do date; sleep 2; done"], cwd: `${HOME}/.code-foundry/plugin-data/hello`, title: "", kind: "clock", labels: { kind: "plugin", plugin: "hello", title: "Clock" }, startedAt: ago(3) });
     for (const [id, h] of Object.entries(SEEDS)) if (h) this.logs.seed(id, h);
     // Republish so connected watchers converge on the reset state.
     for (const t of this.terms.values()) this.termEvents.publish({ event: { case: "updated", value: this.terminalMsg(t) } });
@@ -1159,6 +1184,7 @@ export class World {
       pendingName: "",
       held: false,
       flags: [],
+      owner: "",
       ...o,
       state,
     };
@@ -1197,6 +1223,7 @@ export class World {
       pendingWorktreePath: s.pendingWorktreePath,
       pinned: s.pinned,
       flags: s.flags.map((f) => ({ ...f, setAt: timestampFromDate(f.setAt) })),
+      ...(s.owner ? { owner: s.owner } : {}),
       ...(s.archivedAt ? { archivedAt: timestampFromDate(s.archivedAt) } : {}),
       ...(s.snoozedUntil ? { snoozedUntil: timestampFromDate(s.snoozedUntil) } : {}),
       effortPending: s.effortPending,
@@ -1586,6 +1613,9 @@ export class World {
       case "action":
         // `$SHELL -lc <command>` prints only the command's output (the GUI draws the command).
         break;
+      case "clock":
+        t.history = Array.from({ length: 6 }, (_, i) => `${clockLine(new Date(Date.now() - (6 - i) * 2000))}\r\n`).join("");
+        break;
     }
     this.terms.set(t.id, t);
     return t;
@@ -1611,6 +1641,7 @@ export class World {
       if (t.kind === "top" && t.altScreen) {
         this.output(t, topFrame(t.tick, t.cols, t.rows));
       }
+      if (t.kind === "clock" && t.tick % 2 === 0) this.output(t, `${clockLine(new Date())}\r\n`);
     }
     if (this.seconds % 8 === 0) {
       const project = this.projects.get("repo-cf");

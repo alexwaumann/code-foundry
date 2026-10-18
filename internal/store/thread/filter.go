@@ -40,6 +40,10 @@ type ListOptions struct {
 	CreatedBy string
 	// Labels: only threads carrying every one (lowercased like Store.Label's).
 	Labels []string
+	// Owner: only threads with this owner ("plugin:hello"), or, ending in ":", any
+	// owner with that prefix ("plugin:"). Without it (and without All) owned threads
+	// are left out: they are not the user's (owner.go).
+	Owner string
 	// Limit: at most this many, the most recently active; 0 for no limit.
 	Limit int
 }
@@ -66,6 +70,8 @@ func FilterThreads(threads []Thread, o ListOptions) []Thread {
 func (o ListOptions) matches(t Thread) bool {
 	switch {
 	case !o.All && !o.IncludeArchived && !t.ArchivedAt.IsZero():
+		return false
+	case !o.ownerMatches(t.Owner):
 		return false
 	case o.Status != StatusUnknown && t.Status != o.Status:
 		return false

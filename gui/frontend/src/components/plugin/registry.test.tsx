@@ -3,7 +3,10 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import { NODE_KINDS, type ViewNode } from "@/api/plugin";
 import { emptyContext } from "@/stores/context";
+import type { ThreadView } from "@/api/threads";
 import { usePluginSurfacesStore } from "@/stores/pluginSurfaces";
+import { useTerminalsStore } from "@/stores/terminals";
+import { useThreadsStore } from "@/stores/threads";
 import { demoView } from "@/test/pluginFixtures";
 import { ViewContext, type ViewCtx } from "./context";
 import { NodeList } from "./NodeList";
@@ -71,12 +74,36 @@ describe("node renderer registry", () => {
     expect(usePluginSurfacesStore.getState().drafts[`${ctx.instance}\u0000form\u0000settings`]).toEqual({ name: "Ada" });
   });
 
-  it("renders the log tab: logs with tones, and placeholders for plugin threads and terminals", () => {
+  it("renders the log tab: logs with tones", () => {
     inView(<NodeList nodes={demoView("log").nodes} />, { viewTab: "log" });
     expect(screen.getAllByTestId("plugin-log")).toHaveLength(2);
     expect(document.querySelector('[data-tone="error"]')?.textContent).toBe("error: missing return");
-    expect(screen.getAllByTestId("plugin-placeholder").map((p) => p.getAttribute("data-kind"))).toEqual(["thread", "terminal"]);
-    expect(screen.getAllByTestId("plugin-placeholder")[0]?.textContent).toContain("Arrives with a later version");
+  });
+
+  it("renders the plugin's own thread and terminal, and a muted state for ones it does not know", () => {
+    const assistant = demoView("assistant").nodes;
+    const threadId = assistant.find((n) => n.thread)?.thread?.threadId ?? "";
+    const shell = demoView("shell").nodes;
+    const terminalId = shell.find((n) => n.terminal)?.terminal?.terminalId ?? "";
+    useThreadsStore.setState({ loaded: true, byId: {}, order: [] });
+    useTerminalsStore.setState({ loaded: true, byId: {}, order: [] });
+    inView(<NodeList nodes={[...assistant, ...shell]} />, { viewTab: "assistant" });
+    expect(screen.getByTestId("plugin-thread-gone").textContent).toContain("This thread is gone");
+    expect(screen.getByTestId("plugin-terminal-gone").textContent).toContain("This terminal is gone");
+    cleanup();
+    useThreadsStore.setState({ byId: { [threadId]: { id: threadId, owner: "plugin:hello", worktreePath: "/h", state: "disconnected", status: "idle" } as ThreadView }, order: [], owned: [threadId] });
+    useTerminalsStore.setState({
+      byId: { [terminalId]: { id: terminalId, argv: ["sh"], cwd: "/h", cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: 1, exitedAtMs: null, altScreen: false, labels: { kind: "plugin", plugin: "hello", title: "Clock" } } },
+      order: [terminalId],
+    });
+    inView(<NodeList nodes={[...assistant, ...shell]} />, { viewTab: "assistant" });
+    expect(screen.getByTestId("plugin-thread").getAttribute("data-thread-id")).toBe(threadId);
+    const term = screen.getByTestId("plugin-terminal");
+    expect(term.getAttribute("data-terminal-id")).toBe(terminalId);
+    expect(term.textContent).toContain("Clock");
+    // The plugin's Restart and the host's Open in bottom panel.
+    expect(screen.getAllByTestId("plugin-button").map((b) => b.getAttribute("data-key"))).toContain("restart-shell");
+    expect(screen.getByTestId("plugin-terminal-open-bottom")).toBeTruthy();
   });
 
   it("says so for a node of a kind it does not know", () => {

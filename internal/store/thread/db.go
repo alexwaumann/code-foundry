@@ -9,7 +9,7 @@ import (
 )
 
 // Persistence for the threads table (migrations 0003, 0006, 0008, 0009, 0011, 0014,
-// 0015, 0016, 0017, 0018, 0023, 0027 and 0028) and thread_pull_requests (0010); thread_usage and usage_retired
+// 0015, 0016, 0017, 0018, 0023, 0027, 0028 and 0032) and thread_pull_requests (0010); thread_usage and usage_retired
 // (0012) are in usage_db.go, which also deletes threads (retireThread). No process
 // survives a daemon restart. Status, its reason and StatusChangedAt are (0011): a disconnected
 // thread keeps the status it ended with.
@@ -36,9 +36,9 @@ func saveThread(ctx context.Context, db *sql.DB, s Thread) error {
 			status, status_reason, status_changed_at,
 			context_tokens, context_model, last_result_at, archived_at, snoozed_until,
 			created_by, created_by_name, brief, labels,
-			report_status, report_summary, report_data, report_at, budget_usd, budget_hit_usd, branch, name_provisional)
+			report_status, report_summary, report_data, report_at, budget_usd, budget_hit_usd, branch, name_provisional, owner, spawn_env, spawn_add_dirs)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-			?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (id) DO UPDATE SET
 			claude_session_id = excluded.claude_session_id,
 			project_id = excluded.project_id,
@@ -77,14 +77,17 @@ func saveThread(ctx context.Context, db *sql.DB, s Thread) error {
 			budget_usd = excluded.budget_usd,
 			budget_hit_usd = excluded.budget_hit_usd,
 			branch = excluded.branch,
-			name_provisional = excluded.name_provisional`,
+			name_provisional = excluded.name_provisional,
+			owner = excluded.owner,
+			spawn_env = excluded.spawn_env,
+			spawn_add_dirs = excluded.spawn_add_dirs`,
 		s.ID, s.ClaudeSessionID, s.ProjectID, s.WorktreePath, s.Name, s.AutoNamed, s.Model, s.Effort,
 		millis(s.CreatedAt), millis(s.LastActivityAt), s.ParentID, int(s.State), s.DisconnectReason, s.ExitCode, s.LastError,
 		int(s.PermissionMode), s.BaseRef, s.CreatedWorktree, s.WorkspaceID, s.Pinned,
 		int(s.Status), s.StatusReason, millis(s.StatusChangedAt),
 		s.ContextTokens, s.ContextModel, millis(s.LastResultAt), millis(s.ArchivedAt), millis(s.SnoozedUntil),
 		s.CreatedBy, s.CreatedByName, s.Brief, labelsJSON(s.Labels),
-		int(s.Report.Status), s.Report.Summary, s.Report.Data, millis(s.Report.At), s.BudgetUSD, s.BudgetHitUSD, s.Branch, s.NameProvisional)
+		int(s.Report.Status), s.Report.Summary, s.Report.Data, millis(s.Report.At), s.BudgetUSD, s.BudgetHitUSD, s.Branch, s.NameProvisional, s.Owner, labelsJSON(s.SpawnEnv), labelsJSON(s.SpawnAddDirs))
 	if err != nil {
 		return fmt.Errorf("thread: save %s: %w", s.ID, err)
 	}
@@ -98,7 +101,7 @@ func loadThreads(ctx context.Context, db *sql.DB) ([]Thread, error) {
 			status, status_reason, status_changed_at,
 			context_tokens, context_model, last_result_at, archived_at, snoozed_until,
 			created_by, created_by_name, brief, labels,
-			report_status, report_summary, report_data, report_at, budget_usd, budget_hit_usd, branch, name_provisional
+			report_status, report_summary, report_data, report_at, budget_usd, budget_hit_usd, branch, name_provisional, owner, spawn_env, spawn_add_dirs
 		FROM threads ORDER BY created_at, id`)
 	if err != nil {
 		return nil, fmt.Errorf("thread: load: %w", err)
@@ -109,14 +112,14 @@ func loadThreads(ctx context.Context, db *sql.DB) ([]Thread, error) {
 		var s Thread
 		var created, active, statusAt, lastResult, archived, snoozed, reportAt int64
 		var state, perm, status, reportStatus int
-		var labels string
+		var labels, spawnEnv, spawnAddDirs string
 		if err := rows.Scan(&s.ID, &s.ClaudeSessionID, &s.ProjectID, &s.WorktreePath, &s.Name, &s.AutoNamed,
 			&s.Model, &s.Effort, &created, &active, &s.ParentID, &state, &s.DisconnectReason, &s.ExitCode, &s.LastError,
 			&perm, &s.BaseRef, &s.CreatedWorktree, &s.WorkspaceID, &s.Pinned,
 			&status, &s.StatusReason, &statusAt,
 			&s.ContextTokens, &s.ContextModel, &lastResult, &archived, &snoozed,
 			&s.CreatedBy, &s.CreatedByName, &s.Brief, &labels,
-			&reportStatus, &s.Report.Summary, &s.Report.Data, &reportAt, &s.BudgetUSD, &s.BudgetHitUSD, &s.Branch, &s.NameProvisional); err != nil {
+			&reportStatus, &s.Report.Summary, &s.Report.Data, &reportAt, &s.BudgetUSD, &s.BudgetHitUSD, &s.Branch, &s.NameProvisional, &s.Owner, &spawnEnv, &spawnAddDirs); err != nil {
 			return nil, fmt.Errorf("thread: load: %w", err)
 		}
 		s.CreatedAt, s.LastActivityAt, s.State = fromMillis(created), fromMillis(active), State(state)
@@ -131,6 +134,7 @@ func loadThreads(ctx context.Context, db *sql.DB) ([]Thread, error) {
 		s.ArchivedAt = fromMillis(archived)
 		s.SnoozedUntil = fromMillis(snoozed)
 		s.Labels = parseLabels(labels)
+		s.SpawnEnv, s.SpawnAddDirs = parseLabels(spawnEnv), parseLabels(spawnAddDirs)
 		if s.Report.Status = ReportStatus(reportStatus); !s.Report.Status.valid() {
 			s.Report.Status = ReportNone
 		}

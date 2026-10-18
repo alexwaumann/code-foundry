@@ -422,6 +422,10 @@ message SurfaceActRequest {
   // (multiple selects). A secret input with store is written to the Keychain and the
   // plugin gets {key, stored: true} instead.
   google.protobuf.Struct values = 7;
+  // What the panel the user acted in shows (its thread, project, …): the plugin gets it
+  // as surface/act's context, so a shared instance (scope pr, project, global) knows
+  // which thread a click came from. Unset: ref's context when ref is given, else none.
+  UiContext context = 8;
 }
 
 message SurfaceActResponse {

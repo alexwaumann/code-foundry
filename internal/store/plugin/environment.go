@@ -77,6 +77,9 @@ type SpawnScope struct {
 	ThreadID, ProjectID string
 	MemberProjectIDs    []string
 	NoProject           bool
+	// Owner is the thread's owner: a plugin's own thread does not get that plugin's
+	// session environment (it has its own; threads.go).
+	Owner string
 }
 
 // Contribution is what a spawn gets from every plugin: "KEY=VALUE" entries, PATH
@@ -356,7 +359,8 @@ func (m *Manager) SessionEnvironment(ctx context.Context, scope SpawnScope, wait
 	var c Contribution
 	var names []string
 	for _, e := range m.resolved() {
-		if !e.matches(scope) {
+		if !e.matches(scope) || (scope.Owner != "" && scope.Owner == OwnerOf(e.Plugin)) {
+			// A plugin's own thread brings its own env (thread/create) instead.
 			continue
 		}
 		names = append(names, e.Plugin)
@@ -480,8 +484,11 @@ func (m *Manager) loadEnvironments(ctx context.Context) error {
 }
 
 // forget drops what a disabled or removed plugin left behind: its session environment
-// and its flags on threads. Its secrets and consent stay.
+// and its flags on threads; it archives its threads and closes its terminals
+// (threads.go, terminals.go). Its secrets and consent stay.
 func (m *Manager) forget(ctx context.Context, name string, logs *logBuffer) {
+	m.archiveThreads(ctx, name, logs)
+	m.closeTerminals(ctx, name, logs)
 	m.env.mu.Lock()
 	_, had := m.env.byID[name]
 	m.env.mu.Unlock()
@@ -493,8 +500,8 @@ func (m *Manager) forget(ctx context.Context, name string, logs *logBuffer) {
 	m.clearFlags(ctx, name, logs)
 }
 
-// sweep forgets the environments and flags of plugins that are not enabled (disabled or
-// removed while the daemon was stopped).
+// sweep forgets the environments, flags and threads of plugins that are not enabled
+// (disabled or removed while the daemon was stopped).
 func (m *Manager) sweep(ctx context.Context) {
 	snap := m.Snapshot()
 	enabled := func(name string) bool {
@@ -514,6 +521,11 @@ func (m *Manager) sweep(ctx context.Context) {
 			if !enabled(name) && !slices.Contains(gone, name) {
 				gone = append(gone, name)
 			}
+		}
+	}
+	for _, name := range m.liveThreadOwners() {
+		if !enabled(name) && !slices.Contains(gone, name) {
+			gone = append(gone, name)
 		}
 	}
 	for _, name := range gone {

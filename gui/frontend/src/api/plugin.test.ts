@@ -11,9 +11,9 @@ function allNodes(nodes: readonly ViewNode[]): ViewNode[] {
 }
 
 describe("view model", () => {
-  it("parses the demo's three views and knows every node kind in them", () => {
+  it("parses the demo's five views and knows every node kind in them", () => {
     const kinds = new Set<string>();
-    for (const tab of ["overview", "form", "log"] as const) {
+    for (const tab of ["overview", "form", "log", "assistant", "shell"] as const) {
       const v = demoView(tab);
       expect(v.tabs?.active).toBe(tab);
       for (const n of allNodes(v.nodes)) {
@@ -22,7 +22,7 @@ describe("view model", () => {
         kinds.add(k ?? "");
       }
     }
-    // The demo exercises every v1 node kind (thread and terminal as placeholders).
+    // The demo exercises every v1 node kind (thread and terminal on the Assistant and Shell tabs).
     expect([...kinds].sort()).toEqual([...NODE_KINDS].sort());
   });
 

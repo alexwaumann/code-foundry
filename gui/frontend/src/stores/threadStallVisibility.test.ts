@@ -33,7 +33,7 @@ function setVisibility(state: DocumentVisibilityState): void {
 describe("the visible thread's Watch after the window was hidden", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    useThreadStore.setState({ logs: {}, pending: {}, watch: null, folds: {}, expanded: {} });
+    useThreadStore.setState({ logs: {}, pending: {}, watches: {}, folds: {}, expanded: {} });
     watched.opened = 0;
   });
   afterEach(() => {

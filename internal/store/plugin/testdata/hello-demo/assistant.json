@@ -1,0 +1,144 @@
+{
+  "header": {
+    "icon": "sparkles",
+    "title": "Hello demo",
+    "trailing": {
+      "spans": [
+        {
+          "text": "0 clicks",
+          "tone": "muted"
+        }
+      ]
+    },
+    "pill": {
+      "label": "demo",
+      "tone": "ok"
+    },
+    "subline": {
+      "spans": [
+        {
+          "text": "opened "
+        },
+        {
+          "time": {
+            "at": "2026-10-18T09:02:16.311761-05:00",
+            "style": "relative"
+          }
+        },
+        {
+          "text": " · thread "
+        },
+        {
+          "text": "s-f20aac336477",
+          "mono": true
+        }
+      ]
+    },
+    "actions": [
+      {
+        "key": "hdr-refresh",
+        "label": "Refresh",
+        "icon": "refresh-cw",
+        "action": {
+          "event": "refresh"
+        },
+        "iconOnly": true
+      },
+      {
+        "key": "hdr-docs",
+        "label": "Open the plugin docs",
+        "icon": "external-link",
+        "action": {
+          "openUrl": "https://github.com/alexwaumann/code-foundry"
+        },
+        "iconOnly": true
+      }
+    ],
+    "tabTitle": "Hello"
+  },
+  "tabs": {
+    "items": [
+      {
+        "key": "overview",
+        "label": "Overview"
+      },
+      {
+        "key": "form",
+        "label": "Form"
+      },
+      {
+        "key": "log",
+        "label": "Log"
+      },
+      {
+        "key": "assistant",
+        "label": "Assistant"
+      },
+      {
+        "key": "shell",
+        "label": "Shell"
+      }
+    ],
+    "active": "assistant"
+  },
+  "nodes": [
+    {
+      "key": "assistant-intro",
+      "text": {
+        "content": {
+          "spans": [
+            {
+              "text": "A Claude thread the plugin owns, in its data directory with a small skill and "
+            },
+            {
+              "text": "CF_HELLO_THREAD=1",
+              "mono": true
+            },
+            {
+              "text": ". It is not in the sidebar: "
+            },
+            {
+              "text": "code-foundry plugin threads hello",
+              "mono": true
+            },
+            {
+              "text": " lists it."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "key": "assistant-actions",
+      "actions": {
+        "buttons": [
+          {
+            "key": "send-hello",
+            "label": "Send hello",
+            "icon": "send",
+            "style": "attention",
+            "action": {
+              "event": "send-hello"
+            }
+          },
+          {
+            "key": "ask-main",
+            "label": "Ask the main thread",
+            "icon": "message-square",
+            "action": {
+              "event": "ask-main"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "key": "assistant-thread",
+      "thread": {
+        "threadId": "s-85cf5166e109",
+        "placeholder": "Message the assistant…",
+        "height": "fill"
+      }
+    }
+  ]
+}

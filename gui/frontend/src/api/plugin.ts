@@ -301,16 +301,25 @@ export interface FormNodeData {
   resetToken?: string;
 }
 
+/** A thread or terminal node's height: "auto" (the default), "fill" (the rest of the panel) or pixels. */
+export type NodeHeight = "auto" | "fill" | number;
+
+/** The plugin's own Claude thread, inline: the thread view and (unless readOnly) its composer. */
 export interface ThreadData {
   threadId: string;
   readOnly?: boolean;
   placeholder?: string;
+  height?: NodeHeight;
 }
 
+/** The plugin's own terminal, inline, with "Open in bottom panel" and up to 2 buttons of the plugin's. */
 export interface TerminalData {
   terminalId: string;
+  /** Text rows (4..60, default 16) when height is "auto". */
   rows?: number;
   title?: string;
+  height?: NodeHeight;
+  actions?: ViewButton[];
 }
 
 /** Each node kind's data, by the JSON field that names the kind. */
@@ -671,12 +680,21 @@ export interface ActRequestView {
   /** A change's value. */
   value?: string;
   values?: Readonly<Record<string, FieldValue>>;
+  /** The acting panel's context: the plugin learns which thread a click came from. */
+  context?: UiContextView;
 }
 
 /** Sends a user's act on an element to the plugin; rejects with the plugin's message. */
 export async function actOnSurface(req: ActRequestView, conn: DaemonConnection = daemon): Promise<number> {
   const c = await conn.client(PluginService);
   const values: JsonObject | undefined = req.values && Object.keys(req.values).length > 0 ? { ...req.values } : undefined;
-  const res = await c.act({ instance: req.instance, version: BigInt(req.version), key: req.key, ...(req.value !== undefined ? { value: req.value } : {}), ...(values ? { values } : {}) });
+  const res = await c.act({
+    instance: req.instance,
+    version: BigInt(req.version),
+    key: req.key,
+    ...(req.value !== undefined ? { value: req.value } : {}),
+    ...(values ? { values } : {}),
+    ...(req.context ? { context: toUiContext(req.context) } : {}),
+  });
   return Number(res.version);
 }

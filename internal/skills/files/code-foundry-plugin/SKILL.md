@@ -1,6 +1,6 @@
 ---
 name: code-foundry-plugin
-description: "Build, debug and publish a Code Foundry plugin: a Go executable using pluginsdk with a plugin.json manifest that adds commands, side-panel surfaces, thread flags, event subscriptions or session environment to Code Foundry. Use when asked to build, create, write, fix, test or release a plugin for Code Foundry, to edit a plugin.json, to use pluginsdk, pluginsdk/ui or plugintest, to debug a plugin with code-foundry plugin dev, logs, surface or act, or to add a plugin to the Code Foundry plugin registry."
+description: "Build, debug and publish a Code Foundry plugin: a Go executable using pluginsdk with a plugin.json manifest that adds commands, side-panel surfaces, thread flags, event subscriptions, session environment or its own Claude threads and terminals to Code Foundry. Use when asked to build, create, write, fix, test or release a plugin for Code Foundry, to edit a plugin.json, to use pluginsdk, pluginsdk/ui or plugintest, to debug a plugin with code-foundry plugin dev, logs, surface or act, or to add a plugin to the Code Foundry plugin registry."
 ---
 
 # Building a Code Foundry plugin
@@ -10,7 +10,7 @@ stdout (newline-delimited JSON-RPC 2.0). Its `plugin.json` declares everything u
 **commands** (`code-foundry plugin <name> <command>`, also in the app's command palette),
 **surfaces** (side-panel tabs the app draws from a JSON view model the plugin sends; no
 HTML) and **permissions** the user consents to before it runs (running host commands,
-reading events, flagging threads, adding env to new Claude threads, Keychain secrets).
+reading events, flagging threads, env for new threads, secrets, own threads and terminals).
 Write plugins in Go with the SDK `github.com/alexwaumann/code-foundry/pluginsdk`
 (standard library only; `pluginsdk/ui` builds views, `pluginsdk/plugintest` is a fake host
 for tests). This Code Foundry is {{cf.version}}.

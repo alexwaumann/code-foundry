@@ -36,7 +36,10 @@ const (
 	MaxNoticeButtons = 3
 	MaxSectionButton = 2
 	MaxEmptyButtons  = 2
-	MaxBarButtons    = 6
+	// MaxTerminalButtons is a terminal node's own buttons (the host adds "Open in bottom
+	// panel").
+	MaxTerminalButtons = 2
+	MaxBarButtons      = 6
 )
 
 // KeyPattern is the shape of every key. Keys share one namespace across the view.
@@ -304,6 +307,13 @@ func (c *checker) tabs(path string, t *Tabs) {
 	}
 }
 
+// height checks a thread or terminal node's height.
+func (c *checker) height(path string, h Height) {
+	if px := h.Px(); h.mode == "px" && (px < MinHeightPx || px > MaxHeightPx) {
+		c.bad(path, "%d px is outside %d..%d", px, MinHeightPx, MaxHeightPx)
+	}
+}
+
 // node checks one node at depth (1 = top level).
 func (c *checker) node(path string, n Node, depth int) {
 	c.key(path, n.Key)
@@ -404,13 +414,18 @@ func (c *checker) node(path string, n Node, depth int) {
 		c.form(path+".form", n.Form)
 	case n.Thread != nil:
 		c.required(path+".thread.threadId", n.Thread.ThreadID)
+		c.str(path+".thread.threadId", n.Thread.ThreadID, MaxLabel)
 		c.str(path+".thread.placeholder", n.Thread.Placeholder, MaxLabel)
+		c.height(path+".thread.height", n.Thread.Height)
 	case n.Terminal != nil:
 		c.required(path+".terminal.terminalId", n.Terminal.TerminalID)
+		c.str(path+".terminal.terminalId", n.Terminal.TerminalID, MaxLabel)
 		if r := n.Terminal.Rows; r != 0 && (r < 4 || r > 60) {
 			c.bad(path+".terminal.rows", "%d is outside 4..60", r)
 		}
 		c.str(path+".terminal.title", n.Terminal.Title, MaxLabel)
+		c.height(path+".terminal.height", n.Terminal.Height)
+		c.buttons(path+".terminal.actions", n.Terminal.Actions, MaxTerminalButtons)
 	}
 }
 

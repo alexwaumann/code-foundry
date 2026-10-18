@@ -15,7 +15,7 @@ import { persist } from "zustand/middleware";
 import { useShallow } from "zustand/react/shallow";
 import { basename } from "@/lib/path";
 import { NO_PROJECT } from "@/lib/threadRow";
-import { ACTION_NAME_LABEL, isActionLabels, isPanelLabels, THREAD_LABEL, WORKTREE_LABEL } from "@/lib/termlabel";
+import { ACTION_NAME_LABEL, isActionLabels, isPanelLabels, isPluginLabels, THREAD_LABEL, TITLE_LABEL, WORKTREE_LABEL } from "@/lib/termlabel";
 import { keyOf } from "./panel";
 import { useTerminalsStore, type TerminalsData } from "./terminals";
 import { BOTTOM_DEFAULT, useUiStore, type Selection } from "./ui";
@@ -61,11 +61,14 @@ export function ownerKeyOf(t: LabelledTerminal): string | null {
   return thread ? `${THREAD_PREFIX}${thread}` : PROJECTS_KEY;
 }
 
-/** A key's tabs: the ids of the shells and action runs it owns, in the terminals store's order. */
+/**
+ * A key's tabs: the ids of the shells and action runs it owns, and of the plugins'
+ * terminals the user opened in it (TerminalsData.shownIn), in the terminals store's order.
+ */
 export function bottomTabIds(terminals: TerminalsData, key: string): string[] {
   return terminals.order.filter((id) => {
     const t = terminals.byId[id];
-    return t !== undefined && ownerKeyOf(t) === key;
+    return t !== undefined && (ownerKeyOf(t) === key || (isPluginLabels(t.labels) && terminals.shownIn?.[id] === key));
   });
 }
 
@@ -85,6 +88,7 @@ export function activeTabOf(entry: BottomEntry, ids: readonly string[]): string 
  */
 export function bottomTabTitle(t: { title: string; cwd: string; labels: Readonly<Record<string, string>> }, key: string, noProject = false): string {
   if (isActionLabels(t.labels)) return t.labels[ACTION_NAME_LABEL] || "Action";
+  if (isPluginLabels(t.labels)) return t.labels[TITLE_LABEL] || t.title || "Plugin terminal";
   if (key === PROJECTS_KEY) {
     const wt = t.labels[WORKTREE_LABEL] ?? "";
     return basename(wt || t.cwd);
@@ -106,7 +110,7 @@ export function bottomTabTitles(terminals: TerminalsData, key: string, noProject
   for (const id of bottomTabIds(terminals, key)) {
     const t = terminals.byId[id];
     if (!t) continue;
-    if (key !== PROJECTS_KEY && t.title && !isActionLabels(t.labels)) {
+    if (key !== PROJECTS_KEY && t.title && !isActionLabels(t.labels) && !isPluginLabels(t.labels)) {
       out[id] = t.title;
       continue;
     }

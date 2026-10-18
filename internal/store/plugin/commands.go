@@ -134,10 +134,7 @@ func (m *Manager) runCommand(ctx context.Context, name string, spec pluginsdk.Co
 	var res pluginsdk.CommandResult
 	err := conn.Call(cctx, pluginsdk.MethodCommandInvoke, pluginsdk.CommandRequest{
 		Command: spec.Name, Args: rawArgs(spec.Args, a),
-		Context: pluginsdk.UiContext{
-			ThreadID: uctx.ActiveThreadID, ProjectID: uctx.ActiveProjectID, WorktreePath: uctx.ActiveWorktreePath,
-			TerminalID: uctx.ActiveTerminalID, WorkspaceID: uctx.ActiveWorkspaceID, View: uctx.ActiveView,
-		},
+		Context: UiContextOf(uctx),
 	}, &res)
 	if err != nil {
 		var perr *pluginsdk.Error
@@ -174,4 +171,12 @@ func (m *Manager) whyDownLocked(e *entry) string {
 		return "plugin " + e.name + " is disabled"
 	}
 	return "plugin " + e.name + " is not running"
+}
+
+// UiContextOf is a command context as the protocol's UiContext.
+func UiContextOf(c command.Context) pluginsdk.UiContext {
+	return pluginsdk.UiContext{
+		ThreadID: c.ActiveThreadID, ProjectID: c.ActiveProjectID, WorktreePath: c.ActiveWorktreePath,
+		TerminalID: c.ActiveTerminalID, WorkspaceID: c.ActiveWorkspaceID, View: c.ActiveView,
+	}
 }

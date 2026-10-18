@@ -61,6 +61,9 @@ func (p *panel) view() ui.View {
 }
 
 func (p *panel) Act(_ context.Context, act pluginsdk.SurfaceAct) error {
+	if act.Context.ThreadID != "" {
+		p.h.Log().Info("act", "viewer", act.Context.ThreadID)
+	}
 	switch act.Action {
 	case "inc":
 		p.mu.Lock()
@@ -335,9 +338,15 @@ func TestSurfaceLifecycle(t *testing.T) {
 	if v2.Version != v1v.Version+1 {
 		t.Errorf("versions %d then %d", v1v.Version, v2.Version)
 	}
+	// The act carries the acting panel's context (the plugin's SurfaceAct.Context).
+	if _, err := e.act(w.key, plugin.ActRequest{Key: "inc", Context: command.Context{ActiveThreadID: "s-viewer"}}); err != nil {
+		t.Fatal(err)
+	}
+	e.waitLog("act viewer=s-viewer")
+	w.view("after the second inc", contains("count 2"))
 	// A second watcher gets the current view at once.
 	w2 := e.watch("panel", s1)
-	w2.view("second watcher", contains("count 1"))
+	w2.view("second watcher", contains("count 2"))
 	w2.cancel()
 	w.cancel()
 	e.waitLog("visible=false")
@@ -350,7 +359,7 @@ func TestSurfaceLifecycle(t *testing.T) {
 	if st.Phase != plugin.PhaseOpening || st.Message != "updating" {
 		t.Errorf("reopen state %+v", st)
 	}
-	w3.view("cached view", contains("count 1"))
+	w3.view("cached view", contains("count 2"))
 	w3.view("fresh view", contains("count 0"))
 
 	// Another thread is another instance; a project-scoped surface needs a project.

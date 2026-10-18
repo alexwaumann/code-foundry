@@ -21,7 +21,7 @@
         },
         {
           "time": {
-            "at": "2026-10-18T06:11:51.230008-05:00",
+            "at": "2026-10-18T09:02:16.311761-05:00",
             "style": "relative"
           }
         },
@@ -29,7 +29,7 @@
           "text": " · thread "
         },
         {
-          "text": "s-47aac4538464",
+          "text": "s-f20aac336477",
           "mono": true
         }
       ]
@@ -69,6 +69,14 @@
       {
         "key": "log",
         "label": "Log"
+      },
+      {
+        "key": "assistant",
+        "label": "Assistant"
+      },
+      {
+        "key": "shell",
+        "label": "Shell"
       }
     ],
     "active": "form"

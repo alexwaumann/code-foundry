@@ -51,6 +51,8 @@ export interface SurfaceEntry {
   hostRendered: boolean;
   /** Why the stream failed (not available here, the daemon gone); null while it is fine. */
   error: string | null;
+  /** The panel's context the watch runs with: acts carry it (SurfaceAct.context). */
+  context?: UiContextView;
 }
 
 export interface PluginSurfacesState {
@@ -234,7 +236,7 @@ function onUpdate(watchKey: string, u: SurfaceUpdateView): void {
  * which forgets the watch (drafts and collapsed sections stay with the instance).
  */
 export function startSurfaceWatch(watchKey: string, ref: SurfaceRefView): () => void {
-  usePluginSurfacesStore.setState((s) => ({ watches: { ...s.watches, [watchKey]: s.watches[watchKey] ?? emptyEntry(ref) } }));
+  usePluginSurfacesStore.setState((s) => ({ watches: { ...s.watches, [watchKey]: { ...(s.watches[watchKey] ?? emptyEntry(ref)), context: ref.context } } }));
   const stop = runStream<SurfaceUpdateView>({
     open: (signal) => watchSurface(ref, signal),
     onEvent: (u) => {
@@ -287,7 +289,14 @@ export async function actOnElement(watchKey: string, key: string, opts: ActOptio
   if (!e?.instance || e.version === 0) return false;
   setPending(watchKey, key, true);
   try {
-    await actOnSurface({ instance: e.instance, version: e.version, key, ...(opts.value !== undefined ? { value: opts.value } : {}), ...(opts.values ? { values: opts.values } : {}) });
+    await actOnSurface({
+      instance: e.instance,
+      version: e.version,
+      key,
+      ...(opts.value !== undefined ? { value: opts.value } : {}),
+      ...(opts.values ? { values: opts.values } : {}),
+      ...(e.context ? { context: e.context } : {}),
+    });
     if (opts.clearDraftsOf) clearDrafts(opts.clearDraftsOf);
     return true;
   } catch (err) {

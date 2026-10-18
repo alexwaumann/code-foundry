@@ -96,7 +96,7 @@ func RegisterPluginSurface(r *Registry, b PluginSurfaceBackend) error {
 					return Result{}, InvalidArg("action", "name the element: its action or --key")
 				}
 				req := &v1.SurfaceActRequest{Ref: surfaceRef(uctx, a), Version: uint64(max(a.Int("version"), 0)),
-					Key: a.String("key"), Action: a.String("action")}
+					Key: a.String("key"), Action: a.String("action"), Context: UiContextToProto(uctx)}
 				if a.Has("value") {
 					v := a.String("value")
 					req.Value = &v

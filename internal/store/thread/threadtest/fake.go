@@ -178,7 +178,16 @@ func (f *Fake) Create(_ context.Context, o thread.CreateOptions) (thread.Thread,
 	if o.NoProject {
 		call += " no-project"
 		s.WorktreePath = "/home"
+		if o.Cwd != "" {
+			call += " cwd=" + o.Cwd
+			s.WorktreePath = o.Cwd
+		}
 	}
+	if o.Owner != "" {
+		call += " owner=" + o.Owner
+		s.Owner = o.Owner
+	}
+	s.SpawnEnv, s.SpawnAddDirs = slices.Clone(o.Env), slices.Clone(o.AddDirs)
 	if o.InitialPrompt != "" {
 		call += " prompt=" + o.InitialPrompt
 	}

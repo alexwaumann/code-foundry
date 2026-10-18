@@ -11,6 +11,7 @@ import {
   foldDeferredTurns,
   forgetTurnView,
   KEPT_LOGS,
+  openThreadWatches,
   sameItem,
   setRowExpanded,
   setTurnFolded,
@@ -254,7 +255,7 @@ describe("applyPendingEvent (EventService thread source)", () => {
 describe("startThreadWatch", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    useThreadStore.setState({ logs: {}, pending: {}, watch: null, folds: {}, expanded: {} });
+    useThreadStore.setState({ logs: {}, pending: {}, watches: {}, folds: {}, expanded: {} });
     watched.opened = 0;
   });
   afterEach(() => {
@@ -273,15 +274,36 @@ describe("startThreadWatch", () => {
     });
     const stop = startThreadWatch("s");
     await vi.advanceTimersByTimeAsync(0);
-    expect(useThreadStore.getState().watch).toMatchObject({ threadId: "s", status: "open" });
+    expect(useThreadStore.getState().watches.s).toMatchObject({ status: "open" });
     expect(useThreadStore.getState().logs.s).toBeUndefined();
     await vi.advanceTimersByTimeAsync(WATCH_BATCH_MS);
     expect(useThreadStore.getState().logs.s?.byId.a).toMatchObject({ text: "hello" });
     expect(updates).toHaveBeenCalledTimes(1);
     stop();
     unsub();
-    expect(useThreadStore.getState().watch).toBeNull();
+    expect(useThreadStore.getState().watches.s).toBeUndefined();
     expect(watched.opened).toBe(1);
+  });
+
+  it("opens one Watch per thread on screen: a second view of it shares it, another thread gets its own", async () => {
+    watched.events = [];
+    const main = startThreadWatch("s");
+    const inline = startThreadWatch("s");
+    const other = startThreadWatch("p");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(watched.opened).toBe(2);
+    expect(openThreadWatches()).toBe(2);
+    expect(Object.keys(useThreadStore.getState().watches).sort()).toEqual(["p", "s"]);
+    // The main pane leaves the thread: the plugin's view of it keeps the stream.
+    main();
+    main(); // a second release is harmless
+    await vi.advanceTimersByTimeAsync(0);
+    expect(useThreadStore.getState().watches.s).toBeDefined();
+    expect(watched.opened).toBe(2);
+    inline();
+    other();
+    expect(openThreadWatches()).toBe(0);
+    expect(useThreadStore.getState().watches).toEqual({});
   });
 
   it("keeps the logs of the last KEPT_LOGS watched threads only", async () => {
@@ -308,7 +330,7 @@ describe("turns left open while scrolled up (deferTurnFolds, watchTurnEnds)", ()
     applyWatchBatch(threadId, evs);
   };
   beforeEach(() => {
-    useThreadStore.setState({ logs: {}, pending: {}, watch: null, folds: {}, expanded: {}, deferred: {} });
+    useThreadStore.setState({ logs: {}, pending: {}, watches: {}, folds: {}, expanded: {}, deferred: {} });
   });
 
   it("reports a turn_end once, when it arrives, inside the store update that brings it", () => {

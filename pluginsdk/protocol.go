@@ -51,8 +51,7 @@ const (
 	MethodSecretDelete = "secret/delete"
 	MethodSecretList   = "secret/list"
 	// A method a host does not support (yet) answers CodeMethodNotFound; the host's
-	// initialize capabilities say what it supports. thread/create, thread/send,
-	// terminal/create and terminal/close are not served yet.
+	// initialize capabilities say what it supports.
 	//
 	// MethodViewUpdate (request): ViewUpdateParams → ViewUpdateResult. The whole view
 	// of an open instance; the host validates it (an invalid view is refused with
@@ -78,10 +77,27 @@ const (
 	// MethodSetEnvironment (request): Environment → EnvironmentResult
 	// (Host.SetEnvironment).
 	MethodSetEnvironment = "session/setEnvironment"
-	MethodThreadCreate   = "thread/create"
-	MethodThreadSend     = "thread/send"
+	// Plugin threads (permission threads; capability "threads"): Claude threads the
+	// plugin owns, hidden from the user's thread list.
+	//
+	// MethodThreadCreate (request): ThreadCreateParams → ThreadCreateResult.
+	MethodThreadCreate = "thread/create"
+	// MethodThreadSend (request): ThreadSendParams → {}. Starts the thread's Claude when
+	// it is stopped, like any message.
+	MethodThreadSend = "thread/send"
+	// MethodThreadArchive (request): ThreadRef → {}.
+	MethodThreadArchive = "thread/archive"
+	// MethodThreadList (request): {} → ThreadListResult, the plugin's own threads.
+	MethodThreadList = "thread/list"
+	// Plugin terminals (permission terminals; capability "terminals").
+	//
+	// MethodTerminalCreate (request): TerminalCreateParams → TerminalCreateResult.
 	MethodTerminalCreate = "terminal/create"
-	MethodTerminalClose  = "terminal/close"
+	// MethodTerminalClose (request): TerminalRef → {}. Kills it (SIGHUP, then SIGKILL)
+	// and forgets it.
+	MethodTerminalClose = "terminal/close"
+	// MethodTerminalList (request): {} → TerminalListResult, the plugin's own terminals.
+	MethodTerminalList = "terminal/list"
 )
 
 // Environment variables the host sets in a plugin's process.
@@ -361,6 +377,11 @@ const (
 // SurfaceAct is surface/act's params: the user acted on a view element.
 type SurfaceAct struct {
 	Instance string `json:"instance"`
+	// Context is what the panel the user acted in shows: its thread (and that thread's
+	// project, worktree, workspace), or its project. A shared instance (scope pr,
+	// project or global) learns from it which thread a click came from. From the CLI
+	// (plugin act) it is the --context-* flags'.
+	Context UiContext `json:"context"`
 	// Version is the view version the user acted on (it may be older than the latest).
 	Version uint64 `json:"version"`
 	// Kind is ActClick, ActSubmit, ActChange or ActTab.
@@ -429,4 +450,115 @@ type ViewAppendParams struct {
 	Key      string       `json:"key"`
 	Text     string       `json:"text,omitempty"`
 	Lines    []AppendLine `json:"lines,omitempty"`
+}
+
+// ThreadCreateParams is thread/create's params: a Claude thread the plugin owns (hidden
+// from the user's thread list, shown in the plugin's thread nodes). The host checks Env
+// and AddDirs like a session environment (reserved keys, paths under home, existing
+// directories) and refuses the call naming each problem.
+type ThreadCreateParams struct {
+	// Title is the thread's name (one line, at most 120 characters).
+	Title string `json:"title"`
+	// Cwd is where Claude runs: an existing directory under the user's home ("~/" is
+	// expanded). Default: the project's main worktree with ProjectID, else the plugin's
+	// data dir. With ProjectID it must be one of that project's worktrees.
+	Cwd string `json:"cwd,omitempty"`
+	// ProjectID makes it a thread of that project (its scope for session environments,
+	// pull requests and worktree panels).
+	ProjectID string `json:"projectId,omitempty"`
+	// AddDirs are --add-dir directories (a SKILL.md tree, say), after the host's own.
+	AddDirs []string `json:"addDirs,omitempty"`
+	// Env is added to the thread's environment, every time its Claude starts. It
+	// replaces the plugin's own session environment for this thread (other plugins'
+	// still apply).
+	Env map[string]string `json:"env,omitempty"`
+	// Model and Effort default to the user's settings (threads.default_model,
+	// threads.default_effort).
+	Model  string `json:"model,omitempty"`
+	Effort string `json:"effort,omitempty"`
+	// Prompt, when set, is the thread's first message.
+	Prompt string `json:"prompt,omitempty"`
+}
+
+// ThreadCreateResult is thread/create's answer.
+type ThreadCreateResult struct {
+	ThreadID string `json:"threadId"`
+}
+
+// ThreadSendParams is thread/send's params.
+type ThreadSendParams struct {
+	ThreadID string `json:"threadId"`
+	Text     string `json:"text"`
+}
+
+// ThreadRef names one of the plugin's threads.
+type ThreadRef struct {
+	ThreadID string `json:"threadId"`
+}
+
+// PluginThread is one of the plugin's threads (thread/list).
+type PluginThread struct {
+	ThreadID  string `json:"threadId"`
+	Title     string `json:"title"`
+	Cwd       string `json:"cwd"`
+	ProjectID string `json:"projectId,omitempty"`
+	Model     string `json:"model"`
+	Effort    string `json:"effort,omitempty"`
+	// State is Claude's process: starting, connected, closing or disconnected (stopped:
+	// the next message starts it).
+	State string `json:"state"`
+	// Status is busy, idle, attention (a question, a permission prompt or a finished
+	// turn), error, or unknown.
+	Status    string    `json:"status"`
+	Archived  bool      `json:"archived,omitempty"`
+	CreatedAt time.Time `json:"createdAt"`
+	// CostUSD is what the thread has cost so far (the Usage page's rates).
+	CostUSD float64 `json:"costUsd,omitempty"`
+}
+
+// ThreadListResult is thread/list's answer, oldest first.
+type ThreadListResult struct {
+	Threads []PluginThread `json:"threads"`
+}
+
+// TerminalCreateParams is terminal/create's params: a terminal the plugin owns, shown
+// in its terminal nodes and, on the user's request, in the bottom panel.
+type TerminalCreateParams struct {
+	// Argv is the program and its arguments (argv[0] is looked up on PATH). For the
+	// user's own tools and aliases run "$SHELL", "-lc", "…".
+	Argv []string `json:"argv"`
+	// Cwd is an existing directory under the user's home; default the plugin's data dir.
+	Cwd string `json:"cwd,omitempty"`
+	// Env is added to the daemon's environment (checked like a session environment's).
+	Env map[string]string `json:"env,omitempty"`
+	// Title is the tab's title in the bottom panel (default argv[0]).
+	Title string `json:"title,omitempty"`
+}
+
+// TerminalCreateResult is terminal/create's answer.
+type TerminalCreateResult struct {
+	TerminalID string `json:"terminalId"`
+}
+
+// TerminalRef names one of the plugin's terminals.
+type TerminalRef struct {
+	TerminalID string `json:"terminalId"`
+}
+
+// PluginTerminal is one of the plugin's terminals (terminal/list).
+type PluginTerminal struct {
+	TerminalID string   `json:"terminalId"`
+	Title      string   `json:"title"`
+	Argv       []string `json:"argv"`
+	Cwd        string   `json:"cwd"`
+	// State is running or exited; an exited terminal stays (its output readable) until
+	// the plugin closes it.
+	State     string    `json:"state"`
+	ExitCode  int       `json:"exitCode,omitempty"`
+	StartedAt time.Time `json:"startedAt"`
+}
+
+// TerminalListResult is terminal/list's answer.
+type TerminalListResult struct {
+	Terminals []PluginTerminal `json:"terminals"`
 }

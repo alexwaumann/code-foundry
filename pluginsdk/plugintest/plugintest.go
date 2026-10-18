@@ -7,8 +7,9 @@
 //
 // Permissions are enforced like the real host: host/invoke needs a matching
 // permissions.commands glob, secret/* needs permissions.secrets, thread/setFlag
-// threadStatus, session/setEnvironment sessionEnv, and events/subscribe each source in
-// permissions.events. It does not evaluate when clauses, check views beyond what the
+// threadStatus, session/setEnvironment sessionEnv, events/subscribe each source in
+// permissions.events, thread/* threads and terminal/* terminals (owned.go: kept in
+// memory, nothing runs). It does not evaluate when clauses, check views beyond what the
 // plugin's own Validate did, or store secrets from forms (SetSecret does).
 package plugintest
 
@@ -68,6 +69,7 @@ type Host struct {
 	appends     []pluginsdk.ViewAppendParams
 	envs        []pluginsdk.Environment
 	subs        [][]string
+	own         owned
 	closeOnce   sync.Once
 }
 
@@ -349,6 +351,9 @@ func denied(what string) error {
 }
 
 func (h *Host) handle(ctx context.Context, method string, params json.RawMessage) (any, error) {
+	if res, ok, err := h.handleOwned(ctx, method, params); ok {
+		return res, err
+	}
 	g := h.opts.Granted
 	switch method {
 	case pluginsdk.MethodHostInvoke:

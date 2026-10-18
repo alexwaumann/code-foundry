@@ -288,6 +288,7 @@ func threadToProto(s thread.Thread) *v1.Thread {
 	}
 	metadataToProto(s, p)           // thread_metadata.go
 	p.Flags = flagsToProto(s.Flags) // thread_flags.go
+	p.Owner = s.Owner
 	return p
 }
 
@@ -340,6 +341,6 @@ func listOptionsFromProto(f *v1.ThreadFilter) thread.ListOptions {
 		All: f.GetAll(), IncludeArchived: f.GetIncludeArchived(),
 		Status: thread.Status(f.GetStatus()), State: thread.State(f.GetState()),
 		Project: f.GetProject(), Workspace: f.GetWorkspace(), CreatedBy: f.GetCreatedBy(), Labels: f.GetLabels(),
-		Limit: int(f.GetLimit()),
+		Owner: f.GetOwner(), Limit: int(f.GetLimit()),
 	}
 }

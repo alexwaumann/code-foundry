@@ -88,6 +88,7 @@ func pluginSpawnExtras(plugins *plugin.Manager) thread.SpawnExtrasFunc {
 	return func(ctx context.Context, in thread.SpawnInfo) thread.SpawnExtras {
 		c := plugins.SessionEnvironment(ctx, plugin.SpawnScope{
 			ThreadID: in.ThreadID, ProjectID: in.ProjectID, MemberProjectIDs: in.MemberProjectIDs, NoProject: in.NoProject,
+			Owner: in.Owner,
 		}, in.Wait)
 		return thread.SpawnExtras{Env: c.Env, PathPrepend: c.PathPrepend, AddDirs: c.AddDirs}
 	}

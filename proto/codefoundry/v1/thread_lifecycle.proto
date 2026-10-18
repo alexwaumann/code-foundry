@@ -257,6 +257,12 @@ message Thread {
   // removed, when the thread is archived, and for until_seen flags when the thread is
   // opened. Persisted. Sorted by level (error first), then newest first.
   repeated ThreadFlag flags = 54;
+  // Who owns the thread when the user does not: "plugin:<name>" for a plugin's thread
+  // (thread/create; docs/notes/plugins-6-thread-terminal.md). Owned threads are hidden:
+  // not in the sidebar, attention counts, dock alerts, the Threads panel or lineage, and
+  // left out of a filtered List unless filter.all or filter.owner asks for them. Their
+  // usage still counts. Set once at Create. Empty for the user's threads.
+  string owner = 55;
 }
 
 // ThreadFlagLevel is how loud a plugin's flag is.
@@ -543,6 +549,9 @@ message ThreadFilter {
   repeated string labels = 8;
   // At most this many threads (the most recently active); 0: no limit.
   int32 limit = 9;
+  // Only threads with this owner ("plugin:hello"), or with "plugin:" any plugin's.
+  // Without it (and without all) owned threads are left out.
+  string owner = 10;
 }
 
 message ListThreadsResponse {

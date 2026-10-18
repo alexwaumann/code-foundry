@@ -409,23 +409,29 @@ The plugin reads the value with `h.Secrets().Get(ctx, key)` when it needs it. A 
 empty on submit is left out (the stored one stays). Set `hasValue` to show "Saved · type
 to replace". Without `store` the value reaches the plugin in the submit only.
 
-### thread and terminal (later version)
+### thread and terminal
 
 ```json
-{"key": "helper", "thread": {"threadId": "s-1f2e3d4c5b6a", "readOnly": false, "placeholder": "Ask about this run"}}
-{"key": "shell", "terminal": {"terminalId": "t-1f2e3d4c5b6a", "rows": 12, "title": "test run"}}
+{"key": "helper", "thread": {"threadId": "s-1f2e3d4c5b6a", "placeholder": "Ask about this run", "height": "fill"}}
+{"key": "shell", "terminal": {"terminalId": "t-1f2e3d4c5b6a", "title": "test run", "height": 320,
+  "actions": [{"key": "rerun", "label": "Rerun", "action": {"event": "rerun"}}]}}
 ```
 
 ```go
-ui.Node{Key: "helper", Thread: &ui.Thread{ThreadID: id, Placeholder: "Ask about this run"}}
-ui.Node{Key: "shell", Terminal: &ui.Terminal{TerminalID: id, Rows: 12, Title: "test run"}}
+ui.Node{Key: "helper", Thread: &ui.Thread{ThreadID: id, Placeholder: "Ask about this run", Height: ui.HeightFill}}
+ui.Node{Key: "shell", Terminal: &ui.Terminal{TerminalID: id, Title: "test run", Height: ui.HeightPx(320),
+	Actions: []ui.Button{ui.EventButton("rerun", "Rerun", "rerun")}}}
 ```
 
-A plugin-owned Claude thread (permission `threads`) or terminal (`terminals`, rows
-4..60) drawn inline. **They arrive in a later version**: the host validates them today
-and the GUI shows a placeholder; nothing creates the thread or terminal yet
-(`thread/create`, `terminal/create`). Check `h.HasCapability("view.node.thread")` before
-relying on them.
+The plugin's own Claude thread (`h.CreateThread`, permission `threads`) drawn inline with
+the host's thread view and composer (`readOnly: true` leaves the composer out), or its own
+terminal (`h.CreateTerminal`, permission `terminals`) with the host's terminal view, an
+"Open in bottom panel" button and up to 2 buttons of yours. `height` is `"auto"` (the
+default: about 420 px for a thread, `rows` text rows (4..60, default 16) for a terminal),
+`"fill"` (the rest of the panel, at least 240 px) or pixels (120..1600). A view naming
+another owner's thread or terminal is refused; one that is gone (removed, closed) shows a
+muted empty state. Check `h.HasCapability("view.node.thread")` (`view.node.terminal`)
+before relying on them; `reference/host-api.md` has the calls that make them.
 
 ## Acts
 
@@ -438,7 +444,10 @@ relying on them.
 | `change` | a field with a change event was edited | `Action`, `Key`, `Field`, `Value`, `Values` |
 | `tab` | the user switched tabs | `Action` is `"tab"`, `Key` the new tab's key (`Value` too, as `any`: use `Key`) |
 
-`Version` is the view version acted on. The host takes the kind, event, data and form
+`act.Context` is what the panel the user acted in shows (`ThreadID`, `ProjectID`, …): a
+shared instance (scope `pr`, `project`, `global`) learns from it which thread a click came
+from (capability `act.context`; empty from an older host). `Version` is the view version
+acted on. The host takes the kind, event, data and form
 from its own copy of that version, so a client cannot forge them; the plugin still
 validates `Values`. Return an error to refuse (its message is shown to the user); render
 the result. `code-foundry plugin act <name> <surface> <event> [--key k] [--values '{"name":"Ada"}']`

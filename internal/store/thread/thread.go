@@ -238,6 +238,15 @@ type Thread struct {
 	// Flags are the plugins' flags on the thread (flags.go): one per source, errors
 	// first, then newest first. Persisted (thread_flags). Copy on write.
 	Flags []Flag
+	// Owner is who owns a thread the user does not (CreateOptions.Owner; owner.go):
+	// "plugin:<name>". Owned threads are hidden from the user's lists (ListOptions).
+	// Persisted; set once at Create.
+	Owner string
+	// SpawnEnv ("KEY=VALUE") and SpawnAddDirs are the thread's own additions to every
+	// spawn of it (CreateOptions.Env, AddDirs; spawnextras.go), after the spawn extras'.
+	// Persisted; set once at Create. Copy on write.
+	SpawnEnv     []string
+	SpawnAddDirs []string
 }
 
 // APIRetry is one api_retry frame of a thread's stream (stream.go): Claude retries a
@@ -353,6 +362,16 @@ type CreateOptions struct {
 	// Notify, with CreatedBy, also subscribes the creator to the new thread: condition
 	// settled, repeat (subscriptions.go). ErrInvalidArgument without CreatedBy.
 	Notify bool
+	// Owner makes the thread someone else's than the user's ("plugin:<name>"; owner.go):
+	// hidden from the user's lists. Exclusive with CreatedBy.
+	Owner string
+	// Cwd, with NoProject, is where claude runs instead of Options.Home: an existing
+	// directory inside it (owner.go).
+	Cwd string
+	// Env ("KEY=VALUE") and AddDirs are added to every spawn of the thread, after the
+	// spawn extras' (a plugin's thread/create; the caller validated them).
+	Env     []string
+	AddDirs []string
 }
 
 // RunInTarget names the member a workspace thread should run in: its project id or
