@@ -16,11 +16,17 @@ import (
 // Nothing here installs anything on its own: CheckUpdates only records offers, and
 // Update runs only when asked.
 
-// UpdateOffer is a newer version of an installed plugin that a registry lists.
+// UpdateOffer is a newer version of an installed plugin that a registry lists, or, for a
+// plugin installed straight from a GitHub repository that no registry lists, that the
+// repository's latest release is.
 type UpdateOffer struct {
 	Version string
-	// Registry is the URL of the registry listing it.
+	// Registry is the URL of the registry listing it (https://github.com/<owner>/<repo>
+	// for a release).
 	Registry string
+	// Ref installs it: "<owner>/<repo>@<tag>" for a release; "" installs the name from
+	// the registries.
+	Ref string
 }
 
 // RegistryChanged is published when the merged index changes (an entry added, removed,
@@ -30,19 +36,24 @@ type RegistryChanged struct{ Epoch uint64 }
 
 func (RegistryChanged) isPluginEvent() {}
 
-// offerFor is the update a registry offers for p: a non-dev plugin whose name the merged
-// index lists with a newer version. A plugin installed from a GitHub release is only
-// matched by an entry of the same repository, one installed from a registry only by that
-// registry's entry (another plugin may share its name).
-func offerFor(p Plugin, merged registry.Merged) (UpdateOffer, bool) {
+// offerFor is the update offered for p: a non-dev plugin whose name the merged index
+// lists with a newer version. A plugin installed from a GitHub release is only matched by
+// an entry of the same repository (another plugin may share its name); without one, its
+// repository's latest release (releases, from the last CheckUpdates) is the offer. One
+// installed from a registry is only matched by that registry's entry.
+func offerFor(p Plugin, merged registry.Merged, releases map[string]UpdateOffer) (UpdateOffer, bool) {
 	if p.Dev || p.Manifest.Version == "" {
 		return UpdateOffer{}, false
 	}
+	if fromRepo(p, merged) {
+		r, ok := releases[p.Name]
+		if !ok || !registry.Newer(r.Version, p.Manifest.Version) {
+			return UpdateOffer{}, false
+		}
+		return r, true
+	}
 	e, ok := merged.Entry(p.Name)
 	if !ok || !registry.Newer(e.Version, p.Manifest.Version) {
-		return UpdateOffer{}, false
-	}
-	if p.Installed != nil && p.Installed.Kind == KindGitHub && !strings.EqualFold(p.Installed.Source, e.Repo) {
 		return UpdateOffer{}, false
 	}
 	// Nor is one from a registry by another registry's entry of the name (a registry
@@ -54,11 +65,53 @@ func offerFor(p Plugin, merged registry.Merged) (UpdateOffer, bool) {
 	return UpdateOffer{Version: e.Version, Registry: e.Registry}, true
 }
 
+// fromRepo reports whether p was installed from a GitHub release that no registry entry
+// of the same repository lists: its updates come from the repository's releases.
+func fromRepo(p Plugin, merged registry.Merged) bool {
+	if p.Installed == nil || p.Installed.Kind != KindGitHub {
+		return false
+	}
+	e, ok := merged.Entry(p.Name)
+	return !ok || !strings.EqualFold(p.Installed.Source, e.Repo)
+}
+
+// checkReleases asks, once per update check, each plugin installed from a GitHub
+// repository that no registry lists for its latest release, and records the offers.
+// A failure keeps the last answer (logged at debug: gh may be offline).
+func (m *Manager) checkReleases(ctx context.Context) {
+	m.inst.mu.Lock()
+	merged := m.inst.merged
+	m.inst.mu.Unlock()
+	for _, p := range m.Snapshot().Plugins {
+		if p.Dev || !fromRepo(p, merged) {
+			continue
+		}
+		repo := p.Installed.Source
+		version, tag, err := m.opts.Registry.Fetcher().LatestVersion(ctx, repo)
+		if err != nil {
+			m.log.Debug("plugin update check: release", "plugin", p.Name, "repo", repo, "err", err)
+			continue
+		}
+		o := UpdateOffer{Version: version, Registry: "https://github.com/" + repo, Ref: repo + "@" + tag}
+		m.inst.mu.Lock()
+		if m.inst.releases == nil {
+			m.inst.releases = map[string]UpdateOffer{}
+		}
+		old, had := m.inst.releases[p.Name]
+		m.inst.releases[p.Name] = o
+		m.inst.mu.Unlock()
+		if !had || old != o {
+			m.update(p.Name, nil, func(*entry) {})
+		}
+	}
+}
+
 // setMerged records the registries' latest index and publishes what changed: each
 // plugin whose update offer changed, and RegistryChanged when the index did.
 func (m *Manager) setMerged(merged registry.Merged) {
 	m.inst.mu.Lock()
 	m.inst.merged = merged
+	releases := m.inst.releases
 	fp := merged.Fingerprint()
 	changed := fp != m.inst.fp
 	if changed {
@@ -69,7 +122,7 @@ func (m *Manager) setMerged(merged registry.Merged) {
 	m.inst.mu.Unlock()
 	for _, p := range m.Snapshot().Plugins {
 		// The record matters for offerFor; the snapshot's is current.
-		o, ok := offerFor(p, merged)
+		o, ok := offerFor(p, merged, releases)
 		if (p.Update == nil) == !ok && (p.Update == nil || *p.Update == o) {
 			continue
 		}
@@ -97,6 +150,8 @@ type PluginUpdate struct {
 	Current  string
 	Version  string
 	Registry string
+	// Ref installs it (UpdateOffer.Ref): "" installs Name from the registries.
+	Ref string
 	// Updated: Update installed it. Error: it failed (the others still ran).
 	Updated bool
 	Error   string
@@ -106,17 +161,21 @@ type PluginUpdate struct {
 }
 
 // CheckUpdates reads the registries (the cached indexes within their TTL unless
-// refresh) and returns the installed plugins a registry lists a newer version of. It
-// installs nothing; the snapshot's Plugin.Update carries the same offers.
+// refresh) and returns the installed plugins a registry lists a newer version of, and
+// those installed from a GitHub repository no registry lists whose latest release is
+// newer (one `gh release view` per such plugin per call). It installs nothing; the
+// snapshot's Plugin.Update carries the same offers.
 func (m *Manager) CheckUpdates(ctx context.Context, refresh bool) ([]PluginUpdate, error) {
 	if m.opts.Registry == nil {
 		return nil, fmt.Errorf("%w: this daemon has no plugin registry client", ErrFailedPrecondition)
 	}
 	m.setMerged(m.opts.Registry.Read(ctx, refresh))
+	m.checkReleases(ctx)
 	var out []PluginUpdate
 	for _, p := range m.Snapshot().Plugins {
 		if p.Update != nil {
-			out = append(out, PluginUpdate{Name: p.Name, Current: p.Manifest.Version, Version: p.Update.Version, Registry: p.Update.Registry})
+			out = append(out, PluginUpdate{Name: p.Name, Current: p.Manifest.Version, Version: p.Update.Version,
+				Registry: p.Update.Registry, Ref: p.Update.Ref})
 		}
 	}
 	return out, nil
@@ -151,7 +210,11 @@ func (m *Manager) Update(ctx context.Context, name string, check, refresh bool) 
 		if p, ok := m.Snapshot().Plugin(u.Name); ok {
 			wasEnabled = p.Enabled
 		}
-		res, err := m.Install(ctx, InstallRequest{Ref: u.Name})
+		ref := u.Name
+		if u.Ref != "" {
+			ref = u.Ref
+		}
+		res, err := m.Install(ctx, InstallRequest{Ref: ref})
 		if err != nil {
 			u.Error = err.Error()
 			continue

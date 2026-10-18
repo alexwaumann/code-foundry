@@ -26,7 +26,8 @@ func (h *Plugin) fillAvailability(ps []*v1.Plugin, uctx command.Context) {
 				s.UnavailableReason = "plugin " + p.GetName() + " is disabled"
 				continue
 			}
-			s.Available, s.UnavailableReason = h.surfaces.SurfaceAvailable(p.GetName(), s.GetId(), uctx)
+			a := h.surfaces.SurfaceAvailable(p.GetName(), s.GetId(), uctx)
+			s.Available, s.Unknown, s.UnavailableReason = a.Available, a.Unknown, a.Reason
 		}
 	}
 }
@@ -123,7 +124,12 @@ const defaultSurfaceWait = 10 * time.Second
 // it already has the cached one.
 const getSurfaceSettle = 200 * time.Millisecond
 
+// maxSurfaceSettle bounds GetSurfaceRequest.settle_ms, and the whole settle: a plugin
+// sending views without pause does not hold the call longer.
+const maxSurfaceSettle = 30 * time.Second
+
 // GetSurface opens an instance, waits for a view, and returns it with its elements.
+// With settle_ms it then waits until no new view has come for that long.
 func (h *Plugin) GetSurface(ctx context.Context, req *connect.Request[v1.GetSurfaceRequest]) (*connect.Response[v1.GetSurfaceResponse], error) {
 	if err := h.needSurfaces(); err != nil {
 		return nil, err
@@ -132,7 +138,8 @@ func (h *Plugin) GetSurface(ctx context.Context, req *connect.Request[v1.GetSurf
 	if wait <= 0 {
 		wait = defaultSurfaceWait
 	}
-	wctx, cancel := context.WithTimeout(ctx, wait)
+	quiet := min(max(time.Duration(req.Msg.GetSettleMs())*time.Millisecond, 0), maxSurfaceSettle)
+	wctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	_, ch, err := h.surfaces.WatchSurface(wctx, surfaceRefFromProto(req.Msg.GetRef()))
 	if err != nil {
@@ -140,15 +147,19 @@ func (h *Plugin) GetSurface(ctx context.Context, req *connect.Request[v1.GetSurf
 	}
 	out := &v1.GetSurfaceResponse{}
 	var view *plugin.SurfaceView
+	first := time.NewTimer(wait)
+	defer first.Stop()
 	// A view that arrives with (after) the live state ends the wait. A cached view
 	// followed by "live" and no new view is current too (the plugin re-sent the same
 	// view): it ends the wait shortly after.
 	var settle <-chan time.Time
+	open := true
 loop:
 	for {
 		select {
 		case u, ok := <-ch:
 			if !ok {
+				open = false
 				break loop
 			}
 			switch {
@@ -169,7 +180,12 @@ loop:
 			}
 		case <-settle:
 			break loop
+		case <-first.C:
+			break loop
 		}
+	}
+	if open && quiet > 0 && view != nil && out.GetState().GetPhase() != v1.SurfacePhase_SURFACE_PHASE_FAILED {
+		view = h.settleSurface(ch, out, view, quiet)
 	}
 	cancel()
 	for range ch {
@@ -177,10 +193,39 @@ loop:
 	}
 	if view != nil {
 		for _, el := range h.surfaces.SurfaceElements(view.Instance, view.Version) {
-			out.Elements = append(out.Elements, &v1.SurfaceElement{Key: el.Key, Kind: el.Kind, Action: el.Action, Label: el.Label, Form: el.Form})
+			out.Elements = append(out.Elements, &v1.SurfaceElement{Key: el.Key, Kind: el.Kind, Action: el.Action, Label: el.Label, Form: el.Form, Args: el.Args})
 		}
 	}
 	return connect.NewResponse(out), nil
+}
+
+// settleSurface reads updates until no view has come for quiet (or maxSurfaceSettle has
+// passed, or the stream ends) and returns the last view.
+func (h *Plugin) settleSurface(ch <-chan plugin.SurfaceUpdate, out *v1.GetSurfaceResponse, view *plugin.SurfaceView, quiet time.Duration) *plugin.SurfaceView {
+	still := time.NewTimer(quiet)
+	defer still.Stop()
+	limit := time.NewTimer(maxSurfaceSettle)
+	defer limit.Stop()
+	for {
+		select {
+		case u, ok := <-ch:
+			if !ok {
+				return view
+			}
+			switch {
+			case u.State != nil:
+				out.State = surfaceStateToProto(u.State)
+			case u.View != nil:
+				view = u.View
+				out.View = surfaceViewToProto(u.View)
+				still.Reset(quiet)
+			}
+		case <-still.C:
+			return view
+		case <-limit.C:
+			return view
+		}
+	}
 }
 
 // Act forwards an action on a view element to the plugin.

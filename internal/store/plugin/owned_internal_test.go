@@ -27,8 +27,30 @@ func (o termOwners) Owner(id string) (string, bool) { v, ok := o[id]; return v, 
 func (termOwners) Create(context.Context, string, TerminalSpec) (pluginsdk.PluginTerminal, error) {
 	return pluginsdk.PluginTerminal{}, nil
 }
-func (termOwners) Close(context.Context, string) error     { return nil }
-func (termOwners) Owned(string) []pluginsdk.PluginTerminal { return nil }
+func (termOwners) Close(context.Context, string) error          { return nil }
+func (termOwners) Owned(string) []pluginsdk.PluginTerminal      { return nil }
+func (termOwners) Text(context.Context, string) (string, error) { return "", nil }
+
+func TestTailText(t *testing.T) {
+	tests := []struct {
+		s     string
+		limit int
+		want  string
+		cut   bool
+	}{
+		{"short", 10, "short", false},
+		{"line one\nline two\nline three", 14, "line three", true},
+		{"no newline at all", 7, " at all", true}, // no line start in it: the last 7 bytes
+		{"ab\u00e9cd", 4, "\u00e9cd", true},
+		{"ab\u00e9cd", 3, "cd", true},
+	}
+	for _, tt := range tests {
+		got, cut := tailText(tt.s, tt.limit)
+		if got != tt.want || cut != tt.cut {
+			t.Errorf("tailText(%q, %d) = %q, %v; want %q, %v", tt.s, tt.limit, got, cut, tt.want, tt.cut)
+		}
+	}
+}
 
 // A view may show the plugin's own threads and terminals, and ids the host does not know
 // (shown gone), never another owner's; a terminal node's buttons act.

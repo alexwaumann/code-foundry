@@ -78,7 +78,7 @@ func (l *flagLimiter) allow(thread string, now time.Time) bool {
 func (a *actor) setFlag(ctx context.Context, params json.RawMessage) (any, error) {
 	flags := a.m.opts.Flags
 	if flags == nil {
-		return nil, notSupportedYet(pluginsdk.MethodThreadSetFlag)
+		return nil, notServed(pluginsdk.MethodThreadSetFlag)
 	}
 	p, err := decodeParams[pluginsdk.Flag](pluginsdk.MethodThreadSetFlag, params)
 	if err != nil {
@@ -110,12 +110,14 @@ func (a *actor) setFlag(ctx context.Context, params json.RawMessage) (any, error
 	case err != nil:
 		return nil, pluginsdk.NewError(pluginsdk.CodeInternal, "%v", err)
 	}
-	if changed {
-		if p.Level == pluginsdk.FlagNone {
-			a.hostLog("flag cleared on %s", p.ThreadID)
-		} else {
-			a.hostLog("flag %s on %s: %s", p.Level, p.ThreadID, p.Reason)
-		}
+	switch {
+	case !changed:
+		// A plugin re-asserting its flag on every poll is routine.
+		a.hostDebug("flag %s on %s unchanged", p.Level, p.ThreadID)
+	case p.Level == pluginsdk.FlagNone:
+		a.hostLog("flag cleared on %s", p.ThreadID)
+	default:
+		a.hostLog("flag %s on %s: %s", p.Level, p.ThreadID, p.Reason)
 	}
 	return pluginsdk.FlagResult{Changed: changed}, nil
 }

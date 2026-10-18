@@ -97,6 +97,11 @@ err = h.SetFlag(ctx, pluginsdk.Flag{ThreadID: id, Level: pluginsdk.FlagNone}) //
 _ = h.SetContext(pluginsdk.ContextParams{Key: "failing", Value: true, ThreadID: id})  // gh-actions.failing on that thread
 _ = h.SetContext(pluginsdk.ContextParams{Key: "signed-in", Value: true})                // global
 _ = h.SetContext(pluginsdk.ContextParams{Key: "failing", Value: nil, ThreadID: id})   // remove
+// The same, typed:
+_ = h.SetContextBool("failing", true, pluginsdk.ForThread(id))
+_ = h.SetContextBool("signed-in", true)
+_ = h.ClearContext("failing", pluginsdk.ForThread(id))
+// also SetContextString, SetContextInt, SetContextStrings; pluginsdk.ForProject(id)
 ```
 
 - Readable in every `when` clause as `<plugin>.<key>`: the thread's value, else the
@@ -246,9 +251,17 @@ list, err := h.Secrets().List(ctx) // names and set times, never values
 - The usual way in is a form secret input with `store` (`reference/primitives.md`): the
   user types it, the host stores it, the plugin only reads it. A plugin that needs a
   secret it does not have shows a notice with a form, not an error.
-- The user sees and deletes them with `code-foundry plugin secrets list|delete <name>`;
-  the plugin is not told, so read a secret when you need it (and handle "not found")
-  rather than caching that it exists. Disabling the plugin keeps them.
+- The user sees and deletes them with `code-foundry plugin secrets list|delete <name>`
+  (and in Settings). Disabling the plugin keeps them; `uninstall --purge` deletes them.
+
+When the user deletes one, a running plugin gets `secret/changed` `{key, deleted: true}`
+(`Plugin.OnSecretChanged`; not for its own `Delete`): drop what it read from it (a client,
+a cached token) and bring back the form or notice that asks for it. A plugin that was
+not running learns nothing, so still read a secret when you need it and handle "not
+found" rather than caching that it exists. Consent never changes under a running plugin:
+when an update asks for more the host stops it until the user consents again, and every
+start hands over what was granted (`h.Granted()`). Test it with plugintest's
+`h.DeleteSecret(key)`.
 
 ## Toasts
 
@@ -289,4 +302,15 @@ request, in the bottom panel; `CloseTerminal` and `Terminals` as for threads, an
 terminal stays until closed. At most 32 live threads and 16 terminals. Disabling or
 uninstalling the plugin archives its threads and closes its terminals; terminals end with
 the daemon, threads do not (find them again with `Threads` in Init). plugintest keeps both
-in memory (`CreatedThreads`, `ThreadSends`, `PluginTerminals`, `ExitTerminal`).
+in memory (`CreatedThreads`, `ThreadSends`, `PluginTerminals`, `ExitTerminal`,
+`SetTerminalText`).
+
+A terminal's output is readable: `h.ReadTerminal(ctx, id, maxBytes)` returns the text on
+its screen, plain (no escape sequences), one line per row with trailing spaces trimmed:
+the rows the terminal shows (24 by default, more when a viewer made it taller), not the
+scrollback above them, and at most `maxBytes` of it (0: 64 KiB, at most 256 KiB; its end,
+from a line start, with `Truncated`). When its process exits the plugin gets
+`terminal/exited` `{terminalId, exitCode}` (`Plugin.OnTerminalExit`; 128+n when signal n
+killed it), once; read the screen then rather than polling `Terminals`. For a run whose
+whole output matters, have the command also write it to a file under `h.DataDir()`
+(`Argv: []string{"sh", "-c", "go test ./... 2>&1 | tee " + logPath}`) and read that file on exit.

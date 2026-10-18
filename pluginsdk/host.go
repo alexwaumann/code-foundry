@@ -98,7 +98,9 @@ func (h *Host) Flags() []Flag { return slices.Clone(h.info().Flags) }
 
 // SetContext sets a predicate fact the host's when clauses read as <plugin>.<key>
 // (p.Key without the plugin's name), globally or, with ThreadID or ProjectID, for one
-// thread or project. A nil Value removes it. Facts last until the plugin exits.
+// thread or project. Value is a string, bool, number, list of those, or nil, which
+// removes it. Facts last until the plugin exits. SetContextString, SetContextBool,
+// SetContextInt, SetContextStrings and ClearContext say the same with types.
 func (h *Host) SetContext(p ContextParams) error {
 	return h.conn.Notify(MethodContextSet, p)
 }
@@ -220,6 +222,15 @@ func (h *Host) CreateTerminal(ctx context.Context, p TerminalCreateParams) (stri
 // CloseTerminal kills one of the plugin's terminals and forgets it.
 func (h *Host) CloseTerminal(ctx context.Context, terminalID string) error {
 	return h.conn.Call(ctx, MethodTerminalClose, TerminalRef{TerminalID: terminalID}, nil)
+}
+
+// ReadTerminal returns the plain text on one of the plugin's terminals' screen (its rows,
+// not the scrollback): at most maxBytes (0: 64 KiB), the end of it when longer. Read it
+// when Plugin.OnTerminalExit says the run ended, or while it runs to show progress.
+func (h *Host) ReadTerminal(ctx context.Context, terminalID string, maxBytes int) (TerminalReadResult, error) {
+	var res TerminalReadResult
+	err := h.conn.Call(ctx, MethodTerminalRead, TerminalReadParams{TerminalID: terminalID, MaxBytes: maxBytes}, &res)
+	return res, err
 }
 
 // Terminals lists the plugin's terminals.

@@ -108,25 +108,24 @@ func rawArgs(specs []pluginsdk.ArgSpec, a command.Args) map[string]string {
 	return out
 }
 
-// runCommand forwards one invocation to the plugin as command/invoke.
+// runCommand forwards one invocation to the plugin as command/invoke. Its failures are
+// the command's own (command.Failed): the plugin's error (its message as is; an invalid
+// params error as an invalid argument), a timeout, or the plugin not running.
 func (m *Manager) runCommand(ctx context.Context, name string, spec pluginsdk.CommandSpec, uctx command.Context, a command.Args) (command.Result, error) {
 	m.mu.Lock()
 	var conn *pluginsdk.Conn
-	var why string
+	why := "plugin " + name + " is not installed"
 	if e := m.entries[name]; e != nil {
 		if e.actor != nil {
 			conn = e.actor.running()
 		}
 		if conn == nil || e.state != StateRunning {
-			conn, why = nil, m.whyDownLocked(e)
+			conn, why = nil, m.commandDownLocked(e)
 		}
 	}
 	m.mu.Unlock()
 	if conn == nil {
-		if why == "" {
-			why = "plugin " + name + " is not installed"
-		}
-		return command.Result{}, fmt.Errorf("%w: %s", command.ErrUnavailable, why)
+		return command.Result{}, command.Failed(pluginDown(why))
 	}
 	timeout := time.Duration(spec.Timeout()) * time.Second
 	cctx, cancel := context.WithTimeout(ctx, timeout)
@@ -140,21 +139,49 @@ func (m *Manager) runCommand(ctx context.Context, name string, spec pluginsdk.Co
 		var perr *pluginsdk.Error
 		switch {
 		case errors.As(err, &perr) && perr.Code == pluginsdk.CodeInvalidParams:
-			return command.Result{}, command.InvalidArg("", "%s", perr.Message)
+			return command.Result{}, command.Failed(command.InvalidArg("", "%s", perr.Message))
 		case errors.As(err, &perr):
-			return command.Result{}, errors.New(perr.Message)
+			return command.Result{}, command.Failed(errors.New(perr.Message))
 		case errors.Is(err, context.DeadlineExceeded) && ctx.Err() == nil:
-			return command.Result{}, fmt.Errorf("plugin %s did not answer %s within %s", name, spec.Name, timeout)
+			return command.Result{}, command.Failed(fmt.Errorf("plugin %s did not answer %s within %s", name, spec.Name, timeout))
 		case errors.Is(err, pluginsdk.ErrClosed):
-			return command.Result{}, fmt.Errorf("plugin %s stopped while running %s", name, spec.Name)
+			return command.Result{}, command.Failed(fmt.Errorf("plugin %s stopped while running %s", name, spec.Name))
+		case ctx.Err() != nil:
+			return command.Result{}, ctx.Err()
 		}
-		return command.Result{}, fmt.Errorf("plugin %s: %w", name, err)
+		return command.Result{}, command.Failed(fmt.Errorf("plugin %s: %w", name, err))
 	}
 	out := command.Result{Message: res.Message, ExitCode: res.ExitCode}
 	if len(res.JSON) > 0 && json.Valid(res.JSON) {
 		out.JSON = res.JSON
 	}
 	return out, nil
+}
+
+// pluginDown is a command's failure because its plugin is not running: it reads as why
+// and matches command.ErrUnavailable.
+type pluginDown string
+
+func (e pluginDown) Error() string { return string(e) }
+
+func (pluginDown) Unwrap() error { return command.ErrUnavailable }
+
+// commandDownLocked is why a plugin's command cannot run now, with what to do about it:
+// "plugin X is <state>; run `code-foundry plugin restart X`". m.mu held.
+func (m *Manager) commandDownLocked(e *entry) string {
+	restart := fmt.Sprintf("run `code-foundry plugin restart %s`", e.name)
+	switch e.state {
+	case StateStarting:
+		return fmt.Sprintf("plugin %s is starting; try again in a moment", e.name)
+	case StateCrashed:
+		in := max(e.nextRestartAt.Sub(m.opts.Now()), 0).Round(time.Second)
+		return fmt.Sprintf("plugin %s is crashed (%s); it retries in %s, or %s", e.name, e.lastError, in, restart)
+	case StateFailed:
+		return fmt.Sprintf("plugin %s is failed (%s); %s", e.name, e.lastError, restart)
+	case StateDisabled:
+		return fmt.Sprintf("plugin %s is disabled; run `code-foundry plugin enable %s`", e.name, e.name)
+	}
+	return fmt.Sprintf("plugin %s is %s; %s", e.name, e.state, restart)
 }
 
 // whyDownLocked explains why a plugin cannot take a command now. m.mu held.

@@ -22,7 +22,8 @@ func pluginFixture(t *testing.T) (*command.Registry, *commandtest.Plugin) {
 			Permissions: &v1.PluginPermissions{Commands: []string{"thread.send"}, Secrets: true},
 			Commands:    []*v1.PluginCommand{{Name: "plugin.hello.greet", Title: "Greet"}}},
 		{Name: "quiet", Version: "1.0.0", State: v1.PluginState_PLUGIN_STATE_DISABLED, Permissions: &v1.PluginPermissions{},
-			UpdateAvailable: true, UpdateVersion: "1.1.0"},
+			UpdateAvailable: true, UpdateVersion: "1.1.0",
+			Surfaces: []*v1.PluginSurface{{Id: "runs", Available: true}, {Id: "checks", Unknown: true}, {Id: "logs"}}},
 	}}
 	reg := command.NewRegistry()
 	if err := command.RegisterPlugin(reg, b); err != nil {
@@ -41,8 +42,9 @@ func TestPluginCommands(t *testing.T) {
 		wantMsg   string // substring
 		want      proto.Message
 	}{
-		{name: "list", cmd: "plugin.list", wantMsg: "hello  0.1.0    disabled  commands(thread.send) secrets  1         -         new: code-foundry plugin enable hello"},
+		{name: "list", cmd: "plugin.list", wantMsg: "hello  0.1.0    disabled  commands(thread.send) secrets  1         -                                   new: code-foundry plugin enable hello"},
 		{name: "list offers updates", cmd: "plugin.list", wantMsg: "1.1.0 available: code-foundry plugin update quiet"},
+		{name: "list says unknown for a clause not known yet", cmd: "plugin.list", wantMsg: "runs(on) checks(unknown) logs(off)"},
 		{name: "enable asks for consent", cmd: "plugin.enable", args: map[string]string{"name": "hello"},
 			wantErr: "Enable Hello 0.1.0? It runs bin/hello as you and may:\n  - keep secrets"},
 		{name: "enable with consent", cmd: "plugin.enable", args: map[string]string{"name": "hello"}, confirmed: true,

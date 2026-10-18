@@ -53,11 +53,10 @@ for tests). This Code Foundry is {{cf.version}}.
    and the host's lines: starts, exits, refused calls, rejected views). Never `--follow`
    from your Bash tool: it does not return.
 7. **Drive it without the GUI** (`reference/testing.md`, "Against the daemon"):
-   `code-foundry plugin <name> <command> [args] --thread <id>` runs a command (and is the
-   way to exercise a command button); `plugin surface <name> <surface> --thread <id>`
-   prints the view and its acting elements (a surface that loads shows its first view:
-   run it again); `plugin act <name> <surface> <event> [--key k] [--values '{...}']`
-   sends an event. After every rebuild or `plugin.json` edit:
+   `code-foundry plugin <name> <command> [args] --thread <id>` runs a command; `plugin
+   surface <name> <surface> --thread <id> [--settle 2s]` prints the view and its elements
+   (`--settle` waits out "Loading"); `plugin act <name> <surface> <event> [--key k]
+   [--values '{...}']` clicks (an event or a command button) and prints the view after. After every rebuild or `plugin.json` edit:
    `make build && code-foundry plugin restart <name>` (nothing watches the folder).
 8. **Test** with plugintest: `go test ./...` (`reference/testing.md`). Test every command,
    every act, and that every view passes `ui.View.Validate`.

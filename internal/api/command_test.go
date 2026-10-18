@@ -27,11 +27,29 @@ func TestCommandErrorCodes(t *testing.T) {
 		{"canceled", context.Canceled, connect.CodeCanceled},
 		{"deadline", fmt.Errorf("git: %w", context.DeadlineExceeded), connect.CodeDeadlineExceeded},
 		{"other", errors.New("git exploded"), connect.CodeUnknown},
+		{"command failed", command.Failed(errors.New("it broke")), connect.CodeFailedPrecondition},
+		{"command failed: down", command.Failed(fmt.Errorf("%w: plugin x is disabled", command.ErrUnavailable)), connect.CodeFailedPrecondition},
+		{"command failed: bad args", command.Failed(command.InvalidArg("", "no such run")), connect.CodeInvalidArgument},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := connect.CodeOf(commandError(tt.err)); got != tt.want {
+			err := commandError("x.y", tt.err)
+			if got := connect.CodeOf(err); got != tt.want {
 				t.Fatalf("code = %v, want %v", got, tt.want)
+			}
+			var ce *connect.Error
+			failed := false
+			if errors.As(err, &ce) {
+				for _, d := range ce.Details() {
+					if m, derr := d.Value(); derr == nil {
+						if cf, ok := m.(*v1.CommandFailed); ok && cf.GetCommand() == "x.y" {
+							failed = true
+						}
+					}
+				}
+			}
+			if failed != command.IsFailed(tt.err) {
+				t.Errorf("CommandFailed detail = %v, want %v", failed, command.IsFailed(tt.err))
 			}
 		})
 	}

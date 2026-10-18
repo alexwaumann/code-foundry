@@ -324,7 +324,7 @@ func (a *actor) closeEvents() {
 // subscribe serves events/subscribe.
 func (a *actor) subscribe(_ context.Context, params json.RawMessage) (any, error) {
 	if a.m.eventFeed() == nil {
-		return nil, notSupportedYet(pluginsdk.MethodEventsSubscribe)
+		return nil, notServed(pluginsdk.MethodEventsSubscribe)
 	}
 	sp, err := decodeParams[pluginsdk.SubscribeParams](pluginsdk.MethodEventsSubscribe, params)
 	if err != nil {

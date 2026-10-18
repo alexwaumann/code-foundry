@@ -145,6 +145,9 @@ message PluginSurface {
   // when its scope needs one), and why not.
   bool available = 9;
   string unavailable_reason = 10;
+  // Not available for now because its when clause reads a fact that is not known yet
+  // (a pull request's checks while they are fetched): neither on nor off.
+  bool unknown = 11;
 }
 
 message Plugin {
@@ -420,6 +423,9 @@ message GetSurfaceRequest {
   SurfaceRef ref = 1;
   // How long to wait for the first view (0: 10 s).
   int32 wait_ms = 2;
+  // After the first view, wait until no new view has arrived for this long and return
+  // the last one (0: return the first; at most 30 s, and the whole settle at most 30 s).
+  int32 settle_ms = 3;
 }
 
 // SurfaceElement is one element of a view that acts: a button, row, chip, tab, form
@@ -435,6 +441,9 @@ message SurfaceElement {
   string label = 4;
   // The enclosing form's key, if any.
   string form = 5;
+  // A command element's args as the view sets them (the panel's context fills the
+  // command's context args; a form submit adds the form's values).
+  map<string, string> args = 6;
 }
 
 message GetSurfaceResponse {

@@ -6,7 +6,19 @@ import (
 	"testing"
 
 	"connectrpc.com/connect"
+
+	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 )
+
+// failed is an Invoke error with a CommandFailed detail, as the daemon sends a command's
+// own failure.
+func failed(code connect.Code, msg string) error {
+	ce := connect.NewError(code, errors.New(msg))
+	if d, err := connect.NewErrorDetail(&v1.CommandFailed{Command: "project.create"}); err == nil {
+		ce.AddDetail(d)
+	}
+	return ce
+}
 
 func TestInvokeFailed(t *testing.T) {
 	tests := []struct {
@@ -22,6 +34,12 @@ func TestInvokeFailed(t *testing.T) {
 			"project.create: GraphQL: Name already exists on this account (unknown)", ""},
 		{"several lines from the tool, as is", connect.NewError(connect.CodeUnknown, errors.New("To https://github.com/me/x.git\n ! [rejected] main -> main\nerror: failed to push")),
 			errReported, "", "code-foundry project.create failed:\nTo https://github.com/me/x.git\n ! [rejected] main -> main\nerror: failed to push\n"},
+		{"a plugin's error: its words, exit 1", failed(connect.CodeFailedPrecondition, "no run selected"), errReported, "",
+			"code-foundry project.create: no run selected\n"},
+		{"a plugin's invalid argument: exit 1, no help pointer", failed(connect.CodeInvalidArgument, "project.create: unknown run 12"), errReported, "",
+			"code-foundry project.create: unknown run 12\n"},
+		{"a plugin down: exit 1", failed(connect.CodeFailedPrecondition, "not available in this context: plugin x is failed (boom); run `code-foundry plugin restart x`"),
+			errReported, "", "code-foundry project.create: not available in this context: plugin x is failed (boom); run `code-foundry plugin restart x`\n"},
 		{"other codes", connect.NewError(connect.CodeDeadlineExceeded, errors.New("took too long\nreally")), nil,
 			"project.create: took too long\nreally (deadline_exceeded)", ""},
 	}

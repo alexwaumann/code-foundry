@@ -97,10 +97,14 @@ func (f *fakeFlags) SetFlag(_ context.Context, id string, s plugin.FlagSpec) (bo
 	if id != "t1" {
 		return false, fmt.Errorf("%w: thread %s", plugin.ErrNotFound, id)
 	}
+	k, fl := s.Plugin+"/"+id, pluginsdk.Flag{ThreadID: id, Level: s.Level, Reason: s.Reason, UntilSeen: s.UntilSeen}
+	if old, ok := f.flags[k]; ok && old == fl {
+		return false, nil // the same flag again: no change
+	}
 	if s.Level == pluginsdk.FlagNone {
-		delete(f.flags, s.Plugin+"/"+id)
+		delete(f.flags, k)
 	} else {
-		f.flags[s.Plugin+"/"+id] = pluginsdk.Flag{ThreadID: id, Level: s.Level, Reason: s.Reason, UntilSeen: s.UntilSeen}
+		f.flags[k] = fl
 	}
 	return true, nil
 }
@@ -257,6 +261,14 @@ func TestPluginHooks(t *testing.T) {
 	e.waitState("hooks", plugin.StateRunning)
 	if r, err := e.invoke("plugin.hooks.initflags", nil, command.Context{}); err != nil || r.Message != "t1 attention deploy failed" {
 		t.Errorf("initflags = %+v, %v", r, err)
+	}
+	// Setting the same flag again changes nothing and logs at debug only.
+	if r, err := e.invoke("plugin.hooks.flag", nil, command.Context{}); err != nil || r.Message != "flagged" {
+		t.Fatalf("same flag again = %+v, %v", r, err)
+	}
+	if logs := e.logText("hooks"); !strings.Contains(logs, "host debug flag attention on t1 unchanged") ||
+		strings.Count(logs, "host  flag attention on t1") != 1 {
+		t.Errorf("a re-set flag is a debug line:\n%s", logs)
 	}
 
 	// Disabling drops the contribution and clears the flags.

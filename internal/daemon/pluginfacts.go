@@ -29,7 +29,7 @@ func (f pluginFacts) Thread(id string) (plugin.ThreadFacts, bool) {
 	}
 	out := plugin.ThreadFacts{
 		ID: t.ID, State: t.State.String(), Status: t.Status.String(), ProjectID: t.ProjectID, WorkspaceID: t.WorkspaceID,
-		WorktreePath: t.WorktreePath, Branch: t.Branch,
+		WorktreePath: t.WorktreePath, Branch: t.Branch, Archived: !t.ArchivedAt.IsZero(),
 	}
 	ps := f.project.Snapshot()
 	if w, ok := ps.Worktree(t.ProjectID, t.WorktreePath); ok && w.Branch != "" {

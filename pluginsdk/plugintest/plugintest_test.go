@@ -17,7 +17,7 @@ type surface struct{}
 
 func (surface) Act(context.Context, pluginsdk.SurfaceAct) error { return errors.New("no") }
 func (surface) Visibility(bool)                                 {}
-func (surface) Close()                                          {}
+func (surface) Close(pluginsdk.CloseReason)                     {}
 
 // Start waits for Init, which sees the preset secrets and flags; OpenSurfaceWith hands
 // the plugin its facts; WaitFor also notices state the host never sees.
@@ -69,5 +69,95 @@ func TestStartOptionsAndSurfaceFacts(t *testing.T) {
 	}
 	if raw, _ := h.View(inst); string(raw) != `{"nodes":[{"key":"pr","text":{"content":"octo/app"}}]}` {
 		t.Errorf("view %s", raw)
+	}
+}
+
+// reasonSurface records why it was closed.
+type reasonSurface struct{ got chan pluginsdk.CloseReason }
+
+func (reasonSurface) Act(context.Context, pluginsdk.SurfaceAct) error { return nil }
+func (reasonSurface) Visibility(bool)                                 {}
+func (s reasonSurface) Close(r pluginsdk.CloseReason)                 { s.got <- r }
+
+// Surface.Close gets the host's reason; the SDK closes the rest with shutdown.
+func TestCloseReasons(t *testing.T) {
+	got := make(chan pluginsdk.CloseReason, 8)
+	p := pluginsdk.Plugin{Surfaces: map[string]pluginsdk.SurfaceFactory{
+		"s": func(_ context.Context, h *pluginsdk.Host, open pluginsdk.SurfaceOpen) (pluginsdk.Surface, error) {
+			return reasonSurface{got: got}, h.UpdateView(open.Instance, ui.View{Nodes: []ui.Node{ui.NewText("t", ui.Plain("x"))}})
+		},
+	}}
+	h := plugintest.Start(t, p, plugintest.Options{})
+	for _, tt := range []struct {
+		inst  string
+		close func(string) error
+		want  pluginsdk.CloseReason
+	}{
+		{"p/s/thread:a", h.CloseSurface, pluginsdk.CloseIdle},
+		{"p/s/thread:b", func(i string) error { return h.CloseSurfaceFor(i, pluginsdk.CloseContextGone) }, pluginsdk.CloseContextGone},
+		{"p/s/thread:c", func(i string) error { return h.CloseSurfaceFor(i, pluginsdk.CloseUnavailable) }, pluginsdk.CloseUnavailable},
+	} {
+		if err := h.OpenSurface(context.Background(), tt.inst, "s", pluginsdk.UiContext{}); err != nil {
+			t.Fatal(err)
+		}
+		if err := tt.close(tt.inst); err != nil {
+			t.Fatal(err)
+		}
+		select {
+		case r := <-got:
+			if r != tt.want {
+				t.Errorf("%s: closed for %q, want %q", tt.inst, r, tt.want)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatalf("%s: not closed", tt.inst)
+		}
+	}
+}
+
+// A secret the user deletes reaches the plugin as secret/changed.
+func TestDeleteSecretNotifies(t *testing.T) {
+	got := make(chan pluginsdk.SecretChanged, 1)
+	p := pluginsdk.Plugin{OnSecretChanged: func(_ context.Context, _ *pluginsdk.Host, c pluginsdk.SecretChanged) { got <- c }}
+	h := plugintest.Start(t, p, plugintest.Options{Granted: pluginsdk.Permissions{Secrets: true}, Secrets: map[string]string{"token": "t0k"}})
+	if err := h.DeleteSecret("token"); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case c := <-got:
+		if c != (pluginsdk.SecretChanged{Key: "token", Deleted: true}) {
+			t.Errorf("got %+v", c)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("no secret/changed")
+	}
+	if _, ok := h.Secret("token"); ok {
+		t.Error("still stored")
+	}
+}
+
+// The typed SetContext helpers send the same context/set as SetContext.
+func TestTypedSetContext(t *testing.T) {
+	var h *plugintest.Host
+	p := pluginsdk.Plugin{Init: func(_ context.Context, ph *pluginsdk.Host) error {
+		for _, err := range []error{
+			ph.SetContextBool("on", true),
+			ph.SetContextString("stage", "deploy", pluginsdk.ForThread("s-1")),
+			ph.SetContextInt("failed", 2, pluginsdk.ForProject("p-1")),
+			ph.SetContextStrings("jobs", nil),
+			ph.ClearContext("on"),
+		} {
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}}
+	h = plugintest.Start(t, p, plugintest.Options{})
+	h.WaitFor(2*time.Second, func(h *plugintest.Host) bool { return len(h.Contexts()) == 5 })
+	got, _ := json.Marshal(h.Contexts())
+	want := `[{"key":"on","value":true},{"key":"stage","value":"deploy","threadId":"s-1"},{"key":"failed","value":2,"projectId":"p-1"},` +
+		`{"key":"jobs","value":[]},{"key":"on","value":null}]`
+	if string(got) != want {
+		t.Errorf("contexts\n%s\nwant\n%s", got, want)
 	}
 }

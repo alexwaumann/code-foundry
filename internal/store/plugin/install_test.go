@@ -367,6 +367,40 @@ func TestInstallFromGitHubRelease(t *testing.T) {
 	if ups, err := m.CheckUpdates(ctx, true); err != nil || len(ups) != 0 {
 		t.Errorf("updates = %+v, %v", ups, err)
 	}
+
+	// Its own repository's newer release is its update: one `gh release view` per check.
+	r4 := g.build("gh-plugin", "0.4.0", basePerms)
+	g.gh.Releases["o/ghp@"] = rel("v0.4.0", r4.Base)
+	g.gh.Releases["o/ghp@v0.4.0"] = rel("v0.4.0", r4.Base)
+	g.gh.Assets["o/ghp/v0.4.0/"+r4.Base] = r4.File
+	views := func() int {
+		n := 0
+		for _, c := range g.gh.Calls() {
+			if strings.Join(c, " ") == "release view -R o/ghp --json tagName" {
+				n++
+			}
+		}
+		return n
+	}
+	before := views()
+	ups, err := m.CheckUpdates(ctx, false)
+	want := plugin.PluginUpdate{Name: "gh-plugin", Current: "0.2.0", Version: "0.4.0", Registry: "https://github.com/o/ghp", Ref: "o/ghp@v0.4.0"}
+	if err != nil || len(ups) != 1 || ups[0] != want {
+		t.Fatalf("updates = %+v, %v; want %+v", ups, err, want)
+	}
+	if n := views() - before; n != 1 {
+		t.Errorf("%d release views in one check, want 1", n)
+	}
+	if p, _ := m.Snapshot().Plugin("gh-plugin"); p.Update == nil || p.Update.Version != "0.4.0" {
+		t.Errorf("snapshot offer %+v", p.Update)
+	}
+	done, err := m.Update(ctx, "gh-plugin", false, false)
+	if err != nil || len(done) != 1 || !done[0].Updated || done[0].Version != "0.4.0" {
+		t.Fatalf("update = %+v, %v", done, err)
+	}
+	if p, _ := m.Snapshot().Plugin("gh-plugin"); p.Manifest.Version != "0.4.0" || p.Installed.Source != "o/ghp" || p.Update != nil {
+		t.Errorf("after the update: %s from %+v, offer %+v", p.Manifest.Version, p.Installed, p.Update)
+	}
 }
 
 func TestInstallLinksAndDevConflicts(t *testing.T) {

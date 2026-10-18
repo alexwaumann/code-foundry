@@ -176,7 +176,7 @@ func (a *actor) threadCreate(ctx context.Context, params json.RawMessage) (any, 
 	const method = pluginsdk.MethodThreadCreate
 	threads := a.m.opts.Threads
 	if threads == nil {
-		return nil, notSupportedYet(method)
+		return nil, notServed(method)
 	}
 	p, err := decodeParams[pluginsdk.ThreadCreateParams](method, params)
 	if err != nil {
@@ -230,7 +230,7 @@ func (a *actor) threadCreate(ctx context.Context, params json.RawMessage) (any, 
 func (a *actor) threadSend(ctx context.Context, params json.RawMessage) (any, error) {
 	const method = pluginsdk.MethodThreadSend
 	if a.m.opts.Threads == nil {
-		return nil, notSupportedYet(method)
+		return nil, notServed(method)
 	}
 	p, err := decodeParams[pluginsdk.ThreadSendParams](method, params)
 	if err != nil {
@@ -256,7 +256,7 @@ func (a *actor) threadSend(ctx context.Context, params json.RawMessage) (any, er
 func (a *actor) threadArchive(ctx context.Context, params json.RawMessage) (any, error) {
 	const method = pluginsdk.MethodThreadArchive
 	if a.m.opts.Threads == nil {
-		return nil, notSupportedYet(method)
+		return nil, notServed(method)
 	}
 	p, err := decodeParams[pluginsdk.ThreadRef](method, params)
 	if err != nil {
@@ -275,7 +275,7 @@ func (a *actor) threadArchive(ctx context.Context, params json.RawMessage) (any,
 // threadList serves thread/list.
 func (a *actor) threadList(context.Context, json.RawMessage) (any, error) {
 	if a.m.opts.Threads == nil {
-		return nil, notSupportedYet(pluginsdk.MethodThreadList)
+		return nil, notServed(pluginsdk.MethodThreadList)
 	}
 	list := a.m.opts.Threads.Owned(OwnerOf(a.name))
 	if list == nil {

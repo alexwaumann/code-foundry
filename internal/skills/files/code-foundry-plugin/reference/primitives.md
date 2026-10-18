@@ -63,8 +63,8 @@ chip `deploy` and a button `deploy` collide, so prefix by role (`stage-deploy`,
   a viewer never sees the verdict above a log that is still filling.
 - Acts name a view version: the elements of the last 4 versions still act, so a click on
   a view that was just replaced still arrives (with its old `version`).
-- After `Surface.Close` the instance is gone: `UpdateView` to it fails with -32004. Stop
-  the instance's goroutines in `Close`.
+- After `Surface.Close(reason)` the instance is gone: `UpdateView` to it fails with
+  -32004. Stop the instance's goroutines in `Close`; persist what should survive it.
 
 ## Limits
 
@@ -94,10 +94,12 @@ name, `act.Data` its data, at most 1 KB). A `command` runs a command with the pa
 context through the host, with its confirm dialog: the plugin's own
 (`plugin.<name>.<command>`) or a host command its `permissions.commands` allow (the view
 is refused otherwise); its `context: thread` (and project, worktree) args default from
-the panel's context, so `args` can leave them out, and it runs with the viewer's panel,
+the panel's context, so `args` can leave them out (at most 16 args, 4 KiB together, 2 KiB
+per value: pass ids, not text), and it runs with the viewer's panel,
 which matters for shared instances (`reference/manifest.md`, "One instance, many
 viewers"). `openUrl` and `copy` are done by the host and never reach the plugin, and
-neither does a command button: `plugin act` cannot press one; run the command instead.
+neither does a command button: `plugin act --key <button>` presses one as the GUI does
+(the command runs with the panel's context; `--yes` for one that asks first).
 
 ## Header and tabs
 
@@ -356,10 +358,10 @@ Sections nest two deep: section > section > node.
 ```
 
 ```go
-url := ui.TextField("f-url", "url", "Server")
-url.Required = true
-url.Input.Placeholder, url.Input.Pattern, url.Input.PatternMessage, url.Input.Mono = "https://ci.acme.com", "^https://", "An https URL", true
-token := ui.SecretField("f-token", "token", "API token", "token") // store: the host keeps it under "token"
+url := ui.TextField("f-url", "url", "Server").WithPlaceholder("https://ci.acme.com").AsRequired().
+	WithPattern("^https://", "An https URL").WithHint("Your CI server") // also WithValue, WithChange
+url.Input.Mono = true
+token := ui.SecretField("f-token", "token", "API token", "").WithStore("token") // the host keeps it under "token"
 token.Input.HasValue = tokenIsSet
 project := ui.Field{Key: "f-project", Name: "project", Label: "Project", Select: &ui.Select{OptionsSource: ui.OptionsProjects}}
 env := ui.SelectField("f-env", "env", "Environment", ui.Opt("o-dev", "dev", "Development"), ui.Opt("o-prod", "prod", "Production"))

@@ -118,15 +118,24 @@ arg resolves id suffixes: a command that reads `req.Context.ThreadID` without de
 command acts on a thread. A result's
 `Message` is what the CLI prints and the GUI toasts; `JSON` is `--json`'s output;
 `ExitCode` the CLI's exit status. Return an error to fail: its message is the CLI's
-error (exit 1) and the GUI's error toast; `pluginsdk.NewError(pluginsdk.CodeInvalidParams, ...)`
-makes it a usage error (exit 2).
+error, printed as it is (`code-foundry plugin.<name>.<command>: <message>`, exit 1), and
+the GUI's error toast. `pluginsdk.NewError(pluginsdk.CodeInvalidParams, ...)` marks it a
+bad argument (Connect `InvalidArgument` for API callers, `FailedPrecondition` for any
+other error); the CLI still exits 1. Exit 2 is only for the CLI's own usage errors (an
+unknown flag, a missing required arg). While the plugin is not running its commands fail
+the same way, with what to do: "plugin <name> is failed (…); run `code-foundry plugin
+restart <name>`".
 
 ## Surfaces
 
 A surface is a view the host renders from the plugin's view model
 (`reference/primitives.md`). One **instance** exists per scope value; the host opens it
-when someone first looks (`surface/open` → `Plugin.Surfaces[<id>]`) and closes it a
-minute after the last viewer left.
+when someone first looks (`surface/open` → `Plugin.Surfaces[<id>]`) and closes it
+(`Surface.Close(reason)`) 10 minutes after the last viewer left (`idle`), or at once when
+its thread is archived or removed or its project removed (`context_gone`) or its `when`
+stops holding (`unavailable`; it opens afresh when the clause holds again). What a
+Surface holds goes with it: keep state the user would miss (the selected run, a filter)
+in the plugin, keyed by thread, project or pull request, and restore it on the next open.
 
 | Field | Rules |
 |---|---|

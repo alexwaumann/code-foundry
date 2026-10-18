@@ -107,6 +107,8 @@ func TestValidateViewRefuses(t *testing.T) {
 		{"thread without id", mod(`"threadId": "s-000000000000"`, `"threadId": ""`), nil, "threadId: required"},
 		{"tab not active", mod(`"active": "ta"`, `"active": "z"`), nil, "not one of the tabs"},
 		{"five logs", `{"nodes": [{"key":"1","log":{}},{"key":"2","log":{}},{"key":"3","log":{}},{"key":"4","log":{}},{"key":"5","log":{}}]}`, nil, "5 log nodes"},
+		{"command arg too big", mod(`"name": "thread.send", "args": {"text": "x"}`, `"name": "thread.send", "args": {"text": "`+strings.Repeat("x", 3000)+`"}`), nil,
+			"command.args.text: 3000 bytes, at most 2048"},
 		{"too many elements", `{"nodes": [{"key": "l", "list": {"rows": [` + rows(401) + `]}}]}`, nil, "elements, at most 400"},
 	}
 	for _, tt := range tests {

@@ -180,9 +180,15 @@ func (h *Host) Visibility(instance string, visible bool) error {
 	return h.conn.Notify(pluginsdk.MethodSurfaceVisibility, pluginsdk.SurfaceVisibility{Instance: instance, Visible: visible})
 }
 
-// CloseSurface sends surface/close.
+// CloseSurface sends surface/close with reason idle (no viewer for the grace).
 func (h *Host) CloseSurface(instance string) error {
-	return h.conn.Notify(pluginsdk.MethodSurfaceClose, pluginsdk.SurfaceClose{Instance: instance, Reason: "idle"})
+	return h.CloseSurfaceFor(instance, pluginsdk.CloseIdle)
+}
+
+// CloseSurfaceFor sends surface/close with a reason: pluginsdk.CloseContextGone (the
+// thread was archived), pluginsdk.CloseUnavailable (the when clause stopped holding), ….
+func (h *Host) CloseSurfaceFor(instance string, reason pluginsdk.CloseReason) error {
+	return h.conn.Notify(pluginsdk.MethodSurfaceClose, pluginsdk.SurfaceClose{Instance: instance, Reason: reason})
 }
 
 // Ping pings the plugin.
@@ -279,6 +285,16 @@ func (h *Host) SetSecret(key, value string) {
 		h.values[key] = value
 		h.secrets[key] = pluginsdk.SecretInfo{Key: key, UpdatedAt: time.Now()}
 	})
+}
+
+// DeleteSecret deletes a secret as the user would (`plugin secrets delete`, Settings)
+// and sends the plugin secret/changed {key, deleted: true} (Plugin.OnSecretChanged).
+func (h *Host) DeleteSecret(key string) error {
+	h.record(func() {
+		delete(h.values, key)
+		delete(h.secrets, key)
+	})
+	return h.conn.Notify(pluginsdk.MethodSecretChanged, pluginsdk.SecretChanged{Key: key, Deleted: true})
 }
 
 // Flags returns the thread/setFlag calls.

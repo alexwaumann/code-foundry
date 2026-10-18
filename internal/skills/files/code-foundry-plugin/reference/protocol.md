@@ -68,9 +68,11 @@ listed and fail with the reason; its surfaces say so.
 | `command/invoke` | request (the command's `timeoutSeconds`) | `CommandRequest{command, args, context}` → `CommandResult{message, json, exitCode}` | `Plugin.Commands[command]` |
 | `surface/open` | request (5 s) | `SurfaceOpen{instance, surface, context, facts}` → `{}` | `Plugin.Surfaces[surface]` |
 | `surface/visibility` | notification | `{instance, visible}`: viewers went from none to some (also right after open) or back | `Surface.Visibility` |
-| `surface/close` | notification | `{instance, reason}`: `idle` (no viewer for 60 s), `shutdown` | `Surface.Close` |
+| `surface/close` | notification | `{instance, reason}`: `idle` (no viewer for 10 minutes), `context_gone` (thread archived or removed, project removed), `unavailable` (the `when` stopped holding) | `Surface.Close(reason)`; the SDK adds `shutdown` and `reopened` |
 | `surface/act` | request (10 s) | `SurfaceAct{instance, context, version, kind, action, key, data, field, value, values}` → `{}` | `Surface.Act` |
 | `events/event` | notification | `Event{subscription, snapshot, event}` | `Plugin.OnEvent` |
+| `terminal/exited` | notification | `{terminalId, exitCode}`: one of its terminals' process exited | `Plugin.OnTerminalExit` |
+| `secret/changed` | notification | `{key, deleted: true}`: the user deleted one of its secrets | `Plugin.OnSecretChanged` |
 
 After `surface/open` the plugin sends the instance's view with `view/update` within 10 s
 (else the host shows "not responding"); a view sent before it answers the open counts, so
@@ -98,17 +100,18 @@ first view first. An error from the factory or from `Act` is shown to the user
 | `thread/send` / `archive` / `list` | request | `{threadId, text}`; `{threadId}`; `{}` → `{threads: [PluginThread]}` | `SendThread`, `ArchiveThread`, `Threads` | `threads` |
 | `terminal/create` | request | `{argv, cwd, env, title}` → `{terminalId}` | `CreateTerminal` | `terminals` |
 | `terminal/close` / `list` | request | `{terminalId}`; `{}` → `{terminals: [PluginTerminal]}` | `CloseTerminal`, `Terminals` | `terminals` |
+| `terminal/read` | request | `{terminalId, maxBytes}` → `{text, truncated}`: its screen as plain text | `ReadTerminal` | `terminals` |
 
 What each does and its limits: `reference/host-api.md`. A method this host does not
-support answers -32601 ("not supported yet by this Code Foundry").
+serve answers -32601.
 
 ## Errors
 
 | Code | `pluginsdk` constant | Meaning |
 |---|---|---|
 | -32700, -32600 | `CodeParseError`, `CodeInvalidRequest` | malformed line or message |
-| -32601 | `CodeMethodNotFound` | unknown or not yet supported method |
-| -32602 | `CodeInvalidParams` | bad params; a refused view (the message names each problem); from a command: a usage error (CLI exit 2) |
+| -32601 | `CodeMethodNotFound` | unknown method, or one this host does not serve |
+| -32602 | `CodeInvalidParams` | bad params; a refused view (the message names each problem); from a command: a bad argument (Connect `InvalidArgument`; the CLI prints it and exits 1) |
 | -32603 | `CodeInternal` | any other error, a panic |
 | -32001 | `CodePermissionDenied` | the grant does not cover the call |
 | -32002 | `CodeUnavailable` | not available in that context (the message says why), an archived thread |

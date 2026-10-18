@@ -28,14 +28,29 @@ const (
 	// hidden instance may stop polling.
 	MethodSurfaceVisibility = "surface/visibility"
 	// MethodSurfaceClose (notification): SurfaceClose, after the instance had no viewer
-	// for the host's grace (60 s), or when the plugin is being stopped.
+	// for the host's grace (10 minutes), at once when its thread or project went away or
+	// its when clause stopped holding (SurfaceClose.Reason says which).
 	MethodSurfaceClose = "surface/close"
 	// MethodSurfaceAct (request, 10 s): SurfaceAct → {}. An error's message is shown to
 	// the user.
 	MethodSurfaceAct = "surface/act"
 	// MethodEventsEvent (notification): Event, one subscribed event (Plugin.OnEvent).
 	MethodEventsEvent = "events/event"
+	// MethodTerminalExited (notification): TerminalExited, when the process of one of the
+	// plugin's terminals exits (Plugin.OnTerminalExit). The terminal stays, its screen
+	// readable with terminal/read, until the plugin closes it.
+	MethodTerminalExited = "terminal/exited"
+	// MethodSecretChanged (notification): SecretChanged, when the user deleted one of the
+	// plugin's secrets (`plugin secrets delete`, Settings) (Plugin.OnSecretChanged). Not
+	// sent for the plugin's own secret/delete.
+	MethodSecretChanged = "secret/changed"
 )
+
+// SecretChanged is secret/changed's params: which secret, and that it is gone.
+type SecretChanged struct {
+	Key     string `json:"key"`
+	Deleted bool   `json:"deleted"`
+}
 
 // Plugin → host methods.
 const (
@@ -98,6 +113,9 @@ const (
 	MethodTerminalClose = "terminal/close"
 	// MethodTerminalList (request): {} → TerminalListResult, the plugin's own terminals.
 	MethodTerminalList = "terminal/list"
+	// MethodTerminalRead (request): TerminalReadParams → TerminalReadResult, the plain
+	// text on one of its terminals' screen.
+	MethodTerminalRead = "terminal/read"
 )
 
 // Environment variables the host sets in a plugin's process.
@@ -359,12 +377,35 @@ type SurfaceVisibility struct {
 	Visible  bool   `json:"visible"`
 }
 
-// SurfaceClose is surface/close's params. Reason is "idle" (no viewer for the grace),
-// "shutdown" (the plugin is being stopped) or "gone" (the plugin's surface went away).
+// SurfaceClose is surface/close's params.
 type SurfaceClose struct {
-	Instance string `json:"instance"`
-	Reason   string `json:"reason,omitempty"`
+	Instance string      `json:"instance"`
+	Reason   CloseReason `json:"reason,omitempty"`
 }
+
+// CloseReason says why a surface instance closed (Surface.Close). A plugin's state for
+// an instance (the selected run, a tab's scroll) goes with it: keep what must outlive a
+// close in the plugin (by thread, project or pull request) and restore it on the next
+// surface/open.
+type CloseReason string
+
+// Close reasons. The host sends the first three; the SDK closes with the last two.
+const (
+	// CloseIdle: no viewer for the host's grace (10 minutes).
+	CloseIdle CloseReason = "idle"
+	// CloseContextGone: the instance's thread was archived or removed, or its project
+	// removed. It will not come back.
+	CloseContextGone CloseReason = "context_gone"
+	// CloseUnavailable: its when clause stopped holding while it was open (the pull
+	// request's checks went away, a context fact changed). It opens afresh when the
+	// clause holds again and someone looks.
+	CloseUnavailable CloseReason = "unavailable"
+	// CloseShutdown: the plugin is stopping (Serve is returning).
+	CloseShutdown CloseReason = "shutdown"
+	// CloseReopened: the host opened the same instance again (after a restart of the
+	// host's side); the new Surface replaces this one.
+	CloseReopened CloseReason = "reopened"
+)
 
 // SurfaceAct kinds.
 const (
@@ -556,6 +597,28 @@ type PluginTerminal struct {
 	State     string    `json:"state"`
 	ExitCode  int       `json:"exitCode,omitempty"`
 	StartedAt time.Time `json:"startedAt"`
+}
+
+// TerminalReadParams is terminal/read's params. MaxBytes bounds the text (0: 64 KiB; at
+// most 256 KiB); a longer screen gives its end.
+type TerminalReadParams struct {
+	TerminalID string `json:"terminalId"`
+	MaxBytes   int    `json:"maxBytes,omitempty"`
+}
+
+// TerminalReadResult is terminal/read's answer: the terminal's screen (its rows, not the
+// scrollback above them) as plain text, one line per row, trailing spaces trimmed, no
+// escape sequences. Truncated: only its last MaxBytes, from a line start.
+type TerminalReadResult struct {
+	Text      string `json:"text"`
+	Truncated bool   `json:"truncated,omitempty"`
+}
+
+// TerminalExited is terminal/exited's params. ExitCode is the process's exit status,
+// 128+n when signal n killed it.
+type TerminalExited struct {
+	TerminalID string `json:"terminalId"`
+	ExitCode   int    `json:"exitCode"`
 }
 
 // TerminalListResult is terminal/list's answer.

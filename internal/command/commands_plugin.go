@@ -310,7 +310,8 @@ func formatPlugins(ps []*v1.Plugin) string {
 }
 
 // surfaceSummary lists surfaces with their availability in the listed context:
-// "demo(on) checks(off)".
+// "demo(on) checks(unknown) logs(off)"; unknown while its when clause waits on a fact
+// not known yet (a pull request's checks), so an agent polls instead of giving up.
 func surfaceSummary(ss []*v1.PluginSurface) string {
 	if len(ss) == 0 {
 		return "-"
@@ -318,8 +319,11 @@ func surfaceSummary(ss []*v1.PluginSurface) string {
 	out := make([]string, len(ss))
 	for i, s := range ss {
 		on := "off"
-		if s.GetAvailable() {
+		switch {
+		case s.GetAvailable():
 			on = "on"
+		case s.GetUnknown():
+			on = "unknown"
 		}
 		out[i] = s.GetId() + "(" + on + ")"
 	}

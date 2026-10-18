@@ -328,7 +328,7 @@ func (d *demo) Visibility(visible bool) {
 }
 
 // Close ends the instance.
-func (d *demo) Close() { d.stop() }
+func (d *demo) Close(pluginsdk.CloseReason) { d.stop() }
 
 // pinned is the surface the demo's Pin button makes available on a thread.
 type pinned struct{ h *pluginsdk.Host }
@@ -343,8 +343,8 @@ func newPinned(_ context.Context, h *pluginsdk.Host, open pluginsdk.SurfaceOpen)
 func (*pinned) Act(context.Context, pluginsdk.SurfaceAct) error {
 	return errors.New("nothing to do here")
 }
-func (*pinned) Visibility(bool) {}
-func (*pinned) Close()          {}
+func (*pinned) Visibility(bool)             {}
+func (*pinned) Close(pluginsdk.CloseReason) {}
 
 // checks lists a pull request's checks (the host's pr.checks); it is available where
 // the thread's pull request has GitHub Actions checks.
@@ -410,5 +410,5 @@ func checksView(ctx context.Context, h *pluginsdk.Host, header *ui.Header, uctx 
 func (checks) Act(context.Context, pluginsdk.SurfaceAct) error {
 	return errors.New("nothing to do here")
 }
-func (checks) Visibility(bool) {}
-func (checks) Close()          {}
+func (checks) Visibility(bool)             {}
+func (checks) Close(pluginsdk.CloseReason) {}

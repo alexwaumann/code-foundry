@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"sync"
@@ -20,13 +21,18 @@ import (
 // Surface instances (docs/notes/plugins-2-surfaces.md). One instance is one surface for
 // one scope: <plugin>/<surface>/<scope id>. The first watcher opens it in the plugin
 // (surface/open), watchers going from none to some and back flip surface/visibility, and
-// the last one leaving starts a grace after which it is closed (surface/close). The
-// instance keeps its last view, so a returning watcher paints at once. Views do not go
-// on the bus: each watcher pulls the instance's latest state, coalesced.
+// the last one leaving starts a grace after which it is closed (surface/close, reason
+// idle). An open instance whose thread or project goes away is closed at once
+// (context_gone), and one whose when clause stops holding too (unavailable; it reopens
+// for its watchers when the clause holds again): see recheck. The instance keeps its
+// last view, so a returning watcher paints at once. Views do not go on the bus: each
+// watcher pulls the instance's latest state, coalesced.
 
 // Defaults for the surface Options.
 const (
-	DefaultSurfaceGrace     = 60 * time.Second
+	// DefaultSurfaceGrace is long enough that a plugin's per-instance state (the selected
+	// run, a tab) survives switching to another thread and back.
+	DefaultSurfaceGrace     = 10 * time.Minute
 	DefaultFirstViewTimeout = 10 * time.Second
 	DefaultCoalesce         = 100 * time.Millisecond
 )
@@ -143,6 +149,8 @@ type SurfaceElement struct {
 	Action string
 	Label  string
 	Form   string
+	// Args are a command element's args as the view sets them.
+	Args map[string]string
 }
 
 // ActRequest is an action on an instance's view element.
@@ -165,8 +173,9 @@ type ActRequest struct {
 // Surfaces is the surface half of the plugin store (the API's WatchSurface, GetSurface
 // and Act). *Manager implements it.
 type Surfaces interface {
-	// SurfaceAvailable reports whether a surface is available in uctx, and why not.
-	SurfaceAvailable(plugin, surface string, uctx command.Context) (bool, string)
+	// SurfaceAvailable reports whether a surface is available in uctx, why not, and
+	// whether that is only for now (its when clause waits on a fact not known yet).
+	SurfaceAvailable(plugin, surface string, uctx command.Context) Availability
 	// WatchSurface opens (or joins) the instance ref names and streams its updates until
 	// ctx ends; it returns the instance key. The channel closes when ctx ends.
 	WatchSurface(ctx context.Context, ref SurfaceRef) (string, <-chan SurfaceUpdate, error)
@@ -195,6 +204,10 @@ type surfaceHub struct {
 
 	toastMu sync.Mutex
 	toasts  map[string]*rateLimiter
+
+	// recheckTimer runs recheck once after a burst of context changes.
+	recheckMu    sync.Mutex
+	recheckTimer *time.Timer
 
 	stop chan struct{}
 	done chan struct{}
@@ -232,6 +245,8 @@ func (h *surfaceHub) run() {
 				h.pluginChanged(e.Plugin.Name)
 			case Removed:
 				h.pluginChanged(e.Name)
+			case AvailabilityChanged:
+				h.recheckSoon()
 			}
 		}
 	}
@@ -245,6 +260,11 @@ func (h *surfaceHub) close() {
 	}
 	close(h.stop)
 	<-h.done
+	h.recheckMu.Lock()
+	if h.recheckTimer != nil {
+		h.recheckTimer.Stop()
+	}
+	h.recheckMu.Unlock()
 	h.mu.Lock()
 	all := make([]*instance, 0, len(h.inst))
 	for _, in := range h.inst {
@@ -284,7 +304,8 @@ func (h *surfaceHub) pluginChanged(name string) {
 			if len(in.watchers) > 0 && (in.state.Phase != PhasePluginDown || in.state.Message != why) {
 				in.setStateLocked(PhasePluginDown, why, state)
 			}
-		case len(in.watchers) > 0 && in.openConn != conn && in.openingConn != conn:
+		case len(in.watchers) > 0 && in.openConn != conn && in.openingConn != conn && in.closedFor == "":
+			// (One the host closed while watched reopens through recheck or a new watcher.)
 			reopen = true
 		}
 		in.mu.Unlock()
@@ -312,10 +333,15 @@ func (m *Manager) whyDown(name string) (State, string) {
 type instance struct {
 	h                      *surfaceHub
 	key, plugin, surfaceID string
-	pctx                   pluginsdk.UiContext
-	facts                  map[string]json.RawMessage
+	// scope is the instance's scope id ("thread:<id>", "project:<id>", …).
+	scope string
+	pctx  pluginsdk.UiContext
 
-	mu          sync.Mutex
+	mu sync.Mutex // guards the fields below
+	// uctx is the context the instance was last opened or acted in: recheck evaluates
+	// the when clause in it.
+	uctx        command.Context
+	facts       map[string]json.RawMessage
 	watchers    map[*watcher]struct{}
 	openConn    *pluginsdk.Conn // surface/open answered on it
 	openingConn *pluginsdk.Conn // surface/open in flight on it
@@ -323,6 +349,8 @@ type instance struct {
 	grace       *time.Timer
 	firstView   *time.Timer
 	closedAt    time.Time // zero while open or watched
+	// closedFor is why the host closed it last ("" while open, or never closed).
+	closedFor pluginsdk.CloseReason
 
 	version      uint64
 	base         []byte   // the view's canonical JSON, logs as the view set them
@@ -448,7 +476,9 @@ func (m *Manager) scopeOf(spec pluginsdk.SurfaceSpec, uctx command.Context) (str
 		}
 		return "", pluginsdk.UiContext{}, "the thread has no pull request"
 	default:
-		if t, ok := env.thread(); ok {
+		if t, ok := env.thread(); ok && t.Archived {
+			return "", pluginsdk.UiContext{}, "the thread is archived"
+		} else if ok {
 			return "thread:" + t.ID, pluginsdk.UiContext{ThreadID: t.ID, ProjectID: env.projectID(), WorktreePath: env.worktreePath(),
 				WorkspaceID: env.workspaceID(), View: uctx.ActiveView}, ""
 		}
@@ -472,21 +502,31 @@ func (m *Manager) surfaceAvailability(spec pluginsdk.SurfaceSpec, uctx command.C
 	return m.evalPredicate(p, uctx)
 }
 
+// Availability is a surface's availability in a context.
+type Availability struct {
+	Available bool
+	// Unknown: not available for now, because its when clause reads a fact that is not
+	// known yet (a pull request's checks while they are fetched).
+	Unknown bool
+	// Reason says why it is not available.
+	Reason string
+}
+
 // SurfaceAvailable implements Surfaces.
-func (m *Manager) SurfaceAvailable(plugin, surface string, uctx command.Context) (bool, string) {
+func (m *Manager) SurfaceAvailable(plugin, surface string, uctx command.Context) Availability {
 	p, ok := m.Snapshot().Plugin(plugin)
 	if !ok {
-		return false, "plugin " + plugin + " is not installed"
+		return Availability{Reason: "plugin " + plugin + " is not installed"}
 	}
 	spec, ok := surfaceSpec(p, surface)
 	if !ok {
-		return false, fmt.Sprintf("plugin %s has no surface %q", plugin, surface)
+		return Availability{Reason: fmt.Sprintf("plugin %s has no surface %q", plugin, surface)}
 	}
 	if !p.Enabled {
-		return false, "plugin " + plugin + " is disabled"
+		return Availability{Reason: "plugin " + plugin + " is disabled"}
 	}
 	a := m.surfaceAvailability(spec, uctx)
-	return a.ok, a.reason
+	return Availability{Available: a.ok, Unknown: a.unknown, Reason: a.reason}
 }
 
 // resolve finds (or makes) the instance ref names.
@@ -535,14 +575,14 @@ func (h *surfaceHub) resolve(ref SurfaceRef) (*instance, error) {
 	defer h.mu.Unlock()
 	in := h.inst[key]
 	if in == nil {
-		in = &instance{h: h, key: key, plugin: ref.Plugin, surfaceID: ref.Surface, pctx: pctx,
+		in = &instance{h: h, key: key, plugin: ref.Plugin, surfaceID: ref.Surface, scope: scope, pctx: pctx,
 			watchers: map[*watcher]struct{}{}, logs: map[string]*logBuf{}, index: map[uint64]*actionIndex{}}
 		in.state, in.stateSeq = SurfaceState{Instance: key, Phase: PhaseOpening}, 1
 		h.inst[key] = in
 		h.evictLocked()
 	}
 	in.mu.Lock()
-	in.facts = facts
+	in.facts, in.uctx = facts, ref.Context
 	in.mu.Unlock()
 	return in, nil
 }
@@ -584,12 +624,14 @@ func (m *Manager) WatchSurface(ctx context.Context, ref SurfaceRef) (string, <-c
 	w := &watcher{wake: make(chan struct{}, 1)}
 	in.mu.Lock()
 	in.watchers[w] = struct{}{}
-	first := len(in.watchers) == 1
+	// The first watcher opens it, and so does one of an instance the host closed while
+	// it was watched (its when clause had stopped holding).
+	activate := len(in.watchers) == 1 || (in.openConn == nil && in.openingConn == nil)
 	in.stopTimer(&in.grace)
 	in.closedAt = time.Time{}
 	w.toastSeq = in.toastSeq
 	in.mu.Unlock()
-	if first {
+	if activate {
 		m.surf.activate(in)
 	}
 	select {
@@ -658,7 +700,7 @@ func (h *surfaceHub) graceOver(in *instance) {
 	in.closedAt = h.m.opts.Now()
 	in.mu.Unlock()
 	if conn != nil {
-		_ = conn.Notify(pluginsdk.MethodSurfaceClose, pluginsdk.SurfaceClose{Instance: in.key, Reason: "idle"})
+		_ = conn.Notify(pluginsdk.MethodSurfaceClose, pluginsdk.SurfaceClose{Instance: in.key, Reason: pluginsdk.CloseIdle})
 		h.m.surfLog(in.plugin, "closed %s (no viewer for %s)", in.key, shortDuration(h.m.opts.SurfaceGrace))
 	}
 	h.mu.Lock()
@@ -686,7 +728,7 @@ func (h *surfaceHub) activate(in *instance) {
 		return
 	}
 	in.openingConn, in.openConn = conn, nil
-	in.openVersion = in.version
+	in.openVersion, in.closedFor = in.version, ""
 	msg := ""
 	if in.view != nil {
 		msg = "updating"
@@ -833,7 +875,11 @@ func (m *Manager) SurfaceElements(key string, version uint64) []SurfaceElement {
 	out := make([]SurfaceElement, 0, len(idx.order))
 	for _, k := range idx.order {
 		el := idx.elements[k]
-		out = append(out, SurfaceElement{Key: el.key, Kind: el.kind, Action: el.actionName(), Label: el.label, Form: el.form})
+		se := SurfaceElement{Key: el.key, Kind: el.kind, Action: el.actionName(), Label: el.label, Form: el.form}
+		if el.action != nil && el.action.Command != nil && len(el.action.Command.Args) > 0 {
+			se.Args = maps.Clone(el.action.Command.Args)
+		}
+		out = append(out, se)
 	}
 	return out
 }

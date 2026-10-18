@@ -264,13 +264,20 @@ func (cl *cli) runRegistry(ctx context.Context, args []string) error {
 }
 
 // invokeFailed reports a failed Invoke. Caller mistakes (bad args, unknown command,
-// unavailable in this context) exit 2 with a pointer to help; anything else exits 1.
+// unavailable in this context) exit 2 with a pointer to help; a command's own failure
+// (CommandFailed: a plugin's error, its plugin down) prints its message and exits 1, as
+// does anything else.
 func (cl *cli) invokeFailed(name string, err error) error {
 	var ce *connect.Error
 	if !errors.As(err, &ce) {
 		return err
 	}
 	msg := strings.TrimPrefix(ce.Message(), name+": ")
+	if commandFailed(ce) {
+		// The command's own failure (a plugin's error, its plugin down): its words, exit 1.
+		fmt.Fprintf(cl.stderr, "code-foundry %s: %s\n", name, msg)
+		return errReported
+	}
 	switch ce.Code() {
 	case connect.CodeInvalidArgument, connect.CodeNotFound, connect.CodeFailedPrecondition:
 		fmt.Fprintf(cl.stderr, "code-foundry %s: %s\n", name, msg)
@@ -284,6 +291,19 @@ func (cl *cli) invokeFailed(name string, err error) error {
 		}
 	}
 	return fmt.Errorf("%s: %s (%s)", name, msg, ce.Code())
+}
+
+// commandFailed reports whether ce carries a CommandFailed detail: the command could not
+// do what it was asked on its own terms, not because of how it was called.
+func commandFailed(ce *connect.Error) bool {
+	for _, d := range ce.Details() {
+		if m, err := d.Value(); err == nil {
+			if _, ok := m.(*v1.CommandFailed); ok {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // errReported marks a failure already printed in full (exit 1).

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/alexwaumann/code-foundry/pluginsdk"
 	"github.com/alexwaumann/code-foundry/pluginsdk/plugintest"
@@ -16,8 +17,8 @@ func (s actSurface) Act(_ context.Context, a pluginsdk.SurfaceAct) error {
 	s.got <- a.Context
 	return nil
 }
-func (actSurface) Visibility(bool) {}
-func (actSurface) Close()          {}
+func (actSurface) Visibility(bool)             {}
+func (actSurface) Close(pluginsdk.CloseReason) {}
 
 // The fake host keeps the plugin's threads and terminals, refuses ids that are not the
 // plugin's and calls without the permission, and an act carries the panel's context.
@@ -93,5 +94,41 @@ func TestOwnedNeedsPermissions(t *testing.T) {
 	}
 	if _, err := host.Terminals(context.Background()); !errors.As(err, &perr) || perr.Code != pluginsdk.CodePermissionDenied {
 		t.Fatalf("Terminals without terminals: %v", err)
+	}
+}
+
+// A terminal's exit reaches OnTerminalExit, and ReadTerminal answers its screen.
+func TestTerminalExitAndRead(t *testing.T) {
+	ctx := context.Background()
+	var host *pluginsdk.Host
+	exits := make(chan pluginsdk.TerminalExited, 1)
+	p := pluginsdk.Plugin{
+		Init:           func(_ context.Context, h *pluginsdk.Host) error { host = h; return nil },
+		OnTerminalExit: func(_ context.Context, _ *pluginsdk.Host, ex pluginsdk.TerminalExited) { exits <- ex },
+	}
+	h := plugintest.Start(t, p, plugintest.Options{Granted: pluginsdk.Permissions{Terminals: true}})
+	term, err := host.CreateTerminal(ctx, pluginsdk.TerminalCreateParams{Argv: []string{"go", "test", "./..."}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.SetTerminalText(term, "ok  example.com/calc\nFAIL example.com/x")
+	h.ExitTerminal(term, 1)
+	select {
+	case ex := <-exits:
+		if ex != (pluginsdk.TerminalExited{TerminalID: term, ExitCode: 1}) {
+			t.Errorf("exit %+v", ex)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("no terminal/exited")
+	}
+	if r, err := host.ReadTerminal(ctx, term, 0); err != nil || r.Text != "ok  example.com/calc\nFAIL example.com/x" || r.Truncated {
+		t.Errorf("read = %+v, %v", r, err)
+	}
+	if r, err := host.ReadTerminal(ctx, term, 18); err != nil || r.Text != "FAIL example.com/x" || !r.Truncated {
+		t.Errorf("read 18 bytes = %+v, %v", r, err)
+	}
+	var perr *pluginsdk.Error
+	if _, err := host.ReadTerminal(ctx, "t-other", 0); !errors.As(err, &perr) || perr.Code != pluginsdk.CodeNotFound {
+		t.Errorf("another terminal: %v", err)
 	}
 }

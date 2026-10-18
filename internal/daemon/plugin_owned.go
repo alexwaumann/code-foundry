@@ -158,6 +158,11 @@ func (p pluginTerminals) Owned(name string) []pluginsdk.PluginTerminal {
 	return out
 }
 
+func (p pluginTerminals) Text(ctx context.Context, id string) (string, error) {
+	text, err := p.terminals.ScreenText(ctx, id)
+	return text, ownedErr(err)
+}
+
 func pluginTerminalOf(t terminal.Terminal) pluginsdk.PluginTerminal {
 	out := pluginsdk.PluginTerminal{
 		TerminalID: t.ID, Title: cmp.Or(t.Labels[termlabel.Title], t.Title), Argv: slices.Clone(t.Argv), Cwd: t.Cwd,

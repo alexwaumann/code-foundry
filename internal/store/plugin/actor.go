@@ -37,7 +37,7 @@ type actor struct {
 	conn    *pluginsdk.Conn
 	perms   pluginsdk.Permissions // the running manifest's
 	logs    *logBuffer
-	ignored map[string]bool // later-protocol notifications already logged this run
+	ignored map[string]bool // unknown notifications already logged this run
 	echo    rateLimiter
 
 	// flagRate limits thread/setFlag per thread (flags.go).

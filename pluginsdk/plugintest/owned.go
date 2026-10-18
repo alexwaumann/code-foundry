@@ -23,6 +23,7 @@ type owned struct {
 	sends     []pluginsdk.ThreadSendParams
 	terminals []pluginsdk.PluginTerminal
 	termSpecs []pluginsdk.TerminalCreateParams
+	termText  map[string]string
 }
 
 func (h *Host) handleOwned(_ context.Context, method string, params json.RawMessage) (any, bool, error) {
@@ -32,7 +33,7 @@ func (h *Host) handleOwned(_ context.Context, method string, params json.RawMess
 		if !g.Threads {
 			return nil, true, denied("threads")
 		}
-	case pluginsdk.MethodTerminalCreate, pluginsdk.MethodTerminalClose, pluginsdk.MethodTerminalList:
+	case pluginsdk.MethodTerminalCreate, pluginsdk.MethodTerminalClose, pluginsdk.MethodTerminalList, pluginsdk.MethodTerminalRead:
 		if !g.Terminals {
 			return nil, true, denied("terminals")
 		}
@@ -135,6 +136,27 @@ func (h *Host) handleOwned(_ context.Context, method string, params json.RawMess
 			return nil, true, pluginsdk.NewError(pluginsdk.CodeNotFound, "terminal %s is not one of the plugin's terminals", p.TerminalID)
 		}
 		return struct{}{}, true, nil
+	case pluginsdk.MethodTerminalRead:
+		p, err := decode[pluginsdk.TerminalReadParams](params)
+		if err != nil {
+			return nil, true, err
+		}
+		h.mu.Lock()
+		own := slices.ContainsFunc(h.own.terminals, func(t pluginsdk.PluginTerminal) bool { return t.TerminalID == p.TerminalID })
+		text := h.own.termText[p.TerminalID]
+		h.mu.Unlock()
+		if !own {
+			return nil, true, pluginsdk.NewError(pluginsdk.CodeNotFound, "terminal %s is not one of the plugin's terminals", p.TerminalID)
+		}
+		max := p.MaxBytes
+		if max <= 0 {
+			max = 64 << 10
+		}
+		res := pluginsdk.TerminalReadResult{Text: text}
+		if len(text) > max {
+			res.Text, res.Truncated = text[len(text)-max:], true
+		}
+		return res, true, nil
 	default: // MethodTerminalList
 		return pluginsdk.TerminalListResult{Terminals: h.PluginTerminals()}, true, nil
 	}
@@ -196,7 +218,8 @@ func (h *Host) CreatedTerminals() []pluginsdk.TerminalCreateParams {
 	return slices.Clone(h.own.termSpecs)
 }
 
-// ExitTerminal marks one of the plugin's terminals exited with code.
+// ExitTerminal marks one of the plugin's terminals exited with code and sends the plugin
+// terminal/exited (Plugin.OnTerminalExit), as the real host does.
 func (h *Host) ExitTerminal(id string, code int) {
 	h.record(func() {
 		for i := range h.own.terminals {
@@ -204,5 +227,17 @@ func (h *Host) ExitTerminal(id string, code int) {
 				h.own.terminals[i].State, h.own.terminals[i].ExitCode = "exited", code
 			}
 		}
+	})
+	_ = h.conn.Notify(pluginsdk.MethodTerminalExited, pluginsdk.TerminalExited{TerminalID: id, ExitCode: code})
+}
+
+// SetTerminalText sets what terminal/read answers for one of the plugin's terminals (its
+// screen as plain text).
+func (h *Host) SetTerminalText(id, text string) {
+	h.record(func() {
+		if h.own.termText == nil {
+			h.own.termText = map[string]string{}
+		}
+		h.own.termText[id] = text
 	})
 }

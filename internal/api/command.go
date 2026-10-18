@@ -42,7 +42,7 @@ func (h *Command) Invoke(ctx context.Context, req *connect.Request[v1.InvokeComm
 	res, err := h.reg.Invoke(ctx, contextFromProto(req.Msg.GetContext()), req.Msg.GetName(), req.Msg.GetArgs(),
 		command.Confirmed(req.Msg.GetConfirmed()))
 	if err != nil {
-		return nil, commandError(err)
+		return nil, commandError(req.Msg.GetName(), err)
 	}
 	js, err := res.EncodeJSON()
 	if err != nil {
@@ -53,8 +53,10 @@ func (h *Command) Invoke(ctx context.Context, req *connect.Request[v1.InvokeComm
 
 // commandError maps registry and command errors to Connect errors. Errors that already
 // carry a Connect code (from a store-backed command's backend) keep it. A command that
-// needs confirmation fails with FailedPrecondition and a ConfirmationRequired detail.
-func commandError(err error) error {
+// needs confirmation fails with FailedPrecondition and a ConfirmationRequired detail; a
+// command's own failure (command.FailedError) with InvalidArgument or FailedPrecondition
+// and a CommandFailed detail.
+func commandError(name string, err error) error {
 	var (
 		ce      *connect.Error
 		confirm *command.ConfirmError
@@ -65,6 +67,16 @@ func commandError(err error) error {
 		if d, derr := connect.NewErrorDetail(&v1.ConfirmationRequired{
 			Command: confirm.Command, Message: confirm.Message, Title: confirm.Title,
 		}); derr == nil {
+			out.AddDetail(d)
+		}
+		return out
+	case command.IsFailed(err):
+		code := connect.CodeFailedPrecondition
+		if errors.Is(err, command.ErrInvalidArgs) {
+			code = connect.CodeInvalidArgument
+		}
+		out := connect.NewError(code, err)
+		if d, derr := connect.NewErrorDetail(&v1.CommandFailed{Command: name}); derr == nil {
 			out.AddDetail(d)
 		}
 		return out

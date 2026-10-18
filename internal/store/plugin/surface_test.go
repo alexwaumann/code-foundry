@@ -100,13 +100,15 @@ func (p *panel) Act(_ context.Context, act pluginsdk.SurfaceAct) error {
 }
 
 func (p *panel) Visibility(v bool) { p.h.Log().Info("visibility", "instance", p.inst, "visible", v) }
-func (p *panel) Close()            { p.h.Log().Info("closed", "instance", p.inst) }
+func (p *panel) Close(r pluginsdk.CloseReason) {
+	p.h.Log().Info("closed", "instance", p.inst, "reason", string(r))
+}
 
 type still struct{}
 
 func (still) Act(context.Context, pluginsdk.SurfaceAct) error { return nil }
 func (still) Visibility(bool)                                 {}
-func (still) Close()                                          {}
+func (still) Close(pluginsdk.CloseReason)                     {}
 
 func surfacePlugin() pluginsdk.Plugin {
 	setCtx := func(v any) pluginsdk.CommandFunc {
@@ -413,6 +415,8 @@ func TestSurfaceActs(t *testing.T) {
 		{"wrong action", plugin.ActRequest{Key: "inc", Action: "save"}, plugin.ErrInvalidArgument, `not "save"`},
 		{"plugin error", plugin.ActRequest{Key: "fail"}, plugin.ErrPluginRefused, "it broke"},
 		{"old version", plugin.ActRequest{Key: "inc", Version: 999}, plugin.ErrFailedPrecondition, "is gone"},
+		{"values too big", plugin.ActRequest{Action: "save", Values: map[string]any{"name": strings.Repeat("x", ui.MaxActValues)}},
+			plugin.ErrInvalidArgument, "values are over 65536 bytes"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -594,9 +598,8 @@ func TestShowCommandsAndContextFacts(t *testing.T) {
 		t.Error("the fact leaked to s-2, or the command did not follow")
 	}
 	waitEvent(t, sub, func(ev plugin.Event) bool { _, ok := ev.(plugin.AvailabilityChanged); return ok })
-	ok, why := e.m.SurfaceAvailable("surf", "gated", s2)
-	if ok || !strings.Contains(why, "surf.on") {
-		t.Errorf("s-2: %v %q", ok, why)
+	if a := e.m.SurfaceAvailable("surf", "gated", s2); a.Available || a.Unknown || !strings.Contains(a.Reason, "surf.on") {
+		t.Errorf("s-2: %+v", a)
 	}
 	if _, err := e.invoke("plugin.surf.off", nil, s1); err != nil {
 		t.Fatal(err)
@@ -639,8 +642,11 @@ func TestAsyncChecksFact(t *testing.T) {
 	if why := show.WhyUnavailable(s1); !strings.Contains(why, "not known yet") {
 		t.Errorf("why %q", why)
 	}
-	if ok, why := e.m.SurfaceAvailable("surf", "checks", command.Context{ActiveThreadID: "s-2"}); ok || !strings.Contains(why, "no pull request") {
-		t.Errorf("s-2 (no pull request): %v %q", ok, why)
+	if a := e.m.SurfaceAvailable("surf", "checks", s1); a.Available || !a.Unknown {
+		t.Errorf("s-1 before the checks: %+v, want unknown", a)
+	}
+	if a := e.m.SurfaceAvailable("surf", "checks", command.Context{ActiveThreadID: "s-2"}); a.Available || a.Unknown || !strings.Contains(a.Reason, "no pull request") {
+		t.Errorf("s-2 (no pull request): %+v", a)
 	}
 	e.facts.mu.Lock()
 	e.facts.checks = []plugin.CheckRun{{Name: "test", App: "github-actions", URL: "https://github.com/o/r/actions/runs/1/job/2"}, {Name: "jenkins", URL: "https://ci.example/1"}}
@@ -695,4 +701,58 @@ func TestInvokeAskAndToasts(t *testing.T) {
 	if u.Toast.Level != "error" || u.Toast.Text != "boom" {
 		t.Errorf("toast %+v", u.Toast)
 	}
+}
+
+// An open instance closes at once when its thread is archived (context_gone) or its
+// when clause stops holding (unavailable), not after the idle grace; a watched one closed
+// as unavailable reopens when the clause holds again.
+func TestSurfaceCloseReasons(t *testing.T) {
+	if plugin.DefaultSurfaceGrace != 10*time.Minute {
+		t.Errorf("grace %s, want 10m", plugin.DefaultSurfaceGrace)
+	}
+	e := newSurfEnv(t, func(o *plugin.Options) { o.SurfaceGrace = time.Minute })
+	s2 := command.Context{ActiveThreadID: "s-2"}
+
+	// context_gone: s-1's panel, no longer watched, its thread archived.
+	w := e.watch("panel", s1)
+	w.view("first view", contains("count 0"))
+	w.cancel()
+	e.waitLog("visible=false")
+	e.facts.mu.Lock()
+	t1 := e.facts.threads["s-1"]
+	t1.Archived = true
+	e.facts.threads["s-1"] = t1
+	e.facts.mu.Unlock()
+	e.m.ContextsChanged()
+	e.waitLog("host  closed surf/panel/thread:s-1 (context_gone: the thread was archived)")
+	e.waitLog("log info closed instance=surf/panel/thread:s-1 reason=context_gone")
+	if _, _, err := e.m.WatchSurface(context.Background(), plugin.SurfaceRef{Plugin: "surf", Surface: "panel", Context: s1}); !errors.Is(err, plugin.ErrFailedPrecondition) ||
+		!strings.Contains(err.Error(), "the thread is archived") {
+		t.Errorf("watching an archived thread's surface: %v", err)
+	}
+
+	// unavailable: s-2's gated surface, watched, when surf.on stops holding.
+	if _, err := e.invoke("plugin.surf.on", nil, s2); err != nil {
+		t.Fatal(err)
+	}
+	e.waitAvailable("plugin.surf.show.gated", s2, true)
+	g := e.watch("gated", s2)
+	g.view("gated view", contains("gated"))
+	if _, err := e.invoke("plugin.surf.off", nil, s2); err != nil {
+		t.Fatal(err)
+	}
+	st := g.state("closed", plugin.PhaseFailed)
+	if !strings.Contains(st.Message, "closed: its condition does not hold here: surf.on") {
+		t.Errorf("closed state %+v", st)
+	}
+	e.waitLog("host  closed surf/gated/thread:s-2 (unavailable: its condition does not hold here: surf.on)")
+	if strings.Contains(e.logText("surf"), "closed surf/gated/thread:s-2 (no viewer") {
+		t.Error("closed for idle")
+	}
+	// The clause holds again: its watcher gets it back.
+	if _, err := e.invoke("plugin.surf.on", nil, s2); err != nil {
+		t.Fatal(err)
+	}
+	g.state("reopened", plugin.PhaseLive)
+	e.eventually("a second surface/open", func() bool { return strings.Count(e.logText("surf"), "host  opened surf/gated/thread:s-2") == 2 })
 }

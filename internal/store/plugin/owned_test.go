@@ -31,7 +31,14 @@ func ownedPlugin() pluginsdk.Plugin {
 			return msg(string(b))
 		}
 	}
+	var exitsMu sync.Mutex
+	var exits []string
 	return pluginsdk.Plugin{
+		OnTerminalExit: func(_ context.Context, _ *pluginsdk.Host, ex pluginsdk.TerminalExited) {
+			exitsMu.Lock()
+			defer exitsMu.Unlock()
+			exits = append(exits, fmt.Sprintf("%s=%d", ex.TerminalID, ex.ExitCode))
+		},
 		Init: func(ctx context.Context, h *pluginsdk.Host) error {
 			if h.Granted().SessionEnv {
 				_, err := h.SetEnvironment(ctx, pluginsdk.Environment{Env: map[string]string{"OWNED_SESSION": "1"}, Scope: &pluginsdk.EnvironmentScope{NoProject: true}})
@@ -67,6 +74,16 @@ func ownedPlugin() pluginsdk.Plugin {
 				return "closed", h.CloseTerminal(ctx, c.TerminalID)
 			}),
 			"terms": call(func(ctx context.Context, h *pluginsdk.Host, _ json.RawMessage) (any, error) { return h.Terminals(ctx) }),
+			"termread": call(func(ctx context.Context, h *pluginsdk.Host, p json.RawMessage) (any, error) {
+				var c pluginsdk.TerminalReadParams
+				_ = json.Unmarshal(p, &c)
+				return h.ReadTerminal(ctx, c.TerminalID, c.MaxBytes)
+			}),
+			"exits": func(context.Context, *pluginsdk.Host, pluginsdk.CommandRequest) (pluginsdk.CommandResult, error) {
+				exitsMu.Lock()
+				defer exitsMu.Unlock()
+				return msg(strings.Join(exits, ","))
+			},
 			"caps": func(_ context.Context, h *pluginsdk.Host, _ pluginsdk.CommandRequest) (pluginsdk.CommandResult, error) {
 				var out []string
 				for _, c := range []string{"threads", "terminals", "view.node.thread", "view.node.terminal", "act.context"} {
@@ -82,7 +99,7 @@ func ownedPlugin() pluginsdk.Plugin {
 
 func ownedManifest(name string, perms pluginsdk.Permissions) pluginsdk.Manifest {
 	mf := pluginsdk.Manifest{Name: name, DisplayName: "Owned", Version: "0.1.0", Protocol: 1, Exec: []string{"bin/plugin"}, Permissions: perms}
-	for _, c := range []string{"create", "send", "archive", "threads", "term", "termclose", "terms", "caps"} {
+	for _, c := range []string{"create", "send", "archive", "threads", "term", "termclose", "terms", "termread", "exits", "caps"} {
 		mf.Commands = append(mf.Commands, pluginsdk.CommandSpec{Name: c, Title: c, Args: []pluginsdk.ArgSpec{{Name: "p"}}})
 	}
 	return mf
@@ -209,6 +226,10 @@ func (t fakeTerms) Owner(id string) (string, bool) {
 	return o, ok
 }
 
+func (t fakeTerms) Text(_ context.Context, id string) (string, error) {
+	return "$ date\nSat Oct 18 12:00:00 2026\n" + id, nil
+}
+
 func (t fakeTerms) Owned(name string) []pluginsdk.PluginTerminal {
 	t.f.mu.Lock()
 	defer t.f.mu.Unlock()
@@ -329,6 +350,19 @@ func TestPluginThreadsAndTerminals(t *testing.T) {
 	if got := run("term", pluginsdk.TerminalCreateParams{Argv: []string{"sleep", "60"}, Title: "Sleeper"}); got != `"t-p2"` {
 		t.Fatalf("second term = %s", got)
 	}
+	// Its screen as text (the end when longer than asked), only its own; its exit told.
+	if got := run("termread", pluginsdk.TerminalReadParams{TerminalID: "t-p1"}); got != `{"text":"$ date\nSat Oct 18 12:00:00 2026\nt-p1"}` {
+		t.Errorf("read = %s", got)
+	}
+	if got := run("termread", pluginsdk.TerminalReadParams{TerminalID: "t-p1", MaxBytes: 10}); got != `{"text":"t-p1","truncated":true}` {
+		t.Errorf("read 10 bytes = %s", got)
+	}
+	if got := run("termread", pluginsdk.TerminalReadParams{TerminalID: "t-shell"}); !strings.HasPrefix(got, "code "+strconv.Itoa(pluginsdk.CodeNotFound)) {
+		t.Errorf("read a shell = %s", got)
+	}
+	m.TerminalExited("t-p1", 2)
+	m.TerminalExited("t-shell", 1) // nobody's: nothing
+	e.eventually("terminal/exited", func() bool { return run("exits", nil) == "t-p1=2" })
 	if got := run("termclose", pluginsdk.TerminalRef{TerminalID: "t-p1"}); got != `"closed"` {
 		t.Errorf("close = %s", got)
 	}

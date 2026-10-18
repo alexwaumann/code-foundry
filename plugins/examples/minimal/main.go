@@ -107,4 +107,4 @@ func (s *status) Act(_ context.Context, act pluginsdk.SurfaceAct) error {
 func (s *status) Visibility(bool) {}
 
 // Close ends the instance: stop its goroutines here.
-func (s *status) Close() {}
+func (s *status) Close(pluginsdk.CloseReason) {}

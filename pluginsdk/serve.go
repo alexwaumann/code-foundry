@@ -25,8 +25,10 @@ type Surface interface {
 	Act(ctx context.Context, act SurfaceAct) error
 	// Visibility reports whether anyone is looking; a hidden surface may stop polling.
 	Visibility(visible bool)
-	// Close ends the instance.
-	Close()
+	// Close ends the instance, saying why (CloseIdle, CloseContextGone,
+	// CloseUnavailable, CloseShutdown, CloseReopened; another host may send another).
+	// Stop its pollers; state that must outlive it belongs to the plugin, not the Surface.
+	Close(reason CloseReason)
 }
 
 // Plugin is what a plugin implements. Every field is optional.
@@ -41,6 +43,12 @@ type Plugin struct {
 	Surfaces map[string]SurfaceFactory
 	// OnEvent receives subscribed events in order.
 	OnEvent func(ctx context.Context, h *Host, ev Event)
+	// OnTerminalExit learns that the process of one of its terminals exited (terminal/
+	// exited): read what it printed with Host.ReadTerminal, close it when done.
+	OnTerminalExit func(ctx context.Context, h *Host, ex TerminalExited)
+	// OnSecretChanged learns that the user deleted one of its secrets (`plugin secrets
+	// delete`, Settings): drop what was read from it and ask again (a form, a notice).
+	OnSecretChanged func(ctx context.Context, h *Host, c SecretChanged)
 	// Shutdown runs when the host asks the plugin to stop (it has about 2 seconds).
 	Shutdown func(ctx context.Context, h *Host)
 	// Capabilities the plugin announces in addition to the SDK's own.
@@ -190,6 +198,16 @@ func (s *server) notify(ctx context.Context, method string, params json.RawMessa
 		if json.Unmarshal(params, &ev) == nil {
 			s.p.OnEvent(ctx, s.h, ev)
 		}
+	case MethodTerminalExited:
+		var ex TerminalExited
+		if s.p.OnTerminalExit != nil && json.Unmarshal(params, &ex) == nil {
+			s.p.OnTerminalExit(ctx, s.h, ex)
+		}
+	case MethodSecretChanged:
+		var c SecretChanged
+		if s.p.OnSecretChanged != nil && json.Unmarshal(params, &c) == nil {
+			s.p.OnSecretChanged(ctx, s.h, c)
+		}
 	case MethodSurfaceVisibility:
 		var p struct {
 			Instance string `json:"instance"`
@@ -201,16 +219,17 @@ func (s *server) notify(ctx context.Context, method string, params json.RawMessa
 			}
 		}
 	case MethodSurfaceClose:
-		var p struct {
-			Instance string `json:"instance"`
-		}
+		var p SurfaceClose
 		if json.Unmarshal(params, &p) == nil {
 			s.smu.Lock()
 			sf, ok := s.surfaces[p.Instance]
 			delete(s.surfaces, p.Instance)
 			s.smu.Unlock()
 			if ok {
-				sf.Close()
+				if p.Reason == "" {
+					p.Reason = CloseIdle
+				}
+				sf.Close(p.Reason)
 			}
 		}
 	}
@@ -234,7 +253,7 @@ func (s *server) openSurface(ctx context.Context, params json.RawMessage) (any, 
 	s.surfaces[open.Instance] = sf
 	s.smu.Unlock()
 	if old != nil {
-		old.Close()
+		old.Close(CloseReopened)
 	}
 	return struct{}{}, nil
 }
@@ -252,6 +271,6 @@ func (s *server) closeSurfaces() {
 	s.surfaces = map[string]Surface{}
 	s.smu.Unlock()
 	for _, sf := range all {
-		sf.Close()
+		sf.Close(CloseShutdown)
 	}
 }

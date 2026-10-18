@@ -41,17 +41,10 @@ var hostNotifications = map[string]func(a *actor, params json.RawMessage){
 	pluginsdk.MethodLog: (*actor).logNotification,
 }
 
-// laterMethods arrive with later protocol steps (surfaces, events and flags, the session
-// environment, plugin threads and terminals). Until then a request gets
-// CodeMethodNotFound saying so and a notification is logged once per run.
-var laterMethods = []string{
-	pluginsdk.MethodViewUpdate, pluginsdk.MethodViewToast, pluginsdk.MethodContextSet,
-	pluginsdk.MethodThreadSetFlag, pluginsdk.MethodEventsSubscribe, pluginsdk.MethodEventsUnsubscribe,
-	pluginsdk.MethodSetEnvironment,
-}
-
-func notSupportedYet(method string) error {
-	return pluginsdk.NewError(pluginsdk.CodeMethodNotFound, "%s is not supported yet by this Code Foundry", method)
+// notServed answers a method whose backing this host was built without (no thread
+// store behind thread/*, say: tests, or a host embedding the store without it).
+func notServed(method string) error {
+	return pluginsdk.NewError(pluginsdk.CodeMethodNotFound, "%s is not available in this Code Foundry", method)
 }
 
 // handle serves a plugin's request (on the Conn's goroutine for it).
@@ -64,8 +57,6 @@ func (a *actor) handle(ctx context.Context, method string, params json.RawMessag
 			return nil, pluginsdk.NewError(pluginsdk.CodePermissionDenied, "permission denied: %s needs \"%s\": true in plugin.json's permissions", method, h.permName)
 		}
 		return h.handle(a, ctx, params)
-	case slices.Contains(laterMethods, method):
-		return nil, notSupportedYet(method)
 	default:
 		return nil, pluginsdk.NewError(pluginsdk.CodeMethodNotFound, "unknown method %q", method)
 	}
@@ -86,20 +77,22 @@ func (a *actor) notify(_ context.Context, method string, params json.RawMessage)
 	if !first {
 		return
 	}
-	if slices.Contains(laterMethods, method) {
-		a.hostLog("ignored %s: not supported yet by this Code Foundry", method)
-	} else {
-		a.hostLog("ignored unknown notification %q", method)
-	}
+	a.hostLog("ignored unknown notification %q", method)
 }
 
 // hostLog writes one of the daemon's own lines into the plugin's log.
-func (a *actor) hostLog(format string, args ...any) {
+func (a *actor) hostLog(format string, args ...any) { a.hostLogAt("", format, args...) }
+
+// hostDebug writes a routine line (a successful host/invoke, a flag set again) into the
+// plugin's log at debug: kept for `plugin logs`, tagged so it reads as noise.
+func (a *actor) hostDebug(format string, args ...any) { a.hostLogAt("debug", format, args...) }
+
+func (a *actor) hostLogAt(level, format string, args ...any) {
 	a.mu.Lock()
 	logs := a.logs
 	a.mu.Unlock()
 	if logs != nil {
-		logs.add("host", "", fmt.Sprintf(format, args...))
+		logs.add("host", level, fmt.Sprintf(format, args...))
 	}
 }
 
@@ -185,15 +178,19 @@ func (a *actor) hostInvoke(ctx context.Context, params json.RawMessage) (any, er
 		ActiveThreadID: p.Context.ThreadID, ActiveProjectID: p.Context.ProjectID, ActiveWorktreePath: p.Context.WorktreePath,
 		ActiveTerminalID: p.Context.TerminalID, ActiveWorkspaceID: p.Context.WorkspaceID, ActiveView: p.Context.View,
 	}
-	a.m.log.Info("command invoked", "caller", "plugin:"+a.name, "command", p.Command)
-	a.hostLog("host/invoke %s", p.Command)
 	res, err := a.m.opts.Commands.Invoke(ctx, uctx, p.Command, p.Args)
 	if err != nil {
 		if asked, ok := a.askUser(err, p); ok {
+			a.m.log.Info("command invoked", "caller", "plugin:"+a.name, "command", p.Command, "asked", true)
 			return asked, nil
 		}
+		a.m.log.Info("command invoked", "caller", "plugin:"+a.name, "command", p.Command, "err", err)
+		a.hostLog("host/invoke %s failed: %v", p.Command, err)
 		return nil, invokeError(err)
 	}
+	// A plugin sweeping (gh-actions asks pr.checks every few seconds) would fill the logs.
+	a.m.log.Debug("command invoked", "caller", "plugin:"+a.name, "command", p.Command)
+	a.hostDebug("host/invoke %s", p.Command)
 	out := pluginsdk.CommandResult{Message: res.Message, ExitCode: res.ExitCode}
 	js, err := res.EncodeJSON()
 	if err != nil {

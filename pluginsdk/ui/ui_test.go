@@ -133,6 +133,21 @@ func TestValidateRejects(t *testing.T) {
 		{"event data too big", func(v *View) {
 			v.Nodes = append(v.Nodes, NewActions("a", Button{Key: "b", Label: "B", Action: EventAction("e", strings.Repeat("x", MaxEventData+1))}))
 		}, "bytes, at most"},
+		{"too many command args", func(v *View) {
+			args := map[string]string{}
+			for i := range MaxCommandArgs + 1 {
+				args["a"+itoa(i)] = "x"
+			}
+			v.Nodes = append(v.Nodes, NewActions("a", CommandButton("b", "B", "plugin.x.go", args)))
+		}, "17 args, at most 16"},
+		{"command arg value too big", func(v *View) {
+			args := map[string]string{"text": strings.Repeat("x", MaxCommandArgValue+1)}
+			v.Nodes = append(v.Nodes, NewActions("a", CommandButton("b", "B", "plugin.x.go", args)))
+		}, "command.args.text: 2049 bytes, at most 2048"},
+		{"command args too big together", func(v *View) {
+			args := map[string]string{"a": strings.Repeat("x", 1500), "b": strings.Repeat("x", 1500), "c": strings.Repeat("x", 1500)}
+			v.Nodes = append(v.Nodes, NewActions("a", CommandButton("b", "B", "plugin.x.go", args)))
+		}, "4503 bytes of names and values, at most 4096"},
 		{"javascript url", func(v *View) { v.Nodes = append(v.Nodes, NewActions("a", URLButton("b", "B", "javascript:alert(1)"))) }, "not an http"},
 		{"too many header buttons", func(v *View) {
 			v.Header = &Header{Actions: []Button{EventButton("a", "A", "a"), EventButton("b", "B", "b"), EventButton("c", "C", "c")}}
@@ -222,6 +237,21 @@ func TestValidateRejects(t *testing.T) {
 	}
 }
 
+func TestCommandArgsAtTheLimits(t *testing.T) {
+	args := map[string]string{}
+	for i := range MaxCommandArgs {
+		args["a"+itoa(i)] = strings.Repeat("x", MaxCommandArgsBytes/MaxCommandArgs-len("a"+itoa(i)))
+	}
+	v := NewView(nil, NewActions("a", CommandButton("b", "B", "plugin.x.go", args)))
+	if err := v.Validate(); err != nil {
+		t.Fatalf("16 args, 4 KiB together: %v", err)
+	}
+	one := NewView(nil, NewActions("a", CommandButton("b", "B", "plugin.x.go", map[string]string{"t": strings.Repeat("x", MaxCommandArgValue)})))
+	if err := one.Validate(); err != nil {
+		t.Fatalf("one 2 KiB value: %v", err)
+	}
+}
+
 func itoa(i int) string {
 	b, _ := json.Marshal(i)
 	return string(b)
@@ -308,5 +338,36 @@ func TestHeightJSON(t *testing.T) {
 	n.Terminal.Actions = []Button{EventButton("restart", "Restart", "restart")}
 	if err := (View{Nodes: []Node{n}}).Validate(); err != nil {
 		t.Fatalf("Validate: %v", err)
+	}
+}
+
+func TestFieldWith(t *testing.T) {
+	text := TextField("f", "branch", "Branch")
+	f := text.WithPlaceholder("main").WithHint("The branch to deploy").AsRequired().WithPattern(`^\w+$`, "A word").WithValue("dev")
+	if f.Input.Placeholder != "main" || f.Description.Text != "The branch to deploy" || !f.Required || f.Input.Pattern != `^\w+$` ||
+		f.Input.PatternMessage != "A word" || f.Input.Value != "dev" {
+		t.Errorf("text field %+v %+v", f, f.Input)
+	}
+	if text.Input.Placeholder != "" || text.Required {
+		t.Error("With changed the original field")
+	}
+	s := SecretField("s", "token", "Token", "").WithStore("token").WithValue("leak")
+	if s.Input.Store != "token" || s.Input.Value != "" {
+		t.Errorf("secret %+v", s.Input)
+	}
+	sel := SelectField("p", "project", "Project", Opt("a", "a", "A")).WithPlaceholder("Pick one").WithValue("a")
+	if sel.Select.Placeholder != "Pick one" || len(sel.Select.Value) != 1 {
+		t.Errorf("select %+v", sel.Select)
+	}
+	if tg := ToggleField("t", "on", "On", false).WithValue("true").WithPattern("x", "y"); !tg.Toggle.Value || tg.Input != nil {
+		t.Errorf("toggle %+v", tg)
+	}
+	fs := NewFieldset("g", "Group", ToggleField("a", "a", "A", false)).WithHint("Pick any")
+	if fs.Fieldset.Hint.Text != "Pick any" || fs.Description != nil {
+		t.Errorf("fieldset %+v", fs.Fieldset)
+	}
+	v := NewView(nil, NewForm("form", nil, f, s, sel.WithChange("picked")))
+	if err := v.Validate(); err != nil {
+		t.Errorf("validate: %v", err)
 	}
 }

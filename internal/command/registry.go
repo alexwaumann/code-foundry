@@ -176,6 +176,9 @@ func (r *Registry) Invoke(ctx context.Context, uctx Context, name string, raw ma
 		}
 		return Result{}, &ConfirmError{Command: name, Title: c.Title, Message: msg}
 	}
+	if o.confirmed {
+		ctx = context.WithValue(ctx, confirmedKey{}, true)
+	}
 	return c.Run(ctx, eff, args)
 }
 
