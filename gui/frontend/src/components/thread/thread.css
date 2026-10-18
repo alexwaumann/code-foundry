@@ -359,6 +359,10 @@ html[data-thread-width="full"] .cf-thread {
   min-width: 0;
   overflow: hidden;
 }
+.cf-thread .row > .meta:has(> .act) > :not(.act) {
+  flex: none;
+  white-space: nowrap;
+}
 .cf-thread .row .act {
   flex: 1 1 auto;
   font-size: 12px;
