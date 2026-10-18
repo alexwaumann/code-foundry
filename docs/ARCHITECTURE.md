@@ -96,6 +96,10 @@ internal/
     action/                per-project actions (named command lines) and their runs, in a
                            kind=action terminal or in the background with captured output
                            (docs/notes/actions-1-daemon.md)
+    plugin/                plugins: discovery, consent, one actor per enabled plugin (stdio
+                           JSON-RPC), plugin.<name>.* commands, Keychain secrets
+                           (docs/notes/plugins-1-core.md)
+  childproc/               a child process in its own group with owned pipes (Claude, plugins)
   db/                      SQLite (modernc.org/sqlite, WAL) + migrations; refuses a database
                            migrated by a newer build (db.ErrNewerSchema)
   client/                  Go client for the daemon API, used by CLI and the Wails host
@@ -103,6 +107,9 @@ internal/
   guide/                   the agent guide and the skills' references, rendered from commands and settings
   skills/                  the Claude Code skills written for every thread at daemon start
   fsx/                     the home-directory boundary and directory completion
+pluginsdk/                 the plugin SDK, its own module (stdlib only): manifest, protocol, Serve,
+                           Host, ui (view model), plugintest (docs/notes/plugins-1-core.md)
+plugins/examples/          example plugins (hello), built by `make plugins`
 gui/
   main.go                  Wails v3 host (thin)
   frontend/                Vite + React 19 + TypeScript + Tailwind v4 + shadcn + Zustand
@@ -222,7 +229,7 @@ Services (v1):
   CLI).
 * `EventService` — Watch: one server stream that multiplexes every store's events and UI
   intents (sources project, workspace, terminal, thread list, thread, gh, gitops, settings,
-  update, action, ui; the thread source carries threads' pending requests only, a
+  update, action, plugin, ui; the thread source carries threads' pending requests only, a
   snapshot then changes, never items; filterable). On connect it sends each source's snapshot in that order, then live events; a source that drops events for a
   slow client resends only its own snapshot. This is the GUI's only long-lived sync
   stream; the per-service Watch RPCs remain for the CLI and tests. Live events pass
@@ -270,6 +277,12 @@ Services (v1):
   last 64 KiB of output WaitRun returns. A new thread's worktree runs the project's
   on-worktree-create actions in the background; `run_finished` events carry every end
   (`docs/notes/actions-1-daemon.md`). The action.* commands are the CLI's surface.
+* `PluginService` — List, Enable (with consent, else the text to consent to), Disable,
+  Restart, Dev (link a folder and enable it), Reload, Logs, FollowLogs, ListSecrets,
+  DeleteSecret, Watch. Plugins are executables in `$CONFIG/plugins/<name>` the daemon runs
+  and speaks newline-delimited JSON-RPC 2.0 with over stdio; their manifest commands are
+  `plugin.<name>.<command>` (`docs/notes/plugins-1-core.md`; design in
+  `docs/sketches/plugins/`).
 * `HealthService` — Ping, Version.
 
 Rules:
