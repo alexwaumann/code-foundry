@@ -49,12 +49,12 @@ func RegisterThreadList(r *Registry, d ThreadListDeps) error {
 		Title: "List Threads",
 		Description: "List threads, the most recently active first: one line each, " +
 			"`<id>  <status>  <name>  <project>@<branch>  <age>` and `↳ <creator>` for a thread another thread created. " +
-			"Archived threads are left out unless archived or all is given; at most limit threads.",
+			"Archived threads are left out unless archived or all is given.",
 		Category:     "Thread",
 		NoKeybinding: true,
 		Args: []ArgSpec{
 			{Name: "archived", Type: Bool, Description: "Include archived threads"},
-			{Name: "all", Type: Bool, Description: "Every thread, archived ones too, ignoring the other filters except limit (--json: also the usage of removed threads)"},
+			{Name: "all", Type: Bool, Description: "Every thread, archived ones too (--json: also the usage of removed threads); the other filters still apply"},
 			{Name: "status", Type: Enum, Enum: ThreadListStatuses, Description: "Only threads with this status: busy, idle, attention (a prompt, a question or a finished turn), or error"},
 			{Name: "state", Type: Enum, Enum: ThreadListStates, Description: "Only threads whose Claude process is starting, connected, closing, or disconnected"},
 			{Name: "project", Type: String, Description: "Only threads in this project: its id, name, or an absolute path inside it"},

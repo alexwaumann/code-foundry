@@ -479,8 +479,8 @@ message ListThreadsRequest {
 
 // ThreadFilter selects threads for ListThreadsRequest. Every set field must match.
 message ThreadFilter {
-  // Every thread, archived ones included, and the retired usage ledger; the fields
-  // below except limit are ignored.
+  // Every thread, archived ones included (like include_archived), and the retired
+  // usage ledger; the fields below still apply.
   bool all = 1;
   // Include archived threads (default: they are left out).
   bool include_archived = 2;

@@ -2181,8 +2181,8 @@ func (x *ListThreadsRequest) GetFilter() *ThreadFilter {
 // ThreadFilter selects threads for ListThreadsRequest. Every set field must match.
 type ThreadFilter struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Every thread, archived ones included, and the retired usage ledger; the fields
-	// below except limit are ignored.
+	// Every thread, archived ones included (like include_archived), and the retired
+	// usage ledger; the fields below still apply.
 	All bool `protobuf:"varint,1,opt,name=all,proto3" json:"all,omitempty"`
 	// Include archived threads (default: they are left out).
 	IncludeArchived bool `protobuf:"varint,2,opt,name=include_archived,json=includeArchived,proto3" json:"include_archived,omitempty"`

@@ -59,6 +59,12 @@ func TestGuide(t *testing.T) {
 		"### Thread", "- `thread.wait <id>` Wait until a thread is idle",
 		"  - `--until idle|attention|error|disconnected`: idle, attention",
 		"## Discover more", "code-foundry events --json",
+		// Confirmation, children, project refs, and --all composing.
+		"Commands shown with `--yes` may ask for confirmation", "- `thread.remove [--id] --yes` ",
+		"thread list --created-by $CODE_FOUNDRY_THREAD`", "`--created-by user`",
+		"`thread list --created-by $CODE_FOUNDRY_THREAD --json` has each one's", "`reportData`",
+		"`--project` takes a project id or name; `code-foundry project list` prints them",
+		"`--all` includes them; the other filters still apply",
 	} {
 		if !strings.Contains(guide, want) {
 			t.Errorf("the guide lacks %q", want)
@@ -70,6 +76,14 @@ func TestGuide(t *testing.T) {
 	}
 	if !strings.Contains(guide, "- `settings.set <key> <value>") {
 		t.Error("settings.set's usage is missing")
+	}
+	// Every command that asks for confirmation shows --yes, in the detailed and the
+	// one-line forms alike; no other command does.
+	for _, c := range cmds {
+		u := guideUsage(c)
+		if !strings.Contains(guide, "- `"+u+"` ") || strings.HasSuffix(u, " --yes") != c.GetRequiresConfirmation() {
+			t.Errorf("%s: usage %q in the guide, requires_confirmation %t", c.GetName(), u, c.GetRequiresConfirmation())
+		}
 	}
 	buf.Reset()
 	writeGuide(&buf, cmds, "")

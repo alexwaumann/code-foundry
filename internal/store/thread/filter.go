@@ -21,7 +21,8 @@ const CreatedByUser = "user"
 
 // ListOptions selects threads for Store.List. Every set field must match.
 type ListOptions struct {
-	// All: every thread, archived ones too; the other fields except Limit are ignored.
+	// All: every thread, archived ones too (IncludeArchived); the other fields still
+	// apply. (The API also answers with the retired usage ledger.)
 	All bool
 	// IncludeArchived keeps archived threads (they are left out by default).
 	IncludeArchived bool
@@ -49,7 +50,7 @@ type ListOptions struct {
 func FilterThreads(threads []Thread, o ListOptions) []Thread {
 	var out []Thread
 	for _, t := range threads {
-		if o.All || o.matches(t) {
+		if o.matches(t) {
 			out = append(out, t)
 		}
 	}
@@ -64,7 +65,7 @@ func FilterThreads(threads []Thread, o ListOptions) []Thread {
 
 func (o ListOptions) matches(t Thread) bool {
 	switch {
-	case !o.IncludeArchived && !t.ArchivedAt.IsZero():
+	case !o.All && !o.IncludeArchived && !t.ArchivedAt.IsZero():
 		return false
 	case o.Status != StatusUnknown && t.Status != o.Status:
 		return false
@@ -99,14 +100,14 @@ func lastActive(t Thread) time.Time {
 // name, or a path inside a worktree) and Workspace (an id or a name) first. A ref that
 // names nothing is ErrInvalidArgument.
 func (m *Manager) List(_ context.Context, o ListOptions) ([]Thread, error) {
-	if o.Project != "" && !o.All && m.opts.Projects != nil { // without a project store (tests): an id
+	if o.Project != "" && m.opts.Projects != nil { // without a project store (tests): an id
 		r, err := workspace.ResolveProject(m.opts.Projects.Snapshot(), o.Project)
 		if err != nil {
 			return nil, listRefError("project", o.Project, err)
 		}
 		o.Project = r.ID
 	}
-	if o.Workspace != "" && !o.All {
+	if o.Workspace != "" {
 		if m.opts.Workspaces == nil {
 			return nil, fmt.Errorf("%w: no workspace %q", ErrInvalidArgument, o.Workspace)
 		}

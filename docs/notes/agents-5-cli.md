@@ -13,7 +13,8 @@ tells an agent all of it. Daemon, proto and CLI; no GUI change.
 Agreed with Alex (the brief):
 
 * **`thread.list` filters in the daemon**: `archived` (include archived; default they
-  are left out), `all` (everything, other filters ignored except `limit`), `status`
+  are left out), `all` (everything, other filters ignored except `limit`; since
+  agent-cli-feedback-1.md it composes with them like `archived`), `status`
   (busy, idle, attention, error), `state` (starting, connected, closing, disconnected),
   `repo` (id, name or path), `workspace` (id or name), `created-by` (a thread id or
   suffix, or `user`), `label` (comma list, all must match), `limit` (default 50, 0 = no

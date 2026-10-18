@@ -66,12 +66,15 @@ func writeGuide(w io.Writer, cmds []*v1.Command, self string) {
 	p("- Ids (threads `s-...`, action runs `r-...`, subscriptions `sub-...`, terminals `t-...`) may be given as a unique")
 	p("  suffix of at least 4 characters: `code-foundry thread get 8f3a`.")
 	p("- Exit status: 0 done, 1 failed or timed out, 2 a usage mistake or a refusal (the message says why).")
+	p("- Commands shown with `--yes` may ask for confirmation; without it they then exit 2 and do nothing, so pass")
+	p("  `--yes` when you mean it.")
 	p("")
 	p("## Conventions")
 	p("")
 	p("- Name threads after their task (`--name \"Fix the login redirect\"`). For delegated work give a brief, labels and")
 	p("  a wake: `code-foundry thread new --project <project> --name ... --brief \"what and why\" --labels bug,auth --notify")
 	p("  --request-id <task-key> --prompt \"...\"`. The new thread starts at once; `--notify` wakes you each time it settles.")
+	p("  `--project` takes a project id or name; `code-foundry project list` prints them.")
 	p("- `--request-id` makes `thread new` safe to retry (after a CLI timeout): the same key returns the thread made the")
 	p("  first time instead of a second one.")
 	p("- Do not poll. `code-foundry thread wait <id>` blocks until a thread is idle; `code-foundry thread send --id <id>")
@@ -79,10 +82,14 @@ func writeGuide(w io.Writer, cmds []*v1.Command, self string) {
 	p("  arrives when a thread you subscribed to (`--notify`, `thread subscribe`) settles.")
 	p("- `code-foundry thread read <id>` prints a thread's last items; `--since <nextSince>` (from `--json`) reads on.")
 	p("  `thread get <id>` has its status, brief, labels and report.")
-	p("- `thread list` leaves archived threads out (`--archived` includes them, `--all` lists everything) and shows the")
-	p("  50 most recently active (`--limit 0` for all); filter with `--status`, `--created-by`, `--label`, `--project`.")
+	p("- `thread list` leaves archived threads out (`--archived` or `--all` includes them; the other filters still apply)")
+	p("  and shows the 50 most recently active (`--limit 0` for all); filter with `--status`, `--label`, `--project`.")
+	p("- Your children: `code-foundry thread list --created-by $%s`; `--created-by user` lists the", paths.EnvThread)
+	p("  threads no thread created.")
 	p("- When your task is done (or blocked, or failed), say so: `code-foundry thread report done \"summary\" --data")
 	p("  '{\"key\": \"value\"}'`. The thread that created you reads it with `thread get`.")
+	p("- Your children's reports in one call: `thread list --created-by $%s --json` has each one's", paths.EnvThread)
+	p("  `reportStatus`, `reportSummary`, `reportData`.")
 	p("- Never send input to your own thread: `thread send`, `thread respond` and `thread interrupt` default to it, so")
 	p("  always pass `--id` of the thread you mean.")
 	p("- `code-foundry thread archive <id>` puts a finished child away; `--archived=false` brings it back.")
@@ -157,7 +164,8 @@ func threadIDArg(a *v1.ArgSpec) bool {
 }
 
 // guideUsage is the command and its positional args, "thread.wait <id>", with
-// "[--id]" for a thread command's id flag.
+// "[--id]" for a thread command's id flag and "--yes" for a command that asks for
+// confirmation (requires_confirmation): without a terminal it refuses unless given.
 func guideUsage(c *v1.Command) string {
 	parts := []string{c.GetName()}
 	for _, a := range c.GetArgs() {
@@ -167,6 +175,9 @@ func guideUsage(c *v1.Command) string {
 		case threadIDArg(a):
 			parts = append(parts, "[--id]")
 		}
+	}
+	if c.GetRequiresConfirmation() {
+		parts = append(parts, "--yes")
 	}
 	return strings.Join(parts, " ")
 }
