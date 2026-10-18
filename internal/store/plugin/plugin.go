@@ -123,6 +123,11 @@ type Plugin struct {
 	Capabilities []string
 	// LogPath is logs/plugins/<name>.log.
 	LogPath string
+	// Installed says where `plugin install` got the package (install.go); nil for one
+	// put in the plugins directory by hand.
+	Installed *InstallRecord
+	// Update is a newer version a registry lists (updates.go); nil when there is none.
+	Update *UpdateOffer
 }
 
 // DisplayName is the manifest's display name, else the name.

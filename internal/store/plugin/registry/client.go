@@ -238,3 +238,6 @@ func (m Merged) Err() error {
 	}
 	return errors.Join(errs...)
 }
+
+// Fetcher returns the client's fetcher (downloads, releases).
+func (c *Client) Fetcher() Fetcher { return c.opts.Fetcher }
