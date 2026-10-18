@@ -87,6 +87,10 @@ func (h *Plugin) WatchSurface(ctx context.Context, req *connect.Request[v1.Watch
 	if err != nil {
 		return pluginError(err)
 	}
+	// Flush the headers now: the first update may wait on the plugin.
+	if err := stream.Send(nil); err != nil {
+		return err
+	}
 	beat := newHeartbeat(h.beat)
 	defer beat.Stop()
 	for {
@@ -115,6 +119,10 @@ func (h *Plugin) WatchSurface(ctx context.Context, req *connect.Request[v1.Watch
 // defaultSurfaceWait is how long GetSurface waits for a view by default.
 const defaultSurfaceWait = 10 * time.Second
 
+// getSurfaceSettle is how long GetSurface waits for a new view after the live state when
+// it already has the cached one.
+const getSurfaceSettle = 200 * time.Millisecond
+
 // GetSurface opens an instance, waits for a view, and returns it with its elements.
 func (h *Plugin) GetSurface(ctx context.Context, req *connect.Request[v1.GetSurfaceRequest]) (*connect.Response[v1.GetSurfaceResponse], error) {
 	if err := h.needSurfaces(); err != nil {
@@ -132,21 +140,35 @@ func (h *Plugin) GetSurface(ctx context.Context, req *connect.Request[v1.GetSurf
 	}
 	out := &v1.GetSurfaceResponse{}
 	var view *plugin.SurfaceView
+	// A view that arrives with (after) the live state ends the wait. A cached view
+	// followed by "live" and no new view is current too (the plugin re-sent the same
+	// view): it ends the wait shortly after.
+	var settle <-chan time.Time
 loop:
-	for u := range ch {
-		switch {
-		case u.State != nil:
-			out.State = surfaceStateToProto(u.State)
-			if u.State.Phase == plugin.PhaseFailed || (u.State.Phase != plugin.PhaseOpening && view != nil) {
+	for {
+		select {
+		case u, ok := <-ch:
+			if !ok {
 				break loop
 			}
-		case u.View != nil:
-			view = u.View
-			out.View = surfaceViewToProto(u.View)
-			// A live view from this run ends the wait; a cached one waits for the next.
-			if out.GetState().GetPhase() == v1.SurfacePhase_SURFACE_PHASE_LIVE {
-				break loop
+			switch {
+			case u.State != nil:
+				out.State = surfaceStateToProto(u.State)
+				switch {
+				case u.State.Phase == plugin.PhaseFailed:
+					break loop
+				case u.State.Phase != plugin.PhaseOpening && view != nil:
+					settle = time.After(getSurfaceSettle)
+				}
+			case u.View != nil:
+				view = u.View
+				out.View = surfaceViewToProto(u.View)
+				if out.GetState().GetPhase() != v1.SurfacePhase_SURFACE_PHASE_OPENING {
+					break loop
+				}
 			}
+		case <-settle:
+			break loop
 		}
 	}
 	cancel()

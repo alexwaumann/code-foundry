@@ -589,7 +589,10 @@ func (m *Manager) WatchSurface(ctx context.Context, ref SurfaceRef) (string, <-c
 	if first {
 		m.surf.activate(in)
 	}
-	w.wake <- struct{}{}
+	select {
+	case w.wake <- struct{}{}:
+	default:
+	}
 	out := make(chan SurfaceUpdate)
 	go m.surf.serve(ctx, in, w, out)
 	return in.key, out, nil
