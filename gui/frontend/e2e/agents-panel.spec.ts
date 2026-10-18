@@ -186,8 +186,34 @@ test("the timeline: background and failed chips, live activity, and the end note
   await expect(pr1.getByTestId("thread-agent-activity")).toHaveText("Running go test ./internal/store/...");
   await expect(pr1.getByTestId("thread-agent-elapsed")).toHaveText(/^4m \d\ds$/);
   await expect(pr1.getByLabel("Running")).toBeVisible();
-  // Background rows stay a line; the failed one carries both chips.
-  await expect(pr1.getByTestId("thread-tool").first()).toHaveAttribute("aria-expanded", "false");
+  // Every Agent row is one line: nothing to open while its run works, and none of its
+  // run's rows (PR 1 has a work log and a nested run) in the thread; the failed one
+  // carries both chips.
+  await expect(pr1.getByTestId("thread-tool").first()).not.toHaveAttribute("aria-expanded");
+  await pr1.getByTestId("thread-tool").first().click();
+  await expect(pr1.locator("[data-tool]")).toHaveCount(0);
+  await expect(page.getByTestId("thread-pane")).not.toContainText("Review usage_runs changes");
+  await expect(page.getByTestId("thread-pane")).not.toContainText("-run TestAgent");
+  // The activity takes the line: label, chip, then the activity up to the clock.
+  const box = async (l: ReturnType<Page["locator"]>) => (await l.boundingBox()) ?? { x: NaN, y: NaN, width: NaN, height: NaN };
+  const label = await box(pr1.locator(".lbl").first());
+  const chip = await box(pr1.getByTestId("thread-agent-bg"));
+  const act = await box(pr1.getByTestId("thread-agent-activity"));
+  const clock = await box(pr1.getByTestId("thread-agent-elapsed"));
+  expect(chip.x - (label.x + label.width)).toBeLessThan(20);
+  expect(act.x - (chip.x + chip.width)).toBeLessThan(20);
+  expect(clock.x - (act.x + act.width)).toBeLessThan(20);
+  expect(act.width).toBeGreaterThan(260);
+  expect(act.height).toBeLessThan(24);
+  expect(clock.height).toBeLessThan(24);
+  expect(await box(pr1.getByTestId("thread-tool").first())).toMatchObject({ height: 24 });
+  // In a narrow pane (the panel open beside a small window) the line still holds: the
+  // label and the activity ellipsise, the clock stays whole.
+  await page.setViewportSize({ width: 900, height: 800 });
+  const narrowClock = await box(pr1.getByTestId("thread-agent-elapsed"));
+  expect(narrowClock.height).toBeLessThan(24);
+  expect(await box(pr1.getByTestId("thread-tool").first())).toMatchObject({ height: 24 });
+  await page.setViewportSize({ width: 1280, height: 800 });
   const shot = page.locator('[data-tool="Agent"]').filter({ hasText: "Screenshot the panel in Wails" });
   await expect(shot.getByTestId("thread-agent-failed")).toHaveText("failed");
   await expect(shot.getByTestId("thread-agent-bg")).toHaveText("background");
@@ -196,6 +222,11 @@ test("the timeline: background and failed chips, live activity, and the end note
   await mockPost("thread/agent-end?run=a1");
   await expect(pr1).toHaveAttribute("data-status", "done");
   await expect(pr1.getByTestId("thread-agent-activity")).toHaveCount(0);
+  // Ended, the row opens to its report and only that.
+  await expect(pr1.getByTestId("thread-tool").first()).toHaveAttribute("aria-expanded", "false");
+  await pr1.getByTestId("thread-tool").first().click();
+  await expect(pr1.getByTestId("thread-agent-report")).toHaveText("Added task frame handling to the thread store with 14 table tests; make check is green.");
+  await expect(pr1.locator("[data-tool]")).toHaveCount(0);
   await expect(notes).toHaveCount(2);
   const done = notes.last();
   await expect(done).not.toHaveAttribute("data-failed", "true");

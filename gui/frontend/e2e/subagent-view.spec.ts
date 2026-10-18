@@ -162,7 +162,8 @@ test("Open › on a running Agent row shows the run read-only: header, lineage, 
   await expect(view(page).getByTestId("thread-agent-open")).toHaveCount(0);
   await nested.getByTestId("thread-tool").first().hover();
   await expect(nested.getByTestId("thread-agent-open")).toHaveCount(0);
-  await expect(nested.getByTestId("thread-tool").first()).toHaveAttribute("aria-expanded", "false");
+  // One line: while it runs there is nothing to open.
+  await expect(nested.getByTestId("thread-tool").first()).not.toHaveAttribute("aria-expanded");
   await nested.getByTestId("thread-tool").first().click();
   await expect(nested.locator("[data-tool]")).toHaveCount(0);
 
