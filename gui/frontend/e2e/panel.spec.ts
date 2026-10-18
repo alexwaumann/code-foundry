@@ -91,7 +91,8 @@ test("the header toggle shows the empty surface list and hides the panel again",
   await expect(panelToggle).toHaveAttribute("aria-pressed", "true");
   const empty = panel(page).getByTestId("panel-empty");
   await expect(empty.getByRole("heading", { name: "Open a surface" })).toBeVisible();
-  const entries = empty.locator("[data-surface]");
+  // The built-in surfaces (the mock's hello plugin adds its demo below them: plugins.spec.ts).
+  const entries = empty.locator('[data-surface]:not([data-surface^="plugin."])');
   await expect(entries).toHaveCount(8);
   await expect(entries).toHaveText(["FileF", "DiffD", "Pull requestP", "UsageU", "MCPM", "AgentsA", "ThreadsH", "WorktreeT"]);
   for (const kind of ["files", "diff", "pullrequest"]) {
