@@ -97,8 +97,8 @@ internal/
                            kind=action terminal or in the background with captured output
                            (docs/notes/actions-1-daemon.md)
     plugin/                plugins: discovery, consent, one actor per enabled plugin (stdio
-                           JSON-RPC), plugin.<name>.* commands, Keychain secrets
-                           (docs/notes/plugins-1-core.md)
+                           JSON-RPC), plugin.<name>.* commands, Keychain secrets, surfaces,
+                           predicates, events, flags, session environment (§10)
   childproc/               a child process in its own group with owned pipes (Claude, plugins)
   db/                      SQLite (modernc.org/sqlite, WAL) + migrations; refuses a database
                            migrated by a newer build (db.ErrNewerSchema)
@@ -106,10 +106,12 @@ internal/
   paths/                   XDG-ish paths: config dir, socket, token, db, logs, worktrees, projects
   guide/                   the agent guide and the skills' references, rendered from commands and settings
   skills/                  the Claude Code skills written for every thread at daemon start
+                           (orchestrate, help, plugin)
   fsx/                     the home-directory boundary and directory completion
-pluginsdk/                 the plugin SDK, its own module (stdlib only): manifest, protocol, Serve,
-                           Host, ui (view model), plugintest (docs/notes/plugins-1-core.md)
-plugins/examples/          example plugins (hello), built by `make plugins`
+pluginsdk/                 the plugin SDK, its own module (stdlib only, Go 1.24): manifest, protocol,
+                           Serve, Host, ui (view model), plugintest (§10)
+plugins/                   example plugins, built by `make plugins`: hello (every protocol method),
+                           minimal (the plugin skill's template, embedded by embed.go)
 gui/
   main.go                  Wails v3 host (thin)
   frontend/                Vite + React 19 + TypeScript + Tailwind v4 + shadcn + Zustand
@@ -281,7 +283,7 @@ Services (v1):
   Restart, Dev (link a folder and enable it), Reload, Logs, FollowLogs, ListSecrets,
   DeleteSecret, Watch. Plugins are executables in `$CONFIG/plugins/<name>` the daemon runs
   and speaks newline-delimited JSON-RPC 2.0 with over stdio; their manifest commands are
-  `plugin.<name>.<command>` (`docs/notes/plugins-1-core.md`; design in
+  `plugin.<name>.<command>` (§10; `docs/notes/plugins-1-core.md`; design in
   `docs/sketches/plugins/`).
   WatchSurface, GetSurface and Act serve plugin surfaces: views (the `pluginsdk/ui`
   JSON the daemon validates) per instance `<plugin>/<surface>/<scope>`, opened on the
@@ -354,12 +356,12 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   `--append-system-prompt` line pointing at `code-foundry workspace members`, after the
   static line every thread gets pointing at the skills below (`ThreadPrompt`;
   `docs/notes/agents-5-cli.md`, `docs/notes/agent-skills.md`).
-* **Skills**: at every start the daemon writes two Claude Code skills,
-  `code-foundry-orchestrate` (delegating work to other threads) and `code-foundry-help`
-  (how-to questions about the app), to `<config home>/claude/.claude/skills`
-  (`internal/skills`: static SKILL.md files embedded, references rendered from the
-  registry and the settings schema through `internal/guide`, `docs/GETTING-STARTED.md`
-  embedded by the `docs` package). Every spawn passes `<config home>/claude` as its first
+* **Skills**: at every start the daemon writes three Claude Code skills,
+  `code-foundry-orchestrate` (delegating work to other threads), `code-foundry-help`
+  (how-to questions about the app) and `code-foundry-plugin` (building plugins, §10), to
+  `<config home>/claude/.claude/skills` (`internal/skills`: static SKILL.md files
+  embedded, references rendered from the registry and the settings schema through
+  `internal/guide`, `docs/GETTING-STARTED.md` embedded by the `docs` package). Every spawn passes `<config home>/claude` as its first
   `--add-dir`, before the attachments dir, workspace members and grants
   (`docs/notes/agent-skills.md`).
 * **Spawn extras** (`spawnextras.go`): what plugins contribute to every spawn through the
@@ -620,7 +622,78 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   for what changed (`docs/notes/gh-viewer-polling.md`). Results cached in SQLite so
   startup is instant and offline is tolerable.
 
-## 10. Conventions
+## 10. Plugins
+
+Plugins extend the app without changing it: separate executables, written by users and
+mostly by agents, that the daemon runs and that contribute commands, side-panel
+surfaces, thread flags and a share of every new thread's environment. Design:
+`docs/sketches/plugins/` (`DECISIONS.md` wins); what was built: `docs/notes/plugins-1-core.md`
+through `plugins-4-skill.md`.
+
+* **Package.** A folder `$CONFIG/plugins/<name>` with a `plugin.json` (name, version,
+  protocol, `exec`, permissions, commands, surfaces) and the executable. `plugin dev`
+  links a folder there; registry installs (PR 7) unpack a release tarball there. A
+  plugin found on disk is disabled until the user consents to its permissions
+  (`commands` globs, `events` sources, `threadStatus`, `sessionEnv`, `secrets`,
+  `threads`, `terminals`, `api`: the registry entry's keys); more permissions on an
+  update disable it again until they consent.
+* **Store** (`internal/store/plugin`): discovery and the `plugins` table, one actor per
+  enabled plugin (start with cwd = package folder and a minimal env, `initialize`
+  within 5 s, ping every 30 s, backoff 1 s to 60 s, failed after 5 crashes in 10 min,
+  dev plugins never fail), logs (`logs/plugins/<name>.log` plus a 1,000-line tail), the
+  Keychain secrets (`security`, service `code-foundry-plugin`). Plugin → host methods
+  are a registry (`hostMethods`) each feature file fills from `init`. The store never
+  imports the thread or gh stores: the daemon adapts them (`plugin_hooks.go`,
+  `pluginfacts.go`).
+* **Protocol.** Newline-delimited JSON-RPC 2.0 over the plugin's stdio, proxy-only (no
+  token unless `api`). Host → plugin: `initialize`, `initialized`, `ping`, `shutdown`,
+  `command/invoke`, `surface/open|visibility|close|act`, `events/event`. Plugin → host:
+  `log`, `host/invoke` (the manifest's command globs; never a confirm on the user's
+  behalf; `confirm: ask` hands it to the GUI), `secret/*`, `view/update|append|toast`,
+  `context/set`, `thread/setFlag`, `events/subscribe`, `session/setEnvironment`;
+  `thread/*` and `terminal/*` are PR 6.
+* **Commands.** Manifest commands are `plugin.<name>.<command>` in the one registry
+  (`Registry.ReplacePrefix` on enable and restart), so the palette, CLI and agents get
+  them; each surface adds `plugin.<name>.show.<surface>`, whose availability is the
+  surface's. `when` clauses compile to predicates the daemon evaluates over host facts
+  (thread, project, workspace, the thread's pull request and its checks, fetched
+  lazily) and the plugins' own `context/set` facts.
+* **Surfaces.** An instance per scope value (`<plugin>/<surface>/<global | thread:id |
+  project:id | worktree:path | pr:owner/repo#n>`), opened on the first watcher, closed a
+  minute after the last. Views are the `pluginsdk/ui` JSON, validated by the daemon
+  (schema, limits, keys, URLs, the commands a view may run, secrets), re-encoded,
+  versioned and coalesced per watcher; log nodes take appends. `PluginService.WatchSurface`,
+  `GetSurface` and `Act` serve them; an act names an element of a recent version and the
+  daemon fills in the rest. A form's secret input with `store` goes to the Keychain, and
+  the plugin sees only `{key, stored}`.
+* **Events, flags, environment.** `events/subscribe` feeds a plugin the EventService
+  sources it was granted, on the same loop as `Watch`, through a bounded drop-oldest
+  queue that resends a snapshot after drops. `thread/setFlag` puts an attention or error
+  flag on a thread (an overlay in the thread store; never the stream's status).
+  `session/setEnvironment` contributes env, PATH entries and `--add-dir`s to new threads
+  through the thread store's spawn extras (§6).
+* **SDK** (`pluginsdk/`, a nested module, stdlib only, Go 1.24, `replace`d into the
+  main module): manifest types and validation, the JSON-RPC `Conn`, `Serve` and `Host`;
+  `pluginsdk/ui` (typed nodes, builders, `Validate` with the host's rules);
+  `pluginsdk/plugintest` (a fake host). Plugin repositories `go get` it pinned at a
+  commit until it is tagged `pluginsdk/vX.Y.Z`.
+* **GUI** (PR 5): plugin surfaces are a generic surface kind in the side panel
+  (`panel.plugin.<name>.<surface>`), available exactly when their show command is; one
+  renderer component per node kind, drawn with the app's own components (no HTML from
+  plugins, no filled buttons, neutral header icon, emerald only for `ok`); one
+  `WatchSurface` per visible surface; host-side `command`, `openUrl` and `copy`; form
+  drafts per instance and tab; the consent dialog is `plugin.enable`'s confirm.
+* **Skill.** `code-foundry-plugin` (`internal/skills`) teaches an agent the loop: copy
+  the template (`plugins/examples/minimal`, embedded), `go get` the SDK at the commit
+  this daemon was built from, `plugin dev`, `plugin logs`, `plugin surface` / `plugin
+  act`, plugintest, release tarballs, the registry pull request. Its CLI and host
+  command references are rendered from the registry at start; reserved names, event
+  sources, host facts and view limits are filled in from the code.
+* **Registry** (PR 7): `alexwaumann/code-foundry-plugins` serves `index.json` built from
+  `plugins/<name>.json` entries (release tarball URLs per macOS architecture with
+  SHA-256, permissions equal to the manifest's), validated by its CI.
+
+## 11. Conventions
 
 * Features add files, not edits. Registries over switch statements. Messages owned by the
   emitter.
@@ -632,7 +705,7 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
 * Frontend never imports generated protobuf types outside `src/api/`; it maps to view
   models at the boundary.
 
-## 11. Non-goals for v1
+## 12. Non-goals for v1
 
 * Cross-platform. macOS only.
 * Keeping PTYs alive across daemon restarts.

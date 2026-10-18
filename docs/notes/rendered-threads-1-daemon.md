@@ -211,7 +211,7 @@ while building this). No GUI work: the GUI PR maps the new proto in `src/api`.
   snapshot only asks live rendered threads.
 * **Daemon stop kills the claude child** (SIGTERM to its process group, SIGKILL 2 s
   later) and records "daemon stopped": it talks to the daemon over pipes and cannot
-  outlive it, the same as a terminal thread's PTY (ARCHITECTURE §11: processes do not
+  outlive it, the same as a terminal thread's PTY (ARCHITECTURE §12: processes do not
   survive a restart). Reconnect resumes the transcript.
 * **`SetPermissionMode` refuses `PermissionDefault`**: "no flag" means the user's
   `defaultMode` setting, which the control protocol cannot select (`default` on the wire
