@@ -1,4 +1,4 @@
-package main
+package guide
 
 import (
 	"bytes"
@@ -35,7 +35,7 @@ func registryCommands(t *testing.T) []*v1.Command {
 func TestGuide(t *testing.T) {
 	cmds := registryCommands(t)
 	var buf bytes.Buffer
-	writeGuide(&buf, cmds, "s-7754a478e649")
+	Write(&buf, cmds, "s-7754a478e649")
 	guide := buf.String()
 	for _, c := range cmds {
 		if !strings.Contains(guide, "`"+c.GetName()) {
@@ -89,13 +89,13 @@ func TestGuide(t *testing.T) {
 	// Every command that asks for confirmation shows --yes, in the detailed and the
 	// one-line forms alike; no other command does.
 	for _, c := range cmds {
-		u := guideUsage(c)
+		u := Usage(c)
 		if !strings.Contains(guide, "- `"+u+"` ") || strings.HasSuffix(u, " --yes") != c.GetRequiresConfirmation() {
 			t.Errorf("%s: usage %q in the guide, requires_confirmation %t", c.GetName(), u, c.GetRequiresConfirmation())
 		}
 	}
 	buf.Reset()
-	writeGuide(&buf, cmds, "")
+	Write(&buf, cmds, "")
 	if !strings.Contains(buf.String(), "Inside a thread, `$CODE_FOUNDRY_THREAD` is that thread's id.") {
 		t.Error("outside a thread the guide names the variable")
 	}
