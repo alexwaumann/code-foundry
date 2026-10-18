@@ -71,13 +71,17 @@ gui-dist-stub:
 
 go-check: go-lint go-test
 
+# pluginsdk/ is its own module (stdlib only, replaced into this one), so ./... does not
+# reach it: vet, staticcheck and test it from its own directory.
 go-lint: gui-dist-stub ghostty-vt
-	@unformatted=$$(gofmt -l cmd internal gui/*.go 2>/dev/null); if [ -n "$$unformatted" ]; then echo "gofmt needed:" $$unformatted; exit 1; fi
+	@unformatted=$$(gofmt -l cmd internal gui/*.go pluginsdk plugins 2>/dev/null); if [ -n "$$unformatted" ]; then echo "gofmt needed:" $$unformatted; exit 1; fi
 	go vet ./...
 	go tool staticcheck ./...
+	cd pluginsdk && go vet ./... && "$$(cd .. && go tool -n staticcheck)" ./...
 
 go-test: gui-dist-stub ghostty-vt
 	go test -race ./...
+	cd pluginsdk && go test -race ./...
 
 frontend-deps:
 	$(PNPM) install --frozen-lockfile
