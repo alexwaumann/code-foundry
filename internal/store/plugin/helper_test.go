@@ -107,6 +107,24 @@ func okPlugin() pluginsdk.Plugin {
 				}
 				return msg(v)
 			},
+			// peek and forget pass any key, unchecked by the SDK, to secret/get and
+			// secret/delete (secrets_test.go's namespace escapes).
+			"peek": func(ctx context.Context, h *pluginsdk.Host, req pluginsdk.CommandRequest) (pluginsdk.CommandResult, error) {
+				v, ok, err := h.Secrets().Get(ctx, req.Arg("key"))
+				switch {
+				case err != nil:
+					return msg(fmt.Sprintf("code %d", pluginsdk.ErrorCode(err)))
+				case !ok:
+					return msg("nothing")
+				}
+				return msg("value " + v)
+			},
+			"forget": func(ctx context.Context, h *pluginsdk.Host, req pluginsdk.CommandRequest) (pluginsdk.CommandResult, error) {
+				if err := h.Secrets().Delete(ctx, req.Arg("key")); err != nil {
+					return msg(fmt.Sprintf("code %d", pluginsdk.ErrorCode(err)))
+				}
+				return msg("forgotten")
+			},
 			"slow": func(ctx context.Context, _ *pluginsdk.Host, _ pluginsdk.CommandRequest) (pluginsdk.CommandResult, error) {
 				<-ctx.Done()
 				return msg("late")

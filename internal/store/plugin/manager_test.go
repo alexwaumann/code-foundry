@@ -99,6 +99,8 @@ func testManifest(name string) pluginsdk.Manifest {
 			{Name: "flag", Title: "Flag"},
 			{Name: "remember", Title: "Remember", Args: []pluginsdk.ArgSpec{{Name: "word", Required: true}}},
 			{Name: "recall", Title: "Recall"},
+			{Name: "peek", Title: "Peek", Args: []pluginsdk.ArgSpec{{Name: "key"}}},
+			{Name: "forget", Title: "Forget", Args: []pluginsdk.ArgSpec{{Name: "key"}}},
 			{Name: "slow", Title: "Slow", TimeoutSeconds: 1},
 			{Name: "fail", Title: "Fail"},
 		},

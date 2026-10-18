@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"syscall"
@@ -157,6 +158,7 @@ func Run(ctx context.Context, opts Options) error {
 		Flags:   pluginFlags{threads: st.thread},
 		Threads: pluginThreads{threads: st.thread, settings: st.settings}, Terminals: pluginTerminals{terminals: st.terminal},
 		Registry: pluginRegistryClient(p, st.settings.Settings(), log.With("component", "plugin-registry")),
+		Secrets:  plugin.Keychain{Service: pluginKeychainService(p)},
 	})
 	if err != nil {
 		return err
@@ -337,4 +339,14 @@ func removeRuntimeFiles(log *slog.Logger, p paths.Paths) {
 			log.Warn("remove runtime file", "path", f, "err", err)
 		}
 	}
+}
+
+// pluginKeychainService is the Keychain service of this config home's plugin secrets:
+// the plain one for ~/.code-foundry, a per-home one for any other CODE_FOUNDRY_HOME.
+func pluginKeychainService(p paths.Paths) string {
+	def := ""
+	if u, err := os.UserHomeDir(); err == nil {
+		def = filepath.Join(u, paths.DirName)
+	}
+	return plugin.KeychainServiceFor(p.Home(), def)
 }

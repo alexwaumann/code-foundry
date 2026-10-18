@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -98,6 +99,20 @@ func listSecrets(ctx context.Context, db *sql.DB, plugin string) ([]SecretInfo, 
 		out = append(out, s)
 	}
 	return out, rows.Err()
+}
+
+// hasSecret reports whether plugin's key is recorded: the database, not the Keychain,
+// says which items belong to this home's plugin of that name.
+func hasSecret(ctx context.Context, db *sql.DB, plugin, key string) (bool, error) {
+	var one int
+	err := db.QueryRowContext(ctx, `SELECT 1 FROM plugin_secrets WHERE plugin = ? AND key = ?`, plugin, key).Scan(&one)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		return false, nil
+	case err != nil:
+		return false, fmt.Errorf("plugin: look up secret: %w", err)
+	}
+	return true, nil
 }
 
 func putSecret(ctx context.Context, db *sql.DB, plugin, key string, now time.Time) error {

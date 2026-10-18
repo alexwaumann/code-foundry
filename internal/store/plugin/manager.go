@@ -756,17 +756,21 @@ func (m *Manager) FollowLogs(ctx context.Context, name string, n int) (<-chan Lo
 
 // Secrets implements Store.
 func (m *Manager) Secrets(ctx context.Context, name string) ([]SecretInfo, error) {
+	if !registry.ValidName(name) {
+		return nil, fmt.Errorf("%w: %q is not a plugin name", ErrInvalidArgument, name)
+	}
 	return listSecrets(ctx, m.opts.DB, name)
 }
 
-// DeleteSecret implements Store.
+// DeleteSecret implements Store. The Keychain item goes whether or not the database
+// records it (an orphan is cleaned up); the database says whether there was one. The
+// value is never read.
 func (m *Manager) DeleteSecret(ctx context.Context, name, key string) error {
+	if !registry.ValidName(name) {
+		return fmt.Errorf("%w: %q is not a plugin name", ErrInvalidArgument, name)
+	}
 	if !secretKeyPattern.MatchString(key) {
 		return fmt.Errorf("%w: %q is not a secret key", ErrInvalidArgument, key)
-	}
-	_, had, err := m.opts.Secrets.Get(ctx, name, key)
-	if err != nil {
-		return err
 	}
 	if err := m.opts.Secrets.Delete(ctx, name, key); err != nil {
 		return err
@@ -775,7 +779,7 @@ func (m *Manager) DeleteSecret(ctx context.Context, name, key string) error {
 	if err != nil {
 		return err
 	}
-	if !had && !recorded {
+	if !recorded {
 		return fmt.Errorf("%w: plugin %s has no secret %q", ErrNotFound, name, key)
 	}
 	if e, ok := m.entry(name); ok {
