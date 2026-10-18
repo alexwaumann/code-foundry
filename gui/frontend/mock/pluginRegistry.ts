@@ -104,7 +104,8 @@ export class MockRegistry {
   /** A failure every install reports after its first step, until cleared (POST /__mock/plugin/registry?installError=…). */
   installError = "";
   private epoch = 0;
-  private lastRegistries = "";
+  /** The plugins.registries value the last Browse read; null before one. */
+  private lastRegistries: string | null = null;
 
   constructor(private readonly deps: RegistryDeps) {}
 
@@ -113,7 +114,7 @@ export class MockRegistry {
     this.error = "";
     this.installError = "";
     this.fetchedAt = new Date(Date.now() - 12 * 60_000);
-    this.lastRegistries = this.deps.registries();
+    this.lastRegistries = null;
   }
 
   /** The configured registry URLs, like registry.ParseList: none for "" or "none". */
@@ -132,11 +133,10 @@ export class MockRegistry {
     return this.entries.filter((e) => urls.includes(e.registry));
   }
 
-  /** The settings changed: a new plugins.registries value moves the registry epoch, so Browse reads again (the daemon's SetRegistries). */
+  /** The settings changed: a plugins.registries value other than the last Browse read moves the registry epoch, so Browse reads again (the daemon's SetRegistries). */
   settingsChanged(): void {
-    const v = this.deps.registries();
-    if (v === this.lastRegistries) return;
-    this.lastRegistries = v;
+    if (this.lastRegistries === null || this.deps.registries() === this.lastRegistries) return;
+    this.lastRegistries = null;
     this.deps.publish({ event: { case: "registryEpoch", value: BigInt(++this.epoch) } });
   }
 
@@ -155,6 +155,7 @@ export class MockRegistry {
 
   browse(refresh: boolean): BrowseInit {
     if (refresh) this.fetchedAt = new Date();
+    this.lastRegistries = this.deps.registries();
     const entries: EntryInit[] = this.listed().map((e) => {
       const inst = this.deps.installed(e.name);
       return {
