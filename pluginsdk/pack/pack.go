@@ -39,7 +39,7 @@ var platformPattern = regexp.MustCompile(`^[a-z0-9]+/[a-z0-9]+$`)
 // Result is one tarball written.
 type Result struct {
 	// File is the tarball's path; Base its file name.
-	File, Base string
+	File, Base              string
 	Name, Version, Platform string
 	SHA256                  string
 	Size                    int64
