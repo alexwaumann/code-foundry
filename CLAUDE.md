@@ -40,7 +40,7 @@ cd gui && wails3 dev   # GUI with hot reload (needs a running daemon or auto-sta
 - TypeScript strict, React 19, Tailwind v4, shadcn/ui, Zustand, cmdk, @xterm/xterm.
 - Generated protobuf types are used only in `src/api/`. Map to view models there.
 - Narrow selectors. Virtualize lists. No component subscribes to a whole slice.
-- Only the visible thread holds a `ThreadService.WatchThread` stream and only the visible bottom shell a `TerminalService.Attach` stream.
+- One `ThreadService.WatchThread` stream per visible thread view (shared when two views show the same thread) and one `TerminalService.Attach` stream per visible terminal view; nothing off screen holds one.
 - Text uses a type role class (`text-display`, `text-display-sm`, `text-title`, `text-heading`, `text-subheading`, `text-overline`, `text-body`, `text-body-sm`, `text-label`, `text-caption`, `text-caption-sm`, `text-link`, `text-code`; `text-brand` is the sidebar's app name only; the display roles are for a page's or panel's one big figure), with colour/weight utilities as modifiers after it; never a Tailwind size (`text-sm`, `text-[13px]`) or `leading-[…]` directly. A weight (`font-medium`) is fine as a modifier on a role. `cn` comes from `@/lib/utils`, which knows the roles.
 - Radii use the scale (`rounded-sm` 4, `rounded-md` 6, `rounded-lg` 10, `rounded-pane` 12, `rounded-2xl` 16, `rounded-full`), never bare `rounded` or `rounded-[…]`; an inner corner is one step smaller than its padded parent's. `src/design/guards.test.ts` enforces both, strictly: no file under `src` may have a hit.
 
