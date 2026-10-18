@@ -123,7 +123,7 @@ func (a *actor) run() {
 		if !info.dev && (permanent || len(a.crashes) >= o.CrashLimit) {
 			reason := msg
 			if !permanent {
-				reason = fmt.Sprintf("crashed %d times in %s, last: %s", len(a.crashes), o.CrashWindow, msg)
+				reason = fmt.Sprintf("crashed %d times in %s, last: %s", len(a.crashes), shortDuration(o.CrashWindow), msg)
 			}
 			a.m.log.Warn("plugin failed", "plugin", a.name, "err", reason)
 			info.logs.add("host", "", "failed: run `code-foundry plugin restart "+a.name+"` to try again")
@@ -151,6 +151,18 @@ func (a *actor) run() {
 		case <-t.C:
 		}
 	}
+}
+
+// shortDuration drops a duration's zero tail: 10m, 1h30m, 2s.
+func shortDuration(d time.Duration) string {
+	s := d.String()
+	if strings.HasSuffix(s, "m0s") {
+		s = strings.TrimSuffix(s, "0s")
+	}
+	if strings.HasSuffix(s, "h0m") {
+		s = strings.TrimSuffix(s, "0m")
+	}
+	return s
 }
 
 // backoff is base·2^(n-1), at most ceiling.
@@ -236,6 +248,11 @@ func (a *actor) once(info spawnInfo) (err error) {
 	}, &res)
 	cancel()
 	if err != nil {
+		select {
+		case <-proc.Done():
+			return a.exitError(proc, "")
+		case <-time.After(stderrSettle):
+		}
 		return a.exitError(proc, fmt.Sprintf("did not answer initialize: %v", err))
 	}
 	if res.Protocol != pluginsdk.ProtocolVersion {
@@ -290,6 +307,10 @@ func (a *actor) once(info spawnInfo) (err error) {
 		}
 	}
 }
+
+// stderrSettle is how long a failed initialize waits for the process's exit, so a plugin
+// that died on start reports its exit and last stderr line.
+const stderrSettle = 300 * time.Millisecond
 
 // hostCapabilities are what this host announces in initialize.
 var hostCapabilities = []string{"invoke", "secrets", "log"}

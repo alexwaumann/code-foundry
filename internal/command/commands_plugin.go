@@ -282,7 +282,10 @@ func formatPlugins(ps []*v1.Plugin) string {
 		if p.GetDev() {
 			state += " (dev)"
 		}
-		note := p.GetLastError()
+		note := ""
+		if p.GetState() == v1.PluginState_PLUGIN_STATE_CRASHED || p.GetState() == v1.PluginState_PLUGIN_STATE_FAILED {
+			note = p.GetLastError()
+		}
 		switch {
 		case p.GetDisabledReason() != "":
 			note = p.GetDisabledReason()
