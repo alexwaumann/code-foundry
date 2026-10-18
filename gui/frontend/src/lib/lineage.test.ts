@@ -4,6 +4,7 @@ import {
   capIds,
   childIds,
   creatorOf,
+  hasLineage,
   lineageStatus,
   lineageTail,
   noteCreator,
@@ -98,6 +99,21 @@ describe("siblings and children", () => {
     expect(projectCount(D, childIds(D, "p"))).toBe(3);
     expect(projectCount(D, ["a", "d"])).toBe(1);
     expect(projectCount(D, [])).toBe(0);
+  });
+});
+
+describe("hasLineage", () => {
+  it.each([
+    ["a creator with children", "p", true],
+    ["an agent's thread (a creator and siblings)", "a", true],
+    ["an only child: a creator, no siblings", "a1", true],
+    ["a removed creator still counts (its row stays)", "orphan", true],
+    ["a renamed creator's only child", "r1", true],
+    ["the user's thread with nothing related", "u", false],
+    ["an unknown thread", "zz", false],
+    ["no thread", "", false],
+  ])("%s", (_n, id, want) => {
+    expect(hasLineage(D, id)).toBe(want);
   });
 });
 

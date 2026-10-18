@@ -1,7 +1,10 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentRunView } from "@/api/agents";
 import type { ThreadView } from "@/api/threads";
+
+const toast = vi.hoisted(() => Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), info: vi.fn() }));
+vi.mock("sonner", () => ({ toast }));
 
 const { SidePanel } = await import("@/components/panel/SidePanel");
 const { getPanel, usePanelStore } = await import("@/stores/panel");
@@ -13,7 +16,7 @@ const { agentsPanelCommand, showView, useViewsStore } = await import("@/stores/v
 const { useAgentRowIds, useAgentRun } = await import("@/stores/agents");
 
 const thread = (id: string, state = "connected") =>
-  ({ id, name: `thread ${id}`, projectId: "web", worktreePath: "/src/web", workspaceId: "", pendingWorktreePath: "", state, status: "idle", linkedPullRequests: [], usage: [] }) as unknown as ThreadView;
+  ({ id, name: `thread ${id}`, projectId: "web", worktreePath: "/src/web", workspaceId: "", pendingWorktreePath: "", state, status: "idle", linkedPullRequests: [], usage: [], agentRuns: [] }) as unknown as ThreadView;
 
 const NOW = Date.now();
 
@@ -53,8 +56,20 @@ const RUNS: AgentRunView[] = [
   run("a1b", { description: "Review", agentType: "Explore", parentId: "a1", spawnDepth: 2, activity: "Reading usage_runs.go", lastTool: "Read" }),
 ];
 
+/** The runs in the thread log (the tab's rows) and in the thread list (the surface's availability), like the daemon publishes them. */
 function setAgents(id: string, agents: AgentRunView[]): void {
   useThreadStore.setState((s) => ({ logs: { ...s.logs, [id]: { seq: 1, byId: {}, order: [], pending: [], mcp: null, commands: [], agents } } }));
+  setListRuns(id, agents.length);
+}
+
+/** The thread list's agentRuns: only their count matters to the surface. */
+function setListRuns(id: string, n: number): void {
+  useThreadsStore.setState((s) => {
+    const t = s.byId[id];
+    if (!t) return s;
+    const agentRuns = Array.from({ length: n }, (_, i) => ({ id: `r${String(i)}` })) as unknown as ThreadView["agentRuns"];
+    return { byId: { ...s.byId, [id]: { ...t, agentRuns } } };
+  });
 }
 
 const rows = () => screen.getAllByTestId("agent-row");
@@ -70,12 +85,13 @@ beforeEach(() => {
   useUiStore.setState({ windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260, selection: { kind: "thread", id: "s-r" }, palette: { ...useUiStore.getState().palette, open: false } });
   useThreadStore.setState({ logs: {} });
   setAgents("s-r", RUNS);
+  toast.mockClear();
 });
 
 afterEach(cleanup);
 
 describe("Agents surface", () => {
-  it("is listed with A for a thread and hidden for a page", () => {
+  it("is listed with A for a thread with runs and hidden for a page", () => {
     render(<SidePanel />);
     expect(entry()?.getAttribute("data-availability")).toBe("enabled");
     expect(entry()?.textContent).toContain("Agents");
@@ -84,6 +100,43 @@ describe("Agents surface", () => {
     });
     expect(entry()).toBeNull();
     expect(agentsPanelCommand()).toBe(false);
+    expect(toast).not.toHaveBeenCalled();
+  });
+
+  it("is hidden for a thread without runs, listed live once its first run starts; A does nothing meanwhile", () => {
+    setAgents("s-r", []);
+    render(<SidePanel />);
+    expect(entry()).toBeNull();
+    fireEvent.keyDown(screen.getByTestId("side-panel"), { key: "a" });
+    expect(getPanel("thread:s-r").activeTabId).toBeNull();
+    act(() => {
+      setListRuns("s-r", 1);
+    });
+    expect(entry()?.getAttribute("data-availability")).toBe("enabled");
+    fireEvent.keyDown(screen.getByTestId("side-panel"), { key: "a" });
+    expect(getPanel("thread:s-r").activeTabId).toBe("agents");
+  });
+
+  it("view.panel.agents opens the tab for a thread with runs; without runs it toasts and opens nothing", () => {
+    usePanelStore.setState({ byKey: {} });
+    expect(agentsPanelCommand()).toBe(true);
+    expect(getPanel("thread:s-r")).toMatchObject({ open: true, activeTabId: "agents" });
+    expect(toast).not.toHaveBeenCalled();
+    setAgents("s-r", []);
+    usePanelStore.setState({ byKey: {} });
+    expect(showView("panel.agents")).toBe(true);
+    expect(getPanel("thread:s-r").open).toBe(false);
+    expect(toast).toHaveBeenCalledWith("No agents yet", expect.anything());
+  });
+
+  it("an open tab stays when the surface would be hidden: only the empty list's row goes", () => {
+    act(() => {
+      showView("panel.agents");
+    });
+    setAgents("s-r", []);
+    render(<SidePanel />);
+    expect(getPanel("thread:s-r").activeTabId).toBe("agents");
+    expect(screen.getByTestId("agents-empty")).toBeTruthy();
   });
 
   it("A opens it: the header counts, rows in spawn order with the nested run under its parent", () => {
@@ -131,11 +184,11 @@ describe("Agents surface", () => {
     expect(screen.getByTestId("agents-surface").querySelectorAll("button")).toHaveLength(0);
   });
 
-  it("empty and quiet states", () => {
-    setAgents("s-r", []);
+  it("empty and quiet states (a tab opened before, e.g. restored with the panel)", () => {
     act(() => {
       showView("panel.agents");
     });
+    setAgents("s-r", []);
     render(<SidePanel />);
     expect(screen.getByTestId("agents-empty").textContent).toBe("No agents yet. Claude's subagents (the Agent tool) show here as they run.");
     expect(screen.queryByTestId("agents-count")).toBeNull();

@@ -18,7 +18,7 @@ const { pullRequestSurface } = await import("./pullrequest");
 const status = { upstream: "", ahead: 0, behind: 0, staged: 0, modified: 0, untracked: 0, dirty: false, refreshedAtMs: null };
 const wt = (path: string, branch: string, isMain = false): WorktreeView => ({ projectId: "r1", path, branch, head: "abc", detached: false, isMain, status });
 const project = (branch: string): ProjectView => ({ id: "r1", path: "/src/cf", name: "cf", defaultBranch: "main", githubSlug: "Alex/CF", remotes: ["origin"], git: true, worktrees: [wt("/src/cf", "main", true), wt("/src/cf-work", branch)] });
-const thread = { id: "s1", worktreePath: "/src/cf-work", projectId: "r1", terminalId: "", linkedPullRequests: [] } as unknown as ThreadView;
+const thread = { id: "s1", worktreePath: "/src/cf-work", projectId: "r1", terminalId: "", linkedPullRequests: [], agentRuns: [] } as unknown as ThreadView;
 const prs = (n: number[]): BranchPullRequestsView => ({ pullRequests: n.map((number) => ({ repoSlug: "alex/cf", number, state: "open" }) as PullRequestView), fetchedAtMs: 1, lastError: "" });
 
 beforeEach(() => {

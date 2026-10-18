@@ -11,10 +11,10 @@ import { bottomKeyOf, bottomVisible, getBottom, toggleBottom } from "./bottomPan
 import { linkedPrsTarget, openLinkedPrsSurface } from "./linkedPrsPanel";
 import { expandPanel, getPanel, startPanelPicking, togglePanel } from "./panel";
 import { useUiStore, viewNames, type FocusRegion } from "./ui";
-import { openAgentsSurface } from "./agentsPanel";
+import { agentsPanelTarget, openAgentsSurface } from "./agentsPanel";
 import { openMcpSurface } from "./mcpPanel";
 import { leaveSubagent } from "./subagentView";
-import { openThreadsSurface } from "./threadsPanel";
+import { openThreadsSurface, threadsPanelTarget } from "./threadsPanel";
 import { openUsageSurface } from "./usagePanel";
 import { openWorkspaceSurface } from "./workspacePanel";
 import { openWorktreeSurface } from "./worktreePanel";
@@ -359,13 +359,20 @@ export function mcpPanelCommand(): boolean {
 
 /**
  * view.panel.agents for the current selection: opens (or activates) the Agents tab in the
- * selected thread's panel and shows the panel, like view.panel.mcp. A no-op while the
- * settings or usage page is up and when no thread is selected.
+ * selected thread's panel and shows the panel, like view.panel.mcp. A thread without
+ * subagent runs (the surface is hidden) gets a brief "No agents yet" toast instead, like
+ * view.panel.linked-prs. A no-op while the settings or usage page is up and when no
+ * thread is selected.
  *
  * Focus moves to the panel; with the palette open, its return target moves there instead.
  */
 export function agentsPanelCommand(): boolean {
   if (pageOpen()) return false;
+  const target = agentsPanelTarget();
+  if (target !== "agents") {
+    if (target === "none") toast("No agents yet", { description: "Claude's subagents (the Agent tool) show here as they run." });
+    return false;
+  }
   const key = openAgentsSurface();
   if (key === null) return false;
   const inPalette = useUiStore.getState().palette.open;
@@ -376,13 +383,20 @@ export function agentsPanelCommand(): boolean {
 
 /**
  * view.panel.threads for the current selection: opens (or activates) the Threads tab in
- * the selected thread's panel and shows the panel, like view.panel.agents. A no-op while
- * the settings or usage page is up and when no thread is selected.
+ * the selected thread's panel and shows the panel, like view.panel.agents. A thread
+ * without lineage (no creator, siblings or children: the surface is hidden) gets a brief
+ * "No related threads" toast instead. A no-op while the settings or usage page is up and
+ * when no thread is selected.
  *
  * Focus moves to the panel; with the palette open, its return target moves there instead.
  */
 export function threadsPanelCommand(): boolean {
   if (pageOpen()) return false;
+  const target = threadsPanelTarget();
+  if (target !== "related") {
+    if (target === "none") toast("No related threads", { description: "Threads an agent here creates (code-foundry thread new) show up here." });
+    return false;
+  }
   const key = openThreadsSurface();
   if (key === null) return false;
   const inPalette = useUiStore.getState().palette.open;

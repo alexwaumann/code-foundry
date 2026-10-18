@@ -18,6 +18,7 @@
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
+import { AgentRunStatus, type AgentRunSchema } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
 import { ThreadAgentStatus, ToolCallStatus, type ThreadAgentRunSchema, type ThreadItemSchema } from "../src/gen/codefoundry/v1/thread_pb";
 import { CommandError } from "./errors";
 import type { InvokeOut } from "./gitops";
@@ -25,6 +26,7 @@ import { launchShell, type ShellCall } from "./shells";
 import type { UiIntentInit } from "./world";
 
 export type AgentRunInit = MessageInitShape<typeof ThreadAgentRunSchema>;
+type AgentRunListInit = MessageInitShape<typeof AgentRunSchema>;
 type ItemInit = MessageInitShape<typeof ThreadItemSchema>;
 type Over = Partial<ItemInit> & { at?: Date; until?: Date };
 
@@ -279,6 +281,25 @@ export function scriptAgents(s: AgentsScript, now = Date.now()): AgentRunInit[] 
 export function agentCounts(runs: readonly AgentRunInit[]): { agentsRunning: number; backgroundAgentsRunning: number } {
   const running = runs.filter((r) => r.status === ThreadAgentStatus.RUNNING);
   return { agentsRunning: running.length, backgroundAgentsRunning: running.filter((r) => r.background && (r.spawnDepth ?? 1) <= 1).length };
+}
+
+/**
+ * The thread list's agent_runs for a thread's runs, like the daemon's Thread.agent_runs:
+ * open while running, closed once ended, no usage (the mock prices none per run). The GUI
+ * lists the Agents surface only for a thread with some (docs/notes/panel-polish.md).
+ */
+export function listRuns(runs: readonly AgentRunInit[]): AgentRunListInit[] {
+  return runs.map((r) => ({
+    id: r.id,
+    description: r.description,
+    agentType: r.agentType,
+    model: r.model,
+    effort: r.effort,
+    background: r.background,
+    status: r.status === ThreadAgentStatus.RUNNING ? AgentRunStatus.OPEN : AgentRunStatus.CLOSED,
+    spawnDepth: r.spawnDepth ?? 1,
+    ...(r.startedAt ? { startedAt: r.startedAt } : {}),
+  }));
 }
 
 /** What MockThreadLogs offers the agent commands and the control. */

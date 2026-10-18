@@ -25,7 +25,7 @@ import { MockUpdater, type RestartCost } from "./update";
 import { pageUsage, retiredUsage, sampleUsage, usageFields, type MockUsage } from "./usage";
 import { ENTER_ALT, prompt, RESET, topFrame } from "./screens";
 import { CommandError } from "./errors";
-import { agentCounts, agentsCommands } from "./agents";
+import { agentCounts, agentsCommands, listRuns } from "./agents";
 import { mcpCommands } from "./mcp";
 import { MockActions } from "./actions";
 import { CRASH_STDERR, MockThreadLogs, type SeedHistory, type ThreadState as ScriptedThreadState } from "./thread";
@@ -1176,6 +1176,7 @@ export class World {
       ...usageFields(s.usage),
       ...contextFields(s, this.cacheTTLSeconds()),
       ...agentCounts(this.logs.agentRunsOf(s.id)),
+      agentRuns: listRuns(this.logs.agentRunsOf(s.id)),
       // Shells die with the thread's process (mock/shells.ts).
       backgroundShellsRunning: s.state === ThreadState.CONNECTED ? this.logs.shellsOf(s.id) : 0,
       ...(s.retry ? { retry: { attempt: s.retry.attempt, maxRetries: s.retry.maxRetries, retryAt: timestampFromDate(s.retry.retryAt), errorStatus: s.retry.errorStatus, error: s.retry.error } } : {}),

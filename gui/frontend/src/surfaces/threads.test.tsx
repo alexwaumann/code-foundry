@@ -1,6 +1,9 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ThreadView } from "@/api/threads";
+
+const toast = vi.hoisted(() => Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), info: vi.fn() }));
+vi.mock("sonner", () => ({ toast }));
 
 const { SidePanel } = await import("@/components/panel/SidePanel");
 const { getPanel, usePanelStore } = await import("@/stores/panel");
@@ -8,6 +11,7 @@ const { useProjectsStore } = await import("@/stores/projects");
 const { useThreadsStore } = await import("@/stores/threads");
 const { useUiStore } = await import("@/stores/ui");
 const { showView, threadsPanelCommand, useViewsStore } = await import("@/stores/views");
+const { threadsTab } = await import("@/surfaces/threadsTarget");
 
 const NOW = Date.now();
 let created = 0;
@@ -34,6 +38,7 @@ function thread(id: string, o: Partial<ThreadView> = {}): ThreadView {
     brief: "",
     linkedPullRequests: [],
     usage: [],
+    agentRuns: [],
     ...o,
   } as ThreadView;
 }
@@ -63,6 +68,13 @@ const rowOf = (id: string) => rows().find((r) => r.getAttribute("data-thread") =
 const within = (el: HTMLElement, id: string) => el.querySelector(`[data-testid="${id}"]`);
 const entry = () => screen.queryByTestId("panel-empty")?.querySelector('[data-surface="threads"]') ?? null;
 
+function select(id: string): void {
+  act(() => {
+    useUiStore.setState({ selection: { kind: "thread", id } });
+  });
+  usePanelStore.setState((s) => ({ byKey: { ...s.byKey, [`thread:${id}`]: s.byKey[`thread:${id}`] ?? { open: true, tabs: [], activeTabId: null } } }));
+}
+
 function open(): void {
   act(() => {
     showView("panel.threads");
@@ -72,6 +84,7 @@ function open(): void {
 
 beforeEach(() => {
   created = 0;
+  toast.mockClear();
   useProjectsStore.setState({
     byId: {
       web: { id: "web", name: "web-app", git: true, githubSlug: "", worktrees: [{ path: "/src/web", branch: "cf/fix-login", head: "a", isMain: false }] },
@@ -101,6 +114,36 @@ describe("Threads surface", () => {
     render(<SidePanel />);
     expect(entry()).toBeNull();
     expect(threadsPanelCommand()).toBe(false);
+    expect(toast).not.toHaveBeenCalled();
+  });
+
+  it("is hidden for a thread with nothing related; listed live once a child appears; H does nothing meanwhile", () => {
+    select("u");
+    render(<SidePanel />);
+    expect(entry()).toBeNull();
+    fireEvent.keyDown(screen.getByTestId("side-panel"), { key: "h" });
+    expect(getPanel("thread:u").activeTabId).toBeNull();
+    act(() => {
+      useThreadsStore.setState((s) => ({ byId: { ...s.byId, u1: thread("u1", by("u")) }, order: [...s.order, "u1"] }));
+    });
+    expect(entry()?.getAttribute("data-availability")).toBe("enabled");
+    fireEvent.keyDown(screen.getByTestId("side-panel"), { key: "h" });
+    expect(getPanel("thread:u").activeTabId).toBe("threads");
+  });
+
+  it.each([
+    ["a creator (the header chip's case)", "me", true],
+    ["children only", "p", true],
+    ["an only child: a creator, no siblings", "c1", true],
+    ["nothing related", "u", false],
+  ])("view.panel.threads: %s", (_n, id, opens) => {
+    select(id);
+    usePanelStore.setState({ byKey: {} });
+    expect(threadsPanelCommand()).toBe(opens);
+    expect(getPanel(`thread:${id}`).open).toBe(opens);
+    expect(getPanel(`thread:${id}`).activeTabId).toBe(opens ? "threads" : null);
+    if (opens) expect(toast).not.toHaveBeenCalled();
+    else expect(toast).toHaveBeenCalledWith("No related threads", expect.anything());
   });
 
   it("an agent's thread: header, sections in spawn order, statuses, place, age and brief", () => {
@@ -169,12 +212,10 @@ describe("Threads surface", () => {
     expect(ids("children")).toEqual(["me", "s1", "s2", "s3"]);
   });
 
-  it("nothing related: Created by you, no threads created from here", () => {
-    act(() => {
-      useUiStore.setState({ selection: { kind: "thread", id: "u" } });
-    });
-    usePanelStore.setState({ byKey: { "thread:u": { open: true, tabs: [], activeTabId: null } } });
-    open();
+  it("nothing related (a tab opened before, e.g. restored with the panel): Created by you, no threads created from here", () => {
+    select("u");
+    usePanelStore.setState({ byKey: { "thread:u": { open: true, tabs: [threadsTab()], activeTabId: "threads" } } });
+    render(<SidePanel />);
     expect(screen.queryByTestId("threads-count")).toBeNull();
     expect(screen.queryByTestId("threads-subline")).toBeNull();
     expect(screen.getByTestId("threads-empty").textContent).toBe(
