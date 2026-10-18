@@ -15,14 +15,14 @@ export function formatDuration(ms: number): string {
 }
 
 /**
- * A `duration` span (a fixed time a plugin measured): tenths under 10 s, as the thread
- * view's tool rows do ("0.1s", "2.3s"), so a quick test run does not read "took 0s";
- * whole units from 10 s on (formatDuration). An elapsed time keeps whole seconds.
+ * A `duration` span (a fixed time a plugin measured): under a second in tenths ("0.2s",
+ * "<0.1s"), so a quick test run does not read "took 0s"; from 1 s on as formatDuration
+ * (GitHub's whole seconds stay "2s"). An elapsed time keeps whole seconds.
  */
 export function formatFixedDuration(ms: number): string {
   if (ms <= 0) return "0s";
   if (ms < 100) return "<0.1s";
-  if (ms < 10_000) return `${(Math.floor(ms / 100) / 10).toFixed(1)}s`;
+  if (ms < 1000) return `${(Math.floor(ms / 100) / 10).toFixed(1)}s`;
   return formatDuration(ms);
 }
 
