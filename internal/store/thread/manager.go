@@ -950,7 +950,9 @@ func (m *Manager) startNaming(id, msg string) {
 			return
 		}
 		applied := false
-		m.update(id, true, func(rec *record) { applied = rec.s.applyNamerTitle(name) })
+		if _, ok := m.update(id, true, func(rec *record) { applied = rec.s.applyNamerTitle(name) }); !ok {
+			return // removed meanwhile
+		}
 		took := time.Since(start).Round(time.Millisecond).String()
 		if applied {
 			m.log.Info("thread auto-named", "thread", id, "name", name, "took", took)
