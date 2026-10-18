@@ -3,8 +3,8 @@
 The ninth PR of the plugin stack, on `cf/plugins-7-registry` (73685d8b). It adds Go
 fuzz targets for every place a plugin, a registry or a tarball feeds the daemon bytes,
 table tests with misbehaving fake plugins, a short GUI property test, and fixes what
-they found. Each fix is the smallest change that closes the hole; each bug has a
-regression input (a named seed under the target's `testdata/fuzz/`, or a table test).
+they found, plus two follow-ups the coordinator asked for (#22, #23). Each fix is the
+smallest change that closes the hole; each bug has a regression input (a named seed under the target's `testdata/fuzz/`, or a table test).
 
 ## Targets
 
@@ -96,7 +96,7 @@ plugin or package can cause; **low** a validation hole or an inconsistency.
 | 3 | medium | 100 concurrent `thread/create` (or `terminal/create`) calls | each saw room under the limit (count, then create, no lock): 100 Claude threads for a limit of 32, 100 terminals for 16 | an actor mutex around count + create (`threads.go`, `terminals.go`, `actor.go`); `TestOwnedLimitsUnderConcurrency` |
 | 4 | medium | `view/append` with 65 535 empty lines (64 KiB, the per-append limit), 512 times | the append ring (512 appends kept for watchers catching up) held 2 MiB per append: 1 GiB per surface instance | the ring is bounded by an estimated size too (4 MiB); a watcher further behind gets the whole view, as before (`surface.go`); `TestAppendRingIsBoundedByBytes` |
 | 5 | medium | a peer floods notifications faster than `Notify` handles them (the daemon validates each `view/update`; a plugin's `OnEvent` may be slow) | the incoming notification queue grew without bound | at most 4096 notifications or 16 MiB wait; the rest are dropped and reported once per burst (`pluginsdk/jsonrpc.go`); `TestConnBoundsTheNotificationQueue`, `TestMisbehavingPlugins/flood` |
-| 6 | medium | a peer floods requests whose handlers block | one goroutine per request, without bound | at most 256 requests in flight; the rest are answered at once with `CodeRateLimited`, reported once per burst; `TestConnBoundsRequestsInFlight` |
+| 6 | medium | a peer floods requests whose handlers block | one goroutine per request, without bound | at most 64 requests in flight (`ConnOptions.MaxInflight`); the rest are answered at once with `CodeRateLimited`, reported once per burst; `TestConnBoundsRequestsInFlight` |
 | 7 | medium | a handler's result over the line limit (a command answering more than 4 MiB) | `enqueue` refused it and nothing was sent: the caller waited out its whole timeout (up to 600 s for a command) | the answer becomes a `CodeInternal` error naming the limit; `ErrTooLong` is a typed error; `TestConnResultOverTheLineLimit`, `TestMisbehavingPlugins/hugeresult`, seed `result-over-line-limit` |
 | 8 | medium | a release tarball with any number of PAX (or GNU long-name) headers before one entry | Go's tar reader merges consecutive meta headers into one `Next`, so the entry count and the file-size sum never moved: a ~10 MB download decompressed ~10 GB (measured 0.7 s per 500 MB), a 256 MiB one for minutes, before consent | the gzip stream is capped at `MaxUnpackedBytes` + 64 MiB (`registry/archive.go`); `TestExtractStopsAtTheDecompressionCap` |
 | 9 | medium | `plugin.json` is a FIFO (in a plugin folder or a dev folder) | `os.ReadFile` blocked at open, forever, during discovery, with the store's operation lock held: enable, disable, reload, install hung (and a link to `/dev/zero` or a huge file was read whole) | `readManifest` reads only a regular file, at most 1 MiB (`manager.go`); `TestReadManifestRefusesFIFOsAndHugeFiles` |
@@ -112,6 +112,8 @@ plugin or package can cause; **low** a validation hole or an inconsistency.
 | 19 | low | `context/set` for many thread ids, each set then cleared; or with a megabyte thread id | an empty scope map was kept per id; ids of any size were kept | an emptied scope is dropped; ids over 256 bytes are refused (`facts.go`); `TestClearedFactScopesAreDropped` |
 | 20 | low | `thread/create` with a 4 MB prompt; `terminal/create` with a million empty argv strings | the prompt had no limit (`thread/send` has 256 KiB); argv counted bytes only, so empty strings were free | the prompt has `MaxThreadMessage`; each argv entry counts its NUL; `TestOwnedLimitsUnderConcurrency` |
 | 21 | medium | a plugin named `0` or `1password` (valid without commands) with a surface; or with neither | surfaces bring `plugin.<name>.show.<surface>` commands, and the registry refuses a prefix whose segment starts with a digit: no show commands, so the surfaces never opened; with neither, the empty registration still failed on the prefix and the plugin showed a "commands not registered" issue | `Validate` asks a command-segment name for surfaces too; registering nothing for such a name is a no-op (`pluginsdk/manifest.go`, `commands.go`); seeds `digit-name-with-surface`, `digit-name-no-commands` |
+| 22 | medium | `input.pattern` `(a+)+$`, `(-[a-z]+)*`, or a 10 KB pattern | validated (RE2 compiles it), then the GUI's backtracking JavaScript could spend exponential time on a value: a typed value froze the window on blur or submit | `Validate` refuses a pattern over 256 characters or with a quantified group holding a `+`/`*` quantifier (`(…+)+`, `(…*)*`, `(…+)*`, `(…*)+`; escapes and classes skipped; conservative, so `^[a-z]+(-[a-z]+)*$` is refused too: check such values in the plugin) (`ui/validate.go`); `TestNestedQuantifier` |
+| 23 | medium | a session environment (or a plugin thread's or terminal's env) with `DYLD_INSERT_LIBRARIES`, `LD_PRELOAD`, `NODE_OPTIONS`, `PYTHONPATH`, `PERL5OPT`, `RUBYOPT`, `BASH_ENV`, `ENV`, `ZDOTDIR` or `SSH_ASKPASS` | accepted: code loaded into every process the thread starts (Claude itself, its tools, its shells) | refused as "loads code into every process the thread starts" (anything `DYLD_*`, `LD_*` and the eight names); `ANTHROPIC_*`, `AWS_*` stay allowed (`environment.go`); `TestValidateEnvironment` "keys that load code" |
 
 Nothing panicked: every target ran its corpus and minutes of mutations without a panic
 in the code under test. The predicate compiler held up: Go's RE2 has no backtracking,
@@ -121,19 +123,18 @@ slowest pattern measured (`[\x{0}-\x{10FFFF}]{1000}` against 1 KiB) evaluates in
 
 ## Found, not fixed
 
-* **A form pattern can freeze the GUI (ReDoS).** `input.pattern` is checked by Go's RE2
-  in the daemon (it compiles) but run by JavaScript's backtracking `RegExp` in the GUI on
-  every keystroke and blur: `(a+)+$` against 26 `a`s and a `!` takes 3.5 s in V8, and each
-further `a` doubles it, so a longer value hangs the window. Fixing it
-  needs either the check moved to the daemon (RE2, linear) with the GUI showing its
-  answer, or the GUI running it in a worker with a timeout; a static "nested quantifier"
-  ban would also refuse ordinary patterns like `^[a-z]+(-[a-z]+)*$`. The plugin is code
-  the user consented to, so this is a robustness fix to schedule, not a hole.
-* **The session environment does not reserve `ANTHROPIC_*`, `AWS_*`, `NODE_OPTIONS` or
-  `DYLD_*`.** A plugin with `sessionEnv` can point Claude at another API endpoint or load
-  code into it. That is what the permission's consent text says ("add environment
-  variables … to new Claude sessions"), and the expected enterprise auth plugin needs
-  some of those keys, so it is a design decision, not a validation bug.
+* **A form pattern can freeze the GUI (ReDoS): mitigated, not solved.** `input.pattern`
+  compiles in Go's RE2 but runs in JavaScript's backtracking `RegExp`: `(a+)+$` against 26
+  `a`s and a `!` takes 3.5 s in V8, and each further `a` doubles it. The cheap mitigation
+  is in (#22 below); a real fix needs the check in the daemon (RE2, linear) or a worker
+  with a timeout in the GUI. The GUI already checks patterns only on blur and on submit
+  (`FormNode`'s `blur` and `submit`; typing only clears an error), so no GUI change was
+  needed for "on commit only".
+* **The session environment keeps `ANTHROPIC_*` and `AWS_*` allowed.** A plugin with
+  `sessionEnv` can point Claude at another API endpoint or other credentials. That is what
+  the permission's consent text says ("add environment variables … to new Claude
+  sessions"), and the expected enterprise auth plugin needs those keys. The keys that load
+  code into every process a thread starts are reserved now (#23).
 * **Plugin-side event drops are not resynced.** With the notification cap (#5), a Go
   plugin whose `OnEvent` falls 4096 events behind drops the rest (`pluginsdk: dropping
   notifications …` on its stderr, so in its log); the host's resync-after-drop covers only
@@ -149,6 +150,13 @@ further `a` doubles it, so a longer value hangs the window. Fixing it
   written, not reproducible). `make fuzz` reports it and goes on.
 
 ## Gotchas
+
+* Restacked (2026-10-18) onto `cf/plugins-13-skill-touchup`: #200 had bounded incoming
+  JSON-RPC work too. The merge keeps #200's configurable `ConnOptions.MaxInflight` (64) and
+  `MaxNotifications` (4096) and adds this PR's byte cap (`MaxNotifyQueue`, 16 MiB) and
+  once-per-burst reporting; #200's case-insensitive reserved env keys now cover the
+  code-loading keys too; #201's `ui.MaxActValues` check refuses an oversize act before
+  this PR's payload cap, so `TestOversizeActStoresNoSecret` covers both.
 
 * The fuzz targets' seeds read the hello demo's views and the real manifests by relative
   path (`../../internal/store/plugin/testdata/hello-demo`, `../plugins/examples/...`); in

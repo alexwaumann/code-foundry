@@ -393,8 +393,10 @@ submitted values, or the command arg it fills), a label, a `description`, an `er
 plugin's validation message), `required`, `disabled`, and exactly one control:
 
 - `input`: one-line text; `kind: "secret"` masks it. `value` (never for a secret),
-  `placeholder`, `maxLength`, `pattern` (a regular expression) with `patternMessage`,
-  `mono`. `required`, `maxLength` and `pattern` are checked by the GUI as the user types;
+  `placeholder`, `maxLength`, `pattern` (a regular expression, at most 256 characters,
+  no quantified group holding a quantifier such as `(a+)+` or `(-[a-z]+)*`: the GUI's
+  JavaScript could take exponential time on it) with `patternMessage`, `mono`.
+  `required`, `maxLength` and `pattern` are checked by the GUI as the user types;
   `plugin act --values` and other clients skip them, so the plugin validates every value
   again (and answers with a field `error` or an error).
 - `select`: `options` (up to 200, each `key`, `value`, `label`, `description` in list

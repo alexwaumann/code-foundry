@@ -127,9 +127,14 @@ for _, issue := range res.Issues { h.Log().Warn("environment", "issue", issue) }
 - Pushed, not asked for: push in Init and again whenever it changes; the last push is
   kept across restarts. An empty `Environment{}` withdraws it. Running threads keep what
   they started with; new threads (and restarts) get the new one.
-- `Env`: names `[A-Za-z_][A-Za-z0-9_]*`, text values up to 8 KiB, at most 64. Reserved:
-  `PATH`, `HOME`, `SHELL`, `USER`, `TMPDIR`, `CLAUDECODE`, `CLAUDE_CONFIG_DIR`,
-  `CLAUDE_EFFORT` and anything starting `CODE_FOUNDRY_` or `CLAUDE_CODE_`.
+- `Env`: names `[A-Za-z_][A-Za-z0-9_]*`, text values up to 8 KiB, at most 64. Reserved,
+  in any case (`path` is `PATH` to a shell): `PATH`, `HOME`, `SHELL`, `USER`, `TMPDIR`,
+  `CLAUDECODE`, `CLAUDE_CONFIG_DIR`, `CLAUDE_EFFORT` and anything starting
+  `CODE_FOUNDRY_` or `CLAUDE_CODE_`; and the keys
+  that load code into every process the thread starts: `NODE_OPTIONS`, `PYTHONPATH`,
+  `PERL5OPT`, `RUBYOPT`, `BASH_ENV`, `ENV`, `ZDOTDIR`, `SSH_ASKPASS` and anything starting
+  `DYLD_` or `LD_`. `ANTHROPIC_*` and `AWS_*` are allowed (an auth plugin sets them).
+  The same rules apply to a plugin thread's and terminal's own `Env`.
 - `PathPrepend` (prepended to PATH) and `AddDirs` (`--add-dir`, must exist): absolute or
   `~/` paths under the home directory, at most 16 each.
 - `Scope`: nil means threads of every project but not threads without a project;

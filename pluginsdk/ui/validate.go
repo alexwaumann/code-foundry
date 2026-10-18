@@ -52,6 +52,9 @@ const (
 	MaxActValues = 64 << 10
 	// MaxProblems is how many problems Validate names; the rest are counted.
 	MaxProblems = 50
+	// MaxPattern bounds an input's pattern (the GUI runs it with JavaScript's
+	// backtracking regular expressions).
+	MaxPattern = 256
 )
 
 // KeyPattern is the shape of every key. Keys share one namespace across the view.
@@ -594,6 +597,12 @@ func (c *checker) field(path string, f Field, inFieldset bool) bool {
 			if _, err := regexp.Compile(in.Pattern); err != nil {
 				c.bad(p+".pattern", "%v", err)
 			}
+			if n := utf8.RuneCountInString(in.Pattern); n > MaxPattern {
+				c.bad(p+".pattern", "%d characters, at most %d", n, MaxPattern)
+			}
+			if at := nestedQuantifier(in.Pattern); at >= 0 {
+				c.bad(p+".pattern", "a quantified group holds a quantifier (at %d, like (a+)+ or (-[a-z]+)*): the GUI's JavaScript regular expressions can take exponential time on it; check such values in the plugin", at)
+			}
 		}
 		c.str(p+".placeholder", in.Placeholder, MaxLabel)
 		c.str(p+".patternMessage", in.PatternMessage, MaxLabel)
@@ -717,4 +726,53 @@ func (c *checker) utf8(path string, v reflect.Value) {
 			c.bad(path, "not valid UTF-8")
 		}
 	}
+}
+
+// nestedQuantifier returns the offset of the first group that holds a + or * quantifier
+// and is itself quantified with + or * ("(a+)+", "(x*)*", "(-[a-z]+)*", "((ab)+c)*"), or
+// -1. Backtracking engines (the GUI's JavaScript) can take exponential time on those.
+// The check is syntactic and conservative: escapes and character classes are skipped,
+// and it does not ask whether the repetition is actually ambiguous.
+func nestedQuantifier(pattern string) int {
+	type group struct {
+		start      int
+		quantified bool // holds a + or * quantifier
+	}
+	var stack []group
+	inClass := false
+	for i := 0; i < len(pattern); i++ {
+		ch := pattern[i]
+		switch {
+		case ch == '\\':
+			i++ // the escaped byte
+		case inClass:
+			if ch == ']' {
+				inClass = false
+			}
+		case ch == '[':
+			inClass = true
+			if i+1 < len(pattern) && pattern[i+1] == '^' {
+				i++
+			}
+			if i+1 < len(pattern) && pattern[i+1] == ']' {
+				i++ // a leading ] is a literal
+			}
+		case ch == '(':
+			stack = append(stack, group{start: i})
+		case ch == ')' && len(stack) > 0:
+			g := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			if g.quantified && i+1 < len(pattern) && (pattern[i+1] == '+' || pattern[i+1] == '*') {
+				return g.start
+			}
+			if len(stack) > 0 && g.quantified {
+				stack[len(stack)-1].quantified = true
+			}
+		case ch == '+' || ch == '*':
+			if len(stack) > 0 {
+				stack[len(stack)-1].quantified = true
+			}
+		}
+	}
+	return -1
 }

@@ -59,3 +59,44 @@ func TestValidateFuzzFindings(t *testing.T) {
 		})
 	}
 }
+
+// Patterns the GUI's backtracking regular expressions could spend exponential time on
+// are refused; ordinary ones pass.
+func TestNestedQuantifier(t *testing.T) {
+	tests := []struct {
+		pattern string
+		at      int // -1: allowed
+	}{
+		{`^https://`, -1},
+		{`^[a-z0-9-]+$`, -1},
+		{`^(ab|cd)+$`, -1},
+		{`^(a)+$`, -1},
+		{`^(a+)?$`, -1},
+		{`^(a{2,})+$`, -1},
+		{`^[(a+)+]$`, -1},
+		{`^\(a+\)+$`, -1},
+		{`^[]a+(]+$`, -1},
+		{`(a+)+`, 0},
+		{`^(a*)*$`, 1},
+		{`^(a+)*$`, 1},
+		{`^(a*)+$`, 1},
+		{`^[a-z]+(-[a-z]+)*$`, 7},
+		{`^(?:\w+\s?)+$`, 1},
+		{`x((ab)+c)*`, 1},
+		{`(a|b+)+`, 0},
+		{`([)]+)+`, 0},
+	}
+	for _, tt := range tests {
+		if got := nestedQuantifier(tt.pattern); got != tt.at {
+			t.Errorf("nestedQuantifier(%q) = %d, want %d", tt.pattern, got, tt.at)
+		}
+	}
+	long := View{Nodes: []Node{{Key: "f", Form: &Form{Fields: []Field{{Key: "a", Name: "a", Input: &Input{Pattern: strings.Repeat("a", MaxPattern+1)}}}}}}}
+	if err := long.Validate(); err == nil || !strings.Contains(err.Error(), "257 characters, at most 256") {
+		t.Errorf("long pattern: %v", err)
+	}
+	nested := View{Nodes: []Node{{Key: "f", Form: &Form{Fields: []Field{{Key: "a", Name: "a", Input: &Input{Pattern: `^(a+)+$`}}}}}}}
+	if err := nested.Validate(); err == nil || !strings.Contains(err.Error(), "nodes[0].form.fields[0].input.pattern: a quantified group holds a quantifier (at 1") {
+		t.Errorf("nested: %v", err)
+	}
+}
