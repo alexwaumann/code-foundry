@@ -33,6 +33,9 @@ type Thread struct {
 	Subscriptions  []*v1.ThreadSubscription
 	// Reused is Create's answer flag (a repeated request_id).
 	Reused bool
+	// FailIDs are the thread ids Remove and Archive fail for, with these errors (the
+	// call is recorded first).
+	FailIDs map[string]error
 }
 
 var _ command.ThreadBackend = (*Thread)(nil)
@@ -114,9 +117,12 @@ func (s *Thread) Rename(_ context.Context, r *connect.Request[v1.RenameThreadReq
 	return connect.NewResponse(&v1.RenameThreadResponse{Thread: &v1.Thread{Id: r.Msg.GetId(), Name: r.Msg.GetName()}}), nil
 }
 
-// Remove records the request.
+// Remove records the request; it fails for an id in FailIDs.
 func (s *Thread) Remove(_ context.Context, r *connect.Request[v1.RemoveThreadRequest]) (*connect.Response[v1.RemoveThreadResponse], error) {
 	if err := s.do(r.Msg); err != nil {
+		return nil, err
+	}
+	if err := s.FailIDs[r.Msg.GetId()]; err != nil {
 		return nil, err
 	}
 	return connect.NewResponse(&v1.RemoveThreadResponse{}), nil
@@ -137,9 +143,12 @@ func (s *Thread) Pin(_ context.Context, r *connect.Request[v1.PinThreadRequest])
 
 // Archive returns Current (default: a CONNECTED thread) with the requested id:
 // archiving disconnects and unpins it and sets archived_at (kept when already set);
-// unarchiving clears archived_at.
+// unarchiving clears archived_at. It fails for an id in FailIDs.
 func (s *Thread) Archive(_ context.Context, r *connect.Request[v1.ArchiveThreadRequest]) (*connect.Response[v1.ArchiveThreadResponse], error) {
 	if err := s.do(r.Msg); err != nil {
+		return nil, err
+	}
+	if err := s.FailIDs[r.Msg.GetId()]; err != nil {
 		return nil, err
 	}
 	cur := &v1.Thread{State: v1.ThreadState_THREAD_STATE_CONNECTED}

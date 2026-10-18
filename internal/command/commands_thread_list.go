@@ -59,7 +59,7 @@ func RegisterThreadList(r *Registry, d ThreadListDeps) error {
 			{Name: "state", Type: Enum, Enum: ThreadListStates, Description: "Only threads whose Claude process is starting, connected, closing, or disconnected"},
 			{Name: "project", Type: String, Description: "Only threads in this project: its id, name, or an absolute path inside it"},
 			{Name: "workspace", Type: String, Description: "Only threads of this workspace: its id or name"},
-			{Name: "created-by", Type: String, Description: "Only threads this thread created (its id, or a unique suffix of 4+ characters), or user for threads no thread created"},
+			{Name: "created-by", Type: String, Description: "Only threads created by this thread (id or suffix); user: by the user"},
 			{Name: "label", Type: String, Description: "Comma-separated labels: only threads carrying all of them"},
 			{Name: "limit", Type: Int, Default: threadListDefaultLimit, Description: "At most this many threads, the most recently active (0: no limit)"},
 		},
@@ -73,17 +73,11 @@ func RegisterThreadList(r *Registry, d ThreadListDeps) error {
 				Project: strings.TrimSpace(a.String("project")), Workspace: strings.TrimSpace(a.String("workspace")),
 				Labels: splitList(a.String("label")), Limit: int32(a.Int("limit")),
 			}
-			if by := strings.TrimSpace(a.String("created-by")); by != "" && by != "user" {
-				ids, err := threadIDs(d.Thread)(ctx)
-				if err != nil {
-					return Result{}, err
-				}
-				if f.CreatedBy, err = ResolveID(ThreadID, "created-by", by, ids); err != nil {
-					return Result{}, err
-				}
-			} else {
-				f.CreatedBy = by
+			by, err := resolveCreatedBy(ctx, d.Thread, a.String("created-by"))
+			if err != nil {
+				return Result{}, err
 			}
+			f.CreatedBy = by
 			res, err := d.Thread.List(ctx, connect.NewRequest(&v1.ListThreadsRequest{Filter: f}))
 			if err != nil {
 				return Result{}, err

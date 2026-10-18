@@ -3,7 +3,8 @@
 An agent driving code-foundry from inside a thread (through `code-foundry guide`,
 `cmd/code-foundry/guide.go`) reported where the CLI tripped it. This step fixes the one
 correctness trap and closes the guide gaps. A second, parallel PR adds `thread reports`
-and multi-id `thread remove` / `thread archive`; it is not part of this one.
+and multi-id `thread remove` / `thread archive`; it is not part of this one
+([agent-cli-feedback-2](agent-cli-feedback-2.md)).
 
 ## The feedback, briefly
 

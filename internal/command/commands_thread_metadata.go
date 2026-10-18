@@ -175,8 +175,8 @@ func threadReportCmd(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
 		Name:  "thread.report",
 		Title: "Report on Thread",
-		Description: "Record how a thread's task went (default: the thread this runs in): done, blocked, failed or progress, " +
-			"a summary and optional JSON data. A new report replaces the previous one; the thread's creator reads it with thread get.",
+		Description: "Record how a thread's task went: done, blocked, failed or progress, " +
+			"a summary and optional JSON data. A new report replaces the previous one; the thread's creator reads it with thread reports.",
 		Category:     "Thread",
 		NoKeybinding: true,
 		Args: []ArgSpec{

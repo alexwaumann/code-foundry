@@ -69,6 +69,14 @@ func (r *Registry) idLister(kind IDKind) IDLister {
 func (r *Registry) resolveIDs(ctx context.Context, specs []ArgSpec, args Args, eff Context) (Context, error) {
 	for _, s := range specs {
 		v := args.String(s.Name)
+		if s.IDList && v != "" {
+			full, err := r.resolveIDList(ctx, s, v)
+			if err != nil {
+				return eff, err
+			}
+			args.vals[s.Name] = full
+			continue
+		}
 		if s.ID == NoID || !needsResolve(s.ID, v) {
 			continue
 		}
@@ -90,6 +98,38 @@ func (r *Registry) resolveIDs(ctx context.Context, specs []ArgSpec, args Args, e
 		}
 	}
 	return eff, nil
+}
+
+// resolveIDList resolves each entry of v, an IDList arg, listing the ids once (only
+// when an entry is a suffix): the full ids joined by commas, blanks and repeats dropped.
+// One entry that does not resolve fails them all, so a typo acts on none.
+func (r *Registry) resolveIDList(ctx context.Context, s ArgSpec, v string) (string, error) {
+	list := r.idLister(s.ID)
+	var (
+		ids    []string
+		listed bool
+		out    []string
+	)
+	for _, ref := range splitList(v) {
+		full := ref
+		if list != nil && needsResolve(s.ID, ref) {
+			if !listed {
+				var err error
+				if ids, err = list(ctx); err != nil {
+					return "", err
+				}
+				listed = true
+			}
+			var err error
+			if full, err = ResolveID(s.ID, s.Name, ref, ids); err != nil {
+				return "", err
+			}
+		}
+		if !slices.Contains(out, full) {
+			out = append(out, full)
+		}
+	}
+	return strings.Join(out, ","), nil
 }
 
 // needsResolve: v may be a suffix (not a full id with the kind's prefix, and long

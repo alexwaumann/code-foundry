@@ -81,6 +81,9 @@ type ArgSpec struct {
 	// ID makes the arg an id of that kind: Invoke replaces a unique suffix of one with
 	// the full id before Run (resolve.go). String args only.
 	ID IDKind
+	// IDList makes an ID arg a comma-separated list of ids: Invoke resolves each entry
+	// and hands Run the full ids joined by commas (blanks dropped). Not context-bound.
+	IDList bool
 }
 
 // validate checks the spec's static shape at Register time.
@@ -110,6 +113,8 @@ func (s ArgSpec) validate() error {
 		return errors.New("only a string arg can be read from a file or stdin")
 	case s.ID != NoID && (s.Type != String || idKinds[s.ID].prefix == ""):
 		return errors.New("only a string arg can be an id, of a known kind")
+	case s.IDList && (s.ID == NoID || s.Context != NoContext):
+		return errors.New("an id list needs an id kind and no context")
 	}
 	if s.Default != "" {
 		if _, err := s.parse(s.Default); err != nil {
