@@ -7,13 +7,15 @@ import type { PrStateTone } from "@/components/prs/prState";
  * Image chips sample theirs from the thumbnail; PDF chips use the file accent (AttachmentChip).
  * A thread is sky leaning to cyan: `--info` (the theme's sky) is the file accent already,
  * so the thread tag mixes in some `--success` to tell the two apart. A pull request takes
- * its state's colour, as the PR rows show it (PR_ACCENT); this is the open one.
+ * its state's colour, as the PR rows show it (PR_ACCENT); this is the open one. A
+ * citation is amber (`--warning`), the tint its quote is painted in when re-highlighted.
  */
 export const TAG_ACCENT: Record<Exclude<TagKind, "image">, string> = {
   skill: "[--chip-accent:var(--highlight)]",
   file: "[--chip-accent:var(--info)]",
   thread: "[--chip-accent:color-mix(in_oklab,var(--info)_60%,var(--success))]",
   pr: "[--chip-accent:var(--success)]",
+  cite: "[--chip-accent:var(--warning)]",
 };
 
 /** A pull request tag's accent per state tone (components/prs/prState.ts): open, merged, closed, draft or unknown. */

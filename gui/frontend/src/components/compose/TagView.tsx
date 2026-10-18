@@ -1,11 +1,16 @@
 import { useContext, type ReactNode } from "react";
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
+import { Quote } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { citeLabel } from "@/lib/citation";
 import { tagLabel } from "@/lib/prompt";
+import { cn } from "@/lib/utils";
+import { requestEdit, useEditingCitation } from "@/stores/cite";
+import { useCitation } from "@/stores/compose";
 import { useProjectsStore } from "@/stores/projects";
 import { useSkillDescription } from "@/stores/skills";
 import { AttachmentChip } from "./AttachmentChip";
-import { TagMultiProjectContext, tagOf } from "./tagContext";
+import { TagDraftContext, TagMultiProjectContext, tagOf } from "./tagContext";
 import { TAG_ACCENT, tagClass } from "./tagStyle";
 import { usePrTagInfo, useThreadTagInfo } from "./useTagInfo";
 
@@ -129,7 +134,56 @@ function PrTag({ slug, number, selected }: { slug: string; number: number; selec
   );
 }
 
-/** The node view of a prompt tag (tagNode.ts): an image chip, a skill, a file, a thread or a pull request. */
+/** The quote glyph of a citation chip, in the chip's accent. */
+export function QuoteGlyph() {
+  return <Quote aria-hidden className="size-[0.92em] shrink-0 fill-current stroke-0 text-[color-mix(in_oklab,var(--chip-accent)_70%,var(--color-foreground))]" />;
+}
+
+/** The ring of the chip whose comment is being edited. */
+const EDITING =
+  "data-[editing]:border-[color-mix(in_oklab,var(--chip-accent)_70%,var(--color-border))] data-[editing]:bg-[color-mix(in_oklab,var(--chip-accent)_20%,transparent)] data-[editing]:ring-2 data-[editing]:ring-[color-mix(in_oklab,var(--chip-accent)_22%,transparent)]";
+
+/**
+ * Text quoted from one of Claude's answers (docs/notes/citations.md): the quote glyph and
+ * the quote's first words; the tooltip is the quote and the comment. A click scrolls to
+ * the quote, paints it and opens the comment popover there (the thread's cite layer);
+ * the chip has a ring meanwhile. A token whose body no draft has (pasted from a composer
+ * that has sent it) shows dashed and is left out of the message.
+ */
+function CiteTag({ id, selected }: { id: string; selected: boolean }) {
+  const draftKey = useContext(TagDraftContext);
+  const c = useCitation(draftKey, id);
+  const editing = useEditingCitation(draftKey, id);
+  const label = c ? citeLabel(c.text) : "Quote";
+  return (
+    <Tooltip disableHoverableContent open={editing ? false : undefined}>
+      <TooltipTrigger asChild>
+        <NodeViewWrapper
+          as="span"
+          data-testid="prompt-tag"
+          data-tag-kind="cite"
+          data-cite={id}
+          data-editing={editing ? "" : undefined}
+          role="button"
+          aria-label={c ? `Quote: ${c.text}${c.comment ? `. Comment: ${c.comment}` : ""}` : "Quote not found"}
+          className={tagClass(selected, cn(TAG_ACCENT.cite, "cursor-pointer", !c && "border-dashed", EDITING))}
+          onClick={() => {
+            if (c) requestEdit(draftKey, id);
+          }}
+        >
+          <QuoteGlyph />
+          <span className="truncate">{label}</span>
+        </NodeViewWrapper>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-80 px-2.5 py-1.5 text-body-sm" data-testid="prompt-tag-tooltip">
+        <p className="line-clamp-4 whitespace-pre-wrap">{c ? c.text : "This quote is not in the draft any more"}</p>
+        {c?.comment && <p className="mt-0.5 line-clamp-4 whitespace-pre-wrap text-muted-foreground">{c.comment}</p>}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+/** The node view of a prompt tag (tagNode.ts): an image chip, a skill, a file, a thread, a pull request or a citation. */
 export function TagView({ node, selected, editor }: NodeViewProps) {
   const tag = tagOf(node.attrs);
   switch (tag.tagKind) {
@@ -143,5 +197,7 @@ export function TagView({ node, selected, editor }: NodeViewProps) {
       return <ThreadTag id={tag.id} label={tag.name} selected={selected} />;
     case "pr":
       return <PrTag slug={tag.slug} number={tag.number} selected={selected} />;
+    case "cite":
+      return <CiteTag id={tag.id} selected={selected} />;
   }
 }

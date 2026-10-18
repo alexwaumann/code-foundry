@@ -40,6 +40,12 @@ export interface PromptEditorHandle {
   insertTag(range: { from: number; to: number }, tag: PromptTag): void;
   /** insertTag for plain text (a built-in slash command: "/compact"): the text and one space, one undo step. */
   insertText(range: { from: number; to: number }, text: string): void;
+  /**
+   * Puts a citation tag at the caret (the end of the prompt when it was never focused),
+   * a space before it unless whitespace is there and one after it, and focuses the
+   * prompt after it. One undo step.
+   */
+  insertCite(citationId: string): void;
 }
 
 interface PromptEditorProps {
@@ -354,6 +360,26 @@ export function PromptEditor({
           .focus()
           .insertContentAt(range, nodes)
           .setTextSelection(range.from + 2)
+          .scrollIntoView()
+          .run();
+      },
+      insertCite: (citationId) => {
+        if (editor.isDestroyed) return;
+        const { state } = editor;
+        const at = focused.current ? state.selection.to : TextSelection.atEnd(state.doc).to;
+        const $at = state.doc.resolve(at);
+        const before = $at.parent.textBetween(0, $at.parentOffset, undefined, LEAF_CHAR);
+        const after = $at.parent.textBetween($at.parentOffset, Math.min($at.parentOffset + 1, $at.parent.content.size), undefined, LEAF_CHAR);
+        const pieces: PromptPiece[] = [];
+        if (before !== "" && !/\s$/.test(before)) pieces.push({ kind: "text", text: " " });
+        pieces.push({ kind: "tag", tagKind: "cite", id: citationId });
+        if (after !== " ") pieces.push({ kind: "text", text: " " });
+        const size = pieces.length + (after === " " ? 1 : 0);
+        editor
+          .chain()
+          .focus()
+          .insertContentAt({ from: at, to: at }, piecesToNodes(pieces))
+          .setTextSelection(at + size)
           .scrollIntoView()
           .run();
       },
