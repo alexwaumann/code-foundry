@@ -47,7 +47,7 @@ function TooltipContent({ className, sideOffset = 6, alignOffset, collisionPaddi
  * The app's short tooltip, as a one-liner: `<Tip label="Close tab"><Button …/></Tip>`.
  * The child stays the element (asChild), so it must take a ref and spread props (shadcn
  * Button, a DOM element, a Radix trigger with asChild). No label: it never opens.
- * Text is xs, wraps at max-w-80 and keeps "\n" line breaks. The app root's
+ * Text is xs, wraps at max-w-80 and keeps "\n" line breaks; `maxLines` clamps it. The app root's
  * TooltipProvider sets the delays.
  *
  * - `whenTruncated` for a label that repeats the trigger's own text: it opens only while
@@ -68,6 +68,7 @@ function Tip({
   align = "center",
   sideOffset,
   whenTruncated = false,
+  maxLines,
   className,
   "data-testid": testId,
 }: {
@@ -78,6 +79,8 @@ function Tip({
   sideOffset?: number
   /** Open only while the trigger's text is cut short (truncate, line-clamp, sr-only, in it or inside it): the label then shows what is hidden. */
   whenTruncated?: boolean
+  /** Clamp the label to this many lines with an ellipsis (a long text repeated by whenTruncated); absent: unlimited. */
+  maxLines?: number
   className?: string
   "data-testid"?: string
 }) {
@@ -126,7 +129,13 @@ function Tip({
             escapeTo.current = document.activeElement ?? document.body
           }}
         >
-          {label}
+          {maxLines ? (
+            <span className="line-clamp-(--tip-lines)" style={{ "--tip-lines": maxLines } as React.CSSProperties} data-testid={testId && `${testId}-clamp`}>
+              {label}
+            </span>
+          ) : (
+            label
+          )}
           <EscapeForwarder target={escapeTo} />
         </TooltipContent>
       )}

@@ -95,4 +95,19 @@ describe("Tip", () => {
     overflow(screen.getByTestId("inner"), true);
     expect(tooltipText(screen.getByRole("button"))).toBe("main ← feat/long-branch");
   });
+
+  it.each([
+    ["maxLines clamps the label to that many lines", 5, "5"],
+    ["no maxLines: unlimited, no clamp", undefined, null],
+  ])("%s", (_name, maxLines, want) => {
+    render(
+      <Tip label={"a long report\nwith many lines"} maxLines={maxLines} data-testid="tip">
+        <button type="button">x</button>
+      </Tip>,
+    );
+    expect(tooltipText(screen.getByRole("button"))).toBe("a long report\nwith many lines");
+    const clamp = screen.queryByTestId("tip-clamp");
+    expect(clamp?.style.getPropertyValue("--tip-lines") ?? null).toBe(want);
+    if (want) expect(clamp?.className).toContain("line-clamp-(--tip-lines)");
+  });
 });
