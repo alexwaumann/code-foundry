@@ -31,6 +31,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/command/all"
 	"github.com/alexwaumann/code-foundry/internal/paths"
 	"github.com/alexwaumann/code-foundry/internal/store/gh"
+	"github.com/alexwaumann/code-foundry/internal/store/plugin"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 	"github.com/alexwaumann/code-foundry/internal/termlabel"
@@ -144,6 +145,19 @@ func Run(ctx context.Context, opts Options) error {
 	workspaceAPI := api.NewWorkspace(st.workspace, events)
 	actionAPI := api.NewAction(st.action, events)
 	commands := command.NewRegistry()
+	// Plugins start once every command is registered (below), so a starting plugin's
+	// host/invoke finds them; they stop before the stores close (defers run in reverse),
+	// so a last host/invoke still has a registry and stores behind it.
+	plugins, err := plugin.New(plugin.Options{
+		Dir: p.Plugins(), DataDir: p.PluginData(), LogDir: p.PluginLogs(),
+		DB: st.db, Commands: commands, Bus: events, Log: log.With("component", "plugins"),
+		Home: st.home, HostVersion: opts.Version.Version, APIEnv: threadEnv(port, token),
+	})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = plugins.Close() }()
+	pluginAPI := api.NewPlugin(plugins, events)
 	if err := all.Register(commands, all.Deps{
 		Daemon: command.DaemonInfo{
 			PID: os.Getpid(), Version: opts.Version, Started: started, Home: p.Home(), Socket: p.Socket(),
@@ -186,6 +200,7 @@ func Run(ctx context.Context, opts Options) error {
 		Update:    updateAPI,
 		Workspace: workspaceAPI,
 		Action:    actionAPI,
+		Plugin:    pluginAPI,
 		Restart: func() {
 			// Let the command's response reach the caller first.
 			time.AfterFunc(restartDelay, func() { restart(errRestartRequested) })
@@ -194,6 +209,9 @@ func Run(ctx context.Context, opts Options) error {
 		return fmt.Errorf("register commands: %w", err)
 	}
 	applySettings(st.settings, commands, logLevel, opts.Dev)
+	if err := plugins.Start(ctx); err != nil {
+		log.Error("plugins did not start", "err", err)
+	}
 	commandAPI := api.NewCommand(commands)
 	installSkills(ctx, log.With("component", "skills"), p.Claude(), opts.Version.Version, commandAPI, settingsAPI, st.settings)
 	routes := []api.Route{
@@ -209,8 +227,9 @@ func Run(ctx context.Context, opts Options) error {
 		updateAPI.Route(),
 		workspaceAPI.Route(),
 		actionAPI.Route(),
+		pluginAPI.Route(),
 		api.NewFilesystem(st.home, st.project).Route(),
-		api.NewEvents(api.EventsDeps{Bus: events, Project: st.project, Terminal: st.terminal, Thread: st.thread, Gh: st.gh, GitOps: st.gitops, Settings: st.settings, Update: st.update, Workspace: st.workspace, Action: st.action, Done: ctx.Done(), Clients: clients}).Route(),
+		api.NewEvents(api.EventsDeps{Bus: events, Project: st.project, Terminal: st.terminal, Thread: st.thread, Gh: st.gh, GitOps: st.gitops, Settings: st.settings, Update: st.update, Workspace: st.workspace, Action: st.action, Plugin: plugins, Done: ctx.Done(), Clients: clients}).Route(),
 	}
 	mux := http.NewServeMux()
 	for _, r := range routes {

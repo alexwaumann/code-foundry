@@ -83,15 +83,23 @@ func Write(w io.Writer, cmds []*v1.Command, self string) {
 	p("")
 	p("- `code-foundry help <command>` (or `<command> --help`): every flag of one command.")
 	p("- `code-foundry commands`: every command and whether it is available in the current context.")
+	p("- `code-foundry plugin list`: installed plugins; their commands are `plugin <name> <command>`.")
 	p("- `code-foundry events --json [--source thread-list] [--since <seq> --since-epoch <epoch>]`: the daemon's events")
 	p("  as JSON lines, resumable; for watching many threads at once.")
 	p("- The API is Connect (protobuf) over the daemon's socket; the proto files are in the code-foundry repository")
 	p("  (`proto/codefoundry/v1`), and `--json` answers use their field names.")
 }
 
+// InPluginNamespace reports whether c is a plugin.* command: the plugin management verbs
+// and every installed plugin's own plugin.<name>.<command>. The guide leaves them out
+// (Discover more points at `plugin list`): agents rarely need them, and installed plugins
+// would grow the guide past what an agent reads whole.
+func InPluginNamespace(c *v1.Command) bool { return strings.HasPrefix(c.GetName(), "plugin.") }
+
 // writeGuideCommands lists cmds by category (guideCategoryOrder first), each with its
 // usage and description.
 func writeGuideCommands(w io.Writer, cmds []*v1.Command) {
+	cmds = slices.DeleteFunc(slices.Clone(cmds), InPluginNamespace)
 	byCat := byCategory(cmds)
 	cats := slices.Sorted(func(yield func(string) bool) {
 		for c := range byCat {

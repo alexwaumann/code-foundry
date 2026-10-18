@@ -74,8 +74,11 @@ func newEnv(t *testing.T, mod func(*plugin.Options)) *env {
 
 func (e *env) start() *plugin.Manager {
 	e.t.Helper()
-	m, err := plugin.New(context.Background(), e.opts)
+	m, err := plugin.New(e.opts)
 	if err != nil {
+		e.t.Fatal(err)
+	}
+	if err := m.Start(context.Background()); err != nil {
 		e.t.Fatal(err)
 	}
 	e.m = m
