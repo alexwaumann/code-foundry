@@ -27,6 +27,7 @@ import { ENTER_ALT, prompt, RESET, topFrame } from "./screens";
 import { CommandError } from "./errors";
 import { agentCounts, agentsCommands, listRuns } from "./agents";
 import { mcpCommands } from "./mcp";
+import { MockPlugins } from "./plugins";
 import { MockActions } from "./actions";
 import { CRASH_STDERR, MockThreadLogs, type SeedHistory, type ThreadState as ScriptedThreadState } from "./thread";
 import { contextFields, recordResult, type MockContext } from "./context";
@@ -636,6 +637,12 @@ export class World {
     },
   });
   /** UpdateService (Phase 3d): publishes into the events hub as the update source. */
+  /** Plugins and the hello demo surface (mock/plugins.ts); the EventService plugin source. */
+  readonly plugins = new MockPlugins({
+    publish: (v) => this.events.publish({ source: EventSource.PLUGIN, event: { event: { case: "plugin", value: v } } }),
+    emit: (i) => this.emit(i),
+    threadExists: (id) => this.threads.has(id),
+  });
   readonly update = new MockUpdater(
     (v) => this.events.publish({ source: EventSource.UPDATE, event: { event: { case: "update", value: v } } }),
     () => this.restartCost(),
@@ -703,6 +710,7 @@ export class World {
     this.nextId = 1;
     for (const r of initialProjects()) this.projects.set(r.id, r);
     this.gh.reset();
+    this.plugins.reset();
     const started = new Date(Date.now() - 42 * 60_000);
     // A shell terminal.new started on the Projects page for feat/sidebar (worktree-owned).
     this.addTerm({ id: "t-top", argv: ["top"], cwd: `${CFW}/feat-sidebar`, title: "", kind: "top", labels: shellLabels("", "repo-cf", `${CFW}/feat-sidebar`), startedAt: started });
@@ -2306,6 +2314,7 @@ export class World {
       ...mcpCommands(this.logs, (i) => this.emit(i)),
       ...agentsCommands(this.logs, (i) => this.emit(i)),
       ...this.actions.commands(),
+      ...this.plugins.commands(),
       {
         cmd: {
           name: "terminal.new",

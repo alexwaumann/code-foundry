@@ -13,6 +13,7 @@ import { expandPanel, getPanel, startPanelPicking, togglePanel } from "./panel";
 import { useUiStore, viewNames, type FocusRegion } from "./ui";
 import { agentsPanelTarget, openAgentsSurface } from "./agentsPanel";
 import { openMcpSurface } from "./mcpPanel";
+import { parsePluginView, showPluginView } from "./pluginPanel";
 import { leaveSubagent } from "./subagentView";
 import { openThreadsSurface, threadsPanelTarget } from "./threadsPanel";
 import { openUsageSurface } from "./usagePanel";
@@ -155,6 +156,11 @@ export function showView(name: string): boolean {
       leaveSubagent();
       return true;
     default:
+      // A plugin surface's show command (stores/pluginPanel.ts): a page would hide the panel.
+      if (parsePluginView(name)) {
+        useViewsStore.setState({ settingsOpen: false, usageOpen: false, themesOpen: false, helpOpen: false });
+        return showPluginView(name);
+      }
       // Top-level pages (the Pull Requests page) are selections. Closing settings and
       // usage here too covers re-selecting the page that is already selected.
       if (!viewNames.includes(name)) return false;

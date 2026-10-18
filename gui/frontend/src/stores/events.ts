@@ -12,6 +12,7 @@ import { closeEmptyPanels, onNewTerminal, onRemovedTerminal, revealArrived } fro
 import { applyGhEvent } from "./gh";
 import { applyGitOpsEvent } from "./gitops";
 import { applyIntent } from "./intents";
+import { onPluginEvent } from "./plugins";
 import { applyProjectEvent, replaceProjects, useProjectsStore } from "./projects";
 import { applyRetiredUsage, applyThreadListEvent, replaceThreads, useThreadsStore } from "./threads";
 import { applySettingsSnapshot, loadSettingsSchema } from "./settings";
@@ -79,6 +80,8 @@ const handlers: Handlers = {
     // A failed worktree-create run toasts (stores/actionActions.ts).
     if (ev.kind === "runFinished") onActionRunFinished(ev.finished);
   },
+  // Plugins and their surfaces' availability (stores/plugins.ts re-lists commands).
+  plugin: onPluginEvent,
 };
 
 export function dispatchEvent(ev: EventView): void {

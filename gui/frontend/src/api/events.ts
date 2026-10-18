@@ -4,6 +4,7 @@ import { daemon, type DaemonConnection } from "./endpoint";
 import { HEARTBEAT, isPageVisible, type Heartbeat } from "./stream";
 import { toGhEventView, type GhEventView } from "./gh";
 import { toGitOpsEventView, type GitOpsEventView } from "./gitops";
+import { toPluginEventView, type PluginEventView } from "./plugin";
 import { toProjectEventView, type ProjectEventView } from "./project";
 import { toThreadListEventView, type ThreadListEventView } from "./threads";
 import { toSettingsSnapshotView, type SettingsSnapshotView } from "./settings";
@@ -30,7 +31,8 @@ export type EventView =
   | { source: "ui"; event: UiIntentView }
   | { source: "settings"; event: SettingsSnapshotView }
   | { source: "update"; event: UpdateEventView }
-  | { source: "action"; event: ActionEventView };
+  | { source: "action"; event: ActionEventView }
+  | { source: "plugin"; event: PluginEventView };
 
 export function toEventView(ev: Event): EventView | null {
   const e = ev.event;
@@ -78,6 +80,10 @@ export function toEventView(ev: Event): EventView | null {
     case "action": {
       const v = toActionEventView(e.value);
       return v && { source: "action", event: v };
+    }
+    case "plugin": {
+      const v = toPluginEventView(e.value);
+      return v && { source: "plugin", event: v };
     }
     default:
       return null;
