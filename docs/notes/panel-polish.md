@@ -1,4 +1,4 @@
-# Panel polish: tooltip height, markdown tags, tabs only when there is something, stale MCP (2026-10-18)
+# Panel polish: tooltip height, inline HTML in markdown and threads, tabs only when there is something, stale MCP (2026-10-18)
 
 Four small GUI items in one PR (`cf/panel-polish`). No daemon or proto change.
 
@@ -17,20 +17,51 @@ Four small GUI items in one PR (`cf/panel-polish`). No daemon or proto change.
   and a failed run's error. The row itself still clamps at two lines; the tooltip shows
   three more and an ellipsis instead of the whole report.
 
-## 2. `small`, `mark`, `ins` and `s` in markdown
+## 2. `<small>` and friends in markdown, thread answers included
 
-* `components/pr/Markdown.tsx`'s sanitize whitelist gains the four tags. `index.css`:
-  `.cf-markdown small` is `@apply text-caption` (13px muted, so in a File tab's 15px body
-  it reads smaller, in a PR body the same size but muted); `mark` is the highlight token
-  at 22% behind inherited text, 4px radius; `ins` underlined, `s` struck (stated, not
-  left to the UA, in case a reset touches them).
-* **Gotcha: Claude's answers render HTML as text.** The thread view (`ThreadMarkdown`,
-  `components/thread/Code.tsx`) passes `html: false` on purpose ("Result<T, E>" must not
-  vanish; like Claude Code's own UI), so `<small>` in a thread shows as the literal
-  `<small>…</small>`, before and after this change. The whitelist applies where raw HTML
-  is parsed: PR descriptions and comments, the File tab's markdown preview, the guide.
-  A test pins the thread behaviour. Rendering a few inline tags in threads would mean
-  reversing that decision; not done here.
+Alex's report was that `<small>` did not render in the conversation view. Thread answers
+showed every HTML tag as literal text (`html: false`, like Claude Code's own UI), so the
+fix had two halves.
+
+* **Where raw HTML is parsed** (PR descriptions and comments, the File tab's markdown
+  preview, the guide): `components/pr/Markdown.tsx`'s sanitize whitelist gains `small`,
+  `mark`, `ins`, `s` and `u`.
+* **Thread answers** (`ThreadMarkdown`, `components/thread/Code.tsx`, the `html: false`
+  path): the literal-HTML rule is reversed narrowly. A fixed allowlist renders: `small`,
+  `mark`, `sub`, `sup`, `kbd`, `ins`, `s`, `del`, `u` and `br` (`lib/inlineHtml.ts`
+  `INLINE_HTML_TAGS`). Every other tag stays literal text exactly as before:
+  `<pasted_content>`, `<file>`, `Result<T, E>`, `<script>`.
+  * **How:** a rehype plugin (`rehypeInlineHtml`) in place of the old raw-to-text pass.
+    remark-rehype leaves each inline tag as its own raw node; code spans and fenced
+    blocks hold text, never raw nodes, so a tag in code stays literal with no extra
+    care. Per parent (paragraph, heading, list item, cell), a raw node that is exactly
+    one allowlisted tag without attributes (`<small>`, `</small>`, `<br>`, `<br/>`,
+    any case) and has its matching partner in the same parent becomes an element
+    wrapping what is between. Everything else becomes text: other tags, tags with
+    attributes, `<small/>`, HTML blocks, unmatched opening or closing tags. Markdown
+    inside a pair still renders (`<small>see **this**</small>`). The sanitize schema on
+    this path allows markdown's own elements plus the allowlist only.
+  * **Not rehype-raw:** the brief suggested escaping, then rehype-raw. The plugin builds
+    the elements itself instead, because the HTML parser re-opens unclosed formatting
+    elements (`small`, `s`, `u`, ...) in every following paragraph. One stray `<small>`
+    would then shrink the rest of the message even though it was escaped in the source
+    pass. Matching per parent makes "an unclosed tag swallows nothing" structural.
+  * **Limits:** a pair split across paragraphs does not match, and both tags stay
+    literal. An HTML block (a tag alone on its line: `<small>` newline text newline
+    `</small>`) stays literal, as before. A message still streaming shows a `<small>`
+    literally until its `</small>` arrives.
+  * **Tests:** table tests in `lib/inlineHtml.test.ts` (tag matching, pairing) and
+    `Markdown.test.tsx`. They cover: each allowlisted tag renders; unknown, attributed
+    and self-closed tags stay literal; tags in a code span and a code block stay
+    literal; an unclosed allowlisted tag stays literal and leaves the next paragraph
+    alone.
+* **Styles** (`index.css`):
+  * `.cf-markdown small` is `@apply text-caption`: 13px muted. In a File tab's 15px body
+    and in threads it reads smaller; in a PR body it is the same size, but muted.
+  * `mark` is the highlight token at 22% behind inherited text, 4px radius.
+  * `ins` is underlined and `s` struck. Both are stated rather than left to the UA, in
+    case a reset touches them.
+  * `kbd`, `sub` and `sup` already had styles or UA defaults.
 
 ## 3. Agents and Threads listed only when there is something
 
@@ -110,5 +141,9 @@ Four small GUI items in one PR (`cf/panel-polish`). No daemon or proto change.
   started, listed no MCP servers ("0 of 0 connected"); the next turn's check would bring
   them back. Before this PR the refresh had the same answer, just without the stale
   state around it.
+* Live, inline HTML in a thread answer (Haiku 5.5 asked to echo a reply using every
+  allowlisted tag): small, mark, kbd, sub, sup, s, ins and u render; `<pasted_content>`,
+  `<file>`, `Result<T, E>`, a stray `<small>` and a code span stay literal (screenshots
+  in the PR body).
 * Not checked live: the Tip clamp (no way to hover from a script; the unit test reads
   the clamp) and `<small>` in a File tab preview (unit tests).
