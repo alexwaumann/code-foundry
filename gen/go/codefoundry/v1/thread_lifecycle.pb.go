@@ -448,6 +448,10 @@ type Thread struct {
 	BaseRef string `protobuf:"bytes,20,opt,name=base_ref,json=baseRef,proto3" json:"base_ref,omitempty"`
 	// Create made the worktree for this thread (new_worktree or new_workspace was set).
 	CreatedWorktree bool `protobuf:"varint,21,opt,name=created_worktree,json=createdWorktree,proto3" json:"created_worktree,omitempty"`
+	// The branch Create made the worktree for (with created_worktree; a fork has its
+	// parent's). When a cleanup removed the worktree, a start of the thread makes it again
+	// on this branch at the same path. Empty when the app did not make the worktree.
+	Branch string `protobuf:"bytes,52,opt,name=branch,proto3" json:"branch,omitempty"`
 	// Owner workspace (see the ownership rule above); empty for a project thread and for a
 	// thread without a project. Every spawn of a workspace thread gets --add-dir for the
 	// workspace's other member worktrees, read from the workspace store at launch.
@@ -739,6 +743,13 @@ func (x *Thread) GetCreatedWorktree() bool {
 		return x.CreatedWorktree
 	}
 	return false
+}
+
+func (x *Thread) GetBranch() string {
+	if x != nil {
+		return x.Branch
+	}
+	return ""
 }
 
 func (x *Thread) GetWorkspaceId() string {
@@ -3893,7 +3904,7 @@ var File_codefoundry_v1_thread_lifecycle_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\n" +
-	"%codefoundry/v1/thread_lifecycle.proto\x12\x0ecodefoundry.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x82\x11\n" +
+	"%codefoundry/v1/thread_lifecycle.proto\x12\x0ecodefoundry.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x9a\x11\n" +
 	"\x06Thread\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12*\n" +
 	"\x11claude_session_id\x18\x02 \x01(\tR\x0fclaudeSessionId\x12\x1d\n" +
@@ -3919,7 +3930,8 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\rstatus_reason\x18\x12 \x01(\tR\fstatusReason\x12G\n" +
 	"\x0fpermission_mode\x18\x13 \x01(\x0e2\x1e.codefoundry.v1.PermissionModeR\x0epermissionMode\x12\x19\n" +
 	"\bbase_ref\x18\x14 \x01(\tR\abaseRef\x12)\n" +
-	"\x10created_worktree\x18\x15 \x01(\bR\x0fcreatedWorktree\x12!\n" +
+	"\x10created_worktree\x18\x15 \x01(\bR\x0fcreatedWorktree\x12\x16\n" +
+	"\x06branch\x184 \x01(\tR\x06branch\x12!\n" +
 	"\fworkspace_id\x18\x16 \x01(\tR\vworkspaceId\x122\n" +
 	"\x15pending_worktree_path\x18\x17 \x01(\tR\x13pendingWorktreePath\x12\x16\n" +
 	"\x06pinned\x18\x18 \x01(\bR\x06pinned\x12S\n" +

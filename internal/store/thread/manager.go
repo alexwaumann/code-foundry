@@ -468,6 +468,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 			return Thread{}, err
 		}
 		s.WorkspaceID, s.ProjectID, s.WorktreePath, s.BaseRef, s.CreatedWorktree = cw.workspaceID, cw.projectID, cw.path, cw.baseRef, true
+		s.Branch = cw.branch
 		members = cw.members
 		if cw.name != "" {
 			s.Name, s.AutoNamed = cw.name, true
@@ -487,6 +488,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 			return Thread{}, err
 		}
 		s.ProjectID, s.WorktreePath, s.BaseRef, s.CreatedWorktree = nw.projectID, nw.path, nw.baseRef, true
+		s.Branch = nw.branch
 		if nw.name != "" {
 			s.Name, s.AutoNamed = nw.name, true
 		}
@@ -608,6 +610,9 @@ func (m *Manager) Fork(ctx context.Context, id, name string) (Thread, error) {
 	now := m.opts.Now()
 	s := Thread{
 		ID: newID, ProjectID: parent.ProjectID, WorktreePath: parent.WorktreePath, WorkspaceID: parent.WorkspaceID,
+		// The fork runs in the parent's worktree, so it inherits what the worktree was made
+		// for: a cleanup that removes it is undone when either resumes (recreate.go).
+		BaseRef: parent.BaseRef, CreatedWorktree: parent.CreatedWorktree, Branch: parent.Branch,
 		Name: name, AutoNamed: autoNamed,
 		Model: parent.Model, Effort: parent.Effort, PermissionMode: parent.PermissionMode,
 		State: StateStarting, CreatedAt: now, LastActivityAt: now, ParentID: parent.ID,

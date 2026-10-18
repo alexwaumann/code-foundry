@@ -244,6 +244,7 @@ func threadToProto(s thread.Thread) *v1.Thread {
 		PermissionMode:      v1.PermissionMode(s.PermissionMode),
 		BaseRef:             s.BaseRef,
 		CreatedWorktree:     s.CreatedWorktree,
+		Branch:              s.Branch,
 		WorkspaceId:         s.WorkspaceID,
 		PendingWorktreePath: s.PendingWorktreePath,
 		Pinned:              s.Pinned,

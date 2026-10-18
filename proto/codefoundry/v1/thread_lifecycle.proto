@@ -119,6 +119,10 @@ message Thread {
   string base_ref = 20;
   // Create made the worktree for this thread (new_worktree or new_workspace was set).
   bool created_worktree = 21;
+  // The branch Create made the worktree for (with created_worktree; a fork has its
+  // parent's). When a cleanup removed the worktree, a start of the thread makes it again
+  // on this branch at the same path. Empty when the app did not make the worktree.
+  string branch = 52;
   // Owner workspace (see the ownership rule above); empty for a project thread and for a
   // thread without a project. Every spawn of a workspace thread gets --add-dir for the
   // workspace's other member worktrees, read from the workspace store at launch.
