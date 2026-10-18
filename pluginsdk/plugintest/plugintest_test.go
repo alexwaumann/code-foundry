@@ -134,3 +134,30 @@ func TestDeleteSecretNotifies(t *testing.T) {
 		t.Error("still stored")
 	}
 }
+
+// The typed SetContext helpers send the same context/set as SetContext.
+func TestTypedSetContext(t *testing.T) {
+	var h *plugintest.Host
+	p := pluginsdk.Plugin{Init: func(_ context.Context, ph *pluginsdk.Host) error {
+		for _, err := range []error{
+			ph.SetContextBool("on", true),
+			ph.SetContextString("stage", "deploy", pluginsdk.ForThread("s-1")),
+			ph.SetContextInt("failed", 2, pluginsdk.ForProject("p-1")),
+			ph.SetContextStrings("jobs", nil),
+			ph.ClearContext("on"),
+		} {
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}}
+	h = plugintest.Start(t, p, plugintest.Options{})
+	h.WaitFor(2*time.Second, func(h *plugintest.Host) bool { return len(h.Contexts()) == 5 })
+	got, _ := json.Marshal(h.Contexts())
+	want := `[{"key":"on","value":true},{"key":"stage","value":"deploy","threadId":"s-1"},{"key":"failed","value":2,"projectId":"p-1"},` +
+		`{"key":"jobs","value":[]},{"key":"on","value":null}]`
+	if string(got) != want {
+		t.Errorf("contexts\n%s\nwant\n%s", got, want)
+	}
+}

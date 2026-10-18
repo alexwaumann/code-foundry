@@ -98,7 +98,9 @@ func (h *Host) Flags() []Flag { return slices.Clone(h.info().Flags) }
 
 // SetContext sets a predicate fact the host's when clauses read as <plugin>.<key>
 // (p.Key without the plugin's name), globally or, with ThreadID or ProjectID, for one
-// thread or project. A nil Value removes it. Facts last until the plugin exits.
+// thread or project. Value is a string, bool, number, list of those, or nil, which
+// removes it. Facts last until the plugin exits. SetContextString, SetContextBool,
+// SetContextInt, SetContextStrings and ClearContext say the same with types.
 func (h *Host) SetContext(p ContextParams) error {
 	return h.conn.Notify(MethodContextSet, p)
 }

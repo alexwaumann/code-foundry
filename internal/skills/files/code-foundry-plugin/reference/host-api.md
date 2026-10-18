@@ -97,6 +97,11 @@ err = h.SetFlag(ctx, pluginsdk.Flag{ThreadID: id, Level: pluginsdk.FlagNone}) //
 _ = h.SetContext(pluginsdk.ContextParams{Key: "failing", Value: true, ThreadID: id})  // gh-actions.failing on that thread
 _ = h.SetContext(pluginsdk.ContextParams{Key: "signed-in", Value: true})                // global
 _ = h.SetContext(pluginsdk.ContextParams{Key: "failing", Value: nil, ThreadID: id})   // remove
+// The same, typed:
+_ = h.SetContextBool("failing", true, pluginsdk.ForThread(id))
+_ = h.SetContextBool("signed-in", true)
+_ = h.ClearContext("failing", pluginsdk.ForThread(id))
+// also SetContextString, SetContextInt, SetContextStrings; pluginsdk.ForProject(id)
 ```
 
 - Readable in every `when` clause as `<plugin>.<key>`: the thread's value, else the

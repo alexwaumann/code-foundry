@@ -358,10 +358,10 @@ Sections nest two deep: section > section > node.
 ```
 
 ```go
-url := ui.TextField("f-url", "url", "Server")
-url.Required = true
-url.Input.Placeholder, url.Input.Pattern, url.Input.PatternMessage, url.Input.Mono = "https://ci.acme.com", "^https://", "An https URL", true
-token := ui.SecretField("f-token", "token", "API token", "token") // store: the host keeps it under "token"
+url := ui.TextField("f-url", "url", "Server").WithPlaceholder("https://ci.acme.com").AsRequired().
+	WithPattern("^https://", "An https URL").WithHint("Your CI server") // also WithValue, WithChange
+url.Input.Mono = true
+token := ui.SecretField("f-token", "token", "API token", "").WithStore("token") // the host keeps it under "token"
 token.Input.HasValue = tokenIsSet
 project := ui.Field{Key: "f-project", Name: "project", Label: "Project", Select: &ui.Select{OptionsSource: ui.OptionsProjects}}
 env := ui.SelectField("f-env", "env", "Environment", ui.Opt("o-dev", "dev", "Development"), ui.Opt("o-prod", "prod", "Production"))
