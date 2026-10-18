@@ -32,6 +32,12 @@ func helper(mode string) int {
 		return 0
 	case "noping":
 		return noPing()
+	case "pushenv", "quietenv", "slowenv":
+		if err := pluginsdk.Serve(envPlugin(mode)); err != nil {
+			fmt.Fprintln(os.Stderr, "serve:", err)
+			return 1
+		}
+		return 0
 	case "ok":
 		if err := pluginsdk.Serve(okPlugin()); err != nil {
 			fmt.Fprintln(os.Stderr, "serve:", err)

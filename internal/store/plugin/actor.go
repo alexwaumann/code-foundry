@@ -52,7 +52,8 @@ type actor struct {
 }
 
 func newActor(m *Manager, name string) *actor {
-	return &actor{m: m, name: name, stopCh: make(chan struct{}), done: make(chan struct{}), hung: make(chan struct{}, 1)}
+	return &actor{m: m, name: name, stopCh: make(chan struct{}), done: make(chan struct{}), hung: make(chan struct{}, 1),
+		envReady: make(chan struct{})}
 }
 
 func (a *actor) requestStop() { a.stopOnce.Do(func() { close(a.stopCh) }) }
@@ -193,6 +194,18 @@ func (a *actor) once(info spawnInfo) (err error) {
 	}()
 	o := a.m.opts
 	mf := info.manifest
+	// A spawn may wait for this run's session environment (environment.go): ready once
+	// it pushes, settles or ends.
+	a.mu.Lock()
+	envReady := a.envReady
+	select {
+	case <-envReady: // an earlier run's
+		envReady = make(chan struct{})
+		a.envReady = envReady
+	default:
+	}
+	a.mu.Unlock()
+	defer closeOnce(envReady)
 	if mf.Protocol != pluginsdk.ProtocolVersion {
 		return fmt.Errorf("%w: it speaks protocol %d, this Code Foundry speaks %d", errPermanent, mf.Protocol, pluginsdk.ProtocolVersion)
 	}
@@ -204,10 +217,8 @@ func (a *actor) once(info spawnInfo) (err error) {
 	if err := os.MkdirAll(dataDir, 0o700); err != nil {
 		return fmt.Errorf("data dir: %w", err)
 	}
-	envReady := make(chan struct{})
-	defer closeOnce(envReady)
 	a.mu.Lock()
-	a.perms, a.logs, a.ignored, a.envReady = mf.Permissions, info.logs, map[string]bool{}, envReady
+	a.perms, a.logs, a.ignored = mf.Permissions, info.logs, map[string]bool{}
 	a.mu.Unlock()
 	a.m.update(a.name, a, func(e *entry) { e.state = StateStarting })
 
