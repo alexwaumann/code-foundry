@@ -223,8 +223,9 @@ const ToolRow = memo(function ToolRow({ node }: { node: Extract<WorkNode, { type
   const request = perm?.kind === "permission" ? perm.request : null;
   const waiting = request?.state === "pending";
   // A running foreground subagent opens to show its work; a background one stays a line
-  // (its progress is the activity on the row, the strip and the Agents tab).
-  const [open, toggle] = useToggle(node.key, (agent && t?.status === "running" && !run?.background) || (waiting && EDIT_TOOLS.has(node.name)));
+  // (its progress is the activity on the row, the strip and the Agents tab), and so does a
+  // nested run (spawned by another run): the stream never carries its work.
+  const [open, toggle] = useToggle(node.key, (agent && t?.status === "running" && !run?.background && (run?.spawnDepth ?? 1) <= 1) || (waiting && EDIT_TOOLS.has(node.name)));
   if (!t) return null;
   const tense: Tense = waiting ? "pending" : t.status === "running" ? "running" : "done";
   const s = toolSummary(t, { tense, durationMs: durationOf(t), cwd });

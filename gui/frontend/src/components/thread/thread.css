@@ -1282,7 +1282,10 @@ html[data-thread-width="full"] .cf-thread {
   visibility: visible;
 }
 .cf-thread .agent-host:has(> .row:hover, > .agent-open:hover, > .agent-open:focus-visible) > .row {
-  padding-right: 64px;
+  padding-right: 62px;
+}
+.cf-thread .agent-host:has(> .row:hover, > .agent-open:hover, > .agent-open:focus-visible) > .row .chev {
+  display: none;
 }
 /* The lineage note's "← Back to <parent>" at its right. */
 .cf-thread .lnote .back {

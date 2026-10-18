@@ -76,8 +76,8 @@ test("A opens the tab: runs in spawn order, the nested one under its parent, eve
   await expect(agentRow(page, "a0").getByTestId("agent-tools")).toHaveText("6");
   await expect(agentRow(page, "a0").getByTestId("agent-tokens")).toHaveText("9.4K");
   await expect(agentRow(page, "a1").getByTestId("agent-elapsed")).toHaveText(/^4m \d\ds$/);
-  // Rows are not clickable in v1.
-  await expect(surface(page).locator("button")).toHaveCount(0);
+  // The thread's own runs open in the subagent view (buttons); the nested one does not.
+  expect(await surface(page).locator("button").evaluateAll((els) => els.map((e) => e.getAttribute("data-agent")))).toEqual(["a0", "a1", "a2", "a3"]);
 
   // The separators run border to border: a row is as wide as the panel's body.
   const body = await page.getByTestId("panel-body").boundingBox();
