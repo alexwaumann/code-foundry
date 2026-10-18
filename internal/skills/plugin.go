@@ -222,6 +222,11 @@ Not in the registry, built into the CLI:
   until killed: `+"`code-foundry events --json --source thread-list > /tmp/events.json & pid=$!; sleep 5; kill $pid`"+`.
 - `+"`code-foundry commands --context-thread <id>`"+` lists every command with whether it is available there: your
   plugin's commands and `+"`show`"+` commands follow their `+"`when`"+` clauses.
+
+Reading the output: an error your plugin returned prints as `+"`code-foundry: plugin.<name>.<command>: <message> (unknown)`"+`
+(exit 1; "unknown" is the transport's code for a plugin's own error). `+"`plugin act`"+` prints only the view version
+it acted on: run `+"`plugin surface`"+` again to see the result. `+"`plugin surface --json`"+` carries the view as a JSON
+string in `+"`view.viewJson`"+` (decode it twice, or use the text output).
 `)
 	var verbs, helpers []*v1.Command
 	for _, c := range src.Commands {

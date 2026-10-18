@@ -6,8 +6,10 @@ then the real daemon (`plugin dev`, `plugin surface`, `plugin act`, `plugin logs
 ## plugintest
 
 `plugintest.Start(t, plugin(), opts)` runs the plugin's `pluginsdk.Plugin` over in-memory
-pipes, does the handshake (so `Init` runs), records everything the plugin asks of the host,
-and shuts the plugin down when the test ends. It enforces permissions like the real host:
+pipes, does the handshake, **waits for `Init` to return** (up to 5 s), records everything
+the plugin asks of the host, and shuts the plugin down when the test ends. So what Init
+sets up (subscriptions, the environment, state loaded from the data dir) is in place when
+Start returns; a plugin whose Init blocks sets `NoInitWait`. It enforces permissions like the real host:
 `Invoke` needs a matching `Granted.Commands` glob, secrets need `Granted.Secrets`, flags
 `ThreadStatus`, environment `SessionEnv`, subscriptions `Events`.
 
@@ -20,7 +22,8 @@ h := plugintest.Start(t, plugin(), plugintest.Options{
 		return pluginsdk.CommandResult{Message: "sent"}, nil
 	},
 	Capabilities: []string{"surfaces", "view.tabs"}, // what h.HasCapability sees
-	// DataDir defaults to t.TempDir()
+	Secrets:      map[string]string{"token": "t0k"},  // stored before Init runs
+	DataDir:      dir,                                // default t.TempDir(); h.DataDir() returns it
 })
 ```
 
@@ -103,10 +106,14 @@ if err := h.Act(ctx, pluginsdk.SurfaceAct{Instance: inst, Kind: pluginsdk.ActTab
 if v := view(); v.Tabs.Active != "log" { t.Errorf("active tab %s", v.Tabs.Active) }
 ```
 
-A form submit with a stored secret arrives as `pluginsdk.StoredSecret`; in a test,
-`h.SetSecret("token", "t0k")` plus
-`Values: map[string]any{"token": map[string]any{"key": "token", "stored": true}}` is what
-the host would send.
+A form submit with a stored secret arrives as `{"key": "token", "stored": true}` in
+`act.Values` (read it with `act.Stored("token")`); in a test, `h.SetSecret("token", "t0k")`
+plus `Values: map[string]any{"token": map[string]any{"key": "token", "stored": true}}` is
+what the host would send.
+
+**Restarts**: state that must survive a restart lives in `h.DataDir()` (and secrets).
+Start one host with a `DataDir`, act, shut it down, start a second with the same
+`DataDir` (and `Secrets`), and check Init restored it.
 
 **Host calls**: grant the permission, give `Options.Invoke` a fake answer (decode
 `p.Args`, return `CommandResult{JSON: …}` shaped like the real command's `--json`), then

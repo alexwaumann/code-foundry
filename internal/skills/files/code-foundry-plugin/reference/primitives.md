@@ -25,7 +25,9 @@ Field names are lowerCamel; enums are short lower-case strings. A node is an obj
 a `key` and exactly one kind field. Every key (nodes, rows, chips, pairs, buttons,
 fields, options, tabs) is unique in the view and matches `[A-Za-z0-9._:-]{1,64}`; keys are
 how the host keeps state (a collapsed section, a form draft) across views and how acts
-name elements, so keep them stable between renders.
+name elements, so keep them stable between renders. One namespace for every kind: a
+chip `deploy` and a button `deploy` collide, so prefix by role (`stage-deploy`,
+`btn-deploy`).
 
 ```json
 {
@@ -51,7 +53,9 @@ name elements, so keep them stable between renders.
   extends one log node of the current view without re-sending it (up to 64 KB per
   append). The host keeps the last 2,000 lines or 256 KB per log node. A later view that
   sets that node's `text` or `lines` replaces the buffer; one that leaves both empty keeps
-  it; a view without the node drops it.
+  it; a view without the node drops it. So while output streams, render the log node with
+  empty `text` and send each new chunk once with AppendLog; set `text` only to start
+  over (a new run) or when the view comes back after the node was gone.
 - Acts name a view version: the elements of the last 4 versions still act, so a click on
   a view that was just replaced still arrives (with its old `version`).
 - After `Surface.Close` the instance is gone: `UpdateView` to it fails with -32004. Stop
@@ -361,8 +365,10 @@ submitted values, or the command arg it fills), a label, a `description`, an `er
 plugin's validation message), `required`, `disabled`, and exactly one control:
 
 - `input`: one-line text; `kind: "secret"` masks it. `value` (never for a secret),
-  `placeholder`, `maxLength`, `pattern` (a regular expression the host checks) with
-  `patternMessage`, `mono`.
+  `placeholder`, `maxLength`, `pattern` (a regular expression) with `patternMessage`,
+  `mono`. `required`, `maxLength` and `pattern` are checked by the GUI as the user types;
+  `plugin act --values` and other clients skip them, so the plugin validates every value
+  again (and answers with a field `error` or an error).
 - `select`: `options` (up to 200, each `key`, `value`, `label`, `description` in list
   style, `disabled`), `value` (a list: one value unless `multiple`), `multiple`, `style`
   `dropdown` (default) or `list` (radio or checkbox rows with descriptions),
@@ -385,9 +391,10 @@ so re-rendering does not wipe a half-filled form. Change `resetToken` to drop th
 and show the view's values (after a successful save, a reset).
 
 **Secrets.** A secret input never carries a value. With `store: "<key>"` (permission
-`secrets`) the host writes the submitted value into the plugin's Keychain namespace and
-`act.Values[name]` is `{"key": "<key>", "stored": true}` (`pluginsdk.StoredSecret`); the
-plugin reads the value with `h.Secrets().Get(ctx, key)` when it needs it. A secret left
+`secrets`) the host writes the submitted value into the plugin's Keychain namespace
+(before the plugin sees the submit, even if the plugin then refuses the other fields) and
+`act.Values[name]` is `{"key": "<key>", "stored": true}`: `sk, ok := act.Stored(name)`.
+The plugin reads the value with `h.Secrets().Get(ctx, key)` when it needs it. A secret left
 empty on submit is left out (the stored one stays). Set `hasValue` to show "Saved · type
 to replace". Without `store` the value reaches the plugin in the submit only.
 

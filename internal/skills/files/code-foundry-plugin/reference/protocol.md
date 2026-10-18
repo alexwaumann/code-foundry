@@ -110,7 +110,9 @@ support answers -32601 ("not supported yet by this Code Foundry").
 | -32005 | `CodeRateLimited` | too fast (flags, toasts) |
 
 A handler returns `pluginsdk.NewError(code, format, ...)` to choose the code; any other
-error is -32603 with its message. `pluginsdk.ErrorCode(err)` reads a returned error's
+error is -32603 with its message. A wrapped error keeps the code of the `*pluginsdk.Error`
+inside and sends the whole text: `fmt.Errorf("sending the log: %w", err)` around a refused
+`Invoke` reaches the user as "sending the log: permission denied: …" with -32001. `pluginsdk.ErrorCode(err)` reads a returned error's
 code; `pluginsdk.ErrClosed` means the host went away (Serve is ending).
 
 ## Capabilities

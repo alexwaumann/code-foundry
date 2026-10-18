@@ -103,9 +103,10 @@ for _, issue := range res.Issues { h.Log().Warn("environment", "issue", issue) }
   `CLAUDE_EFFORT` and anything starting `CODE_FOUNDRY_` or `CLAUDE_CODE_`.
 - `PathPrepend` (prepended to PATH) and `AddDirs` (`--add-dir`, must exist): absolute or
   `~/` paths under the home directory, at most 16 each.
-- `Scope`: nil means every project; `Projects` (project ids) limits it to their threads
-  (a workspace thread counts if any member is listed); `NoProject` adds threads without
-  a project.
+- `Scope`: nil means threads of every project but not threads without a project;
+  `&pluginsdk.EnvironmentScope{NoProject: true}` is everywhere; `Projects` (project ids)
+  limits it to their threads (a workspace thread counts if any member is listed), and
+  `NoProject` adds threads without a project.
 - What breaks a rule is dropped with an issue in `res.Issues`; the rest applies
   (`res.Applied`). Plugins apply in name order: a variable an earlier plugin sets is
   dropped from a later one, with an issue. `code-foundry plugin env <name>` shows the
@@ -185,7 +186,8 @@ list, err := h.Secrets().List(ctx) // names and set times, never values
   user types it, the host stores it, the plugin only reads it. A plugin that needs a
   secret it does not have shows a notice with a form, not an error.
 - The user sees and deletes them with `code-foundry plugin secrets list|delete <name>`;
-  disabling the plugin keeps them.
+  the plugin is not told, so read a secret when you need it (and handle "not found")
+  rather than caching that it exists. Disabling the plugin keeps them.
 
 ## Toasts
 

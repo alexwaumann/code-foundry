@@ -367,9 +367,25 @@ type SurfaceAct struct {
 
 // StoredSecret replaces a secret input's value in SurfaceAct.Values when the input has
 // a store key: the host wrote the value to the plugin's secrets (Secrets().Get(Key)).
+// Decoded from JSON it is a map[string]any{"key", "stored"}: read it with
+// SurfaceAct.Stored.
 type StoredSecret struct {
 	Key    string `json:"key"`
 	Stored bool   `json:"stored"`
+}
+
+// Stored returns the secret a submit stored for the field name (a secret input with
+// store), and whether it did: false when the user left the input empty.
+func (a SurfaceAct) Stored(name string) (StoredSecret, bool) {
+	switch v := a.Values[name].(type) {
+	case StoredSecret:
+		return v, v.Stored && v.Key != ""
+	case map[string]any:
+		key, _ := v["key"].(string)
+		stored, _ := v["stored"].(bool)
+		return StoredSecret{Key: key, Stored: stored}, stored && key != ""
+	}
+	return StoredSecret{}, false
 }
 
 // ViewUpdateParams is view/update's params.
