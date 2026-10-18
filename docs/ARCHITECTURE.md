@@ -100,6 +100,8 @@ internal/
                            migrated by a newer build (db.ErrNewerSchema)
   client/                  Go client for the daemon API, used by CLI and the Wails host
   paths/                   XDG-ish paths: config dir, socket, token, db, logs, worktrees, projects
+  guide/                   the agent guide and the skills' references, rendered from commands and settings
+  skills/                  the Claude Code skills written for every thread at daemon start
   fsx/                     the home-directory boundary and directory completion
 gui/
   main.go                  Wails v3 host (thin)
@@ -325,8 +327,16 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   store and adds `--add-dir` for each other member,
   `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1`, and one static
   `--append-system-prompt` line pointing at `code-foundry workspace members`, after the
-  static line every thread gets pointing at `code-foundry guide` (`ThreadPrompt`;
-  `docs/notes/agents-5-cli.md`).
+  static line every thread gets pointing at the skills below (`ThreadPrompt`;
+  `docs/notes/agents-5-cli.md`, `docs/notes/agent-skills.md`).
+* **Skills**: at every start the daemon writes two Claude Code skills,
+  `code-foundry-orchestrate` (delegating work to other threads) and `code-foundry-help`
+  (how-to questions about the app), to `<config home>/claude/.claude/skills`
+  (`internal/skills`: static SKILL.md files embedded, references rendered from the
+  registry and the settings schema through `internal/guide`, `docs/GETTING-STARTED.md`
+  embedded by the `docs` package). Every spawn passes `<config home>/claude` as its first
+  `--add-dir`, before the attachments dir, workspace members and grants
+  (`docs/notes/agent-skills.md`).
   `ThreadService.RunIn` moves a workspace thread to another member with the control
   protocol's `set_cwd` once it is idle (`docs/notes/workspaces-2-launch.md`, superseded
   on the typing detail by `docs/notes/rendered-only.md`).
@@ -419,7 +429,8 @@ the id, resolved by `Invoke` through the lister its domain registered; `thread.l
 filters in the daemon (`ListThreadsRequest.filter`); `thread.new --request-id` is
 idempotent (`thread_requests`); `thread.read` pages items; `thread.send --wait` and
 `thread.wait --after` wait for the turn after a message. `code-foundry guide` (a local
-verb, like `--help`) prints a Markdown guide for agents generated from `CommandService.List`.
+verb, like `--help`) prints a Markdown guide for agents generated from `CommandService.List`
+(`internal/guide`, which also renders the skills' command references).
 
 Pull request commands: the detail panel's actions (`pr.merge`, `pr.revert`,
 `pr.review.request`, `pr.refresh`; docs/notes/gh-pr-detail.md; `pr.review`, `pr.comment`;
@@ -537,8 +548,9 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   sidebar's New thread button. The native app menu's Settings…, Thread and Help items
   run commands in the window through one host event and carry no key equivalents
   (`docs/notes/onboarding-1-entry-points.md`). The help overlay's first tab is the
-  getting started guide, `docs/GETTING-STARTED.md` bundled at build time; keep every
-  label and chord it names in step with the app (`docs/notes/onboarding-2-guide.md`).
+  getting started guide, `docs/GETTING-STARTED.md` bundled at build time (and shipped to
+  threads in the `code-foundry-help` skill); keep every label and chord it names in step
+  with the app (`docs/notes/onboarding-2-guide.md`).
 
 ## 9. Project and GitHub stores
 
