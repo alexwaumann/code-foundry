@@ -385,6 +385,8 @@ func TestCreateResolvesWorktree(t *testing.T) {
 		wantErr error
 	}{
 		{"project only uses main worktree", CreateOptions{ProjectID: "r1"}, nil},
+		{"project by name", CreateOptions{ProjectID: "repo"}, nil},
+		{"project by path", CreateOptions{ProjectID: e.wt}, nil},
 		{"unknown project", CreateOptions{ProjectID: "nope"}, ErrNotFound},
 		{"unregistered path", CreateOptions{WorktreePath: other}, ErrFailedPrecondition},
 		{"path not in project", CreateOptions{ProjectID: "r1", WorktreePath: other}, ErrFailedPrecondition},

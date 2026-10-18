@@ -68,9 +68,9 @@ func (m *Manager) newWorktree(ctx context.Context, id, name string, o CreateOpti
 			return nw, err
 		}
 	}
-	r, ok := m.opts.Projects.Snapshot().Project(projectID)
-	if !ok {
-		return nw, fmt.Errorf("%w: project %s", ErrNotFound, projectID)
+	r, err := m.projectByRef(m.opts.Projects.Snapshot(), projectID)
+	if err != nil {
+		return nw, err
 	}
 	if !r.Git {
 		// Before the namer: a project without git runs threads in its one checkout.
