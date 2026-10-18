@@ -24,6 +24,8 @@ type PluginBackend interface {
 	Logs(context.Context, *connect.Request[v1.PluginLogsRequest]) (*connect.Response[v1.PluginLogsResponse], error)
 	ListSecrets(context.Context, *connect.Request[v1.ListPluginSecretsRequest]) (*connect.Response[v1.ListPluginSecretsResponse], error)
 	DeleteSecret(context.Context, *connect.Request[v1.DeletePluginSecretRequest]) (*connect.Response[v1.DeletePluginSecretResponse], error)
+	// PluginEnvBackend backs plugin.env (commands_plugin_env.go).
+	PluginEnvBackend
 }
 
 var (
@@ -227,6 +229,7 @@ func RegisterPlugin(r *Registry, b PluginBackend) error {
 				return Result{Message: "deleted secret " + a.String("key") + " of plugin " + a.String("name")}, nil
 			},
 		},
+		pluginEnvCmd(b),
 	)
 }
 

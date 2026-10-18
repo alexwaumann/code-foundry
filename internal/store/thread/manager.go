@@ -237,6 +237,8 @@ type Manager struct {
 	subs *subscriptions
 	// reqs are the request ids being created now (requests.go).
 	reqs requests
+	// spawnExtras is what every spawn adds (spawnextras.go); nil: nothing.
+	spawnExtras atomic.Pointer[SpawnExtrasFunc]
 }
 
 type record struct {
@@ -277,6 +279,10 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 	if err != nil {
 		return nil, err
 	}
+	flags, err := loadFlags(ctx, opts.DB)
+	if err != nil {
+		return nil, err
+	}
 	m := &Manager{opts: opts, log: opts.Log, recs: map[string]*record{}, retired: retired,
 		viewers: map[string]int{}, threads: map[string]*threadLog{}, cacheTTL: opts.CacheTTL}
 	m.ctx, m.cancel = context.WithCancel(context.WithoutCancel(ctx))
@@ -292,6 +298,7 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 			}
 		}
 		s.CacheExpiresAt = cacheExpiry(s.LastResultAt, opts.CacheTTL)
+		s.Flags = flags[s.ID]
 		m.recs[s.ID] = &record{s: s, namingTried: s.namedForGood()}
 	}
 	// Wake subscriptions, armed with the threads as loaded (subscriptions.go).
@@ -718,7 +725,7 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 		// the parent; they keep their original times (usage.go).
 		r.usage.notBefore = s.CreatedAt
 	}
-	argv, env := m.claudeCommand(s, l, grants{})
+	argv, env := m.claudeCommand(ctx, s, l, grants{}, true)
 	if err := m.spawnStream(ctx, rec, r, argv, env, first); err != nil {
 		return err
 	}
@@ -755,24 +762,23 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 }
 
 // claudeCommand is the argv and environment of a claude spawn for s: its model,
-// effort and permission mode, --add-dir for the skills dir, the attachments dir, the
-// workspace members and the granted dirs (in that order, every spawn), the system
-// prompt line (ThreadPrompt, and the workspace's) and the workspace env. The prompt is
-// never in argv (it is the first user message). g is what the conversation's
-// allow-for-thread answers granted (an effort restart's; a fresh spawn starts without).
-func (m *Manager) claudeCommand(s Thread, l launch, g grants) (argv, env []string) {
+// effort and permission mode, --add-dir for the skills dir, the spawn extras' dirs
+// (plugins), the attachments dir, the workspace members and the granted dirs (in that
+// order, every spawn), the system prompt line (ThreadPrompt, and the workspace's), the
+// workspace env, then the extras' env and PATH entries. The prompt is never in argv (it
+// is the first user message). g is what the conversation's allow-for-thread answers
+// granted (an effort restart's; a fresh spawn starts without). wait lets the extras wait
+// briefly for a plugin still starting (spawnextras.go); the effort restart passes false.
+func (m *Manager) claudeCommand(ctx context.Context, s Thread, l launch, g grants, wait bool) (argv, env []string) {
 	sa := spawnArgs{model: s.Model, effort: s.Effort, perm: s.PermissionMode,
 		allowedTools: g.allow, disallowedTools: g.deny, appendSystemPrompt: systemPrompt("")}
 	if m.opts.SkillsDir != "" {
 		// First, so the skills load whatever else is added (docs/notes/agent-skills.md).
 		sa.addDirs = append(sa.addDirs, m.opts.SkillsDir)
 	}
-	if m.opts.AttachmentsDir != "" {
-		// Every spawn (not only the first prompt's): a resumed or forked conversation
-		// may read its images again.
-		sa.addDirs = append(sa.addDirs, m.opts.AttachmentsDir)
-	}
 	env = append(slices.Clip(m.opts.Env), paths.EnvThread+"="+s.ID)
+	var wl wsLaunch
+	var members []string
 	if s.WorkspaceID != "" {
 		// The current members, every spawn (create, reconnect, fork): a project added to
 		// the workspace since the row was written is included.
@@ -780,10 +786,11 @@ func (m *Manager) claudeCommand(s Thread, l launch, g grants) (argv, env []strin
 		if m.opts.Workspaces != nil {
 			ws = m.opts.Workspaces.Snapshot()
 		}
-		if wl, ok := workspaceLaunch(ws, s.WorkspaceID, s.WorktreePath, isDir); ok {
-			sa.addDirs = append(sa.addDirs, wl.addDirs...)
+		var ok bool
+		if wl, ok = workspaceLaunch(ws, s.WorkspaceID, s.WorktreePath, isDir); ok {
 			sa.appendSystemPrompt = systemPrompt(wl.prompt)
 			env = append(slices.Clip(env), wl.env...)
+			members = wl.projects
 			if len(wl.missing) > 0 {
 				m.log.Warn("workspace member worktrees missing; not passed to claude", "thread", s.ID,
 					"workspace", s.WorkspaceID, "paths", wl.missing)
@@ -792,7 +799,19 @@ func (m *Manager) claudeCommand(s Thread, l launch, g grants) (argv, env []strin
 			m.log.Warn("workspace of thread not found; starting without its members", "thread", s.ID, "workspace", s.WorkspaceID)
 		}
 	}
+	x := m.extras(ctx, spawnInfoOf(s, members, wait))
+	sa.addDirs = append(sa.addDirs, x.AddDirs...)
+	if m.opts.AttachmentsDir != "" {
+		// Every spawn (not only the first prompt's): a resumed or forked conversation
+		// may read its images again.
+		sa.addDirs = append(sa.addDirs, m.opts.AttachmentsDir)
+	}
+	sa.addDirs = append(sa.addDirs, wl.addDirs...)
 	sa.addDirs = append(sa.addDirs, g.dirs...)
+	env = append(slices.Clip(env), x.Env...)
+	if p := prependPath(env, x.PathPrepend, os.Getenv("PATH")); p != "" {
+		env = append(env, p)
+	}
 	return l.argv(m.opts.Claude, sa), env
 }
 

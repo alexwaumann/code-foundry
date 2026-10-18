@@ -143,7 +143,8 @@ func (r *runner) respawn() {
 	st.proj.restart(restoredTotals(r.m.opts.Paths, r.cwd, l))
 	s, _ := r.m.Snapshot().Thread(r.id)
 	s.WorktreePath, s.Effort = r.cwd, st.wantEffort
-	argv, env := r.m.claudeCommand(s, l, st.grants)
+	// Never waits (the runner's goroutine): the plugins' current contributions as they are.
+	argv, env := r.m.claudeCommand(context.Background(), s, l, st.grants, false)
 	proc, err := claudestream.Start(claudestream.Spec{
 		Argv: argv, Env: env, Dir: r.cwd,
 		Conn: claudestream.Options{Log: r.m.log.With("thread", r.id)},

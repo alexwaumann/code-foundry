@@ -288,6 +288,12 @@ Services (v1):
   first watcher; each surface's `plugin.<name>.show.<surface>` command carries its
   availability (a when clause over host facts) in CommandService.List
   (`docs/notes/plugins-2-surfaces.md`).
+  Environment returns what plugins add to new threads
+  (`session/setEnvironment`: env, PATH entries, `--add-dir`s, scoped by project; `plugin
+  env`). Plugins subscribe to EventService's sources over the protocol (`events/subscribe`,
+  `api.PluginFeed` on the same loop as Watch, a bounded drop-oldest queue per plugin) and
+  raise flags on threads (`thread/setFlag`; `Thread.flags`, ThreadService.ClearFlags,
+  `thread flags`); `docs/notes/plugins-3-events-flags-env.md`.
 * `HealthService` — Ping, Version.
 
 Rules:
@@ -356,6 +362,18 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   embedded by the `docs` package). Every spawn passes `<config home>/claude` as its first
   `--add-dir`, before the attachments dir, workspace members and grants
   (`docs/notes/agent-skills.md`).
+* **Spawn extras** (`spawnextras.go`): what plugins contribute to every spawn through the
+  same `claudeCommand` path, read from the plugin store by a function the daemon sets
+  (`SetSpawnExtras`): their `--add-dir`s right after the skills dir (then attachments,
+  workspace members, grants), their env after the daemon's and the workspace's, their PATH
+  entries in front of PATH. A spawn may wait up to 2 s for a plugin still starting; the
+  effort restart never waits and re-reads them. Naming and shells get none
+  (`docs/notes/plugins-3-events-flags-env.md`).
+* **Flags** (`flags.go`): plugins' attention / error flags with a one-line reason, one per
+  (thread, plugin), an overlay that never touches status; persisted (`thread_flags`),
+  cleared by the plugin, when it is disabled or removed, on archive, and for until-seen
+  flags when the thread's items are watched. The GUI counts a flagged thread as needing
+  attention (sort group, line 2, bell, dock).
   `ThreadService.RunIn` moves a workspace thread to another member with the control
   protocol's `set_cwd` once it is idle (`docs/notes/workspaces-2-launch.md`, superseded
   on the typing detail by `docs/notes/rendered-only.md`).

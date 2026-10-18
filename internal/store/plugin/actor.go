@@ -40,11 +40,20 @@ type actor struct {
 	ignored map[string]bool // later-protocol notifications already logged this run
 	echo    rateLimiter
 
+	// flagRate limits thread/setFlag per thread (flags.go).
+	flagRate flagLimiter
+	// events is the run's subscriptions (events.go); nil until the first subscribe.
+	events *eventPump
+	// envReady closes when the run first pushes its session environment, settles
+	// without one, or ends (environment.go): a spawn waits for it.
+	envReady chan struct{}
+
 	crashes []time.Time // only run's goroutine touches it
 }
 
 func newActor(m *Manager, name string) *actor {
-	return &actor{m: m, name: name, stopCh: make(chan struct{}), done: make(chan struct{}), hung: make(chan struct{}, 1)}
+	return &actor{m: m, name: name, stopCh: make(chan struct{}), done: make(chan struct{}), hung: make(chan struct{}, 1),
+		envReady: make(chan struct{})}
 }
 
 func (a *actor) requestStop() { a.stopOnce.Do(func() { close(a.stopCh) }) }
@@ -185,6 +194,18 @@ func (a *actor) once(info spawnInfo) (err error) {
 	}()
 	o := a.m.opts
 	mf := info.manifest
+	// A spawn may wait for this run's session environment (environment.go): ready once
+	// it pushes, settles or ends.
+	a.mu.Lock()
+	envReady := a.envReady
+	select {
+	case <-envReady: // an earlier run's
+		envReady = make(chan struct{})
+		a.envReady = envReady
+	default:
+	}
+	a.mu.Unlock()
+	defer closeOnce(envReady)
 	if mf.Protocol != pluginsdk.ProtocolVersion {
 		return fmt.Errorf("%w: it speaks protocol %d, this Code Foundry speaks %d", errPermanent, mf.Protocol, pluginsdk.ProtocolVersion)
 	}
@@ -225,6 +246,7 @@ func (a *actor) once(info spawnInfo) (err error) {
 	a.conn = conn
 	a.mu.Unlock()
 	defer func() {
+		a.closeEvents()
 		a.mu.Lock()
 		a.conn = nil
 		a.mu.Unlock()
@@ -245,6 +267,7 @@ func (a *actor) once(info spawnInfo) (err error) {
 		Protocol: pluginsdk.ProtocolVersion,
 		Host:     pluginsdk.HostInfo{Version: o.HostVersion, Capabilities: hostCapabilities},
 		Plugin:   pluginsdk.PluginInfo{Name: a.name, Dir: info.dir, DataDir: dataDir, Granted: info.granted, Dev: info.dev},
+		Flags:    a.m.liveFlags(a.name),
 	}, &res)
 	cancel()
 	if err != nil {
@@ -266,6 +289,9 @@ func (a *actor) once(info spawnInfo) (err error) {
 		e.state, e.startedAt, e.protocol, e.caps, e.nextRestartAt = StateRunning, now, res.Protocol, res.Capabilities, time.Time{}
 	})
 	info.logs.add("host", "", "running")
+	// Its Init (which pushes its session environment) runs now; a spawn waits a moment.
+	settle := time.AfterFunc(envSettle, func() { closeOnce(envReady) })
+	defer settle.Stop()
 
 	ping := time.NewTicker(o.PingInterval)
 	defer ping.Stop()

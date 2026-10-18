@@ -65,6 +65,9 @@ const (
 	ThreadServiceReportProcedure = "/codefoundry.v1.ThreadService/Report"
 	// ThreadServiceSetBudgetProcedure is the fully-qualified name of the ThreadService's SetBudget RPC.
 	ThreadServiceSetBudgetProcedure = "/codefoundry.v1.ThreadService/SetBudget"
+	// ThreadServiceClearFlagsProcedure is the fully-qualified name of the ThreadService's ClearFlags
+	// RPC.
+	ThreadServiceClearFlagsProcedure = "/codefoundry.v1.ThreadService/ClearFlags"
 	// ThreadServiceSubscribeProcedure is the fully-qualified name of the ThreadService's Subscribe RPC.
 	ThreadServiceSubscribeProcedure = "/codefoundry.v1.ThreadService/Subscribe"
 	// ThreadServiceUnsubscribeProcedure is the fully-qualified name of the ThreadService's Unsubscribe
@@ -172,6 +175,9 @@ type ThreadServiceClient interface {
 	// SetBudget sets the thread's spending limit (Thread.budget_usd; 0 clears it). A
 	// budget above the thread's cost re-arms the budget stop. Any state. Persisted.
 	SetBudget(context.Context, *connect.Request[v1.SetThreadBudgetRequest]) (*connect.Response[v1.SetThreadBudgetResponse], error)
+	// ClearFlags removes plugins' flags from a thread (Thread.flags): one plugin's, or
+	// every one with plugin empty. NOT_FOUND when the thread has none to clear.
+	ClearFlags(context.Context, *connect.Request[v1.ClearThreadFlagsRequest]) (*connect.Response[v1.ClearThreadFlagsResponse], error)
 	// Subscribe makes a wake subscription: when the target (a thread, or an action run)
 	// meets the condition, the daemon sends the subscriber a message (a user_message item
 	// with origin WAKE) through Send, which starts a stopped subscriber and unsnoozes it.
@@ -369,6 +375,12 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(threadServiceMethods.ByName("SetBudget")),
 			connect.WithClientOptions(opts...),
 		),
+		clearFlags: connect.NewClient[v1.ClearThreadFlagsRequest, v1.ClearThreadFlagsResponse](
+			httpClient,
+			baseURL+ThreadServiceClearFlagsProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("ClearFlags")),
+			connect.WithClientOptions(opts...),
+		),
 		subscribe: connect.NewClient[v1.SubscribeThreadRequest, v1.SubscribeThreadResponse](
 			httpClient,
 			baseURL+ThreadServiceSubscribeProcedure,
@@ -492,6 +504,7 @@ type threadServiceClient struct {
 	label             *connect.Client[v1.LabelThreadRequest, v1.LabelThreadResponse]
 	report            *connect.Client[v1.ReportThreadRequest, v1.ReportThreadResponse]
 	setBudget         *connect.Client[v1.SetThreadBudgetRequest, v1.SetThreadBudgetResponse]
+	clearFlags        *connect.Client[v1.ClearThreadFlagsRequest, v1.ClearThreadFlagsResponse]
 	subscribe         *connect.Client[v1.SubscribeThreadRequest, v1.SubscribeThreadResponse]
 	unsubscribe       *connect.Client[v1.UnsubscribeThreadRequest, v1.UnsubscribeThreadResponse]
 	listSubscriptions *connect.Client[v1.ListThreadSubscriptionsRequest, v1.ListThreadSubscriptionsResponse]
@@ -589,6 +602,11 @@ func (c *threadServiceClient) Report(ctx context.Context, req *connect.Request[v
 // SetBudget calls codefoundry.v1.ThreadService.SetBudget.
 func (c *threadServiceClient) SetBudget(ctx context.Context, req *connect.Request[v1.SetThreadBudgetRequest]) (*connect.Response[v1.SetThreadBudgetResponse], error) {
 	return c.setBudget.CallUnary(ctx, req)
+}
+
+// ClearFlags calls codefoundry.v1.ThreadService.ClearFlags.
+func (c *threadServiceClient) ClearFlags(ctx context.Context, req *connect.Request[v1.ClearThreadFlagsRequest]) (*connect.Response[v1.ClearThreadFlagsResponse], error) {
+	return c.clearFlags.CallUnary(ctx, req)
 }
 
 // Subscribe calls codefoundry.v1.ThreadService.Subscribe.
@@ -739,6 +757,9 @@ type ThreadServiceHandler interface {
 	// SetBudget sets the thread's spending limit (Thread.budget_usd; 0 clears it). A
 	// budget above the thread's cost re-arms the budget stop. Any state. Persisted.
 	SetBudget(context.Context, *connect.Request[v1.SetThreadBudgetRequest]) (*connect.Response[v1.SetThreadBudgetResponse], error)
+	// ClearFlags removes plugins' flags from a thread (Thread.flags): one plugin's, or
+	// every one with plugin empty. NOT_FOUND when the thread has none to clear.
+	ClearFlags(context.Context, *connect.Request[v1.ClearThreadFlagsRequest]) (*connect.Response[v1.ClearThreadFlagsResponse], error)
 	// Subscribe makes a wake subscription: when the target (a thread, or an action run)
 	// meets the condition, the daemon sends the subscriber a message (a user_message item
 	// with origin WAKE) through Send, which starts a stopped subscriber and unsnoozes it.
@@ -932,6 +953,12 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(threadServiceMethods.ByName("SetBudget")),
 		connect.WithHandlerOptions(opts...),
 	)
+	threadServiceClearFlagsHandler := connect.NewUnaryHandler(
+		ThreadServiceClearFlagsProcedure,
+		svc.ClearFlags,
+		connect.WithSchema(threadServiceMethods.ByName("ClearFlags")),
+		connect.WithHandlerOptions(opts...),
+	)
 	threadServiceSubscribeHandler := connect.NewUnaryHandler(
 		ThreadServiceSubscribeProcedure,
 		svc.Subscribe,
@@ -1068,6 +1095,8 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 			threadServiceReportHandler.ServeHTTP(w, r)
 		case ThreadServiceSetBudgetProcedure:
 			threadServiceSetBudgetHandler.ServeHTTP(w, r)
+		case ThreadServiceClearFlagsProcedure:
+			threadServiceClearFlagsHandler.ServeHTTP(w, r)
 		case ThreadServiceSubscribeProcedure:
 			threadServiceSubscribeHandler.ServeHTTP(w, r)
 		case ThreadServiceUnsubscribeProcedure:
@@ -1173,6 +1202,10 @@ func (UnimplementedThreadServiceHandler) Report(context.Context, *connect.Reques
 
 func (UnimplementedThreadServiceHandler) SetBudget(context.Context, *connect.Request[v1.SetThreadBudgetRequest]) (*connect.Response[v1.SetThreadBudgetResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.SetBudget is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) ClearFlags(context.Context, *connect.Request[v1.ClearThreadFlagsRequest]) (*connect.Response[v1.ClearThreadFlagsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.ClearFlags is not implemented"))
 }
 
 func (UnimplementedThreadServiceHandler) Subscribe(context.Context, *connect.Request[v1.SubscribeThreadRequest]) (*connect.Response[v1.SubscribeThreadResponse], error) {

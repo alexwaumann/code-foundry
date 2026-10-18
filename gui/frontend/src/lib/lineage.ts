@@ -153,11 +153,13 @@ export function lineageStatus(t: ThreadView | undefined): LineageStatus {
     case "question":
     case "plan":
     case "snoozeEnded":
+    case "flagAttention":
       return "input";
     case "finished":
       return "finished";
     case "error":
     case "interrupted":
+    case "flagError":
       return "error";
     case "place":
       return "idle";

@@ -76,6 +76,9 @@ service ThreadService {
   // SetBudget sets the thread's spending limit (Thread.budget_usd; 0 clears it). A
   // budget above the thread's cost re-arms the budget stop. Any state. Persisted.
   rpc SetBudget(SetThreadBudgetRequest) returns (SetThreadBudgetResponse) {}
+  // ClearFlags removes plugins' flags from a thread (Thread.flags): one plugin's, or
+  // every one with plugin empty. NOT_FOUND when the thread has none to clear.
+  rpc ClearFlags(ClearThreadFlagsRequest) returns (ClearThreadFlagsResponse) {}
   // Subscribe makes a wake subscription: when the target (a thread, or an action run)
   // meets the condition, the daemon sends the subscriber a message (a user_message item
   // with origin WAKE) through Send, which starts a stopped subscriber and unsnoozes it.
@@ -798,4 +801,16 @@ message SlashCommandsRequest {
 message SlashCommandsResponse {
   // Empty when Claude never answered the thread's handshake.
   repeated SlashCommand commands = 1;
+}
+
+message ClearThreadFlagsRequest {
+  string id = 1;
+  // The plugin whose flag to clear; empty clears every flag.
+  string plugin = 2;
+}
+
+message ClearThreadFlagsResponse {
+  Thread thread = 1;
+  // How many flags were removed.
+  int32 cleared = 2;
 }

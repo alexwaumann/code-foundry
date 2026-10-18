@@ -22,6 +22,8 @@ type Plugin struct {
 	Lines []*v1.PluginLogLine
 	// Secrets is what ListSecrets returns.
 	Secrets []*v1.PluginSecret
+	// Envs is what Environment returns.
+	Envs []*v1.PluginEnvironment
 }
 
 var _ command.PluginBackend = (*Plugin)(nil)
@@ -141,4 +143,18 @@ func (f *Plugin) DeleteSecret(_ context.Context, r *connect.Request[v1.DeletePlu
 		return nil, err
 	}
 	return connect.NewResponse(&v1.DeletePluginSecretResponse{}), nil
+}
+
+// Environment returns Envs, or the one whose plugin is the request's name.
+func (f *Plugin) Environment(_ context.Context, r *connect.Request[v1.PluginEnvironmentRequest]) (*connect.Response[v1.PluginEnvironmentResponse], error) {
+	if err := f.do(r.Msg); err != nil {
+		return nil, err
+	}
+	out := &v1.PluginEnvironmentResponse{}
+	for _, e := range f.Envs {
+		if r.Msg.GetName() == "" || e.GetPlugin() == r.Msg.GetName() {
+			out.Environments = append(out.Environments, e)
+		}
+	}
+	return connect.NewResponse(out), nil
 }

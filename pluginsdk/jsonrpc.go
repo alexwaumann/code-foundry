@@ -256,6 +256,14 @@ func (c *Conn) Notify(method string, params any) error {
 	return c.send(wire{Method: method}, params)
 }
 
+// Queued is how many bytes wait in the outbound queue: a sender with much to say (the
+// host's event feed) holds back while the peer is behind instead of filling the queue.
+func (c *Conn) Queued() int {
+	c.qmu.Lock()
+	defer c.qmu.Unlock()
+	return c.qbytes
+}
+
 // send encodes m with params and queues it.
 func (c *Conn) send(m wire, params any) error {
 	if params != nil {

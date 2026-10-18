@@ -26,6 +26,7 @@ type Fake struct {
 	plugins map[string]plugin.Plugin
 	logs    map[string][]plugin.LogLine
 	secrets map[string][]plugin.SecretInfo
+	envs    map[string]plugin.Environment
 	// Calls records mutations ("enable hello consent=true", "disable hello", …).
 	calls []string
 }
