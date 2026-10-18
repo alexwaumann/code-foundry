@@ -13,6 +13,7 @@ import { Avatar } from "./Avatar";
 import { ago, checksHeadline, commentCount, stateBadge, timeline, type Tone } from "./model";
 import { MergeButton } from "./MergeButton";
 import { PrAskComposer } from "./PrAskComposer";
+import { PrCode } from "./PrCode";
 import { PrMenu } from "./PrMenu";
 import { PrReviewComposer } from "./PrReviewComposer";
 import { ReviewButton } from "./ReviewButton";
@@ -133,7 +134,7 @@ function Header({ d, prRef, panelKey, onAsk, onReview }: { d: PullRequestDetailV
   );
 }
 
-const innerTabs: { id: PrInnerTab | "code"; label: string }[] = [
+const innerTabs: { id: PrInnerTab; label: string }[] = [
   { id: "summary", label: "Summary" },
   { id: "timeline", label: "Timeline" },
   { id: "code", label: "Code" },
@@ -141,7 +142,7 @@ const innerTabs: { id: PrInnerTab | "code"; label: string }[] = [
 
 /**
  * Summary | Timeline | Code, then the checks headline (Summary) or the timeline's counts
- * and order (Timeline). Container queries on the surface give way in steps, so nothing
+ * and order (Timeline); nothing for Code, whose strip has its own. Container queries on the surface give way in steps, so nothing
  * is pushed out of the bar or overlaps: below 480px the order toggle keeps only its icon
  * (the default 420px panel), below 400px the counts go, and below 340px the headline
  * keeps its icon and number. Measured in WebKit: tabs 208px, counts 119px, toggle 96px.
@@ -153,40 +154,30 @@ function InnerTabBar({ d, tabKey, inner }: { d: PullRequestDetailView; tabKey: s
       <div role="tablist" aria-label="Pull request views" className="flex shrink-0 items-center gap-0.5 rounded-lg bg-muted/60 p-0.5 dark:bg-muted/40">
         {innerTabs.map((t) => {
           const active = t.id === inner;
-          const disabled = t.id === "code";
-          const tab = (
+          return (
             <button
               key={t.id}
               type="button"
               role="tab"
               aria-selected={active}
-              disabled={disabled}
               data-testid={`pr-tab-${t.id}`}
               className={cn(
-                "h-6 rounded-md px-2.5 text-body-sm outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-default disabled:opacity-55 @max-[340px]:px-2",
-                active ? "bg-pane text-foreground shadow-xs dark:bg-accent" : "text-muted-foreground enabled:hover:text-foreground",
+                "h-6 rounded-md px-2.5 text-body-sm outline-none focus-visible:ring-1 focus-visible:ring-ring @max-[340px]:px-2",
+                active ? "bg-pane text-foreground shadow-xs dark:bg-accent" : "text-muted-foreground hover:text-foreground",
               )}
               onClick={() => {
-                if (t.id !== "code") setInnerTab(tabKey, t.id);
+                setInnerTab(tabKey, t.id);
               }}
             >
               {t.label}
             </button>
-          );
-          // Disabled: the reason hangs on a span around it (a disabled button gets no pointer events).
-          return disabled ? (
-            <Tip key={t.id} label="The diff view comes in a later step">
-              <span className="flex">{tab}</span>
-            </Tip>
-          ) : (
-            tab
           );
         })}
       </div>
       <div className="ml-auto flex min-w-0 items-center gap-2 overflow-hidden" data-testid="pr-inner-bar-end">
         {inner === "summary" ? (
           <ChecksHeadline d={d} />
-        ) : (
+        ) : inner === "code" ? null : (
           <>
             <span className="flex shrink-0 items-center gap-2 text-caption whitespace-nowrap tabular-nums @max-[400px]:hidden" data-testid="pr-timeline-counts">
               {/* Timeline entries, not comments: the header's comment count includes thread replies the timeline leaves out. */}
@@ -303,7 +294,8 @@ export function PullRequestSurface({ tabId, slug, number }: { tabId: string; slu
   }
   return (
     // @container: the header, tab bar and summary rows adapt to the panel's width.
-    <div className="@container flex min-w-0 flex-col" data-testid="pr-surface" data-pr={`${slug}#${String(number)}`}>
+    // The Code tab fills the panel: its diff scrolls itself (a virtualized CodeView) under the header.
+    <div className={cn("@container flex min-w-0 flex-col", inner === "code" && "min-h-0 flex-1")} data-testid="pr-surface" data-pr={`${slug}#${String(number)}`}>
       <Header
         d={d}
         prRef={prRef}
@@ -322,7 +314,13 @@ export function PullRequestSurface({ tabId, slug, number }: { tabId: string; slu
       {d.lastError && !d.checksTruncated && <StaleBanner fetchedAtMs={d.fetchedAtMs} lastError={d.lastError} />}
       {error && <Banner testId="pr-refresh-error">Could not refresh: {error}</Banner>}
       <InnerTabBar d={d} tabKey={tabKey} inner={inner} />
-      {inner === "timeline" ? <PrTimeline d={d} tabKey={tabKey} /> : <PrSummary d={d} prRef={prRef} tabKey={tabKey} />}
+      {inner === "timeline" ? (
+        <PrTimeline d={d} tabKey={tabKey} />
+      ) : inner === "code" ? (
+        <PrCode prRef={prRef} tabKey={tabKey} url={d.pullRequest.url} />
+      ) : (
+        <PrSummary d={d} prRef={prRef} tabKey={tabKey} />
+      )}
     </div>
   );
 }

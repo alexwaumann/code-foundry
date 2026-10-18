@@ -21,6 +21,7 @@ import {
 import type { ProjectEventSchema, WorktreeDetailSchema } from "../src/gen/codefoundry/v1/project_pb";
 import type { UiIntentSchema } from "../src/gen/codefoundry/v1/ui_pb";
 import { PrDetailWorld } from "./prDetail";
+import { PrDiffWorld } from "./prDiff";
 
 /** Plain init shapes (no $typeName arm), so spreads stay assignable to the RPC responses. */
 export interface PrInit {
@@ -114,6 +115,8 @@ export class GhWorld {
   calls: Record<string, number> = {};
   /** The pull request detail panel's fixtures (mock/prDetail.ts). */
   prDetails!: PrDetailWorld;
+  /** The Code tab's diff and files (mock/prDiff.ts). */
+  prDiffs!: PrDiffWorld;
   /** Viewer is authenticated (POST /__mock/gh/auth?ok=false flips it). */
   authenticated = true;
 
@@ -275,6 +278,7 @@ export class GhWorld {
       [`${CFW}/fix-resize`, this.detail(`${CFW}/fix-resize`, "origin/main", manyFiles(), Array.from({ length: 12 }, (_, i): [string, string, number] => [`${(0x1f2e3d4c + i * 7919).toString(16)}aa`, `fix(terminal): step ${String(12 - i)} of the resize rework`, (i + 1) * 3 * HOUR]))],
       [GP, this.detail(GP, "origin/main", [{ path: "src/renderer/atlas.zig", status: "M", added: 12, deleted: 3, uncommitted: true }], [])],
     ]);
+    this.prDiffs = new PrDiffWorld({ shas: (slug, number) => this.prDetails.shas(slug, number), count: (rpc) => { this.count(rpc); } });
     this.prDetails = new PrDetailWorld({
       t0: this.t0,
       viewer: VIEWER,

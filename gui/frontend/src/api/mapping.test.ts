@@ -184,6 +184,7 @@ describe("gh mapping", () => {
       latestReviews: [{ author: "kim", state: PullRequestReviewState.CHANGES_REQUESTED, submittedAt: timestampFromMs(9000) }, { author: "x" }],
       reviewRequests: ["acme/core"],
       isCrossRepository: true,
+      headRepoSlug: "fork/r",
       partial: true,
       headSha: "abc123",
       baseSha: "def456",
@@ -205,11 +206,12 @@ describe("gh mapping", () => {
       ],
       reviewRequests: ["acme/core"],
       isCrossRepository: true,
+      headRepoSlug: "fork/r",
       partial: true,
       headSha: "abc123",
       baseSha: "def456",
     });
-    expect(toPullRequestView(create(PullRequestSchema, {}))).toMatchObject({ mergeable: null, mergeState: "", partial: false, headSha: "", baseSha: "" });
+    expect(toPullRequestView(create(PullRequestSchema, {}))).toMatchObject({ mergeable: null, mergeState: "", partial: false, headSha: "", baseSha: "", headRepoSlug: "" });
   });
 
   it("maps a pull request detail", () => {
