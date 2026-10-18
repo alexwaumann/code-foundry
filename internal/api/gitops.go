@@ -87,7 +87,9 @@ func (h *GitOps) OpenPullRequest(ctx context.Context, req *connect.Request[v1.Op
 
 // OpenEditor implements GitOpsServiceHandler.
 func (h *GitOps) OpenEditor(ctx context.Context, req *connect.Request[v1.OpenEditorRequest]) (*connect.Response[v1.OpenEditorResponse], error) {
-	op, err := h.store.OpenEditor(ctx, req.Msg.GetWorktreePath())
+	op, err := h.store.OpenEditor(ctx, gitops.OpenOptions{
+		WorktreePath: req.Msg.GetWorktreePath(), File: req.Msg.GetFile(), Line: int(req.Msg.GetLine()),
+	})
 	if err != nil {
 		return nil, gitopsError(err)
 	}
@@ -96,7 +98,7 @@ func (h *GitOps) OpenEditor(ctx context.Context, req *connect.Request[v1.OpenEdi
 
 // Reveal implements GitOpsServiceHandler.
 func (h *GitOps) Reveal(ctx context.Context, req *connect.Request[v1.RevealRequest]) (*connect.Response[v1.RevealResponse], error) {
-	op, err := h.store.Reveal(ctx, req.Msg.GetWorktreePath())
+	op, err := h.store.Reveal(ctx, gitops.OpenOptions{WorktreePath: req.Msg.GetWorktreePath(), File: req.Msg.GetFile()})
 	if err != nil {
 		return nil, gitopsError(err)
 	}

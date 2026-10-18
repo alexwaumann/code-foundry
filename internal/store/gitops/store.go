@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/fsx"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 )
 
@@ -63,6 +64,9 @@ type Options struct {
 	Git, Gh, Open string
 	// Now is the clock. Default time.Now.
 	Now func() time.Time
+	// Root bounds the files OpenEditor and Reveal accept: a symlink-resolved directory
+	// (fsx.ResolveRoot). Default the home directory (fsx.HomeRoot).
+	Root string
 
 	editorEnv *editorEnv // tests
 }
@@ -108,6 +112,13 @@ func New(o Options) *Manager {
 	}
 	if o.Now == nil {
 		o.Now = time.Now
+	}
+	if o.Root == "" {
+		if r, err := fsx.HomeRoot(); err == nil {
+			o.Root = r
+		} else {
+			o.Log.Warn("no home directory: opening files is refused", "err", err)
+		}
 	}
 	ctx, stop := context.WithCancel(context.Background())
 	m := &Manager{opts: o, log: o.Log, lanes: newLanes(o.Workers), ctx: ctx, stop: stop}

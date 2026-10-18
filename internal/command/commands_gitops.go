@@ -3,6 +3,7 @@ package command
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	"connectrpc.com/connect"
@@ -138,6 +139,7 @@ func RegisterGitOps(r *Registry, d GitOpsDeps) error {
 		return ""
 	}
 	wt := ArgSpec{Name: "worktree", Type: Path, Required: true, Context: ContextWorktree, Description: "Worktree path"}
+	fileArg := ArgSpec{Name: "file", Type: Path, Description: "A file to open instead of the worktree"}
 	return r.RegisterAll(
 		Command{
 			Name:           "git.fetch",
@@ -221,25 +223,30 @@ func RegisterGitOps(r *Registry, d GitOpsDeps) error {
 		Command{
 			Name:        "worktree.open.editor",
 			Title:       "Open Worktree in Editor",
-			Description: "Open the worktree in the configured editor (default: $VISUAL/$EDITOR if it is a GUI editor, else Cursor, VS Code, Zed, or Sublime Text).",
+			Description: "Open the worktree, or one file of it, in the configured editor (default: $VISUAL/$EDITOR if it is a GUI editor, else Cursor, VS Code, Zed, or Sublime Text).",
 			Category:    "Worktree",
 			Keybindings: []string{"cmd+shift+o"},
-			Args:        []ArgSpec{wt},
+			Args:        []ArgSpec{wt, fileArg, {Name: "line", Type: Int, Description: "Line to open the file at (VS Code, Cursor, Windsurf, Zed, Sublime Text)"}},
 			When:        hasActiveWorktree,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-				res, err := b.OpenEditor(ctx, connect.NewRequest(&v1.OpenEditorRequest{WorktreePath: a.Path("worktree")}))
+				if a.Int("line") < 0 {
+					return Result{}, fmt.Errorf("%w: line %d is negative", ErrInvalidArgs, a.Int("line"))
+				}
+				res, err := b.OpenEditor(ctx, connect.NewRequest(&v1.OpenEditorRequest{
+					WorktreePath: a.Path("worktree"), File: a.Path("file"), Line: uint32(a.Int("line")),
+				}))
 				return opResult(res, err)
 			},
 		},
 		Command{
 			Name:        "worktree.reveal",
 			Title:       "Reveal Worktree in Finder",
-			Description: "Show the worktree folder in Finder.",
+			Description: "Show the worktree folder, or one file of it, in Finder.",
 			Category:    "Worktree",
-			Args:        []ArgSpec{wt},
+			Args:        []ArgSpec{wt, fileArg},
 			When:        hasActiveWorktree,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-				res, err := b.Reveal(ctx, connect.NewRequest(&v1.RevealRequest{WorktreePath: a.Path("worktree")}))
+				res, err := b.Reveal(ctx, connect.NewRequest(&v1.RevealRequest{WorktreePath: a.Path("worktree"), File: a.Path("file")}))
 				return opResult(res, err)
 			},
 		},

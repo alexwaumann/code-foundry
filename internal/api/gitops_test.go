@@ -156,7 +156,7 @@ func TestGitOpsWatch(t *testing.T) {
 	if q := recv().GetQueued(); q.GetId() != "op-q" || q.GetKind() != v1.GitOpKind_GIT_OP_KIND_PULL {
 		t.Fatalf("queued = %v", q)
 	}
-	if _, err := fake.Reveal(ctx, "/w"); err != nil {
+	if _, err := fake.Reveal(ctx, gitops.OpenOptions{WorktreePath: "/w"}); err != nil {
 		t.Fatal(err)
 	}
 	if recv().GetStarted() == nil || recv().GetFinished().GetSummary() != "reveal ok" {

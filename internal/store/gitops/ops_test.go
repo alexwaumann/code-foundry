@@ -184,26 +184,48 @@ func TestRevealOpenURLEditor(t *testing.T) {
 	}
 	ctx := context.Background()
 
-	wantOK(t, mustOp(t)(w.m.Reveal(ctx, w.a)), "revealed "+w.a+" in Finder")
+	wantOK(t, mustOp(t)(w.m.Reveal(ctx, OpenOptions{WorktreePath: w.a})), "revealed "+w.a+" in Finder")
 	if c := fr.called("open"); len(c) != 1 || !slices.Equal(c[0].Args, []string{"-R", w.a}) {
 		t.Errorf("open -R calls = %+v", c)
 	}
 
-	op := mustOp(t)(w.m.OpenEditor(ctx, w.a))
+	op := mustOp(t)(w.m.OpenEditor(ctx, OpenOptions{WorktreePath: w.a}))
 	wantOK(t, op, "opened a in zed")
 	if c := fr.called("zed"); len(c) != 1 || c[0].Name != "/opt/bin/zed" || !slices.Equal(c[0].Args, []string{w.a}) {
 		t.Errorf("editor calls = %+v", c)
 	}
 	// The setting is read on every call.
 	editor = "open -a 'Visual Studio Code'"
-	wantOK(t, mustOp(t)(w.m.OpenEditor(ctx, w.a)), "opened a in Visual Studio Code")
+	wantOK(t, mustOp(t)(w.m.OpenEditor(ctx, OpenOptions{WorktreePath: w.a})), "opened a in Visual Studio Code")
 	editor = "code 'unterminated"
-	if _, err := w.m.OpenEditor(ctx, w.a); !errors.Is(err, ErrInvalidArgument) {
+	if _, err := w.m.OpenEditor(ctx, OpenOptions{WorktreePath: w.a}); !errors.Is(err, ErrInvalidArgument) {
 		t.Errorf("bad editor setting err = %v", err)
 	}
 	fr.reply = map[string]Result{"code": {ExitCode: -1, Err: errors.New(`exec: "code": executable file not found in $PATH`)}}
 	editor = "code"
-	wantFailed(t, mustOp(t)(w.m.OpenEditor(ctx, w.a)), "executable file not found")
+	wantFailed(t, mustOp(t)(w.m.OpenEditor(ctx, OpenOptions{WorktreePath: w.a})), "executable file not found")
+
+	// A file: revealed itself, opened at a line where the editor takes one.
+	w.m.opts.Root = filepath.Dir(w.a)
+	readme := filepath.Join(w.a, "README")
+	fr.reply = nil
+	wantOK(t, mustOp(t)(w.m.Reveal(ctx, OpenOptions{WorktreePath: w.a, File: "README"})), "revealed "+readme+" in Finder")
+	if c := fr.called("open"); len(c) == 0 || !slices.Equal(c[len(c)-1].Args, []string{"-R", readme}) {
+		t.Errorf("open -R file calls = %+v", c)
+	}
+	editor = "zed"
+	wantOK(t, mustOp(t)(w.m.OpenEditor(ctx, OpenOptions{WorktreePath: w.a, File: readme, Line: 7})), "opened README in zed")
+	if c := fr.called("zed"); len(c) != 2 || !slices.Equal(c[1].Args, []string{readme + ":7"}) {
+		t.Errorf("zed file calls = %+v", c)
+	}
+	for _, bad := range []string{"../../outside", "/etc/hosts"} {
+		if _, err := w.m.Reveal(ctx, OpenOptions{WorktreePath: w.a, File: bad}); !errors.Is(err, ErrInvalidArgument) {
+			t.Errorf("Reveal file %q err = %v, want ErrInvalidArgument", bad, err)
+		}
+		if _, err := w.m.OpenEditor(ctx, OpenOptions{WorktreePath: w.a, File: bad}); !errors.Is(err, ErrInvalidArgument) {
+			t.Errorf("OpenEditor file %q err = %v, want ErrInvalidArgument", bad, err)
+		}
+	}
 
 	op = mustOp(t)(w.m.OpenURL(ctx, "https://github.com/me/a/pull/1"))
 	wantOK(t, op, "opened https://github.com/me/a/pull/1")

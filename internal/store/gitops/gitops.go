@@ -176,8 +176,8 @@ type Store interface {
 	Push(ctx context.Context, o PushOptions) (Op, error)
 	CreatePR(ctx context.Context, o CreatePROptions) (Op, error)
 	OpenPR(ctx context.Context, worktreePath string) (Op, error)
-	OpenEditor(ctx context.Context, worktreePath string) (Op, error)
-	Reveal(ctx context.Context, worktreePath string) (Op, error)
+	OpenEditor(ctx context.Context, o OpenOptions) (Op, error)
+	Reveal(ctx context.Context, o OpenOptions) (Op, error)
 	OpenURL(ctx context.Context, url string) (Op, error)
 	// GitHubSlug returns the GitHub "owner/name" of the registered project containing
 	// worktreePath, else of project projectID, else "".

@@ -30,9 +30,10 @@ service GitOpsService {
   rpc CreatePullRequest(CreatePullRequestRequest) returns (CreatePullRequestResponse) {}
   // OpenPullRequest opens the current branch's pull request in the default browser.
   rpc OpenPullRequest(OpenPullRequestRequest) returns (OpenPullRequestResponse) {}
-  // OpenEditor opens the worktree in the configured editor.
+  // OpenEditor opens the worktree in the configured editor, or with file one file of
+  // it (at line, for editors that take one).
   rpc OpenEditor(OpenEditorRequest) returns (OpenEditorResponse) {}
-  // Reveal shows the worktree in Finder (`open -R`).
+  // Reveal shows the worktree (or file in it) in Finder (`open -R`).
   rpc Reveal(RevealRequest) returns (RevealResponse) {}
   // OpenUrl opens an http(s) URL in the default browser.
   rpc OpenUrl(OpenUrlRequest) returns (OpenUrlResponse) {}
@@ -149,6 +150,12 @@ message OpenPullRequestResponse {
 
 message OpenEditorRequest {
   string worktree_path = 1;
+  // Optional file to open instead of the folder: absolute, or relative to
+  // worktree_path. Must be under the home directory.
+  string file = 2;
+  // 1-based line to open file at; 0 for none. VS Code, Cursor and Windsurf get
+  // `-g file:line`, Zed and Sublime Text `file:line`; other editors only the file.
+  uint32 line = 3;
 }
 
 message OpenEditorResponse {
@@ -157,6 +164,9 @@ message OpenEditorResponse {
 
 message RevealRequest {
   string worktree_path = 1;
+  // Optional file to reveal instead of the folder: absolute, or relative to
+  // worktree_path. Must be under the home directory.
+  string file = 2;
 }
 
 message RevealResponse {

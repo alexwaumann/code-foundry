@@ -156,6 +156,11 @@ func TestGitOpsCommands(t *testing.T) {
 		{name: "pr.open", cmd: "pr.open", ctx: command.Context{ActiveWorktreePath: "/gh"}, wantReq: &v1.OpenPullRequestRequest{WorktreePath: "/gh"}},
 		{name: "open editor", cmd: "worktree.open.editor", ctx: wt, wantReq: &v1.OpenEditorRequest{WorktreePath: "/wt"}},
 		{name: "reveal", cmd: "worktree.reveal", ctx: wt, wantReq: &v1.RevealRequest{WorktreePath: "/wt"}},
+		{name: "open editor file at line", cmd: "worktree.open.editor", ctx: wt, args: map[string]string{"file": "/wt/a.go", "line": "12"},
+			wantReq: &v1.OpenEditorRequest{WorktreePath: "/wt", File: "/wt/a.go", Line: 12}},
+		{name: "open editor negative line", cmd: "worktree.open.editor", ctx: wt, args: map[string]string{"file": "/wt/a.go", "line": "-1"}, wantErr: command.ErrInvalidArgs},
+		{name: "reveal file", cmd: "worktree.reveal", ctx: wt, args: map[string]string{"file": "~/notes.md"},
+			wantReq: &v1.RevealRequest{WorktreePath: "/wt", File: "/Users/me/notes.md"}},
 		{name: "open url", cmd: "view.open.url", args: map[string]string{"url": "https://x.test/a"}, wantReq: &v1.OpenUrlRequest{Url: "https://x.test/a"}},
 		{name: "open url missing", cmd: "view.open.url", wantErr: command.ErrInvalidArgs},
 	}
