@@ -133,7 +133,7 @@ a sentence of guidance goes in a `text` node. **Tabs** switch views inside one s
 keeps form drafts per tab. The plugin answers with the view of the new active tab:
 `nodes` are always the active tab's. Tab keys share the view's one key namespace: a tab
 `runs` and a list `runs` collide (`nodes[1].key: "runs" is already used by
-tabs.items[0]`), so prefix tabs `tab-…`. Past 8 tabs, group: collapsible sections inside a
+tabs.items[0]`), so prefix tabs `tab-…`. Past the tab limit, group: collapsible sections inside a
 tab, or a second surface for a second subject.
 
 ## Nodes
