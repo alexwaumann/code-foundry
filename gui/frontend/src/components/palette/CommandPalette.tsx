@@ -9,7 +9,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { ProjectPicker } from "@/components/compose/ProjectPicker";
 import { RunInPicker } from "./RunInPicker";
-import { invokeStarted, isStartable, presentCommand, presentInPalette } from "@/keys/bindings";
+import { inPalette, invokeStarted, presentCommand, presentInPalette } from "@/keys/bindings";
 import { formatChord } from "@/keys/chord";
 import { argChoices, groupByCategory, previousArg, promptedArgs, startPrompt, submitArg, UNSET_CHOICE, type ArgPrompt } from "@/palette/args";
 import { refreshCommands, useCommandsStore } from "@/stores/commands";
@@ -72,7 +72,7 @@ function PaletteBody({ initialQuery, initialCommand, initialContext, close }: Bo
     void refreshCommands(context);
   }, [context]);
 
-  const available = useMemo(() => commands.filter(isStartable), [commands]);
+  const available = useMemo(() => commands.filter(inPalette), [commands]);
   const groups = useMemo(() => groupByCategory(available), [available]);
 
   const invoke = (c: CommandView, values: Record<string, string>) => {

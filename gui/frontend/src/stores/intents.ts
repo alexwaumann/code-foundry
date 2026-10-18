@@ -3,6 +3,7 @@ import { playAlertSound } from "@/api/app";
 import type { UiIntentView } from "@/api/ui";
 import { clearRevealOnArrival, revealShell } from "./bottomActions";
 import { PENDING_FOCUS_MS } from "./bottomPanel";
+import { showAgentRun } from "./subagentView";
 import { useTerminalsStore } from "./terminals";
 import { useUiStore } from "./ui";
 import { showView } from "./views";
@@ -84,6 +85,11 @@ export function applyIntent(intent: UiIntentView): void {
     case "playAlertSound":
       // notifications.test: a preview, whatever the focus, cooldown and sound toggle.
       void playAlertSound(intent.volume);
+      break;
+    case "showAgentRun":
+      // thread.agent.open: the thread selected, one of its runs shown read-only.
+      clearPendingFocus();
+      showAgentRun(intent.threadId, intent.runId);
       break;
   }
 }

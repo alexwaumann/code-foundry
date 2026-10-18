@@ -7,6 +7,7 @@ import { errorMessage, isAbort } from "@/api/stream";
 import { requestConfirm } from "./confirm";
 import { contextKey, getUiContext } from "./context";
 import { useProjectsStore } from "./projects";
+import { useSubagentViewStore } from "./subagentView";
 import { useThreadsStore } from "./threads";
 import { useTerminalsStore } from "./terminals";
 import { useUiStore } from "./ui";
@@ -153,7 +154,7 @@ export function startCommandSync(debounceMs = 60): () => void {
     clearTimeout(timer);
     timer = setTimeout(() => void refreshCommands(ctx), debounceMs);
   };
-  const unsubs = [useUiStore.subscribe(check), useTerminalsStore.subscribe(check), useProjectsStore.subscribe(check), useThreadsStore.subscribe(check)];
+  const unsubs = [useUiStore.subscribe(check), useTerminalsStore.subscribe(check), useProjectsStore.subscribe(check), useThreadsStore.subscribe(check), useSubagentViewStore.subscribe(check)];
   check();
   // Retry periodically while the list is failing (e.g. daemon restarting).
   const retry = setInterval(() => {

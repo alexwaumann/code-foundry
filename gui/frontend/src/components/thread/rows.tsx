@@ -28,7 +28,7 @@ import {
 import type { AgentRunView } from "@/api/agents";
 import type { ThreadItemView, ToolCallView, WakeView } from "@/api/thread";
 import { Tip } from "@/components/ui/tooltip";
-import { agentElapsedMs, fmtElapsed, parseAgentNote } from "@/lib/agents";
+import { agentElapsedMs, agentName, fmtElapsed, parseAgentNote } from "@/lib/agents";
 import { copyText } from "@/lib/clipboard";
 import { useNow } from "@/lib/clock";
 import { CREATED_BY_NOTE_ID, parseCreatedByNote } from "@/lib/lineage";
@@ -48,6 +48,7 @@ import { ThreadMarkdown } from "./Code";
 import { CodeRunContext } from "./codeContext";
 import { KeepRowContext, useThreadCtx } from "./context";
 import { LineageNote } from "./LineageNote";
+import { AgentOpen } from "./AgentOpen";
 import { ToolPathChip } from "./PathChip";
 import { AgentReport, ToolDetail } from "./ToolDetail";
 import { UserBubble } from "./UserBubble";
@@ -248,8 +249,11 @@ const ToolRow = memo(function ToolRow({ node }: { node: Extract<WorkNode, { type
       {t.status === "running" && <LoaderCircle className="size-3.5 animate-spin text-info" aria-label="Running" />}
     </>
   );
+  // A thread's own run opens in the read-only subagent view; a nested one (spawned by
+  // another run) has nothing to show there.
+  const openable = run !== undefined && run.spawnDepth <= 1;
   return (
-    <div data-tool={t.name} data-status={t.status}>
+    <div className={openable ? "agent-host" : undefined} data-tool={t.name} data-status={t.status}>
       <Row
         icon={toolIcon(t.name)}
         label={<ToolLabel t={t} tense={tense} cwd={cwd} />}
@@ -259,6 +263,7 @@ const ToolRow = memo(function ToolRow({ node }: { node: Extract<WorkNode, { type
         testId="thread-tool"
         data={{ "data-waiting": waiting ? "true" : undefined }}
       />
+      {openable && <AgentOpen threadId={threadId} runId={run.id} name={agentName(run)} />}
       {open &&
         (!waiting || EDIT_TOOLS.has(t.name)) &&
         (agent ? (
@@ -532,7 +537,7 @@ const SystemNoteRow = memo(function SystemNoteRow({ id }: { id: string }) {
   const run = useAgentRunOfNote(threadId, id);
   if (it?.kind !== "note") return null;
   const note = parseAgentNote(it.text, run?.description ?? "");
-  if (note) return <AgentNoteRow note={note} atMs={it.createdAtMs} />;
+  if (note) return <AgentNoteRow note={note} atMs={it.createdAtMs} threadId={threadId} run={run && run.spawnDepth <= 1 ? run : undefined} />;
   if (parseCreatedByNote(it.text)) return <CreatedByNoteRow threadId={threadId} id={id} text={it.text} atMs={it.createdAtMs} />;
   return (
     <div className="sysnote" role="separator" aria-label={it.text} data-testid="thread-note">
@@ -599,9 +604,10 @@ function NoteAge({ atMs }: { atMs: number }) {
 /**
  * The daemon's note when a background subagent ends (docs/notes/agents-1-daemon.md):
  * one quiet line, a check (emerald) or a cross (red), "Agent finished · name", the report's
- * first line ellipsised, and its age on the right.
+ * first line ellipsised, and its age on the right; when its run is known, "Open ›" after
+ * the age (on hover) shows the run in the read-only subagent view.
  */
-function AgentNoteRow({ note, atMs }: { note: ReturnType<typeof parseAgentNote> & object; atMs: number | null }) {
+function AgentNoteRow({ note, atMs, threadId, run }: { note: ReturnType<typeof parseAgentNote> & object; atMs: number | null; threadId: string; run?: AgentRunView }) {
   const Icon = note.failed ? CircleX : CircleCheck;
   return (
     <div className="agentnote" role="note" data-testid="thread-agent-note" data-failed={note.failed || undefined}>
@@ -625,6 +631,7 @@ function AgentNoteRow({ note, atMs }: { note: ReturnType<typeof parseAgentNote> 
           <NoteAge atMs={atMs} />
         </span>
       )}
+      {run && <AgentOpen threadId={threadId} runId={run.id} name={note.name} testId="thread-agent-note-open" />}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ArrowDown } from "lucide-react";
 import { buildRows, buildTurns, decodeTimelineKey, type TimelineRow } from "@/lib/threadTimeline";
@@ -14,7 +14,7 @@ const USER_SCROLL_MS = 400;
 const SCROLL_KEYS = new Set(["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "]);
 
 /** A first guess of a row's height before it is measured. */
-function estimate(r: TimelineRow | undefined): number {
+function estimate(r: { type: string } | undefined): number {
   switch (r?.type) {
     case "user":
       return 72;
@@ -61,6 +61,40 @@ function useRows(threadId: string, working: boolean): TimelineRow[] {
  */
 export function Timeline({ threadId, working, bottomInset }: { threadId: string; working: boolean; bottomInset: number }) {
   const rows = useRows(threadId, working);
+  return <TimelineList threadId={threadId} rows={rows} bottomInset={bottomInset} renderRow={renderTimelineRow} turns />;
+}
+
+function renderTimelineRow(row: TimelineRow) {
+  return <TimelineRowView row={row} />;
+}
+
+/** A row of a TimelineList: its stable key and its type (the estimate's and the turn spacing's). */
+export interface ListRow {
+  key: string;
+  type: string;
+}
+
+/**
+ * The timeline's list (Timeline above): rows virtualized, following the bottom while
+ * pinned, keeping the reader's place when rows change. `turns`: the rows are the thread's
+ * turns, which fold when they end (pinned) and forget their fold choices when the list
+ * unmounts; the subagent view's rows (SubagentPane) are no turns.
+ */
+export function TimelineList<R extends ListRow>({
+  threadId,
+  rows,
+  bottomInset,
+  renderRow,
+  estimateRow = estimate,
+  turns = false,
+}: {
+  threadId: string;
+  rows: readonly R[];
+  bottomInset: number;
+  renderRow: (row: R) => ReactNode;
+  estimateRow?: (row: R | undefined) => number;
+  turns?: boolean;
+}) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const pinned = useRef(true);
@@ -73,31 +107,30 @@ export function Timeline({ threadId, working, bottomInset }: { threadId: string;
   /** Pins the list (it follows the bottom again); the turns left open while it was scrolled up fold. */
   const pin = useCallback(() => {
     pinned.current = true;
-    foldDeferredTurns(threadId);
-  }, [threadId]);
+    if (turns) foldDeferredTurns(threadId);
+  }, [threadId, turns]);
 
   // A turn's end arrives: scrolled up, the turn stays open (decided inside the store update
   // that brings the turn_end, so the rows never render folded first).
-  useLayoutEffect(
-    () =>
-      watchTurnEnds(threadId, (ids) => {
-        if (!pinned.current) deferTurnFolds(threadId, ids);
-      }),
-    [threadId],
-  );
+  useLayoutEffect(() => {
+    if (!turns) return;
+    return watchTurnEnds(threadId, (ids) => {
+      if (!pinned.current) deferTurnFolds(threadId, ids);
+    });
+  }, [threadId, turns]);
   // Leaving the thread: the next visit shows every finished turn folded.
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    if (!turns) return;
+    return () => {
       forgetTurnView(threadId);
-    },
-    [threadId],
-  );
+    };
+  }, [threadId, turns]);
 
   // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual returns unstable functions by design.
   const v = useVirtualizer({
     count: rows.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: (i) => estimate(rows[i]),
+    estimateSize: (i) => estimateRow(rows[i]),
     overscan: 8,
     paddingStart: 28,
     paddingEnd: bottomInset + 8,
@@ -129,7 +162,7 @@ export function Timeline({ threadId, working, bottomInset }: { threadId: string;
   }, [toBottom]);
   // Away from the bottom, the row at the top of the viewport (and how far it starts above
   // the viewport's top) is the anchor a change of rows keeps in place.
-  const anchor = useRef<{ index: number; offset: number; rows: readonly TimelineRow[] } | null>(null);
+  const anchor = useRef<{ index: number; offset: number; rows: readonly R[] } | null>(null);
   const captureAnchor = useCallback(() => {
     const el = scrollRef.current;
     const vi = el ? v.getVirtualItemForOffset(el.scrollTop) : undefined;
@@ -240,7 +273,7 @@ export function Timeline({ threadId, working, bottomInset }: { threadId: string;
                 ref={v.measureElement}
                 style={{ position: "absolute", top: 0, left: 40, right: 40, transform: `translateY(${String(vi.start)}px)` }}
               >
-                <TimelineRowView row={row} />
+                {renderRow(row)}
               </div>
             );
           })}

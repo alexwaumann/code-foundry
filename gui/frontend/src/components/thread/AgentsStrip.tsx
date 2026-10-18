@@ -1,7 +1,8 @@
 import { Bot, ChevronRight, SquareTerminal } from "lucide-react";
 import { CommandButton } from "@/components/command/CommandButton";
-import { backgroundLabel } from "@/lib/agents";
-import { useStripParts } from "@/stores/agents";
+import { agentName, backgroundLabel, stripPart } from "@/lib/agents";
+import { useAgentRun, useStripRunIds } from "@/stores/agents";
+import { openAgentRun, useCanOpenAgents } from "@/stores/subagentActions";
 import { useThreadsStore } from "@/stores/threads";
 
 const STRIP =
@@ -32,8 +33,42 @@ export function AgentsStrip({ threadId }: { threadId: string }) {
   return null;
 }
 
+/**
+ * One running background run in the strip: its name, a link (dotted underline on hover)
+ * that opens it in the read-only subagent view (thread.agent.open), then " · activity".
+ * The name is plain text where the command is not listed.
+ */
+function StripRun({ threadId, id, first }: { threadId: string; id: string; first: boolean }) {
+  const run = useAgentRun(threadId, id);
+  const can = useCanOpenAgents();
+  if (!run) return null;
+  const name = agentName(run);
+  const part = stripPart(run);
+  const rest = part.slice(name.length);
+  return (
+    <span data-testid="agents-strip-run" data-agent={id}>
+      {!first && <span className="inline-block w-4" aria-hidden />}
+      {can ? (
+        <button
+          type="button"
+          className="cursor-default text-foreground/80 decoration-dotted underline-offset-2 hover:text-foreground hover:underline focus-visible:underline focus-visible:outline-none"
+          data-testid="agents-strip-name"
+          onClick={() => {
+            void openAgentRun(threadId, id);
+          }}
+        >
+          {name}
+        </button>
+      ) : (
+        name
+      )}
+      {rest}
+    </span>
+  );
+}
+
 function Strip({ threadId, agents, shells }: { threadId: string; agents: number; shells: number }) {
-  const parts = useStripParts(threadId);
+  const ids = useStripRunIds(threadId);
   return (
     <div className={STRIP} role="status" data-testid="agents-strip" data-kind="agents">
       <Bot className={ICON} aria-hidden />
@@ -41,11 +76,8 @@ function Strip({ threadId, agents, shells }: { threadId: string; agents: number;
         {backgroundLabel(agents, shells)}
       </span>
       <span className="min-w-0 flex-1 truncate text-muted-foreground" data-testid="agents-strip-runs">
-        {parts.map((p, i) => (
-          <span key={`${String(i)}:${p}`}>
-            {i > 0 && <span className="inline-block w-4" aria-hidden />}
-            {p}
-          </span>
+        {ids.map((id, i) => (
+          <StripRun key={id} threadId={threadId} id={id} first={i === 0} />
         ))}
       </span>
       <CommandButton
