@@ -14,6 +14,18 @@ export function formatDuration(ms: number): string {
   return `${String(Math.floor(h / 24))}d ${String(h % 24)}h`;
 }
 
+/**
+ * A `duration` span (a fixed time a plugin measured): tenths under 10 s, as the thread
+ * view's tool rows do ("0.1s", "2.3s"), so a quick test run does not read "took 0s";
+ * whole units from 10 s on (formatDuration). An elapsed time keeps whole seconds.
+ */
+export function formatFixedDuration(ms: number): string {
+  if (ms <= 0) return "0s";
+  if (ms < 100) return "<0.1s";
+  if (ms < 10_000) return `${(Math.floor(ms / 100) / 10).toFixed(1)}s`;
+  return formatDuration(ms);
+}
+
 function unit(n: number, word: string): string {
   return `${String(n)} ${word}${n === 1 ? "" : "s"}`;
 }
