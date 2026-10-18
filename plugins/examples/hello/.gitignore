@@ -1,0 +1,2 @@
+# make plugins builds the executable here, so `plugin dev plugins/examples/hello` runs it.
+/bin/

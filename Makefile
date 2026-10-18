@@ -36,6 +36,20 @@ LDFLAGS  := -X github.com/alexwaumann/code-foundry/internal/version.Version=$(VE
 FRONTEND := gui/frontend
 PNPM     := pnpm --dir $(FRONTEND)
 
+.PHONY: plugins
+
+## plugins: build the example plugins (plugins/examples/*): each executable next to its
+## plugin.json (bin/, gitignored; for `code-foundry plugin dev plugins/examples/<name>`)
+## and a complete package in bin/plugins/<name> (plugin.json + bin/<name>). Not released.
+plugins:
+	@for dir in plugins/examples/*/; do \
+		name=$$(basename "$$dir"); \
+		echo "plugin $$name"; \
+		go build -trimpath -o "$$dir/bin/$$name" "./$$dir" && \
+		mkdir -p "bin/plugins/$$name/bin" && cp "$$dir/plugin.json" "bin/plugins/$$name/" && \
+		cp "$$dir/bin/$$name" "bin/plugins/$$name/bin/$$name"; \
+	done
+
 .PHONY: all gen build check attest go-check go-lint go-test frontend-check frontend-deps gui-dist-stub \
         dev gui-build gui-dev gui-e2e gui-mock ghostty-vt package release promote clean
 
