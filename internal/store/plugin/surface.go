@@ -157,6 +157,9 @@ type ActRequest struct {
 	Action string
 	Value  *string
 	Values map[string]any
+	// Context is what the acting panel shows (the plugin's SurfaceAct.Context); when it
+	// is empty and Ref names the instance, Ref's context.
+	Context command.Context
 }
 
 // Surfaces is the surface half of the plugin store (the API's WatchSurface, GetSurface

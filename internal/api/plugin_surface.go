@@ -190,6 +190,9 @@ func (h *Plugin) Act(ctx context.Context, req *connect.Request[v1.SurfaceActRequ
 	}
 	m := req.Msg
 	ar := plugin.ActRequest{Instance: m.GetInstance(), Version: m.GetVersion(), Key: m.GetKey(), Action: m.GetAction()}
+	if m.GetContext() != nil {
+		ar.Context = contextFromProto(m.GetContext())
+	}
 	if m.GetInstance() == "" {
 		ar.Ref = surfaceRefFromProto(m.GetRef())
 	}

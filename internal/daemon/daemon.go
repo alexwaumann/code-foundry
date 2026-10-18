@@ -154,7 +154,8 @@ func Run(ctx context.Context, opts Options) error {
 		DB: st.db, Commands: commands, Bus: events, Log: log.With("component", "plugins"),
 		Home: st.home, HostVersion: opts.Version.Version, APIEnv: threadEnv(port, token),
 		Facts: facts, Emitter: command.BusEmitter{Bus: events},
-		Flags: pluginFlags{threads: st.thread},
+		Flags:   pluginFlags{threads: st.thread},
+		Threads: pluginThreads{threads: st.thread, settings: st.settings}, Terminals: pluginTerminals{terminals: st.terminal},
 	})
 	if err != nil {
 		return err
