@@ -115,7 +115,7 @@ func (m *Manager) checkOrigin(ctx context.Context, name, origin string, force bo
 	if !force {
 		return nil, fmt.Errorf("%w: plugin %s came from %s, and a package from %s would inherit %s; "+
 			"--force deletes them and starts it fresh (it asks for consent again), or run `code-foundry plugin uninstall %s --purge` first",
-			ErrFailedPrecondition, name, originWords(r.Origin), originWords(origin), strings.Join(what, ", "), name)
+			ErrFailedPrecondition, name, originWords(r.Origin), originWords(origin), andList(what), name)
 	}
 	return t, nil
 }
@@ -152,7 +152,7 @@ func (m *Manager) claimLocked(ctx context.Context, name, origin string, force bo
 	m.update(name, nil, func(e *entry) { e.row = r })
 	if t != nil {
 		if e, ok := m.entry(name); ok {
-			e.logs.add("host", "", "taken over by "+originWords(origin)+": deleted "+strings.Join(t.what, ", "))
+			e.logs.add("host", "", "taken over by "+originWords(origin)+": deleted "+andList(t.what))
 		}
 	}
 	return t, nil
@@ -206,5 +206,13 @@ func (m *Manager) purgeSecretsAndData(ctx context.Context, name string) ([]strin
 
 // takeoverConsent is the line a consent text gains when enabling carries out a takeover.
 func takeoverConsent(name string, t *takeover) string {
-	return fmt.Sprintf("\nIt replaces the plugin %s from %s: %s will be deleted.", name, originWords(t.from), strings.Join(t.what, ", "))
+	return fmt.Sprintf("\nIt replaces the plugin %s from %s: %s will be deleted.", name, originWords(t.from), andList(t.what))
+}
+
+// andList joins words as "a, b and c".
+func andList(words []string) string {
+	if len(words) < 2 {
+		return strings.Join(words, "")
+	}
+	return strings.Join(words[:len(words)-1], ", ") + " and " + words[len(words)-1]
 }

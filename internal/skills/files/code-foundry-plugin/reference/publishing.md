@@ -72,7 +72,8 @@ A local `make dist` does not reproduce CI's tarballs byte for byte (another Go
 toolchain, other file times), so the registry entry's hashes must come from the
 release's own `SHA256SUMS`, never a local one. To try a release by hand, unpack it into a
 folder **under the home directory** and `code-foundry plugin dev <folder> --yes`
-(`plugin dev` refuses folders elsewhere, `/tmp` included).
+(`plugin dev` refuses folders elsewhere, `/tmp` included; a plugin linked from another
+folder before needs `--force`, which deletes that link's secrets, data and consent).
 
 ## The registry entry
 

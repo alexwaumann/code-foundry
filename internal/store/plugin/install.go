@@ -475,7 +475,7 @@ func (m *Manager) install(ctx context.Context, req InstallRequest, p plan) (Inst
 		return InstallResult{}, err
 	}
 	if took != nil {
-		res.Warnings = append(res.Warnings, fmt.Sprintf("replaced plugin %s from %s: deleted %s", p.name, originWords(took.from), strings.Join(took.what, ", ")))
+		res.Warnings = append(res.Warnings, fmt.Sprintf("replaced plugin %s from %s: deleted %s", p.name, originWords(took.from), andList(took.what)))
 	}
 	if err := swapPackage(pkg, link, filepath.Join(work, "old")); err != nil {
 		return InstallResult{}, err
@@ -631,7 +631,7 @@ func (m *Manager) installLink(ctx context.Context, dir string, req InstallReques
 		return InstallResult{}, err
 	}
 	if took != nil {
-		res.Warnings = append(res.Warnings, fmt.Sprintf("replaced plugin %s from %s: deleted %s", name, originWords(took.from), strings.Join(took.what, ", ")))
+		res.Warnings = append(res.Warnings, fmt.Sprintf("replaced plugin %s from %s: deleted %s", name, originWords(took.from), andList(took.what)))
 		req.Consent = false
 	}
 	if cur, ok := m.Snapshot().Plugin(name); ok {

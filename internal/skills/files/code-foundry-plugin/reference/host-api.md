@@ -227,11 +227,22 @@ err = h.Secrets().Delete(ctx, "token")
 list, err := h.Secrets().List(ctx) // names and set times, never values
 ```
 
-- The values live in the user's login Keychain (service `code-foundry-plugin`, account
-  `<plugin>/<key>`), namespaced to the plugin. Keys `[A-Za-z0-9._-]{1,128}`; values
-  non-empty UTF-8 up to 16 KiB.
+- The values live in the user's login Keychain (service `code-foundry-plugin`, or
+  `code-foundry-plugin-<hash>` for a `CODE_FOUNDRY_HOME` other than `~/.code-foundry`;
+  account `<plugin>/<key>`), namespaced to the plugin by the host. Keys
+  `[A-Za-z0-9._-]{1,128}` (anything else, `/` included, is invalid params); values
+  non-empty UTF-8 up to 16 KiB. Only keys this plugin set through the host are read.
+- They belong to the plugin's source (its registry, release repository or dev folder):
+  a package of the same name from elsewhere starts without them (`plugin install` /
+  `plugin dev --force` deletes them, data dir and consent included). Linking the plugin
+  from another folder (a second checkout) is such a change.
 - Values travel host → plugin only. Never put one in a view, a log, a toast, a command
-  arg, argv or an environment variable you push.
+  arg, argv or an environment variable you push (the host shows pushed variables by name
+  only, but threads see them). The host cannot stop a plugin from leaking its own
+  secret; it only never does so itself.
+- This is isolation between well-behaved plugins, not a sandbox: a plugin runs as the
+  user, and the items trust `/usr/bin/security`, so any of the user's processes can read
+  them.
 - The usual way in is a form secret input with `store` (`reference/primitives.md`): the
   user types it, the host stores it, the plugin only reads it. A plugin that needs a
   secret it does not have shows a notice with a form, not an error.
