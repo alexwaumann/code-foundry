@@ -426,7 +426,9 @@ Pull request commands: the detail panel's actions (`pr.merge`, `pr.revert`,
 docs/notes/pr-review-submit-1-daemon.md, with the panel's Review menu in
 docs/notes/pr-review-submit-2-gui.md) and the thread starters `pr.ask`,
 `pr.explain`, `pr.fix.findings`, which pick or create a worktree and type a prompt built
-from the pull request (docs/notes/pr-thread-commands.md).
+from the pull request (docs/notes/pr-thread-commands.md). The panel's Code tab is read-only
+and has no commands: it reads `GhService.GetPullRequestDiff` and renders it in one
+virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
 
 ## 8. Frontend
 
