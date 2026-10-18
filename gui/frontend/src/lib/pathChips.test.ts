@@ -75,6 +75,42 @@ describe("matchPath: not chips", () => {
   });
 });
 
+describe("matchPath: paths with spaces (a code span, quotes, a line of their own)", () => {
+  it.each<[string, PathContext, string, number?]>([
+    ["docs/my report.pdf", "code", "docs/my report.pdf"],
+    ["shots/screen shot.png", "code", "shots/screen shot.png"],
+    ["docs/my report.pdf", "prose", "docs/my report.pdf"],
+    ["/Users/a/cf scratch/docs/my report.pdf:3", "code", "/Users/a/cf scratch/docs/my report.pdf", 3],
+    ["~/Downloads/report (1).pdf", "code", "~/Downloads/report (1).pdf"],
+    ["/Users/a/Desktop/Screenshot 2026-10-18 at 10.42.13\u202fAM.png", "prose", "/Users/a/Desktop/Screenshot 2026-10-18 at 10.42.13\u202fAM.png"],
+    ["./my notes/todo list.md", "prose", "./my notes/todo list.md"],
+    ["../shared docs/plan v2.md", "code", "../shared docs/plan v2.md"],
+  ])("%s (%s) → %s", (token, where, path, line) => {
+    expect(matchPath(token, where)).toEqual({ text: token, path, ...(line !== undefined && { line }) });
+  });
+
+  it.each<[string, string]>([
+    ["npm run build", "a command"],
+    ["cat docs/a.md", "a command: a space before the first slash"],
+    ["open shots/screen shot.png", "a command on a spaced path"],
+    ["My Documents/a.md", "a relative path with a space before its first slash"],
+    ["screen shot.png", "a bare name: no slash"],
+    ["src/a.ts src/b.ts", "two paths"],
+    ["src/a.ts and src/b.ts", "two paths in words"],
+    ["/bin/cat /tmp/a b.md", "a later word starts like a path"],
+    ["/usr/bin/env -S node.js", "a flag"],
+    ["rm -rf ./a b.md", "a command with a flag"],
+    ["/usr/bin/env node", "no known extension"],
+    ["docs/my reports/", "a folder"],
+    ["docs/my  report.pdf", "two spaces in a row"],
+    ["docs/report (1.pdf", "unbalanced parentheses"],
+    ["docs/my\treport.pdf", "a tab"],
+    ["https://x.com/my report.pdf", "a URL"],
+  ])("%s: not a chip (%s)", (token) => {
+    expect(matchPath(token, "code")).toBeNull();
+  });
+});
+
 describe("splitProse", () => {
   it("cuts chips out of a sentence, punctuation left in the text", () => {
     expect(splitProse("See (src/a.ts:12), then ~/notes.md.")).toEqual([
@@ -88,6 +124,30 @@ describe("splitProse", () => {
 
   it.each(["Nothing to see here", "Use and/or the client/server split.", "Visit https://example.com/a/b.md now"])("null without chips: %s", (text) => {
     expect(splitProse(text)).toBeNull();
+  });
+
+  const chip = (path: string) => ({ text: path, path });
+
+  it.each<[string, string, ReturnType<typeof splitProse>]>([
+    ["straight quotes", 'Open "docs/my report.pdf" now', ['Open "', chip("docs/my report.pdf"), '" now']],
+    ["curly quotes, a stop inside", "See “shots/screen shot.png.”", ["See “", chip("shots/screen shot.png"), ".”"]],
+    ["single quotes", "the file 'docs/my report.pdf' has one page", ["the file '", chip("docs/my report.pdf"), "' has one page"]],
+    [
+      "lines that are only paths",
+      "/Users/a/docs/my report.pdf\n/Users/a/shots/screen shot.png\n\nThe PDF is bigger.",
+      [chip("/Users/a/docs/my report.pdf"), "\n", chip("/Users/a/shots/screen shot.png"), "\n\nThe PDF is bigger."],
+    ],
+    ["the rest of a line after a label (a text node after <strong>)", " /Users/a/my report.pdf.", [" ", chip("/Users/a/my report.pdf"), "."]],
+    ["a bracketed line", "(docs/my report.pdf)", ["(", chip("docs/my report.pdf"), ")"]],
+    ["a bare spaced path in a sentence: no chip, no wrong pieces", "I saved it to /Users/a/docs/my report.pdf for you.", null],
+    ["a bare relative one", "Open docs/my report.pdf now", null],
+    ["a bare one beside a plain path", "Read docs/my report.pdf and src/a.ts.", ["Read docs/my report.pdf and ", chip("src/a.ts"), "."]],
+    ["a sentence that reads like a spaced path loses its chips rather than gaining wrong ones", "Run /usr/bin/python3 on main.py today", null],
+    ["quotes around words, not a path", 'He said "hello there" about src/a.ts', ['He said "hello there" about ', chip("src/a.ts")]],
+    ["apostrophes are not quotes", "Alex's notes and Sam's docs/my report.pdf", null],
+    ["a run stops at a line break", "/usr/bin/env node\nnpm run build.md", [chip("/usr/bin/env"), " node\nnpm run ", chip("build.md")]],
+  ])("%s", (_name, text, want) => {
+    expect(splitProse(text)).toEqual(want);
   });
 
   it("keeps a chip at the very start and end", () => {
@@ -134,5 +194,15 @@ describe("rehypePathChips", () => {
     ]);
     expect(tree.children[1]?.children).toEqual([{ type: "text", value: "src/b.ts" }]);
     expect(tree.children[2]?.children[0]).toEqual({ type: "element", tagName: "code", children: [{ type: "text", value: "src/c.ts" }] });
+  });
+
+  it("marks a quoted spaced path whole", () => {
+    const tree = { type: "root", children: [{ type: "element", tagName: "p", children: [{ type: "text", value: 'It is in "docs/my report.pdf".' }] }] };
+    rehypePathChips()(tree);
+    expect(tree.children[0]?.children).toEqual([
+      { type: "text", value: 'It is in "' },
+      { type: "element", tagName: "span", properties: { dataCfPath: "docs/my report.pdf" }, children: [{ type: "text", value: "docs/my report.pdf" }] },
+      { type: "text", value: '".' },
+    ]);
   });
 });
