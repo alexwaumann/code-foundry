@@ -388,6 +388,11 @@ func TestResolveRelease(t *testing.T) {
 	gh.Releases["o/hello@v0.3.0"] = rel("v0.3.0", "hello-0.3.0-darwin-arm64.tar.gz", "checksums.txt")
 	gh.Assets["o/hello/v0.3.0/checksums.txt"] = sums // does not list 0.3.0
 	gh.Releases["o/hello@v9"] = rel("v9", "x")
+	// The plugin skill's make dist publishes SHA256SUMS.
+	sums4 := filepath.Join(dir, "SHA256SUMS")
+	_ = os.WriteFile(sums4, []byte(sha+"  hello-0.4.0-darwin-arm64.tar.gz\n"), 0o600)
+	gh.Releases["o/hello@v0.4.0"] = rel("v0.4.0", "SHA256SUMS", "hello-0.4.0-darwin-arm64.tar.gz")
+	gh.Assets["o/hello/v0.4.0/SHA256SUMS"] = sums4
 	f := registry.Fetcher{Gh: gh}
 	tests := []struct {
 		tag, platform string
@@ -400,6 +405,9 @@ func TestResolveRelease(t *testing.T) {
 		{tag: "v0.1.0", platform: "darwin/arm64", want: registry.Release{Repo: "o/hello", Tag: "v0.1.0", Name: "hello", Version: "0.1.0",
 			AssetName: "hello-0.1.0-darwin-arm64.tar.gz",
 			Asset:     registry.Artifact{URL: "https://github.com/o/hello/releases/download/v0.1.0/hello-0.1.0-darwin-arm64.tar.gz"}}},
+		{tag: "v0.4.0", platform: "darwin/arm64", want: registry.Release{Repo: "o/hello", Tag: "v0.4.0", Name: "hello", Version: "0.4.0",
+			AssetName: "hello-0.4.0-darwin-arm64.tar.gz", Checksums: "SHA256SUMS",
+			Asset: registry.Artifact{URL: "https://github.com/o/hello/releases/download/v0.4.0/hello-0.4.0-darwin-arm64.tar.gz", SHA256: sha}}},
 		{tag: "v0.1.0", platform: "darwin/amd64", wantErr: "no <name>-0.1.0-darwin-amd64.tar.gz tarball"},
 		{tag: "v0.3.0", platform: "darwin/arm64", wantErr: "does not list hello-0.3.0-darwin-arm64.tar.gz"},
 		{tag: "v9", platform: "darwin/arm64", wantErr: "not v<semver>"},
