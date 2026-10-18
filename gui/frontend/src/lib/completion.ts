@@ -1,6 +1,7 @@
 /**
  * The composer's inline completion: `/` offers skills (stores/skills.ts), or a running
- * thread's slash commands (stores/thread.ts useSlashCommands), `@` files (stores/files.ts). Pure pieces only: where a trigger is, when the card shows, how skills
+ * thread's slash commands (stores/thread.ts useSlashCommands), `@` other threads
+ * (lib/tagCandidates.ts) and files (stores/files.ts), `#` pull requests (lib/tagCandidates.ts). Pure pieces only: where a trigger is, when the card shows, how skills
  * are matched, ranked and grouped, and how file matches become rows. The editor reports
  * triggers (components/compose/PromptEditor.tsx); components/compose/useCompletion.ts
  * runs the card.
@@ -11,7 +12,7 @@ import type { WorktreeChoice } from "./compose";
 import type { PromptTag } from "./prompt";
 
 /** The characters that start a completion. */
-export type TriggerChar = "/" | "@";
+export type TriggerChar = "/" | "@" | "#";
 
 /** A trigger at the caret: the trigger character and what was typed after it. */
 export interface Trigger {
@@ -51,15 +52,17 @@ export const LEAF_CHAR = "￼";
 /**
  * The trigger the caret is in, from the text of its paragraph before it (tags as
  * LEAF_CHAR): a trigger character at the start or right after whitespace, then anything
- * but whitespace up to the caret. "and/or", "a@b" and "/x" right after a tag are not
- * triggers.
+ * but whitespace up to the caret. "and/or", "a@b", "C#" and "/x" right after a tag are not
+ * triggers. A "#" needs something typed after it that is not another "#": "#" alone, a
+ * Markdown heading ("# Title", "## Title") and "##" are not pull request triggers.
  */
 export function findTrigger(before: string, chars: readonly TriggerChar[]): Trigger | null {
-  const m = /(^|\s)([/@])([^\s￼]*)$/.exec(before);
+  const m = /(^|\s)([/@#])([^\s￼]*)$/.exec(before);
   if (!m) return null;
   const char = m[2] as TriggerChar;
   if (!chars.includes(char)) return null;
   const query = m[3] ?? "";
+  if (char === "#" && (query === "" || query.startsWith("#"))) return null;
   return { char, query, offset: before.length - query.length - 1 };
 }
 

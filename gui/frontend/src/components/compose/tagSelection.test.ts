@@ -56,6 +56,8 @@ describe("tag attributes", () => {
     { tagKind: "image", id: "a1", name: "x.png" },
     { tagKind: "skill", name: "deploy", projectId: "" },
     { tagKind: "file", projectId: "r1", path: "src/" },
+    { tagKind: "thread", id: "s-0123456789ab", name: "Fix resize race" },
+    { tagKind: "pr", slug: "alexwaumann/code-foundry", number: 185 },
   ] as const)("round-trip a $tagKind tag", (tag) => {
     expect(tagOf({ ...tagAttrs(tag) })).toEqual(tag);
   });

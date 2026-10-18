@@ -14,6 +14,9 @@ export type MessagePiece =
   | { kind: "text"; text: string }
   | { kind: "skill"; name: string }
   | { kind: "file"; projectId: string; path: string }
+  /** name: the thread's name when the tag was inserted (the bubble shows the current one when known). */
+  | { kind: "thread"; id: string; name: string }
+  | { kind: "pr"; slug: string; number: number }
   /** path "" when the chip lost its attachment before sending. */
   | { kind: "image"; name: string; path: string }
   | { kind: "pdf"; name: string; path: string };
@@ -44,6 +47,10 @@ function tagPiece(tag: PromptTag, attachments: readonly string[]): MessagePiece 
       return { kind: "skill", name: tag.name };
     case "file":
       return { kind: "file", projectId: tag.projectId, path: tag.path };
+    case "thread":
+      return { kind: "thread", id: tag.id, name: tag.name };
+    case "pr":
+      return { kind: "pr", slug: tag.slug, number: tag.number };
     case "image": {
       const i = /^\d+$/.test(tag.id) ? Number(tag.id) : -1;
       const path = attachments[i] ?? "";

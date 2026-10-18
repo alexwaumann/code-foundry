@@ -29,6 +29,22 @@ describe("parseUserMessage", () => {
     ]);
   });
 
+  it("draws thread and pull request tags from the composer's tokens, not from the projected text", () => {
+    const thread = tagToken({ tagKind: "thread", id: "s-0123456789ab", name: "Fix resize race" });
+    const pr = tagToken({ tagKind: "pr", slug: "alexwaumann/code-foundry", number: 185 });
+    const projected = 'see [Thread "Fix resize race" (id s-0123456789ab)] and alexwaumann/code-foundry#185';
+    expect(parseUserMessage(projected, `see ${thread} and ${pr}`, [])).toEqual([
+      { kind: "text", text: "see " },
+      { kind: "thread", id: "s-0123456789ab", name: "Fix resize race" },
+      { kind: "text", text: " and " },
+      { kind: "pr", slug: "alexwaumann/code-foundry", number: 185 },
+    ]);
+    // A message sent without the composer's text (the CLI) stays text.
+    expect(parseUserMessage(projected, "", [])).toEqual([{ kind: "text", text: projected }]);
+    // sentComposerText keeps both tokens as they are.
+    expect(sentComposerText(`${thread} ${pr}`, () => undefined)).toBe(`${thread} ${pr}`);
+  });
+
   it("decodes file paths, keeps directories and lines", () => {
     const path = "docs/a b#%.md";
     expect(parseUserMessage("", `${file("r1", path)} and\n${file("r1", "src/")}`, [])).toEqual([

@@ -3,6 +3,7 @@ import { ArrowDown, FileText, ImageIcon } from "lucide-react";
 import { AttachmentLightbox } from "@/components/compose/AttachmentLightbox";
 import { ChipFace, PdfTile } from "@/components/compose/attachmentFaces";
 import { TAG_ACCENT, tagClass } from "@/components/compose/tagStyle";
+import { usePrTagInfo, useThreadTagInfo } from "@/components/compose/useTagInfo";
 import { Tip } from "@/components/ui/tooltip";
 import { pageCount, previewLabel } from "@/lib/compose";
 import { formatAttachmentSize, kindFromName, middleTruncate, stagedPdfPages, tagLabel } from "@/lib/prompt";
@@ -134,6 +135,31 @@ function FileChip({ projectId, path }: { projectId: string; path: string }) {
   );
 }
 
+/** Another thread, as the composer's tag: its current name; the tooltip says its project and status. */
+function ThreadChip({ id, name }: { id: string; name: string }) {
+  const info = useThreadTagInfo(id, name);
+  return (
+    <Tip label={info.known ? `${info.project}\n${info.status}` : "Thread not found"}>
+      <span data-testid="thread-tag" data-tag-kind="thread" data-thread={id} className={tagClass(false, TAG_ACCENT.thread)}>
+        <span className="truncate">{info.name}</span>
+      </span>
+    </Tip>
+  );
+}
+
+/** A pull request, as the composer's tag: #N in its state's colour; the tooltip is its title. */
+function PrChip({ slug, number }: { slug: string; number: number }) {
+  const info = usePrTagInfo(slug, number);
+  const ref = `${slug}#${String(number)}`;
+  return (
+    <Tip label={info.title ? `${info.title}\n${ref}` : ref}>
+      <span data-testid="thread-tag" data-tag-kind="pr" data-slug={slug} data-number={number} data-state={info.state} className={tagClass(false, info.accent)}>
+        <span className="truncate">#{number}</span>
+      </span>
+    </Tip>
+  );
+}
+
 /** "14:02" (today's), else the date too. */
 function timeOf(ms: number | null): string {
   if (ms === null) return "";
@@ -198,6 +224,10 @@ export const UserBubble = memo(function UserBubble({
                 );
               case "file":
                 return <FileChip key={i} projectId={p.projectId} path={p.path} />;
+              case "thread":
+                return <ThreadChip key={i} id={p.id} name={p.name} />;
+              case "pr":
+                return <PrChip key={i} slug={p.slug} number={p.number} />;
               case "image":
               case "pdf":
                 return <AttachmentChip key={i} name={p.name} path={p.path} pdf={p.kind === "pdf"} />;

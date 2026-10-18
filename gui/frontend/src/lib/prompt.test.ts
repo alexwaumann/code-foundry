@@ -245,3 +245,70 @@ describe("skill and file tags", () => {
     expect(removeReferences(`${DEPLOY} ${A} ${FILE}`, "a1")).toBe(`${DEPLOY} ${FILE}`);
   });
 });
+
+describe("thread and pull request tags", () => {
+  const thread: PromptTag = { tagKind: "thread", id: "s-0123456789ab", name: "Fix resize race" };
+  const pr: PromptTag = { tagKind: "pr", slug: "alexwaumann/code-foundry", number: 185 };
+  const none = () => undefined;
+
+  it("tokens and labels", () => {
+    expect(tagToken(thread)).toBe("[Fix resize race](cf-thread://s-0123456789ab)");
+    expect(tagToken(pr)).toBe("[#185](cf-pr://alexwaumann/code-foundry/185)");
+    expect(tagLabel(thread)).toBe("Fix resize race");
+    expect(tagLabel(pr)).toBe("#185");
+    // A name that would end the token or the projection's quotes is cleaned; a blank one is the id.
+    expect(tagToken({ tagKind: "thread", id: "s-1", name: 'Say "hi" [now]\nplease' })).toBe("[Say hi now please](cf-thread://s-1)");
+    expect(tagToken({ tagKind: "thread", id: "s-1", name: "  " })).toBe("[s-1](cf-thread://s-1)");
+  });
+
+  it("round-trip through the text", () => {
+    const text = `compare ${tagToken(thread)} with ${tagToken(pr)}, then stop`;
+    const [line = []] = parsePrompt(text);
+    expect(line).toEqual([
+      { kind: "text", text: "compare " },
+      { kind: "tag", ...thread },
+      { kind: "text", text: " with " },
+      { kind: "tag", ...pr },
+      { kind: "text", text: ", then stop" },
+    ]);
+    expect(serializePrompt([line])).toBe(text);
+  });
+
+  it("a thread's label is read back (its name when inserted); a pull request's comes from the URL", () => {
+    expect(parseLine("[Old name](cf-thread://s-1)")).toEqual([{ kind: "tag", tagKind: "thread", id: "s-1", name: "Old name" }]);
+    expect(parseLine("[#999 lies](cf-pr://Owner/Repo/7)")).toEqual([{ kind: "tag", tagKind: "pr", slug: "owner/repo", number: 7 }]);
+  });
+
+  it.each([
+    ["an empty thread id", "[x](cf-thread://)"],
+    ["a thread id with a slash", "[x](cf-thread://s-1/2)"],
+    ["a pull request without a number", "[#](cf-pr://o/r/)"],
+    ["a zero-led number", "[#01](cf-pr://o/r/01)"],
+    ["a pull request without a repository", "[#1](cf-pr://o/1)"],
+    ["a non-numeric number", "[#x](cf-pr://o/r/x)"],
+    ["an unclosed token", "[a](cf-thread://s-1"],
+  ])("stays text: %s", (_name, text) => {
+    expect(parseLine(text)).toEqual([{ kind: "text", text }]);
+  });
+
+  it("an unclosed [ typed before a tag stays text, the tag stays a tag", () => {
+    expect(parseLine(`[draft ${tagToken(pr)}`)).toEqual([{ kind: "text", text: "[draft " }, { kind: "tag", ...pr }]);
+    expect(parseLine(`[draft ${tagToken(thread)}`)).toEqual([{ kind: "text", text: "[draft " }, { kind: "tag", ...thread }]);
+  });
+
+  it("projection: a thread line for the daemon to complete, a pull request as owner/repo#N", () => {
+    expect(projectPrompt(`see ${tagToken(thread)} and ${tagToken(pr)}.`, none)).toBe(
+      'see [Thread "Fix resize race" (id s-0123456789ab)] and alexwaumann/code-foundry#185.',
+    );
+    expect(projectPrompt(`${tagToken(pr)}${tagToken(thread)}`, none)).toBe('alexwaumann/code-foundry#185[Thread "Fix resize race" (id s-0123456789ab)]');
+  });
+
+  it("neither belongs to a project: member changes keep them", () => {
+    const text = `${tagToken(thread)} ${tagToken(pr)} ${tagToken({ tagKind: "file", projectId: "r1", path: "a.ts" })}`;
+    expect(tagsByProject(text)).toEqual(["r1"]);
+    expect(projectTagCount(text, "r1")).toBe(1);
+    expect(removeProjectTags(text, "r1")).toBe(`${tagToken(thread)} ${tagToken(pr)}`);
+    expect(retainProjectTags(text, [])).toBe(`${tagToken(thread)} ${tagToken(pr)}`);
+    expect(proseOf(text)).toBe(text);
+  });
+});

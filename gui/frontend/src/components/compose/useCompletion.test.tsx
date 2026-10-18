@@ -164,3 +164,42 @@ describe("useCompletion with a running thread's slash commands", () => {
     expect(t.insertTag).toHaveBeenCalledWith({ from: 4, to: 7 }, { tagKind: "skill", projectId: "", name: "commit" });
   });
 });
+
+describe("useCompletion with a quiet source (the # pull requests)", () => {
+  const HASH: EditorTrigger = { char: "#", query: "12", from: 4, to: 7 };
+  const prs = (n: number, query: string): CompletionSource => ({
+    char: "#",
+    label: "Pull requests",
+    available: true,
+    groups:
+      n === 0
+        ? []
+        : [{ key: "prs", heading: null, items: Array.from({ length: n }, (_, i) => ({ key: String(i), label: `#12${String(i)}`, detail: "", tag: { tagKind: "pr" as const, slug: "o/r", number: 120 + i } })) }],
+    query,
+    searching: false,
+    emptyText: "",
+    quietEmpty: true,
+  });
+
+  it("matches show the list; Enter inserts the pull request tag", () => {
+    const t = setup(HASH, prs(2, "12"));
+    expect(t.c().show).toBe("list");
+    expect(t.key("enter")).toBe(true);
+    expect(t.insertTag).toHaveBeenCalledWith({ from: 4, to: 7 }, { tagKind: "pr", slug: "o/r", number: 120 });
+  });
+
+  it("nothing matching shows no card, and Enter, Tab and Escape pass through (the text stays, Enter sends)", () => {
+    const t = setup({ ...HASH, query: "999" }, prs(0, "999"));
+    expect(t.c().show).toBe("none");
+    expect(t.key("enter")).toBe(false);
+    expect(t.key("tab")).toBe(false);
+    expect(t.key("escape")).toBe(false);
+    expect(t.insertTag).not.toHaveBeenCalled();
+  });
+
+  it("a pool not loaded yet: no card, Enter passes through", () => {
+    const t = setup(HASH, { ...prs(0, "12"), available: false });
+    expect(t.c().show).toBe("none");
+    expect(t.key("enter")).toBe(false);
+  });
+});

@@ -36,6 +36,11 @@ export interface CompletionSource {
   searching: boolean;
   /** "No skills match". */
   emptyText: string;
+  /**
+   * Nothing matching shows no card instead of `emptyText` (the `#` card: a number that is
+   * not a pull request stays text, and Enter sends).
+   */
+  quietEmpty?: boolean;
 }
 
 /**
@@ -177,7 +182,7 @@ export function useCompletion(
     setState(cur);
   }
   const dismissed = live !== null && cur.memo?.at === live.at && cur.memo.dismissed;
-  const show: CompletionShow = live && source.searching && !dismissed ? "searching" : cur.show;
+  const show: CompletionShow = live && source.searching && !dismissed ? "searching" : source.quietEmpty && cur.show === "empty" ? "none" : cur.show;
   // Nothing has answered this trigger yet: Enter must not send what is about to be completed.
   const waiting = live !== null && answered === null && !dismissed;
 

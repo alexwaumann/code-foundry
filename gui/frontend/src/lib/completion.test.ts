@@ -42,6 +42,30 @@ describe("findTrigger", () => {
     expect(findTrigger("see @src", ["/", "@"])).toEqual({ char: "@", query: "src", offset: 4 });
     expect(findTrigger("mail a@b", ["@"])).toBeNull();
   });
+
+  it.each<[string, string, { query: string; offset: number } | null]>([
+    ["digits", "#12", { query: "12", offset: 0 }],
+    ["text after a space", "see #resize", { query: "resize", offset: 4 }],
+    ["a bare # (nothing typed after it yet)", "see #", null],
+    ["a heading at the start of a line", "# Title", null],
+    ["a heading with the caret right after #", "#", null],
+    ["a level-2 heading", "## Title", null],
+    ["## with the caret after it", "##", null],
+    ["###x", "###x", null],
+    ["inside a word (C#)", "C#", null],
+    ["inside a word with more after it", "C#12", null],
+    ["after a tag", `${LEAF_CHAR}#12`, null],
+    ["a space ends it", "#12 ", null],
+    ["text after the heading's space is not a trigger", "# 12", null],
+  ])("# %s", (_name, before, want) => {
+    const t = findTrigger(before, ["/", "@", "#"]);
+    expect(t && { query: t.query, offset: t.offset }).toEqual(want);
+    if (t) expect(t.char).toBe("#");
+  });
+
+  it("# only when asked for", () => {
+    expect(findTrigger("#12", ["/", "@"])).toBeNull();
+  });
 });
 
 describe("nextCard", () => {
