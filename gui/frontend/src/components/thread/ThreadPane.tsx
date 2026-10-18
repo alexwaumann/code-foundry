@@ -6,7 +6,7 @@ import { DragBand } from "@/components/window/DragBand";
 import { PaneHeader } from "@/components/window/PaneHeader";
 import { useLinger } from "@/lib/linger";
 import { useThreadsStore } from "@/stores/threads";
-import { startThreadWatch, useOpenRequests, useThreadEmpty, useThreadLoaded, useThreadPending, useThreadStore } from "@/stores/thread";
+import { forgetTurnView, startThreadWatch, useOpenRequests, useThreadEmpty, useThreadLoaded, useThreadPending, useThreadStore } from "@/stores/thread";
 import { useShownRun } from "@/stores/subagentView";
 import { AgentsStrip } from "./AgentsStrip";
 import { SubagentPane } from "./SubagentPane";
@@ -68,10 +68,18 @@ export function ThreadPane({ threadId }: { threadId: string }) {
 /**
  * The thread's Watch, held while it is selected, and what it shows: the conversation, or
  * one of its subagent runs read-only (SubagentPane, stores/subagentView.ts), which reads
- * the same log. Going into a run and back keeps the one stream.
+ * the same log. Going into a run and back keeps the one stream, and the turns the reader
+ * unfolded: only leaving the thread forgets them (the next visit shows every finished turn
+ * folded).
  */
 function WatchedThread({ threadId }: { threadId: string }) {
-  useEffect(() => startThreadWatch(threadId), [threadId]);
+  useEffect(() => {
+    const stop = startThreadWatch(threadId);
+    return () => {
+      stop();
+      forgetTurnView(threadId);
+    };
+  }, [threadId]);
   const runId = useShownRun(threadId);
   return runId ? <SubagentPane key={runId} threadId={threadId} runId={runId} /> : <ThreadBody threadId={threadId} />;
 }

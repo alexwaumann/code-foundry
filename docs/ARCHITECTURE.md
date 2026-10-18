@@ -523,7 +523,10 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   `docs/notes/mcp-panel.md`), Agents (the thread's subagent runs, one row each in
   spawn order with status, activity or report, and stats; opened by A, `view.panel.agents`
   and the strip above the composer that shows while background runs go on;
-  `docs/notes/agents-2-gui.md`) and Threads (the thread's lineage from the thread list:
+  `docs/notes/agents-2-gui.md`; a depth-1 row, a strip name or an Agent row's Open shows
+  that run read-only in the content pane in the thread's place, the thread staying
+  selected on its one Watch: `thread.agent.open`, back up by Escape or
+  `thread.agent.up`; `docs/notes/subagent-view.md`) and Threads (the thread's lineage from the thread list:
   the thread whose agent created it, its siblings and the threads created from it; opened
   by H, `view.panel.threads` and the header's "from …" chip;
   `docs/notes/agents-3-lineage-gui.md`). Every

@@ -56,6 +56,12 @@ describe("runNodes", () => {
     expect(nodes[0]?.type === "tool" && nodes[0].permissionId).toBe("p");
   });
 
+  it("leaves out the handback call: its report is the run's summary, shown as the report block", () => {
+    const items = [tool("b", "Bash", { parentToolUseId: "A" }), tool("h", "SubagentHandback", { parentToolUseId: "A" })];
+    expect(runNodes(items).map((n) => n.type === "tool" && n.name)).toEqual(["Bash"]);
+    expect(lastTextId(runNodes(items))).toBe("");
+  });
+
   it("has no last text without text", () => {
     expect(lastTextId(runNodes([tool("b", "Bash")]))).toBe("");
   });

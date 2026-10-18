@@ -409,6 +409,19 @@ export class MockThreadLogs {
         this.update(id, { ...x, streaming: false, updatedAt: timestampFromDate(now) });
       }
     }
+    // A done run hands its report back with a SubagentHandback call, as Claude Code's
+    // subagents do (the daemon makes its message the run's summary).
+    if (!failed) {
+      const hb = `${run.toolUseId ?? ""}-handback`;
+      this.append(
+        id,
+        this.item(
+          id,
+          { case: "toolCall", value: { toolUseId: hb, name: "SubagentHandback", inputJson: JSON.stringify({ message: report }), status: ToolCallStatus.DONE, output: "Report delivered." } },
+          { id: hb, parentToolUseId: run.toolUseId ?? "" },
+        ),
+      );
+    }
     if (run.background) {
       const note = this.append(id, this.item(id, { case: "note", value: { text: failed ? `Agent failed · ${run.description ?? ""} · ${error}` : `Agent finished · ${run.description ?? ""} · ${report}` } }));
       ended.noteItemId = note.id ?? "";

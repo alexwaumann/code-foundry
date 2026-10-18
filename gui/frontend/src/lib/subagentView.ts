@@ -20,8 +20,19 @@ export function runItems<T extends Pick<TimelineItem, "parentToolUseId">>(items:
 
 const NO_CHILDREN: ReadonlyMap<string, TimelineItem[]> = new Map();
 
-/** A run's work rows: its items as the timeline's work nodes (groups, merged thinking, its own Agent calls without children). */
-export function runNodes(items: readonly TimelineItem[]): WorkNode[] {
+/**
+ * The tool a subagent hands its report back with (Claude Code's SubagentHandback, its
+ * input `message` the report). The daemon makes the report the run's summary, which the
+ * view shows as its report block, so the call itself is no row of the view.
+ */
+export const HANDBACK_TOOL = "SubagentHandback";
+
+/**
+ * A run's work rows: its items as the timeline's work nodes (groups, merged thinking, its
+ * own Agent calls without children), without its handback call (HANDBACK_TOOL).
+ */
+export function runNodes(all: readonly TimelineItem[]): WorkNode[] {
+  const items = all.filter((it) => !(it.kind === "tool" && it.name === HANDBACK_TOOL));
   const tools = new Set(items.filter((it) => it.kind === "tool").map((it) => it.toolUseId));
   const permissions = new Map<string, TimelineItem>();
   for (const it of items) if (it.kind === "permission" && it.toolUseId && tools.has(it.toolUseId)) permissions.set(it.toolUseId, it);
