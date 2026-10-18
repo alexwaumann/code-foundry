@@ -328,8 +328,9 @@ function TipSnooze({ id }: { id: string }) {
 }
 
 /**
- * "↳ Created by <name>" for a thread an agent created (the name its creator had then); a
- * removed creator is muted and marked so. Nothing for the user's threads.
+ * "↳ Created by <name>" for a thread an agent created (the creator's current name); a
+ * removed creator keeps the name it had then, muted and marked so. Nothing for the user's
+ * threads.
  */
 function TipCreatedBy({ id }: { id: string }) {
   const creator = useCreator(id);

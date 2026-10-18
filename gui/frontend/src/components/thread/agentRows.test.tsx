@@ -132,7 +132,7 @@ describe("Agent rows", () => {
 });
 
 describe("agent notes", () => {
-  const note = (id: string, text: string): ThreadItemView => ({ ...base, id, ordinal: 9, kind: "note", text, createdAtMs: NOW - 3 * 60_000 });
+  const note = (id: string, text: string): ThreadItemView => ({ ...base, id, ordinal: 9, kind: "note", text, createdBy: "", createdAtMs: NOW - 3 * 60_000 });
 
   it("a finished run: green check, the name, the report, its age", () => {
     const el = show([note("n1", "Agent finished · PR 1 · Added tests; make check is green.")], []);

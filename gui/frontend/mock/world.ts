@@ -942,7 +942,8 @@ export class World {
       { id: "s-l-spike", name: "Old redirect spike", createdBy: P, createdByName: PN, status: A, statusReason: "finished", state: D, min: 13, archivedAt: ago(5) },
       { id: "s-l-logs", name: "Tidy redirect logging", createdBy: P, createdByName: PN, brief: "Drop the debug logs around the redirect", state: D, min: 12 },
       { id: "s-l-metrics", name: "Check redirect metrics", createdBy: P, createdByName: PN, state: D, min: 11 },
-      { id: "s-l-grand", name: "Write retry backoff tests", createdBy: C, createdByName: CN, brief: "Write table tests for the retry backoff schedule (3 attempts, 200 ms base)", state: D, min: 9, worktreePath: `${CFW}/fix-resize` },
+      // Its creator was renamed since (the recorded name differs): the GUI shows the current one.
+      { id: "s-l-grand", name: "Write retry backoff tests", createdBy: C, createdByName: `${CN} (old)`, brief: "Write table tests for the retry backoff schedule (3 attempts, 200 ms base)", state: D, min: 9, worktreePath: `${CFW}/fix-resize` },
     ];
     const out: string[] = [];
     for (const { min, ...o } of specs) {
@@ -971,7 +972,7 @@ export class World {
       }
       if (s.createdBy) {
         this.logs.seed(s.id, {
-          note: { id: "note-created-by", text: `Created by ${s.createdByName}${s.brief ? ` · brief: ${s.brief}` : ""}` },
+          note: { id: "note-created-by", text: `Created by ${s.createdByName}${s.brief ? ` · brief: ${s.brief}` : ""}`, createdBy: s.createdBy },
           prompt: s.brief || s.name,
           intro: "Reading the redirect handler first.",
           command: "rg -n exchangeToken internal/auth",

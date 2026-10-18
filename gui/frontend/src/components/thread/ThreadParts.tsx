@@ -84,10 +84,11 @@ const CREATED_BY_CHIP = "flex h-[22px] max-w-60 min-w-0 shrink-[4] items-center 
 
 /**
  * "↳ from <creator>" for a thread an agent created (docs/notes/agents-3-lineage-gui.md,
- * sketch variant A): the creator's name as recorded at creation. A click opens the
- * Threads surface in the side panel (view.panel.threads). When the creator was removed
- * the chip is inert and muted, with "Thread removed" as its tooltip; an archived creator
- * still exists. Nothing for the user's threads.
+ * sketch variant A): the creator's current name (its name at creation once removed,
+ * docs/notes/lineage-by-id.md). A click opens the Threads surface in the side panel
+ * (view.panel.threads). When the creator was removed the chip is inert and muted, with
+ * "Thread removed" as its tooltip; an archived creator still exists. Nothing for the
+ * user's threads.
  */
 function CreatedByChip({ id }: { id: string }) {
   const creator = useCreator(id);

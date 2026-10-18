@@ -66,8 +66,11 @@ export interface SeedHistory {
   end: "done" | "working" | "permission" | "cut";
   /** "cut": the exit code the error item names. */
   exitCode?: number;
-  /** A daemon note before the first message (an agent-made thread's "Created by …", id note-created-by). */
-  note?: { id: string; text: string };
+  /**
+   * A daemon note before the first message (an agent-made thread's "Created by …", id
+   * note-created-by, with its creator's id in createdBy).
+   */
+  note?: { id: string; text: string; createdBy?: string };
   /** Wake messages the daemon sent after the history (docs/notes/agents-4-wake.md): header line and JSON payload. */
   wakes?: { title: string; json: string }[];
 }
@@ -1045,7 +1048,7 @@ export class MockThreadLogs {
       const toolUseId = `toolu_bash_${id}_${String(l.nextOrdinal)}`;
       return push({ case: "toolCall", value: { toolUseId, name: "Bash", inputJson: JSON.stringify({ command }), status: ToolCallStatus.DONE, ...value } }, { id: toolUseId, at: at(sec), until: at(sec + 1) });
     };
-    if (h.note) push({ case: "note", value: { text: h.note.text } }, { id: h.note.id, at: at(0) });
+    if (h.note) push({ case: "note", value: { text: h.note.text, createdBy: h.note.createdBy ?? "" } }, { id: h.note.id, at: at(0) });
     push({ case: "userMessage", value: { text: h.prompt, attachments: [] } }, { at: at(0) });
     push({ case: "assistantText", value: { text: h.intro } }, { at: at(5) });
     bash(h.command, { output: h.output }, 8);

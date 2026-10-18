@@ -106,8 +106,8 @@ describe("Threads surface", () => {
   it("an agent's thread: header, sections in spawn order, statuses, place, age and brief", () => {
     open();
     expect(screen.getByTestId("threads-count").textContent).toBe("5 related");
-    // The name the creator had when it created the thread (createdByName), not its current one.
-    expect(screen.getByTestId("threads-subline").textContent).toBe("Created by name p · 3 siblings · 1 child");
+    // The creator's current name, not the one it had when it created the thread (createdByName).
+    expect(screen.getByTestId("threads-subline").textContent).toBe("Created by Fix login redirect · 3 siblings · 1 child");
     expect(ids("creator")).toEqual(["p"]);
     expect(ids("this")).toEqual(["me"]);
     expect(ids("siblings")).toEqual(["s1", "s2", "s3"]);
@@ -203,5 +203,13 @@ describe("Threads surface", () => {
       useThreadsStore.setState((s) => ({ byId: { ...s.byId, c1: { ...s.byId.c1, state: "connected", status: "busy" } as ThreadView } }));
     });
     expect(within(rowOf("c1"), "lineage-status")?.textContent).toBe("Working");
+  });
+
+  it("a rename of the creator: the subline follows", () => {
+    open();
+    act(() => {
+      useThreadsStore.setState((s) => ({ byId: { ...s.byId, p: { ...s.byId.p, name: "Login redirect" } as ThreadView } }));
+    });
+    expect(screen.getByTestId("threads-subline").textContent).toBe("Created by Login redirect · 3 siblings · 1 child");
   });
 });

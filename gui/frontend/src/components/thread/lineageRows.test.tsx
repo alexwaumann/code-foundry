@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { ThreadItemView } from "@/api/thread";
 import type { ThreadView } from "@/api/threads";
@@ -9,11 +9,11 @@ import { useUiStore } from "@/stores/ui";
 import { ThreadContext } from "./context";
 import { TimelineRowView } from "./rows";
 
-/** The daemon's "Created by" note in the timeline (docs/notes/agents-3-lineage-gui.md). */
+/** The daemon's "Created by" note in the timeline (docs/notes/agents-3-lineage-gui.md, lineage-by-id.md). */
 
 const NOW = Date.now();
 const base = { parentToolUseId: "", updatedAtMs: NOW, streaming: false };
-const note = (id: string, text: string): ThreadItemView => ({ ...base, id, ordinal: 1, kind: "note", text, createdAtMs: NOW - 18 * 60_000 });
+const note = (id: string, text: string, createdBy = "p"): ThreadItemView => ({ ...base, id, ordinal: 1, kind: "note", text, createdBy, createdAtMs: NOW - 18 * 60_000 });
 const user: ThreadItemView = { ...base, id: "u", ordinal: 2, kind: "user", text: "go", attachments: [], composerText: "", createdAtMs: NOW };
 
 const t = (id: string, o: Partial<ThreadView> = {}) => ({ id, name: `name ${id}`, createdBy: "", createdByName: "", ...o }) as ThreadView;
@@ -72,31 +72,47 @@ describe("Created by note", () => {
     expect(q(el, "thread-created-by-note")?.textContent).toBe("Created byFix login redirect18 min ago");
   });
 
-  it("the recorded name says where a name with the separator ends", () => {
-    setThreads([t("p", { name: "A · brief: B" }), t("s", { createdBy: "p", createdByName: "A · brief: B" })]);
-    const el = show([note("note-created-by", "Created by A · brief: B · brief: c")]);
-    expect(q(el, "thread-created-by-note-link")?.textContent).toBe("A · brief: B");
-    expect(q(el, "thread-created-by-note-brief")?.textContent).toBe("brief: c");
+  it("a renamed creator: its current name, linked by id; a later rename re-renders", () => {
+    setThreads([t("p", { name: "Fix login redirect, take 2" }), t("s", { name: "Add retry", createdBy: "p", createdByName: "Fix login redirect" })]);
+    const el = show([note("note-created-by", "Created by Fix login redirect · brief: x")]);
+    const link = q(el, "thread-created-by-note-link") as HTMLElement;
+    expect(link.textContent).toBe("Fix login redirect, take 2");
+    expect(link.getAttribute("data-thread")).toBe("p");
+    expect(q(el, "thread-created-by-note-brief")?.textContent).toBe("brief: x");
+    act(() => {
+      setThreads([t("p", { name: "Login redirect" }), t("s", { name: "Add retry", createdBy: "p", createdByName: "Fix login redirect" })]);
+    });
+    expect(q(el, "thread-created-by-note-link")?.textContent).toBe("Login redirect");
   });
 
-  it("a removed creator: the name as muted text, no link", () => {
+  it("an unnamed creator: its id", () => {
+    setThreads([t("p", { name: "" }), t("s", { createdBy: "p", createdByName: "Fix login redirect" })]);
+    const el = show([note("note-created-by", "Created by Fix login redirect")]);
+    expect(q(el, "thread-created-by-note-link")?.textContent).toBe("p");
+  });
+
+  it("a removed creator: the recorded name as muted text, no link", () => {
     setThreads([t("s", { createdBy: "p", createdByName: "Fix login redirect" })]);
     const el = show([note("note-created-by", "Created by Fix login redirect · brief: x")]);
     expect(q(el, "thread-created-by-note-link")).toBeNull();
     const name = q(el, "thread-created-by-note-name") as HTMLElement;
     expect(name.className).toBe("nm gone");
     expect(name.textContent).toBe("Fix login redirect");
+    expect(q(el, "thread-created-by-note-brief")?.textContent).toBe("brief: x");
   });
 
-  it("a fork's copied note: resolved by name, plain text when ambiguous", () => {
-    setThreads([t("p", { name: "Fix login redirect" }), t("s", { name: "Fork" })]);
-    let el = show([note("note-created-by", "Created by Fix login redirect")]);
-    expect(q(el, "thread-created-by-note-link")?.getAttribute("data-thread")).toBe("p");
-    cleanup();
-    setThreads([t("p", { name: "Fix login redirect" }), t("p2", { name: "Fix login redirect" }), t("s", { name: "Fork" })]);
-    el = show([note("note-created-by", "Created by Fix login redirect")]);
-    expect(q(el, "thread-created-by-note-link")).toBeNull();
-    expect(q(el, "thread-created-by-note-name")?.textContent).toBe("Fix login redirect");
+  it("a fork's copied note: linked by its id, whatever has the name", () => {
+    setThreads([t("p", { name: "Renamed" }), t("p2", { name: "Fix login redirect" }), t("s", { name: "Fork" })]);
+    const el = show([note("note-created-by", "Created by Fix login redirect")]);
+    const link = q(el, "thread-created-by-note-link") as HTMLElement;
+    expect(link.getAttribute("data-thread")).toBe("p");
+    expect(link.textContent).toBe("Renamed");
+  });
+
+  it("a note without a creator id is the plain divider, whatever its text", () => {
+    const el = show([note("note-created-by", "Created by Fix login redirect", "")]);
+    expect(q(el, "thread-created-by-note")).toBeNull();
+    expect(q(el, "thread-note")?.textContent).toBe("Created by Fix login redirect");
   });
 
   it("a wake message: a collapsed Woken by note instead of a bubble, its payload once expanded", () => {
@@ -134,7 +150,7 @@ describe("Created by note", () => {
   });
 
   it("a fork's note stays the centered divider", () => {
-    const el = show([note("note-fork-p", "Forked from Fix login redirect")]);
+    const el = show([note("note-fork-p", "Forked from Fix login redirect", "")]);
     expect(q(el, "thread-created-by-note")).toBeNull();
     expect(q(el, "thread-note")?.textContent).toBe("Forked from Fix login redirect");
     expect(q(el, "thread-note")?.getAttribute("role")).toBe("separator");

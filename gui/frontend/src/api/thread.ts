@@ -132,8 +132,12 @@ export type ThreadItemView = ItemBase &
     | { kind: "error"; text: string }
     | { kind: "compaction"; trigger: string; preTokens: number; postTokens: number; summary: string }
     | { kind: "commandOutput"; text: string }
-    /** A line the daemon adds, not Claude (a fork's "Forked from <parent>", where the copied history ends). */
-    | { kind: "note"; text: string }
+    /**
+     * A line the daemon adds, not Claude (a fork's "Forked from <parent>", where the copied
+     * history ends). createdBy: the creator thread's id when it is the "Created by …" note
+     * at the top of an agent-made thread (a fork's copy too), else "".
+     */
+    | { kind: "note"; text: string; createdBy: string }
   );
 
 export type ThreadItemKind = ThreadItemView["kind"];
@@ -285,7 +289,7 @@ export function toThreadItemView(it: ThreadItem): ThreadItemView | null {
     case "commandOutput":
       return { ...base, kind: "commandOutput", text: p.value.text };
     case "note":
-      return { ...base, kind: "note", text: p.value.text };
+      return { ...base, kind: "note", text: p.value.text, createdBy: p.value.createdBy };
     default:
       return null;
   }

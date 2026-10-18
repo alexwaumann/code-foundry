@@ -5,10 +5,14 @@
  * a list re-renders only when a thread joins, leaves or changes creator.
  */
 import { useShallow } from "zustand/react/shallow";
-import { childIds, creatorOf, lineageStatus, noteCreatorId, projectCount, siblingIds, type Creator, type LineageCounts, type LineageStatus } from "@/lib/lineage";
+import { childIds, creatorOf, lineageStatus, noteCreator, projectCount, siblingIds, type Creator, type LineageCounts, type LineageStatus } from "@/lib/lineage";
 import { useThreadsStore } from "./threads";
 
-/** The thread's creator (id, recorded name, whether it still exists); null when the user made it. */
+/**
+ * The thread's creator (id, current name or the recorded one once removed, whether it
+ * still exists); null when the user made it. Shallow over the three fields, so a rename
+ * of the creator re-renders.
+ */
 export function useCreator(threadId: string): Creator | null {
   return useThreadsStore(useShallow((s) => creatorOf(s, threadId)));
 }
@@ -50,7 +54,11 @@ export function useMadeByThread(id: string): boolean {
   return useThreadsStore((s) => Boolean(s.byId[id]?.createdBy));
 }
 
-/** The thread a created-by note links to ("" for plain text): lib/lineage noteCreatorId. */
-export function useNoteCreatorId(threadId: string, noteId: string, name: string): string {
-  return useThreadsStore((s) => noteCreatorId(s, threadId, noteId, name));
+/**
+ * The creator a created-by note names by its id (lib/lineage noteCreator); `recorded` is
+ * the note's name, for a removed creator. Shallow over id, name (s.byId[createdBy]?.name)
+ * and exists, so a rename or a removal of the creator re-renders the note.
+ */
+export function useNoteCreator(createdBy: string, recorded: string): Creator {
+  return useThreadsStore(useShallow((s) => noteCreator(s, createdBy, recorded)));
 }

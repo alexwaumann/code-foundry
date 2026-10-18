@@ -63,7 +63,7 @@ const call = (id: string, parent = ""): ThreadItemView => ({
   resultJson: "",
 });
 const user: ThreadItemView = { ...base, id: "u", ordinal: 1, kind: "user", text: "go", attachments: [], composerText: "" };
-const note = (id: string, text: string): ThreadItemView => ({ ...base, id, ordinal: 9, kind: "note", text });
+const note = (id: string, text: string): ThreadItemView => ({ ...base, id, ordinal: 9, kind: "note", text, createdBy: "" });
 
 const cmd = (name: string) => ({ name, title: name, available: true, args: [], keybindings: [] }) as unknown as CommandView;
 
