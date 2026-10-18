@@ -14,7 +14,7 @@ import { usePending } from "@/stores/pluginSurfaces";
 import { copyElementText, openElementUrl } from "@/stores/pluginSurfaces";
 import { useRunAction } from "./actions";
 import { useFormCtx, useViewCtx } from "./context";
-import { formatDuration, formatTime } from "./format";
+import { formatFixedDuration, formatTime } from "./format";
 import { PLUGIN_ICONS } from "./icons";
 import { statusDot, statusIcon, toneText, tonePill } from "./tones";
 
@@ -31,7 +31,7 @@ function TimeText({ at, style }: { at: string; style: "relative" | "elapsed" | "
 }
 
 function SpanView({ span }: { span: Span }) {
-  const body = span.time ? <TimeText at={span.time.at} style={span.time.style} /> : span.duration ? <span className="tabular-nums">{formatDuration(span.duration.ms)}</span> : span.text;
+  const body = span.time ? <TimeText at={span.time.at} style={span.time.style} /> : span.duration ? <span className="tabular-nums">{formatFixedDuration(span.duration.ms)}</span> : span.text;
   const cls = cn(toneText[span.tone ?? ""], span.mono && "font-mono", span.strong && "font-semibold");
   if (span.url) {
     const url = span.url;
