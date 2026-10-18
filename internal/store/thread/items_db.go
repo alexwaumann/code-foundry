@@ -11,16 +11,17 @@ import (
 
 // itemData is the JSON in thread_items.data.
 type itemData struct {
-	Text        string      `json:"text,omitempty"`
-	Attachments []string    `json:"attachments,omitempty"`
-	Composer    string      `json:"composer,omitempty"`
-	Origin      string      `json:"origin,omitempty"`
-	WakeTitle   string      `json:"wake_title,omitempty"`
-	WakeJSON    string      `json:"wake_json,omitempty"`
-	Tool        *ToolCall   `json:"tool,omitempty"`
-	Request     *Request    `json:"request,omitempty"`
-	Turn        *TurnEnd    `json:"turn,omitempty"`
-	Compaction  *Compaction `json:"compaction,omitempty"`
+	Text          string      `json:"text,omitempty"`
+	Attachments   []string    `json:"attachments,omitempty"`
+	Composer      string      `json:"composer,omitempty"`
+	Origin        string      `json:"origin,omitempty"`
+	WakeTitle     string      `json:"wake_title,omitempty"`
+	WakeJSON      string      `json:"wake_json,omitempty"`
+	NoteCreatedBy string      `json:"note_created_by,omitempty"`
+	Tool          *ToolCall   `json:"tool,omitempty"`
+	Request       *Request    `json:"request,omitempty"`
+	Turn          *TurnEnd    `json:"turn,omitempty"`
+	Compaction    *Compaction `json:"compaction,omitempty"`
 }
 
 // execer is a *sql.DB or a *sql.Tx.
@@ -49,7 +50,8 @@ func saveItems(ctx context.Context, db *sql.DB, threadID string, items []Item) e
 // saveItem inserts or rewrites one item. Streaming items are never saved.
 func saveItem(ctx context.Context, db execer, threadID string, it Item) error {
 	data, err := json.Marshal(itemData{Text: it.Text, Attachments: it.Attachments, Composer: it.ComposerText,
-		Origin: string(it.Origin), WakeTitle: it.WakeTitle, WakeJSON: it.WakeJSON, Tool: it.Tool, Request: it.Request, Turn: it.Turn, Compaction: it.Compaction})
+		Origin: string(it.Origin), WakeTitle: it.WakeTitle, WakeJSON: it.WakeJSON,
+		NoteCreatedBy: it.NoteCreatedBy, Tool: it.Tool, Request: it.Request, Turn: it.Turn, Compaction: it.Compaction})
 	if err != nil {
 		return fmt.Errorf("thread: encode item %s: %w", it.ID, err)
 	}
@@ -89,6 +91,7 @@ func loadItems(ctx context.Context, db *sql.DB, threadID string) ([]Item, error)
 		it.Kind, it.CreatedAt, it.UpdatedAt = ItemKind(kind), fromMillis(created), fromMillis(updated)
 		it.ComposerText = d.Composer
 		it.Origin, it.WakeTitle, it.WakeJSON = MessageOrigin(d.Origin), d.WakeTitle, d.WakeJSON
+		it.NoteCreatedBy = d.NoteCreatedBy
 		it.Text, it.Attachments, it.Tool, it.Request, it.Turn, it.Compaction = d.Text, d.Attachments, d.Tool, d.Request, d.Turn, d.Compaction
 		out = append(out, it)
 	}

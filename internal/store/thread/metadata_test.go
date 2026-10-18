@@ -162,7 +162,8 @@ func TestCreateRecordsMetadataAndNote(t *testing.T) {
 	items := e.waitItems(child.ID, "the first message", func(items []Item) bool {
 		return slices.ContainsFunc(items, func(it Item) bool { return it.Kind == KindUserMessage })
 	})
-	if items[0].ID != createdByNoteID || items[0].Kind != KindNote || items[0].Text != "Created by Parent · brief: say hi" || items[0].Ordinal != 1 {
+	if items[0].ID != createdByNoteID || items[0].Kind != KindNote || items[0].Text != "Created by Parent · brief: say hi" || items[0].Ordinal != 1 ||
+		items[0].NoteCreatedBy != parent.ID {
 		t.Fatalf("first item = %+v", items[0])
 	}
 	if items[1].Kind != KindUserMessage {
@@ -179,7 +180,7 @@ func TestCreateRecordsMetadataAndNote(t *testing.T) {
 	if plain.CreatedByName != anon.ID || plain.Brief != "" || plain.Labels != nil {
 		t.Errorf("plain = %+v", plain)
 	}
-	if it := e.items(plain.ID).Items; len(it) == 0 || it[0].Text != "Created by "+anon.ID {
+	if it := e.items(plain.ID).Items; len(it) == 0 || it[0].Text != "Created by "+anon.ID || it[0].NoteCreatedBy != anon.ID {
 		t.Errorf("plain items = %+v", it)
 	}
 	// A user's thread has no note.
@@ -210,7 +211,7 @@ func TestCreateRecordsMetadataAndNote(t *testing.T) {
 		!slices.Equal(after.Labels, []string{"agent", "test"}) || after.BudgetUSD != 2.5 {
 		t.Errorf("after restart = %+v", after)
 	}
-	if it := e.items(child.ID).Items; len(it) < 2 || it[0].ID != createdByNoteID || it[1].Kind != KindUserMessage {
+	if it := e.items(child.ID).Items; len(it) < 2 || it[0].ID != createdByNoteID || it[0].NoteCreatedBy != parent.ID || it[1].Kind != KindUserMessage {
 		t.Errorf("items after restart:\n%s", describeItems(it))
 	}
 	if got := len(e.m.Snapshot().Threads); got != n {
@@ -231,6 +232,16 @@ func TestForkDoesNotSetCreatedBy(t *testing.T) {
 	}
 	if f.ParentID != child.ID || f.CreatedBy != "" || f.CreatedByName != "" || f.Brief != "" || f.Labels != nil {
 		t.Errorf("fork = %+v", f)
+	}
+	// The fork's copy of the child's Created by note still names the creator by its id,
+	// after a restart too (the copied rows).
+	for _, restart := range []bool{false, true} {
+		if restart {
+			e.restart()
+		}
+		if it := e.items(f.ID).Items; len(it) == 0 || it[0].ID != createdByNoteID || it[0].NoteCreatedBy != parent.ID {
+			t.Errorf("fork items (restart %v):\n%s", restart, describeItems(it))
+		}
 	}
 }
 

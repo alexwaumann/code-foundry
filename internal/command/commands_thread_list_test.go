@@ -25,6 +25,8 @@ func TestThreadList(t *testing.T) {
 	child := &v1.Thread{Id: "s-867564981c98", ProjectId: "r1", WorktreePath: "/src/app",
 		Status: v1.ThreadStatus_THREAD_STATUS_NEEDS_ATTENTION, StatusReason: "finished", LastActivityAt: ago(3 * time.Hour),
 		CreatedBy: "s-7754a478e649", CreatedByName: "Fix the login"}
+	renamed := proto.CloneOf(busy)
+	renamed.Name = "Fix the login, again"
 	home := &v1.Thread{Id: "s-000000000001", Name: "notes", Status: v1.ThreadStatus_THREAD_STATUS_ERROR, StatusReason: "interrupted",
 		WorktreePath: "/Users/me", CreatedAt: ago(72 * time.Hour), ArchivedAt: ago(time.Hour)}
 	tests := []struct {
@@ -33,6 +35,7 @@ func TestThreadList(t *testing.T) {
 		threads    []*v1.Thread
 		wantFilter *v1.ThreadFilter
 		wantLines  []string // substrings, one per output line
+		wantLookup bool     // a creator is looked up in an unfiltered list
 		wantCode   connect.Code
 	}{
 		{name: "defaults", threads: []*v1.Thread{busy, child, home},
@@ -42,6 +45,18 @@ func TestThreadList(t *testing.T) {
 				"s-867564981c98  attention (finished)  (unnamed)      app@main    3h  ↳ Fix the login",
 				"s-000000000001  error (interrupted)   notes          no project  3d  [archived]",
 			}},
+		// The creator is resolved by its id: its current name, not the recorded one.
+		{name: "a renamed creator shows its current name", threads: []*v1.Thread{renamed, child},
+			wantFilter: &v1.ThreadFilter{Limit: 50},
+			wantLines: []string{
+				"s-7754a478e649  busy                  Fix the login, again",
+				"s-867564981c98  attention (finished)  (unnamed)             app@main    3h  ↳ Fix the login, again",
+			}},
+		// A creator not in the list (left out by the filter, or removed) is looked up in
+		// one unfiltered list; a removed one keeps its recorded name.
+		{name: "a creator not in the list", args: map[string]string{"status": "attention"}, threads: []*v1.Thread{child},
+			wantFilter: &v1.ThreadFilter{Status: v1.ThreadStatus_THREAD_STATUS_NEEDS_ATTENTION, Limit: 50}, wantLookup: true,
+			wantLines: []string{"s-867564981c98  attention (finished)  (unnamed)  app@main  3h  ↳ Fix the login"}},
 		{name: "every filter", args: map[string]string{"archived": "true", "status": "attention", "state": "disconnected", "project": "app",
 			"workspace": "w", "created-by": "user", "label": "a, b", "limit": "0"},
 			wantFilter: &v1.ThreadFilter{IncludeArchived: true, Status: v1.ThreadStatus_THREAD_STATUS_NEEDS_ATTENTION,
@@ -85,10 +100,21 @@ func TestThreadList(t *testing.T) {
 				t.Fatal(err)
 			}
 			var got *v1.ThreadFilter
-			for _, r := range b.Requests() { // the last: created-by's suffix lists them all first
+			// The last but the lookups (filter all, no limit): created-by's suffix lists
+			// them all first, a creator left out of the list is looked up after.
+			lookup := &v1.ThreadFilter{All: true}
+			lookedUp := false
+			for _, r := range b.Requests() {
 				if l, ok := r.(*v1.ListThreadsRequest); ok {
-					got = l.GetFilter()
+					if !proto.Equal(l.GetFilter(), lookup) {
+						got = l.GetFilter()
+					} else if got != nil {
+						lookedUp = true
+					}
 				}
+			}
+			if lookedUp != tt.wantLookup {
+				t.Errorf("looked up creators = %v, want %v", lookedUp, tt.wantLookup)
 			}
 			if !proto.Equal(got, tt.wantFilter) {
 				t.Errorf("filter = %v, want %v", got, tt.wantFilter)

@@ -184,7 +184,12 @@ func TestItemToProto(t *testing.T) {
 		{"thinking", thread.Item{Kind: thread.KindThinking, Text: "hm"}, func(p *v1.ThreadItem) bool { return p.GetThinking().GetText() == "hm" }},
 		{"error", thread.Item{Kind: thread.KindError, Text: "boom"}, func(p *v1.ThreadItem) bool { return p.GetError().GetText() == "boom" }},
 		{"command output", thread.Item{Kind: thread.KindCommandOutput, Text: "Compacted"}, func(p *v1.ThreadItem) bool { return p.GetCommandOutput().GetText() == "Compacted" }},
-		{"note", thread.Item{Kind: thread.KindNote, Text: "Forked from base"}, func(p *v1.ThreadItem) bool { return p.GetNote().GetText() == "Forked from base" }},
+		{"note", thread.Item{Kind: thread.KindNote, Text: "Forked from base"}, func(p *v1.ThreadItem) bool {
+			return p.GetNote().GetText() == "Forked from base" && p.GetNote().GetCreatedBy() == ""
+		}},
+		{"created-by note", thread.Item{Kind: thread.KindNote, Text: "Created by Parent", NoteCreatedBy: "s-parent"}, func(p *v1.ThreadItem) bool {
+			return p.GetNote().GetText() == "Created by Parent" && p.GetNote().GetCreatedBy() == "s-parent"
+		}},
 		{"subagent", thread.Item{Kind: thread.KindAssistantText, Text: "x", ParentToolUseID: "agent"}, func(p *v1.ThreadItem) bool { return p.GetParentToolUseId() == "agent" }},
 		{"unknown kind", thread.Item{Kind: "future"}, func(p *v1.ThreadItem) bool { return p.GetPayload() == nil }},
 	}

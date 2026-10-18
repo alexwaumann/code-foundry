@@ -26,6 +26,7 @@ func TestThreadMetadataCommands(t *testing.T) {
 		ctx      command.Context
 		args     map[string]string
 		current  *v1.Thread
+		others   []*v1.Thread // listed after current
 		wantErr  error
 		wantCode connect.Code
 		wantMsg  string
@@ -78,9 +79,23 @@ func TestThreadMetadataCommands(t *testing.T) {
 				StatusReason: "budget reached", WorktreePath: "/wt", CreatedBy: "s-1", CreatedByName: "Parent", Brief: "say hi",
 				Labels: []string{"a", "b"}, ReportStatus: done, ReportSummary: "all good", ReportData: `{"n":1}`,
 				CostUsd: 1.5, BudgetUsd: 5},
+			others: []*v1.Thread{{Id: "s-1", Name: "Parent"}},
 			wantMsg: "thread child (s-2)\nstatus: needs attention (budget reached)\nworktree: /wt\ncreated by: Parent (s-1)\nbrief: say hi\n" +
 				"labels: a, b\nreport: done: all good\nreport data: {\"n\":1}\ncost: $1.50 of a $5.00 budget",
-			wantReqs: []proto.Message{&v1.GetThreadRequest{Id: "s-2"}}},
+			wantReqs: []proto.Message{&v1.GetThreadRequest{Id: "s-2"}, &v1.ListThreadsRequest{Filter: &v1.ThreadFilter{All: true}}}},
+		// The creator is resolved by its id: its current name, the recorded one only
+		// once it is removed.
+		{name: "get shows a renamed creator's current name", cmd: "thread.get", args: map[string]string{"id": "s-2"},
+			current: &v1.Thread{Name: "child", Status: v1.ThreadStatus_THREAD_STATUS_IDLE, WorktreePath: "/wt", CreatedBy: "s-1", CreatedByName: "Parent"},
+			others:  []*v1.Thread{{Id: "s-1", Name: "Parent, renamed"}},
+			wantMsg: "thread child (s-2)\nstatus: idle\nworktree: /wt\ncreated by: Parent, renamed (s-1)\ncost: $0.00"},
+		{name: "get names an unnamed creator by its id", cmd: "thread.get", args: map[string]string{"id": "s-2"},
+			current: &v1.Thread{Name: "child", Status: v1.ThreadStatus_THREAD_STATUS_IDLE, WorktreePath: "/wt", CreatedBy: "s-1", CreatedByName: "Parent"},
+			others:  []*v1.Thread{{Id: "s-1"}},
+			wantMsg: "thread child (s-2)\nstatus: idle\nworktree: /wt\ncreated by: s-1 (s-1)\ncost: $0.00"},
+		{name: "get keeps a removed creator's recorded name", cmd: "thread.get", args: map[string]string{"id": "s-2"},
+			current: &v1.Thread{Name: "child", Status: v1.ThreadStatus_THREAD_STATUS_IDLE, WorktreePath: "/wt", CreatedBy: "s-1", CreatedByName: "Parent"},
+			wantMsg: "thread child (s-2)\nstatus: idle\nworktree: /wt\ncreated by: Parent (s-1, removed)\ncost: $0.00"},
 		{name: "get of a plain thread", cmd: "thread.get", ctx: inThread,
 			current: &v1.Thread{State: v1.ThreadState_THREAD_STATE_DISCONNECTED, Status: v1.ThreadStatus_THREAD_STATUS_IDLE, StatusReason: "at prompt", WorktreePath: "/wt"},
 			wantMsg: "thread s-me\nstatus: idle (at prompt), disconnected\nworktree: /wt\ncost: $0.00"},
@@ -88,7 +103,7 @@ func TestThreadMetadataCommands(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			reg, b, _ := newLifecycleRegistry(t)
-			b.Current = tt.current
+			b.Current, b.Others = tt.current, tt.others
 			res, err := reg.Invoke(context.Background(), tt.ctx, tt.cmd, tt.args, command.Confirmed(true))
 			switch {
 			case tt.wantCode != 0:

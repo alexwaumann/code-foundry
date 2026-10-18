@@ -92,7 +92,11 @@ func RegisterThreadList(r *Registry, d ThreadListDeps) error {
 			if err != nil {
 				return Result{}, err
 			}
-			return Result{Message: formatThreadList(res.Msg.GetThreads(), projects.Msg.GetProjects(), f, time.Now()), JSON: res.Msg}, nil
+			names, err := threadNames(ctx, d.Thread, res.Msg.GetThreads())
+			if err != nil {
+				return Result{}, err
+			}
+			return Result{Message: formatThreadList(res.Msg.GetThreads(), projects.Msg.GetProjects(), names, f, time.Now()), JSON: res.Msg}, nil
 		},
 	})
 }
@@ -104,9 +108,45 @@ func threadListState(s string) v1.ThreadState {
 	return v1.ThreadState(v1.ThreadState_value["THREAD_STATE_"+strings.ToUpper(s)])
 }
 
+// threadNames maps thread ids to current names for creatorName: those of threads, and,
+// when a creator of one of them is not among them (left out by a filter, or removed),
+// those of every thread, from one unfiltered list. A removed creator is not in it.
+func threadNames(ctx context.Context, b ThreadBackend, threads []*v1.Thread) (map[string]string, error) {
+	names := make(map[string]string, len(threads))
+	for _, t := range threads {
+		names[t.GetId()] = t.GetName()
+	}
+	for _, t := range threads {
+		if by := t.GetCreatedBy(); by != "" {
+			if _, ok := names[by]; !ok {
+				res, err := b.List(ctx, connect.NewRequest(&v1.ListThreadsRequest{Filter: &v1.ThreadFilter{All: true}}))
+				if err != nil {
+					return nil, err
+				}
+				for _, t := range res.Msg.GetThreads() {
+					names[t.GetId()] = t.GetName()
+				}
+				break
+			}
+		}
+	}
+	return names, nil
+}
+
+// creatorName is the name of the thread that created s, resolved by its id: the
+// creator's current name (its id when unnamed), or, when it is not in names (removed),
+// the name recorded at creation, and exists false.
+func creatorName(s *v1.Thread, names map[string]string) (name string, exists bool) {
+	by := s.GetCreatedBy()
+	if n, ok := names[by]; ok {
+		return cmp.Or(n, by), true
+	}
+	return cmp.Or(s.GetCreatedByName(), by), false
+}
+
 // formatThreadList is thread.list's text: one aligned line per thread, then a hint when
-// the limit cut the list, or why it is empty.
-func formatThreadList(threads []*v1.Thread, projects []*v1.Project, f *v1.ThreadFilter, now time.Time) string {
+// the limit cut the list, or why it is empty. names resolves creators (threadNames).
+func formatThreadList(threads []*v1.Thread, projects []*v1.Project, names map[string]string, f *v1.ThreadFilter, now time.Time) string {
 	if len(threads) == 0 {
 		if !f.GetAll() && !f.GetIncludeArchived() {
 			return "no threads (archived threads are left out; --archived includes them)"
@@ -128,7 +168,8 @@ func formatThreadList(threads []*v1.Thread, projects []*v1.Project, f *v1.Thread
 			line += "  [" + strings.Join(marks, ", ") + "]"
 		}
 		if s.GetCreatedBy() != "" {
-			line += "  ↳ " + cmp.Or(s.GetCreatedByName(), s.GetCreatedBy())
+			name, _ := creatorName(s, names)
+			line += "  ↳ " + name
 		}
 		_, _ = fmt.Fprintln(tw, line)
 	}

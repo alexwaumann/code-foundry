@@ -535,7 +535,9 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 		// Before spawn, so the note precedes the first message (written once Claude
 		// answers its handshake); its row once spawn wrote the thread's, like a fork's
 		// copy (fork.go).
-		it, err := m.startNote(ctx, id, createdByNoteID, createdByNoteText(creatorName, brief))
+		// The text keeps the name at creation (the CLI's and a removed creator's
+		// fallback); NoteCreatedBy lets the GUI show the creator's current name.
+		it, err := m.startNote(ctx, id, Item{ID: createdByNoteID, Text: createdByNoteText(creatorName, brief), NoteCreatedBy: creatorID})
 		if err != nil {
 			drop()
 			return Thread{}, err
