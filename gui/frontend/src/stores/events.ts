@@ -120,6 +120,7 @@ async function reconcileThreads(signal: AbortSignal): Promise<void> {
 export function startEventSync(threadRetryMs = 10_000): () => void {
   const stop = runStream<EventView>({
     open: (signal) => watchEvents(signal),
+    slot: { label: "events", priority: "core" },
     onConnect: async (signal) => {
       // The schema carries the model registry; a restarted daemon may have a new one.
       void loadSettingsSchema();

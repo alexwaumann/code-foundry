@@ -1,4 +1,5 @@
-import { vi } from "vitest";
+import { afterEach, vi } from "vitest";
+import { resetStreamSlots } from "@/api/streamSlots";
 
 // Unit tests never load the real Wails runtime. Importing it has side effects: dist/drag.js
 // starts a 50ms poll that touches `window`, and index.js fetches /wails/custom.js. Those can
@@ -37,3 +38,9 @@ if (!("ResizeObserver" in globalThis)) {
     },
   });
 }
+
+// Stream slots (api/streamSlots.ts) are module state: a runner a test left running must
+// not hold a slot in the next test.
+afterEach(() => {
+  resetStreamSlots();
+});

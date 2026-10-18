@@ -52,3 +52,25 @@ export function terminalAutoHeight(rows: number | undefined, fontSize: number): 
   const r = rows !== undefined && rows >= 4 && rows <= 60 ? rows : DEFAULT_ROWS;
   return Math.round(r * ROW_PX * (fontSize / 13)) + PAD_PX;
 }
+
+/**
+ * Whether the element is narrower than `px` (followed as it resizes): a node's own width
+ * decides when its title bar drops button labels. False until measured.
+ */
+export function useNarrowerThan(el: HTMLElement | null, px: number): boolean {
+  const [narrow, setNarrow] = useState(false);
+  useLayoutEffect(() => {
+    if (!el) return;
+    const measure = () => {
+      const w = el.getBoundingClientRect().width;
+      if (w > 0) setNarrow(w < px);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+    };
+  }, [el, px]);
+  return narrow;
+}

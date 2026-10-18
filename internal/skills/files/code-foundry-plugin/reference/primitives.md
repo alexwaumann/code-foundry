@@ -458,11 +458,12 @@ default: about 420 px for a thread, `rows` text rows (4..60, default 16) for a t
 `"fill"` (the rest of the panel, at least 240 px) or pixels (120..1600). A view naming
 another owner's thread or terminal is refused; one that is gone (removed, closed) shows a
 muted empty state; an archived thread still renders, composer included, with no archived
-cue (`SendThread` unarchives it), so drop its node when you archive it. Each of these nodes is a
-live stream from the GUI to the daemon: the GUI attaches one only while it is on screen
-and at most two per view, so show one (two at most) at a time and switch with tabs or
-chips rather than stacking them. Check `h.HasCapability("view.node.thread")` (`view.node.terminal`)
-before relying on them; `reference/host-api.md` has the calls that make them.
+cue (`SendThread` unarchives it), so drop its node when you archive it. Each one holds a
+live stream, so the GUI attaches a node only while it is on screen in the active tab and
+keeps at most 2 live at once (others show "Attach"): put one thread or terminal in a
+view, or let the user pick which, switching with tabs or chips rather than stacking them.
+Check `h.HasCapability("view.node.thread")` (`view.node.terminal`) before relying on
+them; `reference/host-api.md` has the calls that make them.
 
 ## Acts
 

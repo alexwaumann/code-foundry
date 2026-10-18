@@ -21,7 +21,8 @@ const INLINE_INSET = 12;
  * content pane may show the thread too).
  */
 export function InlineThread({ threadId, readOnly = false, placeholder }: { threadId: string; readOnly?: boolean; placeholder?: string | undefined }) {
-  useEffect(() => startThreadWatch(threadId), [threadId]);
+  // An inline holder (api/streamSlots.ts): the content pane's own Watch outranks it.
+  useEffect(() => startThreadWatch(threadId, "inline"), [threadId]);
   const cwd = useThreadsStore((s) => s.byId[threadId]?.worktreePath ?? "");
   const { loaded, empty, catchingUp, watchError, open, busy, working, timelineWorking } = useThreadActivity(threadId);
   const dockRef = useRef<HTMLDivElement>(null);
