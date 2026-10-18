@@ -190,3 +190,14 @@ func (m *Manager) Browse(ctx context.Context, refresh bool) (BrowseResult, error
 	}
 	return out, nil
 }
+
+// Installer is the plugin store's registry half: browse, install, update, uninstall.
+// *Manager implements it.
+type Installer interface {
+	Browse(ctx context.Context, refresh bool) (BrowseResult, error)
+	Install(ctx context.Context, req InstallRequest) (InstallResult, error)
+	Update(ctx context.Context, name string, check, refresh bool) ([]PluginUpdate, error)
+	Uninstall(ctx context.Context, name string, purge bool) (UninstallResult, error)
+}
+
+var _ Installer = (*Manager)(nil)

@@ -63,6 +63,27 @@ service PluginService {
   // (session/setEnvironment): one plugin's, or every one with a contribution when name is
   // empty, as applied (validated, conflicts resolved in name order) with the issues found.
   rpc Environment(PluginEnvironmentRequest) returns (PluginEnvironmentResponse) {}
+  // Browse lists the plugins of every registry in the plugins.registries setting, merged
+  // by name (the first registry listing a name wins), each with what is installed of it,
+  // and every registry's state. Indexes come from the cache (1 h) unless refresh.
+  // docs/notes/plugins-7-registry.md.
+  rpc Browse(BrowsePluginsRequest) returns (BrowsePluginsResponse) {}
+  // RefreshRegistries reads every registry again and returns their state.
+  rpc RefreshRegistries(RefreshPluginRegistriesRequest) returns (RefreshPluginRegistriesResponse) {}
+  // Install installs a plugin from a registry, a GitHub release or a folder (see
+  // InstallPluginRequest.ref): it downloads this platform's tarball, checks its SHA-256,
+  // validates the package and swaps it in for plugins/<name> (the data dir stays). A new
+  // plugin stays disabled until enabled with consent; an enabled one restarts on the new
+  // package and stays enabled unless it asks for more permissions. Each step goes out as
+  // PluginEvent.install_progress.
+  rpc Install(InstallPluginRequest) returns (InstallPluginResponse) {}
+  // Update installs the newer versions the registries list, of one plugin or of every
+  // plugin with one; check only lists them. Nothing is ever updated unasked.
+  rpc Update(UpdatePluginsRequest) returns (UpdatePluginsResponse) {}
+  // Uninstall disables a plugin, stops it and removes its package (a dev link only, never
+  // the folder it points at). purge also deletes its data dir, secrets, logs and the
+  // consent given.
+  rpc Uninstall(UninstallPluginRequest) returns (UninstallPluginResponse) {}
 }
 
 enum PluginState {
@@ -163,6 +184,14 @@ message Plugin {
   repeated PluginCommand commands = 24;
   repeated PluginSurface surfaces = 25;
   string log_path = 26;
+  // Where `plugin install` got the package; unset for one put in the plugins directory
+  // by hand.
+  PluginInstall install = 27;
+  // A registry lists a newer version (found by the update check, Browse or Update).
+  bool update_available = 28;
+  string update_version = 29;
+  // The URL of the registry listing it.
+  string update_registry = 30;
 }
 
 message ListPluginsRequest {
@@ -284,6 +313,11 @@ message PluginEvent {
     // pull request's checks resolved, or a plugin set a context key): re-list commands.
     // Grows by one per change in this daemon's lifetime.
     uint64 availability_epoch = 4;
+    // A step of an install, update or link (Install, Update).
+    PluginInstallProgress install_progress = 5;
+    // The registries' merged index changed (an entry added, removed or bumped): Browse
+    // again. Grows by one per change in this daemon's lifetime.
+    uint64 registry_epoch = 6;
   }
 }
 
@@ -462,4 +496,181 @@ message PluginEnvironment {
 message PluginEnvironmentResponse {
   // By plugin name.
   repeated PluginEnvironment environments = 1;
+}
+
+// PluginInstall says where an installed package came from.
+message PluginInstall {
+  // registry, github (a release) or path (a linked folder).
+  string kind = 1;
+  // The registry's URL, owner/repo, or the folder.
+  string source = 2;
+  string version = 3;
+  // The tarball's SHA-256; empty for a link or a release without a checksums file.
+  string sha256 = 4;
+  google.protobuf.Timestamp installed_at = 5;
+}
+
+enum PluginInstallPhase {
+  PLUGIN_INSTALL_PHASE_UNSPECIFIED = 0;
+  PLUGIN_INSTALL_PHASE_RESOLVING = 1;
+  PLUGIN_INSTALL_PHASE_DOWNLOADING = 2;
+  PLUGIN_INSTALL_PHASE_VERIFYING = 3;
+  PLUGIN_INSTALL_PHASE_EXTRACTING = 4;
+  PLUGIN_INSTALL_PHASE_INSTALLING = 5;
+  PLUGIN_INSTALL_PHASE_DONE = 6;
+  PLUGIN_INSTALL_PHASE_FAILED = 7;
+}
+
+// PluginInstallProgress is one step of an install.
+message PluginInstallProgress {
+  // What was asked for (InstallPluginRequest.ref, or the name for an update).
+  string ref = 1;
+  // The plugin and version, once resolved.
+  string name = 2;
+  string version = 3;
+  PluginInstallPhase phase = 4;
+  // The step in words, or the failure.
+  string message = 5;
+  // Bytes downloaded so far (HTTP downloads; downloads through gh report none).
+  int64 bytes = 6;
+}
+
+// PluginRegistry is one registry's state after the last read.
+message PluginRegistry {
+  string url = 1;
+  // When the index in use was fetched; unset when there is none.
+  google.protobuf.Timestamp fetched_at = 2;
+  // The index in use came from the cache (fresh, or kept because the fetch failed).
+  bool cached = 3;
+  // The last fetch's failure.
+  string error = 4;
+  // How many plugins it lists.
+  int32 plugins = 5;
+  // Skipped entries and names an earlier registry lists already.
+  repeated string issues = 6;
+}
+
+// PluginIndexArtifact is one platform's release tarball of an index entry.
+message PluginIndexArtifact {
+  // "darwin/arm64" or "darwin/amd64".
+  string platform = 1;
+  string url = 2;
+  string sha256 = 3;
+}
+
+// PluginIndexEntry is a plugin a registry lists (its latest version).
+message PluginIndexEntry {
+  string name = 1;
+  string display_name = 2;
+  string description = 3;
+  // The source repository, owner/name on github.com.
+  string repo = 4;
+  string version = 5;
+  int32 protocol = 6;
+  // What it asks for (its manifest's permissions).
+  PluginPermissions permissions = 7;
+  // The permissions in words, as the consent dialog lists them.
+  repeated string permission_lines = 8;
+  repeated PluginIndexArtifact artifacts = 9;
+  // The URL of the registry listing it.
+  string registry = 10;
+  // There is a build for this machine's platform.
+  bool available = 11;
+  // The plugin of that name as installed; unset when it is not.
+  Plugin installed = 12;
+  // installed is older than version.
+  bool update_available = 13;
+}
+
+message BrowsePluginsRequest {
+  // Read every registry again instead of its cached index.
+  bool refresh = 1;
+}
+
+message BrowsePluginsResponse {
+  // By name.
+  repeated PluginIndexEntry entries = 1;
+  // In the setting's order.
+  repeated PluginRegistry registries = 2;
+  // This machine's platform ("darwin/arm64").
+  string platform = 3;
+}
+
+message RefreshPluginRegistriesRequest {}
+
+message RefreshPluginRegistriesResponse {
+  repeated PluginRegistry registries = 1;
+}
+
+message InstallPluginRequest {
+  // A registry plugin name[@version]; owner/repo[@vX.Y.Z] for a GitHub release (its
+  // tarball found by the name <plugin>-<version>-darwin-<arch>.tar.gz, checked against
+  // the release's checksums.txt when it has one); or an absolute folder (or ~/...) with a
+  // plugin.json, linked like Dev.
+  string ref = 1;
+  // Replace a dev link with the package (or a package with a link), or reinstall the
+  // version already installed.
+  bool force = 2;
+  // Enable it afterwards; consent consents to its permissions. Without consent a plugin
+  // that needs it stays disabled and the response says so.
+  bool enable = 3;
+  bool consent = 4;
+  // Read the registries again instead of their cached indexes.
+  bool refresh = 5;
+}
+
+message InstallPluginResponse {
+  Plugin plugin = 1;
+  // registry, github or path; source as PluginInstall.source.
+  string kind = 2;
+  string source = 3;
+  string version = 4;
+  // The version replaced; empty for a new install.
+  string previous_version = 5;
+  // False when that version was installed already and nothing was done.
+  bool changed = 6;
+  // An unverified download, manifest warnings.
+  repeated string warnings = 7;
+  // enable was asked, but the plugin needs consent first: show consent_text.
+  bool needs_consent = 8;
+  string consent_text = 9;
+}
+
+message UpdatePluginsRequest {
+  // One plugin; empty for every plugin with an update.
+  string name = 1;
+  // Only list the updates.
+  bool check = 2;
+  // Read the registries again instead of their cached indexes.
+  bool refresh = 3;
+}
+
+// PluginUpdate is one plugin's update, offered or done.
+message PluginUpdate {
+  string name = 1;
+  string current_version = 2;
+  string version = 3;
+  string registry = 4;
+  bool updated = 5;
+  // Why it failed (the others still ran).
+  string error = 6;
+  // Why an enabled plugin was left disabled: the new version asks for more permissions.
+  string disabled_reason = 7;
+}
+
+message UpdatePluginsResponse {
+  repeated PluginUpdate updates = 1;
+}
+
+message UninstallPluginRequest {
+  string name = 1;
+  // Also delete its data dir, secrets, logs and the consent given.
+  bool purge = 2;
+}
+
+message UninstallPluginResponse {
+  // The package directory or dev link removed; empty when there was none.
+  string removed = 1;
+  // What purge deleted, in words.
+  repeated string purged = 2;
 }
