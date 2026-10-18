@@ -70,6 +70,13 @@ Status: branch `cf/composer-thread-pr-tags`. Two tag kinds next to the skill (`/
   trigger. The `#` source is `quietEmpty`: a query nothing matches shows no card at all
   (not "No pull requests match"), so `fix #999` + Enter sends as typed. Until the pool has
   loaded the source is unavailable (no card, Enter sends). Only a pick makes a tag.
+* **Enter on the `#` card picks only on intent** (Alex, after review): when the arrow keys
+  have moved the highlight, or when the typed number is exactly a listed pull request's
+  (`#187` + Enter inserts #187). Otherwise Enter closes the card and does what it does
+  without one, so `fixes #18` + Enter sends as typed while #187 is listed. Tab and a click
+  always pick. The source's `enterPicks` (`prEnterPicks` in `lib/tagCandidates.ts`) is the
+  rule; `useCompletion` tracks `moved` per card. `@` and `/` are unchanged (Enter picks
+  the highlighted row).
 * **Accents.** Pull request: its state's colour as the PR rows show it (`prStateLook`:
   open emerald, merged violet, closed red, draft or unknown muted), `PR_ACCENT`. Thread:
   "sky", but `--info` (the theme's sky, the same token the Agents strip uses) is already
