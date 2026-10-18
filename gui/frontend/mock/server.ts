@@ -40,7 +40,8 @@
  *        the request first, NotFound); GET /__mock/thread/calls;
  *        /__mock/thread/commands?set=none|more|default (the slash commands: mock/slashCommands.ts) |
  *        /__mock/thread/agent-end?run=a1[&status=failed] (a subagent run of state=agents ends: mock/agents.ts) |
- *        /__mock/thread/shell-end[?status=failed] (the oldest background shell of state=agents|shells ends: mock/shells.ts)
+ *        /__mock/thread/shell-end[?status=failed] (the oldest background shell of state=agents|shells ends: mock/shells.ts) |
+ *        /__mock/thread/mcp-age?id=s-r1&ago=720 (the last MCP check that many seconds ago: mock/mcp.ts)
  *   POST /__mock/terminal/exit?id=t-s1-shell&code=1[&keep=1]   (the process exits; keep=1: a
  *                                                 shell stays, exited, as if the reaper were late)
  *   POST /__mock/terminal/new?delay=700&fail=reason   (terminal.new takes that long; its next run
@@ -162,7 +163,7 @@ import { createProject, deleteProject, listPublishOwners, projectCalls, publishP
 import { ghEvent } from "./github";
 import { prDetailCall } from "./prDetail";
 import { retiredUsage, utcDay } from "./usage";
-import { reconnectMcp, refreshMcp } from "./mcp";
+import { ageMcp, reconnectMcp, refreshMcp } from "./mcp";
 import type { ActionEventInit } from "./actions";
 import { refuseSlashCommand, slashCommandsFor } from "./slashCommands";
 import { MOCK_ATTACHMENT, MOCK_ATTACHMENT_PNG, MockThreadLogs, THREAD_STATES, type ThreadState as ScriptedThreadState } from "./thread";
@@ -841,6 +842,15 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
         json(res, 200, { ok: true });
       } catch (err) {
         json(res, err instanceof CommandError && err.kind === "notfound" ? 404 : 400, { error: err instanceof Error ? err.message : String(err) });
+      }
+      break;
+    case "POST /__mock/thread/mcp-age":
+      // id=s-r1&ago=<seconds>: the thread's last MCP check that long ago (mock/mcp.ts ageMcp).
+      try {
+        ageMcp(world.logs, q.get("id") ?? "s-r1", Number(q.get("ago") ?? "720"));
+        json(res, 200, { ok: true });
+      } catch (err) {
+        json(res, 404, { error: err instanceof Error ? err.message : String(err) });
       }
       break;
     case "POST /__mock/thread/cache":

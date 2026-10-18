@@ -55,3 +55,12 @@ function subscriberFor(periodMs: number): (cb: () => void) => () => void {
 export function useNow(periodMs = 1000): number {
   return useSyncExternalStore(subscriberFor(periodMs), () => clock(periodMs).now);
 }
+
+/**
+ * What `select` makes of the current time, re-evaluated every periodMs but re-rendering
+ * only when the answer changes (Object.is): a state that flips at some moment (an MCP
+ * check going stale) without a render every tick. `select` may change between renders.
+ */
+export function useNowSelect<T>(periodMs: number, select: (now: number) => T): T {
+  return useSyncExternalStore(subscriberFor(periodMs), () => select(clock(periodMs).now));
+}

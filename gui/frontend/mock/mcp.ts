@@ -100,6 +100,16 @@ export function refreshMcp(threads: McpThreads, id: string): McpStatusInit {
   return next;
 }
 
+/**
+ * POST /__mock/thread/mcp-age: the thread's last check (the fixture's when it has none)
+ * moved `agoSeconds` into the past, published like a new answer, so the GUI shows its
+ * stale state (10 min and older) without waiting.
+ */
+export function ageMcp(threads: McpThreads, id: string, agoSeconds: number): void {
+  const cur = threads.mcpOf(id) ?? mcpFixture();
+  threads.setMcp(id, { ...cur, checkedAt: timestampFromDate(new Date(Date.now() - agoSeconds * 1000)) });
+}
+
 /** McpReconnect: the new status and Claude's refusal ("" when it went through). */
 export async function reconnectMcp(threads: McpThreads, id: string, server: string): Promise<{ status: McpStatusInit; error: string }> {
   // The daemon starts Claude for a stopped thread; its last status outlives the process.
