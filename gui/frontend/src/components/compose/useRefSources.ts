@@ -66,7 +66,8 @@ export function useMentionSource(trigger: EditorTrigger | null, files: Completio
   const withFiles = files !== null && files.available;
   const query = withFiles ? files.query : live;
   const rows = useThreadRows(query, currentThreadId);
-  const anyThread = useThreadsStore((s) => threadCandidates(Object.values(s.byId), "", currentThreadId, 1).length > 0);
+  // Only while "@" is live: otherwise every thread update would rank the whole list again.
+  const anyThread = useThreadsStore((s) => live !== null && threadCandidates(Object.values(s.byId), "", currentThreadId, 1).length > 0);
   const fileGroups = withFiles ? files.groups : null;
   const groups = useMemo<CompletionGroup[]>(() => {
     if (query === null) return [];
