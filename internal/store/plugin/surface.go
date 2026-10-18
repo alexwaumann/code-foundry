@@ -837,6 +837,9 @@ func (m *Manager) SurfaceElements(key string, version uint64) []SurfaceElement {
 
 // surfLog writes one of the daemon's lines about a plugin's surfaces into its log.
 func (m *Manager) surfLog(plugin, format string, args ...any) {
+	if m.isClosed() {
+		return // the log files are closed (or closing)
+	}
 	if e, ok := m.entry(plugin); ok {
 		e.logs.add("host", "", fmt.Sprintf(format, args...))
 	}

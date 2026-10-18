@@ -378,6 +378,27 @@ ci / attested  success  github-actions  10-18 05:30  10-18 05:30  https://github
 ci / frontend  skipped  github-actions  10-18 05:30  10-18 05:30  …
 ```
 
+The async checks fact flips on a real pull request: this PR (#193), with a thread in this
+worktree (`project add --path <this worktree>`, `thread new --project … --worktree …`,
+no prompt). The gh poll first learns the branch's pull request, then the checks fetch
+resolves:
+
+```
+06:18:14 code-foundry plugin.hello.show.checks: not available in this context: the thread has no pull request
+06:18:19 code-foundry plugin.hello.show.checks: not available in this context: the thread has no pull request
+06:18:24 code-foundry plugin.hello.show.checks: not available in this context: not known yet ("github-actions" in pr.checks.provider waits on a pull request's checks)
+$ code-foundry plugin list --context-thread $T2
+hello  …  demo(on) pinned(off) checks(on)
+$ code-foundry pr checks --thread $T2
+alexwaumann/code-foundry#193 https://github.com/alexwaumann/code-foundry/pull/193
+NAME           STATUS       PROVIDER        STARTED      COMPLETED    URL
+ci / frontend  in_progress  github-actions  10-18 06:18  -            https://github.com/…/actions/runs/39122670224/job/117661291536
+…
+$ code-foundry plugin surface hello checks --context-thread $T2
+instance hello/checks/pr:alexwaumann/code-foundry#193: live
+view version 2:          # the plugin's host/invoke of pr.checks, one row per Actions job
+```
+
 The plugin's log shows the host's side:
 
 ```
