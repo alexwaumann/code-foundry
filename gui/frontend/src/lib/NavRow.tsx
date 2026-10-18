@@ -11,14 +11,15 @@ export function NavProvider({ value, children }: { value: NavCtx; children: Reac
  * One navigable row. Click moves the cursor (or activates, with activateOnClick);
  * double-click activates; cmd+click runs onCmdClick when given. The cursor row is
  * highlighted and scrolled into view. `tip` is a hover tooltip for what the row hides (a
- * full path); the rows are not focusable (the list uses aria-activedescendant), so arrow
- * keys never open it.
+ * full path); with `tipWhenTruncated` it opens only while the row's text is cut short. The
+ * rows are not focusable (the list uses aria-activedescendant), so arrow keys never open it.
  */
 export function NavRow({
   navKey,
   className,
   children,
   tip,
+  tipWhenTruncated = false,
   activateOnClick = false,
   onCmdClick,
 }: {
@@ -26,6 +27,7 @@ export function NavRow({
   className?: string;
   children: ReactNode;
   tip?: string;
+  tipWhenTruncated?: boolean;
   activateOnClick?: boolean;
   onCmdClick?: () => void;
 }) {
@@ -58,7 +60,7 @@ export function NavRow({
     </div>
   );
   return tip === undefined ? row : (
-    <Tip label={tip} align="start">
+    <Tip label={tip} align="start" whenTruncated={tipWhenTruncated}>
       {row}
     </Tip>
   );

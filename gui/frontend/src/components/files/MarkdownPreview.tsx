@@ -3,6 +3,8 @@ import { ImageIcon } from "lucide-react";
 import { readFile, type FileReadView } from "@/api/files";
 import { Markdown, type MarkdownExtras } from "@/components/pr/Markdown";
 import { CodeBlock } from "@/components/thread/Code";
+import { PathPlaceContext } from "@/components/thread/context";
+import { PathChip } from "@/components/thread/PathChip";
 import { Tip } from "@/components/ui/tooltip";
 import { useBlobSrc } from "./useBlobSrc";
 import "@/components/thread/thread.css";
@@ -46,13 +48,17 @@ function LocalImage({ dir, src, alt }: { dir: string; src: string; alt: string }
  * A markdown file rendered: the shared renderer (components/pr/Markdown) with the thread's
  * highlighted code blocks and framed tables, the file's HTML allowed (READMEs use it,
  * sanitized as GitHub bodies are), and relative images read from disk. Links open in the
- * browser. A reading column with padding, headings on the type roles (files.css).
+ * browser; file paths are chips, relative ones resolved against `base` (the thread checkout
+ * the tab was opened from), not the file's own folder. A reading column with padding,
+ * headings on the type roles (files.css).
  */
-export function MarkdownPreview({ text, dir }: { text: string; dir: string }) {
+export function MarkdownPreview({ text, dir, project, base }: { text: string; dir: string; project: string; base: string }) {
+  const place = useMemo(() => ({ project, base }), [project, base]);
   const extras = useMemo<MarkdownExtras>(
     () => ({
       code: (lang, code) => <CodeBlock lang={lang} code={code} />,
       image: (src, alt) => <LocalImage dir={dir} src={src} alt={alt} />,
+      pathChip: (m) => <PathChip match={m} />,
       table: (rows) => (
         <div className="cf-table">
           <table>{rows}</table>
@@ -64,7 +70,9 @@ export function MarkdownPreview({ text, dir }: { text: string; dir: string }) {
   return (
     <div className="min-h-0 flex-1 overflow-auto" data-testid="file-markdown">
       <div className="cf-thread cf-file-md mx-auto max-w-3xl px-5 py-4">
-        <Markdown extras={extras}>{text}</Markdown>
+        <PathPlaceContext.Provider value={place}>
+          <Markdown extras={extras}>{text}</Markdown>
+        </PathPlaceContext.Provider>
       </div>
     </div>
   );

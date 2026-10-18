@@ -188,7 +188,7 @@ function FileBody({
         {reveal}
       </FileEmptyState>
     );
-  if (rendered === "markdown") return <MarkdownPreview text={text} dir={dirPart(abs)} />;
+  if (rendered === "markdown") return <MarkdownPreview text={text} dir={dirPart(abs)} project={place.project} base={place.dir} />;
   if (rendered === "html") return <HtmlPreview text={text} name={name} />;
   return <CodeBody name={name} text={text} lines={lines} line={line} />;
 }

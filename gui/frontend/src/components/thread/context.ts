@@ -1,4 +1,5 @@
 import { createContext, useContext } from "react";
+import type { PathPlace } from "@/lib/pathChips";
 
 /** The thread a timeline row belongs to, and its worktree (paths inside it are shown relative). */
 export interface ThreadCtx {
@@ -18,3 +19,10 @@ export function useThreadCtx(): ThreadCtx {
  * a Timeline.
  */
 export const KeepRowContext = createContext<(rowKey: string) => void>(() => undefined);
+
+/**
+ * Where path chips (PathChip) resolve relative paths, when not the enclosing thread's: the
+ * File tab's rendered markdown provides its tab's project and base (the thread checkout the
+ * tab was opened from). Null: the thread's (ThreadContext's cwd and its project).
+ */
+export const PathPlaceContext = createContext<PathPlace | null>(null);
