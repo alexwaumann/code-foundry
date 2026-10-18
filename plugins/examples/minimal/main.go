@@ -17,6 +17,10 @@ import (
 	"github.com/alexwaumann/code-foundry/pluginsdk/ui"
 )
 
+// version is plugin.json's version, for the view; TestManifest checks the two agree, so
+// a release bumps both.
+const version = "0.1.0"
+
 func main() {
 	if err := pluginsdk.Serve(plugin()); err != nil {
 		fmt.Fprintln(os.Stderr, "minimal:", err)
@@ -29,7 +33,7 @@ func main() {
 func plugin() pluginsdk.Plugin {
 	return pluginsdk.Plugin{
 		Init: func(_ context.Context, h *pluginsdk.Host) error {
-			h.Log().Info("minimal is up", "host", h.HostVersion(), "dev", h.Dev())
+			h.Log().Info("minimal is up", "version", version, "host", h.HostVersion(), "dev", h.Dev())
 			return nil
 		},
 		Commands: map[string]pluginsdk.CommandFunc{"hello": hello},
@@ -71,7 +75,7 @@ func (s *status) render() error {
 	s.mu.Unlock()
 	thread := s.open.Context.ThreadID
 	return s.h.UpdateView(s.open.Instance, ui.View{
-		Header: &ui.Header{Title: "Minimal", Subline: ui.Spans(ui.T("thread "), ui.T(thread).AsMono())},
+		Header: &ui.Header{Title: "Minimal", Trailing: ui.Plain("v" + version), Subline: ui.Spans(ui.T("thread "), ui.T(thread).AsMono())},
 		Nodes: []ui.Node{
 			ui.NewPairs("facts",
 				ui.Pair{Key: "thread", Label: "Thread", Value: ui.Spans(ui.T(thread).AsMono()), Copyable: true},
