@@ -125,6 +125,30 @@ func (f Fetcher) ResolveRelease(ctx context.Context, repo, tag, platform, tmpDir
 	return r, nil
 }
 
+// LatestVersion is the version of repo's latest published release (its tag without the
+// v), for the update check of a plugin installed straight from the repository: one
+// `gh release view -R <repo> --json tagName`, no download.
+func (f Fetcher) LatestVersion(ctx context.Context, repo string) (version, tag string, err error) {
+	out, err := f.Gh.Run(ctx, "release", "view", "-R", repo, "--json", "tagName")
+	if errors.Is(err, ErrNotFound) {
+		return "", "", fmt.Errorf("%w: %s has no published release (or no access with your gh login)", ErrNotFound, repo)
+	}
+	if err != nil {
+		return "", "", err
+	}
+	var rel struct {
+		TagName string `json:"tagName"`
+	}
+	if err := json.Unmarshal(out, &rel); err != nil {
+		return "", "", fmt.Errorf("gh release view %s: %w", repo, err)
+	}
+	version = strings.TrimPrefix(rel.TagName, "v")
+	if !ValidVersion(version) {
+		return "", "", fmt.Errorf("release %s of %s: the tag is not v<semver>", rel.TagName, repo)
+	}
+	return version, rel.TagName, nil
+}
+
 // FindChecksum finds file's SHA-256 in a checksums file: lines `<hex>  <file>` or
 // `<hex> *<file>` (binary mode), or a lone hash (a <file>.sha256).
 func FindChecksum(data []byte, file string) (string, bool) {

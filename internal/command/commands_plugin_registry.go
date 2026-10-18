@@ -86,7 +86,8 @@ func RegisterPluginRegistry(r *Registry, b PluginRegistryBackend) error {
 			Name:  "plugin.update",
 			Title: "Update Plugins",
 			Description: "Install the newer versions the registries list, of one plugin or of every installed plugin; " +
-				"--check only lists them. An enabled plugin stays enabled unless the new version asks for more " +
+				"--check only lists them. A plugin installed from <owner>/<repo> that no registry lists updates to its " +
+				"repository's latest release. An enabled plugin stays enabled unless the new version asks for more " +
 				"permissions (then enable it again to review them). Dev plugins are never updated.",
 			Category: "Plugin",
 			Args: []ArgSpec{

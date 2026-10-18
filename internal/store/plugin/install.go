@@ -134,6 +134,9 @@ type installState struct {
 	merged registry.Merged
 	fp     string
 	epoch  uint64
+	// releases are the latest releases of the plugins installed from a GitHub repository
+	// that no registry lists, by plugin name, as the last update check found them.
+	releases map[string]UpdateOffer
 }
 
 func (s *installState) record(name string) (InstallRecord, bool) {
@@ -198,7 +201,7 @@ func (m *Manager) installInfo(p *Plugin) {
 	if r, ok := m.inst.records[p.Name]; ok {
 		p.Installed = &r
 	}
-	if o, ok := offerFor(*p, m.inst.merged); ok {
+	if o, ok := offerFor(*p, m.inst.merged, m.inst.releases); ok {
 		p.Update = &o
 	}
 }
