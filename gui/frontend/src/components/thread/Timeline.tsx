@@ -1,8 +1,8 @@
-import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ArrowDown } from "lucide-react";
 import { buildRows, buildTurns, decodeTimelineKey, type TimelineRow } from "@/lib/threadTimeline";
-import { deferTurnFolds, foldDeferredTurns, forgetTurnView, useDeferredTurns, useTimelineKeys, useTurnFolds, watchTurnEnds } from "@/stores/thread";
+import { deferTurnFolds, foldDeferredTurns, useDeferredTurns, useTimelineKeys, useTurnFolds, watchTurnEnds } from "@/stores/thread";
 import { KeepRowContext } from "./context";
 import { TimelineRowView } from "./rows";
 
@@ -53,8 +53,8 @@ function useRows(threadId: string, working: boolean): TimelineRow[] {
  * A turn that ends folds only while the list is pinned; scrolled up, it stays open under
  * the reader (its header turns from "Working" into "Worked for" in place) and folds once
  * the list is pinned again (docs/notes/thread-fold-4-pinned-fold.md). Leaving the thread
- * (this list unmounts) forgets its fold and expand choices: every finished turn is folded
- * on the next visit.
+ * forgets its fold and expand choices (ThreadPane's WatchedThread): every finished turn is
+ * folded on the next visit. A visit to one of its subagent runs is not leaving it.
  * `bottomInset` is the floating composer's height: the last row scrolls clear of it.
  * Away from the bottom, a "Jump to bottom" chip floats above the composer; it scrolls
  * down and pins the list again.
@@ -77,8 +77,8 @@ export interface ListRow {
 /**
  * The timeline's list (Timeline above): rows virtualized, following the bottom while
  * pinned, keeping the reader's place when rows change. `turns`: the rows are the thread's
- * turns, which fold when they end (pinned) and forget their fold choices when the list
- * unmounts; the subagent view's rows (SubagentPane) are no turns.
+ * turns, which fold when they end (pinned); the subagent view's rows (SubagentPane) are no
+ * turns.
  */
 export function TimelineList<R extends ListRow>({
   threadId,
@@ -118,14 +118,6 @@ export function TimelineList<R extends ListRow>({
       if (!pinned.current) deferTurnFolds(threadId, ids);
     });
   }, [threadId, turns]);
-  // Leaving the thread: the next visit shows every finished turn folded.
-  useEffect(() => {
-    if (!turns) return;
-    return () => {
-      forgetTurnView(threadId);
-    };
-  }, [threadId, turns]);
-
   // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual returns unstable functions by design.
   const v = useVirtualizer({
     count: rows.length,
