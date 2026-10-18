@@ -303,7 +303,10 @@ test("the run ending while viewed turns the view done in place, with the report 
   // Its running test and its streaming reply stop with it.
   await expect(view(page).locator('[data-tool="Bash"]')).toHaveAttribute("data-status", "done");
   await expect(view(page).getByTestId("thread-text")).not.toHaveAttribute("data-streaming", "true");
-  // The report is not its last text: it shows as the block it handed back.
+  // It handed the report back with a SubagentHandback call (not its last text): the
+  // report shows as the block, the call is no row of its own.
+  await expect(view(page).locator('[data-tool="SubagentHandback"]')).toHaveCount(0);
+  expect(await view(page).locator("[data-tool]").evaluateAll((els) => els.map((e) => e.getAttribute("data-tool")))).toEqual(["Agent", "Edit", "Write", "Bash"]);
   const report = page.getByTestId("subagent-report");
   await expect(report).toContainText(`Report handed back to ${PARENT}`);
   await expect(report).toContainText("Added task frame handling to the thread store with 14 table tests; make check is green.");
