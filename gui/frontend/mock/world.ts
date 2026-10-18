@@ -634,6 +634,8 @@ export class World {
       this.events.publish({ source: EventSource.SETTINGS, event: { event: { case: "settings", value: { event: { case: "snapshot", value: snap } } } } });
       // Like the daemon: a new cache TTL moves every expiry, so those threads are republished.
       for (const s of this.threads.values()) if (s.lastResultAt) this.publishThread(s);
+      // And a new plugins.registries re-reads Browse (internal/daemon/plugin_registry.go).
+      this.plugins.registry.settingsChanged();
     },
   );
   /** Actions and their runs (mock/actions.ts); terminal runs are kind=action terminals here. */
@@ -663,6 +665,7 @@ export class World {
       if (!this.threads.has(id)) throw new CommandError("notfound", `no thread ${id}`);
       this.logs.send(id, text, []);
     },
+    registries: () => this.settings.value("plugins.registries"),
   });
   readonly update = new MockUpdater(
     (v) => this.events.publish({ source: EventSource.UPDATE, event: { event: { case: "update", value: v } } }),

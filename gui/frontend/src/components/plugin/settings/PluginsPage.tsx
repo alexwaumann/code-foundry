@@ -1,19 +1,23 @@
 import { useEffect, useState } from "react";
-import { FolderPlus, Logs, PanelRight, Power, PowerOff, RotateCcw } from "lucide-react";
+import { ArrowUpCircle, FolderPlus, Loader2, Logs, PanelRight, Power, PowerOff, RotateCcw, Trash2 } from "lucide-react";
 import { pluginEnvironments, type PluginEnvironmentView, type PluginView } from "@/api/plugin";
 import type { SettingPageView, SettingsSchemaView } from "@/api/settings";
+import { pageSections } from "@/components/settings/model";
 import { PageHead } from "@/components/settings/PageHead";
-import { SectionCard } from "@/components/settings/SectionCard";
+import { SectionCard, SettingsSection } from "@/components/settings/SectionCard";
 import { Button } from "@/components/ui/button";
 import { Tip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { startCommandNamed } from "@/keys/bindings";
 import { runCommand, useCommandsStore } from "@/stores/commands";
+import { updatePlugin, usePluginRegistryStore } from "@/stores/pluginRegistry";
 import { usePlugin, usePluginNames, usePluginsStore } from "@/stores/plugins";
 import { useProjectsStore } from "@/stores/projects";
 import { useUiStore } from "@/stores/ui";
 import { PillView, PluginIcon } from "../parts";
+import { BrowseSection, mainAction } from "./BrowseSection";
 import { LogsDialog } from "./LogsDialog";
+import { UninstallDialog } from "./UninstallDialog";
 import { processLine, scopeWords, statePill } from "./state";
 
 /** Every plugin's contribution to new threads, re-read when a plugin changes. */
@@ -108,12 +112,26 @@ function SurfaceButtons({ p }: { p: PluginView }) {
 }
 
 /** One installed plugin: identity, state, the process, problems, its surfaces and what it adds to new threads; the actions. */
-function PluginRow({ name, env, className, onLogs }: { name: string; env: PluginEnvironmentView | undefined; className?: string | undefined; onLogs: (name: string) => void }) {
+function PluginRow({
+  name,
+  env,
+  className,
+  onLogs,
+  onUninstall,
+}: {
+  name: string;
+  env: PluginEnvironmentView | undefined;
+  className?: string | undefined;
+  onLogs: (name: string) => void;
+  onUninstall: (name: string) => void;
+}) {
   const p = usePlugin(name);
+  const busy = usePluginRegistryStore((s) => s.busy[name]);
   if (!p) return null;
   const pill = statePill(p);
   const proc = processLine(p);
-  const main = !p.enabled;
+  const update = p.updateAvailable && !p.dev;
+  const main = !p.enabled && !update;
   return (
     <div className={cn("flex min-w-0 flex-col gap-2 px-4 py-3", className)} data-testid="plugin-row-settings" data-plugin={p.name} data-state={p.state}>
       <div className="flex min-w-0 items-start gap-3">
@@ -143,12 +161,28 @@ function PluginRow({ name, env, className, onLogs }: { name: string; env: Plugin
             </p>
           ))}
           {p.dev && p.devPath && <p className="truncate font-mono text-caption-sm">{p.devPath}</p>}
+          {!p.dev && p.install && (
+            <p className="truncate font-mono text-caption-sm" data-testid="plugin-installed-from">
+              from {p.install.source.replace(/^https?:\/\/(github\.com\/)?/, "")}
+            </p>
+          )}
+          {update && (
+            <p className="text-caption-sm text-warning" data-testid="plugin-update-available">
+              {p.updateVersion} is available.
+            </p>
+          )}
         </div>
       </div>
       <div className="flex min-w-0 flex-col gap-2 pl-7">
         <SurfaceButtons p={p} />
         {env && p.enabled && <EnvSummary env={env} />}
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+          {update && (
+            <Button variant="outline" size="xs" className={mainAction} disabled={busy !== undefined} onClick={() => void updatePlugin(p.name)} data-testid="plugin-update">
+              {busy === "update" ? <Loader2 className="animate-spin" aria-hidden /> : <ArrowUpCircle aria-hidden />}
+              Update to {p.updateVersion}
+            </Button>
+          )}
           {p.enabled ? (
             <Button variant="ghost" size="xs" className="text-muted-foreground hover:text-foreground" onClick={() => void runCommand("plugin.disable", { name: p.name })} data-testid="plugin-disable">
               <PowerOff aria-hidden />
@@ -184,6 +218,19 @@ function PluginRow({ name, env, className, onLogs }: { name: string; env: Plugin
             <Logs aria-hidden />
             Logs
           </Button>
+          <Button
+            variant="ghost"
+            size="xs"
+            className="text-muted-foreground hover:text-foreground"
+            disabled={busy !== undefined}
+            onClick={() => {
+              onUninstall(p.name);
+            }}
+            data-testid="plugin-uninstall"
+          >
+            {busy === "uninstall" ? <Loader2 className="animate-spin" aria-hidden /> : <Trash2 aria-hidden />}
+            Uninstall
+          </Button>
         </div>
       </div>
     </div>
@@ -193,15 +240,17 @@ function PluginRow({ name, env, className, onLogs }: { name: string; env: Plugin
 /**
  * Settings → Plugins (DECISIONS.md, "Registry"): the installed plugins, each with its
  * state, process, problems, surfaces (open in the panel) and what it adds to new
- * threads, and enable (with the consent dialog), disable, restart and logs. "Add a dev
- * plugin" runs plugin.dev from the palette (its folder picker). Browse (registries)
- * comes with the registry step.
+ * threads, and enable (with the consent dialog), disable, restart, update, uninstall and
+ * logs. "Add a dev plugin" runs plugin.dev from the palette (its folder picker). Browse
+ * lists the registries' plugins (BrowseSection); the page's settings (plugins.registries)
+ * follow it.
  */
-export function PluginsPage({ page }: { schema: SettingsSchemaView; page: SettingPageView }) {
+export function PluginsPage({ schema, page }: { schema: SettingsSchemaView; page: SettingPageView }) {
   const names = usePluginNames();
   const loaded = usePluginsStore((s) => s.loaded);
   const envs = useEnvironments();
   const [logsOf, setLogsOf] = useState<string | null>(null);
+  const [uninstallOf, setUninstallOf] = useState<string | null>(null);
   const logsTitle = usePluginsStore((s) => (logsOf ? (s.byName[logsOf]?.displayName ?? logsOf) : ""));
   return (
     <>
@@ -224,14 +273,21 @@ export function PluginsPage({ page }: { schema: SettingsSchemaView; page: Settin
             No plugins yet. Add a dev plugin from a folder, or put one in ~/.code-foundry/plugins.
           </p>
         ) : (
-          names.map((n, i) => <PluginRow key={n} name={n} env={envs[n]} className={i > 0 ? "border-t border-border" : undefined} onLogs={setLogsOf} />)
+          names.map((n, i) => <PluginRow key={n} name={n} env={envs[n]} className={i > 0 ? "border-t border-border" : undefined} onLogs={setLogsOf} onUninstall={setUninstallOf} />)
         )}
       </SectionCard>
-      <SectionCard id="browse" heading="Browse" description="Plugins from registries, to install with one click.">
-        <p className="px-4 py-3 text-caption" data-testid="plugins-browse">
-          Arrives with a later version.
-        </p>
-      </SectionCard>
+      <BrowseSection />
+      {pageSections(schema, page).map((sf) => (
+        <SettingsSection key={sf.section.id} schema={schema} pageId={page.id} section={sf} />
+      ))}
+      {uninstallOf && (
+        <UninstallDialog
+          name={uninstallOf}
+          onClose={() => {
+            setUninstallOf(null);
+          }}
+        />
+      )}
       {logsOf && (
         <LogsDialog
           plugin={logsOf}

@@ -35,7 +35,9 @@ import {
 } from "../src/gen/codefoundry/v1/plugin_pb";
 import { UiIntent_Notify_Level } from "../src/gen/codefoundry/v1/ui_pb";
 import { CommandError } from "./errors";
+import type { InvokeOut } from "./gitops";
 import { Hub } from "./hub";
+import { MockRegistry, type InstallSpec } from "./pluginRegistry";
 import type { UiIntentInit } from "./world";
 
 export type PluginEventInit = MessageInitShape<typeof PluginEventSchema>;
@@ -63,7 +65,7 @@ export interface PluginCommand {
     confirmIf?: (ctx: UiContext | undefined, args: Record<string, string>) => boolean;
   };
   when: (ctx: UiContext | undefined) => boolean;
-  run: (ctx: UiContext | undefined, args: Record<string, string>) => string;
+  run: (ctx: UiContext | undefined, args: Record<string, string>) => string | Promise<InvokeOut>;
 }
 
 interface SurfaceDef {
@@ -94,6 +96,8 @@ interface MockPlugin {
   permissions: { commands: string[]; events: string[]; threadStatus: boolean; sessionEnv: boolean; secrets: boolean; threads?: boolean; terminals?: boolean };
   commands: { name: string; title: string; description: string }[];
   surfaces: SurfaceDef[];
+  /** Where plugin install got it (mock/pluginRegistry.ts); none for hand-placed or dev plugins. */
+  install?: { kind: string; source: string };
 }
 
 /** The hello plugin's own thread and terminal in the default world (mock/world.ts seeds them; the demo's Assistant and Shell tabs show them). */
@@ -449,6 +453,27 @@ function seedPlugins(): MockPlugin[] {
         { id: "checks", title: "Actions Checks", icon: "workflow", scope: "thread", when: () => false },
       ],
     },
+    {
+      // Installed from the fixture registry, which now lists 0.1.0 (mock/pluginRegistry.ts).
+      name: "test-watcher",
+      displayName: "Test Watcher",
+      version: "0.0.9",
+      description: "Runs the project's tests in a thread's worktree whenever files change, shows failures and output in the side panel, flags the thread while tests fail, and sends failures to Claude.",
+      state: PluginState.RUNNING,
+      enabled: true,
+      dev: false,
+      needsConsent: false,
+      granted: true,
+      disabledReason: "",
+      lastError: "",
+      restarts: 0,
+      pid: 48344,
+      startedAt: started,
+      permissions: { commands: ["thread.send"], events: ["project", "threads"], threadStatus: true, sessionEnv: false, secrets: false },
+      commands: [],
+      surfaces: [],
+      install: { kind: "registry", source: "https://github.com/alexwaumann/code-foundry-plugins" },
+    },
   ];
 }
 
@@ -475,6 +500,8 @@ export interface PluginDeps {
   threadExists: (id: string) => boolean;
   /** thread.send (the demo's Send hello to its own thread, Ask the main thread through host/invoke). */
   sendToThread: (id: string, text: string) => void;
+  /** The plugins.registries setting's value (mock/settings.ts). */
+  registries: () => string;
 }
 
 export class MockPlugins {
@@ -485,6 +512,23 @@ export class MockPlugins {
   private epoch = 0;
   /** Acts the GUI sent: "<instance> <key> [viewer=<the acting panel's thread>] <json values>". */
   acts: string[] = [];
+  /** The registries, Browse and plugin.install / update / uninstall (mock/pluginRegistry.ts). */
+  readonly registry: MockRegistry = new MockRegistry({
+    registries: () => this.deps.registries(),
+    installed: (name) => {
+      const p = this.plugins.get(name);
+      return p ? { version: p.version, dev: p.dev, installed: true } : null;
+    },
+    install: (spec) => {
+      this.install(spec);
+    },
+    uninstall: (name) => {
+      this.uninstall(name);
+    },
+    publish: (ev) => {
+      this.deps.publish(ev);
+    },
+  });
 
   constructor(private readonly deps: PluginDeps) {
     this.reset();
@@ -496,6 +540,45 @@ export class MockPlugins {
     this.pinned.clear();
     this.acts = [];
     this.plugins = new Map(seedPlugins().map((p) => [p.name, p]));
+    this.registry.reset();
+  }
+
+  /** Puts an installed (or updated) package in place: a new plugin is disabled pending consent; an update keeps its state. */
+  private install(spec: InstallSpec): void {
+    const had = this.plugins.get(spec.name);
+    if (had) {
+      had.version = spec.version;
+      had.install = { kind: "registry", source: spec.registry };
+      this.changed(had);
+      return;
+    }
+    const p: MockPlugin = {
+      name: spec.name,
+      displayName: spec.displayName,
+      version: spec.version,
+      description: spec.description,
+      state: PluginState.DISABLED,
+      enabled: false,
+      dev: false,
+      needsConsent: true,
+      granted: false,
+      disabledReason: "",
+      lastError: "",
+      restarts: 0,
+      pid: 0,
+      startedAt: new Date(),
+      permissions: { ...spec.permissions },
+      commands: [],
+      surfaces: [],
+      install: { kind: "registry", source: spec.registry },
+    };
+    this.plugins.set(p.name, p);
+    this.changed(p);
+  }
+
+  private uninstall(name: string): void {
+    if (!this.plugins.delete(name)) throw new CommandError("notfound", `no plugin named ${name}`);
+    this.deps.publish({ event: { case: "removedName", value: name } });
   }
 
   private msg(p: MockPlugin, ctx?: UiContext): PluginInit {
@@ -536,6 +619,8 @@ export class MockPlugins {
         available: this.surfaceAvailable(p, s, ctx),
       })),
       logPath: `/Users/dev/.code-foundry/logs/plugins/${p.name}.log`,
+      ...(p.install ? { install: { kind: p.install.kind, source: p.install.source, version: p.version, sha256: "", installedAt: timestampFromDate(p.startedAt) } } : {}),
+      ...this.registry.offer(p.name, p.version, p.dev),
     };
   }
 
@@ -778,6 +863,7 @@ export class MockPlugins {
         run: (_c, a) => `linked ${a.path ?? ""} as dev plugin echo; enabled echo 0.0.1 (starting)`,
       },
     ];
+    out.push(...this.registry.commands());
     for (const p of this.plugins.values()) {
       if (!p.enabled) continue;
       for (const s of p.surfaces) {

@@ -10,12 +10,18 @@
  * string, and a node as `{key, <kind>: {…}}`.
  */
 import { timestampMs } from "@bufbuild/protobuf/wkt";
-import type { JsonObject } from "@bufbuild/protobuf";
+import { fromJsonString, type JsonObject } from "@bufbuild/protobuf";
 import {
+  PluginInstallPhase,
   PluginService,
   PluginState,
   SurfacePhase,
+  InstallPluginResponseSchema,
+  type BrowsePluginsResponse,
   type Plugin,
+  type PluginIndexEntry,
+  type PluginInstallProgress,
+  type PluginRegistry,
   type PluginEnvironment,
   type PluginEvent,
   type PluginLogLine,
@@ -462,6 +468,12 @@ export interface PluginView {
   commands: PluginCommandView[];
   surfaces: PluginSurfaceView[];
   logPath: string;
+  /** Where `plugin install` got the package; null for one put in the plugins folder by hand. */
+  install: PluginInstallView | null;
+  /** A registry lists a newer version (updateVersion, from updateRegistry). */
+  updateAvailable: boolean;
+  updateVersion: string;
+  updateRegistry: string;
 }
 
 function toPermissions(p: PluginPermissions | undefined): PluginPermissionsView {
@@ -503,6 +515,12 @@ export function toPluginView(p: Plugin): PluginView {
     commands: p.commands.map((c) => ({ name: c.name, title: c.title, description: c.description })),
     surfaces: p.surfaces.map((s) => ({ id: s.id, title: s.title, icon: s.icon, scope: s.scope, when: s.when, showCommand: s.showCommand, kind: s.kind })),
     logPath: p.logPath,
+    install: p.install
+      ? { kind: p.install.kind, source: p.install.source, version: p.install.version, sha256: p.install.sha256, installedAtMs: p.install.installedAt ? timestampMs(p.install.installedAt) : null }
+      : null,
+    updateAvailable: p.updateAvailable,
+    updateVersion: p.updateVersion,
+    updateRegistry: p.updateRegistry,
   };
 }
 
@@ -512,7 +530,11 @@ export type PluginEventView =
   | { kind: "updated"; plugin: PluginView }
   | { kind: "removed"; name: string }
   /** Availability may have changed: re-list commands. */
-  | { kind: "availability"; epoch: number };
+  | { kind: "availability"; epoch: number }
+  /** A step of an install or update (docs/notes/plugins-7-registry.md). */
+  | { kind: "install-progress"; progress: InstallProgressView }
+  /** The registries' merged index changed: Browse again. */
+  | { kind: "registry"; epoch: number };
 
 export function toPluginEventView(ev: PluginEvent): PluginEventView | null {
   const e = ev.event;
@@ -525,6 +547,10 @@ export function toPluginEventView(ev: PluginEvent): PluginEventView | null {
       return { kind: "removed", name: e.value };
     case "availabilityEpoch":
       return { kind: "availability", epoch: Number(e.value) };
+    case "installProgress":
+      return { kind: "install-progress", progress: toInstallProgress(e.value) };
+    case "registryEpoch":
+      return { kind: "registry", epoch: Number(e.value) };
     default:
       return null;
   }
@@ -697,4 +723,135 @@ export async function actOnSurface(req: ActRequestView, conn: DaemonConnection =
     ...(req.context ? { context: toUiContext(req.context) } : {}),
   });
   return Number(res.version);
+}
+
+// ---------------------------------------------------------------------------------------
+// Registries (docs/notes/plugins-7-registry.md): Browse, install progress
+
+/** Where an installed package came from. */
+export interface PluginInstallView {
+  /** registry, github or path. */
+  kind: string;
+  /** The registry's URL, owner/repo, or the linked folder. */
+  source: string;
+  version: string;
+  sha256: string;
+  installedAtMs: number | null;
+}
+
+export type InstallPhaseView = "resolving" | "downloading" | "verifying" | "extracting" | "installing" | "done" | "failed" | "unknown";
+
+const installPhases: Record<PluginInstallPhase, InstallPhaseView> = {
+  [PluginInstallPhase.UNSPECIFIED]: "unknown",
+  [PluginInstallPhase.RESOLVING]: "resolving",
+  [PluginInstallPhase.DOWNLOADING]: "downloading",
+  [PluginInstallPhase.VERIFYING]: "verifying",
+  [PluginInstallPhase.EXTRACTING]: "extracting",
+  [PluginInstallPhase.INSTALLING]: "installing",
+  [PluginInstallPhase.DONE]: "done",
+  [PluginInstallPhase.FAILED]: "failed",
+};
+
+/** One step of an install: phase, the daemon's words (or the failure), bytes downloaded. */
+export interface InstallProgressView {
+  /** What was asked for: a registry name, owner/repo or a folder. */
+  ref: string;
+  /** The plugin, once resolved (else ""). */
+  name: string;
+  version: string;
+  phase: InstallPhaseView;
+  message: string;
+  bytes: number;
+}
+
+export function toInstallProgress(p: PluginInstallProgress): InstallProgressView {
+  return { ref: p.ref, name: p.name, version: p.version, phase: installPhases[p.phase], message: p.message, bytes: Number(p.bytes) };
+}
+
+/** One registry's state after the last read. */
+export interface RegistryView {
+  url: string;
+  fetchedAtMs: number | null;
+  cached: boolean;
+  /** The last fetch's failure ("" when it worked). */
+  error: string;
+  plugins: number;
+  issues: string[];
+}
+
+function toRegistry(r: PluginRegistry): RegistryView {
+  return { url: r.url, fetchedAtMs: r.fetchedAt ? timestampMs(r.fetchedAt) : null, cached: r.cached, error: r.error, plugins: r.plugins, issues: [...r.issues] };
+}
+
+/** A plugin a registry lists (its latest version) and what is installed of it. */
+export interface IndexEntryView {
+  name: string;
+  displayName: string;
+  description: string;
+  /** The source repository, owner/name on github.com ("" when the entry has none). */
+  repo: string;
+  version: string;
+  permissions: PluginPermissionsView;
+  /** The permissions in the consent dialog's words. */
+  permissionLines: string[];
+  /** The registry listing it. */
+  registry: string;
+  /** There is a build for this machine. */
+  available: boolean;
+  /** The installed version, null when it is not installed. */
+  installedVersion: string | null;
+  installedDev: boolean;
+  updateAvailable: boolean;
+}
+
+export function toIndexEntry(e: PluginIndexEntry): IndexEntryView {
+  return {
+    name: e.name,
+    displayName: e.displayName || e.name,
+    description: e.description,
+    repo: e.repo,
+    version: e.version,
+    permissions: toPermissions(e.permissions),
+    permissionLines: [...e.permissionLines],
+    registry: e.registry,
+    available: e.available,
+    installedVersion: e.installed ? e.installed.version : null,
+    installedDev: e.installed?.dev ?? false,
+    updateAvailable: e.updateAvailable,
+  };
+}
+
+/** Every registry's plugins merged by name, the registries' states, and this machine's platform. */
+export interface BrowseView {
+  entries: IndexEntryView[];
+  registries: RegistryView[];
+  platform: string;
+}
+
+export function toBrowse(r: BrowsePluginsResponse): BrowseView {
+  return { entries: r.entries.map(toIndexEntry), registries: r.registries.map(toRegistry), platform: r.platform };
+}
+
+/** PluginService.Browse: from each registry's cache (1 h) unless refresh. */
+export async function browsePlugins(refresh = false, signal?: AbortSignal, conn: DaemonConnection = daemon): Promise<BrowseView> {
+  const c = await conn.client(PluginService);
+  return toBrowse(await c.browse({ refresh }, { signal }));
+}
+
+/** What plugin.install's result JSON (an InstallPluginResponse) says of the plugin now. */
+export interface InstallOutcomeView {
+  name: string;
+  version: string;
+  changed: boolean;
+  enabled: boolean;
+  needsConsent: boolean;
+}
+
+export function installOutcome(resultJson: string): InstallOutcomeView | null {
+  try {
+    const r = fromJsonString(InstallPluginResponseSchema, resultJson, { ignoreUnknownFields: true });
+    return { name: r.plugin?.name ?? "", version: r.version, changed: r.changed, enabled: r.plugin?.enabled ?? false, needsConsent: r.plugin?.needsConsent ?? false };
+  } catch {
+    return null;
+  }
 }

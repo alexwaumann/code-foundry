@@ -10,6 +10,7 @@ import (
 
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/model"
+	"github.com/alexwaumann/code-foundry/internal/store/plugin/registry"
 	"github.com/alexwaumann/code-foundry/internal/theme"
 )
 
@@ -113,6 +114,7 @@ const (
 	GroupNotify      = "notifications"
 	GroupKeybindings = "keybindings"
 	GroupUpdate      = "update"
+	GroupPlugins     = "plugins"
 	GroupAdvanced    = "advanced"
 )
 
@@ -124,6 +126,9 @@ const (
 	PageSource        = "source"
 	PageKeybindings   = "keybindings"
 	PageAdvanced      = "advanced"
+	// PagePlugins is drawn by the GUI (Settings → Plugins: installed plugins and Browse)
+	// around its one section of fields.
+	PagePlugins = "plugins"
 )
 
 // Pages in display order. The keybindings page's sections are the command categories
@@ -153,6 +158,8 @@ var Pages = []Page{
 		{ID: "executables", Title: "Executables"},
 		{ID: "logging", Title: "Logging"},
 	}},
+	{ID: PagePlugins, Title: "Plugins", Description: "Separate programs that add commands, panel surfaces, thread flags and environment to Code Foundry.",
+		Sections: []Section{{ID: "registries", Title: "Registries", Description: "Where Browse finds plugins to install."}}},
 }
 
 // Groups are the file's tables, in file order. The settings page follows Pages.
@@ -165,6 +172,7 @@ var Groups = []Group{
 	{GroupNotify, "Notifications", "Dock badge and alerts for threads that need you. macOS banners aren't available to an app without a bundle."},
 	{GroupKeybindings, "Keybindings", `Override a command's chord, or "none" to unbind it. Reserved app chords (cmd+k, cmd+b, cmd+1..9, ...) cannot be bound.`},
 	{GroupUpdate, "Updates", "Which releases the app checks for and offers to install."},
+	{GroupPlugins, "Plugins", "Where plugins are installed from."},
 	{GroupAdvanced, "Advanced", "Executables and logging."},
 }
 
@@ -200,6 +208,7 @@ const (
 	KeyClaudePath        = "advanced.claude_path"
 	KeyGhPath            = "advanced.gh_path"
 	KeyLogLevel          = "advanced.log_level"
+	KeyPluginRegistries  = "plugins.registries"
 	keybindingKeyPrefix  = GroupKeybindings + "."
 	defaultFontFamily    = "JetBrainsMono Nerd Font Mono, JetBrains Mono, SF Mono, Menlo"
 	defaultScrollback    = 10000
@@ -415,6 +424,14 @@ var staticFields = []Field{
 		Enum:        []string{"debug", "info", "warn", "error"}, EnumLabels: []string{"Debug", "Info", "Warn", "Error"}, Default: "info",
 		bind: func(s *Settings) any { return &s.Advanced.LogLevel },
 	},
+	// Plugins › Registries.
+	{
+		Key: KeyPluginRegistries, Group: GroupPlugins, Page: PagePlugins, Section: "registries", Type: String, Title: "Plugin registries",
+		Description: "Where Browse and plugin install find plugins, in order: the first registry listing a name wins. A GitHub repository (https://github.com/<owner>/<repo>, read with your gh login, so private ones work) or an https URL of an index.json. Separate several with commas. Empty (the default) configures none: Browse lists nothing and install takes only a release or a folder.",
+		Default:     "", Placeholder: "https://github.com/<owner>/<repo>",
+		check: checkRegistries,
+		bind:  func(s *Settings) any { return &s.Plugins.Registries },
+	},
 }
 
 // effortLabels names effort levels for display ("xhigh" is "Extra high", like the
@@ -598,4 +615,10 @@ func checkExecutable(v string) error {
 		return fmt.Errorf("%s is not an executable file", p)
 	}
 	return nil
+}
+
+// checkRegistries validates plugins.registries: every entry a registry URL.
+func checkRegistries(v string) error {
+	_, err := registry.ParseList(v)
+	return err
 }

@@ -69,6 +69,9 @@ type Deps struct {
 	Plugin command.PluginBackend
 	// PluginSurface backs plugin.surface and plugin.act. Nil works like Terminal.
 	PluginSurface command.PluginSurfaceBackend
+	// PluginRegistry backs plugin.browse, plugin.install, plugin.update and
+	// plugin.uninstall. Nil works like Terminal.
+	PluginRegistry command.PluginRegistryBackend
 	// PullRequestChecks backs pr.checks (a nil Gh works like Terminal).
 	PullRequestChecks command.PullRequestChecksDeps
 }
@@ -101,6 +104,9 @@ func Register(r *command.Registry, d Deps) error {
 	}
 	if d.PluginSurface == nil {
 		d.PluginSurface = codefoundryv1connect.UnimplementedPluginServiceHandler{}
+	}
+	if d.PluginRegistry == nil {
+		d.PluginRegistry = codefoundryv1connect.UnimplementedPluginServiceHandler{}
 	}
 	if d.Update == nil {
 		d.Update = codefoundryv1connect.UnimplementedUpdateServiceHandler{}
@@ -143,6 +149,7 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterPlugin(r, d.Plugin),
 		command.RegisterPluginSurface(r, d.PluginSurface),
 		command.RegisterPluginOwned(r, command.PluginOwnedDeps{Thread: d.Thread, Project: d.Project, Terminal: d.Terminal}),
+		command.RegisterPluginRegistry(r, d.PluginRegistry),
 		command.RegisterPullRequestChecks(r, d.PullRequestChecks),
 	)
 }

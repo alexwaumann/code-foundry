@@ -2,10 +2,12 @@
 
 A plugin ships as GitHub release tarballs listed in a registry: a git repository whose
 `plugins/<name>.json` entries name each plugin's tarballs and their SHA-256 sums. The
-default registry is `alexwaumann/code-foundry-plugins`; a workplace may run its own with
-the same layout in a private repository. Code Foundry installs from the registry for the
-user (download, hash check, consent); the author's part ends with the registry pull
-request.
+public one is `alexwaumann/code-foundry-plugins`; a workplace may run its own with the
+same layout in a private repository. Code Foundry configures no registry by default: a
+user lists the ones they trust in the `plugins.registries` setting (`code-foundry settings
+set plugins.registries https://github.com/alexwaumann/code-foundry-plugins`; several
+separated by commas). Code Foundry installs from the registry for the user (download,
+hash check, consent); the author's part ends with the registry pull request.
 
 Do every step that publishes (creating the repository, pushing a tag, opening the
 registry pull request) only after the user has said yes.
@@ -116,7 +118,10 @@ git push -u origin HEAD && gh pr create --repo alexwaumann/code-foundry-plugins 
 
 The registry's CI downloads each tarball, checks the SHA-256, reads `plugin.json` from it,
 checks that name, version and permissions match and that the `exec` file is in it. When
-the pull request merges, `index.json` is regenerated.
+the pull request merges, `index.json` is regenerated, and users whose `plugins.registries`
+lists the registry see the plugin in Browse and `code-foundry plugin browse`. Without the
+registry configured, `code-foundry plugin install <owner>/<repo>` installs straight from
+the release.
 
 **Updating**: release the new version, `make registry-entry` again, and a pull request
 replacing `plugins/<name>.json`.

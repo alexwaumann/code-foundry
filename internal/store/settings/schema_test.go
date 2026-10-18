@@ -501,3 +501,31 @@ func TestDefaultWorktreeField(t *testing.T) {
 		})
 	}
 }
+
+func TestPluginRegistriesField(t *testing.T) {
+	tests := []struct {
+		raw, want, issue string
+	}{
+		{raw: "", want: ""},
+		{raw: "o/a, https://x.example/index.json", want: "o/a, https://x.example/index.json"},
+		{raw: "none", want: "none"},
+		{raw: "o/a, http://x.example/index.json", want: "", issue: "plain http only for localhost"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.raw, func(t *testing.T) {
+			r := resolve(map[string]string{KeyPluginRegistries: tt.raw}, nil)
+			if got := r.settings.Plugins.Registries; got != tt.want {
+				t.Errorf("value = %q, want %q", got, tt.want)
+			}
+			var issue string
+			for _, is := range r.issues {
+				if is.Key == KeyPluginRegistries {
+					issue = is.Message
+				}
+			}
+			if (tt.issue == "") != (issue == "") || !strings.Contains(issue, tt.issue) {
+				t.Errorf("issue = %q, want %q", issue, tt.issue)
+			}
+		})
+	}
+}

@@ -16,7 +16,7 @@ import type { JsonObject, Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/plugin.proto.
  */
 export const file_codefoundry_v1_plugin: GenFile = /*@__PURE__*/
-  fileDesc("Chtjb2RlZm91bmRyeS92MS9wbHVnaW4ucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIqMBChFQbHVnaW5QZXJtaXNzaW9ucxIQCghjb21tYW5kcxgBIAMoCRIOCgZldmVudHMYAiADKAkSFQoNdGhyZWFkX3N0YXR1cxgDIAEoCBITCgtzZXNzaW9uX2VudhgEIAEoCBIPCgdzZWNyZXRzGAUgASgIEg8KB3RocmVhZHMYBiABKAgSEQoJdGVybWluYWxzGAcgASgIEgsKA2FwaRgIIAEoCCJBCg1QbHVnaW5Db21tYW5kEgwKBG5hbWUYASABKAkSDQoFdGl0bGUYAiABKAkSEwoLZGVzY3JpcHRpb24YAyABKAkivAEKDVBsdWdpblN1cmZhY2USCgoCaWQYASABKAkSDQoFdGl0bGUYAiABKAkSDAoEaWNvbhgDIAEoCRINCgVzY29wZRgEIAEoCRISCgpwbGFjZW1lbnRzGAUgAygJEgwKBHdoZW4YBiABKAkSFAoMc2hvd19jb21tYW5kGAcgASgJEgwKBGtpbmQYCCABKAkSEQoJYXZhaWxhYmxlGAkgASgIEhoKEnVuYXZhaWxhYmxlX3JlYXNvbhgKIAEoCSLjBQoGUGx1Z2luEgwKBG5hbWUYASABKAkSFAoMZGlzcGxheV9uYW1lGAIgASgJEg8KB3ZlcnNpb24YAyABKAkSEwoLZGVzY3JpcHRpb24YBCABKAkSKgoFc3RhdGUYBSABKA4yGy5jb2RlZm91bmRyeS52MS5QbHVnaW5TdGF0ZRIPCgdlbmFibGVkGAYgASgIEhcKD2Rpc2FibGVkX3JlYXNvbhgHIAEoCRILCgNkZXYYCCABKAgSEAoIZGV2X3BhdGgYCSABKAkSCwoDZGlyGAogASgJEhIKCmxhc3RfZXJyb3IYCyABKAkSDgoGaXNzdWVzGAwgAygJEjYKC3Blcm1pc3Npb25zGA0gASgLMiEuY29kZWZvdW5kcnkudjEuUGx1Z2luUGVybWlzc2lvbnMSMgoHZ3JhbnRlZBgOIAEoCzIhLmNvZGVmb3VuZHJ5LnYxLlBsdWdpblBlcm1pc3Npb25zEjAKDGNvbnNlbnRlZF9hdBgPIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASFQoNbmVlZHNfY29uc2VudBgQIAEoCBIUCgxjb25zZW50X3RleHQYESABKAkSCwoDcGlkGBIgASgFEi4KCnN0YXJ0ZWRfYXQYEyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjMKD25leHRfcmVzdGFydF9hdBgUIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEAoIcmVzdGFydHMYFSABKAUSEAoIcHJvdG9jb2wYFiABKAUSFAoMY2FwYWJpbGl0aWVzGBcgAygJEi8KCGNvbW1hbmRzGBggAygLMh0uY29kZWZvdW5kcnkudjEuUGx1Z2luQ29tbWFuZBIvCghzdXJmYWNlcxgZIAMoCzIdLmNvZGVmb3VuZHJ5LnYxLlBsdWdpblN1cmZhY2USEAoIbG9nX3BhdGgYGiABKAkiQAoSTGlzdFBsdWdpbnNSZXF1ZXN0EioKB2NvbnRleHQYASABKAsyGS5jb2RlZm91bmRyeS52MS5VaUNvbnRleHQiPgoTTGlzdFBsdWdpbnNSZXNwb25zZRInCgdwbHVnaW5zGAEgAygLMhYuY29kZWZvdW5kcnkudjEuUGx1Z2luIjQKE0VuYWJsZVBsdWdpblJlcXVlc3QSDAoEbmFtZRgBIAEoCRIPCgdjb25zZW50GAIgASgIImsKFEVuYWJsZVBsdWdpblJlc3BvbnNlEiYKBnBsdWdpbhgBIAEoCzIWLmNvZGVmb3VuZHJ5LnYxLlBsdWdpbhIVCg1uZWVkc19jb25zZW50GAIgASgIEhQKDGNvbnNlbnRfdGV4dBgDIAEoCSIkChREaXNhYmxlUGx1Z2luUmVxdWVzdBIMCgRuYW1lGAEgASgJIj8KFURpc2FibGVQbHVnaW5SZXNwb25zZRImCgZwbHVnaW4YASABKAsyFi5jb2RlZm91bmRyeS52MS5QbHVnaW4iJAoUUmVzdGFydFBsdWdpblJlcXVlc3QSDAoEbmFtZRgBIAEoCSI/ChVSZXN0YXJ0UGx1Z2luUmVzcG9uc2USJgoGcGx1Z2luGAEgASgLMhYuY29kZWZvdW5kcnkudjEuUGx1Z2luIkIKEERldlBsdWdpblJlcXVlc3QSDAoEcGF0aBgBIAEoCRIPCgdjb25zZW50GAIgASgIEg8KB2RyeV9ydW4YAyABKAgiaAoRRGV2UGx1Z2luUmVzcG9uc2USJgoGcGx1Z2luGAEgASgLMhYuY29kZWZvdW5kcnkudjEuUGx1Z2luEhUKDW5lZWRzX2NvbnNlbnQYAiABKAgSFAoMY29uc2VudF90ZXh0GAMgASgJIhYKFFJlbG9hZFBsdWdpbnNSZXF1ZXN0IhcKFVJlbG9hZFBsdWdpbnNSZXNwb25zZSIwChFQbHVnaW5Mb2dzUmVxdWVzdBIMCgRuYW1lGAEgASgJEg0KBWxpbmVzGAIgASgFInMKDVBsdWdpbkxvZ0xpbmUSCwoDc2VxGAEgASgEEigKBHRpbWUYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEg4KBnNvdXJjZRgDIAEoCRINCgVsZXZlbBgEIAEoCRIMCgR0ZXh0GAUgASgJIlAKElBsdWdpbkxvZ3NSZXNwb25zZRIsCgVsaW5lcxgBIAMoCzIdLmNvZGVmb3VuZHJ5LnYxLlBsdWdpbkxvZ0xpbmUSDAoEcGF0aBgCIAEoCSI2ChdGb2xsb3dQbHVnaW5Mb2dzUmVxdWVzdBIMCgRuYW1lGAEgASgJEg0KBWxpbmVzGAIgASgFIksKDFBsdWdpblNlY3JldBILCgNrZXkYASABKAkSLgoKdXBkYXRlZF9hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiKAoYTGlzdFBsdWdpblNlY3JldHNSZXF1ZXN0EgwKBG5hbWUYASABKAkiSgoZTGlzdFBsdWdpblNlY3JldHNSZXNwb25zZRItCgdzZWNyZXRzGAEgAygLMhwuY29kZWZvdW5kcnkudjEuUGx1Z2luU2VjcmV0IjYKGURlbGV0ZVBsdWdpblNlY3JldFJlcXVlc3QSDAoEbmFtZRgBIAEoCRILCgNrZXkYAiABKAkiHAoaRGVsZXRlUGx1Z2luU2VjcmV0UmVzcG9uc2UiFQoTV2F0Y2hQbHVnaW5zUmVxdWVzdCKrAQoLUGx1Z2luRXZlbnQSMgoIc25hcHNob3QYASABKAsyHi5jb2RlZm91bmRyeS52MS5QbHVnaW5TbmFwc2hvdEgAEikKB3VwZGF0ZWQYAiABKAsyFi5jb2RlZm91bmRyeS52MS5QbHVnaW5IABIWCgxyZW1vdmVkX25hbWUYAyABKAlIABIcChJhdmFpbGFiaWxpdHlfZXBvY2gYBCABKARIAEIHCgVldmVudCI5Cg5QbHVnaW5TbmFwc2hvdBInCgdwbHVnaW5zGAEgAygLMhYuY29kZWZvdW5kcnkudjEuUGx1Z2luImsKClN1cmZhY2VSZWYSDgoGcGx1Z2luGAEgASgJEg8KB3N1cmZhY2UYAiABKAkSKgoHY29udGV4dBgDIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLlVpQ29udGV4dBIQCghpbnN0YW5jZRgEIAEoCSKRAQoMU3VyZmFjZVN0YXRlEhAKCGluc3RhbmNlGAEgASgJEisKBXBoYXNlGAIgASgOMhwuY29kZWZvdW5kcnkudjEuU3VyZmFjZVBoYXNlEg8KB21lc3NhZ2UYAyABKAkSMQoMcGx1Z2luX3N0YXRlGAQgASgOMhsuY29kZWZvdW5kcnkudjEuUGx1Z2luU3RhdGUiWgoLU3VyZmFjZVZpZXcSEAoIaW5zdGFuY2UYASABKAkSDwoHdmVyc2lvbhgCIAEoBBIRCgl2aWV3X2pzb24YAyABKAkSFQoNaG9zdF9yZW5kZXJlZBgEIAEoCCIsCg5TdXJmYWNlTG9nTGluZRIMCgR0ZXh0GAEgASgJEgwKBHRvbmUYAiABKAkifwoQU3VyZmFjZUxvZ0FwcGVuZBIQCghpbnN0YW5jZRgBIAEoCRIPCgd2ZXJzaW9uGAIgASgEEgsKA2tleRgDIAEoCRIMCgR0ZXh0GAQgASgJEi0KBWxpbmVzGAUgAygLMh4uY29kZWZvdW5kcnkudjEuU3VyZmFjZUxvZ0xpbmUiPQoMU3VyZmFjZVRvYXN0EhAKCGluc3RhbmNlGAEgASgJEg0KBWxldmVsGAIgASgJEgwKBHRleHQYAyABKAkijgIKDVN1cmZhY2VVcGRhdGUSLQoFc3RhdGUYASABKAsyHC5jb2RlZm91bmRyeS52MS5TdXJmYWNlU3RhdGVIABIrCgR2aWV3GAIgASgLMhsuY29kZWZvdW5kcnkudjEuU3VyZmFjZVZpZXdIABIyCgZhcHBlbmQYAyABKAsyIC5jb2RlZm91bmRyeS52MS5TdXJmYWNlTG9nQXBwZW5kSAASLQoFdG9hc3QYBCABKAsyHC5jb2RlZm91bmRyeS52MS5TdXJmYWNlVG9hc3RIABI0CgloZWFydGJlYXQYBSABKAsyHy5jb2RlZm91bmRyeS52MS5TdHJlYW1IZWFydGJlYXRIAEIICgZ1cGRhdGUiPgoTV2F0Y2hTdXJmYWNlUmVxdWVzdBInCgNyZWYYASABKAsyGi5jb2RlZm91bmRyeS52MS5TdXJmYWNlUmVmIk0KEUdldFN1cmZhY2VSZXF1ZXN0EicKA3JlZhgBIAEoCzIaLmNvZGVmb3VuZHJ5LnYxLlN1cmZhY2VSZWYSDwoHd2FpdF9tcxgCIAEoBSJYCg5TdXJmYWNlRWxlbWVudBILCgNrZXkYASABKAkSDAoEa2luZBgCIAEoCRIOCgZhY3Rpb24YAyABKAkSDQoFbGFiZWwYBCABKAkSDAoEZm9ybRgFIAEoCSKeAQoSR2V0U3VyZmFjZVJlc3BvbnNlEisKBXN0YXRlGAEgASgLMhwuY29kZWZvdW5kcnkudjEuU3VyZmFjZVN0YXRlEikKBHZpZXcYAiABKAsyGy5jb2RlZm91bmRyeS52MS5TdXJmYWNlVmlldxIwCghlbGVtZW50cxgDIAMoCzIeLmNvZGVmb3VuZHJ5LnYxLlN1cmZhY2VFbGVtZW50Iu8BChFTdXJmYWNlQWN0UmVxdWVzdBIQCghpbnN0YW5jZRgBIAEoCRInCgNyZWYYAiABKAsyGi5jb2RlZm91bmRyeS52MS5TdXJmYWNlUmVmEg8KB3ZlcnNpb24YAyABKAQSCwoDa2V5GAQgASgJEg4KBmFjdGlvbhgFIAEoCRISCgV2YWx1ZRgGIAEoCUgAiAEBEicKBnZhbHVlcxgHIAEoCzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3QSKgoHY29udGV4dBgIIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLlVpQ29udGV4dEIICgZfdmFsdWUiJQoSU3VyZmFjZUFjdFJlc3BvbnNlEg8KB3ZlcnNpb24YASABKAQiKAoYUGx1Z2luRW52aXJvbm1lbnRSZXF1ZXN0EgwKBG5hbWUYASABKAkiKgoMUGx1Z2luRW52VmFyEgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCSLcAQoRUGx1Z2luRW52aXJvbm1lbnQSDgoGcGx1Z2luGAEgASgJEikKA2VudhgCIAMoCzIcLmNvZGVmb3VuZHJ5LnYxLlBsdWdpbkVudlZhchIUCgxwYXRoX3ByZXBlbmQYAyADKAkSEAoIYWRkX2RpcnMYBCADKAkSEAoIcHJvamVjdHMYBSADKAkSEgoKbm9fcHJvamVjdBgGIAEoCBIOCgZpc3N1ZXMYByADKAkSLgoKdXBkYXRlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiVAoZUGx1Z2luRW52aXJvbm1lbnRSZXNwb25zZRI3CgxlbnZpcm9ubWVudHMYASADKAsyIS5jb2RlZm91bmRyeS52MS5QbHVnaW5FbnZpcm9ubWVudCrjAQoLUGx1Z2luU3RhdGUSHAoYUExVR0lOX1NUQVRFX1VOU1BFQ0lGSUVEEAASGQoVUExVR0lOX1NUQVRFX0RJU0FCTEVEEAESGQoVUExVR0lOX1NUQVRFX1NUQVJUSU5HEAISGAoUUExVR0lOX1NUQVRFX1JVTk5JTkcQAxIYChRQTFVHSU5fU1RBVEVfQ1JBU0hFRBAEEhkKFVBMVUdJTl9TVEFURV9TVE9QUElORxAFEhgKFFBMVUdJTl9TVEFURV9TVE9QUEVEEAYSFwoTUExVR0lOX1NUQVRFX0ZBSUxFRBAHKrsBCgxTdXJmYWNlUGhhc2USHQoZU1VSRkFDRV9QSEFTRV9VTlNQRUNJRklFRBAAEhkKFVNVUkZBQ0VfUEhBU0VfT1BFTklORxABEhYKElNVUkZBQ0VfUEhBU0VfTElWRRACEiAKHFNVUkZBQ0VfUEhBU0VfTk9UX1JFU1BPTkRJTkcQAxIdChlTVVJGQUNFX1BIQVNFX1BMVUdJTl9ET1dOEAQSGAoUU1VSRkFDRV9QSEFTRV9GQUlMRUQQBTLCCgoNUGx1Z2luU2VydmljZRJRCgRMaXN0EiIuY29kZWZvdW5kcnkudjEuTGlzdFBsdWdpbnNSZXF1ZXN0GiMuY29kZWZvdW5kcnkudjEuTGlzdFBsdWdpbnNSZXNwb25zZSIAElUKBkVuYWJsZRIjLmNvZGVmb3VuZHJ5LnYxLkVuYWJsZVBsdWdpblJlcXVlc3QaJC5jb2RlZm91bmRyeS52MS5FbmFibGVQbHVnaW5SZXNwb25zZSIAElgKB0Rpc2FibGUSJC5jb2RlZm91bmRyeS52MS5EaXNhYmxlUGx1Z2luUmVxdWVzdBolLmNvZGVmb3VuZHJ5LnYxLkRpc2FibGVQbHVnaW5SZXNwb25zZSIAElgKB1Jlc3RhcnQSJC5jb2RlZm91bmRyeS52MS5SZXN0YXJ0UGx1Z2luUmVxdWVzdBolLmNvZGVmb3VuZHJ5LnYxLlJlc3RhcnRQbHVnaW5SZXNwb25zZSIAEkwKA0RldhIgLmNvZGVmb3VuZHJ5LnYxLkRldlBsdWdpblJlcXVlc3QaIS5jb2RlZm91bmRyeS52MS5EZXZQbHVnaW5SZXNwb25zZSIAElcKBlJlbG9hZBIkLmNvZGVmb3VuZHJ5LnYxLlJlbG9hZFBsdWdpbnNSZXF1ZXN0GiUuY29kZWZvdW5kcnkudjEuUmVsb2FkUGx1Z2luc1Jlc3BvbnNlIgASTwoETG9ncxIhLmNvZGVmb3VuZHJ5LnYxLlBsdWdpbkxvZ3NSZXF1ZXN0GiIuY29kZWZvdW5kcnkudjEuUGx1Z2luTG9nc1Jlc3BvbnNlIgASWAoKRm9sbG93TG9ncxInLmNvZGVmb3VuZHJ5LnYxLkZvbGxvd1BsdWdpbkxvZ3NSZXF1ZXN0Gh0uY29kZWZvdW5kcnkudjEuUGx1Z2luTG9nTGluZSIAMAESZAoLTGlzdFNlY3JldHMSKC5jb2RlZm91bmRyeS52MS5MaXN0UGx1Z2luU2VjcmV0c1JlcXVlc3QaKS5jb2RlZm91bmRyeS52MS5MaXN0UGx1Z2luU2VjcmV0c1Jlc3BvbnNlIgASZwoMRGVsZXRlU2VjcmV0EikuY29kZWZvdW5kcnkudjEuRGVsZXRlUGx1Z2luU2VjcmV0UmVxdWVzdBoqLmNvZGVmb3VuZHJ5LnYxLkRlbGV0ZVBsdWdpblNlY3JldFJlc3BvbnNlIgASTQoFV2F0Y2gSIy5jb2RlZm91bmRyeS52MS5XYXRjaFBsdWdpbnNSZXF1ZXN0GhsuY29kZWZvdW5kcnkudjEuUGx1Z2luRXZlbnQiADABElYKDFdhdGNoU3VyZmFjZRIjLmNvZGVmb3VuZHJ5LnYxLldhdGNoU3VyZmFjZVJlcXVlc3QaHS5jb2RlZm91bmRyeS52MS5TdXJmYWNlVXBkYXRlIgAwARJVCgpHZXRTdXJmYWNlEiEuY29kZWZvdW5kcnkudjEuR2V0U3VyZmFjZVJlcXVlc3QaIi5jb2RlZm91bmRyeS52MS5HZXRTdXJmYWNlUmVzcG9uc2UiABJOCgNBY3QSIS5jb2RlZm91bmRyeS52MS5TdXJmYWNlQWN0UmVxdWVzdBoiLmNvZGVmb3VuZHJ5LnYxLlN1cmZhY2VBY3RSZXNwb25zZSIAEmQKC0Vudmlyb25tZW50EiguY29kZWZvdW5kcnkudjEuUGx1Z2luRW52aXJvbm1lbnRSZXF1ZXN0GikuY29kZWZvdW5kcnkudjEuUGx1Z2luRW52aXJvbm1lbnRSZXNwb25zZSIAQsMBChJjb20uY29kZWZvdW5kcnkudjFCC1BsdWdpblByb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM", [file_codefoundry_v1_command, file_codefoundry_v1_heartbeat, file_google_protobuf_struct, file_google_protobuf_timestamp]);
+  fileDesc("Chtjb2RlZm91bmRyeS92MS9wbHVnaW4ucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIqMBChFQbHVnaW5QZXJtaXNzaW9ucxIQCghjb21tYW5kcxgBIAMoCRIOCgZldmVudHMYAiADKAkSFQoNdGhyZWFkX3N0YXR1cxgDIAEoCBITCgtzZXNzaW9uX2VudhgEIAEoCBIPCgdzZWNyZXRzGAUgASgIEg8KB3RocmVhZHMYBiABKAgSEQoJdGVybWluYWxzGAcgASgIEgsKA2FwaRgIIAEoCCJBCg1QbHVnaW5Db21tYW5kEgwKBG5hbWUYASABKAkSDQoFdGl0bGUYAiABKAkSEwoLZGVzY3JpcHRpb24YAyABKAkivAEKDVBsdWdpblN1cmZhY2USCgoCaWQYASABKAkSDQoFdGl0bGUYAiABKAkSDAoEaWNvbhgDIAEoCRINCgVzY29wZRgEIAEoCRISCgpwbGFjZW1lbnRzGAUgAygJEgwKBHdoZW4YBiABKAkSFAoMc2hvd19jb21tYW5kGAcgASgJEgwKBGtpbmQYCCABKAkSEQoJYXZhaWxhYmxlGAkgASgIEhoKEnVuYXZhaWxhYmxlX3JlYXNvbhgKIAEoCSLeBgoGUGx1Z2luEgwKBG5hbWUYASABKAkSFAoMZGlzcGxheV9uYW1lGAIgASgJEg8KB3ZlcnNpb24YAyABKAkSEwoLZGVzY3JpcHRpb24YBCABKAkSKgoFc3RhdGUYBSABKA4yGy5jb2RlZm91bmRyeS52MS5QbHVnaW5TdGF0ZRIPCgdlbmFibGVkGAYgASgIEhcKD2Rpc2FibGVkX3JlYXNvbhgHIAEoCRILCgNkZXYYCCABKAgSEAoIZGV2X3BhdGgYCSABKAkSCwoDZGlyGAogASgJEhIKCmxhc3RfZXJyb3IYCyABKAkSDgoGaXNzdWVzGAwgAygJEjYKC3Blcm1pc3Npb25zGA0gASgLMiEuY29kZWZvdW5kcnkudjEuUGx1Z2luUGVybWlzc2lvbnMSMgoHZ3JhbnRlZBgOIAEoCzIhLmNvZGVmb3VuZHJ5LnYxLlBsdWdpblBlcm1pc3Npb25zEjAKDGNvbnNlbnRlZF9hdBgPIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASFQoNbmVlZHNfY29uc2VudBgQIAEoCBIUCgxjb25zZW50X3RleHQYESABKAkSCwoDcGlkGBIgASgFEi4KCnN0YXJ0ZWRfYXQYEyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjMKD25leHRfcmVzdGFydF9hdBgUIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEAoIcmVzdGFydHMYFSABKAUSEAoIcHJvdG9jb2wYFiABKAUSFAoMY2FwYWJpbGl0aWVzGBcgAygJEi8KCGNvbW1hbmRzGBggAygLMh0uY29kZWZvdW5kcnkudjEuUGx1Z2luQ29tbWFuZBIvCghzdXJmYWNlcxgZIAMoCzIdLmNvZGVmb3VuZHJ5LnYxLlBsdWdpblN1cmZhY2USEAoIbG9nX3BhdGgYGiABKAkSLgoHaW5zdGFsbBgbIAEoCzIdLmNvZGVmb3VuZHJ5LnYxLlBsdWdpbkluc3RhbGwSGAoQdXBkYXRlX2F2YWlsYWJsZRgcIAEoCBIWCg51cGRhdGVfdmVyc2lvbhgdIAEoCRIXCg91cGRhdGVfcmVnaXN0cnkYHiABKAkiQAoSTGlzdFBsdWdpbnNSZXF1ZXN0EioKB2NvbnRleHQYASABKAsyGS5jb2RlZm91bmRyeS52MS5VaUNvbnRleHQiPgoTTGlzdFBsdWdpbnNSZXNwb25zZRInCgdwbHVnaW5zGAEgAygLMhYuY29kZWZvdW5kcnkudjEuUGx1Z2luIjQKE0VuYWJsZVBsdWdpblJlcXVlc3QSDAoEbmFtZRgBIAEoCRIPCgdjb25zZW50GAIgASgIImsKFEVuYWJsZVBsdWdpblJlc3BvbnNlEiYKBnBsdWdpbhgBIAEoCzIWLmNvZGVmb3VuZHJ5LnYxLlBsdWdpbhIVCg1uZWVkc19jb25zZW50GAIgASgIEhQKDGNvbnNlbnRfdGV4dBgDIAEoCSIkChREaXNhYmxlUGx1Z2luUmVxdWVzdBIMCgRuYW1lGAEgASgJIj8KFURpc2FibGVQbHVnaW5SZXNwb25zZRImCgZwbHVnaW4YASABKAsyFi5jb2RlZm91bmRyeS52MS5QbHVnaW4iJAoUUmVzdGFydFBsdWdpblJlcXVlc3QSDAoEbmFtZRgBIAEoCSI/ChVSZXN0YXJ0UGx1Z2luUmVzcG9uc2USJgoGcGx1Z2luGAEgASgLMhYuY29kZWZvdW5kcnkudjEuUGx1Z2luIkIKEERldlBsdWdpblJlcXVlc3QSDAoEcGF0aBgBIAEoCRIPCgdjb25zZW50GAIgASgIEg8KB2RyeV9ydW4YAyABKAgiaAoRRGV2UGx1Z2luUmVzcG9uc2USJgoGcGx1Z2luGAEgASgLMhYuY29kZWZvdW5kcnkudjEuUGx1Z2luEhUKDW5lZWRzX2NvbnNlbnQYAiABKAgSFAoMY29uc2VudF90ZXh0GAMgASgJIhYKFFJlbG9hZFBsdWdpbnNSZXF1ZXN0IhcKFVJlbG9hZFBsdWdpbnNSZXNwb25zZSIwChFQbHVnaW5Mb2dzUmVxdWVzdBIMCgRuYW1lGAEgASgJEg0KBWxpbmVzGAIgASgFInMKDVBsdWdpbkxvZ0xpbmUSCwoDc2VxGAEgASgEEigKBHRpbWUYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEg4KBnNvdXJjZRgDIAEoCRINCgVsZXZlbBgEIAEoCRIMCgR0ZXh0GAUgASgJIlAKElBsdWdpbkxvZ3NSZXNwb25zZRIsCgVsaW5lcxgBIAMoCzIdLmNvZGVmb3VuZHJ5LnYxLlBsdWdpbkxvZ0xpbmUSDAoEcGF0aBgCIAEoCSI2ChdGb2xsb3dQbHVnaW5Mb2dzUmVxdWVzdBIMCgRuYW1lGAEgASgJEg0KBWxpbmVzGAIgASgFIksKDFBsdWdpblNlY3JldBILCgNrZXkYASABKAkSLgoKdXBkYXRlZF9hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiKAoYTGlzdFBsdWdpblNlY3JldHNSZXF1ZXN0EgwKBG5hbWUYASABKAkiSgoZTGlzdFBsdWdpblNlY3JldHNSZXNwb25zZRItCgdzZWNyZXRzGAEgAygLMhwuY29kZWZvdW5kcnkudjEuUGx1Z2luU2VjcmV0IjYKGURlbGV0ZVBsdWdpblNlY3JldFJlcXVlc3QSDAoEbmFtZRgBIAEoCRILCgNrZXkYAiABKAkiHAoaRGVsZXRlUGx1Z2luU2VjcmV0UmVzcG9uc2UiFQoTV2F0Y2hQbHVnaW5zUmVxdWVzdCKIAgoLUGx1Z2luRXZlbnQSMgoIc25hcHNob3QYASABKAsyHi5jb2RlZm91bmRyeS52MS5QbHVnaW5TbmFwc2hvdEgAEikKB3VwZGF0ZWQYAiABKAsyFi5jb2RlZm91bmRyeS52MS5QbHVnaW5IABIWCgxyZW1vdmVkX25hbWUYAyABKAlIABIcChJhdmFpbGFiaWxpdHlfZXBvY2gYBCABKARIABJBChBpbnN0YWxsX3Byb2dyZXNzGAUgASgLMiUuY29kZWZvdW5kcnkudjEuUGx1Z2luSW5zdGFsbFByb2dyZXNzSAASGAoOcmVnaXN0cnlfZXBvY2gYBiABKARIAEIHCgVldmVudCI5Cg5QbHVnaW5TbmFwc2hvdBInCgdwbHVnaW5zGAEgAygLMhYuY29kZWZvdW5kcnkudjEuUGx1Z2luImsKClN1cmZhY2VSZWYSDgoGcGx1Z2luGAEgASgJEg8KB3N1cmZhY2UYAiABKAkSKgoHY29udGV4dBgDIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLlVpQ29udGV4dBIQCghpbnN0YW5jZRgEIAEoCSKRAQoMU3VyZmFjZVN0YXRlEhAKCGluc3RhbmNlGAEgASgJEisKBXBoYXNlGAIgASgOMhwuY29kZWZvdW5kcnkudjEuU3VyZmFjZVBoYXNlEg8KB21lc3NhZ2UYAyABKAkSMQoMcGx1Z2luX3N0YXRlGAQgASgOMhsuY29kZWZvdW5kcnkudjEuUGx1Z2luU3RhdGUiWgoLU3VyZmFjZVZpZXcSEAoIaW5zdGFuY2UYASABKAkSDwoHdmVyc2lvbhgCIAEoBBIRCgl2aWV3X2pzb24YAyABKAkSFQoNaG9zdF9yZW5kZXJlZBgEIAEoCCIsCg5TdXJmYWNlTG9nTGluZRIMCgR0ZXh0GAEgASgJEgwKBHRvbmUYAiABKAkifwoQU3VyZmFjZUxvZ0FwcGVuZBIQCghpbnN0YW5jZRgBIAEoCRIPCgd2ZXJzaW9uGAIgASgEEgsKA2tleRgDIAEoCRIMCgR0ZXh0GAQgASgJEi0KBWxpbmVzGAUgAygLMh4uY29kZWZvdW5kcnkudjEuU3VyZmFjZUxvZ0xpbmUiPQoMU3VyZmFjZVRvYXN0EhAKCGluc3RhbmNlGAEgASgJEg0KBWxldmVsGAIgASgJEgwKBHRleHQYAyABKAkijgIKDVN1cmZhY2VVcGRhdGUSLQoFc3RhdGUYASABKAsyHC5jb2RlZm91bmRyeS52MS5TdXJmYWNlU3RhdGVIABIrCgR2aWV3GAIgASgLMhsuY29kZWZvdW5kcnkudjEuU3VyZmFjZVZpZXdIABIyCgZhcHBlbmQYAyABKAsyIC5jb2RlZm91bmRyeS52MS5TdXJmYWNlTG9nQXBwZW5kSAASLQoFdG9hc3QYBCABKAsyHC5jb2RlZm91bmRyeS52MS5TdXJmYWNlVG9hc3RIABI0CgloZWFydGJlYXQYBSABKAsyHy5jb2RlZm91bmRyeS52MS5TdHJlYW1IZWFydGJlYXRIAEIICgZ1cGRhdGUiPgoTV2F0Y2hTdXJmYWNlUmVxdWVzdBInCgNyZWYYASABKAsyGi5jb2RlZm91bmRyeS52MS5TdXJmYWNlUmVmIk0KEUdldFN1cmZhY2VSZXF1ZXN0EicKA3JlZhgBIAEoCzIaLmNvZGVmb3VuZHJ5LnYxLlN1cmZhY2VSZWYSDwoHd2FpdF9tcxgCIAEoBSJYCg5TdXJmYWNlRWxlbWVudBILCgNrZXkYASABKAkSDAoEa2luZBgCIAEoCRIOCgZhY3Rpb24YAyABKAkSDQoFbGFiZWwYBCABKAkSDAoEZm9ybRgFIAEoCSKeAQoSR2V0U3VyZmFjZVJlc3BvbnNlEisKBXN0YXRlGAEgASgLMhwuY29kZWZvdW5kcnkudjEuU3VyZmFjZVN0YXRlEikKBHZpZXcYAiABKAsyGy5jb2RlZm91bmRyeS52MS5TdXJmYWNlVmlldxIwCghlbGVtZW50cxgDIAMoCzIeLmNvZGVmb3VuZHJ5LnYxLlN1cmZhY2VFbGVtZW50Iu8BChFTdXJmYWNlQWN0UmVxdWVzdBIQCghpbnN0YW5jZRgBIAEoCRInCgNyZWYYAiABKAsyGi5jb2RlZm91bmRyeS52MS5TdXJmYWNlUmVmEg8KB3ZlcnNpb24YAyABKAQSCwoDa2V5GAQgASgJEg4KBmFjdGlvbhgFIAEoCRISCgV2YWx1ZRgGIAEoCUgAiAEBEicKBnZhbHVlcxgHIAEoCzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3QSKgoHY29udGV4dBgIIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLlVpQ29udGV4dEIICgZfdmFsdWUiJQoSU3VyZmFjZUFjdFJlc3BvbnNlEg8KB3ZlcnNpb24YASABKAQiKAoYUGx1Z2luRW52aXJvbm1lbnRSZXF1ZXN0EgwKBG5hbWUYASABKAkiKgoMUGx1Z2luRW52VmFyEgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCSLcAQoRUGx1Z2luRW52aXJvbm1lbnQSDgoGcGx1Z2luGAEgASgJEikKA2VudhgCIAMoCzIcLmNvZGVmb3VuZHJ5LnYxLlBsdWdpbkVudlZhchIUCgxwYXRoX3ByZXBlbmQYAyADKAkSEAoIYWRkX2RpcnMYBCADKAkSEAoIcHJvamVjdHMYBSADKAkSEgoKbm9fcHJvamVjdBgGIAEoCBIOCgZpc3N1ZXMYByADKAkSLgoKdXBkYXRlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiVAoZUGx1Z2luRW52aXJvbm1lbnRSZXNwb25zZRI3CgxlbnZpcm9ubWVudHMYASADKAsyIS5jb2RlZm91bmRyeS52MS5QbHVnaW5FbnZpcm9ubWVudCKAAQoNUGx1Z2luSW5zdGFsbBIMCgRraW5kGAEgASgJEg4KBnNvdXJjZRgCIAEoCRIPCgd2ZXJzaW9uGAMgASgJEg4KBnNoYTI1NhgEIAEoCRIwCgxpbnN0YWxsZWRfYXQYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIpYBChVQbHVnaW5JbnN0YWxsUHJvZ3Jlc3MSCwoDcmVmGAEgASgJEgwKBG5hbWUYAiABKAkSDwoHdmVyc2lvbhgDIAEoCRIxCgVwaGFzZRgEIAEoDjIiLmNvZGVmb3VuZHJ5LnYxLlBsdWdpbkluc3RhbGxQaGFzZRIPCgdtZXNzYWdlGAUgASgJEg0KBWJ5dGVzGAYgASgDIo0BCg5QbHVnaW5SZWdpc3RyeRILCgN1cmwYASABKAkSLgoKZmV0Y2hlZF9hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASDgoGY2FjaGVkGAMgASgIEg0KBWVycm9yGAQgASgJEg8KB3BsdWdpbnMYBSABKAUSDgoGaXNzdWVzGAYgAygJIkQKE1BsdWdpbkluZGV4QXJ0aWZhY3QSEAoIcGxhdGZvcm0YASABKAkSCwoDdXJsGAIgASgJEg4KBnNoYTI1NhgDIAEoCSLwAgoQUGx1Z2luSW5kZXhFbnRyeRIMCgRuYW1lGAEgASgJEhQKDGRpc3BsYXlfbmFtZRgCIAEoCRITCgtkZXNjcmlwdGlvbhgDIAEoCRIMCgRyZXBvGAQgASgJEg8KB3ZlcnNpb24YBSABKAkSEAoIcHJvdG9jb2wYBiABKAUSNgoLcGVybWlzc2lvbnMYByABKAsyIS5jb2RlZm91bmRyeS52MS5QbHVnaW5QZXJtaXNzaW9ucxIYChBwZXJtaXNzaW9uX2xpbmVzGAggAygJEjYKCWFydGlmYWN0cxgJIAMoCzIjLmNvZGVmb3VuZHJ5LnYxLlBsdWdpbkluZGV4QXJ0aWZhY3QSEAoIcmVnaXN0cnkYCiABKAkSEQoJYXZhaWxhYmxlGAsgASgIEikKCWluc3RhbGxlZBgMIAEoCzIWLmNvZGVmb3VuZHJ5LnYxLlBsdWdpbhIYChB1cGRhdGVfYXZhaWxhYmxlGA0gASgIIicKFEJyb3dzZVBsdWdpbnNSZXF1ZXN0Eg8KB3JlZnJlc2gYASABKAgikAEKFUJyb3dzZVBsdWdpbnNSZXNwb25zZRIxCgdlbnRyaWVzGAEgAygLMiAuY29kZWZvdW5kcnkudjEuUGx1Z2luSW5kZXhFbnRyeRIyCgpyZWdpc3RyaWVzGAIgAygLMh4uY29kZWZvdW5kcnkudjEuUGx1Z2luUmVnaXN0cnkSEAoIcGxhdGZvcm0YAyABKAkiIAoeUmVmcmVzaFBsdWdpblJlZ2lzdHJpZXNSZXF1ZXN0IlUKH1JlZnJlc2hQbHVnaW5SZWdpc3RyaWVzUmVzcG9uc2USMgoKcmVnaXN0cmllcxgBIAMoCzIeLmNvZGVmb3VuZHJ5LnYxLlBsdWdpblJlZ2lzdHJ5ImQKFEluc3RhbGxQbHVnaW5SZXF1ZXN0EgsKA3JlZhgBIAEoCRINCgVmb3JjZRgCIAEoCBIOCgZlbmFibGUYAyABKAgSDwoHY29uc2VudBgEIAEoCBIPCgdyZWZyZXNoGAUgASgIItgBChVJbnN0YWxsUGx1Z2luUmVzcG9uc2USJgoGcGx1Z2luGAEgASgLMhYuY29kZWZvdW5kcnkudjEuUGx1Z2luEgwKBGtpbmQYAiABKAkSDgoGc291cmNlGAMgASgJEg8KB3ZlcnNpb24YBCABKAkSGAoQcHJldmlvdXNfdmVyc2lvbhgFIAEoCRIPCgdjaGFuZ2VkGAYgASgIEhAKCHdhcm5pbmdzGAcgAygJEhUKDW5lZWRzX2NvbnNlbnQYCCABKAgSFAoMY29uc2VudF90ZXh0GAkgASgJIkQKFFVwZGF0ZVBsdWdpbnNSZXF1ZXN0EgwKBG5hbWUYASABKAkSDQoFY2hlY2sYAiABKAgSDwoHcmVmcmVzaBgDIAEoCCKRAQoMUGx1Z2luVXBkYXRlEgwKBG5hbWUYASABKAkSFwoPY3VycmVudF92ZXJzaW9uGAIgASgJEg8KB3ZlcnNpb24YAyABKAkSEAoIcmVnaXN0cnkYBCABKAkSDwoHdXBkYXRlZBgFIAEoCBINCgVlcnJvchgGIAEoCRIXCg9kaXNhYmxlZF9yZWFzb24YByABKAkiRgoVVXBkYXRlUGx1Z2luc1Jlc3BvbnNlEi0KB3VwZGF0ZXMYASADKAsyHC5jb2RlZm91bmRyeS52MS5QbHVnaW5VcGRhdGUiNQoWVW5pbnN0YWxsUGx1Z2luUmVxdWVzdBIMCgRuYW1lGAEgASgJEg0KBXB1cmdlGAIgASgIIjoKF1VuaW5zdGFsbFBsdWdpblJlc3BvbnNlEg8KB3JlbW92ZWQYASABKAkSDgoGcHVyZ2VkGAIgAygJKuMBCgtQbHVnaW5TdGF0ZRIcChhQTFVHSU5fU1RBVEVfVU5TUEVDSUZJRUQQABIZChVQTFVHSU5fU1RBVEVfRElTQUJMRUQQARIZChVQTFVHSU5fU1RBVEVfU1RBUlRJTkcQAhIYChRQTFVHSU5fU1RBVEVfUlVOTklORxADEhgKFFBMVUdJTl9TVEFURV9DUkFTSEVEEAQSGQoVUExVR0lOX1NUQVRFX1NUT1BQSU5HEAUSGAoUUExVR0lOX1NUQVRFX1NUT1BQRUQQBhIXChNQTFVHSU5fU1RBVEVfRkFJTEVEEAcquwEKDFN1cmZhY2VQaGFzZRIdChlTVVJGQUNFX1BIQVNFX1VOU1BFQ0lGSUVEEAASGQoVU1VSRkFDRV9QSEFTRV9PUEVOSU5HEAESFgoSU1VSRkFDRV9QSEFTRV9MSVZFEAISIAocU1VSRkFDRV9QSEFTRV9OT1RfUkVTUE9ORElORxADEh0KGVNVUkZBQ0VfUEhBU0VfUExVR0lOX0RPV04QBBIYChRTVVJGQUNFX1BIQVNFX0ZBSUxFRBAFKrICChJQbHVnaW5JbnN0YWxsUGhhc2USJAogUExVR0lOX0lOU1RBTExfUEhBU0VfVU5TUEVDSUZJRUQQABIiCh5QTFVHSU5fSU5TVEFMTF9QSEFTRV9SRVNPTFZJTkcQARIkCiBQTFVHSU5fSU5TVEFMTF9QSEFTRV9ET1dOTE9BRElORxACEiIKHlBMVUdJTl9JTlNUQUxMX1BIQVNFX1ZFUklGWUlORxADEiMKH1BMVUdJTl9JTlNUQUxMX1BIQVNFX0VYVFJBQ1RJTkcQBBIjCh9QTFVHSU5fSU5TVEFMTF9QSEFTRV9JTlNUQUxMSU5HEAUSHQoZUExVR0lOX0lOU1RBTExfUEhBU0VfRE9ORRAGEh8KG1BMVUdJTl9JTlNUQUxMX1BIQVNFX0ZBSUxFRBAHMqYOCg1QbHVnaW5TZXJ2aWNlElEKBExpc3QSIi5jb2RlZm91bmRyeS52MS5MaXN0UGx1Z2luc1JlcXVlc3QaIy5jb2RlZm91bmRyeS52MS5MaXN0UGx1Z2luc1Jlc3BvbnNlIgASVQoGRW5hYmxlEiMuY29kZWZvdW5kcnkudjEuRW5hYmxlUGx1Z2luUmVxdWVzdBokLmNvZGVmb3VuZHJ5LnYxLkVuYWJsZVBsdWdpblJlc3BvbnNlIgASWAoHRGlzYWJsZRIkLmNvZGVmb3VuZHJ5LnYxLkRpc2FibGVQbHVnaW5SZXF1ZXN0GiUuY29kZWZvdW5kcnkudjEuRGlzYWJsZVBsdWdpblJlc3BvbnNlIgASWAoHUmVzdGFydBIkLmNvZGVmb3VuZHJ5LnYxLlJlc3RhcnRQbHVnaW5SZXF1ZXN0GiUuY29kZWZvdW5kcnkudjEuUmVzdGFydFBsdWdpblJlc3BvbnNlIgASTAoDRGV2EiAuY29kZWZvdW5kcnkudjEuRGV2UGx1Z2luUmVxdWVzdBohLmNvZGVmb3VuZHJ5LnYxLkRldlBsdWdpblJlc3BvbnNlIgASVwoGUmVsb2FkEiQuY29kZWZvdW5kcnkudjEuUmVsb2FkUGx1Z2luc1JlcXVlc3QaJS5jb2RlZm91bmRyeS52MS5SZWxvYWRQbHVnaW5zUmVzcG9uc2UiABJPCgRMb2dzEiEuY29kZWZvdW5kcnkudjEuUGx1Z2luTG9nc1JlcXVlc3QaIi5jb2RlZm91bmRyeS52MS5QbHVnaW5Mb2dzUmVzcG9uc2UiABJYCgpGb2xsb3dMb2dzEicuY29kZWZvdW5kcnkudjEuRm9sbG93UGx1Z2luTG9nc1JlcXVlc3QaHS5jb2RlZm91bmRyeS52MS5QbHVnaW5Mb2dMaW5lIgAwARJkCgtMaXN0U2VjcmV0cxIoLmNvZGVmb3VuZHJ5LnYxLkxpc3RQbHVnaW5TZWNyZXRzUmVxdWVzdBopLmNvZGVmb3VuZHJ5LnYxLkxpc3RQbHVnaW5TZWNyZXRzUmVzcG9uc2UiABJnCgxEZWxldGVTZWNyZXQSKS5jb2RlZm91bmRyeS52MS5EZWxldGVQbHVnaW5TZWNyZXRSZXF1ZXN0GiouY29kZWZvdW5kcnkudjEuRGVsZXRlUGx1Z2luU2VjcmV0UmVzcG9uc2UiABJNCgVXYXRjaBIjLmNvZGVmb3VuZHJ5LnYxLldhdGNoUGx1Z2luc1JlcXVlc3QaGy5jb2RlZm91bmRyeS52MS5QbHVnaW5FdmVudCIAMAESVgoMV2F0Y2hTdXJmYWNlEiMuY29kZWZvdW5kcnkudjEuV2F0Y2hTdXJmYWNlUmVxdWVzdBodLmNvZGVmb3VuZHJ5LnYxLlN1cmZhY2VVcGRhdGUiADABElUKCkdldFN1cmZhY2USIS5jb2RlZm91bmRyeS52MS5HZXRTdXJmYWNlUmVxdWVzdBoiLmNvZGVmb3VuZHJ5LnYxLkdldFN1cmZhY2VSZXNwb25zZSIAEk4KA0FjdBIhLmNvZGVmb3VuZHJ5LnYxLlN1cmZhY2VBY3RSZXF1ZXN0GiIuY29kZWZvdW5kcnkudjEuU3VyZmFjZUFjdFJlc3BvbnNlIgASZAoLRW52aXJvbm1lbnQSKC5jb2RlZm91bmRyeS52MS5QbHVnaW5FbnZpcm9ubWVudFJlcXVlc3QaKS5jb2RlZm91bmRyeS52MS5QbHVnaW5FbnZpcm9ubWVudFJlc3BvbnNlIgASVwoGQnJvd3NlEiQuY29kZWZvdW5kcnkudjEuQnJvd3NlUGx1Z2luc1JlcXVlc3QaJS5jb2RlZm91bmRyeS52MS5Ccm93c2VQbHVnaW5zUmVzcG9uc2UiABJ2ChFSZWZyZXNoUmVnaXN0cmllcxIuLmNvZGVmb3VuZHJ5LnYxLlJlZnJlc2hQbHVnaW5SZWdpc3RyaWVzUmVxdWVzdBovLmNvZGVmb3VuZHJ5LnYxLlJlZnJlc2hQbHVnaW5SZWdpc3RyaWVzUmVzcG9uc2UiABJYCgdJbnN0YWxsEiQuY29kZWZvdW5kcnkudjEuSW5zdGFsbFBsdWdpblJlcXVlc3QaJS5jb2RlZm91bmRyeS52MS5JbnN0YWxsUGx1Z2luUmVzcG9uc2UiABJXCgZVcGRhdGUSJC5jb2RlZm91bmRyeS52MS5VcGRhdGVQbHVnaW5zUmVxdWVzdBolLmNvZGVmb3VuZHJ5LnYxLlVwZGF0ZVBsdWdpbnNSZXNwb25zZSIAEl4KCVVuaW5zdGFsbBImLmNvZGVmb3VuZHJ5LnYxLlVuaW5zdGFsbFBsdWdpblJlcXVlc3QaJy5jb2RlZm91bmRyeS52MS5Vbmluc3RhbGxQbHVnaW5SZXNwb25zZSIAQsMBChJjb20uY29kZWZvdW5kcnkudjFCC1BsdWdpblByb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM", [file_codefoundry_v1_command, file_codefoundry_v1_heartbeat, file_google_protobuf_struct, file_google_protobuf_timestamp]);
 
 /**
  * PluginPermissions mirrors plugin.json's permissions (the plugin registry's entry schema).
@@ -338,6 +338,33 @@ export type Plugin = Message<"codefoundry.v1.Plugin"> & {
    * @generated from field: string log_path = 26;
    */
   logPath: string;
+
+  /**
+   * Where `plugin install` got the package; unset for one put in the plugins directory
+   * by hand.
+   *
+   * @generated from field: codefoundry.v1.PluginInstall install = 27;
+   */
+  install?: PluginInstall | undefined;
+
+  /**
+   * A registry lists a newer version (found by the update check, Browse or Update).
+   *
+   * @generated from field: bool update_available = 28;
+   */
+  updateAvailable: boolean;
+
+  /**
+   * @generated from field: string update_version = 29;
+   */
+  updateVersion: string;
+
+  /**
+   * The URL of the registry listing it.
+   *
+   * @generated from field: string update_registry = 30;
+   */
+  updateRegistry: string;
 };
 
 /**
@@ -847,6 +874,23 @@ export type PluginEvent = Message<"codefoundry.v1.PluginEvent"> & {
      */
     value: bigint;
     case: "availabilityEpoch";
+  } | {
+    /**
+     * A step of an install, update or link (Install, Update).
+     *
+     * @generated from field: codefoundry.v1.PluginInstallProgress install_progress = 5;
+     */
+    value: PluginInstallProgress;
+    case: "installProgress";
+  } | {
+    /**
+     * The registries' merged index changed (an entry added, removed or bumped): Browse
+     * again. Grows by one per change in this daemon's lifetime.
+     *
+     * @generated from field: uint64 registry_epoch = 6;
+     */
+    value: bigint;
+    case: "registryEpoch";
   } | { case: undefined; value?: undefined };
 };
 
@@ -1472,6 +1516,633 @@ export const PluginEnvironmentResponseSchema: GenMessage<PluginEnvironmentRespon
   messageDesc(file_codefoundry_v1_plugin, 44);
 
 /**
+ * PluginInstall says where an installed package came from.
+ *
+ * @generated from message codefoundry.v1.PluginInstall
+ */
+export type PluginInstall = Message<"codefoundry.v1.PluginInstall"> & {
+  /**
+   * registry, github (a release) or path (a linked folder).
+   *
+   * @generated from field: string kind = 1;
+   */
+  kind: string;
+
+  /**
+   * The registry's URL, owner/repo, or the folder.
+   *
+   * @generated from field: string source = 2;
+   */
+  source: string;
+
+  /**
+   * @generated from field: string version = 3;
+   */
+  version: string;
+
+  /**
+   * The tarball's SHA-256; empty for a link or a release without a checksums file.
+   *
+   * @generated from field: string sha256 = 4;
+   */
+  sha256: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp installed_at = 5;
+   */
+  installedAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message codefoundry.v1.PluginInstall.
+ * Use `create(PluginInstallSchema)` to create a new message.
+ */
+export const PluginInstallSchema: GenMessage<PluginInstall> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_plugin, 45);
+
+/**
+ * PluginInstallProgress is one step of an install.
+ *
+ * @generated from message codefoundry.v1.PluginInstallProgress
+ */
+export type PluginInstallProgress = Message<"codefoundry.v1.PluginInstallProgress"> & {
+  /**
+   * What was asked for (InstallPluginRequest.ref, or the name for an update).
+   *
+   * @generated from field: string ref = 1;
+   */
+  ref: string;
+
+  /**
+   * The plugin and version, once resolved.
+   *
+   * @generated from field: string name = 2;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string version = 3;
+   */
+  version: string;
+
+  /**
+   * @generated from field: codefoundry.v1.PluginInstallPhase phase = 4;
+   */
+  phase: PluginInstallPhase;
+
+  /**
+   * The step in words, or the failure.
+   *
+   * @generated from field: string message = 5;
+   */
+  message: string;
+
+  /**
+   * Bytes downloaded so far (HTTP downloads; downloads through gh report none).
+   *
+   * @generated from field: int64 bytes = 6;
+   */
+  bytes: bigint;
+};
+
+/**
+ * Describes the message codefoundry.v1.PluginInstallProgress.
+ * Use `create(PluginInstallProgressSchema)` to create a new message.
+ */
+export const PluginInstallProgressSchema: GenMessage<PluginInstallProgress> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_plugin, 46);
+
+/**
+ * PluginRegistry is one registry's state after the last read.
+ *
+ * @generated from message codefoundry.v1.PluginRegistry
+ */
+export type PluginRegistry = Message<"codefoundry.v1.PluginRegistry"> & {
+  /**
+   * @generated from field: string url = 1;
+   */
+  url: string;
+
+  /**
+   * When the index in use was fetched; unset when there is none.
+   *
+   * @generated from field: google.protobuf.Timestamp fetched_at = 2;
+   */
+  fetchedAt?: Timestamp | undefined;
+
+  /**
+   * The index in use came from the cache (fresh, or kept because the fetch failed).
+   *
+   * @generated from field: bool cached = 3;
+   */
+  cached: boolean;
+
+  /**
+   * The last fetch's failure.
+   *
+   * @generated from field: string error = 4;
+   */
+  error: string;
+
+  /**
+   * How many plugins it lists.
+   *
+   * @generated from field: int32 plugins = 5;
+   */
+  plugins: number;
+
+  /**
+   * Skipped entries and names an earlier registry lists already.
+   *
+   * @generated from field: repeated string issues = 6;
+   */
+  issues: string[];
+};
+
+/**
+ * Describes the message codefoundry.v1.PluginRegistry.
+ * Use `create(PluginRegistrySchema)` to create a new message.
+ */
+export const PluginRegistrySchema: GenMessage<PluginRegistry> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_plugin, 47);
+
+/**
+ * PluginIndexArtifact is one platform's release tarball of an index entry.
+ *
+ * @generated from message codefoundry.v1.PluginIndexArtifact
+ */
+export type PluginIndexArtifact = Message<"codefoundry.v1.PluginIndexArtifact"> & {
+  /**
+   * "darwin/arm64" or "darwin/amd64".
+   *
+   * @generated from field: string platform = 1;
+   */
+  platform: string;
+
+  /**
+   * @generated from field: string url = 2;
+   */
+  url: string;
+
+  /**
+   * @generated from field: string sha256 = 3;
+   */
+  sha256: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.PluginIndexArtifact.
+ * Use `create(PluginIndexArtifactSchema)` to create a new message.
+ */
+export const PluginIndexArtifactSchema: GenMessage<PluginIndexArtifact> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_plugin, 48);
+
+/**
+ * PluginIndexEntry is a plugin a registry lists (its latest version).
+ *
+ * @generated from message codefoundry.v1.PluginIndexEntry
+ */
+export type PluginIndexEntry = Message<"codefoundry.v1.PluginIndexEntry"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string display_name = 2;
+   */
+  displayName: string;
+
+  /**
+   * @generated from field: string description = 3;
+   */
+  description: string;
+
+  /**
+   * The source repository, owner/name on github.com.
+   *
+   * @generated from field: string repo = 4;
+   */
+  repo: string;
+
+  /**
+   * @generated from field: string version = 5;
+   */
+  version: string;
+
+  /**
+   * @generated from field: int32 protocol = 6;
+   */
+  protocol: number;
+
+  /**
+   * What it asks for (its manifest's permissions).
+   *
+   * @generated from field: codefoundry.v1.PluginPermissions permissions = 7;
+   */
+  permissions?: PluginPermissions | undefined;
+
+  /**
+   * The permissions in words, as the consent dialog lists them.
+   *
+   * @generated from field: repeated string permission_lines = 8;
+   */
+  permissionLines: string[];
+
+  /**
+   * @generated from field: repeated codefoundry.v1.PluginIndexArtifact artifacts = 9;
+   */
+  artifacts: PluginIndexArtifact[];
+
+  /**
+   * The URL of the registry listing it.
+   *
+   * @generated from field: string registry = 10;
+   */
+  registry: string;
+
+  /**
+   * There is a build for this machine's platform.
+   *
+   * @generated from field: bool available = 11;
+   */
+  available: boolean;
+
+  /**
+   * The plugin of that name as installed; unset when it is not.
+   *
+   * @generated from field: codefoundry.v1.Plugin installed = 12;
+   */
+  installed?: Plugin | undefined;
+
+  /**
+   * installed is older than version.
+   *
+   * @generated from field: bool update_available = 13;
+   */
+  updateAvailable: boolean;
+};
+
+/**
+ * Describes the message codefoundry.v1.PluginIndexEntry.
+ * Use `create(PluginIndexEntrySchema)` to create a new message.
+ */
+export const PluginIndexEntrySchema: GenMessage<PluginIndexEntry> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_plugin, 49);
+
+/**
+ * @generated from message codefoundry.v1.BrowsePluginsRequest
+ */
+export type BrowsePluginsRequest = Message<"codefoundry.v1.BrowsePluginsRequest"> & {
+  /**
+   * Read every registry again instead of its cached index.
+   *
+   * @generated from field: bool refresh = 1;
+   */
+  refresh: boolean;
+};
+
+/**
+ * Describes the message codefoundry.v1.BrowsePluginsRequest.
+ * Use `create(BrowsePluginsRequestSchema)` to create a new message.
+ */
+export const BrowsePluginsRequestSchema: GenMessage<BrowsePluginsRequest> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_plugin, 50);
+
+/**
+ * @generated from message codefoundry.v1.BrowsePluginsResponse
+ */
+export type BrowsePluginsResponse = Message<"codefoundry.v1.BrowsePluginsResponse"> & {
+  /**
+   * By name.
+   *
+   * @generated from field: repeated codefoundry.v1.PluginIndexEntry entries = 1;
+   */
+  entries: PluginIndexEntry[];
+
+  /**
+   * In the setting's order.
+   *
+   * @generated from field: repeated codefoundry.v1.PluginRegistry registries = 2;
+   */
+  registries: PluginRegistry[];
+
+  /**
+   * This machine's platform ("darwin/arm64").
+   *
+   * @generated from field: string platform = 3;
+   */
+  platform: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.BrowsePluginsResponse.
+ * Use `create(BrowsePluginsResponseSchema)` to create a new message.
+ */
+export const BrowsePluginsResponseSchema: GenMessage<BrowsePluginsResponse> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_plugin, 51);
+
+/**
+ * @generated from message codefoundry.v1.RefreshPluginRegistriesRequest
+ */
+export type RefreshPluginRegistriesRequest = Message<"codefoundry.v1.RefreshPluginRegistriesRequest"> & {
+};
+
+/**
+ * Describes the message codefoundry.v1.RefreshPluginRegistriesRequest.
+ * Use `create(RefreshPluginRegistriesRequestSchema)` to create a new message.
+ */
+export const RefreshPluginRegistriesRequestSchema: GenMessage<RefreshPluginRegistriesRequest> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_plugin, 52);
+
+/**
+ * @generated from message codefoundry.v1.RefreshPluginRegistriesResponse
+ */
+export type RefreshPluginRegistriesResponse = Message<"codefoundry.v1.RefreshPluginRegistriesResponse"> & {
+  /**
+   * @generated from field: repeated codefoundry.v1.PluginRegistry registries = 1;
+   */
+  registries: PluginRegistry[];
+};
+
+/**
+ * Describes the message codefoundry.v1.RefreshPluginRegistriesResponse.
+ * Use `create(RefreshPluginRegistriesResponseSchema)` to create a new message.
+ */
+export const RefreshPluginRegistriesResponseSchema: GenMessage<RefreshPluginRegistriesResponse> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_plugin, 53);
+
+/**
+ * @generated from message codefoundry.v1.InstallPluginRequest
+ */
+export type InstallPluginRequest = Message<"codefoundry.v1.InstallPluginRequest"> & {
+  /**
+   * A registry plugin name[@version]; owner/repo[@vX.Y.Z] for a GitHub release (its
+   * tarball found by the name <plugin>-<version>-darwin-<arch>.tar.gz, checked against
+   * the release's checksums.txt when it has one); or an absolute folder (or ~/...) with a
+   * plugin.json, linked like Dev.
+   *
+   * @generated from field: string ref = 1;
+   */
+  ref: string;
+
+  /**
+   * Replace a dev link with the package (or a package with a link), or reinstall the
+   * version already installed.
+   *
+   * @generated from field: bool force = 2;
+   */
+  force: boolean;
+
+  /**
+   * Enable it afterwards; consent consents to its permissions. Without consent a plugin
+   * that needs it stays disabled and the response says so.
+   *
+   * @generated from field: bool enable = 3;
+   */
+  enable: boolean;
+
+  /**
+   * @generated from field: bool consent = 4;
+   */
+  consent: boolean;
+
+  /**
+   * Read the registries again instead of their cached indexes.
+   *
+   * @generated from field: bool refresh = 5;
+   */
+  refresh: boolean;
+};
+
+/**
+ * Describes the message codefoundry.v1.InstallPluginRequest.
+ * Use `create(InstallPluginRequestSchema)` to create a new message.
+ */
+export const InstallPluginRequestSchema: GenMessage<InstallPluginRequest> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_plugin, 54);
+
+/**
+ * @generated from message codefoundry.v1.InstallPluginResponse
+ */
+export type InstallPluginResponse = Message<"codefoundry.v1.InstallPluginResponse"> & {
+  /**
+   * @generated from field: codefoundry.v1.Plugin plugin = 1;
+   */
+  plugin?: Plugin | undefined;
+
+  /**
+   * registry, github or path; source as PluginInstall.source.
+   *
+   * @generated from field: string kind = 2;
+   */
+  kind: string;
+
+  /**
+   * @generated from field: string source = 3;
+   */
+  source: string;
+
+  /**
+   * @generated from field: string version = 4;
+   */
+  version: string;
+
+  /**
+   * The version replaced; empty for a new install.
+   *
+   * @generated from field: string previous_version = 5;
+   */
+  previousVersion: string;
+
+  /**
+   * False when that version was installed already and nothing was done.
+   *
+   * @generated from field: bool changed = 6;
+   */
+  changed: boolean;
+
+  /**
+   * An unverified download, manifest warnings.
+   *
+   * @generated from field: repeated string warnings = 7;
+   */
+  warnings: string[];
+
+  /**
+   * enable was asked, but the plugin needs consent first: show consent_text.
+   *
+   * @generated from field: bool needs_consent = 8;
+   */
+  needsConsent: boolean;
+
+  /**
+   * @generated from field: string consent_text = 9;
+   */
+  consentText: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.InstallPluginResponse.
+ * Use `create(InstallPluginResponseSchema)` to create a new message.
+ */
+export const InstallPluginResponseSchema: GenMessage<InstallPluginResponse> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_plugin, 55);
+
+/**
+ * @generated from message codefoundry.v1.UpdatePluginsRequest
+ */
+export type UpdatePluginsRequest = Message<"codefoundry.v1.UpdatePluginsRequest"> & {
+  /**
+   * One plugin; empty for every plugin with an update.
+   *
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * Only list the updates.
+   *
+   * @generated from field: bool check = 2;
+   */
+  check: boolean;
+
+  /**
+   * Read the registries again instead of their cached indexes.
+   *
+   * @generated from field: bool refresh = 3;
+   */
+  refresh: boolean;
+};
+
+/**
+ * Describes the message codefoundry.v1.UpdatePluginsRequest.
+ * Use `create(UpdatePluginsRequestSchema)` to create a new message.
+ */
+export const UpdatePluginsRequestSchema: GenMessage<UpdatePluginsRequest> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_plugin, 56);
+
+/**
+ * PluginUpdate is one plugin's update, offered or done.
+ *
+ * @generated from message codefoundry.v1.PluginUpdate
+ */
+export type PluginUpdate = Message<"codefoundry.v1.PluginUpdate"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string current_version = 2;
+   */
+  currentVersion: string;
+
+  /**
+   * @generated from field: string version = 3;
+   */
+  version: string;
+
+  /**
+   * @generated from field: string registry = 4;
+   */
+  registry: string;
+
+  /**
+   * @generated from field: bool updated = 5;
+   */
+  updated: boolean;
+
+  /**
+   * Why it failed (the others still ran).
+   *
+   * @generated from field: string error = 6;
+   */
+  error: string;
+
+  /**
+   * Why an enabled plugin was left disabled: the new version asks for more permissions.
+   *
+   * @generated from field: string disabled_reason = 7;
+   */
+  disabledReason: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.PluginUpdate.
+ * Use `create(PluginUpdateSchema)` to create a new message.
+ */
+export const PluginUpdateSchema: GenMessage<PluginUpdate> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_plugin, 57);
+
+/**
+ * @generated from message codefoundry.v1.UpdatePluginsResponse
+ */
+export type UpdatePluginsResponse = Message<"codefoundry.v1.UpdatePluginsResponse"> & {
+  /**
+   * @generated from field: repeated codefoundry.v1.PluginUpdate updates = 1;
+   */
+  updates: PluginUpdate[];
+};
+
+/**
+ * Describes the message codefoundry.v1.UpdatePluginsResponse.
+ * Use `create(UpdatePluginsResponseSchema)` to create a new message.
+ */
+export const UpdatePluginsResponseSchema: GenMessage<UpdatePluginsResponse> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_plugin, 58);
+
+/**
+ * @generated from message codefoundry.v1.UninstallPluginRequest
+ */
+export type UninstallPluginRequest = Message<"codefoundry.v1.UninstallPluginRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * Also delete its data dir, secrets, logs and the consent given.
+   *
+   * @generated from field: bool purge = 2;
+   */
+  purge: boolean;
+};
+
+/**
+ * Describes the message codefoundry.v1.UninstallPluginRequest.
+ * Use `create(UninstallPluginRequestSchema)` to create a new message.
+ */
+export const UninstallPluginRequestSchema: GenMessage<UninstallPluginRequest> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_plugin, 59);
+
+/**
+ * @generated from message codefoundry.v1.UninstallPluginResponse
+ */
+export type UninstallPluginResponse = Message<"codefoundry.v1.UninstallPluginResponse"> & {
+  /**
+   * The package directory or dev link removed; empty when there was none.
+   *
+   * @generated from field: string removed = 1;
+   */
+  removed: string;
+
+  /**
+   * What purge deleted, in words.
+   *
+   * @generated from field: repeated string purged = 2;
+   */
+  purged: string[];
+};
+
+/**
+ * Describes the message codefoundry.v1.UninstallPluginResponse.
+ * Use `create(UninstallPluginResponseSchema)` to create a new message.
+ */
+export const UninstallPluginResponseSchema: GenMessage<UninstallPluginResponse> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_plugin, 60);
+
+/**
  * @generated from enum codefoundry.v1.PluginState
  */
 export enum PluginState {
@@ -1583,6 +2254,57 @@ export enum SurfacePhase {
  */
 export const SurfacePhaseSchema: GenEnum<SurfacePhase> = /*@__PURE__*/
   enumDesc(file_codefoundry_v1_plugin, 1);
+
+/**
+ * @generated from enum codefoundry.v1.PluginInstallPhase
+ */
+export enum PluginInstallPhase {
+  /**
+   * @generated from enum value: PLUGIN_INSTALL_PHASE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: PLUGIN_INSTALL_PHASE_RESOLVING = 1;
+   */
+  RESOLVING = 1,
+
+  /**
+   * @generated from enum value: PLUGIN_INSTALL_PHASE_DOWNLOADING = 2;
+   */
+  DOWNLOADING = 2,
+
+  /**
+   * @generated from enum value: PLUGIN_INSTALL_PHASE_VERIFYING = 3;
+   */
+  VERIFYING = 3,
+
+  /**
+   * @generated from enum value: PLUGIN_INSTALL_PHASE_EXTRACTING = 4;
+   */
+  EXTRACTING = 4,
+
+  /**
+   * @generated from enum value: PLUGIN_INSTALL_PHASE_INSTALLING = 5;
+   */
+  INSTALLING = 5,
+
+  /**
+   * @generated from enum value: PLUGIN_INSTALL_PHASE_DONE = 6;
+   */
+  DONE = 6,
+
+  /**
+   * @generated from enum value: PLUGIN_INSTALL_PHASE_FAILED = 7;
+   */
+  FAILED = 7,
+}
+
+/**
+ * Describes the enum codefoundry.v1.PluginInstallPhase.
+ */
+export const PluginInstallPhaseSchema: GenEnum<PluginInstallPhase> = /*@__PURE__*/
+  enumDesc(file_codefoundry_v1_plugin, 2);
 
 /**
  * PluginService manages plugins: separate executables under ~/.code-foundry/plugins/<name>
@@ -1763,6 +2485,67 @@ export const PluginService: GenService<{
     methodKind: "unary";
     input: typeof PluginEnvironmentRequestSchema;
     output: typeof PluginEnvironmentResponseSchema;
+  },
+  /**
+   * Browse lists the plugins of every registry in the plugins.registries setting, merged
+   * by name (the first registry listing a name wins), each with what is installed of it,
+   * and every registry's state. Indexes come from the cache (1 h) unless refresh.
+   * docs/notes/plugins-7-registry.md.
+   *
+   * @generated from rpc codefoundry.v1.PluginService.Browse
+   */
+  browse: {
+    methodKind: "unary";
+    input: typeof BrowsePluginsRequestSchema;
+    output: typeof BrowsePluginsResponseSchema;
+  },
+  /**
+   * RefreshRegistries reads every registry again and returns their state.
+   *
+   * @generated from rpc codefoundry.v1.PluginService.RefreshRegistries
+   */
+  refreshRegistries: {
+    methodKind: "unary";
+    input: typeof RefreshPluginRegistriesRequestSchema;
+    output: typeof RefreshPluginRegistriesResponseSchema;
+  },
+  /**
+   * Install installs a plugin from a registry, a GitHub release or a folder (see
+   * InstallPluginRequest.ref): it downloads this platform's tarball, checks its SHA-256,
+   * validates the package and swaps it in for plugins/<name> (the data dir stays). A new
+   * plugin stays disabled until enabled with consent; an enabled one restarts on the new
+   * package and stays enabled unless it asks for more permissions. Each step goes out as
+   * PluginEvent.install_progress.
+   *
+   * @generated from rpc codefoundry.v1.PluginService.Install
+   */
+  install: {
+    methodKind: "unary";
+    input: typeof InstallPluginRequestSchema;
+    output: typeof InstallPluginResponseSchema;
+  },
+  /**
+   * Update installs the newer versions the registries list, of one plugin or of every
+   * plugin with one; check only lists them. Nothing is ever updated unasked.
+   *
+   * @generated from rpc codefoundry.v1.PluginService.Update
+   */
+  update: {
+    methodKind: "unary";
+    input: typeof UpdatePluginsRequestSchema;
+    output: typeof UpdatePluginsResponseSchema;
+  },
+  /**
+   * Uninstall disables a plugin, stops it and removes its package (a dev link only, never
+   * the folder it points at). purge also deletes its data dir, secrets, logs and the
+   * consent given.
+   *
+   * @generated from rpc codefoundry.v1.PluginService.Uninstall
+   */
+  uninstall: {
+    methodKind: "unary";
+    input: typeof UninstallPluginRequestSchema;
+    output: typeof UninstallPluginResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_codefoundry_v1_plugin, 0);

@@ -188,7 +188,7 @@ func pluginEventToProto(ev plugin.Event) *v1.PluginEvent {
 	case plugin.AvailabilityChanged:
 		return &v1.PluginEvent{Event: &v1.PluginEvent_AvailabilityEpoch{AvailabilityEpoch: e.Epoch}}
 	}
-	return nil
+	return registryEventToProto(ev)
 }
 
 var pluginStates = map[plugin.State]v1.PluginState{
@@ -237,6 +237,7 @@ func pluginToProto(p plugin.Plugin) *v1.Plugin {
 	if mf.Name != "" {
 		out.ConsentText = plugin.ConsentText(mf)
 	}
+	fillInstall(out, p)
 	if p.Granted != nil {
 		out.Granted = permissionsToProto(*p.Granted)
 	}

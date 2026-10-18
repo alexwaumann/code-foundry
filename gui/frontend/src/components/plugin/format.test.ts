@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatCountdown, formatDuration, formatRelative, formatTime } from "./format";
+import { formatCountdown, formatDuration, formatFixedDuration, formatRelative, formatTime } from "./format";
 
 describe("plugin time formats", () => {
   it.each([
@@ -11,6 +11,18 @@ describe("plugin time formats", () => {
     [-5, "0s"],
   ])("duration %d ms is %s", (ms, want) => {
     expect(formatDuration(ms)).toBe(want);
+  });
+
+  it.each([
+    [0, "0s"],
+    [40, "<0.1s"],
+    [108, "0.1s"],
+    [999, "0.9s"],
+    [2_390, "2s"],
+    [14_000, "14s"],
+    [252_000, "4m 12s"],
+  ])("fixed duration %d ms is %s", (ms, want) => {
+    expect(formatFixedDuration(ms)).toBe(want);
   });
 
   it.each([
