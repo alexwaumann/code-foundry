@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 )
 
@@ -176,4 +177,48 @@ func (r *Registry) Invoke(ctx context.Context, uctx Context, name string, raw ma
 		return Result{}, &ConfirmError{Command: name, Title: c.Title, Message: msg}
 	}
 	return c.Run(ctx, eff, args)
+}
+
+// ReplacePrefix atomically replaces every command whose name starts with prefix with
+// cmds: the plugin store's dynamic commands (plugin.<name>.*), re-registered on enable
+// and on a manifest change, and removed with an empty cmds on disable. prefix must end
+// in "." and every cmd must carry it and pass Register's checks. A name outside the
+// prefix that collides wraps ErrDuplicate. On any error nothing changes.
+func (r *Registry) ReplacePrefix(prefix string, cmds []Command) error {
+	if !strings.HasSuffix(prefix, ".") || !NamePattern.MatchString(prefix+"x") {
+		return fmt.Errorf("%w: prefix %q must be dotted segments ending in \".\"", ErrInvalidCommand, prefix)
+	}
+	next := make(map[string]*Command, len(cmds))
+	var errs []error
+	for _, c := range cmds {
+		if !strings.HasPrefix(c.Name, prefix) {
+			errs = append(errs, fmt.Errorf("%w %q: outside prefix %q", ErrInvalidCommand, c.Name, prefix))
+			continue
+		}
+		if err := c.validate(); err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		if _, dup := next[c.Name]; dup {
+			errs = append(errs, fmt.Errorf("%w: %q", ErrDuplicate, c.Name))
+			continue
+		}
+		c.Args = slices.Clone(c.Args)
+		c.Keybindings = slices.Clone(c.Keybindings)
+		next[c.Name] = &c
+	}
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for name := range r.cmds {
+		if strings.HasPrefix(name, prefix) {
+			delete(r.cmds, name)
+		}
+	}
+	for name, c := range next {
+		r.cmds[name] = c
+	}
+	return nil
 }
