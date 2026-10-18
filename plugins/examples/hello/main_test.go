@@ -99,12 +99,17 @@ func TestCommands(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	h.WaitFor(5*time.Second, func(h *plugintest.Host) bool {
-		res, err := h.Command(ctx, "events", nil, pluginsdk.UiContext{})
-		return err == nil && res.Message == "2 thread list events"
-	})
-	if !slices.ContainsFunc(h.Logs(), func(l pluginsdk.LogParams) bool { return l.Msg == "event" && l.Attrs["kind"] == "threadList.updated" }) {
+	// The plugin counts, answers the command, then logs: wait on the log line, which
+	// comes last, before checking either.
+	logged := func(h *plugintest.Host) bool {
+		return slices.ContainsFunc(h.Logs(), func(l pluginsdk.LogParams) bool { return l.Msg == "event" && l.Attrs["kind"] == "threadList.updated" })
+	}
+	h.WaitFor(5*time.Second, logged)
+	if !logged(h) {
 		t.Errorf("no event logged: %+v", h.Logs())
+	}
+	if res, err := h.Command(ctx, "events", nil, pluginsdk.UiContext{}); err != nil || res.Message != "2 thread list events" {
+		t.Errorf("events = %+v, %v", res, err)
 	}
 	// flag raises and clears hello's flag on the thread.
 	if res, err := h.Command(ctx, "flag", map[string]string{"level": "attention", "reason": "look"}, pluginsdk.UiContext{ThreadID: "t-1"}); err != nil || res.Message != "attention flag on t-1: look" {
