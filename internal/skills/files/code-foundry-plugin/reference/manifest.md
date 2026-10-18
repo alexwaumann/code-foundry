@@ -75,8 +75,8 @@ whenever a new version asks for more (the plugin is disabled until they agree).
 | `threadStatus` | bool | `Host.SetFlag`: attention or error flags on threads. |
 | `sessionEnv` | bool | `Host.SetEnvironment`: env, PATH entries and `--add-dir`s for new Claude threads. |
 | `secrets` | bool | `Host.Secrets()` and form secret inputs with `store`: the plugin's own Keychain namespace. |
-| `threads` | bool | Plugin-owned Claude threads (`thread` node). Arrives in a later version. |
-| `terminals` | bool | Plugin-owned terminals (`terminal` node). Arrives in a later version. |
+| `threads` | bool | Plugin-owned Claude threads (`CreateThread`, `thread` node; `reference/host-api.md`). |
+| `terminals` | bool | Plugin-owned terminals (`CreateTerminal`, `terminal` node). |
 | `api` | bool | The daemon's endpoint and token in `CODE_FOUNDRY_ENDPOINT` / `CODE_FOUNDRY_TOKEN`: full control of Code Foundry. Avoid; the consent text warns the user. |
 
 ## Commands
@@ -149,12 +149,12 @@ minute after the last viewer left.
 `--project <id>`; the global `--context-thread` works too.
 
 **One instance, many viewers.** A `pr` instance serves every thread on that pull request,
-but its `SurfaceOpen.Context` is the first opener's thread, and a `surface/act` carries no
-viewer context (the same holds for a `project` or `global` surface shown beside different
-threads). So an event that acts on "this
-thread" (send a failure to Claude) would reach the first opener's thread. Make anything
-thread-specific a **command button** instead: the host runs it with the viewing panel's
-context, so the command's `context: thread` arg is the thread the user is looking at.
+but its `SurfaceOpen.Context` is the first opener's thread (the same holds for a `project`
+or `global` surface shown beside different threads). So an event that acts on "this
+thread" (send a failure to Claude) must read the thread from `act.Context`, the acting
+panel's, never from the open. A **command button** works too: the host runs it with the
+viewing panel's context, so the command's `context: thread` arg is the thread the user is
+looking at.
 Command args travel inside the view (its 256 KB budget; an event's `data` is capped at
 1 KB): pass an id the command can look up (a run id, a job id), not the text itself.
 

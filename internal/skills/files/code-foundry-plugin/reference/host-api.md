@@ -252,8 +252,30 @@ not toast it twice.
 `h.UpdateView(instance, view)`, `h.AppendLog(instance, key, text)`,
 `h.AppendLogLines(instance, key, lines...)`: `reference/primitives.md`.
 
-## Later
+## Threads and terminals of its own (permissions `threads`, `terminals`)
 
-Plugin-owned threads and terminals (`thread/create`, `thread/send`, `terminal/create`,
-`terminal/close`; permissions `threads`, `terminals`) arrive in a later version; the SDK
-has no methods for them yet and the host answers -32601.
+```go
+id, err := h.CreateThread(ctx, pluginsdk.ThreadCreateParams{Title: "Deploy helper",
+	AddDirs: []string{skillDir}, Env: map[string]string{"DEPLOYBOT_URL": url}})
+err = h.SendThread(ctx, id, "Summarize the last failed deploy in one line.")
+term, err := h.CreateTerminal(ctx, pluginsdk.TerminalCreateParams{Argv: []string{"make", "test"}, Title: "tests"})
+```
+
+`CreateThread` makes a Claude thread the plugin owns: hidden from the sidebar, `thread
+list`, attention counts and the dock (`code-foundry plugin threads <name>` lists them),
+shown by a `thread` node. `Cwd` defaults to the plugin's data dir (with `ProjectID`, the
+project's main worktree; a `cwd` must be under home); `Env` and `AddDirs` follow the
+session environment's rules, but a bad one refuses the call, and they replace the
+plugin's own session environment for this thread; `Model` and `Effort` default to the
+user's settings; `Prompt` is an optional first message. It runs like any thread: a
+message starts its Claude, which stops at cache expiry, and it costs what it costs (the
+Usage page counts it). `SendThread` and `ArchiveThread` reach only the plugin's own
+threads (-32004 otherwise; a send unarchives); `Threads` lists them. To write to the
+user's thread, `Invoke` `thread.send` with the id from `act.Context`. `CreateTerminal`
+starts a terminal the plugin owns (cwd the data dir unless given, under home; env checked
+like a thread's; `$SHELL -lc` for the user's tools), shown by a `terminal` node and, on
+request, in the bottom panel; `CloseTerminal` and `Terminals` as for threads, and an exited
+terminal stays until closed. At most 32 live threads and 16 terminals. Disabling or
+uninstalling the plugin archives its threads and closes its terminals; terminals end with
+the daemon, threads do not (find them again with `Threads` in Init). plugintest keeps both
+in memory (`CreatedThreads`, `ThreadSends`, `PluginTerminals`, `ExitTerminal`).
