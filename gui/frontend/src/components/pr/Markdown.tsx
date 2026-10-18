@@ -42,8 +42,8 @@ const baseComponents: Components = {
 /**
  * What a body may contain after raw HTML is parsed: the elements markdown and GFM produce
  * (tables, task lists, footnotes), plus a few HTML tags GitHub bodies use (images,
- * collapsible details, line breaks, sub/superscript, keys). Everything else, script and
- * style included, is dropped. Attributes and URL schemes follow GitHub's own schema
+ * collapsible details, line breaks, sub/superscript, keys, fine print, highlights, inserted
+ * and struck text). Everything else, script and style included, is dropped. Attributes and URL schemes follow GitHub's own schema
  * (rehype-sanitize's defaultSchema), except that images load only over https.
  */
 const markdownSchema: SanitizeSchema = {
@@ -51,7 +51,7 @@ const markdownSchema: SanitizeSchema = {
   tagNames: [
     "a", "blockquote", "br", "code", "del", "em", "h1", "h2", "h3", "h4", "h5", "h6", "hr", "img", "input", "li", "ol", "p", "pre",
     "section", "strong", "table", "tbody", "td", "th", "thead", "tr", "ul",
-    "details", "summary", "sub", "sup", "kbd",
+    "details", "summary", "sub", "sup", "kbd", "small", "mark", "ins", "s",
   ],
   protocols: { ...defaultSchema.protocols, src: ["https"] },
 };

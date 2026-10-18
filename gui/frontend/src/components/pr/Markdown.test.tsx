@@ -56,6 +56,20 @@ describe("Markdown", () => {
     expect(c.querySelector("kbd")?.textContent).toBe("⌘K");
   });
 
+  it("keeps small, mark, ins and s (GitHub bodies' fine print, highlights, edits)", () => {
+    const c = md("Done <small>(after the rebase)</small> <mark>breaking</mark> <ins>added</ins> <s>removed</s>");
+    expect(c.querySelector("small")?.textContent).toBe("(after the rebase)");
+    expect(c.querySelector("mark")?.textContent).toBe("breaking");
+    expect(c.querySelector("ins")?.textContent).toBe("added");
+    expect(c.querySelector("s")?.textContent).toBe("removed");
+  });
+
+  it("without raw HTML (a thread), the tags stay text", () => {
+    const c = render(<Markdown extras={{ html: false }}>{"x <small>tiny</small> y"}</Markdown>).container;
+    expect(c.querySelector("small")).toBeNull();
+    expect(c.textContent).toBe("x <small>tiny</small> y");
+  });
+
   it("still renders GFM task lists and tables", () => {
     const c = md("- [x] done\n- [ ] todo\n\n| a | b |\n|---|---|\n| 1 | 2 |");
     expect(c.querySelectorAll('input[type="checkbox"]')).toHaveLength(2);
