@@ -475,7 +475,7 @@ function routes(router: ConnectRouter): void {
 
   // Plugins (mock/plugins.ts): the list, the hello demo's surface, acts, logs, environment.
   router.service(PluginService, {
-    list: (req) => ({ plugins: world.plugins.list(req.context) }),
+    list: (req) => ({ plugins: world.plugins.list(req.context), ...world.plugins.dirs() }),
     enable: (req) =>
       guard(() => {
         const p = world.plugins.list().find((x) => x.name === req.name);
@@ -489,8 +489,8 @@ function routes(router: ConnectRouter): void {
     environment: () => ({ environments: world.plugins.environment() }),
     browse: (req) => world.plugins.registry.browse(req.refresh),
     refreshRegistries: () => ({ registries: world.plugins.registry.browse(true).registries }),
-    listSecrets: () => ({ secrets: [] }),
-    deleteSecret: () => ({}),
+    listSecrets: (req) => guard(() => ({ secrets: world.plugins.listSecrets(req.name) })),
+    deleteSecret: (req) => guard(() => (world.plugins.deleteSecret(req.name, req.key), {})),
     reload: () => ({}),
     watch: async function* (_req, ctx) {
       yield world.plugins.snapshot();
@@ -740,7 +740,10 @@ function threadControl(res: ServerResponse, action: string, q: URLSearchParams):
 /**
  * Plugin controls: POST /__mock/plugin/state?name=hello&state=crashed|running|failed,
  * POST /__mock/plugin/toast?name=hello&text=…, POST /__mock/plugin/invoke?name=hello&command=plugin.hello.forget[&thread=s-1],
- * POST /__mock/plugin/registry?error=… (the default registry's Browse error; empty clears it), GET /__mock/plugin/acts.
+ * POST /__mock/plugin/registry?error=… (the default registry's Browse error; empty clears it) and/or
+ * &installError=… (every install fails with it after its first step; empty clears it),
+ * POST /__mock/plugin/dirs?home=… (the home PluginService.List names the plugin directories under),
+ * GET /__mock/plugin/acts.
  */
 function pluginControl(res: ServerResponse, what: string, q: URLSearchParams): void {
   try {
@@ -763,7 +766,12 @@ function pluginControl(res: ServerResponse, what: string, q: URLSearchParams): v
         return;
       }
       case "POST registry":
-        world.plugins.registry.error = q.get("error") ?? "";
+        if (q.has("error") || !q.has("installError")) world.plugins.registry.error = q.get("error") ?? "";
+        if (q.has("installError")) world.plugins.registry.installError = q.get("installError") ?? "";
+        json(res, 200, { ok: true });
+        return;
+      case "POST dirs":
+        world.plugins.home = q.get("home") ?? "";
         json(res, 200, { ok: true });
         return;
       case "GET acts":

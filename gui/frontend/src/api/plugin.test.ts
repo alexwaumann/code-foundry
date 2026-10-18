@@ -1,10 +1,10 @@
 import { create } from "@bufbuild/protobuf";
 import { timestampFromMs } from "@bufbuild/protobuf/wkt";
 import { describe, expect, it } from "vitest";
-import { PluginEventSchema, PluginSchema, PluginState, SurfacePhase, SurfaceUpdateSchema } from "@/gen/codefoundry/v1/plugin_pb";
+import { PluginEventSchema, PluginSchema, PluginSecretSchema, PluginState, SurfacePhase, SurfaceUpdateSchema } from "@/gen/codefoundry/v1/plugin_pb";
 import { demoJson, demoView } from "@/test/pluginFixtures";
 import { HEARTBEAT } from "./stream";
-import { consentLines, inlineSpans, inlineText, nodeKind, NODE_KINDS, parseView, toPluginEventView, toPluginView, toSurfaceUpdateView, type ViewNode } from "./plugin";
+import { consentLines, inlineSpans, inlineText, nodeKind, NODE_KINDS, parseView, toPluginEventView, toPluginView, toSecretView, toSurfaceUpdateView, type ViewNode } from "./plugin";
 
 function allNodes(nodes: readonly ViewNode[]): ViewNode[] {
   return nodes.flatMap((n) => [n, ...(n.section ? allNodes(n.section.children) : [])]);
@@ -100,5 +100,12 @@ describe("mapping", () => {
     });
     expect(toSurfaceUpdateView(create(SurfaceUpdateSchema, { update: { case: "toast", value: { instance: "i", level: "weird", text: "t" } } }))).toEqual({ kind: "toast", instance: "i", level: "info", text: "t" });
     expect(toSurfaceUpdateView(create(SurfaceUpdateSchema, { update: { case: "heartbeat", value: {} } }))).toBe(HEARTBEAT);
+  });
+});
+
+describe("secrets", () => {
+  it("maps a secret to its name and when it was set, never more", () => {
+    expect(toSecretView(create(PluginSecretSchema, { key: "token", updatedAt: timestampFromMs(1_700_000_000_000) }))).toEqual({ key: "token", updatedAtMs: 1_700_000_000_000 });
+    expect(toSecretView(create(PluginSecretSchema, { key: "word" }))).toEqual({ key: "word", updatedAtMs: null });
   });
 });

@@ -60,3 +60,12 @@ export function registryErrorWords(err: string): string {
   if (e.includes("no such host") || e.includes("connection refused") || e.includes("network is unreachable") || e.includes("timeout") || e.includes("deadline")) return "Could not reach it (offline?).";
   return err;
 }
+
+/** The setting Browse reads its registries from. */
+export const REGISTRIES_SETTING = "plugins.registries";
+
+/** What Browse lists nothing for: no registry configured, or the registries listed none. Null while it lists something. */
+export function emptyBrowse(b: { entries: readonly unknown[]; registries: readonly unknown[] } | null, error: string): "no-registry" | "none-listed" | null {
+  if (!b || error || b.entries.length > 0) return null;
+  return b.registries.length === 0 ? "no-registry" : "none-listed";
+}

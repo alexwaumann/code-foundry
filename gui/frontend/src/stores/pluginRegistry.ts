@@ -89,15 +89,14 @@ function setBusy(name: string, action: RegistryAction | null): void {
 export async function installPlugin(name: string): Promise<void> {
   setBusy(name, "install");
   usePluginRegistryStore.setState((s) => ({ progress: applyInstallProgress(s.progress, { ref: name, name, version: "", phase: "resolving", message: "", bytes: 0 }) }));
+  let failure = "";
   try {
-    const res = await runCommandForResult("plugin.install", { ref: name }, { quiet: true });
+    const res = await runCommandForResult("plugin.install", { ref: name }, { quiet: true, onError: (m) => (failure = m) });
     const out = res ? installOutcome(res.resultJson) : null;
     if (!res) {
-      // Failed (toasted): leave the failure where the row shows it.
-      usePluginRegistryStore.setState((s) => {
-        const p = s.progress[name];
-        return p && p.phase !== "failed" ? { progress: { ...s.progress, [name]: { ...p, phase: "failed", message: p.message || "the install failed" } } } : {};
-      });
+      // Failed (toasted): leave the daemon's words where the row shows them until the next
+      // try or a dismiss. A declined confirm (no failure) clears the row.
+      usePluginRegistryStore.setState((s) => ({ progress: failedProgress(s.progress, name, failure) }));
       return;
     }
     usePluginRegistryStore.setState((s) => ({ progress: applyInstallProgress(s.progress, { ref: name, name, version: out?.version ?? "", phase: "done", message: "", bytes: 0 }) }));
@@ -108,6 +107,28 @@ export async function installPlugin(name: string): Promise<void> {
   } finally {
     setBusy(name, null);
   }
+}
+
+/**
+ * The progress after a failed install of name: the daemon's failed step stays as it said
+ * it; otherwise the command's error (the daemon's text) replaces the step in flight; no
+ * error (the user declined a confirm) drops the entry. Pure.
+ */
+export function failedProgress(s: Readonly<Record<string, InstallProgressView>>, name: string, error: string): Record<string, InstallProgressView> {
+  const p = s[name];
+  if (p?.phase === "failed") return { ...s };
+  const { [name]: _gone, ...rest } = s;
+  if (!error) return rest;
+  return { ...rest, [name]: { ref: p?.ref ?? name, name, version: p?.version ?? "", phase: "failed", message: error, bytes: 0 } };
+}
+
+/** Takes a failed install's words away from under its row (the next install also clears them). */
+export function dismissInstallFailure(name: string): void {
+  usePluginRegistryStore.setState((s) => {
+    if (s.progress[name]?.phase !== "failed") return {};
+    const { [name]: _gone, ...progress } = s.progress;
+    return { progress };
+  });
 }
 
 /** Installs the newer version a registry lists (plugin.update <name>). */

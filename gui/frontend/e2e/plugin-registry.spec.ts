@@ -50,9 +50,7 @@ test("with no registry configured (the default) Browse says so and points at the
   // The setting back to its default: no registry.
   await mockPost("settings/external?plugins.registries=");
   await openPlugins(page);
-  await expect(page.getByTestId("registry-none")).toHaveText(
-    "No registry is configured, so there is nothing to browse. Add one in Plugin registries below.",
-  );
+  await expect(page.getByTestId("registry-none")).toHaveText("No registry configured. Add one in Registries");
   await expect(page.getByTestId("registry-entry")).toHaveCount(0);
   await expect(page.getByTestId("registry-status")).toHaveCount(0);
   await expect(page.getByTestId("registry-empty")).toHaveCount(0);
@@ -103,7 +101,7 @@ test("Uninstall confirms once in its own dialog, with purge as a choice", async 
   await installed(page, "test-watcher").getByTestId("plugin-uninstall").click();
   const dialog = page.getByTestId("uninstall-dialog");
   await expect(dialog).toContainText("Uninstall Test Watcher?");
-  await expect(dialog).toContainText("Its data, secrets and the consent you gave stay for a reinstall.");
+  await expect(dialog).toContainText("Its data (~/.code-foundry/plugin-data/test-watcher), secrets and the consent you gave stay for a reinstall.");
   await dialog.getByTestId("uninstall-purge").click();
   await dialog.getByTestId("uninstall-confirm").click();
   await expect(installed(page, "test-watcher")).toHaveCount(0);

@@ -111,6 +111,8 @@ export class MockRegistry {
   private fetchedAt = new Date(Date.now() - 12 * 60_000);
   /** A failure Browse reports for the registry (POST /__mock/plugin/registry?error=…). */
   error = "";
+  /** A failure every install reports after its first step, until cleared (POST /__mock/plugin/registry?installError=…). */
+  installError = "";
   /** RegistryChanged's epoch and the registries it was last published for. */
   private epoch = 0;
   private seen = "";
@@ -121,6 +123,7 @@ export class MockRegistry {
     this.entries = seedEntries();
     this.error = "";
     this.seen = this.configured().join(" ");
+    this.installError = "";
     this.fetchedAt = new Date(Date.now() - 12 * 60_000);
   }
 
@@ -203,6 +206,7 @@ export class MockRegistry {
     const url = `https://github.com/${e.repo}/releases/download/v${e.version}/${e.name}-${e.version}-darwin-arm64.tar.gz`;
     this.progress(ref, e, PluginInstallPhase.RESOLVING, `resolving ${ref}`);
     await wait();
+    if (this.installError) throw new CommandError("unavailable", this.installError);
     this.progress(ref, e, PluginInstallPhase.DOWNLOADING, `downloading ${url}`);
     await wait();
     this.progress(ref, e, PluginInstallPhase.DOWNLOADING, `downloading ${url}`, 2_621_440);

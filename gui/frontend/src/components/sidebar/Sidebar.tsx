@@ -9,6 +9,7 @@ import { buildSections, FOOTERS, isThreadRow, rowCache, threadKey, type FooterSe
 import { zoomFactor } from "@/lib/zoom";
 import { decodeThreadListKeys, useThreadListKeys } from "@/stores/context";
 import { useEventsStore } from "@/stores/events";
+import { openFlagSurface, shownFlag } from "@/stores/flagSurface";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { useRowHeight } from "@/stores/settings";
@@ -216,8 +217,12 @@ function SidebarList({ bodyHeight }: { bodyHeight: number }) {
   const activate = useCallback((row: Row) => {
     if (!isThreadRow(row)) return;
     const ui = useUiStore.getState();
+    // Read before selecting: opening the thread clears its until-seen flags.
+    const flag = shownFlag(useThreadsStore.getState().byId[row.threadId]);
     ui.setCursor(row.key);
     ui.select({ kind: "thread", id: row.threadId }, { focusPrompt: true });
+    // A plugin's flag on line 2: its thread or pull request surface opens too, when it has one for the thread.
+    if (flag) void openFlagSurface(row.threadId, flag.plugin);
   }, []);
 
   const panels: Readonly<Record<Panel, { rows: readonly Row[]; scrollTo: RefObject<ScrollTo | null> }>> = {

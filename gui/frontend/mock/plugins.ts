@@ -500,8 +500,26 @@ export interface PluginDeps {
   threadExists: (id: string) => boolean;
   /** thread.send (the demo's Send hello to its own thread, Ask the main thread through host/invoke). */
   sendToThread: (id: string, text: string) => void;
-  /** The plugins.registries setting's value (mock/settings.ts). */
+  /** The plugins.registries setting (mock/pluginRegistry.ts). */
   registries: () => string;
+}
+
+/** The daemon's home for the plugin directories (PluginService.List; POST /__mock/plugin/dirs?home=…). */
+export const MOCK_HOME = "/Users/dev/.code-foundry";
+
+/** Secrets the plugins keep in the Keychain, names only (PluginService.ListSecrets). */
+function seedSecrets(): Map<string, { key: string; updatedAt: Date }[]> {
+  const ago = (ms: number) => new Date(Date.now() - ms);
+  return new Map([
+    ["hello", [{ key: "word", updatedAt: ago(2 * 3_600_000) }]],
+    [
+      "acme-data",
+      [
+        { key: "token", updatedAt: ago(3 * 86_400_000) },
+        { key: "refresh-token", updatedAt: ago(3 * 86_400_000) },
+      ],
+    ],
+  ]);
 }
 
 export class MockPlugins {
@@ -534,6 +552,10 @@ export class MockPlugins {
     this.reset();
   }
 
+  /** The home the plugin directories are under (PluginService.List's plugins_dir and data_dir). */
+  home = MOCK_HOME;
+  private secrets = seedSecrets();
+
   reset(): void {
     for (const i of this.instances.values()) i.close();
     this.instances.clear();
@@ -541,6 +563,30 @@ export class MockPlugins {
     this.acts = [];
     this.plugins = new Map(seedPlugins().map((p) => [p.name, p]));
     this.registry.reset();
+    this.home = MOCK_HOME;
+    this.secrets = seedSecrets();
+  }
+
+  /** PluginService.List's directories. */
+  dirs(): { pluginsDir: string; dataDir: string } {
+    return { pluginsDir: `${this.home}/plugins`, dataDir: `${this.home}/plugin-data` };
+  }
+
+  /** A plugin's secrets, names and when set (PluginService.ListSecrets). */
+  listSecrets(name: string): { key: string; updatedAt: ReturnType<typeof timestampFromDate> }[] {
+    this.plugin(name);
+    return (this.secrets.get(name) ?? []).map((x) => ({ key: x.key, updatedAt: timestampFromDate(x.updatedAt) }));
+  }
+
+  /** Deletes one secret (PluginService.DeleteSecret, plugin.secrets.delete); NOT_FOUND when it has none by that name. */
+  deleteSecret(name: string, key: string): void {
+    this.plugin(name);
+    const list = this.secrets.get(name) ?? [];
+    if (!list.some((x) => x.key === key)) throw new CommandError("notfound", `plugin ${name} has no secret ${key}`);
+    this.secrets.set(
+      name,
+      list.filter((x) => x.key !== key),
+    );
   }
 
   /** Puts an installed (or updated) package in place: a new plugin is disabled pending consent; an update keeps its state. */
@@ -863,6 +909,22 @@ export class MockPlugins {
         run: (_c, a) => `linked ${a.path ?? ""} as dev plugin echo; enabled echo 0.0.1 (starting)`,
       },
     ];
+    out.push({
+      cmd: {
+        name: "plugin.secrets.delete",
+        title: "Delete Plugin Secret",
+        category: "Plugin",
+        description: "Delete one of a plugin's secrets from the Keychain.",
+        keybindings: [],
+        args: [nameArg, { name: "key", type: ArgType.STRING, required: true, description: "Secret name (plugin secrets list)" }],
+        confirm: (_c, a) => `Delete secret ${a.key ?? ""} of plugin ${a.name ?? ""} from the Keychain?`,
+      },
+      when: () => true,
+      run: (_c, a) => {
+        this.deleteSecret(a.name ?? "", a.key ?? "");
+        return `deleted secret ${a.key ?? ""} of plugin ${a.name ?? ""}`;
+      },
+    });
     out.push(...this.registry.commands());
     for (const p of this.plugins.values()) {
       if (!p.enabled) continue;
