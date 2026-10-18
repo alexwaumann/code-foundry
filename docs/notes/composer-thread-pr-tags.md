@@ -35,6 +35,12 @@ Status: branch `cf/composer-thread-pr-tags`. Two tag kinds next to the skill (`/
   too), it carries the name for an unknown id, and it never equals the composer text, so
   `composer-text` is always sent and the bubble draws the chip (`sendThreadDraft` drops
   the composer text when it equals the projected text).
+* **Only the composer's own tags are completed** (review fix). A message with composer
+  text has only the lines whose id one of its `cf-thread://` tags names rewritten; the
+  same shape typed or pasted as text (a test fixture, a message copied from `thread
+  read`) reaches Claude exactly as written instead of gaining a transcript or `; not
+  found`. A message without composer text (the CLI, an agent's `thread send`) has every
+  such line completed, as before.
 * **Thread candidates**: from the thread list the GUI holds (no RPC). Active only: not
   archived, not snoozed, never the thread being written in. Matching by name: exact 5,
   prefix 4, word prefix 3, substring 2 (no subsequence: thread names are prose, scattered
@@ -48,7 +54,9 @@ Status: branch `cf/composer-thread-pr-tags`. Two tag kinds next to the skill (`/
   (and a daemon without SearchFiles) now get `@` for threads alone ("No threads match");
   `#` stays off there (no repository).
 * **Pull request token** `[#123](cf-pr://<owner>/<repo>/123)`, slug lower case (the gh
-  store's normalisation); projection `owner/repo#123`, which gh and Claude both read.
+  store's normalisation); projection `owner/repo#123`, which gh and Claude both read. A
+  letter, digit or underscore right against the chip gets a space on that side
+  (`see`+chip would have projected `seeowner/repo#123`, chip+`s` `owner/repo#123s`).
 * **Pull request candidates**: the draft's projects' GitHub slugs (primary, Also in, or
   workspace members). The pool is what the GUI already reads: the viewer's dashboards
   (`GetDashboard`, "tracked": authored, review requested, reviewed, merged in the last 7
@@ -120,7 +128,8 @@ threads from the CLI: "Pick a codename" (Haiku 5.5, replied `CODENAME-AMBER-7731
 * `make check` green: gofmt, vet, staticcheck, `go test -race ./...`, typecheck, lint,
   vitest. Go: `TestRewriteThreadRefs` (table: transcript, no transcript, current name
   cleaned, blank name, unknown id, two lines, shapes left alone, idempotent),
-  `TestSendRewritesThreadRefs`, `TestCreateRewritesThreadRefs`. Vitest: tokens,
+  `TestSendRewritesThreadRefs`, `TestCreateRewritesThreadRefs`,
+  `TestComposerMessagesRewriteOnlyTaggedThreads` (composer text: only tagged ids). Vitest: tokens,
   projection, malformed tokens and member changes (`lib/prompt.test.ts`), the `#` trigger
   table (`lib/completion.test.ts`), candidates (`lib/tagCandidates.test.ts`: archived,
   snoozed and the current thread left out, caps, ranking, the pool), bubble pieces
