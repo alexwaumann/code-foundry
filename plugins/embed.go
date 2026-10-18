@@ -10,7 +10,7 @@ import "embed"
 // repository starts with (no go.mod: the skill has the agent make one).
 //
 //go:embed examples/minimal/plugin.json examples/minimal/main.go examples/minimal/main_test.go
-//go:embed examples/minimal/Makefile examples/minimal/.gitignore examples/minimal/scripts/registry-entry.go
+//go:embed examples/minimal/Makefile examples/minimal/.gitignore examples/minimal/README.md examples/minimal/scripts/registry-entry.go
 //go:embed examples/minimal/.github/workflows/release.yml examples/minimal/.github/workflows/ci.yml
 var Minimal embed.FS
 

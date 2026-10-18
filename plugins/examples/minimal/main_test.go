@@ -12,7 +12,8 @@ import (
 	"github.com/alexwaumann/code-foundry/pluginsdk/ui"
 )
 
-// plugin.json is valid and declares exactly what the plugin serves.
+// plugin.json is valid, has main.go's version and declares exactly what the plugin
+// serves.
 func TestManifest(t *testing.T) {
 	data, err := os.ReadFile("plugin.json")
 	if err != nil {
@@ -21,6 +22,9 @@ func TestManifest(t *testing.T) {
 	m, warnings, err := pluginsdk.LoadManifest(data)
 	if err != nil || len(warnings) > 0 {
 		t.Fatalf("plugin.json: %v %v", err, warnings)
+	}
+	if m.Version != version {
+		t.Errorf("plugin.json says version %s, main.go %s: bump both", m.Version, version)
 	}
 	p := plugin()
 	for _, c := range m.Commands {

@@ -27,8 +27,12 @@ scripts/registry-entry.go   used by make registry-entry (build-ignored)
 .gitignore           bin/, dist/, the binary `go build` names after the module
 .github/workflows/ci.yml       go vet + go test -race on pushes to main and pull requests
 .github/workflows/release.yml  tarballs + SHA256SUMS on a v<version> tag
-README.md            what it does, its permissions and why, how to try it
+README.md            the example's template filled in: what it does, how to install it,
+                     its permissions and why, development
 ```
+
+The example's files are already where the repository wants them (`.github/workflows/`
+included), so a copy is the repository:
 
 ```
 git init && git add -A && git commit -m "<name> 0.1.0"
@@ -36,13 +40,19 @@ gh repo create <owner>/code-foundry-plugin-<name> --public --source . --push
 gh run watch --exit-status $(gh run list --workflow ci.yml --limit 1 --json databaseId -q '.[0].databaseId')
 ```
 
+When the user created the repository first, clone it, copy the example into the clone
+(the skill's step 1: keep its LICENSE) and commit and push instead of `git init` and `gh
+repo create`.
+
 The workflows use `actions/checkout@v5` and `actions/setup-go@v6` on `ubuntu-24.04`
 (cross-compiling for macOS; `go-version-file: go.mod`).
 
 ## Versions
 
 - `version` in `plugin.json` is strict semver without a `v` (`0.1.0`, `0.2.0-rc.1`); the
-  release tag is `v<version>`. Bump it in the same commit as the change: patch for fixes,
+  release tag is `v<version>`. The example also has it in `main.go` (`version`, for views
+  and logs; `TestManifest` fails when the two differ). Bump both in the same commit as
+  the change: patch for fixes,
   minor for features, major when commands, args or settings break.
 - A version that asks for more permissions than the user granted disables the plugin on
   update until they consent again: say why in the release notes.
@@ -122,10 +132,18 @@ checks that name, version and permissions match and that the `exec` file is in i
 the pull request merges, `index.json` is regenerated, and users whose `plugins.registries`
 lists the registry see the plugin in Browse and `code-foundry plugin browse`. Without the
 registry configured, `code-foundry plugin install <owner>/<repo>` installs straight from
-the release.
+the release: it checks each tarball against the release's `SHA256SUMS` (or
+`checksums.txt`, pluginpack's name; either is accepted) and later offers that
+repository's newer releases as updates.
+
+To try the install as a user would (`plugin install <owner>/<repo>`, the consent dialog),
+remove a dev link first with `plugin uninstall <name> --purge`: without `--purge` the
+consent, secrets and data stay and the reinstall asks nothing; installing the same name
+from another source than before needs `--force`, which deletes them.
 
 **Updating**: release the new version, `make registry-entry` again, and a pull request
-replacing `plugins/<name>.json`.
+replacing `plugins/<name>.json`. Users who installed from the repository directly are
+offered the new release without the registry.
 
 **Alternative packer.** Code Foundry versions with registry support also ship
 `pluginsdk/cmd/pluginpack`

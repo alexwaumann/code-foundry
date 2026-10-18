@@ -69,6 +69,9 @@ func TestManifest(t *testing.T) {
 	if err != nil || len(warnings) > 0 {
 		t.Fatalf("plugin.json: %v %v", err, warnings)
 	}
+	if m.Version != version { // the Go constant a view or log shows: a bump cannot miss one
+		t.Errorf("plugin.json says %s, main.go %s", m.Version, version)
+	}
 	p := plugin()
 	for _, c := range m.Commands {
 		if p.Commands[c.Name] == nil {
@@ -175,9 +178,26 @@ home directory; so must an unpacked release tarball you try):
   args; a command that asks first needs `--yes`), and prints the command's result. Then
   it prints the view once no new one has come for `--settle` (default 500ms), so there
   is no need for a `plugin surface` after it; `--quiet` prints only what happened.
-- A `pr` surface's `when` usually reads `pr.checks.*`: the first try for a thread fails
-  with "not known yet" while the checks are fetched; retry after a few seconds.
+- **A `pr` surface** needs a thread whose worktree is on the pull request's head branch:
+  that is how the daemon links a thread to a pull request (naming its URL or number in a
+  prompt does not). A shallow clone under home is enough:
+  ```
+  git clone --depth 1 --branch <head-branch> https://github.com/<owner>/<repo> ~/cf-scratch/<repo>
+  code-foundry project add ~/cf-scratch/<repo>
+  code-foundry thread new --project <repo> --name test --created-by=
+  ```
+  Its `when` usually reads `pr.checks.*`: the first try for a thread fails with "not known
+  yet" while the pull request and its checks are fetched; retry after a few seconds. A
+  daemon with no app window open (an isolated test daemon) polls GitHub only every 15
+  minutes, so after pushing a commit or rerunning CI, `code-foundry pr refresh
+  <owner>/<repo> <number>` fetches the pull request and its checks now.
 - `code-foundry thread new --no-project --name test --created-by=` makes a thread to
   test against (no prompt: nothing is sent to Claude). Never send a prompt just to test.
 - `code-foundry plugin logs <name> --lines 50` after each step: refused views and calls,
   your own log lines.
+- **Consent again.** Consent, secrets and the data dir outlive `plugin uninstall <name>`
+  (for a dev plugin it removes only the link), so a reinstall or a new `plugin dev`
+  starts without asking. To see the consent text as a new user does, `code-foundry plugin
+  uninstall <name> --purge` first (it deletes the plugin's secrets and data too). Linking
+  the same name from another folder is another source: `plugin dev --force` deletes what
+  the old one left (secrets, data, consent) and asks again.

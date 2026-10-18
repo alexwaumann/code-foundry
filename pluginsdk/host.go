@@ -128,12 +128,15 @@ func (h *Host) Unsubscribe(ctx context.Context, subscription string) error {
 	return h.conn.Call(ctx, MethodEventsUnsubscribe, SubscribeResult{Subscription: subscription}, nil)
 }
 
-// Toast shows a short message (ToastInfo, ToastAttention, ToastError) in the GUI.
+// Toast shows a short message (ToastInfo, ToastAttention, ToastError) in the app's
+// toaster, titled with the plugin's display name.
 func (h *Host) Toast(level, text string) error {
 	return h.conn.Notify(MethodViewToast, ToastParams{Level: level, Text: text})
 }
 
-// ToastIn shows a short message in the GUI for one surface instance (in its panel).
+// ToastIn shows a short message in the app's toaster, without the plugin's name, only to
+// whoever has that surface instance on screen (not inside the panel: a message that
+// should stay belongs in a Notice node).
 func (h *Host) ToastIn(instance, level, text string) error {
 	return h.conn.Notify(MethodViewToast, ToastParams{Instance: instance, Level: level, Text: text})
 }

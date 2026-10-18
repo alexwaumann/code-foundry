@@ -127,7 +127,9 @@ type View struct {
 	Nodes  []Node  `json:"nodes"`
 }
 
-// Header is the surface's identity and freshness line.
+// Header is the surface's identity and freshness line. The title is one line; the
+// sub-line (after SublineIcon, a neutral icon from Icons) wraps to two and is cut after
+// that, never revealed: longer guidance belongs in a Text node.
 type Header struct {
 	Icon        string   `json:"icon,omitempty"`  // empty: the manifest's
 	Title       string   `json:"title,omitempty"` // empty: the manifest's
@@ -411,7 +413,7 @@ type Form struct {
 	Submit     *Button  `json:"submit,omitempty"` // event, or command when no secret field
 	Secondary  []Button `json:"secondary,omitempty"`
 	Error      string   `json:"error,omitempty"`
-	Busy       bool     `json:"busy,omitempty"`
+	Busy       bool     `json:"busy,omitempty"`       // disables the form (no spinner: Submit.Busy) for work past the act
 	ResetToken string   `json:"resetToken,omitempty"` // a change drops every draft
 }
 
@@ -424,7 +426,7 @@ type Field struct {
 	Error       string    `json:"error,omitempty"`
 	Required    bool      `json:"required,omitempty"`
 	Disabled    bool      `json:"disabled,omitempty"`
-	Change      *Action   `json:"change,omitempty"` // event only
+	Change      *Action   `json:"change,omitempty"` // event only; on a committed edit (blur, pick), not per keystroke
 	Input       *Input    `json:"input,omitempty"`
 	Select      *Select   `json:"select,omitempty"`
 	Toggle      *Toggle   `json:"toggle,omitempty"`
@@ -452,7 +454,7 @@ type Select struct {
 	Options       []Option      `json:"options,omitempty"` // at most 200
 	Value         []string      `json:"value,omitempty"`   // one unless Multiple
 	Multiple      bool          `json:"multiple,omitempty"`
-	Style         SelectStyle   `json:"style,omitempty"`
+	Style         SelectStyle   `json:"style,omitempty"` // with Multiple: a checkbox menu or checkbox rows
 	Placeholder   string        `json:"placeholder,omitempty"`
 	OptionsSource OptionsSource `json:"optionsSource,omitempty"` // host-filled options
 }
@@ -482,7 +484,9 @@ type Fieldset struct {
 
 // Thread renders a plugin-owned Claude thread (permission threads; Host.CreateThread)
 // with the host's rendered thread view and its composer. A thread that is gone (removed,
-// or not the plugin's) shows a muted empty state.
+// or not the plugin's) shows a muted empty state; an archived one still renders. Each
+// Thread or Terminal node is a live stream the GUI attaches while it is on screen, at
+// most two per view.
 type Thread struct {
 	ThreadID string `json:"threadId"`
 	// ReadOnly leaves the composer out: the plugin alone sends (Host.SendThread).
