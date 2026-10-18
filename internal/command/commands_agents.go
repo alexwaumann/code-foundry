@@ -34,8 +34,12 @@ var (
 // report. A window whose selection is not a thread ignores it.
 const ViewPanelAgents = "panel.agents"
 
-// RegisterAgents registers thread.agents and view.panel.agents.
+// RegisterAgents registers thread.agents, view.panel.agents, and the subagent view's
+// thread.agent.open and thread.agent.up (commands_agents_view.go).
 func RegisterAgents(r *Registry, b AgentsBackend, e Emitter) error {
+	if err := r.RegisterAll(agentViewCommands(b, e)...); err != nil {
+		return err
+	}
 	return r.RegisterAll(
 		Command{
 			Name:  "thread.agents",
