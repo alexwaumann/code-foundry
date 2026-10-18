@@ -7,6 +7,7 @@ import { useSkillDescription } from "@/stores/skills";
 import { AttachmentChip } from "./AttachmentChip";
 import { TagMultiProjectContext, tagOf } from "./tagContext";
 import { TAG_ACCENT, tagClass } from "./tagStyle";
+import { usePrTagInfo, useThreadTagInfo } from "./useTagInfo";
 
 /** A project's name for a tag ("" for none, the id when the project is gone). */
 function useProjectName(projectId: string): string {
@@ -14,8 +15,9 @@ function useProjectName(projectId: string): string {
 }
 
 /**
- * A text-only tag (a skill, a file) with a hover tooltip: one line saying what it is,
- * an optional muted second line. The app root's TooltipProvider sets the delays.
+ * A text-only tag (a skill, a file, a thread, a pull request) with a hover tooltip: one
+ * line saying what it is, an optional muted second line. The app root's TooltipProvider
+ * sets the delays. `accent` overrides the kind's (a pull request's state).
  */
 function TextTag({
   kind,
@@ -25,8 +27,10 @@ function TextTag({
   tip,
   detail,
   data,
+  accent,
 }: {
-  kind: "skill" | "file";
+  kind: "skill" | "file" | "thread" | "pr";
+  accent?: string;
   label: string;
   selected: boolean;
   ariaLabel: string;
@@ -37,7 +41,7 @@ function TextTag({
   return (
     <Tooltip disableHoverableContent>
       <TooltipTrigger asChild>
-        <NodeViewWrapper as="span" data-testid="prompt-tag" data-tag-kind={kind} {...data} role="img" aria-label={ariaLabel} className={tagClass(selected, TAG_ACCENT[kind])}>
+        <NodeViewWrapper as="span" data-testid="prompt-tag" data-tag-kind={kind} {...data} role="img" aria-label={ariaLabel} className={tagClass(selected, accent ?? TAG_ACCENT[kind])}>
           <span className="truncate">{label}</span>
         </NodeViewWrapper>
       </TooltipTrigger>
@@ -88,7 +92,44 @@ function FileTag({ projectId, path, selected }: { projectId: string; path: strin
   );
 }
 
-/** The node view of a prompt tag (tagNode.ts): an image chip, a skill or a file. */
+/**
+ * Another thread: its current name (the label it was inserted with when it is gone); the
+ * tooltip is its project and what it is doing.
+ */
+function ThreadTag({ id, label, selected }: { id: string; label: string; selected: boolean }) {
+  const info = useThreadTagInfo(id, label);
+  return (
+    <TextTag
+      kind="thread"
+      label={info.name}
+      selected={selected}
+      ariaLabel={`Thread ${info.name}${info.known ? `, ${info.project}, ${info.status}` : ", not found"}`}
+      tip={info.known ? info.project : "Thread not found"}
+      detail={info.status}
+      data={{ "data-thread": id }}
+    />
+  );
+}
+
+/** A pull request: #N in its state's colour; the tooltip is its title, the repository muted below. */
+function PrTag({ slug, number, selected }: { slug: string; number: number; selected: boolean }) {
+  const info = usePrTagInfo(slug, number);
+  const ref = `${slug}#${String(number)}`;
+  return (
+    <TextTag
+      kind="pr"
+      accent={info.accent}
+      label={`#${String(number)}`}
+      selected={selected}
+      ariaLabel={`Pull request ${ref}${info.title ? `, ${info.title}` : ""}`}
+      tip={info.title || ref}
+      detail={info.title ? ref : ""}
+      data={{ "data-slug": slug, "data-number": String(number), "data-state": info.state }}
+    />
+  );
+}
+
+/** The node view of a prompt tag (tagNode.ts): an image chip, a skill, a file, a thread or a pull request. */
 export function TagView({ node, selected, editor }: NodeViewProps) {
   const tag = tagOf(node.attrs);
   switch (tag.tagKind) {
@@ -98,5 +139,9 @@ export function TagView({ node, selected, editor }: NodeViewProps) {
       return <SkillTag name={tag.name} projectId={tag.projectId} selected={selected} />;
     case "file":
       return <FileTag projectId={tag.projectId} path={tag.path} selected={selected} />;
+    case "thread":
+      return <ThreadTag id={tag.id} label={tag.name} selected={selected} />;
+    case "pr":
+      return <PrTag slug={tag.slug} number={tag.number} selected={selected} />;
   }
 }

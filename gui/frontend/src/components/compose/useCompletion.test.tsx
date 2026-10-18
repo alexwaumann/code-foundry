@@ -4,6 +4,7 @@ import { useRef, type RefObject } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { CompletionGroup } from "@/lib/completion";
 import type { CompletionKey, EditorTrigger, PromptEditorHandle } from "./PromptEditor";
+import { prEnterPicks } from "@/lib/tagCandidates";
 import { useCompletion, type Completion, type CompletionSource } from "./useCompletion";
 
 const rows = (n: number, char: "/" | "@" = "@"): CompletionGroup[] => [
@@ -162,5 +163,79 @@ describe("useCompletion with a running thread's slash commands", () => {
     expect(t.key("up")).toBe(true);
     expect(t.key("tab")).toBe(true);
     expect(t.insertTag).toHaveBeenCalledWith({ from: 4, to: 7 }, { tagKind: "skill", projectId: "", name: "commit" });
+  });
+});
+
+describe("useCompletion with a quiet source (the # pull requests)", () => {
+  const HASH: EditorTrigger = { char: "#", query: "18", from: 4, to: 7 };
+  const pr = (number: number) => ({ key: String(number), label: `#${String(number)}`, detail: "", tag: { tagKind: "pr" as const, slug: "o/r", number } });
+  const prs = (numbers: readonly number[], query: string): CompletionSource => ({
+    char: "#",
+    label: "Pull requests",
+    available: true,
+    groups: numbers.length === 0 ? [] : [{ key: "prs", heading: null, items: numbers.map(pr) }],
+    query,
+    searching: false,
+    emptyText: "",
+    quietEmpty: true,
+    enterPicks: prEnterPicks,
+  });
+
+  it("#18 with #187 listed: Enter closes the card and passes through (sends as typed)", () => {
+    const t = setup(HASH, prs([187, 188], "18"));
+    expect(t.c().show).toBe("list");
+    expect(t.key("enter")).toBe(false);
+    expect(t.insertTag).not.toHaveBeenCalled();
+    expect(t.c().show).toBe("none");
+  });
+
+  it("#187 typed exactly: Enter inserts that pull request's tag", () => {
+    const t = setup({ ...HASH, query: "187", to: 8 }, prs([187, 1870], "187"));
+    expect(t.key("enter")).toBe(true);
+    expect(t.insertTag).toHaveBeenCalledWith({ from: 4, to: 8 }, { tagKind: "pr", slug: "o/r", number: 187 });
+  });
+
+  it("arrow down then Enter inserts the highlighted row; arrow up back to the first picks it too", () => {
+    const t = setup(HASH, prs([187, 188], "18"));
+    expect(t.key("down")).toBe(true);
+    expect(t.key("enter")).toBe(true);
+    expect(t.insertTag).toHaveBeenLastCalledWith({ from: 4, to: 7 }, { tagKind: "pr", slug: "o/r", number: 188 });
+    const u = setup(HASH, prs([187, 188], "18"));
+    u.key("down");
+    u.key("up");
+    expect(u.key("enter")).toBe(true);
+    expect(u.insertTag).toHaveBeenLastCalledWith({ from: 4, to: 7 }, { tagKind: "pr", slug: "o/r", number: 187 });
+  });
+
+  it("Tab and a click always pick", () => {
+    const t = setup(HASH, prs([187, 188], "18"));
+    expect(t.key("tab")).toBe(true);
+    expect(t.insertTag).toHaveBeenLastCalledWith({ from: 4, to: 7 }, { tagKind: "pr", slug: "o/r", number: 187 });
+    const u = setup(HASH, prs([187, 188], "18"));
+    act(() => {
+      u.c().insert(1);
+    });
+    expect(u.insertTag).toHaveBeenLastCalledWith({ from: 4, to: 7 }, { tagKind: "pr", slug: "o/r", number: 188 });
+  });
+
+  it("a title query: Enter passes through unless the arrow keys moved", () => {
+    const t = setup({ ...HASH, query: "fix" }, prs([187], "fix"));
+    expect(t.key("enter")).toBe(false);
+    expect(t.insertTag).not.toHaveBeenCalled();
+  });
+
+  it("nothing matching shows no card, and Enter, Tab and Escape pass through (the text stays, Enter sends)", () => {
+    const t = setup({ ...HASH, query: "999" }, prs([], "999"));
+    expect(t.c().show).toBe("none");
+    expect(t.key("enter")).toBe(false);
+    expect(t.key("tab")).toBe(false);
+    expect(t.key("escape")).toBe(false);
+    expect(t.insertTag).not.toHaveBeenCalled();
+  });
+
+  it("a pool not loaded yet: no card, Enter passes through", () => {
+    const t = setup(HASH, { ...prs([], "18"), available: false });
+    expect(t.c().show).toBe("none");
+    expect(t.key("enter")).toBe(false);
   });
 });

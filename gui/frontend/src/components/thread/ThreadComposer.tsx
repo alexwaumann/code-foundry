@@ -9,7 +9,8 @@ import { ComposerPicker } from "@/components/compose/ComposerPicker";
 import { PromptEditor, type EditorTrigger, type PromptEditorHandle } from "@/components/compose/PromptEditor";
 import { TagMultiProjectContext } from "@/components/compose/tagContext";
 import { useNoProjectThread } from "@/components/thread/useNoProject";
-import { useCommandSource, useCompletion, useFileSource, useSkillSource } from "@/components/compose/useCompletion";
+import { useCommandSource, useCompletion, useFileSource, useSkillSource, type CompletionSource } from "@/components/compose/useCompletion";
+import { useMentionSource, useProjectSlugs, usePrSource } from "@/components/compose/useRefSources";
 import { Tip } from "@/components/ui/tooltip";
 import { choiceLabel, EFFORT_CHOICES, PERMISSION_CHOICES, type ComposePermission } from "@/lib/compose";
 import { fileSources, skillSources, skillSourcesKey, type TriggerChar } from "@/lib/completion";
@@ -30,9 +31,12 @@ import { ColdCacheNote } from "./ColdCacheNote";
 import { RetryNote } from "./RetryNote";
 import { PendingPrompts, type PromptKeys } from "./PendingPrompt";
 
-const TRIGGERS: readonly TriggerChar[] = ["/", "@"];
-/** A thread without a project: "/" only ("@" would search its cwd, the home directory, which is never indexed). */
-const HOME_TRIGGERS: readonly TriggerChar[] = ["/"];
+const TRIGGERS: readonly TriggerChar[] = ["/", "@", "#"];
+/**
+ * A thread without a project: "/" and "@" for other threads only (files would come from
+ * its cwd, the home directory, which is never indexed; no repository for "#").
+ */
+const HOME_TRIGGERS: readonly TriggerChar[] = ["/", "@"];
 
 /**
  * The last ui promptFocusSeq a thread composer acted on. Module-level: selecting a thread
@@ -161,7 +165,10 @@ export function ThreadComposer({ threadId, pending, busy }: { threadId: string; 
   const commandSource = useCommandSource(trigger, commands, skillSourcesKey(sources.skills), sources.projectIds);
   const slashSource = commands.length > 0 ? commandSource : skillSource;
   const fileSource = useFileSource(trigger, sources.files, sources.projectIds, sources.projectIds[0] ?? "");
-  const completion = useCompletion(trigger, setTrigger, trigger?.char === "@" ? fileSource : slashSource, editorRef);
+  const mentionSource = useMentionSource(trigger, sources.noProject ? null : fileSource, threadId);
+  const prSource = usePrSource(trigger, useProjectSlugs(sources.projectIds));
+  const bySource: Record<TriggerChar, CompletionSource> = { "/": slashSource, "@": mentionSource, "#": prSource };
+  const completion = useCompletion(trigger, setTrigger, bySource[trigger?.char ?? "/"], editorRef);
   const sending = phase !== "idle";
   // The daemon takes a message in any state: a stopped thread starts on it.
   const canSend = !sending && (text.trim() !== "" || hasAttachments);

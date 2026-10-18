@@ -10,7 +10,8 @@ import { MemberChips, type MemberChipModel } from "./MemberChips";
 import { ProjectSwitcher } from "./ProjectSwitcher";
 import { PromptEditor, type EditorTrigger, type PromptEditorHandle } from "./PromptEditor";
 import { TagMultiProjectContext } from "./tagContext";
-import { useCompletion, useFileSource, useSkillSource } from "./useCompletion";
+import { useCompletion, useFileSource, useSkillSource, type CompletionSource } from "./useCompletion";
+import { useMentionSource, useProjectSlugs, usePrSource } from "./useRefSources";
 import { NoGitBadge } from "@/components/projects/NoGitBadge";
 import { ATTACHMENT_MIME_TYPES } from "@/api/threads";
 import { Backdrop } from "@/components/backdrop/Backdrop";
@@ -66,10 +67,13 @@ import { useWorkspacesStore } from "@/stores/workspaces";
 
 const SEP = "\u0001";
 
-/** What starts a completion in the prompt: "/" for skills, "@" for files. */
-const TRIGGERS: readonly TriggerChar[] = ["/", "@"];
-/** Without a project only "/": "@" would search the home directory, which is never indexed. */
-const HOME_TRIGGERS: readonly TriggerChar[] = ["/"];
+/** What starts a completion in the prompt: "/" for skills, "@" for threads and files, "#" for pull requests. */
+const TRIGGERS: readonly TriggerChar[] = ["/", "@", "#"];
+/**
+ * Without a project "/" and "@" for threads only: files would come from the home
+ * directory, which is never indexed, and there is no repository for "#".
+ */
+const HOME_TRIGGERS: readonly TriggerChar[] = ["/", "@"];
 
 /** Model and effort the composer starts with: the settings defaults, else opus / high. */
 function useDefaults(): { model: string; effort: string } {
@@ -388,7 +392,10 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
   const [trigger, setTrigger] = useState<EditorTrigger | null>(null);
   const skillSource = useSkillSource(trigger, skillSourcesKey(sources), projectIds);
   const fileSource = useFileSource(trigger, fileSrcs, projectIds, primary);
-  const completion = useCompletion(trigger, setTrigger, trigger?.char === "@" ? fileSource : skillSource, editorRef);
+  const mentionSource = useMentionSource(trigger, home ? null : fileSource, "");
+  const prSource = usePrSource(trigger, useProjectSlugs(projectIds));
+  const bySource: Record<TriggerChar, CompletionSource> = { "/": skillSource, "@": mentionSource, "#": prSource };
+  const completion = useCompletion(trigger, setTrigger, bySource[trigger?.char ?? "/"], editorRef);
 
   useEffect(() => {
     if (primary && noGitPath === undefined) void loadRefs(primary);

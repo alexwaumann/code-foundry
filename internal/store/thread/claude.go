@@ -145,7 +145,9 @@ func (l launch) argv(claude string, a spawnArgs) []string {
 // path>" (the composer's file tags), which name a file in a worktree that may not
 // exist yet. buildPrompt leaves them alone; Create rewrites them to absolute paths with
 // rewriteFileRefs once the thread's worktrees exist, before claude is spawned. See
-// filerefs.go for the token format.
+// filerefs.go for the token format. Thread references ("[Thread "<name>" (id <id>)]")
+// are completed with the thread's transcript the same way (threadrefs.go), in Create and
+// Send.
 func buildPrompt(text string, attachments []attachment) string {
 	text = strings.TrimSpace(text)
 	if len(attachments) == 0 {

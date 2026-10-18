@@ -539,6 +539,8 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 		m.log.Warn("file references outside the thread's projects; passing their relative paths",
 			"thread", id, "project", s.ProjectID, "workspace", s.WorkspaceID, "refs", dropped)
 	}
+	// Thread references: where Claude can read the other thread (see threadrefs.go).
+	prompt = m.rewriteThreadRefsLogged(id, prompt, o.ComposerPrompt)
 	now := m.opts.Now()
 	s.CreatedAt, s.LastActivityAt = now, now
 	m.mu.Lock()

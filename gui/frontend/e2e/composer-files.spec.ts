@@ -14,6 +14,9 @@ async function setFiles(project: string, files: readonly string[]): Promise<void
 test.beforeEach(async () => {
   await resetMock();
   await setFiles("repo-cf", FILES);
+  // "@thr…" would also list the mock's "Write thread docs" in a Threads group above the
+  // files (composer-threads.spec.ts covers that group): archived, it is not offered.
+  await mockPost("thread/archive?id=s-5");
 });
 
 /** cmd+n, then cmd+<n> in the project picker: the composer for the nth project. */
@@ -126,7 +129,7 @@ test("Escape leaves the text; no matches says so; a click inserts a directory; T
   await expect(page.getByTestId("composer")).toBeVisible();
 
   await page.keyboard.type(" @zzz");
-  await expect(card(page).getByTestId("completion-empty")).toHaveText("No files match");
+  await expect(card(page).getByTestId("completion-empty")).toHaveText("No threads or files match");
   await page.keyboard.press("Backspace");
   await page.keyboard.press("Backspace");
   await page.keyboard.press("Backspace");
@@ -263,13 +266,13 @@ test("a slow search says Searching… until the rows land; Escape before the fir
   expect((await invocations()).at(-1)?.args.prompt).toBe("@cf-file://repo-cf/README.md @fork");
 });
 
-test("a failing search: Enter waits for the answer (No files match), the next Enter closes the card, the one after sends", async ({ page }) => {
+test("a failing search: Enter waits for the answer (no match), the next Enter closes the card, the one after sends", async ({ page }) => {
   await mockPost("files/search?fail=1&delay=300");
   await openApp(page);
   await compose(page);
   await page.keyboard.type("@READM");
   await page.keyboard.press("Enter");
-  await expect(card(page).getByTestId("completion-empty")).toHaveText("No files match");
+  await expect(card(page).getByTestId("completion-empty")).toHaveText("No threads or files match");
   expect(await newThreads()).toBe(0);
   await page.keyboard.press("Enter");
   await expect(card(page)).toHaveCount(0);
@@ -279,20 +282,21 @@ test("a failing search: Enter waits for the answer (No files match), the next En
   expect((await invocations()).at(-1)?.args.prompt).toBe("@READM");
 });
 
-test("a daemon older than SearchFiles: @ is plain text, no card", async ({ page }) => {
+test("a daemon older than SearchFiles: @ offers threads only; a query no thread matches is plain text after one Enter", async ({ page }) => {
   await mockPost("missing-rpc?rpc=FilesystemService/SearchFiles");
   await openApp(page);
   await compose(page);
-  await page.keyboard.type("@thr");
-  await page.waitForTimeout(400);
-  await expect(card(page)).toHaveCount(0);
+  await page.keyboard.type("@fix");
+  await expect(labels(page)).toHaveText(["Fix resize race"]);
+  await expect(card(page).getByRole("listbox")).toHaveAttribute("aria-label", "Threads");
   await page.keyboard.type("x");
-  await page.waitForTimeout(200);
+  await expect(card(page).getByTestId("completion-empty")).toHaveText("No threads match");
+  await page.keyboard.type("y");
   await expect(card(page)).toHaveCount(0);
-  await expect(value(page)).toHaveAttribute("data-value", "@thrx");
+  await expect(value(page)).toHaveAttribute("data-value", "@fixxy");
   await page.keyboard.press("Enter");
   await expect.poll(newThreads).toBe(1);
-  expect((await invocations()).at(-1)?.args.prompt).toBe("@thrx");
+  expect((await invocations()).at(-1)?.args.prompt).toBe("@fixxy");
 });
 
 // The card hangs under the worktree row, out of flow: it moves neither the composer card
