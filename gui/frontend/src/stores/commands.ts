@@ -4,7 +4,7 @@ import { confirmationOf, invokeCommand, listCommands, type CommandView, type Inv
 import { invalidateOnTransportError } from "@/api/endpoint";
 import { isGitOpFailure, isGitOpResult } from "@/api/gitops";
 import { errorMessage, isAbort } from "@/api/stream";
-import { requestConfirm } from "./confirm";
+import { confirmPresenter, requestConfirm } from "./confirm";
 import { contextKey, getUiContext } from "./context";
 import { useProjectsStore } from "./projects";
 import { useSubagentViewStore } from "./subagentView";
@@ -82,17 +82,25 @@ export function whenListed(ctx: UiContextView, timeoutMs = 3000): Promise<boolea
 
 /**
  * Invokes a command; if the daemon wants it confirmed (ConfirmationRequired), opens the
- * confirm dialog and invokes again with confirmed set when the user agrees. Resolves
- * null when the user declines; other errors reject.
+ * confirm dialog (or the command's own presenter: confirmPresenter, e.g. the plugin
+ * consent dialog) and invokes again with confirmed set when the user agrees. Resolves
+ * null when the user declines; other errors reject. `caller` names who asked for it
+ * (a plugin's InvokeCommand intent), shown in the dialog.
  */
-export async function invokeConfirmed(name: string, args: Record<string, string> = {}, ctx: UiContextView = getUiContext()): Promise<Awaited<ReturnType<typeof invokeCommand>> | null> {
+export async function invokeConfirmed(
+  name: string,
+  args: Record<string, string> = {},
+  ctx: UiContextView = getUiContext(),
+  caller?: string,
+): Promise<Awaited<ReturnType<typeof invokeCommand>> | null> {
   try {
     return await invokeCommand(name, ctx, args);
   } catch (err) {
     const confirm = confirmationOf(err);
     if (!confirm) throw err;
     const title = confirm.title || (useCommandsStore.getState().commands.find((c) => c.name === name)?.title ?? name);
-    const yes = await requestConfirm({ title, message: confirm.message, confirmLabel: title });
+    const ask = confirmPresenter(name) ?? requestConfirm;
+    const yes = await ask({ title, message: confirm.message, confirmLabel: title, command: name, args, ...(caller ? { caller } : {}) });
     if (!yes) return null;
     return await invokeCommand(name, ctx, args, undefined, { confirmed: true });
   }
@@ -116,11 +124,11 @@ export async function runCommand(name: string, args: Record<string, string> = {}
 export async function runCommandForResult(
   name: string,
   args: Record<string, string> = {},
-  opts: { ctx?: UiContextView; quiet?: boolean; onError?: (message: string) => void; expected?: (err: unknown) => boolean } = {},
+  opts: { ctx?: UiContextView; quiet?: boolean; onError?: (message: string) => void; expected?: (err: unknown) => boolean; caller?: string } = {},
 ): Promise<InvokeResultView | null> {
   const title = useCommandsStore.getState().commands.find((c) => c.name === name)?.title ?? name;
   try {
-    const res = await invokeConfirmed(name, args, opts.ctx ?? getUiContext());
+    const res = await invokeConfirmed(name, args, opts.ctx ?? getUiContext(), opts.caller);
     if (!res) return null;
     // Git operations report through their own toast (gitops events); skip the duplicate.
     if (!opts.quiet && res.message && !isGitOpResult(res.resultJson)) toast.success(res.message);

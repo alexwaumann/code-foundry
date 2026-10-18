@@ -12,8 +12,11 @@ export default defineConfig({
     strictPort: true,
     // The help overlay's guide is the repo's docs/GETTING-STARTED.md, imported with ?raw
     // (components/help/guide.ts). The directory, not the file: Vite checks "file.md?raw"
-    // itself against the list, and only a parent directory matches it.
-    fs: { allow: [searchForWorkspaceRoot(process.cwd()), path.resolve(import.meta.dirname, "../../docs")] },
+    // itself against the list, and only a parent directory matches it. The plugin tests read
+    // the hello demo's captured views the daemon's tests use (src/test/pluginFixtures.ts).
+    fs: {
+      allow: [searchForWorkspaceRoot(process.cwd()), path.resolve(import.meta.dirname, "../../docs"), path.resolve(import.meta.dirname, "../../internal/store/plugin/testdata/hello-demo")],
+    },
   },
   resolve: {
     alias: { "@": path.resolve(import.meta.dirname, "./src") },

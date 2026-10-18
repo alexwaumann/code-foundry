@@ -153,6 +153,7 @@ import { TerminalService, TerminalState, type AttachEventSchema } from "../src/g
 import { ThreadDecision, ThreadService } from "../src/gen/codefoundry/v1/thread_pb";
 import { ActionRunMode, ActionRunState, ActionService } from "../src/gen/codefoundry/v1/action_pb";
 import { UiService } from "../src/gen/codefoundry/v1/ui_pb";
+import { PluginService } from "../src/gen/codefoundry/v1/plugin_pb";
 import { UpdateService, UpdateState } from "../src/gen/codefoundry/v1/update_pb";
 import { groups as settingsGroups, SettingsValidation } from "./settings";
 import { updateStateNames, type UpdateEventInit } from "./update";
@@ -472,6 +473,37 @@ function routes(router: ConnectRouter): void {
     watch: (_req, ctx) => tracked("UpdateService/Watch", updateEvents(world.events.subscribe(ctx.signal, [{ source: EventSource.UPDATE, event: { event: { case: "update", value: world.update.event() } } }]))),
   });
 
+  // Plugins (mock/plugins.ts): the list, the hello demo's surface, acts, logs, environment.
+  router.service(PluginService, {
+    list: (req) => ({ plugins: world.plugins.list(req.context) }),
+    enable: (req) =>
+      guard(() => {
+        const p = world.plugins.list().find((x) => x.name === req.name);
+        if (p?.needsConsent && !req.consent) return { plugin: p, needsConsent: true, consentText: p.consentText ?? "" };
+        void world.invoke("plugin.enable", undefined, { name: req.name }, true);
+        return { plugin: world.plugins.list().find((x) => x.name === req.name) };
+      }),
+    disable: (req) => guard(() => (void world.invoke("plugin.disable", undefined, { name: req.name }), { plugin: world.plugins.list().find((x) => x.name === req.name) })),
+    restart: (req) => guard(() => (void world.invoke("plugin.restart", undefined, { name: req.name }), { plugin: world.plugins.list().find((x) => x.name === req.name) })),
+    logs: (req) => guard(() => world.plugins.logs(req.name)),
+    environment: () => ({ environments: world.plugins.environment() }),
+    listSecrets: () => ({ secrets: [] }),
+    deleteSecret: () => ({}),
+    reload: () => ({}),
+    watch: async function* (_req, ctx) {
+      yield world.plugins.snapshot();
+      for await (const { source, event } of world.events.subscribe(ctx.signal)) {
+        if (source === EventSource.PLUGIN && event.event?.case === "plugin") yield event.event.value;
+      }
+    },
+    watchSurface: (req, ctx) => {
+      if (!req.ref) throw new ConnectError("a surface ref is required", Code.InvalidArgument);
+      const ref = req.ref;
+      return tracked("PluginService/WatchSurface", world.plugins.watch(ref, ctx.signal));
+    },
+    act: (req) => ({ version: world.plugins.act(req) }),
+  });
+
   router.service(EventService, {
     // The real daemon paces GitHub polling by it; the mock has nothing to pace.
     setClientState: () => ({}),
@@ -481,7 +513,7 @@ function routes(router: ConnectRouter): void {
       const want = new Set(
         req.sources.length > 0
           ? req.sources
-          : [EventSource.PROJECT, EventSource.WORKSPACE, EventSource.TERMINAL, EventSource.THREAD_LIST, EventSource.THREAD, EventSource.GH, EventSource.GITOPS, EventSource.SETTINGS, EventSource.UPDATE, EventSource.UI, EventSource.ACTION],
+          : [EventSource.PROJECT, EventSource.WORKSPACE, EventSource.TERMINAL, EventSource.THREAD_LIST, EventSource.THREAD, EventSource.GH, EventSource.GITOPS, EventSource.SETTINGS, EventSource.UPDATE, EventSource.UI, EventSource.ACTION, EventSource.PLUGIN],
       );
       if (!threadsEnabled) want.delete(EventSource.THREAD_LIST);
       const initial: { source: EventSource; event: EventInit }[] = [
@@ -495,6 +527,7 @@ function routes(router: ConnectRouter): void {
         { source: EventSource.SETTINGS, event: { event: { case: "settings", value: { event: { case: "snapshot", value: world.settings.snapshot() } } } } },
         { source: EventSource.UPDATE, event: { event: { case: "update", value: world.update.event() } } },
         { source: EventSource.ACTION, event: { event: { case: "action", value: world.actions.snapshot() } } },
+        { source: EventSource.PLUGIN, event: { event: { case: "plugin", value: world.plugins.snapshot() } } },
       ];
       const ui = want.has(EventSource.UI);
       return tracked("EventService/Watch", filterEvents(world.events.subscribe(ctx.signal, initial), want), () => {
@@ -702,6 +735,41 @@ function threadControl(res: ServerResponse, action: string, q: URLSearchParams):
   }
 }
 
+/**
+ * Plugin controls: POST /__mock/plugin/state?name=hello&state=crashed|running|failed,
+ * POST /__mock/plugin/toast?name=hello&text=…, POST /__mock/plugin/invoke?name=hello&command=plugin.hello.forget[&thread=s-1],
+ * GET /__mock/plugin/acts.
+ */
+function pluginControl(res: ServerResponse, what: string, q: URLSearchParams): void {
+  try {
+    const name = q.get("name") ?? "hello";
+    switch (what) {
+      case "POST state": {
+        const state = q.get("state") ?? "running";
+        if (state !== "running" && state !== "crashed" && state !== "failed") throw new Error(`unknown state ${state}`);
+        world.plugins.setState(name, state);
+        json(res, 200, { ok: true });
+        return;
+      }
+      case "POST toast":
+        json(res, 200, { delivered: world.plugins.toast(name, q.get("text") ?? "") });
+        return;
+      case "POST invoke": {
+        const thread = q.get("thread") ?? "";
+        const ctx = thread ? ({ activeThreadId: thread, activeTerminalId: "", activeProjectId: "", activeWorktreePath: "", activeView: "", activeWorkspaceId: "" } as Parameters<typeof world.plugins.invokeAsk>[2]) : undefined;
+        json(res, 200, { delivered: world.plugins.invokeAsk(name, q.get("command") ?? "", ctx, {}) });
+        return;
+      }
+      case "GET acts":
+        json(res, 200, world.plugins.acts);
+        return;
+    }
+    json(res, 404, { error: `no plugin control ${what}` });
+  } catch (err) {
+    json(res, 400, { error: err instanceof Error ? err.message : String(err) });
+  }
+}
+
 function control(req: IncomingMessage, res: ServerResponse, path: string, q: URLSearchParams): void {
   const thread = /^\/__mock\/thread\/(attention|status|stop|hold|release|focus|archive|snooze|wake|flag)$/.exec(path);
   if (req.method === "POST" && thread?.[1]) {
@@ -716,6 +784,11 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
   const update = /^\/__mock\/update\/([a-z]+)$/.exec(path);
   if (req.method === "POST" && update?.[1]) {
     updateControl(res, update[1], q);
+    return;
+  }
+  const plugin = /^\/__mock\/plugin\/([a-z]+)$/.exec(path);
+  if (plugin?.[1]) {
+    pluginControl(res, `${req.method ?? ""} ${plugin[1]}`, q);
     return;
   }
   switch (`${req.method ?? ""} ${path}`) {
