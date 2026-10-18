@@ -154,6 +154,58 @@ func TestConnSendAndCloseStdin(t *testing.T) {
 	}
 }
 
+// A CLI that exited before reading its stdin fails a write with ErrClosed, as a CLI
+// whose stdout ended does: the caller learns the process is gone, not a pipe error.
+func TestConnWriteToGoneCLI(t *testing.T) {
+	tests := []struct {
+		name string
+		// pipe is the CLI's stdin with its reader gone.
+		pipe func(t *testing.T) io.WriteCloser
+	}{
+		{"reader exited (EPIPE)", func(t *testing.T) io.WriteCloser {
+			r, w, err := os.Pipe()
+			if err != nil {
+				t.Fatal(err)
+			}
+			_ = r.Close()
+			t.Cleanup(func() { _ = w.Close() })
+			return w
+		}},
+		{"pipe closed after the exit", func(t *testing.T) io.WriteCloser {
+			r, w, err := os.Pipe()
+			if err != nil {
+				t.Fatal(err)
+			}
+			_ = r.Close()
+			_ = w.Close()
+			return w
+		}},
+		{"in-process pipe", func(*testing.T) io.WriteCloser {
+			r, w := io.Pipe()
+			_ = r.Close()
+			return w
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			outR, outW := io.Pipe()
+			c := NewConn(outR, tt.pipe(t), Options{})
+			t.Cleanup(func() {
+				_ = outW.Close()
+				c.Close()
+			})
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if _, err := c.Initialize(ctx); !errors.Is(err, ErrClosed) {
+				t.Errorf("initialize: %v", err)
+			}
+			if err := c.Send(ctx, UserMessage{Blocks: []ContentBlock{TextBlock("x")}}); !errors.Is(err, ErrClosed) {
+				t.Errorf("send: %v", err)
+			}
+		})
+	}
+}
+
 // TestConnReplay feeds each captured session through a Conn and checks the
 // permission requests delivered on Events and the answers written.
 func TestConnReplay(t *testing.T) {

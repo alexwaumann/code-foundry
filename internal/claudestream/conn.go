@@ -7,14 +7,16 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"strconv"
 	"sync"
+	"syscall"
 )
 
 // Errors.
 var (
-	// ErrClosed: the CLI's stdout ended (the process exited or is exiting), so no
-	// response will come.
+	// ErrClosed: the CLI's stdout ended or its stdin is gone (the process exited or is
+	// exiting), so no response will come.
 	ErrClosed = errors.New("claudestream: connection closed")
 	// ErrCancelled: PermissionRequest.Answer after the CLI withdrew the request
 	// (control_cancel_request, after an interrupt).
@@ -283,9 +285,21 @@ func (c *Conn) write(v any) error {
 		return fmt.Errorf("claudestream: write: %w", ErrClosed)
 	}
 	if _, err := c.w.Write(b); err != nil {
+		if stdinGone(err) {
+			return fmt.Errorf("claudestream: write: %w: %w", ErrClosed, err)
+		}
 		return fmt.Errorf("claudestream: write: %w", err)
 	}
 	return nil
+}
+
+// stdinGone reports whether a write failed because the CLI's stdin has no reader any
+// more: the process exited before it read (EPIPE; Go ignores SIGPIPE on a pipe that is
+// not its own stdout), exec closed the pipe after the exit (os.ErrClosed), or an
+// in-process pipe's reader closed (io.ErrClosedPipe). Like stdout ending, it means the
+// process is gone or going.
+func stdinGone(err error) bool {
+	return errors.Is(err, syscall.EPIPE) || errors.Is(err, os.ErrClosed) || errors.Is(err, io.ErrClosedPipe)
 }
 
 // Send writes a user message. The CLI accepts one while a turn runs: Claude picks it
