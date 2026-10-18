@@ -50,9 +50,7 @@ test("with no registry configured (the default) Browse says so and points at the
   // The setting back to its default: no registry.
   await mockPost("settings/external?plugins.registries=");
   await openPlugins(page);
-  await expect(page.getByTestId("registry-none")).toHaveText(
-    "No registry is configured, so there is nothing to browse. Add one in Plugin registries below.",
-  );
+  await expect(page.getByTestId("registry-none")).toHaveText("No registry configured. Add one in Registries");
   await expect(page.getByTestId("registry-entry")).toHaveCount(0);
   await expect(page.getByTestId("registry-status")).toHaveCount(0);
   await expect(page.getByTestId("registry-empty")).toHaveCount(0);
