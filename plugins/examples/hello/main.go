@@ -4,7 +4,8 @@
 // permissions.commands), the secrets API, logging, surfaces (surface.go: a demo of every
 // view node kind, one a context fact makes available, and one gated on a pull request's
 // GitHub Actions checks), an event subscription (the thread list), a flag on a thread
-// (flag) and the session environment (every new thread gets CF_HELLO=1).
+// (flag), the session environment (every new thread gets CF_HELLO=1), and a Claude
+// thread and a terminal of its own (owned.go: the demo's Assistant and Shell tabs).
 //
 // Build it with `make plugins`, then link it for development:
 //
@@ -82,7 +83,7 @@ func plugin() pluginsdk.Plugin {
 			},
 		},
 		Surfaces: map[string]pluginsdk.SurfaceFactory{
-			"demo":   newDemo,
+			"demo":   demoFactory(&owned{}),
 			"pinned": newPinned,
 			"checks": newChecks,
 		},

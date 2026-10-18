@@ -13,7 +13,8 @@ import (
 	"github.com/alexwaumann/code-foundry/pluginsdk/ui"
 )
 
-// The demo surface shows every v1 node kind across three tabs (Overview, Form, Log):
+// The demo surface shows every v1 node kind across five tabs (Overview, Form, Log, and
+// Assistant and Shell with the plugin's own thread and terminal; owned.go):
 // what the GUI's renderer and the mock daemon's fixtures are built against
 // (internal/store/plugin/testdata/hello-demo/). The pinned surface appears only on the
 // threads the demo's Pin button marked (a context fact, hello.pinned). The checks
@@ -26,6 +27,7 @@ type demo struct {
 	open pluginsdk.SurfaceOpen
 	ctx  context.Context
 	stop context.CancelFunc
+	own  *owned // the plugin's thread and terminal, shared by every instance
 
 	mu      sync.Mutex
 	tab     string
@@ -36,13 +38,37 @@ type demo struct {
 	running bool // the log tab's simulated build
 	started time.Time
 	build   int
+	ownErr  error // why the Assistant or Shell tab has nothing to show
 }
 
-func newDemo(_ context.Context, h *pluginsdk.Host, open pluginsdk.SurfaceOpen) (pluginsdk.Surface, error) {
-	ctx, stop := context.WithCancel(context.Background())
-	d := &demo{h: h, open: open, ctx: ctx, stop: stop, tab: "overview", started: time.Now()}
-	h.Log().Debug("demo opened", "instance", open.Instance, "thread", open.Context.ThreadID)
-	return d, d.render()
+// demoFactory opens demo instances sharing own.
+func demoFactory(own *owned) pluginsdk.SurfaceFactory {
+	return func(_ context.Context, h *pluginsdk.Host, open pluginsdk.SurfaceOpen) (pluginsdk.Surface, error) {
+		ctx, stop := context.WithCancel(context.Background())
+		d := &demo{h: h, open: open, ctx: ctx, stop: stop, own: own, tab: "overview", started: time.Now()}
+		h.Log().Debug("demo opened", "instance", open.Instance, "thread", open.Context.ThreadID)
+		return d, d.render()
+	}
+}
+
+// prepare makes what tab shows (the assistant thread, the clock terminal) before it
+// renders; outside d.mu, since it calls the host.
+func (d *demo) prepare(ctx context.Context, tab string) {
+	var err error
+	switch tab {
+	case "assistant":
+		_, err = d.own.assistant(ctx, d.h)
+	case "shell":
+		_, err = d.own.shell(ctx, d.h)
+	default:
+		return
+	}
+	if err != nil {
+		d.h.Log().Warn("demo tab", "tab", tab, "err", err.Error())
+	}
+	d.mu.Lock()
+	d.ownErr = err
+	d.mu.Unlock()
 }
 
 // render sends the current tab's view.
@@ -69,7 +95,8 @@ func (d *demo) viewLocked() ui.View {
 			ui.URLButton("hdr-docs", "Open the plugin docs", "https://github.com/alexwaumann/code-foundry").WithIcon("external-link").AsIconOnly(),
 		},
 	}
-	tabs := ui.NewTabs(d.tab, ui.NewTab("overview", "Overview"), ui.NewTab("form", "Form"), ui.NewTab("log", "Log"))
+	tabs := ui.NewTabs(d.tab, ui.NewTab("overview", "Overview"), ui.NewTab("form", "Form"), ui.NewTab("log", "Log"),
+		ui.NewTab("assistant", "Assistant"), ui.NewTab("shell", "Shell"))
 	tabs.Items[2].Badge = ui.NewPill("live", ui.ToneAttention)
 	if !d.running {
 		tabs.Items[2].Badge = nil
@@ -80,6 +107,12 @@ func (d *demo) viewLocked() ui.View {
 		nodes = d.formNodes()
 	case "log":
 		nodes = d.logNodes()
+	case "assistant":
+		id, _ := d.own.ids()
+		nodes = assistantNodes(id, d.ownErr)
+	case "shell":
+		_, id := d.own.ids()
+		nodes = shellNodes(id, d.ownErr)
 	default:
 		nodes = d.overviewNodes(pin)
 	}
@@ -196,15 +229,32 @@ func (d *demo) logNodes() []ui.Node {
 		{Key: "lint-log", Log: &ui.Log{Title: "lint", Rows: 6, Lines: []ui.LogLine{
 			{Text: "checking 42 files"}, {Text: "warning: unused variable x", Tone: ui.ToneAttention}, {Text: "error: missing return", Tone: ui.ToneError},
 		}}},
-		ui.NewSection("owned", "Plugin threads and terminals (inert until they exist)",
-			ui.Node{Key: "helper-thread", Thread: &ui.Thread{ThreadID: "s-000000000000", ReadOnly: true, Placeholder: "The plugin's own Claude thread renders here."}},
-			ui.Node{Key: "helper-term", Terminal: &ui.Terminal{TerminalID: "t-000000000000", Rows: 8, Title: "build shell"}},
-		),
 	}
 }
 
 // Act handles the demo's events.
 func (d *demo) Act(ctx context.Context, act pluginsdk.SurfaceAct) error {
+	switch act.Kind + ":" + act.Action {
+	case "tab:tab":
+		d.prepare(ctx, act.Key)
+	case "click:send-hello":
+		if err := d.own.sendHello(ctx, d.h); err != nil {
+			return err
+		}
+		_ = d.h.ToastIn(act.Instance, pluginsdk.ToastInfo, "sent to the assistant")
+		return nil
+	case "click:ask-main":
+		if err := askMain(ctx, d.h, act, d.open.Context.ThreadID); err != nil {
+			return err
+		}
+		_ = d.h.ToastIn(act.Instance, pluginsdk.ToastInfo, "sent to the thread")
+		return nil
+	case "click:restart-shell":
+		if err := d.own.restartShell(ctx, d.h); err != nil {
+			return err
+		}
+		return d.render()
+	}
 	d.mu.Lock()
 	switch act.Kind + ":" + act.Action {
 	case "tab:tab":

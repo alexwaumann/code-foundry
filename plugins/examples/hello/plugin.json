@@ -2,7 +2,7 @@
   "name": "hello",
   "displayName": "Hello",
   "version": "0.1.0",
-  "description": "The example plugin: greets, sends a message to a thread through the host, keeps a word in the Keychain, follows the thread list, flags threads and gives new threads CF_HELLO=1.",
+  "description": "The example plugin: greets, sends a message to a thread through the host, keeps a word in the Keychain, follows the thread list, flags threads, gives new threads CF_HELLO=1, and runs a Claude thread and a terminal of its own.",
   "protocol": 1,
   "exec": ["bin/hello"],
   "permissions": {
@@ -10,7 +10,9 @@
     "events": ["threads"],
     "threadStatus": true,
     "sessionEnv": true,
-    "secrets": true
+    "secrets": true,
+    "threads": true,
+    "terminals": true
   },
   "commands": [
     {
