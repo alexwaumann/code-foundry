@@ -236,3 +236,29 @@ func TestInlineJSON(t *testing.T) {
 		t.Error("number accepted as inline")
 	}
 }
+
+func TestButtonWithData(t *testing.T) {
+	b := EventButton("del-1", "Delete", "delete")
+	d := b.WithData("note-1")
+	if d.Action.Event != "delete" || d.Action.Data != "note-1" || b.Action.Data != "" {
+		t.Errorf("WithData: %+v, original %+v", d.Action, b.Action)
+	}
+	if err := (View{Nodes: []Node{NewActions("bar", d)}}).Validate(); err != nil {
+		t.Error(err)
+	}
+	// A button without an action stays without one (Validate refuses it).
+	if e := (Button{Key: "x", Label: "X"}).WithData("y"); e.Action != nil {
+		t.Errorf("WithData invented an action: %+v", e.Action)
+	}
+}
+
+func TestIconsSorted(t *testing.T) {
+	for i, n := range Icons {
+		if !iconPattern.MatchString(n) || (i > 0 && Icons[i-1] >= n) {
+			t.Errorf("Icons[%d] = %q: kebab case, sorted, once", i, n)
+		}
+	}
+	if !KnownIcon("workflow") || KnownIcon("no-such-icon") {
+		t.Error("KnownIcon")
+	}
+}

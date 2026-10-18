@@ -170,19 +170,3 @@ func (cl *cli) assignPositionals(fs *flag.FlagSet, flags []*argFlag, words []str
 	}
 	return nil
 }
-
-// positionalUsage is " <key> [<value>]" for a command's positional args.
-func positionalUsage(cmd *v1.Command) string {
-	var sb strings.Builder
-	for _, a := range cmd.GetArgs() {
-		if !a.GetPositional() {
-			continue
-		}
-		if a.GetRequired() {
-			fmt.Fprintf(&sb, " <%s>", a.GetName())
-		} else {
-			fmt.Fprintf(&sb, " [<%s>]", a.GetName())
-		}
-	}
-	return sb.String()
-}

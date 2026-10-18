@@ -1,6 +1,7 @@
 package pluginsdk
 
 import (
+	"bytes"
 	"encoding/json"
 	"time"
 )
@@ -32,7 +33,7 @@ const (
 	// MethodSurfaceAct (request, 10 s): SurfaceAct → {}. An error's message is shown to
 	// the user.
 	MethodSurfaceAct = "surface/act"
-	// MethodEventsEvent (notification) carries one subscribed event (protocol PR 3).
+	// MethodEventsEvent (notification): Event, one subscribed event (Plugin.OnEvent).
 	MethodEventsEvent = "events/event"
 )
 
@@ -49,8 +50,9 @@ const (
 	MethodSecretSet    = "secret/set"
 	MethodSecretDelete = "secret/delete"
 	MethodSecretList   = "secret/list"
-	// The rest arrive with later protocol PRs; until a host supports one it answers
-	// CodeMethodNotFound.
+	// A method a host does not support (yet) answers CodeMethodNotFound; the host's
+	// initialize capabilities say what it supports. thread/create, thread/send,
+	// terminal/create and terminal/close are not served yet.
 	//
 	// MethodViewUpdate (request): ViewUpdateParams → ViewUpdateResult. The whole view
 	// of an open instance; the host validates it (an invalid view is refused with
@@ -66,15 +68,20 @@ const (
 	// MethodContextSet (notification): ContextParams, a predicate fact
 	// <plugin>.<key> (global, or for one thread or project) the host's when clauses
 	// read. A null value removes it. Facts last until the plugin process ends.
-	MethodContextSet        = "context/set"
-	MethodThreadSetFlag     = "thread/setFlag"
+	MethodContextSet = "context/set"
+	// MethodThreadSetFlag (request): Flag → FlagResult (Host.SetFlag).
+	MethodThreadSetFlag = "thread/setFlag"
+	// MethodEventsSubscribe (request): SubscribeParams → SubscribeResult; the events
+	// arrive as events/event. MethodEventsUnsubscribe ends one.
 	MethodEventsSubscribe   = "events/subscribe"
 	MethodEventsUnsubscribe = "events/unsubscribe"
-	MethodSetEnvironment    = "session/setEnvironment"
-	MethodThreadCreate      = "thread/create"
-	MethodThreadSend        = "thread/send"
-	MethodTerminalCreate    = "terminal/create"
-	MethodTerminalClose     = "terminal/close"
+	// MethodSetEnvironment (request): Environment → EnvironmentResult
+	// (Host.SetEnvironment).
+	MethodSetEnvironment = "session/setEnvironment"
+	MethodThreadCreate   = "thread/create"
+	MethodThreadSend     = "thread/send"
+	MethodTerminalCreate = "terminal/create"
+	MethodTerminalClose  = "terminal/close"
 )
 
 // Environment variables the host sets in a plugin's process.
@@ -188,6 +195,20 @@ type LogParams struct {
 	Level string         `json:"level"` // debug, info, warn, error
 	Msg   string         `json:"msg"`
 	Attrs map[string]any `json:"attrs,omitempty"`
+}
+
+// UnmarshalJSON decodes numbers in Attrs as json.Number, so an integer attr (a run id)
+// prints as written ("39128319017"), never as a float ("3.9128319017e+10").
+func (p *LogParams) UnmarshalJSON(b []byte) error {
+	type plain LogParams
+	d := json.NewDecoder(bytes.NewReader(b))
+	d.UseNumber()
+	var v plain
+	if err := d.Decode(&v); err != nil {
+		return err
+	}
+	*p = LogParams(v)
+	return nil
 }
 
 // SecretKeyParams names one secret.
@@ -361,9 +382,25 @@ type SurfaceAct struct {
 
 // StoredSecret replaces a secret input's value in SurfaceAct.Values when the input has
 // a store key: the host wrote the value to the plugin's secrets (Secrets().Get(Key)).
+// Decoded from JSON it is a map[string]any{"key", "stored"}: read it with
+// SurfaceAct.Stored.
 type StoredSecret struct {
 	Key    string `json:"key"`
 	Stored bool   `json:"stored"`
+}
+
+// Stored returns the secret a submit stored for the field name (a secret input with
+// store), and whether it did: false when the user left the input empty.
+func (a SurfaceAct) Stored(name string) (StoredSecret, bool) {
+	switch v := a.Values[name].(type) {
+	case StoredSecret:
+		return v, v.Stored && v.Key != ""
+	case map[string]any:
+		key, _ := v["key"].(string)
+		stored, _ := v["stored"].(bool)
+		return StoredSecret{Key: key, Stored: stored}, stored && key != ""
+	}
+	return StoredSecret{}, false
 }
 
 // ViewUpdateParams is view/update's params.

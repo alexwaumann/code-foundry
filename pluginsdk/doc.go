@@ -30,6 +30,14 @@
 // imports it without the daemon's dependency graph. Subpackages: ui (typed builders for
 // the surface view model) and plugintest (a fake host for unit tests).
 //
-// The protocol (methods, errors, versioning) is described in the Code Foundry repository
-// under docs/sketches/plugins/ARCHITECTURE.md §B; the manifest in §A.1.
+// Every Code Foundry thread has the code-foundry-plugin skill, which documents the
+// manifest, the protocol, the view model, the host API, testing and publishing for
+// plugin authors (its reference files are written by the daemon at start, beside the
+// skill); it and this documentation are all a plugin author needs.
+//
+// The module needs Go 1.24 or newer and nothing outside the standard library:
+//
+//	go get github.com/alexwaumann/code-foundry/pluginsdk@<commit>
+//
+// (or @vX.Y.Z once the module has release tags, which are pluginsdk/vX.Y.Z).
 package pluginsdk

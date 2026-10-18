@@ -4,13 +4,16 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 
 	"connectrpc.com/connect"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/api"
 	"github.com/alexwaumann/code-foundry/internal/skills"
+	"github.com/alexwaumann/code-foundry/internal/store/plugin"
 	"github.com/alexwaumann/code-foundry/internal/store/settings"
+	"github.com/alexwaumann/code-foundry/internal/version"
 )
 
 // installSkills renders the skills every thread gets (internal/skills) from this
@@ -18,10 +21,10 @@ import (
 // every claude's first --add-dir; the thread store creates it). Called once at start,
 // before the servers listen, so no thread starts meanwhile. A failure is logged: threads
 // work without the skills.
-func installSkills(ctx context.Context, log *slog.Logger, dir, version string, cmds *api.Command, set *api.Settings, st *settings.Store) {
-	files, err := renderSkills(ctx, version, cmds, set, st)
+func installSkills(ctx context.Context, log *slog.Logger, dir string, v version.Info, cmds *api.Command, set *api.Settings, st *settings.Store) {
+	files, err := renderSkills(ctx, v, filepath.Join(dir, skills.SkillsDir), cmds, set, st)
 	if err == nil {
-		err = skills.Install(dir, version, files)
+		err = skills.Install(dir, v.Version, files)
 	}
 	if err != nil {
 		log.Error("threads get no code-foundry skills", "dir", dir, "err", err)
@@ -31,8 +34,9 @@ func installSkills(ctx context.Context, log *slog.Logger, dir, version string, c
 }
 
 // renderSkills lists the commands (unavailable ones too, as `code-foundry guide` does)
-// and the settings schema, and renders the skills from them.
-func renderSkills(ctx context.Context, version string, cmds *api.Command, set *api.Settings, st *settings.Store) (skills.Files, error) {
+// and the settings schema, and renders the skills from them, the build's commit and the
+// plugins' host facts; skillsDir is where they will be installed.
+func renderSkills(ctx context.Context, v version.Info, skillsDir string, cmds *api.Command, set *api.Settings, st *settings.Store) (skills.Files, error) {
 	listed, err := cmds.List(ctx, connect.NewRequest(&v1.ListCommandsRequest{IncludeUnavailable: true}))
 	if err != nil {
 		return nil, fmt.Errorf("list commands: %w", err)
@@ -44,8 +48,9 @@ func renderSkills(ctx context.Context, version string, cmds *api.Command, set *a
 	commands := listed.Msg.GetCommands()
 	dropSettingDefaults(commands, registryOverrides(st.Settings()).ArgDefaults)
 	return skills.Render(skills.Sources{
-		Version: version, Commands: commands,
+		Version: v.Version, Commands: commands,
 		SettingGroups: schema.Msg.GetGroups(), Settings: schema.Msg.GetFields(),
+		Commit: v.Commit, SkillsDir: skillsDir, Facts: plugin.HostFactNames(),
 	})
 }
 

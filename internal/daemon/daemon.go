@@ -223,7 +223,7 @@ func Run(ctx context.Context, opts Options) error {
 		log.Error("plugins did not start", "err", err)
 	}
 	commandAPI := api.NewCommand(commands)
-	installSkills(ctx, log.With("component", "skills"), p.Claude(), opts.Version.Version, commandAPI, settingsAPI, st.settings)
+	installSkills(ctx, log.With("component", "skills"), p.Claude(), opts.Version, commandAPI, settingsAPI, st.settings)
 	routes := []api.Route{
 		api.NewHealth(started, opts.Version).Route(),
 		commandAPI.Route(),

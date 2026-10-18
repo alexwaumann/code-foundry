@@ -118,3 +118,26 @@ func TestInstallRefusesBadPaths(t *testing.T) {
 		t.Error("Install with no dir succeeded")
 	}
 }
+
+// Inside the private .claude the files have ordinary modes, so an example copied out
+// of a skill is a normal checkout.
+func TestInstallModes(t *testing.T) {
+	dir := t.TempDir()
+	if err := Install(dir, "v1", Files{"a/example/.github/workflows/x.yml": []byte("x"), "a/SKILL.md": []byte("s")}); err != nil {
+		t.Fatal(err)
+	}
+	for p, want := range map[string]os.FileMode{
+		ConfigDir:                        0o700 | os.ModeDir,
+		SkillsDir + "/a/example/.github": 0o755 | os.ModeDir,
+		SkillsDir + "/a/example/.github/workflows/x.yml": 0o644,
+		SkillsDir + "/a/SKILL.md":                        0o644,
+	} {
+		fi, err := os.Stat(filepath.Join(dir, filepath.FromSlash(p)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := fi.Mode() & (os.ModePerm | os.ModeDir); got != want {
+			t.Errorf("%s: mode %v, want %v", p, got, want)
+		}
+	}
+}

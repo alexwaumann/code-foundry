@@ -6,7 +6,10 @@
 //	res, err := h.Command(ctx, "greet", map[string]string{"name": "Ada"}, pluginsdk.UiContext{})
 //
 // Permissions are enforced like the real host: host/invoke needs a matching
-// permissions.commands glob and secret/* needs permissions.secrets.
+// permissions.commands glob, secret/* needs permissions.secrets, thread/setFlag
+// threadStatus, session/setEnvironment sessionEnv, and events/subscribe each source in
+// permissions.events. It does not evaluate when clauses, check views beyond what the
+// plugin's own Validate did, or store secrets from forms (SetSecret does).
 package plugintest
 
 import (
@@ -34,6 +37,14 @@ type Options struct {
 	Invoke func(ctx context.Context, p pluginsdk.InvokeParams) (pluginsdk.CommandResult, error)
 	// Capabilities are the host capabilities announced in initialize.
 	Capabilities []string
+	// Secrets are stored before the plugin starts (so Init can read them).
+	Secrets map[string]string
+	// Flags are the plugin's live flags as initialize reports them (Host.Flags in Init),
+	// for testing that Init reconciles them.
+	Flags []pluginsdk.Flag
+	// NoInitWait makes Start return right after the handshake instead of waiting (up to
+	// 5 s) for Plugin.Init to return; for a plugin whose Init blocks.
+	NoInitWait bool
 }
 
 // Host is the fake host.
@@ -60,8 +71,9 @@ type Host struct {
 	closeOnce   sync.Once
 }
 
-// Start serves p against a new fake host and completes the handshake. The plugin is
-// shut down when the test ends.
+// Start serves p against a new fake host, completes the handshake and waits for
+// p.Init to return (Options.NoInitWait: not), so what Init sets up is in place. The
+// plugin is shut down when the test ends.
 func Start(t testing.TB, p pluginsdk.Plugin, opts Options) *Host {
 	t.Helper()
 	if opts.Name == "" {
@@ -72,6 +84,20 @@ func Start(t testing.TB, p pluginsdk.Plugin, opts Options) *Host {
 	}
 	h := &Host{t: t, opts: opts, done: make(chan error, 1), changed: make(chan struct{}),
 		secrets: map[string]pluginsdk.SecretInfo{}, values: map[string]string{}, views: map[string]json.RawMessage{}, versions: map[string]uint64{}}
+	for k, v := range opts.Secrets {
+		h.values[k] = v
+		h.secrets[k] = pluginsdk.SecretInfo{Key: k, UpdatedAt: time.Now()}
+	}
+	initDone := make(chan error, 1)
+	if init := p.Init; init != nil && !opts.NoInitWait {
+		p.Init = func(ctx context.Context, ph *pluginsdk.Host) error {
+			err := init(ctx, ph)
+			initDone <- err
+			return err
+		}
+	} else {
+		initDone <- nil
+	}
 	toPluginR, toPluginW := io.Pipe()
 	toHostR, toHostW := io.Pipe()
 	go func() {
@@ -95,14 +121,26 @@ func Start(t testing.TB, p pluginsdk.Plugin, opts Options) *Host {
 		Protocol: pluginsdk.ProtocolVersion,
 		Host:     pluginsdk.HostInfo{Version: "test", Capabilities: opts.Capabilities},
 		Plugin:   pluginsdk.PluginInfo{Name: opts.Name, DataDir: opts.DataDir, Granted: opts.Granted},
+		Flags:    opts.Flags,
 	}, &res); err != nil {
 		t.Fatalf("plugintest: initialize: %v", err)
 	}
 	if err := h.conn.Notify(pluginsdk.MethodInitialized, struct{}{}); err != nil {
 		t.Fatalf("plugintest: initialized: %v", err)
 	}
+	select {
+	case err := <-initDone:
+		if err != nil {
+			t.Logf("plugintest: Init failed (Serve ends): %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Logf("plugintest: Init has not returned after 5s; going on (Options.NoInitWait skips the wait)")
+	}
 	return h
 }
+
+// DataDir is the plugin's data directory (Options.DataDir, else a temporary one).
+func (h *Host) DataDir() string { return h.opts.DataDir }
 
 // Command invokes one of the plugin's commands (command/invoke).
 func (h *Host) Command(ctx context.Context, name string, args map[string]string, uctx pluginsdk.UiContext) (pluginsdk.CommandResult, error) {
@@ -114,10 +152,17 @@ func (h *Host) Command(ctx context.Context, name string, args map[string]string,
 // OpenSurface opens a surface instance (surface/open) and tells the plugin it is
 // visible, as the host does for its first viewer. The plugin's views arrive in View.
 func (h *Host) OpenSurface(ctx context.Context, instance, surface string, uctx pluginsdk.UiContext) error {
-	if err := h.conn.Call(ctx, pluginsdk.MethodSurfaceOpen, pluginsdk.SurfaceOpen{Instance: instance, Surface: surface, Context: uctx}, nil); err != nil {
+	return h.OpenSurfaceWith(ctx, pluginsdk.SurfaceOpen{Instance: instance, Surface: surface, Context: uctx})
+}
+
+// OpenSurfaceWith is OpenSurface with the whole surface/open, Facts included: a pr
+// scoped surface's Facts["pr"] ({"repo", "number", "url"} as JSON) and the facts its
+// when clause reads.
+func (h *Host) OpenSurfaceWith(ctx context.Context, open pluginsdk.SurfaceOpen) error {
+	if err := h.conn.Call(ctx, pluginsdk.MethodSurfaceOpen, open, nil); err != nil {
 		return err
 	}
-	return h.conn.Notify(pluginsdk.MethodSurfaceVisibility, pluginsdk.SurfaceVisibility{Instance: instance, Visible: true})
+	return h.conn.Notify(pluginsdk.MethodSurfaceVisibility, pluginsdk.SurfaceVisibility{Instance: open.Instance, Visible: true})
 }
 
 // Act sends surface/act. A zero act.Version is the instance's latest.
@@ -167,11 +212,15 @@ func (h *Host) Close() {
 	h.closeOnce.Do(func() { _ = h.conn.Close() })
 }
 
-// WaitFor waits until cond, checked after every recorded call, is true. It fails the
-// test after timeout.
+// WaitFor waits until cond is true, checking it at once, after every call the plugin
+// makes to the host, and every 20 ms (so cond may also read the plugin's own state). It
+// fails the test after timeout, listing the plugin's last log lines (a refused view or
+// call is logged there).
 func (h *Host) WaitFor(timeout time.Duration, cond func(h *Host) bool) {
 	h.t.Helper()
 	deadline := time.After(timeout)
+	tick := time.NewTicker(20 * time.Millisecond)
+	defer tick.Stop()
 	for {
 		h.mu.Lock()
 		ch := h.changed
@@ -181,8 +230,13 @@ func (h *Host) WaitFor(timeout time.Duration, cond func(h *Host) bool) {
 		}
 		select {
 		case <-ch:
+		case <-tick.C:
 		case <-deadline:
-			h.t.Fatalf("plugintest: condition not met after %s", timeout)
+			logs := h.Logs()
+			if len(logs) > 10 {
+				logs = logs[len(logs)-10:]
+			}
+			h.t.Fatalf("plugintest: condition not met after %s; the plugin's last log lines: %+v", timeout, logs)
 		}
 	}
 }

@@ -13,7 +13,7 @@ import (
 	"sync/atomic"
 )
 
-// JSON-RPC error codes: the standard ones, then the protocol's own (ARCHITECTURE.md §B.3).
+// JSON-RPC error codes: the standard ones, then the protocol's own.
 const (
 	CodeParseError     = -32700
 	CodeInvalidRequest = -32600
@@ -45,8 +45,9 @@ var (
 	ErrQueueFull = errors.New("pluginsdk: outbound queue full")
 )
 
-// Error is a JSON-RPC error object. Handlers return one to choose the code; any other
-// error becomes CodeInternal with its message.
+// Error is a JSON-RPC error object. Handlers return one (or wrap one with %w) to choose
+// the code; any other error becomes CodeInternal. The message sent is the returned
+// error's whole text.
 type Error struct {
 	Code    int             `json:"code"`
 	Message string          `json:"message"`
@@ -399,11 +400,12 @@ func (c *Conn) answer(m wire) {
 	result, err := c.handle(m)
 	out := wire{ID: m.ID}
 	if err != nil {
-		var e *Error
-		if !errors.As(err, &e) {
-			e = &Error{Code: CodeInternal, Message: err.Error()}
+		// A wrapped *Error keeps its code and data; the message is the whole chain's, so
+		// fmt.Errorf("sending the log: %w", err) reaches the peer with its context.
+		out.Error = &Error{Code: CodeInternal, Message: err.Error()}
+		if e := (*Error)(nil); errors.As(err, &e) {
+			out.Error.Code, out.Error.Data = e.Code, e.Data
 		}
-		out.Error = e
 	} else {
 		if result == nil {
 			result = struct{}{}
