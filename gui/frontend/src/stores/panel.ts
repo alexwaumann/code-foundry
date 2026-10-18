@@ -133,6 +133,14 @@ export function closeTab(e: PanelEntry, id: string): PanelEntry {
   return { ...e, tabs, activeTabId: next?.id ?? null };
 }
 
+/** Renames a tab (a plugin view's tab title); an unknown id or the same title changes nothing. */
+export function retitleTab(e: PanelEntry, id: string, title: string): PanelEntry {
+  const i = e.tabs.findIndex((t) => t.id === id);
+  const old = e.tabs[i];
+  if (!old || old.title === title || !title) return e;
+  return { ...e, tabs: e.tabs.map((t, j) => (j === i ? { ...t, title } : t)) };
+}
+
 /** Makes an existing tab active (ending picking); an unknown id changes nothing. */
 export function activateTab(e: PanelEntry, id: string): PanelEntry {
   if (e.activeTabId === id || !e.tabs.some((t) => t.id === id)) return e;
@@ -302,6 +310,11 @@ export function togglePanel(target: PanelTarget = "current", open?: boolean, opt
 
 export function closePanelTab(target: PanelTarget, id: string): void {
   update(target, (e) => closeTab(e, id));
+}
+
+/** Sets a tab's title in the strip (retitleTab). */
+export function retitlePanelTab(target: PanelTarget, id: string, title: string): void {
+  update(target, (e) => retitleTab(e, id, title));
 }
 
 export function activatePanelTab(target: PanelTarget, id: string): void {

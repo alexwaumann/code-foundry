@@ -1,6 +1,7 @@
 /**
  * Side-panel surfaces, in the order the empty panel lists them. A surface is one file
- * exporting a SurfaceSpec (see types.ts); list it here. The panel finds renderers,
+ * exporting a SurfaceSpec (see types.ts); list it here. Plugin surfaces are not listed:
+ * surfaceOf falls through to surfaces/plugin.ts, and the empty panel lists them after these. The panel finds renderers,
  * hotkeys and availability through these lookups, never by switching on the kind.
  */
 import { useCallback, useSyncExternalStore } from "react";
@@ -10,6 +11,7 @@ import { diffSurface } from "./diff";
 import { filesSurface } from "./files";
 import { linkedPrsSurface } from "./linkedprs";
 import { mcpSurface } from "./mcp";
+import { pluginSurfaceSpec } from "./plugin";
 import { pullRequestSurface } from "./pullrequest";
 import { threadsSurface } from "./threads";
 import type { SurfaceAvailability, SurfaceContext, SurfaceSpec } from "./types";
@@ -24,8 +26,9 @@ export const surfaces: readonly SurfaceSpec[] = [filesSurface, diffSurface, pull
 const byKind = new Map<SurfaceKind, SurfaceSpec>(surfaces.map((s) => [s.kind, s]));
 const byHotkey = new Map<string, SurfaceSpec>(surfaces.flatMap((s) => (s.hotkey ? [[s.hotkey.toLowerCase(), s] as const] : [])));
 
+/** A kind's spec: a listed surface, else a plugin surface (`plugin.<plugin>.<surface>`, surfaces/plugin.ts). */
 export function surfaceOf(kind: SurfaceKind): SurfaceSpec | undefined {
-  return byKind.get(kind);
+  return byKind.get(kind) ?? pluginSurfaceSpec(kind);
 }
 
 /** The surface a bare letter opens (case-insensitive), if any. */

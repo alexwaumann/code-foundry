@@ -1,0 +1,80 @@
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { ArrowDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { logLines } from "../log";
+import { CopyIconButton } from "../parts";
+import type { NodeProps } from "../registry";
+import { toneText } from "../tones";
+
+/** One log row's height in px (text-caption-sm's line height). */
+const LINE_PX = 16;
+
+/**
+ * A monospace tail the plugin streams (view/append): per-line tone, wrapped with a hanging
+ * indent or scrolling sideways inside its box, `rows` lines tall. It follows the end while
+ * the user is at the bottom; scrolling up stops that and shows "Jump to end". Copy copies
+ * the whole buffer; selection survives appends.
+ */
+export function LogNode({ data }: NodeProps<"log">) {
+  const lines = useMemo(() => logLines(data), [data]);
+  const rows = Math.min(40, Math.max(4, data.rows ?? 16));
+  const box = useRef<HTMLDivElement>(null);
+  // Whether the box sits at its end, so new lines keep it there.
+  const [atEnd, setAtEnd] = useState(true);
+  const follow = !(data.noFollow ?? false);
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (el && follow && atEnd) el.scrollTop = el.scrollHeight;
+  }, [lines, follow, atEnd]);
+  const text = useMemo(() => lines.map((l) => l.text).join("\n"), [lines]);
+  return (
+    <div className="flex min-w-0 flex-col gap-1" data-testid="plugin-log">
+      {(data.title || lines.length > 0) && (
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="min-w-0 flex-1 truncate text-caption-sm">{data.title}</span>
+          {lines.length > 0 && <CopyIconButton text={text} label="Copy log" />}
+        </div>
+      )}
+      <div className="relative min-w-0">
+        <div
+          ref={box}
+          className={cn(
+            "overflow-auto rounded-md border border-border bg-muted/40 px-2 py-1.5 font-mono text-caption-sm text-foreground select-text [font-variant-ligatures:none]",
+            !data.wrap && "whitespace-pre",
+          )}
+          style={{ height: rows * LINE_PX + 14 }}
+          data-testid="plugin-log-box"
+          data-lines={lines.length}
+          onScroll={(e) => {
+            const el = e.currentTarget;
+            setAtEnd(el.scrollHeight - el.scrollTop - el.clientHeight < LINE_PX);
+          }}
+        >
+          {data.truncated && <div className="text-muted-foreground italic">earlier output not shown</div>}
+          {lines.map((l, i) => (
+            <div key={i} className={cn(data.wrap && "pl-[2ch] -indent-[2ch] break-words whitespace-pre-wrap", toneText[l.tone ?? ""])} data-tone={l.tone || undefined}>
+              {l.text || " "}
+            </div>
+          ))}
+        </div>
+        {follow && !atEnd && (
+          <Button
+            variant="outline"
+            size="xs"
+            className="absolute right-2 bottom-2 bg-pane text-muted-foreground shadow-xs dark:bg-pane"
+            onClick={() => {
+              const el = box.current;
+              if (el) el.scrollTop = el.scrollHeight;
+              setAtEnd(true);
+            }}
+            data-testid="plugin-log-jump"
+          >
+            <ArrowDown aria-hidden />
+            Jump to end
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -23,6 +23,11 @@ export function ConfirmDialog() {
           <div className="min-w-0 space-y-2">
             <DialogTitle>{pending?.title}</DialogTitle>
             <DialogDescription className="break-words">{pending?.message}</DialogDescription>
+            {pending?.caller && (
+              <p className="text-caption-sm" data-testid="confirm-caller">
+                Asked by {pending.caller}
+              </p>
+            )}
           </div>
         </div>
         <div className="mt-5 flex justify-end gap-2">

@@ -6,7 +6,6 @@ import { horizontalListSortingStrategy, SortableContext, useSortable } from "@dn
 import { CSS } from "@dnd-kit/utilities";
 import { Plus, X } from "lucide-react";
 import { CommandButton } from "@/components/command/CommandButton";
-import { Kbd } from "@/components/ui/kbd";
 import { Tip } from "@/components/ui/tooltip";
 import { PANE_HEADER_HEIGHT } from "@/components/window/titleBand";
 import { chordFromEvent } from "@/keys/chord";
@@ -30,21 +29,20 @@ import {
 } from "@/stores/panel";
 import { PANEL_MIN, panelMax, useUiStore, visibleSidebarWidth } from "@/stores/ui";
 import { selectPageOpen, useViewsStore } from "@/stores/views";
-import { surfaceOf, surfaces, useAvailability, type SurfaceContext, type SurfaceSpec } from "@/surfaces/registry";
+import { PluginSurfaceRows } from "@/components/plugin/PluginSurfaceRows";
+import { surfaceOf, surfaces, type SurfaceContext } from "@/surfaces/registry";
 import { PanelExpand } from "./PanelExpand";
 import { PanelToggle } from "./PanelToggle";
 import { PanelResizeHandle } from "./PanelResizeHandle";
 import { isPanelChord, panelKeyAction, tabMoveIndex } from "./keys";
 import { revealElement, revealTab, tabNode } from "./reveal";
+import { keepPanelFocus, surfaceContext } from "./surfaceList";
+import { SurfaceRow } from "./SurfaceRow";
 
 const BODY_ID = "side-panel-body";
 
 function isEditable(el: EventTarget): boolean {
   return el instanceof HTMLElement && (el.isContentEditable || el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement);
-}
-
-function surfaceContext(panelKey: string): SurfaceContext {
-  return { selection: useUiStore.getState().selection, panelKey };
 }
 
 /**
@@ -61,16 +59,6 @@ function closeTab(panelKey: string, id: string): void {
 function hidePanel(panelKey: string): void {
   togglePanel(panelKey, false);
   useUiStore.getState().focusContent();
-}
-
-/**
- * The surface list unmounts when a tab opens or picking ends. Focus that was in it (a
- * row reached with Tab) moves to the panel first, so cmd+w and the letters keep working,
- * as in LinkedPRsSurface's openLink.
- */
-function keepPanelFocus(from: Element): void {
-  const list = from.closest("[data-surface-list]");
-  if (list?.contains(document.activeElement)) list.closest<HTMLElement>('[data-region="panel"]')?.focus({ preventScroll: true });
 }
 
 /**
@@ -349,35 +337,6 @@ function TabStrip({ panelKey }: { panelKey: string }) {
   );
 }
 
-/** One entry of the empty list. Its availability is a hook, so it follows the stores the surface reads. */
-function SurfaceRow({ spec, ctx }: { spec: SurfaceSpec; ctx: SurfaceContext }) {
-  const availability = useAvailability(spec, ctx);
-  if (availability === "hidden") return null;
-  const enabled = availability === "enabled";
-  return (
-    <li>
-      <button
-        type="button"
-        disabled={!enabled}
-        data-surface={spec.kind}
-        data-availability={availability}
-        className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-label enabled:hover:bg-accent disabled:cursor-default disabled:opacity-45"
-        onClick={(e) => {
-          const now = surfaceContext(ctx.panelKey);
-          const tab = spec.openDefault(now);
-          if (!tab || spec.available(now) !== "enabled") return;
-          keepPanelFocus(e.currentTarget);
-          openSurface(ctx.panelKey, tab);
-        }}
-      >
-        <spec.icon className="size-4 text-muted-foreground" aria-hidden />
-        <span className="flex-1 truncate">{spec.title}</span>
-        {spec.hotkey && <Kbd>{spec.hotkey.toUpperCase()}</Kbd>}
-      </button>
-    </li>
-  );
-}
-
 /**
  * No tabs yet, or picking (the "+" was clicked): the surfaces this selection can open,
  * with their hotkeys (as in T3 Code). Picking one opens it (or activates its open tab).
@@ -394,6 +353,7 @@ function EmptyState({ panelKey }: { panelKey: string }) {
             <SurfaceRow key={spec.kind} spec={spec} ctx={ctx} />
           ))}
         </ul>
+        <PluginSurfaceRows ctx={ctx} />
       </div>
     </div>
   );
