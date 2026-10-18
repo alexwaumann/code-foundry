@@ -6,7 +6,9 @@ import { INLINE_LIVE_MAX } from "../live";
  * What a thread or terminal node shows in place of its live view when it holds no stream
  * (components/plugin/live.ts): over the inline budget (a muted note and Attach, which takes
  * the oldest live node's place), or waiting for one of the app's connections
- * (api/streamSlots.ts). Off screen or leaving the view tab it is an empty box.
+ * (api/streamSlots.ts). Off screen or leaving the view tab it is an empty box. Its z-10
+ * covers the node's own content only: the thread and terminal nodes are `isolate`, so it
+ * never paints over the surface's sticky header and tabs (also z-10) when scrolled under.
  */
 export function LivePaused({ reason, kind, onAttach }: { reason: "budget" | "connections" | "hidden"; kind: "thread" | "terminal"; onAttach?: () => void }) {
   if (reason === "hidden") return <div className="absolute inset-0 bg-pane" aria-hidden data-testid="plugin-live-hidden" />;

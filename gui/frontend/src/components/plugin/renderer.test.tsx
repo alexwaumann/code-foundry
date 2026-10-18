@@ -248,6 +248,9 @@ describe("thread nodes", () => {
     expect(live()).toEqual([true, true, false]);
     const paused = screen.getByTestId("plugin-live-paused");
     expect(paused.getAttribute("data-reason")).toBe("budget");
+    // The overlay's z-10 stays inside its node: scrolled under the sticky header, it must
+    // not paint over it (found in the release-readiness run).
+    expect(paused.closest('[data-testid="plugin-thread"]')?.classList.contains("isolate")).toBe(true);
     fireEvent.click(screen.getByTestId("plugin-live-attach"));
     expect(live()).toEqual([false, true, true]);
   });

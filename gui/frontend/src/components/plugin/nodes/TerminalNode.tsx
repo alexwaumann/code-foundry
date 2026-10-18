@@ -75,7 +75,7 @@ export function TerminalNode({ node, data }: NodeProps<"terminal">) {
   return (
     <div
       ref={setBox}
-      className="flex min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-pane"
+      className="isolate flex min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-pane"
       data-testid="plugin-terminal"
       data-key={node.key}
       data-terminal-id={data.terminalId}

@@ -58,7 +58,7 @@ export function ThreadNode({ node, data }: NodeProps<"thread">) {
         ref.current = e;
         setEl(e);
       }}
-      className="relative flex min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-pane"
+      className="relative isolate flex min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-pane"
       style={{ height }}
       data-testid="plugin-thread"
       data-key={node.key}
