@@ -69,6 +69,7 @@ function thread(id: string, over: Partial<ThreadView> = {}): ThreadView {
     labels: [],
     report: null,
     budgetUsd: 0,
+    flags: [],
     ...over,
   };
 }

@@ -3,11 +3,13 @@ import { Code, ConnectError } from "@connectrpc/connect";
 import {
   AgentRunStatus,
   PermissionMode,
+  ThreadFlagLevel,
   ThreadReportStatus,
   ThreadState,
   ThreadStatus,
   type AgentRun,
   type Thread,
+  type ThreadFlag,
   type ThreadListEvent,
   type UsageBucket,
 } from "@/gen/codefoundry/v1/thread_lifecycle_pb";
@@ -164,6 +166,28 @@ export interface ThreadView {
    * works interrupts the turn: status "attention", statusReason "budget reached".
    */
   budgetUsd: number;
+  /**
+   * Flags plugins raised on the thread, errors first, then newest first; at most one per
+   * plugin. An overlay on status that never changes it: a flagged thread counts as needing
+   * attention (isAttention), sorts with prompts or errors (lib/thread threadGroup) and line 2
+   * shows the top flag (lib/statusLine). docs/notes/plugins-3-events-flags-env.md.
+   */
+  flags: ThreadFlagView[];
+}
+
+/** A plugin's flag on a thread. */
+export interface ThreadFlagView {
+  /** The plugin's name ("gh-actions"). */
+  plugin: string;
+  /** Its display name ("GitHub Actions"): the reason reads "<pluginName>: <reason>". */
+  pluginName: string;
+  /** Amber "attention" (it needs the user) or red "error" (something failed). */
+  level: "attention" | "error";
+  /** One line, at most 80 characters. */
+  reason: string;
+  setAtMs: number | null;
+  /** Cleared by the daemon when the thread is opened. */
+  untilSeen: boolean;
 }
 
 /** How a thread's task went, as its agent reported it. */
@@ -341,7 +365,30 @@ export function toThreadView(s: Thread): ThreadView {
     labels: [...s.labels],
     report: toThreadReportView(s),
     budgetUsd: s.budgetUsd,
+    flags: s.flags.flatMap(toThreadFlagView),
   };
+}
+
+const flagLevelMap: Record<ThreadFlagLevel, ThreadFlagView["level"] | null> = {
+  [ThreadFlagLevel.UNSPECIFIED]: null,
+  [ThreadFlagLevel.ATTENTION]: "attention",
+  [ThreadFlagLevel.ERROR]: "error",
+};
+
+/** A flag's view; none for a level this GUI does not know. */
+export function toThreadFlagView(f: ThreadFlag): ThreadFlagView[] {
+  const level = flagLevelMap[f.level] ?? null;
+  if (level === null) return [];
+  return [
+    {
+      plugin: f.plugin,
+      pluginName: f.pluginDisplayName || f.plugin,
+      level,
+      reason: f.reason,
+      setAtMs: f.setAt ? timestampMs(f.setAt) : null,
+      untilSeen: f.untilSeen,
+    },
+  ];
 }
 
 const reportStatusMap: Record<ThreadReportStatus, ThreadReportStatusView | null> = {

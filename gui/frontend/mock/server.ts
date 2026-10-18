@@ -147,7 +147,7 @@ import { FilesystemService } from "../src/gen/codefoundry/v1/filesystem_pb";
 import { GhService } from "../src/gen/codefoundry/v1/gh_pb";
 import { HealthService } from "../src/gen/codefoundry/v1/health_pb";
 import { ProjectService } from "../src/gen/codefoundry/v1/project_pb";
-import { ThreadState, ThreadStatus } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
+import { ThreadFlagLevel, ThreadState, ThreadStatus } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
 import { TerminalService, TerminalState, type AttachEventSchema } from "../src/gen/codefoundry/v1/terminal_pb";
 import { ThreadDecision, ThreadService } from "../src/gen/codefoundry/v1/thread_pb";
 import { ActionRunMode, ActionRunState, ActionService } from "../src/gen/codefoundry/v1/action_pb";
@@ -637,12 +637,17 @@ function threadSummary(id: string): Record<string, unknown> {
     archivedAt: s.archivedAt?.toISOString() ?? null,
     snoozedUntil: s.snoozedUntil?.toISOString() ?? null,
     linkedPullRequests: s.linkedPullRequests.map((l) => ({ slug: l.slug, number: l.number, url: l.url })),
+    flags: s.flags.map((f) => ({ plugin: f.plugin, level: ThreadFlagLevel[f.level], reason: f.reason, untilSeen: f.untilSeen })),
   };
 }
 
 const statusNames: Record<string, ThreadStatus> = { busy: ThreadStatus.BUSY, idle: ThreadStatus.IDLE, attention: ThreadStatus.NEEDS_ATTENTION };
+const flagLevels: Record<string, ThreadFlagLevel | null> = { attention: ThreadFlagLevel.ATTENTION, error: ThreadFlagLevel.ERROR, none: null };
 
-/** Thread controls: POST /__mock/thread/{attention|status|stop|hold|release|focus|archive|snooze|wake}?id=…[&status=…][&reason=…&code=…] */
+/**
+ * Thread controls: POST /__mock/thread/{attention|status|stop|hold|release|focus|archive|snooze|wake|flag}?id=…[&status=…][&reason=…&code=…].
+ * flag: &plugin=…&name=<display name>&level=attention|error|none&reason=…[&untilSeen=1] (a plugin's thread/setFlag).
+ */
 function threadControl(res: ServerResponse, action: string, q: URLSearchParams): void {
   const id = q.get("id") ?? "";
   try {
@@ -679,6 +684,13 @@ function threadControl(res: ServerResponse, action: string, q: URLSearchParams):
       case "wake":
         world.wakeThread(id);
         break;
+      case "flag": {
+        const level = flagLevels[q.get("level") ?? "attention"];
+        if (level === undefined) throw new CommandError("invalid", "level must be attention, error or none");
+        const plugin = q.get("plugin") ?? "hello";
+        world.setFlag(id, { plugin, pluginDisplayName: q.get("name") ?? plugin, level, reason: q.get("reason") ?? "", untilSeen: q.get("untilSeen") === "1" });
+        break;
+      }
       default:
         json(res, 404, { error: "unknown thread action" });
         return;
@@ -690,7 +702,7 @@ function threadControl(res: ServerResponse, action: string, q: URLSearchParams):
 }
 
 function control(req: IncomingMessage, res: ServerResponse, path: string, q: URLSearchParams): void {
-  const thread = /^\/__mock\/thread\/(attention|status|stop|hold|release|focus|archive|snooze|wake)$/.exec(path);
+  const thread = /^\/__mock\/thread\/(attention|status|stop|hold|release|focus|archive|snooze|wake|flag)$/.exec(path);
   if (req.method === "POST" && thread?.[1]) {
     threadControl(res, thread[1], q);
     return;
