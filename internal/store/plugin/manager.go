@@ -668,8 +668,8 @@ func (m *Manager) Restart(ctx context.Context, name string) (Plugin, error) {
 }
 
 // Dev implements Store. force lets the link take the name from a package of another
-// source (another folder's link, say), deleting what that one left (origin.go); the
-// consent text then says so.
+// source (another folder's link, an installed package, which it removes), deleting what
+// that one left (origin.go); the consent text then says so.
 func (m *Manager) Dev(ctx context.Context, dir string, consent, dryRun, force bool) (EnableResult, error) {
 	m.opMu.Lock()
 	defer m.opMu.Unlock()
@@ -692,8 +692,8 @@ func (m *Manager) Dev(ctx context.Context, dir string, consent, dryRun, force bo
 	}
 	name := mf.Name
 	link := filepath.Join(m.opts.Dir, name)
-	if fi, err := os.Lstat(link); err == nil && fi.Mode()&fs.ModeSymlink == 0 {
-		return EnableResult{}, fmt.Errorf("%w: a plugin named %s is installed at %s; remove it first", ErrFailedPrecondition, name, link)
+	if fi, err := os.Lstat(link); err == nil && fi.Mode()&fs.ModeSymlink == 0 && !force {
+		return EnableResult{}, fmt.Errorf("%w: a plugin named %s is installed at %s; --force replaces it with a link to %s", ErrFailedPrecondition, name, link, real)
 	}
 	origin := originOf(KindPath, real)
 	took, err := m.checkOrigin(ctx, name, origin, force)
@@ -720,7 +720,7 @@ func (m *Manager) Dev(ctx context.Context, dir string, consent, dryRun, force bo
 	if _, err := m.claimLocked(ctx, name, origin, force); err != nil {
 		return EnableResult{}, err
 	}
-	if err := linkDir(real, link); err != nil {
+	if err := m.linkOverPackage(name, real, link); err != nil {
 		return EnableResult{}, err
 	}
 	if rows, err = loadRows(ctx, m.opts.DB); err != nil {

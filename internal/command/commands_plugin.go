@@ -168,7 +168,7 @@ func RegisterPlugin(r *Registry, b PluginBackend) error {
 			Args: []ArgSpec{
 				{Name: "path", Type: Path, Required: true, Positional: true, Description: "The plugin's folder"},
 				{Name: "force", Type: Bool, Description: "Take the name from a plugin of another source (a link to another folder, " +
-					"an installed package's leftovers), deleting its secrets, data and consent"},
+					"an installed package, which it removes, or its leftovers), deleting its secrets, data and consent"},
 				followArg,
 			},
 			Confirm: "Link {path} as a dev plugin and enable it?",

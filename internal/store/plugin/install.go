@@ -640,21 +640,7 @@ func (m *Manager) installLink(ctx context.Context, dir string, req InstallReques
 	if cur, ok := m.Snapshot().Plugin(name); ok {
 		res.Previous = cur.Manifest.Version
 	}
-	if fi, err := os.Lstat(link); err == nil && fi.Mode()&fs.ModeSymlink == 0 {
-		staging, err := m.stagingRoot()
-		if err != nil {
-			return InstallResult{}, err
-		}
-		trash, err := os.MkdirTemp(staging, name+"-removed-")
-		if err != nil {
-			return InstallResult{}, fmt.Errorf("plugin: staging: %w", err)
-		}
-		defer func() { _ = os.RemoveAll(trash) }()
-		if err := os.Rename(link, filepath.Join(trash, "pkg")); err != nil {
-			return InstallResult{}, fmt.Errorf("plugin: install: move the package aside: %w", err)
-		}
-	}
-	if err := linkDir(real, link); err != nil {
+	if err := m.linkOverPackage(name, real, link); err != nil {
 		return InstallResult{}, err
 	}
 	rows, err := loadRows(ctx, m.opts.DB)
@@ -679,6 +665,26 @@ func (m *Manager) installLink(ctx context.Context, dir string, req InstallReques
 	}
 	m.progress(InstallProgress{Ref: req.Ref, Name: name, Version: mf.Version, Phase: InstallDone, Message: "linked " + real})
 	return m.finishLocked(ctx, req, res, name)
+}
+
+// linkOverPackage points link at real; an installed package there (a directory, not a
+// link) is moved aside and removed first. Callers have checked --force.
+func (m *Manager) linkOverPackage(name, real, link string) error {
+	if fi, err := os.Lstat(link); err == nil && fi.Mode()&fs.ModeSymlink == 0 {
+		staging, err := m.stagingRoot()
+		if err != nil {
+			return err
+		}
+		trash, err := os.MkdirTemp(staging, name+"-removed-")
+		if err != nil {
+			return fmt.Errorf("plugin: staging: %w", err)
+		}
+		defer func() { _ = os.RemoveAll(trash) }()
+		if err := os.Rename(link, filepath.Join(trash, "pkg")); err != nil {
+			return fmt.Errorf("plugin: install: move the package aside: %w", err)
+		}
+	}
+	return linkDir(real, link)
 }
 
 // Uninstall disables a plugin, stops it and removes its package (a dev link is removed,
