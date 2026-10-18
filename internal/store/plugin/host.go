@@ -47,8 +47,7 @@ var hostNotifications = map[string]func(a *actor, params json.RawMessage){
 var laterMethods = []string{
 	pluginsdk.MethodViewUpdate, pluginsdk.MethodViewToast, pluginsdk.MethodContextSet,
 	pluginsdk.MethodThreadSetFlag, pluginsdk.MethodEventsSubscribe, pluginsdk.MethodEventsUnsubscribe,
-	pluginsdk.MethodSetEnvironment, pluginsdk.MethodThreadCreate, pluginsdk.MethodThreadSend,
-	pluginsdk.MethodTerminalCreate, pluginsdk.MethodTerminalClose,
+	pluginsdk.MethodSetEnvironment,
 }
 
 func notSupportedYet(method string) error {

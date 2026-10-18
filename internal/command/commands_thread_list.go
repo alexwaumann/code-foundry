@@ -61,6 +61,7 @@ func RegisterThreadList(r *Registry, d ThreadListDeps) error {
 			{Name: "workspace", Type: String, Description: "Only threads of this workspace: its id or name"},
 			{Name: "created-by", Type: String, Description: "Only threads created by this thread (id or suffix); user: by the user"},
 			{Name: "label", Type: String, Description: "Comma-separated labels: only threads carrying all of them"},
+			{Name: "plugin", Type: String, Description: "Only the threads this plugin owns, or * for every plugin's (left out otherwise, except with all)"},
 			{Name: "limit", Type: Int, Default: threadListDefaultLimit, Description: "At most this many threads, the most recently active (0: no limit)"},
 		},
 		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
@@ -71,7 +72,7 @@ func RegisterThreadList(r *Registry, d ThreadListDeps) error {
 				All: a.Bool("all"), IncludeArchived: a.Bool("archived"),
 				Status: threadListStatuses[a.String("status")], State: threadListState(a.String("state")),
 				Project: strings.TrimSpace(a.String("project")), Workspace: strings.TrimSpace(a.String("workspace")),
-				Labels: splitList(a.String("label")), Limit: int32(a.Int("limit")),
+				Labels: splitList(a.String("label")), Limit: int32(a.Int("limit")), Owner: pluginOwner(a.String("plugin")),
 			}
 			by, err := resolveCreatedBy(ctx, d.Thread, a.String("created-by"))
 			if err != nil {
@@ -93,6 +94,19 @@ func RegisterThreadList(r *Registry, d ThreadListDeps) error {
 			return Result{Message: formatThreadList(res.Msg.GetThreads(), projects.Msg.GetProjects(), names, f, time.Now()), JSON: res.Msg}, nil
 		},
 	})
+}
+
+// pluginOwner is ThreadFilter.owner for thread.list's plugin arg: "plugin:<name>",
+// "plugin:" for "*" (every plugin's), "" for none.
+func pluginOwner(name string) string {
+	switch name = strings.TrimSpace(name); name {
+	case "":
+		return ""
+	case "*":
+		return "plugin:"
+	default:
+		return "plugin:" + name
+	}
 }
 
 func threadListState(s string) v1.ThreadState {
@@ -142,6 +156,9 @@ func creatorName(s *v1.Thread, names map[string]string) (name string, exists boo
 // the limit cut the list, or why it is empty. names resolves creators (threadNames).
 func formatThreadList(threads []*v1.Thread, projects []*v1.Project, names map[string]string, f *v1.ThreadFilter, now time.Time) string {
 	if len(threads) == 0 {
+		if f.GetOwner() != "" {
+			return "no threads"
+		}
 		if !f.GetAll() && !f.GetIncludeArchived() {
 			return "no threads (archived threads are left out; --archived includes them)"
 		}
@@ -164,6 +181,9 @@ func formatThreadList(threads []*v1.Thread, projects []*v1.Project, names map[st
 		if s.GetCreatedBy() != "" {
 			name, _ := creatorName(s, names)
 			line += "  ↳ " + name
+		}
+		if o := s.GetOwner(); o != "" {
+			line += "  (" + o + ")"
 		}
 		_, _ = fmt.Fprintln(tw, line)
 	}

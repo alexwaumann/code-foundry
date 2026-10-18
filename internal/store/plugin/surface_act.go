@@ -12,6 +12,7 @@ import (
 	"unicode/utf8"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
+	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/pluginsdk"
 	"github.com/alexwaumann/code-foundry/pluginsdk/ui"
 )
@@ -29,8 +30,8 @@ func init() {
 }
 
 // surfaceCapabilities are announced in initialize: surfaces and the view model's v1 node
-// kinds a GUI renders. thread and terminal nodes are accepted but inert until plugin
-// threads and terminals exist, so they are not announced.
+// kinds a GUI renders (view.node.thread and view.node.terminal come with plugin threads
+// and terminals: threads.go, terminals.go).
 var surfaceCapabilities = []string{
 	"surfaces", "view.v1", "view.append", "context", "invoke.ask",
 	"view.node.text", "view.node.markdown", "view.node.pairs", "view.node.list", "view.node.chips",
@@ -51,6 +52,9 @@ func (a *actor) viewUpdate(_ context.Context, params json.RawMessage) (any, erro
 		return nil, err
 	}
 	v, canon, errs := validateView(p.View, a.name, a.permissions())
+	if len(errs) == 0 {
+		errs = a.ownedNodeProblems(v) // threads.go
+	}
 	if len(errs) > 0 {
 		pl, _ := a.m.Snapshot().Plugin(a.name)
 		in.reject(pl.DisplayName(), errs, pl.Dev)
@@ -337,6 +341,8 @@ func buildIndex(v *ui.View) *actionIndex {
 			buttons(n.Empty.Actions, "")
 		case n.Section != nil:
 			buttons(n.Section.Actions, "")
+		case n.Terminal != nil:
+			buttons(n.Terminal.Actions, "")
 		case n.Form != nil:
 			fields(n.Form.Fields, n.Key)
 			if s := n.Form.Submit; s != nil && s.Action != nil {
@@ -396,7 +402,11 @@ func (m *Manager) Act(ctx context.Context, req ActRequest) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	act := pluginsdk.SurfaceAct{Instance: key, Version: ver, Kind: el.kind, Action: el.actionName(), Key: el.key}
+	viewer := req.Context
+	if viewer == (command.Context{}) && req.Instance == "" {
+		viewer = req.Ref.Context
+	}
+	act := pluginsdk.SurfaceAct{Instance: key, Version: ver, Kind: el.kind, Action: el.actionName(), Key: el.key, Context: UiContextOf(viewer)}
 	switch el.kind {
 	case pluginsdk.ActClick, pluginsdk.ActSubmit, pluginsdk.ActChange:
 		act.Data = el.action.Data

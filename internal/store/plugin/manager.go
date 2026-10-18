@@ -77,6 +77,10 @@ type Options struct {
 	// Flags keeps the plugins' flags on threads (thread/setFlag; flags.go); nil refuses
 	// thread/setFlag. The daemon passes the thread store.
 	Flags ThreadFlags
+	// Threads and Terminals keep the plugins' own threads and terminals (threads.go,
+	// terminals.go); nil refuses thread/* and terminal/*. The daemon adapts its stores.
+	Threads   OwnedThreads
+	Terminals OwnedTerminals
 	// Events is the daemon's event stream for events/subscribe (events.go); nil refuses
 	// it. SetEvents sets it later (the API's handler needs the store first).
 	Events EventFeed
