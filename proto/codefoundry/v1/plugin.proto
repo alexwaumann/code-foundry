@@ -201,6 +201,10 @@ message ListPluginsRequest {
 
 message ListPluginsResponse {
   repeated Plugin plugins = 1;
+  // Where the packages are (paths.Plugins: <home>/plugins) and the parent of each plugin's
+  // data dir (paths.PluginData: <data_dir>/<name>), for words that name them.
+  string plugins_dir = 2;
+  string data_dir = 3;
 }
 
 message EnablePluginRequest {

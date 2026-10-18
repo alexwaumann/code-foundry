@@ -162,7 +162,7 @@ func Run(ctx context.Context, opts Options) error {
 		return err
 	}
 	defer func() { _ = plugins.Close() }()
-	pluginAPI := api.NewPlugin(plugins, events).WithSurfaces(plugins)
+	pluginAPI := api.NewPlugin(plugins, events).WithSurfaces(plugins).WithDirs(p.Plugins(), p.PluginData())
 	// Every claude spawn gets the plugins' session environments (plugin_hooks.go).
 	st.thread.SetSpawnExtras(pluginSpawnExtras(plugins))
 	eventsAPI := api.NewEvents(api.EventsDeps{Bus: events, Project: st.project, Terminal: st.terminal, Thread: st.thread, Gh: st.gh, GitOps: st.gitops, Settings: st.settings, Update: st.update, Workspace: st.workspace, Action: st.action, Plugin: plugins, Done: ctx.Done(), Clients: clients})
