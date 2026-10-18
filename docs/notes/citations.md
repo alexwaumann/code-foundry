@@ -25,14 +25,18 @@ with one change: a multi-line comment field with Cancel and Save at the bottom r
 * **Citable**: the thread's own assistant text items (`TextRow` with an empty
   `parentToolUseId`, in the thread timeline, not the subagent view). Both ends of the
   selection must be inside the same answer (`citableItem`); a selection that runs into a
-  tool row, a bubble, another answer or the header shows no button. Intermediate text
-  between tool calls counts as an answer too (it is Claude's prose). A subagent's text
-  does not.
+  tool row, a bubble, another answer or the header shows no button. The exception: an end
+  past the answer with no selectable text selected there (`clampToRoot`; a triple-click
+  ends at the start of the next block, which can be the next answer, past tool rows whose
+  text is `user-select: none`) cites the part in the answer. Intermediate text between
+  tool calls counts as an answer too (it is Claude's prose). A subagent's text does not.
 * **Plain text**: an answer's text nodes in order with one newline between blocks
   (`plainText`): no button text (Copy, Run), no whitespace-only nodes between blocks.
   The quote is that text between the selection's ends, trimmed; offsets, prefix and
-  suffix (32 characters each) are into it. The quote is therefore exactly what was
-  rendered: inline code without backticks, paragraphs on their own lines.
+  suffix (32 characters each, one fewer where the 32nd would split an emoji's surrogate
+  pair: a lone surrogate does not percent-encode) are into it. The quote is therefore
+  exactly what was rendered: inline code without backticks, paragraphs on their own
+  lines (table cells too, one per line).
 * **Re-anchoring** (`locateQuote`): the offsets when the text there is still the quote
   and the prefix and suffix agree; else every occurrence of the quote, scored by how much
   of the prefix and suffix agree, ties to the one nearest the old offsets; whitespace is
@@ -60,10 +64,14 @@ with one change: a multi-line comment field with Cancel and Save at the bottom r
   lives (undo brings a deleted chip back with its body), gone with the draft. Label: the
   first 4 words of the quote, at most 24 characters: cut at the last word boundary within
   them when that keeps at least 12, else mid-word; an ellipsis when anything was cut
-  (`The fingerprint then…`; review: the first cut was mid-word, `The fingerprint then mat…`). Tooltip: the quote, then the comment muted. Not
-  project-scoped (member changes keep it). A token whose body no draft has (copied from a
-  composer that has sent it) is dashed and left out of the message; a token copied to
-  another composer while its draft lives finds its body there (`findCitation`).
+  (`The fingerprint then…`; review: the first cut was mid-word, `The fingerprint then
+  mat…`). Tooltip: the quote, then the comment muted. Not project-scoped (member changes
+  keep it). A token whose body no draft has (copied from a composer that has sent it) is
+  dashed, labelled "Quote" and left out of the message; a draft with nothing else does
+  not send ("Nothing to send: the quote is no longer in any draft.", `NOTHING_TO_SEND`),
+  rather than an empty message or a thread with no prompt. A token copied to another
+  composer while its draft lives finds its body there (`findCitation`). Drafts live in
+  memory only, so a reload loses the draft, text and citations alike.
 * **Insertion**: at the prompt's caret (its end when it was never focused), a space
   before unless whitespace is there, one after; the prompt takes the keyboard after it.
 * **Editing**: a click on a composer chip scrolls to its quote (unfolding its turn when
@@ -85,7 +93,10 @@ with one change: a multi-line comment field with Cancel and Save at the bottom r
   A link that does not decode stays text. Its popover: the quote muted behind a 2px rule
   (4 lines, then it scrolls), the comment, "Claude · 05:47 AM" (the answer's time), and
   Go to source (scroll there, flash the quote for 1.6 s). Disabled with "No longer in this
-  thread" when the item is not in this thread's items.
+  thread" when the item is not in this thread's items. The cite layer takes the request
+  (`takeFlash`), so it is not replayed when the thread is shown again. A link typed or
+  pasted by hand draws a chip too: the bubble cannot tell it from a projected one, and it
+  is a valid citation (the e2e relies on it).
 
 ## Gotchas
 
@@ -105,7 +116,9 @@ with one change: a multi-line comment field with Cancel and Save at the bottom r
   list when a drag runs near its edge: the e2e clears the selection first and centres the
   row before selecting.
 * `Range.toString()` includes the whitespace nodes between blocks that the plain text
-  skips; nothing reads it for offsets.
+  skips, and the text of `user-select: none` rows (tool rows) that `Selection.toString()`
+  leaves out; nothing reads it for offsets, and `clampToRoot` checks selectability per
+  text node instead.
 * WebKit can draw macOS Writing Tools' badge at the left of a fresh selection in the
   Wails window; it is the system's, not ours.
 * Running a second Playwright run while the full suite ran cleaned its shared
@@ -162,3 +175,41 @@ clicks and drags.
   timeline (`projects.spec.ts:349`, `settings.spec.ts:293` and `:507`,
   `threads.spec.ts:242`, `usage-page.spec.ts:36`, `worktree-panel.spec.ts:112`; two of
   them the `test-results` clobber above). Re-run alone in both browsers: 12/12 passed.
+
+## Review (2026-10-18)
+
+An independent review of the branch. Fixed, each with a test:
+
+* The chip label cut mid-word at 24 characters (Alex's change): now at the last word
+  boundary within 24 when that keeps at least 12 (`citeLabel` table).
+* A prefix or suffix whose 32-unit edge fell inside an emoji held a lone surrogate, and
+  `encodeURIComponent` threw on send (`URIError`), so the message did not go. The context
+  stops short of the pair; `encode` also maps any lone surrogate to U+FFFD (`quoteAt`
+  test, link round trip).
+* Go to source was kept in the store, so showing the thread again replayed it: a scroll
+  to the old quote and a flash (reproduced in WebKit and Chromium). The layer takes the
+  request; the run is cancelled by the next one or the unmount (e2e).
+* A triple-click on an intermediate answer's paragraph in WebKit ends at the next
+  answer's first paragraph, offset 0, past the tool rows: no Cite button. `clampToRoot`
+  (unit table, e2e).
+* A draft of only an orphan token projected to "" and sent it: the daemon answered
+  `missing required argument "text"` (thread.new would have made a thread with no
+  prompt). Now the composer's error says so and nothing is sent (e2e).
+* A pending chip edit (its quote still being found) survived the layer's unmount and
+  reopened on return; the unmount ends any edit of this draft. The mouseup's deferred
+  check is cleared on unmount.
+* The held paint was repainted only when the root or its text node count changed; it now
+  compares the span's range, so replaced text nodes repaint.
+* The composer chip's tooltip switched between controlled and uncontrolled (a React
+  warning in every e2e run); it is controlled throughout.
+
+Checked and left: the link round trip with `)`, `(`, `%`, `&`, `#`, `=`, `?`, newlines,
+emoji and ids with `/` (all percent-encoded; the link has no whitespace or parentheses);
+the draft token regex does not take a sent link (`/` in the id); several citations next
+to other tags (`userMessage` tests); a streaming answer while the comment field is open
+(the held range follows the delta and the turn's end); a selection from a list item into
+a code block (one answer: cited, the Copy/Run buttons left out); a selection into a bubble
+or across two answers (no button); the subagent view (no layer mounted: it replaces the
+thread body) and PR panel markdown (no `data-cite-item`); Claude echoing a `cf-cite://`
+link (the sanitizer drops the scheme, the text stays); thread switches (the layer is
+keyed by thread, listeners and frames go with it, paints are cleared).
