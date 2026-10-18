@@ -1,0 +1,46 @@
+{
+  "name": "hello",
+  "displayName": "Hello",
+  "version": "0.1.0",
+  "description": "The example plugin: greets, sends a message to a thread through the host, and keeps a word in the Keychain.",
+  "protocol": 1,
+  "exec": ["bin/hello"],
+  "permissions": {
+    "commands": ["thread.send"],
+    "secrets": true
+  },
+  "commands": [
+    {
+      "name": "greet",
+      "title": "Say Hello",
+      "description": "Answer with a greeting.",
+      "args": [{ "name": "name", "positional": true, "description": "Who to greet", "default": "world" }]
+    },
+    {
+      "name": "send",
+      "title": "Send Hello to Thread",
+      "description": "Send a message to a thread through Code Foundry (thread.send).",
+      "args": [
+        { "name": "text", "positional": true, "description": "The message", "default": "Hello from the hello plugin." },
+        { "name": "thread", "context": "thread", "description": "The thread (default: the active one, or --context-thread)" }
+      ]
+    },
+    {
+      "name": "remember",
+      "title": "Remember a Word",
+      "description": "Keep a word in the Keychain, in the plugin's own namespace.",
+      "args": [{ "name": "word", "required": true, "positional": true, "description": "The word" }]
+    },
+    {
+      "name": "recall",
+      "title": "Recall the Word",
+      "description": "Say the remembered word."
+    },
+    {
+      "name": "forget",
+      "title": "Forget the Word",
+      "description": "Remove the remembered word from the Keychain.",
+      "confirm": "Forget the remembered word?"
+    }
+  ]
+}
