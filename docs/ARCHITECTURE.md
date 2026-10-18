@@ -529,7 +529,8 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   `thread.agent.up`; `docs/notes/subagent-view.md`) and Threads (the thread's lineage from the thread list:
   the thread whose agent created it, its siblings and the threads created from it; opened
   by H, `view.panel.threads` and the header's "from …" chip;
-  `docs/notes/agents-3-lineage-gui.md`). Every
+  `docs/notes/agents-3-lineage-gui.md`; the creator resolved by its id under its current
+  name, `docs/notes/lineage-by-id.md`). Every
   palette command is reachable without the mouse, and common ones also have buttons that
   invoke the same registry command. Chords are listed only in the palette and the
   Keyboard Shortcuts overlay (`docs/notes/phase3-ui-buttons.md`), plus the hint on the
