@@ -67,7 +67,7 @@ func (a *actor) terminalCreate(ctx context.Context, params json.RawMessage) (any
 	const method = pluginsdk.MethodTerminalCreate
 	terms := a.m.opts.Terminals
 	if terms == nil {
-		return nil, notSupportedYet(method)
+		return nil, notServed(method)
 	}
 	p, err := decodeParams[pluginsdk.TerminalCreateParams](method, params)
 	if err != nil {
@@ -123,7 +123,7 @@ func (a *actor) terminalClose(ctx context.Context, params json.RawMessage) (any,
 	const method = pluginsdk.MethodTerminalClose
 	terms := a.m.opts.Terminals
 	if terms == nil {
-		return nil, notSupportedYet(method)
+		return nil, notServed(method)
 	}
 	p, err := decodeParams[pluginsdk.TerminalRef](method, params)
 	if err != nil {
@@ -145,7 +145,7 @@ func (a *actor) terminalClose(ctx context.Context, params json.RawMessage) (any,
 // terminalList serves terminal/list.
 func (a *actor) terminalList(context.Context, json.RawMessage) (any, error) {
 	if a.m.opts.Terminals == nil {
-		return nil, notSupportedYet(pluginsdk.MethodTerminalList)
+		return nil, notServed(pluginsdk.MethodTerminalList)
 	}
 	list := a.m.opts.Terminals.Owned(a.name)
 	if list == nil {

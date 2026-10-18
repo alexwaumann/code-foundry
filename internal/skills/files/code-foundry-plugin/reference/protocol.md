@@ -100,14 +100,14 @@ first view first. An error from the factory or from `Act` is shown to the user
 | `terminal/close` / `list` | request | `{terminalId}`; `{}` → `{terminals: [PluginTerminal]}` | `CloseTerminal`, `Terminals` | `terminals` |
 
 What each does and its limits: `reference/host-api.md`. A method this host does not
-support answers -32601 ("not supported yet by this Code Foundry").
+serve answers -32601.
 
 ## Errors
 
 | Code | `pluginsdk` constant | Meaning |
 |---|---|---|
 | -32700, -32600 | `CodeParseError`, `CodeInvalidRequest` | malformed line or message |
-| -32601 | `CodeMethodNotFound` | unknown or not yet supported method |
+| -32601 | `CodeMethodNotFound` | unknown method, or one this host does not serve |
 | -32602 | `CodeInvalidParams` | bad params; a refused view (the message names each problem); from a command: a usage error (CLI exit 2) |
 | -32603 | `CodeInternal` | any other error, a panic |
 | -32001 | `CodePermissionDenied` | the grant does not cover the call |

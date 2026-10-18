@@ -12,7 +12,7 @@
 // down: invoking one then fails saying why. The plugin reaches the host through the
 // methods in host.go: host/invoke (the manifest's permissions.commands globs; it never
 // confirms on the user's behalf), log, and secret/* (the Keychain, namespaced per
-// plugin). Methods of later protocol steps answer "not supported yet".
+// plugin). An unknown method answers -32601.
 //
 // Surfaces (surface.go, surface_act.go): instances opened for their watchers, views the
 // daemon validates, versions and coalesces, log appends, and actions forwarded to the

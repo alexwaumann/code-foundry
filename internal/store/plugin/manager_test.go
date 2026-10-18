@@ -258,7 +258,8 @@ func TestEnableConsentCommandsAndHost(t *testing.T) {
 	}
 
 	logs := e.logText("hello")
-	for _, want := range []string{"log info started data=true", "stderr  stray stdout line", "host  host/invoke thread.send",
+	for _, want := range []string{"log info started data=true", "stderr  stray stdout line", "host debug host/invoke thread.send",
+		"host  host/invoke thread.archive failed: Archive it?",
 		"host  refused view/update: no open surface instance", "host  secret set: word"} {
 		if !strings.Contains(logs, want) {
 			t.Errorf("log lacks %q:\n%s", want, logs)
