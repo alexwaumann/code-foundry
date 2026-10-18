@@ -1,7 +1,7 @@
 // Package paths resolves the on-disk locations code-foundry uses: the config home,
 // the daemon's socket, token, port and lock files, the SQLite database, logs, the
-// worktrees New Worktree creates, cloned and created projects, and staged prompt
-// attachments.
+// worktrees New Worktree creates, cloned and created projects, staged prompt
+// attachments, and the skills shipped to threads.
 //
 // The home directory is, in order of precedence:
 //
@@ -122,6 +122,12 @@ func (p Paths) Projects() string { return filepath.Join(p.home, "projects") }
 // (ThreadService.StageAttachment). The thread store creates it on demand and
 // reaps files older than thread.AttachmentMaxAge.
 func (p Paths) Attachments() string { return filepath.Join(p.home, "attachments") }
+
+// Claude is the directory every thread's claude gets as its first --add-dir: the daemon
+// writes the skills it ships to threads under .claude/skills in it at every start,
+// with a VERSION file (internal/skills). Wholly the daemon's: anything else in it is
+// removed.
+func (p Paths) Claude() string { return filepath.Join(p.home, "claude") }
 
 // WindowBackground is the GUI host's own state: the window colour of each scheme, so the
 // window opens in the last theme's colour before the page (and the daemon's settings)

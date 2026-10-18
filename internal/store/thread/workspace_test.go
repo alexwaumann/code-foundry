@@ -307,19 +307,19 @@ func addDirs(argv []string) []string {
 }
 
 // A workspace thread's every spawn reads the current members: create, reconnect and
-// fork. The attachments dir stays first; the daemon env is kept.
+// fork. The skills dir comes first, then the attachments dir; the daemon env is kept.
 func TestWorkspaceThreadSpawn(t *testing.T) {
-	att := filepath.Join(t.TempDir(), "attachments")
+	skills, att := filepath.Join(t.TempDir(), "claude"), filepath.Join(t.TempDir(), "attachments")
 	base := []string{"CODE_FOUNDRY_ENDPOINT=http://127.0.0.1:1", "CODE_FOUNDRY_TOKEN=t"}
-	e := newWSEnv(t, func(o *Options) { o.AttachmentsDir, o.Env = att, append(o.Env, base...) })
-	line := "This thread runs inside code-foundry. Run `code-foundry guide` to see how to create, wait on, read and wake other threads from the CLI. " +
+	e := newWSEnv(t, func(o *Options) { o.SkillsDir, o.AttachmentsDir, o.Env = skills, att, append(o.Env, base...) })
+	line := ThreadPrompt + " " +
 		"This thread belongs to workspace login. Run `code-foundry workspace members` for the current worktrees."
 	wantEnv := append(slices.Clone(base), "CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1")
 	check := func(what string, s Thread, wantDirs ...string) {
 		t.Helper()
 		spec := e.spec(s.ID)
-		if got := addDirs(spec.Argv); !slices.Equal(got, append([]string{att}, wantDirs...)) {
-			t.Errorf("%s: --add-dir = %q, want %q", what, got, append([]string{att}, wantDirs...))
+		if want := append([]string{skills, att}, wantDirs...); !slices.Equal(addDirs(spec.Argv), want) {
+			t.Errorf("%s: --add-dir = %q, want %q", what, addDirs(spec.Argv), want)
 		}
 		if got := argOf(spec.Argv, "--append-system-prompt"); got != line {
 			t.Errorf("%s: --append-system-prompt = %q", what, got)
@@ -360,7 +360,7 @@ func TestWorkspaceThreadSpawn(t *testing.T) {
 	// A project thread gets none of it but the code-foundry line.
 	p := e.connected(CreateOptions{})
 	spec := e.spec(p.ID)
-	if got := addDirs(spec.Argv); !slices.Equal(got, []string{att}) || argOf(spec.Argv, "--append-system-prompt") != ThreadPrompt ||
+	if got := addDirs(spec.Argv); !slices.Equal(got, []string{skills, att}) || argOf(spec.Argv, "--append-system-prompt") != ThreadPrompt ||
 		!hasAll(spec.Env, base) || slices.Contains(spec.Env, "CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1") {
 		t.Errorf("project thread argv = %q env = %q", spec.Argv, spec.Env)
 	}

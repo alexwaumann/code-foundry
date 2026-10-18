@@ -13,6 +13,7 @@ import (
 	"connectrpc.com/connect"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
+	"github.com/alexwaumann/code-foundry/internal/guide"
 	"github.com/alexwaumann/code-foundry/internal/paths"
 )
 
@@ -336,7 +337,7 @@ func printCommandHelp(w io.Writer, cmd *v1.Command) {
 	if len(cmd.GetArgs()) > 0 {
 		fmt.Fprintln(tw, "\nFlags:")
 		for _, a := range cmd.GetArgs() {
-			fmt.Fprintf(tw, "  --%s %s\t%s\n", a.GetName(), argPlaceholder(a), argDetail(a))
+			fmt.Fprintf(tw, "  --%s %s\t%s\n", a.GetName(), guide.ArgPlaceholder(a), guide.ArgDetail(a))
 		}
 	}
 	fmt.Fprintln(tw, "\nCommon flags:")
@@ -353,30 +354,4 @@ func printCommandHelp(w io.Writer, cmd *v1.Command) {
 	if kb := cmd.GetKeybindings(); len(kb) > 0 {
 		fmt.Fprintf(w, "\nKeybindings: %s\n", strings.Join(kb, ", "))
 	}
-}
-
-func argPlaceholder(a *v1.ArgSpec) string {
-	switch a.GetType() {
-	case v1.ArgType_ARG_TYPE_BOOL:
-		return ""
-	case v1.ArgType_ARG_TYPE_ENUM:
-		return strings.Join(a.GetEnumValues(), "|")
-	case v1.ArgType_ARG_TYPE_INT:
-		return "n"
-	case v1.ArgType_ARG_TYPE_PATH:
-		return "path"
-	default:
-		return "string"
-	}
-}
-
-func argDetail(a *v1.ArgSpec) string {
-	d := a.GetDescription()
-	if a.GetRequired() {
-		d += " (required)"
-	}
-	if def := a.GetDefaultValue(); def != "" {
-		d += fmt.Sprintf(" (default %q)", def)
-	}
-	return d
 }

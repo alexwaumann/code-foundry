@@ -33,10 +33,12 @@ func workspacePrompt(name string) string {
 	return "This thread belongs to workspace " + name + ". Run `code-foundry workspace members` for the current worktrees."
 }
 
-// ThreadPrompt is the one line every thread's system prompt gets
-// (docs/notes/agents-5-cli.md): the CLI guide is where an agent learns to drive other
-// threads. Static for the same reason as workspacePrompt: it never varies per spawn.
-const ThreadPrompt = "This thread runs inside code-foundry. Run `code-foundry guide` to see how to create, wait on, read and wake other threads from the CLI."
+// ThreadPrompt is the one line every thread's system prompt gets: it points at the
+// skills the daemon ships to every thread (Options.SkillsDir, internal/skills), which
+// say how to drive other threads and answer questions about the app
+// (docs/notes/agent-skills.md). Static for the same reason as workspacePrompt: it never
+// varies per spawn.
+const ThreadPrompt = "This thread runs inside code-foundry. Its skills (code-foundry-orchestrate, code-foundry-help) say how to delegate work to other threads and how to answer questions about the app."
 
 // systemPrompt is --append-system-prompt: ThreadPrompt, then the workspace's line
 // (workspacePrompt) for a workspace thread.

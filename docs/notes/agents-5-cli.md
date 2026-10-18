@@ -8,6 +8,10 @@ pages a conversation, `thread send --wait` waits for the turn it starts, events 
 daemon epoch, and `code-foundry guide` (which every thread's system prompt points at)
 tells an agent all of it. Daemon, proto and CLI; no GUI change.
 
+Since [agent-skills](agent-skills.md) the system prompt line points at the two skills the
+daemon ships to every thread (code-foundry-orchestrate, code-foundry-help) instead of
+`code-foundry guide`, and the guide's rendering lives in `internal/guide`.
+
 ## Decisions
 
 Agreed with Alex (the brief):
@@ -110,7 +114,8 @@ Decided while building (not in the brief; flagged for review):
   thread when `$CODE_FOUNDRY_THREAD` is set. **It must stay under 29,000 bytes** (a
   test): the first version was 37 KB, and Claude's Bash tool set it aside in a file, so
   the e2e agent grepped it instead of reading it. Now 27.6 KB, 274 lines.
-* `ThreadPrompt` comes first, the workspace line after it (`systemPrompt`).
+* `ThreadPrompt` comes first, the workspace line after it (`systemPrompt`). Its text
+  changed in agent-skills.md.
 * Id help reads "Thread id (or a unique suffix of 4+ characters)".
 
 ## What was built

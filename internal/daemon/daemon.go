@@ -194,9 +194,11 @@ func Run(ctx context.Context, opts Options) error {
 		return fmt.Errorf("register commands: %w", err)
 	}
 	applySettings(st.settings, commands, logLevel, opts.Dev)
+	commandAPI := api.NewCommand(commands)
+	installSkills(ctx, log.With("component", "skills"), p.Claude(), opts.Version.Version, commandAPI, settingsAPI, st.settings)
 	routes := []api.Route{
 		api.NewHealth(started, opts.Version).Route(),
-		api.NewCommand(commands).Route(),
+		commandAPI.Route(),
 		api.NewUI(events).Route(),
 		terminalAPI.Route(),
 		threadAPI.Route(),
