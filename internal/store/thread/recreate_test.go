@@ -84,7 +84,7 @@ func TestSendRecreatesRemovedWorktree(t *testing.T) {
 		{name: "on origin after a fetch", onFetch: []string{"refs/remotes/origin/<b>"}, wantFetch: true,
 			wantNote: "recreated from branch <b>."},
 		{name: "branch gone: from the recorded base", base: "origin/release", wantFetch: true, wantBase: "origin/release",
-			wantNote: "branch <b> no longer existed, so both were recreated from origin/release. Commits made on the branch earlier are not on it"},
+			wantNote: "branch <b> no longer existed, so both were recreated from origin/release. Commits made on the branch earlier are on it only if they reached origin/release"},
 		{name: "branch gone, no recorded base: the default", wantFetch: true,
 			prepare: func(e *env, _ *recreatingEnv, s Thread) {
 				e.m.update(s.ID, true, func(r *record) { r.s.BaseRef = "" })

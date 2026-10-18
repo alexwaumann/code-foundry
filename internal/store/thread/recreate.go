@@ -43,7 +43,8 @@ func (rw recreatedWorktree) note() string {
 			". Untracked and ignored files from before (build output, installed dependencies, local config) are gone."
 	}
 	return "The worktree was removed and branch " + rw.branch + " no longer existed, so both were recreated from " + rw.base +
-		". Commits made on the branch earlier are not on it, and untracked and ignored files from before are gone."
+		". Commits made on the branch earlier are on it only if they reached " + rw.base +
+		" (a merged branch's have), and untracked and ignored files from before are gone."
 }
 
 // recreatable reports whether s's missing cwd may be made again (see above).
