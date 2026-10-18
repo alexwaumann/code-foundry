@@ -54,7 +54,8 @@ func RegisterPluginRegistry(r *Registry, b PluginRegistryBackend) error {
 			Name:  "plugin.install",
 			Title: "Install Plugin",
 			Description: "Install a plugin: <name>[@<version>] from the registries, <owner>/<repo>[@vX.Y.Z] from a GitHub " +
-				"release (the tarball <name>-<version>-darwin-<arch>.tar.gz, checked against the release's checksums.txt), " +
+				"release (the tarball <name>-<version>-darwin-<arch>.tar.gz, checked against the release's checksums file: " +
+				"checksums.txt, SHA256SUMS, sha256sums.txt, <name>-<version>-checksums.txt or <tarball>.sha256), " +
 				"or an absolute folder, linked like plugin dev. It downloads, checks the SHA-256 and installs into " +
 				"~/.code-foundry/plugins/<name>, replacing an older version (its data stays). It stays disabled until you " +
 				"enable it (plugin enable lists its permissions); --enable --yes enables it at once.",

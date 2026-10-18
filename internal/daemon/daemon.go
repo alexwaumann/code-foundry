@@ -230,6 +230,7 @@ func Run(ctx context.Context, opts Options) error {
 	applyPluginRegistries(st.settings, plugins)
 	defer startPluginUpdateChecks(ctx, log.With("component", "plugins"), events, st.update, plugins)()
 	defer startPluginContexts(ctx, events, plugins)()
+	defer startPluginTerminalExits(ctx, log.With("component", "plugins"), st.terminal, plugins)()
 	commandAPI := api.NewCommand(commands)
 	installSkills(ctx, log.With("component", "skills"), p.Claude(), opts.Version, commandAPI, settingsAPI, st.settings)
 	routes := []api.Route{

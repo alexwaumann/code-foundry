@@ -40,6 +40,9 @@ type OwnedTerminals interface {
 	Owner(id string) (plugin string, ok bool)
 	// Owned lists plugin's terminals.
 	Owned(plugin string) []pluginsdk.PluginTerminal
+	// Text is a terminal's screen as plain text (its rows, not the scrollback), one line
+	// per row, trailing spaces trimmed.
+	Text(ctx context.Context, id string) (string, error)
 }
 
 // Limits of plugin terminals.
@@ -47,6 +50,9 @@ const (
 	maxPluginTerminals = 16
 	maxTerminalArgv    = 64 << 10
 	maxTerminalTitle   = 80
+	// terminal/read's text: by default, and at most.
+	defaultTerminalRead = 64 << 10
+	maxTerminalRead     = 256 << 10
 )
 
 func terminalsGranted(p pluginsdk.Permissions) bool { return p.Terminals }
@@ -56,10 +62,11 @@ func init() {
 		pluginsdk.MethodTerminalCreate: (*actor).terminalCreate,
 		pluginsdk.MethodTerminalClose:  (*actor).terminalClose,
 		pluginsdk.MethodTerminalList:   (*actor).terminalList,
+		pluginsdk.MethodTerminalRead:   (*actor).terminalRead,
 	} {
 		hostMethods[method] = hostMethod{perm: terminalsGranted, permName: "terminals", handle: fn}
 	}
-	hostCapabilities = append(hostCapabilities, "terminals", "view.node.terminal")
+	hostCapabilities = append(hostCapabilities, "terminals", "view.node.terminal", "terminal.read", "terminal.exited")
 }
 
 // terminalCreate serves terminal/create.
@@ -152,6 +159,71 @@ func (a *actor) terminalList(context.Context, json.RawMessage) (any, error) {
 		list = []pluginsdk.PluginTerminal{}
 	}
 	return pluginsdk.TerminalListResult{Terminals: list}, nil
+}
+
+// terminalRead serves terminal/read: the screen's plain text, its end when longer than
+// maxBytes (cut at a line start).
+func (a *actor) terminalRead(ctx context.Context, params json.RawMessage) (any, error) {
+	const method = pluginsdk.MethodTerminalRead
+	terms := a.m.opts.Terminals
+	if terms == nil {
+		return nil, notServed(method)
+	}
+	p, err := decodeParams[pluginsdk.TerminalReadParams](method, params)
+	if err != nil {
+		return nil, err
+	}
+	if owner, ok := terms.Owner(p.TerminalID); !ok || owner != a.name {
+		return nil, pluginsdk.NewError(pluginsdk.CodeNotFound, "%s: terminal %s is not one of plugin %s's terminals", method, p.TerminalID, a.name)
+	}
+	limit := p.MaxBytes
+	switch {
+	case limit <= 0:
+		limit = defaultTerminalRead
+	case limit > maxTerminalRead:
+		limit = maxTerminalRead
+	}
+	text, err := terms.Text(ctx, p.TerminalID)
+	if err != nil {
+		return nil, ownedError(method, err)
+	}
+	text, cut := tailText(text, limit)
+	return pluginsdk.TerminalReadResult{Text: text, Truncated: cut}, nil
+}
+
+// tailText is the last limit bytes of s, from a line start when one is in them (else
+// from a rune start), and whether it cut.
+func tailText(s string, limit int) (string, bool) {
+	if len(s) <= limit {
+		return s, false
+	}
+	t := s[len(s)-limit:]
+	if i := strings.IndexByte(t, '\n'); i >= 0 && i+1 < len(t) {
+		return t[i+1:], true
+	}
+	for len(t) > 0 && !utf8RuneStart(t[0]) {
+		t = t[1:]
+	}
+	return t, true
+}
+
+// TerminalExited tells the plugin owning terminal id that its process exited
+// (terminal/exited); the daemon calls it from the terminal store's events. Nothing for a
+// terminal no plugin owns, or a plugin not running.
+func (m *Manager) TerminalExited(id string, exitCode int) {
+	if m.opts.Terminals == nil {
+		return
+	}
+	owner, ok := m.opts.Terminals.Owner(id)
+	if !ok || owner == "" {
+		return
+	}
+	conn := m.conn(owner)
+	if conn == nil {
+		return
+	}
+	_ = conn.Notify(pluginsdk.MethodTerminalExited, pluginsdk.TerminalExited{TerminalID: id, ExitCode: exitCode})
+	m.surfLog(owner, "terminal %s exited (%d)", id, exitCode)
 }
 
 // Terminals returns plugin name's terminals (the CLI's plugin terminals).

@@ -71,6 +71,7 @@ listed and fail with the reason; its surfaces say so.
 | `surface/close` | notification | `{instance, reason}`: `idle` (no viewer for 10 minutes), `context_gone` (thread archived or removed, project removed), `unavailable` (the `when` stopped holding) | `Surface.Close(reason)`; the SDK adds `shutdown` and `reopened` |
 | `surface/act` | request (10 s) | `SurfaceAct{instance, context, version, kind, action, key, data, field, value, values}` → `{}` | `Surface.Act` |
 | `events/event` | notification | `Event{subscription, snapshot, event}` | `Plugin.OnEvent` |
+| `terminal/exited` | notification | `{terminalId, exitCode}`: one of its terminals' process exited | `Plugin.OnTerminalExit` |
 | `secret/changed` | notification | `{key, deleted: true}`: the user deleted one of its secrets | `Plugin.OnSecretChanged` |
 
 After `surface/open` the plugin sends the instance's view with `view/update` within 10 s
@@ -99,6 +100,7 @@ first view first. An error from the factory or from `Act` is shown to the user
 | `thread/send` / `archive` / `list` | request | `{threadId, text}`; `{threadId}`; `{}` → `{threads: [PluginThread]}` | `SendThread`, `ArchiveThread`, `Threads` | `threads` |
 | `terminal/create` | request | `{argv, cwd, env, title}` → `{terminalId}` | `CreateTerminal` | `terminals` |
 | `terminal/close` / `list` | request | `{terminalId}`; `{}` → `{terminals: [PluginTerminal]}` | `CloseTerminal`, `Terminals` | `terminals` |
+| `terminal/read` | request | `{terminalId, maxBytes}` → `{text, truncated}`: its screen as plain text | `ReadTerminal` | `terminals` |
 
 What each does and its limits: `reference/host-api.md`. A method this host does not
 serve answers -32601.

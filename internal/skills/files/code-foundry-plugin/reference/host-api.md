@@ -302,4 +302,15 @@ request, in the bottom panel; `CloseTerminal` and `Terminals` as for threads, an
 terminal stays until closed. At most 32 live threads and 16 terminals. Disabling or
 uninstalling the plugin archives its threads and closes its terminals; terminals end with
 the daemon, threads do not (find them again with `Threads` in Init). plugintest keeps both
-in memory (`CreatedThreads`, `ThreadSends`, `PluginTerminals`, `ExitTerminal`).
+in memory (`CreatedThreads`, `ThreadSends`, `PluginTerminals`, `ExitTerminal`,
+`SetTerminalText`).
+
+A terminal's output is readable: `h.ReadTerminal(ctx, id, maxBytes)` returns the text on
+its screen, plain (no escape sequences), one line per row with trailing spaces trimmed:
+the rows the terminal shows (24 by default, more when a viewer made it taller), not the
+scrollback above them, and at most `maxBytes` of it (0: 64 KiB, at most 256 KiB; its end,
+from a line start, with `Truncated`). When its process exits the plugin gets
+`terminal/exited` `{terminalId, exitCode}` (`Plugin.OnTerminalExit`; 128+n when signal n
+killed it), once; read the screen then rather than polling `Terminals`. For a run whose
+whole output matters, have the command also write it to a file under `h.DataDir()`
+(`Argv: []string{"sh", "-c", "go test ./... 2>&1 | tee " + logPath}`) and read that file on exit.

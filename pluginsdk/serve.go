@@ -43,6 +43,9 @@ type Plugin struct {
 	Surfaces map[string]SurfaceFactory
 	// OnEvent receives subscribed events in order.
 	OnEvent func(ctx context.Context, h *Host, ev Event)
+	// OnTerminalExit learns that the process of one of its terminals exited (terminal/
+	// exited): read what it printed with Host.ReadTerminal, close it when done.
+	OnTerminalExit func(ctx context.Context, h *Host, ex TerminalExited)
 	// OnSecretChanged learns that the user deleted one of its secrets (`plugin secrets
 	// delete`, Settings): drop what was read from it and ask again (a form, a notice).
 	OnSecretChanged func(ctx context.Context, h *Host, c SecretChanged)
@@ -194,6 +197,11 @@ func (s *server) notify(ctx context.Context, method string, params json.RawMessa
 		var ev Event
 		if json.Unmarshal(params, &ev) == nil {
 			s.p.OnEvent(ctx, s.h, ev)
+		}
+	case MethodTerminalExited:
+		var ex TerminalExited
+		if s.p.OnTerminalExit != nil && json.Unmarshal(params, &ex) == nil {
+			s.p.OnTerminalExit(ctx, s.h, ex)
 		}
 	case MethodSecretChanged:
 		var c SecretChanged

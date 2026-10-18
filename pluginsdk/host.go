@@ -224,6 +224,15 @@ func (h *Host) CloseTerminal(ctx context.Context, terminalID string) error {
 	return h.conn.Call(ctx, MethodTerminalClose, TerminalRef{TerminalID: terminalID}, nil)
 }
 
+// ReadTerminal returns the plain text on one of the plugin's terminals' screen (its rows,
+// not the scrollback): at most maxBytes (0: 64 KiB), the end of it when longer. Read it
+// when Plugin.OnTerminalExit says the run ended, or while it runs to show progress.
+func (h *Host) ReadTerminal(ctx context.Context, terminalID string, maxBytes int) (TerminalReadResult, error) {
+	var res TerminalReadResult
+	err := h.conn.Call(ctx, MethodTerminalRead, TerminalReadParams{TerminalID: terminalID, MaxBytes: maxBytes}, &res)
+	return res, err
+}
+
 // Terminals lists the plugin's terminals.
 func (h *Host) Terminals(ctx context.Context) ([]PluginTerminal, error) {
 	var res TerminalListResult

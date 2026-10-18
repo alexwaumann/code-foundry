@@ -59,7 +59,8 @@ func RegisterPluginOwned(r *Registry, d PluginOwnedDeps) error {
 			Name:  "plugin.terminals",
 			Title: "List Plugin Terminals",
 			Description: "List the terminals a plugin owns (terminal/create): id, state, title, program and directory. " +
-				"terminal read and write take their ids; the plugin closes them, and disabling it does too.",
+				"terminal kill and terminal close take their ids, and the side panel's terminal node or the bottom panel shows " +
+				"them; the plugin closes them, and disabling it does too.",
 			Category:     "Plugin",
 			NoKeybinding: true,
 			Args:         []ArgSpec{nameArg},
