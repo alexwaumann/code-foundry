@@ -395,6 +395,20 @@ export class MockThreadLogs {
         payload: { case: "toolCall", value: { ...call.payload.value, status: failed ? ToolCallStatus.ERROR : ToolCallStatus.DONE, isError: failed, output: out, resultJson: "" } },
       } as ItemInit);
     }
+    // The run's own work stops with it: a running tool ends (done, or interrupted when it
+    // failed), a text still streaming is complete.
+    for (const x of this.log(id).items) {
+      if (x.parentToolUseId !== run.toolUseId) continue;
+      if (x.payload?.case === "toolCall" && x.payload.value.status === ToolCallStatus.RUNNING) {
+        this.update(id, {
+          ...x,
+          updatedAt: timestampFromDate(now),
+          payload: { case: "toolCall", value: { ...x.payload.value, status: failed ? ToolCallStatus.ERROR : ToolCallStatus.DONE, isError: failed, output: failed ? "Interrupted" : "ok" } },
+        } as ItemInit);
+      } else if (x.streaming) {
+        this.update(id, { ...x, streaming: false, updatedAt: timestampFromDate(now) });
+      }
+    }
     if (run.background) {
       const note = this.append(id, this.item(id, { case: "note", value: { text: failed ? `Agent failed · ${run.description ?? ""} · ${error}` : `Agent finished · ${run.description ?? ""} · ${report}` } }));
       ended.noteItemId = note.id ?? "";

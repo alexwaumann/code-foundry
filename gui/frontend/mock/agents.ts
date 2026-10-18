@@ -10,12 +10,16 @@
  *   POST /__mock/thread/agent-end?id=s-r1&run=a1[&status=done|failed]   a run ends: its
  *        Agent call's item finishes, a note follows, the list and the counts are published.
  *
- * The commands thread.agents and view.panel.agents, like the daemon's (any active thread).
+ * The commands thread.agents, view.panel.agents and thread.agent.open (any active thread)
+ * and thread.agent.up (the subagent view, or the CLI), like the daemon's. "PR 1" and the
+ * failed run carry their own items (parent_tool_use_id = their Agent call) for the
+ * read-only subagent view; the done Explore has its work and report.
  */
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
 import { ThreadAgentStatus, ToolCallStatus, type ThreadAgentRunSchema, type ThreadItemSchema } from "../src/gen/codefoundry/v1/thread_pb";
+import { CommandError } from "./errors";
 import type { InvokeOut } from "./gitops";
 import { launchShell, type ShellCall } from "./shells";
 import type { UiIntentInit } from "./world";
@@ -43,6 +47,14 @@ const LAUNCHED = (agentId: string) =>
 export const EXPLORE_REPORT =
   "LinkedPrs in HeaderActions.tsx renders a CommandButton with a count when there are 2+ PRs; the single case is SingleLinkedPr. Both open a panel surface.";
 export const FAILED_ERROR = "Stopped: process exited with code 1";
+/** What the thread asked "PR 1" to do (its Agent call's prompt): the subagent view's prompt bubble. */
+export const PR1_PROMPT =
+  "Implement PR 1: the daemon side of the agents panel. Parse the task frames in claudestream, persist runs in session_agent_runs, publish them on the thread snapshot. Commit as you go. Don't touch the GUI.";
+
+/** `n` lines of placeholder Go source (an edit's diff counts come from its line counts). */
+function lines(tag: string, n: number): string {
+  return Array.from({ length: n }, (_, i) => `\t// ${tag} ${String(i + 1)}`).join("\n");
+}
 /** What a run reports when POST /__mock/thread/agent-end ends it done. */
 export const END_REPORTS: Readonly<Record<string, string>> = {
   a1: "Added task frame handling to the thread store with 14 table tests; make check is green.",
@@ -94,12 +106,27 @@ export function scriptAgents(s: AgentsScript, now = Date.now()): AgentRunInit[] 
 
   const pr1 = s.tool(
     "Agent",
-    { description: "PR 1: daemon task frames", subagent_type: "general-purpose", model: "opus", effort: "high", run_in_background: true, prompt: "Build PR 1." },
+    { description: "PR 1: daemon task frames", subagent_type: "general-purpose", model: "opus", effort: "high", run_in_background: true, prompt: PR1_PROMPT },
     { status: ToolCallStatus.RUNNING, output: "Async agent launched successfully.", resultJson: LAUNCHED("a1") },
     { at: ago(252) },
   );
   const pr1Id = callId(pr1);
-  s.tool("Bash", { command: "go test ./internal/store/..." }, { status: ToolCallStatus.RUNNING }, { at: ago(20), parentToolUseId: pr1Id });
+  // PR 1's own work (its items carry the Agent call as their parent), for the read-only
+  // subagent view: thinking, a read and a search, a nested Agent call, two edits, a test
+  // still running and a reply still streaming.
+  s.it({ case: "thinking", value: { text: "The task frames come on the stream: parse them in claudestream first, then persist the runs." } }, { at: ago(250), until: ago(244), parentToolUseId: pr1Id });
+  s.tool(
+    "Read",
+    { file_path: p("internal/claudestream/types.go") },
+    { output: "", resultJson: JSON.stringify({ type: "text", file: { numLines: 380, startLine: 1, totalLines: 380 } }) },
+    { at: ago(243), parentToolUseId: pr1Id },
+  );
+  s.tool(
+    "Grep",
+    { pattern: "task_started|task_progress", path: p("internal") },
+    { output: "", resultJson: JSON.stringify({ mode: "content", numLines: 14, numFiles: 3 }) },
+    { at: ago(240), parentToolUseId: pr1Id },
+  );
   const review = s.tool(
     "Agent",
     { description: "Review usage_runs changes", subagent_type: "Explore", prompt: "Review the usage_runs changes." },
@@ -107,6 +134,23 @@ export function scriptAgents(s: AgentsScript, now = Date.now()): AgentRunInit[] 
     { at: ago(38), parentToolUseId: pr1Id },
   );
   s.tool("Read", { file_path: p("internal/store/thread/usage_runs.go") }, { status: ToolCallStatus.RUNNING }, { at: ago(5), parentToolUseId: callId(review) });
+  s.tool(
+    "Edit",
+    { file_path: p("internal/store/thread/agents.go"), old_string: lines("old", 3), new_string: lines("new", 84) },
+    { output: "The file has been updated." },
+    { at: ago(36), parentToolUseId: pr1Id },
+  );
+  s.tool(
+    "Write",
+    { file_path: p("internal/store/thread/agents_db.go"), content: lines("db", 61) },
+    { output: "File created successfully." },
+    { at: ago(30), parentToolUseId: pr1Id },
+  );
+  s.tool("Bash", { command: "go test ./internal/store/thread/... -run TestAgent" }, { status: ToolCallStatus.RUNNING }, { at: ago(20), parentToolUseId: pr1Id });
+  s.it(
+    { case: "assistantText", value: { text: "Tests for the frame parser pass. Wiring the runner glue next, then the migration" } },
+    { at: ago(12), parentToolUseId: pr1Id, streaming: true },
+  );
   const pr2 = s.tool(
     "Agent",
     { description: "PR 2: Agents surface in the panel", subagent_type: "general-purpose", model: "opus", effort: "high", run_in_background: true, prompt: "Build PR 2." },
@@ -118,6 +162,19 @@ export function scriptAgents(s: AgentsScript, now = Date.now()): AgentRunInit[] 
     { description: "Screenshot the panel in Wails", subagent_type: "claude", run_in_background: true, prompt: "Screenshot the panel." },
     { status: ToolCallStatus.ERROR, isError: true, output: FAILED_ERROR },
     { at: ago(246), until: ago(183) },
+  );
+  // Its short log: a build, then the launch that failed.
+  s.tool(
+    "Bash",
+    { command: "make gui-build", description: "Build the GUI" },
+    { output: "built bin/Code Foundry", resultJson: JSON.stringify({ stdout: "built bin/Code Foundry", stderr: "", interrupted: false }) },
+    { at: ago(244), until: ago(200), parentToolUseId: callId(shot) },
+  );
+  s.tool(
+    "Bash",
+    { command: "open -a 'Code Foundry'", description: "Open the app" },
+    { isError: true, status: ToolCallStatus.ERROR, output: "LSOpenURLsWithRole() failed with error -10810 for the application Code Foundry." },
+    { at: ago(198), until: ago(184), parentToolUseId: callId(shot) },
   );
   const shell = launchShell(s, { taskId: "b7n2x4kq0", command: "pnpm --dir gui/frontend dev:mock", description: "Start the mock daemon's dev server", at: ago(228) });
   s.shells?.push(shell);
@@ -245,7 +302,7 @@ function shellsNote(n: number): string {
   return ` · ${String(n)} ${n === 1 ? "shell" : "shells"} in the background`;
 }
 
-/** thread.agents and view.panel.agents, like the daemon's (any active thread). */
+/** thread.agents, view.panel.agents, thread.agent.open and thread.agent.up, like the daemon's. */
 export function agentsCommands(threads: AgentThreads, emit: (i: UiIntentInit) => number): Command[] {
   const when = (ctx: UiContext | undefined) => Boolean(ctx?.activeThreadId);
   return [
@@ -283,6 +340,46 @@ export function agentsCommands(threads: AgentThreads, emit: (i: UiIntentInit) =>
       },
       when,
       run: () => `delivered=${String(emit({ intent: { case: "showView", value: { name: "panel.agents" } } }))}`,
+    },
+    {
+      cmd: {
+        name: "thread.agent.open",
+        title: "Open Subagent",
+        category: "Thread",
+        description: "Show one of a thread's own subagent runs read-only in the GUI: its prompt, work log and report, under the thread.",
+        keybindings: [],
+        args: [
+          { name: "run", type: ArgType.STRING, required: true, description: "Agent run id (or its start)" },
+          { name: "id", type: ArgType.STRING, required: true, description: "Thread id" },
+        ],
+      },
+      when,
+      run: (ctx, a) => {
+        const id = a.id || ctx?.activeThreadId || "";
+        threads.calls.push(`agent open ${id} ${a.run ?? ""}`);
+        const runs = threads.agentsOf(id);
+        const ref = a.run ?? "";
+        const exact = runs.find((r) => r.id === ref);
+        const match = exact ? [exact] : runs.filter((r) => (r.id ?? "").startsWith(ref));
+        if (match.length !== 1) throw new CommandError(match.length === 0 ? "notfound" : "invalid", match.length === 0 ? `thread ${id} has no agent run "${ref}"` : `agent run "${ref}" is ambiguous`);
+        const run = match[0];
+        if ((run?.spawnDepth ?? 1) > 1) throw new CommandError("invalid", `agent run ${run?.id ?? ""} was spawned by another agent: only a thread's own runs open`);
+        emit({ intent: { case: "showAgentRun", value: { threadId: id, runId: run?.id ?? "" } } });
+        return Promise.resolve({ message: "", resultJson: JSON.stringify({ delivered: 1 }) });
+      },
+    },
+    {
+      cmd: {
+        name: "thread.agent.up",
+        title: "Back to Parent Thread",
+        category: "Thread",
+        description: "Leave the subagent view for the thread that ran the subagent.",
+        keybindings: ["escape"],
+        args: [],
+      },
+      // Like the daemon's: while the GUI shows a subagent (active view thread.agent), or from the CLI.
+      when: (ctx) => ctx?.activeView === "thread.agent" || !ctx?.activeView,
+      run: () => `delivered=${String(emit({ intent: { case: "showView", value: { name: "agent.up" } } }))}`,
     },
   ];
 }
