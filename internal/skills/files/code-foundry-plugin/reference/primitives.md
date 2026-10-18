@@ -206,7 +206,9 @@ ui.Node{Key: "run-list", List: &ui.List{EmptyText: "No runs yet", Rows: []ui.Row
 
 A row: glyph, title (required), `titleMeta`, pill, `line2`, `trailing`, up to 3 buttons,
 an `action` for the whole row, `selected`. `glyphStyle`: `dot` (default) or `icon`;
-`dense` tightens rows. `emptyText` shows when there are no rows.
+`dense` draws 24 px single-line rows: `line2` and labelled buttons are **not shown**
+(icon-only buttons and `trailing` are), so leave it off when line 2 carries something
+the user needs. `emptyText` shows when there are no rows.
 
 ### chips
 
