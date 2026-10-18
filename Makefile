@@ -107,7 +107,7 @@ FUZZ_TARGETS := \
 	pluginsdk:./ui:FuzzView \
 	.:./internal/store/plugin:FuzzValidateView .:./internal/store/plugin:FuzzViewMutate \
 	.:./internal/store/plugin:FuzzPredicate .:./internal/store/plugin:FuzzActValues \
-	.:./internal/store/plugin:FuzzValidateEnvironment .:./internal/store/plugin:FuzzManifestCommands \
+	.:./internal/store/plugin:FuzzValidateEnvironment .:./internal/store/plugin:FuzzManifestCommands .:./internal/store/plugin:FuzzOwnedParams \
 	.:./internal/store/plugin/registry:FuzzParseIndex .:./internal/store/plugin/registry:FuzzVersion \
 	.:./internal/store/plugin/registry:FuzzParseLocation .:./internal/store/plugin/registry:FuzzFindChecksum \
 	.:./internal/store/plugin/registry:FuzzExtract .:./internal/store/plugin/registry:FuzzExtractBytes

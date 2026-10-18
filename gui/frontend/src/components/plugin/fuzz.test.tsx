@@ -112,5 +112,5 @@ describe("mutated views", () => {
       rendered++;
     }
     expect(rendered).toBeGreaterThan(100);
-  });
+  }, 60_000); // ~1 s alone; the whole suite in parallel can take several
 });
