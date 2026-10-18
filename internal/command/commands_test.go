@@ -78,6 +78,7 @@ func TestAllRegistersEveryDomain(t *testing.T) {
 		"plugin.list", "plugin.enable", "plugin.disable", "plugin.restart", "plugin.reload", "plugin.logs", "plugin.dev",
 		"plugin.secrets.list", "plugin.secrets.delete", "plugin.env", "plugin.surface", "plugin.act", "pr.checks",
 		"plugin.threads", "plugin.terminals",
+		"plugin.browse", "plugin.install", "plugin.update", "plugin.uninstall",
 	}
 	for _, n := range want {
 		if _, ok := f.reg.Get(n); !ok {

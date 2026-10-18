@@ -25,6 +25,8 @@ func TestDecode(t *testing.T) {
 		{name: "unquoted dotted keybinding keys are flattened", in: "[keybindings]\nthread.new = \"cmd+j\"\nproject.worktree.new = \"cmd+alt+n\"\n",
 			want: map[string]string{"keybindings.thread.new": "cmd+j", "keybindings.project.worktree.new": "cmd+alt+n"}},
 		{name: "top-level key", in: "theme = \"dark\"\n", want: map[string]string{"theme": "dark"}},
+		{name: "a list reads comma-separated", in: "[plugins]\nregistries = [\"o/a\", \"https://x.example/index.json\"]\n",
+			want: map[string]string{"plugins.registries": "o/a, https://x.example/index.json"}},
 		{name: "syntax error", in: "[threads\n", wantErr: true},
 	}
 	for _, tt := range tests {

@@ -15,7 +15,7 @@ func TestNoKeybindingCommands(t *testing.T) {
 	want := []string{
 		"action.list", "action.runs", "action.wait",
 		"app.version", "daemon.status", "daemon.version",
-		"plugin.act", "plugin.env", "plugin.list", "plugin.logs", "plugin.reload", "plugin.secrets.list", "plugin.surface", "plugin.terminals", "plugin.threads",
+		"plugin.act", "plugin.browse", "plugin.env", "plugin.list", "plugin.logs", "plugin.reload", "plugin.secrets.list", "plugin.surface", "plugin.terminals", "plugin.threads",
 		"pr.checks", "project.list",
 		"settings.get", "settings.path", "settings.reset", "settings.set",
 		"terminal.list", "theme.list",
