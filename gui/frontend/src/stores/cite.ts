@@ -39,6 +39,11 @@ export function requestFlash(threadId: string, cite: CitationBody): void {
   useCiteStore.setState({ flash: { threadId, cite, seq: ++flashSeq } });
 }
 
+/** The cite layer acts on a Go to source request: forget it, so it is not replayed when a layer mounts again. */
+export function takeFlash(seq: number): void {
+  useCiteStore.setState((s) => (s.flash?.seq === seq ? { flash: null } : s));
+}
+
 /** What a composer offers the cite layer. */
 export interface CiteTarget {
   /** Inserts a citation tag at the caret and focuses the prompt after it. */

@@ -6,9 +6,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { CITE_EDGE, CITE_GAP, citableItem, newCitationId, placeCite, quoteAt, type CitationBody, type CitePlacement, type CiteSide } from "@/lib/citation";
 import { zoomFactor } from "@/lib/zoom";
 import { findCitation, putCitation } from "@/stores/compose";
-import { endEdit, focusCiteTarget, insertCite, useCiteStore } from "@/stores/cite";
+import { endEdit, focusCiteTarget, insertCite, takeFlash, useCiteStore } from "@/stores/cite";
 import { threadDraftKey } from "@/stores/threadActions";
-import { CITE_ITEM_ATTR, citeItemSelector, highlightsSupported, lineRects, offsetOf, paint, plainText, rangeOf, type CitePaint } from "./citeDom";
+import { CITE_ITEM_ATTR, citeItemSelector, clampToRoot, highlightsSupported, lineRects, offsetOf, paint, plainText, rangeOf, type CitePaint } from "./citeDom";
 import { dockTop, frame, revealQuote } from "./reveal";
 import "./cite.css";
 
@@ -37,6 +37,20 @@ function itemOf(node: Node | null, timeline: Element): string | null {
   const el = node instanceof Element ? node : (node?.parentElement ?? null);
   const item = el?.closest(`[${CITE_ITEM_ATTR}]`);
   return item && timeline.contains(item) ? item.getAttribute(CITE_ITEM_ATTR) : null;
+}
+
+/** A Go to source in progress: live until the next one or the unmount; the timer ends its flash. */
+interface FlashRun {
+  live: boolean;
+  timer: ReturnType<typeof setTimeout> | undefined;
+}
+
+const sameRange = (a: Range, b: Range) => a.startContainer === b.startContainer && a.startOffset === b.startOffset && a.endContainer === b.endContainer && a.endOffset === b.endOffset;
+
+function cancelFlash(run: FlashRun | null): void {
+  if (!run) return;
+  run.live = false;
+  clearTimeout(run.timer);
 }
 
 const HIDDEN: CitePlacement = { left: -10_000, top: -10_000, side: "below", visible: false, room: 0 };
@@ -92,14 +106,33 @@ export function CiteLayer({ threadId, paneRef }: { threadId: string; paneRef: Re
       const pane = paneRef.current;
       const timeline = pane?.querySelector('[data-testid="thread-timeline"]');
       const sel = window.getSelection();
-      const id = sel && timeline && !sel.isCollapsed && sel.rangeCount > 0 ? citableItem(itemOf(sel.anchorNode, timeline), itemOf(sel.focusNode, timeline), sel.toString()) : null;
-      const root = id && pane ? pane.querySelector(citeItemSelector(id)) : null;
-      if (!sel || !pane || !id || !root) {
+      let id: string | null = null;
+      let root: Element | null = null;
+      let r: Range | null = null;
+      if (sel && pane && timeline && !sel.isCollapsed && sel.rangeCount > 0) {
+        const range = sel.getRangeAt(0);
+        const ends = [itemOf(sel.anchorNode, timeline), itemOf(sel.focusNode, timeline)];
+        id = citableItem(ends[0] ?? null, ends[1] ?? null, sel.toString());
+        root = id ? pane.querySelector(citeItemSelector(id)) : null;
+        r = range;
+        // One end past the answer (a triple-click ends at the next row's start) with no
+        // text selected there: the part in the answer.
+        for (const end of ends) {
+          if (id || !end) continue;
+          const el = pane.querySelector(citeItemSelector(end));
+          const inside = el && clampToRoot(range, el);
+          if (inside?.toString().trim()) {
+            id = end;
+            root = el;
+            r = inside;
+          }
+        }
+      }
+      if (!sel || !pane || !id || !root || !r) {
         if (openRef.current) close();
         return;
       }
       const pt = plainText(root);
-      const r = sel.getRangeAt(0);
       const q = quoteAt(pt.text, offsetOf(pt, r.startContainer, r.startOffset), offsetOf(pt, r.endContainer, r.endOffset));
       if (!q) {
         if (openRef.current) close();
@@ -108,10 +141,12 @@ export function CiteLayer({ threadId, paneRef }: { threadId: string; paneRef: Re
       side.current = null;
       setOpen({ mode: "button", anchor: { itemId: id, start: q.start, end: q.end, x: x - pane.getBoundingClientRect().left }, body: { threadId, itemId: id, comment: "", ...q }, editId: null, tint: "cf-cite-held" });
     };
+    let pending: ReturnType<typeof setTimeout> | undefined;
     const onUp = (e: MouseEvent) => {
       if (e.button !== 0 || (e.target instanceof Node && contentRef.current?.contains(e.target))) return;
       // After the browser has settled the selection (a click inside one collapses it after mouseup).
-      setTimeout(() => {
+      clearTimeout(pending);
+      pending = setTimeout(() => {
         evaluate(e.clientX);
       }, 0);
     };
@@ -122,6 +157,7 @@ export function CiteLayer({ threadId, paneRef }: { threadId: string; paneRef: Re
     document.addEventListener("mouseup", onUp);
     document.addEventListener("selectionchange", onSelection);
     return () => {
+      clearTimeout(pending);
       document.removeEventListener("mouseup", onUp);
       document.removeEventListener("selectionchange", onSelection);
     };
@@ -151,14 +187,19 @@ export function CiteLayer({ threadId, paneRef }: { threadId: string; paneRef: Re
     };
   }, [editing, draftKey, threadId, paneRef]);
 
-  // A sent chip's Go to source: scroll to the quote and flash it.
+  // A sent chip's Go to source: scroll to the quote and flash it. The layer takes the
+  // request (the store forgets it), so a layer mounting later (back to this thread) does
+  // not replay it; the run is cancelled by the next request or the unmount, not by that.
   const flash = useCiteStore((s) => (s.flash?.threadId === threadId ? s.flash : null));
+  const flashRun = useRef<FlashRun | null>(null);
   useEffect(() => {
     const pane = paneRef.current;
     if (!flash || !pane) return;
-    const run = { live: true };
+    takeFlash(flash.seq);
+    cancelFlash(flashRun.current);
+    const run: FlashRun = { live: true, timer: undefined };
+    flashRun.current = run;
     const alive = () => run.live;
-    let timer: ReturnType<typeof setTimeout> | undefined;
     void revealQuote(threadId, pane, flash.cite).then(async (at) => {
       if (!alive() || !at) return;
       await frame();
@@ -166,14 +207,10 @@ export function CiteLayer({ threadId, paneRef }: { threadId: string; paneRef: Re
       if (!root || !alive()) return;
       const pt = plainText(root);
       paint("cf-cite-mark", rangeOf(pt, at.start, at.end), lineRects(pt, at.start, at.end));
-      timer = setTimeout(() => {
+      run.timer = setTimeout(() => {
         if (!openRef.current) paint("cf-cite-mark", null);
       }, 1600);
     });
-    return () => {
-      run.live = false;
-      if (timer) clearTimeout(timer);
-    };
   }, [flash, threadId, paneRef]);
 
   // While shown: place it every frame (it follows the scroll and the field's growth),
@@ -181,7 +218,7 @@ export function CiteLayer({ threadId, paneRef }: { threadId: string; paneRef: Re
   useEffect(() => {
     if (!open) return;
     let raf = 0;
-    let painted: { root: Element; n: number } | null = null;
+    let painted: Range | null = null;
     const tick = () => {
       raf = requestAnimationFrame(tick);
       const pane = paneRef.current;
@@ -202,9 +239,12 @@ export function CiteLayer({ threadId, paneRef }: { threadId: string; paneRef: Re
           p = placeCite({ first, last, x, width: size.width, height: size.height, pane: box, floor, side: open.mode === "comment" ? (side.current ?? undefined) : undefined });
           if (open.mode === "comment") {
             side.current ??= p.side;
-            if (!highlightsSupported() || painted?.root !== root || painted.n !== pt.segments.length) {
-              painted = { root, n: pt.segments.length };
-              paint(open.tint, rangeOf(pt, open.anchor.start, open.anchor.end), rects);
+            // Repainted when the span's text nodes change (the row remounted, the markdown
+            // re-rendered while streaming): a range over replaced nodes paints nothing.
+            const r = rangeOf(pt, open.anchor.start, open.anchor.end);
+            if (!highlightsSupported() || !r || !painted || !sameRange(painted, r)) {
+              painted = r;
+              paint(open.tint, r, rects);
             }
           }
         }
@@ -234,11 +274,13 @@ export function CiteLayer({ threadId, paneRef }: { threadId: string; paneRef: Re
   // Unmounted (another thread, the thread gone): nothing stays painted or marked.
   useEffect(
     () => () => {
+      cancelFlash(flashRun.current);
       paint("cf-cite-held", null);
       paint("cf-cite-mark", null);
-      if (openRef.current?.editId) endEdit();
+      // An edit of this draft's chip (open, or still finding its quote) ends with it.
+      if (useCiteStore.getState().editing?.draftKey === draftKey) endEdit();
     },
-    [],
+    [draftKey],
   );
 
   const toComment = () => {

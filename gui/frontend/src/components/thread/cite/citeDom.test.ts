@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from "vitest";
 import { locateQuote, quoteAt } from "@/lib/citation";
-import { offsetOf, plainText, rangeOf } from "./citeDom";
+import { clampToRoot, offsetOf, plainText, rangeOf } from "./citeDom";
 
 /** An answer as the markdown renders it: blocks with "\n" text nodes between them, inline code, a code block with its buttons. */
 function answer(): HTMLElement {
@@ -51,6 +51,58 @@ describe("offsetOf / rangeOf", () => {
     // The range spans the formatting newline between the blocks too.
     expect(r?.toString().replace(/\s+/g, " ")).toBe("poller.go fingerprints each PR. Touch");
     expect(rangeOf(pt, 5, 5)).toBeNull();
+  });
+
+  const TOOL_ROW = '<div style="user-select: none">Read 2 files</div>';
+  it.each([
+    ["ends at the next answer's start (a triple-click)", "", (next: Text) => [next.parentElement ?? next, 0] as const, true],
+    ["ends past an unselectable tool row, at the next answer's start", TOOL_ROW, (next: Text) => [next.parentElement ?? next, 0] as const, true],
+    ["ends in the whitespace before the next row", "", (next: Text) => [next.parentElement?.parentElement?.firstChild ?? next, 1] as const, true],
+    ["runs into the next answer's text", "", (next: Text) => [next, 3] as const, false],
+    ["runs past a selectable row's text", "<div>Read 2 files</div>", (next: Text) => [next.parentElement ?? next, 0] as const, false],
+  ])("clampToRoot: a selection that %s", (_name, between, endAt, inside) => {
+    const root = answer();
+    const row = document.createElement("div");
+    row.innerHTML = `\n${between}<p>The next answer.</p>`;
+    document.body.appendChild(row);
+    const next = row.querySelector("p")?.firstChild as Text;
+    const li = root.querySelector("li")?.firstChild as Text;
+    const r = document.createRange();
+    r.setStart(li, 0);
+    const [node, offset] = endAt(next);
+    r.setEnd(node, offset);
+    const c = clampToRoot(r, root);
+    if (!inside) {
+      expect(c).toBeNull();
+      return;
+    }
+    expect(c).not.toBeNull();
+    const pt = plainText(root);
+    const q = c ? quoteAt(pt.text, offsetOf(pt, c.startContainer, c.startOffset), offsetOf(pt, c.endContainer, c.endOffset)) : null;
+    expect(q?.text).toBe("Touch it.\nFold the head sha in.\nx := 1");
+  });
+
+  it("clampToRoot: a selection that starts before the root, past nothing selectable", () => {
+    const root = answer();
+    const prev = document.createElement("div");
+    prev.innerHTML = TOOL_ROW;
+    document.body.insertBefore(prev, root);
+    const strong = root.querySelector("strong")?.firstChild as Text;
+    const r = document.createRange();
+    r.setStart(prev, 0);
+    r.setEnd(strong, 4);
+    const c = clampToRoot(r, root);
+    expect(c?.toString().startsWith("The ")).toBe(true);
+    expect(c?.toString().endsWith("head")).toBe(true);
+  });
+
+  it("clampToRoot: a selection inside the root is itself", () => {
+    const root = answer();
+    const strong = root.querySelector("strong")?.firstChild as Text;
+    const r = document.createRange();
+    r.setStart(strong, 0);
+    r.setEnd(strong, 4);
+    expect(clampToRoot(r, root)?.toString()).toBe("head");
   });
 
   it("a selection's quote is found again after the answer re-renders with text before it", () => {

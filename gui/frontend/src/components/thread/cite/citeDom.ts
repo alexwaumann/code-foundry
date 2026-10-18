@@ -80,6 +80,55 @@ export function offsetOf(pt: PlainText, container: Node, offset: number): number
   return pt.text.length;
 }
 
+/** Whether an element's text can be selected: the nearest user-select that is not auto decides (the app's body has none). */
+function selectable(el: Element | null): boolean {
+  for (let e = el; e; e = e.parentElement) {
+    const s = getComputedStyle(e);
+    const v = s.getPropertyValue("user-select") || s.getPropertyValue("-webkit-user-select");
+    if (v && v !== "auto") return v !== "none";
+  }
+  return true;
+}
+
+/** Whether a range selects text that shows selected: a non-space character of a selectable text node. */
+function selectsText(r: Range): boolean {
+  const top = r.commonAncestorContainer;
+  const nodes: Text[] = [];
+  if (top instanceof Text) nodes.push(top);
+  else {
+    const walker = document.createTreeWalker(top, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) if (r.intersectsNode(n)) nodes.push(n as Text);
+  }
+  return nodes.some((t) => {
+    const from = t === r.startContainer ? r.startOffset : 0;
+    const to = t === r.endContainer ? r.endOffset : t.data.length;
+    return /\S/.test(t.data.slice(from, to)) && selectable(t.parentElement);
+  });
+}
+
+/**
+ * The part of a range inside `root` when the rest of it selects no text, else null. A
+ * triple-click on a paragraph ends at the start of the next block, which can be in the
+ * next row (another answer, past tool rows whose text is not selectable): the selection
+ * is still all in this answer.
+ */
+export function clampToRoot(range: Range, root: Element): Range | null {
+  const c = range.cloneRange();
+  if (!root.contains(range.startContainer)) {
+    const before = range.cloneRange();
+    before.setEnd(root, 0);
+    if (selectsText(before)) return null;
+    c.setStart(root, 0);
+  }
+  if (!root.contains(range.endContainer)) {
+    const after = range.cloneRange();
+    after.setStart(root, root.childNodes.length);
+    if (selectsText(after)) return null;
+    c.setEnd(root, root.childNodes.length);
+  }
+  return c;
+}
+
 /** The text nodes and in-node offsets a plain-text span covers. */
 function pieces(pt: PlainText, start: number, end: number): { node: Text; from: number; to: number }[] {
   const out: { node: Text; from: number; to: number }[] = [];

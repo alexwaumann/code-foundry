@@ -293,3 +293,62 @@ test("a chip whose answer is in a folded turn unfolds it; a quote no longer in t
   await expect(page.getByTestId("cite-source-meta")).toHaveText("No longer in this thread");
   await expect(page.getByTestId("cite-go-to-source")).toBeDisabled();
 });
+
+test("a triple-click that ends at the next row's start cites the paragraph", async ({ page }) => {
+  await openThread(page);
+  const header = page.getByTestId("thread-turn-header").first();
+  await header.evaluate((el) => (el.querySelector("button") ?? el).dispatchEvent(new MouseEvent("click", { bubbles: true })));
+  const mid = pane(page).locator('[data-testid="thread-text"]').filter({ hasText: "Now the fingerprint itself." });
+  await expect(mid).toBeVisible();
+  await mid.evaluate((el) => {
+    el.scrollIntoView({ block: "center" });
+  });
+  await page.waitForTimeout(300);
+  await mid.locator("p").first().click({ clickCount: 3 });
+  await expect(citeButton(page)).toBeVisible();
+  await citeButton(page).click();
+  await page.keyboard.press("Enter");
+  await expect(chips(page)).toHaveText(["Now the fingerprint…"]);
+  await chips(page).first().hover();
+  await expect(openTooltip(page)).toHaveText("Now the fingerprint itself.");
+});
+
+/** Pastes text into the thread composer's prompt. */
+async function paste(page: Page, text: string): Promise<void> {
+  await page.evaluate((t) => {
+    const data = new DataTransfer();
+    data.setData("text/plain", t);
+    document.querySelector('[data-testid="thread-composer"] [contenteditable="true"]')?.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+  }, text);
+}
+
+test("Go to source is not replayed when the thread is shown again; a quote no draft has does not send", async ({ page }) => {
+  await openThread(page);
+  const item = (await answer(page).getAttribute("data-cite-item")) ?? "";
+  await page.getByTestId("thread-composer").locator('[contenteditable="true"]').click();
+  await paste(page, `[Assistant quote](cf-cite://v1/s-r1/${encodeURIComponent(item)}?text=All%20412%20tests&start=0&end=13&prefix=&suffix=) ok`);
+  await page.keyboard.press("Enter");
+  const sentChip = page.getByTestId("thread-user").last().locator('[data-tag-kind="cite"]');
+  await expect(page.locator('[data-testid="thread-text"]').last()).toContainText("Got it");
+  await expect(async () => {
+    await sentChip.click();
+    await expect(page.getByTestId("cite-source")).toBeVisible({ timeout: 1000 });
+  }).toPass();
+  await page.getByTestId("cite-go-to-source").click();
+  await expect.poll(() => hasHighlight(page, "cf-cite-mark")).toBe(true);
+  await expect.poll(() => hasHighlight(page, "cf-cite-mark"), { timeout: 4000 }).toBe(false);
+  await row(page, "s:s-1").click();
+  await row(page, "s:s-r1").click();
+  await expect(answer(page)).toBeVisible();
+  await page.waitForTimeout(500);
+  expect(await hasHighlight(page, "cf-cite-mark")).toBe(false);
+
+  // A draft token whose body no draft has (copied from a composer that has sent it): an error, nothing sent.
+  const before = (await invocations()).filter((i) => i.name === "thread.send").length;
+  await page.getByTestId("thread-composer").locator('[contenteditable="true"]').click();
+  await paste(page, "[Assistant quote](cf-cite://c0123456789ab)");
+  await expect(chips(page)).toHaveText(["Quote"]);
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("thread-composer-error")).toHaveText("Nothing to send: the quote is no longer in any draft.");
+  expect((await invocations()).filter((i) => i.name === "thread.send")).toHaveLength(before);
+});
