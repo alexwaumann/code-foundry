@@ -1146,8 +1146,8 @@ export const ListThreadsRequestSchema: GenMessage<ListThreadsRequest> = /*@__PUR
  */
 export type ThreadFilter = Message<"codefoundry.v1.ThreadFilter"> & {
   /**
-   * Every thread, archived ones included, and the retired usage ledger; the fields
-   * below except limit are ignored.
+   * Every thread, archived ones included (like include_archived), and the retired
+   * usage ledger; the fields below still apply.
    *
    * @generated from field: bool all = 1;
    */

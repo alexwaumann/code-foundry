@@ -47,7 +47,8 @@ func (h *Thread) Fork(ctx context.Context, req *connect.Request[v1.ForkThreadReq
 }
 
 // List returns every thread, and the retired usage ledger; with a filter, the threads
-// it selects, the most recently active first (the ledger only with filter.all).
+// it selects, the most recently active first (the ledger only with filter.all, which
+// the other filter fields narrow like include_archived).
 func (h *Thread) List(ctx context.Context, req *connect.Request[v1.ListThreadsRequest]) (*connect.Response[v1.ListThreadsResponse], error) {
 	if f := req.Msg.GetFilter(); f != nil {
 		threads, err := h.store.List(ctx, listOptionsFromProto(f))

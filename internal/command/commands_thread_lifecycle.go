@@ -106,7 +106,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				{Name: "effort", Type: Enum, Enum: ThreadEfforts, Description: "Effort level (default: settings threads.default_effort)"},
 				{Name: "permission", Type: Enum, Enum: ThreadPermissions, Default: "auto",
 					Description: "Permissions: supervised (confirm every tool call), accept-edits (file edits allowed), or auto (Claude's auto mode)"},
-				{Name: "new-worktree", Type: Bool, Description: "Create a new worktree for the thread (branch cf/<slug of the thread name>, named from the prompt)"},
+				{Name: "new-worktree", Type: Bool, Description: "Create a new worktree for the thread (branch cf/<slug of the thread name>, named from the prompt); without it the thread works in the given worktree, else the project's own checkout (settings threads.default_worktree is the GUI composer's default and does not apply here)"},
 				{Name: "base", Type: String, Description: "Ref the new worktree branches from (default: origin/<default branch>); needs new-worktree"},
 				{Name: "name", Type: String, Description: "Thread name (default: generated from the first message)"},
 				{Name: "prompt", Type: String, Description: "First prompt, sent as the thread's first message once Claude is up"},
