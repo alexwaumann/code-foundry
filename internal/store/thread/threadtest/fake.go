@@ -140,8 +140,8 @@ func (f *Fake) add(call string, s thread.Thread) (thread.Thread, error) {
 }
 
 // Create records the call and adds a STARTING thread ("s-N"). With
-// NewWorktree the thread's worktree is /worktrees/cf-<N> (CreatedWorktree, BaseRef as
-// requested). WorkspaceID is copied as is. With NewWorkspace the thread belongs to
+// NewWorktree the thread's worktree is /worktrees/cf-<N> on branch cf/<N> (CreatedWorktree,
+// BaseRef as requested). WorkspaceID is copied as is. With NewWorkspace the thread belongs to
 // workspace "w-new" and runs in /worktrees/<project>, project being ProjectID or the first project.
 // With NoProject it runs in /home. The call reads "Create <project> <path> <model>
 // <effort>", then " perm=<n>", " new-worktree=<base>", " workspace=<id>",
@@ -159,7 +159,7 @@ func (f *Fake) Create(_ context.Context, o thread.CreateOptions) (thread.Thread,
 	if o.NewWorktree != nil {
 		call += " new-worktree=" + o.NewWorktree.BaseRef
 		f.mu.Lock()
-		s.WorktreePath = fmt.Sprintf("/worktrees/cf-%d", f.next+1)
+		s.WorktreePath, s.Branch = fmt.Sprintf("/worktrees/cf-%d", f.next+1), fmt.Sprintf("cf/%d", f.next+1)
 		f.mu.Unlock()
 		s.CreatedWorktree, s.BaseRef = true, o.NewWorktree.BaseRef
 	}
@@ -262,7 +262,8 @@ func (f *Fake) ReadAttachment(_ context.Context, path string) ([]byte, string, e
 	return []byte("data:" + path), "image/png", nil
 }
 
-// Fork adds a STARTING thread with ParentID set.
+// Fork adds a STARTING thread with ParentID set, in the parent's worktree (with what
+// it was made for: CreatedWorktree, BaseRef, Branch).
 func (f *Fake) Fork(_ context.Context, id, name string) (thread.Thread, error) {
 	f.mu.Lock()
 	parent, err := f.get(id)
@@ -273,6 +274,7 @@ func (f *Fake) Fork(_ context.Context, id, name string) (thread.Thread, error) {
 	return f.add("Fork "+id, thread.Thread{
 		ProjectID: parent.ProjectID, WorktreePath: parent.WorktreePath, Model: parent.Model, Effort: parent.Effort,
 		Name: name, ParentID: id, PermissionMode: parent.PermissionMode, WorkspaceID: parent.WorkspaceID,
+		CreatedWorktree: parent.CreatedWorktree, BaseRef: parent.BaseRef, Branch: parent.Branch,
 	})
 }
 

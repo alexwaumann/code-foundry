@@ -203,6 +203,9 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 		// A new thread's worktree runs its project's on-worktree-create actions in the
 		// background (WorktreeCreated returns at once).
 		WorktreeCreated: s.action.WorktreeCreated,
+		// A thread whose worktree a cleanup removed gets it back under this root when it
+		// starts again (recreate.go).
+		WorktreeRoot: p.Worktrees(),
 		// Wake subscriptions to action runs read them here (wake.go).
 		ActionRun: actionRunForWake(s.action),
 	}); err != nil {

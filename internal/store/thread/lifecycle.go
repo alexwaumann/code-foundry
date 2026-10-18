@@ -167,22 +167,45 @@ func (m *Manager) startStopped(ctx context.Context, id string, o startOpts) (Ite
 			return Item{}, m.failStart(id, nil, err)
 		}
 	}
-	l, lastErr, note, launchErr := m.resumeLaunch(prev)
+	// A worktree a cleanup removed is made again first (recreate.go); clients see the
+	// thread STARTING meanwhile.
+	var notes []string
+	var l launch
+	var lastErr string
+	rw, launchErr := m.ensureWorktree(ctx, prev)
+	if rw != nil {
+		notes = append(notes, rw.note())
+	}
+	if launchErr == nil {
+		var note string
+		l, lastErr, note, launchErr = m.resumeLaunch(prev)
+		if note != "" {
+			notes = append(notes, note)
+			m.log.Info("conversation not found; starting a new one", "thread", id, "claude_session_id", prev.ClaudeSessionID)
+		}
+	}
+	noteLog := log
+	if noteLog == nil && rw != nil {
+		// No message: the recreation is still told in the timeline.
+		if noteLog, err = m.thread(ctx, id); err != nil {
+			m.log.Warn("note the recreated worktree", "thread", id, "err", err)
+		}
+	}
+	if noteLog != nil {
+		w := itemWriter{log: noteLog, save: func(it Item) { m.saveItem(id, it) }}
+		for _, note := range notes {
+			w.add(Item{ID: "note-" + itemSuffix(), Kind: KindNote, Text: note})
+		}
+	}
 	var it Item
 	if log != nil {
 		w := itemWriter{log: log, save: func(it Item) { m.saveItem(id, it) }}
-		if note != "" {
-			w.add(Item{ID: "note-" + itemSuffix(), Kind: KindNote, Text: note})
-		}
 		if it, err = recordUser(w, o.first); err != nil {
 			return Item{}, m.failStart(id, nil, err)
 		}
 	}
 	if launchErr != nil {
 		return it, m.failStart(id, log, launchErr)
-	}
-	if note != "" {
-		m.log.Info("conversation not found; starting a new one", "thread", id, "claude_session_id", prev.ClaudeSessionID)
 	}
 	m.update(id, false, func(r *record) {
 		r.s.LastError = lastErr
@@ -202,6 +225,10 @@ func (m *Manager) startStopped(ctx context.Context, id string, o startOpts) (Ite
 		return it, m.failStart(id, nil, err)
 	} else if err != nil {
 		return it, m.failStart(id, log, err)
+	}
+	if rw != nil && m.opts.WorktreeCreated != nil {
+		// The project's on-worktree-create actions run again, as after Create.
+		m.opts.WorktreeCreated(id, rw.projectID, rw.path)
 	}
 	return it, nil
 }
@@ -270,7 +297,8 @@ func userItem(id string, o *outgoing) Item {
 // conversation when the transcript is there; else a new conversation in the same
 // worktree, with why in lastErr, and note, when a conversation existed but its
 // transcript is gone, for the timeline (Claude remembers nothing of it). An error when
-// the worktree is gone.
+// the worktree is gone (startStopped has recreated one a cleanup removed first, when
+// the thread qualifies: recreate.go).
 func (m *Manager) resumeLaunch(prev Thread) (l launch, lastErr, note string, err error) {
 	if _, err := os.Stat(prev.WorktreePath); err != nil {
 		return launch{}, "", "", fmt.Errorf("%w: worktree %s: %v", ErrFailedPrecondition, prev.WorktreePath, err)

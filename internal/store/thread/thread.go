@@ -148,6 +148,13 @@ type Thread struct {
 	// worktree (CreatedWorktree).
 	BaseRef         string
 	CreatedWorktree bool
+	// Branch is the branch the worktree was made for, when Create made it
+	// (CreatedWorktree; copied by Fork): a worktree removed by a cleanup is made again on
+	// it, at the same path, when the thread resumes (recreate.go). It is what the thread
+	// was created for, not what the worktree has checked out now. Persisted; rows from
+	// before it are filled in from the project store at startup while their worktree
+	// exists (backfillBranches).
+	Branch string
 	// WorkspaceID is the owner workspace; empty for a project thread. Each spawn reads
 	// the workspace's current members from the workspace store.
 	WorkspaceID string

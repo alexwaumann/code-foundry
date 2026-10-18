@@ -107,7 +107,7 @@ type NewWorkspace struct {
 
 // createdWorkspace is what newWorkspace made.
 type createdWorkspace struct {
-	workspaceID, projectID, path, baseRef string
+	workspaceID, projectID, path, baseRef, branch string
 	// members of the new workspace, in member order.
 	members []workspace.Member
 	// name, namerCalled, late: as createdWorktree.
@@ -270,7 +270,7 @@ func (m *Manager) newWorkspace(ctx context.Context, id, name string, o CreateOpt
 	if !ok { // the store made every member or failed; this is a broken fake
 		return cw, fmt.Errorf("%w: workspace %s has no member for project %s", ErrFailedPrecondition, w.ID, cwdProject)
 	}
-	cw.workspaceID, cw.projectID, cw.path, cw.members = w.ID, mem.ProjectID, mem.WorktreePath, w.Members
+	cw.workspaceID, cw.projectID, cw.path, cw.members, cw.branch = w.ID, mem.ProjectID, mem.WorktreePath, w.Members, branch
 	cw.baseRef = cwdBase
 	if cw.baseRef == "" {
 		if r, ok := m.opts.Projects.Snapshot().Project(cwdProject); ok {

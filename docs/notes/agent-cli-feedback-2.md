@@ -6,6 +6,10 @@ its children's reports (it harvested 12 wake messages one by one), and no bulk r
 archive (it wrote a shell loop). This step adds `thread reports` and `--ids` on
 `thread remove` and `thread archive`.
 
+Follow-up: a thread whose worktree `project.worktree.cleanup` removed after it was
+archived gets the worktree back when it is sent a message
+([recreate-worktree](recreate-worktree.md)).
+
 ## Decisions
 
 - **A reports command, not only `thread list --json`.** `thread list --json` has the

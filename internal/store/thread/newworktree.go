@@ -39,7 +39,7 @@ type namingResult struct {
 
 // createdWorktree is what newWorktree made.
 type createdWorktree struct {
-	projectID, path, baseRef string
+	projectID, path, baseRef, branch string
 	// name is the namer's title when it arrived within SlugTimeout.
 	name string
 	// namerCalled: the namer was started for this thread (in time or not).
@@ -89,7 +89,7 @@ func (m *Manager) newWorktree(ctx context.Context, id, name string, o CreateOpti
 	if err != nil {
 		return nw, projectError("create worktree "+branch, err)
 	}
-	nw.projectID, nw.path = r.ID, wt.Path
+	nw.projectID, nw.path, nw.branch = r.ID, wt.Path, branch
 	nw.baseRef = cmp.Or(base, wt.Status.BaseRef, r.DefaultBranch)
 	m.log.Info("worktree created for thread", "thread", id, "project", r.ID, "branch", branch,
 		"path", wt.Path, "base", nw.baseRef)
