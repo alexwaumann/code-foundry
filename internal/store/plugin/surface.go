@@ -87,10 +87,12 @@ func (p SurfacePhase) String() string {
 	return fmt.Sprintf("SurfacePhase(%d)", int(p))
 }
 
-// SurfaceRef names an instance by plugin, surface and the caller's context.
+// SurfaceRef names an instance by plugin, surface and the caller's context, or by the
+// key of an instance the store already has.
 type SurfaceRef struct {
 	Plugin, Surface string
 	Context         command.Context
+	Instance        string
 }
 
 // SurfaceState is an instance's state.
@@ -487,6 +489,12 @@ func (m *Manager) SurfaceAvailable(plugin, surface string, uctx command.Context)
 // resolve finds (or makes) the instance ref names.
 func (h *surfaceHub) resolve(ref SurfaceRef) (*instance, error) {
 	m := h.m
+	if ref.Instance != "" {
+		if in := h.lookup(ref.Instance); in != nil {
+			return in, nil
+		}
+		return nil, fmt.Errorf("%w: no surface instance %q (open it by plugin, surface and context first)", ErrNotFound, ref.Instance)
+	}
 	p, ok := m.Snapshot().Plugin(ref.Plugin)
 	if !ok {
 		return nil, fmt.Errorf("%w: no plugin %q", ErrNotFound, ref.Plugin)

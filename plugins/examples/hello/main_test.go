@@ -31,6 +31,15 @@ func TestManifest(t *testing.T) {
 	if len(served) != len(m.Commands) {
 		t.Errorf("serves %d commands, declares %d", len(served), len(m.Commands))
 	}
+	surfaces := plugin().Surfaces
+	for _, s := range m.Surfaces {
+		if surfaces[s.ID] == nil {
+			t.Errorf("surface %s declared but not served", s.ID)
+		}
+	}
+	if len(surfaces) != len(m.Surfaces) {
+		t.Errorf("serves %d surfaces, declares %d", len(surfaces), len(m.Surfaces))
+	}
 }
 
 func TestCommands(t *testing.T) {
