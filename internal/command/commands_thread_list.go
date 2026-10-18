@@ -49,7 +49,7 @@ func RegisterThreadList(r *Registry, d ThreadListDeps) error {
 		Title: "List Threads",
 		Description: "List threads, the most recently active first: one line each, " +
 			"`<id>  <status>  <name>  <project>@<branch>  <age>` and `↳ <creator>` for a thread another thread created. " +
-			"Archived threads are left out unless archived or all is given; at most limit threads.",
+			"Archived threads are left out unless archived or all is given.",
 		Category:     "Thread",
 		NoKeybinding: true,
 		Args: []ArgSpec{
