@@ -39,6 +39,9 @@ type Options struct {
 	Capabilities []string
 	// Secrets are stored before the plugin starts (so Init can read them).
 	Secrets map[string]string
+	// Flags are the plugin's live flags as initialize reports them (Host.Flags in Init),
+	// for testing that Init reconciles them.
+	Flags []pluginsdk.Flag
 	// NoInitWait makes Start return right after the handshake instead of waiting (up to
 	// 5 s) for Plugin.Init to return; for a plugin whose Init blocks.
 	NoInitWait bool
@@ -118,6 +121,7 @@ func Start(t testing.TB, p pluginsdk.Plugin, opts Options) *Host {
 		Protocol: pluginsdk.ProtocolVersion,
 		Host:     pluginsdk.HostInfo{Version: "test", Capabilities: opts.Capabilities},
 		Plugin:   pluginsdk.PluginInfo{Name: opts.Name, DataDir: opts.DataDir, Granted: opts.Granted},
+		Flags:    opts.Flags,
 	}, &res); err != nil {
 		t.Fatalf("plugintest: initialize: %v", err)
 	}
@@ -148,10 +152,17 @@ func (h *Host) Command(ctx context.Context, name string, args map[string]string,
 // OpenSurface opens a surface instance (surface/open) and tells the plugin it is
 // visible, as the host does for its first viewer. The plugin's views arrive in View.
 func (h *Host) OpenSurface(ctx context.Context, instance, surface string, uctx pluginsdk.UiContext) error {
-	if err := h.conn.Call(ctx, pluginsdk.MethodSurfaceOpen, pluginsdk.SurfaceOpen{Instance: instance, Surface: surface, Context: uctx}, nil); err != nil {
+	return h.OpenSurfaceWith(ctx, pluginsdk.SurfaceOpen{Instance: instance, Surface: surface, Context: uctx})
+}
+
+// OpenSurfaceWith is OpenSurface with the whole surface/open, Facts included: a pr
+// scoped surface's Facts["pr"] ({"repo", "number", "url"} as JSON) and the facts its
+// when clause reads.
+func (h *Host) OpenSurfaceWith(ctx context.Context, open pluginsdk.SurfaceOpen) error {
+	if err := h.conn.Call(ctx, pluginsdk.MethodSurfaceOpen, open, nil); err != nil {
 		return err
 	}
-	return h.conn.Notify(pluginsdk.MethodSurfaceVisibility, pluginsdk.SurfaceVisibility{Instance: instance, Visible: true})
+	return h.conn.Notify(pluginsdk.MethodSurfaceVisibility, pluginsdk.SurfaceVisibility{Instance: open.Instance, Visible: true})
 }
 
 // Act sends surface/act. A zero act.Version is the instance's latest.
@@ -201,11 +212,15 @@ func (h *Host) Close() {
 	h.closeOnce.Do(func() { _ = h.conn.Close() })
 }
 
-// WaitFor waits until cond, checked after every recorded call, is true. It fails the
-// test after timeout.
+// WaitFor waits until cond is true, checking it at once, after every call the plugin
+// makes to the host, and every 20 ms (so cond may also read the plugin's own state). It
+// fails the test after timeout, listing the plugin's last log lines (a refused view or
+// call is logged there).
 func (h *Host) WaitFor(timeout time.Duration, cond func(h *Host) bool) {
 	h.t.Helper()
 	deadline := time.After(timeout)
+	tick := time.NewTicker(20 * time.Millisecond)
+	defer tick.Stop()
 	for {
 		h.mu.Lock()
 		ch := h.changed
@@ -215,8 +230,13 @@ func (h *Host) WaitFor(timeout time.Duration, cond func(h *Host) bool) {
 		}
 		select {
 		case <-ch:
+		case <-tick.C:
 		case <-deadline:
-			h.t.Fatalf("plugintest: condition not met after %s", timeout)
+			logs := h.Logs()
+			if len(logs) > 10 {
+				logs = logs[len(logs)-10:]
+			}
+			h.t.Fatalf("plugintest: condition not met after %s; the plugin's last log lines: %+v", timeout, logs)
 		}
 	}
 }

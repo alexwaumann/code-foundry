@@ -47,10 +47,12 @@ func Install(dir, version string, files Files) error {
 	defer func() { _ = os.RemoveAll(staged) }() // a no-op once renamed into place
 	for p, b := range files {
 		dst := filepath.Join(staged, filepath.FromSlash(path.Join("skills", p)))
-		if err := os.MkdirAll(filepath.Dir(dst), 0o700); err != nil {
+		// Ordinary modes inside the private .claude (MkdirTemp makes it 0700): the plugin
+		// skill's example is copied out as a new repository's files.
+		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 			return fmt.Errorf("skills: %w", err)
 		}
-		if err := os.WriteFile(dst, b, 0o600); err != nil {
+		if err := os.WriteFile(dst, b, 0o644); err != nil {
 			return fmt.Errorf("skills: %w", err)
 		}
 	}

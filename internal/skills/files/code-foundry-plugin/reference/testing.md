@@ -23,6 +23,7 @@ h := plugintest.Start(t, plugin(), plugintest.Options{
 	},
 	Capabilities: []string{"surfaces", "view.tabs"}, // what h.HasCapability sees
 	Secrets:      map[string]string{"token": "t0k"},  // stored before Init runs
+	Flags:        []pluginsdk.Flag{{ThreadID: "s-1", Level: "error", Reason: "old"}}, // h.Flags() in Init
 	DataDir:      dir,                                // default t.TempDir(); h.DataDir() returns it
 })
 ```
@@ -33,6 +34,7 @@ Drive it like the host:
 |---|---|
 | `h.Command(ctx, "greet", args, uctx)` | `command/invoke`: returns the plugin's `CommandResult` or error |
 | `h.OpenSurface(ctx, instance, "status", uctx)` | `surface/open` + `visibility true` |
+| `h.OpenSurfaceWith(ctx, pluginsdk.SurfaceOpen{Instance, Surface, Context, Facts})` | the same with facts: a `pr` surface's `Facts["pr"]` (`json.RawMessage(`{"repo":"octo/app","number":12,"url":"…"}`)`) and the facts its `when` reads |
 | `h.Act(ctx, pluginsdk.SurfaceAct{Instance, Kind, Action, Key, Data, Value, Values})` | `surface/act` (Version 0 = the latest) |
 | `h.Visibility(instance, false)`, `h.CloseSurface(instance)` | visibility and close notifications |
 | `h.Event(pluginsdk.Event{Subscription: "sub-1", Event: json.RawMessage(...)})` | an `events/event` |
@@ -44,11 +46,15 @@ And read what the plugin did: `h.View(instance)` (the last view's JSON), `h.Vers
 `h.Subscriptions()`, `h.Invocations()` (allowed or not), `h.Secret(key)`.
 
 `h.WaitFor(5*time.Second, func(h *plugintest.Host) bool { … })` waits for something done
-asynchronously (in Init, a goroutine, a notification); it re-checks after every recorded
-call and fails the test on timeout. Calls that are requests (`UpdateView`, `SetFlag`,
-`Invoke`, secrets) are recorded before the plugin's handler returns, so after `h.Act` or
-`h.Command` returns their effects are visible without waiting; notifications (`Log`,
-`Toast`, `SetContext`) and anything from another goroutine need `WaitFor`.
+asynchronously (a goroutine, a notification). It checks the condition at once, after
+every call the plugin makes to the host, and every 20 ms, so the condition may read the
+plugin's own state too (behind its mutex). On timeout it fails the test with the
+plugin's last log lines: a view `UpdateView` refused inside a goroutine shows up there
+(the previous view stays, so a test waiting for "loaded" just times out). Calls that are
+requests (`UpdateView`, `SetFlag`, `Invoke`, secrets) are recorded before the plugin's
+handler returns, so after `h.Act` or `h.Command` returns their effects are visible
+without waiting; notifications (`Log`, `Toast`, `SetContext`) and anything from another
+goroutine need `WaitFor`.
 
 ## Patterns
 
@@ -128,7 +134,12 @@ line). Wait on the last thing the plugin does, not an intermediate counter.
 (`strings.Contains(fmt.Sprint(h.Logs()), value)`).
 
 **Time**: inject a clock (`now func() time.Time`) into the plugin's state rather than
-sleeping; for pollers, make the interval a field the test shortens.
+sleeping; for pollers, make the interval a field the test shortens. That a poller stops
+when its work is done is testable too: count the fake `Invoke` (or `gh`) calls, wait a few
+intervals, and check the count did not grow.
+
+**Flags in Init**: start with `Options.Flags` set and check Init cleared what no longer
+holds (`h.Flags()` records the plugin's `SetFlag` calls).
 
 ## What plugintest does not do
 
@@ -138,3 +149,29 @@ after `go test ./...` passes, run the plugin for real (the skill's loop, steps 5
 and check `code-foundry plugin list` (state, NOTE), `plugin logs <name>` (no refused
 views or calls), `plugin surface` for each surface and `plugin act` for each event.
 `plugin surface` prints the view the host accepted and the elements an act can name.
+
+## Against the daemon
+
+What the unit tests cannot show, with the plugin linked by `plugin dev` (its folder, and
+any scratch project you `code-foundry project add` to test against, must be under the
+home directory; so must an unpacked release tarball you try):
+
+- `code-foundry plugin <name> <command> [args] --thread <id>`: a command, as its view
+  button would run it. This is how to exercise a command button.
+- `code-foundry plugin surface <name> <surface> --thread <id>` opens the surface for that
+  thread as the panel would and prints the view the host accepted and the elements an
+  act can name. It returns at the first view: a surface that renders "Loading" first
+  shows that; run it again a moment later (the instance stays open a minute), or watch:
+  `code-foundry plugin surface <name> <surface> --thread <id> --watch > /tmp/view.txt &
+  pid=$!; sleep 5; kill $pid`. `--thread` (and `--project`) take a unique suffix; the
+  global `--context-thread` works too.
+- `code-foundry plugin act <name> <surface> <event> --thread <id>` sends an event: the
+  event name positionally or `--key <element key>`, `tab --key <tab key>` for a tab,
+  `--value` for a field's change, `--values '{"field": "…"}'` for a submit. It reaches
+  events only: a command button answers "the host runs it, not the plugin".
+- A `pr` surface's `when` usually reads `pr.checks.*`: the first try for a thread fails
+  with "not known yet" while the checks are fetched; retry after a few seconds.
+- `code-foundry thread new --no-project --name test --created-by=` makes a thread to
+  test against (no prompt: nothing is sent to Claude). Never send a prompt just to test.
+- `code-foundry plugin logs <name> --lines 50` after each step: refused views and calls,
+  your own log lines.

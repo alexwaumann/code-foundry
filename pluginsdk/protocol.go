@@ -1,6 +1,7 @@
 package pluginsdk
 
 import (
+	"bytes"
 	"encoding/json"
 	"time"
 )
@@ -194,6 +195,20 @@ type LogParams struct {
 	Level string         `json:"level"` // debug, info, warn, error
 	Msg   string         `json:"msg"`
 	Attrs map[string]any `json:"attrs,omitempty"`
+}
+
+// UnmarshalJSON decodes numbers in Attrs as json.Number, so an integer attr (a run id)
+// prints as written ("39128319017"), never as a float ("3.9128319017e+10").
+func (p *LogParams) UnmarshalJSON(b []byte) error {
+	type plain LogParams
+	d := json.NewDecoder(bytes.NewReader(b))
+	d.UseNumber()
+	var v plain
+	if err := d.Decode(&v); err != nil {
+		return err
+	}
+	*p = LogParams(v)
+	return nil
 }
 
 // SecretKeyParams names one secret.

@@ -55,7 +55,12 @@ chip `deploy` and a button `deploy` collide, so prefix by role (`stage-deploy`,
   sets that node's `text` or `lines` replaces the buffer; one that leaves both empty keeps
   it; a view without the node drops it. So while output streams, render the log node with
   empty `text` and send each new chunk once with AppendLog; set `text` only to start
-  over (a new run) or when the view comes back after the node was gone.
+  over or when the view comes back after the node was gone.
+- **A new run** that has printed nothing yet cannot clear the old output with empty
+  `text` (that keeps it): give each run its own node key (`log-run-7`; the old node's
+  buffer goes with it), or seed the new run's text with a first line (`$ go test ./...`).
+- **Order**: append the last output *before* the view that ends the run ("passing"), so
+  a viewer never sees the verdict above a log that is still filling.
 - Acts name a view version: the elements of the last 4 versions still act, so a click on
   a view that was just replaced still arrives (with its old `version`).
 - After `Surface.Close` the instance is gone: `UpdateView` to it fails with -32004. Stop
@@ -88,8 +93,11 @@ place are refused, with a path to the problem (`nodes[2].list.rows[0].title: req
 name, `act.Data` its data, at most 1 KB). A `command` runs a command with the panel's
 context through the host, with its confirm dialog: the plugin's own
 (`plugin.<name>.<command>`) or a host command its `permissions.commands` allow (the view
-is refused otherwise). `openUrl` and `copy` are done by the host and never reach the
-plugin.
+is refused otherwise); its `context: thread` (and project, worktree) args default from
+the panel's context, so `args` can leave them out, and it runs with the viewer's panel,
+which matters for shared instances (`reference/manifest.md`, "One instance, many
+viewers"). `openUrl` and `copy` are done by the host and never reach the plugin, and
+neither does a command button: `plugin act` cannot press one; run the command instead.
 
 ## Header and tabs
 
@@ -99,8 +107,8 @@ plugin.
             "subline": {"spans": [{"text": "updated "}, {"time": {"at": "2026-10-18T09:00:00Z"}}]},
             "trailing": "main",
             "actions": [{"key": "refresh", "label": "Refresh", "icon": "refresh-cw", "iconOnly": true, "action": {"event": "refresh"}}]},
- "tabs": {"items": [{"key": "runs", "label": "Runs"}, {"key": "log", "label": "Log", "badge": {"label": "live", "tone": "attention"}}],
-          "active": "runs"},
+ "tabs": {"items": [{"key": "tab-runs", "label": "Runs"}, {"key": "tab-log", "label": "Log", "badge": {"label": "live", "tone": "attention"}}],
+          "active": "tab-runs"},
  "nodes": []}
 ```
 
@@ -109,15 +117,18 @@ h := &ui.Header{Icon: "workflow", Title: "Checks of octo/app#12", TabTitle: "Che
 	Pill: ui.NewPill("2 failing", ui.ToneError), Trailing: ui.Plain("main"),
 	Subline: ui.Spans(ui.T("updated "), ui.At(fetched, ui.TimeRelative)),
 	Actions: []ui.Button{ui.EventButton("refresh", "Refresh", "refresh").WithIcon("refresh-cw").AsIconOnly()}}
-tabs := ui.NewTabs("runs", ui.NewTab("runs", "Runs"), ui.Tab{Key: "log", Label: "Log", Badge: ui.NewPill("live", ui.ToneAttention)})
+tabs := ui.NewTabs("tab-runs", ui.NewTab("tab-runs", "Runs"), ui.Tab{Key: "tab-log", Label: "Log", Badge: ui.NewPill("live", ui.ToneAttention)})
+v := ui.View{Header: h, Tabs: tabs, Nodes: runsNodes} // NewTabs returns *ui.Tabs
 ```
 
 The header stays pinned above the scrolling body. Empty `icon` and `title` use the
 manifest's; `tabTitle` (40 characters) renames the panel tab; up to 2 header buttons, drawn
 icon-only (give them an icon). **Tabs** switch views inside one surface: the host draws the strip, sends a
-`tab` act (`act.Kind == "tab"`, `act.Key` and `act.Value` the tab's key) when the user
-switches, and keeps form drafts per tab. The plugin answers with the view of the new
-active tab: `nodes` are always the active tab's.
+`tab` act (`act.Kind == "tab"`, `act.Key` the tab's key) when the user switches, and
+keeps form drafts per tab. The plugin answers with the view of the new active tab:
+`nodes` are always the active tab's. Tab keys share the view's one key namespace: a tab
+`runs` and a list `runs` collide (`nodes[1].key: "runs" is already used by
+tabs.items[0]`), so prefix tabs `tab-…`.
 
 ## Nodes
 
@@ -170,7 +181,7 @@ Facts about one thing: a label (40 characters) and a value or a pill.
 ### list
 
 ```json
-{"key": "runs", "list": {"emptyText": "No runs yet", "rows": [
+{"key": "run-list", "list": {"emptyText": "No runs yet", "rows": [
   {"key": "run-7", "glyph": {"status": "running"}, "title": "CI", "titleMeta": "push",
    "line2": {"spans": [{"text": "started "}, {"time": {"at": "2026-10-18T09:00:00Z", "style": "elapsed"}}]},
    "trailing": {"spans": [{"duration": {"ms": 42000}}]},
@@ -181,7 +192,7 @@ Facts about one thing: a label (40 characters) and a value or a pill.
 ```
 
 ```go
-ui.Node{Key: "runs", List: &ui.List{EmptyText: "No runs yet", Rows: []ui.Row{
+ui.Node{Key: "run-list", List: &ui.List{EmptyText: "No runs yet", Rows: []ui.Row{
 	{Key: "run-7", Glyph: ui.StatusGlyph(ui.StatusRunning), Title: "CI", TitleMeta: ui.Plain("push"),
 		Line2:    ui.Spans(ui.T("started "), ui.At(started, ui.TimeElapsed)),
 		Trailing: ui.Spans(ui.For(42 * time.Second)),

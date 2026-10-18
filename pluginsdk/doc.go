@@ -33,7 +33,7 @@
 // Every Code Foundry thread has the code-foundry-plugin skill, which documents the
 // manifest, the protocol, the view model, the host API, testing and publishing for
 // plugin authors (its reference files are written by the daemon at start, beside the
-// skill). The design is in the Code Foundry repository under docs/sketches/plugins.
+// skill); it and this documentation are all a plugin author needs.
 //
 // The module needs Go 1.24 or newer and nothing outside the standard library:
 //

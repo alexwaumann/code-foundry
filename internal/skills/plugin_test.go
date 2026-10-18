@@ -5,11 +5,13 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/skills"
+	"github.com/alexwaumann/code-foundry/pluginsdk/ui"
 )
 
 // pluginSkillFiles are the code-foundry-plugin skill's files.
@@ -22,6 +24,7 @@ var pluginSkillFiles = []string{
 	"code-foundry-plugin/example/plugin.json", "code-foundry-plugin/example/main.go",
 	"code-foundry-plugin/example/main_test.go", "code-foundry-plugin/example/Makefile",
 	"code-foundry-plugin/example/.gitignore", "code-foundry-plugin/example/.github/workflows/release.yml",
+	"code-foundry-plugin/example/.github/workflows/ci.yml", "code-foundry-plugin/example/scripts/registry-entry.go",
 }
 
 // maxPluginFile bounds every file of the plugin skill: an agent reads a reference whole
@@ -61,7 +64,8 @@ func TestRenderPluginSkill(t *testing.T) {
 		}
 	}
 	manifest := string(files[skills.Plugin+"/reference/manifest.md"])
-	for _, want := range []string{"`pr.checks.provider`", "`thread.hasPr`", "`threads`, `thread`", "`surface`, `act`", "`context-thread`"} {
+	for _, want := range []string{"`pr.checks.provider`", "`thread.hasPr`", "`threads`, `thread`", "`surface`, `act`", "`context-thread`",
+		"`activity`, `ban`", "`workflow`, `wrench`"} {
 		if !strings.Contains(manifest, want) {
 			t.Errorf("manifest.md lacks %q", want)
 		}
@@ -149,5 +153,30 @@ func TestSDKPin(t *testing.T) {
 	}
 	if !strings.Contains(string(files[skills.Plugin+"/SKILL.md"]), "pluginsdk@main\n") {
 		t.Error("SKILL.md does not pin main for a dirty build")
+	}
+}
+
+// The skill lists the icons the GUI draws (ui.Icons); once the GUI's allowlist is in
+// this tree the two must agree.
+func TestIconsMatchTheGUI(t *testing.T) {
+	src, err := os.ReadFile("../../gui/frontend/src/components/plugin/icons.ts")
+	if os.IsNotExist(err) {
+		t.Skip("no plugin icon allowlist in the GUI yet")
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(src)
+	start := strings.Index(body, "PLUGIN_ICONS")
+	end := strings.Index(body[max(start, 0):], "\n};")
+	if start < 0 || end < 0 {
+		t.Fatal("icons.ts has no PLUGIN_ICONS map")
+	}
+	var gui []string
+	for _, m := range regexp.MustCompile(`(?m)^\s+"?([a-z0-9-]+)"?:`).FindAllStringSubmatch(body[start:start+end], -1) {
+		gui = append(gui, m[1])
+	}
+	if !slices.Equal(gui, ui.Icons) {
+		t.Errorf("the GUI draws %v, pluginsdk/ui.Icons says %v", gui, ui.Icons)
 	}
 }
