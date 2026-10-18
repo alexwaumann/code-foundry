@@ -69,7 +69,7 @@ listed and fail with the reason; its surfaces say so.
 | `surface/open` | request (5 s) | `SurfaceOpen{instance, surface, context, facts}` → `{}` | `Plugin.Surfaces[surface]` |
 | `surface/visibility` | notification | `{instance, visible}`: viewers went from none to some (also right after open) or back | `Surface.Visibility` |
 | `surface/close` | notification | `{instance, reason}`: `idle` (no viewer for 60 s), `shutdown` | `Surface.Close` |
-| `surface/act` | request (10 s) | `SurfaceAct{instance, version, kind, action, key, data, field, value, values}` → `{}` | `Surface.Act` |
+| `surface/act` | request (10 s) | `SurfaceAct{instance, context, version, kind, action, key, data, field, value, values}` → `{}` | `Surface.Act` |
 | `events/event` | notification | `Event{subscription, snapshot, event}` | `Plugin.OnEvent` |
 
 After `surface/open` the plugin sends the instance's view with `view/update` within 10 s
@@ -94,7 +94,10 @@ first view first. An error from the factory or from `Act` is shown to the user
 | `events/subscribe` | request | `{sources}` → `{subscription}` | `Subscribe` | `events` |
 | `events/unsubscribe` | request | `{subscription}` → `{}` | `Unsubscribe` | |
 | `session/setEnvironment` | request | `{env, pathPrepend, addDirs, scope}` → `{applied, issues}` | `SetEnvironment` | `sessionEnv` |
-| `thread/create`, `thread/send`, `terminal/create`, `terminal/close` | request | (later version) | none yet | `threads`, `terminals` |
+| `thread/create` | request | `{title, cwd, projectId, addDirs, env, model, effort, prompt}` → `{threadId}` | `CreateThread` | `threads` |
+| `thread/send` / `archive` / `list` | request | `{threadId, text}`; `{threadId}`; `{}` → `{threads: [PluginThread]}` | `SendThread`, `ArchiveThread`, `Threads` | `threads` |
+| `terminal/create` | request | `{argv, cwd, env, title}` → `{terminalId}` | `CreateTerminal` | `terminals` |
+| `terminal/close` / `list` | request | `{terminalId}`; `{}` → `{terminals: [PluginTerminal]}` | `CloseTerminal`, `Terminals` | `terminals` |
 
 What each does and its limits: `reference/host-api.md`. A method this host does not
 support answers -32601 ("not supported yet by this Code Foundry").
@@ -124,9 +127,9 @@ code; `pluginsdk.ErrClosed` means the host went away (Serve is ending).
 `initialize` lists what the host supports, so a plugin can work with older and newer
 hosts: `invoke`, `invoke.ask`, `secrets`, `log`, `surfaces`, `view.v1`, `view.append`,
 `view.node.<kind>` for each node kind it renders, `view.tabs`, `view.fieldset`,
-`view.optionsSource`, `view.duration`, `context`, `events`, `flags`, `sessionEnv`.
-Check `h.HasCapability("view.node.chips")` before relying on something newer than
-protocol 1's first release; `thread` and `terminal` nodes are not announced yet.
+`view.optionsSource`, `view.duration`, `context`, `events`, `flags`, `sessionEnv`,
+`threads`, `terminals`, `act.context`. Check `h.HasCapability("view.node.thread")` before
+relying on something newer than protocol 1's first release.
 
 ## Without the SDK
 
