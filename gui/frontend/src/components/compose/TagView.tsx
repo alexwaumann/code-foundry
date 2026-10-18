@@ -1,6 +1,5 @@
 import { useContext, type ReactNode } from "react";
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
-import { Quote } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { citeLabel } from "@/lib/citation";
 import { tagLabel } from "@/lib/prompt";
@@ -10,6 +9,7 @@ import { useCitation } from "@/stores/compose";
 import { useProjectsStore } from "@/stores/projects";
 import { useSkillDescription } from "@/stores/skills";
 import { AttachmentChip } from "./AttachmentChip";
+import { QuoteGlyph } from "./QuoteGlyph";
 import { TagDraftContext, TagMultiProjectContext, tagOf } from "./tagContext";
 import { TAG_ACCENT, tagClass } from "./tagStyle";
 import { usePrTagInfo, useThreadTagInfo } from "./useTagInfo";
@@ -132,11 +132,6 @@ function PrTag({ slug, number, selected }: { slug: string; number: number; selec
       data={{ "data-slug": slug, "data-number": String(number), "data-state": info.state }}
     />
   );
-}
-
-/** The quote glyph of a citation chip, in the chip's accent. */
-export function QuoteGlyph() {
-  return <Quote aria-hidden className="size-[0.92em] shrink-0 fill-current stroke-0 text-[color-mix(in_oklab,var(--chip-accent)_70%,var(--color-foreground))]" />;
 }
 
 /** The ring of the chip whose comment is being edited. */

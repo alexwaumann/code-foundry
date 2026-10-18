@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { ArrowUp } from "lucide-react";
-import { QuoteGlyph } from "@/components/compose/TagView";
+import { QuoteGlyph } from "@/components/compose/QuoteGlyph";
 import { TAG_ACCENT, tagClass } from "@/components/compose/tagStyle";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
