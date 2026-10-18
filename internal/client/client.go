@@ -38,6 +38,9 @@ type Client struct {
 	Project codefoundryv1connect.ProjectServiceClient
 	// Events is for the events CLI verb, which streams EventService.Watch.
 	Events codefoundryv1connect.EventServiceClient
+	// Plugin is for plugin logs --follow and plugin dev, which stream
+	// PluginService.FollowLogs.
+	Plugin codefoundryv1connect.PluginServiceClient
 
 	paths paths.Paths
 }
@@ -64,6 +67,7 @@ func newClient(p paths.Paths, hc *http.Client, baseURL string) *Client {
 		Update:  codefoundryv1connect.NewUpdateServiceClient(hc, baseURL),
 		Project: codefoundryv1connect.NewProjectServiceClient(hc, baseURL),
 		Events:  codefoundryv1connect.NewEventServiceClient(hc, baseURL),
+		Plugin:  codefoundryv1connect.NewPluginServiceClient(hc, baseURL),
 		paths:   p,
 	}
 }

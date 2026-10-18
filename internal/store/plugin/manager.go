@@ -169,9 +169,10 @@ type entry struct {
 	logs  *logBuffer
 }
 
-// New scans the plugins dir, loads the user's choices and starts every enabled plugin.
-// Close it to stop them.
-func New(ctx context.Context, opts Options) (*Manager, error) {
+// New returns a Manager with nothing loaded: Start scans the plugins dir and starts
+// every enabled plugin (the daemon calls it once every command is registered, so a
+// starting plugin's host/invoke finds them). Close it to stop the plugins.
+func New(opts Options) (*Manager, error) {
 	if opts.DB == nil || opts.Commands == nil || opts.Dir == "" || opts.DataDir == "" || opts.LogDir == "" {
 		return nil, errors.New("plugin: Options.DB, Commands, Dir, DataDir and LogDir are required")
 	}
@@ -183,12 +184,13 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 	}
 	m := &Manager{opts: opts, log: opts.Log, entries: map[string]*entry{}}
 	m.rebuildLocked()
-	m.opMu.Lock()
-	defer m.opMu.Unlock()
-	if err := m.reloadLocked(ctx); err != nil {
-		return nil, err
-	}
 	return m, nil
+}
+
+// Start scans the plugins dir, loads the user's choices and starts every enabled plugin
+// (in parallel, without waiting for them).
+func (m *Manager) Start(ctx context.Context) error {
+	return m.Reload(ctx)
 }
 
 // Bus returns the bus events are published on.

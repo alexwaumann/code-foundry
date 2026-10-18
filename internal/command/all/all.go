@@ -64,6 +64,9 @@ type Deps struct {
 	// Action backs action.* (which also use Project and Thread to find a run's owner).
 	// Nil works like Terminal.
 	Action command.ActionBackend
+	// Plugin backs plugin.* (the management verbs; a plugin's own commands come from the
+	// plugin store). Nil works like Terminal.
+	Plugin command.PluginBackend
 }
 
 // Register registers every domain's commands into r.
@@ -88,6 +91,9 @@ func Register(r *command.Registry, d Deps) error {
 	}
 	if d.Action == nil {
 		d.Action = codefoundryv1connect.UnimplementedActionServiceHandler{}
+	}
+	if d.Plugin == nil {
+		d.Plugin = codefoundryv1connect.UnimplementedPluginServiceHandler{}
 	}
 	if d.Update == nil {
 		d.Update = codefoundryv1connect.UnimplementedUpdateServiceHandler{}
@@ -127,5 +133,6 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterUsage(r, d.Thread),
 		command.RegisterWorkspace(r, d.Workspace),
 		command.RegisterAction(r, command.ActionDeps{Action: d.Action, Project: d.Project, Thread: d.Thread}),
+		command.RegisterPlugin(r, d.Plugin),
 	)
 }
