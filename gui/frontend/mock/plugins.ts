@@ -483,7 +483,7 @@ export class MockPlugins {
   /** Threads the demo's Pin button pinned (hello's context fact `pinned`). */
   private pinned = new Set<string>();
   private epoch = 0;
-  /** Acts the GUI sent: "<instance> <key> <json values>". */
+  /** Acts the GUI sent: "<instance> <key> [viewer=<the acting panel's thread>] <json values>". */
   acts: string[] = [];
 
   constructor(private readonly deps: PluginDeps) {
@@ -697,7 +697,7 @@ export class MockPlugins {
     if (el.kind === "host") throw new ConnectError(`${req.key} is a host action: the host runs it, not the plugin`, Code.InvalidArgument);
     const values = (req.values ?? {}) as Record<string, unknown>;
     const viewer = req.context?.activeThreadId ?? "";
-    this.acts.push(`${req.instance} ${req.key} ${JSON.stringify(values)}${req.value !== undefined ? ` value=${req.value}` : ""}${viewer ? ` viewer=${viewer}` : ""}`);
+    this.acts.push(`${req.instance} ${req.key}${viewer ? ` viewer=${viewer}` : ""} ${JSON.stringify(values)}${req.value !== undefined ? ` value=${req.value}` : ""}`);
     const version = req.version || BigInt(inst.version);
     inst.act(el, values, (text) => inst.hub.publish({ update: { case: "toast", value: { instance: inst.key, level: "info", text } } }), viewer);
     return version;
