@@ -120,6 +120,18 @@ describe("quoteAt", () => {
   it("whitespace only is no quote", () => {
     expect(quoteAt(plain, 45, 46)).toBeNull();
   });
+  it("the context does not cut an emoji in half, so the link encodes", () => {
+    // An emoji (two UTF-16 units) the 32-unit edge falls inside, on both sides.
+    const pad = "b".repeat(31);
+    const text = `x😀${pad}quote${pad}😀y`;
+    const s = text.indexOf("quote");
+    const q = quoteAt(text, s, s + 5);
+    expect(q).toMatchObject({ text: "quote", prefix: pad, suffix: pad });
+    const c = { ...body(), ...q };
+    expect(parseCiteLink(citeLink(c))).toEqual(c);
+    // A lone surrogate in a comment still encodes.
+    expect(parseCiteLink(citeLink({ ...c, comment: "half \uD83D" }))?.comment).toBe("half �");
+  });
 });
 
 describe("locateQuote", () => {

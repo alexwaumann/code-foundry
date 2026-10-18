@@ -88,9 +88,12 @@ export function citeLabel(quote: string): string {
   return cut ? `${label}…` : label;
 }
 
-/** encodeURIComponent plus the characters that would end a Markdown link (`(`, `)`) or read oddly in it. */
+/**
+ * encodeURIComponent plus the characters that would end a Markdown link (`(`, `)`) or read
+ * oddly in it. A lone surrogate (which encodeURIComponent throws on) becomes U+FFFD.
+ */
 function encode(s: string): string {
-  return encodeURIComponent(s).replace(/[!'()*]/g, (c) => `%${(c.codePointAt(0) ?? 0).toString(16).toUpperCase()}`);
+  return encodeURIComponent(s.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "�")).replace(/[!'()*]/g, (c) => `%${(c.codePointAt(0) ?? 0).toString(16).toUpperCase()}`);
 }
 
 function decode(s: string): string | null {
@@ -169,8 +172,16 @@ export function quoteAt(plain: string, start: number, end: number): Pick<Citatio
   while (s < e && /\s/.test(plain.charAt(s))) s++;
   while (e > s && /\s/.test(plain.charAt(e - 1))) e--;
   if (s >= e) return null;
-  return { text: plain.slice(s, e), start: s, end: e, prefix: plain.slice(Math.max(0, s - CITE_CONTEXT), s), suffix: plain.slice(e, e + CITE_CONTEXT) };
+  // The context never starts or ends inside a surrogate pair (an emoji cut in half does
+  // not encode: encodeURIComponent throws on a lone surrogate).
+  let from = Math.max(0, s - CITE_CONTEXT);
+  if (from > 0 && isLow(plain.charCodeAt(from))) from++;
+  let to = Math.min(plain.length, e + CITE_CONTEXT);
+  if (to < plain.length && isLow(plain.charCodeAt(to))) to--;
+  return { text: plain.slice(s, e), start: s, end: e, prefix: plain.slice(from, s), suffix: plain.slice(e, to) };
 }
+
+const isLow = (c: number) => c >= 0xdc00 && c <= 0xdfff;
 
 /** The string without whitespace, and for each of its characters the index it had. */
 function squashed(s: string): { text: string; at: number[] } {
