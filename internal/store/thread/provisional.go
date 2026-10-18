@@ -37,11 +37,13 @@ func (s *Thread) nameProvisionally(composer, text string) bool {
 }
 
 // applyNamerTitle names s with the namer's title unless it is named for good (a rename
-// meanwhile wins).
-func (s *Thread) applyNamerTitle(title string) {
-	if !s.namedForGood() {
-		s.Name, s.AutoNamed, s.NameProvisional = title, true, false
+// meanwhile wins). Reports whether it did.
+func (s *Thread) applyNamerTitle(title string) bool {
+	if s.namedForGood() {
+		return false
 	}
+	s.Name, s.AutoNamed, s.NameProvisional = title, true, false
+	return true
 }
 
 // nameFromFirstMessage gives a thread created without a prompt the provisional name of

@@ -949,8 +949,13 @@ func (m *Manager) startNaming(id, msg string) {
 			m.log.Warn("auto-naming failed", "thread", id, "err", err)
 			return
 		}
-		if _, ok := m.update(id, true, func(rec *record) { rec.s.applyNamerTitle(name) }); ok {
-			m.log.Info("thread auto-named", "thread", id, "name", name, "took", time.Since(start).Round(time.Millisecond).String())
+		applied := false
+		m.update(id, true, func(rec *record) { applied = rec.s.applyNamerTitle(name) })
+		took := time.Since(start).Round(time.Millisecond).String()
+		if applied {
+			m.log.Info("thread auto-named", "thread", id, "name", name, "took", took)
+		} else {
+			m.log.Info("naming answer ignored: the thread was named meanwhile", "thread", id, "name", name, "took", took)
 		}
 	}()
 }

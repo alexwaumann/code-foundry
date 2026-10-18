@@ -201,8 +201,12 @@ func (m *Manager) applyLateName(id string, ch <-chan namingResult) {
 			m.log.Warn("auto-naming failed", "thread", id, "err", res.err)
 			return
 		}
-		if _, ok := m.update(id, true, func(rec *record) { rec.s.applyNamerTitle(res.name) }); ok {
+		applied := false
+		m.update(id, true, func(rec *record) { applied = rec.s.applyNamerTitle(res.name) })
+		if applied {
 			m.log.Info("thread auto-named after its worktree was created", "thread", id, "name", res.name)
+		} else {
+			m.log.Info("naming answer ignored: the thread was named meanwhile", "thread", id, "name", res.name)
 		}
 	}()
 }
