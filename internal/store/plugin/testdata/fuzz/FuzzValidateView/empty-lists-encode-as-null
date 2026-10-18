@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("{\"nodes\":[{\"key\":\"c\",\"chips\":{}},{\"key\":\"s\",\"section\":{}},{\"key\":\"f\",\"form\":{}},{\"key\":\"p\",\"pairs\":{}},{\"key\":\"a\",\"actions\":{}},{\"key\":\"l\",\"list\":{}}]}")

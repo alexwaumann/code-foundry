@@ -52,6 +52,9 @@ func helper(mode string) int {
 		}
 		return 0
 	}
+	if fn, ok := extraHelpers[mode]; ok {
+		return fn()
+	}
 	fmt.Fprintln(os.Stderr, "unknown helper mode", mode)
 	return 2
 }

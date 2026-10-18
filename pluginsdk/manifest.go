@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 )
@@ -24,8 +25,9 @@ const ProtocolVersion = 1
 // the plugin is down); initialize may narrow it, never widen it.
 type Manifest struct {
 	// Name is the plugin's id and its directory's name: [a-z0-9][a-z0-9-]{0,63}. A
-	// plugin with commands needs a name that is also a command segment (a letter first,
-	// no double or trailing hyphen): its commands are plugin.<name>.<command>.
+	// plugin with commands or surfaces needs a name that is also a command segment (a
+	// letter first, no double or trailing hyphen): its commands are
+	// plugin.<name>.<command>, its surfaces' plugin.<name>.show.<surface>.
 	Name string `json:"name"`
 	// DisplayName is shown in lists and as the commands' palette group (default Name).
 	DisplayName string `json:"displayName,omitempty"`
@@ -290,8 +292,9 @@ func (m Manifest) Validate() error {
 		bad("name", "%q must match %s", m.Name, namePattern)
 	case slices.Contains(ReservedNames, m.Name):
 		bad("name", "%q is reserved (a plugin.* verb)", m.Name)
-	case len(m.Commands) > 0 && !segmentPattern.MatchString(m.Name):
-		bad("name", "%q cannot carry commands: a command segment starts with a letter and has no double or trailing hyphen", m.Name)
+	case (len(m.Commands) > 0 || len(m.Surfaces) > 0) && !segmentPattern.MatchString(m.Name):
+		// Surfaces bring plugin.<name>.show.<surface> commands.
+		bad("name", "%q cannot carry commands or surfaces: a command segment starts with a letter and has no double or trailing hyphen", m.Name)
 	}
 	if !semverPattern.MatchString(m.Version) {
 		bad("version", "%q is not a semantic version (1.2.3, no leading v)", m.Version)
@@ -427,6 +430,36 @@ func (a ArgSpec) validate() error {
 		return errors.New("a context arg must be a string or a path")
 	case t == ArgEnum && a.Default != "" && !slices.Contains(a.Enum, a.Default):
 		return fmt.Errorf("default %q is not one of the values", a.Default)
+	case a.Default != "":
+		if err := parseArgValue(t, a.Enum, a.Default); err != nil {
+			return fmt.Errorf("default: %w", err)
+		}
+	}
+	return nil
+}
+
+// parseArgValue checks a value of an arg of type t the way the host's command registry
+// parses it (a default it cannot parse keeps every command of the plugin unregistered):
+// a bool is true or false (strconv.ParseBool), an int a whole number that fits in an
+// int, a path absolute or under ~/.
+func parseArgValue(t string, enum []string, v string) error {
+	switch t {
+	case ArgBool:
+		if _, err := strconv.ParseBool(v); err != nil {
+			return fmt.Errorf("want true or false, got %q", v)
+		}
+	case ArgInt:
+		if _, err := strconv.Atoi(v); err != nil {
+			return fmt.Errorf("want an integer, got %q", v)
+		}
+	case ArgEnum:
+		if !slices.Contains(enum, v) {
+			return fmt.Errorf("want one of %s, got %q", strings.Join(enum, ", "), v)
+		}
+	case ArgPath:
+		if v != "~" && !strings.HasPrefix(v, "~/") && !strings.HasPrefix(v, "/") {
+			return fmt.Errorf("want an absolute path or one under ~/, got %q", v)
+		}
 	}
 	return nil
 }

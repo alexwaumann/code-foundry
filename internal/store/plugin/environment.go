@@ -37,26 +37,43 @@ const (
 	maxEnvKeys      = 64
 	maxEnvDirs      = 16
 	maxScopeEntries = 256
+	// maxEnvIssues bounds the issues one push reports (the rest are counted): they are
+	// logged one a line and sent back in the answer.
+	maxEnvIssues = 32
 	// envSettle is how long after initialized a starting plugin counts as having had
 	// its chance to push (its Init runs then).
 	envSettle = 500 * time.Millisecond
 )
 
 // reservedEnv are keys no plugin may set; reservedEnvPrefixes are prefixes.
+// injectionEnv and injectionEnvPrefixes are refused too: they load code into every
+// process the thread starts (the dynamic loader, node, python, perl, ruby, shells,
+// ssh's askpass). ANTHROPIC_* and AWS_* stay allowed: auth plugins set them, and the
+// sessionEnv consent says the plugin adds environment variables to Claude sessions.
 var (
-	reservedEnv         = []string{"CLAUDECODE", "CLAUDE_CONFIG_DIR", "CLAUDE_EFFORT", "PATH", "HOME", "SHELL", "USER", "TMPDIR"}
-	reservedEnvPrefixes = []string{"CODE_FOUNDRY_", "CLAUDE_CODE_"}
-	envKeyPattern       = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+	reservedEnv          = []string{"CLAUDECODE", "CLAUDE_CONFIG_DIR", "CLAUDE_EFFORT", "PATH", "HOME", "SHELL", "USER", "TMPDIR"}
+	reservedEnvPrefixes  = []string{"CODE_FOUNDRY_", "CLAUDE_CODE_"}
+	injectionEnv         = []string{"NODE_OPTIONS", "PYTHONPATH", "PERL5OPT", "RUBYOPT", "BASH_ENV", "ENV", "ZDOTDIR", "SSH_ASKPASS"}
+	injectionEnvPrefixes = []string{"DYLD_", "LD_"}
+	envKeyPattern        = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 )
 
-// reservedEnvKey reports whether key is the daemon's or Claude's, in any case (macOS
-// variables are case-sensitive, but a shell or tool may not be: "path" is zsh's PATH).
-func reservedEnvKey(key string) bool {
+func hasAnyPrefix(key string, prefixes []string) bool {
+	return slices.ContainsFunc(prefixes, func(p string) bool { return strings.HasPrefix(key, p) })
+}
+
+// injectionEnvKey reports whether key makes processes load code, in any case.
+func injectionEnvKey(key string) bool {
 	key = strings.ToUpper(key)
-	if slices.Contains(reservedEnv, key) {
-		return true
-	}
-	return slices.ContainsFunc(reservedEnvPrefixes, func(p string) bool { return strings.HasPrefix(key, p) })
+	return slices.Contains(injectionEnv, key) || hasAnyPrefix(key, injectionEnvPrefixes)
+}
+
+// reservedEnvKey reports whether key is the daemon's or Claude's, or loads code, in any
+// case (macOS variables are case-sensitive, but a shell or tool may not be: "path" is
+// zsh's PATH).
+func reservedEnvKey(key string) bool {
+	up := strings.ToUpper(key)
+	return slices.Contains(reservedEnv, up) || hasAnyPrefix(up, reservedEnvPrefixes) || injectionEnvKey(key)
 }
 
 // withinHome reports whether the clean absolute path p is inside home, also once
@@ -146,6 +163,8 @@ func validateEnvironment(name string, in pluginsdk.Environment, home string) (En
 		switch {
 		case !envKeyPattern.MatchString(k):
 			issues = append(issues, fmt.Sprintf("env %q is not a variable name", k))
+		case injectionEnvKey(k):
+			issues = append(issues, fmt.Sprintf("env %s is reserved: it loads code into every process the thread starts", k))
 		case reservedEnvKey(k):
 			issues = append(issues, fmt.Sprintf("env %s is reserved for Code Foundry and Claude", k))
 		case len(v) > MaxEnvValue:
@@ -205,6 +224,9 @@ func validateEnvironment(name string, in pluginsdk.Environment, home string) (En
 			}
 		}
 		out.NoProject = in.Scope.NoProject
+	}
+	if len(issues) > maxEnvIssues {
+		issues = append(issues[:maxEnvIssues:maxEnvIssues], fmt.Sprintf("… and %d more issues", len(issues)-maxEnvIssues))
 	}
 	return out, issues
 }

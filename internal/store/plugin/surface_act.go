@@ -193,11 +193,51 @@ func validateView(raw json.RawMessage, plugin string, perms pluginsdk.Permission
 	if len(errs) > 0 {
 		return nil, nil, errs
 	}
+	fillLists(&v)
 	canon, err := json.Marshal(v)
 	if err != nil {
 		return nil, nil, []string{"view: " + err.Error()}
 	}
 	return &v, canon, nil
+}
+
+// fillLists makes the view's required lists empty instead of nil, so the canonical JSON
+// has [] where viewers expect a list: a Go plugin's Section{} or Chips{} (and a view
+// without "nodes") would otherwise reach the GUI as null and break its renderer.
+func fillLists(v *ui.View) {
+	if v.Nodes == nil {
+		v.Nodes = []ui.Node{}
+	}
+	var fields func(fs []ui.Field)
+	fields = func(fs []ui.Field) {
+		for i := range fs {
+			if fs[i].Fieldset != nil {
+				if fs[i].Fieldset.Fields == nil {
+					fs[i].Fieldset.Fields = []ui.Field{}
+				}
+				fields(fs[i].Fieldset.Fields)
+			}
+		}
+	}
+	walkNodes(v.Nodes, func(n *ui.Node) {
+		switch {
+		case n.Pairs != nil && n.Pairs.Items == nil:
+			n.Pairs.Items = []ui.Pair{}
+		case n.List != nil && n.List.Rows == nil:
+			n.List.Rows = []ui.Row{}
+		case n.Chips != nil && n.Chips.Chips == nil:
+			n.Chips.Chips = []ui.Chip{}
+		case n.Actions != nil && n.Actions.Buttons == nil:
+			n.Actions.Buttons = []ui.Button{}
+		case n.Section != nil && n.Section.Children == nil:
+			n.Section.Children = []ui.Node{}
+		case n.Form != nil:
+			if n.Form.Fields == nil {
+				n.Form.Fields = []ui.Field{}
+			}
+			fields(n.Form.Fields)
+		}
+	})
 }
 
 // splitJoined turns an errors.Join into its messages.
@@ -430,15 +470,14 @@ func (m *Manager) Act(ctx context.Context, req ActRequest) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
+	secrets := map[string]string{}
 	for name, store := range stores {
 		s, _ := vals[name].(string)
 		if s == "" {
 			delete(vals, name)
 			continue
 		}
-		if err := m.storeSecret(ctx, in.plugin, store, s); err != nil {
-			return 0, err
-		}
+		secrets[store] = s
 		vals[name] = pluginsdk.StoredSecret{Key: store, Stored: true}
 	}
 	if len(vals) > 0 {
@@ -446,6 +485,12 @@ func (m *Manager) Act(ctx context.Context, req ActRequest) (uint64, error) {
 	}
 	if b, err := json.Marshal(act); err != nil || len(b) > maxActPayload {
 		return 0, fmt.Errorf("%w: the action's payload is over %d bytes", ErrInvalidArgument, maxActPayload)
+	}
+	// Stored only once the act is known to go out.
+	for store, s := range secrets {
+		if err := m.storeSecret(ctx, in.plugin, store, s); err != nil {
+			return 0, err
+		}
 	}
 	m.surfLog(in.plugin, "%s %s on %s (version %d)", act.Kind, act.Key, key, ver)
 	cctx, cancel := context.WithTimeout(ctx, surfaceActTimeout)

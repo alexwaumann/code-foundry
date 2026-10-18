@@ -42,6 +42,9 @@ type actor struct {
 
 	// flagRate limits thread/setFlag per thread (flags.go).
 	flagRate flagLimiter
+	// ownedMu serializes thread/create and terminal/create, so the limits on how many a
+	// plugin has hold under concurrent calls (threads.go, terminals.go).
+	ownedMu sync.Mutex
 	// events is the run's subscriptions (events.go); nil until the first subscribe.
 	events *eventPump
 	// envReady closes when the run first pushes its session environment, settles
@@ -127,7 +130,9 @@ func (a *actor) run() {
 		}
 		a.crashes = slices.DeleteFunc(append(a.crashes, now), func(t time.Time) bool { return now.Sub(t) > o.CrashWindow })
 		permanent := errors.Is(err, errPermanent)
-		msg := err.Error()
+		// The last error quotes stderr, which is bytes: the API's protobuf strings refuse
+		// invalid UTF-8 (the plugin list would fail for every plugin).
+		msg := strings.ToValidUTF8(err.Error(), "\uFFFD")
 		info.logs.add("host", "", msg)
 		if !info.dev && (permanent || len(a.crashes) >= o.CrashLimit) {
 			reason := msg

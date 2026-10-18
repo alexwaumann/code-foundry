@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"log/slog"
 	"os"
@@ -365,11 +366,32 @@ func (m *Manager) discover() (map[string]found, error) {
 	return out, nil
 }
 
-// readManifest reads and validates dir/plugin.json.
+// maxManifestBytes bounds plugin.json (a real one is a few KB).
+const maxManifestBytes = 1 << 20
+
+// readManifest reads and validates dir/plugin.json: a regular file of at most
+// maxManifestBytes (a FIFO would block discovery, and the store with it; /dev/zero or a
+// huge file would fill memory).
 func readManifest(dir string) (pluginsdk.Manifest, []string, error) {
-	data, err := os.ReadFile(filepath.Join(dir, pluginsdk.ManifestFile))
+	p := filepath.Join(dir, pluginsdk.ManifestFile)
+	fi, err := os.Stat(p)
+	switch {
+	case err != nil:
+		return pluginsdk.Manifest{}, nil, fmt.Errorf("read %s: %w", pluginsdk.ManifestFile, err)
+	case !fi.Mode().IsRegular():
+		return pluginsdk.Manifest{}, nil, fmt.Errorf("%s is not a regular file", pluginsdk.ManifestFile)
+	}
+	f, err := os.Open(p)
 	if err != nil {
 		return pluginsdk.Manifest{}, nil, fmt.Errorf("read %s: %w", pluginsdk.ManifestFile, err)
+	}
+	defer func() { _ = f.Close() }()
+	data, err := io.ReadAll(io.LimitReader(f, maxManifestBytes+1))
+	switch {
+	case err != nil:
+		return pluginsdk.Manifest{}, nil, fmt.Errorf("read %s: %w", pluginsdk.ManifestFile, err)
+	case len(data) > maxManifestBytes:
+		return pluginsdk.Manifest{}, nil, fmt.Errorf("%s is over %d bytes", pluginsdk.ManifestFile, maxManifestBytes)
 	}
 	return pluginsdk.LoadManifest(data)
 }

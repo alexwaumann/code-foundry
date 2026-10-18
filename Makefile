@@ -56,7 +56,7 @@ plugins:
 	done
 
 .PHONY: all gen build check attest go-check go-lint go-test frontend-check frontend-deps gui-dist-stub \
-        dev gui-build gui-dev gui-e2e gui-mock ghostty-vt package release promote clean
+        dev gui-build gui-dev gui-e2e gui-mock ghostty-vt package release promote clean fuzz
 
 all: build
 
@@ -97,6 +97,34 @@ go-lint: gui-dist-stub ghostty-vt
 	go vet ./...
 	go tool staticcheck ./...
 	cd pluginsdk && go vet ./... && "$$(cd .. && go tool -n staticcheck)" ./...
+
+## fuzz: run every plugin fuzz target for FUZZTIME each (default 30s), one after another
+## (docs/notes/plugins-9-fuzz.md). Not part of check. A failing input lands in the
+## package's testdata/fuzz/<target>/: name it and commit it as a regression seed.
+FUZZTIME ?= 30s
+FUZZ_TARGETS := \
+	pluginsdk:.:FuzzSplitter pluginsdk:.:FuzzConn pluginsdk:.:FuzzParseManifest pluginsdk:.:FuzzMatchCommand \
+	pluginsdk:./ui:FuzzView \
+	.:./internal/store/plugin:FuzzValidateView .:./internal/store/plugin:FuzzViewMutate \
+	.:./internal/store/plugin:FuzzPredicate .:./internal/store/plugin:FuzzActValues \
+	.:./internal/store/plugin:FuzzValidateEnvironment .:./internal/store/plugin:FuzzManifestCommands .:./internal/store/plugin:FuzzOwnedParams \
+	.:./internal/store/plugin/registry:FuzzParseIndex .:./internal/store/plugin/registry:FuzzVersion \
+	.:./internal/store/plugin/registry:FuzzParseLocation .:./internal/store/plugin/registry:FuzzFindChecksum \
+	.:./internal/store/plugin/registry:FuzzExtract .:./internal/store/plugin/registry:FuzzExtractBytes
+# Go's fuzz engine sometimes fails a clean run with "context deadline exceeded" as
+# FUZZTIME ends; that (without a failing input) is reported and skipped.
+fuzz:
+	@for t in $(FUZZ_TARGETS); do \
+		mod=$${t%%:*}; rest=$${t#*:}; pkg=$${rest%%:*}; name=$${rest#*:}; \
+		echo "fuzz $$name ($$pkg, $(FUZZTIME))"; \
+		if out=$$(cd $$mod && go test -run '^$$' -fuzz "^$$name\$$" -fuzztime $(FUZZTIME) $$pkg 2>&1); then \
+			echo "$$out" | tail -1; \
+		elif ! echo "$$out" | grep -q "Failing input" && echo "$$out" | grep -q "context deadline exceeded"; then \
+			echo "  the fuzz engine timed out as FUZZTIME ended (no failing input)"; \
+		else \
+			echo "$$out"; exit 1; \
+		fi; \
+	done
 
 go-test: gui-dist-stub ghostty-vt
 	go test -race ./...

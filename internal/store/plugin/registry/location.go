@@ -132,7 +132,8 @@ type ReleaseAsset struct {
 }
 
 // ParseReleaseURL recognizes https://github.com/<owner>/<repo>/releases/download/<tag>/<asset>,
-// which is downloaded with `gh release download` (private repositories work).
+// which is downloaded with `gh release download` (private repositories work). A tag or
+// asset name starting with "-" is not one (it would reach gh as a flag).
 func ParseReleaseURL(raw string) (ReleaseAsset, bool) {
 	u, err := url.Parse(raw)
 	if err != nil || u.Scheme != "https" || !strings.EqualFold(u.Host, "github.com") {
@@ -148,7 +149,8 @@ func ParseReleaseURL(raw string) (ReleaseAsset, bool) {
 	}
 	tag, err1 := url.PathUnescape(parts[4])
 	name, err2 := url.PathUnescape(parts[5])
-	if err1 != nil || err2 != nil {
+	if err1 != nil || err2 != nil || strings.HasPrefix(tag, "-") || strings.HasPrefix(name, "-") {
+		// gh would read a leading "-" as a flag (`gh release download --dir=… -R …`).
 		return ReleaseAsset{}, false
 	}
 	return ReleaseAsset{Repo: repo, Tag: tag, Name: name}, true

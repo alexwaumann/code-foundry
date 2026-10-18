@@ -71,8 +71,9 @@ chip `deploy` and a button `deploy` collide, so prefix by role (`stage-deploy`,
 {{cf.limits}}
 
 Strings longer than their cap, unknown enum values, a node with two kinds, a duplicate or
-malformed key, a non-http(s) URL, a secret input with a value, or too many buttons in a
-place are refused, with a path to the problem (`nodes[2].list.rows[0].title: required`).
+malformed key, a non-http(s) URL, a secret input with a value, two fields of one name in
+a form, invalid UTF-8 anywhere, or too many buttons in a place are refused, with a path to
+the problem (`nodes[2].list.rows[0].title: required`; the first 50 problems are named).
 
 ## Value types
 
@@ -392,8 +393,10 @@ submitted values, or the command arg it fills), a label, a `description`, an `er
 plugin's validation message), `required`, `disabled`, and exactly one control:
 
 - `input`: one-line text; `kind: "secret"` masks it. `value` (never for a secret),
-  `placeholder`, `maxLength`, `pattern` (a regular expression) with `patternMessage`,
-  `mono`. `required`, `maxLength` and `pattern` are checked by the GUI as the user types;
+  `placeholder`, `maxLength`, `pattern` (a regular expression, at most 256 characters,
+  no quantified group holding a quantifier such as `(a+)+` or `(-[a-z]+)*`: the GUI's
+  JavaScript could take exponential time on it) with `patternMessage`, `mono`.
+  `required`, `maxLength` and `pattern` are checked by the GUI as the user types;
   `plugin act --values` and other clients skip them, so the plugin validates every value
   again (and answers with a field `error` or an error).
 - `select`: `options` (up to 200, each `key`, `value`, `label`, `description` in list
@@ -425,8 +428,8 @@ Change `resetToken` to drop the drafts and show the view's values (a reset). The
 cannot read drafts: to follow what the user enters before submit, give the field a
 `change` event.
 
-**Secrets.** A secret input never carries a value. With `store: "<key>"` (permission
-`secrets`) the host writes the submitted value into the plugin's Keychain namespace
+**Secrets.** A secret input never carries a value. With `store: "<key>"` (letters, digits,
+`.`, `_`, `-`, at most 64; permission `secrets`) the host writes the submitted value into the plugin's Keychain namespace
 (before the plugin sees the submit, even if the plugin then refuses the other fields) and
 `act.Values[name]` is `{"key": "<key>", "stored": true}`: `sk, ok := act.Stored(name)`.
 The plugin reads the value with `h.Secrets().Get(ctx, key)` when it needs it. A secret left

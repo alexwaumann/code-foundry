@@ -52,7 +52,7 @@ show in `code-foundry plugin list`'s NOTE column.
 
 | Field | Rules |
 |---|---|
-| `name` | Required. `[a-z0-9][a-z0-9-]{0,63}`; with commands also a command segment: a letter first, no double or trailing hyphen (`gh-actions`, not `1password` or `gh--x`). Not one of the host's verbs: {{cf.reservedNames}}. It is the folder name under `~/.code-foundry/plugins`, the command prefix `plugin.<name>.` and the registry entry's name. |
+| `name` | Required. `[a-z0-9][a-z0-9-]{0,63}`; with commands or surfaces also a command segment: a letter first, no double or trailing hyphen (`gh-actions`, not `1password` or `gh--x`). Not one of the host's verbs: {{cf.reservedNames}}. It is the folder name under `~/.code-foundry/plugins`, the command prefix `plugin.<name>.` and the registry entry's name. |
 | `displayName` | Up to 60 characters; shown in lists, as the palette group of its commands and before its flag reasons ("GitHub Actions: deploy failed"). Default: `name`. |
 | `version` | Required. Strict semantic version without a leading `v`: `0.1.0`, `1.0.0-rc.1`. The release tag is `v<version>`. |
 | `description` | Up to 300 characters; shown in the consent dialog and the registry. |

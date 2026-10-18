@@ -40,12 +40,21 @@ func TestValidateEnvironment(t *testing.T) {
 				"env CLAUDE_EFFORT is reserved", "env CODE_FOUNDRY_TOKEN is reserved", "env HOME is reserved", "env PATH is reserved",
 				"env SHELL is reserved", "env TMPDIR is reserved", "env USER is reserved"}},
 		{name: "reserved keys in any case", in: pluginsdk.Environment{Env: map[string]string{
-			"path": "/x", "Path": "/x", "home": "/x", "code_foundry_token": "x", "Claude_Code_X": "1", "PATH_EXTRA": "ok"}},
+			"path": "/x", "Path": "/x", "home": "/x", "code_foundry_token": "x", "Claude_Code_X": "1", "node_options": "x", "PATH_EXTRA": "ok"}},
 			wantEnv: []string{"PATH_EXTRA=ok"},
 			wantIssues: []string{"env Claude_Code_X is reserved", "env Path is reserved", "env code_foundry_token is reserved",
-				"env home is reserved", "env path is reserved"}},
+				"env home is reserved", "env node_options is reserved: it loads code", "env path is reserved"}},
 		{name: "a link out of home", in: pluginsdk.Environment{PathPrepend: []string{escape}, AddDirs: []string{escape}},
 			wantIssues: []string{"pathPrepend " + escape + " is outside your home directory", "addDirs " + escape + " is outside your home directory"}},
+		{name: "keys that load code", in: pluginsdk.Environment{Env: map[string]string{
+			"DYLD_INSERT_LIBRARIES": "/x.dylib", "LD_PRELOAD": "/x.so", "NODE_OPTIONS": "--require /x.js", "PYTHONPATH": "/x",
+			"PERL5OPT": "-Mx", "RUBYOPT": "-rx", "BASH_ENV": "/x", "ENV": "/x", "ZDOTDIR": "/x", "SSH_ASKPASS": "/x",
+			"ANTHROPIC_BASE_URL": "https://gw.example", "AWS_PROFILE": "work", "LDFLAGS": "-L/x", "ENVIRONMENT": "prod"}},
+			wantEnv: []string{"ANTHROPIC_BASE_URL=https://gw.example", "AWS_PROFILE=work", "ENVIRONMENT=prod", "LDFLAGS=-L/x"},
+			wantIssues: []string{"env BASH_ENV is reserved: it loads code", "env DYLD_INSERT_LIBRARIES is reserved: it loads code",
+				"env ENV is reserved: it loads code", "env LD_PRELOAD is reserved: it loads code", "env NODE_OPTIONS is reserved: it loads code",
+				"env PERL5OPT is reserved: it loads code", "env PYTHONPATH is reserved: it loads code", "env RUBYOPT is reserved: it loads code",
+				"env SSH_ASKPASS is reserved: it loads code", "env ZDOTDIR is reserved: it loads code"}},
 		{name: "bad names and values", in: pluginsdk.Environment{Env: map[string]string{
 			"1X": "a", "A-B": "a", "BIG": strings.Repeat("x", MaxEnvValue+1), "NUL": "a\x00b", "MAX": strings.Repeat("x", MaxEnvValue)}},
 			wantEnv:    []string{"MAX=" + strings.Repeat("x", MaxEnvValue)},

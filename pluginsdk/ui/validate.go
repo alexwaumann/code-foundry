@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"reflect"
 	"regexp"
 	"slices"
 	"strings"
@@ -49,10 +50,19 @@ const (
 	// MaxActValues bounds an action's form values as the host gets them (encoded JSON):
 	// a bigger submit is refused before it reaches the plugin.
 	MaxActValues = 64 << 10
+	// MaxProblems is how many problems Validate names; the rest are counted.
+	MaxProblems = 50
+	// MaxPattern bounds an input's pattern (the GUI runs it with JavaScript's
+	// backtracking regular expressions).
+	MaxPattern = 256
 )
 
 // KeyPattern is the shape of every key. Keys share one namespace across the view.
 var KeyPattern = regexp.MustCompile(`^[A-Za-z0-9._:-]{1,64}$`)
+
+// StorePattern is the shape of a secret input's store: a key the host's secret store
+// takes (a key without ":").
+var StorePattern = regexp.MustCompile(`^[A-Za-z0-9._-]{1,64}$`)
 
 var iconPattern = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 
@@ -60,6 +70,9 @@ var iconPattern = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 // problem, each with its path ("nodes[2].form.fields[0]: …").
 func (v View) Validate() error {
 	c := &checker{keys: map[string]string{}}
+	if rv := reflect.ValueOf(v); !validUTF8(rv) {
+		c.utf8("", rv)
+	}
 	if v.Header != nil {
 		c.header("header", v.Header)
 	}
@@ -82,19 +95,29 @@ func (v View) Validate() error {
 	} else {
 		c.bad("view", "does not encode: %v", err)
 	}
+	if more := c.problems - len(c.errs); more > 0 {
+		c.errs = append(c.errs, fmt.Errorf("view: %d more problems", more))
+	}
 	return errors.Join(c.errs...)
 }
 
 type checker struct {
-	errs     []error
-	keys     map[string]string // key → path of its first use
-	elements int
-	logs     int
-	logBytes int
+	errs      []error
+	problems  int
+	formNames map[string]string // the current form's field names → path
+	keys      map[string]string // key → path of its first use
+	elements  int
+	logs      int
+	logBytes  int
 }
 
+// bad records a problem; past MaxProblems it only counts it (a view of thousands of bad
+// nodes would otherwise cost megabytes of messages).
 func (c *checker) bad(path, format string, a ...any) {
-	c.errs = append(c.errs, fmt.Errorf("%s: %s", path, fmt.Sprintf(format, a...)))
+	c.problems++
+	if len(c.errs) < MaxProblems {
+		c.errs = append(c.errs, fmt.Errorf("%s: %s", path, fmt.Sprintf(format, a...)))
+	}
 }
 
 func (c *checker) key(path, k string) {
@@ -111,9 +134,6 @@ func (c *checker) key(path, k string) {
 }
 
 func (c *checker) str(path, s string, max int) {
-	if !utf8.ValidString(s) {
-		c.bad(path, "not valid UTF-8")
-	}
 	if n := utf8.RuneCountInString(s); n > max {
 		c.bad(path, "%d characters, at most %d", n, max)
 	}
@@ -202,9 +222,6 @@ func (c *checker) inline(path string, in *Inline, max int) {
 		}
 		if kinds > 1 {
 			c.bad(sp, "a span is text, a time or a duration, not several")
-		}
-		if !utf8.ValidString(s.Text) {
-			c.bad(sp+".text", "not valid UTF-8")
 		}
 		n += utf8.RuneCountInString(s.Text)
 		c.tone(sp+".tone", s.Tone)
@@ -499,6 +516,7 @@ func (c *checker) log(path string, l *Log) {
 }
 
 func (c *checker) form(path string, f *Form) {
+	c.formNames = map[string]string{}
 	secret := false
 	for i, fl := range f.Fields {
 		if c.field(fmt.Sprintf("%s.fields[%d]", path, i), fl, false) {
@@ -558,6 +576,13 @@ func (c *checker) field(path string, f Field, inFieldset bool) bool {
 		return secret
 	}
 	c.required(path+".name", f.Name)
+	if first, dup := c.formNames[f.Name]; dup && f.Name != "" {
+		// The values are keyed by name: one field's value (or a secret's store) would
+		// silently stand for the other's.
+		c.bad(path+".name", "%q is already the name of %s in this form", f.Name, first)
+	} else {
+		c.formNames[f.Name] = path
+	}
 	switch {
 	case f.Input != nil:
 		in := f.Input
@@ -572,6 +597,12 @@ func (c *checker) field(path string, f Field, inFieldset bool) bool {
 			if _, err := regexp.Compile(in.Pattern); err != nil {
 				c.bad(p+".pattern", "%v", err)
 			}
+			if n := utf8.RuneCountInString(in.Pattern); n > MaxPattern {
+				c.bad(p+".pattern", "%d characters, at most %d", n, MaxPattern)
+			}
+			if at := nestedQuantifier(in.Pattern); at >= 0 {
+				c.bad(p+".pattern", "a quantified group holds a quantifier (at %d, like (a+)+ or (-[a-z]+)*): the GUI's JavaScript regular expressions can take exponential time on it; check such values in the plugin", at)
+			}
 		}
 		c.str(p+".placeholder", in.Placeholder, MaxLabel)
 		c.str(p+".patternMessage", in.PatternMessage, MaxLabel)
@@ -579,8 +610,8 @@ func (c *checker) field(path string, f Field, inFieldset bool) bool {
 			if in.Value != "" {
 				c.bad(p+".value", "a secret input never carries its value")
 			}
-			if in.Store != "" && !KeyPattern.MatchString(in.Store) {
-				c.bad(p+".store", "%q must match %s", in.Store, KeyPattern)
+			if in.Store != "" && !StorePattern.MatchString(in.Store) {
+				c.bad(p+".store", "%q must match %s", in.Store, StorePattern)
 			}
 			if f.Change != nil {
 				c.bad(path+".change", "a secret input sends no change events")
@@ -620,4 +651,128 @@ func (c *checker) field(path string, f Field, inFieldset bool) bool {
 		}
 	}
 	return false
+}
+
+// validUTF8 reports whether every string in v is valid UTF-8 (utf8 then names the ones
+// that are not; most views have none, and paths cost).
+func validUTF8(v reflect.Value) bool {
+	switch v.Kind() {
+	case reflect.Pointer, reflect.Interface:
+		return v.IsNil() || validUTF8(v.Elem())
+	case reflect.Struct:
+		for i := range v.NumField() {
+			if v.Type().Field(i).IsExported() && !validUTF8(v.Field(i)) {
+				return false
+			}
+		}
+	case reflect.Slice, reflect.Array:
+		for i := range v.Len() {
+			if !validUTF8(v.Index(i)) {
+				return false
+			}
+		}
+	case reflect.Map:
+		iter := v.MapRange()
+		for iter.Next() {
+			if !validUTF8(iter.Key()) || !validUTF8(iter.Value()) {
+				return false
+			}
+		}
+	case reflect.String:
+		return utf8.ValidString(v.String())
+	}
+	return true
+}
+
+// utf8 reports every string in v that is not valid UTF-8 (struct fields by their JSON
+// names, slice elements, map keys and values). JSON replaces each invalid byte with
+// U+FFFD, so the host would check (and show) other text, of another size, than the
+// plugin did: a log or event data under its byte limit here could be over it there.
+func (c *checker) utf8(path string, v reflect.Value) {
+	switch v.Kind() {
+	case reflect.Pointer, reflect.Interface:
+		if !v.IsNil() {
+			c.utf8(path, v.Elem())
+		}
+	case reflect.Struct:
+		t := v.Type()
+		for i := range t.NumField() {
+			f := t.Field(i)
+			if !f.IsExported() {
+				continue
+			}
+			name, _, _ := strings.Cut(f.Tag.Get("json"), ",")
+			if name == "" {
+				name = strings.ToLower(f.Name)
+			}
+			if path != "" {
+				name = path + "." + name
+			}
+			c.utf8(name, v.Field(i))
+		}
+	case reflect.Slice, reflect.Array:
+		for i := range v.Len() {
+			c.utf8(fmt.Sprintf("%s[%d]", path, i), v.Index(i))
+		}
+	case reflect.Map:
+		iter := v.MapRange()
+		for iter.Next() {
+			k := fmt.Sprint(iter.Key().Interface())
+			c.utf8(path+" key", iter.Key())
+			c.utf8(path+"."+k, iter.Value())
+		}
+	case reflect.String:
+		if !utf8.ValidString(v.String()) {
+			c.bad(path, "not valid UTF-8")
+		}
+	}
+}
+
+// nestedQuantifier returns the offset of the first group that holds a + or * quantifier
+// and is itself quantified with + or * ("(a+)+", "(x*)*", "(-[a-z]+)*", "((ab)+c)*"), or
+// -1. Backtracking engines (the GUI's JavaScript) can take exponential time on those.
+// The check is syntactic and conservative: escapes and character classes are skipped,
+// and it does not ask whether the repetition is actually ambiguous.
+func nestedQuantifier(pattern string) int {
+	type group struct {
+		start      int
+		quantified bool // holds a + or * quantifier
+	}
+	var stack []group
+	inClass := false
+	for i := 0; i < len(pattern); i++ {
+		ch := pattern[i]
+		switch {
+		case ch == '\\':
+			i++ // the escaped byte
+		case inClass:
+			if ch == ']' {
+				inClass = false
+			}
+		case ch == '[':
+			inClass = true
+			if i+1 < len(pattern) && pattern[i+1] == '^' {
+				i++
+			}
+			if i+1 < len(pattern) && pattern[i+1] == ']' {
+				i++ // a leading ] is a literal
+			}
+		case ch == '(':
+			stack = append(stack, group{start: i})
+		case ch == ')' && len(stack) > 0:
+			g := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			if g.quantified && i+1 < len(pattern) && (pattern[i+1] == '+' || pattern[i+1] == '*') {
+				return g.start
+			}
+			if len(stack) > 0 && g.quantified {
+				stack[len(stack)-1].quantified = true
+			}
+		case ch == '+' || ch == '*':
+			if len(stack) > 0 {
+				stack[len(stack)-1].quantified = true
+			}
+		}
+	}
+	return -1
 }

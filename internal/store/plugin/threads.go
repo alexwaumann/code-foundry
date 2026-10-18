@@ -186,6 +186,9 @@ func (a *actor) threadCreate(ctx context.Context, params json.RawMessage) (any, 
 	if err != nil {
 		return nil, err
 	}
+	if len(p.Prompt) > MaxThreadMessage {
+		return nil, pluginsdk.NewError(pluginsdk.CodeInvalidParams, "%s: prompt is at most %d bytes", method, MaxThreadMessage)
+	}
 	env, dirs, err := a.checkedEnv(method, p.Env, p.AddDirs)
 	if err != nil {
 		return nil, err
@@ -200,6 +203,9 @@ func (a *actor) threadCreate(ctx context.Context, params json.RawMessage) (any, 
 	if err != nil {
 		return nil, err
 	}
+	// Count and create under one lock: concurrent creates would each see room.
+	a.ownedMu.Lock()
+	defer a.ownedMu.Unlock()
 	live := 0
 	for _, t := range threads.Owned(OwnerOf(a.name)) {
 		if !t.Archived {
