@@ -184,6 +184,43 @@ func TestActionValues(t *testing.T) {
 	}
 }
 
+func TestChangeValueJoinsValues(t *testing.T) {
+	v, _, errs := validateView(json.RawMessage(`{"nodes": [{"key": "f", "form": {"fields": [
+		{"key": "w", "name": "watch", "toggle": {"value": true}, "change": {"event": "toggle"}},
+		{"key": "t", "name": "tags", "select": {"multiple": true, "options": [{"key": "o1", "value": "a", "label": "A"}]}, "change": {"event": "tags"}},
+		{"key": "n", "name": "name", "input": {}, "change": {"event": "named"}}]}},
+		{"key": "a", "actions": {"buttons": [{"key": "b", "label": "Go", "action": {"event": "go"}}]}}]}`), "p", everyPerms)
+	if len(errs) > 0 {
+		t.Fatal(errs)
+	}
+	idx := buildIndex(v)
+	tests := []struct {
+		name, key, value string
+		in               map[string]any
+		want             string
+	}{
+		{"toggle false", "w", "false", nil, "map[watch:false]"},
+		{"toggle true", "w", "true", nil, "map[watch:true]"},
+		{"toggle not a bool", "w", "maybe", nil, "want true or false"},
+		{"values win", "w", "false", map[string]any{"watch": true}, "map[watch:true]"},
+		{"multiple", "t", "a,b", nil, "map[tags:[a b]]"},
+		{"text", "n", "Ada", map[string]any{"watch": false}, "map[name:Ada watch:false]"},
+		{"not a change", "b", "x", nil, "map[]"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out, err := idx.withChange(idx.elements[tt.key], tt.value, tt.in)
+			got := fmt.Sprint(out)
+			if err != nil {
+				got = err.Error()
+			}
+			if !strings.Contains(got, tt.want) {
+				t.Errorf("withChange = %s, want %s", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestFindElement(t *testing.T) {
 	v, _, _ := validateView(json.RawMessage(every), "p", everyPerms)
 	idx := buildIndex(v)

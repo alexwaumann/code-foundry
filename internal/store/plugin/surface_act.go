@@ -470,6 +470,11 @@ func (m *Manager) Act(ctx context.Context, req ActRequest) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
+	if req.Value != nil {
+		if vals, err = idx.withChange(el, *req.Value, vals); err != nil {
+			return 0, err
+		}
+	}
 	secrets := map[string]string{}
 	for name, store := range stores {
 		s, _ := vals[name].(string)
@@ -599,6 +604,34 @@ func (idx *actionIndex) values(el element, in map[string]any) (map[string]any, m
 		}
 	}
 	return out, stores, nil
+}
+
+// withChange adds a change's value to its values under the field's name, typed by the
+// field's control (a toggle's "false" is false), unless the values carry the field
+// already. The GUI sends both; a client that sends only the value (plugin act --value)
+// then reaches the plugin the same way, so a plugin may read either.
+func (idx *actionIndex) withChange(el element, value string, vals map[string]any) (map[string]any, error) {
+	if el.kind != pluginsdk.ActChange || el.field == "" {
+		return vals, nil
+	}
+	if _, ok := vals[el.field]; ok {
+		return vals, nil
+	}
+	for _, f := range idx.fields {
+		if f.name != el.field || f.form != el.form || f.control == "secret" {
+			continue
+		}
+		cv, err := coerceValue(f.control, value)
+		if err != nil {
+			return nil, fmt.Errorf("%w: field %q: %v", ErrInvalidArgument, el.field, err)
+		}
+		if vals == nil {
+			vals = map[string]any{}
+		}
+		vals[el.field] = cv
+		return vals, nil
+	}
+	return vals, nil
 }
 
 // coerceValue checks a value against its control: a string for text, secret and select;
