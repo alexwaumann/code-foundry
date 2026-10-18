@@ -1,0 +1,158 @@
+{
+  "header": {
+    "icon": "sparkles",
+    "title": "Hello demo",
+    "trailing": {
+      "spans": [
+        {
+          "text": "0 clicks",
+          "tone": "muted"
+        }
+      ]
+    },
+    "pill": {
+      "label": "demo",
+      "tone": "ok"
+    },
+    "subline": {
+      "spans": [
+        {
+          "text": "opened "
+        },
+        {
+          "time": {
+            "at": "2026-10-18T06:11:51.230008-05:00",
+            "style": "relative"
+          }
+        },
+        {
+          "text": " · thread "
+        },
+        {
+          "text": "s-47aac4538464",
+          "mono": true
+        }
+      ]
+    },
+    "actions": [
+      {
+        "key": "hdr-refresh",
+        "label": "Refresh",
+        "icon": "refresh-cw",
+        "action": {
+          "event": "refresh"
+        },
+        "iconOnly": true
+      },
+      {
+        "key": "hdr-docs",
+        "label": "Open the plugin docs",
+        "icon": "external-link",
+        "action": {
+          "openUrl": "https://github.com/alexwaumann/code-foundry"
+        },
+        "iconOnly": true
+      }
+    ],
+    "tabTitle": "Hello"
+  },
+  "tabs": {
+    "items": [
+      {
+        "key": "overview",
+        "label": "Overview"
+      },
+      {
+        "key": "form",
+        "label": "Form"
+      },
+      {
+        "key": "log",
+        "label": "Log"
+      }
+    ],
+    "active": "log"
+  },
+  "nodes": [
+    {
+      "key": "log-state",
+      "text": {
+        "content": "Idle. Start a build to stream its log."
+      }
+    },
+    {
+      "key": "log-actions",
+      "actions": {
+        "buttons": [
+          {
+            "key": "log-start",
+            "label": "Start build",
+            "style": "attention",
+            "action": {
+              "event": "start-log"
+            }
+          },
+          {
+            "key": "log-clear",
+            "label": "Clear",
+            "action": {
+              "event": "clear-log"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "key": "build-log",
+      "log": {
+        "rows": 12,
+        "wrap": true,
+        "title": "build 0"
+      }
+    },
+    {
+      "key": "lint-log",
+      "log": {
+        "lines": [
+          {
+            "text": "checking 42 files"
+          },
+          {
+            "text": "warning: unused variable x",
+            "tone": "attention"
+          },
+          {
+            "text": "error: missing return",
+            "tone": "error"
+          }
+        ],
+        "rows": 6,
+        "title": "lint"
+      }
+    },
+    {
+      "key": "owned",
+      "section": {
+        "title": "Plugin threads and terminals (inert until they exist)",
+        "children": [
+          {
+            "key": "helper-thread",
+            "thread": {
+              "threadId": "s-000000000000",
+              "readOnly": true,
+              "placeholder": "The plugin's own Claude thread renders here."
+            }
+          },
+          {
+            "key": "helper-term",
+            "terminal": {
+              "terminalId": "t-000000000000",
+              "rows": 8,
+              "title": "build shell"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

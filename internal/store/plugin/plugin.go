@@ -14,6 +14,12 @@
 // confirms on the user's behalf), log, and secret/* (the Keychain, namespaced per
 // plugin). Methods of later protocol steps answer "not supported yet".
 //
+// Surfaces (surface.go, surface_act.go): instances opened for their watchers, views the
+// daemon validates, versions and coalesces, log appends, and actions forwarded to the
+// plugin. Availability (predicate.go, facts.go, show.go): when clauses over host facts,
+// plugins' context/set facts and the async pull request checks, carried to clients by
+// the commands' When and plugin.<name>.show.<surface>.
+//
 // The store publishes an immutable Snapshot behind an atomic pointer and Changed /
 // Removed events on the bus, like every store. See docs/notes/plugins-1-core.md and the
 // design in docs/sketches/plugins/.

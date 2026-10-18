@@ -1,0 +1,221 @@
+{
+  "header": {
+    "icon": "sparkles",
+    "title": "Hello demo",
+    "trailing": {
+      "spans": [
+        {
+          "text": "0 clicks",
+          "tone": "muted"
+        }
+      ]
+    },
+    "pill": {
+      "label": "demo",
+      "tone": "ok"
+    },
+    "subline": {
+      "spans": [
+        {
+          "text": "opened "
+        },
+        {
+          "time": {
+            "at": "2026-10-18T06:11:51.230008-05:00",
+            "style": "relative"
+          }
+        },
+        {
+          "text": " · thread "
+        },
+        {
+          "text": "s-47aac4538464",
+          "mono": true
+        }
+      ]
+    },
+    "actions": [
+      {
+        "key": "hdr-refresh",
+        "label": "Refresh",
+        "icon": "refresh-cw",
+        "action": {
+          "event": "refresh"
+        },
+        "iconOnly": true
+      },
+      {
+        "key": "hdr-docs",
+        "label": "Open the plugin docs",
+        "icon": "external-link",
+        "action": {
+          "openUrl": "https://github.com/alexwaumann/code-foundry"
+        },
+        "iconOnly": true
+      }
+    ],
+    "tabTitle": "Hello"
+  },
+  "tabs": {
+    "items": [
+      {
+        "key": "overview",
+        "label": "Overview"
+      },
+      {
+        "key": "form",
+        "label": "Form"
+      },
+      {
+        "key": "log",
+        "label": "Log"
+      }
+    ],
+    "active": "form"
+  },
+  "nodes": [
+    {
+      "key": "form-intro",
+      "text": {
+        "content": "Nothing saved yet."
+      }
+    },
+    {
+      "key": "settings",
+      "form": {
+        "fields": [
+          {
+            "key": "f-name",
+            "name": "name",
+            "label": "Name",
+            "description": "Who the greeting is for.",
+            "required": true,
+            "input": {
+              "placeholder": "Ada",
+              "maxLength": 40,
+              "pattern": "^[A-Za-z ]*$",
+              "patternMessage": "Letters and spaces only"
+            }
+          },
+          {
+            "key": "f-token",
+            "name": "token",
+            "label": "API token",
+            "description": "Stored in your Keychain by Code Foundry; the plugin reads it with secret/get.",
+            "input": {
+              "kind": "secret",
+              "store": "token"
+            }
+          },
+          {
+            "key": "f-project",
+            "name": "project",
+            "label": "Project",
+            "change": {
+              "event": "project-changed"
+            },
+            "select": {
+              "placeholder": "Pick a project",
+              "optionsSource": "projects"
+            }
+          },
+          {
+            "key": "f-env",
+            "name": "env",
+            "label": "Environment",
+            "select": {
+              "options": [
+                {
+                  "key": "o-dev",
+                  "value": "dev",
+                  "label": "Development"
+                },
+                {
+                  "key": "o-prod",
+                  "value": "prod",
+                  "label": "Production",
+                  "description": "Careful: real users."
+                }
+              ],
+              "value": [
+                "dev"
+              ],
+              "style": "list"
+            }
+          },
+          {
+            "key": "f-tags",
+            "name": "tags",
+            "label": "Tags",
+            "select": {
+              "options": [
+                {
+                  "key": "o-a",
+                  "value": "a",
+                  "label": "Alpha"
+                },
+                {
+                  "key": "o-b",
+                  "value": "b",
+                  "label": "Beta"
+                },
+                {
+                  "key": "o-c",
+                  "value": "c",
+                  "label": "Gamma"
+                }
+              ],
+              "value": [
+                "a"
+              ],
+              "multiple": true
+            }
+          },
+          {
+            "key": "f-notify",
+            "fieldset": {
+              "label": "Notify me",
+              "hint": "A fieldset groups related inputs.",
+              "fields": [
+                {
+                  "key": "f-notify-fail",
+                  "name": "notifyFail",
+                  "label": "When a build fails",
+                  "toggle": {
+                    "value": true
+                  }
+                },
+                {
+                  "key": "f-notify-done",
+                  "name": "notifyDone",
+                  "label": "When a build finishes",
+                  "toggle": {
+                    "value": false
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "submit": {
+          "key": "f-save",
+          "label": "Save",
+          "style": "attention",
+          "action": {
+            "event": "save"
+          }
+        },
+        "secondary": [
+          {
+            "key": "f-reset",
+            "label": "Reset",
+            "action": {
+              "event": "reset"
+            }
+          }
+        ],
+        "resetToken": "0"
+      }
+    }
+  ]
+}

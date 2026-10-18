@@ -1,0 +1,524 @@
+{
+  "header": {
+    "icon": "sparkles",
+    "title": "Hello demo",
+    "trailing": {
+      "spans": [
+        {
+          "text": "0 clicks",
+          "tone": "muted"
+        }
+      ]
+    },
+    "pill": {
+      "label": "demo",
+      "tone": "ok"
+    },
+    "subline": {
+      "spans": [
+        {
+          "text": "opened "
+        },
+        {
+          "time": {
+            "at": "2026-10-18T06:11:51.230008-05:00",
+            "style": "relative"
+          }
+        },
+        {
+          "text": " · thread "
+        },
+        {
+          "text": "s-47aac4538464",
+          "mono": true
+        }
+      ]
+    },
+    "actions": [
+      {
+        "key": "hdr-refresh",
+        "label": "Refresh",
+        "icon": "refresh-cw",
+        "action": {
+          "event": "refresh"
+        },
+        "iconOnly": true
+      },
+      {
+        "key": "hdr-docs",
+        "label": "Open the plugin docs",
+        "icon": "external-link",
+        "action": {
+          "openUrl": "https://github.com/alexwaumann/code-foundry"
+        },
+        "iconOnly": true
+      }
+    ],
+    "tabTitle": "Hello"
+  },
+  "tabs": {
+    "items": [
+      {
+        "key": "overview",
+        "label": "Overview"
+      },
+      {
+        "key": "form",
+        "label": "Form"
+      },
+      {
+        "key": "log",
+        "label": "Log"
+      }
+    ],
+    "active": "overview"
+  },
+  "nodes": [
+    {
+      "key": "intro",
+      "text": {
+        "content": {
+          "spans": [
+            {
+              "text": "Every "
+            },
+            {
+              "text": "v1",
+              "strong": true
+            },
+            {
+              "text": " node kind, rendered by "
+            },
+            {
+              "text": "Code Foundry",
+              "url": "https://github.com/alexwaumann/code-foundry"
+            },
+            {
+              "text": ". A build took "
+            },
+            {
+              "duration": {
+                "ms": 100000
+              }
+            },
+            {
+              "text": ", the next starts "
+            },
+            {
+              "time": {
+                "at": "2026-10-18T06:14:51.230042-05:00",
+                "style": "countdown"
+              }
+            },
+            {
+              "text": " · warning",
+              "tone": "attention"
+            },
+            {
+              "text": " · error",
+              "tone": "error"
+            },
+            {
+              "text": " · ",
+              "tone": "muted"
+            },
+            {
+              "text": "mono",
+              "mono": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "key": "code",
+      "text": {
+        "content": "HELLO-4821",
+        "size": "lg",
+        "copyable": true
+      }
+    },
+    {
+      "key": "about",
+      "markdown": {
+        "source": "**Markdown** with `code`, a [link](https://example.com) and a list:\n\n- one\n- two\n"
+      }
+    },
+    {
+      "key": "facts",
+      "pairs": {
+        "items": [
+          {
+            "key": "p-thread",
+            "label": "Thread",
+            "value": {
+              "spans": [
+                {
+                  "text": "s-47aac4538464",
+                  "mono": true
+                }
+              ]
+            },
+            "copyable": true
+          },
+          {
+            "key": "p-status",
+            "label": "Status",
+            "pill": {
+              "label": "passing",
+              "tone": "ok"
+            }
+          },
+          {
+            "key": "p-elapsed",
+            "label": "Running for",
+            "value": {
+              "spans": [
+                {
+                  "time": {
+                    "at": "2026-10-18T06:11:51.230008-05:00",
+                    "style": "elapsed"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "key": "runs",
+      "list": {
+        "rows": [
+          {
+            "key": "run-3",
+            "glyph": {
+              "status": "running"
+            },
+            "title": "Build #3",
+            "titleMeta": "main",
+            "line2": {
+              "spans": [
+                {
+                  "text": "started "
+                },
+                {
+                  "time": {
+                    "at": "2026-10-18T06:11:09.230042-05:00",
+                    "style": "elapsed"
+                  }
+                }
+              ]
+            },
+            "trailing": {
+              "spans": [
+                {
+                  "duration": {
+                    "ms": 42000
+                  }
+                }
+              ]
+            },
+            "actions": [
+              {
+                "key": "run-3-cancel",
+                "label": "Cancel",
+                "icon": "square",
+                "action": {
+                  "event": "cancel-run"
+                },
+                "iconOnly": true
+              }
+            ],
+            "action": {
+              "event": "open-run",
+              "data": "3"
+            }
+          },
+          {
+            "key": "run-2",
+            "glyph": {
+              "status": "failed"
+            },
+            "title": "Build #2",
+            "pill": {
+              "label": "failed",
+              "tone": "error"
+            },
+            "line2": {
+              "spans": [
+                {
+                  "text": "deploy failed",
+                  "tone": "error"
+                }
+              ]
+            },
+            "trailing": {
+              "spans": [
+                {
+                  "duration": {
+                    "ms": 95000
+                  }
+                }
+              ]
+            },
+            "action": {
+              "event": "open-run",
+              "data": "2"
+            }
+          },
+          {
+            "key": "run-1",
+            "glyph": {
+              "icon": "check"
+            },
+            "title": "Build #1",
+            "trailing": {
+              "spans": [
+                {
+                  "time": {
+                    "at": "2026-10-18T05:11:51.230042-05:00",
+                    "style": "relative"
+                  }
+                }
+              ]
+            },
+            "selected": true
+          }
+        ],
+        "glyphStyle": "dot",
+        "emptyText": "No runs"
+      }
+    },
+    {
+      "key": "stages",
+      "chips": {
+        "chips": [
+          {
+            "key": "st-build",
+            "label": "Build",
+            "status": "ok",
+            "meta": {
+              "spans": [
+                {
+                  "duration": {
+                    "ms": 31000
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "key": "st-test",
+            "label": "Test",
+            "status": "running",
+            "meta": {
+              "spans": [
+                {
+                  "time": {
+                    "at": "2026-10-18T06:11:39.230042-05:00",
+                    "style": "elapsed"
+                  }
+                }
+              ]
+            },
+            "selected": true,
+            "action": {
+              "event": "stage",
+              "data": "test"
+            }
+          },
+          {
+            "key": "st-deploy",
+            "label": "Deploy",
+            "status": "pending"
+          },
+          {
+            "key": "st-lint",
+            "label": "Lint",
+            "status": "skipped"
+          },
+          {
+            "key": "st-old",
+            "label": "Old",
+            "status": "off"
+          },
+          {
+            "key": "st-gate",
+            "label": "Gate",
+            "status": "attention"
+          },
+          {
+            "key": "st-e2e",
+            "label": "E2E",
+            "status": "failed"
+          }
+        ]
+      }
+    },
+    {
+      "key": "upload",
+      "progress": {
+        "value": 0.62,
+        "label": "Uploading artifacts",
+        "meta": "62 of 100 MB"
+      }
+    },
+    {
+      "key": "waiting",
+      "progress": {
+        "label": "Waiting for a runner"
+      }
+    },
+    {
+      "key": "auth",
+      "notice": {
+        "tone": "attention",
+        "title": "Sign in needed",
+        "body": "The demo backend wants a token (Form tab).",
+        "detail": "HTTP 401 from https://example.com/api",
+        "icon": "key-round",
+        "actions": [
+          {
+            "key": "auth-form",
+            "label": "Open the form",
+            "style": "attention",
+            "action": {
+              "event": "goto-form"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "key": "more",
+      "section": {
+        "title": "Nested",
+        "meta": "a card that collapses",
+        "pill": {
+          "label": "2"
+        },
+        "actions": [
+          {
+            "key": "more-copy",
+            "label": "Copy the thread id",
+            "icon": "copy",
+            "action": {
+              "copy": "s-47aac4538464"
+            },
+            "iconOnly": true
+          }
+        ],
+        "collapsible": true,
+        "card": true,
+        "tone": "attention",
+        "children": [
+          {
+            "key": "nothing",
+            "empty": {
+              "title": "Nothing here yet",
+              "body": "An empty state inside a section."
+            }
+          },
+          {
+            "key": "stale",
+            "section": {
+              "title": "Last known",
+              "stale": true,
+              "children": [
+                {
+                  "key": "stale-text",
+                  "text": {
+                    "content": "Dimmed: the backend is unreachable."
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "key": "no-artifacts",
+      "empty": {
+        "glyph": {
+          "icon": "package",
+          "tone": "muted"
+        },
+        "title": "No artifacts",
+        "body": "Builds that upload artifacts list them here.",
+        "actions": [
+          {
+            "key": "empty-build",
+            "label": "Start a build",
+            "action": {
+              "event": "start-log"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "key": "bar",
+      "actions": {
+        "buttons": [
+          {
+            "key": "click",
+            "label": "Click (0)",
+            "style": "attention",
+            "action": {
+              "event": "click"
+            }
+          },
+          {
+            "key": "pin",
+            "label": "Pin to this thread",
+            "icon": "pin",
+            "style": "outline",
+            "action": {
+              "event": "pin"
+            }
+          },
+          {
+            "key": "greet",
+            "label": "Greet via command",
+            "action": {
+              "command": {
+                "name": "plugin.hello.greet",
+                "args": {
+                  "name": "panel"
+                }
+              }
+            }
+          },
+          {
+            "key": "forget",
+            "label": "Forget the word",
+            "style": "destructive",
+            "action": {
+              "command": {
+                "name": "plugin.hello.forget"
+              }
+            }
+          },
+          {
+            "key": "docs",
+            "label": "Docs",
+            "style": "link",
+            "action": {
+              "openUrl": "https://github.com/alexwaumann/code-foundry"
+            }
+          },
+          {
+            "key": "copy",
+            "label": "Copy greeting",
+            "action": {
+              "copy": "Hello from the demo surface"
+            }
+          }
+        ],
+        "align": "end"
+      }
+    }
+  ]
+}
