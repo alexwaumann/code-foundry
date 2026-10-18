@@ -90,11 +90,17 @@ func Write(w io.Writer, cmds []*v1.Command, self string) {
 	p("  (`proto/codefoundry/v1`), and `--json` answers use their field names.")
 }
 
-// InPluginNamespace reports whether c is a plugin.* command: the plugin management verbs
-// and every installed plugin's own plugin.<name>.<command>. The guide leaves them out
-// (Discover more points at `plugin list`): agents rarely need them, and installed plugins
-// would grow the guide past what an agent reads whole.
-func InPluginNamespace(c *v1.Command) bool { return strings.HasPrefix(c.GetName(), "plugin.") }
+// InPluginNamespace reports whether c is a plugin.* command (the plugin management verbs
+// and every installed plugin's own plugin.<name>.<command>) or a thread command about
+// plugins' flags (thread.flags, thread.flag.clear). The guide leaves them out (Discover
+// more points at `plugin list`): agents rarely need them, and
+// installed plugins would grow the guide past what an agent reads whole.
+func InPluginNamespace(c *v1.Command) bool {
+	return strings.HasPrefix(c.GetName(), "plugin.") || slices.Contains(pluginThreadCommands, c.GetName())
+}
+
+// pluginThreadCommands are the thread.* commands about plugins.
+var pluginThreadCommands = []string{"thread.flags", "thread.flag.clear"}
 
 // writeGuideCommands lists cmds by category (guideCategoryOrder first), each with its
 // usage and description.

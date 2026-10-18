@@ -56,6 +56,8 @@ type ThreadBackend interface {
 	// SubscriptionBackend backs thread.subscribe, thread.unsubscribe and
 	// thread.subscriptions (commands_thread_subscribe.go).
 	SubscriptionBackend
+	// FlagsBackend backs thread.flag.clear (commands_thread_flags.go).
+	FlagsBackend
 }
 
 var (

@@ -97,6 +97,9 @@ type InitializeParams struct {
 	Protocol int        `json:"protocol"`
 	Host     HostInfo   `json:"host"`
 	Plugin   PluginInfo `json:"plugin"`
+	// Flags are the plugin's live flags on threads (kept across its restarts and the
+	// daemon's), so it can reconcile them: clear what no longer holds.
+	Flags []Flag `json:"flags,omitempty"`
 }
 
 // Narrowing drops manifest contributions the plugin cannot serve right now.
@@ -185,14 +188,23 @@ const (
 	FlagNone      = "none"
 )
 
-// Flag raises (or with FlagNone clears) the plugin's flag on a thread.
+// Flag raises (or with FlagNone clears) the plugin's flag on a thread. A thread has at
+// most one flag per plugin; setting another replaces it. The GUI shows the reason as
+// "<display name>: <reason>", so leave the plugin's name out of it.
 type Flag struct {
 	ThreadID string `json:"threadId"`
 	Level    string `json:"level"`
-	// Reason is one line, at most 80 characters ("Jenkins: deploy stage failed").
+	// Reason is one line, at most 80 characters ("deploy stage failed").
 	Reason string `json:"reason,omitempty"`
-	// UntilSeen clears the flag when the user opens the thread.
+	// UntilSeen clears the flag when the user opens the thread (at once when it is open).
 	UntilSeen bool `json:"untilSeen,omitempty"`
+	// SetAt is when the host recorded it (in InitializeParams.Flags; ignored on set).
+	SetAt time.Time `json:"setAt,omitzero"`
+}
+
+// FlagResult is thread/setFlag's answer: whether anything changed.
+type FlagResult struct {
+	Changed bool `json:"changed"`
 }
 
 // ContextParams is context/set's params: a predicate key under "<plugin>.", global or
@@ -236,7 +248,9 @@ type SubscribeResult struct {
 }
 
 // Event is one subscribed event (events/event). Event is the protojson of
-// codefoundry.v1.Event, the shape the GUI's client sees.
+// codefoundry.v1.Event, the shape the GUI's client sees. Snapshot marks the frames that
+// bring the plugin to a source's current state: right after Subscribe, and again when
+// the plugin fell behind and the host dropped events of the source.
 type Event struct {
 	Subscription string          `json:"subscription"`
 	Snapshot     bool            `json:"snapshot,omitempty"`

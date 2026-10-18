@@ -207,6 +207,9 @@ type Store interface {
 	Secrets(ctx context.Context, name string) ([]SecretInfo, error)
 	// DeleteSecret removes one.
 	DeleteSecret(ctx context.Context, name, key string) error
+	// Environments returns the plugins' session environments as applied
+	// (environment.go): one plugin's with a name (none when it has none), else every one.
+	Environments(name string) ([]Environment, error)
 }
 
 // ConsentText is what the user consents to when enabling m: who it runs as and every

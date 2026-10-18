@@ -245,6 +245,38 @@ message Thread {
   // per budget value: setting a budget above the cost re-arms it. Messages can still be
   // sent. Set at Create and by SetBudget. Persisted.
   double budget_usd = 51;
+  // Flags plugins raised on the thread (thread/setFlag; docs/notes/plugins-3-events-flags-env.md):
+  // at most one per plugin, an overlay on status that never changes it. The GUI counts a
+  // flagged thread as needing attention (error flags sort with errors) and shows the
+  // top flag's reason on the row. Cleared by the plugin, when the plugin is disabled or
+  // removed, when the thread is archived, and for until_seen flags when the thread is
+  // opened. Persisted. Sorted by level (error first), then newest first.
+  repeated ThreadFlag flags = 53;
+}
+
+// ThreadFlagLevel is how loud a plugin's flag is.
+enum ThreadFlagLevel {
+  THREAD_FLAG_LEVEL_UNSPECIFIED = 0;
+  // Amber: the thread needs the user.
+  THREAD_FLAG_LEVEL_ATTENTION = 1;
+  // Red: something failed.
+  THREAD_FLAG_LEVEL_ERROR = 2;
+}
+
+// ThreadFlag is one plugin's flag on a thread (Thread.flags).
+message ThreadFlag {
+  // The plugin's name ("gh-actions").
+  string plugin = 1;
+  // Its display name when the flag was set ("GitHub Actions"): the GUI writes the reason
+  // as "<display name>: <reason>".
+  string plugin_display_name = 2;
+  ThreadFlagLevel level = 3;
+  // One line, at most 80 characters ("deploy failed").
+  string reason = 4;
+  google.protobuf.Timestamp set_at = 5;
+  // Cleared when the user opens the thread (a WatchThread stream starts), or at once
+  // when one is open.
+  bool until_seen = 6;
 }
 
 // How a thread's task went, as its agent reports it (Thread.report_status).

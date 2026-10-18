@@ -1800,6 +1800,257 @@ func (x *PluginSnapshot) GetPlugins() []*Plugin {
 	return nil
 }
 
+type PluginEnvironmentRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// A plugin's name; empty for every plugin with a contribution.
+	Name          string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PluginEnvironmentRequest) Reset() {
+	*x = PluginEnvironmentRequest{}
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PluginEnvironmentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PluginEnvironmentRequest) ProtoMessage() {}
+
+func (x *PluginEnvironmentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PluginEnvironmentRequest.ProtoReflect.Descriptor instead.
+func (*PluginEnvironmentRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *PluginEnvironmentRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+// PluginEnvVar is one environment variable a plugin contributes.
+type PluginEnvVar struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PluginEnvVar) Reset() {
+	*x = PluginEnvVar{}
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PluginEnvVar) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PluginEnvVar) ProtoMessage() {}
+
+func (x *PluginEnvVar) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PluginEnvVar.ProtoReflect.Descriptor instead.
+func (*PluginEnvVar) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *PluginEnvVar) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *PluginEnvVar) GetValue() string {
+	if x != nil {
+		return x.Value
+	}
+	return ""
+}
+
+// PluginEnvironment is one plugin's contribution to new Claude threads, as applied.
+type PluginEnvironment struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Plugin string                 `protobuf:"bytes,1,opt,name=plugin,proto3" json:"plugin,omitempty"`
+	// Sorted by key; keys refused or lost to an earlier plugin are left out (see issues).
+	Env []*PluginEnvVar `protobuf:"bytes,2,rep,name=env,proto3" json:"env,omitempty"`
+	// Directories prepended to PATH, in order.
+	PathPrepend []string `protobuf:"bytes,3,rep,name=path_prepend,json=pathPrepend,proto3" json:"path_prepend,omitempty"`
+	// --add-dir directories, after the daemon's skills dir.
+	AddDirs []string `protobuf:"bytes,4,rep,name=add_dirs,json=addDirs,proto3" json:"add_dirs,omitempty"`
+	// Which threads get it: empty projects means every project; no_project adds threads
+	// without a project.
+	Projects  []string `protobuf:"bytes,5,rep,name=projects,proto3" json:"projects,omitempty"`
+	NoProject bool     `protobuf:"varint,6,opt,name=no_project,json=noProject,proto3" json:"no_project,omitempty"`
+	// What was refused or dropped, in words.
+	Issues []string `protobuf:"bytes,7,rep,name=issues,proto3" json:"issues,omitempty"`
+	// When the plugin last pushed it.
+	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PluginEnvironment) Reset() {
+	*x = PluginEnvironment{}
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PluginEnvironment) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PluginEnvironment) ProtoMessage() {}
+
+func (x *PluginEnvironment) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PluginEnvironment.ProtoReflect.Descriptor instead.
+func (*PluginEnvironment) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *PluginEnvironment) GetPlugin() string {
+	if x != nil {
+		return x.Plugin
+	}
+	return ""
+}
+
+func (x *PluginEnvironment) GetEnv() []*PluginEnvVar {
+	if x != nil {
+		return x.Env
+	}
+	return nil
+}
+
+func (x *PluginEnvironment) GetPathPrepend() []string {
+	if x != nil {
+		return x.PathPrepend
+	}
+	return nil
+}
+
+func (x *PluginEnvironment) GetAddDirs() []string {
+	if x != nil {
+		return x.AddDirs
+	}
+	return nil
+}
+
+func (x *PluginEnvironment) GetProjects() []string {
+	if x != nil {
+		return x.Projects
+	}
+	return nil
+}
+
+func (x *PluginEnvironment) GetNoProject() bool {
+	if x != nil {
+		return x.NoProject
+	}
+	return false
+}
+
+func (x *PluginEnvironment) GetIssues() []string {
+	if x != nil {
+		return x.Issues
+	}
+	return nil
+}
+
+func (x *PluginEnvironment) GetUpdatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
+}
+
+type PluginEnvironmentResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// By plugin name.
+	Environments  []*PluginEnvironment `protobuf:"bytes,1,rep,name=environments,proto3" json:"environments,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PluginEnvironmentResponse) Reset() {
+	*x = PluginEnvironmentResponse{}
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PluginEnvironmentResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PluginEnvironmentResponse) ProtoMessage() {}
+
+func (x *PluginEnvironmentResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PluginEnvironmentResponse.ProtoReflect.Descriptor instead.
+func (*PluginEnvironmentResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *PluginEnvironmentResponse) GetEnvironments() []*PluginEnvironment {
+	if x != nil {
+		return x.Environments
+	}
+	return nil
+}
+
 var File_codefoundry_v1_plugin_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_plugin_proto_rawDesc = "" +
@@ -1919,7 +2170,25 @@ const file_codefoundry_v1_plugin_proto_rawDesc = "" +
 	"\fremoved_name\x18\x03 \x01(\tH\x00R\vremovedNameB\a\n" +
 	"\x05event\"B\n" +
 	"\x0ePluginSnapshot\x120\n" +
-	"\aplugins\x18\x01 \x03(\v2\x16.codefoundry.v1.PluginR\aplugins*\xe3\x01\n" +
+	"\aplugins\x18\x01 \x03(\v2\x16.codefoundry.v1.PluginR\aplugins\".\n" +
+	"\x18PluginEnvironmentRequest\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\"6\n" +
+	"\fPluginEnvVar\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value\"\xa7\x02\n" +
+	"\x11PluginEnvironment\x12\x16\n" +
+	"\x06plugin\x18\x01 \x01(\tR\x06plugin\x12.\n" +
+	"\x03env\x18\x02 \x03(\v2\x1c.codefoundry.v1.PluginEnvVarR\x03env\x12!\n" +
+	"\fpath_prepend\x18\x03 \x03(\tR\vpathPrepend\x12\x19\n" +
+	"\badd_dirs\x18\x04 \x03(\tR\aaddDirs\x12\x1a\n" +
+	"\bprojects\x18\x05 \x03(\tR\bprojects\x12\x1d\n" +
+	"\n" +
+	"no_project\x18\x06 \x01(\bR\tnoProject\x12\x16\n" +
+	"\x06issues\x18\a \x03(\tR\x06issues\x129\n" +
+	"\n" +
+	"updated_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"b\n" +
+	"\x19PluginEnvironmentResponse\x12E\n" +
+	"\fenvironments\x18\x01 \x03(\v2!.codefoundry.v1.PluginEnvironmentR\fenvironments*\xe3\x01\n" +
 	"\vPluginState\x12\x1c\n" +
 	"\x18PLUGIN_STATE_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15PLUGIN_STATE_DISABLED\x10\x01\x12\x19\n" +
@@ -1928,7 +2197,7 @@ const file_codefoundry_v1_plugin_proto_rawDesc = "" +
 	"\x14PLUGIN_STATE_CRASHED\x10\x04\x12\x19\n" +
 	"\x15PLUGIN_STATE_STOPPING\x10\x05\x12\x18\n" +
 	"\x14PLUGIN_STATE_STOPPED\x10\x06\x12\x17\n" +
-	"\x13PLUGIN_STATE_FAILED\x10\a2\xdd\a\n" +
+	"\x13PLUGIN_STATE_FAILED\x10\a2\xc3\b\n" +
 	"\rPluginService\x12Q\n" +
 	"\x04List\x12\".codefoundry.v1.ListPluginsRequest\x1a#.codefoundry.v1.ListPluginsResponse\"\x00\x12U\n" +
 	"\x06Enable\x12#.codefoundry.v1.EnablePluginRequest\x1a$.codefoundry.v1.EnablePluginResponse\"\x00\x12X\n" +
@@ -1941,7 +2210,8 @@ const file_codefoundry_v1_plugin_proto_rawDesc = "" +
 	"FollowLogs\x12'.codefoundry.v1.FollowPluginLogsRequest\x1a\x1d.codefoundry.v1.PluginLogLine\"\x000\x01\x12d\n" +
 	"\vListSecrets\x12(.codefoundry.v1.ListPluginSecretsRequest\x1a).codefoundry.v1.ListPluginSecretsResponse\"\x00\x12g\n" +
 	"\fDeleteSecret\x12).codefoundry.v1.DeletePluginSecretRequest\x1a*.codefoundry.v1.DeletePluginSecretResponse\"\x00\x12M\n" +
-	"\x05Watch\x12#.codefoundry.v1.WatchPluginsRequest\x1a\x1b.codefoundry.v1.PluginEvent\"\x000\x01B\xc3\x01\n" +
+	"\x05Watch\x12#.codefoundry.v1.WatchPluginsRequest\x1a\x1b.codefoundry.v1.PluginEvent\"\x000\x01\x12d\n" +
+	"\vEnvironment\x12(.codefoundry.v1.PluginEnvironmentRequest\x1a).codefoundry.v1.PluginEnvironmentResponse\"\x00B\xc3\x01\n" +
 	"\x12com.codefoundry.v1B\vPluginProtoP\x01ZGgithub.com/alexwaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
 
 var (
@@ -1957,7 +2227,7 @@ func file_codefoundry_v1_plugin_proto_rawDescGZIP() []byte {
 }
 
 var file_codefoundry_v1_plugin_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_codefoundry_v1_plugin_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
+var file_codefoundry_v1_plugin_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
 var file_codefoundry_v1_plugin_proto_goTypes = []any{
 	(PluginState)(0),                   // 0: codefoundry.v1.PluginState
 	(*PluginPermissions)(nil),          // 1: codefoundry.v1.PluginPermissions
@@ -1988,15 +2258,19 @@ var file_codefoundry_v1_plugin_proto_goTypes = []any{
 	(*WatchPluginsRequest)(nil),        // 26: codefoundry.v1.WatchPluginsRequest
 	(*PluginEvent)(nil),                // 27: codefoundry.v1.PluginEvent
 	(*PluginSnapshot)(nil),             // 28: codefoundry.v1.PluginSnapshot
-	(*timestamppb.Timestamp)(nil),      // 29: google.protobuf.Timestamp
+	(*PluginEnvironmentRequest)(nil),   // 29: codefoundry.v1.PluginEnvironmentRequest
+	(*PluginEnvVar)(nil),               // 30: codefoundry.v1.PluginEnvVar
+	(*PluginEnvironment)(nil),          // 31: codefoundry.v1.PluginEnvironment
+	(*PluginEnvironmentResponse)(nil),  // 32: codefoundry.v1.PluginEnvironmentResponse
+	(*timestamppb.Timestamp)(nil),      // 33: google.protobuf.Timestamp
 }
 var file_codefoundry_v1_plugin_proto_depIdxs = []int32{
 	0,  // 0: codefoundry.v1.Plugin.state:type_name -> codefoundry.v1.PluginState
 	1,  // 1: codefoundry.v1.Plugin.permissions:type_name -> codefoundry.v1.PluginPermissions
 	1,  // 2: codefoundry.v1.Plugin.granted:type_name -> codefoundry.v1.PluginPermissions
-	29, // 3: codefoundry.v1.Plugin.consented_at:type_name -> google.protobuf.Timestamp
-	29, // 4: codefoundry.v1.Plugin.started_at:type_name -> google.protobuf.Timestamp
-	29, // 5: codefoundry.v1.Plugin.next_restart_at:type_name -> google.protobuf.Timestamp
+	33, // 3: codefoundry.v1.Plugin.consented_at:type_name -> google.protobuf.Timestamp
+	33, // 4: codefoundry.v1.Plugin.started_at:type_name -> google.protobuf.Timestamp
+	33, // 5: codefoundry.v1.Plugin.next_restart_at:type_name -> google.protobuf.Timestamp
 	2,  // 6: codefoundry.v1.Plugin.commands:type_name -> codefoundry.v1.PluginCommand
 	3,  // 7: codefoundry.v1.Plugin.surfaces:type_name -> codefoundry.v1.PluginSurface
 	4,  // 8: codefoundry.v1.ListPluginsResponse.plugins:type_name -> codefoundry.v1.Plugin
@@ -2004,40 +2278,45 @@ var file_codefoundry_v1_plugin_proto_depIdxs = []int32{
 	4,  // 10: codefoundry.v1.DisablePluginResponse.plugin:type_name -> codefoundry.v1.Plugin
 	4,  // 11: codefoundry.v1.RestartPluginResponse.plugin:type_name -> codefoundry.v1.Plugin
 	4,  // 12: codefoundry.v1.DevPluginResponse.plugin:type_name -> codefoundry.v1.Plugin
-	29, // 13: codefoundry.v1.PluginLogLine.time:type_name -> google.protobuf.Timestamp
+	33, // 13: codefoundry.v1.PluginLogLine.time:type_name -> google.protobuf.Timestamp
 	18, // 14: codefoundry.v1.PluginLogsResponse.lines:type_name -> codefoundry.v1.PluginLogLine
-	29, // 15: codefoundry.v1.PluginSecret.updated_at:type_name -> google.protobuf.Timestamp
+	33, // 15: codefoundry.v1.PluginSecret.updated_at:type_name -> google.protobuf.Timestamp
 	21, // 16: codefoundry.v1.ListPluginSecretsResponse.secrets:type_name -> codefoundry.v1.PluginSecret
 	28, // 17: codefoundry.v1.PluginEvent.snapshot:type_name -> codefoundry.v1.PluginSnapshot
 	4,  // 18: codefoundry.v1.PluginEvent.updated:type_name -> codefoundry.v1.Plugin
 	4,  // 19: codefoundry.v1.PluginSnapshot.plugins:type_name -> codefoundry.v1.Plugin
-	5,  // 20: codefoundry.v1.PluginService.List:input_type -> codefoundry.v1.ListPluginsRequest
-	7,  // 21: codefoundry.v1.PluginService.Enable:input_type -> codefoundry.v1.EnablePluginRequest
-	9,  // 22: codefoundry.v1.PluginService.Disable:input_type -> codefoundry.v1.DisablePluginRequest
-	11, // 23: codefoundry.v1.PluginService.Restart:input_type -> codefoundry.v1.RestartPluginRequest
-	13, // 24: codefoundry.v1.PluginService.Dev:input_type -> codefoundry.v1.DevPluginRequest
-	15, // 25: codefoundry.v1.PluginService.Reload:input_type -> codefoundry.v1.ReloadPluginsRequest
-	17, // 26: codefoundry.v1.PluginService.Logs:input_type -> codefoundry.v1.PluginLogsRequest
-	20, // 27: codefoundry.v1.PluginService.FollowLogs:input_type -> codefoundry.v1.FollowPluginLogsRequest
-	22, // 28: codefoundry.v1.PluginService.ListSecrets:input_type -> codefoundry.v1.ListPluginSecretsRequest
-	24, // 29: codefoundry.v1.PluginService.DeleteSecret:input_type -> codefoundry.v1.DeletePluginSecretRequest
-	26, // 30: codefoundry.v1.PluginService.Watch:input_type -> codefoundry.v1.WatchPluginsRequest
-	6,  // 31: codefoundry.v1.PluginService.List:output_type -> codefoundry.v1.ListPluginsResponse
-	8,  // 32: codefoundry.v1.PluginService.Enable:output_type -> codefoundry.v1.EnablePluginResponse
-	10, // 33: codefoundry.v1.PluginService.Disable:output_type -> codefoundry.v1.DisablePluginResponse
-	12, // 34: codefoundry.v1.PluginService.Restart:output_type -> codefoundry.v1.RestartPluginResponse
-	14, // 35: codefoundry.v1.PluginService.Dev:output_type -> codefoundry.v1.DevPluginResponse
-	16, // 36: codefoundry.v1.PluginService.Reload:output_type -> codefoundry.v1.ReloadPluginsResponse
-	19, // 37: codefoundry.v1.PluginService.Logs:output_type -> codefoundry.v1.PluginLogsResponse
-	18, // 38: codefoundry.v1.PluginService.FollowLogs:output_type -> codefoundry.v1.PluginLogLine
-	23, // 39: codefoundry.v1.PluginService.ListSecrets:output_type -> codefoundry.v1.ListPluginSecretsResponse
-	25, // 40: codefoundry.v1.PluginService.DeleteSecret:output_type -> codefoundry.v1.DeletePluginSecretResponse
-	27, // 41: codefoundry.v1.PluginService.Watch:output_type -> codefoundry.v1.PluginEvent
-	31, // [31:42] is the sub-list for method output_type
-	20, // [20:31] is the sub-list for method input_type
-	20, // [20:20] is the sub-list for extension type_name
-	20, // [20:20] is the sub-list for extension extendee
-	0,  // [0:20] is the sub-list for field type_name
+	30, // 20: codefoundry.v1.PluginEnvironment.env:type_name -> codefoundry.v1.PluginEnvVar
+	33, // 21: codefoundry.v1.PluginEnvironment.updated_at:type_name -> google.protobuf.Timestamp
+	31, // 22: codefoundry.v1.PluginEnvironmentResponse.environments:type_name -> codefoundry.v1.PluginEnvironment
+	5,  // 23: codefoundry.v1.PluginService.List:input_type -> codefoundry.v1.ListPluginsRequest
+	7,  // 24: codefoundry.v1.PluginService.Enable:input_type -> codefoundry.v1.EnablePluginRequest
+	9,  // 25: codefoundry.v1.PluginService.Disable:input_type -> codefoundry.v1.DisablePluginRequest
+	11, // 26: codefoundry.v1.PluginService.Restart:input_type -> codefoundry.v1.RestartPluginRequest
+	13, // 27: codefoundry.v1.PluginService.Dev:input_type -> codefoundry.v1.DevPluginRequest
+	15, // 28: codefoundry.v1.PluginService.Reload:input_type -> codefoundry.v1.ReloadPluginsRequest
+	17, // 29: codefoundry.v1.PluginService.Logs:input_type -> codefoundry.v1.PluginLogsRequest
+	20, // 30: codefoundry.v1.PluginService.FollowLogs:input_type -> codefoundry.v1.FollowPluginLogsRequest
+	22, // 31: codefoundry.v1.PluginService.ListSecrets:input_type -> codefoundry.v1.ListPluginSecretsRequest
+	24, // 32: codefoundry.v1.PluginService.DeleteSecret:input_type -> codefoundry.v1.DeletePluginSecretRequest
+	26, // 33: codefoundry.v1.PluginService.Watch:input_type -> codefoundry.v1.WatchPluginsRequest
+	29, // 34: codefoundry.v1.PluginService.Environment:input_type -> codefoundry.v1.PluginEnvironmentRequest
+	6,  // 35: codefoundry.v1.PluginService.List:output_type -> codefoundry.v1.ListPluginsResponse
+	8,  // 36: codefoundry.v1.PluginService.Enable:output_type -> codefoundry.v1.EnablePluginResponse
+	10, // 37: codefoundry.v1.PluginService.Disable:output_type -> codefoundry.v1.DisablePluginResponse
+	12, // 38: codefoundry.v1.PluginService.Restart:output_type -> codefoundry.v1.RestartPluginResponse
+	14, // 39: codefoundry.v1.PluginService.Dev:output_type -> codefoundry.v1.DevPluginResponse
+	16, // 40: codefoundry.v1.PluginService.Reload:output_type -> codefoundry.v1.ReloadPluginsResponse
+	19, // 41: codefoundry.v1.PluginService.Logs:output_type -> codefoundry.v1.PluginLogsResponse
+	18, // 42: codefoundry.v1.PluginService.FollowLogs:output_type -> codefoundry.v1.PluginLogLine
+	23, // 43: codefoundry.v1.PluginService.ListSecrets:output_type -> codefoundry.v1.ListPluginSecretsResponse
+	25, // 44: codefoundry.v1.PluginService.DeleteSecret:output_type -> codefoundry.v1.DeletePluginSecretResponse
+	27, // 45: codefoundry.v1.PluginService.Watch:output_type -> codefoundry.v1.PluginEvent
+	32, // 46: codefoundry.v1.PluginService.Environment:output_type -> codefoundry.v1.PluginEnvironmentResponse
+	35, // [35:47] is the sub-list for method output_type
+	23, // [23:35] is the sub-list for method input_type
+	23, // [23:23] is the sub-list for extension type_name
+	23, // [23:23] is the sub-list for extension extendee
+	0,  // [0:23] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_plugin_proto_init() }
@@ -2056,7 +2335,7 @@ func file_codefoundry_v1_plugin_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_plugin_proto_rawDesc), len(file_codefoundry_v1_plugin_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   28,
+			NumMessages:   32,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

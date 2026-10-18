@@ -74,6 +74,15 @@ type Options struct {
 	// (default os.Environ()).
 	Environ []string
 	Now     func() time.Time
+	// Flags keeps the plugins' flags on threads (thread/setFlag; flags.go); nil refuses
+	// thread/setFlag. The daemon passes the thread store.
+	Flags ThreadFlags
+	// Events is the daemon's event stream for events/subscribe (events.go); nil refuses
+	// it. SetEvents sets it later (the API's handler needs the store first).
+	Events EventFeed
+	// EnvWait bounds how long a spawn waits for a starting plugin's session environment
+	// (environment.go; default DefaultEnvWait).
+	EnvWait time.Duration
 
 	// Timing; zero values take the defaults above.
 	InitTimeout, PingInterval, PingTimeout, ShutdownTimeout, KillGrace time.Duration
@@ -139,6 +148,9 @@ type Manager struct {
 	entries map[string]*entry
 	closed  bool
 	snap    atomic.Pointer[Snapshot]
+
+	// env is the plugins' session environments (environment.go).
+	env envState
 }
 
 var _ Store = (*Manager)(nil)
@@ -190,7 +202,15 @@ func New(opts Options) (*Manager, error) {
 // Start scans the plugins dir, loads the user's choices and starts every enabled plugin
 // (in parallel, without waiting for them).
 func (m *Manager) Start(ctx context.Context) error {
-	return m.Reload(ctx)
+	// The last session environments first: a plugin starting now may push a newer one.
+	if err := m.loadEnvironments(ctx); err != nil {
+		m.log.Warn("plugin: saved session environments", "err", err)
+	}
+	if err := m.Reload(ctx); err != nil {
+		return err
+	}
+	m.sweep(ctx)
+	return nil
 }
 
 // Bus returns the bus events are published on.
@@ -354,6 +374,7 @@ func (m *Manager) reloadLocked(ctx context.Context) error {
 	for _, e := range gone {
 		m.stopActor(e, StateDisabled)
 		m.unregister(e.name)
+		m.forget(ctx, e.name, nil)
 		m.mu.Lock()
 		delete(m.entries, e.name)
 		m.rebuildLocked()
@@ -402,6 +423,7 @@ func (m *Manager) apply(ctx context.Context, name string, f found, r row, restar
 		}
 		m.stopActor(e, StateDisabled)
 		m.unregister(name)
+		m.forget(ctx, name, e.logs)
 		m.update(name, nil, func(e *entry) {
 			e.row = r
 			e.disabledReason = "its permissions changed: enable it again to review them"
@@ -542,6 +564,7 @@ func (m *Manager) Disable(ctx context.Context, name string) (Plugin, error) {
 	m.update(name, nil, func(e *entry) { e.row, e.disabledReason = r, "" })
 	m.stopActor(e, StateDisabled)
 	m.unregister(name)
+	m.forget(ctx, name, e.logs)
 	e.logs.add("host", "", "disabled")
 	return m.public(name), nil
 }

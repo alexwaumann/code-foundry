@@ -80,6 +80,10 @@ func (h *Host) SetFlag(ctx context.Context, f Flag) error {
 	return h.conn.Call(ctx, MethodThreadSetFlag, f, nil)
 }
 
+// Flags are the plugin's flags on threads as the host had them at initialize (they
+// outlive restarts): reconcile them in Init.
+func (h *Host) Flags() []Flag { return slices.Clone(h.info().Flags) }
+
 // SetContext sets a predicate key ("<plugin>.<key>") the host's when-clauses read.
 func (h *Host) SetContext(p ContextParams) error {
 	return h.conn.Notify(MethodContextSet, p)
@@ -94,7 +98,9 @@ func (h *Host) SetEnvironment(ctx context.Context, env Environment) (Environment
 }
 
 // Subscribe asks for events from sources (permission events); they arrive in
-// Plugin.OnEvent. It returns the subscription id.
+// Plugin.OnEvent, each source's snapshot first. It returns the subscription id (the
+// first events may reach OnEvent before Subscribe returns). Subscriptions end with the
+// plugin's process.
 func (h *Host) Subscribe(ctx context.Context, sources ...string) (string, error) {
 	var res SubscribeResult
 	err := h.conn.Call(ctx, MethodEventsSubscribe, SubscribeParams{Sources: sources}, &res)

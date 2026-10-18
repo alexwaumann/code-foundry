@@ -112,6 +112,9 @@ func threadDetail(s *v1.Thread, names map[string]string) string {
 			lines = append(lines, "report data: "+s.GetReportData())
 		}
 	}
+	if l := flagsLine(s); l != "" {
+		lines = append(lines, l)
+	}
 	cost := "cost: " + formatUSD(s.GetCostUsd())
 	if s.GetUnpriced() {
 		cost += " (some usage unpriced)"

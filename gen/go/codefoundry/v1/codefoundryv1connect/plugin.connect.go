@@ -58,6 +58,9 @@ const (
 	PluginServiceDeleteSecretProcedure = "/codefoundry.v1.PluginService/DeleteSecret"
 	// PluginServiceWatchProcedure is the fully-qualified name of the PluginService's Watch RPC.
 	PluginServiceWatchProcedure = "/codefoundry.v1.PluginService/Watch"
+	// PluginServiceEnvironmentProcedure is the fully-qualified name of the PluginService's Environment
+	// RPC.
+	PluginServiceEnvironmentProcedure = "/codefoundry.v1.PluginService/Environment"
 )
 
 // PluginServiceClient is a client for the codefoundry.v1.PluginService service.
@@ -90,6 +93,10 @@ type PluginServiceClient interface {
 	// Watch sends a snapshot, then every change. A client that falls behind gets a new
 	// snapshot.
 	Watch(context.Context, *connect.Request[v1.WatchPluginsRequest]) (*connect.ServerStreamForClient[v1.PluginEvent], error)
+	// Environment returns what plugins contribute to new Claude threads
+	// (session/setEnvironment): one plugin's, or every one with a contribution when name is
+	// empty, as applied (validated, conflicts resolved in name order) with the issues found.
+	Environment(context.Context, *connect.Request[v1.PluginEnvironmentRequest]) (*connect.Response[v1.PluginEnvironmentResponse], error)
 }
 
 // NewPluginServiceClient constructs a client for the codefoundry.v1.PluginService service. By
@@ -169,6 +176,12 @@ func NewPluginServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(pluginServiceMethods.ByName("Watch")),
 			connect.WithClientOptions(opts...),
 		),
+		environment: connect.NewClient[v1.PluginEnvironmentRequest, v1.PluginEnvironmentResponse](
+			httpClient,
+			baseURL+PluginServiceEnvironmentProcedure,
+			connect.WithSchema(pluginServiceMethods.ByName("Environment")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -185,6 +198,7 @@ type pluginServiceClient struct {
 	listSecrets  *connect.Client[v1.ListPluginSecretsRequest, v1.ListPluginSecretsResponse]
 	deleteSecret *connect.Client[v1.DeletePluginSecretRequest, v1.DeletePluginSecretResponse]
 	watch        *connect.Client[v1.WatchPluginsRequest, v1.PluginEvent]
+	environment  *connect.Client[v1.PluginEnvironmentRequest, v1.PluginEnvironmentResponse]
 }
 
 // List calls codefoundry.v1.PluginService.List.
@@ -242,6 +256,11 @@ func (c *pluginServiceClient) Watch(ctx context.Context, req *connect.Request[v1
 	return c.watch.CallServerStream(ctx, req)
 }
 
+// Environment calls codefoundry.v1.PluginService.Environment.
+func (c *pluginServiceClient) Environment(ctx context.Context, req *connect.Request[v1.PluginEnvironmentRequest]) (*connect.Response[v1.PluginEnvironmentResponse], error) {
+	return c.environment.CallUnary(ctx, req)
+}
+
 // PluginServiceHandler is an implementation of the codefoundry.v1.PluginService service.
 type PluginServiceHandler interface {
 	// List returns every plugin found, by name.
@@ -272,6 +291,10 @@ type PluginServiceHandler interface {
 	// Watch sends a snapshot, then every change. A client that falls behind gets a new
 	// snapshot.
 	Watch(context.Context, *connect.Request[v1.WatchPluginsRequest], *connect.ServerStream[v1.PluginEvent]) error
+	// Environment returns what plugins contribute to new Claude threads
+	// (session/setEnvironment): one plugin's, or every one with a contribution when name is
+	// empty, as applied (validated, conflicts resolved in name order) with the issues found.
+	Environment(context.Context, *connect.Request[v1.PluginEnvironmentRequest]) (*connect.Response[v1.PluginEnvironmentResponse], error)
 }
 
 // NewPluginServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -347,6 +370,12 @@ func NewPluginServiceHandler(svc PluginServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(pluginServiceMethods.ByName("Watch")),
 		connect.WithHandlerOptions(opts...),
 	)
+	pluginServiceEnvironmentHandler := connect.NewUnaryHandler(
+		PluginServiceEnvironmentProcedure,
+		svc.Environment,
+		connect.WithSchema(pluginServiceMethods.ByName("Environment")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/codefoundry.v1.PluginService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case PluginServiceListProcedure:
@@ -371,6 +400,8 @@ func NewPluginServiceHandler(svc PluginServiceHandler, opts ...connect.HandlerOp
 			pluginServiceDeleteSecretHandler.ServeHTTP(w, r)
 		case PluginServiceWatchProcedure:
 			pluginServiceWatchHandler.ServeHTTP(w, r)
+		case PluginServiceEnvironmentProcedure:
+			pluginServiceEnvironmentHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -422,4 +453,8 @@ func (UnimplementedPluginServiceHandler) DeleteSecret(context.Context, *connect.
 
 func (UnimplementedPluginServiceHandler) Watch(context.Context, *connect.Request[v1.WatchPluginsRequest], *connect.ServerStream[v1.PluginEvent]) error {
 	return connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.PluginService.Watch is not implemented"))
+}
+
+func (UnimplementedPluginServiceHandler) Environment(context.Context, *connect.Request[v1.PluginEnvironmentRequest]) (*connect.Response[v1.PluginEnvironmentResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.PluginService.Environment is not implemented"))
 }
