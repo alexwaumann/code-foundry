@@ -218,6 +218,14 @@ and shipped (v0.1.0 releases, registry PRs #1 and #2). Their `SKILL-FEEDBACK.md`
   `go` line, `pluginpack` (PR 7) as the alternative packer, and the two plugin
   repositories cited as larger examples.
 
+Checked end to end after the pass (isolated daemon at the pass's commit, a fresh plugin
+`pong` scaffolded from the installed example): files 0644/0755, `go get` at the pin, `go
+vet`, `go test -race`, `go build ./...` (its binary ignored), `make build dist`, the
+registry entry from the local `SHA256SUMS`, `plugin dev`, a command, `plugin surface` /
+`plugin act` with a suffix `--thread`, and `plugin act` on a command button refused as
+documented. One more correction from it: a manifest with `"permissions": {}` still asks
+for consent once (the skill had said it did not).
+
 ## For PR 6/8 (host behaviour, not changed in this PR)
 
 * `surface/act` carries no viewer context: a shared (`pr`, `project`, `global`) instance
