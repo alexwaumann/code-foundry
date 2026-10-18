@@ -1,6 +1,7 @@
 /**
- * How code and diffs render (components/code): unified or split diffs, and wrapped or
- * scrolled long lines. One choice for the whole app, not per tab. Persisted (localStorage
+ * How code and diffs render (components/code): unified or split diffs, wrapped or
+ * scrolled long lines, and whether the File tab shows a markdown or HTML file rendered or
+ * as source. One choice for the whole app, not per tab. Persisted (localStorage
  * "code-foundry.codeView"); not settings: they are not in the file.
  */
 import { create } from "zustand";
@@ -8,13 +9,22 @@ import { persist } from "zustand/middleware";
 
 export type DiffStyle = "unified" | "split";
 
+/** The kinds of file the File tab can render as well as show as source. */
+export type PreviewKind = "markdown" | "html";
+export type PreviewMode = "rendered" | "source";
+
 interface CodeViewState {
   diffStyle: DiffStyle;
   wrap: boolean;
+  /** Rendered or source, by kind. A store saved before it existed gets the default (persist merges). */
+  preview: Readonly<Record<PreviewKind, PreviewMode>>;
 }
 
 export const useCodeViewStore = create<CodeViewState>()(
-  persist((): CodeViewState => ({ diffStyle: "unified", wrap: false }), { name: "code-foundry.codeView", version: 1 }),
+  persist((): CodeViewState => ({ diffStyle: "unified", wrap: false, preview: { markdown: "rendered", html: "rendered" } }), {
+    name: "code-foundry.codeView",
+    version: 1,
+  }),
 );
 
 export function setDiffStyle(diffStyle: DiffStyle): void {
@@ -23,4 +33,8 @@ export function setDiffStyle(diffStyle: DiffStyle): void {
 
 export function setWrap(wrap: boolean): void {
   useCodeViewStore.setState({ wrap });
+}
+
+export function setPreviewMode(kind: PreviewKind, mode: PreviewMode): void {
+  useCodeViewStore.setState((s) => ({ preview: { ...s.preview, [kind]: mode } }));
 }

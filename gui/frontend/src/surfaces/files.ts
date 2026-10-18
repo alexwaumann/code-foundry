@@ -1,19 +1,30 @@
 import { createElement } from "react";
 import { FileText } from "lucide-react";
-import { makeTab } from "@/stores/panel";
+import { FileTab } from "@/components/files/FileTab";
+import { lastTabOf } from "@/stores/filePanel";
+import { usePanelStore } from "@/stores/panel";
+import { FILE_KIND, fileOfTab } from "./fileTarget";
 import { NO_PROJECT_WATCHES, noProjectNow } from "./noProject";
-import { SurfacePlaceholder } from "./Placeholder";
-import type { SurfaceSpec } from "./types";
+import type { SurfaceContext, SurfaceSpec } from "./types";
 
-/** Files: registered so the panel lists it; not implemented yet, so always disabled. */
+/**
+ * File: one file read from disk (components/files/FileTab.tsx), as code, rendered markdown
+ * or HTML, or an image. Tabs are opened from elsewhere (stores/filePanel.ts: the Diff
+ * tab's Open file, path chips), one per file: params { project, base, path, line? }
+ * (surfaces/fileTarget.ts). F (and the list) bring back the panel's last File tab, so the
+ * entry is live only while the panel has one; dimmed otherwise, and hidden for a thread
+ * without a project until it has one.
+ */
 export const filesSurface: SurfaceSpec = {
-  kind: "files",
-  title: "Files",
+  kind: FILE_KIND,
+  title: "File",
   icon: FileText,
   hotkey: "f",
-  // Hidden for a thread (or composer) without a project: there are no files or diff to show.
-  available: (ctx) => (noProjectNow(ctx.selection) ? "hidden" : "disabled"),
-  watches: NO_PROJECT_WATCHES,
-  render: () => createElement(SurfacePlaceholder, { icon: FileText, title: "Files" }),
-  openDefault: () => makeTab("files", "Files"),
+  available: (ctx: SurfaceContext) => (lastTabOf(FILE_KIND, ctx.panelKey) ? "enabled" : noProjectNow(ctx.selection) ? "hidden" : "disabled"),
+  watches: [...NO_PROJECT_WATCHES, usePanelStore],
+  render: (tab) => {
+    const target = fileOfTab(tab);
+    return target ? createElement(FileTab, { target }) : null;
+  },
+  openDefault: (ctx) => lastTabOf(FILE_KIND, ctx.panelKey),
 };

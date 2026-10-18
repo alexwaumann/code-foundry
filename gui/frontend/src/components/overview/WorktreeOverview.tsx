@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { runCommand } from "@/stores/commands";
 import { worktreeContext } from "@/stores/context";
 import { branchKey, branchPullRequestsResource, openUrl } from "@/stores/gh";
+import { diffOfChange, openDiffInPanel } from "@/stores/filePanel";
 import { openPullRequestInPanel } from "@/stores/prPanel";
 import { openPublishDialog } from "@/stores/publish";
 import { findWorktree, useProjectsStore } from "@/stores/projects";
@@ -24,7 +25,7 @@ import { useTerminalsStore } from "@/stores/terminals";
 import { useUiStore } from "@/stores/ui";
 import { detailKey, worktreeDetailResource } from "@/stores/worktreeDetail";
 import { baseFact, branchPullRequest, operationStrip, originFact, otherThreads, shellsIn, shortRef, upstreamRemote, workingTreeFact, type FactPart, type FactTone } from "./facts";
-import { buildFileRows, fileTotals, type FileRow } from "./files";
+import { buildFileRows, fileTotals, statusColor, type FileRow } from "./files";
 
 const FILE_ROW_H = 24;
 const LOG_ROW_H = 24;
@@ -139,26 +140,17 @@ function PullRequestRow({ pr }: { pr: PullRequestView }) {
   );
 }
 
-const statusColor: Record<string, string> = {
-  A: "text-success",
-  M: "text-warning",
-  D: "text-destructive",
-  R: "text-info",
-  C: "text-info",
-  T: "text-info",
-  U: "text-destructive",
-  "?": "text-muted-foreground",
-};
-
 /**
  * A changed file: status letter, path, then + and − in fixed right-aligned columns
  * (blank at zero) so they line up down the list. The directory is muted and truncates
  * from its start (rtl box; the LRMs keep its slashes in place) so the name stays visible.
+ * A click (or Enter, Space) opens the file's Diff tab in the panel (OverviewBody's items).
  */
 function FileLine({ row }: { row: FileRow }) {
   return (
     <NavRow
       navKey={row.key}
+      activateOnClick
       tip={row.oldPath ? `${row.oldPath} → ${row.path}` : row.path}
       className="grid h-full grid-cols-[1.25rem_minmax(0,1fr)_5ch_5ch] items-center gap-x-2 px-1.5 text-body-sm font-mono"
     >
@@ -363,8 +355,8 @@ function OverviewBody({ project, wt }: { project: ProjectView; wt: WorktreeView 
     const out: NavItem[] = [];
     // The pull request opens in the side panel; cmd+Enter (and cmd+click) on GitHub.
     if (pr) out.push({ key: "pr", activate: () => void openPullRequestInPanel({ slug: pr.repoSlug || slug, number: pr.number }), secondary: () => void openUrl(pr.url) });
-    // File rows have no action yet (the Diff surface is to come): the cursor only.
-    for (const r of fileRows) out.push({ key: r.key });
+    // A changed file opens its Diff tab in this panel: the working tree when it has uncommitted changes, else the branch.
+    for (const r of fileRows) out.push({ key: r.key, activate: () => void openDiffInPanel("current", diffOfChange(project.id, wt.path, r)) });
     if (showCommits) {
       out.push({
         key: "commits",
@@ -380,7 +372,7 @@ function OverviewBody({ project, wt }: { project: ProjectView; wt: WorktreeView 
       if (commitsOpen) for (const e of detail.log) out.push({ key: `l:${e.sha}`, activate: slug ? () => void openUrl(`https://github.com/${slug}/commit/${e.sha}`) : undefined });
     }
     return out;
-  }, [pr, fileRows, showCommits, commitsOpen, detail, slug]);
+  }, [pr, fileRows, showCommits, commitsOpen, detail, slug, project.id, wt.path]);
   const nav = useNav(items);
 
   return (

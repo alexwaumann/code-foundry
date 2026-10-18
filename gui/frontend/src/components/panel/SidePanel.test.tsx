@@ -195,6 +195,8 @@ describe("the new-tab button and picking", () => {
     vi.spyOn(pullRequestSurface, "render").mockImplementation((tab) => <p data-testid="probe">{tab.id}</p>);
     vi.spyOn(filesSurface, "render").mockImplementation((tab) => <p data-testid="probe">{tab.id}</p>);
     vi.spyOn(filesSurface, "available").mockReturnValue("enabled");
+    // The File surface's own default is the panel's last File tab: a stand-in tab here.
+    vi.spyOn(filesSurface, "openDefault").mockReturnValue(files);
     act(() => {
       openSurface(KEY, one);
       openSurface(KEY, two);

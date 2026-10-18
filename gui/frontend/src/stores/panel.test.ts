@@ -104,6 +104,12 @@ describe("openTab", () => {
     ["existing tab is activated, not duplicated", entry(true, [files, diff], diff.id), makeTab("files", "Files"), entry(true, [files, diff], files.id)],
     ["reopens a hidden panel with its tabs", entry(false, [files, diff], diff.id), files, entry(true, [files, diff], files.id)],
     ["refreshes the title of an existing tab", entry(true, [pr], pr.id), makeTab("pullrequest", "#12 Fix", { number: "12" }), entry(true, [{ ...pr, title: "#12 Fix" }], pr.id)],
+    [
+      "refreshes params its id leaves out",
+      entry(true, [files, { ...files, id: "files?path=a", params: { path: "a", line: "3" } }], files.id),
+      { ...files, id: "files?path=a", params: { path: "a", line: "9" } },
+      entry(true, [files, { ...files, id: "files?path=a", params: { path: "a", line: "9" } }], "files?path=a"),
+    ],
     ["picking a new surface appends it and ends picking", picking([files], files.id), diff, entry(true, [files, diff], diff.id)],
     ["picking an open surface activates it and ends picking", picking([files, diff], diff.id), makeTab("files", "Files"), entry(true, [files, diff], files.id)],
   ];
