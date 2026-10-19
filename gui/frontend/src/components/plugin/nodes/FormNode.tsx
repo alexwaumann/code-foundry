@@ -15,6 +15,7 @@ import { fieldValue, formValues, isSecret, pluginValue, validateField, validateF
 import { useSourceOptions } from "../options";
 import { InlineView, PluginButton } from "../parts";
 import type { NodeProps } from "../registry";
+import { useInStrip } from "../strip";
 
 const NO_DRAFTS: Readonly<Record<string, FieldValue>> = {};
 
@@ -29,8 +30,10 @@ interface FieldApi {
 }
 
 function Description({ f, error }: { f: Field; error: string | undefined }) {
+  const strip = useInStrip() !== null;
   if (error) return <p className="text-caption-sm text-destructive" data-testid="plugin-field-error">{error}</p>;
-  if (f.description === undefined) return null;
+  // A strip is one row: descriptions are left out (errors still show, under the control).
+  if (f.description === undefined || strip) return null;
   return (
     <p className="text-caption-sm">
       <InlineView value={f.description} />
@@ -259,6 +262,7 @@ function RequiredMark() {
 
 function FieldView({ f, api }: { f: Field; api: FieldApi }) {
   const { draftKey, locked } = useFormCtx() ?? { draftKey: "", locked: false };
+  const strip = useInStrip() !== null;
   const id = `${draftKey}-${f.key}`.replace(/[^A-Za-z0-9_-]/g, "_");
   const name = f.name ?? "";
   const error = api.hostErrors[name] ?? f.error;
@@ -283,9 +287,9 @@ function FieldView({ f, api }: { f: Field; api: FieldApi }) {
   if (f.toggle) {
     const v = fieldValue(f, api.drafts);
     return (
-      <div className="flex min-w-0 flex-col gap-1" data-testid="plugin-field" data-name={name}>
-        <div className="flex min-w-0 items-center gap-3">
-          <Label htmlFor={id} className="min-w-0 flex-1 text-body-sm font-normal">
+      <div className={cn("flex min-w-0 flex-col gap-1", strip && "shrink-0")} data-testid="plugin-field" data-name={name}>
+        <div className={cn("flex min-w-0 items-center", strip ? "gap-2" : "gap-3")}>
+          <Label htmlFor={id} className={cn("min-w-0 text-body-sm font-normal", strip ? "whitespace-nowrap" : "flex-1")}>
             {f.label}
           </Label>
           <Switch
@@ -304,9 +308,10 @@ function FieldView({ f, api }: { f: Field; api: FieldApi }) {
     );
   }
   return (
-    <div className="flex min-w-0 flex-col gap-1.5" data-testid="plugin-field" data-name={name}>
+    // In a strip the control is the field (a search box): its label names it for screen readers only.
+    <div className={cn("flex min-w-0 flex-col gap-1.5", strip && (f.input ? "min-w-32 flex-[2_1_0%]" : "min-w-28 flex-1"))} data-testid="plugin-field" data-name={name}>
       {f.label && (
-        <Label id={`${id}-label`} htmlFor={id} className="gap-1 text-body-sm font-medium">
+        <Label id={`${id}-label`} htmlFor={id} className={cn("gap-1 text-body-sm font-medium", strip && "sr-only")}>
           {f.label}
           {f.required && <RequiredMark />}
         </Label>
@@ -325,9 +330,13 @@ function FieldView({ f, api }: { f: Field; api: FieldApi }) {
  * required, max length and pattern on blur and on submit; the plugin's own errors come back
  * in its next view. From submit until the plugin answers (and while `busy`) the whole
  * form is disabled and the submit spins. Enter in a text field submits; Escape reverts it.
+ * In a toolbar or footer (strip.ts) the same form lays its fields and buttons out in one
+ * row that wraps: inputs and selects without visible labels or descriptions, toggles with
+ * their label beside the switch.
  */
 export function FormNode({ node, data }: NodeProps<"form">) {
   const { watchKey, instance, viewTab, uiContext, inert } = useViewCtx();
+  const strip = useInStrip() !== null;
   const draftKey = draftKeyOf(instance, viewTab, node.key);
   const drafts = usePluginSurfacesStore((s) => s.drafts[draftKey]) ?? NO_DRAFTS;
   const [hostErrors, setHostErrors] = useState<Record<string, string>>({});
@@ -394,17 +403,25 @@ export function FormNode({ node, data }: NodeProps<"form">) {
   };
   return (
     <FormContext.Provider value={{ draftKey, formKey: node.key, locked }}>
-      <form className="flex min-w-0 flex-col gap-3" onSubmit={onSubmit} noValidate data-testid="plugin-form" data-key={node.key} aria-busy={locked || undefined}>
+      <form
+        className={cn("flex min-w-0", strip ? "flex-wrap items-center gap-1.5" : "flex-col gap-3")}
+        onSubmit={onSubmit}
+        noValidate
+        data-testid="plugin-form"
+        data-key={node.key}
+        data-strip={strip || undefined}
+        aria-busy={locked || undefined}
+      >
         {data.fields.map((f) => (
           <FieldView key={f.key} f={f} api={api} />
         ))}
         {data.error && (
-          <p className="text-caption-sm text-destructive" role="alert" data-testid="plugin-form-error">
+          <p className={cn("text-caption-sm text-destructive", strip && "order-last basis-full")} role="alert" data-testid="plugin-form-error">
             {data.error}
           </p>
         )}
         {(data.submit || (data.secondary?.length ?? 0) > 0) && (
-          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+          <div className={cn("flex min-w-0 items-center gap-1.5", strip ? "shrink-0" : "flex-wrap")}>
             {data.submit && <PluginButton button={data.submit} submit />}
             {data.secondary?.map((b) => (
               <PluginButton key={b.key} button={b} />

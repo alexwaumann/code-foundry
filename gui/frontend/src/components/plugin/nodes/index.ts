@@ -3,6 +3,7 @@ import type { NodeRenderers } from "../registry";
 import { ActionsNode } from "./ActionsNode";
 import { ChipsNode } from "./ChipsNode";
 import { ColumnsNode } from "./ColumnsNode";
+import { ContainerNode } from "./ContainerNode";
 import { DividerNode } from "./DividerNode";
 import { EmptyNode } from "./EmptyNode";
 import { FormNode } from "./FormNode";
@@ -42,4 +43,5 @@ export const renderers: NodeRenderers = {
   divider: DividerNode,
   spacer: SpacerNode,
   group: GroupNode,
+  container: ContainerNode,
 };

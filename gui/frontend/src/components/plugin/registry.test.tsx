@@ -123,8 +123,12 @@ describe("node renderer registry", () => {
     if (!pane) throw new Error("no pane");
     expect([pane.getAttribute("data-key"), pane.style.height, pane.getAttribute("data-fill-box")]).toEqual(["layout-pane", "320px", "true"]);
     expect(pane.querySelector('[data-testid="plugin-log"]')).not.toBeNull();
-    expect(pane.querySelectorAll('[data-testid="plugin-row"]')).toHaveLength(3);
+    expect(pane.querySelectorAll('[data-testid="plugin-row"]')).toHaveLength(6);
     for (const id of ["plugin-markdown", "plugin-pairs"]) expect(screen.getAllByTestId(id)[0]?.closest('[data-key="layout-right"]')).not.toBeNull();
+    // All of it sits in a wide container (a page's main column).
+    const page = screen.getByTestId("plugin-container");
+    expect([page.getAttribute("data-key"), page.getAttribute("data-width"), page.style.maxWidth]).toEqual(["layout-page", "wide", "1080px"]);
+    for (const c of cols) expect(page.contains(c)).toBe(true);
   });
 
   it("renders the layout tab's grid, dividers, groups and spacers: one column before a width", () => {

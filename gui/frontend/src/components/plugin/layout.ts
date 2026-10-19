@@ -1,12 +1,13 @@
 /**
  * The plugin view's layout nodes (docs/notes/plugins-layout-1-columns-pane.md,
- * plugins-layout-2-grid-inline.md): how a columns node decides between side by side and its
- * collapse, and how wide its columns are; how many columns a grid has and what an item
- * spans; a spacer's size. The numbers are pluginsdk/ui's (ColumnMinWidth, ColumnGap,
- * GridMinWidth, ...; a Go test keeps them equal).
+ * plugins-layout-2-grid-inline.md, plugins-layout-3-chrome.md): how a columns node decides
+ * between side by side and its collapse, and how wide its columns are; how many columns a
+ * grid has and what an item spans; a spacer's size; a container's widest. The numbers are
+ * pluginsdk/ui's (ColumnMinWidth, ColumnGap, GridMinWidth, ContainerNarrowWidth, ...; Go
+ * tests keep them equal).
  */
 import { useLayoutEffect, useState, type CSSProperties } from "react";
-import type { ColumnData, ColumnsData, GridData, GridItemData, SpacerData } from "@/api/plugin";
+import type { ColumnData, ColumnsData, ContainerData, GridData, GridItemData, SpacerData } from "@/api/plugin";
 
 /** The width a weighted column needs side by side; it never gets less. */
 export const COLUMN_MIN_WIDTH = 240;
@@ -14,6 +15,18 @@ export const COLUMN_MIN_WIDTH = 240;
 export const COLUMN_GAP = 12;
 
 const MAX_WEIGHT = 6;
+
+/** A "narrow" container's widest (reading width, forms). */
+export const CONTAINER_NARROW_WIDTH = 680;
+/** A "wide" container's widest (a page's main column). */
+export const CONTAINER_WIDE_WIDTH = 1080;
+
+/** A container's max-width in px, or null for "full" (absent, or a width this GUI does not know). */
+export function containerMaxWidth(width: ContainerData["width"]): number | null {
+  if (width === "narrow") return CONTAINER_NARROW_WIDTH;
+  if (width === "wide") return CONTAINER_WIDE_WIDTH;
+  return null;
+}
 
 /** A column's fixed width (px) when it has one in range, else null (weighted). */
 function fixedWidth(c: ColumnData): number | null {

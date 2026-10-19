@@ -13,6 +13,8 @@ import { invalidateOnTransportError } from "@/api/endpoint";
 import {
   actOnSurface,
   childLists,
+  VIEW_LISTS,
+  viewNodes,
   nodeKind,
   watchSurface,
   withChildLists,
@@ -151,13 +153,16 @@ function mapNode(nodes: readonly ViewNode[], key: string, f: (n: ViewNode) => Vi
 
 /** The view with one log node extended (view/append); the same view when the key names no log. */
 export function appendToView(view: PluginViewModel, key: string, text: string, lines: readonly LogLine[]): PluginViewModel {
-  const hit = { log: false };
-  const nodes = mapNode(view.nodes, key, (n) => {
-    if (!n.log) return n;
-    hit.log = true;
-    return { ...n, log: appendToLog(n.log, text, lines) };
-  });
-  return nodes && hit.log ? { ...view, nodes } : view;
+  for (const list of VIEW_LISTS) {
+    const hit = { log: false };
+    const nodes = mapNode(view[list] ?? [], key, (n) => {
+      if (!n.log) return n;
+      hit.log = true;
+      return { ...n, log: appendToLog(n.log, text, lines) };
+    });
+    if (nodes) return hit.log ? { ...view, [list]: nodes } : view;
+  }
+  return view;
 }
 
 /** An entry after one update (toasts are side effects: see startSurfaceWatch). Pure. */
@@ -176,7 +181,7 @@ export function applySurfaceUpdate(e: SurfaceEntry, u: SurfaceUpdateView): Surfa
   }
 }
 
-/** Every form in a view's body (inside sections, columns and panes too), by key. */
+/** Every form in a list of nodes (inside sections, columns, panes and containers too), by key; a view's: formsOf(viewNodes(view)). */
 export function formsOf(nodes: readonly ViewNode[]): { key: string; form: FormNodeData }[] {
   return nodes.flatMap((n) => (n.form ? [{ key: n.key, form: n.form }] : childLists(n).flatMap((l) => formsOf(l))));
 }
@@ -194,7 +199,7 @@ export function reconcileResets(
   const tab = view.tabs?.active ?? "";
   let d = drafts;
   let t = tokens;
-  for (const { key, form } of formsOf(view.nodes)) {
+  for (const { key, form } of formsOf(viewNodes(view))) {
     const dk = draftKeyOf(instance, tab, key);
     const token = form.resetToken ?? "";
     const prev = t[dk];
@@ -229,7 +234,7 @@ export function settleSubmits(
   const due = Object.entries(submitted).filter(([dk, v]) => version > v && dk.startsWith(`${instance}\u0000`));
   if (due.length === 0) return { drafts, submitted };
   const tab = view.tabs?.active ?? "";
-  const forms = new Map(formsOf(view.nodes).map(({ key, form }) => [draftKeyOf(instance, tab, key), form]));
+  const forms = new Map(formsOf(viewNodes(view)).map(({ key, form }) => [draftKeyOf(instance, tab, key), form]));
   let d = drafts;
   const settled = new Set(due.map(([dk]) => dk));
   const sub = Object.fromEntries(Object.entries(submitted).filter(([dk]) => !settled.has(dk)));

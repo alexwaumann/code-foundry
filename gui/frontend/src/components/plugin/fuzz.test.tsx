@@ -7,6 +7,7 @@ import { demoJson, type DemoTab } from "@/test/pluginFixtures";
 import { ViewContext, type ViewCtx } from "./context";
 import { SurfaceHeader } from "./Header";
 import { NodeList } from "./NodeList";
+import { SurfaceFrame } from "./SurfaceFrame";
 import { ViewTabsBar } from "./ViewTabsBar";
 
 /**
@@ -39,7 +40,7 @@ const TEXT = new Set(["text", "label", "title", "detail", "placeholder", "source
 const OPTIONAL = new Set(["icon", "tone", "status", "meta", "pill", "line2", "trailing", "titleMeta", "actions", "action", "glyph", "subline",
   "header", "tabs", "description", "hint", "error", "badge", "selected", "disabled", "busy", "mono", "strong", "url", "rows", "height", "value",
   "options", "lines", "text", "title", "style", "align", "collapsible", "collapsed", "card", "stale", "readOnly", "submit", "secondary",
-  "weight", "width", "collapse", "minHeight", "noScroll", "minWidth", "span", "size", "flex", "noWrap"]);
+  "weight", "width", "collapse", "minHeight", "noScroll", "minWidth", "span", "size", "flex", "noWrap", "toolbar", "footer"]);
 /** Numbers and the values the daemon accepts for them. */
 const NUMBERS: Record<string, readonly number[]> = {
   rows: [0, 4, 40], ms: [0, 1, 59_999, 3_600_000, Number.MAX_SAFE_INTEGER], value: [0, 0.5, 1], maxLength: [0, 1, 10_000], height: [120, 1600],
@@ -102,9 +103,18 @@ describe("mutated views", () => {
       try {
         render(
           <ViewContext.Provider value={{ ...ctx, viewTab: tab }}>
-            <SurfaceHeader header={view.header} fallbackTitle="Hello" icon="sparkles" />
-            {view.tabs && view.tabs.items.length > 0 && <ViewTabsBar tabs={view.tabs} />}
-            <NodeList nodes={view.nodes} />
+            <SurfaceFrame
+              top={
+                <>
+                  <SurfaceHeader header={view.header} fallbackTitle="Hello" icon="sparkles" />
+                  {view.tabs && view.tabs.items.length > 0 && <ViewTabsBar tabs={view.tabs} />}
+                </>
+              }
+              toolbar={view.toolbar ?? []}
+              footer={view.footer ?? []}
+            >
+              <NodeList nodes={view.nodes} />
+            </SurfaceFrame>
           </ViewContext.Provider>,
         );
       } catch (e) {

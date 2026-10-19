@@ -1,8 +1,11 @@
 /**
  * The layout containers (docs/notes/plugins-layout-1-columns-pane.md): when columns sit
  * side by side and how they degrade, pane heights, and what "fill" fills when nested.
- * jsdom has no layout: a fake geometry gives each element (by data-key, or the scroll
- * area) a top, a height and a width, and the ResizeObserver stub re-measures on demand.
+ * jsdom has no layout: a fake geometry gives each element (by data-key, or the surface's
+ * scroll area) a top, a height and a width, and the ResizeObserver stub re-measures on
+ * demand. The nodes render in the surface's frame (SurfaceFrame) inside the panel's body,
+ * so "the scroll area" is the surface's own, between its toolbar and footer
+ * (chrome.test.tsx has fill with strips).
  */
 import { act, cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -16,6 +19,7 @@ import { FILL_BOTTOM, FILL_MIN, fillBoxOf, fillHeight } from "./height";
 import { COLUMN_GAP, COLUMN_MIN_WIDTH, columnStyle, columnsMinWidth, columnWeight, shownColumns, sideBySide } from "./layout";
 import { useInlineLiveStore } from "./live";
 import { NodeList } from "./NodeList";
+import { SurfaceFrame } from "./SurfaceFrame";
 
 const ctx: ViewCtx = { watchKey: "w", instance: "hello/demo/thread:s-1", version: 1, plugin: "hello", viewTab: "layout", uiContext: emptyContext, inert: false };
 
@@ -29,7 +33,8 @@ let boxes: Record<string, Box> = {};
 let observers: (() => void)[] = [];
 
 function boxOf(el: Element): Box | undefined {
-  if (el.hasAttribute("data-scroll-root")) return boxes["scroll-root"];
+  if (el.getAttribute("data-testid") === "plugin-scroll") return boxes["scroll-root"];
+  if (el.hasAttribute("data-scroll-root")) return boxes.panel;
   const key = el.getAttribute("data-key");
   return key === null ? undefined : boxes[key];
 }
@@ -74,7 +79,11 @@ afterEach(() => {
 function inSurface(children: ReactNode) {
   return render(
     <ViewContext.Provider value={ctx}>
-      <div data-scroll-root>{children}</div>
+      <div data-scroll-root>
+        <SurfaceFrame top={null} toolbar={[]} footer={[]}>
+          {children}
+        </SurfaceFrame>
+      </div>
     </ViewContext.Provider>,
   );
 }

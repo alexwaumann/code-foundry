@@ -4,7 +4,7 @@ import { BoxList, InnerList, listGap } from "./list";
 import { renderers } from "./nodes/index";
 import type { NodeRenderer } from "./registry";
 
-/** One node by its kind's renderer (or a notice for a kind this GUI does not know). */
+/** One view node by its kind's renderer (nodes/index.ts); a notice for a kind this GUI does not know. */
 export function NodeView({ node }: { node: ViewNode }) {
   const kind = nodeKind(node);
   if (kind === null) {
