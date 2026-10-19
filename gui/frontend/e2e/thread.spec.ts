@@ -370,6 +370,14 @@ test("reading deep into an open tool row when the turn ends: the row stays open 
   const lines = Array.from({ length: 60 }, (_, i) => `line ${String(i)}`).join("\n\n");
   await mockPost("thread/delta?text=" + encodeURIComponent(`ewDecision,\n}\n\`\`\`\n\n${lines}\n`));
   await expect(pane(page).locator('[data-testid="thread-text"][data-streaming]')).toContainText("line 59");
+  // The run of work with the Edit is a strip while the turn runs: expanded first, the
+  // same way (pinned, above the viewport).
+  await pane(page)
+    .getByTestId("thread-strip-row")
+    .evaluate((b) => {
+      (b as HTMLElement).click();
+    });
+  await expect(pane(page).getByTestId("thread-strip")).toHaveAttribute("data-open", "true");
   // The Edit row open (its diff is a few hundred px tall). Pinned, the list stays at the
   // bottom, so the row is clicked where it is (above the viewport).
   const edit = pane(page).locator('[data-tool="Edit"]').last();
@@ -390,12 +398,16 @@ test("reading deep into an open tool row when the turn ends: the row stays open 
     el.scrollTop += r.getBoundingClientRect().top - el.getBoundingClientRect().top + 150;
   });
   await page.waitForTimeout(100);
-  const before = Math.round(((await row.boundingBox())?.y ?? 0) - (box?.y ?? 0));
+  const editRow = edit.getByTestId("thread-tool");
+  const head = (await pane(page).getByTestId("thread-strip-head").boundingBox())?.height ?? 0;
+  const before = ((await editRow.boundingBox())?.y ?? 0) - (box?.y ?? 0);
   await mockPost("thread/finish");
   await expect(pane(page).locator('[data-testid="thread-text"][data-streaming]')).toHaveCount(0);
-  // The row the user reads stays open, where it was.
-  await expect(edit.getByTestId("thread-tool")).toHaveAttribute("aria-expanded", "true");
-  await expect.poll(async () => Math.round(((await row.boundingBox())?.y ?? -1) - (box?.y ?? 0))).toBe(before);
+  await expect(pane(page).getByTestId("thread-strip")).toHaveCount(0);
+  // The row the user reads stays open, where it was: the strip's rows take its place, so
+  // it moves up by the strip's head only.
+  await expect(editRow).toHaveAttribute("aria-expanded", "true");
+  await expect.poll(async () => Math.abs(((await editRow.boundingBox())?.y ?? -1000) - (box?.y ?? 0) - (before - head))).toBeLessThanOrEqual(1);
   await expect(timeline).not.toHaveAttribute("data-at-bottom", "true");
   await page.getByTestId("thread-jump-bottom").click();
   await expect(timeline).toHaveAttribute("data-at-bottom", "true");
@@ -411,6 +423,9 @@ test("leaving a thread forgets how it was folded: back on it, every finished tur
   const box = await timeline.boundingBox();
   await page.mouse.move((box?.x ?? 0) + 200, (box?.y ?? 0) + 200);
   await page.mouse.wheel(0, -200);
+  // The Edit is in the running turn's strip: expanded first.
+  await wheelUpTo(page, pane(page).getByTestId("thread-strip-row"));
+  await pane(page).getByTestId("thread-strip-row").click();
   await wheelUpTo(page, pane(page).locator('[data-tool="Edit"]'));
   await expect(timeline).not.toHaveAttribute("data-at-bottom", "true");
   const editButton = () => pane(page).locator('[data-tool="Edit"]').getByTestId("thread-tool");
@@ -436,6 +451,47 @@ test("leaving a thread forgets how it was folded: back on it, every finished tur
   await wheelUpTo(page, pane(page).locator('[data-tool="Edit"]'));
   await expect(editButton()).toHaveAttribute("aria-expanded", "false");
 });
+
+for (const scheme of ["dark", "light"] as const) {
+  test(`live tool strip (${scheme}): a run of work in the running turn is one row that expands in place; once the turn ends, unfolding shows the flat rows`, async ({ page }) => {
+    await openThread(page, "streaming", scheme);
+    const timeline = page.getByTestId("thread-timeline");
+    // Write, Bash (failed), Edit, Bash, Agent between the question and the answer: one strip,
+    // its latest step the Agent; the explore groups between texts are runs of one step.
+    const strip = pane(page).getByTestId("thread-strip");
+    await expect(strip).toHaveCount(1);
+    await expect(strip.getByTestId("thread-strip-meta")).toHaveText("5 steps");
+    await expect(strip.getByTestId("thread-strip-row")).toHaveAttribute("aria-expanded", "false");
+    await expect(pane(page).locator('[data-tool="Edit"]')).toHaveCount(0);
+    await expect(pane(page).getByTestId("thread-group").first()).toBeAttached();
+    const box = await timeline.boundingBox();
+    await page.mouse.move((box?.x ?? 0) + 200, (box?.y ?? 0) + 200);
+    await page.mouse.wheel(0, -200);
+    await wheelUpTo(page, strip);
+    await strip.getByTestId("thread-strip-row").click();
+    await expect(strip).toHaveAttribute("data-open", "true");
+    await expect(strip.getByTestId("thread-strip-head")).toHaveText("5 steps");
+    await expect(strip.locator(".members").getByTestId("thread-tool")).toHaveCount(5);
+    await expect(strip.locator('.members [data-tool="Edit"]')).toHaveCount(1);
+    await shot(page, `thread-strip-open-${scheme}`);
+    await strip.getByTestId("thread-strip-head").click();
+    await expect(strip).not.toHaveAttribute("data-open", "true");
+    await expect(pane(page).locator('[data-tool="Edit"]')).toHaveCount(0);
+
+    // The turn ends: no strip; folded once pinned, unfolded it shows the flat rows as before.
+    await mockPost("thread/finish");
+    await expect(page.getByTestId("thread-working")).toHaveCount(0);
+    await expect(strip).toHaveCount(0);
+    await page.getByTestId("thread-jump-bottom").click();
+    const header = headers(page).last();
+    await expect(header).toHaveAttribute("data-folded", "true");
+    await header.locator("button.fold").click();
+    await expect(header).not.toHaveAttribute("data-folded", "true");
+    await wheelUpTo(page, pane(page).locator('[data-tool="Edit"]'));
+    await expect(pane(page).locator('[data-tool="Edit"]')).toHaveCount(1);
+    await expect(pane(page).getByTestId("thread-strip")).toHaveCount(0);
+  });
+}
 
 test("a click on a header folds or unfolds its turn without moving the header on screen", async ({ page }) => {
   // Tall enough for the whole folded thread: the list sits at the bottom (pinned) with the
