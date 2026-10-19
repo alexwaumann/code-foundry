@@ -22,7 +22,7 @@ service ProjectService {
   // RemoveWorktree removes a worktree (and optionally its branch).
   rpc RemoveWorktree(RemoveWorktreeRequest) returns (RemoveWorktreeResponse) {}
   // CleanupWorktrees removes worktrees whose work is already in the default branch:
-  // merged_clean (which includes "created by Code Foundry"), and no live thread, running
+  // merged_clean (which includes "made by Code Foundry"), and no live thread, running
   // terminal or workspace holds them. It
   // refreshes the project's status first (a caller wanting fresh remote refs fetches
   // before), re-evaluates, and removes with `git worktree remove` (never --force).
@@ -126,13 +126,15 @@ message Worktree {
   GitStatus status = 6;
   // HEAD is detached (branch is empty).
   bool detached = 7;
-  // The git half of "safe to clean up": not the main worktree, created by Code Foundry
-  // (its path is under the app's worktrees directory; worktrees
-  // made by hand or by other tools never qualify), on a branch, no staged,
-  // modified, untracked or conflicted entries, no status error, and status.base_ref is
-  // set with base_ahead 0 (every commit on HEAD is in origin/<default>). Whether a live
-  // thread, a running terminal or a workspace holds it is not part of this flag (the
-  // project store does not know them); CleanupWorktrees checks those too.
+  // The git half of "safe to clean up": not the main worktree, made by Code Foundry (it
+  // recorded the worktree when it made it; a `git worktree add` by hand or by another
+  // tool never qualifies, even under the app's worktrees directory), on a branch, no
+  // staged, modified, untracked or conflicted entries, no status error, not made in the
+  // last 10 minutes with no commit since, and its work in status.base_ref: base_ahead 0
+  // (HEAD is in origin/<default>) or a rebased or squash-merged copy of its changes
+  // landed there. Whether a live thread, a running terminal or a workspace holds it is
+  // not part of this flag (the project store does not know them); CleanupWorktrees
+  // checks those too.
   bool merged_clean = 8;
 }
 
@@ -237,16 +239,27 @@ message CleanupWorktreesRequest {
 
 message CleanupWorktreesResponse {
   string project_id = 1;
-  // Removed worktrees (their state just before removal), in the project's order.
-  repeated Worktree removed = 2;
+  // Was the removed worktrees without their reasons.
+  reserved 2;
+  // Removed worktrees (their state just before removal), in the project's order, with
+  // why each could go. With dry_run, the ones that would be.
+  repeated RemovedWorktree removed = 4;
   // Worktrees kept, with why. Without a path the main worktree is not listed.
   repeated SkippedWorktree skipped = 3;
+}
+
+message RemovedWorktree {
+  Worktree worktree = 1;
+  // Why it could go: "branch is in origin/main", "no commits since it was made", "a
+  // rebased or squash-merged copy is in origin/main".
+  string reason = 2;
 }
 
 message SkippedWorktree {
   Worktree worktree = 1;
   // Why it was kept, e.g. "uncommitted changes", "2 commits not in origin/main",
-  // "a live thread runs in it"; or the removal's error.
+  // "not a Code Foundry worktree", "no commits yet, made less than 10 minutes ago",
+  // "thread fix-x is on it"; or the removal's error.
   string reason = 2;
 }
 

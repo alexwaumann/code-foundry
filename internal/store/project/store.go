@@ -44,8 +44,8 @@ type Options struct {
 	DB  *sql.DB  // required; holds the projects table
 	Bus *bus.Bus // required; receives Event values
 	// WorktreeRoot is where CreateWorktree puts every worktree:
-	// <WorktreeRoot>/<owner>/<repo>/<branch>. Required, absolute. Only a worktree inside
-	// it is Worktree.Managed, so only those can be cleaned up.
+	// <WorktreeRoot>/<owner>/<repo>/<branch>. Required, absolute. Being inside it does not
+	// make a worktree Managed; CreateWorktree recording it does (made.go).
 	WorktreeRoot string
 	// AllowedRoot is the directory every registered project must resolve inside
 	// (symlinks followed). Empty means the user's home directory; tests set a temp dir.
@@ -156,6 +156,8 @@ type Git struct {
 	// project -> owner. Each project's entries are written only by its reconcile job
 	// (and dropped by Unregister).
 	routes map[string]watchTarget
+	// made is the worktrees the app made, by path (made.go); guarded by mu.
+	made map[string]madeWorktree
 
 	// pubMu serializes snapshot rebuild + store + publish so events are ordered and
 	// each one reflects the snapshot current when it was published.
@@ -226,6 +228,9 @@ func Start(ctx context.Context, opts Options) (*Git, error) {
 		st := &projectState{wts: map[string]*wtSlot{}}
 		st.meta.Store(m)
 		g.projects[m.ID] = st
+	}
+	if g.made, err = g.loadMade(ctx); err != nil {
+		return nil, err
 	}
 
 	ctx, g.cancel = context.WithCancel(context.WithoutCancel(ctx))
@@ -353,7 +358,7 @@ func (g *Git) buildLocked() *Snapshot {
 		}
 		for _, slot := range st.wts {
 			w := *slot.cur.Load()
-			w.Managed = InsideRoot(w.Path, g.wtRoot)
+			g.managedLocked(&w)
 			r.Worktrees = append(r.Worktrees, w)
 		}
 		slices.SortFunc(r.Worktrees, func(a, b Worktree) int {
@@ -663,6 +668,7 @@ func (g *Git) CreateWorktree(ctx context.Context, opts CreateWorktreeOptions) (W
 		path = real
 	}
 	g.log.Info("worktree created", "project", m.ID, "path", path, "branch", opts.Branch)
+	g.recordMade(ctx, m.ID, path) // before the refresh, so its snapshot has it Managed
 	if err := g.refresh(ctx, m.ID); err != nil {
 		return Worktree{}, err
 	}
@@ -849,6 +855,7 @@ func (g *Git) RemoveWorktree(ctx context.Context, opts RemoveWorktreeOptions) er
 		return fmt.Errorf("%w: %w", ErrFailedPrecondition, err)
 	}
 	g.log.Info("worktree removed", "project", m.ID, "path", path)
+	g.forgetMade(ctx, g.now(), path)
 	var branchErr error
 	if opts.DeleteBranch && wt.Branch != "" {
 		if _, err := g.runner.Run(ctx, m.Path, "branch", "-D", wt.Branch); err != nil {
@@ -896,6 +903,7 @@ func (g *Git) reconcile(ctx context.Context, id string) {
 	next := *prev
 	next.Error = ""
 	var listed []listedWorktree
+	listedAt := g.now()
 	isGit, err := probeGit(next.Path)
 	switch {
 	case err != nil:
@@ -967,6 +975,10 @@ func (g *Git) reconcile(ctx context.Context, id string) {
 			setChanged = true
 		}
 	}
+	var stale []string // records of worktrees git no longer lists (made.go)
+	if next.Error == "" && next.Git {
+		stale = g.staleMadeLocked(id, seen, listedAt)
+	}
 	metaChanged := !next.equal(prev)
 	if metaChanged {
 		st.meta.Store(&next)
@@ -994,6 +1006,7 @@ func (g *Git) reconcile(ctx context.Context, id string) {
 		}
 	}
 	g.mu.Unlock()
+	g.forgetMade(ctx, listedAt, stale...)
 
 	if routesChanged {
 		g.fs.sync(ctx) // a worktree root may have appeared outside the stream's paths
@@ -1133,6 +1146,7 @@ func (g *Git) status(ctx context.Context, projectID, path string) {
 		}
 		if c, ok, reused := g.baseCounts(ctx, st, slot, path, info.Head); ok {
 			next.Status.BaseRef, next.Status.BaseAhead, next.Status.BaseBehind = c.ref, c.ahead, c.behind
+			next.Status.BaseMerged = c.merged
 			if reused {
 				g.log.Debug("base counts reused", "project", projectID, "path", path,
 					"head", shortSHA(c.head), "base", shortSHA(c.sha))

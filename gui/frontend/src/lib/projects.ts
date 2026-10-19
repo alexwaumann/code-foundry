@@ -285,5 +285,5 @@ export function isCleanable(
 
 /** The "in main" tag's tooltip. */
 export function cleanableTitle(baseRef: string | undefined): string {
-  return `Clean: no changes, every commit is in ${baseRef || "origin/<default>"}, no thread or terminal on it`;
+  return `Clean: no changes, its work is in ${baseRef || "origin/<default>"}, no thread or terminal on it`;
 }

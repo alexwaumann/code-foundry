@@ -101,7 +101,7 @@ type ProjectServiceClient interface {
 	// RemoveWorktree removes a worktree (and optionally its branch).
 	RemoveWorktree(context.Context, *connect.Request[v1.RemoveWorktreeRequest]) (*connect.Response[v1.RemoveWorktreeResponse], error)
 	// CleanupWorktrees removes worktrees whose work is already in the default branch:
-	// merged_clean (which includes "created by Code Foundry"), and no live thread, running
+	// merged_clean (which includes "made by Code Foundry"), and no live thread, running
 	// terminal or workspace holds them. It
 	// refreshes the project's status first (a caller wanting fresh remote refs fetches
 	// before), re-evaluates, and removes with `git worktree remove` (never --force).
@@ -446,7 +446,7 @@ type ProjectServiceHandler interface {
 	// RemoveWorktree removes a worktree (and optionally its branch).
 	RemoveWorktree(context.Context, *connect.Request[v1.RemoveWorktreeRequest]) (*connect.Response[v1.RemoveWorktreeResponse], error)
 	// CleanupWorktrees removes worktrees whose work is already in the default branch:
-	// merged_clean (which includes "created by Code Foundry"), and no live thread, running
+	// merged_clean (which includes "made by Code Foundry"), and no live thread, running
 	// terminal or workspace holds them. It
 	// refreshes the project's status first (a caller wanting fresh remote refs fetches
 	// before), re-evaluates, and removes with `git worktree remove` (never --force).

@@ -33,7 +33,7 @@ func (h *Project) CleanupWorktrees(ctx context.Context, req *connect.Request[v1.
 	}
 	out := &v1.CleanupWorktreesResponse{ProjectId: res.ProjectID}
 	for _, w := range res.Removed {
-		out.Removed = append(out.Removed, worktreeToProto(w))
+		out.Removed = append(out.Removed, &v1.RemovedWorktree{Worktree: worktreeToProto(w.Worktree), Reason: w.Reason})
 	}
 	for _, s := range res.Skipped {
 		out.Skipped = append(out.Skipped, &v1.SkippedWorktree{Worktree: worktreeToProto(s.Worktree), Reason: s.Reason})

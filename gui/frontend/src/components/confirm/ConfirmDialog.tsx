@@ -22,7 +22,7 @@ export function ConfirmDialog() {
           <TriangleAlert className="mt-0.5 size-5 shrink-0 text-destructive" aria-hidden />
           <div className="min-w-0 space-y-2">
             <DialogTitle>{pending?.title}</DialogTitle>
-            <DialogDescription className="break-words">{pending?.message}</DialogDescription>
+            <DialogDescription className="max-h-96 overflow-y-auto break-words whitespace-pre-line">{pending?.message}</DialogDescription>
             {pending?.caller && (
               <p className="text-caption-sm" data-testid="confirm-caller">
                 Asked by {pending.caller}

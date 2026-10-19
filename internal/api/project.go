@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"time"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -262,6 +263,6 @@ func worktreeToProto(w project.Worktree) *v1.Worktree {
 	}
 	return &v1.Worktree{
 		ProjectId: w.ProjectID, Path: w.Path, Branch: w.Branch, Head: w.Head,
-		IsMain: w.IsMain, Detached: w.Detached, Status: st, MergedClean: w.MergedClean(),
+		IsMain: w.IsMain, Detached: w.Detached, Status: st, MergedClean: w.MergedClean(time.Now()),
 	}
 }

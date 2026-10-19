@@ -58,6 +58,7 @@ const (
 	gLog        = "log"
 	gLogTotal   = "rev-list --count"
 	gNumstat    = "diff --numstat"
+	gMergeTree  = "merge-tree"
 )
 
 // headOnly is what a changed (HEAD, base) key costs a clean worktree's detail.
@@ -223,8 +224,10 @@ func TestDetailCache(t *testing.T) {
 					git(t, c.f.project, "fetch", "-q")
 				},
 				// Everything is recomputed for the new base sha; the merge base, files,
-				// and log come out the same, so only the status announces a change.
-				wantBase: []string{gRevParse}, wantStatus: []string{gStatus, gAheadBhd}, wantDetail: headOnly,
+				// and log come out the same, so only the status announces a change. Now
+				// ahead and behind, the status also checks whether a copy of the branch
+				// landed (merged.go: the base tree, then a merge-tree).
+				wantBase: []string{gRevParse}, wantStatus: []string{gStatus, gAheadBhd, gRevParse, gMergeTree}, wantDetail: headOnly,
 				wantWorktreeEv: true, wantDetailEv: false,
 				check: func(t *testing.T, wt Worktree, d WorktreeDetail) {
 					if wt.Status.BaseAhead != 1 || wt.Status.BaseBehind != 1 || d.LogTotal != 1 ||

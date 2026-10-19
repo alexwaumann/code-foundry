@@ -25,10 +25,12 @@ type projectBase struct {
 }
 
 // baseCount memoizes one worktree's base ahead/behind: the counts of `git rev-list
-// --left-right --count head...sha`. Written only by the worktree's status job.
+// --left-right --count head...sha`, and whether head's changes are in sha by content
+// (mergedByContent). Written only by the worktree's status job.
 type baseCount struct {
 	head, ref, sha string
 	ahead, behind  int
+	merged         bool
 }
 
 // resolveBase is the jobBase body: the only writer of st.base. It then requests a
@@ -96,6 +98,10 @@ func (g *Git) baseCounts(ctx context.Context, st *projectState, slot *wtSlot, di
 		return baseCount{}, false, false
 	}
 	c = baseCount{head: head, ref: b.ref, sha: b.sha, ahead: a, behind: behind}
+	if a > 0 && behind > 0 {
+		// Only then can a rebased or squash-merged copy of head have landed in the base.
+		c.merged = g.mergedByContent(ctx, dir, head, b.sha)
+	}
 	slot.base.Store(&c)
 	return c, true, false
 }

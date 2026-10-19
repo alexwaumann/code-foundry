@@ -353,7 +353,7 @@ test("a merged, clean worktree shows 'in main' and a broom that removes it after
   const row = wtRow(page, "repo-cf", MERGED);
   // The tag and the broom are on the fixture only.
   await expect(row.getByTestId("worktree-cleanable")).toHaveText("in main");
-  await expectTooltip(page, row.getByTestId("worktree-cleanable"), "Clean: no changes, every commit is in origin/main, no thread or terminal on it");
+  await expectTooltip(page, row.getByTestId("worktree-cleanable"), "Clean: no changes, its work is in origin/main, no thread or terminal on it");
   await expect(page.getByTestId("worktree-cleanable")).toHaveCount(1);
   await expect(page.getByTestId("worktree-cleanup")).toHaveCount(1);
   await expectTooltip(page, row.getByTestId("worktree-cleanup"), "Clean up: remove this worktree");
@@ -366,12 +366,11 @@ test("a merged, clean worktree shows 'in main' and a broom that removes it after
 
   await row.getByTestId("worktree-cleanup").click();
   const dialog = page.getByTestId("confirm-dialog");
-  await expect(dialog).toContainText("Remove the worktree of cf/usage-polish");
-  await expect(dialog).toContainText("Code Foundry created it (under its worktrees directory)");
-  await expect(dialog).toContainText("the branch is kept");
+  await expect(dialog).toContainText(`Remove the worktree of cf/usage-polish at ${MERGED} (branch is in origin/main)?`);
+  await expect(dialog).toContainText("The branch is kept");
   await dialog.getByTestId("confirm-ok").click();
   await expect(row).toHaveCount(0);
-  await expect(page.getByText("Removed 1 worktree: cf/usage-polish")).toBeVisible();
+  await expect(page.getByText("Removed 1 worktree: cf/usage-polish (branch is in origin/main)")).toBeVisible();
   const inv = await lastInvocation("project.worktree.cleanup");
   expect(inv?.args).toEqual({ project: "repo-cf", path: MERGED });
   expect(inv?.context).toMatchObject({ activeProjectId: "repo-cf", activeWorktreePath: MERGED });
@@ -404,10 +403,16 @@ test("the project menu counts merged worktrees, cleans them all up, and is disab
   await expect(page.getByTestId("project-cleanup")).not.toHaveAttribute("data-disabled");
   await page.getByTestId("project-cleanup").click();
   const dialog = page.getByTestId("confirm-dialog");
-  await expect(dialog).toContainText("Remove 2 worktrees created by Code Foundry (under its worktrees directory) whose work is in origin/main: cf/usage-polish, cf/old-docs?");
+  // The prompt lists what goes and what stays, one per line, each with its path and why.
+  await expect(dialog).toContainText("Fetch, then remove 2 worktrees (branches are kept; each is checked again after the fetch):");
+  await expect(dialog).toContainText(`- cf/usage-polish at ${MERGED}: branch is in origin/main`);
+  await expect(dialog).toContainText("Keep 3:");
+  await expect(dialog).toContainText(`- t3code/elsewhere at ${T3}: not a Code Foundry worktree`);
   await dialog.getByTestId("confirm-ok").click();
   await expect(page.getByTestId("worktree-cleanable")).toHaveCount(0);
-  await expect(page.getByText(/^Removed 2 worktrees: cf\/usage-polish, cf\/old-docs; kept 3 worktrees: .*t3code\/elsewhere \(not a Code Foundry worktree\)/)).toBeVisible();
+  await expect(
+    page.getByText(/^Removed 2 worktrees: cf\/usage-polish \(branch is in origin\/main\), cf\/old-docs \(branch is in origin\/main\); kept 3 worktrees: .*t3code\/elsewhere \(not a Code Foundry worktree\)/),
+  ).toBeVisible();
   expect((await lastInvocation("project.worktree.cleanup"))?.args).toEqual({ project: "repo-cf" });
   await expect(project(page, "repo-cf").getByTestId("worktree-branch")).toHaveText(["main", "feat/sidebar", "fix/resize", "t3code/elsewhere"]);
 
