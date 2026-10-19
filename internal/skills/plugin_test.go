@@ -18,7 +18,7 @@ import (
 var pluginSkillFiles = []string{
 	"code-foundry-plugin/SKILL.md",
 	"code-foundry-plugin/reference/manifest.md", "code-foundry-plugin/reference/protocol.md",
-	"code-foundry-plugin/reference/primitives.md", "code-foundry-plugin/reference/host-api.md",
+	"code-foundry-plugin/reference/primitives.md", "code-foundry-plugin/reference/ui-layout.md", "code-foundry-plugin/reference/host-api.md",
 	"code-foundry-plugin/reference/testing.md", "code-foundry-plugin/reference/publishing.md",
 	"code-foundry-plugin/reference/cli.md", "code-foundry-plugin/reference/host-commands.md",
 	"code-foundry-plugin/example/plugin.json", "code-foundry-plugin/example/main.go",
@@ -80,6 +80,12 @@ func TestRenderPluginSkill(t *testing.T) {
 	}
 	if prim := string(files[skills.Plugin+"/reference/primitives.md"]); !strings.Contains(prim, "| Elements in a view (nodes, rows, chips, pairs, fields, options, buttons, tabs) | 400 |") {
 		t.Error("primitives.md lacks the limits table")
+	}
+	if prim := string(files[skills.Plugin+"/reference/primitives.md"]); !strings.Contains(prim, "| Containers (section, columns, pane) a node sits inside | 4 |") {
+		t.Error("primitives.md lacks the container depth")
+	}
+	if layout := string(files[skills.Plugin+"/reference/ui-layout.md"]); !strings.Contains(layout, "2 columns need 492 px") || !strings.Contains(layout, "view.node.columns") {
+		t.Error("ui-layout.md lacks the side by side rule or the capability")
 	}
 
 	// cli.md: every plugin verb's help and the debugging helpers, the common flags once,

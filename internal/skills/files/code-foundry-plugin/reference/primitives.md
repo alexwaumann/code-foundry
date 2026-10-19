@@ -345,8 +345,8 @@ Groups nodes under a title (60 characters, one line: with meta, pill and buttons
 it, it is cut early, so keep it to a few words): `card` draws a box, `tone` `attention`
 or `error` colours the title (and a card's border), `collapsible` + `collapsed` (initial;
 the user's toggle wins), `stale` dims last-known data while the backend is unreachable.
-Up to 2 buttons sit at the end of the title row, after the pill. Sections nest two deep:
-section > section > node.
+Up to 2 buttons sit at the end of the title row, after the pill. A node sits inside at
+most 4 containers (section, columns, pane).
 
 ### form
 
@@ -455,7 +455,8 @@ the host's thread view and composer (`readOnly: true` leaves the composer out), 
 terminal (`h.CreateTerminal`, permission `terminals`) with the host's terminal view, an
 "Open in bottom panel" button and up to 2 buttons of yours. `height` is `"auto"` (the
 default: about 420 px for a thread, `rows` text rows (4..60, default 16) for a terminal),
-`"fill"` (the rest of the panel, at least 240 px) or pixels (120..1600). A view naming
+`"fill"` (the rest of its box: the panel, or the pane around it, `reference/ui-layout.md`;
+at least 240 px) or pixels (120..1600). A view naming
 another owner's thread or terminal is refused; one that is gone (removed, closed) shows a
 muted empty state; an archived thread still renders, composer included, with no archived
 cue (`SendThread` unarchives it), so drop its node when you archive it. Each one holds a
@@ -464,6 +465,13 @@ keeps at most 2 live at once (others show "Attach"): put one thread or terminal 
 view, or let the user pick which, switching with tabs or chips rather than stacking them.
 Check `h.HasCapability("view.node.thread")` (`view.node.terminal`) before relying on
 them; `reference/host-api.md` has the calls that make them.
+
+### columns and pane
+
+Layout containers: `columns` puts 2 to 4 columns side by side where they fit (240 px a
+column) and stacks them, or keeps only the first, where they do not (the side panel);
+`pane` is a box with its own height (auto, px, fill) and scroll. Both are in
+`reference/ui-layout.md`, with what `fill` means inside them.
 
 ## Acts
 
