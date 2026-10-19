@@ -3,6 +3,7 @@ import { useShallow } from "zustand/react/shallow";
 import { ArrowUp, Brain, Folder, FolderGit2, Gauge, GitBranch, GitBranchPlus, GitCommitHorizontal, Layers, Loader2, Paperclip, ShieldCheck, X } from "lucide-react";
 import { AttachmentPreview } from "./AttachmentPreview";
 import { PdfTile } from "./attachmentFaces";
+import { attachLabel, useHostFiles } from "./useHostFiles";
 import { BranchIndicator } from "./BranchIndicator";
 import { ComposerPicker, type PickerGroup } from "./ComposerPicker";
 import { CompletionCard } from "./CompletionCard";
@@ -221,6 +222,7 @@ async function removeWithConfirm(key: string, a: DraftAttachment, refocus: () =>
 /** What the composers' file pickers offer: the accepted types, and any file named .pdf. */
 export const ATTACHMENT_ACCEPT = `image/*,${ATTACHMENT_MIME_TYPES.join(",")},.pdf`;
 
+
 /** A draft's attachment tiles (preview on click, × to remove); also a thread's follow-up composer's. */
 export function Attachments({ draftKey, disabled, refocus }: { draftKey: string; disabled: boolean; refocus: () => void }) {
   const attachments = useDraft(draftKey, "attachments");
@@ -376,6 +378,9 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
   useEffect(() => {
     void loadSkills(sources);
   }, [sources]);
+  // Native drops and the native open panel (in the Wails host); the panel opens in the
+  // checkout the thread will work in, the main checkout for a new worktree, else home.
+  const hostFiles = useHostFiles({ draftKey, editorRef, disabled: busy, startDir: existingPath || primaryCheckout?.path || mainPath || "" });
   // "@" completion: files of the checkouts the thread will see (lib/completion fileSources;
   // a new worktree's come from the main checkout it starts from).
   const worktreeKind = worktree.kind;
@@ -487,6 +492,9 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
         className="isolate grid grid-cols-[minmax(0,1fr)_auto]"
         data-testid="composer-card"
         data-dragging={dragging || undefined}
+        // A native drop (Wails host) lands here by this id; the runtime marks the card
+        // file-drop-target-active while a drag from the OS is over it.
+        {...hostFiles.dropTarget}
         onDragOver={(e) => {
           if (busy || !e.dataTransfer.types.includes("Files")) return;
           e.preventDefault();
@@ -511,7 +519,7 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
           className={cn(
             // Translucent over the backdrop, frosted so the prompt stays readable.
             "-z-10 col-span-2 col-start-1 row-span-2 row-start-1 rounded-lg border shadow-sm backdrop-blur-xl transition-colors",
-            dragging ? "border-info/70 bg-info/5" : "border-border bg-card/85",
+            dragging ? "border-info/70 bg-info/5" : "border-border bg-card/85 in-[.file-drop-target-active]:border-info/70 in-[.file-drop-target-active]:bg-info/5",
           )}
         />
         <div className="col-span-2 col-start-1 row-start-1 flex min-w-0 flex-col">
@@ -586,16 +594,19 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
             data-testid="composer-permission"
           />
           {/* The span carries the tooltip while the button is disabled (no pointer events). */}
-          <Tip label="Attach images or PDFs">
+          <Tip label={attachLabel(hostFiles.hosted)}>
             <span className="ml-auto flex">
               <button
                 type="button"
                 disabled={busy}
-                aria-label="Attach images or PDFs"
+                aria-label={attachLabel(hostFiles.hosted)}
                 data-compose-stop
                 data-testid="composer-attach"
                 className="flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50"
-                onClick={() => fileRef.current?.click()}
+                onClick={() => {
+                  if (hostFiles.hosted) hostFiles.pick();
+                  else fileRef.current?.click();
+                }}
               >
                 <Paperclip className="size-4" />
               </button>

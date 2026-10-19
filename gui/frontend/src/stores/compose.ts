@@ -22,7 +22,7 @@
  */
 import { create } from "zustand";
 import { listRefs, type ProjectView } from "@/api/project";
-import { ATTACHMENT_MIME_TYPES, attachmentMaxBytes, MAX_INLINE_PDF_PAGES, MESSAGE_INLINE_MAX_BYTES, PDF_MIME_TYPE, stageAttachment } from "@/api/threads";
+import { ATTACHMENT_MIME_TYPES, attachmentMaxBytes, MAX_INLINE_PDF_PAGES, MESSAGE_INLINE_MAX_BYTES, PDF_MIME_TYPE, stageAttachment, stageAttachmentPath } from "@/api/threads";
 import { isOutdatedDaemon } from "@/api/errors";
 import { errorMessage } from "@/api/stream";
 import {
@@ -31,6 +31,7 @@ import {
   inlineBytes,
   inlineCapNotice,
   longPdfNotice,
+  MAX_ATTACHMENTS,
   sentInline,
   DEFAULT_PERMISSION,
   defaultWorktree,
@@ -52,8 +53,9 @@ import {
 import { pdfSummary } from "@/lib/pdf";
 import { NO_PROJECT } from "@/lib/threadRow";
 import { sentComposerText } from "@/lib/userMessage";
-import { projectPrompt, removeReferences, removeProjectTags, projectTagCount, tagsByProject } from "@/lib/prompt";
+import { projectPrompt, removeReferences, removeProjectTags, projectTagCount, stagedPdfPages, tagsByProject } from "@/lib/prompt";
 import type { Citation } from "@/lib/citation";
+import { loadAttachment } from "./attachments";
 import { invokeConfirmed, refreshCommands } from "./commands";
 import { requestConfirm, type ConfirmRequest } from "./confirm";
 import { getUiContext } from "./context";
@@ -262,6 +264,72 @@ export function addAttachments(key: string, files: readonly File[]): DraftAttach
   return added;
 }
 
+/** The last segment of a path. */
+function baseName(path: string): string {
+  return path.replace(/\/+$/, "").split("/").pop() ?? path;
+}
+
+interface StagedPath {
+  name: string;
+  type: string;
+  size: number;
+  /** A PDF's count from the staged name (null: an estimate, or an image). */
+  pages: number | null;
+  file: File;
+  stagedPath: string;
+}
+
+/** Stages one dropped or picked path and reads it back as a File named like the original. */
+async function stagePath(path: string): Promise<StagedPath> {
+  const stagedPath = await stageAttachmentPath(path);
+  const loaded = await loadAttachment(stagedPath);
+  if (!loaded) throw new Error("staged, but the daemon did not serve it back");
+  const name = baseName(path);
+  const file = new File([loaded.file], name, { type: loaded.file.type });
+  return { name, type: file.type, size: file.size, pages: file.type === PDF_MIME_TYPE ? stagedPdfPages(stagedPath) : null, file, stagedPath };
+}
+
+/**
+ * Adds image and PDF paths dropped on the composer or picked in the native open panel
+ * (lib/droppedPaths splitDroppedPaths' attach list; the Wails host hands over paths, never
+ * File objects). Each is staged by path at once (ThreadService.StageAttachment) and read
+ * back (ReadAttachment, the thread's loader) as the attachment's file, so its tile, chip
+ * and preview are a pasted file's and the send reuses the staged path. The count cap
+ * applies before staging; the daemon refuses unsupported content, files over the size
+ * cap and vanished paths ("<name>: <its message>" in the notice); the inline cap applies
+ * once the size, and a PDF's page count from the staged name, are known. Resolves to the
+ * ones added (the editor puts chips for them into the text).
+ */
+export async function addAttachmentPaths(key: string, paths: readonly string[]): Promise<DraftAttachment[]> {
+  if (paths.length === 0) return [];
+  const room = Math.max(0, MAX_ATTACHMENTS - getDraft(key).attachments.length);
+  const take = paths.slice(0, room);
+  const notices: string[] = [];
+  if (paths.length > take.length) notices.push(`At most ${String(MAX_ATTACHMENTS)} attachments per message; ${String(paths.length - take.length)} not attached`);
+  const results = await Promise.allSettled(take.map(stagePath));
+  const staged: StagedPath[] = [];
+  results.forEach((r, i) => {
+    if (r.status === "fulfilled") staged.push(r.value);
+    else notices.push(`${baseName(take[i] ?? "")}: ${errorMessage(r.reason)}`);
+  });
+  const d = getDraft(key);
+  const { accepted, rejected } = checkAttachments(staged, { count: d.attachments.length, inlineBytes: draftInlineBytes(d.attachments) }, ATTACHMENT_LIMITS);
+  notices.push(...rejected);
+  const added = accepted.map<DraftAttachment>((a) => ({
+    id: `a${String(nextAttachmentId++)}`,
+    file: a.file,
+    kind: a.type === PDF_MIME_TYPE ? "pdf" : "image",
+    url: URL.createObjectURL(a.file),
+    stagedPath: a.stagedPath,
+    pages: a.pages,
+    thumb: null,
+  }));
+  for (const a of added) if (a.pages !== null && a.pages > MAX_INLINE_PDF_PAGES) notices.push(longPdfNotice(a.file.name, a.pages));
+  updateDraft(key, { attachments: [...d.attachments, ...added], notice: notices.length > 0 ? notices.join(" · ") : null });
+  for (const a of added) if (a.kind === "pdf") void summarizePdf(a);
+  return added;
+}
+
 /** Counts a PDF's pages and renders its thumbnail (pdf.js, loaded on the first PDF: lib/pdf.ts). */
 async function summarizePdf(a: DraftAttachment): Promise<void> {
   try {
@@ -295,7 +363,8 @@ export function settlePdf(id: string, info: { pages: number; thumb: string | nul
   }
   updateDraft(key, {
     attachments: d.attachments.map((x) => (x.id === id ? settled : x)),
-    notice: info.pages > MAX_INLINE_PDF_PAGES ? withNotice(d.notice, longPdfNotice(a.file.name, info.pages)) : d.notice,
+    // A PDF staged by path had its count, and this notice, from the staged name already.
+    notice: a.pages === null && info.pages > MAX_INLINE_PDF_PAGES ? withNotice(d.notice, longPdfNotice(a.file.name, info.pages)) : d.notice,
   });
 }
 

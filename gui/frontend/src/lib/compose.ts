@@ -366,9 +366,10 @@ export function previewLabel(name: string, kind: "image" | "pdf", pages: number 
  * Splits dropped/pasted/picked files into the ones to attach and one message per
  * rejection (wrong type, too big, over the count cap, over the inline cap). `existing`
  * is what the draft already has. An image counts toward the inline cap at once; a PDF
- * only once its pages are counted (sentInline), so it is not checked here.
+ * only once its pages are counted (sentInline): one whose `pages` are known already (a
+ * path the daemon staged, which names the count) is checked here, any other is not.
  */
-export function checkAttachments<F extends FileLike>(
+export function checkAttachments<F extends FileLike & { pages?: number | null }>(
   files: readonly F[],
   existing: { count: number; inlineBytes: number },
   limits: AttachmentLimits,
@@ -378,15 +379,16 @@ export function checkAttachments<F extends FileLike>(
   const rejected: string[] = [];
   let inline = existing.inlineBytes;
   let over = 0;
+  const inlineNow = (f: F) => sentInline({ kind: f.type === limits.pdfType ? "pdf" : "image", size: f.size, pages: f.pages ?? null }, limits.maxInlinePages);
   for (const f of files) {
     const name = f.name || "pasted image";
     const maxBytes = limits.maxBytes(f.type);
     if (!limits.types.includes(f.type)) rejected.push(`${name}: not a ${ATTACHMENT_TYPE_NAMES} file`);
     else if (f.size > maxBytes) rejected.push(`${name}: larger than ${String(Math.round(maxBytes / (1024 * 1024)))} MB`);
     else if (existing.count + accepted.length >= max) over++;
-    else if (f.type !== limits.pdfType && inline + f.size > limits.maxInlineBytes) rejected.push(inlineCapNotice(name, limits.maxInlineBytes));
+    else if (inlineNow(f) && inline + f.size > limits.maxInlineBytes) rejected.push(inlineCapNotice(name, limits.maxInlineBytes));
     else {
-      if (f.type !== limits.pdfType) inline += f.size;
+      if (inlineNow(f)) inline += f.size;
       accepted.push(f);
     }
   }

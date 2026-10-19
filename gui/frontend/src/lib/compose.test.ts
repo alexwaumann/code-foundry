@@ -52,7 +52,7 @@ const file = (name: string, type = "image/png", size = 1000) => ({ name, type, s
 const CAP = "Attachments sent with one message must total under 24 MB";
 
 describe("checkAttachments", () => {
-  it.each<[string, ReturnType<typeof file>[], { count: number; inlineBytes: number }, string[], string[]]>([
+  it.each<[string, (ReturnType<typeof file> & { pages?: number | null })[], { count: number; inlineBytes: number }, string[], string[]]>([
     ["accepts images and PDFs", [file("a.png"), file("b.jpg", "image/jpeg"), file("spec.pdf", PDF)], { count: 0, inlineBytes: 0 }, ["a.png", "b.jpg", "spec.pdf"], []],
     ["rejects other types", [file("notes.txt", "text/plain")], { count: 0, inlineBytes: 0 }, [], ["notes.txt: not a PNG, JPEG, GIF, WebP or PDF file"]],
     ["rejects images over 10 MB", [file("big.png", "image/png", 11 * MB)], { count: 0, inlineBytes: 0 }, [], ["big.png: larger than 10 MB"]],
@@ -69,6 +69,11 @@ describe("checkAttachments", () => {
     ],
     // A PDF's pages are not known yet: the cap applies once they are (stores/compose settlePdf).
     ["does not hold a PDF to the inline cap", [file("spec.pdf", PDF, 19 * MB)], { count: 0, inlineBytes: 20 * MB }, ["spec.pdf"], []],
+    // A path the daemon staged names its count: a short PDF counts toward the cap at once.
+    ["holds a counted short PDF to the inline cap", [{ ...file("spec.pdf", PDF, 19 * MB), pages: 3 }], { count: 0, inlineBytes: 20 * MB }, [], [`${CAP}; spec.pdf not attached`]],
+    ["counts a counted short PDF toward the cap", [{ ...file("a.pdf", PDF, 15 * MB), pages: 10 }, { ...file("b.png", "image/png", 9 * MB + 1) }], { count: 0, inlineBytes: 0 }, ["a.pdf"], [`${CAP}; b.png not attached`]],
+    ["does not hold a counted long PDF to the inline cap", [{ ...file("book.pdf", PDF, 19 * MB), pages: 11 }], { count: 0, inlineBytes: 20 * MB }, ["book.pdf"], []],
+    ["does not hold an uncounted PDF to the inline cap", [{ ...file("x.pdf", PDF, 19 * MB), pages: null }], { count: 0, inlineBytes: 20 * MB }, ["x.pdf"], []],
   ])("%s", (_name, files, existing, accepted, rejected) => {
     const res = checkAttachments(files, existing, limits);
     expect(res.accepted.map((f) => f.name)).toEqual(accepted);
