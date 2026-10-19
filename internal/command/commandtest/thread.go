@@ -27,6 +27,8 @@ type Thread struct {
 	Others []*v1.Thread
 	// RetiredUsage is List's retired usage ledger.
 	RetiredUsage []*v1.UsageBucket
+	// Removed are List's removed threads, answered with include_removed.
+	Removed []*v1.RemovedThread
 	// Fired and Existed are Subscribe's answer flags; Subscriptions is what
 	// ListSubscriptions returns and Unsubscribe removes from (thread_subscriptions.go).
 	Fired, Existed bool
@@ -93,7 +95,11 @@ func (s *Thread) List(_ context.Context, r *connect.Request[v1.ListThreadsReques
 		out = append(out, s.Current)
 	}
 	out = append(out, s.Others...)
-	return connect.NewResponse(&v1.ListThreadsResponse{Threads: out, RetiredUsage: s.RetiredUsage}), nil
+	res := &v1.ListThreadsResponse{Threads: out, RetiredUsage: s.RetiredUsage}
+	if r.Msg.GetFilter().GetIncludeRemoved() {
+		res.Removed = s.Removed
+	}
+	return connect.NewResponse(res), nil
 }
 
 // Get returns Current with the requested id.

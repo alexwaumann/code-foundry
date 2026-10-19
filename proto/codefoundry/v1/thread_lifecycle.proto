@@ -566,12 +566,38 @@ message ThreadFilter {
   // Only threads with this owner ("plugin:hello"), or with "plugin:" any plugin's.
   // Without it (and without all) owned threads are left out.
   string owner = 10;
+  // Also answer with the threads removed within the last 24 hours that match
+  // (ListThreadsResponse.removed): created_by, labels, project, workspace and owner
+  // apply; a status or state leaves every removed thread out; limit applies to them
+  // separately. thread.reports --all and thread.list --all set it.
+  bool include_removed = 11;
 }
 
 message ListThreadsResponse {
   repeated Thread threads = 1;
   // Usage of removed threads (see ThreadListSnapshot.retired_usage).
   repeated UsageBucket retired_usage = 2;
+  // With ThreadFilter.include_removed: the matching removed threads, the most
+  // recently removed first.
+  repeated RemovedThread removed = 3;
+}
+
+// RemovedThread is what the daemon keeps of a thread removed within the last 24 hours,
+// in memory (a daemon restart forgets it): for the agent that created it, waits on it
+// or reads its report. A NOT_FOUND for such an id carries one as an error detail.
+message RemovedThread {
+  string id = 1;
+  string name = 2;
+  // As Thread.created_by: the creator's id, empty when the user made it.
+  string created_by = 3;
+  repeated string labels = 4;
+  string project_id = 5;
+  google.protobuf.Timestamp removed_at = 6;
+  // The thread's last report, as on Thread (report_status UNSPECIFIED when none).
+  ThreadReportStatus report_status = 7;
+  string report_summary = 8;
+  string report_data = 9;
+  google.protobuf.Timestamp report_at = 10;
 }
 
 message GetThreadRequest {
@@ -620,6 +646,9 @@ message WaitThreadResponse {
   Thread thread = 1;
   // The timeout passed before the condition held; thread is the current record.
   bool timed_out = 2;
+  // The thread was removed, before the wait or while it waited (a thread being removed
+  // meets no condition): thread is unset and this is what is known of it.
+  RemovedThread removed = 3;
 }
 
 message RenameThreadRequest {

@@ -42,6 +42,10 @@ type ThreadReport struct {
 	// CreatedBy is the creator's id; "" for a thread the user started.
 	CreatedBy string   `json:"createdBy"`
 	Labels    []string `json:"labels"`
+	// Removed is set, with Status "removed" and RemovedAt, for a thread removed within
+	// the last day (--all lists them; commands_thread_removed.go).
+	Removed   bool       `json:"removed,omitempty"`
+	RemovedAt *time.Time `json:"removedAt,omitempty"`
 }
 
 // RegisterThreadReports registers thread.reports.
@@ -58,7 +62,7 @@ func RegisterThreadReports(r *Registry, b ThreadBackend) error {
 			{Name: "label", Type: String, Description: "Comma-separated labels, all required"},
 			{Name: "status", Type: Enum, Enum: ThreadReportsStatuses, Description: "Only threads with this report; none: not reported"},
 			{Name: "archived", Type: Bool, Description: "Include archived threads"},
-			{Name: "all", Type: Bool, Description: "The same as archived"},
+			{Name: "all", Type: Bool, Description: "Archived and removed too"},
 			{Name: "full", Type: Bool, Description: "Print each report's JSON data"},
 			{Name: "limit", Type: Int, Description: "At most this many, most recently active first (0: all)"},
 		},
@@ -71,18 +75,22 @@ func RegisterThreadReports(r *Registry, b ThreadBackend) error {
 			if err != nil {
 				return Result{}, err
 			}
-			// all here only adds the archived threads: ThreadFilter.all would also drop
-			// created-by and labels, which this command is for.
-			f := &v1.ThreadFilter{IncludeArchived: a.Bool("archived") || a.Bool("all"), CreatedBy: by, Labels: splitList(a.String("label"))}
+			// all here only adds the archived and removed threads: ThreadFilter.all would
+			// also drop created-by and labels, which this command is for.
+			f := &v1.ThreadFilter{IncludeArchived: a.Bool("archived") || a.Bool("all"), IncludeRemoved: a.Bool("all"), CreatedBy: by,
+				Labels: splitList(a.String("label"))}
 			res, err := b.List(ctx, connect.NewRequest(&v1.ListThreadsRequest{Filter: f}))
 			if err != nil {
 				return Result{}, err
 			}
-			threads := filterReports(res.Msg.GetThreads(), a.String("status"), limit)
-			out := make([]ThreadReport, len(threads))
-			for i, s := range threads {
-				out[i] = threadReport(s)
+			all := make([]ThreadReport, 0, len(res.Msg.GetThreads())+len(res.Msg.GetRemoved()))
+			for _, s := range res.Msg.GetThreads() {
+				all = append(all, threadReport(s))
 			}
+			for _, r := range res.Msg.GetRemoved() {
+				all = append(all, removedReport(r))
+			}
+			out := filterReports(all, a.String("status"), limit)
 			return Result{Message: formatThreadReports(out, f, a.Bool("full")), JSON: out}, nil
 		},
 	})
@@ -102,15 +110,15 @@ func resolveCreatedBy(ctx context.Context, b ThreadBackend, by string) (string, 
 	return ResolveID(ThreadID, "created-by", by, ids)
 }
 
-// filterReports keeps the threads whose report status is status ("" any, "none" no
-// report), at most limit of them (0: all).
-func filterReports(threads []*v1.Thread, status string, limit int) []*v1.Thread {
-	var out []*v1.Thread
-	for _, s := range threads {
-		if status != "" && reportWord(s) != status {
+// filterReports keeps the reports whose status is status ("" any, "none" no report),
+// at most limit of them (0: all).
+func filterReports(reports []ThreadReport, status string, limit int) []ThreadReport {
+	out := []ThreadReport{}
+	for _, r := range reports {
+		if status != "" && r.ReportStatus != status {
 			continue
 		}
-		out = append(out, s)
+		out = append(out, r)
 		if limit > 0 && len(out) == limit {
 			break
 		}
@@ -136,13 +144,7 @@ func threadReport(s *v1.Thread) ThreadReport {
 	if r.Labels == nil {
 		r.Labels = []string{}
 	}
-	if d := s.GetReportData(); d != "" {
-		if json.Valid([]byte(d)) {
-			r.ReportData = json.RawMessage(d)
-		} else {
-			r.ReportData, _ = json.Marshal(d) // a string always marshals
-		}
-	}
+	r.ReportData = reportDataJSON(s.GetReportData())
 	if at := s.GetReportAt(); at != nil {
 		t := at.AsTime().UTC()
 		r.ReportAt = &t
@@ -169,6 +171,9 @@ func formatThreadReports(reports []ThreadReport, f *v1.ThreadFilter, full bool) 
 		if !f.GetIncludeArchived() {
 			return "no threads (archived threads are left out; --archived includes them)"
 		}
+		if !f.GetIncludeRemoved() {
+			return "no threads (removed threads are left out; --all includes them)"
+		}
 		return "no threads"
 	}
 	var sb strings.Builder
@@ -183,6 +188,18 @@ func formatThreadReports(reports []ThreadReport, f *v1.ThreadFilter, full bool) 
 			name = "(unnamed)"
 		}
 		summary := oneLineText(r.ReportSummary)
+		if r.Removed {
+			// The status column says removed; the last report goes before its summary.
+			switch {
+			case st == "-":
+				summary = "no report"
+			case summary == "":
+				summary = "last report " + st
+			default:
+				summary = "last report " + st + ": " + summary
+			}
+			st = "removed"
+		}
 		if len(r.ReportData) > 0 && !full {
 			summary = strings.TrimSpace(summary + " (data)")
 		}

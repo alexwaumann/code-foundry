@@ -14,7 +14,8 @@ import (
 )
 
 // Wait blocks until the thread meets req's condition, or its timeout passes (timed_out,
-// with the current record). It subscribes to the thread list before reading the
+// with the current record). A thread removed before or during the wait answers with
+// removed (a thread being removed meets no condition; thread_removed.go). It subscribes to the thread list before reading the
 // snapshot, so a change between the two is not missed and a condition that already
 // holds returns at once. The condition counts only once Claude reacted (isReaction)
 // after req's after item, else after the thread's latest message (lastMessage), so a
@@ -25,6 +26,9 @@ func (h *Thread) Wait(ctx context.Context, req *connect.Request[v1.WaitThreadReq
 	id, until := req.Msg.GetId(), req.Msg.GetUntil()
 	if id == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("a thread id is required"))
+	}
+	if res := h.removedResponse(id); res != nil {
+		return res, nil
 	}
 	var expired <-chan time.Time
 	if d := req.Msg.GetTimeout().AsDuration(); d > 0 {
@@ -40,7 +44,7 @@ func (h *Thread) Wait(ctx context.Context, req *connect.Request[v1.WaitThreadReq
 	itemsC := items.C()
 	cur, ok := h.store.Snapshot().Thread(id)
 	if !ok {
-		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("thread %s not found", id))
+		return h.waitGone(id, "not found")
 	}
 	after, reacted, err := h.reactedAfter(ctx, id, req.Msg.GetAfter())
 	if err != nil {
@@ -85,7 +89,7 @@ func (h *Thread) Wait(ctx context.Context, req *connect.Request[v1.WaitThreadReq
 				// Missed changes: the snapshot has them.
 				dropped = d
 				if cur, ok = h.store.Snapshot().Thread(id); !ok {
-					return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("thread %s was removed", id))
+					return h.waitGone(id, "was removed")
 				}
 				continue
 			}
@@ -96,11 +100,20 @@ func (h *Thread) Wait(ctx context.Context, req *connect.Request[v1.WaitThreadReq
 				}
 			case thread.Removed:
 				if e.ID == id {
-					return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("thread %s was removed", id))
+					return h.waitGone(id, "was removed")
 				}
 			}
 		}
 	}
+}
+
+// waitGone is Wait's answer for a thread that is not in the store: the removed one
+// (removed set), or NOT_FOUND "thread <id> <what>" when the store does not remember it.
+func (h *Thread) waitGone(id, what string) (*connect.Response[v1.WaitThreadResponse], error) {
+	if res := h.removedResponse(id); res != nil {
+		return res, nil
+	}
+	return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("thread %s %s", id, what))
 }
 
 // reactedAfter reads the thread's items: the ordinal of the item after names (its id,

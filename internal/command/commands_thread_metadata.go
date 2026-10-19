@@ -141,6 +141,9 @@ func threadGet(b ThreadBackend, idArg ArgSpec) Command {
 		When:         hasThread,
 		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 			res, err := b.Get(ctx, connect.NewRequest(&v1.GetThreadRequest{Id: a.String("id")}))
+			if r, ok := removedFrom(err); ok {
+				return removedGetResult(r), nil
+			}
 			if err != nil {
 				return Result{}, err
 			}
