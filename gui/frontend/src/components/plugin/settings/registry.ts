@@ -33,12 +33,31 @@ export function shortSource(url: string): string {
   return url.replace(/^https?:\/\//, "").replace(/^github\.com\//, "");
 }
 
-/** What an entry's pill says: not installed (none), the installed version, or that an update is there. */
-export function entryPill(e: Pick<IndexEntryView, "installedVersion" | "updateAvailable" | "installedDev" | "available">): { label: string; tone: Tone } | undefined {
-  if (e.installedVersion === null) return e.available ? undefined : { label: "No build for this Mac", tone: "muted" };
-  if (e.installedDev) return { label: `Dev ${e.installedVersion}`, tone: "muted" };
-  if (e.updateAvailable) return { label: `Update from ${e.installedVersion}`, tone: "attention" };
-  return { label: "Installed", tone: "ok" };
+/**
+ * What an entry's pill says, from the daemon's relation: not installed (none), installed,
+ * an update from its own source, a dev link, or where it was installed from when that is
+ * another source (no update from here, however new).
+ */
+export function entryPill(e: Pick<IndexEntryView, "installedVersion" | "relation" | "installedFrom" | "available">): { label: string; tone: Tone } | undefined {
+  switch (e.relation) {
+    case "not-installed":
+      return e.available ? undefined : { label: "No build for this Mac", tone: "muted" };
+    case "dev":
+      return { label: `Dev ${e.installedVersion ?? ""}`, tone: "muted" };
+    case "update":
+      return { label: `Update from ${e.installedVersion ?? ""}`, tone: "attention" };
+    case "other-source":
+      return { label: `Installed from ${e.installedFrom}`, tone: "muted" };
+    case "installed":
+      return { label: "Installed", tone: "ok" };
+  }
+}
+
+/** The row's one action: Install when nothing of the name is installed, Update when its own source lists a newer version, else none. */
+export function entryAction(e: Pick<IndexEntryView, "relation">): "install" | "update" | null {
+  if (e.relation === "not-installed") return "install";
+  if (e.relation === "update") return "update";
+  return null;
 }
 
 /** "3 plugins · fetched 10:42 (cached)" for a registry that answered; its failure shows on its own. */

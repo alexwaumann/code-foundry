@@ -65,6 +65,46 @@ test("with no registry configured (the default) Browse says so and points at the
   await expect(page.getByTestId("registry-status")).toContainText("alexwaumann/code-foundry-plugins");
 });
 
+test("with a second registry, Browse offers updates only from the install source and says where another source's install came from", async ({ page }) => {
+  // The fixture registry, then a loopback one listing acme-data 1.3.0 (1.2.0 is installed
+  // from Acme's own registry) and a test-watcher 0.2.0 the fixture shadows.
+  const fixture = "https://github.com/alexwaumann/code-foundry-plugins";
+  const loopback = "http://127.0.0.1:8765/index.json";
+  await mockPost(`settings/external?plugins.registries=${encodeURIComponent(`${fixture},${loopback}`)}`);
+  await openPlugins(page);
+  await expect(page.getByTestId("registry-entry")).toHaveCount(3);
+
+  // Another source's entry: where it came from, no Install, no Update, though newer.
+  const acme = entry(page, "acme-data");
+  await expect(acme).toHaveAttribute("data-relation", "other-source");
+  await expect(acme.getByTestId("plugin-pill")).toHaveText("Installed from plugins.acme.dev/index.json");
+  await expect(acme).toContainText("acme-corp/code-foundry-plugin-acme-data · from 127.0.0.1:8765/index.json");
+  await expect(acme.getByTestId("registry-update")).toHaveCount(0);
+  await expect(acme.getByTestId("registry-install")).toHaveCount(0);
+  await expect(installed(page, "acme-data").getByTestId("plugin-update")).toHaveCount(0);
+  await expect(installed(page, "acme-data").getByTestId("plugin-installed-from")).toHaveText("from plugins.acme.dev/index.json");
+
+  // Its own registry's entry is still the update, in Browse and on the Installed row.
+  const tw = entry(page, "test-watcher");
+  await expect(tw).toHaveAttribute("data-relation", "update");
+  await expect(tw.getByTestId("plugin-pill")).toHaveText("Update from 0.0.9");
+  await expect(tw.getByTestId("registry-update")).toHaveText("Update to 0.1.0");
+  await expect(installed(page, "test-watcher").getByTestId("plugin-update-available")).toHaveText("0.1.0 is available.");
+  await expect(page.locator('[data-testid="registry-status"]').filter({ hasText: "127.0.0.1:8765/index.json" })).toContainText(
+    `test-watcher: already listed by ${fixture}, which comes first`,
+  );
+
+  // The loopback registry first: its test-watcher wins the name, and is not an update of
+  // the one installed from the fixture registry (nor is the fixture's, no longer listed).
+  await mockPost(`settings/external?plugins.registries=${encodeURIComponent(`${loopback},${fixture}`)}`);
+  await expect(tw.getByTestId("plugin-pill")).toHaveText("Installed from alexwaumann/code-foundry-plugins");
+  await expect(tw).toContainText("0.2.0");
+  await expect(tw.getByTestId("registry-update")).toHaveCount(0);
+  await expect(installed(page, "test-watcher").getByTestId("plugin-update")).toHaveCount(0);
+  const calls = await invocations();
+  expect(calls.filter((c) => c.name === "plugin.update" || c.name === "plugin.install")).toEqual([]);
+});
+
 test("Install shows the download's progress, then asks for consent; enabling runs it", async ({ page }) => {
   await openPlugins(page);
   const gh = entry(page, "gh-actions");
