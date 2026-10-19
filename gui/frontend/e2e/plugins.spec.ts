@@ -262,8 +262,8 @@ test("the layout tab's toolbar and footer stay pinned while the body scrolls bet
   // Under the plugin's tabs, at the bottom of the panel; a hairline toward the body.
   const tabsBox = await surface(page).getByTestId("plugin-tabs").boundingBox();
   const panelBody = await page.getByTestId("panel-body").boundingBox();
-  let tb = await toolbar.boundingBox();
-  let ft = await footer.boundingBox();
+  const tb = await toolbar.boundingBox();
+  const ft = await footer.boundingBox();
   expect(tabsBox && tb && Math.abs(tb.y - (tabsBox.y + tabsBox.height)) < 1).toBe(true);
   expect(panelBody && ft && Math.abs(ft.y + ft.height - (panelBody.y + panelBody.height)) < 1).toBe(true);
   expect(await toolbar.evaluate((el) => [getComputedStyle(el).borderBottomWidth, getComputedStyle(el).borderTopWidth])).toEqual(["1px", "0px"]);
