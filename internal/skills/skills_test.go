@@ -112,11 +112,13 @@ func TestRender(t *testing.T) {
 	// Frontmatter: names, short descriptions, invocation.
 	for _, tt := range []struct {
 		skill, userInvocable string
-		maxDesc              int
+		maxDesc, maxLines    int
 	}{
-		{skills.Orchestrate, "false", 400}, // model only: not in the slash menu
-		{skills.Help, "", 400},             // both: no invocation keys
-		{skills.Plugin, "", 600},           // both; names the words that should trigger it
+		// Model only: not in the slash menu. Names the user's words for parallel work, and
+		// its loop rules are the ones the orchestration experiment tested (orch-skill-v2).
+		{skills.Orchestrate, "false", 600, 160},
+		{skills.Help, "", 400, 120},   // both: no invocation keys
+		{skills.Plugin, "", 600, 120}, // both; names the words that should trigger it
 	} {
 		p := tt.skill + "/SKILL.md"
 		fm := frontmatter(t, p, files[p])
@@ -133,8 +135,8 @@ func TestRender(t *testing.T) {
 		if _, ok := fm["disable-model-invocation"]; ok {
 			t.Errorf("%s: disable-model-invocation is set", p)
 		}
-		if n := bytes.Count(files[p], []byte("\n")); n > 120 {
-			t.Errorf("%s has %d lines; keep it under ~120", p, n)
+		if n := bytes.Count(files[p], []byte("\n")); n > tt.maxLines {
+			t.Errorf("%s has %d lines; keep it under %d", p, n, tt.maxLines)
 		}
 	}
 

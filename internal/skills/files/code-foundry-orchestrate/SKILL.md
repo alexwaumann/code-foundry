@@ -1,6 +1,6 @@
 ---
 name: code-foundry-orchestrate
-description: "Delegate a unit of work (a PR, a prototype, a fix in its own branch) to a Code Foundry thread in a new worktree instead of a subagent; wait for it, collect its report, archive it and clean up. Use whenever you orchestrate work rather than implement it yourself, or need to create, read, wake or manage other threads."
+description: "Run several pieces of work in parallel as Code Foundry threads, each in its own worktree and branch. Use when the user asks for more than one change on separate branches or PRs, to do things in parallel, to split work up, or to use subagents, helpers or agents for work that edits files; also to create, read, wait on, wake or manage other threads. Wait for them, collect their reports, archive, clean up. For a single change you are asked to make yourself, do it in your own checkout. Native subagents only for read-only research."
 user-invocable: false
 ---
 
@@ -18,13 +18,15 @@ sees every thread in the app's sidebar. You create and drive other threads with 
   (`--new-worktree`) so it never edits your checkout. The user can watch, steer and
   answer it; it outlives your turn.
 - **A native subagent** (your Agent tool) only for read-only research in your own
-  checkout: searching, reading, summarising. Never for work that edits files.
+  checkout: searching, reading, summarising. Never for work that edits files, and never
+  with its worktree isolation.
+- **A single task the user gave you**: do it yourself in your checkout; no thread.
+- Never `git worktree add` under Code Foundry's worktrees directory, and never make
+  branches named `cf/...` by hand: `thread new --new-worktree` does both.
 
 ## The loop
 
-1. **Clean up first.** At the start of any new orchestration, run
-   `code-foundry project worktree cleanup <project id> --yes` (see Cleanup).
-2. **Create** one thread per unit of work. `code-foundry project list` prints each
+1. **Create** one thread per unit of work. `code-foundry project list` prints each
    project's name and id; pass the id.
 
    ```
@@ -35,9 +37,12 @@ sees every thread in the app's sidebar. You create and drive other threads with 
    ```
 
    It starts at once and prints `created thread <name> (<id>) in <worktree>`. The
-   prompt is all the child knows: say what done means, and ask it to finish with
-   `code-foundry thread report done "<summary>"` (or `blocked`/`failed`).
-3. **Wait; do not poll** (no loops of `thread get` or `sleep`). One of:
+   prompt is all the child knows: say what done means, which files it owns (so siblings
+   do not edit the same files), to push with `git push origin HEAD` (not `-u`: sibling
+   worktrees share one git config), and to finish with
+   `code-foundry thread report done "<summary>" --data '{"branch": "...", "files": [...]}'`
+   (or `blocked`/`failed`).
+2. **Wait; do not poll** (no loops of `thread get` or `sleep`). One of:
    - `code-foundry thread wait <id> --for 30m` blocks until the thread stops working.
    - `code-foundry thread send --id <id> "..." --wait --for 30m` sends a follow-up and
      returns once it has been answered.
@@ -49,27 +54,59 @@ sees every thread in the app's sidebar. You create and drive other threads with 
      on every review). The wake says what changed and its `head_sha`; it comes with the
      GitHub poll (about a minute with the app open, up to 15).
 
-   `needs attention (finished)` is a turn that ended normally (nobody has looked at it
-   yet); another reason is a question, a permission or a budget stop. A wait that times
-   out exits 1; the thread is still working, wait again.
-4. **Collect.** `code-foundry thread reports --created-by $CODE_FOUNDRY_THREAD` prints one
+   Pick ONE. With `--notify`, end your turn: do not also run `thread wait` (in the
+   background or not), or every child wakes you twice. To answer or follow up a
+   `--notify` child from a wake turn, `thread send --id <child>` WITHOUT `--wait` and end
+   the turn: `send --wait` there holds back your other children's wakes. A `--notify`
+   subscription fires again on every later settle of that child, including after your
+   follow-ups. Never run a plain `thread wait` right after a `thread send`: it returns
+   the previous turn's status at once; use `send --wait`.
+
+   `needs attention (finished)` is a turn that ended normally. A child that finished
+   WITHOUT a report may be asking you something in prose: `thread read` it before
+   deciding, and answer with `thread send --id <child> "..."`. Other reasons are a
+   question, a permission, or a budget stop (not finished work: tell the user; if they
+   agree, `thread budget --id <id> <usd>` AND `thread send --id <id> "continue"`; raising
+   alone does not resume it). A wait that times out exits 1; the thread is still
+   working, wait again.
+
+   On a wake for a batch, look at the whole batch (`thread reports --created-by
+   $CODE_FOUNDRY_THREAD --all`), and talk to the user only when something needs them (a
+   question, a failure, a conflict) or the batch is complete; otherwise end the turn
+   with one short line.
+3. **Collect.** `code-foundry thread reports --created-by $CODE_FOUNDRY_THREAD` prints one
    line per child (`-`: no report yet; `--json` for the data). `code-foundry thread read <id>`
    prints its last 20 items (`--since <nextSince>` reads on). A child that needs attention
    may be asking a question or for a permission: read it, then
    `code-foundry thread respond --id <id> ...` or `code-foundry thread send --id <id> "..."`.
-5. **Archive** finished children: `code-foundry thread archive --ids <id1>,<id2> --yes`.
-   Archiving keeps the worktree and the branch.
+4. **Check the batch before the roll-up**: `git diff --name-only origin/<default>...<branch>`
+   per branch (or `git merge-tree --write-tree`) and tell the user which branches touch
+   the same files or conflict.
+5. **Archive** a child once the user has accepted or merged its work, not right after
+   its first report: the user may want to review or steer it, and archiving deletes
+   your wake subscriptions on it. Archiving keeps the worktree and the branch:
+   `code-foundry thread archive --ids <id1>,<id2> --yes`.
 6. **Clean up only after merge** (below).
+
+## Leads (children that orchestrate)
+
+- To make a child a lead, tell it in its prompt "You are a lead: use the
+  code-foundry-orchestrate skill" rather than copying these rules into the prompt.
+- A lead never runs `project worktree cleanup`: its parent owns it.
+- Before a lead ends a turn while its workers still run, it posts
+  `code-foundry thread report progress "<n> workers started: <ids>"`; otherwise its
+  parent is woken with "finished" and no report. Its final report's `--data` lists its
+  workers' ids and branches.
 
 ## Cleanup
 
-`code-foundry project worktree cleanup <project id> --yes` is safe to run any time: it
-fetches, then removes only worktrees Code Foundry made whose work is merged into
-origin/<default> and that have no uncommitted changes and no thread (archived ones do
-not count), terminal or workspace on them. It never deletes branches. Run it when the
-user says a PR merged, and at the start of any new orchestration. There is no merge
-notification yet: never assume a PR merged, and never remove worktrees any other way
-(`git worktree remove`, `project worktree remove`).
+`code-foundry project worktree cleanup <project id> --yes` fetches, then removes only
+worktrees Code Foundry made whose work is merged into origin/<default> and that have no
+uncommitted changes and no thread (archived ones do not count), terminal or workspace on
+them. It never deletes branches. Run it when the user says a PR merged, not at the start
+of an orchestration: it is project-wide, and another orchestrator's fresh worktrees may
+be eligible. There is no merge notification yet: never assume a PR merged, and never
+remove worktrees any other way (`git worktree remove`, `project worktree remove`).
 
 ## Conventions
 
@@ -84,7 +121,8 @@ notification yet: never assume a PR merged, and never remove worktrees any other
   (default), checks_failed, checks_passed, review, comment, review_requested,
   head_pushed, merged, closed or changed. `thread subscriptions` lists yours.
 - `--request-id <task-key>` makes `thread new` safe to retry: the same key returns the
-  thread made the first time (for 24 hours) and starts nothing.
+  thread made the first time (for 24 hours) and starts nothing; a key whose thread was
+  removed starts a new thread.
 - `--budget 5` caps a child's cost in USD; at the cap it stops and needs attention
   ("budget reached"). `code-foundry thread budget --id <id> 10` raises it.
 - `--model` and `--effort` default to the user's settings; set them only when the task
