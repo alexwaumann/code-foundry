@@ -30,7 +30,8 @@ type PermissionMode int32
 const (
 	// Claude's default (manual).
 	PermissionMode_PERMISSION_MODE_UNSPECIFIED PermissionMode = 0
-	// --permission-mode manual: every tool call is confirmed.
+	// --permission-mode manual: edits and commands are confirmed; reads, searches and
+	// read-only commands run unconfirmed (Claude's own rules).
 	PermissionMode_PERMISSION_MODE_SUPERVISED PermissionMode = 1
 	// --permission-mode acceptEdits: file edits are accepted, the rest is confirmed.
 	PermissionMode_PERMISSION_MODE_ACCEPT_EDITS PermissionMode = 2
@@ -2682,7 +2683,9 @@ type WaitThreadRequest struct {
 	// only once Claude has reacted after that item, that is once a top-level turn end,
 	// error, permission request or question item follows it. Waiting with after set to a
 	// message just sent therefore never returns for the status of the turn before it.
-	// NOT_FOUND for an id that is not the thread's. Empty: no such check.
+	// NOT_FOUND for an id that is not the thread's. Empty: the thread's latest top-level
+	// user message (a wake message included), so a wait right after a send is race-free;
+	// no check for a thread with no message.
 	After         string `protobuf:"bytes,4,opt,name=after,proto3" json:"after,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

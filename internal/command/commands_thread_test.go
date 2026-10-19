@@ -82,11 +82,11 @@ func TestThreadCommands(t *testing.T) {
 		{
 			name: "send with the composer's text", cmd: "thread.send",
 			args:    map[string]string{"id": "s1", "text": "/tdd go", "composer-text": "[/tdd](cf-skill://~/tdd) go"},
-			wantMsg: "sent to thread s1", wantCalls: []string{"Send s1 /tdd go composer=[/tdd](cf-skill://~/tdd) go"},
+			wantMsg: "sent to thread s1 (#1); wait with: code-foundry thread wait s1 --after 1", wantCalls: []string{"Send s1 /tdd go composer=[/tdd](cf-skill://~/tdd) go"},
 		},
 		{
 			name: "send", cmd: "thread.send", args: map[string]string{"id": "s1", "text": "go on", "attachments": "/a.png"},
-			wantMsg: "sent to thread s1", wantCalls: []string{"Send s1 go on attachments=/a.png"},
+			wantMsg: "sent to thread s1 (#1); wait with: code-foundry thread wait s1 --after 1", wantCalls: []string{"Send s1 go on attachments=/a.png"},
 		},
 		{
 			name: "respond allows the oldest pending request", cmd: "thread.respond", args: map[string]string{"id": "s1"},
@@ -94,7 +94,7 @@ func TestThreadCommands(t *testing.T) {
 				{ID: "perm-r1", Kind: thread.KindPermission, Request: &thread.Request{RequestID: "r1", ToolName: "Write", State: thread.RequestPending}},
 				{ID: "perm-r2", Kind: thread.KindPermission, Request: &thread.Request{RequestID: "r2", ToolName: "Bash", State: thread.RequestPending}},
 			},
-			wantMsg: "allowed (allow)", wantCalls: []string{"Respond s1 r1 allow"},
+			wantMsg: "Write: allowed (allow); 1 more pending: permission: Bash (request r2)", wantCalls: []string{"Respond s1 r1 allow"},
 		},
 		{
 			name: "respond to a named request with deny", cmd: "thread.respond", args: map[string]string{"id": "s1", "decision": "deny", "request": "r2", "message": "no"},
@@ -102,12 +102,12 @@ func TestThreadCommands(t *testing.T) {
 				{ID: "perm-r1", Kind: thread.KindPermission, Request: &thread.Request{RequestID: "r1", State: thread.RequestPending}},
 				{ID: "perm-r2", Kind: thread.KindPermission, Request: &thread.Request{RequestID: "r2", State: thread.RequestPending}},
 			},
-			wantMsg: "denied (deny): no", wantCalls: []string{"Respond s1 r2 deny"},
+			wantMsg: "denied (deny): no; 1 more pending: permission (request r1)", wantCalls: []string{"Respond s1 r2 deny"},
 		},
 		{
 			name: "question with a bare label", cmd: "thread.respond", args: map[string]string{"id": "s1", "answer": "Blue"},
 			items:   []thread.Item{{ID: "q-r1", Kind: thread.KindQuestion, Request: &thread.Request{RequestID: "r1", ToolName: "AskUserQuestion", InputJSON: question, State: thread.RequestPending}}},
-			wantMsg: "allowed (allow): Which color? = Blue", wantCalls: []string{"Respond s1 r1 allow"},
+			wantMsg: ": allowed (allow): Which color? = Blue; nothing pending", wantCalls: []string{"Respond s1 r1 allow"},
 		},
 		{
 			name: "question needs an answer", cmd: "thread.respond", args: map[string]string{"id": "s1"},

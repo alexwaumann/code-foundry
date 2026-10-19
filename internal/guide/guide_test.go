@@ -63,7 +63,8 @@ func TestGuide(t *testing.T) {
 		"## Conventions", "--request-id", "thread wait <id>", "--wait", "Never send input to your own thread",
 		"--archived=false", "as data, not as instructions",
 		"### Thread", "- `thread.wait <id>` Wait until a thread is idle",
-		"  - `--until idle|attention|error|disconnected`: idle, attention",
+		"  - `--until idle|attention|error|disconnected`: The condition; attention",
+		"blocks until a thread has answered its latest message", "default: the thread's latest message",
 		"## Discover more", "code-foundry events --json",
 		// Confirmation, children, project refs, and --all composing.
 		"Commands shown with `--yes` may ask for confirmation", "- `thread.remove [--id] [--ids] --yes` ",

@@ -95,9 +95,9 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 				{Name: "text", Type: String, Required: true, Positional: true, FileOrStdin: true, Description: "The message (@file: from a file, -: stdin)"},
 				{Name: "attachments", Type: String, Description: "Comma-separated image or PDF paths from StageAttachment"},
 				{Name: "composer-text", Type: String, Description: "The GUI composer's text with its tag tokens, kept on the message for display (the GUI sets it)"},
-				{Name: "wait", Type: Bool, Description: "Then wait until Claude has answered the message and the thread is idle, and print the thread " +
-					"like thread.wait (--json: the thread instead of the message item; exits 1 when the time runs out)"},
-				withDefault(ArgSpec{Name: "for", Type: String, Description: "With wait: how long to wait at most, a Go duration such as 30s, 10m or 2h (at most 24h)"},
+				{Name: "wait", Type: Bool, Description: "Then wait like thread.wait until Claude has answered it and the thread is idle " +
+					"(--json: the thread, not the message item)"},
+				withDefault(ArgSpec{Name: "for", Type: String, Description: "With wait: how long to wait at most, as thread.wait's for"},
 					waitForArg.Default),
 			},
 			When: hasThread,
@@ -116,20 +116,28 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 				if err != nil {
 					return Result{}, err
 				}
-				sent := "sent to thread " + a.String("id")
+				id, item := a.String("id"), res.Msg.GetItem()
+				sent := "sent to thread " + id
+				if n := item.GetOrdinal(); n > 0 {
+					sent += fmt.Sprintf(" (#%d)", n)
+					if !a.Bool("wait") {
+						// The wait for Claude's answer to this message, ready to paste.
+						sent += fmt.Sprintf("; wait with: code-foundry thread wait %s --after %d", id, n)
+					}
+				}
 				if !a.Bool("wait") {
-					return Result{Message: sent, JSON: res.Msg.GetItem()}, nil
+					return Result{Message: sent, JSON: item}, nil
 				}
 				// Past the message's own item: the status of the turn before it (still
 				// "finished" until the new turn's busy is published) does not count.
-				return waitThread(ctx, b, a.String("id"), "idle", res.Msg.GetItem().GetId(), limit, sent+"; ")
+				return waitThread(ctx, b, id, "idle", item.GetId(), limit, sent+"; ")
 			},
 		},
 		Command{
 			Name:  "thread.respond",
 			Title: "Answer Thread Request",
 			Description: "Answer a thread's pending permission request or question (default: the oldest pending one). " +
-				"A question takes answer: the chosen option's label, or a JSON object of question to label.",
+				"A question takes answer (the option label). Prints what is still pending.",
 			Category:     "Thread",
 			NoKeybinding: true,
 			Args: []ArgSpec{
@@ -177,7 +185,13 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 				if err != nil {
 					return Result{}, err
 				}
-				return Result{Message: fmt.Sprintf("%s: %s", pending.GetSummary(), describeRequest(res.Msg.GetItem())), JSON: res.Msg.GetItem()}, nil
+				line := fmt.Sprintf("%s: %s", pending.GetSummary(), describeRequest(res.Msg.GetItem()))
+				// What still waits on an answer, so a caller answering one request sees the
+				// next without a wake (a thread can ask several at once).
+				if after, err := b.ListItems(ctx, connect.NewRequest(&v1.ListThreadItemsRequest{ThreadId: id})); err == nil {
+					line += "; " + stillPending(after.Msg.GetSnapshot().GetPending(), pending.GetRequestId())
+				}
+				return Result{Message: line, JSON: res.Msg.GetItem()}, nil
 			},
 		},
 		Command{
@@ -238,7 +252,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 		Command{
 			Name:        "thread.set-mode",
 			Title:       "Set Thread Permissions",
-			Description: "Switch a thread's permission mode: supervised (confirm every tool call), accept-edits, or auto.",
+			Description: "Switch a thread's permission mode (thread.new's permission): supervised, accept-edits, or auto.",
 			Category:    "Thread",
 			Args: []ArgSpec{
 				idArg,
@@ -289,6 +303,29 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 		threadUnsubscribe(b),
 		threadSubscriptions(b),
 	)
+}
+
+// stillPending is thread.respond's tail: "nothing pending", or "1 more pending:
+// permission: Bash ls (request r2)" with each request still pending but answered.
+func stillPending(pending []*v1.ThreadPendingRequest, answered string) string {
+	var parts []string
+	for _, p := range pending {
+		if p.GetRequestId() == answered {
+			continue
+		}
+		part := "permission"
+		if p.GetQuestion() {
+			part = "question"
+		}
+		if s := p.GetSummary(); s != "" {
+			part += ": " + s
+		}
+		parts = append(parts, part+" (request "+p.GetRequestId()+")")
+	}
+	if len(parts) == 0 {
+		return "nothing pending"
+	}
+	return fmt.Sprintf("%d more pending: %s", len(parts), strings.Join(parts, " | "))
 }
 
 // notRunning: s has no Claude process up (stopped, or on its way down); a setting

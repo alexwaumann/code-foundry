@@ -3,6 +3,7 @@ package command_test
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -225,7 +226,7 @@ func TestThreadWaitAfterErrors(t *testing.T) {
 	}
 	_, err = reg.Invoke(context.Background(), command.Context{}, "thread.send", map[string]string{"id": "s1", "text": "x", "wait": "true", "for": "50ms"})
 	if connect.CodeOf(err) != connect.CodeDeadlineExceeded ||
-		!strings.Contains(err.Error(), "sent to thread s1; timed out after 50ms waiting for thread s1 to be idle; it is needs attention (finished)") {
+		!strings.Contains(err.Error(), "sent to thread s1 (#3); timed out after 50ms waiting for thread s1 to be idle; it is needs attention (finished)") {
 		t.Errorf("timeout: %v", err)
 	}
 	_, err = reg.Invoke(context.Background(), command.Context{}, "thread.send", map[string]string{"id": "s1", "text": "x", "wait": "true", "for": "soon"})
@@ -243,5 +244,101 @@ func TestThreadWaitCancelled(t *testing.T) {
 	_, err := reg.Invoke(ctx, command.Context{}, "thread.wait", map[string]string{"id": "s1"})
 	if connect.CodeOf(err) != connect.CodeCanceled {
 		t.Fatalf("err = %v, want canceled", err)
+	}
+}
+
+// thread.wait without --after counts only Claude's reaction to the thread's latest
+// message (the e5 race: send, then a plain wait answered with the turn before it). See
+// docs/notes/send-ordinal-wait-after.md.
+func TestThreadWaitDefaultAfter(t *testing.T) {
+	finished := thread.Thread{ID: "s1", Name: "fix", State: thread.StateConnected, Status: thread.StatusNeedsAttention, StatusReason: "finished"}
+	idle := finished
+	idle.Status, idle.StatusReason = thread.StatusIdle, "at prompt"
+	busy := finished
+	busy.Status, busy.StatusReason = thread.StatusBusy, "working"
+	answered := []thread.Item{{ID: "u-old", Kind: thread.KindUserMessage, Text: "hi"}, {ID: "t-old", Kind: thread.KindTurnEnd}}
+	tests := []struct {
+		name  string
+		start thread.Thread
+		items []thread.Item
+		// send: thread.send (no --wait) before the wait.
+		send bool
+		args map[string]string
+		// blocks: the wait returns only once a new turn ended.
+		blocks  bool
+		wantMsg string
+	}{
+		{
+			name: "finished, then a send: waits for the new turn", start: finished, items: answered, send: true,
+			args: map[string]string{"id": "s1"}, blocks: true, wantMsg: "thread s1 fix: needs attention (finished)",
+		},
+		{
+			name: "idle with no new message: at once", start: idle, items: answered,
+			args: map[string]string{"id": "s1"}, wantMsg: "thread s1 fix: idle (at prompt)",
+		},
+		{
+			name: "explicit after older than the last message: at once", start: finished,
+			items: append(slices.Clone(answered), thread.Item{ID: "u-new", Kind: thread.KindUserMessage, Text: "again"}),
+			args:  map[string]string{"id": "s1", "after": "u-old"}, wantMsg: "thread s1 fix: needs attention (finished)",
+		},
+		{
+			name: "no message: at once, as before", start: finished,
+			args: map[string]string{"id": "s1"}, wantMsg: "thread s1 fix: needs attention (finished)",
+		},
+		{
+			name: "a wake is the latest message", start: finished,
+			items: append(slices.Clone(answered), thread.Item{ID: "w", Kind: thread.KindUserMessage, Origin: thread.OriginWake, Text: "[code-foundry wake] …"}),
+			args:  map[string]string{"id": "s1"}, blocks: true, wantMsg: "thread s1 fix: needs attention (finished)",
+		},
+		{
+			name: "a subagent's prompt is not the thread's message", start: finished,
+			items: append(slices.Clone(answered), thread.Item{ID: "sub-u", Kind: thread.KindUserMessage, ParentToolUseID: "toolu_agent", Text: "look"}),
+			args:  map[string]string{"id": "s1"}, wantMsg: "thread s1 fix: needs attention (finished)",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg, fake := newThreadRegistry(t)
+			fake.Put(tt.start)
+			fake.PutItems("s1", tt.items...)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			if tt.send {
+				if _, err := reg.Invoke(ctx, command.Context{}, "thread.send", map[string]string{"id": "s1", "text": "again"}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			type answer struct {
+				res command.Result
+				err error
+			}
+			done := make(chan answer, 1)
+			go func() {
+				res, err := reg.Invoke(ctx, command.Context{}, "thread.wait", tt.args)
+				done <- answer{res, err}
+			}()
+			if tt.blocks {
+				for _, step := range []func(){
+					func() { fake.Put(busy) },
+					func() { fake.AppendItem("s1", thread.Item{ID: "t-new", Kind: thread.KindTurnEnd}); fake.Put(finished) },
+				} {
+					select {
+					case a := <-done:
+						t.Fatalf("returned (%q, %v) before the new turn ended", a.res.Message, a.err)
+					case <-time.After(30 * time.Millisecond):
+					}
+					step()
+				}
+			}
+			var a answer
+			select {
+			case a = <-done:
+			case <-time.After(5 * time.Second):
+				t.Fatal("the wait did not return")
+			}
+			if a.err != nil || a.res.Message != tt.wantMsg {
+				t.Fatalf("answer %q, %v; want %q", a.res.Message, a.err, tt.wantMsg)
+			}
+		})
 	}
 }

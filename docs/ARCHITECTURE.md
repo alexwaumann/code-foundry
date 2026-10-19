@@ -479,7 +479,8 @@ with an `IDKind` (thread, action run, subscription, terminal) takes a unique suf
 the id, resolved by `Invoke` through the lister its domain registered; `thread.list`
 filters in the daemon (`ListThreadsRequest.filter`); `thread.new --request-id` is
 idempotent (`thread_requests`); `thread.read` pages items; `thread.send --wait` and
-`thread.wait --after` wait for the turn after a message. `code-foundry guide` (a local
+`thread.wait --after` wait for the turn after a message, and a plain `thread.wait` for
+the turn after the thread's latest message (`docs/notes/send-ordinal-wait-after.md`). `code-foundry guide` (a local
 verb, like `--help`) prints a Markdown guide for agents generated from `CommandService.List`
 (`internal/guide`, which also renders the skills' command references).
 

@@ -480,7 +480,12 @@ func pending(items []thread.Item) []thread.PendingRequest {
 	var out []thread.PendingRequest
 	for _, it := range items {
 		if it.Request != nil && it.Request.State == thread.RequestPending {
-			out = append(out, thread.PendingRequest{RequestID: it.Request.RequestID, ItemID: it.ID, Kind: it.Kind, ToolName: it.Request.ToolName})
+			p := thread.PendingRequest{RequestID: it.Request.RequestID, ItemID: it.ID, Kind: it.Kind, ToolName: it.Request.ToolName}
+			if it.Kind == thread.KindPermission {
+				// The store's "<Tool> <description>" (requestSummary).
+				p.Summary = strings.TrimSpace(it.Request.ToolName + " " + it.Request.Description)
+			}
+			out = append(out, p)
 		}
 	}
 	return out

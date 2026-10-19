@@ -16,9 +16,11 @@ import (
 // Wait blocks until the thread meets req's condition, or its timeout passes (timed_out,
 // with the current record). It subscribes to the thread list before reading the
 // snapshot, so a change between the two is not missed and a condition that already
-// holds returns at once. With after, the condition counts only once Claude reacted
-// after that item (isReaction), followed on the thread's item events. See
-// docs/notes/agents-1-wait-events.md and docs/notes/agents-5-cli.md.
+// holds returns at once. The condition counts only once Claude reacted (isReaction)
+// after req's after item, else after the thread's latest message (lastMessage), so a
+// wait right after a send never returns the status of the turn before it; followed on
+// the thread's item events. See docs/notes/agents-1-wait-events.md,
+// docs/notes/agents-5-cli.md and docs/notes/send-ordinal-wait-after.md.
 func (h *Thread) Wait(ctx context.Context, req *connect.Request[v1.WaitThreadRequest]) (*connect.Response[v1.WaitThreadResponse], error) {
 	id, until := req.Msg.GetId(), req.Msg.GetUntil()
 	if id == "" {
@@ -32,25 +34,20 @@ func (h *Thread) Wait(ctx context.Context, req *connect.Request[v1.WaitThreadReq
 	}
 	sub := bus.Subscribe[thread.Event](h.bus, watchBuffer)
 	defer sub.Close()
-	var items *bus.Subscription[thread.ThreadEvent]
-	var itemsC <-chan thread.ThreadEvent
-	reacted, after := true, int64(0)
-	if req.Msg.GetAfter() != "" {
-		// Subscribe before reading the items, as for the list.
-		items = bus.Subscribe[thread.ThreadEvent](h.bus, threadWatchBuffer)
-		defer items.Close()
-		itemsC = items.C()
-		var err error
-		if after, reacted, err = h.reactedAfter(ctx, id, req.Msg.GetAfter()); err != nil {
-			return nil, threadError(err)
-		}
-		if reacted {
-			itemsC = nil
-		}
-	}
+	// Subscribe to the items before reading them, as for the list.
+	items := bus.Subscribe[thread.ThreadEvent](h.bus, threadWatchBuffer)
+	defer items.Close()
+	itemsC := items.C()
 	cur, ok := h.store.Snapshot().Thread(id)
 	if !ok {
 		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("thread %s not found", id))
+	}
+	after, reacted, err := h.reactedAfter(ctx, id, req.Msg.GetAfter())
+	if err != nil {
+		return nil, threadError(err)
+	}
+	if reacted {
+		itemsC = nil
 	}
 	var dropped, itemsDropped uint64
 	for {
@@ -107,14 +104,21 @@ func (h *Thread) Wait(ctx context.Context, req *connect.Request[v1.WaitThreadReq
 }
 
 // reactedAfter reads the thread's items: the ordinal of the item after names (its id,
-// else an ordinal; thread_read.go's sinceOrdinal), and whether Claude reacted after it.
+// else an ordinal; thread_read.go's sinceOrdinal), or with after empty of the thread's
+// latest message, and whether Claude reacted after it. A thread with no message has
+// nothing to react to: reacted.
 func (h *Thread) reactedAfter(ctx context.Context, id, after string) (int64, bool, error) {
 	snap, err := h.store.Items(ctx, id)
 	if err != nil {
 		return 0, false, err
 	}
-	ord, _, err := sinceOrdinal(snap.Items, after)
-	if err != nil {
+	var ord int64
+	if after == "" {
+		var ok bool
+		if ord, ok = lastMessage(snap.Items); !ok {
+			return 0, true, nil
+		}
+	} else if ord, _, err = sinceOrdinal(snap.Items, after); err != nil {
 		return 0, false, err
 	}
 	for i := range snap.Items {
@@ -123,6 +127,17 @@ func (h *Thread) reactedAfter(ctx context.Context, id, after string) (int64, boo
 		}
 	}
 	return ord, false, nil
+}
+
+// lastMessage is the ordinal of the thread's latest top-level user message, a wake
+// message included; false when it has none.
+func lastMessage(items []thread.Item) (int64, bool) {
+	for i := len(items) - 1; i >= 0; i-- {
+		if it := &items[i]; it.Kind == thread.KindUserMessage && it.ParentToolUseID == "" {
+			return it.Ordinal, true
+		}
+	}
+	return 0, false
 }
 
 // isReaction: it (nil for an event without an item) shows Claude reacted after the

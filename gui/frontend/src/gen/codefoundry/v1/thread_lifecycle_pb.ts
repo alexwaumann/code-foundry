@@ -1432,7 +1432,9 @@ export type WaitThreadRequest = Message<"codefoundry.v1.WaitThreadRequest"> & {
    * only once Claude has reacted after that item, that is once a top-level turn end,
    * error, permission request or question item follows it. Waiting with after set to a
    * message just sent therefore never returns for the status of the turn before it.
-   * NOT_FOUND for an id that is not the thread's. Empty: no such check.
+   * NOT_FOUND for an id that is not the thread's. Empty: the thread's latest top-level
+   * user message (a wake message included), so a wait right after a send is race-free;
+   * no check for a thread with no message.
    *
    * @generated from field: string after = 4;
    */
@@ -2041,7 +2043,8 @@ export enum PermissionMode {
   UNSPECIFIED = 0,
 
   /**
-   * --permission-mode manual: every tool call is confirmed.
+   * --permission-mode manual: edits and commands are confirmed; reads, searches and
+   * read-only commands run unconfirmed (Claude's own rules).
    *
    * @generated from enum value: PERMISSION_MODE_SUPERVISED = 1;
    */
