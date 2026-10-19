@@ -655,8 +655,12 @@ type Thread struct {
 	// never values: "GitHub Actions added 2 variables", "Hello removed CF_HELLO". Empty
 	// otherwise.
 	PluginEnvChange string `protobuf:"bytes,57,opt,name=plugin_env_change,json=pluginEnvChange,proto3" json:"plugin_env_change,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// The thread the caller runs in (its context thread, $CODE_FOUNDRY_THREAD): set by the
+	// thread.list command on that row of its answer, so an agent tells its own thread from
+	// another's. Never set by ThreadService.
+	IsCaller      bool `protobuf:"varint,58,opt,name=is_caller,json=isCaller,proto3" json:"is_caller,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Thread) Reset() {
@@ -1072,6 +1076,13 @@ func (x *Thread) GetPluginEnvChange() string {
 		return x.PluginEnvChange
 	}
 	return ""
+}
+
+func (x *Thread) GetIsCaller() bool {
+	if x != nil {
+		return x.IsCaller
+	}
+	return false
 }
 
 // ThreadFlag is one plugin's flag on a thread (Thread.flags).
@@ -4279,7 +4290,7 @@ var File_codefoundry_v1_thread_lifecycle_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\n" +
-	"%codefoundry/v1/thread_lifecycle.proto\x12\x0ecodefoundry.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xe3\x12\n" +
+	"%codefoundry/v1/thread_lifecycle.proto\x12\x0ecodefoundry.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x80\x13\n" +
 	"\x06Thread\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12*\n" +
 	"\x11claude_session_id\x18\x02 \x01(\tR\x0fclaudeSessionId\x12\x1d\n" +
@@ -4345,7 +4356,8 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\x05flags\x186 \x03(\v2\x1a.codefoundry.v1.ThreadFlagR\x05flags\x12\x14\n" +
 	"\x05owner\x187 \x01(\tR\x05owner\x12(\n" +
 	"\x10plugin_env_stale\x188 \x01(\bR\x0epluginEnvStale\x12*\n" +
-	"\x11plugin_env_change\x189 \x01(\tR\x0fpluginEnvChangeJ\x04\b\t\x10\n" +
+	"\x11plugin_env_change\x189 \x01(\tR\x0fpluginEnvChange\x12\x1b\n" +
+	"\tis_caller\x18: \x01(\bR\bisCallerJ\x04\b\t\x10\n" +
 	"J\x04\b\x1f\x10 R\vterminal_idR\x06render\"\xf5\x01\n" +
 	"\n" +
 	"ThreadFlag\x12\x16\n" +

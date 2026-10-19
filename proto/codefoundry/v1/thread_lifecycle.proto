@@ -277,6 +277,10 @@ message Thread {
   // never values: "GitHub Actions added 2 variables", "Hello removed CF_HELLO". Empty
   // otherwise.
   string plugin_env_change = 57;
+  // The thread the caller runs in (its context thread, $CODE_FOUNDRY_THREAD): set by the
+  // thread.list command on that row of its answer, so an agent tells its own thread from
+  // another's. Never set by ThreadService.
+  bool is_caller = 58;
 }
 
 // ThreadFlagLevel is how loud a plugin's flag is.
