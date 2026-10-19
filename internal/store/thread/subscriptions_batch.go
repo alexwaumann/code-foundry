@@ -76,8 +76,8 @@ type wakeSiblingPending struct {
 
 // wakeBatchPayload is the JSON of thread wakes sent as one message.
 type wakeBatchPayload struct {
-	Kind  string              `json:"kind"` // "batch"
-	Wakes []wakeThreadPayload `json:"wakes"`
+	Kind  string `json:"kind"`  // "batch"
+	Wakes []any  `json:"wakes"` // wakeThreadPayload; a restart's notice first (wakeRestartPayload)
 }
 
 // joinsBatchLocked reports whether a thread wake for subscriber queued now joins one
@@ -88,8 +88,12 @@ func (m *Manager) joinsBatchLocked(subscriber string) bool {
 		return false
 	}
 	q := m.subs.queues[subscriber]
-	return q != nil && (q.holding || slices.ContainsFunc(q.items, func(d delivery) bool { return d.thread != nil }))
+	return q != nil && (q.holding || slices.ContainsFunc(q.items, delivery.batched))
 }
+
+// batched reports whether d goes through the batch path: a thread wake, or a restart's
+// wakes.
+func (d delivery) batched() bool { return d.thread != nil || d.restart != nil }
 
 // collectBatch waits out first's batch window and takes it with every thread wake queued
 // for subscriber meanwhile (the other deliveries keep their order). The window ends
@@ -108,7 +112,7 @@ func (m *Manager) collectBatch(subscriber string, first delivery) []delivery {
 		due := first.queued.Add(window)
 		if q != nil {
 			for _, d := range q.items {
-				if d.thread != nil && d.queued.Add(window).After(due) {
+				if d.batched() && d.queued.Add(window).After(due) {
 					due = d.queued.Add(window)
 				}
 			}
@@ -122,7 +126,7 @@ func (m *Manager) collectBatch(subscriber string, first delivery) []delivery {
 			if q != nil {
 				var rest []delivery
 				for _, d := range q.items {
-					if d.thread != nil {
+					if d.batched() {
 						batch = append(batch, d)
 					} else {
 						rest = append(rest, d)
@@ -152,7 +156,26 @@ func (m *Manager) deliverThreadWakes(subscriber string, batch []delivery) {
 	parts := make([]threadWakePart, 0, len(batch))
 	subs := make([]string, 0, len(batch))
 	var slots []time.Time
+	// A restart's wakes go first (DeliverRestartWakes queues them before anything
+	// else); there is one per daemon start.
+	var rw *restartWakes
 	for _, d := range batch {
+		if d.restart == nil {
+			continue
+		}
+		if !d.slot.IsZero() {
+			slots = append(slots, d.slot)
+		}
+		rw = cmp.Or(rw, d.restart)
+		for _, build := range d.restart.parts {
+			parts = append(parts, build(ctx))
+		}
+		subs = append(subs, d.restart.subs...)
+	}
+	for _, d := range batch {
+		if d.restart != nil {
+			continue
+		}
 		if !d.slot.IsZero() {
 			slots = append(slots, d.slot)
 		}
@@ -165,14 +188,20 @@ func (m *Manager) deliverThreadWakes(subscriber string, batch []delivery) {
 		}
 		parts, subs = append(parts, p), append(subs, d.sub)
 	}
-	if len(parts) == 0 {
+	snap := m.Snapshot()
+	if rw != nil {
+		var left bool
+		if parts, left = rw.keepLive(snap, parts); !left {
+			rw = nil
+		}
+	}
+	if len(parts) == 0 && rw == nil {
 		s := m.subs
 		s.mu.Lock()
 		s.refundLocked(subscriber, slots)
 		s.mu.Unlock()
 		return
 	}
-	snap := m.Snapshot()
 	if st, ok := snap.Thread(subscriber); !ok || !st.ArchivedAt.IsZero() {
 		// Archived or removed while the batch waited: a wake must not bring it back.
 		m.log.Info("wake not delivered: the subscriber is gone or archived", "thread", subscriber, "subscriptions", subs)
@@ -186,7 +215,9 @@ func (m *Manager) deliverThreadWakes(subscriber string, batch []delivery) {
 		}
 	}
 	var msg Message
-	if len(parts) == 1 {
+	if rw != nil {
+		msg = restartWake(rw.notice, parts)
+	} else if len(parts) == 1 {
 		p := parts[0]
 		msg = threadWake(p.sub, p.t, p.at, p.d)
 	} else {
@@ -325,21 +356,36 @@ func listNames(names []string) string {
 
 // batchWake is the one message of several thread wakes, in the order they fired.
 func batchWake(parts []threadWakePart) Message {
-	p := wakeBatchPayload{Kind: "batch", Wakes: make([]wakeThreadPayload, 0, len(parts))}
-	titles := make([]string, 0, len(parts))
-	settled := true
-	var sib *wakeSiblings
+	p := wakeBatchPayload{Kind: "batch", Wakes: make([]any, 0, len(parts))}
 	for _, part := range parts {
 		p.Wakes = append(p.Wakes, threadWakePayload(part.sub, part.t, part.at, part.d))
+	}
+	head, sib := batchHeader(parts)
+	return wakeMessage(joinSentences(head, siblingsSentence(sib)), p)
+}
+
+// batchHeader is several thread wakes' header without the siblings sentence: "3
+// threads settled: " (or "3 thread wakes: ", or after a restart "3 threads
+// interrupted: " when the stop interrupted each), then each wake's own; and the
+// siblings counts they carry.
+func batchHeader(parts []threadWakePart) (string, *wakeSiblings) {
+	titles := make([]string, 0, len(parts))
+	settled, stopped := true, true
+	var sib *wakeSiblings
+	for _, part := range parts {
 		titles = append(titles, threadWakeTitle(part.sub.Condition, part.t, part.d))
 		settled = settled && part.sub.Condition == CondSettled
+		stopped = stopped && part.d.appStopped
 		sib = cmp.Or(sib, part.d.siblings)
 	}
 	head := strconv.Itoa(len(parts)) + " thread wakes: "
-	if settled {
+	switch {
+	case stopped:
+		head = strconv.Itoa(len(parts)) + " threads interrupted: "
+	case settled:
 		head = strconv.Itoa(len(parts)) + " threads settled: "
 	}
-	return wakeMessage(joinSentences(head+strings.Join(titles, " "), siblingsSentence(sib)), p)
+	return head + strings.Join(titles, " "), sib
 }
 
 // joinSentences joins a and b with a space; a alone when b is "".
