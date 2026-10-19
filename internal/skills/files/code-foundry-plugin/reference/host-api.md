@@ -57,12 +57,19 @@ GitHub can also run `gh` itself (with the user's login).
 **`pr.checks` and how fresh GitHub data is.** The daemon polls GitHub every
 `github.poll_interval_seconds` (60 s) while an app window is visible, at most every 5
 minutes while every window is hidden, and every 15 minutes with no app open (a CLI-only
-or isolated daemon). `gh` events are sent only when that poll sees a change, so a plugin
-cannot rely on them to follow check runs. `pr.checks` reads the cached pull request
-detail and fetches it again when it is older than about 30 s, so it is fresh when called.
-To follow runs, sweep: call `pr.checks` (or `gh`) per thread of interest about once a
-minute while something runs and every few minutes otherwise, only while someone looks or
-a flag depends on it. A thread's pull request: `pr.checks` with the thread's context
+or isolated daemon). `gh` events are sent only when that poll sees a change. Each poll
+sends one `gh.pullRequestChanged` per pull request that changed, saying what changed
+(`PULL_REQUEST_CHANGE_KIND_CHECKS`, `_HEAD_PUSHED`, …; table below), for every pull request in the viewer's scope:
+their open pull requests, those asking for or with their review, those merged in the
+last week, and the viewer's pull requests on branches the app or a `pr.*` fact looked at
+in the last 10 minutes. To follow check runs, subscribe to `gh` and call `pr.checks` when a
+`CHECKS` or `HEAD_PUSHED` change names a pull request you care about; no timer is needed.
+Latency is the poll interval. `pr.checks` reads the cached pull request detail and
+fetches it again when it is older than about 30 s or the poll saw the pull request move,
+so it is fresh when called. A pull request outside that scope (someone else's that the
+viewer has nothing to do with) sends nothing: sweep those with `pr.checks` or `gh`, about once a
+minute while something runs, only while someone looks or a flag depends on it. A
+thread's pull request: `pr.checks` with the thread's context
 answers -32002 "has no pull request" when there is none (a new thread's branch is linked
 by the next poll); the `threadList` payload carries only `branch` and the pull requests
 Claude linked (`linkedPullRequests`).
@@ -235,6 +242,7 @@ with no `threads`). The useful fields:
 | `project.projectUpdated` / `projectRemovedId` | a whole project (with its worktrees) / an id |
 | `gh.branchPullRequestsUpdated` | `{repoSlug, headRef, fetchedAt}`: a watched branch's pull requests changed |
 | `gh.pullRequestDetailUpdated` | `{repoSlug, number}`: re-read with `pr.checks` |
+| `gh.pullRequestChanged` | one pull request that changed, one event per pull request per poll (coalesced; latency is the poll interval): `repoSlug`, `number`, `url`, `headRef`, `pullRequest` (the summary after the change: `title`, `author`, `state`, `headSha`, `draft`, `reviewDecision`, `checks` `{state, total, passed, failed, pending, skipped}`, `commentCount`, `reviewCount`, `reviewRequests`, …) and `changes`: a list of `{kind, …}` with the old and new values of that kind. Kinds (`PULL_REQUEST_CHANGE_KIND_` + ): `APPEARED` (new in the viewer's scope; not sent for what was there before a restart or a newly watched branch), `MERGED` / `CLOSED` / `REOPENED` (`oldState`, `newState`), `HEAD_PUSHED` (`oldHeadSha`, `newHeadSha`), `CHECKS` (`oldChecks`, `newChecks`: rollups; `newChecks.state` `CHECK_ROLLUP_STATE_SUCCESS` or `_FAILURE` after `_PENDING` means the run finished), `REVIEW_DECISION` (`oldReviewDecision`, `newReviewDecision`), `REVIEWS` and `COMMENTS` (the count rose: `oldCount`, `newCount`), `REVIEW_REQUESTED` (`requested`: new logins and `org/team` slugs; `viewerRequested`), `DRAFT` (`oldDraft`, `newDraft`), `TITLE` (`oldTitle`, `newTitle`). Counts only, never comment or review text: fetch those with `gh` |
 | `gitops.queued` / `started` / `finished` | a git operation on a worktree (fetch, pull, push, …) |
 
 **No per-file events.** `project.worktreeUpdated` is sent when a worktree's status

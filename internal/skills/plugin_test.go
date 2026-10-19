@@ -72,7 +72,8 @@ func TestRenderPluginSkill(t *testing.T) {
 		}
 	}
 	hostAPI := string(files[skills.Plugin+"/reference/host-api.md"])
-	for _, want := range []string{"| `threads` | `thread-list` | `threadList` | `snapshot`, `updated`, `removedId`", "| `thread` | `thread` | `thread` | `pending`, `pendingSnapshot` |"} {
+	for _, want := range []string{"| `threads` | `thread-list` | `threadList` | `snapshot`, `updated`, `removedId`", "| `thread` | `thread` | `thread` | `pending`, `pendingSnapshot` |", "`pullRequestDetailUpdated`, `pullRequestChanged`",
+		"| `gh.pullRequestChanged` |"} {
 		if !strings.Contains(hostAPI, want) {
 			t.Errorf("host-api.md lacks %q", want)
 		}

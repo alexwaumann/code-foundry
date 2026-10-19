@@ -309,7 +309,8 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 			}
 		}
 	}
-	s.staleFullDetails(fps) // cached detail panels: what moved goes stale, the rest is confirmed (pr_detail.go)
+	s.staleFullDetails(fps)        // cached detail panels: what moved goes stale, the rest is confirmed (pr_detail.go)
+	s.markMovedDetails(fps, known) // and PullRequest's cached copies (detail_moved.go)
 	var need []prFingerprint
 	for _, f := range fps {
 		k, ok := known[f.ID]
@@ -380,6 +381,11 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 		pollErr = "pull request details: " + detailErr.Error()
 	}
 	var dashErrs []string
+	// The lists this poll refreshed, for PullRequestChanged (pr_changes.go): the open
+	// dashboards, then the watched branches, then the recently merged search (no
+	// rollup in its fingerprints), so a pull request in several is compared as the
+	// first holds it.
+	var openLists, branchLists, mergedLists []prList
 	newDash := snap.Dashboard
 	newDash.FetchedAt, newDash.Disabled = now, !cfg.Dashboards
 	switch {
@@ -404,6 +410,27 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 			requested[p.ID] = true
 		}
 		newDash.Reviewed = slices.DeleteFunc(slices.Clone(newDash.Reviewed), func(p PullRequest) bool { return requested[p.ID] })
+		// A list never polled before (nil: a new install, dashboards turned back on)
+		// has no baseline.
+		dashList := func(name string, prev, next []PullRequest) prList {
+			return prList{prev: prev, next: next, checks: name != sectionMerged, reviewRequested: name == sectionReview,
+				baseline: !snap.Dashboard.Disabled && prev != nil}
+		}
+		for _, l := range []struct {
+			name       string
+			prev, next []PullRequest
+		}{
+			{sectionAuthored, snap.Dashboard.Authored, newDash.Authored},
+			{sectionReview, snap.Dashboard.ReviewRequested, newDash.ReviewRequested},
+			{sectionReviewed, snap.Dashboard.Reviewed, newDash.Reviewed},
+		} {
+			if res.Sections[l.name].Err == nil {
+				openLists = append(openLists, dashList(l.name, l.prev, l.next))
+			}
+		}
+		if res.Sections[sectionMerged].Err == nil {
+			mergedLists = append(mergedLists, dashList(sectionMerged, snap.Dashboard.RecentlyMerged, newDash.RecentlyMerged))
+		}
 	}
 	newDash.LastError = strings.Join(dashErrs, "; ")
 	if stats != nil {
@@ -436,6 +463,8 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 			} else {
 				st.PullRequests = resolveAll(rr.Branches[head])
 				st.FetchedAt = now
+				branchLists = append(branchLists, prList{prev: prev.PullRequests, next: st.PullRequests, slug: rp.slug, head: head,
+					checks: true, baseline: had && !prev.FetchedAt.IsZero()})
 			}
 			changed := !had || prev.FetchedAt.IsZero() || prev.LastError != st.LastError || !sameJSON(prev.PullRequests, st.PullRequests)
 			s.branches.set(k, st)
@@ -499,6 +528,9 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 			}
 		}
 		publish(s, BranchPullRequestsUpdated{Slug: u.k.slug, HeadRef: u.k.head, FetchedAt: u.st.FetchedAt})
+	}
+	for _, e := range prChanges(slices.Concat(openLists, branchLists, mergedLists), known, s.appearing, login) {
+		publish(s, e)
 	}
 	if err := s.cache.saveActivity(ctx, activityPoll, now, pollRow{FetchedAt: now}); err != nil {
 		s.log.Warn("gh cache write failed", "err", err)
