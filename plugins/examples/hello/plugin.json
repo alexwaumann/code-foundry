@@ -66,6 +66,11 @@
       ]
     },
     {
+      "name": "read-shell",
+      "title": "Read the Clock Terminal",
+      "description": "Print the whole output of the clock terminal (the demo's Shell tab): its scrollback and its screen. Starts the clock when it is not running."
+    },
+    {
       "name": "events",
       "title": "Count Thread Events",
       "description": "Say how many thread list events the plugin received since it started."

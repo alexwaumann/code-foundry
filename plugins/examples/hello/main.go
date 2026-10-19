@@ -18,6 +18,7 @@
 //	code-foundry plugin logs hello
 //	code-foundry plugin surface hello demo --context-thread <thread id>
 //	code-foundry plugin act hello demo click --context-thread <thread id>
+//	code-foundry plugin hello read-shell
 package main
 
 import (
@@ -44,6 +45,7 @@ func main() {
 
 func plugin() pluginsdk.Plugin {
 	var events atomic.Int64
+	own := &owned{}
 	return pluginsdk.Plugin{
 		Init: func(ctx context.Context, h *pluginsdk.Host) error {
 			h.Log().Info("hello is up", "host", h.HostVersion(), "data_dir", h.DataDir(), "dev", h.Dev(), "flags", len(h.Flags()))
@@ -69,13 +71,14 @@ func plugin() pluginsdk.Plugin {
 			}
 		},
 		Commands: map[string]pluginsdk.CommandFunc{
-			"greet":    greet,
-			"send":     send,
-			"remember": remember,
-			"recall":   recall,
-			"forget":   forget,
-			"unpin":    unpin,
-			"flag":     flag,
+			"greet":      greet,
+			"send":       send,
+			"remember":   remember,
+			"recall":     recall,
+			"forget":     forget,
+			"unpin":      unpin,
+			"flag":       flag,
+			"read-shell": readShell(own),
 			"events": func(context.Context, *pluginsdk.Host, pluginsdk.CommandRequest) (pluginsdk.CommandResult, error) {
 				n := events.Load()
 				js, _ := json.Marshal(map[string]int64{"events": n})
@@ -83,7 +86,7 @@ func plugin() pluginsdk.Plugin {
 			},
 		},
 		Surfaces: map[string]pluginsdk.SurfaceFactory{
-			"demo":   demoFactory(&owned{}),
+			"demo":   demoFactory(own),
 			"pinned": newPinned,
 			"checks": newChecks,
 		},
