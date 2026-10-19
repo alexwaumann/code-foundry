@@ -355,6 +355,22 @@ message GhEvent {
     BranchPullRequestsUpdated branch_pull_requests_updated = 5;
     Polled polled = 6;
     PullRequestDetailUpdated pull_request_detail_updated = 7;
+    PullRequestChanged pull_request_changed = 8;
+  }
+
+  // One pull request in the viewer's scope (their dashboards and the watched branches)
+  // changed, as one poll saw it: one event per pull request per poll, coalesced, after
+  // that poll's other events. Latency is the poll interval. Counts only, never the text
+  // of a comment or review.
+  message PullRequestChanged {
+    string repo_slug = 1;
+    int32 number = 2;
+    string url = 3;
+    string head_ref = 4;
+    // The pull request after the change.
+    PullRequest pull_request = 5;
+    // What changed, in the kind enum's order; never empty.
+    repeated PullRequestChange changes = 6;
   }
 
   // A pull request's cached detail changed or went stale (a poll saw the pull request
@@ -399,6 +415,62 @@ message GhEvent {
     // This poll's error; empty when it succeeded.
     string last_error = 2;
   }
+}
+
+// What changed about a pull request (GhEvent.PullRequestChanged).
+enum PullRequestChangeKind {
+  PULL_REQUEST_CHANGE_KIND_UNSPECIFIED = 0;
+  // In the viewer's scope for the first time. Not sent for what a list held when it is
+  // polled for the first time (a new install, a newly watched branch) or after a
+  // restart. Only review_requested can come with it.
+  PULL_REQUEST_CHANGE_KIND_APPEARED = 1;
+  // State moved (old_state, new_state).
+  PULL_REQUEST_CHANGE_KIND_MERGED = 2;
+  PULL_REQUEST_CHANGE_KIND_CLOSED = 3;
+  PULL_REQUEST_CHANGE_KIND_REOPENED = 4;
+  // The head commit moved: a push or a force push (old_head_sha, new_head_sha).
+  PULL_REQUEST_CHANGE_KIND_HEAD_PUSHED = 5;
+  // The head commit's check rollup changed, its state or a count (old_checks,
+  // new_checks).
+  PULL_REQUEST_CHANGE_KIND_CHECKS = 6;
+  // The review decision moved (old_review_decision, new_review_decision). Open pull
+  // requests only, as are reviews, comments and review_requested by login.
+  PULL_REQUEST_CHANGE_KIND_REVIEW_DECISION = 7;
+  // The submitted reviews count rose (old_count, new_count).
+  PULL_REQUEST_CHANGE_KIND_REVIEWS = 8;
+  // The issue and review comments count rose (old_count, new_count).
+  PULL_REQUEST_CHANGE_KIND_COMMENTS = 9;
+  // A review was requested (requested, viewer_requested).
+  PULL_REQUEST_CHANGE_KIND_REVIEW_REQUESTED = 10;
+  // Draft toggled (old_draft, new_draft).
+  PULL_REQUEST_CHANGE_KIND_DRAFT = 11;
+  // The title changed (old_title, new_title).
+  PULL_REQUEST_CHANGE_KIND_TITLE = 12;
+}
+
+// One change of a pull request: kind, and the old and new values its kind names (the
+// other fields are unset).
+message PullRequestChange {
+  PullRequestChangeKind kind = 1;
+  PullRequestState old_state = 2;
+  PullRequestState new_state = 3;
+  string old_head_sha = 4;
+  string new_head_sha = 5;
+  CheckRollup old_checks = 6;
+  CheckRollup new_checks = 7;
+  ReviewDecision old_review_decision = 8;
+  ReviewDecision new_review_decision = 9;
+  int32 old_count = 10;
+  int32 new_count = 11;
+  // review_requested: the user logins and "org/team" slugs newly requested.
+  repeated string requested = 12;
+  // review_requested: the viewer was asked, by login or by entering their
+  // review-requested list (a team request; requested may then be empty).
+  bool viewer_requested = 13;
+  bool old_draft = 14;
+  bool new_draft = 15;
+  string old_title = 16;
+  string new_title = 17;
 }
 
 // One calendar month (in the daemon's time zone) of the viewer's activity.

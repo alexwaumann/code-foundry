@@ -661,6 +661,7 @@ func (s ghSource) topics() []topic {
 		busTopic(s.bus, ghWatchBuffer, func(e gh.RepoActivityUpdated) *v1.Event { return ghWrap(ghRepoActivityEvent(e)) }),
 		busTopic(s.bus, ghWatchBuffer, func(e gh.BranchPullRequestsUpdated) *v1.Event { return ghWrap(ghBranchEvent(e)) }),
 		busTopic(s.bus, ghWatchBuffer, func(e gh.PullRequestDetailUpdated) *v1.Event { return ghWrap(ghDetailEvent(e)) }),
+		busTopic(s.bus, ghChangedBuffer, func(e gh.PullRequestChanged) *v1.Event { return ghWrap(ghPullRequestChangedEvent(e)) }),
 	}
 }
 

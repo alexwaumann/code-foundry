@@ -122,6 +122,8 @@ func (h *Gh) Watch(ctx context.Context, _ *connect.Request[v1.WatchGhRequest], s
 	defer branch.Close()
 	detail := bus.Subscribe[gh.PullRequestDetailUpdated](h.bus, ghWatchBuffer)
 	defer detail.Close()
+	changed := bus.Subscribe[gh.PullRequestChanged](h.bus, ghChangedBuffer)
+	defer changed.Close()
 	// Flush response headers now: clients (connect-go and connect-web) block until they
 	// arrive, and the first event may be a poll interval away. Subscribing first means
 	// nothing published after the client sees the stream open is missed.
@@ -147,6 +149,8 @@ func (h *Gh) Watch(ctx context.Context, _ *connect.Request[v1.WatchGhRequest], s
 			ev = ghBranchEvent(e)
 		case e := <-detail.C():
 			ev = ghDetailEvent(e)
+		case e := <-changed.C():
+			ev = ghPullRequestChangedEvent(e)
 		}
 		if err := stream.Send(ev); err != nil {
 			return err
