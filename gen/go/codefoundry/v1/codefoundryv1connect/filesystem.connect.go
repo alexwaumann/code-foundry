@@ -77,7 +77,8 @@ type FilesystemServiceClient interface {
 	// directory. Symlinks are followed, and the file they lead to must be under the
 	// home directory too: InvalidArgument otherwise (also for a relative path without
 	// an absolute base_dir). A missing path is not_found and a directory is_dir, not
-	// errors. Contents are at most max_bytes (default and limit 1 MiB).
+	// errors. Contents are at most max_bytes (zero means 1 MiB): a text file is always
+	// capped at 1 MiB, any other file (images, PDFs) at 32 MiB.
 	ReadFile(context.Context, *connect.Request[v1.ReadFileRequest]) (*connect.Response[v1.ReadFileResponse], error)
 }
 
@@ -177,7 +178,8 @@ type FilesystemServiceHandler interface {
 	// directory. Symlinks are followed, and the file they lead to must be under the
 	// home directory too: InvalidArgument otherwise (also for a relative path without
 	// an absolute base_dir). A missing path is not_found and a directory is_dir, not
-	// errors. Contents are at most max_bytes (default and limit 1 MiB).
+	// errors. Contents are at most max_bytes (zero means 1 MiB): a text file is always
+	// capped at 1 MiB, any other file (images, PDFs) at 32 MiB.
 	ReadFile(context.Context, *connect.Request[v1.ReadFileRequest]) (*connect.Response[v1.ReadFileResponse], error)
 }
 
