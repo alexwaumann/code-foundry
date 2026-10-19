@@ -146,12 +146,14 @@ type SurfaceUpdate struct {
 // SurfaceElement is one acting element of a view (SurfaceElements).
 type SurfaceElement struct {
 	Key string
-	// Kind is click, submit, change or tab (Act sends them to the plugin), or command,
-	// open_url or copy (the host's).
+	// Kind is click, submit, change, tab or select (Act sends them to the plugin), or
+	// command, open_url or copy (the host's).
 	Kind   string
 	Action string
 	Label  string
 	Form   string
+	// Node is a node tab's tabs node or a select's master-detail.
+	Node string
 	// Args are a command element's args as the view sets them.
 	Args map[string]string
 }
@@ -898,7 +900,7 @@ func (m *Manager) SurfaceElements(key string, version uint64) []SurfaceElement {
 	out := make([]SurfaceElement, 0, len(idx.order))
 	for _, k := range idx.order {
 		el := idx.elements[k]
-		se := SurfaceElement{Key: el.key, Kind: el.kind, Action: el.actionName(), Label: el.label, Form: el.form}
+		se := SurfaceElement{Key: el.key, Kind: el.kind, Action: el.actionName(), Label: el.label, Form: el.form, Node: el.node}
 		if el.action != nil && el.action.Command != nil && len(el.action.Command.Args) > 0 {
 			se.Args = maps.Clone(el.action.Command.Args)
 		}

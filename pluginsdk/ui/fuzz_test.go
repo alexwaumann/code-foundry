@@ -97,10 +97,24 @@ const gridSeed = `{"nodes":[{"key":"g","grid":{"minWidth":200,"items":[
   {"key":"dv","divider":{"label":"Next"}},{"key":"dv2","divider":{}},
   {"key":"sp","spacer":{"size":4}},{"key":"sp0","spacer":{}}]}`
 
+// masterDetailSeed has a master-detail (list width, empty detail, reset token, a row with
+// its own action) whose detail nests tabs and a pane to the depth limit, with a log and a
+// form in a tab, and a second tabs node with a badge.
+const masterDetailSeed = `{"nodes":[{"key":"s","section":{"title":"Runs","children":[
+  {"key":"md","masterDetail":{"listWidth":240,"selected":"r2","resetToken":"1",
+    "emptyDetail":{"glyph":{"icon":"list"},"title":"No run","body":"Choose one","actions":[{"key":"md-new","label":"New","action":{"event":"new"}}]},
+    "list":{"glyphStyle":"dot","rows":[{"key":"r1","title":"Build #1","glyph":{"status":"ok"},"action":{"event":"open","data":"1"}},
+      {"key":"r2","title":"Build #2","glyph":{"status":"failed"},"line2":"cf/fix","trailing":"2m"}]},
+    "detail":[{"key":"rt","tabs":{"active":"rt-log","items":[{"key":"rt-ov","label":"Overview"},{"key":"rt-log","label":"Log","badge":{"label":"3","tone":"attention"}}],
+      "children":[{"key":"rp","pane":{"height":240,"children":[{"key":"rl","log":{"lines":[{"text":"step 1"},{"text":"fail","tone":"error"}]}},
+        {"key":"rx","text":{"content":"deepest"}}]}},
+        {"key":"rf","form":{"fields":[{"key":"rf-n","name":"note","input":{}}],"submit":{"key":"rf-s","label":"Save","action":{"event":"note"}}}}]}}]}}]}},
+  {"key":"t2","tabs":{"active":"t2-a","items":[{"key":"t2-a","label":"A"},{"key":"t2-b","label":"B"}],"children":[]}}]}`
+
 type viewSeed struct{ view, corrupt []byte }
 
 // viewSeeds are FuzzView's seeds: the hello demo's captured views, the walkthrough, a log,
-// a thread, and the layout and grid seeds.
+// a thread, and the layout, grid and master-detail seeds.
 func viewSeeds() []viewSeed {
 	var out []viewSeed
 	files, _ := filepath.Glob(filepath.FromSlash("../../internal/store/plugin/testdata/hello-demo/*.json"))
@@ -115,6 +129,7 @@ func viewSeeds() []viewSeed {
 		viewSeed{[]byte(`{"nodes":[{"key":"t","thread":{"threadId":"x","height":""}}]}`), []byte{}},
 		viewSeed{[]byte(layoutSeed), []byte{0, 0, 0, 2}},
 		viewSeed{[]byte(gridSeed), []byte{0, 0, 1}},
+		viewSeed{[]byte(masterDetailSeed), []byte{0, 1, 0, 0, 2}},
 	)
 }
 

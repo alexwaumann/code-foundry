@@ -81,7 +81,7 @@ func TestRenderPluginSkill(t *testing.T) {
 	if prim := string(files[skills.Plugin+"/reference/primitives.md"]); !strings.Contains(prim, "| Elements in a view (nodes, rows, chips, pairs, fields, options, buttons, tabs) | 400 |") {
 		t.Error("primitives.md lacks the limits table")
 	}
-	if prim := string(files[skills.Plugin+"/reference/primitives.md"]); !strings.Contains(prim, "| Containers (section, columns, pane, grid, container) a node sits inside | 4 |") ||
+	if prim := string(files[skills.Plugin+"/reference/primitives.md"]); !strings.Contains(prim, "| Containers (section, columns, pane, grid, container, masterDetail, tabs) a node sits inside | 4 |") ||
 		!strings.Contains(prim, "| Nodes in the toolbar / in the footer | 6 / 6 |") || !strings.Contains(prim, "| A container's widest: narrow / wide (px) | 680 / 1080 |") {
 		t.Error("primitives.md lacks the container depth, the strips' or the container's limits")
 	}
@@ -96,6 +96,14 @@ func TestRenderPluginSkill(t *testing.T) {
 	if prim := string(files[skills.Plugin+"/reference/primitives.md"]); !strings.Contains(prim, "| Grid: items / least and most minWidth (px) / columns / an item's span | 24 / 160 / 480 / 6 / 2 |") ||
 		!strings.Contains(prim, "| Items in a group | 8 |") || !strings.Contains(prim, "| Spacer size: least / most (px) | 4 / 64 |") {
 		t.Error("primitives.md lacks the grid, group or spacer limits")
+	}
+	if prim := string(files[skills.Plugin+"/reference/primitives.md"]); !strings.Contains(prim, "| Master-detail list width: least / default / most; the detail's least beside it (px) | 200 / 280 / 400; 320 |") ||
+		!strings.Contains(prim, "| Tabs in a tabs node: least / most | 2 / 8 |") {
+		t.Error("primitives.md lacks the master-detail or tabs node limits")
+	}
+	if layout := string(files[skills.Plugin+"/reference/ui-layout.md"]); !strings.Contains(layout, "view.node.masterDetail") || !strings.Contains(layout, "view.node.tabs") ||
+		!strings.Contains(layout, "612 px") || !strings.Contains(layout, `"kind": "select"`) || !strings.Contains(layout, `"node": "run-tabs"`) {
+		t.Error("ui-layout.md lacks the master-detail and tabs node capabilities, breakpoint or act shapes")
 	}
 
 	// cli.md: every plugin verb's help and the debugging helpers, the common flags once,

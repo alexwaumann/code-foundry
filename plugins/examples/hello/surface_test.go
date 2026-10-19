@@ -69,7 +69,7 @@ func TestDemoSurface(t *testing.T) {
 	for _, l := range v.NodeLists() {
 		walk(l)
 	}
-	for _, tab := range []string{"form", "log", "assistant", "shell", "layout"} {
+	for _, tab := range []string{"form", "log", "assistant", "shell", "layout", "run-list"} {
 		if err := h.Act(ctx, pluginsdk.SurfaceAct{Instance: inst, Kind: pluginsdk.ActTab, Action: "tab", Key: tab, Value: tab}); err != nil {
 			t.Fatal(err)
 		}
@@ -80,7 +80,14 @@ func TestDemoSurface(t *testing.T) {
 			walk(l)
 		}
 	}
-	for _, k := range []string{"text", "markdown", "pairs", "list", "chips", "log", "actions", "progress", "notice", "empty", "section", "form", "thread", "terminal", "columns", "pane", "grid", "divider", "spacer", "group", "container"} {
+	// The Runs tab's detail (a tabs node) shows once a run is chosen.
+	if err := h.Act(ctx, pluginsdk.SurfaceAct{Instance: inst, Kind: pluginsdk.ActSelect, Action: "select", Key: "runs-run-5", Value: "runs-run-5", Node: "runs-md"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, l := range view(t, h).NodeLists() {
+		walk(l)
+	}
+	for _, k := range []string{"text", "markdown", "pairs", "list", "chips", "log", "actions", "progress", "notice", "empty", "section", "form", "thread", "terminal", "columns", "pane", "grid", "divider", "spacer", "group", "container", "masterDetail", "tabs"} {
 		if !kinds[k] {
 			t.Errorf("the demo has no %s node", k)
 		}

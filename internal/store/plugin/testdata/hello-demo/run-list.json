@@ -1,0 +1,262 @@
+{
+  "header": {
+    "icon": "sparkles",
+    "title": "Hello demo",
+    "trailing": {
+      "spans": [
+        {
+          "text": "0 clicks",
+          "tone": "muted"
+        }
+      ]
+    },
+    "pill": {
+      "label": "demo",
+      "tone": "ok"
+    },
+    "subline": {
+      "spans": [
+        {
+          "text": "opened "
+        },
+        {
+          "time": {
+            "at": "2026-10-18T09:02:16.311761-05:00",
+            "style": "relative"
+          }
+        },
+        {
+          "text": " · thread "
+        },
+        {
+          "text": "s-f20aac336477",
+          "mono": true
+        }
+      ]
+    },
+    "actions": [
+      {
+        "key": "hdr-refresh",
+        "label": "Refresh",
+        "icon": "refresh-cw",
+        "action": {
+          "event": "refresh"
+        },
+        "iconOnly": true
+      },
+      {
+        "key": "hdr-docs",
+        "label": "Open the plugin docs",
+        "icon": "external-link",
+        "action": {
+          "openUrl": "https://github.com/alexwaumann/code-foundry"
+        },
+        "iconOnly": true
+      }
+    ],
+    "tabTitle": "Hello"
+  },
+  "tabs": {
+    "items": [
+      {
+        "key": "overview",
+        "label": "Overview"
+      },
+      {
+        "key": "form",
+        "label": "Form"
+      },
+      {
+        "key": "log",
+        "label": "Log"
+      },
+      {
+        "key": "assistant",
+        "label": "Assistant"
+      },
+      {
+        "key": "shell",
+        "label": "Shell"
+      },
+      {
+        "key": "layout",
+        "label": "Layout"
+      },
+      {
+        "key": "run-list",
+        "label": "Runs"
+      }
+    ],
+    "active": "run-list"
+  },
+  "nodes": [
+    {
+      "key": "runs-intro",
+      "text": {
+        "content": "The runs beside the chosen run's detail where there is room (a 280 px list, 12 px, at least 320 px of detail); in the side panel, the list, then the run alone under a back button."
+      }
+    },
+    {
+      "key": "runs-md",
+      "masterDetail": {
+        "list": {
+          "rows": [
+            {
+              "key": "runs-run-6",
+              "glyph": {
+                "status": "running"
+              },
+              "title": "Build #6",
+              "line2": {
+                "spans": [
+                  {
+                    "text": "main",
+                    "mono": true
+                  }
+                ]
+              },
+              "trailing": {
+                "spans": [
+                  {
+                    "duration": {
+                      "ms": 282000
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "key": "runs-run-5",
+              "glyph": {
+                "status": "failed"
+              },
+              "title": "Build #5",
+              "line2": {
+                "spans": [
+                  {
+                    "text": "cf/fix",
+                    "mono": true
+                  }
+                ]
+              },
+              "trailing": {
+                "spans": [
+                  {
+                    "duration": {
+                      "ms": 245000
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "key": "runs-run-4",
+              "glyph": {
+                "status": "ok"
+              },
+              "title": "Build #4",
+              "line2": {
+                "spans": [
+                  {
+                    "text": "main",
+                    "mono": true
+                  }
+                ]
+              },
+              "trailing": {
+                "spans": [
+                  {
+                    "duration": {
+                      "ms": 208000
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "key": "runs-run-3",
+              "glyph": {
+                "status": "failed"
+              },
+              "title": "Build #3",
+              "line2": {
+                "spans": [
+                  {
+                    "text": "cf/retry",
+                    "mono": true
+                  }
+                ]
+              },
+              "trailing": {
+                "spans": [
+                  {
+                    "duration": {
+                      "ms": 171000
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "key": "runs-run-2",
+              "glyph": {
+                "status": "ok"
+              },
+              "title": "Build #2",
+              "line2": {
+                "spans": [
+                  {
+                    "text": "cf/fix",
+                    "mono": true
+                  }
+                ]
+              },
+              "trailing": {
+                "spans": [
+                  {
+                    "duration": {
+                      "ms": 134000
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "key": "runs-run-1",
+              "glyph": {
+                "status": "ok"
+              },
+              "title": "Build #1",
+              "line2": {
+                "spans": [
+                  {
+                    "text": "main",
+                    "mono": true
+                  }
+                ]
+              },
+              "trailing": {
+                "spans": [
+                  {
+                    "duration": {
+                      "ms": 97000
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "detail": [],
+        "emptyDetail": {
+          "glyph": {
+            "icon": "list",
+            "tone": "muted"
+          },
+          "title": "No run chosen",
+          "body": "Choose a run to see its overview and its log."
+        }
+      }
+    }
+  ]
+}

@@ -413,7 +413,12 @@ const (
 	ActClick  = "click"  // a button, row or chip with an event action
 	ActSubmit = "submit" // a form's submit button
 	ActChange = "change" // a field with a change event was edited
-	ActTab    = "tab"    // the user switched tabs; Key and Value are the new tab's key
+	// ActTab: the user switched tabs; Key and Value are the new tab's key, Node the tabs
+	// node's key for a node's own tabs (ui.TabsNode) and "" for the view's.
+	ActTab = "tab"
+	// ActSelect: the user chose a row of a master-detail (ui.MasterDetail) that has no
+	// action of its own; Key and Value are the row's key, Node the master-detail's key.
+	ActSelect = "select"
 )
 
 // SurfaceAct is surface/act's params: the user acted on a view element.
@@ -426,16 +431,19 @@ type SurfaceAct struct {
 	Context UiContext `json:"context"`
 	// Version is the view version the user acted on (it may be older than the latest).
 	Version uint64 `json:"version"`
-	// Kind is ActClick, ActSubmit, ActChange or ActTab.
+	// Kind is ActClick, ActSubmit, ActChange, ActTab or ActSelect.
 	Kind string `json:"kind"`
-	// Action is the element's event name ("tab" for a tab).
+	// Action is the element's event name ("tab" for a tab, "select" for a select).
 	Action string `json:"action"`
+	// Node is the tabs node a tab act is on, or the master-detail a select is on; "" for
+	// the view's own tabs and every other act.
+	Node string `json:"node,omitempty"`
 	// Key is the element's key; Data the event's data, as the view declared it.
 	Key  string `json:"key,omitempty"`
 	Data string `json:"data,omitempty"`
 	// Field is the name of the field a change is about.
 	Field string `json:"field,omitempty"`
-	// Value is a change's new value or a tab's key.
+	// Value is a change's new value, a tab's key or a selected row's key.
 	Value any `json:"value,omitempty"`
 	// Values are the enclosing form's fields by name (strings, booleans, string lists);
 	// a secret input with store arrives as StoredSecret, and a secret never arrives in a

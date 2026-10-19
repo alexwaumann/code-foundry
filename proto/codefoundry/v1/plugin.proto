@@ -469,10 +469,12 @@ message GetSurfaceRequest {
 // submit or field with a change event.
 message SurfaceElement {
   string key = 1;
-  // click, submit, change or tab: sent to the plugin with Act; command, open_url or copy:
-  // handled by the host (the GUI), never by Act.
+  // click, submit, change, tab or select (a master-detail's row without an action of its
+  // own): sent to the plugin with Act; command, open_url or copy: handled by the host (the
+  // GUI), never by Act.
   string kind = 2;
-  // The event name (an event action), the command name, the URL; "tab" for a tab.
+  // The event name (an event action), the command name, the URL; "tab" for a tab,
+  // "select" for a select.
   string action = 3;
   // The button's or tab's label, the row's title.
   string label = 4;
@@ -481,6 +483,8 @@ message SurfaceElement {
   // A command element's args as the view sets them (the panel's context fills the
   // command's context args; a form submit adds the form's values).
   map<string, string> args = 6;
+  // A node tab's tabs node, a select's master-detail (the act's node); empty otherwise.
+  string node = 7;
 }
 
 message GetSurfaceResponse {

@@ -81,6 +81,10 @@
       {
         "key": "layout",
         "label": "Layout"
+      },
+      {
+        "key": "run-list",
+        "label": "Runs"
       }
     ],
     "active": "layout"

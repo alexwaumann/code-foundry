@@ -11,9 +11,9 @@ function allNodes(nodes: readonly ViewNode[]): ViewNode[] {
 }
 
 describe("view model", () => {
-  it("parses the demo's six views and knows every node kind in them", () => {
+  it("parses the demo's seven views and knows every node kind in them", () => {
     const kinds = new Set<string>();
-    for (const tab of ["overview", "form", "log", "assistant", "shell", "layout"] as const) {
+    for (const tab of ["overview", "form", "log", "assistant", "shell", "layout", "run-list"] as const) {
       const v = demoView(tab);
       expect(v.tabs?.active).toBe(tab);
       for (const n of allNodes(viewNodes(v))) {
@@ -23,8 +23,11 @@ describe("view model", () => {
       }
     }
     // The demo exercises every v1 node kind (thread and terminal on the Assistant and Shell
-    // tabs, columns, pane and container on Layout).
-    expect([...kinds].sort()).toEqual([...NODE_KINDS].sort());
+    // tabs, columns, pane and container on Layout, masterDetail on Runs). A tabs node is in
+    // a chosen run's detail, and the Runs tab is captured with nothing chosen (the mock
+    // patches the choice in): masterdetail.test.tsx and hello's runs_test.go cover it.
+    expect([...kinds].sort()).not.toContain("tabs");
+    expect([...kinds, "tabs"].sort()).toEqual([...NODE_KINDS].sort());
     // Layout has a toolbar and a footer; the other tabs neither.
     const layout = demoView("layout");
     expect([layout.toolbar?.map((n) => n.key), layout.footer?.map((n) => n.key)]).toEqual([["layout-search-form", "layout-status"], ["layout-count", "layout-footer-bar"]]);

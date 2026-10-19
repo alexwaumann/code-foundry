@@ -11,6 +11,7 @@ import { GridNode } from "./GridNode";
 import { GroupNode } from "./GroupNode";
 import { ListNode } from "./ListNode";
 import { LogNode } from "./LogNode";
+import { MasterDetailNode } from "./MasterDetailNode";
 import { MarkdownNode } from "./MarkdownNode";
 import { NoticeNode } from "./NoticeNode";
 import { PairsNode } from "./PairsNode";
@@ -18,6 +19,7 @@ import { PaneNode } from "./PaneNode";
 import { ProgressNode } from "./ProgressNode";
 import { SectionNode } from "./SectionNode";
 import { SpacerNode } from "./SpacerNode";
+import { TabsNode } from "./TabsNode";
 import { TerminalNode } from "./TerminalNode";
 import { TextNode } from "./TextNode";
 import { ThreadNode } from "./ThreadNode";
@@ -44,4 +46,6 @@ export const renderers: NodeRenderers = {
   spacer: SpacerNode,
   group: GroupNode,
   container: ContainerNode,
+  masterDetail: MasterDetailNode,
+  tabs: TabsNode,
 };

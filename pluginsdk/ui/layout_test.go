@@ -51,7 +51,7 @@ func withKind(key, k string) Node {
 // pass as a second kind, or fail alone.
 func TestEveryKindIsOneKind(t *testing.T) {
 	kinds := nodeKinds()
-	if len(kinds) != 21 {
+	if len(kinds) != 23 {
 		t.Errorf("%d kinds: %v (a new kind needs its validation, GUI renderer and docs)", len(kinds), kinds)
 	}
 	for _, k := range kinds {
@@ -84,6 +84,12 @@ var containers = map[string]func(key string, child Node) Node{
 	},
 	"pane":      func(key string, child Node) Node { return NewPane(key, HeightAuto, child) },
 	"container": func(key string, child Node) Node { return NewContainer(key, ContainerNarrow, child) },
+	"masterDetail": func(key string, child Node) Node {
+		return NewMasterDetail(key, List{Rows: []Row{NewRow(key+"-r", "Run")}}, key+"-r", child)
+	},
+	"tabs": func(key string, child Node) Node {
+		return NewTabsNode(key, NewTabs(key+"-a", NewTab(key+"-a", "A"), NewTab(key+"-b", "B")), child)
+	},
 	"grid": func(key string, child Node) Node {
 		return NewGrid(key, NewGridItem(key+"-a", child), NewGridItem(key+"-b"))
 	},
@@ -146,7 +152,7 @@ func TestContainerDepth(t *testing.T) {
 				t.Errorf("%d %s deep: %v", MaxDepth, k, err)
 			}
 			err := (View{Nodes: []Node{nest(append(at, k))}}).Validate()
-			if err == nil || !strings.Contains(err.Error(), fmt.Sprintf("inside %d containers (section, columns, pane, grid, container), at most %d", MaxDepth+1, MaxDepth)) {
+			if err == nil || !strings.Contains(err.Error(), fmt.Sprintf("inside %d containers (section, columns, pane, grid, container, masterDetail, tabs), at most %d", MaxDepth+1, MaxDepth)) {
 				t.Errorf("%d %s deep: %v", MaxDepth+1, k, err)
 			}
 			// Children reaches the leaf through every level.
@@ -342,6 +348,9 @@ func TestLayoutNumbersMatchTheGUI(t *testing.T) {
 		{layout, "GRID_MAX_SPAN", MaxGridSpan},
 		{layout, "SPACER_SIZE", SpacerSize},
 		{layout, "GROUP_GAP", GroupGap},
+		{layout, "MASTER_DETAIL_LIST_WIDTH", MasterDetailListWidth},
+		{layout, "MASTER_DETAIL_MIN_DETAIL", MasterDetailMinDetail},
+		{layout, "MASTER_DETAIL_GAP", MasterDetailGap},
 	} {
 		m := regexp.MustCompile(`export const ` + c.name + ` = (\d+);`).FindStringSubmatch(c.src)
 		if m == nil {
@@ -354,6 +363,9 @@ func TestLayoutNumbersMatchTheGUI(t *testing.T) {
 	}
 	if want := fmt.Sprintf("export const GRID_MIN_WIDTH_RANGE = [%d, %d] as const;", MinGridMinWidth, MaxGridMinWidth); !strings.Contains(layout, want) {
 		t.Errorf("the GUI's grid min width range is not %q", want)
+	}
+	if want := fmt.Sprintf("export const MASTER_DETAIL_LIST_WIDTH_RANGE = [%d, %d] as const;", MinListWidth, MaxListWidth); !strings.Contains(layout, want) {
+		t.Errorf("the GUI's master-detail list width range is not %q", want)
 	}
 	if want := fmt.Sprintf("s >= %d && s <= %d ? s : SPACER_SIZE", MinSpacer, MaxSpacer); !strings.Contains(layout, want) {
 		t.Errorf("the GUI's spacer range is not %q", want)

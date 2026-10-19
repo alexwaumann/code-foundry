@@ -1,7 +1,8 @@
 // Package ui is the typed view model of plugin surfaces: Go structs for every v1 node
 // and value type of the surface schema (header, tabs, text, markdown, pairs, list,
 // chips, log, actions, progress, notice, empty, section, form with fieldsets and option
-// sources, thread, terminal, the layout containers columns, pane, grid and container,
+// sources, thread, terminal, the layout containers columns, pane, grid, container,
+// masterDetail and tabs,
 // divider, spacer and the inline group; the view's pinned toolbar and footer; inline
 // spans with times and durations), builders, and
 // Validate, which checks a view against the host's rules and limits before it leaves
@@ -305,11 +306,17 @@ type Node struct {
 	Spacer    *Spacer    `json:"spacer,omitempty"`
 	Group     *Group     `json:"group,omitempty"`
 	Container *Container `json:"container,omitempty"`
+	// MasterDetail and Tabs are a list beside the chosen row's detail, and a node's own
+	// tab strip over the active tab's nodes (docs: reference/ui-layout.md).
+	MasterDetail *MasterDetail `json:"masterDetail,omitempty"`
+	Tabs         *TabsNode     `json:"tabs,omitempty"`
 }
 
 // Children returns the node lists a node holds (a section's children, each column's, a
-// pane's, each grid item's, a group's items, a container's), in order, and nil for any other node. The lists share n's arrays,
-// so a walk can change nodes in place.
+// pane's, each grid item's, a group's items, a container's, a master-detail's detail, a
+// tabs node's children), in order, and nil for any other node. The lists share n's
+// arrays, so a walk can change nodes in place. (A master-detail's list rows and empty
+// detail are not nodes: walks that look for buttons and rows look at them too.)
 func (n Node) Children() [][]Node {
 	switch {
 	case n.Section != nil:
@@ -332,6 +339,10 @@ func (n Node) Children() [][]Node {
 		return [][]Node{n.Group.Items}
 	case n.Container != nil:
 		return [][]Node{n.Container.Children}
+	case n.MasterDetail != nil:
+		return [][]Node{n.MasterDetail.Detail}
+	case n.Tabs != nil:
+		return [][]Node{n.Tabs.Children}
 	}
 	return nil
 }
@@ -744,6 +755,60 @@ type Container struct {
 	Width    ContainerWidth `json:"width,omitempty"`
 	Children []Node         `json:"children"`
 }
+
+// MasterDetail is a list beside the detail of its chosen row: where its own width is at
+// least ListWidth + MasterDetailGap + MasterDetailMinDetail px (the default 612 px), the
+// list on the left at ListWidth (MinListWidth..MaxListWidth, 0 = MasterDetailListWidth)
+// and Detail filling the rest, MasterDetailGap px apart, each scrolling on its own; the
+// node is as tall as the taller side, never taller than the rest of its box (a pane with
+// a px or fill height, else the surface's body) below its top, at least 240 px. Narrower
+// (always in the side panel) it shows the list alone; choosing a row shows the detail
+// alone under a back button with the row's title, until the user goes back, Selected
+// changes to a key that is not a row, or ResetToken changes.
+//
+// Choosing a row sends the row's own Action when it has one, else an act of kind
+// pluginsdk.ActSelect ("select") with Key the row's key and Node the master-detail's key;
+// the plugin answers with a view whose Selected is that row and whose Detail is its
+// detail (like a tab act). The host shows the row selected while the act is pending and
+// goes back to Selected when it fails. EmptyDetail is the detail side while Selected is
+// "" (wide only). Selected is "" or a row's key. Form drafts in the detail are kept per
+// selected row.
+type MasterDetail struct {
+	List        List   `json:"list"`
+	Selected    string `json:"selected,omitempty"`
+	Detail      []Node `json:"detail"`
+	ListWidth   int    `json:"listWidth,omitempty"`
+	EmptyDetail *Empty `json:"emptyDetail,omitempty"`
+	// ResetToken: a change shows the list again in the narrow layout (as a form's
+	// resetToken drops its drafts).
+	ResetToken string `json:"resetToken,omitempty"`
+}
+
+// A MasterDetail's numbers (px), which the GUI uses too.
+const (
+	MasterDetailListWidth = 280
+	MinListWidth          = 200
+	MaxListWidth          = 400
+	// MasterDetailMinDetail is the least width of the detail side by side with the list.
+	MasterDetailMinDetail = 320
+	MasterDetailGap       = ColumnGap
+)
+
+// TabsNode is a node's own tab strip (a section's, a pane's, a column's, a detail's) over
+// the active tab's nodes: Tabs (MinNodeTabs..MaxTabs items; Active one of them; tab keys
+// share the view's namespace) and Children, the active tab's content. It is styled like
+// the view's tabs, one step smaller, and scrolls with its list. Switching sends an act of
+// kind pluginsdk.ActTab ("tab") with Key and Value the tab's key and Node the tabs node's
+// key (the view's own tabs send Node ""); the plugin answers with a view whose Active is
+// that tab and whose Children are its nodes. Form drafts are kept per node tab, as per
+// view tab. In JSON: {"key": "k", "tabs": {"items": [...], "active": "a", "children": [...]}}.
+type TabsNode struct {
+	Tabs
+	Children []Node `json:"children"`
+}
+
+// MinNodeTabs is how few tabs a tabs node has (a view's tabs may have one).
+const MinNodeTabs = 2
 
 // Height is a thread, terminal or pane node's height: HeightAuto (the zero value),
 // HeightFill or HeightPx(n). It travels as "auto", "fill" or a number of pixels.

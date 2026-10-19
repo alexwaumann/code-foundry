@@ -15,10 +15,11 @@ import (
 // Limits every view must respect. The host refuses a view
 // that breaks one and keeps the previous one.
 const (
-	MaxElements = 400 // nodes, columns, grid items, rows, chips, pairs, fields, options, buttons, tabs
-	// MaxDepth is how many containers (section, columns, pane, grid, container) a node may
-	// sit inside: section > columns > pane > section > node. A column is part of its
-	// columns node, a grid item of its grid; a group is not a container (it holds leaves).
+	MaxElements = 400 // nodes, columns, grid items, rows, chips, pairs, fields, options, buttons, tabs (a tabs node's too)
+	// MaxDepth is how many containers (section, columns, pane, grid, container,
+	// masterDetail, tabs) a node may sit inside: section > columns > pane > section > node.
+	// A column is part of its columns node, a grid item of its grid; a group is not a
+	// container (it holds leaves).
 	MaxDepth         = 4
 	MaxViewBytes     = 256 << 10 // encoded, log text excluded
 	MaxLabel         = 200
@@ -420,19 +421,19 @@ func kindOf(n Node) string {
 func (c *checker) node(path string, n Node, depth int) {
 	c.key(path, n.Key)
 	if depth > MaxDepth {
-		c.bad(path, "inside %d containers (section, columns, pane, grid, container), at most %d", depth, MaxDepth)
+		c.bad(path, "inside %d containers (section, columns, pane, grid, container, masterDetail, tabs), at most %d", depth, MaxDepth)
 	}
 	kinds := 0
 	for _, set := range []bool{n.Text != nil, n.Markdown != nil, n.Pairs != nil, n.List != nil, n.Chips != nil,
 		n.Log != nil, n.Actions != nil, n.Progress != nil, n.Notice != nil, n.Empty != nil, n.Section != nil,
 		n.Form != nil, n.Thread != nil, n.Terminal != nil, n.Columns != nil, n.Pane != nil, n.Grid != nil,
-		n.Divider != nil, n.Spacer != nil, n.Group != nil, n.Container != nil} {
+		n.Divider != nil, n.Spacer != nil, n.Group != nil, n.Container != nil, n.MasterDetail != nil, n.Tabs != nil} {
 		if set {
 			kinds++
 		}
 	}
 	if kinds != 1 {
-		c.bad(path, "a node has exactly one kind (text, markdown, pairs, list, chips, log, actions, progress, notice, empty, section, form, thread, terminal, columns, pane, grid, divider, spacer, group, container); this one has %d", kinds)
+		c.bad(path, "a node has exactly one kind (text, markdown, pairs, list, chips, log, actions, progress, notice, empty, section, form, thread, terminal, columns, pane, grid, divider, spacer, group, container, masterDetail, tabs); this one has %d", kinds)
 		return
 	}
 	switch {
@@ -551,6 +552,59 @@ func (c *checker) node(path string, n Node, depth int) {
 		for i, ch := range n.Container.Children {
 			c.node(fmt.Sprintf("%s.children[%d]", p, i), ch, depth+1)
 		}
+	case n.MasterDetail != nil:
+		c.masterDetail(path+".masterDetail", n.MasterDetail, depth)
+	case n.Tabs != nil:
+		c.tabsNode(path+".tabs", n.Tabs, depth)
+	}
+}
+
+// masterDetail checks a master-detail node inside depth containers: its list (rows are
+// keys and elements like any list's), its list width, that Selected is "" or a row's
+// key, its empty detail (an empty node's limits) and its detail's nodes (one container
+// deeper).
+func (c *checker) masterDetail(path string, md *MasterDetail, depth int) {
+	c.list(path+".list", &md.List)
+	if w := md.ListWidth; w != 0 && (w < MinListWidth || w > MaxListWidth) {
+		c.bad(path+".listWidth", "%d px is outside %d..%d (0 is %d)", w, MinListWidth, MaxListWidth, MasterDetailListWidth)
+	}
+	if md.Selected != "" && !slices.ContainsFunc(md.List.Rows, func(r Row) bool { return r.Key == md.Selected }) {
+		c.bad(path+".selected", "%q is not a row of the list", md.Selected)
+	}
+	if e := md.EmptyDetail; e != nil {
+		p := path + ".emptyDetail"
+		c.glyph(p+".glyph", e.Glyph)
+		c.str(p+".title", e.Title, MaxLabel)
+		c.inline(p+".body", e.Body, MaxTextContent)
+		c.buttons(p+".actions", e.Actions, MaxEmptyButtons)
+	}
+	c.str(path+".resetToken", md.ResetToken, MaxLabel)
+	for i, ch := range md.Detail {
+		c.node(fmt.Sprintf("%s.detail[%d]", path, i), ch, depth+1)
+	}
+}
+
+// tabsNode checks a tabs node inside depth containers: MinNodeTabs..MaxTabs tabs (keys,
+// labels and badges as the view's tabs), Active one of them, and the active tab's nodes
+// (one container deeper).
+func (c *checker) tabsNode(path string, t *TabsNode, depth int) {
+	if n := len(t.Items); n < MinNodeTabs || n > MaxTabs {
+		c.bad(path+".items", "%d tabs, want %d to %d", n, MinNodeTabs, MaxTabs)
+	}
+	found := false
+	for i, tab := range t.Items {
+		p := fmt.Sprintf("%s.items[%d]", path, i)
+		c.key(p, tab.Key)
+		c.required(p+".label", tab.Label)
+		c.str(p+".label", tab.Label, MaxTabTitle)
+		c.pill(p+".badge", tab.Badge)
+		found = found || tab.Key == t.Active
+	}
+	if !found {
+		c.bad(path+".active", "%q is not one of the tabs", t.Active)
+	}
+	for i, ch := range t.Children {
+		c.node(fmt.Sprintf("%s.children[%d]", path, i), ch, depth+1)
 	}
 }
 
@@ -879,6 +933,10 @@ func (c *checker) utf8(path string, v reflect.Value) {
 		for i := range t.NumField() {
 			f := t.Field(i)
 			if !f.IsExported() {
+				continue
+			}
+			if f.Anonymous && f.Tag.Get("json") == "" {
+				c.utf8(path, v.Field(i)) // an embedded struct's fields are its parent's in JSON (TabsNode's Tabs)
 				continue
 			}
 			name, _, _ := strings.Cut(f.Tag.Get("json"), ",")

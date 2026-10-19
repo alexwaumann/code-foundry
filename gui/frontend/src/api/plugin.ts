@@ -402,6 +402,27 @@ export interface ContainerData {
   children: ViewNode[];
 }
 
+/**
+ * A list beside the detail of its chosen row (components/plugin/nodes/MasterDetailNode):
+ * side by side where the node is at least listWidth (200..400, absent = 280) + 12 + 320 px
+ * wide, else the list alone and the detail alone under a back button. `selected` is ""
+ * (absent) or a row's key; a row without an action sends a "select" act. `emptyDetail` is
+ * the detail side while nothing is selected; a new `resetToken` shows the list again.
+ */
+export interface MasterDetailData {
+  list: ListData;
+  selected?: string;
+  detail: ViewNode[];
+  listWidth?: number;
+  emptyDetail?: EmptyData;
+  resetToken?: string;
+}
+
+/** A node's own tab strip over the active tab's nodes (2..8 tabs; a switch is a "tab" act naming the node). */
+export interface TabsNodeData extends ViewTabs {
+  children: ViewNode[];
+}
+
 /** Each node kind's data, by the JSON field that names the kind. */
 export interface NodeData {
   text: TextData;
@@ -425,12 +446,14 @@ export interface NodeData {
   spacer: SpacerData;
   group: GroupData;
   container: ContainerData;
+  masterDetail: MasterDetailData;
+  tabs: TabsNodeData;
 }
 
 export type NodeKind = keyof NodeData;
 
 /** The kinds this GUI knows, in pluginsdk/ui's order. */
-export const NODE_KINDS: readonly NodeKind[] = ["text", "markdown", "pairs", "list", "chips", "log", "actions", "progress", "notice", "empty", "section", "form", "thread", "terminal", "columns", "pane", "grid", "divider", "spacer", "group", "container"];
+export const NODE_KINDS: readonly NodeKind[] = ["text", "markdown", "pairs", "list", "chips", "log", "actions", "progress", "notice", "empty", "section", "form", "thread", "terminal", "columns", "pane", "grid", "divider", "spacer", "group", "container", "masterDetail", "tabs"];
 
 /** A body node: a key unique in the view and exactly one kind field. */
 export type ViewNode = { key: string } & Partial<NodeData>;
@@ -468,8 +491,9 @@ export function nodeKind(n: ViewNode): NodeKind | null {
 
 /**
  * The node lists a node holds (a section's children, each column's, a pane's, each grid
- * item's, a group's items, a container's), in order; empty for any other node. Every walk
- * over a view's nodes goes through this (from each of VIEW_LISTS).
+ * item's, a group's items, a container's, a master-detail's detail, a tabs node's
+ * children), in order; empty for any other node. Every walk over a view's nodes goes
+ * through this (from each of VIEW_LISTS).
  */
 export function childLists(n: ViewNode): readonly (readonly ViewNode[])[] {
   if (n.section) return [n.section.children];
@@ -478,7 +502,21 @@ export function childLists(n: ViewNode): readonly (readonly ViewNode[])[] {
   if (n.grid) return n.grid.items.map((it) => it.children);
   if (n.group) return [n.group.items];
   if (n.container) return [n.container.children];
+  if (n.masterDetail) return [n.masterDetail.detail];
+  if (n.tabs) return [n.tabs.children];
   return [];
+}
+
+/**
+ * The draft scope a node adds for the nodes it holds (docs/notes/plugins-layout-4-master-detail.md):
+ * a tabs node its active tab, a master-detail its selected row, so a form's drafts are kept
+ * per node tab and per selected row as they are per view tab; "" for any other node. A
+ * form's scope is the view's active tab followed by the scopes of the nodes around it.
+ */
+export function nodeScope(n: ViewNode): string {
+  if (n.tabs) return `\u0001${n.key}=${n.tabs.active}`;
+  if (n.masterDetail) return `\u0001${n.key}=${n.masterDetail.selected ?? ""}`;
+  return "";
 }
 
 /** A node with its lists replaced (same order and count as childLists gives). */
@@ -497,6 +535,8 @@ export function withChildLists(n: ViewNode, lists: readonly (readonly ViewNode[]
   }
   if (n.group) return { ...n, group: { ...n.group, items: list(0, n.group.items) } };
   if (n.container) return { ...n, container: { ...n.container, children: list(0, n.container.children) } };
+  if (n.masterDetail) return { ...n, masterDetail: { ...n.masterDetail, detail: list(0, n.masterDetail.detail) } };
+  if (n.tabs) return { ...n, tabs: { ...n.tabs, children: list(0, n.tabs.children) } };
   return n;
 }
 

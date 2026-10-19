@@ -13,10 +13,10 @@ import (
 	"github.com/alexwaumann/code-foundry/pluginsdk/ui"
 )
 
-// The demo surface shows every v1 node kind across six tabs (Overview, Form, Log,
-// Assistant and Shell with the plugin's own thread and terminal, owned.go, and Layout
+// The demo surface shows every v1 node kind across seven tabs (Overview, Form, Log,
+// Assistant and Shell with the plugin's own thread and terminal, owned.go, Layout
 // with columns, panes, a grid, dividers, spacers, groups, a container, a toolbar and a
-// footer, layout.go):
+// footer, layout.go, and Runs with a master-detail whose detail has its own tabs, runs.go):
 // what the GUI's renderer and the mock daemon's fixtures are built against
 // (internal/store/plugin/testdata/hello-demo/). The pinned surface appears only on the
 // threads the demo's Pin button marked (a context fact, hello.pinned). The checks
@@ -42,6 +42,7 @@ type demo struct {
 	build   int
 	ownErr  error // why the Assistant or Shell tab has nothing to show
 	filter  layoutFilter
+	runs    runsState
 }
 
 // demoFactory opens demo instances sharing own.
@@ -99,7 +100,7 @@ func (d *demo) viewLocked() ui.View {
 		},
 	}
 	tabs := ui.NewTabs(d.tab, ui.NewTab("overview", "Overview"), ui.NewTab("form", "Form"), ui.NewTab("log", "Log"),
-		ui.NewTab("assistant", "Assistant"), ui.NewTab("shell", "Shell"), ui.NewTab("layout", "Layout"))
+		ui.NewTab("assistant", "Assistant"), ui.NewTab("shell", "Shell"), ui.NewTab("layout", "Layout"), ui.NewTab("run-list", "Runs"))
 	tabs.Items[2].Badge = ui.NewPill("live", ui.ToneAttention)
 	if !d.running {
 		tabs.Items[2].Badge = nil
@@ -120,6 +121,8 @@ func (d *demo) viewLocked() ui.View {
 		id, _ := d.own.ids()
 		nodes = layoutNodes(id, d.ownErr, d.filter)
 		toolbar, footer = layoutChrome(d.filter)
+	case "run-list":
+		nodes = runsNodes(d.runs)
 	default:
 		nodes = d.overviewNodes(pin)
 	}
@@ -243,7 +246,9 @@ func (d *demo) logNodes() []ui.Node {
 func (d *demo) Act(ctx context.Context, act pluginsdk.SurfaceAct) error {
 	switch act.Kind + ":" + act.Action {
 	case "tab:tab":
-		d.prepare(ctx, act.Key)
+		if act.Node == "" {
+			d.prepare(ctx, act.Key)
+		}
 	case "click:send-hello":
 		if err := d.own.sendHello(ctx, d.h); err != nil {
 			return err
@@ -265,7 +270,24 @@ func (d *demo) Act(ctx context.Context, act pluginsdk.SurfaceAct) error {
 	d.mu.Lock()
 	switch act.Kind + ":" + act.Action {
 	case "tab:tab":
-		d.tab = act.Key
+		if act.Node == "runs-tabs" {
+			d.runs.tab = act.Key
+		} else {
+			d.tab = act.Key
+		}
+	case "select:select":
+		if err := d.runs.selectRun(act.Key); err != nil {
+			d.mu.Unlock()
+			return err
+		}
+	case "submit:runs-note":
+		if err := d.runs.saveNote(act.Values); err != nil {
+			d.mu.Unlock()
+			return err
+		}
+		d.mu.Unlock()
+		_ = d.h.ToastIn(act.Instance, pluginsdk.ToastInfo, "note saved")
+		return d.render()
 	case "click:click", "click:refresh":
 		d.clicks++
 	case "click:goto-form":

@@ -260,3 +260,18 @@ func NewGroup(key string, align Align, items ...Node) Node {
 func NewContainer(key string, width ContainerWidth, children ...Node) Node {
 	return Node{Key: key, Container: &Container{Width: width, Children: children}}
 }
+
+// NewMasterDetail returns a list beside the detail of its selected row ("" for none; see
+// MasterDetail).
+func NewMasterDetail(key string, list List, selected string, detail ...Node) Node {
+	return Node{Key: key, MasterDetail: &MasterDetail{List: list, Selected: selected, Detail: detail}}
+}
+
+// NewTabsNode returns a node's own tab strip (tabs: NewTabs) over the active tab's nodes.
+func NewTabsNode(key string, tabs *Tabs, children ...Node) Node {
+	n := Node{Key: key, Tabs: &TabsNode{Children: children}}
+	if tabs != nil {
+		n.Tabs.Tabs = *tabs
+	}
+	return n
+}
