@@ -355,8 +355,10 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   store and adds `--add-dir` for each other member,
   `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1`, and one static
   `--append-system-prompt` line pointing at `code-foundry workspace members`, after the
-  static line every thread gets pointing at the skills below (`ThreadPrompt`;
-  `docs/notes/agents-5-cli.md`, `docs/notes/agent-skills.md`).
+  static line every thread gets pointing at the skills below and sending split-up,
+  parallel or multi-branch work to the orchestrate skill rather than the Agent tool
+  (`ThreadPrompt`; `docs/notes/agents-5-cli.md`, `docs/notes/agent-skills.md`,
+  `docs/notes/orch-skill-v2.md`).
 * **Skills**: at every start the daemon writes three Claude Code skills,
   `code-foundry-orchestrate` (delegating work to other threads), `code-foundry-help`
   (how-to questions about the app) and `code-foundry-plugin` (building plugins, §10), to
