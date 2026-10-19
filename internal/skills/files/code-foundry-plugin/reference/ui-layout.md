@@ -209,6 +209,9 @@ md.MasterDetail.EmptyDetail = &ui.Empty{Title: "No run chosen"}
 - `selected` is `""` or a row's key (anything else is refused). `emptyDetail` (an `empty`
   node's fields) is the detail side while nothing is selected, when wide. Rows count as
   elements and share the view's keys; row buttons work as in a `list`.
+- Refused because the app would not show them: a row's own `selected` (the node's
+  `selected` decides), and `detail` nodes while `selected` is `""` (send them with the
+  row that shows them). The `select` act carries no `values`.
 - The detail holds any nodes within the depth limit (the master-detail is a container).
   Form drafts in it are kept per selected row. The hidden side is not drawn, so a thread
   or terminal in the detail holds no stream while the panel shows the list.
