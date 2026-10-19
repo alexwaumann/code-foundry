@@ -34,6 +34,8 @@ export function PaneNode({ node, data }: NodeProps<"pane">) {
   const sized = mode !== "auto";
   const scroll = !(data.noScroll ?? false);
   const ownBox = useMemo(() => ({ box: el, bottom: 0 }), [el]);
+  // A log alone in a sized pane shrinks to it (LogNode), so its tail stays in view instead of the pane scrolling past it.
+  const fitsLog = sized && data.children.length === 1 && data.children[0]?.log !== undefined;
   return (
     <div
       ref={setRef}
@@ -47,7 +49,7 @@ export function PaneNode({ node, data }: NodeProps<"pane">) {
     >
       <FillBoxContext.Provider value={sized ? ownBox : outerBox}>
         <VirtualScrollRoot.Provider value={sized && scroll ? el : outerScroll}>
-          <NodeList nodes={data.children} inner={inner} box={sized} />
+          <NodeList nodes={data.children} inner={inner} box={sized} className={fitsLog ? "min-h-0" : undefined} />
         </VirtualScrollRoot.Provider>
       </FillBoxContext.Provider>
     </div>

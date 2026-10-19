@@ -10,7 +10,7 @@ import { StripRow } from "./StripRow";
  */
 export function FooterBar({ nodes, stale }: { nodes: readonly ViewNode[]; stale?: boolean }) {
   return (
-    <div className={cn("shrink-0 border-t border-pane-border bg-pane px-4 py-2 @max-[340px]:px-3", stale && "opacity-60 [&_.animate-spin]:animate-none")} data-testid="plugin-footer">
+    <div className={cn("shrink-0 border-t border-pane-border bg-pane px-4 py-2 @max-[340px]:px-3", stale && "opacity-60 [&_.animate-spin]:animate-none")} role="region" aria-label="Footer" data-testid="plugin-footer">
       <StripRow nodes={nodes} slot="footer" />
     </div>
   );

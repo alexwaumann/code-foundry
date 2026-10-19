@@ -285,6 +285,27 @@ describe("thread nodes", () => {
     expect(useInlineLiveStore.getState().holders).toEqual([]);
   });
 
+  it("offers no Attach over the budget while streams wait for a connection (it would pause one that streams) (live 8)", () => {
+    useThreadsStore.setState({ loaded: true, byId: { a: thread("a"), b: thread("b"), c: thread("c") }, order: [], owned: ["a", "b", "c"] });
+    useStreamSlotsStore.setState({ open: 5, waiting: ["thread:b"] });
+    inView(
+      <NodeList
+        nodes={[
+          { key: "ta", thread: { threadId: "a" } },
+          { key: "tb", thread: { threadId: "b" } },
+          { key: "tc", thread: { threadId: "c" } },
+        ]}
+      />,
+    );
+    const paused = screen.getAllByTestId("plugin-live-paused").find((p) => p.getAttribute("data-reason") === "budget");
+    expect(paused).toBeDefined();
+    expect(screen.queryByTestId("plugin-live-attach")).toBeNull();
+    act(() => {
+      useStreamSlotsStore.setState({ open: 4, waiting: [] });
+    });
+    expect(screen.getByTestId("plugin-live-attach")).toBeTruthy();
+  });
+
   it("says it waits for a connection when the app's stream slots are full (#1c)", () => {
     useThreadsStore.setState({ loaded: true, byId: { a: thread("a") }, order: [], owned: ["a"] });
     useStreamSlotsStore.setState({ open: 5, waiting: ["thread:a"] });

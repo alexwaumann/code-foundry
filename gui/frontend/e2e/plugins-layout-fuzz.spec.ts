@@ -427,3 +427,42 @@ test("live-5: the view's tabs are one tab stop WebKit reaches (it skips plain bu
   await page.keyboard.press("ArrowLeft");
   await expect(surface(page).locator('[data-testid="plugin-tab"]').last()).toBeFocused();
 });
+
+test("live-9: a log alone in a short px pane shrinks to it, so its newest line shows", async ({ page }) => {
+  await openDemo(page);
+  await showView(page, { view: { nodes: [{ key: "box", pane: { height: 120, children: [{ key: "lg", log: { lines: rows(40).map((r) => ({ text: r.title })), rows: 40 } }] } }] } });
+  const pane = surface(page).locator('[data-testid="plugin-pane"][data-key="box"]');
+  const box = pane.getByTestId("plugin-log-box");
+  const [p, b] = [await pane.boundingBox(), await box.boundingBox()];
+  expect(p && b && b.y + b.height <= p.y + p.height + 1, `log box ${JSON.stringify(b)} in pane ${JSON.stringify(p)}`).toBe(true);
+  // The log follows its tail: the last line is inside the box's view.
+  const last = box.locator("div").filter({ hasText: /^Row 39$/ });
+  const l = await last.boundingBox();
+  expect(l && b && l.y + l.height <= b.y + b.height + 1 && l.y >= b.y - 1).toBe(true);
+});
+
+test("live-7: a wide master-detail's side at its end hands the wheel on to the body", async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await openDemo(page);
+  await dragPanel(page, -600);
+  await showView(page, {
+    view: {
+      nodes: [
+        { key: "md", masterDetail: { list: { rows: rows(30, "m") }, selected: "m0", detail: [{ key: "d", text: { content: "detail" } }] } },
+        { key: "after", list: { rows: rows(30, "a") } },
+      ],
+    },
+  });
+  const md = surface(page).locator('[data-testid="plugin-master-detail"]');
+  await expect(md).toHaveAttribute("data-layout", "wide");
+  const side = md.getByTestId("plugin-md-list");
+  const scroll = surface(page).getByTestId("plugin-scroll");
+  const b = await side.boundingBox();
+  if (!b) throw new Error("no list side");
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+  for (let i = 0; i < 40; i++) await page.mouse.wheel(0, 120);
+  await page.waitForTimeout(300);
+  const [sideAtEnd, bodyTop] = [await side.evaluate((el) => el.scrollTop + el.clientHeight >= el.scrollHeight - 1), await scroll.evaluate((el) => el.scrollTop)];
+  expect(sideAtEnd).toBe(true);
+  expect(bodyTop, "the body scrolls once the side is at its end").toBeGreaterThan(0);
+});
