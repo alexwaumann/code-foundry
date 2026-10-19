@@ -62,18 +62,22 @@ sees every thread in the app's sidebar. You create and drive other threads with 
    follow-ups. Never run a plain `thread wait` right after a `thread send`: it returns
    the previous turn's status at once; use `send --wait`.
 
-   `needs attention (finished)` is a turn that ended normally. A child that finished
-   WITHOUT a report may be asking you something in prose: `thread read` it before
-   deciding, and answer with `thread send --id <child> "..."`. Other reasons are a
-   question, a permission, or a budget stop (not finished work: tell the user; if they
-   agree, `thread budget --id <id> <usd>` AND `thread send --id <id> "continue"`; raising
-   alone does not resume it). A wait that times out exits 1; the thread is still
-   working, wait again.
+   `needs attention (finished)` is a turn that ended normally. A wake saying "finished
+   without a report" or "(report is from before its last message)" has `report_stale:
+   true` and the turn's `last_message` in its JSON: the child may be asking you
+   something in prose; read that before deciding, and answer with `thread send --id
+   <child> "..."`. Each new permission prompt or question wakes you on its own; its
+   `pending` has the `request_id`, the tool `input` (judge that, not the child's
+   description) and a question's `options` (the labels `--answer` takes). A budget stop
+   is not finished work: tell the user; if they agree, `thread budget --id <id> <usd>`
+   AND `thread send --id <id> "continue"` (raising alone does not resume it). A wait
+   that times out exits 1; the thread is still working, wait again.
 
    On a wake for a batch, look at the whole batch (`thread reports --created-by
    $CODE_FOUNDRY_THREAD --all`), and talk to the user only when something needs them (a
    question, a failure, a conflict) or the batch is complete; otherwise end the turn
-   with one short line.
+   with one short line. A lead's wake counts its `children` and says "2 of its 3 child
+   threads still working": its work is not done yet.
 3. **Collect.** `code-foundry thread reports --created-by $CODE_FOUNDRY_THREAD` prints one
    line per child (`-`: no report yet; `--json` for the data). `code-foundry thread read <id>`
    prints its last 20 items (`--since <nextSince>` reads on). A child that needs attention

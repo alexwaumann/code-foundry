@@ -61,8 +61,8 @@ code-foundry thread reports --created-by $CODE_FOUNDRY_THREAD --label batch-1018
 code-foundry thread reports --created-by $CODE_FOUNDRY_THREAD --label batch-1018 --status none
 ```
 
-A child without a report that is no longer working needs a look (`thread read <id>`):
-it may be asking you something in prose. Answer with `thread send --id <id> "..."`
+A child without a report that is no longer working needs a look (its wake's
+`last_message`, or `thread read <id> --full`): it may be asking you something in prose. Answer with `thread send --id <id> "..."`
 without `--wait` and end the turn; its subscription wakes you again.
 When every child has reported, check which branches touch the same files
 (`git diff --name-only origin/main...<branch>` per branch) and summarise for the user
