@@ -17,6 +17,8 @@ const (
 	jobDetail
 	// jobBase owns a project's resolved base sha (base.go).
 	jobBase
+	// jobFiles owns one worktree's collected file changes (files.go).
+	jobFiles
 )
 
 func (k jobKind) String() string {
@@ -29,6 +31,8 @@ func (k jobKind) String() string {
 		return "detail"
 	case jobBase:
 		return "base"
+	case jobFiles:
+		return "files"
 	}
 	return "jobKind(?)"
 }
@@ -38,7 +42,7 @@ func (k jobKind) String() string {
 type jobKey struct {
 	kind      jobKind
 	projectID string
-	path      string // worktree path for jobStatus
+	path      string // worktree path for jobStatus, jobDetail, jobFiles
 }
 
 type jobState struct {

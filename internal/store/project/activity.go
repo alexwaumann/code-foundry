@@ -234,6 +234,13 @@ func (g *Git) SetLiveWorktrees(paths []string) {
 	}
 }
 
+// isLive reports whether the worktree at path (symlinks resolved) is in the live set.
+func (g *Git) isLive(path string) bool {
+	g.live.mu.Lock()
+	defer g.live.mu.Unlock()
+	return g.live.paths[path]
+}
+
 // nudgeTiers wakes the poll and fetch loops: a project may have turned live.
 func (g *Git) nudgeTiers() {
 	for _, ch := range []chan struct{}{g.pollNudge, g.fetchNudge} {
