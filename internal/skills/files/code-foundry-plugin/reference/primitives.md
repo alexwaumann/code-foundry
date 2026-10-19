@@ -135,7 +135,10 @@ keeps form drafts per tab. The plugin answers with the view of the new active ta
 `nodes` are always the active tab's. Tab keys share the view's one key namespace: a tab
 `runs` and a list `runs` collide (`nodes[1].key: "runs" is already used by
 tabs.items[0]`), so prefix tabs `tab-…`. Past the tab limit, group: collapsible sections inside a
-tab, or a second surface for a second subject.
+tab, or a second surface for a second subject. A view may add a pinned **`toolbar`** (under the
+tabs: a search field, filter chips) and **`footer`** (at the bottom: a count, an actions
+bar), up to 6 text, chips, actions, progress or form nodes each, the active tab's like
+`nodes`: `reference/ui-layout.md`.
 
 ## Nodes
 
@@ -466,14 +469,15 @@ view, or let the user pick which, switching with tabs or chips rather than stack
 Check `h.HasCapability("view.node.thread")` (`view.node.terminal`) before relying on
 them; `reference/host-api.md` has the calls that make them.
 
-### columns, pane, grid, divider, spacer, group
+### columns, pane, grid, divider, spacer, group, container
 
 Layout nodes: `columns` puts 2 to 4 columns side by side where they fit (240 px a
 column) and stacks them, or keeps only the first, where they do not (the side panel);
 `pane` is a box with its own height (auto, px, fill) and scroll; `grid` puts cards in as
 many equal columns as fit; `divider` is a hairline (with a label); `spacer` is extra
 space (or, `flex`, pushes what follows to a box's bottom); `group` puts text, chips,
-actions and progress on one line. All in `reference/ui-layout.md`.
+actions and progress on one line; `container` caps its nodes at 680 px (`narrow`) or
+1080 px (`wide`), centred. All in `reference/ui-layout.md`.
 
 ## Acts
 
