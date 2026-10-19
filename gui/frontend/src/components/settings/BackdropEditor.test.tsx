@@ -36,7 +36,7 @@ vi.mock("@/api/settings", async (orig) => ({
   removeBackdrop: daemon.removeBackdrop,
   readBackdrop: daemon.readBackdrop,
 }));
-const save = vi.hoisted(() => ({ fn: vi.fn((_v: Record<string, string>) => Promise.resolve({ ok: true as const })) }));
+const save = vi.hoisted(() => ({ fn: vi.fn<(v: Record<string, string>) => Promise<{ ok: true }>>(() => Promise.resolve({ ok: true as const })) }));
 vi.mock("@/stores/settings", async (orig) => ({ ...(await orig<typeof import("@/stores/settings")>()), saveSettings: save.fn }));
 
 const { SettingRow } = await import("./SettingRow");

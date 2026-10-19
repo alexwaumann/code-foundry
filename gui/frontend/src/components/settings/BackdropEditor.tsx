@@ -121,7 +121,8 @@ export function BackdropEditor(props: EditorProps) {
 
   return (
     <div className="flex flex-col gap-2" data-testid="backdrop-editor">
-      <EnumEditor {...props} commit={choose} />
+      {/* An import's refusal is the gallery's, not the select's: no red border on it. */}
+      <EnumEditor {...props} invalid={false} commit={choose} />
       {images && images.length > 0 && (
         <div className="grid grid-cols-3 gap-1.5" role="group" aria-label="Backdrop images" data-testid="backdrop-gallery">
           {images.map((b, i) => (

@@ -35,11 +35,14 @@ const vars = () => {
   return [el?.style.getPropertyValue("--cf-backdrop-narrow"), el?.style.getPropertyValue("--cf-backdrop-wide")];
 };
 
+const createUrl = vi.fn<(b: Blob) => string>();
+
 beforeEach(() => {
   resetBackdropCache();
   daemon.pending.clear();
   let n = 0;
-  URL.createObjectURL = vi.fn(() => `blob:img-${String(++n)}`);
+  createUrl.mockReset().mockImplementation(() => `blob:img-${String(++n)}`);
+  URL.createObjectURL = createUrl;
   URL.revokeObjectURL = vi.fn();
 });
 afterEach(cleanup);
@@ -72,7 +75,7 @@ describe("Backdrop", () => {
     await answer("a.png", true);
     render(<Backdrop />);
     expect(screen.getAllByTestId("backdrop")).toHaveLength(2);
-    expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
+    expect(createUrl).toHaveBeenCalledTimes(1);
   });
 
   it("custom with a file gone from the folder renders nothing", async () => {
