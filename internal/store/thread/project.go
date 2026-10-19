@@ -117,6 +117,7 @@ func (p *projector) nextID(prefix string) string {
 
 // event applies one stream event.
 func (p *projector) event(ev claudestream.Event) {
+	p.queueEvent(ev) // queued.go
 	switch e := ev.(type) {
 	case *claudestream.StreamEvent:
 		if e.ParentToolUseID == "" {

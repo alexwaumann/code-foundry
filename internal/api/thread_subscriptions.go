@@ -67,7 +67,7 @@ func subscriptionToProto(s thread.Subscription) *v1.ThreadSubscription {
 // userMessageToProto maps a user_message item's payload, with its origin.
 func userMessageToProto(it thread.Item) *v1.UserMessageItem {
 	p := &v1.UserMessageItem{Text: it.Text, Attachments: it.Attachments, ComposerText: it.ComposerText,
-		Origin: v1.MessageOrigin_MESSAGE_ORIGIN_USER, ResumeNote: it.ResumeNote}
+		Origin: v1.MessageOrigin_MESSAGE_ORIGIN_USER, ResumeNote: it.ResumeNote, Queued: it.Queued}
 	if it.Origin == thread.OriginWake {
 		p.Origin, p.WakeTitle, p.WakeJson = v1.MessageOrigin_MESSAGE_ORIGIN_WAKE, it.WakeTitle, it.WakeJSON
 	}

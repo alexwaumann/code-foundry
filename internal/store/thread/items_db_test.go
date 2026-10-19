@@ -18,6 +18,8 @@ func TestItemsDBRoundTrip(t *testing.T) {
 		{"a created-by note keeps its creator", Item{ID: "rt-note-by", Kind: KindNote, Text: "Created by Parent · brief: hi", NoteCreatedBy: "s-parent"}},
 		{"a fork note has no creator", Item{ID: "rt-note-fork", Kind: KindNote, Text: "Forked from base"}},
 		{"a wake message", Item{ID: "rt-wake", Kind: KindUserMessage, Text: "wake", Origin: OriginWake, WakeTitle: "s-1 is idle", WakeJSON: `{"n":1}`}},
+		{"a queued message", Item{ID: "rt-queued", Kind: KindUserMessage, Text: "status?", Queued: true}},
+		{"a message placed where Claude read it", Item{ID: "rt-placed", Kind: KindUserMessage, Text: "status?", PlacedAfter: 1200}},
 	}
 	for i, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

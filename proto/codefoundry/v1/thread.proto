@@ -193,6 +193,12 @@ message ThreadItem {
   // Still arriving: text and tool input grow through deltas until an update with
   // streaming false.
   bool streaming = 6;
+  // A user message Claude read later than it arrived (it was queued while Claude worked):
+  // the ordinal of the item it is shown after, behind any other message placed there with
+  // a smaller ordinal. 0 for every other item. Order the log by (placed_after or ordinal,
+  // placed, ordinal); the ordinal stays what since/after compare
+  // (docs/notes/orch-queued-placement.md).
+  int64 placed_after = 7;
   oneof payload {
     UserMessageItem user_message = 10;
     AssistantTextItem assistant_text = 11;
@@ -240,6 +246,10 @@ message UserMessageItem {
   // turn: one line starting "[code-foundry] " (docs/notes/orch-child-context.md).
   // Empty for most messages.
   string resume_note = 7;
+  // Claude has the message but has not read it yet: it came while Claude worked, and Claude
+  // reads it at its next tool call or when its reply ends. Once read the flag clears and
+  // the item moves there (ThreadItem.placed_after).
+  bool queued = 8;
 }
 
 // MessageOrigin is who sent a user_message item.

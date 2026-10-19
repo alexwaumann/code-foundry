@@ -50,6 +50,7 @@ import { ThreadMarkdown } from "./Code";
 import { CodeRunContext } from "./codeContext";
 import { KeepRowContext, useThreadCtx } from "./context";
 import { LineageNote } from "./LineageNote";
+import { QueuedTag } from "./QueuedTag";
 import { AgentOpen } from "./AgentOpen";
 import { ToolPathChip } from "./PathChip";
 import { AgentReport, ToolDetail } from "./ToolDetail";
@@ -747,12 +748,12 @@ const WAKE_ICONS: Readonly<Record<WakeTone, { icon: LucideIcon; cls: string; lab
  * note per wake, several when the daemon sent a batch of thread wakes as one message
  * (docs/notes/orch-wakes-content.md).
  */
-function WakeNotes({ wake, atMs }: { wake: WakeView; atMs: number | null }) {
+function WakeNotes({ wake, atMs, queued }: { wake: WakeView; atMs: number | null; queued: boolean }) {
   const lines = useMemo(() => wakeLines(wake), [wake]);
   return (
     <>
       {lines.map((line, i) => (
-        <WakeNoteRow key={i} line={line} atMs={atMs} />
+        <WakeNoteRow key={i} line={line} atMs={atMs} queued={queued && i === 0} />
       ))}
     </>
   );
@@ -762,9 +763,10 @@ function WakeNotes({ wake, atMs }: { wake: WakeView; atMs: number | null }) {
  * A wake drawn as a lineage note instead of a bubble (docs/notes/agents-3-lineage-gui.md):
  * the tone's icon, "Woken by <thread>: idle, finished", the report's summary, the age, and
  * the payload as a JSON block once expanded. The thread's name is a link while it exists
- * (its current name; the payload's otherwise); an action run's name is plain text.
+ * (its current name; the payload's otherwise); an action run's name is plain text. `queued`:
+ * Claude has not read the wake yet (QueuedTag), on a batch's first line only.
  */
-function WakeNoteRow({ line, atMs }: { line: WakeLine; atMs: number | null }) {
+function WakeNoteRow({ line, atMs, queued }: { line: WakeLine; atMs: number | null; queued: boolean }) {
   const exists = useThreadsStore((s) => line.threadId !== "" && line.threadId in s.byId);
   const current = useThreadsStore((s) => (line.threadId ? (s.byId[line.threadId]?.name ?? "") : ""));
   const name = current || line.name;
@@ -810,6 +812,7 @@ function WakeNoteRow({ line, atMs }: { line: WakeLine; atMs: number | null }) {
           </Tip>
         </>
       )}
+      {queued && <QueuedTag />}
     </LineageNote>
   );
 }
@@ -838,9 +841,9 @@ const UserRow = memo(function UserRow({ id, steer }: { id: string; steer?: boole
   const it = useThreadItem(threadId, id);
   if (it?.kind !== "user") return null;
   const msg = it.wake ? (
-    <WakeNotes wake={it.wake} atMs={it.createdAtMs} />
+    <WakeNotes wake={it.wake} atMs={it.createdAtMs} queued={it.queued === true} />
   ) : (
-    <UserBubble text={it.text} composerText={it.composerText} attachments={it.attachments} createdAtMs={it.createdAtMs} steer={steer} />
+    <UserBubble text={it.text} composerText={it.composerText} attachments={it.attachments} createdAtMs={it.createdAtMs} steer={steer} queued={it.queued === true} />
   );
   if (!it.resumeNote) return msg;
   return (

@@ -203,11 +203,12 @@ func (m *Manager) saveItem(id string, it Item) {
 }
 
 // closeUnfinished completes items a run left open: streaming text stays as it is,
-// running tool calls become errors, pending requests are cancelled.
+// running tool calls become errors, pending requests are cancelled, queued messages
+// stay where they are (Claude never read them).
 func closeUnfinished(w itemWriter, why string) {
 	for _, it := range w.log.unfinished() {
 		w.change(it.ID, func(x *Item) {
-			x.Streaming = false
+			x.Streaming, x.Queued = false, false
 			if x.Tool != nil && x.Tool.Status == ToolRunning {
 				x.Tool.Status = ToolError
 				if x.Tool.Output == "" {
@@ -563,9 +564,15 @@ func (r *runner) sendMessage(o *outgoing) (Item, error) {
 	if err := st.conn.Send(ctx, claudestream.UserMessage{UUID: id, Blocks: blocks}); err != nil {
 		return Item{}, fmt.Errorf("%w: send to claude: %v", ErrFailedPrecondition, err)
 	}
+	// Claude reads a message sent while it works at its next tool call (queued.go).
+	queued := st.sd.busy || st.sd.compacting
 	var it Item
 	if o.itemID == "" {
-		it = st.proj.w.add(userItem(id, o))
+		u := userItem(id, o)
+		u.Queued = queued
+		it = st.proj.w.add(u)
+	} else if queued {
+		it, _ = st.proj.w.change(id, func(x *Item) { x.Queued = true })
 	} else {
 		it, _ = st.log.get(id)
 	}

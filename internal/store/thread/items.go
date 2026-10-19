@@ -130,10 +130,18 @@ type Item struct {
 	// ResumeNote: user_message's resume note, the line Claude got before the text after
 	// something other than the user stopped its previous turn (resumenote.go).
 	ResumeNote string
-	Tool       *ToolCall
-	Request    *Request // permission_request and question
-	Turn       *TurnEnd
-	Compaction *Compaction
+	// Queued: a user_message Claude has but has not read yet. A message sent while a turn
+	// runs waits in Claude Code's queue until its next tool call (or the end of the reply);
+	// the item is in the log from its arrival so the send shows at once (queued.go).
+	Queued bool
+	// PlacedAfter: the ordinal of the item a user_message is shown after, set when Claude
+	// read it later than it arrived (queued.go); 0 for every other item. The item keeps its
+	// Ordinal (an agent's since/after still names it); only its place in the log moves.
+	PlacedAfter int64
+	Tool        *ToolCall
+	Request     *Request // permission_request and question
+	Turn        *TurnEnd
+	Compaction  *Compaction
 }
 
 // ToolCall is a tool_call item's payload.
@@ -409,13 +417,13 @@ type threadLog struct {
 
 func newThreadLog(id string, b *bus.Bus, now func() time.Time, items []Item) *threadLog {
 	t := &threadLog{id: id, bus: b, now: now, byID: map[string]int{}, nextOrd: 1}
+	t.items = slices.Clone(items)
 	for _, it := range items {
-		t.byID[it.ID] = len(t.items)
-		t.items = append(t.items, it)
 		if it.Ordinal >= t.nextOrd {
 			t.nextOrd = it.Ordinal + 1
 		}
 	}
+	t.reorderLocked() // a placed message (queued.go) sits after its anchor, not at its ordinal
 	return t
 }
 
@@ -453,7 +461,7 @@ func (t *threadLog) append(it Item) Item {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if i, ok := t.byID[it.ID]; ok {
-		it.Ordinal, it.CreatedAt = t.items[i].Ordinal, t.items[i].CreatedAt
+		it.Ordinal, it.CreatedAt, it.PlacedAfter = t.items[i].Ordinal, t.items[i].CreatedAt, t.items[i].PlacedAfter
 		it.UpdatedAt = t.now()
 		t.items[i] = it
 		t.publishLocked(func(seq uint64) ThreadEvent { return ItemUpdated{ThreadID: t.id, Seq: seq, Item: it} }, it.Kind)
@@ -523,13 +531,14 @@ func (t *threadLog) publishLocked(ev func(seq uint64) ThreadEvent, kind ItemKind
 	}
 }
 
-// open returns the items still streaming or running, and pending requests.
+// unfinished returns the items still streaming or running, pending requests, and
+// messages still queued.
 func (t *threadLog) unfinished() []Item {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	var out []Item
 	for _, it := range t.items {
-		if it.Streaming || (it.Tool != nil && it.Tool.Status == ToolRunning) || (it.Request != nil && it.Request.State == RequestPending) {
+		if it.Streaming || it.Queued || (it.Tool != nil && it.Tool.Status == ToolRunning) || (it.Request != nil && it.Request.State == RequestPending) {
 			out = append(out, it)
 		}
 	}

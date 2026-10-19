@@ -267,7 +267,7 @@ var requestStates = map[thread.RequestState]v1.ThreadRequestState{
 
 // itemToProto maps an item; an unknown kind maps to an item without a payload.
 func itemToProto(it thread.Item) *v1.ThreadItem {
-	p := &v1.ThreadItem{Id: it.ID, Ordinal: it.Ordinal, ParentToolUseId: it.ParentToolUseID, Streaming: it.Streaming}
+	p := &v1.ThreadItem{Id: it.ID, Ordinal: it.Ordinal, ParentToolUseId: it.ParentToolUseID, Streaming: it.Streaming, PlacedAfter: it.PlacedAfter}
 	if !it.CreatedAt.IsZero() {
 		p.CreatedAt = timestamppb.New(it.CreatedAt)
 	}

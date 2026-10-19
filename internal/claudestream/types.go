@@ -156,6 +156,8 @@ type Status struct {
 	PermissionMode string  `json:"permissionMode,omitempty"`
 	CompactResult  string  `json:"compact_result,omitempty"`
 	CompactError   string  `json:"compact_error,omitempty"`
+	// UserMessageUUIDs: on "requesting", the user messages the turn has read so far.
+	UserMessageUUIDs []string `json:"user_message_uuids,omitempty"`
 }
 
 // APIRetry is system/api_retry: an API request failed with a retryable error (a 429,

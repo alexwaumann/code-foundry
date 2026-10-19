@@ -32,7 +32,7 @@ export interface ThreadLog {
   /** The thread's event sequence number the log includes. */
   seq: number;
   byId: Readonly<Record<string, ThreadItemView>>;
-  /** Item ids by ordinal. */
+  /** Item ids in the log's order (itemOrder). */
   order: readonly string[];
   pending: readonly ThreadPendingView[];
   /** The thread's MCP servers as last checked (docs/notes/mcp-panel.md); null: none. */
@@ -111,9 +111,20 @@ function samePending(a: readonly ThreadPendingView[], b: readonly ThreadPendingV
   return sameArray(a, b, (x, y) => x.requestId === y.requestId && x.itemId === y.itemId && x.question === y.question && x.toolName === y.toolName && x.summary === y.summary);
 }
 
+/**
+ * The log's order: by ordinal, except a message Claude read later than it arrived
+ * (placedAfter) sits right after the item it was read after, behind messages placed there
+ * earlier (docs/notes/orch-queued-placement.md).
+ */
+export function itemOrder(a: ThreadItemView, b: ThreadItemView): number {
+  const pa = a.placedAfter ?? 0;
+  const pb = b.placedAfter ?? 0;
+  return (pa || a.ordinal) - (pb || b.ordinal) || Number(pa > 0) - Number(pb > 0) || a.ordinal - b.ordinal || a.id.localeCompare(b.id);
+}
+
 function byOrdinal(byId: Readonly<Record<string, ThreadItemView>>): string[] {
   return Object.values(byId)
-    .sort((a, b) => a.ordinal - b.ordinal || a.id.localeCompare(b.id))
+    .sort(itemOrder)
     .map((it) => it.id);
 }
 
@@ -152,7 +163,7 @@ function putItem(log: ThreadLog, it: ThreadItemView, seq: number): ThreadLog {
   const old = log.byId[it.id];
   if (old && sameItem(old, it)) return { ...log, seq };
   const byId = { ...log.byId, [it.id]: it };
-  const order = old && old.ordinal === it.ordinal ? log.order : byOrdinal(byId);
+  const order = old && old.ordinal === it.ordinal && old.placedAfter === it.placedAfter ? log.order : byOrdinal(byId);
   return { ...log, seq, byId, order };
 }
 
