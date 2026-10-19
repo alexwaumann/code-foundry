@@ -611,11 +611,13 @@ type TerminalReadParams struct {
 
 // TerminalReadResult is terminal/read's answer: the terminal's screen (its rows, not the
 // scrollback above them) as plain text, one line per row, trailing spaces trimmed, no
-// escape sequences. Truncated: only its last MaxBytes, from a line start.
+// escape sequences, no newline after the last line (blank rows below it are dropped).
+// Truncated: only its last MaxBytes, from a line start. Lines is how many lines Text
+// has (0 for none; a host before pluginsdk v0.2.1 sets it with Scrollback only).
 //
 // With Scrollback, Text is the scrollback the terminal kept (its last 10,000 rows by
 // default, the scrollback lines setting) and the screen below it, oldest line first, a
-// soft-wrapped line as one line; Lines is how many lines Text has.
+// soft-wrapped line as one line.
 type TerminalReadResult struct {
 	Text      string `json:"text"`
 	Truncated bool   `json:"truncated,omitempty"`

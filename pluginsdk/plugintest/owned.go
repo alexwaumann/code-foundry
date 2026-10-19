@@ -164,11 +164,12 @@ func (h *Host) handleOwned(_ context.Context, method string, params json.RawMess
 		case max <= 0:
 			max = 64 << 10
 		}
+		text = strings.TrimRight(text, "\n") // as the host: no trailing newline
 		res := pluginsdk.TerminalReadResult{Text: text}
 		if len(text) > max {
 			res.Text, res.Truncated = text[len(text)-max:], true
 		}
-		if p.Scrollback && res.Text != "" {
+		if res.Text != "" {
 			res.Lines = strings.Count(res.Text, "\n") + 1
 		}
 		return res, true, nil

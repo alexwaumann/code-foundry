@@ -23,9 +23,9 @@ func TestReadShell(t *testing.T) {
 		t.Fatalf("first read-shell = %+v, %v", res, err)
 	}
 	h.SetTerminalScrollback("pterm-1", "Sat Oct 18 12:00:00\nSat Oct 18 12:00:02\nSat Oct 18 12:00:04")
-	h.SetTerminalText("pterm-1", "Sat Oct 18 12:00:04")
+	h.SetTerminalText("pterm-1", "Sat Oct 18 12:00:02\nSat Oct 18 12:00:04\n") // a part-filled screen
 	res, err = h.Command(ctx, "read-shell", nil, pluginsdk.UiContext{})
-	if err != nil || !strings.HasPrefix(res.Message, "Clock pterm-1: 3 lines with the scrollback, 1 on the screen\nSat Oct 18 12:00:00\n") {
+	if err != nil || !strings.HasPrefix(res.Message, "Clock pterm-1: 3 lines with the scrollback, 2 on the screen\nSat Oct 18 12:00:00\n") {
 		t.Errorf("read-shell = %+v, %v", res, err)
 	}
 	if reads := h.TerminalReads(); len(reads) != 4 || !reads[2].Scrollback || reads[3].Scrollback {
@@ -44,5 +44,15 @@ func TestReadShellOldHost(t *testing.T) {
 	})
 	if _, err := h.Command(context.Background(), "read-shell", nil, pluginsdk.UiContext{}); err == nil || !strings.Contains(err.Error(), "scrollback") {
 		t.Errorf("err = %v", err)
+	}
+}
+
+// An older host's screen read ends with a newline on a part-filled screen and has no
+// line count: the newline does not count as a line.
+func TestLineCount(t *testing.T) {
+	for text, want := range map[string]int{"": 0, "\n": 0, "a": 1, "a\n": 1, "a\nb": 2, "a\nb\n\n": 2, "a\n\nb": 3} {
+		if got := lineCount(text); got != want {
+			t.Errorf("lineCount(%q) = %d, want %d", text, got, want)
+		}
 	}
 }

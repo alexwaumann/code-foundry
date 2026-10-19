@@ -173,7 +173,9 @@ func (a *actor) terminalList(context.Context, json.RawMessage) (any, error) {
 }
 
 // terminalRead serves terminal/read: the screen's plain text (with scrollback, the
-// scrollback's and the screen's), its end when longer than maxBytes (cut at a line start).
+// scrollback's and the screen's), its end when longer than maxBytes (cut at a line
+// start), and its line count. Neither read ends with a newline: the emulator's screen
+// text has one after the last row with text when rows below it are blank.
 func (a *actor) terminalRead(ctx context.Context, params json.RawMessage) (any, error) {
 	const method = pluginsdk.MethodTerminalRead
 	terms := a.m.opts.Terminals
@@ -196,12 +198,12 @@ func (a *actor) terminalRead(ctx context.Context, params json.RawMessage) (any, 
 	if err != nil {
 		return nil, ownedError(method, err)
 	}
-	text, cut := tailText(text, limit)
+	text, cut := tailText(strings.TrimRight(text, "\n"), limit)
 	for jsonLen(text) > maxReadEncoded {
 		text, cut = tailText(text, len(text)/2)
 	}
 	res := pluginsdk.TerminalReadResult{Text: text, Truncated: cut}
-	if p.Scrollback && text != "" {
+	if text != "" {
 		res.Lines = strings.Count(text, "\n") + 1
 	}
 	return res, nil
