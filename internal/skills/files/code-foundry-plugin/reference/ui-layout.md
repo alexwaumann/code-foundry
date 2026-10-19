@@ -220,7 +220,7 @@ md.MasterDetail.EmptyDetail = &ui.Empty{Title: "No run chosen"}
   `selected` decides), and `detail` nodes while `selected` is `""` (send them with the
   row that shows them). The `select` act carries no `values`.
 - The detail holds any nodes within the depth limit (the master-detail is a container).
-  Form drafts in it are kept per selected row. The hidden side is not drawn, so a thread
+  Form drafts and collapsed sections in it are kept per selected row. The hidden side is not drawn, so a thread
   or terminal in the detail holds no stream while the panel shows the list.
 
 ## tabs (a node's own)
