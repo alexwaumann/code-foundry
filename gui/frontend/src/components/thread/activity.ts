@@ -21,6 +21,8 @@ export interface ThreadActivity {
   working: boolean;
   /** working, lingering 2 s past a stop so the live turn header turns into the finished one in place. */
   timelineWorking: boolean;
+  /** On a turn (timelineWorking, or busy waiting on the user): the open turn's work runs show as strips. */
+  timelineStrips: boolean;
 }
 
 /**
@@ -43,7 +45,7 @@ export function useThreadActivity(threadId: string): ThreadActivity {
   // The status can turn idle before the turn_end arrives on the Watch: the header turns
   // into the finished one in place instead of vanishing and coming back.
   const timelineWorking = useLinger(working, open.length === 0 ? 2000 : 0);
-  return { loaded, empty, catchingUp, watchError: catchingUp ? watch.error : null, open, busy, working, timelineWorking };
+  return { loaded, empty, catchingUp, watchError: catchingUp ? watch.error : null, open, busy, working, timelineWorking, timelineStrips: timelineWorking || busy };
 }
 
 /** An element's height, followed (the floating composer's, for the timeline's bottom inset). */

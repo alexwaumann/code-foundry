@@ -70,7 +70,7 @@ function WatchedThread({ threadId }: { threadId: string }) {
 
 function ThreadBody({ threadId }: { threadId: string }) {
   const cwd = useThreadsStore((s) => s.byId[threadId]?.worktreePath ?? "");
-  const { loaded, empty, catchingUp, watchError, open, busy, working, timelineWorking } = useThreadActivity(threadId);
+  const { loaded, empty, catchingUp, watchError, open, busy, working, timelineWorking, timelineStrips } = useThreadActivity(threadId);
   const dockRef = useRef<HTMLDivElement>(null);
   const dockHeight = useElementHeight(dockRef);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -104,7 +104,7 @@ function ThreadBody({ threadId }: { threadId: string }) {
               No messages yet.
             </p>
           )}
-          <Timeline key={threadId} threadId={threadId} working={timelineWorking} bottomInset={dockHeight} />
+          <Timeline key={threadId} threadId={threadId} working={timelineWorking} strips={timelineStrips} bottomInset={dockHeight} />
           <div className="dock" ref={dockRef}>
             <AgentsStrip threadId={threadId} />
             <ThreadComposer key={threadId} threadId={threadId} pending={open} busy={busy} />

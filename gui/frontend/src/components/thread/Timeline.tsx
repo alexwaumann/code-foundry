@@ -25,6 +25,8 @@ function estimate(r: { type: string } | undefined): number {
       return 64;
     case "header":
       return 28;
+    case "strip":
+      return 26;
     case "system":
       return 46;
     default:
@@ -33,12 +35,12 @@ function estimate(r: { type: string } | undefined): number {
 }
 
 /** The timeline's rows from the items' structure (lib/threadTimeline); text deltas do not rebuild it. */
-function useRows(threadId: string, working: boolean): TimelineRow[] {
+function useRows(threadId: string, working: boolean, strips: boolean): TimelineRow[] {
   const keys = useTimelineKeys(threadId);
   const folds = useTurnFolds(threadId);
   const deferred = useDeferredTurns(threadId);
   const turns = useMemo(() => buildTurns(keys.map(decodeTimelineKey)), [keys]);
-  return useMemo(() => buildRows(turns, { fold: (k) => folds[k], deferred: (e) => deferred[e] === true, working }), [turns, folds, deferred, working]);
+  return useMemo(() => buildRows(turns, { fold: (k) => folds[k], deferred: (e) => deferred[e] === true, working, strips }), [turns, folds, deferred, working, strips]);
 }
 
 /**
@@ -56,12 +58,14 @@ function useRows(threadId: string, working: boolean): TimelineRow[] {
  * the list is pinned again (docs/notes/thread-fold-4-pinned-fold.md). Leaving the thread
  * forgets its fold and expand choices (ThreadPane's WatchedThread): every finished turn is
  * folded on the next visit. A visit to one of its subagent runs is not leaving it.
+ * While the thread is on a turn (`strips`: working, or waiting on the user), that turn's
+ * runs of work show as strip rows (docs/notes/live-tool-strip.md).
  * `bottomInset` is the floating composer's height: the last row scrolls clear of it.
  * Away from the bottom, a "Jump to bottom" chip floats above the composer; it scrolls
  * down and pins the list again.
  */
-export function Timeline({ threadId, working, bottomInset, inset }: { threadId: string; working: boolean; bottomInset: number; inset?: number }) {
-  const rows = useRows(threadId, working);
+export function Timeline({ threadId, working, strips, bottomInset, inset }: { threadId: string; working: boolean; strips: boolean; bottomInset: number; inset?: number }) {
+  const rows = useRows(threadId, working, strips);
   return <TimelineList threadId={threadId} rows={rows} bottomInset={bottomInset} renderRow={renderTimelineRow} turns inset={inset} />;
 }
 
