@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/thread_subscriptions.proto.
  */
 export const file_codefoundry_v1_thread_subscriptions: GenFile = /*@__PURE__*/
-  fileDesc("Ciljb2RlZm91bmRyeS92MS90aHJlYWRfc3Vic2NyaXB0aW9ucy5wcm90bxIOY29kZWZvdW5kcnkudjEimAMKElRocmVhZFN1YnNjcmlwdGlvbhIKCgJpZBgBIAEoCRIcChRzdWJzY3JpYmVyX3RocmVhZF9pZBgCIAEoCRI4CgZ0YXJnZXQYAyABKA4yKC5jb2RlZm91bmRyeS52MS5UaHJlYWRTdWJzY3JpcHRpb25UYXJnZXQSEQoJdGFyZ2V0X2lkGAQgASgJEj4KCWNvbmRpdGlvbhgFIAEoDjIrLmNvZGVmb3VuZHJ5LnYxLlRocmVhZFN1YnNjcmlwdGlvbkNvbmRpdGlvbhIOCgZyZXBlYXQYBiABKAgSLgoKY3JlYXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEwoLZmlyZWRfY291bnQYCCABKAMSMQoNbGFzdF9maXJlZF9hdBgJIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASFwoPc3Vic2NyaWJlcl9uYW1lGAogASgJEhMKC3RhcmdldF9uYW1lGAsgASgJEhUKDXRhcmdldF9zdGF0dXMYDCABKAkitwEKFlN1YnNjcmliZVRocmVhZFJlcXVlc3QSHAoUc3Vic2NyaWJlcl90aHJlYWRfaWQYASABKAkSGAoQdGFyZ2V0X3RocmVhZF9pZBgCIAEoCRIVCg10YXJnZXRfcnVuX2lkGAMgASgJEj4KCWNvbmRpdGlvbhgEIAEoDjIrLmNvZGVmb3VuZHJ5LnYxLlRocmVhZFN1YnNjcmlwdGlvbkNvbmRpdGlvbhIOCgZyZXBlYXQYBSABKAgicwoXU3Vic2NyaWJlVGhyZWFkUmVzcG9uc2USOAoMc3Vic2NyaXB0aW9uGAEgASgLMiIuY29kZWZvdW5kcnkudjEuVGhyZWFkU3Vic2NyaXB0aW9uEg0KBWZpcmVkGAIgASgIEg8KB2V4aXN0ZWQYAyABKAgiggEKGFVuc3Vic2NyaWJlVGhyZWFkUmVxdWVzdBIXCg9zdWJzY3JpcHRpb25faWQYASABKAkSHAoUc3Vic2NyaWJlcl90aHJlYWRfaWQYAiABKAkSGAoQdGFyZ2V0X3RocmVhZF9pZBgDIAEoCRIVCg10YXJnZXRfcnVuX2lkGAQgASgJIlAKGVVuc3Vic2NyaWJlVGhyZWFkUmVzcG9uc2USMwoHcmVtb3ZlZBgBIAMoCzIiLmNvZGVmb3VuZHJ5LnYxLlRocmVhZFN1YnNjcmlwdGlvbiI+Ch5MaXN0VGhyZWFkU3Vic2NyaXB0aW9uc1JlcXVlc3QSHAoUc3Vic2NyaWJlcl90aHJlYWRfaWQYASABKAkiXAofTGlzdFRocmVhZFN1YnNjcmlwdGlvbnNSZXNwb25zZRI5Cg1zdWJzY3JpcHRpb25zGAEgAygLMiIuY29kZWZvdW5kcnkudjEuVGhyZWFkU3Vic2NyaXB0aW9uKpgBChhUaHJlYWRTdWJzY3JpcHRpb25UYXJnZXQSKgomVEhSRUFEX1NVQlNDUklQVElPTl9UQVJHRVRfVU5TUEVDSUZJRUQQABIlCiFUSFJFQURfU1VCU0NSSVBUSU9OX1RBUkdFVF9USFJFQUQQARIpCiVUSFJFQURfU1VCU0NSSVBUSU9OX1RBUkdFVF9BQ1RJT05fUlVOEAIq0QIKG1RocmVhZFN1YnNjcmlwdGlvbkNvbmRpdGlvbhItCilUSFJFQURfU1VCU0NSSVBUSU9OX0NPTkRJVElPTl9VTlNQRUNJRklFRBAAEikKJVRIUkVBRF9TVUJTQ1JJUFRJT05fQ09ORElUSU9OX1NFVFRMRUQQARImCiJUSFJFQURfU1VCU0NSSVBUSU9OX0NPTkRJVElPTl9JRExFEAISKwonVEhSRUFEX1NVQlNDUklQVElPTl9DT05ESVRJT05fQVRURU5USU9OEAMSJwojVEhSRUFEX1NVQlNDUklQVElPTl9DT05ESVRJT05fRVJST1IQBBIuCipUSFJFQURfU1VCU0NSSVBUSU9OX0NPTkRJVElPTl9ESVNDT05ORUNURUQQBRIqCiZUSFJFQURfU1VCU0NSSVBUSU9OX0NPTkRJVElPTl9GSU5JU0hFRBAGQtABChJjb20uY29kZWZvdW5kcnkudjFCGFRocmVhZFN1YnNjcmlwdGlvbnNQcm90b1ABWkdnaXRodWIuY29tL2FsZXh3YXVtYW5uL2NvZGUtZm91bmRyeS9nZW4vZ28vY29kZWZvdW5kcnkvdjE7Y29kZWZvdW5kcnl2MaICA0NYWKoCDkNvZGVmb3VuZHJ5LlYxygIOQ29kZWZvdW5kcnlcVjHiAhpDb2RlZm91bmRyeVxWMVxHUEJNZXRhZGF0YeoCD0NvZGVmb3VuZHJ5OjpWMWIGcHJvdG8z", [file_google_protobuf_timestamp]);
+  fileDesc("Ciljb2RlZm91bmRyeS92MS90aHJlYWRfc3Vic2NyaXB0aW9ucy5wcm90bxIOY29kZWZvdW5kcnkudjEimAMKElRocmVhZFN1YnNjcmlwdGlvbhIKCgJpZBgBIAEoCRIcChRzdWJzY3JpYmVyX3RocmVhZF9pZBgCIAEoCRI4CgZ0YXJnZXQYAyABKA4yKC5jb2RlZm91bmRyeS52MS5UaHJlYWRTdWJzY3JpcHRpb25UYXJnZXQSEQoJdGFyZ2V0X2lkGAQgASgJEj4KCWNvbmRpdGlvbhgFIAEoDjIrLmNvZGVmb3VuZHJ5LnYxLlRocmVhZFN1YnNjcmlwdGlvbkNvbmRpdGlvbhIOCgZyZXBlYXQYBiABKAgSLgoKY3JlYXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEwoLZmlyZWRfY291bnQYCCABKAMSMQoNbGFzdF9maXJlZF9hdBgJIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASFwoPc3Vic2NyaWJlcl9uYW1lGAogASgJEhMKC3RhcmdldF9uYW1lGAsgASgJEhUKDXRhcmdldF9zdGF0dXMYDCABKAki1AEKFlN1YnNjcmliZVRocmVhZFJlcXVlc3QSHAoUc3Vic2NyaWJlcl90aHJlYWRfaWQYASABKAkSGAoQdGFyZ2V0X3RocmVhZF9pZBgCIAEoCRIVCg10YXJnZXRfcnVuX2lkGAMgASgJEhsKE3RhcmdldF9wdWxsX3JlcXVlc3QYBiABKAkSPgoJY29uZGl0aW9uGAQgASgOMisuY29kZWZvdW5kcnkudjEuVGhyZWFkU3Vic2NyaXB0aW9uQ29uZGl0aW9uEg4KBnJlcGVhdBgFIAEoCCJzChdTdWJzY3JpYmVUaHJlYWRSZXNwb25zZRI4CgxzdWJzY3JpcHRpb24YASABKAsyIi5jb2RlZm91bmRyeS52MS5UaHJlYWRTdWJzY3JpcHRpb24SDQoFZmlyZWQYAiABKAgSDwoHZXhpc3RlZBgDIAEoCCKfAQoYVW5zdWJzY3JpYmVUaHJlYWRSZXF1ZXN0EhcKD3N1YnNjcmlwdGlvbl9pZBgBIAEoCRIcChRzdWJzY3JpYmVyX3RocmVhZF9pZBgCIAEoCRIYChB0YXJnZXRfdGhyZWFkX2lkGAMgASgJEhUKDXRhcmdldF9ydW5faWQYBCABKAkSGwoTdGFyZ2V0X3B1bGxfcmVxdWVzdBgFIAEoCSJQChlVbnN1YnNjcmliZVRocmVhZFJlc3BvbnNlEjMKB3JlbW92ZWQYASADKAsyIi5jb2RlZm91bmRyeS52MS5UaHJlYWRTdWJzY3JpcHRpb24iPgoeTGlzdFRocmVhZFN1YnNjcmlwdGlvbnNSZXF1ZXN0EhwKFHN1YnNjcmliZXJfdGhyZWFkX2lkGAEgASgJIlwKH0xpc3RUaHJlYWRTdWJzY3JpcHRpb25zUmVzcG9uc2USOQoNc3Vic2NyaXB0aW9ucxgBIAMoCzIiLmNvZGVmb3VuZHJ5LnYxLlRocmVhZFN1YnNjcmlwdGlvbirFAQoYVGhyZWFkU3Vic2NyaXB0aW9uVGFyZ2V0EioKJlRIUkVBRF9TVUJTQ1JJUFRJT05fVEFSR0VUX1VOU1BFQ0lGSUVEEAASJQohVEhSRUFEX1NVQlNDUklQVElPTl9UQVJHRVRfVEhSRUFEEAESKQolVEhSRUFEX1NVQlNDUklQVElPTl9UQVJHRVRfQUNUSU9OX1JVThACEisKJ1RIUkVBRF9TVUJTQ1JJUFRJT05fVEFSR0VUX1BVTExfUkVRVUVTVBADKpkGChtUaHJlYWRTdWJzY3JpcHRpb25Db25kaXRpb24SLQopVEhSRUFEX1NVQlNDUklQVElPTl9DT05ESVRJT05fVU5TUEVDSUZJRUQQABIpCiVUSFJFQURfU1VCU0NSSVBUSU9OX0NPTkRJVElPTl9TRVRUTEVEEAESJgoiVEhSRUFEX1NVQlNDUklQVElPTl9DT05ESVRJT05fSURMRRACEisKJ1RIUkVBRF9TVUJTQ1JJUFRJT05fQ09ORElUSU9OX0FUVEVOVElPThADEicKI1RIUkVBRF9TVUJTQ1JJUFRJT05fQ09ORElUSU9OX0VSUk9SEAQSLgoqVEhSRUFEX1NVQlNDUklQVElPTl9DT05ESVRJT05fRElTQ09OTkVDVEVEEAUSKgomVEhSRUFEX1NVQlNDUklQVElPTl9DT05ESVRJT05fRklOSVNIRUQQBhItCilUSFJFQURfU1VCU0NSSVBUSU9OX0NPTkRJVElPTl9DSEVDS1NfRE9ORRAHEi8KK1RIUkVBRF9TVUJTQ1JJUFRJT05fQ09ORElUSU9OX0NIRUNLU19GQUlMRUQQCBIvCitUSFJFQURfU1VCU0NSSVBUSU9OX0NPTkRJVElPTl9DSEVDS1NfUEFTU0VEEAkSKAokVEhSRUFEX1NVQlNDUklQVElPTl9DT05ESVRJT05fUkVWSUVXEAoSKQolVEhSRUFEX1NVQlNDUklQVElPTl9DT05ESVRJT05fQ09NTUVOVBALEjIKLlRIUkVBRF9TVUJTQ1JJUFRJT05fQ09ORElUSU9OX1JFVklFV19SRVFVRVNURUQQDBItCilUSFJFQURfU1VCU0NSSVBUSU9OX0NPTkRJVElPTl9IRUFEX1BVU0hFRBANEigKJFRIUkVBRF9TVUJTQ1JJUFRJT05fQ09ORElUSU9OX01FUkdFRBAOEigKJFRIUkVBRF9TVUJTQ1JJUFRJT05fQ09ORElUSU9OX0NMT1NFRBAPEikKJVRIUkVBRF9TVUJTQ1JJUFRJT05fQ09ORElUSU9OX0NIQU5HRUQQEELQAQoSY29tLmNvZGVmb3VuZHJ5LnYxQhhUaHJlYWRTdWJzY3JpcHRpb25zUHJvdG9QAVpHZ2l0aHViLmNvbS9hbGV4d2F1bWFubi9jb2RlLWZvdW5kcnkvZ2VuL2dvL2NvZGVmb3VuZHJ5L3YxO2NvZGVmb3VuZHJ5djGiAgNDWFiqAg5Db2RlZm91bmRyeS5WMcoCDkNvZGVmb3VuZHJ5XFYx4gIaQ29kZWZvdW5kcnlcVjFcR1BCTWV0YWRhdGHqAg9Db2RlZm91bmRyeTo6VjFiBnByb3RvMw", [file_google_protobuf_timestamp]);
 
 /**
  * @generated from message codefoundry.v1.ThreadSubscription
@@ -74,8 +74,8 @@ export type ThreadSubscription = Message<"codefoundry.v1.ThreadSubscription"> & 
   lastFiredAt?: Timestamp | undefined;
 
   /**
-   * The subscriber's and the target's names at read time (a run: its action's name);
-   * empty when unnamed or gone.
+   * The subscriber's and the target's names at read time (a run: its action's name; a
+   * pull request: "owner/name#123 Title"); empty when unnamed or gone.
    *
    * @generated from field: string subscriber_name = 10;
    */
@@ -88,8 +88,9 @@ export type ThreadSubscription = Message<"codefoundry.v1.ThreadSubscription"> & 
 
   /**
    * The target's state at read time, as words: a thread's status and reason
-   * ("needs attention (finished)"), a run's "running" or "exited 3"; "gone" when the
-   * target no longer exists.
+   * ("needs attention (finished)"), a run's "running" or "exited 3", a pull request's
+   * "open · checks pending (2/4) · review required" or "merged" ("not polled yet"
+   * before the GitHub poll saw it); "gone" when the target no longer exists.
    *
    * @generated from field: string target_status = 12;
    */
@@ -115,7 +116,7 @@ export type SubscribeThreadRequest = Message<"codefoundry.v1.SubscribeThreadRequ
   subscriberThreadId: string;
 
   /**
-   * Exactly one target: a thread id or an action run id.
+   * Exactly one target: a thread id, an action run id, or a pull request.
    *
    * @generated from field: string target_thread_id = 2;
    */
@@ -127,8 +128,16 @@ export type SubscribeThreadRequest = Message<"codefoundry.v1.SubscribeThreadRequ
   targetRunId: string;
 
   /**
-   * UNSPECIFIED: SETTLED for a thread, FINISHED for a run. A run takes only FINISHED
-   * (or SETTLED); a thread every condition but FINISHED (INVALID_ARGUMENT otherwise).
+   * "owner/name#123" or a github.com pull request URL.
+   *
+   * @generated from field: string target_pull_request = 6;
+   */
+  targetPullRequest: string;
+
+  /**
+   * UNSPECIFIED: SETTLED for a thread, FINISHED for a run, CHECKS_DONE for a pull
+   * request. A run takes only FINISHED (or SETTLED); a thread SETTLED to DISCONNECTED;
+   * a pull request CHECKS_DONE to CHANGED (INVALID_ARGUMENT otherwise).
    *
    * @generated from field: codefoundry.v1.ThreadSubscriptionCondition condition = 4;
    */
@@ -209,6 +218,11 @@ export type UnsubscribeThreadRequest = Message<"codefoundry.v1.UnsubscribeThread
    * @generated from field: string target_run_id = 4;
    */
   targetRunId: string;
+
+  /**
+   * @generated from field: string target_pull_request = 5;
+   */
+  targetPullRequest: string;
 };
 
 /**
@@ -298,6 +312,15 @@ export enum ThreadSubscriptionTarget {
    * @generated from enum value: THREAD_SUBSCRIPTION_TARGET_ACTION_RUN = 2;
    */
   ACTION_RUN = 2,
+
+  /**
+   * A pull request (target_id is "owner/name#123", the slug in lower case). Kept in
+   * the GitHub poll while subscribed; wakes come with the poll (about a minute with the
+   * app open, up to 15 minutes without).
+   *
+   * @generated from enum value: THREAD_SUBSCRIPTION_TARGET_PULL_REQUEST = 3;
+   */
+  PULL_REQUEST = 3,
 }
 
 /**
@@ -309,13 +332,14 @@ export const ThreadSubscriptionTargetSchema: GenEnum<ThreadSubscriptionTarget> =
 /**
  * ThreadSubscriptionCondition is when a subscription fires: on a transition of the
  * target into it (edge-triggered), and once at subscribe time when the target already
- * meets it.
+ * meets it (for a pull request: the checks conditions, MERGED and CLOSED, as the
+ * GitHub cache has it).
  *
  * @generated from enum codefoundry.v1.ThreadSubscriptionCondition
  */
 export enum ThreadSubscriptionCondition {
   /**
-   * SETTLED for a thread, FINISHED for an action run.
+   * SETTLED for a thread, FINISHED for an action run, CHECKS_DONE for a pull request.
    *
    * @generated from enum value: THREAD_SUBSCRIPTION_CONDITION_UNSPECIFIED = 0;
    */
@@ -363,6 +387,79 @@ export enum ThreadSubscriptionCondition {
    * @generated from enum value: THREAD_SUBSCRIPTION_CONDITION_FINISHED = 6;
    */
   FINISHED = 6,
+
+  /**
+   * Pull request conditions. A poll's changes to one pull request make at most one
+   * wake per subscription, listing every change that matched.
+   * Every check on the head completed, whatever the result.
+   *
+   * @generated from enum value: THREAD_SUBSCRIPTION_CONDITION_CHECKS_DONE = 7;
+   */
+  CHECKS_DONE = 7,
+
+  /**
+   * The check rollup became FAILURE or ERROR (other checks may still run).
+   *
+   * @generated from enum value: THREAD_SUBSCRIPTION_CONDITION_CHECKS_FAILED = 8;
+   */
+  CHECKS_FAILED = 8,
+
+  /**
+   * The check rollup became SUCCESS.
+   *
+   * @generated from enum value: THREAD_SUBSCRIPTION_CONDITION_CHECKS_PASSED = 9;
+   */
+  CHECKS_PASSED = 9,
+
+  /**
+   * A review was submitted, or the review decision changed.
+   *
+   * @generated from enum value: THREAD_SUBSCRIPTION_CONDITION_REVIEW = 10;
+   */
+  REVIEW = 10,
+
+  /**
+   * The comments count rose.
+   *
+   * @generated from enum value: THREAD_SUBSCRIPTION_CONDITION_COMMENT = 11;
+   */
+  COMMENT = 11,
+
+  /**
+   * A review was requested.
+   *
+   * @generated from enum value: THREAD_SUBSCRIPTION_CONDITION_REVIEW_REQUESTED = 12;
+   */
+  REVIEW_REQUESTED = 12,
+
+  /**
+   * The head commit moved (a push).
+   *
+   * @generated from enum value: THREAD_SUBSCRIPTION_CONDITION_HEAD_PUSHED = 13;
+   */
+  HEAD_PUSHED = 13,
+
+  /**
+   * Merged. The subscription goes once it fired, even with repeat; so does every other
+   * subscription to the pull request.
+   *
+   * @generated from enum value: THREAD_SUBSCRIPTION_CONDITION_MERGED = 14;
+   */
+  MERGED = 14,
+
+  /**
+   * Closed without merging. Goes once it fired, even with repeat.
+   *
+   * @generated from enum value: THREAD_SUBSCRIPTION_CONDITION_CLOSED = 15;
+   */
+  CLOSED = 15,
+
+  /**
+   * Any change the poll reports; the wake lists them.
+   *
+   * @generated from enum value: THREAD_SUBSCRIPTION_CONDITION_CHANGED = 16;
+   */
+  CHANGED = 16,
 }
 
 /**
