@@ -159,6 +159,11 @@ type Options struct {
 	// McpPollInterval is how often an unsettled MCP status is asked again (mcp.go
 	// settleMcp). Default 3s.
 	McpPollInterval time.Duration
+	// Attended reports whether the user is looking at the app now (a GUI window is
+	// visible and key). Only then does a viewer acknowledge a thread and see its
+	// until-seen flags; the daemon calls AttendedChanged on each change (attended.go).
+	// Must be safe to call with the store's locks held. Nil means always attended.
+	Attended func() bool
 	// Now is the wall clock: timestamps, snooze validation and wake-ups, idle stops.
 	// Default time.Now.
 	Now func() time.Time

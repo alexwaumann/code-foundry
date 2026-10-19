@@ -669,7 +669,7 @@ func (m *Manager) Items(ctx context.Context, id string) (ItemsSnapshot, error) {
 }
 
 // WatchItems implements Store: it counts a viewer until ctx ends (see
-// runner.acknowledge) and returns the snapshot.
+// runner.acknowledge and attended.go) and returns the snapshot.
 func (m *Manager) WatchItems(ctx context.Context, id string) (ItemsSnapshot, error) {
 	t, err := m.thread(ctx, id)
 	if err != nil {
@@ -689,8 +689,9 @@ func (m *Manager) addViewer(id string, d int) {
 		delete(m.viewers, id)
 	}
 	rec, ok := m.recs[id]
-	if ok && d > 0 && m.seenFlagsLocked(rec) {
-		// The user opened the thread: its until-seen flags are seen (flags.go).
+	if ok && d > 0 && m.attended() && m.seenFlagsLocked(rec) {
+		// The user opened the thread while looking at the app: its until-seen flags are
+		// seen (flags.go). Otherwise they are once presence is attended (attended.go).
 		m.commitLocked(rec, false)
 	}
 	if ok && rec.run != nil {

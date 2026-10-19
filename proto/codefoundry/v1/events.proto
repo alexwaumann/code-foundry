@@ -56,6 +56,11 @@ message WatchEventsRequest {
   string client_id = 5;
   // Whether the client's window is visible now (GUI: document.visibilityState).
   bool visible = 6;
+  // Whether the client's window is key now, so keystrokes go to it (GUI:
+  // document.hasFocus()). A GUI client that is both visible and focused makes the
+  // daemon's presence "attended": only then does an open thread view count as the
+  // user seeing what Claude produces (docs/notes/alerts-foreground.md).
+  bool focused = 7;
 }
 
 enum ClientKind {
@@ -69,7 +74,10 @@ enum ClientKind {
 message SetClientStateRequest {
   // WatchEventsRequest.client_id of an open stream.
   string client_id = 1;
+  // As WatchEventsRequest.visible.
   bool visible = 2;
+  // As WatchEventsRequest.focused.
+  bool focused = 3;
 }
 
 message SetClientStateResponse {}

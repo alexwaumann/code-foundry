@@ -73,7 +73,8 @@ type Flag struct {
 	// Reason is one line, at most MaxFlagReasonRunes.
 	Reason string
 	SetAt  time.Time
-	// UntilSeen clears the flag when the user opens the thread.
+	// UntilSeen clears the flag when the user opens the thread, or, when it was open
+	// while they were away from the app, once they look at the app again (attended.go).
 	UntilSeen bool
 }
 
@@ -124,7 +125,8 @@ func withoutFlags(flags []Flag, drop func(Flag) bool) ([]Flag, bool) {
 // SetFlag raises source's flag on thread id, replacing the one it had, or clears it
 // with FlagNone. changed is false when nothing changed (the same flag again, or nothing
 // to clear). An archived thread refuses a flag (ErrFailedPrecondition); an UntilSeen flag
-// on a thread someone watches is seen at once, so it only clears the source's flag.
+// on a thread someone watches while presence is attended (attended.go) is seen at once,
+// so it only clears the source's flag.
 func (m *Manager) SetFlag(ctx context.Context, id string, f Flag) (t Thread, changed bool, err error) {
 	if f.Source == "" {
 		return Thread{}, false, fmt.Errorf("%w: a flag needs a source", ErrInvalidArgument)
@@ -144,7 +146,7 @@ func (m *Manager) SetFlag(ctx context.Context, id string, f Flag) (t Thread, cha
 		return Thread{}, false, err
 	}
 	i := slices.IndexFunc(rec.s.Flags, func(x Flag) bool { return x.Source == f.Source })
-	seen := f.UntilSeen && m.viewers[id] > 0
+	seen := f.UntilSeen && m.viewers[id] > 0 && m.attended()
 	if f.Level == FlagNone || seen {
 		if i < 0 {
 			return rec.s, false, nil
