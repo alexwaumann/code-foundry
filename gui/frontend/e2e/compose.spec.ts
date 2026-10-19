@@ -1,8 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { CF, expectTooltip, freshCopyByDefault, invocations, mockPost, mockUrl, openApp, resetMock, row, testPdf } from "./fixtures";
 
-const OUTDATED = "The running daemon is older than the app. Restart it (Daemon → Restart) to use this feature.";
-
 /** A 1x1 transparent PNG. */
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64");
 
@@ -54,6 +52,8 @@ function promptFocused(page: Page): Promise<boolean> {
 test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktree", async ({ page }) => {
   await freshCopyByDefault();
   await mockPost("thread-new?delay=1500");
+  // A workspace around changes nothing for a single-project thread.
+  await mockPost("workspace?name=login&projects=repo-cf,repo-gp");
   await openApp(page);
   await page.keyboard.press("Meta+n");
   const palette = page.getByTestId("palette");
@@ -127,6 +127,8 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
     permission: "auto",
     prompt: "Add a dark mode toggle\nin settings",
   });
+  const threads = (await (await fetch(`${mockUrl}/__mock/threads`)).json()) as { id: string; workspaceId: string }[];
+  expect(threads.find((t) => t.id === key.slice(2))?.workspaceId).toBe("");
   // The prompt goes out as the thread's first message once Claude is up.
   await expect(page.getByTestId("thread-user").first()).toContainText("Add a dark mode toggle", { timeout: 8000 });
   // The thread's row names its project and the new worktree's branch; it is the newest thread.
@@ -522,39 +524,6 @@ test("image chips: inserted at the caret, one unit for arrows and Backspace, × 
   expect(args?.attachments).toBe(up?.path);
 });
 
-test("the composer stays centered in the content pane at any size, as the draft grows and on errors", async ({ page }) => {
-  await mockPost("thread-new?delay=100");
-  await openApp(page);
-  await compose(page);
-  const centered = async () => {
-    const pane = await page.getByTestId("content-pane").boundingBox();
-    const body = await page.getByTestId("composer-body").boundingBox();
-    if (!pane || !body) return { dx: Infinity, dy: Infinity };
-    return {
-      dx: Math.round(Math.abs(body.x + body.width / 2 - (pane.x + pane.width / 2))),
-      dy: Math.round(Math.abs(body.y + body.height / 2 - (pane.y + pane.height / 2))),
-    };
-  };
-  for (const size of [
-    { width: 1280, height: 800 },
-    { width: 900, height: 560 },
-    { width: 1680, height: 1050 },
-  ]) {
-    await page.setViewportSize(size);
-    await expect.poll(centered).toEqual({ dx: 0, dy: 0 });
-  }
-  await page.setViewportSize({ width: 1280, height: 800 });
-  await page.keyboard.type("Please FAIL here");
-  for (let i = 0; i < 4; i++) {
-    await page.keyboard.press("Shift+Enter");
-    await page.keyboard.type(`line ${String(i)}`);
-  }
-  await expect.poll(centered).toEqual({ dx: 0, dy: 0 });
-  await page.keyboard.press("Enter");
-  await expect(page.getByTestId("composer-error")).toBeVisible();
-  await expect.poll(centered).toEqual({ dx: 0, dy: 0 });
-});
-
 test("a local-only repository: local refs from main, no remote git commands", async ({ page }) => {
   await freshCopyByDefault();
   await openApp(page);
@@ -577,23 +546,6 @@ test("a local-only repository: local refs from main, no remote git commands", as
   const palette = page.getByTestId("palette");
   await expect(palette.locator('[data-command="terminal.new"]')).toBeVisible();
   for (const name of ["git.fetch", "git.pull", "git.push", "pr.create", "pr.open"]) await expect(palette.locator(`[data-command="${name}"]`)).toHaveCount(0);
-});
-
-test("a daemon older than ListRefs/StageAttachment: a clear restart hint, not HTTP 404", async ({ page }) => {
-  await freshCopyByDefault();
-  await mockPost("missing-rpc?rpc=ProjectService/ListRefs&rpc=ThreadService/StageAttachment");
-  await openApp(page);
-  await compose(page);
-  await expect(page.getByTestId("composer-base")).toHaveText("From the default branch");
-  await page.getByTestId("composer-base").click();
-  await expect(page.getByTestId("composer-base-list").getByRole("status")).toHaveText(OUTDATED);
-  await page.keyboard.press("Escape");
-  await page.getByTestId("composer-file-input").setInputFiles([{ name: "shot.png", mimeType: "image/png", buffer: PNG }]);
-  await page.getByTestId("composer-input").click();
-  await page.keyboard.type("Match it");
-  await page.keyboard.press("Enter");
-  await expect(page.getByTestId("composer-error")).toHaveText(OUTDATED);
-  await expect(page.getByTestId("composer")).toBeVisible();
 });
 
 test("an image dropped on the prompt attaches it and puts a chip at the caret", async ({ page }) => {

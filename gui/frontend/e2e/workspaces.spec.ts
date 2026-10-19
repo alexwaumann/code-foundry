@@ -222,33 +222,6 @@ test("pick a project, add Also in: a new workspace with a cf/<slug> worktree in 
   await expect(page.getByTestId("composer-also-in")).toHaveText("Also in…");
 });
 
-test("with workspaces around, a single-project thread sends exactly what it did before", async ({ page }) => {
-  await freshCopyByDefault();
-  await mockPost("workspace?name=login&projects=repo-cf,repo-gp");
-  await openApp(page);
-  await page.keyboard.press("Meta+n");
-  await page.keyboard.press("Meta+3"); // projects keep cmd+1..9: ghostty-playground
-  await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in ghostty-playground?");
-  // The base is the project's default ref once its refs load (flaked on Chromium when Enter came first).
-  await expect(page.getByTestId("composer-base")).toHaveText("From origin/main");
-  await page.keyboard.type("Port the renderer");
-  await page.keyboard.press("Enter");
-  expect(await lastNewThread()).toEqual({
-    project: "repo-gp",
-    "new-worktree": "true",
-    base: "origin/main",
-    model: "claude-sonnet-5[1m]",
-    effort: "medium",
-    permission: "auto",
-    prompt: "Port the renderer",
-  });
-  const created = page.locator('[data-row-kind="thread"][aria-selected="true"]');
-  await expect(created).toBeVisible();
-  const id = ((await created.getAttribute("data-row-key")) ?? "").slice(2);
-  expect((await threads()).find((s) => s.id === id)?.workspaceId).toBe("");
-  expect(await workspaces()).toHaveLength(1);
-});
-
 test("a workspace removed while its composer is open says so", async ({ page }) => {
   await mockPost("workspace?name=login&projects=repo-cf,repo-gp");
   await openApp(page);

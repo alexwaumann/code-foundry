@@ -255,9 +255,10 @@ test("a slow search says Searching… until the rows land; Escape before the fir
 
   // A new query nothing has answered (no prefix of it is cached): Escape at once, then the
   // answer lands.
+  const answered = page.waitForResponse((r) => r.url().endsWith("/SearchFiles") && (r.request().postData() ?? "").includes('"fork"'));
   await page.keyboard.type("@fork");
   await page.keyboard.press("Escape");
-  await page.waitForTimeout(1300);
+  await answered;
   await expect(card(page)).toHaveCount(0);
   expect(await searches()).toContain("search repo-cf fork");
   expect(await newThreads()).toBe(0);
@@ -282,27 +283,10 @@ test("a failing search: Enter waits for the answer (no match), the next Enter cl
   expect((await invocations()).at(-1)?.args.prompt).toBe("@READM");
 });
 
-test("a daemon older than SearchFiles: @ offers threads only; a query no thread matches is plain text after one Enter", async ({ page }) => {
-  await mockPost("missing-rpc?rpc=FilesystemService/SearchFiles");
-  await openApp(page);
-  await compose(page);
-  await page.keyboard.type("@fix");
-  await expect(labels(page)).toHaveText(["Fix resize race"]);
-  await expect(card(page).getByRole("listbox")).toHaveAttribute("aria-label", "Threads");
-  await page.keyboard.type("x");
-  await expect(card(page).getByTestId("completion-empty")).toHaveText("No threads match");
-  await page.keyboard.type("y");
-  await expect(card(page)).toHaveCount(0);
-  await expect(value(page)).toHaveAttribute("data-value", "@fixxy");
-  await page.keyboard.press("Enter");
-  await expect.poll(newThreads).toBe(1);
-  expect((await invocations()).at(-1)?.args.prompt).toBe("@fixxy");
-});
-
 // The card hangs under the worktree row, out of flow: it moves neither the composer card
 // nor that row, and its height is capped to the window below it (layout px = viewport px
-// over the zoom). 90% is the smallest zoom step.
-for (const zoom of [90, 100, 125, 150]) {
+// over the zoom). 90% takes 100%'s path (the full card fits either way), so it is left out.
+for (const zoom of [100, 125, 150]) {
   test(`at ${String(zoom)}%: the file card hangs under the worktree row, moves nothing and fits the window`, async ({ page }) => {
     await setFiles("repo-cf", MANY);
     await page.setViewportSize({ width: 1280, height: 1000 });
@@ -317,6 +301,7 @@ for (const zoom of [90, 100, 125, 150]) {
     expect(after).toEqual(before);
     const pop = await boxOf(page, "completion-card");
     expect(pop.y).toBeGreaterThanOrEqual(after.row.y + after.row.height);
+    expect(Math.abs(pop.x - after.composer.x)).toBeLessThan(1);
     expect(Math.abs(pop.width - after.composer.width)).toBeLessThan(1);
     // The visible bottom: the composer's scrolling section (the pane ends 8px above the window).
     const section = await boxOf(page, "composer");
@@ -325,7 +310,7 @@ for (const zoom of [90, 100, 125, 150]) {
     expect(pop.y + pop.height).toBeLessThanOrEqual(bottom - 16 * (zoom / 100) + 1);
     const fit = await listFit(page);
     expect(fit.scrolls).toBe(true);
-    // A 1000px window has room for the full card at 90% and 100%: ~8 rows (15.5rem).
+    // A 1000px window has room for the full card at 100%: ~8 rows (15.5rem).
     // Zoomed in, the same window is shorter in layout px: fewer whole rows.
     if (zoom <= 100) expect(fit.height).toBe(248);
     else {

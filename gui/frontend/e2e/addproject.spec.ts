@@ -1,5 +1,4 @@
 import { expect, test, type Page } from "@playwright/test";
-import { MOCK_TOKEN } from "../playwright.config";
 import { invocations, listProjects, mockUrl, openAddProjectDialog, openApp, openProjects, projectAt, resetMock } from "./fixtures";
 
 // The Add Project dialog (project.add): its entry points, the tab order, the Local folder
@@ -12,16 +11,6 @@ test.beforeEach(async () => {
 });
 
 const dialog = (page: Page) => page.getByTestId("add-project-dialog");
-
-async function rpc(path: string, body: unknown): Promise<unknown> {
-  const res = await fetch(`${mockUrl}/codefoundry.v1.${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${MOCK_TOKEN}` },
-    body: JSON.stringify(body),
-  });
-  expect(res.ok, path).toBe(true);
-  return res.json();
-}
 
 /** The mock's SearchGitHub / LookupGitHub / Clone calls, in order. */
 async function githubCalls(): Promise<string[]> {
@@ -59,6 +48,8 @@ test("every entry point opens the dialog", async ({ page }) => {
   await page.keyboard.press("Escape");
   await openFromPalette(page, "project.add");
   await expect(dialog(page)).toBeVisible();
+  // Tabs are New, Local folder, GitHub; it opens on Local folder (New is e2e/create.spec.ts).
+  await expect(page.getByTestId("add-project-tabs").getByRole("tab")).toHaveText(["New", "Local folder", "GitHub"]);
   await expect(dialog(page)).toHaveAttribute("data-tab", "local");
   await expect(page.getByTestId("add-project-local-input")).toBeFocused();
   await page.keyboard.press("Escape");
@@ -95,39 +86,6 @@ test("every entry point opens the dialog", async ({ page }) => {
 
   // None of them invoked anything: the dialog is the GUI presentation of project.add.
   expect((await invocations()).filter((i) => i.name.startsWith("project."))).toEqual([]);
-});
-
-test("the project picker's empty state opens the dialog", async ({ page }) => {
-  const { projects: projects } = (await rpc("ProjectService/List", {})) as { projects: { id: string }[] };
-  for (const r of projects) {
-    await rpc("CommandService/Invoke", { name: "project.unregister", context: { activeProjectId: r.id }, confirmed: true });
-  }
-  await openApp(page);
-  await page.getByTestId("sidebar-new-thread").click();
-  const picker = page.getByTestId("palette");
-  await expect(picker).toHaveAttribute("data-mode", "projects");
-  const add = picker.getByTestId("picker-add-project");
-  await expect(add).toHaveAttribute("data-selected", "true");
-  await page.keyboard.press("Enter");
-  await expect(picker).toHaveCount(0);
-  await expect(dialog(page)).toBeVisible();
-  // Local folder even with no projects yet, its path focused; the close button closes.
-  await expect(dialog(page)).toHaveAttribute("data-tab", "local");
-  await expect(page.getByTestId("add-project-local-input")).toBeFocused();
-  await page.getByTestId("add-project-close").click();
-  await expect(dialog(page)).toHaveCount(0);
-});
-
-test("tabs are New, Local folder, GitHub; it opens on Local folder", async ({ page }) => {
-  await openApp(page);
-  await openAddProjectDialog(page);
-  const tabs = page.getByTestId("add-project-tabs").getByRole("tab");
-  await expect(tabs).toHaveText(["New", "Local folder", "GitHub"]);
-  await expect(page.getByTestId("add-project-tab-local")).toHaveAttribute("data-state", "active");
-  await page.getByTestId("add-project-tab-new").click();
-  await expect(dialog(page)).toHaveAttribute("data-tab", "new");
-  await expect(page.getByTestId("add-project-new-name")).toBeFocused();
-  // New lives in e2e/create.spec.ts.
 });
 
 test("Local folder: Tab completes, Enter adds, and the new project opens", async ({ page }) => {

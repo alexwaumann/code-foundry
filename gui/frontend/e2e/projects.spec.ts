@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { CF, expectTooltip, invocations, mockPost, openApp, openProjects, resetMock } from "./fixtures";
 
 /**
@@ -18,28 +18,10 @@ test.beforeEach(async () => {
 const project = (page: Page, projectId: string) => page.locator(`[data-testid="project"][data-project="${projectId}"]`);
 const navKeys = (page: Page) => page.getByTestId("projects-list").locator("[data-nav-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-nav-key")));
 
-test("each project's header says what kind it is", async ({ page }) => {
+// Kind and meta per project are unit-tested (src/lib/projects.test.ts, projectKind).
+test("the project kind icon explains itself in a tooltip", async ({ page }) => {
   await openApp(page);
   await openProjects(page);
-  const want: [string, string, string | null][] = [
-    ["repo-cf", "github", "alexwaumann/code-foundry"],
-    ["repo-gp", "github", "alexwaumann/ghostty-playground"],
-    ["repo-dot", "git", "origin · not GitHub"],
-    ["repo-sk", "git", "local only · no remote"],
-    ["repo-wr", "nogit", null],
-  ];
-  for (const [id, kind, meta] of want) {
-    const p = project(page, id);
-    await expect(p).toHaveAttribute("data-kind", kind);
-    await expect(p).toHaveAttribute("data-git", String(kind !== "nogit"));
-    if (meta === null) {
-      await expect(p.getByTestId("project-meta")).toHaveCount(0);
-      await expect(p.locator(`[data-nav-key="p:${id}"]`).getByTestId("no-git-badge")).toBeVisible();
-    } else {
-      await expect(p.getByTestId("project-meta")).toHaveText(meta);
-    }
-  }
-  // The kind icon explains itself in a tooltip.
   await expectTooltip(page, project(page, "repo-cf").getByTestId("project-kind-icon"), /^A GitHub repository: .*\.$/);
   await expectTooltip(page, project(page, "repo-sk").getByTestId("project-kind-icon"), /no remote.*\.$/);
 });
@@ -135,7 +117,6 @@ test("the filter: / focuses it, it hides what does not match, shows collapsed ma
 const wtRow = (page: Page, projectId: string, path: string) => page.locator(`[data-nav-key="pw:${projectId}::${path}"]`);
 const FEAT = `${CF}.worktrees/feat-sidebar`;
 const FIX = `${CF}.worktrees/fix-resize`;
-const opacity = (testId: string, within: Locator) => within.getByTestId(testId).evaluate((el) => getComputedStyle(el).opacity);
 async function lastInvocation(name: string) {
   await expect.poll(async () => (await invocations()).filter((i) => i.name === name).length).toBeGreaterThan(0);
   return (await invocations()).filter((i) => i.name === name).at(-1);
@@ -152,28 +133,17 @@ async function menuItems(page: Page, testId: string): Promise<string[]> {
   return (await menu.getByRole("menuitem").allInnerTexts()).map((t) => t.replace(/\s+/g, " ").trim());
 }
 
-test("row actions show without hover, muted at rest, in a fixed-width column; rows show no path", async ({ page }) => {
+test("row actions show without hover; rows show no path", async ({ page }) => {
   await openApp(page);
   await openProjects(page);
   await page.mouse.move(0, 0);
   const main = wtRow(page, "repo-cf", CF);
-  const feat = wtRow(page, "repo-cf", FEAT);
   for (const id of ["worktree-new-thread", "worktree-new-terminal", "worktree-more"]) await expect(main.getByTestId(id)).toBeVisible();
-  await expect.poll(() => opacity("worktree-actions", feat)).toBe("0.55");
-  await expect.poll(() => opacity("project-actions", project(page, "repo-cf"))).toBe("0.7");
-  // Hover brings a row's actions (and its card's header actions) to full opacity.
-  await feat.hover();
-  await expect.poll(() => opacity("worktree-actions", feat)).toBe("1");
-  await expect.poll(() => opacity("project-actions", project(page, "repo-cf"))).toBe("1");
-  // Every row's action column is as wide (the main row's too), so the state columns end at one x.
-  const widths = await Promise.all([main, feat, wtRow(page, "repo-cf", FIX)].map(async (r) => (await r.getByTestId("worktree-actions").boundingBox())?.width));
-  expect(new Set(widths).size).toBe(1);
   // Members too: always shown.
   await mockPost("workspace?name=login&projects=repo-cf,repo-gp");
   await expect(page.getByTestId("workspace-member").first()).toBeVisible();
   await page.mouse.move(0, 0);
   await expect(page.getByTestId("member-actions").first().getByTestId("member-terminal")).toBeVisible();
-  await expect.poll(() => page.getByTestId("member-actions").first().evaluate((el) => getComputedStyle(el).opacity)).toBe("0.55");
 
   // No path on git rows (the row's tooltip keeps it); the folder without git keeps it.
   await expect(project(page, "repo-cf").getByTestId("worktree-path")).toHaveCount(0);

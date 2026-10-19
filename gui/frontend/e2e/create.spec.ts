@@ -218,6 +218,7 @@ test("the overview's Publish to GitHub opens the publish dialog for sketches", a
   await openApp(page);
   await selectProject(page, "repo-sk");
   await expect(page.getByTestId("worktree-surface-title")).toHaveText("sketches@main");
+  await expect(page.getByTestId("no-remote")).toContainText("No remote");
   await page.getByTestId("publish-github").click();
   const pub = page.getByTestId("publish-dialog");
   await expect(pub).toBeVisible();
