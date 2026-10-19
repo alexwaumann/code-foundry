@@ -15,7 +15,7 @@ import (
 
 // The demo surface shows every v1 node kind across six tabs (Overview, Form, Log,
 // Assistant and Shell with the plugin's own thread and terminal, owned.go, and Layout
-// with columns and panes, layout.go):
+// with columns, panes, a grid, dividers, spacers and groups, layout.go):
 // what the GUI's renderer and the mock daemon's fixtures are built against
 // (internal/store/plugin/testdata/hello-demo/). The pinned surface appears only on the
 // threads the demo's Pin button marked (a context fact, hello.pinned). The checks

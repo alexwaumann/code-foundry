@@ -119,11 +119,47 @@ describe("node renderer registry", () => {
     expect(screen.getAllByTestId("plugin-column").map((c) => c.getAttribute("data-key"))).toEqual(["layout-left", "layout-right", "layout-detail-summary"]);
     expect(screen.queryByTestId("plugin-thread")).toBeNull();
     expect(screen.queryByTestId("plugin-thread-gone")).toBeNull();
-    const pane = screen.getByTestId("plugin-pane");
+    const pane = screen.getAllByTestId("plugin-pane")[0];
+    if (!pane) throw new Error("no pane");
     expect([pane.getAttribute("data-key"), pane.style.height, pane.getAttribute("data-fill-box")]).toEqual(["layout-pane", "320px", "true"]);
     expect(pane.querySelector('[data-testid="plugin-log"]')).not.toBeNull();
     expect(pane.querySelectorAll('[data-testid="plugin-row"]')).toHaveLength(3);
-    for (const id of ["plugin-markdown", "plugin-pairs"]) expect(screen.getByTestId(id).closest('[data-key="layout-right"]')).not.toBeNull();
+    for (const id of ["plugin-markdown", "plugin-pairs"]) expect(screen.getAllByTestId(id)[0]?.closest('[data-key="layout-right"]')).not.toBeNull();
+  });
+
+  it("renders the layout tab's grid, dividers, groups and spacers: one column before a width", () => {
+    useThreadsStore.setState({ loaded: true, byId: {}, order: [] });
+    inView(<NodeList nodes={demoView("layout").nodes} box />, { viewTab: "layout" });
+    const grid = screen.getByTestId("plugin-grid");
+    expect([grid.getAttribute("data-key"), grid.getAttribute("data-columns")]).toEqual(["layout-grid", "1"]);
+    const items = screen.getAllByTestId("plugin-grid-item");
+    expect(items.map((i) => i.getAttribute("data-key"))).toEqual(["layout-cell-build", "layout-cell-tests", "layout-cell-cover", "layout-cell-deploy", "layout-cell-notes"]);
+    // Stacked, the span-2 card spans the one column.
+    expect(items.map((i) => i.getAttribute("data-span"))).toEqual(["1", "1", "1", "1", "1"]);
+    for (const i of items) expect(i.querySelector('[data-testid="plugin-section"]')).not.toBeNull();
+    expect(screen.getAllByTestId("plugin-divider").map((d) => [d.getAttribute("data-key"), d.getAttribute("data-label")])).toEqual([
+      ["layout-grid-rule", "Grid"],
+      ["layout-group-rule", "Inline groups"],
+      ["layout-rule", null],
+    ]);
+    const groups = screen.getAllByTestId("plugin-group");
+    expect(groups.map((g) => [g.getAttribute("data-key"), g.getAttribute("data-align"), g.getAttribute("data-wrap")])).toEqual([
+      ["layout-line", "between", "true"],
+      ["layout-steps", "start", "true"],
+      ["layout-push-bar", "end", "true"],
+    ]);
+    const line = groups[0];
+    expect(line?.querySelector('[data-testid="plugin-text"]')?.textContent).toBe("3 of 4 checks passed");
+    expect(line?.querySelectorAll('[data-testid="plugin-button"]')).toHaveLength(2);
+    expect(groups[1]?.querySelector('[data-testid="plugin-chips"]')).not.toBeNull();
+    expect(groups[1]?.querySelector('[data-testid="plugin-progress"]')).not.toBeNull();
+    // The flex spacer is in a px pane's own list, so it grows; the fixed one is 24 px.
+    const spacers = screen.getAllByTestId("plugin-spacer");
+    expect(spacers.map((sp) => [sp.getAttribute("data-key"), sp.getAttribute("data-size"), sp.getAttribute("data-flex")])).toEqual([
+      ["layout-push-spacer", "12", "true"],
+      ["layout-gap", "24", null],
+    ]);
+    expect(spacers[0]?.closest('[data-testid="plugin-pane"]')?.getAttribute("data-key")).toBe("layout-push-pane");
   });
 
   it("says so for a node of a kind it does not know", () => {

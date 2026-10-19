@@ -51,7 +51,7 @@ func withKind(key, k string) Node {
 // pass as a second kind, or fail alone.
 func TestEveryKindIsOneKind(t *testing.T) {
 	kinds := nodeKinds()
-	if len(kinds) != 16 {
+	if len(kinds) != 20 {
 		t.Errorf("%d kinds: %v (a new kind needs its validation, GUI renderer and docs)", len(kinds), kinds)
 	}
 	for _, k := range kinds {
@@ -76,13 +76,21 @@ func TestEveryKindIsOneKind(t *testing.T) {
 }
 
 // containers builds each container kind around one child; every kind whose data holds a
-// []Node (directly or in a slice of structs) must be here.
+// []Node (directly or in a slice of structs) must be here or in lineKinds.
 var containers = map[string]func(key string, child Node) Node{
 	"section": func(key string, child Node) Node { return NewSection(key, "", child) },
 	"columns": func(key string, child Node) Node {
 		return NewColumns(key, NewColumn(key+"-a", child), NewColumn(key+"-b"))
 	},
 	"pane": func(key string, child Node) Node { return NewPane(key, HeightAuto, child) },
+	"grid": func(key string, child Node) Node {
+		return NewGrid(key, NewGridItem(key+"-a", child), NewGridItem(key+"-b"))
+	},
+}
+
+// lineKinds hold nodes but are not containers: their items are leaves at their own depth.
+var lineKinds = map[string]func(key string, leaf Node) Node{
+	"group": func(key string, leaf Node) Node { return NewGroup(key, AlignStart, leaf) },
 }
 
 // holdsNodes reports whether t (a struct) has a []Node field, or a slice of structs that do.
@@ -108,9 +116,12 @@ func TestContainerDepth(t *testing.T) {
 		f := nt.Field(i)
 		if f.Type.Kind() == reflect.Pointer && holdsNodes(f.Type.Elem()) {
 			name, _, _ := strings.Cut(f.Tag.Get("json"), ",")
+			if lineKinds[name] != nil {
+				continue
+			}
 			kinds = append(kinds, name)
 			if containers[name] == nil {
-				t.Errorf("container %s: add it to containers (depth, walks, the GUI's childLists)", name)
+				t.Errorf("container %s: add it to containers or lineKinds (depth, walks, the GUI's childLists)", name)
 			}
 		}
 	}
@@ -134,7 +145,7 @@ func TestContainerDepth(t *testing.T) {
 				t.Errorf("%d %s deep: %v", MaxDepth, k, err)
 			}
 			err := (View{Nodes: []Node{nest(append(at, k))}}).Validate()
-			if err == nil || !strings.Contains(err.Error(), fmt.Sprintf("inside %d containers (section, columns, pane), at most %d", MaxDepth+1, MaxDepth)) {
+			if err == nil || !strings.Contains(err.Error(), fmt.Sprintf("inside %d containers (section, columns, pane, grid), at most %d", MaxDepth+1, MaxDepth)) {
 				t.Errorf("%d %s deep: %v", MaxDepth+1, k, err)
 			}
 			// Children reaches the leaf through every level.
@@ -151,6 +162,21 @@ func TestContainerDepth(t *testing.T) {
 				t.Errorf("Children walked %d levels to %q", levels, n.Key)
 			}
 		})
+	}
+	// A group is no level: one at the deepest container holds its leaves there, and
+	// Children walks into it.
+	for name, line := range lineKinds {
+		at := []string{"section", "grid", "columns", "pane"}
+		n := line("line", NewText("leaf", Plain("x")))
+		for i := len(at) - 1; i >= 0; i-- {
+			n = containers[at[i]](fmt.Sprintf("c%d", i), n)
+		}
+		if err := (View{Nodes: []Node{n}}).Validate(); err != nil {
+			t.Errorf("a %s inside %d containers: %v", name, MaxDepth, err)
+		}
+		if ch := line("line", NewText("leaf", Plain("x"))).Children(); len(ch) != 1 || len(ch[0]) != 1 || ch[0][0].Key != "leaf" {
+			t.Errorf("%s: Children = %v", name, ch)
+		}
 	}
 	// The planned page layout: section > columns > pane > leaf, and one spare level.
 	if err := (View{Nodes: []Node{nest([]string{"section", "columns", "pane", "section"})}}).Validate(); err != nil {
@@ -284,8 +310,8 @@ func TestLayoutJSON(t *testing.T) {
 	}
 }
 
-// The GUI draws columns and the live budget with the numbers the SDK documents
-// (gui/frontend/src/components/plugin/layout.ts, live.ts).
+// The GUI draws columns, grids, spacers, groups and the live budget with the numbers the
+// SDK documents (gui/frontend/src/components/plugin/layout.ts, live.ts).
 func TestLayoutNumbersMatchTheGUI(t *testing.T) {
 	read := func(name string) string {
 		b, err := os.ReadFile("../../gui/frontend/src/components/plugin/" + name)
@@ -305,6 +331,12 @@ func TestLayoutNumbersMatchTheGUI(t *testing.T) {
 		{layout, "COLUMN_MIN_WIDTH", ColumnMinWidth},
 		{layout, "COLUMN_GAP", ColumnGap},
 		{live, "INLINE_LIVE_MAX", MaxLiveNodes},
+		{layout, "GRID_MIN_WIDTH", GridMinWidth},
+		{layout, "GRID_MAX_COLUMNS", MaxGridColumns},
+		{layout, "GRID_GAP", GridGap},
+		{layout, "GRID_MAX_SPAN", MaxGridSpan},
+		{layout, "SPACER_SIZE", SpacerSize},
+		{layout, "GROUP_GAP", GroupGap},
 	} {
 		m := regexp.MustCompile(`export const ` + c.name + ` = (\d+);`).FindStringSubmatch(c.src)
 		if m == nil {
@@ -314,5 +346,11 @@ func TestLayoutNumbersMatchTheGUI(t *testing.T) {
 		if got, _ := strconv.Atoi(m[1]); got != c.want {
 			t.Errorf("the GUI's %s is %d, the SDK's %d", c.name, got, c.want)
 		}
+	}
+	if want := fmt.Sprintf("export const GRID_MIN_WIDTH_RANGE = [%d, %d] as const;", MinGridMinWidth, MaxGridMinWidth); !strings.Contains(layout, want) {
+		t.Errorf("the GUI's grid min width range is not %q", want)
+	}
+	if want := fmt.Sprintf("s >= %d && s <= %d ? s : SPACER_SIZE", MinSpacer, MaxSpacer); !strings.Contains(layout, want) {
+		t.Errorf("the GUI's spacer range is not %q", want)
 	}
 }

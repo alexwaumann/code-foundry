@@ -36,7 +36,8 @@ var surfaceCapabilities = []string{
 	"surfaces", "view.v1", "view.append", "context", "invoke.ask",
 	"view.node.text", "view.node.markdown", "view.node.pairs", "view.node.list", "view.node.chips",
 	"view.node.log", "view.node.actions", "view.node.progress", "view.node.notice", "view.node.empty",
-	"view.node.section", "view.node.form", "view.node.columns", "view.node.pane", "view.tabs", "view.fieldset", "view.optionsSource", "view.duration",
+	"view.node.section", "view.node.form", "view.node.columns", "view.node.pane",
+	"view.node.grid", "view.node.divider", "view.node.spacer", "view.node.group", "view.tabs", "view.fieldset", "view.optionsSource", "view.duration",
 }
 
 // viewUpdate serves view/update: validate, number and install a view.
@@ -242,6 +243,17 @@ func fillLists(v *ui.View) {
 			}
 		case n.Pane != nil && n.Pane.Children == nil:
 			n.Pane.Children = []ui.Node{}
+		case n.Grid != nil:
+			if n.Grid.Items == nil {
+				n.Grid.Items = []ui.GridItem{}
+			}
+			for i := range n.Grid.Items {
+				if n.Grid.Items[i].Children == nil {
+					n.Grid.Items[i].Children = []ui.Node{}
+				}
+			}
+		case n.Group != nil && n.Group.Items == nil:
+			n.Group.Items = []ui.Node{}
 		case n.Form != nil:
 			if n.Form.Fields == nil {
 				n.Form.Fields = []ui.Field{}

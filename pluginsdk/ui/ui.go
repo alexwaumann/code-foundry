@@ -1,8 +1,8 @@
 // Package ui is the typed view model of plugin surfaces: Go structs for every v1 node
 // and value type of the surface schema (header, tabs, text, markdown, pairs, list,
 // chips, log, actions, progress, notice, empty, section, form with fieldsets and option
-// sources, thread, terminal, and the layout containers columns and pane; inline spans
-// with times and durations), builders, and
+// sources, thread, terminal, the layout containers columns, pane and grid, and divider,
+// spacer and the inline group; inline spans with times and durations), builders, and
 // Validate, which checks a view against the host's rules and limits before it leaves
 // the plugin. The code-foundry-plugin skill's reference/primitives.md shows every node
 // as JSON and Go.
@@ -77,12 +77,14 @@ const (
 	GlyphIcon GlyphStyle = "icon"
 )
 
-// Align places an actions bar.
+// Align places an actions bar (start or end) or a group's items (any of the four).
 type Align string
 
 const (
-	AlignStart Align = "start" // the default
-	AlignEnd   Align = "end"
+	AlignStart   Align = "start" // the default
+	AlignEnd     Align = "end"
+	AlignCenter  Align = "center"  // groups only
+	AlignBetween Align = "between" // groups only: the free space between the items
 )
 
 // InputKind is a text input's kind.
@@ -278,10 +280,14 @@ type Node struct {
 	Terminal *Terminal `json:"terminal,omitempty"`
 	Columns  *Columns  `json:"columns,omitempty"`
 	Pane     *Pane     `json:"pane,omitempty"`
+	Grid     *Grid     `json:"grid,omitempty"`
+	Divider  *Divider  `json:"divider,omitempty"`
+	Spacer   *Spacer   `json:"spacer,omitempty"`
+	Group    *Group    `json:"group,omitempty"`
 }
 
-// Children returns the node lists a container node holds (a section's children, each
-// column's, a pane's), in order, and nil for any other node. The lists share n's arrays,
+// Children returns the node lists a node holds (a section's children, each column's, a
+// pane's, each grid item's, a group's items), in order, and nil for any other node. The lists share n's arrays,
 // so a walk can change nodes in place.
 func (n Node) Children() [][]Node {
 	switch {
@@ -295,6 +301,14 @@ func (n Node) Children() [][]Node {
 		return out
 	case n.Pane != nil:
 		return [][]Node{n.Pane.Children}
+	case n.Grid != nil:
+		out := make([][]Node, len(n.Grid.Items))
+		for i, it := range n.Grid.Items {
+			out[i] = it.Children
+		}
+		return out
+	case n.Group != nil:
+		return [][]Node{n.Group.Items}
 	}
 	return nil
 }
@@ -603,6 +617,82 @@ type Pane struct {
 	NoScroll  bool   `json:"noScroll,omitempty"`
 	Children  []Node `json:"children"`
 }
+
+// Grid lays its items out in as many equal columns as fit its own width:
+// max(1, floor((width + GridGap) / (MinWidth + GridGap))), at most MaxGridColumns, GridGap
+// px apart both ways. MinWidth (MinGridMinWidth..MaxGridMinWidth, 0 = GridMinWidth) is
+// the least width of a column. In one column (always in the side panel with the default
+// MinWidth) the items stack in order like the list around the grid. 1 to MaxGridItems
+// items; the columns do not shrink to fewer items, so two items in a wide grid keep a
+// card's width and leave the rest of the row empty.
+type Grid struct {
+	MinWidth int        `json:"minWidth,omitempty"`
+	Items    []GridItem `json:"items"`
+}
+
+// GridItem is one cell: a key (in the view's namespace; it counts as an element), its
+// nodes, and Span (1..MaxGridSpan, 0 = 1) columns, at most the grid's column count. An
+// item's only node stretches to the row's height, so cards in a row line up.
+type GridItem struct {
+	Key      string `json:"key"`
+	Span     int    `json:"span,omitempty"`
+	Children []Node `json:"children"`
+}
+
+// Grids' numbers, which the GUI uses too.
+const (
+	GridMinWidth    = 240 // a column's least width when MinWidth is 0
+	MinGridMinWidth = 160
+	MaxGridMinWidth = 480
+	MaxGridColumns  = 6
+	MaxGridSpan     = 2
+	MaxGridItems    = 24
+	GridGap         = ColumnGap
+)
+
+// Divider is a hairline across its list, or with a Label (one line, at most MaxLabel
+// characters, cut when longer than the width) a hairline either side of a centred
+// small-caps label: to separate groups of nodes without a section.
+type Divider struct {
+	Label string `json:"label,omitempty"`
+}
+
+// Spacer is extra space between its neighbours: Size px (MinSpacer..MaxSpacer, 0 =
+// SpacerSize) on top of the list's own gap. With Flex, in a box (a Pane with a px or fill
+// height, or the surface's scrolling body itself, not a section, column or grid item
+// inside them) it grows to take the box's free height, so the nodes after it sit at the
+// box's bottom (an actions bar under a short list); anywhere else, and when the box has
+// no free height, it is Size px.
+type Spacer struct {
+	Size int  `json:"size,omitempty"`
+	Flex bool `json:"flex,omitempty"`
+}
+
+// Spacers' numbers.
+const (
+	SpacerSize = 12
+	MinSpacer  = 4
+	MaxSpacer  = 64
+)
+
+// Group puts 1 to MaxGroupItems leaf nodes on one line, GroupGap px apart and centred
+// vertically: text, chips, actions and progress, not containers or blocks.
+// Items wrap onto more lines when they do not fit, unless NoWrap (then they shrink and
+// wrap inside themselves). Align places them: AlignStart (the default), AlignCenter,
+// AlignEnd or AlignBetween. A progress item grows to take the free width (at least
+// 160 px). A group is not a container: its items sit at its own depth; they count as
+// nodes (elements) do.
+type Group struct {
+	Items  []Node `json:"items"`
+	Align  Align  `json:"align,omitempty"`
+	NoWrap bool   `json:"noWrap,omitempty"`
+}
+
+// Groups' numbers.
+const (
+	MaxGroupItems = 8
+	GroupGap      = 8
+)
 
 // Height is a thread, terminal or pane node's height: HeightAuto (the zero value),
 // HeightFill or HeightPx(n). It travels as "auto", "fill" or a number of pixels.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { PluginViewModel } from "@/api/plugin";
+import type { PluginViewModel, ViewNode } from "@/api/plugin";
 import { demoView } from "@/test/pluginFixtures";
 import { appendToLog, appendToView, applySurfaceUpdate, draftKeyOf, emptyEntry, formHasErrors, formsOf, LOG_MAX_LINES, reconcileResets, settleSubmits, unknownNodes } from "./pluginSurfaces";
 
@@ -56,6 +56,17 @@ describe("logs", () => {
     expect(out.nodes[2]).toBe(v.nodes[2]);
     expect(v.nodes[1]?.columns?.items[0]?.children[0]?.pane?.children[0]?.log?.lines).toHaveLength(24);
     expect(appendToView(v, "layout-pane", "x", [])).toBe(v);
+  });
+
+  it("finds a log inside a grid item, keeping the other items as they were", () => {
+    const g = (items: { key: string; children: ViewNode[] }[]): ViewNode => ({ key: "g", grid: { items } });
+    const v: PluginViewModel = { nodes: [g([{ key: "a", children: [{ key: "t", text: { content: "x" } }] }, { key: "b", children: [{ key: "l", log: { text: "" } }] }])] };
+    const out = appendToView(v, "l", "x", []);
+    expect(out.nodes[0]?.grid?.items[1]?.children[0]?.log?.text).toBe("x");
+    expect(out.nodes[0]?.grid?.items[0]).toBe(v.nodes[0]?.grid?.items[0]);
+    // A group holds no logs: a key in it is no log.
+    const line: PluginViewModel = { nodes: [{ key: "grp", group: { items: [{ key: "gt", text: { content: "x" } }] } }] };
+    expect(appendToView(line, "gt", "x", [])).toBe(line);
   });
 
   it("finds a log inside a section and leaves the view alone for a key that is no log", () => {
@@ -123,12 +134,14 @@ describe("drafts", () => {
     expect(
       formsOf([{ key: "c", columns: { items: [{ key: "a", children: [form("f1")] }, { key: "b", children: [{ key: "p", pane: { children: [form("f2")] } }] }] } }]).map((f) => f.key),
     ).toEqual(["f1", "f2"]);
+    expect(formsOf([{ key: "g", grid: { items: [{ key: "a", children: [form("f3")] }] } }]).map((f) => f.key)).toEqual(["f3"]);
   });
 
   it("names nodes of kinds this GUI does not know", () => {
     expect(unknownNodes(demoView("overview").nodes)).toEqual([]);
     expect(unknownNodes([{ key: "x" }, { key: "s", section: { children: [{ key: "y" }] } }])).toEqual(["x", "y"]);
     expect(unknownNodes(demoView("layout").nodes)).toEqual([]);
+    expect(unknownNodes([{ key: "g", grid: { items: [{ key: "a", children: [{ key: "y" }] }] } }, { key: "grp", group: { items: [{ key: "z" }] } }])).toEqual(["y", "z"]);
     expect(unknownNodes([{ key: "c", columns: { items: [{ key: "a", children: [] }, { key: "b", children: [{ key: "p", pane: { children: [{ key: "z" }] } }] }] } }])).toEqual(["z"]);
   });
 });

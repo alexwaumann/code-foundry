@@ -225,3 +225,32 @@ func (c Column) WithWidth(px int) Column { c.Width, c.Weight = px, 0; return c }
 func NewPane(key string, height Height, children ...Node) Node {
 	return Node{Key: key, Pane: &Pane{Height: height, Children: children}}
 }
+
+// NewGrid returns a grid of items in as many columns of at least GridMinWidth px as fit
+// (one, stacked, in the side panel); set Grid.MinWidth for narrower or wider columns.
+func NewGrid(key string, items ...GridItem) Node {
+	return Node{Key: key, Grid: &Grid{Items: items}}
+}
+
+// NewGridItem returns a grid item one column wide.
+func NewGridItem(key string, children ...Node) GridItem {
+	return GridItem{Key: key, Children: children}
+}
+
+// WithSpan returns it spanning n columns (1..MaxGridSpan; fewer when the grid has fewer).
+func (it GridItem) WithSpan(n int) GridItem { it.Span = n; return it }
+
+// NewDivider returns a hairline, with a centred label unless label is "".
+func NewDivider(key, label string) Node { return Node{Key: key, Divider: &Divider{Label: label}} }
+
+// NewSpacer returns size px of extra space (0: SpacerSize).
+func NewSpacer(key string, size int) Node { return Node{Key: key, Spacer: &Spacer{Size: size}} }
+
+// NewFlexSpacer returns a spacer that pushes the nodes after it to the bottom of its box
+// (see Spacer).
+func NewFlexSpacer(key string) Node { return Node{Key: key, Spacer: &Spacer{Flex: true}} }
+
+// NewGroup returns text, chips, actions and progress nodes on one wrapping line.
+func NewGroup(key string, align Align, items ...Node) Node {
+	return Node{Key: key, Group: &Group{Items: items, Align: align}}
+}
