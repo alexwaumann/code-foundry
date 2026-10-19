@@ -186,7 +186,7 @@ export function MasterDetailNode({ node, data }: NodeProps<"masterDetail">) {
         </>
       ) : showDetail ? (
         <>
-          <Button variant="ghost" size="xs" className="-ml-2 max-w-full min-w-0 self-start text-muted-foreground hover:text-foreground" onClick={back} data-testid="plugin-md-back" aria-label={`Back to the list from ${detailLabel ?? ""}`}>
+          <Button variant="ghost" size="xs" className="-ml-2 max-w-full min-w-0 self-start text-muted-foreground hover:text-foreground" onClick={back} tabIndex={0} data-testid="plugin-md-back" aria-label={`Back to the list from ${detailLabel ?? ""}`}>
             <ChevronLeft aria-hidden />
             <span className="truncate">{shownRow?.title}</span>
           </Button>

@@ -168,7 +168,6 @@ test("a flex spacer in a strip with a form: what follows sits at the row's end, 
 });
 
 test("a tabs node with eight long titles at the panel's width scrolls its strip, not the surface", async ({ page }) => {
-  test.fail(!process.env.FUZZ_NOFAIL, "BUG tabs-3: the active last tab is cut by the prev chevron that appears after it was scrolled into view");
   await openDemo(page);
   const items = Array.from({ length: 8 }, (_, i) => ({ key: `t${String(i)}`, label: `A long tab title ${String(i)}` }));
   await showView(page, { view: { nodes: [{ key: "tn", tabs: { items, active: "t7", children: [{ key: "c7", text: { content: "seven" } }] } }] } });
@@ -181,8 +180,8 @@ test("a tabs node with eight long titles at the panel's width scrolls its strip,
   const list = await strip.getByRole("tablist").boundingBox();
   const geom = await strip.getByRole("tablist").evaluate((el) => ({ scrollLeft: el.scrollLeft, max: el.scrollWidth - el.clientWidth }));
   test.info().annotations.push({ type: "tabs-3", description: `active ${JSON.stringify(active)} tablist ${JSON.stringify(list)} ${JSON.stringify(geom)}` });
-  // BUG tabs-3 (reported, soft so the rest runs): the prev chevron appears after the active tab was scrolled into view and cuts it.
-  expect.soft(active && list && active.x + active.width <= list.x + list.width + 1, "BUG tabs-3: the active tab is cut at the strip's end").toBe(true);
+  // tabs-3: the prev chevron appears after the active tab was scrolled into view; the tab is scrolled again, not cut.
+  expect(active && list && active.x + active.width <= list.x + list.width + 1, "tabs-3: the active tab is cut at the strip's end").toBe(true);
   // Switch to the first while acts take 300 ms: it reads as active meanwhile; the act names the node.
   await control("__actdelay:300");
   await surface(page).getByTestId("plugin-node-tabs-prev").click();
@@ -409,4 +408,22 @@ test("two flex spacers in one fill pane share its free height; a flex spacer in 
   const bar = await surface(page).locator('[data-testid="plugin-strip-item"][data-key="tbar"]').boundingBox();
   const tb = await surface(page).getByTestId("plugin-toolbar").boundingBox();
   expect(bar && tb && Math.abs(bar.x + bar.width - (tb.x + tb.width - 16)) < 2).toBe(true);
+});
+
+test("live-5: the view's tabs are one tab stop WebKit reaches (it skips plain buttons), arrows move between them", async ({ page }) => {
+  await openDemo(page);
+  await tab(page, "layout").click();
+  await expect(tab(page, "layout")).toHaveAttribute("aria-selected", "true");
+  const search = surface(page).getByTestId("plugin-toolbar").getByTestId("plugin-input");
+  await search.focus();
+  await page.keyboard.press("Shift+Tab");
+  await expect(tab(page, "layout")).toBeFocused();
+  await page.keyboard.press("Home");
+  const first = surface(page).locator('[data-testid="plugin-tab"]').first();
+  await expect(first).toBeFocused();
+  await expect(first).toHaveAttribute("tabindex", "0");
+  // Focus moved without choosing: the plugin's tab is still the active one.
+  await expect(tab(page, "layout")).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("ArrowLeft");
+  await expect(surface(page).locator('[data-testid="plugin-tab"]').last()).toBeFocused();
 });

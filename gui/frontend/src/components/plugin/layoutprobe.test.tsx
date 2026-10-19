@@ -365,7 +365,7 @@ describe("live budget", () => {
 });
 
 describe("tab strip", () => {
-  it.fails("BUG tabs-2: the strip's overflow chevrons are not re-measured when tab labels change but their count does not", () => {
+  it("tabs-2: the strip's overflow chevrons are re-measured when tab labels change but their count does not", () => {
     let wide = false;
     vi.spyOn(HTMLElement.prototype, "scrollWidth", "get").mockImplementation(function (this: HTMLElement) {
       return this.getAttribute("role") === "tablist" ? (wide ? 900 : 200) : 0;
@@ -379,6 +379,37 @@ describe("tab strip", () => {
     wide = true;
     pushView(v("A much longer label for the first tab"));
     expect(screen.getByTestId("plugin-node-tabs").getAttribute("data-overflow-end")).toBe("true");
+  });
+
+  it("live-5: one tab stop (roving tabIndex), arrows wrap, Home and End move focus without choosing; the panel is labelled by its tab", () => {
+    mount(view({ key: "tb", tabs: { items: [{ key: "ta", label: "A" }, { key: "tbb", label: "B" }, { key: "tc", label: "C" }], active: "tbb", children: [{ key: "c", text: { content: "c" } }] } }));
+    const tab = (k: string) => document.querySelector<HTMLElement>(`[data-testid="plugin-node-tab"][data-key="${k}"]`) as HTMLElement;
+    expect(["ta", "tbb", "tc"].map((k) => tab(k).tabIndex)).toEqual([-1, 0, -1]);
+    tab("tbb").focus();
+    fireEvent.keyDown(tab("tbb"), { key: "ArrowRight" });
+    expect(document.activeElement).toBe(tab("tc"));
+    fireEvent.keyDown(tab("tc"), { key: "ArrowRight" });
+    expect(document.activeElement).toBe(tab("ta"));
+    fireEvent.keyDown(tab("ta"), { key: "ArrowLeft" });
+    expect(document.activeElement).toBe(tab("tc"));
+    fireEvent.keyDown(tab("tc"), { key: "Home" });
+    expect(document.activeElement).toBe(tab("ta"));
+    expect(["ta", "tbb", "tc"].map((k) => tab(k).tabIndex)).toEqual([0, -1, -1]);
+    fireEvent.keyDown(tab("ta"), { key: "End" });
+    expect(document.activeElement).toBe(tab("tc"));
+    expect(acts.calls).toEqual([]);
+    const panel = screen.getByTestId("plugin-tabs-panel");
+    expect(tab("tbb").getAttribute("aria-controls")).toBe(panel.id);
+    expect(panel.getAttribute("aria-labelledby")).toBe(tab("tbb").id);
+  });
+
+  it("live-10: a long tab label is cut at the tab's max width (a tooltip shows it whole)", () => {
+    const long = "0-WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW";
+    mount(view({ key: "tb", tabs: { items: [{ key: "ta", label: long }, { key: "tbb", label: "B" }], active: "ta", children: [] } }));
+    const t = document.querySelector<HTMLElement>('[data-testid="plugin-node-tab"][data-key="ta"]') as HTMLElement;
+    expect(t.className).toContain("max-w-[min(16rem,80%)]");
+    expect(t.querySelector("span")?.className).toContain("truncate");
+    expect(t.hasAttribute("data-tip")).toBe(true);
   });
 
   it("an active id that is not a tab selects none and still switches on a click", () => {

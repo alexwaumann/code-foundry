@@ -1,4 +1,4 @@
-import { useContext, useMemo } from "react";
+import { useContext, useId, useMemo } from "react";
 import { nodeScope } from "@/api/plugin";
 import { cn } from "@/lib/utils";
 import { chooseElement, chooserKeyOf, useChoice } from "@/stores/pluginSurfaces";
@@ -8,6 +8,7 @@ import { LeavingNode } from "../live";
 import { NodeList } from "../NodeList";
 import type { NodeProps } from "../registry";
 import { TabStrip } from "../TabStrip";
+import { tabElementId } from "../tabIds";
 
 /**
  * A node's own tab strip over the active tab's nodes (docs/notes/plugins-layout-4-master-detail.md):
@@ -26,13 +27,16 @@ export function TabsNode({ node, data }: NodeProps<"tabs">) {
   const choice = useChoice(ctx.watchKey, chooser);
   // The latest tab clicked, while the plugin's view does not show it yet.
   const switching = choice !== undefined && choice !== data.active && data.items.some((t) => t.key === choice) ? choice : undefined;
+  const idBase = useId();
+  const panelId = `${idBase}-panel`;
+  const shownTab = switching ?? data.active;
   const scope = nodeScope(node);
   const inside = useMemo(() => ({ ...ctx, viewTab: ctx.viewTab + scope }), [ctx, scope]);
   return (
     <div className={cn("flex min-w-0 shrink-0 flex-col", listGap(inner))} data-testid="plugin-tabs-node" data-key={node.key} data-active={data.active} data-switching={switching}>
       <TabStrip
         items={data.items}
-        active={switching ?? data.active}
+        active={shownTab}
         onPick={(key) => void chooseElement(ctx.watchKey, chooser, key)}
         inert={ctx.inert}
         size="sm"
@@ -40,10 +44,18 @@ export function TabsNode({ node, data }: NodeProps<"tabs">) {
         className="flex min-w-0 items-center gap-0.5"
         testId="plugin-node-tabs"
         tabTestId="plugin-node-tab"
+        idBase={idBase}
+        panelId={panelId}
       />
       <ViewContext.Provider value={inside}>
         <LeavingNode.Provider value={leaving || switching !== undefined}>
-          <div className="flex min-w-0 flex-col" role="tabpanel" aria-label={data.items.find((t) => t.key === data.active)?.label} data-testid="plugin-tabs-panel">
+          <div
+            className="flex min-w-0 flex-col"
+            id={panelId}
+            role="tabpanel"
+            aria-labelledby={data.items.some((t) => t.key === shownTab) ? tabElementId(idBase, shownTab) : undefined}
+            data-testid="plugin-tabs-panel"
+          >
             <NodeList nodes={data.children} inner={inner} />
           </div>
         </LeavingNode.Provider>
