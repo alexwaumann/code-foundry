@@ -211,7 +211,7 @@ describe("scoped state", () => {
     expect(document.querySelector<HTMLInputElement>('[data-testid="plugin-input"]')?.value).toBe("one");
   });
 
-  it.fails("BUG scope-1: a section's collapse is per instance and key only: collapsing it in one row's detail collapses it in every row's (and every tab's)", () => {
+  it("scope-1: a section's collapse is scoped like drafts: collapsing it in one row's detail leaves every other row's (and tab's) as it was", () => {
     geo.width = 900;
     const sec = (sel: string) => view(md({ selected: sel }, [{ key: "notes", section: { title: "Notes", collapsible: true, children: [{ key: `n-${sel}`, text: { content: `notes of ${sel}` } }] } }]));
     mount(sec("r1"));
@@ -219,6 +219,8 @@ describe("scoped state", () => {
     expect(screen.getByTestId("plugin-section").getAttribute("data-collapsed")).toBe("true");
     pushView(sec("r2"));
     expect(screen.getByTestId("plugin-section").getAttribute("data-collapsed")).toBeNull();
+    pushView(sec("r1"));
+    expect(screen.getByTestId("plugin-section").getAttribute("data-collapsed")).toBe("true");
   });
 });
 

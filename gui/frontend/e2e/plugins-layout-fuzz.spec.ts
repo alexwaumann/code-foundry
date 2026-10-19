@@ -118,7 +118,6 @@ test("a fill pane follows its top when a section above it folds and unfolds", as
 });
 
 test("a group of eight progress bars with noWrap at the panel's default width", async ({ page }) => {
-  test.fail(!process.env.FUZZ_NOFAIL, "BUG group-1: progress items are shrink-0 with a 160 px basis, so noWrap overflows the panel");
   await openDemo(page);
   await showView(page, { view: { nodes: [{ key: "grp", group: { noWrap: true, items: rows(8, "pg").map((r, i) => ({ key: r.key, progress: { value: i / 8, label: r.title } })) } }] } });
   const grp = surface(page).getByTestId("plugin-group");
@@ -164,6 +163,8 @@ test("a flex spacer in a strip with a form: what follows sits at the row's end, 
   const foot = await surface(page).getByTestId("plugin-footer").boundingBox();
   test.info().annotations.push({ type: "strip-flex", description: `form ${String(f?.width)} px, spacer ${String(s?.width)} px, bar ${String(b?.width)} px, footer ${String(foot?.width)} px` });
   expect(b && foot && Math.abs(b.x + b.width - (foot.x + foot.width - 16)) < 2).toBe(true);
+  // strip-flex: the spacer beside a form keeps about its size; the form has the free width.
+  expect(s && s.width < 20, `spacer ${String(s?.width)} px`).toBe(true);
 });
 
 test("a tabs node with eight long titles at the panel's width scrolls its strip, not the surface", async ({ page }) => {

@@ -6,8 +6,9 @@
  * showing their detail alone, and the acts in flight.
  *
  * Keys: a watch is per panel tab (`watchKey`: panel key + tab id); drafts and collapsed
- * sections are per instance (the daemon's `<plugin>/<surface>/<scope id>`), so a tab that
- * closes and reopens on the same instance finds them again. Nothing here is persisted.
+ * sections are per instance (the daemon's `<plugin>/<surface>/<scope id>`) and scope (view
+ * tab, node tab, selected row: draftKeyOf), so a tab that closes and reopens on the same
+ * instance finds them again. Nothing here is persisted.
  */
 import { create } from "zustand";
 import { toast } from "sonner";
@@ -68,8 +69,11 @@ export interface PluginSurfacesState {
   drafts: Readonly<Record<string, Readonly<Record<string, FieldValue>>>>;
   /** Each form's last resetToken, by draftKey: a new one drops its drafts. */
   resetTokens: Readonly<Record<string, string>>;
-  /** The user's section toggles, by instance then section key (true: collapsed). */
-  collapsed: Readonly<Record<string, Readonly<Record<string, boolean>>>>;
+  /**
+   * The user's section toggles (true: collapsed), by draftKeyOf(instance, scope, section
+   * key): per view tab, node tab and selected row, like drafts.
+   */
+  collapsed: Readonly<Record<string, boolean>>;
   /** Elements whose act or command is in flight, by watch key then element key. */
   pending: Readonly<Record<string, Readonly<Record<string, true>>>>;
   /**
@@ -646,13 +650,13 @@ export function useDraft(draftKey: string, name: string): FieldValue | undefined
   return usePluginSurfacesStore((s) => s.drafts[draftKey]?.[name]);
 }
 
-/** The user's collapse toggle of a section (undefined: the plugin's initial state). */
-export function useCollapsed(instance: string, sectionKey: string): boolean | undefined {
-  return usePluginSurfacesStore((s) => s.collapsed[instance]?.[sectionKey]);
+/** The user's collapse toggle of a section, by draftKeyOf(instance, scope, section key) (undefined: the plugin's initial state). */
+export function useCollapsed(sectionKey: string): boolean | undefined {
+  return usePluginSurfacesStore((s) => s.collapsed[sectionKey]);
 }
 
-export function setCollapsed(instance: string, sectionKey: string, collapsed: boolean): void {
-  usePluginSurfacesStore.setState((s) => ({ collapsed: { ...s.collapsed, [instance]: { ...s.collapsed[instance], [sectionKey]: collapsed } } }));
+export function setCollapsed(sectionKey: string, collapsed: boolean): void {
+  usePluginSurfacesStore.setState((s) => ({ collapsed: { ...s.collapsed, [sectionKey]: collapsed } }));
 }
 
 /** Whether a master-detail (by draftKeyOf(instance, scope, node key)) shows its detail alone in the narrow layout. */

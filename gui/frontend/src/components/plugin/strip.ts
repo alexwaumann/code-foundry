@@ -24,12 +24,14 @@ export function useInStrip(): StripSlot | null {
 
 /**
  * How a node sits in the strip's row: a form (a search field, filters) and a progress bar
- * take the free width, an end-aligned actions bar goes to the row's end, a flex spacer takes
- * the free width (pushing what follows to the end), a group not aligned to the start takes
- * the free width to align in, and text, chips, dividers and fixed spacers are as wide as
- * their content.
+ * take the free width, an end-aligned actions bar goes to the row's end, a flex spacer
+ * pushes what follows to the row's end (it takes the free width when nothing else in the
+ * row grows; beside a form, a progress bar or a group that grows it takes next to none,
+ * so they keep theirs), a group not aligned to the start takes the free width to align in,
+ * and text, chips, dividers and fixed spacers are as wide as their content. `row`: the
+ * strip's nodes.
  */
-export function stripItemClass(n: ViewNode): string {
+export function stripItemClass(n: ViewNode, row: readonly ViewNode[] = [n]): string {
   switch (nodeKind(n)) {
     case "form":
       return "min-w-40 flex-1";
@@ -38,12 +40,27 @@ export function stripItemClass(n: ViewNode): string {
     case "actions":
       return n.actions?.align === "end" ? "ml-auto min-w-0" : "min-w-0";
     case "spacer":
-      return n.spacer?.flex ? "flex-1" : "shrink-0";
+      if (!n.spacer?.flex) return "shrink-0";
+      // A grow of 0.001 beside a grower: the sum stays over 1, so the free width is all taken.
+      return row.some((o) => o !== n && grows(o)) ? "shrink-0 grow-[0.001] basis-0" : "flex-1";
     case "divider":
       return "flex shrink-0 items-center";
     case "group":
       return (n.group?.align ?? "start") === "start" ? "min-w-0" : "min-w-0 flex-1";
     default:
       return "min-w-0";
+  }
+}
+
+/** Whether a strip node takes the free width (stripItemClass's flex-1 kinds other than a spacer). */
+function grows(n: ViewNode): boolean {
+  switch (nodeKind(n)) {
+    case "form":
+    case "progress":
+      return true;
+    case "group":
+      return (n.group?.align ?? "start") !== "start";
+    default:
+      return false;
   }
 }

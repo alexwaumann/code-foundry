@@ -1,6 +1,6 @@
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { setCollapsed, useCollapsed } from "@/stores/pluginSurfaces";
+import { draftKeyOf, setCollapsed, useCollapsed } from "@/stores/pluginSurfaces";
 import { useViewCtx } from "../context";
 import { NodeList } from "../NodeList";
 import { ButtonBar, InlineView, PillView } from "../parts";
@@ -9,12 +9,14 @@ import { toneBorder } from "../tones";
 
 /**
  * Nodes under a title, optionally a card (MCP's box, tone border), collapsible (the whole
- * title row toggles; the user's toggle wins for the instance's life) or stale (last known
+ * title row toggles; the user's toggle wins for the instance's life, per view tab, node tab
+ * and selected row like drafts: stores/pluginSurfaces draftKeyOf) or stale (last known
  * data: dimmed, spinners stopped).
  */
 export function SectionNode({ node, data }: NodeProps<"section">) {
-  const { instance } = useViewCtx();
-  const toggled = useCollapsed(instance, node.key);
+  const { instance, viewTab } = useViewCtx();
+  const toggleKey = draftKeyOf(instance, viewTab, node.key);
+  const toggled = useCollapsed(toggleKey);
   const collapsible = data.collapsible ?? false;
   const collapsed = collapsible && (toggled ?? data.collapsed ?? false);
   const titleClass = cn("min-w-0 truncate text-overline", data.tone === "attention" && "text-warning", data.tone === "error" && "text-destructive");
@@ -43,7 +45,7 @@ export function SectionNode({ node, data }: NodeProps<"section">) {
               aria-expanded={!collapsed}
               className="-ml-0.5 flex min-w-0 flex-1 items-center gap-1.5 rounded-sm text-left outline-none focus-visible:ring-1 focus-visible:ring-ring"
               onClick={() => {
-                setCollapsed(instance, node.key, !collapsed);
+                setCollapsed(toggleKey, !collapsed);
               }}
               data-testid="plugin-section-toggle"
             >

@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { NODE_KINDS, type ViewNode } from "@/api/plugin";
 import { emptyContext } from "@/stores/context";
 import type { ThreadView } from "@/api/threads";
-import { usePluginSurfacesStore } from "@/stores/pluginSurfaces";
+import { draftKeyOf, usePluginSurfacesStore } from "@/stores/pluginSurfaces";
 import { useTerminalsStore } from "@/stores/terminals";
 import { useThreadsStore } from "@/stores/threads";
 import { demoView } from "@/test/pluginFixtures";
@@ -42,13 +42,13 @@ describe("node renderer registry", () => {
     expect(document.querySelector('[data-key="stale"][data-stale="true"]')).not.toBeNull();
   });
 
-  it("collapses a section on the host, per instance", () => {
+  it("collapses a section on the host, per instance and view tab", () => {
     inView(<NodeList nodes={demoView("overview").nodes} />);
     const section = document.querySelector('[data-testid="plugin-section"][data-key="more"]');
     const toggle = section?.querySelector('[data-testid="plugin-section-toggle"]');
     if (!toggle) throw new Error("no toggle");
     fireEvent.click(toggle);
-    expect(usePluginSurfacesStore.getState().collapsed[ctx.instance]?.more).toBe(true);
+    expect(usePluginSurfacesStore.getState().collapsed[draftKeyOf(ctx.instance, ctx.viewTab, "more")]).toBe(true);
     expect(section?.getAttribute("data-collapsed")).toBe("true");
   });
 
