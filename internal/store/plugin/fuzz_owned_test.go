@@ -44,6 +44,8 @@ func FuzzOwnedParams(f *testing.F) {
 	f.Add([]byte(`{"title":"  ","cwd":"/etc"}`), []byte(`{"argv":["", "x\u0000"]}`))
 	f.Add([]byte(`{"title":"x","cwd":"~/../.."}`), []byte(`{"argv":["sh"],"cwd":"~/w/../../.."}`))
 	f.Add([]byte(`{"title":"x","projectId":"p"}`), []byte(`{"argv":["sh"]}`))
+	f.Add([]byte(`{"title":"x","permissionMode":" auto "}`), []byte(`{"argv":["sh"]}`))
+	f.Add([]byte(`{"title":"x","permissionMode":"bypassPermissions"}`), []byte(`{"argv":["sh"]}`))
 	home := f.TempDir()
 	if err := os.Mkdir(filepath.Join(home, "w"), 0o700); err != nil {
 		f.Fatal(err)
@@ -75,6 +77,9 @@ func FuzzOwnedParams(f *testing.F) {
 			}
 			if s.Title == "" || strings.ContainsAny(s.Title, "\r\n\x00") || len(s.Title) > maxThreadTitle || !utf8.ValidString(s.Title) {
 				t.Fatalf("title %q", s.Title)
+			}
+			if s.PermissionMode != "" && !slices.Contains(permissionModes, s.PermissionMode) {
+				t.Fatalf("permission mode %q", s.PermissionMode)
 			}
 			if len(s.Prompt) > MaxThreadMessage {
 				t.Fatalf("prompt of %d bytes", len(s.Prompt))

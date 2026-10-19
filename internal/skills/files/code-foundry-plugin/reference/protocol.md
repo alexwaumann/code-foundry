@@ -104,7 +104,7 @@ first view first. An error from the factory or from `Act` is shown to the user
 | `events/subscribe` | request | `{sources}` → `{subscription}` | `Subscribe` | `events` |
 | `events/unsubscribe` | request | `{subscription}` → `{}` | `Unsubscribe` | |
 | `session/setEnvironment` | request | `{env, pathPrepend, addDirs, scope}` → `{applied, issues}` | `SetEnvironment` | `sessionEnv` |
-| `thread/create` | request | `{title, cwd, projectId, addDirs, env, model, effort, prompt}` → `{threadId}` | `CreateThread` | `threads` |
+| `thread/create` | request | `{title, cwd, projectId, addDirs, env, model, effort, permissionMode, prompt}` → `{threadId}` | `CreateThread` | `threads` |
 | `thread/send` / `archive` / `list` | request | `{threadId, text}`; `{threadId}`; `{}` → `{threads: [PluginThread]}` | `SendThread`, `ArchiveThread`, `Threads` | `threads` |
 | `terminal/create` | request | `{argv, cwd, env, title}` → `{terminalId}` | `CreateTerminal` | `terminals` |
 | `terminal/close` / `list` | request | `{terminalId}`; `{}` → `{terminals: [PluginTerminal]}` | `CloseTerminal`, `Terminals` | `terminals` |

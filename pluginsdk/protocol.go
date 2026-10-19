@@ -518,9 +518,21 @@ type ThreadCreateParams struct {
 	// threads.default_effort).
 	Model  string `json:"model,omitempty"`
 	Effort string `json:"effort,omitempty"`
+	// PermissionMode is PermissionModeSupervised (confirm every tool call),
+	// PermissionModeAcceptEdits (file edits allowed) or PermissionModeAuto (Claude's auto
+	// mode): thread.new's --permission values. Default: Claude's own default, which asks
+	// like supervised (no setting picks another). Full access is not offered.
+	PermissionMode string `json:"permissionMode,omitempty"`
 	// Prompt, when set, is the thread's first message.
 	Prompt string `json:"prompt,omitempty"`
 }
+
+// ThreadCreateParams.PermissionMode values.
+const (
+	PermissionModeSupervised  = "supervised"
+	PermissionModeAcceptEdits = "accept-edits"
+	PermissionModeAuto        = "auto"
+)
 
 // ThreadCreateResult is thread/create's answer.
 type ThreadCreateResult struct {

@@ -44,6 +44,9 @@ func TestOwnedThreadsTerminalsAndActContext(t *testing.T) {
 		t.Fatalf("SendThread: %v", err)
 	}
 	var perr *pluginsdk.Error
+	if _, err := host.CreateThread(ctx, pluginsdk.ThreadCreateParams{Title: "x", PermissionMode: "acceptEdits"}); !errors.As(err, &perr) || perr.Code != pluginsdk.CodeInvalidParams {
+		t.Fatalf("CreateThread with Claude's mode name: %v", err)
+	}
 	if err := host.SendThread(ctx, "s-users", "x"); !errors.As(err, &perr) || perr.Code != pluginsdk.CodeNotFound {
 		t.Fatalf("SendThread to another thread: %v", err)
 	}
