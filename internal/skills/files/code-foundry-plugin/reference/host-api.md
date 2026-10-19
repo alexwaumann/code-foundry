@@ -91,6 +91,19 @@ err = h.SetFlag(ctx, pluginsdk.Flag{ThreadID: id, Level: pluginsdk.FlagNone}) //
   Disabling the plugin or archiving the thread clears them. `code-foundry thread flags
   <id>` shows them.
 
+**Choosing a flag mode** is the plugin's call; make it on purpose. `UntilSeen` suits a
+one-off event the user only needs to notice (a CI run failed, a deploy finished): opening
+the thread is the acknowledgement. Sticky (`UntilSeen: false`) suits a condition that
+lasts until something changes (tests failing, a pull request blocked) and that the plugin
+will clear itself (`FlagNone`) when it ends. A sticky flag must leave the user a visible
+way out, because a plugin's quirk can keep it up for good: a clear command (a manifest
+command, so the palette and CLI have it, with its button in the surface) or a line in the
+surface saying the header chip's × or `code-foundry thread flag clear <id> --plugin
+<name>` removes it. A user's clear is not reported to the plugin (a `threads`
+subscription sees it leave `Thread.flags`), so remember the condition you flagged, not
+whether the flag is up, and never raise it again until the condition changes (a different
+set of failing tests, a new run that fails).
+
 ## SetContext: facts for when clauses
 
 ```go

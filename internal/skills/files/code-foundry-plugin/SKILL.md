@@ -83,19 +83,19 @@ showcase` (once `plugins.registries` is configured) and read the matching file.
 - Colour means status: `attention` (amber) needs the user, `error` (red) failed, `ok`
   (emerald) only in pills and glyphs. Choose a status or tone, never a colour (no identity colour).
 - **Actions as commands first.** Whatever a user can do is a manifest command (palette,
-  CLI and agents get it too); the view's button runs it (`ui.CommandButton`). Events
-  (`ui.EventButton`) are for what only makes sense in the view: tabs, form submits,
-  selecting a row.
+  CLI, agents); the view's button runs it (`ui.CommandButton`). Events (`ui.EventButton`)
+  are for what only makes sense in the view: tabs, form submits, selecting a row.
 - Remote or side-effecting runs (cancel or rerun CI, deploy, delete what the user cannot
   get back, sign out) are commands with `confirm` text: the host asks. Local work that is
   cheap to redo (stop or rerun a local test run, hide a row) needs no confirm; give a
   stop button the `destructive` style anyway. Icons: `reference/manifest.md`.
+- **Flags**: until-seen for one-off events; sticky for conditions the plugin clears, with a
+  visible way out, never re-raised after a user's clear (`reference/host-api.md`).
 - **Secrets** never appear in a view, a log line, a command arg or argv: a form's secret
   input with `store` puts one in the Keychain, `h.Secrets().Get` reads it, views show `hasValue`.
 - Nothing is revealed on hover; tooltips exist only on icon-only buttons. Let the host
-  tick times (`ui.At`, `ui.For` spans) instead of re-sending views each second; stream
-  output into a log node with `h.AppendLog`; mark last-known data `stale` when the
-  backend is down.
+  tick times (`ui.At`, `ui.For` spans), not re-send views each second; stream output
+  into a log node with `h.AppendLog`; mark last-known data `stale` when the backend is down.
 
 ## Good to know
 
