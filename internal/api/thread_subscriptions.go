@@ -32,12 +32,15 @@ var subscriptionConditions = map[v1.ThreadSubscriptionCondition]thread.Condition
 	v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_MERGED:           thread.CondMerged,
 	v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_CLOSED:           thread.CondClosed,
 	v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_CHANGED:          thread.CondChanged,
+	// Plugin wake sources (docs/notes/plugins-wake-sources.md).
+	v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_FIRED: thread.CondFired,
 }
 
 var subscriptionTargets = map[thread.TargetKind]v1.ThreadSubscriptionTarget{
 	thread.TargetThread:      v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_THREAD,
 	thread.TargetActionRun:   v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_ACTION_RUN,
 	thread.TargetPullRequest: v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_PULL_REQUEST,
+	thread.TargetPlugin:      v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_PLUGIN,
 }
 
 // subscriptionToProto maps a subscription.
@@ -45,7 +48,7 @@ func subscriptionToProto(s thread.Subscription) *v1.ThreadSubscription {
 	p := &v1.ThreadSubscription{
 		Id: s.ID, SubscriberThreadId: s.SubscriberID, Target: subscriptionTargets[s.TargetKind], TargetId: s.TargetID,
 		Repeat: s.Repeat, FiredCount: int64(s.FiredCount),
-		SubscriberName: s.SubscriberName, TargetName: s.TargetName, TargetStatus: s.TargetStatus,
+		SubscriberName: s.SubscriberName, TargetName: s.TargetName, TargetStatus: s.TargetStatus, Args: s.Args,
 	}
 	for v, c := range subscriptionConditions {
 		if c == s.Condition {
@@ -76,7 +79,8 @@ func (h *Thread) Subscribe(ctx context.Context, req *connect.Request[v1.Subscrib
 	m := req.Msg
 	res, err := h.store.Subscribe(ctx, thread.SubscribeOptions{
 		SubscriberID: m.GetSubscriberThreadId(), TargetThreadID: m.GetTargetThreadId(), TargetRunID: m.GetTargetRunId(),
-		TargetPullRequest: m.GetTargetPullRequest(), Condition: subscriptionConditions[m.GetCondition()], Repeat: m.GetRepeat(),
+		TargetPullRequest: m.GetTargetPullRequest(), TargetPlugin: m.GetTargetPlugin(), Args: m.GetArgs(),
+		Condition: subscriptionConditions[m.GetCondition()], Repeat: m.GetRepeat(),
 	})
 	if err != nil {
 		return nil, threadError(err)
@@ -91,7 +95,7 @@ func (h *Thread) Unsubscribe(ctx context.Context, req *connect.Request[v1.Unsubs
 	m := req.Msg
 	gone, err := h.store.Unsubscribe(ctx, thread.UnsubscribeOptions{
 		ID: m.GetSubscriptionId(), SubscriberID: m.GetSubscriberThreadId(), TargetThreadID: m.GetTargetThreadId(), TargetRunID: m.GetTargetRunId(),
-		TargetPullRequest: m.GetTargetPullRequest(),
+		TargetPullRequest: m.GetTargetPullRequest(), TargetPlugin: m.GetTargetPlugin(),
 	})
 	if err != nil {
 		return nil, threadError(err)
