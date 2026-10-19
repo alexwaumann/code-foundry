@@ -57,6 +57,9 @@ message ArgSpec {
   // The CLI reads the value from a file when it is @<path>, or from stdin when it is -
   // (thread.report's data).
   bool file_or_stdin = 10;
+  // The CLI takes the flag more than once and sends the values joined by newlines
+  // (thread.subscribe's --arg k=v).
+  bool repeatable = 11;
 }
 
 message Command {

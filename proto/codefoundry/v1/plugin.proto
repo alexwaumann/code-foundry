@@ -195,6 +195,37 @@ message Plugin {
   string update_version = 29;
   // The URL of the registry listing it.
   string update_registry = 30;
+  // The manifest's wake sources: events a thread subscribes to with `thread subscribe
+  // --plugin <plugin>/<source>` (docs/notes/plugins-wake-sources.md).
+  repeated PluginWake wakes = 31;
+}
+
+// PluginWake is one manifest wake source.
+message PluginWake {
+  // The source's name; a subscription's target is "<plugin>/<name>".
+  string name = 1;
+  string title = 2;
+  string description = 3;
+  // global, thread, pr or project: what one subscription is about.
+  string scope = 4;
+  repeated PluginWakeArg args = 5;
+  // The shortest subscribe command line: required args without a context as
+  // --arg name=<name>, the rest left to their defaults.
+  string subscribe_line = 6;
+}
+
+// PluginWakeArg is one argument of a wake source.
+message PluginWakeArg {
+  string name = 1;
+  // string, int, bool, enum or duration.
+  string type = 2;
+  string description = 3;
+  bool required = 4;
+  repeated string enum_values = 5;
+  string default_value = 6;
+  // thread, pr or project: the value defaults to the subscribing thread's (its id, its
+  // pull request as owner/name#123, its project's id). Empty for none.
+  string context = 7;
 }
 
 message ListPluginsRequest {

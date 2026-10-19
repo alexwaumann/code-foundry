@@ -187,7 +187,10 @@ type ArgSpec struct {
 	DefaultToThreadEnv bool `protobuf:"varint,9,opt,name=default_to_thread_env,json=defaultToThreadEnv,proto3" json:"default_to_thread_env,omitempty"`
 	// The CLI reads the value from a file when it is @<path>, or from stdin when it is -
 	// (thread.report's data).
-	FileOrStdin   bool `protobuf:"varint,10,opt,name=file_or_stdin,json=fileOrStdin,proto3" json:"file_or_stdin,omitempty"`
+	FileOrStdin bool `protobuf:"varint,10,opt,name=file_or_stdin,json=fileOrStdin,proto3" json:"file_or_stdin,omitempty"`
+	// The CLI takes the flag more than once and sends the values joined by newlines
+	// (thread.subscribe's --arg k=v).
+	Repeatable    bool `protobuf:"varint,11,opt,name=repeatable,proto3" json:"repeatable,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -288,6 +291,13 @@ func (x *ArgSpec) GetDefaultToThreadEnv() bool {
 func (x *ArgSpec) GetFileOrStdin() bool {
 	if x != nil {
 		return x.FileOrStdin
+	}
+	return false
+}
+
+func (x *ArgSpec) GetRepeatable() bool {
+	if x != nil {
+		return x.Repeatable
 	}
 	return false
 }
@@ -752,7 +762,7 @@ const file_codefoundry_v1_command_proto_rawDesc = "" +
 	"\x14active_worktree_path\x18\x04 \x01(\tR\x12activeWorktreePath\x12\x1f\n" +
 	"\vactive_view\x18\x05 \x01(\tR\n" +
 	"activeView\x12.\n" +
-	"\x13active_workspace_id\x18\x06 \x01(\tR\x11activeWorkspaceIdJ\x04\b\a\x10\bR\x17active_session_rendered\"\xeb\x02\n" +
+	"\x13active_workspace_id\x18\x06 \x01(\tR\x11activeWorkspaceIdJ\x04\b\a\x10\bR\x17active_session_rendered\"\x8b\x03\n" +
 	"\aArgSpec\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12+\n" +
 	"\x04type\x18\x02 \x01(\x0e2\x17.codefoundry.v1.ArgTypeR\x04type\x12\x1a\n" +
@@ -767,7 +777,10 @@ const file_codefoundry_v1_command_proto_rawDesc = "" +
 	"\x0edefault_to_cwd\x18\b \x01(\bR\fdefaultToCwd\x121\n" +
 	"\x15default_to_thread_env\x18\t \x01(\bR\x12defaultToThreadEnv\x12\"\n" +
 	"\rfile_or_stdin\x18\n" +
-	" \x01(\bR\vfileOrStdin\"\x93\x02\n" +
+	" \x01(\bR\vfileOrStdin\x12\x1e\n" +
+	"\n" +
+	"repeatable\x18\v \x01(\bR\n" +
+	"repeatable\"\x93\x02\n" +
 	"\aCommand\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +
