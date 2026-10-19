@@ -108,7 +108,7 @@ func TestThreadCommands(t *testing.T) {
 		{
 			name: "question with a bare label", cmd: "thread.respond", args: map[string]string{"id": "s1", "answer": "Blue"},
 			items:   []thread.Item{{ID: "q-r1", Kind: thread.KindQuestion, Request: &thread.Request{RequestID: "r1", ToolName: "AskUserQuestion", InputJSON: question, State: thread.RequestPending}}},
-			wantMsg: ": allowed (allow): Which color? = Blue; nothing pending", wantCalls: []string{"Respond s1 r1 allow"},
+			wantMsg: "answered \"Which color?\": Blue; nothing pending", wantCalls: []string{"Respond s1 r1 allow"},
 		},
 		{
 			name: "question needs an answer", cmd: "thread.respond", args: map[string]string{"id": "s1"},
@@ -139,6 +139,20 @@ func TestThreadCommands(t *testing.T) {
 				"#4 permission Bash ls: pending (request r9)\n#5 claude: done\n#6 turn end: success, 2.5s, 1 in / 9 out tokens, $0.0123 so far\n" +
 				"#7 you: again\n#8 turn end: success, 1.0s, 0 in / 0 out tokens, $0.0030, $0.0153 so far, claude-haiku-5-5\n#9 note: Forked from fix\n" +
 				"#10 wake: Thread s2 is idle: finished.\n#11 turn end: process_ended, 9.9s, 0 in / 0 out tokens (interrupted)",
+		},
+		{
+			// orch-child-context: the resume note Claude got shows under the message.
+			name: "a message with a resume note", cmd: "thread.items", args: map[string]string{"id": "s1"},
+			items: []thread.Item{{ID: "u", Kind: thread.KindUserMessage, Text: "continue",
+				ResumeNote: "[code-foundry] Your previous turn was stopped at the spending limit."}},
+			wantMsg: "#1 you: continue\n    [code-foundry] Your previous turn was stopped at the spending limit.",
+		},
+		{
+			// E7: read --full cut a wake to its title.
+			name: "full prints a wake's JSON", cmd: "thread.items", args: map[string]string{"id": "s1", "full": "true"},
+			items: []thread.Item{{ID: "w", Kind: thread.KindUserMessage, Text: "[code-foundry wake] Thread s2 is idle.\n```json\n{\n  \"kind\": \"thread\"\n}\n```",
+				Origin: thread.OriginWake, WakeTitle: "Thread s2 is idle.", WakeJSON: "{\n  \"kind\": \"thread\"\n}"}},
+			wantMsg: "#1 wake: Thread s2 is idle.\n{\n  \"kind\": \"thread\"\n}",
 		},
 		{
 			name: "set mode", cmd: "thread.set-mode", args: map[string]string{"id": "s1", "permission": "accept-edits"},

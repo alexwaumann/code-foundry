@@ -204,7 +204,8 @@ Services (v1):
   "~" expands, the path must be absolute; the Add Project dialog's Local folder tab calls
   it directly, the CLI through `project add <folder>`),
   Unregister, List, ListWorktrees, CreateWorktree (optionally fetching the base first),
-  CleanupWorktrees (remove worktrees whose work is in origin/<default>: `merged_clean`,
+  DeleteBranch (a branch no worktree has checked out, `-d` unless forced, origin's on
+  request; `docs/notes/orch-cli-batch.md`), CleanupWorktrees (remove worktrees whose work is in origin/<default>: `merged_clean`,
   no thread (archived ones aside), terminal or workspace on it; never deletes branches;
   each removed or kept worktree comes with its reason, which the confirmation lists;
   `docs/notes/projects-polish-3.md`, `docs/notes/cleanup-eligibility.md`),

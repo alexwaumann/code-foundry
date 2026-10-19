@@ -83,11 +83,11 @@ func TestThreadWait(t *testing.T) {
 		},
 		{
 			name: "removed while waiting", start: working, args: map[string]string{"id": "s1"}, remove: true,
-			wantRemoved: "thread s1 fix was removed at ",
+			wantRemoved: "thread fix (s1) was removed at ",
 		},
 		{
 			name: "removed before the wait", start: working, args: map[string]string{"id": "s1"}, removed: true,
-			wantRemoved: "thread s1 fix was removed at ",
+			wantRemoved: "thread fix (s1) was removed at ",
 		},
 		{name: "unknown thread", start: working, args: map[string]string{"id": "s9"}, wantCode: connect.CodeNotFound, wantErr: "thread s9 not found"},
 		{name: "for is not a duration", start: working, args: map[string]string{"id": "s1", "for": "soon"}, invalid: true},

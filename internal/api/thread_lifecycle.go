@@ -87,7 +87,13 @@ func (h *Thread) Get(ctx context.Context, req *connect.Request[v1.GetThreadReque
 	if err != nil {
 		return nil, threadError(err)
 	}
-	return connect.NewResponse(&v1.GetThreadResponse{Thread: threadToProto(s)}), nil
+	p := threadToProto(s)
+	if req.Msg.GetWithDetail() {
+		if err := h.addDetail(ctx, s, p); err != nil {
+			return nil, threadError(err)
+		}
+	}
+	return connect.NewResponse(&v1.GetThreadResponse{Thread: p}), nil
 }
 
 // Rename sets a user-chosen name.

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/proto"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 )
@@ -48,8 +49,8 @@ func RegisterThreadList(r *Registry, d ThreadListDeps) error {
 		Name:  "thread.list",
 		Title: "List Threads",
 		Description: "List threads, the most recently active first: one line each, " +
-			"`<id>  <status>  <name>  <project>@<branch>  <age>` and `↳ <creator>` for a thread another thread created. " +
-			"Archived threads are left out unless archived or all is given.",
+			"`<id>  <status>  <name>  <project>@<branch>  <age>` and `↳ <creator>` for a thread another thread created; " +
+			"`(you)` follows your own thread's name.",
 		Category:     "Thread",
 		NoKeybinding: true,
 		Args: []ArgSpec{
@@ -64,7 +65,7 @@ func RegisterThreadList(r *Registry, d ThreadListDeps) error {
 			{Name: "plugin", Type: String, Description: "Only the threads this plugin owns, or * for every plugin's (left out otherwise, except with all)"},
 			{Name: "limit", Type: Int, Default: threadListDefaultLimit, Description: "At most this many threads, the most recently active (0: no limit)"},
 		},
-		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
+		Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 			if a.Int("limit") < 0 {
 				return Result{}, InvalidArg("limit", "limit must be 0 (no limit) or more, not %d", a.Int("limit"))
 			}
@@ -91,10 +92,26 @@ func RegisterThreadList(r *Registry, d ThreadListDeps) error {
 			if err != nil {
 				return Result{}, err
 			}
+			markCaller(res.Msg.GetThreads(), uctx.CallerThreadID)
 			msg := formatThreadList(res.Msg.GetThreads(), res.Msg.GetRemoved(), projects.Msg.GetProjects(), names, f, time.Now())
 			return Result{Message: msg, JSON: res.Msg}, nil
 		},
 	})
+}
+
+// markCaller sets is_caller on the row of the thread the command runs in (its context
+// thread): W3's orchestrator took its own busy row for another orchestrator. The row is
+// a copy, so a backend's own messages are not changed.
+func markCaller(threads []*v1.Thread, caller string) {
+	if caller == "" {
+		return
+	}
+	for i, s := range threads {
+		if s.GetId() == caller {
+			threads[i] = proto.CloneOf(s)
+			threads[i].IsCaller = true
+		}
+	}
 }
 
 // pluginOwner is ThreadFilter.owner for thread.list's plugin arg: "plugin:<name>",
@@ -170,7 +187,11 @@ func formatThreadList(threads []*v1.Thread, removed []*v1.RemovedThread, project
 	var sb strings.Builder
 	tw := tabwriter.NewWriter(&sb, 0, 4, 2, ' ', 0)
 	for _, s := range threads {
-		line := fmt.Sprintf("%s\t%s\t%s\t%s\t%s", s.GetId(), threadStatusWord(s), threadDisplayName(s), threadPlace(s, projects), age(lastActivity(s), now))
+		name := threadDisplayName(s)
+		if s.GetIsCaller() {
+			name += " (you)"
+		}
+		line := fmt.Sprintf("%s\t%s\t%s\t%s\t%s", s.GetId(), threadStatusWord(s), name, threadPlace(s, projects), age(lastActivity(s), now))
 		var marks []string
 		if s.GetArchivedAt() != nil {
 			marks = append(marks, "archived")

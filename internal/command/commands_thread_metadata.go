@@ -73,11 +73,20 @@ func labelList(s *v1.Thread) string {
 	return strings.Join(s.GetLabels(), ", ")
 }
 
+// staleNote follows a report made before its thread's last message (Thread.report_stale,
+// the wake's rule), whose status thread.get and thread.reports mark with "*" (E6 §4.2,
+// W4 finding 5: a superseded done looked current).
+const staleNote = "(report predates its last message)"
+
 // threadDetail is thread.get's text: one "key: value" line per fact the thread has.
 // names resolves the creator (threadNames): its current name, or the recorded one and
 // "removed".
 func threadDetail(s *v1.Thread, names map[string]string) string {
-	lines := []string{"thread " + threadLabel(s), "status: " + waitStatus(s), "worktree: " + s.GetWorktreePath()}
+	lines := []string{"thread " + threadLabel(s), "status: " + waitStatus(s)}
+	if p := s.GetPending(); p != nil {
+		lines = append(lines, "pending: "+pendingLine(p))
+	}
+	lines = append(lines, "worktree: "+s.GetWorktreePath())
 	if s.GetBranch() != "" {
 		// The branch the worktree was made for (what a recreation checks out again).
 		lines = append(lines, "branch: "+s.GetBranch())
@@ -101,11 +110,17 @@ func threadDetail(s *v1.Thread, names map[string]string) string {
 	}
 	if st := reportStatusName(s.GetReportStatus()); st != "" {
 		r := "report: " + st
+		if s.GetReportStale() {
+			r += "*"
+		}
 		if s.GetReportSummary() != "" {
 			r += ": " + s.GetReportSummary()
 		}
 		if at := s.GetReportAt(); at != nil {
 			r += " (" + at.AsTime().Local().Format(time.DateTime) + ")"
+		}
+		if s.GetReportStale() {
+			r += " " + staleNote
 		}
 		lines = append(lines, r)
 		if s.GetReportData() != "" {
@@ -128,19 +143,37 @@ func threadDetail(s *v1.Thread, names map[string]string) string {
 	return strings.Join(append(lines, cost), "\n")
 }
 
+// pendingLine is thread.get's line for the pending request: `permission Bash (request
+// r1)`, `question "Which color?" [Red | Blue] (request r2)`; --json has the input.
+func pendingLine(p *v1.ThreadPendingDetail) string {
+	line := p.GetKind()
+	switch {
+	case len(p.GetQuestions()) > 1:
+		line += fmt.Sprintf(": %d questions", len(p.GetQuestions()))
+	case p.GetQuestion() != "":
+		line += " " + strconv.Quote(p.GetQuestion())
+		if len(p.GetOptions()) > 0 {
+			line += " [" + strings.Join(p.GetOptions(), " | ") + "]"
+		}
+	case p.GetTool() != "":
+		line += " " + p.GetTool()
+	}
+	return line + " (request " + p.GetRequestId() + ")"
+}
+
 func threadGet(b ThreadBackend, idArg ArgSpec) Command {
 	idArg.Positional = true
 	return Command{
 		Name:  "thread.get",
 		Title: "Show Thread",
-		Description: "Print one thread: its status, worktree, who created it and why, labels, report and cost " +
-			"(--json: the thread with every field).",
+		Description: "Print one thread: its status and pending request, worktree, who created it and why, labels, report " +
+			"(`*`: from before its last message) and cost.",
 		Category:     "Thread",
 		NoKeybinding: true,
 		Args:         []ArgSpec{idArg},
 		When:         hasThread,
 		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-			res, err := b.Get(ctx, connect.NewRequest(&v1.GetThreadRequest{Id: a.String("id")}))
+			res, err := b.Get(ctx, connect.NewRequest(&v1.GetThreadRequest{Id: a.String("id"), WithDetail: true}))
 			if r, ok := removedFrom(err); ok {
 				return removedGetResult(r), nil
 			}

@@ -17,8 +17,9 @@ type Registry struct {
 	cmds map[string]*Command
 	// ov adjusts registered commands (user settings); applied by List, Get, and Invoke.
 	ov Overrides
-	// idListers resolve id suffixes (resolve.go).
-	idListers map[IDKind]IDLister
+	// idListers resolve id suffixes, idFallbacks those none of their ids end in
+	// (resolve.go).
+	idListers, idFallbacks map[IDKind]IDLister
 }
 
 // Overrides adjust registered commands without re-registering them. The daemon sets
@@ -179,6 +180,7 @@ func (r *Registry) Invoke(ctx context.Context, uctx Context, name string, raw ma
 	if o.confirmed {
 		ctx = context.WithValue(ctx, confirmedKey{}, true)
 	}
+	eff.CallerThreadID = uctx.ActiveThreadID
 	return c.Run(ctx, eff, args)
 }
 

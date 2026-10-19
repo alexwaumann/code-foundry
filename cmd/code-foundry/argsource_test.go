@@ -41,6 +41,7 @@ func (f *fakeArgCommands) List(context.Context, *connect.Request[v1.ListCommands
 		}},
 		{Name: "thread.report", Title: "Report", Category: "Thread", Available: true, Args: []*v1.ArgSpec{
 			{Name: "status", Type: v1.ArgType_ARG_TYPE_ENUM, Positional: true},
+			{Name: "summary", Type: v1.ArgType_ARG_TYPE_STRING, Positional: true},
 			{Name: "data", Type: v1.ArgType_ARG_TYPE_STRING, FileOrStdin: true},
 		}},
 		{Name: "thread.subscribe", Title: "Subscribe", Category: "Thread", Available: true, Args: []*v1.ArgSpec{
@@ -90,6 +91,13 @@ func TestCLIThreadEnvDefaultAndArgSources(t *testing.T) {
 		{name: "data from stdin", stdin: `{"s":true}`, args: []string{"thread", "report", "done", "--data", "-"},
 			want: map[string]string{"status": "done", "data": `{"s":true}`}},
 		{name: "a missing file", args: []string{"thread", "report", "done", "--data", "@nope.json"}, wantErr: "--data: open"},
+		// A summary that starts with a flag's name (e6 §4.4) is text: it has spaces.
+		{name: "a summary that starts with --", args: []string{"thread", "report", "done", "--json now emits JSON Lines", "--data", "{}"},
+			want: map[string]string{"status": "done", "summary": "--json now emits JSON Lines", "data": "{}"}},
+		{name: "a one-word summary after --", args: []string{"thread", "report", "done", "--data", "{}", "--", "--json"},
+			want: map[string]string{"status": "done", "summary": "--json", "data": "{}"}},
+		{name: "a flag's value may have spaces after =", args: []string{"thread", "report", "done", `--data={"a": 1}`},
+			want: map[string]string{"status": "done", "data": `{"a": 1}`}},
 		{name: "a prompt from a file", args: []string{"thread", "new", "--created-by=", "--prompt", "@prompt.txt"},
 			want: map[string]string{"prompt": prompt, "created-by": ""}},
 		{name: "a prompt from stdin", stdin: "from stdin", args: []string{"thread", "new", "--created-by=", "--prompt", "-"},

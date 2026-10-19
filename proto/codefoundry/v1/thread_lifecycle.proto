@@ -3,6 +3,7 @@ syntax = "proto3";
 package codefoundry.v1;
 
 import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 
 // Thread lifecycle messages: the thread record (Thread), its state and status, and the
@@ -277,6 +278,17 @@ message Thread {
   // never values: "GitHub Actions added 2 variables", "Hello removed CF_HELLO". Empty
   // otherwise.
   string plugin_env_change = 57;
+  // The thread the caller runs in (its context thread, $CODE_FOUNDRY_THREAD): set by the
+  // thread.list command on that row of its answer, so an agent tells its own thread from
+  // another's. Never set by ThreadService.
+  bool is_caller = 58;
+  // The request a "permission: …" or "question: …" status describes; set by
+  // ThreadService.Get with with_detail only.
+  ThreadPendingDetail pending = 59;
+  // The report was made before the thread's last message (a follow-up or a wake), so it
+  // describes an older turn: the wake's report_stale rule. Set by ThreadService.Get with
+  // with_detail only.
+  bool report_stale = 60;
 }
 
 // ThreadFlagLevel is how loud a plugin's flag is.
@@ -598,10 +610,40 @@ message RemovedThread {
   string report_summary = 8;
   string report_data = 9;
   google.protobuf.Timestamp report_at = 10;
+  // What the thread cost and its budget when it was removed, as on Thread.
+  double cost_usd = 11;
+  bool unpriced = 12;
+  double budget_usd = 13;
 }
 
 message GetThreadRequest {
   string id = 1;
+  // Also read the thread's items for Thread.pending and report_stale (thread.get,
+  // thread.reports): the detail a wake carries. Unset leaves them empty and reads
+  // nothing.
+  bool with_detail = 2;
+}
+
+// ThreadPendingDetail is the request a NEEDS_ATTENTION "permission: …" or "question: …"
+// status describes, as a wake's JSON carries it: what thread.respond needs.
+message ThreadPendingDetail {
+  // "permission" or "question".
+  string kind = 1;
+  string request_id = 2;
+  string tool = 3;
+  // The tool's input: its JSON, or when longer than 4 KiB its head as a string with a
+  // marker (thread.read --full has it whole).
+  google.protobuf.Value input = 4;
+  // A question's first question and its option labels (what --answer takes);
+  // questions lists every one when it asks more than one.
+  string question = 5;
+  repeated string options = 6;
+  repeated ThreadPendingQuestion questions = 7;
+}
+
+message ThreadPendingQuestion {
+  string question = 1;
+  repeated string options = 2;
 }
 
 message GetThreadResponse {

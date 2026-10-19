@@ -353,7 +353,7 @@ func formatSubscriptions(subs []*v1.ThreadSubscription, subscriber string) strin
 			repeat = "yes"
 		}
 		if t := s.GetLastFiredAt(); t != nil {
-			last = t.AsTime().Local().Format(time.TimeOnly)
+			last = t.AsTime().UTC().Format(time.RFC3339) // UTC like every other command (E1, E5)
 		}
 		id := s.GetTargetId()
 		if args := subscriptionArgs(s); args != "" {

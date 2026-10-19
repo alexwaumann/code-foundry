@@ -191,3 +191,24 @@ func TestRemoveFailsClearsRemoving(t *testing.T) {
 		t.Errorf("after a failed removal: %+v (tombstone %v)", s, gone)
 	}
 }
+
+// A tombstone keeps what the thread cost and its budget (E4 4.6).
+func TestTombstoneKeepsCost(t *testing.T) {
+	at := time.Date(2026, 10, 19, 12, 0, 0, 0, time.UTC)
+	usage := []UsageBucket{{Model: "claude-haiku-4-5", Day: "2026-10-19", Requests: 3, Input: 94_000}}
+	tests := []struct {
+		name string
+		t    Thread
+	}{
+		{name: "used and budgeted", t: Thread{ID: "s-1", Usage: usage, BudgetUSD: 0.5}},
+		{name: "never ran", t: Thread{ID: "s-2"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := TombstoneOf(tt.t, at)
+			if !slices.Equal(r.Usage, tt.t.Usage) || r.BudgetUSD != tt.t.BudgetUSD || !r.RemovedAt.Equal(at) {
+				t.Errorf("tombstone = %+v", r)
+			}
+		})
+	}
+}

@@ -24,12 +24,12 @@ func threadSnooze(b ThreadBackend, idArg ArgSpec) Command {
 		Title: "Snooze or Unsnooze Thread",
 		Description: "Snooze a thread until a time: Claude is closed, its terminals are removed and it is unpinned and " +
 			"listed apart; when the time comes it returns needing attention (\"snooze ended\"). " +
-			"until takes " + SnoozeUntilHelp + ". clear unsnoozes. " +
-			"Pinning, archiving or sending a message unsnoozes a thread too.",
+			"clear unsnoozes. Pinning, archiving or sending a message unsnoozes a thread too.",
 		Category: "Thread",
 		Args: []ArgSpec{
 			idArg,
-			{Name: "until", Type: String, Description: "When the thread wakes: 1h, 90m, tomorrow, next-week, mon..sun, 2026-10-20, 2026-10-20 14:00 or RFC 3339"},
+			// The forms only here: the guide has no room for them twice.
+			{Name: "until", Type: String, Description: "When the thread wakes: " + SnoozeUntilHelp},
 			{Name: "clear", Type: Bool, Description: "Unsnooze the thread instead"},
 		},
 		When:    hasThread,

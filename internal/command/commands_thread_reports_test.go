@@ -26,6 +26,9 @@ func TestThreadReports(t *testing.T) {
 		ReportStatus: v1.ThreadReportStatus_THREAD_REPORT_STATUS_BLOCKED, ReportSummary: "needs a token"}
 	silent := &v1.Thread{Id: "s-000000000003", Status: v1.ThreadStatus_THREAD_STATUS_BUSY, CreatedBy: "s-7754a478e649"}
 	children := []*v1.Thread{done, blocked, silent}
+	// Get with detail says the report predates the last message (the wake's rule).
+	superseded := &v1.Thread{Id: "s-000000000004", Name: "Alias", Status: v1.ThreadStatus_THREAD_STATUS_BUSY,
+		ReportStatus: v1.ThreadReportStatus_THREAD_REPORT_STATUS_DONE, ReportSummary: "Added --pending-only", ReportStale: true}
 	gone := []*v1.RemovedThread{
 		{Id: "s-00000000000a", Name: "Add persistence", CreatedBy: "s-7754a478e649", RemovedAt: at,
 			ReportStatus: v1.ThreadReportStatus_THREAD_REPORT_STATUS_DONE, ReportSummary: "c6b0cb6", ReportData: `{"n": 1}`},
@@ -39,6 +42,7 @@ func TestThreadReports(t *testing.T) {
 		wantFilter *v1.ThreadFilter
 		wantMsg    string
 		wantIDs    []string // the --json answer's ids
+		wantStale  []string // the --json answer's ids with stale
 		wantCode   connect.Code
 		wantArgErr bool
 	}{
@@ -54,6 +58,11 @@ func TestThreadReports(t *testing.T) {
 				"    {\n      \"pr\": 12,\n      \"files\": [\n        \"a.go\"\n      ]\n    }\n" +
 				"s-000000000003  -     (unnamed)",
 			wantIDs: []string{"s-867564981c98", "s-000000000003"}},
+		// E6 §4.2: a done report from before a follow-up looked current.
+		{name: "a stale report is marked", threads: []*v1.Thread{superseded, blocked}, wantFilter: &v1.ThreadFilter{},
+			wantMsg: "s-000000000004  done*    Alias  Added --pending-only (report predates its last message)\n" +
+				"s-000000000002  blocked  Docs   needs a token",
+			wantIDs: []string{"s-000000000004", "s-000000000002"}, wantStale: []string{"s-000000000004"}},
 		{name: "status filters here", args: map[string]string{"status": "blocked"}, threads: children,
 			wantFilter: &v1.ThreadFilter{}, wantMsg: "s-000000000002  blocked  Docs  needs a token", wantIDs: []string{"s-000000000002"}},
 		{name: "none is the unreported", args: map[string]string{"status": "none"}, threads: children,
@@ -122,12 +131,24 @@ func TestThreadReports(t *testing.T) {
 			if !ok {
 				t.Fatalf("JSON = %T", res.JSON)
 			}
-			var ids []string
+			var ids, stale []string
 			for _, r := range reports {
 				ids = append(ids, r.ID)
+				if r.Stale {
+					stale = append(stale, r.ID)
+				}
 			}
 			if strings.Join(ids, ",") != strings.Join(tt.wantIDs, ",") {
 				t.Errorf("JSON ids = %v, want %v", ids, tt.wantIDs)
+			}
+			if strings.Join(stale, ",") != strings.Join(tt.wantStale, ",") {
+				t.Errorf("JSON stale = %v, want %v", stale, tt.wantStale)
+			}
+			// Only threads with a report are asked for their detail.
+			for _, r := range b.Requests() {
+				if g, ok := r.(*v1.GetThreadRequest); ok && (!g.GetWithDetail() || g.GetId() == silent.GetId()) {
+					t.Errorf("Get %v", g)
+				}
 			}
 		})
 	}

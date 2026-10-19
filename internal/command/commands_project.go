@@ -21,6 +21,7 @@ type ProjectBackend interface {
 	Unregister(context.Context, *connect.Request[v1.UnregisterProjectRequest]) (*connect.Response[v1.UnregisterProjectResponse], error)
 	CreateWorktree(context.Context, *connect.Request[v1.CreateWorktreeRequest]) (*connect.Response[v1.CreateWorktreeResponse], error)
 	RemoveWorktree(context.Context, *connect.Request[v1.RemoveWorktreeRequest]) (*connect.Response[v1.RemoveWorktreeResponse], error)
+	DeleteBranch(context.Context, *connect.Request[v1.DeleteBranchRequest]) (*connect.Response[v1.DeleteBranchResponse], error)
 	CleanupWorktrees(context.Context, *connect.Request[v1.CleanupWorktreesRequest]) (*connect.Response[v1.CleanupWorktreesResponse], error)
 	Refresh(context.Context, *connect.Request[v1.RefreshProjectRequest]) (*connect.Response[v1.RefreshProjectResponse], error)
 	List(context.Context, *connect.Request[v1.ListProjectsRequest]) (*connect.Response[v1.ListProjectsResponse], error)
@@ -61,7 +62,8 @@ func (f NotGitFunc) whyNotGit(c Context) string {
 }
 
 // RegisterProject registers project.list, project.unregister, project.worktree.new, project.worktree.remove,
-// project.refresh and project.git.init. Adding a project is project.add (commands_project_add.go).
+// project.branch.delete, project.refresh and project.git.init. Adding a project is project.add
+// (commands_project_add.go).
 func RegisterProject(r *Registry, b ProjectBackend, notGit NotGitFunc) error {
 	notGit = notGit.or()
 	projectArg := ArgSpec{Name: "project", Type: String, Required: true, Context: ContextProject, Description: "Project id"}
@@ -140,18 +142,24 @@ func RegisterProject(r *Registry, b ProjectBackend, notGit NotGitFunc) error {
 			Description: "Remove a worktree from disk, optionally deleting its branch.",
 			Category:    "Project",
 			Args: []ArgSpec{
-				projectArg,
+				{Name: "project", Type: String, Context: ContextProject, Description: "Project id (default: the project the worktree is registered in)"},
 				{Name: "path", Type: Path, Required: true, Context: ContextWorktree, Description: "Worktree path"},
 				{Name: "delete-branch", Type: Bool, Description: "Also delete the branch"},
 				{Name: "force", Type: Bool, Description: "Remove even with uncommitted changes"},
 			},
-			When:           func(c Context) bool { return hasWorktree(c) && !notGit(c) },
-			WhyUnavailable: notGit.whyNotGit,
+			// The project may be left out: the path names it (W4 finding 2: inside a
+			// thread, --path alone was "not available in this context").
+			When:           func(c Context) bool { return hasActiveWorktree(c) && !notGit(c) },
+			WhyUnavailable: whyNoWorktree(notGit),
 			Confirm:        "Remove worktree {path}? This deletes files on disk.",
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				path := a.Path("path")
+				project, err := worktreeProject(ctx, b, a.String("project"), path)
+				if err != nil {
+					return Result{}, err
+				}
 				if _, err := b.RemoveWorktree(ctx, connect.NewRequest(&v1.RemoveWorktreeRequest{
-					ProjectId:    a.String("project"),
+					ProjectId:    project,
 					Path:         path,
 					DeleteBranch: a.Bool("delete-branch"),
 					Force:        a.Bool("force"),
@@ -181,5 +189,6 @@ func RegisterProject(r *Registry, b ProjectBackend, notGit NotGitFunc) error {
 			},
 		},
 		gitInitCommand(b, projectArg, notGit),
+		branchDeleteCommand(b, notGit),
 	)
 }

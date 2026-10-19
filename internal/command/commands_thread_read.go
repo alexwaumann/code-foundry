@@ -32,7 +32,7 @@ func threadRead(b ThreadBackend, idArg ArgSpec) Command {
 		Name:  "thread.read",
 		Title: "Read Thread",
 		Description: "Print a thread's latest items as a readable log, like thread.items: the last 20, or with since the ones " +
-			"after an item (oldest first, at most last). --json: {items, nextSince, more}; pass nextSince as since to read on.",
+			"after an item (oldest first, at most last). --json: {items, nextSince, more}.",
 		Category:     "Thread",
 		NoKeybinding: true,
 		Args: []ArgSpec{
@@ -51,6 +51,9 @@ func threadRead(b ThreadBackend, idArg ArgSpec) Command {
 			res, err := b.ListItems(ctx, connect.NewRequest(&v1.ListThreadItemsRequest{ThreadId: id, Query: &v1.ThreadItemsQuery{
 				Last: int32(a.Int("last")), Since: since, Role: threadItemRoles[a.String("role")],
 			}}))
+			if r, ok := removedFrom(err); ok {
+				return removedWaitResult(r, ""), nil // exit 1, like thread.get and thread.wait
+			}
 			if err != nil {
 				return Result{}, err
 			}

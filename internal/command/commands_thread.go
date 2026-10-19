@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -87,6 +89,7 @@ var threadDecisions = map[string]v1.ThreadDecision{
 func RegisterThread(r *Registry, b ThreadBackend) error {
 	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextThread, ID: ThreadID, Description: "Thread id" + IDHelp}
 	r.SetIDLister(ThreadID, threadIDs(b))
+	r.SetIDFallback(ThreadID, removedThreadIDs(b))
 	r.SetIDLister(SubscriptionID, subscriptionIDs(b))
 	return r.RegisterAll(
 		Command{
@@ -106,7 +109,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 					waitForArg.Default),
 			},
 			When: hasThread,
-			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
+			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 				var limit time.Duration
 				if a.Bool("wait") {
 					var err error
@@ -129,8 +132,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 				if n := item.GetOrdinal(); n > 0 {
 					sent += fmt.Sprintf(" (#%d)", n)
 					if !a.Bool("wait") {
-						// The wait for Claude's answer to this message, ready to paste.
-						sent += fmt.Sprintf("; wait with: code-foundry thread wait %s --after %d", id, n)
+						sent += "; " + sendNext(ctx, b, uctx.CallerThreadID, id, n)
 					}
 				}
 				if !a.Bool("wait") {
@@ -194,6 +196,9 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 					return Result{}, err
 				}
 				line := fmt.Sprintf("%s: %s", pending.GetSummary(), describeRequest(res.Msg.GetItem()))
+				if q := res.Msg.GetItem().GetQuestion(); q != nil && len(q.GetAnswers()) > 0 {
+					line = answeredLine(q.GetAnswers())
+				}
 				// What still waits on an answer, so a caller answering one request sees the
 				// next without a wake. Claude asks for parallel tool calls one after the
 				// other, the next a few ms after an answer (w2a: 15 ms), so a CLI caller
@@ -245,6 +250,9 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 			When: hasThread,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				res, err := b.ListItems(ctx, connect.NewRequest(&v1.ListThreadItemsRequest{ThreadId: a.String("id")}))
+				if r, ok := removedFrom(err); ok {
+					return removedWaitResult(r, ""), nil // exit 1, like thread.read
+				}
 				if err != nil {
 					return Result{}, err
 				}
@@ -327,6 +335,32 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 	)
 }
 
+// sendNext is what thread.send tells its caller to do next about message n to thread
+// id: end its turn when it holds a wake subscription that the answer meets (settled,
+// idle or attention; E3, W2: the wait hint contradicted --notify), else the wait for
+// the answer, ready to paste. A failed look-up gives the wait hint.
+func sendNext(ctx context.Context, b SubscriptionBackend, caller, id string, n int64) string {
+	if caller != "" && caller != id {
+		res, err := b.ListSubscriptions(ctx, connect.NewRequest(&v1.ListThreadSubscriptionsRequest{SubscriberThreadId: caller}))
+		if err == nil {
+			for _, s := range res.Msg.GetSubscriptions() {
+				if s.GetTarget() == v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_THREAD && s.GetTargetId() == id &&
+					slices.Contains(answerConditions, s.GetCondition()) {
+					return "you are subscribed (" + s.GetId() + "): end your turn; it wakes you"
+				}
+			}
+		}
+	}
+	return fmt.Sprintf("wait with: code-foundry thread wait %s --after %d", id, n)
+}
+
+// answerConditions are the wake conditions a thread's answer to a message meets.
+var answerConditions = []v1.ThreadSubscriptionCondition{
+	v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_SETTLED,
+	v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_IDLE,
+	v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_ATTENTION,
+}
+
 // stillPending is thread.respond's tail: "nothing pending", or "1 more pending:
 // permission: Bash ls (request r2)" with each request still pending but answered.
 func stillPending(pending []*v1.ThreadPendingRequest, answered string) string {
@@ -398,6 +432,17 @@ func parseAnswers(answer string, questions []string) (map[string]string, error) 
 	return map[string]string{questions[0]: answer}, nil
 }
 
+// answeredLine is thread.respond's line for an answered question: `answered "Which
+// color?": Blue`, the questions in order of their text (E3 item 6: "allowed (allow):
+// <question> = <label>" read as a permission).
+func answeredLine(answers map[string]string) string {
+	var parts []string
+	for _, q := range slices.Sorted(maps.Keys(answers)) {
+		parts = append(parts, strconv.Quote(q)+": "+answers[q])
+	}
+	return "answered " + strings.Join(parts, "; ")
+}
+
 // describeRequest is a resolved request's outcome, e.g. "allowed (allow_session)".
 func describeRequest(it *v1.ThreadItem) string {
 	r := it.GetPermission()
@@ -459,8 +504,16 @@ func FormatThreadItems(snap *v1.ThreadItemsSnapshot, full bool) string {
 			u := it.GetUserMessage()
 			body = "you: " + line(u.GetText())
 			if u.GetOrigin() == v1.MessageOrigin_MESSAGE_ORIGIN_WAKE {
-				// The daemon's, for a wake subscription (commands_thread_subscribe.go).
+				// The daemon's, for a wake subscription (commands_thread_subscribe.go);
+				// full adds its JSON (E7: the title alone hid the report and pending).
 				body = "wake: " + line(u.GetWakeTitle())
+				if full && u.GetWakeJson() != "" {
+					body += "\n" + strings.TrimSpace(u.GetWakeJson())
+				}
+			}
+			if n := u.GetResumeNote(); n != "" {
+				// What Claude got before the text (orch-child-context.md); --json has it too.
+				body += "\n" + indent + "    " + line(n)
 			}
 			for _, a := range u.GetAttachments() {
 				kind := "image"

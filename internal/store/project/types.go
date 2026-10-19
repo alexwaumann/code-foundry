@@ -239,6 +239,8 @@ type Store interface {
 	// ErrFailedPrecondition for a project without git.
 	CreateWorktree(ctx context.Context, opts CreateWorktreeOptions) (Worktree, error)
 	RemoveWorktree(ctx context.Context, opts RemoveWorktreeOptions) error
+	// DeleteBranch deletes a branch no worktree has checked out (branch_delete.go).
+	DeleteBranch(ctx context.Context, opts DeleteBranchOptions) (DeleteBranchResult, error)
 	// ListRefs lists the project's local branches and remote-tracking refs, read from git
 	// on each call (not from the snapshot).
 	ListRefs(ctx context.Context, projectID string) (Refs, error)

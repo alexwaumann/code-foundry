@@ -184,16 +184,17 @@ Only on the user's say-so. Ask first whether to delete the branch too, then:
 
 ```
 code-foundry thread remove --id 5e6f --yes
-code-foundry project worktree remove --project 8c3d5e7f9a1b \
-  --path ~/.code-foundry/worktrees/acme/web/cf/bump-the-router --yes
+code-foundry project worktree remove --path ~/.code-foundry/worktrees/acme/web/cf/bump-the-router --yes
 ```
 
-`thread remove` stops a working child itself: no `thread interrupt` first. Inside a
-thread `project worktree remove` needs `--project` (without it: "not available in this
-context"). Add `--delete-branch` to the second command when the user said yes; it
-deletes the local branch, and a pushed branch stays on origin until `git push origin
---delete <branch>`, again only on the user's say-so. Never `git worktree remove`. A
-removed child leaves a tombstone: `thread reports --all` lists it as removed.
+`thread remove` stops a working child itself: no `thread interrupt` first. The path
+names the project (`--project` only for a path no project has). Add `--delete-branch` to
+the second command when the user said yes; it deletes the local branch. A pushed branch
+stays on origin until `code-foundry project branch delete <project> <branch> --remote
+--yes` (`--force` for unmerged work), again only on the user's say-so; the same command
+deletes a branch whose worktree is already gone. Never `git worktree remove` or raw git
+branch deletion. A removed child leaves a tombstone: `thread reports --all` lists it as
+removed.
 
 Notes:
 

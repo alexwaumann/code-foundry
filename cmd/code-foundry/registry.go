@@ -5,7 +5,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"path/filepath"
+	"slices"
 	"strings"
 	"text/tabwriter"
 
@@ -157,11 +159,44 @@ func (cl *cli) lookup(ctx context.Context, args []string) (*v1.Command, []string
 	words := leadingWords(args)
 	cmd, n := resolveCommand(cmds, words)
 	if cmd == nil {
+		if group := groupCommands(cmds, words); len(group) > 0 {
+			// `code-foundry thread`: a group, not a command; say what is in it.
+			writeGroup(cl.stderr, strings.Join(words, " "), group)
+			return nil, nil, errUsage
+		}
 		fmt.Fprintf(cl.stderr, "code-foundry: unknown command %q (run `code-foundry commands` to list commands)\n",
 			strings.Join(words, " "))
 		return nil, nil, errUsage
 	}
 	return cmd, args[n:], nil
+}
+
+// groupCommands are the commands whose dotted names start with words as segments
+// (`thread` lists thread.*, `project worktree` project.worktree.*).
+func groupCommands(cmds []*v1.Command, words []string) []*v1.Command {
+	if len(words) == 0 {
+		return nil
+	}
+	prefix := strings.Join(words, ".") + "."
+	var out []*v1.Command
+	for _, c := range cmds {
+		if strings.HasPrefix(c.GetName(), prefix) {
+			out = append(out, c)
+		}
+	}
+	slices.SortFunc(out, func(a, b *v1.Command) int { return strings.Compare(a.GetName(), b.GetName()) })
+	return out
+}
+
+// writeGroup lists a group's commands, one per line with its title (E4 4.10: `help
+// thread` was "unknown command").
+func writeGroup(w io.Writer, group string, cmds []*v1.Command) {
+	fmt.Fprintf(w, "%s commands (`code-foundry help <command>` for one):\n", group)
+	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+	for _, c := range cmds {
+		fmt.Fprintf(tw, "  %s\t%s\n", c.GetName(), c.GetTitle())
+	}
+	_ = tw.Flush()
 }
 
 // runRegistry invokes a daemon command.
@@ -171,7 +206,9 @@ func (cl *cli) runRegistry(ctx context.Context, args []string) error {
 		return err
 	}
 	fs := cl.newFlagSet(cmd.GetName())
-	fs.Usage = func() { guide.WriteHelp(cl.stderr, cmd, true) }
+	// The flag package prints a bad flag's error line, then Usage: the help is for -h
+	// (errHelp below), a mistake gets one line pointing at it (badFlag).
+	fs.Usage = func() {}
 	flags := make([]*argFlag, len(cmd.GetArgs()))
 	for i, a := range cmd.GetArgs() {
 		flags[i] = &argFlag{spec: a}
@@ -184,8 +221,13 @@ func (cl *cli) runRegistry(ctx context.Context, args []string) error {
 	}
 	cf := cl.addContextFlags(fs)
 	words, err := cl.parseWithPositionals(fs, rest)
+	if errors.Is(err, errHelp) {
+		guide.WriteHelp(cl.stderr, cmd, true)
+		return nil
+	}
 	if err != nil {
-		return quietHelp(err)
+		cl.badFlag(cmd.GetName())
+		return err
 	}
 	if err := cl.assignPositionals(fs, flags, words); err != nil {
 		return err
@@ -268,6 +310,13 @@ func (cl *cli) runRegistry(ctx context.Context, args []string) error {
 	return nil
 }
 
+// badFlag follows the flag package's one-line error ("flag provided but not defined:
+// -x") with where to look, instead of the whole help: a text that starts with "-" (a
+// report's summary) is the usual cause, and "--" before it makes it a word.
+func (cl *cli) badFlag(name string) {
+	fmt.Fprintf(cl.stderr, "Run `code-foundry help %s` for usage; a value that starts with - goes after --.\n", name)
+}
+
 // invokeFailed reports a failed Invoke. Caller mistakes (bad args, unknown command,
 // unavailable in this context) exit 2 with a pointer to help; a command's own failure
 // (CommandFailed: a plugin's error, its plugin down) prints its message and exits 1, as
@@ -345,8 +394,23 @@ func runCommands(ctx context.Context, cl *cli, args []string) error {
 	return w.Flush()
 }
 
-// commandHelp prints help for the daemon command named by words.
+// commandHelp prints help for the daemon command named by words, or the list of a
+// group's commands (`help thread`).
 func (cl *cli) commandHelp(ctx context.Context, words []string) error {
+	c, err := cl.connect(ctx)
+	if err != nil {
+		return err
+	}
+	cmds, err := c.ListCommands(ctx, nil, true)
+	if err != nil {
+		return err
+	}
+	if cmd, _ := resolveCommand(cmds, leadingWords(words)); cmd == nil {
+		if group := groupCommands(cmds, words); len(group) > 0 && len(leadingWords(words)) == len(words) {
+			writeGroup(cl.stdout, strings.Join(words, " "), group)
+			return nil
+		}
+	}
 	cmd, rest, err := cl.lookup(ctx, words)
 	if err != nil {
 		return err

@@ -39,6 +39,9 @@ type ThreadReport struct {
 	// string should it not parse.
 	ReportData json.RawMessage `json:"reportData,omitempty"`
 	ReportAt   *time.Time      `json:"reportAt,omitempty"`
+	// Stale: the report was made before the thread's last message, so it describes an
+	// older turn (Thread.report_stale, the wake's rule).
+	Stale bool `json:"stale,omitempty"`
 	// CreatedBy is the creator's id; "" for a thread the user started.
 	CreatedBy string   `json:"createdBy"`
 	Labels    []string `json:"labels"`
@@ -46,6 +49,8 @@ type ThreadReport struct {
 	// the last day (--all lists them; commands_thread_removed.go).
 	Removed   bool       `json:"removed,omitempty"`
 	RemovedAt *time.Time `json:"removedAt,omitempty"`
+	// CostUSD is what the thread cost (at removal, for a removed one); omitted at 0.
+	CostUSD float64 `json:"costUsd,omitempty"`
 }
 
 // RegisterThreadReports registers thread.reports.
@@ -54,7 +59,7 @@ func RegisterThreadReports(r *Registry, b ThreadBackend) error {
 		Name:  "thread.reports",
 		Title: "Show Thread Reports",
 		Description: "The reports of threads, for the thread that created them: one line each " +
-			"(`-`: no report yet; `(data)`: it has JSON data, see full). --json: one object each, reportData parsed.",
+			"(`-`: no report yet; `(data)`: it has JSON data, see full; `*`: from before its last message). --json: one object each.",
 		Category:     "Thread",
 		NoKeybinding: true,
 		Args: []ArgSpec{
@@ -91,6 +96,7 @@ func RegisterThreadReports(r *Registry, b ThreadBackend) error {
 				all = append(all, removedReport(r))
 			}
 			out := filterReports(all, a.String("status"), limit)
+			markStale(ctx, b, out)
 			return Result{Message: formatThreadReports(out, f, a.Bool("full")), JSON: out}, nil
 		},
 	})
@@ -126,6 +132,21 @@ func filterReports(reports []ThreadReport, status string, limit int) []ThreadRep
 	return out
 }
 
+// markStale sets Stale on each report its thread's detail says predates its last
+// message (GetThreadRequest.with_detail reads the thread's items, so only threads with a
+// report are asked). A thread gone meanwhile stays as listed.
+func markStale(ctx context.Context, b ThreadBackend, reports []ThreadReport) {
+	for i, r := range reports {
+		if r.Removed || r.ReportStatus == "none" {
+			continue
+		}
+		res, err := b.Get(ctx, connect.NewRequest(&v1.GetThreadRequest{Id: r.ID, WithDetail: true}))
+		if err == nil {
+			reports[i].Stale = res.Msg.GetThread().GetReportStale()
+		}
+	}
+}
+
 // reportWord is s's report status as thread.reports' status names it; "none" without
 // a report.
 func reportWord(s *v1.Thread) string {
@@ -140,6 +161,7 @@ func threadReport(s *v1.Thread) ThreadReport {
 	r := ThreadReport{
 		ID: s.GetId(), Name: s.GetName(), Status: threadStatusName(s.GetStatus()), ReportStatus: reportWord(s),
 		ReportSummary: s.GetReportSummary(), CreatedBy: s.GetCreatedBy(), Labels: slices.Clone(s.GetLabels()),
+		CostUSD: s.GetCostUsd(),
 	}
 	if r.Labels == nil {
 		r.Labels = []string{}
@@ -202,6 +224,10 @@ func formatThreadReports(reports []ThreadReport, f *v1.ThreadFilter, full bool) 
 		}
 		if len(r.ReportData) > 0 && !full {
 			summary = strings.TrimSpace(summary + " (data)")
+		}
+		if r.Stale {
+			st += "*"
+			summary = strings.TrimSpace(summary + " " + staleNote)
 		}
 		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", r.ID, st, name, summary)
 	}

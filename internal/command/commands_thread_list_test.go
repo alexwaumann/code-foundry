@@ -32,6 +32,7 @@ func TestThreadList(t *testing.T) {
 	tests := []struct {
 		name       string
 		args       map[string]string
+		caller     string // the context thread
 		threads    []*v1.Thread
 		removed    []*v1.RemovedThread
 		wantFilter *v1.ThreadFilter
@@ -46,6 +47,15 @@ func TestThreadList(t *testing.T) {
 				"s-867564981c98  attention (finished)  (unnamed)      app@main    3h  ↳ Fix the login",
 				"s-000000000001  error (interrupted)   notes          no project  3d  [archived]",
 			}},
+		// The caller's own row says so (W3: an orchestrator took itself for another).
+		{name: "the caller's row", caller: "s-7754a478e649", threads: []*v1.Thread{busy, child},
+			wantFilter: &v1.ThreadFilter{Limit: 50},
+			wantLines: []string{
+				"s-7754a478e649  busy                  Fix the login (you)  app@cf/fix  5m",
+				"s-867564981c98  attention (finished)  (unnamed)            app@main    3h  ↳ Fix the login",
+			}},
+		{name: "a caller not in the list", caller: "s-999999999999", threads: []*v1.Thread{busy},
+			wantFilter: &v1.ThreadFilter{Limit: 50}, wantLines: []string{"s-7754a478e649  busy  Fix the login  app@cf/fix  5m"}},
 		// The creator is resolved by its id: its current name, not the recorded one.
 		{name: "a renamed creator shows its current name", threads: []*v1.Thread{renamed, child},
 			wantFilter: &v1.ThreadFilter{Limit: 50},
@@ -100,7 +110,7 @@ func TestThreadList(t *testing.T) {
 			if err := command.RegisterThreadList(reg, command.ThreadListDeps{Thread: b, Project: &commandtest.Project{Projects: projects}}); err != nil {
 				t.Fatal(err)
 			}
-			res, err := reg.Invoke(context.Background(), command.Context{}, "thread.list", tt.args)
+			res, err := reg.Invoke(context.Background(), command.Context{ActiveThreadID: tt.caller}, "thread.list", tt.args)
 			if tt.wantCode == connect.CodeInvalidArgument {
 				if !errors.Is(err, command.ErrInvalidArgs) {
 					t.Fatalf("err = %v, want an argument error", err)
@@ -145,8 +155,17 @@ func TestThreadList(t *testing.T) {
 					t.Errorf("line %d = %q, want %q in it", i, lines[i], want)
 				}
 			}
-			if _, ok := res.JSON.(*v1.ListThreadsResponse); !ok {
-				t.Errorf("JSON = %T", res.JSON)
+			js, ok := res.JSON.(*v1.ListThreadsResponse)
+			if !ok {
+				t.Fatalf("JSON = %T", res.JSON)
+			}
+			for _, s := range js.GetThreads() {
+				if s.GetIsCaller() != (s.GetId() == tt.caller) {
+					t.Errorf("thread %s isCaller = %v", s.GetId(), s.GetIsCaller())
+				}
+			}
+			if busy.GetIsCaller() {
+				t.Error("the backend's thread was changed")
 			}
 		})
 	}
