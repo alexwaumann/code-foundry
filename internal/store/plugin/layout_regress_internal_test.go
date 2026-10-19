@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	sdktest "github.com/alexwaumann/code-foundry/pluginsdk/plugintest"
 	"github.com/alexwaumann/code-foundry/pluginsdk/ui"
 )
 
@@ -186,4 +187,14 @@ func TestRequiredListsAreEveryRequiredList(t *testing.T) {
 		}
 	}
 	walk(reflect.TypeFor[ui.View]())
+}
+
+// plugintest's fake host announces this host's capabilities by default, so a plugin
+// test sees what the real host announces (it announced none, and a plugin that checks
+// view.node.masterDetail rendered its fallback under test).
+func TestPluginTestAnnouncesTheHostsCapabilities(t *testing.T) {
+	got, want := slices.Sorted(slices.Values(sdktest.HostCapabilities)), slices.Sorted(slices.Values(hostCapabilities))
+	if !slices.Equal(got, want) {
+		t.Errorf("pluginsdk/plugintest.HostCapabilities\n%v\nthe host's\n%v", got, want)
+	}
 }

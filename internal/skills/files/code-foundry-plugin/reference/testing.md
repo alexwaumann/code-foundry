@@ -22,7 +22,7 @@ h := plugintest.Start(t, plugin(), plugintest.Options{
 		// answers the plugin's allowed host/invoke calls; nil answers "unknown command"
 		return pluginsdk.CommandResult{Message: "sent"}, nil
 	},
-	Capabilities: []string{"surfaces", "view.tabs"}, // what h.HasCapability sees
+	Capabilities: []string{"surfaces", "view.tabs"}, // what h.HasCapability sees; nil = the real host's (plugintest.HostCapabilities)
 	Secrets:      map[string]string{"token": "t0k"},  // stored before Init runs
 	Flags:        []pluginsdk.Flag{{ThreadID: "s-1", Level: "error", Reason: "old"}}, // h.Flags() in Init
 	DataDir:      dir,                                // default t.TempDir(); h.DataDir() returns it
@@ -38,7 +38,7 @@ Drive it like the host:
 | `h.Command(ctx, "greet", args, uctx)` | `command/invoke`: returns the plugin's `CommandResult` or error |
 | `h.OpenSurface(ctx, instance, "status", uctx)` | `surface/open` + `visibility true` |
 | `h.OpenSurfaceWith(ctx, pluginsdk.SurfaceOpen{Instance, Surface, Context, Facts})` | the same with facts: a `pr` surface's `Facts["pr"]` (`json.RawMessage(`{"repo":"octo/app","number":12,"url":"…"}`)`) and the facts its `when` reads |
-| `h.Act(ctx, pluginsdk.SurfaceAct{Instance, Kind, Action, Key, Data, Value, Values})` | `surface/act` (Version 0 = the latest) |
+| `h.Act(ctx, pluginsdk.SurfaceAct{Instance, Kind, Action, Key, Data, Value, Values})` | `surface/act` (Version 0 = the latest); a tab or master-detail row's act is shaped from the latest view as the host does (kind, node, `Value` the key, no `Values`; the wrong kind is refused), others go as given |
 | `h.Visibility(instance, false)`, `h.CloseSurface(instance)`, `h.CloseSurfaceFor(instance, pluginsdk.CloseContextGone)` | visibility and close notifications (`CloseSurface` says `idle`) |
 | `h.Event(pluginsdk.Event{Subscription: "sub-1", Event: json.RawMessage(...)})` | an `events/event` |
 | `h.Ping(ctx)`, `h.Shutdown(ctx)` | ping; shutdown and what `Serve` returned |
@@ -116,7 +116,7 @@ view := func() ui.View {
 	if err := v.Validate(); err != nil { t.Fatalf("invalid view: %v", err) }
 	return v
 }
-if err := h.Act(ctx, pluginsdk.SurfaceAct{Instance: inst, Kind: pluginsdk.ActTab, Action: "tab", Key: "log", Value: "log"}); err != nil {
+if err := h.Act(ctx, pluginsdk.SurfaceAct{Instance: inst, Key: "log"}); err != nil { // a tab: the host's shape
 	t.Fatal(err)
 }
 if v := view(); v.Tabs.Active != "log" { t.Errorf("active tab %s", v.Tabs.Active) }
