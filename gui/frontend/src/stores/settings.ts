@@ -30,8 +30,8 @@ export const KEYS = {
 
 const KEYBINDING_PREFIX = "keybindings.";
 
-
-export const ROW_HEIGHTS = { compact: 26, comfortable: 30 } as const;
+/** A sidebar thread row's first line by density: a text-body name with 3px or 5px above and below (components/sidebar/rowSizes.ts). */
+export const ROW_HEIGHTS = { compact: 28, comfortable: 32 } as const;
 
 /** appearance.density as a known value; anything else is the default (comfortable). */
 export function densityOf(v: string | undefined): keyof typeof ROW_HEIGHTS {

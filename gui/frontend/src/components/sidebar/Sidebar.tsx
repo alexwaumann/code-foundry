@@ -15,14 +15,11 @@ import { useUiStore } from "@/stores/ui";
 import { useRowHeight } from "@/stores/settings";
 import { RowMenu } from "./RowMenu";
 import { ResizeHandle } from "./ResizeHandle";
+import { HEADER_HEIGHT, ROW_GAP, rowSize } from "./rowSizes";
 import { RowTooltipsEnabled } from "./rowTooltips";
 import { SidebarRow } from "./SidebarRow";
 import { SidebarStatus } from "./SidebarStatus";
 import { SidebarNewThread, SidebarToolbar } from "./SidebarToolbar";
-
-/** A footer header's height; thread rows are two lines (rowHeight + SECOND_LINE), snoozed and archived rows one (rowHeight). */
-const HEADER_HEIGHT = 26;
-const SECOND_LINE = 15;
 
 /** The most of the sidebar body a footer (header and rows) takes before its rows scroll. */
 const FOOTER_CAPS: Readonly<Record<FooterSection, number>> = { working: 0.4, snoozed: 0.25, archived: 0.3 };
@@ -134,6 +131,9 @@ function PanelRows({ rows, sizeOf, selectedKey, cursorKey, onActivate, scrollTo,
     estimateSize: (i) => sizeOf(rows[i]),
     getItemKey: (i) => rows[i]?.key ?? i,
     overscan: 10,
+    // Space between rows, outside each row's box (rowSizes.ts). A panel holds thread rows
+    // only (a footer's header sits above its panel), so it falls between threads.
+    gap: ROW_GAP,
     paddingStart,
     paddingEnd,
   });
@@ -198,10 +198,7 @@ function SidebarList({ bodyHeight }: { bodyHeight: number }) {
   // The row the context menu is open for (right-clicked), or null.
   const [menuRow, setMenuRow] = useState<ThreadRow | null>(null);
 
-  const sizeOf = useCallback(
-    (row: Row | undefined) => (row?.kind === "header" ? HEADER_HEIGHT : row?.section === "archived" || row?.section === "snoozed" ? rowHeight : rowHeight + SECOND_LINE),
-    [rowHeight],
-  );
+  const sizeOf = useCallback((row: Row | undefined) => rowSize(row, rowHeight), [rowHeight]);
 
   const cursorIndex = useMemo(() => {
     const key = cursorKey ?? selectedKey;
