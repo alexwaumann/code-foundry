@@ -51,9 +51,11 @@ per-file events) and threw the path away.
 
 ## Decisions
 
-* **Op = what is there when the window closes.** Not there: `removed` (so created and
-  removed in one window is removed, and the old side of a rename is removed). There:
-  `created`, `modified` or `renamed`. Last op wins falls out of it.
+* **Op = what is there when the window closes.** Not there: `removed` (the old side of a
+  rename is removed). There: `created`, `modified` or `renamed`. Last op wins falls out
+  of it. A path created and gone in one window that was never reported (not in `seen`)
+  is left out entirely since gh-events-4 (`docs/notes/gh-events-4-feedback.md`): save
+  temp files.
 * **FSEvents flags are cumulative** (`fsevents-watcher.md`). Probed: an append to a file
   created 0, 2 and 10 s earlier still carried `ItemCreated`; at 40 s it did not. So
   `created` needs three things: a create flag, a path this worktree has not reported as
@@ -123,8 +125,9 @@ untar (one process each time; the timing includes the fork/exec).
 ## Gotchas
 
 * **bsdtar extracts through temp names** (`f0001.txt.9Y9FxH`, then renamed onto
-  `f0001.txt`), so an untar lists every file twice: the temp name `removed` and the real
-  one `created`. That halves what fits under the cap; the cap is the brief's and stays.
+  `f0001.txt`), so an untar listed every file twice: the temp name `removed` and the real
+  one `created`, halving what fits under the cap. Since gh-events-4 the temp names are
+  left out (created and gone, never reported), and the cap holds 500 real files.
 * **check-ignore stops at the first refused path** (submodule, symlink) with exit 128 and
   prints only the results before it; exit 1 means nothing was ignored.
 * **The stream's "since now" start replays** a recent event for a file written just
