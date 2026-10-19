@@ -299,6 +299,32 @@ describe("master-detail, narrow", () => {
     expect(root().getAttribute("data-showing")).toBe("list");
   });
 
+  it("goes back to the list on a new resetToken and stays on the detail when the plugin selects another row", () => {
+    boxes.md = { top: 0, height: 0, width: 328 };
+    usePluginSurfacesStore.setState({ details: { [DK]: { token: "1", selected: "r1" } } });
+    const r = inSurface(<NodeList nodes={[mdNode({ selected: "r1", resetToken: "1" })]} />);
+    expect(root().getAttribute("data-showing")).toBe("detail");
+    const next = (over: Partial<MasterDetailData>) => {
+      const view: PluginViewModel = { tabs: { items: [{ key: "run-list", label: "Runs" }], active: "run-list" }, nodes: [mdNode(over)] };
+      act(() => {
+        usePluginSurfacesStore.setState((s) => ({ details: reconcileDetails(s.details, INSTANCE, view) }));
+      });
+      r.rerender(
+        <ViewContext.Provider value={ctx}>
+          <SurfaceFrame top={null} toolbar={[]} footer={[]}>
+            <NodeList nodes={view.nodes} />
+          </SurfaceFrame>
+        </ViewContext.Provider>,
+      );
+    };
+    next({ selected: "r2", resetToken: "1" });
+    expect(root().getAttribute("data-showing")).toBe("detail");
+    expect(screen.getByTestId("plugin-md-back").textContent).toBe("Build #2");
+    next({ selected: "r2", resetToken: "2" });
+    expect(root().getAttribute("data-showing")).toBe("list");
+    expect(row("r2").getAttribute("data-selected")).toBe("true");
+  });
+
   it("does nothing while inert", () => {
     boxes.md = { top: 0, height: 0, width: 328 };
     inSurface(<NodeList nodes={[mdNode()]} />, { inert: true });
