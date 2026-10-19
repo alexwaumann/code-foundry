@@ -1,8 +1,8 @@
 /**
- * Targeted probes of the layout primitives (docs/notes/plugins-layout-{1..4}*.md), found by
- * the layout fuzz pass (/tmp/cf-layout-fuzz/gui.md). `it.fails` marks a probe that shows a
- * bug today: it passes while the bug is there and fails once it is fixed (then make it an
- * `it`). Plain `it`s are checks that came out clean and stay as regressions.
+ * Targeted probes of the layout primitives (docs/notes/plugins-layout-{1..4}*.md), from the
+ * layout fuzz pass; each is named by its finding's id (docs/notes/plugins-layout-fixes-gui.md
+ * has them, their causes and fixes). A probe for a bug still open would be an `it.fails`
+ * (it passes while the bug is there); there are none. The rest are regressions.
  */
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -79,7 +79,7 @@ function mount(v: PluginViewModel) {
 }
 
 describe("master-detail: the optimistic choice", () => {
-  it("BUG md-1: a failed earlier choice closes the detail of a later one still in flight (narrow)", async () => {
+  it("md-1: a failed earlier choice leaves the detail of a later one still in flight (narrow)", async () => {
     geo.width = 360;
     mount(view(md({ selected: "" })));
     fireEvent.click(row("r1") as HTMLElement); // act A
@@ -91,16 +91,16 @@ describe("master-detail: the optimistic choice", () => {
     expect(root()?.dataset.showing).toBe("detail");
   });
 
-  it("BUG md-2: with two choices in flight the list's first pending row shows as chosen, not the last clicked (wide)", () => {
+  it("md-2: with two choices in flight the last row clicked shows as chosen, not the list's first pending row (wide)", () => {
     geo.width = 900;
     mount(view(md({ selected: "" })));
     fireEvent.click(row("r1") as HTMLElement);
     fireEvent.click(row("r3") as HTMLElement);
-    // The user clicked r3 last; picking = rows.find(pending) takes the list's first pending row, r1.
+    // The user clicked r3 last (rows.find over the pending keys took the list's first, r1).
     expect(root()?.dataset.selected).toBe("r3");
   });
 
-  it("BUG md-3: the act answering before the plugin's next view (the daemon coalesces views 100 ms) flashes the list and drops Back's focus (narrow)", async () => {
+  it("md-3: the act answering before the plugin's next view (the daemon coalesces views 100 ms) keeps the detail and Back's focus (narrow)", async () => {
     geo.width = 360;
     mount(view(md({ selected: "" })));
     fireEvent.click(row("r2") as HTMLElement);
@@ -113,7 +113,7 @@ describe("master-detail: the optimistic choice", () => {
     expect(document.activeElement?.getAttribute("data-testid")).toBe("plugin-md-back");
   });
 
-  it("BUG tabs-1: a node tab's act answering before the next view shows the old tab again until it arrives", async () => {
+  it("tabs-1: a node tab's act answering before the next view keeps the clicked tab active until the view comes", async () => {
     mount(view({ key: "tb", tabs: { items: [{ key: "ta", label: "A" }, { key: "tbb", label: "B" }], active: "ta", children: [{ key: "a-text", text: { content: "tab A" } }] } }));
     fireEvent.click(document.querySelector('[data-testid="plugin-node-tab"][data-key="tbb"]') as HTMLElement);
     expect(document.querySelector('[data-testid="plugin-node-tab"][data-key="tbb"]')?.getAttribute("aria-selected")).toBe("true");
@@ -172,7 +172,7 @@ describe("master-detail: Back", () => {
 // md-4 and md-6 (Back in a virtualized list; the owed focus paid later) need real layout:
 // e2e/plugins-layout-fuzz.spec.ts (jsdom's virtualizer draws no rows at all).
 describe("master-detail: focus", () => {
-  it("HARDEN md-7: a refused choice drops focus to the document (Back, which had it, is gone; the row does not get it back)", async () => {
+  it("md-7: a refused choice hands focus back to the row that was chosen (Back, which had it, is gone)", async () => {
     geo.width = 360;
     mount(view(md({ selected: "" })));
     fireEvent.click(row("r2") as HTMLElement);
@@ -242,7 +242,7 @@ describe("fill height", () => {
     expect(pane()?.style.height).toBe("384px");
   });
 
-  it("BUG fill-2: a fill node keeps its first box when an enclosing pane becomes a box (auto → px) under the same key", () => {
+  it("fill-2: a fill node follows an enclosing pane that becomes a box (auto → px) under the same key", () => {
     geo.height = 700;
     geo.boxes.outer = { height: 300 };
     const v = (h: "auto" | number): PluginViewModel => view({ key: "outer", pane: { height: h, children: [{ key: "inner", pane: { height: "fill", children: [] } }] } });
