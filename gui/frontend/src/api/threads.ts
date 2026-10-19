@@ -542,3 +542,22 @@ export async function stageAttachment(file: { name: string; type: string; arrayB
     throw orOutdatedDaemon(err);
   }
 }
+
+/**
+ * Stages the file at an absolute path (one dropped on the composer or picked in the
+ * native file dialog; the Wails host hands over paths, WebKit never does) without
+ * uploading its bytes: the daemon reads it, sniffs the type, applies the same limits
+ * and page count as stageAttachment, and returns the daemon-side path. Unsupported
+ * content fails with InvalidArgument and the same message as an unsupported type
+ * (shown as the composer notice); a missing file with NotFound. `pages` is a hint like
+ * stageAttachment's.
+ */
+export async function stageAttachmentPath(path: string, pages: number | null = null, conn: DaemonConnection = daemon): Promise<string> {
+  const c = await conn.client(ThreadService);
+  try {
+    const res = await c.stageAttachment({ path, pages: pages ?? 0 });
+    return res.path;
+  } catch (err) {
+    throw orOutdatedDaemon(err);
+  }
+}

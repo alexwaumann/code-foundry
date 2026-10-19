@@ -231,7 +231,7 @@ func TestStageAttachmentFile(t *testing.T) {
 		{name: "image over cap", path: sparse("huge.png", pngData, MaxAttachmentBytes+1), wantErr: ErrInvalidArgument, errText: "the limit for an image is 10 MiB"},
 		{name: "pdf over cap", path: sparse("huge.pdf", pdfData, MaxPDFAttachmentBytes+1), wantErr: ErrInvalidArgument, errText: "the limit for a PDF is 20 MiB"},
 		{name: "empty", path: write("empty.png", nil), wantErr: ErrInvalidArgument, errText: "attachment is empty"},
-		{name: "missing", path: filepath.Join(src, "gone.png"), wantErr: ErrNotFound},
+		{name: "missing", path: filepath.Join(src, "gone.png"), wantErr: ErrNotFound, errText: `attachment "` + src + `/gone.png" does not exist`},
 		{name: "relative", path: "shot.png", wantErr: ErrInvalidArgument, errText: "not absolute"},
 		{name: "directory", path: src, wantErr: ErrInvalidArgument, errText: "is a directory"},
 		{name: "fifo", path: fifo, wantErr: ErrInvalidArgument, errText: "not a regular file"},

@@ -224,10 +224,19 @@ func (m *Manager) StageAttachmentFile(ctx context.Context, path, mimeType string
 // does not exist, else ErrInvalidArgument (not readable by the daemon's user).
 func attachmentFileError(path string, err error) error {
 	if errors.Is(err, fs.ErrNotExist) {
-		return fmt.Errorf("%w: attachment %q does not exist", ErrNotFound, path)
+		return attachmentNotFound(fmt.Sprintf("attachment %q does not exist", path))
 	}
 	return fmt.Errorf("%w: attachment %q: %w", ErrInvalidArgument, path, err)
 }
+
+// attachmentNotFound is ErrNotFound with its own message: the composer shows it, and
+// ErrNotFound's "thread not found" would mislead there.
+type attachmentNotFound string
+
+func (e attachmentNotFound) Error() string { return string(e) }
+
+// Is makes errors.Is(err, ErrNotFound) hold.
+func (e attachmentNotFound) Is(target error) bool { return target == ErrNotFound }
 
 // stageAttachment creates a fresh file in the attachments directory, fills it with
 // write and, for a PDF, settles the page count into its name (StageAttachment's

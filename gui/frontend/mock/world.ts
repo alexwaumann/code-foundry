@@ -2065,6 +2065,21 @@ export class World {
     return path;
   }
 
+  /**
+   * ThreadService.StageAttachment with a path: the mock has no files, so the type comes
+   * from the extension (the daemon sniffs the content) and the bytes are empty. Errors
+   * like the daemon: relative is invalid, anything but the five types is invalid with
+   * the daemon's unsupported-type message.
+   */
+  stageAttachmentPath(path: string, pages = 0): string {
+    if (!path.startsWith("/")) throw new CommandError("invalid", `attachment path "${path}" is not absolute`);
+    const ext = (/\.[a-z0-9]+$/i.exec(path)?.[0] ?? "").toLowerCase();
+    const types: Record<string, string> = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp", ".pdf": "application/pdf" };
+    const mimeType = types[ext];
+    if (!mimeType) throw new CommandError("invalid", `attachment type "text/plain; charset=utf-8" (want image/png, image/jpeg, image/gif, image/webp or application/pdf)`);
+    return this.stageAttachment(path.slice(path.lastIndexOf("/") + 1), mimeType, new Uint8Array(), pages);
+  }
+
   /** ProjectService.ListRefs: local branches, then remote-tracking refs, and the default base. */
   listRefs(projectId: string): { refs: string[]; defaultRef: string } {
     const project = this.projects.get(projectId);
