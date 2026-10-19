@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
@@ -331,6 +332,8 @@ type actionIndex struct {
 	elements map[string]element
 	order    []string
 	fields   []fieldInfo
+	// replaced is when a newer version came (zero for the current one).
+	replaced time.Time
 }
 
 // buildIndex walks a view for its acting elements and form fields.
@@ -453,15 +456,29 @@ func buildIndex(v *ui.View) *actionIndex {
 	return idx
 }
 
-// indexLocked records the acting elements of the new version, keeping the last few.
-func (in *instance) indexLocked(v *ui.View) {
+// indexLocked records the acting elements of the new version (made at now), keeping the
+// earlier ones replaced within keptFor, at most keptVersions in all.
+func (in *instance) indexLocked(v *ui.View, now time.Time) {
+	if prev := in.index[in.version-1]; prev != nil && prev.replaced.IsZero() {
+		prev.replaced = now
+	}
 	in.index[in.version] = buildIndex(v)
-	for ver := range in.index {
-		if ver+keptVersions <= in.version {
+	for ver, idx := range in.index {
+		if ver+keptVersions <= in.version || (ver != in.version && now.Sub(idx.replaced) > keptFor) {
 			delete(in.index, ver)
 		}
 	}
 }
+
+// staleVersionError is an act on a version no longer kept: the view changed under the
+// user's click. It is a failed precondition with words the GUI's toast can show.
+type staleVersionError struct{ version, current uint64 }
+
+func (e staleVersionError) Error() string {
+	return "the view changed before this action reached it; try again"
+}
+
+func (e staleVersionError) Is(target error) bool { return target == ErrFailedPrecondition }
 
 // Act implements Surfaces.
 func (m *Manager) Act(ctx context.Context, req ActRequest) (uint64, error) {
@@ -495,7 +512,8 @@ func (m *Manager) Act(ctx context.Context, req ActRequest) (uint64, error) {
 	cur := in.version
 	in.mu.Unlock()
 	if idx == nil {
-		return 0, fmt.Errorf("%w: version %d of %s's view is gone (the current one is %d)", ErrFailedPrecondition, ver, key, cur)
+		m.surfLog(in.plugin, "act on version %d of %s refused: gone (the current one is %d)", ver, key, cur)
+		return 0, staleVersionError{version: ver, current: cur}
 	}
 	el, err := idx.find(req.Key, req.Action)
 	if err != nil {

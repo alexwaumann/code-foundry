@@ -127,3 +127,41 @@ func TestTerminalTitleFromArgv(t *testing.T) {
 		}
 	}
 }
+
+// A version's elements are kept keptFor after a newer one replaced it, at most
+// keptVersions; the current one always (finding live #3: at 40 views a second, a fixed
+// four versions failed 27 % of clicks).
+func TestKeptVersions(t *testing.T) {
+	in := newFuzzInstance()
+	t0 := time.Unix(1000, 0)
+	accept := func(i int, at time.Time) {
+		t.Helper()
+		v, canon, errs := validateView(json.RawMessage(fmt.Sprintf(`{"nodes":[{"key":"b","actions":{"buttons":[{"key":"go","label":"Go %d","action":{"event":"go"}}]}}]}`, i)), "p", fuzzPerms)
+		if len(errs) > 0 {
+			t.Fatal(errs)
+		}
+		in.accept(v, canon, at)
+	}
+	for i := range 100 {
+		accept(i, t0)
+	}
+	if len(in.index) != keptVersions || in.index[100] == nil || in.index[100-keptVersions+1] == nil || in.index[100-keptVersions] != nil {
+		t.Fatalf("after 100 views at once: %d kept", len(in.index))
+	}
+	// 2.9 s after the last replacement everything replaced then is still kept; 3.1 s
+	// after, only the newest two (the one just replaced and the current one).
+	accept(100, t0.Add(2900*time.Millisecond))
+	if len(in.index) != keptVersions {
+		t.Fatalf("at 2.9 s: %d kept", len(in.index))
+	}
+	accept(101, t0.Add(6100*time.Millisecond))
+	if len(in.index) != 2 || in.index[102] == nil || in.index[101] == nil {
+		t.Fatalf("at 6.1 s: %d kept", len(in.index))
+	}
+	// A view shown for long and just replaced still acts (its age counts from its
+	// replacement): the one replaced 3.1 s ago goes.
+	accept(102, t0.Add(9200*time.Millisecond))
+	if len(in.index) != 2 || in.index[103] == nil || in.index[102] == nil {
+		t.Fatalf("a long-shown view replaced: %d kept", len(in.index))
+	}
+}

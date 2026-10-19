@@ -61,8 +61,10 @@ chip `deploy` and a button `deploy` collide, so prefix by role (`stage-deploy`,
   buffer goes with it), or seed the new run's text with a first line (`$ go test ./...`).
 - **Order**: append the last output *before* the view that ends the run ("passing"), so
   a viewer never sees the verdict above a log that is still filling.
-- Acts name a view version: the elements of the last 4 versions still act, so a click on
-  a view that was just replaced still arrives (with its old `version`).
+- Acts name a view version: a version's elements still act for 3 s after a newer view
+  replaced it (at most 64 versions), so a click on a view that was just replaced still
+  arrives (with its old `version`). An act on an older one is refused ("the view changed
+  before this action reached it; try again").
 - After `Surface.Close(reason)` the instance is gone: `UpdateView` to it fails with
   -32004. Stop the instance's goroutines in `Close`; persist what should survive it.
 
