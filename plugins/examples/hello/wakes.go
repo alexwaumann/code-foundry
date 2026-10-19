@@ -56,7 +56,7 @@ func (t *ticker) subscribed(h *pluginsdk.Host, s pluginsdk.WakeSubscription) {
 	ctx, cancel := context.WithCancel(context.Background())
 	t.loops[every] = cancel
 	go t.loop(ctx, h, every, d)
-	h.Log().Info("tick armed", "every", every, "subscription", s.Subscription)
+	h.Log().Info("tick armed", "every", every, "subscription", s.Subscription, "rearm", s.Rearm)
 }
 
 // unsubscribed disarms a subscription; the loop of its every stops with the last one.

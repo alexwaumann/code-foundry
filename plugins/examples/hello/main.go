@@ -54,6 +54,11 @@ func plugin() pluginsdk.Plugin {
 	return pluginsdk.Plugin{
 		OnWakeSubscribed:   func(_ context.Context, h *pluginsdk.Host, s pluginsdk.WakeSubscription) { ticks.subscribed(h, s) },
 		OnWakeUnsubscribed: func(_ context.Context, h *pluginsdk.Host, u pluginsdk.WakeUnsubscribed) { ticks.unsubscribed(h, u) },
+		// After a start's replay: hello keeps its ticks in memory, so there is nothing saved
+		// to prune; a plugin that saves subscriptions drops those not replayed here.
+		OnWakeArmed: func(_ context.Context, h *pluginsdk.Host, count int) {
+			h.Log().Info("wake subscriptions replayed", "count", count)
+		},
 		Init: func(ctx context.Context, h *pluginsdk.Host) error {
 			h.Log().Info("hello is up", "host", h.HostVersion(), "data_dir", h.DataDir(), "dev", h.Dev(), "flags", len(h.Flags()))
 			// Every new Claude thread gets CF_HELLO=1 while hello is enabled.
