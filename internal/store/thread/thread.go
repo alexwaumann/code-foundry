@@ -228,6 +228,10 @@ type Thread struct {
 	// and the turn Claude starts by itself to report it has not ended yet (wake.go). Not
 	// persisted; Thread.background_wake_pending on the API.
 	WakePending bool
+	// Removing: Store.Remove is closing the thread to forget it (tombstones.go). The
+	// thread meets no wait or wake condition meanwhile (Meets). Not persisted, not on
+	// the API.
+	Removing bool
 	// CreatedBy is the thread whose agent created this one (CreateOptions.CreatedBy);
 	// empty when the user did. CreatedByName is that thread's name (its id when unnamed)
 	// at creation, kept verbatim. Persisted (metadata.go).
@@ -471,6 +475,12 @@ type Store interface {
 	// List returns the threads o selects, the most recently active first (filter.go).
 	// A Project or Workspace that names nothing is ErrInvalidArgument.
 	List(ctx context.Context, o ListOptions) ([]Thread, error)
+	// Removed returns what is kept of a thread removed within RemovedTTL
+	// (tombstones.go). A look-up of such an id is a *RemovedError.
+	Removed(id string) (RemovedThread, bool)
+	// ListRemoved returns the threads removed within RemovedTTL that o selects
+	// (FilterRemoved), the most recently removed first.
+	ListRemoved(ctx context.Context, o ListOptions) ([]RemovedThread, error)
 
 	// Thread conversations (conversation.go, items.go).
 

@@ -134,13 +134,16 @@ func threadGet(b ThreadBackend, idArg ArgSpec) Command {
 		Name:  "thread.get",
 		Title: "Show Thread",
 		Description: "Print one thread: its status, worktree, who created it and why, labels, report and cost " +
-			"(--json: the thread with every field).",
+			"(--json: the thread with every field). A thread removed within the last day: when, and its last report (exit 1).",
 		Category:     "Thread",
 		NoKeybinding: true,
 		Args:         []ArgSpec{idArg},
 		When:         hasThread,
 		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 			res, err := b.Get(ctx, connect.NewRequest(&v1.GetThreadRequest{Id: a.String("id")}))
+			if r, ok := removedFrom(err); ok {
+				return removedGetResult(r), nil
+			}
 			if err != nil {
 				return Result{}, err
 			}

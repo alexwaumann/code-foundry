@@ -40,6 +40,8 @@ type Fake struct {
 	nextSub int
 	// requests are CreateOnce's keys (creator NUL key) to thread ids.
 	requests map[string]string
+	// removed are Remove's tombstones, by id.
+	removed map[string]thread.RemovedThread
 }
 
 var _ thread.Store = (*Fake)(nil)
@@ -93,6 +95,9 @@ func (f *Fake) record(call string) error {
 
 func (f *Fake) get(id string) (thread.Thread, error) {
 	s, ok := f.byID[id]
+	if r, gone := f.removed[id]; !ok && gone {
+		return thread.Thread{}, &thread.RemovedError{Thread: r}
+	}
 	if !ok {
 		return thread.Thread{}, fmt.Errorf("%w: %s", thread.ErrNotFound, id)
 	}
@@ -420,6 +425,11 @@ func (f *Fake) Remove(_ context.Context, id string) error {
 		return err
 	}
 	delete(f.byID, id)
+	if f.removed == nil {
+		f.removed = map[string]thread.RemovedThread{}
+	}
+	f.removed[id] = thread.RemovedThread{ID: s.ID, Name: s.Name, ProjectID: s.ProjectID, WorkspaceID: s.WorkspaceID,
+		CreatedBy: s.CreatedBy, Owner: s.Owner, Labels: slices.Clone(s.Labels), Report: s.Report, RemovedAt: f.Now()}
 	if len(s.Usage) > 0 {
 		f.retired = thread.SumUsage(f.retired, s.Usage)
 	}
@@ -781,4 +791,24 @@ func (f *Fake) McpReconnect(_ context.Context, id, server string) (thread.McpRec
 	}
 	f.PutMcp(id, &next)
 	return thread.McpReconnectResult{Status: &next, Error: msg}, nil
+}
+
+// Removed returns the tombstone Remove kept of id (thread.Store.Removed). The fake
+// keeps them for good: tests set the clock.
+func (f *Fake) Removed(id string) (thread.RemovedThread, bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	r, ok := f.removed[id]
+	return r, ok
+}
+
+// ListRemoved returns the tombstones o selects (thread.FilterRemoved).
+func (f *Fake) ListRemoved(_ context.Context, o thread.ListOptions) ([]thread.RemovedThread, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := make([]thread.RemovedThread, 0, len(f.removed))
+	for _, r := range f.removed {
+		out = append(out, r)
+	}
+	return thread.FilterRemoved(out, o), nil
 }

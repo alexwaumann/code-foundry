@@ -510,18 +510,24 @@ func threadWake(sub Subscription, t Thread, at time.Time, d wakeDetail) Message 
 	if p.Thread.Labels == nil {
 		p.Thread.Labels = []string{}
 	}
-	if t.Report.Status != ReportNone {
-		r := &wakeReport{Status: t.Report.Status.String(), Summary: t.Report.Summary, At: wakeTime(t.Report.At), Data: json.RawMessage("null")}
-		if t.Report.Data != "" && json.Valid([]byte(t.Report.Data)) {
-			r.Data = json.RawMessage(t.Report.Data)
-		}
-		p.Thread.Report = r
-	}
+	p.Thread.Report = wakeReportOf(t.Report)
 	if d.children.Total > 0 {
 		kids := d.children
 		p.Thread.Children = &kids
 	}
 	return wakeMessage(threadWakeTitle(sub.Condition, t, d), p)
+}
+
+// wakeReportOf is a report in a wake's JSON; nil for none.
+func wakeReportOf(rep Report) *wakeReport {
+	if rep.Status == ReportNone {
+		return nil
+	}
+	r := &wakeReport{Status: rep.Status.String(), Summary: rep.Summary, At: wakeTime(rep.At), Data: json.RawMessage("null")}
+	if rep.Data != "" && json.Valid([]byte(rep.Data)) {
+		r.Data = json.RawMessage(rep.Data)
+	}
+	return r
 }
 
 // threadWakeTitle is a thread wake's header without its prefix, for example

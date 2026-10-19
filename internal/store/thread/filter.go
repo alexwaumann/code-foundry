@@ -106,24 +106,35 @@ func lastActive(t Thread) time.Time {
 // name, or a path inside a worktree) and Workspace (an id or a name) first. A ref that
 // names nothing is ErrInvalidArgument.
 func (m *Manager) List(_ context.Context, o ListOptions) ([]Thread, error) {
+	o, err := m.resolveListRefs(o)
+	if err != nil {
+		return nil, err
+	}
+	return FilterThreads(m.Snapshot().Threads, o), nil
+}
+
+// resolveListRefs resolves o's Project (an id, a name, or a path inside a worktree)
+// and Workspace (an id or a name) to ids. A ref that names nothing is
+// ErrInvalidArgument.
+func (m *Manager) resolveListRefs(o ListOptions) (ListOptions, error) {
 	if o.Project != "" && m.opts.Projects != nil { // without a project store (tests): an id
 		r, err := workspace.ResolveProject(m.opts.Projects.Snapshot(), o.Project)
 		if err != nil {
-			return nil, listRefError("project", o.Project, err)
+			return o, listRefError("project", o.Project, err)
 		}
 		o.Project = r.ID
 	}
 	if o.Workspace != "" {
 		if m.opts.Workspaces == nil {
-			return nil, fmt.Errorf("%w: no workspace %q", ErrInvalidArgument, o.Workspace)
+			return o, fmt.Errorf("%w: no workspace %q", ErrInvalidArgument, o.Workspace)
 		}
 		w, err := workspace.ResolveWorkspace(m.opts.Workspaces.Snapshot(), workspace.Ref{Workspace: o.Workspace})
 		if err != nil {
-			return nil, listRefError("workspace", o.Workspace, err)
+			return o, listRefError("workspace", o.Workspace, err)
 		}
 		o.Workspace = w.ID
 	}
-	return FilterThreads(m.Snapshot().Threads, o), nil
+	return o, nil
 }
 
 // listRefError is a filter ref that names nothing (or several), as InvalidArgument.

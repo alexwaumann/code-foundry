@@ -62,6 +62,15 @@ func (h *Thread) List(ctx context.Context, req *connect.Request[v1.ListThreadsRe
 		if snap := h.store.Snapshot(); f.GetAll() && snap != nil {
 			res.RetiredUsage = retiredToProto(snap.RetiredUsage)
 		}
+		if f.GetIncludeRemoved() {
+			removed, err := h.store.ListRemoved(ctx, listOptionsFromProto(f))
+			if err != nil {
+				return nil, threadError(err)
+			}
+			for _, r := range removed {
+				res.Removed = append(res.Removed, removedToProto(r))
+			}
+		}
 		return connect.NewResponse(res), nil
 	}
 	snap := h.store.Snapshot()
@@ -298,6 +307,9 @@ func threadError(err error) error {
 	var ce *connect.Error
 	if errors.As(err, &ce) {
 		return err
+	}
+	if re := removedError(err); re != nil {
+		return re
 	}
 	code := connect.CodeInternal
 	switch {

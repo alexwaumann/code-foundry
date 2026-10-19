@@ -54,7 +54,7 @@ func RegisterThreadList(r *Registry, d ThreadListDeps) error {
 		NoKeybinding: true,
 		Args: []ArgSpec{
 			{Name: "archived", Type: Bool, Description: "Include archived threads"},
-			{Name: "all", Type: Bool, Description: "Every thread, archived ones too (--json: also the usage of removed threads); the other filters still apply"},
+			{Name: "all", Type: Bool, Description: "Every thread, archived ones too, then those removed within the last day ([removed]; --json: removed, and the usage of removed threads); the other filters still apply"},
 			{Name: "status", Type: Enum, Enum: ThreadListStatuses, Description: "Only threads with this status: busy, idle, attention (a prompt, a question or a finished turn), or error"},
 			{Name: "state", Type: Enum, Enum: ThreadListStates, Description: "Only threads whose Claude process is starting, connected, closing, or disconnected"},
 			{Name: "project", Type: String, Description: "Only threads in this project: its id, name, or an absolute path inside it"},
@@ -69,7 +69,7 @@ func RegisterThreadList(r *Registry, d ThreadListDeps) error {
 				return Result{}, InvalidArg("limit", "limit must be 0 (no limit) or more, not %d", a.Int("limit"))
 			}
 			f := &v1.ThreadFilter{
-				All: a.Bool("all"), IncludeArchived: a.Bool("archived"),
+				All: a.Bool("all"), IncludeArchived: a.Bool("archived"), IncludeRemoved: a.Bool("all"),
 				Status: threadListStatuses[a.String("status")], State: threadListState(a.String("state")),
 				Project: strings.TrimSpace(a.String("project")), Workspace: strings.TrimSpace(a.String("workspace")),
 				Labels: splitList(a.String("label")), Limit: int32(a.Int("limit")), Owner: pluginOwner(a.String("plugin")),
@@ -91,7 +91,16 @@ func RegisterThreadList(r *Registry, d ThreadListDeps) error {
 			if err != nil {
 				return Result{}, err
 			}
-			return Result{Message: formatThreadList(res.Msg.GetThreads(), projects.Msg.GetProjects(), names, f, time.Now()), JSON: res.Msg}, nil
+			now := time.Now()
+			msg := formatThreadList(res.Msg.GetThreads(), projects.Msg.GetProjects(), names, f, now)
+			if removed := res.Msg.GetRemoved(); len(removed) > 0 {
+				if len(res.Msg.GetThreads()) == 0 {
+					msg = formatRemovedList(removed, names, now)
+				} else {
+					msg += "\n" + formatRemovedList(removed, names, now)
+				}
+			}
+			return Result{Message: msg, JSON: res.Msg}, nil
 		},
 	})
 }

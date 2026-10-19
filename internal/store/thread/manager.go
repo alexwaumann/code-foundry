@@ -250,6 +250,8 @@ type Manager struct {
 	subs *subscriptions
 	// reqs are the request ids being created now (requests.go).
 	reqs requests
+	// removed are the tombstones of removed threads (tombstones.go).
+	removed tombstones
 	// spawnExtras is what every spawn adds (spawnextras.go); nil: nothing.
 	spawnExtras atomic.Pointer[SpawnExtrasFunc]
 }
@@ -387,7 +389,7 @@ func (m *Manager) Get(_ context.Context, id string) (Thread, error) {
 	if s, ok := m.Snapshot().Thread(id); ok {
 		return s, nil
 	}
-	return Thread{}, fmt.Errorf("%w: %s", ErrNotFound, id)
+	return Thread{}, m.notFound(id)
 }
 
 // rebuildLocked publishes a new snapshot. Callers hold m.mu.
@@ -437,7 +439,7 @@ func (m *Manager) commitLocked(rec *record, persist bool) {
 func (m *Manager) record(id string) (*record, error) {
 	rec, ok := m.recs[id]
 	if !ok {
-		return nil, fmt.Errorf("%w: %s", ErrNotFound, id)
+		return nil, m.notFound(id)
 	}
 	return rec, nil
 }
@@ -909,8 +911,20 @@ func (m *Manager) Close(ctx context.Context, id string) error {
 }
 
 // Remove closes the thread if needed, kills and removes the shells that belong to it
-// (terminals labelled termlabel.KindShell with its id), then forgets it.
-func (m *Manager) Remove(ctx context.Context, id string) error {
+// (terminals labelled termlabel.KindShell with its id), then forgets it, keeping a
+// tombstone for RemovedTTL (tombstones.go). Meanwhile the thread is Removing, so the
+// closing snapshot meets no wait or wake condition; once it is forgotten its
+// subscribers get a CondRemoved wake (subscriptions_removed.go). When it fails the
+// thread stays, no longer Removing.
+func (m *Manager) Remove(ctx context.Context, id string) (err error) {
+	if err := m.setRemoving(id, true); err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = m.setRemoving(id, false) // gone meanwhile: nothing to clear
+		}
+	}()
 	if err := m.Close(ctx, id); err != nil {
 		return err
 	}
@@ -937,11 +951,31 @@ func (m *Manager) Remove(ctx context.Context, id string) error {
 	if len(rec.s.Usage) > 0 {
 		m.retired = SumUsage(m.retired, rec.s.Usage)
 	}
+	// The tombstone goes in before the event: a waiter that sees Removed finds it.
+	tomb := removedThread(rec.s, m.opts.Now().Round(0).Truncate(time.Millisecond))
+	m.removed.add(tomb)
 	m.rebuildLocked()
+	m.log.Info("thread removed", "thread", id, "name", rec.s.Name, "created_by", rec.s.CreatedBy)
 	bus.Publish[Event](m.opts.Bus, Removed{ID: id})
+	m.fireRemovedLocked(tomb)     // before forgetLocked deletes the subscriptions
 	m.forgetLocked(id, "removed") // wake subscriptions (subscriptions.go)
 	if len(rec.s.Usage) > 0 {
 		bus.Publish[Event](m.opts.Bus, RetiredUsage{Buckets: m.retired})
+	}
+	return nil
+}
+
+// setRemoving sets or clears Thread.Removing (tombstones.go) and publishes the thread.
+func (m *Manager) setRemoving(id string, on bool) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	rec, err := m.record(id)
+	if err != nil {
+		return err
+	}
+	if rec.s.Removing != on {
+		rec.s.Removing = on
+		m.commitLocked(rec, false)
 	}
 	return nil
 }

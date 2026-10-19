@@ -89,8 +89,12 @@ const ReasonWakeLimit = "wake limit"
 // mid-turn), or needs attention for anything but a pending permission prompt or
 // question (a turn that ended unseen, "finished" or "error: <code>", "snooze ended",
 // "budget reached", "wake limit"). The ThreadService.Wait conditions are the same
-// (docs/notes/agents-1-wait-events.md).
+// (docs/notes/agents-1-wait-events.md). A thread being removed (Thread.Removing) meets
+// none: its closing snapshot is not a thread that settled.
 func Meets(c Condition, t Thread) bool {
+	if t.Removing {
+		return false
+	}
 	switch c {
 	case CondSettled:
 		return Meets(CondIdle, t) || Meets(CondAttention, t)
@@ -444,7 +448,7 @@ func (m *Manager) subscribe(sub Subscription, run ActionRun, pr *PullRequestInfo
 		case sub.TargetID == sub.SubscriberID:
 			return SubscribeResult{}, fmt.Errorf("%w: thread %s cannot subscribe to itself", ErrFailedPrecondition, sub.TargetID)
 		case !ok:
-			return SubscribeResult{}, fmt.Errorf("%w: target thread %s", ErrNotFound, sub.TargetID)
+			return SubscribeResult{}, fmt.Errorf("target thread: %w", m.notFound(sub.TargetID))
 		case !trec.s.ArchivedAt.IsZero():
 			return SubscribeResult{}, fmt.Errorf("%w: thread %s is archived", ErrFailedPrecondition, sub.TargetID)
 		}
@@ -503,18 +507,25 @@ func (m *Manager) subscribe(sub Subscription, run ActionRun, pr *PullRequestInfo
 }
 
 // observeLocked is the commit hook: t was just published. An archived thread's
-// subscriptions go (forgetLocked); otherwise each subscription to t fires when t went
-// into its condition, and a settled or attention one also when t, still meeting it,
-// now waits on another pending request than when last seen (requestKey): a permission
-// prompt answered and the next one asked within the status debounce publish as one
-// change, from "permission: Edit …" to "permission: Bash …". A reason change that is
-// not a new request (finished, then finished again) does not fire. Callers hold m.mu.
+// subscriptions go (forgetLocked); a thread being removed is skipped (its subscribers
+// get a removed wake, subscriptions_removed.go); otherwise each subscription to t fires
+// when t went into its condition, and a settled or attention one also when t, still
+// meeting it, now waits on another pending request than when last seen (requestKey): a
+// permission prompt answered and the next one asked within the status debounce publish
+// as one change, from "permission: Edit …" to "permission: Bash …". A reason change
+// that is not a new request (finished, then finished again) does not fire. Callers hold
+// m.mu.
 func (m *Manager) observeLocked(t Thread) {
 	if m.subs == nil {
 		return
 	}
 	if !t.ArchivedAt.IsZero() {
 		m.forgetLocked(t.ID, "archived")
+		return
+	}
+	if t.Removing {
+		// Its subscribers get a removed wake (fireRemovedLocked). Should the removal
+		// fail, the next change is compared with the state from before it.
 		return
 	}
 	s := m.subs

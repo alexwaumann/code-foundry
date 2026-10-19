@@ -43,7 +43,8 @@ func threadWait(b ThreadBackend, idArg ArgSpec) Command {
 		Title: "Wait for Thread",
 		Description: "Wait until a thread is idle (Claude not working and no question or permission prompt pending), " +
 			"needs attention, has an error, or is disconnected; returns at once when it already is. " +
-			"Prints the thread's status (--json: the thread). Exits 1 when the time runs out.",
+			"Prints the thread's status (--json: the thread). Exits 1 when the time runs out, or when the thread is removed " +
+			"(--json: removed true and its last report).",
 		Category:     "Thread",
 		NoKeybinding: true,
 		Args: []ArgSpec{
@@ -81,14 +82,21 @@ func waitLimit(a Args) (time.Duration, error) {
 }
 
 // waitThread waits (ThreadService.Wait) and answers like thread.wait: the thread's
-// status line and the thread, or DEADLINE_EXCEEDED naming its status. what, when set,
-// starts the timeout message ("sent to thread s-1; ").
+// status line and the thread, DEADLINE_EXCEEDED naming its status, or, for a thread
+// removed before or during the wait, removedWaitResult (exit 1). what, when set,
+// starts the timeout and removed messages ("sent to thread s-1; ").
 func waitThread(ctx context.Context, b ThreadBackend, id, until, after string, limit time.Duration, what string) (Result, error) {
 	res, err := b.Wait(ctx, connect.NewRequest(&v1.WaitThreadRequest{
 		Id: id, Until: threadWaitConditions[until], Timeout: durationpb.New(limit), After: after,
 	}))
+	if r, ok := removedFrom(err); ok {
+		return removedWaitResult(r, what), nil
+	}
 	if err != nil {
 		return Result{}, err
+	}
+	if r := res.Msg.GetRemoved(); r != nil {
+		return removedWaitResult(r, what), nil
 	}
 	s := res.Msg.GetThread()
 	if res.Msg.GetTimedOut() {

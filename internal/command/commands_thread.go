@@ -113,6 +113,9 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 					ThreadId: a.String("id"), Text: a.String("text"), Attachments: splitList(a.String("attachments")),
 					ComposerText: a.String("composer-text"),
 				}))
+				if r, ok := removedFrom(err); ok {
+					return removedWaitResult(r, ""), nil // exit 1, not a usage error
+				}
 				if err != nil {
 					return Result{}, err
 				}
