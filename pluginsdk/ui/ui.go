@@ -771,8 +771,9 @@ type Container struct {
 // the plugin answers with a view whose Selected is that row and whose Detail is its
 // detail (like a tab act). The host shows the row selected while the act is pending and
 // goes back to Selected when it fails. EmptyDetail is the detail side while Selected is
-// "" (wide only). Selected is "" or a row's key. Form drafts in the detail are kept per
-// selected row.
+// "" (wide only). Selected is "" or a row's key; Detail is empty while Selected is "",
+// and the list's rows set no Selected of their own (Validate refuses both: neither is
+// shown). Form drafts in the detail are kept per selected row.
 type MasterDetail struct {
 	List        List   `json:"list"`
 	Selected    string `json:"selected,omitempty"`

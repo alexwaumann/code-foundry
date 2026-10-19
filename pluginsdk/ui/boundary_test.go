@@ -75,7 +75,8 @@ func TestDepthEveryMix(t *testing.T) {
 	for _, levels := range combos(ui.MaxDepth + 1) {
 		v := ui.View{Nodes: []ui.Node{nestLevels(levels, -1)}}
 		msgs := problems(v.Validate())
-		if len(msgs) != 1 || !strings.Contains(msgs[0], "inside 5 containers") {
+		// The message names the containers around the leaf, outermost first.
+		if len(msgs) != 1 || !strings.HasSuffix(msgs[0], ": inside 5 containers ("+strings.Join(levels, " > ")+"), at most 4") {
 			t.Fatalf("%v: %q", levels, msgs)
 		}
 		if p, _, _ := strings.Cut(msgs[0], ": "); !pathExists(v, p) || !strings.HasSuffix(p, "]") {
@@ -178,7 +179,7 @@ func TestElementsAtTheLimitEverywhere(t *testing.T) {
 			for i := range fill - 3 { // md, empty-detail button, pairs node
 				rows = append(rows, ui.NewRow(fmt.Sprintf("r%d", i), "Run"))
 			}
-			md := ui.NewMasterDetail("md", ui.List{Rows: rows}, "", pad("p", 0))
+			md := ui.NewMasterDetail("md", ui.List{Rows: rows}, "r0", pad("p", 0))
 			md.MasterDetail.EmptyDetail = &ui.Empty{Title: "none", Actions: []ui.Button{ui.EventButton("eb", "Go", "go")}}
 			return ui.View{Nodes: []ui.Node{md}}
 		},

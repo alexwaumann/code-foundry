@@ -57,7 +57,7 @@ func (p *panel) view() ui.View {
 			ui.CommandButton("cmd", "Cmd", "plugin.surf.on", nil)),
 		form,
 		{Key: "out", Log: &ui.Log{}},
-		ui.NewMasterDetail("pmd", ui.List{Rows: []ui.Row{ui.NewRow("pr1", "Run 1"), ui.NewRow("pr2", "Run 2")}}, "",
+		ui.NewMasterDetail("pmd", ui.List{Rows: []ui.Row{ui.NewRow("pr1", "Run 1"), ui.NewRow("pr2", "Run 2")}}, "pr1",
 			ui.NewTabsNode("ptabs", ui.NewTabs("pt1", ui.NewTab("pt1", "One"), ui.NewTab("pt2", "Two")))),
 	}}
 }
@@ -65,6 +65,14 @@ func (p *panel) view() ui.View {
 func (p *panel) Act(_ context.Context, act pluginsdk.SurfaceAct) error {
 	if act.Context.ThreadID != "" {
 		p.h.Log().Info("act", "viewer", act.Context.ThreadID)
+	}
+	if act.Kind == pluginsdk.ActSelect || act.Kind == pluginsdk.ActTab {
+		// Dispatch on the kind: a click's event may be named "select" or "tab" too.
+		p.mu.Lock()
+		vals, _ := json.Marshal(act.Values)
+		p.got = fmt.Sprintf("%s:%s key=%s value=%v node=%q values=%s version=%d", act.Kind, act.Action, act.Key, act.Value, act.Node, vals, act.Version)
+		p.mu.Unlock()
+		return p.h.UpdateView(p.inst, p.view())
 	}
 	switch act.Action {
 	case "inc":
@@ -97,11 +105,6 @@ func (p *panel) Act(_ context.Context, act pluginsdk.SurfaceAct) error {
 		return nil
 	case "fail":
 		return errors.New("it broke")
-	case "select", "tab":
-		p.mu.Lock()
-		vals, _ := json.Marshal(act.Values)
-		p.got = fmt.Sprintf("%s:%s key=%s value=%v node=%q values=%s version=%d", act.Kind, act.Action, act.Key, act.Value, act.Node, vals, act.Version)
-		p.mu.Unlock()
 	}
 	return p.h.UpdateView(p.inst, p.view())
 }

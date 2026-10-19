@@ -20,7 +20,8 @@ import (
 //   - Validate never panics;
 //   - every problem's path (and the path a duplicate names) exists in the view;
 //   - the "N elements" problem appears exactly when an independent count of the
-//     view's elements is over MaxElements, with that count;
+//     view's elements is over MaxElements, with that count (unless a node is past
+//     MaxDepth: its insides are not counted);
 //   - an accepted view round-trips through JSON (decodes, validates, re-encodes byte for
 //     byte) and its nodes are all reached by NodeLists and Children.
 func TestGeneratedViews(t *testing.T) {
@@ -88,9 +89,14 @@ func checkGenerated(t *testing.T, seed uint64) bool {
 			got, _ = strconv.Atoi(sm[1])
 		}
 	}
-	truncated := len(msgs) > ui.MaxProblems // the view-wide problems come last and are only counted then
+	// A node past MaxDepth is counted, its insides not (the view is refused anyway; the
+	// depth problem may be past the named ones).
+	deepest := 0
+	for _, l := range v.NodeLists() {
+		countKinds(l, 0, map[string]int{}, &deepest)
+	}
 	switch {
-	case truncated:
+	case deepest > ui.MaxDepth:
 	case want > ui.MaxElements && got != want:
 		t.Errorf("seed %d: %d elements by the count, Validate says %d (-1: nothing)", seed, want, got)
 	case want <= ui.MaxElements && got != -1:
