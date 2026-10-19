@@ -61,6 +61,7 @@ show in `code-foundry plugin list`'s NOTE column.
 | `permissions` | What the plugin may do through the host (below). `{}` asks for nothing; the user still consents once to running the plugin at all. |
 | `commands` | Up to 100 (below). |
 | `surfaces` | Up to 20 (below). |
+| `wakes` | Up to 50 wake sources (below). |
 
 ## Permissions
 
@@ -172,6 +173,45 @@ The instance id is `<plugin>/<surface>/<scope id>` (`gh-actions/runs/pr:octo/app
 every fact the surface's `when` clause reads. Each surface gets a command
 `plugin.<name>.show.<id>` (`code-foundry plugin <name> show <id>`) that opens it in the
 GUI; it is available exactly where the surface is.
+
+## Wakes
+
+A wake source is an event an agent's thread waits for instead of polling: the agent runs
+`code-foundry thread subscribe --plugin <name>/<source> [--arg k=v ...] [--repeat]`, the
+host sends the plugin `wake/subscribed`, and the plugin fires the source (`h.FireWake`,
+`host-api.md`) when the event happens; every subscribed thread whose args the fire's
+match covers gets a `[code-foundry wake]` message. No permission is needed: a wake only
+reaches threads that asked for it. `code-foundry plugin wakes <name>` lists them.
+
+```json
+"wakes": [
+  {
+    "name": "checks-done",
+    "title": "Checks done",
+    "description": "Every check on the pull request's head completed; the payload has the conclusion and the failed jobs.",
+    "scope": "pr",
+    "args": [
+      { "name": "pr", "context": "pr", "required": true, "description": "owner/name#123" },
+      { "name": "conclusion", "type": "enum", "enum": ["success", "failure"], "description": "Only this outcome" }
+    ]
+  }
+]
+```
+
+| Field | Rules |
+|---|---|
+| `name` | Required, `[a-z0-9-]{1,64}`, unique. The subscription's target is `<plugin>/<name>`. |
+| `title` | Required, up to 80 characters; `plugin wakes` and `thread subscriptions` show it. |
+| `description` | Up to 300 characters: when it fires, what the payload carries. |
+| `scope` | `global` (default), `thread`, `pr` or `project`: what one subscription is about. Descriptive; the args say which one. |
+| `args` | Up to 16. Each: `name` (kebab case), `type` `string` (default), `int`, `bool`, `enum` (with `enum`) or `duration` (Go, over 0: `10s`), `description`, `required`, `default`, `context`. |
+
+An arg with `context` (string args only) takes the subscribing thread's value when the
+agent does not give it: `thread` its id, `project` its project's id, `pr` its pull request
+as `owner/name#123` (lower-case slug; an agent may also give `#123`, `123` or the URL).
+Otherwise the `default` is kept; a `required` arg left without a value refuses the
+subscription, naming it. An optional arg without a value is absent, so that
+subscription matches every fire of the source. Values are one line, at most 512 bytes.
 
 ## Icons
 

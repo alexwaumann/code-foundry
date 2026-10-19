@@ -40,10 +40,14 @@ Drive it like the host:
 | `h.Event(pluginsdk.Event{Subscription: "sub-1", Event: json.RawMessage(...)})` | an `events/event` |
 | `h.Ping(ctx)`, `h.Shutdown(ctx)` | ping; shutdown and what `Serve` returned |
 | `h.SetSecret(key, value)` | a secret as if the user had stored it (a form with `store`) |
+| `h.Subscribe("tick", args, uctx)`, `h.SubscribeWith(pluginsdk.WakeSubscription{…})`, `h.Unsubscribe(id)` | `wake/subscribed` (`Subscribe` repeats; `SubscribeWith` with `Repeat: false` is a one-shot the fake removes after its first fire, sending `wake/unsubscribed`; an existing id is a restart's re-arm) and `wake/unsubscribed` |
 
 And read what the plugin did: `h.View(instance)` (the last view's JSON), `h.Version(instance)`,
 `h.Appends()`, `h.Toasts()`, `h.Logs()`, `h.Flags()`, `h.Contexts()`, `h.Environments()`,
-`h.Subscriptions()`, `h.Invocations()` (allowed or not), `h.Secret(key)`.
+`h.Subscriptions()`, `h.Invocations()` (allowed or not), `h.Secret(key)`, and the
+wake fires: `h.Fires()` (each `WakeFire`) with `h.Delivered()` (how many of the fake's
+subscriptions each reached, by the host's match rule). `Options.Wakes` (the manifest's
+`Wakes`) makes the fake refuse an undeclared source or match arg, as the host does.
 
 `h.WaitFor(5*time.Second, func(h *plugintest.Host) bool { … })` waits for something done
 asynchronously (a goroutine, a notification). It checks the condition at once, after
@@ -144,6 +148,12 @@ intervals, and check the count did not grow.
 **Flags in Init**: start with `Options.Flags` set and check Init cleared what no longer
 holds (`h.Flags()` records the plugin's `SetFlag` calls).
 
+**Wake sources**: subscribe with the args an agent would give, make the event happen
+(or shorten the poll interval), and check `h.Fires()` for the source, match, title and
+payload; subscribe the same id again (a restart's re-arm) and check nothing doubled;
+unsubscribe and check the plugin stopped watching (no new fires after a few intervals).
+Check every message about an event ends with `pluginsdk.WakeHint(...)`.
+
 ## What plugintest does not do
 
 It does not evaluate `when` clauses, check command buttons against the permissions,
@@ -195,6 +205,12 @@ home directory; so must an unpacked release tarball you try):
   test against (no prompt: nothing is sent to Claude). Never send a prompt just to test.
 - `code-foundry plugin logs <name> --lines 50` after each step: refused views and calls,
   your own log lines.
+- **Wake sources**: `code-foundry plugin wakes <name>` lists them with the line that
+  subscribes. Subscribe a test thread (`thread new --no-project --created-by=` as above):
+  `code-foundry thread subscribe --id <thread> --plugin <name>/<source> --arg k=v`;
+  `thread subscriptions --id <thread>` shows it; make the event happen (or a command that
+  fires it), then `code-foundry thread items --id <thread>` shows `wake: <title>`. The
+  wake starts the stopped thread's Claude (one cheap turn): unsubscribe when done.
 - **Consent again.** Consent, secrets and the data dir outlive `plugin uninstall <name>`
   (for a dev plugin it removes only the link), so a reinstall or a new `plugin dev`
   starts without asking. To see the consent text as a new user does, `code-foundry plugin

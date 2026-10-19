@@ -314,6 +314,48 @@ when an update asks for more the host stops it until the user consents again, an
 start hands over what was granted (`h.Granted()`). Test it with plugintest's
 `h.DeleteSecret(key)`.
 
+## FireWake: wake sources agents subscribe to
+
+A manifest wake source (`manifest.md`, "Wakes") lets an agent's thread wait for an event
+instead of polling. The host keeps the subscriptions; the plugin watches for each one's
+event and fires:
+
+```go
+pluginsdk.Plugin{
+	// Sent when a thread subscribes, and again for every live subscription after each
+	// start (the plugin re-arms here). Key state by s.Subscription; a repeat is the same one.
+	OnWakeSubscribed: func(ctx context.Context, h *pluginsdk.Host, s pluginsdk.WakeSubscription) {
+		w.arm(s.Subscription, s.Source, s.Args["pr"]) // s.Context: the subscriber's thread, project
+	},
+	// Unsubscribed, a one-shot that fired, its thread archived: stop watching.
+	OnWakeUnsubscribed: func(ctx context.Context, h *pluginsdk.Host, u pluginsdk.WakeUnsubscribed) {
+		w.disarm(u.Subscription)
+	},
+}
+
+// When the event happens: every subscription to the source whose args all equal the
+// match's values is woken (fewer args match more broadly). It returns how many threads.
+n, err := h.FireWake(ctx, "checks-done", map[string]string{"pr": "octo/app#12", "conclusion": "failure"},
+	"3 of 12 checks failed", map[string]any{"failed": []string{"lint", "e2e"}})
+```
+
+- **Match**: name only the source's args. A subscription without an arg (an optional one
+  the agent left out) matches any value of it. Fire once per distinct value set: one fire
+  for `pr=octo/app#12` reaches every thread waiting on that pull request.
+- The thread gets `[code-foundry wake] <display name>: <source> — <title>` and a JSON
+  block `{kind: "plugin", subscription_id, plugin, source, args, title, payload,
+  fired_at}`. Title: one line, at most 200 characters; payload: any JSON, at most 8 KiB
+  (send ids and counts, not logs). At most 20 fires a second.
+- A one-shot subscription (the default) goes after the first fire that reaches it (the
+  plugin then gets `wake/unsubscribed`); `--repeat` stays. Each thread gets at most 60
+  wakes an hour, whatever their source.
+- Disabling, uninstalling or replacing the plugin, or an update that drops a source, ends
+  its subscriptions with a last wake `… — source gone (<reason>)` (payload null).
+- **Advertise the source.** End every message, flag reason or timeline text the plugin
+  sends about an event with `h.WakeHint(source, args)` (or `pluginsdk.WakeHint(plugin,
+  source, args)`): the exact `code-foundry thread subscribe --plugin … --arg …` line, so an
+  agent that reads "checks failed" waits for the next run instead of polling it.
+
 ## Toasts
 
 `h.Toast(pluginsdk.ToastInfo, "Rerun started")` shows a short message in the app's
