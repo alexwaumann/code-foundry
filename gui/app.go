@@ -25,8 +25,8 @@ type AppInfo struct {
 }
 
 // AppService is bound to the frontend: the GUI's own version, relaunching itself, the
-// native folder picker (pickdir.go), the Dock badge, bounce and alert sound (notify.go),
-// and the window background (windowbg.go).
+// native folder picker (pickdir.go), the file picker (filedrop.go), the Dock badge,
+// bounce and alert sound (notify.go), and the window background (windowbg.go).
 // Updates are installed by the daemon; the host only quits and reopens the window.
 type AppService struct {
 	log *slog.Logger

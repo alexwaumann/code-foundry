@@ -3,8 +3,8 @@
 
 /**
  * AppService is bound to the frontend: the GUI's own version, relaunching itself, the
- * native folder picker (pickdir.go), the Dock badge, bounce and alert sound (notify.go),
- * and the window background (windowbg.go).
+ * native folder picker (pickdir.go), the file picker (filedrop.go), the Dock badge,
+ * bounce and alert sound (notify.go), and the window background (windowbg.go).
  * Updates are installed by the daemon; the host only quits and reopens the window.
  * @module
  */
@@ -41,6 +41,17 @@ export function Info(): $CancellablePromise<$models.AppInfo> {
  */
 export function PickDirectory(startDir: string): $CancellablePromise<string> {
     return $Call.ByID(4292351642, startDir);
+}
+
+/**
+ * PickFiles shows the native open panel for the composer's attach button: files and
+ * folders, several at once, no type filter (the composer attaches images and PDFs and
+ * inserts any other path as text). It opens at startDir when that is an existing
+ * directory (the thread's checkout), else at home. Returns the chosen paths, empty when
+ * the user cancels.
+ */
+export function PickFiles(startDir: string): $CancellablePromise<string[] | null> {
+    return $Call.ByID(1376910418, startDir);
 }
 
 /**
