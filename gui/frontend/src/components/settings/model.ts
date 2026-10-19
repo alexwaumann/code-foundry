@@ -5,6 +5,7 @@
 import type { SettingFieldView, SettingPageView, SettingSectionView, SettingsSchemaView } from "@/api/settings";
 import { formatChord } from "@/keys/chord";
 import { enumOptionLabel } from "@/lib/models";
+import { OWNED_KEYS } from "./ownedKeys";
 
 /** An enum value's name: the schema's label (the model registry's "Opus 4.8"), else the value; "" is "no preference". */
 export function enumLabel(f: SettingFieldView, v: string): string {
@@ -60,10 +61,13 @@ export interface SectionFields {
   fields: SettingFieldView[];
 }
 
-/** A page's sections in order, each with its fields in display order; empty sections are left out. */
+/**
+ * A page's sections in order, each with its fields in display order; empty sections are
+ * left out, and so are fields another field's editor owns (OWNED_KEYS).
+ */
 export function pageSections(schema: SettingsSchemaView, page: SettingPageView): SectionFields[] {
   return page.sections
-    .map((section) => ({ section, fields: schema.fields.filter((f) => f.page === page.id && f.section === section.id) }))
+    .map((section) => ({ section, fields: schema.fields.filter((f) => f.page === page.id && f.section === section.id && !OWNED_KEYS.has(f.key)) }))
     .filter((s) => s.fields.length > 0);
 }
 
@@ -100,7 +104,7 @@ export function searchSettings(schema: SettingsSchemaView, words: readonly strin
   const counts: Record<string, number> = {};
   for (const page of schema.pages) {
     const sections = new Map(page.sections.map((s) => [s.id, s]));
-    const fields = schema.fields.filter((f) => f.page === page.id && matchField(f, words));
+    const fields = schema.fields.filter((f) => f.page === page.id && !OWNED_KEYS.has(f.key) && matchField(f, words));
     // Section order first (fields keep their order within one).
     const order = new Map(page.sections.map((s, i) => [s.id, i]));
     fields.sort((a, b) => (order.get(a.section) ?? Infinity) - (order.get(b.section) ?? Infinity));

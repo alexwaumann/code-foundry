@@ -42,6 +42,18 @@ const (
 	SettingsServiceUpdateProcedure = "/codefoundry.v1.SettingsService/Update"
 	// SettingsServiceWatchProcedure is the fully-qualified name of the SettingsService's Watch RPC.
 	SettingsServiceWatchProcedure = "/codefoundry.v1.SettingsService/Watch"
+	// SettingsServiceListBackdropsProcedure is the fully-qualified name of the SettingsService's
+	// ListBackdrops RPC.
+	SettingsServiceListBackdropsProcedure = "/codefoundry.v1.SettingsService/ListBackdrops"
+	// SettingsServiceImportBackdropProcedure is the fully-qualified name of the SettingsService's
+	// ImportBackdrop RPC.
+	SettingsServiceImportBackdropProcedure = "/codefoundry.v1.SettingsService/ImportBackdrop"
+	// SettingsServiceRemoveBackdropProcedure is the fully-qualified name of the SettingsService's
+	// RemoveBackdrop RPC.
+	SettingsServiceRemoveBackdropProcedure = "/codefoundry.v1.SettingsService/RemoveBackdrop"
+	// SettingsServiceReadBackdropProcedure is the fully-qualified name of the SettingsService's
+	// ReadBackdrop RPC.
+	SettingsServiceReadBackdropProcedure = "/codefoundry.v1.SettingsService/ReadBackdrop"
 )
 
 // SettingsServiceClient is a client for the codefoundry.v1.SettingsService service.
@@ -59,6 +71,24 @@ type SettingsServiceClient interface {
 	// Watch streams the current snapshot, then one snapshot per change. The GUI receives
 	// the same events on EventService instead.
 	Watch(context.Context, *connect.Request[v1.WatchSettingsRequest]) (*connect.ServerStreamForClient[v1.SettingsEvent], error)
+	// Backdrop images: copies of pictures the user added, in the backdrops directory of
+	// the Code Foundry home, that appearance.backdrop = custom shows (the one named by
+	// appearance.backdrop_file).
+	//
+	// ListBackdrops returns the images, oldest first.
+	ListBackdrops(context.Context, *connect.Request[v1.ListBackdropsRequest]) (*connect.Response[v1.ListBackdropsResponse], error)
+	// ImportBackdrop copies the PNG, JPEG, WebP or GIF at an absolute path in (at most
+	// 24 MiB; the type is sniffed) and selects it: appearance.backdrop = custom and
+	// appearance.backdrop_file = its name. The name comes from the content, so adding the
+	// same picture again keeps one copy. Unsupported content, a directory or a file over
+	// the cap is InvalidArgument; a missing path NotFound.
+	ImportBackdrop(context.Context, *connect.Request[v1.ImportBackdropRequest]) (*connect.Response[v1.ImportBackdropResponse], error)
+	// RemoveBackdrop deletes an image. When appearance.backdrop_file names it, that is
+	// cleared, and a custom backdrop falls back to forest. NotFound when it is gone.
+	RemoveBackdrop(context.Context, *connect.Request[v1.RemoveBackdropRequest]) (*connect.Response[v1.RemoveBackdropResponse], error)
+	// ReadBackdrop returns an image's bytes. Only names directly inside the directory:
+	// anything with a separator, or hidden, is InvalidArgument; a missing file NotFound.
+	ReadBackdrop(context.Context, *connect.Request[v1.ReadBackdropRequest]) (*connect.Response[v1.ReadBackdropResponse], error)
 }
 
 // NewSettingsServiceClient constructs a client for the codefoundry.v1.SettingsService service. By
@@ -96,15 +126,43 @@ func NewSettingsServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(settingsServiceMethods.ByName("Watch")),
 			connect.WithClientOptions(opts...),
 		),
+		listBackdrops: connect.NewClient[v1.ListBackdropsRequest, v1.ListBackdropsResponse](
+			httpClient,
+			baseURL+SettingsServiceListBackdropsProcedure,
+			connect.WithSchema(settingsServiceMethods.ByName("ListBackdrops")),
+			connect.WithClientOptions(opts...),
+		),
+		importBackdrop: connect.NewClient[v1.ImportBackdropRequest, v1.ImportBackdropResponse](
+			httpClient,
+			baseURL+SettingsServiceImportBackdropProcedure,
+			connect.WithSchema(settingsServiceMethods.ByName("ImportBackdrop")),
+			connect.WithClientOptions(opts...),
+		),
+		removeBackdrop: connect.NewClient[v1.RemoveBackdropRequest, v1.RemoveBackdropResponse](
+			httpClient,
+			baseURL+SettingsServiceRemoveBackdropProcedure,
+			connect.WithSchema(settingsServiceMethods.ByName("RemoveBackdrop")),
+			connect.WithClientOptions(opts...),
+		),
+		readBackdrop: connect.NewClient[v1.ReadBackdropRequest, v1.ReadBackdropResponse](
+			httpClient,
+			baseURL+SettingsServiceReadBackdropProcedure,
+			connect.WithSchema(settingsServiceMethods.ByName("ReadBackdrop")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // settingsServiceClient implements SettingsServiceClient.
 type settingsServiceClient struct {
-	getSchema *connect.Client[v1.GetSettingsSchemaRequest, v1.GetSettingsSchemaResponse]
-	get       *connect.Client[v1.GetSettingsRequest, v1.GetSettingsResponse]
-	update    *connect.Client[v1.UpdateSettingsRequest, v1.UpdateSettingsResponse]
-	watch     *connect.Client[v1.WatchSettingsRequest, v1.SettingsEvent]
+	getSchema      *connect.Client[v1.GetSettingsSchemaRequest, v1.GetSettingsSchemaResponse]
+	get            *connect.Client[v1.GetSettingsRequest, v1.GetSettingsResponse]
+	update         *connect.Client[v1.UpdateSettingsRequest, v1.UpdateSettingsResponse]
+	watch          *connect.Client[v1.WatchSettingsRequest, v1.SettingsEvent]
+	listBackdrops  *connect.Client[v1.ListBackdropsRequest, v1.ListBackdropsResponse]
+	importBackdrop *connect.Client[v1.ImportBackdropRequest, v1.ImportBackdropResponse]
+	removeBackdrop *connect.Client[v1.RemoveBackdropRequest, v1.RemoveBackdropResponse]
+	readBackdrop   *connect.Client[v1.ReadBackdropRequest, v1.ReadBackdropResponse]
 }
 
 // GetSchema calls codefoundry.v1.SettingsService.GetSchema.
@@ -127,6 +185,26 @@ func (c *settingsServiceClient) Watch(ctx context.Context, req *connect.Request[
 	return c.watch.CallServerStream(ctx, req)
 }
 
+// ListBackdrops calls codefoundry.v1.SettingsService.ListBackdrops.
+func (c *settingsServiceClient) ListBackdrops(ctx context.Context, req *connect.Request[v1.ListBackdropsRequest]) (*connect.Response[v1.ListBackdropsResponse], error) {
+	return c.listBackdrops.CallUnary(ctx, req)
+}
+
+// ImportBackdrop calls codefoundry.v1.SettingsService.ImportBackdrop.
+func (c *settingsServiceClient) ImportBackdrop(ctx context.Context, req *connect.Request[v1.ImportBackdropRequest]) (*connect.Response[v1.ImportBackdropResponse], error) {
+	return c.importBackdrop.CallUnary(ctx, req)
+}
+
+// RemoveBackdrop calls codefoundry.v1.SettingsService.RemoveBackdrop.
+func (c *settingsServiceClient) RemoveBackdrop(ctx context.Context, req *connect.Request[v1.RemoveBackdropRequest]) (*connect.Response[v1.RemoveBackdropResponse], error) {
+	return c.removeBackdrop.CallUnary(ctx, req)
+}
+
+// ReadBackdrop calls codefoundry.v1.SettingsService.ReadBackdrop.
+func (c *settingsServiceClient) ReadBackdrop(ctx context.Context, req *connect.Request[v1.ReadBackdropRequest]) (*connect.Response[v1.ReadBackdropResponse], error) {
+	return c.readBackdrop.CallUnary(ctx, req)
+}
+
 // SettingsServiceHandler is an implementation of the codefoundry.v1.SettingsService service.
 type SettingsServiceHandler interface {
 	// GetSchema returns every field, the file groups they belong to, and the pages and
@@ -142,6 +220,24 @@ type SettingsServiceHandler interface {
 	// Watch streams the current snapshot, then one snapshot per change. The GUI receives
 	// the same events on EventService instead.
 	Watch(context.Context, *connect.Request[v1.WatchSettingsRequest], *connect.ServerStream[v1.SettingsEvent]) error
+	// Backdrop images: copies of pictures the user added, in the backdrops directory of
+	// the Code Foundry home, that appearance.backdrop = custom shows (the one named by
+	// appearance.backdrop_file).
+	//
+	// ListBackdrops returns the images, oldest first.
+	ListBackdrops(context.Context, *connect.Request[v1.ListBackdropsRequest]) (*connect.Response[v1.ListBackdropsResponse], error)
+	// ImportBackdrop copies the PNG, JPEG, WebP or GIF at an absolute path in (at most
+	// 24 MiB; the type is sniffed) and selects it: appearance.backdrop = custom and
+	// appearance.backdrop_file = its name. The name comes from the content, so adding the
+	// same picture again keeps one copy. Unsupported content, a directory or a file over
+	// the cap is InvalidArgument; a missing path NotFound.
+	ImportBackdrop(context.Context, *connect.Request[v1.ImportBackdropRequest]) (*connect.Response[v1.ImportBackdropResponse], error)
+	// RemoveBackdrop deletes an image. When appearance.backdrop_file names it, that is
+	// cleared, and a custom backdrop falls back to forest. NotFound when it is gone.
+	RemoveBackdrop(context.Context, *connect.Request[v1.RemoveBackdropRequest]) (*connect.Response[v1.RemoveBackdropResponse], error)
+	// ReadBackdrop returns an image's bytes. Only names directly inside the directory:
+	// anything with a separator, or hidden, is InvalidArgument; a missing file NotFound.
+	ReadBackdrop(context.Context, *connect.Request[v1.ReadBackdropRequest]) (*connect.Response[v1.ReadBackdropResponse], error)
 }
 
 // NewSettingsServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -175,6 +271,30 @@ func NewSettingsServiceHandler(svc SettingsServiceHandler, opts ...connect.Handl
 		connect.WithSchema(settingsServiceMethods.ByName("Watch")),
 		connect.WithHandlerOptions(opts...),
 	)
+	settingsServiceListBackdropsHandler := connect.NewUnaryHandler(
+		SettingsServiceListBackdropsProcedure,
+		svc.ListBackdrops,
+		connect.WithSchema(settingsServiceMethods.ByName("ListBackdrops")),
+		connect.WithHandlerOptions(opts...),
+	)
+	settingsServiceImportBackdropHandler := connect.NewUnaryHandler(
+		SettingsServiceImportBackdropProcedure,
+		svc.ImportBackdrop,
+		connect.WithSchema(settingsServiceMethods.ByName("ImportBackdrop")),
+		connect.WithHandlerOptions(opts...),
+	)
+	settingsServiceRemoveBackdropHandler := connect.NewUnaryHandler(
+		SettingsServiceRemoveBackdropProcedure,
+		svc.RemoveBackdrop,
+		connect.WithSchema(settingsServiceMethods.ByName("RemoveBackdrop")),
+		connect.WithHandlerOptions(opts...),
+	)
+	settingsServiceReadBackdropHandler := connect.NewUnaryHandler(
+		SettingsServiceReadBackdropProcedure,
+		svc.ReadBackdrop,
+		connect.WithSchema(settingsServiceMethods.ByName("ReadBackdrop")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/codefoundry.v1.SettingsService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case SettingsServiceGetSchemaProcedure:
@@ -185,6 +305,14 @@ func NewSettingsServiceHandler(svc SettingsServiceHandler, opts ...connect.Handl
 			settingsServiceUpdateHandler.ServeHTTP(w, r)
 		case SettingsServiceWatchProcedure:
 			settingsServiceWatchHandler.ServeHTTP(w, r)
+		case SettingsServiceListBackdropsProcedure:
+			settingsServiceListBackdropsHandler.ServeHTTP(w, r)
+		case SettingsServiceImportBackdropProcedure:
+			settingsServiceImportBackdropHandler.ServeHTTP(w, r)
+		case SettingsServiceRemoveBackdropProcedure:
+			settingsServiceRemoveBackdropHandler.ServeHTTP(w, r)
+		case SettingsServiceReadBackdropProcedure:
+			settingsServiceReadBackdropHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -208,4 +336,20 @@ func (UnimplementedSettingsServiceHandler) Update(context.Context, *connect.Requ
 
 func (UnimplementedSettingsServiceHandler) Watch(context.Context, *connect.Request[v1.WatchSettingsRequest], *connect.ServerStream[v1.SettingsEvent]) error {
 	return connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.SettingsService.Watch is not implemented"))
+}
+
+func (UnimplementedSettingsServiceHandler) ListBackdrops(context.Context, *connect.Request[v1.ListBackdropsRequest]) (*connect.Response[v1.ListBackdropsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.SettingsService.ListBackdrops is not implemented"))
+}
+
+func (UnimplementedSettingsServiceHandler) ImportBackdrop(context.Context, *connect.Request[v1.ImportBackdropRequest]) (*connect.Response[v1.ImportBackdropResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.SettingsService.ImportBackdrop is not implemented"))
+}
+
+func (UnimplementedSettingsServiceHandler) RemoveBackdrop(context.Context, *connect.Request[v1.RemoveBackdropRequest]) (*connect.Response[v1.RemoveBackdropResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.SettingsService.RemoveBackdrop is not implemented"))
+}
+
+func (UnimplementedSettingsServiceHandler) ReadBackdrop(context.Context, *connect.Request[v1.ReadBackdropRequest]) (*connect.Response[v1.ReadBackdropResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.SettingsService.ReadBackdrop is not implemented"))
 }

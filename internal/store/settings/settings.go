@@ -78,7 +78,10 @@ type Appearance struct {
 	Zoom        int    // percent; scales the whole GUI
 	Density     string // compact, comfortable
 	ThreadWidth string // compact, comfortable, full
-	Backdrop    string // forest, none
+	Backdrop    string // forest, none, custom
+	// BackdropFile is the image custom shows: a file name in the backdrops directory
+	// (paths.Backdrops, internal/store/backdrop).
+	BackdropFile string
 	// PanelKeepOpen keeps the side panel open on its new tab page when its last tab
 	// closes, instead of hiding it.
 	PanelKeepOpen bool

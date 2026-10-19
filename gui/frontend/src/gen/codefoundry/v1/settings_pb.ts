@@ -4,13 +4,15 @@
 
 import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import type { Timestamp } from "@bufbuild/protobuf/wkt";
+import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file codefoundry/v1/settings.proto.
  */
 export const file_codefoundry_v1_settings: GenFile = /*@__PURE__*/
-  fileDesc("Ch1jb2RlZm91bmRyeS92MS9zZXR0aW5ncy5wcm90bxIOY29kZWZvdW5kcnkudjEi0QIKDFNldHRpbmdGaWVsZBILCgNrZXkYASABKAkSDQoFdGl0bGUYAiABKAkSEwoLZGVzY3JpcHRpb24YAyABKAkSDQoFZ3JvdXAYBCABKAkSKQoEdHlwZRgFIAEoDjIbLmNvZGVmb3VuZHJ5LnYxLlNldHRpbmdUeXBlEhMKC2VudW1fdmFsdWVzGAYgAygJEhUKDWRlZmF1bHRfdmFsdWUYByABKAkSGAoQcmVzdGFydF9yZXF1aXJlZBgIIAEoCBILCgNtaW4YCSABKAMSCwoDbWF4GAogASgDEhMKC3BsYWNlaG9sZGVyGAsgASgJEhMKC2VudW1fbGFiZWxzGAwgAygJEgwKBHBhZ2UYDSABKAkSDwoHc2VjdGlvbhgOIAEoCRIMCgR1bml0GA8gASgJEhIKCmRlcGVuZHNfb24YECABKAkSCwoDcm93GBEgASgJIj4KDFNldHRpbmdHcm91cBIKCgJpZBgBIAEoCRINCgV0aXRsZRgCIAEoCRITCgtkZXNjcmlwdGlvbhgDIAEoCSJvCgtTZXR0aW5nUGFnZRIKCgJpZBgBIAEoCRINCgV0aXRsZRgCIAEoCRITCgtkZXNjcmlwdGlvbhgDIAEoCRIwCghzZWN0aW9ucxgEIAMoCzIeLmNvZGVmb3VuZHJ5LnYxLlNldHRpbmdTZWN0aW9uIkAKDlNldHRpbmdTZWN0aW9uEgoKAmlkGAEgASgJEg0KBXRpdGxlGAIgASgJEhMKC2Rlc2NyaXB0aW9uGAMgASgJIiwKDFNldHRpbmdJc3N1ZRILCgNrZXkYASABKAkSDwoHbWVzc2FnZRgCIAEoCSL6AQoQU2V0dGluZ3NTbmFwc2hvdBI8CgZ2YWx1ZXMYASADKAsyLC5jb2RlZm91bmRyeS52MS5TZXR0aW5nc1NuYXBzaG90LlZhbHVlc0VudHJ5EgwKBHBhdGgYAiABKAkSEAoIcmV2aXNpb24YAyABKAQSEgoKbG9hZF9lcnJvchgEIAEoCRIsCgZpc3N1ZXMYBSADKAsyHC5jb2RlZm91bmRyeS52MS5TZXR0aW5nSXNzdWUSFwoPcmVzdGFydF9wZW5kaW5nGAYgAygJGi0KC1ZhbHVlc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiSAoYU2V0dGluZ3NWYWxpZGF0aW9uRXJyb3JzEiwKBmVycm9ycxgBIAMoCzIcLmNvZGVmb3VuZHJ5LnYxLlNldHRpbmdJc3N1ZSJOCg1TZXR0aW5nc0V2ZW50EjQKCHNuYXBzaG90GAEgASgLMiAuY29kZWZvdW5kcnkudjEuU2V0dGluZ3NTbmFwc2hvdEgAQgcKBWV2ZW50IhoKGEdldFNldHRpbmdzU2NoZW1hUmVxdWVzdCKjAQoZR2V0U2V0dGluZ3NTY2hlbWFSZXNwb25zZRIsCgZncm91cHMYASADKAsyHC5jb2RlZm91bmRyeS52MS5TZXR0aW5nR3JvdXASLAoGZmllbGRzGAIgAygLMhwuY29kZWZvdW5kcnkudjEuU2V0dGluZ0ZpZWxkEioKBXBhZ2VzGAMgAygLMhsuY29kZWZvdW5kcnkudjEuU2V0dGluZ1BhZ2UiFAoSR2V0U2V0dGluZ3NSZXF1ZXN0IkkKE0dldFNldHRpbmdzUmVzcG9uc2USMgoIc2V0dGluZ3MYASABKAsyIC5jb2RlZm91bmRyeS52MS5TZXR0aW5nc1NuYXBzaG90IokBChVVcGRhdGVTZXR0aW5nc1JlcXVlc3QSQQoGdmFsdWVzGAEgAygLMjEuY29kZWZvdW5kcnkudjEuVXBkYXRlU2V0dGluZ3NSZXF1ZXN0LlZhbHVlc0VudHJ5Gi0KC1ZhbHVlc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiTAoWVXBkYXRlU2V0dGluZ3NSZXNwb25zZRIyCghzZXR0aW5ncxgBIAEoCzIgLmNvZGVmb3VuZHJ5LnYxLlNldHRpbmdzU25hcHNob3QiFgoUV2F0Y2hTZXR0aW5nc1JlcXVlc3QqvAEKC1NldHRpbmdUeXBlEhwKGFNFVFRJTkdfVFlQRV9VTlNQRUNJRklFRBAAEhcKE1NFVFRJTkdfVFlQRV9TVFJJTkcQARIUChBTRVRUSU5HX1RZUEVfSU5UEAISFQoRU0VUVElOR19UWVBFX0JPT0wQAxIVChFTRVRUSU5HX1RZUEVfRU5VTRAEEhUKEVNFVFRJTkdfVFlQRV9QQVRIEAUSGwoXU0VUVElOR19UWVBFX0tFWUJJTkRJTkcQBjL0AgoPU2V0dGluZ3NTZXJ2aWNlEmIKCUdldFNjaGVtYRIoLmNvZGVmb3VuZHJ5LnYxLkdldFNldHRpbmdzU2NoZW1hUmVxdWVzdBopLmNvZGVmb3VuZHJ5LnYxLkdldFNldHRpbmdzU2NoZW1hUmVzcG9uc2UiABJQCgNHZXQSIi5jb2RlZm91bmRyeS52MS5HZXRTZXR0aW5nc1JlcXVlc3QaIy5jb2RlZm91bmRyeS52MS5HZXRTZXR0aW5nc1Jlc3BvbnNlIgASWQoGVXBkYXRlEiUuY29kZWZvdW5kcnkudjEuVXBkYXRlU2V0dGluZ3NSZXF1ZXN0GiYuY29kZWZvdW5kcnkudjEuVXBkYXRlU2V0dGluZ3NSZXNwb25zZSIAElAKBVdhdGNoEiQuY29kZWZvdW5kcnkudjEuV2F0Y2hTZXR0aW5nc1JlcXVlc3QaHS5jb2RlZm91bmRyeS52MS5TZXR0aW5nc0V2ZW50IgAwAULFAQoSY29tLmNvZGVmb3VuZHJ5LnYxQg1TZXR0aW5nc1Byb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM");
+  fileDesc("Ch1jb2RlZm91bmRyeS92MS9zZXR0aW5ncy5wcm90bxIOY29kZWZvdW5kcnkudjEi0QIKDFNldHRpbmdGaWVsZBILCgNrZXkYASABKAkSDQoFdGl0bGUYAiABKAkSEwoLZGVzY3JpcHRpb24YAyABKAkSDQoFZ3JvdXAYBCABKAkSKQoEdHlwZRgFIAEoDjIbLmNvZGVmb3VuZHJ5LnYxLlNldHRpbmdUeXBlEhMKC2VudW1fdmFsdWVzGAYgAygJEhUKDWRlZmF1bHRfdmFsdWUYByABKAkSGAoQcmVzdGFydF9yZXF1aXJlZBgIIAEoCBILCgNtaW4YCSABKAMSCwoDbWF4GAogASgDEhMKC3BsYWNlaG9sZGVyGAsgASgJEhMKC2VudW1fbGFiZWxzGAwgAygJEgwKBHBhZ2UYDSABKAkSDwoHc2VjdGlvbhgOIAEoCRIMCgR1bml0GA8gASgJEhIKCmRlcGVuZHNfb24YECABKAkSCwoDcm93GBEgASgJIj4KDFNldHRpbmdHcm91cBIKCgJpZBgBIAEoCRINCgV0aXRsZRgCIAEoCRITCgtkZXNjcmlwdGlvbhgDIAEoCSJvCgtTZXR0aW5nUGFnZRIKCgJpZBgBIAEoCRINCgV0aXRsZRgCIAEoCRITCgtkZXNjcmlwdGlvbhgDIAEoCRIwCghzZWN0aW9ucxgEIAMoCzIeLmNvZGVmb3VuZHJ5LnYxLlNldHRpbmdTZWN0aW9uIkAKDlNldHRpbmdTZWN0aW9uEgoKAmlkGAEgASgJEg0KBXRpdGxlGAIgASgJEhMKC2Rlc2NyaXB0aW9uGAMgASgJIiwKDFNldHRpbmdJc3N1ZRILCgNrZXkYASABKAkSDwoHbWVzc2FnZRgCIAEoCSL6AQoQU2V0dGluZ3NTbmFwc2hvdBI8CgZ2YWx1ZXMYASADKAsyLC5jb2RlZm91bmRyeS52MS5TZXR0aW5nc1NuYXBzaG90LlZhbHVlc0VudHJ5EgwKBHBhdGgYAiABKAkSEAoIcmV2aXNpb24YAyABKAQSEgoKbG9hZF9lcnJvchgEIAEoCRIsCgZpc3N1ZXMYBSADKAsyHC5jb2RlZm91bmRyeS52MS5TZXR0aW5nSXNzdWUSFwoPcmVzdGFydF9wZW5kaW5nGAYgAygJGi0KC1ZhbHVlc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiSAoYU2V0dGluZ3NWYWxpZGF0aW9uRXJyb3JzEiwKBmVycm9ycxgBIAMoCzIcLmNvZGVmb3VuZHJ5LnYxLlNldHRpbmdJc3N1ZSJOCg1TZXR0aW5nc0V2ZW50EjQKCHNuYXBzaG90GAEgASgLMiAuY29kZWZvdW5kcnkudjEuU2V0dGluZ3NTbmFwc2hvdEgAQgcKBWV2ZW50IhoKGEdldFNldHRpbmdzU2NoZW1hUmVxdWVzdCKjAQoZR2V0U2V0dGluZ3NTY2hlbWFSZXNwb25zZRIsCgZncm91cHMYASADKAsyHC5jb2RlZm91bmRyeS52MS5TZXR0aW5nR3JvdXASLAoGZmllbGRzGAIgAygLMhwuY29kZWZvdW5kcnkudjEuU2V0dGluZ0ZpZWxkEioKBXBhZ2VzGAMgAygLMhsuY29kZWZvdW5kcnkudjEuU2V0dGluZ1BhZ2UiFAoSR2V0U2V0dGluZ3NSZXF1ZXN0IkkKE0dldFNldHRpbmdzUmVzcG9uc2USMgoIc2V0dGluZ3MYASABKAsyIC5jb2RlZm91bmRyeS52MS5TZXR0aW5nc1NuYXBzaG90IokBChVVcGRhdGVTZXR0aW5nc1JlcXVlc3QSQQoGdmFsdWVzGAEgAygLMjEuY29kZWZvdW5kcnkudjEuVXBkYXRlU2V0dGluZ3NSZXF1ZXN0LlZhbHVlc0VudHJ5Gi0KC1ZhbHVlc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiTAoWVXBkYXRlU2V0dGluZ3NSZXNwb25zZRIyCghzZXR0aW5ncxgBIAEoCzIgLmNvZGVmb3VuZHJ5LnYxLlNldHRpbmdzU25hcHNob3QiFgoUV2F0Y2hTZXR0aW5nc1JlcXVlc3QicwoIQmFja2Ryb3ASDAoEbmFtZRgBIAEoCRIMCgRzaXplGAIgASgDEg0KBXdpZHRoGAMgASgFEg4KBmhlaWdodBgEIAEoBRIsCghhZGRlZF9hdBgFIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiFgoUTGlzdEJhY2tkcm9wc1JlcXVlc3QiRAoVTGlzdEJhY2tkcm9wc1Jlc3BvbnNlEisKCWJhY2tkcm9wcxgBIAMoCzIYLmNvZGVmb3VuZHJ5LnYxLkJhY2tkcm9wIiUKFUltcG9ydEJhY2tkcm9wUmVxdWVzdBIMCgRwYXRoGAEgASgJIkQKFkltcG9ydEJhY2tkcm9wUmVzcG9uc2USKgoIYmFja2Ryb3AYASABKAsyGC5jb2RlZm91bmRyeS52MS5CYWNrZHJvcCIlChVSZW1vdmVCYWNrZHJvcFJlcXVlc3QSDAoEbmFtZRgBIAEoCSIYChZSZW1vdmVCYWNrZHJvcFJlc3BvbnNlIiMKE1JlYWRCYWNrZHJvcFJlcXVlc3QSDAoEbmFtZRgBIAEoCSI3ChRSZWFkQmFja2Ryb3BSZXNwb25zZRIMCgRkYXRhGAEgASgMEhEKCW1pbWVfdHlwZRgCIAEoCSq8AQoLU2V0dGluZ1R5cGUSHAoYU0VUVElOR19UWVBFX1VOU1BFQ0lGSUVEEAASFwoTU0VUVElOR19UWVBFX1NUUklORxABEhQKEFNFVFRJTkdfVFlQRV9JTlQQAhIVChFTRVRUSU5HX1RZUEVfQk9PTBADEhUKEVNFVFRJTkdfVFlQRV9FTlVNEAQSFQoRU0VUVElOR19UWVBFX1BBVEgQBRIbChdTRVRUSU5HX1RZUEVfS0VZQklORElORxAGMvcFCg9TZXR0aW5nc1NlcnZpY2USYgoJR2V0U2NoZW1hEiguY29kZWZvdW5kcnkudjEuR2V0U2V0dGluZ3NTY2hlbWFSZXF1ZXN0GikuY29kZWZvdW5kcnkudjEuR2V0U2V0dGluZ3NTY2hlbWFSZXNwb25zZSIAElAKA0dldBIiLmNvZGVmb3VuZHJ5LnYxLkdldFNldHRpbmdzUmVxdWVzdBojLmNvZGVmb3VuZHJ5LnYxLkdldFNldHRpbmdzUmVzcG9uc2UiABJZCgZVcGRhdGUSJS5jb2RlZm91bmRyeS52MS5VcGRhdGVTZXR0aW5nc1JlcXVlc3QaJi5jb2RlZm91bmRyeS52MS5VcGRhdGVTZXR0aW5nc1Jlc3BvbnNlIgASUAoFV2F0Y2gSJC5jb2RlZm91bmRyeS52MS5XYXRjaFNldHRpbmdzUmVxdWVzdBodLmNvZGVmb3VuZHJ5LnYxLlNldHRpbmdzRXZlbnQiADABEl4KDUxpc3RCYWNrZHJvcHMSJC5jb2RlZm91bmRyeS52MS5MaXN0QmFja2Ryb3BzUmVxdWVzdBolLmNvZGVmb3VuZHJ5LnYxLkxpc3RCYWNrZHJvcHNSZXNwb25zZSIAEmEKDkltcG9ydEJhY2tkcm9wEiUuY29kZWZvdW5kcnkudjEuSW1wb3J0QmFja2Ryb3BSZXF1ZXN0GiYuY29kZWZvdW5kcnkudjEuSW1wb3J0QmFja2Ryb3BSZXNwb25zZSIAEmEKDlJlbW92ZUJhY2tkcm9wEiUuY29kZWZvdW5kcnkudjEuUmVtb3ZlQmFja2Ryb3BSZXF1ZXN0GiYuY29kZWZvdW5kcnkudjEuUmVtb3ZlQmFja2Ryb3BSZXNwb25zZSIAElsKDFJlYWRCYWNrZHJvcBIjLmNvZGVmb3VuZHJ5LnYxLlJlYWRCYWNrZHJvcFJlcXVlc3QaJC5jb2RlZm91bmRyeS52MS5SZWFkQmFja2Ryb3BSZXNwb25zZSIAQsUBChJjb20uY29kZWZvdW5kcnkudjFCDVNldHRpbmdzUHJvdG9QAVpHZ2l0aHViLmNvbS9hbGV4d2F1bWFubi9jb2RlLWZvdW5kcnkvZ2VuL2dvL2NvZGVmb3VuZHJ5L3YxO2NvZGVmb3VuZHJ5djGiAgNDWFiqAg5Db2RlZm91bmRyeS5WMcoCDkNvZGVmb3VuZHJ5XFYx4gIaQ29kZWZvdW5kcnlcVjFcR1BCTWV0YWRhdGHqAg9Db2RlZm91bmRyeTo6VjFiBnByb3RvMw", [file_google_protobuf_timestamp]);
 
 /**
  * @generated from message codefoundry.v1.SettingField
@@ -480,6 +482,187 @@ export const WatchSettingsRequestSchema: GenMessage<WatchSettingsRequest> = /*@_
   messageDesc(file_codefoundry_v1_settings, 14);
 
 /**
+ * Backdrop is one image in the backdrops directory.
+ *
+ * @generated from message codefoundry.v1.Backdrop
+ */
+export type Backdrop = Message<"codefoundry.v1.Backdrop"> & {
+  /**
+   * File name in the directory, <32 hex of the content>.<ext> for an import; the value
+   * of appearance.backdrop_file that shows it.
+   *
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: int64 size = 2;
+   */
+  size: bigint;
+
+  /**
+   * Pixel size from the image's header; 0 when it does not say.
+   *
+   * @generated from field: int32 width = 3;
+   */
+  width: number;
+
+  /**
+   * @generated from field: int32 height = 4;
+   */
+  height: number;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp added_at = 5;
+   */
+  addedAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message codefoundry.v1.Backdrop.
+ * Use `create(BackdropSchema)` to create a new message.
+ */
+export const BackdropSchema: GenMessage<Backdrop> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_settings, 15);
+
+/**
+ * @generated from message codefoundry.v1.ListBackdropsRequest
+ */
+export type ListBackdropsRequest = Message<"codefoundry.v1.ListBackdropsRequest"> & {
+};
+
+/**
+ * Describes the message codefoundry.v1.ListBackdropsRequest.
+ * Use `create(ListBackdropsRequestSchema)` to create a new message.
+ */
+export const ListBackdropsRequestSchema: GenMessage<ListBackdropsRequest> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_settings, 16);
+
+/**
+ * @generated from message codefoundry.v1.ListBackdropsResponse
+ */
+export type ListBackdropsResponse = Message<"codefoundry.v1.ListBackdropsResponse"> & {
+  /**
+   * @generated from field: repeated codefoundry.v1.Backdrop backdrops = 1;
+   */
+  backdrops: Backdrop[];
+};
+
+/**
+ * Describes the message codefoundry.v1.ListBackdropsResponse.
+ * Use `create(ListBackdropsResponseSchema)` to create a new message.
+ */
+export const ListBackdropsResponseSchema: GenMessage<ListBackdropsResponse> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_settings, 17);
+
+/**
+ * @generated from message codefoundry.v1.ImportBackdropRequest
+ */
+export type ImportBackdropRequest = Message<"codefoundry.v1.ImportBackdropRequest"> & {
+  /**
+   * Absolute path of the picture to copy in.
+   *
+   * @generated from field: string path = 1;
+   */
+  path: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.ImportBackdropRequest.
+ * Use `create(ImportBackdropRequestSchema)` to create a new message.
+ */
+export const ImportBackdropRequestSchema: GenMessage<ImportBackdropRequest> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_settings, 18);
+
+/**
+ * @generated from message codefoundry.v1.ImportBackdropResponse
+ */
+export type ImportBackdropResponse = Message<"codefoundry.v1.ImportBackdropResponse"> & {
+  /**
+   * @generated from field: codefoundry.v1.Backdrop backdrop = 1;
+   */
+  backdrop?: Backdrop | undefined;
+};
+
+/**
+ * Describes the message codefoundry.v1.ImportBackdropResponse.
+ * Use `create(ImportBackdropResponseSchema)` to create a new message.
+ */
+export const ImportBackdropResponseSchema: GenMessage<ImportBackdropResponse> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_settings, 19);
+
+/**
+ * @generated from message codefoundry.v1.RemoveBackdropRequest
+ */
+export type RemoveBackdropRequest = Message<"codefoundry.v1.RemoveBackdropRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.RemoveBackdropRequest.
+ * Use `create(RemoveBackdropRequestSchema)` to create a new message.
+ */
+export const RemoveBackdropRequestSchema: GenMessage<RemoveBackdropRequest> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_settings, 20);
+
+/**
+ * @generated from message codefoundry.v1.RemoveBackdropResponse
+ */
+export type RemoveBackdropResponse = Message<"codefoundry.v1.RemoveBackdropResponse"> & {
+};
+
+/**
+ * Describes the message codefoundry.v1.RemoveBackdropResponse.
+ * Use `create(RemoveBackdropResponseSchema)` to create a new message.
+ */
+export const RemoveBackdropResponseSchema: GenMessage<RemoveBackdropResponse> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_settings, 21);
+
+/**
+ * @generated from message codefoundry.v1.ReadBackdropRequest
+ */
+export type ReadBackdropRequest = Message<"codefoundry.v1.ReadBackdropRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.ReadBackdropRequest.
+ * Use `create(ReadBackdropRequestSchema)` to create a new message.
+ */
+export const ReadBackdropRequestSchema: GenMessage<ReadBackdropRequest> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_settings, 22);
+
+/**
+ * @generated from message codefoundry.v1.ReadBackdropResponse
+ */
+export type ReadBackdropResponse = Message<"codefoundry.v1.ReadBackdropResponse"> & {
+  /**
+   * @generated from field: bytes data = 1;
+   */
+  data: Uint8Array;
+
+  /**
+   * Sniffed: image/png, image/jpeg, image/webp or image/gif.
+   *
+   * @generated from field: string mime_type = 2;
+   */
+  mimeType: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.ReadBackdropResponse.
+ * Use `create(ReadBackdropResponseSchema)` to create a new message.
+ */
+export const ReadBackdropResponseSchema: GenMessage<ReadBackdropResponse> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_settings, 23);
+
+/**
  * @generated from enum codefoundry.v1.SettingType
  */
 export enum SettingType {
@@ -587,6 +770,56 @@ export const SettingsService: GenService<{
     methodKind: "server_streaming";
     input: typeof WatchSettingsRequestSchema;
     output: typeof SettingsEventSchema;
+  },
+  /**
+   * Backdrop images: copies of pictures the user added, in the backdrops directory of
+   * the Code Foundry home, that appearance.backdrop = custom shows (the one named by
+   * appearance.backdrop_file).
+   *
+   * ListBackdrops returns the images, oldest first.
+   *
+   * @generated from rpc codefoundry.v1.SettingsService.ListBackdrops
+   */
+  listBackdrops: {
+    methodKind: "unary";
+    input: typeof ListBackdropsRequestSchema;
+    output: typeof ListBackdropsResponseSchema;
+  },
+  /**
+   * ImportBackdrop copies the PNG, JPEG, WebP or GIF at an absolute path in (at most
+   * 24 MiB; the type is sniffed) and selects it: appearance.backdrop = custom and
+   * appearance.backdrop_file = its name. The name comes from the content, so adding the
+   * same picture again keeps one copy. Unsupported content, a directory or a file over
+   * the cap is InvalidArgument; a missing path NotFound.
+   *
+   * @generated from rpc codefoundry.v1.SettingsService.ImportBackdrop
+   */
+  importBackdrop: {
+    methodKind: "unary";
+    input: typeof ImportBackdropRequestSchema;
+    output: typeof ImportBackdropResponseSchema;
+  },
+  /**
+   * RemoveBackdrop deletes an image. When appearance.backdrop_file names it, that is
+   * cleared, and a custom backdrop falls back to forest. NotFound when it is gone.
+   *
+   * @generated from rpc codefoundry.v1.SettingsService.RemoveBackdrop
+   */
+  removeBackdrop: {
+    methodKind: "unary";
+    input: typeof RemoveBackdropRequestSchema;
+    output: typeof RemoveBackdropResponseSchema;
+  },
+  /**
+   * ReadBackdrop returns an image's bytes. Only names directly inside the directory:
+   * anything with a separator, or hidden, is InvalidArgument; a missing file NotFound.
+   *
+   * @generated from rpc codefoundry.v1.SettingsService.ReadBackdrop
+   */
+  readBackdrop: {
+    methodKind: "unary";
+    input: typeof ReadBackdropRequestSchema;
+    output: typeof ReadBackdropResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_codefoundry_v1_settings, 0);

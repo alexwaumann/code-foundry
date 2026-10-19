@@ -98,6 +98,8 @@
  *   GET  /__mock/settings                          ({ raw, values } of the settings "file")
  *   POST /__mock/settings/external?appearance.font_size=18   (a hand edit; "" deletes a key)
  *   POST /__mock/settings/external?loadError=…               (the file stops parsing)
+ *   POST /__mock/backdrops/import?path=/Users/me/Pictures/a.png   (an import, as Add image… does; mock/backdrops.ts)
+ *   GET  /__mock/backdrops                         ({ images: names, calls })
  *   GET  /__mock/update
  *   POST /__mock/update/state?state=idle|available|downloading|downloaded|installed|restartRequired|failed&version=v0.2.0[&reason=…]
  *   POST /__mock/update/latest?version=v0.2.0     (what the next check finds)
@@ -378,6 +380,13 @@ function routes(router: ConnectRouter): void {
         throw new ConnectError((err as Error).message, Code.FailedPrecondition);
       }
     },
+    listBackdrops: () => ({ backdrops: world.backdrops.list() }),
+    importBackdrop: (req) => guard(() => ({ backdrop: world.backdrops.import(req.path) })),
+    removeBackdrop: (req) => guard(() => {
+      world.backdrops.remove(req.name);
+      return {};
+    }),
+    readBackdrop: (req) => guard(() => world.backdrops.read(req.name)),
     watch: async function* (_req, ctx) {
       yield { event: { case: "snapshot" as const, value: world.settings.snapshot() } };
       for await (const { source, event } of world.events.subscribe(ctx.signal)) {
@@ -1126,6 +1135,17 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       json(res, 200, { raw: world.settings.raw });
       break;
     }
+    case "POST /__mock/backdrops/import":
+      try {
+        // JSON-safe: the proto message carries bigints.
+        json(res, 200, { name: world.backdrops.import(q.get("path") ?? "")?.name ?? "" });
+      } catch (err) {
+        json(res, 400, { error: (err as Error).message });
+      }
+      break;
+    case "GET /__mock/backdrops":
+      json(res, 200, { images: world.backdrops.list().map((b) => b.name), calls: world.backdrops.calls });
+      break;
     case "GET /__mock/writes":
       json(res, 200, world.writes);
       break;

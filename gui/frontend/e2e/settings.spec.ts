@@ -355,6 +355,34 @@ test("a text setting reverts on Escape and commits on Enter", async ({ page }) =
   await expect.poll(async () => (await mockSettings()).raw["appearance.font_size"]).toBe("15");
 });
 
+test("the backdrop row's gallery shows, selects and removes images; Add image… needs the app", async ({ page }) => {
+  const first = (await mockPost("backdrops/import?path=/Users/me/Pictures/sea.png")) as { name: string };
+  await mockPost("backdrops/import?path=/Users/me/Pictures/dunes.jpg");
+  await openSettings(page, "appearance");
+  const row = setting(page, "appearance.backdrop");
+  const thumbs = row.getByTestId("backdrop-thumb");
+  // The last import is the one shown; the file key has no row of its own.
+  await expect(thumbs).toHaveCount(2);
+  await expect(thumbs.nth(1)).toHaveAttribute("data-selected", "true");
+  await expect(select(page, "appearance.backdrop")).toHaveAttribute("data-value", "custom");
+  await expect(setting(page, "appearance.backdrop_file")).toHaveCount(0);
+  await expect(thumbs.nth(0).locator("img")).toHaveAttribute("src", /^blob:/);
+
+  await row.getByRole("button", { name: /^Show image 1/ }).click();
+  await expect(thumbs.nth(0)).toHaveAttribute("data-selected", "true");
+  await expect.poll(async () => (await mockSettings()).raw["appearance.backdrop_file"]).toBe(first.name);
+
+  // Removing the shown one falls back to the forest.
+  await thumbs.nth(0).hover();
+  await row.getByRole("button", { name: "Remove image 1" }).click();
+  await expect(thumbs).toHaveCount(1);
+  await expect(select(page, "appearance.backdrop")).toHaveAttribute("data-value", "forest");
+  await expect(thumbs.nth(0)).not.toHaveAttribute("data-selected", "true");
+
+  // No host in a browser: no open panel.
+  await expect(row.getByTestId("backdrop-add")).toBeDisabled();
+});
+
 test("appearance.thread_width sets data-thread-width on <html>, live", async ({ page }) => {
   await openSettings(page, "appearance");
   const html = page.locator("html");

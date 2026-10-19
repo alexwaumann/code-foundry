@@ -95,6 +95,7 @@ internal/
     gitops/                git/gh operations per worktree (fetch, pull, push, PR); editor, Finder, browser
     clone/                 gh repo clone into the projects dir with streamed output, then register
     newproject/            new projects in the projects dir (git init, register); gh repo create to publish
+    backdrop/              the user's backdrop images: copies named by content, selected through settings
     update/                release checks via gh (stable or tip channel), downloads and installs with the embedded installer
     workspace/             branch sets: one branch as a worktree in several projects
                            (docs/notes/workspaces-1-store.md)
@@ -260,7 +261,10 @@ Services (v1):
   GitHub poll (`docs/notes/gh-poll-tiers.md`), attended decides whether an open thread
   view counts as seen (`docs/notes/alerts-foreground.md`).
 * `SettingsService` — GetSchema, Get, Update, Watch over `$CONFIG/settings.toml` (TOML,
-  hand-editable, reloaded on change). See `docs/notes/phase3b-settings.md`.
+  hand-editable, reloaded on change). See `docs/notes/phase3b-settings.md`. ListBackdrops,
+  ImportBackdrop, RemoveBackdrop and ReadBackdrop keep the user's backdrop images (copies in
+  `$CONFIG/backdrops`, internal/store/backdrop) that `appearance.backdrop = custom` shows
+  (`docs/notes/custom-backdrop.md`).
 * `UpdateService` — Get, Check, Download, Install, Relaunch, RequestRestart, Watch. The
   24h release check on the `update.channel` setting's channel (stable: the newest full
   release; tip: the highest release, prereleases included; re-checked at once when the

@@ -17,6 +17,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/paths"
 	"github.com/alexwaumann/code-foundry/internal/presence"
 	"github.com/alexwaumann/code-foundry/internal/store/action"
+	"github.com/alexwaumann/code-foundry/internal/store/backdrop"
 	"github.com/alexwaumann/code-foundry/internal/store/clone"
 	"github.com/alexwaumann/code-foundry/internal/store/gh"
 	"github.com/alexwaumann/code-foundry/internal/store/gitops"
@@ -36,9 +37,12 @@ type stores struct {
 	bus *bus.Bus
 	// settings is opened first: the other stores take start-time options from it.
 	settings *settings.Store
-	db       *sql.DB
-	project  *project.Git
-	gh       *gh.Store
+	// backdrops keeps the user's backdrop images and selects them through settings; it
+	// holds no resources.
+	backdrops *backdrop.Store
+	db        *sql.DB
+	project   *project.Git
+	gh        *gh.Store
 	// cloner clones GitHub repositories into the projects dir and registers them in
 	// project. It holds no resources: a clone in flight dies with its request.
 	cloner *clone.Cloner
@@ -101,6 +105,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	}); err != nil {
 		return nil, err
 	}
+	s.backdrops = backdrop.New(backdrop.Options{Dir: p.Backdrops(), Settings: s.settings, Log: log.With("store", "backdrop")})
 	// Start-time settings (see internal/daemon/settings.go for the live ones).
 	cfg := s.settings.Settings()
 	if s.db, err = db.Open(ctx, p.DB()); err != nil {

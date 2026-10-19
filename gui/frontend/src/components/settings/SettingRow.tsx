@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import type { SettingFieldView } from "@/api/settings";
 import { Tip } from "@/components/ui/tooltip";
 import { Highlight } from "./Highlight";
-import { keyEditors } from "./keyEditors";
+import { keyEditors, tallKeyEditors } from "./keyEditors";
 import { displayValue } from "./model";
 import { useSettingField } from "./useSettingField";
 
@@ -59,11 +59,15 @@ export function FieldError({ message, className }: { message: string | null; cla
 /** The editor and its reset arrow; a switch or a number input sits at the right end. */
 function EditorCell({ field, state }: { field: SettingFieldView; state: FieldState }) {
   const right = field.type === "bool" || (field.type === "int" && !keyEditors[field.key]);
+  const tall = tallKeyEditors.has(field.key);
   return (
     <div className="flex min-w-0 flex-col gap-1">
-      <div className="flex items-center gap-1.5">
+      <div className={cn("flex gap-1.5", tall ? "items-start" : "items-center")}>
         <div className={right ? "flex min-w-0 flex-1 justify-end" : "min-w-0 flex-1"}>{state.editor}</div>
-        <ResetButton field={field} state={state} />
+        {/* Beside the first control (h-8) rather than the middle of a tall editor. */}
+        <div className={cn("flex", tall && "mt-[5px]")}>
+          <ResetButton field={field} state={state} />
+        </div>
       </div>
       <FieldError message={state.message} />
     </div>
@@ -91,7 +95,8 @@ export function SettingRow({ field, className, crumb, words, indent = false, dim
   return (
     <div
       className={cn(
-        "relative grid grid-cols-[minmax(0,1fr)_18rem] items-center gap-x-6 gap-y-1 px-4 py-3",
+        "relative grid grid-cols-[minmax(0,1fr)_18rem] gap-x-6 gap-y-1 px-4 py-3",
+        tallKeyEditors.has(field.key) ? "items-start" : "items-center",
         // The hairline from the parent row down to this one, ending in a short elbow.
         indent &&
           "pl-10 before:absolute before:top-0 before:bottom-4 before:left-5 before:w-px before:bg-border after:absolute after:bottom-4 after:left-5 after:h-px after:w-2 after:bg-border",
