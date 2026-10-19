@@ -386,8 +386,8 @@ test("reading deep into an open tool row when the turn ends: the row stays open 
   });
   await expect(edit.getByTestId("thread-tool")).toHaveAttribute("aria-expanded", "true");
   const row = edit.locator("xpath=ancestor::*[@data-index][1]");
-  const rowBox = await row.boundingBox();
-  expect(rowBox?.height ?? 0).toBeGreaterThan(200);
+  // The diff lays out a frame or two after the row opens (later under load).
+  await expect.poll(async () => (await row.boundingBox())?.height ?? 0).toBeGreaterThan(200);
   // The user's wheel unpins; then the viewport's top goes 150px into the open row.
   const box = await timeline.boundingBox();
   await page.mouse.move((box?.x ?? 0) + 200, (box?.y ?? 0) + 200);
