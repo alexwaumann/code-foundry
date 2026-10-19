@@ -616,7 +616,8 @@ func TestPythonPlugin(t *testing.T) {
 	if _, err := exec.LookPath("python3"); err != nil {
 		t.Skip("python3 not installed")
 	}
-	e := newEnv(t, nil)
+	sink := &fakeSink{}
+	e := newEnv(t, func(o *plugin.Options) { o.Wakes = sink })
 	dst := filepath.Join(e.opts.Dir, "pyecho")
 	if err := os.MkdirAll(dst, 0o755); err != nil {
 		t.Fatal(err)
@@ -645,6 +646,21 @@ func TestPythonPlugin(t *testing.T) {
 	}
 	if !strings.Contains(e.logText("pyecho"), "stderr  pyecho ready") {
 		t.Error("stderr not logged")
+	}
+	// Wake sources over the bare protocol: wake/subscribed arms, wake/fire answers.
+	for _, s := range []plugin.WakeSub{
+		{ID: "sub-high", Plugin: "pyecho", Source: "bell", ThreadID: "t-9", Args: map[string]string{"tone": "high"}},
+		{ID: "sub-low", Plugin: "pyecho", Source: "bell", ThreadID: "t-9", Args: map[string]string{"tone": "low"}},
+	} {
+		sink.add(s)
+		m.WakeChanged(s, true)
+	}
+	r, err = e.invoke("plugin.pyecho.ring", nil, command.Context{})
+	if err != nil || r.Message != "rang: delivered 1" {
+		t.Fatalf("ring = %+v, %v", r, err)
+	}
+	if fires, _ := sink.seen(); len(fires) != 1 || fires[0] != `pyecho|Python echo|bell|tone=high|ring (2 armed)|{"armed": ["sub-high", "sub-low"]}` {
+		t.Errorf("fires = %q", fires)
 	}
 	p, _ := m.Snapshot().Plugin("pyecho")
 	if err := m.Close(); err != nil {

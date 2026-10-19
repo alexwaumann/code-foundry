@@ -5,7 +5,8 @@
 // view node kind, one a context fact makes available, and one gated on a pull request's
 // GitHub Actions checks), an event subscription (the thread list), a flag on a thread
 // (flag), the session environment (every new thread gets CF_HELLO=1), and a Claude
-// thread and a terminal of its own (owned.go: the demo's Assistant and Shell tabs).
+// thread and a terminal of its own (owned.go: the demo's Assistant and Shell tabs), and
+// a wake source agents subscribe to (wakes.go: tick).
 //
 // Build it with `make plugins`, then link it for development:
 //
@@ -19,6 +20,9 @@
 //	code-foundry plugin surface hello demo --context-thread <thread id>
 //	code-foundry plugin act hello demo click --context-thread <thread id>
 //	code-foundry plugin hello read-shell
+//	code-foundry plugin wakes hello
+//	code-foundry thread subscribe --plugin hello/tick --arg every=2s --id <thread id>
+//	code-foundry plugin hello fire-tick
 package main
 
 import (
@@ -46,7 +50,10 @@ func main() {
 func plugin() pluginsdk.Plugin {
 	var events atomic.Int64
 	own := &owned{}
+	ticks := newTicker()
 	return pluginsdk.Plugin{
+		OnWakeSubscribed:   func(_ context.Context, h *pluginsdk.Host, s pluginsdk.WakeSubscription) { ticks.subscribed(h, s) },
+		OnWakeUnsubscribed: func(_ context.Context, h *pluginsdk.Host, u pluginsdk.WakeUnsubscribed) { ticks.unsubscribed(h, u) },
 		Init: func(ctx context.Context, h *pluginsdk.Host) error {
 			h.Log().Info("hello is up", "host", h.HostVersion(), "data_dir", h.DataDir(), "dev", h.Dev(), "flags", len(h.Flags()))
 			// Every new Claude thread gets CF_HELLO=1 while hello is enabled.
@@ -79,6 +86,7 @@ func plugin() pluginsdk.Plugin {
 			"unpin":      unpin,
 			"flag":       flag,
 			"read-shell": readShell(own),
+			"fire-tick":  ticks.fireTick,
 			"events": func(context.Context, *pluginsdk.Host, pluginsdk.CommandRequest) (pluginsdk.CommandResult, error) {
 				n := events.Load()
 				js, _ := json.Marshal(map[string]int64{"events": n})
@@ -91,6 +99,7 @@ func plugin() pluginsdk.Plugin {
 			"checks": newChecks,
 		},
 		Shutdown: func(_ context.Context, h *pluginsdk.Host) {
+			ticks.stop()
 			h.Log().Info("hello is stopping")
 		},
 	}
