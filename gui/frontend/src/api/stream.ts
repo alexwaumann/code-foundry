@@ -63,6 +63,57 @@ export function isPageVisible(): boolean {
 }
 
 /**
+ * Whether the page's window is key now, so keystrokes go to it (true outside a
+ * browser). In WKWebView the document has focus while the window is key: an in-app
+ * dialog keeps it, another app (or its window) takes it.
+ */
+export function isPageFocused(): boolean {
+  return typeof document === "undefined" || document.hasFocus();
+}
+
+/**
+ * Whether the user is looking at the page now: it is visible and its window is key. A
+ * covered or minimized WKWebView reports hidden even while its app is active, and
+ * another app being active takes the focus while the window may still show. The
+ * daemon's presence uses the same rule over every GUI client
+ * (docs/notes/alerts-foreground.md).
+ */
+export function isPageAttended(): boolean {
+  return typeof document === "undefined" || (document.visibilityState === "visible" && document.hasFocus());
+}
+
+/** How long onPageStateChange waits for the page's visibility and focus to settle. */
+export const PAGE_STATE_SETTLE_MS = 100;
+
+/**
+ * Calls `cb` once the page's visibility or focus changed and then held still for
+ * `settleMs` (visibilitychange on the document, focus and blur on the window), so a
+ * quick flip (a blur and focus in a row as a native menu or sheet opens and closes)
+ * becomes one call or none worth acting on. `cb` reads the state itself. Returns the
+ * unsubscribe function.
+ */
+export function onPageStateChange(cb: () => void, settleMs = PAGE_STATE_SETTLE_MS): () => void {
+  if (typeof window === "undefined" || typeof document === "undefined") return () => undefined;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const onChange = () => {
+    if (timer !== null) clearTimeout(timer);
+    timer = setTimeout(() => {
+      timer = null;
+      cb();
+    }, settleMs);
+  };
+  document.addEventListener("visibilitychange", onChange);
+  window.addEventListener("focus", onChange);
+  window.addEventListener("blur", onChange);
+  return () => {
+    if (timer !== null) clearTimeout(timer);
+    document.removeEventListener("visibilitychange", onChange);
+    window.removeEventListener("focus", onChange);
+    window.removeEventListener("blur", onChange);
+  };
+}
+
+/**
  * Calls `cb` with the page's visibility each time it changes (the Wails window was
  * hidden, minimized or fully covered, or came back). Returns the unsubscribe function.
  */

@@ -2,7 +2,8 @@
  * The Dock badge and attention alerts (docs/notes/dock-alerts.md). macOS notification
  * banners are not available to the bare GUI executable, so the Dock is the channel: the
  * badge counts the threads that need the user, and an alert (a bounce, a sound or both)
- * fires when a thread starts needing them while Code Foundry is not the active app.
+ * fires when a thread starts needing them while the user is not looking at the app
+ * (another app is active, or its window is covered or minimized).
  *
  * stepDockAlerts is the whole decision, pure: state + inputs -> state + effects.
  * startDockAlerts feeds it from the threads and settings stores and runs the effects
@@ -10,6 +11,7 @@
  */
 import { bounceDock, playAlertSound, setDockBadge } from "@/api/app";
 import type { SettingsSnapshotView } from "@/api/settings";
+import { isPageAttended } from "@/api/stream";
 import { attentionIds, useThreadsStore } from "./threads";
 import { useSettingsStore } from "./settings";
 
@@ -75,8 +77,11 @@ export interface DockAlertsInput {
   epoch: number;
   /** attentionIds of the current threads: the bell and window title count. */
   attention: readonly string[];
-  /** Code Foundry is the active app (its window has focus). */
-  focused: boolean;
+  /**
+   * The user is looking at the app: its window is visible and key (isPageAttended). Not
+   * when another app is active, nor when Code Foundry's window is covered or minimized.
+   */
+  attended: boolean;
   nowMs: number;
   settings: AlertSettings | null;
 }
@@ -90,7 +95,7 @@ export type DockEffect = { kind: "badge"; count: number } | { kind: "alert"; bou
 /**
  * One evaluation. The badge follows the attention count (0 when the badge is off),
  * whatever the focus or cooldown. An alert fires when a thread enters the attention set
- * (absent at the previous evaluation of the same epoch) while the app is not focused,
+ * (absent at the previous evaluation of the same epoch) while the app is not attended,
  * at least one of bounce and sound is on (a sound at volume 0 counts as off), and the
  * cooldown since the last alert has passed. Inside the cooldown the trigger is dropped,
  * not queued. With bounce and sound both off nothing fires and the cooldown is not
@@ -111,7 +116,7 @@ export function stepDockAlerts(state: DockAlertsState, input: DockAlertsInput): 
   let lastAlertAtMs = state.lastAlertAtMs;
   const baseline = state.epoch !== input.epoch;
   const sound = settings !== null && settings.sound && settings.soundVolume > 0;
-  if (!baseline && settings && !input.focused && (settings.bounce || sound)) {
+  if (!baseline && settings && !input.attended && (settings.bounce || sound)) {
     const entered = input.attention.some((id) => !state.attention.has(id));
     const cooled = lastAlertAtMs === null || input.nowMs - lastAlertAtMs >= settings.cooldownMs;
     if (entered && cooled) {
@@ -127,7 +132,8 @@ export interface DockAlertsDeps {
   bounce: () => void;
   /** Plays the alert sound at volume percent (host-side NSSound, gui/notify_darwin.go). */
   playSound: (volume: number) => void;
-  focused: () => boolean;
+  /** Whether the user is looking at the app now (DockAlertsInput.attended). */
+  attended: () => boolean;
   now: () => number;
 }
 
@@ -135,9 +141,10 @@ const hostDeps: DockAlertsDeps = {
   setBadge: (count) => void setDockBadge(count),
   bounce: () => void bounceDock(),
   playSound: (volume) => void playAlertSound(volume),
-  // WKWebView's document has focus while the window is key: an in-app dialog keeps it,
-  // switching to another app (or its window) takes it.
-  focused: () => document.hasFocus(),
+  // Visible and key: the same rule as the daemon's attended presence, so the thread
+  // open in the main pane, which the daemon no longer acknowledges while the user is
+  // away, enters the attention set and alerts (docs/notes/alerts-foreground.md).
+  attended: isPageAttended,
   now: () => Date.now(),
 };
 
@@ -155,7 +162,7 @@ export function startDockAlerts(deps: DockAlertsDeps = hostDeps): () => void {
     const next = stepDockAlerts(state, {
       epoch: threads.epoch,
       attention: attentionIds(threads),
-      focused: deps.focused(),
+      attended: deps.attended(),
       nowMs: deps.now(),
       settings: alertSettings(useSettingsStore.getState().snapshot),
     });

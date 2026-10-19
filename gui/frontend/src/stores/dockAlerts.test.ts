@@ -22,7 +22,7 @@ function run(steps: (Partial<DockAlertsInput> & { attention: readonly string[] }
   let state = initialDockAlerts;
   const effects: DockEffect[][] = [];
   for (const s of steps) {
-    const r = stepDockAlerts(state, { epoch: 1, focused: false, nowMs: 0, settings: on, ...s });
+    const r = stepDockAlerts(state, { epoch: 1, attended: false, nowMs: 0, settings: on, ...s });
     state = r.state;
     effects.push(r.effects);
   }
@@ -39,14 +39,14 @@ describe("stepDockAlerts", () => {
     expect(effects).toEqual([[{ kind: "badge", count: 2 }]]);
   });
 
-  it("a thread entering while unfocused alerts once", () => {
+  it("a thread entering while unattended alerts once", () => {
     const { effects } = run([{ attention: [] }, { attention: ["a"], nowMs: 1000 }, { attention: ["a"], nowMs: 2000 }]);
     expect(effects[1]).toEqual([{ kind: "badge", count: 1 }, bounce]);
     expect(alerts(effects)).toEqual([0, 1, 0]);
   });
 
-  it("a thread entering while focused does not alert; the badge still moves", () => {
-    const { effects } = run([{ attention: [] }, { attention: ["a"], focused: true }]);
+  it("a thread entering while attended does not alert; the badge still moves", () => {
+    const { effects } = run([{ attention: [] }, { attention: ["a"], attended: true }]);
     expect(effects[1]).toEqual([{ kind: "badge", count: 1 }]);
   });
 
@@ -230,14 +230,14 @@ describe("alertSettings", () => {
 describe("startDockAlerts", () => {
   let stop: () => void;
   let calls: string[];
-  let focused: boolean;
+  let attended: boolean;
   let now: number;
   const settings = (values: Record<string, string>) => {
     useSettingsStore.setState({ snapshot: { values, path: "", revision: 1, loadError: "", issues: [], restartPending: [] } });
   };
   beforeEach(() => {
     calls = [];
-    focused = false;
+    attended = false;
     now = 0;
     useThreadsStore.setState({ ...emptyThreads, epoch: 0 });
     useSettingsStore.setState({ snapshot: null });
@@ -245,7 +245,7 @@ describe("startDockAlerts", () => {
       setBadge: (n) => calls.push(`badge ${String(n)}`),
       bounce: () => calls.push("bounce"),
       playSound: (v) => calls.push(`sound ${String(v)}`),
-      focused: () => focused,
+      attended: () => attended,
       now: () => now,
     };
     stop = startDockAlerts(deps);
@@ -254,7 +254,7 @@ describe("startDockAlerts", () => {
     stop();
   });
 
-  it("badges once settings arrive, re-baselines on the List, then bounces on a transition while unfocused", () => {
+  it("badges once settings arrive, re-baselines on the List, then bounces on a transition while unattended", () => {
     settings({ "notifications.cooldown_seconds": "60" });
     expect(calls).toEqual(["badge 0"]);
     // The (re)connect's List: two threads already waiting. A new epoch, so no alert.
@@ -268,10 +268,10 @@ describe("startDockAlerts", () => {
     expect(calls).toEqual(["badge 0", "badge 2", "badge 3", "bounce"]);
   });
 
-  it("does not bounce while focused, and turning the badge off clears it", () => {
+  it("does not bounce while attended, and turning the badge off clears it", () => {
     settings({ "notifications.sound": "true" });
     useThreadsStore.setState((s) => ({ ...replaceThreads(s, [thread("a", { status: "busy" })]), epoch: s.epoch + 1 }));
-    focused = true;
+    attended = true;
     useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: thread("a", { status: "attention", statusReason: "permission: Bash" }) }));
     expect(calls).toEqual(["badge 0", "badge 1"]);
     settings({ "notifications.sound": "true", "notifications.dock_badge": "false" });
