@@ -23,7 +23,7 @@ package ui
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
+	"reflect"
 	"strconv"
 	"time"
 )
@@ -871,8 +871,17 @@ func (h Height) MarshalJSON() ([]byte, error) {
 	return json.Marshal(h.String())
 }
 
-// UnmarshalJSON accepts "auto", "fill" or a whole number of pixels.
+// UnmarshalJSON accepts "auto", "fill" or a whole number of pixels. Anything else is a
+// *json.UnmarshalTypeError, so encoding/json names the field it is in
+// ("Go struct field Pane.nodes.pane.height").
 func (h *Height) UnmarshalJSON(b []byte) error {
+	bad := func() error {
+		v := string(b)
+		if len(v) > 40 {
+			v = v[:40] + "…"
+		}
+		return &json.UnmarshalTypeError{Value: v + ` (want "auto", "fill" or a whole number of pixels)`, Type: reflect.TypeFor[Height]()}
+	}
 	var s string
 	if err := json.Unmarshal(b, &s); err == nil {
 		switch s {
@@ -881,13 +890,13 @@ func (h *Height) UnmarshalJSON(b []byte) error {
 		case "fill":
 			*h = HeightFill
 		default:
-			return fmt.Errorf("height %q: want \"auto\", \"fill\" or a number of pixels", s)
+			return bad()
 		}
 		return nil
 	}
 	var n float64
 	if err := json.Unmarshal(b, &n); err != nil || n != float64(int(n)) {
-		return fmt.Errorf("height %s: want \"auto\", \"fill\" or a whole number of pixels", b)
+		return bad()
 	}
 	*h = HeightPx(int(n))
 	return nil

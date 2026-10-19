@@ -127,3 +127,20 @@ func TestMasterDetailIgnoredStateRefused(t *testing.T) {
 		}
 	}
 }
+
+// A height that is not "auto", "fill" or whole pixels names its field, as a bad
+// minHeight does (it was a bare "view: height …" anywhere in the view).
+func TestBadHeightKeepsItsPath(t *testing.T) {
+	for in, want := range map[string]string{
+		`{"nodes":[{"key":"s","section":{"children":[{"key":"p","pane":{"height":"120","children":[]}}]}}]}`: `"120" (want "auto", "fill" or a whole number of pixels) into Go struct field Pane.nodes.section.children.pane.height of type ui.Height`,
+		`{"nodes":[{"key":"t","thread":{"threadId":"s-1","height":320.5}}]}`:                                 `320.5 (want "auto", "fill" or a whole number of pixels) into Go struct field Thread.nodes.thread.height of type ui.Height`,
+		`{"nodes":[{"key":"t","terminal":{"terminalId":"t-1","height":true}}]}`:                              `true (want "auto", "fill" or a whole number of pixels) into Go struct field Terminal.nodes.terminal.height of type ui.Height`,
+		`{"nodes":[{"key":"p","pane":{"height":"` + strings.Repeat("x", 100) + `","children":[]}}]}`:         `"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx… (want`,
+	} {
+		var v ui.View
+		err := json.Unmarshal([]byte(in), &v)
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%s: %v, want %q", in, err, want)
+		}
+	}
+}
