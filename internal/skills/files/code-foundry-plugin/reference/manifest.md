@@ -199,7 +199,9 @@ fact    := segment ("." segment)*        segment := [A-Za-z_][A-Za-z0-9_-]*
 - Facts about pull request checks are fetched lazily, the first time a clause reads them
   for a thread: until they arrive the clause is "not known yet" (unavailable: `plugin
   surface` fails with `not known yet (…waits on a pull request's checks)`, `plugin list`
-  shows the surface as `unknown`); retry a few seconds later. A new thread's branch is matched to its pull
+  shows the surface as `unknown`); retry a few seconds later. Once known they are fetched
+  again when the GitHub poll sees the pull request's head or checks move (at the latest
+  every 10 minutes), and availability is re-announced when they changed. A new thread's branch is matched to its pull
   request by the next GitHub poll (up to a minute with the app open). `unknown && false`
   is false, `unknown || true` is true.
 - A clause that does not parse is a plugin issue (NOTE column) and its command or surface
