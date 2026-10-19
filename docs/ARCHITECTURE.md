@@ -606,8 +606,9 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   or double-click into the page's own panel, a member from the Workspace surface;
   `docs/notes/worktree-panel-tab.md`, `docs/notes/workspaces-5-panel.md`) and Linked PRs (the
   thread's linked pull requests, newest first, each opening as a PR tab; opened by L,
-  `view.panel.linked-prs`, the thread header and the sidebar's PR badge;
-  `docs/notes/linked-prs.md`), MCP (the thread's MCP servers, one card each
+  `view.panel.linked-prs`, the thread header and the sidebar's PR tag, which shows one
+  pull request's state and number or a count, closed ones left out;
+  `docs/notes/linked-prs.md`, `docs/notes/sidebar-pr-tag.md`), MCP (the thread's MCP servers, one card each
   with status, error, tools and Reconnect; opened by M and `view.panel.mcp`;
   `docs/notes/mcp-panel.md`), Agents (the thread's subagent runs, one row each in
   spawn order with status, activity or report, and stats; opened by A, `view.panel.agents`
