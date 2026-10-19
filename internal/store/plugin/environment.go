@@ -14,6 +14,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/fsx"
 	"github.com/alexwaumann/code-foundry/pluginsdk"
 )
@@ -119,13 +120,32 @@ type SpawnScope struct {
 	// Owner is the thread's owner: a plugin's own thread does not get that plugin's
 	// session environment (it has its own; threads.go).
 	Owner string
+	// Quiet: no log line (the thread store's staleness check asks for every running
+	// thread on every plugin change).
+	Quiet bool
 }
 
 // Contribution is what a spawn gets from every plugin: "KEY=VALUE" entries, PATH
-// entries and --add-dir directories, in plugin name order.
+// entries and --add-dir directories, in plugin name order. Sources are the same by
+// plugin (the thread store fingerprints them to tell a running thread its environment
+// changed; docs/notes/plugins-env-restart.md).
 type Contribution struct {
 	Env, PathPrepend, AddDirs []string
+	Sources                   []ContributionSource
 }
+
+// ContributionSource is one plugin's part of a Contribution.
+type ContributionSource struct {
+	Plugin, DisplayName       string
+	Env, PathPrepend, AddDirs []string
+}
+
+// EnvironmentChanged is published when a plugin's session environment was pushed,
+// withdrawn or dropped. Enabling, disabling and removing a plugin also change what
+// applies; they publish Changed and Removed.
+type EnvironmentChanged struct{ Plugin string }
+
+func (EnvironmentChanged) isPluginEvent() {}
 
 // envState is the contributions by plugin. Guarded by mu.
 type envState struct {
@@ -283,6 +303,7 @@ func (a *actor) setEnvironment(ctx context.Context, params json.RawMessage) (any
 		}
 		a.hostLog("session environment withdrawn")
 		a.envPushed()
+		bus.Publish[Event](m.opts.Bus, EnvironmentChanged{Plugin: a.name})
 		return pluginsdk.EnvironmentResult{Applied: true}, nil
 	}
 	raw, err := json.Marshal(in)
@@ -301,6 +322,7 @@ func (a *actor) setEnvironment(ctx context.Context, params json.RawMessage) (any
 	m.env.byID[a.name] = e
 	m.env.mu.Unlock()
 	a.envPushed()
+	bus.Publish[Event](m.opts.Bus, EnvironmentChanged{Plugin: a.name})
 	applied, _ := m.environment(a.name)
 	keys := slices.Sorted(maps.Keys(applied.Env))
 	a.hostLog("session environment: env %s; path %d; add-dirs %d; %s", orNone(keys), len(applied.PathPrepend), len(applied.AddDirs), scopeText(applied))
@@ -402,27 +424,37 @@ func (m *Manager) SessionEnvironment(ctx context.Context, scope SpawnScope, wait
 	}
 	var c Contribution
 	var names []string
+	snap := m.Snapshot()
 	for _, e := range m.resolved() {
 		if !e.matches(scope) || (scope.Owner != "" && scope.Owner == OwnerOf(e.Plugin)) {
 			// A plugin's own thread brings its own env (thread/create) instead.
 			continue
 		}
 		names = append(names, e.Plugin)
-		for _, k := range slices.Sorted(maps.Keys(e.Env)) {
-			c.Env = append(c.Env, k+"="+e.Env[k])
+		src := ContributionSource{Plugin: e.Plugin, DisplayName: e.Plugin, PathPrepend: e.PathPrepend}
+		if p, ok := snap.Plugin(e.Plugin); ok {
+			src.DisplayName = p.DisplayName()
 		}
+		for _, k := range slices.Sorted(maps.Keys(e.Env)) {
+			src.Env = append(src.Env, k+"="+e.Env[k])
+		}
+		c.Env = append(c.Env, src.Env...)
 		c.PathPrepend = append(c.PathPrepend, e.PathPrepend...)
 		for _, d := range e.AddDirs {
 			if fi, err := os.Stat(d); err != nil || !fi.IsDir() {
-				m.log.Warn("plugin add-dir is gone; not passed to claude", "plugin", e.Plugin, "dir", d, "thread", scope.ThreadID)
+				if !scope.Quiet {
+					m.log.Warn("plugin add-dir is gone; not passed to claude", "plugin", e.Plugin, "dir", d, "thread", scope.ThreadID)
+				}
 				continue
 			}
+			src.AddDirs = append(src.AddDirs, d)
 			if !slices.Contains(c.AddDirs, d) {
 				c.AddDirs = append(c.AddDirs, d)
 			}
 		}
+		c.Sources = append(c.Sources, src)
 	}
-	if len(names) > 0 {
+	if len(names) > 0 && !scope.Quiet {
 		keys := make([]string, len(c.Env))
 		for i, kv := range c.Env {
 			keys[i], _, _ = strings.Cut(kv, "=")
@@ -486,8 +518,12 @@ func (m *Manager) waitEnvironments(ctx context.Context, thread string) {
 // dropEnvironment forgets a plugin's contribution.
 func (m *Manager) dropEnvironment(ctx context.Context, name string) error {
 	m.env.mu.Lock()
+	_, had := m.env.byID[name]
 	delete(m.env.byID, name)
 	m.env.mu.Unlock()
+	if had {
+		bus.Publish[Event](m.opts.Bus, EnvironmentChanged{Plugin: name})
+	}
 	if _, err := m.opts.DB.ExecContext(ctx, `DELETE FROM plugin_environments WHERE plugin = ?`, name); err != nil {
 		return fmt.Errorf("plugin: drop environment: %w", err)
 	}

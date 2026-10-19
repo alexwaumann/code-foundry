@@ -88,8 +88,14 @@ func pluginSpawnExtras(plugins *plugin.Manager) thread.SpawnExtrasFunc {
 	return func(ctx context.Context, in thread.SpawnInfo) thread.SpawnExtras {
 		c := plugins.SessionEnvironment(ctx, plugin.SpawnScope{
 			ThreadID: in.ThreadID, ProjectID: in.ProjectID, MemberProjectIDs: in.MemberProjectIDs, NoProject: in.NoProject,
-			Owner: in.Owner,
-		}, in.Wait)
-		return thread.SpawnExtras{Env: c.Env, PathPrepend: c.PathPrepend, AddDirs: c.AddDirs}
+			Owner: in.Owner, Quiet: in.Probe,
+		}, in.Wait && !in.Probe)
+		x := thread.SpawnExtras{Env: c.Env, PathPrepend: c.PathPrepend, AddDirs: c.AddDirs}
+		for _, src := range c.Sources {
+			x.Sources = append(x.Sources, thread.ExtrasSource{
+				ID: src.Plugin, Name: src.DisplayName, Env: src.Env, PathPrepend: src.PathPrepend, AddDirs: src.AddDirs,
+			})
+		}
+		return x
 	}
 }

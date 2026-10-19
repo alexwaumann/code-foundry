@@ -263,6 +263,18 @@ message Thread {
   // left out of a filtered List unless filter.all or filter.owner asks for them. Their
   // usage still counts. Set once at Create. Empty for the user's threads.
   string owner = 55;
+  // The plugins' session environment for the thread's scope changed since its running
+  // Claude process started (a plugin pushed new values, or was enabled, disabled or
+  // removed): the process still has the old one, and ThreadService.Restart applies the
+  // new one. The daemon compares a fingerprint of what the process got (keys, hashed
+  // values, PATH entries, add-dirs); setting the same values again is no change. Cleared
+  // by the next spawn or restart and when the process ends. Never set on a thread that
+  // is not running. Not persisted. See docs/notes/plugins-env-restart.md.
+  bool plugin_env_stale = 56;
+  // With plugin_env_stale, what changed, by plugin display name and variable names,
+  // never values: "GitHub Actions added 2 variables", "Hello removed CF_HELLO". Empty
+  // otherwise.
+  string plugin_env_change = 57;
 }
 
 // ThreadFlagLevel is how loud a plugin's flag is.

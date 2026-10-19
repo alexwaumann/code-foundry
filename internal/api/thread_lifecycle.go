@@ -289,6 +289,7 @@ func threadToProto(s thread.Thread) *v1.Thread {
 	metadataToProto(s, p)           // thread_metadata.go
 	p.Flags = flagsToProto(s.Flags) // thread_flags.go
 	p.Owner = s.Owner
+	p.PluginEnvStale, p.PluginEnvChange = s.PluginEnvStale, s.PluginEnvChange // thread_restart.go
 	return p
 }
 

@@ -83,9 +83,17 @@ type streamState struct {
 	// (Store.SetEffort); a restart (effort.go) makes them equal. held are sends that
 	// came during a restart, answered once the new process is up.
 	effort, wantEffort string
-	restart            restartPhase
-	restartTimer       *time.Timer
-	held               []threadCmd
+	// wantRestart: the user asked for a restart (Store.Restart; restart.go), which
+	// maybeRestart begins once the interrupted turn is over; restartInterrupted: its
+	// interrupt went out. userRestart: the restart under way is the user's.
+	wantRestart, restartInterrupted, userRestart bool
+	// restartFrom is the effort of the process a restart replaced (onRestarted notes a
+	// change).
+	restartFrom  string
+	restartForce *time.Timer // forceRestart's deadline (restart.go)
+	restart      restartPhase
+	restartTimer *time.Timer
+	held         []threadCmd
 	// grants: what allow-for-thread answers gave this conversation, passed again to a
 	// restarted process (effort.go).
 	grants grants
@@ -105,7 +113,7 @@ func (st *streamState) connection() (*claudestream.Conn, error) {
 	st.connMu.Lock()
 	defer st.connMu.Unlock()
 	if st.swapping {
-		return nil, fmt.Errorf("%w: Claude is restarting for an effort change; try again in a moment", ErrFailedPrecondition)
+		return nil, fmt.Errorf("%w: Claude is restarting; try again in a moment", ErrFailedPrecondition)
 	}
 	return st.conn, nil
 }
@@ -122,6 +130,7 @@ type threadCmd struct {
 	ctx       context.Context
 	send      *outgoing
 	effort    *string // SetEffort
+	restart   bool    // Restart (restart.go)
 	wakeLimit bool    // the wake limit was reached (subscriptions_fire.go)
 	requestID string
 	decision  Decision
@@ -129,9 +138,10 @@ type threadCmd struct {
 }
 
 type threadReply struct {
-	item   Item
-	thread Thread // SetEffort's
-	err    error
+	item      Item
+	thread    Thread // SetEffort's, Restart's
+	restarted bool   // Restart's: a restart was asked of the running process
+	err       error
 }
 
 // viewersChanged tells the runner the thread's viewer count changed. Non-blocking.
@@ -263,6 +273,8 @@ func (r *runner) run() {
 			if !st.initialized && !r.closing && st.restart == restartNone {
 				r.failStart(errors.New("no answer to the initialize handshake"))
 			}
+		case <-timerC(st.restartForce):
+			r.forceRestart()
 		case <-timerC(st.restartTimer):
 			st.restartTimer = nil
 			if !st.initialized && !r.closing {
@@ -627,7 +639,7 @@ func (r *runner) onThreadCmd(cmd threadCmd) {
 		// The process is on its way out: Send waits for it, then starts a new one.
 		cmd.reply <- threadReply{err: errProcessGone}
 		return
-	case cmd.send != nil && r.st.restart != restartNone:
+	case cmd.send != nil && (r.st.restart != restartNone || r.st.wantRestart):
 		// Sent once the restarted process is up (onRestarted).
 		r.st.held = append(r.st.held, cmd)
 		return
@@ -637,6 +649,8 @@ func (r *runner) onThreadCmd(cmd threadCmd) {
 		rep.item, rep.err = r.sendMessage(cmd.send)
 	case cmd.effort != nil:
 		rep.thread = r.setEffort(*cmd.effort)
+	case cmd.restart:
+		rep.thread, rep.restarted = r.requestRestart()
 	case cmd.wakeLimit:
 		rep.item = r.onWakeLimit()
 	default:
@@ -842,12 +856,12 @@ func (r *runner) shutdown() {
 }
 
 func (r *runner) stopStreamTimers() {
-	for _, t := range []*time.Timer{r.st.drainTimer, r.st.restartTimer} {
+	for _, t := range []*time.Timer{r.st.drainTimer, r.st.restartTimer, r.st.restartForce} {
 		if t != nil {
 			t.Stop()
 		}
 	}
-	r.st.drainTimer, r.st.restartTimer = nil, nil
+	r.st.drainTimer, r.st.restartTimer, r.st.restartForce = nil, nil, nil
 }
 
 // maybeExited finishes once the process has exited and its output is read.

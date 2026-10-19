@@ -247,6 +247,12 @@ type Thread struct {
 	// Persisted; set once at Create. Copy on write.
 	SpawnEnv     []string
 	SpawnAddDirs []string
+	// PluginEnvStale: the spawn extras (plugins' session environment) for the thread's
+	// scope changed since its running process started (envstale.go); PluginEnvChange
+	// says what, by source name and variable names, never values. Cleared by a spawn, a
+	// restart and the process's end. Not persisted.
+	PluginEnvStale  bool
+	PluginEnvChange string
 }
 
 // APIRetry is one api_retry frame of a thread's stream (stream.go): Claude retries a
@@ -486,6 +492,10 @@ type Store interface {
 	// when idle, else after the running turn (EffortPending meanwhile); a thread that is
 	// not running only records it.
 	SetEffort(ctx context.Context, id, effort string) (Thread, error)
+	// Restart restarts a running thread's Claude with the same conversation (the effort
+	// restart's path: --resume), interrupting a running turn first; restarted is false,
+	// and nothing happens, when Claude is not running (restart.go).
+	Restart(ctx context.Context, id string) (t Thread, restarted bool, err error)
 	// McpStatus returns a thread's MCP servers as last checked (mcp.go), also while it
 	// is not running. refresh asks Claude again first, starting a stopped thread without
 	// a prompt. Without it, a running thread not checked yet is asked once.
