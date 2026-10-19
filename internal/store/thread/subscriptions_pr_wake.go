@@ -84,9 +84,7 @@ type wakePRChange struct {
 
 func ptr[T any](v T) *T { return &v }
 
-func wakeChecksOf(c PRChecks) wakeChecks {
-	return wakeChecks{State: c.State, Total: c.Total, Passed: c.Passed, Failed: c.Failed, Pending: c.Pending, Skipped: c.Skipped}
-}
+func wakeChecksOf(c PRChecks) wakeChecks { return wakeChecks(c) }
 
 func wakePRChangeOf(c PullRequestChange) wakePRChange {
 	w := wakePRChange{Kind: c.Kind}
