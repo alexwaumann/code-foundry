@@ -15,8 +15,10 @@ import (
 // Limits every view must respect. The host refuses a view
 // that breaks one and keeps the previous one.
 const (
-	MaxElements      = 400       // nodes, rows, chips, pairs, fields, options, buttons, tabs
-	MaxDepth         = 3         // section > section > node
+	MaxElements = 400 // nodes, columns, rows, chips, pairs, fields, options, buttons, tabs
+	// MaxDepth is how many containers (section, columns, pane) a node may sit inside:
+	// section > columns > pane > section > node. A column is part of its columns node.
+	MaxDepth         = 4
 	MaxViewBytes     = 256 << 10 // encoded, log text excluded
 	MaxLabel         = 200
 	MaxHeaderTitle   = 120
@@ -80,7 +82,7 @@ func (v View) Validate() error {
 		c.tabs("tabs", v.Tabs)
 	}
 	for i, n := range v.Nodes {
-		c.node(fmt.Sprintf("nodes[%d]", i), n, 1)
+		c.node(fmt.Sprintf("nodes[%d]", i), n, 0)
 	}
 	if c.elements > MaxElements {
 		c.bad("view", "%d elements, at most %d", c.elements, MaxElements)
@@ -353,29 +355,29 @@ func (c *checker) tabs(path string, t *Tabs) {
 	}
 }
 
-// height checks a thread or terminal node's height.
+// height checks a thread, terminal or pane node's height.
 func (c *checker) height(path string, h Height) {
 	if px := h.Px(); h.mode == "px" && (px < MinHeightPx || px > MaxHeightPx) {
 		c.bad(path, "%d px is outside %d..%d", px, MinHeightPx, MaxHeightPx)
 	}
 }
 
-// node checks one node at depth (1 = top level).
+// node checks one node inside depth containers (0 = top level).
 func (c *checker) node(path string, n Node, depth int) {
 	c.key(path, n.Key)
 	if depth > MaxDepth {
-		c.bad(path, "nested deeper than %d", MaxDepth)
+		c.bad(path, "inside %d containers (section, columns, pane), at most %d", depth, MaxDepth)
 	}
 	kinds := 0
 	for _, set := range []bool{n.Text != nil, n.Markdown != nil, n.Pairs != nil, n.List != nil, n.Chips != nil,
 		n.Log != nil, n.Actions != nil, n.Progress != nil, n.Notice != nil, n.Empty != nil, n.Section != nil,
-		n.Form != nil, n.Thread != nil, n.Terminal != nil} {
+		n.Form != nil, n.Thread != nil, n.Terminal != nil, n.Columns != nil, n.Pane != nil} {
 		if set {
 			kinds++
 		}
 	}
 	if kinds != 1 {
-		c.bad(path, "a node has exactly one kind (text, markdown, pairs, list, chips, log, actions, progress, notice, empty, section, form, thread, terminal); this one has %d", kinds)
+		c.bad(path, "a node has exactly one kind (text, markdown, pairs, list, chips, log, actions, progress, notice, empty, section, form, thread, terminal, columns, pane); this one has %d", kinds)
 		return
 	}
 	switch {
@@ -472,6 +474,51 @@ func (c *checker) node(path string, n Node, depth int) {
 		c.str(path+".terminal.title", n.Terminal.Title, MaxLabel)
 		c.height(path+".terminal.height", n.Terminal.Height)
 		c.buttons(path+".terminal.actions", n.Terminal.Actions, MaxTerminalButtons)
+	case n.Columns != nil:
+		c.columns(path+".columns", n.Columns, depth)
+	case n.Pane != nil:
+		c.pane(path+".pane", n.Pane, depth)
+	}
+}
+
+// columns checks a columns node inside depth containers: its count, collapse, and each
+// column's key, weight or width, and nodes (one container deeper).
+func (c *checker) columns(path string, cs *Columns, depth int) {
+	if n := len(cs.Items); n < MinColumns || n > MaxColumns {
+		c.bad(path+".items", "%d columns, want %d to %d", n, MinColumns, MaxColumns)
+	}
+	if !slices.Contains([]ColumnsCollapse{"", CollapseStack, CollapseFirst}, cs.Collapse) {
+		c.bad(path+".collapse", "unknown collapse %q (stack or first)", cs.Collapse)
+	}
+	for i, col := range cs.Items {
+		p := fmt.Sprintf("%s.items[%d]", path, i)
+		c.key(p, col.Key)
+		if col.Weight < 0 || col.Weight > MaxColumnWeight {
+			c.bad(p+".weight", "%d is outside 1..%d (0 is 1)", col.Weight, MaxColumnWeight)
+		}
+		if col.Width != 0 && (col.Width < MinColumnWidth || col.Width > MaxColumnWidth) {
+			c.bad(p+".width", "%d px is outside %d..%d", col.Width, MinColumnWidth, MaxColumnWidth)
+		}
+		if col.Weight != 0 && col.Width != 0 {
+			c.bad(p, "a column has a weight or a width, not both")
+		}
+		for j, ch := range col.Children {
+			c.node(fmt.Sprintf("%s.children[%d]", p, j), ch, depth+1)
+		}
+	}
+}
+
+// pane checks a pane node inside depth containers: its height, its least height, and
+// its nodes (one container deeper).
+func (c *checker) pane(path string, pn *Pane, depth int) {
+	c.height(path+".height", pn.Height)
+	if m := pn.MinHeight; m != 0 && (m < MinHeightPx || m > MaxHeightPx) {
+		c.bad(path+".minHeight", "%d px is outside %d..%d", m, MinHeightPx, MaxHeightPx)
+	} else if px := pn.Height.Px(); px > 0 && m > px {
+		c.bad(path+".minHeight", "%d px is above the pane's height (%d px)", m, px)
+	}
+	for i, ch := range pn.Children {
+		c.node(fmt.Sprintf("%s.children[%d]", path, i), ch, depth+1)
 	}
 }
 

@@ -1,7 +1,8 @@
 // Package ui is the typed view model of plugin surfaces: Go structs for every v1 node
 // and value type of the surface schema (header, tabs, text, markdown, pairs, list,
 // chips, log, actions, progress, notice, empty, section, form with fieldsets and option
-// sources, thread, terminal; inline spans with times and durations), builders, and
+// sources, thread, terminal, and the layout containers columns and pane; inline spans
+// with times and durations), builders, and
 // Validate, which checks a view against the host's rules and limits before it leaves
 // the plugin. The code-foundry-plugin skill's reference/primitives.md shows every node
 // as JSON and Go.
@@ -275,6 +276,27 @@ type Node struct {
 	Form     *Form     `json:"form,omitempty"`
 	Thread   *Thread   `json:"thread,omitempty"`
 	Terminal *Terminal `json:"terminal,omitempty"`
+	Columns  *Columns  `json:"columns,omitempty"`
+	Pane     *Pane     `json:"pane,omitempty"`
+}
+
+// Children returns the node lists a container node holds (a section's children, each
+// column's, a pane's), in order, and nil for any other node. The lists share n's arrays,
+// so a walk can change nodes in place.
+func (n Node) Children() [][]Node {
+	switch {
+	case n.Section != nil:
+		return [][]Node{n.Section.Children}
+	case n.Columns != nil:
+		out := make([][]Node, len(n.Columns.Items))
+		for i, c := range n.Columns.Items {
+			out[i] = c.Children
+		}
+		return out
+	case n.Pane != nil:
+		return [][]Node{n.Pane.Children}
+	}
+	return nil
 }
 
 // Text is a sentence or a value to copy.
@@ -485,16 +507,16 @@ type Fieldset struct {
 // Thread renders a plugin-owned Claude thread (permission threads; Host.CreateThread)
 // with the host's rendered thread view and its composer. A thread that is gone (removed,
 // or not the plugin's) shows a muted empty state; an archived one still renders. Each
-// Thread or Terminal node is a live stream the GUI attaches while it is on screen, at
-// most two per view.
+// Thread or Terminal node is a live stream the GUI attaches while it is on screen; it
+// keeps at most MaxLiveNodes of them live at once and shows the rest paused, with Attach.
 type Thread struct {
 	ThreadID string `json:"threadId"`
 	// ReadOnly leaves the composer out: the plugin alone sends (Host.SendThread).
 	ReadOnly bool `json:"readOnly,omitempty"`
 	// Placeholder is the composer's empty text ("Ask the assistant…").
 	Placeholder string `json:"placeholder,omitempty"`
-	// Height: HeightAuto (the zero value: about 420 px), HeightFill (the rest of the
-	// panel's height, at least 240 px) or HeightPx(n).
+	// Height: HeightAuto (the zero value: about 420 px), HeightFill (the rest of its box's
+	// height, at least 240 px: see Pane) or HeightPx(n).
 	Height Height `json:"height,omitzero"`
 }
 
@@ -513,8 +535,77 @@ type Terminal struct {
 	Actions []Button `json:"actions,omitempty"`
 }
 
-// Height is a thread or terminal node's height: HeightAuto (the zero value), HeightFill or
-// HeightPx(n). It travels as "auto", "fill" or a number of pixels.
+// MaxLiveNodes is how many thread and terminal nodes the GUI keeps live (attached to
+// their streams) at once, across every plugin view on screen. A node beyond it shows
+// "Paused" and Attach, which takes the oldest live node's place. Not a validation limit:
+// a view may hold more. (Each live node holds one of the six HTTP/1.1 connections the GUI
+// has to the daemon, which the app's own streams and calls share.)
+const MaxLiveNodes = 2
+
+// ColumnsCollapse is how a Columns node degrades when its container is narrower than
+// the columns need (always in the side panel).
+type ColumnsCollapse string
+
+const (
+	// CollapseStack (the default) shows the columns one under another, in order.
+	CollapseStack ColumnsCollapse = "stack"
+	// CollapseFirst shows only the first column and drops the others: for page-only
+	// detail beside a first column that is the panel's summary.
+	CollapseFirst ColumnsCollapse = "first"
+)
+
+// Columns lays out 2 to 4 columns side by side, ColumnGap px apart, when its container
+// is at least as wide as they need: ColumnMinWidth px a column (a fixed column wider than
+// that, its Width), plus the gaps (2 columns: 492 px). Narrower (always in the side
+// panel, about 360 px) it degrades by Collapse. Side by side, every column is as tall as
+// the tallest, and a weighted column never gets less than ColumnMinWidth.
+type Columns struct {
+	Items    []Column        `json:"items"`
+	Collapse ColumnsCollapse `json:"collapse,omitempty"`
+}
+
+// Column is one column: a key (in the view's namespace; it counts as an element) and its
+// nodes. Weight (1..MaxColumnWeight, 0 = 1) shares the width left after the fixed
+// columns; Width fixes it in px (MinColumnWidth..MaxColumnWidth). Set one, not both.
+type Column struct {
+	Key      string `json:"key"`
+	Weight   int    `json:"weight,omitempty"`
+	Width    int    `json:"width,omitempty"`
+	Children []Node `json:"children"`
+}
+
+// Columns' numbers, which the GUI uses too.
+const (
+	MinColumns      = 2
+	MaxColumns      = 4
+	MaxColumnWeight = 6
+	MinColumnWidth  = 160 // a fixed column's Width
+	MaxColumnWidth  = 640
+	// ColumnMinWidth is the width every column needs for the columns to sit side by
+	// side; a weighted one never gets less.
+	ColumnMinWidth = 240
+	// ColumnGap is the space between columns, side by side (the design system's pane gap).
+	ColumnGap = 12
+)
+
+// Pane is a box of nodes with its own height and scroll: Height HeightAuto (the zero
+// value: as tall as its nodes), HeightPx(n) or HeightFill (the rest of its own box, see
+// HeightFill). A pane with a px or fill height is the box its fill nodes fill: a Thread
+// with HeightFill in Pane{Height: HeightPx(600)} takes the pane's height below the
+// thread's top. Its nodes scroll inside it when they are taller, unless NoScroll (then
+// they are cut: for a pane whose one node scrolls itself, a thread or a terminal).
+// MinHeight (0, or MinHeightPx..MaxHeightPx) is an auto pane's least height and a fill
+// pane's floor (instead of 240 px); a px pane's MinHeight is at most its height. The pane
+// draws no border or background of its own.
+type Pane struct {
+	Height    Height `json:"height,omitzero"`
+	MinHeight int    `json:"minHeight,omitempty"`
+	NoScroll  bool   `json:"noScroll,omitempty"`
+	Children  []Node `json:"children"`
+}
+
+// Height is a thread, terminal or pane node's height: HeightAuto (the zero value),
+// HeightFill or HeightPx(n). It travels as "auto", "fill" or a number of pixels.
 type Height struct {
 	mode string // "", "auto", "fill", "px"
 	px   int
@@ -524,7 +615,9 @@ type Height struct {
 var (
 	// HeightAuto is the host's default height for the node.
 	HeightAuto = Height{mode: "auto"}
-	// HeightFill takes the rest of the panel's height (at least 240 px).
+	// HeightFill takes the rest of its box's height below the node (at least 240 px): the
+	// nearest enclosing Pane with a HeightPx or HeightFill height, else the surface's
+	// scrolling body (the side panel, the page).
 	HeightFill = Height{mode: "fill"}
 )
 
