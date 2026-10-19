@@ -23,7 +23,8 @@ err := h.UpdateView(open.Instance, v)
 
 Field names are lowerCamel; enums are short lower-case strings. A node is an object with
 a `key` and exactly one kind field. Every key (nodes, rows, chips, pairs, buttons,
-fields, options, tabs) is unique in the view and matches `[A-Za-z0-9._:-]{1,64}`; keys are
+fields, options, tabs) is unique in the view and matches `[A-Za-z0-9._:-]{1,64}`, not
+starting `cf-` (the host's own, like its invalid-view notice); keys are
 how the host keeps state (a collapsed section, a form draft) across views and how acts
 name elements, so keep them stable between renders. One namespace for every kind: a
 chip `deploy` and a button `deploy` collide, so prefix by role (`stage-deploy`,

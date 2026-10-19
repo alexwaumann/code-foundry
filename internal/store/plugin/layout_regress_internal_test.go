@@ -5,21 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 	"time"
-)
 
-// knownIssue skips a test of a finding that is not fixed yet (CF_KNOWN_ISSUES=1 runs it).
-func knownIssue(t *testing.T) {
-	t.Helper()
-	if os.Getenv("CF_KNOWN_ISSUES") == "" {
-		t.Skip("known issue (sdk.md); CF_KNOWN_ISSUES=1 runs it")
-	}
-}
+	"github.com/alexwaumann/code-foundry/pluginsdk/ui"
+)
 
 // Regressions from the layout fuzzing pass (2026-10-19,
 // docs/notes/plugins-layout-fixes-sdk.md).
@@ -70,27 +63,26 @@ func TestValidateViewDeepIsCheap(t *testing.T) {
 	}
 }
 
-// The invalid-view notice a dev plugin gets above its previous view steps around the
-// previous view's node keys only; a column, grid item, node tab or row keyed
-// "cf-invalid-view" then shares its key.
-func TestKnownRejectNoticeKeyCollides(t *testing.T) {
-	knownIssue(t)
+// The invalid-view notice a dev plugin gets above its previous view stepped around the
+// previous view's node keys only, so a column, grid item, node tab or row keyed
+// "cf-invalid-view" shared its key. Keys starting "cf-" are now the host's: Validate
+// refuses them anywhere, and the notice's key is reserved.
+func TestRejectNoticeKeyIsReserved(t *testing.T) {
 	for _, raw := range []string{
 		`{"nodes":[{"key":"c","columns":{"items":[{"key":"cf-invalid-view","children":[]},{"key":"c2","children":[]}]}}]}`,
 		`{"nodes":[{"key":"g","grid":{"items":[{"key":"cf-invalid-view","children":[]}]}}]}`,
 		`{"nodes":[{"key":"t","tabs":{"active":"cf-invalid-view","items":[{"key":"cf-invalid-view","label":"A"},{"key":"b","label":"B"}],"children":[]}}]}`,
 		`{"nodes":[{"key":"md","masterDetail":{"list":{"rows":[{"key":"cf-invalid-view","title":"R"}]},"detail":[]}}]}`,
+		`{"nodes":[{"key":"cf-x","text":{"content":"x"}}]}`,
+		`{"nodes":[],"footer":[{"key":"a","actions":{"buttons":[{"key":"cf-go","label":"Go","action":{"event":"go"}}]}}]}`,
 	} {
-		v, canon, errs := validateView(json.RawMessage(raw), "p", fuzzPerms)
-		if len(errs) > 0 {
-			t.Fatal(errs)
+		_, _, errs := validateView(json.RawMessage(raw), "p", fuzzPerms)
+		if len(errs) != 1 || !strings.Contains(errs[0], `keys starting "cf-" are the host's`) {
+			t.Errorf("%s: %q", raw, errs)
 		}
-		in := newFuzzInstance()
-		in.accept(v, canon, time.Unix(0, 0))
-		in.reject("P", []string{"x: bad"}, true)
-		if out := string(in.renderLocked()); strings.Count(out, `"key":"cf-invalid-view"`) > 1 {
-			t.Errorf("two elements keyed cf-invalid-view: %s", out)
-		}
+	}
+	if !strings.HasPrefix(invalidViewKey, ui.ReservedKeyPrefix) {
+		t.Errorf("the notice's key %q is not reserved", invalidViewKey)
 	}
 }
 

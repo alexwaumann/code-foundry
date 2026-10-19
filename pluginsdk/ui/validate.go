@@ -65,6 +65,10 @@ const (
 // KeyPattern is the shape of every key. Keys share one namespace across the view.
 var KeyPattern = regexp.MustCompile(`^[A-Za-z0-9._:-]{1,64}$`)
 
+// ReservedKeyPrefix starts the keys of what the host adds to a view (its invalid-view
+// notice): a plugin's keys do not.
+const ReservedKeyPrefix = "cf-"
+
 // StorePattern is the shape of a secret input's store: a key the host's secret store
 // takes (a key without ":").
 var StorePattern = regexp.MustCompile(`^[A-Za-z0-9._-]{1,64}$`)
@@ -143,6 +147,10 @@ func (c *checker) key(path, k string) {
 	c.elements++
 	if !KeyPattern.MatchString(k) {
 		c.bad(path+".key", "%q must match %s", k, KeyPattern)
+		return
+	}
+	if strings.HasPrefix(k, ReservedKeyPrefix) {
+		c.bad(path+".key", "%q: keys starting %q are the host's", k, ReservedKeyPrefix)
 		return
 	}
 	if first, dup := c.keys[k]; dup {

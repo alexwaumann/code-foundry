@@ -1050,6 +1050,10 @@ func (in *instance) installLogsLocked(v *ui.View) {
 	in.logs = next
 }
 
+// invalidViewKey is the host's notice above (or instead of) an invalid view: a reserved
+// key, so it never meets one of the plugin's.
+const invalidViewKey = ui.ReservedKeyPrefix + "invalid-view"
+
 // reject records an invalid view: the plugin's earlier view stays; without one (or for a
 // dev plugin, above it) the instance shows a host-made notice saying why.
 func (in *instance) reject(displayName string, errs []string, dev bool) {
@@ -1067,15 +1071,10 @@ func (in *instance) reject(displayName string, errs []string, dev bool) {
 		body += "s"
 	}
 	body += "). Its log has the details: code-foundry plugin logs " + in.plugin
-	notice := ui.Node{Key: "cf-invalid-view", Notice: &ui.Notice{Tone: ui.ToneError, Title: "Invalid view", Body: &ui.Inline{Text: body}, Detail: detail}}
+	notice := ui.Node{Key: invalidViewKey, Notice: &ui.Notice{Tone: ui.ToneError, Title: "Invalid view", Body: &ui.Inline{Text: body}, Detail: detail}}
 	v := ui.View{Nodes: []ui.Node{notice}}
 	if in.view != nil {
 		prev := *in.view
-		keys := map[string]bool{}
-		walkView(&prev, func(n *ui.Node) { keys[n.Key] = true })
-		for keys[notice.Key] {
-			notice.Key += "-"
-		}
 		v = prev
 		v.Nodes = append([]ui.Node{notice}, prev.Nodes...)
 	}
