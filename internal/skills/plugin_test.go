@@ -138,23 +138,44 @@ func TestRenderPluginSkill(t *testing.T) {
 }
 
 func TestSDKPin(t *testing.T) {
-	for _, tt := range []struct{ commit, want string }{
-		{"0123456789abcdef0123456789abcdef01234567", "0123456789abcdef0123456789abcdef01234567"},
-		{"0123456789abcdef0123456789abcdef01234567-dirty", "main"},
-		{"", "main"},
-		{"v1.2.3", "main"},
+	const sha = "0123456789abcdef0123456789abcdef01234567"
+	for _, tt := range []struct{ commit, tag, want string }{
+		{sha, "", sha},
+		{sha, "pluginsdk/v0.2.1", "v0.2.1"},
+		{sha, "pluginsdk/v10.0.12", "v10.0.12"},
+		{sha, "v0.2.1", sha},                         // not the SDK's tag
+		{sha, "pluginsdk/v0.2.1-rc.1", sha},          // not a release
+		{sha, "pluginsdk/v0.2", sha},                 // not semver
+		{sha + "-dirty", "pluginsdk/v0.2.1", "main"}, // a modified checkout is not the tag
+		{sha + "-dirty", "", "main"},
+		{"", "", "main"},
+		{"", "pluginsdk/v0.2.1", "main"},
+		{"v1.2.3", "", "main"},
 	} {
-		if got := skills.SDKPin(tt.commit); got != tt.want {
-			t.Errorf("SDKPin(%q) = %q, want %q", tt.commit, got, tt.want)
+		if got := skills.SDKPin(tt.commit, tt.tag); got != tt.want {
+			t.Errorf("SDKPin(%q, %q) = %q, want %q", tt.commit, tt.tag, got, tt.want)
 		}
 	}
-	// A build without a clean commit names main.
-	files, err := skills.Render(skills.Sources{Version: "dev", Commit: "abc-dirty"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(files[skills.Plugin+"/SKILL.md"]), "pluginsdk@main\n") {
-		t.Error("SKILL.md does not pin main for a dirty build")
+	for _, tt := range []struct {
+		name string
+		src  skills.Sources
+		want string
+	}{
+		// A build without a clean commit names main.
+		{"dirty", skills.Sources{Version: "dev", Commit: "abc-dirty"}, "pluginsdk@main\n"},
+		{"commit", skills.Sources{Version: "dev", Commit: sha}, "pluginsdk@" + sha + "\n"},
+		// A build from a commit carrying the SDK's tag pins its version.
+		{"tagged", skills.Sources{Version: "v1.4.0", Commit: sha, SDKTag: "pluginsdk/v0.2.1"}, "pluginsdk@v0.2.1\n"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			files, err := skills.Render(tt.src)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if body := string(files[skills.Plugin+"/SKILL.md"]); !strings.Contains(body, "go get github.com/alexwaumann/code-foundry/"+tt.want) {
+				t.Errorf("SKILL.md does not pin %q", tt.want)
+			}
+		})
 	}
 }
 

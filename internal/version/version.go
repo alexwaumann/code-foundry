@@ -14,17 +14,26 @@ var Version = "dev"
 // file) has none. `make build` sets it with -ldflags "-X ...version.Commit=<sha>[-dirty]".
 var Commit = ""
 
+// PluginSDKTag is the pluginsdk/vX.Y.Z tag on the commit the binary was built from
+// ("" when it has none): the plugin skill pins the SDK at that version rather than the
+// commit. The daemon cannot run git when it starts, so `make build` resolves it
+// (`git tag --points-at HEAD 'pluginsdk/v*'`) into
+// -ldflags "-X ...version.PluginSDKTag=pluginsdk/vX.Y.Z".
+var PluginSDKTag = ""
+
 // Info describes the running build.
 type Info struct {
 	Version   string
 	Commit    string
 	GoVersion string
+	// PluginSDKTag is PluginSDKTag: the pluginsdk/vX.Y.Z tag on Commit, if any.
+	PluginSDKTag string
 }
 
 // Get returns build information, filling the commit from the embedded VCS info, else
 // from Commit.
 func Get() Info {
-	info := Info{Version: Version, Commit: Commit, GoVersion: runtime.Version()}
+	info := Info{Version: Version, Commit: Commit, GoVersion: runtime.Version(), PluginSDKTag: PluginSDKTag}
 	if bi, ok := debug.ReadBuildInfo(); ok {
 		dirty := false
 		for _, s := range bi.Settings {

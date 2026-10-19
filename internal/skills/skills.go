@@ -47,6 +47,9 @@ type Sources struct {
 	// Commit is the commit the daemon was built from (version.Info.Commit, maybe with
 	// "-dirty"): the plugin SDK version the plugin skill pins.
 	Commit string
+	// SDKTag is the pluginsdk/vX.Y.Z tag on Commit (version.Info.PluginSDKTag, "" for
+	// none): when set the skill pins that version instead of the commit.
+	SDKTag string
 	// SkillsDir is where Install puts the skills (<dir>/.claude/skills), for paths the
 	// skills name; empty when unknown.
 	SkillsDir string

@@ -37,7 +37,7 @@ var placeholder = regexp.MustCompile(`\{\{cf\.([A-Za-z]+)\}\}`)
 func placeholders(src Sources) map[string]string {
 	return map[string]string{
 		"version":       src.Version,
-		"sdkPin":        SDKPin(src.Commit),
+		"sdkPin":        SDKPin(src.Commit, src.SDKTag),
 		"example":       exampleDir(src.SkillsDir),
 		"facts":         codeList(src.Facts),
 		"reservedNames": codeList(pluginsdk.ReservedNames),
@@ -143,16 +143,23 @@ func fill(p string, b []byte, values map[string]string) ([]byte, error) {
 	return out, err
 }
 
-var commitPattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
+var (
+	commitPattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
+	sdkTagPattern = regexp.MustCompile(`^pluginsdk/(v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*))$`)
+)
 
-// SDKPin is what a plugin pins the SDK at with `go get <SDKModule>@<pin>`: the commit
-// this build was made from (its SDK speaks this daemon's protocol exactly), or "main"
-// for a build without a clean commit (a modified checkout, a test).
-func SDKPin(commit string) string {
-	if commitPattern.MatchString(commit) {
-		return commit
+// SDKPin is what a plugin pins the SDK at with `go get <SDKModule>@<pin>`: the version
+// of the pluginsdk/vX.Y.Z tag on the commit this build was made from (tag), else that
+// commit (its SDK speaks this daemon's protocol exactly), or "main" for a build without
+// a clean commit (a modified checkout, a test). A modified checkout ignores the tag too.
+func SDKPin(commit, tag string) string {
+	if !commitPattern.MatchString(commit) {
+		return "main"
 	}
-	return "main"
+	if m := sdkTagPattern.FindStringSubmatch(tag); m != nil {
+		return m[1]
+	}
+	return commit
 }
 
 // exampleDir is where the installed example is, for the skill to copy from.
