@@ -24,7 +24,10 @@ busy yet (E5 hit it twice; reproduced deterministically).
   `…; nothing pending`. `--json` is unchanged (the answered item).
 * **Supervised help says what Claude's manual mode does**: "asks before edits and
   commands; read-only ones run unasked" (was "confirm every tool call"; w2a saw reads and
-  read-only Bash run unasked). Same wording in the proto and store comments.
+  read-only Bash run unasked). Same wording in the proto, store and pluginsdk comments;
+  the GUI's mode picker hint reads "Edits and commands ask; reads run" (`lib/compose.ts`)
+  and a supervised prompt's hint "Supervised asks before edits and commands"
+  (`lib/threadRequest.ts`). Text only.
 * The guide's "Do not poll" line says a wait counts only once the thread answered its
   latest message.
 
@@ -52,10 +55,8 @@ busy yet (E5 hit it twice; reproduced deterministically).
   `thread.wait`/`--until`, `thread.set-mode` and `thread.respond` lost repeated wording
   (the duration format and "exits 1" live on `thread.wait`; the answer format on
   `--answer`). The guide is at 28,965 bytes.
-* Not done here: the skill text (another PR), the GUI's own supervised hints
-  (`lib/compose.ts` "Confirm every tool call", `lib/threadRequest.ts` "Supervised asks
-  before every tool call") and the pluginsdk comment, which make the same claim; wake on
-  each new pending request (REPORT C2).
+* Not done here: the skill text (another PR); wake on each new pending request
+  (REPORT C2).
 
 ## Gotchas
 

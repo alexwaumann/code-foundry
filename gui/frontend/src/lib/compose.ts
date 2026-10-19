@@ -23,7 +23,7 @@ export type ComposePermission = Exclude<PermissionModeView, "">;
 
 /** thread.new `permission` values. Full access (bypassPermissions) is never offered. */
 export const PERMISSION_CHOICES: readonly (Choice & { value: ComposePermission; hint: string })[] = [
-  { value: "supervised", label: "Supervised", hint: "Confirm every tool call" },
+  { value: "supervised", label: "Supervised", hint: "Edits and commands ask; reads run" },
   { value: "accept-edits", label: "Accept edits", hint: "File edits run; the rest asks" },
   { value: "auto", label: "Auto", hint: "Claude's classifier decides" },
 ];

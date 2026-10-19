@@ -73,7 +73,7 @@ describe("permission prompts", () => {
   it("hints why the mode asked", () => {
     expect(modeHint("accept-edits", "Bash")).toBe("Accept edits asks before commands");
     expect(modeHint("accept-edits", "Write")).toBe("Accept edits asks for files outside the project");
-    expect(modeHint("supervised", "Read")).toBe("Supervised asks before every tool call");
+    expect(modeHint("supervised", "Read")).toBe("Supervised asks before edits and commands");
     expect(modeHint("", "Bash")).toBe("");
   });
 });

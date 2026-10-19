@@ -168,7 +168,7 @@ const EDIT_TOOLS = new Set(["Edit", "MultiEdit", "Write", "NotebookEdit"]);
 export function modeHint(permissionMode: string, toolName: string): string {
   switch (permissionMode) {
     case "supervised":
-      return "Supervised asks before every tool call";
+      return "Supervised asks before edits and commands";
     case "accept-edits":
       return EDIT_TOOLS.has(toolName) ? "Accept edits asks for files outside the project" : "Accept edits asks before commands";
     case "auto":
