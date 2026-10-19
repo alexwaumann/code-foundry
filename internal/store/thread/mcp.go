@@ -162,6 +162,11 @@ type mcpState struct {
 	// saved is the ticket of the status last persisted, guarded by threadLog.saveMu:
 	// setMcp saves after unlocking mu, so two checks' saves can arrive out of order.
 	saved uint64
+	// conn is the process whose answer was applied last (nil: none since the last one
+	// ended), and reported whether it has listed a server yet: Claude starts MCP servers
+	// in the background, so a process's first answers can list none.
+	conn     *claudestream.Conn
+	reported bool
 }
 
 // mcpTicket numbers a check about to be made.
@@ -176,17 +181,60 @@ func (t *threadLog) mcpTicket() uint64 {
 // check's answer is there already. It reports whether it was applied.
 func (t *threadLog) setMcp(ticket uint64, s *McpStatus) bool {
 	t.mu.Lock()
+	ok := t.applyMcpLocked(ticket, s)
+	t.mu.Unlock()
+	if ok {
+		t.persistMcp(ticket, s)
+	}
+	return ok
+}
+
+// applyMcpLocked caches and publishes s unless a later check's answer is there. t.mu
+// held.
+func (t *threadLog) applyMcpLocked(ticket uint64, s *McpStatus) bool {
 	if ticket <= t.mcp.applied {
-		t.mu.Unlock()
 		return false
 	}
 	t.mcp.applied = ticket
 	t.mcp.status = s
 	t.seq++
 	bus.Publish[ThreadEvent](t.bus, McpChanged{ThreadID: t.id, Seq: t.seq, Status: s})
-	t.mu.Unlock()
-	t.persistMcp(ticket, s)
 	return true
+}
+
+// answerMcp is setMcp for an answer of process conn that listed answered servers. An
+// answer listing none from a process that has listed none yet is Claude still starting
+// them: with keep set, s then takes the cached servers, as pending, rather than
+// replacing a known list with nothing. first reports that no answer of conn was applied
+// before this one.
+func (t *threadLog) answerMcp(ticket uint64, conn *claudestream.Conn, s *McpStatus, answered int, keep bool) (first bool) {
+	t.mu.Lock()
+	same := t.mcp.conn == conn
+	if answered == 0 && keep && (!same || !t.mcp.reported) && t.mcp.status != nil {
+		s.Servers = pendingServers(t.mcp.status.Servers)
+	}
+	ok := t.applyMcpLocked(ticket, s)
+	if ok {
+		if !same {
+			t.mcp.conn, t.mcp.reported = conn, false
+		}
+		t.mcp.reported = t.mcp.reported || answered > 0
+	}
+	t.mu.Unlock()
+	if ok {
+		t.persistMcp(ticket, s)
+	}
+	return !same
+}
+
+// pendingServers is servers as they read while connecting again: what their
+// configuration says (name, scope, source, transport), nothing a connection reported.
+func pendingServers(servers []McpServer) []McpServer {
+	out := make([]McpServer, len(servers))
+	for i, sv := range servers {
+		out[i] = McpServer{Name: sv.Name, Status: McpPending, Scope: sv.Scope, Source: sv.Source, Transport: sv.Transport}
+	}
+	return out
 }
 
 // persistMcp saves the status of check ticket unless a later check's is saved already.
@@ -209,6 +257,7 @@ func (t *threadLog) dropMcpChecks() {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.mcp.applied = t.mcp.issued
+	t.mcp.conn, t.mcp.reported = nil, false
 }
 
 func (t *threadLog) mcpStatus() *McpStatus {
@@ -218,45 +267,80 @@ func (t *threadLog) mcpStatus() *McpStatus {
 }
 
 // MCP polling while the answer is unsettled (mcpUnsettled): Claude starts servers in the
-// background, so the first turn's check often finds one pending.
+// background, so a process's first check often finds one pending, or none at all.
+// Options.McpPollInterval overrides the interval.
 const (
 	mcpPendingPolls    = 5
 	mcpPendingInterval = 3 * time.Second
 )
 
+// mcpCheck is one check of a thread's MCP servers, and the polls that follow it.
+type mcpCheck struct {
+	conn    *claudestream.Conn
+	log     *threadLog
+	id      string
+	trigger McpTrigger
+	server  string // the server reconnected (McpTriggerReconnect)
+	// init is system/init's servers on a turn's check (turn): they fill in what the
+	// answer lacks, and they are the process's server list, so an empty answer is not
+	// filled from the cache then.
+	init []claudestream.McpServerInit
+	turn bool
+}
+
 // checkMcp asks Claude for its MCP servers off the runner goroutine (system/init, whose
-// mcp_servers fill in what the answer lacks) and, while the answer looks unsettled, asks
-// again a few times: a server still connecting, a server init listed missing, or no
-// servers at all on the process's first check (claude.ai connectors arrive a moment
-// after the first turn starts; mcp_status then answered none in a live run).
+// mcp_servers fill in what the answer lacks) and settles the answer (settleMcp).
 func (r *runner) checkMcp(init []claudestream.McpServerInit) {
-	conn, log, m, id := r.st.conn, r.st.log, r.m, r.id
-	first := !r.st.mcpChecked
-	r.st.mcpChecked = true
+	c := mcpCheck{conn: r.st.conn, log: r.st.log, id: r.id, trigger: McpTriggerTurn, init: init, turn: true}
+	m := r.m
 	go func() {
-		trigger := McpTriggerTurn
-		for poll := 0; ; poll++ {
-			s, err := m.fetchMcp(context.Background(), conn, log, trigger, "", init)
-			if err != nil {
-				if !errors.Is(err, claudestream.ErrClosed) {
-					m.log.Warn("check MCP servers", "thread", id, "err", err)
-				}
-				return
-			}
-			if !mcpUnsettled(s, init, first) || poll >= mcpPendingPolls {
-				return
-			}
+		s, first, err := m.fetchMcp(context.Background(), c, false)
+		if err != nil {
+			m.warnMcp(c.id, err)
+			return
+		}
+		m.settleMcp(c, s, first)
+	}()
+}
+
+// settleMcp asks again, a few times, while the answer s of check c looks unsettled: a
+// server still connecting (pending, also the cached servers kept while a process lists
+// none), a server init listed missing, or no servers at all on the process's first
+// check (claude.ai connectors arrive a moment after the process starts; mcp_status then
+// answered none in a live run). The polls run on their own goroutine and end with the
+// process; their answers are McpChanged events. The last poll's answer is taken as it
+// is: a process that still lists no servers then has none.
+func (m *Manager) settleMcp(c mcpCheck, s *McpStatus, first bool) {
+	if !mcpUnsettled(s, c.init, first) {
+		return
+	}
+	c.trigger, c.server = McpTriggerRefresh, ""
+	go func() {
+		for poll := 1; poll <= mcpPendingPolls; poll++ {
 			select {
-			case <-conn.Done():
+			case <-c.conn.Done():
 				return
-			case <-time.After(mcpPendingInterval):
+			case <-time.After(m.opts.McpPollInterval):
 			}
-			trigger = McpTriggerRefresh
+			s, _, err := m.fetchMcp(context.Background(), c, poll == mcpPendingPolls)
+			if err != nil {
+				m.warnMcp(c.id, err)
+				return
+			}
+			if !mcpUnsettled(s, c.init, first) {
+				return
+			}
 		}
 	}()
 }
 
-// mcpUnsettled reports whether a turn's check should be repeated soon.
+func (m *Manager) warnMcp(id string, err error) {
+	if !errors.Is(err, claudestream.ErrClosed) {
+		m.log.Warn("check MCP servers", "thread", id, "err", err)
+	}
+}
+
+// mcpUnsettled reports whether a check should be repeated soon.
 func mcpUnsettled(s *McpStatus, init []claudestream.McpServerInit, first bool) bool {
 	if s.anyPending() || (first && len(s.Servers) == 0) {
 		return true
@@ -279,19 +363,20 @@ func fillFromInit(servers []McpServer, init []claudestream.McpServerInit) []McpS
 }
 
 // fetchMcp asks Claude (mcp_status, bounded by streamControlTimeout) and caches the
-// answer, completed by fill (system/init's list). It returns the answer, also when a
-// later check's answer was cached first.
-func (m *Manager) fetchMcp(ctx context.Context, conn *claudestream.Conn, log *threadLog, trigger McpTrigger, server string, fill []claudestream.McpServerInit) (*McpStatus, error) {
-	ticket := log.mcpTicket()
+// answer, completed by c.init and, unless final or a turn's check, by the cached
+// servers while the process lists none (answerMcp). It returns the answer, also when a
+// later check's answer was cached first, and whether it was the process's first.
+func (m *Manager) fetchMcp(ctx context.Context, c mcpCheck, final bool) (*McpStatus, bool, error) {
+	ticket := c.log.mcpTicket()
 	ctx, cancel := context.WithTimeout(ctx, streamControlTimeout)
 	defer cancel()
-	wire, err := conn.McpStatus(ctx)
+	wire, err := c.conn.McpStatus(ctx)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
-	s := &McpStatus{CheckedAt: m.opts.Now(), Trigger: trigger, Server: server, Servers: fillFromInit(mcpFromWire(wire), fill)}
-	log.setMcp(ticket, s)
-	return s, nil
+	s := &McpStatus{CheckedAt: m.opts.Now(), Trigger: c.trigger, Server: c.server, Servers: fillFromInit(mcpFromWire(wire), c.init)}
+	first := c.log.answerMcp(ticket, c.conn, s, len(wire), !final && !c.turn)
+	return s, first, nil
 }
 
 // McpStatus implements Store.
@@ -318,8 +403,13 @@ func (m *Manager) McpStatus(ctx context.Context, id string, refresh bool) (*McpS
 	if err != nil {
 		return nil, err
 	}
-	s, err := m.fetchMcp(ctx, conn, log, McpTriggerRefresh, "", nil)
-	return s, controlErr(err)
+	c := mcpCheck{conn: conn, log: log, id: id, trigger: McpTriggerRefresh}
+	s, first, err := m.fetchMcp(ctx, c, false)
+	if err != nil {
+		return nil, controlErr(err)
+	}
+	m.settleMcp(c, s, first)
+	return s, nil
 }
 
 // McpReconnect implements Store.
@@ -358,8 +448,12 @@ func (m *Manager) McpReconnect(ctx context.Context, id, server string) (McpRecon
 		return res, controlErr(err)
 	}
 	m.log.Info("MCP server reconnected", "thread", id, "server", server, "err", res.Error)
-	if res.Status, err = m.fetchMcp(ctx, conn, log, McpTriggerReconnect, server, nil); err != nil {
+	c := mcpCheck{conn: conn, log: log, id: id, trigger: McpTriggerReconnect, server: server}
+	s, first, err := m.fetchMcp(ctx, c, false)
+	if err != nil {
 		return res, controlErr(err)
 	}
+	res.Status = s
+	m.settleMcp(c, s, first)
 	return res, nil
 }
