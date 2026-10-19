@@ -96,6 +96,15 @@ type Options struct {
 	// (subscriptions.go); nil refuses them. The daemon reads the action store; it also
 	// calls Manager.ActionRunFinished for every run that ends.
 	ActionRun func(ctx context.Context, id string) (ActionRun, bool)
+	// PullRequest looks up a pull request ("owner/name#123") for wake subscriptions to
+	// pull requests (subscriptions_pr.go), from the GitHub store's cache only; false when
+	// it is not there. nil refuses them. The daemon also calls
+	// Manager.PullRequestChanged for every change the GitHub poll sees.
+	PullRequest func(ctx context.Context, target string) (PullRequestInfo, bool)
+	// WatchPullRequests is told the pull requests the subscriptions watch (sorted
+	// "owner/name#123") whenever that set changes, from New on, so the GitHub poll keeps
+	// them in scope. Called under the store's locks: it must not call back into it.
+	WatchPullRequests func(targets []string)
 	// WakeLimit is how many wakes a subscriber gets per rolling WakeWindow at most
 	// (subscriptions_fire.go). Default WakeLimit (the package constant).
 	WakeLimit int
@@ -305,7 +314,7 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 		m.recs[s.ID] = &record{s: s, namingTried: s.namedForGood()}
 	}
 	// Wake subscriptions, armed with the threads as loaded (subscriptions.go).
-	if m.subs, err = loadSubscriptionState(ctx, opts.DB, opts.Log, m.recs); err != nil {
+	if m.subs, err = loadSubscriptionState(ctx, opts.DB, opts.Log, m.recs, opts.WatchPullRequests); err != nil {
 		return nil, err
 	}
 	m.mu.Lock()

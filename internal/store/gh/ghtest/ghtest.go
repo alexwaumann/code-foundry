@@ -28,6 +28,7 @@ type Store struct {
 	owners  []gh.PublishOwner             // owners.go
 	diffs   map[string]gh.PullRequestDiff // files.go
 	files   map[string]gh.PullRequestFile // files.go
+	watched []string                      // watch.go
 }
 
 var _ gh.Service = (*Store)(nil)

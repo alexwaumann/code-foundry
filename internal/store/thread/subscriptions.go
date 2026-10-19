@@ -138,15 +138,18 @@ type Subscription struct {
 	SubscriberName, TargetName, TargetStatus string
 }
 
-// SubscribeOptions configures Store.Subscribe: exactly one of TargetThreadID and
-// TargetRunID. Condition "" is CondSettled for a thread, CondFinished for a run; a run
-// also takes CondSettled (it means finished). Repeat is ignored for a run.
+// SubscribeOptions configures Store.Subscribe: exactly one of TargetThreadID,
+// TargetRunID and TargetPullRequest ("owner/name#123" or a pull request URL).
+// Condition "" is CondSettled for a thread, CondFinished for a run, CondChecksDone for
+// a pull request; a run also takes CondSettled (it means finished). Repeat is ignored
+// for a run.
 type SubscribeOptions struct {
-	SubscriberID   string
-	TargetThreadID string
-	TargetRunID    string
-	Condition      Condition
-	Repeat         bool
+	SubscriberID      string
+	TargetThreadID    string
+	TargetRunID       string
+	TargetPullRequest string
+	Condition         Condition
+	Repeat            bool
 }
 
 // SubscribeResult is Store.Subscribe's answer.
@@ -163,10 +166,11 @@ type SubscribeResult struct {
 // UnsubscribeOptions configures Store.Unsubscribe: an ID, or a SubscriberID and exactly
 // one target.
 type UnsubscribeOptions struct {
-	ID             string
-	SubscriberID   string
-	TargetThreadID string
-	TargetRunID    string
+	ID                string
+	SubscriberID      string
+	TargetThreadID    string
+	TargetRunID       string
+	TargetPullRequest string
 }
 
 // ActionRun is what a wake about an action run says (Options.ActionRun).
@@ -192,6 +196,9 @@ type subscriptions struct {
 	noted map[string]time.Time
 	// queues are the deliveries waiting for each subscriber's drain goroutine.
 	queues map[string]*wakeQueue
+	// watch is Options.WatchPullRequests; watched the set it was last told.
+	watch   func(targets []string)
+	watched []string
 }
 
 // subRec is a subscription and whether its target met the condition when last seen.
@@ -204,13 +211,13 @@ type subRec struct {
 // loaded (recs): a subscription whose target meets its condition now waits for the
 // next transition into it. Run subscriptions (runs do not outlive the daemon) and those
 // of threads that are gone or archived are deleted.
-func loadSubscriptionState(ctx context.Context, db *sql.DB, log *slog.Logger, recs map[string]*record) (*subscriptions, error) {
+func loadSubscriptionState(ctx context.Context, db *sql.DB, log *slog.Logger, recs map[string]*record, watch func([]string)) (*subscriptions, error) {
 	rows, err := loadSubscriptions(ctx, db)
 	if err != nil {
 		return nil, err
 	}
 	s := &subscriptions{db: db, log: log, byID: map[string]*subRec{}, sent: map[string][]time.Time{},
-		noted: map[string]time.Time{}, queues: map[string]*wakeQueue{}}
+		noted: map[string]time.Time{}, queues: map[string]*wakeQueue{}, watch: watch}
 	live := func(id string) (Thread, bool) {
 		rec, ok := recs[id]
 		if !ok || !rec.s.ArchivedAt.IsZero() {
@@ -221,12 +228,15 @@ func loadSubscriptionState(ctx context.Context, db *sql.DB, log *slog.Logger, re
 	var stale []string
 	for _, sub := range rows {
 		_, okSub := live(sub.SubscriberID)
-		target, okTarget := live(sub.TargetID)
-		if !okSub || sub.TargetKind != TargetThread || !okTarget {
+		switch target, okTarget := live(sub.TargetID); {
+		case okSub && sub.TargetKind == TargetThread && okTarget:
+			s.byID[sub.ID] = &subRec{s: sub, sat: Meets(sub.Condition, target)}
+		case okSub && sub.TargetKind == TargetPullRequest:
+			// Edge-triggered on the GitHub poll's changes, which carry their own before.
+			s.byID[sub.ID] = &subRec{s: sub}
+		default:
 			stale = append(stale, sub.ID)
-			continue
 		}
-		s.byID[sub.ID] = &subRec{s: sub, sat: Meets(sub.Condition, target)}
 	}
 	if len(stale) > 0 {
 		if err := deleteSubscriptions(ctx, db, stale); err != nil {
@@ -235,6 +245,9 @@ func loadSubscriptionState(ctx context.Context, db *sql.DB, log *slog.Logger, re
 		log.Info("dropped wake subscriptions at startup (action runs do not outlive the daemon; archived or removed threads)",
 			"count", len(stale))
 	}
+	s.mu.Lock()
+	s.syncWatchLocked()
+	s.mu.Unlock()
 	return s, nil
 }
 
@@ -250,10 +263,27 @@ func newSubscriptionID() (string, error) {
 // subscribeTarget validates o's target and condition: the target's kind and id and the
 // condition with its default.
 func subscribeTarget(o SubscribeOptions) (TargetKind, string, Condition, error) {
-	thread, run := strings.TrimSpace(o.TargetThreadID), strings.TrimSpace(o.TargetRunID)
+	thread, run, pr := strings.TrimSpace(o.TargetThreadID), strings.TrimSpace(o.TargetRunID), strings.TrimSpace(o.TargetPullRequest)
+	n := 0
+	for _, t := range []string{thread, run, pr} {
+		if t != "" {
+			n++
+		}
+	}
 	switch {
-	case (thread == "") == (run == ""):
-		return "", "", "", fmt.Errorf("%w: give exactly one target: a thread or an action run", ErrInvalidArgument)
+	case n != 1:
+		return "", "", "", fmt.Errorf("%w: give exactly one target: a thread, an action run or a pull request", ErrInvalidArgument)
+	case pr != "":
+		target, err := ParsePullRequestTarget(pr)
+		if err != nil {
+			return "", "", "", err
+		}
+		c := cmp.Or(o.Condition, CondChecksDone)
+		if !slices.Contains(PullRequestConditions, c) {
+			return "", "", "", fmt.Errorf("%w: condition %q is not a pull request's (want checks_done, checks_failed, checks_passed, review, comment, review_requested, head_pushed, merged, closed or changed)",
+				ErrInvalidArgument, c)
+		}
+		return TargetPullRequest, target, c, nil
 	case run != "":
 		switch o.Condition {
 		case "", CondFinished, CondSettled:
@@ -279,9 +309,21 @@ func (m *Manager) Subscribe(ctx context.Context, o SubscribeOptions) (SubscribeR
 		return SubscribeResult{}, fmt.Errorf("%w: a subscriber thread is required", ErrInvalidArgument)
 	}
 	var run ActionRun
-	if kind == TargetActionRun {
+	var pr *PullRequestInfo
+	switch kind {
+	case TargetActionRun:
 		if run, err = m.actionRun(ctx, target); err != nil {
 			return SubscribeResult{}, err
+		}
+	case TargetPullRequest:
+		if m.opts.PullRequest == nil {
+			return SubscribeResult{}, fmt.Errorf("%w: pull requests are not available", ErrFailedPrecondition)
+		}
+		if p, ok := m.opts.PullRequest(ctx, target); ok {
+			if p.State == "merged" && cond != CondMerged {
+				return SubscribeResult{}, fmt.Errorf("%w: pull request %s is merged; nothing more will happen to it", ErrFailedPrecondition, target)
+			}
+			pr = &p
 		}
 	}
 	id, err := newSubscriptionID()
@@ -290,8 +332,8 @@ func (m *Manager) Subscribe(ctx context.Context, o SubscribeOptions) (SubscribeR
 	}
 	res, err := m.subscribe(Subscription{
 		ID: id, SubscriberID: subscriber, TargetKind: kind, TargetID: target, Condition: cond,
-		Repeat: o.Repeat && kind == TargetThread, CreatedAt: m.opts.Now().Round(0).Truncate(time.Millisecond),
-	}, run)
+		Repeat: o.Repeat && kind != TargetActionRun, CreatedAt: m.opts.Now().Round(0).Truncate(time.Millisecond),
+	}, run, pr)
 	if err != nil || kind != TargetActionRun || res.Fired || res.Existed {
 		return res, err
 	}
@@ -317,8 +359,9 @@ func (m *Manager) actionRun(ctx context.Context, id string) (ActionRun, error) {
 
 // subscribe validates sub against the threads and the other subscriptions and keeps
 // it, under m.mu and the subscriptions' lock: it fires at once when its target already
-// meets the condition (a run: already finished, given as run).
-func (m *Manager) subscribe(sub Subscription, run ActionRun) (SubscribeResult, error) {
+// meets the condition (a run: already finished, given as run; a pull request: as the
+// GitHub store's cache has it, pr, nil when unknown there).
+func (m *Manager) subscribe(sub Subscription, run ActionRun, pr *PullRequestInfo) (SubscribeResult, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.closed {
@@ -376,8 +419,13 @@ func (m *Manager) subscribe(sub Subscription, run ActionRun) (SubscribeResult, e
 		if run.Finished {
 			fired = m.fireLocked(r, func(s Subscription, at time.Time) Message { return runWake(s, run, at) })
 		}
+	case TargetPullRequest:
+		if pr != nil && prAlreadyMet(sub.Condition, *pr) {
+			p := *pr
+			fired = m.fireLocked(r, func(s Subscription, at time.Time) Message { return prWake(s, p, nil, at) })
+		}
 	}
-	if fired && !r.s.Repeat {
+	if fired && (!r.s.Repeat || prTerminal(r.s.Condition)) {
 		m.log.Info("wake subscription fired at once", "subscription", sub.ID, "subscriber", sub.SubscriberID,
 			"target", sub.TargetID, "condition", sub.Condition)
 		return SubscribeResult{Subscription: r.s, Fired: true}, nil
@@ -386,6 +434,7 @@ func (m *Manager) subscribe(sub Subscription, run ActionRun) (SubscribeResult, e
 		return SubscribeResult{}, err
 	}
 	s.byID[sub.ID] = r
+	s.syncWatchLocked()
 	m.log.Info("wake subscription added", "subscription", sub.ID, "subscriber", sub.SubscriberID, "target_kind", sub.TargetKind,
 		"target", sub.TargetID, "condition", sub.Condition, "repeat", sub.Repeat, "fired", fired)
 	return SubscribeResult{Subscription: r.s, Fired: fired}, nil
@@ -485,6 +534,26 @@ func (s *subscriptions) removeLocked(ids []string) {
 	if err := deleteSubscriptions(context.Background(), s.db, ids); err != nil {
 		s.log.Error("delete wake subscriptions", "subscriptions", ids, "err", err)
 	}
+	s.syncWatchLocked()
+}
+
+// syncWatchLocked tells Options.WatchPullRequests the pull requests the subscriptions
+// watch when the set changed. Callers hold s.mu.
+func (s *subscriptions) syncWatchLocked() {
+	var targets []string
+	for _, r := range s.byID {
+		if r.s.TargetKind == TargetPullRequest && !slices.Contains(targets, r.s.TargetID) {
+			targets = append(targets, r.s.TargetID)
+		}
+	}
+	slices.Sort(targets)
+	if slices.Equal(targets, s.watched) {
+		return
+	}
+	s.watched = targets
+	if s.watch != nil {
+		s.watch(slices.Clone(targets))
+	}
 }
 
 // forgetLocked deletes the subscriptions of thread id and those to it, and drops the
@@ -532,7 +601,8 @@ func (m *Manager) Unsubscribe(_ context.Context, o UnsubscribeOptions) ([]Subscr
 		m.log.Info("wake subscription removed", "subscription", id)
 		return []Subscription{r.s}, nil
 	}
-	kind, target, _, err := subscribeTarget(SubscribeOptions{TargetThreadID: o.TargetThreadID, TargetRunID: o.TargetRunID})
+	kind, target, _, err := subscribeTarget(SubscribeOptions{TargetThreadID: o.TargetThreadID, TargetRunID: o.TargetRunID,
+		TargetPullRequest: o.TargetPullRequest})
 	if err != nil {
 		return nil, fmt.Errorf("%w: give a subscription id, or a subscriber and a target", ErrInvalidArgument)
 	}
@@ -595,6 +665,14 @@ func (m *Manager) Subscriptions(ctx context.Context, subscriber string) ([]Subsc
 				if run.Finished {
 					sub.TargetStatus = "exited " + strconv.Itoa(run.ExitCode)
 				}
+			}
+		case TargetPullRequest:
+			sub.TargetName, sub.TargetStatus = sub.TargetID, "not polled yet"
+			if m.opts.PullRequest == nil {
+				continue
+			}
+			if p, ok := m.opts.PullRequest(ctx, sub.TargetID); ok {
+				sub.TargetName, sub.TargetStatus = prTargetName(p), prStatusWords(p)
 			}
 		}
 	}
