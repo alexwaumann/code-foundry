@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { dismissInstallFailure, installPlugin, loadBrowse, updatePlugin, usePluginRegistryStore } from "@/stores/pluginRegistry";
 import { PillView } from "../parts";
-import { emptyBrowse, entryPill, progressWords, REGISTRIES_SETTING, registryErrorWords, registryLine, shortSource } from "./registry";
+import { emptyBrowse, entryAction, entryPill, progressWords, REGISTRIES_SETTING, registryErrorWords, registryLine, shortSource } from "./registry";
 
 /** The amber-outlined main action of a row (no filled buttons). */
 export const mainAction = "bg-transparent dark:bg-transparent border-warning/40 text-warning hover:bg-warning/10 hover:text-warning dark:border-warning/40";
@@ -45,14 +45,14 @@ function EntryRow({ name, className }: { name: string; className?: string | unde
   const busy = usePluginRegistryStore((s) => s.busy[name]);
   if (!e) return null;
   const pill = entryPill(e);
-  const installed = e.installedVersion !== null;
+  const action = entryAction(e);
   return (
-    <div className={cn("flex min-w-0 flex-col gap-2 px-4 py-3", className)} data-testid="registry-entry" data-plugin={e.name}>
+    <div className={cn("flex min-w-0 flex-col gap-2 px-4 py-3", className)} data-testid="registry-entry" data-plugin={e.name} data-relation={e.relation}>
       <div className="flex min-w-0 flex-col gap-0.5">
         <div className="flex min-w-0 items-center gap-2">
           <span className="min-w-0 truncate text-label">{e.displayName}</span>
           <span className="shrink-0 font-mono text-caption-sm">{e.version}</span>
-          <PillView pill={pill} className="ml-auto" />
+          <PillView pill={pill} className={cn("ml-auto", e.relation === "other-source" && "max-w-1/2 truncate")} />
         </div>
         {e.description && <p className="line-clamp-2 text-caption">{e.description}</p>}
         <p className="text-caption-sm break-words" data-testid="registry-permissions">
@@ -64,7 +64,7 @@ function EntryRow({ name, className }: { name: string; className?: string | unde
         <Progress name={e.name} />
       </div>
       <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-        {!installed && (
+        {action === "install" && (
           <Button
             variant="outline"
             size="xs"
@@ -77,7 +77,7 @@ function EntryRow({ name, className }: { name: string; className?: string | unde
             Install
           </Button>
         )}
-        {installed && e.updateAvailable && !e.installedDev && (
+        {action === "update" && (
           <Button variant="outline" size="xs" className={mainAction} disabled={busy !== undefined} onClick={() => void updatePlugin(e.name)} data-testid="registry-update">
             {busy === "update" ? <Loader2 className="animate-spin" aria-hidden /> : <ArrowUpCircle aria-hidden />}
             Update to {e.version}

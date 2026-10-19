@@ -11,7 +11,7 @@
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
-import { PluginInstallPhase, type BrowsePluginsResponseSchema, type PluginIndexEntrySchema } from "../src/gen/codefoundry/v1/plugin_pb";
+import { PluginIndexRelation, PluginInstallPhase, type BrowsePluginsResponseSchema, type PluginIndexEntrySchema } from "../src/gen/codefoundry/v1/plugin_pb";
 import { CommandError } from "./errors";
 import type { PluginCommand, PluginEventInit } from "./plugins";
 
@@ -20,6 +20,14 @@ type BrowseInit = MessageInitShape<typeof BrowsePluginsResponseSchema>;
 
 /** The registry the fixture lists, configured in the mock's settings (not a default). */
 export const FIXTURE_REGISTRY = "https://github.com/alexwaumann/code-foundry-plugins";
+
+/**
+ * A second registry, on loopback, that nothing configures by default: it lists acme-data
+ * 1.3.0 (installed 1.2.0 from Acme's own registry, so Browse says where it came from and
+ * offers nothing) and a test-watcher 0.2.0 that the fixture registry shadows when it comes
+ * first (docs/notes/plugins-browse-offer.md).
+ */
+export const LOOPBACK_REGISTRY = "http://127.0.0.1:8765/index.json";
 
 /** The plugins.registries value as the daemon reads it: URLs separated by commas or spaces. */
 export function parseRegistries(v: string): string[] {
@@ -49,13 +57,22 @@ interface Entry extends InstallSpec {
   repo: string;
 }
 
+/** An installed plugin as the registry half sees it: its version, dev link, and where `plugin install` got it. */
+export interface InstalledInfo {
+  version: string;
+  dev: boolean;
+  install?: { kind: string; source: string } | undefined;
+}
+
 export interface RegistryDeps {
   /** The plugins.registries setting's value. */
   registries: () => string;
-  installed: (name: string) => { version: string; dev: boolean } | null;
+  installed: (name: string) => InstalledInfo | null;
   install: (spec: InstallSpec) => void;
   uninstall: (name: string) => void;
   publish: (ev: PluginEventInit) => void;
+  /** The registries changed: publish every plugin again, as the daemon does for those whose offer changed. */
+  republish: () => void;
 }
 
 function seedEntries(): Entry[] {
@@ -79,6 +96,61 @@ function seedEntries(): Entry[] {
       registry: FIXTURE_REGISTRY,
     },
   ];
+}
+
+function loopbackEntries(): Entry[] {
+  return [
+    {
+      name: "acme-data",
+      displayName: "Acme Data",
+      version: "1.3.0",
+      description: "Signs you in to Acme's data warehouse and gives new threads a read-only token.",
+      repo: "acme-corp/code-foundry-plugin-acme-data",
+      permissions: { commands: ["thread.send"], events: [], threadStatus: false, sessionEnv: true, secrets: true },
+      registry: LOOPBACK_REGISTRY,
+    },
+    {
+      name: "test-watcher",
+      displayName: "Test Watcher",
+      version: "0.2.0",
+      description: "A fork of the test watcher.",
+      repo: "someone/code-foundry-plugin-test-watcher",
+      permissions: { commands: ["thread.send"], events: ["project", "threads"], threadStatus: true, sessionEnv: false, secrets: false },
+      registry: LOOPBACK_REGISTRY,
+    },
+  ];
+}
+
+/** How an entry stands to the installed plugin of its name: the daemon's plugin.Relation (internal/store/plugin/updates.go). */
+type Relation = "not_installed" | "installed" | "update" | "dev" | "other_source";
+
+const relations: Record<Relation, PluginIndexRelation> = {
+  not_installed: PluginIndexRelation.NOT_INSTALLED,
+  installed: PluginIndexRelation.INSTALLED,
+  update: PluginIndexRelation.UPDATE,
+  dev: PluginIndexRelation.DEV,
+  other_source: PluginIndexRelation.OTHER_SOURCE,
+};
+
+/** The daemon's sameSource: the registry it was installed from, or for a release an entry of that repository. */
+function sameSource(inst: InstalledInfo, e: Entry): boolean {
+  if (inst.install?.kind === "registry") return inst.install.source === e.registry;
+  if (inst.install?.kind === "github") return e.repo !== "" && inst.install.source.toLowerCase() === e.repo.toLowerCase();
+  return false;
+}
+
+function relate(inst: InstalledInfo | null, e: Entry): Relation {
+  if (!inst) return "not_installed";
+  if (inst.dev) return "dev";
+  if (!sameSource(inst, e)) return "other_source";
+  return newer(e.version, inst.version) ? "update" : "installed";
+}
+
+/** The daemon's SourceLabel. */
+function sourceLabel(inst: InstalledInfo): string {
+  if (!inst.install) return "the plugins folder";
+  if (inst.install.kind === "registry") return inst.install.source.replace(/^https?:\/\//, "").replace(/^github\.com\//, "");
+  return inst.install.source;
 }
 
 /** The daemon's Permissions.Describe. */
@@ -134,6 +206,7 @@ export class MockRegistry {
     this.seen = now;
     this.epoch++;
     this.deps.publish({ event: { case: "registryEpoch", value: BigInt(this.epoch) } });
+    this.deps.republish();
   }
 
   /** The configured registries (none by default). */
@@ -141,9 +214,28 @@ export class MockRegistry {
     return parseRegistries(this.deps.registries());
   }
 
-  /** What the configured registries list: the fixture's entries when it is one of them. */
+  /** A registry's own list (the fixture's, the loopback one's; any other lists none). */
+  private listOf(url: string): Entry[] {
+    if (url === FIXTURE_REGISTRY) return this.entries;
+    if (url === LOOPBACK_REGISTRY) return loopbackEntries();
+    return [];
+  }
+
+  /** What the configured registries list merged by name, the first registry listing a name winning (sorted by name, as the daemon's). */
   private listed(): Entry[] {
-    return this.configured().includes(FIXTURE_REGISTRY) ? this.entries : [];
+    const out = new Map<string, Entry>();
+    for (const url of this.configured()) for (const e of this.listOf(url)) if (!out.has(e.name)) out.set(e.name, e);
+    return [...out.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  /** A later registry's duplicates of names an earlier one lists, as the daemon words them. */
+  private issues(url: string): string[] {
+    const regs = this.configured();
+    const before = regs.slice(0, regs.indexOf(url));
+    return this.listOf(url).flatMap((e) => {
+      const first = before.find((u) => this.listOf(u).some((x) => x.name === e.name));
+      return first ? [`${e.name}: already listed by ${first}, which comes first`] : [];
+    });
   }
 
   private entry(name: string): Entry {
@@ -155,10 +247,10 @@ export class MockRegistry {
     return e;
   }
 
-  /** The update fields of a Plugin message. */
-  offer(name: string, version: string, dev: boolean): { updateAvailable?: boolean; updateVersion?: string; updateRegistry?: string } {
+  /** The update fields of a Plugin message: an offer only from the source it was installed from (the daemon's offerFor). */
+  offer(name: string): { updateAvailable?: boolean; updateVersion?: string; updateRegistry?: string } {
     const e = this.listed().find((x) => x.name === name);
-    if (!e || dev || !newer(e.version, version)) return {};
+    if (!e || relate(this.deps.installed(name), e) !== "update") return {};
     return { updateAvailable: true, updateVersion: e.version, updateRegistry: e.registry };
   }
 
@@ -182,17 +274,23 @@ export class MockRegistry {
         })),
         registry: e.registry,
         available: true,
-        ...(inst ? { installed: { name: e.name, version: inst.version, dev: inst.dev }, updateAvailable: !inst.dev && newer(e.version, inst.version) } : {}),
+        ...(inst ? { installed: { name: e.name, version: inst.version, dev: inst.dev } } : {}),
+        relation: relations[relate(inst, e)],
+        updateAvailable: relate(inst, e) === "update",
+        installedFrom: inst && relate(inst, e) === "other_source" ? sourceLabel(inst) : "",
       };
     });
     return {
       entries,
       platform: "darwin/arm64",
-      registries: this.configured().map((url) =>
-        url === FIXTURE_REGISTRY
-          ? { url, fetchedAt: timestampFromDate(this.fetchedAt), cached: !refresh, error: this.error, plugins: this.entries.length, issues: [] }
-          : { url, fetchedAt: timestampFromDate(this.fetchedAt), cached: !refresh, error: "", plugins: 0, issues: [] },
-      ),
+      registries: this.configured().map((url) => ({
+        url,
+        fetchedAt: timestampFromDate(this.fetchedAt),
+        cached: !refresh,
+        error: url === FIXTURE_REGISTRY ? this.error : "",
+        plugins: this.listOf(url).length,
+        issues: this.issues(url),
+      })),
     };
   }
 
@@ -293,7 +391,12 @@ export class MockRegistry {
           for (const n of names) {
             const e = this.listed().find((x) => x.name === n);
             const had = this.deps.installed(n);
-            if (!e || !had || had.dev || !newer(e.version, had.version)) continue;
+            if (!e || !had) continue;
+            if (relate(had, e) === "other_source" && newer(e.version, had.version)) {
+              lines.push(`not offered: ${n} ${e.version} from ${e.registry} (installed from ${sourceLabel(had)})`);
+              continue;
+            }
+            if (relate(had, e) !== "update") continue;
             if (a.check === "true") {
               lines.push(`${n} ${had.version} → ${e.version}`);
               continue;

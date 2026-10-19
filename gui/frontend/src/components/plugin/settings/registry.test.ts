@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emptyBrowse, entryPill, progressWords, registryErrorWords, registryLine, shortSource, sizeWords } from "./registry";
+import { emptyBrowse, entryAction, entryPill, progressWords, registryErrorWords, registryLine, shortSource, sizeWords } from "./registry";
 
 describe("registry words", () => {
   it("says each install step", () => {
@@ -11,13 +11,25 @@ describe("registry words", () => {
     expect(sizeWords(10)).toBe("1 KB");
   });
 
-  it("pills an entry by what is installed", () => {
-    const e = { installedVersion: null, updateAvailable: false, installedDev: false, available: true };
+  it("pills an entry by the daemon's relation, newer or not", () => {
+    const e = { installedVersion: null, relation: "not-installed", installedFrom: "", available: true } as const;
     expect(entryPill(e)).toBeUndefined();
     expect(entryPill({ ...e, available: false })?.label).toBe("No build for this Mac");
-    expect(entryPill({ ...e, installedVersion: "0.1.0" })).toEqual({ label: "Installed", tone: "ok" });
-    expect(entryPill({ ...e, installedVersion: "0.0.9", updateAvailable: true })).toEqual({ label: "Update from 0.0.9", tone: "attention" });
-    expect(entryPill({ ...e, installedVersion: "0.0.9", installedDev: true })?.label).toBe("Dev 0.0.9");
+    expect(entryPill({ ...e, installedVersion: "0.1.0", relation: "installed" })).toEqual({ label: "Installed", tone: "ok" });
+    expect(entryPill({ ...e, installedVersion: "0.0.9", relation: "update" })).toEqual({ label: "Update from 0.0.9", tone: "attention" });
+    expect(entryPill({ ...e, installedVersion: "0.0.9", relation: "dev" })?.label).toBe("Dev 0.0.9");
+    expect(entryPill({ ...e, installedVersion: "0.1.1", relation: "other-source", installedFrom: "127.0.0.1:8765/index.json" })).toEqual({
+      label: "Installed from 127.0.0.1:8765/index.json",
+      tone: "muted",
+    });
+  });
+
+  it("offers Install only when nothing is installed and Update only from the install source", () => {
+    expect(entryAction({ relation: "not-installed" })).toBe("install");
+    expect(entryAction({ relation: "update" })).toBe("update");
+    expect(entryAction({ relation: "installed" })).toBeNull();
+    expect(entryAction({ relation: "dev" })).toBeNull();
+    expect(entryAction({ relation: "other-source" })).toBeNull();
   });
 
   it("describes registries and their failures", () => {
