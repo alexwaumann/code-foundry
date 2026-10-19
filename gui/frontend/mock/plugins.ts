@@ -126,7 +126,7 @@ function shiftTimes(v: unknown, shiftMs: number): unknown {
 
 type Node = Record<string, unknown> & { key: string };
 
-/** The node lists a node holds: a section's children, each column's, a pane's, each grid item's, a group's items, a container's (api/plugin.ts childLists). */
+/** The node lists a node holds: a section's children, each column's, a pane's, each grid item's, a group's items, a container's, a master-detail's detail, a tabs node's children (api/plugin.ts childLists). */
 function childListsOf(n: Node): Node[][] {
   const sec = n.section as { children?: Node[] } | undefined;
   const cols = n.columns as { items?: { children?: Node[] }[] } | undefined;
@@ -134,7 +134,9 @@ function childListsOf(n: Node): Node[][] {
   const grid = n.grid as { items?: { children?: Node[] }[] } | undefined;
   const group = n.group as { items?: Node[] } | undefined;
   const box = n.container as { children?: Node[] } | undefined;
-  return [sec?.children, ...(cols?.items ?? []).map((c) => c.children), pane?.children, ...(grid?.items ?? []).map((it) => it.children), group?.items, box?.children].filter(
+  const md = n.masterDetail as { detail?: Node[] } | undefined;
+  const tabs = n.tabs as { children?: Node[] } | undefined;
+  return [sec?.children, ...(cols?.items ?? []).map((c) => c.children), pane?.children, ...(grid?.items ?? []).map((it) => it.children), group?.items, box?.children, md?.detail, tabs?.children].filter(
     (l): l is Node[] => Array.isArray(l),
   );
 }
@@ -158,10 +160,12 @@ function patchNode(nodes: Node[], key: string, f: (n: Node) => void): boolean {
 
 interface Element {
   key: string;
-  kind: "click" | "submit" | "change" | "tab" | "host";
+  kind: "click" | "submit" | "change" | "tab" | "select" | "host";
   event: string;
   /** The event's data (a chip's status, a row's id). */
   data?: string;
+  /** A node tab's tabs node, a select's master-detail (SurfaceAct.node). */
+  node?: string;
 }
 
 /** The elements of a view that act, by key (like the daemon's actionIndex). */
@@ -206,6 +210,18 @@ function elementsOf(view: Record<string, unknown>): Map<string, Element> {
       any.chips?.chips?.forEach((c) => {
         action(c.key, c.action, "click");
       });
+      const md = n.masterDetail as { list?: { rows?: { key: string; action?: unknown; actions?: unknown[] }[] }; emptyDetail?: { actions?: unknown[] } } | undefined;
+      md?.list?.rows?.forEach((r) => {
+        if (r.action) action(r.key, r.action, "click");
+        else out.set(r.key, { key: r.key, kind: "select", event: "select", node: n.key });
+        r.actions?.forEach((b) => {
+          button(b);
+        });
+      });
+      md?.emptyDetail?.actions?.forEach((b) => {
+        button(b);
+      });
+      (n.tabs as { items?: { key: string }[] } | undefined)?.items?.forEach((t) => out.set(t.key, { key: t.key, kind: "tab", event: "tab", node: n.key }));
       if (any.form) {
         if (any.form.submit) button(any.form.submit, "submit");
         any.form.secondary?.forEach((b) => {
@@ -220,6 +236,80 @@ function elementsOf(view: Record<string, unknown>): Map<string, Element> {
   return out;
 }
 
+/** The Runs tab's runs (the real plugin's layoutRuns) and how long each took (runs.go runTook). */
+const RUNS = [
+  { n: 6, status: "running", branch: "main" },
+  { n: 5, status: "failed", branch: "cf/fix" },
+  { n: 4, status: "ok", branch: "main" },
+  { n: 3, status: "failed", branch: "cf/retry" },
+  { n: 2, status: "ok", branch: "cf/fix" },
+  { n: 1, status: "ok", branch: "main" },
+] as const;
+
+function runKey(n: number): string {
+  return `runs-run-${String(n)}`;
+}
+
+/** A run's log lines (runs.go runLog): a failed run's last step is an error, the running one stops at step 9. */
+function runLog(r: (typeof RUNS)[number]): { text: string; tone?: string }[] {
+  const lines: { text: string; tone?: string }[] = Array.from({ length: 12 }, (_, i) => ({ text: `build ${String(r.n)}  step ${String(i + 1).padStart(2, "0")}  ok` }));
+  if (r.status === "failed") lines[11] = { text: `build ${String(r.n)}  step 12  FAIL: 1 test failed`, tone: "error" };
+  if (r.status === "running") return [...lines.slice(0, 8), { text: `build ${String(r.n)}  step 09  running…`, tone: "muted" }];
+  return lines;
+}
+
+/**
+ * The Runs tab as the real plugin renders it (plugins/examples/hello/runs.go): the chosen
+ * row and its detail (facts, then the detail's own tabs: Overview with the note form, Log
+ * with a pane of the run's log). The captured view has nothing chosen.
+ */
+function patchRuns(nodes: Node[], st: { selected: string; tab: string; notes: Record<string, string> }): void {
+  patchNode(nodes, "runs-md", (n) => {
+    const md = n.masterDetail as Record<string, unknown>;
+    const r = RUNS.find((x) => runKey(x.n) === st.selected);
+    if (!r) return;
+    md.selected = st.selected;
+    const pill = r.status === "running" ? { label: "running" } : r.status === "failed" ? { label: "failed", tone: "error" } : { label: "passed", tone: "ok" };
+    const took = { spans: [{ duration: { ms: (60 + 37 * r.n) * 1000 } }] };
+    const tab = st.tab === "runs-tab-log" ? "runs-tab-log" : "runs-tab-overview";
+    const log = runLog(r);
+    const note = st.notes[st.selected];
+    const children =
+      tab === "runs-tab-log"
+        ? [{ key: "runs-log-pane", pane: { height: 240, children: [{ key: "runs-log", log: { title: `build ${String(r.n)}`, lines: log } }] } }]
+        : [
+            { key: "runs-summary", markdown: { source: `**Build #${String(r.n)}** on \`${r.branch}\`: ${String(log.length)} steps. A **tabs** node gives the detail its own tabs; the note below keeps its draft per run and per tab.` } },
+            {
+              key: "runs-note-form",
+              form: {
+                fields: [{ key: "runs-note", name: "note", label: "Note", input: { placeholder: "Add a note to this run", ...(note ? { value: note } : {}) } }],
+                submit: { key: "runs-note-save", label: "Save note", action: { event: "runs-note" } },
+              },
+            },
+          ];
+    md.detail = [
+      {
+        key: "runs-facts",
+        pairs: {
+          items: [
+            { key: "runs-f-branch", label: "Branch", value: { spans: [{ text: r.branch, mono: true }] } },
+            { key: "runs-f-status", label: "Status", pill },
+            { key: "runs-f-took", label: "Took", value: took },
+          ],
+        },
+      },
+      {
+        key: "runs-tabs",
+        tabs: {
+          items: [{ key: "runs-tab-overview", label: "Overview" }, { key: "runs-tab-log", label: "Log", ...(r.status === "failed" ? { badge: { label: "1 error", tone: "error" } } : {}) }],
+          active: tab,
+          children,
+        },
+      },
+    ];
+  });
+}
+
 /** One open demo instance: the real plugin's state, the view it renders, its watchers. */
 class DemoInstance {
   tab = "overview";
@@ -232,6 +322,8 @@ class DemoInstance {
   running = false;
   /** The Layout tab's toolbar filter (the real plugin's layoutFilter). */
   layoutFilter = { status: "", query: "", resets: 0 };
+  /** The Runs tab's state (the real plugin's runsState): the chosen run, the detail's tab, notes by run. */
+  runs: { selected: string; tab: string; notes: Record<string, string> } = { selected: "", tab: "", notes: {} };
   buildLog = "";
   version = 0;
   view: Record<string, unknown> | null = null;
@@ -304,6 +396,8 @@ class DemoInstance {
         (n.thread as { threadId: string }).threadId = HELLO_THREAD;
       });
       this.patchLayoutFilter(v);
+    } else if (this.tab === "run-list") {
+      patchRuns(nodes, this.runs);
     } else if (this.tab === "shell") {
       patchNode(nodes, "clock", (n) => {
         (n.terminal as { terminalId: string }).terminalId = HELLO_TERMINAL;
@@ -388,7 +482,17 @@ class DemoInstance {
       case "click:restart-shell":
         break;
       case "tab:tab":
-        this.tab = el.key;
+        if (el.node === "runs-tabs") this.runs = { ...this.runs, tab: el.key };
+        else this.tab = el.key;
+        break;
+      case "select:select":
+        if (!RUNS.some((r) => runKey(r.n) === el.key)) throw new ConnectError(`plugin refused: no run "${el.key}"`, Code.Aborted);
+        this.runs = { ...this.runs, selected: el.key };
+        break;
+      case "submit:runs-note":
+        if (!this.runs.selected) throw new ConnectError("plugin refused: no run chosen", Code.Aborted);
+        this.runs = { ...this.runs, notes: { ...this.runs.notes, [this.runs.selected]: typeof values.note === "string" ? values.note.trim() : "" } };
+        toast("note saved");
         break;
       case "click:click":
       case "click:refresh":
