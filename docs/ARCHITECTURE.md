@@ -741,7 +741,9 @@ built: `docs/notes/plugins-1-core.md` through `plugins-6-thread-terminal.md`.
 * **Skill.** `code-foundry-plugin` (`internal/skills`) teaches an agent the loop: copy
   the template (`plugins/examples/minimal`, embedded), `go get` the SDK at the commit
   this daemon was built from, `plugin dev`, `plugin logs`, `plugin surface` / `plugin
-  act`, plugintest, release tarballs, the registry pull request. Its CLI and host
+  act`, plugintest, release tarballs (`make release`, one script for `release.yml` on
+  the runner the user names and for a release by hand when they have none), the
+  registry pull request. Its CLI and host
   command references are rendered from the registry at start; reserved names, event
   sources, host facts and view limits are filled in from the code.
 * **Registry** (PR 7): `alexwaumann/code-foundry-plugins` serves `index.json` built from

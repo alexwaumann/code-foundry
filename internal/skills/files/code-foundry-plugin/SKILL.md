@@ -16,16 +16,18 @@ plugins in Go with the SDK `github.com/alexwaumann/code-foundry/pluginsdk` (stan
 
 ## The loop
 
-1. **Scaffold** from the example: one command, one surface, tests, a Makefile, CI and
-   release workflows in `.github/workflows/`, a README template to fill in. Work in a
-   folder under the home directory (`plugin dev` refuses others; ask the user where they
-   keep code) named after the repository it becomes (an existing clone: copy into it):
+1. **Scaffold** from the example (a command, a surface, tests, Makefile, CI and release
+   workflows, README template) in a folder under the home directory (`plugin dev` refuses
+   others; ask where the user keeps code) named after its repository (a clone: copy into it):
    ```
    mkdir -p <dir>/code-foundry-plugin-<name> && cd <dir>/code-foundry-plugin-<name>
    cp -R {{cf.example}}/. .
    ```
    Replace `minimal` and `Minimal` with the plugin's name everywhere (`grep -rni minimal .`),
-   kebab case starting with a letter (`gh-actions`); fill in the README.
+   kebab case starting with a letter (`gh-actions`); fill in the README. Ask the user which
+   GitHub Actions runner to use: hosted `ubuntu-24.04` or a self-hosted/org label (set it as
+   `runs-on` in both workflows). Not known: `rm -rf .github`, and tell them the by-hand
+   commands for CI and releases (`reference/publishing.md`, "Runners").
 2. **Manifest**: edit `plugin.json` (`reference/manifest.md`): commands and their args,
    surfaces with a scope and a `when` clause, and the fewest permissions that work.
 3. **Module** (Go 1.24 or newer; keep the `go` line `go mod init` writes, CI installs it):
@@ -56,9 +58,9 @@ plugins in Go with the SDK `github.com/alexwaumann/code-foundry/pluginsdk` (stan
    <name>` (nothing watches the folder).
 8. **Test** with plugintest: `go test ./...` (`reference/testing.md`). Test every command,
    every act, and that every view passes `ui.View.Validate`.
-9. **Release**: push to GitHub (`ci.yml` runs vet and race tests), bump `version` in
-   `plugin.json` and `main.go` (a test checks they agree), tag `v<version>` and push the
-   tag; `release.yml` publishes the tarballs (`reference/publishing.md`).
+9. **Release**: push (`ci.yml` runs `make check`), bump `version` in `plugin.json` and
+   `main.go` (a test checks they agree), tag `v<version>`, push the tag; `release.yml` runs
+   `make release`. No workflows: run both by hand (`reference/publishing.md`).
 10. **Registry**: `make registry-entry` writes `dist/<name>.json`. Only a registry the user
     configured lists it, never a default: `code-foundry settings get plugins.registries`
     (comma-separated). One: a pull request to it; several: ask which; none: stop and tell
@@ -110,11 +112,9 @@ alexwaumann/code-foundry-plugin-showcase` and read the matching file.
 
 ## References (next to this file)
 
-- `reference/manifest.md`: every `plugin.json` field, permissions, scopes, `when` clauses.
-- `reference/protocol.md`: methods both ways, errors, lifecycle, timeouts, crashes.
+- `reference/manifest.md`: every `plugin.json` field, permissions, scopes, `when` clauses; `reference/protocol.md`: methods both ways, errors, lifecycle, timeouts, crashes.
 - `reference/primitives.md`: every view node and value type, limits; `reference/ui-layout.md`: columns, panes, grids, inline, containers, master-detail, node tabs, toolbar, footer.
 - `reference/host-api.md`: Invoke, flags, context facts, session env, events, secrets, toasts.
-- `reference/testing.md`: plugintest patterns; driving the plugin in the daemon.
-- `reference/publishing.md`: release workflow, tarballs, the registry entry.
+- `reference/testing.md`: plugintest patterns, driving the plugin in the daemon; `reference/publishing.md`: runners, releases (workflow or by hand), the registry entry.
 - `reference/cli.md`: the `plugin` commands' help; `reference/host-commands.md`: what it may run.
 - `example/`: the minimal plugin to copy.
