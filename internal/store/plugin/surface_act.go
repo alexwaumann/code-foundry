@@ -36,7 +36,7 @@ var surfaceCapabilities = []string{
 	"surfaces", "view.v1", "view.append", "context", "invoke.ask",
 	"view.node.text", "view.node.markdown", "view.node.pairs", "view.node.list", "view.node.chips",
 	"view.node.log", "view.node.actions", "view.node.progress", "view.node.notice", "view.node.empty",
-	"view.node.section", "view.node.form", "view.tabs", "view.fieldset", "view.optionsSource", "view.duration",
+	"view.node.section", "view.node.form", "view.node.columns", "view.node.pane", "view.tabs", "view.fieldset", "view.optionsSource", "view.duration",
 }
 
 // viewUpdate serves view/update: validate, number and install a view.
@@ -231,6 +231,17 @@ func fillLists(v *ui.View) {
 			n.Actions.Buttons = []ui.Button{}
 		case n.Section != nil && n.Section.Children == nil:
 			n.Section.Children = []ui.Node{}
+		case n.Columns != nil:
+			if n.Columns.Items == nil {
+				n.Columns.Items = []ui.Column{}
+			}
+			for i := range n.Columns.Items {
+				if n.Columns.Items[i].Children == nil {
+					n.Columns.Items[i].Children = []ui.Node{}
+				}
+			}
+		case n.Pane != nil && n.Pane.Children == nil:
+			n.Pane.Children = []ui.Node{}
 		case n.Form != nil:
 			if n.Form.Fields == nil {
 				n.Form.Fields = []ui.Field{}

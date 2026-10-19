@@ -861,12 +861,13 @@ func (in *instance) renderLocked() []byte {
 	return out
 }
 
-// walkNodes calls fn for every node, sections' children included.
+// walkNodes calls fn for every node, containers' children included (sections, columns,
+// panes: ui.Node.Children), parents before their children.
 func walkNodes(nodes []ui.Node, fn func(n *ui.Node)) {
 	for i := range nodes {
 		fn(&nodes[i])
-		if s := nodes[i].Section; s != nil {
-			walkNodes(s.Children, fn)
+		for _, children := range nodes[i].Children() {
+			walkNodes(children, fn)
 		}
 	}
 }
