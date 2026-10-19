@@ -69,8 +69,9 @@ removed; nothing when unchanged.
   keeps the daemon's.
 * **`thread read`'s text output shows the message only** (`you: continue`); the note is
   in `--json` (`userMessage.resumeNote`) and in the GUI. Left for the CLI PR in flight.
-* **Guide cap.** The `--permission` help grew; "Permissions: " was dropped from it to
-  stay under 29,000 bytes (28,997).
+* **Guide cap.** Main's guide was 28,996 of its 29,000 bytes. The `--permission` help
+  now names the pre-allowed verbs and pays for it by dropping "Permissions: ", "file "
+  and "(Claude's auto mode)": 28,998. The next guide addition needs a trim.
 * **Migration number.** 0036 may collide with another PR in flight; the one that merges
   second renumbers.
 
