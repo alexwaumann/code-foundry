@@ -1,9 +1,20 @@
 import { defineConfig, devices } from "@playwright/test";
 
-/** e2e against the mock daemon. Ports differ from `pnpm run mock` / `wails3 dev` defaults
- * so a running dev setup does not interfere; E2E_MOCK_PORT / E2E_VITE_PORT move them
- * (e.g. two worktrees running e2e at once). See e2e/fixtures.ts. */
-export const MOCK_PORT = Number(process.env.E2E_MOCK_PORT ?? 7799);
+/**
+ * e2e against the mock daemon. Ports differ from `pnpm run mock` / `wails3 dev` defaults so
+ * a running dev setup does not interfere.
+ *
+ * Every worker drives its own mock daemon: the mock is one world per process, and specs
+ * reset it in beforeEach, so workers cannot share one. The runner starts E2E_WORKERS mocks
+ * on E2E_MOCK_PORT, +1, +2, … and a worker talks to the one at its parallel index (set by
+ * Playwright in the worker process; unset in the runner, which never calls the mock). Vite
+ * is stateless and shared. E2E_MOCK_PORT / E2E_VITE_PORT move the ports (e.g. two worktrees
+ * running e2e at once: leave E2E_WORKERS ports of room). `--workers` on the command line
+ * must not exceed E2E_WORKERS: there is no mock for the extra workers. See e2e/fixtures.ts.
+ */
+export const WORKERS = Number(process.env.E2E_WORKERS ?? 4);
+const MOCK_PORT_BASE = Number(process.env.E2E_MOCK_PORT ?? 7799);
+export const MOCK_PORT = MOCK_PORT_BASE + Number(process.env.TEST_PARALLEL_INDEX ?? 0);
 export const MOCK_TOKEN = "e2e-token";
 export const VITE_PORT = Number(process.env.E2E_VITE_PORT ?? 9255);
 
@@ -13,8 +24,9 @@ export default defineConfig({
   testIgnore: /live(-[a-z]+)?\.spec\.ts$/,
   timeout: 20_000,
   expect: { timeout: 5_000 },
-  // Tests share one mock daemon and reset it in beforeEach.
-  workers: 1,
+  // Files run in parallel across workers; the tests of one file stay in order on one worker
+  // (a file's tests share its mock and may build on the previous test's view).
+  workers: WORKERS,
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   reporter: process.env.CI ? "line" : [["list"]],
@@ -24,19 +36,17 @@ export default defineConfig({
     colorScheme: "dark",
     trace: "retain-on-failure",
   },
-  projects: [
-    // WebKit is what WKWebView (the Wails window) runs, so it is the primary target.
-    { name: "webkit", use: { ...devices["Desktop Safari"], viewport: { width: 1280, height: 800 } } },
-    { name: "chromium", use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } } },
-  ],
+  // WebKit only: it is what WKWebView (the Wails window) runs, and the app runs nowhere
+  // else. A Chromium pass used to double the run and was the flakier of the two.
+  projects: [{ name: "webkit", use: { ...devices["Desktop Safari"], viewport: { width: 1280, height: 800 } } }],
   webServer: [
-    {
+    ...Array.from({ length: WORKERS }, (_, i) => ({
       command: "./node_modules/.bin/tsx mock/server.ts",
-      env: { MOCK_PORT: String(MOCK_PORT), MOCK_TOKEN },
-      url: `http://127.0.0.1:${String(MOCK_PORT)}/__mock/invocations`,
+      env: { MOCK_PORT: String(MOCK_PORT_BASE + i), MOCK_TOKEN },
+      url: `http://127.0.0.1:${String(MOCK_PORT_BASE + i)}/__mock/invocations`,
       reuseExistingServer: false,
-      stdout: "ignore",
-    },
+      stdout: "ignore" as const,
+    })),
     {
       command: `./node_modules/.bin/vite --port ${String(VITE_PORT)} --strictPort`,
       url: `http://127.0.0.1:${String(VITE_PORT)}`,

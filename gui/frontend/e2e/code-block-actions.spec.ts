@@ -99,8 +99,18 @@ test("Run in terminal: hidden while the block streams, then a new shell in the t
   await expect(host(page)).not.toHaveAttribute("data-terminal-id", id ?? "");
 });
 
-test("Copy puts the raw code on the clipboard and shows Copied; a Bash row copies its command", async ({ page, browserName, context }) => {
-  if (browserName === "chromium") await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+test("Copy puts the raw code on the clipboard and shows Copied; a Bash row copies its command", async ({ page }) => {
+  // WebKit lets no test read the clipboard back: record what the app writes to it instead
+  // (lib/clipboard.ts takes the writeText path when it exists).
+  await page.addInitScript(() => {
+    const w = window as unknown as { __cfClipboard: string[] };
+    w.__cfClipboard = [];
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: (text: string) => { w.__cfClipboard.push(text); return Promise.resolve(); } },
+    });
+  });
+  const lastCopied = () => page.evaluate(() => (window as unknown as { __cfClipboard: string[] }).__cfClipboard.at(-1) ?? "");
   await streamToBash(page);
   await mockPost("thread/finish?rest=" + encodeURIComponent("\n```\n"));
   const copy = goBlock(page).getByTestId("code-copy");
@@ -108,12 +118,10 @@ test("Copy puts the raw code on the clipboard and shows Copied; a Bash row copie
   await copy.click();
   await expect(copy).toHaveAttribute("aria-label", "Copied");
   await expect(copy).toHaveText("Copied");
-  if (browserName === "chromium") {
-    const text = await page.evaluate(() => navigator.clipboard.readText());
-    expect(text).toContain("func fingerprintOf(pr PullRequest) Fingerprint {\n\treturn Fingerprint{");
-    expect(text).not.toContain("<span");
-    expect(text.endsWith("}")).toBe(true);
-  }
+  const text = await lastCopied();
+  expect(text).toContain("func fingerprintOf(pr PullRequest) Fingerprint {\n\treturn Fingerprint{");
+  expect(text).not.toContain("<span");
+  expect(text.endsWith("}")).toBe(true);
   await expect(copy).toHaveAttribute("aria-label", "Copy code", { timeout: 3000 });
 
   // The turn's last Bash row: its command line has Copy, never Run. The timeline follows
@@ -135,12 +143,10 @@ test("Copy puts the raw code on the clipboard and shows Copied; a Bash row copie
   const shown = ((await cmd.locator(".cmd").textContent()) ?? "").replace(/^\$ /, "").replace(/Copied$/, "");
   await copyCmd.click();
   await expect(copyCmd).toHaveAttribute("aria-label", "Copied");
-  if (browserName === "chromium") {
-    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(shown);
-  }
+  expect(await lastCopied()).toBe(shown);
 });
 
-test("the buttons are keyboard reachable: focus shows them", async ({ page, browserName }) => {
+test("the buttons are keyboard reachable: focus shows them", async ({ page }) => {
   await streamToBash(page);
   await mockPost("thread/finish?rest=" + encodeURIComponent("\n```\n"));
   const run = bashBlock(page).getByTestId("code-run");
@@ -148,7 +154,7 @@ test("the buttons are keyboard reachable: focus shows them", async ({ page, brow
   await run.focus();
   await expect(bashBlock(page).locator(".cf-code-actions")).toHaveCSS("opacity", "1");
   // WebKit (like Safari and the Wails window) moves between buttons with Option+Tab.
-  await page.keyboard.press(browserName === "webkit" ? "Alt+Tab" : "Tab");
+  await page.keyboard.press("Alt+Tab");
   await expect(bashBlock(page).getByTestId("code-copy")).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(bashBlock(page).getByTestId("code-copy")).toHaveAttribute("aria-label", "Copied");

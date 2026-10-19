@@ -155,8 +155,8 @@ gui-build: build
 	cd gui && $(WAILS3) build
 	rm -rf gui/bin/CodeFoundry.app gui/bin/CodeFoundry
 
-## gui-e2e: Playwright (WebKit + Chromium) against the mock daemon. Not part of `check`:
-## it needs browser binaries (`pnpm --dir gui/frontend exec playwright install webkit chromium`).
+## gui-e2e: Playwright (WebKit, one mock daemon per worker; E2E_WORKERS=4) against the mock
+## daemon. Not part of `check`: it needs the browser (`pnpm --dir gui/frontend exec playwright install webkit`).
 gui-e2e: frontend-deps
 	$(PNPM) run e2e
 
