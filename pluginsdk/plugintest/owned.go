@@ -52,6 +52,9 @@ func (h *Host) handleOwned(_ context.Context, method string, params json.RawMess
 		if p.Title == "" {
 			return nil, true, pluginsdk.NewError(pluginsdk.CodeInvalidParams, "thread/create: title is required")
 		}
+		if m := strings.TrimSpace(p.PermissionMode); m != "" && !slices.Contains([]string{pluginsdk.PermissionModeSupervised, pluginsdk.PermissionModeAcceptEdits, pluginsdk.PermissionModeAuto}, m) {
+			return nil, true, pluginsdk.NewError(pluginsdk.CodeInvalidParams, "thread/create: permissionMode %q (want one of supervised, accept-edits, auto)", m)
+		}
 		var id string
 		h.record(func() {
 			h.own.creates = append(h.own.creates, p)

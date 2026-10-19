@@ -46,27 +46,51 @@ func ownedErr(err error) error {
 	return err
 }
 
+// pluginPermissionModes map thread/create's permissionMode to the thread store's ("" is
+// Claude's default, no flag).
+var pluginPermissionModes = map[string]thread.PermissionMode{
+	"":                                  thread.PermissionDefault,
+	pluginsdk.PermissionModeSupervised:  thread.PermissionSupervised,
+	pluginsdk.PermissionModeAcceptEdits: thread.PermissionAcceptEdits,
+	pluginsdk.PermissionModeAuto:        thread.PermissionAuto,
+}
+
 func (p pluginThreads) Create(ctx context.Context, owner string, s plugin.ThreadSpec) (pluginsdk.PluginThread, error) {
-	o := thread.CreateOptions{
-		Owner: owner, Name: s.Title, Model: s.Model, Effort: s.Effort, InitialPrompt: s.Prompt,
-		Env: s.Env, AddDirs: s.AddDirs,
-	}
+	var defaults settings.Threads
 	if p.settings != nil {
 		if snap := p.settings.Snapshot(); snap != nil {
-			o.Model = cmp.Or(o.Model, snap.Settings.Threads.DefaultModel)
-			o.Effort = cmp.Or(o.Effort, snap.Settings.Threads.DefaultEffort)
+			defaults = snap.Settings.Threads
 		}
 	}
-	if s.ProjectID != "" {
-		o.ProjectID, o.WorktreePath = s.ProjectID, s.Cwd
-	} else {
-		o.NoProject, o.Cwd = true, s.Cwd
+	o, err := pluginCreateOptions(owner, s, defaults)
+	if err != nil {
+		return pluginsdk.PluginThread{}, err
 	}
 	t, err := p.threads.Create(ctx, o)
 	if err != nil {
 		return pluginsdk.PluginThread{}, ownedErr(err)
 	}
 	return pluginThreadOf(t), nil
+}
+
+// pluginCreateOptions is the thread store's CreateOptions for a plugin thread: the
+// user's default model and effort when the spec has none, Claude's default permission
+// mode when it names none, the project's worktree or (no project) the cwd.
+func pluginCreateOptions(owner string, s plugin.ThreadSpec, defaults settings.Threads) (thread.CreateOptions, error) {
+	mode, ok := pluginPermissionModes[s.PermissionMode]
+	if !ok {
+		return thread.CreateOptions{}, fmt.Errorf("%w: permission mode %q", plugin.ErrInvalidArgument, s.PermissionMode)
+	}
+	o := thread.CreateOptions{
+		Owner: owner, Name: s.Title, Model: cmp.Or(s.Model, defaults.DefaultModel), Effort: cmp.Or(s.Effort, defaults.DefaultEffort),
+		InitialPrompt: s.Prompt, Env: s.Env, AddDirs: s.AddDirs, PermissionMode: mode,
+	}
+	if s.ProjectID != "" {
+		o.ProjectID, o.WorktreePath = s.ProjectID, s.Cwd
+	} else {
+		o.NoProject, o.Cwd = true, s.Cwd
+	}
+	return o, nil
 }
 
 func (p pluginThreads) Send(ctx context.Context, id, text string) error {

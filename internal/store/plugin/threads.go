@@ -33,8 +33,13 @@ import (
 // AddDirs already checked.
 type ThreadSpec struct {
 	Title, Cwd, ProjectID, Model, Effort, Prompt string
-	Env, AddDirs                                 []string
+	// PermissionMode is "" (Claude's default) or one of permissionModes.
+	PermissionMode string
+	Env, AddDirs   []string
 }
+
+// permissionModes are thread/create's permissionMode values (thread.new's --permission).
+var permissionModes = []string{pluginsdk.PermissionModeSupervised, pluginsdk.PermissionModeAcceptEdits, pluginsdk.PermissionModeAuto}
 
 // OwnedThreads is the thread store as plugin threads need it; the daemon adapts it (and
 // fills in the user's default model and effort). Errors wrap ErrNotFound,
@@ -195,6 +200,10 @@ func (a *actor) threadCreate(ctx context.Context, params json.RawMessage) (any, 
 	if len(p.Prompt) > MaxThreadMessage {
 		return nil, pluginsdk.NewError(pluginsdk.CodeInvalidParams, "%s: prompt is at most %d bytes", method, MaxThreadMessage)
 	}
+	mode := strings.TrimSpace(p.PermissionMode)
+	if mode != "" && !slices.Contains(permissionModes, mode) {
+		return nil, pluginsdk.NewError(pluginsdk.CodeInvalidParams, "%s: permissionMode %q (want one of %s)", method, mode, strings.Join(permissionModes, ", "))
+	}
 	env, dirs, err := a.checkedEnv(method, p.Env, p.AddDirs)
 	if err != nil {
 		return nil, err
@@ -223,7 +232,7 @@ func (a *actor) threadCreate(ctx context.Context, params json.RawMessage) (any, 
 	}
 	t, err := threads.Create(ctx, OwnerOf(a.name), ThreadSpec{
 		Title: title, Cwd: cwd, ProjectID: strings.TrimSpace(p.ProjectID), Model: strings.TrimSpace(p.Model),
-		Effort: strings.TrimSpace(p.Effort), Prompt: p.Prompt, Env: env, AddDirs: dirs,
+		Effort: strings.TrimSpace(p.Effort), PermissionMode: mode, Prompt: p.Prompt, Env: env, AddDirs: dirs,
 	})
 	if err != nil {
 		a.hostLog("refused thread/create: %v", err)

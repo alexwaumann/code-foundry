@@ -416,7 +416,9 @@ project's main worktree; a `cwd` must be under home); `Env` and `AddDirs` follow
 session environment's rules, but a bad one refuses the call, and they replace the
 plugin's own session environment for this thread; `Model` and `Effort` default to the
 user's settings (`Model` a model id, `Effort` `low` … `max`: the values `code-foundry help
-thread.new` lists for `--model` and `--effort`); `Prompt` is an optional first message.
+thread.new` lists for `--model` and `--effort`); `PermissionMode` is `supervised`,
+`accept-edits` or `auto` (`PermissionMode*` constants, `thread.new --permission`'s values;
+default Claude's own, which asks like supervised); `Prompt` is an optional first message.
 An `AddDirs` entry (here or in `SetEnvironment`) is a directory Claude Code may read and
 loads skills from: a skill is `<dir>/.claude/skills/<skill>/SKILL.md` (with `name` and
 `description` front matter), as above; `<dir>` itself is passed. It runs like any thread: a

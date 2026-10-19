@@ -319,6 +319,22 @@ func TestPluginThreadsAndTerminals(t *testing.T) {
 		!slices.Equal(spec.AddDirs, []string{skills}) || spec.Title != "Assistant" {
 		t.Errorf("created %s: %+v", owned.owners["s-p1"], spec)
 	}
+	// The permission mode passes through trimmed; none is Claude's default.
+	if spec.PermissionMode != "" {
+		t.Errorf("default permission mode = %q", spec.PermissionMode)
+	}
+	for _, mode := range []string{pluginsdk.PermissionModeSupervised, " " + pluginsdk.PermissionModeAcceptEdits + " ", pluginsdk.PermissionModeAuto} {
+		var id string
+		if err := json.Unmarshal([]byte(run("create", pluginsdk.ThreadCreateParams{Title: "Mode", PermissionMode: mode})), &id); err != nil {
+			t.Fatalf("create %q: %v", mode, err)
+		}
+		if got := owned.specs[id].PermissionMode; got != strings.TrimSpace(mode) {
+			t.Errorf("create %q: spec mode %q", mode, got)
+		}
+		owned.threads = owned.threads[:len(owned.threads)-1] // keep the later checks' one thread
+		delete(owned.specs, id)
+		delete(owned.owners, id)
+	}
 	for _, tt := range []struct {
 		name string
 		p    pluginsdk.ThreadCreateParams
@@ -330,6 +346,8 @@ func TestPluginThreadsAndTerminals(t *testing.T) {
 		{"missing add-dir", pluginsdk.ThreadCreateParams{Title: "x", AddDirs: []string{"~/nope"}}, "is not a directory"},
 		{"cwd outside home", pluginsdk.ThreadCreateParams{Title: "x", Cwd: t.TempDir()}, "outside your home"},
 		{"store refuses", pluginsdk.ThreadCreateParams{Title: "x", Model: "bogus"}, "unknown model"},
+		{"unknown permission mode", pluginsdk.ThreadCreateParams{Title: "x", PermissionMode: "bypassPermissions"}, `permissionMode "bypassPermissions" (want one of supervised, accept-edits, auto)`},
+		{"claude's mode name", pluginsdk.ThreadCreateParams{Title: "x", PermissionMode: "acceptEdits"}, "want one of"},
 	} {
 		if got := run("create", tt.p); !strings.HasPrefix(got, "code "+strconv.Itoa(pluginsdk.CodeInvalidParams)) || !strings.Contains(got, tt.want) {
 			t.Errorf("%s: create = %s", tt.name, got)
