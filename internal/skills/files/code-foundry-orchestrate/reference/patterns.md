@@ -87,7 +87,7 @@ code-foundry thread read 5e6f --last 10
 `send --wait` returns once the child has answered this message, not an earlier turn.
 To follow up with several children at once, send to each without `--wait` and end your
 turn (their `--notify` subscriptions wake you), or run the `send --wait` calls in
-parallel; do not `thread send` then plain `thread wait` (it returns the old status).
+parallel (a plain `thread wait` after a `send` waits for the answer to that message).
 Inside a wake turn of a `--notify` batch, always the first: a `send --wait` there holds
 back the other children's wakes. Repeat until the PR is right, then tell the user it is ready to merge. When the user says
 it merged, clean up:
