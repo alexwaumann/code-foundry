@@ -27,7 +27,7 @@ describe("wakeLine", () => {
   it.each([
     ["not JSON", "{oops"],
     ["not an object", "[1]"],
-    ["neither a thread nor a run", '{"kind":"pr"}', '{\n  "kind": "pr"\n}'],
+    ["a pull request (no note of its own yet)", '{"kind":"pull_request","pull_request":{"number":7}}', '{\n  "kind": "pull_request",\n  "pull_request": {\n    "number": 7\n  }\n}'],
   ])("an unreadable payload (%s): the header as the summary", (_n, json, body = json) => {
     const l = wakeLine({ title: 'Thread "X" (s-1) is idle: finished.', json });
     expect(l).toMatchObject({ tone: "ok", threadId: "", name: "", detail: "", summary: 'Thread "X" (s-1) is idle: finished.' });

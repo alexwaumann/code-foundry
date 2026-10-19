@@ -90,6 +90,30 @@ code-foundry thread archive --ids 5e6f --yes
 code-foundry project worktree cleanup 8c3d5e7f9a1b --yes
 ```
 
+## 4. Open a PR and wait for CI and review
+
+You (or a child) opened a pull request and want to know when its checks finish and when
+someone reviews it, without polling `gh`.
+
+```
+code-foundry thread subscribe --pr acme/web#87 --until checks_done
+# subscribed sub-4b2c9e1d7a30: s-… wakes when pr acme/web#87 finishes its checks (once)
+code-foundry thread subscribe --pr acme/web#87 --until review --repeat
+```
+
+End your turn. Each wake is a message:
+
+```
+[code-foundry wake] Pull request acme/web#87 "Bump the router": checks done (3 passed, 1 failed).
+```
+
+followed by a JSON block with the pull request's state, check counts, review decision
+and the changes (counts only, never comment text). On a failure, read the failing job
+(`gh pr checks 87 --repo acme/web`), fix, push, and subscribe again for `checks_done`
+(the first one is gone once it fired). A merged pull request ends every subscription to
+it. Subscribe a child's thread instead with `--id <child>`. `code-foundry thread
+subscriptions` lists what you wait for; `thread unsubscribe --pr acme/web#87` stops.
+
 Notes:
 
 - Never `thread send` without `--id`: it would go to your own thread.

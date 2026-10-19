@@ -137,24 +137,19 @@ func threadSubscribe(b ThreadBackend) Command {
 	return Command{
 		Name:  "thread.subscribe",
 		Title: "Subscribe Thread to Wakes",
-		Description: "Wake a thread (default: the thread this runs in) with a message when another thread settles " +
-			"(or is idle, needs attention, has an error, is disconnected), an action run finishes, or a pull request " +
-			"finishes its checks, gets a review or comment, is pushed, merged or closed. " +
-			"Fires on each change into the condition, and at once when the target already meets it; " +
-			"once by default, every time with repeat. A stopped thread starts with the wake; a snoozed one is unsnoozed. " +
-			"Pull request wakes come with the GitHub poll: about a minute with the app open, up to 15 without.",
+		Description: "Wake a thread (default: the thread this runs in) with a message when another thread settles, " +
+			"an action run finishes, or a pull request's checks finish. " +
+			"Fires on each change into the condition, and at once when already met; once by default, every time with repeat.",
 		Category:     "Thread",
 		NoKeybinding: true,
 		Args: []ArgSpec{
 			{Name: "id", Type: String, Required: true, Context: ContextThread, ID: ThreadID, Description: "The thread to wake (default: the thread this runs in)" + IDHelp},
 			{Name: "thread", Type: String, ID: ThreadID, Description: "Target thread id" + IDHelp},
 			{Name: "run", Type: String, ID: RunID, Description: "Target action run id (r-…; see action runs)" + IDHelp},
-			{Name: "pr", Type: String, Description: "Target pull request: owner/name#123 or its github.com URL"},
+			{Name: "pr", Type: String, Description: "Target pull request: owner/name#123 or its URL"},
 			{Name: "until", Type: Enum, Enum: SubscriptionConditions,
-				Description: "A thread: settled (the default: idle or needs attention, Claude is not working), idle, attention, error or disconnected. " +
-					"A run: finished. A pull request: checks_done (the default: every check completed), checks_failed, checks_passed, " +
-					"review (submitted, or the decision changed), comment, review_requested, head_pushed, merged, closed or changed (anything)"},
-			{Name: "repeat", Type: Bool, Description: "Wake on every change into the condition (default: once, then the subscription goes; merged and closed always go)"},
+				Description: "Default: settled for a thread, finished for a run, checks_done for a pull request"},
+			{Name: "repeat", Type: Bool, Description: "Wake on every change into the condition, not once"},
 		},
 		When: hasThread,
 		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
@@ -200,15 +195,15 @@ func threadUnsubscribe(b ThreadBackend) Command {
 		Name:  "thread.unsubscribe",
 		Title: "Unsubscribe Thread from Wakes",
 		Description: "Remove a wake subscription by id, or every subscription of a thread (default: the thread this runs in) " +
-			"to a target thread, action run or pull request.",
+			"to a target.",
 		Category:     "Thread",
 		NoKeybinding: true,
 		Args: []ArgSpec{
 			{Name: "subscription", Type: String, Positional: true, ID: SubscriptionID, Description: "Subscription id (sub-…)" + IDHelp},
-			{Name: "id", Type: String, Context: ContextThread, ID: ThreadID, Description: "With thread or run: the subscribed thread (default: the thread this runs in)" + IDHelp},
+			{Name: "id", Type: String, Context: ContextThread, ID: ThreadID, Description: "With a target: the subscribed thread (default: the thread this runs in)" + IDHelp},
 			{Name: "thread", Type: String, ID: ThreadID, Description: "Remove the subscriptions to this thread" + IDHelp},
 			{Name: "run", Type: String, ID: RunID, Description: "Remove the subscriptions to this action run" + IDHelp},
-			{Name: "pr", Type: String, Description: "Remove the subscriptions to this pull request (owner/name#123 or its URL)"},
+			{Name: "pr", Type: String, Description: "Remove the subscriptions to this pull request"},
 		},
 		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 			req := &v1.UnsubscribeThreadRequest{SubscriptionId: strings.TrimSpace(a.String("subscription"))}
