@@ -51,7 +51,9 @@ func (w threadPluginWakes) Changed(s thread.Subscription, added bool) {
 	w.plugins.WakeChanged(wakeSub(s), added)
 }
 
-func (w threadPluginWakes) Describe(target string) (string, string) { return w.plugins.DescribeWake(target) }
+func (w threadPluginWakes) Describe(target string) (string, string) {
+	return w.plugins.DescribeWake(target)
+}
 
 // wakeSub is a thread store subscription as the plugin store knows it.
 func wakeSub(s thread.Subscription) plugin.WakeSub {

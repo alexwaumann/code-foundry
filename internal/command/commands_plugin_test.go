@@ -42,7 +42,7 @@ func TestPluginCommands(t *testing.T) {
 		wantMsg   string // substring
 		want      proto.Message
 	}{
-		{name: "list", cmd: "plugin.list", wantMsg: "hello  0.1.0    disabled  commands(thread.send) secrets  1         -                                   new: code-foundry plugin enable hello"},
+		{name: "list", cmd: "plugin.list", wantMsg: "hello  0.1.0    disabled  commands(thread.send) secrets  1         -                                   -      new: code-foundry plugin enable hello"},
 		{name: "list offers updates", cmd: "plugin.list", wantMsg: "1.1.0 available: code-foundry plugin update quiet"},
 		{name: "list says unknown for a clause not known yet", cmd: "plugin.list", wantMsg: "runs(on) checks(unknown) logs(off)"},
 		{name: "enable asks for consent", cmd: "plugin.enable", args: map[string]string{"name": "hello"},

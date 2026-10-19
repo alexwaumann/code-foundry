@@ -190,11 +190,12 @@ func writeCategory(w io.Writer, level, cat string, list []*v1.Command, detailed 
 // takes (the intro explains it; the usage shows [--id]), nor the ids of thread remove
 // and archive (a Conventions line; the usage shows [--ids]), nor the args only the GUI
 // sets (its composer's text, staged attachments), nor a plugin arg (plugins' own
-// threads; left out like the plugin namespace).
+// threads, plugin wake sources and their --arg: left out like the plugin namespace; the
+// skills and `plugin wakes` carry them).
 func guideShowsArg(a *v1.ArgSpec) bool {
 	d := a.GetDescription()
 	return !threadIDArg(a) && !threadIDsArg(a) && !strings.Contains(d, "(the GUI sets it)") && !strings.Contains(d, "from StageAttachment") &&
-		a.GetName() != "plugin"
+		a.GetName() != "plugin" && !a.GetRepeatable()
 }
 
 // threadIDsArg: a's the "ids" of a thread command (several threads at once).
@@ -293,6 +294,9 @@ func ArgDetail(a *v1.ArgSpec) string {
 	}
 	if def := a.GetDefaultValue(); def != "" {
 		d += fmt.Sprintf(" (default %q)", def)
+	}
+	if a.GetRepeatable() {
+		d += " (repeatable)"
 	}
 	return d
 }

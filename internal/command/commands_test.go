@@ -77,7 +77,7 @@ func TestAllRegistersEveryDomain(t *testing.T) {
 		"action.list", "action.add", "action.edit", "action.remove", "action.run", "action.wait", "action.runs",
 		"plugin.list", "plugin.enable", "plugin.disable", "plugin.restart", "plugin.reload", "plugin.logs", "plugin.dev",
 		"plugin.secrets.list", "plugin.secrets.delete", "plugin.env", "plugin.surface", "plugin.act", "pr.checks",
-		"plugin.threads", "plugin.terminals",
+		"plugin.threads", "plugin.terminals", "plugin.wakes",
 		"plugin.browse", "plugin.install", "plugin.update", "plugin.uninstall",
 	}
 	for _, n := range want {

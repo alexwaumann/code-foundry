@@ -15,12 +15,14 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 )
 
-// Wake subscriptions (docs/notes/agents-4-wake.md, docs/notes/gh-events-3-pr-wake.md):
-// thread.subscribe has the daemon send a thread (default: the one this runs in) a wake
-// message when another thread settles (or is idle, needs attention, has an error, is
-// disconnected), an action run finishes, or a pull request's checks finish, it gets a
-// review or comment, is pushed, merged or closed, so an agent that started other
-// threads or opened a pull request is woken instead of polling.
+// Wake subscriptions (docs/notes/agents-4-wake.md, docs/notes/gh-events-3-pr-wake.md,
+// docs/notes/plugins-wake-sources.md): thread.subscribe has the daemon send a thread
+// (default: the one this runs in) a wake message when another thread settles (or is
+// idle, needs attention, has an error, is disconnected), an action run finishes, a pull
+// request's checks finish, it gets a review or comment, is pushed, merged or closed, or a
+// plugin fires one of its wake sources (--plugin <plugin>/<source> with --arg k=v), so
+// an agent that started other threads or opened a pull request is woken instead of
+// polling.
 // thread.unsubscribe and thread.subscriptions manage them. thread.new --notify
 // subscribes the creator to the new thread (commands_thread_lifecycle.go).
 
@@ -33,7 +35,8 @@ type SubscriptionBackend interface {
 
 // SubscriptionConditions are thread.subscribe's until values: a thread takes settled to
 // disconnected, a run only finished (settled means finished for a run), a pull request
-// checks_done to changed.
+// checks_done to changed. A plugin's wake source takes none: its only condition is
+// fired.
 var SubscriptionConditions = append([]string{"settled", "idle", "attention", "error", "disconnected", "finished"}, pullRequestConditions...)
 
 // pullRequestConditions are the conditions of a pull request target; the first is the
@@ -59,6 +62,7 @@ var subscriptionConditions = map[string]v1.ThreadSubscriptionCondition{
 	"merged":           v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_MERGED,
 	"closed":           v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_CLOSED,
 	"changed":          v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_CHANGED,
+	"fired":            v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_FIRED,
 }
 
 // pullRequestVerbs say what a pull request does to meet a condition.
@@ -85,15 +89,59 @@ func conditionName(c v1.ThreadSubscriptionCondition) string {
 	return "settled"
 }
 
-// subscriptionTarget is "thread s-1", "run r-1" or "pr acme/web#7".
+// subscriptionTarget is "thread s-1", "run r-1", "pr acme/web#7" or "plugin hello/tick".
 func subscriptionTarget(s *v1.ThreadSubscription) string {
 	switch s.GetTarget() {
 	case v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_ACTION_RUN:
 		return "run " + s.GetTargetId()
 	case v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_PULL_REQUEST:
 		return "pr " + s.GetTargetId()
+	case v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_PLUGIN:
+		return "plugin " + s.GetTargetId()
 	}
 	return "thread " + s.GetTargetId()
+}
+
+// subscriptionArgs is a plugin subscription's args, "every=2s pr=a/b#1" (sorted), "" for
+// none.
+func subscriptionArgs(s *v1.ThreadSubscription) string {
+	args := s.GetArgs()
+	keys := make([]string, 0, len(args))
+	for k := range args {
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
+	parts := make([]string, len(keys))
+	for i, k := range keys {
+		parts[i] = k + "=" + args[k]
+	}
+	return strings.Join(parts, " ")
+}
+
+// parseWakeArgs reads thread.subscribe's --arg values: "k=v" lines (the CLI joins a
+// repeated flag's values with newlines).
+func parseWakeArgs(raw string) (map[string]string, error) {
+	var out map[string]string
+	for line := range strings.SplitSeq(raw, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		k, v, ok := strings.Cut(line, "=")
+		k = strings.TrimSpace(k)
+		_, dup := out[k]
+		switch {
+		case !ok || k == "":
+			return nil, InvalidArg("arg", "%q is not name=value", line)
+		case dup:
+			return nil, InvalidArg("arg", "%s given twice", k)
+		}
+		if out == nil {
+			out = map[string]string{}
+		}
+		out[k] = strings.TrimSpace(v)
+	}
+	return out, nil
 }
 
 // subscriptionLine is one subscription in a message: "sub-1: s-p wakes when thread s-c
@@ -105,6 +153,11 @@ func subscriptionLine(s *v1.ThreadSubscription) string {
 	}
 	verb := "is " + conditionName(s.GetCondition())
 	switch s.GetCondition() {
+	case v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_FIRED:
+		verb = "fires"
+		if a := subscriptionArgs(s); a != "" {
+			verb += " (" + a + ")"
+		}
 	case v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_ATTENTION:
 		verb = "needs attention"
 	case v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_ERROR:
@@ -118,19 +171,20 @@ func subscriptionLine(s *v1.ThreadSubscription) string {
 	return s.GetId() + ": " + s.GetSubscriberThreadId() + " wakes when " + subscriptionTarget(s) + " " + verb + " (" + how + ")"
 }
 
-// subscribeTargetArgs reads exactly one of thread, run and pr.
-func subscribeTargetArgs(a Args) (thread, run, pr string, err error) {
+// subscribeTargetArgs reads exactly one of thread, run, pr and plugin.
+func subscribeTargetArgs(a Args) (thread, run, pr, plugin string, err error) {
 	thread, run, pr = strings.TrimSpace(a.String("thread")), strings.TrimSpace(a.String("run")), strings.TrimSpace(a.String("pr"))
+	plugin = strings.TrimSpace(a.String("plugin"))
 	n := 0
-	for _, t := range []string{thread, run, pr} {
+	for _, t := range []string{thread, run, pr, plugin} {
 		if t != "" {
 			n++
 		}
 	}
 	if n != 1 {
-		return "", "", "", InvalidArg("thread", "give exactly one target: thread (a thread id), run (an action run id) or pr (owner/name#123 or a pull request URL)")
+		return "", "", "", "", InvalidArg("thread", "give exactly one target: thread (a thread id), run (an action run id), pr (owner/name#123 or a pull request URL) or plugin (<plugin>/<source>; code-foundry plugin wakes lists them)")
 	}
-	return thread, run, pr, nil
+	return thread, run, pr, plugin, nil
 }
 
 func threadSubscribe(b ThreadBackend) Command {
@@ -138,7 +192,7 @@ func threadSubscribe(b ThreadBackend) Command {
 		Name:  "thread.subscribe",
 		Title: "Subscribe Thread to Wakes",
 		Description: "Wake a thread (default: the thread this runs in) with a message when another thread settles, " +
-			"an action run finishes, or a pull request's checks finish. " +
+			"an action run finishes, a pull request's checks finish, or a plugin wake fires (plugin wakes). " +
 			"Fires on each change into the condition, and at once when already met; once by default, every time with repeat.",
 		Category:     "Thread",
 		NoKeybinding: true,
@@ -147,13 +201,20 @@ func threadSubscribe(b ThreadBackend) Command {
 			{Name: "thread", Type: String, ID: ThreadID, Description: "Target thread id" + IDHelp},
 			{Name: "run", Type: String, ID: RunID, Description: "Target action run id (r-…; see action runs)" + IDHelp},
 			{Name: "pr", Type: String, Description: "Target pull request: owner/name#123 or its URL"},
+			{Name: "plugin", Type: String, Description: "Target wake source, <plugin>/<source> (code-foundry plugin wakes lists them)"},
+			{Name: "arg", Type: String, Repeatable: true, Description: "A wake source's arg as name=value; " +
+				"args with a context default to this thread's (its id, pull request, project)"},
 			{Name: "until", Type: Enum, Enum: SubscriptionConditions,
 				Description: "Default: settled for a thread, finished for a run, checks_done for a pull request"},
 			{Name: "repeat", Type: Bool, Description: "Wake on every change into the condition, not once"},
 		},
 		When: hasThread,
 		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-			thread, run, pr, err := subscribeTargetArgs(a)
+			thread, run, pr, plugin, err := subscribeTargetArgs(a)
+			if err != nil {
+				return Result{}, err
+			}
+			args, err := parseWakeArgs(a.String("arg"))
 			if err != nil {
 				return Result{}, err
 			}
@@ -166,10 +227,18 @@ func threadSubscribe(b ThreadBackend) Command {
 				return Result{}, InvalidArg("until", "%s is not a thread's condition; a thread takes settled, idle, attention, error or disconnected", until)
 			case pr != "" && until != "" && !isPR:
 				return Result{}, InvalidArg("until", "%s is not a pull request's condition; a pull request takes %s", until, strings.Join(pullRequestConditions, ", "))
+			case plugin != "" && until != "" && until != "settled":
+				return Result{}, InvalidArg("until", "a plugin's wake source fires when the plugin fires it; leave until out (not %s)", until)
+			case plugin == "" && len(args) > 0:
+				return Result{}, InvalidArg("arg", "args are for a plugin's wake source (--plugin)")
+			}
+			cond := subscriptionConditions[until]
+			if plugin != "" {
+				cond = v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_UNSPECIFIED
 			}
 			res, err := b.Subscribe(ctx, connect.NewRequest(&v1.SubscribeThreadRequest{
 				SubscriberThreadId: a.String("id"), TargetThreadId: thread, TargetRunId: run, TargetPullRequest: pr,
-				Condition: subscriptionConditions[until], Repeat: a.Bool("repeat"),
+				TargetPlugin: plugin, Args: args, Condition: cond, Repeat: a.Bool("repeat"),
 			}))
 			if err != nil {
 				return Result{}, err
@@ -204,19 +273,20 @@ func threadUnsubscribe(b ThreadBackend) Command {
 			{Name: "thread", Type: String, ID: ThreadID, Description: "Remove the subscriptions to this thread" + IDHelp},
 			{Name: "run", Type: String, ID: RunID, Description: "Remove the subscriptions to this action run" + IDHelp},
 			{Name: "pr", Type: String, Description: "Remove the subscriptions to this pull request"},
+			{Name: "plugin", Type: String, Description: "Remove the subscriptions to this wake source, <plugin>/<source> (whatever their args)"},
 		},
 		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 			req := &v1.UnsubscribeThreadRequest{SubscriptionId: strings.TrimSpace(a.String("subscription"))}
 			if req.SubscriptionId == "" {
-				thread, run, pr, err := subscribeTargetArgs(a)
+				thread, run, pr, plugin, err := subscribeTargetArgs(a)
 				if err != nil {
-					return Result{}, InvalidArg("subscription", "give a subscription id, or a target (thread, run or pr)")
+					return Result{}, InvalidArg("subscription", "give a subscription id, or a target (thread, run, pr or plugin)")
 				}
 				if a.String("id") == "" {
 					return Result{}, InvalidArg("id", "give the subscribed thread's id with a target")
 				}
-				req.SubscriberThreadId, req.TargetThreadId, req.TargetRunId, req.TargetPullRequest = a.String("id"), thread, run, pr
-			} else if a.String("thread") != "" || a.String("run") != "" || a.String("pr") != "" {
+				req.SubscriberThreadId, req.TargetThreadId, req.TargetRunId, req.TargetPullRequest, req.TargetPlugin = a.String("id"), thread, run, pr, plugin
+			} else if a.String("thread") != "" || a.String("run") != "" || a.String("pr") != "" || a.String("plugin") != "" {
 				return Result{}, InvalidArg("subscription", "give a subscription id or a target, not both")
 			}
 			res, err := b.Unsubscribe(ctx, connect.NewRequest(req))
@@ -285,7 +355,11 @@ func formatSubscriptions(subs []*v1.ThreadSubscription, subscriber string) strin
 		if t := s.GetLastFiredAt(); t != nil {
 			last = t.AsTime().Local().Format(time.TimeOnly)
 		}
-		target := strings.SplitN(subscriptionTarget(s), " ", 2)[0] + " " + named(s.GetTargetId(), s.GetTargetName())
+		id := s.GetTargetId()
+		if args := subscriptionArgs(s); args != "" {
+			id += " " + args
+		}
+		target := strings.SplitN(subscriptionTarget(s), " ", 2)[0] + " " + named(id, s.GetTargetName())
 		if s.GetTarget() == v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_PULL_REQUEST {
 			target = "pr " + cmp.Or(s.GetTargetName(), s.GetTargetId()) // the name starts with the id
 		}

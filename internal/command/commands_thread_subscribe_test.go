@@ -25,6 +25,8 @@ func TestThreadSubscriptionCommands(t *testing.T) {
 		finished  = v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_FINISHED
 		review    = v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_REVIEW
 		checks    = v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_CHECKS_DONE
+		fired     = v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_FIRED
+		unset     = v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_UNSPECIFIED
 		auto      = v1.PermissionMode_PERMISSION_MODE_AUTO
 	)
 	inThread := command.Context{ActiveThreadID: "s-me"}
@@ -38,6 +40,8 @@ func TestThreadSubscriptionCommands(t *testing.T) {
 			TargetId: "s-me", Condition: attention, TargetStatus: "busy (working)"},
 		{Id: "sub-4", SubscriberThreadId: "s-me", Target: v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_PULL_REQUEST,
 			TargetId: "acme/web#7", TargetName: "acme/web#7 Retry", Condition: review, Repeat: true, TargetStatus: "open · checks pending (2/4)"},
+		{Id: "sub-5", SubscriberThreadId: "s-other", Target: v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_PLUGIN,
+			TargetId: "hello/tick", TargetName: "Hello: Tick", Condition: fired, Args: map[string]string{"every": "2s", "a": "b"}, TargetStatus: "running"},
 	}
 	tests := []struct {
 		name           string
@@ -88,6 +92,20 @@ func TestThreadSubscriptionCommands(t *testing.T) {
 		{name: "no target", cmd: "thread.subscribe", ctx: inThread, wantErr: command.ErrInvalidArgs},
 		{name: "two targets", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"thread": "s-c", "run": "r-1"}, wantErr: command.ErrInvalidArgs},
 		{name: "no subscriber", cmd: "thread.subscribe", args: map[string]string{"thread": "s-c"}, wantErr: command.ErrUnavailable},
+		{name: "subscribe to a plugin's wake source", cmd: "thread.subscribe", ctx: inThread,
+			args:     map[string]string{"plugin": "hello/tick", "arg": "every=2s\n\n pr = a/b#1 ", "repeat": "true"},
+			wantMsg:  "subscribed sub-1: s-me wakes when plugin hello/tick fires (every=2s pr=a/b#1) (repeat)",
+			wantReqs: []proto.Message{&v1.SubscribeThreadRequest{SubscriberThreadId: "s-me", TargetPlugin: "hello/tick", Args: map[string]string{"every": "2s", "pr": "a/b#1"}, Condition: unset, Repeat: true}}},
+		{name: "a plugin without args", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"plugin": "hello/tick"},
+			wantMsg:  "subscribed sub-1: s-me wakes when plugin hello/tick fires (once)",
+			wantReqs: []proto.Message{&v1.SubscribeThreadRequest{SubscriberThreadId: "s-me", TargetPlugin: "hello/tick", Condition: unset}}},
+		{name: "an arg value with =", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"plugin": "x/y", "arg": "q=a=b"},
+			wantReqs: []proto.Message{&v1.SubscribeThreadRequest{SubscriberThreadId: "s-me", TargetPlugin: "x/y", Args: map[string]string{"q": "a=b"}, Condition: unset}}},
+		{name: "an arg without =", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"plugin": "hello/tick", "arg": "every"}, wantErr: command.ErrInvalidArgs},
+		{name: "an arg twice", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"plugin": "hello/tick", "arg": "every=1s\nevery=2s"}, wantErr: command.ErrInvalidArgs},
+		{name: "args without a plugin", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"thread": "s-c", "arg": "every=1s"}, wantErr: command.ErrInvalidArgs},
+		{name: "a plugin until idle", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"plugin": "hello/tick", "until": "idle"}, wantErr: command.ErrInvalidArgs},
+		{name: "a plugin and a thread", cmd: "thread.subscribe", ctx: inThread, args: map[string]string{"plugin": "hello/tick", "thread": "s-c"}, wantErr: command.ErrInvalidArgs},
 
 		{name: "unsubscribe by id", cmd: "thread.unsubscribe", args: map[string]string{"subscription": "sub-2"},
 			wantMsg:  "removed sub-2: s-me wakes when run r-1 finishes (once)",
@@ -100,6 +118,9 @@ func TestThreadSubscriptionCommands(t *testing.T) {
 			wantReqs: []proto.Message{&v1.UnsubscribeThreadRequest{SubscriberThreadId: "s-me", TargetPullRequest: "acme/web#7"}},
 			wantJSON: `{"removed":[{"id":"sub-4","subscriberThreadId":"s-me","target":"THREAD_SUBSCRIPTION_TARGET_PULL_REQUEST","targetId":"acme/web#7",` +
 				`"condition":"THREAD_SUBSCRIPTION_CONDITION_REVIEW","repeat":true,"targetName":"acme/web#7Retry","targetStatus":"open·checkspending(2/4)"}]}`},
+		{name: "unsubscribe from a plugin's wake source", cmd: "thread.unsubscribe", args: map[string]string{"id": "s-other", "plugin": "hello/tick"},
+			wantMsg:  "removed sub-5: s-other wakes when plugin hello/tick fires (a=b every=2s) (once)",
+			wantReqs: []proto.Message{&v1.UnsubscribeThreadRequest{SubscriberThreadId: "s-other", TargetPlugin: "hello/tick"}}},
 		{name: "unsubscribe nothing", cmd: "thread.unsubscribe", ctx: inThread, wantErr: command.ErrInvalidArgs},
 		{name: "unsubscribe an id and a pull request", cmd: "thread.unsubscribe", ctx: inThread, args: map[string]string{"subscription": "sub-4", "pr": "acme/web#7"}, wantErr: command.ErrInvalidArgs},
 		{name: "unsubscribe both", cmd: "thread.unsubscribe", ctx: inThread, args: map[string]string{"subscription": "sub-1", "thread": "s-c"}, wantErr: command.ErrInvalidArgs},
@@ -114,6 +135,10 @@ func TestThreadSubscriptionCommands(t *testing.T) {
 			wantReqs: []proto.Message{&v1.ListThreadSubscriptionsRequest{SubscriberThreadId: "s-me"}}},
 		{name: "list all", cmd: "thread.subscriptions", ctx: inThread, args: map[string]string{"all": "true"},
 			wantReqs: []proto.Message{&v1.ListThreadSubscriptionsRequest{}}},
+		{name: "list a plugin target", cmd: "thread.subscriptions", args: map[string]string{"id": "s-other"},
+			wantMsg: "ID     SUBSCRIBER  TARGET                                        UNTIL      REPEAT  FIRED  LAST FIRED  TARGET STATUS\n" +
+				"sub-3  s-other     thread s-me                                   attention  no      0      -           busy (working)\n" +
+				"sub-5  s-other     plugin hello/tick a=b every=2s (Hello: Tick)  fired      no      0      -           running"},
 		{name: "list none", cmd: "thread.subscriptions", args: map[string]string{"id": "s-none"}, wantMsg: "thread s-none has no wake subscriptions"},
 		{name: "list needs a thread", cmd: "thread.subscriptions", wantErr: command.ErrInvalidArgs},
 

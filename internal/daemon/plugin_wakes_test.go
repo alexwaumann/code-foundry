@@ -27,7 +27,9 @@ func (f *fakeResolver) WakeChanged(s plugin.WakeSub, added bool) {
 	f.changed = append(f.changed, fmt.Sprintf("%s %s %s %s %v %v", s.ID, s.Plugin, s.Source, s.ThreadID, s.Args, added))
 }
 
-func (f *fakeResolver) DescribeWake(target string) (string, string) { return "Hello: " + target, "running" }
+func (f *fakeResolver) DescribeWake(target string) (string, string) {
+	return "Hello: " + target, "running"
+}
 
 // The plugin store's errors read as the thread store's (the API maps those to codes);
 // subscriptions split their target into plugin and source.
