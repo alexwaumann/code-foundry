@@ -38,7 +38,9 @@ import (
 // other go as one message (subscriptions_batch.go). A one-shot subscription goes once it fired; a
 // repeat one stays. Subscriptions are persisted (thread_subscriptions, migration 0024)
 // and rehydrated by New, armed with the targets as loaded: nothing fires for what
-// happened while the daemon was stopped. Action runs live in the action store's memory,
+// happened while the daemon was stopped, except what DeliverRestartWakes sends once the
+// daemon is up (subscriptions_restart.go): the wakes the stop suppressed, threads the
+// stop interrupted, and a restart notice. Action runs live in the action store's memory,
 // so run subscriptions are dropped at startup. Archiving or removing the subscriber or
 // the target thread deletes its subscriptions.
 
@@ -143,6 +145,10 @@ type Subscription struct {
 	// count); LastFiredAt is the latest, zero before the first.
 	FiredCount  int
 	LastFiredAt time.Time
+	// SuppressedAt is when a thread target met the condition while the daemon was
+	// stopping, so the wake could not be sent; the next start delivers it
+	// (subscriptions_restart.go). Zero for none.
+	SuppressedAt time.Time
 
 	// Filled by Subscriptions at read time, not persisted: the subscriber's and the
 	// target's names (a run's: its action's), and the target's state in words.
@@ -219,6 +225,8 @@ type subscriptions struct {
 	plugins PluginWakes
 	notes   []pluginNote
 	noting  bool
+	// restarted: DeliverRestartWakes ran (subscriptions_restart.go).
+	restarted bool
 }
 
 // subRec is a subscription, whether its target met the condition when last seen, and

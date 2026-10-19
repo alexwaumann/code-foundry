@@ -75,12 +75,14 @@ type wakeQueue struct {
 
 // delivery is a wake to send, or (limit) the wake limit to tell. msg makes the message
 // when it is sent, off the locks; a thread wake has thread instead (it reads its
-// target's items then, and may join others in one message: subscriptions_batch.go).
+// target's items then, and may join others in one message: subscriptions_batch.go); the
+// wakes of a restart have restart (subscriptions_restart.go), which batches like one.
 type delivery struct {
-	sub    string // the subscription, for the log
-	msg    func(context.Context) Message
-	thread func(context.Context) threadWakePart
-	limit  bool
+	sub     string // the subscription, for the log
+	msg     func(context.Context) Message
+	thread  func(context.Context) threadWakePart
+	restart *restartWakes
+	limit   bool
 	// queued is when it was queued (the monotonic clock: the batch window); slot is its
 	// wake limit slot (Options.Now), zero when it joins a batch that has one.
 	queued time.Time
@@ -105,16 +107,20 @@ func (m *Manager) fireLocked(r *subRec, build func(Subscription, time.Time) Mess
 func (m *Manager) fireThreadLocked(r *subRec, t Thread) bool {
 	kids := m.childrenLocked(t.ID)
 	return m.fireLaterLocked(r, func(s Subscription, at time.Time) delivery {
-		return delivery{thread: func(ctx context.Context) threadWakePart {
-			d := wakeDetail{children: kids}
-			if items, err := m.Items(ctx, t.ID); err != nil {
-				m.log.Warn("wake detail: read the thread's items", "thread", t.ID, "err", err)
-			} else {
-				d = wakeDetailOf(t, items.Items, kids)
-			}
-			return threadWakePart{sub: s, t: t, at: at, d: d}
-		}}
+		return delivery{thread: func(ctx context.Context) threadWakePart { return m.threadPart(ctx, s, t, at, kids) }}
 	})
+}
+
+// threadPart is sub's wake about thread t, fired at, with t's children kids: the
+// detail is read from t's items now (off the locks).
+func (m *Manager) threadPart(ctx context.Context, sub Subscription, t Thread, at time.Time, kids wakeChildren) threadWakePart {
+	d := wakeDetail{children: kids}
+	if items, err := m.Items(ctx, t.ID); err != nil {
+		m.log.Warn("wake detail: read the thread's items", "thread", t.ID, "err", err)
+	} else {
+		d = wakeDetailOf(t, items.Items, kids)
+	}
+	return threadWakePart{sub: sub, t: t, at: at, d: d}
 }
 
 // childrenLocked counts the threads thread id created that are not archived. Callers
@@ -146,8 +152,9 @@ func (m *Manager) fireLaterLocked(r *subRec, build func(Subscription, time.Time)
 	subscriber := r.s.SubscriberID
 	if m.closed {
 		// The daemon is stopping (its runners' ends commit as they go): not a fire, so a
-		// one-shot subscription is kept for the next transition after a restart.
-		m.log.Info("wake not fired: the daemon is stopping", "thread", subscriber, "subscription", r.s.ID)
+		// one-shot subscription is kept. A thread target's is recorded and the next start
+		// delivers it (subscriptions_restart.go).
+		m.suppressLocked(r, now)
 		return false
 	}
 	d := build(r.s, now)
@@ -223,7 +230,7 @@ func (s *subscriptions) next(subscriber string, batching bool) (delivery, bool) 
 	}
 	d := q.items[0]
 	q.items = q.items[1:]
-	q.holding = batching && d.thread != nil
+	q.holding = batching && d.batched()
 	return d, true
 }
 
@@ -241,7 +248,7 @@ func (m *Manager) drain(subscriber string) {
 			m.wakeLimitReached(subscriber)
 			continue
 		}
-		if d.thread != nil {
+		if d.batched() {
 			m.deliverThreadWakes(subscriber, m.collectBatch(subscriber, d))
 			continue
 		}
@@ -316,11 +323,14 @@ func (r *runner) onWakeLimit() Item {
 // The JSON payloads. Field order is the output's.
 
 type wakeThreadPayload struct {
-	Kind           string     `json:"kind"`
-	SubscriptionID string     `json:"subscription_id"`
-	Condition      Condition  `json:"condition"`
-	FiredAt        string     `json:"fired_at"`
-	Thread         wakeThread `json:"thread"`
+	Kind           string    `json:"kind"`
+	SubscriptionID string    `json:"subscription_id"`
+	Condition      Condition `json:"condition"`
+	FiredAt        string    `json:"fired_at"`
+	// AfterRestart: fired by the daemon's stop or for a thread it interrupted, sent
+	// after the restart (subscriptions_restart.go).
+	AfterRestart bool       `json:"after_restart,omitempty"`
+	Thread       wakeThread `json:"thread"`
 }
 
 type wakeThread struct {
@@ -433,6 +443,9 @@ type wakeDetail struct {
 	// siblings counts the subscriber's children when the target is one of them; set
 	// when the wake is sent (subscriptions_batch.go).
 	siblings *wakeSiblings
+	// afterRestart: sent by a restart (subscriptions_restart.go); appStopped: the
+	// target's turn was cut by the stop.
+	afterRestart, appStopped bool
 }
 
 // Wake detail bounds: the last assistant message (runes, one line) and a pending
@@ -548,7 +561,7 @@ func threadWake(sub Subscription, t Thread, at time.Time, d wakeDetail) Message 
 
 // threadWakePayload is the JSON of sub's wake about thread t, fired at, with detail d.
 func threadWakePayload(sub Subscription, t Thread, at time.Time, d wakeDetail) wakeThreadPayload {
-	p := wakeThreadPayload{Kind: "thread", SubscriptionID: sub.ID, Condition: sub.Condition, FiredAt: wakeTime(at), Thread: wakeThread{
+	p := wakeThreadPayload{Kind: "thread", SubscriptionID: sub.ID, Condition: sub.Condition, FiredAt: wakeTime(at), AfterRestart: d.afterRestart, Thread: wakeThread{
 		ID: t.ID, Name: t.Name, State: t.State.String(), Status: statusNames[t.Status], StatusReason: t.StatusReason,
 		ProjectID: t.ProjectID, WorktreePath: t.WorktreePath, CreatedBy: t.CreatedBy, Labels: t.Labels,
 		ReportStale: d.noReport || d.staleReport, LastMessage: d.lastMessage, Pending: d.pending, Siblings: d.siblings,
@@ -611,6 +624,8 @@ func threadWakeTitle(c Condition, t Thread, d wakeDetail) string {
 		line += ": " + oneLine(t.StatusReason, maxHeaderReason)
 	}
 	switch {
+	case d.appStopped:
+		line = who + " was interrupted when the app stopped"
 	case d.noReport && t.StatusReason == "finished":
 		line += " without a report"
 	case d.noReport:

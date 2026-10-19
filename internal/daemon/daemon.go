@@ -304,6 +304,9 @@ func Run(ctx context.Context, opts Options) error {
 	log.Info("daemon started",
 		"pid", os.Getpid(), "version", opts.Version.Version, "commit", opts.Version.Commit,
 		"socket", p.Socket(), "port", port, "home", p.Home())
+	// Up: the wakes the last stop owes its orchestrators (interrupted children, a
+	// restart notice) can start their threads now (docs/notes/orch-restart-wakes.md).
+	st.thread.DeliverRestartWakes()
 
 	var runErr error
 	select {
