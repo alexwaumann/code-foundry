@@ -107,7 +107,10 @@ func (a *actor) terminalCreate(ctx context.Context, params json.RawMessage) (any
 		return nil, err
 	}
 	if title == "" {
-		title = filepath.Base(p.Argv[0])
+		// The program's name, under the rule a given title meets.
+		if title, err = oneLine(method, "title (argv[0]'s base name without one; pass a title)", filepath.Base(p.Argv[0]), maxTerminalTitle, false); err != nil {
+			return nil, err
+		}
 	}
 	env, _, err := a.checkedEnv(method, p.Env, nil)
 	if err != nil {
