@@ -15,7 +15,8 @@ const justify: Partial<Record<string, string>> = {
  * and progress (the daemon refuses other kinds), 8 px apart and centred vertically, placed
  * by align. They wrap onto more lines when they do not fit, unless noWrap (then they shrink
  * and wrap inside themselves). An item is as wide as its content; a progress bar grows to
- * the free width, at least 160 px.
+ * the free width, at least 160 px while the group wraps (under noWrap it shrinks below
+ * that too, rather than push the line past the panel).
  */
 export function GroupNode({ node, data }: NodeProps<"group">) {
   const wrap = !(data.noWrap ?? false);
@@ -30,7 +31,7 @@ export function GroupNode({ node, data }: NodeProps<"group">) {
       data-wrap={wrap}
     >
       {data.items.map((n) => (
-        <div key={n.key} className={cn("min-w-0", n.progress ? "shrink-0 grow basis-40" : "shrink")} data-testid="plugin-group-item" data-key={n.key}>
+        <div key={n.key} className={cn("min-w-0", n.progress ? cn("grow basis-40", wrap ? "shrink-0" : "shrink") : "shrink")} data-testid="plugin-group-item" data-key={n.key}>
           <NodeView node={n} />
         </div>
       ))}

@@ -310,6 +310,53 @@ function patchRuns(nodes: Node[], st: { selected: string; tab: string; notes: Re
   });
 }
 
+
+/**
+ * Layout fuzzing controls (e2e/plugins-layout-fuzz.spec.ts; POST /__mock/plugin/demotab with
+ * a `__` tab): `__viewdelay:<ms>` publishes each new view that long after the act returns
+ * (the daemon coalesces views, DefaultCoalesce 100 ms, so its act answers first);
+ * `__actdelay:<ms>` makes every act take that long; `__failnext:<key>` refuses the next act
+ * on that key; `view:<json>` shows a custom view ({view, details?, tabChildren?}): a
+ * master-detail's select sets its selected row and detail (details[node][row], else a
+ * text), a node tab its active tab and children (tabChildren[node][tab], else a text), a
+ * view tab its active tab; other acts re-render. Reset with the mock.
+ */
+export const fuzzControl = { viewDelayMs: 0, actDelayMs: 0, failNext: new Set<string>() };
+
+interface CustomSpec {
+  view: Record<string, unknown>;
+  details?: Record<string, Record<string, Node[]>>;
+  tabChildren?: Record<string, Record<string, Node[]>>;
+  selected: Record<string, string>;
+  active: Record<string, string>;
+  viewTab?: string;
+}
+
+/** The custom view with the user's choices applied (selected rows, node tabs, the view tab). */
+function customView(spec: CustomSpec): Record<string, unknown> {
+  const v = JSON.parse(JSON.stringify(spec.view)) as Record<string, unknown>;
+  if (spec.viewTab !== undefined && v.tabs) (v.tabs as { active: string }).active = spec.viewTab;
+  const walk = (nodes: Node[]) => {
+    for (const n of nodes) {
+      const md = n.masterDetail as { selected?: string; detail: Node[] } | undefined;
+      if (md && n.key in spec.selected) {
+        const sel = spec.selected[n.key] ?? "";
+        if (sel !== (md.selected ?? "")) md.detail = spec.details?.[n.key]?.[sel] ?? [{ key: `${n.key}-d-${sel}`, text: { content: `Detail of ${sel}` } }];
+        md.selected = sel;
+      }
+      const tabs = n.tabs as { active: string; children: Node[] } | undefined;
+      if (tabs && n.key in spec.active) {
+        const act = spec.active[n.key] ?? "";
+        if (act !== tabs.active) tabs.children = spec.tabChildren?.[n.key]?.[act] ?? [{ key: `${n.key}-c-${act}`, text: { content: `Tab ${act}` } }];
+        tabs.active = act;
+      }
+      for (const children of childListsOf(n)) walk(children);
+    }
+  };
+  for (const l of viewListsOf(v)) walk(l);
+  return v;
+}
+
 /** One open demo instance: the real plugin's state, the view it renders, its watchers. */
 class DemoInstance {
   tab = "overview";
@@ -325,6 +372,8 @@ class DemoInstance {
   /** The Runs tab's state (the real plugin's runsState): the chosen run, the detail's tab, notes by run. */
   runs: { selected: string; tab: string; notes: Record<string, string> } = { selected: "", tab: "", notes: {} };
   buildLog = "";
+  /** A custom view (fuzzControl's `view:<json>`), shown while tab is "custom". */
+  custom: CustomSpec | null = null;
   version = 0;
   view: Record<string, unknown> | null = null;
   phase = SurfacePhase.OPENING;
@@ -349,6 +398,14 @@ class DemoInstance {
   }
 
   render(): void {
+    if (this.tab === "custom" && this.custom) {
+      this.view = customView(this.custom);
+      this.version++;
+      this.phase = SurfacePhase.LIVE;
+      this.message = "";
+      this.publishView();
+      return;
+    }
     const shift = this.openedAt - CAPTURED_AT;
     // "stress" (POST /__mock/plugin/demotab?tab=stress; not in the captured views): two
     // thread nodes and a terminal in one view, more live streams than the GUI's budget.
@@ -418,8 +475,21 @@ class DemoInstance {
     this.version++;
     this.phase = SurfacePhase.LIVE;
     this.message = "";
+    this.publishView();
+  }
+
+  /** Publishes the current view, fuzzControl.viewDelayMs later when set (the daemon's coalescing). */
+  private publishView(): void {
     const u = this.viewUpdate();
-    if (u) this.hub.publish(u);
+    if (!u) return;
+    if (fuzzControl.viewDelayMs > 0) {
+      this.timers.push(
+        setTimeout(() => {
+          this.hub.publish(u);
+        }, fuzzControl.viewDelayMs),
+      );
+    }
+    else this.hub.publish(u);
   }
 
   /**
@@ -469,6 +539,14 @@ class DemoInstance {
 
   /** The plugin's surface/act. Throws the plugin's refusal as Aborted, like the daemon. */
   act(el: Element, values: Record<string, unknown>, toast: (text: string) => void, viewer = ""): void {
+    if (fuzzControl.failNext.delete(el.key)) throw new ConnectError(`plugin refused: ${el.key} (failnext)`, Code.Aborted);
+    if (this.tab === "custom" && this.custom) {
+      if (el.kind === "select" && el.node) this.custom.selected[el.node] = el.key;
+      else if (el.kind === "tab" && el.node) this.custom.active[el.node] = el.key;
+      else if (el.kind === "tab") this.custom.viewTab = el.key;
+      this.render();
+      return;
+    }
     switch (`${el.kind}:${el.event}`) {
       case "click:send-hello":
         this.send(HELLO_THREAD, "say hello in one line");
@@ -766,6 +844,9 @@ export class MockPlugins {
     this.instances.clear();
     this.pinned.clear();
     this.acts = [];
+    fuzzControl.viewDelayMs = 0;
+    fuzzControl.actDelayMs = 0;
+    fuzzControl.failNext.clear();
     this.plugins = new Map(seedPlugins().map((p) => [p.name, p]));
     this.registry.reset();
     this.home = MOCK_HOME;
@@ -907,6 +988,28 @@ export class MockPlugins {
 
   /** Every open hello demo instance switches to `tab` (POST /__mock/plugin/demotab), as if the plugin did. */
   demoTab(tab: string): void {
+    if (tab.startsWith("__viewdelay:")) {
+      fuzzControl.viewDelayMs = Number(tab.slice(12));
+      return;
+    }
+    if (tab.startsWith("__actdelay:")) {
+      fuzzControl.actDelayMs = Number(tab.slice(11));
+      return;
+    }
+    if (tab.startsWith("__failnext:")) {
+      fuzzControl.failNext.add(tab.slice(11));
+      return;
+    }
+    if (tab.startsWith("view:")) {
+      const spec = JSON.parse(tab.slice(5)) as Omit<CustomSpec, "selected" | "active">;
+      for (const inst of this.instances.values()) {
+        if (!inst.key.startsWith("hello/demo/")) continue;
+        inst.custom = { ...spec, selected: {}, active: {} };
+        inst.tab = "custom";
+        inst.render();
+      }
+      return;
+    }
     for (const inst of this.instances.values()) {
       if (!inst.key.startsWith("hello/demo/")) continue;
       inst.tab = tab;
@@ -1034,7 +1137,7 @@ export class MockPlugins {
     }
   }
 
-  act(req: SurfaceActRequest): bigint {
+  act(req: SurfaceActRequest): bigint | Promise<bigint> {
     const inst = this.instances.get(req.instance);
     if (!inst?.view) throw new ConnectError(`${req.instance} is not open (watch it first)`, Code.FailedPrecondition);
     const el = elementsOf(inst.view).get(req.key);
@@ -1044,8 +1147,22 @@ export class MockPlugins {
     const viewer = req.context?.activeThreadId ?? "";
     this.acts.push(`${req.instance} ${req.key}${viewer ? ` viewer=${viewer}` : ""} ${JSON.stringify(values)}${req.value !== undefined ? ` value=${req.value}` : ""}`);
     const version = req.version || BigInt(inst.version);
-    inst.act(el, values, (text) => inst.hub.publish({ update: { case: "toast", value: { instance: inst.key, level: "info", text } } }), viewer);
-    return version;
+    const run = () => {
+      inst.act(el, values, (text) => inst.hub.publish({ update: { case: "toast", value: { instance: inst.key, level: "info", text } } }), viewer);
+      return version;
+    };
+    if (fuzzControl.actDelayMs > 0) {
+      return new Promise((resolve, reject) =>
+        setTimeout(() => {
+          try {
+            resolve(run());
+          } catch (e) {
+            reject(e instanceof Error ? e : new Error(String(e)));
+          }
+        }, fuzzControl.actDelayMs),
+      );
+    }
+    return run();
   }
 
   // -------------------------------------------------------------------------------------

@@ -1,6 +1,8 @@
-import type { ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import type { ViewNode } from "@/api/plugin";
+import { VirtualScrollRoot } from "@/components/pr/virtualRoot";
 import { FooterBar } from "./FooterBar";
+import { FILL_BOTTOM, FillBoxContext } from "./height";
 import { ToolbarBar } from "./ToolbarBar";
 
 /**
@@ -10,18 +12,26 @@ import { ToolbarBar } from "./ToolbarBar";
  * ([data-scroll-root]): fill nodes fill it (height.ts), so they end at the footer, and
  * live nodes count as on screen in it (live.ts). It fills the panel's body, which then
  * never scrolls itself. `stale` dims the strips like the body while the plugin is down.
+ * The scroll area is the body's fill box and its long lists' scroll root (FillBoxContext,
+ * VirtualScrollRoot).
  */
 export function SurfaceFrame({ top, toolbar, footer, stale = false, children }: { top: ReactNode; toolbar: readonly ViewNode[]; footer: readonly ViewNode[]; stale?: boolean; children: ReactNode }) {
+  const [scroll, setScroll] = useState<HTMLDivElement | null>(null);
+  const fillBox = useMemo(() => ({ box: scroll, bottom: FILL_BOTTOM }), [scroll]);
   return (
     <>
       <div className="shrink-0 bg-pane" data-testid="plugin-top">
         {top}
         {toolbar.length > 0 && <ToolbarBar nodes={toolbar} stale={stale} />}
       </div>
-      <div className="flex min-h-0 flex-1 flex-col overflow-auto" data-scroll-root data-testid="plugin-scroll">
+      <div ref={setScroll} className="flex min-h-0 flex-1 flex-col overflow-auto" data-scroll-root data-testid="plugin-scroll">
         {/* The 16 px under the body is the scroll area's bottom space (height.ts FILL_BOTTOM);
             grow: at least the area's height, so the body's list is its box (a flex spacer). */}
-        <div className="flex min-w-0 grow flex-col pb-4">{children}</div>
+        <FillBoxContext.Provider value={fillBox}>
+          <VirtualScrollRoot.Provider value={scroll}>
+            <div className="flex min-w-0 grow flex-col pb-4">{children}</div>
+          </VirtualScrollRoot.Provider>
+        </FillBoxContext.Provider>
       </div>
       {footer.length > 0 && <FooterBar nodes={footer} stale={stale} />}
     </>

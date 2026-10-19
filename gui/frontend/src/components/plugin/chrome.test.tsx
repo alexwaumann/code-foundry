@@ -33,7 +33,7 @@ vi.mock("@/api/plugin", async (importOriginal) => ({
 }));
 
 const INSTANCE = "hello/demo/thread:s-1";
-const ctx: ViewCtx = { watchKey: "w", instance: INSTANCE, version: 1, plugin: "hello", viewTab: "layout", uiContext: emptyContext, inert: false };
+const ctx: ViewCtx = { watchKey: "w", instance: INSTANCE, plugin: "hello", viewTab: "layout", uiContext: emptyContext, inert: false };
 
 /** Each fake element's box by data-testid or data-key: top (page coordinates) and height. */
 let boxes: Record<string, { top: number; height: number }> = {};
@@ -82,7 +82,7 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
-  usePluginSurfacesStore.setState({ watches: {}, drafts: {}, resetTokens: {}, collapsed: {}, pending: {}, submitted: {} });
+  usePluginSurfacesStore.setState({ watches: {}, drafts: {}, resetTokens: {}, collapsed: {}, pending: {}, submitted: {}, details: {}, choices: {} });
 });
 
 /** A surface's frame inside the panel's (scrolling) body, as PluginSurface draws it. */
@@ -187,6 +187,11 @@ describe("the strips' row", () => {
     expect(stripItemClass(text("t"))).toBe("min-w-0");
     expect(stripItemClass({ key: "c", chips: { chips: [] } })).toBe("min-w-0");
     expect(stripItemClass({ key: "s", spacer: { flex: true } })).toBe("flex-1");
+    // strip-flex: beside a form (or a progress bar, a growing group) the spacer takes next to nothing; the form keeps the free width.
+    const sp: ViewNode = { key: "s", spacer: { flex: true } };
+    expect(stripItemClass(sp, [search(), sp])).toContain("grow-[0.001]");
+    expect(stripItemClass(sp, [{ key: "p", progress: {} }, sp])).toContain("grow-[0.001]");
+    expect(stripItemClass(sp, [text("t"), sp, { key: "a", actions: { buttons: [] } }])).toBe("flex-1");
     expect(stripItemClass({ key: "s", spacer: { size: 8 } })).toBe("shrink-0");
     expect(stripItemClass({ key: "d", divider: {} })).toContain("shrink-0");
     expect(stripItemClass({ key: "g", group: { items: [] } })).toBe("min-w-0");
@@ -210,7 +215,8 @@ describe("the strips' row", () => {
     const [fixed, flex] = Array.from(footer.querySelectorAll<HTMLElement>('[data-testid="plugin-spacer"]'));
     expect([fixed?.style.width, fixed?.style.height, fixed?.getAttribute("data-flex")]).toEqual(["24px", "", null]);
     expect([flex?.style.minWidth, flex?.getAttribute("data-flex")]).toEqual(["12px", "true"]);
-    expect(flex?.parentElement?.className).toBe("flex-1");
+    // Beside a group that takes the free width to align in, the spacer takes next to none (strip-flex).
+    expect(flex?.parentElement?.className).toBe("shrink-0 grow-[0.001] basis-0");
     // Neither takes back a list gap in a row.
     expect(fixed?.className ?? "").not.toContain("-mt-3");
     const group = footer.querySelector<HTMLElement>('[data-testid="plugin-group"]');

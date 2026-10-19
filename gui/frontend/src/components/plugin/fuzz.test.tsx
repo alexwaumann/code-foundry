@@ -18,7 +18,7 @@ import { ViewTabsBar } from "./ViewTabsBar";
  * that reproduces it.
  */
 
-const ctx: ViewCtx = { watchKey: "w", instance: "hello/demo/thread:s-1", version: 1, plugin: "hello", viewTab: "overview", uiContext: emptyContext, inert: false };
+const ctx: ViewCtx = { watchKey: "w", instance: "hello/demo/thread:s-1", plugin: "hello", viewTab: "overview", uiContext: emptyContext, inert: false };
 
 /** mulberry32: a small seeded PRNG. */
 function rng(seed: number): () => number {

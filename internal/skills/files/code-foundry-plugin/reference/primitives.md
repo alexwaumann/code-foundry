@@ -352,7 +352,7 @@ it, it is cut early, so keep it to a few words): `card` draws a box, `tone` `att
 or `error` colours the title (and a card's border), `collapsible` + `collapsed` (initial;
 the user's toggle wins), `stale` dims last-known data while the backend is unreachable.
 Up to 2 buttons sit at the end of the title row, after the pill. A node sits inside at
-most 4 containers (section, columns, pane, grid).
+most 4 containers (all seven kinds: `ui-layout.md`).
 
 ### form
 
@@ -467,8 +467,9 @@ another owner's thread or terminal is refused; one that is gone (removed, closed
 muted empty state; an archived thread still renders, composer included, with no archived
 cue (`SendThread` unarchives it), so drop its node when you archive it. Each one holds a
 live stream, so the GUI attaches a node only while it is on screen in the active tab and
-keeps at most 2 live at once (others show "Attach"): put one thread or terminal in a
-view, or let the user pick which, switching with tabs or chips rather than stacking them.
+keeps at most 2 live at once (others show "Attach"; fewer when the app's connections
+run out): put one thread or terminal in a view, or let the user pick which, switching
+with tabs or chips rather than stacking them.
 Check `h.HasCapability("view.node.thread")` (`view.node.terminal`) before relying on
 them; `reference/host-api.md` has the calls that make them.
 

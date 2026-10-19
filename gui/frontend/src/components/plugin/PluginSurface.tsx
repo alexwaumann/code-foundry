@@ -127,7 +127,7 @@ export function PluginSurface({ tab }: { tab: Tab }) {
   const viewTab = view?.tabs?.active ?? "";
   const down = phase === "plugin-down" || phase === "not-responding" || phase === "failed";
   const inert = down || error !== null;
-  const ctx = useMemo<ViewCtx>(() => ({ watchKey, instance, version, plugin, viewTab, uiContext, inert }), [watchKey, instance, version, plugin, viewTab, uiContext, inert]);
+  const ctx = useMemo<ViewCtx>(() => ({ watchKey, instance, plugin, viewTab, uiContext, inert }), [watchKey, instance, plugin, viewTab, uiContext, inert]);
 
   if (!loaded) return <Opening />;
   if (!known) {

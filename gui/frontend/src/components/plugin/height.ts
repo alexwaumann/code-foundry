@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState, type RefObject } from "react";
+import { createContext, useContext, useLayoutEffect, useState, type RefObject } from "react";
 import type { NodeHeight } from "@/api/plugin";
 
 /** "fill" never goes below this (unless a fill pane's minHeight says less), however little of its box is left. */
@@ -20,6 +20,20 @@ export function fillHeight(boxHeight: number, nodeTop: number, floor = FILL_MIN,
   return Math.max(floor, Math.floor(boxHeight - nodeTop - bottom));
 }
 
+/**
+ * The box fill nodes inside fill and the space they leave under it: a sized pane provides
+ * itself, the surface's frame its scroll area (box null until mounted: fill nodes wait).
+ * Not provided (undefined: a node drawn outside a surface), fillBoxOf finds it in the DOM.
+ * A context rather than a DOM lookup, so a node follows an enclosing pane that becomes or
+ * stops being a box under the same key.
+ */
+export interface FillBox {
+  box: HTMLElement | null;
+  bottom: number;
+}
+
+export const FillBoxContext = createContext<FillBox | undefined>(undefined);
+
 /** The box a fill node at `el` fills, and the space it leaves under it: the nearest fill box around el, else the scroll area. */
 export function fillBoxOf(el: HTMLElement): { box: HTMLElement; bottom: number } | null {
   const box = el.parentElement?.closest<HTMLElement>(`[${FILL_BOX_ATTR}], [data-scroll-root]`) ?? null;
@@ -29,29 +43,50 @@ export function fillBoxOf(el: HTMLElement): { box: HTMLElement; bottom: number }
 
 /**
  * The CSS height of a thread, terminal or pane node: pixels as given, `auto` for "auto"
- * (absent), and for "fill" the rest of its box (fillBoxOf, fillHeight) at least `floor`,
- * measured on the node and followed as the box resizes.
+ * (absent), and for "fill" the rest of its box (FillBoxContext, fillHeight) at least
+ * `floor`, measured on the node and followed as the box resizes and as anything in the box
+ * changes: what is above the node moves it without resizing the box (a section folding,
+ * text growing, columns going side by side), so any change in the box outside the node
+ * itself re-measures (a MutationObserver; its callback runs before the next paint).
  */
 export function useNodeHeight<A extends number | undefined>(ref: RefObject<HTMLElement | null>, height: NodeHeight | undefined, auto: A, floor = FILL_MIN): number | A {
   const fill = height === "fill";
+  const provided = useContext(FillBoxContext);
   const [filled, setFilled] = useState(floor);
   useLayoutEffect(() => {
     const el = ref.current;
     if (!fill || !el) return;
-    const at = fillBoxOf(el);
-    if (!at) return;
-    const { box, bottom } = at;
+    const at = provided === undefined ? fillBoxOf(el) : provided;
+    const box = at?.box;
+    if (!at || !box) return;
     const measure = () => {
       const top = el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop - box.clientTop;
-      setFilled(fillHeight(box.clientHeight, top, floor, bottom));
+      setFilled(fillHeight(box.clientHeight, top, floor, at.bottom));
     };
     measure();
-    const ro = new ResizeObserver(measure);
+    // The box's resize comes before the re-render it causes (columns going side by side on
+    // their own observer): measure again in the next frame too.
+    let frame = 0;
+    const ro = new ResizeObserver(() => {
+      measure();
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(measure);
+    });
     ro.observe(box);
+    const mo =
+      typeof MutationObserver === "undefined"
+        ? null
+        : new MutationObserver((records) => {
+            // Changes inside the node (a thread streaming) do not move it.
+            if (records.some((r) => !el.contains(r.target))) measure();
+          });
+    mo?.observe(box, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["class", "style"] });
     return () => {
+      cancelAnimationFrame(frame);
       ro.disconnect();
+      mo?.disconnect();
     };
-  }, [ref, fill, floor]);
+  }, [ref, fill, floor, provided]);
   if (typeof height === "number") return height;
   return fill ? filled : auto;
 }

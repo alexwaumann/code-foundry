@@ -1,10 +1,11 @@
-import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useContext, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft } from "lucide-react";
 import { nodeScope, type Row } from "@/api/plugin";
-import { VirtualStack } from "@/components/pr/VirtualStack";
+import { VirtualStack, type Reveal } from "@/components/pr/VirtualStack";
+import { VirtualScrollRoot } from "@/components/pr/virtualRoot";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { actOnElement, closeDetail, draftKeyOf, openDetail, useDetailOpen, usePluginSurfacesStore } from "@/stores/pluginSurfaces";
+import { chooseElement, chooserKeyOf, closeDetail, openDetail, useChoice, useDetailOpen } from "@/stores/pluginSurfaces";
 import { useRunAction } from "../actions";
 import { useViewCtx, ViewContext } from "../context";
 import { FILL_MIN, useNodeHeight } from "../height";
@@ -32,9 +33,15 @@ function chooses(r: Row): boolean {
  * (per instance, view tab and node: openDetail, reconcileDetails), so it survives
  * re-renders and remounts and goes back to the list when the plugin's selected row stops
  * being a row or its resetToken changes. A row without an action sends a `select` act, a
- * row with an event its click; the chosen row reads as selected while the act is pending,
- * and the detail on screen dims and lets its live nodes go (live.ts LeavingNode). The
- * hidden side is not drawn, so it holds no stream.
+ * row with an event its click; the latest row chosen reads as selected from the click
+ * until the plugin's next view (stores/pluginSurfaces chooseElement; a view that does not
+ * select it goes back to the list), and the detail on screen dims and lets its live nodes
+ * go meanwhile (live.ts LeavingNode). The hidden side is not drawn, so it holds no stream.
+ *
+ * Focus (narrow): choosing a row focuses Back in the commit that shows the detail; when
+ * the list comes back (Back, a refused choice, the plugin moving on) with focus lost, the
+ * row whose detail it was is scrolled into view and focused in the commit that draws it
+ * (VirtualStack reveal). Neither is attempted later than that, nor when focus is elsewhere.
  */
 export function MasterDetailNode({ node, data }: NodeProps<"masterDetail">) {
   const ctx = useViewCtx();
@@ -43,38 +50,62 @@ export function MasterDetailNode({ node, data }: NodeProps<"masterDetail">) {
   const run = useRunAction();
   const ref = useRef<HTMLDivElement>(null);
   const [el, setEl] = useState<HTMLDivElement | null>(null);
+  // Stable: an inline callback ref detaches and re-attaches on every render (two renders a pass).
+  const setRef = useCallback((e: HTMLDivElement | null) => {
+    ref.current = e;
+    setEl(e);
+  }, []);
+  const [listSide, setListSide] = useState<HTMLDivElement | null>(null);
+  const [detailSide, setDetailSide] = useState<HTMLDivElement | null>(null);
   const width = useElementWidth(el);
   const listWidth = masterDetailListWidth(data);
   const wide = masterDetailWide(width, listWidth);
   const cap = useNodeHeight(ref, "fill", undefined, FILL_MIN);
   const rows = data.list.rows ?? [];
   const selected = data.selected ?? "";
-  // The row whose choice is in flight (its act pending), shown as selected meanwhile.
-  const picking = usePluginSurfacesStore((s) => rows.find((r) => r.key !== selected && chooses(r) && s.pending[ctx.watchKey]?.[r.key])?.key);
+  // The chooser's key is also the narrow state's (stores/pluginSurfaces details).
+  const detailKey = chooserKeyOf(ctx.instance, ctx.viewTab, node.key);
+  const choice = useChoice(ctx.watchKey, detailKey);
+  // The latest row chosen, while the plugin's view does not select it yet.
+  const picking = choice !== undefined && choice !== selected && rows.some((r) => r.key === choice && chooses(r)) ? choice : undefined;
   const shown = picking ?? selected;
   const shownRow = rows.find((r) => r.key === shown);
-  const detailKey = draftKeyOf(ctx.instance, ctx.viewTab, node.key);
   const open = useDetailOpen(detailKey);
   const showDetail = wide || (open && shownRow !== undefined);
   const scope = nodeScope(node);
   const inside = useMemo(() => ({ ...ctx, viewTab: ctx.viewTab + scope }), [ctx, scope]);
-  const focus = useRef<"back" | "row" | null>(null);
 
-  // Narrow: the back button takes focus when the detail opens, the chosen row when the list returns.
-  useEffect(() => {
-    const want = focus.current;
-    if (!want || !el || wide) return;
-    const target =
-      want === "back" && showDetail
-        ? el.querySelector<HTMLElement>('[data-testid="plugin-md-back"]')
-        : want === "row" && !showDetail
-          ? el.querySelector<HTMLElement>(`[data-testid="plugin-row"][data-key="${CSS.escape(shown)}"]`)
-          : null;
-    if (target) {
-      target.focus();
-      focus.current = null;
-    }
+  // Narrow: Back takes focus in the commit right after a choice (one try).
+  const focusBack = useRef(false);
+  useLayoutEffect(() => {
+    if (!focusBack.current) return;
+    focusBack.current = false;
+    const back = !wide && el ? el.querySelector<HTMLElement>('[data-testid="plugin-md-back"]') : null;
+    if (back && el && focusFree(el)) back.focus();
   });
+
+  // Narrow: the list coming back (Back, a refused choice, the plugin moving on) with focus
+  // lost hands it to the row whose detail it was (the list's reveal).
+  const [reveal, setReveal] = useState<Reveal | null>(null);
+  const revealRow = useCallback((key: string) => {
+    const r: Reveal = {
+      key,
+      done: (item) => {
+        setReveal((cur) => (cur === r ? null : cur));
+        const root = ref.current;
+        const target = item?.matches('[data-testid="plugin-row"]') ? item : item?.querySelector<HTMLElement>('[data-testid="plugin-row"]');
+        if (target && root && focusFree(root)) target.focus();
+      },
+    };
+    setReveal(r);
+  }, []);
+  const was = useRef({ wide, showDetail, shown });
+  useLayoutEffect(() => {
+    const before = was.current;
+    was.current = { wide, showDetail, shown };
+    if (wide || before.wide || !before.showDetail || showDetail || !before.shown || !el) return;
+    if (focusFree(el)) revealRow(before.shown);
+  }, [wide, showDetail, shown, revealRow, el]);
 
   const choose = (r: Row) => {
     if (ctx.inert) return;
@@ -83,14 +114,14 @@ export function MasterDetailNode({ node, data }: NodeProps<"masterDetail">) {
       return;
     }
     openDetail(detailKey, data.resetToken ?? "", selected);
-    if (!wide) focus.current = "back";
+    if (!wide) focusBack.current = true;
     if (r.key === shown) return;
-    void actOnElement(ctx.watchKey, r.key).then((took) => {
-      if (!took) closeDetail(detailKey);
+    void chooseElement(ctx.watchKey, detailKey, r.key).then((how) => {
+      // Refused (and still the latest choice): back to the list; focus follows (above).
+      if (how === "refused") closeDetail(detailKey);
     });
   };
   const back = () => {
-    focus.current = "row";
     closeDetail(detailKey);
   };
 
@@ -110,6 +141,7 @@ export function MasterDetailNode({ node, data }: NodeProps<"masterDetail">) {
         estimate={dense ? 24 : 44}
         className="flex min-w-0 flex-col"
         testId="plugin-list"
+        reveal={reveal ?? undefined}
         render={(r) => <RowView row={r} glyphStyle={glyphStyle} dense={dense} selected={r.key === shown} onActivate={() => { choose(r); }} />}
       />
     );
@@ -126,15 +158,14 @@ export function MasterDetailNode({ node, data }: NodeProps<"masterDetail">) {
         </LeavingNode.Provider>
       </ViewContext.Provider>
     );
+  const detailLabel = shownRow?.title;
 
   return (
     <div
-      ref={(e) => {
-        ref.current = e;
-        setEl(e);
-      }}
+      ref={setRef}
       className={cn("flex min-w-0 shrink-0", wide ? "flex-row items-stretch gap-3" : cn("flex-col", listGap(inner)))}
       style={wide ? { maxHeight: cap } : undefined}
+      role="group"
       data-testid="plugin-master-detail"
       data-key={node.key}
       data-layout={wide ? "wide" : "narrow"}
@@ -144,29 +175,40 @@ export function MasterDetailNode({ node, data }: NodeProps<"masterDetail">) {
     >
       {wide ? (
         <>
-          {/* The rows overhang 8 px to the left (like a list's), so the side does too; the right is clipped at the gap. */}
-          <div key="wide-list" className="-ml-2 flex min-h-0 shrink-0 flex-col overflow-x-hidden overflow-y-auto overscroll-contain pl-2" style={{ width: listWidth + 8 }} data-testid="plugin-md-list" data-virtual-root>
-            {list}
+          {/* The rows overhang 8 px to the left (like a list's), so the side does too; the right is clipped at the gap.
+              No overscroll-contain on either side: at its end a side hands the wheel on to the body (what follows the node stays reachable). */}
+          <div key="wide-list" ref={setListSide} className="-ml-2 flex min-h-0 shrink-0 flex-col overflow-x-hidden overflow-y-auto pl-2" style={{ width: listWidth + 8 }} role="region" aria-label="List" data-testid="plugin-md-list">
+            <VirtualScrollRoot.Provider value={listSide}>{list}</VirtualScrollRoot.Provider>
           </div>
-          <div className="-mx-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-contain px-2" data-testid="plugin-md-detail">
-            {detail}
+          <div ref={setDetailSide} className="-mx-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-2" role="region" aria-label={detailLabel ?? "Detail"} data-testid="plugin-md-detail">
+            <VirtualScrollRoot.Provider value={detailSide}>{detail}</VirtualScrollRoot.Provider>
           </div>
         </>
       ) : showDetail ? (
         <>
-          <Button variant="ghost" size="xs" className="-ml-2 max-w-full min-w-0 self-start text-muted-foreground hover:text-foreground" onClick={back} data-testid="plugin-md-back" aria-label={`Back to the list from ${shownRow?.title ?? ""}`}>
+          <Button variant="ghost" size="xs" className="-ml-2 max-w-full min-w-0 self-start text-muted-foreground hover:text-foreground" onClick={back} tabIndex={0} data-testid="plugin-md-back" aria-label={`Back to the list from ${detailLabel ?? ""}`}>
             <ChevronLeft aria-hidden />
             <span className="truncate">{shownRow?.title}</span>
           </Button>
-          <div className="flex min-w-0 flex-col" data-testid="plugin-md-detail">
+          <div className="flex min-w-0 flex-col" role="region" aria-label={detailLabel ?? "Detail"} data-testid="plugin-md-detail">
             {detail}
           </div>
         </>
       ) : (
-        <div key="narrow-list" className="flex min-w-0 flex-col" data-testid="plugin-md-list">
+        <div key="narrow-list" className="flex min-w-0 flex-col" role="region" aria-label="List" data-testid="plugin-md-list">
           {list}
         </div>
       )}
     </div>
   );
+}
+
+/**
+ * Whether focus may move inside `root`: nothing has it (the element that had it went), it
+ * is already inside, or a box around root has it (WebKit does not focus a clicked button:
+ * the nearest focusable box around it, the side panel, takes focus instead).
+ */
+function focusFree(root: HTMLElement): boolean {
+  const a = document.activeElement;
+  return !a || a === document.body || root.contains(a) || a.contains(root);
 }

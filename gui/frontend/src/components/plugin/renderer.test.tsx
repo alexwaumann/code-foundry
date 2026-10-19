@@ -9,7 +9,7 @@ import type { Field, ViewNode } from "@/api/plugin";
 import { useStreamSlotsStore } from "@/api/streamSlots";
 import type { ThreadView } from "@/api/threads";
 import { emptyContext } from "@/stores/context";
-import { usePluginSurfacesStore } from "@/stores/pluginSurfaces";
+import { chooserKeyOf, usePluginSurfacesStore } from "@/stores/pluginSurfaces";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { ViewContext, type ViewCtx } from "./context";
@@ -17,7 +17,7 @@ import { SurfaceHeader } from "./Header";
 import { useInlineLiveStore } from "./live";
 import { NodeList } from "./NodeList";
 
-const ctx: ViewCtx = { watchKey: "w", instance: "showcase/gallery/global", version: 1, plugin: "showcase", viewTab: "forms", uiContext: emptyContext, inert: false };
+const ctx: ViewCtx = { watchKey: "w", instance: "showcase/gallery/global", plugin: "showcase", viewTab: "forms", uiContext: emptyContext, inert: false };
 
 function inView(children: ReactNode) {
   return render(<ViewContext.Provider value={ctx}>{children}</ViewContext.Provider>);
@@ -39,7 +39,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
-  usePluginSurfacesStore.setState({ watches: {}, drafts: {}, resetTokens: {}, collapsed: {}, pending: {}, submitted: {} });
+  usePluginSurfacesStore.setState({ watches: {}, drafts: {}, resetTokens: {}, collapsed: {}, pending: {}, submitted: {}, details: {}, choices: {} });
   useInlineLiveStore.setState({ holders: [], waiting: [] });
   useStreamSlotsStore.setState({ open: 0, waiting: [] });
   useUiStore.setState({ selection });
@@ -271,7 +271,7 @@ describe("thread nodes", () => {
     expect(useInlineLiveStore.getState().holders).toHaveLength(2);
   });
 
-  it("lets go while the user is leaving the view tab (its act in flight) (#1a)", () => {
+  it("lets go while the user is leaving the view tab (its choice in flight) (#1a)", () => {
     useThreadsStore.setState({ loaded: true, byId: { a: thread("a") }, order: [], owned: ["a"] });
     usePluginSurfacesStore.setState({
       watches: { w: { plugin: "showcase", surface: "gallery", instance: ctx.instance, phase: "live", message: "", pluginState: "running", version: 1, hostRendered: false, error: null, view: { nodes: [], tabs: { active: "owned", items: [{ key: "owned", label: "Owned" }, { key: "text", label: "Text" }] } } } },
@@ -279,10 +279,31 @@ describe("thread nodes", () => {
     inView(<NodeList nodes={[{ key: "ta", thread: { threadId: "a" } }]} />);
     expect(screen.getByTestId("plugin-thread").getAttribute("data-live")).toBe("true");
     act(() => {
-      usePluginSurfacesStore.setState({ pending: { w: { text: true } } });
+      usePluginSurfacesStore.setState({ choices: { w: { [chooserKeyOf(ctx.instance, "", "")]: { key: "text", seq: 1, version: 1, answered: false } } } });
     });
     expect(screen.getByTestId("plugin-thread").getAttribute("data-live")).toBeNull();
     expect(useInlineLiveStore.getState().holders).toEqual([]);
+  });
+
+  it("offers no Attach over the budget while streams wait for a connection (it would pause one that streams) (live 8)", () => {
+    useThreadsStore.setState({ loaded: true, byId: { a: thread("a"), b: thread("b"), c: thread("c") }, order: [], owned: ["a", "b", "c"] });
+    useStreamSlotsStore.setState({ open: 5, waiting: ["thread:b"] });
+    inView(
+      <NodeList
+        nodes={[
+          { key: "ta", thread: { threadId: "a" } },
+          { key: "tb", thread: { threadId: "b" } },
+          { key: "tc", thread: { threadId: "c" } },
+        ]}
+      />,
+    );
+    const paused = screen.getAllByTestId("plugin-live-paused").find((p) => p.getAttribute("data-reason") === "budget");
+    expect(paused).toBeDefined();
+    expect(screen.queryByTestId("plugin-live-attach")).toBeNull();
+    act(() => {
+      useStreamSlotsStore.setState({ open: 4, waiting: [] });
+    });
+    expect(screen.getByTestId("plugin-live-attach")).toBeTruthy();
   });
 
   it("says it waits for a connection when the app's stream slots are full (#1c)", () => {

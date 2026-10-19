@@ -10,8 +10,9 @@ import { useInStrip } from "../strip";
  * unless it is first). Flex, in its box's own list (list.ts BoxList: the surface's, a px or
  * fill pane's), it grows to the box's free height, so the nodes after it sit at the box's
  * bottom; anywhere else it is its size. In a toolbar or footer (strip.ts) it is space
- * across: size px, or with flex the row's free width (its strip item grows), so what
- * follows sits at the row's end.
+ * across: size px, or with flex what is left of the row's width (its strip item grows,
+ * next to nothing beside a form or another grower: strip.ts), so what follows sits at the
+ * row's end.
  */
 export function SpacerNode({ node, data }: NodeProps<"spacer">) {
   const inner = useInnerList();

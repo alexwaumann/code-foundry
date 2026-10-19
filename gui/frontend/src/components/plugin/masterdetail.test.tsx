@@ -12,7 +12,7 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { childLists, nodeScope, withChildLists, type ActRequestView, type MasterDetailData, type PluginViewModel, type Row, type ViewNode } from "@/api/plugin";
 import { emptyContext } from "@/stores/context";
-import { draftKeyOf, emptyEntry, formsOf, reconcileDetails, reconcileResets, usePluginSurfacesStore, walkScoped } from "@/stores/pluginSurfaces";
+import { applyUpdateToState, draftKeyOf, emptyEntry, formsOf, reconcileDetails, reconcileResets, usePluginSurfacesStore, walkScoped } from "@/stores/pluginSurfaces";
 import { demoView } from "@/test/pluginFixtures";
 import { ViewContext, type ViewCtx } from "./context";
 import { FILL_MIN } from "./height";
@@ -36,7 +36,7 @@ vi.mock("@/api/plugin", async (importOriginal) => ({
 }));
 
 const INSTANCE = "hello/demo/thread:s-1";
-const ctx: ViewCtx = { watchKey: "w", instance: INSTANCE, version: 1, plugin: "hello", viewTab: "run-list", uiContext: emptyContext, inert: false };
+const ctx: ViewCtx = { watchKey: "w", instance: INSTANCE, plugin: "hello", viewTab: "run-list", uiContext: emptyContext, inert: false };
 const DK = draftKeyOf(INSTANCE, "run-list", "md");
 
 let boxes: Record<string, { top: number; height: number; width: number }> = {};
@@ -76,14 +76,14 @@ beforeEach(() => {
       }
     },
   );
-  usePluginSurfacesStore.setState({ watches: { w: { ...emptyEntry({ plugin: "hello", surface: "demo" }), instance: INSTANCE, version: 1, phase: "live" } }, drafts: {}, resetTokens: {}, pending: {}, submitted: {}, details: {} });
+  usePluginSurfacesStore.setState({ watches: { w: { ...emptyEntry({ plugin: "hello", surface: "demo" }), instance: INSTANCE, version: 1, phase: "live" } }, drafts: {}, resetTokens: {}, pending: {}, submitted: {}, details: {}, choices: {} });
 });
 
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
-  usePluginSurfacesStore.setState({ watches: {}, drafts: {}, resetTokens: {}, collapsed: {}, pending: {}, submitted: {}, details: {} });
+  usePluginSurfacesStore.setState({ watches: {}, drafts: {}, resetTokens: {}, collapsed: {}, pending: {}, submitted: {}, details: {}, choices: {} });
 });
 
 function resize(): void {
@@ -208,7 +208,7 @@ describe("master-detail, narrow", () => {
     expect(root().getAttribute("data-showing")).toBe("list");
     expect(screen.getAllByTestId("plugin-row")).toHaveLength(4);
     expect(row("r2").getAttribute("data-selected")).toBe("true");
-    expect(row("r2").getAttribute("aria-pressed")).toBe("true");
+    expect(row("r2").getAttribute("aria-current")).toBe("true");
     expect(row("r1").getAttribute("role")).toBe("button");
     expect(screen.queryByTestId("plugin-md-back")).toBeNull();
     // The hidden detail is not drawn, so its live nodes hold nothing.
@@ -229,7 +229,7 @@ describe("master-detail, narrow", () => {
     expect(screen.getByTestId("plugin-md-content").getAttribute("data-pending")).toBe("true");
     await settle(true);
     r.rerender(
-      <ViewContext.Provider value={{ ...ctx, version: 2 }}>
+      <ViewContext.Provider value={ctx}>
         <SurfaceFrame top={null} toolbar={[]} footer={[]}>
           <NodeList nodes={[mdNode({ selected: "r2" })]} />
         </SurfaceFrame>
@@ -381,13 +381,19 @@ describe("master-detail, wide", () => {
     expect(root().style.maxHeight).toBe(`${String(FILL_MIN)}px`);
   });
 
-  it("chooses on click and dims the old detail while the act is pending", async () => {
+  it("chooses on click and dims the old detail until the plugin's next view after the act", async () => {
     boxes.md = { top: 0, height: 0, width: 900 };
     inSurface(<NodeList nodes={[mdNode({ selected: "r1" })]} />);
     fireEvent.click(row("r2"));
     expect(acts.calls.map((c) => c.key)).toEqual(["r2"]);
     expect(screen.getByTestId("plugin-md-content").className).toContain("opacity-60");
     await settle(true);
+    // Answered, but the view the plugin sent with it has not come (the daemon coalesces views).
+    expect(screen.getByTestId("plugin-md-content").className).toContain("opacity-60");
+    expect(root().getAttribute("data-selected")).toBe("r2");
+    act(() => {
+      usePluginSurfacesStore.setState((s) => applyUpdateToState(s, "w", { kind: "view", instance: INSTANCE, version: 2, view: { nodes: [] }, hostRendered: false }));
+    });
     expect(screen.getByTestId("plugin-md-content").className).not.toContain("opacity-60");
   });
 });
@@ -413,7 +419,7 @@ describe("live nodes", () => {
     expect(screen.getByTestId("probe").getAttribute("data-leaving")).toBeNull();
     cleanup();
     // A terminal in a pending detail shows paused (no stream).
-    usePluginSurfacesStore.setState({ pending: { w: { r2: true } } });
+    usePluginSurfacesStore.setState({ choices: { w: { [DK]: { key: "r2", seq: 1, version: 1, answered: false } } } });
     inSurface(<NodeList nodes={[mdNode({ selected: "r1" }, [probeNode, { key: "d-term", terminal: { terminalId: "t-1" } }])]} />);
     expect(screen.getByTestId("plugin-md-content").getAttribute("data-pending")).toBe("true");
     expect(document.querySelector('[data-key="d-term"][data-live="true"]')).toBeNull();
