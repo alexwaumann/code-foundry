@@ -88,7 +88,7 @@ func (h *Plugin) Update(ctx context.Context, req *connect.Request[v1.UpdatePlugi
 	for _, u := range ups {
 		out.Updates = append(out.Updates, &v1.PluginUpdate{
 			Name: u.Name, CurrentVersion: u.Current, Version: u.Version, Registry: u.Registry,
-			Updated: u.Updated, Error: u.Error, DisabledReason: u.Disabled,
+			Updated: u.Updated, Error: u.Error, DisabledReason: u.Disabled, InstalledFrom: u.InstalledFrom,
 		})
 	}
 	return connect.NewResponse(out), nil
@@ -136,9 +136,21 @@ func indexEntryToProto(e plugin.BrowseEntry) *v1.PluginIndexEntry {
 	_, out.Available = e.Artifact(registry.Platform())
 	if e.Installed != nil {
 		out.Installed = pluginToProto(*e.Installed)
-		out.UpdateAvailable = !e.Installed.Dev && registry.Newer(e.Version, e.Installed.Manifest.Version)
 	}
+	// The store's decision (plugin.Relation), not a version comparison here: an entry of
+	// another source is no update even when it is newer.
+	out.Relation = indexRelations[e.Relation]
+	out.UpdateAvailable = e.Relation == plugin.RelationUpdate
+	out.InstalledFrom = e.InstalledFrom
 	return out
+}
+
+var indexRelations = map[plugin.Relation]v1.PluginIndexRelation{
+	plugin.RelationNotInstalled: v1.PluginIndexRelation_PLUGIN_INDEX_RELATION_NOT_INSTALLED,
+	plugin.RelationInstalled:    v1.PluginIndexRelation_PLUGIN_INDEX_RELATION_INSTALLED,
+	plugin.RelationUpdate:       v1.PluginIndexRelation_PLUGIN_INDEX_RELATION_UPDATE,
+	plugin.RelationDev:          v1.PluginIndexRelation_PLUGIN_INDEX_RELATION_DEV,
+	plugin.RelationOtherSource:  v1.PluginIndexRelation_PLUGIN_INDEX_RELATION_OTHER_SOURCE,
 }
 
 // fillInstall sets a plugin's install record and update offer (pluginToProto).
