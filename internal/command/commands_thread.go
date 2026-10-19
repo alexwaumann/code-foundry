@@ -218,18 +218,15 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 			Category:    "Thread",
 			// No keybinding: Escape (Claude Code's key) stopped turns by accident. The GUI
 			// interrupts from the composer's Interrupt button only.
-			Args: []ArgSpec{idArg},
+			Args: []ArgSpec{idArg,
+				// Inside a thread the stopped thread's next message names the thread that
+				// stopped it, not the user (docs/notes/orch-child-context.md). Not the context
+				// thread: an explicit --id stands in for it.
+				{Name: "by", Type: String, DefaultToThreadEnv: true, ID: ThreadID,
+					Description: "Thread that interrupts, named in the stopped thread's next message (the CLI sets it from $CODE_FOUNDRY_THREAD)"}},
 			When: hasThread,
-			Run: func(ctx context.Context, c Context, a Args) (Result, error) {
-				// From the CLI inside a thread (its context thread is $CODE_FOUNDRY_THREAD):
-				// the stopped thread's next message names the thread that stopped it, not the
-				// user (docs/notes/orch-child-context.md). The GUI's context thread is the
-				// one on screen: the user's interrupt.
-				by := ""
-				if c.ActiveView == "" {
-					by = c.ActiveThreadID
-				}
-				if _, err := b.Interrupt(ctx, connect.NewRequest(&v1.InterruptThreadRequest{ThreadId: a.String("id"), ByThreadId: by})); err != nil {
+			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
+				if _, err := b.Interrupt(ctx, connect.NewRequest(&v1.InterruptThreadRequest{ThreadId: a.String("id"), ByThreadId: a.String("by")})); err != nil {
 					return Result{}, err
 				}
 				return Result{Message: "interrupted thread " + a.String("id")}, nil
