@@ -100,6 +100,15 @@ export function useSettingValue(key: string): string | undefined {
   return useSettingsStore((s) => s.snapshot?.values[key]);
 }
 
+/**
+ * appearance.panel_keep_open: closing a side panel's last tab leaves it open on the
+ * surface list. Off until a snapshot says "true". Read when a tab closes (stores/panel.ts
+ * closePanelTab), so it applies live.
+ */
+export function panelKeepOpen(): boolean {
+  return useSettingsStore.getState().snapshot?.values[KEYS.panelKeepOpen] === "true";
+}
+
 /** CSS font-family for the terminal: the setting plus fallbacks, else the bundled font's stack. */
 export function terminalFontFamily(setting: string | undefined): string {
   const v = setting?.trim();

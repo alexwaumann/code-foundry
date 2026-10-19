@@ -10,6 +10,7 @@
  */
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { panelKeepOpen } from "./settings";
 import { PANEL_DEFAULT, clampPanelWidth, isDashboard, useUiStore, visibleSidebarWidth, type Selection } from "./ui";
 
 /**
@@ -118,15 +119,17 @@ export function openTab(e: PanelEntry, tab: Tab): PanelEntry {
 
 /**
  * Removes a tab. Closing the active tab activates its right neighbour, else the left one.
- * Closing the last tab hides the panel (and ends picking). While picking, the panel keeps
+ * Closing the last tab ends picking and hides the panel, unless `keepOpen` (the
+ * appearance.panel_keep_open setting, read by closePanelTab): then the panel keeps its
+ * open state and, with no tabs, shows the surface list. While picking, the panel keeps
  * picking; closing the tab it would go back to moves `pickFrom` to that tab's right
  * neighbour, else the left one, like closing an active tab. An unknown id changes nothing.
  */
-export function closeTab(e: PanelEntry, id: string): PanelEntry {
+export function closeTab(e: PanelEntry, id: string, keepOpen = false): PanelEntry {
   const i = e.tabs.findIndex((t) => t.id === id);
   if (i < 0) return e;
   const tabs = e.tabs.filter((t) => t.id !== id);
-  if (tabs.length === 0) return { ...dropPickFrom(e), open: false, tabs, activeTabId: null };
+  if (tabs.length === 0) return { ...dropPickFrom(e), open: keepOpen && e.open, tabs, activeTabId: null };
   const next = tabs[i] ?? tabs[i - 1] ?? null;
   if (e.pickFrom === id && next) return { ...e, tabs, pickFrom: next.id };
   if (e.activeTabId !== id) return { ...e, tabs };
@@ -308,8 +311,14 @@ export function togglePanel(target: PanelTarget = "current", open?: boolean, opt
   return key !== null && (usePanelStore.getState().byKey[key]?.open ?? false);
 }
 
-export function closePanelTab(target: PanelTarget, id: string): void {
-  update(target, (e) => closeTab(e, id));
+/**
+ * Closes a tab (closeTab). Whether closing the last one keeps the panel open is the
+ * appearance.panel_keep_open setting unless `keepOpen` is given. Every path that removes
+ * a side panel tab comes through here.
+ */
+export function closePanelTab(target: PanelTarget, id: string, opts: { keepOpen?: boolean } = {}): void {
+  const keepOpen = opts.keepOpen ?? panelKeepOpen();
+  update(target, (e) => closeTab(e, id, keepOpen));
 }
 
 /** Sets a tab's title in the strip (retitleTab). */
