@@ -31,7 +31,9 @@ func TestManifestWakes(t *testing.T) {
 			m.Wakes[0].Args = append(m.Wakes[0].Args, WakeArgSpec{Name: "pr", Context: WakeContextPR, Required: true})
 		}},
 		{name: "arg context worktree", mutate: func(m *Manifest) { m.Wakes[0].Args[0] = WakeArgSpec{Name: "w", Context: ArgContextWorktree} }, want: "unknown context"},
-		{name: "arg context on int", mutate: func(m *Manifest) { m.Wakes[0].Args[0] = WakeArgSpec{Name: "n", Type: ArgInt, Context: WakeContextThread} }, want: "must be a string"},
+		{name: "arg context on int", mutate: func(m *Manifest) {
+			m.Wakes[0].Args[0] = WakeArgSpec{Name: "n", Type: ArgInt, Context: WakeContextThread}
+		}, want: "must be a string"},
 		{name: "arg required with default", mutate: func(m *Manifest) { m.Wakes[0].Args[0].Required = true }, want: "required arg"},
 		{name: "arg twice", mutate: func(m *Manifest) { m.Wakes[0].Args = append(m.Wakes[0].Args, m.Wakes[0].Args[0]) }, want: "declared twice"},
 		{name: "arg enum default", mutate: func(m *Manifest) {
