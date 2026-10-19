@@ -82,5 +82,31 @@ the sidebar row, its tooltip, and the CLI's status word.
   they read `needs attention: finished`; an `attention` subscription on a lead no longer
   fires when the lead ends a turn only to wait (it fires when the lead's turn ends with
   nothing left to wait on), a `settled` one (`--notify`) still does.
+* Haiku 5.5 blocks a foreground `sleep N` (the harness asks for Monitor) and runs it in
+  the background, so a "slow child" built on `sleep` ends its turn at once. The live
+  check's children ran `python3 -c 'import time; time.sleep(240)'` instead.
+* A `make check` failure to remember: the guide (`TestGuide`) is within 50 bytes of its
+  29,000-byte cap, so a clause added to any command description can break it.
 
 ## Verified
+
+* `make check` green; table tests `TestWaitingRule` (busy child, two of three busy, at
+  prompt, no subscriptions, settled child, a child asking a question, archived child,
+  child being removed, `error` subscription, question / permission / turn error / budget
+  win, busy, a lead waiting on its worker, worker archived, a cycle),
+  `TestWaitingUntilWake` (running and stopped subscriber: waiting, then busy, then
+  finished, never finished in between; restart loads finished; unsubscribe ends it),
+  `TestThreadStatusWordWaiting`, GUI `waiting.test.ts`, `TipWaiting.test.tsx`, the
+  sidebar sort (`tree.test.ts`), `threadGroup`, `statusLine`, the row, `attentionIds` and a
+  review-loop round through `startDockAlerts` (no badge, no bounce until the last turn).
+* Live, isolated daemon (`CODE_FOUNDRY_HOME=/tmp/cf-build-orch-waiting-status`), the
+  built GUI, a Haiku 5.5 orchestrator creating Haiku 5.5 children with `--notify`.
+  `thread list` every 0.5 s: round 1 `busy` -> `waiting (on 1 child)` -> (child
+  settled) `waiting` for the 1 s batch window -> `busy` -> `attention (finished)`.
+  Round 2 with two children sleeping 240 s: `waiting (on 2 children)` for four minutes,
+  `waiting (on 1 child)` when the first settled, `waiting` while the batched wake waited,
+  `busy`, `attention (finished)`. The orchestrator was never `attention` between. The
+  Dock badge read 1 (the first child's finished turn) while the orchestrator waited
+  (`lsappinfo` StatusLabel), the bell 1, and the row sat in the idle group reading
+  "Waiting · waiting-todo @ main" with the hourglass; the tooltip said "Waiting on 2
+  child threads" with both names (dark and light screenshots in the PR).
