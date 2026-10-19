@@ -23,7 +23,8 @@ err := h.UpdateView(open.Instance, v)
 
 Field names are lowerCamel; enums are short lower-case strings. A node is an object with
 a `key` and exactly one kind field. Every key (nodes, rows, chips, pairs, buttons,
-fields, options, tabs) is unique in the view and matches `[A-Za-z0-9._:-]{1,64}`; keys are
+fields, options, tabs) is unique in the view and matches `[A-Za-z0-9._:-]{1,64}`, not
+starting `cf-` (the host's own, like its invalid-view notice); keys are
 how the host keeps state (a collapsed section, a form draft) across views and how acts
 name elements, so keep them stable between renders. One namespace for every kind: a
 chip `deploy` and a button `deploy` collide, so prefix by role (`stage-deploy`,
@@ -61,8 +62,10 @@ chip `deploy` and a button `deploy` collide, so prefix by role (`stage-deploy`,
   buffer goes with it), or seed the new run's text with a first line (`$ go test ./...`).
 - **Order**: append the last output *before* the view that ends the run ("passing"), so
   a viewer never sees the verdict above a log that is still filling.
-- Acts name a view version: the elements of the last 4 versions still act, so a click on
-  a view that was just replaced still arrives (with its old `version`).
+- Acts name a view version: a version's elements still act for 3 s after a newer view
+  replaced it (at most 64 versions), so a click on a view that was just replaced still
+  arrives (with its old `version`). An act on an older one is refused ("the view changed
+  before this action reached it; try again").
 - After `Surface.Close(reason)` the instance is gone: `UpdateView` to it fails with
   -32004. Stop the instance's goroutines in `Close`; persist what should survive it.
 
@@ -490,8 +493,13 @@ All in `reference/ui-layout.md`.
 | `click` | a button, row or chip with an event | `Action` (event name), `Key` (element key), `Data` |
 | `submit` | a form's submit with an event | `Action`, `Key`, `Data`, `Values` (the form's fields by name) |
 | `change` | a field with a change event was edited | `Action`, `Key`, `Field`, `Value`, `Values` |
-| `tab` | the user switched tabs | `Action` is `"tab"`, `Key` the new tab's key (`Value` too, as `any`: use `Key`), `Node` the `tabs` node's key ("" for the view's tabs) |
-| `select` | a `masterDetail` row without an action was chosen | `Action` is `"select"`, `Key` the row's key, `Node` the master-detail's key |
+| `tab` | the user switched tabs | `Action` is `"tab"`, `Key` the new tab's key (`Value` too, as `any`: use `Key`), `Node` the `tabs` node's key ("" for the view's tabs); no `Values` |
+| `select` | a `masterDetail` row without an action was chosen | `Action` is `"select"`, `Key` the row's key (`Value` too: use `Key`), `Node` the master-detail's key; no `Values` |
+
+**Dispatch on `Kind`** first: a button's or row's event may itself be named `tab` or
+`select` (it arrives as `kind: click, action: select`), so `switch act.Action` alone
+mistakes it for a master-detail choice. `switch act.Kind { case pluginsdk.ActSelect: …;
+case pluginsdk.ActTab: …; case pluginsdk.ActClick: switch act.Action { … } }`.
 
 `act.Context` is what the panel the user acted in shows (`ThreadID`, `ProjectID`, …): a
 shared instance (scope `pr`, `project`, `global`) learns from it which thread a click came

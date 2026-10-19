@@ -23,7 +23,8 @@ func TestPluginSurfaceCommands(t *testing.T) {
 		State: &v1.SurfaceState{Instance: "hello/demo/thread:s-1", Phase: v1.SurfacePhase_SURFACE_PHASE_LIVE},
 		View:  &v1.SurfaceView{Instance: "hello/demo/thread:s-1", Version: 4, ViewJson: `{"nodes":[{"key":"t","text":{"content":"hi"}}]}`},
 		Elements: []*v1.SurfaceElement{{Key: "click", Kind: "click", Action: "click", Label: "Click"},
-			{Key: "rerun", Kind: "command", Action: "plugin.hello.rerun", Label: "Rerun", Args: map[string]string{"run": "7"}}},
+			{Key: "rerun", Kind: "command", Action: "plugin.hello.rerun", Label: "Rerun", Args: map[string]string{"run": "7"}},
+			{Key: "t-log", Kind: "tab", Action: "tab", Label: "Log", Node: "run-tabs"}},
 	}}
 	reg := command.NewRegistry()
 	if err := command.RegisterPluginSurface(reg, b); err != nil {
@@ -36,7 +37,8 @@ func TestPluginSurfaceCommands(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, want := range []string{"instance hello/demo/thread:s-1: live", "view version 4:\n{\n  \"nodes\": [",
-		"KEY    KIND     ACTION                    LABEL  FORM", "click  click    click                     Click", "rerun  command  plugin.hello.rerun run=7  Rerun"} {
+		"KEY    KIND     ACTION                    LABEL  FORM  NODE", "click  click    click                     Click", "rerun  command  plugin.hello.rerun run=7  Rerun",
+		"t-log  tab      tab                       Log          run-tabs"} {
 		if !strings.Contains(res.Message, want) {
 			t.Errorf("surface output lacks %q:\n%s", want, res.Message)
 		}

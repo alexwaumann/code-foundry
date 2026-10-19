@@ -152,7 +152,7 @@ func TestContainerDepth(t *testing.T) {
 				t.Errorf("%d %s deep: %v", MaxDepth, k, err)
 			}
 			err := (View{Nodes: []Node{nest(append(at, k))}}).Validate()
-			if err == nil || !strings.Contains(err.Error(), fmt.Sprintf("inside %d containers (section, columns, pane, grid, container, masterDetail, tabs), at most %d", MaxDepth+1, MaxDepth)) {
+			if err == nil || !strings.Contains(err.Error(), fmt.Sprintf("inside %d containers (%s), at most %d", MaxDepth+1, strings.Join(append(at, k), " > "), MaxDepth)) {
 				t.Errorf("%d %s deep: %v", MaxDepth+1, k, err)
 			}
 			// Children reaches the leaf through every level.

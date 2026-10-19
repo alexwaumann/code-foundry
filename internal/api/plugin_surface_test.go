@@ -153,6 +153,15 @@ func TestGetSurfaceAndAct(t *testing.T) {
 	if _, err := c.Act(ctx, connect.NewRequest(&v1.SurfaceActRequest{Instance: key, Key: "go"})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Errorf("precondition: %v", err)
 	}
+	// The plugin did not answer in time, or stopped while it had the act.
+	surfaces.ActErr = fmt.Errorf("plugin hello did not answer within 10s: %w", context.DeadlineExceeded)
+	if _, err := c.Act(ctx, connect.NewRequest(&v1.SurfaceActRequest{Instance: key, Key: "go"})); connect.CodeOf(err) != connect.CodeDeadlineExceeded {
+		t.Errorf("timeout: %v", err)
+	}
+	surfaces.ActErr = fmt.Errorf("plugin hello stopped while handling the action: %w", plugin.ErrUnavailable)
+	if _, err := c.Act(ctx, connect.NewRequest(&v1.SurfaceActRequest{Instance: key, Key: "go"})); connect.CodeOf(err) != connect.CodeUnavailable {
+		t.Errorf("stopped: %v", err)
+	}
 }
 
 // settle_ms waits for the views after the first until none has come for that long.

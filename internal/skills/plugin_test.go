@@ -2,6 +2,9 @@ package skills_test
 
 import (
 	"bytes"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -78,7 +81,7 @@ func TestRenderPluginSkill(t *testing.T) {
 			t.Errorf("host-api.md lacks %q", want)
 		}
 	}
-	if prim := string(files[skills.Plugin+"/reference/primitives.md"]); !strings.Contains(prim, "| Elements in a view (nodes, rows, chips, pairs, fields, options, buttons, tabs) | 400 |") {
+	if prim := string(files[skills.Plugin+"/reference/primitives.md"]); !strings.Contains(prim, "| Elements in a view (nodes, columns, grid items, rows, chips, pairs, fields, options, buttons, tabs) | 400 |") {
 		t.Error("primitives.md lacks the limits table")
 	}
 	if prim := string(files[skills.Plugin+"/reference/primitives.md"]); !strings.Contains(prim, "| Containers (section, columns, pane, grid, container, masterDetail, tabs) a node sits inside | 4 |") ||
@@ -225,5 +228,66 @@ func TestIconsMatchTheGUI(t *testing.T) {
 	}
 	if !slices.Equal(gui, ui.Icons) {
 		t.Errorf("the GUI draws %v, pluginsdk/ui.Icons says %v", gui, ui.Icons)
+	}
+}
+
+// Every exported Max*/Min* constant of pluginsdk/ui is a limit the host enforces, so the
+// generated limits table (viewLimits) names it: a new limit fails here until it has a
+// row.
+func TestViewLimitsNameEveryLimit(t *testing.T) {
+	notLimits := map[string]bool{
+		"MaxProblems":  true, // how many problems Validate names
+		"MaxLiveNodes": true, // the GUI's live-stream budget, not a view limit (ui-layout.md)
+	}
+	fset := token.NewFileSet()
+	uiFiles, err := filepath.Glob(filepath.Join("..", "..", "pluginsdk", "ui", "*.go"))
+	if err != nil || len(uiFiles) == 0 {
+		t.Fatal("pluginsdk/ui sources", err)
+	}
+	var limits []string
+	for _, p := range uiFiles {
+		if strings.HasSuffix(p, "_test.go") {
+			continue
+		}
+		f, err := parser.ParseFile(fset, p, nil, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, d := range f.Decls {
+			if g, ok := d.(*ast.GenDecl); ok && g.Tok == token.CONST {
+				for _, sp := range g.Specs {
+					for _, name := range sp.(*ast.ValueSpec).Names {
+						if n := name.Name; (strings.HasPrefix(n, "Max") || strings.HasPrefix(n, "Min")) && name.IsExported() && !notLimits[n] {
+							limits = append(limits, n)
+						}
+					}
+				}
+			}
+		}
+	}
+	f, err := parser.ParseFile(fset, "plugin.go", nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	named := map[string]bool{}
+	for _, d := range f.Decls {
+		if fn, ok := d.(*ast.FuncDecl); ok && fn.Name.Name == "viewLimits" {
+			ast.Inspect(fn, func(n ast.Node) bool {
+				if sel, ok := n.(*ast.SelectorExpr); ok {
+					if x, ok := sel.X.(*ast.Ident); ok && x.Name == "ui" {
+						named[sel.Sel.Name] = true
+					}
+				}
+				return true
+			})
+		}
+	}
+	if len(limits) < 40 {
+		t.Fatalf("found %d limits in pluginsdk/ui: %v", len(limits), limits)
+	}
+	for _, l := range limits {
+		if !named[l] {
+			t.Errorf("ui.%s is not in viewLimits' table (internal/skills/plugin.go)", l)
+		}
 	}
 }

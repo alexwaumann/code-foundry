@@ -35,11 +35,11 @@ const (
 	DefaultSurfaceGrace     = 10 * time.Minute
 	DefaultFirstViewTimeout = 10 * time.Second
 	DefaultCoalesce         = 100 * time.Millisecond
+	DefaultActTimeout       = 10 * time.Second
 )
 
 const (
 	surfaceOpenTimeout = 5 * time.Second
-	surfaceActTimeout  = 10 * time.Second
 	// A plugin sending more than floodRate views a second for floodSeconds seconds is
 	// throttled to one a second.
 	floodRate         = 50
@@ -58,10 +58,15 @@ const (
 	// lines, each under the per-append limit, would otherwise hold a gigabyte.
 	maxAppendBytes = 4 << 20
 	toastRing      = 16
-	keptVersions   = 4
-	maxClosed      = 64
-	maxActPayload  = 64 << 10
-	maxToastText   = 200
+	// An act names the version it was made on; a version's acting elements are kept
+	// keptFor after a newer one replaced it, at most keptVersions of them (the GUI's view
+	// lags the plugin's by the coalesce interval and a round trip: at 40 views a second,
+	// four versions were gone before a click on one arrived).
+	keptFor       = 3 * time.Second
+	keptVersions  = 64
+	maxClosed     = 64
+	maxActPayload = 64 << 10
+	maxToastText  = 200
 )
 
 // SurfacePhase is an instance's host-side state.
@@ -984,7 +989,7 @@ func (in *instance) accept(v *ui.View, canon []byte, now time.Time) (uint64, boo
 	in.version++
 	in.base, in.view, in.hostRendered = canon, v, false
 	in.installLogsLocked(v)
-	in.indexLocked(v)
+	in.indexLocked(v, now)
 	in.stopTimer(&in.firstView)
 	if in.state.Phase != PhaseLive {
 		in.setStateLocked(PhaseLive, "", StateRunning)
@@ -1045,6 +1050,10 @@ func (in *instance) installLogsLocked(v *ui.View) {
 	in.logs = next
 }
 
+// invalidViewKey is the host's notice above (or instead of) an invalid view: a reserved
+// key, so it never meets one of the plugin's.
+const invalidViewKey = ui.ReservedKeyPrefix + "invalid-view"
+
 // reject records an invalid view: the plugin's earlier view stays; without one (or for a
 // dev plugin, above it) the instance shows a host-made notice saying why.
 func (in *instance) reject(displayName string, errs []string, dev bool) {
@@ -1062,15 +1071,10 @@ func (in *instance) reject(displayName string, errs []string, dev bool) {
 		body += "s"
 	}
 	body += "). Its log has the details: code-foundry plugin logs " + in.plugin
-	notice := ui.Node{Key: "cf-invalid-view", Notice: &ui.Notice{Tone: ui.ToneError, Title: "Invalid view", Body: &ui.Inline{Text: body}, Detail: detail}}
+	notice := ui.Node{Key: invalidViewKey, Notice: &ui.Notice{Tone: ui.ToneError, Title: "Invalid view", Body: &ui.Inline{Text: body}, Detail: detail}}
 	v := ui.View{Nodes: []ui.Node{notice}}
 	if in.view != nil {
 		prev := *in.view
-		keys := map[string]bool{}
-		walkView(&prev, func(n *ui.Node) { keys[n.Key] = true })
-		for keys[notice.Key] {
-			notice.Key += "-"
-		}
 		v = prev
 		v.Nodes = append([]ui.Node{notice}, prev.Nodes...)
 	}
@@ -1083,12 +1087,20 @@ func (in *instance) reject(displayName string, errs []string, dev bool) {
 	if in.view == nil {
 		in.logs = map[string]*logBuf{}
 	}
-	in.indexLocked(&v)
+	in.indexLocked(&v, in.now())
 	in.stopTimer(&in.firstView)
 	if in.state.Phase != PhaseLive {
 		in.setStateLocked(PhaseLive, "", StateRunning)
 	}
 	in.wakeLocked()
+}
+
+// now is the manager's clock (time.Now for an instance without a hub: tests).
+func (in *instance) now() time.Time {
+	if in.h != nil && in.h.m != nil {
+		return in.h.m.opts.Now()
+	}
+	return time.Now()
 }
 
 func truncateUTF8(s string, n int) string {

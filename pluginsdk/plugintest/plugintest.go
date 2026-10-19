@@ -10,8 +10,11 @@
 // threadStatus, session/setEnvironment sessionEnv, events/subscribe each source in
 // permissions.events, thread/* threads and terminal/* terminals (owned.go: kept in
 // memory, nothing runs). Wake sources (wakes.go): SubscribeWake sends wake/subscribed as
-// an agent's subscription would, WakeFires records wake/fire. It does not evaluate when clauses, check views beyond what the
-// plugin's own Validate did, or store secrets from forms (SetSecret does).
+// an agent's subscription would, WakeFires records wake/fire. Start announces the real
+// host's capabilities (HostCapabilities) unless Options lists others, and Act shapes a
+// tab or select act from the latest view as the host does (acts.go). It does not
+// evaluate when clauses, check views beyond what the plugin's own Validate did, or store
+// secrets from forms (SetSecret does).
 package plugintest
 
 import (
@@ -37,7 +40,8 @@ type Options struct {
 	// Invoke answers host/invoke calls the permissions allow. Nil answers
 	// CodeNotFound ("unknown command").
 	Invoke func(ctx context.Context, p pluginsdk.InvokeParams) (pluginsdk.CommandResult, error)
-	// Capabilities are the host capabilities announced in initialize.
+	// Capabilities are the host capabilities announced in initialize: nil announces
+	// HostCapabilities (the real host's), an empty list none.
 	Capabilities []string
 	// Secrets are stored before the plugin starts (so Init can read them).
 	Secrets map[string]string
@@ -95,6 +99,9 @@ func Start(t testing.TB, p pluginsdk.Plugin, opts Options) *Host {
 	}
 	if opts.DataDir == "" {
 		opts.DataDir = t.TempDir()
+	}
+	if opts.Capabilities == nil {
+		opts.Capabilities = HostCapabilities
 	}
 	h := &Host{t: t, opts: opts, done: make(chan error, 1), changed: make(chan struct{}),
 		secrets: map[string]pluginsdk.SecretInfo{}, values: map[string]string{}, views: map[string]json.RawMessage{}, versions: map[string]uint64{}}
@@ -182,10 +189,17 @@ func (h *Host) OpenSurfaceWith(ctx context.Context, open pluginsdk.SurfaceOpen) 
 	return h.conn.Notify(pluginsdk.MethodSurfaceVisibility, pluginsdk.SurfaceVisibility{Instance: open.Instance, Visible: true})
 }
 
-// Act sends surface/act. A zero act.Version is the instance's latest.
+// Act sends surface/act. A zero act.Version is the instance's latest. A tab or select
+// act (by its key) is shaped as the host shapes it from the latest view: kind, action
+// and node from the view, Value the key, no Values; naming a tab as a select (or the
+// reverse) is refused (acts.go). Other acts go as given.
 func (h *Host) Act(ctx context.Context, act pluginsdk.SurfaceAct) error {
 	if act.Version == 0 {
 		act.Version = h.Version(act.Instance)
+	}
+	act, err := h.hostAct(act)
+	if err != nil {
+		return err
 	}
 	return h.conn.Call(ctx, pluginsdk.MethodSurfaceAct, act, nil)
 }

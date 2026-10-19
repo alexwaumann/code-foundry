@@ -125,7 +125,7 @@ func checkView(t *testing.T, raw []byte) {
 }
 
 // requiredLists are the view model's lists without omitempty: viewers expect arrays.
-var requiredLists = []string{"nodes", "items", "rows", "chips", "buttons", "children", "fields"}
+var requiredLists = []string{"nodes", "items", "rows", "chips", "buttons", "children", "fields", "detail"}
 
 // nullList returns the path of a required list that is null in the view's JSON.
 func nullList(view []byte) string {
@@ -168,6 +168,12 @@ func FuzzValidateView(f *testing.F) {
 	f.Add([]byte(`{"nodes":[{"key":"a","log":{"text":"x"}}],"nodes":null}`))
 	f.Add([]byte(`  {"Nodes":[{"KEY":"a","TEXT":{"content":"x"}}]}`))
 	f.Add([]byte(`{}`))
+	// Generated views (viewgen_test.go): every layout node, both strips, deep and valid.
+	for seed := range uint64(24) {
+		if b, err := json.Marshal(genView(seed)); err == nil {
+			f.Add(b)
+		}
+	}
 	f.Fuzz(func(t *testing.T, raw []byte) {
 		checkView(t, raw)
 	})

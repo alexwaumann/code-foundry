@@ -320,13 +320,15 @@ func FormatSurface(res *v1.GetSurfaceResponse) string {
 	if len(res.GetElements()) > 0 {
 		sb.WriteString("\nelements:\n")
 		tw := tabwriter.NewWriter(&sb, 0, 4, 2, ' ', 0)
-		_, _ = fmt.Fprintln(tw, "  KEY\tKIND\tACTION\tLABEL\tFORM")
+		// NODE is a tab's tabs node or a select's master-detail: two tabs nodes' tabs
+		// look alike otherwise.
+		_, _ = fmt.Fprintln(tw, "  KEY\tKIND\tACTION\tLABEL\tFORM\tNODE")
 		for _, el := range res.GetElements() {
 			action := el.GetAction()
 			for _, k := range slices.Sorted(maps.Keys(el.GetArgs())) {
 				action += " " + k + "=" + el.GetArgs()[k]
 			}
-			_, _ = fmt.Fprintf(tw, "  %s\t%s\t%s\t%s\t%s\n", el.GetKey(), el.GetKind(), action, el.GetLabel(), el.GetForm())
+			_, _ = fmt.Fprintf(tw, "  %s\t%s\t%s\t%s\t%s\t%s\n", el.GetKey(), el.GetKind(), action, el.GetLabel(), el.GetForm(), el.GetNode())
 		}
 		_ = tw.Flush()
 	}

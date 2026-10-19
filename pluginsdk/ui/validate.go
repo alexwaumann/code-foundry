@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 )
@@ -64,9 +65,17 @@ const (
 // KeyPattern is the shape of every key. Keys share one namespace across the view.
 var KeyPattern = regexp.MustCompile(`^[A-Za-z0-9._:-]{1,64}$`)
 
+// ReservedKeyPrefix starts the keys of what the host adds to a view (its invalid-view
+// notice): a plugin's keys do not.
+const ReservedKeyPrefix = "cf-"
+
 // StorePattern is the shape of a secret input's store: a key the host's secret store
 // takes (a key without ":").
 var StorePattern = regexp.MustCompile(`^[A-Za-z0-9._-]{1,64}$`)
+
+// maxProblemPath bounds the path a UTF-8 problem names (a node deeper than MaxDepth is
+// refused, but the UTF-8 walk looks at every string, however deep).
+const maxProblemPath = 512
 
 var iconPattern = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 
@@ -75,7 +84,7 @@ var iconPattern = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 func (v View) Validate() error {
 	c := &checker{keys: map[string]string{}}
 	if rv := reflect.ValueOf(v); !validUTF8(rv) {
-		c.utf8("", rv)
+		c.utf8(nil, rv)
 	}
 	if v.Header != nil {
 		c.header("header", v.Header)
@@ -85,21 +94,23 @@ func (v View) Validate() error {
 	}
 	c.strip("toolbar", v.Toolbar)
 	for i, n := range v.Nodes {
-		c.node(fmt.Sprintf("nodes[%d]", i), n, 0)
+		c.node(fmt.Sprintf("nodes[%d]", i), n, nil)
 	}
 	c.strip("footer", v.Footer)
+	// The view-wide problems are named even past MaxProblems: a view over a limit says
+	// so however many other problems it has.
 	if c.elements > MaxElements {
-		c.bad("view", "%d elements, at most %d", c.elements, MaxElements)
+		c.always("view", "%d elements, at most %d", c.elements, MaxElements)
 	}
 	if c.logs > MaxLogNodes {
-		c.bad("view", "%d log nodes, at most %d", c.logs, MaxLogNodes)
+		c.always("view", "%d log nodes, at most %d", c.logs, MaxLogNodes)
 	}
 	if b, err := json.Marshal(v); err == nil {
 		if n := len(b) - c.logBytes; n > MaxViewBytes {
-			c.bad("view", "%d bytes encoded (logs excluded), at most %d", n, MaxViewBytes)
+			c.always("view", "%d bytes encoded (logs excluded), at most %d", n, MaxViewBytes)
 		}
 	} else {
-		c.bad("view", "does not encode: %v", err)
+		c.always("view", "does not encode: %v", err)
 	}
 	if more := c.problems - len(c.errs); more > 0 {
 		c.errs = append(c.errs, fmt.Errorf("view: %d more problems", more))
@@ -126,10 +137,20 @@ func (c *checker) bad(path, format string, a ...any) {
 	}
 }
 
+// always records a problem whatever the count (the few view-wide ones).
+func (c *checker) always(path, format string, a ...any) {
+	c.problems++
+	c.errs = append(c.errs, fmt.Errorf("%s: %s", path, fmt.Sprintf(format, a...)))
+}
+
 func (c *checker) key(path, k string) {
 	c.elements++
 	if !KeyPattern.MatchString(k) {
 		c.bad(path+".key", "%q must match %s", k, KeyPattern)
+		return
+	}
+	if strings.HasPrefix(k, ReservedKeyPrefix) {
+		c.bad(path+".key", "%q: keys starting %q are the host's", k, ReservedKeyPrefix)
 		return
 	}
 	if first, dup := c.keys[k]; dup {
@@ -379,8 +400,8 @@ func (c *checker) strip(path string, nodes []Node) {
 	}
 	for i, n := range nodes {
 		p := fmt.Sprintf("%s[%d]", path, i)
-		c.node(p, n, 0)
-		if k := kindOf(n); k != "" && !slices.Contains(StripKinds, k) {
+		c.node(p, n, nil)
+		if k := n.kind(); k != "" && !slices.Contains(StripKinds, k) {
 			c.bad(p, "a %s node cannot be in the %s (%s)", k, path, strings.Join(StripKinds, ", "))
 			continue
 		}
@@ -402,26 +423,15 @@ func (c *checker) strip(path string, nodes []Node) {
 	}
 }
 
-// kindOf is the JSON name of n's one kind field, "" unless it has exactly one.
-func kindOf(n Node) string {
-	v, t := reflect.ValueOf(n), reflect.TypeFor[Node]()
-	name := ""
-	for i := range t.NumField() {
-		if f := v.Field(i); f.Kind() == reflect.Pointer && !f.IsNil() {
-			if name != "" {
-				return ""
-			}
-			name, _, _ = strings.Cut(t.Field(i).Tag.Get("json"), ",")
-		}
-	}
-	return name
-}
-
-// node checks one node inside depth containers (0 = top level).
-func (c *checker) node(path string, n Node, depth int) {
+// node checks one node inside the outer containers (their kinds, outermost first; nil at
+// the top level). A node past MaxDepth is counted and refused once, and its insides are
+// not looked at: the view is refused anyway, and a deep view's walk would cost its depth
+// in paths at every level.
+func (c *checker) node(path string, n Node, outer []string) {
 	c.key(path, n.Key)
-	if depth > MaxDepth {
-		c.bad(path, "inside %d containers (section, columns, pane, grid, container, masterDetail, tabs), at most %d", depth, MaxDepth)
+	if len(outer) > MaxDepth {
+		c.bad(path, "inside %d containers (%s), at most %d", len(outer), strings.Join(outer, " > "), MaxDepth)
+		return
 	}
 	kinds := 0
 	for _, set := range []bool{n.Text != nil, n.Markdown != nil, n.Pairs != nil, n.List != nil, n.Chips != nil,
@@ -512,7 +522,7 @@ func (c *checker) node(path string, n Node, depth int) {
 		c.buttons(p+".actions", s.Actions, MaxSectionButton)
 		c.tone(p+".tone", s.Tone)
 		for i, ch := range s.Children {
-			c.node(fmt.Sprintf("%s.children[%d]", p, i), ch, depth+1)
+			c.node(fmt.Sprintf("%s.children[%d]", p, i), ch, append(outer, "section"))
 		}
 	case n.Form != nil:
 		c.form(path+".form", n.Form)
@@ -531,11 +541,11 @@ func (c *checker) node(path string, n Node, depth int) {
 		c.height(path+".terminal.height", n.Terminal.Height)
 		c.buttons(path+".terminal.actions", n.Terminal.Actions, MaxTerminalButtons)
 	case n.Columns != nil:
-		c.columns(path+".columns", n.Columns, depth)
+		c.columns(path+".columns", n.Columns, outer)
 	case n.Pane != nil:
-		c.pane(path+".pane", n.Pane, depth)
+		c.pane(path+".pane", n.Pane, outer)
 	case n.Grid != nil:
-		c.grid(path+".grid", n.Grid, depth)
+		c.grid(path+".grid", n.Grid, outer)
 	case n.Divider != nil:
 		c.str(path+".divider.label", n.Divider.Label, MaxLabel)
 	case n.Spacer != nil:
@@ -543,28 +553,38 @@ func (c *checker) node(path string, n Node, depth int) {
 			c.bad(path+".spacer.size", "%d px is outside %d..%d (0 is %d)", sz, MinSpacer, MaxSpacer, SpacerSize)
 		}
 	case n.Group != nil:
-		c.group(path+".group", n.Group, depth)
+		c.group(path+".group", n.Group, outer)
 	case n.Container != nil:
 		p := path + ".container"
 		if !slices.Contains([]ContainerWidth{"", ContainerFull, ContainerWide, ContainerNarrow}, n.Container.Width) {
 			c.bad(p+".width", "unknown width %q (narrow, wide or full)", n.Container.Width)
 		}
 		for i, ch := range n.Container.Children {
-			c.node(fmt.Sprintf("%s.children[%d]", p, i), ch, depth+1)
+			c.node(fmt.Sprintf("%s.children[%d]", p, i), ch, append(outer, "container"))
 		}
 	case n.MasterDetail != nil:
-		c.masterDetail(path+".masterDetail", n.MasterDetail, depth)
+		c.masterDetail(path+".masterDetail", n.MasterDetail, outer)
 	case n.Tabs != nil:
-		c.tabsNode(path+".tabs", n.Tabs, depth)
+		c.tabsNode(path+".tabs", n.Tabs, outer)
 	}
 }
 
-// masterDetail checks a master-detail node inside depth containers: its list (rows are
-// keys and elements like any list's), its list width, that Selected is "" or a row's
-// key, its empty detail (an empty node's limits) and its detail's nodes (one container
-// deeper).
-func (c *checker) masterDetail(path string, md *MasterDetail, depth int) {
+// masterDetail checks a master-detail node inside the outer containers: its list (rows are
+// keys and elements like any list's, none selected by itself), its list width, that
+// Selected is "" or a row's key, its empty detail (an empty node's limits) and its
+// detail's nodes (one container deeper, none while nothing is selected). The GUI shows
+// neither a row's own selected nor a detail while nothing is selected, and a hidden
+// detail's elements would still act from the CLI.
+func (c *checker) masterDetail(path string, md *MasterDetail, outer []string) {
 	c.list(path+".list", &md.List)
+	for i, r := range md.List.Rows {
+		if r.Selected {
+			c.bad(fmt.Sprintf("%s.list.rows[%d].selected", path, i), "a master-detail's rows are not selected by themselves: set the node's selected")
+		}
+	}
+	if md.Selected == "" && len(md.Detail) > 0 {
+		c.bad(path+".detail", "%d nodes while nothing is selected: the detail shows only beside a selected row (emptyDetail is shown until then)", len(md.Detail))
+	}
 	if w := md.ListWidth; w != 0 && (w < MinListWidth || w > MaxListWidth) {
 		c.bad(path+".listWidth", "%d px is outside %d..%d (0 is %d)", w, MinListWidth, MaxListWidth, MasterDetailListWidth)
 	}
@@ -580,14 +600,14 @@ func (c *checker) masterDetail(path string, md *MasterDetail, depth int) {
 	}
 	c.str(path+".resetToken", md.ResetToken, MaxLabel)
 	for i, ch := range md.Detail {
-		c.node(fmt.Sprintf("%s.detail[%d]", path, i), ch, depth+1)
+		c.node(fmt.Sprintf("%s.detail[%d]", path, i), ch, append(outer, "masterDetail"))
 	}
 }
 
-// tabsNode checks a tabs node inside depth containers: MinNodeTabs..MaxTabs tabs (keys,
+// tabsNode checks a tabs node inside the outer containers: MinNodeTabs..MaxTabs tabs (keys,
 // labels and badges as the view's tabs), Active one of them, and the active tab's nodes
 // (one container deeper).
-func (c *checker) tabsNode(path string, t *TabsNode, depth int) {
+func (c *checker) tabsNode(path string, t *TabsNode, outer []string) {
 	if n := len(t.Items); n < MinNodeTabs || n > MaxTabs {
 		c.bad(path+".items", "%d tabs, want %d to %d", n, MinNodeTabs, MaxTabs)
 	}
@@ -604,13 +624,13 @@ func (c *checker) tabsNode(path string, t *TabsNode, depth int) {
 		c.bad(path+".active", "%q is not one of the tabs", t.Active)
 	}
 	for i, ch := range t.Children {
-		c.node(fmt.Sprintf("%s.children[%d]", path, i), ch, depth+1)
+		c.node(fmt.Sprintf("%s.children[%d]", path, i), ch, append(outer, "tabs"))
 	}
 }
 
-// grid checks a grid node inside depth containers: its least column width, its item
+// grid checks a grid node inside the outer containers: its least column width, its item
 // count, and each item's key, span and nodes (one container deeper).
-func (c *checker) grid(path string, g *Grid, depth int) {
+func (c *checker) grid(path string, g *Grid, outer []string) {
 	if w := g.MinWidth; w != 0 && (w < MinGridMinWidth || w > MaxGridMinWidth) {
 		c.bad(path+".minWidth", "%d px is outside %d..%d (0 is %d)", w, MinGridMinWidth, MaxGridMinWidth, GridMinWidth)
 	}
@@ -624,14 +644,14 @@ func (c *checker) grid(path string, g *Grid, depth int) {
 			c.bad(p+".span", "%d is outside 1..%d (0 is 1)", it.Span, MaxGridSpan)
 		}
 		for j, ch := range it.Children {
-			c.node(fmt.Sprintf("%s.children[%d]", p, j), ch, depth+1)
+			c.node(fmt.Sprintf("%s.children[%d]", p, j), ch, append(outer, "grid"))
 		}
 	}
 }
 
-// group checks a group node inside depth containers: its item count, align, and each
+// group checks a group node inside the outer containers: its item count, align, and each
 // item, a leaf of a kind that sits on a line (at the group's own depth).
-func (c *checker) group(path string, g *Group, depth int) {
+func (c *checker) group(path string, g *Group, outer []string) {
 	if n := len(g.Items); n < 1 || n > MaxGroupItems {
 		c.bad(path+".items", "%d items, want 1 to %d", n, MaxGroupItems)
 	}
@@ -645,7 +665,7 @@ func (c *checker) group(path string, g *Group, depth int) {
 			c.bad(p, "a group holds %s nodes, not %s", strings.Join(groupKinds, ", "), k)
 			continue
 		}
-		c.node(p, it, depth)
+		c.node(p, it, outer)
 	}
 }
 
@@ -668,9 +688,9 @@ func (n Node) kind() string {
 	return name
 }
 
-// columns checks a columns node inside depth containers: its count, collapse, and each
+// columns checks a columns node inside the outer containers: its count, collapse, and each
 // column's key, weight or width, and nodes (one container deeper).
-func (c *checker) columns(path string, cs *Columns, depth int) {
+func (c *checker) columns(path string, cs *Columns, outer []string) {
 	if n := len(cs.Items); n < MinColumns || n > MaxColumns {
 		c.bad(path+".items", "%d columns, want %d to %d", n, MinColumns, MaxColumns)
 	}
@@ -690,14 +710,14 @@ func (c *checker) columns(path string, cs *Columns, depth int) {
 			c.bad(p, "a column has a weight or a width, not both")
 		}
 		for j, ch := range col.Children {
-			c.node(fmt.Sprintf("%s.children[%d]", p, j), ch, depth+1)
+			c.node(fmt.Sprintf("%s.children[%d]", p, j), ch, append(outer, "columns"))
 		}
 	}
 }
 
-// pane checks a pane node inside depth containers: its height, its least height, and
+// pane checks a pane node inside the outer containers: its height, its least height, and
 // its nodes (one container deeper).
-func (c *checker) pane(path string, pn *Pane, depth int) {
+func (c *checker) pane(path string, pn *Pane, outer []string) {
 	c.height(path+".height", pn.Height)
 	if m := pn.MinHeight; m != 0 && (m < MinHeightPx || m > MaxHeightPx) {
 		c.bad(path+".minHeight", "%d px is outside %d..%d", m, MinHeightPx, MaxHeightPx)
@@ -705,7 +725,7 @@ func (c *checker) pane(path string, pn *Pane, depth int) {
 		c.bad(path+".minHeight", "%d px is above the pane's height (%d px)", m, px)
 	}
 	for i, ch := range pn.Children {
-		c.node(fmt.Sprintf("%s.children[%d]", path, i), ch, depth+1)
+		c.node(fmt.Sprintf("%s.children[%d]", path, i), ch, append(outer, "pane"))
 	}
 }
 
@@ -784,7 +804,11 @@ func (c *checker) field(path string, f Field, inFieldset bool) bool {
 	c.inline(path+".description", f.Description, MaxTextContent)
 	c.str(path+".error", f.Error, MaxLabel)
 	if f.Change != nil {
-		if f.Change.Event == "" {
+		switch {
+		case f.Fieldset != nil:
+			// The host never indexes it (a fieldset is not a control): it could not fire.
+			c.bad(path+".change", "a fieldset has no change action (give its fields one)")
+		case f.Change.Event == "":
 			c.bad(path+".change", "a change action is an event")
 		}
 		c.action(path+".change", f.Change)
@@ -921,8 +945,10 @@ func validUTF8(v reflect.Value) bool {
 // utf8 reports every string in v that is not valid UTF-8 (struct fields by their JSON
 // names, slice elements, map keys and values). JSON replaces each invalid byte with
 // U+FFFD, so the host would check (and show) other text, of another size, than the
-// plugin did: a log or event data under its byte limit here could be over it there.
-func (c *checker) utf8(path string, v reflect.Value) {
+// plugin did: a log or event data under its byte limit here could be over it there. The
+// path is a stack of segments joined only for a problem that is named (a deep view's
+// walk would otherwise build its depth in path at every string).
+func (c *checker) utf8(path []string, v reflect.Value) {
 	switch v.Kind() {
 	case reflect.Pointer, reflect.Interface:
 		if !v.IsNil() {
@@ -943,25 +969,33 @@ func (c *checker) utf8(path string, v reflect.Value) {
 			if name == "" {
 				name = strings.ToLower(f.Name)
 			}
-			if path != "" {
-				name = path + "." + name
+			if len(path) > 0 {
+				name = "." + name
 			}
-			c.utf8(name, v.Field(i))
+			c.utf8(append(path, name), v.Field(i))
 		}
 	case reflect.Slice, reflect.Array:
 		for i := range v.Len() {
-			c.utf8(fmt.Sprintf("%s[%d]", path, i), v.Index(i))
+			c.utf8(append(path, "["+strconv.Itoa(i)+"]"), v.Index(i))
 		}
 	case reflect.Map:
 		iter := v.MapRange()
 		for iter.Next() {
 			k := fmt.Sprint(iter.Key().Interface())
-			c.utf8(path+" key", iter.Key())
-			c.utf8(path+"."+k, iter.Value())
+			c.utf8(append(path, " key"), iter.Key())
+			c.utf8(append(path, "."+k), iter.Value())
 		}
 	case reflect.String:
 		if !utf8.ValidString(v.String()) {
-			c.bad(path, "not valid UTF-8")
+			if len(c.errs) >= MaxProblems {
+				c.problems++ // only counted: no path to build
+				return
+			}
+			p := strings.Join(path, "")
+			if len(p) > maxProblemPath {
+				p = "…" + p[len(p)-maxProblemPath:] // the end names the string
+			}
+			c.bad(p, "not valid UTF-8")
 		}
 	}
 }

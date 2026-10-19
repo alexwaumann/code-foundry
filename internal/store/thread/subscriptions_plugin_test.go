@@ -199,8 +199,12 @@ func TestPluginWakes(t *testing.T) {
 		t.Errorf("another source woke %d", n)
 	}
 	items := e.waitItems(parent.ID, "four wakes", func(items []Item) bool { return len(wakes(items)) == 4 })
-	if w := wakes(items)[0]; w.WakeTitle != "Hello: tick — tick every 2s" || !strings.Contains(w.WakeJSON, `"subscription_id": "`+once.ID+`"`) {
-		t.Errorf("first wake = %q\n%s", w.WakeTitle, w.WakeJSON)
+	// The first fire woke the one-shot and the broad subscription at once, in either
+	// order: the one-shot's wake is one of the first two.
+	if first := wakes(items)[:2]; !slices.ContainsFunc(first, func(w Item) bool {
+		return w.WakeTitle == "Hello: tick — tick every 2s" && strings.Contains(w.WakeJSON, `"subscription_id": "`+once.ID+`"`)
+	}) {
+		t.Errorf("first wakes = %q\n%s\n%s", first[0].WakeTitle, first[0].WakeJSON, first[1].WakeJSON)
 	}
 	e.waitItems(other.ID, "one wake", func(items []Item) bool { return len(wakes(items)) == 1 })
 	if got, _ := e.subscription(broad.ID); got.FiredCount != 3 || got.TargetName != "Hello: tick" || got.TargetStatus != "running" {

@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
@@ -331,6 +332,8 @@ type actionIndex struct {
 	elements map[string]element
 	order    []string
 	fields   []fieldInfo
+	// replaced is when a newer version came (zero for the current one).
+	replaced time.Time
 }
 
 // buildIndex walks a view for its acting elements and form fields.
@@ -453,15 +456,29 @@ func buildIndex(v *ui.View) *actionIndex {
 	return idx
 }
 
-// indexLocked records the acting elements of the new version, keeping the last few.
-func (in *instance) indexLocked(v *ui.View) {
+// indexLocked records the acting elements of the new version (made at now), keeping the
+// earlier ones replaced within keptFor, at most keptVersions in all.
+func (in *instance) indexLocked(v *ui.View, now time.Time) {
+	if prev := in.index[in.version-1]; prev != nil && prev.replaced.IsZero() {
+		prev.replaced = now
+	}
 	in.index[in.version] = buildIndex(v)
-	for ver := range in.index {
-		if ver+keptVersions <= in.version {
+	for ver, idx := range in.index {
+		if ver+keptVersions <= in.version || (ver != in.version && now.Sub(idx.replaced) > keptFor) {
 			delete(in.index, ver)
 		}
 	}
 }
+
+// staleVersionError is an act on a version no longer kept: the view changed under the
+// user's click. It is a failed precondition with words the GUI's toast can show.
+type staleVersionError struct{ version, current uint64 }
+
+func (e staleVersionError) Error() string {
+	return "the view changed before this action reached it; try again"
+}
+
+func (e staleVersionError) Is(target error) bool { return target == ErrFailedPrecondition }
 
 // Act implements Surfaces.
 func (m *Manager) Act(ctx context.Context, req ActRequest) (uint64, error) {
@@ -495,7 +512,8 @@ func (m *Manager) Act(ctx context.Context, req ActRequest) (uint64, error) {
 	cur := in.version
 	in.mu.Unlock()
 	if idx == nil {
-		return 0, fmt.Errorf("%w: version %d of %s's view is gone (the current one is %d)", ErrFailedPrecondition, ver, key, cur)
+		m.surfLog(in.plugin, "act on version %d of %s refused: gone (the current one is %d)", ver, key, cur)
+		return 0, staleVersionError{version: ver, current: cur}
 	}
 	el, err := idx.find(req.Key, req.Action)
 	if err != nil {
@@ -517,7 +535,12 @@ func (m *Manager) Act(ctx context.Context, req ActRequest) (uint64, error) {
 	if el.kind == pluginsdk.ActChange {
 		act.Field = el.field
 	}
-	if req.Value != nil && el.kind != pluginsdk.ActTab && el.kind != pluginsdk.ActSelect {
+	if el.kind == pluginsdk.ActTab || el.kind == pluginsdk.ActSelect {
+		// The host sets a tab's or select's value (its key) and it carries no form's values
+		// (the GUI sends none): a client's are dropped.
+		req.Value, req.Values = nil, nil
+	}
+	if req.Value != nil {
 		act.Value = *req.Value
 	}
 	if len(req.Values) > 0 {
@@ -557,7 +580,8 @@ func (m *Manager) Act(ctx context.Context, req ActRequest) (uint64, error) {
 		}
 	}
 	m.surfLog(in.plugin, "%s %s on %s (version %d)", act.Kind, act.Key, key, ver)
-	cctx, cancel := context.WithTimeout(ctx, surfaceActTimeout)
+	timeout := m.opts.ActTimeout
+	cctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	if err := conn.Call(cctx, pluginsdk.MethodSurfaceAct, act, nil); err != nil {
 		var perr *pluginsdk.Error
@@ -565,9 +589,9 @@ func (m *Manager) Act(ctx context.Context, req ActRequest) (uint64, error) {
 		case errors.As(err, &perr):
 			return ver, fmt.Errorf("%w: %s", ErrPluginRefused, perr.Message)
 		case errors.Is(err, context.DeadlineExceeded) && ctx.Err() == nil:
-			return ver, fmt.Errorf("plugin %s did not answer within %s", in.plugin, surfaceActTimeout)
+			return ver, causedError{fmt.Sprintf("plugin %s did not answer within %s", in.plugin, timeout), context.DeadlineExceeded}
 		case errors.Is(err, pluginsdk.ErrClosed):
-			return ver, fmt.Errorf("plugin %s stopped while handling the action", in.plugin)
+			return ver, causedError{fmt.Sprintf("plugin %s stopped while handling the action", in.plugin), ErrUnavailable}
 		}
 		return ver, fmt.Errorf("plugin %s: %w", in.plugin, err)
 	}

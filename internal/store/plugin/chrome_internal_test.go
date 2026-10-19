@@ -60,20 +60,17 @@ func TestStripsAndContainerWalked(t *testing.T) {
 		}
 	}
 
-	// An invalid view after this one: the notice goes above the body and the strips stay;
-	// its key steps around a strip's.
+	// An invalid view after this one: the notice goes above the body and the strips stay.
 	in := newFuzzInstance()
 	if ver, _ := in.accept(v, canon, time.Unix(0, 0)); ver != 1 {
 		t.Fatalf("version %d", ver)
 	}
-	in.view = v
-	in.view.Toolbar[1].Key = "cf-invalid-view"
 	in.reject("P", []string{"nodes[0]: bad"}, true)
 	var shown ui.View
 	if err := json.Unmarshal(in.renderLocked(), &shown); err != nil {
 		t.Fatal(err)
 	}
-	if len(shown.Toolbar) != 2 || len(shown.Footer) != 1 || shown.Nodes[0].Notice == nil || shown.Nodes[0].Key != "cf-invalid-view-" {
+	if len(shown.Toolbar) != 2 || len(shown.Footer) != 1 || shown.Nodes[0].Notice == nil || shown.Nodes[0].Key != "cf-invalid-view" {
 		t.Errorf("after reject: toolbar %d, footer %d, first %+v", len(shown.Toolbar), len(shown.Footer), shown.Nodes[0])
 	}
 	if _, ok := in.index[in.version].elements["send"]; !ok {
