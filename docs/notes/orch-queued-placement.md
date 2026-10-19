@@ -60,7 +60,7 @@ No `--replay-user-messages` needed:
 * **Persistence**: `queued` and `placed_after` live in `thread_items.data` (JSON). No
   migration.
 * **Proto**: `ThreadItem.placed_after = 7` (any item, so a client can sort without
-  knowing payloads), `UserMessageItem.queued = 7`.
+  knowing payloads), `UserMessageItem.queued = 8`.
 * **Paging** (`thread read`, `ListItems` query): the page is in the log's order, but
   "the first/last N" and `nextSince` count by ordinal. Otherwise a placed message at the
   end of a page would hand out its lower ordinal as `nextSince`, and the next read would
