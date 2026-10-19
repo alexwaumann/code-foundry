@@ -135,6 +135,11 @@ type Thread struct {
 	// daemon restarts, until a reconnect replaces them.
 	Status       Status
 	StatusReason string
+	// PendingRequestID is the can_use_tool request a "permission: …" or "question: …"
+	// StatusReason describes (the oldest pending one), published with the status; ""
+	// otherwise and once the process is gone. Two requests in a row can read the same
+	// reason: wake subscriptions tell them apart by it (subscriptions.go). Not persisted.
+	PendingRequestID string
 	// StatusChangedAt is when Status or StatusReason last changed. Persisted; zero if
 	// never known.
 	StatusChangedAt time.Time
