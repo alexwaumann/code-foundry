@@ -7,7 +7,7 @@ VERSION := $(shell sed -n 's/^  "version": "\(.*\)",$$/\1/p' plugin.json)
 # The GitHub repository (owner/name) the releases are in: the current checkout's.
 REPO    ?= $(shell gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null)
 
-.PHONY: build test dist registry-entry clean
+.PHONY: build test check dist release registry-entry clean
 
 ## build: the executable plugin.json's exec names, for `code-foundry plugin dev`.
 build:
@@ -16,6 +16,12 @@ build:
 ## test: the unit tests (plugintest).
 test:
 	go test ./...
+
+## check: what CI runs on every push (ci.yml), or you by hand without it: vet and the
+## race-enabled tests.
+check:
+	go vet ./...
+	go test -race ./...
 
 ## dist: one release tarball per macOS architecture with plugin.json and bin/<name> at
 ## its root, and their SHA-256 sums: dist/<name>-<version>-darwin-<arch>.tar.gz,
@@ -30,10 +36,16 @@ dist:
 	done
 	cd dist && shasum -a 256 *.tar.gz > SHA256SUMS && cat SHA256SUMS
 
+## release: the GitHub release v<version> from the tag on HEAD (pushed first), then the
+## registry entry: scripts/release.sh, which release.yml runs too. DRY_RUN=1 stops
+## before publishing (tag check, tests and make dist only).
+release:
+	sh scripts/release.sh
+
 ## registry-entry: dist/<name>.json, the plugin's entry for a registry
 ## (its plugins/<name>.json), from plugin.json and the
 ## SHA256SUMS of the GitHub release v<version> (not a local make dist: CI's tarballs
-## differ byte for byte). Run it after the release workflow finished.
+## differ byte for byte). make release ends with it; run it alone to redo the entry.
 registry-entry:
 	@[ -n "$(REPO)" ] || { echo "registry-entry: set REPO=owner/name (gh repo view found none)" >&2; exit 1; }
 	mkdir -p dist

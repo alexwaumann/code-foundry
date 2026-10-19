@@ -1,4 +1,6 @@
-# Vets and tests every push to main and every pull request (release.yml tests tags).
+# Vets and tests every push to main and every pull request (release.yml tests tags):
+# make check. runs-on is the runner the skill asked about: GitHub's hosted ubuntu-24.04,
+# or a self-hosted or organization label ([self-hosted, linux]).
 name: ci
 on:
   push:
@@ -10,11 +12,9 @@ jobs:
   test:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version-file: go.mod
-      - name: Vet
-        run: go vet ./...
-      - name: Test
-        run: go test -race ./...
+      - name: Check
+        run: make check

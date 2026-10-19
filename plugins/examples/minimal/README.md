@@ -35,8 +35,21 @@ code-foundry plugin surface minimal status --thread <id>
 code-foundry plugin logs minimal --lines 50
 ```
 
-Releases: bump `version` in `plugin.json` (and `version` in `main.go`), tag `v<version>`
-and push the tag; `.github/workflows/release.yml` publishes the tarballs.
+CI runs `make check` (vet, race tests) on each push and pull request. A release: bump
+`version` in `plugin.json` (and `version` in `main.go`), commit, tag `v<version>` and push
+the tag; `.github/workflows/release.yml` runs `make release`, which tests, checks the tag,
+builds the tarballs and publishes them with their `SHA256SUMS`.
+
+Without the workflows (no runner yet), run the same steps by hand:
+
+```
+make check                                        # before each push
+git tag v0.2.0 && git push origin main v0.2.0
+make release DRY_RUN=1                            # tag check, tests, tarballs; no publishing
+make release                                      # the GitHub release, then dist/minimal.json
+```
+
+(Keep the paragraph for the path this repository uses and delete the other.)
 
 ## License
 
