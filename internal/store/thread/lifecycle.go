@@ -290,7 +290,7 @@ func recordUser(w itemWriter, o *outgoing) (Item, error) {
 
 func userItem(id string, o *outgoing) Item {
 	return Item{ID: id, Kind: KindUserMessage, Text: o.text, Attachments: attachmentPaths(o.attachments), ComposerText: o.composer,
-		Origin: o.origin, WakeTitle: o.wakeTitle, WakeJSON: o.wakeJSON}
+		Origin: o.origin, WakeTitle: o.wakeTitle, WakeJSON: o.wakeJSON, ResumeNote: o.note}
 }
 
 // resumeLaunch is how a stopped thread starts again: claude --resume of its

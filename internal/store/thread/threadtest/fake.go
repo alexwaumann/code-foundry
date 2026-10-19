@@ -671,11 +671,15 @@ func (f *Fake) Respond(_ context.Context, id, requestID string, d thread.Decisio
 	return it, nil
 }
 
-// Interrupt records "Interrupt <id>".
-func (f *Fake) Interrupt(_ context.Context, id string) error {
+// Interrupt records "Interrupt <id>", with " by <by>" when another thread asked.
+func (f *Fake) Interrupt(_ context.Context, id, by string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if err := f.record("Interrupt " + id); err != nil {
+	call := "Interrupt " + id
+	if by != "" {
+		call += " by " + by
+	}
+	if err := f.record(call); err != nil {
 		return err
 	}
 	_, err := f.get(id)

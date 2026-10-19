@@ -24,7 +24,8 @@ const ReasonBudgetReached = "budget reached"
 
 // budgetNoteText is the note the budget stop appends. Claude itself does not see it: the
 // interrupt reaches it as Claude Code's own "The user doesn't want to proceed with this
-// tool use" (docs/notes/orch-small-fixes.md), so the note says what really happened.
+// tool use" (docs/notes/orch-small-fixes.md), so the note says what really happened;
+// Claude learns it from the resume note its next message starts with (resumenote.go).
 func budgetNoteText(budget float64) string {
 	return "Code Foundry stopped this turn: the spending limit of " + FormatUSD(budget) +
 		" was reached; nothing was rejected by the user. Raise it with `code-foundry thread budget`, then send a message to continue."
@@ -45,6 +46,9 @@ func (m *Manager) crossBudget(id string) (budget, cost float64, fired bool) {
 		return 0, 0, false
 	}
 	rec.s.BudgetHitUSD = rec.s.BudgetUSD
+	// Claude sees the interrupt as the user's rejection: its next message says
+	// otherwise (resumenote.go).
+	setResumeNoteLocked(rec, ResumeNote{Cause: ResumeBudget, BudgetUSD: rec.s.BudgetUSD, At: m.opts.Now()})
 	m.commitLocked(rec, true)
 	return rec.s.BudgetUSD, cost, true
 }

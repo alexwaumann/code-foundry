@@ -121,8 +121,10 @@ export type ThreadItemView = ItemBase &
     /**
      * composerText: the composer's text with its tag tokens ("" when sent without the composer); see lib/userMessage.
      * wake: set when the daemon sent it for a wake subscription (docs/notes/agents-4-wake.md), not the user.
+     * resumeNote: the line Claude got before the text after something other than the user stopped its previous turn
+     * (the budget stop, another thread's interrupt, an app restart; docs/notes/orch-child-context.md).
      */
-    | { kind: "user"; text: string; attachments: readonly string[]; composerText: string; wake?: WakeView }
+    | { kind: "user"; text: string; attachments: readonly string[]; composerText: string; wake?: WakeView; resumeNote?: string }
     | { kind: "text"; text: string }
     | { kind: "thinking"; text: string }
     | ({ kind: "tool" } & ToolCallView)
@@ -239,6 +241,7 @@ export function toThreadItemView(it: ThreadItem): ThreadItemView | null {
         attachments: [...p.value.attachments],
         composerText: p.value.composerText,
         ...(p.value.origin === MessageOrigin.WAKE ? { wake: { title: p.value.wakeTitle, json: p.value.wakeJson } } : {}),
+        ...(p.value.resumeNote ? { resumeNote: p.value.resumeNote } : {}),
       };
     case "assistantText":
       return { ...base, kind: "text", text: p.value.text };

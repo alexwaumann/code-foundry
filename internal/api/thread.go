@@ -148,7 +148,7 @@ var errDecision = errors.New("a decision is required: allow, allow for session, 
 
 // Interrupt stops the running turn.
 func (h *Thread) Interrupt(ctx context.Context, req *connect.Request[v1.InterruptThreadRequest]) (*connect.Response[v1.InterruptThreadResponse], error) {
-	if err := h.store.Interrupt(ctx, req.Msg.GetThreadId()); err != nil {
+	if err := h.store.Interrupt(ctx, req.Msg.GetThreadId(), req.Msg.GetByThreadId()); err != nil {
 		return nil, threadError(err)
 	}
 	return connect.NewResponse(&v1.InterruptThreadResponse{}), nil

@@ -357,7 +357,7 @@ func TestRespondInterruptStopped(t *testing.T) {
 		strings.Contains(err.Error(), "reconnect") {
 		t.Errorf("respond: %v", err)
 	}
-	if err := e.m.Interrupt(e.ctx(), s.ID); err != nil {
+	if err := e.m.Interrupt(e.ctx(), s.ID, ""); err != nil {
 		t.Errorf("interrupt: %v", err)
 	}
 	if got := e.snapshot(s.ID); !stopped(got) {

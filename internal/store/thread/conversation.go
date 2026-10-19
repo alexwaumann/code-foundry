@@ -70,8 +70,14 @@ func (m *Manager) Send(ctx context.Context, id string, msg Message) (Item, error
 		m.log.Warn("file references outside the thread's projects; passing their relative paths", "thread", id, "refs", dropped)
 	}
 	prompt = m.rewriteThreadRefsLogged(id, prompt, msg.ComposerText)
+	// After a stop that was not the user's, the message starts with what happened
+	// (resumenote.go); cleared once it went out.
+	note, resume := m.resumeNote(id)
+	if note != "" {
+		prompt = note + "\n\n" + prompt
+	}
 	o := &outgoing{text: strings.TrimSpace(msg.Text), composer: strings.TrimSpace(msg.ComposerText), attachments: attachments, prompt: prompt,
-		origin: msg.Origin, wakeTitle: msg.WakeTitle, wakeJSON: msg.WakeJSON}
+		origin: msg.Origin, wakeTitle: msg.WakeTitle, wakeJSON: msg.WakeJSON, note: note, resume: resume}
 	m.nameFromFirstMessage(id, log, o)
 	for {
 		live, closing, reserved, _, err := m.lifecycle(id)
@@ -142,9 +148,10 @@ func (m *Manager) Respond(ctx context.Context, id, requestID string, d Decision)
 }
 
 // Interrupt implements Store. A thread that is not running has nothing to stop: a
-// no-op.
-func (m *Manager) Interrupt(ctx context.Context, id string) error {
-	r, _, err := m.liveOrStopped(ctx, id)
+// no-op. With by (another thread asked for it), a turn it stopped leaves a resume note
+// (resumenote.go).
+func (m *Manager) Interrupt(ctx context.Context, id, by string) error {
+	r, s, err := m.liveOrStopped(ctx, id)
 	if err != nil || r == nil {
 		return err
 	}
@@ -152,7 +159,11 @@ func (m *Manager) Interrupt(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	return controlErr(conn.Interrupt(ctx))
+	if err := controlErr(conn.Interrupt(ctx)); err != nil {
+		return err
+	}
+	m.noteInterrupt(id, by, midTurn(s))
+	return nil
 }
 
 // setLive applies a setting: through Claude's control protocol (apply) on a live

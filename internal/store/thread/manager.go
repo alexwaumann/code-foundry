@@ -79,6 +79,10 @@ type Options struct {
 	// project store's Options.WorktreeRoot). Only a missing cwd under it is recreated
 	// when its thread starts (recreate.go); empty recreates none.
 	WorktreeRoot string
+	// TmpRoot is the directory each thread's TMPDIR is made under, one per thread id
+	// (paths.Tmp; childcontext.go): made at every spawn, removed with the thread and,
+	// for threads that are gone, at New. Empty: threads keep the daemon's TMPDIR.
+	TmpRoot string
 	// Env entries ("KEY=VALUE") are added to every claude process's environment
 	// (Create, Reconnect, Fork). The daemon passes its loopback endpoint and token so
 	// the CLI inside a thread reaches it without the Unix socket. Every process also
@@ -316,6 +320,10 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 		if s.State != StateDisconnected {
 			lost = append(lost, s.ID)
 			s.State, s.DisconnectReason = StateDisconnected, ReasonDaemonRestarts
+			if midTurn(s) {
+				// The turn died with the daemon (resumenote.go).
+				s.ResumeNote = ResumeNote{Cause: ResumeRestart, At: opts.Now()}
+			}
 			st, reason := disconnectedStatus(s.Status, s.StatusReason)
 			s.setStatus(st, reason, opts.Now())
 			if err := saveThread(ctx, opts.DB, s); err != nil {
@@ -333,6 +341,8 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 	m.mu.Lock()
 	m.rebuildLocked()
 	m.mu.Unlock()
+	// Nothing runs yet: the TMPDIRs of threads that are gone go (childcontext.go).
+	m.reapThreadTmps()
 	// The runs the daemon lost: loading a stopped thread's log closes what its run left
 	// open, the turn included (closeLostRun); done now, not when someone first reads the
 	// items, so the timeline is whole at once.
@@ -808,12 +818,15 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 // x is the extras it applied, for the staleness fingerprint (envstale.go).
 func (m *Manager) claudeCommand(ctx context.Context, s Thread, l launch, g grants, wait bool) (argv, env []string, x SpawnExtras) {
 	sa := spawnArgs{model: s.Model, effort: s.Effort, perm: s.PermissionMode,
-		allowedTools: g.allow, disallowedTools: g.deny, appendSystemPrompt: systemPrompt("")}
+		allowedTools: allowedTools(g.allow), disallowedTools: g.deny, appendSystemPrompt: systemPrompt("")}
 	if m.opts.SkillsDir != "" {
 		// First, so the skills load whatever else is added (docs/notes/agent-skills.md).
 		sa.addDirs = append(sa.addDirs, m.opts.SkillsDir)
 	}
 	env = append(slices.Clip(m.opts.Env), paths.EnvThread+"="+s.ID)
+	// Its own TMPDIR, before the workspace's and the thread's own env, which may set
+	// another (childcontext.go); plugins cannot (a reserved name).
+	env = append(env, m.tmpEnv(s.ID)...)
 	var wl wsLaunch
 	var members []string
 	if s.WorkspaceID != "" {
@@ -938,6 +951,9 @@ func (m *Manager) Remove(ctx context.Context, id string) (err error) {
 	if err := m.removeShells(ctx, id); err != nil {
 		return err
 	}
+	// Its process is gone, and a start meanwhile fails the removal below: its TMPDIR
+	// goes (a failed removal leaves the thread to make it again at its next spawn).
+	m.removeThreadTmp(id)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	rec, err := m.record(id)

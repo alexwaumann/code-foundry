@@ -45,6 +45,11 @@ type outgoing struct {
 	// origin, wakeTitle and wakeJSON: the item's Origin, WakeTitle and WakeJSON.
 	origin              MessageOrigin
 	wakeTitle, wakeJSON string
+	// note is the resume note line the prompt starts with (the item's ResumeNote), and
+	// resume the pending note it came from, cleared once the message went out
+	// (resumenote.go); empty without one.
+	note   string
+	resume ResumeNote
 }
 
 // streamState is the runner's process half. Every field is touched only by
@@ -561,6 +566,9 @@ func (r *runner) sendMessage(o *outgoing) (Item, error) {
 	} else {
 		it, _ = st.log.get(id)
 	}
+	if o.note != "" {
+		r.m.clearResumeNote(r.id, o.resume)
+	}
 	st.sd.sent(o.origin != OriginWake)
 	r.activity = r.m.opts.Now()
 	r.checkStatus()
@@ -830,6 +838,8 @@ func (r *runner) abandon() {
 // it over pipes), so it is terminated, and the thread disconnects "daemon stopped".
 func (r *runner) shutdown() {
 	st := r.st
+	// A turn the stop cuts off leaves a resume note for the next message (resumenote.go).
+	cut := st.sd.busy || st.sd.compacting || len(st.pending) > 0
 	_ = st.conn.CloseStdin()
 	_ = st.proc.Signal(syscall.SIGTERM)
 	select {
@@ -849,8 +859,12 @@ func (r *runner) shutdown() {
 	// End the reader even if a grandchild kept stdout open.
 	st.proc.CloseOutput()
 	r.log().info("thread disconnected", "reason", ReasonDaemonStopped)
+	now := r.m.opts.Now()
 	r.finish(func(s *Thread) {
 		s.State, s.DisconnectReason = StateDisconnected, ReasonDaemonStopped
+		if cut {
+			s.ResumeNote = ResumeNote{Cause: ResumeRestart, At: now}
+		}
 	})
 }
 

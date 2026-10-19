@@ -348,7 +348,7 @@ func TestRenderedSetEffortGap(t *testing.T) {
 		{
 			name: "interrupt, model and mode wait for the new process; respond finds nothing",
 			run: func(t *testing.T, re *env, s Thread) {
-				if err := re.m.Interrupt(re.ctx(), s.ID); !errors.Is(err, ErrFailedPrecondition) {
+				if err := re.m.Interrupt(re.ctx(), s.ID, ""); !errors.Is(err, ErrFailedPrecondition) {
 					t.Errorf("interrupt: %v", err)
 				}
 				if _, err := re.m.SetModel(re.ctx(), s.ID, "sonnet"); !errors.Is(err, ErrFailedPrecondition) {
@@ -573,8 +573,9 @@ func TestRenderedSetEffortRespawnArgv(t *testing.T) {
 	if argOf(argv, "--resume") != argOf(first, "--session-id") || slices.Contains(argv, "--session-id") || slices.Contains(argv, "--") {
 		t.Errorf("respawn argv %q", argv)
 	}
-	i := slices.Index(argv, "--allowedTools")
-	if i < 0 || !slices.Equal(argv[i+1:min(i+3, len(argv))], []string{"Bash(mkdir -p sub)", "Bash(touch sub/a.txt)"}) {
+	// After the protocol rules every spawn has (childcontext.go).
+	i := slices.Index(argv, "--allowedTools") + len(ProtocolAllowedTools)
+	if i < len(ProtocolAllowedTools) || !slices.Equal(argv[i+1:min(i+3, len(argv))], []string{"Bash(mkdir -p sub)", "Bash(touch sub/a.txt)"}) {
 		t.Errorf("the session's grants are not passed again: %q", argv)
 	}
 }
@@ -616,7 +617,7 @@ func TestRenderedRespondToWithdrawnRequest(t *testing.T) {
 	s := re.create(CreateOptions{PermissionMode: PermissionSupervised, InitialPrompt: "write"})
 	re.waitFor(s.ID, "permission", func(s Thread) bool { return s.Status == StatusNeedsAttention })
 	p := re.items(s.ID).Pending[0]
-	if err := re.m.Interrupt(re.ctx(), s.ID); err != nil {
+	if err := re.m.Interrupt(re.ctx(), s.ID, ""); err != nil {
 		t.Fatal(err)
 	}
 	re.waitItems(s.ID, "the request withdrawn", func(items []Item) bool {

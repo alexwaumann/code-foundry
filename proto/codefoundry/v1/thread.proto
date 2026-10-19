@@ -235,6 +235,11 @@ message UserMessageItem {
   // WAKE only: the JSON payload of the fenced block (kind, subscription_id, condition,
   // fired_at, and the thread or the run).
   string wake_json = 6;
+  // The resume note Claude got before the text, when something other than the user
+  // (the budget stop, another thread's interrupt, an app restart) stopped its previous
+  // turn: one line starting "[code-foundry] " (docs/notes/orch-child-context.md).
+  // Empty for most messages.
+  string resume_note = 7;
 }
 
 // MessageOrigin is who sent a user_message item.
@@ -721,6 +726,10 @@ message RespondThreadResponse {
 
 message InterruptThreadRequest {
   string thread_id = 1;
+  // The thread that asks for it (the CLI sends $CODE_FOUNDRY_THREAD); empty for the
+  // user. A turn another thread stopped leaves a resume note: the next message Claude
+  // gets starts with a line saying who stopped it (docs/notes/orch-child-context.md).
+  string by_thread_id = 2;
 }
 
 message InterruptThreadResponse {}

@@ -13,6 +13,7 @@ import {
   FileText,
   FoldVertical,
   Globe,
+  Info,
   Lightbulb,
   List,
   ListTodo,
@@ -813,13 +814,41 @@ function WakeNoteRow({ line, atMs }: { line: WakeLine; atMs: number | null }) {
   );
 }
 
+/**
+ * The resume note a message carried (docs/notes/orch-child-context.md): what the daemon told Claude before the
+ * message after something other than the user stopped its previous turn, one muted line above it.
+ */
+function ResumeNoteRow({ note }: { note: string }) {
+  const text = note.replace(/^\[code-foundry\] /, "");
+  return (
+    <LineageNote icon={<Info aria-label="Code Foundry note" />} atMs={null} testId="thread-resume-note">
+      <span className="lead">Told Claude</span>
+      <Tip label={text} whenTruncated>
+        <span className="sum" data-testid="thread-resume-note-text">
+          {text}
+        </span>
+      </Tip>
+    </LineageNote>
+  );
+}
+
 /** A user message: a turn's opening bubble, or a steer's smaller one inside the turn; a wake message is a note either way. */
 const UserRow = memo(function UserRow({ id, steer }: { id: string; steer?: boolean }) {
   const { threadId } = useThreadCtx();
   const it = useThreadItem(threadId, id);
   if (it?.kind !== "user") return null;
-  if (it.wake) return <WakeNotes wake={it.wake} atMs={it.createdAtMs} />;
-  return <UserBubble text={it.text} composerText={it.composerText} attachments={it.attachments} createdAtMs={it.createdAtMs} steer={steer} />;
+  const msg = it.wake ? (
+    <WakeNotes wake={it.wake} atMs={it.createdAtMs} />
+  ) : (
+    <UserBubble text={it.text} composerText={it.composerText} attachments={it.attachments} createdAtMs={it.createdAtMs} steer={steer} />
+  );
+  if (!it.resumeNote) return msg;
+  return (
+    <>
+      <ResumeNoteRow note={it.resumeNote} />
+      {msg}
+    </>
+  );
 });
 
 /** Re-renders every second while `live`. */

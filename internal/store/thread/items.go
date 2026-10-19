@@ -124,9 +124,12 @@ type Item struct {
 	ComposerText string
 	// Origin, WakeTitle and WakeJSON: user_message's sender (Message.Origin); a wake's
 	// header line without its prefix and its JSON payload (subscriptions_fire.go).
-	Origin     MessageOrigin
-	WakeTitle  string
-	WakeJSON   string
+	Origin    MessageOrigin
+	WakeTitle string
+	WakeJSON  string
+	// ResumeNote: user_message's resume note, the line Claude got before the text after
+	// something other than the user stopped its previous turn (resumenote.go).
+	ResumeNote string
 	Tool       *ToolCall
 	Request    *Request // permission_request and question
 	Turn       *TurnEnd
