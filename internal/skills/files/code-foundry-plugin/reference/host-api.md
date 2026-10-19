@@ -417,14 +417,14 @@ session environment's rules, but a bad one refuses the call, and they replace th
 plugin's own session environment for this thread; `Model` and `Effort` default to the
 user's settings (`Model` a model id, `Effort` `low` … `max`: the values `code-foundry help
 thread.new` lists for `--model` and `--effort`); `PermissionMode` is `supervised`,
-`accept-edits` or `auto` (`PermissionMode*` constants, `thread.new --permission`'s values;
-default Claude's own, which asks like supervised); `Prompt` is an optional first message.
+`accept-edits` or `auto` (`--permission`'s values; default Claude's own, which asks);
+`Prompt` is an optional first message.
 An `AddDirs` entry (here or in `SetEnvironment`) is a directory Claude Code may read and
 loads skills from: a skill is `<dir>/.claude/skills/<skill>/SKILL.md` (with `name` and
 `description` front matter), as above; `<dir>` itself is passed. It runs like any thread: a
 message starts its Claude, which stops at cache expiry, and it costs what it costs (the
 Usage page counts it). `SendThread` and `ArchiveThread` reach only the plugin's own
-threads (-32004 otherwise; a send unarchives; an archived thread's node still renders,
+threads (-32004 otherwise; an archived thread's node still renders,
 so drop it from the view); `Threads` lists them. To write to the
 user's thread, `Invoke` `thread.send` with the id from `act.Context`. `CreateTerminal`
 starts a terminal the plugin owns (cwd the data dir unless given, under home; env checked
