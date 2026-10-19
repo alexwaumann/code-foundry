@@ -100,3 +100,11 @@ app and its daemon were quit and `/tmp/cf-strip` removed.
 Not exercised live: a permission or question breaking a strip (auto mode asks nothing;
 unit tests only), and an Agent as the latest step (the e2e strip's latest step is the
 mock's Agent, but its label is not asserted).
+
+## Unrelated flake fixed on the way
+
+`make check` failed twice on `surfaces/mcp.test.tsx` ("Checked 13s ago" for "12s"): its
+`STATUS.checkedAtMs` was `Date.now() - 12_000` at module load, so under load the test
+rendered more than half a second later. `beforeEach` now stamps it per test, and the
+reconnect test reuses that stamp (a second `Date.now()` there read "11s", the panel's
+shared clock having captured its `now` at mount).

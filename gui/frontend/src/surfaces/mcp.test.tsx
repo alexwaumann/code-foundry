@@ -44,6 +44,9 @@ const STATUS: McpStatusView = {
   ],
 };
 
+/** The check time beforeEach gives s-r (12 s before the test starts). */
+let checkedAtMs = STATUS.checkedAtMs;
+
 function setMcp(id: string, mcp: McpStatusView | null): void {
   useThreadStore.setState((s) => ({ logs: { ...s.logs, [id]: { seq: 1, byId: {}, order: [], pending: [], mcp, commands: [], agents: [] } } }));
 }
@@ -60,7 +63,9 @@ beforeEach(() => {
   useViewsStore.setState({ settingsOpen: false });
   useUiStore.setState({ windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260, selection: { kind: "thread", id: "s-r" }, palette: { ...useUiStore.getState().palette, open: false } });
   useThreadStore.setState({ logs: {} });
-  setMcp("s-r", STATUS);
+  // Stamped per test: a check time taken when the module loaded drifts past 12s under load.
+  checkedAtMs = Date.now() - 12_000;
+  setMcp("s-r", { ...STATUS, checkedAtMs });
   api.get.mockResolvedValue(null);
 });
 
@@ -136,7 +141,7 @@ describe("MCP surface", () => {
     expect(within(card("playwright"), "mcp-pill")?.textContent).toBe("Connecting…");
     expect((within(card("playwright"), "mcp-reconnect") as HTMLButtonElement).disabled).toBe(true);
     await act(async () => {
-      setMcp("s-r", { ...STATUS, trigger: "reconnect", server: "playwright", servers: STATUS.servers.map((s) => (s.name === "playwright" ? { ...s, status: "connected", error: "" } : s)) });
+      setMcp("s-r", { ...STATUS, checkedAtMs, trigger: "reconnect", server: "playwright", servers: STATUS.servers.map((s) => (s.name === "playwright" ? { ...s, status: "connected", error: "" } : s)) });
       finish({ message: "reconnected playwright: connected", resultJson: "{}" });
       await Promise.resolve();
     });
