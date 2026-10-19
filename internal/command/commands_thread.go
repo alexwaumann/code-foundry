@@ -87,6 +87,7 @@ var threadDecisions = map[string]v1.ThreadDecision{
 func RegisterThread(r *Registry, b ThreadBackend) error {
 	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextThread, ID: ThreadID, Description: "Thread id" + IDHelp}
 	r.SetIDLister(ThreadID, threadIDs(b))
+	r.SetIDFallback(ThreadID, removedThreadIDs(b))
 	r.SetIDLister(SubscriptionID, subscriptionIDs(b))
 	return r.RegisterAll(
 		Command{
@@ -244,6 +245,9 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 			When: hasThread,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				res, err := b.ListItems(ctx, connect.NewRequest(&v1.ListThreadItemsRequest{ThreadId: a.String("id")}))
+				if r, ok := removedFrom(err); ok {
+					return removedWaitResult(r, ""), nil // exit 1, like thread.read
+				}
 				if err != nil {
 					return Result{}, err
 				}

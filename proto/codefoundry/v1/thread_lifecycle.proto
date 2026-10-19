@@ -610,6 +610,10 @@ message RemovedThread {
   string report_summary = 8;
   string report_data = 9;
   google.protobuf.Timestamp report_at = 10;
+  // What the thread cost and its budget when it was removed, as on Thread.
+  double cost_usd = 11;
+  bool unpriced = 12;
+  double budget_usd = 13;
 }
 
 message GetThreadRequest {

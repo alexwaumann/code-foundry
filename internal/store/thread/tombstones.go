@@ -39,15 +39,23 @@ type RemovedThread struct {
 	// Report is the thread's last report; the zero value when it never reported.
 	Report    Report
 	RemovedAt time.Time
+	// Usage and BudgetUSD are the thread's at removal, so what it cost is still known
+	// (E4 4.6: an orchestrator's cost table undercounted a removed child). Usage is
+	// shared with the thread's last snapshot (copy on write, never mutated).
+	Usage     []UsageBucket
+	BudgetUSD float64
 }
 
 // removedThread is the tombstone of t, removed at.
 func removedThread(t Thread, at time.Time) RemovedThread {
 	return RemovedThread{
 		ID: t.ID, Name: t.Name, ProjectID: t.ProjectID, WorkspaceID: t.WorkspaceID, CreatedBy: t.CreatedBy, Owner: t.Owner,
-		Labels: slices.Clone(t.Labels), Report: t.Report, RemovedAt: at,
+		Labels: slices.Clone(t.Labels), Report: t.Report, RemovedAt: at, Usage: t.Usage, BudgetUSD: t.BudgetUSD,
 	}
 }
+
+// TombstoneOf is the tombstone Remove keeps of t, removed at; fake stores keep the same.
+func TombstoneOf(t Thread, at time.Time) RemovedThread { return removedThread(t, at) }
 
 // Label is how messages name r: `"Fix the login" (s-1)`, or its id when unnamed.
 func (r RemovedThread) Label() string {

@@ -49,6 +49,8 @@ type ThreadReport struct {
 	// the last day (--all lists them; commands_thread_removed.go).
 	Removed   bool       `json:"removed,omitempty"`
 	RemovedAt *time.Time `json:"removedAt,omitempty"`
+	// CostUSD is what the thread cost (at removal, for a removed one); omitted at 0.
+	CostUSD float64 `json:"costUsd,omitempty"`
 }
 
 // RegisterThreadReports registers thread.reports.
@@ -159,6 +161,7 @@ func threadReport(s *v1.Thread) ThreadReport {
 	r := ThreadReport{
 		ID: s.GetId(), Name: s.GetName(), Status: threadStatusName(s.GetStatus()), ReportStatus: reportWord(s),
 		ReportSummary: s.GetReportSummary(), CreatedBy: s.GetCreatedBy(), Labels: slices.Clone(s.GetLabels()),
+		CostUSD: s.GetCostUsd(),
 	}
 	if r.Labels == nil {
 		r.Labels = []string{}

@@ -2657,6 +2657,10 @@ type RemovedThread struct {
 	ReportSummary string                 `protobuf:"bytes,8,opt,name=report_summary,json=reportSummary,proto3" json:"report_summary,omitempty"`
 	ReportData    string                 `protobuf:"bytes,9,opt,name=report_data,json=reportData,proto3" json:"report_data,omitempty"`
 	ReportAt      *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=report_at,json=reportAt,proto3" json:"report_at,omitempty"`
+	// What the thread cost and its budget when it was removed, as on Thread.
+	CostUsd       float64 `protobuf:"fixed64,11,opt,name=cost_usd,json=costUsd,proto3" json:"cost_usd,omitempty"`
+	Unpriced      bool    `protobuf:"varint,12,opt,name=unpriced,proto3" json:"unpriced,omitempty"`
+	BudgetUsd     float64 `protobuf:"fixed64,13,opt,name=budget_usd,json=budgetUsd,proto3" json:"budget_usd,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2759,6 +2763,27 @@ func (x *RemovedThread) GetReportAt() *timestamppb.Timestamp {
 		return x.ReportAt
 	}
 	return nil
+}
+
+func (x *RemovedThread) GetCostUsd() float64 {
+	if x != nil {
+		return x.CostUsd
+	}
+	return 0
+}
+
+func (x *RemovedThread) GetUnpriced() bool {
+	if x != nil {
+		return x.Unpriced
+	}
+	return false
+}
+
+func (x *RemovedThread) GetBudgetUsd() float64 {
+	if x != nil {
+		return x.BudgetUsd
+	}
+	return 0
 }
 
 type GetThreadRequest struct {
@@ -4677,7 +4702,7 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\x13ListThreadsResponse\x120\n" +
 	"\athreads\x18\x01 \x03(\v2\x16.codefoundry.v1.ThreadR\athreads\x12@\n" +
 	"\rretired_usage\x18\x02 \x03(\v2\x1b.codefoundry.v1.UsageBucketR\fretiredUsage\x127\n" +
-	"\aremoved\x18\x03 \x03(\v2\x1d.codefoundry.v1.RemovedThreadR\aremoved\"\x8e\x03\n" +
+	"\aremoved\x18\x03 \x03(\v2\x1d.codefoundry.v1.RemovedThreadR\aremoved\"\xe4\x03\n" +
 	"\rRemovedThread\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1d\n" +
@@ -4693,7 +4718,11 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\vreport_data\x18\t \x01(\tR\n" +
 	"reportData\x127\n" +
 	"\treport_at\x18\n" +
-	" \x01(\v2\x1a.google.protobuf.TimestampR\breportAt\"C\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\breportAt\x12\x19\n" +
+	"\bcost_usd\x18\v \x01(\x01R\acostUsd\x12\x1a\n" +
+	"\bunpriced\x18\f \x01(\bR\bunpriced\x12\x1d\n" +
+	"\n" +
+	"budget_usd\x18\r \x01(\x01R\tbudgetUsd\"C\n" +
 	"\x10GetThreadRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1f\n" +
 	"\vwith_detail\x18\x02 \x01(\bR\n" +

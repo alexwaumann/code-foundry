@@ -37,25 +37,10 @@ func removedFrom(err error) (*v1.RemovedThread, bool) {
 	return nil, false
 }
 
-// removedWaitResult is thread.wait's and thread.send's answer for a removed thread:
-// "thread <id> <name> was removed", its last report on a second line, exit 1. --json:
-// the thread as thread.reports has it, removed true. what, when set, starts the
-// message ("sent to thread s-1; ").
-func removedWaitResult(r *v1.RemovedThread, what string) Result {
-	line := what + "thread " + r.GetId()
-	if r.GetName() != "" {
-		line += " " + r.GetName()
-	}
-	line += " was removed"
-	if at := r.GetRemovedAt(); at != nil {
-		line += " at " + at.AsTime().Local().Format(removedTimeLayout)
-	}
-	return Result{Message: withLastReport(line, r), JSON: removedReport(r), ExitCode: 1}
-}
-
-// removedGetResult is thread.get's answer for a removed thread: "thread <name> (<id>)
-// was removed at <time>" and its last report, exit 1.
-func removedGetResult(r *v1.RemovedThread) Result {
+// removedLine is the first line every command prints for a removed thread: "thread
+// <name> (<id>) was removed at <time>". thread.get, thread.wait, thread.send and
+// thread.read print it alike (E4 4.5, W4 finding 4).
+func removedLine(r *v1.RemovedThread) string {
 	line := "thread " + r.GetId()
 	if r.GetName() != "" {
 		line = "thread " + r.GetName() + " (" + r.GetId() + ")"
@@ -64,13 +49,40 @@ func removedGetResult(r *v1.RemovedThread) Result {
 	if at := r.GetRemovedAt(); at != nil {
 		line += " at " + at.AsTime().Local().Format(removedTimeLayout)
 	}
+	return line
+}
+
+// removedWaitResult is thread.wait's, thread.send's and thread.read's answer for a
+// removed thread: removedLine, its last report and cost, exit 1 (not the usage exit 2
+// of an unknown id). --json: the thread as thread.reports has it, removed true. what,
+// when set, starts the message ("sent to thread s-1; ").
+func removedWaitResult(r *v1.RemovedThread, what string) Result {
+	return Result{Message: withCost(withLastReport(what+removedLine(r), r), r), JSON: removedReport(r), ExitCode: 1}
+}
+
+// removedGetResult is thread.get's answer for a removed thread: removedLine, its
+// creator and labels, its last report and cost, exit 1.
+func removedGetResult(r *v1.RemovedThread) Result {
+	line := removedLine(r)
 	if by := r.GetCreatedBy(); by != "" {
 		line += "\ncreated by: " + by
 	}
 	if len(r.GetLabels()) > 0 {
 		line += "\nlabels: " + strings.Join(r.GetLabels(), ", ")
 	}
-	return Result{Message: withLastReport(line, r), JSON: removedReport(r), ExitCode: 1}
+	return Result{Message: withCost(withLastReport(line, r), r), JSON: removedReport(r), ExitCode: 1}
+}
+
+// withCost adds "cost: $0.09" (of its budget) under msg: what the removed thread cost.
+func withCost(msg string, r *v1.RemovedThread) string {
+	msg += "\ncost: " + formatUSD(r.GetCostUsd())
+	if r.GetUnpriced() {
+		msg += " (some usage unpriced)"
+	}
+	if b := r.GetBudgetUsd(); b > 0 {
+		msg += " of a " + formatBudget(b) + " budget"
+	}
+	return msg
 }
 
 // withLastReport adds "last report: done — <summary>" (or "no report") under msg.
@@ -109,6 +121,7 @@ func removedReport(r *v1.RemovedThread) ThreadReport {
 	out := ThreadReport{
 		ID: r.GetId(), Name: r.GetName(), Status: "removed", ReportStatus: cmp.Or(reportStatusName(r.GetReportStatus()), "none"),
 		ReportSummary: r.GetReportSummary(), CreatedBy: r.GetCreatedBy(), Labels: slices.Clone(r.GetLabels()), Removed: true,
+		CostUSD: r.GetCostUsd(),
 	}
 	if out.Labels == nil {
 		out.Labels = []string{}

@@ -64,6 +64,41 @@ func (r *Registry) idLister(kind IDKind) IDLister {
 	return r.idListers[kind]
 }
 
+// SetIDFallback makes a suffix of kind that names none of its listed ids resolve
+// against list instead: the threads removed within the last day (removedThreadIDs), so
+// a removed thread's suffix reaches the command, which says it was removed (E4 4.5).
+func (r *Registry) SetIDFallback(kind IDKind, list IDLister) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.idFallbacks == nil {
+		r.idFallbacks = make(map[IDKind]IDLister)
+	}
+	r.idFallbacks[kind] = list
+}
+
+// resolveRef resolves one suffix ref of kind against ids, then, when none ends in it,
+// against the kind's fallback ids.
+func (r *Registry) resolveRef(ctx context.Context, kind IDKind, arg, ref string, ids []string) (string, error) {
+	full, err := ResolveID(kind, arg, ref, ids)
+	if connect.CodeOf(err) != connect.CodeNotFound {
+		return full, err
+	}
+	r.mu.RLock()
+	fallback := r.idFallbacks[kind]
+	r.mu.RUnlock()
+	if fallback == nil {
+		return full, err
+	}
+	more, ferr := fallback(ctx)
+	if ferr != nil {
+		return "", ferr
+	}
+	if full, ferr := ResolveID(kind, arg, ref, more); ferr == nil {
+		return full, nil
+	}
+	return "", err
+}
+
 // resolveIDs replaces every id arg given as a suffix with its full id, in args and in
 // eff for a context-bound one.
 func (r *Registry) resolveIDs(ctx context.Context, specs []ArgSpec, args Args, eff Context) (Context, error) {
@@ -88,7 +123,7 @@ func (r *Registry) resolveIDs(ctx context.Context, specs []ArgSpec, args Args, e
 		if err != nil {
 			return eff, err
 		}
-		full, err := ResolveID(s.ID, s.Name, v, ids)
+		full, err := r.resolveRef(ctx, s.ID, s.Name, v, ids)
 		if err != nil {
 			return eff, err
 		}
@@ -121,7 +156,7 @@ func (r *Registry) resolveIDList(ctx context.Context, s ArgSpec, v string) (stri
 				listed = true
 			}
 			var err error
-			if full, err = ResolveID(s.ID, s.Name, ref, ids); err != nil {
+			if full, err = r.resolveRef(ctx, s.ID, s.Name, ref, ids); err != nil {
 				return "", err
 			}
 		}
@@ -177,6 +212,22 @@ func threadIDs(b ThreadBackend) IDLister {
 		}
 		ids := make([]string, len(res.Msg.GetThreads()))
 		for i, t := range res.Msg.GetThreads() {
+			ids[i] = t.GetId()
+		}
+		return ids, nil
+	}
+}
+
+// removedThreadIDs lists the ids of the threads removed within the last day (the
+// daemon's tombstones), the fallback of a thread id suffix.
+func removedThreadIDs(b ThreadBackend) IDLister {
+	return func(ctx context.Context) ([]string, error) {
+		res, err := b.List(ctx, connect.NewRequest(&v1.ListThreadsRequest{Filter: &v1.ThreadFilter{All: true, IncludeRemoved: true}}))
+		if err != nil {
+			return nil, err
+		}
+		ids := make([]string, len(res.Msg.GetRemoved()))
+		for i, t := range res.Msg.GetRemoved() {
 			ids[i] = t.GetId()
 		}
 		return ids, nil

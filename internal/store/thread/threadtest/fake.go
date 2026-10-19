@@ -428,8 +428,7 @@ func (f *Fake) Remove(_ context.Context, id string) error {
 	if f.removed == nil {
 		f.removed = map[string]thread.RemovedThread{}
 	}
-	f.removed[id] = thread.RemovedThread{ID: s.ID, Name: s.Name, ProjectID: s.ProjectID, WorkspaceID: s.WorkspaceID,
-		CreatedBy: s.CreatedBy, Owner: s.Owner, Labels: slices.Clone(s.Labels), Report: s.Report, RemovedAt: f.Now()}
+	f.removed[id] = thread.TombstoneOf(s, f.Now())
 	if len(s.Usage) > 0 {
 		f.retired = thread.SumUsage(f.retired, s.Usage)
 	}

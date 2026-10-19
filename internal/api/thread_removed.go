@@ -20,7 +20,9 @@ func removedToProto(r thread.RemovedThread) *v1.RemovedThread {
 	p := &v1.RemovedThread{
 		Id: r.ID, Name: r.Name, CreatedBy: r.CreatedBy, Labels: slices.Clone(r.Labels), ProjectId: r.ProjectID,
 		ReportStatus: v1.ThreadReportStatus(r.Report.Status), ReportSummary: r.Report.Summary, ReportData: r.Report.Data,
+		BudgetUsd: r.BudgetUSD,
 	}
+	_, p.CostUsd, p.Unpriced = usageToProto(r.Usage)
 	if !r.RemovedAt.IsZero() {
 		p.RemovedAt = timestamppb.New(r.RemovedAt)
 	}

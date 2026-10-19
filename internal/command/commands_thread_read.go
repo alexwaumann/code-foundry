@@ -51,6 +51,9 @@ func threadRead(b ThreadBackend, idArg ArgSpec) Command {
 			res, err := b.ListItems(ctx, connect.NewRequest(&v1.ListThreadItemsRequest{ThreadId: id, Query: &v1.ThreadItemsQuery{
 				Last: int32(a.Int("last")), Since: since, Role: threadItemRoles[a.String("role")],
 			}}))
+			if r, ok := removedFrom(err); ok {
+				return removedWaitResult(r, ""), nil // exit 1, like thread.get and thread.wait
+			}
 			if err != nil {
 				return Result{}, err
 			}
