@@ -24,7 +24,7 @@ export function InlineThread({ threadId, readOnly = false, placeholder }: { thre
   // An inline holder (api/streamSlots.ts): the content pane's own Watch outranks it.
   useEffect(() => startThreadWatch(threadId, "inline"), [threadId]);
   const cwd = useThreadsStore((s) => s.byId[threadId]?.worktreePath ?? "");
-  const { loaded, empty, catchingUp, watchError, open, busy, working, timelineWorking } = useThreadActivity(threadId);
+  const { loaded, empty, catchingUp, watchError, open, busy, working, timelineWorking, timelineStrips } = useThreadActivity(threadId);
   const dockRef = useRef<HTMLDivElement>(null);
   const dockHeight = useElementHeight(dockRef);
   const ctx = useMemo(() => ({ threadId, cwd }), [threadId, cwd]);
@@ -43,7 +43,7 @@ export function InlineThread({ threadId, readOnly = false, placeholder }: { thre
             No messages yet.
           </p>
         )}
-        <Timeline key={threadId} threadId={threadId} working={timelineWorking} bottomInset={readOnly ? 0 : dockHeight} inset={INLINE_INSET} />
+        <Timeline key={threadId} threadId={threadId} working={timelineWorking} strips={timelineStrips} bottomInset={readOnly ? 0 : dockHeight} inset={INLINE_INSET} />
         {!readOnly && (
           <div className="dock" ref={dockRef}>
             <ThreadComposer key={threadId} threadId={threadId} pending={open} busy={busy} placeholder={placeholder} focusRequests={false} />

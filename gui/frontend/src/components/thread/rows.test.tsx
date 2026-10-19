@@ -427,3 +427,109 @@ describe("path chips", () => {
     expect(openFileInPanel).toHaveBeenCalledWith("current", { project: "", base: "/w", path: "/elsewhere/notes.md", line: 30 });
   });
 });
+
+describe("a live tool strip", () => {
+  const hi: ThreadItemView = { ...base, id: "u", ordinal: 1, kind: "user", text: "go", attachments: [], composerText: "" };
+  let ord = 1;
+  const bash = (id: string, command: string, over: Partial<Extract<ThreadItemView, { kind: "tool" }>> = {}): ThreadItemView => ({
+    ...base,
+    id,
+    ordinal: ++ord,
+    kind: "tool",
+    toolUseId: id,
+    name: "Bash",
+    inputJson: JSON.stringify({ command }),
+    status: "done",
+    output: "",
+    isError: false,
+    resultJson: "",
+    createdAtMs: 1_000,
+    updatedAtMs: 2_300,
+    ...over,
+  });
+
+  /** The live turn with strips on, re-rendered in place (same React tree) for each list of items. */
+  function live(items: ThreadItemView[]) {
+    const tree = (its: ThreadItemView[]) => {
+      const byId = Object.fromEntries(its.map((it) => [it.id, it]));
+      useThreadStore.setState({ logs: { s: { seq: 1, byId, order: its.map((it) => it.id), pending: [], mcp: null, commands: [], agents: [] } } });
+      const rows = buildRows(buildTurns(its.map((it) => decodeTimelineKey(timelineKey(structOf(it))))), { fold: () => undefined, working: true, strips: true });
+      return (
+        <ThreadContext.Provider value={{ threadId: "s", cwd: "/w" }}>
+          {rows.map((r) => (
+            <TimelineRowView key={r.key} row={r} />
+          ))}
+        </ThreadContext.Provider>
+      );
+    };
+    const r = render(tree(items));
+    return {
+      c: r.container,
+      update: (its: ThreadItemView[]) => {
+        r.rerender(tree(its));
+      },
+    };
+  }
+
+  it("collapsed, a running latest step shows the sky spinner, the running tense, its elapsed time and the run's steps", () => {
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
+    vi.setSystemTime(13_000);
+    const { c } = live([hi, bash("b1", "ls"), bash("b2", "pwd"), bash("b3", "go test ./...", { status: "running", createdAtMs: 1_000, updatedAtMs: null })]);
+    expect(c.querySelectorAll('[data-testid="thread-strip"]')).toHaveLength(1);
+    // The run's rows are not shown, only its latest step.
+    expect(c.querySelectorAll('[data-testid="thread-tool"]')).toHaveLength(0);
+    const row = c.querySelector('[data-testid="thread-strip-row"]');
+    expect(row?.getAttribute("aria-expanded")).toBe("false");
+    expect(row?.getAttribute("data-running")).toBe("true");
+    expect(row?.querySelector(".ico svg")?.getAttribute("class")).toContain("animate-spin");
+    expect(row?.querySelector(".ico svg")?.getAttribute("class")).toContain("t-sky");
+    expect(row?.querySelector(".lbl")?.textContent).toBe("Running go test ./...");
+    expect(c.querySelector('[data-testid="thread-strip-meta"]')?.textContent).toBe("12s · 3 steps");
+  });
+
+  it("collapsed, a finished latest step shows its label and only the step count", () => {
+    const steps = Array.from({ length: 12 }, (_, i) => bash(`d${String(i)}`, `echo ${String(i)}`));
+    const { c } = live([hi, ...steps]);
+    const row = c.querySelector('[data-testid="thread-strip-row"]');
+    expect(row?.getAttribute("data-running")).toBeNull();
+    expect(row?.querySelector(".ico svg.animate-spin")).toBeNull();
+    expect(row?.querySelector(".lbl")?.textContent).toBe("Ran echo 11");
+    expect(c.querySelector('[data-testid="thread-strip-meta"]')?.textContent).toBe("12 steps");
+  });
+
+  it("a click expands it in place to an N steps head over the run's rows; a click on the head collapses it", () => {
+    const { c } = live([hi, bash("b1", "ls"), bash("b2", "pwd"), bash("b3", "whoami")]);
+    fireEvent.click(c.querySelector('[data-testid="thread-strip-row"]') as HTMLElement);
+    const strip = c.querySelector('[data-testid="thread-strip"]');
+    expect(strip?.hasAttribute("data-open")).toBe(true);
+    const head = c.querySelector('[data-testid="thread-strip-head"]');
+    expect(head?.getAttribute("aria-expanded")).toBe("true");
+    expect(head?.textContent).toBe("3 steps");
+    expect([...c.querySelectorAll('[data-testid="thread-strip"] .members [data-testid="thread-tool"] .lbl')].map((el) => el.textContent)).toEqual(["Ran ls", "Ran pwd", "Ran whoami"]);
+    // No tool detail opened: the click expanded the run.
+    expect(c.querySelector('[data-testid="thread-bash"]')).toBeNull();
+    fireEvent.click(head as HTMLElement);
+    expect(c.querySelector('[data-testid="thread-strip"]')?.hasAttribute("data-open")).toBe(false);
+    expect(c.querySelector('[data-testid="thread-strip-row"]')).not.toBeNull();
+    expect(c.querySelectorAll('[data-testid="thread-tool"]')).toHaveLength(0);
+  });
+
+  it("stays expanded when the next tool call arrives (keyed by the run's first item)", () => {
+    const first = [hi, bash("b1", "ls"), bash("b2", "pwd")];
+    const { c, update } = live(first);
+    fireEvent.click(c.querySelector('[data-testid="thread-strip-row"]') as HTMLElement);
+    update([...first, bash("b3", "whoami", { status: "running", updatedAtMs: null })]);
+    expect(c.querySelector('[data-testid="thread-strip"]')?.hasAttribute("data-open")).toBe(true);
+    expect(c.querySelector('[data-testid="thread-strip-head"]')?.textContent).toBe("3 steps");
+    expect(c.querySelectorAll('[data-testid="thread-strip"] .members [data-testid="thread-tool"]')).toHaveLength(3);
+  });
+
+  it("a tool waiting for permission is its own row after the strip, waiting for you", () => {
+    const { c } = live([...editWaiting("Bash", { command: "git push" }).slice(0, 1), bash("b1", "ls"), bash("b2", "pwd"), ...editWaiting("Bash", { command: "git push" }).slice(1)]);
+    expect(c.querySelector('[data-testid="thread-strip-meta"]')?.textContent).toBe("2 steps");
+    const waiting = c.querySelector('[data-waiting="true"]');
+    expect(waiting?.getAttribute("data-testid")).toBe("thread-tool");
+    expect(waiting?.textContent).toContain("waiting for you");
+    expect(waiting?.closest('[data-testid="thread-strip"]')).toBeNull();
+  });
+});

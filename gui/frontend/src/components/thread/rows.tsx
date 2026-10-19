@@ -14,6 +14,7 @@ import {
   FoldVertical,
   Globe,
   Lightbulb,
+  List,
   ListTodo,
   LoaderCircle,
   MessageCircleQuestionMark,
@@ -36,7 +37,7 @@ import { canonicalModelName } from "@/lib/models";
 import { formatAgo } from "@/lib/thread";
 import { questionsOf } from "@/lib/threadRequest";
 import { wakeLine, type WakeTone } from "@/lib/wake";
-import { groupLabel, turnCostLabel, type TimelineRow, type WorkNode } from "@/lib/threadTimeline";
+import { groupLabel, turnCostLabel, type StripStep, type TimelineRow, type WorkNode } from "@/lib/threadTimeline";
 import { agentReport, formatDuration, parseObject, splitPath, str, toolFileTarget, toolSummary, type Tense } from "@/lib/toolSummary";
 import { useAgentRunOfCall, useAgentRunOfNote } from "@/stores/agents";
 import { useNoteCreator } from "@/stores/lineage";
@@ -80,6 +81,7 @@ function toolIcon(name: string): LucideIcon {
  */
 function Row({
   icon: Icon,
+  iconClassName,
   label,
   meta,
   expanded,
@@ -88,6 +90,8 @@ function Row({
   data,
 }: {
   icon: LucideIcon;
+  /** The icon's own classes (a running strip's sky spinner). */
+  iconClassName?: string;
   label: ReactNode;
   meta?: ReactNode;
   /** undefined: the row does not expand. */
@@ -99,7 +103,7 @@ function Row({
   const body = (
     <>
       <span className="ico">
-        <Icon aria-hidden />
+        <Icon className={iconClassName} aria-hidden />
       </span>
       <span className="lbl">{label}</span>
       {meta && <span className="meta">{meta}</span>}
@@ -634,6 +638,77 @@ function AgentNoteRow({ note, atMs, threadId, run }: { note: ReturnType<typeof p
   );
 }
 
+/** A running step's elapsed time ("12s", "1m 04s"), on the shared 1 s clock. */
+function StepElapsed({ from }: { from: number }) {
+  const now = useNow(1000);
+  return <span className="tabular-nums">{formatDuration(Math.max(0, now - from)).replace(/\.\ds$/, "s") || "0s"}</span>;
+}
+
+/**
+ * A collapsed strip's one row: the latest step's icon and label (the sky spinner and the
+ * running tense while it runs), then its elapsed time while running and the run's step
+ * count ("12s · 3 steps"; a finished latest step's own meta is left out: "12 steps").
+ */
+function StripLatest({ step, steps, onToggle }: { step: StripStep; steps: number; onToggle: () => void }) {
+  const { threadId, cwd } = useThreadCtx();
+  // A group's latest member is the one that may still run.
+  const it = useThreadItem(threadId, step.type === "tool" ? step.id : (step.ids[step.ids.length - 1] ?? ""));
+  const t = it?.kind === "tool" ? it : null;
+  const running = t?.status === "running";
+  const from = running ? t.createdAtMs : null;
+  const icon = running ? LoaderCircle : step.type === "tool" ? toolIcon(step.name) : step.names[0] === "Read" ? FileText : Search;
+  const label = step.type === "group" ? groupLabel(step.names) : t ? <ToolLabel t={t} tense={running ? "running" : "done"} cwd={cwd} /> : null;
+  return (
+    <Row
+      icon={icon}
+      iconClassName={running ? "t-sky animate-spin" : undefined}
+      label={label}
+      meta={
+        <span data-testid="thread-strip-meta">
+          {from !== null && (
+            <>
+              <StepElapsed from={from} />
+              {" · "}
+            </>
+          )}
+          {stepsLabel(steps)}
+        </span>
+      }
+      expanded={false}
+      onToggle={onToggle}
+      testId="thread-strip-row"
+      data={{ "data-running": running ? "true" : undefined }}
+    />
+  );
+}
+
+/**
+ * A run of work in the live turn as one row (docs/notes/live-tool-strip.md): collapsed,
+ * the latest step and the step count; a click expands it in place to an "N steps" head
+ * (a list icon, chevron down) over the run's own rows, indented like a group's members.
+ * Expanded or not is the reader's choice per run (keyed by its first item), so it holds
+ * as the run grows, for the rest of the turn.
+ */
+const StripRow = memo(function StripRow({ node }: { node: Extract<WorkNode, { type: "strip" }> }) {
+  const [open, toggle] = useToggle(node.key, false);
+  return (
+    <div className="strip" data-testid="thread-strip" data-open={open || undefined}>
+      {open ? (
+        <>
+          <Row icon={List} label={stepsLabel(node.steps)} expanded onToggle={toggle} testId="thread-strip-head" />
+          <div className="members">
+            {node.nodes.map((n) => (
+              <WorkNodeView key={n.key} node={n} />
+            ))}
+          </div>
+        </>
+      ) : (
+        <StripLatest step={node.latest} steps={node.steps} onToggle={toggle} />
+      )}
+    </div>
+  );
+});
+
 /** A row of a turn's work log. */
 export function WorkNodeView({ node }: { node: WorkNode }) {
   switch (node.type) {
@@ -655,6 +730,8 @@ export function WorkNodeView({ node }: { node: WorkNode }) {
       return <SystemNoteRow id={node.id} />;
     case "steer":
       return <UserRow id={node.id} steer />;
+    case "strip":
+      return <StripRow node={node} />;
   }
 }
 
