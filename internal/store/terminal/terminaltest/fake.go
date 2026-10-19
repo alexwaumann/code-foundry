@@ -35,13 +35,14 @@ type Fake struct {
 }
 
 type fakeTerm struct {
-	info    terminal.Terminal
-	spec    terminal.Spec
-	output  []byte
-	written []byte
-	screen  *string
-	paste   bool // mode 2004, from the last ESC[?2004h/l emitted
-	subs    map[chan terminal.AttachEvent]struct{}
+	info       terminal.Terminal
+	spec       terminal.Spec
+	output     []byte
+	written    []byte
+	screen     *string
+	scrollback *string
+	paste      bool // mode 2004, from the last ESC[?2004h/l emitted
+	subs       map[chan terminal.AttachEvent]struct{}
 }
 
 var _ terminal.Store = (*Fake)(nil)
@@ -244,6 +245,20 @@ func (f *Fake) ScreenText(_ context.Context, id string) (string, error) {
 	return string(t.output), nil
 }
 
+// ScrollbackText returns the text set with SetScrollback, else all output so far.
+func (f *Fake) ScrollbackText(_ context.Context, id string) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	t, err := f.get(id)
+	if err != nil {
+		return "", err
+	}
+	if t.scrollback != nil {
+		return *t.scrollback, nil
+	}
+	return string(t.output), nil
+}
+
 // BracketedPaste reports mode 2004 as the last ESC[?2004h or ESC[?2004l Emit sent left it.
 func (f *Fake) BracketedPaste(_ context.Context, id string) (bool, error) {
 	f.mu.Lock()
@@ -289,6 +304,18 @@ func (f *Fake) SetScreen(id, text string) error {
 		return err
 	}
 	t.screen = &text
+	return nil
+}
+
+// SetScrollback sets what ScrollbackText returns (instead of all output so far).
+func (f *Fake) SetScrollback(id, text string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	t, err := f.get(id)
+	if err != nil {
+		return err
+	}
+	t.scrollback = &text
 	return nil
 }
 

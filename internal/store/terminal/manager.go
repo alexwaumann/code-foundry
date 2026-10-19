@@ -345,6 +345,21 @@ func (m *Manager) ScreenText(ctx context.Context, id string) (string, error) {
 	return text, terr
 }
 
+// ScrollbackText returns the scrollback and the screen as plain text. See
+// Store.ScrollbackText.
+func (m *Manager) ScrollbackText(ctx context.Context, id string) (string, error) {
+	a, err := m.actor(id)
+	if err != nil {
+		return "", err
+	}
+	var text string
+	var terr error
+	if err := a.call(ctx, func() { text, terr = a.scrollbackText() }); err != nil {
+		return "", err
+	}
+	return text, terr
+}
+
 // BracketedPaste reads mode 2004 from the terminal's emulator (on its actor).
 func (m *Manager) BracketedPaste(ctx context.Context, id string) (bool, error) {
 	a, err := m.actor(id)

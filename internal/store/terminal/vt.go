@@ -99,3 +99,20 @@ func formatActivePlain(t *ghostty.Terminal, cols, rows uint16) (string, error) {
 	}
 	return text, nil
 }
+
+// formatScrollbackPlain returns the active screen with its scrollback above it as plain
+// text, oldest line first: soft-wrapped rows joined into one line, trailing whitespace
+// trimmed, trailing blank rows dropped. On the alternate screen (a full-screen program)
+// that is the alternate screen alone, which has no scrollback. Call only on t's owning
+// goroutine.
+func formatScrollbackPlain(t *ghostty.Terminal) (string, error) {
+	b, err := format(t,
+		ghostty.WithFormatterFormat(ghostty.FormatterFormatPlain),
+		ghostty.WithFormatterUnwrap(true),
+		ghostty.WithFormatterTrim(true),
+	)
+	if err != nil {
+		return "", fmt.Errorf("scrollback text: %w", err)
+	}
+	return string(b), nil
+}
