@@ -69,10 +69,12 @@ export type WorkNode =
   | { type: "system"; key: string; id: string }
   /**
    * A run of work in the live turn collapsed into one row (stripRuns): its nodes in order
-   * (thinking included), the latest step (never thinking) and the step count. Keyed by the
-   * run's first item, so the key holds while the run grows.
+   * (thinking included), the latest step (never thinking) and the step count. Its row key
+   * is its first node's, so when the turn ends that node's row takes the strip's place
+   * (the list's anchor keeps a reader's place). Its expanded state is under `expandKey`,
+   * `strip:<the run's first item>`, which holds while the run grows.
    */
-  | { type: "strip"; key: string; nodes: WorkNode[]; latest: StripStep; steps: number };
+  | { type: "strip"; key: string; expandKey: string; nodes: WorkNode[]; latest: StripStep; steps: number };
 
 /** A strip's latest step: a tool row (an Agent included) or an explore group. */
 export type StripStep = Extract<WorkNode, { type: "tool" } | { type: "group" }>;
@@ -374,8 +376,9 @@ function firstItemId(n: WorkNode): string {
 /**
  * The live turn's body with each run of work (consecutive `inRun` nodes) of two steps or
  * more as one strip row; a run of one step stays as its rows. Steps count as the header's
- * do (a group or an Agent is one; thinking is none). The strip's key is its run's first
- * item (`strip:<id>`), stable while the run grows, so its expanded state holds.
+ * do (a group or an Agent is one; thinking is none). The strip's expanded state is keyed
+ * by its run's first item (`strip:<id>`), stable while the run grows; its row key is its
+ * first node's, the row that takes its place when the turn ends.
  */
 export function stripRuns(body: readonly WorkNode[]): WorkNode[] {
   const out: WorkNode[] = [];
@@ -384,7 +387,7 @@ export function stripRuns(body: readonly WorkNode[]): WorkNode[] {
     const steps = run.filter((n): n is StripStep => n.type === "tool" || n.type === "group");
     const latest = steps[steps.length - 1];
     const first = run[0];
-    if (latest && first && steps.length >= 2) out.push({ type: "strip", key: `strip:${firstItemId(first)}`, nodes: run, latest, steps: steps.length });
+    if (latest && first && steps.length >= 2) out.push({ type: "strip", key: first.key, expandKey: `strip:${firstItemId(first)}`, nodes: run, latest, steps: steps.length });
     else out.push(...run);
     run = [];
   };

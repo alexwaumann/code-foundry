@@ -690,7 +690,7 @@ function StripLatest({ step, steps, onToggle }: { step: StripStep; steps: number
  * as the run grows, for the rest of the turn.
  */
 const StripRow = memo(function StripRow({ node }: { node: Extract<WorkNode, { type: "strip" }> }) {
-  const [open, toggle] = useToggle(node.key, false);
+  const [open, toggle] = useToggle(node.expandKey, false);
   return (
     <div className="strip" data-testid="thread-strip" data-open={open || undefined}>
       {open ? (

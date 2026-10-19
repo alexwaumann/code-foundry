@@ -405,9 +405,9 @@ describe("live tool strip (stripRuns)", () => {
     expect(s?.steps).toBe(2);
   });
 
-  it("the key is the run's first item and holds while the run grows (a lone Read turning into a group included)", () => {
+  it("the expanded state's key is the run's first item and holds while the run grows (a lone Read turning into a group included)", () => {
     const items = [user("u1"), text("a"), tool("Read", { id: "r1" }), tool("Bash", { id: "b1" })];
-    const keyOf = (its: TimelineItem[]) => strips(buildRows(buildTurns(its), live)).map((r) => r.key);
+    const keyOf = (its: TimelineItem[]) => strips(buildRows(buildTurns(its), live)).map((r) => r.expandKey);
     expect(keyOf(items)).toEqual(["strip:r1"]);
     expect(keyOf([...items, tool("Edit")])).toEqual(["strip:r1"]);
     // The first node changes from a tool row to a group: the key stays its first item.
@@ -416,6 +416,15 @@ describe("live tool strip (stripRuns)", () => {
     const thinkingFirst = [user("u1"), item("thinking", { id: "th1" }), tool("Bash"), tool("Bash")];
     expect(keyOf(thinkingFirst)).toEqual(["strip:th1"]);
     expect(keyOf([...thinkingFirst, item("thinking"), tool("Bash")])).toEqual(["strip:th1"]);
+  });
+
+  it("the row key is the first node's, so that node's row takes the strip's place when the turn ends", () => {
+    const running = [user("u1"), text("a"), item("thinking", { id: "th1" }), tool("Bash", { id: "b1" }), tool("Edit", { id: "e1" })];
+    const live1 = buildRows(buildTurns(running), live);
+    expect(strips(live1).map((r) => r.key)).toEqual(["th:th1"]);
+    const done = buildRows(buildTurns([...running, text("b"), end("x")]), { fold: () => false, working: false, strips: false });
+    expect(done.map((r) => r.key)).toContain("th:th1");
+    expect(strips(buildRows(buildTurns([user("u1"), tool("Bash", { id: "b2" }), tool("Bash")]), live)).map((r) => r.key)).toEqual(["b2"]);
   });
 
   it("stays on while a request waits (working is false); only the open turn gets strips", () => {
