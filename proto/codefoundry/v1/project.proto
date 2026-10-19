@@ -21,6 +21,9 @@ service ProjectService {
   rpc CreateWorktree(CreateWorktreeRequest) returns (CreateWorktreeResponse) {}
   // RemoveWorktree removes a worktree (and optionally its branch).
   rpc RemoveWorktree(RemoveWorktreeRequest) returns (RemoveWorktreeResponse) {}
+  // DeleteBranch deletes a local branch no worktree has checked out (and optionally
+  // origin's), for a branch whose worktree is already gone.
+  rpc DeleteBranch(DeleteBranchRequest) returns (DeleteBranchResponse) {}
   // CleanupWorktrees removes worktrees whose work is already in the default branch:
   // merged_clean (which includes "made by Code Foundry"), and no live thread, running
   // terminal or workspace holds them. It
@@ -226,6 +229,23 @@ message RemoveWorktreeRequest {
 }
 
 message RemoveWorktreeResponse {}
+
+message DeleteBranchRequest {
+  string project_id = 1;
+  string branch = 2;
+  // `git branch -D` (unmerged work is lost); without it `git branch -d`, which refuses
+  // a branch not merged into its upstream or HEAD.
+  bool force = 3;
+  // Also `git push origin --delete <branch>`. A branch origin does not have is not an
+  // error.
+  bool remote = 4;
+}
+
+message DeleteBranchResponse {
+  // Whether the local branch existed and was deleted; whether origin's was.
+  bool local_deleted = 1;
+  bool remote_deleted = 2;
+}
 
 message CleanupWorktreesRequest {
   // Project id or name (a name only when exactly one registered project has it).

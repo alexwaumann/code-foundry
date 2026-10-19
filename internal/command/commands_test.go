@@ -59,6 +59,7 @@ func TestAllRegistersEveryDomain(t *testing.T) {
 		"ui.palette.open", "ui.notify", "ui.focus.terminal", "ui.focus.project",
 		"terminal.new", "terminal.list", "terminal.close", "terminal.kill", "terminal.remove",
 		"project.list", "project.unregister", "project.worktree.new", "project.worktree.remove", "project.worktree.cleanup", "project.refresh", "project.git.init",
+		"project.branch.delete",
 		"project.add", "project.clone", "project.create", "project.github.publish", "project.delete",
 		"thread.new", "thread.list", "thread.reports", "thread.focus",
 		"thread.rename", "thread.fork", "thread.remove", "thread.run-in", "thread.pin", "thread.archive", "thread.snooze",

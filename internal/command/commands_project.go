@@ -21,6 +21,7 @@ type ProjectBackend interface {
 	Unregister(context.Context, *connect.Request[v1.UnregisterProjectRequest]) (*connect.Response[v1.UnregisterProjectResponse], error)
 	CreateWorktree(context.Context, *connect.Request[v1.CreateWorktreeRequest]) (*connect.Response[v1.CreateWorktreeResponse], error)
 	RemoveWorktree(context.Context, *connect.Request[v1.RemoveWorktreeRequest]) (*connect.Response[v1.RemoveWorktreeResponse], error)
+	DeleteBranch(context.Context, *connect.Request[v1.DeleteBranchRequest]) (*connect.Response[v1.DeleteBranchResponse], error)
 	CleanupWorktrees(context.Context, *connect.Request[v1.CleanupWorktreesRequest]) (*connect.Response[v1.CleanupWorktreesResponse], error)
 	Refresh(context.Context, *connect.Request[v1.RefreshProjectRequest]) (*connect.Response[v1.RefreshProjectResponse], error)
 	List(context.Context, *connect.Request[v1.ListProjectsRequest]) (*connect.Response[v1.ListProjectsResponse], error)
@@ -61,7 +62,8 @@ func (f NotGitFunc) whyNotGit(c Context) string {
 }
 
 // RegisterProject registers project.list, project.unregister, project.worktree.new, project.worktree.remove,
-// project.refresh and project.git.init. Adding a project is project.add (commands_project_add.go).
+// project.branch.delete, project.refresh and project.git.init. Adding a project is project.add
+// (commands_project_add.go).
 func RegisterProject(r *Registry, b ProjectBackend, notGit NotGitFunc) error {
 	notGit = notGit.or()
 	projectArg := ArgSpec{Name: "project", Type: String, Required: true, Context: ContextProject, Description: "Project id"}
@@ -187,5 +189,6 @@ func RegisterProject(r *Registry, b ProjectBackend, notGit NotGitFunc) error {
 			},
 		},
 		gitInitCommand(b, projectArg, notGit),
+		branchDeleteCommand(b, notGit),
 	)
 }

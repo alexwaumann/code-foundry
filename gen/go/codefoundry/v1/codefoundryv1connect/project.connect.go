@@ -48,6 +48,9 @@ const (
 	// ProjectServiceRemoveWorktreeProcedure is the fully-qualified name of the ProjectService's
 	// RemoveWorktree RPC.
 	ProjectServiceRemoveWorktreeProcedure = "/codefoundry.v1.ProjectService/RemoveWorktree"
+	// ProjectServiceDeleteBranchProcedure is the fully-qualified name of the ProjectService's
+	// DeleteBranch RPC.
+	ProjectServiceDeleteBranchProcedure = "/codefoundry.v1.ProjectService/DeleteBranch"
 	// ProjectServiceCleanupWorktreesProcedure is the fully-qualified name of the ProjectService's
 	// CleanupWorktrees RPC.
 	ProjectServiceCleanupWorktreesProcedure = "/codefoundry.v1.ProjectService/CleanupWorktrees"
@@ -100,6 +103,9 @@ type ProjectServiceClient interface {
 	CreateWorktree(context.Context, *connect.Request[v1.CreateWorktreeRequest]) (*connect.Response[v1.CreateWorktreeResponse], error)
 	// RemoveWorktree removes a worktree (and optionally its branch).
 	RemoveWorktree(context.Context, *connect.Request[v1.RemoveWorktreeRequest]) (*connect.Response[v1.RemoveWorktreeResponse], error)
+	// DeleteBranch deletes a local branch no worktree has checked out (and optionally
+	// origin's), for a branch whose worktree is already gone.
+	DeleteBranch(context.Context, *connect.Request[v1.DeleteBranchRequest]) (*connect.Response[v1.DeleteBranchResponse], error)
 	// CleanupWorktrees removes worktrees whose work is already in the default branch:
 	// merged_clean (which includes "made by Code Foundry"), and no live thread, running
 	// terminal or workspace holds them. It
@@ -218,6 +224,12 @@ func NewProjectServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(projectServiceMethods.ByName("RemoveWorktree")),
 			connect.WithClientOptions(opts...),
 		),
+		deleteBranch: connect.NewClient[v1.DeleteBranchRequest, v1.DeleteBranchResponse](
+			httpClient,
+			baseURL+ProjectServiceDeleteBranchProcedure,
+			connect.WithSchema(projectServiceMethods.ByName("DeleteBranch")),
+			connect.WithClientOptions(opts...),
+		),
 		cleanupWorktrees: connect.NewClient[v1.CleanupWorktreesRequest, v1.CleanupWorktreesResponse](
 			httpClient,
 			baseURL+ProjectServiceCleanupWorktreesProcedure,
@@ -313,6 +325,7 @@ type projectServiceClient struct {
 	get                 *connect.Client[v1.GetProjectRequest, v1.GetProjectResponse]
 	createWorktree      *connect.Client[v1.CreateWorktreeRequest, v1.CreateWorktreeResponse]
 	removeWorktree      *connect.Client[v1.RemoveWorktreeRequest, v1.RemoveWorktreeResponse]
+	deleteBranch        *connect.Client[v1.DeleteBranchRequest, v1.DeleteBranchResponse]
 	cleanupWorktrees    *connect.Client[v1.CleanupWorktreesRequest, v1.CleanupWorktreesResponse]
 	refresh             *connect.Client[v1.RefreshProjectRequest, v1.RefreshProjectResponse]
 	watch               *connect.Client[v1.WatchProjectsRequest, v1.ProjectEvent]
@@ -357,6 +370,11 @@ func (c *projectServiceClient) CreateWorktree(ctx context.Context, req *connect.
 // RemoveWorktree calls codefoundry.v1.ProjectService.RemoveWorktree.
 func (c *projectServiceClient) RemoveWorktree(ctx context.Context, req *connect.Request[v1.RemoveWorktreeRequest]) (*connect.Response[v1.RemoveWorktreeResponse], error) {
 	return c.removeWorktree.CallUnary(ctx, req)
+}
+
+// DeleteBranch calls codefoundry.v1.ProjectService.DeleteBranch.
+func (c *projectServiceClient) DeleteBranch(ctx context.Context, req *connect.Request[v1.DeleteBranchRequest]) (*connect.Response[v1.DeleteBranchResponse], error) {
+	return c.deleteBranch.CallUnary(ctx, req)
 }
 
 // CleanupWorktrees calls codefoundry.v1.ProjectService.CleanupWorktrees.
@@ -445,6 +463,9 @@ type ProjectServiceHandler interface {
 	CreateWorktree(context.Context, *connect.Request[v1.CreateWorktreeRequest]) (*connect.Response[v1.CreateWorktreeResponse], error)
 	// RemoveWorktree removes a worktree (and optionally its branch).
 	RemoveWorktree(context.Context, *connect.Request[v1.RemoveWorktreeRequest]) (*connect.Response[v1.RemoveWorktreeResponse], error)
+	// DeleteBranch deletes a local branch no worktree has checked out (and optionally
+	// origin's), for a branch whose worktree is already gone.
+	DeleteBranch(context.Context, *connect.Request[v1.DeleteBranchRequest]) (*connect.Response[v1.DeleteBranchResponse], error)
 	// CleanupWorktrees removes worktrees whose work is already in the default branch:
 	// merged_clean (which includes "made by Code Foundry"), and no live thread, running
 	// terminal or workspace holds them. It
@@ -559,6 +580,12 @@ func NewProjectServiceHandler(svc ProjectServiceHandler, opts ...connect.Handler
 		connect.WithSchema(projectServiceMethods.ByName("RemoveWorktree")),
 		connect.WithHandlerOptions(opts...),
 	)
+	projectServiceDeleteBranchHandler := connect.NewUnaryHandler(
+		ProjectServiceDeleteBranchProcedure,
+		svc.DeleteBranch,
+		connect.WithSchema(projectServiceMethods.ByName("DeleteBranch")),
+		connect.WithHandlerOptions(opts...),
+	)
 	projectServiceCleanupWorktreesHandler := connect.NewUnaryHandler(
 		ProjectServiceCleanupWorktreesProcedure,
 		svc.CleanupWorktrees,
@@ -657,6 +684,8 @@ func NewProjectServiceHandler(svc ProjectServiceHandler, opts ...connect.Handler
 			projectServiceCreateWorktreeHandler.ServeHTTP(w, r)
 		case ProjectServiceRemoveWorktreeProcedure:
 			projectServiceRemoveWorktreeHandler.ServeHTTP(w, r)
+		case ProjectServiceDeleteBranchProcedure:
+			projectServiceDeleteBranchHandler.ServeHTTP(w, r)
 		case ProjectServiceCleanupWorktreesProcedure:
 			projectServiceCleanupWorktreesHandler.ServeHTTP(w, r)
 		case ProjectServiceRefreshProcedure:
@@ -716,6 +745,10 @@ func (UnimplementedProjectServiceHandler) CreateWorktree(context.Context, *conne
 
 func (UnimplementedProjectServiceHandler) RemoveWorktree(context.Context, *connect.Request[v1.RemoveWorktreeRequest]) (*connect.Response[v1.RemoveWorktreeResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ProjectService.RemoveWorktree is not implemented"))
+}
+
+func (UnimplementedProjectServiceHandler) DeleteBranch(context.Context, *connect.Request[v1.DeleteBranchRequest]) (*connect.Response[v1.DeleteBranchResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ProjectService.DeleteBranch is not implemented"))
 }
 
 func (UnimplementedProjectServiceHandler) CleanupWorktrees(context.Context, *connect.Request[v1.CleanupWorktreesRequest]) (*connect.Response[v1.CleanupWorktreesResponse], error) {

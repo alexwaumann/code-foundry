@@ -217,6 +217,16 @@ func (f *Project) RemoveWorktree(_ context.Context, r *connect.Request[v1.Remove
 	return connect.NewResponse(&v1.RemoveWorktreeResponse{}), f.Err
 }
 
+// DeleteBranch records the request and answers that the local branch went, and
+// origin's when asked.
+func (f *Project) DeleteBranch(_ context.Context, r *connect.Request[v1.DeleteBranchRequest]) (*connect.Response[v1.DeleteBranchResponse], error) {
+	f.record(r.Msg)
+	if f.Err != nil {
+		return nil, f.Err
+	}
+	return connect.NewResponse(&v1.DeleteBranchResponse{LocalDeleted: true, RemoteDeleted: r.Msg.GetRemote()}), nil
+}
+
 // CleanupWorktrees records the request and answers with OnCleanup.
 func (f *Project) CleanupWorktrees(_ context.Context, r *connect.Request[v1.CleanupWorktreesRequest]) (*connect.Response[v1.CleanupWorktreesResponse], error) {
 	f.record(r.Msg)
