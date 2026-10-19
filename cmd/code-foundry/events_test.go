@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"maps"
 	"net/http"
@@ -141,7 +142,7 @@ func TestRunEvents(t *testing.T) {
 	t.Cleanup(srv.Close)
 	c := &client.Client{Events: codefoundryv1connect.NewEventServiceClient(srv.Client(), srv.URL)}
 
-	start := func(t *testing.T, args ...string) (*lineWriter, context.CancelFunc, chan error) {
+	start := func(t *testing.T, args ...string) (*lineWriter, context.CancelFunc, chan error, *bytes.Buffer) {
 		t.Helper()
 		lw := newLineWriter()
 		var stderr bytes.Buffer
@@ -150,10 +151,10 @@ func TestRunEvents(t *testing.T) {
 		done := make(chan error, 1)
 		go func() { done <- runEvents(ctx, cl, args) }()
 		t.Cleanup(cancel)
-		return lw, cancel, done
+		return lw, cancel, done, &stderr
 	}
 
-	lw, cancel, done := start(t, "--source", "project,thread-list", "--json")
+	lw, cancel, done, _ := start(t, "--source", "project,thread-list", "--json")
 	var epoch string
 	for range 2 {
 		var ev map[string]any
@@ -189,28 +190,101 @@ func TestRunEvents(t *testing.T) {
 	}
 	seqs := slices.Sorted(maps.Keys(texts))
 
-	// A second client resumes after the first event: the other two, as text lines,
-	// with or without the epoch.
-	for _, args := range [][]string{{}, {"--since-epoch", epoch}} {
-		lw2, cancel2, done2 := start(t, append([]string{"--source", "project,thread-list", "--since", strconv.FormatUint(seqs[0], 10)}, args...)...)
-		got := []string{lw2.next(t), lw2.next(t)}
-		if want := []string{texts[seqs[1]], texts[seqs[2]]}; !slices.Equal(got, want) {
-			t.Fatalf("replay %v = %q, want %q", args, got, want)
-		}
-		cancel2()
-		if err := <-done2; err != nil {
-			t.Fatal(err)
-		}
+	// A second client resumes after the first event with the epoch: the other two, as
+	// text lines.
+	lw2, cancel2, done2, _ := start(t, "--source", "project,thread-list", "--since", strconv.FormatUint(seqs[0], 10), "--since-epoch", epoch)
+	got := []string{lw2.next(t), lw2.next(t)}
+	if want := []string{texts[seqs[1]], texts[seqs[2]]}; !slices.Equal(got, want) {
+		t.Fatalf("replay = %q, want %q", got, want)
+	}
+	cancel2()
+	if err := <-done2; err != nil {
+		t.Fatal(err)
 	}
 
-	// Another daemon's epoch (it restarted): snapshots, not a replay.
-	lw3, cancel3, done3 := start(t, "--source", "project", "--since", strconv.FormatUint(seqs[0], 10), "--since-epoch", "0123456789ab")
-	if got := lw3.next(t); got != "- project snapshot" {
-		t.Fatalf("first line with another epoch = %q, want the snapshot", got)
+	// Another daemon's epoch (it restarted), or none to compare (E8): snapshots, not a
+	// replay; without an epoch a notice says so.
+	for _, tt := range []struct {
+		args       []string
+		wantNotice string
+	}{
+		{args: []string{"--since-epoch", "0123456789ab"}},
+		{wantNotice: "code-foundry events: --since " + strconv.FormatUint(seqs[0], 10) +
+			" without --since-epoch could be another daemon's seq; starting with snapshots (pass both to resume)\n"},
+	} {
+		lw3, cancel3, done3, stderr := start(t, append([]string{"--source", "project", "--since", strconv.FormatUint(seqs[0], 10)}, tt.args...)...)
+		if got := lw3.next(t); got != "- project snapshot" {
+			t.Fatalf("first line with %v = %q, want the snapshot", tt.args, got)
+		}
+		cancel3()
+		if err := <-done3; err != nil {
+			t.Fatal(err)
+		}
+		if stderr.String() != tt.wantNotice {
+			t.Errorf("stderr with %v = %q, want %q", tt.args, stderr.String(), tt.wantNotice)
+		}
 	}
-	cancel3()
-	if err := <-done3; err != nil {
-		t.Fatal(err)
+}
+
+// When the daemon goes away the stream exits 1 and says how to resume (E8: exit 0 and
+// an empty stderr looked like a normal end).
+func TestRunEventsDaemonGone(t *testing.T) {
+	b := bus.New()
+	projects := projecttest.New(b)
+	route := api.NewEvents(api.EventsDeps{Bus: b, Project: projects}).Route()
+	mux := http.NewServeMux()
+	mux.Handle(route.Path, route.Handler)
+	srv := httptest.NewUnstartedServer(mux)
+	srv.EnableHTTP2 = true
+	srv.StartTLS()
+	t.Cleanup(srv.Close)
+	c := &client.Client{Events: codefoundryv1connect.NewEventServiceClient(srv.Client(), srv.URL)}
+	lw := newLineWriter()
+	var stderr bytes.Buffer
+	cl := &cli{stdout: lw, stderr: &stderr, connect: func(context.Context) (*client.Client, error) { return c, nil }}
+	done := make(chan error, 1)
+	go func() { done <- runEvents(context.Background(), cl, []string{"--source", "project", "--json"}) }()
+
+	lw.next(t) // the snapshot
+	projects.Put(project.Project{ID: "r1", Name: "app"})
+	var ev v1.Event
+	if err := protojson.Unmarshal([]byte(lw.next(t)), &ev); err != nil || ev.GetSeq() == 0 {
+		t.Fatalf("event %v (err %v)", &ev, err)
+	}
+	srv.CloseClientConnections()
+	select {
+	case err := <-done:
+		if !errors.Is(err, errReported) {
+			t.Fatalf("err = %v, want exit 1 (errReported)", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the stream did not end")
+	}
+	want := fmt.Sprintf("; resume with --since %d --since-epoch %s\n", ev.GetSeq(), ev.GetEpoch())
+	if s := stderr.String(); !strings.HasPrefix(s, "code-foundry events: daemon connection lost") || !strings.HasSuffix(s, want) {
+		t.Errorf("stderr = %q, want the loss and %q", s, want)
+	}
+}
+
+func TestConnectionLost(t *testing.T) {
+	tests := []struct {
+		name  string
+		last  uint64
+		epoch string
+		err   error
+		want  string
+	}{
+		{name: "a clean end", last: 42, epoch: "e1", want: "daemon connection lost; resume with --since 42 --since-epoch e1"},
+		{name: "an error", last: 42, epoch: "e1", err: errors.New("unexpected EOF"),
+			want: "daemon connection lost (unexpected EOF); resume with --since 42 --since-epoch e1"},
+		{name: "only snapshots seen", epoch: "e1", want: "daemon connection lost; run events again to start with snapshots"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := connectionLost(tt.last, tt.epoch, tt.err); got != tt.want {
+				t.Errorf("connectionLost = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
 

@@ -22,11 +22,12 @@ import (
 // a local verb because registry commands are unary. --json events carry the daemon's
 // epoch; resuming with --since and --since-epoch across a daemon restart starts over
 // with snapshots (docs/notes/agents-5-cli.md). Heartbeats are not printed. It ends
-// on Ctrl-C, when a piped stdin closes, or when the daemon stops.
+// on Ctrl-C or when a piped stdin closes (exit 0), or when the daemon goes away: exit 1
+// with the --since and --since-epoch to resume with (docs/notes/orch-cli-batch.md).
 func runEvents(ctx context.Context, cl *cli, args []string) error {
 	fs := cl.newFlagSet("events")
 	sourceFlag := fs.String("source", "", "comma-separated `sources` to follow (default all): "+strings.Join(eventSourceNames(), ", "))
-	since := fs.Uint64("since", 0, "resume after this `seq` (the last one seen): replays the events after it if the daemon still has them, else starts with snapshots")
+	since := fs.Uint64("since", 0, "with --since-epoch, resume after this `seq` (the last one seen): replays the events after it if the daemon still has them, else starts with snapshots (as it does without --since-epoch)")
 	sinceEpoch := fs.String("since-epoch", "", "with --since: the `epoch` that seq was read under (every --json event has it); "+
 		"another daemon's epoch (it restarted) starts with snapshots instead of resuming")
 	asJSON := fs.Bool("json", false, "print each event as one JSON object (protojson, with its seq and epoch)")
@@ -37,6 +38,13 @@ func runEvents(ctx context.Context, cl *cli, args []string) error {
 	if err != nil {
 		fmt.Fprintf(cl.stderr, "code-foundry events: %s\n", err)
 		return errUsage
+	}
+	if *since > 0 && *sinceEpoch == "" {
+		// Without the epoch a seq cannot be told from a restarted daemon's same number
+		// (E8: --since 2 replayed the new daemon's events and missed the restart).
+		fmt.Fprintf(cl.stderr, "code-foundry events: --since %d without --since-epoch could be another daemon's seq; "+
+			"starting with snapshots (pass both to resume)\n", *since)
+		*since = 0
 	}
 	c, err := cl.connect(ctx)
 	if err != nil {
@@ -56,8 +64,17 @@ func runEvents(ctx context.Context, cl *cli, args []string) error {
 		return cl.eventsFailed(ctx, err)
 	}
 	defer func() { _ = stream.Close() }()
+	// Where a resume starts: the last live event's seq (snapshots have none) and the
+	// epoch every event carries.
+	last, epoch := *since, *sinceEpoch
 	for stream.Receive() {
 		ev := stream.Msg()
+		if e := ev.GetEpoch(); e != "" && e != epoch {
+			last, epoch = 0, e
+		}
+		if ev.GetSeq() > 0 {
+			last = ev.GetSeq()
+		}
 		if ev.GetHeartbeat() != nil {
 			continue
 		}
@@ -73,11 +90,29 @@ func runEvents(ctx context.Context, cl *cli, args []string) error {
 			return nil // stdout closed (| head): done
 		}
 	}
-	return cl.eventsFailed(ctx, stream.Err())
+	if ctx.Err() != nil || errors.Is(stream.Err(), context.Canceled) {
+		return nil // Ctrl-C, or the supervising process closed stdin
+	}
+	// The daemon never ends a stream while it runs: it went away (E8: exit 0 and
+	// nothing on stderr looked like a normal end).
+	fmt.Fprintln(cl.stderr, "code-foundry events: "+connectionLost(last, epoch, stream.Err()))
+	return errReported
 }
 
-// eventsFailed is the stream's end: nil when the user or stdin stopped it or the
-// daemon ended it cleanly.
+// connectionLost says the stream's daemon went away (err, when the stream had one) and
+// how to resume after the last seq seen under epoch.
+func connectionLost(last uint64, epoch string, err error) string {
+	msg := "daemon connection lost"
+	if err != nil {
+		msg += " (" + err.Error() + ")"
+	}
+	if last == 0 || epoch == "" {
+		return msg + "; run events again to start with snapshots"
+	}
+	return fmt.Sprintf("%s; resume with --since %d --since-epoch %s", msg, last, epoch)
+}
+
+// eventsFailed is a stream that did not start: nil when the user or stdin stopped it.
 func (cl *cli) eventsFailed(ctx context.Context, err error) error {
 	if err == nil || ctx.Err() != nil || errors.Is(err, context.Canceled) {
 		return nil
