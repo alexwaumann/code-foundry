@@ -532,6 +532,19 @@ func (m *Manager) loadEnvironments(ctx context.Context) error {
 // (threads.go, terminals.go). Its secrets and consent stay.
 func (m *Manager) forget(ctx context.Context, name string, logs *logBuffer) {
 	m.archiveThreads(ctx, name, logs)
+	m.release(ctx, name, logs)
+}
+
+// discard is forget for good (an uninstall, a takeover by another source): the plugin's
+// threads are removed rather than archived. It returns the ids of the threads removed.
+func (m *Manager) discard(ctx context.Context, name string, logs *logBuffer) []string {
+	removed := m.removeThreads(ctx, name, logs)
+	m.release(ctx, name, logs)
+	return removed
+}
+
+// release closes a plugin's terminals and drops its session environment and flags.
+func (m *Manager) release(ctx context.Context, name string, logs *logBuffer) {
 	m.closeTerminals(ctx, name, logs)
 	m.env.mu.Lock()
 	_, had := m.env.byID[name]
@@ -545,7 +558,9 @@ func (m *Manager) forget(ctx context.Context, name string, logs *logBuffer) {
 }
 
 // sweep forgets the environments, flags and threads of plugins that are not enabled
-// (disabled or removed while the daemon was stopped).
+// (disabled or removed while the daemon was stopped). Their threads are archived, not
+// removed, even when the package is gone: a package deleted by hand is not an uninstall,
+// and putting it back (or enabling it) gets them back.
 func (m *Manager) sweep(ctx context.Context) {
 	snap := m.Snapshot()
 	enabled := func(name string) bool {

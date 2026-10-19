@@ -23,9 +23,11 @@ import (
 // thread store keeps them like any thread, owned by "plugin:<name>", which hides them
 // from the user's lists; this side checks the permission and the arguments (the env and
 // add-dirs under the session environment's rules), names the owner, lets a plugin reach
-// only its own threads, and archives them when the plugin is disabled or removed. A
-// thread's own env replaces its plugin's session environment for it (SessionEnvironment
-// skips the owner).
+// only its own threads, archives them when the plugin is disabled (or its package goes
+// without an uninstall), and removes them when it is uninstalled or taken over by a
+// package from another source (docs/notes/plugins-plugin-threads-remove.md). A thread's
+// own env replaces its plugin's session environment for it (SessionEnvironment skips the
+// owner).
 
 // ThreadSpec is a plugin thread as the thread store makes it: Env ("KEY=VALUE") and
 // AddDirs already checked.
@@ -44,6 +46,9 @@ type OwnedThreads interface {
 	Send(ctx context.Context, id, text string) error
 	// Archive archives a thread (its process stops).
 	Archive(ctx context.Context, id string) error
+	// Remove removes a thread the way thread.remove does: its process stops first, then
+	// the thread is forgotten.
+	Remove(ctx context.Context, id string) error
 	// Owner is a thread's owner ("" for the user's); ok false when there is no such
 	// thread.
 	Owner(id string) (owner string, ok bool)
@@ -60,7 +65,8 @@ const (
 	maxThreadTitle   = 120
 	// MaxThreadMessage bounds thread/send's text.
 	MaxThreadMessage = 256 << 10
-	// ownedArchiveTimeout bounds archiving a plugin's threads when it is turned off.
+	// ownedArchiveTimeout bounds archiving a plugin's threads when it is turned off, and
+	// removing them when it is uninstalled or taken over.
 	ownedArchiveTimeout = 20 * time.Second
 )
 
@@ -352,6 +358,53 @@ func (m *Manager) archiveThreads(ctx context.Context, name string, logs *logBuff
 		logs.add("host", "", fmt.Sprintf("archived its threads: %d", n))
 	}
 	m.log.Info("plugin threads archived", "plugin", name, "count", n)
+}
+
+// removeThreads removes every thread of a plugin, archived ones too (it was uninstalled
+// or taken over by a package from another source), all at once, through the thread
+// store's Remove: Claude stops first. It returns the ids removed, oldest thread first.
+func (m *Manager) removeThreads(ctx context.Context, name string, logs *logBuffer) []string {
+	threads := m.opts.Threads
+	if threads == nil {
+		return nil
+	}
+	all := threads.Owned(OwnerOf(name))
+	if len(all) == 0 {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), ownedArchiveTimeout)
+	defer cancel()
+	done := make([]bool, len(all))
+	var wg sync.WaitGroup
+	for i, t := range all {
+		wg.Go(func() {
+			if err := threads.Remove(ctx, t.ThreadID); err != nil {
+				m.log.Warn("plugin: remove its thread", "plugin", name, "thread", t.ThreadID, "err", err)
+				return
+			}
+			done[i] = true
+		})
+	}
+	wg.Wait()
+	var removed []string
+	for i, t := range all {
+		if done[i] {
+			removed = append(removed, t.ThreadID)
+		}
+	}
+	if len(removed) > 0 && logs != nil {
+		logs.add("host", "", "removed its threads: "+strings.Join(removed, ", "))
+	}
+	m.log.Info("plugin threads removed", "plugin", name, "count", len(removed), "of", len(all))
+	return removed
+}
+
+// threadsWords is "its N thread(s)", for messages.
+func threadsWords(n int) string {
+	if n == 1 {
+		return "its 1 thread"
+	}
+	return fmt.Sprintf("its %d threads", n)
 }
 
 // ownedNodeProblems are a view's thread and terminal nodes that name another owner's

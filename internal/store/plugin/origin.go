@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 )
@@ -17,8 +18,8 @@ import (
 // "path:<folder>", or "manual:<package dir>" for a package put in plugins/ by hand and
 // enabled. A package of another origin may take the name only when nothing would be
 // inherited, or with force, which first deletes what there is (secrets, data, consent,
-// the session environment and flags) so the new package starts empty and asks for
-// consent again. An empty origin (a row from before the column that the migration could
+// the session environment and flags) and removes the old package's threads, so the new
+// package starts empty and asks for consent again. An empty origin (a row from before the column that the migration could
 // not attribute) binds to the first origin that claims it.
 
 // KindManual is an origin kind only: a package put in plugins/ by hand.
@@ -67,8 +68,8 @@ func (m *Manager) currentOrigin(name string) string {
 	return originOf(KindManual, e.link)
 }
 
-// inheritance is what a package taking name would inherit, in words; empty when
-// nothing.
+// inheritance is what a package taking name would inherit and a takeover deletes, in
+// words; empty when nothing. Its threads are counted apart (ownedThreads).
 func (m *Manager) inheritance(ctx context.Context, name string, r row) ([]string, error) {
 	var what []string
 	if r.Granted != nil {
@@ -87,11 +88,47 @@ func (m *Manager) inheritance(ctx context.Context, name string, r row) ([]string
 	return what, nil
 }
 
+// ownedThreads counts name's threads, archived ones too.
+func (m *Manager) ownedThreads(name string) int {
+	if m.opts.Threads == nil {
+		return 0
+	}
+	return len(m.opts.Threads.Owned(OwnerOf(name)))
+}
+
 // takeover is a package of another origin claiming a name that has something to
 // inherit.
 type takeover struct {
 	from string   // the origin the name's consent, secrets and data belong to
-	what []string // what would be inherited, in words
+	what []string // what would be inherited and is deleted, in words
+	// threads counts the old package's threads (a takeover removes them); removed are the
+	// ids claimLocked removed.
+	threads int
+	removed []string
+}
+
+// inherits is everything the new package would inherit, in words.
+func (t *takeover) inherits() string {
+	w := t.what
+	if t.threads > 0 {
+		w = append(slices.Clone(w), threadsWords(t.threads))
+	}
+	return andList(w)
+}
+
+// done says what a carried-out takeover deleted and removed.
+func (t *takeover) done() string {
+	var w []string
+	if len(t.what) > 0 {
+		w = append(w, "deleted "+andList(t.what))
+	}
+	if len(t.removed) > 0 {
+		w = append(w, "removed "+threadsWords(len(t.removed)))
+	}
+	if len(w) == 0 {
+		return "nothing to delete"
+	}
+	return strings.Join(w, " and ")
 }
 
 // checkOrigin reports whether a package from origin may take name: nil when the origin
@@ -108,21 +145,24 @@ func (m *Manager) checkOrigin(ctx context.Context, name, origin string, force bo
 		return nil, nil
 	}
 	what, err := m.inheritance(ctx, name, r)
-	if err != nil || len(what) == 0 {
+	if err != nil {
 		return nil, err
 	}
-	t := &takeover{from: r.Origin, what: what}
+	t := &takeover{from: r.Origin, what: what, threads: m.ownedThreads(name)}
+	if len(what) == 0 && t.threads == 0 {
+		return nil, nil
+	}
 	if !force {
 		return nil, fmt.Errorf("%w: plugin %s came from %s, and a package from %s would inherit %s; "+
 			"--force deletes them and starts it fresh (it asks for consent again), or run `code-foundry plugin uninstall %s --purge` first",
-			ErrFailedPrecondition, name, originWords(r.Origin), originWords(origin), andList(what), name)
+			ErrFailedPrecondition, name, originWords(r.Origin), originWords(origin), t.inherits(), name)
 	}
 	return t, nil
 }
 
 // claimLocked binds name to origin: after checkOrigin (same rules), a takeover with
-// force deletes what the old origin's package left (purgeIdentity) and the row then
-// records the new origin with no consent. It returns the takeover carried out (nil when
+// force deletes what the old origin's package left and removes its threads
+// (purgeIdentity), and the row then records the new origin with no consent. It returns the takeover carried out (nil when
 // there was none). opMu held.
 func (m *Manager) claimLocked(ctx context.Context, name, origin string, force bool) (*takeover, error) {
 	t, err := m.checkOrigin(ctx, name, origin, force)
@@ -136,7 +176,9 @@ func (m *Manager) claimLocked(ctx context.Context, name, origin string, force bo
 	r := rows[name]
 	r.Name = name
 	if t != nil {
-		if err := m.purgeIdentity(ctx, name); err != nil {
+		removed, err := m.purgeIdentity(ctx, name)
+		t.removed = removed
+		if err != nil {
 			return nil, err
 		}
 		r.Enabled, r.Granted, r.ConsentedAt = false, nil, time.Time{}
@@ -152,27 +194,27 @@ func (m *Manager) claimLocked(ctx context.Context, name, origin string, force bo
 	m.update(name, nil, func(e *entry) { e.row = r })
 	if t != nil {
 		if e, ok := m.entry(name); ok {
-			e.logs.add("host", "", "taken over by "+originWords(origin)+": deleted "+andList(t.what))
+			e.logs.add("host", "", "taken over by "+originWords(origin)+": "+t.done())
 		}
 	}
 	return t, nil
 }
 
 // purgeIdentity stops name's plugin and deletes what belongs to its origin: its secrets,
-// its data dir, its session environment and flags (its threads are archived and its
-// terminals closed). opMu held.
-func (m *Manager) purgeIdentity(ctx context.Context, name string) error {
+// its data dir, its session environment and flags; its threads are removed (their ids
+// returned) and its terminals closed. opMu held.
+func (m *Manager) purgeIdentity(ctx context.Context, name string) ([]string, error) {
 	var logs *logBuffer
 	if e, ok := m.entry(name); ok {
 		logs = e.logs
 		m.stopActor(e, StateDisabled)
 		m.unregister(name)
 	}
-	m.forget(ctx, name, logs)
+	removed := m.discard(ctx, name, logs)
 	if _, err := m.purgeSecretsAndData(ctx, name); err != nil {
-		return err
+		return removed, err
 	}
-	return nil
+	return removed, nil
 }
 
 // purgeSecretsAndData deletes name's recorded secrets (Keychain item, then row) and its
@@ -207,7 +249,14 @@ func (m *Manager) purgeSecretsAndData(ctx context.Context, name string) ([]strin
 
 // takeoverConsent is the line a consent text gains when enabling carries out a takeover.
 func takeoverConsent(name string, t *takeover) string {
-	return fmt.Sprintf("\nIt replaces the plugin %s from %s: %s will be deleted.", name, originWords(t.from), andList(t.what))
+	s := fmt.Sprintf("\nIt replaces the plugin %s from %s: ", name, originWords(t.from))
+	switch {
+	case len(t.what) > 0 && t.threads > 0:
+		return s + andList(t.what) + " will be deleted, and it removes " + threadsWords(t.threads) + "."
+	case t.threads > 0:
+		return s + "it removes " + threadsWords(t.threads) + "."
+	}
+	return s + andList(t.what) + " will be deleted."
 }
 
 // andList joins words as "a, b and c".

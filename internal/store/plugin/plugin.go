@@ -176,6 +176,9 @@ type EnableResult struct {
 	NeedsConsent bool
 	// Consent is the text the user consents to (ConsentText).
 	Consent string
+	// RemovedThreads (Dev with force) are the ids of the threads of the plugin the link
+	// took the name from.
+	RemovedThreads []string
 }
 
 // LogLine is one line of a plugin's log.
