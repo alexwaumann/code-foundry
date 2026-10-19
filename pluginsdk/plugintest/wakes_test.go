@@ -2,6 +2,7 @@ package plugintest_test
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -107,5 +108,63 @@ func TestFireWakeLimits(t *testing.T) {
 	}
 	if err := <-errs; pluginsdk.ErrorCode(err) != pluginsdk.CodeInvalidParams {
 		t.Errorf("a two-line title: %v", err)
+	}
+}
+
+// Options.WakeSubscriptions are replayed at start with Rearm, then wake/armed with their
+// count (0 for none): a plugin that remembers subscriptions from before drops those the
+// replay did not bring (they ended while it was down).
+func TestWakeRearmAndArmed(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		replay []pluginsdk.WakeSubscription
+		want   string
+	}{
+		{"one of two still live", []pluginsdk.WakeSubscription{{Subscription: "sub-1", Source: "tick"}}, "armed 1: sub-1"},
+		{"none live", nil, "armed 0: "},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var mu sync.Mutex
+			remembered := map[string]bool{"sub-1": true, "sub-2": true} // from the plugin's data dir
+			rearmed := map[string]bool{}
+			result := ""
+			p := pluginsdk.Plugin{
+				OnWakeSubscribed: func(_ context.Context, _ *pluginsdk.Host, s pluginsdk.WakeSubscription) {
+					mu.Lock()
+					defer mu.Unlock()
+					if !s.Rearm {
+						t.Errorf("%s replayed without Rearm", s.Subscription)
+					}
+					rearmed[s.Subscription] = true
+				},
+				OnWakeArmed: func(_ context.Context, _ *pluginsdk.Host, count int) {
+					mu.Lock()
+					defer mu.Unlock()
+					var kept []string
+					for id := range remembered {
+						if !rearmed[id] {
+							delete(remembered, id)
+							continue
+						}
+						kept = append(kept, id)
+					}
+					result = fmt.Sprintf("armed %d: %s", count, strings.Join(kept, ","))
+				},
+			}
+			h := plugintest.Start(t, p, plugintest.Options{WakeSubscriptions: tt.replay})
+			h.WaitFor(time.Second, func(*plugintest.Host) bool {
+				mu.Lock()
+				defer mu.Unlock()
+				return result != ""
+			})
+			mu.Lock()
+			defer mu.Unlock()
+			if result != tt.want {
+				t.Errorf("got %q, want %q", result, tt.want)
+			}
+			if got := h.WakeSubscriptions(); len(got) != len(tt.replay) {
+				t.Errorf("live subscriptions %+v", got)
+			}
+		})
 	}
 }

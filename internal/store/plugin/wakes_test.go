@@ -20,8 +20,9 @@ import (
 )
 
 // The "wakes" helper plugin: it keeps what wake/subscribed and wake/unsubscribed told
-// it ("armed" lists it, with how often each subscription was sent) and fires a source
-// on "fire" (source, match "k=v,…", title).
+// it ("armed" lists it, with how often each subscription was sent and whether the last
+// was a re-arm), the counts wake/armed brought ("signals"), and fires a source on "fire"
+// (source, match "k=v,…", title).
 var _ = func() bool {
 	extraHelpers["wakes"] = func() int {
 		if err := pluginsdk.Serve(wakesPlugin()); err != nil {
@@ -37,6 +38,7 @@ func wakesPlugin() pluginsdk.Plugin {
 	var mu sync.Mutex
 	armed := map[string]pluginsdk.WakeSubscription{}
 	sent := map[string]int{}
+	var signals []string
 	return pluginsdk.Plugin{
 		OnWakeSubscribed: func(_ context.Context, _ *pluginsdk.Host, s pluginsdk.WakeSubscription) {
 			mu.Lock()
@@ -49,13 +51,27 @@ func wakesPlugin() pluginsdk.Plugin {
 			defer mu.Unlock()
 			delete(armed, u.Subscription)
 		},
+		OnWakeArmed: func(_ context.Context, _ *pluginsdk.Host, count int) {
+			mu.Lock()
+			defer mu.Unlock()
+			signals = append(signals, fmt.Sprint(count))
+		},
 		Commands: map[string]pluginsdk.CommandFunc{
+			"signals": func(context.Context, *pluginsdk.Host, pluginsdk.CommandRequest) (pluginsdk.CommandResult, error) {
+				mu.Lock()
+				defer mu.Unlock()
+				return msg(strings.Join(signals, ","))
+			},
 			"armed": func(context.Context, *pluginsdk.Host, pluginsdk.CommandRequest) (pluginsdk.CommandResult, error) {
 				mu.Lock()
 				defer mu.Unlock()
 				var out []string
 				for id, s := range armed {
-					out = append(out, fmt.Sprintf("%s %s %s %s/%s x%d", id, s.Source, pluginsdk.FormatWakeArgs(s.Args), s.Context.ThreadID, s.Context.ProjectID, sent[id]))
+					line := fmt.Sprintf("%s %s %s %s/%s x%d", id, s.Source, pluginsdk.FormatWakeArgs(s.Args), s.Context.ThreadID, s.Context.ProjectID, sent[id])
+					if s.Rearm {
+						line += " rearm"
+					}
+					out = append(out, line)
 				}
 				sort.Strings(out)
 				return msg(strings.Join(out, "; "))
@@ -82,6 +98,7 @@ func wakesManifest(name string) pluginsdk.Manifest {
 		Name: name, DisplayName: "Wakes " + name, Version: "0.1.0", Protocol: 1, Exec: []string{"bin/plugin"},
 		Commands: []pluginsdk.CommandSpec{
 			{Name: "armed", Title: "Armed"},
+			{Name: "signals", Title: "Signals"},
 			{Name: "fire", Title: "Fire", Args: []pluginsdk.ArgSpec{{Name: "source"}, {Name: "match"}, {Name: "title"}}},
 		},
 		Wakes: []pluginsdk.WakeSpec{
@@ -212,6 +229,11 @@ func newWakesEnv(t *testing.T, sink *fakeSink) *env {
 		t.Fatal(err)
 	}
 	e.waitState("waker", plugin.StateRunning)
+	// Armed (wake/armed with no subscription), so what a test adds next is a new one.
+	e.eventually("the arm", func() bool {
+		r, err := e.invoke("plugin.waker.signals", nil, command.Context{})
+		return err == nil && r.Message == "0"
+	})
 	return e
 }
 
@@ -338,15 +360,26 @@ func TestWakeArmAndFire(t *testing.T) {
 		t.Errorf("log:\n%s", e.logText("waker"))
 	}
 
-	// A restart re-arms.
+	// A restart re-arms: the live subscription with rearm, then wake/armed with 1.
 	if _, err := e.m.Restart(context.Background(), "waker"); err != nil {
 		t.Fatal(err)
 	}
 	e.waitState("waker", plugin.StateRunning)
-	e.eventually("the re-arm after a restart", func() bool { return armed() == "sub-1 tick every=2s s-pr/p-gh x1" })
+	e.eventually("the re-arm after a restart", func() bool { return armed() == "sub-1 tick every=2s s-pr/p-gh x1 rearm" })
 	if !strings.Contains(e.logText("waker"), "re-armed 1 wake subscriptions") {
 		t.Errorf("log:\n%s", e.logText("waker"))
 	}
+	e.eventually("wake/armed with 1 after the restart", func() bool {
+		r, err := e.invoke("plugin.waker.signals", nil, command.Context{})
+		return err == nil && r.Message == "1"
+	})
+	// A subscription made after the arm is not a re-arm.
+	sub3 := plugin.WakeSub{ID: "sub-3", Plugin: "waker", Source: "tick", ThreadID: "s-gh", Args: map[string]string{"every": "1h"}}
+	sink.add(sub3)
+	e.m.WakeChanged(sub3, true)
+	e.eventually("a new subscription after the re-arm", func() bool {
+		return armed() == "sub-1 tick every=2s s-pr/p-gh x1 rearm; sub-3 tick every=1h s-gh/p-gh x1"
+	})
 }
 
 // A plugin that goes ends its subscriptions with a reason; an update that drops a source

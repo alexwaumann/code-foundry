@@ -19,9 +19,10 @@ type readTerms struct {
 func (r readTerms) Text(context.Context, string) (string, error)       { return r.screen, nil }
 func (r readTerms) Scrollback(context.Context, string) (string, error) { return r.scrollback, nil }
 
-// terminal/read: the screen or, with scrollback, the history and the screen; the head is
-// cut (from a line start) at maxBytes, 64 KiB/256 KiB for the screen, 1 MiB with
-// scrollback, and the JSON answer always fits a protocol line.
+// terminal/read: the screen or, with scrollback, the history and the screen, without a
+// trailing newline and with its line count; the head is cut (from a line start) at
+// maxBytes, 64 KiB/256 KiB for the screen, 1 MiB with scrollback, and the JSON answer
+// always fits a protocol line.
 func TestTerminalRead(t *testing.T) {
 	numbered := func(n int) string { // "line 000000\n…line n-1", 12 bytes a line
 		var b strings.Builder
@@ -46,7 +47,14 @@ func TestTerminalRead(t *testing.T) {
 		cut        bool
 		lines      int
 	}{
-		{name: "screen", screen: "$ ls\nfoo", scrollback: "old\n$ ls\nfoo", params: pluginsdk.TerminalReadParams{}, wantText: "$ ls\nfoo"},
+		{name: "screen", screen: "$ ls\nfoo", scrollback: "old\n$ ls\nfoo", params: pluginsdk.TerminalReadParams{}, wantText: "$ ls\nfoo", lines: 2},
+		// A part-filled screen's text ends with a newline (blank rows below): dropped, so
+		// the line count is the rows with text, as with scrollback.
+		{name: "screen part-filled", screen: "$ ls\nfoo\n", params: pluginsdk.TerminalReadParams{}, wantText: "$ ls\nfoo", lines: 2},
+		{name: "screen blank rows below", screen: "$ ls\nfoo\n\n\n", params: pluginsdk.TerminalReadParams{}, wantText: "$ ls\nfoo", lines: 2},
+		{name: "screen blank row inside kept", screen: "a\n\nb\n", params: pluginsdk.TerminalReadParams{}, wantText: "a\n\nb", lines: 3},
+		{name: "screen empty", screen: "\n", params: pluginsdk.TerminalReadParams{}, wantText: ""},
+		{name: "scrollback trailing newline", scrollback: "old\nfoo\n", params: pluginsdk.TerminalReadParams{Scrollback: true}, wantText: "old\nfoo", lines: 2},
 		{name: "scrollback oldest first", screen: "$ ls\nfoo", scrollback: "old\n$ ls\nfoo", params: pluginsdk.TerminalReadParams{Scrollback: true}, wantText: "old\n$ ls\nfoo", lines: 3},
 		{name: "scrollback empty", params: pluginsdk.TerminalReadParams{Scrollback: true}, wantText: ""},
 		{name: "scrollback maxBytes cuts the head at a line", scrollback: numbered(20), params: pluginsdk.TerminalReadParams{Scrollback: true, MaxBytes: 20},
@@ -56,11 +64,11 @@ func TestTerminalRead(t *testing.T) {
 		{name: "scrollback at most 1 MiB", scrollback: big, params: pluginsdk.TerminalReadParams{Scrollback: true, MaxBytes: 8 << 20},
 			wantSuffix: "\nline 149999", wantLen: 1 << 20, cut: true, lines: 87381},
 		{name: "screen at most 256 KiB", screen: big, params: pluginsdk.TerminalReadParams{MaxBytes: 8 << 20},
-			wantSuffix: "\nline 149999", wantLen: 256 << 10, cut: true},
+			wantSuffix: "\nline 149999", wantLen: 256 << 10, cut: true, lines: 21845},
 		{name: "screen default 64 KiB", screen: big, params: pluginsdk.TerminalReadParams{},
-			wantSuffix: "\nline 149999", wantLen: 64 << 10, cut: true},
+			wantSuffix: "\nline 149999", wantLen: 64 << 10, cut: true, lines: 5461},
 		{name: "escaped text halves until it fits a line", scrollback: strings.Repeat("<<<<<<<<<\n", 100_000) /* 1,000,000 bytes, ~5.6 MB as JSON */, params: pluginsdk.TerminalReadParams{Scrollback: true},
-			wantPrefix: "<", wantSuffix: "<\n<<<<<<<<<\n", wantLen: 500_000, cut: true, lines: 50000},
+			wantPrefix: "<", wantSuffix: "<\n<<<<<<<<<", wantLen: 499_999, cut: true, lines: 49999},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

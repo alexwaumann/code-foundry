@@ -17,7 +17,8 @@ import (
 // agent may wait for in its manifest (Manifest.Wakes); an agent subscribes its thread
 // with `code-foundry thread subscribe --plugin <plugin>/<source> [--arg k=v …]`; the host
 // tells the plugin (wake/subscribed, again for every live subscription after each
-// start, so a restarted plugin re-arms) and the plugin fires the source
+// start with rearm set, then wake/armed, so a restarted plugin re-arms and drops what
+// ended while it was down) and the plugin fires the source
 // (Host.FireWake) when the event happens. The host delivers a wake message into every
 // subscribed thread whose args the fire's match covers. No permission is needed: a
 // wake goes only to threads that asked for it.
@@ -213,12 +214,16 @@ const (
 	// MethodWakeSubscribed (host → plugin notification): WakeSubscription, a thread
 	// subscribed to one of the plugin's wake sources. Sent when it subscribes and again,
 	// for every live subscription, right after each initialized (so a restarted plugin
-	// re-arms): treat a repeat as the same subscription.
+	// re-arms), those with Rearm set: treat a repeat as the same subscription.
 	MethodWakeSubscribed = "wake/subscribed"
 	// MethodWakeUnsubscribed (host → plugin notification): WakeUnsubscribed, the
 	// subscription is gone (unsubscribed, a one-shot that fired, its thread archived or
 	// removed). Stop watching for it.
 	MethodWakeUnsubscribed = "wake/unsubscribed"
+	// MethodWakeArmed (host → plugin notification): WakeArmed, sent once after each
+	// initialized's replay of the live subscriptions (also when there were none). A
+	// subscription the plugin remembers that was not replayed ended while it was down.
+	MethodWakeArmed = "wake/armed"
 	// MethodWakeFire (plugin → host request): WakeFire → WakeFireResult. Delivers a wake
 	// to every subscription of the source whose args the match repeats.
 	MethodWakeFire = "wake/fire"
@@ -238,6 +243,14 @@ type WakeSubscription struct {
 	// Repeat: the subscription stays after a fire; otherwise the host removes it (and
 	// sends wake/unsubscribed) after the first fire that reaches it.
 	Repeat bool `json:"repeat,omitempty"`
+	// Rearm: the host is replaying a live subscription after the plugin started (it may
+	// be one the plugin remembers from before); false for a thread subscribing now.
+	Rearm bool `json:"rearm,omitempty"`
+}
+
+// WakeArmed is wake/armed's params: how many live subscriptions the host replayed.
+type WakeArmed struct {
+	Count int `json:"count"`
 }
 
 // WakeUnsubscribed is wake/unsubscribed's params.
@@ -289,9 +302,10 @@ func (h *Host) WakeHint(source string, args map[string]string) string {
 
 // WakeHint returns the command line that subscribes the thread it runs in to a wake
 // source: "code-foundry thread subscribe --plugin gh-actions/checks-done --arg
-// pr=owner/name#12". End every message, flag reason or timeline text about an event
-// with it, so an agent that reads it waits for the next one instead of polling. Args
-// are sorted by name; a value the shell would split or expand is single-quoted.
+// pr=owner/name#12". End every message, notice or timeline text about an event with
+// it, so an agent that reads it waits for the next one instead of polling; never a flag
+// reason (one line of at most 80 characters: the line does not fit). Args are sorted by
+// name; a value the shell would split or expand is single-quoted.
 func WakeHint(plugin, source string, args map[string]string) string {
 	var b strings.Builder
 	b.WriteString("code-foundry thread subscribe --plugin ")

@@ -33,11 +33,16 @@ RELEASE_REPO ?= alexwaumann/code-foundry
 # The commit, for builds Go cannot stamp (a git worktree's .git is a file): the plugin
 # skill pins the SDK at it. "-dirty" when the tree has changes.
 COMMIT   ?= $(shell git rev-parse HEAD 2>/dev/null)$(shell [ -n "$$(git status --porcelain 2>/dev/null)" ] && echo -dirty)
+# The newest pluginsdk/vX.Y.Z tag on HEAD, if any: the plugin skill then pins the SDK at
+# that version instead of the commit (a release built from a tagged main commit; the
+# release workflow fetches the tags).
+PLUGINSDK_TAG ?= $(shell git tag --points-at HEAD --list 'pluginsdk/v*' --sort=-v:refname 2>/dev/null | head -n 1)
 # One set of version ldflags for both binaries (the CLI here, the GUI via scripts/package.sh;
-# Commit is the CLI's only).
+# Commit and PluginSDKTag are the CLI's only).
 LDFLAGS  := -X github.com/alexwaumann/code-foundry/internal/version.Version=$(VERSION) \
             -X github.com/alexwaumann/code-foundry/internal/version.ReleaseRepo=$(RELEASE_REPO) \
-            -X github.com/alexwaumann/code-foundry/internal/version.Commit=$(COMMIT)
+            -X github.com/alexwaumann/code-foundry/internal/version.Commit=$(COMMIT) \
+            -X github.com/alexwaumann/code-foundry/internal/version.PluginSDKTag=$(PLUGINSDK_TAG)
 FRONTEND := gui/frontend
 PNPM     := pnpm --dir $(FRONTEND)
 

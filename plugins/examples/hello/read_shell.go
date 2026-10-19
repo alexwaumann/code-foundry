@@ -30,9 +30,9 @@ func readShell(own *owned) pluginsdk.CommandFunc {
 		if err != nil {
 			return pluginsdk.CommandResult{}, err
 		}
-		screenLines := 0
-		if screen.Text != "" {
-			screenLines = strings.Count(screen.Text, "\n") + 1
+		screenLines := screen.Lines
+		if screenLines == 0 { // a host before pluginsdk v0.2.1 counts the scrollback read's only
+			screenLines = lineCount(screen.Text)
 		}
 		js, _ := json.Marshal(map[string]any{
 			"terminalId": id, "lines": all.Lines, "screenLines": screenLines, "truncated": all.Truncated, "text": all.Text,
@@ -43,4 +43,14 @@ func readShell(own *owned) pluginsdk.CommandFunc {
 		}
 		return pluginsdk.CommandResult{Message: msg, JSON: js}, nil
 	}
+}
+
+// lineCount is how many lines text has, a trailing newline not starting another (an
+// older host's screen read ends with one when rows below the text are blank).
+func lineCount(text string) int {
+	text = strings.TrimRight(text, "\n")
+	if text == "" {
+		return 0
+	}
+	return strings.Count(text, "\n") + 1
 }

@@ -213,6 +213,11 @@ Otherwise the `default` is kept; a `required` arg left without a value refuses t
 subscription, naming it. An optional arg without a value is absent, so that
 subscription matches every fire of the source. Values are one line, at most 512 bytes.
 
+`plugin wakes` prints each arg's type, `required`, and its default after it ("default
+this thread's id", "… pull request", "… project" for a context arg, else the `default`
+value), so an arg's `description` says what it selects ("Only this outcome"), never its
+default.
+
 ## Icons
 
 The GUI draws these lucide icons (header and surface icons, glyphs, buttons, notices;

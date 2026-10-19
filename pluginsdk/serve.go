@@ -35,7 +35,10 @@ type Surface interface {
 type Plugin struct {
 	// Init runs once the host has finished the handshake (after initialized): subscribe,
 	// push the environment, set context. An error ends Serve; the host restarts the
-	// plugin with backoff.
+	// plugin with backoff. Until it returns, Serve holds back everything else the host
+	// sends but ping and shutdown: commands, surfaces, events, terminal exits, secret
+	// changes and wake subscriptions reach their handlers after Init, notifications in
+	// the order they came. So Init must not wait for one of them.
 	Init func(ctx context.Context, h *Host) error
 	// Commands by manifest name ("greet").
 	Commands map[string]CommandFunc
@@ -53,12 +56,18 @@ type Plugin struct {
 	// OnWakeSubscribed learns that a thread subscribed to one of the manifest's wake
 	// sources (wake/subscribed): start watching for its event, keyed by
 	// sub.Subscription, and fire it with Host.FireWake. The host sends every live
-	// subscription again after each start, so a restarted plugin re-arms here; treat a
-	// subscription it already has as the same one.
+	// subscription again after each start (sub.Rearm), so a restarted plugin re-arms
+	// here; treat a subscription it already has as the same one. It runs after Init.
 	OnWakeSubscribed func(ctx context.Context, h *Host, sub WakeSubscription)
 	// OnWakeUnsubscribed learns that a subscription went (unsubscribed, a one-shot that
 	// fired, its thread archived): stop watching for it.
 	OnWakeUnsubscribed func(ctx context.Context, h *Host, u WakeUnsubscribed)
+	// OnWakeArmed learns that the host has replayed every live subscription after a
+	// start (wake/armed, count of them, also 0): a subscription the plugin kept state for
+	// (in its data dir) that was not replayed ended while it was down, so drop that state.
+	// It comes once per start, after the replay's OnWakeSubscribed calls and before any
+	// new subscription's.
+	OnWakeArmed func(ctx context.Context, h *Host, count int)
 	// Shutdown runs when the host asks the plugin to stop (it has about 2 seconds).
 	Shutdown func(ctx context.Context, h *Host)
 	// Capabilities the plugin announces in addition to the SDK's own.
@@ -78,7 +87,7 @@ func Serve(p Plugin) error {
 func ServeConn(ctx context.Context, r io.Reader, w io.Writer, p Plugin) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	s := &server{p: p, ctx: ctx, stop: make(chan struct{}), ready: make(chan struct{}), surfaces: map[string]Surface{}}
+	s := &server{p: p, ctx: ctx, stop: make(chan struct{}), ready: make(chan struct{}), started: make(chan struct{}), surfaces: map[string]Surface{}}
 	conn := NewConn(r, w, ConnOptions{
 		Handle: s.handle,
 		Notify: s.notify,
@@ -119,12 +128,38 @@ type server struct {
 	stop     chan struct{}
 	stopOnce sync.Once
 	ready    chan struct{} // closed once h is set; handlers wait for it
+	// started is closed once Plugin.Init has returned (at initialized without one);
+	// everything but initialize, ping and shutdown waits for it (awaitInit).
+	started     chan struct{}
+	startedOnce sync.Once
 
 	errMu sync.Mutex
 	errc  chan error
 
 	smu      sync.Mutex
 	surfaces map[string]Surface
+}
+
+// start marks Init as returned: the held-back requests and notifications go on.
+func (s *server) start() { s.startedOnce.Do(func() { close(s.started) }) }
+
+// awaitInit waits until Init has returned, and reports false when Serve is ending
+// first (Init failed, the host went). The notifications wait on their one goroutine,
+// so they reach the handlers in order; requests wait on their own.
+func (s *server) awaitInit(ctx context.Context) bool {
+	select {
+	case <-s.started:
+		return true
+	default:
+	}
+	select {
+	case <-s.started:
+		return true
+	case <-ctx.Done():
+	case <-s.ctx.Done():
+	case <-s.stop:
+	}
+	return false
 }
 
 func (s *server) failed() chan error {
@@ -160,6 +195,11 @@ func (s *server) handle(ctx context.Context, method string, params json.RawMessa
 			cancel()
 		}
 		return struct{}{}, nil
+	}
+	if !s.awaitInit(ctx) {
+		return nil, NewError(CodeUnavailable, "%s: the plugin is stopping before it started", method)
+	}
+	switch method {
 	case MethodCommandInvoke:
 		var req CommandRequest
 		if err := json.Unmarshal(params, &req); err != nil {
@@ -189,17 +229,25 @@ func (s *server) handle(ctx context.Context, method string, params json.RawMessa
 // notify handles the host's notifications.
 func (s *server) notify(ctx context.Context, method string, params json.RawMessage) {
 	<-s.ready
-	switch method {
-	case MethodInitialized:
+	if method == MethodInitialized {
 		if s.p.Init == nil {
+			s.start()
 			return
 		}
 		go func() {
 			if err := s.p.Init(s.ctx, s.h); err != nil {
 				s.h.Log().Error("init failed", "err", err.Error())
 				s.failed() <- fmt.Errorf("init: %w", err)
+				return
 			}
+			s.start()
 		}()
+		return
+	}
+	if !s.awaitInit(ctx) {
+		return
+	}
+	switch method {
 	case MethodEventsEvent:
 		if s.p.OnEvent == nil {
 			return
@@ -222,6 +270,11 @@ func (s *server) notify(ctx context.Context, method string, params json.RawMessa
 		var u WakeUnsubscribed
 		if s.p.OnWakeUnsubscribed != nil && json.Unmarshal(params, &u) == nil {
 			s.p.OnWakeUnsubscribed(ctx, s.h, u)
+		}
+	case MethodWakeArmed:
+		var a WakeArmed
+		if s.p.OnWakeArmed != nil && json.Unmarshal(params, &a) == nil {
+			s.p.OnWakeArmed(ctx, s.h, a.Count)
 		}
 	case MethodSecretChanged:
 		var c SecretChanged

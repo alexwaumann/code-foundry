@@ -17,6 +17,8 @@ import (
 // wake/fire calls (WakeFires) and answers how many of its subscriptions the match reaches,
 // removing a one-shot one that it reached (wake/unsubscribed), as the host does. With
 // Options.Wakes it also refuses a source or match arg the manifest does not declare.
+// Options.WakeSubscriptions are replayed at start (Rearm set, then wake/armed), as the
+// host replays the live subscriptions after a restart.
 
 // wakeState is the fake's wake subscriptions and fires. Guarded by Host.mu.
 type wakeState struct {
@@ -46,6 +48,18 @@ func (h *Host) SubscribeWakeWith(sub pluginsdk.WakeSubscription) (string, error)
 		h.wakes.subs = append(h.wakes.subs, sub)
 	})
 	return sub.Subscription, h.conn.Notify(pluginsdk.MethodWakeSubscribed, sub)
+}
+
+// rearmWakes replays subs as the host does after initialized: each with Rearm, then
+// wake/armed.
+func (h *Host) rearmWakes(subs []pluginsdk.WakeSubscription) error {
+	for _, sub := range subs {
+		sub.Rearm = true
+		if _, err := h.SubscribeWakeWith(sub); err != nil {
+			return err
+		}
+	}
+	return h.conn.Notify(pluginsdk.MethodWakeArmed, pluginsdk.WakeArmed{Count: len(subs)})
 }
 
 // UnsubscribeWake removes a subscription and sends wake/unsubscribed.

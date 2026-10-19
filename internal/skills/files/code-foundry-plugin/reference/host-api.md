@@ -323,13 +323,19 @@ event and fires:
 ```go
 pluginsdk.Plugin{
 	// Sent when a thread subscribes, and again for every live subscription after each
-	// start (the plugin re-arms here). Key state by s.Subscription; a repeat is the same one.
+	// start with s.Rearm set (the plugin re-arms here). Key state by s.Subscription; a
+	// repeat is the same one.
 	OnWakeSubscribed: func(ctx context.Context, h *pluginsdk.Host, s pluginsdk.WakeSubscription) {
 		w.arm(s.Subscription, s.Source, s.Args["pr"]) // s.Context: the subscriber's thread, project
 	},
 	// Unsubscribed, a one-shot that fired, its thread archived: stop watching.
 	OnWakeUnsubscribed: func(ctx context.Context, h *pluginsdk.Host, u pluginsdk.WakeUnsubscribed) {
 		w.disarm(u.Subscription)
+	},
+	// Once per start, after the replay (count of them, 0 too): a subscription the plugin
+	// saved in its data dir that was not replayed ended while it was down; drop it.
+	OnWakeArmed: func(ctx context.Context, h *pluginsdk.Host, count int) {
+		w.dropNotRearmed()
 	},
 }
 
@@ -351,10 +357,16 @@ n, err := h.FireWake(ctx, "checks-done", map[string]string{"pr": "octo/app#12", 
   wakes an hour, whatever their source.
 - Disabling, uninstalling or replacing the plugin, or an update that drops a source, ends
   its subscriptions with a last wake `… — source gone (<reason>)` (payload null).
-- **Advertise the source.** End every message, flag reason or timeline text the plugin
-  sends about an event with `h.WakeHint(source, args)` (or `pluginsdk.WakeHint(plugin,
-  source, args)`): the exact `code-foundry thread subscribe --plugin … --arg …` line, so an
-  agent that reads "checks failed" waits for the next run instead of polling it.
+- **Ordering.** Every wake notification, like everything else the host sends, reaches
+  the plugin after `Init` has returned, in order: a re-arm finds what Init loaded. Keep
+  only in-memory state, or save it in the data dir and let `OnWakeArmed` prune it; a timer
+  to forget a subscription is not needed.
+- **Advertise the source.** End every message, notice or timeline text the plugin sends
+  about an event with `h.WakeHint(source, args)` (or `pluginsdk.WakeHint(plugin, source,
+  args)`): the exact `code-foundry thread subscribe --plugin … --arg …` line, so an agent
+  that reads "checks failed" waits for the next run instead of polling it. Never a flag
+  reason: it is one line of at most 80 characters and the line does not fit; the
+  failure's message or the panel's notice carries it.
 
 ## Toasts
 
@@ -418,7 +430,9 @@ A terminal's output is readable: `h.ReadTerminal(ctx, id, maxBytes)` returns the
 its screen, plain (no escape sequences), one line per row with trailing spaces trimmed:
 the rows the terminal shows (24 by default, more when a viewer made it taller), not the
 scrollback above them, and at most `maxBytes` of it (0: 64 KiB, at most 256 KiB; its end,
-from a line start, with `Truncated`). When its process exits the plugin gets
+from a line start, with `Truncated`). Blank rows below the text are dropped and no read
+ends with a newline; `Lines` counts the text's lines (a host before pluginsdk v0.2.1
+sets it with the scrollback only, and its screen text may end with a newline). When its process exits the plugin gets
 `terminal/exited` `{terminalId, exitCode}` (`Plugin.OnTerminalExit`; 128+n when signal n
 killed it), once; read the screen then rather than polling `Terminals`. For a run whose
 whole output matters, read it with the scrollback:

@@ -3,6 +3,9 @@ package pluginsdk_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -111,5 +114,121 @@ func TestServeInitErrorEndsServe(t *testing.T) {
 			return
 		}
 		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+// Until Init returns, Serve holds back what the host sends (the re-armed wake
+// subscriptions, wake/armed, events, new subscriptions, commands); then the
+// notifications reach their handlers in the order they came.
+func TestServeHoldsBackUntilInit(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	release := make(chan struct{})
+	var mu sync.Mutex
+	var seen []string
+	note := func(s string) {
+		mu.Lock()
+		defer mu.Unlock()
+		seen = append(seen, s)
+	}
+	got := func() []string {
+		mu.Lock()
+		defer mu.Unlock()
+		return slices.Clone(seen)
+	}
+	p := pluginsdk.Plugin{
+		Init: func(context.Context, *pluginsdk.Host) error {
+			<-release
+			note("init")
+			return nil
+		},
+		OnWakeSubscribed: func(_ context.Context, _ *pluginsdk.Host, s pluginsdk.WakeSubscription) {
+			note(fmt.Sprintf("subscribed %s rearm=%v", s.Subscription, s.Rearm))
+		},
+		OnWakeArmed: func(_ context.Context, _ *pluginsdk.Host, n int) { note(fmt.Sprintf("armed %d", n)) },
+		OnWakeUnsubscribed: func(_ context.Context, _ *pluginsdk.Host, u pluginsdk.WakeUnsubscribed) {
+			note("unsubscribed " + u.Subscription)
+		},
+		OnEvent: func(_ context.Context, _ *pluginsdk.Host, ev pluginsdk.Event) { note("event " + ev.Subscription) },
+		Commands: map[string]pluginsdk.CommandFunc{
+			"hi": func(context.Context, *pluginsdk.Host, pluginsdk.CommandRequest) (pluginsdk.CommandResult, error) {
+				note("command")
+				return pluginsdk.CommandResult{Message: "hi"}, nil
+			},
+		},
+	}
+	h := plugintest.Start(t, p, plugintest.Options{NoInitWait: true, WakeSubscriptions: []pluginsdk.WakeSubscription{
+		{Subscription: "sub-a", Source: "tick"}, {Subscription: "sub-b", Source: "tick"},
+	}})
+	if err := h.Event(pluginsdk.Event{Subscription: "ev-1"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.SubscribeWake("tick", nil, pluginsdk.UiContext{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.UnsubscribeWake("sub-a"); err != nil {
+		t.Fatal(err)
+	}
+	cmd := make(chan error, 1)
+	go func() {
+		_, err := h.Command(ctx, "hi", nil, pluginsdk.UiContext{})
+		cmd <- err
+	}()
+	if err := h.Ping(ctx); err != nil { // ping is answered while Init runs
+		t.Fatalf("ping during Init: %v", err)
+	}
+	time.Sleep(100 * time.Millisecond)
+	if s := got(); len(s) != 0 {
+		t.Fatalf("handlers ran before Init returned: %q", s)
+	}
+	close(release)
+	if err := <-cmd; err != nil {
+		t.Fatalf("command after Init: %v", err)
+	}
+	h.WaitFor(time.Second, func(*plugintest.Host) bool { return len(got()) == 8 })
+	s := got()
+	if s[0] != "init" {
+		t.Errorf("first = %q, want init", s[0])
+	}
+	notes := slices.DeleteFunc(slices.Clone(s[1:]), func(x string) bool { return x == "command" })
+	want := []string{"subscribed sub-a rearm=true", "subscribed sub-b rearm=true", "armed 2", "event ev-1",
+		"subscribed wsub-1 rearm=false", "unsubscribed sub-a"}
+	if !slices.Equal(notes, want) {
+		t.Errorf("notifications %q, want %q", notes, want)
+	}
+}
+
+// A command held back while Init fails gets an error, not its handler.
+func TestServeHeldBackWhenInitFails(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	fail := make(chan struct{})
+	ran := make(chan struct{}, 1)
+	h := plugintest.Start(t, pluginsdk.Plugin{
+		Init: func(context.Context, *pluginsdk.Host) error {
+			<-fail
+			return errors.New("no config")
+		},
+		Commands: map[string]pluginsdk.CommandFunc{
+			"hi": func(context.Context, *pluginsdk.Host, pluginsdk.CommandRequest) (pluginsdk.CommandResult, error) {
+				ran <- struct{}{}
+				return pluginsdk.CommandResult{}, nil
+			},
+		},
+	}, plugintest.Options{NoInitWait: true})
+	cmd := make(chan error, 1)
+	go func() {
+		_, err := h.Command(ctx, "hi", nil, pluginsdk.UiContext{})
+		cmd <- err
+	}()
+	time.Sleep(50 * time.Millisecond)
+	close(fail)
+	if err := <-cmd; err == nil {
+		t.Error("command answered after Init failed")
+	}
+	select {
+	case <-ran:
+		t.Error("the command's handler ran though Init failed")
+	default:
 	}
 }

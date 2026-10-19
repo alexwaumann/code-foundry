@@ -257,3 +257,6 @@ the thread's transcript deleted.
 ## Daemon restart
 
 Needed: migration 0034, new RPC fields and commands, the plugin protocol methods.
+
+Follow-up: `plugins-wake-polish.md` (pluginsdk v0.2.1): handlers wait for Init, `rearm`
+and `wake/armed`, wake hints never in flag reasons, the SDK pin uses the tag.

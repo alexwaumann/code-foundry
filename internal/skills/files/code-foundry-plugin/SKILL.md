@@ -100,11 +100,11 @@ showcase` (once `plugins.registries` is configured) and read the matching file.
   `h.DataDir()` is its state folder. Run the user's own tools (`go test`, `npm test`)
   through their login shell (`$SHELL -lc "<cmd>"`), as project actions do. stdout is
   the protocol: the SDK sends a stray `fmt.Println` to the log instead.
-- Requests are handled concurrently (guard state with a mutex); events and other
-  notifications arrive in order on one goroutine, so `OnEvent` must return quickly.
-- **Wake sources** (`manifest.md` "Wakes", `host-api.md` "FireWake"): arm in
-  `OnWakeSubscribed` (sent again after every start), fire with `h.FireWake`. End every
-  message, flag reason or timeline text about an event with `h.WakeHint(source, args)`.
+- Requests run concurrently (guard state with a mutex); notifications in order on one
+  goroutine (`OnEvent` returns quickly); none of them before `Init` has returned.
+- **Wake sources** (`manifest.md` "Wakes", `host-api.md` "FireWake"): arm in `OnWakeSubscribed`
+  (replayed with `Rearm` after each start, then `OnWakeArmed`); fire with `h.FireWake`; end
+  messages, notices, timeline text (never a flag reason: 80 chars) with `h.WakeHint(source, args)`.
 
 ## References (next to this file)
 

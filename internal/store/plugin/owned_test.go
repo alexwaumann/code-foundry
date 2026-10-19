@@ -386,10 +386,10 @@ func TestPluginThreadsAndTerminals(t *testing.T) {
 		t.Fatalf("second term = %s", got)
 	}
 	// Its screen as text (the end when longer than asked), only its own; its exit told.
-	if got := run("termread", pluginsdk.TerminalReadParams{TerminalID: "t-p1"}); got != `{"text":"$ date\nSat Oct 18 12:00:00 2026\nt-p1"}` {
+	if got := run("termread", pluginsdk.TerminalReadParams{TerminalID: "t-p1"}); got != `{"text":"$ date\nSat Oct 18 12:00:00 2026\nt-p1","lines":3}` {
 		t.Errorf("read = %s", got)
 	}
-	if got := run("termread", pluginsdk.TerminalReadParams{TerminalID: "t-p1", MaxBytes: 10}); got != `{"text":"t-p1","truncated":true}` {
+	if got := run("termread", pluginsdk.TerminalReadParams{TerminalID: "t-p1", MaxBytes: 10}); got != `{"text":"t-p1","truncated":true,"lines":1}` {
 		t.Errorf("read 10 bytes = %s", got)
 	}
 	// With scrollback: the history, then the screen; the head cut at maxBytes.

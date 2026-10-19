@@ -50,7 +50,7 @@ func renderSkills(ctx context.Context, v version.Info, skillsDir string, cmds *a
 	return skills.Render(skills.Sources{
 		Version: v.Version, Commands: commands,
 		SettingGroups: schema.Msg.GetGroups(), Settings: schema.Msg.GetFields(),
-		Commit: v.Commit, SkillsDir: skillsDir, Facts: plugin.HostFactNames(),
+		Commit: v.Commit, SDKTag: v.PluginSDKTag, SkillsDir: skillsDir, Facts: plugin.HostFactNames(),
 	})
 }
 
