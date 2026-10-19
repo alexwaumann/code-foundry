@@ -201,7 +201,8 @@ Services (v1):
   Unregister, List, ListWorktrees, CreateWorktree (optionally fetching the base first),
   CleanupWorktrees (remove worktrees whose work is in origin/<default>: `merged_clean`,
   no thread (archived ones aside), terminal or workspace on it; never deletes branches;
-  `docs/notes/projects-polish-3.md`),
+  each removed or kept worktree comes with its reason, which the confirmation lists;
+  `docs/notes/projects-polish-3.md`, `docs/notes/cleanup-eligibility.md`),
   ListRefs, Watch, GetWorktreeDetail (files and log against the base branch, Phase 3a),
   InitGit (`git init` and an empty first commit in a project without git;
   `docs/notes/add-project-2-nogit.md`), SearchGitHub and LookupGitHub (GraphQL through
@@ -614,8 +615,12 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   operation in progress, read from marker files in the admin dir without another git
   command; `docs/notes/worktree-op-state.md`). Every worktree the app makes goes to
   `<config home>/worktrees/<owner>/<repo>/<branch>` (`_local/<name>` without a GitHub
-  origin); no setting or request field moves it, and only worktrees under that root are
-  `Managed` (cleanable; `docs/notes/drop-worktree-dir.md`). One recursive FSEvents
+  origin); no setting or request field moves it (`docs/notes/drop-worktree-dir.md`).
+  CreateWorktree records each worktree it makes (`project_worktrees`: path, HEAD, time),
+  and only a recorded one is `Managed` (cleanable); a `git worktree add` under the root
+  is not. Cleanup keeps one made in the last 10 minutes with no commit since, and counts
+  a branch whose rebased or squash-merged copy landed as merged (`Status.BaseMerged`, a
+  memoized `git merge-tree`; `docs/notes/cleanup-eligibility.md`). One recursive FSEvents
   stream (cgo, confined to one goroutine) over the worktree root, every project
   directory, and any worktree outside both is routed by path to debounced status,
   base, and reconcile jobs (`docs/notes/fsevents-watcher.md`); a live worktree's tree

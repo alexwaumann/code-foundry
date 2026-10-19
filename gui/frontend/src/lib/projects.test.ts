@@ -279,7 +279,7 @@ describe("isCleanable", () => {
     });
   }
   it("names the base in its tooltip", () => {
-    expect(cleanableTitle("origin/main")).toBe("Clean: no changes, every commit is in origin/main, no thread or terminal on it");
+    expect(cleanableTitle("origin/main")).toBe("Clean: no changes, its work is in origin/main, no thread or terminal on it");
     expect(cleanableTitle("")).toContain("origin/<default>");
   });
 });

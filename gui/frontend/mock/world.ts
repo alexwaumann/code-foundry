@@ -426,7 +426,15 @@ function managed(w: MockWorktree): boolean {
   return w.path.startsWith(`${WORKTREE_ROOT}/`);
 }
 
-/** The daemon's project.MergedCleanReason == "": not main, made by the app, on a branch, nothing uncommitted, every commit in baseRef. */
+/** Why the daemon's cleanup may remove w (the only reason the mock models). */
+function removedReason(w: MockWorktree): string {
+  return `branch is in ${w.status.baseRef ?? "origin/main"}`;
+}
+
+/**
+ * The daemon's project.CleanupVerdict removable: not main, made by the app, on a branch, nothing uncommitted, every
+ * commit in baseRef. The mock tells "made by the app" by path and does not model the 10-minute grace or rebased copies.
+ */
 function mergedClean(w: MockWorktree): boolean {
   const st = w.status;
   return !w.isMain && managed(w) && !w.detached && w.branch !== "" && !st.dirty && st.staged + st.modified + st.untracked === 0 && Boolean(st.baseRef) && (st.baseAhead ?? 0) === 0;
@@ -2915,10 +2923,20 @@ export class World {
           ],
           confirm: (ctx, args) => {
             const ref = args.project || ctx?.activeProjectId || "";
-            const rm = this.cleanupWorktrees(ref, args.path ?? "", true).removed;
-            if (rm.length === 0) return `Fetch ${ref} and remove the worktrees created by Code Foundry (under its worktrees directory) whose work is already in the default branch? Branches are kept.`;
-            if (args.path) return `Remove the worktree of ${rm[0]?.branch ?? ""} (${args.path})? Code Foundry created it (under its worktrees directory) and its work is in origin/main; the branch is kept. It is checked again after a fetch.`;
-            return `Remove ${String(rm.length)} ${rm.length === 1 ? "worktree" : "worktrees"} created by Code Foundry (under its worktrees directory) whose work is in origin/main: ${rm.map((w) => w.branch).join(", ")}? Branches are kept; each is checked again after a fetch.`;
+            const { removed: rm, skipped: sk } = this.cleanupWorktrees(ref, args.path ?? "", true);
+            const line = (w: MockWorktree, reason: string) => `\n- ${w.branch} at ${w.path}: ${reason}`;
+            const r0 = rm[0];
+            const s0 = sk[0];
+            if (args.path && r0) return `Remove the worktree of ${r0.branch} at ${r0.path} (${removedReason(r0)})? The branch is kept. It is checked again after a fetch.`;
+            if (args.path && s0) return `Fetch and check the worktree of ${s0.w.branch} at ${s0.w.path} again? Right now it is kept: ${s0.reason}.`;
+            if (rm.length + sk.length === 0) return `Fetch ${ref} and remove the worktrees Code Foundry made whose work is already in the default branch? Branches are kept.`;
+            let msg =
+              rm.length === 0
+                ? "Fetch and remove the worktrees Code Foundry made whose work is in the default branch? None would be removed now; each is checked again after the fetch."
+                : `Fetch, then remove ${String(rm.length)} ${rm.length === 1 ? "worktree" : "worktrees"} (branches are kept; each is checked again after the fetch):` +
+                  rm.map((w) => line(w, removedReason(w))).join("");
+            if (sk.length > 0) msg += `\nKeep ${String(sk.length)}:` + sk.map((s) => line(s.w, s.reason)).join("");
+            return msg;
           },
         },
         when: (ctx) => Boolean(ctx?.activeProjectId && this.projects.get(ctx.activeProjectId)?.git !== false),
@@ -2926,7 +2944,7 @@ export class World {
           const res = this.cleanupWorktrees(args.project || ctx?.activeProjectId || "", args.path ?? "", false);
           const parts: string[] = [];
           const n = (k: number) => `${String(k)} ${k === 1 ? "worktree" : "worktrees"}`;
-          if (res.removed.length > 0) parts.push(`Removed ${n(res.removed.length)}: ${res.removed.map((w) => w.branch).join(", ")}`);
+          if (res.removed.length > 0) parts.push(`Removed ${n(res.removed.length)}: ${res.removed.map((w) => `${w.branch} (${removedReason(w)})`).join(", ")}`);
           if (res.skipped.length > 0) parts.push(`${res.removed.length === 0 ? "Nothing removed; kept" : "kept"} ${n(res.skipped.length)}: ${res.skipped.map((s) => `${s.w.branch} (${s.reason})`).join(", ")}`);
           return parts.join("; ") || "No worktrees to clean up";
         },
