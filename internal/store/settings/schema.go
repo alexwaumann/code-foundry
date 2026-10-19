@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -650,6 +651,54 @@ func checkBackdropFile(v string) error {
 	}
 	if strings.ContainsAny(v, `/\`) || strings.HasPrefix(v, ".") {
 		return fmt.Errorf("want a file name in the backdrops folder, got %q", v)
+	}
+	return nil
+}
+
+// crossCheck is a rule over several keys' resolved values. Update runs it when the
+// change sets one of keys and reports a refusal on the first of them it sets. Load and
+// reload do not: a hand-edited file is not rewritten, and its readers fall back instead
+// (custom without an image renders the forest art).
+type crossCheck struct {
+	keys  []string
+	check func(o Options, values map[string]string) error
+}
+
+var crossChecks = []crossCheck{
+	{keys: []string{KeyBackdrop, KeyBackdropFile}, check: checkBackdropChoice},
+}
+
+// crossIssues returns the cross checks partial runs into, given the resolved values.
+func crossIssues(o Options, partial, values map[string]string) []Issue {
+	var out []Issue
+	for _, c := range crossChecks {
+		i := slices.IndexFunc(c.keys, func(k string) bool { _, ok := partial[k]; return ok })
+		if i < 0 {
+			continue
+		}
+		if err := c.check(o, values); err != nil {
+			out = append(out, Issue{c.keys[i], err.Error()})
+		}
+	}
+	return out
+}
+
+// checkBackdropChoice refuses appearance.backdrop = custom without an image to show:
+// appearance.backdrop_file empty, or (with Options.BackdropsDir) naming no regular file in
+// the backdrops directory. Images are added on the settings page, which selects each one.
+func checkBackdropChoice(o Options, values map[string]string) error {
+	if values[KeyBackdrop] != BackdropCustom {
+		return nil
+	}
+	file := values[KeyBackdropFile]
+	if file == "" {
+		return errors.New("custom needs an image: add one under Settings › Appearance › Backdrop first")
+	}
+	if o.BackdropsDir == "" {
+		return nil
+	}
+	if fi, err := os.Lstat(filepath.Join(o.BackdropsDir, file)); err != nil || !fi.Mode().IsRegular() {
+		return fmt.Errorf("custom needs an image, and %q is not in the backdrops folder", file)
 	}
 	return nil
 }

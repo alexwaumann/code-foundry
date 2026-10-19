@@ -379,6 +379,14 @@ test("the backdrop row's gallery shows, selects and removes images; Add image…
   await expect(select(page, "appearance.backdrop")).toHaveAttribute("data-value", "forest");
   await expect(thumbs.nth(0)).not.toHaveAttribute("data-selected", "true");
 
+  // Removing the last one takes Custom out of the list.
+  await thumbs.nth(0).hover();
+  await row.getByRole("button", { name: "Remove image 1" }).click();
+  await expect(row.getByTestId("backdrop-gallery")).toHaveCount(0);
+  await select(page, "appearance.backdrop").click();
+  await expect(page.getByRole("option")).toHaveText(["Forest (default)", "None"]);
+  await page.keyboard.press("Escape");
+
   // No host in a browser: no open panel.
   await expect(row.getByTestId("backdrop-add")).toBeDisabled();
 });

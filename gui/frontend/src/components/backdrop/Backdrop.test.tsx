@@ -78,17 +78,19 @@ describe("Backdrop", () => {
     expect(createUrl).toHaveBeenCalledTimes(1);
   });
 
-  it("custom with a file gone from the folder renders nothing", async () => {
-    setValues({ "appearance.backdrop": "custom", "appearance.backdrop_file": "gone.png" });
+  it.each([
+    ["gone from the folder", "gone.png"],
+    ["named by no file", ""],
+  ])("custom with its image %s falls back to the forest", async (_, file) => {
+    setValues({ "appearance.backdrop": "custom", "appearance.backdrop_file": file });
     render(<Backdrop />);
-    await answer("gone.png", false);
-    expect(art()).toBeNull();
-  });
-
-  it("custom with no file renders nothing and asks for nothing", () => {
-    setValues({ "appearance.backdrop": "custom", "appearance.backdrop_file": "" });
-    render(<Backdrop />);
-    expect(art()).toBeNull();
-    expect(daemon.pending.size).toBe(0);
+    if (file) {
+      expect(art()).toBeNull(); // loading: no forest flash before the image
+      await answer(file, false);
+    } else {
+      expect(daemon.pending.size).toBe(0);
+    }
+    expect(art()?.dataset.backdrop).toBe("forest");
+    expect(vars()[0]).not.toContain("blob:");
   });
 });

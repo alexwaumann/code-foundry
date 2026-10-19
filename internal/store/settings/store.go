@@ -67,6 +67,10 @@ type Options struct {
 	Log *slog.Logger
 	// Debounce coalesces file events. Default DefaultDebounce.
 	Debounce time.Duration
+	// BackdropsDir is the backdrops directory (paths.Backdrops). Update refuses
+	// appearance.backdrop = custom unless appearance.backdrop_file names a file in it.
+	// Empty: only an empty appearance.backdrop_file is refused.
+	BackdropsDir string
 }
 
 // Store is the file-backed settings store. Methods are safe for concurrent use.
@@ -245,6 +249,7 @@ func (s *Store) Update(_ context.Context, partial map[string]string) (*Snapshot,
 			bad = append(bad, is)
 		}
 	}
+	bad = append(bad, crossIssues(s.opts, partial, r.values)...)
 	if len(bad) > 0 {
 		slices.SortFunc(bad, func(a, b Issue) int { return strings.Compare(a.Key, b.Key) })
 		return nil, &ValidationError{Issues: dedupeIssues(bad)}

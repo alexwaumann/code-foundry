@@ -247,6 +247,8 @@ export class MockSettings {
   raw: Record<string, string> = initialRaw();
   revision = 1;
   loadError = "";
+  /** Whether the backdrops folder has an image (world.ts wires mock/backdrops.ts); unset: only "" is missing. */
+  backdropExists?: (name: string) => boolean;
   private readonly startup: Record<string, string>;
 
   constructor(
@@ -372,6 +374,13 @@ export class MockSettings {
         else if (prev && `keybindings.${prev}` in partial) issues.push({ key: `keybindings.${prev}`, message: `${chord} is already bound to ${c.name}` });
         else owners.set(chord, c.name);
       }
+    }
+    // Like the daemon's cross check (internal/store/settings, checkBackdropChoice).
+    const choiceKey = ["appearance.backdrop", "appearance.backdrop_file"].find((k) => k in partial);
+    const file = next["appearance.backdrop_file"] ?? "";
+    if (choiceKey && next["appearance.backdrop"] === "custom") {
+      if (file === "") issues.push({ key: choiceKey, message: "custom needs an image: add one under Settings › Appearance › Backdrop first" });
+      else if (this.backdropExists && !this.backdropExists(file)) issues.push({ key: choiceKey, message: `custom needs an image, and "${file}" is not in the backdrops folder` });
     }
     if (issues.length > 0) throw new SettingsValidation(issues);
     this.raw = next;

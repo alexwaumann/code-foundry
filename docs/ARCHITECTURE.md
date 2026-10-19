@@ -264,7 +264,8 @@ Services (v1):
   hand-editable, reloaded on change). See `docs/notes/phase3b-settings.md`. ListBackdrops,
   ImportBackdrop, RemoveBackdrop and ReadBackdrop keep the user's backdrop images (copies in
   `$CONFIG/backdrops`, internal/store/backdrop) that `appearance.backdrop = custom` shows
-  (`docs/notes/custom-backdrop.md`).
+  (`docs/notes/custom-backdrop.md`); Update refuses `custom` unless `appearance.backdrop_file`
+  names one of them (`docs/notes/backdrop-custom-guard.md`).
 * `UpdateService` — Get, Check, Download, Install, Relaunch, RequestRestart, Watch. The
   24h release check on the `update.channel` setting's channel (stable: the newest full
   release; tip: the highest release, prereleases included; re-checked at once when the

@@ -102,6 +102,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	}()
 	if s.settings, err = settings.Open(ctx, settings.Options{
 		Path: filepath.Join(p.Home(), settings.FileName), Bus: s.bus, Log: log.With("store", "settings"),
+		BackdropsDir: p.Backdrops(),
 	}); err != nil {
 		return nil, err
 	}

@@ -23,8 +23,8 @@ import (
 // The real store behind the handler: import selects, list shows, read returns the
 // bytes, remove of the selected one falls back to forest.
 func TestSettingsBackdrops(t *testing.T) {
-	set, _ := newSettingsFake(t, nil)
-	dir := t.TempDir()
+	set, path := newSettingsFake(t, nil)
+	dir := filepath.Dir(path)
 	h := NewSettings(set).WithBackdrops(backdrop.New(backdrop.Options{Dir: filepath.Join(dir, "backdrops"), Settings: set}))
 	ctx := context.Background()
 

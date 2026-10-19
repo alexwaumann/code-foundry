@@ -97,9 +97,9 @@ test("a custom backdrop shows the user's image behind the start page and the com
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("composer")).toBeVisible();
   await expect(page.getByTestId("backdrop")).toHaveAttribute("data-backdrop", "custom");
-  // Gone from the folder (removed elsewhere): nothing, not the forest.
+  // Gone from the folder (removed by hand): the forest again.
   await mockPost("settings/external?appearance.backdrop_file=0000000000000000000000000000dead.png");
-  await expect(page.getByTestId("backdrop")).toHaveCount(0);
+  await expect(page.getByTestId("backdrop")).toHaveAttribute("data-backdrop", "forest");
 });
 
 test("appearance.backdrop none removes the artwork from the start page and the composer", async ({ page }) => {

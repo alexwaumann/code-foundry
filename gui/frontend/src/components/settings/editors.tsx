@@ -32,8 +32,11 @@ const EMPTY_ENUM = "__cf_default__";
 /**
  * `markDefault` (on) appends " (default)" to the default's label in the list, not in the
  * trigger, where the reset arrow already marks a changed value. The theme slot rows turn it off.
+ * `hide` leaves values out of the list (the backdrop row's Custom while there is no image);
+ * the caller keeps `value` out of it, or the trigger shows nothing.
  */
-export function EnumEditor({ field, value, pending, invalid, commit, markDefault = true }: EditorProps & { markDefault?: boolean }) {
+export function EnumEditor({ field, value, pending, invalid, commit, markDefault = true, hide }: EditorProps & { markDefault?: boolean; hide?: readonly string[] }) {
+  const values = hide ? field.enumValues.filter((v) => !hide.includes(v)) : field.enumValues;
   const toItem = (v: string) => (v === "" ? EMPTY_ENUM : v);
   return (
     <Select
@@ -47,7 +50,7 @@ export function EnumEditor({ field, value, pending, invalid, commit, markDefault
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        {field.enumValues.map((v) => (
+        {values.map((v) => (
           <SelectItem key={v} value={toItem(v)}>
             {enumLabel(field, v)}
             {markDefault && v === field.defaultValue && v !== "" && (

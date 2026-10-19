@@ -339,3 +339,71 @@ func TestReloadNeverRevertsAnUpdate(t *testing.T) {
 		t.Fatalf("font size after Update returned and a concurrent reload finished = %s, want 15", got)
 	}
 }
+
+// custom needs an image: Update refuses it with an empty appearance.backdrop_file or one
+// naming no file in the backdrops directory, on whichever of the two keys it sets.
+// Changes that leave both keys alone are not checked (a hand edit loads as it is).
+func TestUpdateBackdropChoice(t *testing.T) {
+	const img = "0123456789abcdef0123456789abcdef.png"
+	tests := []struct {
+		name    string
+		initial string // the file before the update
+		noDir   bool   // Options.BackdropsDir unset
+		partial map[string]string
+		want    []Issue // nil: accepted
+	}{
+		{name: "custom with no image", partial: map[string]string{KeyBackdrop: BackdropCustom},
+			want: []Issue{{KeyBackdrop, "custom needs an image: add one under Settings › Appearance › Backdrop first"}}},
+		{name: "custom with a missing image", partial: map[string]string{KeyBackdrop: BackdropCustom, KeyBackdropFile: "gone.png"},
+			want: []Issue{{KeyBackdrop, `custom needs an image, and "gone.png" is not in the backdrops folder`}}},
+		{name: "custom with an image", partial: map[string]string{KeyBackdrop: BackdropCustom, KeyBackdropFile: img}},
+		{name: "custom keeping the remembered image", initial: "[appearance]\nbackdrop_file = \"" + img + "\"\n",
+			partial: map[string]string{KeyBackdrop: BackdropCustom}},
+		{name: "clearing the image under custom", initial: "[appearance]\nbackdrop = \"custom\"\nbackdrop_file = \"" + img + "\"\n",
+			partial: map[string]string{KeyBackdropFile: ""},
+			want:    []Issue{{KeyBackdropFile, "custom needs an image: add one under Settings › Appearance › Backdrop first"}}},
+		{name: "a missing image under forest", partial: map[string]string{KeyBackdrop: BackdropForest, KeyBackdropFile: "gone.png"}},
+		{name: "forest from a broken custom", initial: "[appearance]\nbackdrop = \"custom\"\n", partial: map[string]string{KeyBackdrop: BackdropForest}},
+		{name: "another key under a broken custom", initial: "[appearance]\nbackdrop = \"custom\"\n", partial: map[string]string{KeyFontSize: "14"}},
+		{name: "no directory: only an empty name is refused", noDir: true, partial: map[string]string{KeyBackdrop: BackdropCustom, KeyBackdropFile: "gone.png"}},
+		{name: "no directory, no image", noDir: true, partial: map[string]string{KeyBackdrop: BackdropCustom},
+			want: []Issue{{KeyBackdrop, "custom needs an image: add one under Settings › Appearance › Backdrop first"}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			home := t.TempDir()
+			path := filepath.Join(home, FileName)
+			if tt.initial != "" {
+				if err := os.WriteFile(path, []byte(tt.initial), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			opts := Options{Path: path, Log: slog.New(slog.DiscardHandler)}
+			if !tt.noDir {
+				opts.BackdropsDir = filepath.Join(home, "backdrops")
+				if err := os.Mkdir(opts.BackdropsDir, 0o700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(filepath.Join(opts.BackdropsDir, img), []byte("png"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			s, err := Open(context.Background(), opts)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = s.Close() })
+			_, err = s.Update(context.Background(), tt.partial)
+			if tt.want == nil {
+				if err != nil {
+					t.Fatalf("Update: %v", err)
+				}
+				return
+			}
+			var ve *ValidationError
+			if !errors.As(err, &ve) || !slices.Equal(ve.Issues, tt.want) {
+				t.Fatalf("err = %v, want issues %v", err, tt.want)
+			}
+		})
+	}
+}

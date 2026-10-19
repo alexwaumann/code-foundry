@@ -36,6 +36,10 @@ function refusal(path: string, err: unknown): string {
  * is untouched, and adding it again is one click). Adding opens the host's file panel and
  * imports the first file picked, which the daemon selects. In a browser there is no
  * panel (a file input gives no path), so the button is disabled.
+ *
+ * Custom is in the list only when there is an image (the daemon refuses custom without
+ * one). Custom whose image is not listed (none chosen, or gone) shows as the default,
+ * Forest, which is what the backdrop renders then.
  */
 export function BackdropEditor(props: EditorProps) {
   const { value, setError } = props;
@@ -70,6 +74,11 @@ export function BackdropEditor(props: EditorProps) {
       if (!res.ok) setError(res.error);
     });
   };
+
+  // Until the list arrives, custom is taken at its word; after, it needs its image listed.
+  const broken = value === CUSTOM_BACKDROP && images !== null && !images.some((b) => b.name === file);
+  const shown = broken ? props.field.defaultValue : value;
+  const hide = (images === null ? value !== CUSTOM_BACKDROP : images.length === 0) ? [CUSTOM_BACKDROP] : undefined;
 
   // Custom with no image chosen (or the chosen one gone) shows the newest one.
   const choose = (raw: string) => {
@@ -122,7 +131,7 @@ export function BackdropEditor(props: EditorProps) {
   return (
     <div className="flex flex-col gap-2" data-testid="backdrop-editor">
       {/* An import's refusal is the gallery's, not the select's: no red border on it. */}
-      <EnumEditor {...props} invalid={false} commit={choose} />
+      <EnumEditor {...props} value={shown} invalid={false} commit={choose} hide={hide} />
       {images && images.length > 0 && (
         <div className="grid grid-cols-3 gap-1.5" role="group" aria-label="Backdrop images" data-testid="backdrop-gallery">
           {images.map((b, i) => (

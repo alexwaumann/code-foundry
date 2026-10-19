@@ -24,11 +24,13 @@ type Fake struct {
 
 var _ settings.Service = (*Fake)(nil)
 
-// New returns a Fake whose file lives in dir (use t.TempDir()). b receives
-// settings.Changed; nil uses a private bus.
+// New returns a Fake whose file lives in dir (use t.TempDir()), with the backdrops
+// directory at dir/backdrops as in a real home. b receives settings.Changed; nil uses a
+// private bus.
 func New(ctx context.Context, dir string, b *bus.Bus, cmds []settings.CommandInfo) (*Fake, error) {
 	s, err := settings.Open(ctx, settings.Options{
 		Path: filepath.Join(dir, settings.FileName), Bus: b, Log: slog.New(slog.DiscardHandler),
+		BackdropsDir: filepath.Join(dir, "backdrops"),
 	})
 	if err != nil {
 		return nil, err
