@@ -45,11 +45,18 @@ type Options struct {
 	// for testing that Init reconciles them.
 	Flags []pluginsdk.Flag
 	// NoInitWait makes Start return right after the handshake instead of waiting (up to
-	// 5 s) for Plugin.Init to return; for a plugin whose Init blocks.
+	// 5 s) for Plugin.Init to return; for a plugin whose Init blocks. Serve holds back
+	// commands, surfaces, events and wake subscriptions until Init returns, so those
+	// wait too.
 	NoInitWait bool
 	// Wakes are the manifest's wake sources: wake/fire is refused for another source or
 	// a match arg a source does not declare (wakes.go). Nil accepts any.
 	Wakes []pluginsdk.WakeSpec
+	// WakeSubscriptions are the live wake subscriptions at start, as after a restart:
+	// Start sends each (an empty Subscription gets "wsub-<n>") with Rearm set right
+	// after initialized, then wake/armed with their count, as the host does (wake/armed
+	// with 0 when there are none).
+	WakeSubscriptions []pluginsdk.WakeSubscription
 }
 
 // Host is the fake host.
@@ -134,6 +141,9 @@ func Start(t testing.TB, p pluginsdk.Plugin, opts Options) *Host {
 	}
 	if err := h.conn.Notify(pluginsdk.MethodInitialized, struct{}{}); err != nil {
 		t.Fatalf("plugintest: initialized: %v", err)
+	}
+	if err := h.rearmWakes(opts.WakeSubscriptions); err != nil {
+		t.Fatalf("plugintest: re-arm wakes: %v", err)
 	}
 	select {
 	case err := <-initDone:

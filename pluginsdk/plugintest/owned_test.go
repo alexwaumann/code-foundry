@@ -137,11 +137,16 @@ func TestTerminalExitAndRead(t *testing.T) {
 	if r, err := host.ReadTerminalWith(ctx, term, pluginsdk.ReadTerminalOptions{Scrollback: true}); err != nil || r.Text != "=== RUN TestAdd\nok  example.com/calc\nFAIL example.com/x" || r.Lines != 3 || r.Truncated {
 		t.Errorf("read scrollback = %+v, %v", r, err)
 	}
-	if r, err := host.ReadTerminalWith(ctx, term, pluginsdk.ReadTerminalOptions{}); err != nil || r.Text != "ok  example.com/calc\nFAIL example.com/x" || r.Lines != 0 {
+	if r, err := host.ReadTerminalWith(ctx, term, pluginsdk.ReadTerminalOptions{}); err != nil || r.Text != "ok  example.com/calc\nFAIL example.com/x" || r.Lines != 2 {
 		t.Errorf("read screen with options = %+v, %v", r, err)
 	}
+	// A screen with blank rows below its text: no trailing newline, as the host.
+	h.SetTerminalText(term, "ok  example.com/calc\n")
+	if r, err := host.ReadTerminal(ctx, term, 0); err != nil || r.Text != "ok  example.com/calc" || r.Lines != 1 {
+		t.Errorf("read part-filled screen = %+v, %v", r, err)
+	}
 	reads := h.TerminalReads()
-	if len(reads) != 5 || !reads[3].Scrollback || reads[4].Scrollback || reads[1].MaxBytes != 18 {
+	if len(reads) != 6 || !reads[3].Scrollback || reads[4].Scrollback || reads[1].MaxBytes != 18 {
 		t.Errorf("reads = %+v", reads)
 	}
 }

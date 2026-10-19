@@ -20,8 +20,8 @@ import (
 // thread store keeps the subscriptions and delivers the wakes; this side resolves a new
 // subscription's args against the manifest and the subscriber's context
 // (ResolveWake), tells the running plugin about subscriptions (wake/subscribed and
-// wake/unsubscribed; every live one again after each initialized, so a restarted plugin
-// re-arms), serves wake/fire, and ends a plugin's subscriptions with a last "source
+// wake/unsubscribed; every live one again after each initialized with rearm set, then
+// wake/armed, so a restarted plugin re-arms and drops the ones that ended), serves wake/fire, and ends a plugin's subscriptions with a last "source
 // gone" wake when it is disabled, removed, uninstalled or replaced, or an update drops
 // a source (endWakes). No permission: a wake only reaches threads that asked for it.
 
@@ -65,8 +65,9 @@ type actorWakes struct {
 
 func (m *Manager) wakeSink() WakeSink { return m.opts.Wakes }
 
-// armWakes sends the starting plugin every live subscription to its sources, then lets
-// WakeChanged send the next ones.
+// armWakes sends the starting plugin every live subscription to its sources (rearm
+// set), then wake/armed with their count (also 0, so the plugin can drop state for
+// subscriptions that ended while it was down), then lets WakeChanged send the next ones.
 func (a *actor) armWakes(conn *pluginsdk.Conn) {
 	sink := a.m.wakeSink()
 	a.wakes.mu.Lock()
@@ -77,8 +78,11 @@ func (a *actor) armWakes(conn *pluginsdk.Conn) {
 	}
 	subs := sink.Subscriptions(a.name)
 	for _, s := range subs {
-		_ = conn.Notify(pluginsdk.MethodWakeSubscribed, a.m.wakeSubscription(s))
+		sub := a.m.wakeSubscription(s)
+		sub.Rearm = true
+		_ = conn.Notify(pluginsdk.MethodWakeSubscribed, sub)
 	}
+	_ = conn.Notify(pluginsdk.MethodWakeArmed, pluginsdk.WakeArmed{Count: len(subs)})
 	if len(subs) > 0 {
 		a.hostLog("re-armed %d wake subscriptions", len(subs))
 	}
