@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CommandView } from "@/api/command";
 import type { ThreadView } from "@/api/threads";
+import { envStaleTip } from "@/lib/envStale";
 import { useCommandsStore } from "@/stores/commands";
 import { contextKey, getUiContext } from "@/stores/context";
 import { useThreadsStore } from "@/stores/threads";
@@ -10,7 +11,7 @@ import { useUiStore } from "@/stores/ui";
 const start = vi.hoisted(() => vi.fn());
 vi.mock("@/keys/bindings", async (orig) => ({ ...(await orig<typeof import("@/keys/bindings")>()), startCommandNamed: start }));
 
-const { EnvStaleNote, envStaleTip } = await import("./EnvStaleNote");
+const { EnvStaleNote } = await import("./EnvStaleNote");
 
 const restart: CommandView = { name: "thread.restart", title: "Restart Claude", description: "", category: "Thread", args: [], keybindings: [], available: true };
 

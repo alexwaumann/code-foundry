@@ -1,13 +1,8 @@
 import { Plug } from "lucide-react";
 import { CommandButton } from "@/components/command/CommandButton";
 import { Tip } from "@/components/ui/tooltip";
+import { envStaleTip } from "@/lib/envStale";
 import { useThreadsStore } from "@/stores/threads";
-
-/** What the note's tooltip says: what changed (when the daemon said), and what Restart does. */
-export function envStaleTip(change: string): string {
-  const what = change ? `${change}.\n` : "";
-  return `${what}Claude is still running with the old environment. Restart restarts the Claude process with the new one; the conversation continues.`;
-}
 
 /**
  * A muted line in the thread's header when a plugin's session environment changed since
@@ -18,7 +13,10 @@ export function envStaleTip(change: string): string {
  * while the process is current or not running.
  */
 export function EnvStaleNote({ id }: { id: string }) {
-  const change = useThreadsStore((s) => (s.byId[id]?.pluginEnvStale ? (s.byId[id]?.pluginEnvChange ?? "") : null));
+  const change = useThreadsStore((s) => {
+    const t = s.byId[id];
+    return t?.pluginEnvStale ? (t.pluginEnvChange ?? "") : null;
+  });
   if (change === null) return null;
   return (
     <span className="flex min-w-0 shrink-[2] items-center gap-1 text-caption-sm text-muted-foreground" data-testid="thread-env-stale">
