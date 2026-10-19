@@ -215,6 +215,9 @@ Services (v1):
   request; `docs/notes/orch-cli-batch.md`), CleanupWorktrees (remove worktrees whose work is in origin/<default>: `merged_clean`,
   no thread (archived ones aside), terminal or workspace on it; never deletes branches;
   each removed or kept worktree comes with its reason, which the confirmation lists;
+  `force` also removes those kept only for uncommitted changes, which are marked so
+  the command can ask first; a removal refused for uncommitted changes, here or in
+  RemoveWorktree and the workspace removals, carries an `UncommittedWork` detail;
   `docs/notes/projects-polish-3.md`, `docs/notes/cleanup-eligibility.md`),
   ListRefs, Watch, GetWorktreeDetail (files and log against the base branch, Phase 3a),
   InitGit (`git init` and an empty first commit in a project without git;
@@ -241,6 +244,12 @@ Services (v1):
   is a result (state FAILED, output), not an RPC error. The GUI reaches it only through
   the git.*, pr.*, worktree.open.editor, worktree.reveal and view.open.url commands.
 * `CommandService` — List(context) → available commands with their arg schemas; Invoke.
+  A command that asks first fails Invoke with a `ConfirmationRequired` detail; clients ask
+  and invoke again with `confirmed`. A confirmed command may ask a second time with
+  `args` to merge (removing a worktree would delete uncommitted work: `force`) and
+  optionally the result that stands if the user declines; the GUI asks again, the CLI
+  prompts again on a terminal, and `--yes` never answers it
+  (`docs/notes/dirty-worktree-confirm.md`).
 * `UiService` — WatchIntents (server stream: focus thread, open palette, …); Emit (from
   CLI).
 * `EventService` — Watch: one server stream that multiplexes every store's events and UI

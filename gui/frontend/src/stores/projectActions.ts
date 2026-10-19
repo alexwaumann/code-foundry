@@ -19,7 +19,7 @@ export function newTerminalIn(projectId: string, path: string): Promise<boolean>
   return newWorktreeTerminal(projectId, path);
 }
 
-/** project.worktree.remove (the daemon asks for confirmation; dirty worktrees are refused without force). */
+/** project.worktree.remove (the daemon asks for confirmation, then again, naming the work, before deleting uncommitted changes). */
 export function removeWorktree(projectId: string, path: string): Promise<boolean> {
   return runCommand("project.worktree.remove", {}, worktreeContext(projectId, path));
 }
@@ -33,7 +33,10 @@ export function cleanupWorktree(projectId: string, path: string): Promise<boolea
   return runCommand("project.worktree.cleanup", { project: projectId, path }, worktreeContext(projectId, path));
 }
 
-/** project.worktree.cleanup for every merged, clean, unheld worktree of the project (confirmed; the prompt lists the branches). */
+/**
+ * project.worktree.cleanup for every merged, clean, unheld worktree of the project (confirmed; the prompt lists the
+ * branches). Merged ones with uncommitted changes are asked about after, with their counts (a second question).
+ */
 export function cleanupMergedWorktrees(projectId: string): Promise<boolean> {
   return runCommand("project.worktree.cleanup", { project: projectId }, projectContext(projectId));
 }
@@ -89,7 +92,7 @@ export function addToWorkspace(workspaceId: string, projectId: string): Promise<
   return runCommand("workspace.add-project", { project: projectRef(useProjectsStore.getState(), projectId), workspace: workspaceId });
 }
 
-/** workspace.remove-project (confirmed; refused while a thread runs there or with changes). */
+/** workspace.remove-project (confirmed; refused while a thread runs there; uncommitted changes are asked about again). */
 export function removeFromWorkspace(workspaceId: string, projectId: string): Promise<boolean> {
   return runCommand("workspace.remove-project", { project: projectRef(useProjectsStore.getState(), projectId), workspace: workspaceId });
 }
