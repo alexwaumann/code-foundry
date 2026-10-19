@@ -279,6 +279,8 @@ type record struct {
 	// envPrint fingerprints the spawn extras the running process got (envstale.go);
 	// nil while no process runs. Replaced, never mutated.
 	envPrint *extrasPrint
+	// wait is the waiting overlay's state (waiting.go).
+	wait waitState
 }
 
 var _ Store = (*Manager)(nil)
@@ -317,6 +319,7 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 	m.ctx, m.cancel = context.WithCancel(context.WithoutCancel(ctx))
 	var lost []string
 	for _, s := range rows {
+		s.unwaitLoaded() // nothing is waited on at startup (waiting.go)
 		if s.State != StateDisconnected {
 			lost = append(lost, s.ID)
 			s.State, s.DisconnectReason = StateDisconnected, ReasonDaemonRestarts
@@ -442,7 +445,14 @@ func (m *Manager) update(id string, persist bool, fn func(*record)) (Thread, boo
 // commitLocked persists (when asked) before it swaps in the snapshot: Snapshot is read
 // without m.mu, so saving second would let a reader see a change the database does not
 // have yet, and a crash in that window would lose a status the GUI already showed.
+//
+// The status shown is the waiting overlay's (waiting.go); the thread's subscribers are
+// re-evaluated after the wake subscriptions saw the change (a one-shot that fired is
+// gone by then, its wake queued).
 func (m *Manager) commitLocked(rec *record, persist bool) {
+	if m.applyWaitingLocked(rec) {
+		persist = true
+	}
 	if persist {
 		if err := saveThread(context.Background(), m.opts.DB, rec.s); err != nil {
 			m.log.Error("persist thread", "thread", rec.s.ID, "err", err)
@@ -450,7 +460,12 @@ func (m *Manager) commitLocked(rec *record, persist bool) {
 	}
 	m.rebuildLocked()
 	bus.Publish[Event](m.opts.Bus, Updated{Thread: rec.s})
+	var subscribers []string
+	if m.subs != nil {
+		subscribers = m.subs.subscribersOf(rec.s.ID)
+	}
 	m.observeLocked(rec.s) // wake subscriptions (subscriptions.go)
+	m.rewaitLocked(subscribers)
 }
 
 func (m *Manager) record(id string) (*record, error) {

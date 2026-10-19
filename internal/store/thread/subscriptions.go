@@ -91,7 +91,9 @@ const ReasonWakeLimit = "wake limit"
 // and no answer is pending": not starting, and status idle, error (the process ended
 // mid-turn), or needs attention for anything but a pending permission prompt or
 // question (a turn that ended unseen, "finished" or "error: <code>", "snooze ended",
-// "budget reached", "wake limit"). The ThreadService.Wait conditions are the same
+// "budget reached", "wake limit"). A thread waiting on its child threads (idle
+// "waiting on N child threads", waiting.go) is idle, not attention. The
+// ThreadService.Wait conditions are the same
 // (docs/notes/agents-1-wait-events.md). A thread being removed (Thread.Removing) meets
 // none: its closing snapshot is not a thread that settled.
 func Meets(c Condition, t Thread) bool {
@@ -407,6 +409,9 @@ func (m *Manager) Subscribe(ctx context.Context, o SubscribeOptions) (SubscribeR
 		ID: id, SubscriberID: subscriber, TargetKind: kind, TargetID: target, Condition: cond, Args: args,
 		Repeat: o.Repeat && kind != TargetActionRun, CreatedAt: m.opts.Now().Round(0).Truncate(time.Millisecond),
 	}, run, pr)
+	if err == nil {
+		m.rewait(subscriber) // it may wait on the target now (waiting.go)
+	}
 	if err != nil || kind != TargetActionRun || res.Fired || res.Existed {
 		return res, err
 	}
@@ -678,8 +683,18 @@ func (m *Manager) forgetLocked(id, why string) {
 	m.log.Info("wake subscriptions deleted with their thread", "thread", id, "why", why, "subscriptions", ids)
 }
 
-// Unsubscribe implements Store.
+// Unsubscribe implements Store. A subscriber that waited on the target may wait on
+// nothing now (waiting.go).
 func (m *Manager) Unsubscribe(_ context.Context, o UnsubscribeOptions) ([]Subscription, error) {
+	out, err := m.unsubscribe(o)
+	if len(out) > 0 {
+		m.rewait(out[0].SubscriberID)
+	}
+	return out, err
+}
+
+// unsubscribe removes the subscriptions o names.
+func (m *Manager) unsubscribe(o UnsubscribeOptions) ([]Subscription, error) {
 	s := m.subs
 	if id := strings.TrimSpace(o.ID); id != "" {
 		s.mu.Lock()
@@ -819,4 +834,47 @@ func (m *Manager) notifyCreator(ctx context.Context, creator, child string) {
 		return
 	}
 	m.log.Info("creator notified of its new thread", "thread", child, "created_by", creator, "subscription", res.Subscription.ID)
+}
+
+// waitTargets are the threads subscriber's subscriptions wait on (waiting.go): the
+// targets of its thread subscriptions whose condition a working thread meets when it
+// settles (settled, idle, attention), each once.
+func (s *subscriptions) waitTargets(subscriber string) []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []string
+	for _, r := range s.byID {
+		if r.s.SubscriberID != subscriber || r.s.TargetKind != TargetThread || !slices.Contains(waitConditions, r.s.Condition) ||
+			slices.Contains(out, r.s.TargetID) {
+			continue
+		}
+		out = append(out, r.s.TargetID)
+	}
+	slices.Sort(out)
+	return out
+}
+
+// waitConditions are the thread conditions a subscriber waits on (waitTargets).
+var waitConditions = []Condition{CondSettled, CondIdle, CondAttention}
+
+// subscribersOf are the threads with a subscription to thread target, each once.
+func (s *subscriptions) subscribersOf(target string) []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []string
+	for _, r := range s.byID {
+		if r.s.TargetKind == TargetThread && r.s.TargetID == target && !slices.Contains(out, r.s.SubscriberID) {
+			out = append(out, r.s.SubscriberID)
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
+// wakeQueued reports whether a wake to thread id is queued or being delivered.
+func (s *subscriptions) wakeQueued(id string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, ok := s.queues[id]
+	return ok
 }

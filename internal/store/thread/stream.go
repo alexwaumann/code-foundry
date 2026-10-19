@@ -441,6 +441,9 @@ func (r *runner) queue(o *outgoing) (Item, error) {
 	st.queued = append(st.queued, o)
 	st.sd.waiting = true
 	r.checkStatus()
+	if o.origin == OriginWake {
+		r.publishStatus() // as send does (waiting.go)
+	}
 	return it, nil
 }
 
@@ -572,6 +575,11 @@ func (r *runner) sendMessage(o *outgoing) (Item, error) {
 	st.sd.sent(o.origin != OriginWake)
 	r.activity = r.m.opts.Now()
 	r.checkStatus()
+	if o.origin == OriginWake {
+		// Published before the wake's delivery returns, not after the debounce: the
+		// waiting overlay holds the subscriber while the wake is queued (waiting.go).
+		r.publishStatus()
+	}
 	return it, nil
 }
 
