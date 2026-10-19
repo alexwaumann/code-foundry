@@ -171,7 +171,9 @@ func (cl *cli) runRegistry(ctx context.Context, args []string) error {
 		return err
 	}
 	fs := cl.newFlagSet(cmd.GetName())
-	fs.Usage = func() { guide.WriteHelp(cl.stderr, cmd, true) }
+	// The flag package prints a bad flag's error line, then Usage: the help is for -h
+	// (errHelp below), a mistake gets one line pointing at it (badFlag).
+	fs.Usage = func() {}
 	flags := make([]*argFlag, len(cmd.GetArgs()))
 	for i, a := range cmd.GetArgs() {
 		flags[i] = &argFlag{spec: a}
@@ -184,8 +186,13 @@ func (cl *cli) runRegistry(ctx context.Context, args []string) error {
 	}
 	cf := cl.addContextFlags(fs)
 	words, err := cl.parseWithPositionals(fs, rest)
+	if errors.Is(err, errHelp) {
+		guide.WriteHelp(cl.stderr, cmd, true)
+		return nil
+	}
 	if err != nil {
-		return quietHelp(err)
+		cl.badFlag(cmd.GetName())
+		return err
 	}
 	if err := cl.assignPositionals(fs, flags, words); err != nil {
 		return err
@@ -266,6 +273,13 @@ func (cl *cli) runRegistry(ctx context.Context, args []string) error {
 		}
 	}
 	return nil
+}
+
+// badFlag follows the flag package's one-line error ("flag provided but not defined:
+// -x") with where to look, instead of the whole help: a text that starts with "-" (a
+// report's summary) is the usual cause, and "--" before it makes it a word.
+func (cl *cli) badFlag(name string) {
+	fmt.Fprintf(cl.stderr, "Run `code-foundry help %s` for usage; a value that starts with - goes after --.\n", name)
 }
 
 // invokeFailed reports a failed Invoke. Caller mistakes (bad args, unknown command,

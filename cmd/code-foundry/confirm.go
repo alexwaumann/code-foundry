@@ -9,6 +9,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"unicode"
 
 	"connectrpc.com/connect"
 
@@ -84,12 +85,13 @@ func (cl *cli) invoke(ctx context.Context, cmd *v1.Command, uctx *v1.UiContext, 
 
 // parseWithPositionals parses flags that may be interleaved with bare words
 // (`settings set --json key value`) and returns the words. "--" ends flags. A negative
-// number ("-1", "-0.5") is a word, not a flag, unless it is the value of the flag
-// before it (`thread budget -1`, `--usd -1`).
+// number ("-1", "-0.5") or a dash word with a space in it ("--json now prints JSON", a
+// report's summary) is a word, not a flag, unless it is the value of the flag before it
+// (`thread budget -1`, `--usd -1`).
 func (cl *cli) parseWithPositionals(fs *flag.FlagSet, args []string) ([]string, error) {
 	var words []string
 	for {
-		if i := negativeWord(fs, args); i >= 0 {
+		if i := dashWord(fs, args); i >= 0 {
 			head, err := cl.parseWithPositionals(fs, args[:i])
 			if err != nil {
 				return nil, err
@@ -120,20 +122,31 @@ func (cl *cli) parseWithPositionals(fs *flag.FlagSet, args []string) ([]string, 
 	}
 }
 
-// negativeWord is the index of the first negative number in args the flag package would
-// take for a flag, or -1. It stops at "--"; a number right after a flag that takes a
-// value (--usd -1) is that flag's.
-func negativeWord(fs *flag.FlagSet, args []string) int {
+// dashWord is the index of the first word in args the flag package would take for a
+// flag, or -1: a negative number, or a dash word whose name has a space in it (no flag's
+// does). It stops at "--"; a word right after a flag that takes a value (--usd -1) is
+// that flag's.
+func dashWord(fs *flag.FlagSet, args []string) int {
 	for i, a := range args {
 		if a == "--" {
 			return -1
 		}
-		if !negativeNumber.MatchString(a) || (i > 0 && takesValue(fs, args[i-1])) {
+		if (!negativeNumber.MatchString(a) && !spacedDash(a)) || (i > 0 && takesValue(fs, args[i-1])) {
 			continue
 		}
 		return i
 	}
 	return -1
+}
+
+// spacedDash: a starts with "-" and its name (before any "=value") has white space, so
+// it is text ("--json now prints JSON"), not a flag.
+func spacedDash(a string) bool {
+	if !strings.HasPrefix(a, "-") {
+		return false
+	}
+	name, _, _ := strings.Cut(strings.TrimLeft(a, "-"), "=")
+	return strings.ContainsFunc(name, unicode.IsSpace)
 }
 
 var negativeNumber = regexp.MustCompile(`^-[0-9]+(\.[0-9]*)?$|^-\.[0-9]+$`)
