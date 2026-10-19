@@ -2,8 +2,8 @@
 
 The CLI items of the 2026-10-19 orchestration battle test (report REPORT.md section B,
 plus A9, A11 and A13; write-ups e3, e4, e6, e8, w2, w3, w4). Each item is its own commit.
-The wake engine (`subscriptions_fire.go`, `wake.go`) is untouched: another PR changes it.
-Skill text is left to the skill PR.
+The wake engine (`subscriptions_fire.go`, `wake.go`) is untouched: #241 changed it.
+Skill text changes only where this PR made it wrong (patterns.md §7).
 
 ## What shipped
 
@@ -70,7 +70,13 @@ Skill text is left to the skill PR.
   the pending request and the stale star (and list `project.branch.delete`), the snooze
   `until` forms are listed once (on the arg), `thread.list` drops its archived sentence
   (the conventions say it), `thread.read` its nextSince hint (same), and
-  `thread.mcp-reconnect` says its login hint in fewer words. Now 28,988 bytes.
+  `thread.mcp-reconnect` says its login hint in fewer words. After rebasing on the wake
+  PR (#241, +32 bytes) `thread.get` also drops "(--json: the thread with every field)".
+  Now 28,982 bytes.
+* **Skill §7 follows the CLI.** The v3 skill (#240, merged meanwhile) said `project
+  worktree remove` needs `--project` inside a thread and sent a pushed branch to raw
+  `git push origin --delete`. `reference/patterns.md` §7 now drops `--project` and
+  names `project branch delete … --remote --yes`.
 
 ## Gotchas
 
@@ -138,7 +144,6 @@ code-foundry events: --since 1 without --since-epoch could be another daemon's s
 
 ## Left for later
 
-* The skill's discard paragraph can now say `project worktree remove --path <wt> --yes`
-  (no `--project`) and `project branch delete <project> <branch> [--remote] --yes` for
-  the branch; the skill PR owns that text.
 * B6 (`--descendants-of`) was not in this batch.
+* The live check ran before rebasing on #240/#241; after the rebase only unit tests
+  and `make check` ran again.

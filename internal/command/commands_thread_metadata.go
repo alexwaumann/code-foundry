@@ -167,7 +167,7 @@ func threadGet(b ThreadBackend, idArg ArgSpec) Command {
 		Name:  "thread.get",
 		Title: "Show Thread",
 		Description: "Print one thread: its status and pending request, worktree, who created it and why, labels, report " +
-			"(`*`: from before its last message) and cost (--json: the thread with every field).",
+			"(`*`: from before its last message) and cost.",
 		Category:     "Thread",
 		NoKeybinding: true,
 		Args:         []ArgSpec{idArg},
