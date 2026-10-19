@@ -13,7 +13,7 @@ code-foundry thread new --project 4e1f0a7b9c2d --new-worktree \
   --name "Fix the login redirect" \
   --brief "After login users land on / instead of the page they asked for" \
   --labels bug,auth --request-id fix-login-redirect \
-  --prompt "After login, redirect to the page the user first asked for (the next query parameter). You own src/auth/login.ts and its test. Add a test. Run the test suite, commit, git push origin HEAD and open a PR. Then run: code-foundry thread report done \"<one-line summary>\" --data '{\"branch\": \"<branch>\", \"pr\": \"<url>\"}'"
+  --prompt "After login, redirect to the page the user first asked for (the next query parameter). You own src/auth/login.ts and its test. Add a test. Run the test suite, commit, git push origin HEAD and open a PR if origin is on GitHub. Your LAST step: code-foundry thread report done \"<one-line summary>\" --data '{\"branch\": \"<branch>\", \"pr\": \"<url>\"}'"
 # created thread Fix the login redirect (s-3f9a1c2b7d10) in ~/.code-foundry/worktrees/acme/api/cf/fix-the-login-redirect
 
 code-foundry thread wait 7d10 --for 1h
@@ -73,6 +73,17 @@ review or steer them. Archive them in one call once the user accepts the work:
 code-foundry thread archive --ids 5e4f,5e6f --yes
 ```
 
+## 2b. Work that builds on a sibling's branch
+
+After the first child pushed, the second branches from it, not from main:
+
+```
+code-foundry thread new --project 8c3d5e7f9a1b --new-worktree --base origin/cf/add-filter \
+  --name "CLI --tag flag" --notify --request-id batch-1018-tag --prompt "..."
+```
+
+Merge order is then first branch, second branch.
+
 ## 3. A review loop
 
 A child opened a PR; you review it and send it back until it is right.
@@ -108,7 +119,9 @@ code-foundry thread subscribe --pr acme/web#87 --until checks_done --repeat
 code-foundry thread subscribe --pr acme/web#87 --until review --repeat
 ```
 
-End your turn. Each wake is a message:
+End your turn. The wake comes with the GitHub poll: about a minute with the app open, up
+to 15 without it. `--until` also takes checks_failed, checks_passed, comment,
+review_requested, head_pushed, merged, closed and changed. Each wake is a message:
 
 ```
 [code-foundry wake] Pull request acme/web#87 "Bump the router": checks done (3 passed, 1 failed).
@@ -123,6 +136,64 @@ yet): compare `head_sha` with what you pushed. A merged pull request ends every
 subscription to it. Subscribe a child's thread instead with `--id <child>`.
 `code-foundry thread subscriptions` lists what you wait for; `thread unsubscribe --pr
 acme/web#87` stops.
+
+## 5. A supervised child
+
+`--permission supervised` makes the child ask before every edit and command (reads and
+read-only commands run unasked); each request wakes you. Say so in its prompt, so that
+what it asks for is easy to judge and a refusal can be precise:
+
+```
+code-foundry thread new --project 8c3d5e7f9a1b --new-worktree --permission supervised \
+  --name "Fix the date parser" --notify --request-id fix-date-parser \
+  --prompt "... You are supervised: every edit and command needs approval. Use Edit/Write for files (no heredocs, sed or scripts), and keep git commit and git push in separate commands. ..."
+```
+
+On a wake whose `pending` is a permission, judge the tool `input` against the task and
+answer with `code-foundry thread respond --id <child> allow --request <request_id>` (or
+`deny --message "<why>"`). When a
+child asks a question while others wait for permission, first answer every pending
+request you can (`thread list --created-by $CODE_FOUNDRY_THREAD` shows who is waiting),
+then relay the question to the user as plain text at the end of your turn, and answer
+the child with `thread respond --id <child> --answer "<option label>"` once the user
+has. The child still asks with its own question tool (its `options` reach you in the
+wake); only you relay in plain text: a blocking question tool in your turn would hold
+back every other child until the user answers. Never tell a child not to use its
+question tool.
+
+## 6. Budget stops
+
+`--budget <usd>` stops a child at that cost; the wake and `thread get` say "budget
+reached". A budget stop is not finished work: tell the user what the child got done and
+what is left. A budget the user set is theirs: never raise it unasked, even when the
+child is close to done. Once they agree, raise it and resume the child in one go:
+raising alone does not start a turn, and the child saw the stop as a rejection of its
+last tool call.
+
+```
+code-foundry thread budget --id 5e6f 10
+code-foundry thread send --id 5e6f "Code Foundry stopped your last turn at its spending limit (now raised), nothing was rejected; check what your last command did, then continue"
+```
+
+If you already checked what its last command did (a commit made, a push done), say
+that instead of "check what your last command did".
+
+## 7. Discarding a child's work
+
+Only on the user's say-so. Ask first whether to delete the branch too, then:
+
+```
+code-foundry thread remove --id 5e6f --yes
+code-foundry project worktree remove --project 8c3d5e7f9a1b \
+  --path ~/.code-foundry/worktrees/acme/web/cf/bump-the-router --yes
+```
+
+`thread remove` stops a working child itself: no `thread interrupt` first. Inside a
+thread `project worktree remove` needs `--project` (without it: "not available in this
+context"). Add `--delete-branch` to the second command when the user said yes; it
+deletes the local branch, and a pushed branch stays on origin until `git push origin
+--delete <branch>`, again only on the user's say-so. Never `git worktree remove`. A
+removed child leaves a tombstone: `thread reports --all` lists it as removed.
 
 Notes:
 

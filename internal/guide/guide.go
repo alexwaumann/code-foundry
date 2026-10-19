@@ -69,8 +69,8 @@ func Write(w io.Writer, cmds []*v1.Command, self string) {
 	p("  and shows the 50 most recently active (`--limit 0` for all).")
 	p("- Your children: `code-foundry thread list --created-by $%s`, and their reports in one call:", paths.EnvThread)
 	p("  `thread reports --created-by $%s` (`--json` for the data). `--created-by user`: threads no thread created.", paths.EnvThread)
-	p("- When your task is done (or blocked, or failed), say so: `code-foundry thread report done \"summary\" --data")
-	p("  '{\"key\": \"value\"}'`.")
+	p("- When your task is done (or blocked, or failed), say so as your last step, every caveat in the summary:")
+	p("  `code-foundry thread report done \"summary\" --data '{\"key\": \"value\"}'`.")
 	p("- Never send input to your own thread: `thread send`, `thread respond` and `thread interrupt` default to it, so")
 	p("  always pass `--id` of the thread you mean.")
 	p("- `code-foundry thread archive --id <id>` puts a finished child away; `--archived=false` brings it back.")
@@ -87,8 +87,8 @@ func Write(w io.Writer, cmds []*v1.Command, self string) {
 	p("- `code-foundry plugin list`: installed plugins; their commands are `plugin <name> <command>`.")
 	p("- `code-foundry events --json [--source thread-list] [--since <seq> --since-epoch <epoch>]`: the daemon's events")
 	p("  as JSON lines, resumable; for watching many threads at once.")
-	p("- The API is Connect (protobuf) over the daemon's socket; the proto files are in the code-foundry repository")
-	p("  (`proto/codefoundry/v1`), and `--json` answers use their field names.")
+	p("- The API is Connect (protobuf) over the daemon's socket; `--json` answers use the field names of the")
+	p("  code-foundry repository's `proto/codefoundry/v1`.")
 }
 
 // InPluginNamespace reports whether c is a plugin.* command (the plugin management verbs

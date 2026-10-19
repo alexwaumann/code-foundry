@@ -115,7 +115,7 @@ func TestRender(t *testing.T) {
 		maxDesc, maxLines    int
 	}{
 		// Model only: not in the slash menu. Names the user's words for parallel work, and
-		// its loop rules are the ones the orchestration experiment tested (orch-skill-v2).
+		// its loop rules are the ones the orchestration experiment tested (orch-skill-v2, v3).
 		{skills.Orchestrate, "false", 600, 160},
 		{skills.Help, "", 400, 120},   // both: no invocation keys
 		{skills.Plugin, "", 600, 120}, // both; names the words that should trigger it
@@ -213,6 +213,22 @@ func TestRender(t *testing.T) {
 	}
 	if !bytes.Equal(files[skills.Help+"/reference/getting-started.md"], repo) || !bytes.Equal(docs.GettingStarted, repo) {
 		t.Error("reference/getting-started.md is not docs/GETTING-STARTED.md")
+	}
+
+	// The orchestrate skill keeps its line cap by pointing at worked sections of
+	// patterns.md (orch-skill-v3); each section exists and SKILL.md names it.
+	orch, patterns := string(files[skills.Orchestrate+"/SKILL.md"]), string(files[skills.Orchestrate+"/reference/patterns.md"])
+	for _, tt := range []struct{ heading, pointer string }{
+		{"## 5. A supervised child\n", "`reference/patterns.md` §5"},
+		{"## 6. Budget stops\n", "`reference/patterns.md` §6"},
+		{"## 7. Discarding a child's work\n", "`reference/patterns.md` §7"},
+	} {
+		if !strings.Contains(patterns, "\n"+tt.heading) {
+			t.Errorf("patterns.md lacks %q", tt.heading)
+		}
+		if !strings.Contains(orch, tt.pointer) {
+			t.Errorf("the orchestrate SKILL.md does not point at %s", tt.pointer)
+		}
 	}
 
 	// The skills reference their files by the paths they are installed at.
