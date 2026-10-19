@@ -17,7 +17,7 @@ Skill text changes only where this PR made it wrong (patterns.md §7).
 | A11 | A thread id suffix that names no thread resolves against the threads removed within the day; `get`, `wait`, `send`, `read` and `items` print the same first line (`thread <name> (<id>) was removed at <time>`), the last report and the cost, exit 1; the tombstone keeps usage and budget; `thread reports --json` has `costUsd` | `resolve.go` (`SetIDFallback`, `removedThreadIDs`), `commands_thread_removed.go`, `tombstones.go`, `RemovedThread.cost_usd/unpriced/budget_usd` |
 | A13 | `events` that the user did not stop exits 1 with `daemon connection lost; resume with --since <last seq> --since-epoch <epoch>`; `--since` without `--since-epoch` prints a notice and starts with snapshots | `cmd/code-foundry/events.go` |
 | B5 | `project worktree remove --path <wt> --yes` takes the project from the path; no path says `give the worktree with --path`; a path no project has names `--project`. New `project branch delete <project> <branch> --yes [--force] [--remote]` | `commands_project.go`, `commands_project_git.go`, `commands_project_branch.go`, `ProjectService.DeleteBranch`, `internal/store/project/branch_delete.go` |
-| B7 | `thread subscriptions` LAST FIRED in UTC RFC 3339; `help thread` (a group) lists its commands, a bare `thread` does on stderr (exit 2); `thread read --full` prints a wake's JSON; `respond --answer` prints `answered "<question>": <label>`; the daemon logs INFO `request answered` (thread, request, decision) | `commands_thread_subscribe.go`, `cmd/code-foundry/registry.go`, `commands_thread.go`, `internal/store/thread/conversation.go` |
+| B7 | `thread subscriptions` LAST FIRED in UTC RFC 3339; `help thread` (a group) lists its commands, a bare `thread` does on stderr (exit 2); `thread read --full` prints a wake's JSON, and `read`/`items` text a message's `[code-foundry] …` resume note (#242 had it in `--json` only); `respond --answer` prints `answered "<question>": <label>`; the daemon logs INFO `request answered` (thread, request, decision) | `commands_thread_subscribe.go`, `cmd/code-foundry/registry.go`, `commands_thread.go`, `internal/store/thread/conversation.go` |
 
 ## Decisions
 
@@ -145,5 +145,5 @@ code-foundry events: --since 1 without --since-epoch could be another daemon's s
 ## Left for later
 
 * B6 (`--descendants-of`) was not in this batch.
-* The live check ran before rebasing on #240/#241; after the rebase only unit tests
+* The live check ran before rebasing on #240, #241 and #242; after the rebase only unit tests
   and `make check` ran again.

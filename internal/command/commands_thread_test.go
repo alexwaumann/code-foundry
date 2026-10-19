@@ -141,6 +141,13 @@ func TestThreadCommands(t *testing.T) {
 				"#10 wake: Thread s2 is idle: finished.\n#11 turn end: process_ended, 9.9s, 0 in / 0 out tokens (interrupted)",
 		},
 		{
+			// orch-child-context: the resume note Claude got shows under the message.
+			name: "a message with a resume note", cmd: "thread.items", args: map[string]string{"id": "s1"},
+			items: []thread.Item{{ID: "u", Kind: thread.KindUserMessage, Text: "continue",
+				ResumeNote: "[code-foundry] Your previous turn was stopped at the spending limit."}},
+			wantMsg: "#1 you: continue\n    [code-foundry] Your previous turn was stopped at the spending limit.",
+		},
+		{
 			// E7: read --full cut a wake to its title.
 			name: "full prints a wake's JSON", cmd: "thread.items", args: map[string]string{"id": "s1", "full": "true"},
 			items: []thread.Item{{ID: "w", Kind: thread.KindUserMessage, Text: "[code-foundry wake] Thread s2 is idle.\n```json\n{\n  \"kind\": \"thread\"\n}\n```",

@@ -511,6 +511,10 @@ func FormatThreadItems(snap *v1.ThreadItemsSnapshot, full bool) string {
 					body += "\n" + strings.TrimSpace(u.GetWakeJson())
 				}
 			}
+			if n := u.GetResumeNote(); n != "" {
+				// What Claude got before the text (orch-child-context.md); --json has it too.
+				body += "\n" + indent + "    " + line(n)
+			}
 			for _, a := range u.GetAttachments() {
 				kind := "image"
 				if strings.EqualFold(filepath.Ext(a), ".pdf") {
