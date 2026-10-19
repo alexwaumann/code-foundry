@@ -1,7 +1,7 @@
 //go:build ignore
 
 // registry-entry writes a plugin's entry for a Code Foundry plugin registry
-// (plugins/<name>.json in alexwaumann/code-foundry-plugins) from plugin.json and the
+// (its plugins/<name>.json) from plugin.json and the
 // release's SHA256SUMS: name, display name, description, repository, version, protocol,
 // all eight permission keys, and the darwin/arm64 and darwin/amd64 tarball URLs of the
 // GitHub release v<version> with their hashes. `make registry-entry` runs it:

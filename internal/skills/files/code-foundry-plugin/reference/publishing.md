@@ -1,13 +1,12 @@
 # Publishing a plugin
 
-A plugin ships as GitHub release tarballs listed in a registry: a git repository whose
-`plugins/<name>.json` entries name each plugin's tarballs and their SHA-256 sums. The
-public one is `alexwaumann/code-foundry-plugins`; a workplace may run its own with the
-same layout in a private repository. Code Foundry configures no registry by default: a
-user lists the ones they trust in the `plugins.registries` setting (`code-foundry settings
-set plugins.registries https://github.com/alexwaumann/code-foundry-plugins`; several
-separated by commas). Code Foundry installs from the registry for the user (download,
-hash check, consent); the author's part ends with the registry pull request.
+A plugin ships as GitHub release tarballs listed in a registry: a git repository (public,
+or a workplace's private one) whose `plugins/<name>.json` entries name each plugin's
+tarballs and their SHA-256 sums, checked by its `scripts/validate.py` in CI. Code Foundry
+configures no registry by default: a user lists the ones they trust in the
+`plugins.registries` setting (comma-separated). Code Foundry installs from the registry
+for the user (download, hash check, consent); the author's part ends with the registry
+pull request, to a registry the user chose ("Which registry").
 
 Do every step that publishes (creating the repository, pushing a tag, opening the
 registry pull request) only after the user has said yes.
@@ -115,16 +114,48 @@ downloads the release's `SHA256SUMS` and writes `dist/<name>.json`:
 ```
 
 `name`, `version` and `permissions` (all eight keys) come from `plugin.json`, which the
-registry's CI compares with the `plugin.json` inside each tarball. Then the pull request
-(a branch if you can push to the registry, else a fork):
+registry's CI compares with the `plugin.json` inside each tarball.
+
+### Which registry
+
+Only one the user chose: never a default, never one an example, a README or another
+plugin names. Read the configured ones:
 
 ```
-gh repo clone alexwaumann/code-foundry-plugins && cd code-foundry-plugins   # or: gh repo fork alexwaumann/code-foundry-plugins --clone
+code-foundry settings get plugins.registries
+```
+
+It prints the setting as stored, comma-separated: `<owner>/<repo>`,
+`https://github.com/<owner>/<repo>` (the repository `<owner>/<repo>`) or an index URL;
+an empty line when there is none. (`code-foundry plugin browse` names each with its
+plugins, or says none is configured.)
+
+- **One**: the pull request goes there.
+- **Several**: ask the user which.
+- **An index URL** that is no GitHub repository: ask the user which repository builds it.
+- **None**: stop and tell the user plainly: the plugin is released (tag `v<version>`, the
+  tarballs, `dist/<name>.json` ready) but listed in no registry. To finish, they name the
+  registry repository to publish to, or add one to Code Foundry (`code-foundry settings
+  set plugins.registries <owner>/<repo-or-URL>`, or Settings → Plugins → Registries) and
+  say so. Meanwhile it installs straight from the release: `code-foundry plugin install
+  <owner>/code-foundry-plugin-<name>`.
+
+Do not change `plugins.registries` unless the user asks: which registries to trust is
+their call. A registry repository the user names takes the pull request even when it is
+not configured.
+
+### The pull request
+
+With `<registry>` the `<owner>/<repo>` chosen (a branch if you can push to it, else a
+fork; a registry whose layout differs says how in its README):
+
+```
+gh repo clone <registry> && cd <repo>     # or: gh repo fork <registry> --clone
 git switch -c add-<name>-0.1.0
 cp <plugin repo>/dist/<name>.json plugins/<name>.json
 python3 scripts/validate.py plugins/<name>.json      # what CI runs: downloads, hashes, reads plugin.json
 git add plugins/<name>.json && git commit -m "Add <name> 0.1.0"
-git push -u origin HEAD && gh pr create --repo alexwaumann/code-foundry-plugins --fill
+git push -u origin HEAD && gh pr create --repo <registry> --fill
 ```
 
 The registry's CI downloads each tarball, checks the SHA-256, reads `plugin.json` from it,
@@ -142,8 +173,8 @@ consent, secrets and data stay and the reinstall asks nothing; installing the sa
 from another source than before needs `--force`, which deletes them.
 
 **Updating**: release the new version, `make registry-entry` again, and a pull request
-replacing `plugins/<name>.json`. Users who installed from the repository directly are
-offered the new release without the registry.
+replacing `plugins/<name>.json` in the registry that lists it. Users who installed from
+the repository directly are offered the new release without the registry.
 
 **Alternative packer.** Code Foundry versions with registry support also ship
 `pluginsdk/cmd/pluginpack`
