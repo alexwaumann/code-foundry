@@ -50,6 +50,15 @@ type Plugin struct {
 	// OnSecretChanged learns that the user deleted one of its secrets (`plugin secrets
 	// delete`, Settings): drop what was read from it and ask again (a form, a notice).
 	OnSecretChanged func(ctx context.Context, h *Host, c SecretChanged)
+	// OnWakeSubscribed learns that a thread subscribed to one of the manifest's wake
+	// sources (wake/subscribed): start watching for its event, keyed by
+	// sub.Subscription, and fire it with Host.FireWake. The host sends every live
+	// subscription again after each start, so a restarted plugin re-arms here; treat a
+	// subscription it already has as the same one.
+	OnWakeSubscribed func(ctx context.Context, h *Host, sub WakeSubscription)
+	// OnWakeUnsubscribed learns that a subscription went (unsubscribed, a one-shot that
+	// fired, its thread archived): stop watching for it.
+	OnWakeUnsubscribed func(ctx context.Context, h *Host, u WakeUnsubscribed)
 	// Shutdown runs when the host asks the plugin to stop (it has about 2 seconds).
 	Shutdown func(ctx context.Context, h *Host)
 	// Capabilities the plugin announces in addition to the SDK's own.
@@ -203,6 +212,16 @@ func (s *server) notify(ctx context.Context, method string, params json.RawMessa
 		var ex TerminalExited
 		if s.p.OnTerminalExit != nil && json.Unmarshal(params, &ex) == nil {
 			s.p.OnTerminalExit(ctx, s.h, ex)
+		}
+	case MethodWakeSubscribed:
+		var sub WakeSubscription
+		if s.p.OnWakeSubscribed != nil && json.Unmarshal(params, &sub) == nil {
+			s.p.OnWakeSubscribed(ctx, s.h, sub)
+		}
+	case MethodWakeUnsubscribed:
+		var u WakeUnsubscribed
+		if s.p.OnWakeUnsubscribed != nil && json.Unmarshal(params, &u) == nil {
+			s.p.OnWakeUnsubscribed(ctx, s.h, u)
 		}
 	case MethodSecretChanged:
 		var c SecretChanged

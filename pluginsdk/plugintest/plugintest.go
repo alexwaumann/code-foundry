@@ -9,7 +9,8 @@
 // permissions.commands glob, secret/* needs permissions.secrets, thread/setFlag
 // threadStatus, session/setEnvironment sessionEnv, events/subscribe each source in
 // permissions.events, thread/* threads and terminal/* terminals (owned.go: kept in
-// memory, nothing runs). It does not evaluate when clauses, check views beyond what the
+// memory, nothing runs). Wake sources (wakes.go): Subscribe sends wake/subscribed as an
+// agent's subscription would, Fires records wake/fire. It does not evaluate when clauses, check views beyond what the
 // plugin's own Validate did, or store secrets from forms (SetSecret does).
 package plugintest
 
@@ -46,6 +47,9 @@ type Options struct {
 	// NoInitWait makes Start return right after the handshake instead of waiting (up to
 	// 5 s) for Plugin.Init to return; for a plugin whose Init blocks.
 	NoInitWait bool
+	// Wakes are the manifest's wake sources: wake/fire is refused for another source or
+	// a match arg a source does not declare (wakes.go). Nil accepts any.
+	Wakes []pluginsdk.WakeSpec
 }
 
 // Host is the fake host.
@@ -70,6 +74,7 @@ type Host struct {
 	envs        []pluginsdk.Environment
 	subs        [][]string
 	own         owned
+	wakes       wakeState
 	closeOnce   sync.Once
 }
 
@@ -368,6 +373,9 @@ func denied(what string) error {
 
 func (h *Host) handle(ctx context.Context, method string, params json.RawMessage) (any, error) {
 	if res, ok, err := h.handleOwned(ctx, method, params); ok {
+		return res, err
+	}
+	if res, ok, err := h.handleWakes(ctx, method, params); ok {
 		return res, err
 	}
 	g := h.opts.Granted

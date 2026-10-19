@@ -46,6 +46,9 @@ type Manifest struct {
 	Commands []CommandSpec `json:"commands,omitempty"`
 	// Surfaces are the plugin's views (side-panel tabs, settings sections).
 	Surfaces []SurfaceSpec `json:"surfaces,omitempty"`
+	// Wakes are the events an agent's thread may subscribe to (wake.go): `code-foundry
+	// thread subscribe --plugin <name>/<wake>`. The plugin fires them (Host.FireWake).
+	Wakes []WakeSpec `json:"wakes,omitempty"`
 }
 
 // Permissions is what a plugin may do through the host, shown at consent and enforced
@@ -157,7 +160,7 @@ var EventSources = []string{"project", "workspace", "threads", "thread", "gh", "
 // ReservedNames are plugin names the host's own plugin.* verbs use.
 var ReservedNames = []string{
 	"list", "show", "install", "uninstall", "enable", "disable", "restart", "logs", "dev",
-	"reload", "surface", "act", "secrets", "update", "env", "threads", "terminals", "browse",
+	"reload", "surface", "act", "secrets", "update", "env", "threads", "terminals", "browse", "wakes",
 }
 
 // ReservedArgNames are CLI flags every command has; args may not use them.
@@ -207,6 +210,13 @@ func ParseManifest(data []byte) (Manifest, []string, error) {
 		}
 		warnings = append(warnings, unknownInList("commands", raw["commands"], CommandSpec{})...)
 		warnings = append(warnings, unknownInList("surfaces", raw["surfaces"], SurfaceSpec{})...)
+		warnings = append(warnings, unknownInList("wakes", raw["wakes"], WakeSpec{})...)
+		var wakes []map[string]json.RawMessage
+		if json.Unmarshal(raw["wakes"], &wakes) == nil {
+			for i, w := range wakes {
+				warnings = append(warnings, unknownInList(fmt.Sprintf("wakes[%d].args", i), w["args"], WakeArgSpec{})...)
+			}
+		}
 		var cmds []map[string]json.RawMessage
 		if json.Unmarshal(raw["commands"], &cmds) == nil {
 			for i, c := range cmds {
@@ -255,7 +265,7 @@ func unknownFields(prefix string, raw map[string]json.RawMessage, schema any) []
 func jsonFieldNames(schema any) []string {
 	switch schema.(type) {
 	case Manifest:
-		return []string{"name", "displayName", "version", "description", "protocol", "exec", "permissions", "commands", "surfaces"}
+		return []string{"name", "displayName", "version", "description", "protocol", "exec", "permissions", "commands", "surfaces", "wakes"}
 	case Permissions:
 		return []string{"commands", "events", "threadStatus", "sessionEnv", "secrets", "threads", "terminals", "api"}
 	case CommandSpec:
@@ -264,6 +274,10 @@ func jsonFieldNames(schema any) []string {
 		return []string{"name", "type", "description", "required", "enum", "default", "positional", "context"}
 	case SurfaceSpec:
 		return []string{"id", "title", "icon", "scope", "placement", "when"}
+	case WakeSpec:
+		return []string{"name", "title", "description", "args", "scope"}
+	case WakeArgSpec:
+		return []string{"name", "type", "description", "required", "enum", "default", "context"}
 	}
 	return nil
 }
@@ -386,6 +400,7 @@ func (m Manifest) Validate() error {
 			}
 		}
 	}
+	validateWakes(m.Wakes, bad)
 	return errors.Join(errs...)
 }
 

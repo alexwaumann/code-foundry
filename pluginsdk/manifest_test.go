@@ -116,7 +116,7 @@ func TestParseManifestWarnsUnknownFields(t *testing.T) {
 
 // TestJSONFieldNames keeps the hand-written field lists in step with the struct tags.
 func TestJSONFieldNames(t *testing.T) {
-	for _, schema := range []any{Manifest{}, Permissions{}, CommandSpec{}, ArgSpec{}, SurfaceSpec{}} {
+	for _, schema := range []any{Manifest{}, Permissions{}, CommandSpec{}, ArgSpec{}, SurfaceSpec{}, WakeSpec{}, WakeArgSpec{}} {
 		var tags []string
 		rt := reflect.TypeOf(schema)
 		for i := range rt.NumField() {
