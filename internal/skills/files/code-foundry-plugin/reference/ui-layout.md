@@ -1,15 +1,17 @@
-# Layout: columns, panes, grids, inline nodes, containers, toolbar and footer
+# Layout: columns, panes, grids, inline nodes, containers, master-detail, node tabs, toolbar and footer
 
 Container nodes arrange other nodes: **columns** (side by side), **pane** (a box with its
-own height and scroll), **grid** (cards in as many columns as fit) and **container** (a
-capped, centred width). **divider**, **spacer** and **group** (leaves on one line) space
+own height and scroll), **grid** (cards in as many columns as fit), **container** (a
+capped, centred width), **masterDetail** (a list beside its chosen row's detail) and
+**tabs** (a node's own tab strip). **divider**, **spacer** and **group** (leaves on one line) space
 and line up nodes without a container. Two view slots pin nodes around the scrolling
 body: the **toolbar** and the **footer**. A surface shows in the side panel (about 360 px
 wide, the user can widen it) and, later, in pages of the main pane: one view serves both,
 so every container says how it degrades to one column. Check
 `h.HasCapability("view.node.columns")` (`view.node.pane`, `view.node.grid`,
 `view.node.divider`, `view.node.spacer`, `view.node.group`, `view.node.container`,
-`view.toolbar`, `view.footer`) before sending them: an older host refuses the view.
+`view.node.masterDetail`, `view.node.tabs`, `view.toolbar`, `view.footer`) before
+sending them: an older host refuses the view.
 
 ## columns
 
@@ -166,6 +168,80 @@ full width; on a page (or a widened panel) a narrow container keeps text and for
 reading width and a wide one is the page's main column. It draws nothing and spaces its
 nodes like the list around it. It is a container for the depth limit; fill looks past it.
 
+## masterDetail
+
+```json
+{"key": "runs", "masterDetail": {"selected": "run-5", "listWidth": 280,
+  "list": {"rows": [{"key": "run-6", "title": "Build #6", "glyph": {"status": "running"}},
+                    {"key": "run-5", "title": "Build #5", "glyph": {"status": "failed"}}]},
+  "emptyDetail": {"glyph": {"icon": "list"}, "title": "No run chosen"},
+  "detail": [{"key": "run-facts", "pairs": {"items": []}}]}}
+```
+
+```go
+md := ui.NewMasterDetail("runs", ui.List{Rows: rows}, selected, detailNodes...) // selected: "" or a row key
+md.MasterDetail.EmptyDetail = &ui.Empty{Title: "No run chosen"}
+```
+
+- **Wide** (the node's own width at least `listWidth` + 12 + 320 px: **612 px** by
+  default) the list sits on the left at `listWidth` (200..400, absent = 280) and the detail
+  fills the rest, 12 px apart, each scrolling on its own. The node is as tall as the
+  taller side and never taller than the rest of its box below its top (a pane with a px
+  or fill height, else the surface's body; at least 240 px), so a long list scrolls
+  beside a short detail.
+- **Narrow** (always the side panel at its default width) it shows the **list alone**.
+  Choosing a row shows the **detail alone**, under a back button with the row's title;
+  Back shows the list again (nothing is sent). The host keeps "showing the detail" per
+  node and view tab, and shows the list again when `selected` changes to something that is
+  not a row (`""` included) or when `resetToken` changes: send a new token to bring the
+  user back to the list (after deleting the run, say).
+- **Choosing a row** without an `action` sends a `select` act, which the plugin answers
+  with a view whose `selected` is that row and whose `detail` is its detail (like a tab):
+
+  ```json
+  {"kind": "select", "action": "select", "key": "run-5", "value": "run-5", "node": "runs"}
+  ```
+
+  A row with an event action sends its click instead (the plugin still answers with the
+  new `selected`); a command, URL or copy row runs it and is not chosen. The host shows
+  the chosen row selected while the act is pending (the old detail dims) and goes back
+  to `selected` if the act fails (return an error to refuse).
+- `selected` is `""` or a row's key (anything else is refused). `emptyDetail` (an `empty`
+  node's fields) is the detail side while nothing is selected, when wide. Rows count as
+  elements and share the view's keys; row buttons work as in a `list`.
+- The detail holds any nodes within the depth limit (the master-detail is a container).
+  Form drafts in it are kept per selected row. The hidden side is not drawn, so a thread
+  or terminal in the detail holds no stream while the panel shows the list.
+
+## tabs (a node's own)
+
+```json
+{"key": "run-tabs", "tabs": {"active": "run-tab-log",
+  "items": [{"key": "run-tab-overview", "label": "Overview"}, {"key": "run-tab-log", "label": "Log", "badge": {"label": "1 error", "tone": "error"}}],
+  "children": [{"key": "run-log-pane", "pane": {"height": 240, "children": [{"key": "run-log", "log": {"text": "…"}}]}}]}}
+```
+
+```go
+tabs := ui.NewTabsNode("run-tabs", ui.NewTabs(active, ui.NewTab("run-tab-overview", "Overview"), ui.NewTab("run-tab-log", "Log")), children...)
+```
+
+- A tab strip for one part of the view (a section's, a pane's, a column's, a detail's),
+  drawn like the view's tabs one step smaller, scrolling with its list (not pinned);
+  `children` are the active tab's nodes. **2 to 8 tabs**; `active` must be one of them;
+  tab keys share the view's keys (a view tab `log` and a node tab `log` collide).
+- Switching sends the view's `tab` act with the tabs node's key in `node` (`""` for the
+  view's own tabs; dispatch on it):
+
+  ```json
+  {"kind": "tab", "action": "tab", "key": "run-tab-log", "value": "run-tab-log", "node": "run-tabs"}
+  ```
+
+  The plugin answers with a view whose `active` is that tab and whose `children` are its
+  nodes. Form drafts are kept per node tab, as per view tab. It is a container.
+- **Nested tabs or sections?** Tabs when the parts are alternatives the user looks at one
+  at a time (a run's overview or its log); sections (collapsible if long) when they are
+  read together or compared. Prefer the view's own tabs for whole pages.
+
 ## toolbar and footer
 
 ```json
@@ -239,9 +315,10 @@ grows to match.
   minHeight 0 or 120..1600 px; container width narrow (680 px), wide (1080 px) or full.
 - Grid: 1..24 items, minWidth 160..480 px, at most 6 columns, span 1..2. Group: 1..8
   items. Spacer: size 4..64 px. Divider label: 200 characters. Toolbar and footer: 6
-  nodes each.
-- A node sits inside at most 4 containers (section, columns, pane, grid, container, in
-  any mix): `section > columns > pane > section > node` is the deepest. A column is part
+  nodes each. Master-detail: listWidth 200..400 px (280), the detail at least 320 px
+  beside it. A tabs node: 2..8 tabs.
+- A node sits inside at most 4 containers (section, columns, pane, grid, container,
+  masterDetail, tabs, in any mix): `section > columns > pane > section > node` is the deepest. A column is part
   of its columns node and a grid item of its grid, not a level; a group is no level.
 - Columns, grid items, group items and the toolbar's and footer's nodes count as
   elements toward the view's 400.
@@ -266,3 +343,6 @@ grows to match.
   over the list in the body, the count in the `footer`.
 - **A page's reading column**: `container(narrow)[ markdown, form ]`; the panel shows it
   full width.
+- **A list/detail page**: `masterDetail(list of items, detail: pairs, tabs[Overview: markdown,
+  form | Log: pane(240: log)])`: two sides on a page, the list then the item in the panel.
+  Keep filters in the `toolbar` above it and the row's actions in the detail.

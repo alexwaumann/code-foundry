@@ -112,7 +112,7 @@ alexwaumann/code-foundry-plugin-showcase` and read the matching file.
 
 - `reference/manifest.md`: every `plugin.json` field, permissions, scopes, `when` clauses.
 - `reference/protocol.md`: methods both ways, errors, lifecycle, timeouts, crashes.
-- `reference/primitives.md`: every view node and value type, limits; `reference/ui-layout.md`: columns, panes, grids, inline, containers, toolbar, footer.
+- `reference/primitives.md`: every view node and value type, limits; `reference/ui-layout.md`: columns, panes, grids, inline, containers, master-detail, node tabs, toolbar, footer.
 - `reference/host-api.md`: Invoke, flags, context facts, session env, events, secrets, toasts.
 - `reference/testing.md`: plugintest patterns; driving the plugin in the daemon.
 - `reference/publishing.md`: release workflow, tarballs, the registry entry.

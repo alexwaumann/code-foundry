@@ -469,7 +469,7 @@ view, or let the user pick which, switching with tabs or chips rather than stack
 Check `h.HasCapability("view.node.thread")` (`view.node.terminal`) before relying on
 them; `reference/host-api.md` has the calls that make them.
 
-### columns, pane, grid, divider, spacer, group, container
+### columns, pane, grid, divider, spacer, group, container, masterDetail, tabs
 
 Layout nodes: `columns` puts 2 to 4 columns side by side where they fit (240 px a
 column) and stacks them, or keeps only the first, where they do not (the side panel);
@@ -477,7 +477,9 @@ column) and stacks them, or keeps only the first, where they do not (the side pa
 many equal columns as fit; `divider` is a hairline (with a label); `spacer` is extra
 space (or, `flex`, pushes what follows to a box's bottom); `group` puts text, chips,
 actions and progress on one line; `container` caps its nodes at 680 px (`narrow`) or
-1080 px (`wide`), centred. All in `reference/ui-layout.md`.
+1080 px (`wide`), centred; `masterDetail` is a list beside its chosen row's detail (the
+list, then the detail with Back, in the panel); `tabs` gives a node its own tab strip.
+All in `reference/ui-layout.md`.
 
 ## Acts
 
@@ -488,7 +490,8 @@ actions and progress on one line; `container` caps its nodes at 680 px (`narrow`
 | `click` | a button, row or chip with an event | `Action` (event name), `Key` (element key), `Data` |
 | `submit` | a form's submit with an event | `Action`, `Key`, `Data`, `Values` (the form's fields by name) |
 | `change` | a field with a change event was edited | `Action`, `Key`, `Field`, `Value`, `Values` |
-| `tab` | the user switched tabs | `Action` is `"tab"`, `Key` the new tab's key (`Value` too, as `any`: use `Key`) |
+| `tab` | the user switched tabs | `Action` is `"tab"`, `Key` the new tab's key (`Value` too, as `any`: use `Key`), `Node` the `tabs` node's key ("" for the view's tabs) |
+| `select` | a `masterDetail` row without an action was chosen | `Action` is `"select"`, `Key` the row's key, `Node` the master-detail's key |
 
 `act.Context` is what the panel the user acted in shows (`ThreadID`, `ProjectID`, …): a
 shared instance (scope `pr`, `project`, `global`) learns from it which thread a click came
