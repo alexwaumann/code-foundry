@@ -33,7 +33,7 @@ func TestThreadSubscriptionCommands(t *testing.T) {
 	listed := []*v1.ThreadSubscription{
 		{Id: "sub-1", SubscriberThreadId: "s-me", SubscriberName: "Foreman", Target: v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_THREAD,
 			TargetId: "s-c", TargetName: "Child", Condition: settled, Repeat: true, FiredCount: 2,
-			LastFiredAt: timestamppb.New(time.Date(2026, 10, 17, 9, 30, 5, 0, time.Local)), TargetStatus: "needs attention (finished)"},
+			LastFiredAt: timestamppb.New(time.Date(2026, 10, 17, 9, 30, 5, 0, time.FixedZone("CDT", -5*3600))), TargetStatus: "needs attention (finished)"},
 		{Id: "sub-2", SubscriberThreadId: "s-me", Target: v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_ACTION_RUN,
 			TargetId: "r-1", TargetName: "Test", Condition: finished, TargetStatus: "running"},
 		{Id: "sub-3", SubscriberThreadId: "s-other", Target: v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_THREAD,
@@ -128,10 +128,10 @@ func TestThreadSubscriptionCommands(t *testing.T) {
 		{name: "unsubscribe unknown", cmd: "thread.unsubscribe", args: map[string]string{"subscription": "sub-9"}, wantCode: connect.CodeNotFound},
 
 		{name: "list the context thread's", cmd: "thread.subscriptions", ctx: inThread,
-			wantMsg: "ID     SUBSCRIBER      TARGET               UNTIL     REPEAT  FIRED  LAST FIRED  TARGET STATUS\n" +
-				"sub-1  s-me (Foreman)  thread s-c (Child)   settled   yes     2      09:30:05    needs attention (finished)\n" +
-				"sub-2  s-me            run r-1 (Test)       finished  no      0      -           running\n" +
-				"sub-4  s-me            pr acme/web#7 Retry  review    yes     0      -           open · checks pending (2/4)",
+			wantMsg: "ID     SUBSCRIBER      TARGET               UNTIL     REPEAT  FIRED  LAST FIRED            TARGET STATUS\n" +
+				"sub-1  s-me (Foreman)  thread s-c (Child)   settled   yes     2      2026-10-17T14:30:05Z  needs attention (finished)\n" +
+				"sub-2  s-me            run r-1 (Test)       finished  no      0      -                     running\n" +
+				"sub-4  s-me            pr acme/web#7 Retry  review    yes     0      -                     open · checks pending (2/4)",
 			wantReqs: []proto.Message{&v1.ListThreadSubscriptionsRequest{SubscriberThreadId: "s-me"}}},
 		{name: "list all", cmd: "thread.subscriptions", ctx: inThread, args: map[string]string{"all": "true"},
 			wantReqs: []proto.Message{&v1.ListThreadSubscriptionsRequest{}}},
