@@ -26,7 +26,10 @@ import (
 // commitLocked under m.mu for every published change) fires a subscription when its
 // target goes from not meeting the condition to meeting it, and Subscribe fires once at
 // once when the target already meets it, so a late subscriber does not miss a finished
-// child. Running in the commit gives a total order with Subscribe (also under m.mu): no
+// child. A settled or attention subscription also fires on each new pending request
+// while the condition holds (requestKey; docs/notes/wake-detail.md): a supervised child
+// going from one permission prompt straight to the next never leaves needs attention,
+// and the next prompt must wake its parent all the same. Running in the commit gives a total order with Subscribe (also under m.mu): no
 // change is seen twice or missed, whatever the bus buffers. Run targets fire once, when
 // the daemon reports the run's end (ActionRunFinished), or at once when it already ended.
 //
@@ -213,11 +216,34 @@ type subscriptions struct {
 	noting  bool
 }
 
-// subRec is a subscription and whether its target met the condition when last seen.
+// subRec is a subscription, whether its target met the condition when last seen, and
+// the pending request it was then waiting on (requestKey).
 type subRec struct {
 	s   Subscription
 	sat bool
+	req string
 }
+
+// requestKey names the pending request (permission prompt or question) a running
+// thread waits on: its PendingRequestID, else its "permission: …"/"question: …" reason;
+// "" when it waits on none or has no process (a stopped thread keeps the reason of a
+// request that ended with its process).
+func requestKey(t Thread) string {
+	if t.Status != StatusNeedsAttention || t.State == StateDisconnected || t.State == StateClosing || !isRequestReason(t.StatusReason) {
+		return ""
+	}
+	return cmp.Or(t.PendingRequestID, t.StatusReason)
+}
+
+// isRequestReason reports whether a status reason is a pending request's.
+func isRequestReason(reason string) bool {
+	return strings.HasPrefix(reason, "permission:") || strings.HasPrefix(reason, "question:")
+}
+
+// firesOnRequest reports whether a subscription with condition c, met before and now,
+// fires again for a new pending request: settled and attention (the conditions a
+// prompt meets).
+func firesOnRequest(c Condition) bool { return c == CondSettled || c == CondAttention }
 
 // loadSubscriptionState rehydrates the subscriptions for New, armed with the threads as
 // loaded (recs): a subscription whose target meets its condition now waits for the
@@ -446,9 +472,9 @@ func (m *Manager) subscribe(sub Subscription, run ActionRun, pr *PullRequestInfo
 	fired := false
 	switch sub.TargetKind {
 	case TargetThread:
-		r.sat = Meets(sub.Condition, target)
+		r.sat, r.req = Meets(sub.Condition, target), requestKey(target)
 		if r.sat {
-			fired = m.fireLocked(r, func(s Subscription, at time.Time) Message { return threadWake(s, target, at) })
+			fired = m.fireThreadLocked(r, target)
 		}
 	case TargetActionRun:
 		if run.Finished {
@@ -478,7 +504,11 @@ func (m *Manager) subscribe(sub Subscription, run ActionRun, pr *PullRequestInfo
 
 // observeLocked is the commit hook: t was just published. An archived thread's
 // subscriptions go (forgetLocked); otherwise each subscription to t fires when t went
-// into its condition. Callers hold m.mu.
+// into its condition, and a settled or attention one also when t, still meeting it,
+// now waits on another pending request than when last seen (requestKey): a permission
+// prompt answered and the next one asked within the status debounce publish as one
+// change, from "permission: Edit …" to "permission: Bash …". A reason change that is
+// not a new request (finished, then finished again) does not fire. Callers hold m.mu.
 func (m *Manager) observeLocked(t Thread) {
 	if m.subs == nil {
 		return
@@ -499,14 +529,16 @@ func (m *Manager) observeLocked(t Thread) {
 	slices.SortFunc(hit, func(a, b *subRec) int {
 		return cmp.Or(a.s.CreatedAt.Compare(b.s.CreatedAt), strings.Compare(a.s.ID, b.s.ID))
 	})
+	req := requestKey(t)
 	for _, r := range hit {
 		now := Meets(r.s.Condition, t)
-		was := r.sat
-		r.sat = now
-		if !now || was {
+		was, wasReq := r.sat, r.req
+		r.sat, r.req = now, req
+		newRequest := was && firesOnRequest(r.s.Condition) && req != "" && req != wasReq
+		if !now || (was && !newRequest) {
 			continue
 		}
-		if m.fireLocked(r, func(s Subscription, at time.Time) Message { return threadWake(s, t, at) }) {
+		if m.fireThreadLocked(r, t) {
 			s.firedLocked(r)
 		}
 	}

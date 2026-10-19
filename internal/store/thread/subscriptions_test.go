@@ -78,8 +78,8 @@ func TestThreadWakeMessage(t *testing.T) {
 	child := Thread{ID: "s-c", Name: "Write retry backoff tests", State: StateConnected, Status: StatusNeedsAttention,
 		StatusReason: "finished", ProjectID: "r1", WorktreePath: "/w", CreatedBy: "s-p", Labels: []string{"tests"},
 		Report: Report{Status: ReportDone, Summary: "6 table tests, all passing", Data: `{"n":6}`, At: at}}
-	msg := threadWake(Subscription{ID: "sub-1", Condition: CondSettled}, child, at)
-	wantTitle := `Thread "Write retry backoff tests" (s-c) is idle: finished. Report: done — 6 table tests, all passing.`
+	msg := threadWake(Subscription{ID: "sub-1", Condition: CondSettled}, child, at, wakeDetail{})
+	wantTitle := `Thread "Write retry backoff tests" (s-c) needs attention: finished. Report: done — 6 table tests, all passing.`
 	if msg.WakeTitle != wantTitle || msg.Origin != OriginWake {
 		t.Errorf("title = %q (origin %q), want %q", msg.WakeTitle, msg.Origin, wantTitle)
 	}
@@ -119,22 +119,22 @@ func TestThreadWakeMessage(t *testing.T) {
 	titles := map[Condition]string{
 		CondSettled:      "Thread s-x needs attention: permission: Bash ls.",
 		CondAttention:    "Thread s-x needs attention: permission: Bash ls.",
-		CondIdle:         "Thread s-x is idle: permission: Bash ls.",
+		CondIdle:         "Thread s-x needs attention: permission: Bash ls.",
 		CondError:        "Thread s-x has an error: permission: Bash ls.",
 		CondDisconnected: "Thread s-x is disconnected: permission: Bash ls.",
 	}
 	for c, want := range titles {
-		if got := threadWakeTitle(c, plain); got != want {
+		if got := threadWakeTitle(c, plain, wakeDetail{}); got != want {
 			t.Errorf("title(%s) = %q, want %q", c, got, want)
 		}
 	}
-	if m := threadWake(Subscription{ID: "sub-2", Condition: CondIdle}, plain, at); !strings.Contains(m.WakeJSON, `"labels": []`) ||
+	if m := threadWake(Subscription{ID: "sub-2", Condition: CondIdle}, plain, at, wakeDetail{}); !strings.Contains(m.WakeJSON, `"labels": []`) ||
 		!strings.Contains(m.WakeJSON, `"report": null`) {
 		t.Errorf("plain JSON:\n%s", m.WakeJSON)
 	}
 	long := plain
 	long.Report = Report{Status: ReportBlocked, Summary: "line one\nline two " + strings.Repeat("x", 300)}
-	if got := threadWakeTitle(CondSettled, long); strings.Contains(got, "\n") || !strings.HasSuffix(got, "…") {
+	if got := threadWakeTitle(CondSettled, long, wakeDetail{}); strings.Contains(got, "\n") || !strings.HasSuffix(got, "…") {
 		t.Errorf("long summary title = %q", got)
 	}
 }
@@ -215,16 +215,34 @@ type step struct {
 	st     State
 	status Status
 	reason string
+	req    string // PendingRequestID
 }
 
 var (
-	busy     = step{StateConnected, StatusBusy, "working"}
-	finished = step{StateConnected, StatusNeedsAttention, "finished"}
-	atPrompt = step{StateConnected, StatusIdle, "at prompt"}
-	askBash  = step{StateConnected, StatusNeedsAttention, "permission: Bash ls"}
-	crashed  = step{StateDisconnected, StatusError, ReasonInterrupted}
-	offIdle  = step{StateDisconnected, StatusIdle, "at prompt"}
+	busy     = step{StateConnected, StatusBusy, "working", ""}
+	finished = step{StateConnected, StatusNeedsAttention, "finished", ""}
+	atPrompt = step{StateConnected, StatusIdle, "at prompt", ""}
+	askBash  = step{StateConnected, StatusNeedsAttention, "permission: Bash ls", ""}
+	crashed  = step{StateDisconnected, StatusError, ReasonInterrupted, ""}
+	offIdle  = step{StateDisconnected, StatusIdle, "at prompt", ""}
+	budget   = step{StateConnected, StatusNeedsAttention, ReasonBudgetReached, ""}
+	// A supervised child's prompts, one after the other (W2A): by reason, then by id.
+	askEdit   = step{StateConnected, StatusNeedsAttention, "permission: Edit README.md", ""}
+	askWhich  = step{StateConnected, StatusNeedsAttention, "question: Which format?", ""}
+	askEdit1  = step{StateConnected, StatusNeedsAttention, "permission: Edit README.md", "req-1"}
+	askEdit2  = step{StateConnected, StatusNeedsAttention, "permission: Edit README.md", "req-2"}
+	offAsking = step{StateDisconnected, StatusNeedsAttention, "permission: Edit README.md", ""}
 )
+
+// setStep commits a stopped thread as reading s.
+func (e *env) setStep(id string, s step) {
+	e.t.Helper()
+	if _, ok := e.m.update(id, false, func(rec *record) {
+		rec.s.State, rec.s.Status, rec.s.StatusReason, rec.s.PendingRequestID = s.st, s.status, s.reason, s.req
+	}); !ok {
+		e.t.Fatalf("no thread %s", id)
+	}
+}
 
 // Edge-triggered: each condition fires on a transition into it, not while it holds.
 func TestSubscriptionTransitions(t *testing.T) {
@@ -241,19 +259,31 @@ func TestSubscriptionTransitions(t *testing.T) {
 		{"attention: prompts and finished turns", CondAttention, busy, []step{askBash, busy, finished, atPrompt, busy}, 2},
 		{"error: a crash", CondError, busy, []step{finished, busy, crashed}, 1},
 		{"disconnected", CondDisconnected, atPrompt, []step{busy, finished, offIdle, busy, offIdle}, 2},
+		// Each new pending request wakes a settled or attention subscriber, though the
+		// thread never leaves needs attention (wake-detail.md); nothing else that keeps
+		// the condition does.
+		{"settled: a permission chain", CondSettled, busy, []step{askEdit, askBash, finished}, 2},
+		{"attention: a permission chain", CondAttention, busy, []step{askEdit, askBash, askWhich, busy}, 3},
+		{"settled: the same reason, another request", CondSettled, busy, []step{askEdit1, askEdit1, askEdit2, finished}, 2},
+		{"settled: finished, then finished", CondSettled, busy, []step{finished, finished, budget, atPrompt}, 1},
+		{"settled: a turn ends after a prompt", CondSettled, busy, []step{askEdit, finished}, 1},
+		{"settled: a prompt right after a turn", CondSettled, busy, []step{finished, askEdit}, 2},
+		{"settled: the process ends at a prompt", CondSettled, busy, []step{askEdit1, offAsking}, 1},
+		{"idle: not a permission chain", CondIdle, busy, []step{askEdit, askBash, finished}, 1},
+		{"error: not a prompt", CondError, busy, []step{askEdit, askBash}, 0},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			for _, repeat := range []bool{true, false} {
 				e := newEnv(t)
 				parent, child := e.stopped("parent"), e.stopped("child")
-				e.setThread(child.ID, tt.start.st, tt.start.status, tt.start.reason)
+				e.setStep(child.ID, tt.start)
 				res, err := e.m.Subscribe(e.ctx(), SubscribeOptions{SubscriberID: parent.ID, TargetThreadID: child.ID, Condition: tt.cond, Repeat: repeat})
 				if err != nil || res.Fired {
 					t.Fatalf("Subscribe = %+v, %v", res, err)
 				}
 				for _, s := range tt.steps {
-					e.setThread(child.ID, s.st, s.status, s.reason)
+					e.setStep(child.ID, s)
 				}
 				want := tt.want
 				if !repeat {
@@ -290,7 +320,7 @@ func TestSubscribeFiresAtOnce(t *testing.T) {
 	}
 	items := e.waitItems(parent.ID, "the wake", func(items []Item) bool { return len(wakes(items)) == 1 })
 	w := wakes(items)[0]
-	wantTitle := `Thread "child" (` + child.ID + `) is idle: finished. Report: done — all good.`
+	wantTitle := `Thread "child" (` + child.ID + `) needs attention: finished. Report: done — all good.`
 	if w.WakeTitle != wantTitle || w.Text != "[code-foundry wake] "+wantTitle+"\n```json\n"+w.WakeJSON+"\n```" ||
 		!strings.Contains(w.WakeJSON, `"subscription_id": "`+res.Subscription.ID+`"`) {
 		t.Errorf("wake = %+v", w)

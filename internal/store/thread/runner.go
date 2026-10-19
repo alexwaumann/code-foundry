@@ -59,7 +59,9 @@ type runner struct {
 
 	status, pubStatus Status
 	reason, pubReason string
-	debounce          *time.Timer
+	// ask, pubAsk: the request id the reason describes (Thread.PendingRequestID).
+	ask, pubAsk string
+	debounce    *time.Timer
 
 	activity, pubActivity, savedActivity time.Time
 
@@ -317,23 +319,27 @@ func (r *runner) rescan(s Thread, cid, path string, limit int64) {
 // checkStatus schedules a debounced publish when the status changed.
 func (r *runner) checkStatus() {
 	r.status, r.reason = r.st.sd.Status()
-	if (r.status != r.pubStatus || r.reason != r.pubReason) && r.debounce == nil {
+	r.ask = r.st.sd.asking()
+	if (r.status != r.pubStatus || r.reason != r.pubReason || r.ask != r.pubAsk) && r.debounce == nil {
 		r.debounce = time.NewTimer(r.m.opts.StatusDebounce)
 	}
 }
 
 // publishStatus publishes and persists the status. Persisting every change
 // (debounced, a handful per turn) is what lets a thread that is waiting on the user
-// still say so after the daemon dies without a clean shutdown.
+// still say so after the daemon dies without a clean shutdown. A new request that
+// reads like the one before it (the same reason) is a change too: PendingRequestID.
 func (r *runner) publishStatus() {
 	r.status, r.reason = r.st.sd.Status()
-	if r.status == r.pubStatus && r.reason == r.pubReason {
+	r.ask = r.st.sd.asking()
+	if r.status == r.pubStatus && r.reason == r.pubReason && r.ask == r.pubAsk {
 		return
 	}
-	r.pubStatus, r.pubReason, r.pubActivity = r.status, r.reason, r.activity
+	r.pubStatus, r.pubReason, r.pubAsk, r.pubActivity = r.status, r.reason, r.ask, r.activity
 	now := r.m.opts.Now()
 	r.m.update(r.id, true, func(rec *record) {
 		rec.s.setStatus(r.status, r.reason, now)
+		rec.s.PendingRequestID = r.ask
 		rec.s.LastActivityAt = r.activity
 	})
 }
@@ -372,6 +378,7 @@ func (r *runner) finish(fn func(*Thread)) {
 		s.Retry = nil           // the process is gone, so is the request it retried
 		s.BackgroundShellsRunning = 0
 		s.WakePending = false
+		s.PendingRequestID = "" // its requests ended with it
 		s.setStatus(st, reason, now)
 		if r.activity.After(s.LastActivityAt) {
 			s.LastActivityAt = r.activity

@@ -27,6 +27,11 @@ Agreed with Alex (the brief):
   ```
   ````
 
+  Since `wake-detail.md` (2026-10-19) the header reads `needs attention: finished
+  without a report.` here, and the JSON adds `report_stale`, `last_message`,
+  `pending` and `children`; settled and attention subscriptions also fire on each new
+  pending request.
+
   A run: `[code-foundry wake] Action "Slow" run r-… finished with exit 3.` and
   `{ "kind": "action_run", …, "run": { id, action_id, action_name, repo_id, exit_code,
   started_at, finished_at, output_tail } }` (the last 4 KiB of the output).
@@ -397,3 +402,5 @@ and a snoozed subscriber (Send's unsnooze, unchanged).
 Needed: migration 0024, new RPCs and commands, the commit hook.
 
 Plugins add a third target kind, their wake sources: `docs/notes/plugins-wake-sources.md`.
+
+Wake detail (a wake per new pending request; no or stale report, last message, pending request, children in settled wakes): `docs/notes/wake-detail.md`.

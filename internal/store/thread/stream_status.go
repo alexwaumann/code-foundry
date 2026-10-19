@@ -154,14 +154,28 @@ func resultErrorCode(r *claudestream.Result) string {
 	return "error"
 }
 
+// asking is the request id Status's reason describes: the oldest pending one once
+// started, else "".
+func (d *streamStatus) asking() string {
+	if !d.started || len(d.pending) == 0 {
+		return ""
+	}
+	return d.pending[0].id
+}
+
 // ask adds a pending request; its reason is what the status says while it is the
 // oldest one.
 func (d *streamStatus) ask(id string, it Item) {
-	reason := "permission: " + requestSummary(it)
+	d.pending = append(d.pending, pendingReason{id: id, reason: requestReason(it)})
+}
+
+// requestReason is the status reason of a pending request item: "permission: <tool>
+// <what>" or "question: <question>".
+func requestReason(it Item) string {
 	if it.Kind == KindQuestion {
-		reason = "question: " + requestSummary(it)
+		return "question: " + requestSummary(it)
 	}
-	d.pending = append(d.pending, pendingReason{id: id, reason: reason})
+	return "permission: " + requestSummary(it)
 }
 
 // resolved removes a request (answered, withdrawn, or the process ended).

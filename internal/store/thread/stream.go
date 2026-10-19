@@ -373,11 +373,12 @@ func (r *runner) onInitialized(res initResult) {
 		rec.s.LastActivityAt = r.activity
 		if sentFirst {
 			rec.s.setStatus(r.status, r.reason, now)
+			rec.s.PendingRequestID = r.ask
 		}
 	})
 	r.pubActivity = r.activity
 	if sentFirst {
-		r.pubStatus, r.pubReason = r.status, r.reason
+		r.pubStatus, r.pubReason, r.pubAsk = r.status, r.reason, r.ask
 	}
 	if !r.readyClosed {
 		// After the row says connected: a caller waiting on ready (lifecycle.go running)

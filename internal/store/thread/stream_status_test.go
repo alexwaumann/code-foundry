@@ -56,6 +56,10 @@ func TestStreamStatus(t *testing.T) {
 			if st != tt.want || reason != tt.reason || d.AtPrompt() != tt.atPrompt || d.unseen != tt.wantUnseen {
 				t.Errorf("got %v %q atPrompt=%v unseen=%v", st, reason, d.AtPrompt(), d.unseen)
 			}
+			// asking names the request the reason describes, and only then.
+			if ask := d.asking(); isRequestReason(reason) != (ask != "") || (ask != "" && reason != requestReason(map[string]Item{"p1": perm, "q1": quest}[ask])) {
+				t.Errorf("asking %q with reason %q", ask, reason)
+			}
 		})
 	}
 }

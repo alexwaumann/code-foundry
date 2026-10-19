@@ -99,6 +99,9 @@ func TestRenderedWritePermissionEndToEnd(t *testing.T) {
 	if len(snap.Pending) != 1 || snap.Pending[0].Kind != KindPermission || snap.Pending[0].Summary != "Write hello.txt" {
 		t.Fatalf("pending %+v", snap.Pending)
 	}
+	if got.PendingRequestID == "" || got.PendingRequestID != snap.Pending[0].RequestID {
+		t.Errorf("PendingRequestID %q, pending %q", got.PendingRequestID, snap.Pending[0].RequestID)
+	}
 	first := snap.Items[0]
 	if first.Kind != KindUserMessage || first.Text != "create @cf-file://r1/hello.txt please" || first.ID != user["uuid"] ||
 		first.ComposerText != "create [hello.txt](cf-file://r1/hello.txt) please" {
