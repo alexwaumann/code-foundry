@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package codefoundry.v1;
 
+import "google/protobuf/timestamp.proto";
+
 // SettingsService reads and edits the user's settings file ($CONFIG/settings.toml).
 // The file is the source of truth: edits made by hand while the daemon runs are picked
 // up and published like edits made through Update.
@@ -23,6 +25,25 @@ service SettingsService {
   // Watch streams the current snapshot, then one snapshot per change. The GUI receives
   // the same events on EventService instead.
   rpc Watch(WatchSettingsRequest) returns (stream SettingsEvent) {}
+
+  // Backdrop images: copies of pictures the user added, in the backdrops directory of
+  // the Code Foundry home, that appearance.backdrop = custom shows (the one named by
+  // appearance.backdrop_file).
+  //
+  // ListBackdrops returns the images, oldest first.
+  rpc ListBackdrops(ListBackdropsRequest) returns (ListBackdropsResponse) {}
+  // ImportBackdrop copies the PNG, JPEG, WebP or GIF at an absolute path in (at most
+  // 24 MiB; the type is sniffed) and selects it: appearance.backdrop = custom and
+  // appearance.backdrop_file = its name. The name comes from the content, so adding the
+  // same picture again keeps one copy. Unsupported content, a directory or a file over
+  // the cap is InvalidArgument; a missing path NotFound.
+  rpc ImportBackdrop(ImportBackdropRequest) returns (ImportBackdropResponse) {}
+  // RemoveBackdrop deletes an image. When appearance.backdrop_file names it, that is
+  // cleared, and a custom backdrop falls back to forest. NotFound when it is gone.
+  rpc RemoveBackdrop(RemoveBackdropRequest) returns (RemoveBackdropResponse) {}
+  // ReadBackdrop returns an image's bytes. Only names directly inside the directory:
+  // anything with a separator, or hidden, is InvalidArgument; a missing file NotFound.
+  rpc ReadBackdrop(ReadBackdropRequest) returns (ReadBackdropResponse) {}
 }
 
 enum SettingType {
@@ -160,3 +181,46 @@ message UpdateSettingsResponse {
 }
 
 message WatchSettingsRequest {}
+
+// Backdrop is one image in the backdrops directory.
+message Backdrop {
+  // File name in the directory, <32 hex of the content>.<ext> for an import; the value
+  // of appearance.backdrop_file that shows it.
+  string name = 1;
+  int64 size = 2;
+  // Pixel size from the image's header; 0 when it does not say.
+  int32 width = 3;
+  int32 height = 4;
+  google.protobuf.Timestamp added_at = 5;
+}
+
+message ListBackdropsRequest {}
+
+message ListBackdropsResponse {
+  repeated Backdrop backdrops = 1;
+}
+
+message ImportBackdropRequest {
+  // Absolute path of the picture to copy in.
+  string path = 1;
+}
+
+message ImportBackdropResponse {
+  Backdrop backdrop = 1;
+}
+
+message RemoveBackdropRequest {
+  string name = 1;
+}
+
+message RemoveBackdropResponse {}
+
+message ReadBackdropRequest {
+  string name = 1;
+}
+
+message ReadBackdropResponse {
+  bytes data = 1;
+  // Sniffed: image/png, image/jpeg, image/webp or image/gif.
+  string mime_type = 2;
+}

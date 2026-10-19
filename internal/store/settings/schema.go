@@ -199,6 +199,7 @@ const (
 	KeyDensity           = "appearance.density"
 	KeyThreadWidth       = "appearance.thread_width"
 	KeyBackdrop          = "appearance.backdrop"
+	KeyBackdropFile      = "appearance.backdrop_file"
 	KeyPanelKeepOpen     = "appearance.panel_keep_open"
 	KeyDockBadge         = "notifications.dock_badge"
 	KeyBounce            = "notifications.bounce"
@@ -219,6 +220,14 @@ const (
 	defaultFetchSeconds  = 120
 	defaultSoundVolume   = 50
 	defaultAlertCooldown = 60
+)
+
+// appearance.backdrop values: the bundled forest art, nothing, or the image named by
+// appearance.backdrop_file.
+const (
+	BackdropForest = "forest"
+	BackdropNone   = "none"
+	BackdropCustom = "custom"
 )
 
 // threads.default_worktree values: a new worktree, or the project's main checkout.
@@ -325,8 +334,16 @@ var staticFields = []Field{
 	{
 		Key: KeyBackdrop, Group: GroupAppearance, Page: PageAppearance, Section: "window", Type: Enum, Title: "Backdrop",
 		Description: "Faint artwork behind the start page and the new-thread composer.",
-		Enum:        []string{"forest", "none"}, EnumLabels: []string{"Forest", "None"}, Default: "forest",
+		Enum:        []string{BackdropForest, BackdropNone, BackdropCustom}, EnumLabels: []string{"Forest", "None", "Custom"}, Default: BackdropForest,
 		bind: func(s *Settings) any { return &s.Appearance.Backdrop },
+	},
+	{
+		// Owned by the backdrop row's editor in the GUI (its gallery), which leaves this
+		// row out; the backdrop store sets it on import and clears it on removal.
+		Key: KeyBackdropFile, Group: GroupAppearance, Page: PageAppearance, Section: "window", Type: String, Title: "Backdrop image",
+		Description: "The image the Custom backdrop shows: a file name in the backdrops folder of the Code Foundry home. Images are added and removed on the settings page.",
+		check:       checkBackdropFile,
+		bind:        func(s *Settings) any { return &s.Appearance.BackdropFile },
 	},
 	{
 		Key: KeyPanelKeepOpen, Group: GroupAppearance, Page: PageAppearance, Section: "window", Type: Bool, Title: "Keep side panel open",
@@ -625,6 +642,18 @@ func checkExecutable(v string) error {
 }
 
 // checkRegistries validates plugins.registries: every entry a registry URL.
+// checkBackdropFile accepts "" or a plain, non-hidden file name: the backdrops directory
+// is the only place appearance.backdrop_file can point.
+func checkBackdropFile(v string) error {
+	if v == "" {
+		return nil
+	}
+	if strings.ContainsAny(v, `/\`) || strings.HasPrefix(v, ".") {
+		return fmt.Errorf("want a file name in the backdrops folder, got %q", v)
+	}
+	return nil
+}
+
 func checkRegistries(v string) error {
 	_, err := registry.ParseList(v)
 	return err

@@ -150,7 +150,7 @@ func Run(ctx context.Context, opts Options) error {
 	threadAPI := api.NewThread(st.thread, events)
 	gitopsAPI := api.NewGitOps(st.gitops, events, ctx.Done())
 	ghAPI := api.NewGh(st.gh, events, ctx.Done())
-	settingsAPI := api.NewSettings(st.settings)
+	settingsAPI := api.NewSettings(st.settings).WithBackdrops(st.backdrops)
 	updateAPI := api.NewUpdate(st.update, events, ctx.Done())
 	workspaceAPI := api.NewWorkspace(st.workspace, events)
 	actionAPI := api.NewAction(st.action, events)

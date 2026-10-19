@@ -8,6 +8,7 @@ import (
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
+	"github.com/alexwaumann/code-foundry/internal/store/backdrop"
 	"github.com/alexwaumann/code-foundry/internal/store/settings"
 )
 
@@ -15,6 +16,8 @@ import (
 // store.
 type Settings struct {
 	store settings.Service
+	// backdrops serves the backdrop images (WithBackdrops); nil: Unimplemented.
+	backdrops backdrop.Service
 }
 
 var _ codefoundryv1connect.SettingsServiceHandler = (*Settings)(nil)

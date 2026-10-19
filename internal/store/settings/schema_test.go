@@ -56,7 +56,14 @@ func TestFieldParse(t *testing.T) {
 		{key: KeyThemeLight, in: "dracula", err: `Dracula ("dracula") is a dark theme; the light theme must be one of "github-light", "catppuccin-latte", "graphite-light", "gruvbox-light", "rose-pine-dawn", "atom-one-light", "solarized-light"`},
 		{key: KeyThemeLight, in: "sepia", err: `unknown theme "sepia"; light themes are "github-light", "catppuccin-latte", "graphite-light", "gruvbox-light", "rose-pine-dawn", "atom-one-light", "solarized-light"`},
 		{key: KeyBackdrop, in: "none", want: "none"},
-		{key: KeyBackdrop, in: "aurora", err: `want one of "forest", "none", got "aurora"`},
+		{key: KeyBackdrop, in: "custom", want: "custom"},
+		{key: KeyBackdrop, in: "aurora", err: `want one of "forest", "none", "custom", got "aurora"`},
+		{key: KeyBackdropFile, in: "0123456789abcdef0123456789abcdef.png", want: "0123456789abcdef0123456789abcdef.png"},
+		{key: KeyBackdropFile, in: "my photo.jpg", want: "my photo.jpg"},
+		{key: KeyBackdropFile, in: "", want: ""},
+		{key: KeyBackdropFile, in: "../settings.toml", err: `want a file name in the backdrops folder, got "../settings.toml"`},
+		{key: KeyBackdropFile, in: "/etc/hosts", err: `want a file name in the backdrops folder, got "/etc/hosts"`},
+		{key: KeyBackdropFile, in: ".hidden.png", err: `want a file name in the backdrops folder, got ".hidden.png"`},
 		{key: KeyPanelKeepOpen, in: "true", want: "true"},
 		{key: KeyPanelKeepOpen, in: "yes", err: `want true or false, got "yes"`},
 		{key: KeyThreadWidth, in: "full", want: "full"},
@@ -149,6 +156,7 @@ func TestEnumLabels(t *testing.T) {
 		{KeyDensity, "compact", "Compact"},
 		{KeyThreadWidth, "full", "Full"},
 		{KeyBackdrop, "none", "None"},
+		{KeyBackdrop, "custom", "Custom"},
 		{KeyLogLevel, "warn", "Warn"},
 	}
 	for _, tt := range tests {
