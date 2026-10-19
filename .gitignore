@@ -9,7 +9,6 @@
 node_modules/
 
 # zig, ghostty source, and libghostty-vt build output (see `make ghostty-vt`)
-/third_party/
 
 # macOS
 .DS_Store

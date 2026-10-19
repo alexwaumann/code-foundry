@@ -14,16 +14,19 @@ runs:
           scripts/ghostty-vt.sh
 
     # libghostty-vt (static) from the pinned ghostty commit with zig 0.16.0, cached on
-    # both pins. The .pc files hardcode the absolute prefix, which is stable on runners.
-    # A cold build downloads zig and the ghostty source and takes about a minute.
+    # both pins. The script installs into a per-user cache dir outside the checkout; the
+    # .pc files hardcode that absolute prefix, which is stable on runners. A cold build
+    # downloads zig and the ghostty source and takes about a minute.
     - name: libghostty-vt cache key
       id: ghostty-vt
       shell: bash
-      run: echo "key=$(./scripts/ghostty-vt.sh --print-key)" >> "$GITHUB_OUTPUT"
+      run: |
+        echo "key=$(./scripts/ghostty-vt.sh --print-key)" >> "$GITHUB_OUTPUT"
+        echo "prefix=$(./scripts/ghostty-vt.sh --print-prefix)" >> "$GITHUB_OUTPUT"
 
     - uses: actions/cache@v6
       with:
-        path: third_party/ghostty-vt
+        path: ${{ steps.ghostty-vt.outputs.prefix }}
         key: ${{ runner.os }}-${{ steps.ghostty-vt.outputs.key }}
 
     - shell: bash

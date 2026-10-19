@@ -94,9 +94,10 @@ make gui-build   # "gui/bin/Code Foundry", a bare executable (no .app bundle)
 `./bin/code-foundry gui` starts `gui/bin/Code Foundry` and points it at that CLI. Dev
 builds never check for updates.
 
-`make build` also builds libghostty-vt from a pinned ghostty commit with a pinned zig,
-both downloaded into the gitignored `third_party/` on first use (about a minute; needs
-network access to ziglang.org, github.com and codeberg.org).
+`make build` also builds libghostty-vt from a pinned ghostty commit with a pinned zig on
+first use (about a minute; needs network access to ziglang.org, github.com and
+codeberg.org). The result lives in `~/Library/Caches/code-foundry/ghostty-vt/` and is
+shared by every checkout and worktree; the downloads are deleted after the build.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/PLAN.md](docs/PLAN.md), and
 [CLAUDE.md](CLAUDE.md) for the build commands.
