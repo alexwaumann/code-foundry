@@ -145,5 +145,5 @@ code-foundry events: --since 1 without --since-epoch could be another daemon's s
 ## Left for later
 
 * B6 (`--descendants-of`) was not in this batch.
-* The live check ran before rebasing on #240, #241 and #242; after the rebase only unit tests
-  and `make check` ran again.
+* The full live check ran before rebasing on #240, #241 and #242; after the rebase a
+  shorter one (B1 report summary, B4 pending, A9 star, A11 read by suffix) passed again.
