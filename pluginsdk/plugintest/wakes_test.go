@@ -46,11 +46,11 @@ func TestWakes(t *testing.T) {
 		{Name: "checks-done", Title: "Checks done", Args: []pluginsdk.WakeArgSpec{{Name: "pr", Context: pluginsdk.WakeContextPR}}},
 	}})
 	nArmed := func() int { mu.Lock(); defer mu.Unlock(); return len(armed) }
-	broad, err := h.Subscribe("checks-done", nil, pluginsdk.UiContext{ThreadID: "s-1"})
+	broad, err := h.SubscribeWake("checks-done", nil, pluginsdk.UiContext{ThreadID: "s-1"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	once, err := h.SubscribeWith(pluginsdk.WakeSubscription{Source: "checks-done", Args: map[string]string{"pr": "a/b#1"}})
+	once, err := h.SubscribeWakeWith(pluginsdk.WakeSubscription{Source: "checks-done", Args: map[string]string{"pr": "a/b#1"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,14 +77,14 @@ func TestWakes(t *testing.T) {
 	if _, err := fire("nope", ""); pluginsdk.ErrorCode(err) != pluginsdk.CodeNotFound {
 		t.Fatalf("an undeclared source: %v", err)
 	}
-	fires := h.Fires()
+	fires := h.WakeFires()
 	if len(fires) != 4 || fires[0].Title != "checks done" || string(fires[0].Payload) != `{"conclusion":"success"}` {
 		t.Fatalf("fires %+v", fires)
 	}
-	if d := h.Delivered(); len(d) != 4 || d[0] != 1 || d[1] != 2 || d[2] != 1 || d[3] != 0 {
+	if d := h.WakeDelivered(); len(d) != 4 || d[0] != 1 || d[1] != 2 || d[2] != 1 || d[3] != 0 {
 		t.Fatalf("delivered %v", d)
 	}
-	if err := h.Unsubscribe(broad); err != nil {
+	if err := h.UnsubscribeWake(broad); err != nil {
 		t.Fatal(err)
 	}
 	h.WaitFor(time.Second, func(*plugintest.Host) bool { return nArmed() == 0 })

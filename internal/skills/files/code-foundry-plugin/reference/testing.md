@@ -40,12 +40,12 @@ Drive it like the host:
 | `h.Event(pluginsdk.Event{Subscription: "sub-1", Event: json.RawMessage(...)})` | an `events/event` |
 | `h.Ping(ctx)`, `h.Shutdown(ctx)` | ping; shutdown and what `Serve` returned |
 | `h.SetSecret(key, value)` | a secret as if the user had stored it (a form with `store`) |
-| `h.Subscribe("tick", args, uctx)`, `h.SubscribeWith(pluginsdk.WakeSubscription{…})`, `h.Unsubscribe(id)` | `wake/subscribed` (`Subscribe` repeats; `SubscribeWith` with `Repeat: false` is a one-shot the fake removes after its first fire, sending `wake/unsubscribed`; an existing id is a restart's re-arm) and `wake/unsubscribed` |
+| `h.SubscribeWake("tick", args, uctx)`, `h.SubscribeWakeWith(pluginsdk.WakeSubscription{…})`, `h.UnsubscribeWake(id)` | `wake/subscribed` (`SubscribeWake` repeats; `SubscribeWakeWith` with `Repeat: false` is a one-shot the fake removes after its first fire, sending `wake/unsubscribed`; an existing id is a restart's re-arm) and `wake/unsubscribed` |
 
 And read what the plugin did: `h.View(instance)` (the last view's JSON), `h.Version(instance)`,
 `h.Appends()`, `h.Toasts()`, `h.Logs()`, `h.Flags()`, `h.Contexts()`, `h.Environments()`,
 `h.Subscriptions()`, `h.Invocations()` (allowed or not), `h.Secret(key)`, and the
-wake fires: `h.Fires()` (each `WakeFire`) with `h.Delivered()` (how many of the fake's
+wake fires: `h.WakeFires()` (each `WakeFire`) with `h.WakeDelivered()` (how many of the fake's
 subscriptions each reached, by the host's match rule). `Options.Wakes` (the manifest's
 `Wakes`) makes the fake refuse an undeclared source or match arg, as the host does.
 
@@ -149,7 +149,7 @@ intervals, and check the count did not grow.
 holds (`h.Flags()` records the plugin's `SetFlag` calls).
 
 **Wake sources**: subscribe with the args an agent would give, make the event happen
-(or shorten the poll interval), and check `h.Fires()` for the source, match, title and
+(or shorten the poll interval), and check `h.WakeFires()` for the source, match, title and
 payload; subscribe the same id again (a restart's re-arm) and check nothing doubled;
 unsubscribe and check the plugin stopped watching (no new fires after a few intervals).
 Check every message about an event ends with `pluginsdk.WakeHint(...)`.

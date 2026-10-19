@@ -191,7 +191,7 @@ func threadSubscribe(b ThreadBackend) Command {
 	return Command{
 		Name:  "thread.subscribe",
 		Title: "Subscribe Thread to Wakes",
-		Description: "Wake a thread (default: the thread this runs in) with a message when another thread settles, " +
+		Description: "Wake a thread with a message when another thread settles, " +
 			"an action run finishes, a pull request's checks finish, or a plugin wake fires (plugin wakes). " +
 			"Fires on each change into the condition, and at once when already met; once by default, every time with repeat.",
 		Category:     "Thread",

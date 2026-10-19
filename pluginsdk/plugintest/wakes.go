@@ -13,8 +13,8 @@ import (
 )
 
 // Wake sources (pluginsdk/wake.go): the test subscribes like an agent's thread would
-// (Subscribe, SubscribeWith: wake/subscribed), and the fake records the plugin's
-// wake/fire calls (Fires) and answers how many of its subscriptions the match reaches,
+// (SubscribeWake, SubscribeWakeWith: wake/subscribed), and the fake records the plugin's
+// wake/fire calls (WakeFires) and answers how many of its subscriptions the match reaches,
 // removing a one-shot one that it reached (wake/unsubscribed), as the host does. With
 // Options.Wakes it also refuses a source or match arg the manifest does not declare.
 
@@ -26,16 +26,16 @@ type wakeState struct {
 	sent  []int // delivered, per fire
 }
 
-// Subscribe subscribes a thread with uctx to source with args, repeating (it stays after
+// SubscribeWake subscribes a thread with uctx to source with args, repeating (it stays after
 // fires), and sends wake/subscribed. It returns the subscription id ("wsub-<n>").
-func (h *Host) Subscribe(source string, args map[string]string, uctx pluginsdk.UiContext) (string, error) {
-	return h.SubscribeWith(pluginsdk.WakeSubscription{Source: source, Args: args, Context: uctx, Repeat: true})
+func (h *Host) SubscribeWake(source string, args map[string]string, uctx pluginsdk.UiContext) (string, error) {
+	return h.SubscribeWakeWith(pluginsdk.WakeSubscription{Source: source, Args: args, Context: uctx, Repeat: true})
 }
 
-// SubscribeWith sends wake/subscribed for sub (Repeat false: a one-shot, removed by the
+// SubscribeWakeWith sends wake/subscribed for sub (Repeat false: a one-shot, removed by the
 // first fire that reaches it). An empty sub.Subscription gets "wsub-<n>"; an existing id
 // is sent again, as the host does after a restart.
-func (h *Host) SubscribeWith(sub pluginsdk.WakeSubscription) (string, error) {
+func (h *Host) SubscribeWakeWith(sub pluginsdk.WakeSubscription) (string, error) {
 	h.record(func() {
 		if sub.Subscription == "" {
 			h.wakes.next++
@@ -48,8 +48,8 @@ func (h *Host) SubscribeWith(sub pluginsdk.WakeSubscription) (string, error) {
 	return sub.Subscription, h.conn.Notify(pluginsdk.MethodWakeSubscribed, sub)
 }
 
-// Unsubscribe removes a subscription and sends wake/unsubscribed.
-func (h *Host) Unsubscribe(id string) error {
+// UnsubscribeWake removes a subscription and sends wake/unsubscribed.
+func (h *Host) UnsubscribeWake(id string) error {
 	var source string
 	h.record(func() {
 		h.wakes.subs = slices.DeleteFunc(h.wakes.subs, func(s pluginsdk.WakeSubscription) bool {
@@ -70,16 +70,16 @@ func (h *Host) WakeSubscriptions() []pluginsdk.WakeSubscription {
 	return slices.Clone(h.wakes.subs)
 }
 
-// Fires returns the plugin's wake/fire calls (refused ones too).
-func (h *Host) Fires() []pluginsdk.WakeFire {
+// WakeFires returns the plugin's wake/fire calls (refused ones too).
+func (h *Host) WakeFires() []pluginsdk.WakeFire {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	return slices.Clone(h.wakes.fires)
 }
 
-// Delivered returns how many subscriptions each recorded fire reached (0 for a refused
-// one), in the order of Fires.
-func (h *Host) Delivered() []int {
+// WakeDelivered returns how many subscriptions each recorded fire reached (0 for a refused
+// one), in the order of WakeFires.
+func (h *Host) WakeDelivered() []int {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	return slices.Clone(h.wakes.sent)

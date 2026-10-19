@@ -9,8 +9,8 @@
 // permissions.commands glob, secret/* needs permissions.secrets, thread/setFlag
 // threadStatus, session/setEnvironment sessionEnv, events/subscribe each source in
 // permissions.events, thread/* threads and terminal/* terminals (owned.go: kept in
-// memory, nothing runs). Wake sources (wakes.go): Subscribe sends wake/subscribed as an
-// agent's subscription would, Fires records wake/fire. It does not evaluate when clauses, check views beyond what the
+// memory, nothing runs). Wake sources (wakes.go): SubscribeWake sends wake/subscribed as
+// an agent's subscription would, WakeFires records wake/fire. It does not evaluate when clauses, check views beyond what the
 // plugin's own Validate did, or store secrets from forms (SetSecret does).
 package plugintest
 

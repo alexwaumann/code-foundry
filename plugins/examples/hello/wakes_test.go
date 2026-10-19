@@ -33,19 +33,19 @@ func TestTick(t *testing.T) {
 		t.Fatalf("fire-tick with no subscriber = %q, %v", res.Message, err)
 	}
 
-	fast, err := h.Subscribe("tick", map[string]string{"every": "40ms"}, pluginsdk.UiContext{ThreadID: "s-1"})
+	fast, err := h.SubscribeWake("tick", map[string]string{"every": "40ms"}, pluginsdk.UiContext{ThreadID: "s-1"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := h.SubscribeWith(pluginsdk.WakeSubscription{Subscription: fast, Source: "tick", Args: map[string]string{"every": "40ms"}, Repeat: true}); err != nil {
+	if _, err := h.SubscribeWakeWith(pluginsdk.WakeSubscription{Subscription: fast, Source: "tick", Args: map[string]string{"every": "40ms"}, Repeat: true}); err != nil {
 		t.Fatal(err) // the re-arm after a restart: still one loop
 	}
-	if _, err := h.SubscribeWith(pluginsdk.WakeSubscription{Source: "tick", Args: map[string]string{"every": "60ms"}}); err != nil {
+	if _, err := h.SubscribeWakeWith(pluginsdk.WakeSubscription{Source: "tick", Args: map[string]string{"every": "60ms"}}); err != nil {
 		t.Fatal(err)
 	}
 	fires := func(every string) (n, delivered int) {
-		d := h.Delivered()
-		for i, f := range h.Fires() {
+		d := h.WakeDelivered()
+		for i, f := range h.WakeFires() {
 			if f.Match["every"] == every {
 				n++
 				delivered += d[i]
@@ -62,7 +62,7 @@ func TestTick(t *testing.T) {
 	if n, d := fires("60ms"); n != n60 || d != 1 || d60 != 1 {
 		t.Errorf("60ms after its one-shot went: %d fires (%d before), %d delivered", n, n60, d)
 	}
-	if f := h.Fires()[0]; !strings.HasPrefix(f.Title, "tick 1 (every ") || !strings.Contains(string(f.Payload), `"n":1`) {
+	if f := h.WakeFires()[0]; !strings.HasPrefix(f.Title, "tick 1 (every ") || !strings.Contains(string(f.Payload), `"n":1`) {
 		t.Errorf("first fire %+v", f)
 	}
 	n40, d40 := fires("40ms")
@@ -75,7 +75,7 @@ func TestTick(t *testing.T) {
 		!strings.HasSuffix(res.Message, "Wait for the next one: code-foundry thread subscribe --plugin hello/tick --arg every=40ms") {
 		t.Errorf("fire-tick = %q, %v", res.Message, err)
 	}
-	if err := h.Unsubscribe(fast); err != nil {
+	if err := h.UnsubscribeWake(fast); err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(150 * time.Millisecond)

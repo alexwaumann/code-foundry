@@ -13,7 +13,7 @@ Alex on 2026-10-18 (the brief); built on `origin/main` c6c05673.
 | Manifest `wakes` (`WakeSpec`, `WakeArgSpec`, scopes, contexts, `ArgDuration`), validation, unknown-field warnings, `Manifest.Wake`, `WakeSpec.Arg`, `WakeArgSpec.Check` | `pluginsdk/wake.go`, `manifest.go` (field, `validateWakes` call, `jsonFieldNames`, `ReservedNames` + `wakes`) |
 | Protocol | `wake/subscribed {subscription, source, args, context, repeat}` and `wake/unsubscribed {subscription, source}` (host → plugin notifications), `wake/fire {source, match, title, payload}` → `{delivered}` (request); capability `wakes` |
 | SDK | `Plugin.OnWakeSubscribed`, `Plugin.OnWakeUnsubscribed` (`serve.go`); `Host.FireWake(ctx, source, match, title, payload)`, `Host.WakeHint`, `pluginsdk.WakeHint(plugin, source, args)`, `ParseWakeTarget`, `MatchWake`, `FormatWakeArgs` |
-| plugintest | `pluginsdk/plugintest/wakes.go`: `Subscribe`, `SubscribeWith`, `Unsubscribe`, `WakeSubscriptions`, `Fires`, `Delivered`, `Options.Wakes` (refuses what the host would) |
+| plugintest | `pluginsdk/plugintest/wakes.go`: `SubscribeWake`, `SubscribeWakeWith`, `UnsubscribeWake`, `WakeSubscriptions`, `WakeFires`, `WakeDelivered`, `Options.Wakes` (refuses what the host would) |
 | Proto | `ThreadSubscriptionTarget.PLUGIN = 4`, `ThreadSubscriptionCondition.FIRED = 20`, `ThreadSubscription.args = 20`, `SubscribeThreadRequest.target_plugin = 10` / `args = 11`, `UnsubscribeThreadRequest.target_plugin = 10`; `Plugin.wakes = 31` (`PluginWake`, `PluginWakeArg`, `subscribe_line`); `ArgSpec.repeatable = 11` |
 | Migration | `0034_thread_subscription_args.sql`: `thread_subscriptions.args` (JSON object, `'{}'`) |
 | Thread store | `internal/store/thread/subscriptions_plugin.go` (new): `TargetPlugin`, `CondFired`, `PluginWakes` (Resolve, Changed, Describe), `SetPluginWakes`, the ordered Changed queue, `FirePlugin`, `PluginWakesGone`, `PluginSubscriptions`, the message. Small edits in `subscriptions.go` (target parsing, args on `Subscription`/options, dedupe by args, plugin rows kept at startup, removals queue Changed, listing) and `subscriptions_db.go` |
@@ -54,12 +54,13 @@ From the brief:
 
 Decided while building (flagged for review):
 
-* **Field and enum numbers leave room for the pull request target** another thread is
-  building on `cf/gh-events-3-pr-wake` (uncommitted there: `TargetPullRequest`, ten
-  conditions, `target_pull_request`): PLUGIN is 4, FIRED is 20, the new request fields
-  are 10/11, `ThreadSubscription.args` 20. Its `owner/name#123` lower-case form is the
-  `pr` context's. Whoever lands second resolves `subscribeTarget` (both count targets now)
-  and `removeLocked` (both hook it), mechanically.
+* **Beside the pull request target** (`gh-events-3-pr-wake.md`, merged as #214 while this
+  was in review; rebased on it): PLUGIN is 4 (PULL_REQUEST 3), FIRED is 20 (the pull
+  request conditions 7 to 16), `target_plugin`/`args` are 10/11 (`target_pull_request`
+  6 and 5), `ThreadSubscription.args` 20. `subscribeTarget`, `removeLocked`, the threadtest
+  fake and the command take all four targets. The `pr` context arg uses its
+  `owner/name#123` lower-case form, so a plugin source and a pull request subscription
+  name a pull request the same way.
 * **No fire at subscribe time** for a plugin target (the host does not know the event's
   state; the plugin may fire at once from `OnWakeSubscribed` if it does).
 * **Subscriptions survive a daemon restart** (unlike run targets): the plugin re-arms.
@@ -91,7 +92,7 @@ Decided while building (flagged for review):
 * SDK (`pluginsdk/wake_test.go`): manifest table (names, scopes, types, contexts,
   defaults, limits), unknown wake fields, `Check`, `WakeHint` (sorting, quoting),
   `ParseWakeTarget`, `MatchWake`, `FormatWakeArgs`; `jsonFieldNames` covers the new types.
-  plugintest (`wakes_test.go`): arm/disarm, match, one-shot removal, undeclared source,
+  plugintest (`wakes_test.go`, `SubscribeWake`, `WakeFires`, …: named apart from the event `Subscriptions()`): arm/disarm, match, one-shot removal, undeclared source,
   payload and title limits.
 * Thread store (`subscriptions_plugin_test.go`): target parsing table, the message, fires
   with match semantics and one-shot vs repeat, Changed order, existed, refusals, listing,
@@ -235,10 +236,10 @@ the thread's transcript deleted.
 
 ## Gotchas
 
-* **The agent guide is at 28,991 bytes** of its 29,000 cap. `thread.subscribe`'s
-  description had to shrink ("or meets another until condition") to make room for
-  "or a plugin wake fires (plugin wakes)". The next command that touches the guide needs
-  to cut something.
+* **The agent guide is at 28,996 bytes** of its 29,000 cap (after the rebase on the pull
+  request target, which also grew it). `thread.subscribe`'s description dropped "(default:
+  the thread this runs in)" (the `--id` flag says it) to make room for "or a plugin wake
+  fires (plugin wakes)". The next command that touches the guide needs to cut something.
 * `SKILL.md` of the plugin skill is at its 120-line cap.
 * Three wakes delivered within a second into a stopped thread became two turns: the
   first starts Claude, the next two were queued behind it and answered together.
