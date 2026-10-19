@@ -4,10 +4,8 @@ import (
 	"cmp"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"slices"
 	"strings"
-	"text/tabwriter"
 	"time"
 
 	"connectrpc.com/connect"
@@ -143,18 +141,6 @@ func removedListLine(r *v1.RemovedThread, names map[string]string, now time.Time
 		line += "  ↳ " + cmp.Or(names[by], by)
 	}
 	return line
-}
-
-// formatRemovedList is thread.list's lines for removed threads (removedListLine),
-// aligned among themselves; they follow the threads' lines.
-func formatRemovedList(removed []*v1.RemovedThread, names map[string]string, now time.Time) string {
-	var sb strings.Builder
-	tw := tabwriter.NewWriter(&sb, 0, 4, 2, ' ', 0)
-	for _, r := range removed {
-		_, _ = fmt.Fprintln(tw, removedListLine(r, names, now))
-	}
-	_ = tw.Flush()
-	return strings.TrimRight(sb.String(), "\n")
 }
 
 // reportDataJSON is a report's data for --json: the object as it is, a JSON string

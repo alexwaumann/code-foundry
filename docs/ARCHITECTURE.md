@@ -148,7 +148,10 @@ start; the Wails host reads them and injects them into the page before load.
 
 Services (v1):
 
-* `ThreadService`, the lifecycle — Create, Fork, List, Get, Rename, Remove, RunIn,
+* `ThreadService`, the lifecycle — Create, Fork, List, Get, Rename, Remove (keeps a
+  24 h in-memory tombstone: Get is NOT_FOUND with a `RemovedThread` detail, Wait answers
+  `removed`, List adds them on `include_removed`, subscribers get a `removed` wake;
+  `docs/notes/removed-thread-signal.md`), RunIn,
   Pin (the user's pin, persisted; `docs/notes/workspaces-4-sidebar.md`), Archive (close,
   remove the thread's shells, unpin, stamp `archived_at`; pin and send
   unarchive; `docs/notes/archive-threads-1-daemon.md`), Snooze (close, remove the

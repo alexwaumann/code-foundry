@@ -91,15 +91,7 @@ func RegisterThreadList(r *Registry, d ThreadListDeps) error {
 			if err != nil {
 				return Result{}, err
 			}
-			now := time.Now()
-			msg := formatThreadList(res.Msg.GetThreads(), projects.Msg.GetProjects(), names, f, now)
-			if removed := res.Msg.GetRemoved(); len(removed) > 0 {
-				if len(res.Msg.GetThreads()) == 0 {
-					msg = formatRemovedList(removed, names, now)
-				} else {
-					msg += "\n" + formatRemovedList(removed, names, now)
-				}
-			}
+			msg := formatThreadList(res.Msg.GetThreads(), res.Msg.GetRemoved(), projects.Msg.GetProjects(), names, f, time.Now())
 			return Result{Message: msg, JSON: res.Msg}, nil
 		},
 	})
@@ -161,10 +153,12 @@ func creatorName(s *v1.Thread, names map[string]string) (name string, exists boo
 	return cmp.Or(s.GetCreatedByName(), by), false
 }
 
-// formatThreadList is thread.list's text: one aligned line per thread, then a hint when
-// the limit cut the list, or why it is empty. names resolves creators (threadNames).
-func formatThreadList(threads []*v1.Thread, projects []*v1.Project, names map[string]string, f *v1.ThreadFilter, now time.Time) string {
-	if len(threads) == 0 {
+// formatThreadList is thread.list's text: one aligned line per thread, then one per
+// removed thread (removedListLine), then a hint when the limit cut the list, or why it
+// is empty. names resolves creators (threadNames).
+func formatThreadList(threads []*v1.Thread, removed []*v1.RemovedThread, projects []*v1.Project, names map[string]string, f *v1.ThreadFilter,
+	now time.Time) string {
+	if len(threads) == 0 && len(removed) == 0 {
 		if f.GetOwner() != "" {
 			return "no threads"
 		}
@@ -195,6 +189,9 @@ func formatThreadList(threads []*v1.Thread, projects []*v1.Project, names map[st
 			line += "  (" + o + ")"
 		}
 		_, _ = fmt.Fprintln(tw, line)
+	}
+	for _, r := range removed {
+		_, _ = fmt.Fprintln(tw, removedListLine(r, names, now))
 	}
 	_ = tw.Flush()
 	out := strings.TrimRight(sb.String(), "\n")
