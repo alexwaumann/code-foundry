@@ -492,8 +492,13 @@ All in `reference/ui-layout.md`.
 | `click` | a button, row or chip with an event | `Action` (event name), `Key` (element key), `Data` |
 | `submit` | a form's submit with an event | `Action`, `Key`, `Data`, `Values` (the form's fields by name) |
 | `change` | a field with a change event was edited | `Action`, `Key`, `Field`, `Value`, `Values` |
-| `tab` | the user switched tabs | `Action` is `"tab"`, `Key` the new tab's key (`Value` too, as `any`: use `Key`), `Node` the `tabs` node's key ("" for the view's tabs) |
-| `select` | a `masterDetail` row without an action was chosen | `Action` is `"select"`, `Key` the row's key, `Node` the master-detail's key |
+| `tab` | the user switched tabs | `Action` is `"tab"`, `Key` the new tab's key (`Value` too, as `any`: use `Key`), `Node` the `tabs` node's key ("" for the view's tabs); no `Values` |
+| `select` | a `masterDetail` row without an action was chosen | `Action` is `"select"`, `Key` the row's key (`Value` too: use `Key`), `Node` the master-detail's key; no `Values` |
+
+**Dispatch on `Kind`** first: a button's or row's event may itself be named `tab` or
+`select` (it arrives as `kind: click, action: select`), so `switch act.Action` alone
+mistakes it for a master-detail choice. `switch act.Kind { case pluginsdk.ActSelect: …;
+case pluginsdk.ActTab: …; case pluginsdk.ActClick: switch act.Action { … } }`.
 
 `act.Context` is what the panel the user acted in shows (`ThreadID`, `ProjectID`, …): a
 shared instance (scope `pr`, `project`, `global`) learns from it which thread a click came

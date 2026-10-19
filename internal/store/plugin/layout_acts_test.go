@@ -45,20 +45,16 @@ func TestLayoutActEdges(t *testing.T) {
 		t.Fatal(err)
 	}
 	w.view("the stale select", contains(`node=\"pmd\" values=null version=1`))
-	// Values on a select: the docs list none for a select or a tab act (Action, Key,
-	// Node), and the GUI sends none.
-	_, err := e.act(w.key, plugin.ActRequest{Key: "pr2", Values: map[string]any{"name": "Ada"}})
-	switch {
-	case errors.Is(err, plugin.ErrInvalidArgument):
-		// refused: fine
-	case err != nil:
+	// Values (and a value) on a select or a tab are dropped: the act carries its key as
+	// its value and no form's values (the GUI sends none).
+	if _, err := e.act(w.key, plugin.ActRequest{Key: "pr2", Value: new("pr1"), Values: map[string]any{"name": "Ada"}}); err != nil {
 		t.Fatal(err)
-	default:
-		v := w.view("the select with values", contains("key=pr2"))
-		if strings.Contains(string(v.JSON), `values={\"name\":\"Ada\"}`) {
-			t.Log("KNOWN (sdk.md, values on select/tab acts): a select act carries a form's values to the plugin")
-		}
 	}
+	w.view("the select with values", contains(`got select:select key=pr2 value=pr2 node=\"pmd\" values=null`))
+	if _, err := e.act(w.key, plugin.ActRequest{Key: "pt2", Values: map[string]any{"name": "Ada"}}); err != nil {
+		t.Fatal(err)
+	}
+	w.view("the tab with values", contains(`got tab:tab key=pt2 value=pt2 node=\"ptabs\" values=null`))
 }
 
 // Under a fast stream the version on screen is often several behind (the GUI coalesces

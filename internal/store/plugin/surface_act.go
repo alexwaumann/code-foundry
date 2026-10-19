@@ -535,7 +535,12 @@ func (m *Manager) Act(ctx context.Context, req ActRequest) (uint64, error) {
 	if el.kind == pluginsdk.ActChange {
 		act.Field = el.field
 	}
-	if req.Value != nil && el.kind != pluginsdk.ActTab && el.kind != pluginsdk.ActSelect {
+	if el.kind == pluginsdk.ActTab || el.kind == pluginsdk.ActSelect {
+		// The host sets a tab's or select's value (its key) and it carries no form's values
+		// (the GUI sends none): a client's are dropped.
+		req.Value, req.Values = nil, nil
+	}
+	if req.Value != nil {
 		act.Value = *req.Value
 	}
 	if len(req.Values) > 0 {
