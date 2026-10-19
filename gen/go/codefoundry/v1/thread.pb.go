@@ -546,6 +546,12 @@ type ThreadItem struct {
 	// Still arriving: text and tool input grow through deltas until an update with
 	// streaming false.
 	Streaming bool `protobuf:"varint,6,opt,name=streaming,proto3" json:"streaming,omitempty"`
+	// A user message Claude read later than it arrived (it was queued while Claude worked):
+	// the ordinal of the item it is shown after, behind any other message placed there with
+	// a smaller ordinal. 0 for every other item. Order the log by (placed_after or ordinal,
+	// placed, ordinal); the ordinal stays what since/after compare
+	// (docs/notes/orch-queued-placement.md).
+	PlacedAfter int64 `protobuf:"varint,7,opt,name=placed_after,json=placedAfter,proto3" json:"placed_after,omitempty"`
 	// Types that are valid to be assigned to Payload:
 	//
 	//	*ThreadItem_UserMessage
@@ -634,6 +640,13 @@ func (x *ThreadItem) GetStreaming() bool {
 		return x.Streaming
 	}
 	return false
+}
+
+func (x *ThreadItem) GetPlacedAfter() int64 {
+	if x != nil {
+		return x.PlacedAfter
+	}
+	return 0
 }
 
 func (x *ThreadItem) GetPayload() isThreadItem_Payload {
@@ -844,7 +857,11 @@ type UserMessageItem struct {
 	// (the budget stop, another thread's interrupt, an app restart) stopped its previous
 	// turn: one line starting "[code-foundry] " (docs/notes/orch-child-context.md).
 	// Empty for most messages.
-	ResumeNote    string `protobuf:"bytes,7,opt,name=resume_note,json=resumeNote,proto3" json:"resume_note,omitempty"`
+	ResumeNote string `protobuf:"bytes,7,opt,name=resume_note,json=resumeNote,proto3" json:"resume_note,omitempty"`
+	// Claude has the message but has not read it yet: it came while Claude worked, and Claude
+	// reads it at its next tool call or when its reply ends. Once read the flag clears and
+	// the item moves there (ThreadItem.placed_after).
+	Queued        bool `protobuf:"varint,8,opt,name=queued,proto3" json:"queued,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -926,6 +943,13 @@ func (x *UserMessageItem) GetResumeNote() string {
 		return x.ResumeNote
 	}
 	return ""
+}
+
+func (x *UserMessageItem) GetQueued() bool {
+	if x != nil {
+		return x.Queued
+	}
+	return false
 }
 
 // One text block of Claude's reply (markdown).
@@ -4514,7 +4538,7 @@ var File_codefoundry_v1_thread_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_thread_proto_rawDesc = "" +
 	"\n" +
-	"\x1bcodefoundry/v1/thread.proto\x12\x0ecodefoundry.v1\x1a\x1ecodefoundry/v1/heartbeat.proto\x1a%codefoundry/v1/thread_lifecycle.proto\x1a)codefoundry/v1/thread_subscriptions.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xbe\a\n" +
+	"\x1bcodefoundry/v1/thread.proto\x12\x0ecodefoundry.v1\x1a\x1ecodefoundry/v1/heartbeat.proto\x1a%codefoundry/v1/thread_lifecycle.proto\x1a)codefoundry/v1/thread_subscriptions.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xe1\a\n" +
 	"\n" +
 	"ThreadItem\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
@@ -4524,7 +4548,8 @@ const file_codefoundry_v1_thread_proto_rawDesc = "" +
 	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
 	"updated_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12\x1c\n" +
-	"\tstreaming\x18\x06 \x01(\bR\tstreaming\x12D\n" +
+	"\tstreaming\x18\x06 \x01(\bR\tstreaming\x12!\n" +
+	"\fplaced_after\x18\a \x01(\x03R\vplacedAfter\x12D\n" +
 	"\fuser_message\x18\n" +
 	" \x01(\v2\x1f.codefoundry.v1.UserMessageItemH\x00R\vuserMessage\x12J\n" +
 	"\x0eassistant_text\x18\v \x01(\v2!.codefoundry.v1.AssistantTextItemH\x00R\rassistantText\x12:\n" +
@@ -4541,7 +4566,7 @@ const file_codefoundry_v1_thread_proto_rawDesc = "" +
 	"compaction\x12J\n" +
 	"\x0ecommand_output\x18\x13 \x01(\v2!.codefoundry.v1.CommandOutputItemH\x00R\rcommandOutput\x12.\n" +
 	"\x04note\x18\x14 \x01(\v2\x18.codefoundry.v1.NoteItemH\x00R\x04noteB\t\n" +
-	"\apayload\"\x80\x02\n" +
+	"\apayload\"\x98\x02\n" +
 	"\x0fUserMessageItem\x12\x12\n" +
 	"\x04text\x18\x01 \x01(\tR\x04text\x12 \n" +
 	"\vattachments\x18\x02 \x03(\tR\vattachments\x12#\n" +
@@ -4551,7 +4576,8 @@ const file_codefoundry_v1_thread_proto_rawDesc = "" +
 	"wake_title\x18\x05 \x01(\tR\twakeTitle\x12\x1b\n" +
 	"\twake_json\x18\x06 \x01(\tR\bwakeJson\x12\x1f\n" +
 	"\vresume_note\x18\a \x01(\tR\n" +
-	"resumeNote\"'\n" +
+	"resumeNote\x12\x16\n" +
+	"\x06queued\x18\b \x01(\bR\x06queued\"'\n" +
 	"\x11AssistantTextItem\x12\x12\n" +
 	"\x04text\x18\x01 \x01(\tR\x04text\"\"\n" +
 	"\fThinkingItem\x12\x12\n" +

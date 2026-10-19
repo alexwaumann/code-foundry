@@ -72,3 +72,46 @@ func TestPageItems(t *testing.T) {
 		})
 	}
 }
+
+// A message Claude read later than it arrived (PlacedAfter) is shown where it was read;
+// pages still count by ordinal, so a since read on never skips it.
+func TestPageItemsPlaced(t *testing.T) {
+	items := []thread.Item{ // the log's order
+		{ID: "u1", Ordinal: 1, Kind: thread.KindUserMessage},
+		{ID: "m1/0", Ordinal: 2, Kind: thread.KindAssistantText},
+		{ID: "toolu_1", Ordinal: 4, Kind: thread.KindToolCall, Tool: &thread.ToolCall{Status: thread.ToolDone}},
+		{ID: "u2", Ordinal: 3, Kind: thread.KindUserMessage, PlacedAfter: 4},
+		{ID: "m2/0", Ordinal: 5, Kind: thread.KindAssistantText},
+	}
+	tests := []struct {
+		name     string
+		q        *v1.ThreadItemsQuery
+		want     []string
+		wantNext string
+		wantMore bool
+	}{
+		{name: "everything in the log's order", q: &v1.ThreadItemsQuery{}, want: []string{"u1", "m1/0", "toolu_1", "u2", "m2/0"}, wantNext: "m2/0"},
+		{name: "the last two by ordinal", q: &v1.ThreadItemsQuery{Last: 2}, want: []string{"toolu_1", "m2/0"}, wantNext: "m2/0"},
+		{name: "the first two after u1", q: &v1.ThreadItemsQuery{Since: "u1", Last: 2}, want: []string{"m1/0", "u2"}, wantNext: "u2", wantMore: true},
+		{name: "reading on from there", q: &v1.ThreadItemsQuery{Since: "u2", Last: 2}, want: []string{"toolu_1", "m2/0"}, wantNext: "m2/0"},
+		{name: "since the placed message's ordinal", q: &v1.ThreadItemsQuery{Since: "3"}, want: []string{"toolu_1", "m2/0"}, wantNext: "m2/0"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p, err := pageItems(items, tt.q)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got []string
+			for _, it := range p.items {
+				got = append(got, it.ID)
+			}
+			if !slices.Equal(got, tt.want) || p.nextSince != tt.wantNext || p.more != tt.wantMore {
+				t.Errorf("page = %v next %q more %v; want %v %q %v", got, p.nextSince, p.more, tt.want, tt.wantNext, tt.wantMore)
+			}
+		})
+	}
+	if ord, ok := lastMessage(items); !ok || ord != 3 {
+		t.Errorf("lastMessage = %d %v, want 3 (the newest message, not the last in the log)", ord, ok)
+	}
+}

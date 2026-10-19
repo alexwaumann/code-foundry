@@ -36,6 +36,8 @@ func forkItems(parent []Item, noteID, note string, now time.Time) []Item {
 			continue
 		}
 		it = cloneItem(it)
+		// Renumbered in the log's order: a placed message's place is its ordinal now.
+		it.Queued, it.PlacedAfter = false, 0
 		if it.Tool != nil && it.Tool.Status == ToolRunning {
 			it.Tool.Status = ToolError
 			if it.Tool.Output == "" {

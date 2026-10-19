@@ -1,7 +1,9 @@
 package api
 
 import (
+	"cmp"
 	"fmt"
+	"slices"
 	"strconv"
 
 	"connectrpc.com/connect"
@@ -21,10 +23,12 @@ type itemPage struct {
 	more      bool
 }
 
-// pageItems selects q's page of items (in ordinal order): those of q's role; after
-// q.since (an item id, else an ordinal) the first q.last of them, else the last q.last;
-// q.last 0 is every one. A since that names no item of the thread and is no number is
-// NotFound.
+// pageItems selects q's page of items: those of q's role; after q.since (an item id, else
+// an ordinal) the first q.last of them by ordinal, else the last q.last; q.last 0 is every
+// one. The page is in the log's order: by ordinal, except a message Claude read later than
+// it arrived sits where it read it (docs/notes/orch-queued-placement.md); counting by
+// ordinal keeps since from skipping it. A since that names no item of the thread and is
+// no number is NotFound.
 func pageItems(items []thread.Item, q *v1.ThreadItemsQuery) (itemPage, error) {
 	since, hasSince, err := sinceOrdinal(items, q.GetSince())
 	if err != nil {
@@ -38,20 +42,30 @@ func pageItems(items []thread.Item, q *v1.ThreadItemsQuery) (itemPage, error) {
 	}
 	p := itemPage{items: sel}
 	if n := int(q.GetLast()); n > 0 && len(sel) > n {
+		byOrd := slices.SortedFunc(slices.Values(sel), func(a, b thread.Item) int { return cmp.Compare(a.Ordinal, b.Ordinal) })
+		keep := byOrd[len(byOrd)-n:]
 		if hasSince {
-			p.items, p.more = sel[:n], true
-		} else {
-			p.items = sel[len(sel)-n:]
+			keep, p.more = byOrd[:n], true
 		}
+		lo, hi := keep[0].Ordinal, keep[len(keep)-1].Ordinal
+		p.items = slices.DeleteFunc(slices.Clone(sel), func(it thread.Item) bool { return it.Ordinal < lo || it.Ordinal > hi })
 	}
-	p.nextSince = q.GetSince()
-	for _, it := range p.items {
+	p.nextSince = nextSince(p.items, q.GetSince())
+	return p, nil
+}
+
+// nextSince is where the next read goes on after items: the item with the highest
+// ordinal before the first one still streaming (in ordinal order: a placed message sits
+// after items with higher ordinals), else since.
+func nextSince(items []thread.Item, since string) string {
+	byOrd := slices.SortedFunc(slices.Values(items), func(a, b thread.Item) int { return cmp.Compare(a.Ordinal, b.Ordinal) })
+	for _, it := range byOrd {
 		if it.Streaming {
 			break
 		}
-		p.nextSince = it.ID
+		since = it.ID
 	}
-	return p, nil
+	return since
 }
 
 // sinceOrdinal reads a since: the ordinal of the item with that id, else the number

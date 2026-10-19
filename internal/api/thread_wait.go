@@ -143,14 +143,16 @@ func (h *Thread) reactedAfter(ctx context.Context, id, after string) (int64, boo
 }
 
 // lastMessage is the ordinal of the thread's latest top-level user message, a wake
-// message included; false when it has none.
+// message included; false when it has none. The highest ordinal, not the last in the
+// log: a queued message Claude read late sits after newer ones.
 func lastMessage(items []thread.Item) (int64, bool) {
-	for i := len(items) - 1; i >= 0; i-- {
-		if it := &items[i]; it.Kind == thread.KindUserMessage && it.ParentToolUseID == "" {
-			return it.Ordinal, true
+	var last int64
+	for i := range items {
+		if it := &items[i]; it.Kind == thread.KindUserMessage && it.ParentToolUseID == "" && it.Ordinal > last {
+			last = it.Ordinal
 		}
 	}
-	return 0, false
+	return last, last > 0
 }
 
 // isReaction: it (nil for an event without an item) shows Claude reacted after the

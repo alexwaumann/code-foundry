@@ -19,6 +19,8 @@ type itemData struct {
 	WakeJSON      string      `json:"wake_json,omitempty"`
 	ResumeNote    string      `json:"resume_note,omitempty"`
 	NoteCreatedBy string      `json:"note_created_by,omitempty"`
+	Queued        bool        `json:"queued,omitempty"`
+	PlacedAfter   int64       `json:"placed_after,omitempty"`
 	Tool          *ToolCall   `json:"tool,omitempty"`
 	Request       *Request    `json:"request,omitempty"`
 	Turn          *TurnEnd    `json:"turn,omitempty"`
@@ -52,7 +54,7 @@ func saveItems(ctx context.Context, db *sql.DB, threadID string, items []Item) e
 func saveItem(ctx context.Context, db execer, threadID string, it Item) error {
 	data, err := json.Marshal(itemData{Text: it.Text, Attachments: it.Attachments, Composer: it.ComposerText,
 		Origin: string(it.Origin), WakeTitle: it.WakeTitle, WakeJSON: it.WakeJSON, ResumeNote: it.ResumeNote,
-		NoteCreatedBy: it.NoteCreatedBy, Tool: it.Tool, Request: it.Request, Turn: it.Turn, Compaction: it.Compaction})
+		NoteCreatedBy: it.NoteCreatedBy, Queued: it.Queued, PlacedAfter: it.PlacedAfter, Tool: it.Tool, Request: it.Request, Turn: it.Turn, Compaction: it.Compaction})
 	if err != nil {
 		return fmt.Errorf("thread: encode item %s: %w", it.ID, err)
 	}
@@ -69,7 +71,8 @@ func saveItem(ctx context.Context, db execer, threadID string, it Item) error {
 	return nil
 }
 
-// loadItems returns a thread's items by ordinal.
+// loadItems returns a thread's items by ordinal (newThreadLog puts placed messages in
+// their place).
 func loadItems(ctx context.Context, db *sql.DB, threadID string) ([]Item, error) {
 	rows, err := db.QueryContext(ctx, `SELECT ordinal, item_id, kind, parent_tool_use_id, created_at, updated_at, data
 		FROM thread_items WHERE thread_id = ? ORDER BY ordinal`, threadID)
@@ -93,6 +96,7 @@ func loadItems(ctx context.Context, db *sql.DB, threadID string) ([]Item, error)
 		it.ComposerText = d.Composer
 		it.Origin, it.WakeTitle, it.WakeJSON = MessageOrigin(d.Origin), d.WakeTitle, d.WakeJSON
 		it.NoteCreatedBy, it.ResumeNote = d.NoteCreatedBy, d.ResumeNote
+		it.Queued, it.PlacedAfter = d.Queued, d.PlacedAfter
 		it.Text, it.Attachments, it.Tool, it.Request, it.Turn, it.Compaction = d.Text, d.Attachments, d.Tool, d.Request, d.Turn, d.Compaction
 		out = append(out, it)
 	}

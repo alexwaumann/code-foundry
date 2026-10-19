@@ -462,6 +462,10 @@ func FormatThreadItems(snap *v1.ThreadItemsSnapshot, full bool) string {
 				// The daemon's, for a wake subscription (commands_thread_subscribe.go).
 				body = "wake: " + line(u.GetWakeTitle())
 			}
+			if u.GetQueued() {
+				// Claude reads it at its next tool call (docs/notes/orch-queued-placement.md).
+				body += " (queued)"
+			}
 			for _, a := range u.GetAttachments() {
 				kind := "image"
 				if strings.EqualFold(filepath.Ext(a), ".pdf") {
