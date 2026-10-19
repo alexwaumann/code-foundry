@@ -1,7 +1,9 @@
 /**
  * A wake message (docs/notes/agents-4-wake.md) as the timeline's one-line "Woken by …"
  * note (docs/notes/agents-3-lineage-gui.md): who woke the thread, how it ended, a summary,
- * from the payload the daemon sent with it. Pure.
+ * from the payload the daemon sent with it. A batch of thread wakes sent as one message
+ * (`{"kind": "batch", "wakes": [...]}`, docs/notes/orch-wakes-content.md) is one line per
+ * wake. Pure.
  */
 import type { WakeView } from "@/api/thread";
 
@@ -66,14 +68,28 @@ function runLine(r: Obj, json: string): WakeLine {
   };
 }
 
-/** The note's line for a wake message. */
-export function wakeLine(w: WakeView): WakeLine {
-  let p: Obj | null;
+function parse(json: string): Obj | null {
   try {
-    p = obj(JSON.parse(w.json));
+    return obj(JSON.parse(json));
   } catch {
-    p = null;
+    return null;
   }
+}
+
+/** The notes' lines for a wake message: one per wake of a batch, else one. */
+export function wakeLines(w: WakeView): WakeLine[] {
+  const p = parse(w.json);
+  const batch = p?.kind === "batch" && Array.isArray(p.wakes) ? p.wakes.map(obj) : null;
+  if (!batch || batch.length === 0 || batch.some((b) => !b)) return [lineOf(p, w)];
+  return batch.map((b) => lineOf(b, w));
+}
+
+/** The note's line for a wake message (a batch's first wake). */
+export function wakeLine(w: WakeView): WakeLine {
+  return wakeLines(w)[0] ?? lineOf(null, w);
+}
+
+function lineOf(p: Obj | null, w: WakeView): WakeLine {
   const json = p ? JSON.stringify(p, null, 2) : w.json;
   const thread = obj(p?.thread);
   if (thread) return threadLine(thread, json);
