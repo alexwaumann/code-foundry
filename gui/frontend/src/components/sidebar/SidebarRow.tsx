@@ -23,8 +23,7 @@ import { useWorkspacesStore } from "@/stores/workspaces";
 import { RowTooltipsEnabled } from "./rowTooltips";
 import { TipWaiting } from "./TipWaiting";
 import { openWorkspaceSurface } from "@/stores/workspacePanel";
-import { openLinkedPrsSurface } from "@/stores/linkedPrsPanel";
-import { prBadge } from "@/surfaces/linkedprsTarget";
+import { LinkedPrsBadge } from "./LinkedPrsBadge";
 
 interface RowProps {
   row: Row;
@@ -107,25 +106,6 @@ function WorkspaceBadge({ id }: { id: string }) {
     >
       <Layers className="size-2.5 shrink-0" aria-hidden />
       <span className="truncate">{workspace}</span>
-    </span>
-  );
-}
-
-/** "N PRs" when the thread linked pull requests; nothing otherwise. */
-function LinkedPrsBadge({ id }: { id: string }) {
-  const count = useThreadsStore((st) => st.byId[id]?.linkedPullRequests.length ?? 0);
-  if (count === 0) return null;
-  return (
-    // Like the workspace badge: a click opens the Linked PRs surface in the thread's side
-    // panel, and goes on to the row, which selects the thread (and so shows that panel).
-    <span
-      className="flex shrink-0 cursor-pointer items-center rounded-sm bg-success/15 px-1 text-caption-sm font-medium text-success tabular-nums hover:bg-success/30"
-      data-testid="row-linked-prs"
-      onClick={() => {
-        openLinkedPrsSurface({ kind: "thread", id });
-      }}
-    >
-      {prBadge(count)}
     </span>
   );
 }
@@ -432,22 +412,34 @@ function ThreadTipBody({ id }: { id: string }) {
 /**
  * A thread row's hover tooltip (the app root's TooltipProvider sets the 500 ms delay). Pointer
  * only: the rows are not focusable (the list uses aria-activedescendant), so keyboard
- * navigation never opens it; a click or right-click closes it. Not while renaming.
+ * navigation never opens it; a click or right-click closes it. Not while renaming, and not
+ * over a badge with a tooltip of its own.
  */
 function ThreadTooltip({ id, children }: { id: string; children: ReactElement }) {
   const enabled = useContext(RowTooltipsEnabled);
   const renaming = useUiStore((s) => s.renamingThreadId === id);
   const [open, setOpen] = useState(false);
+  // Typed as Radix's trigger (a button); asChild puts it on the row's div.
+  const ref = useRef<HTMLButtonElement>(null);
   const allowed = enabled && !renaming;
   return (
     <Tooltip
       open={open && allowed}
       onOpenChange={(o) => {
-        setOpen(o && allowed);
+        // Not over a badge with its own tooltip (Tip, the linked-PRs tag): that one says it.
+        setOpen(o && allowed && !ref.current?.querySelector("[data-tip]:hover"));
       }}
       disableHoverableContent
     >
-      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipTrigger
+        asChild
+        ref={ref}
+        onPointerOver={(e) => {
+          if (e.target instanceof Element && e.target.closest("[data-tip]")) setOpen(false);
+        }}
+      >
+        {children}
+      </TooltipTrigger>
       <TooltipContent side="right" align="start" sideOffset={12} className="w-[260px] px-2.5 py-2 text-body-sm" data-testid="thread-tooltip" data-thread-id={id}>
         <ThreadTipBody id={id} />
       </TooltipContent>

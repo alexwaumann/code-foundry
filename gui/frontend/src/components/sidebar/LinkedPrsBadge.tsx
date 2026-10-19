@@ -1,0 +1,50 @@
+import type { Tone } from "@/components/pr/model";
+import { toneText } from "@/components/pr/tones";
+import { prStateLook } from "@/components/prs/prState";
+import { Tip } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
+import { openLinkedPrsSurface } from "@/stores/linkedPrsPanel";
+import { linkedPrTag, linkedPrTagText, linkedPrTip } from "./linkedPrTag";
+import { useLinkedPrFacts, useLinkKeys } from "./useLinkedPrs";
+
+/** The chip's tint per tone; the text colour is the PR surfaces' (pr/tones `toneText`). */
+const toneTint: Readonly<Record<Tone, string>> = {
+  success: "bg-success/15 hover:bg-success/30",
+  merged: "bg-highlight/15 hover:bg-highlight/30",
+  draft: "bg-muted-foreground/15 hover:bg-muted-foreground/25",
+  neutral: "bg-muted-foreground/15 hover:bg-muted-foreground/25",
+  failure: "bg-destructive/15 hover:bg-destructive/30",
+  pending: "bg-warning/15 hover:bg-warning/30",
+};
+
+/**
+ * The thread's linked pull requests, closed ones left out (linkedPrTag): one shows its
+ * state icon and bare number in the state's colour, several "N PRs" in the worst state's;
+ * nothing when none is left. The tooltip says what the tag hides (states, the one's title).
+ */
+export function LinkedPrsBadge({ id }: { id: string }) {
+  const keys = useLinkKeys(id);
+  const facts = useLinkedPrFacts(keys);
+  const tag = linkedPrTag(facts);
+  if (tag === null) return null;
+  const look = tag.kind === "one" ? prStateLook(tag.state === "draft" ? "open" : tag.state, tag.state === "draft") : null;
+  return (
+    <Tip label={linkedPrTip(facts)} side="right" data-testid="row-linked-prs-tip">
+      {/* Like the workspace badge: a click opens the Linked PRs surface in the thread's side
+          panel, and goes on to the row, which selects the thread (and so shows that panel). */}
+      <span
+        className={cn("flex shrink-0 cursor-pointer items-center gap-0.5 rounded-sm px-1 text-caption-sm font-medium tabular-nums", toneText[tag.tone], toneTint[tag.tone])}
+        data-testid="row-linked-prs"
+        data-kind={tag.kind}
+        data-state={tag.kind === "one" ? tag.state : undefined}
+        data-tone={tag.tone}
+        onClick={() => {
+          openLinkedPrsSurface({ kind: "thread", id });
+        }}
+      >
+        {look && <look.icon className="size-3 shrink-0" aria-label={look.label} />}
+        {linkedPrTagText(tag)}
+      </span>
+    </Tip>
+  );
+}
