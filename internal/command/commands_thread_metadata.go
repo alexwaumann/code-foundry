@@ -193,7 +193,7 @@ func threadReportCmd(b ThreadBackend, idArg ArgSpec) Command {
 			idArg,
 			{Name: "status", Type: Enum, Enum: ThreadReportStatuses, Required: true, Positional: true, Description: "done, blocked, failed or progress"},
 			{Name: "summary", Type: String, Positional: true, Description: "What happened, in at most 1000 characters"},
-			{Name: "data", Type: String, FileOrStdin: true, Description: "A JSON object of results (at most 16 KiB); @file.json reads a file, - reads stdin"},
+			{Name: "data", Type: String, FileOrStdin: true, Description: "A JSON object of results, at most 16 KiB (@file: from a file, -: stdin)"},
 		},
 		When: hasThread,
 		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
