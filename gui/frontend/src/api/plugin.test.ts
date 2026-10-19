@@ -4,16 +4,16 @@ import { describe, expect, it } from "vitest";
 import { PluginEventSchema, PluginSchema, PluginSecretSchema, PluginState, SurfacePhase, SurfaceUpdateSchema } from "@/gen/codefoundry/v1/plugin_pb";
 import { demoJson, demoView } from "@/test/pluginFixtures";
 import { HEARTBEAT } from "./stream";
-import { consentLines, inlineSpans, inlineText, nodeKind, NODE_KINDS, parseView, toPluginEventView, toPluginView, toSecretView, toSurfaceUpdateView, type ViewNode } from "./plugin";
+import { childLists, consentLines, inlineSpans, inlineText, nodeKind, NODE_KINDS, parseView, withChildLists, toPluginEventView, toPluginView, toSecretView, toSurfaceUpdateView, type ViewNode } from "./plugin";
 
 function allNodes(nodes: readonly ViewNode[]): ViewNode[] {
-  return nodes.flatMap((n) => [n, ...(n.section ? allNodes(n.section.children) : [])]);
+  return nodes.flatMap((n) => [n, ...childLists(n).flatMap((l) => allNodes(l))]);
 }
 
 describe("view model", () => {
-  it("parses the demo's five views and knows every node kind in them", () => {
+  it("parses the demo's six views and knows every node kind in them", () => {
     const kinds = new Set<string>();
-    for (const tab of ["overview", "form", "log", "assistant", "shell"] as const) {
+    for (const tab of ["overview", "form", "log", "assistant", "shell", "layout"] as const) {
       const v = demoView(tab);
       expect(v.tabs?.active).toBe(tab);
       for (const n of allNodes(v.nodes)) {
@@ -22,8 +22,22 @@ describe("view model", () => {
         kinds.add(k ?? "");
       }
     }
-    // The demo exercises every v1 node kind (thread and terminal on the Assistant and Shell tabs).
+    // The demo exercises every v1 node kind (thread and terminal on the Assistant and Shell
+    // tabs, columns and pane on Layout).
     expect([...kinds].sort()).toEqual([...NODE_KINDS].sort());
+  });
+
+  it("lists a container's nodes and replaces them in the same order", () => {
+    const t = (key: string): ViewNode => ({ key, text: { content: key } });
+    const cols: ViewNode = { key: "c", columns: { collapse: "first", items: [{ key: "a", weight: 2, children: [t("a1")] }, { key: "b", width: 200, children: [t("b1"), t("b2")] }] } };
+    expect(childLists(cols).map((l) => l.map((n) => n.key))).toEqual([["a1"], ["b1", "b2"]]);
+    expect(childLists({ key: "p", pane: { height: "fill", children: [t("p1")] } }).map((l) => l.map((n) => n.key))).toEqual([["p1"]]);
+    expect(childLists({ key: "s", section: { children: [t("s1")] } }).map((l) => l.map((n) => n.key))).toEqual([["s1"]]);
+    expect(childLists(t("x"))).toEqual([]);
+    const swapped = withChildLists(cols, [[t("z")], [t("y")]]);
+    expect(swapped.columns).toEqual({ collapse: "first", items: [{ key: "a", weight: 2, children: [t("z")] }, { key: "b", width: 200, children: [t("y")] }] });
+    expect(withChildLists({ key: "p", pane: { height: 300, children: [] } }, [[t("q")]]).pane).toEqual({ height: 300, children: [t("q")] });
+    expect(withChildLists(t("x"), [[t("q")]])).toEqual(t("x"));
   });
 
   it("refuses what is not a view", () => {

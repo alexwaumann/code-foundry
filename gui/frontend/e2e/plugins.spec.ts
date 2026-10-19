@@ -197,3 +197,49 @@ test("Settings → Plugins lists them; enabling one asks for consent with its pe
   await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "plugin.acme-data.access");
   await expect(surface(page).getByTestId("plugin-title")).toHaveText("Data access");
 });
+
+test("the layout tab: columns stack in the panel and sit side by side once it is wide enough; collapse first adds the thread there", async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await openDemo(page);
+  await tab(page, "layout").click();
+  await expect(tab(page, "layout")).toHaveAttribute("aria-selected", "true");
+  const cols = surface(page).locator('[data-testid="plugin-columns"][data-key="layout-cols"]');
+  const detail = surface(page).locator('[data-testid="plugin-columns"][data-key="layout-detail"]');
+  await expect(cols).toHaveAttribute("data-layout", "stack");
+  await expect(detail.getByTestId("plugin-column")).toHaveCount(1);
+  await expect(surface(page).getByTestId("plugin-thread")).toHaveCount(0);
+  // Stacked: the right column (markdown) sits under the left one (the pane).
+  const left = cols.locator('[data-testid="plugin-column"][data-key="layout-left"]');
+  const right = cols.locator('[data-testid="plugin-column"][data-key="layout-right"]');
+  let l = await left.boundingBox();
+  let r = await right.boundingBox();
+  expect(r && l && r.y >= l.y + l.height).toBe(true);
+  // The pane is 320 px and scrolls its log and list inside.
+  const pane = surface(page).locator('[data-testid="plugin-pane"][data-key="layout-pane"]');
+  expect(Math.round((await pane.boundingBox())?.height ?? 0)).toBe(320);
+  expect(await pane.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+
+  // Widen the panel past 2 × 240 + 12 px.
+  const h = await page.getByTestId("panel-resize-handle").boundingBox();
+  if (!h) throw new Error("no handle");
+  await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(h.x - 500, h.y + h.height / 2, { steps: 6 });
+  await page.mouse.up();
+  await expect(cols).toHaveAttribute("data-layout", "row");
+  l = await left.boundingBox();
+  r = await right.boundingBox();
+  expect(l && r && Math.round(r.x - (l.x + l.width))).toBe(12);
+  expect(l && r && Math.abs(r.y - l.y) < 1).toBe(true);
+  // Weight 2 beside weight 1.
+  expect(l && r && Math.abs(l.width - 2 * r.width) < 2).toBe(true);
+  await expect(detail.getByTestId("plugin-column")).toHaveCount(2);
+  const thread = detail.getByTestId("plugin-thread");
+  await expect(thread).toHaveAttribute("data-thread-id", "s-hello-assistant");
+  // The thread fills its fill pane, which fills the rest of the panel (at least its 320 px minHeight).
+  const chat = detail.locator('[data-testid="plugin-pane"][data-key="layout-chat-pane"]');
+  const c = await chat.boundingBox();
+  const t = await thread.boundingBox();
+  expect(c && c.height >= 320).toBe(true);
+  expect(c && t && Math.abs(t.y + t.height - (c.y + c.height)) < 2).toBe(true);
+});

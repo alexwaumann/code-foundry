@@ -107,6 +107,25 @@ describe("node renderer registry", () => {
     expect(screen.getByTestId("plugin-terminal-open-bottom")).toBeTruthy();
   });
 
+  it("renders the layout tab: two columns of a pane (log and list) beside markdown and pairs, stacked before a width; collapse first", () => {
+    useThreadsStore.setState({ loaded: true, byId: {}, order: [] });
+    inView(<NodeList nodes={demoView("layout").nodes} />, { viewTab: "layout" });
+    const cols = screen.getAllByTestId("plugin-columns");
+    expect(cols.map((c) => [c.getAttribute("data-key"), c.getAttribute("data-layout"), c.getAttribute("data-collapse")])).toEqual([
+      ["layout-cols", "stack", "stack"],
+      ["layout-detail", "stack", "first"],
+    ]);
+    // Stacked, collapse first drops the thread's column: only the summary shows.
+    expect(screen.getAllByTestId("plugin-column").map((c) => c.getAttribute("data-key"))).toEqual(["layout-left", "layout-right", "layout-detail-summary"]);
+    expect(screen.queryByTestId("plugin-thread")).toBeNull();
+    expect(screen.queryByTestId("plugin-thread-gone")).toBeNull();
+    const pane = screen.getByTestId("plugin-pane");
+    expect([pane.getAttribute("data-key"), pane.style.height, pane.getAttribute("data-fill-box")]).toEqual(["layout-pane", "320px", "true"]);
+    expect(pane.querySelector('[data-testid="plugin-log"]')).not.toBeNull();
+    expect(pane.querySelectorAll('[data-testid="plugin-row"]')).toHaveLength(3);
+    for (const id of ["plugin-markdown", "plugin-pairs"]) expect(screen.getByTestId(id).closest('[data-key="layout-right"]')).not.toBeNull();
+  });
+
   it("says so for a node of a kind it does not know", () => {
     const nodes: ViewNode[] = [{ key: "x" }];
     inView(<NodeList nodes={nodes} />);

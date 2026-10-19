@@ -1,34 +1,49 @@
 import { useLayoutEffect, useState, type RefObject } from "react";
 import type { NodeHeight } from "@/api/plugin";
 
-/** "fill" never goes below this, however little of the panel is left. */
+/** "fill" never goes below this (unless a fill pane's minHeight says less), however little of its box is left. */
 export const FILL_MIN = 240;
-/** The space "fill" leaves under the node (the surface's bottom padding). */
-const FILL_BOTTOM = 16;
+/** The space "fill" leaves under the node in the surface's scroll area (its bottom padding); a pane has none. */
+export const FILL_BOTTOM = 16;
 
 /**
- * A fill node's height: the rest of its scroll box's (the side panel's data-scroll-root)
- * height below the node's top, at least FILL_MIN, followed as the panel resizes.
+ * Marks a fill box: a pane with a px or fill height (PaneNode). A fill node fills the
+ * nearest one around it, else the surface's scroll area ([data-scroll-root]).
  */
-export function fillHeight(boxHeight: number, nodeTop: number): number {
-  return Math.max(FILL_MIN, Math.round(boxHeight - nodeTop - FILL_BOTTOM));
+export const FILL_BOX_ATTR = "data-fill-box";
+
+/**
+ * A fill node's height: the rest of its box's height below the node's top, less the
+ * box's bottom space, at least `floor`.
+ */
+export function fillHeight(boxHeight: number, nodeTop: number, floor = FILL_MIN, bottom = FILL_BOTTOM): number {
+  return Math.max(floor, Math.floor(boxHeight - nodeTop - bottom));
+}
+
+/** The box a fill node at `el` fills, and the space it leaves under it: the nearest fill box around el, else the scroll area. */
+export function fillBoxOf(el: HTMLElement): { box: HTMLElement; bottom: number } | null {
+  const box = el.parentElement?.closest<HTMLElement>(`[${FILL_BOX_ATTR}], [data-scroll-root]`) ?? null;
+  if (!box) return null;
+  return { box, bottom: box.hasAttribute(FILL_BOX_ATTR) ? 0 : FILL_BOTTOM };
 }
 
 /**
- * The CSS height of a thread or terminal node: pixels as given, `auto` for "auto" (absent),
- * and for "fill" the rest of the panel (fillHeight), measured on the node.
+ * The CSS height of a thread, terminal or pane node: pixels as given, `auto` for "auto"
+ * (absent), and for "fill" the rest of its box (fillBoxOf, fillHeight) at least `floor`,
+ * measured on the node and followed as the box resizes.
  */
-export function useNodeHeight(ref: RefObject<HTMLElement | null>, height: NodeHeight | undefined, auto: number): number {
+export function useNodeHeight<A extends number | undefined>(ref: RefObject<HTMLElement | null>, height: NodeHeight | undefined, auto: A, floor = FILL_MIN): number | A {
   const fill = height === "fill";
-  const [filled, setFilled] = useState(FILL_MIN);
+  const [filled, setFilled] = useState(floor);
   useLayoutEffect(() => {
     const el = ref.current;
     if (!fill || !el) return;
-    const box = el.closest<HTMLElement>("[data-scroll-root]");
-    if (!box) return;
+    const at = fillBoxOf(el);
+    if (!at) return;
+    const { box, bottom } = at;
     const measure = () => {
-      const top = el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
-      setFilled(fillHeight(box.clientHeight, top));
+      const top = el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop - box.clientTop;
+      setFilled(fillHeight(box.clientHeight, top, floor, bottom));
     };
     measure();
     const ro = new ResizeObserver(measure);
@@ -36,7 +51,7 @@ export function useNodeHeight(ref: RefObject<HTMLElement | null>, height: NodeHe
     return () => {
       ro.disconnect();
     };
-  }, [ref, fill]);
+  }, [ref, fill, floor]);
   if (typeof height === "number") return height;
   return fill ? filled : auto;
 }

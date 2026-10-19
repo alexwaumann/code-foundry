@@ -38,10 +38,12 @@ const TEXT = new Set(["text", "label", "title", "detail", "placeholder", "source
 /** Optional fields the daemon lets a view leave out. */
 const OPTIONAL = new Set(["icon", "tone", "status", "meta", "pill", "line2", "trailing", "titleMeta", "actions", "action", "glyph", "subline",
   "header", "tabs", "description", "hint", "error", "badge", "selected", "disabled", "busy", "mono", "strong", "url", "rows", "height", "value",
-  "options", "lines", "text", "title", "style", "align", "collapsible", "collapsed", "card", "stale", "readOnly", "submit", "secondary"]);
+  "options", "lines", "text", "title", "style", "align", "collapsible", "collapsed", "card", "stale", "readOnly", "submit", "secondary",
+  "weight", "width", "collapse", "minHeight", "noScroll"]);
 /** Numbers and the values the daemon accepts for them. */
 const NUMBERS: Record<string, readonly number[]> = {
   rows: [0, 4, 40], ms: [0, 1, 59_999, 3_600_000, Number.MAX_SAFE_INTEGER], value: [0, 0.5, 1], maxLength: [0, 1, 10_000], height: [120, 1600],
+  weight: [0, 1, 6], width: [160, 640], minHeight: [0, 120, 1600],
 };
 const strings = ["", " ", "x".repeat(4000), "é\u2028\u0000<script>alert(1)</script>", "**md** `code` [l](javascript:alert(1))", "\n\n\t"];
 
@@ -88,7 +90,7 @@ afterEach(() => {
 });
 
 describe("mutated views", () => {
-  const tabs: DemoTab[] = ["overview", "form", "log", "assistant", "shell"];
+  const tabs: DemoTab[] = ["overview", "form", "log", "assistant", "shell", "layout"];
   it("parse and render without throwing", () => {
     let rendered = 0;
     for (let seed = 1; seed <= 150; seed++) {

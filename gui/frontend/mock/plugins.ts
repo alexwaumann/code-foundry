@@ -126,6 +126,14 @@ function shiftTimes(v: unknown, shiftMs: number): unknown {
 
 type Node = Record<string, unknown> & { key: string };
 
+/** The node lists a container holds: a section's children, each column's, a pane's (api/plugin.ts childLists). */
+function childListsOf(n: Node): Node[][] {
+  const sec = n.section as { children?: Node[] } | undefined;
+  const cols = n.columns as { items?: { children?: Node[] }[] } | undefined;
+  const pane = n.pane as { children?: Node[] } | undefined;
+  return [sec?.children, ...(cols?.items ?? []).map((c) => c.children), pane?.children].filter((l): l is Node[] => Array.isArray(l));
+}
+
 /** Applies f to the node with `key` (at any depth); returns whether it found it. */
 function patchNode(nodes: Node[], key: string, f: (n: Node) => void): boolean {
   for (const n of nodes) {
@@ -133,8 +141,7 @@ function patchNode(nodes: Node[], key: string, f: (n: Node) => void): boolean {
       f(n);
       return true;
     }
-    const sec = n.section as { children?: Node[] } | undefined;
-    if (sec?.children && patchNode(sec.children, key, f)) return true;
+    for (const children of childListsOf(n)) if (patchNode(children, key, f)) return true;
   }
   return false;
 }
@@ -194,7 +201,7 @@ function elementsOf(view: Record<string, unknown>): Map<string, Element> {
         });
         fields((any.form.fields ?? []) as Parameters<typeof fields>[0]);
       }
-      if (any.section?.children) walk(any.section.children);
+      for (const children of childListsOf(n)) walk(children);
     }
   };
   walk(view.nodes as Node[]);
@@ -276,6 +283,10 @@ class DemoInstance {
       });
     } else if (this.tab === "assistant") {
       patchNode(nodes, "assistant-thread", (n) => {
+        (n.thread as { threadId: string }).threadId = HELLO_THREAD;
+      });
+    } else if (this.tab === "layout") {
+      patchNode(nodes, "layout-thread", (n) => {
         (n.thread as { threadId: string }).threadId = HELLO_THREAD;
       });
     } else if (this.tab === "shell") {

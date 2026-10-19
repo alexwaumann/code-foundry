@@ -45,6 +45,19 @@ describe("logs", () => {
     expect(lines.truncated).toBe(true);
   });
 
+  it("finds a log inside a pane inside a column, keeping the other lists as they were", () => {
+    const v = demoView("layout");
+    const out = appendToView(v, "layout-log", "", [{ text: "step 25  ok" }]);
+    const left = out.nodes[1]?.columns?.items[0]?.children[0]?.pane?.children[0]?.log;
+    expect(left?.lines?.at(-1)).toEqual({ text: "step 25  ok" });
+    expect(left?.lines).toHaveLength(25);
+    // Only the path to the log is new: the other column and the next node keep their identity.
+    expect(out.nodes[1]?.columns?.items[1]).toBe(v.nodes[1]?.columns?.items[1]);
+    expect(out.nodes[2]).toBe(v.nodes[2]);
+    expect(v.nodes[1]?.columns?.items[0]?.children[0]?.pane?.children[0]?.log?.lines).toHaveLength(24);
+    expect(appendToView(v, "layout-pane", "x", [])).toBe(v);
+  });
+
   it("finds a log inside a section and leaves the view alone for a key that is no log", () => {
     const v: PluginViewModel = { nodes: [{ key: "s", section: { children: [{ key: "l", log: { text: "" } }] } }] };
     expect(appendToView(v, "l", "x", []).nodes[0]?.section?.children[0]?.log?.text).toBe("x");
@@ -106,10 +119,16 @@ describe("drafts", () => {
   it("lists forms at any depth", () => {
     expect(formsOf(demoView("form").nodes).map((f) => f.key)).toEqual(["settings"]);
     expect(formsOf([{ key: "s", section: { children: [{ key: "f", form: { fields: [] } }] } }]).map((f) => f.key)).toEqual(["f"]);
+    const form = (key: string) => ({ key, form: { fields: [] } });
+    expect(
+      formsOf([{ key: "c", columns: { items: [{ key: "a", children: [form("f1")] }, { key: "b", children: [{ key: "p", pane: { children: [form("f2")] } }] }] } }]).map((f) => f.key),
+    ).toEqual(["f1", "f2"]);
   });
 
   it("names nodes of kinds this GUI does not know", () => {
     expect(unknownNodes(demoView("overview").nodes)).toEqual([]);
     expect(unknownNodes([{ key: "x" }, { key: "s", section: { children: [{ key: "y" }] } }])).toEqual(["x", "y"]);
+    expect(unknownNodes(demoView("layout").nodes)).toEqual([]);
+    expect(unknownNodes([{ key: "c", columns: { items: [{ key: "a", children: [] }, { key: "b", children: [{ key: "p", pane: { children: [{ key: "z" }] } }] }] } }])).toEqual(["z"]);
   });
 });
