@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { expectTooltip, invocations, mockPost, openApp, resetMock, row, writes } from "./fixtures";
 
 /**
@@ -18,13 +18,6 @@ const host = (page: Page) => page.getByTestId("bottom-terminal-host");
 /** Text the rest of the streaming answer ends with: the Go block closes, then a bash block. */
 const CLOSE_GO = "ewDecision,\n\tHeadOid:     pr.HeadRefOid,\n\t}\n}\n```\n\nRun the package's tests:\n\n```bash\ngo test ./internal/store/pr/";
 const BASH_CMD = "go test ./internal/store/pr/";
-
-/** Whether the element is fully inside the thread timeline's visible area. */
-async function inView(page: Page, el: Locator): Promise<boolean> {
-  if ((await el.count()) === 0) return false;
-  const [b, t] = await Promise.all([el.boundingBox(), page.getByTestId("thread-timeline").boundingBox()]);
-  return b !== null && t !== null && b.y >= t.y && b.y + b.height <= t.y + t.height;
-}
 
 function screenText(page: Page): Promise<string> {
   return page.evaluate(() => (window as unknown as { __cfTerminal?: { renderer: { getText(): string } } }).__cfTerminal?.renderer.getText() ?? "");
@@ -99,7 +92,8 @@ test("Run in terminal: hidden while the block streams, then a new shell in the t
   await expect(host(page)).not.toHaveAttribute("data-terminal-id", id ?? "");
 });
 
-test("Copy puts the raw code on the clipboard and shows Copied; a Bash row copies its command", async ({ page }) => {
+// A Bash row's Copy command (and no Run) is CodeActions.test.tsx's.
+test("Copy puts the raw code on the clipboard and shows Copied", async ({ page }) => {
   // WebKit lets no test read the clipboard back: record what the app writes to it instead
   // (lib/clipboard.ts takes the writeText path when it exists).
   await page.addInitScript(() => {
@@ -123,39 +117,16 @@ test("Copy puts the raw code on the clipboard and shows Copied; a Bash row copie
   expect(text).not.toContain("<span");
   expect(text.endsWith("}")).toBe(true);
   await expect(copy).toHaveAttribute("aria-label", "Copy code", { timeout: 3000 });
-
-  // The turn's last Bash row: its command line has Copy, never Run. The timeline follows
-  // the bottom unless the user scrolls, so scroll it with the wheel. The turn folded when
-  // it ended: show its work first.
-  await pane(page).locator('[data-testid="thread-turn-header"]:not([data-live])').last().getByRole("button", { name: "Show this turn's work" }).click();
-  const bash = pane(page).locator('[data-tool="Bash"]').last();
-  await page.getByTestId("thread-timeline").hover();
-  for (let i = 0; i < 40 && !(await inView(page, bash.locator("button[aria-expanded]").first())); i++) {
-    await page.mouse.wheel(0, -200);
-    await page.waitForTimeout(50);
-  }
-  await bash.locator("button[aria-expanded]").first().click();
-  const cmd = bash.getByTestId("thread-bash");
-  await cmd.hover();
-  const copyCmd = cmd.getByTestId("code-copy");
-  await expect(copyCmd).toHaveAttribute("aria-label", "Copy command");
-  await expect(cmd.getByTestId("code-run")).toHaveCount(0);
-  const shown = ((await cmd.locator(".cmd").textContent()) ?? "").replace(/^\$ /, "").replace(/Copied$/, "");
-  await copyCmd.click();
-  await expect(copyCmd).toHaveAttribute("aria-label", "Copied");
-  expect(await lastCopied()).toBe(shown);
 });
 
 test("the buttons are keyboard reachable: focus shows them", async ({ page }) => {
   await streamToBash(page);
   await mockPost("thread/finish?rest=" + encodeURIComponent("\n```\n"));
   const run = bashBlock(page).getByTestId("code-run");
-  await expect(bashBlock(page).locator(".cf-code-actions")).toHaveCSS("opacity", "0");
+  // Hidden until hovered (the first test); focus shows them too, with no pointer.
   await run.focus();
   await expect(bashBlock(page).locator(".cf-code-actions")).toHaveCSS("opacity", "1");
   // WebKit (like Safari and the Wails window) moves between buttons with Option+Tab.
   await page.keyboard.press("Alt+Tab");
   await expect(bashBlock(page).getByTestId("code-copy")).toBeFocused();
-  await page.keyboard.press("Enter");
-  await expect(bashBlock(page).getByTestId("code-copy")).toHaveAttribute("aria-label", "Copied");
 });

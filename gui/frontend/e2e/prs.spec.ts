@@ -68,29 +68,18 @@ test.describe("Pull Requests page", () => {
     const merged = page.getByTestId("activity-merged");
     const commits = page.getByTestId("activity-commits");
     const tip = page.getByTestId("activity-tooltip");
-    // Oldest first: index 3 of 6 is two months back (August in the mock's October).
+    // The tooltip's content and side are ActivityCharts.test.tsx's; here, a real pointer.
     await merged.getByTestId("activity-month").nth(3).hover();
     await expect(tip).toHaveCount(1);
     await expect(merged.getByTestId("activity-tooltip")).toBeVisible();
-    await expect(tip).toContainText("210");
-    await expect(tip).toContainText("17");
-    await expect(tip).toHaveAttribute("data-side", "left");
     await expect(commits.getByTestId("activity-crosshair")).toHaveCount(1);
     await expect(commits.getByTestId("activity-band")).toBeVisible();
     await shot(page, "prs-activity-hover");
     // The pointer moves to the other card: the tooltip follows it.
     await commits.getByTestId("activity-month").nth(1).hover();
     await expect(tip).toHaveCount(1);
-    const now = new Date();
-    const june = new Date(now.getFullYear(), now.getMonth() - 4, 1);
-    await expect(commits.getByTestId("activity-tooltip")).toHaveAttribute("data-month", `${String(june.getFullYear())}-${String(june.getMonth() + 1).padStart(2, "0")}`);
-    await expect(tip.locator('[data-series="commits"]')).toContainText("0");
-    await expect(tip).toHaveAttribute("data-side", "right");
+    await expect(commits.getByTestId("activity-tooltip")).toBeVisible();
     await expect(merged.getByTestId("activity-crosshair")).toHaveCount(1);
-    // The current month says so.
-    await commits.getByTestId("activity-month").nth(5).hover();
-    await expect(tip).toContainText("(so far)");
-    await expect(tip).toContainText("16");
     // Leaving clears both.
     await page.mouse.move(2, 2);
     await expect(tip).toHaveCount(0);
