@@ -200,4 +200,6 @@ home directory; so must an unpacked release tarball you try):
   starts without asking. To see the consent text as a new user does, `code-foundry plugin
   uninstall <name> --purge` first (it deletes the plugin's secrets and data too). Linking
   the same name from another folder is another source: `plugin dev --force` deletes what
-  the old one left (secrets, data, consent) and asks again.
+  the old one left (secrets, data, consent), removes its threads and asks again.
+  `plugin uninstall` removes the plugin's threads too (`plugin disable` only archives
+  them).

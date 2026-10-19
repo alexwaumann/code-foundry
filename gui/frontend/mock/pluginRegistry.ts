@@ -309,7 +309,7 @@ export class MockRegistry {
           name: "plugin.uninstall",
           title: "Uninstall Plugin",
           category: "Plugin",
-          description: "Disable a plugin, stop it and remove its package; --purge deletes its data, secrets and consent too.",
+          description: "Disable a plugin, stop it, remove its threads and its package; --purge deletes its data, secrets and consent too.",
           keybindings: [],
           args: [nameArg, { name: "purge", type: ArgType.BOOL, required: false, description: "Also delete its data, secrets, logs and consent" }],
           confirm: (_c, a) =>

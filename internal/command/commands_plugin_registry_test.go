@@ -33,6 +33,8 @@ func TestPluginRegistryCommands(t *testing.T) {
 		browse    *v1.BrowsePluginsResponse // instead of the two-registry browse
 		install   *v1.InstallPluginResponse
 		update    *v1.UpdatePluginsResponse
+		uninstall *v1.UninstallPluginResponse
+		threads   []*v1.Thread // the plugin's threads, which the uninstall confirm counts
 		wantErr   string // a ConfirmError's message prefix, or a substring of the error
 		wantMsg   []string
 		want      proto.Message
@@ -73,6 +75,15 @@ func TestPluginRegistryCommands(t *testing.T) {
 		{name: "uninstall purge asks", cmd: "plugin.uninstall", args: map[string]string{"name": "hello", "purge": "true"}, wantErr: "Uninstall plugin hello and delete its data"},
 		{name: "uninstall", cmd: "plugin.uninstall", args: map[string]string{"name": "hello", "purge": "true"}, confirmed: true,
 			want: &v1.UninstallPluginRequest{Name: "hello", Purge: true}, wantMsg: []string{"uninstalled hello"}},
+		{name: "uninstall asks with the threads it removes", cmd: "plugin.uninstall", args: map[string]string{"name": "hello"},
+			threads: []*v1.Thread{{Id: "s-1"}, {Id: "s-2"}},
+			wantErr: "Uninstall plugin hello? It removes its 2 threads; its data, secrets and consent stay (--purge deletes them)."},
+		{name: "uninstall purge asks with the thread it removes", cmd: "plugin.uninstall", args: map[string]string{"name": "hello", "purge": "true"},
+			threads: []*v1.Thread{{Id: "s-1"}},
+			wantErr: "Uninstall plugin hello? It removes its 1 thread and deletes its data, its secrets in the Keychain, its logs and the consent given."},
+		{name: "uninstall reports the threads removed", cmd: "plugin.uninstall", args: map[string]string{"name": "hello"}, confirmed: true,
+			uninstall: &v1.UninstallPluginResponse{Removed: "/p/hello", RemovedThreadIds: []string{"s-1", "s-2"}},
+			wantMsg:   []string{"uninstalled hello (removed /p/hello)\nremoved its 2 threads: s-1, s-2"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -80,9 +91,9 @@ func TestPluginRegistryCommands(t *testing.T) {
 			if tt.browse != nil {
 				br = tt.browse
 			}
-			b := &commandtest.PluginRegistry{BrowseRes: br, InstallRes: tt.install, UpdateRes: tt.update}
+			b := &commandtest.PluginRegistry{BrowseRes: br, InstallRes: tt.install, UpdateRes: tt.update, UninstallRes: tt.uninstall}
 			reg := command.NewRegistry()
-			if err := command.RegisterPluginRegistry(reg, b); err != nil {
+			if err := command.RegisterPluginRegistry(reg, b, &commandtest.Thread{Others: tt.threads}); err != nil {
 				t.Fatal(err)
 			}
 			var opts []command.InvokeOption

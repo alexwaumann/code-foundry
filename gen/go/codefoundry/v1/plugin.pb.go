@@ -1280,12 +1280,14 @@ func (x *DevPluginRequest) GetForce() bool {
 }
 
 type DevPluginResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Plugin        *Plugin                `protobuf:"bytes,1,opt,name=plugin,proto3" json:"plugin,omitempty"`
-	NeedsConsent  bool                   `protobuf:"varint,2,opt,name=needs_consent,json=needsConsent,proto3" json:"needs_consent,omitempty"`
-	ConsentText   string                 `protobuf:"bytes,3,opt,name=consent_text,json=consentText,proto3" json:"consent_text,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	Plugin       *Plugin                `protobuf:"bytes,1,opt,name=plugin,proto3" json:"plugin,omitempty"`
+	NeedsConsent bool                   `protobuf:"varint,2,opt,name=needs_consent,json=needsConsent,proto3" json:"needs_consent,omitempty"`
+	ConsentText  string                 `protobuf:"bytes,3,opt,name=consent_text,json=consentText,proto3" json:"consent_text,omitempty"`
+	// force took the name from a plugin of another source: the ids of its threads, removed.
+	RemovedThreadIds []string `protobuf:"bytes,4,rep,name=removed_thread_ids,json=removedThreadIds,proto3" json:"removed_thread_ids,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *DevPluginResponse) Reset() {
@@ -1337,6 +1339,13 @@ func (x *DevPluginResponse) GetConsentText() string {
 		return x.ConsentText
 	}
 	return ""
+}
+
+func (x *DevPluginResponse) GetRemovedThreadIds() []string {
+	if x != nil {
+		return x.RemovedThreadIds
+	}
+	return nil
 }
 
 type ReloadPluginsRequest struct {
@@ -4080,10 +4089,12 @@ type InstallPluginResponse struct {
 	// An unverified download, manifest warnings.
 	Warnings []string `protobuf:"bytes,7,rep,name=warnings,proto3" json:"warnings,omitempty"`
 	// enable was asked, but the plugin needs consent first: show consent_text.
-	NeedsConsent  bool   `protobuf:"varint,8,opt,name=needs_consent,json=needsConsent,proto3" json:"needs_consent,omitempty"`
-	ConsentText   string `protobuf:"bytes,9,opt,name=consent_text,json=consentText,proto3" json:"consent_text,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	NeedsConsent bool   `protobuf:"varint,8,opt,name=needs_consent,json=needsConsent,proto3" json:"needs_consent,omitempty"`
+	ConsentText  string `protobuf:"bytes,9,opt,name=consent_text,json=consentText,proto3" json:"consent_text,omitempty"`
+	// force took the name from a plugin of another source: the ids of its threads, removed.
+	RemovedThreadIds []string `protobuf:"bytes,10,rep,name=removed_thread_ids,json=removedThreadIds,proto3" json:"removed_thread_ids,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *InstallPluginResponse) Reset() {
@@ -4177,6 +4188,13 @@ func (x *InstallPluginResponse) GetConsentText() string {
 		return x.ConsentText
 	}
 	return ""
+}
+
+func (x *InstallPluginResponse) GetRemovedThreadIds() []string {
+	if x != nil {
+		return x.RemovedThreadIds
+	}
+	return nil
 }
 
 type UpdatePluginsRequest struct {
@@ -4439,9 +4457,11 @@ type UninstallPluginResponse struct {
 	// The package directory or dev link removed; empty when there was none.
 	Removed string `protobuf:"bytes,1,opt,name=removed,proto3" json:"removed,omitempty"`
 	// What purge deleted, in words.
-	Purged        []string `protobuf:"bytes,2,rep,name=purged,proto3" json:"purged,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Purged []string `protobuf:"bytes,2,rep,name=purged,proto3" json:"purged,omitempty"`
+	// The ids of the plugin's threads, removed (as thread.remove removes a thread).
+	RemovedThreadIds []string `protobuf:"bytes,3,rep,name=removed_thread_ids,json=removedThreadIds,proto3" json:"removed_thread_ids,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *UninstallPluginResponse) Reset() {
@@ -4484,6 +4504,13 @@ func (x *UninstallPluginResponse) GetRemoved() string {
 func (x *UninstallPluginResponse) GetPurged() []string {
 	if x != nil {
 		return x.Purged
+	}
+	return nil
+}
+
+func (x *UninstallPluginResponse) GetRemovedThreadIds() []string {
+	if x != nil {
+		return x.RemovedThreadIds
 	}
 	return nil
 }
@@ -4582,11 +4609,12 @@ const file_codefoundry_v1_plugin_proto_rawDesc = "" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x18\n" +
 	"\aconsent\x18\x02 \x01(\bR\aconsent\x12\x17\n" +
 	"\adry_run\x18\x03 \x01(\bR\x06dryRun\x12\x14\n" +
-	"\x05force\x18\x04 \x01(\bR\x05force\"\x8b\x01\n" +
+	"\x05force\x18\x04 \x01(\bR\x05force\"\xb9\x01\n" +
 	"\x11DevPluginResponse\x12.\n" +
 	"\x06plugin\x18\x01 \x01(\v2\x16.codefoundry.v1.PluginR\x06plugin\x12#\n" +
 	"\rneeds_consent\x18\x02 \x01(\bR\fneedsConsent\x12!\n" +
-	"\fconsent_text\x18\x03 \x01(\tR\vconsentText\"\x16\n" +
+	"\fconsent_text\x18\x03 \x01(\tR\vconsentText\x12,\n" +
+	"\x12removed_thread_ids\x18\x04 \x03(\tR\x10removedThreadIds\"\x16\n" +
 	"\x14ReloadPluginsRequest\"\x17\n" +
 	"\x15ReloadPluginsResponse\"=\n" +
 	"\x11PluginLogsRequest\x12\x12\n" +
@@ -4771,7 +4799,7 @@ const file_codefoundry_v1_plugin_proto_rawDesc = "" +
 	"\x05force\x18\x02 \x01(\bR\x05force\x12\x16\n" +
 	"\x06enable\x18\x03 \x01(\bR\x06enable\x12\x18\n" +
 	"\aconsent\x18\x04 \x01(\bR\aconsent\x12\x18\n" +
-	"\arefresh\x18\x05 \x01(\bR\arefresh\"\xb6\x02\n" +
+	"\arefresh\x18\x05 \x01(\bR\arefresh\"\xe4\x02\n" +
 	"\x15InstallPluginResponse\x12.\n" +
 	"\x06plugin\x18\x01 \x01(\v2\x16.codefoundry.v1.PluginR\x06plugin\x12\x12\n" +
 	"\x04kind\x18\x02 \x01(\tR\x04kind\x12\x16\n" +
@@ -4781,7 +4809,9 @@ const file_codefoundry_v1_plugin_proto_rawDesc = "" +
 	"\achanged\x18\x06 \x01(\bR\achanged\x12\x1a\n" +
 	"\bwarnings\x18\a \x03(\tR\bwarnings\x12#\n" +
 	"\rneeds_consent\x18\b \x01(\bR\fneedsConsent\x12!\n" +
-	"\fconsent_text\x18\t \x01(\tR\vconsentText\"Z\n" +
+	"\fconsent_text\x18\t \x01(\tR\vconsentText\x12,\n" +
+	"\x12removed_thread_ids\x18\n" +
+	" \x03(\tR\x10removedThreadIds\"Z\n" +
 	"\x14UpdatePluginsRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05check\x18\x02 \x01(\bR\x05check\x12\x18\n" +
@@ -4798,10 +4828,11 @@ const file_codefoundry_v1_plugin_proto_rawDesc = "" +
 	"\aupdates\x18\x01 \x03(\v2\x1c.codefoundry.v1.PluginUpdateR\aupdates\"B\n" +
 	"\x16UninstallPluginRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
-	"\x05purge\x18\x02 \x01(\bR\x05purge\"K\n" +
+	"\x05purge\x18\x02 \x01(\bR\x05purge\"y\n" +
 	"\x17UninstallPluginResponse\x12\x18\n" +
 	"\aremoved\x18\x01 \x01(\tR\aremoved\x12\x16\n" +
-	"\x06purged\x18\x02 \x03(\tR\x06purged*\xe3\x01\n" +
+	"\x06purged\x18\x02 \x03(\tR\x06purged\x12,\n" +
+	"\x12removed_thread_ids\x18\x03 \x03(\tR\x10removedThreadIds*\xe3\x01\n" +
 	"\vPluginState\x12\x1c\n" +
 	"\x18PLUGIN_STATE_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15PLUGIN_STATE_DISABLED\x10\x01\x12\x19\n" +

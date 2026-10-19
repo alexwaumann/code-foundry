@@ -316,9 +316,13 @@ user's thread, `Invoke` `thread.send` with the id from `act.Context`. `CreateTer
 starts a terminal the plugin owns (cwd the data dir unless given, under home; env checked
 like a thread's; `$SHELL -lc` for the user's tools), shown by a `terminal` node and, on
 request, in the bottom panel; `CloseTerminal` and `Terminals` as for threads, and an exited
-terminal stays until closed. At most 32 live threads and 16 terminals. Disabling or
-uninstalling the plugin archives its threads and closes its terminals; terminals end with
-the daemon, threads do not (find them again with `Threads` in Init). plugintest keeps both
+terminal stays until closed. At most 32 live threads and 16 terminals. Disabling the
+plugin archives its threads (enabling it again finds them with `Threads`; a send
+unarchives one) and closes its terminals. Uninstalling it (with or without `--purge`), or
+another source taking its name with `--force`, removes its threads for good, as `thread
+remove` does (Claude stops first; the user is told how many), and closes its terminals.
+Terminals end with the daemon, threads do not (find them again with `Threads` in Init).
+plugintest keeps both
 in memory (`CreatedThreads`, `ThreadSends`, `PluginTerminals`, `ExitTerminal`,
 `SetTerminalText`).
 

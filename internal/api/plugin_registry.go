@@ -69,7 +69,7 @@ func (h *Plugin) Install(ctx context.Context, req *connect.Request[v1.InstallPlu
 	return connect.NewResponse(&v1.InstallPluginResponse{
 		Plugin: pluginToProto(res.Plugin), Kind: string(res.Kind), Source: res.Source, Version: res.Version,
 		PreviousVersion: res.Previous, Changed: res.Changed, Warnings: res.Warnings,
-		NeedsConsent: res.NeedsConsent, ConsentText: res.Consent,
+		NeedsConsent: res.NeedsConsent, ConsentText: res.Consent, RemovedThreadIds: res.RemovedThreads,
 	}), nil
 }
 
@@ -104,7 +104,7 @@ func (h *Plugin) Uninstall(ctx context.Context, req *connect.Request[v1.Uninstal
 	if err != nil {
 		return nil, pluginError(err)
 	}
-	return connect.NewResponse(&v1.UninstallPluginResponse{Removed: res.Removed, Purged: res.Purged}), nil
+	return connect.NewResponse(&v1.UninstallPluginResponse{Removed: res.Removed, Purged: res.Purged, RemovedThreadIds: res.RemovedThreads}), nil
 }
 
 func registriesToProto(rs []registry.Status) []*v1.PluginRegistry {

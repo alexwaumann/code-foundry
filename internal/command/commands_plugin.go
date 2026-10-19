@@ -168,7 +168,7 @@ func RegisterPlugin(r *Registry, b PluginBackend) error {
 			Args: []ArgSpec{
 				{Name: "path", Type: Path, Required: true, Positional: true, Description: "The plugin's folder"},
 				{Name: "force", Type: Bool, Description: "Take the name from a plugin of another source (a link to another folder, " +
-					"an installed package, which it removes, or its leftovers), deleting its secrets, data and consent"},
+					"an installed package, which it removes, or its leftovers), deleting its secrets, data and consent and removing its threads"},
 				followArg,
 			},
 			Confirm: "Link {path} as a dev plugin and enable it?",
@@ -189,7 +189,11 @@ func RegisterPlugin(r *Registry, b PluginBackend) error {
 					return Result{}, err
 				}
 				p := res.Msg.GetPlugin()
-				return Result{Message: fmt.Sprintf("linked %s as dev plugin %s; %s", a.Path("path"), p.GetName(), enabledMessage(p)), JSON: res.Msg}, nil
+				msg := fmt.Sprintf("linked %s as dev plugin %s; %s", a.Path("path"), p.GetName(), enabledMessage(p))
+				if ids := res.Msg.GetRemovedThreadIds(); len(ids) > 0 {
+					msg += "\nremoved the replaced plugin's threads: " + strings.Join(ids, ", ")
+				}
+				return Result{Message: msg, JSON: res.Msg}, nil
 			},
 		},
 		Command{

@@ -254,6 +254,8 @@ message DevPluginResponse {
   Plugin plugin = 1;
   bool needs_consent = 2;
   string consent_text = 3;
+  // force took the name from a plugin of another source: the ids of its threads, removed.
+  repeated string removed_thread_ids = 4;
 }
 
 message ReloadPluginsRequest {}
@@ -657,6 +659,8 @@ message InstallPluginResponse {
   // enable was asked, but the plugin needs consent first: show consent_text.
   bool needs_consent = 8;
   string consent_text = 9;
+  // force took the name from a plugin of another source: the ids of its threads, removed.
+  repeated string removed_thread_ids = 10;
 }
 
 message UpdatePluginsRequest {
@@ -696,4 +700,6 @@ message UninstallPluginResponse {
   string removed = 1;
   // What purge deleted, in words.
   repeated string purged = 2;
+  // The ids of the plugin's threads, removed (as thread.remove removes a thread).
+  repeated string removed_thread_ids = 3;
 }

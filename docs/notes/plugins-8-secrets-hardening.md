@@ -163,11 +163,10 @@ an OS one.
 
 ## Later
 
-* **Owned threads survive a takeover**: `claimLocked` archives the old package's threads,
-  but they keep the owner tag `plugin:<name>`, so the new package can `thread/list` them
-  and `thread/send` into them (resuming the old conversation). Fix: a thread store
-  `Reown(from, to)` (e.g. `plugin:<name>` → a tag no plugin can hold) called from
-  `claimLocked`.
+* ~~**Owned threads survive a takeover**~~ **Done** (2026-10-18,
+  `docs/notes/plugins-plugin-threads-remove.md`): a forced takeover and every uninstall
+  remove the old package's threads through the thread store's `Remove` (no re-tagging),
+  and threads alone count as something a new source would inherit.
 * Native Keychain access with a daemon-only ACL once the binary is signed.
 * A `plugin act` way to pass `--values` on stdin.
 * Rate-limit the "refused … requests in flight" log line.

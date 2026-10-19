@@ -29,9 +29,16 @@ var (
 	_ PluginRegistryBackend = codefoundryv1connect.PluginServiceClient(nil)
 )
 
+// PluginThreadLister is ThreadService.List: plugin.uninstall's confirm counts the
+// threads it removes.
+type PluginThreadLister interface {
+	List(context.Context, *connect.Request[v1.ListThreadsRequest]) (*connect.Response[v1.ListThreadsResponse], error)
+}
+
 // RegisterPluginRegistry registers plugin.browse, plugin.install, plugin.update and
-// plugin.uninstall.
-func RegisterPluginRegistry(r *Registry, b PluginRegistryBackend) error {
+// plugin.uninstall. threads (may be nil) counts a plugin's threads for the uninstall
+// confirm.
+func RegisterPluginRegistry(r *Registry, b PluginRegistryBackend, threads PluginThreadLister) error {
 	refreshArg := ArgSpec{Name: "refresh", Type: Bool, Description: "Read the registries again instead of their cached indexes (kept 1 hour)"}
 	return r.RegisterAll(
 		Command{
@@ -64,7 +71,7 @@ func RegisterPluginRegistry(r *Registry, b PluginRegistryBackend) error {
 				{Name: "ref", Type: String, Required: true, Positional: true, Description: "name[@version], owner/repo[@vX.Y.Z], or /absolute/folder"},
 				{Name: "enable", Type: Bool, Description: "Enable it afterwards, consenting to its permissions (asks; --yes confirms)"},
 				{Name: "force", Type: Bool, Description: "Replace a dev link, reinstall the version already installed, or take the name " +
-					"from a plugin of another source (deleting its secrets, data and consent; enabling asks again)"},
+					"from a plugin of another source (deleting its secrets, data and consent and removing its threads; enabling asks again)"},
 				refreshArg,
 			},
 			Confirm:   "Install {ref} and enable it?",
@@ -109,19 +116,17 @@ func RegisterPluginRegistry(r *Registry, b PluginRegistryBackend) error {
 		Command{
 			Name:  "plugin.uninstall",
 			Title: "Uninstall Plugin",
-			Description: "Disable a plugin, stop it and remove its package (for a dev plugin only the link, never your " +
-				"folder). Its data, secrets and consent stay for a reinstall; --purge deletes them too.",
+			Description: "Disable a plugin, stop it, remove its threads (as thread remove does) and its package (for a dev " +
+				"plugin only the link, never your folder). Its data, secrets and consent stay for a reinstall; --purge deletes " +
+				"them too.",
 			Category: "Plugin",
 			Args: []ArgSpec{
 				{Name: "name", Type: String, Required: true, Positional: true, Description: "Plugin name (code-foundry plugin list)"},
 				{Name: "purge", Type: Bool, Description: "Also delete its data directory, its secrets in the Keychain, its logs and the consent given"},
 			},
 			Confirm: "Uninstall plugin {name}?",
-			DynamicConfirm: func(_ context.Context, _ Context, a Args) string {
-				if a.Bool("purge") {
-					return "Uninstall plugin " + a.String("name") + " and delete its data, its secrets in the Keychain, its logs and the consent given?"
-				}
-				return "Uninstall plugin " + a.String("name") + "? Its data, secrets and consent stay (--purge deletes them)."
+			DynamicConfirm: func(ctx context.Context, _ Context, a Args) string {
+				return uninstallConfirm(a.String("name"), a.Bool("purge"), pluginThreadCount(ctx, threads, a.String("name")))
 			},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				res, err := b.Uninstall(ctx, connect.NewRequest(&v1.UninstallPluginRequest{Name: a.String("name"), Purge: a.Bool("purge")}))
@@ -132,6 +137,9 @@ func RegisterPluginRegistry(r *Registry, b PluginRegistryBackend) error {
 				if res.Msg.GetRemoved() != "" {
 					msg += " (removed " + res.Msg.GetRemoved() + ")"
 				}
+				if ids := res.Msg.GetRemovedThreadIds(); len(ids) > 0 {
+					msg += "\nremoved " + threadsWords(len(ids)) + ": " + strings.Join(ids, ", ")
+				}
 				if p := res.Msg.GetPurged(); len(p) > 0 {
 					msg += "\ndeleted " + strings.Join(p, ", ")
 				}
@@ -139,6 +147,41 @@ func RegisterPluginRegistry(r *Registry, b PluginRegistryBackend) error {
 			},
 		},
 	)
+}
+
+// uninstallConfirm is plugin.uninstall's confirm text; n is how many threads the plugin
+// has (they are removed), 0 when it has none or that is unknown.
+func uninstallConfirm(name string, purge bool, n int) string {
+	switch {
+	case purge && n > 0:
+		return "Uninstall plugin " + name + "? It removes " + threadsWords(n) + " and deletes its data, its secrets in the Keychain, its logs and the consent given."
+	case purge:
+		return "Uninstall plugin " + name + " and delete its data, its secrets in the Keychain, its logs and the consent given?"
+	case n > 0:
+		return "Uninstall plugin " + name + "? It removes " + threadsWords(n) + "; its data, secrets and consent stay (--purge deletes them)."
+	}
+	return "Uninstall plugin " + name + "? Its data, secrets and consent stay (--purge deletes them)."
+}
+
+// pluginThreadCount counts plugin name's threads, archived ones too; 0 when that cannot
+// be asked.
+func pluginThreadCount(ctx context.Context, threads PluginThreadLister, name string) int {
+	if threads == nil {
+		return 0
+	}
+	res, err := threads.List(ctx, connect.NewRequest(&v1.ListThreadsRequest{Filter: &v1.ThreadFilter{Owner: pluginOwner(name), IncludeArchived: true}}))
+	if err != nil {
+		return 0
+	}
+	return len(res.Msg.GetThreads())
+}
+
+// threadsWords is "its N thread(s)".
+func threadsWords(n int) string {
+	if n == 1 {
+		return "its 1 thread"
+	}
+	return fmt.Sprintf("its %d threads", n)
 }
 
 // installConsent is the confirm text of plugin.install --enable: for a registry name, the

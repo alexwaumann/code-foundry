@@ -149,7 +149,7 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterPlugin(r, d.Plugin),
 		command.RegisterPluginSurface(r, d.PluginSurface),
 		command.RegisterPluginOwned(r, command.PluginOwnedDeps{Thread: d.Thread, Project: d.Project, Terminal: d.Terminal}),
-		command.RegisterPluginRegistry(r, d.PluginRegistry),
+		command.RegisterPluginRegistry(r, d.PluginRegistry, d.Thread),
 		command.RegisterPullRequestChecks(r, d.PullRequestChecks),
 	)
 }
