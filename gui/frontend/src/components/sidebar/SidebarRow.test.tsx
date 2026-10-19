@@ -1,10 +1,12 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { DashboardView, PullRequestDetailView, PullRequestView } from "@/api/gh";
 import type { ThreadView } from "@/api/threads";
 
 const renameThread = vi.hoisted(() => vi.fn<(id: string, name: string) => Promise<boolean>>(() => Promise.resolve(true)));
 vi.mock("@/stores/threadActions", async (orig) => ({ ...(await orig<typeof import("@/stores/threadActions")>()), renameThread }));
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { dashboardResource, pullRequestDetailResource, pullRequestKey } from "@/stores/gh";
 import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
@@ -263,5 +265,78 @@ describe("SidebarRow waiting on its child threads", () => {
     expect(screen.getByTestId("row-place").getAttribute("data-thread-badge")).toBe("idle");
     expect(screen.getByTestId("row-status").className).toBe("");
     expect(screen.getByTestId("row-waiting").getAttribute("class")).toContain("text-muted-foreground");
+  });
+});
+
+describe("SidebarRow linked PRs tag", () => {
+  const SLUG = "o/r";
+  const link = (number: number) => ({ slug: SLUG, number, url: `https://github.com/${SLUG}/pull/${String(number)}`, linkedAt: null });
+  const pr = (number: number, state: PullRequestView["state"], o: Partial<PullRequestView> = {}) =>
+    ({ repoSlug: SLUG, number, state, draft: false, title: `PR ${String(number)}`, updatedAtMs: 1, partial: false, ...o }) as PullRequestView;
+  const dashboard = (authored: PullRequestView[], recentlyMerged: PullRequestView[] = []) =>
+    ({ authored, reviewRequested: [], reviewed: [], recentlyMerged }) as unknown as DashboardView;
+
+  beforeEach(() => {
+    pullRequestDetailResource.store.setState({ entries: {} });
+    dashboardResource.store.setState({ entries: {} });
+  });
+
+  const tag = () => screen.queryByTestId("row-linked-prs");
+
+  it("no links, or only closed ones: no tag", () => {
+    renderRow({});
+    expect(tag()).toBeNull();
+    cleanup();
+    pullRequestDetailResource.set(pullRequestKey(SLUG, 131), { data: { pullRequest: pr(131, "closed") } as PullRequestDetailView });
+    renderRow({ linkedPullRequests: [link(131)] });
+    expect(tag()).toBeNull();
+  });
+
+  it.each([
+    ["open: green, the PR icon", pr(142, "open"), "open", "success", "text-success"],
+    ["draft: the draft tone", pr(145, "open", { draft: true }), "draft", "draft", "text-muted-foreground"],
+    ["merged: the merged tone", pr(138, "merged"), "merged", "merged", "text-highlight"],
+  ])("one %s, the bare number", (_name, p, state, tone, cls) => {
+    dashboardResource.set("tracked", { data: dashboard([p]) });
+    renderRow({ linkedPullRequests: [link(p.number)] });
+    const el = tag();
+    expect(el?.textContent).toBe(String(p.number));
+    expect(el?.getAttribute("data-state")).toBe(state);
+    expect(el?.getAttribute("data-tone")).toBe(tone);
+    expect(el?.className).toContain(cls);
+    expect(el?.querySelector(`svg[aria-label="${state}"]`)).not.toBeNull();
+  });
+
+  it("one not read yet: the number, neutral, the generic icon", () => {
+    renderRow({ linkedPullRequests: [link(7)] });
+    expect(tag()?.textContent).toBe("7");
+    expect(tag()?.getAttribute("data-state")).toBe("unknown");
+    expect(tag()?.getAttribute("data-tone")).toBe("neutral");
+  });
+
+  it("several: the count without closed ones, in the worst state's tone", () => {
+    dashboardResource.set("tracked", { data: dashboard([pr(1, "open"), pr(2, "open", { draft: true })], [pr(3, "merged")]) });
+    pullRequestDetailResource.set(pullRequestKey(SLUG, 4), { data: { pullRequest: pr(4, "closed") } as PullRequestDetailView });
+    renderRow({ linkedPullRequests: [link(1), link(2), link(3), link(4)] });
+    expect(tag()?.textContent).toBe("3 PRs");
+    expect(tag()?.getAttribute("data-kind")).toBe("many");
+    expect(tag()?.getAttribute("data-tone")).toBe("draft");
+  });
+
+  it("the fresher read wins: a cached detail newer than the dashboard", () => {
+    dashboardResource.set("tracked", { data: dashboard([pr(142, "open", { updatedAtMs: 1 })]) });
+    pullRequestDetailResource.set(pullRequestKey(SLUG, 142), { data: { pullRequest: pr(142, "merged", { updatedAtMs: 2 }) } as PullRequestDetailView });
+    renderRow({ linkedPullRequests: [link(142)] });
+    expect(tag()?.getAttribute("data-state")).toBe("merged");
+  });
+
+  it("re-renders when the state moves", () => {
+    dashboardResource.set("tracked", { data: dashboard([pr(142, "open")]) });
+    renderRow({ linkedPullRequests: [link(142)] });
+    expect(tag()?.getAttribute("data-state")).toBe("open");
+    act(() => {
+      dashboardResource.set("tracked", { data: dashboard([], [pr(142, "merged", { updatedAtMs: 2 })]) });
+    });
+    expect(tag()?.getAttribute("data-state")).toBe("merged");
   });
 });

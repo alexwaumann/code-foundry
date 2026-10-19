@@ -73,7 +73,9 @@ test("hidden without links; a link brings the sidebar badge, the header button a
   await expect(empty(page)).toBeVisible();
 
   await link("s-1", 142);
-  await expect(row(page, "s:s-1").getByTestId("row-linked-prs")).toHaveText("1 PR");
+  // One open PR: its bare number (docs/notes/sidebar-pr-tag.md).
+  await expect(row(page, "s:s-1").getByTestId("row-linked-prs")).toHaveText("142");
+  await expect(row(page, "s:s-1").getByTestId("row-linked-prs")).toHaveAttribute("data-state", "open");
   // One link: the header shows that PR, its state icon and number in the state's colour.
   await expect(page.getByTestId("pane-linked-pr")).toHaveText("#142");
   await expect(page.getByTestId("pane-linked-pr")).toHaveAttribute("data-state", "open");
@@ -89,6 +91,7 @@ test("hidden without links; a link brings the sidebar badge, the header button a
 
   await link("s-1", 147);
   await expect(row(page, "s:s-1").getByTestId("row-linked-prs")).toHaveText("2 PRs");
+  await expect(row(page, "s:s-1").getByTestId("row-linked-prs")).toHaveAttribute("data-tone", "success");
   // Two or more: a muted count (view.panel.linked-prs).
   await expect(page.getByTestId("pane-linked-prs")).toHaveAttribute("aria-label", "Show Linked PRs in Side Panel (2)");
   await expect(page.getByTestId("pane-linked-prs")).toHaveText("2");
@@ -177,6 +180,47 @@ test("the sidebar badge opens the surface for its thread and selects it", async 
   await expect(list(page).getByTestId("linkedpr-repo")).toHaveText(["· alexwaumann/code-foundry", "· alexwaumann/ghostty-playground"]);
 });
 
+/**
+ * The sidebar tag's states (docs/notes/sidebar-pr-tag.md): s-1 open #142, s-3 draft #145,
+ * s-4 merged #138, s-5 all three plus closed #131. #131 is on no dashboard, so it counts
+ * as unknown until its detail is read (the Linked PRs surface reads it); then it drops out.
+ */
+async function linkStates(): Promise<void> {
+  await link("s-1", 142, 10 * MIN);
+  await link("s-3", 145, 10 * MIN);
+  await link("s-4", 138, 10 * MIN);
+  for (const n of [138, 145, 142, 131]) await link("s-5", n, 10 * MIN);
+  // #147 is on no dashboard: unknown until something reads its detail.
+  await link("s-2", 147, 10 * MIN);
+}
+
+test("the sidebar tag: one PR's state and number, a count in the worst state's tone, closed ones left out", async ({ page }) => {
+  await linkStates();
+  await openApp(page);
+  const tag = (thread: string) => row(page, `s:${thread}`).getByTestId("row-linked-prs");
+  await expect(tag("s-1")).toHaveText("142");
+  await expect(tag("s-1")).toHaveAttribute("data-state", "open");
+  await expect(tag("s-3")).toHaveText("145");
+  await expect(tag("s-3")).toHaveAttribute("data-state", "draft");
+  await expect(tag("s-4")).toHaveText("138");
+  await expect(tag("s-4")).toHaveAttribute("data-state", "merged");
+  // #131 not read yet: it counts.
+  await expect(tag("s-5")).toHaveText("4 PRs");
+  await expect(tag("s-5")).toHaveAttribute("data-tone", "draft");
+  // The tooltip names the one PR's state and title.
+  await tag("s-1").hover();
+  await expect(page.getByTestId("row-linked-prs-tip").first()).toContainText("Open · feat(gui): virtualized sidebar tree with thread rows");
+  await expect(page.getByTestId("thread-tooltip")).toHaveCount(0);
+  // Opening s-5's list reads #131's detail: closed, so it leaves the count.
+  await tag("s-5").click();
+  await expectLinkedTab(page, "s-5");
+  await expect(list(page).locator('[data-testid="linkedpr-state"][data-state="closed"]')).toHaveCount(1);
+  await expect(tag("s-5")).toHaveText("3 PRs");
+  await page.mouse.move(0, 0);
+  await tag("s-5").hover();
+  await expect(page.getByTestId("row-linked-prs-tip").first()).toContainText("#142 · Open #145 · Draft #138 · Merged");
+});
+
 test("hover actions: open on GitHub and copy the link", async ({ page }) => {
   await linkFour();
   await openApp(page);
@@ -230,5 +274,32 @@ for (const scheme of ["dark", "light"] as const) {
     await expect(panel(page)).toHaveCount(0);
     await page.getByTestId("pane-linked-prs").hover();
     await shot("linkedprs-header-sidebar");
+  });
+}
+
+/** SHOTS=<dir>: the sidebar tag's screenshots for docs/notes/sidebar-pr-tag.md's PR, dark and light. */
+for (const scheme of ["dark", "light"] as const) {
+  test(`sidebar tag screenshots (${scheme})`, async ({ page }, info) => {
+    const shots = process.env.SHOTS;
+    test.skip(!shots || info.project.name !== "webkit", "SHOTS=<dir> with WebKit only");
+    const suffix = scheme === "light" ? "-light" : "";
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.setViewportSize({ width: 1400, height: 900 });
+    await linkStates();
+    await openApp(page);
+    const tag = (thread: string) => row(page, `s:${thread}`).getByTestId("row-linked-prs");
+    // Read #131 (closed) so it leaves s-5's count, then select s-1.
+    await tag("s-5").click();
+    await expect(tag("s-5")).toHaveText("3 PRs");
+    await row(page, "s:s-1").click();
+    await page.mouse.move(700, 450);
+    const sidebar = page.getByTestId("sidebar");
+    const box = await sidebar.boundingBox();
+    if (!box) throw new Error("no sidebar");
+    const clip = { x: box.x, y: box.y, width: box.width, height: box.height };
+    await page.screenshot({ path: `${shots ?? ""}/sidebar-pr-tag${suffix}.png`, clip });
+    await tag("s-5").hover();
+    await expect(page.getByTestId("row-linked-prs-tip").first()).toBeVisible();
+    await page.screenshot({ path: `${shots ?? ""}/sidebar-pr-tag-tip${suffix}.png`, clip: { ...clip, width: box.width + 300 } });
   });
 }
