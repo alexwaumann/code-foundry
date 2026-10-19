@@ -35,7 +35,7 @@ func TestPluginRegistryCommands(t *testing.T) {
 		update    *v1.UpdatePluginsResponse
 		uninstall *v1.UninstallPluginResponse
 		threads   []*v1.Thread // the plugin's threads, which the uninstall confirm counts
-		wantErr   string // a ConfirmError's message prefix, or a substring of the error
+		wantErr   string       // a ConfirmError's message prefix, or a substring of the error
 		wantMsg   []string
 		want      proto.Message
 	}{
