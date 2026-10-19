@@ -395,3 +395,5 @@ and a snoozed subscriber (Send's unsnooze, unchanged).
 ## Daemon restart
 
 Needed: migration 0024, new RPCs and commands, the commit hook.
+
+Plugins add a third target kind, their wake sources: `docs/notes/plugins-wake-sources.md`.

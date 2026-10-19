@@ -2,7 +2,7 @@
   "name": "hello",
   "displayName": "Hello",
   "version": "0.1.0",
-  "description": "The example plugin: greets, sends a message to a thread through the host, keeps a word in the Keychain, follows the thread list, flags threads, gives new threads CF_HELLO=1, and runs a Claude thread and a terminal of its own.",
+  "description": "The example plugin: greets, sends a message to a thread through the host, keeps a word in the Keychain, follows the thread list, flags threads, gives new threads CF_HELLO=1, runs a Claude thread and a terminal of its own, and ticks for subscribed threads.",
   "protocol": 1,
   "exec": ["bin/hello"],
   "permissions": {
@@ -74,6 +74,21 @@
       "name": "events",
       "title": "Count Thread Events",
       "description": "Say how many thread list events the plugin received since it started."
+    },
+    {
+      "name": "fire-tick",
+      "title": "Fire Tick Now",
+      "description": "Fire the tick wake source now: wake the threads subscribed to it.",
+      "args": [{ "name": "every", "description": "Only the subscriptions with this every (default: each one armed)" }]
+    }
+  ],
+  "wakes": [
+    {
+      "name": "tick",
+      "title": "Tick",
+      "description": "Fires every <every> while a thread is subscribed (once without --repeat); the payload has the tick count. A demo of wake sources.",
+      "scope": "global",
+      "args": [{ "name": "every", "type": "duration", "default": "10s", "description": "How often it fires" }]
     }
   ],
   "surfaces": [

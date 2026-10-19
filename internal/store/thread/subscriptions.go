@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log/slog"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -123,8 +124,10 @@ type Subscription struct {
 	ID           string // "sub-" + 12 hex digits
 	SubscriberID string // the thread that is woken
 	TargetKind   TargetKind
-	TargetID     string // a thread id, or an action run id
+	TargetID     string // a thread id, an action run id, or "<plugin>/<source>"
 	Condition    Condition
+	// Args are a plugin target's (subscriptions_plugin.go); nil for the others.
+	Args map[string]string
 	// Repeat: fires on every transition into the condition; else it goes once it fired.
 	Repeat    bool
 	CreatedAt time.Time
@@ -139,15 +142,18 @@ type Subscription struct {
 }
 
 // SubscribeOptions configures Store.Subscribe: exactly one of TargetThreadID,
-// TargetRunID and TargetPullRequest ("owner/name#123" or a pull request URL).
-// Condition "" is CondSettled for a thread, CondFinished for a run, CondChecksDone for
-// a pull request; a run also takes CondSettled (it means finished). Repeat is ignored
-// for a run.
+// TargetRunID, TargetPullRequest ("owner/name#123" or a pull request URL) and
+// TargetPlugin ("<plugin>/<source>", with Args). Condition "" is CondSettled for a
+// thread, CondFinished for a run, CondChecksDone for a pull request, CondFired for a
+// plugin; a run and a plugin also take CondSettled (it means their own). Repeat is
+// ignored for a run.
 type SubscribeOptions struct {
 	SubscriberID      string
 	TargetThreadID    string
 	TargetRunID       string
 	TargetPullRequest string
+	TargetPlugin      string
+	Args              map[string]string
 	Condition         Condition
 	Repeat            bool
 }
@@ -171,6 +177,7 @@ type UnsubscribeOptions struct {
 	TargetThreadID    string
 	TargetRunID       string
 	TargetPullRequest string
+	TargetPlugin      string
 }
 
 // ActionRun is what a wake about an action run says (Options.ActionRun).
@@ -199,6 +206,11 @@ type subscriptions struct {
 	// watch is Options.WatchPullRequests; watched the set it was last told.
 	watch   func(targets []string)
 	watched []string
+	// plugins is the plugin store's side of plugin targets (subscriptions_plugin.go);
+	// notes are its Changed calls waiting, noting whether a goroutine makes them.
+	plugins PluginWakes
+	notes   []pluginNote
+	noting  bool
 }
 
 // subRec is a subscription and whether its target met the condition when last seen.
@@ -228,6 +240,11 @@ func loadSubscriptionState(ctx context.Context, db *sql.DB, log *slog.Logger, re
 	var stale []string
 	for _, sub := range rows {
 		_, okSub := live(sub.SubscriberID)
+		if okSub && sub.TargetKind == TargetPlugin {
+			// The plugin re-arms when it starts (PluginSubscriptions).
+			s.byID[sub.ID] = &subRec{s: sub}
+			continue
+		}
 		switch target, okTarget := live(sub.TargetID); {
 		case okSub && sub.TargetKind == TargetThread && okTarget:
 			s.byID[sub.ID] = &subRec{s: sub, sat: Meets(sub.Condition, target)}
@@ -263,16 +280,19 @@ func newSubscriptionID() (string, error) {
 // subscribeTarget validates o's target and condition: the target's kind and id and the
 // condition with its default.
 func subscribeTarget(o SubscribeOptions) (TargetKind, string, Condition, error) {
-	thread, run, pr := strings.TrimSpace(o.TargetThreadID), strings.TrimSpace(o.TargetRunID), strings.TrimSpace(o.TargetPullRequest)
+	thread, run, pr, plugin := strings.TrimSpace(o.TargetThreadID), strings.TrimSpace(o.TargetRunID), strings.TrimSpace(o.TargetPullRequest),
+		strings.TrimSpace(o.TargetPlugin)
 	n := 0
-	for _, t := range []string{thread, run, pr} {
+	for _, t := range []string{thread, run, pr, plugin} {
 		if t != "" {
 			n++
 		}
 	}
 	switch {
 	case n != 1:
-		return "", "", "", fmt.Errorf("%w: give exactly one target: a thread, an action run or a pull request", ErrInvalidArgument)
+		return "", "", "", fmt.Errorf("%w: give exactly one target: a thread, an action run, a pull request or a plugin's wake source", ErrInvalidArgument)
+	case plugin == "" && len(o.Args) > 0:
+		return "", "", "", fmt.Errorf("%w: args are for a plugin's wake source", ErrInvalidArgument)
 	case pr != "":
 		target, err := ParsePullRequestTarget(pr)
 		if err != nil {
@@ -284,6 +304,15 @@ func subscribeTarget(o SubscribeOptions) (TargetKind, string, Condition, error) 
 				ErrInvalidArgument, c)
 		}
 		return TargetPullRequest, target, c, nil
+	case plugin != "":
+		if p, src, ok := strings.Cut(plugin, "/"); !ok || p == "" || src == "" || strings.Contains(src, "/") {
+			return "", "", "", fmt.Errorf("%w: %q is not <plugin>/<source> (code-foundry plugin wakes lists them)", ErrInvalidArgument, plugin)
+		}
+		switch o.Condition {
+		case "", CondFired, CondSettled:
+			return TargetPlugin, plugin, CondFired, nil
+		}
+		return "", "", "", fmt.Errorf("%w: a plugin's wake source's only condition is fired, not %s", ErrInvalidArgument, o.Condition)
 	case run != "":
 		switch o.Condition {
 		case "", CondFinished, CondSettled:
@@ -310,6 +339,7 @@ func (m *Manager) Subscribe(ctx context.Context, o SubscribeOptions) (SubscribeR
 	}
 	var run ActionRun
 	var pr *PullRequestInfo
+	var args map[string]string
 	switch kind {
 	case TargetActionRun:
 		if run, err = m.actionRun(ctx, target); err != nil {
@@ -325,13 +355,17 @@ func (m *Manager) Subscribe(ctx context.Context, o SubscribeOptions) (SubscribeR
 			}
 			pr = &p
 		}
+	case TargetPlugin:
+		if args, err = m.resolvePluginTarget(ctx, subscriber, target, o.Args); err != nil {
+			return SubscribeResult{}, err
+		}
 	}
 	id, err := newSubscriptionID()
 	if err != nil {
 		return SubscribeResult{}, err
 	}
 	res, err := m.subscribe(Subscription{
-		ID: id, SubscriberID: subscriber, TargetKind: kind, TargetID: target, Condition: cond,
+		ID: id, SubscriberID: subscriber, TargetKind: kind, TargetID: target, Condition: cond, Args: args,
 		Repeat: o.Repeat && kind != TargetActionRun, CreatedAt: m.opts.Now().Round(0).Truncate(time.Millisecond),
 	}, run, pr)
 	if err != nil || kind != TargetActionRun || res.Fired || res.Existed {
@@ -397,7 +431,8 @@ func (m *Manager) subscribe(sub Subscription, run ActionRun, pr *PullRequestInfo
 		target = trec.s
 	}
 	for _, r := range s.byID {
-		if r.s.SubscriberID == sub.SubscriberID && r.s.TargetKind == sub.TargetKind && r.s.TargetID == sub.TargetID && r.s.Condition == sub.Condition {
+		if r.s.SubscriberID == sub.SubscriberID && r.s.TargetKind == sub.TargetKind && r.s.TargetID == sub.TargetID && r.s.Condition == sub.Condition &&
+			maps.Equal(r.s.Args, sub.Args) {
 			if r.s.Repeat != sub.Repeat {
 				r.s.Repeat = sub.Repeat
 				if err := saveSubscription(context.Background(), s.db, r.s); err != nil {
@@ -435,6 +470,7 @@ func (m *Manager) subscribe(sub Subscription, run ActionRun, pr *PullRequestInfo
 	}
 	s.byID[sub.ID] = r
 	s.syncWatchLocked()
+	s.notePluginLocked(r.s, true)
 	m.log.Info("wake subscription added", "subscription", sub.ID, "subscriber", sub.SubscriberID, "target_kind", sub.TargetKind,
 		"target", sub.TargetID, "condition", sub.Condition, "repeat", sub.Repeat, "fired", fired)
 	return SubscribeResult{Subscription: r.s, Fired: fired}, nil
@@ -529,6 +565,9 @@ func (s *subscriptions) removeLocked(ids []string) {
 		return
 	}
 	for _, id := range ids {
+		if r, ok := s.byID[id]; ok {
+			s.notePluginLocked(r.s, false)
+		}
 		delete(s.byID, id)
 	}
 	if err := deleteSubscriptions(context.Background(), s.db, ids); err != nil {
@@ -602,7 +641,7 @@ func (m *Manager) Unsubscribe(_ context.Context, o UnsubscribeOptions) ([]Subscr
 		return []Subscription{r.s}, nil
 	}
 	kind, target, _, err := subscribeTarget(SubscribeOptions{TargetThreadID: o.TargetThreadID, TargetRunID: o.TargetRunID,
-		TargetPullRequest: o.TargetPullRequest})
+		TargetPullRequest: o.TargetPullRequest, TargetPlugin: o.TargetPlugin})
 	if err != nil {
 		return nil, fmt.Errorf("%w: give a subscription id, or a subscriber and a target", ErrInvalidArgument)
 	}
@@ -674,6 +713,8 @@ func (m *Manager) Subscriptions(ctx context.Context, subscriber string) ([]Subsc
 			if p, ok := m.opts.PullRequest(ctx, sub.TargetID); ok {
 				sub.TargetName, sub.TargetStatus = prTargetName(p), prStatusWords(p)
 			}
+		case TargetPlugin:
+			s.describePlugin(sub)
 		}
 	}
 	sortSubscriptions(out)

@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/thread_subscriptions.proto.
  */
 export const file_codefoundry_v1_thread_subscriptions: GenFile = /*@__PURE__*/
-  fileDesc("Ciljb2RlZm91bmRyeS92MS90aHJlYWRfc3Vic2NyaXB0aW9ucy5wcm90bxIOY29kZWZvdW5kcnkudjEimAMKElRocmVhZFN1YnNjcmlwdGlvbhIKCgJpZBgBIAEoCRIcChRzdWJzY3JpYmVyX3RocmVhZF9pZBgCIAEoCRI4CgZ0YXJnZXQYAyABKA4yKC5jb2RlZm91bmRyeS52MS5UaHJlYWRTdWJzY3JpcHRpb25UYXJnZXQSEQoJdGFyZ2V0X2lkGAQgASgJEj4KCWNvbmRpdGlvbhgFIAEoDjIrLmNvZGVmb3VuZHJ5LnYxLlRocmVhZFN1YnNjcmlwdGlvbkNvbmRpdGlvbhIOCgZyZXBlYXQYBiABKAgSLgoKY3JlYXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEwoLZmlyZWRfY291bnQYCCABKAMSMQoNbGFzdF9maXJlZF9hdBgJIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASFwoPc3Vic2NyaWJlcl9uYW1lGAogASgJEhMKC3RhcmdldF9uYW1lGAsgASgJEhUKDXRhcmdldF9zdGF0dXMYDCABKAki1AEKFlN1YnNjcmliZVRocmVhZFJlcXVlc3QSHAoUc3Vic2NyaWJlcl90aHJlYWRfaWQYASABKAkSGAoQdGFyZ2V0X3RocmVhZF9pZBgCIAEoCRIVCg10YXJnZXRfcnVuX2lkGAMgASgJEhsKE3RhcmdldF9wdWxsX3JlcXVlc3QYBiABKAkSPgoJY29uZGl0aW9uGAQgASgOMisuY29kZWZvdW5kcnkudjEuVGhyZWFkU3Vic2NyaXB0aW9uQ29uZGl0aW9uEg4KBnJlcGVhdBgFIAEoCCJzChdTdWJzY3JpYmVUaHJlYWRSZXNwb25zZRI4CgxzdWJzY3JpcHRpb24YASABKAsyIi5jb2RlZm91bmRyeS52MS5UaHJlYWRTdWJzY3JpcHRpb24SDQoFZmlyZWQYAiABKAgSDwoHZXhpc3RlZBgDIAEoCCKfAQoYVW5zdWJzY3JpYmVUaHJlYWRSZXF1ZXN0EhcKD3N1YnNjcmlwdGlvbl9pZBgBIAEoCRIcChRzdWJzY3JpYmVyX3RocmVhZF9pZBgCIAEoCRIYChB0YXJnZXRfdGhyZWFkX2lkGAMgASgJEhUKDXRhcmdldF9ydW5faWQYBCABKAkSGwoTdGFyZ2V0X3B1bGxfcmVxdWVzdBgFIAEoCSJQChlVbnN1YnNjcmliZVRocmVhZFJlc3BvbnNlEjMKB3JlbW92ZWQYASADKAsyIi5jb2RlZm91bmRyeS52MS5UaHJlYWRTdWJzY3JpcHRpb24iPgoeTGlzdFRocmVhZFN1YnNjcmlwdGlvbnNSZXF1ZXN0EhwKFHN1YnNjcmliZXJfdGhyZWFkX2lkGAEgASgJIlwKH0xpc3RUaHJlYWRTdWJzY3JpcHRpb25zUmVzcG9uc2USOQoNc3Vic2NyaXB0aW9ucxgBIAMoCzIiLmNvZGVmb3VuZHJ5LnYxLlRocmVhZFN1YnNjcmlwdGlvbirFAQoYVGhyZWFkU3Vic2NyaXB0aW9uVGFyZ2V0EioKJlRIUkVBRF9TVUJTQ1JJUFRJT05fVEFSR0VUX1VOU1BFQ0lGSUVEEAASJQohVEhSRUFEX1NVQlNDUklQVElPTl9UQVJHRVRfVEhSRUFEEAESKQolVEhSRUFEX1NVQlNDUklQVElPTl9UQVJHRVRfQUNUSU9OX1JVThACEisKJ1RIUkVBRF9TVUJTQ1JJUFRJT05fVEFSR0VUX1BVTExfUkVRVUVTVBADKpkGChtUaHJlYWRTdWJzY3JpcHRpb25Db25kaXRpb24SLQopVEhSRUFEX1NVQlNDUklQVElPTl9DT05ESVRJT05fVU5TUEVDSUZJRUQQABIpCiVUSFJFQURfU1VCU0NSSVBUSU9OX0NPTkRJVElPTl9TRVRUTEVEEAESJgoiVEhSRUFEX1NVQlNDUklQVElPTl9DT05ESVRJT05fSURMRRACEisKJ1RIUkVBRF9TVUJTQ1JJUFRJT05fQ09ORElUSU9OX0FUVEVOVElPThADEicKI1RIUkVBRF9TVUJTQ1JJUFRJT05fQ09ORElUSU9OX0VSUk9SEAQSLgoqVEhSRUFEX1NVQlNDUklQVElPTl9DT05ESVRJT05fRElTQ09OTkVDVEVEEAUSKgomVEhSRUFEX1NVQlNDUklQVElPTl9DT05ESVRJT05fRklOSVNIRUQQBhItCilUSFJFQURfU1VCU0NSSVBUSU9OX0NPTkRJVElPTl9DSEVDS1NfRE9ORRAHEi8KK1RIUkVBRF9TVUJTQ1JJUFRJT05fQ09ORElUSU9OX0NIRUNLU19GQUlMRUQQCBIvCitUSFJFQURfU1VCU0NSSVBUSU9OX0NPTkRJVElPTl9DSEVDS1NfUEFTU0VEEAkSKAokVEhSRUFEX1NVQlNDUklQVElPTl9DT05ESVRJT05fUkVWSUVXEAoSKQolVEhSRUFEX1NVQlNDUklQVElPTl9DT05ESVRJT05fQ09NTUVOVBALEjIKLlRIUkVBRF9TVUJTQ1JJUFRJT05fQ09ORElUSU9OX1JFVklFV19SRVFVRVNURUQQDBItCilUSFJFQURfU1VCU0NSSVBUSU9OX0NPTkRJVElPTl9IRUFEX1BVU0hFRBANEigKJFRIUkVBRF9TVUJTQ1JJUFRJT05fQ09ORElUSU9OX01FUkdFRBAOEigKJFRIUkVBRF9TVUJTQ1JJUFRJT05fQ09ORElUSU9OX0NMT1NFRBAPEikKJVRIUkVBRF9TVUJTQ1JJUFRJT05fQ09ORElUSU9OX0NIQU5HRUQQEELQAQoSY29tLmNvZGVmb3VuZHJ5LnYxQhhUaHJlYWRTdWJzY3JpcHRpb25zUHJvdG9QAVpHZ2l0aHViLmNvbS9hbGV4d2F1bWFubi9jb2RlLWZvdW5kcnkvZ2VuL2dvL2NvZGVmb3VuZHJ5L3YxO2NvZGVmb3VuZHJ5djGiAgNDWFiqAg5Db2RlZm91bmRyeS5WMcoCDkNvZGVmb3VuZHJ5XFYx4gIaQ29kZWZvdW5kcnlcVjFcR1BCTWV0YWRhdGHqAg9Db2RlZm91bmRyeTo6VjFiBnByb3RvMw", [file_google_protobuf_timestamp]);
+  fileDesc("Ciljb2RlZm91bmRyeS92MS90aHJlYWRfc3Vic2NyaXB0aW9ucy5wcm90bxIOY29kZWZvdW5kcnkudjEigQQKElRocmVhZFN1YnNjcmlwdGlvbhIKCgJpZBgBIAEoCRIcChRzdWJzY3JpYmVyX3RocmVhZF9pZBgCIAEoCRI4CgZ0YXJnZXQYAyABKA4yKC5jb2RlZm91bmRyeS52MS5UaHJlYWRTdWJzY3JpcHRpb25UYXJnZXQSEQoJdGFyZ2V0X2lkGAQgASgJEj4KCWNvbmRpdGlvbhgFIAEoDjIrLmNvZGVmb3VuZHJ5LnYxLlRocmVhZFN1YnNjcmlwdGlvbkNvbmRpdGlvbhIOCgZyZXBlYXQYBiABKAgSLgoKY3JlYXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEwoLZmlyZWRfY291bnQYCCABKAMSMQoNbGFzdF9maXJlZF9hdBgJIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASFwoPc3Vic2NyaWJlcl9uYW1lGAogASgJEhMKC3RhcmdldF9uYW1lGAsgASgJEhUKDXRhcmdldF9zdGF0dXMYDCABKAkSOgoEYXJncxgUIAMoCzIsLmNvZGVmb3VuZHJ5LnYxLlRocmVhZFN1YnNjcmlwdGlvbi5BcmdzRW50cnkaKwoJQXJnc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEi2AIKFlN1YnNjcmliZVRocmVhZFJlcXVlc3QSHAoUc3Vic2NyaWJlcl90aHJlYWRfaWQYASABKAkSGAoQdGFyZ2V0X3RocmVhZF9pZBgCIAEoCRIVCg10YXJnZXRfcnVuX2lkGAMgASgJEhsKE3RhcmdldF9wdWxsX3JlcXVlc3QYBiABKAkSFQoNdGFyZ2V0X3BsdWdpbhgKIAEoCRI+Cgljb25kaXRpb24YBCABKA4yKy5jb2RlZm91bmRyeS52MS5UaHJlYWRTdWJzY3JpcHRpb25Db25kaXRpb24SDgoGcmVwZWF0GAUgASgIEj4KBGFyZ3MYCyADKAsyMC5jb2RlZm91bmRyeS52MS5TdWJzY3JpYmVUaHJlYWRSZXF1ZXN0LkFyZ3NFbnRyeRorCglBcmdzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASJzChdTdWJzY3JpYmVUaHJlYWRSZXNwb25zZRI4CgxzdWJzY3JpcHRpb24YASABKAsyIi5jb2RlZm91bmRyeS52MS5UaHJlYWRTdWJzY3JpcHRpb24SDQoFZmlyZWQYAiABKAgSDwoHZXhpc3RlZBgDIAEoCCK2AQoYVW5zdWJzY3JpYmVUaHJlYWRSZXF1ZXN0EhcKD3N1YnNjcmlwdGlvbl9pZBgBIAEoCRIcChRzdWJzY3JpYmVyX3RocmVhZF9pZBgCIAEoCRIYChB0YXJnZXRfdGhyZWFkX2lkGAMgASgJEhUKDXRhcmdldF9ydW5faWQYBCABKAkSGwoTdGFyZ2V0X3B1bGxfcmVxdWVzdBgFIAEoCRIVCg10YXJnZXRfcGx1Z2luGAogASgJIlAKGVVuc3Vic2NyaWJlVGhyZWFkUmVzcG9uc2USMwoHcmVtb3ZlZBgBIAMoCzIiLmNvZGVmb3VuZHJ5LnYxLlRocmVhZFN1YnNjcmlwdGlvbiI+Ch5MaXN0VGhyZWFkU3Vic2NyaXB0aW9uc1JlcXVlc3QSHAoUc3Vic2NyaWJlcl90aHJlYWRfaWQYASABKAkiXAofTGlzdFRocmVhZFN1YnNjcmlwdGlvbnNSZXNwb25zZRI5Cg1zdWJzY3JpcHRpb25zGAEgAygLMiIuY29kZWZvdW5kcnkudjEuVGhyZWFkU3Vic2NyaXB0aW9uKuwBChhUaHJlYWRTdWJzY3JpcHRpb25UYXJnZXQSKgomVEhSRUFEX1NVQlNDUklQVElPTl9UQVJHRVRfVU5TUEVDSUZJRUQQABIlCiFUSFJFQURfU1VCU0NSSVBUSU9OX1RBUkdFVF9USFJFQUQQARIpCiVUSFJFQURfU1VCU0NSSVBUSU9OX1RBUkdFVF9BQ1RJT05fUlVOEAISKwonVEhSRUFEX1NVQlNDUklQVElPTl9UQVJHRVRfUFVMTF9SRVFVRVNUEAMSJQohVEhSRUFEX1NVQlNDUklQVElPTl9UQVJHRVRfUExVR0lOEAQqwgYKG1RocmVhZFN1YnNjcmlwdGlvbkNvbmRpdGlvbhItCilUSFJFQURfU1VCU0NSSVBUSU9OX0NPTkRJVElPTl9VTlNQRUNJRklFRBAAEikKJVRIUkVBRF9TVUJTQ1JJUFRJT05fQ09ORElUSU9OX1NFVFRMRUQQARImCiJUSFJFQURfU1VCU0NSSVBUSU9OX0NPTkRJVElPTl9JRExFEAISKwonVEhSRUFEX1NVQlNDUklQVElPTl9DT05ESVRJT05fQVRURU5USU9OEAMSJwojVEhSRUFEX1NVQlNDUklQVElPTl9DT05ESVRJT05fRVJST1IQBBIuCipUSFJFQURfU1VCU0NSSVBUSU9OX0NPTkRJVElPTl9ESVNDT05ORUNURUQQBRIqCiZUSFJFQURfU1VCU0NSSVBUSU9OX0NPTkRJVElPTl9GSU5JU0hFRBAGEi0KKVRIUkVBRF9TVUJTQ1JJUFRJT05fQ09ORElUSU9OX0NIRUNLU19ET05FEAcSLworVEhSRUFEX1NVQlNDUklQVElPTl9DT05ESVRJT05fQ0hFQ0tTX0ZBSUxFRBAIEi8KK1RIUkVBRF9TVUJTQ1JJUFRJT05fQ09ORElUSU9OX0NIRUNLU19QQVNTRUQQCRIoCiRUSFJFQURfU1VCU0NSSVBUSU9OX0NPTkRJVElPTl9SRVZJRVcQChIpCiVUSFJFQURfU1VCU0NSSVBUSU9OX0NPTkRJVElPTl9DT01NRU5UEAsSMgouVEhSRUFEX1NVQlNDUklQVElPTl9DT05ESVRJT05fUkVWSUVXX1JFUVVFU1RFRBAMEi0KKVRIUkVBRF9TVUJTQ1JJUFRJT05fQ09ORElUSU9OX0hFQURfUFVTSEVEEA0SKAokVEhSRUFEX1NVQlNDUklQVElPTl9DT05ESVRJT05fTUVSR0VEEA4SKAokVEhSRUFEX1NVQlNDUklQVElPTl9DT05ESVRJT05fQ0xPU0VEEA8SKQolVEhSRUFEX1NVQlNDUklQVElPTl9DT05ESVRJT05fQ0hBTkdFRBAQEicKI1RIUkVBRF9TVUJTQ1JJUFRJT05fQ09ORElUSU9OX0ZJUkVEEBRC0AEKEmNvbS5jb2RlZm91bmRyeS52MUIYVGhyZWFkU3Vic2NyaXB0aW9uc1Byb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM", [file_google_protobuf_timestamp]);
 
 /**
  * @generated from message codefoundry.v1.ThreadSubscription
@@ -90,11 +90,19 @@ export type ThreadSubscription = Message<"codefoundry.v1.ThreadSubscription"> & 
    * The target's state at read time, as words: a thread's status and reason
    * ("needs attention (finished)"), a run's "running" or "exited 3", a pull request's
    * "open · checks pending (2/4) · review required" or "merged" ("not polled yet"
-   * before the GitHub poll saw it); "gone" when the target no longer exists.
+   * before the GitHub poll saw it), a plugin's state ("running", "disabled"); "gone"
+   * when the target no longer exists.
    *
    * @generated from field: string target_status = 12;
    */
   targetStatus: string;
+
+  /**
+   * A plugin target's args: given, defaulted or taken from the subscriber's context.
+   *
+   * @generated from field: map<string, string> args = 20;
+   */
+  args: { [key: string]: string };
 };
 
 /**
@@ -116,7 +124,8 @@ export type SubscribeThreadRequest = Message<"codefoundry.v1.SubscribeThreadRequ
   subscriberThreadId: string;
 
   /**
-   * Exactly one target: a thread id, an action run id, or a pull request.
+   * Exactly one target: a thread id, an action run id, a pull request, or a plugin's
+   * wake source ("<plugin>/<source>").
    *
    * @generated from field: string target_thread_id = 2;
    */
@@ -135,9 +144,15 @@ export type SubscribeThreadRequest = Message<"codefoundry.v1.SubscribeThreadRequ
   targetPullRequest: string;
 
   /**
+   * @generated from field: string target_plugin = 10;
+   */
+  targetPlugin: string;
+
+  /**
    * UNSPECIFIED: SETTLED for a thread, FINISHED for a run, CHECKS_DONE for a pull
-   * request. A run takes only FINISHED (or SETTLED); a thread SETTLED to DISCONNECTED;
-   * a pull request CHECKS_DONE to CHANGED (INVALID_ARGUMENT otherwise).
+   * request, FIRED for a plugin. A run takes only FINISHED (or SETTLED); a thread SETTLED
+   * to DISCONNECTED; a pull request CHECKS_DONE to CHANGED; a plugin only FIRED (or
+   * SETTLED) (INVALID_ARGUMENT otherwise).
    *
    * @generated from field: codefoundry.v1.ThreadSubscriptionCondition condition = 4;
    */
@@ -149,6 +164,15 @@ export type SubscribeThreadRequest = Message<"codefoundry.v1.SubscribeThreadRequ
    * @generated from field: bool repeat = 5;
    */
   repeat: boolean;
+
+  /**
+   * A plugin target's args, by the source's arg names. An arg with a context defaults
+   * to the subscriber's (its id, pull request or project); a required one without a
+   * value is INVALID_ARGUMENT naming it.
+   *
+   * @generated from field: map<string, string> args = 11;
+   */
+  args: { [key: string]: string };
 };
 
 /**
@@ -223,6 +247,13 @@ export type UnsubscribeThreadRequest = Message<"codefoundry.v1.UnsubscribeThread
    * @generated from field: string target_pull_request = 5;
    */
   targetPullRequest: string;
+
+  /**
+   * "<plugin>/<source>": every subscription of the subscriber to it, whatever its args.
+   *
+   * @generated from field: string target_plugin = 10;
+   */
+  targetPlugin: string;
 };
 
 /**
@@ -321,6 +352,15 @@ export enum ThreadSubscriptionTarget {
    * @generated from enum value: THREAD_SUBSCRIPTION_TARGET_PULL_REQUEST = 3;
    */
   PULL_REQUEST = 3,
+
+  /**
+   * A plugin's wake source (target_id is "<plugin>/<source>"; args select which of its
+   * events). The plugin fires it; disabling or uninstalling the plugin, or an update
+   * that drops the source, sends a last "source gone" wake and removes it.
+   *
+   * @generated from enum value: THREAD_SUBSCRIPTION_TARGET_PLUGIN = 4;
+   */
+  PLUGIN = 4,
 }
 
 /**
@@ -460,6 +500,14 @@ export enum ThreadSubscriptionCondition {
    * @generated from enum value: THREAD_SUBSCRIPTION_CONDITION_CHANGED = 16;
    */
   CHANGED = 16,
+
+  /**
+   * A plugin target's only condition: the plugin fired the source with a match that
+   * covers the subscription's args.
+   *
+   * @generated from enum value: THREAD_SUBSCRIPTION_CONDITION_FIRED = 20;
+   */
+  FIRED = 20,
 }
 
 /**

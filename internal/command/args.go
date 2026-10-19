@@ -84,6 +84,9 @@ type ArgSpec struct {
 	// IDList makes an ID arg a comma-separated list of ids: Invoke resolves each entry
 	// and hands Run the full ids joined by commas (blanks dropped). Not context-bound.
 	IDList bool
+	// Repeatable lets the CLI take the flag more than once; it sends the values joined
+	// by newlines (thread.subscribe's --arg k=v). String args only, not positional.
+	Repeatable bool
 }
 
 // validate checks the spec's static shape at Register time.
@@ -115,6 +118,8 @@ func (s ArgSpec) validate() error {
 		return errors.New("only a string arg can be an id, of a known kind")
 	case s.IDList && (s.ID == NoID || s.Context != NoContext):
 		return errors.New("an id list needs an id kind and no context")
+	case s.Repeatable && (s.Type != String || s.Positional || s.Context != NoContext):
+		return errors.New("only a string flag without a context can be repeated")
 	}
 	if s.Default != "" {
 		if _, err := s.parse(s.Default); err != nil {

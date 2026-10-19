@@ -8,6 +8,10 @@
   "permissions": { "commands": ["thread.send"] },
   "commands": [
     { "name": "echo", "title": "Echo", "args": [{ "name": "text", "positional": true }] },
-    { "name": "send", "title": "Send Through the Host", "args": [{ "name": "text", "required": true }] }
+    { "name": "send", "title": "Send Through the Host", "args": [{ "name": "text", "required": true }] },
+    { "name": "ring", "title": "Ring the Bell" }
+  ],
+  "wakes": [
+    { "name": "bell", "title": "Bell", "args": [{ "name": "tone", "type": "enum", "enum": ["high", "low"] }] }
   ]
 }

@@ -210,7 +210,7 @@ func (m *Manager) purgeIdentity(ctx context.Context, name string) ([]string, err
 		m.stopActor(e, StateDisabled)
 		m.unregister(name)
 	}
-	removed := m.discard(ctx, name, logs)
+	removed := m.discard(ctx, name, logs, "the plugin was replaced by another source")
 	if _, err := m.purgeSecretsAndData(ctx, name); err != nil {
 		return removed, err
 	}

@@ -265,6 +265,7 @@ func pluginToProto(p plugin.Plugin) *v1.Plugin {
 		out.Surfaces = append(out.Surfaces, &v1.PluginSurface{Id: s.ID, Title: s.Title, Icon: s.Icon, Scope: scope, Placements: placements,
 			When: s.When, ShowCommand: plugin.ShowCommand(p.Name, s.ID), Kind: plugin.SurfaceKind(p.Name, s.ID)})
 	}
+	out.Wakes = pluginWakesToProto(p.Name, mf.Wakes)
 	return out
 }
 

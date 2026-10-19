@@ -39,6 +39,10 @@ func (f *fakeArgCommands) List(context.Context, *connect.Request[v1.ListCommands
 			{Name: "status", Type: v1.ArgType_ARG_TYPE_ENUM, Positional: true},
 			{Name: "data", Type: v1.ArgType_ARG_TYPE_STRING, FileOrStdin: true},
 		}},
+		{Name: "thread.subscribe", Title: "Subscribe", Category: "Thread", Available: true, Args: []*v1.ArgSpec{
+			{Name: "plugin", Type: v1.ArgType_ARG_TYPE_STRING},
+			{Name: "arg", Type: v1.ArgType_ARG_TYPE_STRING, Repeatable: true},
+		}},
 	}}), nil
 }
 
@@ -78,6 +82,10 @@ func TestCLIThreadEnvDefaultAndArgSources(t *testing.T) {
 		{name: "data from stdin", stdin: `{"s":true}`, args: []string{"thread", "report", "done", "--data", "-"},
 			want: map[string]string{"status": "done", "data": `{"s":true}`}},
 		{name: "a missing file", args: []string{"thread", "report", "done", "--data", "@nope.json"}, wantErr: "--data: open"},
+		{name: "a repeated flag's values joined by newlines", args: []string{"thread", "subscribe", "--plugin", "hello/tick", "--arg", "every=2s", "--arg=pr=a/b#1"},
+			want: map[string]string{"plugin": "hello/tick", "arg": "every=2s\npr=a/b#1"}},
+		{name: "a flag that does not repeat keeps the last value", args: []string{"thread", "subscribe", "--plugin", "a/b", "--plugin", "c/d"},
+			want: map[string]string{"plugin": "c/d"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -73,6 +73,8 @@ listed and fail with the reason; its surfaces say so.
 | `events/event` | notification | `Event{subscription, snapshot, event}` | `Plugin.OnEvent` |
 | `terminal/exited` | notification | `{terminalId, exitCode}`: one of its terminals' process exited | `Plugin.OnTerminalExit` |
 | `secret/changed` | notification | `{key, deleted: true}`: the user deleted one of its secrets | `Plugin.OnSecretChanged` |
+| `wake/subscribed` | notification | `{subscription, source, args, context, repeat}`: a thread subscribed to a wake source; every live one again after each `initialized` | `Plugin.OnWakeSubscribed` |
+| `wake/unsubscribed` | notification | `{subscription, source}`: it went (unsubscribed, a one-shot fired, its thread archived) | `Plugin.OnWakeUnsubscribed` |
 
 After `surface/open` the plugin sends the instance's view with `view/update` within 10 s
 (else the host shows "not responding"); a view sent before it answers the open counts, so
@@ -101,6 +103,7 @@ first view first. An error from the factory or from `Act` is shown to the user
 | `terminal/create` | request | `{argv, cwd, env, title}` → `{terminalId}` | `CreateTerminal` | `terminals` |
 | `terminal/close` / `list` | request | `{terminalId}`; `{}` → `{terminals: [PluginTerminal]}` | `CloseTerminal`, `Terminals` | `terminals` |
 | `terminal/read` | request | `{terminalId, maxBytes, scrollback}` → `{text, truncated, lines}`: its screen as plain text, with `scrollback` the scrollback and the screen (`lines` counted; capability `terminal.scrollback`) | `ReadTerminal`, `ReadTerminalWith` | `terminals` |
+| `wake/fire` | request | `{source, match, title, payload}` → `{delivered}` | `FireWake` | a manifest `wakes` entry |
 
 What each does and its limits: `reference/host-api.md`. A method this host does not
 serve answers -32601.
@@ -131,7 +134,7 @@ code; `pluginsdk.ErrClosed` means the host went away (Serve is ending).
 hosts: `invoke`, `invoke.ask`, `secrets`, `log`, `surfaces`, `view.v1`, `view.append`,
 `view.node.<kind>` for each node kind it renders, `view.tabs`, `view.fieldset`,
 `view.optionsSource`, `view.duration`, `context`, `events`, `flags`, `sessionEnv`,
-`threads`, `terminals`, `act.context`. Check `h.HasCapability("view.node.thread")` before
+`threads`, `terminals`, `act.context`, `wakes`. Check `h.HasCapability("view.node.thread")` before
 relying on something newer than protocol 1's first release.
 
 ## Without the SDK

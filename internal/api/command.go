@@ -137,6 +137,7 @@ func commandToProto(c command.Listed) *v1.Command {
 			DefaultToCwd:       a.DefaultToCwd,
 			DefaultToThreadEnv: a.DefaultToThreadEnv,
 			FileOrStdin:        a.FileOrStdin,
+			Repeatable:         a.Repeatable,
 		}
 	}
 	return &v1.Command{

@@ -49,7 +49,7 @@ func pluginByName(ctx context.Context, b PluginBackend, name string) (*v1.Plugin
 
 // RegisterPlugin registers the plugin management verbs: plugin.list, plugin.enable,
 // plugin.disable, plugin.restart, plugin.reload, plugin.logs, plugin.dev,
-// plugin.secrets.list and plugin.secrets.delete. A plugin's own commands
+// plugin.secrets.list, plugin.secrets.delete, plugin.env and plugin.wakes. A plugin's own commands
 // (plugin.<name>.<command>) come from the plugin store (Registry.ReplacePrefix).
 func RegisterPlugin(r *Registry, b PluginBackend) error {
 	nameArg := ArgSpec{Name: "name", Type: String, Required: true, Positional: true, Description: "Plugin name (code-foundry plugin list)"}
@@ -236,6 +236,7 @@ func RegisterPlugin(r *Registry, b PluginBackend) error {
 			},
 		},
 		pluginEnvCmd(b),
+		pluginWakesCmd(b),
 	)
 }
 
@@ -286,7 +287,7 @@ func formatPlugins(ps []*v1.Plugin) string {
 	}
 	var sb strings.Builder
 	tw := tabwriter.NewWriter(&sb, 0, 4, 2, ' ', 0)
-	_, _ = fmt.Fprintln(tw, "NAME\tVERSION\tSTATE\tPERMISSIONS\tCOMMANDS\tSURFACES\tNOTE")
+	_, _ = fmt.Fprintln(tw, "NAME\tVERSION\tSTATE\tPERMISSIONS\tCOMMANDS\tSURFACES\tWAKES\tNOTE")
 	for _, p := range ps {
 		state := pluginState(p.GetState())
 		if p.GetDev() {
@@ -306,8 +307,8 @@ func formatPlugins(ps []*v1.Plugin) string {
 		case p.GetUpdateAvailable() && note == "":
 			note = p.GetUpdateVersion() + " available: code-foundry plugin update " + p.GetName()
 		}
-		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%d\t%s\t%s\n", p.GetName(), p.GetVersion(), state,
-			permissionSummary(p.GetPermissions()), len(p.GetCommands()), surfaceSummary(p.GetSurfaces()), note)
+		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\n", p.GetName(), p.GetVersion(), state,
+			permissionSummary(p.GetPermissions()), len(p.GetCommands()), surfaceSummary(p.GetSurfaces()), wakeSummary(p.GetWakes()), note)
 	}
 	_ = tw.Flush()
 	return strings.TrimRight(sb.String(), "\n")
@@ -330,6 +331,18 @@ func surfaceSummary(ss []*v1.PluginSurface) string {
 			on = "unknown"
 		}
 		out[i] = s.GetId() + "(" + on + ")"
+	}
+	return strings.Join(out, " ")
+}
+
+// wakeSummary names a plugin's wake sources ("tick checks-done"; plugin wakes has more).
+func wakeSummary(ws []*v1.PluginWake) string {
+	if len(ws) == 0 {
+		return "-"
+	}
+	out := make([]string, len(ws))
+	for i, w := range ws {
+		out[i] = w.GetName()
 	}
 	return strings.Join(out, " ")
 }

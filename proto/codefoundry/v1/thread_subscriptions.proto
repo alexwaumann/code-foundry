@@ -6,9 +6,10 @@ import "google/protobuf/timestamp.proto";
 
 // Wake subscriptions (ThreadService.Subscribe, Unsubscribe, ListSubscriptions): a
 // subscriber thread is sent a message when a target thread meets a condition, a target
-// action run finishes, or a target pull request changes, so an agent that started
-// other threads or opened a pull request is woken instead of polling. See
-// docs/notes/agents-4-wake.md and docs/notes/gh-events-3-pr-wake.md.
+// action run finishes, a target pull request changes, or a plugin fires a wake source,
+// so an agent that started other threads or opened a pull request is woken instead of
+// polling. See docs/notes/agents-4-wake.md, docs/notes/gh-events-3-pr-wake.md and
+// docs/notes/plugins-wake-sources.md.
 
 // ThreadSubscriptionTarget is what a subscription watches.
 enum ThreadSubscriptionTarget {
@@ -22,6 +23,10 @@ enum ThreadSubscriptionTarget {
   // the GitHub poll while subscribed; wakes come with the poll (about a minute with the
   // app open, up to 15 minutes without).
   THREAD_SUBSCRIPTION_TARGET_PULL_REQUEST = 3;
+  // A plugin's wake source (target_id is "<plugin>/<source>"; args select which of its
+  // events). The plugin fires it; disabling or uninstalling the plugin, or an update
+  // that drops the source, sends a last "source gone" wake and removes it.
+  THREAD_SUBSCRIPTION_TARGET_PLUGIN = 4;
 }
 
 // ThreadSubscriptionCondition is when a subscription fires: on a transition of the
@@ -67,6 +72,9 @@ enum ThreadSubscriptionCondition {
   THREAD_SUBSCRIPTION_CONDITION_CLOSED = 15;
   // Any change the poll reports; the wake lists them.
   THREAD_SUBSCRIPTION_CONDITION_CHANGED = 16;
+  // A plugin target's only condition: the plugin fired the source with a match that
+  // covers the subscription's args.
+  THREAD_SUBSCRIPTION_CONDITION_FIRED = 20;
 }
 
 message ThreadSubscription {
@@ -91,24 +99,34 @@ message ThreadSubscription {
   // The target's state at read time, as words: a thread's status and reason
   // ("needs attention (finished)"), a run's "running" or "exited 3", a pull request's
   // "open · checks pending (2/4) · review required" or "merged" ("not polled yet"
-  // before the GitHub poll saw it); "gone" when the target no longer exists.
+  // before the GitHub poll saw it), a plugin's state ("running", "disabled"); "gone"
+  // when the target no longer exists.
   string target_status = 12;
+  // A plugin target's args: given, defaulted or taken from the subscriber's context.
+  map<string, string> args = 20;
 }
 
 message SubscribeThreadRequest {
   // The subscriber thread.
   string subscriber_thread_id = 1;
-  // Exactly one target: a thread id, an action run id, or a pull request.
+  // Exactly one target: a thread id, an action run id, a pull request, or a plugin's
+  // wake source ("<plugin>/<source>").
   string target_thread_id = 2;
   string target_run_id = 3;
   // "owner/name#123" or a github.com pull request URL.
   string target_pull_request = 6;
+  string target_plugin = 10;
   // UNSPECIFIED: SETTLED for a thread, FINISHED for a run, CHECKS_DONE for a pull
-  // request. A run takes only FINISHED (or SETTLED); a thread SETTLED to DISCONNECTED;
-  // a pull request CHECKS_DONE to CHANGED (INVALID_ARGUMENT otherwise).
+  // request, FIRED for a plugin. A run takes only FINISHED (or SETTLED); a thread SETTLED
+  // to DISCONNECTED; a pull request CHECKS_DONE to CHANGED; a plugin only FIRED (or
+  // SETTLED) (INVALID_ARGUMENT otherwise).
   ThreadSubscriptionCondition condition = 4;
   // Ignored for a run (fires once).
   bool repeat = 5;
+  // A plugin target's args, by the source's arg names. An arg with a context defaults
+  // to the subscriber's (its id, pull request or project); a required one without a
+  // value is INVALID_ARGUMENT naming it.
+  map<string, string> args = 11;
 }
 
 message SubscribeThreadResponse {
@@ -129,6 +147,8 @@ message UnsubscribeThreadRequest {
   string target_thread_id = 3;
   string target_run_id = 4;
   string target_pull_request = 5;
+  // "<plugin>/<source>": every subscription of the subscriber to it, whatever its args.
+  string target_plugin = 10;
 }
 
 message UnsubscribeThreadResponse {

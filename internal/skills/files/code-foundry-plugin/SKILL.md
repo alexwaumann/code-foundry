@@ -9,10 +9,10 @@ A plugin is an executable the Code Foundry daemon starts and talks to over its s
 stdout (newline-delimited JSON-RPC 2.0). Its `plugin.json` declares everything up front:
 **commands** (`code-foundry plugin <name> <command>`, also in the app's command palette),
 **surfaces** (side-panel tabs the app draws from a JSON view model the plugin sends; no
-HTML) and **permissions** the user consents to before it runs (host commands, events,
-thread flags, env for new threads, secrets, own threads and terminals). Write plugins in
-Go with the SDK `github.com/alexwaumann/code-foundry/pluginsdk` (standard library only;
-`/ui` builds views, `/plugintest` is a fake host for tests). This Code Foundry is {{cf.version}}.
+HTML), **wake sources** agents subscribe to instead of polling, and **permissions** the
+user consents to (host commands, events, flags, env, secrets, threads, terminals). Write
+plugins in Go with the SDK `github.com/alexwaumann/code-foundry/pluginsdk` (standard library only;
+`/ui` builds views, `/plugintest` a fake host for tests). This Code Foundry is {{cf.version}}.
 
 ## The loop
 
@@ -64,11 +64,8 @@ Go with the SDK `github.com/alexwaumann/code-foundry/pluginsdk` (standard librar
 
 Ask the user before steps 9 and 10: they publish under the user's name. Larger examples:
 `alexwaumann/code-foundry-plugin-gh-actions` and `alexwaumann/code-foundry-plugin-test-watcher`.
-
 **Showcase.** `alexwaumann/code-foundry-plugin-showcase` is the living gallery of every
-component (each node, field, span and button style, flags, toasts, facts, environment,
-secrets, events, host commands, its own thread and terminal), a tab per family with its
-Go in `tab_*.go`. To see a component in the real panel, `code-foundry plugin install
+component, a tab per family with its Go in `tab_*.go`: `code-foundry plugin install
 showcase` (once `plugins.registries` is configured) and read the matching file.
 
 ## Design rules for surfaces
@@ -105,6 +102,9 @@ showcase` (once `plugins.registries` is configured) and read the matching file.
   the protocol: the SDK sends a stray `fmt.Println` to the log instead.
 - Requests are handled concurrently (guard state with a mutex); events and other
   notifications arrive in order on one goroutine, so `OnEvent` must return quickly.
+- **Wake sources** (`manifest.md` "Wakes", `host-api.md` "FireWake"): arm in
+  `OnWakeSubscribed` (sent again after every start), fire with `h.FireWake`. End every
+  message, flag reason or timeline text about an event with `h.WakeHint(source, args)`.
 
 ## References (next to this file)
 

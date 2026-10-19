@@ -566,16 +566,18 @@ func (m *Manager) loadEnvironments(ctx context.Context) error {
 // forget drops what a disabled or removed plugin left behind: its session environment
 // and its flags on threads; it archives its threads and closes its terminals
 // (threads.go, terminals.go). Its secrets and consent stay.
-func (m *Manager) forget(ctx context.Context, name string, logs *logBuffer) {
+func (m *Manager) forget(ctx context.Context, name string, logs *logBuffer, why string) {
 	m.archiveThreads(ctx, name, logs)
 	m.release(ctx, name, logs)
+	m.endWakes(name, nil, why, logs)
 }
 
 // discard is forget for good (an uninstall, a takeover by another source): the plugin's
 // threads are removed rather than archived. It returns the ids of the threads removed.
-func (m *Manager) discard(ctx context.Context, name string, logs *logBuffer) []string {
+func (m *Manager) discard(ctx context.Context, name string, logs *logBuffer, why string) []string {
 	removed := m.removeThreads(ctx, name, logs)
 	m.release(ctx, name, logs)
+	m.endWakes(name, nil, why, logs)
 	return removed
 }
 
@@ -624,6 +626,7 @@ func (m *Manager) sweep(ctx context.Context) {
 		}
 	}
 	for _, name := range gone {
-		m.forget(ctx, name, nil)
+		m.forget(ctx, name, nil, "the plugin is disabled")
 	}
+	m.sweepWakes()
 }
