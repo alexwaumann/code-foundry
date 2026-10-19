@@ -120,7 +120,7 @@ func removeThreads(ctx context.Context, b ThreadBackend, ids []string) Result {
 // archiveThreads is thread.archive given ids: it archives each (archived=false
 // unarchives each); unlike one id it does not toggle, since a list may mix both.
 func archiveThreads(ctx context.Context, b ThreadBackend, ids []string, a Args) Result {
-	archived := !a.Has("archived") || a.Bool("archived")
+	archived := archiveTarget(a)
 	verb := "archived"
 	if !archived {
 		verb = "unarchived"

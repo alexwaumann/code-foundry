@@ -48,9 +48,9 @@ func RegisterThreadList(r *Registry, d ThreadListDeps) error {
 	return r.Register(Command{
 		Name:  "thread.list",
 		Title: "List Threads",
-		Description: "List threads, the most recently active first: one line each, " +
-			"`<id>  <status>  <name>  <project>@<branch>  <age>` and `↳ <creator>` for a thread another thread created; " +
-			"`(you)` follows your own thread's name.",
+		Description: "List threads: one line each, " +
+			"`<id>  <status>  <name>  <project>@<branch>  <age>` and `↳ <creator>` if a thread created it; " +
+			"`(you)` marks your own.",
 		Category:     "Thread",
 		NoKeybinding: true,
 		Args: []ArgSpec{
@@ -63,6 +63,7 @@ func RegisterThreadList(r *Registry, d ThreadListDeps) error {
 			{Name: "created-by", Type: String, Description: "Only threads created by this thread (id or suffix); user: by the user"},
 			{Name: "label", Type: String, Description: "Comma-separated labels: only threads carrying all of them"},
 			{Name: "plugin", Type: String, Description: "Only the threads this plugin owns, or * for every plugin's (left out otherwise, except with all)"},
+			descendantsArg("only it and the threads below it, as a tree with each one's cost and a total line"),
 			{Name: "limit", Type: Int, Default: threadListDefaultLimit, Description: "At most this many threads, the most recently active (0: no limit)"},
 		},
 		Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
@@ -74,6 +75,7 @@ func RegisterThreadList(r *Registry, d ThreadListDeps) error {
 				Status: threadListStatuses[a.String("status")], State: threadListState(a.String("state")),
 				Project: strings.TrimSpace(a.String("project")), Workspace: strings.TrimSpace(a.String("workspace")),
 				Labels: splitList(a.String("label")), Limit: int32(a.Int("limit")), Owner: pluginOwner(a.String("plugin")),
+				DescendantsOf: a.String("descendants-of"),
 			}
 			by, err := resolveCreatedBy(ctx, d.Thread, a.String("created-by"))
 			if err != nil {
@@ -172,7 +174,9 @@ func creatorName(s *v1.Thread, names map[string]string) (name string, exists boo
 
 // formatThreadList is thread.list's text: one aligned line per thread, then one per
 // removed thread (removedListLine), then a hint when the limit cut the list, or why it
-// is empty. names resolves creators (threadNames).
+// is empty. names resolves creators (threadNames). With f.descendants_of the threads
+// are a subtree in tree order: each name indented for its depth (subtreeName) instead
+// of the creator after it, its cost after its age, and a total line.
 func formatThreadList(threads []*v1.Thread, removed []*v1.RemovedThread, projects []*v1.Project, names map[string]string, f *v1.ThreadFilter,
 	now time.Time) string {
 	if len(threads) == 0 && len(removed) == 0 {
@@ -184,6 +188,8 @@ func formatThreadList(threads []*v1.Thread, removed []*v1.RemovedThread, project
 		}
 		return "no threads"
 	}
+	tree := f.GetDescendantsOf() != ""
+	var cost float64
 	var sb strings.Builder
 	tw := tabwriter.NewWriter(&sb, 0, 4, 2, ' ', 0)
 	for _, s := range threads {
@@ -191,7 +197,14 @@ func formatThreadList(threads []*v1.Thread, removed []*v1.RemovedThread, project
 		if s.GetIsCaller() {
 			name += " (you)"
 		}
+		if tree {
+			name = subtreeName(name, s.GetDepth())
+		}
 		line := fmt.Sprintf("%s\t%s\t%s\t%s\t%s", s.GetId(), threadStatusWord(s), name, threadPlace(s, projects), age(lastActivity(s), now))
+		if tree {
+			line += "\t" + formatUSD(s.GetCostUsd())
+			cost += s.GetCostUsd()
+		}
 		var marks []string
 		if s.GetArchivedAt() != nil {
 			marks = append(marks, "archived")
@@ -202,7 +215,7 @@ func formatThreadList(threads []*v1.Thread, removed []*v1.RemovedThread, project
 		if len(marks) > 0 {
 			line += "  [" + strings.Join(marks, ", ") + "]"
 		}
-		if s.GetCreatedBy() != "" {
+		if s.GetCreatedBy() != "" && !tree {
 			name, _ := creatorName(s, names)
 			line += "  ↳ " + name
 		}
@@ -216,6 +229,9 @@ func formatThreadList(threads []*v1.Thread, removed []*v1.RemovedThread, project
 	}
 	_ = tw.Flush()
 	out := strings.TrimRight(sb.String(), "\n")
+	if tree {
+		out += "\n" + subtreeTotal(len(threads), cost)
+	}
 	if n := f.GetLimit(); n > 0 && len(threads) == int(n) {
 		out += fmt.Sprintf("\n(the %d most recently active; --limit 0 lists all)", n)
 	}

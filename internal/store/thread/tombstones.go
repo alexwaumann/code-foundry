@@ -36,6 +36,9 @@ type RemovedThread struct {
 	CreatedBy string
 	Owner     string
 	Labels    []string
+	// CreatedAt is when the thread was created: its place among its siblings in a
+	// subtree it is no longer listed in (lineage.go).
+	CreatedAt time.Time
 	// Report is the thread's last report; the zero value when it never reported.
 	Report    Report
 	RemovedAt time.Time
@@ -50,7 +53,7 @@ type RemovedThread struct {
 func removedThread(t Thread, at time.Time) RemovedThread {
 	return RemovedThread{
 		ID: t.ID, Name: t.Name, ProjectID: t.ProjectID, WorkspaceID: t.WorkspaceID, CreatedBy: t.CreatedBy, Owner: t.Owner,
-		Labels: slices.Clone(t.Labels), Report: t.Report, RemovedAt: at, Usage: t.Usage, BudgetUSD: t.BudgetUSD,
+		Labels: slices.Clone(t.Labels), CreatedAt: t.CreatedAt, Report: t.Report, RemovedAt: at, Usage: t.Usage, BudgetUSD: t.BudgetUSD,
 	}
 }
 
@@ -151,9 +154,10 @@ func (m *Manager) ListRemoved(_ context.Context, o ListOptions) ([]RemovedThread
 
 // FilterRemoved returns the removed threads o selects, the most recently removed first,
 // at most o.Limit of them. A removed thread has no status or state: o.Status or o.State
-// leaves every one out. Archived or not does not apply.
+// leaves every one out, and so does o.DescendantsOf (a subtree lists live threads
+// only). Archived or not does not apply.
 func FilterRemoved(removed []RemovedThread, o ListOptions) []RemovedThread {
-	if o.Status != StatusUnknown || o.State != StateUnspecified {
+	if o.Status != StatusUnknown || o.State != StateUnspecified || o.DescendantsOf != "" {
 		return nil
 	}
 	o.IncludeArchived = true

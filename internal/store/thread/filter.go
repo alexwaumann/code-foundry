@@ -46,23 +46,55 @@ type ListOptions struct {
 	Owner string
 	// Limit: at most this many, the most recently active; 0 for no limit.
 	Limit int
+	// DescendantsOf: only this thread and the threads below it (lineage.go's Subtree:
+	// created by it, by those, and so on, MaxLineageDepth levels deep), in tree order
+	// with Thread.Depth set. Removed threads are never listed (FilterRemoved) but keep
+	// the line between a root and the threads below them.
+	DescendantsOf string
 }
 
 // FilterThreads returns the threads o selects, the most recently active first (last
 // activity, else creation; then the newest created, then by id), at most o.Limit of
-// them. o.Project and o.Workspace are compared as ids.
+// them. o.Project and o.Workspace are compared as ids. With o.DescendantsOf,
+// FilterLineage without removed threads.
 func FilterThreads(threads []Thread, o ListOptions) []Thread {
+	return FilterLineage(threads, nil, o)
+}
+
+// FilterLineage is FilterThreads, with removed's creators in the lineage
+// o.DescendantsOf walks: the threads of that subtree that o selects, the most
+// recently active o.Limit of them, in tree order (Subtree), each with its Depth.
+func FilterLineage(threads []Thread, removed []RemovedThread, o ListOptions) []Thread {
+	var pos map[string]int // a subtree thread's place in tree order
+	var depth map[string]int
+	if o.DescendantsOf != "" {
+		sub := Subtree(lineageNodes(threads, removed), o.DescendantsOf)
+		pos, depth = make(map[string]int, len(sub)), make(map[string]int, len(sub))
+		for i, e := range sub {
+			pos[e.ID], depth[e.ID] = i, e.Depth
+		}
+	}
 	var out []Thread
 	for _, t := range threads {
-		if o.matches(t) {
-			out = append(out, t)
+		if !o.matches(t) {
+			continue
 		}
+		if pos != nil {
+			if _, ok := pos[t.ID]; !ok {
+				continue
+			}
+			t.Depth = depth[t.ID]
+		}
+		out = append(out, t)
 	}
 	slices.SortStableFunc(out, func(a, b Thread) int {
 		return cmp.Or(lastActive(b).Compare(lastActive(a)), b.CreatedAt.Compare(a.CreatedAt), cmp.Compare(a.ID, b.ID))
 	})
 	if o.Limit > 0 && len(out) > o.Limit {
 		out = out[:o.Limit]
+	}
+	if pos != nil {
+		slices.SortFunc(out, func(a, b Thread) int { return cmp.Compare(pos[a.ID], pos[b.ID]) })
 	}
 	return out
 }
@@ -110,7 +142,11 @@ func (m *Manager) List(_ context.Context, o ListOptions) ([]Thread, error) {
 	if err != nil {
 		return nil, err
 	}
-	return FilterThreads(m.Snapshot().Threads, o), nil
+	var removed []RemovedThread
+	if o.DescendantsOf != "" {
+		removed = m.removed.list(m.opts.Now())
+	}
+	return FilterLineage(m.Snapshot().Threads, removed, o), nil
 }
 
 // resolveListRefs resolves o's Project (an id, a name, or a path inside a worktree)

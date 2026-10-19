@@ -62,12 +62,12 @@ func TestThreadListFilter(t *testing.T) {
 
 func TestListOptionsFromProto(t *testing.T) {
 	got := listOptionsFromProto(&v1.ThreadFilter{All: true, IncludeArchived: true, Status: v1.ThreadStatus_THREAD_STATUS_ERROR,
-		State: v1.ThreadState_THREAD_STATE_CLOSING, Project: "app", Workspace: "w", CreatedBy: "user", Labels: []string{"a"}, Limit: 3, Owner: "plugin:hello"})
+		State: v1.ThreadState_THREAD_STATE_CLOSING, Project: "app", Workspace: "w", CreatedBy: "user", Labels: []string{"a"}, Limit: 3, Owner: "plugin:hello", DescendantsOf: "s-1"})
 	want := thread.ListOptions{All: true, IncludeArchived: true, Status: thread.StatusError, State: thread.StateClosing,
-		Project: "app", Workspace: "w", CreatedBy: thread.CreatedByUser, Labels: []string{"a"}, Limit: 3, Owner: "plugin:hello"}
+		Project: "app", Workspace: "w", CreatedBy: thread.CreatedByUser, Labels: []string{"a"}, Limit: 3, Owner: "plugin:hello", DescendantsOf: "s-1"}
 	if got.All != want.All || got.IncludeArchived != want.IncludeArchived || got.Status != want.Status || got.State != want.State ||
 		got.Project != want.Project || got.Workspace != want.Workspace || got.CreatedBy != want.CreatedBy ||
-		!slices.Equal(got.Labels, want.Labels) || got.Limit != want.Limit || got.Owner != want.Owner {
+		!slices.Equal(got.Labels, want.Labels) || got.Limit != want.Limit || got.Owner != want.Owner || got.DescendantsOf != want.DescendantsOf {
 		t.Errorf("listOptionsFromProto = %+v, want %+v", got, want)
 	}
 }

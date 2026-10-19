@@ -69,6 +69,7 @@ func Write(w io.Writer, cmds []*v1.Command, self string) {
 	p("  and shows the 50 most recently active (`--limit 0` for all).")
 	p("- Your children: `code-foundry thread list --created-by $%s`, and their reports in one call:", paths.EnvThread)
 	p("  `thread reports --created-by $%s` (`--json` for the data). `--created-by user`: threads no thread created.", paths.EnvThread)
+	p("  `--descendants-of <id>` (list, reports, archive): its whole tree, with costs.")
 	p("- When your task is done (or blocked, or failed), say so as your last step, every caveat in the summary:")
 	p("  `code-foundry thread report done \"summary\" --data '{\"key\": \"value\"}'`.")
 	p("- Never send input to your own thread: `thread send`, `thread respond` and `thread interrupt` default to it, so")
@@ -188,7 +189,8 @@ func writeCategory(w io.Writer, level, cat string, list []*v1.Command, detailed 
 
 // guideShowsArg: the arg gets its own line. Not the thread id every thread command
 // takes (the intro explains it; the usage shows [--id]), nor the ids of thread remove
-// and archive (a Conventions line; the usage shows [--ids]), nor the args only the GUI
+// and archive (a Conventions line; the usage shows [--ids]), nor descendants-of and
+// archive's include-root (a Conventions line), nor the args only the GUI
 // sets (its composer's text, staged attachments) or the CLI sets from the environment
 // (thread interrupt's --by), nor a plugin arg (plugins' own
 // threads, plugin wake sources and their --arg: left out like the plugin namespace; the
@@ -196,7 +198,7 @@ func writeCategory(w io.Writer, level, cat string, list []*v1.Command, detailed 
 func guideShowsArg(a *v1.ArgSpec) bool {
 	d := a.GetDescription()
 	return !threadIDArg(a) && !threadIDsArg(a) && !strings.Contains(d, "(the GUI sets it)") && !strings.Contains(d, "(the CLI sets it") && !strings.Contains(d, "from StageAttachment") &&
-		a.GetName() != "plugin" && !a.GetRepeatable()
+		a.GetName() != "plugin" && a.GetName() != "descendants-of" && a.GetName() != "include-root" && !a.GetRepeatable()
 }
 
 // threadIDsArg: a's the "ids" of a thread command (several threads at once).

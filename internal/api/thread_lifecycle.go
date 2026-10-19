@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
@@ -58,6 +59,9 @@ func (h *Thread) List(ctx context.Context, req *connect.Request[v1.ListThreadsRe
 		res := &v1.ListThreadsResponse{Threads: make([]*v1.Thread, len(threads))}
 		for i, t := range threads {
 			res.Threads[i] = threadToProto(t)
+		}
+		if f.GetDescendantsOf() != "" {
+			res.Totals = subtreeTotals(threads, res.Threads)
 		}
 		if snap := h.store.Snapshot(); f.GetAll() && snap != nil {
 			res.RetiredUsage = retiredToProto(snap.RetiredUsage)
@@ -360,6 +364,17 @@ func listOptionsFromProto(f *v1.ThreadFilter) thread.ListOptions {
 		All: f.GetAll(), IncludeArchived: f.GetIncludeArchived(),
 		Status: thread.Status(f.GetStatus()), State: thread.State(f.GetState()),
 		Project: f.GetProject(), Workspace: f.GetWorkspace(), CreatedBy: f.GetCreatedBy(), Labels: f.GetLabels(),
-		Owner: f.GetOwner(), Limit: int(f.GetLimit()),
+		Owner: f.GetOwner(), Limit: int(f.GetLimit()), DescendantsOf: f.GetDescendantsOf(),
 	}
+}
+
+// subtreeTotals sets each listed thread's depth (a List with descendants_of) and sums
+// them: threads and protos are the same list.
+func subtreeTotals(threads []thread.Thread, protos []*v1.Thread) *v1.ThreadTotals {
+	tot := &v1.ThreadTotals{Threads: int32(len(protos))}
+	for i, p := range protos {
+		p.Depth = proto.Int32(int32(threads[i].Depth))
+		tot.CostUsd += p.GetCostUsd()
+	}
+	return tot
 }

@@ -238,6 +238,9 @@ type Thread struct {
 	// at creation, kept verbatim. Persisted (metadata.go).
 	CreatedBy     string
 	CreatedByName string
+	// Depth is how far below ListOptions.DescendantsOf the thread is (0: that thread),
+	// set on List's answer with that option only; never in a snapshot.
+	Depth int
 	// Brief is what the thread was started for, in its creator's words. Persisted.
 	Brief string
 	// Labels are sorted, distinct label tokens (CleanLabels). Persisted. Copy on write.

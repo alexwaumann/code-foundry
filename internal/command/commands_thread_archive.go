@@ -15,7 +15,8 @@ import (
 // while Claude is working or waiting on the user's answer, since it ends that turn, or
 // while the thread's background agents or shells run, since they stop with it; idle,
 // finished, errored and stopped threads archive at once, and unarchiving never asks.
-// With ids it acts on several threads (commands_thread_bulk.go).
+// With ids it acts on several threads (commands_thread_bulk.go), with descendants-of on
+// a thread's subtree (commands_thread_descendants.go).
 // See docs/notes/archive-threads-1-daemon.md and docs/notes/thread-lifecycle.md.
 func threadArchive(b ThreadBackend, idArg ArgSpec) Command {
 	return Command{
@@ -28,6 +29,8 @@ func threadArchive(b ThreadBackend, idArg ArgSpec) Command {
 			optionalID(idArg),
 			threadIDsArg,
 			{Name: "archived", Type: Bool, Description: "Archive (true) or unarchive (false); default: the opposite of now (with ids: archive)"},
+			descendantsArg("archive the threads below it (not it, unless include-root)"),
+			includeRootArg,
 		},
 		When:    hasThreadOrCLI,
 		Confirm: "Archive thread {id}? Claude is still working; archiving ends the turn.",
@@ -38,6 +41,15 @@ func threadArchive(b ThreadBackend, idArg ArgSpec) Command {
 			return archiveConfirm(ctx, b, a)
 		},
 		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
+			if a.String("descendants-of") != "" {
+				if a.Has("ids") {
+					return Result{}, InvalidArg("ids", "give ids or descendants-of, not both")
+				}
+				return archiveSubtree(ctx, b, a)
+			}
+			if a.Bool("include-root") {
+				return Result{}, InvalidArg("include-root", "include-root goes with descendants-of")
+			}
 			ids, err := targetThreads(a)
 			if err != nil {
 				return Result{}, err
@@ -70,8 +82,15 @@ func threadArchive(b ThreadBackend, idArg ArgSpec) Command {
 
 // archiveConfirm is thread.archive's confirmation for this call, or "" when it needs
 // none: unarchiving, or archiving a thread that is not mid-turn (archiveInterrupts).
-// An unknown thread needs none either: Run reports it. Given ids, archiveManyConfirm.
+// An unknown thread needs none either: Run reports it. Given ids, archiveManyConfirm;
+// given descendants-of, archiveSubtreeConfirm.
 func archiveConfirm(ctx context.Context, b ThreadBackend, a Args) string {
+	if a.String("descendants-of") != "" {
+		if a.Has("ids") {
+			return "" // Run refuses
+		}
+		return archiveSubtreeConfirm(ctx, b, a)
+	}
 	ids, err := targetThreads(a)
 	if err != nil {
 		return ""
