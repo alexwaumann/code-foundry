@@ -195,7 +195,7 @@ describe("walks and scopes", () => {
     expect(reconcileDetails(open, "i", { nodes: [] })).toBe(open);
     // Inside a tabs node the key carries its scope.
     const scoped = draftKeyOf("i", "\u0001tb=a", "md");
-    const inTabs: PluginViewModel = { nodes: [{ key: "tb", tabs: { items: [{ key: "a", label: "A" }, { key: "b", label: "B" }], active: "a", children: [mdNode({ selected: "zz" as string })] } }] };
+    const inTabs: PluginViewModel = { nodes: [{ key: "tb", tabs: { items: [{ key: "a", label: "A" }, { key: "b", label: "B" }], active: "a", children: [mdNode({ selected: "zz" })] } }] };
     expect(reconcileDetails({ [scoped]: { token: "", selected: "r1" } }, "i", inTabs)[scoped]).toBeUndefined();
   });
 });
@@ -456,9 +456,9 @@ describe("tabs node", () => {
     again("r1", "tl");
     expect(screen.queryByTestId("plugin-input")).toBeNull();
     again("r1", "ta");
-    expect((screen.getByTestId("plugin-input") as HTMLInputElement).value).toBe("flaky");
+    expect(screen.getByTestId<HTMLInputElement>("plugin-input").value).toBe("flaky");
     again("r2", "ta");
-    expect((screen.getByTestId("plugin-input") as HTMLInputElement).value).toBe("");
+    expect(screen.getByTestId<HTMLInputElement>("plugin-input").value).toBe("");
   });
 });
 
