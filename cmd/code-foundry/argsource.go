@@ -1,10 +1,13 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"strings"
+	"unicode"
 )
 
 // maxArgSource bounds what readArgSource reads; the daemon refuses large values anyway
@@ -13,6 +16,8 @@ const maxArgSource = 1 << 20
 
 // readArgSource is a FileOrStdin arg's value (ArgSpec.file_or_stdin): the contents of
 // <path> for @<path> (relative to the CLI's cwd), stdin for -, else the value as given.
+// A value with whitespace that names no file is also taken as given: a prompt may
+// start with a Claude Code file mention ("@main.go explain this").
 func (cl *cli) readArgSource(name, v string) (string, error) {
 	var r io.Reader
 	switch {
@@ -27,6 +32,9 @@ func (cl *cli) readArgSource(name, v string) (string, error) {
 			return "", err
 		}
 		f, err := os.Open(p)
+		if errors.Is(err, fs.ErrNotExist) && strings.ContainsFunc(v, unicode.IsSpace) {
+			return v, nil
+		}
 		if err != nil {
 			return "", fmt.Errorf("--%s: %w", name, err)
 		}

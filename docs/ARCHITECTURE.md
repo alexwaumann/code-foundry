@@ -139,7 +139,9 @@ Transport:
 
 Every Claude process also gets `CODE_FOUNDRY_THREAD=<its thread id>`, which the CLI sends
 as its default `--context-thread`: an agent's `code-foundry terminal new` or `action run`
-lands in its own thread's bottom panel (`docs/notes/actions-1-daemon.md`).
+lands in its own thread's bottom panel (`docs/notes/actions-1-daemon.md`). The daemon puts
+the directory of `CODE_FOUNDRY_BIN` (the CLI it runs as) on the PATH of everything it
+starts, so a thread finds `code-foundry` by name (`docs/notes/orch-small-fixes.md`).
 
 Both listeners serve the same handlers. The port and token are written by the daemon on
 start; the Wails host reads them and injects them into the page before load.

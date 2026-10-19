@@ -109,6 +109,10 @@ const (
 // ReasonInterrupted is the StatusReason of StatusError: the process ended mid-turn.
 const ReasonInterrupted = "interrupted"
 
+// ReasonArchived is the StatusReason, with StatusIdle, of a thread whose turn (or
+// pending request) an archive cut off: stopped on purpose, not interrupted (Archive).
+const ReasonArchived = "archived"
+
 // Thread is an immutable snapshot of one thread. Field meanings follow
 // codefoundry.v1.Thread.
 //

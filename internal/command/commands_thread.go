@@ -92,7 +92,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 			Category: "Thread",
 			Args: []ArgSpec{
 				idArg,
-				{Name: "text", Type: String, Required: true, Positional: true, Description: "The message"},
+				{Name: "text", Type: String, Required: true, Positional: true, FileOrStdin: true, Description: "The message (@file: from a file, -: stdin)"},
 				{Name: "attachments", Type: String, Description: "Comma-separated image or PDF paths from StageAttachment"},
 				{Name: "composer-text", Type: String, Description: "The GUI composer's text with its tag tokens, kept on the message for display (the GUI sets it)"},
 				{Name: "wait", Type: Bool, Description: "Then wait until Claude has answered the message and the thread is idle, and print the thread " +

@@ -87,9 +87,11 @@ func Run(ctx context.Context, opts Options) error {
 	defer func() { _ = logFile.Close() }()
 
 	// Before any store starts a process: children must not inherit an enclosing
-	// Claude Code session's variables, or another daemon's endpoint.
+	// Claude Code session's variables, or another daemon's endpoint, and they find
+	// the CLI on PATH.
 	scrubClaudeEnv(log)
 	scrubEndpointEnv(log)
+	addCLIToPath(log)
 
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()

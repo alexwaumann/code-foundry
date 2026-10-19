@@ -23,6 +23,11 @@ import (
 // EnvHome overrides the config home directory.
 const EnvHome = "CODE_FOUNDRY_HOME"
 
+// EnvBin is the code-foundry CLI the daemon runs as. `code-foundry daemon` sets it to
+// itself when unset (the GUI sets it before auto-starting one); the daemon puts its
+// directory on the PATH of everything it starts, so threads find the CLI by name.
+const EnvBin = "CODE_FOUNDRY_BIN"
+
 // The daemon sets these in every Claude session it spawns: its loopback endpoint
 // (http://127.0.0.1:<port>) and bearer token. The CLI prefers them over the Unix
 // socket (client.EndpointFromEnv); sandboxed threads cannot connect to sockets.

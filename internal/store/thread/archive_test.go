@@ -75,6 +75,49 @@ func TestArchive(t *testing.T) {
 	}
 }
 
+// TestArchiveStatus: a turn (or a pending request) the archive cuts off reads idle
+// "archived", not error "interrupted"; a thread interrupted before keeps its status.
+func TestArchiveStatus(t *testing.T) {
+	tests := []struct {
+		name       string
+		setup      statusSetup
+		before     func(e *env, s Thread) // nil: archive the live thread
+		want       Status
+		wantReason string
+	}{
+		{name: "busy", setup: busySetup, want: StatusIdle, wantReason: ReasonArchived},
+		{name: "at a permission prompt", setup: permissionSetup, want: StatusIdle, wantReason: ReasonArchived},
+		{name: "idle", setup: idleSetup, want: StatusIdle, wantReason: "at prompt"},
+		{name: "interrupted before", setup: busySetup, want: StatusError, wantReason: ReasonInterrupted,
+			before: func(e *env, s Thread) {
+				e.exit(s.ID, 1)
+				e.waitFor(s.ID, "crashed", func(s Thread) bool { return s.State == StateDisconnected })
+			}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e, s := tt.setup.start(t)
+			if tt.before != nil {
+				tt.before(e, s)
+			}
+			got, err := e.m.Archive(e.ctx(), s.ID, true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.Status != tt.want || got.StatusReason != tt.wantReason {
+				t.Errorf("archived status %v %q, want %v %q", got.Status, got.StatusReason, tt.want, tt.wantReason)
+			}
+			rows, err := loadThreads(e.ctx(), e.m.opts.DB)
+			if err != nil || len(rows) != 1 {
+				t.Fatalf("load = %v, %v", rows, err)
+			}
+			if r := rows[0]; r.Status != tt.want || r.StatusReason != tt.wantReason {
+				t.Errorf("persisted %v %q, want %v %q", r.Status, r.StatusReason, tt.want, tt.wantReason)
+			}
+		})
+	}
+}
+
 func TestArchiveUnknown(t *testing.T) {
 	e := newEnv(t)
 	for _, archived := range []bool{true, false} {

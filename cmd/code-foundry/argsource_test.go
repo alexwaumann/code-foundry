@@ -32,8 +32,12 @@ type fakeArgCommands struct {
 func (f *fakeArgCommands) List(context.Context, *connect.Request[v1.ListCommandsRequest]) (*connect.Response[v1.ListCommandsResponse], error) {
 	return connect.NewResponse(&v1.ListCommandsResponse{Commands: []*v1.Command{
 		{Name: "thread.new", Title: "New Thread", Category: "Thread", Available: true, Args: []*v1.ArgSpec{
-			{Name: "prompt", Type: v1.ArgType_ARG_TYPE_STRING},
+			{Name: "prompt", Type: v1.ArgType_ARG_TYPE_STRING, FileOrStdin: true},
 			{Name: "created-by", Type: v1.ArgType_ARG_TYPE_STRING, DefaultToThreadEnv: true},
+		}},
+		{Name: "thread.send", Title: "Send to Thread", Category: "Thread", Available: true, Args: []*v1.ArgSpec{
+			{Name: "id", Type: v1.ArgType_ARG_TYPE_STRING, Required: true},
+			{Name: "text", Type: v1.ArgType_ARG_TYPE_STRING, Required: true, Positional: true, FileOrStdin: true},
 		}},
 		{Name: "thread.report", Title: "Report", Category: "Thread", Available: true, Args: []*v1.ArgSpec{
 			{Name: "status", Type: v1.ArgType_ARG_TYPE_ENUM, Positional: true},
@@ -56,6 +60,10 @@ func (f *fakeArgCommands) Invoke(_ context.Context, req *connect.Request[v1.Invo
 func TestCLIThreadEnvDefaultAndArgSources(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "r.json"), []byte(`{"n": 1}`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prompt := "Fix the \"parse\" bug (see $(cat notes)).\nThen report.\n"
+	if err := os.WriteFile(filepath.Join(dir, "prompt.txt"), []byte(prompt), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	inThread := map[string]string{paths.EnvThread: "s-parent"}
@@ -82,6 +90,17 @@ func TestCLIThreadEnvDefaultAndArgSources(t *testing.T) {
 		{name: "data from stdin", stdin: `{"s":true}`, args: []string{"thread", "report", "done", "--data", "-"},
 			want: map[string]string{"status": "done", "data": `{"s":true}`}},
 		{name: "a missing file", args: []string{"thread", "report", "done", "--data", "@nope.json"}, wantErr: "--data: open"},
+		{name: "a prompt from a file", args: []string{"thread", "new", "--created-by=", "--prompt", "@prompt.txt"},
+			want: map[string]string{"prompt": prompt, "created-by": ""}},
+		{name: "a prompt from stdin", stdin: "from stdin", args: []string{"thread", "new", "--created-by=", "--prompt", "-"},
+			want: map[string]string{"prompt": "from stdin", "created-by": ""}},
+		{name: "a prompt starting with a file mention is kept", args: []string{"thread", "new", "--created-by=", "--prompt", "@main.go explain this"},
+			want: map[string]string{"prompt": "@main.go explain this", "created-by": ""}},
+		{name: "a missing prompt file", args: []string{"thread", "new", "--prompt", "@nope.txt"}, wantErr: "--prompt: open"},
+		{name: "a message from a file", args: []string{"thread", "send", "--id", "s-1", "@prompt.txt"},
+			want: map[string]string{"id": "s-1", "text": prompt}},
+		{name: "a message from stdin", stdin: "continue", args: []string{"thread", "send", "--id", "s-1", "-"},
+			want: map[string]string{"id": "s-1", "text": "continue"}},
 		{name: "a repeated flag's values joined by newlines", args: []string{"thread", "subscribe", "--plugin", "hello/tick", "--arg", "every=2s", "--arg=pr=a/b#1"},
 			want: map[string]string{"plugin": "hello/tick", "arg": "every=2s\npr=a/b#1"}},
 		{name: "a flag that does not repeat keeps the last value", args: []string{"thread", "subscribe", "--plugin", "a/b", "--plugin", "c/d"},
