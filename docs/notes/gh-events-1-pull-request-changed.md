@@ -127,3 +127,45 @@ The proto kind is `PULL_REQUEST_CHANGE_KIND_` + the upper-cased Go kind.
   checks, different checks); `TestPluginChecksFollowGhEvents` (the daemon glue).
 
 ## End to end
+
+2026-10-18, isolated `CODE_FOUNDRY_HOME=/tmp/cf-ghev-home`, the branch binary through a
+wrapper that unsets every `CLAUDE*` variable, `daemon --dev`. This repository registered,
+a thread on this worktree (`thread new --project code-foundry --worktree <this worktree>
+--created-by=`, no prompt), `pr checks --thread <id>` to watch its branch. A daemon
+without a GUI polls every 15 minutes, so a scratch program (not committed) held an
+EventService stream open as a visible GUI client: the poll ran every 60 s. Then `events
+--json --source gh`, pushing to this pull request (#210) and letting CI run.
+
+* The first full poll (51 details, nothing cached) sent no `pullRequestChanged`.
+* Every poll sent at most one event for #210, though it was in the authored dashboard and
+  on the watched branch (`branches=1` in the poll log).
+* The changes, in order (seq, kinds; `oldChecks` → `newChecks` abbreviated):
+  ```
+  16  head_pushed 80649937 → 1b8930b8                  (the note commit pushed)
+  28  head_pushed 1b8930b8 → 4a3d1bae, checks {} → PENDING 1/1 pending   (rebase, force push)
+  40  checks PENDING 1 pending → PENDING 1 passed 3 pending   (the CI jobs registered)
+  52  #211 appeared                                     (another thread opened a pull request)
+  139 checks PENDING 1 passed 3 pending → PENDING 3 passed 1 pending
+  234 checks PENDING 3 passed 1 pending → SUCCESS 4 passed
+  ```
+  The last one in full:
+  ```json
+  {"gh":{"pullRequestChanged":{"repoSlug":"alexwaumann/code-foundry","number":210,
+   "url":"https://github.com/alexwaumann/code-foundry/pull/210","headRef":"cf/gh-events-1-pull-request-changed",
+   "pullRequest":{"repoSlug":"alexwaumann/code-foundry","number":210,"title":"gh: pullRequestChanged events (granular PR changes per poll)",
+    "author":"alexwaumann","headRef":"cf/gh-events-1-pull-request-changed","headSha":"4a3d1baedec13cfa62fdfa97ce6329cccbef81b6",
+    "baseRef":"main","mergeable":"MERGEABLE_MERGEABLE","mergeStateStatus":"MERGE_STATE_STATUS_CLEAN",
+    "headRepoSlug":"alexwaumann/code-foundry","url":"https://github.com/alexwaumann/code-foundry/pull/210",
+    "updatedAt":"2026-10-19T01:13:24Z","checks":{"state":"CHECK_ROLLUP_STATE_SUCCESS","total":4,"passed":4},
+    "state":"PULL_REQUEST_STATE_OPEN","createdAt":"2026-10-19T01:07:48Z","additions":2644,"deletions":387,
+    "changedFiles":25,"baseSha":"40a720b1fbc73465b25028e9bde3cb9e668d5a37"},
+   "changes":[{"kind":"PULL_REQUEST_CHANGE_KIND_CHECKS",
+    "oldChecks":{"state":"CHECK_ROLLUP_STATE_PENDING","total":4,"passed":3,"pending":1},
+    "newChecks":{"state":"CHECK_ROLLUP_STATE_SUCCESS","total":4,"passed":4}}]}},
+   "seq":"234","epoch":"880fae4a9c0e"}
+  ```
+* `pr checks --thread <id>` listed the run's jobs (through `gh.Service.PullRequest`, the
+  plugin fact's read); `plugin list` unchanged (no plugins); no WARN or ERROR in the
+  daemon log.
+* GitHub had marked the pull request `CONFLICTING` after the first push (main had moved),
+  and CI does not run on a conflicting pull request: no checks until the rebase.
