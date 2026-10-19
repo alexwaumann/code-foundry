@@ -59,20 +59,23 @@ GitHub can also run `gh` itself (with the user's login).
 minutes while every window is hidden, and every 15 minutes with no app open (a CLI-only
 or isolated daemon). `gh` events are sent only when that poll sees a change. Each poll
 sends one `gh.pullRequestChanged` per pull request that changed, saying what changed
-(`PULL_REQUEST_CHANGE_KIND_CHECKS`, `_HEAD_PUSHED`, …; table below), for every pull request in the viewer's scope:
+(`CHECKS`, `HEAD_PUSHED`, …; table below), for every pull request in the viewer's scope:
 their open pull requests, those asking for or with their review, those merged in the
 last week, and the viewer's pull requests on branches the app or a `pr.*` fact looked at
-in the last 10 minutes. To follow check runs, subscribe to `gh` and call `pr.checks` when a
-`CHECKS` or `HEAD_PUSHED` change names a pull request you care about; no timer is needed.
-Latency is the poll interval. `pr.checks` reads the cached pull request detail and
-fetches it again when it is older than about 30 s or the poll saw the pull request move,
-so it is fresh when called. A pull request outside that scope (someone else's that the
-viewer has nothing to do with) sends nothing: sweep those with `pr.checks` or `gh`, about once a
-minute while something runs, only while someone looks or a flag depends on it. A
-thread's pull request: `pr.checks` with the thread's context
-answers -32002 "has no pull request" when there is none (a new thread's branch is linked
-by the next poll); the `threadList` payload carries only `branch` and the pull requests
-Claude linked (`linkedPullRequests`).
+in the last 10 minutes. To follow check runs, subscribe to `gh` and call `pr.checks` when
+a `CHECKS` or `HEAD_PUSHED` change names a pull request you care about; no timer is
+needed. Latency is the poll interval. The `pr.checks` command reads the cached pull
+request detail and fetches it again when it is older than about 30 s or the poll saw the
+pull request move, so it is fresh when called (`when` clauses read `pr.checks.*` from a
+cache of their own: `manifest.md`). A pull request outside that scope (someone else's)
+sends nothing: sweep those with `pr.checks` or `gh`, about once a minute while something
+runs, only while someone looks or a flag depends on it. A thread's pull request:
+`pr.checks` with the thread's context answers -32002 "has no pull request" when there is
+none (a new thread's branch is linked by the next poll); the `threadList` payload carries
+only `branch` and the pull requests Claude linked (`linkedPullRequests`). That `branch`
+is the one Code Foundry made the thread's worktree on, empty in an existing checkout; the
+branch checked out now is the `project` source's `worktrees[].branch` for the thread's
+`worktreePath`.
 
 ## SetFlag: thread attention and error (permission `threadStatus`)
 
@@ -206,20 +209,24 @@ pluginsdk.Plugin{
   {"gitops":{"finished":{…}},"seq":"44","epoch":"c85aff6ef6fc"}
   ```
   `updated` carries the whole object after the change, `removedId` (or `removedName`)
-  the id of what went; `snapshot` replaces everything. The table below lists every
-  change. See real payloads before decoding them: `events` streams until killed, so
-  capture a few seconds of it (macOS has no `timeout`), doing whatever should produce the
-  events meanwhile:
+  the id of what went. The table below lists every change. See real payloads before
+  decoding them: capture a few seconds of `events` (it streams until killed; macOS has
+  no `timeout`) while producing the events:
   ```
   code-foundry events --json --source thread-list > /tmp/events.json & pid=$!; sleep 5; kill $pid
   ```
   `code-foundry thread get <id> --json` shows a thread's fields. Decode only what you
   need.
-- Each source starts with its snapshot (`ev.Snapshot` true; `{"threadList":{"snapshot":{"threads":[…]}}}`),
-  then live events in order. Events may reach OnEvent before Subscribe returns.
+- Each source starts with its snapshot (`ev.Snapshot` true), then live events in order.
+  Most snapshots are one object replacing everything
+  (`{"threadList":{"snapshot":{"threads":[…]}}}`; `thread`: `pendingSnapshot`); `gh`'s
+  are ordinary events (`viewerUpdated`, `polled`, `dashboardUpdated`,
+  `repoActivityUpdated`), `update`'s its `status`. Events may reach OnEvent before
+  Subscribe returns.
 - OnEvent runs on the notification goroutine: keep it short (hand work to a goroutine).
   A plugin that falls behind loses the oldest events (the host keeps 2,048 or 8 MiB) and
-  then gets that source's snapshot again: treat a snapshot as "replace what you know".
+  then gets that source's snapshot again: a snapshot after the first means events were
+  lost, so replace or rescan what you know.
 - Subscriptions end with the process: subscribe in Init. At most 16 at once;
   `h.Unsubscribe(ctx, id)` ends one.
 
@@ -243,7 +250,7 @@ with no `threads`). The useful fields:
 | `project.projectUpdated` / `projectRemovedId` | a whole project (with its worktrees) / an id |
 | `gh.branchPullRequestsUpdated` | `{repoSlug, headRef, fetchedAt}`: a watched branch's pull requests changed |
 | `gh.pullRequestDetailUpdated` | `{repoSlug, number}`: re-read with `pr.checks` |
-| `gh.pullRequestChanged` | one pull request that changed, one event per pull request per poll (coalesced; latency is the poll interval): `repoSlug`, `number`, `url`, `headRef`, `pullRequest` (the summary after the change: `title`, `author`, `state`, `headSha`, `draft`, `reviewDecision`, `checks` `{state, total, passed, failed, pending, skipped}`, `commentCount`, `reviewCount`, `reviewRequests`, …) and `changes`: a list of `{kind, …}` with the old and new values of that kind. Kinds (`PULL_REQUEST_CHANGE_KIND_` + ): `APPEARED` (new in the viewer's scope; not sent for what was there before a restart or a newly watched branch), `MERGED` / `CLOSED` / `REOPENED` (`oldState`, `newState`), `HEAD_PUSHED` (`oldHeadSha`, `newHeadSha`), `CHECKS` (`oldChecks`, `newChecks`: rollups; `newChecks.state` `CHECK_ROLLUP_STATE_SUCCESS` or `_FAILURE` after `_PENDING` means the run finished), `REVIEW_DECISION` (`oldReviewDecision`, `newReviewDecision`), `REVIEWS` and `COMMENTS` (the count rose: `oldCount`, `newCount`), `REVIEW_REQUESTED` (`requested`: new logins and `org/team` slugs; `viewerRequested`), `DRAFT` (`oldDraft`, `newDraft`), `TITLE` (`oldTitle`, `newTitle`). Counts only, never comment or review text: fetch those with `gh` |
+| `gh.pullRequestChanged` | one pull request that changed, one event per pull request per poll (coalesced): `repoSlug`, `number`, `url`, `headRef`, `pullRequest` (the summary after the change: `title`, `author`, `state`, `headSha`, `draft`, `reviewDecision`, `checks` `{state, total, passed, failed, pending, skipped}`, `commentCount`, `reviewCount`, `reviewRequests`, …) and `changes`: a list of `{kind, …}` with the old and new values of that kind. Kinds (`PULL_REQUEST_CHANGE_KIND_` + ): `APPEARED` (new in the viewer's scope; not sent for what was there before a restart or a newly watched branch), `MERGED` / `CLOSED` / `REOPENED` (`oldState`, `newState`), `HEAD_PUSHED` (`oldHeadSha`, `newHeadSha`), `CHECKS` (`oldChecks`, `newChecks`: rollups; `newChecks.state` `CHECK_ROLLUP_STATE_SUCCESS` or `_FAILURE` after `_PENDING` means the run finished), `REVIEW_DECISION` (`oldReviewDecision`, `newReviewDecision`), `REVIEWS` and `COMMENTS` (the count rose: `oldCount`, `newCount`), `REVIEW_REQUESTED` (`requested`: new logins and `org/team` slugs; `viewerRequested`), `DRAFT` (`oldDraft`, `newDraft`), `TITLE` (`oldTitle`, `newTitle`). Counts only, never comment or review text: fetch those with `gh`. No `CHECKS` for a rerun ending with the rollup it had (failure 1/1 → 1/1) or a run that starts and ends between two polls: follow a run you reran yourself. Just after a push, a `when` on `pr.checks.*` can read "not known yet" for seconds the first time it is asked with no GUI: retry |
 | `gitops.queued` / `started` / `finished` | a git operation on a worktree (fetch, pull, push, …) |
 
 **Per-file events.** `project.worktreeFilesChanged` lists the files that changed in a
@@ -256,21 +263,26 @@ worktree, so a plugin that reacts to edits (a test watcher) needs no polling:
   when the second ends: `created` (new), `modified` (was there before), `removed` (gone,
   also the old side of a rename), `renamed` (moved onto this path). Paths use forward
   slashes, relative to `path` (the worktree root). A directory ends in `/` and appears
-  only when removed or renamed in (its files are not listed then; rescan it). Treat
-  `created`, `modified` and `renamed` alike when all you need is "this file changed".
-- **`truncated: true`** means more files changed than listed (the list stops at 500, by
-  path): run `git status` in the worktree yourself rather than trusting the list.
+  only when removed or renamed: `rm -rf sub` lists `sub/` and every file under it; one
+  moved in or out lists only itself (rescan it). An atomic save (`sed -i`, editors: a
+  temp file renamed onto the file) is one entry: a never-listed path created and gone
+  within the second is left out. Treat `created`, `modified` and `renamed` alike when
+  all you need is "this file changed".
+- **`truncated: true`**: more changed than listed (the list stops at 500, by path).
+  Still a change: a watcher can just re-run; one that needs the list runs `git status`.
 - **Left out:** gitignored paths (git's own rules, so a tracked file always counts),
   anything under a `.git` directory, and paths inside a submodule. A second in which
   only ignored files changed (build output, `node_modules`) sends nothing, so re-running
   on every event cannot loop on your own outputs.
 - **Live worktrees only:** ones with a thread that is not archived or snoozed. An idle
   worktree sends no file lists (its `worktreeUpdated` status summaries still come).
-- It is never in a snapshot. After a resync snapshot you may have missed some: rescan
-  what you watch once.
+- It is never in a snapshot. The `project` snapshot at startup is not a resync; a later
+  one means events were lost: rescan what you watch once.
 
 Keep using `project.worktreeUpdated` for head, branch, checkout and status-count changes:
-a commit or `git checkout` changes files too, but `worktreeUpdated` says what happened.
+a commit sends no files event (only `.git` changes), its new head comes as
+`worktreeUpdated`; a `git checkout` changes files, but `worktreeUpdated` says what
+happened.
 `worktreeDetailUpdated` is sent only for worktrees whose detail someone asked for in the
 last 10 minutes (the app's worktree panel), so a plugin cannot rely on it.
 

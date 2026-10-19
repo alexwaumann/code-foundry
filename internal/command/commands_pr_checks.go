@@ -82,7 +82,8 @@ func RegisterPullRequestChecks(r *Registry, d PullRequestChecksDeps) error {
 		Description: "List the checks on a pull request's head commit: name, workflow, status, conclusion, the GitHub App " +
 			"that ran it (provider: github-actions, another app, or status for commit statuses), its details URL, and " +
 			"when it started and completed. Name the pull request (repo-slug and number) or a thread (--thread, " +
-			"--context-thread): its branch's pull request, else the newest one Claude linked. Cached like the PR panel.",
+			"--context-thread): its branch's pull request, else the newest one Claude linked. Cached for about 30 s, " +
+			"and fetched again once the GitHub poll sees the pull request move.",
 		Category:     "Pull Request",
 		NoKeybinding: true,
 		Args: []ArgSpec{

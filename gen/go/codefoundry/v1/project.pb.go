@@ -31,7 +31,7 @@ const (
 	FileOp_FILE_OP_CREATED FileOp = 1
 	// Exists, and was there before.
 	FileOp_FILE_OP_MODIFIED FileOp = 2
-	// Gone (deleted, or renamed away).
+	// Gone (deleted, or renamed away), and was there before the window or was listed.
 	FileOp_FILE_OP_REMOVED FileOp = 3
 	// Exists, and was renamed onto this path.
 	FileOp_FILE_OP_RENAMED FileOp = 4
@@ -1865,7 +1865,9 @@ func (*ProjectEvent_WorktreeFilesChanged) isProjectEvent_Event() {}
 // that is not archived or snoozed. Idle worktrees still refresh their status
 // (worktree_updated) but send no file lists. Paths under a .git directory, inside a
 // submodule, and gitignored ones (git check-ignore: a tracked file is never ignored)
-// are left out; a window where every path was ignored sends nothing.
+// are left out, and so is a path created and gone within the window that was never
+// listed as existing (the temp file of an atomic save or `sed -i`, renamed onto the
+// real name); a window where every path was left out sends nothing.
 type WorktreeFilesChanged struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	ProjectId string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`

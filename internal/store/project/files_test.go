@@ -46,7 +46,10 @@ func TestFileOpFor(t *testing.T) {
 	}{
 		{"new file", opCreate, true, false, true, FileCreated},
 		{"created then written", opCreate | opWrite, true, false, true, FileCreated},
-		{"created then removed", opCreate | opRemove, false, false, true, FileRemoved},
+		{"created then removed, never reported", opCreate | opRemove, false, false, true, 0},
+		{"created then renamed away, never reported (save temp file)", opCreate | opWrite | opRename, false, false, true, 0},
+		{"reported, stale create flag, removed", opCreate | opRemove, false, true, false, FileRemoved},
+		{"removed, there before the window", opRemove, false, false, false, FileRemoved},
 		{"written then removed", opWrite | opRemove, false, true, false, FileRemoved},
 		{"removed then recreated", opRemove | opCreate, true, false, true, FileCreated},
 		{"edit", opWrite, true, false, false, FileModified},
@@ -114,6 +117,112 @@ func TestResolveFiles(t *testing.T) {
 		if seen[p] != now {
 			t.Errorf("seen[%s] = %v, want now", p, seen[p])
 		}
+	}
+}
+
+// TestResolveTransient: paths created and gone within the window, never reported, are
+// left out; what was there before is still removed.
+func TestResolveTransient(t *testing.T) {
+	now := time.Unix(1000, 0)
+	old := now.Add(-time.Minute)
+	past := time.Unix(1, 0)
+	const (
+		file = fsevents.ItemIsFile
+		dir  = fsevents.ItemIsDir
+		tmp  = fsevents.ItemCreated | fsevents.ItemModified | fsevents.ItemRenamed | file // written, renamed away
+	)
+	type ev struct {
+		rel   string
+		flags fsevents.EventFlags
+	}
+	tests := []struct {
+		name string
+		evs  []ev
+		disk map[string]fileStat
+		seen []string
+		want []ChangedFile
+	}{
+		{
+			name: "atomic save of a reported file (sed -i, editors)",
+			evs:  []ev{{".!47037!calc_test.go", tmp}, {"calc_test.go", fsevents.ItemRenamed | file}},
+			disk: map[string]fileStat{"calc_test.go": {exists: true, birth: now, mtime: now}},
+			seen: []string{"calc_test.go"},
+			want: []ChangedFile{{"calc_test.go", FileModified}},
+		},
+		{
+			name: "rm of a reported file",
+			evs:  []ev{{"calc.go", fsevents.ItemRemoved | file}},
+			seen: []string{"calc.go"},
+			want: []ChangedFile{{"calc.go", FileRemoved}},
+		},
+		{
+			name: "rm of a file there before, never reported",
+			evs:  []ev{{"calc.go", fsevents.ItemRemoved | file}},
+			want: []ChangedFile{{"calc.go", FileRemoved}},
+		},
+		{
+			name: "created and removed, never reported",
+			evs:  []ev{{"scratch.txt", fsevents.ItemCreated | file}, {"scratch.txt", fsevents.ItemRemoved | file}},
+			want: []ChangedFile{},
+		},
+		{
+			name: "untar through temp names (bsdtar)",
+			evs: []ev{
+				{"pkg", fsevents.ItemCreated | dir}, {"pkg.k6fzK1", tmp},
+				{"pkg/a.txt.9Y9FxH", tmp}, {"pkg/a.txt", fsevents.ItemCreated | fsevents.ItemRenamed | file},
+				{"pkg/b.txt.Q2wE3r", tmp}, {"pkg/b.txt", fsevents.ItemCreated | fsevents.ItemRenamed | file},
+			},
+			disk: map[string]fileStat{
+				"pkg":       {exists: true, dir: true, birth: now, mtime: now},
+				"pkg/a.txt": {exists: true, birth: past, mtime: past},
+				"pkg/b.txt": {exists: true, birth: past, mtime: past},
+			},
+			want: []ChangedFile{{"pkg/a.txt", FileCreated}, {"pkg/b.txt", FileCreated}},
+		},
+		{
+			name: "rm -rf of a directory there before",
+			evs:  []ev{{"sub", fsevents.ItemRemoved | dir}, {"sub/a.go", fsevents.ItemRemoved | file}, {"sub/b.go", fsevents.ItemRemoved | file}},
+			want: []ChangedFile{{"sub/", FileRemoved}, {"sub/a.go", FileRemoved}, {"sub/b.go", FileRemoved}},
+		},
+		{
+			name: "temp directory created and removed with its files",
+			evs: []ev{
+				{"tmp", fsevents.ItemCreated | fsevents.ItemRemoved | dir},
+				{"tmp/x", fsevents.ItemCreated | fsevents.ItemRemoved | dir},
+				{"tmp/x/y.o", fsevents.ItemCreated | fsevents.ItemRemoved | file},
+				{"tmpfile", fsevents.ItemModified | file},
+			},
+			disk: map[string]fileStat{"tmpfile": {exists: true, birth: old, mtime: now}},
+			want: []ChangedFile{{"tmpfile", FileModified}},
+		},
+		{
+			name: "directory with a reported file removed, stale create flag",
+			evs:  []ev{{"new", fsevents.ItemCreated | fsevents.ItemRemoved | dir}, {"new/a.go", fsevents.ItemCreated | fsevents.ItemRemoved | file}},
+			seen: []string{"new/a.go"},
+			want: []ChangedFile{{"new/", FileRemoved}, {"new/a.go", FileRemoved}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var c fileCollector
+			k := filesJob("p", "/w")
+			for _, e := range tt.evs {
+				c.add(k, e.rel, e.flags, now)
+			}
+			seen := map[string]time.Time{}
+			for _, p := range tt.seen {
+				seen[p] = old
+			}
+			got := resolveFiles(c.take(k), seen, now, func(rel string) fileStat { return tt.disk[rel] })
+			if !slices.Equal(got, tt.want) {
+				t.Fatalf("resolveFiles =\n%v\nwant\n%v", got, tt.want)
+			}
+			for _, e := range tt.evs {
+				if _, ok := seen[e.rel]; ok && !tt.disk[e.rel].exists {
+					t.Errorf("gone path %s stays remembered", e.rel)
+				}
+			}
+		})
 	}
 }
 
@@ -288,6 +397,10 @@ func TestFilesEventLiveOnly(t *testing.T) {
 
 	// Only ignored paths: nothing.
 	h.store.onEvents([]fsevents.Event{ev("x.log", fsevents.ItemModified)})
+	h.noFilesEvent(f.project, 400*time.Millisecond)
+
+	// Only a save temp file, created and renamed away: nothing.
+	h.store.onEvents([]fsevents.Event{ev(".!47037!a.go", fsevents.ItemCreated|fsevents.ItemModified|fsevents.ItemRenamed)})
 	h.noFilesEvent(f.project, 400*time.Millisecond)
 
 	// More than the cap: the first 500 by path, truncated.

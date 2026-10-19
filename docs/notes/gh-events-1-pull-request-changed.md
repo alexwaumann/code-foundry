@@ -10,11 +10,11 @@ event. Poll cadence is untouched (presence tiers and intervals as in
 | Piece | Where |
 |---|---|
 | `gh.PullRequestChanged`, `gh.Change`, `gh.ChangeKind` (+ constants, `ChangeKinds`), the diff | `internal/store/gh/pr_changes.go`, called at the end of `applyPoll` (`poll.go`) |
-| `PullRequest` refetches a cached detail the poll saw move | `internal/store/gh/detail_moved.go`, the check in `Store.PullRequest`, `invalidateFull` marks too |
+| `PullRequest` refetches a cached detail the poll saw move (what keeps the `pr.checks` command fresh after an event) | `internal/store/gh/detail_moved.go`, the check in `Store.PullRequest`, `invalidateFull` marks too |
 | Proto | `GhEvent.pull_request_changed` (`GhEvent.PullRequestChanged`), `PullRequestChange`, `PullRequestChangeKind` in `gh.proto` |
 | API | `internal/api/gh_changes.go`, mapped in `Gh.Watch` and the EventService gh source (so `events --json --source gh` and plugin feeds) |
 | Fake | `ghtest.Store.ChangePullRequest` |
-| pr.checks fact invalidation | `plugin.Manager.InvalidatePullRequestChecks` (`facts.go`), wired in `internal/daemon/plugin_checks.go`; `checksFresh` 60 s → 10 min |
+| `pr.checks.*` fact invalidation (the `when` predicates' cache only) | `plugin.Manager.InvalidatePullRequestChecks` (`facts.go`), wired in `internal/daemon/plugin_checks.go`; `checksFresh` 60 s → 10 min |
 | Skill | `host-api.md`: the payload row, following check runs by subscribing; `manifest.md`: the fact's refetch |
 
 ## The Go type (PR C reads it)
@@ -83,7 +83,12 @@ The proto kind is `PULL_REQUEST_CHANGE_KIND_` + the upper-cased Go kind.
   sorted by repository and number. Their subscriptions (Watch, EventService, the daemon's
   checks glue) buffer 512, not 64: a poll publishes them back to back, and a dropped
   EventService event only resyncs the gh snapshot, which has no changes in it.
-* **pr.checks fact.** `checksCache.invalidate` refetches an entry still cached (used in the
+* **pr.checks fact.** This is the plugin store's cache of the `pr.checks.*` facts that
+  `when` clauses read, nothing else: the `pr.checks` command (`commands_pr_checks.go`,
+  through `GhService.GetPullRequest`) reads `gh.Service.PullRequest` directly, and its
+  freshness after an event is `detail_moved.go`'s (gotcha below). The fact's own fetch
+  (`pluginFacts.PullRequestChecks`) goes through `gh.Service.PullRequest` too, so it needs
+  both. `checksCache.invalidate` refetches an entry still cached (used in the
   last 10 minutes), or marks a running fetch to run again (its answer may predate the
   change); a pull request no predicate asked about is left alone. AvailabilityChanged goes
   out when the result differs, as before. The daemon invalidates on `head_pushed` or
@@ -93,7 +98,8 @@ The proto kind is `PULL_REQUEST_CHANGE_KIND_` + the upper-cased Go kind.
 ## Gotchas
 
 * **`gh.Service.PullRequest` did not read the full-detail cache.** The brief assumed the
-  plugin fact went through the detail panel's cache (`staleFullDetails`). It reads its own
+  plugin fact went through the detail panel's cache (`staleFullDetails`). `PullRequest`
+  (what the `pr.checks` command reads and the fact fetches through) reads its own
   SQLite copy (`loadDetail`) with a 30 s `DetailTTL`, which the poll never invalidated: a
   refetch within 30 s of the previous one (60 s fact refresh, 60 s poll) could get the
   copy from before the change. `detail_moved.go` records, per pull request, when the poll
