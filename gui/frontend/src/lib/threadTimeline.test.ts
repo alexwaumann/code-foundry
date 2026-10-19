@@ -219,6 +219,17 @@ describe("buildTurns / buildRows", () => {
     ]);
   });
 
+  it("a restart's note between turns stays apart: the next message starts a turn, not a steer", () => {
+    const items = [user("u1"), text("a"), end("e1"), item("commandOutput", { id: "r" }), user("u2"), text("b"), end("e2")];
+    const turns = buildTurns(items);
+    expect(turns.map((t) => [t.key, t.user, t.end])).toEqual([
+      ["u1", ["u1"], "e1"],
+      ["r", [], ""],
+      ["u2", ["u2"], "e2"],
+    ]);
+    expect(shape(buildRows(turns, { fold: () => undefined, working: false }))).toEqual(["user:u1", "header(folded 0)", "final:a", "note:commandOutput", "user:u2", "header(folded 0)", "final:b"]);
+  });
+
   it("a system note stands alone between turns: the copied history folds above it, the fork's turns follow", () => {
     const items = [user("u1"), tool("Bash"), text("a"), end("e1"), item("note", { id: "n" }), user("u2"), text("b")];
     const turns = buildTurns(items);

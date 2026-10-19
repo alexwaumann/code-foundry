@@ -103,7 +103,89 @@ shells get the plugins' environment when they start.
   action, so it joined `guide.leftOut` (with `pr.checks`).
 * The mock's `/__mock/thread/<action>` routes are whitelisted by a regexp in
   `mock/server.ts`: a new action needs it there too (404 otherwise).
+* The timeline (`lib/threadTimeline.ts buildTurns`) opened a turn at a daemon note with
+  no user message before it ("Restarted Claude", and the effort restart's "Set effort to
+  …" before this), so the next message read "sent mid-turn" under a "Worked for" header.
+  A note-only, user-less turn now ends at the next user message.
+* `ps eww` cannot read a login zsh's environment on macOS (it shows only `/bin/zsh -l`);
+  the shell check types `printenv` into it instead (`terminal new --run`).
+* A thread restarted before its first message has no transcript, so the restart reuses the
+  original launch (`--session-id` of the same id), as the effort restart does; after a
+  message it is `--resume <id>`.
 
-## End to end
+## End to end (2026-10-18, isolated `CODE_FOUNDRY_HOME=~/.cf-envrestart`)
 
-(filled below after the run)
+`make build plugins`; the daemon started with `env -i` (no `CLAUDE*` variables of the
+calling session), `code-foundry` a wrapper for the branch binary with that home;
+`threads.default_model claude-haiku-5-5[1m]`, effort low. One Haiku turn in all.
+
+```
+$ code-foundry plugin dev plugins/examples/hello --yes --follow=false
+linked …/plugins/examples/hello as dev plugin hello; enabled hello 0.1.0 (starting)
+$ code-foundry plugin env hello
+plugin hello
+  scope: every project, and threads without a project
+  env CF_HELLO
+  pushed: 2026-10-18 19:52:24
+
+New threads in scope get this, and new bottom-panel shells in scope get the env and PATH entries too. Running threads and shells keep what they started with; a thread shows "Plugin environment changed" until restarted (thread restart <id>).
+$ code-foundry thread new --no-project --name "Env restart check"
+created thread Env restart check (s-81854c4089d7) in /Users/alex (no project)
+$ ps eww -o command= -p 46182 | tr ' ' '\n' | grep CF_HELLO          # its claude
+CF_HELLO=1
+$ code-foundry terminal new --context-thread s-81854c4089d7 --run 'printenv CF_HELLO > /tmp/cf-envrestart/shell1.txt || echo unset > /tmp/cf-envrestart/shell1.txt'
+created terminal t-db71a4741ee2 and ran the command in it
+$ cat /tmp/cf-envrestart/shell1.txt
+1
+$ code-foundry plugin disable hello
+disabled hello
+$ code-foundry thread get s-81854c4089d7
+thread Env restart check (s-81854c4089d7)
+status: idle (at prompt)
+worktree: /Users/alex
+plugin environment: changed since Claude started (Hello removed CF_HELLO); thread restart s-81854c4089d7 applies it
+cost: $0.00
+$ code-foundry thread get s-81854c4089d7 --json        # the two fields
+{"pluginEnvStale": true, "pluginEnvChange": "Hello removed CF_HELLO"}
+$ code-foundry thread restart s-81854c4089d7
+restarting Claude for thread Env restart check (s-81854c4089d7); the conversation continues
+$ code-foundry thread get s-81854c4089d7
+thread Env restart check (s-81854c4089d7)
+status: idle (at prompt)
+worktree: /Users/alex
+cost: $0.00
+# daemon log: thread restart requested (at_prompt) → restarting claude for the user (pid 46182)
+#   → claude restarted (pid 49572), --session-id e5f7110a-… (no message yet: the same launch)
+$ code-foundry thread send --id s-81854c4089d7 --wait 'Run exactly this shell command with the Bash tool and reply with its output only: printenv CF_HELLO || echo unset'
+$ code-foundry thread read s-81854c4089d7
+#1 output: Restarted Claude
+#2 you: Run exactly this shell command with the Bash tool and reply with its output only: printenv CF_HELLO || echo unset
+#3 tool Bash [done] {"command":"printenv CF_HELLO || echo unset","description":"Print CF_HELLO env var or unset"}
+    → unset
+#4 claude: unset
+#5 turn end: success, 3.1s, 49432 in / 99 out tokens, $0.0028, $0.0028 so far, claude-haiku-5-5
+$ code-foundry terminal new --context-thread s-81854c4089d7 --run 'printenv CF_HELLO > …/shell2.txt || echo unset > …/shell2.txt'   # hello disabled
+$ cat …/shell2.txt
+unset
+$ code-foundry plugin enable hello --yes
+$ code-foundry thread get s-81854c4089d7 | grep plugin
+plugin environment: changed since Claude started (Hello added CF_HELLO); thread restart s-81854c4089d7 applies it
+$ code-foundry thread restart s-81854c4089d7
+restarting Claude for thread Env restart check (s-81854c4089d7); the conversation continues
+# new claude pid 53034: --resume e5f7110a-f989-4e20-a54c-cda26af4bc8c (the same session), CF_HELLO=1; not stale
+```
+
+GUI: the frontend (Vite dev) in WebKit through Playwright against that daemon (the
+`plugins-5-gui` method; a Wails copy would share the installed app's WebKit state): the
+header line after the disable, its tooltip, and the thread after the restarts, dark and
+light, on the `cf/plugins-env-restart-shots` branch. The test thread was archived, its
+transcript (`~/.claude/projects/-Users-alex/e5f7110a-….jsonl`) and `~/.cf-envrestart`
+removed afterwards.
+
+## Open
+
+* Running shells and action terminals do not learn of a change (no staleness for shells);
+  action runs get no plugin environment at all.
+* No sidebar or `thread list` hint (header and `thread get` only, per the decision).
+* A plugin that pushes often makes every running thread in scope stale each time it
+  really changes; the skill now says not to push on a timer.
