@@ -6,8 +6,10 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"maps"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"unicode"
 
@@ -47,9 +49,16 @@ func confirmationOf(err error) *v1.ConfirmationRequired {
 	return nil
 }
 
+// maxConfirmStages bounds how many confirmations one invoke asks (the command's own,
+// then a second stage such as deleting uncommitted work).
+const maxConfirmStages = 3
+
 // invoke calls the command, asking for confirmation when the daemon requires it: on a
-// terminal the user is prompted and the command re-invoked with confirmed set;
-// otherwise the message is printed with a pointer to --yes (exit 2).
+// terminal the user is prompted and the command re-invoked with confirmed set (and a
+// second-stage confirmation's args merged in); otherwise the message is printed with a
+// pointer to --yes (exit 2). --yes never answers a second-stage confirmation (one with
+// args, e.g. deleting uncommitted work): the command's declined result stands when it
+// has one, else it fails pointing at the flag (--force) to pass on purpose.
 func (cl *cli) invoke(ctx context.Context, cmd *v1.Command, uctx *v1.UiContext, vals map[string]string, yes bool) (*v1.InvokeCommandResponse, error) {
 	c, err := cl.connect(ctx)
 	if err != nil {
@@ -57,30 +66,82 @@ func (cl *cli) invoke(ctx context.Context, cmd *v1.Command, uctx *v1.UiContext, 
 	}
 	name := cmd.GetName()
 	req := &v1.InvokeCommandRequest{Name: name, Context: uctx, Args: vals, Confirmed: yes}
-	res, err := c.Command.Invoke(ctx, connect.NewRequest(req))
-	if err == nil {
-		return res.Msg, nil
+	var stdin *bufio.Reader
+	for stage := 0; ; stage++ {
+		res, err := c.Command.Invoke(ctx, connect.NewRequest(req))
+		if err == nil {
+			return res.Msg, nil
+		}
+		cr := confirmationOf(err)
+		if cr == nil || stage >= maxConfirmStages {
+			return nil, cl.invokeFailed(name, err)
+		}
+		escalates := len(cr.GetArgs()) > 0
+		if escalates && cr.GetCommand() != name {
+			// A command run for this one (plugin.act's button) asks again: its args are
+			// not this command's to merge.
+			fmt.Fprintf(cl.stderr, "code-foundry %s: %s\nRun %s itself to answer this.\n", name, cr.GetMessage(), cr.GetCommand())
+			return nil, errUsage
+		}
+		if escalates && yes {
+			return cl.notAnsweredByYes(name, cr)
+		}
+		if cl.interactive == nil || !cl.interactive() || cl.stdin == nil {
+			if escalates {
+				return cl.notAnsweredByYes(name, cr)
+			}
+			fmt.Fprintf(cl.stderr, "code-foundry %s: %s\nRe-run with --yes to confirm.\n", name, cr.GetMessage())
+			return nil, errUsage
+		}
+		fmt.Fprintf(cl.stderr, "%s [y/N] ", cr.GetMessage())
+		if stdin == nil {
+			stdin = bufio.NewReader(cl.stdin)
+		}
+		answer, _ := stdin.ReadString('\n')
+		if a := strings.ToLower(strings.TrimSpace(answer)); a != "y" && a != "yes" {
+			if d := cr.GetDeclined(); d != nil {
+				return d, nil
+			}
+			fmt.Fprintf(cl.stderr, "code-foundry %s: cancelled\n", name)
+			return nil, errCancelled
+		}
+		req.Confirmed = true
+		if escalates {
+			merged := maps.Clone(req.Args)
+			if merged == nil {
+				merged = map[string]string{}
+			}
+			maps.Copy(merged, cr.GetArgs())
+			req.Args = merged
+		}
 	}
-	cr := confirmationOf(err)
-	if cr == nil {
-		return nil, cl.invokeFailed(name, err)
+}
+
+// notAnsweredByYes handles a second-stage confirmation the user was not asked (--yes,
+// or no terminal): the declined result when the command has one, with a note on
+// stderr, else the message and the flags that answer it (exit 2).
+func (cl *cli) notAnsweredByYes(name string, cr *v1.ConfirmationRequired) (*v1.InvokeCommandResponse, error) {
+	flags := argFlags(cr.GetArgs())
+	if d := cr.GetDeclined(); d != nil {
+		fmt.Fprintf(cl.stderr, "code-foundry %s: this was not asked, so nothing more was done (--yes does not answer it; %s does):\n%s\n",
+			name, flags, cr.GetMessage())
+		return d, nil
 	}
-	if cl.interactive == nil || !cl.interactive() || cl.stdin == nil {
-		fmt.Fprintf(cl.stderr, "code-foundry %s: %s\nRe-run with --yes to confirm.\n", name, cr.GetMessage())
-		return nil, errUsage
+	fmt.Fprintf(cl.stderr, "code-foundry %s: %s\n--yes does not answer this; re-run with %s to.\n", name, cr.GetMessage(), flags)
+	return nil, errUsage
+}
+
+// argFlags renders args as the CLI flags that pass them: "--force", "--mode=x".
+func argFlags(args map[string]string) string {
+	out := make([]string, 0, len(args))
+	for _, k := range slices.Sorted(maps.Keys(args)) {
+		if v := args[k]; v == "true" {
+			out = append(out, "--"+k)
+		} else {
+			out = append(out, "--"+k+"="+v)
+		}
 	}
-	fmt.Fprintf(cl.stderr, "%s [y/N] ", cr.GetMessage())
-	answer, _ := bufio.NewReader(cl.stdin).ReadString('\n')
-	if a := strings.ToLower(strings.TrimSpace(answer)); a != "y" && a != "yes" {
-		fmt.Fprintf(cl.stderr, "code-foundry %s: cancelled\n", name)
-		return nil, errCancelled
-	}
-	req.Confirmed = true
-	res, err = c.Command.Invoke(ctx, connect.NewRequest(req))
-	if err != nil {
-		return nil, cl.invokeFailed(name, err)
-	}
-	return res.Msg, nil
+	return strings.Join(out, " ")
 }
 
 // parseWithPositionals parses flags that may be interleaved with bare words

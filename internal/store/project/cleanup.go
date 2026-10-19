@@ -42,8 +42,8 @@ func CleanupVerdict(w Worktree, now time.Time) (removable bool, reason string) {
 		return false, "git status not read yet"
 	case st.Operation != "":
 		return false, st.Operation + " in progress"
-	case st.Dirty || st.Staged+st.Modified+st.Untracked+st.Conflicted > 0:
-		return false, "uncommitted changes"
+	case st.HasUncommitted():
+		return false, UncommittedReason
 	case st.BaseRef == "":
 		return false, "no remote default branch to compare with"
 	case justMade(w, now):
@@ -68,6 +68,10 @@ func justMade(w Worktree, now time.Time) bool {
 	return !w.CreatedAt.IsZero() && now.Sub(w.CreatedAt) < FreshFor &&
 		(w.CreatedHead == "" || w.Head == w.CreatedHead)
 }
+
+// UncommittedReason is why a worktree with staged, modified, untracked or conflicted
+// entries is kept.
+const UncommittedReason = "uncommitted changes"
 
 // NotManagedReason is why a worktree the app did not make is kept.
 const NotManagedReason = "not a Code Foundry worktree"
@@ -119,6 +123,10 @@ type CleanupOptions struct {
 	// DryRun evaluates the current snapshot only: no refresh, nothing removed, and
 	// Removed lists what would be.
 	DryRun bool
+	// Force also removes the worktrees kept only for their uncommitted changes (every
+	// other CleanupVerdict condition passes and Hold has nothing), with `git worktree
+	// remove --force`, deleting those changes. It relaxes no other condition.
+	Force bool
 	// Hold returns why something outside git keeps w (a live thread runs in it, a
 	// terminal is open there, a workspace has it), or "". It is asked right before each
 	// removal. Nil: nothing holds a worktree.
@@ -131,6 +139,9 @@ type CleanupOptions struct {
 type CleanupItem struct {
 	Worktree Worktree
 	Reason   string
+	// Uncommitted: kept only for its uncommitted changes (Force removes it), or, when
+	// removed, removed with Force and its uncommitted changes with it.
+	Uncommitted bool
 }
 
 // CleanupResult is what Cleanup did.
@@ -143,8 +154,9 @@ type CleanupResult struct {
 // Cleanup removes the worktrees of a project whose work is already in its default branch
 // (CleanupVerdict removable and no Hold): it refreshes the project's status (reconcile, base,
 // every worktree; callers that want fresh remote refs fetch first), re-evaluates each
-// worktree, and removes it with RemoveWorktree, never forced, so git itself still
-// refuses a worktree that changed meanwhile. Branches are never deleted. A failed
+// worktree, and removes it with RemoveWorktree, not forced unless opts.Force and only
+// for a worktree kept for its uncommitted changes alone, so git itself still refuses a
+// clean worktree that changed meanwhile. Branches are never deleted. A failed
 // removal is a skip with git's error as the reason, not an error. Without a Path the
 // main worktree is left out of Skipped.
 func Cleanup(ctx context.Context, s Store, opts CleanupOptions) (CleanupResult, error) {
@@ -181,17 +193,29 @@ func Cleanup(ctx context.Context, s Store, opts CleanupOptions) (CleanupResult, 
 			continue
 		}
 		removable, reason := CleanupVerdict(w, now())
-		if removable && opts.Hold != nil {
-			if held := opts.Hold(w); held != "" {
-				removable, reason = false, held
+		// Kept for its uncommitted changes alone: with them set aside every other
+		// condition passes.
+		uncommitted := false
+		if !removable && w.Status.HasUncommitted() {
+			if ok, why := CleanupVerdict(withoutUncommitted(w), now()); ok {
+				uncommitted = true
+				if opts.Force {
+					removable, reason = true, why
+				}
 			}
 		}
+		if (removable || uncommitted) && opts.Hold != nil {
+			if held := opts.Hold(w); held != "" {
+				removable, reason, uncommitted = false, held, false
+			}
+		}
+		item := CleanupItem{Worktree: w, Reason: reason, Uncommitted: uncommitted}
 		if !removable {
-			res.Skipped = append(res.Skipped, CleanupItem{Worktree: w, Reason: reason})
+			res.Skipped = append(res.Skipped, item)
 			continue
 		}
 		if !opts.DryRun {
-			if err := s.RemoveWorktree(ctx, RemoveWorktreeOptions{ProjectID: r.ID, Path: w.Path}); err != nil {
+			if err := s.RemoveWorktree(ctx, RemoveWorktreeOptions{ProjectID: r.ID, Path: w.Path, Force: uncommitted}); err != nil {
 				if ctx.Err() != nil {
 					return res, ctx.Err()
 				}
@@ -199,7 +223,7 @@ func Cleanup(ctx context.Context, s Store, opts CleanupOptions) (CleanupResult, 
 				continue
 			}
 		}
-		res.Removed = append(res.Removed, CleanupItem{Worktree: w, Reason: reason})
+		res.Removed = append(res.Removed, item)
 	}
 	return res, nil
 }

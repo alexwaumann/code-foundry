@@ -170,10 +170,11 @@ type Store interface {
 	AddProject(ctx context.Context, opts AddProjectOptions) (Workspace, error)
 	// RemoveProject removes a member's worktree and drops the member. It refuses while a
 	// live thread runs in the worktree, and (without Force) when git refuses because
-	// of uncommitted changes.
+	// of uncommitted changes (the error wraps *project.UncommittedError).
 	RemoveProject(ctx context.Context, opts RemoveProjectOptions) (Workspace, error)
 	// Remove removes every member worktree and forgets the workspace, with the same
-	// guards across all members, checked before anything is removed.
+	// guards across all members, checked before anything is removed (uncommitted
+	// changes: an error wrapping *project.UncommittedError naming every dirty member).
 	Remove(ctx context.Context, opts RemoveOptions) error
 	// Members resolves ref and joins its members with the project store's state.
 	Members(ctx context.Context, ref Ref) (Membership, error)

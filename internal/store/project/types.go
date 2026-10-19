@@ -220,6 +220,8 @@ type RemoveWorktreeOptions struct {
 	// DeleteBranch also runs `git branch -D <branch>` after removing the worktree.
 	DeleteBranch bool
 	// Force passes --force to `git worktree remove` (discarding local changes).
+	// Without it, a worktree git refuses for its uncommitted changes fails with
+	// *UncommittedError (its status read again).
 	Force bool
 }
 

@@ -147,12 +147,12 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 			Name:  "workspace.remove-project",
 			Title: "Remove Project from Workspace",
 			Description: "Delete a member project's worktree and drop it from the workspace. Refused while a thread runs " +
-				"in that worktree, and when it has uncommitted changes unless --force.",
+				"in that worktree." + forceNote,
 			Category: "Workspace",
 			Args: []ArgSpec{
 				{Name: "project", Type: String, Required: true, Positional: true, Description: "Project id, name, or path (the member worktree path works too)"},
 				wsArg, cwdArg,
-				{Name: "force", Type: Bool, Description: "Remove even with uncommitted changes"},
+				{Name: "force", Type: Bool, Description: "Remove even with uncommitted changes, deleting them (without it: asked)"},
 				{Name: "delete-branch", Type: Bool, Description: "Also delete the branch"},
 			},
 			Confirm: "Remove project {project} from its workspace? This deletes its worktree from disk.",
@@ -162,6 +162,9 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 					Force: a.Bool("force"), DeleteBranch: a.Bool("delete-branch"),
 				}))
 				if err != nil {
+					if wts := uncommittedOf(err); wts != nil && !a.Bool("force") {
+						return Result{}, deleteWorkConfirm("workspace.remove-project", wts, "the worktree")
+					}
 					return Result{}, err
 				}
 				w := res.Msg.GetWorkspace()
@@ -172,11 +175,11 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 			Name:  "workspace.remove",
 			Title: "Remove Workspace",
 			Description: "Delete every member worktree and forget the workspace. Refused while a thread runs in any member " +
-				"worktree, and when any has uncommitted changes unless --force; nothing is removed then.",
+				"worktree; nothing is removed then." + forceNote,
 			Category: "Workspace",
 			Args: []ArgSpec{
 				{Name: "workspace", Type: String, Required: true, Positional: true, Description: "Workspace id or name"},
-				{Name: "force", Type: Bool, Description: "Remove even with uncommitted changes"},
+				{Name: "force", Type: Bool, Description: "Remove even with uncommitted changes, deleting them (without it: asked)"},
 				{Name: "delete-branch", Type: Bool, Description: "Also delete each member's branch"},
 			},
 			Confirm: "Remove workspace {workspace}? This deletes every member worktree from disk.",
@@ -185,6 +188,9 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 				if _, err := b.Remove(ctx, connect.NewRequest(&v1.RemoveWorkspaceRequest{
 					Workspace: ws, Force: a.Bool("force"), DeleteBranch: a.Bool("delete-branch"),
 				})); err != nil {
+					if wts := uncommittedOf(err); wts != nil && !a.Bool("force") {
+						return Result{}, deleteWorkConfirm("workspace.remove", wts, "the workspace's worktrees")
+					}
 					return Result{}, err
 				}
 				return Result{Message: "removed workspace " + ws}, nil

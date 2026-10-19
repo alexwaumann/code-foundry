@@ -645,7 +645,19 @@ type ConfirmationRequired struct {
 	// Rendered prompt, e.g. "Remove worktree /x? This deletes files on disk."
 	Message string `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
 	// Command title, for the dialog's confirm button.
-	Title         string `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
+	Title string `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
+	// Set on a second-stage confirmation: one a command raises after the user already
+	// confirmed it once (removing a worktree turned out to delete uncommitted work:
+	// {"force": "true"}). If the user agrees, invoke again with these args merged over
+	// the original ones and confirmed set. A client applies them only to the command it
+	// invoked (command equals InvokeCommandRequest.name) and never on the user's behalf:
+	// the CLI's --yes does not accept one, so an agent passes the flag (--force) itself.
+	Args map[string]string `protobuf:"bytes,4,rep,name=args,proto3" json:"args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// What the command already did and answers when the user declines a second-stage
+	// confirmation (a bulk worktree cleanup removed the clean worktrees before asking
+	// about the ones with uncommitted changes). Clients show it as the result. Unset:
+	// declining leaves nothing done, and the CLI's --yes fails with the message.
+	Declined      *InvokeCommandResponse `protobuf:"bytes,5,opt,name=declined,proto3" json:"declined,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -699,6 +711,20 @@ func (x *ConfirmationRequired) GetTitle() string {
 		return x.Title
 	}
 	return ""
+}
+
+func (x *ConfirmationRequired) GetArgs() map[string]string {
+	if x != nil {
+		return x.Args
+	}
+	return nil
+}
+
+func (x *ConfirmationRequired) GetDeclined() *InvokeCommandResponse {
+	if x != nil {
+		return x.Declined
+	}
+	return nil
 }
 
 // CommandFailed is the error detail of an Invoke whose command could not do what it was
@@ -807,11 +833,16 @@ const file_codefoundry_v1_command_proto_rawDesc = "" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12\x1f\n" +
 	"\vresult_json\x18\x02 \x01(\tR\n" +
 	"resultJson\x12\x1b\n" +
-	"\texit_code\x18\x03 \x01(\x05R\bexitCode\"`\n" +
+	"\texit_code\x18\x03 \x01(\x05R\bexitCode\"\xa0\x02\n" +
 	"\x14ConfirmationRequired\x12\x18\n" +
 	"\acommand\x18\x01 \x01(\tR\acommand\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12\x14\n" +
-	"\x05title\x18\x03 \x01(\tR\x05title\")\n" +
+	"\x05title\x18\x03 \x01(\tR\x05title\x12B\n" +
+	"\x04args\x18\x04 \x03(\v2..codefoundry.v1.ConfirmationRequired.ArgsEntryR\x04args\x12A\n" +
+	"\bdeclined\x18\x05 \x01(\v2%.codefoundry.v1.InvokeCommandResponseR\bdeclined\x1a7\n" +
+	"\tArgsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\")\n" +
 	"\rCommandFailed\x12\x18\n" +
 	"\acommand\x18\x01 \x01(\tR\acommand*\x83\x01\n" +
 	"\aArgType\x12\x18\n" +
@@ -839,7 +870,7 @@ func file_codefoundry_v1_command_proto_rawDescGZIP() []byte {
 }
 
 var file_codefoundry_v1_command_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_codefoundry_v1_command_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_codefoundry_v1_command_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_codefoundry_v1_command_proto_goTypes = []any{
 	(ArgType)(0),                  // 0: codefoundry.v1.ArgType
 	(*UiContext)(nil),             // 1: codefoundry.v1.UiContext
@@ -852,6 +883,7 @@ var file_codefoundry_v1_command_proto_goTypes = []any{
 	(*ConfirmationRequired)(nil),  // 8: codefoundry.v1.ConfirmationRequired
 	(*CommandFailed)(nil),         // 9: codefoundry.v1.CommandFailed
 	nil,                           // 10: codefoundry.v1.InvokeCommandRequest.ArgsEntry
+	nil,                           // 11: codefoundry.v1.ConfirmationRequired.ArgsEntry
 }
 var file_codefoundry_v1_command_proto_depIdxs = []int32{
 	0,  // 0: codefoundry.v1.ArgSpec.type:type_name -> codefoundry.v1.ArgType
@@ -860,15 +892,17 @@ var file_codefoundry_v1_command_proto_depIdxs = []int32{
 	3,  // 3: codefoundry.v1.ListCommandsResponse.commands:type_name -> codefoundry.v1.Command
 	1,  // 4: codefoundry.v1.InvokeCommandRequest.context:type_name -> codefoundry.v1.UiContext
 	10, // 5: codefoundry.v1.InvokeCommandRequest.args:type_name -> codefoundry.v1.InvokeCommandRequest.ArgsEntry
-	4,  // 6: codefoundry.v1.CommandService.List:input_type -> codefoundry.v1.ListCommandsRequest
-	6,  // 7: codefoundry.v1.CommandService.Invoke:input_type -> codefoundry.v1.InvokeCommandRequest
-	5,  // 8: codefoundry.v1.CommandService.List:output_type -> codefoundry.v1.ListCommandsResponse
-	7,  // 9: codefoundry.v1.CommandService.Invoke:output_type -> codefoundry.v1.InvokeCommandResponse
-	8,  // [8:10] is the sub-list for method output_type
-	6,  // [6:8] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	11, // 6: codefoundry.v1.ConfirmationRequired.args:type_name -> codefoundry.v1.ConfirmationRequired.ArgsEntry
+	7,  // 7: codefoundry.v1.ConfirmationRequired.declined:type_name -> codefoundry.v1.InvokeCommandResponse
+	4,  // 8: codefoundry.v1.CommandService.List:input_type -> codefoundry.v1.ListCommandsRequest
+	6,  // 9: codefoundry.v1.CommandService.Invoke:input_type -> codefoundry.v1.InvokeCommandRequest
+	5,  // 10: codefoundry.v1.CommandService.List:output_type -> codefoundry.v1.ListCommandsResponse
+	7,  // 11: codefoundry.v1.CommandService.Invoke:output_type -> codefoundry.v1.InvokeCommandResponse
+	10, // [10:12] is the sub-list for method output_type
+	8,  // [8:10] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_command_proto_init() }
@@ -882,7 +916,7 @@ func file_codefoundry_v1_command_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_command_proto_rawDesc), len(file_codefoundry_v1_command_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   10,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

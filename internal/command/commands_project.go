@@ -139,13 +139,13 @@ func RegisterProject(r *Registry, b ProjectBackend, notGit NotGitFunc) error {
 		Command{
 			Name:        "project.worktree.remove",
 			Title:       "Remove Worktree",
-			Description: "Remove a worktree from disk, optionally deleting its branch.",
+			Description: "Remove a worktree from disk, optionally deleting its branch." + forceNote,
 			Category:    "Project",
 			Args: []ArgSpec{
 				{Name: "project", Type: String, Context: ContextProject, Description: "Project id (default: the project the worktree is registered in)"},
 				{Name: "path", Type: Path, Required: true, Context: ContextWorktree, Description: "Worktree path"},
 				{Name: "delete-branch", Type: Bool, Description: "Also delete the branch"},
-				{Name: "force", Type: Bool, Description: "Remove even with uncommitted changes"},
+				{Name: "force", Type: Bool, Description: "Remove even with uncommitted changes, deleting them (without it: asked)"},
 			},
 			// The project may be left out: the path names it (W4 finding 2: inside a
 			// thread, --path alone was "not available in this context").
@@ -164,6 +164,9 @@ func RegisterProject(r *Registry, b ProjectBackend, notGit NotGitFunc) error {
 					DeleteBranch: a.Bool("delete-branch"),
 					Force:        a.Bool("force"),
 				})); err != nil {
+					if wts := uncommittedOf(err); wts != nil && !a.Bool("force") {
+						return Result{}, deleteWorkConfirm("project.worktree.remove", wts, "the worktree")
+					}
 					return Result{}, err
 				}
 				return Result{Message: "removed worktree " + path}, nil

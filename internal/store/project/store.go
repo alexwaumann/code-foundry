@@ -852,6 +852,15 @@ func (g *Git) RemoveWorktree(ctx context.Context, opts RemoveWorktreeOptions) er
 	}
 	args = append(args, path)
 	if _, err := g.runner.Run(ctx, m.Path, args...); err != nil {
+		if !opts.Force {
+			// git refuses a worktree with modified or untracked files: read its status
+			// again, so the caller can show what --force would delete.
+			if g.sched.wait(ctx, jobKey{kind: jobStatus, projectID: m.ID, path: path}) == nil {
+				if now, ok := g.Snapshot().Worktree(m.ID, path); ok && now.Status.HasUncommitted() {
+					return &UncommittedError{Worktrees: []Worktree{now}}
+				}
+			}
+		}
 		return fmt.Errorf("%w: %w", ErrFailedPrecondition, err)
 	}
 	g.log.Info("worktree removed", "project", m.ID, "path", path)

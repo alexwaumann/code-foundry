@@ -70,7 +70,23 @@ func TestProjectUnaryAndErrorCodes(t *testing.T) {
 	if _, err := c.Refresh(ctx, connect.NewRequest(&v1.RefreshProjectRequest{})); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := c.RemoveWorktree(ctx, connect.NewRequest(&v1.RemoveWorktreeRequest{ProjectId: r.GetId(), Path: "/worktrees/_local/proj/a-b"})); err != nil {
+	// Dirty: refused with the worktree and its counts in an UncommittedWork detail.
+	_, err = c.RemoveWorktree(ctx, connect.NewRequest(&v1.RemoveWorktreeRequest{ProjectId: r.GetId(), Path: "/worktrees/_local/proj/a-b"}))
+	var ce *connect.Error
+	var uw *v1.UncommittedWork
+	if errors.As(err, &ce) {
+		for _, d := range ce.Details() {
+			if m, derr := d.Value(); derr == nil {
+				if u, ok := m.(*v1.UncommittedWork); ok {
+					uw = u
+				}
+			}
+		}
+	}
+	if ce == nil || ce.Code() != connect.CodeFailedPrecondition || len(uw.GetWorktrees()) != 1 || uw.GetWorktrees()[0].GetStatus().GetUntracked() != 3 {
+		t.Fatalf("RemoveWorktree of a dirty worktree = %v (detail %v)", err, uw)
+	}
+	if _, err := c.RemoveWorktree(ctx, connect.NewRequest(&v1.RemoveWorktreeRequest{ProjectId: r.GetId(), Path: "/worktrees/_local/proj/a-b", Force: true})); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := c.Unregister(ctx, connect.NewRequest(&v1.UnregisterProjectRequest{Id: r.GetId()})); err != nil {
@@ -240,7 +256,7 @@ func TestProjectWatch(t *testing.T) {
 	if got := next().GetWorktreeUpdated(); got.GetPath() != w.Path || got.GetStatus().GetModified() != 1 {
 		t.Fatalf("want worktree_updated, got %v", got)
 	}
-	_ = fake.RemoveWorktree(ctx, project.RemoveWorktreeOptions{ProjectID: r.ID, Path: w.Path})
+	_ = fake.RemoveWorktree(ctx, project.RemoveWorktreeOptions{ProjectID: r.ID, Path: w.Path, Force: true})
 	if got := next().GetWorktreeRemoved(); got.GetPath() != w.Path || got.GetProjectId() != r.ID {
 		t.Fatalf("want worktree_removed, got %v", got)
 	}

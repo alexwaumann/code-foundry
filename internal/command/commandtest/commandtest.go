@@ -178,6 +178,8 @@ type Project struct {
 	// OnCleanup answers CleanupWorktrees (dry runs included); nil answers an empty
 	// response for the requested project.
 	OnCleanup func(*v1.CleanupWorktreesRequest) (*v1.CleanupWorktreesResponse, error)
+	// OnRemoveWorktree, when set, answers RemoveWorktree's error.
+	OnRemoveWorktree func(*v1.RemoveWorktreeRequest) error
 }
 
 var _ command.ProjectBackend = (*Project)(nil)
@@ -214,6 +216,11 @@ func (f *Project) CreateWorktree(_ context.Context, r *connect.Request[v1.Create
 // RemoveWorktree records the request.
 func (f *Project) RemoveWorktree(_ context.Context, r *connect.Request[v1.RemoveWorktreeRequest]) (*connect.Response[v1.RemoveWorktreeResponse], error) {
 	f.record(r.Msg)
+	if f.OnRemoveWorktree != nil {
+		if err := f.OnRemoveWorktree(r.Msg); err != nil {
+			return nil, err
+		}
+	}
 	return connect.NewResponse(&v1.RemoveWorktreeResponse{}), f.Err
 }
 
