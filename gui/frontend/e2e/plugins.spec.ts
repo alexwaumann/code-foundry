@@ -392,3 +392,81 @@ test("the layout tab: the grid stacks in the panel and goes to columns as it wid
   expect(Math.abs((await cardH("layout-cell-build")) - (await cardH("layout-cell-tests")))).toBeLessThan(1);
   expect(await bottomOf()).toBe(0);
 });
+
+test("the runs tab: a master-detail shows the list, then a run with a back button in the panel; its own tabs keep drafts; side by side when wide", async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await openDemo(page);
+  await tab(page, "run-list").click();
+  await expect(tab(page, "run-list")).toHaveAttribute("aria-selected", "true");
+  const md = surface(page).locator('[data-testid="plugin-master-detail"][data-key="runs-md"]');
+  const runRow = (n: number) => md.locator(`[data-testid="plugin-row"][data-key="runs-run-${String(n)}"]`);
+  await expect(md).toHaveAttribute("data-layout", "narrow");
+  await expect(md).toHaveAttribute("data-showing", "list");
+  await expect(md.getByTestId("plugin-row")).toHaveCount(6);
+  await expect(md.getByTestId("plugin-empty")).toHaveCount(0);
+
+  // Choose a run: a select act, then the run alone under a back button with its title.
+  await runRow(5).click();
+  await expect(md).toHaveAttribute("data-showing", "detail");
+  const back = md.getByTestId("plugin-md-back");
+  await expect(back).toHaveText("Build #5");
+  await expect(back).toBeFocused();
+  await expect(md).toHaveAttribute("data-selected", "runs-run-5");
+  await expect(md.getByTestId("plugin-row")).toHaveCount(0);
+  await expect(md.getByTestId("plugin-pairs")).toContainText("cf/fix");
+  expect((await acts()).some((a) => a.includes(" runs-run-5 "))).toBe(true);
+
+  // The detail's own tabs: a draft in Overview survives a trip to Log and back.
+  const nodeTab = (key: string) => md.locator(`[data-testid="plugin-node-tab"][data-key="${key}"]`);
+  await expect(nodeTab("runs-tab-overview")).toHaveAttribute("aria-selected", "true");
+  await expect(nodeTab("runs-tab-log")).toContainText("1 error");
+  const note = md.getByTestId("plugin-input");
+  await note.fill("flaky test");
+  await nodeTab("runs-tab-log").click();
+  await expect(nodeTab("runs-tab-log")).toHaveAttribute("aria-selected", "true");
+  await expect(md.getByTestId("plugin-input")).toHaveCount(0);
+  const logPane = md.locator('[data-testid="plugin-pane"][data-key="runs-log-pane"]');
+  await expect(logPane).toBeVisible();
+  expect(Math.round((await logPane.boundingBox())?.height ?? 0)).toBe(240);
+  await expect(md.getByTestId("plugin-log")).toContainText("FAIL: 1 test failed");
+  await expect(tab(page, "run-list")).toHaveAttribute("aria-selected", "true");
+  expect((await acts()).some((a) => a.includes(" runs-tab-log "))).toBe(true);
+  await nodeTab("runs-tab-overview").click();
+  await expect(md.getByTestId("plugin-input")).toHaveValue("flaky test");
+
+  // Back: the list again, the run still selected, focus on its row; nothing sent.
+  const before = (await acts()).length;
+  await back.click();
+  await expect(md).toHaveAttribute("data-showing", "list");
+  await expect(runRow(5)).toHaveAttribute("data-selected", "true");
+  await expect(runRow(5)).toBeFocused();
+  expect((await acts()).length).toBe(before);
+
+  // Widen the panel past 280 + 12 + 320 px: the list beside the detail, each scrolling.
+  const h = await page.getByTestId("panel-resize-handle").boundingBox();
+  if (!h) throw new Error("no handle");
+  await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(h.x - 500, h.y + h.height / 2, { steps: 6 });
+  await page.mouse.up();
+  await expect(md).toHaveAttribute("data-layout", "wide");
+  const list = md.getByTestId("plugin-md-list");
+  const detail = md.getByTestId("plugin-md-detail");
+  const box = await md.boundingBox();
+  const l = await list.boundingBox();
+  const d = await detail.boundingBox();
+  // The list side is 280 px (and its rows' 8 px overhang); the detail's content starts 12 px after it.
+  expect(box && l && Math.round(l.x + l.width - box.x)).toBe(280);
+  expect(box && d && Math.round(d.x + 8 - box.x)).toBe(292);
+  expect(l && d && Math.abs(l.y - d.y) < 1).toBe(true);
+  expect(await list.evaluate((el) => getComputedStyle(el).overflowY)).toBe("auto");
+  expect(await detail.evaluate((el) => getComputedStyle(el).overflowY)).toBe("auto");
+  await expect(md.getByTestId("plugin-md-back")).toHaveCount(0);
+  await expect(md.getByTestId("plugin-pairs")).toContainText("cf/fix");
+  // Another run in place; the detail keeps its tab.
+  await runRow(4).click();
+  await expect(md).toHaveAttribute("data-selected", "runs-run-4");
+  await expect(md.getByTestId("plugin-pairs")).toContainText("main");
+  await expect(runRow(4)).toHaveAttribute("data-selected", "true");
+  await expect(runRow(5)).not.toHaveAttribute("data-selected", "true");
+});
