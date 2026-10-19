@@ -515,6 +515,7 @@ func TestPullRequestSubscriptionsRehydrate(t *testing.T) {
 	}
 	e.m.PullRequestChanged(prEvent(passed4, PullRequestChange{Kind: PRChangeComments, OldCount: 5, NewCount: 6}))
 	e.waitItems(parent.ID, "the comment wake", func(items []Item) bool { return len(wakes(items)) == 1 })
+	e.waitFor(parent.ID, "the woken turn's end", func(s Thread) bool { return s.Status == StatusNeedsAttention && s.StatusReason == "finished" })
 
 	if _, err := e.m.Archive(e.ctx(), parent.ID, true); err != nil {
 		t.Fatal(err)
