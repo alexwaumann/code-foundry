@@ -1,8 +1,9 @@
-import { ConnectError } from "@connectrpc/connect";
+import { Code, ConnectError } from "@connectrpc/connect";
 import {
   SettingType,
   SettingsService,
   SettingsValidationErrorsSchema,
+  type Backdrop,
   type SettingField,
   type SettingGroup,
   type SettingPage,
@@ -175,6 +176,63 @@ export async function updateSettings(values: Record<string, string>, conn: Daemo
       const [detail] = err.findDetails(SettingsValidationErrorsSchema);
       if (detail) throw new SettingsValidationError(detail.errors.map((i) => ({ key: i.key, message: i.message })));
     }
+    throw err;
+  }
+}
+
+/** An image in the daemon's backdrops folder (SettingsService.ListBackdrops). */
+export interface BackdropView {
+  /** File name in the folder; appearance.backdrop_file's value that shows it. */
+  name: string;
+  size: number;
+  /** Pixel size from the header; 0 when unknown. */
+  width: number;
+  height: number;
+  /** When it was added (ms since the epoch); 0 when unknown. */
+  addedAt: number;
+}
+
+function toBackdropView(b: Backdrop): BackdropView {
+  return {
+    name: b.name,
+    size: Number(b.size),
+    width: b.width,
+    height: b.height,
+    addedAt: b.addedAt ? Number(b.addedAt.seconds) * 1000 + Math.floor(b.addedAt.nanos / 1e6) : 0,
+  };
+}
+
+/** The backdrop images, oldest first. */
+export async function listBackdrops(conn: DaemonConnection = daemon): Promise<BackdropView[]> {
+  const c = await conn.client(SettingsService);
+  return (await c.listBackdrops({})).backdrops.map(toBackdropView);
+}
+
+/**
+ * Copies the picture at an absolute path into the backdrops folder and selects it
+ * (appearance.backdrop = custom). A refusal (not an image, over 24 MiB, gone) is a
+ * ConnectError whose rawMessage is for the user.
+ */
+export async function importBackdrop(path: string, conn: DaemonConnection = daemon): Promise<BackdropView | null> {
+  const c = await conn.client(SettingsService);
+  const res = await c.importBackdrop({ path });
+  return res.backdrop ? toBackdropView(res.backdrop) : null;
+}
+
+/** Deletes a backdrop image; the daemon falls back to forest when it was the one shown. */
+export async function removeBackdrop(name: string, conn: DaemonConnection = daemon): Promise<void> {
+  const c = await conn.client(SettingsService);
+  await c.removeBackdrop({ name });
+}
+
+/** A backdrop image's bytes, or null when it is gone (or not an image). Other failures throw. */
+export async function readBackdrop(name: string, conn: DaemonConnection = daemon): Promise<{ data: Uint8Array; mimeType: string } | null> {
+  const c = await conn.client(SettingsService);
+  try {
+    const res = await c.readBackdrop({ name });
+    return { data: res.data, mimeType: res.mimeType };
+  } catch (err) {
+    if (err instanceof ConnectError && (err.code === Code.NotFound || err.code === Code.InvalidArgument)) return null;
     throw err;
   }
 }

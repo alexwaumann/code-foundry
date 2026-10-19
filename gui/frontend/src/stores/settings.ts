@@ -25,6 +25,7 @@ export const KEYS = {
   density: "appearance.density",
   threadWidth: "appearance.thread_width",
   backdrop: "appearance.backdrop",
+  backdropFile: "appearance.backdrop_file",
   panelKeepOpen: "appearance.panel_keep_open",
   scrollback: "threads.scrollback_lines",
 } as const;

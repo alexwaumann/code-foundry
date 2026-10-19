@@ -86,6 +86,22 @@ test("thread list hides when nothing is running or waiting", async ({ page }) =>
   await expect(page.getByTestId("start-threads")).toHaveCount(0);
 });
 
+test("a custom backdrop shows the user's image behind the start page and the composer", async ({ page }) => {
+  // An import selects the image (appearance.backdrop = custom).
+  await mockPost("backdrops/import?path=/Users/me/Pictures/sea.png");
+  await openApp(page);
+  const art = start(page).locator("..").getByTestId("backdrop");
+  await expect(art).toHaveAttribute("data-backdrop", "custom");
+  await expect(art.locator(".cf-backdrop-art")).toHaveAttribute("style", /--cf-backdrop-narrow: url\("blob:.*--cf-backdrop-wide: url\("blob:/);
+  await page.getByTestId("welcome-actions").getByRole("button", { name: "New thread" }).click();
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("composer")).toBeVisible();
+  await expect(page.getByTestId("backdrop")).toHaveAttribute("data-backdrop", "custom");
+  // Gone from the folder (removed elsewhere): nothing, not the forest.
+  await mockPost("settings/external?appearance.backdrop_file=0000000000000000000000000000dead.png");
+  await expect(page.getByTestId("backdrop")).toHaveCount(0);
+});
+
 test("appearance.backdrop none removes the artwork from the start page and the composer", async ({ page }) => {
   await openApp(page);
   await expect(start(page).locator("..").getByTestId("backdrop")).toHaveAttribute("data-backdrop", "forest");

@@ -20,6 +20,7 @@ import { HOME, projectFolder } from "./filesystem";
 import { projectCommands } from "./create";
 import { Hub } from "./hub";
 import { MockSettings, MODEL_VALUES } from "./settings";
+import { MockBackdrops } from "./backdrops";
 import { themesFor } from "../src/themes";
 import { MockUpdater, type RestartCost } from "./update";
 import { pageUsage, retiredUsage, sampleUsage, usageFields, type MockUsage } from "./usage";
@@ -652,6 +653,8 @@ export class World {
       this.plugins.registry.settingsChanged();
     },
   );
+  /** The backdrops folder (mock/backdrops.ts); imports select through settings. */
+  readonly backdrops = new MockBackdrops(this.settings);
   /** Actions and their runs (mock/actions.ts); terminal runs are kind=action terminals here. */
   readonly actions = new MockActions({
     publish: (v) => this.events.publish({ source: EventSource.ACTION, event: { event: { case: "action", value: v } } }),
@@ -743,6 +746,7 @@ export class World {
     this.generation++;
     this.gitops.reset();
     this.settings.reset();
+    this.backdrops.reset();
     this.writes = [];
     this.resizes = [];
     this.nextId = 1;

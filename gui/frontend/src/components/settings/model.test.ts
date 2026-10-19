@@ -95,6 +95,21 @@ describe("page layout", () => {
     expect(pageSections(schema, empty)).toEqual([]);
   });
 
+  it("leaves out a field another field's editor owns, on its page and in search", () => {
+    const appearance: SettingPageView = { id: "appearance", title: "Appearance", description: "", sections: [{ id: "window", title: "Window", description: "" }] };
+    const s: SettingsSchemaView = {
+      groups: [],
+      pages: [appearance],
+      fields: [
+        field("appearance.backdrop", "appearance", "window", { title: "Backdrop" }),
+        field("appearance.backdrop_file", "appearance", "window", { title: "Backdrop image" }),
+      ],
+    };
+    expect(pageSections(s, appearance).map((x) => x.fields.map((f) => f.key))).toEqual([["appearance.backdrop"]]);
+    expect(searchSettings(s, ["backdrop"]).hits.map((h) => h.field.key)).toEqual(["appearance.backdrop"]);
+    expect(searchSettings(s, ["image"]).counts).toEqual({ appearance: 0 });
+  });
+
   it("puts fields sharing a row id side by side, others alone", () => {
     const rows = fieldRows(schema.fields.filter((f) => f.section === "threads"));
     expect(rows.map((r) => r.map((f) => f.key))).toEqual([["threads.default_model", "threads.default_effort"], ["threads.auto_name"]]);
