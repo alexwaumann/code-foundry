@@ -87,9 +87,10 @@ func RegisterPluginRegistry(r *Registry, b PluginRegistryBackend) error {
 			Name:  "plugin.update",
 			Title: "Update Plugins",
 			Description: "Install the newer versions the registries list, of one plugin or of every installed plugin; " +
-				"--check only lists them. A plugin installed from <owner>/<repo> that no registry lists updates to its " +
-				"repository's latest release. An enabled plugin stays enabled unless the new version asks for more " +
-				"permissions (then enable it again to review them). Dev plugins are never updated.",
+				"--check only lists them. A plugin updates only from the source it was installed from: its registry, or for " +
+				"<owner>/<repo> a registry entry of that repository, else the repository's latest release. Another source's " +
+				"newer version is listed as not offered (plugin install --force switches). An enabled plugin stays enabled " +
+				"unless the new version asks for more permissions (then enable it again to review them). Dev plugins are never updated.",
 			Category: "Plugin",
 			Args: []ArgSpec{
 				{Name: "name", Type: String, Positional: true, Description: "Plugin name (default: every plugin with an update)"},
@@ -200,21 +201,60 @@ func installedMessage(r *v1.InstallPluginResponse, enable bool) string {
 	return strings.Join(lines, "\n")
 }
 
-func formatUpdates(ups []*v1.PluginUpdate, check bool) string {
-	if len(ups) == 0 {
-		return "every plugin is up to date"
+// relationNote is what plugin.browse's INSTALLED column adds to the installed version:
+// the daemon's relation (PluginIndexEntry.relation), as Browse in the GUI shows it.
+func relationNote(e *v1.PluginIndexEntry) string {
+	switch e.GetRelation() {
+	case v1.PluginIndexRelation_PLUGIN_INDEX_RELATION_DEV:
+		return " (dev)"
+	case v1.PluginIndexRelation_PLUGIN_INDEX_RELATION_UPDATE:
+		return " (update)"
+	case v1.PluginIndexRelation_PLUGIN_INDEX_RELATION_OTHER_SOURCE:
+		return " (installed from " + e.GetInstalledFrom() + ")"
 	}
-	var sb strings.Builder
-	if check {
+	return ""
+}
+
+// notOffered is the line for an update a registry lists of a plugin installed from
+// another source (PluginUpdate.installed_from): no offer, and how to switch.
+func notOffered(u *v1.PluginUpdate) string {
+	return fmt.Sprintf("not offered: %s %s from %s (installed from %s; `code-foundry plugin install %s --force` switches to it, deleting its secrets, data and consent)",
+		u.GetName(), u.GetVersion(), u.GetRegistry(), u.GetInstalledFrom(), u.GetName())
+}
+
+func formatUpdates(ups []*v1.PluginUpdate, check bool) string {
+	var offers, others []*v1.PluginUpdate
+	for _, u := range ups {
+		if u.GetInstalledFrom() != "" {
+			others = append(others, u)
+		} else {
+			offers = append(offers, u)
+		}
+	}
+	var lines []string
+	switch {
+	case len(offers) == 0:
+		lines = append(lines, "every plugin is up to date")
+	case check:
+		var sb strings.Builder
 		tw := tabwriter.NewWriter(&sb, 0, 4, 2, ' ', 0)
 		_, _ = fmt.Fprintln(tw, "NAME\tINSTALLED\tAVAILABLE\tREGISTRY")
-		for _, u := range ups {
+		for _, u := range offers {
 			_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", u.GetName(), u.GetCurrentVersion(), u.GetVersion(), u.GetRegistry())
 		}
 		_ = tw.Flush()
 		sb.WriteString("install with: code-foundry plugin update [<name>]")
-		return sb.String()
+		lines = append(lines, sb.String())
+	default:
+		lines = append(lines, updatedLines(offers)...)
 	}
+	for _, u := range others {
+		lines = append(lines, notOffered(u))
+	}
+	return strings.Join(lines, "\n")
+}
+
+func updatedLines(ups []*v1.PluginUpdate) []string {
 	var lines []string
 	for _, u := range ups {
 		switch {
@@ -230,7 +270,7 @@ func formatUpdates(ups []*v1.PluginUpdate, check bool) string {
 			lines = append(lines, l)
 		}
 	}
-	return strings.Join(lines, "\n")
+	return lines
 }
 
 // noRegistryMessage is plugin.browse's answer when plugins.registries lists none (its
@@ -250,12 +290,7 @@ func formatBrowse(r *v1.BrowsePluginsResponse) string {
 		for _, e := range r.GetEntries() {
 			inst := "-"
 			if p := e.GetInstalled(); p != nil {
-				inst = p.GetVersion()
-				if p.GetDev() {
-					inst += " (dev)"
-				} else if e.GetUpdateAvailable() {
-					inst += " (update)"
-				}
+				inst = p.GetVersion() + relationNote(e)
 			}
 			version := e.GetVersion()
 			if !e.GetAvailable() {

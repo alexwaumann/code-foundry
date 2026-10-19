@@ -38,7 +38,10 @@ func (f *installFake) Install(_ context.Context, req plugin.InstallRequest) (plu
 
 func (f *installFake) Update(_ context.Context, name string, check, refresh bool) ([]plugin.PluginUpdate, error) {
 	f.got = append(f.got, []any{name, check, refresh})
-	return []plugin.PluginUpdate{{Name: "hello", Current: "0.1.0", Version: "0.2.0", Registry: "r", Updated: true, Disabled: "grew"}}, nil
+	return []plugin.PluginUpdate{
+		{Name: "hello", Current: "0.1.0", Version: "0.2.0", Registry: "r", Updated: true, Disabled: "grew"},
+		{Name: "other", Current: "1.0.0", Version: "2.0.0", Registry: "r2", InstalledFrom: "o/reg"},
+	}, nil
 }
 
 func (f *installFake) Uninstall(_ context.Context, name string, purge bool) (plugin.UninstallResult, error) {
@@ -68,7 +71,10 @@ func TestPluginRegistryService(t *testing.T) {
 			Name: "hello", DisplayName: "Hello", Version: "0.2.0", Repo: "o/hello", Protocol: 1, Registry: "https://github.com/o/reg",
 			Permissions: pluginsdk.Permissions{Secrets: true},
 			Artifacts:   map[string]registry.Artifact{registry.Platform(): {URL: "https://x/h.tgz", SHA256: "s"}, "linux/riscv": {URL: "u", SHA256: "t"}},
-		}, Installed: &installed}},
+		}, Installed: &installed, Relation: plugin.RelationUpdate}, {Entry: registry.Entry{
+			// Newer than what is installed, but another registry's: no update.
+			Name: "other", Version: "9.0.0", Protocol: 1, Registry: "http://127.0.0.1:9/index.json",
+		}, Installed: &installed, Relation: plugin.RelationOtherSource, InstalledFrom: "o/reg"}},
 		Registries: []registry.Status{{URL: "https://github.com/o/reg", Plugins: 1, Cached: true, FetchedAt: time.Unix(20, 0)}},
 	}}
 	f.Put(installed)
@@ -83,6 +89,13 @@ func TestPluginRegistryService(t *testing.T) {
 		e.GetInstalled().GetVersion() != "0.1.0" || len(e.GetArtifacts()) != 2 || e.GetArtifacts()[0].GetPlatform() != registry.Platform() ||
 		len(e.GetPermissionLines()) != 1 || !e.GetPermissions().GetSecrets() {
 		t.Errorf("entry = %v", e)
+	}
+	if e.GetRelation() != v1.PluginIndexRelation_PLUGIN_INDEX_RELATION_UPDATE || e.GetInstalledFrom() != "" {
+		t.Errorf("relation = %v from %q", e.GetRelation(), e.GetInstalledFrom())
+	}
+	if o := br.Msg.GetEntries()[1]; o.GetRelation() != v1.PluginIndexRelation_PLUGIN_INDEX_RELATION_OTHER_SOURCE ||
+		o.GetUpdateAvailable() || o.GetInstalledFrom() != "o/reg" {
+		t.Errorf("other source entry = %v", o)
 	}
 	if r := br.Msg.GetRegistries()[0]; !r.GetCached() || r.GetPlugins() != 1 || r.GetFetchedAt().AsTime().Unix() != 20 {
 		t.Errorf("registry = %v", r)
@@ -101,7 +114,8 @@ func TestPluginRegistryService(t *testing.T) {
 		t.Errorf("install request = %+v", got)
 	}
 	up, err := c.Update(ctx, connect.NewRequest(&v1.UpdatePluginsRequest{Name: "hello", Check: true}))
-	if err != nil || up.Msg.GetUpdates()[0].GetDisabledReason() != "grew" || !up.Msg.GetUpdates()[0].GetUpdated() {
+	if err != nil || up.Msg.GetUpdates()[0].GetDisabledReason() != "grew" || !up.Msg.GetUpdates()[0].GetUpdated() ||
+		up.Msg.GetUpdates()[1].GetInstalledFrom() != "o/reg" {
 		t.Errorf("update = %v, %v", up, err)
 	}
 	un, err := c.Uninstall(ctx, connect.NewRequest(&v1.UninstallPluginRequest{Name: "hello", Purge: true}))

@@ -220,6 +220,75 @@ func (PluginInstallPhase) EnumDescriptor() ([]byte, []int) {
 	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{2}
 }
 
+// How a Browse entry stands to the installed plugin of its name: the daemon's decision,
+// the same one behind Plugin.update_available and `plugin update --check`
+// (docs/notes/plugins-browse-offer.md). An entry offers Install only when NOT_INSTALLED
+// and Update only when UPDATE.
+type PluginIndexRelation int32
+
+const (
+	PluginIndexRelation_PLUGIN_INDEX_RELATION_UNSPECIFIED PluginIndexRelation = 0
+	// No plugin of the name is installed.
+	PluginIndexRelation_PLUGIN_INDEX_RELATION_NOT_INSTALLED PluginIndexRelation = 1
+	// Installed from this entry's source, at its version or newer.
+	PluginIndexRelation_PLUGIN_INDEX_RELATION_INSTALLED PluginIndexRelation = 2
+	// Installed from this entry's source, older.
+	PluginIndexRelation_PLUGIN_INDEX_RELATION_UPDATE PluginIndexRelation = 3
+	// A dev link of the name.
+	PluginIndexRelation_PLUGIN_INDEX_RELATION_DEV PluginIndexRelation = 4
+	// Installed from another source (installed_from): another registry, another
+	// repository's releases, or put in the plugins folder by hand. This entry would take
+	// the name over, which only `plugin install --force` does.
+	PluginIndexRelation_PLUGIN_INDEX_RELATION_OTHER_SOURCE PluginIndexRelation = 5
+)
+
+// Enum value maps for PluginIndexRelation.
+var (
+	PluginIndexRelation_name = map[int32]string{
+		0: "PLUGIN_INDEX_RELATION_UNSPECIFIED",
+		1: "PLUGIN_INDEX_RELATION_NOT_INSTALLED",
+		2: "PLUGIN_INDEX_RELATION_INSTALLED",
+		3: "PLUGIN_INDEX_RELATION_UPDATE",
+		4: "PLUGIN_INDEX_RELATION_DEV",
+		5: "PLUGIN_INDEX_RELATION_OTHER_SOURCE",
+	}
+	PluginIndexRelation_value = map[string]int32{
+		"PLUGIN_INDEX_RELATION_UNSPECIFIED":   0,
+		"PLUGIN_INDEX_RELATION_NOT_INSTALLED": 1,
+		"PLUGIN_INDEX_RELATION_INSTALLED":     2,
+		"PLUGIN_INDEX_RELATION_UPDATE":        3,
+		"PLUGIN_INDEX_RELATION_DEV":           4,
+		"PLUGIN_INDEX_RELATION_OTHER_SOURCE":  5,
+	}
+)
+
+func (x PluginIndexRelation) Enum() *PluginIndexRelation {
+	p := new(PluginIndexRelation)
+	*p = x
+	return p
+}
+
+func (x PluginIndexRelation) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (PluginIndexRelation) Descriptor() protoreflect.EnumDescriptor {
+	return file_codefoundry_v1_plugin_proto_enumTypes[3].Descriptor()
+}
+
+func (PluginIndexRelation) Type() protoreflect.EnumType {
+	return &file_codefoundry_v1_plugin_proto_enumTypes[3]
+}
+
+func (x PluginIndexRelation) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use PluginIndexRelation.Descriptor instead.
+func (PluginIndexRelation) EnumDescriptor() ([]byte, []int) {
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{3}
+}
+
 // PluginPermissions mirrors plugin.json's permissions (the plugin registry's entry schema).
 type PluginPermissions struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -3666,10 +3735,14 @@ type PluginIndexEntry struct {
 	Available bool `protobuf:"varint,11,opt,name=available,proto3" json:"available,omitempty"`
 	// The plugin of that name as installed; unset when it is not.
 	Installed *Plugin `protobuf:"bytes,12,opt,name=installed,proto3" json:"installed,omitempty"`
-	// installed is older than version.
-	UpdateAvailable bool `protobuf:"varint,13,opt,name=update_available,json=updateAvailable,proto3" json:"update_available,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// relation is UPDATE: installed is older than version and from this entry's source.
+	UpdateAvailable bool                `protobuf:"varint,13,opt,name=update_available,json=updateAvailable,proto3" json:"update_available,omitempty"`
+	Relation        PluginIndexRelation `protobuf:"varint,14,opt,name=relation,proto3,enum=codefoundry.v1.PluginIndexRelation" json:"relation,omitempty"`
+	// Where the installed plugin came from, short (a registry URL without its scheme,
+	// owner/repo, "the plugins folder"); set only when relation is OTHER_SOURCE.
+	InstalledFrom string `protobuf:"bytes,15,opt,name=installed_from,json=installedFrom,proto3" json:"installed_from,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *PluginIndexEntry) Reset() {
@@ -3791,6 +3864,20 @@ func (x *PluginIndexEntry) GetUpdateAvailable() bool {
 		return x.UpdateAvailable
 	}
 	return false
+}
+
+func (x *PluginIndexEntry) GetRelation() PluginIndexRelation {
+	if x != nil {
+		return x.Relation
+	}
+	return PluginIndexRelation_PLUGIN_INDEX_RELATION_UNSPECIFIED
+}
+
+func (x *PluginIndexEntry) GetInstalledFrom() string {
+	if x != nil {
+		return x.InstalledFrom
+	}
+	return ""
 }
 
 type BrowsePluginsRequest struct {
@@ -4254,8 +4341,12 @@ type PluginUpdate struct {
 	Error string `protobuf:"bytes,6,opt,name=error,proto3" json:"error,omitempty"`
 	// Why an enabled plugin was left disabled: the new version asks for more permissions.
 	DisabledReason string `protobuf:"bytes,7,opt,name=disabled_reason,json=disabledReason,proto3" json:"disabled_reason,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Set when this is no update: registry lists version, newer, but the plugin was
+	// installed from installed_from (short, as PluginIndexEntry.installed_from), so it is
+	// not offered and not installed (`plugin install <name> --force` switches source).
+	InstalledFrom string `protobuf:"bytes,8,opt,name=installed_from,json=installedFrom,proto3" json:"installed_from,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *PluginUpdate) Reset() {
@@ -4333,6 +4424,13 @@ func (x *PluginUpdate) GetError() string {
 func (x *PluginUpdate) GetDisabledReason() string {
 	if x != nil {
 		return x.DisabledReason
+	}
+	return ""
+}
+
+func (x *PluginUpdate) GetInstalledFrom() string {
+	if x != nil {
+		return x.InstalledFrom
 	}
 	return ""
 }
@@ -4737,7 +4835,7 @@ const file_codefoundry_v1_plugin_proto_rawDesc = "" +
 	"\x13PluginIndexArtifact\x12\x1a\n" +
 	"\bplatform\x18\x01 \x01(\tR\bplatform\x12\x10\n" +
 	"\x03url\x18\x02 \x01(\tR\x03url\x12\x16\n" +
-	"\x06sha256\x18\x03 \x01(\tR\x06sha256\"\x83\x04\n" +
+	"\x06sha256\x18\x03 \x01(\tR\x06sha256\"\xeb\x04\n" +
 	"\x10PluginIndexEntry\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12!\n" +
 	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12 \n" +
@@ -4752,7 +4850,9 @@ const file_codefoundry_v1_plugin_proto_rawDesc = "" +
 	" \x01(\tR\bregistry\x12\x1c\n" +
 	"\tavailable\x18\v \x01(\bR\tavailable\x124\n" +
 	"\tinstalled\x18\f \x01(\v2\x16.codefoundry.v1.PluginR\tinstalled\x12)\n" +
-	"\x10update_available\x18\r \x01(\bR\x0fupdateAvailable\"0\n" +
+	"\x10update_available\x18\r \x01(\bR\x0fupdateAvailable\x12?\n" +
+	"\brelation\x18\x0e \x01(\x0e2#.codefoundry.v1.PluginIndexRelationR\brelation\x12%\n" +
+	"\x0einstalled_from\x18\x0f \x01(\tR\rinstalledFrom\"0\n" +
 	"\x14BrowsePluginsRequest\x12\x18\n" +
 	"\arefresh\x18\x01 \x01(\bR\arefresh\"\xaf\x01\n" +
 	"\x15BrowsePluginsResponse\x12:\n" +
@@ -4785,7 +4885,7 @@ const file_codefoundry_v1_plugin_proto_rawDesc = "" +
 	"\x14UpdatePluginsRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05check\x18\x02 \x01(\bR\x05check\x12\x18\n" +
-	"\arefresh\x18\x03 \x01(\bR\arefresh\"\xda\x01\n" +
+	"\arefresh\x18\x03 \x01(\bR\arefresh\"\x81\x02\n" +
 	"\fPluginUpdate\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12'\n" +
 	"\x0fcurrent_version\x18\x02 \x01(\tR\x0ecurrentVersion\x12\x18\n" +
@@ -4793,7 +4893,8 @@ const file_codefoundry_v1_plugin_proto_rawDesc = "" +
 	"\bregistry\x18\x04 \x01(\tR\bregistry\x12\x18\n" +
 	"\aupdated\x18\x05 \x01(\bR\aupdated\x12\x14\n" +
 	"\x05error\x18\x06 \x01(\tR\x05error\x12'\n" +
-	"\x0fdisabled_reason\x18\a \x01(\tR\x0edisabledReason\"O\n" +
+	"\x0fdisabled_reason\x18\a \x01(\tR\x0edisabledReason\x12%\n" +
+	"\x0einstalled_from\x18\b \x01(\tR\rinstalledFrom\"O\n" +
 	"\x15UpdatePluginsResponse\x126\n" +
 	"\aupdates\x18\x01 \x03(\v2\x1c.codefoundry.v1.PluginUpdateR\aupdates\"B\n" +
 	"\x16UninstallPluginRequest\x12\x12\n" +
@@ -4826,7 +4927,14 @@ const file_codefoundry_v1_plugin_proto_rawDesc = "" +
 	"\x1fPLUGIN_INSTALL_PHASE_EXTRACTING\x10\x04\x12#\n" +
 	"\x1fPLUGIN_INSTALL_PHASE_INSTALLING\x10\x05\x12\x1d\n" +
 	"\x19PLUGIN_INSTALL_PHASE_DONE\x10\x06\x12\x1f\n" +
-	"\x1bPLUGIN_INSTALL_PHASE_FAILED\x10\a2\xa6\x0e\n" +
+	"\x1bPLUGIN_INSTALL_PHASE_FAILED\x10\a*\xf3\x01\n" +
+	"\x13PluginIndexRelation\x12%\n" +
+	"!PLUGIN_INDEX_RELATION_UNSPECIFIED\x10\x00\x12'\n" +
+	"#PLUGIN_INDEX_RELATION_NOT_INSTALLED\x10\x01\x12#\n" +
+	"\x1fPLUGIN_INDEX_RELATION_INSTALLED\x10\x02\x12 \n" +
+	"\x1cPLUGIN_INDEX_RELATION_UPDATE\x10\x03\x12\x1d\n" +
+	"\x19PLUGIN_INDEX_RELATION_DEV\x10\x04\x12&\n" +
+	"\"PLUGIN_INDEX_RELATION_OTHER_SOURCE\x10\x052\xa6\x0e\n" +
 	"\rPluginService\x12Q\n" +
 	"\x04List\x12\".codefoundry.v1.ListPluginsRequest\x1a#.codefoundry.v1.ListPluginsResponse\"\x00\x12U\n" +
 	"\x06Enable\x12#.codefoundry.v1.EnablePluginRequest\x1a$.codefoundry.v1.EnablePluginResponse\"\x00\x12X\n" +
@@ -4864,180 +4972,182 @@ func file_codefoundry_v1_plugin_proto_rawDescGZIP() []byte {
 	return file_codefoundry_v1_plugin_proto_rawDescData
 }
 
-var file_codefoundry_v1_plugin_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_codefoundry_v1_plugin_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
 var file_codefoundry_v1_plugin_proto_msgTypes = make([]protoimpl.MessageInfo, 62)
 var file_codefoundry_v1_plugin_proto_goTypes = []any{
 	(PluginState)(0),                        // 0: codefoundry.v1.PluginState
 	(SurfacePhase)(0),                       // 1: codefoundry.v1.SurfacePhase
 	(PluginInstallPhase)(0),                 // 2: codefoundry.v1.PluginInstallPhase
-	(*PluginPermissions)(nil),               // 3: codefoundry.v1.PluginPermissions
-	(*PluginCommand)(nil),                   // 4: codefoundry.v1.PluginCommand
-	(*PluginSurface)(nil),                   // 5: codefoundry.v1.PluginSurface
-	(*Plugin)(nil),                          // 6: codefoundry.v1.Plugin
-	(*ListPluginsRequest)(nil),              // 7: codefoundry.v1.ListPluginsRequest
-	(*ListPluginsResponse)(nil),             // 8: codefoundry.v1.ListPluginsResponse
-	(*EnablePluginRequest)(nil),             // 9: codefoundry.v1.EnablePluginRequest
-	(*EnablePluginResponse)(nil),            // 10: codefoundry.v1.EnablePluginResponse
-	(*DisablePluginRequest)(nil),            // 11: codefoundry.v1.DisablePluginRequest
-	(*DisablePluginResponse)(nil),           // 12: codefoundry.v1.DisablePluginResponse
-	(*RestartPluginRequest)(nil),            // 13: codefoundry.v1.RestartPluginRequest
-	(*RestartPluginResponse)(nil),           // 14: codefoundry.v1.RestartPluginResponse
-	(*DevPluginRequest)(nil),                // 15: codefoundry.v1.DevPluginRequest
-	(*DevPluginResponse)(nil),               // 16: codefoundry.v1.DevPluginResponse
-	(*ReloadPluginsRequest)(nil),            // 17: codefoundry.v1.ReloadPluginsRequest
-	(*ReloadPluginsResponse)(nil),           // 18: codefoundry.v1.ReloadPluginsResponse
-	(*PluginLogsRequest)(nil),               // 19: codefoundry.v1.PluginLogsRequest
-	(*PluginLogLine)(nil),                   // 20: codefoundry.v1.PluginLogLine
-	(*PluginLogsResponse)(nil),              // 21: codefoundry.v1.PluginLogsResponse
-	(*FollowPluginLogsRequest)(nil),         // 22: codefoundry.v1.FollowPluginLogsRequest
-	(*PluginSecret)(nil),                    // 23: codefoundry.v1.PluginSecret
-	(*ListPluginSecretsRequest)(nil),        // 24: codefoundry.v1.ListPluginSecretsRequest
-	(*ListPluginSecretsResponse)(nil),       // 25: codefoundry.v1.ListPluginSecretsResponse
-	(*DeletePluginSecretRequest)(nil),       // 26: codefoundry.v1.DeletePluginSecretRequest
-	(*DeletePluginSecretResponse)(nil),      // 27: codefoundry.v1.DeletePluginSecretResponse
-	(*WatchPluginsRequest)(nil),             // 28: codefoundry.v1.WatchPluginsRequest
-	(*PluginEvent)(nil),                     // 29: codefoundry.v1.PluginEvent
-	(*PluginSnapshot)(nil),                  // 30: codefoundry.v1.PluginSnapshot
-	(*SurfaceRef)(nil),                      // 31: codefoundry.v1.SurfaceRef
-	(*SurfaceState)(nil),                    // 32: codefoundry.v1.SurfaceState
-	(*SurfaceView)(nil),                     // 33: codefoundry.v1.SurfaceView
-	(*SurfaceLogLine)(nil),                  // 34: codefoundry.v1.SurfaceLogLine
-	(*SurfaceLogAppend)(nil),                // 35: codefoundry.v1.SurfaceLogAppend
-	(*SurfaceToast)(nil),                    // 36: codefoundry.v1.SurfaceToast
-	(*SurfaceUpdate)(nil),                   // 37: codefoundry.v1.SurfaceUpdate
-	(*WatchSurfaceRequest)(nil),             // 38: codefoundry.v1.WatchSurfaceRequest
-	(*GetSurfaceRequest)(nil),               // 39: codefoundry.v1.GetSurfaceRequest
-	(*SurfaceElement)(nil),                  // 40: codefoundry.v1.SurfaceElement
-	(*GetSurfaceResponse)(nil),              // 41: codefoundry.v1.GetSurfaceResponse
-	(*SurfaceActRequest)(nil),               // 42: codefoundry.v1.SurfaceActRequest
-	(*SurfaceActResponse)(nil),              // 43: codefoundry.v1.SurfaceActResponse
-	(*PluginEnvironmentRequest)(nil),        // 44: codefoundry.v1.PluginEnvironmentRequest
-	(*PluginEnvVar)(nil),                    // 45: codefoundry.v1.PluginEnvVar
-	(*PluginEnvironment)(nil),               // 46: codefoundry.v1.PluginEnvironment
-	(*PluginEnvironmentResponse)(nil),       // 47: codefoundry.v1.PluginEnvironmentResponse
-	(*PluginInstall)(nil),                   // 48: codefoundry.v1.PluginInstall
-	(*PluginInstallProgress)(nil),           // 49: codefoundry.v1.PluginInstallProgress
-	(*PluginRegistry)(nil),                  // 50: codefoundry.v1.PluginRegistry
-	(*PluginIndexArtifact)(nil),             // 51: codefoundry.v1.PluginIndexArtifact
-	(*PluginIndexEntry)(nil),                // 52: codefoundry.v1.PluginIndexEntry
-	(*BrowsePluginsRequest)(nil),            // 53: codefoundry.v1.BrowsePluginsRequest
-	(*BrowsePluginsResponse)(nil),           // 54: codefoundry.v1.BrowsePluginsResponse
-	(*RefreshPluginRegistriesRequest)(nil),  // 55: codefoundry.v1.RefreshPluginRegistriesRequest
-	(*RefreshPluginRegistriesResponse)(nil), // 56: codefoundry.v1.RefreshPluginRegistriesResponse
-	(*InstallPluginRequest)(nil),            // 57: codefoundry.v1.InstallPluginRequest
-	(*InstallPluginResponse)(nil),           // 58: codefoundry.v1.InstallPluginResponse
-	(*UpdatePluginsRequest)(nil),            // 59: codefoundry.v1.UpdatePluginsRequest
-	(*PluginUpdate)(nil),                    // 60: codefoundry.v1.PluginUpdate
-	(*UpdatePluginsResponse)(nil),           // 61: codefoundry.v1.UpdatePluginsResponse
-	(*UninstallPluginRequest)(nil),          // 62: codefoundry.v1.UninstallPluginRequest
-	(*UninstallPluginResponse)(nil),         // 63: codefoundry.v1.UninstallPluginResponse
-	nil,                                     // 64: codefoundry.v1.SurfaceElement.ArgsEntry
-	(*timestamppb.Timestamp)(nil),           // 65: google.protobuf.Timestamp
-	(*UiContext)(nil),                       // 66: codefoundry.v1.UiContext
-	(*StreamHeartbeat)(nil),                 // 67: codefoundry.v1.StreamHeartbeat
-	(*structpb.Struct)(nil),                 // 68: google.protobuf.Struct
+	(PluginIndexRelation)(0),                // 3: codefoundry.v1.PluginIndexRelation
+	(*PluginPermissions)(nil),               // 4: codefoundry.v1.PluginPermissions
+	(*PluginCommand)(nil),                   // 5: codefoundry.v1.PluginCommand
+	(*PluginSurface)(nil),                   // 6: codefoundry.v1.PluginSurface
+	(*Plugin)(nil),                          // 7: codefoundry.v1.Plugin
+	(*ListPluginsRequest)(nil),              // 8: codefoundry.v1.ListPluginsRequest
+	(*ListPluginsResponse)(nil),             // 9: codefoundry.v1.ListPluginsResponse
+	(*EnablePluginRequest)(nil),             // 10: codefoundry.v1.EnablePluginRequest
+	(*EnablePluginResponse)(nil),            // 11: codefoundry.v1.EnablePluginResponse
+	(*DisablePluginRequest)(nil),            // 12: codefoundry.v1.DisablePluginRequest
+	(*DisablePluginResponse)(nil),           // 13: codefoundry.v1.DisablePluginResponse
+	(*RestartPluginRequest)(nil),            // 14: codefoundry.v1.RestartPluginRequest
+	(*RestartPluginResponse)(nil),           // 15: codefoundry.v1.RestartPluginResponse
+	(*DevPluginRequest)(nil),                // 16: codefoundry.v1.DevPluginRequest
+	(*DevPluginResponse)(nil),               // 17: codefoundry.v1.DevPluginResponse
+	(*ReloadPluginsRequest)(nil),            // 18: codefoundry.v1.ReloadPluginsRequest
+	(*ReloadPluginsResponse)(nil),           // 19: codefoundry.v1.ReloadPluginsResponse
+	(*PluginLogsRequest)(nil),               // 20: codefoundry.v1.PluginLogsRequest
+	(*PluginLogLine)(nil),                   // 21: codefoundry.v1.PluginLogLine
+	(*PluginLogsResponse)(nil),              // 22: codefoundry.v1.PluginLogsResponse
+	(*FollowPluginLogsRequest)(nil),         // 23: codefoundry.v1.FollowPluginLogsRequest
+	(*PluginSecret)(nil),                    // 24: codefoundry.v1.PluginSecret
+	(*ListPluginSecretsRequest)(nil),        // 25: codefoundry.v1.ListPluginSecretsRequest
+	(*ListPluginSecretsResponse)(nil),       // 26: codefoundry.v1.ListPluginSecretsResponse
+	(*DeletePluginSecretRequest)(nil),       // 27: codefoundry.v1.DeletePluginSecretRequest
+	(*DeletePluginSecretResponse)(nil),      // 28: codefoundry.v1.DeletePluginSecretResponse
+	(*WatchPluginsRequest)(nil),             // 29: codefoundry.v1.WatchPluginsRequest
+	(*PluginEvent)(nil),                     // 30: codefoundry.v1.PluginEvent
+	(*PluginSnapshot)(nil),                  // 31: codefoundry.v1.PluginSnapshot
+	(*SurfaceRef)(nil),                      // 32: codefoundry.v1.SurfaceRef
+	(*SurfaceState)(nil),                    // 33: codefoundry.v1.SurfaceState
+	(*SurfaceView)(nil),                     // 34: codefoundry.v1.SurfaceView
+	(*SurfaceLogLine)(nil),                  // 35: codefoundry.v1.SurfaceLogLine
+	(*SurfaceLogAppend)(nil),                // 36: codefoundry.v1.SurfaceLogAppend
+	(*SurfaceToast)(nil),                    // 37: codefoundry.v1.SurfaceToast
+	(*SurfaceUpdate)(nil),                   // 38: codefoundry.v1.SurfaceUpdate
+	(*WatchSurfaceRequest)(nil),             // 39: codefoundry.v1.WatchSurfaceRequest
+	(*GetSurfaceRequest)(nil),               // 40: codefoundry.v1.GetSurfaceRequest
+	(*SurfaceElement)(nil),                  // 41: codefoundry.v1.SurfaceElement
+	(*GetSurfaceResponse)(nil),              // 42: codefoundry.v1.GetSurfaceResponse
+	(*SurfaceActRequest)(nil),               // 43: codefoundry.v1.SurfaceActRequest
+	(*SurfaceActResponse)(nil),              // 44: codefoundry.v1.SurfaceActResponse
+	(*PluginEnvironmentRequest)(nil),        // 45: codefoundry.v1.PluginEnvironmentRequest
+	(*PluginEnvVar)(nil),                    // 46: codefoundry.v1.PluginEnvVar
+	(*PluginEnvironment)(nil),               // 47: codefoundry.v1.PluginEnvironment
+	(*PluginEnvironmentResponse)(nil),       // 48: codefoundry.v1.PluginEnvironmentResponse
+	(*PluginInstall)(nil),                   // 49: codefoundry.v1.PluginInstall
+	(*PluginInstallProgress)(nil),           // 50: codefoundry.v1.PluginInstallProgress
+	(*PluginRegistry)(nil),                  // 51: codefoundry.v1.PluginRegistry
+	(*PluginIndexArtifact)(nil),             // 52: codefoundry.v1.PluginIndexArtifact
+	(*PluginIndexEntry)(nil),                // 53: codefoundry.v1.PluginIndexEntry
+	(*BrowsePluginsRequest)(nil),            // 54: codefoundry.v1.BrowsePluginsRequest
+	(*BrowsePluginsResponse)(nil),           // 55: codefoundry.v1.BrowsePluginsResponse
+	(*RefreshPluginRegistriesRequest)(nil),  // 56: codefoundry.v1.RefreshPluginRegistriesRequest
+	(*RefreshPluginRegistriesResponse)(nil), // 57: codefoundry.v1.RefreshPluginRegistriesResponse
+	(*InstallPluginRequest)(nil),            // 58: codefoundry.v1.InstallPluginRequest
+	(*InstallPluginResponse)(nil),           // 59: codefoundry.v1.InstallPluginResponse
+	(*UpdatePluginsRequest)(nil),            // 60: codefoundry.v1.UpdatePluginsRequest
+	(*PluginUpdate)(nil),                    // 61: codefoundry.v1.PluginUpdate
+	(*UpdatePluginsResponse)(nil),           // 62: codefoundry.v1.UpdatePluginsResponse
+	(*UninstallPluginRequest)(nil),          // 63: codefoundry.v1.UninstallPluginRequest
+	(*UninstallPluginResponse)(nil),         // 64: codefoundry.v1.UninstallPluginResponse
+	nil,                                     // 65: codefoundry.v1.SurfaceElement.ArgsEntry
+	(*timestamppb.Timestamp)(nil),           // 66: google.protobuf.Timestamp
+	(*UiContext)(nil),                       // 67: codefoundry.v1.UiContext
+	(*StreamHeartbeat)(nil),                 // 68: codefoundry.v1.StreamHeartbeat
+	(*structpb.Struct)(nil),                 // 69: google.protobuf.Struct
 }
 var file_codefoundry_v1_plugin_proto_depIdxs = []int32{
 	0,  // 0: codefoundry.v1.Plugin.state:type_name -> codefoundry.v1.PluginState
-	3,  // 1: codefoundry.v1.Plugin.permissions:type_name -> codefoundry.v1.PluginPermissions
-	3,  // 2: codefoundry.v1.Plugin.granted:type_name -> codefoundry.v1.PluginPermissions
-	65, // 3: codefoundry.v1.Plugin.consented_at:type_name -> google.protobuf.Timestamp
-	65, // 4: codefoundry.v1.Plugin.started_at:type_name -> google.protobuf.Timestamp
-	65, // 5: codefoundry.v1.Plugin.next_restart_at:type_name -> google.protobuf.Timestamp
-	4,  // 6: codefoundry.v1.Plugin.commands:type_name -> codefoundry.v1.PluginCommand
-	5,  // 7: codefoundry.v1.Plugin.surfaces:type_name -> codefoundry.v1.PluginSurface
-	48, // 8: codefoundry.v1.Plugin.install:type_name -> codefoundry.v1.PluginInstall
-	66, // 9: codefoundry.v1.ListPluginsRequest.context:type_name -> codefoundry.v1.UiContext
-	6,  // 10: codefoundry.v1.ListPluginsResponse.plugins:type_name -> codefoundry.v1.Plugin
-	6,  // 11: codefoundry.v1.EnablePluginResponse.plugin:type_name -> codefoundry.v1.Plugin
-	6,  // 12: codefoundry.v1.DisablePluginResponse.plugin:type_name -> codefoundry.v1.Plugin
-	6,  // 13: codefoundry.v1.RestartPluginResponse.plugin:type_name -> codefoundry.v1.Plugin
-	6,  // 14: codefoundry.v1.DevPluginResponse.plugin:type_name -> codefoundry.v1.Plugin
-	65, // 15: codefoundry.v1.PluginLogLine.time:type_name -> google.protobuf.Timestamp
-	20, // 16: codefoundry.v1.PluginLogsResponse.lines:type_name -> codefoundry.v1.PluginLogLine
-	65, // 17: codefoundry.v1.PluginSecret.updated_at:type_name -> google.protobuf.Timestamp
-	23, // 18: codefoundry.v1.ListPluginSecretsResponse.secrets:type_name -> codefoundry.v1.PluginSecret
-	30, // 19: codefoundry.v1.PluginEvent.snapshot:type_name -> codefoundry.v1.PluginSnapshot
-	6,  // 20: codefoundry.v1.PluginEvent.updated:type_name -> codefoundry.v1.Plugin
-	49, // 21: codefoundry.v1.PluginEvent.install_progress:type_name -> codefoundry.v1.PluginInstallProgress
-	6,  // 22: codefoundry.v1.PluginSnapshot.plugins:type_name -> codefoundry.v1.Plugin
-	66, // 23: codefoundry.v1.SurfaceRef.context:type_name -> codefoundry.v1.UiContext
+	4,  // 1: codefoundry.v1.Plugin.permissions:type_name -> codefoundry.v1.PluginPermissions
+	4,  // 2: codefoundry.v1.Plugin.granted:type_name -> codefoundry.v1.PluginPermissions
+	66, // 3: codefoundry.v1.Plugin.consented_at:type_name -> google.protobuf.Timestamp
+	66, // 4: codefoundry.v1.Plugin.started_at:type_name -> google.protobuf.Timestamp
+	66, // 5: codefoundry.v1.Plugin.next_restart_at:type_name -> google.protobuf.Timestamp
+	5,  // 6: codefoundry.v1.Plugin.commands:type_name -> codefoundry.v1.PluginCommand
+	6,  // 7: codefoundry.v1.Plugin.surfaces:type_name -> codefoundry.v1.PluginSurface
+	49, // 8: codefoundry.v1.Plugin.install:type_name -> codefoundry.v1.PluginInstall
+	67, // 9: codefoundry.v1.ListPluginsRequest.context:type_name -> codefoundry.v1.UiContext
+	7,  // 10: codefoundry.v1.ListPluginsResponse.plugins:type_name -> codefoundry.v1.Plugin
+	7,  // 11: codefoundry.v1.EnablePluginResponse.plugin:type_name -> codefoundry.v1.Plugin
+	7,  // 12: codefoundry.v1.DisablePluginResponse.plugin:type_name -> codefoundry.v1.Plugin
+	7,  // 13: codefoundry.v1.RestartPluginResponse.plugin:type_name -> codefoundry.v1.Plugin
+	7,  // 14: codefoundry.v1.DevPluginResponse.plugin:type_name -> codefoundry.v1.Plugin
+	66, // 15: codefoundry.v1.PluginLogLine.time:type_name -> google.protobuf.Timestamp
+	21, // 16: codefoundry.v1.PluginLogsResponse.lines:type_name -> codefoundry.v1.PluginLogLine
+	66, // 17: codefoundry.v1.PluginSecret.updated_at:type_name -> google.protobuf.Timestamp
+	24, // 18: codefoundry.v1.ListPluginSecretsResponse.secrets:type_name -> codefoundry.v1.PluginSecret
+	31, // 19: codefoundry.v1.PluginEvent.snapshot:type_name -> codefoundry.v1.PluginSnapshot
+	7,  // 20: codefoundry.v1.PluginEvent.updated:type_name -> codefoundry.v1.Plugin
+	50, // 21: codefoundry.v1.PluginEvent.install_progress:type_name -> codefoundry.v1.PluginInstallProgress
+	7,  // 22: codefoundry.v1.PluginSnapshot.plugins:type_name -> codefoundry.v1.Plugin
+	67, // 23: codefoundry.v1.SurfaceRef.context:type_name -> codefoundry.v1.UiContext
 	1,  // 24: codefoundry.v1.SurfaceState.phase:type_name -> codefoundry.v1.SurfacePhase
 	0,  // 25: codefoundry.v1.SurfaceState.plugin_state:type_name -> codefoundry.v1.PluginState
-	34, // 26: codefoundry.v1.SurfaceLogAppend.lines:type_name -> codefoundry.v1.SurfaceLogLine
-	32, // 27: codefoundry.v1.SurfaceUpdate.state:type_name -> codefoundry.v1.SurfaceState
-	33, // 28: codefoundry.v1.SurfaceUpdate.view:type_name -> codefoundry.v1.SurfaceView
-	35, // 29: codefoundry.v1.SurfaceUpdate.append:type_name -> codefoundry.v1.SurfaceLogAppend
-	36, // 30: codefoundry.v1.SurfaceUpdate.toast:type_name -> codefoundry.v1.SurfaceToast
-	67, // 31: codefoundry.v1.SurfaceUpdate.heartbeat:type_name -> codefoundry.v1.StreamHeartbeat
-	31, // 32: codefoundry.v1.WatchSurfaceRequest.ref:type_name -> codefoundry.v1.SurfaceRef
-	31, // 33: codefoundry.v1.GetSurfaceRequest.ref:type_name -> codefoundry.v1.SurfaceRef
-	64, // 34: codefoundry.v1.SurfaceElement.args:type_name -> codefoundry.v1.SurfaceElement.ArgsEntry
-	32, // 35: codefoundry.v1.GetSurfaceResponse.state:type_name -> codefoundry.v1.SurfaceState
-	33, // 36: codefoundry.v1.GetSurfaceResponse.view:type_name -> codefoundry.v1.SurfaceView
-	40, // 37: codefoundry.v1.GetSurfaceResponse.elements:type_name -> codefoundry.v1.SurfaceElement
-	31, // 38: codefoundry.v1.SurfaceActRequest.ref:type_name -> codefoundry.v1.SurfaceRef
-	68, // 39: codefoundry.v1.SurfaceActRequest.values:type_name -> google.protobuf.Struct
-	66, // 40: codefoundry.v1.SurfaceActRequest.context:type_name -> codefoundry.v1.UiContext
-	45, // 41: codefoundry.v1.PluginEnvironment.env:type_name -> codefoundry.v1.PluginEnvVar
-	65, // 42: codefoundry.v1.PluginEnvironment.updated_at:type_name -> google.protobuf.Timestamp
-	46, // 43: codefoundry.v1.PluginEnvironmentResponse.environments:type_name -> codefoundry.v1.PluginEnvironment
-	65, // 44: codefoundry.v1.PluginInstall.installed_at:type_name -> google.protobuf.Timestamp
+	35, // 26: codefoundry.v1.SurfaceLogAppend.lines:type_name -> codefoundry.v1.SurfaceLogLine
+	33, // 27: codefoundry.v1.SurfaceUpdate.state:type_name -> codefoundry.v1.SurfaceState
+	34, // 28: codefoundry.v1.SurfaceUpdate.view:type_name -> codefoundry.v1.SurfaceView
+	36, // 29: codefoundry.v1.SurfaceUpdate.append:type_name -> codefoundry.v1.SurfaceLogAppend
+	37, // 30: codefoundry.v1.SurfaceUpdate.toast:type_name -> codefoundry.v1.SurfaceToast
+	68, // 31: codefoundry.v1.SurfaceUpdate.heartbeat:type_name -> codefoundry.v1.StreamHeartbeat
+	32, // 32: codefoundry.v1.WatchSurfaceRequest.ref:type_name -> codefoundry.v1.SurfaceRef
+	32, // 33: codefoundry.v1.GetSurfaceRequest.ref:type_name -> codefoundry.v1.SurfaceRef
+	65, // 34: codefoundry.v1.SurfaceElement.args:type_name -> codefoundry.v1.SurfaceElement.ArgsEntry
+	33, // 35: codefoundry.v1.GetSurfaceResponse.state:type_name -> codefoundry.v1.SurfaceState
+	34, // 36: codefoundry.v1.GetSurfaceResponse.view:type_name -> codefoundry.v1.SurfaceView
+	41, // 37: codefoundry.v1.GetSurfaceResponse.elements:type_name -> codefoundry.v1.SurfaceElement
+	32, // 38: codefoundry.v1.SurfaceActRequest.ref:type_name -> codefoundry.v1.SurfaceRef
+	69, // 39: codefoundry.v1.SurfaceActRequest.values:type_name -> google.protobuf.Struct
+	67, // 40: codefoundry.v1.SurfaceActRequest.context:type_name -> codefoundry.v1.UiContext
+	46, // 41: codefoundry.v1.PluginEnvironment.env:type_name -> codefoundry.v1.PluginEnvVar
+	66, // 42: codefoundry.v1.PluginEnvironment.updated_at:type_name -> google.protobuf.Timestamp
+	47, // 43: codefoundry.v1.PluginEnvironmentResponse.environments:type_name -> codefoundry.v1.PluginEnvironment
+	66, // 44: codefoundry.v1.PluginInstall.installed_at:type_name -> google.protobuf.Timestamp
 	2,  // 45: codefoundry.v1.PluginInstallProgress.phase:type_name -> codefoundry.v1.PluginInstallPhase
-	65, // 46: codefoundry.v1.PluginRegistry.fetched_at:type_name -> google.protobuf.Timestamp
-	3,  // 47: codefoundry.v1.PluginIndexEntry.permissions:type_name -> codefoundry.v1.PluginPermissions
-	51, // 48: codefoundry.v1.PluginIndexEntry.artifacts:type_name -> codefoundry.v1.PluginIndexArtifact
-	6,  // 49: codefoundry.v1.PluginIndexEntry.installed:type_name -> codefoundry.v1.Plugin
-	52, // 50: codefoundry.v1.BrowsePluginsResponse.entries:type_name -> codefoundry.v1.PluginIndexEntry
-	50, // 51: codefoundry.v1.BrowsePluginsResponse.registries:type_name -> codefoundry.v1.PluginRegistry
-	50, // 52: codefoundry.v1.RefreshPluginRegistriesResponse.registries:type_name -> codefoundry.v1.PluginRegistry
-	6,  // 53: codefoundry.v1.InstallPluginResponse.plugin:type_name -> codefoundry.v1.Plugin
-	60, // 54: codefoundry.v1.UpdatePluginsResponse.updates:type_name -> codefoundry.v1.PluginUpdate
-	7,  // 55: codefoundry.v1.PluginService.List:input_type -> codefoundry.v1.ListPluginsRequest
-	9,  // 56: codefoundry.v1.PluginService.Enable:input_type -> codefoundry.v1.EnablePluginRequest
-	11, // 57: codefoundry.v1.PluginService.Disable:input_type -> codefoundry.v1.DisablePluginRequest
-	13, // 58: codefoundry.v1.PluginService.Restart:input_type -> codefoundry.v1.RestartPluginRequest
-	15, // 59: codefoundry.v1.PluginService.Dev:input_type -> codefoundry.v1.DevPluginRequest
-	17, // 60: codefoundry.v1.PluginService.Reload:input_type -> codefoundry.v1.ReloadPluginsRequest
-	19, // 61: codefoundry.v1.PluginService.Logs:input_type -> codefoundry.v1.PluginLogsRequest
-	22, // 62: codefoundry.v1.PluginService.FollowLogs:input_type -> codefoundry.v1.FollowPluginLogsRequest
-	24, // 63: codefoundry.v1.PluginService.ListSecrets:input_type -> codefoundry.v1.ListPluginSecretsRequest
-	26, // 64: codefoundry.v1.PluginService.DeleteSecret:input_type -> codefoundry.v1.DeletePluginSecretRequest
-	28, // 65: codefoundry.v1.PluginService.Watch:input_type -> codefoundry.v1.WatchPluginsRequest
-	38, // 66: codefoundry.v1.PluginService.WatchSurface:input_type -> codefoundry.v1.WatchSurfaceRequest
-	39, // 67: codefoundry.v1.PluginService.GetSurface:input_type -> codefoundry.v1.GetSurfaceRequest
-	42, // 68: codefoundry.v1.PluginService.Act:input_type -> codefoundry.v1.SurfaceActRequest
-	44, // 69: codefoundry.v1.PluginService.Environment:input_type -> codefoundry.v1.PluginEnvironmentRequest
-	53, // 70: codefoundry.v1.PluginService.Browse:input_type -> codefoundry.v1.BrowsePluginsRequest
-	55, // 71: codefoundry.v1.PluginService.RefreshRegistries:input_type -> codefoundry.v1.RefreshPluginRegistriesRequest
-	57, // 72: codefoundry.v1.PluginService.Install:input_type -> codefoundry.v1.InstallPluginRequest
-	59, // 73: codefoundry.v1.PluginService.Update:input_type -> codefoundry.v1.UpdatePluginsRequest
-	62, // 74: codefoundry.v1.PluginService.Uninstall:input_type -> codefoundry.v1.UninstallPluginRequest
-	8,  // 75: codefoundry.v1.PluginService.List:output_type -> codefoundry.v1.ListPluginsResponse
-	10, // 76: codefoundry.v1.PluginService.Enable:output_type -> codefoundry.v1.EnablePluginResponse
-	12, // 77: codefoundry.v1.PluginService.Disable:output_type -> codefoundry.v1.DisablePluginResponse
-	14, // 78: codefoundry.v1.PluginService.Restart:output_type -> codefoundry.v1.RestartPluginResponse
-	16, // 79: codefoundry.v1.PluginService.Dev:output_type -> codefoundry.v1.DevPluginResponse
-	18, // 80: codefoundry.v1.PluginService.Reload:output_type -> codefoundry.v1.ReloadPluginsResponse
-	21, // 81: codefoundry.v1.PluginService.Logs:output_type -> codefoundry.v1.PluginLogsResponse
-	20, // 82: codefoundry.v1.PluginService.FollowLogs:output_type -> codefoundry.v1.PluginLogLine
-	25, // 83: codefoundry.v1.PluginService.ListSecrets:output_type -> codefoundry.v1.ListPluginSecretsResponse
-	27, // 84: codefoundry.v1.PluginService.DeleteSecret:output_type -> codefoundry.v1.DeletePluginSecretResponse
-	29, // 85: codefoundry.v1.PluginService.Watch:output_type -> codefoundry.v1.PluginEvent
-	37, // 86: codefoundry.v1.PluginService.WatchSurface:output_type -> codefoundry.v1.SurfaceUpdate
-	41, // 87: codefoundry.v1.PluginService.GetSurface:output_type -> codefoundry.v1.GetSurfaceResponse
-	43, // 88: codefoundry.v1.PluginService.Act:output_type -> codefoundry.v1.SurfaceActResponse
-	47, // 89: codefoundry.v1.PluginService.Environment:output_type -> codefoundry.v1.PluginEnvironmentResponse
-	54, // 90: codefoundry.v1.PluginService.Browse:output_type -> codefoundry.v1.BrowsePluginsResponse
-	56, // 91: codefoundry.v1.PluginService.RefreshRegistries:output_type -> codefoundry.v1.RefreshPluginRegistriesResponse
-	58, // 92: codefoundry.v1.PluginService.Install:output_type -> codefoundry.v1.InstallPluginResponse
-	61, // 93: codefoundry.v1.PluginService.Update:output_type -> codefoundry.v1.UpdatePluginsResponse
-	63, // 94: codefoundry.v1.PluginService.Uninstall:output_type -> codefoundry.v1.UninstallPluginResponse
-	75, // [75:95] is the sub-list for method output_type
-	55, // [55:75] is the sub-list for method input_type
-	55, // [55:55] is the sub-list for extension type_name
-	55, // [55:55] is the sub-list for extension extendee
-	0,  // [0:55] is the sub-list for field type_name
+	66, // 46: codefoundry.v1.PluginRegistry.fetched_at:type_name -> google.protobuf.Timestamp
+	4,  // 47: codefoundry.v1.PluginIndexEntry.permissions:type_name -> codefoundry.v1.PluginPermissions
+	52, // 48: codefoundry.v1.PluginIndexEntry.artifacts:type_name -> codefoundry.v1.PluginIndexArtifact
+	7,  // 49: codefoundry.v1.PluginIndexEntry.installed:type_name -> codefoundry.v1.Plugin
+	3,  // 50: codefoundry.v1.PluginIndexEntry.relation:type_name -> codefoundry.v1.PluginIndexRelation
+	53, // 51: codefoundry.v1.BrowsePluginsResponse.entries:type_name -> codefoundry.v1.PluginIndexEntry
+	51, // 52: codefoundry.v1.BrowsePluginsResponse.registries:type_name -> codefoundry.v1.PluginRegistry
+	51, // 53: codefoundry.v1.RefreshPluginRegistriesResponse.registries:type_name -> codefoundry.v1.PluginRegistry
+	7,  // 54: codefoundry.v1.InstallPluginResponse.plugin:type_name -> codefoundry.v1.Plugin
+	61, // 55: codefoundry.v1.UpdatePluginsResponse.updates:type_name -> codefoundry.v1.PluginUpdate
+	8,  // 56: codefoundry.v1.PluginService.List:input_type -> codefoundry.v1.ListPluginsRequest
+	10, // 57: codefoundry.v1.PluginService.Enable:input_type -> codefoundry.v1.EnablePluginRequest
+	12, // 58: codefoundry.v1.PluginService.Disable:input_type -> codefoundry.v1.DisablePluginRequest
+	14, // 59: codefoundry.v1.PluginService.Restart:input_type -> codefoundry.v1.RestartPluginRequest
+	16, // 60: codefoundry.v1.PluginService.Dev:input_type -> codefoundry.v1.DevPluginRequest
+	18, // 61: codefoundry.v1.PluginService.Reload:input_type -> codefoundry.v1.ReloadPluginsRequest
+	20, // 62: codefoundry.v1.PluginService.Logs:input_type -> codefoundry.v1.PluginLogsRequest
+	23, // 63: codefoundry.v1.PluginService.FollowLogs:input_type -> codefoundry.v1.FollowPluginLogsRequest
+	25, // 64: codefoundry.v1.PluginService.ListSecrets:input_type -> codefoundry.v1.ListPluginSecretsRequest
+	27, // 65: codefoundry.v1.PluginService.DeleteSecret:input_type -> codefoundry.v1.DeletePluginSecretRequest
+	29, // 66: codefoundry.v1.PluginService.Watch:input_type -> codefoundry.v1.WatchPluginsRequest
+	39, // 67: codefoundry.v1.PluginService.WatchSurface:input_type -> codefoundry.v1.WatchSurfaceRequest
+	40, // 68: codefoundry.v1.PluginService.GetSurface:input_type -> codefoundry.v1.GetSurfaceRequest
+	43, // 69: codefoundry.v1.PluginService.Act:input_type -> codefoundry.v1.SurfaceActRequest
+	45, // 70: codefoundry.v1.PluginService.Environment:input_type -> codefoundry.v1.PluginEnvironmentRequest
+	54, // 71: codefoundry.v1.PluginService.Browse:input_type -> codefoundry.v1.BrowsePluginsRequest
+	56, // 72: codefoundry.v1.PluginService.RefreshRegistries:input_type -> codefoundry.v1.RefreshPluginRegistriesRequest
+	58, // 73: codefoundry.v1.PluginService.Install:input_type -> codefoundry.v1.InstallPluginRequest
+	60, // 74: codefoundry.v1.PluginService.Update:input_type -> codefoundry.v1.UpdatePluginsRequest
+	63, // 75: codefoundry.v1.PluginService.Uninstall:input_type -> codefoundry.v1.UninstallPluginRequest
+	9,  // 76: codefoundry.v1.PluginService.List:output_type -> codefoundry.v1.ListPluginsResponse
+	11, // 77: codefoundry.v1.PluginService.Enable:output_type -> codefoundry.v1.EnablePluginResponse
+	13, // 78: codefoundry.v1.PluginService.Disable:output_type -> codefoundry.v1.DisablePluginResponse
+	15, // 79: codefoundry.v1.PluginService.Restart:output_type -> codefoundry.v1.RestartPluginResponse
+	17, // 80: codefoundry.v1.PluginService.Dev:output_type -> codefoundry.v1.DevPluginResponse
+	19, // 81: codefoundry.v1.PluginService.Reload:output_type -> codefoundry.v1.ReloadPluginsResponse
+	22, // 82: codefoundry.v1.PluginService.Logs:output_type -> codefoundry.v1.PluginLogsResponse
+	21, // 83: codefoundry.v1.PluginService.FollowLogs:output_type -> codefoundry.v1.PluginLogLine
+	26, // 84: codefoundry.v1.PluginService.ListSecrets:output_type -> codefoundry.v1.ListPluginSecretsResponse
+	28, // 85: codefoundry.v1.PluginService.DeleteSecret:output_type -> codefoundry.v1.DeletePluginSecretResponse
+	30, // 86: codefoundry.v1.PluginService.Watch:output_type -> codefoundry.v1.PluginEvent
+	38, // 87: codefoundry.v1.PluginService.WatchSurface:output_type -> codefoundry.v1.SurfaceUpdate
+	42, // 88: codefoundry.v1.PluginService.GetSurface:output_type -> codefoundry.v1.GetSurfaceResponse
+	44, // 89: codefoundry.v1.PluginService.Act:output_type -> codefoundry.v1.SurfaceActResponse
+	48, // 90: codefoundry.v1.PluginService.Environment:output_type -> codefoundry.v1.PluginEnvironmentResponse
+	55, // 91: codefoundry.v1.PluginService.Browse:output_type -> codefoundry.v1.BrowsePluginsResponse
+	57, // 92: codefoundry.v1.PluginService.RefreshRegistries:output_type -> codefoundry.v1.RefreshPluginRegistriesResponse
+	59, // 93: codefoundry.v1.PluginService.Install:output_type -> codefoundry.v1.InstallPluginResponse
+	62, // 94: codefoundry.v1.PluginService.Update:output_type -> codefoundry.v1.UpdatePluginsResponse
+	64, // 95: codefoundry.v1.PluginService.Uninstall:output_type -> codefoundry.v1.UninstallPluginResponse
+	76, // [76:96] is the sub-list for method output_type
+	56, // [56:76] is the sub-list for method input_type
+	56, // [56:56] is the sub-list for extension type_name
+	56, // [56:56] is the sub-list for extension extendee
+	0,  // [0:56] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_plugin_proto_init() }
@@ -5068,7 +5178,7 @@ func file_codefoundry_v1_plugin_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_plugin_proto_rawDesc), len(file_codefoundry_v1_plugin_proto_rawDesc)),
-			NumEnums:      3,
+			NumEnums:      4,
 			NumMessages:   62,
 			NumExtensions: 0,
 			NumServices:   1,

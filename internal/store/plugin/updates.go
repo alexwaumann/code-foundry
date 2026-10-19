@@ -24,8 +24,9 @@ type UpdateOffer struct {
 	// Registry is the URL of the registry listing it (https://github.com/<owner>/<repo>
 	// for a release).
 	Registry string
-	// Ref installs it: "<owner>/<repo>@<tag>" for a release; "" installs the name from
-	// the registries.
+	// Ref installs it: "<owner>/<repo>@<tag>" for a plugin installed from a release (its
+	// repository's latest, or the version a registry entry of that repository lists);
+	// "" installs the name from the registries.
 	Ref string
 }
 
@@ -36,14 +37,105 @@ type RegistryChanged struct{ Epoch uint64 }
 
 func (RegistryChanged) isPluginEvent() {}
 
-// offerFor is the update offered for p: a non-dev plugin whose name the merged index
-// lists with a newer version. A plugin installed from a GitHub release is only matched by
-// an entry of the same repository (another plugin may share its name); without one, its
-// repository's latest release (releases, from the last CheckUpdates) is the offer. One
-// installed from a registry is only matched by that registry's entry.
+// Relation is how a registry entry stands to the installed plugin of its name: the one
+// decision behind Browse's rows, Plugin.Update and `plugin update --check`
+// (docs/notes/plugins-browse-offer.md). Clients read it; they do not derive it.
+type Relation string
+
+const (
+	// RelationNotInstalled: no plugin of the name is installed. Install.
+	RelationNotInstalled Relation = "not_installed"
+	// RelationInstalled: installed from the entry's source, at its version or newer.
+	RelationInstalled Relation = "installed"
+	// RelationUpdate: installed from the entry's source, older. Update.
+	RelationUpdate Relation = "update"
+	// RelationDev: a dev link of the name. Neither installed over nor updated from here.
+	RelationDev Relation = "dev"
+	// RelationOtherSource: installed from another source (another registry, another
+	// repository's releases, or put in plugins/ by hand). Neither Install nor Update: the
+	// entry's package would take the name over (origin.go), which only
+	// `plugin install --force` does.
+	RelationOtherSource Relation = "other_source"
+)
+
+// sameSource reports whether entry e comes from the source p was installed from: the
+// registry it was installed from, or, for a plugin installed from a GitHub release, an
+// entry of that repository (whichever registry lists it: the registry only points at
+// the releases it came from). A package put in plugins/ by hand, or linked, has no
+// source a registry entry can match.
+func sameSource(p Plugin, e registry.Entry) bool {
+	if p.Installed == nil {
+		return false
+	}
+	switch p.Installed.Kind {
+	case KindRegistry:
+		return p.Installed.Source == e.Registry
+	case KindGitHub:
+		return e.Repo != "" && strings.EqualFold(p.Installed.Source, e.Repo)
+	}
+	return false
+}
+
+// relate is entry e's relation to p, the installed plugin of its name (nil when none).
+func relate(p *Plugin, e registry.Entry) Relation {
+	switch {
+	case p == nil:
+		return RelationNotInstalled
+	case p.Dev:
+		return RelationDev
+	case !sameSource(*p, e):
+		return RelationOtherSource
+	case p.Manifest.Version != "" && registry.Newer(e.Version, p.Manifest.Version):
+		return RelationUpdate
+	}
+	return RelationInstalled
+}
+
+// SourceLabel is where p was installed from, short, for "installed from <label>": a
+// registry's URL without its scheme (and github.com/), owner/repo for a release, the
+// folder of a dev link, or "the plugins folder" for a package put there by hand.
+func SourceLabel(p Plugin) string {
+	switch {
+	case p.Dev && p.DevPath != "":
+		return p.DevPath
+	case p.Installed == nil:
+		return "the plugins folder"
+	case p.Installed.Kind == KindRegistry:
+		return ShortURL(p.Installed.Source)
+	}
+	return p.Installed.Source
+}
+
+// ShortURL is a registry or repository URL without its scheme and github.com host:
+// "alexwaumann/code-foundry-plugins", "127.0.0.1:8765/index.json" (the GUI's
+// shortSource).
+func ShortURL(u string) string {
+	u = strings.TrimPrefix(strings.TrimPrefix(u, "https://"), "http://")
+	return strings.TrimPrefix(u, "github.com/")
+}
+
+// offerFor is the update offered for p, a non-dev plugin, and only ever from the source
+// it was installed from (relate): its registry's entry; for a GitHub release install, a
+// registry entry of the same repository (installed as that repository's release, so it
+// stays a release install of the same origin), else the repository's latest release
+// (releases, from the last CheckUpdates). Another source's entry of the name is never an
+// offer: installing it would be a takeover (origin.go), which only
+// `plugin install --force` does. Nor is anything an offer for a package put in plugins/
+// by hand (no source to match).
 func offerFor(p Plugin, merged registry.Merged, releases map[string]UpdateOffer) (UpdateOffer, bool) {
 	if p.Dev || p.Manifest.Version == "" {
 		return UpdateOffer{}, false
+	}
+	e, listed := merged.Entry(p.Name)
+	if listed && sameSource(p, e) {
+		if relate(&p, e) != RelationUpdate {
+			return UpdateOffer{}, false
+		}
+		o := UpdateOffer{Version: e.Version, Registry: e.Registry}
+		if p.Installed.Kind == KindGitHub {
+			o.Ref = p.Installed.Source + "@v" + e.Version
+		}
+		return o, true
 	}
 	if fromRepo(p, merged) {
 		r, ok := releases[p.Name]
@@ -52,17 +144,7 @@ func offerFor(p Plugin, merged registry.Merged, releases map[string]UpdateOffer)
 		}
 		return r, true
 	}
-	e, ok := merged.Entry(p.Name)
-	if !ok || !registry.Newer(e.Version, p.Manifest.Version) {
-		return UpdateOffer{}, false
-	}
-	// Nor is one from a registry by another registry's entry of the name (a registry
-	// added first, or the first one dropping it): installing that would be a takeover
-	// (origin.go), which only `plugin install --force` does.
-	if p.Installed != nil && p.Installed.Kind == KindRegistry && p.Installed.Source != e.Registry {
-		return UpdateOffer{}, false
-	}
-	return UpdateOffer{Version: e.Version, Registry: e.Registry}, true
+	return UpdateOffer{}, false
 }
 
 // fromRepo reports whether p was installed from a GitHub release that no registry entry
@@ -72,7 +154,7 @@ func fromRepo(p Plugin, merged registry.Merged) bool {
 		return false
 	}
 	e, ok := merged.Entry(p.Name)
-	return !ok || !strings.EqualFold(p.Installed.Source, e.Repo)
+	return !ok || !sameSource(p, e)
 }
 
 // checkReleases asks, once per update check, each plugin installed from a GitHub
@@ -158,25 +240,46 @@ type PluginUpdate struct {
 	// Disabled says why an enabled plugin was left disabled after the update (it asks
 	// for more permissions than were granted: enable it again to review them).
 	Disabled string
+	// InstalledFrom, when set, makes this no offer: Registry lists Version, newer, but the
+	// plugin was installed from another source (SourceLabel), so it is not offered and
+	// Update skips it (RelationOtherSource; `plugin install --force` switches).
+	InstalledFrom string
 }
 
 // CheckUpdates reads the registries (the cached indexes within their TTL unless
-// refresh) and returns the installed plugins a registry lists a newer version of, and
-// those installed from a GitHub repository no registry lists whose latest release is
-// newer (one `gh release view` per such plugin per call). It installs nothing; the
-// snapshot's Plugin.Update carries the same offers.
+// refresh) and returns the installed plugins their own source lists a newer version of
+// (offerFor), and those installed from a GitHub repository no registry lists whose
+// latest release is newer (one `gh release view` per such plugin per call). After the
+// offers come the entries that are no offer because the plugin came from elsewhere
+// (InstalledFrom set) but list a newer version. It installs nothing; the snapshot's
+// Plugin.Update carries the same offers.
 func (m *Manager) CheckUpdates(ctx context.Context, refresh bool) ([]PluginUpdate, error) {
 	if m.opts.Registry == nil {
 		return nil, fmt.Errorf("%w: this daemon has no plugin registry client", ErrFailedPrecondition)
 	}
 	m.setMerged(m.opts.Registry.Read(ctx, refresh))
 	m.checkReleases(ctx)
+	snap := m.Snapshot()
 	var out []PluginUpdate
-	for _, p := range m.Snapshot().Plugins {
+	for _, p := range snap.Plugins {
 		if p.Update != nil {
 			out = append(out, PluginUpdate{Name: p.Name, Current: p.Manifest.Version, Version: p.Update.Version,
 				Registry: p.Update.Registry, Ref: p.Update.Ref})
 		}
+	}
+	m.inst.mu.Lock()
+	merged := m.inst.merged
+	m.inst.mu.Unlock()
+	for _, e := range merged.Entries {
+		p, ok := snap.Plugin(e.Name)
+		if !ok || relate(&p, e) != RelationOtherSource || p.Manifest.Version == "" || !registry.Newer(e.Version, p.Manifest.Version) {
+			continue
+		}
+		if p.Update != nil && !registry.Newer(e.Version, p.Update.Version) {
+			continue // its own source offers as much
+		}
+		out = append(out, PluginUpdate{Name: p.Name, Current: p.Manifest.Version, Version: e.Version, Registry: e.Registry,
+			InstalledFrom: SourceLabel(p)})
 	}
 	return out, nil
 }
@@ -206,6 +309,9 @@ func (m *Manager) Update(ctx context.Context, name string, check, refresh bool) 
 	}
 	for i := range offers {
 		u := &offers[i]
+		if u.InstalledFrom != "" {
+			continue // not an offer (another source lists it)
+		}
 		wasEnabled := false
 		if p, ok := m.Snapshot().Plugin(u.Name); ok {
 			wasEnabled = p.Enabled
@@ -232,6 +338,12 @@ type BrowseEntry struct {
 	registry.Entry
 	// Installed is the plugin as installed, when it is.
 	Installed *Plugin
+	// Relation is the entry's relation to Installed: what Browse offers (Install, Update,
+	// or nothing).
+	Relation Relation
+	// InstalledFrom is where Installed came from (SourceLabel) when Relation is
+	// RelationOtherSource; else empty.
+	InstalledFrom string
 }
 
 // BrowseResult is Browse's answer.
@@ -241,7 +353,8 @@ type BrowseResult struct {
 }
 
 // Browse returns every registry's plugins merged by name (the first registry listing a
-// name wins), each with the installed plugin of that name, and each registry's state.
+// name wins), each with the installed plugin of that name and its relation to it (the
+// decision offerFor makes), and each registry's state.
 // refresh reads every registry again instead of its cached index.
 func (m *Manager) Browse(ctx context.Context, refresh bool) (BrowseResult, error) {
 	if m.opts.Registry == nil {
@@ -255,6 +368,10 @@ func (m *Manager) Browse(ctx context.Context, refresh bool) (BrowseResult, error
 		be := BrowseEntry{Entry: e}
 		if p, ok := snap.Plugin(e.Name); ok {
 			be.Installed = &p
+		}
+		be.Relation = relate(be.Installed, e)
+		if be.Relation == RelationOtherSource {
+			be.InstalledFrom = SourceLabel(*be.Installed)
 		}
 		out.Entries = append(out.Entries, be)
 	}
