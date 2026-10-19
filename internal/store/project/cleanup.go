@@ -6,46 +6,70 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
-// MergedCleanReason is the git half of the worktree cleanup rule: "" when w can be
-// removed without losing work, else why not. Removable means not the main worktree,
-// created by Code Foundry (Managed: under its worktrees directory), on a branch, a status that has been read without error, no staged, modified,
-// untracked or conflicted entries, and every commit on HEAD in the remote-tracking
-// default branch (Status.BaseRef set, BaseAhead 0). Pure.
+// FreshFor is how long cleanup keeps a worktree the app made while its HEAD is still the
+// commit it was made at: a thread or an orchestrator that just made it has not
+// committed yet, and an empty branch is otherwise "in the base".
+const FreshFor = 10 * time.Minute
+
+// CleanupVerdict is the git half of the worktree cleanup rule for w at now: whether it
+// can be removed without losing work, and why (or why not). Pure.
+//
+// Removable means: not the main worktree; made by Code Foundry (Managed: recorded when
+// it was made, not merely under the worktrees directory); on a branch; a status read
+// without error; no operation in progress; no staged, modified, untracked or conflicted
+// entries; a remote-tracking default branch to compare with (Status.BaseRef); not made
+// in the last FreshFor with no commit since; and its work is in BaseRef, either because
+// HEAD is reachable from it (BaseAhead 0) or because its changes landed as a rebased or
+// squash-merged copy (Status.BaseMerged).
 //
 // Live threads, running terminals and workspace membership are the other half; the
 // project store does not know them (CleanupOptions.Hold).
-func MergedCleanReason(w Worktree) string {
+func CleanupVerdict(w Worktree, now time.Time) (removable bool, reason string) {
 	st := w.Status
 	switch {
 	case w.IsMain:
-		return "main worktree"
+		return false, "main worktree"
 	case !w.Managed:
-		return NotManagedReason
+		return false, NotManagedReason
 	case w.Detached || w.Branch == "":
-		return "detached HEAD"
+		return false, "detached HEAD"
 	case st.Error != "":
-		return "git status failed: " + st.Error
+		return false, "git status failed: " + st.Error
 	case st.RefreshedAt.IsZero():
-		return "git status not read yet"
+		return false, "git status not read yet"
 	case st.Operation != "":
-		return st.Operation + " in progress"
+		return false, st.Operation + " in progress"
 	case st.Dirty || st.Staged+st.Modified+st.Untracked+st.Conflicted > 0:
-		return "uncommitted changes"
+		return false, "uncommitted changes"
 	case st.BaseRef == "":
-		return "no remote default branch to compare with"
+		return false, "no remote default branch to compare with"
+	case justMade(w, now):
+		return false, "just made, no commits yet (kept for " + FreshFor.String() + ")"
+	case st.BaseAhead > 0 && st.BaseMerged:
+		return true, "its changes are in " + st.BaseRef + " (rebased or squash-merged)"
 	case st.BaseAhead > 0:
 		n := "commits"
 		if st.BaseAhead == 1 {
 			n = "commit"
 		}
-		return strconv.Itoa(st.BaseAhead) + " " + n + " not in " + st.BaseRef
+		return false, strconv.Itoa(st.BaseAhead) + " " + n + " not in " + st.BaseRef
+	case w.CreatedHead != "" && w.Head == w.CreatedHead:
+		return true, "no commits since it was made"
 	}
-	return ""
+	return true, "branch is in " + st.BaseRef
 }
 
-// NotManagedReason is why a worktree outside the app's worktrees directory is kept.
+// justMade: w was made less than FreshFor before now and HEAD has not moved since (or
+// the head it was made at is unknown).
+func justMade(w Worktree, now time.Time) bool {
+	return !w.CreatedAt.IsZero() && now.Sub(w.CreatedAt) < FreshFor &&
+		(w.CreatedHead == "" || w.Head == w.CreatedHead)
+}
+
+// NotManagedReason is why a worktree the app did not make is kept.
 const NotManagedReason = "not a Code Foundry worktree"
 
 // InsideRoot reports whether path is strictly inside one of roots (never a root
@@ -81,8 +105,11 @@ func resolved(p string) string {
 	return p
 }
 
-// MergedClean reports MergedCleanReason(w) == "".
-func (w Worktree) MergedClean() bool { return MergedCleanReason(w) == "" }
+// MergedClean reports whether CleanupVerdict(w, now) is removable.
+func (w Worktree) MergedClean(now time.Time) bool {
+	ok, _ := CleanupVerdict(w, now)
+	return ok
+}
 
 // CleanupOptions configures Cleanup.
 type CleanupOptions struct {
@@ -96,10 +123,12 @@ type CleanupOptions struct {
 	// terminal is open there, a workspace has it), or "". It is asked right before each
 	// removal. Nil: nothing holds a worktree.
 	Hold func(w Worktree) string
+	// Now is the time CleanupVerdict judges at. Nil: time.Now.
+	Now func() time.Time
 }
 
-// CleanupSkip is a worktree Cleanup kept, and why.
-type CleanupSkip struct {
+// CleanupItem is a worktree Cleanup removed (or would), or kept, and why.
+type CleanupItem struct {
 	Worktree Worktree
 	Reason   string
 }
@@ -107,12 +136,12 @@ type CleanupSkip struct {
 // CleanupResult is what Cleanup did.
 type CleanupResult struct {
 	ProjectID string
-	Removed   []Worktree
-	Skipped   []CleanupSkip
+	Removed   []CleanupItem
+	Skipped   []CleanupItem
 }
 
 // Cleanup removes the worktrees of a project whose work is already in its default branch
-// (MergedCleanReason "" and no Hold): it refreshes the project's status (reconcile, base,
+// (CleanupVerdict removable and no Hold): it refreshes the project's status (reconcile, base,
 // every worktree; callers that want fresh remote refs fetch first), re-evaluates each
 // worktree, and removes it with RemoveWorktree, never forced, so git itself still
 // refuses a worktree that changed meanwhile. Branches are never deleted. A failed
@@ -142,17 +171,23 @@ func Cleanup(ctx context.Context, s Store, opts CleanupOptions) (CleanupResult, 
 		}
 		candidates = []Worktree{w}
 	}
+	now := time.Now
+	if opts.Now != nil {
+		now = opts.Now
+	}
 	res := CleanupResult{ProjectID: r.ID}
 	for _, w := range candidates {
 		if opts.Path == "" && w.IsMain {
 			continue
 		}
-		reason := MergedCleanReason(w)
-		if reason == "" && opts.Hold != nil {
-			reason = opts.Hold(w)
+		removable, reason := CleanupVerdict(w, now())
+		if removable && opts.Hold != nil {
+			if held := opts.Hold(w); held != "" {
+				removable, reason = false, held
+			}
 		}
-		if reason != "" {
-			res.Skipped = append(res.Skipped, CleanupSkip{Worktree: w, Reason: reason})
+		if !removable {
+			res.Skipped = append(res.Skipped, CleanupItem{Worktree: w, Reason: reason})
 			continue
 		}
 		if !opts.DryRun {
@@ -160,11 +195,11 @@ func Cleanup(ctx context.Context, s Store, opts CleanupOptions) (CleanupResult, 
 				if ctx.Err() != nil {
 					return res, ctx.Err()
 				}
-				res.Skipped = append(res.Skipped, CleanupSkip{Worktree: w, Reason: err.Error()})
+				res.Skipped = append(res.Skipped, CleanupItem{Worktree: w, Reason: err.Error()})
 				continue
 			}
 		}
-		res.Removed = append(res.Removed, w)
+		res.Removed = append(res.Removed, CleanupItem{Worktree: w, Reason: reason})
 	}
 	return res, nil
 }

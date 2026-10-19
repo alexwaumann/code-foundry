@@ -53,11 +53,16 @@ type Worktree struct {
 	IsMain    bool
 	Detached  bool
 	Status    Status
-	// Managed: the worktree is inside the directory the app creates worktrees in
-	// (Options.WorktreeRoot), so the app made it. Only managed
-	// worktrees can be cleaned up; others (made by hand or by other tools) never are.
-	// Set when the snapshot is built.
+	// Managed: the app made this worktree (CreateWorktree recorded it; made.go), and
+	// only managed worktrees can be cleaned up. Being under Options.WorktreeRoot is not
+	// enough: an agent's own `git worktree add` there is not managed. Set when the
+	// snapshot is built.
 	Managed bool
+	// CreatedAt and CreatedHead are when the app made the worktree and its HEAD right
+	// after (managed worktrees only; CreatedHead is "" for one made before the app
+	// recorded heads). Cleanup keeps a worktree made moments ago with no commits yet.
+	CreatedAt   time.Time
+	CreatedHead string
 }
 
 // Status is the git status of a worktree.
@@ -77,6 +82,10 @@ type Status struct {
 	BaseRef    string
 	BaseAhead  int
 	BaseBehind int
+	// BaseMerged: HEAD has commits not in BaseRef, yet merging HEAD into BaseRef would
+	// change nothing, so its changes landed another way (a rebased or squash-merged
+	// copy). Checked only when HEAD is both ahead of and behind BaseRef (base.go).
+	BaseMerged bool
 	// Operation is the git operation in progress (OpRebase, OpAm, OpMerge,
 	// OpCherryPick, OpRevert, OpBisect) or "", read from marker files in the
 	// worktree's admin dir (operation.go). OperationStep and OperationTotal are a

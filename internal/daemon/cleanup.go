@@ -8,7 +8,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/termlabel"
 )
 
-// cleanupHold is the non-git half of the worktree cleanup rule (project.MergedCleanReason
+// cleanupHold is the non-git half of the worktree cleanup rule (project.CleanupVerdict
 // is the git half): why something keeps the worktree at path, or "". A thread is on it
 // (its cwd is the worktree or inside it; any state, archived ones excluded by the caller), a terminal that has not exited
 // belongs to it (worktree label) or runs inside it, or it is a workspace member. Pure;
