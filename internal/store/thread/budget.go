@@ -22,9 +22,12 @@ import (
 // the interrupted turn ended (streamStatus).
 const ReasonBudgetReached = "budget reached"
 
-// budgetNoteText is the note the budget stop appends.
+// budgetNoteText is the note the budget stop appends. Claude itself does not see it: the
+// interrupt reaches it as Claude Code's own "The user doesn't want to proceed with this
+// tool use" (docs/notes/orch-small-fixes.md), so the note says what really happened.
 func budgetNoteText(budget float64) string {
-	return "Budget of " + FormatUSD(budget) + " reached; Claude was interrupted. Raise it with `code-foundry thread budget`."
+	return "Code Foundry stopped this turn: the spending limit of " + FormatUSD(budget) +
+		" was reached; nothing was rejected by the user. Raise it with `code-foundry thread budget`, then send a message to continue."
 }
 
 // crossBudget marks the budget stop as fired for thread id when its cost reached its

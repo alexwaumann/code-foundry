@@ -347,7 +347,8 @@ func TestBudgetStop(t *testing.T) {
 	}
 	items := e.waitItems(s.ID, "the turn end", hasTurnEnd)
 	note, ok := lastKind(items, KindNote)
-	if !ok || note.Text != "Budget of $0.001 reached; Claude was interrupted. Raise it with `code-foundry thread budget`." {
+	if !ok || note.Text != "Code Foundry stopped this turn: the spending limit of $0.001 was reached; nothing was rejected by the user. "+
+		"Raise it with `code-foundry thread budget`, then send a message to continue." {
 		t.Errorf("note = %+v\n%s", note, describeItems(items))
 	}
 	// The turn ended and the status stays until the next message.

@@ -496,7 +496,8 @@ type Thread struct {
 	// wake subscriptions woke it 60 times within an hour and further wakes are dropped;
 	// cleared by the next message, or once seen), or "interrupted" / "did not start" for
 	// ERROR. Persisted with status: a DISCONNECTED thread keeps the status and reason it had when its process
-	// ended (a busy one becomes ERROR "interrupted"), across daemon restarts. Empty when
+	// ended (a busy one becomes ERROR "interrupted", or IDLE "archived" when an archive
+	// stopped it), across daemon restarts. Empty when
 	// unknown.
 	StatusReason string `protobuf:"bytes,18,opt,name=status_reason,json=statusReason,proto3" json:"status_reason,omitempty"`
 	// Permission mode passed to claude; re-passed on Reconnect.
