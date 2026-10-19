@@ -3039,10 +3039,12 @@ func (x *GetSurfaceRequest) GetSettleMs() int32 {
 type SurfaceElement struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Key   string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
-	// click, submit, change or tab: sent to the plugin with Act; command, open_url or copy:
-	// handled by the host (the GUI), never by Act.
+	// click, submit, change, tab or select (a master-detail's row without an action of its
+	// own): sent to the plugin with Act; command, open_url or copy: handled by the host (the
+	// GUI), never by Act.
 	Kind string `protobuf:"bytes,2,opt,name=kind,proto3" json:"kind,omitempty"`
-	// The event name (an event action), the command name, the URL; "tab" for a tab.
+	// The event name (an event action), the command name, the URL; "tab" for a tab,
+	// "select" for a select.
 	Action string `protobuf:"bytes,3,opt,name=action,proto3" json:"action,omitempty"`
 	// The button's or tab's label, the row's title.
 	Label string `protobuf:"bytes,4,opt,name=label,proto3" json:"label,omitempty"`
@@ -3050,7 +3052,9 @@ type SurfaceElement struct {
 	Form string `protobuf:"bytes,5,opt,name=form,proto3" json:"form,omitempty"`
 	// A command element's args as the view sets them (the panel's context fills the
 	// command's context args; a form submit adds the form's values).
-	Args          map[string]string `protobuf:"bytes,6,rep,name=args,proto3" json:"args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Args map[string]string `protobuf:"bytes,6,rep,name=args,proto3" json:"args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// A node tab's tabs node, a select's master-detail (the act's node); empty otherwise.
+	Node          string `protobuf:"bytes,7,opt,name=node,proto3" json:"node,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3125,6 +3129,13 @@ func (x *SurfaceElement) GetArgs() map[string]string {
 		return x.Args
 	}
 	return nil
+}
+
+func (x *SurfaceElement) GetNode() string {
+	if x != nil {
+		return x.Node
+	}
+	return ""
 }
 
 type GetSurfaceResponse struct {
@@ -5007,14 +5018,15 @@ const file_codefoundry_v1_plugin_proto_rawDesc = "" +
 	"\x11GetSurfaceRequest\x12,\n" +
 	"\x03ref\x18\x01 \x01(\v2\x1a.codefoundry.v1.SurfaceRefR\x03ref\x12\x17\n" +
 	"\await_ms\x18\x02 \x01(\x05R\x06waitMs\x12\x1b\n" +
-	"\tsettle_ms\x18\x03 \x01(\x05R\bsettleMs\"\xef\x01\n" +
+	"\tsettle_ms\x18\x03 \x01(\x05R\bsettleMs\"\x83\x02\n" +
 	"\x0eSurfaceElement\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x12\n" +
 	"\x04kind\x18\x02 \x01(\tR\x04kind\x12\x16\n" +
 	"\x06action\x18\x03 \x01(\tR\x06action\x12\x14\n" +
 	"\x05label\x18\x04 \x01(\tR\x05label\x12\x12\n" +
 	"\x04form\x18\x05 \x01(\tR\x04form\x12<\n" +
-	"\x04args\x18\x06 \x03(\v2(.codefoundry.v1.SurfaceElement.ArgsEntryR\x04args\x1a7\n" +
+	"\x04args\x18\x06 \x03(\v2(.codefoundry.v1.SurfaceElement.ArgsEntryR\x04args\x12\x12\n" +
+	"\x04node\x18\a \x01(\tR\x04node\x1a7\n" +
 	"\tArgsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xb5\x01\n" +

@@ -193,7 +193,7 @@ loop:
 	}
 	if view != nil {
 		for _, el := range h.surfaces.SurfaceElements(view.Instance, view.Version) {
-			out.Elements = append(out.Elements, &v1.SurfaceElement{Key: el.Key, Kind: el.Kind, Action: el.Action, Label: el.Label, Form: el.Form, Args: el.Args})
+			out.Elements = append(out.Elements, &v1.SurfaceElement{Key: el.Key, Kind: el.Kind, Action: el.Action, Label: el.Label, Form: el.Form, Args: el.Args, Node: el.Node})
 		}
 	}
 	return connect.NewResponse(out), nil

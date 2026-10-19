@@ -57,6 +57,8 @@ func (p *panel) view() ui.View {
 			ui.CommandButton("cmd", "Cmd", "plugin.surf.on", nil)),
 		form,
 		{Key: "out", Log: &ui.Log{}},
+		ui.NewMasterDetail("pmd", ui.List{Rows: []ui.Row{ui.NewRow("pr1", "Run 1"), ui.NewRow("pr2", "Run 2")}}, "",
+			ui.NewTabsNode("ptabs", ui.NewTabs("pt1", ui.NewTab("pt1", "One"), ui.NewTab("pt2", "Two")))),
 	}}
 }
 
@@ -95,6 +97,10 @@ func (p *panel) Act(_ context.Context, act pluginsdk.SurfaceAct) error {
 		return nil
 	case "fail":
 		return errors.New("it broke")
+	case "select", "tab":
+		p.mu.Lock()
+		p.got = fmt.Sprintf("%s:%s key=%s value=%v node=%q", act.Kind, act.Action, act.Key, act.Value, act.Node)
+		p.mu.Unlock()
 	}
 	return p.h.UpdateView(p.inst, p.view())
 }
@@ -434,7 +440,7 @@ func TestSurfaceActs(t *testing.T) {
 		t.Errorf("unknown instance: %v", err)
 	}
 	elements := e.m.SurfaceElements(w.key, 0)
-	if len(elements) != 7 || elements[0].Key != "inc" || elements[6].Kind != "submit" || elements[6].Form != "form" {
+	if len(elements) != 11 || elements[0].Key != "inc" || elements[6].Kind != "submit" || elements[6].Form != "form" || elements[7].Kind != "select" {
 		t.Errorf("elements %+v", elements)
 	}
 }
@@ -755,4 +761,43 @@ func TestSurfaceCloseReasons(t *testing.T) {
 	}
 	g.state("reopened", plugin.PhaseLive)
 	e.eventually("a second surface/open", func() bool { return strings.Count(e.logText("surf"), "host  opened surf/gated/thread:s-2") == 2 })
+}
+
+// A master-detail's row without an action sends a select act and a tabs node's tab a tab
+// act, both naming their node; the plugin answers with a new view. GetSurface's elements
+// carry the node too.
+func TestSurfaceSelectAndNodeTabActs(t *testing.T) {
+	e := newSurfEnv(t, nil)
+	w := e.watch("panel", s1)
+	w.view("first view", contains("count 0"))
+	if _, err := e.act(w.key, plugin.ActRequest{Key: "pr2"}); err != nil {
+		t.Fatal(err)
+	}
+	w.view("after the select", contains(`got select:select key=pr2 value=pr2 node=\"pmd\"`))
+	if _, err := e.act(w.key, plugin.ActRequest{Key: "pt2", Action: "tab"}); err != nil {
+		t.Fatal(err)
+	}
+	w.view("after the node tab", contains(`got tab:tab key=pt2 value=pt2 node=\"ptabs\"`))
+	// A value from the client does not replace the row's key; a wrong action is refused.
+	v := "pr1"
+	if _, err := e.act(w.key, plugin.ActRequest{Key: "pr2", Value: &v}); err != nil {
+		t.Fatal(err)
+	}
+	w.view("the select keeps its key", contains(`got select:select key=pr2 value=pr2`))
+	if _, err := e.act(w.key, plugin.ActRequest{Key: "pr1", Action: "click"}); !errors.Is(err, plugin.ErrInvalidArgument) || !strings.Contains(err.Error(), `element "pr1"'s action is "select", not "click"`) {
+		t.Errorf("a select acted as a click: %v", err)
+	}
+	if _, err := e.act(w.key, plugin.ActRequest{Action: "select"}); !errors.Is(err, plugin.ErrInvalidArgument) || !strings.Contains(err.Error(), `no element acts "select"`) {
+		t.Errorf("a select without a key: %v", err)
+	}
+	els := map[string]plugin.SurfaceElement{}
+	for _, el := range e.m.SurfaceElements(w.key, 0) {
+		els[el.Key] = el
+	}
+	if el := els["pr1"]; el.Kind != pluginsdk.ActSelect || el.Action != "select" || el.Node != "pmd" || el.Label != "Run 1" {
+		t.Errorf("pr1 element %+v", el)
+	}
+	if el := els["pt2"]; el.Kind != pluginsdk.ActTab || el.Node != "ptabs" || el.Label != "Two" {
+		t.Errorf("pt2 element %+v", el)
+	}
 }

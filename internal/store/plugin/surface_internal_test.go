@@ -70,7 +70,12 @@ const every = `{
       {"key": "grpc", "chips": {"chips": [{"key": "gc", "label": "Lint", "action": {"event": "chip"}}]}},
       {"key": "grpa", "actions": {"buttons": [{"key": "gpb", "label": "In a group", "action": {"event": "line"}}]}},
       {"key": "grpp", "progress": {"value": 0.25}}]}},
-    {"key": "ct", "container": {"width": "narrow", "children": [{"key": "ct1", "text": {"content": "centred"}}]}}
+    {"key": "ct", "container": {"width": "narrow", "children": [{"key": "ct1", "text": {"content": "centred"}}]}},
+    {"key": "md", "masterDetail": {"selected": "md1", "listWidth": 240, "resetToken": "1",
+      "list": {"rows": [{"key": "md1", "title": "Run 1"}, {"key": "md2", "title": "Run 2", "action": {"event": "open", "data": "2"}}]},
+      "emptyDetail": {"title": "None", "actions": [{"key": "mde", "label": "New", "action": {"event": "new"}}]},
+      "detail": [{"key": "tn", "tabs": {"active": "tn1", "items": [{"key": "tn1", "label": "One"}, {"key": "tn2", "label": "Two"}],
+        "children": [{"key": "tnt", "text": {"content": "in a tab"}}]}}]}}
   ]
 }`
 
@@ -81,7 +86,7 @@ func TestValidateViewAcceptsEveryKind(t *testing.T) {
 	if len(errs) > 0 {
 		t.Fatalf("errors: %v", errs)
 	}
-	if len(v.Nodes) != 22 || len(v.Toolbar) != 2 || len(v.Footer) != 2 || !json.Valid(canon) {
+	if len(v.Nodes) != 23 || len(v.Toolbar) != 2 || len(v.Footer) != 2 || !json.Valid(canon) {
 		t.Fatalf("nodes %d, canon %s", len(v.Nodes), canon)
 	}
 	idx := buildIndex(v)
@@ -92,7 +97,7 @@ func TestValidateViewAcceptsEveryKind(t *testing.T) {
 	want := map[string]string{"h1": "click", "ta": "tab", "tb": "tab", "r1": "click", "r1b": "click", "c1": "click", "b1": "click",
 		"b2": "command", "b3": "command", "b4": "open_url", "b5": "copy", "f3": "change", "fs": "submit", "fr": "click", "cb": "click",
 		"gb": "click", "gc": "click", "gpb": "click",
-		"tqs": "submit", "tc1": "click", "fb": "command"}
+		"tqs": "submit", "tc1": "click", "fb": "command", "md1": "select", "md2": "click", "mde": "click", "tn1": "tab", "tn2": "tab"}
 	if fmt.Sprint(kinds) != fmt.Sprint(want) {
 		t.Errorf("elements\n got %v\nwant %v", kinds, want)
 	}

@@ -37,7 +37,7 @@ var surfaceCapabilities = []string{
 	"view.node.text", "view.node.markdown", "view.node.pairs", "view.node.list", "view.node.chips",
 	"view.node.log", "view.node.actions", "view.node.progress", "view.node.notice", "view.node.empty",
 	"view.node.section", "view.node.form", "view.node.columns", "view.node.pane", "view.node.container",
-	"view.node.grid", "view.node.divider", "view.node.spacer", "view.node.group", "view.tabs", "view.toolbar", "view.footer", "view.fieldset", "view.optionsSource", "view.duration",
+	"view.node.grid", "view.node.divider", "view.node.spacer", "view.node.group", "view.node.masterDetail", "view.node.tabs", "view.tabs", "view.toolbar", "view.footer", "view.fieldset", "view.optionsSource", "view.duration",
 }
 
 // viewUpdate serves view/update: validate, number and install a view.
@@ -257,6 +257,20 @@ func fillLists(v *ui.View) {
 			n.Group.Items = []ui.Node{}
 		case n.Container != nil && n.Container.Children == nil:
 			n.Container.Children = []ui.Node{}
+		case n.MasterDetail != nil:
+			if n.MasterDetail.List.Rows == nil {
+				n.MasterDetail.List.Rows = []ui.Row{}
+			}
+			if n.MasterDetail.Detail == nil {
+				n.MasterDetail.Detail = []ui.Node{}
+			}
+		case n.Tabs != nil:
+			if n.Tabs.Items == nil {
+				n.Tabs.Items = []ui.Tab{}
+			}
+			if n.Tabs.Children == nil {
+				n.Tabs.Children = []ui.Node{}
+			}
 		case n.Form != nil:
 			if n.Form.Fields == nil {
 				n.Form.Fields = []ui.Field{}
@@ -282,14 +296,17 @@ func splitJoined(err error) []string {
 type element struct {
 	key, kind, label string
 	form             string     // the enclosing form's key
-	action           *ui.Action // nil for a tab
+	action           *ui.Action // nil for a tab or a select
 	field            string     // a change's field name
+	node             string     // a node tab's tabs node, a select's master-detail
 }
 
 func (e element) actionName() string {
 	switch {
 	case e.kind == pluginsdk.ActTab:
 		return "tab"
+	case e.kind == pluginsdk.ActSelect:
+		return "select"
 	case e.action == nil:
 		return ""
 	case e.action.Event != "":
@@ -382,15 +399,31 @@ func buildIndex(v *ui.View) *actionIndex {
 			add(element{key: t.Key, kind: pluginsdk.ActTab, label: t.Label})
 		}
 	}
+	rows := func(rs []ui.Row, selectIn string) {
+		for i := range rs {
+			r := &rs[i]
+			switch {
+			case r.Action != nil:
+				add(element{key: r.Key, kind: kindOf(r.Action, pluginsdk.ActClick), label: r.Title, action: r.Action})
+			case selectIn != "":
+				// A master-detail's row without an action of its own selects it.
+				add(element{key: r.Key, kind: pluginsdk.ActSelect, label: r.Title, node: selectIn})
+			}
+			buttons(r.Actions, "")
+		}
+	}
 	walkView(v, func(n *ui.Node) {
 		switch {
 		case n.List != nil:
-			for i := range n.List.Rows {
-				r := &n.List.Rows[i]
-				if r.Action != nil {
-					add(element{key: r.Key, kind: kindOf(r.Action, pluginsdk.ActClick), label: r.Title, action: r.Action})
-				}
-				buttons(r.Actions, "")
+			rows(n.List.Rows, "")
+		case n.MasterDetail != nil:
+			rows(n.MasterDetail.List.Rows, n.Key)
+			if e := n.MasterDetail.EmptyDetail; e != nil {
+				buttons(e.Actions, "")
+			}
+		case n.Tabs != nil:
+			for _, t := range n.Tabs.Items {
+				add(element{key: t.Key, kind: pluginsdk.ActTab, label: t.Label, node: n.Key})
 			}
 		case n.Chips != nil:
 			for i := range n.Chips.Chips {
@@ -472,11 +505,11 @@ func (m *Manager) Act(ctx context.Context, req ActRequest) (uint64, error) {
 	if viewer == (command.Context{}) && req.Instance == "" {
 		viewer = req.Ref.Context
 	}
-	act := pluginsdk.SurfaceAct{Instance: key, Version: ver, Kind: el.kind, Action: el.actionName(), Key: el.key, Context: UiContextOf(viewer)}
+	act := pluginsdk.SurfaceAct{Instance: key, Version: ver, Kind: el.kind, Action: el.actionName(), Key: el.key, Node: el.node, Context: UiContextOf(viewer)}
 	switch el.kind {
 	case pluginsdk.ActClick, pluginsdk.ActSubmit, pluginsdk.ActChange:
 		act.Data = el.action.Data
-	case pluginsdk.ActTab:
+	case pluginsdk.ActTab, pluginsdk.ActSelect:
 		act.Value = el.key
 	default:
 		return 0, fmt.Errorf("%w: %s is a %s action: the host runs it, not the plugin", ErrInvalidArgument, el.key, el.kind)
@@ -484,7 +517,7 @@ func (m *Manager) Act(ctx context.Context, req ActRequest) (uint64, error) {
 	if el.kind == pluginsdk.ActChange {
 		act.Field = el.field
 	}
-	if req.Value != nil && el.kind != pluginsdk.ActTab {
+	if req.Value != nil && el.kind != pluginsdk.ActTab && el.kind != pluginsdk.ActSelect {
 		act.Value = *req.Value
 	}
 	if len(req.Values) > 0 {
@@ -578,7 +611,7 @@ func (idx *actionIndex) find(key, action string) (element, error) {
 	}
 	var found []element
 	for _, k := range idx.order {
-		if el := idx.elements[k]; el.actionName() == action && el.kind != pluginsdk.ActTab {
+		if el := idx.elements[k]; el.actionName() == action && el.kind != pluginsdk.ActTab && el.kind != pluginsdk.ActSelect {
 			found = append(found, el)
 		}
 	}
