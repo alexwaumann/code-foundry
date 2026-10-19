@@ -466,6 +466,38 @@ test("Working section: a header with the count collapses and expands its rows, p
   await expect(page.getByTestId("working-header")).toHaveAttribute("aria-expanded", "true");
 });
 
+test("thread rows sit 4px apart at both densities, each row's box (and its selection) the row's own height", async ({ page }) => {
+  await openApp(page);
+  await page.getByTestId("snoozed-header").click();
+  await expect(page.getByTestId("sidebar-snoozed-rows").locator("[data-row-key]")).toHaveCount(2);
+  const gaps = async (a: string, b: string) => {
+    const [ra, rb] = [await row(page, a).boundingBox(), await row(page, b).boundingBox()];
+    return { height: ra?.height, gap: Math.round(((rb?.y ?? 0) - ((ra?.y ?? 0) + (ra?.height ?? 0))) * 10) / 10 };
+  };
+  const snoozed = async () => {
+    const keys = await page.getByTestId("sidebar-snoozed-rows").locator("[data-row-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key") ?? ""));
+    expect(keys).toHaveLength(2);
+    return gaps(keys[0] ?? "", keys[1] ?? "");
+  };
+  for (const [density, two, one] of [
+    ["comfortable", 50, 32],
+    ["compact", 46, 28],
+  ] as const) {
+    await mockPost(`settings/external?appearance.density=${density}`);
+    await expect(page.locator("html")).toHaveAttribute("data-density", density);
+    // Main list and the Working footer: two-line rows; Snoozed: one-line rows.
+    await expect.poll(() => gaps("s:s-2", "s:s-6")).toEqual({ height: two, gap: 4 });
+    expect(await gaps("s:s-5", "s:s-1")).toEqual({ height: two, gap: 4 });
+    expect(await snoozed()).toEqual({ height: one, gap: 4 });
+  }
+  // The selection background is the row's own box: the gap under it stays the sidebar's.
+  await row(page, "s:s-2").click();
+  await expect(row(page, "s:s-2")).toHaveClass(/bg-sidebar-accent/);
+  const parent = await row(page, "s:s-2").evaluate((e) => (e.parentElement ? e.parentElement.getBoundingClientRect().height : 0));
+  expect(parent).toBe(46);
+  await mockPost("settings/external?appearance.density=");
+});
+
 test("Working section: the header counts threads as they start and stop working, and goes away with the last one", async ({ page }) => {
   await openApp(page);
   await expect(page.getByTestId("working-count")).toHaveText("2");

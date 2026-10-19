@@ -63,7 +63,7 @@ function RenameField({ id, name }: { id: string; name: string }) {
       defaultValue={name}
       aria-label="Thread name"
       data-testid="rename-input"
-      className="h-5 min-w-0 flex-1 rounded-sm border border-sidebar-ring bg-background px-1 text-body-sm outline-none"
+      className="h-[22px] min-w-0 flex-1 rounded-sm border border-sidebar-ring bg-background px-1 text-body outline-none"
       onClick={(e) => {
         e.stopPropagation();
       }}
@@ -249,12 +249,15 @@ function MadeByThreadGlyph({ id }: { id: string }) {
 }
 
 /**
- * The name's look: the id stands in, muted, while there is no name; a provisional name
- * (the daemon's cut of the first prompt, until the naming model's title lands) is muted
- * and italic.
+ * The name's look: one role above the row's text (text-body, semibold), so names stand
+ * out from the status line and from each other (docs/notes/sidebar-row-emphasis.md). It
+ * keeps the row's colour (text-inherit: the role's own foreground would drop the row's
+ * sidebar and selection tokens). The id stands in, muted, while there is no name; a
+ * provisional name (the daemon's cut of the first prompt, until the naming model's title
+ * lands) is muted and italic.
  */
 function nameClass(name: string, provisional: boolean): string {
-  return cn("truncate", (!name || provisional) && "text-muted-foreground", provisional && "italic");
+  return cn("truncate text-body font-semibold text-inherit", (!name || provisional) && "text-muted-foreground", provisional && "italic");
 }
 
 function ThreadLabel({ id }: { id: string }) {

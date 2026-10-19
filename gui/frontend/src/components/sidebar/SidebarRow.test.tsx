@@ -95,6 +95,12 @@ describe("SidebarRow provisional name", () => {
     expect(el.className.includes("text-muted-foreground")).toBe(muted);
     expect(el.className.includes("italic")).toBe(italic);
     expect(el.getAttribute("data-provisional")).toBe(italic ? "true" : null);
+    // One role above the row's text-body-sm, semibold; a named thread keeps the row's colour.
+    const cls = el.className.split(" ");
+    expect(cls).toContain("text-body");
+    expect(cls).toContain("font-semibold");
+    expect(cls).not.toContain("text-body-sm");
+    expect(cls.includes("text-inherit")).toBe(!muted);
   });
 });
 
@@ -140,6 +146,12 @@ describe("SidebarRow archived", () => {
     expect(screen.queryByTestId("row-place")).toBeNull();
     expect(screen.getByTestId("row-archived-age").className).toContain("tabular-nums");
     expect(screen.getByTestId("thread-body").className).not.toContain("opacity-50");
+  });
+
+  it("the name is text-body semibold, like a two-line row's", () => {
+    renderArchived({ name: "Old work", archivedAtMs: Date.now() });
+    const cls = screen.getByTestId("thread-name").className.split(" ");
+    expect(cls).toEqual(expect.arrayContaining(["text-body", "font-semibold", "text-inherit"]));
   });
 
   it("an unnamed thread shows its id, muted", () => {
