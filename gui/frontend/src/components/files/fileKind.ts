@@ -58,10 +58,11 @@ const ARCHIVES = new Set(["zip", "gz", "tgz", "tar", "bz2", "xz", "7z", "dmg"]);
 const SHELL = new Set(["sh", "bash", "zsh", "fish"]);
 const PROSE = new Set(["md", "markdown", "mdx", "txt", "rst", "adoc"]);
 
-/** A lucide file icon for the header: image, archive, JSON, shell, prose, else code (a plain file without an extension). */
+/** A lucide file icon for the header: image, PDF, archive, JSON, shell, prose, else code (a plain file without an extension). */
 export function fileIconOf(path: string, mime = ""): LucideIcon {
   const ext = extOf(path);
   if (mime.startsWith("image/")) return FileImage;
+  if (mime === "application/pdf" || ext === "pdf") return FileText;
   if (ARCHIVES.has(ext)) return FileArchive;
   if (ext === "json" || ext === "jsonc") return FileJson;
   if (SHELL.has(ext)) return FileTerminal;
@@ -96,7 +97,18 @@ export function firstChangeLine(diff: Pick<FileDiffMetadata, "hunks">): number |
   return null;
 }
 
-/** "Showing the first 1 MiB of 4.2 MB": ReadFile returns at most 1 MiB, so a truncated read is exactly that. */
+/** A PDF's header meta: "3 pages · 4.2 MB · PDF"; "4.2 MB · PDF" until pdf.js has counted its pages. */
+export function pdfMeta(size: number, pages: number | null): string {
+  const count = pages === null ? "" : `${String(pages)} ${pages === 1 ? "page" : "pages"} · `;
+  return `${count}${formatSize(size)} · PDF`;
+}
+
+/** An image or PDF that did not come back whole (over the read cap): "PDF · 48 MB · too large to show". */
+export function tooLargeHeading(kind: "Image" | "PDF", size: number): string {
+  return `${kind} · ${formatSize(size)} · too large to show`;
+}
+
+/** "Showing the first 1 MiB of 4.2 MB": the daemon returns at most 1 MiB of a text file, so a truncated text read is exactly that. */
 export function truncatedNotice(size: number): string {
   return `Showing the first 1 MiB of ${formatSize(size)}`;
 }

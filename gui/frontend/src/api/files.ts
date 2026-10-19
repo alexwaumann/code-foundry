@@ -5,14 +5,15 @@ import { orOutdatedDaemon } from "./errors";
 /**
  * FilesystemService.ReadFile as the File tab shows it (docs/notes/file-viewer-3-tabs.md).
  * Text is decoded as UTF-8 (invalid bytes become U+FFFD) when the daemon calls the file
- * text; an image keeps its bytes for an object URL; any other binary keeps neither.
+ * text; an image or a PDF keeps its bytes (an object URL, pdf.js); any other binary keeps
+ * neither.
  */
 export interface FileReadView {
   /** Absolute, cleaned path as asked for (before following symlinks). */
   path: string;
   /** Size of the whole file in bytes (a directory's own size for a folder). */
   size: number;
-  /** Only the first MiB came back. */
+  /** Only part came back: the first MiB of a text file, the first READ_MAX_BYTES of any other. */
   truncated: boolean;
   binary: boolean;
   /** "text/markdown", "image/png", "text/plain; charset=utf-8", … ("" when not found). */
@@ -24,7 +25,19 @@ export interface FileReadView {
   text: string | null;
   /** The bytes of an image (mime image/*); null otherwise. */
   image: Uint8Array | null;
+  /** The bytes of a PDF (mime application/pdf); null otherwise. */
+  pdf: Uint8Array | null;
 }
+
+/**
+ * How much readFile asks for: 32 MiB, so an image or a PDF up to that size comes back
+ * whole. Text is capped at 1 MiB by the daemon whatever we ask, and a daemon older than the
+ * larger cap clamps every read to 1 MiB, so there the File tab behaves as it did (a larger
+ * image or PDF is truncated and shown as too large).
+ */
+export const READ_MAX_BYTES = 32 * 1024 * 1024;
+
+export const PDF_MIME = "application/pdf";
 
 const utf8 = new TextDecoder("utf-8");
 
@@ -35,6 +48,8 @@ export function isImageMime(mime: string): boolean {
 
 export function toFileReadView(r: ReadFileResponse): FileReadView {
   const image = isImageMime(r.mimeType);
+  const pdf = r.mimeType === PDF_MIME;
+  const present = !r.notFound && !r.isDir;
   const text = !r.binary && !r.notFound && !r.isDir ? utf8.decode(r.contents) : null;
   return {
     path: r.resolvedPath,
@@ -46,7 +61,8 @@ export function toFileReadView(r: ReadFileResponse): FileReadView {
     notFound: r.notFound,
     isDir: r.isDir,
     text,
-    image: image && !r.notFound && !r.isDir ? r.contents : null,
+    image: image && present ? r.contents : null,
+    pdf: pdf && present ? r.contents : null,
   };
 }
 
@@ -58,7 +74,7 @@ export function toFileReadView(r: ReadFileResponse): FileReadView {
 export async function readFile(baseDir: string, path: string, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<FileReadView> {
   const c = await conn.client(FilesystemService);
   try {
-    return toFileReadView(await c.readFile({ baseDir, path, maxBytes: 0n }, { signal }));
+    return toFileReadView(await c.readFile({ baseDir, path, maxBytes: BigInt(READ_MAX_BYTES) }, { signal }));
   } catch (err) {
     throw orOutdatedDaemon(err);
   }
