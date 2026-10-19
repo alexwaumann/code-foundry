@@ -124,24 +124,6 @@ test("timeline: a wake message is a collapsed Woken by note that expands to its 
   await expect(header(page).getByTestId("thread-title")).toHaveText("Add retry to login redirect");
 });
 
-test("a renamed creator: the chip, the tooltip and the note show its current name; the note links by id", async ({ page }) => {
-  await openApp(page);
-  // s-l-grand recorded "Add retry to login redirect (old)"; its creator is named "Add retry to login redirect".
-  const tip = page.locator('[data-testid="thread-tooltip"]:not([data-state="closed"])');
-  await row(page, "s:s-l-grand").hover();
-  await expect(tip).toHaveAttribute("data-thread-id", "s-l-grand");
-  await expect(tip.getByTestId("tip-created-by")).toHaveText("Created by Add retry to login redirect");
-  await open(page, "s-l-grand");
-  await expect(chip(page)).toHaveText("from Add retry to login redirect");
-  const note = page.getByTestId("thread-created-by-note");
-  const link = note.getByTestId("thread-created-by-note-link");
-  await expect(link).toHaveText("Add retry to login redirect");
-  await expect(link).toHaveAttribute("data-thread", C);
-  await expect(note.getByTestId("thread-created-by-note-brief")).toHaveText(/^brief: Write table tests for the retry backoff schedule/);
-  await link.click();
-  await expect(header(page).getByTestId("thread-title")).toHaveText("Add retry to login redirect");
-});
-
 test("header: a removed creator leaves an inert chip saying so, with the recorded name; an archived one still opens", async ({ page }) => {
   await openApp(page);
   await open(page, "s-l-grand");

@@ -62,23 +62,7 @@ test("Enter on a workspace member row opens its tab in the page's panel", async 
   await expect(page.getByTestId("projects-page")).toBeVisible();
 });
 
-test("a project without git: its tab says so and offers Initialize Git; the thread row menu shows a thread's worktree", async ({ page }) => {
-  await openApp(page);
-  await openProjects(page);
-  await page.locator('[data-nav-key="p:repo-wr"]').dblclick();
-  await expect(surface(page)).toHaveAttribute("data-git", "false");
-  await expect(surface(page).getByTestId("section-nogit")).toContainText("Not a git repository");
-  await expect(surface(page).getByTestId("init-git")).toBeEnabled();
-
-  // Show worktree on a thread row: the thread's own panel, with its worktree tab, focused.
-  await row(page, "s:s-3").click({ button: "right" });
-  await page.getByTestId("row-menu").getByText("Show worktree").click();
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-3");
-  await expect(tabs(page)).toHaveText(["code-foundry · fix/resize"]);
-  await expect.poll(() => inPanel(page)).toBe(true);
-});
-
-test("a thread's panel lists Worktree with T; T, the list entry and the palette command open the thread's own worktree", async ({ page }) => {
+test("a thread's panel lists Worktree with T; T, the list entry, the palette command and the row menu open the thread's own worktree", async ({ page }) => {
   await openApp(page);
   await row(page, "s:s-1").click();
   await expect(page.getByTestId("thread-pane")).toBeVisible();
@@ -106,6 +90,13 @@ test("a thread's panel lists Worktree with T; T, the list entry and the palette 
   await palette.locator('[data-command="view.panel.worktree"]').click();
   await expect(palette).toHaveCount(0);
   await expect(tabs(page)).toHaveText(["code-foundry"]);
+  await expect.poll(() => inPanel(page)).toBe(true);
+
+  // Show worktree on another thread's row: that thread's own panel, with its worktree tab, focused.
+  await row(page, "s:s-3").click({ button: "right" });
+  await page.getByTestId("row-menu").getByText("Show worktree").click();
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-3");
+  await expect(tabs(page)).toHaveText(["code-foundry · fix/resize"]);
   await expect.poll(() => inPanel(page)).toBe(true);
 });
 

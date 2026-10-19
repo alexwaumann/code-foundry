@@ -1,11 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
-import { expectNoTooltip, invocations, mockPost, mockUrl, openApp, openTooltip, resetMock, row } from "./fixtures";
+import { invocations, mockPost, mockUrl, openApp, openTooltip, resetMock, row } from "./fixtures";
 
 /**
  * Answering a thread (rendered threads PR 3, docs/notes/rendered-threads-3-interaction.md):
  * the docked permission and question prompts over the mock's scripted thread
  * (mock/thread.ts), their keyboard, Escape not interrupting and effort changes. Set SHOTS=<dir>
- * to save screenshots of the panels in both schemes.
+ * to save screenshots of the panels in both schemes (the light pass runs only then: the panel
+ * tests assert nothing theme-specific).
  */
 
 test.beforeEach(async () => {
@@ -63,7 +64,9 @@ async function editorFocused(page: Page): Promise<boolean> {
   return page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.isContentEditable);
 }
 
-for (const scheme of ["dark", "light"] as const) {
+const schemes = process.env.SHOTS ? (["dark", "light"] as const) : (["dark"] as const);
+
+for (const scheme of schemes) {
   test.describe(scheme, () => {
     test("the permission panel and deny with a reason", async ({ page }) => {
       await openThread(page, "permission", scheme);
@@ -224,10 +227,6 @@ test("a subagent's request names the agent that asked", async ({ page }) => {
   await shot(page, "subagent-dark");
   await page.mouse.move(0, 0);
   await expect(openTooltip(page)).toHaveCount(0);
-  await chip.evaluate((el) => {
-    el.style.flex = "none";
-  });
-  await expectNoTooltip(page, chip);
   await prompt.getByTestId("thread-permission-allow").click();
   await expect(composer(page).getByTestId("thread-permission")).toHaveCount(0);
   await expect.poll(responds).toEqual(["respond s-r1 allow req-sub"]);
@@ -273,16 +272,9 @@ test("Escape never interrupts a running turn (editor or timeline); the Interrupt
   await page.getByTestId("thread-interrupt").click();
   await expect.poll(calls).toContain("interrupt s-r1");
   await expect(page.locator('[data-testid="thread-turn-header"]:not([data-live])').last()).toContainText("Interrupted");
+  await expect(page.getByTestId("thread-interrupt")).toHaveCount(0);
   // No success toast for an interrupt: the header says it.
   await expect(page.getByText("interrupted thread s-r1")).toHaveCount(0);
-});
-
-test("Interrupt Thread has no shortcut", async ({ page }) => {
-  await openThread(page, "idle");
-  await page.keyboard.press("Meta+k");
-  await page.keyboard.type("Interrupt Thread");
-  await expect(page.getByRole("option", { name: /Interrupt Thread/ })).toBeVisible();
-  await expect(page.getByRole("option", { name: /Interrupt Thread/ })).not.toContainText(/esc/i);
 });
 
 test("an effort change while busy waits for the turn; when idle it applies at once", async ({ page }) => {

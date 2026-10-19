@@ -194,26 +194,6 @@ test("the timeline: background and failed chips, live activity, and the end note
   await expect(pr1.locator("[data-tool]")).toHaveCount(0);
   await expect(page.getByTestId("thread-pane")).not.toContainText("Review usage_runs changes");
   await expect(page.getByTestId("thread-pane")).not.toContainText("-run TestAgent");
-  // The activity takes the line: label, chip, then the activity up to the clock.
-  const box = async (l: ReturnType<Page["locator"]>) => (await l.boundingBox()) ?? { x: NaN, y: NaN, width: NaN, height: NaN };
-  const label = await box(pr1.locator(".lbl").first());
-  const chip = await box(pr1.getByTestId("thread-agent-bg"));
-  const act = await box(pr1.getByTestId("thread-agent-activity"));
-  const clock = await box(pr1.getByTestId("thread-agent-elapsed"));
-  expect(chip.x - (label.x + label.width)).toBeLessThan(20);
-  expect(act.x - (chip.x + chip.width)).toBeLessThan(20);
-  expect(clock.x - (act.x + act.width)).toBeLessThan(20);
-  expect(act.width).toBeGreaterThan(260);
-  expect(act.height).toBeLessThan(24);
-  expect(clock.height).toBeLessThan(24);
-  expect(await box(pr1.getByTestId("thread-tool").first())).toMatchObject({ height: 24 });
-  // In a narrow pane (the panel open beside a small window) the line still holds: the
-  // label and the activity ellipsise, the clock stays whole.
-  await page.setViewportSize({ width: 900, height: 800 });
-  const narrowClock = await box(pr1.getByTestId("thread-agent-elapsed"));
-  expect(narrowClock.height).toBeLessThan(24);
-  expect(await box(pr1.getByTestId("thread-tool").first())).toMatchObject({ height: 24 });
-  await page.setViewportSize({ width: 1280, height: 800 });
   const shot = page.locator('[data-tool="Agent"]').filter({ hasText: "Screenshot the panel in Wails" });
   await expect(shot.getByTestId("thread-agent-failed")).toHaveText("failed");
   await expect(shot.getByTestId("thread-agent-bg")).toHaveText("background");

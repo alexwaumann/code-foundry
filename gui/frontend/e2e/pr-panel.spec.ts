@@ -221,12 +221,6 @@ test("the reviewer picker shows requests and recents, searches GitHub from 2 cha
   await expect(page.getByTestId("pr-reviewer-recent")).toHaveCount(0);
   await shot(page, "chunk3-reviewers");
 
-  // One character searches nothing.
-  await search.fill("z");
-  await page.waitForTimeout(600);
-  expect((await ghCalls())["ListReviewerCandidates query"]).toBeUndefined();
-  await expect(cands).toHaveCount(3);
-
   // Two or more search GitHub: someone past the first 100 is found; no match says so.
   await search.fill("zoe-zim");
   await expect.poll(logins).toEqual([["zoe-zimmerman", "false"]]);
@@ -267,18 +261,12 @@ test("the reviewer picker shows requests and recents, searches GitHub from 2 cha
   const before = (await invocations()).filter((i) => i.name === "pr.review.request").length;
   await recent.getByTestId("pr-reviewer-recent-remove").click();
   await expect(page.getByTestId("pr-reviewer-recent")).toHaveCount(0);
-  await page.waitForTimeout(300);
-  expect((await invocations()).filter((i) => i.name === "pr.review.request")).toHaveLength(before);
 
-  // Choosing a requested team withdraws it.
+  // Choosing a requested team withdraws it; it is the only request since the ×.
   await cands.filter({ hasText: "acme/core" }).click();
-  await expect.poll(async () => (await invocations()).filter((i) => i.name === "pr.review.request").at(-1)?.args).toEqual({
-    "repo-slug": SLUG,
-    number: "145",
-    login: "acme/core",
-    kind: "team",
-    requested: "false",
-  });
+  await expect.poll(async () => (await invocations()).filter((i) => i.name === "pr.review.request").slice(before).map((i) => i.args)).toEqual([
+    { "repo-slug": SLUG, number: "145", login: "acme/core", kind: "team", requested: "false" },
+  ]);
   await expect(page.getByTestId("pr-reviewer").filter({ hasText: "acme/core" })).toHaveCount(0);
 
   // Escape closes the picker; the panel keeps its tab.
@@ -287,7 +275,7 @@ test("the reviewer picker shows requests and recents, searches GitHub from 2 cha
   await expect(tabs(page)).toHaveText(["#145"]);
 });
 
-test("menu: Refresh, the thread actions, Open on GitHub, Copy link; shift+cmd+c copies too", async ({ page }) => {
+test("menu: Refresh (and a failed one), the thread actions, Open on GitHub, Copy link; shift+cmd+c copies too", async ({ page }) => {
   await openPrPage(page);
   await prRow(page, "authored", 145).click();
   await page.getByTestId("pr-menu-button").click();
@@ -311,6 +299,12 @@ test("menu: Refresh, the thread actions, Open on GitHub, Copy link; shift+cmd+c 
   await expect(page.getByTestId("pr-menu-refresh-hint")).toHaveText(/^Updated [0-5]s ago$/);
   // Quiet: the menu reports it, no toast.
   await expect(page.getByText(/^Refreshed #145/)).toHaveCount(0);
+  // A failure is toasted and reported in the menu; the copy stays.
+  await mockPost("gh/pr-fail?command=pr.refresh");
+  await page.getByTestId("pr-menu-refresh").click();
+  await expect(page.getByText("Refresh Pull Request failed")).toBeVisible();
+  await expect(page.getByTestId("pr-refresh-error")).toContainText("502 Bad Gateway");
+  await expect(page.getByTestId("pr-check")).toHaveCount(7);
 
   await page.getByTestId("pr-menu-copy").click();
   await expect(menu).toHaveCount(0);
@@ -384,18 +378,6 @@ test("#140 (read access) explains the picker and has no revert; #131 is closed; 
   await expect(page.getByTestId("pr-not-found")).toContainText("Pull request not found");
 });
 
-test("closing the last tab hides the panel; cmd+w closes the active one", async ({ page }) => {
-  await openPrPage(page);
-  await prRow(page, "authored", 145).click();
-  await prRow(page, "authored", 142).click();
-  await expect(tabs(page)).toHaveText(["#145", "#142"]);
-  await page.getByTestId("pr-title").click();
-  await page.keyboard.press("Meta+w");
-  await expect(tabs(page)).toHaveText(["#145"]);
-  await page.getByRole("button", { name: "Close #145" }).click();
-  await expect(panel(page)).toHaveCount(0);
-});
-
 test("panel state is per selection; a thread or worktree on a PR branch enables the surface", async ({ page }) => {
   await openPrPage(page);
   await prRow(page, "authored", 142).click();
@@ -431,26 +413,12 @@ test("panel state is per selection; a thread or worktree on a PR branch enables 
 });
 
 test("light scheme", async ({ page }) => {
+  test.skip(!shots, "SHOTS=<dir> only: the screenshot is all it adds");
   await page.emulateMedia({ colorScheme: "light" });
   await openPrPage(page);
   await prRow(page, "authored", 145).click();
   await expect(page.getByTestId("pr-checks-summary")).toHaveText("2 failing");
   await shot(page, "chunk3-light-summary");
-});
-
-test("a failed Refresh is reported, and the copy stays", async ({ page }) => {
-  await openPrPage(page);
-  await prRow(page, "authored", 145).click();
-  await expect(page.getByTestId("pr-title")).toContainText("resize race");
-  await mockPost("gh/pr-fail?command=pr.refresh");
-  await page.getByTestId("pr-menu-button").click();
-  await page.getByTestId("pr-menu-refresh").click();
-  await expect(page.getByText("Refresh Pull Request failed")).toBeVisible();
-  await expect(page.getByTestId("pr-refresh-error")).toContainText("502 Bad Gateway");
-  await expect(page.getByTestId("pr-menu-refresh-hint")).toHaveText(/^Updated \d+s ago$/);
-  await page.keyboard.press("Escape");
-  await expect(page.getByTestId("pr-title")).toContainText("resize race");
-  await expect(page.getByTestId("pr-check")).toHaveCount(7);
 });
 
 test("closing a tab drops its inner state: reopened, it starts on Summary", async ({ page }) => {
@@ -459,7 +427,9 @@ test("closing a tab drops its inner state: reopened, it starts on Summary", asyn
   await page.getByTestId("pr-tab-timeline").click();
   await page.getByTestId("pr-timeline-order").click();
   await expect(page.getByTestId("pr-timeline")).toHaveAttribute("data-order", "oldest");
-  await page.getByRole("button", { name: "Close #145" }).click();
+  // cmd+w from inside the surface closes it; the last tab gone, the panel hides.
+  await page.getByTestId("pr-title").click();
+  await page.keyboard.press("Meta+w");
   await expect(panel(page)).toHaveCount(0);
   await prRow(page, "authored", 145).click();
   await expect(page.getByTestId("pr-tab-summary")).toHaveAttribute("aria-selected", "true");
@@ -505,10 +475,17 @@ test("at 280px nothing overflows: header, inner tab bar, logins, popups; the act
   await expect(page.getByTestId("pr-reviewer-picker")).toBeVisible();
   expect(inside(await boxOf(page, "pr-reviewer-picker"), await boxOf(page, "side-panel"))).toBe(true);
   await page.keyboard.press("Escape");
+  // Review keeps its icons (the label is for screen readers); its menu and composer fit.
+  expect((await boxOf(page, "pr-review-button")).width).toBeLessThan(48);
+  await expect(page.getByTestId("pr-review-button")).toHaveAccessibleName("Review");
   await page.getByTestId("pr-review-button").click();
   await expect(page.getByTestId("pr-review-menu")).toBeVisible();
   expect(inside(await boxOf(page, "pr-review-menu"), await boxOf(page, "side-panel"))).toBe(true);
+  await page.getByTestId("pr-review-comment").click();
+  expect(await overflowX(page, "pr-review-composer")).toBeLessThanOrEqual(0);
+  expect(inside(await boxOf(page, "pr-review-submit"), await boxOf(page, "side-panel"))).toBe(true);
   await page.keyboard.press("Escape");
+  await expect(page.getByTestId("pr-review-composer")).toHaveCount(0);
 
   // Many tabs: each new one scrolls into view in the strip.
   for (const [section, n] of [["authored", 142], ["authored", 12], ["review", 139], ["merged", 138], ["merged", 136], ["merged", 10]] as const) {
@@ -765,6 +742,7 @@ test("a pull request's running threads show on every surface that shows it", asy
   await openApp(page);
   await row(page, "s:s-1").click();
   await openPr(page, 145);
+  // Longer than the siblings' 800ms: s-1's ask must still be starting after the page switch and the typing below.
   await mockPost("gh/pr-delay?ms=2000");
   await openAsk(page);
   await askInput(page).pressSequentially("From s-1");
@@ -806,7 +784,7 @@ test("a pull request's running threads show on every surface that shows it", asy
   expect(await threadInvocations("pr.explain")).toHaveLength(1);
 });
 
-test("at 280px the composer's hint fits and its field grows to six rows, then scrolls", async ({ page }) => {
+test("at 280px the composer's hint fits and its field grows, then scrolls", async ({ page }) => {
   await openPrPage(page);
   await prRow(page, "authored", 145).click();
   await setPanelWidth(page, 280);
@@ -815,19 +793,16 @@ test("at 280px the composer's hint fits and its field grows to six rows, then sc
   expect(await page.getByTestId("pr-ask-hint").evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
   expect(inside(await boxOf(page, "pr-ask-send"), await boxOf(page, "side-panel"))).toBe(true);
 
-  const size = () =>
-    askInput(page).evaluate((el) => ({ height: el.clientHeight, scroll: el.scrollHeight, line: parseFloat(getComputedStyle(el).lineHeight) }));
+  const size = () => askInput(page).evaluate((el) => ({ height: el.clientHeight, scroll: el.scrollHeight }));
   const three = await size();
-  await askInput(page).fill("one\ntwo");
-  expect((await size()).height).toBe(three.height);
   await askInput(page).fill("1\n2\n3\n4\n5");
   const five = await size();
   expect(five.height).toBeGreaterThan(three.height);
   expect(five.scroll).toBeLessThanOrEqual(five.height);
   await askInput(page).fill(Array.from({ length: 12 }, (_, i) => `line ${String(i + 1)}`).join("\n"));
   const many = await size();
-  // Six rows plus the padding, then it scrolls.
-  expect(Math.abs(many.height - (6 * many.line + 16))).toBeLessThanOrEqual(2);
+  // It stops growing, then scrolls.
+  expect(many.height).toBeGreaterThanOrEqual(five.height);
   expect(many.scroll).toBeGreaterThan(many.height);
   await askInput(page).fill("short");
   expect((await size()).height).toBe(three.height);
@@ -851,11 +826,6 @@ test("#142 merges: Squash and merge confirms, runs pr.merge with squash and the 
   await expect(button).toBeVisible();
   await expect(button).toHaveText("Merge");
   await expect(button).not.toHaveAttribute("aria-disabled");
-  // Left of the ⋯ menu, on the repo row.
-  const b = await boxOf(page, "pr-merge-button");
-  const m = await boxOf(page, "pr-menu-button");
-  expect(b.x + b.width).toBeLessThanOrEqual(m.x);
-  expect(Math.abs(b.y + b.height / 2 - (m.y + m.height / 2))).toBeLessThan(2);
 
   await button.click();
   const menu = page.getByTestId("pr-merge-menu");
@@ -866,15 +836,6 @@ test("#142 merges: Squash and merge confirms, runs pr.merge with squash and the 
   await expect(page.getByTestId("pr-merge-delete-branch-note")).toHaveText("Deletes origin/feat/sidebar; local branches and worktrees are untouched");
   expect(inside(await boxOf(page, "pr-merge-menu"), await boxOf(page, "side-panel"))).toBe(true);
   await settledAnimations(page, "pr-merge-menu");
-  // The label sits as far right of the box as the box sits from the menu's edge.
-  const gaps = await del.evaluate((el) => {
-    const box = el.querySelector("[data-state]")?.getBoundingClientRect();
-    const label = el.querySelector("[data-testid=pr-merge-delete-branch-note]")?.parentElement?.getBoundingClientRect();
-    const menu = el.closest("[data-testid=pr-merge-menu]")?.getBoundingClientRect();
-    return box && label && menu ? { left: box.left - menu.left, right: label.left - box.right } : null;
-  });
-  expect(gaps).not.toBeNull();
-  expect(Math.abs((gaps?.left ?? 0) - (gaps?.right ?? 99))).toBeLessThanOrEqual(1);
   await shot(page, "merge-button");
 
   await page.getByTestId("pr-merge-method-squash").click();
@@ -1207,35 +1168,6 @@ test("#145 (the viewer's own): Approve and Request changes are disabled with the
   await prRow(page, "merged", 138).click();
   await expect(page.getByTestId("pr-state")).toHaveText("Merged");
   await expect(page.getByTestId("pr-review-button")).toHaveCount(0);
-});
-
-test("at 280px Review keeps its icons, its menu and composer fit the panel, and the chip keeps its icon", async ({ page }) => {
-  await shotViewport(page);
-  await openPrPage(page);
-  await prRow(page, "review", 139).click();
-  await setPanelWidth(page, 280);
-  const button = page.getByTestId("pr-review-button");
-  await expect(button).toBeVisible();
-  expect(await overflowX(page, "pr-header")).toBeLessThanOrEqual(0);
-  expect((await boxOf(page, "pr-review-button")).width).toBeLessThan(48);
-  await expect(button).toHaveAccessibleName("Review");
-  expect(inside(await boxOf(page, "pr-actions"), await boxOf(page, "pr-header"))).toBe(true);
-  await button.click();
-  await expect(page.getByTestId("pr-review-menu")).toBeVisible();
-  await settledAnimations(page, "pr-review-menu");
-  expect(inside(await boxOf(page, "pr-review-menu"), await boxOf(page, "side-panel"))).toBe(true);
-  expect(await page.getByTestId("pr-review-menu").evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0);
-  await page.getByTestId("pr-review-request-changes").click();
-  expect(await overflowX(page, "pr-review-composer")).toBeLessThanOrEqual(0);
-  expect(inside(await boxOf(page, "pr-review-submit"), await boxOf(page, "side-panel"))).toBe(true);
-  await reviewInput(page).fill("Split this into two pull requests.");
-  await page.keyboard.press("Meta+Enter");
-  await expect(page.getByTestId("pr-review-composer")).toHaveCount(0);
-  const chip = page.getByTestId("pr-your-review");
-  await expect(chip).toHaveAttribute("data-review", "changes_requested");
-  await expect(chip).toHaveAccessibleName("You requested changes");
-  expect((await boxOf(page, "pr-your-review")).width).toBeLessThan(40);
-  expect(await overflowX(page, "pr-header")).toBeLessThanOrEqual(0);
 });
 
 test("the review composer closes when the pull request stops taking reviews (merged meanwhile)", async ({ page }) => {

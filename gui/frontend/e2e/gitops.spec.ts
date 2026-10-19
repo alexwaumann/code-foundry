@@ -48,9 +48,9 @@ test("a failed op stays up and expands to show the output", async ({ page }) => 
   await expect(failed.getByTestId("gitop-output")).toContainText("hint: Updates were rejected");
   // No generic "Git: Push failed" toast on top of it.
   await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Git: Push failed" })).toHaveCount(0);
-  // Failures do not auto-dismiss.
-  await page.waitForTimeout(5500);
-  await expect(failed).toBeVisible();
+  // Failures stay until dismissed: they carry a close button (success toasts time out).
+  await failed.getByRole("button", { name: "Close toast" }).click();
+  await expect(failed).toHaveCount(0);
 });
 
 test("a second op on the same worktree shows as waiting", async ({ page }) => {

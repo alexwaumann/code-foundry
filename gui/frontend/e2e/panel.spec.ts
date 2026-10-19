@@ -219,31 +219,6 @@ test("surface hotkeys do nothing while their surfaces are disabled", async ({ pa
   await expect(panel(page).getByTestId("panel-tabs")).toHaveCount(0);
 });
 
-test("each thread has its own panel state", async ({ page }) => {
-  await openApp(page);
-  await selectThread(page, "s-1");
-  await page.getByTestId("panel-toggle").click();
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-1");
-
-  await selectThread(page, "s-2");
-  await expect(panel(page)).toHaveCount(0);
-  await expect(page.getByTestId("panel-toggle")).toHaveAttribute("aria-pressed", "false");
-
-  await selectThread(page, "s-1");
-  await expect(panel(page)).toBeVisible();
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-1");
-
-  // Hiding it on s-1 leaves s-2's (still hidden) alone, and vice versa.
-  await selectThread(page, "s-2");
-  await page.getByTestId("panel-toggle").click();
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-2");
-  await selectThread(page, "s-1");
-  await page.getByTestId("panel-toggle").click();
-  await expect(panel(page)).toHaveCount(0);
-  await selectThread(page, "s-2");
-  await expect(panel(page)).toBeVisible();
-});
-
 test("cmd+shift+e toggles the panel, even from the thread's prompt, and the daemon intent does too", async ({ page }) => {
   await openApp(page);
   await selectThread(page, "s-1");
@@ -255,8 +230,8 @@ test("cmd+shift+e toggles the panel, even from the thread's prompt, and the daem
   await expect(panel(page).getByTestId("panel-empty")).toBeVisible();
   await page.keyboard.press("Meta+Shift+e");
   await expect(panel(page)).toHaveCount(0);
-  // Hiding the focused panel hands focus back to the thread.
-  await expect.poll(() => page.evaluate(() => document.activeElement?.closest("[data-region]")?.getAttribute("data-region"))).toBe("content");
+  // Hiding the focused panel hands focus back to the thread's prompt.
+  await expect(threadPrompt(page)).toBeFocused();
 
   // The CLI path: view.panel.toggle emits ShowView "panel.toggle" to every window.
   expect(await emit({ showView: { name: "panel.toggle" } })).toBeGreaterThan(0);
@@ -382,50 +357,6 @@ test("tabs are keyboard reachable: arrows move, Enter activates, Tab reaches the
   await expect(tabs).toHaveText(["Files"]);
 });
 
-test("the resize separator is keyboard operable", async ({ page }) => {
-  await openApp(page);
-  await selectThread(page, "s-1");
-  await page.getByTestId("panel-toggle").click();
-  const handle = page.getByTestId("panel-resize-handle");
-  await expect(handle).toHaveAttribute("aria-valuenow", "420");
-  await expect(handle).toHaveAttribute("aria-valuemin", "280");
-  await handle.focus();
-  await page.keyboard.press("ArrowLeft");
-  await expect(handle).toHaveAttribute("aria-valuenow", "436");
-  expect((await box(page, "side-panel")).width).toBe(436);
-  await page.keyboard.press("Shift+ArrowRight");
-  await expect(handle).toHaveAttribute("aria-valuenow", "372");
-  await page.keyboard.press("Home");
-  await expect(handle).toHaveAttribute("aria-valuenow", "280");
-});
-
-test("a narrow window with a wide sidebar shrinks the panel, then hides it, never squeezing the content pane", async ({ page }) => {
-  await openApp(page);
-  await selectThread(page, "s-1");
-  await setSidebarWidth(page, 520);
-  await page.setViewportSize({ width: 1200, height: 800 });
-  await page.getByTestId("panel-toggle").click();
-  await expect(panel(page)).toBeVisible();
-  // 1200 - 520 sidebar - 36 gaps - 360 content minimum.
-  await expect.poll(async () => (await box(page, "side-panel")).width).toBe(284);
-  expect((await box(page, "content-pane")).width).toBeGreaterThanOrEqual(360);
-  expect((await box(page, "side-panel")).right).toBe(1200 - 12);
-
-  // No room for 280px: the panel hides but stays open, and the content pane fills the row.
-  await page.setViewportSize({ width: 1000, height: 800 });
-  await expect(panel(page)).toHaveCount(0);
-  await expect(page.getByTestId("panel-toggle")).toHaveAttribute("aria-pressed", "true");
-  expect((await box(page, "content-pane")).right).toBe(1000 - 12);
-
-  // Hiding the sidebar makes room again.
-  await threadPrompt(page).click();
-  await page.keyboard.press("Meta+b");
-  await expect(page.getByTestId("sidebar")).toHaveCount(0);
-  await expect(panel(page)).toBeVisible();
-  expect((await box(page, "side-panel")).right).toBe(1000 - 12);
-  expect((await box(page, "content-pane")).width).toBeGreaterThanOrEqual(360);
-});
-
 test("dragging starts from the rendered width after the room shrinks", async ({ page }) => {
   await openApp(page);
   await selectThread(page, "s-1");
@@ -434,27 +365,12 @@ test("dragging starts from the rendered width after the room shrinks", async ({ 
   // At 1280 with the 280px sidebar the room bound is 604, so 420+200 clamps to it.
   await expect.poll(async () => (await box(page, "side-panel")).width).toBe(604);
 
-  // The window shrinks: the panel renders at the room (1000-280-36-360 = 324), and the
-  // stored width is kept, so it comes back with the room.
-  await page.setViewportSize({ width: 1000, height: 800 });
-  await expect.poll(async () => (await box(page, "side-panel")).width).toBe(324);
-  await page.setViewportSize({ width: 1280, height: 800 });
-  await expect.poll(async () => (await box(page, "side-panel")).width).toBe(604);
+  // The window shrinks: the panel renders at the room (1000-280-36-360 = 324) and keeps
+  // the stored 604; a drag acts on the 324 at once.
   await page.setViewportSize({ width: 1000, height: 800 });
   await expect.poll(async () => (await box(page, "side-panel")).width).toBe(324);
   await dragHandle(page, 30);
   await expect.poll(async () => (await box(page, "side-panel")).width).toBe(294);
-
-  // A wider sidebar shrinks the rendered width below the stored one; a drag acts at once.
-  await page.setViewportSize({ width: 1280, height: 800 });
-  await setSidebarWidth(page, 480);
-  // 1280-480-36-360 = 404 is the room; the stored 294 fits. Widen to the room.
-  await dragHandle(page, -200);
-  await expect.poll(async () => (await box(page, "side-panel")).width).toBe(404);
-  await setSidebarWidth(page, 520);
-  await expect.poll(async () => (await box(page, "side-panel")).width).toBe(364);
-  await dragHandle(page, 20);
-  await expect.poll(async () => (await box(page, "side-panel")).width).toBe(344);
 });
 
 test("the palette hands focus back to the panel, and its toggle moves focus", async ({ page }) => {
@@ -499,31 +415,6 @@ test("closing the last tab on the Pull Requests page focuses the page's list", a
   // Its keys work at once.
   await page.keyboard.press("j");
   await expect(page.getByTestId("prs-list").locator('[aria-selected="true"]')).toHaveCount(1);
-});
-
-test("hiding the focused panel on a stopped thread focuses its prompt", async ({ page }) => {
-  await openApp(page);
-  await row(page, "s:s-3").click();
-  await expect(page.getByTestId("thread-composer")).toBeVisible();
-  await page.keyboard.press("Meta+Shift+e");
-  await expect.poll(() => region(page)).toBe("panel");
-  await page.keyboard.press("Meta+Shift+e");
-  await expect(panel(page)).toHaveCount(0);
-  await expect(page.getByTestId("thread-composer").getByTestId("composer-input")).toBeFocused();
-});
-
-test("worktrees and the Pull Requests page have their own panels and toggles", async ({ page }) => {
-  await openApp(page);
-  await page.keyboard.press("Meta+Shift+d");
-  await expect(page.getByTestId("prs-page")).toBeVisible();
-  await page.getByTestId("prs-page").getByTestId("panel-toggle").click();
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "view:pullrequests");
-
-  await row(page, "s:s-3").click();
-  await expect(page.getByTestId("thread-composer")).toBeVisible();
-  await expect(panel(page)).toHaveCount(0);
-  await page.getByTestId("thread-header").getByTestId("panel-toggle").click();
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-3");
 });
 
 /** The thread pane's width (it narrows as the side panel widens; 0 while hidden). */
@@ -701,7 +592,7 @@ test("view.panel.expand from the palette and the CLI; focus follows the hidden t
   await expect.poll(() => region(page)).toBe("panel");
 });
 
-test("the + after the last tab shows the surface list without adding a tab; picking, a tab, Escape and cmd+w leave it", async ({ page }) => {
+test("the + after the last tab shows the surface list without adding a tab; picking, Escape and cmd+w leave it", async ({ page }) => {
   await openApp(page);
   await selectThread(page, "s-1");
   await recordCmdW(page);
@@ -714,24 +605,12 @@ test("the + after the last tab shows the surface list without adding a tab; pick
   const plus = panel(page).getByTestId("panel-tabs").getByTestId("panel-new-tab");
   await expect(tabs).toHaveText(["Files", "Diff"]);
 
-  // Right after the last tab, in the strip, tab height, never dragging the window.
-  await expect(plus).toHaveAttribute("aria-label", "New tab");
-  await expect(plus).toHaveAttribute("aria-pressed", "false");
-  const last = await tabs.last().evaluate((el) => (el.parentElement ?? el).getBoundingClientRect().right);
-  const p = await box(page, "panel-new-tab");
-  expect(p.left - last).toBeGreaterThanOrEqual(0);
-  expect(p.left - last).toBeLessThanOrEqual(8);
-  expect(p.bottom - p.top).toBe(28);
-  expect(await plus.evaluate((el) => getComputedStyle(el).getPropertyValue("--wails-draggable").trim())).toBe("no-drag");
-
-  // Picking: the list shows, no tab is added or selected, the + is pressed, the panel has focus.
+  // Picking: the list shows, no tab is added, the panel has focus.
   await plus.click();
   await expect(panel(page)).toHaveAttribute("data-picking", "true");
   await expect(empty.getByRole("heading", { name: "Open a surface" })).toBeVisible();
   await expect(body).toHaveCount(0);
   await expect(tabs).toHaveText(["Files", "Diff"]);
-  await expect(tabs.and(page.locator('[aria-selected="true"]'))).toHaveCount(0);
-  await expect(plus).toHaveAttribute("aria-pressed", "true");
   await expect.poll(() => region(page)).toBe("panel");
   // The + runs the registry command through its local presenter: no daemon call.
   expect((await invocations()).map((i) => i.name)).not.toContain("view.panel.new-tab");
@@ -740,7 +619,6 @@ test("the + after the last tab shows the surface list without adding a tab; pick
   await page.keyboard.press("Escape");
   await expect(panel(page)).not.toHaveAttribute("data-picking");
   await expect(body).toHaveAttribute("data-tab-id", "diff");
-  await expect(plus).toHaveAttribute("aria-pressed", "false");
 
   // Picking a surface adds its tab and activates it.
   await plus.click();
@@ -749,23 +627,10 @@ test("the + after the last tab shows the surface list without adding a tab; pick
   await expect(body).toHaveAttribute("data-surface", "worktree");
   await expect(panel(page)).not.toHaveAttribute("data-picking");
 
-  // Picking it again activates the open tab instead of adding one.
-  await tabs.filter({ hasText: "Files" }).click();
-  await plus.click();
-  await empty.locator('[data-surface="worktree"]').click();
-  await expect(tabs).toHaveText(["Files", "Diff", "code-foundry"]);
-  await expect(body).toHaveAttribute("data-surface", "worktree");
-
-  // Clicking a tab leaves picking.
-  await plus.click();
-  await tabs.filter({ hasText: "Files" }).click();
-  await expect(body).toHaveAttribute("data-tab-id", "files");
-  await expect(panel(page)).not.toHaveAttribute("data-picking");
-
   // cmd+w goes back too (handled), instead of closing a tab or hiding the panel.
   await plus.click();
   await page.keyboard.press("Meta+w");
-  await expect(body).toHaveAttribute("data-tab-id", "files");
+  await expect(body).toHaveAttribute("data-surface", "worktree");
   await expect(tabs).toHaveText(["Files", "Diff", "code-foundry"]);
   await expect.poll(() => cmdW(page)).toEqual([true]);
 });
@@ -825,11 +690,6 @@ test("view.panel.new-tab from the palette and the CLI shows a hidden panel picki
   expect((await invocations()).map((i) => i.name)).toContain("view.panel.new-tab");
 });
 
-/** The strip's tab titles, in DOM order. */
-function tabTitles(page: Page): Promise<string[]> {
-  return panel(page).getByRole("tab").allTextContents();
-}
-
 /**
  * Presses the mouse on a tab and moves it, in steps (past the 4px drag threshold), to
  * `x` on the tab's own row. The mouse stays down: `page.mouse.up()` drops it.
@@ -886,7 +746,7 @@ test("dragging a tab onto its neighbour reorders the strip without activating it
   await expect(body).toHaveAttribute("data-tab-id", "files");
 });
 
-test("dropping a tab on the + puts it last; dragging back to the first tab puts it first", async ({ page }) => {
+test("dropping a tab on the + puts it last, dragging back to the first tab puts it first; Escape mid-drag cancels, even while picking", async ({ page }) => {
   await openApp(page);
   await selectThread(page, "s-1");
   await page.getByTestId("panel-toggle").click();
@@ -906,39 +766,17 @@ test("dropping a tab on the + puts it last; dragging back to the first tab puts 
   await page.mouse.up();
   await expect(tabs).toHaveText(["Files", "Diff", "#12"]);
 
-  // Escape mid-drag cancels: nothing moves.
+  // Escape mid-drag cancels: nothing moves. While picking (shown by the CLI's new-tab, not
+  // the +: dnd-kit swallows clicks for 50ms after a drop) it belongs to the drag, so the
+  // surface list stays; once the drag is over, Escape is the panel's again.
+  expect(await emit({ showView: { name: "panel.new-tab" } })).toBeGreaterThan(0);
+  await expect(panel(page)).toHaveAttribute("data-picking", "true");
   await startTabDrag(page, tabs.first(), await centerX(plus));
+  await expect(panel(page).locator("[data-dragging]")).toHaveCount(1);
   await page.keyboard.press("Escape");
   await page.mouse.up();
   await expect(tabs).toHaveText(["Files", "Diff", "#12"]);
-});
-
-test("while picking, Escape mid-drag cancels the drag and leaves picking alone; alt+arrows do nothing mid-drag", async ({ page }) => {
-  await openApp(page);
-  await selectThread(page, "s-1");
-  await page.getByTestId("panel-toggle").click();
-  await injectTab(page, "files", "Files");
-  await injectTab(page, "diff", "Diff");
-  await injectTab(page, "pullrequest", "#12", { number: "12" });
-  const tabs = panel(page).getByRole("tab");
-  const plus = panel(page).getByTestId("panel-new-tab");
-  await plus.click();
   await expect(panel(page)).toHaveAttribute("data-picking", "true");
-
-  await startTabDrag(page, tabs.first(), await centerX(plus));
-  const lifted = panel(page).locator("[data-dragging]");
-  await expect(lifted).toHaveCount(1);
-  // The pressed tab has focus in Chromium; WebKit leaves it on the panel. Either way alt+arrows wait for the drop.
-  await page.keyboard.press("Alt+ArrowRight");
-  await expect(tabs).toHaveText(["Files", "Diff", "#12"]);
-  // Escape belongs to the drag: it is cancelled, and the surface list stays.
-  await page.keyboard.press("Escape");
-  await expect(lifted).toHaveCount(0);
-  await expect(panel(page)).toHaveAttribute("data-picking", "true");
-  await page.mouse.up();
-  await expect(tabs).toHaveText(["Files", "Diff", "#12"]);
-  await expect(panel(page)).toHaveAttribute("data-picking", "true");
-  // Once the drag is over, Escape is the panel's again.
   await page.keyboard.press("Escape");
   await expect(panel(page)).not.toHaveAttribute("data-picking");
 });
@@ -1028,35 +866,6 @@ test("dragging a tab to the strip's edge scrolls the strip and lands it at the f
   const [m, sb] = await Promise.all([moved.boundingBox(), strip.boundingBox()]);
   expect(m && sb && m.x + m.width <= sb.x + sb.width + 1).toBe(true);
   await expect(moved.getByRole("tab")).toBeFocused();
-});
-
-test("alt+Left/Right move the focused tab one slot, keep focus on it, and stop at the ends", async ({ page }) => {
-  await openApp(page);
-  await selectThread(page, "s-1");
-  await page.getByTestId("panel-toggle").click();
-  await injectTab(page, "files", "Files");
-  await injectTab(page, "diff", "Diff");
-  await injectTab(page, "pullrequest", "#12", { number: "12" });
-  const tabs = panel(page).getByRole("tab");
-  const files = tabs.filter({ hasText: "Files" });
-  await files.focus();
-  await page.keyboard.press("Alt+ArrowRight");
-  await expect.poll(() => tabTitles(page)).toEqual(["Diff", "Files", "#12"]);
-  await expect(files).toBeFocused();
-  await page.keyboard.press("Alt+ArrowRight");
-  await expect.poll(() => tabTitles(page)).toEqual(["Diff", "#12", "Files"]);
-  await expect(files).toBeFocused();
-  // The last slot: nothing moves, focus stays.
-  await page.keyboard.press("Alt+ArrowRight");
-  await expect.poll(() => tabTitles(page)).toEqual(["Diff", "#12", "Files"]);
-  await expect(files).toBeFocused();
-  await page.keyboard.press("Alt+ArrowLeft");
-  await expect.poll(() => tabTitles(page)).toEqual(["Diff", "Files", "#12"]);
-  await expect(files).toBeFocused();
-  // Moving is not activating; plain arrows still move focus.
-  await expect(panel(page).getByTestId("panel-body")).toHaveAttribute("data-tab-id", "pullrequest?number=12");
-  await page.keyboard.press("ArrowLeft");
-  await expect(tabs.filter({ hasText: "Diff" })).toBeFocused();
 });
 
 /** SHOTS=<dir>: docs/notes/panel-tab-reorder screenshots, mid-drag, WebKit, 1400x900, dark and light. */

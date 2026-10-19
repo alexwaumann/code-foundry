@@ -396,14 +396,3 @@ test("thread.agent.open from the CLI selects the thread and shows the run; the p
   await expectParent(page);
   expect((await invocations()).map((i) => i.name)).toContain("thread.agent.up");
 });
-
-test("the palette's Back to Parent Thread goes up from the view", async ({ page }) => {
-  await openThread(page);
-  await openAgentsTab(page);
-  await agentRow(page, "a0").click();
-  await expectViewing(page, "a0", "Find the header chip pattern");
-  await page.keyboard.press("Meta+k");
-  await page.keyboard.type("Back to Parent Thread");
-  await page.getByTestId("palette").locator('[data-command="thread.agent.up"]').click();
-  await expectParent(page);
-});

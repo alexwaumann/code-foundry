@@ -208,4 +208,7 @@ test("theme pick from the CLI (ShowView themes.light) opens the page on that slo
   await page.getByTestId("settings-themes-link").click();
   await expect(page$(page)).toBeVisible();
   await expect(page.getByTestId("themes-slot-dark")).toHaveAttribute("aria-pressed", "true");
+  // Closing goes back to Settings on Appearance, where it came from.
+  await page.getByRole("button", { name: "Close themes" }).click();
+  await expect(page.getByTestId("settings-body")).toHaveAttribute("data-page", "appearance");
 });

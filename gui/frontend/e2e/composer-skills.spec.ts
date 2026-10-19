@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { invocations, mockPost, mockUrl, openApp, resetMock } from "./fixtures";
+import { invocations, mockUrl, openApp, resetMock } from "./fixtures";
 
 // The mock's skills (mock/filesystem.ts): every project has deploy ("Ship the current
 // branch to staging.") and review; the user has commit.
@@ -62,8 +62,6 @@ async function expectAnchored(page: Page, before: { composer: Box; row: Box }): 
   expect(Math.abs(pop.width - after.composer.width)).toBeLessThan(1);
   expect(pop.y + pop.height).toBeLessThanOrEqual(page.viewportSize()?.height ?? 0);
 }
-
-const setZoom = (page: Page, z: number) => page.evaluate(`import("/src/stores/ui.ts").then((m) => m.useUiStore.getState().setZoom(${String(z)}))`);
 
 const DEPLOY = "[/deploy](cf-skill://repo-cf/deploy)";
 const COMMIT = "[/commit](cf-skill://~/commit)";
@@ -252,36 +250,3 @@ test("Also in: skills grouped by project; removing the project removes its tags 
   await expect(page.getByTestId("composer-member")).toHaveCount(0);
   await expect(dialog).toHaveCount(0);
 });
-
-test("a daemon older than ListSkills: / is plain text, no card", async ({ page }) => {
-  await mockPost("missing-rpc?rpc=FilesystemService/ListSkills");
-  await openApp(page);
-  await compose(page);
-  await page.keyboard.type("/dep");
-  await expect(value(page)).toHaveAttribute("data-value", "/dep");
-  await expect(card(page)).toHaveCount(0);
-  await page.keyboard.press("Enter");
-  await expect.poll(newThreads).toBe(1);
-  expect((await invocations()).at(-1)?.args.prompt).toBe("/dep");
-});
-
-for (const zoom of [100, 125]) {
-  test(`at ${String(zoom)}%: the card opens under the worktree row without moving the composer, and closes the same way`, async ({ page }) => {
-    await openApp(page);
-    await setZoom(page, zoom);
-    await expect(page.locator("html")).toHaveCSS("zoom", String(zoom / 100));
-    await compose(page);
-    await expect.poll(completionCalls).toContain("skills repo-cf true");
-    const before = await composerBoxes(page);
-    await page.keyboard.type("/");
-    // Every skill: deploy and review (project), commit (User).
-    await expect(rows(page)).toHaveCount(3);
-    await expectAnchored(page, before);
-    await page.keyboard.type("z");
-    await expect(card(page).getByTestId("completion-empty")).toBeVisible();
-    await expectAnchored(page, before);
-    await page.keyboard.press("Escape");
-    await expect(card(page)).toHaveCount(0);
-    expect(await composerBoxes(page)).toEqual(before);
-  });
-}

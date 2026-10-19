@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { emit, invocations, mockPost, openApp, openProjects, resetMock, row } from "./fixtures";
+import { emit, invocations, mockPost, openApp, resetMock, row } from "./fixtures";
 
 /**
  * The Linked PRs surface (docs/notes/linked-prs.md, GUI chunk): a thread's pull requests
@@ -82,6 +82,10 @@ test("hidden without links; a link brings the sidebar badge, the header button a
   await expect(entry).toHaveAttribute("data-availability", "enabled");
   await expect(entry).toContainText("Linked PRs");
   await expect(entry.locator("kbd")).toHaveText("L");
+  // It opens that PR as a tab of the thread's panel.
+  await page.getByTestId("pane-linked-pr").click();
+  await expect(tabs(page)).toHaveText(["#142"]);
+  await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "pullrequest");
 
   await link("s-1", 147);
   await expect(row(page, "s:s-1").getByTestId("row-linked-prs")).toHaveText("2 PRs");
@@ -173,24 +177,6 @@ test("the sidebar badge opens the surface for its thread and selects it", async 
   await expect(list(page).getByTestId("linkedpr-repo")).toHaveText(["· alexwaumann/code-foundry", "· alexwaumann/ghostty-playground"]);
 });
 
-test("one link: the header shows that PR in its state's colour and opens it as a panel tab", async ({ page }) => {
-  await link("s-1", 138);
-  await openApp(page);
-  await row(page, "s:s-1").click();
-  const pr = page.getByTestId("pane-linked-pr");
-  await expect(pr).toHaveText("#138");
-  // Merged, from the PR's cached detail.
-  await expect(pr).toHaveAttribute("data-state", "merged");
-  await expect(pr.locator('svg[aria-label="merged"]')).toBeVisible();
-  // No tooltip: the number is visible.
-  await expect(pr).not.toHaveAttribute("title", /.*/);
-  await pr.click();
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-1");
-  await expect(tabs(page)).toHaveText(["#138"]);
-  await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "pullrequest");
-  await expect(page.getByTestId("pr-surface")).toContainText("pace requests through one worker");
-});
-
 test("hover actions: open on GitHub and copy the link", async ({ page }) => {
   await linkFour();
   await openApp(page);
@@ -206,24 +192,6 @@ test("hover actions: open on GitHub and copy the link", async ({ page }) => {
   await expect.poll(async () => (await invocations()).filter((i) => i.name === "view.open.url").map((i) => i.args.url)).toEqual([`https://github.com/${CF}/pull/142`]);
   // Neither opened a tab.
   await expect(tabs(page)).toHaveText(["Linked PRs"]);
-});
-
-test("the palette lists it for any thread; without links it only says so", async ({ page }) => {
-  await openApp(page);
-  await row(page, "s:s-1").click();
-  await page.keyboard.press("Meta+k");
-  await page.keyboard.type("Show Linked PRs");
-  const palette = page.getByTestId("palette");
-  await palette.locator('[data-command="view.panel.linked-prs"]').click();
-  await expect(palette).toHaveCount(0);
-  await expect(page.getByText("No linked PRs yet")).toBeVisible();
-  await expect(panel(page)).toHaveCount(0);
-
-  // A page is no thread: not listed.
-  await openProjects(page);
-  await page.keyboard.press("Meta+k");
-  await page.keyboard.type("Show Linked PRs");
-  await expect(palette.locator('[data-command="view.panel.linked-prs"]')).toHaveCount(0);
 });
 
 /** SHOTS=<dir>: the notes' screenshots, WebKit, 1400x900, dark and light. */

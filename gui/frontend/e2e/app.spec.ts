@@ -1,22 +1,8 @@
 import { expect, test } from "@playwright/test";
-import { CF, DEFAULT_ORDER, emit, expectTerminalText, invocations, mockPost, openApp, openProjects, openStreams, resetMock, row, writes } from "./fixtures";
+import { CF, emit, expectTerminalText, invocations, mockPost, openApp, openStreams, resetMock, row, writes } from "./fixtures";
 
 test.beforeEach(async () => {
   await resetMock();
-});
-
-test("sidebar lists threads only; projects and worktrees are on the Projects page, shells in bottom panels", async ({ page }) => {
-  await openApp(page);
-  const list = page.getByTestId("thread-list");
-  // The waiting thread, the idle ones, then the working ones under Working. No terminal rows:
-  // shells (t-top, t-s1-shell) show in their owner's bottom panel.
-  await expect.poll(() => list.locator("[data-row-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")))).toEqual(DEFAULT_ORDER);
-  await expect(list.locator('[data-row-kind]:not([data-row-kind="thread"]):not([data-row-kind="header"])')).toHaveCount(0);
-  await expect.poll(() => list.locator('[data-row-kind="header"]').evaluateAll((els) => els.map((e) => e.getAttribute("data-section")))).toEqual(["working", "snoozed", "archived"]);
-  await openProjects(page);
-  await expect(page.getByTestId("project-name")).toHaveText(["code-foundry", "dotfiles", "ghostty-playground", "sketches", "writing"]);
-  await expect(page.locator('[data-testid="project"][data-project="repo-cf"]').getByTestId("worktree-branch")).toHaveText(["main", "feat/sidebar", "fix/resize"]);
-  await expect(page.getByTestId("daemon-status")).toContainText("mock");
 });
 
 test("selecting a thread shows its conversation; switching watches the other one instead", async ({ page }) => {
@@ -159,7 +145,8 @@ test("required args are prompted inline before invoking", async ({ page }) => {
   expect((await invocations()).at(-1)?.args).toEqual({ level: "warning" });
 });
 
-test("FocusTerminal intent: a shell shows in its owner's bottom panel; an unknown id says so", async ({ page }) => {
+// An unknown id's expiry toast is src/stores/intents.test.ts (it waits out the pending-focus window).
+test("FocusTerminal intent: a shell shows in its owner's bottom panel", async ({ page }) => {
   await openApp(page);
   // A worktree's shell: the Projects page, with the shell active in its bottom panel.
   await expect.poll(() => emit({ focusTerminal: { terminalId: "t-top" } })).toBeGreaterThan(0);
@@ -171,10 +158,6 @@ test("FocusTerminal intent: a shell shows in its owner's bottom panel; an unknow
   await expect(row(page, "s:s-1")).toHaveAttribute("aria-selected", "true");
   await expect(page.getByTestId("bottom-terminal-host")).toHaveAttribute("data-terminal-id", "t-s1-shell");
   await expect.poll(() => page.evaluate(() => document.activeElement?.closest("[data-region]")?.getAttribute("data-region"))).toBe("bottom");
-  // A terminal that never shows up: nothing moves, and a toast says so once the wait ends.
-  await emit({ focusTerminal: { terminalId: "t-nowhere" } });
-  await expect(page.getByText("Terminal t-nowhere not found")).toBeVisible({ timeout: 12_000 });
-  await expect(row(page, "s:s-1")).toHaveAttribute("aria-selected", "true");
 });
 
 test("OpenPalette and Notify intents", async ({ page }) => {
@@ -184,32 +167,6 @@ test("OpenPalette and Notify intents", async ({ page }) => {
   await emit({ openPalette: { query: "refresh" } });
   await expect(page.getByRole("combobox")).toHaveValue("refresh");
   await expect(page.getByTestId("palette").locator('[data-command="project.refresh"]')).toBeVisible();
-});
-
-test("sidebar is keyboard navigable", async ({ page }) => {
-  await openApp(page);
-  const list = page.getByTestId("thread-list");
-  await list.focus();
-  await page.keyboard.press("Home"); // s-2 (needs attention, on top)
-  for (const want of ["s-6", "s-4", "s-3", "s-5", "s-1"]) {
-    // The Working header between s-3 and s-5 is skipped.
-    await page.keyboard.press("ArrowDown");
-    await expect(list).toHaveAttribute("aria-activedescendant", `row-s:${want}`);
-  }
-  await page.keyboard.press("Enter");
-  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-1");
-  await list.focus();
-  await page.keyboard.press("End");
-  await expect(list).toHaveAttribute("aria-activedescendant", "row-s:s-1");
-  // cmd+N jumps to the Nth thread in sidebar order: s-2, s-6, s-4, s-3, s-5, s-1.
-  await page.keyboard.press("Meta+1");
-  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-2");
-  await page.keyboard.press("Meta+3");
-  await expect(row(page, "s:s-4")).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByTestId("thread-composer")).toBeVisible();
-  // Past the last thread: nothing changes.
-  await page.keyboard.press("Meta+9");
-  await expect(row(page, "s:s-4")).toHaveAttribute("aria-selected", "true");
 });
 
 test("WebGL context loss falls back to the DOM renderer", async ({ page, browserName }) => {

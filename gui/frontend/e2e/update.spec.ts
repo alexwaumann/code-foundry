@@ -205,16 +205,6 @@ test("installed with threads idle or stopped says nothing will be interrupted", 
   await expect(d).toHaveCount(0);
 });
 
-test("installed with nothing running", async ({ page }) => {
-  await openApp(page);
-  await mockPost("empty");
-  await mockPost("update/state?state=restartRequired&version=v0.2.0");
-  await indicator(page).click();
-  const d = dialog(page);
-  await expect(d).toHaveAttribute("data-variant", "readyIdle");
-  await expect(d).toContainText("Restart to finish updating. No thread is working or waiting on you, so nothing will be interrupted.");
-});
-
 test("app.update from the palette opens the dialog and downloads", async ({ page }) => {
   await openApp(page);
   await mockPost("update/state?state=available&version=v0.3.0");

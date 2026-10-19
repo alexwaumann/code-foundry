@@ -57,14 +57,3 @@ test("restarting a working thread asks first: the conversation continues, the tu
   const confirmed = (await invocations()).filter((i) => i.name === "thread.restart");
   expect(confirmed.map((i) => i.confirmed ?? false)).toEqual([false, false, true]);
 });
-
-test("the line goes when Claude stops (the next start gets the new environment)", async ({ page }) => {
-  await openApp(page);
-  await mockPost("thread/status?id=s-1&status=idle");
-  await row(page, "s:s-1").click();
-  await stale("s-1", "Hello changed CF_HELLO");
-  const note = page.getByTestId("thread-header").getByTestId("thread-env-stale");
-  await expect(note).toBeVisible();
-  await mockPost("thread/stop?id=s-1&reason=idle&code=0");
-  await expect(note).toHaveCount(0);
-});

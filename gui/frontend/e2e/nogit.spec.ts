@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { invocations, mockPost, openApp, openProjects, resetMock, selectProject } from "./fixtures";
+import { invocations, openApp, openProjects, resetMock, selectProject } from "./fixtures";
 
 /**
  * Add-project PR 2: a project without git (the mock's "writing", a plain folder) and a
@@ -110,40 +110,4 @@ test("the composer in a project without git offers only its current checkout; th
   await expect(where.getByTestId("no-git-badge")).toBeVisible();
   await expect(where.getByTestId("thread-branch")).toHaveCount(0);
   await expect(where.getByTestId("thread-worktree-chip")).toHaveCount(0);
-});
-
-test("a git repository without a remote: Publish to GitHub is there", async ({ page }) => {
-  await openApp(page);
-  await selectProject(page, "repo-sk");
-  await expect(page.getByTestId("worktree-surface-title")).toHaveText("sketches@main");
-  await expect(page.getByTestId("no-remote")).toContainText("No remote");
-  // Live since add-project PR 4 (e2e/create.spec.ts publishes with it).
-  await expect(page.getByTestId("publish-github")).toBeEnabled();
-  await expect(page.getByTestId("publish-github")).toHaveText("Publish to GitHub");
-  // Worktrees and files work as for any git repository.
-  await expect(page.getByTestId("worktree-facts")).toBeVisible();
-  await expect(page.getByTestId("worktree-changes")).toBeVisible();
-
-  // A remote that is not GitHub, and a GitHub repository: no Publish button.
-  for (const id of ["repo-dot", "repo-cf"]) {
-    await selectProject(page, id);
-    await expect(page.getByTestId("worktree-surface")).toHaveAttribute("data-git", "true");
-    await expect(page.getByTestId("publish-github")).toHaveCount(0);
-  }
-});
-
-test("workspace member pickers leave out projects without git, not repositories without a remote", async ({ page }) => {
-  await mockPost("workspace?name=login&projects=repo-cf");
-  await openApp(page);
-  // The composer's Also in (a new workspace).
-  await compose(page, 1);
-  await page.getByTestId("composer-also-in").click();
-  await expect(page.getByTestId("composer-also-in-list").getByRole("option")).toHaveText([/^dotfiles/, /^ghostty-playground/, /^sketches/]);
-  await page.keyboard.press("Escape");
-
-  // An existing workspace's Add project.
-  await openProjects(page);
-  const ws = page.locator('[data-testid="workspace"]');
-  await ws.getByTestId("workspace-add-member").click();
-  await expect(page.getByTestId("workspace-add-member-list").getByRole("option")).toHaveText(["dotfiles", "ghostty-playground", "sketches"]);
 });

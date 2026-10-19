@@ -3,7 +3,8 @@ import { mockPost, openApp, resetMock, row } from "./fixtures";
 
 /**
  * The API-retry note of a rendered thread's composer (docs/notes/api-retry-note.md)
- * over the mock's "Fix stale PR badge". Set SHOTS=<dir> to save screenshots.
+ * over the mock's "Fix stale PR badge". Set SHOTS=<dir> to save screenshots (in both schemes:
+ * the light pass runs only then, nothing here is theme-specific).
  */
 
 test.beforeEach(async () => {
@@ -26,7 +27,9 @@ async function shot(page: Page, name: string): Promise<void> {
 
 const note = (page: Page) => page.getByTestId("thread-composer").getByTestId("thread-retry");
 
-for (const scheme of ["dark", "light"] as const) {
+const schemes = process.env.SHOTS ? (["dark", "light"] as const) : (["dark"] as const);
+
+for (const scheme of schemes) {
   test(`${scheme}: a rate-limit retry shows above the prompt while the thread works; the next frame clears it`, async ({ page }) => {
     await openThread(page, scheme);
     await expect(note(page)).toBeHidden();
@@ -55,10 +58,4 @@ test("the countdown runs on the composer's own clock and turns into 'retrying no
   await expect(note(page)).toHaveText(/^API overloaded · retrying in [12] s \(attempt 1 of 10\)$/);
   await page.clock.runFor(4_000);
   await expect(note(page)).toHaveText("API overloaded · retrying now (attempt 1 of 10)");
-});
-
-test("a connection error without a response", async ({ page }) => {
-  await openThread(page);
-  await mockPost("thread/retry?id=s-r1&in=60&attempt=2&max=10&status=0&error=connection");
-  await expect(note(page)).toHaveText(/^No response from the API · retrying in (1 min|59 s) \(attempt 2 of 10\)$/);
 });

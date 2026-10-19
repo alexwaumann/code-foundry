@@ -112,17 +112,15 @@ test("M and the command open it; tools expand with hint icons and their tooltips
   await expect(github.getByTestId("mcp-tools")).toHaveCount(0);
 });
 
-test("Reconnect on the failed card: Connecting… with a spinner, then Connected with its tools", async ({ page }) => {
+test("Reconnect on the failed card: Connecting…, then Connected with its tools", async ({ page }) => {
   await openThread(page);
   expect(await emit({ showView: { name: "panel.mcp" } })).toBeGreaterThan(0);
   await expectMcpTab(page);
   const pw = card(page, "playwright");
-  await expect(pw.getByTestId("mcp-reconnect")).toHaveClass(/border-warning\/40/);
   await pw.getByTestId("mcp-reconnect").click();
   await expect(pw).toHaveAttribute("data-status", "pending");
   await expect(pw.getByTestId("mcp-pill")).toHaveText("Connecting…");
   await expect(pw.getByTestId("mcp-reconnect")).toBeDisabled();
-  await expect(pw.getByTestId("mcp-reconnect").locator(".animate-spin")).toHaveCount(1);
 
   await expect(pw).toHaveAttribute("data-status", "connected");
   await expect(pw.getByTestId("mcp-pill")).toHaveText("Connected");
@@ -163,6 +161,8 @@ test("a stopped thread keeps its last status; Refresh and Reconnect are enabled 
   // The mock answers without starting Claude (the daemon starts it), so the thread stays
   // stopped and the fresh check still reads stale (docs/notes/panel-polish.md).
   await expect(surface(page).getByTestId("mcp-checked")).toHaveText(/^Last check (just now|\d+s ago) · may be out of date$/);
+  // Stale at once, however recent the check.
+  await expectStale(page, true);
   expect(await threadCalls()).toContain("mcp s-r1 refresh");
 });
 
@@ -200,16 +200,6 @@ test("a check 10 min old goes stale: amber line, dashed pills, Refresh as the ca
   await expect(surface(page).getByTestId("mcp-checked")).toHaveText(/^Checked (just now|\d+s ago)$/);
   await expectStale(page, false);
   expect(await threadCalls()).toContain("mcp s-r1 refresh");
-});
-
-test("a stopped thread's status is stale at once, however recent the check", async ({ page }) => {
-  await mockPost("thread?state=stopped");
-  await openApp(page);
-  await row(page, "s:s-r1").click();
-  expect(await emit({ showView: { name: "panel.mcp" } })).toBeGreaterThan(0);
-  await expectMcpTab(page);
-  await expect(surface(page).getByTestId("mcp-checked")).toHaveText(/^Last check (just now|\d+s ago) · may be out of date$/);
-  await expectStale(page, true);
 });
 
 test("a thread Claude never reported for says so without mentioning running; Refresh checks", async ({ page }) => {

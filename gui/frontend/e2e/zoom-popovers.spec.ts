@@ -30,8 +30,9 @@ async function rect(l: Locator) {
   return { left: b.x, top: b.y, right: b.x + b.width, bottom: b.y + b.height, width: b.width, height: b.height };
 }
 
-// 90% is the bottom of the zoom ladder (stores/ui.ts ZOOM_LEVELS).
-for (const zoom of [90, 100, 125, 150]) {
+// 90% is the bottom of the zoom ladder (stores/ui.ts ZOOM_LEVELS). 100% is not a zoom case:
+// at 125% the same checks hold with the factor applied.
+for (const zoom of [90, 125, 150]) {
   test(`the composer model picker opens right under its trigger at ${String(zoom)}%`, async ({ page }) => {
     // Tall enough that the whole model list fits below the trigger at 150%.
     await page.setViewportSize({ width: 1280, height: 1100 });
@@ -148,24 +149,23 @@ test("at 125% the usage chart tooltip follows the pointer", async ({ page }) => 
   expect(Math.abs(t.top - (d.top + 60) + 10 * 1.25)).toBeLessThanOrEqual(1);
 });
 
-for (const zoom of [100, 125]) {
-  test(`a settings select opens under its trigger, as wide, at ${String(zoom)}%`, async ({ page }) => {
-    await page.setViewportSize({ width: 1280, height: 1100 });
-    await openApp(page);
-    await setZoom(page, zoom);
-    await page.keyboard.press("Meta+Comma");
-    await page.getByTestId("settings-nav-appearance").click();
-    const trigger = page.locator('[data-setting="appearance.theme"] [data-slot="select-trigger"]');
-    await trigger.click();
-    const list = page.locator('[data-slot="select-content"]');
-    await expect(list).toHaveAttribute("data-side", "bottom");
-    // The shadcn Select is a popper (ui/select.tsx): sideOffset 4 grows with the zoom, and the
-    // trigger's width (a viewport-px --radix-* length) is divided back by it.
-    await expect
-      .poll(async () => {
-        const [t, l] = [await rect(trigger), await rect(list)];
-        return { gap: Math.abs(l.top - t.bottom - 4 * (zoom / 100)) <= 1, left: Math.abs(l.left - t.left) <= 1, width: Math.abs(l.width - t.width) <= 1 };
-      })
-      .toEqual({ gap: true, left: true, width: true });
-  });
-}
+test("a settings select opens under its trigger, as wide, at 125%", async ({ page }) => {
+  const zoom = 125;
+  await page.setViewportSize({ width: 1280, height: 1100 });
+  await openApp(page);
+  await setZoom(page, zoom);
+  await page.keyboard.press("Meta+Comma");
+  await page.getByTestId("settings-nav-appearance").click();
+  const trigger = page.locator('[data-setting="appearance.theme"] [data-slot="select-trigger"]');
+  await trigger.click();
+  const list = page.locator('[data-slot="select-content"]');
+  await expect(list).toHaveAttribute("data-side", "bottom");
+  // The shadcn Select is a popper (ui/select.tsx): sideOffset 4 grows with the zoom, and the
+  // trigger's width (a viewport-px --radix-* length) is divided back by it.
+  await expect
+    .poll(async () => {
+      const [t, l] = [await rect(trigger), await rect(list)];
+      return { gap: Math.abs(l.top - t.bottom - 4 * (zoom / 100)) <= 1, left: Math.abs(l.left - t.left) <= 1, width: Math.abs(l.width - t.width) <= 1 };
+    })
+    .toEqual({ gap: true, left: true, width: true });
+});

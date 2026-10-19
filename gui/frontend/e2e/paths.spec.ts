@@ -95,18 +95,10 @@ test("a highlighted folder: / descends, Tab descends, Enter submits it", async (
   await expect.poll(async () => (await projectAt("/Users/dev/Documents/Projects/side-project"))?.name).toBe("side-project");
 });
 
-test("an absolute path is taken under home, and long listings are bounded", async ({ page }) => {
+// Absolute paths mapping under home is paths.test.ts's (homeRelative).
+test("long listings are bounded to the first 200", async ({ page }) => {
   const dialog = await openAddProject(page);
   const input = page.getByTestId("add-project-local-input");
-  // The input cannot name anything outside home: a pasted absolute path under the mock's
-  // home maps to it, any other one is read relative to home (and lists nothing).
-  await input.fill("/Users/dev/Documents/");
-  await expect(input).toHaveValue("Documents/");
-  await expect(entry(page, "Projects")).toBeVisible();
-  await input.fill("/etc/");
-  await expect(input).toHaveAttribute("data-path", "~/etc/");
-  await expect(page.getByTestId("path-entry")).toHaveCount(0);
-
   await input.fill("many/");
   await expect(page.getByTestId("path-entry")).toHaveCount(200);
   await expect(dialog.getByText("Folders (first 200)")).toBeVisible();

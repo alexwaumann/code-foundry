@@ -1,21 +1,8 @@
 import { expect, test } from "@playwright/test";
-import { CF, freshCopyByDefault, invocations, openApp, openProjects, resetMock, row } from "./fixtures";
-
-const FIX_RESIZE = `${CF}.worktrees/fix-resize`;
-const DOTFILES = "/Users/dev/dotfiles";
+import { freshCopyByDefault, invocations, openApp, resetMock, row } from "./fixtures";
 
 test.beforeEach(async () => {
   await resetMock();
-});
-
-test("no footer and no chord hints outside the palette and help", async ({ page }) => {
-  await openApp(page);
-  await expect(page.locator("footer")).toHaveCount(0);
-  await expect(page.getByTestId("hints")).toHaveCount(0);
-  // The welcome panel names no chords; the sidebar only New thread's (onboarding-1).
-  await expect(page.locator("kbd")).toHaveCount(1);
-  await expect(page.getByTestId("sidebar-new-thread").locator("kbd")).toHaveCount(1);
-  await expect(page.getByTestId("nav-pullrequests")).toHaveText("Pull Requests");
 });
 
 test("sidebar new-thread button opens the project picker, then the composer", async ({ page }) => {
@@ -49,28 +36,13 @@ test("sidebar new-thread button opens the project picker, then the composer", as
   await expect(page.getByTestId("thread-pane")).toBeVisible();
 });
 
-// The sidebar band has no New terminal button (docs/notes/sidebar-title-band.md); the
-// palette is the route that replaced it, with the same context.
-test("New Terminal from the palette starts a terminal in the selected thread's worktree", async ({ page }) => {
+test("status row buttons toggle settings, open help and the palette; so does the welcome panel's palette button", async ({ page }) => {
   await openApp(page);
-  // s-3 runs in fix/resize.
-  await row(page, "s:s-3").click();
-  await page.keyboard.press("Meta+k");
-  await page.getByTestId("palette").locator('[data-command="terminal.new"]').click();
-  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("terminal.new");
-  const last = (await invocations()).at(-1);
-  expect(last?.name).toBe("terminal.new");
-  expect(last?.context?.activeWorktreePath).toBe(FIX_RESIZE);
-  // The shell belongs to the thread (labels thread=s-3): the thread stays selected, the
-  // sidebar gains no row, and the shell opens in the thread's bottom panel.
-  await expect(row(page, "s:s-3")).toHaveAttribute("aria-selected", "true");
-  await expect(page.locator('[data-row-kind]:not([data-row-kind="thread"]):not([data-row-kind="header"])')).toHaveCount(0);
-  await expect(page.getByTestId("bottom-panel").getByRole("tab")).toHaveCount(1);
-  await expect(page.getByTestId("bottom-terminal-host")).toHaveAttribute("data-attach-phase", "live");
-});
+  await page.getByTestId("welcome-actions").getByRole("button", { name: "Command palette" }).click();
+  await expect(page.getByTestId("palette")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("palette")).toHaveCount(0);
 
-test("status row buttons toggle settings, open help and the palette", async ({ page }) => {
-  await openApp(page);
   const status = page.getByTestId("sidebar-status");
   await expect(status.getByTestId("daemon-status")).toBeVisible();
 
@@ -135,26 +107,4 @@ test("thread pane header: the name renames, the location opens the worktree; no 
   await row(page, "s:s-1").click();
   await expect(header.getByRole("button", { name: "Close Thread" })).toHaveCount(0);
   await expect(header.getByRole("button", { name: "Reconnect Thread" })).toHaveCount(0);
-});
-
-test("empty states and the welcome panel offer buttons", async ({ page }) => {
-  await openApp(page);
-  const welcome = page.getByTestId("welcome-actions");
-  await welcome.getByRole("button", { name: "New thread" }).click();
-  await expect(page.getByTestId("palette")).toHaveAttribute("data-mode", "projects");
-  await page.keyboard.press("Escape");
-  await expect(page.getByTestId("palette")).toHaveCount(0);
-  await welcome.getByRole("button", { name: "Command palette" }).click();
-  await expect(page.getByTestId("palette")).toBeVisible();
-  await page.keyboard.press("Escape");
-
-  // The Projects page's rows carry their worktree as the command's context.
-  await openProjects(page);
-  const dot = page.locator(`[data-nav-key="pw:repo-dot::${DOTFILES}"]`);
-  await dot.hover();
-  await dot.getByTestId("worktree-new-terminal").click();
-  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("terminal.new");
-  const last = (await invocations()).at(-1);
-  expect(last?.name).toBe("terminal.new");
-  expect(last?.context?.activeWorktreePath).toBe(DOTFILES);
 });

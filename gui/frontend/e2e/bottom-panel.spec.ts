@@ -160,21 +160,6 @@ test('the toggle and "+" start shells for the thread, which open there focused',
   await expect(row(page, "s:s-2")).toHaveAttribute("aria-selected", "true");
 });
 
-test("a stopped thread has the toggle left of the side panel's, and its panel", async ({ page }) => {
-  await openApp(page);
-  // s-3 is stopped; a shell it owns keeps running.
-  await row(page, "s:s-3").click();
-  await expect(page.getByTestId("thread-composer")).toBeVisible();
-  const header = page.getByTestId("thread-header");
-  const pair = header.locator('[data-testid="bottom-toggle"] + [data-testid="panel-toggle"]');
-  await expect(pair).toHaveCount(1);
-  await header.getByTestId("bottom-toggle").click();
-  await expect(tabs(page)).toHaveCount(1);
-  await expect(host(page)).toHaveAttribute("data-attach-phase", "live");
-  expect((await invocations()).at(-1)?.context).toMatchObject({ activeThreadId: "s-3" });
-  await expect(page.getByTestId("thread-composer")).toBeVisible();
-});
-
 test("× and cmd+w close terminals through terminal.close; closing the last one hides the panel", async ({ page }) => {
   await openApp(page);
   await selectThread(page, "s-1");
@@ -257,7 +242,7 @@ test("the resize handle sizes one panel by keyboard and double-click, and the he
   await expect(page.getByTestId("bottom-resize-handle")).toHaveAttribute("aria-valuenow", "280");
 });
 
-test("no bottom panel on the dashboard, the Pull Requests page, settings, or under an expanded side panel", async ({ page }) => {
+test("no bottom panel on the dashboard, the Pull Requests page, settings, usage, or under an expanded side panel", async ({ page }) => {
   await openApp(page);
   // The dashboard: no toggle, and cmd+j does nothing.
   await page.keyboard.press("Meta+j");
@@ -286,6 +271,12 @@ test("no bottom panel on the dashboard, the Pull Requests page, settings, or und
   await expect(bottom(page)).toHaveCount(0);
   await page.keyboard.press("Meta+j");
   await page.getByTestId("status-settings").click();
+  await expect(bottom(page)).toBeVisible();
+  // So does the Usage page.
+  await page.getByTestId("status-usage").click();
+  await expect(page.getByTestId("usage-page")).toBeVisible();
+  await expect(bottom(page)).toHaveCount(0);
+  await page.getByTestId("usage-page-close").click();
   await expect(bottom(page)).toBeVisible();
 
   // The side panel expanded over the content column hides it too, and detaches it.
@@ -443,23 +434,6 @@ test("the resize handle is part of the panel: cmd+j from it hides the panel", as
   await page.keyboard.press("Meta+j");
   await expect(bottom(page)).toHaveCount(0);
   await expect.poll(() => region(page)).toBe("content");
-});
-
-test("the Usage page hides the panel and brings it back when it closes", async ({ page }) => {
-  await openApp(page);
-  await selectThread(page, "s-1");
-  await page.getByTestId("bottom-toggle").click();
-  await expect(bottom(page)).toBeVisible();
-  await page.getByTestId("status-usage").click();
-  await expect(page.getByTestId("usage-page")).toBeVisible();
-  await expect(bottom(page)).toHaveCount(0);
-  // No Attach stream at all (a thread has no terminal of its own).
-  await expect.poll(attachStreams).toBe(0);
-  // cmd+j is a no-op meanwhile.
-  await page.keyboard.press("Meta+j");
-  await page.getByTestId("usage-page-close").click();
-  await expect(bottom(page)).toBeVisible();
-  await expect(host(page)).toHaveAttribute("data-attach-phase", "live");
 });
 
 test("cmd+j on a thread without shells starts one; its exit hides the panel; the next cmd+j starts a fresh one", async ({ page }) => {

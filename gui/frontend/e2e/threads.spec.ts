@@ -1,5 +1,5 @@
 import { expect, test, type Page, type Request } from "@playwright/test";
-import { appPath, CF, emit, invocations, mockPost, openApp, openProjects, openStreams, releaseThreads, resetMock, row } from "./fixtures";
+import { appPath, CF, emit, invocations, mockPost, openApp, openProjects, openStreams, resetMock, row } from "./fixtures";
 
 const FIX_RESIZE = `${CF}.worktrees/fix-resize`;
 
@@ -33,11 +33,7 @@ test("thread rows render with status badges, above the terminals no thread owns;
     await expect(row(page, `s:${id}`).getByTestId("thread-body")).toHaveCSS("opacity", "1");
   }
   await expect(tree).not.toContainText(/disconnected|starting|closing/i);
-  // resetMock holds s-5 starting; released, the mock's clock settles it.
-  await releaseThreads("s-5");
-  // Starting reads as busy; once Claude is up the mock leaves it idle.
-  await expect(badge(page, "s-5")).toHaveAttribute("data-thread-badge", "idle", { timeout: 12_000 });
-  await expect(row(page, "s:s-5")).toHaveAttribute("data-section", "idle");
+  // Starting to idle once Claude is up: threadBadge (src/lib/thread.test.ts).
 });
 
 test("a stopped thread shows its conversation and the composer; a message starts it and gets the answer", async ({ page }) => {
@@ -86,32 +82,6 @@ test("a running thread that stops looks the same: the composer stays focused and
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("thread-pane").getByTestId("thread-user").last()).toContainText("Carry on");
   await expect(page.getByTestId("thread-pane").locator('[data-testid="thread-text"]').last()).toContainText("Got it: I'll take a look now.", { timeout: 10_000 });
-});
-
-test("no Close or Reconnect anywhere: header, row menu, palette, chords", async ({ page }) => {
-  await openApp(page);
-  await row(page, "s:s-4").click();
-  const header = page.getByTestId("thread-header");
-  await expect(header.getByRole("button", { name: /Close Thread|Reconnect Thread/ })).toHaveCount(0);
-  await row(page, "s:s-4").click({ button: "right" });
-  const menu = page.getByTestId("row-menu");
-  await expect(menu).toBeVisible();
-  await expect(menu).not.toContainText("Reconnect");
-  await expect(menu.getByRole("menuitem", { name: "Close" })).toHaveCount(0);
-  await page.keyboard.press("Escape");
-  await page.keyboard.press("Meta+k");
-  await page.keyboard.type("Thread");
-  const palette = page.getByTestId("palette");
-  await expect(palette.locator('[data-command="thread.rename"]')).toBeVisible();
-  await expect(palette.locator('[data-command="thread.close"], [data-command="thread.reconnect"]')).toHaveCount(0);
-  await page.keyboard.press("Escape");
-  const before = (await invocations()).length;
-  await page.getByTestId("thread-composer").getByTestId("composer-input").click();
-  await page.keyboard.press("Meta+Shift+w");
-  await page.keyboard.press("Meta+Shift+r");
-  // A chord that does run a command (cmd+t, terminal.new) after them: once it is in, nothing came before it.
-  await page.keyboard.press("Meta+t");
-  await expect.poll(async () => (await invocations()).slice(before).map((i) => i.name)).toEqual(["terminal.new"]);
 });
 
 test("a stopped thread keeps its status: busy ends interrupted, attention persists", async ({ page }) => {

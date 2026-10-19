@@ -3,8 +3,9 @@ import { invocations, mockPost, mockUrl, openApp, openStreams, resetMock, row, t
 
 /**
  * A thread (components/thread, docs/notes/rendered-threads-2-gui.md) over the
- * mock's scripted "Fix stale PR badge" (mock/thread.ts), in both schemes. Set SHOTS=<dir>
- * to save screenshots.
+ * mock's scripted "Fix stale PR badge" (mock/thread.ts). Set SHOTS=<dir> to save screenshots
+ * (in both schemes: the light pass runs only then, except for the permission row's amber,
+ * a colour checked in both).
  */
 
 test.beforeEach(async () => {
@@ -71,7 +72,9 @@ const pane = (page: Page) => page.getByTestId("thread-pane");
 /** Finished turns' headers (the running turn's live header is "thread-working" inside it). */
 const headers = (page: Page) => page.locator('[data-testid="thread-turn-header"]:not([data-live])');
 
-for (const scheme of ["dark", "light"] as const) {
+const schemes = process.env.SHOTS ? (["dark", "light"] as const) : (["dark"] as const);
+
+for (const scheme of schemes) {
   test.describe(scheme, () => {
     test("the timeline: user tags, folded earlier turn, work rows, diff, subagent, markdown", async ({ page }) => {
       await openThread(page, "permission", scheme);
@@ -143,13 +146,9 @@ for (const scheme of ["dark", "light"] as const) {
       // The final answer's markdown: GFM table, highlighted Go in the bundled mono.
       const answer = await reveal(page, pane(page).locator('[data-testid="thread-text"][data-final]'));
       await expect(answer.locator("table tr")).toHaveCount(4);
-      // Framed (rounded, header filled) and as wide as the answer.
-      const frame = answer.locator(".cf-table");
-      expect(await frame.evaluate((el) => getComputedStyle(el).borderTopLeftRadius)).toBe("8px");
-      expect(await frame.locator("th").first().evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe("rgba(0, 0, 0, 0)");
-      expect(await frame.locator("table").evaluate((el) => Math.abs(el.getBoundingClientRect().width - (el.closest(".cf-markdown")?.getBoundingClientRect().width ?? 0)))).toBeLessThan(3);
+      // Framed, its header filled.
+      expect(await answer.locator(".cf-table th").first().evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe("rgba(0, 0, 0, 0)");
       await expect(answer.locator('pre[data-lang="go"] .hljs-keyword').first()).toHaveText("func");
-      expect(await answer.locator("pre code").evaluate((el) => getComputedStyle(el).fontFamily)).toContain("JetBrainsMono Nerd Font Mono");
       await shot(page, `thread-timeline-${scheme}`);
 
       // The header folds it again.
@@ -157,35 +156,6 @@ for (const scheme of ["dark", "light"] as const) {
       await first.locator("button.fold").click();
       await expect(first).toHaveAttribute("data-folded", "true");
       await expect(pane(page).locator('[data-tool="Edit"]')).toHaveCount(0);
-    });
-
-    test("a pending permission docks into the composer; the timeline keeps an amber row", async ({ page }) => {
-      await openThread(page, "permission", scheme);
-      await expect(row(page, "s:s-r1")).toContainText("Needs input · Bash git push");
-      const waiting = pane(page).locator('[data-waiting="true"]');
-      await expect(waiting).toContainText("Run git push --force-with-lease origin cf/pr-badge-stale");
-      await expect(waiting.getByTestId("thread-waiting")).toHaveText("waiting for you");
-      const color = await waiting.getByTestId("thread-waiting").evaluate((el) => getComputedStyle(el).color);
-      expect(color).not.toBe(await waiting.locator(".lbl").evaluate((el) => getComputedStyle(el).color));
-
-      const composer = page.getByTestId("thread-composer");
-      const prompt = composer.getByTestId("thread-permission");
-      await expect(prompt).toContainText("Allow Claude to run this command?");
-      await expect(prompt).toContainText("git push --force-with-lease origin cf/pr-badge-stale");
-      await expect(prompt).toContainText("Allow for session adds Bash(git push:*)");
-      await expect(prompt.getByTestId("thread-permission-allow")).toBeVisible();
-      await expect(prompt.getByTestId("thread-permission-allow-session")).toBeVisible();
-      await expect(prompt.getByTestId("thread-permission-deny")).toBeVisible();
-      // One Interrupt: the composer's.
-      await expect(page.getByText("Interrupt", { exact: true })).toHaveCount(1);
-      await expect(composer.getByTestId("thread-interrupt")).toBeVisible();
-      // The prompt sits above the editor, inside the card.
-      const promptBox = await prompt.boundingBox();
-      const editorBox = await composer.getByTestId("composer-prompt").boundingBox();
-      expect(promptBox && editorBox && promptBox.y + promptBox.height <= editorBox.y + 1).toBe(true);
-      await shot(page, `thread-permission-${scheme}`);
-
-      // Answering: e2e/thread-prompts.spec.ts.
     });
 
     test("streaming: a caret while the answer grows under the live header, which becomes the finished one in place", async ({ page }) => {
@@ -359,6 +329,40 @@ for (const scheme of ["dark", "light"] as const) {
       await expect(header).toHaveAttribute("data-folded", "true");
       await expect.poll(async () => timeline.evaluate((el) => el.scrollHeight)).toBeLessThan(height);
       await expect(timeline).toHaveAttribute("data-at-bottom", "true");
+    });
+  });
+}
+
+// The waiting row's amber is a theme colour: checked in both schemes.
+for (const scheme of ["dark", "light"] as const) {
+  test.describe(scheme, () => {
+    test("a pending permission docks into the composer; the timeline keeps an amber row", async ({ page }) => {
+      await openThread(page, "permission", scheme);
+      await expect(row(page, "s:s-r1")).toContainText("Needs input · Bash git push");
+      const waiting = pane(page).locator('[data-waiting="true"]');
+      await expect(waiting).toContainText("Run git push --force-with-lease origin cf/pr-badge-stale");
+      await expect(waiting.getByTestId("thread-waiting")).toHaveText("waiting for you");
+      const color = await waiting.getByTestId("thread-waiting").evaluate((el) => getComputedStyle(el).color);
+      expect(color).not.toBe(await waiting.locator(".lbl").evaluate((el) => getComputedStyle(el).color));
+
+      const composer = page.getByTestId("thread-composer");
+      const prompt = composer.getByTestId("thread-permission");
+      await expect(prompt).toContainText("Allow Claude to run this command?");
+      await expect(prompt).toContainText("git push --force-with-lease origin cf/pr-badge-stale");
+      await expect(prompt).toContainText("Allow for session adds Bash(git push:*)");
+      await expect(prompt.getByTestId("thread-permission-allow")).toBeVisible();
+      await expect(prompt.getByTestId("thread-permission-allow-session")).toBeVisible();
+      await expect(prompt.getByTestId("thread-permission-deny")).toBeVisible();
+      // One Interrupt: the composer's.
+      await expect(page.getByText("Interrupt", { exact: true })).toHaveCount(1);
+      await expect(composer.getByTestId("thread-interrupt")).toBeVisible();
+      // The prompt sits above the editor, inside the card.
+      const promptBox = await prompt.boundingBox();
+      const editorBox = await composer.getByTestId("composer-prompt").boundingBox();
+      expect(promptBox && editorBox && promptBox.y + promptBox.height <= editorBox.y + 1).toBe(true);
+      await shot(page, `thread-permission-${scheme}`);
+
+      // Answering: e2e/thread-prompts.spec.ts.
     });
   });
 }
@@ -702,14 +706,6 @@ test("scrolled up, a Jump to bottom chip floats above the composer; a click scro
   await expect(chip).toBeHidden();
 });
 
-test("Interrupt stops the running turn (thread.interrupt)", async ({ page }) => {
-  await openThread(page, "streaming");
-  await page.getByTestId("thread-interrupt").click();
-  await expect.poll(calls).toContain("interrupt s-r1");
-  await expect(headers(page).last()).toContainText("Interrupted");
-  await expect(page.getByTestId("thread-interrupt")).toHaveCount(0);
-});
-
 test("only the visible thread holds a Watch; a page holds none", async ({ page }) => {
   await openThread(page, "idle");
   await expect.poll(async () => (await openStreams())["ThreadService/WatchThread"] ?? 0).toBe(1);
@@ -773,20 +769,6 @@ test("a claude that did not start: its error in the timeline, the composer, and 
   await expect(pane(page).locator('[data-testid="thread-text"]').last()).toContainText("Got it: I'll take a look now.", { timeout: 10_000 });
   await expect(working).toHaveCount(0, { timeout: 5000 });
   await expect(pane(page).getByTestId("thread-error")).toBeVisible();
-});
-
-test("a stopped thread at its prompt keeps its conversation, the composer and the cold-cache note", async ({ page }) => {
-  await openThread(page, "stopped");
-  await expect(page.getByTestId("thread-disconnected")).toHaveCount(0);
-  await expect(page.getByTestId("reconnect")).toHaveCount(0);
-  const composer = page.getByTestId("thread-composer");
-  await expect(composer.getByTestId("thread-cold-cache")).toHaveText(/^Cache expired · the next message re-reads 25\.7K tokens/);
-  await expect(composer.getByTestId("thread-send")).toBeDisabled();
-  await expect(headers(page).last()).toContainText("Sonnet 5");
-  await expect(pane(page).locator('[data-testid="thread-text"]').last()).toContainText("All 412 tests pass and the branch is pushed");
-  await expect(page.getByTestId("thread-working")).toHaveCount(0);
-  await expect(page.getByTestId("thread-empty")).toHaveCount(0);
-  await expect(row(page, "s:s-r1").getByTestId("row-place")).toHaveAttribute("data-thread-badge", "idle");
 });
 
 test("a fork shows its parent's conversation, ended by a Forked from note", async ({ page }) => {

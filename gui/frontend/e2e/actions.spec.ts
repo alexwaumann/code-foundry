@@ -127,37 +127,25 @@ test("a project without actions: the empty state and New action…", async ({ pa
   await expect(dialog(page).getByTestId("action-name")).toBeFocused();
 });
 
-/**
- * Radix checks a radio when an arrow key moved the focus to it, and moves the focus a task
- * later: a press whose keyup lands first (Chromium under Playwright) only moves the focus.
- * A person's key is down far longer.
- */
-async function arrow(page: Page, key: string): Promise<void> {
-  await page.keyboard.press(key, { delay: 50 });
-}
-
-test("the icon tiles are one radio group: arrow keys move the choice, the mouse picks one", async ({ page }) => {
+// The group's one tab stop and roving focus are ActionDialog.test.tsx.
+test("the icon tiles: arrow keys move the choice and wrap at the ends, the mouse picks one", async ({ page }) => {
   await openMenu(page);
   await menu(page).getByTestId("action-new").click();
-  const group = dialog(page).getByRole("radiogroup", { name: "Icon" });
   const tile = (icon: string) => dialog(page).locator(`[data-testid="action-icon"][data-icon="${icon}"]`);
   const checked = dialog(page).locator('[data-testid="action-icon"][aria-checked="true"]');
   await expect(checked).toHaveAttribute("data-icon", "play");
-  // One tab stop: the group, which hands the focus to the checked tile.
-  await expect(group).toHaveAttribute("tabindex", "0");
-  await expect(dialog(page).locator('[data-testid="action-icon"][tabindex="0"]')).toHaveCount(0);
   await tile("play").focus();
-  await arrow(page, "ArrowRight");
+  await page.keyboard.press("ArrowRight");
   await expect(tile("test")).toBeFocused();
   await expect(checked).toHaveAttribute("data-icon", "test");
-  await arrow(page, "ArrowRight");
+  await page.keyboard.press("ArrowRight");
   await expect(checked).toHaveAttribute("data-icon", "lint");
-  await arrow(page, "ArrowLeft");
+  await page.keyboard.press("ArrowLeft");
   await expect(checked).toHaveAttribute("data-icon", "test");
   // Wraps at the ends.
   await page.keyboard.press("End");
   await expect(tile("debug")).toBeFocused();
-  await arrow(page, "ArrowRight");
+  await page.keyboard.press("ArrowRight");
   await expect(checked).toHaveAttribute("data-icon", "play");
   await tile("build").click();
   await expect(checked).toHaveAttribute("data-icon", "build");
