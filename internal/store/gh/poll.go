@@ -53,8 +53,9 @@ type cycleStats struct {
 func (s *Store) poll(ctx context.Context) error {
 	start := s.opts.Now()
 	cfg := s.config()
-	plan, idle := s.planPoll(cfg, start)
 	s.cycle = cycleStats{}
+	s.resolveWatchedHeads(ctx)
+	plan, idle := s.planPoll(cfg, start)
 	err := s.runPoll(ctx, cfg, &plan, idle)
 	if ctx.Err() == nil {
 		end := s.opts.Now()
@@ -108,17 +109,31 @@ func (s *Store) runPoll(ctx context.Context, cfg Config, plan *pollPlan, idle bo
 func (s *Store) planPoll(cfg Config, now time.Time) (pollPlan, bool) {
 	s.mu.Lock()
 	tracked := slices.Sorted(maps.Keys(s.tracked))
-	heads := map[string][]string{}
+	headSet := map[branchKey]bool{}
 	for k, at := range s.watches {
 		if now.Sub(at) > s.opts.BranchWatch {
 			delete(s.watches, k)
 			continue
 		}
-		heads[k.slug] = append(heads[k.slug], k.head)
+		headSet[k] = true
 	}
 	statsDue := s.opts.StatsInterval > 0 && len(tracked) > 0 && !now.Before(s.statsNext)
 	s.pollAgain = false // what was asked for so far is in this plan
 	s.mu.Unlock()
+	// Watched pull requests are watched branches without the expiry (pr_watch.go); one
+	// whose head is not known yet waits for resolveWatchedHeads.
+	keep := map[string][]int{}
+	for r, head := range s.watchedPullRequests() {
+		if head == "" {
+			continue
+		}
+		headSet[branchKey{r.Slug, head}] = true
+		keep[r.Slug] = append(keep[r.Slug], r.Number)
+	}
+	heads := map[string][]string{}
+	for k := range headSet {
+		heads[k.slug] = append(heads[k.slug], k.head)
+	}
 
 	var plan pollPlan
 	if s.opts.SearchAs != "" && s.searchAsID == "" {
@@ -160,7 +175,8 @@ func (s *Store) planPoll(cfg Config, now time.Time) (pollPlan, bool) {
 	slices.Sort(slugs)
 	for _, slug := range slugs {
 		slices.Sort(heads[slug])
-		rp := repoPlan{slug: slug, defaultBranch: isTracked[slug], branches: heads[slug]}
+		slices.Sort(keep[slug])
+		rp := repoPlan{slug: slug, defaultBranch: isTracked[slug], branches: heads[slug], keep: keep[slug]}
 		if plan.stats != nil && isTracked[slug] {
 			rp.months = windows[:1]
 			if closedDue(snap.Repos[slug].Activity.Stats, windows, now, s.opts.HistoryInterval) {
@@ -295,7 +311,8 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 		add(res.Sections[sec.name].PRs)
 	}
 	// Only the viewer's own branch PRs are kept, so only they get details (a watched
-	// default branch of a busy repository lists other people's PRs).
+	// default branch of a busy repository lists other people's PRs), and the watched
+	// pull requests whoever wrote them (pr_watch.go).
 	login := res.Viewer.Login
 	if s.opts.SearchAs != "" {
 		login = s.opts.SearchAs
@@ -304,7 +321,7 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 		rr := res.Repos[rp.slug]
 		for _, head := range rp.branches {
 			if fps, ok := rr.Branches[head]; ok {
-				rr.Branches[head] = keepViewerFingerprints(fps, login)
+				rr.Branches[head] = keepFingerprints(fps, login, rp.keep)
 				add(rr.Branches[head])
 			}
 		}

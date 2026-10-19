@@ -76,6 +76,9 @@ type repoPlan struct {
 	defaultBranch bool
 	// branches are watched head branches, in alias order (b0, b1, ...).
 	branches []string
+	// keep are the watched pull requests' numbers (WatchPullRequests): their branch
+	// lists keep them whoever wrote them.
+	keep []int
 	// months selects this repository's stats (stats due, tracked): the viewer's merged
 	// pull requests and default-branch commits in each month, newest first (the current
 	// month in the poll, the closed ones in a statsOnly plan).

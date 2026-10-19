@@ -125,6 +125,7 @@ type Store struct {
 	mu             sync.Mutex
 	tracked        map[string]bool
 	watches        branchWatches
+	prWatches      map[PullRequestRef]prWatch // WatchPullRequests (pr_watch.go)
 	pollNext       time.Time
 	pollAgain      bool // a poll was asked for while one was running
 	pollFailures   int
@@ -209,6 +210,7 @@ func New(ctx context.Context, opts Options) (*Store, error) {
 		cache:       cache{db: opts.DB},
 		tracked:     map[string]bool{},
 		watches:     branchWatches{},
+		prWatches:   map[PullRequestRef]prWatch{},
 		branches:    branchStates{m: map[branchKey]BranchPullRequests{}},
 		searchFirst: map[string]int{},
 		detailBatch: opts.DetailBatch,

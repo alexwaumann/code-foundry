@@ -32,6 +32,10 @@ const (
 	// An action run (target_id is a run id, "r-…"). Runs live in the daemon's memory, so
 	// these subscriptions do not survive a daemon restart.
 	ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_ACTION_RUN ThreadSubscriptionTarget = 2
+	// A pull request (target_id is "owner/name#123", the slug in lower case). Kept in
+	// the GitHub poll while subscribed; wakes come with the poll (about a minute with the
+	// app open, up to 15 minutes without).
+	ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_PULL_REQUEST ThreadSubscriptionTarget = 3
 )
 
 // Enum value maps for ThreadSubscriptionTarget.
@@ -40,11 +44,13 @@ var (
 		0: "THREAD_SUBSCRIPTION_TARGET_UNSPECIFIED",
 		1: "THREAD_SUBSCRIPTION_TARGET_THREAD",
 		2: "THREAD_SUBSCRIPTION_TARGET_ACTION_RUN",
+		3: "THREAD_SUBSCRIPTION_TARGET_PULL_REQUEST",
 	}
 	ThreadSubscriptionTarget_value = map[string]int32{
-		"THREAD_SUBSCRIPTION_TARGET_UNSPECIFIED": 0,
-		"THREAD_SUBSCRIPTION_TARGET_THREAD":      1,
-		"THREAD_SUBSCRIPTION_TARGET_ACTION_RUN":  2,
+		"THREAD_SUBSCRIPTION_TARGET_UNSPECIFIED":  0,
+		"THREAD_SUBSCRIPTION_TARGET_THREAD":       1,
+		"THREAD_SUBSCRIPTION_TARGET_ACTION_RUN":   2,
+		"THREAD_SUBSCRIPTION_TARGET_PULL_REQUEST": 3,
 	}
 )
 
@@ -77,11 +83,12 @@ func (ThreadSubscriptionTarget) EnumDescriptor() ([]byte, []int) {
 
 // ThreadSubscriptionCondition is when a subscription fires: on a transition of the
 // target into it (edge-triggered), and once at subscribe time when the target already
-// meets it.
+// meets it (for a pull request: the checks conditions, MERGED and CLOSED, as the
+// GitHub cache has it).
 type ThreadSubscriptionCondition int32
 
 const (
-	// SETTLED for a thread, FINISHED for an action run.
+	// SETTLED for a thread, FINISHED for an action run, CHECKS_DONE for a pull request.
 	ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_UNSPECIFIED ThreadSubscriptionCondition = 0
 	// IDLE or ATTENTION: Claude is not working (a turn ended, a prompt or question waits,
 	// the process ended).
@@ -96,27 +103,70 @@ const (
 	ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_DISCONNECTED ThreadSubscriptionCondition = 5
 	// An action run's only condition: it exited. Fires once; the subscription goes.
 	ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_FINISHED ThreadSubscriptionCondition = 6
+	// Pull request conditions. A poll's changes to one pull request make at most one
+	// wake per subscription, listing every change that matched.
+	// Every check on the head completed, whatever the result.
+	ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_CHECKS_DONE ThreadSubscriptionCondition = 7
+	// The check rollup became FAILURE or ERROR (other checks may still run).
+	ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_CHECKS_FAILED ThreadSubscriptionCondition = 8
+	// The check rollup became SUCCESS.
+	ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_CHECKS_PASSED ThreadSubscriptionCondition = 9
+	// A review was submitted, or the review decision changed.
+	ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_REVIEW ThreadSubscriptionCondition = 10
+	// The comments count rose.
+	ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_COMMENT ThreadSubscriptionCondition = 11
+	// A review was requested.
+	ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_REVIEW_REQUESTED ThreadSubscriptionCondition = 12
+	// The head commit moved (a push).
+	ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_HEAD_PUSHED ThreadSubscriptionCondition = 13
+	// Merged. The subscription goes once it fired, even with repeat; so does every other
+	// subscription to the pull request.
+	ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_MERGED ThreadSubscriptionCondition = 14
+	// Closed without merging. Goes once it fired, even with repeat.
+	ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_CLOSED ThreadSubscriptionCondition = 15
+	// Any change the poll reports; the wake lists them.
+	ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_CHANGED ThreadSubscriptionCondition = 16
 )
 
 // Enum value maps for ThreadSubscriptionCondition.
 var (
 	ThreadSubscriptionCondition_name = map[int32]string{
-		0: "THREAD_SUBSCRIPTION_CONDITION_UNSPECIFIED",
-		1: "THREAD_SUBSCRIPTION_CONDITION_SETTLED",
-		2: "THREAD_SUBSCRIPTION_CONDITION_IDLE",
-		3: "THREAD_SUBSCRIPTION_CONDITION_ATTENTION",
-		4: "THREAD_SUBSCRIPTION_CONDITION_ERROR",
-		5: "THREAD_SUBSCRIPTION_CONDITION_DISCONNECTED",
-		6: "THREAD_SUBSCRIPTION_CONDITION_FINISHED",
+		0:  "THREAD_SUBSCRIPTION_CONDITION_UNSPECIFIED",
+		1:  "THREAD_SUBSCRIPTION_CONDITION_SETTLED",
+		2:  "THREAD_SUBSCRIPTION_CONDITION_IDLE",
+		3:  "THREAD_SUBSCRIPTION_CONDITION_ATTENTION",
+		4:  "THREAD_SUBSCRIPTION_CONDITION_ERROR",
+		5:  "THREAD_SUBSCRIPTION_CONDITION_DISCONNECTED",
+		6:  "THREAD_SUBSCRIPTION_CONDITION_FINISHED",
+		7:  "THREAD_SUBSCRIPTION_CONDITION_CHECKS_DONE",
+		8:  "THREAD_SUBSCRIPTION_CONDITION_CHECKS_FAILED",
+		9:  "THREAD_SUBSCRIPTION_CONDITION_CHECKS_PASSED",
+		10: "THREAD_SUBSCRIPTION_CONDITION_REVIEW",
+		11: "THREAD_SUBSCRIPTION_CONDITION_COMMENT",
+		12: "THREAD_SUBSCRIPTION_CONDITION_REVIEW_REQUESTED",
+		13: "THREAD_SUBSCRIPTION_CONDITION_HEAD_PUSHED",
+		14: "THREAD_SUBSCRIPTION_CONDITION_MERGED",
+		15: "THREAD_SUBSCRIPTION_CONDITION_CLOSED",
+		16: "THREAD_SUBSCRIPTION_CONDITION_CHANGED",
 	}
 	ThreadSubscriptionCondition_value = map[string]int32{
-		"THREAD_SUBSCRIPTION_CONDITION_UNSPECIFIED":  0,
-		"THREAD_SUBSCRIPTION_CONDITION_SETTLED":      1,
-		"THREAD_SUBSCRIPTION_CONDITION_IDLE":         2,
-		"THREAD_SUBSCRIPTION_CONDITION_ATTENTION":    3,
-		"THREAD_SUBSCRIPTION_CONDITION_ERROR":        4,
-		"THREAD_SUBSCRIPTION_CONDITION_DISCONNECTED": 5,
-		"THREAD_SUBSCRIPTION_CONDITION_FINISHED":     6,
+		"THREAD_SUBSCRIPTION_CONDITION_UNSPECIFIED":      0,
+		"THREAD_SUBSCRIPTION_CONDITION_SETTLED":          1,
+		"THREAD_SUBSCRIPTION_CONDITION_IDLE":             2,
+		"THREAD_SUBSCRIPTION_CONDITION_ATTENTION":        3,
+		"THREAD_SUBSCRIPTION_CONDITION_ERROR":            4,
+		"THREAD_SUBSCRIPTION_CONDITION_DISCONNECTED":     5,
+		"THREAD_SUBSCRIPTION_CONDITION_FINISHED":         6,
+		"THREAD_SUBSCRIPTION_CONDITION_CHECKS_DONE":      7,
+		"THREAD_SUBSCRIPTION_CONDITION_CHECKS_FAILED":    8,
+		"THREAD_SUBSCRIPTION_CONDITION_CHECKS_PASSED":    9,
+		"THREAD_SUBSCRIPTION_CONDITION_REVIEW":           10,
+		"THREAD_SUBSCRIPTION_CONDITION_COMMENT":          11,
+		"THREAD_SUBSCRIPTION_CONDITION_REVIEW_REQUESTED": 12,
+		"THREAD_SUBSCRIPTION_CONDITION_HEAD_PUSHED":      13,
+		"THREAD_SUBSCRIPTION_CONDITION_MERGED":           14,
+		"THREAD_SUBSCRIPTION_CONDITION_CLOSED":           15,
+		"THREAD_SUBSCRIPTION_CONDITION_CHANGED":          16,
 	}
 )
 
@@ -163,13 +213,14 @@ type ThreadSubscription struct {
 	FiredCount int64 `protobuf:"varint,8,opt,name=fired_count,json=firedCount,proto3" json:"fired_count,omitempty"`
 	// Unset until it fired.
 	LastFiredAt *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=last_fired_at,json=lastFiredAt,proto3" json:"last_fired_at,omitempty"`
-	// The subscriber's and the target's names at read time (a run: its action's name);
-	// empty when unnamed or gone.
+	// The subscriber's and the target's names at read time (a run: its action's name; a
+	// pull request: "owner/name#123 Title"); empty when unnamed or gone.
 	SubscriberName string `protobuf:"bytes,10,opt,name=subscriber_name,json=subscriberName,proto3" json:"subscriber_name,omitempty"`
 	TargetName     string `protobuf:"bytes,11,opt,name=target_name,json=targetName,proto3" json:"target_name,omitempty"`
 	// The target's state at read time, as words: a thread's status and reason
-	// ("needs attention (finished)"), a run's "running" or "exited 3"; "gone" when the
-	// target no longer exists.
+	// ("needs attention (finished)"), a run's "running" or "exited 3", a pull request's
+	// "open · checks pending (2/4) · review required" or "merged" ("not polled yet"
+	// before the GitHub poll saw it); "gone" when the target no longer exists.
 	TargetStatus  string `protobuf:"bytes,12,opt,name=target_status,json=targetStatus,proto3" json:"target_status,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -293,11 +344,14 @@ type SubscribeThreadRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The subscriber thread.
 	SubscriberThreadId string `protobuf:"bytes,1,opt,name=subscriber_thread_id,json=subscriberThreadId,proto3" json:"subscriber_thread_id,omitempty"`
-	// Exactly one target: a thread id or an action run id.
+	// Exactly one target: a thread id, an action run id, or a pull request.
 	TargetThreadId string `protobuf:"bytes,2,opt,name=target_thread_id,json=targetThreadId,proto3" json:"target_thread_id,omitempty"`
 	TargetRunId    string `protobuf:"bytes,3,opt,name=target_run_id,json=targetRunId,proto3" json:"target_run_id,omitempty"`
-	// UNSPECIFIED: SETTLED for a thread, FINISHED for a run. A run takes only FINISHED
-	// (or SETTLED); a thread every condition but FINISHED (INVALID_ARGUMENT otherwise).
+	// "owner/name#123" or a github.com pull request URL.
+	TargetPullRequest string `protobuf:"bytes,6,opt,name=target_pull_request,json=targetPullRequest,proto3" json:"target_pull_request,omitempty"`
+	// UNSPECIFIED: SETTLED for a thread, FINISHED for a run, CHECKS_DONE for a pull
+	// request. A run takes only FINISHED (or SETTLED); a thread SETTLED to DISCONNECTED;
+	// a pull request CHECKS_DONE to CHANGED (INVALID_ARGUMENT otherwise).
 	Condition ThreadSubscriptionCondition `protobuf:"varint,4,opt,name=condition,proto3,enum=codefoundry.v1.ThreadSubscriptionCondition" json:"condition,omitempty"`
 	// Ignored for a run (fires once).
 	Repeat        bool `protobuf:"varint,5,opt,name=repeat,proto3" json:"repeat,omitempty"`
@@ -352,6 +406,13 @@ func (x *SubscribeThreadRequest) GetTargetThreadId() string {
 func (x *SubscribeThreadRequest) GetTargetRunId() string {
 	if x != nil {
 		return x.TargetRunId
+	}
+	return ""
+}
+
+func (x *SubscribeThreadRequest) GetTargetPullRequest() string {
+	if x != nil {
+		return x.TargetPullRequest
 	}
 	return ""
 }
@@ -442,6 +503,7 @@ type UnsubscribeThreadRequest struct {
 	SubscriberThreadId string `protobuf:"bytes,2,opt,name=subscriber_thread_id,json=subscriberThreadId,proto3" json:"subscriber_thread_id,omitempty"`
 	TargetThreadId     string `protobuf:"bytes,3,opt,name=target_thread_id,json=targetThreadId,proto3" json:"target_thread_id,omitempty"`
 	TargetRunId        string `protobuf:"bytes,4,opt,name=target_run_id,json=targetRunId,proto3" json:"target_run_id,omitempty"`
+	TargetPullRequest  string `protobuf:"bytes,5,opt,name=target_pull_request,json=targetPullRequest,proto3" json:"target_pull_request,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -500,6 +562,13 @@ func (x *UnsubscribeThreadRequest) GetTargetThreadId() string {
 func (x *UnsubscribeThreadRequest) GetTargetRunId() string {
 	if x != nil {
 		return x.TargetRunId
+	}
+	return ""
+}
+
+func (x *UnsubscribeThreadRequest) GetTargetPullRequest() string {
+	if x != nil {
+		return x.TargetPullRequest
 	}
 	return ""
 }
@@ -659,32 +728,35 @@ const file_codefoundry_v1_thread_subscriptions_proto_rawDesc = "" +
 	" \x01(\tR\x0esubscriberName\x12\x1f\n" +
 	"\vtarget_name\x18\v \x01(\tR\n" +
 	"targetName\x12#\n" +
-	"\rtarget_status\x18\f \x01(\tR\ftargetStatus\"\xfb\x01\n" +
+	"\rtarget_status\x18\f \x01(\tR\ftargetStatus\"\xab\x02\n" +
 	"\x16SubscribeThreadRequest\x120\n" +
 	"\x14subscriber_thread_id\x18\x01 \x01(\tR\x12subscriberThreadId\x12(\n" +
 	"\x10target_thread_id\x18\x02 \x01(\tR\x0etargetThreadId\x12\"\n" +
-	"\rtarget_run_id\x18\x03 \x01(\tR\vtargetRunId\x12I\n" +
+	"\rtarget_run_id\x18\x03 \x01(\tR\vtargetRunId\x12.\n" +
+	"\x13target_pull_request\x18\x06 \x01(\tR\x11targetPullRequest\x12I\n" +
 	"\tcondition\x18\x04 \x01(\x0e2+.codefoundry.v1.ThreadSubscriptionConditionR\tcondition\x12\x16\n" +
 	"\x06repeat\x18\x05 \x01(\bR\x06repeat\"\x91\x01\n" +
 	"\x17SubscribeThreadResponse\x12F\n" +
 	"\fsubscription\x18\x01 \x01(\v2\".codefoundry.v1.ThreadSubscriptionR\fsubscription\x12\x14\n" +
 	"\x05fired\x18\x02 \x01(\bR\x05fired\x12\x18\n" +
-	"\aexisted\x18\x03 \x01(\bR\aexisted\"\xc3\x01\n" +
+	"\aexisted\x18\x03 \x01(\bR\aexisted\"\xf3\x01\n" +
 	"\x18UnsubscribeThreadRequest\x12'\n" +
 	"\x0fsubscription_id\x18\x01 \x01(\tR\x0esubscriptionId\x120\n" +
 	"\x14subscriber_thread_id\x18\x02 \x01(\tR\x12subscriberThreadId\x12(\n" +
 	"\x10target_thread_id\x18\x03 \x01(\tR\x0etargetThreadId\x12\"\n" +
-	"\rtarget_run_id\x18\x04 \x01(\tR\vtargetRunId\"Y\n" +
+	"\rtarget_run_id\x18\x04 \x01(\tR\vtargetRunId\x12.\n" +
+	"\x13target_pull_request\x18\x05 \x01(\tR\x11targetPullRequest\"Y\n" +
 	"\x19UnsubscribeThreadResponse\x12<\n" +
 	"\aremoved\x18\x01 \x03(\v2\".codefoundry.v1.ThreadSubscriptionR\aremoved\"R\n" +
 	"\x1eListThreadSubscriptionsRequest\x120\n" +
 	"\x14subscriber_thread_id\x18\x01 \x01(\tR\x12subscriberThreadId\"k\n" +
 	"\x1fListThreadSubscriptionsResponse\x12H\n" +
-	"\rsubscriptions\x18\x01 \x03(\v2\".codefoundry.v1.ThreadSubscriptionR\rsubscriptions*\x98\x01\n" +
+	"\rsubscriptions\x18\x01 \x03(\v2\".codefoundry.v1.ThreadSubscriptionR\rsubscriptions*\xc5\x01\n" +
 	"\x18ThreadSubscriptionTarget\x12*\n" +
 	"&THREAD_SUBSCRIPTION_TARGET_UNSPECIFIED\x10\x00\x12%\n" +
 	"!THREAD_SUBSCRIPTION_TARGET_THREAD\x10\x01\x12)\n" +
-	"%THREAD_SUBSCRIPTION_TARGET_ACTION_RUN\x10\x02*\xd1\x02\n" +
+	"%THREAD_SUBSCRIPTION_TARGET_ACTION_RUN\x10\x02\x12+\n" +
+	"'THREAD_SUBSCRIPTION_TARGET_PULL_REQUEST\x10\x03*\x99\x06\n" +
 	"\x1bThreadSubscriptionCondition\x12-\n" +
 	")THREAD_SUBSCRIPTION_CONDITION_UNSPECIFIED\x10\x00\x12)\n" +
 	"%THREAD_SUBSCRIPTION_CONDITION_SETTLED\x10\x01\x12&\n" +
@@ -692,7 +764,18 @@ const file_codefoundry_v1_thread_subscriptions_proto_rawDesc = "" +
 	"'THREAD_SUBSCRIPTION_CONDITION_ATTENTION\x10\x03\x12'\n" +
 	"#THREAD_SUBSCRIPTION_CONDITION_ERROR\x10\x04\x12.\n" +
 	"*THREAD_SUBSCRIPTION_CONDITION_DISCONNECTED\x10\x05\x12*\n" +
-	"&THREAD_SUBSCRIPTION_CONDITION_FINISHED\x10\x06B\xd0\x01\n" +
+	"&THREAD_SUBSCRIPTION_CONDITION_FINISHED\x10\x06\x12-\n" +
+	")THREAD_SUBSCRIPTION_CONDITION_CHECKS_DONE\x10\a\x12/\n" +
+	"+THREAD_SUBSCRIPTION_CONDITION_CHECKS_FAILED\x10\b\x12/\n" +
+	"+THREAD_SUBSCRIPTION_CONDITION_CHECKS_PASSED\x10\t\x12(\n" +
+	"$THREAD_SUBSCRIPTION_CONDITION_REVIEW\x10\n" +
+	"\x12)\n" +
+	"%THREAD_SUBSCRIPTION_CONDITION_COMMENT\x10\v\x122\n" +
+	".THREAD_SUBSCRIPTION_CONDITION_REVIEW_REQUESTED\x10\f\x12-\n" +
+	")THREAD_SUBSCRIPTION_CONDITION_HEAD_PUSHED\x10\r\x12(\n" +
+	"$THREAD_SUBSCRIPTION_CONDITION_MERGED\x10\x0e\x12(\n" +
+	"$THREAD_SUBSCRIPTION_CONDITION_CLOSED\x10\x0f\x12)\n" +
+	"%THREAD_SUBSCRIPTION_CONDITION_CHANGED\x10\x10B\xd0\x01\n" +
 	"\x12com.codefoundry.v1B\x18ThreadSubscriptionsProtoP\x01ZGgithub.com/alexwaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
 
 var (

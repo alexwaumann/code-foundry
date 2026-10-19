@@ -5,9 +5,10 @@ package codefoundry.v1;
 import "google/protobuf/timestamp.proto";
 
 // Wake subscriptions (ThreadService.Subscribe, Unsubscribe, ListSubscriptions): a
-// subscriber thread is sent a message when a target thread meets a condition or a
-// target action run finishes, so an agent that started other threads is woken instead
-// of polling. See docs/notes/agents-4-wake.md.
+// subscriber thread is sent a message when a target thread meets a condition, a target
+// action run finishes, or a target pull request changes, so an agent that started
+// other threads or opened a pull request is woken instead of polling. See
+// docs/notes/agents-4-wake.md and docs/notes/gh-events-3-pr-wake.md.
 
 // ThreadSubscriptionTarget is what a subscription watches.
 enum ThreadSubscriptionTarget {
@@ -17,13 +18,18 @@ enum ThreadSubscriptionTarget {
   // An action run (target_id is a run id, "r-…"). Runs live in the daemon's memory, so
   // these subscriptions do not survive a daemon restart.
   THREAD_SUBSCRIPTION_TARGET_ACTION_RUN = 2;
+  // A pull request (target_id is "owner/name#123", the slug in lower case). Kept in
+  // the GitHub poll while subscribed; wakes come with the poll (about a minute with the
+  // app open, up to 15 minutes without).
+  THREAD_SUBSCRIPTION_TARGET_PULL_REQUEST = 3;
 }
 
 // ThreadSubscriptionCondition is when a subscription fires: on a transition of the
 // target into it (edge-triggered), and once at subscribe time when the target already
-// meets it.
+// meets it (for a pull request: the checks conditions, MERGED and CLOSED, as the
+// GitHub cache has it).
 enum ThreadSubscriptionCondition {
-  // SETTLED for a thread, FINISHED for an action run.
+  // SETTLED for a thread, FINISHED for an action run, CHECKS_DONE for a pull request.
   THREAD_SUBSCRIPTION_CONDITION_UNSPECIFIED = 0;
   // IDLE or ATTENTION: Claude is not working (a turn ended, a prompt or question waits,
   // the process ended).
@@ -38,6 +44,29 @@ enum ThreadSubscriptionCondition {
   THREAD_SUBSCRIPTION_CONDITION_DISCONNECTED = 5;
   // An action run's only condition: it exited. Fires once; the subscription goes.
   THREAD_SUBSCRIPTION_CONDITION_FINISHED = 6;
+  // Pull request conditions. A poll's changes to one pull request make at most one
+  // wake per subscription, listing every change that matched.
+  // Every check on the head completed, whatever the result.
+  THREAD_SUBSCRIPTION_CONDITION_CHECKS_DONE = 7;
+  // The check rollup became FAILURE or ERROR (other checks may still run).
+  THREAD_SUBSCRIPTION_CONDITION_CHECKS_FAILED = 8;
+  // The check rollup became SUCCESS.
+  THREAD_SUBSCRIPTION_CONDITION_CHECKS_PASSED = 9;
+  // A review was submitted, or the review decision changed.
+  THREAD_SUBSCRIPTION_CONDITION_REVIEW = 10;
+  // The comments count rose.
+  THREAD_SUBSCRIPTION_CONDITION_COMMENT = 11;
+  // A review was requested.
+  THREAD_SUBSCRIPTION_CONDITION_REVIEW_REQUESTED = 12;
+  // The head commit moved (a push).
+  THREAD_SUBSCRIPTION_CONDITION_HEAD_PUSHED = 13;
+  // Merged. The subscription goes once it fired, even with repeat; so does every other
+  // subscription to the pull request.
+  THREAD_SUBSCRIPTION_CONDITION_MERGED = 14;
+  // Closed without merging. Goes once it fired, even with repeat.
+  THREAD_SUBSCRIPTION_CONDITION_CLOSED = 15;
+  // Any change the poll reports; the wake lists them.
+  THREAD_SUBSCRIPTION_CONDITION_CHANGED = 16;
 }
 
 message ThreadSubscription {
@@ -55,24 +84,28 @@ message ThreadSubscription {
   int64 fired_count = 8;
   // Unset until it fired.
   google.protobuf.Timestamp last_fired_at = 9;
-  // The subscriber's and the target's names at read time (a run: its action's name);
-  // empty when unnamed or gone.
+  // The subscriber's and the target's names at read time (a run: its action's name; a
+  // pull request: "owner/name#123 Title"); empty when unnamed or gone.
   string subscriber_name = 10;
   string target_name = 11;
   // The target's state at read time, as words: a thread's status and reason
-  // ("needs attention (finished)"), a run's "running" or "exited 3"; "gone" when the
-  // target no longer exists.
+  // ("needs attention (finished)"), a run's "running" or "exited 3", a pull request's
+  // "open · checks pending (2/4) · review required" or "merged" ("not polled yet"
+  // before the GitHub poll saw it); "gone" when the target no longer exists.
   string target_status = 12;
 }
 
 message SubscribeThreadRequest {
   // The subscriber thread.
   string subscriber_thread_id = 1;
-  // Exactly one target: a thread id or an action run id.
+  // Exactly one target: a thread id, an action run id, or a pull request.
   string target_thread_id = 2;
   string target_run_id = 3;
-  // UNSPECIFIED: SETTLED for a thread, FINISHED for a run. A run takes only FINISHED
-  // (or SETTLED); a thread every condition but FINISHED (INVALID_ARGUMENT otherwise).
+  // "owner/name#123" or a github.com pull request URL.
+  string target_pull_request = 6;
+  // UNSPECIFIED: SETTLED for a thread, FINISHED for a run, CHECKS_DONE for a pull
+  // request. A run takes only FINISHED (or SETTLED); a thread SETTLED to DISCONNECTED;
+  // a pull request CHECKS_DONE to CHANGED (INVALID_ARGUMENT otherwise).
   ThreadSubscriptionCondition condition = 4;
   // Ignored for a run (fires once).
   bool repeat = 5;
@@ -95,6 +128,7 @@ message UnsubscribeThreadRequest {
   string subscriber_thread_id = 2;
   string target_thread_id = 3;
   string target_run_id = 4;
+  string target_pull_request = 5;
 }
 
 message UnsubscribeThreadResponse {

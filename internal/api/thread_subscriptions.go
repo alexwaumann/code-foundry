@@ -21,11 +21,23 @@ var subscriptionConditions = map[v1.ThreadSubscriptionCondition]thread.Condition
 	v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_ERROR:        thread.CondError,
 	v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_DISCONNECTED: thread.CondDisconnected,
 	v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_FINISHED:     thread.CondFinished,
+	// Pull requests (docs/notes/gh-events-3-pr-wake.md).
+	v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_CHECKS_DONE:      thread.CondChecksDone,
+	v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_CHECKS_FAILED:    thread.CondChecksFailed,
+	v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_CHECKS_PASSED:    thread.CondChecksPassed,
+	v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_REVIEW:           thread.CondReview,
+	v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_COMMENT:          thread.CondComment,
+	v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_REVIEW_REQUESTED: thread.CondReviewRequested,
+	v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_HEAD_PUSHED:      thread.CondHeadPushed,
+	v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_MERGED:           thread.CondMerged,
+	v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_CLOSED:           thread.CondClosed,
+	v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_CHANGED:          thread.CondChanged,
 }
 
 var subscriptionTargets = map[thread.TargetKind]v1.ThreadSubscriptionTarget{
-	thread.TargetThread:    v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_THREAD,
-	thread.TargetActionRun: v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_ACTION_RUN,
+	thread.TargetThread:      v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_THREAD,
+	thread.TargetActionRun:   v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_ACTION_RUN,
+	thread.TargetPullRequest: v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_PULL_REQUEST,
 }
 
 // subscriptionToProto maps a subscription.
@@ -64,7 +76,7 @@ func (h *Thread) Subscribe(ctx context.Context, req *connect.Request[v1.Subscrib
 	m := req.Msg
 	res, err := h.store.Subscribe(ctx, thread.SubscribeOptions{
 		SubscriberID: m.GetSubscriberThreadId(), TargetThreadID: m.GetTargetThreadId(), TargetRunID: m.GetTargetRunId(),
-		Condition: subscriptionConditions[m.GetCondition()], Repeat: m.GetRepeat(),
+		TargetPullRequest: m.GetTargetPullRequest(), Condition: subscriptionConditions[m.GetCondition()], Repeat: m.GetRepeat(),
 	})
 	if err != nil {
 		return nil, threadError(err)
@@ -79,6 +91,7 @@ func (h *Thread) Unsubscribe(ctx context.Context, req *connect.Request[v1.Unsubs
 	m := req.Msg
 	gone, err := h.store.Unsubscribe(ctx, thread.UnsubscribeOptions{
 		ID: m.GetSubscriptionId(), SubscriberID: m.GetSubscriberThreadId(), TargetThreadID: m.GetTargetThreadId(), TargetRunID: m.GetTargetRunId(),
+		TargetPullRequest: m.GetTargetPullRequest(),
 	})
 	if err != nil {
 		return nil, threadError(err)

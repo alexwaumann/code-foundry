@@ -106,3 +106,40 @@ func TestUserMessageOrigin(t *testing.T) {
 		t.Errorf("wake = %v", w)
 	}
 }
+
+func TestThreadSubscriptionsPullRequest(t *testing.T) {
+	fake, c := newThreadServer(t)
+	ctx := context.Background()
+	fake.Put(thread.Thread{ID: "s-p", Name: "Parent", State: thread.StateConnected, Status: thread.StatusBusy, StatusReason: "working"})
+	res, err := c.Subscribe(ctx, connect.NewRequest(&v1.SubscribeThreadRequest{SubscriberThreadId: "s-p",
+		TargetPullRequest: "https://github.com/Acme/web/pull/7", Repeat: true}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := res.Msg.GetSubscription()
+	if s.GetTarget() != v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_PULL_REQUEST || s.GetTargetId() != "acme/web#7" ||
+		s.GetCondition() != v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_CHECKS_DONE || !s.GetRepeat() {
+		t.Errorf("Subscribe = %v", res.Msg)
+	}
+	// Every pull request condition maps both ways.
+	for v, cond := range subscriptionConditions {
+		if !slices.Contains(thread.PullRequestConditions, cond) {
+			continue
+		}
+		res, err := c.Subscribe(ctx, connect.NewRequest(&v1.SubscribeThreadRequest{SubscriberThreadId: "s-p", TargetPullRequest: "acme/web#8", Condition: v}))
+		if err != nil || res.Msg.GetSubscription().GetCondition() != v {
+			t.Errorf("Subscribe %s = %v, %v", v, res.Msg, err)
+		}
+	}
+	if _, err := c.Subscribe(ctx, connect.NewRequest(&v1.SubscribeThreadRequest{SubscriberThreadId: "s-p", TargetPullRequest: "acme/web#7",
+		Condition: v1.ThreadSubscriptionCondition_THREAD_SUBSCRIPTION_CONDITION_SETTLED})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Errorf("settled on a pull request = %v", err)
+	}
+	if _, err := c.Subscribe(ctx, connect.NewRequest(&v1.SubscribeThreadRequest{SubscriberThreadId: "s-p", TargetPullRequest: "acme"})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Errorf("a bad pull request = %v", err)
+	}
+	gone, err := c.Unsubscribe(ctx, connect.NewRequest(&v1.UnsubscribeThreadRequest{SubscriberThreadId: "s-p", TargetPullRequest: "acme/web#7"}))
+	if err != nil || len(gone.Msg.GetRemoved()) != 1 || gone.Msg.GetRemoved()[0].GetTargetId() != "acme/web#7" {
+		t.Errorf("Unsubscribe = %v, %v", gone, err)
+	}
+}

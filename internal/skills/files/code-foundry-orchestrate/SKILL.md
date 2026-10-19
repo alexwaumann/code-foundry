@@ -43,6 +43,11 @@ sees every thread in the app's sidebar. You create and drive other threads with 
      returns once it has been answered.
    - End your turn. `--notify` sends you a `[code-foundry wake]` message each time the
      child settles; best for long work or several children.
+   - After opening a pull request, wait for CI or review the same way:
+     `code-foundry thread subscribe --pr <owner/name#N> --until checks_done --repeat`,
+     then end your turn; it wakes you once per push's CI run (`--until review --repeat`:
+     on every review). The wake says what changed and its `head_sha`; it comes with the
+     GitHub poll (about a minute with the app open, up to 15).
 
    `needs attention (finished)` is a turn that ended normally (nobody has looked at it
    yet); another reason is a question, a permission or a budget stop. A wait that times
@@ -75,6 +80,9 @@ notification yet: never assume a PR merged, and never remove worktrees any other
   `thread interrupt` default to it: always pass `--id <child>`.
 - Ids (`s-...` threads, `r-...` action runs, `sub-...` subscriptions) take a unique
   suffix of 4+ characters: `code-foundry thread read 7d10`.
+- `thread subscribe --pr` takes `owner/name#N` or the PR's URL; `--until` checks_done
+  (default), checks_failed, checks_passed, review, comment, review_requested,
+  head_pushed, merged, closed or changed. `thread subscriptions` lists yours.
 - `--request-id <task-key>` makes `thread new` safe to retry: the same key returns the
   thread made the first time (for 24 hours) and starts nothing.
 - `--budget 5` caps a child's cost in USD; at the cap it stops and needs attention
@@ -97,6 +105,6 @@ notification yet: never assume a PR merged, and never remove worktrees any other
   project command with its flags, generated from this daemon's commands. Read it before
   using a flag not shown here.
 - `reference/patterns.md`: worked examples: one child and a wait; fanning out several
-  children and collecting their reports; a review loop.
+  children and collecting their reports; a review loop; waiting for a PR's CI and review.
 - `code-foundry help <command>`: every flag of one command. `code-foundry guide`: the
   whole CLI guide.

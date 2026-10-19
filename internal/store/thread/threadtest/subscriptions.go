@@ -15,21 +15,36 @@ import (
 // is set when a thread target already meets the condition, as the store would.
 
 // Subscribe records "Subscribe <subscriber> <kind> <target> <condition> repeat=<bool>"
-// and keeps the subscription as "sub-<n>". A run target is accepted whatever its id.
+// and keeps the subscription as "sub-<n>". A run target is accepted whatever its id; a
+// pull request is normalised (thread.ParsePullRequestTarget) and never fires.
 func (f *Fake) Subscribe(_ context.Context, o thread.SubscribeOptions) (thread.SubscribeResult, error) {
 	kind, target, cond := thread.TargetThread, strings.TrimSpace(o.TargetThreadID), cmp.Or(o.Condition, thread.CondSettled)
 	if run := strings.TrimSpace(o.TargetRunID); run != "" {
 		kind, target, cond = thread.TargetActionRun, run, thread.CondFinished
+	}
+	if pr := strings.TrimSpace(o.TargetPullRequest); pr != "" {
+		kind, cond = thread.TargetPullRequest, cmp.Or(o.Condition, thread.CondChecksDone)
+		var err error
+		if target, err = thread.ParsePullRequestTarget(pr); err != nil {
+			return thread.SubscribeResult{}, err
+		}
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if err := f.record(fmt.Sprintf("Subscribe %s %s %s %s repeat=%t", o.SubscriberID, kind, target, cond, o.Repeat)); err != nil {
 		return thread.SubscribeResult{}, err
 	}
+	targets := 0
+	for _, t := range []string{o.TargetThreadID, o.TargetRunID, o.TargetPullRequest} {
+		if t != "" {
+			targets++
+		}
+	}
 	switch {
-	case (o.TargetThreadID == "") == (o.TargetRunID == ""):
+	case targets != 1:
 		return thread.SubscribeResult{}, fmt.Errorf("%w: give exactly one target", thread.ErrInvalidArgument)
-	case kind == thread.TargetThread && !slices.Contains(thread.ThreadConditions, cond):
+	case kind == thread.TargetThread && !slices.Contains(thread.ThreadConditions, cond),
+		kind == thread.TargetPullRequest && !slices.Contains(thread.PullRequestConditions, cond):
 		return thread.SubscribeResult{}, fmt.Errorf("%w: condition %q", thread.ErrInvalidArgument, cond)
 	}
 	if _, err := f.get(o.SubscriberID); err != nil {
@@ -54,7 +69,7 @@ func (f *Fake) Subscribe(_ context.Context, o thread.SubscribeOptions) (thread.S
 	f.nextSub++
 	sub := thread.Subscription{
 		ID: fmt.Sprintf("sub-%d", f.nextSub), SubscriberID: o.SubscriberID, TargetKind: kind, TargetID: target, Condition: cond,
-		Repeat: o.Repeat && kind == thread.TargetThread, CreatedAt: f.Now(),
+		Repeat: o.Repeat && kind != thread.TargetActionRun, CreatedAt: f.Now(),
 	}
 	if fired {
 		sub.FiredCount, sub.LastFiredAt = 1, sub.CreatedAt
@@ -68,6 +83,9 @@ func (f *Fake) Subscribe(_ context.Context, o thread.SubscribeOptions) (thread.S
 // Unsubscribe records "Unsubscribe <id>" or "Unsubscribe <subscriber> <target>".
 func (f *Fake) Unsubscribe(_ context.Context, o thread.UnsubscribeOptions) ([]thread.Subscription, error) {
 	target := o.TargetThreadID + o.TargetRunID
+	if o.TargetPullRequest != "" {
+		target, _ = thread.ParsePullRequestTarget(o.TargetPullRequest)
+	}
 	call := "Unsubscribe " + o.ID
 	if o.ID == "" {
 		call = "Unsubscribe " + o.SubscriberID + " " + target
