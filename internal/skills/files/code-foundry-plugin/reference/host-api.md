@@ -227,19 +227,39 @@ with no `threads`). The useful fields:
 | `project.snapshot` | `projects`: each with `id`, `name`, `path`, `githubSlug`, `defaultBranch`, `git`, `worktrees` |
 | `project.worktreeUpdated` (a worktree) | `projectId`, `path`, `branch`, `head`, `isMain`, `detached`, `status`: `{modified, staged, untracked, conflicted, dirty, ahead, behind, upstream, baseRef, baseAhead, baseBehind, operation, error, refreshedAt}` |
 | `project.worktreeRemoved` | `{projectId, path}` |
+| `project.worktreeFilesChanged` | `{projectId, path, files: [{path, op}], truncated}`: `path` is the worktree root, each file's `path` worktree-relative; `op` is `FILE_OP_CREATED`, `_MODIFIED`, `_REMOVED` or `_RENAMED` |
 | `project.projectUpdated` / `projectRemovedId` | a whole project (with its worktrees) / an id |
 | `gh.branchPullRequestsUpdated` | `{repoSlug, headRef, fetchedAt}`: a watched branch's pull requests changed |
 | `gh.pullRequestDetailUpdated` | `{repoSlug, number}`: re-read with `pr.checks` |
 | `gitops.queued` / `started` / `finished` | a git operation on a worktree (fetch, pull, push, …) |
 
-**No per-file events.** `project.worktreeUpdated` is sent when a worktree's status
-*summary* changes: the counts above, `dirty`, `head`, `branch`, `operation`. Editing a file
-that is already modified changes none of them and sends nothing. `worktreeDetailUpdated`
-is sent only for worktrees whose detail someone asked for in the last 10 minutes (the
-app's worktree panel), so a plugin cannot rely on it. A plugin that must see every edit
-(a test watcher) uses `worktreeUpdated` as a hint and polls the worktree it watches
-itself (`git status --porcelain` plus file mtimes, every second or two), only while a
-viewer or a flag needs it.
+**Per-file events.** `project.worktreeFilesChanged` lists the files that changed in a
+worktree, so a plugin that reacts to edits (a test watcher) needs no polling:
+
+- **One per worktree per second at most.** Edits are collected from the first one for
+  1 s, then sent as one event; a burst (a build, a checkout, an untar) arrives as one
+  event per second while it lasts.
+- **`files`** is sorted by path, each path at most once per event, with what is there
+  when the second ends: `created` (new), `modified` (was there before), `removed` (gone,
+  also the old side of a rename), `renamed` (moved onto this path). Paths use forward
+  slashes, relative to `path` (the worktree root). A directory ends in `/` and appears
+  only when removed or renamed in (its files are not listed then; rescan it). Treat
+  `created`, `modified` and `renamed` alike when all you need is "this file changed".
+- **`truncated: true`** means more files changed than listed (the list stops at 500, by
+  path): run `git status` in the worktree yourself rather than trusting the list.
+- **Left out:** gitignored paths (git's own rules, so a tracked file always counts),
+  anything under a `.git` directory, and paths inside a submodule. A second in which
+  only ignored files changed (build output, `node_modules`) sends nothing, so re-running
+  on every event cannot loop on your own outputs.
+- **Live worktrees only:** ones with a thread that is not archived or snoozed. An idle
+  worktree sends no file lists (its `worktreeUpdated` status summaries still come).
+- It is never in a snapshot. After a resync snapshot you may have missed some: rescan
+  what you watch once.
+
+Keep using `project.worktreeUpdated` for head, branch, checkout and status-count changes:
+a commit or `git checkout` changes files too, but `worktreeUpdated` says what happened.
+`worktreeDetailUpdated` is sent only for worktrees whose detail someone asked for in the
+last 10 minutes (the app's worktree panel), so a plugin cannot rely on it.
 
 ## Secrets (permission `secrets`)
 

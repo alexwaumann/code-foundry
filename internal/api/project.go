@@ -218,6 +218,8 @@ func eventToProto(ev project.Event) *v1.ProjectEvent {
 		}}
 	case project.WorktreeDetailUpdated:
 		return worktreeDetailEvent(e)
+	case project.WorktreeFilesChanged:
+		return worktreeFilesEvent(e)
 	}
 	return nil
 }

@@ -617,7 +617,10 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   `Managed` (cleanable; `docs/notes/drop-worktree-dir.md`). One recursive FSEvents
   stream (cgo, confined to one goroutine) over the worktree root, every project
   directory, and any worktree outside both is routed by path to debounced status,
-  base, and reconcile jobs (`docs/notes/fsevents-watcher.md`). Workers write disjoint
+  base, and reconcile jobs (`docs/notes/fsevents-watcher.md`); a live worktree's tree
+  edits also feed a files job that publishes the changed, non-ignored paths once per
+  tree window (`WorktreeFilesChanged`, not in the snapshot;
+  `docs/notes/gh-events-2-worktree-files.md`). Workers write disjoint
   per-path snapshot pointers. The backstop poll and the background fetch run each
   project on a live tier (a worktree with a live thread, or a detail asked for in the
   last 10 minutes: poll and fetch every 2 min) or a slower idle tier (poll 10 min,
