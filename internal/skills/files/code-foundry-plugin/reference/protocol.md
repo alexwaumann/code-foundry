@@ -42,7 +42,12 @@ and result type is a Go type there (`go doc github.com/alexwaumann/code-foundry/
    read it.
 2. `initialized` (notification): the plugin is running. `Plugin.Init` runs now, on its own
    goroutine: subscribe, push the session environment, set context facts. An error from
-   Init ends `Serve`, which the host counts as a crash.
+   Init ends `Serve`, which the host counts as a crash. Until Init returns, `Serve` holds
+   back everything else the host sends but `ping` and `shutdown`: the wake replay,
+   `wake/armed`, events, terminal exits, commands, surface opens and acts wait and then
+   reach their handlers, the notifications in the order they came. So Init must not wait
+   for one of them (a command, an event, a terminal's exit). A plugin speaking the
+   protocol without the SDK should do the same.
 3. Commands, surfaces, acts and events arrive while it runs. `ping` every 30 s (5 s to
    answer); two missed pings and the host restarts it.
 4. `shutdown` (request, 2 s; `Plugin.Shutdown` gets 1.5 s), then the plugin exits. If it
@@ -73,7 +78,8 @@ listed and fail with the reason; its surfaces say so.
 | `events/event` | notification | `Event{subscription, snapshot, event}` | `Plugin.OnEvent` |
 | `terminal/exited` | notification | `{terminalId, exitCode}`: one of its terminals' process exited | `Plugin.OnTerminalExit` |
 | `secret/changed` | notification | `{key, deleted: true}`: the user deleted one of its secrets | `Plugin.OnSecretChanged` |
-| `wake/subscribed` | notification | `{subscription, source, args, context, repeat}`: a thread subscribed to a wake source; every live one again after each `initialized` | `Plugin.OnWakeSubscribed` |
+| `wake/subscribed` | notification | `{subscription, source, args, context, repeat, rearm}`: a thread subscribed to a wake source; every live one again after each `initialized`, with `rearm: true` | `Plugin.OnWakeSubscribed` |
+| `wake/armed` | notification | `{count}`: once after each `initialized`'s replay (also when `count` is 0), before any new subscription; a remembered subscription not replayed ended while the plugin was down | `Plugin.OnWakeArmed` |
 | `wake/unsubscribed` | notification | `{subscription, source}`: it went (unsubscribed, a one-shot fired, its thread archived) | `Plugin.OnWakeUnsubscribed` |
 
 After `surface/open` the plugin sends the instance's view with `view/update` within 10 s
@@ -102,7 +108,7 @@ first view first. An error from the factory or from `Act` is shown to the user
 | `thread/send` / `archive` / `list` | request | `{threadId, text}`; `{threadId}`; `{}` → `{threads: [PluginThread]}` | `SendThread`, `ArchiveThread`, `Threads` | `threads` |
 | `terminal/create` | request | `{argv, cwd, env, title}` → `{terminalId}` | `CreateTerminal` | `terminals` |
 | `terminal/close` / `list` | request | `{terminalId}`; `{}` → `{terminals: [PluginTerminal]}` | `CloseTerminal`, `Terminals` | `terminals` |
-| `terminal/read` | request | `{terminalId, maxBytes, scrollback}` → `{text, truncated, lines}`: its screen as plain text, with `scrollback` the scrollback and the screen (`lines` counted; capability `terminal.scrollback`) | `ReadTerminal`, `ReadTerminalWith` | `terminals` |
+| `terminal/read` | request | `{terminalId, maxBytes, scrollback}` → `{text, truncated, lines}`: its screen as plain text, with `scrollback` the scrollback and the screen (capability `terminal.scrollback`); no trailing newline, `lines` counted (screen reads too since pluginsdk v0.2.1) | `ReadTerminal`, `ReadTerminalWith` | `terminals` |
 | `wake/fire` | request | `{source, match, title, payload}` → `{delivered}` | `FireWake` | a manifest `wakes` entry |
 
 What each does and its limits: `reference/host-api.md`. A method this host does not

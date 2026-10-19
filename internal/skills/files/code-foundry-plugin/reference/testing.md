@@ -9,7 +9,8 @@ then the real daemon (`plugin dev`, `plugin surface`, `plugin act`, `plugin logs
 pipes, does the handshake, **waits for `Init` to return** (up to 5 s), records everything
 the plugin asks of the host, and shuts the plugin down when the test ends. So what Init
 sets up (subscriptions, the environment, state loaded from the data dir) is in place when
-Start returns; a plugin whose Init blocks sets `NoInitWait`. It enforces permissions like the real host:
+Start returns; a plugin whose Init blocks sets `NoInitWait` (commands, events and wake
+notifications wait for Init then, as with the real host). It enforces permissions like the real host:
 `Invoke` needs a matching `Granted.Commands` glob, secrets need `Granted.Secrets`, flags
 `ThreadStatus`, environment `SessionEnv`, subscriptions `Events`.
 
@@ -25,6 +26,8 @@ h := plugintest.Start(t, plugin(), plugintest.Options{
 	Secrets:      map[string]string{"token": "t0k"},  // stored before Init runs
 	Flags:        []pluginsdk.Flag{{ThreadID: "s-1", Level: "error", Reason: "old"}}, // h.Flags() in Init
 	DataDir:      dir,                                // default t.TempDir(); h.DataDir() returns it
+	// live at start, as after a restart: sent with Rearm after initialized, then wake/armed
+	WakeSubscriptions: []pluginsdk.WakeSubscription{{Subscription: "sub-1", Source: "tick"}},
 })
 ```
 
@@ -152,6 +155,9 @@ holds (`h.Flags()` records the plugin's `SetFlag` calls).
 (or shorten the poll interval), and check `h.WakeFires()` for the source, match, title and
 payload; subscribe the same id again (a restart's re-arm) and check nothing doubled;
 unsubscribe and check the plugin stopped watching (no new fires after a few intervals).
+For a restart, start with `Options.WakeSubscriptions` (and a data dir holding what the
+plugin saved): the plugin re-arms those and, on `OnWakeArmed`, drops the saved ones that
+were not replayed.
 Check every message about an event ends with `pluginsdk.WakeHint(...)`.
 
 ## What plugintest does not do
